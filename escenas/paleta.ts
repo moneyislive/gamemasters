@@ -234,7 +234,9 @@ export function esDeUnColorDeJugador(u: number, v: number): boolean {
  * por lo mismo: un dato que llega de fuera no puede dejar la escena en negro.
  */
 export function saltoAlColor(u: number, color: string): number {
-  return saltoALaColumna(u, columnaDelColor(color));
+  /* Sólo la columna: las piezas y el asentamiento se quedan en la fila del color. */
+  const suya = Math.floor(u * COLUMNAS_DEL_ATLAS);
+  return (columnaDelColor(color) - suya) / COLUMNAS_DEL_ATLAS;
 }
 
 /** La columna de la fila del color en la que está un color de jugador; uno desconocido, el azul. */
@@ -243,18 +245,20 @@ export function columnaDelColor(color: string): number {
 }
 
 /**
- * LO QUE HAY QUE SUMARLE A ESTA UV PARA QUE PASE A LA COLUMNA PEDIDA de la fila del color,
- * venga de la columna que venga. Es `saltoAlColor` sin el nombre del color por medio, y
- * hace falta desde que el caserío del paisaje se lleva a columnas que NO son de ningún
- * jugador (`COLUMNAS_DEL_CASERIO`). Cero para un vértice que ya está donde se le pide.
+ * LO QUE HAY QUE SUMARLE A ESTA UV PARA QUE PASE A LA CELDA PEDIDA, venga de la celda que
+ * venga: columna y fila. Es `saltoAlColor` sin el nombre del color por medio y con la fila
+ * dentro, y hace falta desde que el caserío del paisaje se lleva a celdas que NO son de
+ * ningún jugador ni están en su fila (`CELDAS_DEL_CASERIO`). Cero en las dos si el vértice
+ * ya está donde se le pide, que es lo que permite no clonar lo que no cambia.
  */
-export function saltoALaColumna(u: number, columna: number): number {
-  const suya = Math.floor(u * COLUMNAS_DEL_ATLAS);
-  return (columna - suya) / COLUMNAS_DEL_ATLAS;
+export function saltoALaCelda(u: number, v: number, celda: CeldaDelAtlas): { u: number; v: number } {
+  const columna = Math.floor(u * COLUMNAS_DEL_ATLAS);
+  const fila = Math.floor(v * FILAS_DEL_ATLAS);
+  return { u: (celda[0] - columna) / COLUMNAS_DEL_ATLAS, v: (celda[1] - fila) / FILAS_DEL_ATLAS };
 }
 
 /**
- * ═══ LAS TRES COLUMNAS DEL CASERÍO DEL PAISAJE: LOS PARDOS DE LA FILA DEL COLOR ═══
+ * ═══ LAS SEIS CELDAS DEL CASERÍO DEL PAISAJE: GRISES, PARDOS Y UN AMARILLO APAGADO ═══
  *
  * ═══ EL FALLO, DICHO POR QUIEN JUGABA ═══
  *
@@ -266,28 +270,53 @@ export function saltoALaColumna(u: number, columna: number): number {
  * quien fundaba al lado, seguía llevando un color de colono: el de otro, o el propio, que
  * hace que un pueblo parezca una ciudad de alguien.
  *
- * ═══ LO QUE SE ELIGIÓ, MIDIENDO LAS TREINTA Y DOS CELDAS DEL ATLAS ═══
+ * La primera versión fueron los tres pardos de la fila del color, uno por comarca. Miguel,
+ * viéndolos: «me gustaría que se notara un poco de variedad en las gamas de color, aunque
+ * solo cambien entre grisáceo, marrones que no sean el de la madera e incluso amarillos
+ * apagados». Tres pardos parecidos, uno por aldea, no se notaban.
  *
- * Las tres columnas de la derecha de la MISMA fila del color, que es lo que permite llevar
- * un tejado allí con el mismo salto horizontal con el que se tiñe una pieza. Medidas sobre
- * la tabla compilada del atlas (media de la celda, franja clara, franja oscura), y sus
- * distancias CIE76 al colono más cercano y a la madera de la celda (6,0), `#995841`:
+ * ═══ LO QUE HAY, MIDIENDO LAS TREINTA Y DOS CELDAS DEL ATLAS ═══
  *
- *     (5,3)  #c5b197  (#decfbb → #ac9273)  L* 73   pardo claro     colono 46,5  madera 36,8
- *     (6,3)  #978675  (#bbab9a → #736150)  L* 57   pardo grisáceo  colono 45,7  madera 27,7
- *     (7,3)  #746459  (#998779 → #4f4138)  L* 44   pardo oscuro    colono 45,3  madera 25,7
+ * Seis celdas, de cualquier fila —por eso el salto lleva ahora la fila (`saltoALaCelda`)—,
+ * medidas sobre la tabla compilada del atlas: media de la celda, L*, y distancia CIE76 al
+ * colono más cercano y a la madera de la celda (6,0), `#995841`:
  *
- * Es exactamente la gama que pidió —claro, grisáceo, oscuro— y ninguna es la madera: la
- * madera es un rojizo saturado y éstas son pardos apagados. La cuarta columna de esa fila,
- * la (4,3) `#f89946`, es el otro naranja del pack y está a 5,6 del amarillo: no vale, y
- * `verify:escena` lo afirma para que nadie la meta «porque también es de la fila». Las
- * distancias se vuelven a medir allí sobre la tabla de verdad; aquí están escritas para
- * quien lea, no para que nadie se fíe de ellas.
+ *     (5,3)  #c5b197  L* 73   beige           colono 46,5  madera 36,8
+ *     (6,3)  #978675  L* 57   pardo grisáceo  colono 45,7  madera 27,7
+ *     (7,3)  #746459  L* 44   pardo oscuro    colono 45,3  madera 25,7
+ *     (2,2)  #828c91  L* 58   gris piedra     colono 39,4  madera 41,6
+ *     (3,0)  #4b5155  L* 34   pizarra         colono 39,3  madera 39,5
+ *     (4,2)  #daae7d  L* 74   arena           colono 29,8  madera 33,8
  *
- * El tono se elige por COMARCA (`caserio.ts`), no por edificio: cada aldea de su piedra, y
- * los grupos de dibujo —comarca × modelo— no se multiplican por tres.
+ * Del gris frío al amarillo apagado de la arena —la misma celda con la que el pack pinta
+ * sus playas—, pasando por tres pardos que no son la madera. Entre sí se separan 13,8 como
+ * poco (pardo grisáceo y pardo oscuro), o sea que se distinguen. Lo que se DESCARTÓ, con
+ * número: el gris cálido (6,1) y el taupe (7,1) son las mismas manchas que (6,3) y (7,3) a
+ * 7,1 y 3,4 —no añaden variedad—; la crema (5,2) está a 11,1 del beige; el dorado (3,1) es
+ * un amarillo de verdad, a 14,7 del colono amarillo; y la (4,3) es el otro naranja del pack,
+ * a 5,6. `verify:escena` rechaza el dorado y el naranja para que nadie los meta por bonitos.
+ *
+ * ═══ LA VARA: 25 AL COLONO, 20 A LA MADERA ═══
+ *
+ * Veinte es el umbral con el que esta casa dice que una superficie NO se come una pieza; el
+ * colono pide algo más porque lo que hay que impedir no es «se pierde» sino «se confunde».
+ * La arena marca la vara: 29,8 del amarillo es un amarillo APAGADO, que es justo lo que
+ * Miguel pidió que cupiera; el dorado, a 14,7, ya no lo es. Las distancias se vuelven a
+ * medir en `verify:escena` sobre la tabla de verdad; aquí están escritas para quien lea.
+ *
+ * El tono se elige por COMARCA Y CLASE DE EDIFICIO (`caserio.ts`): las casas de una aldea
+ * comparten cantera y la iglesia o la taberna pueden salir de otra. Con eso una aldea tiene
+ * un color dominante que se ve desde el aire y variedad dentro, y los grupos de dibujo
+ * —comarca × modelo— no crecen, porque el tono va con el modelo.
  */
-export const COLUMNAS_DEL_CASERIO: readonly number[] = [5, 6, 7];
+export const CELDAS_DEL_CASERIO: readonly CeldaDelAtlas[] = [
+  [5, 3],
+  [6, 3],
+  [7, 3],
+  [2, 2],
+  [3, 0],
+  [4, 2],
+];
 
 /**
  * ═══ EL COLOR DE CADA JUGADOR EN PLANO, Y POR QUÉ HACÍA FALTA MEDIRLO ═══
@@ -339,10 +368,11 @@ export const COLUMNAS_DEL_CASERIO: readonly number[] = [5, 6, 7];
  * los jugadores y eso confunde bastante». Un pueblo rojo alrededor de una choza roja parece
  * una ciudad del rojo, y un pueblo rojo lejos de todos parece de alguien. Así que ahora:
  *
- *   · EL CASERÍO DEL PAISAJE ES PARDO. Sus vértices de color de colono se llevan a una de
- *     las tres columnas de la derecha de la misma fila —`COLUMNAS_DEL_CASERIO`, medidas
- *     abajo—, un tono por comarca (`caserio.ts`). Ningún tejado del paisaje comparte téxel
- *     con ninguna pieza: la distancia mínima a los cuatro colores es 45,3 CIE76, medida.
+ *   · EL CASERÍO DEL PAISAJE ES GRIS, PARDO O ARENA. Sus vértices de color de colono se
+ *     llevan a una de las seis celdas de `CELDAS_DEL_CASERIO` —medidas abajo—, un tono por
+ *     comarca y clase de edificio (`caserio.ts`). Ningún tejado del paisaje comparte téxel
+ *     con ninguna pieza: la distancia mínima a los cuatro colores es 29,8 CIE76, medida, y
+ *     es la de la arena al amarillo, que es el «amarillo apagado» que Miguel pidió.
  *
  *   · EL ASENTAMIENTO DEL JUGADOR SÍ SE TIÑE. Las tres casas y el pozo que rodean su choza
  *     (`asentamiento.ts`) salen del mismo catálogo y siguen yendo al color del dueño con
