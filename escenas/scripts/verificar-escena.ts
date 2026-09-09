@@ -86,6 +86,8 @@ import {
   pellizcando,
 } from '../acercar';
 import { sitiosDelTablero, sitiosPermitidos } from '../sitios';
+import { PERIODO_DEL_MAR, tiempoDelMar } from '../tiempo-del-mar';
+import { GLSL_DEL_AGUA } from '../embarcadero/agua';
 import {
   alejarseParaQueQuepa,
   ALTURA_DE_SALIDA,
@@ -329,6 +331,8 @@ import {
   COLOR_DEL_AGUA_DEL_PACK,
   CORONA_DE_LAS_OLAS,
   GLSL_DE_LA_MAREA,
+  olaEn as olaEnElPliegue,
+  zonaEn as zonaEnElPliegue,
   espumaPosibleEn,
   loQueSubeEn,
   SOMBRA_DEL_TABLERO,
@@ -1383,6 +1387,55 @@ paso('El sombreador del mar: sus uniforms, su GLSL y el color que promete no cam
     primeraLinea(vertice) === 'precision mediump float;' &&
       primeraLinea(fragmento) === 'precision mediump float;',
     { vertice: primeraLinea(vertice), fragmento: primeraLinea(fragmento) },
+  );
+
+  /*
+   * ═══ EL TIEMPO ENTRA ACOTADO, Y EL PLIEGUE NO SE VE ═══
+   *
+   * Miguel lo vio jugando: el mar se ve bien al abrir el tablero y al cabo de un rato los
+   * parches de olas se llenan de rayitas y se ven los recuadros que las habilitan. El uniform
+   * `tiempo` era el reloj crudo y en el fragmento se multiplicaba por 9,5 antes de entrar en
+   * un seno: a los veinte minutos, diez mil radianes, y el `sin` de la GPU deja de ser un
+   * seno. Ahora el tiempo llega plegado a `PERIODO_DEL_MAR` (`tiempo-del-mar.ts`), y para que
+   * el pliegue no se vea TODAS las velocidades angulares del agua tienen que dar vueltas
+   * enteras en él. Se leen del GLSL de verdad —del mar del delta y del agua del muelle, que
+   * comparten el pliegue— y no de una lista escrita aquí: una velocidad nueva que alguien
+   * escriba a mano en el sombreador cae en esta red.
+   */
+  /* Sin los comentarios del GLSL: el fragmento cuenta en un comentario el término viejo y la orilla apagada. */
+  const sinComentariosDeGlsl = (glsl: string): string => glsl.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const coeficientesDelTiempo = (glsl: string): number[] =>
+    [...sinComentariosDeGlsl(glsl).matchAll(/\bt(?:iempo)?\s*\*\s*([0-9]+(?:\.[0-9]+)?)/g)].map((m) => Number(m[1]));
+  const velocidadesDelMar = coeficientesDelTiempo(texto);
+  const velocidadesDelMuelle = coeficientesDelTiempo(`${GLSL_DEL_AGUA.vertice}\n${GLSL_DEL_AGUA.fragmento}`);
+  const vueltas = (v: number): number => (PERIODO_DEL_MAR * v) / (2 * Math.PI);
+  const noCierran = [...velocidadesDelMar, ...velocidadesDelMuelle].filter((v) => Math.abs(vueltas(v) - Math.round(vueltas(v))) > 1e-6);
+  comprobar(
+    'todas las velocidades angulares del mar del delta y del agua del muelle dan vueltas enteras en PERIODO_DEL_MAR (628,3 s): el pliegue del tiempo no se ve',
+    velocidadesDelMar.length >= 8 && velocidadesDelMuelle.length >= 5 && noCierran.length === 0,
+    { velocidadesDelMar, velocidadesDelMuelle, noCierran, periodo: PERIODO_DEL_MAR },
+  );
+  comprobar(
+    'tiempoDelMar pliega al periodo, y el campo de las olas es el mismo a un lado y a otro del pliegue',
+    Math.abs(tiempoDelMar(PERIODO_DEL_MAR + 1) - 1) < 1e-9 &&
+      tiempoDelMar(10) === 10 &&
+      [[100, 200], [-300, 50], [0, 0], [640, -410]].every(
+        ([x, z]) =>
+          Math.abs(olaEnElPliegue(x as number, z as number, PERIODO_DEL_MAR) - olaEnElPliegue(x as number, z as number, 0)) < 1e-6 &&
+          Math.abs(zonaEnElPliegue(x as number, z as number, PERIODO_DEL_MAR) - zonaEnElPliegue(x as number, z as number, 0)) < 1e-6,
+      ),
+  );
+  comprobar(
+    'y el tiempo ya no multiplica al paso de la cresta: «(vCosta + tiempo * 9.5) * paso» era el término que crecía sin tope',
+    !/tiempo \* 9\.5/.test(sinComentariosDeGlsl(fragmento)) && /vCosta \* paso \+ tiempo \* 1\.15/.test(fragmento),
+  );
+  const fuenteDelDeltaParaElMar = fs.readFileSync(path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'), 'utf8');
+  const fuenteDelMuelle = fs.readFileSync(path.join(import.meta.dirname ?? __dirname, '..', 'embarcadero', 'Embarcadero.tsx'), 'utf8');
+  comprobar(
+    'la escena escribe en el uniform del mar el tiempo PLEGADO y nunca el reloj crudo, y el muelle hace lo mismo con su agua',
+    /material\.uniforms\.tiempo\.value = tiempoDelMar\(estado\.clock\.elapsedTime\);/.test(fuenteDelDeltaParaElMar) &&
+      !/uniforms\.tiempo\.value = estado\.clock\.elapsedTime;/.test(fuenteDelDeltaParaElMar) &&
+      /mar\.material\.uniforms\.tiempo\.value = tiempoDelMar\(t\);/.test(fuenteDelMuelle),
   );
 
   const includes = fragmento

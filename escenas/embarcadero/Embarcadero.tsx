@@ -77,6 +77,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { ESCALA_DEL_PACK, ESCALON, LAMINA } from '../escala';
+import { tiempoDelMar } from '../tiempo-del-mar';
 import { geometriaDelMar, materialDelAgua } from './agua';
 import { Aventurero } from './aventurero';
 import { generarCala, semillaDeCodigo, sorteo } from './cala';
@@ -1172,7 +1173,8 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
     cielo.uniforms.amanecer.value = amanecer.current;
     colorDeLaNiebla(amanecer.current, colorDeNiebla);
     if (niebla.current !== null) niebla.current.color.copy(colorDeNiebla);
-    mar.material.uniforms.tiempo.value = t;
+    /* Plegado, como el mar del delta: sin tope, el agua degenera con los minutos (`tiempo-del-mar.ts`). */
+    mar.material.uniforms.tiempo.value = tiempoDelMar(t);
     mar.material.uniforms.brillo.value = 1 - 0.85 * amanecer.current;
     if (cupula.current !== null) cupula.current.position.copy(cam.position);
 

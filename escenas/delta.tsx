@@ -163,6 +163,7 @@ import { crearRelieve, hexDePunto } from './relieve';
 import type { Relieve, Subtesela } from './relieve';
 import { contornoDelDelta, geometriaDelMar } from './costa';
 import { LAS_LUCES_DEL_DELTA, materialDeLaMarea } from './marea';
+import { tiempoDelMar } from './tiempo-del-mar';
 import { apuntaLosLados, piezaDeCauce, piezaDeSenda, teselasDeUnCamino } from './sendas';
 import { CAUCE, CUERPO, HONDO, piezaDeOrilla } from './aguas';
 import { CELDA_DE_LA_ARENA } from './paleta';
@@ -771,9 +772,15 @@ function Mar({ alcance, relieve }: { alcance: number; relieve: Relieve }): JSX.E
    * No pasa por estado de React a propósito: son sesenta escrituras por segundo, y
    * cada una que cruzara el estado repintaría el mundo entero —dos mil teselas
    * instanciadas— para mover un número dentro de un material.
+   *
+   * Y VA PLEGADO, no crudo. Con `elapsedTime` tal cual, a los veinte minutos de partida el
+   * argumento de los senos del fragmento pasaba de diez mil radianes y las olas se
+   * deshacían en rayitas dentro de cada parche: se vio jugando. `tiempoDelMar` lo pliega a
+   * un periodo en el que todas las velocidades del agua dan vueltas enteras, así que el
+   * pliegue no se ve y el argumento nunca pasa de unos setecientos (`tiempo-del-mar.ts`).
    */
   useFrame((estado) => {
-    material.uniforms.tiempo.value = estado.clock.elapsedTime;
+    material.uniforms.tiempo.value = tiempoDelMar(estado.clock.elapsedTime);
   });
 
   /*

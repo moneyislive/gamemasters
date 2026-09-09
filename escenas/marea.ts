@@ -348,7 +348,11 @@ export function loQueSubeEn(costa: number): number {
  *
  * En `mediump` esto es barato y seguro: los argumentos de los senos se quedan en un par
  * de cientos aun en el borde del disco, que es donde un `fract` con el multiplicador
- * grande del ruido de manual se convierte en bandas.
+ * grande del ruido de manual se convierte en bandas. Y EL TIEMPO TAMBIÉN VA ACOTADO, que
+ * es la mitad que esta frase se dejaba: el uniform `tiempo` llega plegado por
+ * `tiempoDelMar` a un periodo en el que todas las velocidades de aquí dan vueltas enteras
+ * (ver `tiempo-del-mar.ts`, y el fallo que se vio jugando sin eso). Por eso cada velocidad
+ * de esta tabla es un múltiplo de 0,01: el que ponga una que no lo sea verá el pliegue.
  */
 export interface TrenDeOlas {
   /** El vector de onda, en radianes por unidad de mundo. Su módulo da el largo del tren. */
@@ -417,6 +421,16 @@ export const ZONAS_DE_LAS_OLAS = {
 } as const;
 
 const PESO_DE_LOS_TRENES = TRENES_DE_LAS_OLAS.reduce((s, tren) => s + tren.peso, 0);
+
+/**
+ * A QUÉ VELOCIDAD AVANZA LA CRESTA HACIA LA ORILLA, en radianes de fase por segundo: 1,15, que
+ * es lo que daba el «9,5 por el paso medio de 0,1208» de antes. Es una constante y no un
+ * producto por lo que dice `tiempo-del-mar.ts`: el tiempo tiene que entrar en el seno como
+ * `t · ω` con ω múltiplo de 0,01, o el pliegue del tiempo se ve como un salto. Se emite con TRES
+ * decimales a propósito: con dos, un 1,147 escrito aquí saldría al GLSL como 1,15 y `verify:escena`,
+ * que lee el GLSL, no lo vería.
+ */
+export const VELOCIDAD_DE_LA_CRESTA = 1.15;
 
 /** El `smoothstep` de GLSL, que aquí hace falta para calcular el campo igual que la GPU. */
 function suavizar(desde: number, hasta: number, x: number): number {
@@ -650,7 +664,15 @@ void main() {
    */
   float parche = olas(vPosicionMundo.xz, tiempo);
   float paso = 0.1208 * (1.0 + 0.45 * sin(dot(vPosicionMundo.xz, vec2(0.0083, -0.0061)) + tiempo * 0.03));
-  float fase = (vCosta + tiempo * 9.5) * paso
+  /*
+   * EL TIEMPO SE SUMA A LA FASE, NO SE MULTIPLICA POR EL PASO. Esto era
+   * «(vCosta + tiempo * 9.5) * paso», y ése era el término que degeneraba el mar con los
+   * minutos: un tiempo sin tope por nueve y medio dentro de un seno (ver «tiempo-del-mar.ts»).
+   * Con la velocidad de la cresta como constante propia (VELOCIDAD_DE_LA_CRESTA, 1,15 rad/s:
+   * lo que daba 9,5 · 0,1208), el tiempo plegado da vueltas enteras y el pliegue no se ve; y
+   * la línea sigue yendo hacia la orilla igual, porque el paso sigue multiplicando a la costa.
+   */
+  float fase = vCosta * paso + tiempo * ${VELOCIDAD_DE_LA_CRESTA.toFixed(3)}
              + sin(dot(vPosicionMundo.xz, vec2(0.0141, -0.0113))) * 2.4
              + sin(dot(vPosicionMundo.xz, vec2(-0.0301, 0.0247))) * 0.9;
   /* El umbral lo abre el propio parche: de un pelo blanco a una línea de veinte unidades. */
@@ -686,7 +708,11 @@ void main() {
 
 /** Los uniforms del mar, escritos para que se puedan comprobar sin abrir un navegador. */
 export interface UniformsDeLaMarea extends Record<string, THREE.IUniform> {
-  /** Los segundos del reloj de la escena. Lo mueve el `useFrame` de `delta.tsx`. */
+  /**
+   * Los segundos del reloj de la escena, PLEGADOS por `tiempoDelMar` (`tiempo-del-mar.ts`).
+   * Lo mueve el `useFrame` de `delta.tsx`, y nunca con el reloj crudo: sin tope, el mar
+   * degenera con los minutos.
+   */
   tiempo: { value: number };
   /** El agua del pack, que es de donde arranca todo. */
   calma: { value: THREE.Color };

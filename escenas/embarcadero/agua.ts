@@ -15,7 +15,11 @@
  * Tiene que compilar en WebGL2 y en `expo-gl` con el mismo texto: nada de
  * extensiones, precisión `mediump` declarada, sin texturas y sin derivadas. La
  * normal se saca ANALÍTICAMENTE de los mismos senos que desplazan, así que no
- * hace falta `dFdx`. Y se usan los trozos de niebla de three (`fog_*`) para que
+ * hace falta `dFdx`. Y EL TIEMPO LLEGA PLEGADO (`tiempoDelMar`, en `tiempo-del-mar.ts`): por
+ * eso cada velocidad de aquí —0,9, 0,63, 2,1, 1,7 y 1,1— es un múltiplo de 0,01, y
+ * `verify:escena` lo exige leyendo este texto. Sin el pliegue, el agua del muelle degenera
+ * con los minutos igual que degeneró el mar del delta.
+ * Y se usan los trozos de niebla de three (`fog_*`) para que
  * el mar se funda con el cielo en el horizonte exactamente donde lo hace todo lo
  * demás: con dos nieblas distintas el horizonte se lee como una costura.
  *
@@ -185,3 +189,6 @@ export function geometriaDelMar(
   geometria.computeBoundingSphere();
   return geometria;
 }
+
+/** El texto de los dos sombreadores, para que `verify:escena` lea sus velocidades sin construir el material. */
+export const GLSL_DEL_AGUA = { vertice: VERTICE, fragmento: FRAGMENTO } as const;
