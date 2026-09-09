@@ -661,14 +661,20 @@ function Banco(): JSX.Element {
    * partida: suficientes para que se solapen y el iman tenga trabajo. En la partida de
    * verdad esto llega del servidor.
    */
-  const mano = useMemo(() => {
+  /*
+   * LA MANO DE MENTIRA ES ESTADO, y no un memo, desde que la bolsa existe: al soltar una
+   * ficha encima tiene que IRSE, que es lo que hace la de verdad (`cobrar` en `riberas.ts`,
+   * y lo afirma `verify:riberas-en-tres` jugándolo). Un banco en el que la carta tirada se
+   * queda en la mano enseña un gesto que en la partida no existe.
+   */
+  const [mano, ponerMano] = useState(() => {
     /* Los cinco de Riberas, que es a lo que se juega. `sal` sigue sin icono a proposito. */
     const BIENES = ['limo', 'junco', 'sal', 'piedra', 'grano'];
     return Array.from({ length: 11 }, (_, i) => ({
       id: `c${String(i)}`,
       bien: BIENES[(i * 3 + (i % 2)) % BIENES.length] as string,
     }));
-  }, []);
+  });
 
   /*
    * LA BARRA DEL BANCO, con una regla de mentira.
@@ -940,6 +946,7 @@ function Banco(): JSX.Element {
               cuantasALaBolsa={porLaBolsa}
               onTirarFicha={(bien) => {
                 ponerTrueque(`a la bolsa: ${bien}`);
+                ponerMano((m) => m.filter((c) => c.id !== cogida));
                 ponerCogida(null);
                 ponerPorLaBolsa((n) => Math.max(0, n - 1));
               }}

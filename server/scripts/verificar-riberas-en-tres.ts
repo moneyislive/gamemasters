@@ -123,6 +123,7 @@ import {
   esVistaQueSePinta,
   jugadaSinPreguntar,
   jugadasDeLaCarta,
+  laBolsaDelDescarte,
   laManoDeLaIzquierda,
   loQueSeOyeDelVado,
   manoEnTres,
@@ -2710,6 +2711,37 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
     }) && aTirar.some((o) => o.rotulo.startsWith('Tirar una ')),
     aTirar.map((o) => o.rotulo),
   );
+
+  /*
+   * ═══ Y AL TIRAR UNA, LA FICHA SE VA DE LA MANO EN EL ACTO ═══
+   *
+   * Miguel pidió comprobarlo —«que cuando descartamos los recursos al salir el ladrón las
+   * cartas se quitan de nuestra mano»— y se comprueba jugándolo por el árbitro y no leyendo
+   * el reductor: se manda la primera opción de tirar tal cual la ofrece el juego, y la mano
+   * que la ESCENA pintaría (`manoEnTres`, que es lo que llega a `<Delta>`) tiene que perder
+   * exactamente esa carta, en el mismo movimiento y no al cerrarse el descarte. La que se va
+   * es la más vieja de ese bien, que es lo que `cobrar` promete, y la bolsa baja una.
+   */
+  const laPrimera = aTirar[0];
+  if (laPrimera !== undefined) {
+    const bienTirado = (laPrimera.carga as { bien: string }).bien;
+    const antesDeTirar = manoEnTres(vista);
+    const trasTirar = jugar(mesaDelDescarte, { quien: 'A', rev: mesaDelDescarte.rev, movimiento: { tipo: laPrimera.tipo, carga: laPrimera.carga } });
+    const vistaTrasTirar = vistaEn(trasTirar, 'A');
+    const despuesDeTirar = manoEnTres(vistaTrasTirar);
+    const idas = antesDeTirar.filter((c) => !despuesDeTirar.some((d) => d.id === c.id));
+    const masVieja = antesDeTirar.filter((c) => c.bien === bienTirado).map((c) => c.id).sort()[0];
+    comprobar(
+      'al tirar una ficha a la bolsa, la mano de la escena pierde EXACTAMENTE esa carta en el acto: de nueve a ocho, de ese bien y la más vieja',
+      antesDeTirar.length === 9 && despuesDeTirar.length === 8 && idas.length === 1 && idas[0]?.bien === bienTirado && idas[0]?.id === masVieja,
+      { antes: antesDeTirar.length, despues: despuesDeTirar.length, idas: idas.map((c) => c.id), masVieja },
+    );
+    comprobar(
+      'y la bolsa baja de cuatro a tres sin salir del descarte: la mano se vacía ficha a ficha, no al final',
+      laBolsaDelDescarte(vistaTrasTirar, 'A')?.faltan === 3 && (vistaTrasTirar as { momento?: unknown }).momento === 'descartando',
+      { bolsa: laBolsaDelDescarte(vistaTrasTirar, 'A'), momento: (vistaTrasTirar as { momento?: unknown }).momento },
+    );
+  }
   /*
    * LA VACUNA: en un turno normal no hay ningún botón de tirar fichas. Sin ella, «los cinco
    * llegan» sería verde igual con una escena que no filtrara nada nunca.

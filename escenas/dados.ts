@@ -77,26 +77,45 @@ export const COLOR_DEL_PUNTO = '#2a2118';
 // ---------------------------------------------------------------------------
 
 /**
- * LA ARISTA DE CADA DADO, en lados del hueco del reparto: 0,52.
+ * LA ARISTA QUE SE PIDE PARA CADA DADO, en lados del hueco del reparto: 0,364.
  *
- * Era 0,46 y en el iPhone SE apaisado daba 20,6 puntos de dado y 3,7 de punto, por
- * debajo del mínimo legible con el asa en regla (§1.15 de `docs/LA-MESA-DE-RIBERAS.md`).
- * El asa tiene aire de sobra (1,6 lados para un par que ocupaba 1,0), así que subió: el par
- * mide `2 · 0,52 + 0,08 = 1,12` lados y deja 0,24 a cada lado del asa, exactamente el
- * `AIRE` de la barra. Con eso las dos exigencias caen en el mismo sitio: al asa mínima de
- * 44 puntos el dado mide 22,9 y el punto 4,1. Vive aquí, sin `three`, para que la escena
- * escale con el mismo número que `verify:escena` mide en puntos.
+ * ═══ ERA 0,52 Y FIJA; AHORA ES LO QUE SE PIDE, Y EL HUECO DICE LO QUE SE DA ═══
+ *
+ * Miguel, jugando en un monitor: «haz los dados un poco más pequeños, como un 30 %». En un
+ * monitor a 1080 el hueco del reparto mide más de cien puntos y el dado a 0,52 lados salía
+ * de cincuenta y tantos: grande para lo que es, dos dados en el borde de la mesa. Pero el
+ * 0,52 no era capricho: subió de 0,46 porque en el iPhone SE apaisado el dado daba 20,6
+ * puntos y el punto 3,7, por debajo del mínimo legible (§1.15 de `docs/LA-MESA-DE-RIBERAS.md`:
+ * 22 de dado, 4 de punto). Bajar a 0,364 a secas rompería el §1.15 en todos los lienzos
+ * pequeños, y la regla de la casa es que ningún juego es sólo para PC.
+ *
+ * Así que la arista deja de ser una constante y pasa a ser DEL HUECO: `aristaDelDado` pide
+ * 0,364 lados y, donde eso no llega al mínimo legible, la sube hasta él —y nunca por encima
+ * de `ARISTA_TOPE_DEL_DADO`, que es lo que el asa y el quinto hueco reservan—. En el monitor
+ * el dado mide lo que antes por 0,7; en el SE y en el 390 de pie se queda en el mínimo, que
+ * es donde ya estaba. `HuecoDeLosDados.arista` lleva el resultado en unidades de mundo, y la
+ * escena, el árbol de Node y `verify:escena` la leen de ahí y no de esta constante.
  */
-export const ARISTA_DEL_DADO = 0.52;
+export const ARISTA_DEL_DADO = 0.364;
+/**
+ * LO MÁS QUE PUEDE CRECER EL DADO al subir al mínimo legible, en lados: 0,52, la arista de
+ * antes. Es la que dimensiona lo que lo rodea —el par al tope mide `2 · 0,52 + 0,08 = 1,12`
+ * lados, deja 0,24 a cada lado del asa de 1,6 (el `AIRE` de la barra) y es lo que el quinto
+ * hueco reserva—, porque el asa tiene que valer para el dado más grande que pueda haber, no
+ * para el que se pide. Al asa mínima de 44 puntos el dado al tope mide 22,9 y el punto 4,1.
+ */
+export const ARISTA_TOPE_DEL_DADO = 0.52;
 /** Cuánto aire queda entre los dos dados, en lados del hueco. */
 export const HUECO_ENTRE_DADOS = 0.08;
 /**
- * LO QUE MIDE EL PAR DE PUNTA A PUNTA, en lados del hueco: 1,12. Es lo que `huecosDeLaMesa`
- * reserva para el asa y el tapete cuando los dados van como quinto hueco —un hueco de un
- * lado se le queda corto en 0,12— y lo que el colgado deja dentro de sus 1,6 con el
- * `AIRE` a cada lado. Vive aquí, junto a la arista, para que la barra no repita la suma.
+ * LO QUE MIDE EL PAR DE PUNTA A PUNTA CON LOS DADOS AL TOPE, en lados del hueco: 1,12. Es lo
+ * que `huecosDeLaMesa` reserva para el asa y el tapete cuando los dados van como quinto
+ * hueco —un hueco de un lado se le queda corto en 0,12— y lo que el colgado deja dentro de
+ * sus 1,6 con el `AIRE` a cada lado. Se calcula AL TOPE y no a la arista pedida a propósito:
+ * el sitio se reserva para el dado más grande que pueda salir, y con el pedido sobra aire.
+ * Vive aquí, junto a la arista, para que la barra no repita la suma.
  */
-export const ANCHO_DEL_PAR_DE_DADOS = 2 * ARISTA_DEL_DADO + HUECO_ENTRE_DADOS;
+export const ANCHO_DEL_PAR_DE_DADOS = 2 * ARISTA_TOPE_DEL_DADO + HUECO_ENTRE_DADOS;
 /**
  * EL DIÁMETRO DE CADA PUNTO, en aristas del dado: el 18 %. Es lo que hace que el punto no
  * baje de 4 puntos de pantalla cuando el dado no baja de 22; el D6 del pack lleva sus
@@ -112,29 +131,49 @@ export const PUNTO_DEL_DADO = 0.18;
 export const DADO_MINIMO = 22;
 export const PUNTO_MINIMO = 4;
 /**
- * A QUÉ ALTURA SOBRE LA TAPA VA EL CENTRO DEL CUBO cuando está apoyado: media arista.
- * Con la tapa en la cara de abajo del zócalo (`cotaDeLaTapa`, 0,48 lados bajo el centro
- * del hueco) el centro queda 0,22 lados bajo el centro del hueco, y la cara de arriba del
- * dado apoyado, justo en él.
+ * LA ARISTA DE LOS DADOS DE UN HUECO, en unidades de mundo. Ver `ARISTA_DEL_DADO`.
+ *
+ * Se pide `ARISTA_DEL_DADO` lados. Si en este lienzo eso no llega al mínimo legible del
+ * §1.15 —que no son los 22 puntos a secas de `DADO_MINIMO`, sino lo que haga falta para que
+ * el punto mida `PUNTO_MINIMO`: 4 / 0,18 = 22,2— se sube hasta él; y nunca por encima de
+ * `ARISTA_TOPE_DEL_DADO`, que es el dado para el que está reservado el sitio. `mundoPorPunto`
+ * es lo que mide un punto de pantalla en unidades de mundo a la distancia de la barra, que
+ * `huecosDeLaMesa` ya sabe porque recibe el alto del lienzo en puntos.
+ *
+ * El centro del cubo apoyado va a MEDIA ARISTA sobre la tapa (`arista / 2`), y como la
+ * arista ya no es fija tampoco lo es esa altura: con la tapa 0,48 lados bajo el centro del
+ * hueco, el centro queda entre 0,30 (dado pedido) y 0,22 (dado al tope) lados por debajo.
  */
-export const CENTRO_DEL_DADO_SOBRE_LA_TAPA = ARISTA_DEL_DADO / 2;
+export function aristaDelDado(lado: number, mundoPorPunto: number): number {
+  const pedida = ARISTA_DEL_DADO * lado;
+  const minima = Math.max(DADO_MINIMO, PUNTO_MINIMO / PUNTO_DEL_DADO) * mundoPorPunto;
+  const tope = ARISTA_TOPE_DEL_DADO * lado;
+  return Math.min(tope, Math.max(pedida, minima));
+}
 /**
- * CUÁNTO SALTA EL DADO AL RODAR, en lados. En lo alto del salto la cara de arriba llega a
- * `hueco.y + 0,24 · lado` (`−0,48 + 0,26 + 0,20 + 0,26`), por debajo del techo del asa
- * (`hueco.y + 0,5 · lado`): el dado no se sale de lo que se puede pulsar.
+ * CUÁNTO SALTA EL DADO AL RODAR, en lados. En lo alto del salto la cara de arriba llega, con
+ * el dado AL TOPE, a `hueco.y + 0,24 · lado` (`−0,48 + 0,26 + 0,20 + 0,26`), por debajo del
+ * techo del asa (`hueco.y + 0,5 · lado`): el dado no se sale de lo que se puede pulsar. Con
+ * el dado pedido llega más abajo (`+0,084`): la cota se calcula siempre al tope.
  */
 export const SALTO_DEL_DADO = 0.2;
 /**
- * EL RADIO DE LA SOMBRA DE CONTACTO DE CADA DADO, en lados del hueco: un poco más que la
- * media arista (0,26) para que asome por los cuatro lados, y poco más que la media
- * distancia entre los dos centros (0,30) para que las dos sombras apenas se toquen. La
- * misma geometría fundida que las de los huecos: se AÑADEN a su lista de centros.
+ * EL RADIO DE LA SOMBRA DE CONTACTO DE CADA DADO, en ARISTAS del dado: 0,615, un poco más
+ * que la media arista para que asome por los cuatro lados. Iba en lados del hueco (0,32)
+ * cuando la arista era fija; en aristas la sombra encoge con el dado, que es lo que hace
+ * una sombra de contacto. La misma geometría fundida que las de los huecos: se AÑADEN a su
+ * lista de centros.
  */
-export const RADIO_DE_LA_SOMBRA_DEL_DADO = 0.32;
+export const RADIO_DE_LA_SOMBRA_DEL_DADO = 0.615;
 
-/** Dónde cae cada uno de los dos dados respecto del centro de su hueco, en lados. */
-export function centroDelDado(indice: 0 | 1): number {
-  return (indice === 0 ? -1 : 1) * ((ARISTA_DEL_DADO + HUECO_ENTRE_DADOS) / 2);
+/**
+ * Dónde cae cada uno de los dos dados respecto del centro de su hueco, en lados: los dos
+ * pegados al centro con `HUECO_ENTRE_DADOS` de aire entre ellos, sea cual sea su arista (que
+ * llega en lados, `arista / lado`), para que un dado pequeño no se quede colgando en la punta
+ * de un asa pensada para el grande.
+ */
+export function centroDelDado(indice: 0 | 1, aristaEnLados: number): number {
+  return (indice === 0 ? -1 : 1) * ((aristaEnLados + HUECO_ENTRE_DADOS) / 2);
 }
 
 /**

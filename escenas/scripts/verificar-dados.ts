@@ -273,7 +273,7 @@ function cargaConThree(ruta: string): Promise<GLTF> {
   const caja = gltf === null ? null : new Box3().setFromObject(gltf.scene);
   const tolerancia = ARISTA_DEL_D6_EN_EL_PACK * HOLGURA_DE_LA_CAJA;
   comprobar(
-    'y la caja que mide three es la del pack: la escena lo escalará con ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK',
+    'y la caja que mide three es la del pack: la escena lo escalará con la arista del hueco / ARISTA_DEL_D6_EN_EL_PACK',
     caja !== null &&
       ['x', 'y', 'z'].every((eje) => Math.abs(caja.max[eje as 'x'] - caja.min[eje as 'x'] - ARISTA_DEL_D6_EN_EL_PACK) <= tolerancia),
     caja === null ? 'sin escena' : { x: (caja.max.x - caja.min.x).toFixed(4), y: (caja.max.y - caja.min.y).toFixed(4), z: (caja.max.z - caja.min.z).toFixed(4) },

@@ -51,7 +51,7 @@ import {
   ORDEN_DE_LAS_CASILLAS,
 } from '../capas';
 import { ZOCALO, huecosDeLaMesa } from '../barra';
-import { ARISTA_DEL_DADO, CENTRO_DEL_DADO_SOBRE_LA_TAPA, RADIO_DE_LA_SOMBRA_DEL_DADO, centroDelDado } from '../dados';
+import { RADIO_DE_LA_SOMBRA_DEL_DADO, centroDelDado } from '../dados';
 import { tapaDeLaMesa } from '../mesa';
 import {
   FONDO_DEL_TAPETE,
@@ -235,7 +235,7 @@ export function arbolDeLaMesa(lienzo: LienzoDelModelo): { escena: THREE.Scene; c
     const centros = huecos.map((h) => ({ x: h.x, z: h.z, radio: h.lado * RADIO_DE_LA_SOMBRA }));
     if (dados !== null) {
       for (const i of [0, 1] as const) {
-        centros.push({ x: dados.x + centroDelDado(i) * dados.lado, z: dados.z, radio: dados.lado * RADIO_DE_LA_SOMBRA_DEL_DADO });
+        centros.push({ x: dados.x + centroDelDado(i, dados.arista / dados.lado) * dados.lado, z: dados.z, radio: dados.arista * RADIO_DE_LA_SOMBRA_DEL_DADO });
       }
     }
     barra.add(
@@ -260,10 +260,10 @@ export function arbolDeLaMesa(lienzo: LienzoDelModelo): { escena: THREE.Scene; c
       /* El grupo de los dados con su asa única, y dentro un grupo por cubo, como en `Dados`. */
       const grupoDeLosDados = grupo('Dados', ORDEN_DE_LA_BARRA, [dados.x, dados.y, dados.z]);
       grupoDeLosDados.add(malla('barra:asa de los dados', new THREE.BoxGeometry(dados.ancho, dados.alto, dados.lado * 0.8), invisible()));
-      const arista = ARISTA_DEL_DADO * dados.lado;
-      const reposoY = tapa.cota - dados.y + CENTRO_DEL_DADO_SOBRE_LA_TAPA * dados.lado;
+      const arista = dados.arista;
+      const reposoY = tapa.cota - dados.y + arista / 2;
       for (const i of [0, 1] as const) {
-        const cubo = grupo(`dado ${String(i)} ref={cubos}`, ORDEN_DE_LA_BARRA, [centroDelDado(i) * dados.lado, reposoY, 0]);
+        const cubo = grupo(`dado ${String(i)} ref={cubos}`, ORDEN_DE_LA_BARRA, [centroDelDado(i, arista / dados.lado) * dados.lado, reposoY, 0]);
         cubo.add(malla(`barra:DADO ${String(i)}`, new THREE.BoxGeometry(arista, arista, arista), opaco()));
         grupoDeLosDados.add(cubo);
       }

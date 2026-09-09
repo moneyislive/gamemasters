@@ -244,8 +244,6 @@ import type { HuecoDeLaBarra, HuecoDeLosDados, MazoDeLaBarra, PiezaDeBarra } fro
  */
 import {
   ARISTA_DEL_D6_EN_EL_PACK,
-  ARISTA_DEL_DADO,
-  CENTRO_DEL_DADO_SOBRE_LA_TAPA,
   RADIO_DE_LA_SOMBRA_DEL_DADO,
   SACUDIDA,
   anguloRodado,
@@ -2133,9 +2131,9 @@ function Barra({
     if (conDados && sitioDeLosDados !== null) {
       for (const i of [0, 1] as const) {
         centros.push({
-          x: sitioDeLosDados.x + centroDelDado(i) * sitioDeLosDados.lado,
+          x: sitioDeLosDados.x + centroDelDado(i, sitioDeLosDados.arista / sitioDeLosDados.lado) * sitioDeLosDados.lado,
           z: sitioDeLosDados.z,
-          radio: sitioDeLosDados.lado * RADIO_DE_LA_SOMBRA_DEL_DADO,
+          radio: sitioDeLosDados.arista * RADIO_DE_LA_SOMBRA_DEL_DADO,
         });
       }
     }
@@ -2365,8 +2363,9 @@ function Barra({
  *
  * ═══ EL MODELO Y EL RESPALDO ENSEÑAN EL MISMO NÚMERO ═══
  *
- * El D6 del pack se escala con `ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK` y el
- * respaldo se construye ya a `ARISTA_DEL_DADO · lado`; los dos ponen cada valor en la cara
+ * El D6 del pack se escala con `sitio.arista / ARISTA_DEL_D6_EN_EL_PACK` y el respaldo se
+ * construye ya a `sitio.arista` —la arista la trae el hueco, ver `aristaDelDado`—; los dos
+ * ponen cada valor en la cara
  * de `CARA_DEL_VALOR`, así que `cuaternionDelValor` vale para los dos y el dado se asienta
  * en el número que salió venga de donde venga la malla.
  */
@@ -2387,8 +2386,8 @@ function Dados({
   modelo: readonly Instanciable[] | undefined;
   onPulsar: () => Promise<ResultadoDelToque>;
 }): JSX.Element {
-  const { lado } = sitio;
-  const arista = ARISTA_DEL_DADO * lado;
+  /* La arista la trae el hueco: la pedida, subida al mínimo legible donde no llega. */
+  const { lado, arista } = sitio;
   const cubos = useRef<[THREE.Group | null, THREE.Group | null]>([null, null]);
   const maquina = useRef<EstadoDeLosDados>(dadosEnReposo(semilla));
   const cola = useRef<SucesoDeLosDados[]>([]);
@@ -2433,7 +2432,7 @@ function Dados({
   );
   const escalaDelPack = arista / ARISTA_DEL_D6_EN_EL_PACK;
   /* El centro del cubo apoyado, en el grupo de los dados (que está en el centro del sitio). */
-  const reposoY = cota - sitio.y + CENTRO_DEL_DADO_SOBRE_LA_TAPA * lado;
+  const reposoY = cota - sitio.y + arista / 2;
 
   /* Los dos cuaterniones objetivo, rehechos sólo cuando cambian el par o el sello. */
   const objetivo = useRef<[THREE.Quaternion, THREE.Quaternion]>([new THREE.Quaternion(), new THREE.Quaternion()]);
@@ -2464,7 +2463,7 @@ function Dados({
     for (const i of [0, 1] as const) {
       const g = cubos.current[i];
       if (g === null) continue;
-      g.position.set(centroDelDado(i) * lado, reposoY, 0);
+      g.position.set(centroDelDado(i, arista / lado) * lado, reposoY, 0);
 
       if (fase.fase === 'rodando') {
         /*

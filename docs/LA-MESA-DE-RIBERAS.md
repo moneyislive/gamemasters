@@ -585,6 +585,19 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     triángulos del respaldo, que no cambian (los puntos son los mismos 21 por dado; los
     del D6 del pack son 662 por dado, medidos, §5.1).
 
+    > **9 de septiembre de 2026:** la arista baja de 0,52 a **0,364 lados** (un 30 % menos,
+    > pedido jugando en un monitor: «haz los dados un poco más pequeños») y deja de ser un
+    > número fijo. Es lo que se PIDE, y `aristaDelDado` (`escenas/dados.ts`) la sube hasta el
+    > mínimo legible de esta decisión donde 0,364 lados no llegan —22,2 puntos, los que dan un
+    > punto de 4, y no los 22 a secas— y nunca por encima de `ARISTA_TOPE_DEL_DADO = 0,52`,
+    > que es lo que el asa y el quinto reservan (`ANCHO_DEL_PAR_DE_DADOS` sigue en 1,12,
+    > calculado al tope). El hueco lleva su `arista` en unidades de mundo
+    > (`HuecoDeLosDados.arista`) y la escena, el árbol de Node y `verify:escena` la leen de
+    > ahí. Medido en los quince lienzos: en los nueve teléfonos el dado se queda en 22,2 (la
+    > pedida da de 16,0 a 21,9), y en tabletas y monitores es la pedida, de 32,6 a 55,0 —en el
+    > monitor a 1080, 55,0 donde había 78,6—. La tabla de arriba es la de 0,52 y queda como
+    > historia de por qué existe el tope.
+
 16. **La mesa recogida SALE SOLA cuando pasa a tocarme, salvo con una carta cogida.**
     (Decisión 7.) Como dice el §6: recoger es para mirar, y cuando hay que actuar la
     mesa vuelve; si la recojo en mi propio turno se queda hasta que yo diga; y si en el

@@ -31,7 +31,7 @@
  */
 
 /* Lo que mide el par de dados de punta a punta: el quinto hueco se lo reserva entero. */
-import { ANCHO_DEL_PAR_DE_DADOS } from './dados';
+import { ANCHO_DEL_PAR_DE_DADOS, aristaDelDado } from './dados';
 
 /**
  * UNA PIEZA DE LA BARRA: lo que se puede coger para ponerlo en el tablero.
@@ -220,10 +220,12 @@ export function huecosDeLaBarra(
  *
  * `ancho` y `alto` van aparte porque el asa nunca es cuadrada: colgada a la izquierda mide
  * 1,6 lados por 1, y como quinto hueco mide lo que el par, `ANCHO_DEL_PAR_DE_DADOS` lados
- * (1,12) por 1. `lado` es el del reparto al que pertenece, que es lo que escala los dados
- * (`ARISTA_DEL_DADO` lados cada uno). `forma` dice cuál de los dos peldaños se ha
- * aplicado, para que un comprobador pueda afirmar en qué lienzo pasa cada cosa y no sólo
- * que «hay dados».
+ * (1,12) por 1. `lado` es el del reparto al que pertenece. `arista` es lo que mide cada
+ * dado en este lienzo, en unidades de mundo: la pedida (`ARISTA_DEL_DADO` lados) subida al
+ * mínimo legible donde no llega (`aristaDelDado`); va aquí y no se recalcula al pintar
+ * porque sólo aquí se sabe cuánto mide un punto de pantalla. `forma` dice cuál de los dos
+ * peldaños se ha aplicado, para que un comprobador pueda afirmar en qué lienzo pasa cada
+ * cosa y no sólo que «hay dados».
  *
  * ═══ POR QUÉ EL QUINTO NO MIDE UN LADO ═══
  *
@@ -244,7 +246,12 @@ export function huecosDeLaBarra(
  * pieza: el aire no cabía entero. Lo mide `verify:escena` («el par cabe en el asa y en el
  * tapete en los DOS peldaños, con su aire») con la geometría de `huecosDeLaBarra(5)`.
  */
-export interface HuecoDeLosDados {
+/**
+ * UN ASA COLGADA DE LA BARRA: la forma que comparten el asa de los dados y la del reloj de
+ * arena. Los dados le añaden su arista; el reloj no tiene dados, y por eso `sitioDelReloj`
+ * devuelve esto y no un hueco de dados con una arista de mentira dentro.
+ */
+export interface AsaDeLaBarra {
   x: number;
   y: number;
   z: number;
@@ -252,6 +259,11 @@ export interface HuecoDeLosDados {
   alto: number;
   lado: number;
   forma: 'colgado' | 'quinto';
+}
+
+export interface HuecoDeLosDados extends AsaDeLaBarra {
+  /** Lo que mide cada dado aquí, en unidades de mundo. Ver `aristaDelDado`. */
+  arista: number;
 }
 
 /** Cuánto mide el asa de los dados colgada, en lados del reparto. Los dos cubos y su aire. */
@@ -324,6 +336,7 @@ export function huecosDeLaMesa(
         ancho: ANCHO_DEL_ASA_DE_LOS_DADOS * lado,
         alto: lado,
         lado,
+        arista: aristaDelDado(lado, alto / altoEnPuntos),
         forma: 'colgado',
       },
     };
@@ -349,6 +362,7 @@ export function huecosDeLaMesa(
         ancho: anchoDelQuinto,
         alto: quinto.lado,
         lado: quinto.lado,
+        arista: aristaDelDado(quinto.lado, alto / altoEnPuntos),
         forma: 'quinto',
       },
     };
@@ -501,7 +515,7 @@ export function sitioDelReloj(
   piezas: readonly HuecoDeLaBarra[],
   campo: number,
   proporcion: number,
-): HuecoDeLosDados | null {
+): AsaDeLaBarra | null {
   const ultimo = piezas[piezas.length - 1];
   if (ultimo === undefined) return null;
   const { ancho } = loQueSeVe(campo, proporcion);

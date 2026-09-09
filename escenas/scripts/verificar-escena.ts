@@ -130,7 +130,8 @@ import {
   ANCHO_DEL_PAR_DE_DADOS,
   ARISTA_DEL_DADO,
   ASENTAR,
-  CENTRO_DEL_DADO_SOBRE_LA_TAPA,
+  ARISTA_TOPE_DEL_DADO,
+  aristaDelDado,
   DADO_MINIMO,
   HUECO_ENTRE_DADOS,
   PUNTO_DEL_DADO,
@@ -3377,10 +3378,12 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
      * Lo que puede pisar la primera pieza es el DADO, no el asa: el asa es invisible y los
      * cubos no reciben rayos, así que un asa estrecha con los dados asomando por fuera
      * pasaría esta medida y los dados se meterían en el zócalo de al lado. Se mide el borde
-     * derecho del dado derecho: `dados.x + centroDelDado(1) · lado + ARISTA_DEL_DADO · lado / 2`.
+     * derecho del dado derecho: `dados.x + centroDelDado(1, arista/lado) · lado + arista / 2`, con
+     * la arista que el hueco trae para ESTE lienzo (la pedida, o el mínimo legible).
      */
-    const bordeDerechoDelDado = dados.x + centroDelDado(1) * dados.lado + (ARISTA_DEL_DADO * dados.lado) / 2;
-    const bordeIzquierdoDelDado = dados.x + centroDelDado(0) * dados.lado - (ARISTA_DEL_DADO * dados.lado) / 2;
+    const enLados = dados.arista / dados.lado;
+    const bordeDerechoDelDado = dados.x + centroDelDado(1, enLados) * dados.lado + dados.arista / 2;
+    const bordeIzquierdoDelDado = dados.x + centroDelDado(0, enLados) * dados.lado - dados.arista / 2;
     if (primera !== undefined && bordeDerechoDelDado > primera.x - primera.lado / 2 - 0.2 * primera.lado + 1e-9) {
       malosDeLaMesa.push(`${nombre}: los dados pisan (o casi) la primera pieza`);
     }
@@ -3454,11 +3457,11 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
     { malosDeLaMesa, medidasDeLaMesa },
   );
   comprobar(
-    'el par cabe en el asa y en el tapete en los DOS peldaños, con su aire: como quinto el asa mide el par (1,12 lados, 51,3 pt en 390) y crece hacia la izquierda, con 0,24 lados hasta la primera pieza y más de un lado hasta el canto',
+    'el par cabe en el asa y en el tapete en los DOS peldaños, con su aire: como quinto el asa mide el par AL TOPE (1,12 lados, 51,3 pt en 390) y crece hacia la izquierda, con al menos 0,24 lados hasta la primera pieza —0,275 en 390, porque el dado se queda en el mínimo legible y no en el tope— y más de un lado hasta el canto',
     malosDelPar.length === 0 &&
       parEnElAsa.length === LIENZOS.length - 2 &&
       parEnElAsa.filter((m) => m.includes('quinto')).length === 4 &&
-      parEnElAsa.some((m) => m.startsWith('móvil corriente: quinto, asa de 1.12 lados (51.3 pt), par de 51.3 pt, aire hasta la primera pieza 0.240 lados (11.0 pt), hasta el canto 1.157 lados')),
+      parEnElAsa.some((m) => m.startsWith('móvil corriente: quinto, asa de 1.12 lados (51.3 pt), par de 51.3 pt, aire hasta la primera pieza 0.275 lados (12.6 pt), hasta el canto 1.157 lados')),
     { malosDelPar, parEnElAsa },
   );
   comprobar(
@@ -4620,31 +4623,58 @@ paso('Los dados se reparten por turno, ruedan hasta que el servidor contesta, y 
     { mesa: triangulosDeLaMesa(SEGMENTOS_DE_LA_MESA.maximo), TOPE_DE_LA_MESA, mar: TRIANGULOS_DEL_MAR },
   );
 
-  /* ── 5. LAS MEDIDAS DEL DADO: el par cabe en el asa, el salto queda bajo su techo ── */
-  const anchoDelPar = 2 * ARISTA_DEL_DADO + HUECO_ENTRE_DADOS;
+  /* ── 5. LAS MEDIDAS DEL DADO: el par AL TOPE cabe en el asa, el salto queda bajo su techo ── */
+  /*
+   * LA ARISTA YA NO ES UNA: se pide 0,364 lados (un 30 % menos que los 0,52 de antes, pedido
+   * jugando en un monitor) y `aristaDelDado` la sube al mínimo legible donde no llega, sin
+   * pasar del tope de 0,52, que es para el que se reserva el sitio. Lo que se mide fijo es
+   * lo que dimensiona: el par AL TOPE.
+   */
+  const anchoDelPar = 2 * ARISTA_TOPE_DEL_DADO + HUECO_ENTRE_DADOS;
   comprobar(
-    'el par de dados mide 1,12 lados (2 · 0,52 + 0,08) y deja 0,24 lados de aire a cada lado del asa de 1,6: exactamente el AIRE de la barra',
-    Math.abs(ARISTA_DEL_DADO - 0.52) < 1e-12 &&
+    'se pide 0,364 lados de arista (0,7 · 0,52) con tope en 0,52, y el par AL TOPE mide 1,12 lados (2 · 0,52 + 0,08) y deja 0,24 lados de aire a cada lado del asa de 1,6: exactamente el AIRE de la barra',
+    Math.abs(ARISTA_DEL_DADO - 0.364) < 1e-12 &&
+      Math.abs(ARISTA_TOPE_DEL_DADO - 0.52) < 1e-12 &&
       Math.abs(anchoDelPar - 1.12) < 1e-12 &&
-      Math.abs((ANCHO_DEL_ASA_DE_LOS_DADOS - anchoDelPar) / 2 - 0.24) < 1e-12 &&
-      Math.abs(centroDelDado(1) - centroDelDado(0) - (ARISTA_DEL_DADO + HUECO_ENTRE_DADOS)) < 1e-12 &&
-      centroDelDado(0) + centroDelDado(1) === 0,
+      Math.abs(ANCHO_DEL_PAR_DE_DADOS - anchoDelPar) < 1e-12 &&
+      Math.abs((ANCHO_DEL_ASA_DE_LOS_DADOS - anchoDelPar) / 2 - 0.24) < 1e-12,
     { par: anchoDelPar, aire: (ANCHO_DEL_ASA_DE_LOS_DADOS - anchoDelPar) / 2 },
   );
-  /* Del centro del hueco hacia abajo: la tapa a −0,48; el centro del cubo a −0,22; la cara de arriba en lo alto del salto a +0,24. */
-  const tapaDesdeElHueco = -(ZOCALO.centro + ZOCALO.alto / 2);
-  const techoEnElSalto = tapaDesdeElHueco + CENTRO_DEL_DADO_SOBRE_LA_TAPA + SALTO_DEL_DADO + ARISTA_DEL_DADO / 2;
   comprobar(
-    'apoyado, el centro del cubo queda a media arista sobre la tapa (0,22 lados bajo el centro del hueco) y en lo alto del salto la cara de arriba llega a +0,24 lados, bajo el techo del asa (+0,5)',
-    Math.abs(CENTRO_DEL_DADO_SOBRE_LA_TAPA - ARISTA_DEL_DADO / 2) < 1e-12 &&
-      Math.abs(tapaDesdeElHueco + CENTRO_DEL_DADO_SOBRE_LA_TAPA - -0.22) < 1e-12 &&
+    'los dos dados van pegados al centro con su hueco de aire entre ellos, sea cual sea su arista: centroDelDado los separa arista + 0,08 y los deja simétricos, para el pedido y para el tope',
+    [ARISTA_DEL_DADO, ARISTA_TOPE_DEL_DADO].every(
+      (a) => Math.abs(centroDelDado(1, a) - centroDelDado(0, a) - (a + HUECO_ENTRE_DADOS)) < 1e-12 && centroDelDado(0, a) + centroDelDado(1, a) === 0,
+    ),
+  );
+  /*
+   * `aristaDelDado` se mide en sus tres tramos: sin mínimo que valga (un punto de pantalla
+   * que no mide nada) da la pedida; con un punto enorme se queda en el tope; y entre medias
+   * da el mínimo legible, que es el del PUNTO (4 / 0,18 = 22,2) y no los 22 a secas: con un
+   * lado de 50 la pedida es 18,2 y el tope 26, y sale 22,2.
+   */
+  comprobar(
+    'aristaDelDado da la pedida donde sobra sitio, el mínimo legible del punto (22,2 pt) donde no llega, y nunca pasa del tope',
+    Math.abs(aristaDelDado(100, 0) - ARISTA_DEL_DADO * 100) < 1e-12 &&
+      Math.abs(aristaDelDado(1, 1) - ARISTA_TOPE_DEL_DADO) < 1e-12 &&
+      Math.abs(aristaDelDado(50, 1) - PUNTO_MINIMO / PUNTO_DEL_DADO) < 1e-9 &&
+      PUNTO_MINIMO / PUNTO_DEL_DADO > DADO_MINIMO,
+    { pedida: aristaDelDado(100, 0), tope: aristaDelDado(1, 1), minimo: aristaDelDado(50, 1) },
+  );
+  /* Del centro del hueco hacia abajo, AL TOPE: la tapa a −0,48; el centro del cubo a −0,22; la cara de arriba en lo alto del salto a +0,24. */
+  const tapaDesdeElHueco = -(ZOCALO.centro + ZOCALO.alto / 2);
+  const techoEnElSalto = tapaDesdeElHueco + ARISTA_TOPE_DEL_DADO / 2 + SALTO_DEL_DADO + ARISTA_TOPE_DEL_DADO / 2;
+  const techoConLaPedida = tapaDesdeElHueco + ARISTA_DEL_DADO / 2 + SALTO_DEL_DADO + ARISTA_DEL_DADO / 2;
+  comprobar(
+    'apoyado al tope, el centro del cubo queda a media arista sobre la tapa (0,22 lados bajo el centro del hueco) y en lo alto del salto la cara de arriba llega a +0,24 lados, bajo el techo del asa (+0,5); con la pedida se queda en +0,084',
+    Math.abs(tapaDesdeElHueco + ARISTA_TOPE_DEL_DADO / 2 - -0.22) < 1e-12 &&
       Math.abs(techoEnElSalto - 0.24) < 1e-12 &&
-      techoEnElSalto < 0.5,
-    { centro: tapaDesdeElHueco + CENTRO_DEL_DADO_SOBRE_LA_TAPA, techo: techoEnElSalto },
+      techoEnElSalto < 0.5 &&
+      Math.abs(techoConLaPedida - 0.084) < 1e-12,
+    { centro: tapaDesdeElHueco + ARISTA_TOPE_DEL_DADO / 2, techo: techoEnElSalto, conLaPedida: techoConLaPedida },
   );
   comprobar(
-    'la sombra de cada dado asoma por sus cuatro lados (radio > media arista) y las dos apenas se tocan (radio < la distancia entre centros)',
-    RADIO_DE_LA_SOMBRA_DEL_DADO > ARISTA_DEL_DADO / 2 && RADIO_DE_LA_SOMBRA_DEL_DADO < ARISTA_DEL_DADO + HUECO_ENTRE_DADOS,
+    'la sombra de cada dado, en aristas, asoma por sus cuatro lados (radio > media arista) y no llega al centro del otro dado ni con el dado al tope',
+    RADIO_DE_LA_SOMBRA_DEL_DADO > 0.5 && RADIO_DE_LA_SOMBRA_DEL_DADO < 1 + HUECO_ENTRE_DADOS / ARISTA_TOPE_DEL_DADO,
     { radio: RADIO_DE_LA_SOMBRA_DEL_DADO },
   );
 
@@ -4753,7 +4783,7 @@ paso('Los dados se reparten por turno, ruedan hasta que el servidor contesta, y 
     radioMedido = Math.max(radioMedido, Math.hypot(dx, dy, dz));
   }
   comprobar('el primer punto del respaldo mide de verdad 0,18 aristas de diámetro y queda un pelo por fuera de su cara', Math.abs(radioMedido * 2 - PUNTO_DEL_DADO) < 1e-6 && Math.abs(Math.max(Math.abs(posicionesDeLosPuntos.getX(0)), Math.abs(posicionesDeLosPuntos.getY(0)), Math.abs(posicionesDeLosPuntos.getZ(0))) - 0.5) < 0.01, { diametro: radioMedido * 2 });
-  comprobar('el D6 del pack se escala con ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK, y el pack mide 0,75', ARISTA_DEL_D6_EN_EL_PACK === 0.75 && Math.abs((ARISTA_DEL_DADO * 1) / ARISTA_DEL_D6_EN_EL_PACK - 0.6933) < 1e-3);
+  comprobar('el D6 del pack se escala con la arista del hueco / ARISTA_DEL_D6_EN_EL_PACK, y el pack mide 0,75: con la pedida sale 0,4853 por lado y con el tope 0,6933', ARISTA_DEL_D6_EN_EL_PACK === 0.75 && Math.abs(ARISTA_DEL_DADO / ARISTA_DEL_D6_EN_EL_PACK - 0.4853) < 1e-3 && Math.abs(ARISTA_TOPE_DEL_DADO / ARISTA_DEL_D6_EN_EL_PACK - 0.6933) < 1e-3);
 
   /* ── 8. EL MÍNIMO LEGIBLE, en todos los lienzos con sitio, y los dos umbrales de la tabla ── */
   const CAMPO_DE_LA_MESA = (45 * Math.PI) / 180;
@@ -4763,7 +4793,7 @@ paso('Los dados se reparten por turno, ruedan hasta que el servidor contesta, y 
     const { dados } = huecosDeLaMesa(4, CAMPO_DE_LA_MESA, prop, alto);
     if (dados === null) return null;
     const enPuntos = (u: number): number => (u / visto.alto) * alto;
-    const dado = enPuntos(ARISTA_DEL_DADO * dados.lado);
+    const dado = enPuntos(dados.arista);
     return { forma: dados.forma, dado, punto: dado * PUNTO_DEL_DADO, asa: enPuntos(dados.alto) };
   };
   const ilegibles: string[] = [];
@@ -4775,13 +4805,22 @@ paso('Los dados se reparten por turno, ruedan hasta que el servidor contesta, y 
       continue;
     }
     legibles.push(`${nombre}: ${m.forma}, dado ${m.dado.toFixed(1)} pt, punto ${m.punto.toFixed(1)} pt`);
-    if (m.dado < DADO_MINIMO || m.punto < PUNTO_MINIMO) ilegibles.push(`${nombre}: dado ${m.dado.toFixed(1)} y punto ${m.punto.toFixed(1)}`);
+    if (m.dado < DADO_MINIMO - 1e-9 || m.punto < PUNTO_MINIMO - 1e-9) ilegibles.push(`${nombre}: dado ${m.dado.toFixed(1)} y punto ${m.punto.toFixed(1)}`);
   }
+  /*
+   * MEDIDO CON LA ARISTA PEDIDA DE 0,364 (medir-dados.mts, 9 de septiembre de 2026): en los
+   * NUEVE teléfonos de la lista la pedida no llega (16,0 a 21,9 puntos) y el dado se queda en
+   * el mínimo del punto, 22,2, con el punto en 4,0 clavado; en las dos tabletas y los tres
+   * monitores sobra sitio y el dado es el pedido: 32,6 a 55,0 puntos, 0,7 de lo que medía.
+   * Antes ningún lienzo estaba en el mínimo (el SE daba 23,3): ahora el mínimo se PISA, y
+   * por eso las dos comparaciones llevan tolerancia.
+   */
   comprobar(
-    'en ningún lienzo con sitio el dado baja de 22 puntos ni el punto de 4 (§1.15): 23,3 y 4,2 en el SE apaisado, 23,8 y 4,3 de pie en 390',
+    'en ningún lienzo con sitio el dado baja de 22 puntos ni el punto de 4 (§1.15): en los teléfonos el dado se queda en el mínimo del punto, 22,2 y 4,0 —SE apaisado y 390 incluidos—, y en el monitor a 1080 mide el pedido, 55,0',
     DADO_MINIMO === 22 && PUNTO_MINIMO === 4 && ilegibles.length === 0 &&
-      legibles.some((l) => l.startsWith('apaisado SE 1ª: colgado, dado 23.3 pt, punto 4.2 pt')) &&
-      legibles.some((l) => l.startsWith('móvil corriente: quinto, dado 23.8 pt, punto 4.3 pt')) &&
+      legibles.some((l) => l.startsWith('apaisado SE 1ª: colgado, dado 22.2 pt, punto 4.0 pt')) &&
+      legibles.some((l) => l.startsWith('móvil corriente: quinto, dado 22.2 pt, punto 4.0 pt')) &&
+      legibles.some((l) => l.startsWith('apaisado monitor 1080: colgado, dado 55.0 pt, punto 9.9 pt')) &&
       legibles.filter((l) => l.endsWith('sin dados')).length === 2,
     ilegibles.length > 0 ? ilegibles : legibles,
   );
@@ -5329,9 +5368,10 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
       (trozoDeDados.match(/raycast=\{\(\) => null\}/g) ?? []).length === 3,
   );
   comprobar(
-    'Dados busca MODELO.dado en el catálogo, lo escala con ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK y pinta el respaldo de cubo-del-dado.ts si no está; la máquina faseDeLosDados es la única que decide la fase',
+    'Dados busca MODELO.dado en el catálogo, lo escala con la arista DEL HUECO / ARISTA_DEL_D6_EN_EL_PACK (no la recalcula: sólo el hueco sabe cuánto mide un punto) y pinta el respaldo de cubo-del-dado.ts si no está; la máquina faseDeLosDados es la única que decide la fase',
     /modelo=\{aplanados\.get\(MODELO\.dado\)\}/.test(fuente) &&
-      /const arista = ARISTA_DEL_DADO \* lado;/.test(trozoDeDados) &&
+      /const \{ lado, arista \} = sitio;/.test(trozoDeDados) &&
+      !/ARISTA_DEL_DADO/.test(trozoDeDados) &&
       /const escalaDelPack = arista \/ ARISTA_DEL_D6_EN_EL_PACK;/.test(trozoDeDados) &&
       /geometriaDelCuerpoDelDado\(arista\), puntos: geometriaDeLosPuntosDelDado\(arista\)/.test(trozoDeDados) &&
       /cuaternionDelValor\(valor, giroDelDadoAsentado\(i, selloDelPar\)/.test(trozoDeDados) &&
@@ -5358,8 +5398,8 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
   );
   comprobar(
     'las sombras de los dos dados se AÑADEN a la lista de centros de las sombras de los huecos: una geometría, una llamada, y su radio es RADIO_DE_LA_SOMBRA_DEL_DADO',
-    /centros\.push\(\{\s+x: sitioDeLosDados\.x \+ centroDelDado\(i\) \* sitioDeLosDados\.lado,/.test(fuente) &&
-      /radio: sitioDeLosDados\.lado \* RADIO_DE_LA_SOMBRA_DEL_DADO,/.test(fuente) &&
+    /centros\.push\(\{\s+x: sitioDeLosDados\.x \+ centroDelDado\(i, sitioDeLosDados\.arista \/ sitioDeLosDados\.lado\) \* sitioDeLosDados\.lado,/.test(fuente) &&
+      /radio: sitioDeLosDados\.arista \* RADIO_DE_LA_SOMBRA_DEL_DADO,/.test(fuente) &&
       /geometriaDeLasSombras\(centros\)/.test(fuente) &&
       (soloCodigo(fuente).match(/geometriaDeLasSombras\(/g) ?? []).length === 1,
   );
@@ -5623,14 +5663,14 @@ paso('Recoger la mesa: la bajada tapa el asa PROYECTADA en los quince lienzos, e
         esquinasDelPlano([d.x, tapa.cota + SOBRE_LA_TAPA, d.z], [d.ancho / 2, (d.lado * FONDO_DEL_TAPETE) / 2]),
       ]);
       /* El cubo gira, así que lo que asoma es su esfera de media diagonal, arriba y hacia acá. */
-      const media = ((ARISTA_DEL_DADO * Math.sqrt(3)) / 2) * d.lado;
+      const media = (d.arista * Math.sqrt(3)) / 2;
       for (const i of [0, 1] as const) {
         partes.push([
           `el dado ${String(i)} en lo alto del salto`,
           verticesDeLaCaja(
             [
-              d.x + centroDelDado(i) * d.lado,
-              cotaDeLaTapa(primero) + (CENTRO_DEL_DADO_SOBRE_LA_TAPA + SALTO_DEL_DADO) * d.lado,
+              d.x + centroDelDado(i, d.arista / d.lado) * d.lado,
+              cotaDeLaTapa(primero) + d.arista / 2 + SALTO_DEL_DADO * d.lado,
               d.z,
             ],
             [media, media, media],
@@ -5640,8 +5680,8 @@ paso('Recoger la mesa: la bajada tapa el asa PROYECTADA en los quince lienzos, e
         partes.push([
           `la sombra del dado ${String(i)}`,
           esquinasDelPlano(
-            [d.x + centroDelDado(i) * d.lado, tapa.cota + SOBRE_LA_TAPA, d.z],
-            [RADIO_DE_LA_SOMBRA_DEL_DADO * d.lado, RADIO_DE_LA_SOMBRA_DEL_DADO * d.lado],
+            [d.x + centroDelDado(i, d.arista / d.lado) * d.lado, tapa.cota + SOBRE_LA_TAPA, d.z],
+            [RADIO_DE_LA_SOMBRA_DEL_DADO * d.arista, RADIO_DE_LA_SOMBRA_DEL_DADO * d.arista],
           ),
         ]);
       }

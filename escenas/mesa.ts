@@ -46,7 +46,7 @@ import {
   loQueSeVe,
 } from './barra';
 import type { HuecoDeLaBarra } from './barra';
-import { ARISTA_DEL_DADO, CENTRO_DEL_DADO_SOBRE_LA_TAPA, SALTO_DEL_DADO } from './dados';
+import { ARISTA_TOPE_DEL_DADO, SALTO_DEL_DADO } from './dados';
 import { CELDA_DEL_JUGADOR, COLUMNA_DEL_COLOR, FILAS_DEL_ATLAS } from './paleta';
 import { fbm } from './ruido';
 import { tablaDelAtlas } from './texeles-del-atlas';
@@ -148,7 +148,9 @@ export function tapaDeLaMesa(hueco: HuecoDeLaBarra, campo: number, proporcion: n
  *   · EL VÉRTICE MÁS ALTO Y MÁS LEJANO DEL ASA: `hueco.y + ½·alto·lado` a `D + 0,627·lado`.
  *     Manda en los quince.
  *   · UN DADO EN LO ALTO DE SU SALTO: el cubo gira, así que lo que asoma es su esfera de
- *     media diagonal (`ARISTA_DEL_DADO·√3/2`), arriba y hacia la cámara a la vez.
+ *     media diagonal (`ARISTA_TOPE_DEL_DADO·√3/2`), arriba y hacia la cámara a la vez. Al
+ *     TOPE y no a la arista del hueco: esto es una cota, y vale para el dado más grande
+ *     que pueda salir en cualquier lienzo.
  *   · EL BORDE TRASERO DE LA TAPA: lo más lejos de la cámara que hay en la mesa
  *     (`D + 0,6·lado`), aunque viva bajo la cota.
  *
@@ -182,9 +184,9 @@ export function bajadaDeLaMesa(hueco: HuecoDeLaBarra, campo: number, proporcion:
     hueco.y + (ASA_DEL_HUECO.alto / 2) * lado,
     DISTANCIA_DE_LA_BARRA + fondoDelAsaGirada() * lado,
   );
-  const mediaDiagonal = ((ARISTA_DEL_DADO * Math.sqrt(3)) / 2) * lado;
+  const mediaDiagonal = ((ARISTA_TOPE_DEL_DADO * Math.sqrt(3)) / 2) * lado;
   const dado = hastaElCanto(
-    cotaDeLaTapa(hueco) + (CENTRO_DEL_DADO_SOBRE_LA_TAPA + SALTO_DEL_DADO) * lado + mediaDiagonal,
+    cotaDeLaTapa(hueco) + (ARISTA_TOPE_DEL_DADO / 2 + SALTO_DEL_DADO) * lado + mediaDiagonal,
     DISTANCIA_DE_LA_BARRA + mediaDiagonal,
   );
   const tapa = tapaDeLaMesa(hueco, campo, proporcion);
