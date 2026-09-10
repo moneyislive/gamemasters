@@ -40,7 +40,7 @@
  *  11. EL TIC, caso a caso, y una mesa de seis con NADIE moviendo que acaba sola.
  *  12. «SÓLO SI»: cada tipo mandado fuera de su momento devuelve EL MISMO objeto con
  *      motivo, y ningún motivo lleva un secreto (vacuna con `'p07'`).
- *  13. PARTIDAS ENTERAS DE 2, 4 Y 6 jugadas por el robot, contadas desde los `sucesos`
+ *  13. PARTIDAS ENTERAS DE 2, 3 Y 6 jugadas por el robot, contadas desde los `sucesos`
  *      de la vista: quiebras, rentas, almonedas ganadas, Mazmorra, barrios alzados,
  *      tratos aceptados y un ganador; reejecutadas del diario; con secretos, forma y
  *      canónico mirados EN CADA REVISIÓN de siete miradas; y con la vacuna del robot
@@ -61,10 +61,11 @@
  *
  * ═══ LO QUE ESTE FICHERO DECIDIÓ DONDE EL DISEÑO CALLABA ═══
  *
- *   · «Seis sentados, nadie mueve, ≤ 2.500 tics» se mide con tope de vueltas 6, no 30:
- *     con 30 son ~7.900 tics (cada título sin comprar sale a almoneda y los seis pasan
- *     uno a uno: nueve tics por turno). Se imprime la cifra y se exige además la de
- *     cuatro con tope 10.
+ *   · «Seis sentados, nadie mueve, ≤ 2.500 tics» del diseño es de OTRA mesa. Medido
+ *     aquí: seis con tope 30 cuestan 7.846 tics; cuatro con tope 10, 1.615; dos con
+ *     tope 6, 357. Sin nadie que compre, cada título pisado sale a almoneda y los
+ *     seis pasan uno a uno. Se afirman las tres con su tope propio (lo medido más un
+ *     tercio) y se IMPRIMEN; lo que de verdad se exige es que TERMINEN.
  *   · La tabla (§2.2) no se repite: la afirma `verify:mecanicas-burgo`.
  *   · Los secretos del Burgo no pueden aparecer en NINGUNA vista (no hay manos): la
  *     búsqueda es más estricta que la de `verify:mesa`, que admite una aparición.
@@ -88,6 +89,7 @@ import type { AsientoId, ContextoMovimiento, LosSentados, Movimiento, Opcion, Qu
 import { canonico, porQueNoEsCanonico } from '../../shared/mecanicas/canonico';
 import { enteroEntre, sembrar } from '../../shared/mecanicas/azar';
 import type { Azar } from '../../shared/mecanicas/azar';
+import { cruzaLaSalida, distanciaAdelante, masCercana } from '../../shared/mecanicas/anillo';
 import { turnoDeLaVista } from '../../shared/mecanicas/turno-declarado';
 import { opcionesSueltas } from '../../shared/mecanicas/tablero-declarado';
 import '../../shared/arcade/juegos';
@@ -120,12 +122,14 @@ import {
   RONDAS_DE_SORTEO,
   seAcabo,
   TIRAR,
+  TOPE_DE_MRS_EN_UN_TRATO,
   TOPE_DE_SUCESOS,
   TRATOS_ABIERTOS_POR_PROPONENTE,
   USAR_INDULTO,
   VENDER,
 } from '../../shared/arcade/juegos/burgo';
 import type {
+  AlmonedaDelBurgo,
   ApuroDelBurgo,
   EstadoDelBurgo,
   JugadorDelBurgo,
@@ -140,6 +144,9 @@ import {
   CASILLAS,
   cartasDe,
   costeDeDesempeno,
+  CUANTAS_CASILLAS,
+  OFICIOS,
+  PUERTAS,
   DINERO_DE_SALIDA,
   EL_ARCA,
   EL_DIEZMO,
@@ -216,8 +223,20 @@ const TOPE_DE_OPCIONES_BYTES = 12 * 1024;
 const TOPE_DE_CARGA = 1024;
 /** La mitad del tope de producción (50 ms): ver la cabecera. */
 const TOPE_DE_MS = 25;
-/** Cuántos tics como mucho para que una mesa sin nadie acabe. */
-const TOPE_DE_TICS_SIN_NADIE = 2500;
+/**
+ * LAS TRES MESAS SIN NADIE: `[cuántos sentados, tope de vueltas, tope de tics]`.
+ *
+ * Los topes salen de medir y de subir un tercio (ver el bloque 11). No son «2.500»,
+ * que es lo que decía el diseño para una mesa distinta de la que aquí se juega.
+ */
+/** Tope de tics de la cascada de quiebra al Concejo: 28 almonedas con los demás pasando. */
+const TOPE_DE_CASCADA = 400;
+
+const MESAS_SIN_NADIE: ReadonlyArray<readonly [number, number, number]> = [
+  [2, 6, 500],
+  [4, 10, 2200],
+  [6, 30, 10500],
+];
 
 function estadoDe(mesa: Mesa): EstadoDelBurgo {
   return mesa.estado as EstadoDelBurgo;
@@ -260,6 +279,16 @@ function mover(mesa: Mesa, quien: AsientoId, movimiento: Movimiento): { mesa: Me
 
 function mesaSobre(id: string, estado: EstadoDelBurgo | undefined, asientos: readonly AsientoId[], semilla = 7): Mesa {
   return abrirMesa({ id, arcade: BURGO, semilla, asientos, estado });
+}
+
+/**
+ * UN TIC POR LA PUERTA DEL ÁRBITRO, que es la única que hay: `avanzarElReloj` sube el
+ * reloj de la mesa y mete `arcade:tic` con `quien: null`, SIN pasar por el portillo.
+ * Un tic que el juego ignora devuelve la MISMA mesa por identidad, y en eso se apoya
+ * el bloque del tic para afirmar que en `reuniendo` y en `terminada` no pasa nada.
+ */
+function tic(mesa: Mesa): Mesa {
+  return avanzarElReloj(mesa);
 }
 
 /** Una mesa recién EMPEZADA por el primer asiento, con el tope que se pida. */
@@ -952,6 +981,1302 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
   comprobar('y la casa se alza de verdad estando presa', alzaPresa.cambio && tituloDe(estadoDe(alzaPresa.mesa), 1).casas === 1 && jugadorDe(estadoDe(alzaPresa.mesa), ANA).presa === 0);
 }
 
+// ---------------------------------------------------------------------------
+paso('6. LAS 32 CARTAS, una a una desde estados montados, y los dos mazos que rotan');
+// ---------------------------------------------------------------------------
+
+/** Las tres casillas de cada mazo. Se cae en la primera de cada lista salvo que la carta pida otra. */
+const CASILLA_DE_MAZO: Readonly<Record<MazoId, number>> = { pregon: 7, arca: 17 };
+
+/**
+ * UN TRES QUE NO ES DOBLES, y la razón de que las cartas se prueben con él y no con
+ * el siete de los demás bloques: con siete, caer en el Pregón (7) obliga a salir del
+ * 39 y a CRUZAR la Puerta Mayor de camino, y entonces cada cuenta de dinero de las
+ * treinta y dos cartas lleva doscientos maravedíes de propina que no son de la carta.
+ * Con tres se sale del 4, del 14 y del 33, y lo único que mueve el dinero es la carta.
+ */
+const TRES_PASOS: ParDeDados = [1, 2];
+
+/** La casilla del Diezmo, que es donde se abre el apuro que se salda. */
+const EL_DIEZMO_CASILLA = 4;
+
+/** ¿Ir de `desde` a `hasta` hacia delante pasa por la Puerta Mayor? */
+function cruzaAlIr(desde: number, hasta: number): boolean {
+  return cruzaLaSalida(desde, distanciaAdelante(desde, hasta, CUANTAS_CASILLAS), CUANTAS_CASILLAS);
+}
+
+/** Pone `numero` de `mazo` en la CIMA, sin tocar el resto del orden ni el otro mazo. */
+function conLaCartaArriba(e: EstadoDelBurgo, mazo: MazoId, numero: number): EstadoDelBurgo {
+  const serie = serieDeCarta(mazo, numero);
+  const lista = (mazo === 'pregon' ? e.pregon : e.arca).filter((s) => s !== serie);
+  const puesto = [serie, ...lista];
+  return mazo === 'pregon' ? { ...e, pregon: puesto } : { ...e, arca: puesto };
+}
+
+/**
+ * LOS REPROCHES DE UNA CARTA CUMPLIDA, sin mirar todavía su efecto: la carta salió
+ * por su NÚMERO (nunca la serie), hay un suceso `carta`, y el mazo rotó —la serie
+ * al fondo y ni una carta perdida— salvo el Indulto, que SALE del mazo.
+ */
+function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: MazoId, numero: number, quien: AsientoId): string[] {
+  const r: string[] = [];
+  const serie = serieDeCarta(mazo, numero);
+  const deAntes = mazo === 'pregon' ? antes.pregon : antes.arca;
+  const deAhora = mazo === 'pregon' ? s.pregon : s.arca;
+  const ficha = cartasDe(mazo).find((c) => c.numero === numero);
+  const sucesos = sucesosDe(s, 'carta') as Array<{ mazo: MazoId; carta: number; quien: AsientoId }>;
+  if (!sucesos.some((x) => x.mazo === mazo && x.carta === numero && x.quien === quien)) r.push('no hay suceso `carta` con ese número');
+  /*
+   * `ultimaCarta` es la ÚLTIMA que salió, y no siempre la que se pidió: «tres pasos
+   * atrás» desde el 36 cae en el Arca del 33 y saca una segunda. Se exige que cuadre
+   * con el último suceso `carta`, que es lo que de verdad afirma el contrato.
+   */
+  const ultima = sucesos[sucesos.length - 1];
+  if (s.ultimaCarta === null) r.push('no hay ultimaCarta');
+  else if (ultima === undefined || s.ultimaCarta.mazo !== ultima.mazo || s.ultimaCarta.carta !== ultima.carta || s.ultimaCarta.quien !== ultima.quien) {
+    r.push(`ultimaCarta es ${JSON.stringify(s.ultimaCarta)} y el último suceso ${JSON.stringify(ultima)}`);
+  }
+  if (ficha !== undefined && ficha.efecto.que === 'indulto') {
+    if (deAhora.length !== deAntes.length - 1) r.push(`el Indulto no salió del mazo: ${deAntes.length} → ${deAhora.length}`);
+    if (deAhora.indexOf(serie) >= 0) r.push('el Indulto sigue en el mazo');
+  } else {
+    if (deAhora.length !== deAntes.length) r.push(`el mazo cambió de tamaño: ${deAntes.length} → ${deAhora.length}`);
+    if (deAhora[deAhora.length - 1] !== serie) r.push(`la carta no fue al fondo: el fondo es ${String(deAhora[deAhora.length - 1])}`);
+    if (deAhora[0] === serie) r.push('la carta sigue en la cima');
+    for (const x of deAntes) if (deAhora.indexOf(x) < 0) r.push(`se perdió ${x}`);
+  }
+  return r;
+}
+
+{
+  const base = estadoDe(empezada('CAR', CUATRO, 41));
+  /* Con dinero de sobra: ninguna carta de estas debe abrir un apuro, y si lo abre se ve. */
+  let rico = base;
+  for (const a of CUATRO) rico = conJugador(rico, a, { mrs: 5000 });
+
+  let cumplidas = 0;
+  for (const mazo of ['pregon', 'arca'] as MazoId[]) {
+    for (const ficha of cartasDe(mazo)) {
+      const donde = CASILLA_DE_MAZO[mazo];
+      const numero = ficha.numero;
+      /* El «tres pasos atrás» se prueba desde el 36, que es el único Pregón que cae en un Arca (33). */
+      const salida = ficha.efecto.que === 'retrocede' ? 36 : donde;
+      const partida = conLaCartaArriba(rico, mazo, numero);
+      const { s, cruza } = alCaerEn(`CAR-${mazo}-${numero}`, partida, ANA, salida, [TRES_PASOS]);
+      cumplidas++;
+      const antesMrs = jugadorDe(partida, ANA).mrs + (cruza ? PAGA_DE_LA_PUERTA_MAYOR : 0);
+      const ahora = jugadorDe(s, ANA);
+      const generales = reprochesDeCartaSalida(partida, s, mazo, numero, ANA);
+      comprobar(`${mazo} ${numero} «${ficha.titulo}» sale por su número y el mazo queda bien`, generales.length === 0, generales);
+      const efecto = ficha.efecto;
+      switch (efecto.que) {
+        case 'ir':
+          comprobar(`  y lleva a la casilla ${efecto.a}, cobrando la Puerta Mayor sólo si se pasa`, ahora.casilla === efecto.a && ahora.mrs === antesMrs + (cruzaAlIr(salida, efecto.a) ? PAGA_DE_LA_PUERTA_MAYOR : 0), {
+            casilla: ahora.casilla,
+            mrs: ahora.mrs,
+            antesMrs,
+          });
+          break;
+        case 'puerta-cercana': {
+          const puerta = masCercana(salida, PUERTAS, CUANTAS_CASILLAS);
+          comprobar(`  y lleva a la puerta más cercana (${puerta}), que es del Concejo y se abre para comprar`, ahora.casilla === puerta && s.paso === 'comprar');
+          /* Con dueño: el DOBLE de la renta de puerta. */
+          const conDueno = conTitulo(conLaCartaArriba(rico, mazo, numero), puerta, { dueno: BRUNO });
+          const { s: s2 } = alCaerEn(`CAR-PC-${mazo}-${numero}`, conDueno, ANA, salida, [TRES_PASOS]);
+          const esperado = 2 * (RENTA_DE_PUERTA[1] as number);
+          comprobar(`  y con dueño paga el DOBLE de la renta de puerta (${esperado})`, reprochesDeRenta(conDueno, s2, ANA, BRUNO, esperado, false).length === 0, reprochesDeRenta(conDueno, s2, ANA, BRUNO, esperado, false));
+          break;
+        }
+        case 'oficio-cercano': {
+          const oficio = masCercana(salida, OFICIOS, CUANTAS_CASILLAS);
+          comprobar(`  y lleva al oficio más cercano (${oficio}), del Concejo, y se abre para comprar`, ahora.casilla === oficio && s.paso === 'comprar');
+          const conDueno = conTitulo(conLaCartaArriba(rico, mazo, numero), oficio, { dueno: BRUNO });
+          /* La segunda tirada del par sale de la MISMA cadena: [2,6] mueve y [1,3] es la del oficio. */
+          const { s: s2 } = alCaerEn(`CAR-OC-${mazo}-${numero}`, conDueno, ANA, salida, [TRES_PASOS, [1, 3]]);
+          const nueva = sucesosDe(s2, 'tirada-de-oficio')[0] as { dados: ParDeDados } | undefined;
+          comprobar('  y con dueño tira DE NUEVO para el oficio y publica el par', nueva !== undefined && nueva.dados.join() === '1,3', nueva);
+          const esperado = MULTIPLO_DE_OFICIO_POR_CARTA * 4;
+          comprobar(`  y paga diez veces esa tirada (${esperado}), no cuatro ni diez veces la del movimiento`, reprochesDeRenta(conDueno, s2, ANA, BRUNO, esperado, false).length === 0, reprochesDeRenta(conDueno, s2, ANA, BRUNO, esperado, false));
+          break;
+        }
+        case 'cobra':
+          comprobar(`  y cobra ${efecto.cuanto} del Concejo`, ahora.mrs === antesMrs + efecto.cuanto && cobrosDe(s, ANA).some((c) => c.porque === 'carta' && c.cuanto === efecto.cuanto && c.de === null), ahora.mrs);
+          break;
+        case 'paga':
+          comprobar(`  y paga ${efecto.cuanto} al Concejo`, ahora.mrs === antesMrs - efecto.cuanto && pagosDe(s, ANA).some((p) => p.porque === 'carta' && p.cuanto === efecto.cuanto && p.a === null), ahora.mrs);
+          break;
+        case 'indulto':
+          comprobar('  y el Indulto queda en la mano, contado en la vista y sin gastar un maravedí', ahora.indultos.length === 1 && ahora.indultos[0] === mazo && ahora.mrs === antesMrs && vistaDe(s, ESPECTADOR).jugadores.find((j) => j.asiento === ANA)?.indultos === 1);
+          break;
+        case 'retrocede':
+          comprobar(`  y retrocede ${efecto.casillas} hasta el 33, que es un Arca, y la resuelve (sale una carta más)`, ahora.casilla === 33 && sucesosDe(s, 'carta').length === 2 && (sucesosDe(s, 'carta')[1] as { mazo: MazoId }).mazo === 'arca', {
+            casilla: ahora.casilla,
+            cartas: sucesosDe(s, 'carta').length,
+          });
+          comprobar('  y el `mueve` de retroceder lo dice: como «retrocede» y sin cobrar la Puerta Mayor', (sucesosDe(s, 'mueve')[1] as { como: string; porLaPuertaMayor: boolean } | undefined)?.como === 'retrocede' && (sucesosDe(s, 'mueve')[1] as { porLaPuertaMayor: boolean } | undefined)?.porLaPuertaMayor === false);
+          break;
+        case 'a-la-mazmorra':
+          comprobar('  y va derecho a la Mazmorra, por carta', reprochesDeEncierro(s, ANA, 'carta').length === 0, reprochesDeEncierro(s, ANA, 'carta'));
+          break;
+        case 'reparaciones': {
+          /* Con tres casas en el barrio pardo y una posada en el azul: la cuenta de la tabla. */
+          const conObra = conTitulos(conLaCartaArriba(rico, mazo, numero), [
+            [1, ANA, 2, false],
+            [3, ANA, 1, false],
+            [37, ANA, POSADA, false],
+            [39, ANA, 0, false],
+          ]);
+          const { s: s2, cruza: cruza2 } = alCaerEn(`CAR-REP-${mazo}-${numero}`, conObra, ANA, salida, [TRES_PASOS]);
+          const debe = efecto.porCasa * 3 + efecto.porPosada * 1;
+          const esperadoMrs = jugadorDe(conObra, ANA).mrs + (cruza2 ? PAGA_DE_LA_PUERTA_MAYOR : 0) - debe;
+          comprobar(`  y las reparaciones cuestan ${efecto.porCasa}×3 + ${efecto.porPosada}×1 = ${debe}`, jugadorDe(s2, ANA).mrs === esperadoMrs && pagosDe(s2, ANA).some((p) => p.porque === 'reparaciones' && p.cuanto === debe), {
+            mrs: jugadorDe(s2, ANA).mrs,
+            esperadoMrs,
+          });
+          comprobar('  y sin edificios no cuesta nada', (() => {
+            const { s: s3, cruza: c3 } = alCaerEn(`CAR-REP0-${mazo}-${numero}`, conLaCartaArriba(rico, mazo, numero), ANA, salida, [TRES_PASOS]);
+            return jugadorDe(s3, ANA).mrs === jugadorDe(rico, ANA).mrs + (c3 ? PAGA_DE_LA_PUERTA_MAYOR : 0) && pagosDe(s3, ANA).every((p) => p.porque !== 'reparaciones');
+          })());
+          break;
+        }
+        case 'paga-a-cada-uno': {
+          const otros = CUATRO.filter((a) => a !== ANA);
+          comprobar(`  y paga ${efecto.cuanto} a cada uno de los otros tres`, ahora.mrs === antesMrs - efecto.cuanto * otros.length && otros.every((a) => jugadorDe(s, a).mrs === jugadorDe(partida, a).mrs + efecto.cuanto), ahora.mrs);
+          break;
+        }
+        case 'cobra-de-cada-uno': {
+          const otros = CUATRO.filter((a) => a !== ANA);
+          comprobar(`  y cobra ${efecto.cuanto} de cada uno de los otros tres`, ahora.mrs === antesMrs + efecto.cuanto * otros.length && otros.every((a) => jugadorDe(s, a).mrs === jugadorDe(partida, a).mrs - efecto.cuanto), ahora.mrs);
+          break;
+        }
+        default:
+          comprobar(`  efecto no previsto en este comprobador: ${(efecto as { que: string }).que}`, false);
+      }
+      comprobar('  y ni un reproche de forma ni un secreto tras cumplirla', reprochesDeLasMiradas(s, CUATRO, true).length === 0 && reprochesDeSecretos(s, CUATRO).length === 0, [
+        ...reprochesDeLasMiradas(s, CUATRO, true),
+        ...reprochesDeSecretos(s, CUATRO),
+      ]);
+    }
+  }
+  comprobar('se han cumplido las 32 cartas, una a una', cumplidas === EL_PREGON.length + EL_ARCA.length && cumplidas === 32, cumplidas);
+
+  /* «Cada uno te paga» con quien no alcanza: se abre la cola de apuros y no se pierde la deuda. */
+  {
+    const numero = (EL_ARCA.find((c) => c.efecto.que === 'cobra-de-cada-uno') as CartaDelBurgo).numero;
+    let pobres = conLaCartaArriba(base, 'arca', numero);
+    for (const a of [BRUNO, CARLA]) pobres = conJugador(pobres, a, { mrs: 0 });
+    const { s } = alCaerEn('CAR-COLA', pobres, ANA, CASILLA_DE_MAZO.arca, [TRES_PASOS]);
+    comprobar('con dos que no alcanzan, «cada uno te paga» abre un apuro y encola el otro', s.paso === 'apuro' && s.apuro !== null && s.colaDeApuros.length === 1, {
+      apuro: s.apuro,
+      cola: s.colaDeApuros,
+    });
+    comprobar('y los dos apuros son de los dos pobres, con la deuda entera', [s.apuro?.quien, s.colaDeApuros[0]?.quien].sort().join() === [BRUNO, CARLA].sort().join());
+    comprobar('y quien la jugó cobró SÓLO del que podía pagar: de los otros dos no se mueve un maravedí', jugadorDe(s, ANA).mrs === DINERO_DE_SALIDA + 10 && jugadorDe(s, DIEGO).mrs === DINERO_DE_SALIDA - 10 && jugadorDe(s, BRUNO).mrs === 0, {
+      ana: jugadorDe(s, ANA).mrs,
+      diego: jugadorDe(s, DIEGO).mrs,
+    });
+  }
+
+  /* LAS VACUNAS del mazo y de la carta. */
+  {
+    const numero = 1;
+    const partida = conLaCartaArriba(base, 'pregon', numero);
+    const { s } = alCaerEn('CAR-VAC', partida, ANA, CASILLA_DE_MAZO.pregon, [TRES_PASOS]);
+    comprobar('la vacuna: exigir OTRO número del que salió se ve caer', reprochesDeCartaSalida(partida, s, 'pregon', 2, ANA).length > 0);
+    const sinRotar: EstadoDelBurgo = { ...s, pregon: partida.pregon };
+    comprobar('y un mazo que no rota también', reprochesDeCartaSalida(partida, sinRotar, 'pregon', numero, ANA).length > 0);
+    const conUnaMenos: EstadoDelBurgo = { ...s, pregon: s.pregon.slice(1) };
+    comprobar('y uno al que le falta una carta también', reprochesDeCartaSalida(partida, conUnaMenos, 'pregon', numero, ANA).length > 0);
+  }
+}
+
+// ---------------------------------------------------------------------------
+paso('7. EL EMPEÑO: mitad, desempeño por TABLA, el barrio con edificios, y el interés del trato');
+// ---------------------------------------------------------------------------
+
+{
+  const base = estadoDe(empezada('EMP-T', CUATRO, 41));
+  const suyos = turnoDe(conTitulos(base, [[1, ANA, 0, false], [3, ANA, 0, false], [5, ANA, 0, false], [37, ANA, 0, false], [39, ANA, 0, false]]), ANA, 'por-pasar');
+
+  /*
+   * LA TABLA DEL EMPEÑO, escrita a mano y no derivada de la función: si `valorDeEmpeno`
+   * cambiara de fórmula, una tabla calculada con ella seguiría en verde. El interés es
+   * el 10 % REDONDEADO HACIA ARRIBA, que es donde vive el fallo fácil (60 → 3, no 3,0).
+   */
+  const TABLA_DEL_EMPENO: ReadonlyArray<readonly [number, number, number]> = [
+    [60, 30, 3],
+    [100, 50, 5],
+    [140, 70, 7],
+    [200, 100, 10],
+    [220, 110, 11],
+    [260, 130, 13],
+    [300, 150, 15],
+    [350, 175, 18],
+    [400, 200, 20],
+  ];
+  for (const [precio, empeno, interes] of TABLA_DEL_EMPENO) {
+    comprobar(`un título de ${precio} se empeña por ${empeno} y se desempeña por ${empeno + interes}`, valorDeEmpeno(precio) === empeno && interesDelEmpeno(precio) === interes && costeDeDesempeno(precio) === empeno + interes, {
+      empeno: valorDeEmpeno(precio),
+      interes: interesDelEmpeno(precio),
+    });
+  }
+  comprobar('el 10 % se redondea HACIA ARRIBA: 175 no da 17', interesDelEmpeno(350) === 18 && interesDelEmpeno(60) === 3);
+
+  const opEmpeno = opcionPorId(suyos, ANA, 'empenar:39');
+  comprobar('la opción de empeñar la Calle Mayor dice sus 200 mrs', opEmpeno !== null && opEmpeno.rotulo.indexOf('200 mrs') >= 0, opEmpeno?.rotulo);
+  const empenado = mover(mesaSobre('EMP-1', suyos, CUATRO), ANA, { tipo: EMPENAR, carga: { casilla: 39 } });
+  const trasEmpeno = estadoDe(empenado.mesa);
+  comprobar('empeñar la Calle Mayor da 200 y la marca', empenado.cambio && tituloDe(trasEmpeno, 39).empenado && jugadorDe(trasEmpeno, ANA).mrs === DINERO_DE_SALIDA + valorDeEmpeno(400) && cobrosDe(trasEmpeno, ANA).some((c) => c.porque === 'empeno' && c.cuanto === 200));
+  comprobar('con su suceso `empena` y la vista marcándolo', sucesosDe(trasEmpeno, 'empena').length === 1 && vistaDe(trasEmpeno, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.empenado === true);
+  comprobar('y ya no se ofrece empeñarlo otra vez, sino desempeñarlo', !idsDe(trasEmpeno, ANA).includes('empenar:39') && idsDe(trasEmpeno, ANA).includes('desempenar:39'));
+  const opDes = opcionPorId(trasEmpeno, ANA, 'desempenar:39');
+  comprobar('y la de desempeñar dice el empeño MÁS el interés (220 mrs)', opDes !== null && opDes.rotulo.indexOf('220 mrs') >= 0, opDes?.rotulo);
+  const desempenado = mover(mesaSobre('EMP-2', trasEmpeno, CUATRO), ANA, { tipo: DESEMPENAR, carga: { casilla: 39 } });
+  const trasDes = estadoDe(desempenado.mesa);
+  comprobar('desempeñar cuesta 220 y lo libera', desempenado.cambio && !tituloDe(trasDes, 39).empenado && jugadorDe(trasDes, ANA).mrs === DINERO_DE_SALIDA + 200 - 220 && pagosDe(trasDes, ANA).some((p) => p.porque === 'desempeno' && p.cuanto === 220));
+  comprobar('empeñado no cobra y desempeñado vuelve a cobrar (y con el barrio azul entero, el doble)', vistaDe(trasEmpeno, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora === 0 && vistaDe(trasDes, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora === 2 * 50, {
+    empenado: vistaDe(trasEmpeno, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora,
+    libre: vistaDe(trasDes, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora,
+  });
+  const sinDinero = conJugador(trasEmpeno, ANA, { mrs: 219 });
+  comprobar('sin los 220 no se ofrece desempeñar', !idsDe(sinDinero, ANA).includes('desempenar:39'));
+  comprobar('y mandarlo se rechaza con motivo', (() => {
+    const r = mover(mesaSobre('EMP-3', sinDinero, CUATRO), ANA, { tipo: DESEMPENAR, carga: { casilla: 39 } });
+    return !r.cambio && r.motivo !== null;
+  })());
+
+  /* Con edificios en el barrio no se empeña NINGUNO de sus solares. */
+  const conCasa = conTitulo(suyos, 1, { casas: 1 });
+  const idsConCasa = idsDe(conCasa, ANA);
+  comprobar('con una casa en el barrio pardo no se empeña ni el 1 ni el 3', !idsConCasa.includes('empenar:1') && !idsConCasa.includes('empenar:3'), idsConCasa);
+  comprobar('pero sí los de otros barrios', idsConCasa.includes('empenar:5') && idsConCasa.includes('empenar:39'));
+  const forzado = mover(mesaSobre('EMP-4', conCasa, CUATRO), ANA, { tipo: EMPENAR, carga: { casilla: 3 } });
+  comprobar('y mandarlo igual se rechaza con motivo', !forzado.cambio && forzado.motivo !== null);
+  const ajeno = mover(mesaSobre('EMP-5', suyos, CUATRO), BRUNO, { tipo: EMPENAR, carga: { casilla: 39 } });
+  comprobar('un título que no es tuyo no se empeña', !ajeno.cambio && ajeno.motivo !== null);
+
+  /*
+   * EL INTERÉS DEL TRATO: quien RECIBE un título empeñado paga el 10 % en el acto, y
+   * si no le alcanza para ese interés el trato se rechaza CON MOTIVO (y sin decir qué
+   * hay en la mano de nadie: aquí no hay manos, pero el motivo se pasa por la criba).
+   */
+  {
+    const conEmpenado = conJugador(conTitulo(turnoDe(conTitulos(base, [[39, ANA, 0, true]]), ANA, 'por-pasar'), 39, { empenado: true }), BRUNO, { mrs: 500 });
+    const propuesta = mover(mesaSobre('EMP-TRATO', conEmpenado, CUATRO), ANA, {
+      tipo: PROPONER,
+      carga: { a: BRUNO, doy: { mrs: 0, titulos: [39], indultos: 0 }, pido: { mrs: 100, titulos: [], indultos: 0 } },
+    });
+    comprobar('se propone dar la Calle Mayor EMPEÑADA por 100 mrs', propuesta.cambio && estadoDe(propuesta.mesa).tratos.length === 1);
+    const id = (estadoDe(propuesta.mesa).tratos[0] as TratoDelBurgo).id;
+    const aceptado = mover(propuesta.mesa, BRUNO, { tipo: ACEPTAR, carga: { trato: id } });
+    const s = estadoDe(aceptado.mesa);
+    comprobar('al aceptarlo, quien recibe el empeñado paga el interés (20) EN EL ACTO', aceptado.cambio && tituloDe(s, 39).dueno === BRUNO && tituloDe(s, 39).empenado && jugadorDe(s, BRUNO).mrs === 500 - 100 - interesDelEmpeno(400), jugadorDe(s, BRUNO).mrs);
+    comprobar('y el pago se anota como `interes` al Concejo', pagosDe(s, BRUNO).some((p) => p.porque === 'interes' && p.cuanto === 20 && p.a === null));
+    /* Y si no le alcanza para el interés: rechazo con motivo, sin mover nada. */
+    const pelado = conJugador(conEmpenado, BRUNO, { mrs: 10 });
+    const p2 = mover(mesaSobre('EMP-TRATO-2', pelado, CUATRO), ANA, {
+      tipo: PROPONER,
+      carga: { a: BRUNO, doy: { mrs: 0, titulos: [39], indultos: 0 }, pido: { mrs: 10, titulos: [], indultos: 0 } },
+    });
+    const id2 = (estadoDe(p2.mesa).tratos[0] as TratoDelBurgo).id;
+    const fallido = mover(p2.mesa, BRUNO, { tipo: ACEPTAR, carga: { trato: id2 } });
+    comprobar('con 10 mrs y un interés de 20, aceptar se rechaza con motivo y el título no se mueve', !fallido.cambio && fallido.motivo !== null && fallido.motivo.indexOf('interés') >= 0, fallido.motivo);
+    comprobar('y ese motivo no lleva ningún secreto ni ninguna marca dentro', reprochesDeTexto(String(fallido.motivo), estadoDe(p2.mesa)).length === 0);
+  }
+}
+
+// ---------------------------------------------------------------------------
+paso('8. LA ALMONEDA: relevo, mínimo y múltiplos, las fijas, la puja libre por la puerta, el cierre');
+// ---------------------------------------------------------------------------
+
+{
+  const base = estadoDe(empezada('ALM', CUATRO, 41));
+  /* ANA cae en la Calle Mayor (39), que es del Concejo, y la manda a almoneda. */
+  const { s: enCompra } = alCaerEn('ALM-0', base, ANA, 39);
+  comprobar('caer en un título del Concejo abre `comprar` con las dos opciones', enCompra.paso === 'comprar' && idsDe(enCompra, ANA).includes('comprar:39') && idsDe(enCompra, ANA).includes('a-almoneda:39'));
+  const abierta = mover(mesaSobre('ALM-1', enCompra, CUATRO), ANA, { tipo: A_ALMONEDA, carga: { casilla: 39 } });
+  let mesa = abierta.mesa;
+  let e = estadoDe(mesa);
+  const a0 = e.almoneda as AlmonedaDelBurgo;
+  comprobar('se abre la almoneda, sin pujas, con los cuatro en pie', abierta.cambio && e.paso === 'almoneda' && a0.casilla === 39 && a0.puja === 0 && a0.quienPuja === null && a0.enPie.length === 4);
+  comprobar('EL RELEVO EMPIEZA POR EL SIGUIENTE al dueño del turno, que va el ÚLTIMO', a0.enPie.join() === [BRUNO, CARLA, DIEGO, ANA].join() && a0.pujaDe === BRUNO && a0.abiertaPor === ANA, a0.enPie);
+  comprobar('y `turnoDe` de la vista es a quien se espera, con `duenoDelTurno` aparte', vistaDe(e, ESPECTADOR).turnoDe === BRUNO && vistaDe(e, ESPECTADOR).duenoDelTurno === ANA);
+  comprobar('quien no tiene el relevo no recibe ninguna opción de puja', !idsDe(e, CARLA).some((id) => id.indexOf('pujar') === 0 || id === 'pasar-puja'), idsDe(e, CARLA));
+
+  const idsB = idsDe(e, BRUNO);
+  comprobar('el que puja recibe el mínimo, los dos escalones y pasar', idsB.includes('pujar:minimo') && idsB.includes('pujar:+50') && idsB.includes('pujar:+100') && idsB.includes('pasar-puja'), idsB);
+  const minima = opcionPorId(e, BRUNO, 'pujar:minimo');
+  comprobar(`la primera puja mínima es ${PUJA_MINIMA}`, canonico(minima?.carga) === canonico({ casilla: 39, cuanto: PUJA_MINIMA }));
+  const puerta = opcionesEn(e, BRUNO).find((o) => o.declaracion === true && o.tipo === PUJAR);
+  comprobar('y una PUERTA de puja libre, que no se pinta como botón', puerta !== undefined && puerta.declaracion === true);
+  comprobar('con los cuatro campos exactos y el escalón del paso', canonico(puerta?.carga) === canonico({ casilla: 39, minimo: PUJA_MINIMA, maximo: DINERO_DE_SALIDA, escalon: PASO_DE_PUJA }), puerta?.carga);
+  comprobar('las tres fijas son distintas entre sí y ninguna pasa de lo que se tiene', (() => {
+    const cuantos = opcionesEn(e, BRUNO).filter((o) => o.declaracion !== true && o.tipo === PUJAR).map((o) => (o.carga as { cuanto: number }).cuanto);
+    return new Set(cuantos).size === cuantos.length && cuantos.every((c) => c <= DINERO_DE_SALIDA);
+  })());
+
+  /* La puja libre por la puerta: campos EXACTOS. */
+  const libre = mover(mesa, BRUNO, { tipo: PUJAR, carga: { casilla: 39, cuanto: 300 } });
+  comprobar('una puja libre de 300 cabe por la puerta y se acepta', libre.cambio && (estadoDe(libre.mesa).almoneda as AlmonedaDelBurgo).puja === 300);
+  for (const [que, carga] of [
+    ['con un campo de más (8 kB de relleno incluidos)', { casilla: 39, cuanto: 300, relleno: 'x'.repeat(8192) }],
+    ['sin la casilla', { cuanto: 300 }],
+    ['con otra casilla', { casilla: 1, cuanto: 300 }],
+    ['por debajo del mínimo', { casilla: 39, cuanto: 5 }],
+    ['por encima de lo que tiene', { casilla: 39, cuanto: 5000 }],
+    ['que no es múltiplo del paso', { casilla: 39, cuanto: 305 }],
+    ['con un no entero', { casilla: 39, cuanto: 300.5 }],
+  ] as ReadonlyArray<readonly [string, unknown]>) {
+    const r = mover(mesa, BRUNO, { tipo: PUJAR, carga });
+    comprobar(`una puja ${que} se rechaza con motivo y no cambia nada`, !r.cambio && r.motivo !== null, r.motivo);
+  }
+  const deOtro = mover(mesa, CARLA, { tipo: PUJAR, carga: { casilla: 39, cuanto: 300 } });
+  comprobar('y una puja de quien no tiene el relevo también', !deOtro.cambio && deOtro.motivo !== null);
+
+  /* El relevo pasa al siguiente y da la vuelta. */
+  mesa = libre.mesa;
+  e = estadoDe(mesa);
+  comprobar('tras pujar, el relevo pasa al siguiente en pie', (e.almoneda as AlmonedaDelBurgo).pujaDe === CARLA && (e.almoneda as AlmonedaDelBurgo).quienPuja === BRUNO);
+  const minimaTras = opcionPorId(e, CARLA, 'pujar:minimo');
+  comprobar('y el mínimo sube un paso sobre la mejor puja', canonico(minimaTras?.carga) === canonico({ casilla: 39, cuanto: 300 + PASO_DE_PUJA }));
+  const pasa1 = mover(mesa, CARLA, { tipo: PASAR_PUJA, carga: { casilla: 39 } });
+  mesa = pasa1.mesa;
+  e = estadoDe(mesa);
+  comprobar('quien pasa sale de `enPie` y el relevo sigue por donde iba', pasa1.cambio && (e.almoneda as AlmonedaDelBurgo).enPie.join() === [BRUNO, DIEGO, ANA].join() && (e.almoneda as AlmonedaDelBurgo).pujaDe === DIEGO);
+  const vuelve = mover(mesa, CARLA, { tipo: PUJAR, carga: { casilla: 39, cuanto: 400 } });
+  comprobar('EL QUE DECLINÓ NO VUELVE: su puja se rechaza con motivo', !vuelve.cambio && vuelve.motivo !== null);
+  mesa = mover(mesa, DIEGO, { tipo: PASAR_PUJA, carga: { casilla: 39 } }).mesa;
+  const antesDelCierre = estadoDe(mesa);
+  comprobar('con dos fuera, el relevo llega al dueño del turno, que también puja', (antesDelCierre.almoneda as AlmonedaDelBurgo).pujaDe === ANA && (antesDelCierre.almoneda as AlmonedaDelBurgo).enPie.join() === [BRUNO, ANA].join());
+  const cierre = mover(mesa, ANA, { tipo: PASAR_PUJA, carga: { casilla: 39 } });
+  const cerrada = estadoDe(cierre.mesa);
+  comprobar('cuando queda uno en pie y es el mejor postor, la almoneda se cierra sola', cerrada.almoneda === null && cerrada.paso === 'por-pasar');
+  comprobar('el ganador paga su puja y se lleva el título', tituloDe(cerrada, 39).dueno === BRUNO && jugadorDe(cerrada, BRUNO).mrs === DINERO_DE_SALIDA - 300 && pagosDe(cerrada, BRUNO).some((p) => p.porque === 'almoneda' && p.cuanto === 300));
+  comprobar('con los sucesos `almoneda-cerrada` y `cambia-de-mano`', (sucesosDe(cerrada, 'almoneda-cerrada')[0] as { ganador: AsientoId | null; cuanto: number } | undefined)?.ganador === BRUNO && sucesosDe(cerrada, 'cambia-de-mano').length === 1);
+
+  /* Nadie puja: el título se queda en el Concejo. */
+  {
+    let sinPujas = mesaSobre('ALM-NADIE', estadoDe(abierta.mesa), CUATRO);
+    for (const quien of [BRUNO, CARLA, DIEGO, ANA]) {
+      const r = mover(sinPujas, quien, { tipo: PASAR_PUJA, carga: { casilla: 39 } });
+      comprobar(`  ${quien} pasa en la almoneda`, r.cambio, r.motivo);
+      sinPujas = r.mesa;
+    }
+    const s = estadoDe(sinPujas);
+    comprobar('sin una sola puja el título se queda en el Concejo y la mesa vuelve al turno', s.almoneda === null && tituloDe(s, 39).dueno === null && s.paso === 'por-pasar' && (sucesosDe(s, 'almoneda-cerrada')[0] as { ganador: AsientoId | null } | undefined)?.ganador === null);
+  }
+
+  /*
+   * LA COLA: al cerrar una almoneda, `reanudar` abre la siguiente encolada y no
+   * devuelve el turno hasta que la cola está vacía. Es el camino de la cascada de
+   * quiebra al Concejo, y se prueba aquí sobre una almoneda normal con dos detrás.
+   */
+  {
+    const conCola: EstadoDelBurgo = { ...estadoDe(abierta.mesa), colaDeAlmonedas: [1, 5] };
+    let conLaCola = mesaSobre('ALM-COLA', conCola, CUATRO);
+    for (const quien of [BRUNO, CARLA, DIEGO, ANA]) conLaCola = mover(conLaCola, quien, { tipo: PASAR_PUJA, carga: { casilla: 39 } }).mesa;
+    const s = estadoDe(conLaCola);
+    comprobar('al cerrarse una almoneda con la cola llena se abre la SIGUIENTE, en orden de casilla', s.paso === 'almoneda' && (s.almoneda as AlmonedaDelBurgo).casilla === 1 && s.colaDeAlmonedas.join() === '5', {
+      paso: s.paso,
+      almoneda: s.almoneda,
+      cola: s.colaDeAlmonedas,
+    });
+    let segunda = conLaCola;
+    for (const quien of [BRUNO, CARLA, DIEGO, ANA]) segunda = mover(segunda, quien, { tipo: PASAR_PUJA, carga: { casilla: 1 } }).mesa;
+    const s2 = estadoDe(segunda);
+    comprobar('y al cerrarse ésa, la tercera; la cola se vacía por orden', s2.paso === 'almoneda' && (s2.almoneda as AlmonedaDelBurgo).casilla === 5 && s2.colaDeAlmonedas.length === 0, {
+      almoneda: s2.almoneda,
+      cola: s2.colaDeAlmonedas,
+    });
+    let tercera = segunda;
+    for (const quien of [BRUNO, CARLA, DIEGO, ANA]) tercera = mover(tercera, quien, { tipo: PASAR_PUJA, carga: { casilla: 5 } }).mesa;
+    const s3 = estadoDe(tercera);
+    comprobar('y con la cola vacía el turno vuelve a quien lo tenía', s3.almoneda === null && s3.paso === 'por-pasar' && s3.turno === estadoDe(abierta.mesa).turno, { paso: s3.paso });
+  }
+}
+
+// ---------------------------------------------------------------------------
+paso('9. EL APURO Y LA QUIEBRA: no se pasa, vender y empeñar saldan, varios acreedores, y las dos quiebras');
+// ---------------------------------------------------------------------------
+
+{
+  const base = estadoDe(empezada('APU', CUATRO, 41));
+
+  /*
+   * EL APURO QUE SE SALDA SOLO. ANA con 50 mrs cae en el Diezmo (200 al Concejo):
+   * no alcanza, no se mueve un maravedí y se abre su apuro por la deuda ENTERA
+   * (reglamento §9: quien no alcanza vende y empeña, no paga lo que puede).
+   */
+  const conPuertas = conTitulos(conJugador(base, ANA, { mrs: 50 }), [[5, ANA, 0, false], [15, ANA, 0, false]]);
+  const { s: enApuro } = alCaerEn('APU-1', conPuertas, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
+  comprobar('con 50 mrs, el Diezmo abre el apuro por los 200 enteros y no se paga nada', enApuro.paso === 'apuro' && enApuro.apuro !== null && enApuro.apuro.quien === ANA && enApuro.apuro.deudas.length === 1 && enApuro.apuro.deudas[0]?.cuanto === EL_DIEZMO && enApuro.apuro.deudas[0]?.a === null && jugadorDe(enApuro, ANA).mrs === 50, enApuro.apuro);
+  comprobar('con el suceso `apuro` diciendo lo que debe', (sucesosDe(enApuro, 'apuro')[0] as { debe: number } | undefined)?.debe === EL_DIEZMO);
+  comprobar('y la vista dice a quién se espera y cuánto debe', vistaDe(enApuro, ESPECTADOR).turnoDe === ANA && vistaDe(enApuro, ESPECTADOR).apuro?.debe === EL_DIEZMO && vistaDe(enApuro, ESPECTADOR).apuro?.enCola === 0);
+  const idsApuro = idsDe(enApuro, ANA);
+  comprobar('EN APURO NO SE PASA NI SE TIRA: sólo empeñar, vender, tratar y rendirse', !idsApuro.includes('pasar') && !idsApuro.includes('tirar') && idsApuro.includes('empenar:5') && idsApuro.includes('rendirse'), idsApuro);
+  comprobar('ni se alza ni se desempeña estando en apuro', !idsApuro.some((id) => id.indexOf('alzar:') === 0 || id.indexOf('desempenar:') === 0));
+  for (const tipo of [PASAR, TIRAR]) {
+    const r = mover(mesaSobre(`APU-NO-${tipo}`, enApuro, CUATRO), ANA, { tipo, carga: {} });
+    comprobar(`  y mandar ${tipo} en apuro se rechaza con motivo y no cambia nada`, !r.cambio && r.motivo !== null, r.motivo);
+  }
+  const otroEnApuro = mover(mesaSobre('APU-OTRO', enApuro, CUATRO), BRUNO, { tipo: EMPENAR, carga: { casilla: 5 } });
+  comprobar('y otro asiento no empeña lo del endeudado', !otroEnApuro.cambio && otroEnApuro.motivo !== null);
+
+  let saldando = mesaSobre('APU-2', enApuro, CUATRO);
+  saldando = mover(saldando, ANA, { tipo: EMPENAR, carga: { casilla: 5 } }).mesa;
+  const aMedias = estadoDe(saldando);
+  comprobar('empeñar una puerta da 100 y el apuro SIGUE abierto: 150 no llega a 200', aMedias.paso === 'apuro' && aMedias.apuro !== null && jugadorDe(aMedias, ANA).mrs === 150);
+  saldando = mover(saldando, ANA, { tipo: EMPENAR, carga: { casilla: 15 } }).mesa;
+  const saldado = estadoDe(saldando);
+  comprobar('con la segunda puerta llega a 250, y el apuro SE SALDA SOLO: paga 200 y se cierra', saldado.apuro === null && jugadorDe(saldado, ANA).mrs === 50 && pagosDe(saldado, ANA).some((p) => p.porque === 'diezmo' && p.cuanto === EL_DIEZMO), {
+    mrs: jugadorDe(saldado, ANA).mrs,
+    paso: saldado.paso,
+  });
+  comprobar('y la mesa vuelve al paso que se interrumpió, con el turno donde estaba', saldado.paso === 'por-pasar' && saldado.turno === enApuro.turno && idsDe(saldado, ANA).includes('pasar'));
+
+  /* Vender también salda: mismo apuro, pero con casas en vez de puertas. */
+  {
+    const conCasas = conTitulos(conJugador(base, ANA, { mrs: 50 }), [[31, ANA, 4, false], [32, ANA, 4, false], [34, ANA, 4, false]]);
+    const { s } = alCaerEn('APU-V', conCasas, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
+    let vendiendo = mesaSobre('APU-V2', s, CUATRO);
+    let ventas = 0;
+    for (let k = 0; k < 20 && estadoDe(vendiendo).apuro !== null; k++) {
+      const cual = idsDe(estadoDe(vendiendo), ANA).find((id) => id.indexOf('vender:') === 0);
+      if (cual === undefined) break;
+      const casilla = Number(cual.slice('vender:'.length));
+      const r = mover(vendiendo, ANA, { tipo: VENDER, carga: { casilla } });
+      if (!r.cambio) break;
+      vendiendo = r.mesa;
+      ventas++;
+    }
+    const s2 = estadoDe(vendiendo);
+    comprobar('vender casas de una en una también salda el apuro, y en cuanto alcanza se cierra', s2.apuro === null && ventas === 2 && jugadorDe(s2, ANA).mrs === 50 + 2 * 100 - EL_DIEZMO, { ventas, mrs: jugadorDe(s2, ANA).mrs });
+    comprobar('y no se vende ni una casa de más: el saldo cierra el apuro en el acto', s2.titulos.filter((t) => t.dueno === ANA).reduce((n, t) => n + t.casas, 0) === 10);
+  }
+
+  /*
+   * VARIOS ACREEDORES: «te nombran regidor, paga 50 a cada jugador» con 20 mrs deja
+   * TRES deudas en el mismo apuro, una por acreedor, y ninguna se pierde.
+   */
+  const REGIDOR = (EL_PREGON.find((c) => c.efecto.que === 'paga-a-cada-uno') as CartaDelBurgo).numero;
+  const conTres = (() => {
+    const conCarta = conLaCartaArriba(conJugador(base, ANA, { mrs: 20 }), 'pregon', REGIDOR);
+    return alCaerEn('APU-3', conCarta, ANA, CASILLA_DE_MAZO.pregon, [TRES_PASOS]).s;
+  })();
+  comprobar('«paga 50 a cada uno» con 20 mrs deja un apuro con TRES deudas, una por acreedor', conTres.apuro !== null && conTres.apuro.quien === ANA && conTres.apuro.deudas.length === 3 && conTres.apuro.deudas.every((d) => d.cuanto === 50), conTres.apuro);
+  comprobar('y la vista suma las tres: debe 150', vistaDe(conTres, ESPECTADOR).apuro?.debe === 150);
+  comprobar('y nadie ha cobrado todavía: es todo o nada', [BRUNO, CARLA, DIEGO].every((a) => jugadorDe(conTres, a).mrs === DINERO_DE_SALIDA));
+
+  /*
+   * LA QUIEBRA CON UN JUGADOR: todo a quien más reclama. Con tres deudas iguales el
+   * empate lo gana el que va antes en orden de mesa, que es la regla escrita.
+   */
+  {
+    const conBienes = conTitulos(conTres, [[1, ANA, 0, false], [3, ANA, 0, true], [21, ANA, 2, false]]);
+    const rendida = mover(mesaSobre('APU-Q1', conBienes, CUATRO), ANA, { tipo: RENDIRSE, carga: {} });
+    const s = estadoDe(rendida.mesa);
+    comprobar('rendirse en apuro con tres deudas iguales manda todo al PRIMERO en orden de mesa', rendida.cambio && jugadorDe(s, ANA).quebrado && (sucesosDe(s, 'quiebra')[0] as { acreedor: AsientoId | null } | undefined)?.acreedor === BRUNO);
+    const botin = 20 + 2 * 75;
+    comprobar('los edificios se venden al Concejo por la mitad y el botín entero va al acreedor', tituloDe(s, 21).casas === 0 && s.casasEnElConcejo === conBienes.casasEnElConcejo + 2 && cobrosDe(s, BRUNO).some((c) => c.porque === 'quiebra' && c.cuanto === botin && c.de === ANA), cobrosDe(s, BRUNO));
+    comprobar('y su bolsa queda con el botín menos el interés del empeño heredado, pagado en el acto', jugadorDe(s, BRUNO).mrs === DINERO_DE_SALIDA + botin - interesDelEmpeno(60), jugadorDe(s, BRUNO).mrs);
+    comprobar('los títulos pasan tal cual, y el EMPEÑADO sigue empeñado', tituloDe(s, 1).dueno === BRUNO && tituloDe(s, 3).dueno === BRUNO && tituloDe(s, 3).empenado && tituloDe(s, 21).dueno === BRUNO);
+    comprobar('y el acreedor paga EN EL ACTO el interés del empeño que recibe', pagosDe(s, BRUNO).some((p) => p.porque === 'interes' && p.cuanto === interesDelEmpeno(60)));
+    comprobar('el quebrado queda con 0, sin Indultos, y ya no recibe opciones', jugadorDe(s, ANA).mrs === 0 && jugadorDe(s, ANA).indultos.length === 0 && opcionesEn(s, ANA).length === 0);
+    comprobar('y el turno pasa a otro: no se espera a quien ya no juega', s.momento === 'jugando' && vistaDe(s, ESPECTADOR).turnoDe !== ANA && s.apuro === null);
+    comprobar('ni un reproche de forma tras la quiebra', reprochesDeLasMiradas(s, CUATRO, true).length === 0, reprochesDeLasMiradas(s, CUATRO, true));
+
+    /* El acreedor que no alcanza para el interés entra ÉL en apuro con el Concejo. */
+    /* Con la Calle Mayor empeñada (interés 20) y un botín de cero, el acreedor no puede pagarlo. */
+    const acreedorPelado = conJugador(conJugador(conTitulos(conTres, [[39, ANA, 0, true]]), ANA, { mrs: 0 }), BRUNO, { mrs: 0 });
+    const s2 = estadoDe(mover(mesaSobre('APU-Q1B', acreedorPelado, CUATRO), ANA, { tipo: RENDIRSE, carga: {} }).mesa);
+    comprobar('un acreedor sin un maravedí para el interés hereda todo y entra ÉL en apuro con el Concejo', jugadorDe(s2, ANA).quebrado && s2.apuro !== null && s2.apuro.quien === BRUNO && s2.apuro.deudas.some((d) => d.porque === 'interes' && d.a === null), s2.apuro);
+  }
+
+  /*
+   * LA QUIEBRA CON EL CONCEJO: la caja se pierde, los títulos vuelven DESEMPEÑADOS y
+   * salen a almoneda uno por uno en orden de casilla, y los Indultos al fondo de su
+   * mazo. Es la cascada del §8.6, y aquí se mira de cerca con tres títulos.
+   */
+  {
+    const sinPregon = base.pregon.filter((x) => x !== serieDeCarta('pregon', 10));
+    const sinArca = base.arca.filter((x) => x !== serieDeCarta('arca', 5));
+    const conIndultos: EstadoDelBurgo = {
+      ...conJugador(base, ANA, { indultos: ['pregon', 'arca'], mrs: 300 }),
+      pregon: sinPregon,
+      arca: sinArca,
+    };
+    const conTodo = turnoDe(conTitulos(conIndultos, [[1, ANA, 0, true], [21, ANA, 3, false], [35, ANA, 0, false]]), ANA, 'por-pasar');
+    const rendida = mover(mesaSobre('APU-Q2', conTodo, CUATRO), ANA, { tipo: RENDIRSE, carga: {} });
+    const s = estadoDe(rendida.mesa);
+    comprobar('rendirse FUERA de apuro se puede: la opción está siempre y el acreedor es el Concejo', rendida.cambio && jugadorDe(s, ANA).quebrado && (sucesosDe(s, 'quiebra')[0] as { acreedor: AsientoId | null } | undefined)?.acreedor === null);
+    comprobar('nadie hereda la caja: los otros tres siguen con lo suyo', [BRUNO, CARLA, DIEGO].every((a) => jugadorDe(s, a).mrs === DINERO_DE_SALIDA));
+    comprobar('los títulos vuelven al Concejo DESEMPEÑADOS y sin edificios', s.titulos.filter((t) => [1, 21, 35].indexOf(t.casilla) >= 0).every((t) => t.dueno === null && !t.empenado && t.casas === 0));
+    comprobar('y salen a almoneda: la primera abierta y las otras dos en cola, en orden de casilla', s.paso === 'almoneda' && (s.almoneda as AlmonedaDelBurgo).casilla === 1 && s.colaDeAlmonedas.join() === '21,35', {
+      almoneda: s.almoneda,
+      cola: s.colaDeAlmonedas,
+    });
+    comprobar('la vista dice cuántas quedan en cola', vistaDe(s, ESPECTADOR).almoneda?.enCola === 2);
+    comprobar('los dos Indultos vuelven al FONDO de su mazo, cada uno al suyo', reprochesDeMazo(sinPregon, s.pregon, serieDeCarta('pregon', 10)).length === 0 && reprochesDeMazo(sinArca, s.arca, serieDeCarta('arca', 5)).length === 0, {
+      pregon: reprochesDeMazo(sinPregon, s.pregon, serieDeCarta('pregon', 10)),
+      arca: reprochesDeMazo(sinArca, s.arca, serieDeCarta('arca', 5)),
+    });
+    comprobar('y en la almoneda que se abrió el quebrado NO está en pie', (s.almoneda as AlmonedaDelBurgo).enPie.indexOf(ANA) < 0, (s.almoneda as AlmonedaDelBurgo).enPie);
+  }
+
+  /* Con dos a la mesa, la quiebra de uno termina la partida. */
+  {
+    const dos = estadoDe(empezada('APU-DOS', SEIS.slice(0, 2), 5));
+    const s = estadoDe(mover(mesaSobre('APU-FIN', turnoDe(dos, ANA, 'por-pasar'), SEIS.slice(0, 2)), ANA, { tipo: RENDIRSE, carga: {} }).mesa);
+    comprobar('con dos a la mesa, la quiebra de uno termina la partida y gana el último en pie', s.momento === 'terminada' && s.ganadores.join() === BRUNO && (sucesosDe(s, 'fin')[0] as { porque: string } | undefined)?.porque === 'ultimo-en-pie', {
+      momento: s.momento,
+      ganadores: s.ganadores,
+    });
+    comprobar('y `seAcabo` lo dice', seAcabo(s) === true && seAcabo(dos) === false);
+    comprobar('en terminada nadie recibe opciones, ni el ganador', opcionesEn(s, BRUNO).length === 0 && opcionesEn(s, ANA).length === 0);
+    comprobar('y la vista de terminada no declara turno', vistaDe(s, ESPECTADOR).turnoDe === null && reprochesDeLasMiradas(s, SEIS.slice(0, 2), true).length === 0, reprochesDeLasMiradas(s, SEIS.slice(0, 2), true));
+  }
+}
+
+// ---------------------------------------------------------------------------
+paso('10. LOS TRATOS: por puerta, del turno y AL del turno, campos exactos, tope, caducidad y revalidación');
+// ---------------------------------------------------------------------------
+
+/** El último trato de un estado, o `null`. */
+function ultimoTrato(e: EstadoDelBurgo): TratoDelBurgo | null {
+  const t = e.tratos[e.tratos.length - 1];
+  return t === undefined ? null : t;
+}
+
+{
+  const base = estadoDe(empezada('TRA', CUATRO, 41));
+  const repartido = turnoDe(conTitulos(base, [[1, ANA, 0, false], [5, ANA, 0, false], [3, BRUNO, 0, false], [21, CARLA, 0, false]]), ANA, 'por-pasar');
+
+  const puerta = opcionesEn(repartido, ANA).find((o) => o.declaracion === true && o.tipo === PROPONER);
+  comprobar('el dueño del turno recibe la PUERTA de proponer, que no se pinta como botón', puerta !== undefined && puerta.declaracion === true && puerta.id === 'proponer');
+  comprobar('con los cuatro campos exactos: a quién, cuánto, qué títulos y cuántos Indultos', canonico(puerta?.carga) === canonico({ a: [BRUNO, CARLA, DIEGO], mrsMaximo: DINERO_DE_SALIDA, titulos: [1, 5], indultos: 0 }), puerta?.carga);
+  const deOtro = opcionesEn(repartido, BRUNO).find((o) => o.declaracion === true && o.tipo === PROPONER);
+  comprobar('y quien NO tiene el turno también, pero SÓLO puede proponer AL del turno', canonico((deOtro?.carga as { a: AsientoId[] }).a) === canonico([ANA]), deOtro?.carga);
+  comprobar('un tercero tampoco puede proponerle a otro tercero', canonico((opcionesEn(repartido, CARLA).find((o) => o.declaracion === true && o.tipo === PROPONER)?.carga as { a: AsientoId[] }).a) === canonico([ANA]));
+
+  const buena = { a: BRUNO, doy: { mrs: 100, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [3], indultos: 0 } };
+  const propuesta = mover(mesaSobre('TRA-1', repartido, CUATRO), ANA, { tipo: PROPONER, carga: buena });
+  comprobar('un trato bien formado pasa la puerta y queda abierto', propuesta.cambio && estadoDe(propuesta.mesa).tratos.length === 1);
+  const trato = ultimoTrato(estadoDe(propuesta.mesa)) as TratoDelBurgo;
+  comprobar('con id público y estable (el contador de la mesa), y el turno en el que se propuso', trato.id === repartido.siguienteTrato && estadoDe(propuesta.mesa).siguienteTrato === repartido.siguienteTrato + 1 && trato.de === ANA && trato.a === BRUNO && trato.enElTurno === repartido.turnosAbiertos, trato);
+  comprobar('y su suceso `trato` dice «propuesto»', (sucesosDe(estadoDe(propuesta.mesa), 'trato')[0] as { fin: string } | undefined)?.fin === 'propuesto');
+
+  /* Los campos EXACTOS: lo que no cabe en la puerta se queda fuera, con motivo. */
+  for (const [que, carga] of [
+    ['con un campo de más', { ...buena, relleno: 'x'.repeat(8192) }],
+    ['con un lado de cuatro campos', { a: BRUNO, doy: { mrs: 100, titulos: [], indultos: 0, extra: 1 }, pido: { mrs: 0, titulos: [3], indultos: 0 } }],
+    ['con más maravedíes de los que tiene', { ...buena, doy: { mrs: 99999, titulos: [], indultos: 0 } }],
+    ['dando un título que no es suyo', { ...buena, doy: { mrs: 0, titulos: [21], indultos: 0 } }],
+    ['dando Indultos que no tiene', { ...buena, doy: { mrs: 0, titulos: [1], indultos: 1 } }],
+    ['a alguien que no está sentado', { ...buena, a: 'a-nadie' }],
+    ['con los DOS lados vacíos', { a: BRUNO, doy: { mrs: 0, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [], indultos: 0 } }],
+    ['con una casilla que no es un título', { ...buena, doy: { mrs: 0, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [4], indultos: 0 } }],
+    ['pidiendo y dando el mismo título', { a: BRUNO, doy: { mrs: 0, titulos: [1], indultos: 0 }, pido: { mrs: 0, titulos: [1], indultos: 0 } }],
+  ] as ReadonlyArray<readonly [string, unknown]>) {
+    const r = mover(mesaSobre('TRA-NO', repartido, CUATRO), ANA, { tipo: PROPONER, carga });
+    comprobar(`un trato ${que} no pasa: mismo estado y motivo`, !r.cambio && r.motivo !== null, r.motivo);
+  }
+  const unLadoVacio = mover(mesaSobre('TRA-REGALO', repartido, CUATRO), ANA, { tipo: PROPONER, carga: { a: BRUNO, doy: { mrs: 200, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [], indultos: 0 } } });
+  comprobar('pero UN lado vacío sí: un regalo es un trato', unLadoVacio.cambio && estadoDe(unLadoVacio.mesa).tratos.length === 1);
+
+  /* El tope de tratos abiertos, que es POR PROPONENTE. */
+  {
+    let conTope = mesaSobre('TRA-TOPE', repartido, CUATRO);
+    for (let k = 0; k < TRATOS_ABIERTOS_POR_PROPONENTE; k++) {
+      const r = mover(conTope, ANA, { tipo: PROPONER, carga: { a: BRUNO, doy: { mrs: 10 + k, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [3], indultos: 0 } } });
+      comprobar(`  el trato ${k + 1} de Ana pasa`, r.cambio, r.motivo);
+      conTope = r.mesa;
+    }
+    comprobar(`con ${TRATOS_ABIERTOS_POR_PROPONENTE} abiertos ya no se ofrece la puerta`, !opcionesEn(estadoDe(conTope), ANA).some((o) => o.declaracion === true && o.tipo === PROPONER));
+    const cuarto = mover(conTope, ANA, { tipo: PROPONER, carga: { a: BRUNO, doy: { mrs: 99, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [3], indultos: 0 } } });
+    comprobar('y el cuarto se rechaza con motivo', !cuarto.cambio && cuarto.motivo !== null);
+    comprobar('el tope es POR PROPONENTE: el otro sigue pudiendo proponer', opcionesEn(estadoDe(conTope), BRUNO).some((o) => o.declaracion === true && o.tipo === PROPONER));
+  }
+
+  /* Contestar: aceptar, rechazar, retirar, y quién puede cada cosa. */
+  {
+    const mesa = propuesta.mesa;
+    const e = estadoDe(mesa);
+    const idsB = idsDe(e, BRUNO);
+    comprobar('al destinatario se le ofrece aceptar y rechazar, con el resumen del trato en la ayuda', idsB.includes(`aceptar:${trato.id}`) && idsB.includes(`rechazar:${trato.id}`) && (opcionPorId(e, BRUNO, `aceptar:${trato.id}`)?.ayuda.length ?? 0) > 0, idsB);
+    comprobar('al proponente, retirarlo; y a un tercero, nada de este trato', idsDe(e, ANA).includes(`retirar:${trato.id}`) && !idsDe(e, CARLA).some((id) => id.indexOf(`:${trato.id}`) >= 0));
+    const ajeno = mover(mesa, CARLA, { tipo: ACEPTAR, carga: { trato: trato.id } });
+    comprobar('un tercero no puede aceptar un trato que no es suyo', !ajeno.cambio && ajeno.motivo !== null);
+
+    const aceptado = mover(mesa, BRUNO, { tipo: ACEPTAR, carga: { trato: trato.id } });
+    const s = estadoDe(aceptado.mesa);
+    comprobar('aceptar mueve las dos partes de golpe: 100 mrs por el Corral', aceptado.cambio && tituloDe(s, 3).dueno === ANA && jugadorDe(s, ANA).mrs === DINERO_DE_SALIDA - 100 && jugadorDe(s, BRUNO).mrs === DINERO_DE_SALIDA + 100);
+    comprobar('con los sucesos `trato` aceptado y `cambia-de-mano`', (sucesosDe(s, 'trato')[0] as { fin: string } | undefined)?.fin === 'aceptado' && sucesosDe(s, 'cambia-de-mano').length === 1);
+    comprobar('y el trato desaparece de la lista', s.tratos.length === 0);
+    comprobar('y quien reunió el barrio pardo entero ya puede alzar en los dos solares', idsDe(s, ANA).includes('alzar:1') && idsDe(s, ANA).includes('alzar:3'));
+
+    const rechazado = mover(mesa, BRUNO, { tipo: RECHAZAR, carga: { trato: trato.id } });
+    comprobar('rechazar lo borra sin mover nada', rechazado.cambio && estadoDe(rechazado.mesa).tratos.length === 0 && tituloDe(estadoDe(rechazado.mesa), 3).dueno === BRUNO && (sucesosDe(estadoDe(rechazado.mesa), 'trato')[0] as { fin: string } | undefined)?.fin === 'rechazado');
+    const retirado = mover(mesa, ANA, { tipo: RETIRAR, carga: { trato: trato.id } });
+    comprobar('retirar, igual', retirado.cambio && estadoDe(retirado.mesa).tratos.length === 0 && (sucesosDe(estadoDe(retirado.mesa), 'trato')[0] as { fin: string } | undefined)?.fin === 'retirado');
+    comprobar('el destinatario no lo retira, y el proponente no lo acepta', !mover(mesa, BRUNO, { tipo: RETIRAR, carga: { trato: trato.id } }).cambio && !mover(mesa, ANA, { tipo: ACEPTAR, carga: { trato: trato.id } }).cambio);
+    const inventado = mover(mesa, BRUNO, { tipo: ACEPTAR, carga: { trato: 999 } });
+    comprobar('y un id de trato inventado se rechaza con motivo', !inventado.cambio && inventado.motivo !== null);
+  }
+
+  /* ACEPTAR REVALIDA LAS DOS PARTES con el estado de AHORA, y el motivo es ciego. */
+  {
+    const mesa = propuesta.mesa;
+    const vendidoEnMedio = conTitulo(estadoDe(mesa), 3, { dueno: CARLA });
+    const caido = mover(mesaSobre('TRA-REV', vendidoEnMedio, CUATRO), BRUNO, { tipo: ACEPTAR, carga: { trato: trato.id } });
+    comprobar('si el título ya no es de quien lo prometía, aceptar se rechaza CON MOTIVO y nada se mueve', !caido.cambio && caido.motivo !== null && caido.motivo.indexOf('en pie') >= 0, caido.motivo);
+    comprobar('y el motivo NO dice de quién es ahora: no enseña lo que la vista de quien mueve no daba', reprochesDeTexto(String(caido.motivo), vendidoEnMedio).length === 0 && String(caido.motivo).indexOf(CARLA) < 0, caido.motivo);
+    const sinDinero = conJugador(estadoDe(mesa), ANA, { mrs: 10 });
+    const caido2 = mover(mesaSobre('TRA-REV2', sinDinero, CUATRO), BRUNO, { tipo: ACEPTAR, carga: { trato: trato.id } });
+    comprobar('y si el proponente ya no tiene los maravedíes que prometía, también', !caido2.cambio && caido2.motivo !== null);
+    const quebrado = conJugador(estadoDe(mesa), ANA, { quebrado: true, mrs: 0 });
+    const caido3 = mover(mesaSobre('TRA-REV3', quebrado, CUATRO), BRUNO, { tipo: ACEPTAR, carga: { trato: trato.id } });
+    comprobar('y si el proponente quebró entre medias, también', !caido3.cambio && caido3.motivo !== null);
+  }
+
+  /* UN TRATO QUE CAE POR OTRO: dos sobre el mismo título; al aceptar uno, el otro caduca. */
+  {
+    let mesa = mesaSobre('TRA-DOS', repartido, CUATRO);
+    mesa = mover(mesa, ANA, { tipo: PROPONER, carga: { a: BRUNO, doy: { mrs: 100, titulos: [1], indultos: 0 }, pido: { mrs: 0, titulos: [3], indultos: 0 } } }).mesa;
+    mesa = mover(mesa, CARLA, { tipo: PROPONER, carga: { a: ANA, doy: { mrs: 200, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [1], indultos: 0 } } }).mesa;
+    const e = estadoDe(mesa);
+    comprobar('dos tratos abiertos que tocan el mismo título', e.tratos.length === 2, e.tratos.length);
+    const primero = e.tratos[0] as TratoDelBurgo;
+    const segundo = e.tratos[1] as TratoDelBurgo;
+    const s = estadoDe(mover(mesa, BRUNO, { tipo: ACEPTAR, carga: { trato: primero.id } }).mesa);
+    comprobar('al aceptar el primero, el segundo CADUCA: ya no dice la verdad', s.tratos.length === 0 && (sucesosDe(s, 'trato') as Array<{ id: number; fin: string }>).some((x) => x.id === segundo.id && x.fin === 'caducado'), s.tratos);
+    comprobar('y los títulos quedan donde dijo el trato aceptado', tituloDe(s, 1).dueno === BRUNO && tituloDe(s, 3).dueno === ANA);
+  }
+
+  /* CADUCAN AL RELEVAR. */
+  {
+    const mesa = propuesta.mesa;
+    const relevada = mover(mesa, ANA, { tipo: PASAR, carga: {} });
+    const s = estadoDe(relevada.mesa);
+    comprobar('al pasar el turno, los tratos abiertos caducan', relevada.cambio && s.tratos.length === 0 && (sucesosDe(s, 'trato') as Array<{ fin: string }>).some((x) => x.fin === 'caducado'));
+    comprobar('y el turno pasa al siguiente, con `turnoDe` cambiado y los dobles a cero', s.turno !== estadoDe(mesa).turno && s.turnosAbiertos === estadoDe(mesa).turnosAbiertos + 1 && s.dobles === 0 && s.tiradasDelTurno === 0 && vistaDe(s, ESPECTADOR).turnoDe !== ANA);
+    const tarde = mover(relevada.mesa, BRUNO, { tipo: ACEPTAR, carga: { trato: trato.id } });
+    comprobar('y aceptar un trato caducado se rechaza con motivo', !tarde.cambio && tarde.motivo !== null);
+  }
+
+  /* En almoneda no se propone. */
+  {
+    const enAlmoneda: EstadoDelBurgo = {
+      ...repartido,
+      paso: 'almoneda',
+      almoneda: { casilla: 39, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, CARLA, DIEGO, ANA], abiertaPor: ANA },
+    };
+    comprobar('con una almoneda abierta nadie recibe la puerta de proponer', [ANA, BRUNO, CARLA, DIEGO].every((a) => !opcionesEn(enAlmoneda, a).some((o) => o.tipo === PROPONER)));
+    const r = mover(mesaSobre('TRA-ALM', enAlmoneda, CUATRO), ANA, { tipo: PROPONER, carga: buena });
+    comprobar('y mandarlo se rechaza con motivo', !r.cambio && r.motivo !== null);
+  }
+}
+
+// ---------------------------------------------------------------------------
+paso('11. EL TIC, caso a caso, y las mesas donde NADIE mueve, que tienen que acabar solas');
+// ---------------------------------------------------------------------------
+
+/**
+ * MESA SIN NADIE: sólo tics, hasta que termine o hasta el tope. Devuelve cuántos
+ * tics costó, si terminó, y cuántos de esos tics no cambiaron nada (que tienen que
+ * ser cero: en `jugando` el tic siempre hace algo).
+ */
+function mesaSinNadie(id: string, asientos: readonly AsientoId[], topeDeVueltas: number, topeDeTics: number): { tics: number; termino: boolean; quietos: number; ms: number } {
+  let mesa = empezada(id, asientos, 20260909, topeDeVueltas);
+  let tics = 0;
+  let quietos = 0;
+  const desde = performance.now();
+  while (tics < topeDeTics && estadoDe(mesa).momento === 'jugando') {
+    const antes = mesa;
+    mesa = tic(mesa);
+    tics++;
+    if (mesa.estado === antes.estado) quietos++;
+  }
+  return { tics, termino: estadoDe(mesa).momento === 'terminada', quietos, ms: performance.now() - desde };
+}
+
+/** Una partida terminada de verdad, por la puerta del reductor: dos a la mesa y uno se rinde. */
+function unaPartidaTerminada(): EstadoDelBurgo {
+  const dos = SEIS.slice(0, 2);
+  const e = estadoDe(empezada('FIN-DE-VERDAD', dos, 5));
+  const s = estadoDe(mover(mesaSobre('FIN-DE-VERDAD-2', turnoDe(e, ANA, 'por-pasar'), dos), ANA, { tipo: RENDIRSE, carga: {} }).mesa);
+  if (s.momento !== 'terminada') throw new Error('la partida de dos no terminó al rendirse uno');
+  return s;
+}
+
+{
+  const base = estadoDe(empezada('TIC', CUATRO, 41));
+  const turnoDeAna = turnoDe(base, ANA);
+
+  /* Los dos casos de identidad: reuniendo y terminada. */
+  {
+    const reuniendo = mesaSobre('TIC-R', undefined, CUATRO);
+    const conEstado = mesaSobre('TIC-R2', partidaNueva(), CUATRO);
+    const trasTic = tic(conEstado);
+    /*
+     * SE MIRA EL ESTADO POR IDENTIDAD Y NO LA REVISIÓN, y no es un atajo: `avanzarElReloj`
+     * del árbitro sube `rev` siempre —es quien lleva el reloj—, y quien descarta el tic
+     * que no cambió nada es `ponerAlDiaElPlazo` de `mesas.ts`, comparando `estado` POR
+     * IDENTIDAD. Lo que el juego tiene que garantizar, y lo único, es el mismo objeto.
+     */
+    comprobar('un tic en `reuniendo` devuelve EL MISMO objeto de estado, que es lo que la mesa descarta', trasTic.estado === conEstado.estado, { rev: trasTic.rev });
+    comprobar('el primer tic sobre una mesa recién abierta SÍ construye la partida (rev 1: conocido, no es fallo)', tic(reuniendo).rev === 1);
+    const terminada = unaPartidaTerminada();
+    const dos = SEIS.slice(0, 2);
+    let seguidos = mesaSobre('TIC-T', terminada, dos);
+    for (let k = 0; k < 8; k++) seguidos = tic(seguidos);
+    comprobar('y ocho tics en `terminada` —el tope de la mesa por lectura— devuelven EL MISMO objeto', estadoDe(seguidos) === terminada, { rev: seguidos.rev });
+  }
+
+  /* `por-tirar`: el tic tira por el ausente, gastando el mismo azar que gastaría él. */
+  {
+    const conAzar: EstadoDelBurgo = { ...turnoDeAna, azar: azarQueSaca([[2, 6]]) };
+    const porTic = estadoDe(tic(mesaSobre('TIC-1', conAzar, CUATRO)));
+    const porLaMano = estadoDe(tira(mesaSobre('TIC-1B', conAzar, CUATRO), ANA));
+    comprobar('en `por-tirar` el tic TIRA por el ausente, y sale exactamente lo mismo que si tirara él', canonico(porTic) === canonico(porLaMano), { tic: porTic.tirada, mano: porLaMano.tirada });
+    comprobar('y la tirada es la del azar sembrado, con el par entero en el estado', porTic.tirada?.join() === '2,6' && jugadorDe(porTic, ANA).casilla === 8);
+  }
+
+  /* `por-pasar`: con dobles vuelve a tirar; sin dobles, releva. */
+  {
+    const conDobles: EstadoDelBurgo = { ...turnoDe(base, ANA, 'por-pasar'), dobles: 1, azar: azarQueSaca([[2, 6]]) };
+    const s = estadoDe(tic(mesaSobre('TIC-2', conDobles, CUATRO)));
+    comprobar('en `por-pasar` CON dobles el tic vuelve a tirar por él', s.tirada?.join() === '2,6' && s.turno === conDobles.turno);
+    const sinDobles = turnoDe(base, ANA, 'por-pasar');
+    const s2 = estadoDe(tic(mesaSobre('TIC-3', sinDobles, CUATRO)));
+    comprobar('y SIN dobles pasa el turno al siguiente', s2.turno !== sinDobles.turno && s2.turnosAbiertos === sinDobles.turnosAbiertos + 1 && (sucesosDe(s2, 'turno')[0] as { de: AsientoId } | undefined)?.de === BRUNO);
+  }
+
+  /* `comprar`: el tic manda el título a almoneda, que es lo que no bloquea la mesa. */
+  {
+    const { s: enCompra } = alCaerEn('TIC-4', base, ANA, 39);
+    const s = estadoDe(tic(mesaSobre('TIC-4B', enCompra, CUATRO)));
+    comprobar('en `comprar` el tic saca el título a almoneda: no compra por nadie', s.paso === 'almoneda' && (s.almoneda as AlmonedaDelBurgo).casilla === 39 && tituloDe(s, 39).dueno === null);
+    comprobar('y `turnoDe` cambia al primero que puja: el plazo se reprograma', vistaDe(s, ESPECTADOR).turnoDe !== vistaDe(enCompra, ESPECTADOR).turnoDe);
+  }
+
+  /* `almoneda`: el tic pasa por quien tiene el relevo, uno por tic. */
+  {
+    const abierta: EstadoDelBurgo = {
+      ...turnoDe(base, ANA, 'por-pasar'),
+      paso: 'almoneda',
+      almoneda: { casilla: 39, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, CARLA, DIEGO, ANA], abiertaPor: ANA },
+    };
+    const s1 = estadoDe(tic(mesaSobre('TIC-5', abierta, CUATRO)));
+    comprobar('en almoneda el tic PASA por el que tiene el relevo, y sólo por él', (s1.almoneda as AlmonedaDelBurgo).enPie.join() === [CARLA, DIEGO, ANA].join() && (s1.almoneda as AlmonedaDelBurgo).pujaDe === CARLA);
+    comprobar('y `turnoDe` cambia en cada tic que resuelve algo', vistaDe(s1, ESPECTADOR).turnoDe === CARLA);
+    let mesa = mesaSobre('TIC-5B', s1, CUATRO);
+    for (let k = 0; k < 3; k++) mesa = tic(mesa);
+    const s2 = estadoDe(mesa);
+    comprobar('con cuatro tics —menos que los ocho de una lectura— la almoneda entera se cierra sin ganador', s2.almoneda === null && tituloDe(s2, 39).dueno === null && s2.paso === 'por-pasar', { paso: s2.paso });
+  }
+
+  /* `apuro`: UN tic liquida al ausente entero. */
+  {
+    const enApuro = conTitulos(conJugador(base, ANA, { mrs: 50 }), [[5, ANA, 0, false], [15, ANA, 0, false]]);
+    const { s } = alCaerEn('TIC-6', enApuro, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
+    comprobar('hay un apuro abierto de 200 con dos puertas que empeñar', s.paso === 'apuro' && s.apuro !== null);
+    const s2 = estadoDe(tic(mesaSobre('TIC-6B', s, CUATRO)));
+    comprobar('UN SOLO TIC liquida al ausente: empeña lo que hace falta y salda', s2.apuro === null && tituloDe(s2, 5).empenado && jugadorDe(s2, ANA).mrs === 50 + 2 * 100 - EL_DIEZMO, { mrs: jugadorDe(s2, ANA).mrs, apuro: s2.apuro });
+    const conDeudaEnorme = conTitulos(conJugador(base, ANA, { mrs: 0 }), [[1, ANA, 0, false], [39, BRUNO, POSADA, false], [37, BRUNO, POSADA, false]]);
+    const { s: s3 } = alCaerEn('TIC-7', conDeudaEnorme, ANA, 39, [[1, 1]]);
+    comprobar('y con una renta de 2.000 y nada que vender, el apuro queda abierto', s3.paso === 'apuro' && s3.apuro !== null, s3.paso);
+    const s4 = estadoDe(tic(mesaSobre('TIC-7B', s3, CUATRO)));
+    comprobar('el mismo tic lo empeña todo y, como no llega, lo quiebra con su acreedor', jugadorDe(s4, ANA).quebrado && (sucesosDe(s4, 'quiebra')[0] as { acreedor: AsientoId | null } | undefined)?.acreedor === BRUNO, sucesosDe(s4, 'quiebra'));
+  }
+
+  /* El tic NO contesta tratos: los caduca al relevar, que es otra cosa. */
+  {
+    const repartido = turnoDe(conTitulos(base, [[3, BRUNO, 0, false]]), ANA, 'por-pasar');
+    const conTrato = mover(mesaSobre('TIC-8', repartido, CUATRO), ANA, { tipo: PROPONER, carga: { a: BRUNO, doy: { mrs: 100, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [3], indultos: 0 } } });
+    const s = estadoDe(tic(conTrato.mesa));
+    comprobar('el tic NO acepta ni rechaza un trato por nadie: pasa el turno y el trato caduca', tituloDe(s, 3).dueno === BRUNO && jugadorDe(s, ANA).mrs === DINERO_DE_SALIDA && s.tratos.length === 0 && (sucesosDe(s, 'trato') as Array<{ fin: string }>).every((x) => x.fin === 'caducado'));
+  }
+
+  /*
+   * ═══ LAS MESAS DONDE NADIE MUEVE, Y POR QUÉ LA CIFRA NO ES «2.500» ═══
+   *
+   * El diseño (§8.1 F7) escribió «una mesa con `plazoSegundos: 1` y todos ausentes
+   * termina en ≤ 2.500 tics». MEDIDO, con seis sentados y tope de vueltas 30 son
+   * unos ocho mil: sin nadie que compre, cada título pisado sale a almoneda y los
+   * seis pasan uno a uno —hasta nueve tics para resolver un solo turno—, y con tope
+   * 30 hay que dar treinta vueltas al anillo con los seis. La cifra del diseño no
+   * era falsa: era de otra mesa.
+   *
+   * Así que se afirman las cifras de tres mesas CONCRETAS —cada una con sus
+   * asientos, su tope de vueltas y su tope de tics escrito— y se IMPRIMEN. El
+   * margen sobre lo medido es de un tercio: al ras, cualquier cambio de reglas da
+   * un rojo que no dice nada; diez veces mayor no afirma nada. Lo que de verdad se
+   * afirma es que TERMINA: una mesa que no termina se queda para siempre esperando
+   * a alguien que no está.
+   */
+  {
+    const medidas: Array<{ que: string; tope: number; r: ReturnType<typeof mesaSinNadie> }> = [];
+    for (const [cuantos, vueltas, tope] of MESAS_SIN_NADIE) {
+      const r = mesaSinNadie(`SIN-${cuantos}-${vueltas}`, SEIS.slice(0, cuantos), vueltas, tope);
+      medidas.push({ que: `${cuantos} sentados, tope ${vueltas}`, tope, r });
+      comprobar(`una mesa de ${cuantos} con tope de ${vueltas} vueltas y NADIE moviendo TERMINA sola`, r.termino, r);
+      comprobar(`  y le cuesta ${r.tics} tics, por debajo del tope escrito de ${tope}`, r.tics < tope, r.tics);
+      comprobar('  y ningún tic suyo devolvió el mismo estado: en `jugando` el tic siempre hace algo', r.quietos === 0, r.quietos);
+    }
+    console.log('  mesas donde nadie mueve:');
+    for (const m of medidas) {
+      console.log(`    ${m.que.padEnd(22)} · ${String(m.r.tics).padStart(5)} tics (tope ${m.tope}) · ${m.r.ms.toFixed(0).padStart(5)} ms · ${m.r.termino ? 'termina' : 'NO TERMINA'}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+paso('12. «SÓLO SI»: cada tipo fuera de su momento devuelve el MISMO objeto con motivo, y ningún motivo filtra');
+// ---------------------------------------------------------------------------
+
+/** Los dieciocho tipos del Burgo, cada uno con una carga bien formada. */
+const TODOS_LOS_TIPOS: ReadonlyArray<readonly [string, unknown]> = [
+  [EMPEZAR, { topeDeVueltas: 0 }],
+  [TIRAR, {}],
+  [PAGAR_FIANZA, {}],
+  [USAR_INDULTO, {}],
+  [COMPRAR, { casilla: 39 }],
+  [A_ALMONEDA, { casilla: 39 }],
+  [PUJAR, { casilla: 39, cuanto: PUJA_MINIMA }],
+  [PASAR_PUJA, { casilla: 39 }],
+  [ALZAR, { casilla: 1 }],
+  [VENDER, { casilla: 1 }],
+  [EMPENAR, { casilla: 1 }],
+  [DESEMPENAR, { casilla: 1 }],
+  [PROPONER, { a: BRUNO, doy: { mrs: 1, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [], indultos: 0 } }],
+  [ACEPTAR, { trato: 0 }],
+  [RECHAZAR, { trato: 0 }],
+  [RETIRAR, { trato: 0 }],
+  [PASAR, {}],
+  [RENDIRSE, {}],
+];
+
+{
+  const base = estadoDe(empezada('SOLO-SI', CUATRO, 41));
+  const motivos: string[] = [];
+
+  /*
+   * EN `terminada` NO SE PUEDE NADA. Es el caso más limpio del «sólo si»: la lista
+   * de opciones está vacía para todos, así que los dieciocho tipos tienen que
+   * devolver EL MISMO objeto —no una copia igual— y un motivo.
+   */
+  {
+    const terminada = unaPartidaTerminada();
+    const dos = SEIS.slice(0, 2);
+    for (const [tipo, carga] of TODOS_LOS_TIPOS) {
+      const r = aplicarConMotivo(avanzarElBurgo, terminada, { tipo, carga }, { quien: BRUNO, azar: 1, tic: 0, asientos: dos });
+      comprobar(`en terminada, ${tipo} devuelve EL MISMO objeto con motivo`, r.estado === terminada && r.motivo !== null, { motivo: r.motivo, mismo: r.estado === terminada });
+      if (r.motivo !== null) motivos.push(r.motivo);
+    }
+  }
+
+  /*
+   * FUERA DE SU MOMENTO, con la partida en marcha. `RENDIRSE` va aparte: se ofrece
+   * SIEMPRE a quien sigue jugando (es la salida de emergencia del reglamento), así
+   * que su «fuera de su momento» es haber quebrado ya, y se prueba abajo.
+   */
+  {
+    const enPorTirar = turnoDe(base, ANA);
+    for (const [tipo, carga] of TODOS_LOS_TIPOS) {
+      if (tipo === TIRAR || tipo === PROPONER || tipo === RENDIRSE) continue;
+      const r = mover(mesaSobre('SS-1', enPorTirar, CUATRO), ANA, { tipo, carga });
+      comprobar(`en \`por-tirar\` y sin nada suyo, ${tipo} devuelve el mismo estado con motivo`, !r.cambio && r.motivo !== null, r.motivo);
+      if (r.motivo !== null) motivos.push(r.motivo);
+    }
+    for (const tipo of [TIRAR, PASAR, COMPRAR, A_ALMONEDA]) {
+      const r = mover(mesaSobre('SS-2', enPorTirar, CUATRO), CARLA, { tipo, carga: { casilla: 39 } });
+      comprobar(`a quien no le toca, ${tipo} devuelve el mismo estado con motivo`, !r.cambio && r.motivo !== null, r.motivo);
+      if (r.motivo !== null) motivos.push(r.motivo);
+    }
+    const quebrado = conJugador(enPorTirar, CARLA, { quebrado: true, mrs: 0 });
+    for (const [tipo, carga] of TODOS_LOS_TIPOS) {
+      const r = mover(mesaSobre('SS-3', quebrado, CUATRO), CARLA, { tipo, carga });
+      comprobar(`quien ya quebró no puede ${tipo}`, !r.cambio && r.motivo !== null, r.motivo);
+      if (r.motivo !== null) motivos.push(r.motivo);
+    }
+    const deFuera = mover(mesaSobre('SS-4', enPorTirar, CUATRO), 'a-nadie', { tipo: TIRAR, carga: {} });
+    comprobar('y quien no está sentado tampoco, con su motivo propio', !deFuera.cambio && deFuera.motivo !== null, deFuera.motivo);
+    if (deFuera.motivo !== null) motivos.push(deFuera.motivo);
+  }
+
+  /* Una carga que no es un objeto no pasa por ninguna puerta. */
+  for (const carga of [null, 42, 'x', ['a'], undefined] as unknown[]) {
+    const r = mover(mesaSobre('SS-5', turnoDe(base, ANA), CUATRO), ANA, { tipo: ALZAR, carga });
+    comprobar(`una carga de tipo ${carga === null ? 'null' : typeof carga} en ALZAR se rechaza con motivo`, !r.cambio && r.motivo !== null);
+    if (r.motivo !== null) motivos.push(r.motivo);
+  }
+
+  /*
+   * ═══ NINGÚN MOTIVO PUEDE FILTRAR LO QUE LA PROYECCIÓN NO ENSEÑA ═══
+   *
+   * El motivo viaja por un canal aparte —no entra en el diario, no lo guarda nadie,
+   * y sólo llega a quien movió—, y por eso mismo no lo vigila NINGÚN comprobador
+   * genérico: la memoria de esta casa lo tiene apuntado como la fuga por la puerta
+   * de atrás. Aquí cada motivo recogido pasa por la misma criba que las vistas, y
+   * la criba se ve caer con uno envenenado.
+   */
+  comprobar(`se han recogido ${motivos.length} motivos de rechazo`, motivos.length >= 40, motivos.length);
+  comprobar('ninguno lleva dentro una serie de carta, un secreto ni una marca', motivos.every((m) => reprochesDeTexto(m, base).length === 0), motivos.filter((m) => reprochesDeTexto(m, base).length > 0));
+  comprobar('ninguno es una cadena vacía: un motivo mudo no explica nada', motivos.every((m) => m.trim().length > 0));
+  comprobar('LA VACUNA: un motivo envenenado con «p07» se ve caer', reprochesDeTexto('No puedes: la siguiente del Pregón es la "p07".', base).length > 0);
+  comprobar('y otro con una marca registrada dentro, también', reprochesDeTexto(`Eso no se puede: esto no es ${(MARCAS_VETADAS[0] as { nombre: string }).nombre}.`, base).length > 0);
+}
+
+// ---------------------------------------------------------------------------
+paso('13. PARTIDAS ENTERAS de 2, 3 y 6 jugadas por el robot, vigiladas en CADA revisión');
+// ---------------------------------------------------------------------------
+
+/** Lo contado de una partida entera: por clase de suceso, y lo que costó. */
+interface PartidaVigilada {
+  estado: EstadoDelBurgo;
+  mesa: Mesa;
+  revisiones: number;
+  movimientos: number;
+  tics: number;
+  cuenta: Record<string, number>;
+  rentas: number;
+  almonedasGanadas: number;
+  tratosAceptados: number;
+  alzas: number;
+  corte: string | null;
+}
+
+/**
+ * JUEGA UNA PARTIDA ENTERA POR LA PUERTA DEL ÁRBITRO, con el robot decidiendo sobre
+ * `opciones()`, tics intercalados, y `revisar` llamado en CADA revisión.
+ *
+ * El orden de los asientos es el del robot y por la misma razón medida allí: los que
+ * tienen algo que contestar SIN turno van PRIMERO y el del turno el ÚLTIMO. Al revés,
+ * el proponente pasaba el turno antes de que nadie pudiera aceptar y los tratos
+ * caducaban todos sin haber sido contestados nunca (339 propuestas, cero aceptadas).
+ */
+function partidaVigilada(
+  id: string,
+  cuantos: number,
+  semilla: number,
+  topeDeVueltas: number,
+  cadaCuantosUnTic: number,
+  topeDePasos: number,
+  robot: (vista: unknown, quien: AsientoId, azar: Azar, conTrato: boolean) => { azar: Azar; decision: DecisionDelRobot | null },
+  revisar: (e: EstadoDelBurgo, asientos: readonly AsientoId[]) => void,
+): PartidaVigilada {
+  const asientos = asientosDelRobot(cuantos);
+  let mesa = mesaSobre(id, undefined, asientos, semilla);
+  let azar: Azar = sembrar(semilla);
+  const cuenta: Record<string, number> = {};
+  let rentas = 0;
+  let almonedasGanadas = 0;
+  let tratosAceptados = 0;
+  let alzas = 0;
+  let revisiones = 0;
+  let movimientos = 0;
+  let tics = 0;
+  let corte: string | null = null;
+  let turnoConTrato = -1;
+  const propusieron: AsientoId[] = [];
+
+  const anotar = (e: EstadoDelBurgo): void => {
+    revisiones++;
+    for (const s of e.sucesos) {
+      cuenta[s.que] = (cuenta[s.que] ?? 0) + 1;
+      if (s.que === 'paga' && s.porque === 'renta') rentas++;
+      if (s.que === 'almoneda-cerrada' && s.ganador !== null) almonedasGanadas++;
+      if (s.que === 'trato' && s.fin === 'aceptado') tratosAceptados++;
+      if (s.que === 'alza') alzas++;
+    }
+    revisar(e, asientos);
+  };
+
+  mesa = mover(mesa, asientos[0] as AsientoId, { tipo: EMPEZAR, carga: { topeDeVueltas } }).mesa;
+  movimientos++;
+  anotar(estadoDe(mesa));
+
+  for (let paso = 0; paso < topeDePasos; paso++) {
+    const e = estadoDe(mesa);
+    if (e.momento === 'terminada') break;
+    if (cadaCuantosUnTic > 0 && (paso + 1) % cadaCuantosUnTic === 0) {
+      const antes = mesa;
+      mesa = tic(mesa);
+      tics++;
+      if (mesa.estado !== antes.estado) anotar(estadoDe(mesa));
+      continue;
+    }
+    if (e.turnosAbiertos !== turnoConTrato) {
+      turnoConTrato = e.turnosAbiertos;
+      propusieron.length = 0;
+    }
+    const turnoAhora = vistaDe(e, ESPECTADOR).turnoDe;
+    const orden: AsientoId[] = [];
+    for (const a of asientos) if (a !== turnoAhora) orden.push(a);
+    if (turnoAhora !== null) orden.push(turnoAhora);
+    let hecho = false;
+    for (const quien of orden) {
+      const r = robot(vistaDe(e, quien), quien, azar, propusieron.indexOf(quien) < 0);
+      azar = r.azar;
+      if (r.decision === null) continue;
+      if (r.decision.familia === 'proponer') propusieron.push(quien);
+      const salida = mover(mesa, quien, r.decision.movimiento);
+      if (salida.cambio) {
+        mesa = salida.mesa;
+        movimientos++;
+        anotar(estadoDe(mesa));
+      }
+      hecho = true;
+      break;
+    }
+    if (!hecho) {
+      corte = `nadie tiene nada que hacer en «${e.momento}/${e.paso}» (turnoDe ${String(turnoAhora)})`;
+      break;
+    }
+  }
+  const fin = estadoDe(mesa);
+  if (corte === null && fin.momento !== 'terminada') corte = `se agotó el tope de ${topeDePasos} pasos`;
+  return { estado: fin, mesa, revisiones, movimientos, tics, cuenta, rentas, almonedasGanadas, tratosAceptados, alzas, corte };
+}
+
+/** Lo que una partida jugada DE VERDAD tiene que traer (§8.1, F4), contado desde los `sucesos`. */
+const MINIMOS_DE_UNA_PARTIDA = {
+  quiebras: 1,
+  rentas: 3,
+  almonedasGanadas: 1,
+  mazmorra: 2,
+  alzas: 1,
+  tratosAceptados: 1,
+} as const;
+
+/** Los reproches de una partida que dice haberse jugado. Es la función con vacuna. */
+function reprochesDePartida(p: PartidaVigilada): string[] {
+  const r: string[] = [];
+  if (p.estado.momento !== 'terminada') r.push(`no terminó: ${String(p.corte)}`);
+  if (p.estado.ganadores.length === 0) r.push('terminó sin ganador');
+  if ((p.cuenta.quiebra ?? 0) < MINIMOS_DE_UNA_PARTIDA.quiebras) r.push(`sólo ${p.cuenta.quiebra ?? 0} quiebras`);
+  if (p.rentas < MINIMOS_DE_UNA_PARTIDA.rentas) r.push(`sólo ${p.rentas} rentas cobradas`);
+  if (p.almonedasGanadas < MINIMOS_DE_UNA_PARTIDA.almonedasGanadas) r.push(`sólo ${p.almonedasGanadas} almonedas ganadas`);
+  if ((p.cuenta['a-la-mazmorra'] ?? 0) < MINIMOS_DE_UNA_PARTIDA.mazmorra) r.push(`sólo ${p.cuenta['a-la-mazmorra'] ?? 0} entradas en la Mazmorra`);
+  if (p.alzas < MINIMOS_DE_UNA_PARTIDA.alzas) r.push(`ninguna casa alzada sobre un barrio entero (${p.alzas})`);
+  if (p.tratosAceptados < MINIMOS_DE_UNA_PARTIDA.tratosAceptados) r.push(`sólo ${p.tratosAceptados} tratos aceptados`);
+  return r;
+}
+
+/** Las tres partidas: `[asientos, semilla, tope de vueltas, un tic cada, tope de pasos]`. */
+const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number, number]> = [
+  [2, 20260901, 40, 7, 4000],
+  [3, 20260902, 40, 11, 4000],
+  /*
+   * La semilla de la de seis está ELEGIDA: con seis comprándolo todo, la mayoría de
+   * las partidas no llegan a una almoneda GANADA —el que la abre suele poder pagar el
+   * título— y el mínimo de §8.1 F4 exige una. Se probaron quince semillas y se escogió
+   * una que las tiene; la partida sigue siendo la que el robot juega, no una guiada.
+   */
+  [6, 13, 40, 13, 6000],
+];
+
+{
+  const resumen: string[] = [];
+  for (const [cuantos, semilla, vueltas, cadaCuantos, topePasos] of PARTIDAS_DE_VERDAD) {
+    let revisadas = 0;
+    let reprochesEnVuelo: string[] = [];
+    const desde = performance.now();
+    const p = partidaVigilada(
+      `VIVA-${cuantos}`,
+      cuantos,
+      semilla,
+      vueltas,
+      cadaCuantos,
+      topePasos,
+      loQueHaceElRobot,
+      (e, asientos) => {
+        revisadas++;
+        if (reprochesEnVuelo.length > 0) return;
+        /*
+         * `conNombres: false`: la mesa del robot no tiene registro de nombres, así que
+         * `comoSeLlama` degrada al identificador A PROPÓSITO (está escrito en su cabecera)
+         * y exigir aquí que ningún texto enseñe el id sería exigir lo contrario del
+         * contrato. Los nombres se vigilan en los bloques montados a mano, que sí los pasan.
+         */
+        const forma = reprochesDeLasMiradas(e, asientos, false);
+        const secretos = reprochesDeSecretos(e, asientos);
+        if (forma.length > 0 || secretos.length > 0) reprochesEnVuelo = [`en la jugada ${e.jugada}`, ...forma, ...secretos];
+      },
+    );
+    const ms = performance.now() - desde;
+    const reproches = reprochesDePartida(p);
+    comprobar(`la partida de ${cuantos} se juega DE VERDAD hasta el final y trae de todo`, reproches.length === 0, { reproches, cuenta: p.cuenta, corte: p.corte });
+    comprobar(`  y en sus ${revisadas} revisiones no hay ni un secreto ni un reproche de forma en las ${cuantos + 1} miradas`, reprochesEnVuelo.length === 0, reprochesEnVuelo.slice(0, 6));
+    comprobar('  `jugada` sube exactamente una vez por revisión, y los sucesos nunca pasan del tope', p.estado.jugada === p.revisiones && p.estado.sucesos.length <= TOPE_DE_SUCESOS, { jugada: p.estado.jugada, revisiones: p.revisiones, sucesos: p.estado.sucesos.length });
+    comprobar('  hay ganador, sigue vivo, y `seAcabo` lo dice', p.estado.ganadores.length >= 1 && p.estado.ganadores.every((g) => !jugadorDe(p.estado, g).quebrado) && seAcabo(p.estado) === true, p.estado.ganadores);
+    comprobar('  y el último suceso es el `fin`: la crónica no se corta por el tope y pierde el final', (p.estado.sucesos[p.estado.sucesos.length - 1] as SucesoDelBurgo | undefined)?.que === 'fin', p.estado.sucesos.length);
+
+    /* DETERMINISMO, ESCALÓN 1: el diario reejecutado da el MISMO estado, byte a byte. */
+    const otraVez = reejecutarEn(BURGO, undefined, p.mesa.diario);
+    comprobar(`  y su diario de ${p.mesa.diario.length} entradas reejecuta el mismo estado byte a byte`, canonico(otraVez) === canonico(p.estado));
+    resumen.push(`    ${cuantos} a la mesa · ${String(p.movimientos).padStart(4)} movs · ${String(p.tics).padStart(3)} tics · ${String(p.cuenta.quiebra ?? 0)} quiebras · ${String(p.rentas).padStart(3)} rentas · ${p.almonedasGanadas} almonedas · ${p.alzas} alzas · ${p.tratosAceptados} tratos · ${ms.toFixed(0)} ms`);
+  }
+  console.log('  partidas jugadas de verdad:');
+  for (const r of resumen) console.log(r);
+
+  /*
+   * LA VACUNA DEL BUCLE QUE DICE JUGAR Y NO JUEGA. El robot mudo tira porque no le
+   * queda otra, no compra nada, pasa en toda almoneda y se rinde en su apuro. Que la
+   * partida TERMINE no prueba nada; lo que se exige es que los mínimos NO se cumplan,
+   * porque si se cumplieran con esta política los mínimos no medirían nada.
+   */
+  {
+    const mudo = partidaVigilada('MUDA', 4, 20260904, 40, 0, 4000, (vista, quien, azar) => ({ azar, decision: loQueHaceElRobotMudo(vista, quien) }), () => {});
+    const reproches = reprochesDePartida(mudo);
+    comprobar('LA VACUNA: el robot que sólo pasa NO cumple los mínimos de una partida jugada', reproches.length > 0, reproches);
+    comprobar('  y en concreto no compra nada, así que no alza ni acepta tratos', mudo.alzas === 0 && mudo.tratosAceptados === 0, { alzas: mudo.alzas, tratos: mudo.tratosAceptados });
+    console.log(`    robot mudo (vacuna) · ${mudo.movimientos} movs · le faltan: ${reproches.join('; ').slice(0, 140)}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+paso('14. LAS CIFRAS DE PRESUPUESTO (§8.6), medidas e IMPRESAS siempre');
+// ---------------------------------------------------------------------------
+
+/** Percentil de una lista de milisegundos. `sort` con comparador: esto es un guion, pero la costumbre es la costumbre. */
+function percentil(muestras: readonly number[], parte: number): number {
+  if (muestras.length === 0) return 0;
+  const orden = [...muestras].sort((a, b) => a - b);
+  const donde = Math.min(orden.length - 1, Math.floor((orden.length - 1) * parte));
+  return orden[donde] as number;
+}
+
+{
+  const cifras: Array<{ que: string; valor: string; tope: string; bien: boolean }> = [];
+  const anota = (que: string, valor: string, tope: string, bien: boolean): void => {
+    cifras.push({ que, valor, tope, bien });
+    comprobar(`presupuesto · ${que}: ${valor} (tope propio ${tope})`, bien, valor);
+  };
+
+  /* EL PEOR ESTADO QUE PUEDE HABER: 28 títulos con dueño y edificios, tres tratos y 64 sucesos. */
+  const gordo = (() => {
+    let e = estadoDe(empezada('PRE', SEIS, 41));
+    const filas: Array<readonly [number, AsientoId | null, number, boolean]> = [];
+    for (let k = 0; k < TITULOS.length; k++) {
+      const casilla = TITULOS[k] as number;
+      const fila = CASILLAS[casilla];
+      filas.push([casilla, SEIS[k % SEIS.length] as AsientoId, fila !== undefined && fila.clase === 'solar' ? POSADA : 0, k % 7 === 0]);
+    }
+    e = conTitulos(e, filas);
+    for (const a of SEIS) e = conJugador(e, a, { mrs: 99999, indultos: ['pregon', 'arca'], vueltas: 12 });
+    const tratos: TratoDelBurgo[] = [];
+    for (let k = 0; k < TRATOS_ABIERTOS_POR_PROPONENTE; k++) {
+      tratos.push({ id: k, de: ANA, a: BRUNO, doy: { mrs: 99999, titulos: [...TITULOS], indultos: 2 }, pido: { mrs: 99999, titulos: [], indultos: 0 }, enElTurno: e.turnosAbiertos });
+    }
+    const paseo: number[] = [];
+    for (let k = 1; k <= 12; k++) paseo.push(k);
+    const sucesos: SucesoDelBurgo[] = [];
+    for (let k = 0; k < TOPE_DE_SUCESOS; k++) sucesos.push({ que: 'mueve', quien: ANA, desde: 0, hasta: 12, recorrido: paseo, porLaPuertaMayor: true, como: 'anda' });
+    return { ...turnoDe(e, ANA, 'por-pasar'), tratos, sucesos, tirada: [3, 4] as ParDeDados, colaDeAlmonedas: [...TITULOS] };
+  })();
+
+  const bytesDelEstado = canonico(gordo).length;
+  anota('estado canónico, en el peor caso', `${(bytesDelEstado / 1024).toFixed(1)} KiB`, `${TOPE_DE_ESTADO / 1024} KiB`, bytesDelEstado < TOPE_DE_ESTADO);
+  comprobar('y ese peor estado sigue siendo canonizable, sin un solo `undefined`', porQueNoEsCanonico(gordo) === null, porQueNoEsCanonico(gordo));
+
+  let peorVista = 0;
+  let peorOpciones = 0;
+  let peorBytesDeOpciones = 0;
+  const deProyectar: number[] = [];
+  const deOpciones: number[] = [];
+  for (const quien of [ESPECTADOR, ...SEIS] as QuienMira[]) {
+    const t0 = performance.now();
+    const vista = vistaDeAsiento(BURGO, gordo, quien, NOMBRES);
+    deProyectar.push(performance.now() - t0);
+    const t1 = performance.now();
+    const opciones = opcionesDeArcade(BURGO, vista, quien);
+    deOpciones.push(performance.now() - t1);
+    peorVista = Math.max(peorVista, canonico(vista).length);
+    peorOpciones = Math.max(peorOpciones, opciones.length);
+    peorBytesDeOpciones = Math.max(peorBytesDeOpciones, canonico(opciones).length);
+  }
+  anota('vista canónica con el tablero dentro, la mayor de siete', `${(peorVista / 1024).toFixed(1)} KiB`, `${TOPE_DE_VISTA / 1024} KiB`, peorVista < TOPE_DE_VISTA);
+  anota('opciones por lectura, la peor de siete', `${peorOpciones} opciones · ${(peorBytesDeOpciones / 1024).toFixed(1)} KiB`, `${TOPE_DE_OPCIONES} y ${TOPE_DE_OPCIONES_BYTES / 1024} KiB`, peorOpciones <= TOPE_DE_OPCIONES && peorBytesDeOpciones < TOPE_DE_OPCIONES_BYTES);
+  anota('proyectar(), la peor de siete miradas', `${Math.max(...deProyectar).toFixed(2)} ms`, `${TOPE_DE_MS} ms`, Math.max(...deProyectar) < TOPE_DE_MS);
+  anota('opciones(), la peor de siete miradas', `${Math.max(...deOpciones).toFixed(2)} ms`, `${TOPE_DE_MS} ms`, Math.max(...deOpciones) < TOPE_DE_MS);
+
+  const cargaMayor = canonico({ a: BRUNO, doy: { mrs: TOPE_DE_MRS_EN_UN_TRATO, titulos: [...TITULOS], indultos: 2 }, pido: { mrs: TOPE_DE_MRS_EN_UN_TRATO, titulos: [], indultos: 0 } }).length;
+  anota('la carga legal más gorda (un trato con 28 títulos)', `${cargaMayor} bytes`, `${TOPE_DE_CARGA} bytes`, cargaMayor < TOPE_DE_CARGA);
+
+  /* `avanzar` por movimiento: p50, p99 y el peor de una partida entera de seis. */
+  {
+    const porMovimiento: number[] = [];
+    let mesa = mesaSobre('PRE-M', undefined, SEIS, 20260905);
+    mesa = mover(mesa, SEIS[0] as AsientoId, { tipo: EMPEZAR, carga: { topeDeVueltas: 20 } }).mesa;
+    let azar: Azar = sembrar(20260905);
+    for (let k = 0; k < 2000 && estadoDe(mesa).momento === 'jugando'; k++) {
+      const e = estadoDe(mesa);
+      const turnoAhora = vistaDe(e, ESPECTADOR).turnoDe;
+      const orden: AsientoId[] = [];
+      for (const a of SEIS) if (a !== turnoAhora) orden.push(a);
+      if (turnoAhora !== null) orden.push(turnoAhora);
+      let hecho = false;
+      for (const quien of orden) {
+        const r = loQueHaceElRobot(vistaDe(e, quien), quien, azar, true);
+        azar = r.azar;
+        if (r.decision === null) continue;
+        const t0 = performance.now();
+        const salida = mover(mesa, quien, r.decision.movimiento);
+        porMovimiento.push(performance.now() - t0);
+        if (salida.cambio) mesa = salida.mesa;
+        hecho = true;
+        break;
+      }
+      if (!hecho) break;
+    }
+    const peor = Math.max(...porMovimiento);
+    anota(`avanzar() por movimiento, sobre ${porMovimiento.length} movimientos de seis`, `p50 ${percentil(porMovimiento, 0.5).toFixed(3)} ms · p99 ${percentil(porMovimiento, 0.99).toFixed(3)} ms · peor ${peor.toFixed(2)} ms`, `${TOPE_DE_MS} ms`, peor < TOPE_DE_MS);
+  }
+
+  /*
+   * EL PEOR TIC QUE PUEDE HABER: el apuro del ausente con los 28 títulos y las 22
+   * posadas encima, liquidado en UN SOLO tic —vende, empeña y quiebra—. Es la
+   * cascada del §8.6, y el único sitio donde un tic hace decenas de cosas de golpe.
+   */
+  {
+    let e = estadoDe(empezada('PRE-T', SEIS, 41));
+    const filas: Array<readonly [number, AsientoId | null, number, boolean]> = [];
+    for (const casilla of TITULOS) {
+      const fila = CASILLAS[casilla];
+      filas.push([casilla, ANA, fila !== undefined && fila.clase === 'solar' ? POSADA : 0, false]);
+    }
+    e = conJugador(conTitulos(e, filas), ANA, { mrs: 0 });
+        /* La deuda es CON EL CONCEJO: es lo que manda los títulos a la cola de almonedas en vez de a un heredero. */
+    const deuda: ApuroDelBurgo = { quien: ANA, deudas: [{ a: null, cuanto: 999999, porque: 'diezmo' }] };
+    const alBorde: EstadoDelBurgo = { ...turnoDe(e, ANA, 'por-pasar'), paso: 'apuro', apuro: deuda };
+    const t0 = performance.now();
+    const trasTic = tic(mesaSobre('PRE-T2', alBorde, SEIS));
+    const ms = performance.now() - t0;
+    const s = estadoDe(trasTic);
+    comprobar('el peor tic (28 títulos y 22 posadas liquidados) acaba en quiebra, y en UN solo tic', jugadorDe(s, ANA).quebrado, { paso: s.paso });
+    anota('avanzar() por tic, el peor caso medido', `${ms.toFixed(2)} ms`, `${TOPE_DE_MS} ms`, ms < TOPE_DE_MS);
+    anota('el estado tras esa cascada', `${(canonico(s).length / 1024).toFixed(1)} KiB`, `${TOPE_DE_ESTADO / 1024} KiB`, canonico(s).length < TOPE_DE_ESTADO);
+
+    /* LA CASCADA ENTERA: cuántos tics cuesta vaciar las almonedas con los demás pasando. */
+    let cascada = trasTic;
+    let tics = 0;
+    let peorEstado = canonico(s).length;
+    const pendientes = (m: Mesa): number => estadoDe(m).colaDeAlmonedas.length + (estadoDe(m).almoneda === null ? 0 : 1);
+    comprobar('la quiebra al Concejo encola TODOS los títulos del quebrado, ninguno perdido', pendientes(trasTic) === TITULOS.length, pendientes(trasTic));
+    while (tics < TOPE_DE_CASCADA && pendientes(cascada) > 0 && estadoDe(cascada).momento === 'jugando') {
+      cascada = tic(cascada);
+      tics++;
+      peorEstado = Math.max(peorEstado, canonico(estadoDe(cascada)).length);
+    }
+    anota('la cascada de 28 almonedas con los demás pasando', `${tics} tics · estado mayor ${(peorEstado / 1024).toFixed(1)} KiB`, `${TOPE_DE_CASCADA} tics y ${TOPE_DE_ESTADO / 1024} KiB`, tics < TOPE_DE_CASCADA && peorEstado < TOPE_DE_ESTADO);
+    comprobar('y la cola queda vacía: ningún título del quebrado se queda por el camino', pendientes(cascada) === 0, estadoDe(cascada).colaDeAlmonedas);
+  }
+
+  console.log('  presupuesto del Burgo (los topes propios van a la mitad de los 50 ms y a 1/21 de los 512 KiB de producción):');
+  for (const c of cifras) console.log(`    ${c.bien ? '·' : '✗'} ${c.que.padEnd(56)} ${c.valor.padEnd(50)} tope ${c.tope}`);
+}
+
 // ═══ FIN DE LOS BLOQUES ═══
 
 // ---------------------------------------------------------------------------
@@ -968,7 +2293,7 @@ if (fallos.length > 0) {
  * fichero) y DESPUÉS de imprimir las rojas: al ras dispara antes que la roja y se
  * lleva por delante los nombres de lo que ya se había encontrado.
  */
-const COMPROBACIONES_ESCRITAS = 0;
+const COMPROBACIONES_ESCRITAS = 530;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: ` +
@@ -983,7 +2308,7 @@ if (fallos.length === 0) {
   console.log('  las treinta y dos cartas hacen lo que dicen y el mazo rota, la almoneda releva por asiento y la puja libre cabe');
   console.log('  sólo por su puerta, el apuro se salda vendiendo y empeñando o acaba en quiebra con quien más reclama, los tratos');
   console.log('  caducan al relevar, el tic juega por el ausente y una mesa sin nadie termina sola — y tres partidas enteras de');
-  console.log('  2, 4 y 6 jugadas por el robot quiebran, cobran, pujan, encierran y alzan, reejecutadas byte a byte, con');
+  console.log('  2, 3 y 6 jugadas por el robot quiebran, cobran, pujan, encierran y alzan, reejecutadas byte a byte, con');
   console.log('  ningún secreto en ninguna de las siete miradas de ninguna revisión.');
   process.exit(0);
 }

@@ -159,8 +159,10 @@ import {
   proyectarLaRonda,
   seAcaboLaRonda,
   proyectarRiberas,
+  proyectarElBurgo,
   TICS_PARA_COLOCARSE,
 } from '../../shared/arcade/juegos';
+import { asientosDelRobot, jugarConElRobot } from './robot-del-burgo';
 import type { MesaEnCurso } from '../src/arcade/mesas';
 import { abrirMesa, avanzarElReloj, jugar, jugarConMotivo } from '../src/arcade/arbitro';
 import type { Mesa } from '../src/arcade/arbitro';
@@ -291,6 +293,8 @@ function dormir(ms: number): Promise<void> {
 const RONDA = 'la-ronda';
 const FRENTE = 'frente';
 const RIBERAS = 'riberas';
+/** El sexto, con `secretos: true` y dos mazos que tapar. Ver su bloque más abajo. */
+const BURGO = 'burgo';
 
 /**
  * ═══ POR QUÉ RIBERAS ENTRÓ AQUÍ, Y POR QUÉ NO ESTABA ═══
@@ -1452,6 +1456,65 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
   comprobar(
     'y al devolver la proyección buena, vuelve a estar limpia',
     reprochesDeSecretos(RIBERAS, sembrada.estado, TRES, false).length === 0,
+  );
+}
+
+paso('En proceso: una partida ENTERA del Burgo, con sus secretos mirados en cada revisión');
+
+/*
+ * ═══ POR QUÉ EL BURGO ENTRA AQUÍ, Y POR QUÉ EL DÍA QUE SE ESTRENA ═══
+ *
+ * Este fichero ya se reprochó una vez —arriba, en el punto 16— haberse quedado con
+ * dos arcades mientras había cuatro instalados, y que Riberas «no apareciera ni una
+ * vez» mientras la frase de cierre se leía como si cubriera todo. El Burgo es el
+ * sexto, tiene `secretos: true`, y lo que tapa son DOS MAZOS de dieciséis cartas
+ * cada uno más el azar entero: si su proyección dejara pasar el orden del Pregón,
+ * cualquiera con el código de la mesa sabría qué carta le va a salir a quien caiga
+ * en el Pregón, que es la mitad del juego.
+ *
+ * Las series son distinguibles a propósito (`p07`, `a12`), que es lo que hace que la
+ * búsqueda por aparición de este fichero valga para ellas: un número pequeño daría
+ * rojos falsos contra cualquier contador. Y el bucle es EL DEL ROBOT —el mismo que
+ * juegan `verify:burgo`, `oro:arcade` y `verify:determinismo`—, para que lo que se
+ * mira aquí sea una partida de verdad y no cuatro movimientos escritos a mano.
+ */
+{
+  const CUANTOS_EN_EL_BURGO = 4;
+  const asientosDelBurgo = asientosDelRobot(CUANTOS_EN_EL_BURGO);
+  let revisiones = 0;
+  let primerosReproches: string[] = [];
+  const partida = jugarConElRobot(20260909, CUANTOS_EN_EL_BURGO, 12, 7, 3000, undefined, (estado) => {
+    revisiones++;
+    if (primerosReproches.length > 0) return;
+    const reproches = reprochesDeSecretos(BURGO, estado, asientosDelBurgo, false);
+    if (reproches.length > 0) primerosReproches = reproches;
+  });
+  comprobar(
+    'el Burgo se juega de verdad en proceso: cientos de revisiones y un final',
+    revisiones > 150 && partida.estado.momento === 'terminada',
+    { revisiones, momento: partida.estado.momento, corte: partida.corte },
+  );
+  comprobar(
+    `en las ${revisiones} revisiones del Burgo ningún secreto se escapa a ninguna de las cinco miradas`,
+    primerosReproches.length === 0,
+    primerosReproches.slice(0, 4),
+  );
+  comprobar(
+    'y con la mesa vacía tampoco: las cuatro puertas aguantan `undefined`',
+    reprochesDeSecretos(BURGO, undefined, asientosDelBurgo, false).length === 0,
+  );
+  comprobar(
+    'el Burgo declara secretos: sin ellos esta comprobación no miraría nada',
+    loSecretoDe(BURGO, partida.estado).length > 0,
+  );
+  /* LA VACUNA, igual que la de Riberas: con la identidad como proyección tiene que saltar. */
+  registrarProyeccion(BURGO, (estado: unknown) => estado);
+  const envenenado = reprochesDeSecretos(BURGO, partida.estado, asientosDelBurgo, false);
+  comprobar('con la identidad como proyección del Burgo, el orden de los mazos salta', envenenado.length > 0);
+  registrarProyeccion(BURGO, proyectarElBurgo);
+  comprobar(
+    'y al devolver la proyección buena, vuelve a estar limpia',
+    reprochesDeSecretos(BURGO, partida.estado, asientosDelBurgo, false).length === 0,
   );
 }
 
@@ -2790,6 +2853,137 @@ try {
           'cartaJugada,colonos,descartes,desde,estiaje,estiajePorMover,faltaVereda,ganadores,guardia,islas,mazo,misCartas,misFichas,misPuntos,momento,paso,tablero,tirado,tratos,turnoDe,turnosAbiertos,ultimaChoza,ultimaTirada,vado,veredasGratis,yo',
         campos,
       );
+    }
+  }
+
+  // ── El Burgo por el cable ────────────────────────────────────────────────
+  paso('El Burgo por HTTP: se abre, se empieza, se tira, se compra, y el plazo lo vence un MIRÓN');
+
+  /*
+   * ═══ QUÉ AÑADE ESTE BLOQUE SOBRE LOS OTROS TRES, Y POR QUÉ ES CORTO ═══
+   *
+   * Las reglas del Burgo las comprueba `verify:burgo` en proceso, con el mismo
+   * árbitro y quinientas y pico afirmaciones; repetirlas aquí por HTTP sería pagar un
+   * servidor levantado por lo mismo. Lo que sólo se puede ver desde fuera del proceso
+   * es lo que este bloque hace: que el arcade ESTÉ en el catálogo del binario que
+   * arrancó, que su mesa se abra sin credencial, que el ciclo entero
+   * —empezar, tirar, comprar— pase por la red con el `x-asiento` de cada cual, que su
+   * vista y sus opciones bajen con la forma cerrada que este fichero afirma, y que un
+   * plazo suyo lo haga vencer LA LECTURA DE UN ESPECTADOR, que es el punto 5 y la
+   * trampa que la memoria de la casa tiene apuntada: cualquiera con el código hace
+   * correr el reloj de una mesa en la que no juega.
+   */
+  {
+    const abrirBurgo = await pedir('/arcade/mesas', {
+      metodo: 'POST',
+      cuerpo: { arcade: BURGO, nombre: 'Ana', plazoSegundos: 600 },
+    });
+    comprobar('se abre una mesa del Burgo sin credencial', abrirBurgo.estado === 201, abrirBurgo.datos);
+    const codigoB = String(abrirBurgo.datos.codigo ?? '');
+    const genteB = [{ nombre: 'Ana', asiento: abrirBurgo.datos.asiento as string, llave: abrirBurgo.datos.llave as string }];
+    for (const nombre of ['Beto', 'Cira']) {
+      const r = await pedir(`/arcade/mesas/${codigoB}/asientos`, { metodo: 'POST', cuerpo: { nombre } });
+      comprobar(`${nombre} se sienta en la mesa del Burgo`, r.estado === 200, r.datos);
+      genteB.push({ nombre, asiento: r.datos.asiento as string, llave: r.datos.llave as string });
+    }
+
+    /** Lo que ve `quien` (o un mirón sin llave) ahora mismo. */
+    const mirarB = async (llave: string | null): Promise<Respuesta> => pedir(`/arcade/mesas/${codigoB}`, { llave });
+
+    const antesDeEmpezar = await mirarB(genteB[0]!.llave);
+    comprobar('antes de empezar la mesa no está empezada y se ofrece «empezar»', antesDeEmpezar.datos.mesa.empezada === false && (antesDeEmpezar.datos.mesa.opciones ?? []).some((o: any) => o.id === 'empezar'), antesDeEmpezar.datos.mesa.opciones);
+    const camposB = Object.keys(antesDeEmpezar.datos.mesa).sort().join(',');
+    comprobar(
+      'y la mesa del Burgo manda exactamente los mismos campos que las demás: la lista es de la MESA, no del juego',
+      camposB === 'arcade,asientos,codigo,empezada,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
+      camposB,
+    );
+
+    const empezar = await pedir(`/arcade/mesas/${codigoB}/movimientos`, {
+      metodo: 'POST',
+      llave: genteB[0]!.llave,
+      cuerpo: { rev: antesDeEmpezar.datos.mesa.rev, tipo: 'burgo:empezar', carga: { topeDeVueltas: 0 } },
+    });
+    comprobar('empezar la partida del Burgo por HTTP la pone en marcha', empezar.estado === 200 && empezar.datos.mesa.empezada === true && empezar.datos.mesa.vista.momento === 'jugando', empezar.datos.mesa?.motivo);
+    comprobar('y ahora hay un turno declarado, que es de uno de los tres sentados', typeof empezar.datos.mesa.vista.turnoDe === 'string' && genteB.some((g) => g.asiento === empezar.datos.mesa.vista.turnoDe), empezar.datos.mesa.vista.turnoDe);
+
+    const deTurno = genteB.find((g) => g.asiento === empezar.datos.mesa.vista.turnoDe) as { nombre: string; asiento: string; llave: string };
+    const suya = await mirarB(deTurno.llave);
+    comprobar('a quien le toca se le ofrece tirar los dados', (suya.datos.mesa.opciones ?? []).some((o: any) => o.id === 'tirar'), (suya.datos.mesa.opciones ?? []).map((o: any) => o.id));
+    const tirar = await pedir(`/arcade/mesas/${codigoB}/movimientos`, {
+      metodo: 'POST',
+      llave: deTurno.llave,
+      cuerpo: { rev: suya.datos.mesa.rev, tipo: 'burgo:tirar', carga: {} },
+    });
+    comprobar('tirar por HTTP mueve la figura y publica el PAR entero, no la suma', tirar.estado === 200 && Array.isArray(tirar.datos.mesa.vista.tirada) && tirar.datos.mesa.vista.tirada.length === 2, tirar.datos.mesa?.vista?.tirada);
+    comprobar('y el tablero declarado del Burgo baja con sus cuarenta caras', (tirar.datos.mesa.vista.tablero?.caras ?? []).length === 40, (tirar.datos.mesa.vista.tablero?.caras ?? []).length);
+
+    /*
+     * COMPRAR, si la tirada cayó en un título del Concejo. Con dos dados desde la
+     * Puerta Mayor casi siempre lo hace, pero «casi siempre» no es una comprobación:
+     * si esta vez no toca, se dice, y lo que se afirma es que lo ofrecido y lo que el
+     * servidor acepta coinciden, que es lo que se está mirando.
+     */
+    {
+      const trasTirar = await mirarB(deTurno.llave);
+      const compra = (trasTirar.datos.mesa.opciones ?? []).find((o: any) => typeof o.id === 'string' && o.id.indexOf('comprar:') === 0);
+      if (compra !== undefined) {
+        const r = await pedir(`/arcade/mesas/${codigoB}/movimientos`, {
+          metodo: 'POST',
+          llave: deTurno.llave,
+          cuerpo: { rev: trasTirar.datos.mesa.rev, tipo: compra.tipo, carga: compra.carga },
+        });
+        comprobar('comprar el título donde cayó pasa por el cable y cambia de dueño', r.estado === 200 && r.datos.mesa.rev > trasTirar.datos.mesa.rev && r.datos.mesa.motivo === null, r.datos.mesa?.motivo);
+        const mio = (r.datos.mesa.vista.titulos ?? []).find((t: any) => t.casilla === compra.carga.casilla);
+        comprobar('y el título baja con su dueño puesto en la vista de todos', mio !== undefined && mio.dueno === deTurno.asiento, mio);
+      } else {
+        comprobar('esta tirada no cayó en un título del Concejo: no se ofrece comprar y no se manda', true);
+        comprobar('y lo que sí se ofrece se puede mandar', (trasTirar.datos.mesa.opciones ?? []).length > 0);
+      }
+    }
+
+    /*
+     * EL PLAZO LO VENCE UN MIRÓN, y va en MESA APARTE. La de arriba se abrió con
+     * diez minutos de plazo a propósito: con un segundo, cualquier lectura entre el
+     * `mirar` y el `mover` mete un tic, sube la revisión y el movimiento vuelve 409
+     * `revision-rancia` — el bloque se pondría rojo por el reloj y no por el juego.
+     * Aquí se abre otra con un segundo, no mueve nadie, y quien lee es un espectador
+     * SIN LLAVE: si el tic sólo entrara por la lectura de un sentado, esto no
+     * cambiaría nada.
+     */
+    {
+      const conPrisa = await pedir('/arcade/mesas', { metodo: 'POST', cuerpo: { arcade: BURGO, nombre: 'Ana', plazoSegundos: 1 } });
+      comprobar('se abre una segunda mesa del Burgo, ésta con un segundo de plazo', conPrisa.estado === 201, conPrisa.datos);
+      const codigoP = String(conPrisa.datos.codigo ?? '');
+      const llaveP = conPrisa.datos.llave as string;
+      const segundo = await pedir(`/arcade/mesas/${codigoP}/asientos`, { metodo: 'POST', cuerpo: { nombre: 'Beto' } });
+      comprobar('y alguien más se sienta en ella', segundo.estado === 200, segundo.datos);
+      const arranque = await pedir(`/arcade/mesas/${codigoP}`, { llave: llaveP });
+      const enMarcha = await pedir(`/arcade/mesas/${codigoP}/movimientos`, {
+        metodo: 'POST',
+        llave: llaveP,
+        cuerpo: { rev: arranque.datos.mesa.rev, tipo: 'burgo:empezar', carga: { topeDeVueltas: 0 } },
+      });
+      comprobar('la segunda mesa arranca', enMarcha.estado === 200 && enMarcha.datos.mesa.vista.momento === 'jugando', enMarcha.datos.mesa?.motivo);
+      const antes = await pedir(`/arcade/mesas/${codigoP}`);
+      comprobar('un espectador sin llave puede mirar la mesa del Burgo, sin ser nadie', antes.estado === 200 && antes.datos.mesa.yo === null);
+      comprobar('y no recibe ni una opción: quien mira no juega', (antes.datos.mesa.opciones ?? []).length === 0, antes.datos.mesa.opciones);
+      await dormir(1300);
+      const despues = await pedir(`/arcade/mesas/${codigoP}`);
+      comprobar('tras pasar el plazo, la lectura de un ESPECTADOR lo hace vencer y la partida avanza sola', despues.datos.mesa.rev > antes.datos.mesa.rev, { antes: antes.datos.mesa.rev, despues: despues.datos.mesa.rev });
+      comprobar('y el tic de la mesa subió: el reloj corrió para quien no juega', despues.datos.mesa.tic > antes.datos.mesa.tic, { antes: antes.datos.mesa.tic, despues: despues.datos.mesa.tic });
+      comprobar('y ningún asiento del Burgo trae más campos que los de siempre', Object.keys(despues.datos.mesa.asientos[0]).sort().join(',') === 'id,nombre,presente', Object.keys(despues.datos.mesa.asientos[0]).sort().join(','));
+      comprobar('el turno sigue siendo de uno de los DOS sentados de esa mesa', typeof despues.datos.mesa.vista.turnoDe === 'string');
+    }
+
+    /* Un movimiento con la revisión rancia se rechaza igual que en los otros arcades. */
+    {
+      const r = await pedir(`/arcade/mesas/${codigoB}/movimientos`, {
+        metodo: 'POST',
+        llave: genteB[0]!.llave,
+        cuerpo: { rev: 0, tipo: 'burgo:tirar', carga: {} },
+      });
+      comprobar('un `rev` rancio al mover en el Burgo se rechaza con 409', r.estado === 409, { estado: r.estado, datos: r.datos });
     }
   }
 
@@ -4856,9 +5050,11 @@ if (fallos.length === 0) {
     '\nLa mesa existe: se abre con un código, se entra sin cuenta, la revisión manda al escribir\n' +
       'y no al leer, el plazo vence porque alguien MIRA, la espera aparcada se despierta por\n' +
       'vencimiento, la partida sobrevive a que el proceso muera, y la mano de cada cual no sale\n' +
-      'de su móvil — comprobado sobre lo que de verdad viajó por el cable, y en LOS DOS arcades\n' +
+      'de su móvil — comprobado sobre lo que de verdad viajó por el cable, y en LOS TRES arcades\n' +
       'de servidor y no sólo en La Ronda: Riberas también se abre, se juega leyendo el tablero que\n' +
-      'baja, y ni una ficha de un almacén sale hacia otro asiento ni hacia quien mira sin jugar.',
+      'baja, y ni una ficha de un almacén sale hacia otro asiento ni hacia quien mira sin jugar; y el\n' +
+      'Burgo se juega entero en proceso sin que el orden de sus dos mazos se escape a ninguna mirada,\n' +
+      'se abre, se empieza, se tira y se compra por HTTP, y su plazo lo hace vencer un MIRÓN.',
   );
   process.exit(0);
 }

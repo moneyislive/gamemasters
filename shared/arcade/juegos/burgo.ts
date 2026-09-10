@@ -2361,9 +2361,24 @@ function venceElPlazo(e: EstadoDelBurgo): EstadoDelBurgo {
   if (e.momento !== 'jugando') return e;
   const cronica: Cronica = [];
   let s = e;
-  if (!estaVivo(e, e.turno)) {
-    s = reanudar(e, cronica);
-  } else if (e.paso === 'almoneda') {
+  /*
+   * ═══ LA ALMONEDA Y EL APURO SE MIRAN ANTES QUE «EL DEL TURNO YA NO JUEGA» ═══
+   *
+   * Aquí `!estaVivo(e, e.turno)` iba EL PRIMERO y dejaba la mesa muerta en el caso
+   * más previsible de todos: quien quiebra CON EL CONCEJO durante su propio turno
+   * deja sus veintiocho títulos en la cola de almonedas, y `quebrar` abre la primera
+   * sin tocar `turno` —el relevo llega después, cuando la cola se vacía—. Con el
+   * turno apuntando a un quebrado, cada tic entraba por esta primera rama, llamaba a
+   * `reanudar`, y `reanudar` con una almoneda abierta devuelve EL MISMO objeto: el
+   * tic no cambiaba nada, la almoneda no avanzaba nunca y la mesa se quedaba
+   * esperando para siempre a gente que no estaba. Medido: cuatrocientos tics para
+   * cerrar UNA de las veintiocho almonedas, y las veintisiete restantes intactas.
+   *
+   * La almoneda y el apuro no son del dueño del turno —tienen su propio `pujaDe` y
+   * su propio `quien`—, así que se resuelven aunque el turno esté vacante; sólo
+   * cuando no hay ninguna de las dos importa que el del turno siga jugando.
+   */
+  if (e.paso === 'almoneda') {
     if (e.almoneda === null) s = reanudar(e, cronica);
     else {
       const i = indiceDelJugador(e, e.almoneda.pujaDe);
@@ -2371,6 +2386,8 @@ function venceElPlazo(e: EstadoDelBurgo): EstadoDelBurgo {
     }
   } else if (e.paso === 'apuro') {
     s = e.apuro === null ? reanudar(e, cronica) : liquidar(e, cronica);
+  } else if (!estaVivo(e, e.turno)) {
+    s = reanudar(e, cronica);
   } else if (e.paso === 'comprar') {
     const j = jugadorEn(e, e.turno) as JugadorDelBurgo;
     const t = tituloDe(e, j.casilla);
