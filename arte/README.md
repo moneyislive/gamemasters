@@ -6,7 +6,7 @@ Este fichero es la receta para rehacerlo.
 
 ## Qué hay que bajarse
 
-Nueve packs de [Kay Lousberg](https://kaylousberg.com), todos con licencia **CC0**
+Diez packs de [Kay Lousberg](https://kaylousberg.com), todos con licencia **CC0**
 (`License.txt` dentro de cada uno). CC0 significa dominio público: se pueden usar en
 proyectos personales, educativos y comerciales, sin obligación de citar. Citarle no es
 obligatorio y se hace igual, que para eso está el `NOTICE`.
@@ -22,12 +22,21 @@ obligatorio y se hace igual, que para eso está el `NOTICE`.
 | `arte/kaykit/furniture-bits/` | KayKit Furniture Bits 1.0 FREE (`KayKit_Furniture_Bits_1.0_FREE.zip`, 53 `.gltf`) | [itch.io](https://kaylousberg.itch.io/), «Furniture Bits» |
 | `arte/kaykit/halloween-bits/` | KayKit Halloween Bits 1.0 FREE (`KayKit_HalloweenBits_1.0_FREE.zip`, 63 `.gltf`) | [itch.io](https://kaylousberg.itch.io/), «Halloween Bits» |
 | `arte/kaykit/restaurant-bits/` | KayKit Restaurant Bits 1.0 FREE (`KayKit_Restaurant_Bits_1.0_FREE.zip`, 144 `.gltf`) | [itch.io](https://kaylousberg.itch.io/), «Restaurant Bits» |
+| `arte/kaykit/city-builder/` | KayKit City Builder Bits 1.0 FREE (`KayKit_City_Builder_Bits_1.0_FREE.zip`, 41 `.gltf`) | [itch.io](https://kaylousberg.itch.io/), «City Builder Bits» |
 | `arte/sketchfab/reloj-de-arena/` | Hourglass / Sand Clock, de **arloopa** | [Sketchfab](https://sketchfab.com/3d-models/hourglass-sand-clock-86fb4b7dc8444a33b7bde4ad1adc535e) |
 
-Los cuatro últimos (Dungeon, Furniture, Halloween y Restaurant) entraron con El Burgo y
-sólo los usa `escenas/modelos/burgo.glb`: ver «El Burgo: siete packs en un solo fichero»
-más abajo. Su `License.txt` dice lo mismo que los otros cinco, comprobado con el fichero
-delante: CC0, «free to use in personal, educational and commercial projects».
+Los cinco últimos (Dungeon, Furniture, Halloween, Restaurant y **City Builder**) entraron
+con El Burgo y sólo los usa `escenas/modelos/burgo.glb`: ver «El Burgo: ocho packs en un solo
+fichero» más abajo. Su `License.txt` dice lo mismo que los otros cinco, comprobado con el
+fichero delante: CC0, «free to use in personal, educational and commercial projects».
+
+**City Builder Bits es el pack que manda dentro del anillo del Burgo.** Trae los ocho bloques
+urbanos (`building_A`…`building_H`, con y sin acera), las **seis losas de carretera** con las
+que se traza la red entera —recta, cebra, esquina, esquina redondeada, cruce y te—, cinco
+coches y el mobiliario de calle. Su medida clave, comprobada pieza a pieza: **las siete losas
+(las seis de calle más `base`) miden 2,000 × 2,000**, y de ahí sale la retícula de la ciudad.
+Descomprimido tal cual: el `.gltf` cuelga de
+`city-builder/KayKit_City_Builder_Bits_1.0_FREE/Assets/gltf/`.
 
 ## El reloj de arena NO es CC0, y eso cambia una obligación
 
@@ -192,23 +201,24 @@ la escena las gira. `verify:embarcadero-modelos` vuelve a abrir el fichero desde
 con `@gltf-transform` y con el `GLTFLoader` de three, y comprueba todo lo de arriba más
 que una escena llena cabe en el presupuesto de un móvil.
 
-## El Burgo: siete packs en un solo fichero, ya a escala del mundo
+## El Burgo: ocho packs en un solo fichero, ya a escala del mundo
 
-`escenas/modelos/burgo.glb` son las piezas del tablero y del lobby de El Burgo (el arcade de
-comprar solares de un burgo medieval, `docs/burgo/`): el caserío y las murallas del solar,
-las casas-ficha y los peones de cada asiento, la mazmorra, el dinero, y el atrezo de la
-plaza. Salen de **siete packs a la vez**, y la tabla que manda es
-`escenas/burgo/piezas.ts` (una línea por pieza, con su pack):
+`escenas/modelos/burgo.glb` son las piezas del tablero de El Burgo y de la CIUDAD MODERNA que
+va dentro del anillo (`docs/burgo/LA-CIUDAD.md`): calles, bloques, coches, semáforos, farolas,
+los muebles con los que se amueblan las salas de los edificios, el cementerio, el polígono, el
+parque, y las fichas de asiento del tablero. Salen de **ocho packs a la vez**, y la tabla que
+manda es `escenas/burgo/piezas.ts` (una línea por pieza, con su pack):
 
 | Pack | Qué aporta al Burgo |
 | --- | --- |
-| Medieval Hexagon **EXTRA** | los edificios de solar (herrería, mercado, iglesia, molino…), las murallas y sus puertas, el suelo y la naturaleza, la bandera y el estandarte de asiento |
-| Board Game Bits | las fichas de asiento que se tiñen —casa, peón, figura, disco— y las monedas |
-| Dungeon | la mazmorra entera: muros, reja, antorchas, cofres, pilar, losa, llavero, montones de monedas, pendón |
-| Resource Bits | los lingotes de oro |
-| Furniture Bits | el taburete y la mesa de madera de la plaza |
-| Restaurant Bits | las mesas redondas, la silla y la caja de zanahorias de la plaza |
-| Halloween Bits | el farol, la farola, el banco y la verja de la plaza |
+| **City Builder Bits** | la ciudad: las seis losas de carretera, la parcela, los ocho bloques (con y sin acera), los cinco coches, farolas, semáforos, bancos, arbustos, papeleras, contenedores y el depósito de agua |
+| Board Game Bits | las seis fichas de asiento que se tiñen —casa, peón, figura, disco y los dos banderines— y las monedas |
+| Restaurant Bits | las cocinas y los comedores enteros: encimeras, fregadero, fogón, campana, horno, nevera, mesas, sillas, platos y género; y el muro y el suelo que anclan el módulo de sala |
+| Furniture Bits | los interiores: sofás, butacas, camas, armarios, estanterías, mesas, lámparas, alfombras y cuadros |
+| Halloween Bits | el cementerio (verja, tumbas, lápidas, cripta, arco) y el arbolado del parque |
+| Dungeon | lo que sirve de interior moderno: peldañeados, estanterías, mesa de trabajo, cajas y barriles; y el taburete que prueba la unidad de los cinco packs de persona |
+| Resource Bits | el polígono: palets, tablones, sillares, bidones, chatarra, perfiles y los lingotes |
+| Medieval Hexagon **EXTRA** | **sólo el campo de fuera del anillo**: teselas de hierba, árboles, arboledas, rocas, colinas y nubes. Ni un edificio: la ciudad no es medieval |
 
 ```bash
 npm run compilar:burgo -w escenas
@@ -217,22 +227,24 @@ npm run verify:burgo-modelos -w escenas
 
 Tres cosas que este compilador hace distinto de los otros, y por qué:
 
-- **La escala se hornea al compilar.** Los siete packs vienen en cuatro unidades distintas
-  (la casa del hexagonal mide 0,93, la casa-ficha 1,0, la pared de la mazmorra 4,0, una
-  silla 1,26; medido) y una escena que tuviera que acordarse de siete factores al instanciar
-  se olvidaría de uno. `piezas.ts` mide un factor por pack —anclando cada uno a la persona
+- **La escala se hornea al compilar.** Los ocho packs vienen en cuatro unidades distintas
+  (la casa del hexagonal mide 0,93, la casa-ficha 1,0, la pared de restaurante 4,0 y una
+  silla 1,26 —los cinco packs de persona van a uno—, y la losa de calle del City Builder 2,0)
+  y una escena que tuviera que acordarse de cuatro factores al instanciar se olvidaría de uno. `piezas.ts` mide un factor por pack —anclando cada uno a la persona
   de 2,543 de `escenas/escala.ts`— y el compilador lo aplica a las posiciones; el fichero
   sale a escala del mundo y la escena lo instancia a 1. Al revés que `embarcadero.glb`, que
   va a la unidad del pack y se sube con `ESCALA_DEL_PACK` al montarlo.
-- **Un solo material para siete packs.** Sin textura, lo único que los distingue es la
+- **Un solo material para ocho packs.** Sin textura, lo único que los distingue es la
   rugosidad que cada uno dejó a su gusto; se iguala antes de fundir y `dedup` deja uno.
 - **El azul de referencia del tinte es el del pack.** Las fichas de Board Game Bits se tiñen
   con la misma máscara `_TINTE` que el embarcadero, pero su azul medio es el suyo
   (`AZUL_DE_LAS_FICHAS` en `piezas.ts`), y `escenas/embarcadero/tinte.ts` lo recibe por
   parámetro para conservar el sombreado contra el azul correcto.
 
-El fichero tiene un techo de 3 MB (`TOPE_DE_BYTES_DEL_BURGO`) y el compilador se niega a
-pasarlo; lo que se quedó fuera por peso está apuntado en `PIEZAS_EN_ESPERA` con su coste.
+El fichero tiene un techo de **8 MB** (`TOPE_DE_BYTES_DEL_BURGO`) y el compilador se niega a
+pasarlo —subió de 3 cuando el centro del tablero pasó de ser una muralla vacía a ser una
+ciudad; el precedente medido es `tablero.glb`, que pesa 4.209 kB y viaja en cada despliegue—.
+Hoy pesa 3.073 kB con 163 piezas y 68.789 triángulos; lo que se quedó fuera por peso está apuntado en `PIEZAS_EN_ESPERA` con su coste.
 Lo sirve `server/src/routes/modelos.ts` en `/api/arcade/modelos/burgo.glb`, con ruta fija
 como los demás, y está versionado: sin eso daría 200 en el portátil y 404 en el despliegue.
 

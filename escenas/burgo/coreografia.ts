@@ -59,7 +59,13 @@ export const POR_JUGADOR_EN_EL_SORTEO = 0.9;
 export const ESCALON_DE_LOS_PEONES = 0.12;
 export const CAMBIO_DE_TURNO = 0.4;
 export const TIRADA = RODAR_MINIMO + ASENTAR;
-export const MONEDAS = { base: 0.9, porMoneda: 0.07, tope: 6, porCada: 50, altura: 6, escalon: 0.07 } as const;
+/**
+ * `altura` sube de 6 a 27 con el tablero, y por la misma razón que el dígito del precio: una
+ * moneda vuela desde un peón hasta el Concejo, que con el tablero de 864 está a unas 500
+ * unidades, y un arco de 6 sobre 500 es una línea recta. 27 es 6 × 2,25 redondeado hacia
+ * arriba, o sea el mismo arco que se veía sobre el tablero de 384.
+ */
+export const MONEDAS = { base: 0.9, porMoneda: 0.07, tope: 6, porCada: 50, altura: 27, escalon: 0.07 } as const;
 /** Las monedas de un mismo movimiento arrancan a esto unas de otras. */
 export const SOLAPE_DE_MONEDAS = 0.2;
 export const COMPRA = 0.7;

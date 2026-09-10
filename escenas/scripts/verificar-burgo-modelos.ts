@@ -13,32 +13,52 @@
  *   · Que dentro están EXACTAMENTE las piezas de `burgo/piezas.ts`, con esos nombres y
  *     en ese orden. Una que falte es un solar vacío; una que sobre viaja a cada móvil.
  *   · Que TODAS las primitivas llevan `COLOR_0` y NINGUNA lleva UV, y que no hay ni una
- *     textura ni una imagen. Siete packs son siete atlas que se podrían colar: uno que se
+ *     textura ni una imagen. Ocho packs son ocho atlas que se podrían colar: uno que se
  *     colara se ve bien en el PC y deja un hueco en el móvil.
- *   · Que las piezas de asiento llevan `_TINTE` con lo que tiene que haber: las fichas de
- *     Board Game Bits y el estandarte enteras, la casa grande, la posada y la bandera a
- *     medias, y las demás sin máscara. Se escribe como expectativa, no se deduce.
+ *   · Que las piezas de asiento llevan `_TINTE` con lo que tiene que haber: las SEIS de
+ *     Board Game Bits enteras —casa, peón, figura, disco y los dos banderines— y las demás
+ *     sin máscara. Se escribe como expectativa, no se deduce.
  *   · Que LA ESCALA ES LA DEL MUNDO, medida pieza a pieza contra `escala.ts`: la
- *     casa-ficha mide una persona, la casa grande dos, la tesela lo que la del tablero ya
- *     escalada, la losa una casilla, el muro de la mazmorra lo que la muralla del pack
- *     hexagonal, y nada baja de medio metro ni pasa de cuatro casillas. Éste es el
- *     fallo propio de un fichero que mezcla siete packs: una silla del tamaño de una
- *     iglesia no da error, se ve.
+ *     casa-ficha mide una persona, la tesela lo que la del tablero ya escalada, la losa y
+ *     el muro un MÓDULO DE SALA (4), las SIETE losas del City Builder la RETÍCULA DE LA
+ *     CIUDAD (12), el coche más de dos personas de largo y menos de una de alto, el cuerpo
+ *     C tres plantas de 4,5, la puerta más que una persona y menos que una planta, y nada
+ *     baja de medio metro ni pasa de seis módulos. Éste es el fallo propio de un fichero
+ *     que mezcla ocho packs: una silla del tamaño de un bloque no da error, se ve.
+ *   · Y que LOS CINCO PACKS DE PERSONA están de verdad en la misma unidad, con la
+ *     medida que lo demostró: el taburete de Furniture (`chair_stool_wood`) y la
+ *     banqueta del Dungeon (`stool`) son la MISMA pieza, 0,750 × 0,500 × 0,750 en los
+ *     dos packs. Si un día uno de los cinco cambia de factor, esa pareja deja de casar
+ *     y se ve aquí y no en la sala, con una silla media persona más alta que la de al
+ *     lado (que es exactamente lo que había con el Dungeon a 1,5).
  *   · Que ningún fichero del Burgo nombra una marca ajena: la mecánica es de dominio
  *     público y el nombre de quien la vende no lo es.
- *   · Que el fichero pesa menos del tope de `piezas.ts` y baja de un techo de triángulos.
+ *   · Que el fichero pesa menos del tope de `piezas.ts` —ocho megas, con el `tablero.glb` de
+ *     Riberas como precedente medido— y baja de un techo de triángulos.
  *
  * ═══ LAS VACUNAS: EL JUEZ DE TALLAS TIENE DIENTES ═══
  *
  * Un juez de tallas que leyera la misma tabla que el compilador podría estar en verde
- * midiéndose a sí mismo. Por eso se le pasa DOS veces con cajas falsas y se exige que
- * caiga: con las cajas divididas por el factor de cada pieza —lo que habría si nadie
- * hubiera escalado— tienen que caer la casa, la casa grande, la tesela, la losa y el
- * muro; y con las cajas multiplicadas otra vez por `ESCALA_DEL_PACK` —lo que haría una
- * escena que tratara este fichero como el embarcadero— tienen que caer también, y
- * además el tope de talla. Y la caja de la casa y del muro se vuelve a medir con el
- * `Box3` de three sobre la escena cargada: dos medidas por dos caminos, y tienen que
- * coincidir.
+ * midiéndose a sí mismo. Por eso se le pasa TRES veces con cajas falsas y se exige que
+ * caiga:
+ *
+ *   · Con las cajas divididas por el factor de cada pieza —lo que habría si nadie
+ *     hubiera escalado— tienen que caer la casa, la casa grande y la tesela. Y NO caen
+ *     la losa ni el muro, a propósito: sus packs van a factor 1 porque ya están en la
+ *     unidad del mundo, así que «nadie escaló» es invisible para ellos. Que la vacuna
+ *     diga qué anclas NO puede levantar es parte de lo que se afirma.
+ *   · Con las cajas multiplicadas otra vez por `ESCALA_DEL_PACK` —lo que haría una
+ *     escena que tratara este fichero como el embarcadero— tienen que caer todas las
+ *     anclas de talla y además el tope.
+ *   · Y con SÓLO las piezas del Dungeon multiplicadas por 1,5 —el factor que esta
+ *     tabla llevaba antes de medir los packs— tienen que caer la losa, el muro, la
+ *     valla del circuito y la pareja taburete/banqueta. Ésta es la vacuna del fallo
+ *     que de verdad hubo, y sin ella nada de lo de arriba lo habría visto: a 1,5 la
+ *     losa medía 6, el muro medía 6, y todo casaba con un tablero cuyas casillas
+ *     medían 6.
+ *
+ * Y la caja de la casa y del muro se vuelve a medir con el `Box3` de three sobre la
+ * escena cargada: dos medidas por dos caminos, y tienen que coincidir.
  *
  * ═══ POR QUÉ ÉSTE SÍ IMPORTA `three` ═══
  *
@@ -59,19 +79,23 @@ import type { Mesh, MeshStandardMaterial, Object3D } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
+  ALTURA_DE_PLANTA,
   ATRIBUTO_DE_TINTE,
   ATRIBUTO_DE_TINTE_CARGADO,
+  BYTES_DEL_TABLERO_DE_RIBERAS,
   escalaDe,
-  LADO_DE_CASILLA,
+  MODULO_DE_LA_CIUDAD,
   nombresDelBurgo,
   PIEZA,
   PIEZAS_DEL_BURGO,
   PIEZAS_QUE_SE_TINEN,
   PIEZAS_TENIDAS_ENTERAS,
+  RETICULA_DE_LA_CIUDAD,
+  TALLA_MAXIMA_DE_PIEZA,
   TOPE_DE_BYTES_DEL_BURGO,
 } from '../burgo/piezas';
 import type { NombreDePieza } from '../burgo/piezas';
-import { ALTURA_DE_UNA_CASA, ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
+import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
 import { NOMBRE_QUE_SOBREVIVE } from '../nombres';
 
 let hechas = 0;
@@ -91,20 +115,54 @@ const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..');
 const FICHERO = path.join(RAIZ, 'modelos', 'burgo.glb');
 
 /**
- * EL TECHO DE TRIÁNGULOS DEL FICHERO ENTERO: setenta y tantas piezas sueltas, no un
- * tablero. Cuántas veces pone cada una un tablero lleno lo decidirá quien escriba el
- * juego, y ese día entra aquí una tabla de multiplicidades como la del embarcadero.
+ * EL TECHO DE TRIÁNGULOS DEL FICHERO ENTERO: ciento cuarenta mil.
+ *
+ * Eran setenta mil cuando el catálogo eran setenta y tres piezas para un tablero con
+ * un edificio por casilla. Ahora son ciento sesenta y tres, porque dentro del anillo hay
+ * una ciudad moderna que hay que poder construir: calles, bloques, coches, semáforos,
+ * cocinas, salones, tumbas y palets. Esto NO es el presupuesto de lo que
+ * se pinta —eso lo suma `burgo/presupuesto.ts` con las multiplicidades—: es el techo
+ * del CATÁLOGO, una pieza de cada. El doble de lo que se mide hoy, para que ampliar
+ * no exija tocar esta línea cada vez y para que meter un castillo de seis mil sí se
+ * note.
  */
-const TOPE_DE_TRIANGULOS = 70_000;
+const TOPE_DE_TRIANGULOS = 140_000;
 
-/** Nada más pequeño que medio metro ni más grande que cuatro casillas: ver la cabecera. */
+/** Nada más pequeño que medio metro ni más grande que seis módulos: ver la cabecera. */
 const TALLA_MINIMA = 0.5;
-const TALLA_MAXIMA = 4 * LADO_DE_CASILLA;
+const TALLA_MAXIMA = TALLA_MAXIMA_DE_PIEZA;
+
+/**
+ * LO QUE LA CASILLA RESERVA A LAS CASAS: módulo y medio, seis unidades.
+ *
+ * Cuatro casas-ficha en 2 × 2 miden 5,1 de lado; la casilla nueva es mucho más ancha
+ * (`LA-CIUDAD.md`), pero el hueco que se les reserva sigue siendo éste, para que las
+ * cuatro y la posada se lean como una fila de un tablero de mesa y no como un barrio.
+ */
+const HUECO_DE_LAS_CASAS = 1.5 * MODULO_DE_LA_CIUDAD;
+
+/**
+ * LAS SIETE LOSAS QUE TIENEN QUE MEDIR LA RETÍCULA, escritas a mano y no derivadas del pack.
+ *
+ * A mano porque «todas las piezas del City Builder que sean losas» es un filtro, y un
+ * filtro que se rompa deja la lista vacía y el comprobador verde sin haber mirado nada.
+ * Son las seis de calle más la parcela, y si mañana el pack trae una séptima de calle hay
+ * que escribirla aquí: eso es una línea, y el silencio no lo es.
+ */
+const LOSAS_DE_LA_RETICULA: readonly NombreDePieza[] = [
+  PIEZA.calzada,
+  PIEZA.calzadaPaso,
+  PIEZA.calzadaCurva,
+  PIEZA.calzadaCurvaSuave,
+  PIEZA.calzadaCruce,
+  PIEZA.calzadaTe,
+  PIEZA.solera,
+];
 
 /** Cuánto puede apartarse una pieza-ancla de lo que `escala.ts` dice que mide. */
 const HOLGURA_DE_ANCLA = 0.02;
-/** Y cuánto el muro de la mazmorra de la muralla del hexagonal, que no se buscó que casaran. */
-const HOLGURA_ENTRE_MURALLAS = 0.03;
+/** Y cuánto pueden diferir dos piezas de packs distintos que tienen que ser la misma. */
+const HOLGURA_ENTRE_PACKS = 0.03;
 
 const NOMBRES = nombresDelBurgo();
 const mismos = (a: readonly string[], b: readonly string[]): boolean =>
@@ -151,7 +209,11 @@ if (!fs.existsSync(FICHERO)) {
   process.exit(1);
 }
 const bytesDelFichero = fs.statSync(FICHERO).size;
-comprobar(`y pesa menos de ${Math.round(TOPE_DE_BYTES_DEL_BURGO / 1024)} kB`, bytesDelFichero < TOPE_DE_BYTES_DEL_BURGO, { kB: Math.round(bytesDelFichero / 1024) });
+comprobar(
+  `y pesa menos de ${Math.round(TOPE_DE_BYTES_DEL_BURGO / 1024)} kB (tablero.glb, que ya viaja en cada despliegue, pesa ${Math.round(BYTES_DEL_TABLERO_DE_RIBERAS / 1024)})`,
+  bytesDelFichero < TOPE_DE_BYTES_DEL_BURGO,
+  { kB: Math.round(bytesDelFichero / 1024) },
+);
 
 /* El JSON del `.glb` se lee a mano, como en el embarcadero: es lo que va por el cable. */
 {
@@ -308,7 +370,7 @@ paso('Las piezas de asiento llevan su máscara, y las demás no');
   comprobar('y la máscara sólo vale 0 o 1', conValoresRaros.length === 0, conValoresRaros);
   comprobar('en cada una hay vértices de color', sinColorDeAsiento.length === 0, sinColorDeAsiento);
   comprobar(
-    'la casa grande, la posada y la bandera tienen también vértices SIN color: la piedra y el mástil no se tiñen',
+    'ninguna pieza declarada teñida entera esconde vértices sin color, y las declaradas a medias sí los tienen',
     planaSinQuerer.length === 0,
     planaSinQuerer,
   );
@@ -329,13 +391,22 @@ paso('Los nombres sobreviven al cargador, los hijos siguen ahí y la escala va e
   const malos = nodos.filter((n) => !NOMBRE_QUE_SOBREVIVE.test(n) || PropertyBinding.sanitizeNodeName(n) !== n);
   comprobar('ningún nombre de nodo, raíz o hijo, lleva algo que GLTFLoader vaya a borrar', malos.length === 0, malos);
 
-  /* El molino es la prueba de que los hijos se conservan: las aspas van en una malla aparte. */
-  const molino = raices.find((r) => r.getName() === PIEZA.molino);
-  const aspas = molino === undefined ? [] : descendientesDe(molino).filter((n) => n.getName().includes('fan') && n.getMesh() !== null);
-  const anidadas = aspas.some((a) => !(molino as Node).listChildren().includes(a));
-  comprobar('el molino conserva las aspas en un nodo propio, colgando de la torre', aspas.length === 1 && anidadas, {
-    aspas: aspas.map((a) => a.getName()),
-    hijosDelMolino: molino?.listChildren().map((h) => h.getName()),
+  /*
+   * EL COCHE ES LA PRUEBA DE QUE LOS HIJOS SE CONSERVAN: las cuatro ruedas van en nodos
+   * propios, colgando de la carrocería, con su nombre del pack (`..._wheel_front_left`).
+   *
+   * Antes esta comprobación la hacía el molino con sus aspas; el molino se cayó con lo
+   * medieval, y las ruedas no son un sustituto de compromiso: son mejor testigo, porque de
+   * ellas depende que un coche que circula pueda girarlas. Si el compilador aplanase el
+   * árbol —o si `mergeDocuments` fundiera los nodos—, las ruedas dejarían de existir por
+   * separado y nadie lo vería hasta que un coche cruzara la avenida deslizándose.
+   */
+  const cocheDePrueba = raices.find((r) => r.getName() === PIEZA.cocheBerlina);
+  const ruedas = cocheDePrueba === undefined ? [] : descendientesDe(cocheDePrueba).filter((n) => n.getName().includes('wheel') && n.getMesh() !== null);
+  const ruedasAnidadas = ruedas.every((a) => !(cocheDePrueba as Node).listChildren().includes(a));
+  comprobar('el coche conserva las cuatro ruedas en nodos propios, colgando de la carrocería', ruedas.length === 4 && ruedasAnidadas, {
+    ruedas: ruedas.map((a) => a.getName()),
+    hijosDelCoche: cocheDePrueba?.listChildren().map((h) => h.getName()),
   });
 
   /*
@@ -411,26 +482,84 @@ function problemasDeTalla(caja: (n: string) => Caja | undefined): string[] {
   if (!cerca(alto(PIEZA.casa), ALTURA_DE_UNA_PERSONA, HOLGURA_DE_ANCLA)) {
     problemas.push(`casa: mide ${r(alto(PIEZA.casa))} de alto y una casa-ficha mide una persona (${ALTURA_DE_UNA_PERSONA})`);
   }
-  if (!(huella(PIEZA.casa) * 2 <= LADO_DE_CASILLA)) {
-    problemas.push(`casa: con ${r(huella(PIEZA.casa))} de huella, cuatro en 2 × 2 no caben en una casilla de ${LADO_DE_CASILLA}`);
+  if (!(huella(PIEZA.casa) * 2 <= HUECO_DE_LAS_CASAS)) {
+    problemas.push(`casa: con ${r(huella(PIEZA.casa))} de huella, cuatro en 2 × 2 no caben en el hueco de ${HUECO_DE_LAS_CASAS}`);
   }
-  if (!cerca(alto(PIEZA.casaGrande), ALTURA_DE_UNA_CASA, HOLGURA_DE_ANCLA)) {
-    problemas.push(`casa-grande: mide ${r(alto(PIEZA.casaGrande))} de alto y una casa mide dos personas (${r(ALTURA_DE_UNA_CASA)})`);
-  }
-  if (!(huella(PIEZA.casaGrande) <= LADO_DE_CASILLA)) {
-    problemas.push(`casa-grande: con ${r(huella(PIEZA.casaGrande))} de huella no cabe en una casilla de ${LADO_DE_CASILLA}`);
+  /*
+   * LA RETÍCULA: las SIETE losas del City Builder —las seis de calle y la parcela— miden lo
+   * mismo en las dos direcciones del suelo, y ese mismo es `RETICULA_DE_LA_CIUDAD`.
+   *
+   * Es el ancla que sustituyó a la casa grande medieval cuando la ciudad se modernizó, y es
+   * la que de verdad importa: si UNA sola de las siete saliera a otra talla, la red de
+   * calles abriría una junta cada doce unidades y la ciudad se descosería entera sin que
+   * nada fallara. Miden 2 × 2 en el pack y salen a 12 × 12 con `ESCALA_DEL_URBANISMO`.
+   */
+  for (const n of LOSAS_DE_LA_RETICULA) {
+    if (!cerca(ancho(n), RETICULA_DE_LA_CIUDAD, HOLGURA_DE_ANCLA) || !cerca(fondo(n), RETICULA_DE_LA_CIUDAD, HOLGURA_DE_ANCLA)) {
+      problemas.push(`reticula: ${n} mide ${r(ancho(n))} × ${r(fondo(n))} y la retícula de la ciudad es ${RETICULA_DE_LA_CIUDAD} por lado`);
+    }
   }
   if (!cerca(ancho(PIEZA.tesela), 2 * ESCALA_DEL_PACK, HOLGURA_DE_ANCLA)) {
     problemas.push(`tesela: mide ${r(ancho(PIEZA.tesela))} de ancho y la del tablero ya escalada mide ${r(2 * ESCALA_DEL_PACK)}`);
   }
-  if (!cerca(ancho(PIEZA.losa), LADO_DE_CASILLA, HOLGURA_DE_ANCLA) || !cerca(fondo(PIEZA.losa), LADO_DE_CASILLA, HOLGURA_DE_ANCLA)) {
-    problemas.push(`losa: mide ${r(ancho(PIEZA.losa))} × ${r(fondo(PIEZA.losa))} y es el suelo de una casilla de ${LADO_DE_CASILLA}`);
+  if (!cerca(ancho(PIEZA.losa), MODULO_DE_LA_CIUDAD, HOLGURA_DE_ANCLA) || !cerca(fondo(PIEZA.losa), MODULO_DE_LA_CIUDAD, HOLGURA_DE_ANCLA)) {
+    problemas.push(`losa: mide ${r(ancho(PIEZA.losa))} × ${r(fondo(PIEZA.losa))} y una sala mide un módulo (${MODULO_DE_LA_CIUDAD}) por lado`);
   }
-  if (!cerca(alto(PIEZA.muro), LADO_DE_CASILLA, HOLGURA_DE_ANCLA)) {
-    problemas.push(`muro: mide ${r(alto(PIEZA.muro))} de alto y la rejilla de la mazmorra escalada da ${LADO_DE_CASILLA}`);
+  if (!cerca(alto(PIEZA.muro), MODULO_DE_LA_CIUDAD, HOLGURA_DE_ANCLA) || !cerca(ancho(PIEZA.muro), MODULO_DE_LA_CIUDAD, HOLGURA_DE_ANCLA)) {
+    problemas.push(`muro: mide ${r(ancho(PIEZA.muro))} × ${r(alto(PIEZA.muro))} y una planta es un módulo (${MODULO_DE_LA_CIUDAD}) de largo y de alto`);
   }
-  if (!cerca(alto(PIEZA.muro), alto(PIEZA.muralla), HOLGURA_ENTRE_MURALLAS)) {
-    problemas.push(`muralla: mide ${r(alto(PIEZA.muralla))} y el muro de la mazmorra ${r(alto(PIEZA.muro))}: las dos murallas del Burgo no casan`);
+  /*
+   * LA PAREJA QUE PRUEBA QUE LOS CINCO PACKS DE PERSONA VAN A LA MISMA UNIDAD.
+   * `chair_stool_wood` de Furniture y `stool` del Dungeon son el mismo taburete
+   * dibujado dos veces: 0,750 × 0,500 × 0,750 en los dos packs. Si difieren, es que
+   * uno de los dos lleva un factor que el otro no, y en la misma sala se verá una
+   * banqueta más alta que otra sin que nada falle.
+   */
+  if (!cerca(alto(PIEZA.banqueta), alto(PIEZA.taburete), HOLGURA_ENTRE_PACKS)) {
+    problemas.push(
+      `pareja: la banqueta del Dungeon mide ${r(alto(PIEZA.banqueta))} y el taburete de Furniture ${r(alto(PIEZA.taburete))}: ` +
+        'son la misma pieza y los dos packs tienen que ir a la misma unidad',
+    );
+  }
+  /* Una puerta se pasa de persona y no llega a planta: 2,543 < 2,8 < 4. */
+  if (!(alto(PIEZA.hojaDePuerta) > ALTURA_DE_UNA_PERSONA && alto(PIEZA.hojaDePuerta) < MODULO_DE_LA_CIUDAD)) {
+    problemas.push(
+      `puerta: la hoja mide ${r(alto(PIEZA.hojaDePuerta))} y tiene que pasar de una persona (${ALTURA_DE_UNA_PERSONA}) ` +
+        `sin llegar a una planta (${MODULO_DE_LA_CIUDAD})`,
+    );
+  }
+  /*
+   * EL COCHE, QUE ES LO QUE PRUEBA QUE EL FACTOR DEL PACK NUEVO ES EL BUENO.
+   *
+   * La retícula sola no basta: una retícula de doce se puede conseguir con cualquier factor
+   * si a alguien se le ocurre cambiar `RETICULA_DE_LA_CIUDAD`, y entonces los coches, las
+   * farolas y los bancos se irían con ella sin que ninguna losa protestara. El coche tiene
+   * medida en el mundo real —4 metros de largo, poco más de metro y medio de alto— y la
+   * persona mide 1,80 en 2,543 unidades. Así que se exige lo que se puede afirmar mirando
+   * la calle: un coche es MÁS LARGO que dos personas y MENOS ALTO que una. Con el factor
+   * bueno sale 5,63 de largo (2,21 personas) y 2,28 de alto (0,90 personas).
+   */
+  const largoDelCoche = Math.max(ancho(PIEZA.cocheBerlina), fondo(PIEZA.cocheBerlina)) / ALTURA_DE_UNA_PERSONA;
+  const altoDelCoche = alto(PIEZA.cocheBerlina) / ALTURA_DE_UNA_PERSONA;
+  if (!(largoDelCoche >= 2 && largoDelCoche <= 2.6)) {
+    problemas.push(`coche: mide ${r(largoDelCoche)} personas de largo y un coche mide entre 2 y 2,6`);
+  }
+  if (!(altoDelCoche >= 0.7 && altoDelCoche < 1)) {
+    problemas.push(`coche: mide ${r(altoDelCoche)} personas de alto y un coche no le llega a la cabeza a nadie`);
+  }
+  /*
+   * Y LA PLANTA DEL PACK CAE EN LA PLANTA QUE SE CONSTRUYE DENTRO. Cinco de los ocho
+   * bloques miden 2,250 sin base en el pack, que son tres plantas de 0,750; ya escalados
+   * son 13,5, que son tres `ALTURA_DE_PLANTA` de 4,5 clavadas. Si esto dejara de cumplirse,
+   * las ventanas de la fachada dejarían de coincidir con los pisos de dentro, y eso no lo
+   * ve ningún otro comprobador: lo vería Miguel.
+   */
+  const plantasDelCuerpoC = alto(PIEZA.cuerpoC) / ALTURA_DE_PLANTA;
+  if (!cerca(plantasDelCuerpoC, 3, HOLGURA_DE_ANCLA)) {
+    problemas.push(
+      `planta: el cuerpo C mide ${r(alto(PIEZA.cuerpoC))} de alto, que son ${r(plantasDelCuerpoC)} plantas de ${ALTURA_DE_PLANTA}, ` +
+        'y tenían que ser tres justas',
+    );
   }
   const peon = alto(PIEZA.peon) / ALTURA_DE_UNA_PERSONA;
   if (!(peon >= 0.8 && peon <= 1)) {
@@ -452,13 +581,28 @@ const de = (problemas: readonly string[], etiqueta: string): string[] => problem
 {
   const problemas = problemasDeTalla((n) => cajas.get(n));
   comprobar('la casa-ficha mide una persona de alto y cuatro caben en una casilla', de(problemas, 'casa').length === 0, de(problemas, 'casa'));
-  comprobar('la casa grande mide dos personas y cabe en una casilla', de(problemas, 'casa-grande').length === 0, de(problemas, 'casa-grande'));
+  comprobar(
+    `las seis losas de calle y la parcela miden la retícula de la ciudad (${RETICULA_DE_LA_CIUDAD}) por lado`,
+    de(problemas, 'reticula').length === 0,
+    de(problemas, 'reticula'),
+  );
   comprobar('la tesela mide lo que la del tablero YA escalada: aquí la escala va dentro', de(problemas, 'tesela').length === 0, de(problemas, 'tesela'));
   comprobar(
-    'la losa es una casilla, el muro mide lo que la rejilla escalada, y lo mismo que la muralla del hexagonal',
-    [...de(problemas, 'losa'), ...de(problemas, 'muro'), ...de(problemas, 'muralla')].length === 0,
-    [...de(problemas, 'losa'), ...de(problemas, 'muro'), ...de(problemas, 'muralla')],
+    `la losa y el muro miden un módulo de sala (${MODULO_DE_LA_CIUDAD}) por lado`,
+    [...de(problemas, 'losa'), ...de(problemas, 'muro')].length === 0,
+    [...de(problemas, 'losa'), ...de(problemas, 'muro')],
   );
+  comprobar(
+    `el coche es más largo que dos personas y no le llega a la cabeza a ninguna, y el cuerpo C mide tres plantas de ${ALTURA_DE_PLANTA}`,
+    [...de(problemas, 'coche'), ...de(problemas, 'planta')].length === 0,
+    [...de(problemas, 'coche'), ...de(problemas, 'planta')],
+  );
+  comprobar(
+    'el taburete de Furniture y la banqueta del Dungeon son la misma pieza: los cinco packs de persona van a la misma unidad',
+    de(problemas, 'pareja').length === 0,
+    de(problemas, 'pareja'),
+  );
+  comprobar('la hoja de puerta pasa de una persona y no llega a una planta', de(problemas, 'puerta').length === 0, de(problemas, 'puerta'));
   comprobar('el peón mide entre el 80 % y el 100 % de una persona', de(problemas, 'peon').length === 0, de(problemas, 'peon'));
   comprobar(
     `ninguna pieza baja de ${TALLA_MINIMA} ni pasa de ${TALLA_MAXIMA} en su lado mayor`,
@@ -466,8 +610,16 @@ const de = (problemas: readonly string[], etiqueta: string): string[] => problem
     de(problemas, 'talla'),
   );
 
-  /* LA VACUNA DE «NADIE ESCALÓ»: las cajas a la unidad de cada pack. */
   const porPieza = new Map(PIEZAS_DEL_BURGO.map((p) => [p.nombre, p] as const));
+
+  /*
+   * LA VACUNA DE «NADIE ESCALÓ»: las cajas a la unidad de cada pack.
+   *
+   * Sólo puede levantar las anclas de los packs que LLEVAN factor —hexagonal, Board Game
+   * Bits y ahora City Builder—, porque los otros cinco van a uno y dividir por uno no
+   * cambia nada. Se escribe así, con la lista corta, para no afirmar una cobertura que no
+   * tiene.
+   */
   const sinEscalar = problemasDeTalla((n) => {
     const c = cajas.get(n);
     const p = porPieza.get(n);
@@ -475,10 +627,10 @@ const de = (problemas: readonly string[], etiqueta: string): string[] => problem
     const k = escalaDe(p);
     return [c[0] / k, c[1] / k, c[2] / k];
   });
-  const anclas = ['casa', 'casa-grande', 'tesela', 'losa', 'muro'];
-  const anclasQueNoCaen = anclas.filter((a) => de(sinEscalar, a).length === 0);
+  const anclasEscaladas = ['casa', 'tesela', 'reticula', 'coche'];
+  const anclasQueNoCaen = anclasEscaladas.filter((a) => de(sinEscalar, a).length === 0);
   comprobar(
-    'se ve fallar: con las cajas a la unidad de cada pack —como si nadie hubiera escalado— caen la casa, la casa grande, la tesela, la losa y el muro',
+    'se ve fallar: con las cajas a la unidad de cada pack —como si nadie hubiera escalado— caen la casa, la tesela, la retícula y el coche',
     anclasQueNoCaen.length === 0,
     { noCaen: anclasQueNoCaen, problemas: sinEscalar.slice(0, 6) },
   );
@@ -488,11 +640,39 @@ const de = (problemas: readonly string[], etiqueta: string): string[] => problem
     const c = cajas.get(n);
     return c === undefined ? undefined : [c[0] * ESCALA_DEL_PACK, c[1] * ESCALA_DEL_PACK, c[2] * ESCALA_DEL_PACK];
   });
-  const anclasQueNoCaenDosVeces = [...anclas, 'talla'].filter((a) => de(dosVeces, a).length === 0);
+  const anclasQueNoCaenDosVeces = [...anclasEscaladas, 'losa', 'muro', 'puerta', 'planta', 'talla'].filter((a) => de(dosVeces, a).length === 0);
   comprobar(
-    'se ve fallar: con las cajas multiplicadas otra vez por ESCALA_DEL_PACK caen las mismas cinco y además el tope de talla',
+    'se ve fallar: con las cajas multiplicadas otra vez por ESCALA_DEL_PACK caen todas las anclas de talla y además el tope',
     anclasQueNoCaenDosVeces.length === 0,
     { noCaen: anclasQueNoCaenDosVeces, problemas: dosVeces.slice(0, 6) },
+  );
+
+  /*
+   * LA VACUNA DEL FALLO QUE HUBO: el Dungeon a 1,5, como en la primera tabla.
+   *
+   * Es la única de las tres que caza lo que de verdad estaba mal. A 1,5 la losa medía 6 y
+   * el muro 6, y las dos casaban con un tablero de casillas de 6: todo verde, y una
+   * banqueta del Dungeon media persona más alta que el taburete idéntico de Furniture.
+   *
+   * Ahora la losa y el muro salen de restaurant-bits —la ciudad es moderna y sus tabiques
+   * no son de mazmorra—, así que esta vacuna se ha quedado con UN solo testigo en el
+   * Dungeon: la pareja de taburetes. Se dice aquí porque una vacuna que dice cazar cuatro
+   * cosas y sólo puede cazar una es peor que ninguna. Y ése es exactamente el motivo por el
+   * que `banqueta` sigue en la tabla aunque nadie la ponga en una sala: es el único hilo
+   * que queda atando el Dungeon a la unidad de persona.
+   */
+  const dungeonA1Coma5 = problemasDeTalla((n) => {
+    const c = cajas.get(n);
+    const p = porPieza.get(n);
+    if (c === undefined || p === undefined) return undefined;
+    if (p.pack !== 'dungeon') return c;
+    return [c[0] * 1.5, c[1] * 1.5, c[2] * 1.5];
+  });
+  const anclasQueNoCaenA1Coma5 = ['pareja'].filter((a) => de(dungeonA1Coma5, a).length === 0);
+  comprobar(
+    'se ve fallar: con el Dungeon a 1,5 —lo que llevaba la primera tabla— cae la pareja de taburetes, que es el único testigo que queda en ese pack',
+    anclasQueNoCaenA1Coma5.length === 0,
+    { noCaen: anclasQueNoCaenA1Coma5, problemas: dungeonA1Coma5.slice(0, 6) },
   );
 }
 
@@ -572,12 +752,12 @@ function cargaConThree(ruta: string): Promise<GLTF> {
   );
   comprobar('y ningún atributo llega entrelazado: se clonan en silencio', mallas > 0 && entrelazados.length === 0, entrelazados.slice(0, 6));
 
-  const molino = gltf?.scene.getObjectByName(PIEZA.molino);
-  let aspas: Object3D | undefined;
-  molino?.traverse((o: Object3D) => {
-    if (o.name.includes('fan') && (o as Mesh).isMesh) aspas = o;
+  const cocheCargado = gltf?.scene.getObjectByName(PIEZA.cocheBerlina);
+  const ruedasCargadas: string[] = [];
+  cocheCargado?.traverse((o: Object3D) => {
+    if (o.name.includes('wheel') && (o as Mesh).isMesh) ruedasCargadas.push(o.name);
   });
-  comprobar('y las aspas del molino se pueden buscar por nombre en la escena cargada', aspas !== undefined && aspas.parent !== molino, aspas?.name);
+  comprobar('y las cuatro ruedas del coche se pueden buscar por nombre en la escena cargada', ruedasCargadas.length === 4, ruedasCargadas);
 
   /*
    * LA SEGUNDA MEDIDA, POR OTRO CAMINO: `Box3` de three sobre la escena cargada, con
@@ -587,7 +767,7 @@ function cargaConThree(ruta: string): Promise<GLTF> {
    */
   gltf?.scene.updateMatrixWorld(true);
   const desacuerdos: string[] = [];
-  for (const nombre of [PIEZA.casa, PIEZA.muro, PIEZA.molino, PIEZA.puertaMuralla]) {
+  for (const nombre of [PIEZA.casa, PIEZA.muro, PIEZA.calzada, PIEZA.cripta]) {
     const objeto = gltf?.scene.getObjectByName(nombre);
     const propia = cajas.get(nombre);
     if (objeto === undefined || propia === undefined) {
@@ -604,7 +784,7 @@ function cargaConThree(ruta: string): Promise<GLTF> {
     }
   }
   comprobar(
-    'y la casa, el muro, el molino y la puerta de la muralla miden en three lo mismo que medidos con gltf-transform: la talla no se lee a sí misma',
+    'y la casa, el muro, la calzada y la cripta miden en three lo mismo que medidos con gltf-transform: la talla no se lee a sí misma',
     desacuerdos.length === 0,
     desacuerdos,
   );
@@ -624,7 +804,7 @@ if (fallos.length > 0) {
  * cae a la mitad termina con código cero y una lista corta de aciertos, y eso se lee
  * como verde. El número va a mano y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 41;
+const COMPROBACIONES_ESCRITAS = 44;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
@@ -637,14 +817,16 @@ if (hechas < COMPROBACIONES_ESCRITAS) {
 if (fallos.length === 0) {
   console.log(`${hechas} comprobaciones`);
   console.log(
-    '\nburgo.glb trae exactamente las piezas que burgo/piezas.ts declara, de siete packs, todas con\n' +
-      'el color horneado y ninguna con textura ni UV; las de asiento llevan su máscara —las fichas\n' +
-      'y el estandarte enteras, la casa grande, la posada y la bandera a medias— y las demás no;\n' +
-      'la escala va horneada en los vértices y es la del mundo del Muelle: la casa-ficha mide una\n' +
-      'persona, la casa grande dos, la tesela lo que la del tablero, la losa una casilla y el muro\n' +
-      'lo que la muralla; los nombres llegan enteros por el GLTFLoader de three; y ningún fichero\n' +
-      'del Burgo nombra una marca ajena. Lo que esto NO prueba es que se vea bien: para eso hace\n' +
-      'falta mirar.',
+    '\nburgo.glb trae exactamente las piezas que burgo/piezas.ts declara, de ocho packs, todas con\n' +
+      'el color horneado y ninguna con textura ni UV; las seis de asiento llevan su máscara y se\n' +
+      'tiñen enteras, y las demás no la llevan; la escala va horneada en los vértices y es la del\n' +
+      'mundo del Muelle: la casa-ficha mide una persona, la tesela lo que la del tablero, la losa y\n' +
+      'el muro un módulo de sala, las siete losas del City Builder la retícula de la ciudad (12) y\n' +
+      'el coche dos personas y pico de largo; los cinco packs de persona van a la misma unidad —el\n' +
+      'taburete de Furniture y la banqueta del Dungeon son la misma pieza— y las cuatro ruedas del\n' +
+      'coche siguen siendo nodos propios. Los nombres llegan enteros por el GLTFLoader de three, y\n' +
+      'ningún fichero del Burgo nombra una marca ajena. Lo que esto NO prueba es que se vea bien:\n' +
+      'para eso hace falta mirar.',
   );
   process.exit(0);
 }

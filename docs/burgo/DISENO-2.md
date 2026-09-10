@@ -32,6 +32,15 @@ hexagonal y no sirve; de él se copian patrones internos: `Puesta`/`Copias` con
 
 ### 5.1 Geometría del tablero (unidades del mundo; `y = 0` es el suelo del anillo)
 
+> **REVOCADO por `docs/burgo/LA-CIUDAD.md` §1 y §2 (10-sep-2026).** Lo de abajo es la
+> geometría del tablero pequeño con muralla: casilla de 8 x 14 e interior de 72. Miguel pidió
+> lo contrario —fuera la muralla, el centro mucho más grande y una ciudad de verdad dentro—,
+> y la traza nueva mide casilla **32 x 48**, esquina **48** e interior **288** (24 celdas de
+> retícula de 12). También quedan revocados el atrezo medieval de las casillas y las cuatro
+> escenas de esquina. Se conserva de esta sección lo que `LA-CIUDAD.md` no toca: la
+> orientación del anillo, el marco `fuera`/`adelante` de cada casilla y la ele de paso de las
+> esquinas.
+
 ```
 ANCHO_DE_CASILLA = 8    FONDO_DE_CASILLA = 14    LADO_DE_ESQUINA = 14    CASILLAS_POR_LADO = 11
 LADO_EXTERIOR = 9·8 + 2·14 = 100        MEDIO_LADO = 50
@@ -125,6 +134,14 @@ posición fija (1.080, una instancia), `colinas-a` × 2, `arboleda-pequena` × 2
 por el otro lado). Sembrado con `semillaDelCodigo(codigo)` (decorado, NUNCA `ctx.azar`).
 
 ### 5.2 Presupuesto, con las cifras medidas (tablero LLENO: 6 sentados, 32 casas, 12 posadas, 28 banderas)
+
+> **REVOCADO por `docs/burgo/LA-CIUDAD.md` §8 (10-sep-2026).** Los topes de abajo —110.000
+> en plena y 90.000 en sobria— son los del Muelle, y no llegan: con una ciudad dentro del
+> anillo la suma medida sale en **528.250**. Los topes nuevos son **560.000** en plena y
+> **130.000** en sobria, con **150** llamadas de dibujo (90 en sobria), y la tabla de
+> multiplicidades entera se rehace con los niveles de detalle de `LA-CIUDAD.md` §8. Los
+> renglones de abajo que citan piezas medievales (molino, pozo, pendón, farol, taberna) ya no
+> existen en el catálogo: ver `PIEZAS_EN_ESPERA` en `escenas/burgo/piezas.ts`.
 
 | Bloque | Cuenta | Triángulos |
 |---|---|---|

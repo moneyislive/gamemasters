@@ -438,11 +438,27 @@ function escudo(cx: number, arriba: number, ancho: number, alto: number): Punto[
 
 /** Un dibujo de carta, con lo que se ve escrito al lado para quien lea el generado. */
 interface Dibujo {
-  /** La llave con la que la escena lo pide. Es el nombre de la familia, no su rótulo. */
+  /**
+   * EL IDENTIFICADOR ÚNICO del dibujo dentro de este guion. Sale también como llave del
+   * mapa generado, salvo que se diga otra en `llave`. Es único en TODO el guion porque
+   * `revisiones` se queja de dos dibujos con el mismo nombre, y esa queja es útil.
+   */
   carta: string;
+  /**
+   * LA LLAVE DEL MAPA GENERADO, cuando no puede ser `carta`. La necesitan los diez
+   * guarismos sueltos: en el mapa se piden por `'0'`…`'9'`, pero esas cadenas ya son
+   * llaves de `CONTORNOS_DE_LA_CIFRA` y dos dibujos con el mismo `carta` es un error a
+   * propósito. Así que se llaman `guarismo-0`… aquí dentro y salen como `'0'`… fuera.
+   */
+  llave?: string;
   /** QUÉ SE VE, en una frase. Viaja al fichero generado. */
   que: string;
   contornos: number[][];
+}
+
+/** La llave con la que la escena pide un dibujo. */
+function llaveDe(d: Dibujo): string {
+  return d.llave ?? d.carta;
 }
 
 /*
@@ -1576,8 +1592,247 @@ const CIFRAS: readonly Dibujo[] = Array.from(
   (_, i) => cifra(i + 1),
 );
 
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ LOS DIEZ GUARISMOS SUELTOS, Y POR QUÉ AHORA SÍ ═══
+ *
+ * `CONTORNOS_DE_LA_CIFRA` emite la cifra ENTERA y llega hasta treinta, y la cabecera de
+ * arriba explica por qué: en un delta el único número que se pide es el de una ficha de
+ * comarca, la escena lo encaja por su lado mayor, y componerlo de dos piezas
+ * normalizadas por separado habría dado dos guarismos de tamaños distintos.
+ *
+ * El Burgo pide otra cosa. En sus cuarenta casillas hay que leer un PRECIO —60, 100,
+ * 200, 350, 400— y una renta que llega a 2.000; una tabla de cifras enteras para eso
+ * serían cientos de dibujos y aun así se quedaría corta el día que alguien cambie un
+ * número del reglamento. Así que aquí van los diez guarismos, sueltos, y la casilla
+ * compone el número que le toque.
+ *
+ * ═══ Y CÓMO SE ESQUIVA EL PROBLEMA QUE HIZO QUE NO ESTUVIERAN ═══
+ *
+ * El problema era la normalización por el lado mayor: un `1` suelto saldría tan ancho
+ * como un `8`. Se esquiva no normalizando. Los diez se dibujan en la MISMA caja del
+ * lienzo —`CAJA_DEL_GUARISMO`, 300 × 400 centrada—, la caja se emite, y quien componga
+ * un precio escala TODOS los guarismos por esa caja y no por la suya: así el `1` sale
+ * estrecho y a la misma altura que el `8`, que es lo que hace una cifra y no un
+ * revoltijo. El paso de uno al siguiente es `AVANCE_DEL_GUARISMO`, el mismo aire que ya
+ * separa los dos guarismos de un «12».
+ *
+ * Los trazos son los MISMOS que los de las cifras (`GUARISMOS`, arriba): si alguien
+ * corrige la panza del seis, se corrige en los dos sitios a la vez y no puede haber un
+ * seis del delta distinto del seis del Burgo.
+ */
+const CAJA_DEL_GUARISMO = { x: (LIENZO - 300) / 2, y: (LIENZO - ALTO_DEL_GUARISMO) / 2, ancho: 300, alto: ALTO_DEL_GUARISMO } as const;
+
+/** El paso de un guarismo al siguiente al componer un número: la caja más su aire. */
+const AVANCE_DEL_GUARISMO = CAJA_DEL_GUARISMO.ancho + 40;
+
+/** El grosor de la cinta de un guarismo suelto: el mismo que el de una cifra de uno. */
+const GROSOR_DEL_GUARISMO = 64;
+
+const GUARISMOS_SUELTOS: readonly Dibujo[] = '0123456789'.split('').map((d) => ({
+  carta: `guarismo-${d}`,
+  llave: d,
+  que: `El guarismo ${d}, en la caja común de todos: 300 × 400 centrada en el lienzo.`,
+  contornos: guarismo(d, CAJA_DEL_GUARISMO.x, CAJA_DEL_GUARISMO.ancho, GROSOR_DEL_GUARISMO),
+}));
+
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ LOS EMBLEMAS DE LAS CASILLAS QUE NO SE COMPRAN ═══
+ *
+ * De las cuarenta casillas del Burgo, veintiocho llevan un precio y con eso se leen. Las
+ * otras doce no tienen precio que enseñar —o lo tienen y no basta—, y sin nada encima
+ * quedarían como doce cuadros de color. Cuatro son las esquinas, y esas llevan su escena
+ * en tres dimensiones (`LA-CIUDAD.md`). Quedan estas seis marcas para las ocho de en
+ * medio y para el sentido de la marcha.
+ *
+ *     arca     El Arca del Concejo (2, 17, 33): un arcón con su cerradura.
+ *     pregon   El Pregón (7, 22, 36): un pergamino enrollado por los dos cabos.
+ *     puerta   Las cuatro Puertas (5, 15, 25, 35): un pórtico sobre la calzada de la avenida.
+ *     oficio   El Molino y El Pozo (12, 28): una rueda de molino, dentada y aligerada.
+ *     tasa     El Diezmo (4) y La Alcabala (38): una balanza. Las dos son un impuesto y
+ *              se distinguen por su cifra, que sí se pinta: 200 y 100.
+ *     flecha   El sentido de la marcha, en la Puerta Mayor y en las cuatro esquinas.
+ *
+ * Se dibujan con las mismas tres reglas que los nueve naipes (ver arriba): masa donde
+ * hay masa, el detalle de dentro como AGUJERO y nunca como raya, y nada de lo de dentro
+ * tocando el borde. Y con una cuarta que aquí es la que muerde: NINGÚN contorno macizo
+ * puede quedar DENTRO de otro macizo, porque `toShapes` lo descarta en silencio por
+ * redundante. Es lo que mata a la rueda de radios —cada radio queda dentro del círculo
+ * de la llanta— y por eso la rueda de este fichero es una silueta dentada con agujeros
+ * y no una llanta con radios. `revisa` lo caza contando contornos de entrada y de
+ * salida, pero conviene saberlo antes de dibujar y no después.
+ */
+
+/** Un polígono con cada lado partido en `partes`: más vértices para triangular. */
+function partido(puntos: readonly Punto[], partes: number): Punto[] {
+  const salida: Punto[] = [];
+  for (let i = 0; i < puntos.length; i++) {
+    const a = puntos[i] as Punto;
+    const b = puntos[(i + 1) % puntos.length] as Punto;
+    for (let k = 0; k < partes; k++) {
+      const t = k / partes;
+      salida.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+  }
+  return salida;
+}
+
+/** Un rectángulo por sus dos esquinas. */
+function rectangulo(x0: number, y0: number, x1: number, y1: number): Punto[] {
+  return [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ];
+}
+
+const EMBLEMAS: readonly Dibujo[] = [
+  /*
+   * EL ARCA: un arcón con la tapa abombada y la cerradura calada.
+   *
+   * La tapa es media elipse APOYADA en el borde de arriba del cajón, tangente y sin
+   * meterse dentro: dos macizos que se tocan y no se contienen, que es lo que
+   * `toShapes` sabe llevar. Los dos herrajes y la cerradura son agujeros del cajón.
+   */
+  {
+    carta: 'arca',
+    que: 'El Arca del Concejo: un arcón con la tapa abombada, dos herrajes y la cerradura calada.',
+    contornos: [
+      macizo(partido(rectangulo(70, 268, 442, 440), 4)),
+      macizo(arco(256, 268, 186, 0, 180, 20)),
+      hueco(partido(rectangulo(236, 300, 276, 364), 3)),
+      hueco(partido(rectangulo(120, 300, 148, 430), 3)),
+      hueco(partido(rectangulo(364, 300, 392, 430), 3)),
+    ],
+  },
+
+  /*
+   * EL PREGÓN: un pergamino con los dos cabos enrollados, y tres renglones calados.
+   *
+   * Una sola silueta —los dos rollos son parte del contorno, no piezas aparte— por lo
+   * mismo de siempre: dos círculos macizos encima del cuerpo serían dos contornos
+   * metidos en otro y desaparecerían sin decirlo.
+   */
+  {
+    carta: 'pregon',
+    que: 'El Pregón: un pergamino con los dos cabos enrollados y tres renglones calados.',
+    contornos: [
+      macizo([
+        ...arco(256, 180, 110, 180, 0, 20),
+        [366, 330],
+        ...arco(256, 330, 110, 0, -180, 20),
+        [146, 180],
+      ]),
+      hueco(partido(rectangulo(176, 208, 336, 228), 3)),
+      hueco(partido(rectangulo(176, 246, 336, 266), 3)),
+      hueco(partido(rectangulo(176, 284, 296, 304), 3)),
+    ],
+  },
+
+  /*
+   * LA PUERTA: un pórtico de entrada sobre la calzada, con su viga, sus dos pilas y la
+   * calzada en fuga con dos trazos de la línea de eje.
+   *
+   * Era un lienzo de muralla almenado. La muralla se cayó (`LA-CIUDAD.md` §9) y con ella
+   * las almenas: las cuatro Puertas del reglamento son ahora las bocas de las cuatro
+   * avenidas, y lo que se ve al llegar a una es un pórtico sobre la calzada. Tres macizos
+   * que SE TOCAN y no se contienen —viga sobre pilas, calzada entre pilas sin llegar a
+   * ellas—, que es lo único que `toShapes` sabe llevar; los dos trazos de la línea de eje
+   * son agujeros de la calzada. La silueta se lee del derecho y del revés, que importa
+   * porque la misma marca se pinta en las cuatro Puertas y dos de ellas se miran de canto.
+   */
+  {
+    carta: 'puerta',
+    que: 'Una Puerta de la ciudad: un pórtico sobre la calzada, con la línea de eje calada.',
+    contornos: [
+      macizo(partido(rectangulo(90, 72, 422, 122), 4)),
+      macizo(partido(rectangulo(104, 122, 158, 440), 4)),
+      macizo(partido(rectangulo(354, 122, 408, 440), 4)),
+      macizo(partido([[186, 440], [214, 210], [298, 210], [326, 440]], 4)),
+      hueco(partido(rectangulo(246, 246, 266, 306), 3)),
+      hueco(partido(rectangulo(244, 342, 268, 416), 3)),
+    ],
+  },
+
+  /*
+   * EL OFICIO: una rueda de molino, dentada por fuera y aligerada por dentro.
+   *
+   * Doce dientes en la propia silueta, el eje y cuatro aligeramientos como agujeros.
+   * Ver la cabecera: una llanta con radios no se puede dibujar así.
+   */
+  {
+    carta: 'oficio',
+    que: 'El Molino y El Pozo: una rueda de molino de doce dientes, con el eje y cuatro aligeramientos.',
+    contornos: (() => {
+      const dientes: Punto[] = [];
+      const cuantos = 12;
+      for (let i = 0; i < cuantos * 4; i++) {
+        const a = (2 * Math.PI * i) / (cuantos * 4);
+        const r = i % 4 === 0 || i % 4 === 1 ? 210 : 168;
+        dientes.push([256 + r * Math.cos(a), 256 - r * Math.sin(a)]);
+      }
+      const aligeramientos: number[][] = [];
+      for (let i = 0; i < 4; i++) {
+        const a = Math.PI / 4 + (Math.PI * i) / 2;
+        aligeramientos.push(hueco(elipse(256 + 108 * Math.cos(a), 256 - 108 * Math.sin(a), 38, 38, 20)));
+      }
+      return [macizo(dientes), hueco(elipse(256, 256, 42, 42, 20)), ...aligeramientos];
+    })(),
+  },
+
+  /*
+   * LA TASA: una balanza de dos platillos.
+   *
+   * Aquí sí hay siete macizos, y ninguno cae dentro de otro: el mástil cruza el
+   * balancín y el pie, y cada cordel baja del balancín a su platillo asomando por
+   * fuera de los dos. Se comprobó contando contornos de entrada y de salida.
+   */
+  {
+    carta: 'tasa',
+    que: 'El Diezmo y La Alcabala: una balanza de dos platillos con su mástil y su pie.',
+    contornos: [
+      trazo([[256, 96], [256, 424]], 30),
+      trazo([[76, 152], [436, 152]], 26),
+      trazo([[146, 424], [366, 424]], 30),
+      trazo([[76, 152], [76, 268]], 14),
+      macizo(partido([[26, 268], [126, 268], [106, 336], [46, 336]], 3)),
+      trazo([[436, 152], [436, 268]], 14),
+      macizo(partido([[386, 268], [486, 268], [466, 336], [406, 336]], 3)),
+    ],
+  },
+
+  /*
+   * LA FLECHA: el sentido de la marcha. Una sola silueta, con los lados partidos para
+   * que triangule en algo más que cinco triángulos.
+   */
+  {
+    carta: 'flecha',
+    que: 'El sentido de la marcha: una flecha maciza que apunta a la derecha.',
+    contornos: [
+      macizo(
+        partido(
+          [
+            [72, 186],
+            [286, 186],
+            [286, 86],
+            [456, 256],
+            [286, 426],
+            [286, 326],
+            [72, 326],
+          ],
+          3,
+        ),
+      ),
+    ],
+  },
+];
+
 const revisiones = new Map<string, ReturnType<typeof revisa>>();
-for (const dibujo of [...CARTAS, SAL, ...CIFRAS]) {
+for (const dibujo of [...CARTAS, SAL, ...CIFRAS, ...GUARISMOS_SUELTOS, ...EMBLEMAS]) {
   if (revisiones.has(dibujo.carta)) {
     console.error(`Hay dos dibujos con la llave ${dibujo.carta}.`);
     process.exit(2);
@@ -1617,8 +1872,28 @@ const cuerpoDeLasCartas = CARTAS.map(
     `  /** ${d.que} */\n  ${d.carta}: [\n${d.contornos.map(comoTira).join('\n')}\n  ],`,
 ).join('\n');
 
+const cuerpoDeLosGuarismos = GUARISMOS_SUELTOS.map(
+  (d) => `  /** ${d.que} */\n  '${llaveDe(d)}': [\n${d.contornos.map(comoTira).join('\n')}\n  ],`,
+).join('\n');
+
+const cuerpoDeLosEmblemas = EMBLEMAS.map(
+  (d) => `  /** ${d.que} */\n  ${llaveDe(d)}: [\n${d.contornos.map(comoTira).join('\n')}\n  ],`,
+).join('\n');
+
 const salida = `/**
- * LOS ICONOS DE RIBERAS: los bienes y las cartas del mazo, en contornos de puntos.
+ * LOS ICONOS DE LAS ESCENAS, en contornos de puntos: los bienes y las cartas de Riberas,
+ * y los guarismos y los emblemas del Burgo.
+ *
+ * ═══ SON DE DOS JUEGOS, Y NO SE MEZCLAN ═══
+ *
+ * \`CONTORNOS_DEL_BIEN\`, \`CONTORNOS_DE_LA_CARTA\` y \`CONTORNOS_DE_LA_CIFRA\` son de RIBERAS:
+ * los bienes de la mano, los naipes del mazo y las cifras enteras de la ficha de comarca.
+ * \`CONTORNOS_DEL_GUARISMO\` y \`CONTORNOS_DEL_EMBLEMA\` son del BURGO: los diez guarismos con
+ * los que una casilla compone su precio, y las marcas de las casillas que no se compran.
+ * Viven en el mismo fichero porque se dibujan igual y los pinta el mismo código, pero no
+ * se pisan: quien toque las cifras del delta no está tocando los precios del Burgo, y al
+ * revés. La única regla que los separa está escrita en \`CONTORNOS_DEL_GUARISMO\`, y es que
+ * los guarismos NO se encajan por su lado mayor.
  *
  * ═══ ESTE FICHERO SE GENERA. NO SE EDITA A MANO ═══
  *
@@ -1728,13 +2003,79 @@ export const CIFRAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_C
  * lector que se saca el tope de la tabla que está leyendo no puede afirmar nada sobre ella.
  */
 export const CIFRA_MAS_ALTA_CON_ICONO = ${String(HASTA_DONDE_CUENTA_EL_DESCARTE)};
+
+/**
+ * LOS DIEZ GUARISMOS SUELTOS, con la llave \`'0'\`…\`'9'\`. Son del BURGO, no del delta.
+ *
+ * En el anillo del Burgo hay que leer un precio (60, 100, 200, 350, 400) y una renta que
+ * llega a 2.000: una tabla de cifras enteras para eso serían cientos de dibujos, y aun así
+ * se quedaría corta el día que cambie un número del reglamento. Así que aquí van los diez
+ * y quien pinta la casilla compone el número.
+ *
+ * ═══ ÉSTOS NO SE NORMALIZAN POR SU CAJA. SE NORMALIZAN POR \`CAJA_DEL_GUARISMO\` ═══
+ *
+ * Es la única regla que hay que respetar, y si se rompe no falla nada: sale un precio con
+ * el \`1\` tan ancho como el \`8\` y los guarismos a alturas distintas. Los diez están
+ * dibujados en la MISMA caja del lienzo, la de abajo. Quien componga un número tiene que
+ * escalarlos TODOS por esa caja —no por la caja de cada uno— y separarlos
+ * \`AVANCE_DEL_GUARISMO\`. Es justo lo contrario de lo que se hace con los bienes y las
+ * cartas, que sí se encajan por su lado mayor.
+ *
+ * Los trazos son los mismos que los de \`CONTORNOS_DE_LA_CIFRA\`: un seis es un seis en los
+ * dos sitios porque salen de la misma función.
+ */
+export const CONTORNOS_DEL_GUARISMO: Readonly<Record<string, readonly (readonly number[])[]>> = {
+${cuerpoDeLosGuarismos}
+};
+
+/** Los diez guarismos, para comprobar que no falta ninguno. */
+export const GUARISMOS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DEL_GUARISMO);
+
+/**
+ * LA CAJA COMÚN DE LOS DIEZ, dentro del lienzo de ${String(LIENZO)}: por aquí se escalan todos.
+ * El origen es el de SVG, arriba a la izquierda y con la \`y\` creciendo hacia abajo.
+ */
+export const CAJA_DEL_GUARISMO = {
+  x: ${String(CAJA_DEL_GUARISMO.x)},
+  y: ${String(CAJA_DEL_GUARISMO.y)},
+  ancho: ${String(CAJA_DEL_GUARISMO.ancho)},
+  alto: ${String(CAJA_DEL_GUARISMO.alto)},
+} as const;
+
+/** Cuánto avanza el sitio de un guarismo al siguiente, en unidades del lienzo. */
+export const AVANCE_DEL_GUARISMO = ${String(AVANCE_DEL_GUARISMO)};
+
+/**
+ * LOS EMBLEMAS DE LAS CASILLAS DEL BURGO QUE NO SE COMPRAN.
+ *
+ * De las cuarenta casillas, veintiocho llevan precio y con eso se leen; cuatro son las
+ * esquinas y llevan su escena en tres dimensiones. Éstas son las marcas de las ocho de en
+ * medio, más la flecha del sentido de la marcha:
+ *
+ *     arca     El Arca del Concejo (2, 17, 33)
+ *     pregon   El Pregón (7, 22, 36)
+ *     puerta   Las cuatro Puertas (5, 15, 25, 35)
+ *     oficio   El Molino y El Pozo (12, 28)
+ *     tasa     El Diezmo (4) y La Alcabala (38) — las dos, y se distinguen por su cifra
+ *     flecha   El sentido de la marcha, en la Puerta Mayor y en las esquinas
+ *
+ * Se pintan como los bienes y las cartas: una tinta plana sobre el color de la casilla,
+ * encajados por su lado mayor. Ésos SÍ se normalizan por su caja; los guarismos no.
+ */
+export const CONTORNOS_DEL_EMBLEMA: Readonly<Record<string, readonly (readonly number[])[]>> = {
+${cuerpoDeLosEmblemas}
+};
+
+/** Los emblemas que tienen dibujo. Sirve para comprobar que no falta ninguno. */
+export const EMBLEMAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DEL_EMBLEMA);
 `;
 
 fs.writeFileSync(DESTINO, salida, 'utf8');
 
 const kb = (salida.length / 1024).toFixed(1);
 console.log(
-  `\n  ${String(iconos.length + 1)} bienes + ${String(CARTAS.length)} cartas + ${String(CIFRAS.length)} cifras · ${kb} kB en ` +
+  `\n  ${String(iconos.length + 1)} bienes + ${String(CARTAS.length)} cartas + ${String(CIFRAS.length)} cifras + ` +
+    `${String(GUARISMOS_SUELTOS.length)} guarismos + ${String(EMBLEMAS.length)} emblemas · ${kb} kB en ` +
     `${path.relative(RAIZ, DESTINO)}`,
 );
 for (const i of iconos) {

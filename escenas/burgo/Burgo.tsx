@@ -3,18 +3,43 @@
  *
  * ═══ QUÉ MONTA ═══
  *
- * Lo que `docs/burgo/DISENO-2.md` §5 describe: el anillo de cuarenta casillas con sus
- * tres bandas de suelo propio (`anillo-en-3d.ts` da los sitios; aquí sólo se instancia),
- * los edificios de cada solar, las cuatro esquinas, la muralla con sus puertas, la plaza
- * con el Concejo y el suelo de dados, la ronda de árboles, el campo de teselas sembrado
- * con el código de la mesa, tres nubes derivando, la cúpula de mediodía y la niebla. Y
- * encima lo que cambia con la partida: casas y posadas, banderas de dueño, seis peones,
- * UN aventurero (el que mueve), los dos dados, las monedas que vuelan, el naipe de la
- * carta, la marca de la casilla que se puede tocar y la reja de la Mazmorra.
+ * DOS COSAS QUE SE INSTANCIAN DE MANERAS DISTINTAS, y conviene no confundirlas:
+ *
+ *  · EL TABLERO. El anillo de cuarenta casillas con sus cuatro bandas de suelo propio y la
+ *    línea que separa una de otra (`anillo-en-3d.ts` da los sitios; aquí sólo se instancia),
+ *    el frente de manzana de cada solar, las cuatro esquinas —que son manzanas urbanas de
+ *    9 × 9 celdas: un cruce, una comisaría, una plaza y una avenida—, el precio y el emblema
+ *    de cada casilla fundidos en una sola geometría de tinta, el paño de dados, el campo de
+ *    teselas sembrado con el código de la mesa, cinco nubes derivando, la cúpula de mediodía
+ *    y la niebla. Nada de esto cambia durante la partida.
+ *  · LA CIUDAD de dentro del recinto de 648 (`ciudad.ts`): 2.916 celdas, 691 edificios,
+ *    1.577 losas de calzada, catorce distritos, 18 coches circulando y los interiores de los
+ *    edificios que se abren. Esto NO cabe entero —la ciudad en su nivel más alto pesa un
+ *    millón y medio de triángulos— y por eso se monta por GRUPOS y por CERCANÍA (ver más
+ *    abajo). El presupuesto es 900.000 en un PC y 230.000 en un móvil, para las dos cosas.
+ *
+ * Y encima lo que cambia con la partida: casas y posadas, banderas de dueño, seis peones,
+ * UN aventurero (el que mueve), los dos dados, las monedas que vuelan, el naipe de la carta,
+ * la marca de la casilla que se puede tocar y la reja de la Comisaría.
+ *
+ * ═══ LA CIUDAD SE REPARTE POR CERCANÍA, Y ES LO ÚNICO QUE HACE QUE EXISTA ═══
+ *
+ * `montarLaCiudad` dice, grupo a grupo, cuál de sus tres montajes toca: L1 (las piezas del
+ * pack enteras), L2 (un prisma con banda de ventanas por edificio, y las calles del pack) y
+ * L3 (un prisma pelado y una manta de asfalto). Se llama cuando la cámara CAMBIA DE CELDA de
+ * 12, no por fotograma, y con el reparto anterior, que es lo que aplica la histéresis de 40
+ * unidades y evita que una cámara parada en un umbral parpadee. Después se reescriben todas
+ * las matrices de una pasada: son unos miles, no el millón y medio de triángulos que la
+ * ciudad tiene descritos.
+ *
+ * Los INTERIORES son otro asunto: se abren los TRES edificios más cercanos al punto que la
+ * cámara mira, y sólo cuando el ojo tiene ese punto a menos de 420. Al abrirlos, la cáscara
+ * del pack se DESMONTA (no `visible={false}`: la regla de la casa) y en su sitio se montan
+ * las salas con sus tabiques y sus muebles.
  *
  * ═══ CÓMO SE CUENTAN LAS LLAMADAS, QUE ES LO QUE MANDA (§5.2) ═══
  *
- * Todo lo ESTÁTICO —solares, esquinas, muralla, plaza, ronda, campo— se aplana y se FUNDE
+ * Todo lo ESTÁTICO del TABLERO —solares, esquinas, campo— se aplana y se FUNDE
  * en UNA geometría (`fundir` de `embarcadero/cargar.ts`; el `.glb` trae un solo material)
  * y el suelo del anillo es otra geometría propia con `vertexColors`: dos llamadas. Lo que
  * cambia va instanciado: las casas (y las casas de posada) en UNA `InstancedMesh` con
@@ -23,11 +48,18 @@
  * pintar con `instanceColor`); discos de contacto, monedas, marcas de casilla, discos del
  * trato y asas, una cada uno; el aventurero fundido, uno; los dados, dos; las aspas del
  * molino, una; la reja que sube, una (la fija va en el fundido); el naipe, el cielo y las
- * nubes, cuatro (el agua de la ribera es un cuadro más del suelo propio). Medido en el
- * banco con seis sentados, tablero lleno, siete colores de bandera, el aventurero en pie
- * y el asa de los dados montada: 24 llamadas. Los triángulos los suma
- * `verify:burgo-escena` con el `.glb` real; las llamadas se miran en `banco-burgo.html`
- * con `gl.info.render`.
+ * nubes, cuatro.
+ *
+ * Y LA CIUDAD SUMA LAS SUYAS, que son las que de verdad podían dispararse: una
+ * `InstancedMesh` POR PIEZA DEL PACK (unas cincuenta distintas), una por cuenta de
+ * triángulos de bulto (poco más de una docena), una por pieza de coche que circula y una
+ * malla por cinta (nueve). Parece mucho y no lo es: una malla instanciada con `count = 0`
+ * NO cuesta una llamada —three sale antes de `renderInstances` con `primcount === 0`— así
+ * que sólo pagan las piezas que ese reparto ha puesto de verdad. Medido en el banco con
+ * seis sentados, tablero lleno y la semilla BANCO: 74 llamadas desde la pose de salida, 61
+ * a media altura, 96 a pie de calle con tres interiores abiertos (el máximo que se ha
+ * visto), y 60 en sobria; el tope es 150 y 90. Los triángulos los suma `verify:burgo-escena`
+ * con el `.glb` real; las llamadas se miran en `banco-burgo.html` con `gl.info.render`.
  *
  * ═══ EL `.glb` VA HORNEADO Y A ESCALA DEL MUNDO ═══
  *
@@ -136,29 +168,32 @@ import type { FiguraId } from '../embarcadero/figuras';
 import { DURACION } from '../embarcadero/gestos';
 import { ATRIBUTO_DE_TINTE_CARGADO } from '../embarcadero/piezas';
 import type { Traer } from '../embarcadero/tipos';
-import { PIEZA } from './piezas';
+import { PIEZA, RETICULA_DE_LA_CIUDAD } from './piezas';
 import type { NombreDePieza } from './piezas';
 import {
-  ACERA,
-  AGUA_DE_LA_RIBERA,
-  ALTURA_DE_LA_ACERA,
+  ALTURA_DEL_BORDE,
+  ALTURA_DEL_FILETE,
+  ALTURA_DEL_REBORDE,
   ANCHO_DE_CASILLA,
   ANILLO_DEL_BURGO,
   ARISTA_DE_LOS_DADOS,
   BANDERA_SOBRE_LA_POSADA,
+  BORDE_CLARO,
   BORDE_INTERIOR,
-  CALLE,
   CASILLAS,
   CONFIN_DE_LAS_NUBES,
   DERIVA_DE_LAS_NUBES,
   EL_CONCEJO,
   HUECOS_DE_LOS_DADOS,
+  FILETE,
+  FRANJA,
+  LADO_DE_ESQUINA,
   LADO_INTERIOR,
-  LINEA_MEDIA_DE_LA_CALLE,
+  LINEA_DE_LA_MARCHA,
   MEDIO_LADO,
   RADIO_DEL_ASA_DE_LOS_DADOS,
-  SOLAR,
   SUBIDA_DE_LA_REJA,
+  SUPERFICIE,
   SUELO_DE_DADOS,
   campo,
   huecoDeBandera,
@@ -168,13 +203,27 @@ import {
   marcoDeCasilla,
   mundoEstatico,
   puestaDeLaReja,
-  puestaDelAgua,
   puestasDeLasEsquinas,
   puntoEnCasilla,
   puntoEnEsquina,
   semillaDelCampo,
+  suelosDelAnillo,
 } from './anillo-en-3d';
-import type { AnilloEn3D, Punto, Puesta } from './anillo-en-3d';
+import type { AnilloEn3D, PapelDelSuelo, Punto, Puesta } from './anillo-en-3d';
+import {
+  MUEBLE,
+  RECINTO_DEL_BURGO,
+  TRIANGULOS_DEL_TABIQUE,
+  TRIANGULOS_DEL_TABIQUE_CON_PUERTA,
+  TRIANGULOS_DE_LA_ESCALERA,
+  TRIANGULOS_DE_LA_LOSA,
+  ciudadDelCodigo,
+  cocheEnElInstante,
+  montarLaCiudad,
+  salasDelEdificio,
+} from './ciudad';
+import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
+import { claveDelBulto, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
 import { CASAS_DEL_CONCEJO, DISCOS_DEL_TRATO, DISCOS_DE_CONTACTO, MONEDAS_EN_VUELO, POSADAS_DEL_CONCEJO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DEL_DISCO, TITULOS } from './presupuesto';
 import {
   HUNDIR_CASAS,
@@ -223,13 +272,43 @@ const RADIO_DEL_CIELO = ALCANCE_DEL_BURGO * 6;
 const NIEBLA = { cerca: ALCANCE_DEL_BURGO * 2, lejos: ALCANCE_DEL_BURGO * 4 } as const;
 /** Las luces de mediodía: sin sombras en ningún cliente. */
 const LUZ = { hemisferio: { cielo: '#d8e8ff', suelo: '#8a7a5a', intensidad: 0.85 }, sol: { rumbo: [1, 2, 1.2] as const, color: '#fff3dd', intensidad: 1.7 } } as const;
-/** Los colores del suelo propio. */
-const COLOR_DE_LA_CALLE = '#b5a88f';
-const COLOR_DEL_SOLAR = '#8db264';
-const COLOR_DE_LA_ESQUINA = '#c9bda2';
-const COLOR_DE_LA_ACERA_SIN_BARRIO = '#d7cbb0';
-const COLOR_DEL_INTERIOR = '#95b56c';
+/** Los colores del suelo propio, banda a banda (LA-CIUDAD.md §2). */
+const COLOR_DEL_FILETE = '#efe7d2';
+const COLOR_DE_LA_SUPERFICIE = '#e4dcc4';
+const COLOR_DEL_MARCO = '#f4eedd';
+const COLOR_DE_LA_ESQUINA = '#e0d7bd';
+const COLOR_DE_LA_FRANJA_SIN_BARRIO = '#d7cbb0';
+/**
+ * LA LÍNEA QUE SEPARA DOS CASILLAS: la tinta del tablero, la misma del precio.
+ *
+ * Es lo que hace que un lado del anillo se lea como NUEVE CASILLAS y no como un borde beige
+ * de 648 con números encima. Ver `ANCHO_DE_LA_LINEA` en `anillo-en-3d.ts`.
+ */
+const COLOR_DE_LA_LINEA = '#4a4238';
+/*
+ * EL SUELO DEL RECINTO NO ES UN PRADO, Y ESO SE VIO MIRANDO.
+ *
+ * Era verde (`#95b56c`), y con la ciudad montada por niveles el resultado era una ciudad de
+ * bloques grises PLANTADA EN UN CAMPO: a más de 156 unidades las parcelas no llevan solera
+ * —el nivel de detalle se las come— y lo que se veía entre los edificios era el prado. Un
+ * gris cálido de losa hace que la ciudad se lea como ciudad en los tres niveles y no cuesta
+ * un triángulo: es el mismo cuadro de siempre con otro color. Lo verde de dentro (el parque,
+ * el césped del estadio, el cementerio) lo pinta cada distrito con su propio suelo, que
+ * `ciudad.ts` mantiene montado hasta el último nivel justamente para esto.
+ */
+const COLOR_DEL_INTERIOR = '#a19d90';
 const COLOR_DE_LA_TIERRA = '#7a9b55';
+/** El color de cada papel de cuadro de suelo: una sola tabla, y `construirSuelo` no decide nada. */
+const COLOR_DEL_SUELO: Readonly<Record<PapelDelSuelo, string>> = {
+  franja: COLOR_DE_LA_FRANJA_SIN_BARRIO,
+  reborde: COLOR_DE_LA_FRANJA_SIN_BARRIO,
+  filete: COLOR_DEL_FILETE,
+  superficie: COLOR_DE_LA_SUPERFICIE,
+  borde: COLOR_DEL_MARCO,
+  esquina: COLOR_DE_LA_ESQUINA,
+  linea: COLOR_DE_LA_LINEA,
+  recinto: COLOR_DEL_INTERIOR,
+};
 /** Cuánto mide de lado la tierra bajo el campo. */
 const LADO_DE_LA_TIERRA = CONFIN_DE_LAS_NUBES * 3;
 /** El acento con el que se enciende la casilla tocable, y el blanco de la destacada. */
@@ -270,6 +349,232 @@ const CAPACIDAD = {
   marcas: CASILLAS + 1,
   trato: DISCOS_DEL_TRATO,
 } as const;
+
+/* ───────────────────────── La ciudad de dentro del recinto ───────────────────────── */
+
+/**
+ * CADA CUÁNTO SE VUELVE A REPARTIR LA CIUDAD POR NIVELES.
+ *
+ * No por fotograma: `montarLaCiudad` recorre 174 grupos y reescribir las matrices son unos
+ * miles de `compose`. Se hace cuando la cámara CAMBIA DE CELDA (12 unidades), que es lo que
+ * pide `LA-CIUDAD.md` §8, y con eso una panorámica a 60 fotogramas por segundo reparte tres
+ * o cuatro veces por segundo en vez de sesenta.
+ */
+const PASO_PARA_REPARTIR = RETICULA_DE_LA_CIUDAD;
+/** Cuántos edificios se abren a la vez, como mucho (§5). Tres, y los tres más cercanos. */
+const EDIFICIOS_ABIERTOS = 3;
+/**
+ * CUÁNDO SE ABRE UN EDIFICIO, Y POR QUÉ NO ES «CON EL OJO POR DEBAJO DE 40».
+ *
+ * `LA-CIUDAD.md` §5 lo escribió como «por debajo de 60 de distancia y 40 de ALTURA DE OJO», y
+ * al medirlo en el banco resultó ser una regla que NO PUEDE CUMPLIRSE NUNCA con la cámara que
+ * hay. La cuenta, con los números de `camara-del-burgo.ts` y `camara.ts`:
+ *
+ *     cercanía más corta (`LIMITES_DEL_BURGO.masCerca` 0,15) → el ojo queda a 366 del punto
+ *     que mira; inclinación mínima (`ALTURA_MINIMA`, 12°) → altura de ojo 366 · sen 12° = 76.
+ *
+ * O sea que el ojo NUNCA baja de 76, y con el umbral en 40 los interiores no se abrían jamás
+ * en una partida: sólo en el banco, bajando la mirada por debajo de lo que el cliente deja.
+ * Un adorno que el jugador no ve no es un adorno, es peso muerto.
+ *
+ * Así que la regla pasa a medirse donde de verdad está la atención: EL PUNTO QUE LA CÁMARA
+ * MIRA en el suelo, y a qué distancia tiene el ojo de ese punto. Con la cercanía más corta el
+ * ojo está a 366, y una sala de 8 de lado mide ahí 8/366 · 1.304 = 28 píxeles en un PC: se ve
+ * el sofá. Con la cercanía siguiente (0,2) el ojo se va a 488 y la sala baja de 21 px. El
+ * umbral se pone en 420, entre las dos: se abren cuando el jugador ha acercado del todo, y no
+ * antes. Los 60 del radio no se tocan: son los del plano y son lo que abarca la mirada.
+ */
+const PARA_ABRIR = { distancia: 60, alcance: 420 } as const;
+/**
+ * CUÁNTOS SITIOS SE LE GUARDA A CADA MUEBLE, Y DE DÓNDE SALE EL NÚMERO.
+ *
+ * La primera versión dimensionó el almacén de muebles con la muestra de tres interiores que
+ * la ciudad trae montada, por tres. En el banco saltó el aviso en cuanto la cámara se metió
+ * en una calle —«la ciudad se pasó de la capacidad de anaquel-pequeno», y luego de «cama»—
+ * porque el edificio que uno abre no tiene por qué ser de los tres: una tienda lleva
+ * anaqueles que un dormitorio no lleva. Catar dieciséis edificios tampoco bastó: medido, la
+ * muestra de dieciséis se queda corta hasta ×3.
+ *
+ * Así que el número está MEDIDO SOBRE TODO EL UNIVERSO, no estimado. Recorriendo los 3.110
+ * edificios con cáscara de cinco ciudades enteras y amueblándolos uno a uno:
+ *
+ *   · `salasDelEdificio` NO emite ni una pieza que no esté en la tabla `MUEBLE` de
+ *     `ciudad.ts` (40 distintas de las 60 que la tabla tiene), así que el universo de piezas
+ *     que pueden hacer falta se sabe de antemano y no hay que catarlo.
+ *   · El máximo de UNA pieza en UN edificio son 18 (`plato`, en un restaurante). Ni una
+ *     llega a 24 en 3.110 edificios.
+ *
+ * Con eso, `24 × 3` sitios por pieza cubre los tres que pueden estar abiertos a la vez con
+ * margen, cuesta 60 × 72 = 4.320 matrices (276 kB) y se sabe en el acto, sin amueblar nada
+ * al montar. La escritura sigue parándose en la capacidad y avisando una vez por `alFallar`:
+ * es una cota medida sobre cinco ciudades, no un teorema.
+ */
+const MUEBLES_POR_EDIFICIO = 24;
+/** Y lo mismo para los tabiques y las losas, que son bultos: el máximo medido fue 24 (los de 10). */
+const BULTOS_POR_EDIFICIO = 32;
+
+/**
+ * EL ÚNICO INTERRUPTOR DE LA ESCENA, Y ES DEL BANCO.
+ *
+ * `banco-burgo.html` tiene que poder abrir y cerrar los interiores a mano para mirarlos, y
+ * el sitio obvio para eso sería una prop. No lo es: `tipos.ts` es el CONTRATO que cumplen
+ * los dos clientes, y meterle una prop que sólo usa un banco de pruebas la convierte en algo
+ * que la app tendrá que pasar para siempre. Así que va aquí, con su valor de la PARTIDA por
+ * defecto (`true`), y lo que se documenta es que nadie más lo toca: `app/` y `escritorio/src`
+ * no lo nombran, y `verify:burgo-escena` comprueba que sigue naciendo en `true`.
+ */
+export const INTERRUPTORES_DEL_BANCO = { interiores: true };
+
+/** Una malla instanciada de la ciudad: su geometría, su capacidad y su contador vivo. */
+interface MallaDeLaCiudad {
+  readonly clave: string;
+  readonly geometria: THREE.BufferGeometry;
+  readonly capacidad: number;
+  /** Los bultos llevan color por instancia; las piezas del pack, no (su color va horneado). */
+  readonly conColor: boolean;
+}
+
+interface CiudadEn3D {
+  readonly ciudad: LaCiudad;
+  readonly piezas: readonly MallaDeLaCiudad[];
+  readonly bultos: readonly MallaDeLaCiudad[];
+  readonly coches: readonly MallaDeLaCiudad[];
+  /**
+   * LAS NUEVE CINTAS VAN SIEMPRE MONTADAS, y no es un descuido.
+   *
+   * Son nueve en toda la ciudad —el sendero del parque, la pista del circuito, sus dos
+   * quitamiedos, la línea de meta, las aceras del parque— y suman unos mil triángulos. Que
+   * el trazado del parque y el óvalo del circuito se lean DESDE ARRIBA es medio distrito:
+   * quitarlos a 420 unidades ahorraría mil triángulos de 692.000 y borraría las dos cosas
+   * que hacen que la ciudad se entienda desde la pose de salida.
+   */
+  readonly cintas: readonly THREE.BufferGeometry[];
+  readonly material: THREE.Material;
+  /** Por índice de edificio, su clave de cáscara: la puesta que se DESMONTA al abrirlo. */
+  readonly cascaras: ReadonlyMap<number, string>;
+  readonly soltar: () => void;
+}
+
+/** La clave con la que se reconoce una puesta concreta del pack: pieza y sitio, redondeados. */
+function claveDePuesta(pieza: string, x: number, z: number): string {
+  return `${pieza}|${x.toFixed(2)}|${z.toFixed(2)}`;
+}
+
+/**
+ * LAS MALLAS DE LA CIUDAD, con la capacidad sacada de la propia ciudad y no de un número
+ * escrito a mano.
+ *
+ * La capacidad de una pieza es la suma, grupo a grupo, del MÁXIMO que ese grupo pone de esa
+ * pieza en cualquiera de sus tres niveles. Es una cota superior de verdad —ningún reparto
+ * puede pedir más— y sale barata de calcular una vez. Escribir «500 farolas» a mano habría
+ * durado hasta la primera semilla con una calle más.
+ */
+function construirLaCiudad(ciudad: LaCiudad, catalogo: CatalogoDeModelos, material: THREE.Material): CiudadEn3D {
+  const propias: THREE.BufferGeometry[] = [];
+  const geometriaDe = (nombre: string): THREE.BufferGeometry | null => {
+    const nodo = catalogo.get(nombre);
+    if (nodo === undefined) return null;
+    const partes = aplana(nodo);
+    for (const p of partes) propias.push(p.geometria);
+    const g = unaGeometria(partes);
+    if (g !== null && g !== partes[0]?.geometria) propias.push(g);
+    return g;
+  };
+  const topeDePieza = new Map<string, number>();
+  /** Por clave de bulto (`bulto-30`, `bulto-260-llano`), su cuenta de triángulos y su capacidad. */
+  const topeDeBulto = new Map<string, { triangulos: number; llano: boolean; capacidad: number }>();
+  const sube = (mapa: Map<string, number>, clave: string, cuanto: number): void => {
+    mapa.set(clave, (mapa.get(clave) ?? 0) + cuanto);
+  };
+  const subeBulto = (triangulos: number, llano: boolean, cuanto: number): void => {
+    const clave = claveDelBulto(triangulos, llano);
+    const hecho = topeDeBulto.get(clave);
+    if (hecho === undefined) topeDeBulto.set(clave, { triangulos, llano, capacidad: cuanto });
+    else hecho.capacidad += cuanto;
+  };
+  for (const g of ciudad.grupos) {
+    const porPieza = new Map<string, number>();
+    const porBulto = new Map<string, { triangulos: number; llano: boolean; cuantos: number }>();
+    for (const nivel of g.niveles) {
+      const p = new Map<string, number>();
+      const b = new Map<string, { triangulos: number; llano: boolean; cuantos: number }>();
+      for (const q of [...nivel.puestas, ...nivel.coches]) p.set(q.pieza, (p.get(q.pieza) ?? 0) + 1);
+      for (const q of nivel.bultos) {
+        const llano = q.alto <= 0;
+        const clave = claveDelBulto(q.triangulos, llano);
+        const hecho = b.get(clave);
+        if (hecho === undefined) b.set(clave, { triangulos: q.triangulos, llano, cuantos: 1 });
+        else hecho.cuantos++;
+      }
+      for (const [k, n] of p) porPieza.set(k, Math.max(porPieza.get(k) ?? 0, n));
+      for (const [k, v] of b) {
+        const hecho = porBulto.get(k);
+        if (hecho === undefined) porBulto.set(k, { ...v });
+        else hecho.cuantos = Math.max(hecho.cuantos, v.cuantos);
+      }
+    }
+    for (const [k, n] of porPieza) sube(topeDePieza, k, n);
+    for (const v of porBulto.values()) subeBulto(v.triangulos, v.llano, v.cuantos);
+  }
+  /* Y los interiores, que no son de ningún grupo: la tabla entera de muebles (ver `MUEBLES_POR_EDIFICIO`). */
+  for (const pieza of Object.keys(MUEBLE)) sube(topeDePieza, pieza, MUEBLES_POR_EDIFICIO * EDIFICIOS_ABIERTOS);
+  for (const cuenta of [TRIANGULOS_DEL_TABIQUE, TRIANGULOS_DEL_TABIQUE_CON_PUERTA, TRIANGULOS_DE_LA_ESCALERA]) {
+    subeBulto(cuenta, false, BULTOS_POR_EDIFICIO * EDIFICIOS_ABIERTOS);
+  }
+  /* La losa de una sala es un bulto CON grueso, no un plano: `GRUESO_DE_LA_LOSA` es 0,5. */
+  subeBulto(TRIANGULOS_DE_LA_LOSA, false, BULTOS_POR_EDIFICIO * EDIFICIOS_ABIERTOS);
+
+  const piezas: MallaDeLaCiudad[] = [];
+  for (const [nombre, capacidad] of [...topeDePieza].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    if (catalogo.get(nombre) === undefined) continue;
+    const geometria = geometriaDe(nombre);
+    if (geometria === null) continue;
+    piezas.push({ clave: nombre, geometria, capacidad, conColor: false });
+  }
+  const bultos: MallaDeLaCiudad[] = [];
+  for (const [clave, v] of [...topeDeBulto].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    bultos.push({ clave, geometria: geometriaDeUnBulto(v.triangulos, v.llano), capacidad: v.capacidad, conColor: true });
+  }
+  /* Los coches que CIRCULAN van aparte: se reescriben cada fotograma y los demás no. */
+  const porCoche = new Map<string, number>();
+  for (const r of ciudad.coches.rutas) porCoche.set(r.pieza, (porCoche.get(r.pieza) ?? 0) + 1);
+  const coches: MallaDeLaCiudad[] = [];
+  for (const [nombre, capacidad] of [...porCoche].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    if (catalogo.get(nombre) === undefined) continue;
+    const geometria = geometriaDe(nombre);
+    if (geometria === null) continue;
+    coches.push({ clave: `ruta-${nombre}`, geometria, capacidad, conColor: false });
+  }
+
+  /*
+   * LAS CINTAS NO SE INSTANCIAN: son nueve en toda la ciudad y cada una es distinta. Cada
+   * una es su propia malla, con su color horneado, y se muestra o se esconde con el nivel
+   * de su grupo. Se esconde DESMONTÁNDOLA del árbol, no con `visible`, que aquí da igual
+   * porque no cogen el dedo, pero la regla de la casa es una sola.
+   */
+  const cintas: THREE.BufferGeometry[] = [];
+  for (const c of ciudad.cintas) {
+    const geometria = geometriaDeUnaCinta(c);
+    propias.push(geometria);
+    cintas.push(geometria);
+  }
+
+  const cascaras = new Map<number, string>();
+  for (const e of ciudad.edificios) if (e.cascara !== null) cascaras.set(e.indice, claveDePuesta(e.cascara, e.centro.x, e.centro.z));
+
+  return {
+    ciudad,
+    piezas,
+    bultos,
+    coches,
+    cintas,
+    material,
+    cascaras,
+    soltar: () => {
+      for (const g of propias) g.dispose();
+    },
+  };
+}
 
 const EJE_Y = new THREE.Vector3(0, 1, 0);
 const EJE_Z = new THREE.Vector3(0, 0, 1);
@@ -427,7 +732,7 @@ function construirMundo(catalogo: CatalogoDeModelos, semilla: number, calidad: '
 
   /* El molino: las aspas fuera, el cuerpo al fundido. */
   let aspas: Aspas | null = null;
-  const molino = catalogo.get(PIEZA.molino);
+  const molino = catalogo.get(PIEZA.torreDeAgua);
   if (molino !== undefined) {
     const copia = molino.clone(true);
     copia.updateWorldMatrix(true, true);
@@ -453,7 +758,7 @@ function construirMundo(catalogo: CatalogoDeModelos, semilla: number, calidad: '
     }
     const cuerpo = aplana(copia);
     for (const c of cuerpo) propias.push(c.geometria);
-    porPieza.set(PIEZA.molino, cuerpo);
+    porPieza.set(PIEZA.torreDeAgua, cuerpo);
   }
 
   /*
@@ -467,7 +772,7 @@ function construirMundo(catalogo: CatalogoDeModelos, semilla: number, calidad: '
   const rejaFijaPuesta = puestasDesLasRejas().find((p) => !(Math.abs(p.x - laQueSube.x) < 1e-6 && Math.abs(p.z - laQueSube.z) < 1e-6)) ?? null;
   for (const p of [...mundoEstatico(semilla, calidad), ...(rejaFijaPuesta === null ? [] : [rejaFijaPuesta])]) {
     const matriz = matrizDelBurgo(p.x, p.y, p.z, p.giro, p.talla);
-    if (p.pieza === PIEZA.molino && aspas !== null) aspas.matrizDelMolino.copy(matriz);
+    if (p.pieza === PIEZA.torreDeAgua && aspas !== null) aspas.matrizDelMolino.copy(matriz);
     for (const parte of partesDe(p.pieza)) {
       /* Los estandartes de la Puerta Mayor van teñidos del ámbar del Concejo (§5.1). */
       const geometria = p.pieza === PIEZA.estandarte ? geometriaTenidaDe(PIEZA.estandarte, parte.geometria, AMBAR_DEL_CONCEJO) : parte.geometria;
@@ -481,10 +786,10 @@ function construirMundo(catalogo: CatalogoDeModelos, semilla: number, calidad: '
 
   /* La reja que sube y baja, suelta. */
   let reja: PiezaSuelta | null = null;
-  const geometriaDeLaReja = unaGeometria(partesDe(PIEZA.muroReja));
+  const geometriaDeLaReja = unaGeometria(partesDe(PIEZA.verjaPuerta));
   if (geometriaDeLaReja !== null) {
-    if (geometriaDeLaReja !== partesDe(PIEZA.muroReja)[0]?.geometria) propias.push(geometriaDeLaReja);
-    const materialDeLaReja = partesDe(PIEZA.muroReja)[0]?.material ?? material;
+    if (geometriaDeLaReja !== partesDe(PIEZA.verjaPuerta)[0]?.geometria) propias.push(geometriaDeLaReja);
+    const materialDeLaReja = partesDe(PIEZA.verjaPuerta)[0]?.material ?? material;
     reja = { geometria: geometriaDeLaReja, material: materialDeLaReja as THREE.Material, puesta: laQueSube };
   }
 
@@ -529,7 +834,7 @@ function construirMundo(catalogo: CatalogoDeModelos, semilla: number, calidad: '
 
 /** Las dos puestas de `muro-reja` de la Mazmorra, en el mundo. */
 function puestasDesLasRejas(): Puesta[] {
-  return puestasDeLasEsquinas().filter((p) => p.pieza === PIEZA.muroReja);
+  return puestasDeLasEsquinas().filter((p) => p.pieza === PIEZA.verjaPuerta);
 }
 
 /* ─────────────────────────────── El suelo propio ─────────────────────────────── */
@@ -541,11 +846,24 @@ interface Suelo {
 }
 
 /**
- * EL SUELO DEL ANILLO, geometría propia con color por vértice: por casilla lateral, las
- * tres bandas (la acera alzada 0,15 con sus dos cantos), las cuatro esquinas, el suelo de
- * dados de la plaza, el suelo de la ciudad interior y la tierra bajo el campo. El color
- * de la acera es el del barrio y se REESCRIBE por vértice cuando cambia la vista o se
- * empeña (nunca con opacidad). Las cuentas están en `presupuesto.ts` (`triangulosDelSuelo`).
+ * EL SUELO DEL ANILLO, GEOMETRÍA PROPIA CON COLOR POR VÉRTICE.
+ *
+ * ═══ LOS CUADROS NO SE VUELVEN A CALCULAR AQUÍ: SE PIDEN ═══
+ *
+ * La primera versión de esta función repetía la aritmética de `suelosDeLaCasilla` —las
+ * cuatro bandas, el canto del reborde, los dos tramos de marco de una esquina— con las
+ * mismas constantes pero escrita otra vez. El resultado era que `verify:burgo-escena` medía
+ * `suelosDelAnillo()`, que NADIE dibujaba, y la escena dibujaba una copia que el comprobador
+ * no miraba nunca. Es el fallo de «el comprobador verde por filtro roto» con otro traje:
+ * dos verdades sobre lo mismo, y sólo una vigilada. Ahora hay una: `anillo-en-3d.ts` dice
+ * dónde van los cuadros y aquí sólo se les da color y se enhebran.
+ *
+ * Lo que se añade encima son los tres cuadros que NO son del anillo: el paño de dados de la
+ * plaza, el suelo del recinto de la ciudad y la tierra bajo el campo.
+ *
+ * El color de la FRANJA es el del barrio y se REESCRIBE por vértice cuando cambia la vista o
+ * se empeña (nunca con opacidad), así que de cada casilla se guarda el tramo de vértices de
+ * sus cuadros `franja` y `reborde`. Las cuentas están en `presupuesto.ts`.
  */
 function construirSuelo(): Suelo {
   const posiciones: number[] = [];
@@ -554,7 +872,9 @@ function construirSuelo(): Suelo {
   const aceras = new Map<number, { desde: number; hasta: number }>();
   let vertices = 0;
   const color = new THREE.Color();
-  const cuadro = (a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[], hex: string, normal: readonly number[]): void => {
+  const cuadro = (puntos: readonly (readonly [number, number, number])[], hex: string, normal: readonly [number, number, number]): void => {
+    const [a, b, c, d] = puntos as readonly [number, number, number][];
+    if (a === undefined || b === undefined || c === undefined || d === undefined) return;
     color.set(hex);
     /*
      * EL SENTIDO DE GIRO SE DERIVA DE LA NORMAL PEDIDA, no se supone: la primera versión
@@ -562,64 +882,54 @@ function construirSuelo(): Suelo {
      * salía mirando hacia ABAJO (el producto vectorial daba −y), así que la calle y el
      * solar se pintaban a oscuras —iluminados por el suelo del hemisferio— sin error.
      */
-    const ux = (b[0] as number) - (a[0] as number);
-    const uy = (b[1] as number) - (a[1] as number);
-    const uz = (b[2] as number) - (a[2] as number);
-    const vx = (c[0] as number) - (a[0] as number);
-    const vy = (c[1] as number) - (a[1] as number);
-    const vz = (c[2] as number) - (a[2] as number);
-    const nx = uy * vz - uz * vy;
-    const ny = uz * vx - ux * vz;
-    const nz = ux * vy - uy * vx;
-    const alDerecho = nx * (normal[0] as number) + ny * (normal[1] as number) + nz * (normal[2] as number) >= 0;
+    const nx = (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]);
+    const ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
+    const nz = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    const alDerecho = nx * normal[0] + ny * normal[1] + nz * normal[2] >= 0;
     for (const v of alDerecho ? [a, b, c, c, d, a] : [a, d, c, c, b, a]) {
-      posiciones.push(v[0] as number, v[1] as number, v[2] as number);
+      posiciones.push(v[0], v[1], v[2]);
       colores.push(color.r, color.g, color.b);
-      normales.push(normal[0] as number, normal[1] as number, normal[2] as number);
+      normales.push(normal[0], normal[1], normal[2]);
       vertices++;
     }
   };
-  const medio = ANCHO_DE_CASILLA / 2;
-  for (let i = 0; i < CASILLAS; i++) {
-    const m = marcoDeCasilla(i);
-    if (m.esEsquina) {
-      const e = (u: number, v: number): number[] => {
-        const p = puntoEnEsquina(m, u, v);
-        return [p.x, 0, p.z];
-      };
-      cuadro(e(BORDE_INTERIOR, BORDE_INTERIOR), e(MEDIO_LADO, BORDE_INTERIOR), e(MEDIO_LADO, MEDIO_LADO), e(BORDE_INTERIOR, MEDIO_LADO), COLOR_DE_LA_ESQUINA, [0, 1, 0]);
-      continue;
+  let casillaEnCurso = -1;
+  let desdeDeLaAcera = 0;
+  for (const q of suelosDelAnillo()) {
+    if (q.papel === 'franja') {
+      casillaEnCurso = q.casilla;
+      desdeDeLaAcera = vertices;
     }
-    const p = (radial: number, aLoLargo: number, y: number): number[] => {
-      const q = puntoEnCasilla(m, radial, aLoLargo);
-      return [q.x, y, q.z];
-    };
-    const desde = vertices;
-    /* La acera: la tapa alzada y los dos cantos. */
-    cuadro(p(ACERA.desde, -medio, ALTURA_DE_LA_ACERA), p(ACERA.hasta, -medio, ALTURA_DE_LA_ACERA), p(ACERA.hasta, medio, ALTURA_DE_LA_ACERA), p(ACERA.desde, medio, ALTURA_DE_LA_ACERA), COLOR_DE_LA_ACERA_SIN_BARRIO, [0, 1, 0]);
-    cuadro(p(ACERA.desde, -medio, 0), p(ACERA.desde, -medio, ALTURA_DE_LA_ACERA), p(ACERA.desde, medio, ALTURA_DE_LA_ACERA), p(ACERA.desde, medio, 0), COLOR_DE_LA_ACERA_SIN_BARRIO, [-m.fuera.x, 0, -m.fuera.z]);
-    cuadro(p(ACERA.hasta, -medio, ALTURA_DE_LA_ACERA), p(ACERA.hasta, -medio, 0), p(ACERA.hasta, medio, 0), p(ACERA.hasta, medio, ALTURA_DE_LA_ACERA), COLOR_DE_LA_ACERA_SIN_BARRIO, [m.fuera.x, 0, m.fuera.z]);
-    aceras.set(i, { desde, hasta: vertices });
-    cuadro(p(CALLE.desde, -medio, 0), p(CALLE.hasta, -medio, 0), p(CALLE.hasta, medio, 0), p(CALLE.desde, medio, 0), COLOR_DE_LA_CALLE, [0, 1, 0]);
-    cuadro(p(SOLAR.desde, -medio, 0), p(SOLAR.hasta, -medio, 0), p(SOLAR.hasta, medio, 0), p(SOLAR.desde, medio, 0), COLOR_DEL_SOLAR, [0, 1, 0]);
+    cuadro(q.puntos, COLOR_DEL_SUELO[q.papel], q.normal);
+    if (q.papel === 'reborde' && casillaEnCurso === q.casilla) aceras.set(q.casilla, { desde: desdeDeLaAcera, hasta: vertices });
   }
-  /* El agua de la ribera, detrás del muelle: un cuadro más de este suelo, y no una malla (una llamada menos). */
-  {
-    const agua = puestaDelAgua();
-    const c = Math.cos(agua.giro);
-    const s = Math.sin(agua.giro);
-    const w = AGUA_DE_LA_RIBERA.ancho / 2;
-    const f = AGUA_DE_LA_RIBERA.fondo / 2;
-    const q = (u: number, v: number): number[] => [agua.x + u * c + v * s, AGUA_DE_LA_RIBERA.y, agua.z - u * s + v * c];
-    cuadro(q(-w, -f), q(w, -f), q(w, f), q(-w, f), AGUA_DE_LA_RIBERA.color, [0, 1, 0]);
-  }
-  /* El suelo de dados, el de la ciudad interior y la tierra bajo el campo. */
+  /* El paño de dados, el suelo del recinto y la tierra bajo el campo: no son del anillo. */
+  const llano = (lado: number, y: number, hex: string): void => {
+    const m = lado / 2;
+    cuadro(
+      [
+        [-m, y, -m],
+        [-m, y, m],
+        [m, y, m],
+        [m, y, -m],
+      ],
+      hex,
+      [0, 1, 0],
+    );
+  };
   const d = SUELO_DE_DADOS.lado / 2;
-  cuadro([-d, SUELO_DE_DADOS.y, -d], [-d, SUELO_DE_DADOS.y, d], [d, SUELO_DE_DADOS.y, d], [d, SUELO_DE_DADOS.y, -d], SUELO_DE_DADOS.color, [0, 1, 0]);
-  const h = LADO_INTERIOR / 2;
-  cuadro([-h, 0, -h], [-h, 0, h], [h, 0, h], [h, 0, -h], COLOR_DEL_INTERIOR, [0, 1, 0]);
-  const t = LADO_DE_LA_TIERRA / 2;
-  cuadro([-t, -0.03, -t], [-t, -0.03, t], [t, -0.03, t], [t, -0.03, -t], COLOR_DE_LA_TIERRA, [0, 1, 0]);
+  cuadro(
+    [
+      [SUELO_DE_DADOS.x - d, SUELO_DE_DADOS.y, SUELO_DE_DADOS.z - d],
+      [SUELO_DE_DADOS.x - d, SUELO_DE_DADOS.y, SUELO_DE_DADOS.z + d],
+      [SUELO_DE_DADOS.x + d, SUELO_DE_DADOS.y, SUELO_DE_DADOS.z + d],
+      [SUELO_DE_DADOS.x + d, SUELO_DE_DADOS.y, SUELO_DE_DADOS.z - d],
+    ],
+    SUELO_DE_DADOS.color,
+    [0, 1, 0],
+  );
+  llano(LADO_INTERIOR, 0, COLOR_DEL_SUELO.recinto);
+  llano(LADO_DE_LA_TIERRA, -0.03, COLOR_DE_LA_TIERRA);
 
   const geometria = new THREE.BufferGeometry();
   geometria.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posiciones), 3));
@@ -634,7 +944,7 @@ function pintaLaAcera(suelo: Suelo, casilla: CasillaEn3D, luminancia: number): v
   const tramo = suelo.aceras.get(casilla.indice);
   if (tramo === undefined) return;
   const color = suelo.geometria.getAttribute('color') as THREE.BufferAttribute;
-  auxColor.set(casilla.colorDelBarrio ?? COLOR_DE_LA_ACERA_SIN_BARRIO).multiplyScalar(luminancia);
+  auxColor.set(casilla.colorDelBarrio ?? COLOR_DE_LA_FRANJA_SIN_BARRIO).multiplyScalar(luminancia);
   for (let i = tramo.desde; i < tramo.hasta; i++) color.setXYZ(i, auxColor.r, auxColor.g, auxColor.b);
   color.needsUpdate = true;
 }
@@ -694,7 +1004,7 @@ function puntoDelDinero(asiento: string | null, casilla: number, asientos: reado
 /** El centro de la calle de una casilla: donde se pone la marca. */
 function centroDeLaMarca(casilla: number): Punto {
   const m = marcoDeCasilla(casilla);
-  return m.esEsquina ? puntoEnEsquina(m, LINEA_MEDIA_DE_LA_CALLE, MEDIO_LADO - 6.5) : m.centro;
+  return m.centro;
 }
 
 /* ─────────────────────────────── La escena entera ─────────────────────────────── */
@@ -811,6 +1121,25 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   const suelo = useMemo(construirSuelo, []);
   useEffect(() => () => suelo.geometria.dispose(), [suelo]);
 
+  /*
+   * ─ LA CIUDAD: se genera de la semilla de la mesa y se pasa a geometría con el catálogo. ─
+   *
+   * `ciudadDelCodigo` es aritmética pura y tarda unas decenas de milisegundos: se hace UNA
+   * vez por código y calidad, mientras el telón está bajado (antes de `alEstarListo`), y no
+   * se vuelve a tocar. Lo que cambia por fotograma es sólo el REPARTO por niveles.
+   */
+  const ciudad = useMemo(() => ciudadDelCodigo(codigo, RECINTO_DEL_BURGO, calidad), [codigo, calidad]);
+  const laCiudad = useMemo(
+    () => (catalogo === null || mundo === null || mundo.material === null ? null : construirLaCiudad(ciudad, catalogo, mundo.material)),
+    [ciudad, catalogo, mundo],
+  );
+  useEffect(() => () => laCiudad?.soltar(), [laCiudad]);
+  useEffect(() => soltarLosBultos, []);
+
+  /* Los precios y los emblemas: no cambian con la partida, así que van fundidos y son UNA llamada. */
+  const rotulos = useMemo(geometriaDeLosRotulos, []);
+  useEffect(() => () => rotulos?.geometria.dispose(), [rotulos]);
+
   const materiales = useMemo(
     () => ({
       suelo: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }),
@@ -823,6 +1152,11 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       asa: new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
       dadoCuerpo: new THREE.MeshStandardMaterial({ color: COLOR_DEL_NUMERO, roughness: 0.6 }),
       dadoPuntos: new THREE.MeshStandardMaterial({ color: COLOR_DEL_PUNTO, roughness: 0.6 }),
+      /* Lo propio de la ciudad: color por vértice (y por instancia en los bultos), sin brillo. */
+      bulto: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.94, metalness: 0 }),
+      cinta: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0, side: THREE.DoubleSide }),
+      /* La tinta de los rótulos: plana, como una tinta impresa, y no una superficie iluminada. */
+      rotulo: new THREE.MeshBasicMaterial({ vertexColors: true }),
     }),
     [],
   );
@@ -929,6 +1263,26 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   const fotogramasDesdeElArranque = useRef(0);
   const listoAvisado = useRef(false);
 
+  /* ─ La ciudad viva: el reparto por niveles, los interiores abiertos y las mallas. ─ */
+  const laCiudadRef = useRef<CiudadEn3D | null>(laCiudad);
+  laCiudadRef.current = laCiudad;
+  const mallasDeLaCiudad = useRef(new Map<string, THREE.InstancedMesh>());
+  const mallasDeCoches = useRef(new Map<string, THREE.InstancedMesh>());
+  const reparto = useRef({
+    /** Dónde estaba la cámara cuando se repartió: `null` = no se ha repartido nunca. */
+    desde: null as { x: number; z: number } | null,
+    /** Por grupo, el nivel que tenía: es lo que da la histéresis. */
+    niveles: [] as number[],
+    montaje: null as MontajeDeLaCiudad | null,
+    /** Los índices de los edificios abiertos, en orden, y sus salas ya pedidas. */
+    abiertos: [] as number[],
+    salas: [] as PuestaDeSala[],
+    /** Cuántos repartos se han hecho, y si ya se avisó de un desbordamiento de capacidad. */
+    repartos: 0,
+    avisadoElDesborde: false,
+  });
+  const salasPorEdificio = useRef(new Map<number, PuestaDeSala[]>());
+
   /* Las mallas instanciadas. */
   const casas = useRef<THREE.InstancedMesh>(null);
   const peonesMalla = useRef<THREE.InstancedMesh>(null);
@@ -956,13 +1310,13 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     if (m === null) return;
     for (let i = 0; i < CASILLAS; i++) {
       const marco = marcoDeCasilla(i);
-      const centro = marco.esEsquina ? puntoEnEsquina(marco, MEDIO_LADO - 7, MEDIO_LADO - 7) : puntoEnCasilla(marco, MEDIO_LADO - 7, 0);
-      const ancho = marco.esEsquina ? 14 : ANCHO_DE_CASILLA;
+      const centro = marco.esEsquina ? puntoEnEsquina(marco, SUPERFICIE.centro, SUPERFICIE.centro) : puntoEnCasilla(marco, SUPERFICIE.centro, 0);
+      const ancho = marco.esEsquina ? LADO_DE_ESQUINA : ANCHO_DE_CASILLA;
       auxEuler.set(-Math.PI / 2, 0, 0);
       auxGiro.setFromEuler(auxEuler);
       auxGiro2.setFromAxisAngle(EJE_Y, Math.atan2(marco.fuera.x, marco.fuera.z));
       auxGiro.premultiply(auxGiro2);
-      m.setMatrixAt(i, auxMatriz.compose(auxPosicion.set(centro.x, ALZA_DEL_ASA, centro.z), auxGiro, auxEscala.set(ancho, 14, 1)));
+      m.setMatrixAt(i, auxMatriz.compose(auxPosicion.set(centro.x, ALZA_DEL_ASA, centro.z), auxGiro, auxEscala.set(ancho, marco.esEsquina ? LADO_DE_ESQUINA : SUPERFICIE.hasta - FILETE.desde, 1)));
     }
     m.instanceMatrix.needsUpdate = true;
     m.computeBoundingSphere();
@@ -988,6 +1342,145 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       sucesosDeDados.current.push({ que: 'vista', vista: v });
       vistaDeDadosPendiente.current = null;
     }
+  };
+
+  // -------------------------------------------------------------------------
+  // La ciudad: repartirla por niveles y escribir sus matrices
+  // -------------------------------------------------------------------------
+
+  /* Cuando cambia la ciudad (código o calidad) las mallas son otras: hay que repartir de cero. */
+  useEffect(() => {
+    reparto.current.desde = null;
+    reparto.current.niveles = [];
+    reparto.current.abiertos = [];
+    reparto.current.salas = [];
+    salasPorEdificio.current.clear();
+  }, [laCiudad]);
+
+  /**
+   * QUÉ EDIFICIOS SE ABREN: los TRES más cercanos AL PUNTO QUE SE MIRA, y sólo de cerca.
+   *
+   * `x` y `z` son el punto del suelo al que apunta la cámara —no dónde está el ojo— y
+   * `alcance` lo lejos que el ojo tiene ese punto. Los dos hacen falta: el radio dice «esa
+   * manzana es la que se está mirando» y el alcance dice «y se está mirando de cerca». Ver
+   * `PARA_ABRIR` para por qué el segundo no es la altura del ojo.
+   */
+  const edificiosQueSeAbren = (c: CiudadEn3D, x: number, z: number, alcance: number): number[] => {
+    if (!plena || !INTERRUPTORES_DEL_BANCO.interiores || alcance > PARA_ABRIR.alcance) return [];
+    const cerca: { indice: number; d: number }[] = [];
+    for (const e of c.ciudad.edificios) {
+      if (e.cascara === null) continue;
+      const d = Math.hypot(e.centro.x - x, e.centro.z - z);
+      if (d <= PARA_ABRIR.distancia) cerca.push({ indice: e.indice, d });
+    }
+    cerca.sort((a, b) => a.d - b.d);
+    return cerca
+      .slice(0, EDIFICIOS_ABIERTOS)
+      .map((k) => k.indice)
+      .sort((a, b) => a - b);
+  };
+
+  /**
+   * ESCRIBIR LA CIUDAD ENTERA: una pasada por los 174 grupos, cada uno a SU nivel.
+   *
+   * Lo que se escribe es sólo lo que está montado, así que el bucle recorre la ciudad pero
+   * escribe unos miles de matrices, no el millón y medio de triángulos que la ciudad tiene
+   * en L1. Y va POR MALLA: una `InstancedMesh` por pieza del pack y una por cuenta de
+   * triángulos de bulto, con el contador puesto al final. El que se pasa de capacidad NO
+   * desborda: se para y lo dice una vez por `alFallar`.
+   */
+  const escribirLaCiudad = (c: CiudadEn3D, montaje: MontajeDeLaCiudad, abiertos: readonly number[], salas: readonly PuestaDeSala[]): void => {
+    const mallas = mallasDeLaCiudad.current;
+    const cuenta = new Map<string, number>();
+    const ocultas = new Set<string>();
+    for (const indice of abiertos) {
+      const clave = c.cascaras.get(indice);
+      if (clave !== undefined) ocultas.add(clave);
+    }
+    let desbordada: string | null = null;
+    const pon = (clave: string, color: string | null): void => {
+      const malla = mallas.get(clave);
+      if (malla === undefined) return;
+      const n = cuenta.get(clave) ?? 0;
+      if (n >= (malla.userData.capacidad as number)) {
+        desbordada ??= clave;
+        return;
+      }
+      malla.setMatrixAt(n, auxMatriz);
+      if (color !== null) malla.setColorAt(n, auxColor.set(color));
+      cuenta.set(clave, n + 1);
+    };
+    const ponPuesta = (p: PuestaEnLaCiudad): void => {
+      if (ocultas.size > 0 && ocultas.has(claveDePuesta(p.pieza, p.x, p.z))) return;
+      matrizDelBurgo(p.x, p.y, p.z, p.giro, p.talla, auxMatriz);
+      pon(p.pieza, null);
+    };
+    const ponBulto = (b: BultoPropio): void => {
+      auxGiro.setFromAxisAngle(EJE_Y, b.giro);
+      auxMatriz.compose(auxPosicion.set(b.x, b.y, b.z), auxGiro, auxEscala.set(Math.max(1e-4, b.ancho), Math.max(1e-4, b.alto), Math.max(1e-4, b.fondo)));
+      pon(claveDelBulto(b.triangulos, b.alto <= 0), b.color);
+    };
+    for (const g of c.ciudad.grupos) {
+      const d = g.niveles[montaje.nivelDelGrupo[g.indice] ?? 2];
+      if (d === undefined) continue;
+      for (const p of d.puestas) ponPuesta(p);
+      for (const p of d.coches) ponPuesta(p);
+      for (const b of d.bultos) ponBulto(b);
+    }
+    /* Los interiores: sus tabiques y sus losas son bultos, y sus muebles piezas del pack. */
+    for (const sala of salas) {
+      for (const b of sala.bultos) ponBulto(b);
+      for (const m of sala.muebles) ponPuesta(m);
+    }
+    for (const [clave, malla] of mallas) {
+      const n = cuenta.get(clave) ?? 0;
+      malla.count = n;
+      malla.instanceMatrix.needsUpdate = true;
+      if (malla.instanceColor !== null) malla.instanceColor.needsUpdate = true;
+      /* La regla de la casa: toda `InstancedMesh` recalcula su esfera tras escribir matrices. */
+      malla.computeBoundingSphere();
+    }
+    if (desbordada !== null && !reparto.current.avisadoElDesborde) {
+      reparto.current.avisadoElDesborde = true;
+      falla(`la ciudad se pasó de la capacidad de «${desbordada}»: se dibuja lo que cabe`);
+    }
+  };
+
+  /**
+   * REPARTIR: sólo cuando la cámara cambia de CELDA o cuando cambian los edificios abiertos.
+   *
+   * `montarLaCiudad` recibe el reparto ANTERIOR, que es lo que aplica la histéresis de 40
+   * unidades: sin ella, una cámara parada justo en un umbral parpadearía entre dos montajes
+   * cada vez que el amortiguado del mirador la moviera medio metro.
+   */
+  const repartirLaCiudad = (x: number, z: number, focoX: number, focoZ: number, alcance: number): void => {
+    const c = laCiudadRef.current;
+    if (c === null) return;
+    const r = reparto.current;
+    const abiertos = edificiosQueSeAbren(c, focoX, focoZ, alcance);
+    const mismos = abiertos.length === r.abiertos.length && abiertos.every((v, k) => v === r.abiertos[k]);
+    const lejos = r.desde === null || Math.abs(r.desde.x - x) >= PASO_PARA_REPARTIR || Math.abs(r.desde.z - z) >= PASO_PARA_REPARTIR;
+    if (!lejos && mismos) return;
+    r.desde = { x, z };
+    if (!mismos) {
+      r.abiertos = abiertos;
+      const salas: PuestaDeSala[] = [];
+      for (const indice of abiertos) {
+        let hechas = salasPorEdificio.current.get(indice);
+        if (hechas === undefined) {
+          const e: EdificioDeLaCiudad | undefined = c.ciudad.edificios[indice];
+          hechas = e === undefined ? [] : salasDelEdificio(e, c.ciudad.semilla);
+          salasPorEdificio.current.set(indice, hechas);
+        }
+        salas.push(...hechas);
+      }
+      r.salas = salas;
+    }
+    const montaje = montarLaCiudad(c.ciudad, x, z, r.niveles.length === c.ciudad.grupos.length ? r.niveles : undefined);
+    r.montaje = montaje;
+    r.niveles = [...montaje.nivelDelGrupo];
+    r.repartos++;
+    escribirLaCiudad(c, montaje, r.abiertos, r.salas);
   };
 
   // -------------------------------------------------------------------------
@@ -1214,15 +1707,15 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
                 const brota = esPosada ? 0 : cuantas - 1;
                 if (k === brota) escala = backOut((t - (esPosada ? HUNDIR_CASAS : 0)) / POR_CASA);
               }
-              mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, ALTURA_DE_LA_ACERA, h.z, giro, Math.max(0.001, escala), auxMatriz));
+              mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, Math.max(0.001, escala), auxMatriz));
               mc.setColorAt(nCasas, auxColor);
               nCasas++;
             }
           }
           if (esPosada) {
-            const p = puntoEnCasilla(marco, ACERA.centro, BANDERA_SOBRE_LA_POSADA.aLoLargo);
+            const p = puntoEnCasilla(marco, FRANJA.centro, BANDERA_SOBRE_LA_POSADA.u);
             const escala = alzaAqui !== undefined ? backOut((t - HUNDIR_CASAS) / POR_CASA) : 1;
-            escribeBandera(suyo, p.x, ALTURA_DE_LA_ACERA + BANDERA_SOBRE_LA_POSADA.alza * Math.max(0.001, escala), p.z, giro, escala);
+            escribeBandera(suyo, p.x, ALTURA_DEL_REBORDE + BANDERA_SOBRE_LA_POSADA.alza * Math.max(0.001, escala), p.z, giro, escala);
           }
         }
         /* La casa que se vende, hundiéndose donde estaba. */
@@ -1230,7 +1723,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           const k = Math.min(3, vende.suceso.casas);
           const h = huecoDeCasa(c.indice, k);
           auxColor.set(suyo);
-          mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, ALTURA_DE_LA_ACERA, h.z, giro, Math.max(0.001, hundirse(ahora - vende.desde, vende.hasta - vende.desde)), auxMatriz));
+          mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, Math.max(0.001, hundirse(ahora - vende.desde, vende.hasta - vende.desde)), auxMatriz));
           mc.setColorAt(nCasas, auxColor);
           nCasas++;
         }
@@ -1252,10 +1745,10 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           }
           const y = cae === undefined ? 0 : caidaConRebote(ahora - cae.desde);
           const giroDeLaBandera = cae !== undefined && cae.suceso.que === 'cambia-de-mano' ? giro + Math.PI * pinza((ahora - cae.desde) / (cae.hasta - cae.desde), 0, 1) : giro;
-          escribeBandera(suyo, b.x, ALTURA_DE_LA_ACERA + y, b.z, giroDeLaBandera, 1 - 0.45 * f);
+          escribeBandera(suyo, b.x, ALTURA_DEL_REBORDE + y, b.z, giroDeLaBandera, 1 - 0.45 * f);
         } else if (c.enAlmoneda || (desierta !== undefined && 'casilla' in desierta.suceso && desierta.suceso.casilla === c.indice)) {
           const escala = desierta !== undefined && 'casilla' in desierta.suceso && desierta.suceso.casilla === c.indice ? hundirse(ahora - desierta.desde, desierta.hasta - desierta.desde) : parpadeo(ahora);
-          escribeBandera(AMBAR_DEL_CONCEJO, b.x, ALTURA_DE_LA_ACERA, b.z, giro, escala);
+          escribeBandera(AMBAR_DEL_CONCEJO, b.x, ALTURA_DEL_REBORDE, b.z, giro, escala);
         }
       }
       if (mc !== null) {
@@ -1490,6 +1983,43 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       if (cupula.current !== null) cupula.current.position.copy(cam.position);
     }
 
+    /* ─ La ciudad: el reparto por niveles (por celda) y los coches que circulan (por fotograma). ─ */
+    {
+      const cam = s.camera as THREE.PerspectiveCamera;
+      /*
+       * EL NIVEL DE DETALLE SE MIDE DESDE EL OJO y los interiores desde EL PUNTO QUE SE MIRA:
+       * son dos preguntas distintas. «¿Qué se ve grande?» la contesta la distancia al ojo, que
+       * es lo que `verify:la-ciudad` proyecta desde sus ocho poses. «¿Qué está mirando el
+       * jugador?» la contesta dónde corta el suelo el rayo de la cámara.
+       */
+      auxRayo.origin.copy(cam.position);
+      cam.getWorldDirection(auxRayo.direction);
+      const corte = auxRayo.intersectPlane(PLANO_DEL_SUELO, auxVector);
+      const focoX = corte === null ? cam.position.x : corte.x;
+      const focoZ = corte === null ? cam.position.z : corte.z;
+      const alcance = corte === null ? Infinity : cam.position.distanceTo(corte);
+      repartirLaCiudad(cam.position.x, cam.position.z, focoX, focoZ, alcance);
+      const c = laCiudadRef.current;
+      if (c !== null) {
+        const cuenta = new Map<string, number>();
+        for (const ruta of c.ciudad.coches.rutas) {
+          const clave = `ruta-${ruta.pieza}`;
+          const malla = mallasDeCoches.current.get(clave);
+          if (malla === undefined) continue;
+          const n = cuenta.get(clave) ?? 0;
+          if (n >= (malla.userData.capacidad as number)) continue;
+          const coche = cocheEnElInstante(ruta, ahora);
+          malla.setMatrixAt(n, matrizDelBurgo(coche.x, coche.y, coche.z, coche.giro, 1, auxMatriz));
+          cuenta.set(clave, n + 1);
+        }
+        for (const [clave, malla] of mallasDeCoches.current) {
+          malla.count = cuenta.get(clave) ?? 0;
+          malla.instanceMatrix.needsUpdate = true;
+          malla.computeBoundingSphere();
+        }
+      }
+    }
+
     /* ─ La medida: una vez por segundo, con la media real. ─ */
     const m = medida.current;
     m.segundos += dt;
@@ -1662,6 +2192,79 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
       {/* El suelo del anillo, la plaza y la tierra: una geometría propia con color por vértice. */}
       <mesh geometry={suelo.geometria} material={materiales.suelo} raycast={() => null} />
+
+      {/* Los precios y los emblemas de las casillas: fundidos en una sola geometría, tinta plana. */}
+      {rotulos === null ? null : <mesh geometry={rotulos.geometria} material={materiales.rotulo} position={[0, 0, 0]} raycast={() => null} />}
+
+      {/*
+        LA CIUDAD. Una `InstancedMesh` por pieza del pack y una por cuenta de triángulos de
+        bulto; las que no tienen nada montado se quedan con `count = 0` y NO cuestan una
+        llamada de dibujo (three sale antes de `renderInstances` con `primcount === 0`), que
+        es lo que hace que 174 grupos por tres niveles quepan en unas decenas de llamadas.
+      */}
+      {laCiudad === null ? null : (
+        <group>
+          {laCiudad.piezas.map((m) => (
+            <instancedMesh
+              key={m.clave}
+              ref={(malla) => {
+                if (malla === null) {
+                  mallasDeLaCiudad.current.delete(m.clave);
+                  return;
+                }
+                malla.userData.capacidad = m.capacidad;
+                /* El nombre es para la lupa del banco: una malla sin nombre no se puede señalar. */
+                malla.name = m.clave;
+                malla.count = 0;
+                mallasDeLaCiudad.current.set(m.clave, malla);
+                reparto.current.desde = null;
+              }}
+              args={[m.geometria, laCiudad.material, m.capacidad]}
+              raycast={() => null}
+            />
+          ))}
+          {laCiudad.bultos.map((m) => (
+            <instancedMesh
+              key={m.clave}
+              ref={(malla) => {
+                if (malla === null) {
+                  mallasDeLaCiudad.current.delete(m.clave);
+                  return;
+                }
+                malla.userData.capacidad = m.capacidad;
+                /* El nombre es para la lupa del banco: una malla sin nombre no se puede señalar. */
+                malla.name = m.clave;
+                malla.count = 0;
+                mallasDeLaCiudad.current.set(m.clave, malla);
+                reparto.current.desde = null;
+              }}
+              args={[m.geometria, materiales.bulto, m.capacidad]}
+              raycast={() => null}
+            />
+          ))}
+          {laCiudad.coches.map((m) => (
+            <instancedMesh
+              key={m.clave}
+              ref={(malla) => {
+                if (malla === null) {
+                  mallasDeCoches.current.delete(m.clave);
+                  return;
+                }
+                malla.userData.capacidad = m.capacidad;
+                /* El nombre es para la lupa del banco: una malla sin nombre no se puede señalar. */
+                malla.name = m.clave;
+                malla.count = 0;
+                mallasDeCoches.current.set(m.clave, malla);
+              }}
+              args={[m.geometria, laCiudad.material, m.capacidad]}
+              raycast={() => null}
+            />
+          ))}
+          {laCiudad.cintas.map((g, k) => (
+            <mesh key={`cinta-${String(k)}`} geometry={g} material={materiales.cinta} raycast={() => null} />
+          ))}
+        </group>
+      )}
 
       {mundo === null ? null : (
         <group>

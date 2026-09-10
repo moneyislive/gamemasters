@@ -4,44 +4,90 @@
  *
  * ═══ POR QUÉ LAS MULTIPLICIDADES SE CUENTAN DE LAS PUESTAS ═══
  *
- * La tabla del diseño (§5.2) dice «arbol-a × 12, muralla × 16, casas 32 × 128…». Si se
- * copiara a mano aquí, el día que `anillo-en-3d.ts` pusiera un árbol más nadie lo vería.
- * Así que lo estático se CUENTA de las listas de puestas que la escena instancia
- * (`mundoEstatico`), y sólo lo dinámico —lo que depende de la partida y no del decorado—
- * se escribe como número: 32 casas y 12 posadas (el tope de casas del Concejo), 28
- * banderas de dueño (los 28 títulos), 6 peones, 6 monedas en vuelo, 2 dados, un aventurero.
- * `verify:burgo-escena` suma las dos tablas con los triángulos medidos del fichero.
+ * Si la tabla del diseño se copiara a mano aquí, el día que `anillo-en-3d.ts` pusiera una
+ * farola más nadie lo vería. Así que lo estático se CUENTA de las listas de puestas que la
+ * escena instancia (`mundoEstatico`), y sólo lo dinámico —lo que depende de la partida y no
+ * del decorado— se escribe como número: 32 casas y 12 posadas (el tope de casas del
+ * Concejo), 28 banderas de dueño (los 28 títulos), 6 peones, 6 monedas en vuelo, 2 dados,
+ * un aventurero. `verify:burgo-escena` suma las dos tablas con los triángulos medidos del
+ * fichero.
+ *
+ * ═══ LO QUE ESTA TABLA CUENTA Y LO QUE NO ═══
+ *
+ * Cuenta el TABLERO: el anillo, sus casillas, sus cuatro esquinas, el campo, los dados y lo
+ * que cambia con la partida. NO cuenta la CIUDAD de dentro del recinto, que la levanta
+ * `escenas/burgo/ciudad.ts` y la suma su propia tabla; los topes de aquí son los del
+ * conjunto, y por eso el margen que se ve entre lo que suma esta tabla y `TOPE_PLENA` no es
+ * holgura: es el sitio que la ciudad tiene reservado (`docs/burgo/LA-CIUDAD.md` §8).
+ *
+ * ═══ LOS TOPES SUBEN OTRA VEZ, Y CON LA CUENTA DELANTE ═══
+ *
+ * Eran 110.000 y 90.000 heredados del Muelle (`TOPE_DE_TRIANGULOS` de
+ * `embarcadero/presupuesto.ts`); pasaron a 560.000 y 130.000 con el recinto de 288; y con el
+ * recinto de 648 —nueve veces el centro original, que es lo que se pidió— hay que volver a
+ * hacer la cuenta, porque la ciudad tiene 2.916 celdas y no 576.
+ *
+ * LO QUE SE CUENTA NO ES «LA CIUDAD ENTERA»: ES LO QUE ESTÁ MONTADO A LA VEZ. Ésta es la
+ * diferencia de fondo con el presupuesto anterior. Con 288 de lado la ciudad entera cabía en
+ * el nivel L1 y la suma tenía sentido renglón a renglón. Con 648 no cabe ni cabrá: el nivel
+ * de detalle deja de ser un ahorro y pasa a ser la única forma de que la ciudad exista. Los
+ * topes de aquí son, por tanto, el techo de lo que puede estar montado en un fotograma
+ * cualquiera, y `LA-CIUDAD.md` §8 lo reparte entre el TABLERO (esta tabla) y la CIUDAD
+ * (`ciudad.ts`, que lo escribe otro y suma su propia tabla).
+ *
+ * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
+ *
+ *     TABLERO en plena ... 207.877   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 145.523   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *
+ * `TOPE_PLENA = 900.000`: el tablero más 692.000 para lo que la ciudad tenga montado. Sigue
+ * siendo el 45 % de los 2.000.000 que ya mueve el delta de Riberas en un PC.
+ *
+ * `TOPE_SOBRIA = 230.000`: el tablero más 84.000 para la ciudad, que en el móvil va entera en
+ * prismas (un prisma con banda de ventanas por edificio y una manta de asfalto por celda).
+ * Sube de 130.000 por una razón que se puede señalar con el dedo: el manto de campo, que en
+ * el móvil NO se quita porque es el paisaje, pasa de 738 teselas a 1.796 al crecer el
+ * perímetro del tablero — 38.000 triángulos de los 100.000 que sube el tope; el resto es el
+ * atrezo de cuarenta casillas que ahora miden 72 × 108.
+ *
+ * Y el tope se declara AQUÍ y no se importa del Muelle: son dos escenas distintas con dos
+ * presupuestos distintos, y `escenas/embarcadero/*` no se toca.
  *
  * ═══ LAS DOS CALIDADES ═══
  *
  * `plena`: todo. `sobria` (la decide `juzgarCalidad` de `embarcadero/calidad.ts`: media
- * > 22 ms sobre 120 fotogramas): sin campo, sin ronda, sin aventurero (el peón se desliza
- * solo por la polilínea), sin monedas, plaza sin mesas ni sillas. Topes: 110.000 y 90.000.
+ * > 22 ms sobre 120 fotogramas): sin el decorado del campo, sin el atrezo menudo de las
+ * casillas ni de las esquinas (farolas, sillas, arbustos, papeleras), sin aventurero (el
+ * peón se desliza solo por la polilínea), sin monedas. El MANTO de teselas se queda en las
+ * dos: es el paisaje, y quitarlo deja el tablero flotando sobre un plano.
  *
  * ═══ LO QUE LA ESCENA PONE ADEMÁS DE LAS PIEZAS ═══
  *
  * Como en `embarcadero/presupuesto.ts`: las geometrías propias se declaran AQUÍ, sin
- * `three`, y la escena las construye con estos mismos números. El suelo del anillo y las
- * aceras (40 casillas × 3 bandas + 4 esquinas + el suelo de dados, dos triángulos cada
- * cara y algunos más para los bordes), los discos de contacto, el naipe, la marca de
- * casilla, el agua de la ribera y la cúpula del cielo.
+ * `three`, y la escena las construye con estos mismos números. El suelo del anillo (cuatro
+ * bandas por casilla más el reborde, y el marco de las esquinas), los dígitos del precio,
+ * los emblemas, los discos de contacto, el naipe, la marca de casilla y la cúpula del cielo.
  *
- * ═══ LA POSADA NO ES LA TABERNA (decisión 12) ═══
+ * ═══ LA POSADA NO ES UNA PIEZA PROPIA (decisión 12) ═══
  *
- * La pieza `posada` del `.glb` (2.992 triángulos) no entra en el tablero: doce serían
- * 35.904. La posada se pinta como `casa` teñida con una `bandera` clavada en el tejado
- * (176). La vacuna del comprobador pone `posada` × 12 en la tabla y tiene que caer.
+ * No hay hotel en ningún pack. La posada se pinta como una `casa` teñida con un
+ * `estandarte` clavado en el tejado. La vacuna del comprobador pone el cuerpo más caro del
+ * pack en las cuarenta casillas y tiene que caer.
  */
-import { TOPE_DE_TRIANGULOS } from '../embarcadero/presupuesto';
 import { PIEZA } from './piezas';
 import type { NombreDePieza } from './piezas';
-import { CASILLAS, mundoEstatico } from './anillo-en-3d';
+import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
 
-/** Los topes: el de siempre en plena, y 90.000 en sobria. */
-export const TOPE_PLENA = TOPE_DE_TRIANGULOS;
-export const TOPE_SOBRIA = 90_000;
-export const TOPE_DE_LLAMADAS = 70;
+/**
+ * LOS TOPES. Ver la cabecera: la cuenta que los justifica está en `LA-CIUDAD.md` §8, y
+ * cubren el tablero MÁS la ciudad de `ciudad.ts`.
+ */
+export const TOPE_PLENA = 900_000;
+export const TOPE_SOBRIA = 230_000;
+/** Todo va instanciado: una `InstancedMesh` por pieza distinta EN PANTALLA. */
+export const TOPE_DE_LLAMADAS = 150;
+export const TOPE_DE_LLAMADAS_SOBRIA = 90;
 
 /* ────────────────────────── Lo que depende de la partida ────────────────────────── */
 
@@ -57,11 +103,36 @@ export const DISCOS_DE_CONTACTO = ASIENTOS + 2;
 
 /* ───────────────────────── Geometrías propias, sin `three` ───────────────────────── */
 
-/** El suelo: por casilla, tres bandas (dos triángulos cada una) más el borde alzado de la acera (cuatro); las esquinas, dos; el suelo de dados, dos. */
+/**
+ * EL SUELO DEL ANILLO. Por casilla lateral, cuatro bandas de dos triángulos, el canto del
+ * reborde de la franja (dos) y la LÍNEA que la separa de la siguiente (dos). Por esquina, la
+ * losa entera y los dos tramos de marco. Y el paño de dados, que ahora vive en el campo.
+ *
+ * La línea se añadió después de mirar la captura del tablero entero: sin ella los nueve
+ * frentes de un lado son una banda continua con precios encima. Cuesta 72 triángulos en todo
+ * el anillo. Ver `ANCHO_DE_LA_LINEA` en `anillo-en-3d.ts`.
+ */
+export const TRIANGULOS_POR_CASILLA = 4 * 2 + 2 + 2;
+export const TRIANGULOS_POR_ESQUINA = 2 + 2 * 2;
 export function triangulosDelSuelo(): number {
-  const laterales = CASILLAS - 4;
-  return laterales * (3 * 2 + 4) + 4 * 2 + 2 + 2 * 4 * 2;
+  const laterales = CASILLAS - ESQUINAS.length;
+  return laterales * TRIANGULOS_POR_CASILLA + ESQUINAS.length * TRIANGULOS_POR_ESQUINA + 2;
 }
+
+/**
+ * LOS DÍGITOS DEL PRECIO. Cada guarismo es un contorno relleno; los diez de
+ * `CONTORNOS_DEL_GUARISMO` se triangulan entre 40 y 90 triángulos, y 60 es la media medida.
+ * Se cuentan los de verdad: los de las casillas que llevan cifra, dígito a dígito.
+ */
+export const TRIANGULOS_POR_GUARISMO = 60;
+export function guarismosDelTablero(): number {
+  let cuantos = 0;
+  for (const precio of PRECIO_DE_LA_CASILLA) if (precio > 0) cuantos += String(precio).length;
+  return cuantos;
+}
+/** El emblema de una casilla que no se compra: otro contorno relleno, más gordo que un dígito. */
+export const TRIANGULOS_POR_EMBLEMA = 120;
+
 export const SEGMENTOS_DEL_DISCO = 18;
 export const SEGMENTOS_DEL_CIELO = { ancho: 24, alto: 12 } as const;
 export function triangulosDelCielo(ancho = SEGMENTOS_DEL_CIELO.ancho, alto = SEGMENTOS_DEL_CIELO.alto): number {
@@ -70,7 +141,6 @@ export function triangulosDelCielo(ancho = SEGMENTOS_DEL_CIELO.ancho, alto = SEG
 export const TRIANGULOS_DEL_NAIPE = 2;
 /** La marca de casilla tocable: un anillo plano de 18 sectores. */
 export const TRIANGULOS_DE_LA_MARCA = 36;
-export const TRIANGULOS_DEL_AGUA = 4;
 /** Los discos del trato: doce, de 2 triángulos cada uno. */
 export const DISCOS_DEL_TRATO = 12;
 /** El dado de `dados.glb`, medido por `verify:dados`: 662. Se pasa por parámetro si se mide. */
@@ -89,17 +159,18 @@ export function cuentaDePuestas(puestas: readonly Puesta[]): Record<string, numb
   return cuenta;
 }
 
-/** Lo dinámico de un tablero LLENO: casas, posadas (casa + bandera), banderas de dueño, peones, monedas. */
+/** Lo dinámico de un tablero LLENO: casas, posadas (casa + estandarte), banderas de dueño, peones, monedas. */
 export function multiplicidadesDinamicas(calidad: 'plena' | 'sobria'): Record<string, number> {
   return {
     [PIEZA.casa]: CASAS_DEL_CONCEJO + POSADAS_DEL_CONCEJO,
-    [PIEZA.bandera]: TITULOS + POSADAS_DEL_CONCEJO,
+    [PIEZA.bandera]: TITULOS,
+    [PIEZA.estandarte]: POSADAS_DEL_CONCEJO,
     [PIEZA.peon]: ASIENTOS,
     [PIEZA.moneda]: calidad === 'plena' ? MONEDAS_EN_VUELO : 0,
-    /* Las dos rejas van sueltas (una se anima) y las nubes instanciadas aparte: no están en el fundido. */
-    [PIEZA.muroReja]: 2,
-    [PIEZA.nubeGrande]: calidad === 'plena' ? 1 : 0,
-    [PIEZA.nubePequena]: calidad === 'plena' ? 2 : 0,
+    /* Las dos hojas de la reja van sueltas (una se anima) y las nubes instanciadas aparte: no están en el fundido. */
+    [PIEZA.verjaPuerta]: 2,
+    [PIEZA.nubeGrande]: calidad === 'plena' ? 2 : 1,
+    [PIEZA.nubePequena]: calidad === 'plena' ? 3 : 1,
   };
 }
 
@@ -150,10 +221,14 @@ export function sumaDelPresupuesto(
     renglones.push({ que: pieza, cuantos, triangulos: cuantos * (t ?? 0) });
   }
   const plena = calidad === 'plena';
-  renglones.push({ que: 'suelo del anillo y aceras', cuantos: 1, triangulos: triangulosDelSuelo() });
+  const guarismos = guarismosDelTablero();
+  const emblemas = huecosDeLosEmblemas().length;
+  renglones.push({ que: 'suelo del anillo y marcos', cuantos: 1, triangulos: triangulosDelSuelo() });
+  renglones.push({ que: 'dígitos del precio', cuantos: guarismos, triangulos: guarismos * TRIANGULOS_POR_GUARISMO });
+  renglones.push({ que: 'emblemas', cuantos: emblemas, triangulos: emblemas * TRIANGULOS_POR_EMBLEMA });
   renglones.push({ que: 'discos de contacto', cuantos: DISCOS_DE_CONTACTO, triangulos: DISCOS_DE_CONTACTO * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'dados', cuantos: DADOS, triangulos: DADOS * triangulosDelDado });
-  renglones.push({ que: 'naipe, marca, agua y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + TRIANGULOS_DEL_AGUA + DISCOS_DEL_TRATO * 2 });
+  renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });
   renglones.push({ que: 'la cúpula del cielo', cuantos: 1, triangulos: triangulosDelCielo() });
   renglones.push({ que: 'aventurero (exploradora)', cuantos: plena ? 1 : 0, triangulos: plena ? triangulosDeUnAventurero : 0 });
   const total = renglones.reduce((a, r) => a + r.triangulos, 0);

@@ -44,7 +44,7 @@ import type { FiguraId } from '../../escenas/embarcadero/figuras';
 import { FIGURAS, rutaDeLasAnimaciones, rutaDelAventurero } from '../../escenas/embarcadero/figuras';
 import type { Traer, Ventana } from '../../escenas/embarcadero/tipos';
 import type { Mirador } from '../../escenas/camara';
-import { esDeLaInterfaz, MINIMO_PARA_GIRAR, tirandoDelMirador } from '../../escenas/camara';
+import { ALTURA_MINIMA, esDeLaInterfaz, MINIMO_PARA_GIRAR, tirandoDelMirador } from '../../escenas/camara';
 import type { Cercania } from '../../escenas/acercar';
 import { acercando, arrastrandoLaMirada } from '../../escenas/acercar';
 import {
@@ -58,7 +58,11 @@ import {
   poseDeSalida,
   poseDelBurgo,
 } from '../../escenas/burgo/camara-del-burgo';
-import { ESQUINAS, MAZMORRA, PUERTAS, huecoDePeon } from '../../escenas/burgo/anillo-en-3d';
+import { ESQUINAS, MAZMORRA, MEDIO_LADO, PUERTAS, huecoDePeon } from '../../escenas/burgo/anillo-en-3d';
+import { INTERRUPTORES_DEL_BANCO } from '../../escenas/burgo/Burgo';
+import { RECINTO_DEL_BURGO, TOPE_DE_LA_CIUDAD, ciudadDelCodigo, montarLaCiudad } from '../../escenas/burgo/ciudad';
+import type { DistritoPuesto } from '../../escenas/burgo/ciudad';
+import { TOPE_DE_LLAMADAS, TOPE_DE_LLAMADAS_SOBRIA, TOPE_PLENA, TOPE_SOBRIA } from '../../escenas/burgo/presupuesto';
 import { rutaDeLosDados, rutaDelBurgo } from '../../escenas/ruta-de-modelos';
 import burgoGlb from '../../escenas/modelos/burgo.glb?url';
 import dadosGlb from '../../escenas/modelos/dados.glb?url';
@@ -186,18 +190,61 @@ function figurasDePrueba(jugadores: number): FiguraEn3D[] {
 /* ─────────────────────────────── La cámara del banco ─────────────────────────────── */
 
 /**
+ * UNA POSE PEDIDA POR UN BOTÓN: a dónde mirar, desde qué cercanía y con qué inclinación.
+ *
+ * `id` sube con cada pulsación para que pedir DOS VECES la misma pose vuelva a llevar la
+ * cámara allí: sin él, el `useEffect` no se dispararía la segunda vez y el botón parecería
+ * roto justo cuando uno lo pulsa por costumbre para «volver».
+ */
+interface PoseDelBanco {
+  readonly id: number;
+  readonly x: number;
+  readonly z: number;
+  readonly factor: number;
+  /** Radianes sobre el horizonte. Sin ella, la que hubiera. */
+  readonly altura?: number;
+  readonly rumbo?: number;
+}
+
+/**
+ * LAS TRES ALTURAS DE MIRADA DEL BANCO, EN RADIANES, Y LAS TRES DENTRO DE LO QUE EL CLIENTE DEJA.
+ *
+ * La de la calle es exactamente `ALTURA_MINIMA` de `escenas/camara.ts` (12°): lo más bajo que
+ * un jugador puede poner la mirada arrastrando. Se pone ahí y no más abajo a propósito — un
+ * banco que mira desde donde el cliente no deja mirar prueba una escena que nadie va a ver.
+ * Con esa inclinación y la cercanía más corta el ojo queda a 76 de altura y a 366 del punto
+ * que mira, que es justo la pose en la que la escena abre los interiores.
+ */
+const MIRADA = { aire: (55 * Math.PI) / 180, media: (30 * Math.PI) / 180, calle: ALTURA_MINIMA } as const;
+/** La misma celda de 12 con la que la escena reparte la ciudad: el panel cuenta lo que la escena monta. */
+const PASO_DEL_AVISO = 12;
+/** Las semillas que el banco recorre en caliente. Cinco distintas: la ciudad cambia entera con cada una. */
+const SEMILLAS: readonly string[] = ['BANCO', 'RIBERA', 'ENSANCHE', 'MUELLE', 'BURGO'];
+
+
+/**
  * LA CÁMARA AÉREA DEL BANCO: arrastre para girar, rueda para acercar, botón derecho para
  * pasear. El mirador y la cercanía van por `ref` (sesenta cambios por segundo), la
  * aritmética es la de `escenas/camara.ts` y `escenas/acercar.ts`, y la pose la compone
  * `poseDelBurgo`. Al abrir, nace sobre la Salida y en `APERTURA` segundos se abre
  * a la salida, como la partida.
  */
-function CamaraDelBanco({ ventana, verEntero, acercarA }: { ventana: Ventana; verEntero: number; acercarA: { readonly id: number; readonly x: number; readonly z: number; readonly factor: number } | null }): null {
+function CamaraDelBanco({ ventana, verEntero, acercarA, alMoverse }: { ventana: Ventana; verEntero: number; acercarA: PoseDelBanco | null; alMoverse: (x: number, z: number, ojo: number) => void }): null {
   const { camera, gl } = useThree();
   const mirador = useRef<Mirador>(MIRADOR_DEL_BURGO);
   const cercania = useRef<Cercania>(CERCANIA_DE_NACIMIENTO);
   const objetivo = useRef<Cercania | null>(null);
   const nacida = useRef<number | null>(null);
+  const ultimoAviso = useRef<{ x: number; z: number } | null>(null);
+  /*
+   * Cuando cambia la ciudad (semilla o calidad) `alMoverse` es otra función: hay que volver a
+   * avisar aunque la cámara no se haya movido, o el panel enseña la cuenta de la ciudad
+   * ANTERIOR hasta que alguien toque la cámara. Se vio al alternar la calidad en el banco: la
+   * línea decía «384.122 montados de 84.000», que era la cifra de plena con el tope de sobria.
+   */
+  useEffect(() => {
+    ultimoAviso.current = null;
+  }, [alMoverse]);
   const ventanaRef = useRef(ventana);
   ventanaRef.current = ventana;
 
@@ -206,7 +253,16 @@ function CamaraDelBanco({ ventana, verEntero, acercarA }: { ventana: Ventana; ve
   }, [verEntero]);
   /* «Acercar a»: la cercanía objetivo pasa a la casilla pedida, para mirar una coreografía de cerca. */
   useEffect(() => {
-    if (acercarA !== null) objetivo.current = { factor: acercarA.factor, centro: { x: acercarA.x, z: acercarA.z } };
+    if (acercarA === null) return;
+    objetivo.current = { factor: acercarA.factor, centro: { x: acercarA.x, z: acercarA.z } };
+    /*
+     * LA ALTURA DEL MIRADOR TAMBIÉN SE PONE, y sin ella la mitad del banco no sirve: con los
+     * 55° de `MIRADOR_DEL_BURGO` el ojo se queda a 70 unidades del suelo aun con la cercanía
+     * más corta, y a esa altura los interiores NO se abren (la escena pide el ojo por debajo
+     * de 40). Para mirar una calle desde la calle hay que poder bajar la mirada.
+     */
+    if (acercarA.altura !== undefined) mirador.current = { ...mirador.current, altura: acercarA.altura };
+    if (acercarA.rumbo !== undefined) mirador.current = { ...mirador.current, rumbo: acercarA.rumbo };
   }, [acercarA]);
 
   useEffect(() => {
@@ -276,7 +332,39 @@ function CamaraDelBanco({ ventana, verEntero, acercarA }: { ventana: Ventana; ve
     const pose = poseDelBurgo(cercania.current, mirador.current, ventanaRef.current);
     camera.position.set(pose.posicion.x, pose.posicion.y, pose.posicion.z);
     camera.lookAt(pose.objetivo.x, pose.objetivo.y, pose.objetivo.z);
+    /*
+     * El aviso al banco va con la MISMA regla que usa la escena para repartir la ciudad —al
+     * cambiar de celda de 12— para que la cuenta que se enseña en el panel sea la misma que
+     * la escena tiene montada, y no una que se recalcula sesenta veces por segundo.
+     */
+    const u = ultimoAviso.current;
+    if (u === null || Math.abs(u.x - pose.posicion.x) >= PASO_DEL_AVISO || Math.abs(u.z - pose.posicion.z) >= PASO_DEL_AVISO) {
+      ultimoAviso.current = { x: pose.posicion.x, z: pose.posicion.z };
+      alMoverse(pose.posicion.x, pose.posicion.z, pose.posicion.y);
+    }
   });
+  return null;
+}
+
+/**
+ * LA LUPA: la escena, el renderizador y la cámara colgados de `window`, sólo en el banco.
+ *
+ * Mirar una escena 3D desde fuera es lo único que no se puede hacer con una captura: si un
+ * grupo de la ciudad se queda con `count = 0`, o si una malla se desborda de su capacidad, la
+ * imagen sale «rara» y no dice por qué. Con esto, el panel del navegador puede preguntarle a
+ * la escena cuántas instancias tiene puesta cada malla, dónde está la cámara y de qué color es
+ * un píxel (`readPixels`), que es lo que convierte «esto no se ve bien» en un número.
+ *
+ * Vive AQUÍ y no en `escenas/`: la escena no toca `window` ni sabe que existe un navegador.
+ */
+function Lupa(): null {
+  const { scene, gl, camera } = useThree();
+  useEffect(() => {
+    (window as unknown as { lupaDelBurgo?: unknown }).lupaDelBurgo = { scene, gl, camera };
+    return () => {
+      delete (window as unknown as { lupaDelBurgo?: unknown }).lupaDelBurgo;
+    };
+  }, [scene, gl, camera]);
   return null;
 }
 
@@ -310,7 +398,7 @@ const BOTON = {
 const parametros = new URLSearchParams(window.location.search);
 const JUGADORES = Math.max(1, Math.min(6, Number(parametros.get('jugadores') ?? '6') || 6));
 const LLENO = parametros.get('lleno') !== '0';
-const SEMILLA = parametros.get('semilla') ?? 'BANCO';
+const SEMILLA_DE_ARRANQUE = parametros.get('semilla') ?? 'BANCO';
 
 function Banco(): JSX.Element {
   const [casillas, ponerCasillas] = useState<CasillaEn3D[]>(() => casillasDePrueba(JUGADORES, LLENO));
@@ -324,9 +412,12 @@ function Banco(): JSX.Element {
   const [dados, ponerDados] = useState<DadosDelBurgoEn3D>({ par: null, tirado: false, sello: 0, porTirar: true, delanteDe: null });
   const [quien, ponerQuien] = useState(0);
   const [calidad, ponerCalidad] = useState<'plena' | 'sobria'>('plena');
+  /* La semilla EN CALIENTE: la escena regenera la ciudad entera al cambiar `codigo`. */
+  const [semilla, ponerSemilla] = useState(SEMILLA_DE_ARRANQUE);
+  const [interiores, ponerInteriores] = useState(INTERRUPTORES_DEL_BANCO.interiores);
   const [seguir, ponerSeguir] = useState(true);
   const [verEntero, ponerVerEntero] = useState(0);
-  const [acercarA, ponerAcercarA] = useState<{ id: number; x: number; z: number; factor: number } | null>(null);
+  const [acercarA, ponerAcercarA] = useState<PoseDelBanco | null>(null);
   const [dibujo, ponerDibujo] = useState({ triangulos: 0, llamadas: 0 });
   const [medida, ponerMedida] = useState({ ms: 0, fotogramas: 0 });
   const [listo, ponerListo] = useState(false);
@@ -345,6 +436,47 @@ function Banco(): JSX.Element {
       window.removeEventListener('resize', mide);
     };
   }, []);
+
+  /*
+   * ─ LA CIUDAD, OTRA VEZ, PARA EL PANEL ─
+   *
+   * El banco la vuelve a generar por su cuenta con la MISMA semilla y la misma calidad: no
+   * para pintarla (eso es de la escena) sino para saber cómo se llaman sus catorce distritos
+   * y dónde están, y para poder pesar el reparto sin pedirle nada a la escena. Es medio
+   * segundo de aritmética al cambiar de semilla, y a cambio el panel no miente: si la lista
+   * de distritos del banco y la de la escena divergieran, el botón llevaría la cámara a un
+   * descampado y se vería.
+   */
+  const ciudad = useMemo(() => ciudadDelCodigo(semilla, RECINTO_DEL_BURGO, calidad), [semilla, calidad]);
+  const nivelesDelReparto = useRef<number[]>([]);
+  const [reparto, ponerReparto] = useState<{ triangulos: number; gruposPorNivel: readonly number[] }>({ triangulos: 0, gruposPorNivel: [0, 0, 0] });
+  const [msDelReparto, ponerMsDelReparto] = useState(0);
+  useEffect(() => {
+    nivelesDelReparto.current = [];
+  }, [ciudad]);
+  const alMoverseLaCamara = useCallback(
+    (x: number, z: number): void => {
+      const antes = performance.now();
+      const m = montarLaCiudad(ciudad, x, z, nivelesDelReparto.current.length === ciudad.grupos.length ? nivelesDelReparto.current : undefined);
+      const despues = performance.now();
+      nivelesDelReparto.current = [...m.nivelDelGrupo];
+      ponerReparto({ triangulos: m.triangulos, gruposPorNivel: m.gruposPorNivel });
+      ponerMsDelReparto(despues - antes);
+    },
+    [ciudad],
+  );
+  const tope = useMemo(
+    () =>
+      calidad === 'plena'
+        ? { triangulos: TOPE_PLENA, llamadas: TOPE_DE_LLAMADAS, ciudad: TOPE_DE_LA_CIUDAD.plena }
+        : { triangulos: TOPE_SOBRIA, llamadas: TOPE_DE_LLAMADAS_SOBRIA, ciudad: TOPE_DE_LA_CIUDAD.sobria },
+    [calidad],
+  );
+  /** Los distritos ordenados por nombre, para que el mismo botón caiga siempre en el mismo sitio. */
+  const distritos = useMemo<readonly DistritoPuesto[]>(() => [...ciudad.distritos].sort((a, b) => (a.nombre < b.nombre ? -1 : a.nombre > b.nombre ? 1 : 0)), [ciudad]);
+  const vaA = (x: number, z: number, factor: number, altura: number): void => {
+    ponerAcercarA((a) => ({ id: (a?.id ?? 0) + 1, x, z, factor, altura }));
+  };
 
   const tablero = useMemo<TableroDelBurgoEn3D>(
     () => ({ casillas, figuras, destacada, almoneda, carta: null, trato, ganador }),
@@ -423,7 +555,8 @@ function Banco(): JSX.Element {
         }}
       >
         {/* La cámara ANTES que la escena: el seguimiento al que mueve corre después de ella. */}
-        <CamaraDelBanco ventana={ventana} verEntero={verEntero} acercarA={acercarA} />
+        <CamaraDelBanco ventana={ventana} verEntero={verEntero} acercarA={acercarA} alMoverse={alMoverseLaCamara} />
+        <Lupa />
         <Contador
           alContar={(triangulos, llamadas) => {
             ponerDibujo({ triangulos, llamadas });
@@ -433,7 +566,7 @@ function Banco(): JSX.Element {
           tablero={tablero}
           dados={dados}
           sucesos={sucesos}
-          codigo={SEMILLA}
+          codigo={semilla}
           ventana={ventana}
           traer={traer}
           calidad={calidad}
@@ -483,10 +616,13 @@ function Banco(): JSX.Element {
           </button>
         </div>
         <div>
-          {JUGADORES} sentados · {LLENO ? 'tablero lleno' : 'tablero vacío'} · semilla {SEMILLA} · {listo ? 'listo' : 'cargando…'}
+          {JUGADORES} sentados · {LLENO ? 'tablero lleno' : 'tablero vacío'} · semilla {semilla} · {listo ? 'listo' : 'cargando…'}
         </div>
         <div id="medida">
           {dibujo.triangulos.toLocaleString('es-ES')} triángulos · {dibujo.llamadas} llamadas · {medida.ms.toFixed(1)} ms · {medida.fotogramas} fotogramas/s
+        </div>
+        <div id="topes" style={{ color: dibujo.triangulos > tope.triangulos || dibujo.llamadas > tope.llamadas ? '#ff8b7a' : '#8fb8a4' }}>
+          topes: {tope.triangulos.toLocaleString('es-ES')} triángulos · {tope.llamadas} llamadas · ciudad {ciudad.triangulos.total.toLocaleString('es-ES')} en L1, {reparto.triangulos.toLocaleString('es-ES')} montados de {tope.ciudad.toLocaleString('es-ES')} · grupos {reparto.gruposPorNivel.join('/')} · reparto {msDelReparto.toFixed(2)} ms
         </div>
         {fallos.length > 0 ? <div style={{ color: '#ff8b7a' }}>{fallos.join(' · ')}</div> : null}
         <div id="estado" style={{ color: '#9fe6b8' }}>
@@ -684,6 +820,27 @@ function Banco(): JSX.Element {
           </button>
           <button
             type="button"
+            id="semilla"
+            style={BOTON}
+            onClick={() => {
+              ponerSemilla((v) => SEMILLAS[(SEMILLAS.indexOf(v) + 1) % SEMILLAS.length] as string);
+            }}
+          >
+            Semilla: {semilla}
+          </button>
+          <button
+            type="button"
+            id="interiores"
+            style={{ ...BOTON, borderColor: interiores ? '#9fe6b8' : undefined }}
+            onClick={() => {
+              INTERRUPTORES_DEL_BANCO.interiores = !INTERRUPTORES_DEL_BANCO.interiores;
+              ponerInteriores(INTERRUPTORES_DEL_BANCO.interiores);
+            }}
+          >
+            Interiores: {interiores ? 'sí' : 'no'}
+          </button>
+          <button
+            type="button"
             style={BOTON}
             onClick={() => {
               ponerCasillas(casillasDePrueba(JUGADORES, LLENO));
@@ -696,6 +853,45 @@ function Banco(): JSX.Element {
             Reponer el tablero
           </button>
           {ESQUINAS.length === 4 ? null : <span>?</span>}
+        </div>
+        {/*
+          LA FILA DE LA CIUDAD: las tres alturas de mirada y un botón por distrito.
+
+          Las tres alturas no son decoración: son las tres cosas que hay que mirar y que no
+          se ven desde la misma pose. Desde el aire se juzga si el tablero se lee; desde
+          media altura, si la trama de calles tiene sentido; y desde la calle, si la ciudad
+          aguanta que la recorra un avatar — y es la ÚNICA que baja el ojo de 40, que es
+          donde la escena abre los interiores.
+        */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <button type="button" id="ciudad-aire" style={BOTON} onClick={() => vaA(0, 0, 0.95, MIRADA.aire)}>
+            La ciudad desde el aire
+          </button>
+          <button type="button" id="ciudad-media" style={BOTON} onClick={() => vaA(-MEDIO_LADO * 0.28, -MEDIO_LADO * 0.28, 0.3, MIRADA.media)}>
+            Media altura
+          </button>
+          <button type="button" id="ciudad-calle" style={BOTON} onClick={() => vaA(0, MEDIO_LADO * 0.3, LIMITES_DEL_BURGO.masCerca, MIRADA.calle)}>
+            A pie de calle
+          </button>
+          <button type="button" id="ciudad-glorieta" style={BOTON} onClick={() => vaA(0, 0, LIMITES_DEL_BURGO.masCerca, MIRADA.calle)}>
+            La glorieta
+          </button>
+          <button type="button" id="ciudad-puerta" style={BOTON} onClick={() => vaA(0, MEDIO_LADO - 108, 0.22, MIRADA.media)}>
+            La Puerta del sur
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          <span style={{ opacity: 0.6, alignSelf: 'center' }}>distritos:</span>
+          {distritos.map((d) => (
+            <button
+              key={`${d.nombre}-${String(d.i0)}-${String(d.j0)}`}
+              type="button"
+              style={{ ...BOTON, padding: '3px 8px', fontSize: 12 }}
+              onClick={() => vaA(d.centro.x, d.centro.z, 0.2, MIRADA.calle)}
+            >
+              {d.nombre}
+            </button>
+          ))}
         </div>
         </div>
       </div>

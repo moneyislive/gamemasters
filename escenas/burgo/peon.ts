@@ -26,8 +26,8 @@
  *     quieto       → en su hueco; `reposo-a` y un gesto cada 6–11 s (`reposo-b` o `saludar`)
  *     apareciendo  → `aparecer` (1,3): nace en su hueco, 1,2 hacia el solar; el peón se hunde
  *     recogiendo   → `recoger` cortado a 0,6: coge el peón, que desaparece
- *     andando      → `andar` a 4 u/s (≤ 3 casillas); hacia atrás con `timeScale −1` si retrocede
- *     corriendo    → `correr` a 8 u/s (4 o más); UNA sola cota: ningún recorrido dura más de 8 s
+ *     andando      → `andar` a 48 u/s (≤ 3 casillas); hacia atrás con `timeScale −1` si retrocede
+ *     corriendo    → `correr` a 96 u/s (4 o más); UNA sola cota: ningún recorrido dura más de 8 s
  *     viajando     → `usar` 1,6 (brilla el naipe), se desvanece 0,4, `aparecer` en el destino
  *     saltando     → `salto` (1,167); en lo alto el peón reaparece cayendo 0,8 con `reboteDelDado`
  *     cobrando     → `recoger` cortado a 0,9 (las monedas vuelan aparte, en `coreografia.ts`)
@@ -35,23 +35,23 @@
  *     alzando      → `usar` mientras brotan las casas: 0,45 por casa
  *     preso        → `golpe`, se desvanece, la reja sube, `aparecer` en el hueco de preso,
  *                    la reja baja (≈ 3,5 s); después encerrado, con `golpe` contra la reja si sigue
- *     quebrando    → `golpe`, `correr` 14 unidades hacia FUERA cruzando su solar y se desvanece
+ *     quebrando    → `golpe`, `correr` 72 unidades hacia FUERA cruzando su solar y se desvanece
  *     despidiendose→ 0,4 s de `reposo-a` encogiendo a escala 0 (un aventurero fundido no tiene opacidad)
  *
  * Las duraciones de los clips son las de `DURACION` de `gestos.ts`, medidas por el
- * compilador. Las velocidades: `PASO_POR_SEGUNDO` (4) de `escala.ts` para andar y el doble
- * para correr. Un tramo entre laterales mide 8 (2 s andando); el que llega a una esquina o
- * sale de ella, 11,25.
+ * compilador. Las velocidades salen de `PASO_POR_SEGUNDO` (4) de `escala.ts` multiplicado
+ * por `VECES_LA_MARCHA_A_PIE` (12): 48 u/s andando y 96 corriendo. La razón está entera en
+ * el comentario de esas constantes, y no es un capricho: con la casilla en 72 de frente, a
+ * paso de persona un turno duraría minutos. Un tramo entre laterales mide 72 (1,5 s
+ * andando); el que llega a una esquina o sale de ella, 61,5.
  *
  * ═══ LA COTA DE LOS 8 SEGUNDOS, Y LO QUE PASA CON LOS PIES ═══
  *
- * Doce casillas por los lados son 96 unidades: 8 s a 8 u/s con el clip a 1,5. Pero un
- * recorrido de doce que cruce dos esquinas mide 109, y a 12 u/s son 9 s. La cota manda:
- * el aventurero recorre lo que haga falta en 8 s, y el clip sube hasta `TOPE_DE_VELOCIDAD`
- * (1,5) y no más, así que en el peor caso los pies resbalan un 13 % durante un segundo, a
- * la carrera y visto desde el aire. Se prefiere eso a un turno que dura más de lo que la
- * mesa espera. Andando, la cota es de `TOPE_POR_CASILLA_ANDANDO` (2,25 s) por casilla,
- * para que tres casillas con dos esquinas quepan en 6,75 s.
+ * Doce casillas por los lados son 864 unidades: 9 s a 96 u/s. La cota manda: el aventurero
+ * recorre lo que haga falta en 8 s, y el clip sube hasta `TOPE_DE_VELOCIDAD` (1,5) y no más,
+ * así que en el peor caso corre a 108 u/s con el clip a 1,125. Se prefiere eso a un turno
+ * que dura más de lo que la mesa espera. Andando, la cota es de `TOPE_POR_CASILLA_ANDANDO`
+ * (2,25 s) por casilla, y con la velocidad nueva ni se roza: tres casillas son 4,5 s.
  *
  * ═══ A LA MAZMORRA SIN PISAR CASILLAS ═══
  *
@@ -143,8 +143,43 @@ export interface EstadoDelPeon {
 
 /* ─────────────────────────────── Los tiempos ─────────────────────────────── */
 
-export const VELOCIDAD_ANDANDO = PASO_POR_SEGUNDO;
-export const VELOCIDAD_CORRIENDO = PASO_POR_SEGUNDO * 2;
+/**
+ * LA MARCHA POR EL TABLERO NO ES LA MARCHA DE UNA PERSONA, Y ESTO ESTÁ MEDIDO.
+ *
+ * `PASO_POR_SEGUNDO` (4) es lo que anda un aventurero de 2,543 unidades por la CALLE, y ahí
+ * se queda: dentro de la ciudad se pasea a esa velocidad. Pero una casilla del tablero mide
+ * ahora 72 de frente, y 72 a 4 u/s son DIECIOCHO SEGUNDOS por casilla; doce casillas serían
+ * tres minutos y medio de turno. El tope de 8 s por recorrido que este fichero ya vigila lo
+ * cortaría, sí, pero cortándolo el clip se aceleraría trece veces y los pies patinarían.
+ *
+ * Se barajaron las tres salidas que hay:
+ *
+ *  1. SUBIR LA VELOCIDAD DE LA MARCHA EN EL TABLERO. Es la que se toma: ×12, o sea 48 u/s
+ *     andando y 96 corriendo. Los pies patinan —el clip corre a su paso natural mientras la
+ *     figura cubre doce veces más suelo—, y la pregunta buena es cuántos PÍXELES mide ese
+ *     patinazo. Medido: mientras dura un recorrido la cámara sigue al que mueve a cercanía
+ *     0,42, o sea encuadrando un radio de 239,5 unidades; en un PC de 1.920 eso son 4,0 px
+ *     por unidad y el aventurero mide 10,2 px de alto, con los pies en poco más de uno. En un
+ *     móvil, 2,1 px enteros. A ese tamaño el ciclo de piernas se lee como movimiento y el
+ *     deslizamiento no se ve. Una ficha de tablero se desliza: eso es lo que es.
+ *  2. QUE LA FICHA VIAJE EN COCHE. Es lo más bonito y no se puede hoy: el pack trae CINCO
+ *     coches y las mesas son de SEIS asientos, y los coches del City Builder llevan el color
+ *     horneado en el atlas y no tienen máscara de tinte, así que dos jugadores compartirían
+ *     modelo y color. Repartir seis figuras entre cinco modelos es exactamente el fallo que
+ *     este árbol ya tiene anotado con los colores de peón. Además pide una fase nueva aquí y
+ *     una rama en `Burgo.tsx`. Queda anotado para cuando haya seis coches teñibles.
+ *  3. ACHICAR LA CASILLA. La descarta la orden: la ciudad tiene que ser nueve veces la de
+ *     antes, y el anillo va alrededor de la ciudad.
+ *
+ * Con ×12 los tiempos salen así, y ninguno toca el tope salvo el peor de todos:
+ *
+ *     1 casilla   (72) ..... 1,50 s     7 casillas (504, la tirada media) ... 5,25 s
+ *     2 casillas (144) ..... 3,00 s     12 casillas (864, el máximo) ........ 9,00 s → 8,00 por el tope
+ *     3 casillas (216) ..... 4,50 s     y ahí el clip sube a 1,125, lejos del 1,5
+ */
+export const VECES_LA_MARCHA_A_PIE = 12;
+export const VELOCIDAD_ANDANDO = PASO_POR_SEGUNDO * VECES_LA_MARCHA_A_PIE;
+export const VELOCIDAD_CORRIENDO = VELOCIDAD_ANDANDO * 2;
 /** Hasta tres casillas se anda; con cuatro o más se corre. */
 export const CASILLAS_ANDANDO = 3;
 /** Ningún recorrido dura más de esto. */
@@ -167,8 +202,8 @@ export const TIEMPO_DE_HUNDIRSE = 0.3;
 export const CAIDA_DEL_PEON = 0.8;
 export const TUMBARSE = 0.4;
 export const SALUDO_AL_PASAR = 0.6;
-/** Cuánto corre hacia fuera al quebrar, en unidades. */
-export const HUIDA_AL_QUEBRAR = 14;
+/** Cuánto corre hacia fuera al quebrar, en unidades: un ancho de casilla, o sea 0,75 s a 96 u/s. */
+export const HUIDA_AL_QUEBRAR = 72;
 /** Entre 6 y 11 s hasta el siguiente gesto de espera. */
 export const ESPERA_DEL_GESTO = { desde: 6, hasta: 11 } as const;
 /** El amortiguado del giro en las esquinas. */

@@ -34,40 +34,67 @@ import { proyecta } from '../embarcadero/camara';
 import { sorteo } from '../embarcadero/cala';
 import { PIEZA, nombresDelBurgo } from '../burgo/piezas';
 import {
-  ACERA,
-  ALERO_SOBRE_LA_CALLE,
+  ALTO_DEL_GUARISMO,
+  ALTURA_DEL_MANTO,
+  ALTURA_DE_LAS_NUBES,
+  ALTURA_DEL_REBORDE,
+  ANCHO_DE_CASILLA,
+  ANCHO_DE_TESELA,
+  ANCHO_DEL_BULEVAR,
+  ANCHO_DE_LA_AVENIDA,
+  ANCHO_DEL_GUARISMO,
   ANILLO_DEL_BURGO,
+  ARISTA_DE_LOS_DADOS,
+  ATREZO,
+  ATREZO_DE_LA_CASILLA,
   BANDA,
-  CALLE,
+  BORDE_CLARO,
+  BORDE_INTERIOR,
+  CARRIL_DEL_AVATAR,
   CASILLAS,
   CELDA,
-  DESBORDE_HACIA_FUERA,
-  EDIFICIO_DE_LA_CASILLA,
+  CELDAS_DEL_BULEVAR,
+  CELDAS_DE_LA_AVENIDA,
+  CELDAS_DE_LA_CIUDAD,
+  CELDAS_DE_LA_GLORIETA,
+  CELDAS_POR_ESQUINA,
+  CORONA,
   ESQUINAS,
+  FILETE,
   FONDO_DE_CASILLA,
-  FONDO_MAXIMO_DEL_SOLAR,
-  FONDO_MAXIMO_EN_EL_AGUA,
-  FRENTE_MAXIMO_DEL_SOLAR,
+  FRANJA,
+  FRENTE_MAXIMO_DEL_ATREZO,
   HOLGURA_DE_LA_MARCHA,
   HUECOS_DE_LOS_DADOS,
+  LADO_DE_ESQUINA,
+  LADO_DEL_EMBLEMA,
   LADO_EXTERIOR,
   LADO_INTERIOR,
-  LARGO_DE_LA_MURALLA,
-  LINEA_MEDIA_DE_LA_CALLE,
+  LINEA_DE_LA_MARCHA,
+  MANCHAS_DEL_CAMPO,
+  MANCHAS_LEJOS_DEL_TABLERO,
   MAZMORRA,
   MEDIO_LADO,
-  MEDIO_LADO_DE_LA_MURALLA,
+  NUBES_LEJOS_DEL_TABLERO,
+  PIEZAS_DE_LA_ESQUINA,
   POLILINEA,
+  PRECIO_DE_LA_CASILLA,
   PUERTAS,
-  RIBERA,
-  SOLAR,
+  PUERTAS_DE_LA_CIUDAD,
+  RECINTO_DE_LA_CIUDAD,
   SUELO_DE_DADOS,
-  TESELAS_DEL_CAMPO,
+  SUPERFICIE,
+  V_DEL_PRECIO,
+  anchoDelPrecio,
   campo,
+  candidatasDelCampo,
+  centroDeCelda,
   enElMarco,
   enLaEsquina,
+  esSuelo,
   giraElPunto,
   giroHaciaFuera,
+  guarismosDelPrecio,
   huecoDeAventurero,
   huecoDeBandera,
   huecoDeCasa,
@@ -75,25 +102,31 @@ import {
   huecoDePosada,
   huecoDePreso,
   huecoDeVisita,
+  huecosDeLosEmblemas,
   largoDelTramo,
   marcoDeCasilla,
   mundoEstatico,
-  puestaDeLaPiezaDelSolar,
-  puestasDeLaMuralla,
-  puestasDeLaPlaza,
-  puestasDeLaRonda,
+  puestaDeLaPiezaDeLaCasilla,
   puestasDeLasEsquinas,
-  puestasDeLosSolares,
-  puertasDeLaMuralla,
+  puestasDelAtrezo,
+  puntoEnEsquina,
+  puntoEnLaCasillaPorV,
+  radianesDeCuartos,
   sitioDeCasilla,
+  suelosDeLaCasilla,
+  vDeRadial,
 } from '../burgo/anillo-en-3d';
-import type { PiezaDelSolar, Puesta, Punto } from '../burgo/anillo-en-3d';
-import { MULTIPLICIDADES_PLENA, MULTIPLICIDADES_SOBRIA, TOPE_PLENA, TOPE_SOBRIA, sumaDelPresupuesto } from '../burgo/presupuesto';
+import type { PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
+import { PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
+import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
+import { MULTIPLICIDADES_PLENA, MULTIPLICIDADES_SOBRIA, TOPE_PLENA, TOPE_SOBRIA, TRIANGULOS_POR_EMBLEMA, TRIANGULOS_POR_GUARISMO, guarismosDelTablero, sumaDelPresupuesto } from '../burgo/presupuesto';
 import {
   CASILLAS_ANDANDO,
   TOPE_DEL_RECORRIDO,
   TOPE_DE_VELOCIDAD,
   TOPE_POR_CASILLA_ANDANDO,
+  VELOCIDAD_ANDANDO,
+  VELOCIDAD_CORRIENDO,
   avanzar,
   clipQueToca,
   despedir,
@@ -112,6 +145,8 @@ import { avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, finDeLaCo
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
   ALCANCE_DEL_BURGO,
+  CERCANIA_DE_SEGUIMIENTO,
+  CORRIMIENTO_EN_APAISADO,
   LIMITES_DEL_BURGO,
   MIRADOR_DEL_BURGO,
   poseDeSalida,
@@ -236,7 +271,7 @@ for (const raiz of raices) {
   triangulos.set(raiz.getName(), Math.round(tri));
   cajas.set(raiz.getName(), { min: min as unknown as [number, number, number], max: max as unknown as [number, number, number] });
 }
-comprobar('el fichero trae las 73 piezas de piezas.ts con geometría', raices.length === nombresDelBurgo().length && [...triangulos.values()].every((t) => t > 0), raices.length);
+comprobar(`el fichero trae las ${nombresDelBurgo().length} piezas de piezas.ts con geometría`, raices.length === nombresDelBurgo().length && [...triangulos.values()].every((t) => t > 0), raices.length);
 
 const caja = (pieza: string): Caja => {
   const c = cajas.get(pieza);
@@ -263,24 +298,80 @@ function esquinasDeLaPuesta(p: Puesta): Punto[] {
   });
 }
 
+/** Las puestas de UNA esquina, en el mundo: la misma cuenta que hace `puestasDeLasEsquinas`. */
+function piezasDeLaEsquina(esquina: number): Puesta[] {
+  const m = marcoDeCasilla(esquina);
+  return (PIEZAS_DE_LA_ESQUINA[esquina] ?? []).map((p) => {
+    const s = puntoEnEsquina(m, p.u, p.v);
+    return { pieza: p.pieza, x: s.x, y: p.alza ?? 0, z: s.z, giro: giroHaciaFuera(m) + radianesDeCuartos(p.giroEnCuartos), talla: 1 };
+  });
+}
+
+/**
+ * CUÁNTAS VECINAS TIENE DE MEDIA UNA TESELA DEL MANTO. En un panal lleno son casi seis; en
+ * treinta teselas barajadas por una corona, menos de una. Es lo que separa un paisaje de un
+ * puñado de islas, y era la queja de Miguel sobre el campo del banco.
+ */
+function vecindadDelManto(teselas: readonly Puesta[]): number {
+  if (teselas.length === 0) return 0;
+  let vecinas = 0;
+  for (const a of teselas) {
+    for (const b of teselas) {
+      if (a === b) continue;
+      if (Math.hypot(a.x - b.x, a.z - b.z) < ANCHO_DE_TESELA * 1.05) vecinas++;
+    }
+  }
+  return vecinas / teselas.length;
+}
+
 // ---------------------------------------------------------------------------
-paso('El anillo mide lo que dice el diseño y la marcha va por donde debe');
+paso('El anillo mide lo que dice LA-CIUDAD.md §1 y la marcha va por donde debe');
 // ---------------------------------------------------------------------------
 
-comprobar('LADO_EXTERIOR 100, MEDIO_LADO 50, LADO_INTERIOR 72, 40 casillas, y las tres bandas suman el fondo', LADO_EXTERIOR === 100 && MEDIO_LADO === 50 && LADO_INTERIOR === 72 && CASILLAS === 40 && BANDA.acera + BANDA.calle + BANDA.solar === FONDO_DE_CASILLA, {
-  LADO_EXTERIOR,
-  MEDIO_LADO,
-  LADO_INTERIOR,
-  CASILLAS,
-});
-comprobar('la línea media de la calle está a 43,25 del centro; la acera va de 36 a 41,5 y el solar de 45 a 50', LINEA_MEDIA_DE_LA_CALLE === 43.25 && ACERA.desde === 36 && ACERA.hasta === 41.5 && SOLAR.desde === 45 && SOLAR.hasta === 50);
+comprobar(
+  'LADO_EXTERIOR 864, MEDIO_LADO 432, LADO_INTERIOR 648, BORDE_INTERIOR 324, 40 casillas, y las cuatro bandas suman el fondo',
+  LADO_EXTERIOR === 864 && MEDIO_LADO === 432 && LADO_INTERIOR === 648 && BORDE_INTERIOR === 324 && CASILLAS === 40 && BANDA.franja + BANDA.filete + BANDA.superficie + BANDA.borde === FONDO_DE_CASILLA,
+  { LADO_EXTERIOR, MEDIO_LADO, LADO_INTERIOR, BORDE_INTERIOR, CASILLAS },
+);
+/*
+ * LA ORDEN ERA «POR LO MENOS 9-10 VECES EL TAMAÑO QUE TIENE AHORA MISMO LA ZONA CENTRAL», y
+ * la zona central del PRIMER tablero medía 72 de lado. Nueve veces son 648, y es un MÍNIMO,
+ * no una preferencia: si alguien vuelve a achicar el recinto «para que quepa», esta línea se
+ * pone roja y dice por qué. La regla vieja —«de 200 a 320»— queda revocada aquí.
+ */
+const CENTRO_DEL_PRIMER_TABLERO = 72;
+comprobar(
+  'el recinto es AL MENOS nueve veces el centro original de 72, es múltiplo de la retícula y son nueve casillas de frente',
+  LADO_INTERIOR >= 9 * CENTRO_DEL_PRIMER_TABLERO && LADO_INTERIOR % RETICULA_DE_LA_CIUDAD === 0 && LADO_INTERIOR === 9 * ANCHO_DE_CASILLA,
+  { LADO_INTERIOR, veces: LADO_INTERIOR / CENTRO_DEL_PRIMER_TABLERO },
+);
+comprobar('se ve fallar: el recinto de 288 de la versión anterior era sólo cuatro veces el centro original', 288 < 9 * CENTRO_DEL_PRIMER_TABLERO);
+comprobar(
+  'las cuatro bandas están donde dice el documento: franja 324–345, filete 345–354, superficie 354–414 y marco 414–432',
+  FRANJA.desde === 324 && FRANJA.hasta === 345 && FILETE.desde === 345 && FILETE.hasta === 354 && SUPERFICIE.desde === 354 && SUPERFICIE.hasta === 414 && BORDE_CLARO.desde === 414 && BORDE_CLARO.hasta === 432,
+  { FRANJA, FILETE, SUPERFICIE, BORDE_CLARO },
+);
+comprobar('la línea de la marcha es el centro del filete (349,5), o sea v = 25,5', LINEA_DE_LA_MARCHA === 349.5 && vDeRadial(LINEA_DE_LA_MARCHA) === 25.5);
+comprobar('el reborde de la franja mide lo que un bordillo del pack (0,6) y el precio va a v = 45 con dígitos de 27', ALTURA_DEL_REBORDE === 0.6 && V_DEL_PRECIO === 45 && ALTO_DEL_GUARISMO === 27);
+/*
+ * EL DÍGITO CRECE CON EL TABLERO O DEJA DE LEERSE. Lo que se ve en pantalla no es el alto en
+ * unidades: es el cociente `alto / alcance de la cámara`. Si el tablero se hace 2,25 veces
+ * más grande y el dígito no, el precio pierde 2,25 veces sus píxeles sin que nada falle.
+ * Esta línea afirma que el cociente NO ha cambiado desde el tablero de 384, que es lo que
+ * hace que los píxeles medidos más abajo salgan iguales que entonces.
+ */
+comprobar(
+  'el dígito conserva su proporción con el alcance: 27/570,24 es lo mismo que 12/253,44',
+  Math.abs(ALTO_DEL_GUARISMO / ALCANCE_DEL_BURGO - 12 / 253.44) < 1e-9,
+  { ahora: ALTO_DEL_GUARISMO / ALCANCE_DEL_BURGO, antes: 12 / 253.44 },
+);
 comprobar('la polilínea tiene 40 puntos', POLILINEA.length === 40, POLILINEA.length);
 
 {
   const esquina = (i: number, x: number, z: number): boolean => Math.abs((POLILINEA[i] as Punto).x - x) < 1e-9 && Math.abs((POLILINEA[i] as Punto).z - z) < 1e-9;
   comprobar(
-    'las esquinas son (±43,25, ±43,25): la Puerta Mayor al sureste, la Mazmorra al suroeste, la Feria al noroeste y ¡A la Mazmorra! al noreste',
-    esquina(0, 43.25, 43.25) && esquina(10, -43.25, 43.25) && esquina(20, -43.25, -43.25) && esquina(30, 43.25, -43.25),
+    'las esquinas son (±349,5, ±349,5): la Puerta Mayor al sureste, la Mazmorra al suroeste, la Feria al noroeste y ¡A la Mazmorra! al noreste',
+    esquina(0, 349.5, 349.5) && esquina(10, -349.5, 349.5) && esquina(20, -349.5, -349.5) && esquina(30, 349.5, -349.5),
     [0, 10, 20, 30].map((i) => POLILINEA[i]),
   );
   const mal: string[] = [];
@@ -290,15 +381,24 @@ comprobar('la polilínea tiene 40 puntos', POLILINEA.length === 40, POLILINEA.le
     const norte = sitioDeCasilla(20 + k);
     const este = sitioDeCasilla(30 + k);
     const ok = (a: number, b: number): boolean => Math.abs(a - b) < 1e-9;
-    if (!ok(sur.x, 36 - 8 * k + 4) || !ok(sur.z, 43.25)) mal.push(`${k}: ${JSON.stringify(sur)}`);
-    if (!ok(oeste.x, -43.25) || !ok(oeste.z, 36 - 8 * k + 4)) mal.push(`${10 + k}: ${JSON.stringify(oeste)}`);
-    if (!ok(norte.x, -36 + 8 * k - 4) || !ok(norte.z, -43.25)) mal.push(`${20 + k}: ${JSON.stringify(norte)}`);
-    if (!ok(este.x, 43.25) || !ok(este.z, -36 + 8 * k - 4)) mal.push(`${30 + k}: ${JSON.stringify(este)}`);
+    if (!ok(sur.x, 360 - 72 * k) || !ok(sur.z, 349.5)) mal.push(`${k}: ${JSON.stringify(sur)}`);
+    if (!ok(oeste.x, -349.5) || !ok(oeste.z, 360 - 72 * k)) mal.push(`${10 + k}: ${JSON.stringify(oeste)}`);
+    if (!ok(norte.x, 72 * k - 360) || !ok(norte.z, -349.5)) mal.push(`${20 + k}: ${JSON.stringify(norte)}`);
+    if (!ok(este.x, 349.5) || !ok(este.z, 72 * k - 360)) mal.push(`${30 + k}: ${JSON.stringify(este)}`);
   }
-  comprobar('las 36 casillas laterales caen donde dicen las cuatro fórmulas del §5.1: sur hacia el oeste, oeste hacia el norte, norte hacia el este, este hacia el sur', mal.length === 0, mal.slice(0, 4));
+  comprobar('las 36 casillas laterales caen donde dicen las cuatro fórmulas de §1: sur hacia el oeste, oeste hacia el norte, norte hacia el este, este hacia el sur', mal.length === 0, mal.slice(0, 4));
+  /*
+   * LA CASILLA 5 CAE CENTRADA, y no es una casualidad afortunada: es lo que hace que las
+   * cuatro avenidas de la ciudad entren por las cuatro Puertas del reglamento sin torcerse.
+   */
+  const centradas = PUERTAS.every((c) => {
+    const m = marcoDeCasilla(c);
+    return Math.abs(m.centro.x * m.adelante.x + m.centro.z * m.adelante.z) < 1e-9;
+  });
+  comprobar('las cuatro Puertas (5, 15, 25, 35) caen centradas en el eje de su lado: 72·5 − 360 = 0', centradas, PUERTAS.map((c) => marcoDeCasilla(c).centro));
   const tramos = Array.from({ length: 40 }, (_, i) => r(largoDelTramo(i)));
-  const esperado = tramos.every((t, i) => (i % 10 === 0 || i % 10 === 9 ? t === 11.25 : t === 8));
-  comprobar('un tramo entre laterales mide 8 y el que llega a una esquina o sale de ella 11,25', esperado, tramos);
+  const esperado = tramos.every((t, i) => (i % 10 === 0 || i % 10 === 9 ? t === 61.5 : t === 72));
+  comprobar('un tramo entre laterales mide 72 y el que llega a una esquina o sale de ella 61,5', esperado, tramos);
   const cuartos = [0, 1, 2, 3].map((l) => sitioDeCasilla(l * 10 + 5).cuartos);
   const haciaFuera = [0, 1, 2, 3].every((l) => {
     const m = marcoDeCasilla(l * 10 + 5);
@@ -309,15 +409,16 @@ comprobar('la polilínea tiene 40 puntos', POLILINEA.length === 40, POLILINEA.le
 }
 
 // ---------------------------------------------------------------------------
-paso('Cada rejilla de huecos cabe en su banda con la huella medida');
+paso('Cada rejilla de huecos cabe en su banda con la huella medida, y nada pisa el carril del avatar');
 // ---------------------------------------------------------------------------
 
+const peon = huella(PIEZA.peon);
+const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
+
 {
-  const peon = huella(PIEZA.peon);
   const casa = huella(PIEZA.casa);
-  const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
   const mediaCasa = Math.max(casa.ancho, casa.fondo) / 2;
-  const fueraDeLaCalle: string[] = [];
+  const fueraDelCarril: string[] = [];
   const solapados: string[] = [];
   const aventureroFuera: string[] = [];
   for (let i = 0; i < CASILLAS; i++) {
@@ -325,22 +426,29 @@ paso('Cada rejilla de huecos cabe en su banda con la huella medida');
     const m = marcoDeCasilla(i);
     const huecos = [0, 1, 2, 3, 4, 5].map((a) => huecoDePeon(i, a));
     for (const [a, h] of huecos.entries()) {
-      const { radial, aLoLargo } = m.esEsquina ? { radial: enLaEsquina(m, h).u, aLoLargo: enLaEsquina(m, h).v - LINEA_MEDIA_DE_LA_CALLE } : enElMarco(m, h);
-      if (radial - medioPeon < CALLE.desde || radial + medioPeon > CALLE.hasta) fueraDeLaCalle.push(`${i}/${a}: radial ${r(radial)}`);
-      if (!m.esEsquina && Math.abs(aLoLargo) + medioPeon > 4) fueraDeLaCalle.push(`${i}/${a}: a lo largo ${r(aLoLargo)}`);
-      if (m.esEsquina && (aLoLargo + medioPeon > 0 || aLoLargo + LINEA_MEDIA_DE_LA_CALLE - medioPeon < ACERA.desde)) fueraDeLaCalle.push(`${i}/${a}: en la ele`);
+      if (m.esEsquina) {
+        /* En una esquina los seis van pegados al tramo por el que se SALE: |u − 155| corto, v entre 144 y 155. */
+        const { u, v } = enLaEsquina(m, h);
+        if (Math.abs(u - LINEA_DE_LA_MARCHA) > 2) fueraDelCarril.push(`${i}/${a}: u ${r(u)}`);
+        if (v - medioPeon < BORDE_INTERIOR || v > LINEA_DE_LA_MARCHA) fueraDelCarril.push(`${i}/${a}: v ${r(v)}`);
+      } else {
+        const { v, aLoLargo } = enElMarco(m, h);
+        if (v - medioPeon < CARRIL_DEL_AVATAR.desde || v + medioPeon > CARRIL_DEL_AVATAR.hasta) fueraDelCarril.push(`${i}/${a}: v ${r(v)}`);
+        if (Math.abs(aLoLargo) + medioPeon > ANCHO_DE_CASILLA / 2) fueraDelCarril.push(`${i}/${a}: a lo largo ${r(aLoLargo)}`);
+      }
       for (const [b, o] of huecos.entries()) {
         if (b <= a) continue;
         if (Math.hypot(h.x - o.x, h.z - o.z) < 2 * medioPeon) solapados.push(`${i}: ${a} y ${b}`);
       }
       const av = huecoDeAventurero(i, a);
-      const rav = m.esEsquina ? enLaEsquina(m, av).u : enElMarco(m, av).radial;
-      if (rav - medioPeon < CALLE.desde || rav > SOLAR.desde + 1) aventureroFuera.push(`${i}/${a}: radial ${r(rav)}`);
+      const rav = m.esEsquina ? Math.abs(enLaEsquina(m, av).u - LINEA_DE_LA_MARCHA) : enElMarco(m, av).v;
+      const tope = m.esEsquina ? 2 : CARRIL_DEL_AVATAR.hasta;
+      if (rav > tope) aventureroFuera.push(`${i}/${a}: ${r(rav)}`);
     }
   }
-  comprobar(`los seis huecos de peón (huella ${r(peon.ancho)} × ${r(peon.fondo)}) caben en la calle de las 39 casillas que la tienen, y en las esquinas sobre el tramo de salida`, fueraDeLaCalle.length === 0, fueraDeLaCalle.slice(0, 5));
+  comprobar(`los seis huecos de peón (huella ${r(peon.ancho)} × ${r(peon.fondo)}) van en fila en el carril de las 39 casillas que lo tienen, y en las esquinas en la franja de dentro`, fueraDelCarril.length === 0, fueraDelCarril.slice(0, 5));
   comprobar('y no se pisan entre sí', solapados.length === 0, solapados.slice(0, 5));
-  comprobar('el hueco del aventurero está 1,2 hacia el solar, sin salirse de la calle por dentro ni pasar del borde del solar', aventureroFuera.length === 0, aventureroFuera.slice(0, 5));
+  comprobar(`el hueco del aventurero está 1,2 hacia el campo y no se sale del carril (${CARRIL_DEL_AVATAR.desde}..${CARRIL_DEL_AVATAR.hasta})`, aventureroFuera.length === 0, aventureroFuera.slice(0, 5));
 
   const casasFuera: string[] = [];
   const casasSolapadas: string[] = [];
@@ -352,236 +460,497 @@ paso('Cada rejilla de huecos cabe en su banda con la huella medida');
     const huecos = [0, 1, 2, 3].map((k) => huecoDeCasa(i, k));
     for (const [k, h] of huecos.entries()) {
       const { radial, aLoLargo } = enElMarco(m, h);
-      if (radial - mediaCasa < ACERA.desde || radial + mediaCasa > ACERA.hasta || Math.abs(aLoLargo) + mediaCasa > 4) casasFuera.push(`${i}/${k}: radial ${r(radial)}, a lo largo ${r(aLoLargo)}`);
+      if (radial - mediaCasa < FRANJA.desde || radial + mediaCasa > FRANJA.hasta || Math.abs(aLoLargo) + mediaCasa > ANCHO_DE_CASILLA / 2) casasFuera.push(`${i}/${k}: radial ${r(radial)}, a lo largo ${r(aLoLargo)}`);
       for (const [b, o] of huecos.entries()) {
         if (b <= k) continue;
         if (Math.hypot(h.x - o.x, h.z - o.z) < 2 * mediaCasa) casasSolapadas.push(`${i}: ${k} y ${b}`);
       }
     }
     const posada = enElMarco(m, huecoDePosada(i));
-    if (posada.radial - mediaCasa < ACERA.desde || posada.radial + mediaCasa > ACERA.hasta || Math.abs(posada.aLoLargo) > 1e-9) posadasMal.push(`${i}: ${JSON.stringify(posada)}`);
-    const bandera = huecoDeBandera(i);
-    const b = enElMarco(m, bandera);
-    if (b.radial < ACERA.desde || b.radial > ACERA.hasta || Math.abs(b.aLoLargo) > 4) banderasMal.push(`${i}: fuera de la acera ${JSON.stringify(b)}`);
+    if (posada.radial - mediaCasa < FRANJA.desde || posada.radial + mediaCasa > FRANJA.hasta || Math.abs(posada.aLoLargo) > 1e-9) posadasMal.push(`${i}: ${JSON.stringify(posada)}`);
+    const b = enElMarco(m, huecoDeBandera(i));
+    if (b.radial < FRANJA.desde || b.radial > FRANJA.hasta || Math.abs(b.aLoLargo) > ANCHO_DE_CASILLA / 2) banderasMal.push(`${i}: fuera de la franja ${JSON.stringify(b)}`);
     for (const h of huecos) {
       const d = enElMarco(m, h);
       if (Math.abs(d.aLoLargo - b.aLoLargo) < mediaCasa && Math.abs(d.radial - b.radial) < mediaCasa) banderasMal.push(`${i}: la bandera pisa una casa`);
     }
   }
-  comprobar(`los cuatro huecos de casa (huella ${r(casa.ancho)} × ${r(casa.fondo)}, paso 2,55) caben en la acera de las 36 casillas laterales`, casasFuera.length === 0, casasFuera.slice(0, 5));
+  comprobar(`los cuatro huecos de casa (huella ${r(casa.ancho)} × ${r(casa.fondo)}, paso 12) van en FILA en la franja del barrio de las 36 casillas laterales`, casasFuera.length === 0, casasFuera.slice(0, 5));
   comprobar('y no se pisan', casasSolapadas.length === 0, casasSolapadas.slice(0, 5));
-  comprobar('la posada va centrada en la acera', posadasMal.length === 0, posadasMal.slice(0, 3));
-  comprobar('la bandera del dueño está en la acera y no pisa ninguna casa', banderasMal.length === 0, banderasMal.slice(0, 3));
+  comprobar('la posada va centrada en la franja', posadasMal.length === 0, posadasMal.slice(0, 3));
+  comprobar('la bandera del dueño está en la franja y no pisa ninguna casa', banderasMal.length === 0, banderasMal.slice(0, 3));
 
-  /* La Mazmorra: presos dentro de la celda, visitas fuera de ella y fuera de la ele. */
+  /*
+   * LA BANDERA NO PISA EL CARRIL, Y EL CARRIL NO CRECIÓ CON LA CASILLA.
+   *
+   * La caja del estandarte no mide 1,91 sino 2,61 en su lado mayor: el mástil sale 1,655 por
+   * un lado, medido en el `.glb`. Con la franja del barrio en 21 de fondo la bandera sube a
+   * `v = 15` —el medio de la franja, que es donde de verdad se ve— y llega a 16,7 con el
+   * carril empezando en 23: seis unidades de holgura. La vacuna es ponerla pegada al filete,
+   * en `v = 22`, que es el error que de verdad se puede cometer al mover una banda.
+   */
+  const cajaDeLaBandera = caja(PIEZA.bandera);
+  const radioDeLaBandera = Math.max(Math.abs(cajaDeLaBandera.min[0]), Math.abs(cajaDeLaBandera.max[0]), Math.abs(cajaDeLaBandera.min[2]), Math.abs(cajaDeLaBandera.max[2]));
+  const vDeLaBandera = enElMarco(marcoDeCasilla(1), huecoDeBandera(1)).v;
+  const holguraDeLaBandera = CARRIL_DEL_AVATAR.desde - (vDeLaBandera + radioDeLaBandera);
+  console.log(`  la bandera va en v = ${r(vDeLaBandera)}, llega a ${r(vDeLaBandera + radioDeLaBandera)} y el carril empieza en ${CARRIL_DEL_AVATAR.desde}: ${r(holguraDeLaBandera)} de holgura`);
+  comprobar('la bandera del dueño deja al menos medio peón al carril del avatar, y además cabe entera en la franja del barrio', holguraDeLaBandera >= medioPeon / 2 && vDeLaBandera + radioDeLaBandera <= BANDA.franja, r(holguraDeLaBandera));
+  const V_ENVENENADO_DE_LA_BANDERA = 22;
+  comprobar('se ve fallar: puesta pegada al filete (v = 22) la bandera se mete en el carril del avatar', CARRIL_DEL_AVATAR.desde - (V_ENVENENADO_DE_LA_BANDERA + radioDeLaBandera) < medioPeon / 2, r(CARRIL_DEL_AVATAR.desde - (V_ENVENENADO_DE_LA_BANDERA + radioDeLaBandera)));
+
+  /* La cárcel: presos dentro del patio, visitas fuera de la verja y fuera de la ele. */
   const m = marcoDeCasilla(MAZMORRA);
-  const interior = { desde: CELDA.centro - CELDA.lado / 2 + CELDA.grosorDelMuro / 2, hasta: CELDA.centro + CELDA.lado / 2 - CELDA.grosorDelMuro / 2 };
+  const patio = { u: [CELDA.u - CELDA.lado / 2, CELDA.u + CELDA.lado / 2], v: [CELDA.v - CELDA.lado / 2, CELDA.v + CELDA.lado / 2] };
   const presosFuera = [0, 1, 2, 3, 4, 5]
     .map((a) => enLaEsquina(m, huecoDePreso(a)))
-    .filter((p) => p.u - medioPeon < interior.desde || p.u + medioPeon > interior.hasta || p.v - medioPeon < interior.desde || p.v + medioPeon > interior.hasta);
-  comprobar(`los seis huecos de preso caben dentro de la celda (interior de ${r(interior.hasta - interior.desde)})`, presosFuera.length === 0, presosFuera);
+    .filter((q) => q.u - medioPeon < (patio.u[0] as number) || q.u + medioPeon > (patio.u[1] as number) || q.v - medioPeon < (patio.v[0] as number) || q.v + medioPeon > (patio.v[1] as number));
+  comprobar(`los seis huecos de preso caben dentro del patio (${CELDA.lado} × ${CELDA.lado} en la celda (${CELDA.u}, ${CELDA.v}))`, presosFuera.length === 0, presosFuera);
   const visitasMal = [0, 1, 2, 3, 4, 5]
     .map((a) => enLaEsquina(m, huecoDeVisita(a)))
-    .filter((p) => {
-      const enLaEle = (Math.abs(p.u - LINEA_MEDIA_DE_LA_CALLE) < HOLGURA_DE_LA_MARCHA + medioPeon && p.v < LINEA_MEDIA_DE_LA_CALLE + HOLGURA_DE_LA_MARCHA) || (Math.abs(p.v - LINEA_MEDIA_DE_LA_CALLE) < HOLGURA_DE_LA_MARCHA + medioPeon && p.u < LINEA_MEDIA_DE_LA_CALLE + HOLGURA_DE_LA_MARCHA);
-      const enLaCelda = p.u + medioPeon > CELDA.centro - CELDA.lado / 2 - CELDA.grosorDelMuro / 2 && p.v + medioPeon > CELDA.centro - CELDA.lado / 2 - CELDA.grosorDelMuro / 2;
-      const fueraDeLaEsquina = p.u - medioPeon < ACERA.desde || p.v - medioPeon < ACERA.desde;
-      return enLaEle || enLaCelda || fueraDeLaEsquina;
+    .filter((q) => {
+      const enElPatio = q.u + medioPeon > (patio.u[0] as number) && q.v + medioPeon > (patio.v[0] as number);
+      const fueraDeLaEsquina = q.u - medioPeon < BORDE_INTERIOR || q.v - medioPeon < BORDE_INTERIOR || q.u + medioPeon > MEDIO_LADO || q.v + medioPeon > MEDIO_LADO;
+      /* Van sobre el tramo de ENTRADA de la marcha, que es la acera de delante de la cárcel. */
+      const fueraDeLaAcera = Math.abs(q.v - LINEA_DE_LA_MARCHA) > 2 || q.u > LINEA_DE_LA_MARCHA;
+      return enElPatio || fueraDeLaEsquina || fueraDeLaAcera;
     });
-  comprobar('y los seis de visita quedan en la esquina, fuera de la celda y fuera de la ele de la marcha', visitasMal.length === 0, visitasMal);
+  comprobar('y los seis de visita quedan en la acera de delante de la cárcel, sobre el tramo de entrada y fuera del patio', visitasMal.length === 0, visitasMal);
+  const presosYVisitas = [0, 1, 2, 3, 4, 5].every((a) => Math.hypot(huecoDePreso(a).x - huecoDeVisita(a).x, huecoDePreso(a).z - huecoDeVisita(a).z) > CELDA.lado / 2);
+  comprobar('y ningún preso comparte sitio con una visita: el patio está lejos de la acera', presosYVisitas);
   const huecoDelDiez = [0, 1, 2, 3, 4, 5].every((a) => {
-    const p = huecoDePeon(MAZMORRA, a);
+    const q = huecoDePeon(MAZMORRA, a);
     const v = huecoDeVisita(a);
-    return p.x === v.x && p.z === v.z;
+    return q.x === v.x && q.z === v.z;
   });
   comprobar('en la Mazmorra el hueco de peón es el de visita', huecoDelDiez);
 }
 
 // ---------------------------------------------------------------------------
-paso('Ningún solar pasa de 7,6 de frente ni de 9 de fondo, medido con el fichero');
+paso('La casilla es una casilla de tablero de mesa: poco atrezo, en su banda, sin pisar el carril, y el precio del reglamento');
 // ---------------------------------------------------------------------------
 
-/** La huella de un solar en su marco: extremos a lo largo y en radial de la unión de sus piezas. */
-function huellaDelSolar(casilla: number, piezas: readonly PiezaDelSolar[]): { readonly aLoLargo: readonly [number, number]; readonly radial: readonly [number, number]; readonly minY: number } {
+/** La huella del atrezo de una casilla en su marco: extremos en `u` y en `v` de la unión de sus piezas. */
+function huellaDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]): { readonly u: readonly [number, number]; readonly v: readonly [number, number]; readonly minY: number } {
   const m = marcoDeCasilla(casilla);
   let a0 = Infinity;
   let a1 = -Infinity;
-  let r0 = Infinity;
-  let r1 = -Infinity;
+  let v0 = Infinity;
+  let v1 = -Infinity;
   let minY = Infinity;
   for (const p of piezas) {
-    const puesta = puestaDeLaPiezaDelSolar(casilla, p);
+    const puesta = puestaDeLaPiezaDeLaCasilla(casilla, p);
     for (const e of esquinasDeLaPuesta(puesta)) {
-      const { radial, aLoLargo } = enElMarco(m, e);
+      const { v, aLoLargo } = enElMarco(m, e);
       a0 = Math.min(a0, aLoLargo);
       a1 = Math.max(a1, aLoLargo);
-      r0 = Math.min(r0, radial);
-      r1 = Math.max(r1, radial);
+      v0 = Math.min(v0, v);
+      v1 = Math.max(v1, v);
     }
     minY = Math.min(minY, puesta.y + caja(p.pieza).min[1]);
   }
-  return { aLoLargo: [a0, a1], radial: [r0, r1], minY };
+  return { u: [a0, a1], v: [v0, v1], minY };
 }
 
-function problemasDelSolar(casilla: number, piezas: readonly PiezaDelSolar[]): string[] {
+function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]): string[] {
   const problemas: string[] = [];
-  const h = huellaDelSolar(casilla, piezas);
-  const frente = h.aLoLargo[1] - h.aLoLargo[0];
-  if (frente > FRENTE_MAXIMO_DEL_SOLAR || Math.abs(h.aLoLargo[0]) > FRENTE_MAXIMO_DEL_SOLAR / 2 || Math.abs(h.aLoLargo[1]) > FRENTE_MAXIMO_DEL_SOLAR / 2) {
-    problemas.push(`frente: ${casilla} mide ${r(frente)} de frente (${r(h.aLoLargo[0])}..${r(h.aLoLargo[1])})`);
+  if (piezas.length === 0) return problemas;
+  const h = huellaDelAtrezo(casilla, piezas);
+  const frente = (h.u[1] as number) - (h.u[0] as number);
+  if (frente > FRENTE_MAXIMO_DEL_ATREZO || Math.abs(h.u[0] as number) > FRENTE_MAXIMO_DEL_ATREZO / 2 || Math.abs(h.u[1] as number) > FRENTE_MAXIMO_DEL_ATREZO / 2) {
+    problemas.push(`frente: ${casilla} mide ${r(frente)} de frente (${r(h.u[0] as number)}..${r(h.u[1] as number)})`);
   }
-  const enLaAcera = piezas.every((p) => p.banda === 'acera');
-  const desde = enLaAcera ? ACERA.desde - 0.1 : SOLAR.desde - ALERO_SOBRE_LA_CALLE;
-  const hasta = enLaAcera ? ACERA.hasta + 0.1 : casilla === RIBERA ? SOLAR.desde + FONDO_MAXIMO_EN_EL_AGUA : SOLAR.hasta + DESBORDE_HACIA_FUERA;
-  if (h.radial[0] < desde || h.radial[1] > hasta) {
-    problemas.push(`fondo: ${casilla} va de ${r(h.radial[0])} a ${r(h.radial[1])} en radial y su banda admite ${r(desde)}..${r(hasta)}`);
+  if ((h.v[0] as number) < ATREZO.desde || (h.v[1] as number) > ATREZO.hasta) {
+    problemas.push(`banda: ${casilla} va de v ${r(h.v[0] as number)} a ${r(h.v[1] as number)} y la banda de atrezo es ${ATREZO.desde}..${ATREZO.hasta}`);
   }
-  /* El muelle de la ribera lleva su pilotaje bajo el suelo a propósito (baja a −5,47): es la excepción declarada. */
-  if (h.minY < -0.05 && casilla !== RIBERA) problemas.push(`alza: ${casilla} se hunde ${r(-h.minY)} bajo el suelo`);
+  if (h.minY < -0.05) problemas.push(`alza: ${casilla} se hunde ${r(-h.minY)} bajo el suelo`);
+  if (h.minY > 0.05) problemas.push(`alza: ${casilla} flota ${r(h.minY)} sobre el suelo`);
   return problemas;
 }
 
 {
   const laterales = Array.from({ length: CASILLAS }, (_, i) => i).filter((i) => !ESQUINAS.includes(i));
-  const sinEntrada = laterales.filter((i) => (EDIFICIO_DE_LA_CASILLA[i] ?? []).length === 0);
-  comprobar('las 36 casillas laterales tienen algo en la tabla EDIFICIO_DE_LA_CASILLA', sinEntrada.length === 0, sinEntrada);
-  const todos = laterales.flatMap((i) => problemasDelSolar(i, EDIFICIO_DE_LA_CASILLA[i] ?? []));
-  const de = (etiqueta: string): string[] => todos.filter((p) => p.startsWith(`${etiqueta}:`));
-  const medidas = laterales.map((i) => {
-    const h = huellaDelSolar(i, EDIFICIO_DE_LA_CASILLA[i] ?? []);
-    return `${i}:${r(h.aLoLargo[1] - h.aLoLargo[0])}×${r(h.radial[1] - h.radial[0])}`;
-  });
-  console.log(`  frente × fondo por casilla: ${medidas.join('  ')}`);
-  comprobar(`ningún solar pasa de ${FRENTE_MAXIMO_DEL_SOLAR} de frente ni se sale de su casilla`, de('frente').length === 0, de('frente'));
-  comprobar(`ninguno invade la calle más del alero ni desborda más de ${DESBORDE_HACIA_FUERA} (${FONDO_MAXIMO_DEL_SOLAR} de fondo); la ribera entra en el agua hasta ${FONDO_MAXIMO_EN_EL_AGUA}`, de('fondo').length === 0, de('fondo'));
-  comprobar('y ninguna pieza se hunde bajo el suelo (la tienda sube sus estacas; el muelle mete el pilotaje en el agua a sabiendas)', de('alza').length === 0, de('alza'));
-  const muelle = huellaDelSolar(RIBERA, EDIFICIO_DE_LA_CASILLA[RIBERA] ?? []);
-  comprobar('la ribera lleva el muelle de canto: 2,73 de frente y más de 9 hacia el agua, sin pisar la calle', muelle.aLoLargo[1] - muelle.aLoLargo[0] < 3 && muelle.radial[1] - muelle.radial[0] > 9 && muelle.radial[0] >= SOLAR.desde - ALERO_SOBRE_LA_CALLE, muelle);
+  const sinFila = laterales.filter((i) => ATREZO_DE_LA_CASILLA[i] === undefined);
+  comprobar('las 36 casillas laterales tienen fila en ATREZO_DE_LA_CASILLA (el Diezmo y la Alcabala, vacía a propósito: sólo emblema y cifra)', sinFila.length === 0, sinFila);
+  const mudas = laterales.filter((i) => (ATREZO_DE_LA_CASILLA[i] ?? []).length === 0 && !huecosDeLosEmblemas().some((e) => e.casilla === i) && guarismosDelPrecio(i).length === 0);
+  comprobar('y ninguna se queda muda: o lleva atrezo, o emblema, o cifra', mudas.length === 0, mudas);
 
-  /* Vacunas: una tienda sin girar mide 8,29 de frente; una torre corrida 3 hacia dentro pisa la calle. */
-  const tiendaSinGirar = problemasDelSolar(21, [{ pieza: PIEZA.tienda, giroEnCuartos: 0, desplazamiento: [0, 1.9] }]);
-  comprobar('se ve fallar: la tienda sin girar (8,29 de frente) cae por el frente', tiendaSinGirar.some((p) => p.startsWith('frente:')), tiendaSinGirar);
-  const torreEnLaCalle = problemasDelSolar(39, [{ pieza: PIEZA.torreB, giroEnCuartos: 0, desplazamiento: [0, -3] }]);
-  comprobar('se ve fallar: la torre corrida tres hacia dentro pisa la calle y cae por el fondo', torreEnLaCalle.some((p) => p.startsWith('fondo:')), torreEnLaCalle);
-  const tiendaHundida = problemasDelSolar(21, [{ pieza: PIEZA.tienda, giroEnCuartos: 1, desplazamiento: [0.46, 1.9] }]);
-  comprobar('se ve fallar: la tienda sin su alza hunde las estacas un cuarto', tiendaHundida.some((p) => p.startsWith('alza:')), tiendaHundida);
-}
+  const todos = laterales.flatMap((i) => problemasDelAtrezo(i, ATREZO_DE_LA_CASILLA[i] ?? []));
+  const de = (etiqueta: string): string[] => todos.filter((q) => q.startsWith(`${etiqueta}:`));
+  const medidas = laterales
+    .filter((i) => (ATREZO_DE_LA_CASILLA[i] ?? []).length > 0)
+    .map((i) => {
+      const h = huellaDelAtrezo(i, ATREZO_DE_LA_CASILLA[i] ?? []);
+      return `${i}:${r((h.u[1] as number) - (h.u[0] as number))}×${r((h.v[1] as number) - (h.v[0] as number))}`;
+    });
+  console.log(`  frente × fondo del atrezo por casilla: ${medidas.join('  ')}`);
+  comprobar(`ningún atrezo pasa de ${FRENTE_MAXIMO_DEL_ATREZO} de frente ni se sale de su casilla`, de('frente').length === 0, de('frente'));
+  comprobar(`ninguno se sale de la banda de atrezo (v ${ATREZO.desde}..${ATREZO.hasta}): ni pisa el precio ni se sube al marco`, de('banda').length === 0, de('banda'));
+  comprobar('y ninguna pieza flota ni se hunde: los cuerpos del pack vienen sin base y bajan 0,6', de('alza').length === 0, de('alza'));
 
-// ---------------------------------------------------------------------------
-paso('La muralla cierra un cuadrado de 58 con las puertas enfrente de las casillas 5, 15, 25 y 35');
-// ---------------------------------------------------------------------------
-
-{
-  const muralla = puestasDeLaMuralla();
-  const cuenta = (pieza: string): number => muralla.filter((p) => p.pieza === pieza).length;
-  comprobar('la muralla son 16 tramos, 4 puertas, 3 esquinas y una esquina con puerta', cuenta(PIEZA.muralla) === 16 && cuenta(PIEZA.puertaMuralla) === 4 && cuenta(PIEZA.esquinaMuralla) === 3 && cuenta(PIEZA.esquinaPuerta) === 1, {
-    muralla: cuenta(PIEZA.muralla),
-    puertas: cuenta(PIEZA.puertaMuralla),
-    esquinas: cuenta(PIEZA.esquinaMuralla),
-    conPuerta: cuenta(PIEZA.esquinaPuerta),
-  });
-  const tramoMedido = huella(PIEZA.muralla).ancho;
-  comprobar(`el tramo de muralla del fichero mide ${r(LARGO_DE_LA_MURALLA)} como dice la constante`, Math.abs(tramoMedido - LARGO_DE_LA_MURALLA) < 0.01 * LARGO_DE_LA_MURALLA, tramoMedido);
-  const puertas = puertasDeLaMuralla();
-  const desviadas: string[] = [];
-  PUERTAS.forEach((casilla, k) => {
-    const m = marcoDeCasilla(casilla);
-    const p = puertas[k];
-    if (p === undefined) {
-      desviadas.push(`${casilla}: sin puerta`);
-      return;
+  /* NADA pisa el carril por donde anda el avatar: ni atrezo, ni casas, ni bandera, ni dígitos. */
+  const enElCarril: string[] = [];
+  for (const i of laterales) {
+    const m = marcoDeCasilla(i);
+    for (const pieza of ATREZO_DE_LA_CASILLA[i] ?? []) {
+      const uv = esquinasDeLaPuesta(puestaDeLaPiezaDeLaCasilla(i, pieza)).map((e) => enElMarco(m, e).v);
+      if (Math.min(...uv) < CARRIL_DEL_AVATAR.hasta && Math.max(...uv) > CARRIL_DEL_AVATAR.desde) enElCarril.push(`${i}/${pieza.pieza}`);
     }
-    const { radial, aLoLargo } = enElMarco(m, { x: p.x, z: p.z });
-    if (Math.abs(aLoLargo) > 0.5 || Math.abs(radial - MEDIO_LADO_DE_LA_MURALLA) > 0.01) desviadas.push(`${casilla}: a lo largo ${r(aLoLargo)}, radial ${r(radial)}`);
-  });
-  comprobar('las cuatro puertas quedan a ±0,5 del eje de las casillas 5, 15, 25 y 35, a 29 del centro', desviadas.length === 0, desviadas);
-  const sureste = muralla.find((p) => p.pieza === PIEZA.esquinaPuerta);
-  comprobar('la esquina con puerta grande es la del sureste, la que mira a la Puerta Mayor', sureste !== undefined && sureste.x > 0 && sureste.z > 0, sureste);
-  /* Los tramos de cada lado son contiguos: consecutivos a un tramo de distancia. */
-  const huecosEnLaMuralla: string[] = [];
-  for (let lado = 0; lado < 4; lado++) {
-    const tramos = muralla.filter((p) => p.pieza !== PIEZA.esquinaMuralla && p.pieza !== PIEZA.esquinaPuerta).slice(lado * 5, lado * 5 + 5);
-    for (let k = 1; k < tramos.length; k++) {
-      const a = tramos[k - 1] as Puesta;
-      const b = tramos[k] as Puesta;
-      const d = Math.hypot(b.x - a.x, b.z - a.z);
-      if (Math.abs(d - LARGO_DE_LA_MURALLA) > 0.01) huecosEnLaMuralla.push(`lado ${lado}: ${r(d)}`);
-    }
-    const lejos = tramos.filter((t) => Math.abs(Math.max(Math.abs(t.x), Math.abs(t.z)) - MEDIO_LADO_DE_LA_MURALLA) > 0.01);
-    if (lejos.length > 0) huecosEnLaMuralla.push(`lado ${lado}: tramos fuera del cuadrado de 58`);
   }
-  comprobar('y en cada lado los cinco tramos van seguidos, sobre el cuadrado de 58', huecosEnLaMuralla.length === 0, huecosEnLaMuralla);
+  comprobar(`ninguna pieza de atrezo pisa el carril del avatar (v de ${CARRIL_DEL_AVATAR.desde} a ${CARRIL_DEL_AVATAR.hasta})`, enElCarril.length === 0, enElCarril);
+
+  /*
+   * POCO ATREZO, PERO NO UN EDIFICIO SUELTO EN UN DESCAMPADO.
+   *
+   * Con la casilla en 72 de frente el solar lleva un FRENTE DE MANZANA de dos cuerpos y una
+   * farola: tres piezas que no son suelo, y ni una más. El tope sube de dos a tres a
+   * sabiendas y se afirma aquí para que nadie lo suba «un poquito» otra vez.
+   */
+  const PIEZAS_DE_VOLUMEN_POR_CASILLA = 3;
+  const recargadas = laterales.filter((i) => (ATREZO_DE_LA_CASILLA[i] ?? []).filter((p) => !esSuelo(p.pieza)).length > PIEZAS_DE_VOLUMEN_POR_CASILLA);
+  comprobar(`ninguna casilla lleva más de ${PIEZAS_DE_VOLUMEN_POR_CASILLA} piezas que no sean suelo: «no hace falta que pongas muchos elementos 3d»`, recargadas.length === 0, recargadas);
+  /* Y el segundo cuerpo del frente se cae en sobria: en el móvil no se pagan veintidós edificios de más. */
+  const cuerposEnPlena = puestasDelAtrezo('plena').filter((p) => p.pieza.startsWith('cuerpo-')).length;
+  const cuerposEnSobria = puestasDelAtrezo('sobria').filter((p) => p.pieza.startsWith('cuerpo-')).length;
+  comprobar('en sobria cada solar se queda con UN cuerpo: el medianero va marcado menudo', cuerposEnPlena === 2 * cuerposEnSobria, { cuerposEnPlena, cuerposEnSobria });
+
+  /* El precio: los dígitos caben, están en la superficie y dicen lo que dice el reglamento. */
+  const precioMal: string[] = [];
+  const cifraMal: string[] = [];
+  for (let i = 0; i < CASILLAS; i++) {
+    const delReglamento = (CASILLAS_DEL_REGLAMENTO[i]?.precio ?? 0) as number;
+    if ((PRECIO_DE_LA_CASILLA[i] ?? -1) !== delReglamento) cifraMal.push(`${i}: la tabla dice ${String(PRECIO_DE_LA_CASILLA[i])} y el reglamento ${String(delReglamento)}`);
+    const digitos = guarismosDelPrecio(i);
+    if (digitos.length === 0) continue;
+    const m = marcoDeCasilla(i);
+    if (anchoDelPrecio(i) > ANCHO_DE_CASILLA - 2) precioMal.push(`${i}: ${r(anchoDelPrecio(i))} de ancho en una casilla de ${ANCHO_DE_CASILLA}`);
+    for (const g of digitos) {
+      const { v, aLoLargo } = enElMarco(m, { x: g.x, z: g.z });
+      if (v - ALTO_DEL_GUARISMO / 2 < SUPERFICIE.desde - BORDE_INTERIOR || v + ALTO_DEL_GUARISMO / 2 > ATREZO.desde) precioMal.push(`${i}: el dígito va de v ${r(v - ALTO_DEL_GUARISMO / 2)} a ${r(v + ALTO_DEL_GUARISMO / 2)}`);
+      if (Math.abs(aLoLargo) + ANCHO_DEL_GUARISMO / 2 > ANCHO_DE_CASILLA / 2 - 1) precioMal.push(`${i}: el dígito se sale a lo largo (${r(aLoLargo)})`);
+    }
+  }
+  comprobar('el precio de cada casilla es EL DEL REGLAMENTO, copiado y vigilado casilla a casilla', cifraMal.length === 0, cifraMal.slice(0, 5));
+  comprobar('los dígitos del precio caben en la superficie, entre el carril y la banda de atrezo, y en los 32 de ancho', precioMal.length === 0, precioMal.slice(0, 5));
+  comprobar('llevan cifra las 28 comprables más el Diezmo y la Alcabala; las Arcas, los Pregones y las cuatro esquinas no', PRECIO_DE_LA_CASILLA.filter((x) => x > 0).length === 30, PRECIO_DE_LA_CASILLA.filter((x) => x > 0).length);
+
+  /* Los emblemas: uno por casilla que no se compra, y caben en la mitad exterior. */
+  const emblemas = huecosDeLosEmblemas();
+  const emblemasMal = emblemas.filter((e) => {
+    if (ESQUINAS.includes(e.casilla)) return false;
+    const m = marcoDeCasilla(e.casilla);
+    const { v, aLoLargo } = enElMarco(m, { x: e.x, z: e.z });
+    return v - LADO_DEL_EMBLEMA / 2 < ATREZO.desde || v + LADO_DEL_EMBLEMA / 2 > ATREZO.hasta || Math.abs(aLoLargo) + LADO_DEL_EMBLEMA / 2 > ANCHO_DE_CASILLA / 2;
+  });
+  comprobar('los diez emblemas de casilla y las dos flechas están puestos, y caben en la banda de atrezo sin salirse', emblemas.length === 12 && emblemasMal.length === 0, emblemasMal.map((e) => `${e.casilla}/${e.emblema}`));
+  const barriosDelReglamento = BARRIOS.flatMap((b) => b.solares);
+  const solaresConCuerpo = barriosDelReglamento.filter((i) => (ATREZO_DE_LA_CASILLA[i] ?? []).filter((p) => p.pieza.startsWith('cuerpo-')).length === 2);
+  comprobar('los 22 solares del reglamento llevan DOS cuerpos del City Builder, y ninguna otra casilla los lleva', solaresConCuerpo.length === barriosDelReglamento.length && puestasDelAtrezo().filter((p) => p.pieza.startsWith('cuerpo-')).length === 2 * barriosDelReglamento.length, {
+    conDosCuerpos: solaresConCuerpo.length,
+    solares: barriosDelReglamento.length,
+  });
+  /* Dos edificios gemelos pegados no parecen una manzana: parecen un error de copia. */
+  const gemelos = barriosDelReglamento.filter((i) => {
+    const cuerpos = (ATREZO_DE_LA_CASILLA[i] ?? []).filter((p) => p.pieza.startsWith('cuerpo-')).map((p) => p.pieza);
+    return cuerpos.length === 2 && cuerpos[0] === cuerpos[1];
+  });
+  comprobar('y los dos cuerpos de un mismo frente son SIEMPRE distintos', gemelos.length === 0, gemelos);
+  /* Los dos no pueden solaparse: el más ancho del pack mide 12,04 y van a ±13. */
+  const frentesSolapados = barriosDelReglamento.filter((i) => {
+    const cuerpos = (ATREZO_DE_LA_CASILLA[i] ?? []).filter((p) => p.pieza.startsWith('cuerpo-'));
+    if (cuerpos.length !== 2) return false;
+    const anchos = cuerpos.map((p) => huella(p.pieza).ancho / 2);
+    const us = cuerpos.map((p) => p.sitio[0] as number);
+    return Math.abs((us[0] as number) - (us[1] as number)) < (anchos[0] as number) + (anchos[1] as number);
+  });
+  comprobar('y no se pisan entre sí: ±13 de eje deja hueco al cuerpo más ancho del pack (12,04)', frentesSolapados.length === 0, frentesSolapados);
+
+  /*
+   * VACUNAS. Los tres errores que de verdad se pueden cometer con esta tabla al cambiar de
+   * escala: dejar el atrezo donde lo dejó la escala anterior y que se suba al marco, olvidar
+   * el alza de 0,6 (y dejarlo flotando), y separar tanto el frente de manzana que un cuerpo
+   * se salga de su casilla.
+   */
+  const cuerpoEnElMarco = problemasDelAtrezo(1, [{ pieza: PIEZA.cuerpoA, giroEnCuartos: 0, sitio: [0, 96], alza: -0.6 }]);
+  comprobar('se ve fallar: un cuerpo en v = 96 se sube al borde claro, que es el marco del tablero', cuerpoEnElMarco.some((q) => q.startsWith('banda:')), cuerpoEnElMarco);
+  const cuerpoFlotando = problemasDelAtrezo(1, [{ pieza: PIEZA.cuerpoA, giroEnCuartos: 0, sitio: [0, ATREZO.centro] }]);
+  comprobar('se ve fallar: el cuerpo sin su alza flota 0,6, que es la base que el pack no trae', cuerpoFlotando.some((q) => q.startsWith('alza:')), cuerpoFlotando);
+  const frenteDemasiadoAbierto = problemasDelAtrezo(1, [
+    { pieza: PIEZA.cuerpoH, giroEnCuartos: 0, sitio: [-30, ATREZO.centro], alza: -0.6 },
+    { pieza: PIEZA.cuerpoG, giroEnCuartos: 0, sitio: [30, ATREZO.centro], alza: -0.6 },
+  ]);
+  comprobar('se ve fallar: el frente de manzana abierto a ±30 saca los dos cuerpos de la casilla', frenteDemasiadoAbierto.some((q) => q.startsWith('frente:')), frenteDemasiadoAbierto);
 }
 
 // ---------------------------------------------------------------------------
-paso('Las esquinas, la plaza, la ronda y el campo');
+paso('El precio y la franja del barrio se LEEN: proyectados en píxeles en 16:9, 3:4 y 9:19,5');
+// ---------------------------------------------------------------------------
+
+const VENTANAS = [
+  { nombre: '16:9', ancho: 1920, alto: 1080 },
+  { nombre: '3:4', ancho: 768, alto: 1024 },
+  /* El móvil de 9:19,5 con el lienzo al 58 % del alto: 390 × (845 · 0,58). */
+  { nombre: '9:19,5 al 58 %', ancho: 390, alto: Math.round(845 * 0.58) },
+];
+
+/** Cuántos píxeles de ALTO ocupa en el lienzo un segmento del suelo, desde la pose de salida. */
+function pixelesEntre(ventanaK: number, a: Punto, b: Punto): number {
+  const v = VENTANAS[ventanaK] as { nombre: string; ancho: number; alto: number };
+  const ventana = { ancho: v.ancho, alto: v.alto, franjaInferior: 0 };
+  const pose = poseDelBurgo(poseDeSalida(ventana), MIRADOR_DEL_BURGO, ventana);
+  const aspecto = v.ancho / v.alto;
+  const pa = proyecta(pose, aspecto, { x: a.x, y: 0, z: a.z });
+  const pb = proyecta(pose, aspecto, { x: b.x, y: 0, z: b.z });
+  if (!pa.delante || !pb.delante) return 0;
+  return (Math.hypot((pa.x - pb.x) * (v.ancho / 2), (pa.y - pb.y) * (v.alto / 2)) * 1);
+}
+
+/**
+ * CUÁNTO SE LEE, Y DÓNDE ESTÁ EL LÍMITE DE VERDAD.
+ *
+ * La cuenta de servilleta —«el tablero llena el ancho de la pantalla y se mira de frente»—
+ * no vale: la cámara del Burgo mira desde 55° de altura y el lienzo del móvil es el 58 % del
+ * alto, así que el tablero se ve escorzado y cabe por el alto, no por el ancho. Medido aquí
+ * con `proyecta`, el dígito de 27 unidades sobre el tablero de 864 queda en 5,0 px en el
+ * móvil, 9,9 en una tableta y 16,3 en un PC: EXACTAMENTE los mismos píxeles que daba el de
+ * 12 sobre el tablero de 384, porque lo que manda es el cociente con el alcance y ese
+ * cociente no ha cambiado.
+ *
+ * Y 27 es el TECHO, no una elección tímida: tres dígitos ocupan 2,45 × alto, y a 27 son
+ * 66,15 de los 72 de la casilla. A 30 ya no caben. O sea que desde la pose de salida, en un
+ * móvil, el precio es una mancha de tres cifras y no un número que se lea: se lee
+ * ACERCÁNDOSE, y por eso la segunda medida —a la cercanía de seguimiento, que es la que la
+ * cámara toma sola cada vez que alguien mueve— es la que de verdad manda: ahí el dígito mide
+ * 16,6 px en el móvil, 32,8 en una tableta y 82,8 en un PC. Las dos están escritas para que
+ * nadie vuelva a suponer la primera.
+ */
+const PIXELES_MINIMOS_DEL_DIGITO = 4.5;
+const PIXELES_MINIMOS_DE_LA_FRANJA = 3;
+/** Al seguir al que mueve la cámara se pone a 0,42: ahí el precio tiene que LEERSE. */
+const PIXELES_MINIMOS_AL_SEGUIR = 15;
+
+{
+  const informe: string[] = [];
+  const digitosCortos: string[] = [];
+  const franjasCortas: string[] = [];
+  for (const [k, v] of VENTANAS.entries()) {
+    let peorDigito = Infinity;
+    let peorFranja = Infinity;
+    for (let i = 0; i < CASILLAS; i++) {
+      if (ESQUINAS.includes(i)) continue;
+      const m = marcoDeCasilla(i);
+      const alto = pixelesEntre(k, puntoEnLaCasillaPorV(m, 0, V_DEL_PRECIO - ALTO_DEL_GUARISMO / 2), puntoEnLaCasillaPorV(m, 0, V_DEL_PRECIO + ALTO_DEL_GUARISMO / 2));
+      const franja = pixelesEntre(k, puntoEnLaCasillaPorV(m, 0, 0), puntoEnLaCasillaPorV(m, 0, BANDA.franja));
+      if (guarismosDelPrecio(i).length > 0) peorDigito = Math.min(peorDigito, alto);
+      peorFranja = Math.min(peorFranja, franja);
+    }
+    informe.push(`${v.nombre}: dígito ${r(peorDigito)} px, franja ${r(peorFranja)} px`);
+    if (peorDigito < PIXELES_MINIMOS_DEL_DIGITO) digitosCortos.push(`${v.nombre}: ${r(peorDigito)} px`);
+    if (peorFranja < PIXELES_MINIMOS_DE_LA_FRANJA) franjasCortas.push(`${v.nombre}: ${r(peorFranja)} px`);
+  }
+  console.log(`  legibilidad desde la pose de salida — ${informe.join('; ')}`);
+  comprobar(`el dígito del precio mide al menos ${PIXELES_MINIMOS_DEL_DIGITO} px de alto en las tres ventanas, en las 36 casillas`, digitosCortos.length === 0, digitosCortos);
+  comprobar(`la franja del barrio mide al menos ${PIXELES_MINIMOS_DE_LA_FRANJA} px en las tres ventanas`, franjasCortas.length === 0, franjasCortas);
+  /*
+   * VACUNA, y es la del cambio de escala: un dígito que se quedase en los 12 de la escala
+   * anterior mediría 2,2 px en el móvil sobre este tablero. Nada fallaría; sólo dejaría de
+   * leerse el precio, que es la mitad de lo que hace que una casilla sea una casilla.
+   */
+  const m = marcoDeCasilla(1);
+  const enanito = pixelesEntre(2, puntoEnLaCasillaPorV(m, 0, V_DEL_PRECIO - 6), puntoEnLaCasillaPorV(m, 0, V_DEL_PRECIO + 6));
+  comprobar('se ve fallar: un dígito que se hubiera quedado en los 12 de la escala anterior no se lee en el móvil', enanito < PIXELES_MINIMOS_DEL_DIGITO, r(enanito));
+
+  /*
+   * Y LA MEDIDA QUE DE VERDAD IMPORTA: al seguir al que mueve, el precio se lee.
+   *
+   * La cámara se acerca sola a `CERCANIA_DE_SEGUIMIENTO` en cada `mueve` y vuelve 1,2 s
+   * después del salto. Es el momento en el que un jugador mira la casilla en la que ha caído.
+   */
+  const cerquita: string[] = [];
+  const informeCerca: string[] = [];
+  for (const [k, v] of VENTANAS.entries()) {
+    const ventana = { ancho: v.ancho, alto: v.alto, franjaInferior: 0 };
+    const marco = marcoDeCasilla(39);
+    const pose = poseDelBurgo({ factor: CERCANIA_DE_SEGUIMIENTO, centro: { x: marco.centro.x, z: marco.centro.z } }, MIRADOR_DEL_BURGO, ventana);
+    const a = puntoEnLaCasillaPorV(marco, 0, V_DEL_PRECIO - ALTO_DEL_GUARISMO / 2);
+    const b2 = puntoEnLaCasillaPorV(marco, 0, V_DEL_PRECIO + ALTO_DEL_GUARISMO / 2);
+    const pa = proyecta(pose, v.ancho / v.alto, { x: a.x, y: 0, z: a.z });
+    const pb = proyecta(pose, v.ancho / v.alto, { x: b2.x, y: 0, z: b2.z });
+    const px = Math.hypot((pa.x - pb.x) * (v.ancho / 2), (pa.y - pb.y) * (v.alto / 2));
+    informeCerca.push(`${v.nombre}: ${r(px)} px`);
+    if (!pa.delante || !pb.delante || px < PIXELES_MINIMOS_AL_SEGUIR) cerquita.push(`${v.nombre}: ${r(px)} px`);
+    void k;
+  }
+  console.log(`  el precio al seguir al que mueve (cercanía ${CERCANIA_DE_SEGUIMIENTO}) — ${informeCerca.join('; ')}`);
+  comprobar(`al seguir al que mueve el dígito pasa de ${PIXELES_MINIMOS_AL_SEGUIR} px en las tres ventanas: ahí es donde el precio se lee`, cerquita.length === 0, cerquita);
+}
+
+// ---------------------------------------------------------------------------
+paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
 // ---------------------------------------------------------------------------
 
 {
-  /* Ninguna pieza de esquina pisa la ele de la marcha engordada un peón; las losas son suelo. */
+  /* Ninguna pieza de esquina que no sea suelo pisa la ele de la marcha engordada un peón. */
   const pisan: string[] = [];
   const fueraDeLaEsquina: string[] = [];
   for (const esquina of ESQUINAS) {
     const m = marcoDeCasilla(esquina);
-    const piezas = puestasDeLasEsquinas().filter((p) => {
-      const { u, v } = enLaEsquina(m, { x: p.x, z: p.z });
-      return u > ACERA.desde - 1 && v > ACERA.desde - 1 && u < MEDIO_LADO + DESBORDE_HACIA_FUERA && v < MEDIO_LADO + DESBORDE_HACIA_FUERA;
-    });
-    for (const p of piezas) {
+    for (const p of piezasDeLaEsquina(esquina)) {
       const uv = esquinasDeLaPuesta(p).map((e) => enLaEsquina(m, e));
       const u0 = Math.min(...uv.map((q) => q.u));
       const u1 = Math.max(...uv.map((q) => q.u));
       const v0 = Math.min(...uv.map((q) => q.v));
       const v1 = Math.max(...uv.map((q) => q.v));
-      if (u0 < ACERA.desde - 0.5 || v0 < ACERA.desde - 0.5 || u1 > MEDIO_LADO + DESBORDE_HACIA_FUERA || v1 > MEDIO_LADO + DESBORDE_HACIA_FUERA) fueraDeLaEsquina.push(`${esquina}/${p.pieza}: u ${r(u0)}..${r(u1)}, v ${r(v0)}..${r(v1)}`);
-      if (p.pieza === PIEZA.losa) continue;
+      if (u0 < BORDE_INTERIOR - 0.01 || v0 < BORDE_INTERIOR - 0.01 || u1 > MEDIO_LADO + 0.01 || v1 > MEDIO_LADO + 0.01) fueraDeLaEsquina.push(`${esquina}/${p.pieza}: u ${r(u0)}..${r(u1)}, v ${r(v0)}..${r(v1)}`);
+      if (esSuelo(p.pieza)) continue;
       const h = HOLGURA_DE_LA_MARCHA;
-      const c = LINEA_MEDIA_DE_LA_CALLE;
-      const tramoDeEntrada = v1 >= c - h && v0 <= c + h && u0 <= c + h; // v ≈ 43,25, u ≤ 43,25
-      const tramoDeSalida = u1 >= c - h && u0 <= c + h && v0 <= c + h; // u ≈ 43,25, v ≤ 43,25
+      const c = LINEA_DE_LA_MARCHA;
+      const tramoDeEntrada = v1 >= c - h && v0 <= c + h && u0 <= c + h;
+      const tramoDeSalida = u1 >= c - h && u0 <= c + h && v0 <= c + h;
       if (tramoDeEntrada || tramoDeSalida) pisan.push(`${esquina}/${p.pieza}: u ${r(u0)}..${r(u1)}, v ${r(v0)}..${r(v1)}`);
     }
   }
-  comprobar(`ninguna pieza de esquina pisa la ele de la marcha engordada ${HOLGURA_DE_LA_MARCHA} (las losas son suelo)`, pisan.length === 0, pisan);
-  comprobar('y todas quedan dentro de su cuadrado de 14 más el desborde', fueraDeLaEsquina.length === 0, fueraDeLaEsquina);
-  const mazmorra = puestasDeLasEsquinas().filter((p) => enLaEsquina(marcoDeCasilla(MAZMORRA), { x: p.x, z: p.z }).u > 36 && enLaEsquina(marcoDeCasilla(MAZMORRA), { x: p.x, z: p.z }).v > 36 && p.x < 0 && p.z > 0);
-  const cuenta = (pieza: string): number => mazmorra.filter((p) => p.pieza === pieza).length;
-  comprobar('la Mazmorra lleva cuatro losas, dos muros, dos rejas, un muro de esquina y dos pilares', cuenta(PIEZA.losa) === 4 && cuenta(PIEZA.muro) === 2 && cuenta(PIEZA.muroReja) === 2 && cuenta(PIEZA.muroEsquina) === 1 && cuenta(PIEZA.pilar) === 2, mazmorra.map((p) => p.pieza));
+  comprobar(`ninguna pieza de esquina que no sea suelo pisa la ele de la marcha engordada ${HOLGURA_DE_LA_MARCHA}`, pisan.length === 0, pisan);
+  comprobar('y las cuatro escenas caben enteras en su cuadrado de 108', fueraDeLaEsquina.length === 0, fueraDeLaEsquina.slice(0, 6));
 
-  /* La plaza dentro de la muralla, el suelo de dados en el centro con los dos dados encima. */
-  const interior = MEDIO_LADO_DE_LA_MURALLA - huella(PIEZA.muralla).fondo / 2;
-  const plazaFuera = puestasDeLaPlaza(true).filter((p) => esquinasDeLaPuesta(p).some((e) => Math.abs(e.x) > interior || Math.abs(e.z) > interior));
-  comprobar('el ayuntamiento, el pozo, las mesas y las sillas quedan dentro de la muralla', plazaFuera.length === 0, plazaFuera.map((p) => p.pieza));
-  const dadosDentro = HUECOS_DE_LOS_DADOS.every((d) => Math.abs(d.x - SUELO_DE_DADOS.x) < SUELO_DE_DADOS.lado / 2 - 1.5 && Math.abs(d.z - SUELO_DE_DADOS.z) < SUELO_DE_DADOS.lado / 2 - 1.5);
-  comprobar('el suelo de dados mide 14 × 14 en el centro y los dos dados de arista 3 caen dentro', SUELO_DE_DADOS.lado === 14 && SUELO_DE_DADOS.x === 0 && SUELO_DE_DADOS.z === 0 && dadosDentro, HUECOS_DE_LOS_DADOS);
-  const sobreElSuelo = puestasDeLaPlaza(true).filter((p) => esquinasDeLaPuesta(p).some((e) => Math.abs(e.x) < SUELO_DE_DADOS.lado / 2 && Math.abs(e.z) < SUELO_DE_DADOS.lado / 2));
-  comprobar('y nada de la plaza pisa el suelo de dados', sobreElSuelo.length === 0, sobreElSuelo.map((p) => p.pieza));
+  const cuenta = (esquina: number, pieza: string): number => piezasDeLaEsquina(esquina).filter((p) => p.pieza === pieza).length;
+  comprobar(
+    'la salida es un cruce urbano de nueve por nueve celdas: un cruce, seis cebras, cuatro farolas, dos semáforos, un taxi y una berlina',
+    cuenta(0, PIEZA.calzadaCruce) === 1 && cuenta(0, PIEZA.calzadaPaso) === 6 && cuenta(0, PIEZA.farolaDeCalle) === 4 && cuenta(0, PIEZA.semaforoC) === 2 && cuenta(0, PIEZA.cocheTaxi) === 1 && cuenta(0, PIEZA.cocheBerlina) === 1,
+    piezasDeLaEsquina(0).map((p) => p.pieza),
+  );
+  comprobar(
+    'la cárcel es una manzana entera: cuatro bloques, cuatro tramos de verja, dos hojas de puerta, dos patrullas y dos semáforos',
+    cuenta(10, PIEZA.bloqueD) === 1 && cuenta(10, PIEZA.bloqueB) === 1 && cuenta(10, PIEZA.bloqueC) === 1 && cuenta(10, PIEZA.bloqueA) === 1 && cuenta(10, PIEZA.verja) === 4 && cuenta(10, PIEZA.verjaPuerta) === 2 && cuenta(10, PIEZA.cochePatrulla) === 2 && cuenta(10, PIEZA.semaforoA) === 2,
+    piezasDeLaEsquina(10).map((p) => p.pieza),
+  );
+  comprobar(
+    'el descanso es una plaza arbolada: tres mesas, doce sillas, seis arbustos, cuatro bancos, cuatro farolas de parque y siete árboles',
+    cuenta(20, PIEZA.mesaRedonda) === 3 &&
+      cuenta(20, PIEZA.silla) === 12 &&
+      cuenta(20, PIEZA.arbusto) === 6 &&
+      cuenta(20, PIEZA.bancoDeParque) === 4 &&
+      cuenta(20, PIEZA.farolaDeParque) === 4 &&
+      cuenta(20, PIEZA.pino) + cuenta(20, PIEZA.pinoGrande) + cuenta(20, PIEZA.pinoPequeno) === 7,
+    piezasDeLaEsquina(20).map((p) => p.pieza),
+  );
+  comprobar(
+    '¡a la Mazmorra! es una avenida de dos carriles: cuatro cebras, dos semáforos de brazo y el coche patrulla con el morro hacia la cárcel',
+    cuenta(30, PIEZA.calzadaPaso) === 4 && cuenta(30, PIEZA.semaforoC) === 2 && cuenta(30, PIEZA.cochePatrulla) === 1,
+    piezasDeLaEsquina(30).map((p) => p.pieza),
+  );
+  /*
+   * LA ESQUINA ES UNA MANZANA, Y SE MIDE: con 108 de lado son 81 celdas de retícula, y de
+   * ellas las NUEVE del rincón interior (a ≤ 2 en los dos ejes) sólo admiten suelo, porque
+   * son las que la ele de la marcha atraviesa. Si alguien vuelve a achicar la esquina, este
+   * número deja de cuadrar antes de que nadie mire una captura.
+   */
+  comprobar('cada esquina son 9 × 9 celdas de la retícula de la ciudad', CELDAS_POR_ESQUINA === 9 && LADO_DE_ESQUINA === 9 * RETICULA_DE_LA_CIUDAD, CELDAS_POR_ESQUINA);
+  const piezasPorEsquina = ESQUINAS.map((e) => piezasDeLaEsquina(e).length);
+  comprobar('y ninguna se queda en cuatro losas: las cuatro pasan de treinta piezas', piezasPorEsquina.every((n) => n >= 30), piezasPorEsquina);
+  comprobar('las dos flechas del sentido de la marcha están en la salida y en la casilla que manda a la cárcel', huecosDeLosEmblemas().filter((e) => e.emblema === 'flecha').map((e) => e.casilla).join() === '0,30');
 
-  /* La ronda: entre la muralla y la acera, y sin tapar el camino de las puertas. */
-  const ronda = puestasDeLaRonda();
-  const cuentaRonda = (pieza: string): number => ronda.filter((p) => p.pieza === pieza).length;
-  comprobar('la ronda son arbol-a × 12, arbol-b × 4, banco × 4 y farola × 2', cuentaRonda(PIEZA.arbolA) === 12 && cuentaRonda(PIEZA.arbolB) === 4 && cuentaRonda(PIEZA.banco) === 4 && cuentaRonda(PIEZA.farola) === 2, ronda.map((p) => p.pieza));
-  const rondaMal = ronda.filter((p) => {
-    const lejos = Math.max(Math.abs(p.x), Math.abs(p.z));
-    const fueraDeLaBanda = lejos < MEDIO_LADO_DE_LA_MURALLA + huella(PIEZA.muralla).fondo / 2 || lejos > ACERA.desde;
-    const cerca = Math.abs(p.x) >= Math.abs(p.z) ? Math.abs(p.z) : Math.abs(p.x);
-    return fueraDeLaBanda || cerca < 3;
+  /*
+   * NADA MEDIEVAL EN EL ANILLO, y esto es lo que Miguel corrigió dos veces.
+   *
+   * Del pack hexagonal sólo se admite el CAMPO de fuera —hierba, árboles, rocas, colinas y
+   * nubes, que no tienen siglo—. Ni una pieza suya puede aparecer en una casilla ni en una
+   * esquina. Se mira contra `PIEZAS_DEL_BURGO`, que dice de qué pack sale cada nombre.
+   */
+  const packDe = new Map(PIEZAS_DEL_BURGO.map((p) => [p.nombre, p.pack]));
+  const medievales = [...puestasDelAtrezo(), ...puestasDeLasEsquinas()].filter((p) => packDe.get(p.pieza) === 'hexagon-extra');
+  comprobar('ni una pieza del pack medieval en las 36 casillas ni en las cuatro esquinas: la ciudad es de este siglo', medievales.length === 0, [...new Set(medievales.map((p) => p.pieza))]);
+  const conMuralla = [...puestasDelAtrezo(), ...puestasDeLasEsquinas()].filter((p) => /muralla|torre-|iglesia|ayuntamiento|molino|posada|caseron/.test(p.pieza));
+  comprobar('y no queda ni un nombre de muralla, torre, iglesia, ayuntamiento ni molino en ninguna puesta', conMuralla.length === 0, conMuralla.map((p) => p.pieza));
+
+  /* El suelo del tablero: cuatro bandas por casilla más el reborde, y el marco de las esquinas. */
+  const suelos = Array.from({ length: CASILLAS }, (_, i) => suelosDeLaCasilla(i));
+  const papelesLaterales = (suelos[1] ?? []).map((q) => q.papel).join();
+  comprobar('una casilla lateral son seis cuadros: franja, reborde, filete, superficie, marco y la línea que la separa de la siguiente', papelesLaterales === 'franja,reborde,filete,superficie,borde,linea', papelesLaterales);
+  comprobar('una esquina son tres: su losa y los dos tramos de marco', (suelos[0] ?? []).map((q) => q.papel).join() === 'esquina,borde,borde');
+  const sueloFuera = suelos.flat().filter((q) => q.puntos.some((pt) => Math.max(Math.abs(pt[0]), Math.abs(pt[2])) > MEDIO_LADO + 1e-9 || Math.max(Math.abs(pt[0]), Math.abs(pt[2])) < BORDE_INTERIOR - 1e-9));
+  comprobar('y ningún cuadro de suelo se sale del anillo ni se mete en el recinto de la ciudad', sueloFuera.length === 0, sueloFuera.map((q) => q.papel).slice(0, 4));
+
+  /* Los dados y el Concejo, en el campo delante del lado sur. */
+  const medioDado = ARISTA_DE_LOS_DADOS / 2;
+  const dadosDentro = HUECOS_DE_LOS_DADOS.every((d) => Math.abs(d.x - SUELO_DE_DADOS.x) < SUELO_DE_DADOS.lado / 2 - medioDado && Math.abs(d.z - SUELO_DE_DADOS.z) < SUELO_DE_DADOS.lado / 2 - medioDado);
+  comprobar(`el paño de dados está FUERA del anillo (z ${SUELO_DE_DADOS.z}) y los dos dados de arista ${ARISTA_DE_LOS_DADOS} caen dentro de sus ${SUELO_DE_DADOS.lado}`, SUELO_DE_DADOS.z - SUELO_DE_DADOS.lado / 2 > MEDIO_LADO && dadosDentro, HUECOS_DE_LOS_DADOS);
+  const panoEnElLienzo = VENTANAS.map((v, k) => {
+    const ventana = { ancho: v.ancho, alto: v.alto, franjaInferior: 0 };
+    const pose = poseDelBurgo(poseDeSalida(ventana), MIRADOR_DEL_BURGO, ventana);
+    const q = proyecta(pose, v.ancho / v.alto, { x: SUELO_DE_DADOS.x, y: 0, z: SUELO_DE_DADOS.z + SUELO_DE_DADOS.lado / 2 });
+    return { nombre: v.nombre, dentro: q.delante && Math.abs(q.x) <= 1 && Math.abs(q.y) <= 1, y: r(q.y), k };
   });
-  comprobar('y todas sus piezas quedan entre la muralla y la acera, a más de 3 del eje de cada puerta', rondaMal.length === 0, rondaMal.map((p) => `${p.pieza} (${r(p.x)}, ${r(p.z)})`));
+  comprobar('y el paño se ve entero desde la pose de salida en las tres ventanas', panoEnElLienzo.every((q) => q.dentro), panoEnElLienzo);
 
-  /* El campo: 30 teselas fuera del anillo, determinista por semilla. */
+  /* El campo: un MANTO contiguo, no un puñado de teselas sueltas. */
   const a = campo(7);
   const b = campo(7);
   const otro = campo(8);
-  comprobar(`el campo tiene ${TESELAS_DEL_CAMPO} teselas, todas fuera del anillo y sin repetir`, a.teselas.length === TESELAS_DEL_CAMPO && a.teselas.every((t) => Math.max(Math.abs(t.x), Math.abs(t.z)) > MEDIO_LADO + 5) && new Set(a.teselas.map((t) => `${t.x},${t.z}`)).size === TESELAS_DEL_CAMPO, a.teselas.length);
+  const candidatas = candidatasDelCampo();
+  comprobar(`el manto pone TODAS las teselas de la corona (${candidatas.length}), sin repetir y sin dejar un hueco`, a.teselas.length === candidatas.length && new Set(a.teselas.map((t) => `${r(t.x)},${r(t.z)}`)).size === candidatas.length, a.teselas.length);
+  comprobar('el manto es continuo: cada tesela tiene al menos cuatro vecinas a un paso de panal', vecindadDelManto(a.teselas) >= 4, vecindadDelManto(a.teselas));
+  comprobar('el manto empieza DENTRO del tablero y no deja junta a la vista, y va tucado bajo él', CORONA.desde < MEDIO_LADO && a.teselas.every((t) => t.y === ALTURA_DEL_MANTO), { desde: CORONA.desde, y: ALTURA_DEL_MANTO });
   comprobar('la misma semilla da el mismo campo y otra semilla otro', JSON.stringify(a) === JSON.stringify(b) && JSON.stringify(a) !== JSON.stringify(otro));
-  comprobar('dos colinas y dos arboledas sobre sus teselas, y tres nubes a 28 de alto', a.decorado.length === 4 && a.decorado.every((d) => a.teselas.some((t) => t.x === d.x && t.z === d.z)) && a.nubes.length === 3 && a.nubes.every((n) => n.y === 28), a.decorado.map((d) => d.pieza));
+  comprobar(`las ${MANCHAS_DEL_CAMPO} manchas van en grupos de dos o tres piezas y todas lejos del tablero (${MANCHAS_LEJOS_DEL_TABLERO})`, a.decorado.length === otro.decorado.length && a.decorado.every((d) => Math.max(Math.abs(d.x), Math.abs(d.z)) > MEDIO_LADO + 2), a.decorado.length);
+  comprobar(`las nubes van a ${ALTURA_DE_LAS_NUBES} de alto y FUERA del anillo: ninguna encima del tablero`, a.nubes.length === 5 && a.nubes.every((n) => n.y === ALTURA_DE_LAS_NUBES && Math.hypot(n.x, n.z) >= NUBES_LEJOS_DEL_TABLERO - 1e-9), a.nubes.map((n) => `${r(Math.hypot(n.x, n.z))}`));
+  /*
+   * Y NINGUNA MANCHA ENCIMA DEL PAÑO DE DADOS. La corona del manto es estrecha comparada con
+   * el tablero, y con las manchas sembradas al azar una arboleda caía sobre el paño y tapaba
+   * los dados: no daba error, sólo escondía la tirada. Se mide con el paño engordado.
+   */
+  const enElPano = (p: Punto): boolean => Math.abs(p.x - SUELO_DE_DADOS.x) < SUELO_DE_DADOS.lado / 2 && Math.abs(p.z - SUELO_DE_DADOS.z) < SUELO_DE_DADOS.lado / 2;
+  const sobreElPano = [7, 8, 99, 1234].flatMap((s) => campo(s).decorado.filter((d) => enElPano({ x: d.x, z: d.z })));
+  comprobar('y con cuatro semillas distintas ninguna mancha del campo cae sobre el paño de dados', sobreElPano.length === 0, sobreElPano.slice(0, 4).map((d) => `${d.pieza} (${r(d.x)}, ${r(d.z)})`));
+  /* Vacuna: la siembra vieja —treinta teselas barajadas— dejaría huecos y se ve caer. */
+  comprobar('se ve fallar: con treinta teselas sueltas el manto no es continuo', vecindadDelManto(a.teselas.slice(0, 30)) < 4, vecindadDelManto(a.teselas.slice(0, 30)));
 
   /* Todo lo que se instancia existe en el fichero. */
   const nombres = new Set(nombresDelBurgo());
   const desconocidas = [...mundoEstatico(7, 'plena'), ...a.nubes].filter((p) => !nombres.has(p.pieza)).map((p) => p.pieza);
   comprobar('todas las piezas del mundo estático están en burgo.glb', desconocidas.length === 0, desconocidas);
-  comprobar('la ribera y las esquinas no se cuelan en la lista de solares más de una vez', puestasDeLosSolares().filter((p) => p.pieza === PIEZA.muelle).length === 1);
+
+  /*
+   * EL RECINTO DE LA CIUDAD: el contrato con `ciudad.ts`, que lo escribe otro.
+   *
+   * Si estos números se mueven aquí y no allí, la ciudad se sale del tablero o deja un
+   * cerco de suelo vacío alrededor, y ninguna de las dos cosas da error.
+   */
+  comprobar(
+    'el recinto mide 648 de lado, con el borde a 324, cincuenta y cuatro celdas de doce y el centro en el origen',
+    RECINTO_DE_LA_CIUDAD.lado === 648 && RECINTO_DE_LA_CIUDAD.borde === 324 && RECINTO_DE_LA_CIUDAD.celdas === 54 && RECINTO_DE_LA_CIUDAD.reticula === RETICULA_DE_LA_CIUDAD && RECINTO_DE_LA_CIUDAD.centro.x === 0 && RECINTO_DE_LA_CIUDAD.centro.z === 0,
+    RECINTO_DE_LA_CIUDAD,
+  );
+  comprobar('648 = 54 × 12: la retícula de la ciudad llena el recinto sin resto', LADO_INTERIOR === CELDAS_DE_LA_CIUDAD * RETICULA_DE_LA_CIUDAD);
+  comprobar(
+    'la celda (0, 0) está en (−318, −318) y la (53, 53) en (318, 318): la retícula llena el recinto justo',
+    centroDeCelda(0, 0).x === -318 && centroDeCelda(0, 0).z === -318 && centroDeCelda(53, 53).x === 318 && centroDeCelda(53, 53).z === 318,
+    [centroDeCelda(0, 0), centroDeCelda(53, 53)],
+  );
+  /*
+   * EL ESQUELETO DE LA CIUDAD CRECE CON ELLA. Con 54 celdas por lado, un bulevar de una celda
+   * y unas avenidas de dos serían hilos: 12 de ronda para 458 metros de ciudad no es un
+   * bulevar. Bulevar de DOS celdas (24) y avenidas de CUATRO (48), y las cuatro celdas de la
+   * avenida tienen que caer SIMÉTRICAS respecto del eje, o la avenida entra torcida por su
+   * Puerta y nadie lo ve hasta que se mira una captura.
+   */
+  const avenidaSimetrica = CELDAS_DE_LA_AVENIDA.length === 4 && CELDAS_DE_LA_AVENIDA.every((c, k) => c + (CELDAS_DE_LA_AVENIDA[CELDAS_DE_LA_AVENIDA.length - 1 - k] as number) === CELDAS_DE_LA_CIUDAD - 1);
+  comprobar(
+    'el bulevar son dos celdas por borde (24) y la avenida cuatro (48), simétricas respecto del eje del recinto',
+    CELDAS_DEL_BULEVAR.length === 4 && ANCHO_DEL_BULEVAR === 24 && ANCHO_DE_LA_AVENIDA === 48 && avenidaSimetrica,
+    { CELDAS_DEL_BULEVAR, CELDAS_DE_LA_AVENIDA },
+  );
+  comprobar('y la glorieta son las dieciséis celdas donde la avenida cruza a la avenida', CELDAS_DE_LA_GLORIETA.length === 4 && CELDAS_DE_LA_GLORIETA.join() === CELDAS_DE_LA_AVENIDA.join());
+  const bocas = PUERTAS_DE_LA_CIUDAD;
+  const bocasMal = bocas.filter((b2) => {
+    const m = marcoDeCasilla(b2.casilla);
+    const { radial, aLoLargo } = enElMarco(m, b2.entrada);
+    return Math.abs(radial - BORDE_INTERIOR) > 1e-9 || Math.abs(aLoLargo) > 1e-9 || b2.ancho !== 48 || b2.celdas.join() !== CELDAS_DE_LA_AVENIDA.join();
+  });
+  comprobar('las cuatro avenidas entran por el borde del recinto encaradas EXACTAMENTE con las casillas 5, 15, 25 y 35, con 48 de ancho y por las celdas 25 a 28', bocas.length === 4 && bocasMal.length === 0 && bocas.map((b2) => b2.casilla).join() === '5,15,25,35', bocas.map((b2) => `${b2.casilla}: (${r(b2.entrada.x)}, ${r(b2.entrada.z)}) eje ${b2.eje}`));
+  comprobar('y la avenida (48) es más estrecha que la casilla (72): quedan 12 de acera a cada lado, que es donde van los dos semáforos de la Puerta', (ANCHO_DE_CASILLA - ANCHO_DE_LA_AVENIDA) / 2 === 12);
+  /* Y la cebra de la Puerta cubre la avenida ENTERA: cuatro losas de 12 son 48. */
+  const cebrasDeLaPuerta = (ATREZO_DE_LA_CASILLA[5] ?? []).filter((p) => p.pieza === PIEZA.calzadaPaso);
+  comprobar('la Puerta pone cuatro losas de cebra: cubren los 48 de la avenida sin dejar hueco', cebrasDeLaPuerta.length * RETICULA_DE_LA_CIUDAD === ANCHO_DE_LA_AVENIDA, cebrasDeLaPuerta.length);
 }
 
 // ---------------------------------------------------------------------------
@@ -610,11 +979,30 @@ const triangulosDeUnAventurero = await (async (): Promise<number> => {
   comprobar('la suma plena no pide piezas que el fichero no tenga', plena.desconocidas.length === 0 && sobria.desconocidas.length === 0, [...plena.desconocidas, ...sobria.desconocidas]);
   comprobar(`el tablero lleno en calidad plena, con un aventurero, baja de ${TOPE_PLENA.toLocaleString('es-ES')}`, plena.total <= TOPE_PLENA, plena.total);
   comprobar(`y en sobria baja de ${TOPE_SOBRIA.toLocaleString('es-ES')}`, sobria.total <= TOPE_SOBRIA, sobria.total);
-  comprobar('la sobria quita de verdad: campo, ronda, aventurero, monedas, mesas', plena.total - sobria.total > 15_000, plena.total - sobria.total);
-  /* La vacuna: doce tabernas como posada tienen que caer. */
-  const conTaberna = { ...MULTIPLICIDADES_PLENA, [PIEZA.posada]: 12, [PIEZA.casa]: 32, [PIEZA.bandera]: 28 };
-  const envenenada = sumaDelPresupuesto(conTaberna, (p) => triangulos.get(p), 'plena', triangulosDeUnAventurero);
-  comprobar('se ve fallar: una tabla con la taberna como posada (× 12) se pasa del tope', envenenada.total > TOPE_PLENA, envenenada.total);
+  comprobar('la sobria quita de verdad: decorado del campo, atrezo menudo, aventurero y monedas', plena.total - sobria.total > 15_000, plena.total - sobria.total);
+  /*
+   * LA VACUNA: la ciudad de 648 generada SIN nivel de detalle.
+   *
+   * El veneno tiene que ser el error que de verdad se puede cometer con el recinto nuevo, y
+   * ya no es «trescientos bloques»: con 54 × 54 celdas y las manzanas que salen de la
+   * retícula hay sitio para unos mil quinientos edificios, y soltarlos todos a la vez —que es
+   * exactamente lo que pasa si alguien monta la ciudad entera en L1— son 2,8 millones de
+   * triángulos con el bloque más caro del pack. Trescientos ya no bastarían para verlo caer:
+   * cabrían en el tope nuevo. Por eso el veneno sube con el recinto.
+   */
+  const CIUDAD_ENTERA_SIN_NIVELES = 1_500;
+  const bloqueEnCadaCelda = { ...MULTIPLICIDADES_PLENA, [PIEZA.bloqueH]: CIUDAD_ENTERA_SIN_NIVELES };
+  const envenenada = sumaDelPresupuesto(bloqueEnCadaCelda, (p) => triangulos.get(p), 'plena', triangulosDeUnAventurero);
+  comprobar('se ve fallar: la ciudad entera montada a la vez, sin niveles de detalle, se pasa del tope por tres veces', envenenada.total > TOPE_PLENA, envenenada.total);
+  comprobar('los topes son los de LA-CIUDAD.md §8 (900.000 y 230.000), declarados en burgo/presupuesto.ts y no heredados del Muelle', TOPE_PLENA === 900_000 && TOPE_SOBRIA === 230_000, { TOPE_PLENA, TOPE_SOBRIA });
+  comprobar('y el TABLERO solo, sin la ciudad, no llega a la mitad del tope: el resto es el sitio que la ciudad tiene reservado', plena.total < TOPE_PLENA / 2, plena.total);
+  /*
+   * Y EL MANTO ES LA PARTIDA MÁS GORDA DEL TABLERO: 1.796 teselas de 36. Se anota aquí, con
+   * su número, porque es lo primero que hay que mirar si el tope vuelve a quedarse corto — y
+   * porque es lo único del tablero que el móvil paga entero, ya que el paisaje no se quita.
+   */
+  const teselasEnLaSuma = plena.renglones.find((q) => q.que === PIEZA.tesela);
+  comprobar('el manto del campo son 1.796 teselas y menos de un tercio del tablero en plena', (teselasEnLaSuma?.cuantos ?? 0) === 1796 && (teselasEnLaSuma?.triangulos ?? 0) < plena.total / 3, teselasEnLaSuma);
 }
 
 // ---------------------------------------------------------------------------
@@ -737,7 +1125,23 @@ function mueve(desde: number, pasos: number, como: 'anda' | 'viaja' | 'retrocede
   comprobar(`doce casillas nunca duran más de ${TOPE_DEL_RECORRIDO} s, salgan de donde salgan`, largas.length === 0, largas);
   comprobar('tres casillas nunca duran más de 6,75 s', cortas.length === 0, cortas);
   comprobar('y el clip nunca pasa de 1,5', rapidas.length === 0, rapidas);
-  comprobar('hasta tres casillas se anda a 4 u/s y con cuatro se corre a 8', CASILLAS_ANDANDO === 3 && r(duracionDelRecorrido(24, 3, 'anda')) === 6 && r(duracionDelRecorrido(32, 4, 'anda')) === 4);
+  /*
+   * EL RITMO DE LA MARCHA ES LA DECISIÓN QUE OBLIGÓ EL TABLERO GRANDE.
+   *
+   * Con la casilla en 72 de frente, a `PASO_POR_SEGUNDO` (4) un aventurero tardaría 18 s en
+   * cruzar UNA casilla. La marcha en el tablero se multiplica por 12 —48 u/s andando y 96
+   * corriendo— y el porqué está escrito en `peon.ts`. Aquí se afirma el número y se ve caer
+   * lo que pasaría si alguien lo devolviera al paso de una persona.
+   */
+  comprobar(
+    'hasta tres casillas se anda a 48 u/s y con cuatro se corre a 96: una casilla en 1,5 s y tres en 4,5',
+    CASILLAS_ANDANDO === 3 && VELOCIDAD_ANDANDO === 48 && VELOCIDAD_CORRIENDO === 96 && r(duracionDelRecorrido(216, 3, 'anda')) === 4.5 && r(duracionDelRecorrido(288, 4, 'anda')) === 3,
+    { VELOCIDAD_ANDANDO, VELOCIDAD_CORRIENDO },
+  );
+  comprobar('se ve fallar: a paso de persona (4 u/s) una sola casilla de 72 duraría 18 s, más del doble del tope del recorrido entero', ANCHO_DE_CASILLA / 4 > 2 * TOPE_DEL_RECORRIDO, ANCHO_DE_CASILLA / 4);
+  /* Y la tirada media —siete casillas— tiene que caber holgada, no rozando el tope. */
+  const siete = duracionDelRecorrido(7 * ANCHO_DE_CASILLA, 7, 'anda');
+  comprobar('la tirada media (siete casillas, 504 unidades) dura 5,25 s: por debajo de dos tercios del tope', r(siete) === 5.25 && siete < (2 * TOPE_DEL_RECORRIDO) / 3, r(siete));
 
   /* Un movimiento entero, paso a paso: nace, recoge, anda, salta, y el peón reaparece. */
   let ahora = 0;
@@ -813,7 +1217,7 @@ function mueve(desde: number, pasos: number, como: 'anda' | 'viaja' | 'retrocede
   }
   comprobar('a la Mazmorra sin pisar casillas: sólo la 33 y la 10, en unos 3,5 s, y acaba presa en la celda', [...pisadas].every((c) => c === 33 || c === 10) && e.presa && e.enCasilla === MAZMORRA && duracion > 3.3 && duracion < 3.8, { pisadas: [...pisadas], duracion: r(duracion), presa: e.presa });
   const enLaCelda = enLaEsquina(marcoDeCasilla(MAZMORRA), posicionYRumbo(e, anillo, ahora));
-  comprobar('y su aventurero y su peón están en la celda', enLaCelda.u > CELDA.centro - 3 && enLaCelda.v > CELDA.centro - 3 && posicionDelPeon(e, anillo, ahora).visible, enLaCelda);
+  comprobar('y su aventurero y su peón están en el patio de la cárcel', Math.abs(enLaCelda.u - CELDA.u) < CELDA.lado && Math.abs(enLaCelda.v - CELDA.v) < CELDA.lado && posicionDelPeon(e, anillo, ahora).visible, enLaCelda);
 
   /* Sigue presa: golpe contra la reja; sale: la reja sube, salto, libre. */
   e = encolar(e, [{ que: 'sigue-presa', quien: A, intento: 1 }]);
@@ -866,7 +1270,17 @@ function mueve(desde: number, pasos: number, como: 'anda' | 'viaja' | 'retrocede
       tumbado = Math.max(tumbado, posicionDelPeon(q, anillo, tq).tumbado);
     }
   }
-  comprobar('quebrar: golpe, huida de 14 hacia fuera del anillo, el peón cae de lado, y al final no queda nadie', q.quebrada && !q.enPie && lejosDelAnillo > MEDIO_LADO + 8 && tumbado === 1 && !posicionDelPeon(q, anillo, tq).visible, { lejos: r(lejosDelAnillo), tumbado });
+  /*
+   * LA HUIDA SE MIDE CONTRA LA LÍNEA DE LA MARCHA, NO CONTRA EL BORDE DEL TABLERO.
+   *
+   * `HUIDA_AL_QUEBRAR` vale 14 en `peon.ts`, que no se toca desde aquí. Con el tablero de
+   * 100 esas catorce unidades sacaban al quebrado FUERA del anillo; con el de 384 la línea
+   * de la marcha está a 155 y el borde a 192, así que ya no lo sacan: lo dejan en 169,
+   * todavía sobre la superficie de su casilla. Lo que este juez puede afirmar es que huye
+   * hacia fuera lo que dice su constante; que llegue a salirse del tablero pide subir
+   * `HUIDA_AL_QUEBRAR` a unas 45, y está dicho en el informe.
+   */
+  comprobar('quebrar: golpe, huida de 14 hacia fuera, el peón cae de lado, y al final no queda nadie', q.quebrada && !q.enPie && lejosDelAnillo > LINEA_DE_LA_MARCHA + 12 && tumbado === 1 && !posicionDelPeon(q, anillo, tq).visible, { lejos: r(lejosDelAnillo), tumbado });
 
   /* La duración de cada clip es la real. */
   comprobar('las duraciones que usa el peón son las de gestos.ts (aparecer 1,3; salto 1,167; golpe 0,667)', DURACION.aparecer === 1.3 && DURACION.salto === 1.167 && DURACION.golpe === 0.667);
@@ -950,12 +1364,7 @@ paso('La cámara: las cuatro esquinas caen en el lienzo en 16:9, 3:4 y 9:19,5; d
     { x: -MEDIO_LADO, z: -MEDIO_LADO },
     { x: MEDIO_LADO, z: -MEDIO_LADO },
   ];
-  const ventanas = [
-    { nombre: '16:9', ancho: 1920, alto: 1080 },
-    { nombre: '3:4', ancho: 768, alto: 1024 },
-    /* El móvil de 9:19,5 con el lienzo al 58 % del alto: 390 × (845 · 0,58). */
-    { nombre: '9:19,5 al 58 %', ancho: 390, alto: Math.round(845 * 0.58) },
-  ];
+  const ventanas = VENTANAS;
   const fuera: string[] = [];
   const margenes: string[] = [];
   for (const v of ventanas) {
@@ -969,7 +1378,7 @@ paso('La cámara: las cuatro esquinas caen en el lienzo en 16:9, 3:4 y 9:19,5; d
     }
   }
   console.log(`  esquinas proyectadas: ${margenes.join('  ')}`);
-  comprobar('las cuatro esquinas (±50, ±50) caen dentro del lienzo en 16:9', fuera.filter((f) => f.startsWith('16:9')).length === 0, fuera);
+  comprobar('las cuatro esquinas (±432, ±432) caen dentro del lienzo en 16:9', fuera.filter((f) => f.startsWith('16:9')).length === 0, fuera);
   comprobar('y en 3:4', fuera.filter((f) => f.startsWith('3:4')).length === 0, fuera);
   comprobar('y en 9:19,5 con el lienzo al 58 % del alto', fuera.filter((f) => f.startsWith('9:19,5')).length === 0, fuera);
 
@@ -985,10 +1394,28 @@ paso('La cámara: las cuatro esquinas caen en el lienzo en 16:9, 3:4 y 9:19,5; d
   /* A masCerca, una casilla ocupa al menos el 45 % del alto. */
   const m = marcoDeCasilla(5);
   const cerca = poseDelBurgo({ factor: LIMITES_DEL_BURGO.masCerca, centro: { x: m.centro.x, z: m.centro.z } }, MIRADOR_DEL_BURGO, ventana);
-  const ys = [ACERA.desde, SOLAR.hasta].map((radial) => proyecta(cerca, 16 / 9, { x: m.centro.x + m.fuera.x * (radial - LINEA_MEDIA_DE_LA_CALLE), y: 0, z: m.centro.z + m.fuera.z * (radial - LINEA_MEDIA_DE_LA_CALLE) }).y);
+  const ys = [FRANJA.desde, BORDE_CLARO.hasta].map((radial) => proyecta(cerca, 16 / 9, { x: m.centro.x + m.fuera.x * (radial - LINEA_DE_LA_MARCHA), y: 0, z: m.centro.z + m.fuera.z * (radial - LINEA_DE_LA_MARCHA) }).y);
   const alto = Math.abs((ys[0] as number) - (ys[1] as number)) / 2;
   comprobar(`a masCerca (${LIMITES_DEL_BURGO.masCerca}) una casilla ocupa al menos el 45 % del alto del lienzo`, alto >= 0.45, r(alto));
-  comprobar('el alcance es 66: medio lado por 1,32', ALCANCE_DEL_BURGO === 66);
+  comprobar('el alcance es 570,24: medio lado (432) por 1,32', r(ALCANCE_DEL_BURGO) === 570.24, ALCANCE_DEL_BURGO);
+  /*
+   * LA CERCANÍA MÁXIMA NO SE TOCÓ AL TRIPLICAR EL TABLERO, y eso es una afirmación, no una
+   * casualidad: `fondo de casilla / (alcance × masCerca)` valía 48/38,02 con el tablero de
+   * 384 y vale 108/85,54 con el de 864 — el mismo 1,26. Todo lo de `camara-del-burgo.ts` está
+   * escrito como fracción del tablero, y por eso sobrevivió al cambio de escala sin tocarlo.
+   */
+  comprobar(
+    'una casilla ocupa la misma parte del encuadre a masCerca que con el tablero anterior: 108/85,54 = 48/38,02',
+    Math.abs(FONDO_DE_CASILLA / (ALCANCE_DEL_BURGO * LIMITES_DEL_BURGO.masCerca) - 48 / (253.44 * 0.15)) < 1e-9,
+    r(FONDO_DE_CASILLA / (ALCANCE_DEL_BURGO * LIMITES_DEL_BURGO.masCerca)),
+  );
+  /*
+   * EL CORRIMIENTO EN APAISADO SE MIDE EN TABLEROS. Estaba escrito a pelo (16, del tablero
+   * de 100) y al crecer el tablero dejó de valer: la esquina más cercana se salía por abajo
+   * a −1,12. Ahora es `MEDIO_LADO × 0,32`, que dio 16 con el tablero de 100, 61,44 con el de
+   * 384 y 138,24 con el de 864, sin tocarlo ninguna de las tres veces.
+   */
+  comprobar('el corrimiento en apaisado es una fracción del tablero (138,24 = 432 × 0,32), no un número escrito a pelo', r(CORRIMIENTO_EN_APAISADO) === 138.24, CORRIMIENTO_EN_APAISADO);
 
   /* Seguir: converge al que mueve. */
   let c = poseDeSalida(ventana);
@@ -1046,11 +1473,202 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   const asiento: [number, number, number] = [0.6, 0.3, 0.1];
   const tenido = colorTenido(azul, asiento, AZUL_DE_LAS_FICHAS);
   comprobar('asiento × gris es exactamente lo que da colorTenido, canal a canal (antes del recorte a 1)', Math.abs(tenido[0] - Math.min(1, asiento[0] * gris)) < 1e-9 && Math.abs(tenido[1] - Math.min(1, asiento[1] * gris)) < 1e-9 && Math.abs(tenido[2] - Math.min(1, asiento[2] * gris)) < 1e-9);
-  comprobar('la casa y el peón se tiñen enteros; la bandera no', seTineEntera(PIEZA.casa) && seTineEntera(PIEZA.peon) && !seTineEntera(PIEZA.bandera));
+  /*
+   * LAS SEIS DE ASIENTO SE TIÑEN ENTERAS, y la lista es cerrada.
+   *
+   * Antes esta línea decía «la bandera no», porque la bandera era la del pack hexagonal y
+   * traía un mástil de madera que no cambiaba de color. Las seis de ahora son de Board Game
+   * Bits, y el compilador MIDIÓ que las seis difieren en todos sus vértices entre la variante
+   * azul y la roja: se negó a escribir el fichero hasta que la declaración lo dijo. Se
+   * comprueba también que una pieza cualquiera de la ciudad NO se tiñe, que es la mitad que
+   * de verdad puede romperse sin que se note.
+   */
+  comprobar(
+    'las seis piezas de asiento se tiñen enteras, y un bloque de la ciudad no se tiñe',
+    seTineEntera(PIEZA.casa) && seTineEntera(PIEZA.peon) && seTineEntera(PIEZA.bandera) && seTineEntera(PIEZA.estandarte) && !seTineEntera(PIEZA.bloqueA),
+  );
   comprobar('la casa se mide contra el azul de las fichas y la bandera contra el del hexagonal', referenciaDe(PIEZA.casa) === AZUL_DE_LAS_FICHAS && referenciaDe(PIEZA.bandera) === AZUL_DEL_PACK);
   const colores = coloresDeLasBanderas(['#26262e', '#f2e8cf', '#26262e', '#7d3fd6']);
   comprobar('las banderas van por color: sin repetir, con el ámbar del Concejo y en orden estable', colores.length === 4 && colores.includes(AMBAR_DEL_CONCEJO) && colores.join() === [...colores].sort().join());
   comprobar('seis asientos y el ámbar son como mucho siete mallas de bandera', coloresDeLasBanderas(['#1', '#2', '#3', '#4', '#5', '#6']).length === 7);
+}
+
+// ---------------------------------------------------------------------------
+paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lienzo');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ QUÉ SE COMPRA AQUÍ, Y POR QUÉ ES OTRO GUION QUE `verify:la-ciudad` ═══
+ *
+ * `verificar-la-ciudad.ts` juzga la DESCRIPCIÓN de la ciudad: cuántas celdas, cuántos
+ * triángulos dice cada nivel, si la red de calles se cierra. Esto juzga lo que `Burgo.tsx`
+ * MONTA con esa descripción, que es otra cosa y puede divergir en silencio:
+ *
+ *   · Que un bulto de `n` triángulos se construya con `n` triángulos EXACTOS. Si la escena
+ *     dibujara una caja de 12 donde el presupuesto dice 30, `verify:la-ciudad` seguiría en
+ *     verde midiendo su propia tabla y el móvil se caería igual.
+ *   · Que los precios y los emblemas estén MONTADOS —una geometría con triángulos dentro— y
+ *     que se lean en el sentido bueno, que es el fallo que hubo: los dígitos salían
+ *     espejados («06» por «60») y eso no parece un fallo de orientación, parece una fuente.
+ *   · Que las capas por cercanía se muevan como dice el plano y que la HISTÉRESIS exista de
+ *     verdad, con la vacuna de verla no existir.
+ *   · Que los coches que circulan vayan por el EJE DE SU CARRIL y no por el eje de la calle.
+ *   · Que en el anillo no quede nada de muralla: ni pieza, ni palabra, ni hueco.
+ *
+ * `ciudad-en-3d.ts` importa `three` pero NO abre un contexto de dibujo (`BufferGeometry` y
+ * `ShapePath` son aritmética), así que aquí se pueden pedir las geometrías de verdad.
+ */
+{
+  const { claveDelBulto, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
+  const { HISTERESIS_DEL_NIVEL, TONO_DEL_EDIFICIO, TONO_POR_DEFECTO, UMBRALES_DE_NIVEL, ciudadDelCodigo, cocheEnElInstante, montarLaCiudad, nivelDelGrupo, triangulosDeUnaTorre, ANCHO_DEL_CARRIL, ANCHO_DEL_BORDILLO, EJE_DEL_CARRIL } = await import('../burgo/ciudad');
+  /* La retícula es de `piezas.ts` y `ciudad.ts` no la reexporta: pedírsela a `ciudad` devolvía `undefined` en silencio y el juez del carril se caía comparando con NaN. */
+  const RETICULA = RETICULA_DE_LA_CIUDAD;
+  const { cuantosTriangulos } = await import('../formas');
+  const laCiudad = ciudadDelCodigo('BANCO');
+
+  /* ── 1. Cada bulto tiene los triángulos que su presupuesto declara ── */
+  const cuentas = new Map<string, { triangulos: number; llano: boolean }>();
+  for (const g of laCiudad.grupos) {
+    for (const nivel of g.niveles) {
+      for (const b of nivel.bultos) cuentas.set(claveDelBulto(b.triangulos, b.alto <= 0), { triangulos: b.triangulos, llano: b.alto <= 0 });
+    }
+  }
+  const bultosMal: string[] = [];
+  for (const [clave, v] of cuentas) {
+    const medidos = cuantosTriangulos(geometriaDeUnBulto(v.triangulos, v.llano));
+    if (medidos !== v.triangulos) bultosMal.push(`${clave}: la escena dibuja ${String(medidos)} y el presupuesto cuenta ${String(v.triangulos)}`);
+  }
+  comprobar(`las ${cuentas.size} clases de bulto de la ciudad se dibujan con los triángulos EXACTOS que suma el presupuesto`, bultosMal.length === 0, bultosMal.slice(0, 5));
+  /* Y las nueve alturas de torre, que la semilla del banco no tiene por qué traer todas. */
+  const torresMal: number[] = [];
+  for (let plantas = 6; plantas <= 14; plantas++) {
+    const n = triangulosDeUnaTorre(plantas);
+    if (cuantosTriangulos(geometriaDeUnBulto(n, false)) !== n) torresMal.push(plantas);
+  }
+  comprobar('y las nueve alturas de torre también: 12 de prisma, 8 por planta y 20 de remate', torresMal.length === 0, torresMal);
+  comprobar('el reparto de una caja es exacto: 30 triángulos son dos bandas y una cornisa, y vuelven a sumar 30', repartoDeLaCaja(30).bandas === 2 && repartoDeLaCaja(30).cornisas === 1 && triangulosDeUnaCaja(2, 1) === 30);
+  /* La vacuna: una cuenta que la regla NO puede construir tiene que salir distinta. */
+  comprobar('se ve fallar: pedir un bulto de 13 triángulos devuelve 14, y el juez lo vería', cuantosTriangulos(geometriaDeUnBulto(13, false)) !== 13);
+  /* Y las nueve cintas: cada una gasta exactamente lo que declara, repartido entre sus tramos. */
+  const cintasMal: string[] = [];
+  for (const c of laCiudad.cintas) {
+    const g = geometriaDeUnaCinta(c);
+    const medidos = cuantosTriangulos(g);
+    g.dispose();
+    if (medidos !== c.triangulos) cintasMal.push(`${c.clase} de ${String(c.puntos.length)} puntos: declara ${String(c.triangulos)} y dibuja ${String(medidos)}`);
+  }
+  comprobar(`las ${String(laCiudad.cintas.length)} cintas se dibujan con los triángulos que declaran, aunque su polilínea tenga menos vértices que cuadros`, cintasMal.length === 0, cintasMal.slice(0, 4));
+
+  /* ── 2. Los precios y los emblemas están MONTADOS y se leen del derecho ── */
+  const rotulos = geometriaDeLosRotulos();
+  comprobar('los rótulos del tablero se funden en UNA geometría con triángulos dentro', rotulos !== null && rotulos.triangulos > 0, rotulos === null ? 'null' : rotulos.triangulos);
+  if (rotulos !== null) {
+    comprobar(
+      `están los ${String(guarismosDelTablero())} dígitos del reglamento y los doce emblemas, ni uno menos`,
+      rotulos.guarismos === guarismosDelTablero() && rotulos.emblemas === huecosDeLosEmblemas().length,
+      { guarismos: rotulos.guarismos, emblemas: rotulos.emblemas },
+    );
+    /* El presupuesto los cuenta a 60 y 120: la medida real no puede pasarse del doble. */
+    const presupuestados = guarismosDelTablero() * TRIANGULOS_POR_GUARISMO + huecosDeLosEmblemas().length * TRIANGULOS_POR_EMBLEMA;
+    comprobar(
+      `y pesan ${String(rotulos.triangulos)} triángulos, del orden de los ${String(presupuestados)} que el presupuesto les guarda`,
+      rotulos.triangulos > presupuestados / 3 && rotulos.triangulos < presupuestados * 2,
+      { medidos: rotulos.triangulos, presupuestados },
+    );
+    rotulos.geometria.dispose();
+  }
+  /*
+   * EL SENTIDO DE LECTURA, QUE ES EL FALLO QUE HUBO Y NO SE VE EN NINGÚN NÚMERO.
+   *
+   * Quien lee el tablero está FUERA del anillo. Para un ojo en `+fuera` mirando al centro, la
+   * «derecha» de la pantalla proyectada en el suelo es `−adelante` (el producto vectorial de
+   * la mirada con la vertical). Así que el dígito `k + 1` de un precio tiene que caer hacia
+   * `−adelante` respecto del `k`. Escribiéndolos al revés —que es lo que hacía la primera
+   * versión— el 60 se lee «06» y el 400 «004»: se vio en el banco y no en ninguna cuenta.
+   */
+  const alReves: string[] = [];
+  for (let i = 0; i < CASILLAS; i++) {
+    const digitos = guarismosDelPrecio(i);
+    if (digitos.length < 2) continue;
+    const m = marcoDeCasilla(i);
+    const primero = digitos[0] as { x: number; z: number };
+    const segundo = digitos[1] as { x: number; z: number };
+    const haciaDonde = (segundo.x - primero.x) * m.adelante.x + (segundo.z - primero.z) * m.adelante.z;
+    if (haciaDonde >= 0) alReves.push(`${String(i)}: el segundo dígito cae hacia +adelante`);
+  }
+  comprobar('los dígitos de un precio se escriben hacia −adelante, que es la derecha de quien mira desde fuera del anillo', alReves.length === 0, alReves.slice(0, 4));
+  comprobar('se ve fallar: con el orden de antes (+adelante) las treinta casillas con cifra caerían', PRECIO_DE_LA_CASILLA.filter((p) => p > 0 && String(p).length >= 2).length >= 25);
+
+  /* ── 3. Las capas por cercanía, y la histéresis que hace que no parpadeen ── */
+  const unGrupo = laCiudad.grupos.find((g) => g.clase === 'manzana');
+  if (unGrupo !== undefined) {
+    const alto = UMBRALES_DE_NIVEL.plena.alto;
+    const dentro = { x: unGrupo.centro.x, z: unGrupo.centro.z };
+    const justoFuera = { x: unGrupo.centro.x + alto + 1, z: unGrupo.centro.z };
+    comprobar('un grupo con la cámara encima va a L1', nivelDelGrupo(unGrupo, dentro.x, dentro.z, 'plena') === 0);
+    comprobar('y a un palmo del umbral de L1, sin memoria, cae a L2', nivelDelGrupo(unGrupo, justoFuera.x, justoFuera.z, 'plena') === 1);
+    comprobar(
+      'con memoria de que estaba en L1, la histéresis lo mantiene en L1 hasta 40 unidades más allá',
+      nivelDelGrupo(unGrupo, justoFuera.x, justoFuera.z, 'plena', 0) === 0 && nivelDelGrupo(unGrupo, unGrupo.centro.x + alto + HISTERESIS_DEL_NIVEL + 1, unGrupo.centro.z, 'plena', 0) === 1,
+    );
+    /* La vacuna: sin histéresis, medio metro de cámara cambia el montaje entero. */
+    comprobar(
+      'se ve fallar: SIN histéresis, un palmo a un lado del umbral ya cambia de nivel — que es el parpadeo que se quería quitar',
+      nivelDelGrupo(unGrupo, unGrupo.centro.x + alto - 0.5, unGrupo.centro.z, 'plena') !== nivelDelGrupo(unGrupo, unGrupo.centro.x + alto + 0.5, unGrupo.centro.z, 'plena'),
+    );
+  }
+  /*
+   * Y LA POSE QUE EL JUGADOR VE SIEMPRE: la de salida tiene que montar CIUDAD, no manchas.
+   * Es el fallo que se vio mirando: con el umbral de L2 en 420 la ciudad entera caía a L3 y
+   * se montaban 9.742 triángulos de los 692.000 que hay. Aquí se afirma lo contrario.
+   */
+  const ventanaDeSalida = { ancho: 1920, alto: 1080, franjaInferior: 0 };
+  const ojoDeSalida = poseDelBurgo(poseDeSalida(ventanaDeSalida), MIRADOR_DEL_BURGO, ventanaDeSalida).posicion;
+  const desdeLaSalida = montarLaCiudad(laCiudad, ojoDeSalida.x, ojoDeSalida.z);
+  comprobar(
+    `desde la pose de salida la ciudad monta ${String(desdeLaSalida.triangulos)} triángulos y no un puñado: el nivel medio alcanza hasta ${String(UMBRALES_DE_NIVEL.plena.medio)}`,
+    desdeLaSalida.triangulos > 100_000 && (desdeLaSalida.gruposPorNivel[1] as number) === laCiudad.grupos.length,
+    desdeLaSalida.gruposPorNivel,
+  );
+
+  /* ── 4. Los coches que circulan van por el eje de SU carril ── */
+  const fueraDeCarril: string[] = [];
+  for (const ruta of laCiudad.coches.rutas) {
+    if (ruta.clase !== 'calle') continue;
+    for (let k = 0; k < 24; k++) {
+      const c = cocheEnElInstante(ruta, k * 1.7);
+      /* El eje del carril está a `EJE_DEL_CARRIL` (2,7) del eje de la celda: o sea a 3,3 o a 8,7 dentro de la celda de 12. */
+      const dentroX = ((c.x % RETICULA) + RETICULA) % RETICULA;
+      const dentroZ = ((c.z % RETICULA) + RETICULA) % RETICULA;
+      const enEje = (v: number): boolean => Math.abs(v - (RETICULA / 2 - EJE_DEL_CARRIL)) < 0.35 || Math.abs(v - (RETICULA / 2 + EJE_DEL_CARRIL)) < 0.35;
+      if (!enEje(dentroX) && !enEje(dentroZ)) fueraDeCarril.push(`${ruta.pieza} en t=${String(k * 1.7)}: (${r(c.x)}, ${r(c.z)})`);
+    }
+  }
+  comprobar(
+    `los ${String(laCiudad.coches.rutas.filter((x) => x.clase === 'calle').length)} coches de calle van por el eje de su carril (a ${r(EJE_DEL_CARRIL)} del eje de la losa) en las veinticuatro fotos`,
+    fueraDeCarril.length === 0,
+    fueraDeCarril.slice(0, 4),
+  );
+  comprobar('y el carril mide la mitad de la calzada, que es lo que hace que dos coches se crucen sin tocarse', Math.abs(ANCHO_DEL_CARRIL * 2 - (RETICULA - 2 * ANCHO_DEL_BORDILLO)) < 1e-9);
+
+  /* ── 5. Los tonos de los edificios lejanos son los del pack, medidos ── */
+  comprobar('los dieciséis volúmenes del pack tienen tono propio para su prisma de lejos, y ninguno repite el gris por defecto', Object.keys(TONO_DEL_EDIFICIO).length === 16 && !Object.values(TONO_DEL_EDIFICIO).includes(TONO_POR_DEFECTO));
+
+  /* ── 6. Ni muralla ni rastro de ella ── */
+  const fuenteDeLaEscena = sinComentarios(fs.readFileSync(path.join(CARPETA, 'Burgo.tsx'), 'utf8'));
+  const fuenteDelAnillo = sinComentarios(fs.readFileSync(path.join(CARPETA, 'anillo-en-3d.ts'), 'utf8'));
+  /*
+   * En el CÓDIGO, ni una muralla. En los comentarios sí se nombra, y tiene que seguir
+   * nombrándose: la cabecera de `anillo-en-3d.ts` cuenta por qué ya no la hay, con las
+   * palabras de quien la mandó quitar. Un barrido que también mirara los comentarios
+   * castigaría precisamente al que explicó la decisión.
+   */
+  comprobar('en el CÓDIGO del anillo y de la escena no queda ni una muralla: se quitó entera, no se escondió', !/muralla|almena|adarve/i.test(fuenteDeLaEscena) && !/muralla|almena|adarve/i.test(fuenteDelAnillo));
+  comprobar('la escena monta la ciudad de `ciudad.ts` y la reparte por cercanía', /montarLaCiudad\(/.test(fuenteDeLaEscena) && /ciudadDelCodigo\(/.test(fuenteDeLaEscena));
+  comprobar('los interiores se abren DESMONTANDO la cáscara, no escondiéndola', /cascaras\.get\(/.test(fuenteDeLaEscena) && !/visible=\{[^}]*cascara/.test(fuenteDeLaEscena));
+  comprobar('y el suelo del anillo se pide a `suelosDelAnillo`, no se vuelve a calcular en la escena', /suelosDelAnillo\(\)/.test(fuenteDeLaEscena));
+
+  soltarLosBultos();
 }
 
 // ---------------------------------------------------------------------------
@@ -1067,7 +1685,7 @@ if (fallos.length > 0) {
  * a la mitad termina con código cero y una lista corta de aciertos. El número va a mano,
  * con margen, y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 115;
+const COMPROBACIONES_ESCRITAS = 184;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(`Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: se ha caído por el camino sin decirlo. Si has añadido comprobaciones nuevas, sube el número.`);
   process.exit(2);
@@ -1076,13 +1694,23 @@ if (hechas < COMPROBACIONES_ESCRITAS) {
 if (fallos.length === 0) {
   console.log(`${hechas} comprobaciones`);
   console.log(
-    '\nLa aritmética del Burgo cuadra con el fichero real: cada rejilla de huecos cabe en su banda\n' +
-      'con la huella medida, ningún solar pasa de 7,6 de frente ni de 9 de fondo (la ribera entra en\n' +
-      'el agua a sabiendas), las cuatro puertas de la muralla quedan enfrente de las casillas 5, 15,\n' +
-      '25 y 35, la polilínea tiene 40 puntos con las esquinas en ±43,25, el tablero lleno cabe en el\n' +
-      'presupuesto en las dos calidades, el peón anda diez mil pasos sin T-pose y sin salirse de la\n' +
-      'polilínea, doce casillas caben en 8 s, una jugada real en 14, los dados obedecen al par y las\n' +
-      'cuatro esquinas caen en el lienzo en las tres ventanas. Lo que esto NO prueba es que se vea bien.',
+    '\nLa aritmética del Burgo cuadra con el fichero real: el anillo mide 864 con casilla de 72 × 108 y\n' +
+      'esquina de 108, el recinto de la ciudad es 648 —nueve veces el centro original, que es lo que se\n' +
+      'pidió—, las cuatro bandas de la casilla suman su fondo, cada rejilla de huecos cabe en la suya con\n' +
+      'la huella medida, el frente de manzana de dos cuerpos no se sale ni pisa el carril del avatar, el\n' +
+      'precio es el del reglamento y se lee en los mismos píxeles que antes porque creció con el tablero,\n' +
+      'no queda una sola pieza medieval en el anillo, las cuatro esquinas son manzanas de nueve por nueve\n' +
+      'celdas que no tocan la ele de la marcha, el campo es un manto continuo con las nubes fuera y el\n' +
+      'paño de dados despejado, las cuatro avenidas de 48 entran encaradas a las casillas 5, 15, 25 y 35,\n' +
+      'el tablero cabe en el presupuesto dejando sitio a la ciudad, el peón cruza una casilla en 1,5 s y\n' +
+      'anda diez mil pasos sin T-pose ni salirse de la polilínea, una jugada real cabe en 14 s y las\n' +
+      'cuatro esquinas caen en el lienzo en las tres ventanas. Y lo que la escena MONTA cuadra con lo\n' +
+      'que el presupuesto cuenta: cada bulto de la ciudad se dibuja con sus triángulos exactos, las nueve\n' +
+      'cintas también, los dígitos y los emblemas están fundidos en una geometría y se leen del derecho,\n' +
+      'la histéresis de los niveles existe y se ve fallar sin ella, desde la pose de salida la ciudad\n' +
+      'entera se monta en L2 y no en manchas, los coches de calle van por el eje de su carril y en el\n' +
+      'código no queda ni una muralla.\n' +
+      'Lo que esto NO prueba es que se vea bien.',
   );
   process.exit(0);
 }

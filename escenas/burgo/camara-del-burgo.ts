@@ -15,19 +15,26 @@
  *
  * ═══ LAS CIFRAS, Y DE DÓNDE SALEN ═══
  *
- *   · `ALCANCE_DEL_BURGO = 66`: `MEDIO_LADO 50 × 1,32`. Con `LEJANIA` de `camara.ts` el
- *     ojo queda a 117 del centro en 16:9 y las cuatro esquinas del anillo (±50, ±50) caen
+ *   · `ALCANCE_DEL_BURGO = 570,24`: `MEDIO_LADO 432 × 1,32`. Con `LEJANIA` de `camara.ts` el
+ *     ojo queda lo bastante lejos para que las cuatro esquinas del anillo (±432, ±432) caigan
  *     dentro del lienzo; `verify:burgo-escena` lo proyecta con `proyecta` de
  *     `embarcadero/camara.ts` en 16:9, 3:4 y 9:19,5 (éste con el lienzo al 58 % del alto,
  *     que es lo que la app le da) con `franjaInferior 0`.
  *   · `MIRADOR_DEL_BURGO`: rumbo 0,35 (desde el sur, algo al este: el lado 1–9 es el más
  *     cercano y lleva los edificios bajos, ver `anillo-en-3d.ts`) y 55° de altura, más
  *     alto que los 40° del delta porque hay que LEER las aceras de color.
- *   · `LIMITES_DEL_BURGO`: `masCerca 0,15` (66 × 0,15 ≈ 10: una casilla y sus vecinas
+ *   · `LIMITES_DEL_BURGO`: `masCerca 0,15` (570,24 × 0,15 = 85,54: una casilla y sus vecinas
  *     llenando el lienzo; a esa cercanía una casilla ocupa más del 45 % del alto, medido)
  *     y `masLejos 1,25`, el de siempre.
- *   · `ALTURA_MINIMA_DEL_OJO_DEL_BURGO = 12`: la de siempre; `torre-b` mide 13,6 pero es
- *     delgada y está en el canto.
+ *
+ *     EL 0,15 NO SE HA TOCADO AL TRIPLICAR EL TABLERO, y ésa es la prueba de que las cifras
+ *     de este fichero están bien escritas: `fondo de casilla / (alcance × masCerca)` valía
+ *     48 / 38,02 y ahora vale 108 / 85,54 — el mismo 1,26. Lo mismo el dígito del precio, que
+ *     se ve exactamente igual de grande porque 27/570,24 = 12/253,44. Todo lo que aquí es una
+ *     FRACCIÓN del tablero sobrevive solo a un cambio de escala; lo que estuviera escrito en
+ *     unidades, no —y de eso este fichero ya tuvo un caso, el corrimiento en apaisado—.
+ *   · `ALTURA_MINIMA_DEL_OJO_DEL_BURGO = 12`: la de siempre; lo más alto del anillo es un
+ *     `cuerpo-h` de 17,7, pero a `masCerca` el ojo queda por encima de 70.
  *   · `CERCANIA_DE_SEGUIMIENTO 0,42` al que mueve; `CERCANIA_DE_ALMONEDA 0,5` a la casilla.
  *
  * ═══ SEGUIR AL QUE MUEVE ═══
@@ -53,10 +60,10 @@ export const ALCANCE_DEL_BURGO = MEDIO_LADO * 1.32;
 /** Más alto que el delta (40°): hay que leer las aceras. El rumbo es sólo el punto de partida. */
 export const MIRADOR_DEL_BURGO: Mirador = { rumbo: 0.35, altura: (55 * Math.PI) / 180 };
 
-/** 66 × 0,15 ≈ 10: una casilla y sus vecinas llenando el lienzo. */
+/** 570,24 × 0,15 = 85,54: una casilla y sus vecinas llenando el lienzo, igual que antes (ver la cabecera). */
 export const LIMITES_DEL_BURGO: LimitesDeCercania = { masCerca: 0.15, masLejos: 1.25 };
 
-/** La de siempre: torre-b mide 13,6 pero es delgada. */
+/** La de siempre: lo más alto del anillo mide 17,7 y a `masCerca` el ojo queda por encima de 70. */
 export const ALTURA_MINIMA_DEL_OJO_DEL_BURGO = 12;
 
 export const CERCANIA_DE_SEGUIMIENTO = 0.42;
@@ -87,17 +94,25 @@ export function proporcionDe(ventana: Ventana): number {
  *
  * En retrato, `alejarseParaQueQuepa` (dentro de `ojoDelMirador`) ya retira el ojo lo que
  * hace falta para que el ancho del mundo sea el de un monitor, y el anillo cabe con
- * factor 1 mirando al centro (medido: la peor esquina queda a 0,80 del semialto en 9:19,5
- * con el lienzo al 58 %). En 16:9 no: a 55° de altura y 45° de campo, la esquina más
- * cercana a la cámara se sale por abajo (a −1,58). Barrido en Node con `proyecta`: con el
- * alcance de 66 la salida cabe si el ojo se retira un 20 % (factor 1,2, por debajo de
- * `masLejos`) Y la mirada se corre 16 unidades hacia el lado de la cámara, que sube el
- * anillo en el encuadre; así la peor esquina queda a 0,85. Entre 1:1 y 16:9 se mezcla
+ * factor 1 mirando al centro. En 16:9 no: a 55° de altura y 45° de campo, la esquina más
+ * cercana a la cámara se sale por abajo. Barrido en Node con `proyecta`: la salida cabe si
+ * el ojo se retira un 20 % (factor 1,2, por debajo de `masLejos`) Y la mirada se corre hacia
+ * el lado de la cámara, que sube el anillo en el encuadre. Entre 1:1 y 16:9 se mezcla
  * linealmente, para que girar una tableta no dé un salto. `verify:burgo-escena` proyecta
  * las cuatro esquinas en las tres ventanas con esta misma función.
+ *
+ * ═══ EL CORRIMIENTO SE MIDE EN TABLEROS, NO EN UNIDADES ═══
+ *
+ * Era 16, escrito a pelo cuando el tablero medía 100 de lado. Al pasar a 384 esas dieciséis
+ * unidades dejaron de significar nada —el 4 % de lo que significaban— y la esquina más
+ * cercana volvió a salirse por abajo (medido: −1,12 en 16:9). Así que se declara como
+ * fracción del tablero: `MEDIO_LADO × 0,32`, que daba EXACTAMENTE 16 con el tablero de 100,
+ * 61,44 con el de 384 y 138,24 con el de 864. Un número escrito así no se queda atrás cuando
+ * el tablero crece, y ésta es la tercera escala en la que aguanta sin tocarlo.
  */
 export const RETIRO_EN_APAISADO = 0.2;
-export const CORRIMIENTO_EN_APAISADO = 16;
+export const FRACCION_DEL_CORRIMIENTO = 0.32;
+export const CORRIMIENTO_EN_APAISADO = MEDIO_LADO * FRACCION_DEL_CORRIMIENTO;
 
 export function poseDeSalida(ventana: Ventana): Cercania {
   const proporcion = proporcionDe(ventana);
