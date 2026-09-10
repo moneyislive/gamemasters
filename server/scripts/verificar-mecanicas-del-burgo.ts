@@ -19,7 +19,10 @@
  *     la mitad y no puede llevar coma), rentas que crecen de solar a hotel, el
  *     precio de la casa igual en todo el barrio, y la tabla ENTERA de deshipoteca
  *     escrita a mano —28 valores— contra `costeDeDesempeno`: un `Math.floor` donde
- *     va `Math.ceil` cambia el 350 de 193 a 192 y nadie lo ve en una partida.
+ *     va `Math.ceil` cambia el 350 de 193 a 192 y nadie lo ve en una partida. Y con
+ *     ella la DÉCIMA DEL IMPUESTO, que redondea al revés (hacia abajo) porque es la
+ *     alternativa que se le ofrece a quien paga y no un interés que cobra el
+ *     Ayuntamiento: el rótulo del botón y el cobro del reductor salen de esa cuenta.
  *  3. LAS CARTAS SON 16 + 16, NUMERADAS 1..16 SIN HUECOS, y la serie y el número van
  *     y vuelven. El número es lo que se publica; la serie es el secreto. Si
  *     `numeroDeSerie('p07')` diera 0, la carta saldría muda.
@@ -70,12 +73,14 @@ import {
   EL_ARCA,
   EL_PREGON,
   OFICIOS,
+  PARTE_DEL_IMPUESTO,
   PUERTAS,
   TITULOS,
   barrioDe,
   carta,
   cartasDe,
   costeDeDesempeno,
+  decimaDelPatrimonio,
   interesDelEmpeno,
   mazoDeSerie,
   numeroDeSerie,
@@ -325,6 +330,36 @@ const DESEMPENO_A_MANO: readonly (readonly [number, number, number, number, numb
     Math.floor(valorDeEmpeno(350) / 10) + valorDeEmpeno(350) !== costeDeDesempeno(350) && costeDeDesempeno(350) === 193,
   );
   comprobar('se ve fallar: el 150 del servicio también redondea arriba (7,5 → 8)', interesDelEmpeno(150) === 8 && Math.floor(7.5) !== 8);
+}
+
+/*
+ * LA DÉCIMA DEL IMPUESTO, que es la otra cuenta de un renglón de la tabla y va al revés
+ * que el interés: HACIA ABAJO. El Impuesto oficial deja elegir entre la cantidad fija y
+ * el 10 % del patrimonio, y el rótulo del botón promete la misma cifra que el reductor
+ * cobra porque los dos llaman aquí. Redondear hacia arriba haría que la «décima» costara
+ * más que una décima, y con un patrimonio de 2.441 la diferencia es de un euro que nadie
+ * vería en una partida y que dejaría el saldo descuadrado en la siguiente.
+ */
+{
+  const aMano: readonly (readonly [number, number])[] = [
+    [0, 0],
+    [9, 0],
+    [10, 1],
+    [90, 9],
+    [1500, 150],
+    [2440, 244],
+    [2441, 244],
+    [2449, 244],
+    [12345, 1234],
+  ];
+  const malas: string[] = [];
+  for (const [patrimonio, decima] of aMano) {
+    if (decimaDelPatrimonio(patrimonio) !== decima) malas.push(`el 10 % de ${patrimonio} da ${decimaDelPatrimonio(patrimonio)} y no ${decima}`);
+  }
+  comprobar('la décima del Impuesto es la de la tabla escrita a mano, y siempre entera', malas.length === 0, malas);
+  comprobar('la parte del Impuesto es una décima, no otra cosa', PARTE_DEL_IMPUESTO === 10);
+  comprobar('se ve fallar: redondear hacia ARRIBA cambiaría el 2.441 (244,1 → 245, no 244)', Math.ceil(2441 / PARTE_DEL_IMPUESTO) !== decimaDelPatrimonio(2441) && decimaDelPatrimonio(2441) === 244);
+  comprobar('un patrimonio imposible (negativo, NaN, infinito) no cobra nada en vez de decir «NaN €»', decimaDelPatrimonio(-500) === 0 && decimaDelPatrimonio(Number.NaN) === 0 && decimaDelPatrimonio(Number.POSITIVE_INFINITY) === 0);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -773,11 +808,13 @@ if (fallos.length > 0) {
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS». Un bloque que se caiga por el camino
  * —un `forEach` que no entra, una excepción tragada— acaba con menos comprobaciones
- * y el mismo color. Con todo verde este guion hace 106 (sin `burgo.ts`; con él, dos
- * más); el número va diez por debajo para que, si algo se rompe dentro de un bloque,
- * salga la ROJA con su nombre y no este guardia. Al añadir comprobaciones, subirlo.
+ * y el mismo color. Con todo verde este guion hace 112 (110 sin `burgo.ts`: los dos
+ * colores del juego sólo se contrastan si el fichero existe); el número va por debajo
+ * de ESE MÍNIMO —110, no 112— para que, si algo se rompe dentro de un bloque, salga la
+ * ROJA con su nombre y no este guardia, que además dispara DESPUÉS de imprimirlas. Al
+ * añadir comprobaciones, subirlo.
  */
-const COMPROBACIONES_ESCRITAS = 96;
+const COMPROBACIONES_ESCRITAS = 108;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: ` +

@@ -24,15 +24,44 @@
  * ═══ CADA MOVIMIENTO EXACTAMENTE UNA VEZ, MEDIDO ═══
  *
  * La cabecera de `burgo-en-tres.ts` declara una partición: los dados llevan TIRAR;
- * las casillas tocables las obras; la hoja las pujas, los tratos y los botones del
- * momento; y `opcionesFueraDelTablero` lo que quede. Aquí se afirma en cada vista que
- * la unión es TODA la lista sin puertas, que los botones sueltos no repiten nada de lo
- * que ya está pintado, que los dados y la hoja no comparten nada, y que las obras de
- * las fichas de «Lo mío» son LOS MISMOS objetos que las casillas tocables abren: la
- * ficha es el botón y la casilla su atajo (§4 y §6.3 piden los dos), y por eso se
- * cuentan como uno; comprar y sacar a subasta, que no son de un título mío, sólo
- * tienen la casilla. Se afirma con los OBJETOS pintados y también con `null` en cada
- * hueco: con todo a `null` vuelven todas menos las puertas.
+ * las casillas tocables las obras; EL CARRIL los botones del momento; la hoja las pujas,
+ * los tratos y —sólo si no se pinta el carril— esos mismos botones del momento; la caja de
+ * los tratos las propuestas vivas que me tocan; y `opcionesFueraDelTablero` lo que quede.
+ * Aquí se afirma en cada vista que la unión es TODA la lista sin puertas y que NINGÚN
+ * movimiento tiene dos botones, mire donde mire; y se afirma DOS VECES cada vez que un
+ * mueble de fuera se lleva los botones de una sección: con él puesto y con él en `null`,
+ * porque el cliente que no lo pinta tiene que seguir pudiendo jugar.
+ *
+ * Y se cuentan botones y atajos por separado, que es la corrección que trajo el apuro:
+ * la casilla encendida NO es un botón, es el atajo de uno que está en la ficha de «Lo
+ * mío» —o en la sección «Ahora», adonde vender e hipotecar suben cuando corre la cuenta
+ * atrás del apuro—. Toda casilla encendida tiene que llegar a un botón por identidad, y
+ * las dos que no pueden tenerlo —comprar y sacar a subasta, que no son de un título mío—
+ * salen por `obrasSoloEnElAnillo` para que el cliente les pinte un gemelo de sólo apoyo:
+ * sin esa cuenta, el movimiento principal del juego se queda alcanzable sólo con el ratón
+ * y la partición sigue siendo una partición. Se afirma con los OBJETOS pintados y también
+ * con `null` en cada hueco: con todo a `null` vuelven todas menos las puertas.
+ *
+ * ═══ Y LOS CINCO MUEBLES QUE LA PANTALLA NUEVA ESTRENA ═══
+ *
+ * El carril (un cuadrado de 44 puntos por opción del momento, con su glifo), la caja de los
+ * tratos, el cartel al pie de una casilla, la ficha de una casilla cualquiera y la de un
+ * jugador, y la crónica. De cada uno se afirma lo que puede fallar en silencio: que el
+ * carril no añada ni pierda un cuadrado ni pinte dos iguales, que la caja y la sección de
+ * la hoja no pinten los mismos botones a la vez, que el cartel diga la renta de HOY y lo
+ * mismo que la tarjeta, que la ficha de un jugador no cuente un patrimonio que la vista no
+ * dice, y que la crónica no se coma un renglón por parecerse al anterior.
+ *
+ * ═══ Y DEL CARRIL SE CUENTA ADEMÁS CUÁNTAS VECES TUVO ALGO QUE PINTAR ═══
+ *
+ * Porque estuvo vacío y en verde. El mueble se alimentaba de `opcionesFueraDelTablero`, que
+ * en estas mismas tres partidas devuelve CERO opciones en las 16.660 vistas: el carril
+ * recibía `[]` siempre, y como un carril vacío no da error —se lee como una pantalla sin
+ * nada que hacer— tres de sus cuatro vacunas se saltaban solas con `carril.length === 0 ||`.
+ * Ahora lleva las opciones del momento, se llena en 1.234, 4.015 y 5.788 vistas de las tres,
+ * y ese contador (`carrilesConCuadrados`) tiene un MÍNIMO EXIGIDO: si algún día vuelve a
+ * quedarse vacío, se ve rojo en vez de pasar por comprobado. Y sus vacunas se envenenan
+ * sobre el carril de un apuro DE VERDAD, que es el más largo que da el juego.
  *
  * ═══ Y `burgo-servido`: EL SERVIDOR DE VERDAD ═══
  *
@@ -79,6 +108,7 @@ import {
   loSecretoDelBurgo,
   opcionesDelBurgo,
   PAGAR_FIANZA,
+  PAGAR_IMPUESTO,
   partidaNueva,
   PASAR,
   PASAR_PUJA,
@@ -97,21 +127,33 @@ import { BARRIOS, barrioDe, carta, CASILLAS, cartasDe, CUANTAS_CASILLAS, POSADA,
 import {
   camaraSigueA,
   cardinal,
+  carrilDelBurgo,
+  cartelDeCasilla,
   cartelEnTres,
   dadosEnTres,
+  EL_CARRIL_DE_LA_MESA,
   elPregonEnTres,
   esperaA,
   esVistaQueSePinta,
   fichaDeCasilla,
+  fichaDeJugador,
   figurasEnTres,
   firmaDelTablero,
+  glifosDelCarrilDelBurgo,
   hojaEnTres,
+  laCronicaConLaVista,
+  LOS_MIOS,
+  LOS_TRATOS_DE_LA_MESA,
+  PARA_CONTESTAR,
   maravedies,
   marcadorEnTres,
   meToca,
   obraPosibleEnCasilla,
+  obrasSoloEnElAnillo,
+  opcionesDelCarrilDelBurgo,
   opcionesFueraDelTablero,
   ORDEN_DE_LA_HOJA,
+  pregonDelBurgo,
   pujaEnTres,
   recorridoEnTres,
   seVeEnTres,
@@ -119,8 +161,17 @@ import {
   tableroEnTres,
   tirarEnTres,
   tratoEnTres,
+  TOPE_DE_LA_CRONICA,
 } from '../../shared/arcade/juegos/burgo-en-tres';
-import type { HojaDelBurgo, OpcionQueLlega } from '../../shared/arcade/juegos/burgo-en-tres';
+import type {
+  CartelDeCasilla,
+  FichaDeJugador,
+  GlifoDelCarrilDelBurgo,
+  HojaDelBurgo,
+  OpcionQueLlega,
+  PregonDelBurgo,
+  RenglonDeLaCronica,
+} from '../../shared/arcade/juegos/burgo-en-tres';
 import type { TableroDelBurgoEn3D } from '../../escenas/burgo/tipos';
 import { figuraDeSerie } from '../../escenas/embarcadero/figuras';
 
@@ -235,7 +286,8 @@ function decideElRobot(robot: Robot, vista: VistaDelBurgo, quien: AsientoId, opc
   if (vista.paso === 'comprar') {
     const comprar = porTipo(opciones, COMPRAR);
     if (comprar !== null && de(robot, 6) !== 0) return comprar;
-    return porTipo(opciones, A_ALMONEDA);
+    const subasta = porTipo(opciones, A_ALMONEDA);
+    if (subasta !== null) return subasta;
   }
   if (vista.paso === 'almoneda') {
     const puja = pujaEnTres(vista, quien, opciones);
@@ -267,9 +319,27 @@ function decideElRobot(robot: Robot, vista: VistaDelBurgo, quien: AsientoId, opc
         }
       }
     }
-    return porTipo(opciones, TIRAR) ?? porTipo(opciones, PASAR);
+    const sigue = porTipo(opciones, TIRAR) ?? porTipo(opciones, PASAR);
+    if (sigue !== null) return sigue;
   }
-  return null;
+  /*
+   * ═══ Y SI CON EL TURNO EN LA MANO EL JUEGO OFRECE ALGO QUE ESTE ROBOT NO CONOCE ═══
+   *
+   * MEDIDO: con el Impuesto a elegir (regla 4), la casilla del Impuesto para el turno en el
+   * paso `comprar` con dos opciones —la cantidad fija y el 10 %— y NINGUNA de las que este
+   * robot buscaba ahí. El robot devolvía `null`, nadie movía, y la partida por el cable se
+   * quedaba clavada: sobre la mesa en proceso el reloj la rescataba, pero en el bloque de
+   * `burgo-servido` no hay tic, así que el comprobador se ponía rojo en «treinta
+   * movimientos entraron por el sondeo» una de cada dos veces, y la roja no decía nada de
+   * la regla nueva. Un robot que se planta delante de una lista de movimientos legales no
+   * está probando el juego: está probando lo que el robot ya sabía.
+   *
+   * Se coge lo primero que el juego ofrezca, sin puertas —que no son movimientos— y sin la
+   * quiebra —que sí lo es y acaba la partida—. Así, una regla nueva no vuelve a parar la
+   * partida sin decir por qué, y el que la escriba no tiene que venir aquí a darse de alta.
+   */
+  const cualquiera = opciones.find((o) => o.declaracion !== true && o.tipo !== RENDIRSE);
+  return cualquiera ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -278,13 +348,36 @@ function decideElRobot(robot: Robot, vista: VistaDelBurgo, quien: AsientoId, opc
 
 type Puntos = { firma: string; o: OpcionQueLlega }[];
 
-/** Qué pinta cada sitio de la partición, por firma canónica. */
+/**
+ * Qué pinta cada sitio de la partición, por firma canónica.
+ *
+ * ═══ HAY BOTONES Y HAY ATAJOS, Y NO SE CUENTAN IGUAL ═══
+ *
+ * `tocables` NO es un botón: es la marca del acento sobre el anillo, el ATAJO de un botón
+ * que está en otro sitio —la ficha de «Lo mío», o la sección «Ahora» en mi apuro, desde que
+ * vender e hipotecar suben ahí—. Los BOTONES son `dados`, `hoja`, `fichas`, `pregon` y
+ * `fuera`, y de ésos cada movimiento tiene EXACTAMENTE UNO. Contar el atajo como botón fue
+ * lo que obligó durante un tiempo a que la sección «Ahora» no pudiera llevar una obra, y
+ * eso no es una regla del juego: es una cuenta mal hecha.
+ *
+ * `gemelos` tampoco es un botón: son las obras que el anillo enciende y que NINGÚN botón
+ * recoge —comprar y sacar a subasta, que no tienen ficha porque el título no es mío—, y a
+ * las que el cliente le debe un gemelo de sólo apoyo para que se puedan hacer con teclado.
+ *
+ * `carril` SÍ ES UN BOTÓN, y es el sexto: cada cuadrado de 44 puntos se pulsa y manda. Entra
+ * en la cuenta de «uno y sólo uno» con los demás, que es lo que caza que la sección «Ahora»
+ * y el carril pinten a la vez la misma opción —dos «Pasar el turno» en la misma pantalla, y
+ * la partida se juega igual mientras uno de los dos sobra.
+ */
 interface Particion {
   tocables: Puntos;
   dados: Puntos;
   hoja: Puntos;
   fichas: Puntos;
+  pregon: Puntos;
+  carril: Puntos;
   fuera: Puntos;
+  gemelos: Puntos;
 }
 
 function particionDe(
@@ -294,6 +387,8 @@ function particionDe(
   tablero: TableroDelBurgoEn3D | null,
   dados: ReturnType<typeof dadosEnTres>,
   hoja: HojaDelBurgo<Opcion> | null,
+  pregon: PregonDelBurgo<Opcion> | null = null,
+  carril: readonly GlifoDelCarrilDelBurgo<Opcion>[] | null = null,
 ): Particion {
   const tocables: Puntos = [];
   if (tablero !== null) {
@@ -309,51 +404,65 @@ function particionDe(
     for (const s of hoja.secciones) for (const o of s.opciones) hojaP.push({ firma: firma(o), o });
     for (const b of hoja.mios) for (const f of b.fichas) for (const o of f.opciones) fichas.push({ firma: firma(o), o });
   }
-  const fuera: Puntos = opcionesFueraDelTablero(opciones, tablero, dados, hoja).map((o) => ({ firma: firma(o), o }));
-  return { tocables, dados: dadosP, hoja: hojaP, fichas, fuera };
+  const pregonP: Puntos = [];
+  if (pregon !== null) {
+    for (const tira of [...pregon.paraContestar, ...pregon.mios]) {
+      for (const o of [tira.aceptar, tira.rechazar, tira.retirar]) if (o !== null) pregonP.push({ firma: firma(o), o });
+    }
+  }
+  const carrilP: Puntos = carril === null ? [] : carril.map((g) => ({ firma: firma(g.opcion), o: g.opcion }));
+  const fuera: Puntos = opcionesFueraDelTablero(opciones, tablero, dados, hoja, pregon, carril).map((o) => ({ firma: firma(o), o }));
+  const gemelos: Puntos = obrasSoloEnElAnillo(opciones, tablero, hoja, carril).map((o) => ({ firma: firma(o), o }));
+  return { tocables, dados: dadosP, hoja: hojaP, fichas, pregon: pregonP, carril: carrilP, fuera, gemelos };
 }
 
-/** LA PARTICIÓN: cada movimiento sin puerta exactamente en un botón o un asa, y ninguno perdido. */
+/** LA PARTICIÓN: cada movimiento sin puerta exactamente en un botón, y ninguno perdido. */
 function reprochesDeLaParticion(opciones: readonly Opcion[], p: Particion): string[] {
   const r: string[] = [];
   const todas = opciones.filter((o) => o.declaracion !== true).map(firma);
-  const union = [...p.tocables, ...p.dados, ...p.hoja, ...p.fichas, ...p.fuera].map((x) => x.firma);
+  const botones = [...p.dados, ...p.hoja, ...p.fichas, ...p.pregon, ...p.carril, ...p.fuera];
+  const union = [...p.tocables, ...botones].map((x) => x.firma);
   for (const f of todas) if (union.indexOf(f) < 0) r.push(`se pierde ${f.slice(0, 80)}`);
   for (const f of union) if (todas.indexOf(f) < 0) r.push(`se pinta algo que el juego no ofrece: ${f.slice(0, 80)}`);
+  /* UN SOLO BOTÓN POR MOVIMIENTO, mire donde mire: es la cuenta que importa. */
+  const vistas: string[] = [];
+  for (const x of botones) {
+    if (vistas.indexOf(x.firma) >= 0) r.push(`dos botones para el mismo movimiento: ${x.firma.slice(0, 80)}`);
+    vistas.push(x.firma);
+  }
   const repetido = (lista: Puntos, nombre: string): void => {
-    const vistas: string[] = [];
+    const yaVistas: string[] = [];
     for (const x of lista) {
-      if (vistas.indexOf(x.firma) >= 0) r.push(`${nombre} repite ${x.firma.slice(0, 80)}`);
-      vistas.push(x.firma);
+      if (yaVistas.indexOf(x.firma) >= 0) r.push(`${nombre} repite ${x.firma.slice(0, 80)}`);
+      yaVistas.push(x.firma);
     }
   };
-  repetido(p.hoja, 'la hoja');
-  repetido(p.fuera, 'los botones sueltos');
   repetido(p.tocables, 'las casillas');
-  const cruce = (a: Puntos, b: Puntos, nombre: string): void => {
-    for (const x of a) if (b.some((y) => y.firma === x.firma)) r.push(`${nombre}: ${x.firma.slice(0, 80)}`);
-  };
-  cruce(p.fuera, p.tocables, 'un botón suelto repite una casilla tocable');
-  cruce(p.fuera, p.dados, 'un botón suelto repite los dados');
-  cruce(p.fuera, p.hoja, 'un botón suelto repite la hoja');
-  cruce(p.fuera, p.fichas, 'un botón suelto repite una ficha');
-  cruce(p.dados, p.hoja, 'los dados y la hoja pintan lo mismo');
-  cruce(p.dados, p.tocables, 'los dados y una casilla pintan lo mismo');
-  cruce(p.hoja, p.tocables, 'una sección de la hoja repite una casilla tocable');
   /*
-   * Las obras de las fichas de «Lo mío» son LOS MISMOS objetos que las casillas
-   * abren (un botón y su atajo, no dos botones): toda obra de una ficha es una
-   * casilla tocable, y toda casilla tocable que no sea comprar ni sacar a subasta
-   * —las dos obras sobre un título que aún no es mío— está en una ficha por
-   * identidad. Cuando no hay tablero (`tocables` vacío) la ficha es el único sitio.
+   * EL ATAJO SIEMPRE TIENE SU BOTÓN. Toda casilla encendida está, POR IDENTIDAD, o en un
+   * botón (la ficha de «Lo mío», o «Ahora» en mi apuro) o en la lista de gemelos —comprar y
+   * sacar a subasta, que no tienen ficha porque el título no es mío todavía—. Sin esta
+   * cuenta, una obra alcanzable sólo con el ratón pasa desapercibida: la partición seguiría
+   * siendo una partición y el movimiento seguiría teniendo sitio.
    */
   const deTituloAjeno = (o: OpcionQueLlega): boolean => o.tipo === COMPRAR || o.tipo === A_ALMONEDA;
-  for (const t of p.tocables) if (!deTituloAjeno(t.o) && !p.fichas.some((f) => f.o === t.o)) r.push(`una obra tocable de un título mío no está en su ficha como el mismo objeto: ${t.firma.slice(0, 80)}`);
+  for (const t of p.tocables) {
+    const conBoton = botones.some((b) => b.o === t.o);
+    const conGemelo = p.gemelos.some((g) => g.o === t.o);
+    if (!conBoton && !conGemelo) r.push(`una casilla encendida sin botón ni gemelo de apoyo: ${t.firma.slice(0, 80)}`);
+    if (conBoton && conGemelo) r.push(`una obra con botón pide además un gemelo: ${t.firma.slice(0, 80)}`);
+    if (!conBoton && !deTituloAjeno(t.o)) r.push(`una obra de un título mío se quedó sin botón: ${t.firma.slice(0, 80)}`);
+  }
+  for (const g of p.gemelos) {
+    if (!p.tocables.some((t) => t.o === g.o)) r.push(`un gemelo de apoyo para una casilla que no está encendida: ${g.firma.slice(0, 80)}`);
+    if (!deTituloAjeno(g.o)) r.push(`un gemelo de apoyo para una obra que tendría que tener ficha: ${g.firma.slice(0, 80)}`);
+  }
+  /* Las fichas de «Lo mío» son mías, y son los MISMOS objetos que abre la casilla. */
   for (const t of p.tocables) if (deTituloAjeno(t.o) && p.fichas.some((f) => f.o === t.o)) r.push(`una ficha de «Lo mío» ofrece comprar un título que no es mío: ${t.firma.slice(0, 80)}`);
   if (p.tocables.length > 0) for (const f of p.fichas) if (!p.tocables.some((t) => t.o === f.o)) r.push(`una ficha trae una obra que ninguna casilla abre: ${f.firma.slice(0, 80)}`);
   for (const f of p.fichas) if (deTituloAjeno(f.o)) r.push(`una ficha ofrece comprar: ${f.firma.slice(0, 80)}`);
   /* Y todo lo pintado es una opción ENTERA del juego, por identidad. */
-  for (const x of [...p.tocables, ...p.dados, ...p.hoja, ...p.fichas, ...p.fuera]) {
+  for (const x of [...p.tocables, ...botones, ...p.gemelos]) {
     if (!opciones.some((o) => o === x.o)) r.push(`se pintó una opción montada, no la del juego: ${x.firma.slice(0, 80)}`);
     if (x.o.declaracion === true) r.push(`se pintó una puerta: ${x.o.id}`);
   }
@@ -441,8 +550,23 @@ function reprochesDeLosDados(vista: VistaDelBurgo, quien: QuienMira, opciones: r
   return r;
 }
 
-/** LA HOJA: ocho secciones en orden, opciones del juego enteras, sin puertas, y ningún secreto ni carta no robada. */
-function reprochesDeLaHoja(vista: VistaDelBurgo, quien: QuienMira, opciones: readonly Opcion[], h: HojaDelBurgo<Opcion>, secretos: readonly string[]): string[] {
+/**
+ * LA HOJA: ocho secciones en orden, opciones del juego enteras, sin puertas, y ningún secreto
+ * ni carta no robada.
+ *
+ * El sexto parámetro es EL CARRIL tal como se pinta, o `null` si no se pinta, y hace falta
+ * para saber dónde tienen que estar los botones del momento: con el carril puesto, «Ahora» se
+ * queda sin ellos a propósito, y sin este dato la comprobación del apuro —«la obra subió a
+ * "Ahora"»— se pondría roja justo cuando todo está bien.
+ */
+function reprochesDeLaHoja(
+  vista: VistaDelBurgo,
+  quien: QuienMira,
+  opciones: readonly Opcion[],
+  h: HojaDelBurgo<Opcion>,
+  secretos: readonly string[],
+  carril: readonly GlifoDelCarrilDelBurgo<Opcion>[] | null = null,
+): string[] {
   const r: string[] = [];
   if (h.secciones.length !== ORDEN_DE_LA_HOJA.length) r.push(`${h.secciones.length} secciones`);
   for (let i = 0; i < ORDEN_DE_LA_HOJA.length; i++) {
@@ -489,7 +613,25 @@ function reprochesDeLaHoja(vista: VistaDelBurgo, quien: QuienMira, opciones: rea
     else if (m.mrs !== j.mrs || m.patrimonio !== j.patrimonio || m.titulos !== j.titulos.length || m.indultos !== j.indultos) r.push(`el marcador miente sobre ${j.asiento}`);
     else if (m.esSuTurno !== (vista.duenoDelTurno === j.asiento) || m.seLeEspera !== (vista.turnoDe === j.asiento)) r.push(`el marcador marca mal a ${j.asiento}`);
   }
-  /* «Lo mío»: exactamente mis títulos, agrupados, y cada ficha con SUS obras. */
+  /*
+   * «Lo mío»: exactamente mis títulos, agrupados, y cada ficha con SUS obras… salvo en MI
+   * apuro, donde vender e hipotecar suben a «Ahora» y se van de las fichas. Ahí la ficha
+   * queda vacía de obras a propósito: el mismo botón en los dos sitios es un botón de más.
+   */
+  const enMiApuro = quien !== null && vista.apuro !== null && vista.apuro.quien === quien;
+  const enLaSeccion = h.secciones.find((s) => s.id === 'ahora')?.opciones ?? [];
+  /*
+   * DÓNDE ESTÁN LOS BOTONES DEL MOMENTO: en la sección si no hay carril, y en el carril si lo
+   * hay. Nunca en los dos —de eso se encarga la partición, que los cuenta juntos—, así que
+   * aquí se mira EL SITIO QUE TOCA y no los dos a la vez: mirar los dos daría por buena una
+   * sección que no soltó nada.
+   */
+  const enAhora: readonly Opcion[] = carril === null ? enLaSeccion : carril.map((g) => g.opcion);
+  if (carril !== null && enLaSeccion.length !== 0) r.push(`con el carril puesto, «Ahora» sigue pintando ${enLaSeccion.length} botones`);
+  if (carril !== null && enAhora.length > 0) {
+    const lineas = h.secciones.find((s) => s.id === 'ahora')?.lineas ?? [];
+    if (!lineas.some((l) => l.indexOf(EL_CARRIL_DE_LA_MESA) >= 0)) r.push('«Ahora» soltó sus botones y no dice dónde están');
+  }
   const misCasillas = h.mios.flatMap((b) => b.fichas.map((f) => f.casilla)).sort((a, b) => a - b);
   const deLaVista = yo === undefined ? [] : [...yo.titulos].sort((a, b) => a - b);
   if (llano(misCasillas) !== llano(deLaVista)) r.push(`«Lo mío» trae ${llano(misCasillas)} y la vista ${llano(deLaVista)}`);
@@ -497,10 +639,13 @@ function reprochesDeLaHoja(vista: VistaDelBurgo, quien: QuienMira, opciones: rea
     for (const f of b.fichas) {
       if (f.barrio !== null && f.barrio.id !== b.id) r.push(`la ficha ${f.casilla} está en el barrio equivocado`);
       const obras = obraPosibleEnCasilla(vista, quien, opciones, f.casilla);
-      if (f.opciones.length !== obras.length || !f.opciones.every((o, k) => o === obras[k])) r.push(`la ficha ${f.casilla} no lleva sus obras`);
+      const esperadas = enMiApuro ? [] : obras;
+      if (f.opciones.length !== esperadas.length || !f.opciones.every((o, k) => o === esperadas[k])) r.push(`la ficha ${f.casilla} no lleva sus obras`);
       if (!f.esMio) r.push(`la ficha ${f.casilla} de «Lo mío» no es mía`);
+      if (enMiApuro) for (const o of obras) if (!enAhora.some((x) => x === o)) r.push(`en el apuro, la obra de ${f.casilla} no subió a «Ahora»`);
     }
   }
+  if (!enMiApuro) for (const o of enAhora) if ([COMPRAR, A_ALMONEDA, ALZAR, VENDER, EMPENAR, DESEMPENAR].indexOf(o.tipo) >= 0) r.push(`«Ahora» lleva una obra fuera del apuro: ${o.id}`);
   /* La subasta y los tratos de la hoja son los de las funciones sueltas. */
   const puja = pujaEnTres(vista, quien, opciones);
   if ((h.puja === null) !== (puja === null)) r.push('la hoja y pujaEnTres no coinciden');
@@ -557,6 +702,207 @@ function reprochesDeLasFichas(vista: VistaDelBurgo, quien: QuienMira, opciones: 
   return r;
 }
 
+/**
+ * EL CARTEL AL PIE de las cuarenta casillas: el nombre, el precio, el estado y la renta de
+ * hoy. El cuarto parámetro es QUIÉN REDACTA el cartel, y existe para poder envenenarlo: un
+ * juez cuyo testigo se saca él mismo del mismo sitio no se puede ver caer.
+ */
+function reprochesDeLosCarteles(
+  vista: VistaDelBurgo,
+  quien: QuienMira,
+  opciones: readonly Opcion[],
+  haz: (casilla: number) => CartelDeCasilla = (casilla) => cartelDeCasilla(vista, casilla),
+): string[] {
+  const r: string[] = [];
+  for (let i = 0; i < CUANTAS_CASILLAS; i++) {
+    const c = haz(i);
+    const fila = CASILLAS[i];
+    if (fila === undefined) continue;
+    if (c.casilla !== i || c.nombre !== fila.nombre || c.rotulo !== fila.rotulo || c.clase !== fila.clase) r.push(`el cartel ${i} no es el de la tabla`);
+    if (c.frases.length < 1 || c.frases.length > 2) r.push(`el cartel ${i} tiene ${c.frases.length} frases`);
+    if (c.frase !== c.frases.join(' — ')) r.push(`el cartel ${i} no es la unión de sus frases`);
+    if ((c.frases[0] ?? '').indexOf(fila.nombre) !== 0) r.push(`el cartel ${i} no empieza por el nombre`);
+    const seCompra = fila.clase === 'solar' || fila.clase === 'puerta' || fila.clase === 'oficio';
+    if (c.seCompra !== seCompra) r.push(`el cartel ${i} miente en seCompra`);
+    if (seCompra && c.frase.indexOf(maravedies(fila.precio)) < 0) r.push(`el cartel ${i} no dice el precio`);
+    const barrio = barrioDe(i);
+    const acera = fila.clase === 'solar' && barrio !== null ? barrio.color : null;
+    if (c.color !== acera) r.push(`el cartel ${i} pinta la acera ${c.color}`);
+    const tit = vista.titulos.find((x) => x.casilla === i);
+    const dueno = tit === undefined ? undefined : vista.jugadores.find((j) => j.asiento === tit.dueno);
+    if (c.colorDelDueno !== (dueno === undefined ? null : dueno.color)) r.push(`el cartel ${i} pinta el filo del dueño mal`);
+    if (c.esMio !== (tit !== undefined && vista.yo !== null && tit.dueno === vista.yo)) r.push(`esMio del cartel ${i}`);
+    if (tit !== undefined && tit.dueno !== null && !tit.empenado && tit.rentaAhora > 0 && c.frase.indexOf(maravedies(tit.rentaAhora)) < 0) {
+      r.push(`el cartel ${i} no dice la renta de hoy`);
+    }
+    /* Y es la MISMA frase que la tarjeta: dos redacciones del mismo dato acaban discrepando. */
+    if (fichaDeCasilla(vista, i, quien, opciones).cartel !== c.frase) r.push(`la ficha ${i} y su cartel no dicen lo mismo`);
+  }
+  return r;
+}
+
+/** LA FICHA DE UN JUGADOR: lo que la vista dice de él, sus títulos, y ningún botón. */
+function reprochesDeLasFichasDeJugador(
+  vista: VistaDelBurgo,
+  quien: QuienMira,
+  opciones: readonly Opcion[],
+  haz: (asiento: AsientoId) => FichaDeJugador | null = (asiento) => fichaDeJugador(vista, asiento, quien, opciones),
+): string[] {
+  const r: string[] = [];
+  const puerta = tratoEnTres(vista, quien, opciones)?.puerta ?? null;
+  for (const j of vista.jugadores) {
+    const f = haz(j.asiento);
+    if (f === null) {
+      r.push(`sin ficha de ${j.asiento}`);
+      continue;
+    }
+    if (f.mrs !== j.mrs || f.patrimonio !== j.patrimonio || f.casilla !== j.casilla || f.quebrado !== j.quebrado) r.push(`la ficha de ${j.asiento} miente sobre la vista`);
+    if (f.presa !== j.presa >= 0 || f.indultos !== j.indultos) r.push(`la ficha de ${j.asiento} miente en presa o Salvoconductos`);
+    if (f.cuantosTitulos !== j.titulos.length) r.push(`la ficha de ${j.asiento} cuenta ${f.cuantosTitulos} títulos y tiene ${j.titulos.length}`);
+    if (f.soyYo !== (quien !== null && j.asiento === quien)) r.push(`soyYo de ${j.asiento}`);
+    if (f.nombreDeLaCasilla !== (CASILLAS[j.casilla]?.nombre ?? '')) r.push(`la ficha de ${j.asiento} no dice dónde está`);
+    if (f.linea !== marcadorEnTres(vista, quien).jugadores.find((m) => m.asiento === j.asiento)?.linea) r.push(`la línea de ${j.asiento} no es la del marcador`);
+    const suyas = [...f.barrios.flatMap((b) => b.titulos.map((t) => t.casilla)), ...f.sueltos.map((t) => t.casilla)].sort((a, b) => a - b);
+    if (llano(suyas) !== llano([...j.titulos].sort((a, b) => a - b))) r.push(`los títulos de la ficha de ${j.asiento}: ${llano(suyas)} frente a ${llano(j.titulos)}`);
+    for (const b of f.barrios) {
+      const tabla = BARRIOS.find((x) => x.id === b.id);
+      if (tabla === undefined) r.push(`la ficha de ${j.asiento} inventa el barrio ${b.id}`);
+      else if (b.entero !== (b.titulos.length === tabla.solares.length)) r.push(`«barrio entero» de ${b.id} en la ficha de ${j.asiento}`);
+    }
+    for (const c of f.tratables) if (j.titulos.indexOf(c) < 0) r.push(`la ficha de ${j.asiento} ofrece en trato un título que no es suyo`);
+    /* El componedor existe EXACTAMENTE cuando la puerta del trato admite a este destinatario. */
+    const admitido = puerta !== null && quien !== null && j.asiento !== quien && puerta.a.some((d) => d.asiento === j.asiento);
+    if ((f.trato !== null) !== admitido) r.push(`el componedor de ${j.asiento} sale ${f.trato === null ? 'sin' : 'con'} puerta y el juego dice lo contrario`);
+    if (f.trato !== null && puerta !== null) {
+      if (f.trato.mrsMaximo !== puerta.mrsMaximo || llano(f.trato.titulos) !== llano(puerta.titulos)) r.push(`el componedor de ${j.asiento} no lleva lo que declara la puerta`);
+      if (f.trato.a.asiento !== j.asiento) r.push(`el componedor de ${j.asiento} apunta a otro`);
+    }
+  }
+  if (haz('nadie-de-esta-mesa') !== null) r.push('hay ficha de un asiento que no está sentado');
+  return r;
+}
+
+/** EL CARRIL: un cuadrado por opción recibida que no sea puerta, en orden y con la opción entera. */
+function reprochesDelCarril(
+  vista: VistaDelBurgo,
+  quien: QuienMira,
+  opciones: readonly Opcion[],
+  glifos: readonly GlifoDelCarrilDelBurgo<Opcion>[] = glifosDelCarrilDelBurgo(vista, quien, opciones),
+): string[] {
+  const r: string[] = [];
+  const sinPuertas = opciones.filter((o) => o.declaracion !== true);
+  if (glifos.length !== sinPuertas.length) r.push(`el carril pinta ${glifos.length} cuadrados para ${sinPuertas.length} movimientos`);
+  for (let k = 0; k < glifos.length; k++) {
+    const g = glifos[k] as (typeof glifos)[number];
+    const o = sinPuertas[k];
+    if (o === undefined || g.opcion !== o) {
+      r.push(`el cuadrado ${k} no es la opción ${k} del carril`);
+      continue;
+    }
+    if (g.glifo.length < 1 || g.glifo.length > 2) r.push(`el glifo «${g.glifo}» de ${o.id} no cabe en el cuadrado`);
+    if (g.ayuda !== o.rotulo) r.push(`la ayuda de ${o.id} no es su rótulo`);
+    if (g.rotulo.length === 0) r.push(`el cuadrado de ${o.id} sin rótulo corto`);
+    const casilla = (o.carga as { casilla?: unknown } | null)?.casilla;
+    const esperada = typeof casilla === 'number' ? casilla : null;
+    if (g.casilla !== esperada) r.push(`el cuadrado de ${o.id} dice casilla ${g.casilla} y la carga ${String(esperada)}`);
+    if (g.casilla !== null && CASILLAS[g.casilla]?.clase === 'solar') {
+      const barrio = barrioDe(g.casilla);
+      if (barrio !== null && g.color !== barrio.color) r.push(`el filo de ${o.id} no es la acera de su barrio`);
+    }
+  }
+  /*
+   * DOS CUADRADOS IGUALES SON UN CUADRADO QUE NO SE PUEDE ELEGIR. Se admite el empate sólo
+   * cuando el JUEGO tampoco los distingue (dos tratos vivos de la misma persona llevan el
+   * mismo rótulo entero): ésa es una ambigüedad del rótulo, no del carril, y se cierra en la
+   * caja de los tratos, donde cada propuesta es una tira con su frase.
+   */
+  for (let a = 0; a < glifos.length; a++) {
+    for (let b = a + 1; b < glifos.length; b++) {
+      const x = glifos[a] as (typeof glifos)[number];
+      const y = glifos[b] as (typeof glifos)[number];
+      if (x.glifo === y.glifo && x.rotulo === y.rotulo && x.ayuda !== y.ayuda) r.push(`dos cuadrados iguales para «${x.ayuda}» y «${y.ayuda}»`);
+    }
+  }
+  return r;
+}
+
+/** LA CAJA DE LOS TRATOS: mis propuestas vivas, redactadas, con las opciones del juego enteras. */
+function reprochesDelPregon(vista: VistaDelBurgo, quien: QuienMira, opciones: readonly Opcion[], p: PregonDelBurgo<Opcion> | null): string[] {
+  const r: string[] = [];
+  const mios = vista.tratos.filter((t) => t.a === quien || t.de === quien);
+  const deberia = quien !== null && vista.momento === 'jugando' && mios.length > 0;
+  if (deberia !== (p !== null)) {
+    r.push(`la caja sale ${p === null ? 'vacía' : 'puesta'} con ${mios.length} tratos míos`);
+    return r;
+  }
+  if (p === null) return r;
+  const tiras = [...p.paraContestar, ...p.mios];
+  if (tiras.length !== mios.length) r.push(`la caja trae ${tiras.length} tiras para ${mios.length} tratos`);
+  /*
+   * CADA TIRA EN SU BLOQUE. Sin esto, todo lo de abajo se mira sobre `tiras`, que es la
+   * suma de los dos, y una caja que echara MIS propuestas al bloque de «Para contestar»
+   * —dos botones de aceptar que el juego no ofrece, y ningún «Retirar» donde se busca—
+   * pasaba entera: `soyElDestinatario` lo escribe la misma función que reparte, así que
+   * comparar la tira consigo misma no dice nada. Es el reparto lo que hay que mirar.
+   */
+  for (const x of p.paraContestar) if (!x.soyElDestinatario) r.push(`la tira ${x.id} está en «${PARA_CONTESTAR}» y no va dirigida a mí`);
+  for (const x of p.mios) if (x.soyElDestinatario) r.push(`la tira ${x.id} está en «${LOS_MIOS}» y es una que tengo que contestar`);
+  for (const t of mios) {
+    const tira = tiras.find((x) => x.id === t.id);
+    if (tira === undefined) {
+      r.push(`la caja se deja el trato ${t.id}`);
+      continue;
+    }
+    if (tira.soyElDestinatario !== (t.a === quien) || tira.soyElProponente !== (t.de === quien)) r.push(`la tira ${t.id} mira desde el lado equivocado`);
+    if (tira.frase.length === 0) r.push(`la tira ${t.id} sin frase`);
+    if (tira.soyElDestinatario && tira.frase.indexOf(tira.de.nombre) < 0) r.push(`la tira ${t.id} no nombra a quien la propone`);
+    if (tira.soyElProponente && tira.frase.indexOf(tira.a.nombre) < 0) r.push(`la tira ${t.id} no nombra a quien va dirigida`);
+    if (tira.comoAnda.length === 0 || tira.comoAndaSinNombre.length === 0) r.push(`la tira ${t.id} sin renglón de estado`);
+    for (const o of [tira.aceptar, tira.rechazar, tira.retirar]) {
+      if (o === null) continue;
+      if (!opciones.some((x) => x === o)) r.push(`la tira ${t.id} pinta una opción que no es del juego`);
+      if (o.declaracion === true) r.push(`la tira ${t.id} pinta una puerta`);
+      if ((o.carga as { trato?: unknown }).trato !== t.id) r.push(`la tira ${t.id} lleva la opción de otro trato`);
+    }
+    const aceptarDelJuego = opciones.find((o) => o.tipo === ACEPTAR && (o.carga as { trato?: unknown }).trato === t.id) ?? null;
+    const retirarDelJuego = opciones.find((o) => o.tipo === RETIRAR && (o.carga as { trato?: unknown }).trato === t.id) ?? null;
+    if (tira.aceptar !== aceptarDelJuego) r.push(`el aceptar de la tira ${t.id} no es el del juego`);
+    if (tira.retirar !== retirarDelJuego) r.push(`el retirar de la tira ${t.id} no es el del juego`);
+  }
+  for (const tira of tiras) if (!mios.some((t) => t.id === tira.id)) r.push(`la caja pinta el trato ${tira.id}, que no es mío`);
+  if (p.caduca.length === 0) r.push('la caja no dice que los tratos caducan');
+  return r;
+}
+
+/**
+ * LA CRÓNICA: del más nuevo al más viejo, un renglón por jugada, y cada texto el pregón de
+ * la vista de esa jugada. Se le dan las vistas que se leyeron para que no se pueda inventar
+ * una línea que nadie dijo.
+ */
+function reprochesDeLaCronica(cronica: readonly RenglonDeLaCronica[], vistas: readonly VistaDelBurgo[], tope: number): string[] {
+  const r: string[] = [];
+  if (cronica.length > tope) r.push(`la crónica guarda ${cronica.length} renglones con tope ${tope}`);
+  const jugadas: number[] = [];
+  for (let k = 0; k < cronica.length; k++) {
+    const x = cronica[k];
+    if (x === undefined) continue;
+    if (jugadas.indexOf(x.jugada) >= 0) r.push(`la crónica repite la jugada ${x.jugada}`);
+    jugadas.push(x.jugada);
+    const anterior = k === 0 ? undefined : cronica[k - 1];
+    if (anterior !== undefined && anterior.jugada <= x.jugada) r.push(`la crónica no va del más nuevo al más viejo en ${x.jugada}`);
+    const suya = vistas.find((v) => v.jugada === x.jugada);
+    if (suya === undefined) r.push(`la crónica trae la jugada ${x.jugada}, que nadie leyó`);
+    else if (suya.pregon !== x.texto) r.push(`el renglón ${x.jugada} no es el pregón de su vista`);
+  }
+  if (cronica.length < tope) {
+    for (const v of vistas) {
+      if (v.pregon.length === 0) continue;
+      if (!cronica.some((x) => x.jugada === v.jugada)) r.push(`la crónica se deja la jugada ${v.jugada}`);
+    }
+  }
+  return r;
+}
+
 // ---------------------------------------------------------------------------
 // LAS PARTIDAS: mesas reales, y en cada paso las siete miradas
 // ---------------------------------------------------------------------------
@@ -581,6 +927,18 @@ interface Cuentas {
   movimientos: number;
   tics: number;
   ganador: boolean;
+  /** Cuántas miradas tuvieron la caja de los tratos puesta, y cuántas pidieron un gemelo de apoyo. */
+  cajasDeTratos: number;
+  gemelosDeApoyo: number;
+  /**
+   * EL CARRIL, MEDIDO. `carrilesConCuadrados` es cuántas vistas tuvieron al menos un cuadrado
+   * que pulsar; los otros dos son para leer de un vistazo si el mueble se está usando de
+   * verdad o si sale siempre con el mismo botón solitario. Sin un mínimo sobre el primero, un
+   * carril vacío en las tres partidas pasa por comprobado.
+   */
+  carrilesConCuadrados: number;
+  cuadradosDelCarril: number;
+  carrilMasLargo: number;
 }
 
 function cuentasNuevas(): Cuentas {
@@ -602,6 +960,11 @@ function cuentasNuevas(): Cuentas {
     movimientos: 0,
     tics: 0,
     ganador: false,
+    cajasDeTratos: 0,
+    gemelosDeApoyo: 0,
+    carrilesConCuadrados: 0,
+    cuadradosDelCarril: 0,
+    carrilMasLargo: 0,
   };
 }
 
@@ -628,17 +991,66 @@ function revisarLaMesa(mesa: Mesa, c: Cuentas, anteriores: Map<string, VistaDelB
     }
     const tablero = tableroEnTres(vista, quien, opciones);
     const dados = dadosEnTres(vista, quien, opciones);
-    const hoja = hojaEnTres(vista, quien, opciones);
+    /*
+     * LA CAJA DE LOS TRATOS Y EL CARRIL SE COMPONEN ANTES QUE LA HOJA, que es el orden que el
+     * cliente tiene que seguir: la hoja los recibe compuestos para soltar sus botones —«El
+     * trato» los suyos, «Ahora» los suyos— y la criba recibe los tres. Compuestos al revés,
+     * cada sección pintaría sus botones y el mueble de fuera los suyos, y el mismo movimiento
+     * tendría dos sitios donde pulsarse.
+     */
+    const pregon = pregonDelBurgo(vista, quien, opciones);
+    const carril = carrilDelBurgo(vista, quien, opciones);
+    const hoja = hojaEnTres(vista, quien, opciones, pregon, carril);
     if (tablero === null) {
       anota(c, donde, ['sin tablero']);
       continue;
     }
     anota(c, donde, reprochesDelTablero(vista, quien, opciones, tablero));
     anota(c, donde, reprochesDeLosDados(vista, quien, opciones, dados));
-    anota(c, donde, reprochesDeLaHoja(vista, quien, opciones, hoja, secretos));
-    anota(c, donde, reprochesDeLaParticion(opciones, particionDe(vista, quien, opciones, tablero, dados, hoja)));
+    anota(c, donde, reprochesDeLaHoja(vista, quien, opciones, hoja, secretos, carril));
+    anota(c, donde, reprochesDelPregon(vista, quien, opciones, pregon));
+    anota(c, donde, reprochesDeLaParticion(opciones, particionDe(vista, quien, opciones, tablero, dados, hoja, pregon, carril)));
+    anota(c, donde, reprochesDelCarril(vista, quien, opcionesDelCarrilDelBurgo(vista, quien, opciones), carril));
     anota(c, donde, reprochesDeLosTextos(vista, quien));
+    if (pregon !== null) c.cajasDeTratos++;
+    if (obrasSoloEnElAnillo(opciones, tablero, hoja, carril).length > 0) c.gemelosDeApoyo++;
+    /*
+     * CUÁNTAS VISTAS TUVIERON ALGO QUE PINTAR EN EL CARRIL. Este contador es lo que compra
+     * que no vuelva el fallo que trajo el mueble: el carril se alimentaba de
+     * `opcionesFueraDelTablero`, que en estas mismas tres partidas devolvía CERO opciones en
+     * las 16.660 vistas, y nadie lo vio porque un carril vacío no da error: se lee como una
+     * pantalla sin nada que hacer. Con un mínimo exigido abajo, un carril que se quede vacío
+     * se ve ROJO.
+     */
+    if (carril.length > 0) {
+      c.carrilesConCuadrados++;
+      c.cuadradosDelCarril += carril.length;
+      if (carril.length > c.carrilMasLargo) c.carrilMasLargo = carril.length;
+      /*
+       * Y LA PARTICIÓN SIN EL CARRIL: los botones del momento vuelven ENTEROS a la sección,
+       * que es lo que ve el cliente que no pinta la cinta (el retablo del móvil). Sin esto,
+       * el día que «Ahora» dejara de recuperarlos, la partida sería injugable exactamente en
+       * el cliente que este comprobador no abre.
+       */
+      const sinCarril = hojaEnTres(vista, quien, opciones, pregon);
+      anota(c, donde, reprochesDeLaParticion(opciones, particionDe(vista, quien, opciones, tablero, dados, sinCarril, pregon, null)));
+      const enLaSeccion = sinCarril.secciones.find((s) => s.id === 'ahora')?.opciones ?? [];
+      if (enLaSeccion.length !== carril.length || !enLaSeccion.every((o, k) => o === carril[k]?.opcion)) {
+        anota(c, donde, [`sin carril la sección lleva ${enLaSeccion.length} botones y el carril pinta ${carril.length}`]);
+      }
+    }
     if (vista.jugada % 7 === 0) anota(c, donde, reprochesDeLasFichas(vista, quien, opciones));
+    if (vista.jugada % 7 === 0) anota(c, donde, reprochesDeLosCarteles(vista, quien, opciones));
+    if (vista.jugada % 5 === 0) anota(c, donde, reprochesDeLasFichasDeJugador(vista, quien, opciones));
+    /* Y la partición SIN la caja: los botones de los tratos vuelven enteros a la hoja. */
+    if (pregon !== null) {
+      const sinCaja = hojaEnTres(vista, quien, opciones);
+      anota(c, donde, reprochesDeLaParticion(opciones, particionDe(vista, quien, opciones, tablero, dados, sinCaja, null)));
+      const enLaSeccion = sinCaja.secciones.find((s) => s.id === 'trato')?.opciones ?? [];
+      const enLaCaja = [...pregon.paraContestar, ...pregon.mios].flatMap((t) => [t.aceptar, t.rechazar, t.retirar]).filter((o) => o !== null);
+      if (enLaSeccion.length !== enLaCaja.length) anota(c, donde, [`sin caja la sección lleva ${enLaSeccion.length} botones y la caja pinta ${enLaCaja.length}`]);
+      if ((hoja.secciones.find((s) => s.id === 'trato')?.opciones.length ?? -1) !== 0) anota(c, donde, ['con la caja puesta, «El trato» sigue pintando botones']);
+    }
     if (quien === null && opciones.length !== 0) anota(c, donde, ['el espectador tiene opciones']);
     if (quien === null && tablero.casillas.some((x) => x.tocable)) anota(c, donde, ['el espectador tiene casillas tocables']);
     /* La firma: la misma vista proyectada dos veces da la misma firma. */
@@ -776,6 +1188,9 @@ function resumen(c: Cuentas): Record<string, unknown> {
     hitos: c.hitos,
     saltos: [c.saltosDeUna, c.saltosDeDos],
     gruesas: [c.gruesasConMueve, c.gruesasConCambioDeMano, c.gruesasVacias],
+    cajas: c.cajasDeTratos,
+    gemelos: c.gemelosDeApoyo,
+    carriles: [c.carrilesConCuadrados, c.cuadradosDelCarril, c.carrilMasLargo],
     pujasLibres: c.pujasLibresAceptadas,
     tratosMontados: c.tratosMontadosAceptados,
     montadosRechazados: c.montadosRechazados.slice(0, 4),
@@ -842,8 +1257,32 @@ for (const p of PARTIDAS) {
   comprobar(`${p.id}: hubo subastas abiertas y compras`, (cuentas.hitos['almoneda-abierta'] ?? 0) >= 1 && (cuentas.hitos['compra'] ?? 0) >= 5, cuentas.hitos);
   comprobar(`${p.id}: alguien pasó por la Comisaría`, (cuentas.hitos['a-la-mazmorra'] ?? 0) >= 1, cuentas.hitos);
   comprobar(`${p.id}: salieron cartas`, (cuentas.hitos['carta'] ?? 0) >= 2, cuentas.hitos);
+  comprobar(`${p.id}: hubo obras que sólo tenía el anillo y pidieron gemelo de apoyo`, cuentas.gemelosDeApoyo >= 5, cuentas.gemelosDeApoyo);
+  /*
+   * ═══ EL CARRIL SE LLENÓ, Y ÉSTA ES LA CUENTA QUE COMPRA QUE NO VUELVA EL FALLO ═══
+   *
+   * El mueble nació alimentado por `opcionesFueraDelTablero`, que en estas mismas partidas
+   * devolvía CERO opciones en las 16.660 vistas: el carril venía vacío siempre, sus vacunas
+   * se saltaban solas y su cabecera describía un fallo imposible. Un carril vacío no da error
+   * —se lee como una pantalla sin nada que hacer—, así que la única manera de que se vea es
+   * exigirle un suelo. Se pide sobre las VISTAS con al menos un cuadrado y no sobre el total
+   * de cuadrados: un carril de ocho en una sola vista no dice que el mueble se use.
+   */
+  comprobar(`${p.id}: el carril tuvo cuadrados que pulsar en muchas vistas: ${cuentas.carrilesConCuadrados} de ${cuentas.vistas}`, cuentas.carrilesConCuadrados >= 400, [cuentas.carrilesConCuadrados, cuentas.cuadradosDelCarril, cuentas.carrilMasLargo]);
+  /*
+   * MEDIDO HOY, con estas tres semillas: 1.234 de 1.854 vistas, 4.015 de 6.035 y 5.788 de
+   * 8.771, y el carril más largo tuvo 19, 24 y 19 cuadrados (un apuro con muchos títulos: la
+   * quiebra, y vender e hipotecar cada uno de ellos). El suelo se pone en 400 —tres veces por
+   * debajo del peor— para que lo que se caiga sea el mueble vacío y no una semilla con suerte.
+   */
+  comprobar(`${p.id}: y alguna vez tuvo más de un cuadrado, que es cuando el rótulo corto tiene que distinguirlos`, cuentas.carrilMasLargo >= 3, cuentas.carrilMasLargo);
   if (p.tic > 0) comprobar(`${p.id}: el tic entró y jugó por el ausente`, cuentas.tics >= 20, cuentas.tics);
 }
+comprobar(
+  'entre las tres partidas: la caja de los tratos se pintó de verdad en muchas miradas',
+  cuentasDeTodas.reduce((s, c) => s + c.cajasDeTratos, 0) >= 5,
+  cuentasDeTodas.map((c) => c.cajasDeTratos),
+);
 comprobar('entre las tres partidas: pujas libres montadas por la puerta y ACEPTADAS por el reductor', cuentasDeTodas.reduce((s, c) => s + c.pujasLibresAceptadas, 0) >= 2, cuentasDeTodas.map((c) => c.pujasLibresAceptadas));
 comprobar('entre las tres partidas: tratos montados por la puerta y ACEPTADOS por el reductor (propuestos de verdad)', cuentasDeTodas.reduce((s, c) => s + c.tratosMontadosAceptados, 0) >= 2 && (hitosDeTodas['trato-propuesto'] ?? 0) >= 2, [cuentasDeTodas.map((c) => c.tratosMontadosAceptados), hitosDeTodas['trato-propuesto']]);
 comprobar('entre las tres partidas: se ganó alguna subasta y se alzó', (hitosDeTodas['almoneda-ganada'] ?? 0) >= 1 && (hitosDeTodas['alza'] ?? 0) >= 1, hitosDeTodas);
@@ -890,7 +1329,8 @@ paso('Quiebra y fin: un apuro sin salida, la quiebra por rendirse, y el último 
     const vistaB = vistaEn(mesa, b.asiento);
     const opcionesB = opcionesEn(mesa, b.asiento);
     const hojaB = hojaEnTres(vistaB, b.asiento, opcionesB);
-    comprobar('en el apuro la hoja abre «Lo mío» y «Ahora» dice cuánto debe', hojaB.abre === 'mios' && hojaB.secciones[2]?.lineas.some((l) => l.indexOf(maravedies(500)) >= 0) === true, hojaB.secciones[2]?.lineas);
+    comprobar('en el apuro la hoja abre «Ahora» —donde están las obras desde que suben— y dice cuánto debe', hojaB.abre === 'ahora' && hojaB.secciones[2]?.lineas.some((l) => l.indexOf(maravedies(500)) >= 0) === true, [hojaB.abre, hojaB.secciones[2]?.lineas]);
+    comprobar('y manda vender o hipotecar AQUÍ MISMO, no a rodar hasta «Lo mío»', hojaB.secciones[2]?.lineas.some((l) => l.indexOf('aquí mismo') >= 0) === true, hojaB.secciones[2]?.lineas);
     comprobar('y la cinta dice que es el turno de A y que B está en apuro', hojaB.cinta.turno.indexOf('apuro') >= 0 && hojaB.cinta.turno.indexOf(`Turno de ${vistaB.jugadores[0]?.nombre ?? ''}`) === 0, hojaB.cinta.turno);
     comprobar('el marcador enmarca a A (su turno) y pone el punto en B (se le espera)', marcadorEnTres(vistaB, b.asiento).jugadores.map((m) => `${m.esSuTurno ? 'T' : ''}${m.seLeEspera ? 'E' : ''}`).join(',') === 'T,E');
     comprobar('a B se le espera: los dados no tienen asa y la única salida es rendirse', dadosEnTres(vistaB, b.asiento, opcionesB)?.porTirar === false && opcionesB.some((o) => o.tipo === RENDIRSE));
@@ -915,6 +1355,120 @@ paso('Quiebra y fin: un apuro sin salida, la quiebra por rendirse, y el último 
     /* Y el tic sobre el apuro sin salida también quiebra. */
     const porTic = avanzarElReloj(mesa);
     comprobar('el tic sobre un apuro sin salida quiebra al ausente igual', estadoDe(porTic).jugadores[1]?.quebrado === true);
+  }
+}
+
+/* ═══ 3 bis. EL APURO CON TÍTULOS: las obras suben a «Ahora» y se van de «Lo mío» ═══ */
+paso('El apuro con títulos: vender e hipotecar donde corre el reloj, una sola vez, y la casilla como atajo');
+{
+  const base = jugarUnaPartida('BUR-3D-AP', 2, 31, 60, 0).mesa;
+  const e = estadoDe(base);
+  const [a, b] = e.jugadores;
+  if (a !== undefined && b !== undefined) {
+    /*
+     * B debe 500 y NO tiene efectivo, pero sí dos solares sin casas: el juego le ofrece
+     * hipotecar los dos (y sólo eso, más la quiebra). Es el caso que el montaje de arriba
+     * no podía dar —allí B se quedaba sin títulos— y sin él nadie mira nunca si las obras
+     * del apuro llegan a algún botón.
+     */
+    const titulos = e.titulos.map((t) => (t.casilla === 1 || t.casilla === 3 ? { ...t, dueno: b.asiento, casas: 0, empenado: false } : { ...t, dueno: null, casas: 0, empenado: false }));
+    const montado: EstadoDelBurgo = {
+      ...e,
+      paso: 'apuro',
+      luego: 'por-pasar',
+      turno: 0,
+      dobles: 0,
+      almoneda: null,
+      colaDeAlmonedas: [],
+      colaDeApuros: [],
+      tratos: [],
+      titulos,
+      jugadores: e.jugadores.map((j, k) => (k === 1 ? { ...j, mrs: 0, presa: -1, quebrado: false } : { ...j, mrs: 1000, quebrado: false })),
+      apuro: { quien: b.asiento, deudas: [{ a: a.asiento, cuanto: 500, porque: 'renta' }] },
+      jugada: e.jugada + 1,
+      sucesos: [{ que: 'apuro', quien: b.asiento, debe: 500 }],
+    };
+    const mesa = abrirMesa({ id: 'BUR-3D-AP2', arcade: BURGO, semilla: 31, asientos: [...base.asientos], estado: montado });
+    const vista = vistaEn(mesa, b.asiento);
+    const opciones = opcionesEn(mesa, b.asiento);
+    const hoja = hojaEnTres(vista, b.asiento, opciones);
+    const tablero = tableroEnTres(vista, b.asiento, opciones);
+    const dados = dadosEnTres(vista, b.asiento, opciones);
+    const obrasDelJuego = opciones.filter((o) => [VENDER, EMPENAR, ALZAR, DESEMPENAR].indexOf(o.tipo) >= 0);
+    comprobar('B está en apuro con dos títulos y el juego le ofrece obras', vista.apuro?.quien === b.asiento && obrasDelJuego.length >= 2, [vista.apuro, obrasDelJuego.map((o) => o.id)]);
+    const enAhora = hoja.secciones.find((s) => s.id === 'ahora')?.opciones ?? [];
+    comprobar('las obras del apuro están en «Ahora», ENTERAS y por identidad', obrasDelJuego.every((o) => enAhora.indexOf(o) >= 0), enAhora.map((o) => o.id));
+    comprobar('y «Ahora» lleva además lo del momento (la quiebra) sin repetir nada', enAhora.some((o) => o.tipo === RENDIRSE) && new Set(enAhora.map((o) => firma(o))).size === enAhora.length, enAhora.map((o) => o.id));
+    const enLasFichas = hoja.mios.flatMap((x) => x.fichas.flatMap((f) => f.opciones));
+    comprobar('«Lo mío» sigue enseñando mis dos títulos, y ya SIN sus obras: el botón está arriba', hoja.mios.flatMap((x) => x.fichas).length === 2 && enLasFichas.length === 0, [hoja.mios.flatMap((x) => x.fichas.map((f) => f.casilla)), enLasFichas.map((o) => o.id)]);
+    comprobar('la casilla del anillo las sigue encendiendo: es el atajo, no un segundo botón', obrasDelJuego.every((o) => obraPosibleEnCasilla(vista, b.asiento, opciones, (o.carga as { casilla: number }).casilla).indexOf(o) >= 0));
+    comprobar('y no vuelven como botón suelto', opcionesFueraDelTablero(opciones, tablero, dados, hoja).length === 0, opcionesFueraDelTablero(opciones, tablero, dados, hoja).map((o) => o.id));
+    const particion = particionDe(vista, b.asiento, opciones, tablero, dados, hoja);
+    comprobar('la partición del apuro no tiene reproche', reprochesDeLaParticion(opciones, particion).length === 0, reprochesDeLaParticion(opciones, particion));
+    comprobar('y la hoja del apuro tampoco', reprochesDeLaHoja(vista, b.asiento, opciones, hoja, seriesSecretas(mesa)).length === 0, reprochesDeLaHoja(vista, b.asiento, opciones, hoja, seriesSecretas(mesa)));
+    /* LA VACUNA: dejarlas TAMBIÉN en «Lo mío» son dos botones para el mismo movimiento. */
+    const enLosDos: HojaDelBurgo<Opcion> = {
+      ...hoja,
+      mios: hoja.mios.map((x) => ({ ...x, fichas: x.fichas.map((f) => ({ ...f, opciones: obraPosibleEnCasilla(vista, b.asiento, opciones, f.casilla) })) })),
+    };
+    comprobar(
+      'la vacuna del apuro: la misma obra en «Ahora» y en su ficha se ve caer como dos botones',
+      reprochesDeLaParticion(opciones, particionDe(vista, b.asiento, opciones, tablero, dados, enLosDos)).some((x) => x.indexOf('dos botones') >= 0),
+      reprochesDeLaParticion(opciones, particionDe(vista, b.asiento, opciones, tablero, dados, enLosDos)),
+    );
+    /* Y la de al lado: quitarlas de los dos sitios deja la casilla encendida sin botón. */
+    const enNinguno: HojaDelBurgo<Opcion> = {
+      ...hoja,
+      secciones: hoja.secciones.map((s) => (s.id === 'ahora' ? { ...s, opciones: s.opciones.filter((o) => obrasDelJuego.indexOf(o) < 0) } : s)),
+    };
+    comprobar(
+      'y la vacuna de al lado: sin botón en ninguno de los dos, la casilla encendida se queda sin sitio donde pulsarse',
+      reprochesDeLaParticion(opciones, particionDe(vista, b.asiento, opciones, tablero, dados, enNinguno)).some((x) => x.indexOf('sin botón') >= 0),
+      reprochesDeLaParticion(opciones, particionDe(vista, b.asiento, opciones, tablero, dados, enNinguno)),
+    );
+    /*
+     * ═══ CON APURO Y CON UN TRATO POR CONTESTAR, EL CAJÓN ABRE «AHORA» ═══
+     *
+     * Se pueden dar a la vez y nadie lo había mirado: contestar un trato se ofrece SIN TURNO
+     * y sin mirar el apuro, así que quien tiene la cuenta atrás encima puede tener además una
+     * propuesta esperando. La rama del trato iba delante y el cajón le abría «El trato»,
+     * dejando plegado el único sitio donde está escrito cuánto debe y a quién. Manda el apuro:
+     * es el único reloj con final forzoso en mi contra, y el trato tiene otro mueble a la
+     * vista (la caja del pie) mientras que la cuenta de la deuda no está en ninguna otra
+     * parte. Las dos comprobaciones van juntas a propósito: la segunda afirma que la rama del
+     * trato sigue viva cuando no hay apuro, o sea que esto es un orden y no un borrado.
+     */
+    const conTratoYApuro: EstadoDelBurgo = {
+      ...montado,
+      tratos: [{ id: 1, de: a.asiento, a: b.asiento, doy: { mrs: 600, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [1], indultos: 0 }, enElTurno: montado.turnosAbiertos }],
+      siguienteTrato: 2,
+      jugada: montado.jugada + 1,
+    };
+    const mesaTA = abrirMesa({ id: 'BUR-3D-AP4', arcade: BURGO, semilla: 31, asientos: [...base.asientos], estado: conTratoYApuro });
+    const vistaTA = vistaEn(mesaTA, b.asiento);
+    const opcionesTA = opcionesEn(mesaTA, b.asiento);
+    const hojaTA = hojaEnTres(vistaTA, b.asiento, opcionesTA);
+    comprobar(
+      'con la cuenta atrás encima y un trato por contestar, el cajón abre «Ahora» y no «El trato»',
+      hojaTA.abre === 'ahora' && hojaTA.trato !== null && hojaTA.trato.abiertos.some((t) => t.soyElDestinatario && t.aceptar !== null),
+      [hojaTA.abre, hojaTA.trato?.abiertos.length],
+    );
+    const sinApuro: EstadoDelBurgo = { ...conTratoYApuro, paso: 'por-pasar', apuro: null, turno: 0, jugada: conTratoYApuro.jugada + 1 };
+    const mesaSA = abrirMesa({ id: 'BUR-3D-AP5', arcade: BURGO, semilla: 31, asientos: [...base.asientos], estado: sinApuro });
+    comprobar(
+      'y sin apuro el mismo trato SÍ abre «El trato»: es un orden entre dos ramas vivas, no una rama borrada',
+      hojaEnTres(vistaEn(mesaSA, b.asiento), b.asiento, opcionesEn(mesaSA, b.asiento)).abre === 'trato',
+      hojaEnTres(vistaEn(mesaSA, b.asiento), b.asiento, opcionesEn(mesaSA, b.asiento)).abre,
+    );
+
+    /* Fuera del apuro, las obras NO suben: el botón vuelve a ser la ficha. */
+    const enPie: EstadoDelBurgo = { ...montado, paso: 'por-pasar', apuro: null, jugadores: montado.jugadores.map((j, k) => (k === 1 ? { ...j, mrs: 800 } : j)), turno: 1, jugada: montado.jugada + 1 };
+    const otraMesa = abrirMesa({ id: 'BUR-3D-AP3', arcade: BURGO, semilla: 31, asientos: [...base.asientos], estado: enPie });
+    const vistaB = vistaEn(otraMesa, b.asiento);
+    const opcionesB = opcionesEn(otraMesa, b.asiento);
+    const hojaB = hojaEnTres(vistaB, b.asiento, opcionesB);
+    const ahoraB = hojaB.secciones.find((s) => s.id === 'ahora')?.opciones ?? [];
+    comprobar('fuera del apuro «Ahora» no lleva ni una obra, y las fichas las recuperan', ahoraB.every((o) => [VENDER, EMPENAR, ALZAR, DESEMPENAR, COMPRAR, A_ALMONEDA].indexOf(o.tipo) < 0) && hojaB.mios.flatMap((x) => x.fichas.flatMap((f) => f.opciones)).length >= 1, [ahoraB.map((o) => o.id), hojaB.mios.flatMap((x) => x.fichas.flatMap((f) => f.opciones)).map((o) => o.id)]);
   }
 }
 
@@ -1160,6 +1714,379 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
   comprobar('los ocho barrios de la tabla salen en «Lo mío» con su color cuando se tienen', BARRIOS.length === 8 && TITULOS.length === 28);
 }
 
+/* ═══ 5 bis. LOS CINCO MUEBLES NUEVOS: EL CARRIL, LA CAJA, EL CARTEL, LAS DOS FICHAS Y LA CRÓNICA ═══ */
+paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador y la crónica, con sus vacunas');
+{
+  const mesa = ultimaMesaJugada ?? abrirMesa({ id: 'BUR-3D-M', arcade: BURGO, semilla: 1, asientos: ['A', 'B'] });
+  const quien = mesa.asientos[0] as AsientoId;
+  const vista = vistaEn(mesa, quien);
+  const opciones = opcionesEn(mesa, quien);
+  const tablero = tableroEnTres(vista, quien, opciones) as TableroDelBurgoEn3D;
+  const dados = dadosEnTres(vista, quien, opciones);
+  const hoja = hojaEnTres(vista, quien, opciones);
+
+  /* ── EL CARRIL ── */
+  comprobar('el carril de la última mesa no tiene reproche', reprochesDelCarril(vista, quien, opcionesDelCarrilDelBurgo(vista, quien, opciones), carrilDelBurgo(vista, quien, opciones)).length === 0);
+  comprobar('y ninguna puerta se pinta como cuadrado', glifosDelCarrilDelBurgo(vista, quien, opciones).every((g) => g.opcion.declaracion !== true));
+  const conPuerta = opciones.filter((o) => o.declaracion === true);
+  comprobar('un carril de puras puertas sale vacío, no con cuadrados que no juegan', conPuerta.length === 0 || glifosDelCarrilDelBurgo(vista, quien, conPuerta).length === 0, conPuerta.map((o) => o.id));
+  /*
+   * LOS DIECIOCHO GLIFOS SON DISTINTOS DOS A DOS. Se comprueba con una lista fabricada de
+   * un movimiento por tipo, porque una partida de verdad nunca los ofrece todos a la vez y
+   * el día que dos coincidieran no se vería jugando: se vería como dos cuadrados iguales.
+   *
+   * SON DIECIOCHO Y NO DIECISIETE: el Impuesto entra en la cuenta. Se quedaba fuera de esta
+   * lista —tiene su propio bloque más abajo, donde se mira que sus dos formas lleven rótulos
+   * cortos distintos— y con eso su «Im» no se comparaba con ningún otro: el día que alguien
+   * le pusiera «Pa» nadie lo vería. Los diecinueve tipos del juego menos `PROPONER`, que es
+   * una puerta y no se pinta nunca, son estos dieciocho.
+   */
+  const TIPOS = [EMPEZAR, TIRAR, PAGAR_FIANZA, USAR_INDULTO, COMPRAR, A_ALMONEDA, PUJAR, PASAR_PUJA, ALZAR, VENDER, EMPENAR, DESEMPENAR, ACEPTAR, RECHAZAR, RETIRAR, PASAR, RENDIRSE, PAGAR_IMPUESTO];
+  const unoDeCada = TIPOS.map((tipo, k) => ({ id: `x${k}`, tipo, carga: {}, rotulo: `Movimiento ${k}`, ayuda: '' }));
+  const glifosDeCada = glifosDelCarrilDelBurgo(vista, quien, unoDeCada).map((g) => g.glifo);
+  comprobar(`los ${TIPOS.length} glifos del carril son distintos dos a dos`, new Set(glifosDeCada).size === TIPOS.length, glifosDeCada);
+  comprobar('y todos caben en el cuadrado: una o dos letras', glifosDeCada.every((g) => g.length >= 1 && g.length <= 2), glifosDeCada);
+  const desconocido = glifosDelCarrilDelBurgo(vista, quien, [{ id: 'z', tipo: 'burgo:algo-que-no-existe', carga: {}, rotulo: 'Hacer algo nuevo', ayuda: '' }]);
+  comprobar('un movimiento que este cliente no conoce cae a las dos primeras letras de su rótulo, no a un hueco', desconocido[0]?.glifo === 'Ha' && desconocido[0]?.rotulo === 'Hacer algo nuevo', desconocido);
+  comprobar('y sin rótulo tampoco se queda en blanco', glifosDelCarrilDelBurgo(vista, quien, [{ id: 'z', tipo: 'burgo:otro', carga: {}, rotulo: '', ayuda: '' }])[0]?.glifo === '?');
+  const conObra = glifosDelCarrilDelBurgo(vista, quien, [{ id: 'c39', tipo: COMPRAR, carga: { casilla: 39 }, rotulo: 'Comprar Avenida de las Acacias por 400 €', ayuda: '' }])[0];
+  comprobar(
+    'el cuadrado de una obra dice el verbo dentro, el rótulo de SEIS LETRAS de la cara debajo, y el filo de la acera',
+    conObra?.glifo === 'Co' && conObra.rotulo === (CASILLAS[39]?.rotulo ?? '') && conObra.color === (barrioDe(39)?.color ?? null) && conObra.casilla === 39,
+    conObra,
+  );
+  const conPuja = glifosDelCarrilDelBurgo(vista, quien, [{ id: 'p', tipo: PUJAR, carga: { casilla: 5, cuanto: 120 }, rotulo: 'Pujar 120 € por la Estación', ayuda: '' }])[0];
+  comprobar('el de una puja dice la cifra, que es lo que la distingue de la puja de al lado', conPuja?.glifo === 'Pu' && conPuja.rotulo === maravedies(120), conPuja);
+  /*
+   * PASAR EN LA SUBASTA DICE «PASAR», Y ANTES DECÍA EL SOLAR. El juego manda `PASAR_PUJA` con
+   * la casilla de lo que se subasta, y la rama del nombre de la casilla iba delante del verbo
+   * declarado: salía «Ps / Acacia», que se lee como si pasar hiciera algo CON Acacia, y la
+   * entrada `[PASAR_PUJA]: 'Pasar'` de la tabla no se alcanzaba nunca. El solar sigue dicho
+   * donde no estorba —el filo con el color de su acera, y `casilla` para señalarla—, que es
+   * además lo coherente con las pujas fijas de al lado: en una subasta todos los cuadrados
+   * son de la misma casilla y repetirla no distingue ninguno.
+   */
+  const pasarLaPuja = glifosDelCarrilDelBurgo(vista, quien, [{ id: 'pp', tipo: PASAR_PUJA, carga: { casilla: 39 }, rotulo: 'Pasar', ayuda: '' }])[0];
+  comprobar('el de pasar en la subasta dice el VERBO y no el solar, y señala el solar con el filo y la casilla', pasarLaPuja?.glifo === 'Ps' && pasarLaPuja.rotulo === 'Pasar' && pasarLaPuja.casilla === 39 && pasarLaPuja.color === (barrioDe(39)?.color ?? null), pasarLaPuja);
+  comprobar('y no se lee igual que la puja de al lado sobre la misma casilla', `${pasarLaPuja?.glifo ?? ''}·${pasarLaPuja?.rotulo ?? ''}` !== `${conPuja?.glifo ?? ''}·${conPuja?.rotulo ?? ''}`);
+  /*
+   * EL IMPUESTO LLEGA DOS VECES CON EL MISMO TIPO y lo que las separa está en la carga:
+   * sin rótulo corto propio, los dos cuadrados dirían el rótulo entero del juego, que no
+   * cabe en 44 puntos.
+   */
+  const impuestos = glifosDelCarrilDelBurgo(vista, quien, [
+    { id: 'impuesto:fijo', tipo: PAGAR_IMPUESTO, carga: { como: 'fijo' }, rotulo: 'Pagar 200 € del Impuesto', ayuda: '' },
+    { id: 'impuesto:decima', tipo: PAGAR_IMPUESTO, carga: { como: 'decima' }, rotulo: 'Pagar el 10 % de tu patrimonio (340 €)', ayuda: '' },
+  ]);
+  comprobar('las dos formas de pagar el Impuesto llevan el mismo glifo y rótulos cortos distintos', impuestos.every((g) => g.glifo === 'Im') && impuestos[0]?.rotulo === 'Fijo' && impuestos[1]?.rotulo === '10 %', impuestos);
+  comprobar('y no se leen como dos cuadrados iguales', reprochesDelCarril(vista, quien, [], impuestos).every((x) => x.indexOf('iguales') < 0));
+  /*
+   * Y «Ahora» tampoco puede decir «compra o sácala a subasta» delante del Impuesto: el paso
+   * `comprar` para el turno en dos casillas que no se compran, y la frase se decide por la
+   * CLASE de la casilla, que es lo que dice la tabla.
+   */
+  const enElImpuesto = {
+    ...vista,
+    momento: 'jugando',
+    paso: 'comprar',
+    turnoDe: quien,
+    duenoDelTurno: quien,
+    apuro: null,
+    almoneda: null,
+    jugadores: vista.jugadores.map((j) => (j.asiento === quien ? { ...j, casilla: 4, quebrado: false, presa: -1 } : j)),
+  } as unknown as VistaDelBurgo;
+  const lineasDelImpuesto = hojaEnTres(enElImpuesto, quien, opciones).secciones.find((s) => s.id === 'ahora')?.lineas ?? [];
+  comprobar('«Ahora» en la casilla del Impuesto manda elegir cómo pagarlo, no comprar nada', lineasDelImpuesto.some((l) => l === `Has caído en ${CASILLAS[4]?.nombre ?? ''}: elige cómo pagarlo.`), lineasDelImpuesto);
+  const enUnSolar = { ...enElImpuesto, jugadores: enElImpuesto.jugadores.map((j) => (j.asiento === quien ? { ...j, casilla: 39 } : j)) } as VistaDelBurgo;
+  comprobar('y en un solar sigue diciendo lo de siempre', (hojaEnTres(enUnSolar, quien, opciones).secciones.find((s) => s.id === 'ahora')?.lineas ?? []).some((l) => l.indexOf('compra o sácala a subasta') >= 0));
+  /*
+   * ═══ Y LAS VACUNAS DEL CARRIL VAN SOBRE UN CARRIL DE VERDAD, QUE ANTES NO EXISTÍA ═══
+   *
+   * MEDIDO ENTONCES: en las 16.660 vistas de las tres partidas de arriba,
+   * `opcionesFueraDelTablero` —que era lo que alimentaba el carril— devolvía CERO opciones,
+   * siempre. Los dados se llevan tirar, el anillo las obras, «La subasta» las pujas, la caja
+   * de los tratos los tres del trato, y lo del momento se iba a «Ahora», dentro del cajón. O
+   * sea que el carril venía VACÍO en todas las vistas de tres partidas enteras, y tres de sus
+   * cuatro vacunas empezaban por `carril.length === 0 ||`: se daban por buenas sin mirar
+   * nada. Verde por filtro vacío, no por vigilancia.
+   *
+   * Ahora el carril lleva las opciones del momento y en las mismas tres partidas se llena en
+   * 1.234, 4.015 y 5.788 vistas (lo cuenta `carrilesConCuadrados`, con su mínimo). Así que
+   * las vacunas se pueden envenenar donde tienen que estar: SOBRE UNA PARTIDA. Se monta un
+   * apuro con títulos porque es el carril más largo que da el juego —la quiebra más vender e
+   * hipotecar título a título— y porque es el caso donde el rótulo corto tiene que decir de
+   * qué solar habla: ocho cuadrados «Ve» sin nombre son ocho maneras de vender el que no era.
+   */
+  const deVerdad = jugarUnaPartida('BUR-3D-CR', 2, 31, 60, 0).mesa;
+  const eR = estadoDe(deVerdad);
+  const [ra, rb] = eR.jugadores;
+  if (ra !== undefined && rb !== undefined) {
+    const mesaR = abrirMesa({
+      id: 'BUR-3D-CR2',
+      arcade: BURGO,
+      semilla: 31,
+      asientos: [...deVerdad.asientos],
+      estado: {
+        ...eR,
+        paso: 'apuro',
+        luego: 'por-pasar',
+        turno: 0,
+        dobles: 0,
+        almoneda: null,
+        colaDeAlmonedas: [],
+        colaDeApuros: [],
+        tratos: [],
+        titulos: eR.titulos.map((t) => ([1, 3, 6, 8].indexOf(t.casilla) >= 0 ? { ...t, dueno: rb.asiento, casas: 0, empenado: false } : { ...t, dueno: null, casas: 0, empenado: false })),
+        jugadores: eR.jugadores.map((j, k) => (k === 1 ? { ...j, mrs: 0, presa: -1, quebrado: false } : { ...j, mrs: 1000, quebrado: false })),
+        apuro: { quien: rb.asiento, deudas: [{ a: ra.asiento, cuanto: 500, porque: 'renta' }] },
+        jugada: eR.jugada + 1,
+        sucesos: [{ que: 'apuro', quien: rb.asiento, debe: 500 }],
+      },
+    });
+    const vistaR = vistaEn(mesaR, rb.asiento);
+    const opcionesR = opcionesEn(mesaR, rb.asiento);
+    const delMomento = opcionesDelCarrilDelBurgo(vistaR, rb.asiento, opcionesR);
+    const cuadrados = carrilDelBurgo(vistaR, rb.asiento, opcionesR);
+    /* Se imprime para que se LEA lo que se pinta: un carril de cuadrados mudos pasa cualquier cuenta. */
+    console.log(`  el carril del apuro: ${cuadrados.map((g) => `${g.glifo}/${g.rotulo}`).join('  ')}`);
+    comprobar('el carril de una partida de verdad trae varios cuadrados que pulsar', cuadrados.length >= 3, cuadrados.map((g) => `${g.glifo}/${g.rotulo}`));
+    comprobar('y no tiene reproche', reprochesDelCarril(vistaR, rb.asiento, delMomento, cuadrados).length === 0, reprochesDelCarril(vistaR, rb.asiento, delMomento, cuadrados));
+    comprobar('un cuadrado por opción del momento, en el mismo orden y con LA MISMA opción por identidad', cuadrados.length === delMomento.length && cuadrados.every((g, k) => g.opcion === delMomento[k]));
+    /* Y ES LA MISMA LISTA que «Ahora» pintaría sin carril: la sección y la cinta no pueden discrepar. */
+    const enLaSeccion = hojaEnTres(vistaR, rb.asiento, opcionesR).secciones.find((s) => s.id === 'ahora')?.opciones ?? [];
+    comprobar('el carril lleva EXACTAMENTE lo que «Ahora» llevaría sin él, por identidad', enLaSeccion.length === cuadrados.length && enLaSeccion.every((o, k) => o === cuadrados[k]?.opcion), [enLaSeccion.map((o) => o.id), cuadrados.map((g) => g.opcion.id)]);
+    const conElCarril = hojaEnTres(vistaR, rb.asiento, opcionesR, null, cuadrados).secciones.find((s) => s.id === 'ahora');
+    comprobar('con el carril puesto «Ahora» suelta sus botones, conserva sus renglones y dice dónde se pulsan', (conElCarril?.opciones.length ?? -1) === 0 && (conElCarril?.lineas.length ?? 0) > 0 && (conElCarril?.lineas ?? []).some((l) => l.indexOf(EL_CARRIL_DE_LA_MESA) >= 0), conElCarril?.lineas);
+    /*
+     * EL APURO: las obras que subieron a «Ahora» siguen saliendo UNA VEZ, ahora desde el
+     * carril, y cada cuadrado dice DE QUÉ SOLAR habla. Sin el rótulo corto serían cuatro «Hi»
+     * idénticos y hipotecar el equivocado no da error: da una partida perdida.
+     */
+    const obrasR = opcionesR.filter((o) => [VENDER, EMPENAR, ALZAR, DESEMPENAR].indexOf(o.tipo) >= 0);
+    comprobar('en el apuro, las obras del juego están todas en el carril y ninguna en las fichas de «Lo mío»', obrasR.length >= 2 && obrasR.every((o) => cuadrados.some((g) => g.opcion === o)) && hojaEnTres(vistaR, rb.asiento, opcionesR, null, cuadrados).mios.flatMap((b) => b.fichas.flatMap((f) => f.opciones)).length === 0, obrasR.map((o) => o.id));
+    const deObras = cuadrados.filter((g) => obrasR.some((o) => o === g.opcion));
+    comprobar('cada cuadrado de una obra dice qué solar es: el rótulo de seis letras de su cara y el filo de su acera', deObras.every((g) => g.casilla !== null && g.rotulo === (CASILLAS[g.casilla]?.rotulo ?? '') && g.color === (barrioDe(g.casilla)?.color ?? null)), deObras.map((g) => [g.glifo, g.rotulo, g.casilla, g.color]));
+    comprobar('y dos obras de dos solares distintos no dan dos cuadrados iguales', new Set(deObras.map((g) => `${g.glifo}·${g.rotulo}`)).size === deObras.length, deObras.map((g) => `${g.glifo}·${g.rotulo}`));
+    const tablaR = tableroEnTres(vistaR, rb.asiento, opcionesR);
+    const particionR = particionDe(vistaR, rb.asiento, opcionesR, tablaR, dadosEnTres(vistaR, rb.asiento, opcionesR), hojaEnTres(vistaR, rb.asiento, opcionesR, null, cuadrados), null, cuadrados);
+    comprobar('la partición con el carril puesto no tiene reproche: cada movimiento en un botón y ni uno perdido', reprochesDeLaParticion(opcionesR, particionR).length === 0, reprochesDeLaParticion(opcionesR, particionR));
+    comprobar('y no queda ningún botón suelto al pie', particionR.fuera.length === 0, particionR.fuera.map((x) => x.o.id));
+    /*
+     * EL GEMELO DE SÓLO APOYO CUENTA EL CARRIL COMO SITIO. Una obra que está en el carril YA
+     * tiene botón, y pedirle además un gemelo son media docena de botones invisibles que
+     * mandan movimientos que ya se ven. La vacuna es no pasarle el carril: entonces las
+     * mismas obras aparecen como huérfanas, que es lo que pasaba antes de este parámetro.
+     */
+    const hojaR = hojaEnTres(vistaR, rb.asiento, opcionesR, null, cuadrados);
+    comprobar('con el carril puesto, ninguna obra del apuro pide gemelo de sólo apoyo', obrasSoloEnElAnillo(opcionesR, tablaR, hojaR, cuadrados).length === 0, obrasSoloEnElAnillo(opcionesR, tablaR, hojaR, cuadrados).map((o) => o.id));
+    comprobar('y la vacuna: sin decirle que el carril existe, las mismas obras salen como huérfanas', obrasSoloEnElAnillo(opcionesR, tablaR, hojaR).length === deObras.length, obrasSoloEnElAnillo(opcionesR, tablaR, hojaR).map((o) => o.id));
+    /* LA VACUNA DE LA PARTICIÓN: la sección que NO suelta sus botones con el carril puesto son dos botones. */
+    const sinSoltar = hojaEnTres(vistaR, rb.asiento, opcionesR);
+    comprobar(
+      'la vacuna: «Ahora» sin soltar sus botones y el carril puesto se ven como dos botones para el mismo movimiento',
+      reprochesDeLaParticion(opcionesR, particionDe(vistaR, rb.asiento, opcionesR, tablaR, dadosEnTres(vistaR, rb.asiento, opcionesR), sinSoltar, null, cuadrados)).some((x) => x.indexOf('dos botones') >= 0),
+    );
+    /* Y LAS DEL CARRIL, sobre los cuadrados de esta partida y no sobre unos fabricados. */
+    comprobar('la vacuna del carril: un cuadrado de menos se ve caer', reprochesDelCarril(vistaR, rb.asiento, delMomento, cuadrados.slice(1)).length > 0);
+    comprobar('uno con la opción de otro también', reprochesDelCarril(vistaR, rb.asiento, delMomento, [cuadrados[1] as (typeof cuadrados)[number], ...cuadrados.slice(1)]).length > 0);
+    const conAyudaAjena = [{ ...(cuadrados[0] as (typeof cuadrados)[number]), ayuda: 'otra cosa' }, ...cuadrados.slice(1)];
+    comprobar('y uno cuya ayuda no es el rótulo del juego también', reprochesDelCarril(vistaR, rb.asiento, delMomento, conAyudaAjena).some((x) => x.indexOf('ayuda') >= 0));
+    const sinRotulo = [{ ...(cuadrados[0] as (typeof cuadrados)[number]), rotulo: '' }, ...cuadrados.slice(1)];
+    comprobar('y uno sin rótulo corto —el cuadrado que no dice qué solar es— también', reprochesDelCarril(vistaR, rb.asiento, delMomento, sinRotulo).some((x) => x.indexOf('rótulo corto') >= 0));
+  }
+  const dosIguales: GlifoDelCarrilDelBurgo<Opcion>[] = [
+    { glifo: 'Co', rotulo: 'Mayor', ayuda: 'Comprar Calle Mayor por 350 €', casilla: null, color: null, opcion: unoDeCada[0] as unknown as Opcion },
+    { glifo: 'Co', rotulo: 'Mayor', ayuda: 'Comprar otra cosa', casilla: null, color: null, opcion: unoDeCada[1] as unknown as Opcion },
+  ];
+  comprobar('y dos cuadrados iguales para dos movimientos que el juego SÍ distingue también', reprochesDelCarril(vista, quien, [], dosIguales).some((x) => x.indexOf('iguales') >= 0));
+
+  /* ── LA CAJA DE LOS TRATOS ── */
+  const base = jugarUnaPartida('BUR-3D-CJ', 2, 47, 60, 0).mesa;
+  const eC = estadoDe(base);
+  const [ca, cb] = eC.jugadores;
+  if (ca !== undefined && cb !== undefined) {
+    /*
+     * DOS TRATOS VIVOS A LA VEZ Y EN LOS DOS SENTIDOS: A (que tiene el turno) le propone a
+     * B, y B —que puede proponer sin turno AL DUEÑO DEL TURNO— le propone a A. Es el caso
+     * que en Riberas no existe y que aquí obliga a que la caja tenga los dos bloques.
+     */
+    const conTratos: EstadoDelBurgo = {
+      ...eC,
+      paso: 'por-pasar',
+      luego: 'por-pasar',
+      turno: 0,
+      dobles: 0,
+      almoneda: null,
+      colaDeAlmonedas: [],
+      colaDeApuros: [],
+      apuro: null,
+      titulos: eC.titulos.map((t) => (t.casilla === 1 ? { ...t, dueno: cb.asiento, casas: 0, empenado: false } : t.casilla === 3 ? { ...t, dueno: ca.asiento, casas: 0, empenado: false } : t)),
+      jugadores: eC.jugadores.map((j) => ({ ...j, mrs: 900, quebrado: false })),
+      tratos: [
+        { id: 1, de: ca.asiento, a: cb.asiento, doy: { mrs: 350, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [1], indultos: 0 }, enElTurno: eC.turnosAbiertos },
+        { id: 2, de: cb.asiento, a: ca.asiento, doy: { mrs: 0, titulos: [1], indultos: 0 }, pido: { mrs: 200, titulos: [], indultos: 0 }, enElTurno: eC.turnosAbiertos },
+      ],
+      siguienteTrato: 3,
+      jugada: eC.jugada + 1,
+      sucesos: [{ que: 'trato', id: 2, de: cb.asiento, a: ca.asiento, fin: 'propuesto' }],
+    };
+    const mesaT = abrirMesa({ id: 'BUR-3D-CJ2', arcade: BURGO, semilla: 47, asientos: [...base.asientos], estado: conTratos });
+    const vistaB = vistaEn(mesaT, cb.asiento);
+    const opcionesB = opcionesEn(mesaT, cb.asiento);
+    const caja = pregonDelBurgo(vistaB, cb.asiento, opcionesB);
+    comprobar('la caja de los tratos de B trae los DOS bloques a la vez: uno para contestar y uno suyo', caja !== null && caja.paraContestar.length === 1 && caja.mios.length === 1, caja);
+    comprobar('la caja no tiene reproche', reprochesDelPregon(vistaB, cb.asiento, opcionesB, caja).length === 0, reprochesDelPregon(vistaB, cb.asiento, opcionesB, caja));
+    const paraB = caja?.paraContestar[0];
+    comprobar(
+      'la tira que hay que contestar está redactada desde donde mira quien la lee y con el vocabulario',
+      paraB !== undefined && paraB.frase.indexOf(`${paraB.de.nombre} te ofrece`) === 0 && paraB.frase.indexOf(maravedies(350)) >= 0 && paraB.frase.indexOf(CASILLAS[1]?.nombre ?? '') >= 0,
+      paraB?.frase,
+    );
+    comprobar('con el aceptar y el rechazar ENTEROS del juego, y sin retirar', paraB !== undefined && opcionesB.indexOf(paraB.aceptar as Opcion) >= 0 && opcionesB.indexOf(paraB.rechazar as Opcion) >= 0 && paraB.retirar === null);
+    comprobar('y con el color de quien la propone en el raíl', paraB !== undefined && paraB.color === vistaB.jugadores.find((j) => j.asiento === ca.asiento)?.color);
+    const miaDeB = caja?.mios[0];
+    comprobar('la tira propia dice a quién se le ofrece y que se está esperando, y trae el retirar', miaDeB !== undefined && miaDeB.frase.indexOf(`Le ofreces a ${miaDeB.a.nombre}`) === 0 && miaDeB.comoAnda.indexOf('esperando') >= 0 && miaDeB.retirar !== null && miaDeB.aceptar === null);
+    const nombreDeA = vistaB.jugadores.find((j) => j.asiento === ca.asiento)?.nombre ?? ca.asiento;
+    comprobar('y la caja dice que caducan, con el nombre de quien tiene el turno', (caja?.caduca ?? '').indexOf(nombreDeA) >= 0, caja?.caduca);
+    const aceptado = paraB?.aceptar === undefined || paraB.aceptar === null ? null : mover(mesaT, cb.asiento, paraB.aceptar);
+    comprobar('y el aceptar de la tira, MANDADO POR EL ÁRBITRO, entra: es la opción del juego, no una montada', aceptado !== null && aceptado.cambio, aceptado?.motivo);
+    /* La hoja suelta sus botones cuando la caja se pinta, y los recupera cuando no. */
+    const conCaja = hojaEnTres(vistaB, cb.asiento, opcionesB, caja);
+    const sinCaja = hojaEnTres(vistaB, cb.asiento, opcionesB);
+    const enLaSeccion = (h: HojaDelBurgo<Opcion>): readonly Opcion[] => h.secciones.find((s) => s.id === 'trato')?.opciones ?? [];
+    comprobar('con la caja puesta, «El trato» se queda con sus renglones y SIN botones', enLaSeccion(conCaja).length === 0 && (conCaja.secciones.find((s) => s.id === 'trato')?.lineas.length ?? 0) > 0);
+    comprobar('y sin caja los recupera enteros: los mismos objetos, ni uno menos', enLaSeccion(sinCaja).length === 3 && enLaSeccion(sinCaja).every((o) => opcionesB.indexOf(o) >= 0), enLaSeccion(sinCaja).map((o) => o.id));
+    comprobar('con la caja, la sección dice DÓNDE se contestan: un renglón sin botones se lee como una sección rota', (conCaja.secciones.find((s) => s.id === 'trato')?.lineas ?? []).some((l) => l.indexOf(LOS_TRATOS_DE_LA_MESA) >= 0));
+    comprobar('y la hoja ya no se abre sola por el trato: lo que había que contestar está a la vista', conCaja.abre !== 'trato' && sinCaja.abre === 'trato', [conCaja.abre, sinCaja.abre]);
+    const tableroT = tableroEnTres(vistaB, cb.asiento, opcionesB);
+    const dadosT = dadosEnTres(vistaB, cb.asiento, opcionesB);
+    comprobar('la criba con la caja no devuelve los botones de los tratos como sueltos', opcionesFueraDelTablero(opcionesB, tableroT, dadosT, conCaja, caja).every((o) => [ACEPTAR, RECHAZAR, RETIRAR].indexOf(o.tipo) < 0));
+    comprobar('y sin caja ni hoja, los tres vuelven como botones sueltos', opcionesFueraDelTablero(opcionesB, tableroT, dadosT, null, null).filter((o) => [ACEPTAR, RECHAZAR, RETIRAR].indexOf(o.tipo) >= 0).length === 3);
+    const conCajaP = particionDe(vistaB, cb.asiento, opcionesB, tableroT, dadosT, conCaja, caja);
+    comprobar('la partición con la caja puesta no tiene reproche', reprochesDeLaParticion(opcionesB, conCajaP).length === 0, reprochesDeLaParticion(opcionesB, conCajaP));
+    /* LA VACUNA DE LA CAJA: pintar los dos muebles a la vez son dos botones para lo mismo. */
+    const enLosDos = particionDe(vistaB, cb.asiento, opcionesB, tableroT, dadosT, sinCaja, caja);
+    comprobar('la vacuna de la caja: la caja y la sección pintando a la vez se ven caer como dos botones', reprochesDeLaParticion(opcionesB, enLosDos).some((x) => x.indexOf('dos botones') >= 0), reprochesDeLaParticion(opcionesB, enLosDos));
+    const cajaAjena: PregonDelBurgo<Opcion> | null = caja === null ? null : { ...caja, paraContestar: [...caja.paraContestar, { ...(caja.paraContestar[0] as (typeof caja.paraContestar)[number]), id: 99 }] };
+    comprobar('y una tira de un trato que no es mío también', reprochesDelPregon(vistaB, cb.asiento, opcionesB, cajaAjena).some((x) => x.indexOf('no es mío') >= 0));
+    /*
+     * Y LA DE LOS DOS BLOQUES CAMBIADOS, que es la que faltaba: una caja que eche mis
+     * propuestas al bloque de «Para contestar» tiene las mismas tiras, los mismos ids y las
+     * mismas opciones —lo único que cambia es en qué montón está cada una—, así que todo lo
+     * que se mira sobre la suma de los dos la daba por buena. En pantalla es un bloque que
+     * pide contestar lo que sólo se puede retirar.
+     */
+    const bloquesCambiados: PregonDelBurgo<Opcion> | null = caja === null ? null : { ...caja, paraContestar: [...caja.paraContestar, ...caja.mios], mios: [] };
+    comprobar('y los dos bloques cambiados también: lo mío no se contesta y lo que me proponen no se retira', reprochesDelPregon(vistaB, cb.asiento, opcionesB, bloquesCambiados).some((x) => x.indexOf(PARA_CONTESTAR) >= 0));
+    comprobar('un mirón no tiene caja, y un asiento sin tratos vivos tampoco', pregonDelBurgo(vistaEn(mesaT, null), null, []) === null && pregonDelBurgo(vista, quien, opciones) === null);
+    /*
+     * LOS NOMBRES DE LOS MUEBLES VIAJAN DESDE AQUÍ, no desde cada cliente: dos copias de
+     * «Los tratos de la mesa» son dos sitios donde el día que una cambie sólo cambiará una,
+     * y el PC diría una cosa y el teléfono otra sobre la misma mesa.
+     */
+    comprobar(
+      'los nombres de la caja y de sus dos bloques bajan de la traducción, y usan el vocabulario del §0',
+      LOS_TRATOS_DE_LA_MESA.length > 0 && PARA_CONTESTAR.length > 0 && LOS_MIOS.length > 0 && LOS_TRATOS_DE_LA_MESA.indexOf('trato') >= 0,
+      [LOS_TRATOS_DE_LA_MESA, PARA_CONTESTAR, LOS_MIOS],
+    );
+  }
+
+  /* ── EL CARTEL AL PIE ── */
+  comprobar('los cuarenta carteles de la última mesa no tienen reproche', reprochesDeLosCarteles(vista, quien, opciones).length === 0, reprochesDeLosCarteles(vista, quien, opciones));
+  const c39 = cartelDeCasilla(vista, 39);
+  comprobar('el cartel de un solar: nombre, barrio y precio en la primera frase', c39.frases[0] === `${CASILLAS[39]?.nombre ?? ''} · ${barrioDe(39)?.nombre ?? ''} · ${maravedies(400)}`, c39);
+  const conDueno = { ...vista, titulos: vista.titulos.map((t) => (t.casilla === 39 ? { ...t, dueno: quien, casas: 2, empenado: false, rentaAhora: 600, barrioEntero: false } : t)) } as VistaDelBurgo;
+  const c39mio = cartelDeCasilla(conDueno, 39);
+  comprobar('con dueño, la segunda frase dice de quién es, qué tiene y cuánto cobra HOY', c39mio.frases.length === 2 && (c39mio.frases[1] ?? '').indexOf('2 casas') >= 0 && (c39mio.frases[1] ?? '').indexOf(maravedies(600)) >= 0 && c39mio.esMio === (vista.yo === quien), c39mio.frases);
+  const c10 = cartelDeCasilla(vista, 10);
+  comprobar('el cartel de la Comisaría no inventa precio ni renta', !c10.seCompra && c10.frase.indexOf('€') < 0 && c10.colorDelDueno === null, c10);
+  const c4 = cartelDeCasilla(vista, 4);
+  comprobar('y el del Impuesto dice lo que cobra, que es lo único que hay que saber al caer', c4.frase.indexOf(maravedies(CASILLAS[4]?.precio ?? 0)) >= 0, c4);
+  comprobar('una vista que no es del Burgo da el cartel de la tabla, sin dueño: nunca un hueco bajo el cursor', cartelDeCasilla({ desde: 'riberas' }, 39).nombre === (CASILLAS[39]?.nombre ?? '') && cartelDeCasilla({ desde: 'riberas' }, 39).colorDelDueno === null);
+  comprobar(
+    'la vacuna del cartel: un cartel que no dice la renta de hoy se ve caer',
+    reprochesDeLosCarteles(conDueno, quien, opciones, (casilla) => ({ ...cartelDeCasilla(conDueno, casilla), frases: [CASILLAS[casilla]?.nombre ?? ''], frase: CASILLAS[casilla]?.nombre ?? '' })).length > 0,
+  );
+  comprobar(
+    'y uno que discrepa de la tarjeta también: son el mismo dato dicho dos veces',
+    reprochesDeLosCarteles(vista, quien, opciones, (casilla) => ({ ...cartelDeCasilla(vista, casilla), frase: `${cartelDeCasilla(vista, casilla).frase} ` })).some((x) => x.indexOf('no dicen lo mismo') >= 0),
+  );
+
+  /* ── LA FICHA DE UNA CASILLA, PARA CUALQUIERA ── */
+  /* La renta de hoy es la de la fila de tres casas de la TABLA: inventarla aquí sería inventar la regla. */
+  const rentaDeTres = CASILLAS[39]?.rentas[3] ?? 0;
+  const ajena = { ...vista, titulos: vista.titulos.map((t) => (t.casilla === 39 ? { ...t, dueno: 'otro-asiento', casas: 3, empenado: false, rentaAhora: rentaDeTres } : t)) } as VistaDelBurgo;
+  const fAjena = fichaDeCasilla(ajena, 39, quien, opciones);
+  comprobar('la tarjeta de una casilla AJENA trae la tabla entera, la fila de hoy y ninguna obra', fAjena.rentas.length === 7 && fAjena.rentas.filter((x) => x.actual).length === 1 && fAjena.opciones.length === 0 && !fAjena.esMio, fAjena.rentas);
+  comprobar('la tabla de rentas NO se colapsa en un renglón: `lineas` no la lleva y `rentas` va fila a fila', fAjena.lineas.every((l) => fAjena.rentas.filter((x) => l.indexOf(x.rotulo) >= 0).length <= 1), fAjena.lineas);
+  const enElBarrio = fAjena.solaresDelBarrio;
+  comprobar('y dice quién tiene los solares del barrio, que es lo que se mira antes de comprar', enElBarrio.length === (barrioDe(39)?.solares.length ?? 0) && enElBarrio.some((s) => s.esEsta && s.casilla === 39), enElBarrio.map((s) => `${s.casilla}:${s.dueno?.nombre ?? '-'}`));
+  comprobar('con un renglón que lo cuenta en palabras', fAjena.lineas.some((l) => l.indexOf(barrioDe(39)?.nombre ?? '') === 0 && l.indexOf('solares') >= 0), fAjena.lineas);
+  comprobar('fuera de los solares no hay barrio que contar', fichaDeCasilla(vista, 5, quien, opciones).solaresDelBarrio.length === 0 && fichaDeCasilla(vista, 10, quien, opciones).solaresDelBarrio.length === 0);
+  comprobar('y `seCompra` separa los títulos de las casillas que sólo cobran', fichaDeCasilla(vista, 5, quien, opciones).seCompra && !fichaDeCasilla(vista, 4, quien, opciones).seCompra);
+
+  /* ── LA FICHA DE UN JUGADOR ── */
+  comprobar('las fichas de jugador de la última mesa no tienen reproche', reprochesDeLasFichasDeJugador(vista, quien, opciones).length === 0, reprochesDeLasFichasDeJugador(vista, quien, opciones));
+  const mia = fichaDeJugador(vista, quien, quien, opciones);
+  comprobar('mi propia ficha dice el patrimonio y no me ofrece un trato conmigo mismo', mia !== null && mia.soyYo && mia.trato === null && mia.lineas.some((l) => l.indexOf('patrimonio') >= 0), mia?.lineas);
+  /* En pie —ni quebrado ni en la Comisaría— la segunda línea dice DÓNDE está, que es lo que el marcador no decía. */
+  const enPie = { ...vista, jugadores: vista.jugadores.map((j) => (j.asiento === quien ? { ...j, quebrado: false, presa: -1, casilla: 39 } : j)) } as VistaDelBurgo;
+  const dePie = fichaDeJugador(enPie, quien, quien, opciones);
+  comprobar('y de un jugador en pie dice en qué casilla está, con su nombre', dePie !== null && dePie.lineas.some((l) => l === `En ${CASILLAS[39]?.nombre ?? ''}.`), dePie?.lineas);
+  const preso = { ...enPie, jugadores: enPie.jugadores.map((j) => (j.asiento === quien ? { ...j, presa: 1 } : j)) } as VistaDelBurgo;
+  comprobar('y de uno en la Comisaría, por qué intento va', fichaDeJugador(preso, quien, quien, opciones)?.lineas.some((l) => l.indexOf('En la Comisaría: intento 2 de') === 0) === true, fichaDeJugador(preso, quien, quien, opciones)?.lineas);
+  comprobar('un asiento que no está sentado no tiene ficha', fichaDeJugador(vista, 'nadie', quien, opciones) === null);
+  comprobar('y una vista que no es del Burgo tampoco', fichaDeJugador({ desde: 'riberas' }, quien, quien, opciones) === null);
+  comprobar(
+    'la vacuna de la ficha de jugador: una que cuente un patrimonio que no es el de la vista se ve caer',
+    reprochesDeLasFichasDeJugador(vista, quien, opciones, (asiento) => {
+      const f = fichaDeJugador(vista, asiento, quien, opciones);
+      return f === null ? null : { ...f, patrimonio: f.patrimonio + 1 };
+    }).length > 0,
+  );
+  comprobar(
+    'y una que ofrezca en trato un título que no es suyo también',
+    reprochesDeLasFichasDeJugador(vista, quien, opciones, (asiento) => {
+      const f = fichaDeJugador(vista, asiento, quien, opciones);
+      return f === null ? null : { ...f, tratables: [...f.tratables, 37] };
+    }).some((x) => x.indexOf('no es suyo') >= 0) || vista.jugadores.some((j) => j.titulos.indexOf(37) >= 0),
+  );
+
+  /* ── LOS GEMELOS DE SÓLO APOYO ── */
+  const gemelos = obrasSoloEnElAnillo(opciones, tablero, hoja);
+  comprobar('los gemelos son SÓLO comprar y sacar a subasta: lo demás tiene su botón en la ficha o en «Ahora»', gemelos.every((o) => o.tipo === COMPRAR || o.tipo === A_ALMONEDA), gemelos.map((o) => o.id));
+  comprobar('sin anillo montado no hay gemelo que pintar: todo vuelve como botón suelto', obrasSoloEnElAnillo(opciones, null, hoja).length === 0);
+  comprobar('y con el cajón cerrado el anillo se queda con TODAS las obras, que es lo que hay que decirle al cliente', obrasSoloEnElAnillo(opciones, tablero, null).length >= gemelos.length);
+  comprobar('un gemelo es la opción ENTERA del juego, no una montada', gemelos.every((o) => opciones.indexOf(o) >= 0));
+
+  /* ── LA CRÓNICA ── */
+  const v1 = { ...vista, jugada: 10, pregon: 'Ana tira y saca un cinco.' } as VistaDelBurgo;
+  const v2 = { ...vista, jugada: 11, pregon: 'Ana tira y saca un cinco.' } as VistaDelBurgo;
+  const v3 = { ...vista, jugada: 12, pregon: 'Bea cayó en Calle Mayor y pagó 350 € a Ana.' } as VistaDelBurgo;
+  const c1 = laCronicaConLaVista([], v1);
+  const c2 = laCronicaConLaVista(c1, v2);
+  const c3 = laCronicaConLaVista(c2, v3);
+  comprobar('la crónica acumula un renglón por jugada, del más nuevo al más viejo', c3.length === 3 && c3[0]?.jugada === 12 && c3[2]?.jugada === 10, c3);
+  /*
+   * DOS FRASES IGUALES EN DOS JUGADAS SON DOS RENGLONES. Comparar con el texto anterior
+   * —que es como lo hacía la app a mano— se comía el segundo: dos «Ana tira y saca un
+   * cinco» son dos tiradas de verdad, no un sondeo repetido.
+   */
+  comprobar('dos jugadas con la misma frase son DOS renglones: no es un sondeo repetido, es que pasó dos veces', c2.length === 2 && c2[0]?.texto === c2[1]?.texto);
+  comprobar('y el mismo sondeo dos veces no añade nada, y devuelve LA MISMA lista por identidad', laCronicaConLaVista(c3, v3) === c3);
+  comprobar('una vista sin pregón no añade nada, y tampoco una que no es del Burgo', laCronicaConLaVista(c3, { ...v3, jugada: 13, pregon: '' }) === c3 && laCronicaConLaVista(c3, { desde: 'riberas' }) === c3);
+  const otraPartida = laCronicaConLaVista(c3, { ...vista, jugada: 2, pregon: 'La mesa empieza.' } as VistaDelBurgo);
+  comprobar('si la jugada va hacia atrás es otra mesa: la crónica empieza de cero en vez de mezclar dos relatos', otraPartida.length === 1 && otraPartida[0]?.jugada === 2, otraPartida);
+  let larga: readonly RenglonDeLaCronica[] = [];
+  for (let k = 1; k <= TOPE_DE_LA_CRONICA + 12; k++) larga = laCronicaConLaVista(larga, { ...vista, jugada: k, pregon: `Pasó la cosa ${k}.` } as VistaDelBurgo);
+  comprobar(`la crónica se para en el tope de ${TOPE_DE_LA_CRONICA} y se queda con lo último`, larga.length === TOPE_DE_LA_CRONICA && larga[0]?.jugada === TOPE_DE_LA_CRONICA + 12, larga.length);
+  comprobar('y con un tope propio, en él', laCronicaConLaVista(larga, { ...vista, jugada: 999, pregon: 'Y una más.' } as VistaDelBurgo, 3).length === 3);
+  comprobar('la crónica de las tres vistas no tiene reproche', reprochesDeLaCronica(c3, [v1, v2, v3], TOPE_DE_LA_CRONICA).length === 0, reprochesDeLaCronica(c3, [v1, v2, v3], TOPE_DE_LA_CRONICA));
+  comprobar('la vacuna de la crónica: dos renglones de la misma jugada se ven caer', reprochesDeLaCronica([...c3, c3[0] as RenglonDeLaCronica], [v1, v2, v3], TOPE_DE_LA_CRONICA).some((x) => x.indexOf('repite') >= 0));
+  comprobar('una crónica del revés también', reprochesDeLaCronica([...c3].reverse(), [v1, v2, v3], TOPE_DE_LA_CRONICA).some((x) => x.indexOf('más nuevo') >= 0));
+  comprobar('y un renglón que no es el pregón de su vista también', reprochesDeLaCronica([{ jugada: 12, texto: 'otra cosa' }, ...c3.slice(1)], [v1, v2, v3], TOPE_DE_LA_CRONICA).some((x) => x.indexOf('no es el pregón') >= 0));
+}
+
 /* ═══ 6. `burgo-servido`: EL SERVIDOR DE VERDAD ═══ */
 paso('burgo-servido: el modelo por HTTP y el ciclo entero de una mesa por el cable');
 
@@ -1391,13 +2318,14 @@ try {
 
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
 /*
- * VA CON MARGEN Y NO AL RAS: hoy se hacen unas 180, y el guardia está veinte por debajo:
- * más que el bloque más pequeño. Al ras hace lo contrario de lo que quiere: una
- * comprobación que se cae de un `if` dispara el guardia antes que la roja, y con el
- * guardia delante nadie ve el nombre de lo que se rompió. Por eso las rojas se
- * imprimen ANTES de irse.
+ * VA CON MARGEN Y NO AL RAS: hoy se hacen 293 —eran 274 antes de que el carril dejara de
+ * venir vacío, y 180 antes del carril, la caja de los tratos, el cartel al pie, las dos
+ * fichas y la crónica—, y el guardia está veintiocho por debajo: más que el bloque
+ * condicional más pequeño. Al ras hace lo contrario de lo que quiere: una comprobación que
+ * se cae de un `if` dispara el guardia antes que la roja, y con el guardia delante nadie ve
+ * el nombre de lo que se rompió. Por eso las rojas se imprimen ANTES de irse.
  */
-const MINIMO = 160;
+const MINIMO = 265;
 if (hechas < MINIMO) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);

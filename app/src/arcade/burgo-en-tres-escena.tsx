@@ -64,6 +64,33 @@
  * qué. Una pantalla de partida que depende de que baje un fichero de casi tres
  * megabytes no es una pantalla de partida: es una demostración.
  *
+ * ═══ EL TABLERO ES LA PANTALLA, Y LA HOJA UN CAJÓN QUE SUBE DESDE EL PIE ═══
+ *
+ * Antes el lienzo se llevaba el 58 % del alto y la hoja iba DEBAJO, en flujo. Eso
+ * hacía dos cosas malas a la vez: dejaba el anillo en media pantalla —en un teléfono
+ * en pie, 490 puntos de 845— y metía todo lo que se pulsa dentro de una columna que
+ * hay que rodar. Ahora el lienzo se lleva todo lo que queda bajo la barra de la mesa
+ * y la hoja sube cuando se pide, igual que el cajón del PC; lo único que se queda
+ * fuera, flotando sobre el pie del lienzo, es lo que hay que poder mirar y pulsar SIN
+ * abrir nada: la cinta con el asa del cajón, EL CARRIL, la caja de los tratos, el
+ * cartel de la casilla señalada y los botones que no recoja ningún mueble.
+ *
+ * ═══ Y ESO NO DEJA EL ANILLO DEBAJO DEL PIE: ESTÁ MEDIDO ═══
+ *
+ * `poseDeSalida` sólo mira la PROPORCIÓN del lienzo, no su altura, así que un lienzo
+ * más alto no acerca nada: reencuadra. Proyectando las cuatro esquinas del anillo
+ * (±432, ±432) con `poseDelBurgo` y `proyecta` —las mismas funciones que
+ * `verify:burgo-escena`— en un teléfono de 390 × 845 con la barra de la mesa puesta
+ * (lienzo de 390 × 725):
+ *
+ *     al 58 % (390 × 490):  x ∈ [−0,796, 0,698]   y ∈ [−0,564, 0,425]
+ *     entero  (390 × 725):  x ∈ [−0,778, 0,712]   y ∈ [−0,362, 0,299]
+ *
+ * O sea que la esquina más baja del anillo pasa del 78 % al 68 % del alto, y por
+ * debajo quedan 231 puntos libres donde antes quedaban 107. La cinta y el carril
+ * juntos miden unos 144: el pie flota sobre lienzo vacío y no sobre casillas. Las
+ * cuatro esquinas siguen dentro con margen en las tres ventanas de la casa.
+ *
  * ═══ Y NINGUNA DECISIÓN DE ESTA PANTALLA MIRA LA PLATAFORMA ═══
  *
  * `Platform.OS` no aparece ni una vez, ni siquiera en las sombras: van a `false` en
@@ -76,16 +103,7 @@
  */
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -102,20 +120,28 @@ import '../../../shared/arcade/juegos';
 import { BURGO } from '../../../shared/arcade/juegos';
 import { opcionesSueltas, tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
 import {
+  carrilDelBurgo,
+  cartelDeCasilla,
   dadosEnTres,
-  elPregonEnTres,
   esVistaQueSePinta,
   fichaDeCasilla,
   firmaDelTablero,
   hojaEnTres,
+  laCronicaConLaVista,
   obraPosibleEnCasilla,
+  obrasSoloEnElAnillo,
   opcionesFueraDelTablero,
+  pregonDelBurgo,
   seVeEnTres,
   sucesosEnTres,
   tableroEnTres,
   tirarEnTres,
 } from '../../../shared/arcade/juegos/burgo-en-tres';
-import type { DestinoDelTrato, HojaDelBurgo } from '../../../shared/arcade/juegos/burgo-en-tres';
+import type {
+  DestinoDelTrato,
+  HojaDelBurgo,
+  RenglonDeLaCronica,
+} from '../../../shared/arcade/juegos/burgo-en-tres';
 import { Burgo } from '../../../escenas/burgo/Burgo';
 import type { ModoDeCamara, TableroDelBurgoEn3D } from '../../../escenas/burgo/tipos';
 /*
@@ -144,6 +170,11 @@ import { Canvas } from '../tres/Lienzo';
 import { apuntarFallo } from '../parte-de-fallos';
 import { conAlfa } from '../tema';
 import {
+  ElCajonDeLaHoja,
+  ElCarrilDeLaMesa,
+  ElCartelDeLaCasilla,
+  LaCajaDeLosTratos,
+  LaCintaDelBurgo,
   LaFichaDeUnaCasilla,
   LaFichaDelJugador,
   LaHojaDelBurgo,
@@ -169,32 +200,42 @@ import {
 import { traer } from './traer';
 
 /**
- * CUÁNTO ALTO SE LLEVA EL LIENZO: el 58 % de la pantalla y nunca menos de 360.
+ * CUÁNTO ALTO SE LLEVA EL LIENZO: TODO EL QUE QUEDA. Ya no hay fracción.
  *
- * Fijo y no elástico, al revés que la caja del `Retablo`: un `flex: 1` sin suelo se
- * encoge hasta cero antes de que nada se desplace, y un lienzo de tres dimensiones
- * a cero de alto es un contexto de GL que se crea y se destruye por nada. El pie
- * —la hoja, las opciones sueltas y la crónica— es lo que cede y se desplaza por
- * dentro. Y es el mismo 58 % con el que `verify:burgo-escena` proyecta las cuatro
- * esquinas del anillo en 9:19,5: si cambia aquí, aquella medida deja de valer.
+ * Aquí vivían un `PARTE_DEL_ALTO = 0.58` y un suelo de 360. El 58 % era lo que la
+ * hoja, en flujo y debajo, le dejaba al anillo; desde que la hoja es un cajón que
+ * sube desde el pie, no hay nada debajo que repartir y el lienzo se lleva lo que
+ * queda bajo la barra de la mesa. Sigue sin ser un `flex: 1` desnudo sobre nada: es
+ * el único hijo que crece de una columna que ya tiene alto, así que no puede
+ * encogerse a cero —que es lo que aquel suelo de 360 evitaba— y el suelo sobra.
+ *
+ * LO QUE HAY QUE VOLVER A MEDIR ESTÁ EN OTRO FICHERO, y no es mío:
+ * `verify:burgo-escena` proyecta las cuatro esquinas del anillo en una ventana que
+ * llama «9:19,5 al 58 %» y calcula como `390 × Math.round(845 × 0,58)`. Esa ventana
+ * describe una pantalla que ya no existe. Medido con sus mismas funciones, la que
+ * hay que poner es `390 × 725` —la pantalla menos la barra— y ahí las cuatro
+ * esquinas caen en x ∈ [−0,778, 0,712] e y ∈ [−0,362, 0,299], o sea DENTRO y con más
+ * margen que antes. Se dice aquí, y allí no se toca nada.
  */
-const PARTE_DEL_ALTO = 0.58;
-const ALTO_MINIMO_DEL_LIENZO = 360;
 
 /**
- * LA HOJA ES HERMANA DEL LIENZO Y NO SE LE PONE ENCIMA, así que no tapa nada y la
- * franja que la cámara tiene que esquivar es CERO. En el Muelle sí es 0,36, porque
- * allí la hoja flota sobre la escena.
+ * LO QUE LA HOJA TAPA DEL LIENZO: CERO, y ahora por otro motivo.
+ *
+ * Antes era cero porque la hoja era hermana del lienzo y no se le ponía encima. Ahora
+ * hay muebles flotando sobre el pie —la cinta, el carril, la caja de los tratos, el
+ * cartel— y aun así sigue siendo cero, por dos razones medidas: el cajón, que es lo
+ * único que tapa de verdad, tapa TODO cuando está abierto y entonces nadie mira el
+ * anillo; y el pie que flota mide unos 144 puntos, mientras que la esquina más baja
+ * del anillo se proyecta al 68 % del alto de un lienzo de 725, o sea con 231 puntos
+ * de lienzo vacío por debajo. En el Muelle sí es 0,36, porque allí la hoja flota
+ * sobre la escena y la tapa de verdad.
  */
 const FRANJA_QUE_TAPA_LA_HOJA = 0;
 
 /** Hoy la escena sólo sabe la aérea; el otro modo está reservado en `tipos.ts`. Objeto de módulo: no se refabrica por fotograma. */
 const CAMARA_AEREA: ModoDeCamara = { modo: 'aerea' };
 
-/** Cuántos pregones se recuerdan de esta partida. La crónica del mueble enseña los tres últimos. */
-const TOPE_DE_LA_CRONICA = 40;
-
-/** La clave con la que los pregones entran en la crónica. Ver `AvisoDeMesa`. */
+/** La clave con la que los pregones entran en la crónica del mueble. Ver `AvisoDeMesa`. */
 const CLAVE_DEL_PREGON = 'burgo:pregon';
 
 /**
@@ -458,8 +499,6 @@ function LaMesaEnTres({
   /* Y si el mundo no ha llegado, tampoco: la partida se juega sobre el retablo. */
   const [elMundoNoLlego, ponerElMundoNoLlego] = useState<string | null>(null);
   const [llegando, ponerLlegando] = useState(true);
-  const { height: altoDeLaPantalla } = useWindowDimensions();
-  const altoDelLienzo = Math.max(ALTO_MINIMO_DEL_LIENZO, Math.round(altoDeLaPantalla * PARTE_DEL_ALTO));
 
   /*
    * ═══ LO COGIDO VIVE AQUÍ, Y SE SUELTA CUANDO CAMBIA LA MESA ═══
@@ -488,6 +527,20 @@ function LaMesaEnTres({
   useEffect(() => {
     soltarTodo();
   }, [vista.rev, soltarTodo]);
+
+  /*
+   * ═══ LA CASILLA SEÑALADA NO ENTRA EN «LO COGIDO», Y ESO ES LA DECISIÓN ═══
+   *
+   * Las tres hojas de arriba se sueltan en cada revisión porque llevan OPCIONES
+   * dentro: una compuesta con la revisión anterior se manda con algo que el servidor
+   * ya no ofrece. El cartel de la casilla señalada no lleva ninguna —`cartelDeCasilla`
+   * ni siquiera recibe la lista de opciones, y eso está escrito en su cabecera para
+   * que no se le metan— y se redacta entero desde la vista de AHORA en cada
+   * repintado, así que no puede mentir. Soltarlo con cada revisión lo dejaría en
+   * pantalla dos segundos de cada treinta en una mesa de seis, que es como no
+   * tenerlo.
+   */
+  const [laSenalada, ponerLaSenalada] = useState<number | null>(null);
 
   const [medida, ponerMedida] = useState({ ancho: 0, alto: 0 });
   const medir = useCallback((e: LayoutChangeEvent) => {
@@ -567,22 +620,94 @@ function LaMesaEnTres({
     return { jugada, lista };
   }, [laVista]);
 
-  /* La hoja entera: las ocho secciones, con sus textos y sus opciones ENTERAS. */
+  /*
+   * ═══ EL ORDEN DE ESTAS SEIS LLAMADAS NO ES LIBRE, Y ES LA MITAD DEL ENCARGO ═══
+   *
+   * Los tres primeros muebles no dependen de nadie salvo del anterior; la hoja recibe
+   * LOS DOS que ya pintan movimientos suyos, y la criba va SIEMPRE la última porque es
+   * la única que mira a todas las demás. Compuesta antes que la hoja o que el carril,
+   * quitaría por un mueble que todavía no existe.
+   *
+   *     tablero → dados → la caja de los tratos → el carril → la hoja → la criba
+   *
+   * Y a la hoja se le pasan LOS OBJETOS y no dos banderas. Un `boolean` que se quedara
+   * en `true` con el mueble sin pintar deja el movimiento sin sitio en toda la
+   * pantalla y sin un solo error: con la caja, «El trato» suelta sus botones; con el
+   * carril, «Ahora» suelta los suyos y añade un renglón que dice dónde se pulsan.
+   */
+  const pregon = useMemo(() => pregonDelBurgo(laVista, yo, opciones), [laVista, yo, opciones]);
+  const carril = useMemo(() => carrilDelBurgo(laVista, yo, opciones), [laVista, yo, opciones]);
   const hoja: HojaDelBurgo<OpcionDeMesa> = useMemo(
-    () => hojaEnTres(laVista, yo, opciones),
-    [laVista, yo, opciones],
+    () => hojaEnTres(laVista, yo, opciones, pregon, carril),
+    [laVista, yo, opciones, pregon, carril],
   );
 
   /*
-   * LOS BOTONES SUELTOS: lo que ni los dados, ni las casillas tocables, ni la hoja
-   * recogen. Recibe LOS OBJETOS que se pintan —no interruptores— y se aplica
-   * DESPUÉS de componerlos, que es lo que hace que el botón desaparezca exactamente
-   * cuando el asa, la marca o la sección existen.
+   * La sección abierta y el cajón, recordados por mesa y abiertos solos cuando toca
+   * actuar. Sube aquí —antes estaba más abajo— porque `cajonAbierto` es lo que decide
+   * si la hoja SE PINTA, y eso es lo que la criba necesita saber.
+   */
+  const { abierta, alAbrir, cajonAbierto, alternarElCajon, cerrarElCajon, alAbrirEnElCajon } =
+    usarLaSeccionAbierta(vista.codigo, hoja.abre, hoja.cinta.espera, hoja.cinta.meToca, carril, pregon);
+
+  /*
+   * LOS BOTONES SUELTOS: lo que ni los dados, ni las casillas tocables, ni la hoja,
+   * ni la caja de los tratos, ni el carril recogen. Recibe LOS OBJETOS que se pintan
+   * —no interruptores— y se aplica DESPUÉS de componerlos, que es lo que hace que el
+   * botón desaparezca exactamente cuando el asa, la marca, la sección, la tira o el
+   * cuadrado existen.
+   *
+   * ═══ Y LA HOJA SÓLO CUENTA CON EL CAJÓN ABIERTO ═══
+   *
+   * Es la regla de la casa aplicada al mueble nuevo: la criba recibe lo que SE PINTA,
+   * y una hoja dentro de un cajón cerrado no se pinta. Con el cajón cerrado, lo que
+   * sólo enseñaba la hoja —las pujas de una subasta, sobre todo— vuelve como botón
+   * suelto al pie del lienzo, que es donde se puede pulsar sin abrir nada; al abrirlo
+   * se va a sus secciones, donde se lee con su rótulo largo. Nunca está en los dos
+   * sitios a la vez.
    */
   const fuera = useMemo(
-    () => opcionesFueraDelTablero(opciones, datos, dados, hoja),
-    [opciones, datos, dados, hoja],
+    () => opcionesFueraDelTablero(opciones, datos, dados, cajonAbierto ? hoja : null, pregon, carril),
+    [opciones, datos, dados, hoja, cajonAbierto, pregon, carril],
   );
+
+  /*
+   * ═══ LAS OBRAS QUE SÓLO TIENE EL ANILLO, PARA QUIEN NO PUEDE TOCAR EL ANILLO ═══
+   *
+   * COMPRAR y SACAR A SUBASTA no son de un título mío todavía, así que no tienen
+   * ficha en «Lo mío»: la criba les quita el botón suelto —porque su casilla está
+   * encendida— y no se lo da nadie. O sea que el movimiento principal del juego sólo
+   * se podía hacer con el dedo sobre una escena de tres dimensiones. Con lector de
+   * pantalla, el lienzo entero es UN elemento, y ahí dentro no hay cuarenta casillas:
+   * hay una etiqueta.
+   *
+   * `obrasSoloEnElAnillo` devuelve exactamente esas —y ni una más: se le pasa también
+   * EL CARRIL, porque en mi apuro vender e hipotecar se van de las fichas a «Ahora» y
+   * de «Ahora» al carril, y sin decírselo pediría un gemelo para cada una—. Aquí se
+   * ofrecen por la MISMA puerta que tirar los dados: acciones de accesibilidad del
+   * lienzo, que es el precedente que esta pantalla ya tenía escrito. No es un segundo
+   * botón, es el mismo dicho para quien no puede hacer el gesto.
+   */
+  const soloEnElAnillo = useMemo(
+    () => obrasSoloEnElAnillo(opciones, datos, cajonAbierto ? hoja : null, carril),
+    [opciones, datos, hoja, cajonAbierto, carril],
+  );
+
+  /**
+   * LAS ACCIONES DEL LIENZO: tirar, y una por obra que sólo tiene el anillo.
+   *
+   * `undefined` y no una lista vacía cuando no hay ninguna, que es lo que había:
+   * una lista vacía le dice al lector de pantalla que el elemento tiene un menú de
+   * acciones, y abrirlo para encontrarlo vacío es peor que no anunciarlo. Los
+   * nombres son posicionales (`obra:0`) porque el nombre de una acción es una llave
+   * interna y el ROTULO —lo que se oye— es el del juego, entero.
+   */
+  const accionesDelLienzo = useMemo(() => {
+    const lista: { readonly name: string; readonly label: string }[] = [];
+    if (dados !== null && dados.porTirar) lista.push({ name: 'tirar', label: 'Tirar los dados' });
+    for (const [i, o] of soloEnElAnillo.entries()) lista.push({ name: `obra:${String(i)}`, label: o.rotulo });
+    return lista.length === 0 ? undefined : lista;
+  }, [dados, soloEnElAnillo]);
 
   /* Cómo se llama una casilla, preguntado a la traducción y no a una tabla de aquí. */
   const nombreDeCasilla = useCallback(
@@ -591,24 +716,36 @@ function LaMesaEnTres({
   );
 
   /*
-   * ═══ LA CRÓNICA: EL PREGÓN DE CADA VISTA, ACUMULADO ═══
+   * ═══ LA CRÓNICA: EL PREGÓN DE CADA VISTA, ACUMULADO POR `shared/` ═══
    *
    * El pregón es la frase que el juego escribe para la mesa entera, y viaja en cada
-   * vista: sólo la última. Quien quiera un relato tiene que guardarlo, y eso es
-   * cosa del cliente porque el estado del juego no puede llevar histórico (el tope
-   * de 512 KiB por estado, y el presupuesto por movimiento). Se apunta cuando
-   * CAMBIA el texto, no en cada revisión: un sondeo que trae la misma frase no es
-   * una línea nueva de la crónica.
+   * vista: sólo la última. Quien quiera un relato tiene que guardarlo, y eso es cosa
+   * del cliente porque el estado del juego no puede llevar histórico (el tope de
+   * 512 KiB por estado, y el presupuesto por movimiento).
+   *
+   * ═══ LO QUE HACÍA ESTA PANTALLA ESTABA MAL, Y NO SE VEÍA ═══
+   *
+   * Apuntaba cuando CAMBIABA el texto. Con eso, dos sucesos iguales seguidos —dos
+   * «Ana tira», dos cobros idénticos— eran UNO SOLO en el relato: el segundo
+   * desaparecía sin que nadie lo notara. Ahora lo lleva `laCronicaConLaVista`, que
+   * apunta POR JUGADA: la jugada sube con cada cambio de estado y es única por vista,
+   * así que un sondeo que trae la misma vista no añade nada y dos jugadas con la misma
+   * frase son dos renglones, que es lo que pasó de verdad. Y si la jugada va hacia
+   * atrás —otra mesa, una recién abierta— empieza de cero en vez de mezclar dos
+   * relatos. Devuelve LA MISMA LISTA por identidad cuando no hay nada nuevo, así que
+   * el `useState` no repinta: eso es lo que impide una crónica nueva por sondeo.
    */
-  const [pregones, ponerPregones] = useState<readonly AvisoDeMesa[]>([]);
-  const ultimoPregon = useRef('');
+  const [cronicaDelBurgo, ponerCronicaDelBurgo] = useState<readonly RenglonDeLaCronica[]>([]);
   useEffect(() => {
-    const { texto } = elPregonEnTres(laVista);
-    if (texto.length === 0 || texto === ultimoPregon.current) return;
-    ultimoPregon.current = texto;
-    ponerPregones((antes) => [{ clave: CLAVE_DEL_PREGON, texto }, ...antes].slice(0, TOPE_DE_LA_CRONICA));
+    ponerCronicaDelBurgo((antes) => laCronicaConLaVista(antes, laVista));
   }, [laVista]);
-  const cronica = useMemo(() => [...pregones, ...mesa.cronica], [pregones, mesa.cronica]);
+  const cronica = useMemo(
+    (): readonly AvisoDeMesa[] => [
+      ...cronicaDelBurgo.map((r) => ({ clave: `${CLAVE_DEL_PREGON}:${String(r.jugada)}`, texto: r.texto })),
+      ...mesa.cronica,
+    ],
+    [cronicaDelBurgo, mesa.cronica],
+  );
 
   /*
    * EL GESTO Y LA CÁMARA. El alcance es el del Burgo y no el del delta: 66 unidades
@@ -765,10 +902,18 @@ function LaMesaEnTres({
    * SE HA TOCADO UNA CASILLA DEL ANILLO.
    *
    * Con UNA obra posible se manda sin preguntar; con VARIAS se abre la hoja
-   * «¿Qué haces en …?»; con NINGUNA se abre la ficha de la casilla, que es la misma
-   * tarjeta de «Lo mío» y se lee igual siendo de otro. Es el trato que la
-   * traducción pide en su cabecera, y la lista de obras la da
+   * «¿Qué haces en …?»; con NINGUNA se SEÑALA, que es lo que ha cambiado. Es el trato
+   * que la traducción pide en su cabecera, y la lista de obras la da
    * `obraPosibleEnCasilla`: aquí no se decide qué se puede hacer en un solar.
+   *
+   * ═══ SIN OBRAS YA NO SE ABRE UNA CAJA MODAL, SE PONE UN CARTEL ═══
+   *
+   * Tocar una casilla en la que no hay nada que hacer es la interacción MÁS FRECUENTE
+   * de este juego: «¿de quién es?», «¿cuánto cobra hoy?», «¿cuánto le falta a Ana para
+   * el barrio?». Abría la tarjeta entera con su velo y su cierre, o sea veinte cajas
+   * modales por turno para leer dos renglones. Ahora deja el cartel al pie —dos
+   * renglones, sin velo, sin robar el foco, y sin irse hasta que se señale otra— y la
+   * tarjeta entera sigue a un toque: el cartel entero es el botón que la abre.
    */
   const alTocarCasilla = useCallback(
     (indice: number) => {
@@ -784,12 +929,14 @@ function LaMesaEnTres({
       if (obras.length > 1) {
         ponerLaCasilla(null);
         ponerElJugador(null);
+        ponerLaSenalada(null);
         ponerQueHacesAqui({ casilla: indice, obras });
         return;
       }
       ponerQueHacesAqui(null);
       ponerElJugador(null);
-      ponerLaCasilla(indice);
+      ponerLaCasilla(null);
+      ponerLaSenalada(indice);
     },
     [laInterfazSeLoQueda, mesa, laVista, yo, opciones, soltarTodo],
   );
@@ -821,6 +968,7 @@ function LaMesaEnTres({
       laInterfazSeLoQueda();
       ponerQueHacesAqui(null);
       ponerLaCasilla(null);
+      ponerLaSenalada(null);
       ponerElJugador(asiento);
     },
     [laInterfazSeLoQueda],
@@ -839,41 +987,88 @@ function LaMesaEnTres({
     ponerSeguir(false);
   }, [verElTableroEntero, cercania, mirador, ventana]);
 
-  /* La sección abierta de la hoja, recordada por mesa y abierta sola cuando toca actuar. */
-  const { abierta, alAbrir } = usarLaSeccionAbierta(
-    vista.codigo,
-    hoja.abre,
-    hoja.cinta.espera,
-    hoja.cinta.meToca,
-  );
-
-  /* ─── El pie, que es el mismo en las dos ramas ─── */
+  /* ─── El pie y el cajón, que son los mismos en las dos ramas ─── */
 
   /*
-   * LA HOJA, LAS SUELTAS Y LA CRÓNICA. Es una función local y no un componente a
-   * propósito: no lleva ganchos, así que se puede llamar detrás de los `return` de
-   * abajo, y así el pie de la rama del anillo y el del respaldo no pueden separarse
-   * el día que alguien retoque uno.
+   * EL CARTEL DE LA CASILLA SEÑALADA, y no se pinta si hay una hoja abierta encima:
+   * las tres hojas son modales y llevan velo, así que un cartel debajo del velo es
+   * cromo apagado que sigue ocupando el pie. Las frases las escribe `cartelDeCasilla`
+   * y aquí no se redacta ninguna.
+   */
+  const elCartel =
+    laSenalada === null || queHacesAqui !== null || laCasilla !== null || elJugador !== null
+      ? null
+      : cartelDeCasilla(laVista, laSenalada);
+
+  /*
+   * ═══ EL PIE: LO QUE SE VE Y SE PULSA SIN ABRIR NADA ═══
+   *
+   * Es una función local y no un componente a propósito: no lleva ganchos, así que se
+   * puede llamar detrás de los `return` de abajo, y así el pie de la rama del anillo y
+   * el del respaldo no pueden separarse el día que alguien retoque uno.
+   *
+   * El orden es de abajo hacia arriba por urgencia: la CINTA la última, pegada al
+   * borde, porque lleva el asa del cajón y es lo que se busca a ciegas con el pulgar;
+   * encima el CARRIL, que es lo que hay que pulsar ahora mismo; encima los botones que
+   * ningún mueble recogió; encima la CAJA DE LOS TRATOS, que caduca y por eso pide
+   * mirada; y arriba del todo el CARTEL de la casilla señalada, que es lo único que no
+   * pide nada.
+   *
+   * Y va con `pointerEvents="box-none"`: el hueco entre los muebles del pie es
+   * TABLERO, y tiene que seguir girándose con el dedo. Sin eso, la franja de abajo del
+   * anillo dejaría de responder al gesto sin que se viera por qué.
    */
   const elPie = (sueltas: readonly OpcionDeMesa[]): JSX.Element => (
-    <ScrollView style={estilos.pieDeLaMesa} contentContainerStyle={{ paddingBottom: abajo }}>
-      <LaHojaDelBurgo
-        hoja={hoja}
-        quieto={mesa.quieto}
-        abierta={abierta}
-        alAbrir={alAbrir}
-        alElegir={alElegirOpcion}
-        alMandar={alMandar}
-        alTocarJugador={alTocarFigura}
-        nombreDeCasilla={nombreDeCasilla}
-      />
+    <View style={[estilos.pieDeLaMesa, { paddingBottom: abajo + 8 }]} pointerEvents="box-none">
+      {elCartel === null ? null : (
+        <ElCartelDeLaCasilla
+          cartel={elCartel}
+          alVerLaFicha={() => {
+            ponerLaSenalada(null);
+            ponerQueHacesAqui(null);
+            ponerElJugador(null);
+            ponerLaCasilla(elCartel.casilla);
+          }}
+          alQuitar={() => {
+            ponerLaSenalada(null);
+          }}
+        />
+      )}
+      {pregon === null ? null : (
+        <LaCajaDeLosTratos pregon={pregon} quieto={mesa.quieto} alElegir={alElegirOpcion} />
+      )}
       {/* Lo que decide es lo PINTABLE y no lo que llega: ver `hayAlgoQuePintar`. */}
       {hayAlgoQuePintar(sueltas) ? (
-        <LasOpciones opciones={sueltas} alTocar={mesa.mover} quieto={mesa.quieto} />
+        <ScrollView style={estilos.sueltasDelPie} contentContainerStyle={estilos.pilaDelPie}>
+          <LasOpciones opciones={sueltas} alTocar={mesa.mover} quieto={mesa.quieto} />
+        </ScrollView>
       ) : null}
-      <LaCronica cronica={cronica} />
-    </ScrollView>
+      <ElCarrilDeLaMesa carril={carril} quieto={mesa.quieto} alElegir={alElegirOpcion} />
+      <LaCintaDelBurgo cinta={hoja.cinta} cajonAbierto={cajonAbierto} alAlternarElCajon={alternarElCajon} />
+    </View>
   );
+
+  /*
+   * EL CAJÓN, con la hoja entera dentro: las ocho secciones y la crónica. Los botones
+   * sueltos NO van aquí: con el cajón abierto la criba ya se los da a las secciones,
+   * que es donde se leen con su rótulo largo, y con el cajón cerrado están en el pie.
+   */
+  const elCajon = (): JSX.Element | null =>
+    !cajonAbierto ? null : (
+      <ElCajonDeLaHoja alCerrar={cerrarElCajon} abajo={abajo}>
+        <LaHojaDelBurgo
+          hoja={hoja}
+          quieto={mesa.quieto}
+          abierta={abierta}
+          alAbrir={alAbrir}
+          alElegir={alElegirOpcion}
+          alMandar={alMandar}
+          alTocarJugador={alTocarFigura}
+          nombreDeCasilla={nombreDeCasilla}
+        />
+        <LaCronica cronica={cronica} />
+      </ElCajonDeLaHoja>
+    );
 
   /* ─── El respaldo: el retablo SVG de siempre, y por qué ─── */
 
@@ -895,31 +1090,46 @@ function LaMesaEnTres({
   const respaldoSobreElRetablo = (nota: string): JSX.Element => {
     const tablero = tableroDeLaVista(laVista);
     const sinElRetablo = tablero === null ? opciones : opcionesSueltas(tablero, opciones);
-    const sueltas = opcionesFueraDelTablero(sinElRetablo, null, null, hoja);
+    const sueltas = opcionesFueraDelTablero(
+      sinElRetablo,
+      null,
+      null,
+      cajonAbierto ? hoja : null,
+      pregon,
+      carril,
+    );
     return (
       <View style={estilos.todo}>
-        <BarraDeLaMesa
-          juego={juego}
-          codigo={vista.codigo}
-          asientos={vista.asientos}
-          salir={mesa.salir}
-          tirar={mesa.tirar}
-          arriba={arriba}
-        />
-        <LineaDelTurno mesa={vista} nombres={nombres} />
-        <ElAviso texto={mesa.aviso} />
-        {/*
-          LA NOTA DEL RESPALDO, en tenue y no en alarma: no es un peligro, es un
-          cambio de pincel. Dice el motivo porque «no se ha podido» sin motivo manda
-          a adivinar, y el motivo de verdad casi siempre es la cobertura.
-        */}
-        <Text style={estilos.nota}>{nota}</Text>
-        {tablero === null ? null : (
-          <View style={estilos.cajaDelRetablo}>
-            <Retablo tablero={tablero} alTocar={mesa.mover} quieto={mesa.quieto} />
-          </View>
-        )}
-        {elPie(sueltas)}
+        {/* La misma trampa de foco que la otra rama: las DOS mitades, o una plataforma se escapa. */}
+        <View
+          style={estilos.debajoDelCajon}
+          accessibilityElementsHidden={cajonAbierto}
+          importantForAccessibility={cajonAbierto ? 'no-hide-descendants' : 'auto'}
+        >
+          <BarraDeLaMesa
+            juego={juego}
+            codigo={vista.codigo}
+            asientos={vista.asientos}
+            salir={mesa.salir}
+            tirar={mesa.tirar}
+            arriba={arriba}
+          />
+          <LineaDelTurno mesa={vista} nombres={nombres} />
+          <ElAviso texto={mesa.aviso} />
+          {/*
+            LA NOTA DEL RESPALDO, en tenue y no en alarma: no es un peligro, es un
+            cambio de pincel. Dice el motivo porque «no se ha podido» sin motivo manda
+            a adivinar, y el motivo de verdad casi siempre es la cobertura.
+          */}
+          <Text style={estilos.nota}>{nota}</Text>
+          {tablero === null ? null : (
+            <View style={estilos.cajaDelRetablo}>
+              <Retablo tablero={tablero} alTocar={mesa.mover} quieto={mesa.quieto} />
+            </View>
+          )}
+          {elPie(sueltas)}
+        </View>
+        {elCajon()}
       </View>
     );
   };
@@ -957,195 +1167,250 @@ function LaMesaEnTres({
 
   return (
     <View style={estilos.todo}>
-      <BarraDeLaMesa
-        juego={juego}
-        codigo={vista.codigo}
-        asientos={vista.asientos}
-        salir={mesa.salir}
-        tirar={mesa.tirar}
-        arriba={arriba}
-      />
-      <LineaDelTurno mesa={vista} nombres={nombres} />
-      <ElAviso texto={mesa.aviso} />
+      {/*
+        ═══ TODO LO QUE QUEDA DEBAJO DEL CAJÓN SE APAGA DE UN GOLPE ═══
 
-      <View style={[estilos.cajaDelLienzo, { height: altoDelLienzo }]}>
-        <RedDelLienzo alCaer={ponerElLienzoCayo}>
-          <GestureDetector gesture={gesto}>
-            {/*
-              LA ETIQUETA VA EN LA VISTA QUE SÓLO ENVUELVE EL `Canvas`, y no en la
-              caja de fuera: `accessible` agrupa a sus hijos, y la caja tiene también
-              las hojas, cuyos botones quedarían fuera del alcance de un lector de
-              pantalla justo cuando hay que contestar.
-            */}
-            <View
-              style={estilos.lienzo}
-              /*
-                EL NODO DEL LIENZO, para la rueda del ratón. En la web es el elemento
-                del documento donde se apuntan `wheel` y el arrastre con el botón
-                secundario; en nativo se guarda y no se usa.
-              */
-              ref={apuntarElLienzo}
-              onLayout={medir}
-              accessible
-              accessibilityLabel="El burgo en tres dimensiones. Arrastra con un dedo para girarlo, pellizca para acercarlo y mueve dos dedos para recorrerlo."
-              /*
-                TIRAR PARA QUIEN NO VE EL LIENZO. El botón de tirar se ha ido del pie
-                mientras el asa existe, y un dado que sólo se pueda tocar con el dedo
-                sería el primer movimiento del juego inaccesible: la acción existe
-                mientras exista el asa y se ofrece por la misma puerta.
-              */
-              accessibilityActions={
-                dados !== null && dados.porTirar ? [{ name: 'tirar', label: 'Tirar los dados' }] : undefined
-              }
-              onAccessibilityAction={(e) => {
-                if (e.nativeEvent.actionName === 'tirar') void alTocarLosDados();
-              }}
-            >
-              <Canvas
+        Es la trampa de foco de esta plataforma, y hacen falta LAS DOS mitades:
+        `accessibilityElementsHidden` es de iOS y `importantForAccessibility` es de
+        Android. Con una sola, en la otra plataforma el lector se sale del cajón y se
+        pone a leer el tablero y la barra de la mesa — que es exactamente lo que un
+        modal existe para impedir.
+      */}
+      <View
+        style={estilos.debajoDelCajon}
+        accessibilityElementsHidden={cajonAbierto}
+        importantForAccessibility={cajonAbierto ? 'no-hide-descendants' : 'auto'}
+      >
+        <BarraDeLaMesa
+          juego={juego}
+          codigo={vista.codigo}
+          asientos={vista.asientos}
+          salir={mesa.salir}
+          tirar={mesa.tirar}
+          arriba={arriba}
+        />
+        <LineaDelTurno mesa={vista} nombres={nombres} />
+        <ElAviso texto={mesa.aviso} />
+
+        <View style={estilos.cajaDelLienzo}>
+          <RedDelLienzo alCaer={ponerElLienzoCayo}>
+            <GestureDetector gesture={gesto}>
+              {/*
+                LA ETIQUETA VA EN LA VISTA QUE SÓLO ENVUELVE EL `Canvas`, y no en la
+                caja de fuera: `accessible` agrupa a sus hijos, y la caja tiene también
+                las hojas, cuyos botones quedarían fuera del alcance de un lector de
+                pantalla justo cuando hay que contestar.
+              */}
+              <View
                 style={estilos.lienzo}
-                gl={{ antialias: true }}
-                dpr={[1, 2]}
                 /*
-                 * SIN SOMBRAS EN NINGÚN CLIENTE, y no es una decisión por plataforma:
-                 * un mapa de 2048 por lado redibujado cada fotograma baja un móvil de
-                 * gama media de sesenta a veinte, y el anillo se lee perfectamente con
-                 * los discos de contacto bajo los peones y el aventurero. Es lo mismo
-                 * que hace el Muelle.
-                 */
-                shadows={false}
-                camera={{ fov: CAMPO_DE_LA_CAMARA, near: 0.5, far: ALCANCE_DEL_BURGO * 16 }}
-                onCreated={({ gl }) => {
-                  /* El mismo mapeo tonal que el banco y que el delta: ACES a 1,05. */
-                  gl.toneMapping = ACESFilmicToneMapping;
-                  gl.toneMappingExposure = 1.05;
+                  EL NODO DEL LIENZO, para la rueda del ratón. En la web es el elemento
+                  del documento donde se apuntan `wheel` y el arrastre con el botón
+                  secundario; en nativo se guarda y no se usa.
+                */
+                ref={apuntarElLienzo}
+                onLayout={medir}
+                accessible
+                accessibilityLabel="El burgo en tres dimensiones. Arrastra con un dedo para girarlo, pellizca para acercarlo y mueve dos dedos para recorrerlo."
+                /*
+                  TIRAR —Y COMPRAR— PARA QUIEN NO VE EL LIENZO. El botón de tirar se ha
+                  ido del pie mientras el asa existe, y un dado que sólo se pueda tocar
+                  con el dedo sería el primer movimiento del juego inaccesible: la acción
+                  existe mientras exista el asa y se ofrece por la misma puerta.
+
+                  Y por esa misma puerta salen ahora las obras que SÓLO tiene el anillo
+                  —comprar y sacar a subasta, que no son de un título mío todavía y por
+                  eso no tienen ficha en «Lo mío»—. Sin esto, el movimiento que decide la
+                  partida entera sólo se podía hacer con el dedo sobre una escena de tres
+                  dimensiones: para un lector de pantalla el lienzo es UN elemento con una
+                  etiqueta, no cuarenta casillas. Quién entra en esa lista lo decide
+                  `obrasSoloEnElAnillo` mirando lo que ya tiene botón en algún sitio, y no
+                  una tabla de tipos que un día se quede corta.
+                */
+                accessibilityActions={accionesDelLienzo}
+                onAccessibilityAction={(e) => {
+                  const cual = e.nativeEvent.actionName;
+                  if (cual === 'tirar') {
+                    void alTocarLosDados();
+                    return;
+                  }
+                  const donde = cual.startsWith('obra:') ? Number.parseInt(cual.slice('obra:'.length), 10) : -1;
+                  const obra = soloEnElAnillo[donde];
+                  if (obra !== undefined) alElegirOpcion(obra);
                 }}
               >
-                {/*
-                  EL OJO VA ANTES QUE `<Burgo>` Y CON PRIORIDAD 0. Ver la cabecera:
-                  r3f corre los suscriptores de igual prioridad en orden de montaje,
-                  y el seguimiento de la escena mezcla desde la pose que este
-                  fotograma acaba de dejar.
-                */}
-                <ElOjoDelBurgo mirador={mirador} cercania={cercania} />
-                <Burgo
-                  tablero={datos}
-                  dados={dados}
-                  sucesos={sucesos}
-                  codigo={vista.codigo}
-                  ventana={ventana}
-                  traer={traer}
-                  calidad={calidad}
-                  camara={CAMARA_AEREA}
-                  seguirAlQueMueve={seguirAlQueMueve}
-                  quieto={mesa.quieto}
-                  alTocarCasilla={alTocarCasilla}
-                  alTocarLosDados={alTocarLosDados}
-                  alTocarFigura={alTocarFigura}
-                  alEstarListo={alEstarListo}
-                  alFallar={alFallar}
-                  alMedir={alMedir}
-                  alTerminarLaCola={alTerminarLaCola}
-                />
-              </Canvas>
+                <Canvas
+                  style={estilos.lienzo}
+                  gl={{ antialias: true }}
+                  dpr={[1, 2]}
+                  /*
+                   * SIN SOMBRAS EN NINGÚN CLIENTE, y no es una decisión por plataforma:
+                   * un mapa de 2048 por lado redibujado cada fotograma baja un móvil de
+                   * gama media de sesenta a veinte, y el anillo se lee perfectamente con
+                   * los discos de contacto bajo los peones y el aventurero. Es lo mismo
+                   * que hace el Muelle.
+                   */
+                  shadows={false}
+                  camera={{ fov: CAMPO_DE_LA_CAMARA, near: 0.5, far: ALCANCE_DEL_BURGO * 16 }}
+                  onCreated={({ gl }) => {
+                    /* El mismo mapeo tonal que el banco y que el delta: ACES a 1,05. */
+                    gl.toneMapping = ACESFilmicToneMapping;
+                    gl.toneMappingExposure = 1.05;
+                  }}
+                >
+                  {/*
+                    EL OJO VA ANTES QUE `<Burgo>` Y CON PRIORIDAD 0. Ver la cabecera:
+                    r3f corre los suscriptores de igual prioridad en orden de montaje,
+                    y el seguimiento de la escena mezcla desde la pose que este
+                    fotograma acaba de dejar.
+                  */}
+                  <ElOjoDelBurgo mirador={mirador} cercania={cercania} />
+                  <Burgo
+                    tablero={datos}
+                    dados={dados}
+                    sucesos={sucesos}
+                    codigo={vista.codigo}
+                    ventana={ventana}
+                    traer={traer}
+                    calidad={calidad}
+                    camara={CAMARA_AEREA}
+                    seguirAlQueMueve={seguirAlQueMueve}
+                    quieto={mesa.quieto}
+                    alTocarCasilla={alTocarCasilla}
+                    alTocarLosDados={alTocarLosDados}
+                    alTocarFigura={alTocarFigura}
+                    alEstarListo={alEstarListo}
+                    alFallar={alFallar}
+                    alMedir={alMedir}
+                    alTerminarLaCola={alTerminarLaCola}
+                  />
+                </Canvas>
+              </View>
+            </GestureDetector>
+          </RedDelLienzo>
+
+          {/*
+            EL TELÓN, mientras el mundo no está: suelo con el nombre del juego y una
+            línea. Nunca coge toques. Se levanta con `alEstarListo`, que el contrato
+            promete SIEMPRE —con modelos, sin ellos o a los quince segundos—, así que
+            no hay forma de quedarse debajo para siempre.
+          */}
+          {llegando ? (
+            <View style={estilos.telon} pointerEvents="none">
+              <Text style={estilos.lugar}>EL BURGO</Text>
+              <Text style={estilos.espera}>Abriendo las puertas…</Text>
             </View>
-          </GestureDetector>
-        </RedDelLienzo>
+          ) : null}
 
-        {/*
-          EL TELÓN, mientras el mundo no está: suelo con el nombre del juego y una
-          línea. Nunca coge toques. Se levanta con `alEstarListo`, que el contrato
-          promete SIEMPRE —con modelos, sin ellos o a los quince segundos—, así que
-          no hay forma de quedarse debajo para siempre.
-        */}
-        {llegando ? (
-          <View style={estilos.telon} pointerEvents="none">
-            <Text style={estilos.lugar}>EL BURGO</Text>
-            <Text style={estilos.espera}>Abriendo las puertas…</Text>
+          {/*
+            LA SALIDA DEL ACERCAMIENTO, Y POR QUÉ ES UN BOTÓN Y NO UN GESTO. Quien se
+            acerca a una esquina del anillo y pasea la mirada acaba, tarde o temprano,
+            sin saber dónde está: eso es lo que separa un zoom de una trampa. Volver
+            tiene que ser algo que SE VE.
+
+            Sólo cuando hace falta: `seHaMovido` es falso mientras se esté como al
+            llegar, y entonces un botón para volver a donde ya estás sería ruido encima
+            del tablero. Va aquí FUERA del `GestureDetector`, hermano del lienzo y no
+            hijo: así se lleva su propio toque sin quitárselo a la escena y queda fuera
+            del `accessible` que agrupa el lienzo.
+
+            Arriba a la IZQUIERDA, que es la única esquina que esta pantalla no usa
+            para nada: el pie —cinta, carril, caja y cartel— es de abajo, las hojas son
+            de abajo y el telón es de todo. Con el lienzo a pantalla entera esa esquina
+            sigue libre porque la barra de la mesa NO flota: va en flujo, encima del
+            lienzo, y el lienzo empieza donde ella acaba.
+          */}
+          {!llegando && seHaMovido ? (
+            <Pressable
+              style={estilos.volver}
+              onPress={verElBurgoEntero}
+              accessibilityRole="button"
+              accessibilityLabel="Ver el burgo entero"
+              accessibilityHint="Vuelve a mirar el anillo completo desde el aire, sin cambiar el ángulo"
+            >
+              <Text style={estilos.volverRotulo}>Ver el burgo entero</Text>
+            </Pressable>
+          ) : null}
+
+          {/*
+            EL PIE, FLOTANDO SOBRE EL LIENZO Y NO DEBAJO DE ÉL. Va dentro de la caja del
+            lienzo y con `box-none`, así que el hueco entre sus muebles sigue siendo
+            tablero que se gira con el dedo. En la rama del respaldo el mismo `elPie` va
+            en FLUJO bajo el retablo, que ahí no hay nada sobre lo que flotar.
+
+            ═══ Y VA ANTES QUE LAS TRES HOJAS, QUE ES UNA DECISIÓN Y NO UN ORDEN ═══
+
+            Aquí no hay `z-index`: en esta plataforma pinta encima el hermano que va
+            DESPUÉS. Escrito detrás de las hojas, el pie —la cinta, el carril, la caja de
+            los tratos— quedaba por encima del velo de una hoja modal: los botones de
+            debajo se verían encendidos y se podrían pulsar con una tarjeta abierta
+            delante, que es exactamente lo que un velo existe para impedir. Delante, la
+            hoja lo tapa con su velo y lo de debajo se adivina y no se toca.
+          */}
+          <View style={estilos.pieFlotante} pointerEvents="box-none">
+            {/*
+              MIENTRAS EL ANILLO SE PONE AL DÍA. La hoja enseña la vista NUEVA desde el
+              primer fotograma —está decidido así— y el tablero todavía está andando lo
+              anterior. Sin esta línea, el marcador dice una cosa y el tablero otra
+              durante ocho segundos y no hay manera de saber cuál va bien.
+            */}
+            {laEscenaVaDetras ? <Text style={estilos.alDia}>El burgo se está poniendo al día…</Text> : null}
+            {elPie(fuera)}
           </View>
-        ) : null}
 
-        {/*
-          LA SALIDA DEL ACERCAMIENTO, Y POR QUÉ ES UN BOTÓN Y NO UN GESTO. Quien se
-          acerca a una esquina del anillo y pasea la mirada acaba, tarde o temprano,
-          sin saber dónde está: eso es lo que separa un zoom de una trampa. Volver
-          tiene que ser algo que SE VE.
+          {/*
+            LAS TRES HOJAS, HERMANAS DEL `GestureDetector` Y NUNCA DENTRO: un
+            `Pressable` dentro del detector le pelea el toque al giro del tablero. Se
+            escriben una detrás de otra y no en un `if/else` para que el día que dos
+            puedan salir a la vez se vea el solape en pantalla en vez de que una
+            desaparezca en silencio; hoy no pueden, porque cada manejador suelta las
+            otras dos antes de abrir la suya.
+          */}
+          {queHacesAqui === null ? null : (
+            <LaHojaSobreElLienzo
+              titulo={`¿Qué haces en ${nombreDeCasilla(queHacesAqui.casilla)}?`}
+              alDejarlo={soltarTodo}
+            >
+              <LaFichaDeUnaCasilla
+                ficha={fichaDeCasilla(laVista, queHacesAqui.casilla, yo, opciones)}
+                quieto={mesa.quieto}
+                alElegir={alElegirOpcion}
+              />
+            </LaHojaSobreElLienzo>
+          )}
 
-          Sólo cuando hace falta: `seHaMovido` es falso mientras se esté como al
-          llegar, y entonces un botón para volver a donde ya estás sería ruido encima
-          del tablero. Va aquí FUERA del `GestureDetector`, hermano del lienzo y no
-          hijo: así se lleva su propio toque sin quitárselo a la escena y queda fuera
-          del `accessible` que agrupa el lienzo.
+          {laFicha === null ? null : (
+            <LaHojaSobreElLienzo titulo={laFicha.rotulo} alDejarlo={soltarTodo}>
+              <LaFichaDeUnaCasilla ficha={laFicha} quieto={mesa.quieto} alElegir={alElegirOpcion} />
+            </LaHojaSobreElLienzo>
+          )}
 
-          Arriba a la IZQUIERDA, que es la única esquina que esta pantalla no usa
-          para nada: las hojas son de abajo y el telón es de todo.
-        */}
-        {!llegando && seHaMovido ? (
-          <Pressable
-            style={estilos.volver}
-            onPress={verElBurgoEntero}
-            accessibilityRole="button"
-            accessibilityLabel="Ver el burgo entero"
-            accessibilityHint="Vuelve a mirar el anillo completo desde el aire, sin cambiar el ángulo"
-          >
-            <Text style={estilos.volverRotulo}>Ver el burgo entero</Text>
-          </Pressable>
-        ) : null}
-
-        {/*
-          LAS TRES HOJAS, HERMANAS DEL `GestureDetector` Y NUNCA DENTRO: un
-          `Pressable` dentro del detector le pelea el toque al giro del tablero. Se
-          escriben una detrás de otra y no en un `if/else` para que el día que dos
-          puedan salir a la vez se vea el solape en pantalla en vez de que una
-          desaparezca en silencio; hoy no pueden, porque cada manejador suelta las
-          otras dos antes de abrir la suya.
-        */}
-        {queHacesAqui === null ? null : (
-          <LaHojaSobreElLienzo
-            titulo={`¿Qué haces en ${nombreDeCasilla(queHacesAqui.casilla)}?`}
-            alDejarlo={soltarTodo}
-          >
-            <LaFichaDeUnaCasilla
-              ficha={fichaDeCasilla(laVista, queHacesAqui.casilla, yo, opciones)}
-              quieto={mesa.quieto}
-              alElegir={alElegirOpcion}
-            />
-          </LaHojaSobreElLienzo>
-        )}
-
-        {laFicha === null ? null : (
-          <LaHojaSobreElLienzo titulo={laFicha.rotulo} alDejarlo={soltarTodo}>
-            <LaFichaDeUnaCasilla ficha={laFicha} quieto={mesa.quieto} alElegir={alElegirOpcion} />
-          </LaHojaSobreElLienzo>
-        )}
-
-        {elDelJugador === null ? null : (
-          <LaHojaSobreElLienzo titulo={elDelJugador.nombre} alDejarlo={soltarTodo}>
-            <LaFichaDelJugador
-              jugador={elDelJugador}
-              destino={suDestino}
-              nombreDeCasilla={nombreDeCasilla}
-              alProponerle={
-                suDestino === null
-                  ? null
-                  : () => {
-                      soltarTodo();
-                      alAbrir('trato');
-                    }
-              }
-            />
-          </LaHojaSobreElLienzo>
-        )}
+          {elDelJugador === null ? null : (
+            <LaHojaSobreElLienzo titulo={elDelJugador.nombre} alDejarlo={soltarTodo}>
+              <LaFichaDelJugador
+                jugador={elDelJugador}
+                destino={suDestino}
+                nombreDeCasilla={nombreDeCasilla}
+                alProponerle={
+                  suDestino === null
+                    ? null
+                    : () => {
+                        soltarTodo();
+                        /*
+                          SUBE EL CAJÓN Y ABRE «El trato» DE UNA VEZ. Antes bastaba con
+                          abrir la sección porque la hoja estaba siempre en pantalla;
+                          desde que vive en un cajón, abrir la sección sola manda al
+                          componedor a un sitio que no se ve.
+                        */
+                        alAbrirEnElCajon('trato');
+                      }
+                }
+              />
+            </LaHojaSobreElLienzo>
+          )}
+        </View>
       </View>
-
-      {/*
-        MIENTRAS EL ANILLO SE PONE AL DÍA. La hoja de abajo enseña la vista NUEVA
-        desde el primer fotograma —está decidido así— y el tablero todavía está
-        andando lo anterior. Sin esta línea, el marcador dice una cosa y el tablero
-        otra durante ocho segundos y no hay manera de saber cuál va bien.
-      */}
-      {laEscenaVaDetras ? <Text style={estilos.alDia}>El burgo se está poniendo al día…</Text> : null}
-
-      {elPie(fuera)}
+      {elCajon()}
     </View>
   );
 }
@@ -1195,7 +1460,9 @@ function destinoDelTrato(hoja: HojaDelBurgo<OpcionDeMesa>, asiento: string): Des
  *
  * La proporción sale del tamaño del lienzo y no de la pantalla: la corrección de
  * retrato de `camara.ts` (`alejarseParaQueQuepa`) depende de lo ancho que sea el
- * hueco donde se dibuja, y aquí ese hueco es el 58 % del alto.
+ * hueco donde se dibuja. Ese hueco ya NO es una fracción —esta línea decía «el 58 %
+ * del alto», que era el reparto de cuando la hoja iba debajo y en flujo—: es todo lo
+ * que queda bajo la barra de la mesa, y por eso se lee del lienzo y no se calcula aquí.
  *
  * Prioridad 0 —la de r3f por defecto— y montado ANTES de `<Burgo>`: ver la cabecera
  * del fichero. No se le pone niebla desde aquí: la del Burgo es lineal y la escena
@@ -1237,16 +1504,49 @@ function ElOjoDelBurgo({
  */
 const estilos = StyleSheet.create({
   todo: { flex: 1, backgroundColor: SALA.suelo },
-  /* El pie: pide lo que mide y cede antes que el lienzo. El `flexGrow: 0` hay que escribirlo. */
-  pieDeLaMesa: { flexGrow: 0, flexShrink: 1 },
+  /* Todo lo que el cajón tapa: la pantalla entera menos el propio cajón. */
+  debajoDelCajon: { flex: 1 },
+  /*
+   * EL PIE: la pila de muebles que se ve sin abrir nada. No se posiciona él —lo
+   * coloca quien lo llama, flotando en la rama del anillo y en flujo en la del
+   * respaldo—, y así el MISMO pie sirve para las dos sin dos copias que se separen.
+   */
+  /*
+   * `flexShrink: 1` sólo cuenta en la rama del respaldo, donde el pie va en FLUJO
+   * debajo del retablo: ahí, con una subasta abierta y tres tratos vivos a la vez, la
+   * pila del pie más el suelo de 200 del retablo pueden pasarse del alto de un
+   * teléfono pequeño. Cediendo, quien se encoge son las dos listas de dentro —que ya
+   * tienen tope y se desplazan— en vez de irse el retablo fuera de la pantalla.
+   * Flotando, encima del lienzo, esto no hace nada.
+   */
+  pieDeLaMesa: { flexShrink: 1, gap: 8, paddingHorizontal: 12 },
+  /*
+   * DÓNDE FLOTA EL PIE: pegado al borde de abajo del lienzo, y sólo lo que ocupa. Sin
+   * `top`, así que no se estira ni tapa el anillo más de lo que miden sus muebles.
+   */
+  pieFlotante: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  /*
+   * LOS BOTONES QUE NO RECOGIÓ NINGÚN MUEBLE, con tope y desplazables. Con el cajón
+   * cerrado aquí caen sobre todo las pujas de una subasta: cuatro botones con su
+   * ayuda debajo pasan de 300 puntos y se comerían el anillo entero. Con tope de 180
+   * se desplazan por dentro y el tablero se sigue viendo.
+   */
+  sueltasDelPie: { flexGrow: 0, flexShrink: 1, maxHeight: 180 },
+  pilaDelPie: { gap: 8 },
   /* El mismo suelo que el mueble genérico le pone al retablo: por debajo deja de servir. */
   cajaDelRetablo: { flex: 1, minHeight: 200 },
   /*
-   * LA CAJA DEL LIENZO: alto fijo puesto desde la pantalla, y `overflow: hidden`
-   * para que el telón y las hojas se recorten con ella. Sin fondo propio: el
-   * `Canvas` pinta el cielo, y mientras no está, el telón pinta el suelo.
+   * LA CAJA DEL LIENZO: TODO el alto que queda bajo la barra de la mesa, y
+   * `overflow: hidden` para que el telón, el pie y las hojas se recorten con ella.
+   * Sin fondo propio: el `Canvas` pinta el cielo, y mientras no está, el telón pinta
+   * el suelo.
+   *
+   * Aquí había un alto FIJO —el 58 % de la pantalla, con suelo de 360— porque debajo
+   * iba la hoja en flujo y había que repartir. Ya no hay nada debajo: la hoja es un
+   * cajón. `flex: 1` no puede encogerse a cero porque es el único hijo que crece de
+   * una columna que ya tiene alto, que era lo que aquel suelo evitaba.
    */
-  cajaDelLienzo: { width: '100%', overflow: 'hidden' },
+  cajaDelLienzo: { flex: 1, width: '100%', overflow: 'hidden' },
   lienzo: { flex: 1 },
   telon: {
     position: 'absolute',
@@ -1272,14 +1572,29 @@ const estilos = StyleSheet.create({
     paddingTop: 10,
     textAlign: 'center',
   },
-  /* Lo mismo, debajo del lienzo, mientras la cola de sucesos se reproduce. */
+  /*
+   * Lo mismo, mientras la cola de sucesos se reproduce, y ya NO va debajo del lienzo:
+   * desde que el tablero es la pantalla entera esta línea FLOTA sobre la escena, encima
+   * del pie. Por eso lleva caja y antes no: en flujo caía sobre `SALA.suelo` (6,50:1) y
+   * ahora cae sobre el campo del burgo, donde el mismo tenue vale 1,12:1. Y se enseña
+   * durante toda la cola —hasta ocho segundos—, que es justo cuando explica por qué el
+   * marcador dice una cosa y el tablero otra: es la línea que no se puede perder.
+   * `alignSelf` para que la caja mida lo que la frase y no el ancho de la pantalla.
+   */
   alDia: {
     ...LETRA.cuerpo,
     color: SALA.tenue,
     fontSize: 13,
     lineHeight: 18,
-    paddingHorizontal: 16,
-    paddingTop: 6,
+    alignSelf: 'flex-start',
+    marginHorizontal: 12,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.teja,
   },
   /*
    * EL BOTÓN DE VOLVER AL BURGO ENTERO: cromo sobre el lienzo, arriba y a la

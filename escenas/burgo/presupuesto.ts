@@ -37,8 +37,12 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 207.877   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 145.523   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 207.949   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 145.595   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *
+ * (Eran 207.877 y 145.523 hasta que se añadió la LÍNEA que separa dos casillas: 72 triángulos
+ * en todo el anillo, contados por `triangulosDelSuelo` pero no traídos aquí. Los de arriba son
+ * los que `verify:burgo-escena` imprime hoy.)
  *
  * `TOPE_PLENA = 900.000`: el tablero más 692.000 para lo que la ciudad tenga montado. Sigue
  * siendo el 45 % de los 2.000.000 que ya mueve el delta de Riberas en un PC.
@@ -68,11 +72,25 @@
  * bandas por casilla más el reborde, y el marco de las esquinas), los dígitos del precio,
  * los emblemas, los discos de contacto, el naipe, la marca de casilla y la cúpula del cielo.
  *
- * ═══ LA POSADA NO ES UNA PIEZA PROPIA (decisión 12) ═══
+ * ═══ LA POSADA NO ES UNA PIEZA PROPIA (decisión 12), Y AHORA TAMPOCO ES UNA CASA ═══
  *
  * No hay hotel en ningún pack. La posada se pinta como una `casa` teñida con un
  * `estandarte` clavado en el tejado. La vacuna del comprobador pone el cuerpo más caro del
  * pack en las cuarenta casillas y tiene que caer.
+ *
+ * Lo que la decisión 12 no decía era A QUÉ TALLA, y por eso durante toda la fase un hotel fue
+ * literalmente una casa: la misma geometría, la misma escala, distinta sólo por ir centrada.
+ * La diferencia entre cuatro casas y un hotel —la decisión más cara del reglamento— no se
+ * veía. Desde esta tanda el hotel tiene volumen propio (`TALLA_DEL_HOTEL` en `anillo-en-3d.ts`:
+ * 22,34 × 14 × 14, frente a los 10,34 × 10,5 × 10,5 de una casa), y sigue siendo la MISMA
+ * malla con otra matriz.
+ *
+ * Y eso es exactamente por qué esta tabla no se mueve ni un renglón: una escala distinta no
+ * cuesta un triángulo ni una llamada de dibujo. Los 44 edificios de un tablero lleno —32 casas
+ * y 12 hoteles— se siguen contando como `casa` en `multiplicidadesDinamicas`, y las 44
+ * instancias van en la misma `InstancedMesh`. Un modelo NUEVO de hotel sí costaría: 12
+ * instancias más de otra pieza, otra llamada, y habría que sumarlo aquí. `verify:burgo-escena`
+ * afirma que la cuenta de `casa` sigue siendo 44 justamente para que ese día se note.
  */
 import { PIEZA } from './piezas';
 import type { NombreDePieza } from './piezas';

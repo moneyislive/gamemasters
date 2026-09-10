@@ -47,6 +47,15 @@
  *      que sólo pasa, que se ve caer.
  *  14. TAMAÑOS Y PRESUPUESTO: el peor estado, la peor vista, las peores opciones, la
  *      carga más gorda, la cascada de 28 subastas, y las cifras impresas.
+ *  15. LAS CUATRO REGLAS OFICIALES que estaban fuera de alcance en `DISENO-3.md` §12 y
+ *      volvieron a entrar: obrar en el turno de cualquiera (y los tres momentos en que
+ *      no), tratar entre dos que no tienen el turno, la subasta del último edificio
+ *      (casa y hotel, con el suelo del precio de lista y el solar de cada pujador) y la
+ *      elección del 10 % en el Impuesto (con el tic eligiendo lo barato). Cada una con
+ *      su vacuna, y el veneno de cada vacuna es EL COMPORTAMIENTO VIEJO. Y con ellas el
+ *      TOPE DE VUELTAS, que no cambia y que aquí se ve andar entero por primera vez: el
+ *      relevo que lo alcanza, el patrimonio que gana, el empate que se comparte y el
+ *      quebrado que no gana por rico.
  *
  * ═══ LAS VACUNAS ═══
  *
@@ -108,8 +117,10 @@ import {
   LIBRE,
   loSecretoDelBurgo,
   MANIFIESTO_BURGO,
+  maravedies,
   opcionesDelBurgo,
   PAGAR_FIANZA,
+  PAGAR_IMPUESTO,
   partidaNueva,
   PASAR,
   PASAR_PUJA,
@@ -144,6 +155,7 @@ import {
   CASILLAS,
   cartasDe,
   costeDeDesempeno,
+  decimaDelPatrimonio,
   CUANTAS_CASILLAS,
   OFICIOS,
   PUERTAS,
@@ -440,7 +452,7 @@ function reprochesDeTexto(texto: string, e: EstadoDelBurgo): string[] {
 
 /** Los campos EXACTOS de `VistaDelBurgo` (§3.1). Un campo nuevo pone esto rojo y obliga a venir a mirar si puede salir. */
 const CAMPOS_DE_LA_VISTA =
-  'almoneda,apuro,aviso,concejo,desde,dobles,duenoDelTurno,ganadores,jugada,jugadores,luego,momento,paso,pregon,quedan,sorteoDeSalida,sucesos,tablero,tirada,tiradasDelTurno,titulos,topeDeVueltas,tratos,turnoDe,turnosAbiertos,ultimaCarta,yo';
+  'almoneda,apuro,aviso,concejo,desde,dobles,duenoDelTurno,ganadores,impuestoSinPagar,jugada,jugadores,luego,momento,paso,pregon,quedan,sorteoDeSalida,sucesos,tablero,tirada,tiradasDelTurno,titulos,topeDeVueltas,tratos,turnoDe,turnosAbiertos,ultimaCarta,yo';
 
 /**
  * LA FORMA DE LO QUE SE LE MANDA A UNA MIRADA: canónico, campos cerrados, `turnoDe`
@@ -886,10 +898,10 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
 {
   const base = estadoDe(empezada('MAZ', CUATRO, 41));
 
-  /* Dobles repite. */
-  const { s: dobles } = alCaerEn('DOB-1', base, ANA, 4, [[2, 2]]);
-  comprobar('con dobles se mueve, se resuelve la casilla y se queda en por-tirar con dobles 1', dobles.dobles === 1 && dobles.paso === 'por-tirar' && dobles.tiradasDelTurno === 1 && jugadorDe(dobles, ANA).casilla === 4);
-  comprobar('y pagó el Impuesto al caer en el 4', pagosDe(dobles, ANA).some((p) => p.porque === 'diezmo' && p.cuanto === EL_DIEZMO));
+  /* Dobles repite. Se cae en el Descanso (20), que no pide nada: el Impuesto tiene su propio bloque. */
+  const { s: dobles } = alCaerEn('DOB-1', base, ANA, LA_FERIA, [[2, 2]]);
+  comprobar('con dobles se mueve, se resuelve la casilla y se queda en por-tirar con dobles 1', dobles.dobles === 1 && dobles.paso === 'por-tirar' && dobles.tiradasDelTurno === 1 && jugadorDe(dobles, ANA).casilla === LA_FERIA);
+  comprobar('y en el Descanso no se paga nada', pagosDe(dobles, ANA).length === 0, pagosDe(dobles, ANA));
   comprobar('la vista ofrece tirar otra vez y NO pasar', idsDe(dobles, ANA).includes('tirar') && !idsDe(dobles, ANA).includes('pasar'), idsDe(dobles, ANA));
   comprobar('y el suceso `tira` lleva dobles: true con el PAR entero', (sucesosDe(dobles, 'tira')[0] as { dobles: boolean; dados: ParDeDados }).dobles && (sucesosDe(dobles, 'tira')[0] as { dados: ParDeDados }).dados.join() === '2,2');
   const { s: sinDobles } = alCaerEn('DOB-0', base, ANA, LA_FERIA);
@@ -907,11 +919,31 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
   comprobar('primer dobles: la Salida, dobles 1', jugadorDe(estadoDe(mesa), ANA).casilla === 0 && estadoDe(mesa).dobles === 1);
   mesa = tira(mesa, ANA);
   comprobar('segundo dobles: el Impuesto, dobles 2', jugadorDe(estadoDe(mesa), ANA).casilla === 4 && estadoDe(mesa).dobles === 2);
+  /*
+   * Y EL IMPUESTO PARA LA CADENA HASTA QUE SE ELIGE CÓMO SE PAGA (regla 4): con los
+   * dobles pendientes, el turno vuelve a `por-tirar` en cuanto se paga y la tercera
+   * tirada sigue siendo la que encierra.
+   */
+  comprobar('caer en el Impuesto NO cobra todavía: enciende la marca y deja los dobles como estaban', estadoDe(mesa).impuestoSinPagar && estadoDe(mesa).paso === 'por-tirar' && jugadorDe(estadoDe(mesa), ANA).mrs === DINERO_DE_SALIDA + PAGA_DE_LA_PUERTA_MAYOR, {
+    marca: estadoDe(mesa).impuestoSinPagar,
+    mrs: jugadorDe(estadoDe(mesa), ANA).mrs,
+  });
+  {
+    /* Tirar sin elegir lo cobra de camino, por la cantidad fija: en otra mesa, para no gastar la cadena. */
+    const sinElegir = estadoDe(mover(mesaSobre('DOB-SIN-ELEGIR', estadoDe(mesa), CUATRO), ANA, { tipo: TIRAR, carga: {} }).mesa);
+    comprobar('y tirar sin elegir cobra la fija de camino y apaga la marca', !sinElegir.impuestoSinPagar && jugadorDe(sinElegir, ANA).mrs === DINERO_DE_SALIDA, { mrs: jugadorDe(sinElegir, ANA).mrs });
+  }
+  const conImpuesto = mover(mesa, ANA, { tipo: PAGAR_IMPUESTO, carga: { como: 'fijo' } });
+  mesa = conImpuesto.mesa;
+  comprobar('y elegirlo a mano cobra lo mismo sin tocar los dobles ni el paso', conImpuesto.cambio && estadoDe(mesa).paso === 'por-tirar' && estadoDe(mesa).dobles === 2 && jugadorDe(estadoDe(mesa), ANA).mrs === DINERO_DE_SALIDA, {
+    paso: estadoDe(mesa).paso,
+    mrs: jugadorDe(estadoDe(mesa), ANA).mrs,
+  });
   mesa = tira(mesa, ANA);
   const tres = estadoDe(mesa);
   comprobar('tercer dobles: a la Comisaría sin mover ni cobrar', reprochesDeEncierro(tres, ANA, 'tres-dobles').length === 0 && sucesosDe(tres, 'mueve').length === 0, reprochesDeEncierro(tres, ANA, 'tres-dobles'));
   comprobar('y el turno queda en por-pasar: se ofrece pasar y no tirar', tres.paso === 'por-pasar' && idsDe(tres, ANA).includes('pasar') && !idsDe(tres, ANA).includes('tirar'));
-  comprobar('rev 3 y jugada subida tres veces: una por tirada', mesa.rev === 3 && tres.jugada === base.jugada + 3);
+  comprobar('rev 4 y jugada subida cuatro veces: una por tirada y otra por el Impuesto', mesa.rev === 4 && tres.jugada === base.jugada + 4, { rev: mesa.rev, jugada: tres.jugada - base.jugada });
   /* La vacuna: un estado que dejara al de los tres dobles libre en la calle se ve caer. */
   const noEncerrado = conJugador(tres, ANA, { casilla: 12, presa: LIBRE });
   comprobar('la vacuna: sin el tope de tres dobles (libre en el 12) los reproches del encierro caen', reprochesDeEncierro(noEncerrado, ANA, 'tres-dobles').length > 0);
@@ -999,6 +1031,22 @@ const TRES_PASOS: ParDeDados = [1, 2];
 
 /** La casilla del Impuesto, que es donde se abre el apuro que se salda. */
 const EL_DIEZMO_CASILLA = 4;
+
+/**
+ * CAER EN EL IMPUESTO Y PAGAR LA CANTIDAD FIJA de un tirón.
+ *
+ * Desde la regla 4 el Impuesto se ELIGE y caer en él ya no cobra: enciende la marca. Los
+ * bloques que sólo querían la deuda de 200 € encima (el apuro, la liquidación del tic)
+ * la piden aquí y siguen midiendo lo suyo; la elección tiene su propio bloque. Si al
+ * caer NO se encendió la marca —porque ya venía un apuro abierto, que es el caso en que
+ * el reductor cobra la fija sin preguntar— se devuelve tal cual.
+ */
+function alCaerEnElImpuesto(id: string, base: EstadoDelBurgo, quien: AsientoId): EstadoDelBurgo {
+  const { s } = alCaerEn(id, base, quien, EL_DIEZMO_CASILLA, [TRES_PASOS]);
+  if (!s.impuestoSinPagar) return s;
+  const asientos = s.jugadores.map((j) => j.asiento);
+  return estadoDe(mover(mesaSobre(`${id}-FIJO`, s, asientos), quien, { tipo: PAGAR_IMPUESTO, carga: { como: 'fijo' } }).mesa);
+}
 
 /** ¿Ir de `desde` a `hasta` hacia delante pasa por la Salida? */
 function cruzaAlIr(desde: number, hasta: number): boolean {
@@ -1408,7 +1456,7 @@ paso('9. EL APURO Y LA QUIEBRA: no se pasa, vender y hipotecar saldan, varios ac
    * (reglamento §9: quien no alcanza vende y hipoteca, no paga lo que puede).
    */
   const conPuertas = conTitulos(conJugador(base, ANA, { mrs: 50 }), [[5, ANA, 0, false], [15, ANA, 0, false]]);
-  const { s: enApuro } = alCaerEn('APU-1', conPuertas, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
+  const enApuro = alCaerEnElImpuesto('APU-1', conPuertas, ANA);
   comprobar('con 50 €, el Impuesto abre el apuro por los 200 enteros y no se paga nada', enApuro.paso === 'apuro' && enApuro.apuro !== null && enApuro.apuro.quien === ANA && enApuro.apuro.deudas.length === 1 && enApuro.apuro.deudas[0]?.cuanto === EL_DIEZMO && enApuro.apuro.deudas[0]?.a === null && jugadorDe(enApuro, ANA).mrs === 50, enApuro.apuro);
   comprobar('con el suceso `apuro` diciendo lo que debe', (sucesosDe(enApuro, 'apuro')[0] as { debe: number } | undefined)?.debe === EL_DIEZMO);
   comprobar('y la vista dice a quién se espera y cuánto debe', vistaDe(enApuro, ESPECTADOR).turnoDe === ANA && vistaDe(enApuro, ESPECTADOR).apuro?.debe === EL_DIEZMO && vistaDe(enApuro, ESPECTADOR).apuro?.enCola === 0);
@@ -1437,7 +1485,7 @@ paso('9. EL APURO Y LA QUIEBRA: no se pasa, vender y hipotecar saldan, varios ac
   /* Vender también salda: mismo apuro, pero con casas en vez de puertas. */
   {
     const conCasas = conTitulos(conJugador(base, ANA, { mrs: 50 }), [[31, ANA, 4, false], [32, ANA, 4, false], [34, ANA, 4, false]]);
-    const { s } = alCaerEn('APU-V', conCasas, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
+    const s = alCaerEnElImpuesto('APU-V', conCasas, ANA);
     let vendiendo = mesaSobre('APU-V2', s, CUATRO);
     let ventas = 0;
     for (let k = 0; k < 20 && estadoDe(vendiendo).apuro !== null; k++) {
@@ -1554,9 +1602,31 @@ function ultimoTrato(e: EstadoDelBurgo): TratoDelBurgo | null {
   const puerta = opcionesEn(repartido, ANA).find((o) => o.declaracion === true && o.tipo === PROPONER);
   comprobar('el dueño del turno recibe la PUERTA de proponer, que no se pinta como botón', puerta !== undefined && puerta.declaracion === true && puerta.id === 'proponer');
   comprobar('con los cuatro campos exactos: a quién, cuánto, qué títulos y cuántos Salvoconductos', canonico(puerta?.carga) === canonico({ a: [BRUNO, CARLA, DIEGO], mrsMaximo: DINERO_DE_SALIDA, titulos: [1, 5], indultos: 0 }), puerta?.carga);
+  /*
+   * REGLA 2: CUALQUIERA LE PROPONE A CUALQUIERA. Antes la puerta de quien no tenía el
+   * turno sólo listaba al dueño del turno, y dos que no lo tuvieran no podían tratar
+   * entre ellos; en el juego oficial sí. La puerta de cada uno lista ahora a TODOS los
+   * vivos menos él.
+   */
   const deOtro = opcionesEn(repartido, BRUNO).find((o) => o.declaracion === true && o.tipo === PROPONER);
-  comprobar('y quien NO tiene el turno también, pero SÓLO puede proponer AL del turno', canonico((deOtro?.carga as { a: AsientoId[] }).a) === canonico([ANA]), deOtro?.carga);
-  comprobar('un tercero tampoco puede proponerle a otro tercero', canonico((opcionesEn(repartido, CARLA).find((o) => o.declaracion === true && o.tipo === PROPONER)?.carga as { a: AsientoId[] }).a) === canonico([ANA]));
+  comprobar('quien NO tiene el turno recibe la puerta y puede proponer a CUALQUIERA vivo', canonico((deOtro?.carga as { a: AsientoId[] }).a) === canonico([ANA, CARLA, DIEGO]), deOtro?.carga);
+  comprobar('y un tercero también, con el dueño del turno dentro de la lista', canonico((opcionesEn(repartido, CARLA).find((o) => o.declaracion === true && o.tipo === PROPONER)?.carga as { a: AsientoId[] }).a) === canonico([ANA, BRUNO, DIEGO]));
+  comprobar('nadie se ofrece a sí mismo como destinatario', [ANA, BRUNO, CARLA, DIEGO].every((quien) => ((opcionesEn(repartido, quien).find((o) => o.declaracion === true && o.tipo === PROPONER)?.carga as { a: AsientoId[] }).a).indexOf(quien) < 0));
+  {
+    /* Y el trato ENTRE DOS QUE NO TIENEN EL TURNO se propone, se acepta y mueve la mercancía. */
+    const entreDos = { a: CARLA, doy: { mrs: 0, titulos: [3], indultos: 0 }, pido: { mrs: 300, titulos: [], indultos: 0 } };
+    const propuestoSinTurno = mover(mesaSobre('TRA-SIN-TURNO', repartido, CUATRO), BRUNO, { tipo: PROPONER, carga: entreDos });
+    comprobar('dos que no tienen el turno pueden tratar entre ellos', propuestoSinTurno.cambio && estadoDe(propuestoSinTurno.mesa).tratos.length === 1, propuestoSinTurno.motivo);
+    const cerrado = mover(propuestoSinTurno.mesa, CARLA, { tipo: ACEPTAR, carga: { trato: repartido.siguienteTrato } });
+    const s = estadoDe(cerrado.mesa);
+    comprobar('  y aceptarlo mueve el título y los euros sin que el del turno haga nada', cerrado.cambio && tituloDe(s, 3).dueno === CARLA && jugadorDe(s, BRUNO).mrs === DINERO_DE_SALIDA + 300 && jugadorDe(s, CARLA).mrs === DINERO_DE_SALIDA - 300, {
+      dueno: tituloDe(s, 3).dueno,
+      bruno: jugadorDe(s, BRUNO).mrs,
+    });
+    comprobar('  y el turno sigue siendo del mismo', s.turno === repartido.turno && vistaDe(s, ESPECTADOR).duenoDelTurno === ANA);
+    /* LA VACUNA: con la regla vieja (uno de los dos con el turno) este trato no existía. */
+    comprobar('LA VACUNA de la regla 2: la lista de destinos de quien no tiene el turno YA NO es sólo el del turno', canonico((deOtro?.carga as { a: AsientoId[] }).a) !== canonico([ANA]));
+  }
 
   const buena = { a: BRUNO, doy: { mrs: 100, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [3], indultos: 0 } };
   const propuesta = mover(mesaSobre('TRA-1', repartido, CUATRO), ANA, { tipo: PROPONER, carga: buena });
@@ -1668,7 +1738,7 @@ function ultimoTrato(e: EstadoDelBurgo): TratoDelBurgo | null {
     const enAlmoneda: EstadoDelBurgo = {
       ...repartido,
       paso: 'almoneda',
-      almoneda: { casilla: 39, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, CARLA, DIEGO, ANA], abiertaPor: ANA },
+      almoneda: { casilla: 39, edificio: false, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, CARLA, DIEGO, ANA], abiertaPor: ANA },
     };
     comprobar('con una subasta abierta nadie recibe la puerta de proponer', [ANA, BRUNO, CARLA, DIEGO].every((a) => !opcionesEn(enAlmoneda, a).some((o) => o.tipo === PROPONER)));
     const r = mover(mesaSobre('TRA-ALM', enAlmoneda, CUATRO), ANA, { tipo: PROPONER, carga: buena });
@@ -1764,7 +1834,7 @@ function unaPartidaTerminada(): EstadoDelBurgo {
     const abierta: EstadoDelBurgo = {
       ...turnoDe(base, ANA, 'por-pasar'),
       paso: 'almoneda',
-      almoneda: { casilla: 39, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, CARLA, DIEGO, ANA], abiertaPor: ANA },
+      almoneda: { casilla: 39, edificio: false, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, CARLA, DIEGO, ANA], abiertaPor: ANA },
     };
     const s1 = estadoDe(tic(mesaSobre('TIC-5', abierta, CUATRO)));
     comprobar('en subasta el tic PASA por el que tiene el relevo, y sólo por él', (s1.almoneda as AlmonedaDelBurgo).enPie.join() === [CARLA, DIEGO, ANA].join() && (s1.almoneda as AlmonedaDelBurgo).pujaDe === CARLA);
@@ -1778,7 +1848,7 @@ function unaPartidaTerminada(): EstadoDelBurgo {
   /* `apuro`: UN tic liquida al ausente entero. */
   {
     const enApuro = conTitulos(conJugador(base, ANA, { mrs: 50 }), [[5, ANA, 0, false], [15, ANA, 0, false]]);
-    const { s } = alCaerEn('TIC-6', enApuro, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
+    const s = alCaerEnElImpuesto('TIC-6', enApuro, ANA);
     comprobar('hay un apuro abierto de 200 con dos puertas que hipotecar', s.paso === 'apuro' && s.apuro !== null);
     const s2 = estadoDe(tic(mesaSobre('TIC-6B', s, CUATRO)));
     comprobar('UN SOLO TIC liquida al ausente: hipoteca lo que hace falta y salda', s2.apuro === null && tituloDe(s2, 5).empenado && jugadorDe(s2, ANA).mrs === 50 + 2 * 100 - EL_DIEZMO, { mrs: jugadorDe(s2, ANA).mrs, apuro: s2.apuro });
@@ -2070,10 +2140,17 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
   /*
    * La semilla de la de seis está ELEGIDA: con seis comprándolo todo, la mayoría de
    * las partidas no llegan a una subasta GANADA —el que la abre suele poder pagar el
-   * título— y el mínimo de §8.1 F4 exige una. Se probaron quince semillas y se escogió
-   * una que las tiene; la partida sigue siendo la que el robot juega, no una guiada.
+   * título— y el mínimo de §8.1 F4 exige una. La partida sigue siendo la que el robot
+   * juega, no una guiada.
+   *
+   * Era la 13 y ahora es la 19: con las cuatro reglas oficiales nuevas el robot juega
+   * OTRA partida —el Impuesto cuesta un gesto más y la décima se paga cuando sale más
+   * barata— y con la 13 sólo un jugador pasaba por la Comisaría de las dos que exige
+   * el mínimo. Se probaron veinte semillas con la política nueva: diecisiete cumplen
+   * los seis mínimos, y se escogió la 19 (5 quiebras, 59 rentas, 5 subastas ganadas, 5
+   * entradas en la Comisaría, 95 alzas y 6 tratos aceptados en 563 movimientos).
    */
-  [6, 13, 40, 13, 6000],
+  [6, 19, 40, 13, 6000],
 ];
 
 {
@@ -2277,6 +2354,295 @@ function percentil(muestras: readonly number[], parte: number): number {
   for (const c of cifras) console.log(`    ${c.bien ? '·' : '✗'} ${c.que.padEnd(56)} ${c.valor.padEnd(50)} tope ${c.tope}`);
 }
 
+// ---------------------------------------------------------------------------
+paso('15. LAS CUATRO REGLAS OFICIALES QUE FALTABAN: obrar sin turno, tratar entre dos, la última casa y el 10 %');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ QUÉ SE MIDE AQUÍ Y POR QUÉ CON JUECES CON VACUNA ═══
+ *
+ * Las cuatro reglas de `DISENO-3.md` §12 que volvieron a entrar en alcance cambian
+ * QUIÉN puede hacer QUÉ y CUÁNDO, que es justo la clase de regla que no se cae: se
+ * juega mal. Cada una lleva aquí un JUEZ —una función de reproches— que se aplica al
+ * caso bueno y a un caso ENVENENADO, y el veneno de cada una es EL COMPORTAMIENTO
+ * VIEJO: la mesa ocupada donde antes no se obraba, el Ayuntamiento con dos casas donde
+ * antes se alzaba por orden de llegada, y el Impuesto ya cobrado donde antes no había
+ * elección. Si mañana alguien deshace una de las cuatro, su juez lo dice.
+ */
+
+/** Los cuatro prefijos de las obras, que es lo que `opcionesDeObra` ofrece. */
+const OBRAS_OFRECIDAS: readonly string[] = ['alzar:', 'vender:', 'empenar:', 'desempenar:'];
+
+/**
+ * EL JUEZ DE «AQUÍ SE OBRA»: para cada obra que se espera, exige que esté OFRECIDA y
+ * que el reductor la ACEPTE. Las dos cosas juntas, porque el fallo que se busca es el
+ * botón mudo: la opción encendida por una regla y el reductor rechazando por otra.
+ */
+function reprochesDeObrarAhora(e: EstadoDelBurgo, quien: AsientoId, esperadas: readonly string[], asientos: readonly AsientoId[]): string[] {
+  const r: string[] = [];
+  const ids = idsDe(e, quien);
+  for (const prefijo of esperadas) {
+    const cual = ids.find((id) => id.indexOf(prefijo) === 0);
+    if (cual === undefined) {
+      r.push(`no se ofrece ninguna obra «${prefijo}» a ${quien}`);
+      continue;
+    }
+    const o = opcionPorId(e, quien, cual) as Opcion;
+    const salida = mover(mesaSobre(`OBRA-${prefijo}${quien}`, e, asientos), quien, { tipo: o.tipo, carga: o.carga });
+    if (!salida.cambio) r.push(`«${cual}» se ofrece y el reductor no la acepta: ${String(salida.motivo)}`);
+  }
+  return r;
+}
+
+/** El juez del revés: aquí NO se obra, ni ofrecido ni mandado a mano. */
+function reprochesDeNoObrar(e: EstadoDelBurgo, quien: AsientoId, casilla: number, asientos: readonly AsientoId[]): string[] {
+  const r: string[] = [];
+  for (const id of idsDe(e, quien)) {
+    for (const prefijo of OBRAS_OFRECIDAS) if (id.indexOf(prefijo) === 0) r.push(`se ofrece «${id}» a ${quien} y la mesa está ocupada`);
+  }
+  for (const tipo of [ALZAR, VENDER, EMPENAR, DESEMPENAR]) {
+    const salida = mover(mesaSobre(`NO-OBRA-${tipo}${quien}`, e, asientos), quien, { tipo, carga: { casilla } });
+    if (salida.cambio) r.push(`${tipo} en ${casilla} ha cambiado la mesa y no debía`);
+    else if (salida.motivo === null) r.push(`${tipo} se rechaza sin motivo`);
+  }
+  return r;
+}
+
+{
+  /* ═══ REGLA 1: SE OBRA EN EL TURNO DE CUALQUIERA ═══ */
+  const base = estadoDe(empezada('R1', CUATRO, 41));
+  /*
+   * ANA tiene el turno; BRUNO tiene el barrio pardo entero (con una casa puesta, para
+   * que haya algo que vender), una estación hipotecada que deshipotecar, otra sin
+   * hipotecar que hipotecar, y dinero. Las cuatro obras a la vez, que es lo que se mide.
+   */
+  const conBarrios = conTitulos(conJugador(base, BRUNO, { mrs: 900 }), [
+    [1, BRUNO, 0, false],
+    [3, BRUNO, 1, false],
+    [5, BRUNO, 0, true],
+    [15, BRUNO, 0, false],
+  ]);
+  const enElTurnoDeAna = turnoDe(conBarrios, ANA, 'por-pasar');
+
+  const reprochesDeBruno = reprochesDeObrarAhora(enElTurnoDeAna, BRUNO, OBRAS_OFRECIDAS, CUATRO);
+  comprobar('REGLA 1: quien NO tiene el turno alza, vende, hipoteca y deshipoteca, y el reductor lo acepta', reprochesDeBruno.length === 0, reprochesDeBruno);
+  const alzada = mover(mesaSobre('R1-ALZA', enElTurnoDeAna, CUATRO), BRUNO, { tipo: ALZAR, carga: { casilla: 1 } });
+  const trasAlzar = estadoDe(alzada.mesa);
+  comprobar('  y la casa se pone de verdad: sube el solar, baja el Ayuntamiento y se cobra el precio', tituloDe(trasAlzar, 1).casas === 1 && trasAlzar.casasEnElConcejo === base.casasEnElConcejo - 1 && jugadorDe(trasAlzar, BRUNO).mrs === 900 - 50, {
+    casas: tituloDe(trasAlzar, 1).casas,
+    mrs: jugadorDe(trasAlzar, BRUNO).mrs,
+  });
+  comprobar('  sin tocar el turno ni el paso de quien lo tiene', trasAlzar.turno === enElTurnoDeAna.turno && trasAlzar.paso === 'por-pasar' && vistaDe(trasAlzar, ESPECTADOR).turnoDe === ANA);
+  comprobar('  y el suceso `alza` lo cuenta con su casilla', (sucesosDe(trasAlzar, 'alza')[0] as { quien: AsientoId; casas: number } | undefined)?.quien === BRUNO);
+
+  /* LA VACUNA de la regla 1: los TRES momentos en que la mesa espera una respuesta. */
+  const conSubasta: EstadoDelBurgo = {
+    ...enElTurnoDeAna,
+    paso: 'almoneda',
+    almoneda: { casilla: 39, edificio: false, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, CARLA, DIEGO, ANA], abiertaPor: ANA },
+  };
+  comprobar('LA VACUNA: con una subasta abierta el juez de «aquí se obra» CAE', reprochesDeObrarAhora(conSubasta, BRUNO, OBRAS_OFRECIDAS, CUATRO).length > 0);
+  comprobar('  y no se obra ni ofrecido ni mandado a mano', reprochesDeNoObrar(conSubasta, BRUNO, 1, CUATRO).length === 0, reprochesDeNoObrar(conSubasta, BRUNO, 1, CUATRO));
+  const conApuroAjeno: EstadoDelBurgo = {
+    ...conTitulos(enElTurnoDeAna, [[26, ANA, 0, false]]),
+    paso: 'apuro',
+    apuro: { quien: ANA, deudas: [{ a: null, cuanto: 5000, porque: 'diezmo' }] },
+  };
+  comprobar('con el apuro de OTRO abierto tampoco se obra: la mesa espera una deuda', reprochesDeNoObrar(conApuroAjeno, BRUNO, 1, CUATRO).length === 0, reprochesDeNoObrar(conApuroAjeno, BRUNO, 1, CUATRO));
+  comprobar('  pero el endeudado sigue hipotecando lo suyo, que es de lo que va su apuro', reprochesDeObrarAhora(conApuroAjeno, ANA, ['empenar:'], CUATRO).length === 0 && idsDe(conApuroAjeno, ANA).includes('rendirse'), reprochesDeObrarAhora(conApuroAjeno, ANA, ['empenar:'], CUATRO));
+  comprobar('  y sigue sin poder alzar ni deshipotecar en su apuro, que es lo de siempre', !idsDe(conApuroAjeno, ANA).some((id) => id.indexOf('alzar:') === 0 || id.indexOf('desempenar:') === 0), idsDe(conApuroAjeno, ANA));
+
+  /* Y con la casilla del dueño del turno sin resolver: él sí, los demás no. */
+  const { s: enCompra } = alCaerEn('R1-COMPRA', conBarrios, ANA, 39);
+  comprobar('con el del turno decidiendo si compra, los demás NO obran', reprochesDeNoObrar(enCompra, BRUNO, 1, CUATRO).length === 0, reprochesDeNoObrar(enCompra, BRUNO, 1, CUATRO));
+  const conAlgoQueObrar = conTitulos(enCompra, [[21, ANA, 0, false], [23, ANA, 0, false], [24, ANA, 0, false]]);
+  comprobar('  y el del turno sí, que es lo de siempre', reprochesDeObrarAhora(conAlgoQueObrar, ANA, ['alzar:'], CUATRO).length === 0, reprochesDeObrarAhora(conAlgoQueObrar, ANA, ['alzar:'], CUATRO));
+
+  /* ═══ REGLA 4: EL IMPUESTO SE ELIGE ═══ */
+  const patrimonioGordo = conTitulos(conJugador(base, ANA, { mrs: 2000 }), [[21, ANA, 0, false], [23, ANA, 0, false]]);
+  const { s: enElImpuesto } = alCaerEn('R4-1', patrimonioGordo, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
+  const idsImpuesto = idsDe(enElImpuesto, ANA);
+  comprobar('REGLA 4: caer en el Impuesto NO cobra: enciende la marca y ofrece los dos pagos', enElImpuesto.impuestoSinPagar && idsImpuesto.includes('impuesto:fijo') && idsImpuesto.includes('impuesto:decima') && jugadorDe(enElImpuesto, ANA).mrs === 2000, {
+    marca: enElImpuesto.impuestoSinPagar,
+    ids: idsImpuesto,
+  });
+  comprobar('  y la marca viaja en la vista de todos, que es de donde salen los botones', vistaDe(enElImpuesto, ESPECTADOR).impuestoSinPagar === true && vistaDe(enElImpuesto, BRUNO).impuestoSinPagar === true);
+  comprobar('  sólo el del turno los recibe: el Impuesto no lo elige un tercero', !idsDe(enElImpuesto, BRUNO).some((id) => id.indexOf('impuesto:') === 0), idsDe(enElImpuesto, BRUNO));
+  const patrimonioDeAna = vistaDe(enElImpuesto, ANA).jugadores.find((j) => j.asiento === ANA)?.patrimonio ?? 0;
+  const laDecima = decimaDelPatrimonio(patrimonioDeAna);
+  comprobar('  el patrimonio que publica la vista es el efectivo más los títulos: 2.000 + 220 + 220', patrimonioDeAna === 2000 + 220 + 220, patrimonioDeAna);
+  comprobar('  y el rótulo del 10 % promete EXACTAMENTE lo que la tabla calcula', (opcionPorId(enElImpuesto, ANA, 'impuesto:decima')?.rotulo ?? '').indexOf(maravedies(laDecima)) >= 0, opcionPorId(enElImpuesto, ANA, 'impuesto:decima')?.rotulo);
+  comprobar('  no lo paga otro por él', !mover(mesaSobre('R4-AJENO', enElImpuesto, CUATRO), BRUNO, { tipo: PAGAR_IMPUESTO, carga: { como: 'fijo' } }).cambio);
+  /* PASAR SIN ELEGIR paga la fija: es la que anuncia la casilla, y por eso el turno no se queda clavado. */
+  const pasandoSinElegir = mover(mesaSobre('R4-PASA', enElImpuesto, CUATRO), ANA, { tipo: PASAR, carga: {} });
+  const trasPasar = estadoDe(pasandoSinElegir.mesa);
+  comprobar('  pasar el turno sin elegir cobra la cantidad fija y releva', pasandoSinElegir.cambio && jugadorDe(trasPasar, ANA).mrs === 2000 - EL_DIEZMO && !trasPasar.impuestoSinPagar && trasPasar.turno !== enElImpuesto.turno, {
+    mrs: jugadorDe(trasPasar, ANA).mrs,
+    marca: trasPasar.impuestoSinPagar,
+  });
+  comprobar('  y no se cobra dos veces: la marca se apaga con el cobro', pagosDe(trasPasar, ANA).filter((p) => p.porque === 'diezmo').length === 1, pagosDe(trasPasar, ANA));
+  const porLaDecima = mover(mesaSobre('R4-DECIMA', enElImpuesto, CUATRO), ANA, { tipo: PAGAR_IMPUESTO, carga: { como: 'decima' } });
+  const trasLaDecima = estadoDe(porLaDecima.mesa);
+  comprobar('  pagar el 10 % cobra esa cifra exacta, apaga la marca y deja el turno donde estaba', porLaDecima.cambio && jugadorDe(trasLaDecima, ANA).mrs === 2000 - laDecima && !trasLaDecima.impuestoSinPagar && trasLaDecima.paso === 'por-pasar' && trasLaDecima.turno === enElImpuesto.turno && pagosDe(trasLaDecima, ANA).some((p) => p.porque === 'diezmo' && p.cuanto === laDecima), {
+    mrs: jugadorDe(trasLaDecima, ANA).mrs,
+    decima: laDecima,
+    paso: trasLaDecima.paso,
+  });
+  comprobar('  y ya pagado, la elección desaparece y pasar el turno ya no cobra nada', !idsDe(trasLaDecima, ANA).some((id) => id.indexOf('impuesto:') === 0) && jugadorDe(estadoDe(mover(mesaSobre('R4-YA', trasLaDecima, CUATRO), ANA, { tipo: PASAR, carga: {} }).mesa), ANA).mrs === 2000 - laDecima);
+  const porLaFija = estadoDe(mover(mesaSobre('R4-FIJA', enElImpuesto, CUATRO), ANA, { tipo: PAGAR_IMPUESTO, carga: { como: 'fijo' } }).mesa);
+  comprobar('  y pagar la fija cobra los 200 de la tabla: se elige de verdad, y las dos cifras son distintas', jugadorDe(porLaFija, ANA).mrs === 2000 - EL_DIEZMO && laDecima !== EL_DIEZMO, { fija: jugadorDe(porLaFija, ANA).mrs, decima: laDecima });
+  const conCarga = mover(mesaSobre('R4-CARGA', enElImpuesto, CUATRO), ANA, { tipo: PAGAR_IMPUESTO, carga: { como: 'la-mitad' } });
+  comprobar('  una elección inventada no pasa el portillo', !conCarga.cambio && conCarga.motivo !== null, conCarga.motivo);
+  comprobar('  con 2.440 de patrimonio la décima (244) es MÁS CARA que la fija, y aun así se ofrece: elige quien paga', laDecima > EL_DIEZMO, { decima: laDecima, fija: EL_DIEZMO });
+  /* El tic paga por el ausente lo que menos cuesta, que aquí es la fija. */
+  const trasTicRico = estadoDe(tic(mesaSobre('R4-TIC', enElImpuesto, CUATRO)));
+  comprobar('  el tic paga por el ausente lo más barato de los dos: con patrimonio gordo, la fija', !trasTicRico.impuestoSinPagar && jugadorDe(trasTicRico, ANA).mrs === 2000 - EL_DIEZMO && trasTicRico.turno === enElImpuesto.turno, { mrs: jugadorDe(trasTicRico, ANA).mrs });
+  comprobar('  y el tic hace UNA cosa: cobrar el Impuesto y nada más; el siguiente ya releva', estadoDe(tic(tic(mesaSobre('R4-TIC-2', enElImpuesto, CUATRO)))).turno !== enElImpuesto.turno);
+  comprobar('  el aviso de quien tiene que elegir dice las dos cifras', vistaDe(enElImpuesto, ANA).aviso.indexOf(maravedies(laDecima)) >= 0 && vistaDe(enElImpuesto, ANA).aviso.indexOf(maravedies(EL_DIEZMO)) >= 0, vistaDe(enElImpuesto, ANA).aviso);
+
+  /* Y el mismo Impuesto con poco patrimonio: la décima es el salvavidas, y el tic la coge. */
+  const pelado = conJugador(base, ANA, { mrs: 90 });
+  const { s: impuestoPelado } = alCaerEn('R4-POBRE', pelado, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
+  const decimaPelada = decimaDelPatrimonio(vistaDe(impuestoPelado, ANA).jugadores.find((j) => j.asiento === ANA)?.patrimonio ?? 0);
+  comprobar('con 90 € y nada más, la décima son 9 € y la fija no le alcanza', decimaPelada === 9 && jugadorDe(impuestoPelado, ANA).mrs === 90, { decima: decimaPelada });
+  const trasTicPelado = estadoDe(tic(mesaSobre('R4-TIC2', impuestoPelado, CUATRO)));
+  comprobar('  y el tic coge la décima: 9 € pagados, sin apuro y sin quiebra', trasTicPelado.apuro === null && jugadorDe(trasTicPelado, ANA).mrs === 81 && !trasTicPelado.impuestoSinPagar, { mrs: jugadorDe(trasTicPelado, ANA).mrs, apuro: trasTicPelado.apuro });
+  const pasandoPelado = estadoDe(mover(mesaSobre('R4-POBRE-PASA', impuestoPelado, CUATRO), ANA, { tipo: PASAR, carga: {} }).mesa);
+  comprobar('  pero si PASA sin elegir paga la fija, no le alcanza y se abre su apuro sin relevar el turno', pasandoPelado.apuro !== null && pasandoPelado.turno === impuestoPelado.turno && jugadorDe(pasandoPelado, ANA).mrs === 90, { apuro: pasandoPelado.apuro, turno: pasandoPelado.turno });
+  const eligiendoLaFija = estadoDe(mover(mesaSobre('R4-POBRE-FIJA', impuestoPelado, CUATRO), ANA, { tipo: PAGAR_IMPUESTO, carga: { como: 'fijo' } }).mesa);
+  comprobar('  y si aun así elige la fija, se abre su apuro por los 200 enteros', eligiendoLaFija.apuro !== null && eligiendoLaFija.apuro.deudas.some((d) => d.porque === 'diezmo' && d.cuanto === EL_DIEZMO) && jugadorDe(eligiendoLaFija, ANA).mrs === 90, eligiendoLaFija.apuro);
+
+  /* LA VACUNA de la regla 4: el comportamiento viejo —cobrar al caer— se ve caer. */
+  const comoAntes: EstadoDelBurgo = { ...conJugador(enElImpuesto, ANA, { mrs: 2000 - EL_DIEZMO }), impuestoSinPagar: false };
+  comprobar('LA VACUNA: con el Impuesto ya cobrado al caer (lo de antes), la elección no está y se ve', !idsDe(comoAntes, ANA).includes('impuesto:fijo') && !idsDe(comoAntes, ANA).includes('impuesto:decima'));
+}
+
+{
+  /* ═══ REGLA 3: LA SUBASTA DE LA ÚLTIMA CASA ═══ */
+  const base = estadoDe(empezada('R3', CUATRO, 41));
+  /* ANA tiene el barrio pardo (casa de 50) y BRUNO el azul (casa de 200); queda UNA casa. */
+  const conDosBarrios: EstadoDelBurgo = {
+    ...conTitulos(conJugador(conJugador(base, ANA, { mrs: 800 }), BRUNO, { mrs: 800 }), [
+      [1, ANA, 0, false],
+      [3, ANA, 0, false],
+      [37, BRUNO, 0, false],
+      [39, BRUNO, 0, false],
+    ]),
+    casasEnElConcejo: 1,
+  };
+  const laUltima = turnoDe(conDosBarrios, ANA, 'por-pasar');
+  const pedida = mover(mesaSobre('R3-1', laUltima, CUATRO), ANA, { tipo: ALZAR, carga: { casilla: 1 } });
+  const enSubasta = estadoDe(pedida.mesa);
+  const a0 = enSubasta.almoneda as AlmonedaDelBurgo;
+  comprobar('REGLA 3: con UNA casa y otro que también la quiere, ALZAR no alza: la subasta', pedida.cambio && enSubasta.paso === 'almoneda' && a0 !== null && a0.edificio === true && tituloDe(enSubasta, 1).casas === 0, {
+    paso: enSubasta.paso,
+    almoneda: enSubasta.almoneda,
+  });
+  comprobar('  quien la pidió abre la puja al precio de lista de SU barrio y no ha pagado nada todavía', a0.puja === 50 && a0.quienPuja === ANA && a0.casilla === 1 && jugadorDe(enSubasta, ANA).mrs === 800, { puja: a0.puja, mrs: jugadorDe(enSubasta, ANA).mrs });
+  comprobar('  en pie van sólo los que podrían alzarla, y el que la pidió el último', a0.enPie.join() === [BRUNO, ANA].join() && a0.pujaDe === BRUNO, a0.enPie);
+  comprobar('  la casa sigue en el Ayuntamiento mientras se puja: no se reserva', enSubasta.casasEnElConcejo === 1);
+  comprobar('  y el aviso del que puja dice que es el último edificio y por qué solar puja', vistaDe(enSubasta, BRUNO).aviso.indexOf('último edificio') >= 0 && vistaDe(enSubasta, BRUNO).aviso.indexOf('Tilos') >= 0, vistaDe(enSubasta, BRUNO).aviso);
+  const barata = mover(mesaSobre('R3-BARATA', enSubasta, CUATRO), BRUNO, { tipo: PUJAR, carga: { casilla: 37, cuanto: 60 } });
+  comprobar('  nadie puja por debajo del precio de casa de SU barrio: 60 por un solar de 200 se rechaza', !barata.cambio && barata.motivo !== null, barata.motivo);
+  const minimoDeBruno = opcionPorId(enSubasta, BRUNO, 'pujar:minimo');
+  comprobar('  y su puja mínima ofrecida es justo ese precio de lista, por su propio solar', canonico(minimoDeBruno?.carga) === canonico({ casilla: 37, cuanto: 200 }), minimoDeBruno?.carga);
+  const ajena = mover(mesaSobre('R3-AJENA', enSubasta, CUATRO), BRUNO, { tipo: PUJAR, carga: { casilla: 1, cuanto: 200 } });
+  comprobar('  y no se puja por el solar de otro', !ajena.cambio && ajena.motivo !== null);
+  const pujada = mover(mesaSobre('R3-PUJA', enSubasta, CUATRO), BRUNO, { tipo: PUJAR, carga: { casilla: 37, cuanto: 200 } });
+  const conPuja = estadoDe(pujada.mesa);
+  comprobar('  al pujar, la subasta apunta al solar del mejor postor', pujada.cambio && (conPuja.almoneda as AlmonedaDelBurgo).casilla === 37 && (conPuja.almoneda as AlmonedaDelBurgo).puja === 200 && (conPuja.almoneda as AlmonedaDelBurgo).quienPuja === BRUNO, conPuja.almoneda);
+  const cerrada = estadoDe(mover(mesaSobre('R3-CIERRE', conPuja, CUATRO), ANA, { tipo: PASAR_PUJA, carga: { casilla: 37 } }).mesa);
+  comprobar('  y al pasar el otro se cierra sola: la casa se pone en el solar del ganador, que paga su puja', cerrada.almoneda === null && tituloDe(cerrada, 37).casas === 1 && tituloDe(cerrada, 1).casas === 0 && jugadorDe(cerrada, BRUNO).mrs === 600 && cerrada.casasEnElConcejo === 0, {
+    casas37: tituloDe(cerrada, 37).casas,
+    mrs: jugadorDe(cerrada, BRUNO).mrs,
+    concejo: cerrada.casasEnElConcejo,
+  });
+  comprobar('  con los sucesos de la subasta cerrada y del alza', sucesosDe(cerrada, 'almoneda-cerrada').length === 1 && (sucesosDe(cerrada, 'alza')[0] as { quien: AsientoId } | undefined)?.quien === BRUNO);
+  comprobar('  y la mesa vuelve al turno de quien lo tenía', cerrada.paso === 'por-pasar' && cerrada.turno === laUltima.turno);
+  /* Si el rival pasa, la casa es del que la pidió y al precio de lista: la regla nueva no le cuesta nada. */
+  const sinRival = estadoDe(mover(mesaSobre('R3-PASA', enSubasta, CUATRO), BRUNO, { tipo: PASAR_PUJA, carga: { casilla: 1 } }).mesa);
+  comprobar('  si el rival pasa, la casa se queda donde se pidió y por el precio de lista', sinRival.almoneda === null && tituloDe(sinRival, 1).casas === 1 && jugadorDe(sinRival, ANA).mrs === 750 && sinRival.casasEnElConcejo === 0, {
+    casas: tituloDe(sinRival, 1).casas,
+    mrs: jugadorDe(sinRival, ANA).mrs,
+  });
+  /* LA VACUNA de la regla 3: con dos casas en el Ayuntamiento (no es la última) se alza sin subasta. */
+  const conDos: EstadoDelBurgo = { ...laUltima, casasEnElConcejo: 2 };
+  const directa = estadoDe(mover(mesaSobre('R3-DOS', conDos, CUATRO), ANA, { tipo: ALZAR, carga: { casilla: 1 } }).mesa);
+  comprobar('LA VACUNA: con DOS casas no hay escasez, se alza por orden de llegada y no se abre subasta', directa.almoneda === null && tituloDe(directa, 1).casas === 1 && directa.casasEnElConcejo === 1, { almoneda: directa.almoneda, casas: tituloDe(directa, 1).casas });
+  /* Y sin rival que la quiera tampoco: la subasta de uno solo sería un trámite. */
+  const sinNadieMas: EstadoDelBurgo = { ...conTitulos(laUltima, [[37, null, 0, false], [39, null, 0, false]]), casasEnElConcejo: 1 };
+  const solitaria = estadoDe(mover(mesaSobre('R3-SOLO', sinNadieMas, CUATRO), ANA, { tipo: ALZAR, carga: { casilla: 1 } }).mesa);
+  comprobar('con la última casa pero sin nadie más que pueda alzarla, se alza sin subasta', solitaria.almoneda === null && tituloDe(solitaria, 1).casas === 1 && solitaria.casasEnElConcejo === 0);
+
+  /* EL ÚLTIMO HOTEL, que es la otra existencia y la otra cuenta. */
+  const conCuatroCasas: EstadoDelBurgo = {
+    ...conTitulos(conJugador(conJugador(base, ANA, { mrs: 800 }), BRUNO, { mrs: 800 }), [
+      [1, ANA, 4, false],
+      [3, ANA, 4, false],
+      [37, BRUNO, 4, false],
+      [39, BRUNO, 4, false],
+    ]),
+    casasEnElConcejo: 8,
+    posadasEnElConcejo: 1,
+  };
+  const porElHotel = estadoDe(mover(mesaSobre('R3-HOTEL', turnoDe(conCuatroCasas, ANA, 'por-pasar'), CUATRO), ANA, { tipo: ALZAR, carga: { casilla: 1 } }).mesa);
+  const aH = porElHotel.almoneda as AlmonedaDelBurgo;
+  comprobar('el ÚLTIMO HOTEL también se subasta, y sólo entre los que tienen las cuatro casas', porElHotel.paso === 'almoneda' && aH !== null && aH.edificio === true && aH.enPie.join() === [BRUNO, ANA].join(), porElHotel.almoneda);
+  const conHotel = estadoDe(mover(mesaSobre('R3-HOTEL2', porElHotel, CUATRO), BRUNO, { tipo: PASAR_PUJA, carga: { casilla: 1 } }).mesa);
+  comprobar('  y al cerrarse, el hotel sustituye a las cuatro casas, que vuelven al Ayuntamiento', tituloDe(conHotel, 1).casas === POSADA && conHotel.posadasEnElConcejo === 0 && conHotel.casasEnElConcejo === 8 + (POSADA - 1) && jugadorDe(conHotel, ANA).mrs === 750, {
+    casas: tituloDe(conHotel, 1).casas,
+    concejo: conHotel.casasEnElConcejo,
+    posadas: conHotel.posadasEnElConcejo,
+  });
+  /* Y una mesa guardada de antes de esta regla, sin el campo `edificio`, es la subasta de siempre. */
+  const comoAntes = comoSiSiempreHubieraHabidoBurgo({
+    ...laUltima,
+    paso: 'almoneda',
+    almoneda: { casilla: 39, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, ANA], abiertaPor: ANA },
+  } as unknown as EstadoDelBurgo);
+  comprobar('una subasta guardada SIN el campo `edificio` se lee como la del título, no como la del edificio', vistaDe(comoAntes, BRUNO).almoneda?.edificio === false && idsDe(comoAntes, BRUNO).includes('pujar:minimo'), vistaDe(comoAntes, BRUNO).almoneda);
+}
+
+{
+  /*
+   * ═══ Y EL TOPE DE VUELTAS, QUE NO CAMBIA PERO TENÍA QUE VERSE ANDAR ═══
+   *
+   * El §12 del diseño lo dejaba «escrito y comprobado» pero sin ofrecer en la hoja del
+   * Muelle, y así sigue: el camino está abierto en las reglas y ofrecerlo es de quien
+   * toque la hoja. Lo que faltaba era ver el final ENTERO por la puerta del reductor —el
+   * relevo que alcanza el tope, el patrimonio que gana y el empate que se comparte—,
+   * porque un camino abierto que nadie recorre es un camino que no se sabe si existe.
+   */
+  const conTope = estadoDe(empezada('TOP', CUATRO, 41, 3));
+  comprobar('EL TOPE DE VUELTAS: EMPEZAR lo admite en la carga y la vista lo publica', conTope.topeDeVueltas === 3 && vistaDe(conTope, ESPECTADOR).topeDeVueltas === 3);
+  const alBorde = (patrimonios: ReadonlyArray<readonly [AsientoId, number]>, vueltas: number): EstadoDelBurgo => {
+    let s = turnoDe(conTope, ANA, 'por-pasar');
+    for (const a of CUATRO) s = conJugador(s, a, { vueltas });
+    for (const [quien, mrs] of patrimonios) s = conJugador(s, quien, { mrs });
+    return s;
+  };
+  const gana = estadoDe(mover(mesaSobre('TOP-1', alBorde([[ANA, 1000], [BRUNO, 5000], [CARLA, 900], [DIEGO, 800]], 3), CUATRO), ANA, { tipo: PASAR, carga: {} }).mesa);
+  comprobar('  cuando el MÍNIMO de vueltas de los vivos alcanza el tope, la partida acaba al relevar', gana.momento === 'terminada' && (sucesosDe(gana, 'fin')[0] as { porque: string } | undefined)?.porque === 'tope-de-vueltas', {
+    momento: gana.momento,
+    fin: sucesosDe(gana, 'fin'),
+  });
+  comprobar('  y gana el mayor patrimonio, aunque no sea el que pasó el turno', gana.ganadores.join() === BRUNO, gana.ganadores);
+  const empate = estadoDe(mover(mesaSobre('TOP-2', alBorde([[ANA, 5000], [BRUNO, 5000], [CARLA, 900], [DIEGO, 800]], 3), CUATRO), ANA, { tipo: PASAR, carga: {} }).mesa);
+  comprobar('  con dos patrimonios iguales el Burgo se comparte: sin desempate inventado', empate.ganadores.join() === [ANA, BRUNO].join(), empate.ganadores);
+  const quebrado = conJugador(alBorde([[ANA, 1000], [BRUNO, 9000], [CARLA, 900], [DIEGO, 800]], 3), BRUNO, { quebrado: true });
+  const sinElRico = estadoDe(mover(mesaSobre('TOP-3', quebrado, CUATRO), ANA, { tipo: PASAR, carga: {} }).mesa);
+  comprobar('  y un quebrado no gana por rico: no cuenta ni para el mínimo ni para el patrimonio', sinElRico.momento === 'terminada' && sinElRico.ganadores.join() === ANA, sinElRico.ganadores);
+  /* LA VACUNA: una vuelta por debajo del tope, la partida sigue. */
+  const sigue = estadoDe(mover(mesaSobre('TOP-4', alBorde([[ANA, 1000], [BRUNO, 5000], [CARLA, 900], [DIEGO, 800]], 2), CUATRO), ANA, { tipo: PASAR, carga: {} }).mesa);
+  comprobar('LA VACUNA del tope: con una vuelta menos la partida NO acaba y el turno pasa al siguiente', sigue.momento === 'jugando' && sigue.turno !== conTope.turno, { momento: sigue.momento });
+  /* Y sin tope (0), que es lo que la hoja del Muelle ofrece hoy, no acaba nunca por vueltas. */
+  const sinTope = estadoDe(empezada('TOP-5', CUATRO, 41, 0));
+  let conMuchasVueltas = turnoDe(sinTope, ANA, 'por-pasar');
+  for (const a of CUATRO) conMuchasVueltas = conJugador(conMuchasVueltas, a, { vueltas: 99 });
+  const nadaDeFin = estadoDe(mover(mesaSobre('TOP-6', conMuchasVueltas, CUATRO), ANA, { tipo: PASAR, carga: {} }).mesa);
+  comprobar('sin tope (0), noventa y nueve vueltas no acaban nada: es la partida que ofrece el Muelle hoy', nadaDeFin.momento === 'jugando', nadaDeFin.momento);
+}
+
 // ═══ FIN DE LOS BLOQUES ═══
 
 // ---------------------------------------------------------------------------
@@ -2293,7 +2659,7 @@ if (fallos.length > 0) {
  * fichero) y DESPUÉS de imprimir las rojas: al ras dispara antes que la roja y se
  * lleva por delante los nombres de lo que ya se había encontrado.
  */
-const COMPROBACIONES_ESCRITAS = 530;
+const COMPROBACIONES_ESCRITAS = 590;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: ` +
@@ -2310,6 +2676,9 @@ if (fallos.length === 0) {
   console.log('  caducan al relevar, el tic juega por el ausente y una mesa sin nadie termina sola — y tres partidas enteras de');
   console.log('  2, 3 y 6 jugadas por el robot quiebran, cobran, pujan, encierran y alzan, reejecutadas byte a byte, con');
   console.log('  ningún secreto en ninguna de las siete miradas de ninguna revisión.');
+  console.log('  Y las cuatro reglas oficiales que faltaban: se obra en el turno de cualquiera salvo con la mesa esperando una');
+  console.log('  respuesta, dos que no tienen el turno tratan entre ellos, la última casa y el último hotel se subastan entre');
+  console.log('  quienes podrían alzarlos, y el Impuesto se elige entre la cantidad fija y el 10 % del patrimonio.');
   process.exit(0);
 }
 process.exit(1);

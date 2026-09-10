@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE LA INTERFAZ DEL BURGO.
+
+      Entrada APARTE de `index.html`, como `banco3d.html` y `banco-burgo.html`, y por lo
+      mismo: la Sala tiene su enrutador probado por `verify:escritorio`, y meter aquí una
+      ruta nueva para mirar una pantalla obligaría a tocarlo. Esto no es una pantalla del
+      producto.
+
+      Y APARTE TAMBIÉN DE `banco-burgo.html`, que es el banco de la ESCENA: allí se juzga
+      que el anillo se ve —que un edificio no tapa la calle, que el aventurero anda por la
+      línea media—, y aquí se juzga que la INTERFAZ se ve: la cinta, el cajón, la hoja, las
+      fichas, el componedor y el retablo del respaldo. Son dos preguntas distintas y una
+      sola pantalla con las dos habría acabado siendo la que no se abre para ninguna.
+
+      Se abre en http://localhost:5175/sala/banco-hoja-burgo.html (o el puerto que tenga el
+      Vite del escritorio). Mandos, todos en la dirección para que un enlace enseñe lo
+      mismo: ?momento=subasta&asiento=s2&lienzo=móvil%20corriente&mundo=0
+
+      ═══ LA HOJA ENTRA POR `<link>` Y NO POR UN `import` DEL MÓDULO ═══
+
+      `main.tsx`, `banco3d.tsx` y `banco-burgo.tsx` hacen `import './estilo.css'`, que es lo
+      normal en este cliente. Aquí no se puede: `verify:escritorio` IMPORTA
+      `src/banco-hoja-burgo.tsx` desde Node —para leer las dieciocho medidas y rebobinar los
+      guiones de los momentos— y Node no sabe qué hacer con un `.css`. La hoja se pide desde
+      aquí, que es donde el navegador la necesita y donde Node no mira.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banco de la interfaz · el Burgo</title>
+    <meta name="theme-color" content="#080a0e" />
+    <link rel="stylesheet" href="/src/estilo.css" />
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/banco-hoja-burgo.tsx"></script>
+  </body>
+</html>

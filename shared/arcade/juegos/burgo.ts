@@ -96,6 +96,74 @@
  *   · `encuadre` se importa de `malla-hexagonal.ts` (donde vive) y no de `anillo.ts`.
  *   · Dentro de un trato, los Salvoconductos que se dan son los PRIMEROS de la lista del que
  *     los da; como hay uno por mazo, nadie puede recibir dos del mismo mazo.
+ *
+ * ═══ LAS CUATRO REGLAS OFICIALES QUE FALTABAN, Y CÓMO SE CIERRAN ═══
+ *
+ * `docs/burgo/DISENO-3.md` §12 las daba por fuera de alcance y volvieron a entrar. Las
+ * cuatro tocan el mismo sitio —quién puede hacer qué y cuándo— y por eso se escriben
+ * aquí juntas, con los bordes que hubo que decidir y el fallo que cada borde evita:
+ *
+ *   1. OBRAR FUERA DEL PROPIO TURNO. Alzar, vender, hipotecar y deshipotecar se hacen
+ *      EN CUALQUIER MOMENTO, también durante el turno de otro: es la mitad de la
+ *      táctica del juego (alzar de golpe antes de que el rival caiga en tu barrio) y
+ *      sin ello un jugador de seis obraba una vez cada seis turnos. La guarda es
+ *      `puedeObrarAhora` y deja fuera TRES momentos, que son los tres en los que la
+ *      mesa espera UNA respuesta concreta con su plazo: la subasta abierta, el apuro
+ *      abierto y la casilla sin resolver del que tiene el turno. Los dos primeros
+ *      porque el dinero es lo que decide quién gana la puja y quién quiebra, y un pago
+ *      de un tercero en medio cambia el resultado sin que a ese tercero le toque nada:
+ *      ya está medido en la única puerta que queda abierta a eso —un trato aceptado
+ *      durante una subasta puede dejar sin dinero al mejor postor, y por eso el cierre
+ *      tiene una rama entera para ello—; el tercero porque `comprar` no cabe en `luego`
+ *      y una obra que abre una subasta de la última casa se llevaría por delante la
+ *      compra sin resolver. El endeudado sigue pudiendo vender e hipotecar durante su
+ *      propio apuro (son las dos obras que dan dinero) y sigue sin poder alzar ni
+ *      deshipotecar, que es lo de siempre y lo que dice el reglamento §9.
+ *
+ *   2. TRATOS ENTRE DOS CUALESQUIERA. `puedeProponer` exigía que uno de los dos tuviera
+ *      el turno, y en el juego oficial no hace falta. Se abre. La CADUCIDAD al relevar
+ *      se conserva, y ahora significa otra cosa: no «tus tratos mueren cuando dejas de
+ *      tener el turno» sino «una propuesta vale para la vuelta en que se hizo». Se
+ *      conserva por tres razones medidas: un trato es una foto de un tablero que cambia
+ *      —y ahora cambia MÁS, porque cualquiera obra en cualquier momento—; el aviso de
+ *      cada asiento enseña el trato pendiente, y un trato inmortal taparía para siempre
+ *      lo que de verdad concierne a quien mira; y el tic no sabe contestar tratos, así
+ *      que un ausente acumularía propuestas hasta el fin de la partida. Volver a
+ *      proponer cuesta un gesto.
+ *
+ *   3. LA SUBASTA DE LA ÚLTIMA CASA (reglamento oficial de escasez). Antes, con el
+ *      Ayuntamiento sin casas no se alzaba y ya está —«no hay casas», dicho en la
+ *      ayuda—, y el primero que pulsaba se llevaba la última. Con la regla 1 eso deja
+ *      de ser una rareza y pasa a ser una carrera: seis pueden pedir la misma casa en
+ *      el mismo instante. Ahora, cuando queda UNA y hay al menos otro que podría
+ *      alzarla, ALZAR no alza: abre una subasta por ese edificio, con el que la pidió
+ *      abriendo la puja al PRECIO DE LISTA de su barrio (así, si los demás pasan, se la
+ *      lleva por lo que le habría costado y nadie pierde nada por la regla nueva). Cada
+ *      uno puja por SU solar —la almoneda apunta al solar del mejor postor— y nadie
+ *      puede pujar por debajo del precio de casa de su propio barrio. Un solar por
+ *      pujador y no una lista: el parejo obligatorio deja casi siempre un solo solar
+ *      donde toca alzar, y una puerta por solar no cabe en el portillo, que busca UNA
+ *      por tipo.
+ *
+ *   4. LA ELECCIÓN DEL 10 % EN EL IMPUESTO. El Impuesto oficial deja elegir entre la
+ *      cantidad fija y el 10 % del patrimonio. Caer en él ya no cobra: enciende
+ *      `impuestoSinPagar` —una marca del turno, como `dobles`— y ofrece los dos pagos
+ *      mientras siga encendida. Quien TIRA o PASA sin elegir paga la fija, que es la que
+ *      la casilla anuncia y la que el reglamento pone por defecto; el 10 % hay que
+ *      pedirlo. El tic, que juega POR el ausente, paga lo más barato de los dos.
+ *
+ *      Una MARCA y no un PASO nuevo, y esto está medido: la traducción a la escena
+ *      (`burgo-en-tres.ts`, que no es de esta tanda) normaliza a `por-tirar` cualquier
+ *      paso que no conozca —los dados dirían que no se ha tirado cuando ya se tiró— y su
+ *      robot de pruebas sólo sabe contestar a los pasos que ya existían: con un paso
+ *      nuevo, la mesa por el cable se quedaba parada en 11 movimientos de los 30 que
+ *      pide su comprobador. Con la marca, TIRAR y PASAR se siguen ofreciendo y son
+ *      ellos los que cobran, así que ni la escena ni su robot notan la regla nueva.
+ *
+ *      Y con el Impuesto sin pagar SÍ se obra, que es lo contrario de lo que parecería:
+ *      vender casas a mitad de precio para bajar la décima pierde 100 por ahorrar 20, e
+ *      hipotecar no mueve el patrimonio ni un euro (quita medio precio en título y pone
+ *      medio precio en efectivo). No hay nada que ganar, así que no hay nada que cerrar.
  */
 import { barajar, enteroEntre, sembrar } from '../../mecanicas/azar';
 import type { Azar } from '../../mecanicas/azar';
@@ -147,6 +215,7 @@ import {
   carta,
   cartasDe,
   costeDeDesempeno,
+  decimaDelPatrimonio,
   interesDelEmpeno,
   numeroDeSerie,
   serieDeCarta,
@@ -198,6 +267,8 @@ export const TIRAR = 'burgo:tirar';
 export const PAGAR_FIANZA = 'burgo:pagar-fianza';
 export const USAR_INDULTO = 'burgo:usar-indulto';
 export const COMPRAR = 'burgo:comprar';
+/** El Impuesto, con la elección dentro (`carga.como`): la cantidad fija o el 10 %. */
+export const PAGAR_IMPUESTO = 'burgo:pagar-impuesto';
 export const A_ALMONEDA = 'burgo:a-almoneda';
 export const PUJAR = 'burgo:pujar';
 export const PASAR_PUJA = 'burgo:pasar-puja';
@@ -288,7 +359,17 @@ export interface TituloDelBurgo {
 }
 
 export interface AlmonedaDelBurgo {
+  /** El título que se vende; en la del edificio, EL SOLAR DEL MEJOR POSTOR (cambia con cada puja). */
   readonly casilla: number;
+  /**
+   * `true` = se subasta el ÚLTIMO edificio del Ayuntamiento (casa u hotel, según las
+   * casas que tenga ya el solar de cada puja); `false` = el título de `casilla`.
+   *
+   * Se mira SIEMPRE con `esAlmonedaDeObra`, que exige el `true` y no el `!== false`:
+   * una mesa guardada de antes de esta regla no trae el campo, y `undefined` tiene que
+   * leerse como la subasta de siempre.
+   */
+  readonly edificio: boolean;
   /** 0 = sin pujas. */
   readonly puja: number;
   /** El mejor postor. */
@@ -297,7 +378,7 @@ export interface AlmonedaDelBurgo {
   readonly pujaDe: AsientoId;
   /** Quienes NO han pasado, en orden de mesa. */
   readonly enPie: readonly AsientoId[];
-  /** De quién es el turno de verdad (`duenoDelTurno`). */
+  /** Quien la abrió: el dueño del turno en la del título, y el que pidió el edificio en la del edificio (que puede no tener el turno). */
   readonly abiertaPor: AsientoId;
 }
 
@@ -489,6 +570,19 @@ export interface EstadoDelBurgo {
   readonly colaDeApuros: readonly ApuroDelBurgo[];
   readonly tratos: readonly TratoDelBurgo[];
   readonly siguienteTrato: number;
+  /**
+   * EL IMPUESTO PISADO Y NO PAGADO por el dueño del turno (regla 4).
+   *
+   * Es un dato del TURNO, como `dobles`: se enciende al caer en la casilla, se apaga al
+   * cobrarlo y el relevo lo apaga por si acaso. No es un PASO —`comprar` y `almoneda` lo
+   * son— y no lo es por una razón medida: la traducción a la escena normaliza cualquier
+   * paso que no conozca a `por-tirar` y su robot de pruebas sólo sabe contestar a los
+   * pasos que ya existían, así que un paso nuevo dejaba la mesa parada por el cable en
+   * un fichero que no es de esta tanda (11 movimientos de 30, medido). Con la marca,
+   * TIRAR y PASAR se siguen ofreciendo y son ellos los que cobran la cantidad fija si no
+   * se eligió antes el 10 %.
+   */
+  readonly impuestoSinPagar: boolean;
   /** 0 = sin tope (regla de mesa). */
   readonly topeDeVueltas: number;
   /** La ÚLTIMA tirada del sorteo de cada jugador, una por jugador en orden de asiento (para animar). */
@@ -530,6 +624,7 @@ export function partidaNueva(): EstadoDelBurgo {
     colaDeApuros: [],
     tratos: [],
     siguienteTrato: 1,
+    impuestoSinPagar: false,
     topeDeVueltas: 0,
     sorteoDeSalida: [],
     jugada: 0,
@@ -738,9 +833,54 @@ function sumaDeDeudasDel(apuro: ApuroDelBurgo): number {
   return total;
 }
 
-/** Los tres pasos en los que el dueño del turno puede obrar (alzar, hipotecar, deshipotecar, comprar…). */
-function pasoDeObrar(paso: PasoDelTurno): boolean {
-  return paso === 'por-tirar' || paso === 'por-pasar' || paso === 'comprar';
+/**
+ * ═══ «¿PUEDO OBRAR AHORA?», ESCRITO UNA VEZ PARA EL ESTADO Y PARA LA VISTA ═══
+ *
+ * Desde que se obra fuera del propio turno, la pregunta ya no es «¿es mi turno y estoy
+ * en un paso de obrar?» sino «¿está la mesa esperando UNA respuesta concreta de
+ * alguien?». Eso lo contestan cinco datos que el estado y la vista tienen los dos, y se
+ * copian a esta forma para que la guarda se escriba UNA vez: si el botón se encendiera
+ * con una regla y el reductor rechazara con otra, el jugador vería un botón mudo, que
+ * es el fallo que esta casa tiene apuntado como el más caro de encontrar.
+ */
+interface LaMesaAhora {
+  readonly momento: MomentoDelBurgo;
+  readonly paso: PasoDelTurno;
+  readonly hayAlmoneda: boolean;
+  readonly hayApuro: boolean;
+  readonly duenoDelTurno: AsientoId | null;
+}
+
+function laMesaDelEstado(e: EstadoDelBurgo): LaMesaAhora {
+  return {
+    momento: e.momento,
+    paso: e.paso,
+    hayAlmoneda: e.almoneda !== null,
+    hayApuro: e.apuro !== null,
+    duenoDelTurno: duenoDelTurno(e),
+  };
+}
+
+/**
+ * ¿PUEDE `quien` ALZAR, VENDER, HIPOTECAR O DESHIPOTECAR AHORA MISMO?
+ *
+ * Cualquiera vivo, en el turno de cualquiera, SALVO en los tres momentos en que la mesa
+ * espera una respuesta con plazo: una subasta abierta, un apuro abierto y el título sin
+ * dueño que el dueño del turno acaba de pisar y aún no ha resuelto, que sólo él puede
+ * resolver. El endeudado en su propio apuro va por otra puerta (`estoyEnMiApuro`):
+ * vender e hipotecar sí, alzar y deshipotecar no.
+ *
+ * El Impuesto sin pagar NO cierra la puerta: vender casas a mitad de precio para bajar
+ * la décima es una ruina (se pierden 100 por ahorrar 20) y una hipoteca no mueve el
+ * patrimonio ni un euro —quita medio precio en título y pone medio precio en efectivo—,
+ * así que no hay nada que ganar obrando antes de pagarlo.
+ */
+function puedeObrarAhora(m: LaMesaAhora, quien: AsientoId): boolean {
+  if (m.momento !== 'jugando') return false;
+  if (m.hayAlmoneda || m.paso === 'almoneda') return false;
+  if (m.hayApuro || m.paso === 'apuro') return false;
+  if (m.paso === 'comprar') return m.duenoDelTurno === quien;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -775,6 +915,27 @@ function conSaldos(e: EstadoDelBurgo, saldos: Saldos): EstadoDelBurgo {
 }
 
 /**
+ * LA COLA DE SUBASTAS CON LA COMPRA SIN RESOLVER DENTRO, si es que hay una.
+ *
+ * Un `comprar` no cabe en `luego` —no se puede reanudar una compra con el dinero
+ * cambiado— así que cuando algo interrumpe ese paso, el título sin dueño que el del
+ * turno estaba mirando sale a subasta cuando la interrupción se cierre. Lo usan las
+ * DOS cosas que pueden interrumpirlo: el apuro (que existe desde el primer commit) y
+ * la subasta de la última casa (regla 3), y por eso está escrito aquí una sola vez.
+ * En la casilla del Impuesto no hay título: devuelve la cola tal cual, y quien
+ * interrumpa el Impuesto sin cobrarlo tiene un fallo — por eso no se le deja
+ * interrumpir (`puedeObrarAhora`).
+ */
+function conLaCompraEncolada(e: EstadoDelBurgo): readonly number[] {
+  if (e.paso !== 'comprar') return e.colaDeAlmonedas;
+  const delTurno = jugadorEn(e, e.turno);
+  if (delTurno === null) return e.colaDeAlmonedas;
+  const t = tituloDe(e, delTurno.casilla);
+  if (t === null || t.dueno !== null || e.colaDeAlmonedas.indexOf(delTurno.casilla) >= 0) return e.colaDeAlmonedas;
+  return [...e.colaDeAlmonedas, delTurno.casilla];
+}
+
+/**
  * Abre el apuro de `quien` con una deuda más, o lo engorda si ya lo tiene, o lo
  * encola si el apuro vigente es de otro. `paso` pasa a `'apuro'` sólo cuando el
  * apuro que se abre es el vigente: los de la cola esperan su turno.
@@ -794,13 +955,7 @@ function apurar(e: EstadoDelBurgo, quien: number, deuda: DeudaDelBurgo, cronica:
     let luego: PasoDeVuelta = e.luego;
     let colaDeAlmonedas = e.colaDeAlmonedas;
     if (e.paso === 'por-tirar' || e.paso === 'por-pasar') luego = e.paso;
-    else if (e.paso === 'comprar') {
-      const delTurno = jugadorEn(e, e.turno);
-      const t = delTurno === null ? null : tituloDe(e, delTurno.casilla);
-      if (delTurno !== null && t !== null && t.dueno === null && colaDeAlmonedas.indexOf(delTurno.casilla) < 0) {
-        colaDeAlmonedas = [...colaDeAlmonedas, delTurno.casilla];
-      }
-    }
+    else colaDeAlmonedas = conLaCompraEncolada(e);
     return { ...e, apuro, paso: 'apuro', luego, colaDeAlmonedas };
   }
   if (e.apuro.quien === asiento) {
@@ -851,6 +1006,25 @@ function transferirEntre(
   if (deAsiento !== null) cronica.push({ que: 'paga', quien: deAsiento, a: aAsiento, cuanto: importe, porque, casilla });
   if (aAsiento !== null) cronica.push({ que: 'cobra', quien: aAsiento, de: deAsiento, cuanto: importe, porque, casilla });
   return s;
+}
+
+/**
+ * ¿SE MOVIÓ DE VERDAD EL DINERO DE `i`, o el pago abrió un apuro y no se movió nada?
+ *
+ * Existe porque el «¿falló el pago?» estaba escrito como `s.apuro !== null`, y eso es
+ * mentira en cuanto hay un apuro ABIERTO DE OTRO, que ya no es un caso imposible: al
+ * cerrar la subasta del último edificio (regla 3) puede haber uno, porque quien se rinde
+ * durante la puja deja a su heredero pagando el interés de las hipotecas que hereda y
+ * eso puede abrirle el suyo. Con la comprobación vieja, el ganador de la puja habría
+ * pagado su puja y se habría quedado sin edificio. Se mira el SALDO, que es lo único que
+ * distingue un pago hecho de uno que no.
+ */
+function pagoHecho(antes: EstadoDelBurgo, despues: EstadoDelBurgo, i: number, cuanto: number): boolean {
+  const a = jugadorEn(antes, i);
+  const d = jugadorEn(despues, i);
+  if (a === null || d === null) return false;
+  const importe = Math.trunc(cuanto);
+  return d.mrs === a.mrs - (importe > 0 ? importe : 0);
 }
 
 /**
@@ -1147,8 +1321,20 @@ function resolverCasilla(e: EstadoDelBurgo, i: number, modo: ModoDeRenta, cronic
       }
       return transferirEntre(s, i, dueno, rentaDe(s, t, tirada, modo), 'renta', j.casilla, cronica);
     }
-    case 'diezmo':
-      return transferirEntre(e, i, null, fila.precio, 'diezmo', j.casilla, cronica);
+    case 'diezmo': {
+      /*
+       * EL IMPUESTO NO SE COBRA AL CAER: SE ELIGE (regla 4). Se enciende la marca del
+       * turno y se ofrecen los dos pagos; si no se elige, lo cobra TIRAR o PASAR por la
+       * cantidad fija, que es la que la casilla anuncia. Con un apuro abierto NO se
+       * elige y se cobra el fijo en el acto: el 10 % de un patrimonio que está a punto
+       * de liquidarse no sería una elección, sino un descuento por deber dinero.
+       * Sólo elige el DUEÑO DEL TURNO: aquí no cae nadie más.
+       */
+      if (e.apuro !== null || e.paso === 'apuro' || i !== e.turno) {
+        return transferirEntre(e, i, null, fila.precio, 'diezmo', j.casilla, cronica);
+      }
+      return { ...e, impuestoSinPagar: true };
+    }
     case 'alcabala':
       return transferirEntre(e, i, null, fila.precio, 'alcabala', j.casilla, cronica);
     case 'pregon':
@@ -1195,15 +1381,82 @@ function abrirAlmoneda(e: EstadoDelBurgo, casilla: number, cronica: Cronica): Es
   const luego: PasoDeVuelta = e.paso === 'por-tirar' || e.paso === 'por-pasar' ? e.paso : e.luego;
   return {
     ...e,
-    almoneda: { casilla, puja: 0, quienPuja: null, pujaDe: primero, enPie, abiertaPor: abiertaPor === null ? primero : abiertaPor },
+    almoneda: { casilla, edificio: false, puja: 0, quienPuja: null, pujaDe: primero, enPie, abiertaPor: abiertaPor === null ? primero : abiertaPor },
     paso: 'almoneda',
     luego,
   };
 }
 
+/**
+ * ABRE LA SUBASTA DEL ÚLTIMO EDIFICIO (regla 3), con `i` pujando ya el precio de lista.
+ *
+ * En pie van `i` y los demás vivos que TAMBIÉN podrían alzar ese mismo tipo de
+ * edificio ahora mismo (barrio entero, parejo, sin hipotecas y con dinero para el
+ * precio de lista): es lo más cerca que se puede estar del «los que quieran comprarla»
+ * del reglamento sin preguntárselo a cada uno, que costaría una fase entera y un plazo
+ * por cabeza. Si no hay ningún rival NO se abre nada y quien pidió alza como siempre:
+ * una subasta de uno solo es un trámite que cuesta seis pases.
+ *
+ * El relevo empieza por el primer rival y `i` va el último, porque `i` ya ha pujado: si
+ * todos pasan, se cierra sola y él se lleva la casa por lo que le habría costado.
+ */
+function abrirAlmonedaDeObra(e: EstadoDelBurgo, i: number, casilla: number, cronica: Cronica): EstadoDelBurgo {
+  const j = jugadorEn(e, i);
+  const fila = filaDe(casilla);
+  const t = tituloDe(e, casilla);
+  if (j === null || fila === null || t === null) return e;
+  const posada = t.casas === POSADA - 1;
+  const n = e.jugadores.length;
+  const enPie: AsientoId[] = [];
+  for (let paso = 1; paso <= n; paso++) {
+    const k = (i + paso) % n;
+    const otro = jugadorEn(e, k);
+    if (otro === null || !estaVivo(e, k)) continue;
+    if (k === i || solarDondeAlzaria(e, otro.asiento, otro.mrs, posada) >= 0) enPie.push(otro.asiento);
+  }
+  const primero = enPie[0];
+  if (primero === undefined || enPie.length < 2) return e;
+  cronica.push({ que: 'almoneda-abierta', casilla });
+  cronica.push({ que: 'puja', quien: j.asiento, casilla, cuanto: fila.casa });
+  const luego: PasoDeVuelta = e.paso === 'por-tirar' || e.paso === 'por-pasar' ? e.paso : e.luego;
+  return {
+    ...e,
+    colaDeAlmonedas: conLaCompraEncolada(e),
+    almoneda: { casilla, edificio: true, puja: fila.casa, quienPuja: j.asiento, pujaDe: primero, enPie, abiertaPor: j.asiento },
+    paso: 'almoneda',
+    luego,
+  };
+}
+
+/** ¿Esta subasta es la del último edificio? El `=== true` es la migración: sin campo, es la del título. */
+function esAlmonedaDeObra(a: AlmonedaDelBurgo): boolean {
+  return a.edificio === true;
+}
+
+/** En la del edificio, ¿lo que se subasta es un hotel? Lo dicen las casas del solar del mejor postor. */
+function esUnHotelLoQueSeSubasta(m: ConTitulos, a: AlmonedaDelBurgo): boolean {
+  const t = tituloDe(m, a.casilla);
+  return t !== null && t.casas === POSADA - 1;
+}
+
 /** La puja más baja que se admite ahora: `PUJA_MINIMA` sin pujas, la última más el paso después. */
 function pujaMinimaDe(a: AlmonedaDelBurgo): number {
   return a.puja === 0 ? PUJA_MINIMA : a.puja + PASO_DE_PUJA;
+}
+
+/**
+ * LA PUJA MÍNIMA DE ESTE PUJADOR POR ESTE SOLAR. En la del título es la de siempre; en
+ * la del edificio, además, nunca por debajo del PRECIO DE LA CASA del barrio: el
+ * Ayuntamiento no vende una casa de 200 por 60 porque el barrio del otro sea barato.
+ * Los cuatro precios de casa (50, 100, 150, 200) son múltiplos del paso de puja, así
+ * que el mínimo sigue siendo un múltiplo y la puerta sigue cuadrando.
+ */
+function pujaMinimaPara(a: AlmonedaDelBurgo, casilla: number): number {
+  const base = pujaMinimaDe(a);
+  if (!esAlmonedaDeObra(a)) return base;
+  const fila = filaDe(casilla);
+  const suelo = fila === null ? 0 : fila.casa;
+  return base > suelo ? base : suelo;
 }
 
 /** El siguiente en pie después de `tras`, dando la vuelta; el primero si `tras` ya no está. */
@@ -1232,6 +1485,7 @@ function cerrarAlmoneda(e: EstadoDelBurgo, cronica: Cronica): EstadoDelBurgo {
   const a = e.almoneda;
   if (a === null) return e;
   let s: EstadoDelBurgo = { ...e, almoneda: null };
+  if (esAlmonedaDeObra(a)) return cerrarLaObra(s, a, cronica);
   let ganador: AsientoId | null = null;
   let cuanto = 0;
   if (a.quienPuja !== null && a.puja > 0) {
@@ -1249,18 +1503,63 @@ function cerrarAlmoneda(e: EstadoDelBurgo, cronica: Cronica): EstadoDelBurgo {
   return reanudar(s, cronica);
 }
 
-/** Una puja: `cuanto` entero, múltiplo del paso, no por debajo del mínimo ni por encima de lo que se tiene. */
+/**
+ * CIERRA LA SUBASTA DEL ÚLTIMO EDIFICIO: el mejor postor paga su puja y el edificio se
+ * alza EN SU SOLAR, que es el que la almoneda lleva apuntado. Se revalida `puedeAlzar`
+ * con el estado de ahora —entre la puja y el cierre pudo rendirse, o heredar la quiebra
+ * de otro— y si ya no procede, el edificio se queda en el Ayuntamiento y no se cobra
+ * nada: es el mismo cierre sin deuda que la subasta del título.
+ */
+function cerrarLaObra(estado: EstadoDelBurgo, a: AlmonedaDelBurgo, cronica: Cronica): EstadoDelBurgo {
+  let s = estado;
+  let ganador: AsientoId | null = null;
+  let cuanto = 0;
+  if (a.quienPuja !== null && a.puja > 0) {
+    const k = indiceDelJugador(s, a.quienPuja);
+    const j = jugadorEn(s, k);
+    const t = tituloDe(s, a.casilla);
+    if (j !== null && !j.quebrado && t !== null && j.mrs >= a.puja && puedeAlzar(s, j.asiento, j.mrs, a.casilla)) {
+      const seraPosada = t.casas === POSADA - 1;
+      const pagada = transferirEntre(s, k, null, a.puja, seraPosada ? 'posada' : 'casa', a.casilla, cronica);
+      if (pagoHecho(s, pagada, k, a.puja)) {
+        s = conTitulo(pagada, a.casilla, { casas: t.casas + 1 });
+        s = seraPosada
+          ? { ...s, casasEnElConcejo: s.casasEnElConcejo + (POSADA - 1), posadasEnElConcejo: s.posadasEnElConcejo - 1 }
+          : { ...s, casasEnElConcejo: s.casasEnElConcejo - 1 };
+        cronica.push({ que: 'alza', quien: j.asiento, casilla: a.casilla, casas: t.casas + 1 });
+        ganador = j.asiento;
+        cuanto = a.puja;
+      }
+    }
+  }
+  cronica.push({ que: 'almoneda-cerrada', casilla: a.casilla, ganador, cuanto });
+  return reanudar(s, cronica);
+}
+
+/**
+ * Una puja: `cuanto` entero, múltiplo del paso, no por debajo del mínimo ni por encima
+ * de lo que se tiene. En la del título, `casilla` es la del título y no hay más; en la
+ * del edificio es EL SOLAR DEL PUJADOR, que tiene que ser alzable ahora mismo y del
+ * mismo tipo (casa u hotel) que el que se está subastando.
+ */
 function pujar(e: EstadoDelBurgo, i: number, casilla: number, cuanto: number, cronica: Cronica): EstadoDelBurgo {
   const a = e.almoneda;
   const j = jugadorEn(e, i);
   if (a === null || j === null || e.paso !== 'almoneda' || j.quebrado) return e;
-  if (a.casilla !== casilla || a.pujaDe !== j.asiento || a.enPie.indexOf(j.asiento) < 0) return e;
+  if (a.pujaDe !== j.asiento || a.enPie.indexOf(j.asiento) < 0) return e;
+  if (esAlmonedaDeObra(a)) {
+    const mio = tituloDe(e, casilla);
+    const delMejor = tituloDe(e, a.casilla);
+    if (mio === null || delMejor === null) return e;
+    if ((mio.casas === POSADA - 1) !== (delMejor.casas === POSADA - 1)) return e;
+    if (!puedeAlzar(e, j.asiento, j.mrs, casilla)) return e;
+  } else if (a.casilla !== casilla) return e;
   if (!Number.isInteger(cuanto) || cuanto % PASO_DE_PUJA !== 0) return e;
-  if (cuanto < pujaMinimaDe(a) || cuanto > j.mrs) return e;
+  if (cuanto < pujaMinimaPara(a, casilla) || cuanto > j.mrs) return e;
   const pujaDe = siguienteEnPie(a.enPie, j.asiento);
   if (pujaDe === null) return e;
   cronica.push({ que: 'puja', quien: j.asiento, casilla, cuanto });
-  const s: EstadoDelBurgo = { ...e, almoneda: { ...a, puja: cuanto, quienPuja: j.asiento, pujaDe } };
+  const s: EstadoDelBurgo = { ...e, almoneda: { ...a, casilla, puja: cuanto, quienPuja: j.asiento, pujaDe } };
   return cerrarSiToca(s, cronica);
 }
 
@@ -1320,6 +1619,30 @@ function puedeAlzar(m: LoQueSeMira, asiento: AsientoId, mrs: number, casilla: nu
   return mrs >= fila.casa;
 }
 
+/**
+ * EL SOLAR DONDE `asiento` ALZARÍA el edificio del tipo que se pide (hotel o casa): el
+ * de menos casas y, a igualdad, el de casilla menor. `-1` si no hay ninguno.
+ *
+ * Es el criterio del PAREJO, que es el que manda: con el barrio parejo obligatorio, en
+ * cuanto un solar va por detrás no hay elección posible, y cuando todos van iguales
+ * cualquiera vale y hay que escoger uno de forma determinista. Lo usan la subasta del
+ * último edificio (para saber quién más la quiere y por qué solar puja cada uno) y
+ * `opciones()` (para ofrecerle a cada uno una puja por su solar).
+ */
+function solarDondeAlzaria(m: LoQueSeMira, asiento: AsientoId, mrs: number, posada: boolean): number {
+  let mejor = -1;
+  let menos = POSADA + 1;
+  for (const c of TITULOS) {
+    const t = tituloDe(m, c);
+    if (t === null || t.dueno !== asiento) continue;
+    if ((t.casas === POSADA - 1) !== posada) continue;
+    if (t.casas >= menos || !puedeAlzar(m, asiento, mrs, c)) continue;
+    menos = t.casas;
+    mejor = c;
+  }
+  return mejor;
+}
+
 /** ¿Puede `asiento` vender un edificio de `casilla`? Parejo al revés: se quita de donde haya más. */
 function puedeVender(m: LoQueSeMira, asiento: AsientoId, casilla: number): boolean {
   const t = tituloDe(m, casilla);
@@ -1358,14 +1681,41 @@ function loQueDaVender(m: LoQueSeMira, casilla: number): number {
   return porCasa;
 }
 
+/**
+ * ¿QUEDA UNO SOLO DE ESTE EDIFICIO EN EL AYUNTAMIENTO? Es la escasez del reglamento
+ * oficial, y lo que dispara la subasta de la regla 3.
+ */
+function elUltimoQueQueda(m: LoQueSeMira, posada: boolean): boolean {
+  return posada ? m.posadasEnElConcejo === 1 : m.casasEnElConcejo === 1;
+}
+
+/** ¿Hay OTRO que también podría alzar ese mismo edificio ahora mismo? Es «varios lo quieren». */
+function otroLoQuiere(e: EstadoDelBurgo, i: number, posada: boolean): boolean {
+  for (const k of vivos(e)) {
+    if (k === i) continue;
+    const otro = jugadorEn(e, k);
+    if (otro !== null && solarDondeAlzaria(e, otro.asiento, otro.mrs, posada) >= 0) return true;
+  }
+  return false;
+}
+
 function alzar(e: EstadoDelBurgo, i: number, casilla: number, cronica: Cronica): EstadoDelBurgo {
   const j = jugadorEn(e, i);
   const t = tituloDe(e, casilla);
   const fila = filaDe(casilla);
   if (j === null || t === null || fila === null || !puedeAlzar(e, j.asiento, j.mrs, casilla)) return e;
   const seraPosada = t.casas === POSADA - 1;
+  /*
+   * LA ÚLTIMA NO SE VENDE POR ORDEN DE LLEGADA: se subasta si algún otro también la
+   * quiere. Si la subasta no llegara a abrirse —no hay dos en pie— se alza como siempre:
+   * un `return e` aquí sería un botón que se ofrece y no hace nada.
+   */
+  if (elUltimoQueQueda(e, seraPosada) && otroLoQuiere(e, i, seraPosada)) {
+    const subastada = abrirAlmonedaDeObra(e, i, casilla, cronica);
+    if (subastada !== e) return subastada;
+  }
   let s = transferirEntre(e, i, null, fila.casa, seraPosada ? 'posada' : 'casa', casilla, cronica);
-  if (s.apuro !== null) return e;
+  if (!pagoHecho(e, s, i, fila.casa)) return e;
   s = conTitulo(s, casilla, { casas: t.casas + 1 });
   s = seraPosada
     ? { ...s, casasEnElConcejo: s.casasEnElConcejo + (POSADA - 1), posadasEnElConcejo: s.posadasEnElConcejo - 1 }
@@ -1417,7 +1767,7 @@ function desempenar(e: EstadoDelBurgo, i: number, casilla: number, cronica: Cron
   const fila = filaDe(casilla);
   if (j === null || fila === null || !puedeDesempenar(e, j.asiento, j.mrs, casilla)) return e;
   const s = transferirEntre(e, i, null, costeDeDesempeno(fila.precio), 'desempeno', casilla, cronica);
-  if (s.apuro !== null && e.apuro === null) return e;
+  if (!pagoHecho(e, s, i, costeDeDesempeno(fila.precio))) return e;
   cronica.push({ que: 'desempena', quien: j.asiento, casilla });
   return conTitulo(s, casilla, { empenado: false });
 }
@@ -1462,11 +1812,15 @@ function interesDeLosEmpenos(m: LoQueSeMira, titulos: readonly number[]): number
   return total;
 }
 
-/** ¿Puede `de` proponer ahora a `a`? El dueño del turno a cualquiera vivo; cualquiera vivo al dueño del turno. Nunca en subasta. */
+/**
+ * ¿PUEDE `de` PROPONERLE AHORA A `a`? CUALQUIERA VIVO A CUALQUIERA VIVO (regla 2), con
+ * el turno o sin él, hasta tres tratos abiertos por proponente. Nunca durante una
+ * subasta: es el único momento en que un trato aceptado cambia quién gana la puja, y
+ * eso ya tiene una rama entera en el cierre para los tratos que venían de antes.
+ */
 function puedeProponer(e: EstadoDelBurgo, de: number, a: number): boolean {
-  if (e.momento !== 'jugando' || e.paso === 'almoneda') return false;
+  if (e.momento !== 'jugando' || e.paso === 'almoneda' || e.almoneda !== null) return false;
   if (de === a || !estaVivo(e, de) || !estaVivo(e, a)) return false;
-  if (de !== e.turno && a !== e.turno) return false;
   const asiento = asientoDe(e, de);
   return asiento !== null && tratosAbiertosDe(e.tratos, asiento) < TRATOS_ABIERTOS_POR_PROPONENTE;
 }
@@ -1767,6 +2121,7 @@ function relevo(e: EstadoDelBurgo, cronica: Cronica): EstadoDelBurgo {
     tratos,
     paso: 'por-tirar',
     luego: 'por-pasar',
+    impuestoSinPagar: false,
   };
   if (s.topeDeVueltas > 0) {
     let minimo = Number.MAX_SAFE_INTEGER;
@@ -1817,6 +2172,7 @@ function terminar(e: EstadoDelBurgo, ganadores: readonly AsientoId[]): EstadoDel
     apuro: null,
     colaDeApuros: [],
     tratos: [],
+    impuestoSinPagar: false,
   };
 }
 
@@ -1912,6 +2268,7 @@ function empezar(e: EstadoDelBurgo, ctx: ContextoMovimiento, topeDeVueltas: numb
     colaDeApuros: [],
     tratos: [],
     siguienteTrato: 1,
+    impuestoSinPagar: false,
     topeDeVueltas: Number.isInteger(topeDeVueltas) && topeDeVueltas > 0 ? topeDeVueltas : 0,
     sorteoDeSalida: ultimas,
     azar,
@@ -2148,10 +2505,31 @@ function motivoDeNoOfrecido(v: VistaSinTablero, movimiento: Movimiento): string 
   if (v.momento === 'terminada') return 'La partida ya ha terminado.';
   const yo = jugadorVisto(v, v.yo);
   if (yo !== null && yo.quebrado) return 'Has quebrado: ya no juegas.';
-  if (v.turnoDe !== null && v.turnoDe !== v.yo) {
+  /*
+   * «Le toca a Bea» sólo vale para lo que SÓLO se hace con el turno. Desde que se obra,
+   * se trata y se quiebra uno en cualquier momento (reglas 1 y 2), ese motivo sería
+   * mentira en la mitad de los rechazos: quien intenta alzar donde no tiene el barrio
+   * entero leería que el problema es el turno y volvería a intentarlo en el suyo.
+   */
+  if (!seHaceSinTurno(movimiento.tipo) && v.turnoDe !== null && v.turnoDe !== v.yo) {
     return `Eso ya no se puede hacer: le toca a ${nombreEnLaVista(v, v.turnoDe)}.`;
   }
   return 'Eso ya no se puede hacer: la mesa cambió entre que se pintó el botón y lo pulsaste.';
+}
+
+/** Los movimientos que no piden el turno: las cuatro obras, los cuatro tratos y la quiebra. */
+function seHaceSinTurno(tipo: string): boolean {
+  return (
+    tipo === ALZAR ||
+    tipo === VENDER ||
+    tipo === EMPENAR ||
+    tipo === DESEMPENAR ||
+    tipo === PROPONER ||
+    tipo === ACEPTAR ||
+    tipo === RECHAZAR ||
+    tipo === RETIRAR ||
+    tipo === RENDIRSE
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2211,7 +2589,10 @@ function despachar(
       if (!esElDelTurno || !sinInterrupcion) return actual;
       const toca = actual.paso === 'por-tirar' || (actual.paso === 'por-pasar' && actual.dobles > 0);
       if (!toca) return actual;
-      return tirar(actual, yo, cronica);
+      /* Seguir jugando sin elegir es elegir la fija: se cobra antes de tocar los dados. */
+      const cobrado = pagarElImpuesto(actual, yo, false, cronica);
+      if (cobrado.apuro !== null) return cobrado;
+      return tirar(cobrado, yo, cronica);
     }
     case PAGAR_FIANZA: {
       if (!esElDelTurno || !sinInterrupcion || actual.paso !== 'por-tirar' || j.presa < 0 || j.mrs < FIANZA) return actual;
@@ -2268,23 +2649,30 @@ function despachar(
     }
     case ALZAR: {
       const casilla = casillaDeLaCarga(carga);
-      if (casilla === null || !esElDelTurno || !pasoDeObrar(actual.paso)) return actual;
+      if (casilla === null || !puedeObrarAhora(laMesaDelEstado(actual), j.asiento)) return actual;
       return alzar(actual, yo, casilla, cronica);
     }
     case VENDER: {
       const casilla = casillaDeLaCarga(carga);
-      if (casilla === null || !puedeObrarEnApuro(actual, yo)) return actual;
+      if (casilla === null || !puedeObrarQueDeDinero(actual, yo)) return actual;
       return vender(actual, yo, casilla, cronica);
     }
     case EMPENAR: {
       const casilla = casillaDeLaCarga(carga);
-      if (casilla === null || !puedeObrarEnApuro(actual, yo)) return actual;
+      if (casilla === null || !puedeObrarQueDeDinero(actual, yo)) return actual;
       return empenar(actual, yo, casilla, cronica);
     }
     case DESEMPENAR: {
       const casilla = casillaDeLaCarga(carga);
-      if (casilla === null || !esElDelTurno || !pasoDeObrar(actual.paso)) return actual;
+      if (casilla === null || !puedeObrarAhora(laMesaDelEstado(actual), j.asiento)) return actual;
       return desempenar(actual, yo, casilla, cronica);
+    }
+    case PAGAR_IMPUESTO: {
+      const o = cargaComoObjeto(carga);
+      const como = o === null ? null : o.como;
+      if (como !== 'fijo' && como !== 'decima') return actual;
+      if (!esElDelTurno || !sinInterrupcion || !actual.impuestoSinPagar) return actual;
+      return pagarElImpuesto(actual, yo, como === 'decima', cronica);
     }
     case PROPONER: {
       const o = cargaComoObjeto(carga);
@@ -2321,7 +2709,10 @@ function despachar(
     }
     case PASAR: {
       if (!esElDelTurno || !sinInterrupcion || actual.paso !== 'por-pasar' || actual.dobles !== 0) return actual;
-      return relevo(actual, cronica);
+      /* Igual que al tirar: pasar sin elegir paga la fija, y si no alcanza el apuro se queda el turno. */
+      const cobrado = pagarElImpuesto(actual, yo, false, cronica);
+      if (cobrado.apuro !== null) return cobrado;
+      return relevo(cobrado, cronica);
     }
     case RENDIRSE: {
       const acreedor = actual.apuro !== null && actual.apuro.quien === j.asiento ? acreedorDe(actual, actual.apuro) : null;
@@ -2332,10 +2723,38 @@ function despachar(
   }
 }
 
-/** Vender e hipotecar: el dueño del turno en un paso de obrar, o el endeudado durante su apuro. */
-function puedeObrarEnApuro(e: EstadoDelBurgo, yo: number): boolean {
-  if (e.turno === yo && pasoDeObrar(e.paso)) return true;
+/** ¿Está `yo` en SU apuro? Es la única puerta que sigue abierta cuando la mesa espera una deuda. */
+function estoyEnMiApuro(e: EstadoDelBurgo, yo: number): boolean {
   return e.paso === 'apuro' && e.apuro !== null && e.apuro.quien === asientoDe(e, yo);
+}
+
+/**
+ * VENDER E HIPOTECAR: las dos obras que DAN dinero, y por eso son las únicas que el
+ * endeudado puede hacer durante su propio apuro (reglamento §9). Cualquiera las hace
+ * además cuando la mesa está tranquila, como las otras dos.
+ */
+function puedeObrarQueDeDinero(e: EstadoDelBurgo, yo: number): boolean {
+  const asiento = asientoDe(e, yo);
+  if (asiento === null) return false;
+  return puedeObrarAhora(laMesaDelEstado(e), asiento) || estoyEnMiApuro(e, yo);
+}
+
+/**
+ * EL IMPUESTO, con la elección hecha: la cantidad fija de la tabla o el 10 % del
+ * patrimonio, que se cuenta con `patrimonioDe` —el MISMO número que la vista publica y
+ * que el rótulo del botón promete—. Si no alcanza, `transferirEntre` abre el apuro y
+ * manda él sobre el paso. La marca se apaga en los dos casos: la deuda, si la hay, ya
+ * está en el apuro, y dejarla encendida cobraría el Impuesto dos veces. Un 10 % de cero
+ * es un pago de cero y también apaga la marca: si no, el turno se quedaría clavado.
+ */
+function pagarElImpuesto(e: EstadoDelBurgo, i: number, porLaDecima: boolean, cronica: Cronica): EstadoDelBurgo {
+  const j = jugadorEn(e, i);
+  if (j === null || !e.impuestoSinPagar) return e;
+  const fila = filaDe(j.casilla);
+  if (fila === null || fila.clase !== 'diezmo') return { ...e, impuestoSinPagar: false };
+  const cuanto = porLaDecima ? decimaDelPatrimonio(patrimonioDe(e, j)) : fila.precio;
+  const s = transferirEntre({ ...e, impuestoSinPagar: false }, i, null, cuanto, 'diezmo', j.casilla, cronica);
+  return s.impuestoSinPagar ? { ...s, impuestoSinPagar: false } : s;
 }
 
 // ---------------------------------------------------------------------------
@@ -2350,7 +2769,8 @@ function puedeObrarEnApuro(e: EstadoDelBurgo, yo: number): boolean {
  *   · `apuro` → liquida a `apuro.quien` en UN tic: vende el edificio del solar con
  *     más casas (empate: casilla más alta), hipoteca el título de mayor precio (empate:
  *     casilla más alta), y si con todo no llega, quiebra con su acreedor.
- *   · `comprar` → a subasta.
+ *   · `comprar` → a subasta; y si lo que falta por resolver es el Impuesto, lo paga
+ *     por el camino más barato de los dos.
  *   · `por-tirar` → tira por él (gasta azar: lo mismo que gastaría él).
  *   · `por-pasar` con dobles → tira otra vez; sin dobles → pasa.
  *
@@ -2388,6 +2808,18 @@ function venceElPlazo(e: EstadoDelBurgo): EstadoDelBurgo {
     s = e.apuro === null ? reanudar(e, cronica) : liquidar(e, cronica);
   } else if (!estaVivo(e, e.turno)) {
     s = reanudar(e, cronica);
+  } else if (e.impuestoSinPagar) {
+    /*
+     * EL AUSENTE PAGA EL IMPUESTO Y LO QUE MENOS LE CUESTA, y es LO ÚNICO que hace este
+     * tic: un tic hace una cosa. Lo más barato porque es lo que él elegiría —el tic
+     * juega por él, no contra él— y a igualdad la fija, que no depende de contar el
+     * patrimonio. Va ANTES que tirar o pasar porque si no, el tic que tira cobraría la
+     * fija de camino y la elección del ausente se perdería sin que nadie la viera.
+     */
+    const j = jugadorEn(e, e.turno) as JugadorDelBurgo;
+    const fila = filaDe(j.casilla);
+    const fija = fila === null ? 0 : fila.precio;
+    s = pagarElImpuesto(e, e.turno, decimaDelPatrimonio(patrimonioDe(e, j)) < fija, cronica);
   } else if (e.paso === 'comprar') {
     const j = jugadorEn(e, e.turno) as JugadorDelBurgo;
     const t = tituloDe(e, j.casilla);
@@ -2492,6 +2924,8 @@ export interface TituloVisto {
 
 export interface AlmonedaVista {
   readonly casilla: number;
+  /** `true` = se subasta el último edificio del Ayuntamiento y `casilla` es el solar del mejor postor. */
+  readonly edificio: boolean;
   readonly puja: number;
   readonly quienPuja: AsientoId | null;
   readonly pujaDe: AsientoId;
@@ -2534,6 +2968,8 @@ export interface VistaDelBurgo {
   readonly almoneda: AlmonedaVista | null;
   readonly apuro: ApuroVisto | null;
   readonly tratos: readonly TratoVisto[];
+  /** El dueño del turno pisó el Impuesto y todavía no lo ha pagado: puede elegir el 10 %. */
+  readonly impuestoSinPagar: boolean;
   readonly topeDeVueltas: number;
   readonly sorteoDeSalida: readonly ParDeDados[];
   readonly jugada: number;
@@ -2634,8 +3070,26 @@ function porqueEnPalabras(porque: PorqueDelDinero): string {
   }
 }
 
-/** Una frase por suceso; `''` para los que no se cuentan en la crónica. */
-function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string): string {
+/**
+ * LAS CASILLAS QUE EN ESTE CAMBIO SON (O ACABAN DE SER) SUBASTA DE EDIFICIO.
+ *
+ * Los sucesos de la subasta —`almoneda-abierta`, `puja`, `almoneda-cerrada`— son los
+ * mismos para el título y para el último edificio, y a propósito: un miembro más en
+ * `SucesoDelBurgo` obliga a tocar la coreografía de la escena y su comprobador, que no
+ * son de esta tanda. Lo que distingue a una de otra no cabe en el suceso, pero sí está
+ * en el estado: la subasta abierta dice si es de obra, y una cerrada dejó un `alza` en
+ * el mismo cambio y en la misma casilla. Con eso, la crónica dice «el edificio» donde
+ * hay que decirlo y no «se lleva la Calle del Teatro» cuando lo que se llevó fue una casa.
+ */
+function casillasDeObraSubastadas(e: EstadoDelBurgo): number[] {
+  const salida: number[] = [];
+  if (e.almoneda !== null && esAlmonedaDeObra(e.almoneda)) salida.push(e.almoneda.casilla);
+  for (const s of e.sucesos) if (s.que === 'alza' && salida.indexOf(s.casilla) < 0) salida.push(s.casilla);
+  return salida;
+}
+
+/** Una frase por suceso; `''` para los que no se cuentan en la crónica. `deObra` sólo lo miran los tres de la subasta. */
+function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string, deObra: (casilla: number) => boolean = () => false): string {
   switch (s.que) {
     case 'sale':
       return '';
@@ -2679,12 +3133,21 @@ function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string): st
     case 'sigue-presa':
       return `${nombre(s.quien)} sigue en la Comisaría (intento ${s.intento} de ${INTENTOS_EN_LA_MAZMORRA}).`;
     case 'almoneda-abierta':
-      return `Sale a subasta ${nombreDeCasilla(s.casilla)}.`;
+      return deObra(s.casilla)
+        ? `Se subasta el último edificio del Ayuntamiento; ahora mismo iría a ${nombreDeCasilla(s.casilla)}.`
+        : `Sale a subasta ${nombreDeCasilla(s.casilla)}.`;
     case 'puja':
-      return `${nombre(s.quien)} puja ${maravedies(s.cuanto)} por ${nombreDeCasilla(s.casilla)}.`;
+      return deObra(s.casilla)
+        ? `${nombre(s.quien)} puja ${maravedies(s.cuanto)} por el edificio, para ${nombreDeCasilla(s.casilla)}.`
+        : `${nombre(s.quien)} puja ${maravedies(s.cuanto)} por ${nombreDeCasilla(s.casilla)}.`;
     case 'pasa-puja':
       return `${nombre(s.quien)} pasa en la subasta.`;
     case 'almoneda-cerrada':
+      if (deObra(s.casilla)) {
+        return s.ganador === null
+          ? 'El edificio se queda en el Ayuntamiento.'
+          : `${nombre(s.ganador)} se lleva el edificio por ${maravedies(s.cuanto)}.`;
+      }
       return s.ganador === null
         ? `${nombreDeCasilla(s.casilla)} se queda en el Ayuntamiento.`
         : `${nombre(s.ganador)} se lleva ${nombreDeCasilla(s.casilla)} por ${maravedies(s.cuanto)}.`;
@@ -2721,9 +3184,10 @@ const FRASES_DEL_PREGON = 3;
 /** La frase de la mesa: las últimas frases del último cambio. Nunca vacía en `jugando`. */
 function redactarPregon(e: EstadoDelBurgo, nombre: (a: AsientoId | null) => string): string {
   if (e.momento === 'reuniendo') return 'La mesa se está reuniendo: cuando estéis todos, cualquiera puede empezar.';
+  const deObra = casillasDeObraSubastadas(e);
   const frases: string[] = [];
   for (const s of e.sucesos) {
-    const f = fraseDe(s, nombre);
+    const f = fraseDe(s, nombre, (casilla) => deObra.indexOf(casilla) >= 0);
     if (f.length > 0) frases.push(f);
   }
   const desde = frases.length > FRASES_DEL_PREGON ? frases.length - FRASES_DEL_PREGON : 0;
@@ -2746,12 +3210,24 @@ function redactarAviso(e: EstadoDelBurgo, quien: QuienMira, nombre: (a: AsientoI
     return `Debes ${maravedies(sumaDeDeudasDel(e.apuro))}: vende, hipoteca o declárate en quiebra.`;
   }
   if (e.paso === 'almoneda' && e.almoneda !== null && e.almoneda.pujaDe === quien) {
-    return `Te toca pujar por ${nombreDeCasilla(e.almoneda.casilla)}: mínimo ${maravedies(pujaMinimaDe(e.almoneda))}.`;
+    const a = e.almoneda;
+    if (esAlmonedaDeObra(a)) {
+      const mio = solarDondeAlzaria(e, j.asiento, j.mrs, esUnHotelLoQueSeSubasta(e, a));
+      return mio < 0
+        ? 'Se subasta el último edificio del Ayuntamiento y ya no te queda dónde ponerlo: pasa.'
+        : `Se subasta el último edificio del Ayuntamiento: puja por ponerlo en ${nombreDeCasilla(mio)} (mínimo ${maravedies(pujaMinimaPara(a, mio))}) o pasa.`;
+    }
+    return `Te toca pujar por ${nombreDeCasilla(a.casilla)}: mínimo ${maravedies(pujaMinimaDe(a))}.`;
   }
   for (const t of e.tratos) {
     if (t.a === quien) return `${nombre(t.de)} te propone un trato.`;
   }
   if (aQuienSeEspera(e) === quien) {
+    if (e.impuestoSinPagar) {
+      const fila = filaDe(j.casilla);
+      const fijo = fila === null ? 0 : fila.precio;
+      return `${fila === null ? 'El Impuesto' : fila.nombre}: paga ${maravedies(fijo)} o el 10 % de tu patrimonio (${maravedies(decimaDelPatrimonio(patrimonioDe(e, j)))}). Si tiras o pasas sin elegir, se cobra ${maravedies(fijo)}.`;
+    }
     if (e.paso === 'por-tirar') {
       return j.presa >= 0
         ? `Estás en la Comisaría: paga la fianza, usa un Salvoconducto o prueba con los dados (intento ${j.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}).`
@@ -2821,9 +3297,11 @@ function loQueSeVe(e: EstadoDelBurgo, quien: QuienMira, sentados: LosSentados): 
     turnosAbiertos: e.turnosAbiertos,
     dobles: e.dobles,
     ultimaCarta: e.ultimaCarta,
-    almoneda: e.almoneda === null ? null : { ...e.almoneda, enCola: e.colaDeAlmonedas.length },
+    /* `edificio` se normaliza al proyectar: una mesa guardada de antes de la regla 3 no lo trae, y la vista lo declara. */
+    almoneda: e.almoneda === null ? null : { ...e.almoneda, edificio: esAlmonedaDeObra(e.almoneda), enCola: e.colaDeAlmonedas.length },
     apuro: e.apuro === null ? null : { ...e.apuro, debe: sumaDeDeudasDel(e.apuro), enCola: e.colaDeApuros.length },
     tratos: e.tratos,
+    impuestoSinPagar: e.impuestoSinPagar === true,
     topeDeVueltas: e.topeDeVueltas,
     sorteoDeSalida: e.sorteoDeSalida,
     jugada: e.jugada,
@@ -2903,9 +3381,11 @@ function comoVista(vista: unknown): VistaSinTablero | null {
     turnosAbiertos: typeof v.turnosAbiertos === 'number' ? v.turnosAbiertos : 0,
     dobles: typeof v.dobles === 'number' ? v.dobles : 0,
     ultimaCarta: cargaComoObjeto(v.ultimaCarta) === null ? null : (v.ultimaCarta as CartaSalida),
-    almoneda: almoneda === null ? null : (almoneda as unknown as AlmonedaVista),
+    /* `edificio` se normaliza aquí: una vista de ayer no lo trae, y sin él la subasta es la del título. */
+    almoneda: almoneda === null ? null : ({ ...almoneda, edificio: almoneda.edificio === true } as unknown as AlmonedaVista),
     apuro: apuro === null ? null : (apuro as unknown as ApuroVisto),
     tratos: v.tratos as TratoVisto[],
+    impuestoSinPagar: v.impuestoSinPagar === true,
     topeDeVueltas: typeof v.topeDeVueltas === 'number' ? v.topeDeVueltas : 0,
     sorteoDeSalida: Array.isArray(v.sorteoDeSalida) ? (v.sorteoDeSalida as ParDeDados[]) : [],
     jugada: typeof v.jugada === 'number' ? v.jugada : 0,
@@ -2937,7 +3417,12 @@ function opcionesDeReunion(): readonly Opcion[] {
   ];
 }
 
-/** Las obras que `yo` puede hacer ahora: en apuro sólo vender e hipotecar; con el turno, las cuatro. */
+/**
+ * Las obras que `yo` puede hacer ahora: en apuro sólo vender e hipotecar; el resto del
+ * tiempo, las cuatro, CON TURNO O SIN ÉL (regla 1). Quien decide el «resto del tiempo»
+ * no es esta función sino `puedeObrarAhora`, que la guarda en el único sitio desde el
+ * que se la llama sin apuro; aquí sólo se decide QUÉ título admite cada obra.
+ */
 function opcionesDeObra(v: VistaSinTablero, yo: JugadorVisto, enApuro: boolean): Opcion[] {
   const m = loQueSeMiraDe(v);
   const salida: Opcion[] = [];
@@ -2955,9 +3440,11 @@ function opcionesDeObra(v: VistaSinTablero, yo: JugadorVisto, enApuro: boolean):
           seraPosada
             ? `Alzar un hotel en ${fila.nombre} (${maravedies(fila.casa)})`
             : `Alzar la ${ordinal(t.casas + 1)} casa en ${fila.nombre} (${maravedies(fila.casa)})`,
-          seraPosada
-            ? 'El hotel sustituye a las cuatro casas, que vuelven al Ayuntamiento.'
-            : 'Barrio entero, por parejo y con casas en el Ayuntamiento.',
+          elUltimoQueQueda(m, seraPosada)
+            ? 'Es el último que le queda al Ayuntamiento: si algún otro también puede alzarlo, sale a subasta y tu puja abre en este precio.'
+            : seraPosada
+              ? 'El hotel sustituye a las cuatro casas, que vuelven al Ayuntamiento.'
+              : 'Barrio entero, por parejo y con casas en el Ayuntamiento.',
         ),
       );
     }
@@ -3006,11 +3493,24 @@ function topeDePuja(mrs: number): number {
   return Math.floor(mrs / PASO_DE_PUJA) * PASO_DE_PUJA;
 }
 
+/** Lo que la guarda de obrar mira, sacado de la VISTA: la otra mitad de `laMesaDelEstado`. */
+function laMesaDeLaVista(v: VistaSinTablero): LaMesaAhora {
+  return {
+    momento: v.momento,
+    paso: v.paso,
+    hayAlmoneda: v.almoneda !== null,
+    hayApuro: v.apuro !== null,
+    duenoDelTurno: v.duenoDelTurno,
+  };
+}
+
 /**
  * QUÉ PUEDE HACER `quien` AHORA MISMO, con lo que él sabe. Recibe la vista, jamás
  * el estado. `[]` al espectador, en `terminada` y a un quebrado. Lo que se hace SIN
- * turno (contestar tratos, obrar en el propio apuro, proponer al del turno,
- * rendirse) va ANTES del `if (v.turnoDe !== quien)`.
+ * turno —contestar tratos, LAS CUATRO OBRAS (regla 1), proponerle a cualquiera
+ * (regla 2), obrar en el propio apuro y rendirse— va ANTES del `if (v.turnoDe !== quien)`,
+ * que desde estas dos reglas sólo guarda lo que de verdad es del turno: los dados, la
+ * casilla pisada, la puja y el pase.
  */
 export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opcion[] {
   const v = comoVista(vista);
@@ -3034,16 +3534,21 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
     }
   }
 
-  /* Sin turno: obrar en el propio apuro. */
+  /*
+   * LAS OBRAS, con turno o sin él (regla 1). En el propio apuro sólo las dos que dan
+   * dinero; el resto del tiempo, las cuatro, siempre que la mesa no esté esperando una
+   * respuesta con plazo (`puedeObrarAhora`, la misma guarda que usa el reductor).
+   */
   const enMiApuro = v.paso === 'apuro' && v.apuro !== null && v.apuro.quien === quien;
   if (enMiApuro) for (const o of opcionesDeObra(v, yo, true)) salida.push(o);
+  else if (puedeObrarAhora(laMesaDeLaVista(v), quien)) for (const o of opcionesDeObra(v, yo, false)) salida.push(o);
 
-  /* Sin turno o con él: proponer un trato (declaración). */
-  if (v.paso !== 'almoneda' && v.duenoDelTurno !== null) {
+  /* Sin turno o con él: proponer un trato a cualquiera vivo (declaración). */
+  if (v.paso !== 'almoneda' && v.almoneda === null && v.duenoDelTurno !== null) {
     const destinos: AsientoId[] = [];
     for (const j of v.jugadores) {
       if (j.quebrado || j.asiento === quien) continue;
-      if (v.duenoDelTurno === quien || j.asiento === v.duenoDelTurno) destinos.push(j.asiento);
+      destinos.push(j.asiento);
     }
     if (destinos.length > 0 && tratosAbiertosDe(v.tratos, quien) < TRATOS_ABIERTOS_POR_PROPONENTE) {
       const m = loQueSeMiraDe(v);
@@ -3064,6 +3569,36 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
   }
 
   if (v.turnoDe === quien) {
+    /*
+     * EL IMPUESTO, A ELEGIR (regla 4), y ANTES del paso: se pisa en `por-pasar` y, con
+     * dobles, en `por-tirar`. Los dos rótulos dicen la cifra EXACTA que se va a cobrar,
+     * y la del 10 % sale de `yo.patrimonio` —lo que la vista publica— pasado por la
+     * misma cuenta que usa el reductor: si cada lado la escribiera por su cuenta, el
+     * botón prometería una cosa y el cobro sería otra. La ayuda dice lo que pasa si no
+     * se elige, porque tirar o pasar cobra la fija y eso no se puede deshacer.
+     */
+    if (v.impuestoSinPagar && v.almoneda === null && v.apuro === null) {
+      const laDelImpuesto = filaDe(yo.casilla);
+      const fijo = laDelImpuesto === null ? 0 : laDelImpuesto.precio;
+      salida.push(
+        opcion(
+          'impuesto:fijo',
+          PAGAR_IMPUESTO,
+          { como: 'fijo' },
+          `Pagar ${maravedies(fijo)} del Impuesto`,
+          'La cantidad fija de la casilla, pase lo que pase con tu patrimonio. Es también lo que se cobra si tiras o pasas sin elegir.',
+        ),
+      );
+      salida.push(
+        opcion(
+          'impuesto:decima',
+          PAGAR_IMPUESTO,
+          { como: 'decima' },
+          `Pagar el 10 % de tu patrimonio (${maravedies(decimaDelPatrimonio(yo.patrimonio))})`,
+          'Tu patrimonio es el efectivo más lo que valen tus títulos y tus edificios; los hipotecados, por la mitad. Elígelo ANTES de tirar o pasar.',
+        ),
+      );
+    }
     if (v.paso === 'por-tirar') {
       if (yo.presa >= 0) {
         salida.push(
@@ -3084,7 +3619,6 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
       } else {
         salida.push(opcion('tirar', TIRAR, {}, 'Tirar los dados', 'Mueves lo que sumen; con dobles repites, y a los tres dobles seguidos, a comisaría.'));
       }
-      for (const o of opcionesDeObra(v, yo, false)) salida.push(o);
     } else if (v.paso === 'comprar') {
       const m = loQueSeMiraDe(v);
       const t = tituloDe(m, yo.casilla);
@@ -3099,38 +3633,60 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
           opcion(`a-almoneda:${yo.casilla}`, A_ALMONEDA, { casilla: yo.casilla }, `Sacar ${fila.nombre} a subasta`, 'Pujan todos, tú también; sin pujas se queda en el Ayuntamiento.'),
         );
       }
-      for (const o of opcionesDeObra(v, yo, false)) salida.push(o);
     } else if (v.paso === 'almoneda') {
       const a = v.almoneda;
       if (a !== null && a.pujaDe === quien) {
-        const fila = filaDe(a.casilla);
-        const nombre = fila === null ? nombreDeCasilla(a.casilla) : fila.nombre;
-        const minimo = pujaMinimaDe(a);
-        const fijas: { id: string; cuanto: number }[] = [{ id: 'pujar:minimo', cuanto: minimo }];
-        for (const escalon of ESCALONES_DE_PUJA) fijas.push({ id: `pujar:+${escalon}`, cuanto: a.puja + escalon });
-        const vistas: number[] = [];
-        for (const f of fijas) {
-          if (f.cuanto < minimo || f.cuanto > yo.mrs || vistas.indexOf(f.cuanto) >= 0) continue;
-          vistas.push(f.cuanto);
-          salida.push(opcion(f.id, PUJAR, { casilla: a.casilla, cuanto: f.cuanto }, `Pujar ${maravedies(f.cuanto)} por ${nombre}`, `Mejor puja hasta ahora: ${maravedies(a.puja)}.`));
+        /*
+         * POR QUÉ SÓLO UN SOLAR EN LA SUBASTA DEL EDIFICIO. Se puja por PONER el
+         * edificio en un solar propio, y el portillo busca UNA puerta por tipo: con una
+         * por solar, `estaOfrecido` se quedaría con la primera y las demás no se podrían
+         * mandar. Se ofrece el solar que toca por parejo (`solarDondeAlzaria`), que con
+         * el parejo obligatorio es casi siempre el único donde se puede alzar.
+         */
+        const deObra = esAlmonedaDeObra(a);
+        const m = loQueSeMiraDe(v);
+        const mio = deObra ? solarDondeAlzaria(m, yo.asiento, yo.mrs, esUnHotelLoQueSeSubasta(m, a)) : a.casilla;
+        if (mio >= 0) {
+          const fila = filaDe(mio);
+          const nombre = deObra
+            ? `el último edificio, para ${fila === null ? nombreDeCasilla(mio) : fila.nombre}`
+            : fila === null
+              ? nombreDeCasilla(mio)
+              : fila.nombre;
+          const minimo = pujaMinimaPara(a, mio);
+          const fijas: { id: string; cuanto: number }[] = [{ id: 'pujar:minimo', cuanto: minimo }];
+          for (const escalon of ESCALONES_DE_PUJA) fijas.push({ id: `pujar:+${escalon}`, cuanto: a.puja + escalon });
+          const vistas: number[] = [];
+          for (const f of fijas) {
+            if (f.cuanto < minimo || f.cuanto > yo.mrs || vistas.indexOf(f.cuanto) >= 0) continue;
+            vistas.push(f.cuanto);
+            salida.push(opcion(f.id, PUJAR, { casilla: mio, cuanto: f.cuanto }, `Pujar ${maravedies(f.cuanto)} por ${nombre}`, `Mejor puja hasta ahora: ${maravedies(a.puja)}.`));
+          }
+          const maximo = topeDePuja(yo.mrs);
+          if (maximo >= minimo) {
+            salida.push({
+              id: 'pujar',
+              tipo: PUJAR,
+              carga: { casilla: mio, minimo, maximo, escalon: PASO_DE_PUJA },
+              declaracion: true,
+              rotulo: `Pujar por ${nombre}`,
+              ayuda: `Entre ${maravedies(minimo)} y ${maravedies(maximo)}, de ${PASO_DE_PUJA} en ${PASO_DE_PUJA}.`,
+            });
+          }
         }
-        const maximo = topeDePuja(yo.mrs);
-        if (maximo >= minimo) {
-          salida.push({
-            id: 'pujar',
-            tipo: PUJAR,
-            carga: { casilla: a.casilla, minimo, maximo, escalon: PASO_DE_PUJA },
-            declaracion: true,
-            rotulo: `Pujar por ${nombre}`,
-            ayuda: `Entre ${maravedies(minimo)} y ${maravedies(maximo)}, de ${PASO_DE_PUJA} en ${PASO_DE_PUJA}.`,
-          });
-        }
-        salida.push(opcion('pasar-puja', PASAR_PUJA, { casilla: a.casilla }, 'Pasar en la subasta', 'Ya no pujas por este título.'));
+        salida.push(
+          opcion(
+            'pasar-puja',
+            PASAR_PUJA,
+            { casilla: a.casilla },
+            'Pasar en la subasta',
+            deObra ? 'Ya no pujas por este edificio.' : 'Ya no pujas por este título.',
+          ),
+        );
       }
     } else if (v.paso === 'por-pasar') {
       if (v.dobles > 0) salida.push(opcion('tirar', TIRAR, {}, 'Volver a tirar (dobles)', 'Sacaste dobles: tiras otra vez. Tres seguidos, a comisaría.'));
       else salida.push(opcion('pasar', PASAR, {}, 'Pasar el turno', 'Tus tratos abiertos caducan al pasar.'));
-      for (const o of opcionesDeObra(v, yo, false)) salida.push(o);
     }
   }
 
@@ -3295,6 +3851,7 @@ function rangoDeAccion(tipo: string): number {
     case USAR_INDULTO:
       return 2;
     case COMPRAR:
+    case PAGAR_IMPUESTO:
       return 3;
     case A_ALMONEDA:
       return 4;
@@ -3400,10 +3957,13 @@ function panelesDe(v: VistaSinTablero, quien: QuienMira): PanelDeTablero[] {
     const a = v.almoneda;
     const enPie: string[] = [];
     for (const x of a.enPie) enPie.push(nombreEnLaVista(v, x));
+    const queSeSubasta = esAlmonedaDeObra(a)
+      ? `${esUnHotelLoQueSeSubasta(loQueSeMiraDe(v), a) ? 'El último hotel' : 'La última casa'} del Ayuntamiento, para ${nombreDeCasilla(a.casilla)}`
+      : nombreDeCasilla(a.casilla);
     paneles.push({
       titulo: 'La subasta',
       lineas: [
-        `${nombreDeCasilla(a.casilla)} · ${a.quienPuja === null ? 'sin pujas' : `${maravedies(a.puja)} de ${nombreEnLaVista(v, a.quienPuja)}`}`,
+        `${queSeSubasta} · ${a.quienPuja === null ? 'sin pujas' : `${maravedies(a.puja)} de ${nombreEnLaVista(v, a.quienPuja)}`}`,
         `Puja ${nombreEnLaVista(v, a.pujaDe)}. En pie: ${enPie.join(', ')}.`,
         a.enCola > 0 ? `${a.enCola} ${a.enCola === 1 ? 'título más en cola' : 'títulos más en cola'}.` : 'Ninguno más en cola.',
       ],

@@ -10,6 +10,16 @@
  * inyecta un suceso como lo haría la mesa (una jugada nueva con su lista) y deja la
  * vista en su estado final, que es exactamente lo que el sondeo hace.
  *
+ * ═══ Y LA INTERFAZ NO SE JUZGA AQUÍ ═══
+ *
+ * Esto monta la ESCENA suelta, con su cámara y sus mandos de sondeo, y nada más. La
+ * cinta, el cajón, la hoja, las fichas, el componedor y el retablo del respaldo se
+ * miran en `banco-hoja-burgo.tsx`, que pinta el pintor entero contra momentos de
+ * partida congelados y sin servidor. Queda dicho aquí porque el sitio natural para
+ * buscarlos es éste y no están: son dos preguntas distintas —«¿se ve el mundo?» y «¿se
+ * ve la pantalla?»— y un solo banco con las dos habría acabado siendo el que no se abre
+ * para ninguna de las dos.
+ *
  * ═══ EL TABLERO ES FIJO Y NO ALEATORIO ═══
  *
  * Se monta a mano con `?jugadores=6&lleno=1&semilla=ABCDE`: seis asientos con los

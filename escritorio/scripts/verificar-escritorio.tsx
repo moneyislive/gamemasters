@@ -199,16 +199,68 @@ import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
  */
 import { BURGO } from '../../shared/arcade/juegos';
 import {
+  carrilDelBurgo as carrilDelBurgoShared,
+  cartelDeCasilla as cartelDeCasillaDelBurgo,
   dadosEnTres as dadosDelBurgoEnTres,
+  EL_CARRIL_DE_LA_MESA,
+  fichaDeCasilla as fichaDeCasillaDelBurgo,
+  fichaDeJugador as fichaDeJugadorDelBurgo,
+  glifosDelCarrilDelBurgo as glifosDelCarrilShared,
   hojaEnTres as hojaDelBurgoEnTres,
+  laCronicaConLaVista,
+  marcadorEnTres as marcadorEnTresDelBurgo,
   obraPosibleEnCasilla,
+  obrasSoloEnElAnillo,
   opcionesFueraDelTablero as opcionesFueraDelBurgo,
+  pregonDelBurgo,
   seVeEnTres as elBurgoSeVeEnTres,
   tableroEnTres as tableroDelBurgoEnTres,
 } from '../../shared/arcade/juegos/burgo-en-tres';
+/* El tipo del único movimiento que este cliente pregunta antes de mandar. Ver `seConfirmaAntes`. */
+import { RENDIRSE as RENDIRSE_DEL_BURGO } from '../../shared/arcade/juegos/burgo';
 import { BurgoEnTres, MarcadorDelBurgo } from '../src/burgo-en-tres';
-import { LasHojasDelBurgo } from '../src/hojas-del-burgo';
+import {
+  LaCronicaDelBurgo,
+  LaFichaDeUnJugador,
+  LasHojasDelBurgo,
+  LasPuertasDelBurgo,
+  LaTarjetaDeUnaCasilla,
+} from '../src/hojas-del-burgo';
 import { PINTORES_PROPIOS } from '../src/pintores';
+/*
+ * LAS PIEZAS GENÉRICAS DEL LIENZO Y EL BANCO DE LA INTERFAZ, importados de verdad y no leídos
+ * como texto: lo que se cuenta es el marcado que SALE, y un `aria-modal` escrito en una rama
+ * que no se toma está en la fuente y no está en la pantalla.
+ */
+import {
+  BAJO_EL_CARRIL,
+  BAJO_LA_CINTA,
+  CAJA_DEL_LIENZO,
+  CajaColgadaDelLienzo,
+  CajaEnElLienzo,
+  CARRIL_DEL_LIENZO,
+  CarrilDelLienzo,
+  CARTEL_DEL_LIENZO,
+  CartelAlPie,
+  COLGADA_DEL_LIENZO,
+  ElijeUna,
+  QUIETA_EN_EL_LIENZO,
+  RUEDAN_SOLAS,
+  VELO_DEL_LIENZO,
+} from '../src/lienzo-propio';
+/*
+ * Y EL BANCO SE IMPORTA, NO SE LEE: sus dieciocho medidas y sus guiones son datos, y
+ * `banco-hoja-burgo.tsx` está escrito para poder cargarse desde Node —no monta nada sin
+ * `document` y no importa la hoja de estilo— justamente para que esto se pueda hacer.
+ */
+import {
+  LIENZOS_DEL_BANCO,
+  loQueFaltaEnElMomento,
+  MOMENTOS,
+  rebobinar,
+  sentadosDe as sentadosDeLosMomentos,
+} from '../src/banco-hoja-burgo';
+import type { MomentoDelBanco } from '../src/banco-hoja-burgo';
 
 /**
  * EL FUENTE SIN SUS COMENTARIOS, Y POR QUÉ ESTO ESTÁ ARRIBA DEL TODO.
@@ -1848,16 +1900,48 @@ function burgoEnTres(): void {
     /<button[^>]*burgo-cinta-ficha[^>]*>/.exec(html)?.[0]?.slice(0, 300) ?? null,
   );
   /*
-   * LOS BOTONES SUELTOS VAN EN FLUJO Y FUERA DEL RECUADRO, no encima del anillo: un botón
-   * sobre el tablero es un clic perdido que compra un solar. Se compra que el `.formulario`
-   * empiece DESPUÉS de que el recuadro se cierre, contando el trozo del HTML donde está.
+   * ═══ NO QUEDA NADA EN FLUJO POR DEBAJO DEL RECUADRO, Y ANTES SÍ QUEDABA ═══
+   *
+   * Aquí se compraba LO CONTRARIO: que el `<Formulario>` de botones sueltos empezara DESPUÉS
+   * de que el recuadro se cerrara, o sea en flujo por debajo del lienzo. Esa comprobación
+   * estaba verde y la pantalla estaba rota: desde la página de pie el recuadro vale la ventana
+   * entera menos la cabecera de la Sala, así que «debajo del recuadro» está debajo del canto
+   * de la pantalla. Es el mismo sitio del que Riberas sacó los suyos, y el commit que lo
+   * arregló allí lo dejó escrito: los comprobadores miraban la LISTA DE OPCIONES y esa cuenta
+   * salía bien; nadie miraba la PANTALLA.
+   *
+   * Ahora se compra que el formulario NO ESTÉ —ni uno— y que el recuadro sea EL ÚNICO HIJO de
+   * la raíz del pintor. Lo que se pintaba ahí vive dentro, en el carril, y eso se cuenta abajo.
+   *
+   * ═══ Y SE MIDE POR PROFUNDIDAD Y NO POR LA COLA, PORQUE LA COLA NO MIDE ESTO ═══
+   *
+   * La primera forma de esta comprobación pedía dos cosas: que no hubiera `class="formulario"`
+   * y que el marcado terminara en `</div></div>`. Las dos se pueden cumplir con la pantalla
+   * rota, y se comprobó: un `<div>` con una `<ul class="opciones">` de botones de verdad
+   * colgado DEBAJO del recuadro —o sea el fallo entero que esta fase viene a matar, sin usar
+   * `<Formulario>`— deja la cola en `</div></div>` igual, no escribe `class="formulario"` en
+   * ninguna parte, y no toca ni una de las cuentas de la partición, que comparan LISTAS DE
+   * OPCIONES y no botones pintados. Las 902 salían verdes con la pantalla rota.
+   *
+   * Lo que hay que medir no es la última pareja de etiquetas: es que el recuadro ABRA el
+   * cuerpo de la raíz y lo CIERRE, o sea que su `</div>` emparejado sea el final del cuerpo y
+   * no quede sitio para un hermano detrás. Se recorre la profundidad de los `<div>`, que es la
+   * única forma de saber cuál cierra a cuál.
    */
-  const dondeElRecuadro = html.indexOf('burgo-lienzo');
-  const dondeElFormulario = html.indexOf('class="formulario"');
+  const cuerpoDeLaRaiz = /^<div class="burgo-en-tres">([\s\S]*)<\/div>$/.exec(html.trim())?.[1] ?? null;
+  const elRecuadroEsElUnicoHijo = ((): boolean => {
+    if (cuerpoDeLaRaiz === null || !cuerpoDeLaRaiz.startsWith('<div class="burgo-lienzo')) return false;
+    let hondo = 0;
+    for (const t of cuerpoDeLaRaiz.matchAll(/<(\/?)div\b[^>]*>/g)) {
+      hondo += t[1] === '/' ? -1 : 1;
+      if (hondo === 0) return t.index + t[0].length === cuerpoDeLaRaiz.length;
+    }
+    return false;
+  })();
   comprobar(
-    'los botones sueltos van en flujo por debajo del recuadro y no encima del anillo',
-    dondeElRecuadro >= 0 && dondeElFormulario > dondeElRecuadro,
-    { recuadro: dondeElRecuadro, formulario: dondeElFormulario },
+    'no queda NADA en flujo por debajo del recuadro: el recuadro es el ÚNICO hijo de la raíz del pintor, y el formulario de botones sueltos se ha ido',
+    !html.includes('class="formulario"') && elRecuadroEsElUnicoHijo,
+    { formulario: html.indexOf('class="formulario"'), cuerpo: cuerpoDeLaRaiz === null ? null : cuerpoDeLaRaiz.slice(0, 60), cola: html.trim().slice(-60) },
   );
   comprobar(
     'el recuadro lleva las DOS clases: la suya, que la cámara busca, y la genérica `lienzo-propio` de la que cuelga la pantalla completa',
@@ -1958,13 +2042,107 @@ function burgoEnTres(): void {
     sinMundo.every((o) => o.declaracion !== true),
     sinMundo.filter((o) => o.declaracion === true).map((o) => o.id),
   );
-  comprobar(
-    'salen como botón exactamente esas, ni una de más ni una de menos',
-    html.split('class="opcion-rotulo"').length - 1 === loQueSePuedePintar(sinMundo).length,
-    { botones: html.split('class="opcion-rotulo"').length - 1, sinMundo: sinMundo.map((o) => o.id) },
+  /*
+   * ═══ Y SE PINTAN EN EL CARRIL, QUE ES ADONDE SE HAN MUDADO ═══
+   *
+   * Antes esto contaba `class="opcion-rotulo"` en el render, porque los sueltos eran un
+   * `<Formulario>` en flujo. Ya no hay flujo: la tira de la cinta pinta lo que criba
+   * `carrilDelBurgo` —lo del momento— y detrás lo que la criba dejó fuera, que sin mundo y con
+   * el cajón cerrado es todo lo demás. Se rehace la cuenta del pintor con las mismas funciones
+   * y en el mismo ORDEN que él las llama (la criba la última, que es la única que mira a las
+   * otras), y se compra que el número de cuadrados sea exactamente ése.
+   *
+   * Un cuadrado de 44 puntos no lleva el rótulo dentro —cabe un glifo de dos letras—, así que
+   * el rótulo ENTERO del juego se busca donde de verdad está: en el nombre accesible, que es lo
+   * que se oye y lo que sale al posar el ratón. Buscarlo en el TEXTO sería buscarlo donde este
+   * mueble no lo pone nunca, y la comprobación se pondría roja por estar bien hecha.
+   */
+  const laCaja = pregonDelBurgo(vista, 's1', opciones);
+  const loDelMomento = carrilDelBurgoShared(vista, 's1', opciones);
+  const hojaConMuebles = hojaDelBurgoEnTres(vista, 's1', opciones, laCaja, loDelMomento.length > 0 ? loDelMomento : null);
+  const fueraDeTodo = opcionesFueraDelBurgo(
+    opciones,
+    null,
+    null,
+    null,
+    laCaja,
+    loDelMomento.length > 0 ? loDelMomento : null,
   );
-  for (const o of sinMundo) {
-    comprobar(`el rótulo suelto «${o.rotulo}» sale tal cual`, texto.includes(o.rotulo), o.id);
+  const enElCarril = [...loDelMomento, ...glifosDelCarrilShared(vista, 's1', fueraDeTodo)];
+  /*
+   * Y LA HOJA SUELTA LO QUE LOS DOS MUEBLES DE FUERA YA PINTAN. Es la otra mitad de «cada
+   * movimiento se enseña exactamente una vez»: con el carril puesto, «Ahora» se queda con sus
+   * renglones y sin botones; con la caja de los tratos puesta, «El trato» hace lo mismo. Si
+   * alguno de los dos se quedara con los suyos, la misma opción estaría en la tira Y dentro del
+   * cajón, y las dos se ven a la vez en cuanto se abre.
+   */
+  const ahoraConCarril = hojaConMuebles.secciones.find((s) => s.id === 'ahora');
+  const tratoConCaja = hojaConMuebles.secciones.find((s) => s.id === 'trato');
+  comprobar(
+    'con el carril puesto, la sección «Ahora» se queda con sus renglones y sin un solo botón',
+    ahoraConCarril !== undefined && (loDelMomento.length === 0 || ahoraConCarril.opciones.length === 0),
+    { opciones: ahoraConCarril?.opciones.map((o) => o.id), lineas: ahoraConCarril?.lineas.length },
+  );
+  comprobar(
+    'y con la caja de los tratos puesta, «El trato» hace lo mismo',
+    tratoConCaja !== undefined && (laCaja === null || tratoConCaja.opciones.length === 0),
+    tratoConCaja?.opciones.map((o) => o.id),
+  );
+  comprobar(
+    'el carril de la cinta pinta un cuadrado por movimiento sin sitio: ni uno de más ni uno de menos',
+    html.split('lienzo-carril-glifo').length - 1 === enElCarril.length && enElCarril.length > 0,
+    { cuadrados: html.split('lienzo-carril-glifo').length - 1, esperados: enElCarril.map((g) => g.opcion.id) },
+  );
+  for (const g of enElCarril) {
+    comprobar(
+      `el cuadrado «${g.glifo}» dice «${g.opcion.rotulo}» en su nombre accesible`,
+      html.includes(`aria-label="${g.opcion.rotulo}"`),
+      g.opcion.id,
+    );
+  }
+  comprobar(
+    'y entre el carril y la caja de los tratos no se pierde ni un movimiento con el cajón cerrado y sin mundo',
+    movimientos.every(
+      (o) =>
+        enElCarril.some((g) => firmaDe(g.opcion) === firmaDe(o)) ||
+        (laCaja !== null &&
+          [...laCaja.paraContestar, ...laCaja.mios].some((t) =>
+            [t.aceptar, t.rechazar, t.retirar].some((x) => x !== null && firmaDe(x) === firmaDe(o)),
+          )),
+    ),
+    movimientos.filter((o) => !enElCarril.some((g) => firmaDe(g.opcion) === firmaDe(o))).map((o) => o.id),
+  );
+  comprobar(
+    'y ni un cuadrado repetido: los del momento y las sobras son listas disjuntas por construcción',
+    new Set(enElCarril.map((g) => firmaDe(g.opcion))).size === enElCarril.length,
+    enElCarril.map((g) => g.opcion.id),
+  );
+  /*
+   * LA VACUNA DE LAS SOBRAS, que es la que compra la mitad nueva de este mueble: si el carril
+   * se quedara sólo con lo que criba `carrilDelBurgo` —que es lo que decía su contrato, y lo
+   * que este pintor hacía antes de mudar los sueltos aquí—, los movimientos que la hoja
+   * cerrada suelta no tendrían dónde pulsarse. Se mide con la partida de verdad y con el
+   * número: son los que están.
+   */
+  const sinLasSobras = loDelMomento.map((g) => firmaDe(g.opcion));
+  comprobar(
+    'VACUNA: sin pegar las sobras al carril, hay movimientos del juego que no se pueden pulsar en ninguna parte de la pantalla',
+    fueraDeTodo.length > 0 && fueraDeTodo.some((o) => sinLasSobras.indexOf(firmaDe(o)) < 0),
+    { sobras: fueraDeTodo.map((o) => o.id), delMomento: loDelMomento.map((g) => g.opcion.id) },
+  );
+  /*
+   * LO IRREVERSIBLE VA AL FINAL DE LA TIRA. La quiebra llega entre lo del momento, o sea en
+   * medio de la fila y al lado de «pasar el turno»; un cuadrado de 44 puntos ahí es demasiado
+   * fácil de rozar. Se compra por el ÚLTIMO nombre accesible del carril, que es lo que se ve.
+   */
+  const laQuiebra = movimientos.find((o) => o.tipo === RENDIRSE_DEL_BURGO);
+  if (laQuiebra !== undefined) {
+    const nombres = [...html.matchAll(/lienzo-carril-hueco[^>]*aria-label="([^"]*)"/g)].map((m) => m[1]);
+    comprobar(
+      'y el cuadrado de la quiebra va el ÚLTIMO de la tira, que es donde menos se roza',
+      nombres.length > 1 && nombres[nombres.length - 1] === laQuiebra.rotulo,
+      nombres,
+    );
   }
   const dentroDelCajon = renderToStaticMarkup(
     <LasHojasDelBurgo hoja={hoja} vista={vista} yo="s1" quieto={false} alElegir={() => undefined} />,
@@ -2031,12 +2209,22 @@ function burgoEnTres(): void {
     comprobar(
       'y «Empezar la partida» se ve sin abrir nada: es la única opción de la mesa reunida, y encerrada en el cajón la partida no podría empezar',
       partida.opcionesReunida.length > 0 &&
-        palabrasDe(htmlReunida).includes(partida.opcionesReunida[0]?.rotulo ?? 'no-hay') &&
-        htmlReunida.split('class="opcion-rotulo"').length - 1 === partida.opcionesReunida.length,
+        htmlReunida.includes(`aria-label="${partida.opcionesReunida[0]?.rotulo ?? 'no-hay'}"`) &&
+        htmlReunida.split('lienzo-carril-glifo').length - 1 === partida.opcionesReunida.length,
       {
-        botones: htmlReunida.split('class="opcion-rotulo"').length - 1,
+        cuadrados: htmlReunida.split('lienzo-carril-glifo').length - 1,
         opciones: partida.opcionesReunida.map((o) => o.id),
       },
+    );
+    /*
+     * Y NO ESTÁ EN FLUJO NI DENTRO DEL CAJÓN: está en la tira de la cinta, a la vista. Las dos
+     * mitades importan, porque el fallo tiene dos formas de volver —un formulario debajo del
+     * canto de la pantalla, o un cajón cerrado— y ninguna de las dos da un error.
+     */
+    comprobar(
+      'y no en flujo por debajo del lienzo ni detrás del «≡»: está en el carril, dentro del recuadro',
+      !htmlReunida.includes('class="formulario"') && !htmlReunida.includes('burgo-cajon'),
+      htmlReunida.trim().slice(-60),
     );
     comprobar(
       'y se pinta el telón con el anillo detrás, no el retablo: no ha fallado nada, sólo falta el modelo',
@@ -8437,6 +8625,1126 @@ elMuelle();
 riberasEnTres();
 burgoEnTres();
 elAcercamientoDelDelta();
+// ---------------------------------------------------------------------------
+// 13 · Las piezas que los dos pintores propios comparten, y el banco de la interfaz
+// ---------------------------------------------------------------------------
+
+/**
+ * LAS CINCO PIEZAS GENÉRICAS DE `lienzo-propio.tsx`, Y EL BANCO DESDE EL QUE SE MIRAN.
+ *
+ * ═══ QUÉ COMPRA ESTE BLOQUE, Y POR QUÉ NINGUNA DE LAS DOS MITADES SE VE FALLAR SOLA ═══
+ *
+ * La primera mitad son LAS PIEZAS: la caja modal, la caja que no es modal, el cartel del pie
+ * y el carril de cuadrados de 44. Son las cuatro formas que este cliente ya tenía escritas
+ * DENTRO de `riberas-en-tres.tsx` —y que el Burgo estaba a punto de escribir por segunda vez—
+ * con el prefijo genérico. Un modal al que le falte una de sus cuatro mitades no da un error
+ * en ninguna consola: sin velo, cerrarlo TOCA lo que hay debajo del dedo; sin `aria-modal`, un
+ * lector sigue leyendo la pantalla de atrás; sin la trampa, el tabulador se va a la cabecera
+ * de la Sala; y sin el foco de vuelta, se queda en el `<body>`. Las cuatro se rinden.
+ *
+ * Y se miden CONTRA LAS DIECIOCHO MEDIDAS, porque una caja que cabe en un monitor y no en
+ * 288×317 tampoco falla: se sale por el canto y lo que se sale simplemente no está. Los
+ * números NO se escriben aquí: se sacan de la hoja con expresiones regulares y la aritmética
+ * se hace con lo que la hoja dice, para que no haya dos lecturas del mismo reparto.
+ *
+ * La segunda mitad es EL BANCO. Un banco que enseña un momento con el rótulo de otro es la
+ * peor de las pantallas: no se cae, se mira, y lo que se juzga encima no vale. Por eso cada
+ * momento declara lo que tiene que ser verdad al llegar y aquí se rebobinan LOS SIETE contra
+ * el reductor de hoy. Y se afirma CUÁNTOS se rebobinaron, porque cero momentos inspeccionados
+ * son cero reproches y eso se lee como vigilado.
+ */
+function lasPiezasDelLienzoYSuBanco(): void {
+  paso('Las piezas que los dos pintores propios comparten, medidas contra los dieciocho lienzos');
+
+  const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
+  const fuente = readFileSync(new URL('../src/lienzo-propio.tsx', import.meta.url), 'utf8');
+  const fuenteSinComentarios = sinComentarios(fuente);
+  const reglaDeLaHoja = (selector: string): string =>
+    new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(hoja)?.[1] ?? '';
+
+  // ── 1. LAS CUATRO MITADES DE LO MODAL, EN EL MARCADO QUE DE VERDAD SALE ──
+
+  /*
+   * Se renderiza la pieza DE VERDAD y se cuenta lo que sale, no se lee el JSX: un `aria-modal`
+   * escrito en una rama que no se toma está en la fuente y no está en la pantalla.
+   */
+  const laCaja = renderToStaticMarkup(
+    <CajaEnElLienzo nombre="La hoja de la partida" alCerrar={() => undefined}>
+      <p>dentro</p>
+    </CajaEnElLienzo>,
+  );
+  comprobar(
+    'la caja modal del lienzo sale con sus CUATRO mitades: velo que se come el clic, `role="dialog"`, `aria-modal` y NOMBRE',
+    laCaja.includes(`class="${VELO_DEL_LIENZO}"`) &&
+      laCaja.includes('role="dialog"') &&
+      laCaja.includes('aria-modal="true"') &&
+      laCaja.includes('aria-label="La hoja de la partida"') &&
+      laCaja.includes('tabindex="-1"'),
+    laCaja.slice(0, 260),
+  );
+  comprobar(
+    'y el velo va `aria-hidden`: para un lector la caja ya es modal, y un `<div>` sin texto en medio sólo sería ruido',
+    new RegExp(`class="${VELO_DEL_LIENZO}"[^>]*aria-hidden="true"`).test(laCaja),
+    laCaja.slice(0, 200),
+  );
+  /*
+   * LA CUARTA MITAD NO SE VE EN EL MARCADO: el foco de vuelta lo hace `alCerrar`, y adónde
+   * vuelve depende de quién abrió. Lo que sí se puede comprar es que la pieza NO se lo invente
+   * —no hay ningún `.focus()` sobre un destino elegido aquí dentro— y que la trampa que arma
+   * sea LA COMPARTIDA y no una segunda pila.
+   */
+  comprobar(
+    'la caja no se inventa adónde vuelve el foco: arma la trampa COMPARTIDA y el destino lo pone quien la cierra',
+    /export function CajaEnElLienzo\(\{[\s\S]*?usarLaTrampaDeFoco\(true, caja, alCerrar\);/.test(fuenteSinComentarios) &&
+      /import \{ armarUnaTrampa, loQueHaceLaTrampa, mandaEstaTrampa, RAIZ_DE_LA_CASA \} from '\.\/riberas-en-tres';/.test(
+        fuente,
+      ),
+  );
+  /* Y LA VACUNA DE LAS CUATRO MITADES: una caja sin velo tiene que hacer caer al juez. */
+  const cajaEnvenenada = '<div role="dialog" aria-modal="true" aria-label="La hoja" tabindex="-1"><p>dentro</p></div>';
+  comprobar(
+    'VACUNA: una caja «modal» sin velo no pasa por modal',
+    !cajaEnvenenada.includes(`class="${VELO_DEL_LIENZO}"`),
+  );
+
+  // ── 2. LA CAJA QUE NO ES MODAL: NI VELO, NI `dialog`, NI TRAMPA ──
+
+  const laColgada = renderToStaticMarkup(
+    <CajaColgadaDelLienzo nombre="Lo que se propone">
+      <p>una propuesta</p>
+    </CajaColgadaDelLienzo>,
+  );
+  comprobar(
+    'la caja NO modal sale sin velo, sin `dialog` y sin `aria-modal` —se lee mientras juega otro y por debajo se sigue girando el tablero—, pero CON nombre',
+    !laColgada.includes(VELO_DEL_LIENZO) &&
+      !laColgada.includes('role="dialog"') &&
+      !laColgada.includes('aria-modal') &&
+      laColgada.includes('role="group"') &&
+      laColgada.includes('aria-label="Lo que se propone"'),
+    laColgada.slice(0, 200),
+  );
+  comprobar(
+    'y vive en el nivel de la cinta (2) y no en el del velo (3) ni en el de la caja modal (4): por debajo se toca el mundo',
+    /z-index:\s*2/.test(reglaDeLaHoja(`.${COLGADA_DEL_LIENZO}`)) &&
+      /z-index:\s*3/.test(reglaDeLaHoja(`.${VELO_DEL_LIENZO}`)) &&
+      /z-index:\s*4/.test(reglaDeLaHoja(`.${CAJA_DEL_LIENZO}`)),
+    {
+      colgada: reglaDeLaHoja(`.${COLGADA_DEL_LIENZO}`).replace(/\s+/g, ' ').slice(0, 120),
+      velo: reglaDeLaHoja(`.${VELO_DEL_LIENZO}`).replace(/\s+/g, ' ').slice(0, 120),
+    },
+  );
+
+  // ── 3. EL CARTEL: NO SE PULSA, SIGUE EN EL ÁRBOL VACÍO, Y UNA SOLA REGIÓN VIVA ──
+
+  const cartelPuesto = renderToStaticMarkup(<CartelAlPie frases={['Pagas 50 €', 'Te quedan 120 €']} vivo />);
+  const cartelVacio = renderToStaticMarkup(<CartelAlPie frases={[]} vivo />);
+  const cartelMudo = renderToStaticMarkup(<CartelAlPie frases={['Pagas 50 €']} vivo={false} />);
+  comprobar(
+    'el cartel del pie pinta cada frase en su renglón y sigue EN EL ÁRBOL cuando no hay nada que decir (una región viva que nace con su texto no se anuncia)',
+    cuantos(cartelPuesto, 'span') === 2 && cartelVacio.includes(`class="${CARTEL_DEL_LIENZO}"`),
+    { puesto: cartelPuesto, vacio: cartelVacio },
+  );
+  comprobar(
+    'y vacío no deja caja fantasma sobre el mundo: `:empty` le quita fondo, filo y relleno',
+    /background:\s*none/.test(reglaDeLaHoja(`.${CARTEL_DEL_LIENZO}:empty`)) &&
+      /padding:\s*0/.test(reglaDeLaHoja(`.${CARTEL_DEL_LIENZO}:empty`)),
+    reglaDeLaHoja(`.${CARTEL_DEL_LIENZO}:empty`).replace(/\s+/g, ' '),
+  );
+  comprobar(
+    'no se pulsa —`pointer-events: none`, o taparía justo la casilla que explica— y no lleva botón de cerrar',
+    /pointer-events:\s*none/.test(reglaDeLaHoja(`.${CARTEL_DEL_LIENZO}`)) && !cartelPuesto.includes('<button'),
+    reglaDeLaHoja(`.${CARTEL_DEL_LIENZO}`).replace(/\s+/g, ' ').slice(0, 160),
+  );
+  comprobar(
+    'y UNA SOLA REGIÓN VIVA POR PANTALLA: sólo el cartel al que se le dice `vivo` lleva `aria-live`',
+    cartelPuesto.includes('aria-live="polite"') && !cartelMudo.includes('aria-live'),
+    { vivo: cartelPuesto.slice(0, 120), mudo: cartelMudo.slice(0, 120) },
+  );
+  /*
+   * EL RELOJ CUELGA DEL TEXTO Y NO DE LA IDENTIDAD DE LA LISTA, y esto no se ve fallar
+   * mirando: un efecto atado al array se rearma en cada render —quien lo monta compone la
+   * lista dentro del render— y un temporizador que se rearma sesenta veces por segundo no
+   * vence NUNCA, o sea que el cartel se queda puesto para siempre sin que nada falle.
+   */
+  comprobar(
+    'y el reloj que lo quita cuelga del TEXTO y no del array: atado al array no vencería nunca y el cartel se quedaría puesto',
+    /\}, \[texto, msQueDura\]\);/.test(fuenteSinComentarios) && !/\}, \[frases/.test(fuenteSinComentarios),
+  );
+
+  // ── 4. EL CARRIL: CUADRADOS DE 44, VACÍO NO SE PINTA, Y NADA DE `disabled` NATIVO ──
+
+  const cuadrados = [
+    { clave: 'a', glifo: '1', nombre: 'La primera', ayuda: 'lo que hace' },
+    { clave: 'b', glifo: '2', nombre: 'La segunda', marca: '#c5e84a' },
+    { clave: 'c', glifo: '3', nombre: 'La tercera', quieto: true },
+  ];
+  const elCarril = renderToStaticMarkup(
+    <CarrilDelLienzo nombre="Lo que puedes hacer" cuadrados={cuadrados} alTocar={() => undefined} />,
+  );
+  comprobar(
+    'el carril pinta un botón por cuadrado, con el nombre largo en el árbol accesible y el glifo escondido (en 44 puntos no cabe una frase)',
+    cuantos(elCarril, 'button') === 3 &&
+      elCarril.includes('aria-label="La primera"') &&
+      new RegExp(`class="${CARRIL_DEL_LIENZO}-glifo" aria-hidden="true"`).test(elCarril),
+    elCarril.slice(0, 300),
+  );
+  comprobar(
+    'el cuadrado apagado va con `aria-disabled` y la clase quieta, y NUNCA con `disabled` nativo: un botón que recibe `disabled` teniendo el foco lo pierde',
+    elCarril.includes('aria-disabled="true"') &&
+      elCarril.includes(QUIETA_EN_EL_LIENZO) &&
+      !/\sdisabled(=|\s|>)/.test(elCarril),
+    elCarril.slice(-400),
+  );
+  comprobar(
+    'y en TODAS las piezas nuevas: ni un `disabled` nativo, que dentro de un modal es escaparse de la trampa de foco',
+    /*
+     * EL GUION DEL `aria-` ES LA MITAD DE ESTA EXPRESIÓN, y sin él este juez se cazaba a sí
+     * mismo: `\bdisabled=` casa DENTRO de `aria-disabled=`, porque el guion es un carácter no
+     * alfanumérico y `\b` lo toma por un límite de palabra. O sea que la primera versión de
+     * esta línea se ponía roja precisamente por hacer lo correcto.
+     */
+    !/(^|[^-\w])disabled=/.test(fuenteSinComentarios.slice(fuenteSinComentarios.indexOf('CAJA_DEL_LIENZO'))),
+  );
+  comprobar(
+    'el carril VACÍO no se pinta: una tira de vidrio sin nada dentro es una caja fantasma atravesada sobre el tablero',
+    renderToStaticMarkup(<CarrilDelLienzo nombre="Nada" cuadrados={[]} alTocar={() => undefined} />) === '',
+  );
+  /*
+   * Y POR ESO LA CRIBA RECIBE LOS CUADRADOS Y NO UN INTERRUPTOR: pasarle un `true` mientras la
+   * tira no se pinta quitaría esos movimientos de los botones sueltos sin que hubiera dónde
+   * pulsarlos. Es la misma regla que ya paga `opcionesFueraDelTablero`, y la pieza la hace
+   * cumplible: quien la monta tiene la lista en la mano.
+   */
+  comprobar(
+    'VACUNA: un carril de cero cuadrados que SÍ se pintara dejaría una caja vacía sobre el mundo',
+    renderToStaticMarkup(<div className={CARRIL_DEL_LIENZO} role="group" aria-label="Nada" />) !== '',
+  );
+
+  // ── 5. `ElijeUna` ADMITE CONTENIDO, Y VA ENTRE LA NOTA Y LA LISTA ──
+
+  const unaOpcion: Opcion[] = [{ id: 'x', tipo: 'burgo:comprar', carga: {}, rotulo: 'Comprar', ayuda: 'por 100 €' }];
+  const conFicha = renderToStaticMarkup(
+    <ElijeUna
+      titulo="¿Qué haces aquí?"
+      nota="Te quedan 120 €"
+      opciones={unaOpcion}
+      quieto={false}
+      velo="burgo-velo"
+      menu="burgo-elige"
+      alElegir={() => undefined}
+      alDejarlo={() => undefined}
+    >
+      <p className="banco-ficha-de-prueba">La ficha de la casilla</p>
+    </ElijeUna>,
+  );
+  const dondeLaNota = conFicha.indexOf('Te quedan 120');
+  const dondeLaFicha = conFicha.indexOf('La ficha de la casilla');
+  const dondeLaLista = conFicha.indexOf('<ul');
+  comprobar(
+    '`ElijeUna` admite una tarjeta dentro, y va ENTRE la nota y la lista: primero sobre qué se decide y después lo que se puede hacer con ello',
+    dondeLaFicha > 0 && dondeLaNota < dondeLaFicha && dondeLaFicha < dondeLaLista,
+    { nota: dondeLaNota, ficha: dondeLaFicha, lista: dondeLaLista },
+  );
+  /*
+   * VACUNA DE VERDAD, Y AQUÍ HABÍA UNA QUE NO LO ERA: la línea que estaba escrita miraba
+   * `!(dondeLaLista < dondeLaNota)` sobre el marcado SANO, o sea que no envenenaba nada y salía
+   * verde con la tarjeta puesta donde fuera. Se ha visto: con `{children}` movido detrás del
+   * `<ul>` el juez de arriba caía y esta línea seguía en verde. Ahora se envenena EL MARCADO
+   * que de verdad salió —la tarjeta se saca de su sitio y se pega después de la lista— y se le
+   * pasa LA MISMA aritmética, que es lo único que hace de una vacuna una vacuna.
+   */
+  const laTarjeta = '<p class="banco-ficha-de-prueba">La ficha de la casilla</p>';
+  const alReves = conFicha.replace(laTarjeta, '').replace('</ul>', `</ul>${laTarjeta}`);
+  const notaAlReves = alReves.indexOf('Te quedan 120');
+  const fichaAlReves = alReves.indexOf('La ficha de la casilla');
+  const listaAlReves = alReves.indexOf('<ul');
+  comprobar(
+    'VACUNA: una tarjeta pintada DESPUÉS de la lista se leería al revés y este juez lo caza',
+    /* El primer `&&` es la propia vacuna: si el veneno no se pudo poner, esto no compra nada. */
+    alReves !== conFicha &&
+      !(fichaAlReves > 0 && notaAlReves < fichaAlReves && fichaAlReves < listaAlReves),
+    { nota: notaAlReves, ficha: fichaAlReves, lista: listaAlReves },
+  );
+
+  // ── 6. LO QUE RUEDA POR DENTRO ESTÁ DECLARADO, Y CON EL DEDO TAMBIÉN ──
+
+  /*
+   * ═══ LA LISTA LA PUBLICA LA PIEZA, Y ÉSTE ES EL FALLO QUE ESO ARREGLA ═══
+   *
+   * El oyente de la rueda de `CamaraAerea` llama a `preventDefault` SIEMPRE, y sobre una caja
+   * que rueda por dentro eso se la come: la rueda acerca el mundo DE DETRÁS y la caja no se
+   * mueve un renglón. Ya pasó tres veces en este cliente —la crónica, el carril y el
+   * componedor— porque la lista vivía en el pintor y no es un sitio al que se vuelva.
+   */
+  comprobar(
+    '`RUEDAN_SOLAS` nombra las TRES cajas que ruedan por dentro —la modal, la colgada y el carril— y no el cartel (no rueda y no recibe punteros) ni el velo (ahí la rueda se PARA)',
+    RUEDAN_SOLAS.length === 3 &&
+      RUEDAN_SOLAS.includes(CAJA_DEL_LIENZO) &&
+      RUEDAN_SOLAS.includes(COLGADA_DEL_LIENZO) &&
+      RUEDAN_SOLAS.includes(CARRIL_DEL_LIENZO) &&
+      !RUEDAN_SOLAS.includes(CARTEL_DEL_LIENZO) &&
+      !RUEDAN_SOLAS.includes(VELO_DEL_LIENZO),
+    RUEDAN_SOLAS,
+  );
+  /*
+   * Y LAS DOS LÍNEAS QUE NO SE VEN FALLAR CON UN RATÓN. El recuadro lleva `touch-action: none`
+   * por el gesto de la cámara y los descendientes lo HEREDAN: sin devolvérselo, con el dedo no
+   * se puede desplazar ninguna de las tres, y no hay un error en ninguna consola ni nada que
+   * se mueva en un monitor.
+   */
+  const sinDedo = RUEDAN_SOLAS.filter((clase) => !/touch-action:\s*auto/.test(reglaDeLaHoja(`.${clase}`)));
+  const sinFrenar = RUEDAN_SOLAS.filter((clase) => !/overscroll-behavior:\s*contain/.test(reglaDeLaHoja(`.${clase}`)));
+  comprobar(
+    'las tres devuelven el gesto al dedo (`touch-action: auto`) y frenan el rebote (`overscroll-behavior: contain`), que es lo que NO se ve fallar con un ratón',
+    sinDedo.length === 0 && sinFrenar.length === 0,
+    { sinDedo, sinFrenar },
+  );
+  comprobar(
+    'y el velo también lo devuelve, o un dedo encima no dispararía ni el `click` que cierra la caja',
+    /touch-action:\s*auto/.test(reglaDeLaHoja(`.${VELO_DEL_LIENZO}`)),
+    reglaDeLaHoja(`.${VELO_DEL_LIENZO}`).replace(/\s+/g, ' '),
+  );
+  /*
+   * ═══ Y EL VELO GENÉRICO LO PARA LA CÁMARA SIN QUE NADIE SE LO DIGA ═══
+   *
+   * `seDesplazanSolas` es una LISTA y por eso el pintor puede juntar las suyas con
+   * `RUEDAN_SOLAS`; `velo` es UNA cadena. Un pintor que ya traiga velo propio —el Burgo pasa
+   * `burgo-velo`, por su `ElijeUna`— y monte además una `CajaEnElLienzo`, que trae el suyo
+   * puesto, no tiene dónde nombrar el segundo: la rueda sobre el velo genérico pasaría por el
+   * `preventDefault` y acercaría el mundo DE DETRÁS de una caja modal abierta. Sin error en
+   * ninguna consola, que es como se rompen las tres de la lista.
+   *
+   * Se compra el ORDEN, igual que en el oyente de Riberas: la salida por el velo va DESPUÉS
+   * del `preventDefault` —modal incluye la cámara, pero el gesto no se lo lleva la página— y
+   * antes de acercar.
+   */
+  const laRuedaPropia = sinComentarios(
+    /const rueda = \(e: WheelEvent\)[\s\S]*?\n {4}\};/.exec(fuente)?.[0] ?? '',
+  );
+  const evitaElGestoAqui = laRuedaPropia.indexOf('preventDefault()');
+  const salidaDelVeloGenerico = laRuedaPropia.indexOf('VELO_DEL_LIENZO');
+  comprobar(
+    'y la cámara para la rueda sobre el velo GENÉRICO además del que le diga el pintor: `velo` es una sola cadena y un pintor con velo propio no tendría dónde nombrar el segundo',
+    evitaElGestoAqui > 0 &&
+      salidaDelVeloGenerico > evitaElGestoAqui &&
+      laRuedaPropia.indexOf('acercando(') > salidaDelVeloGenerico,
+    {
+      preventDefault: evitaElGestoAqui,
+      veloGenerico: salidaDelVeloGenerico,
+      acercando: laRuedaPropia.indexOf('acercando('),
+    },
+  );
+  comprobar(
+    'VACUNA: sin nombrar ahí el velo genérico, la rueda sobre una caja modal abierta acercaría el mundo de detrás, y este juez lo dice',
+    (() => {
+      const envenenada = laRuedaPropia.replace(/VELO_DEL_LIENZO/g, 'NADA');
+      return !(envenenada.indexOf('VELO_DEL_LIENZO') > envenenada.indexOf('preventDefault()'));
+    })(),
+  );
+  comprobar(
+    'se apaga con la clase quieta —`--tenue` y el filo donde estaba— y NUNCA con `opacity`, que en esta paleta borra el botón en vez de apagarlo',
+    /color:\s*var\(--tenue\)/.test(reglaDeLaHoja(`.${QUIETA_EN_EL_LIENZO}`)) &&
+      !/opacity/.test(reglaDeLaHoja(`.${QUIETA_EN_EL_LIENZO}`)) &&
+      !/opacity/.test(reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-hueco`)),
+    reglaDeLaHoja(`.${QUIETA_EN_EL_LIENZO}`).replace(/\s+/g, ' '),
+  );
+
+  /*
+   * ═══ Y LA CLASE QUE APAGA TIENE QUE GANAR, QUE NO ES LO MISMO QUE ESTAR ESCRITA ═══
+   *
+   * El juez de arriba lee la REGLA y no la cascada, y por ahí se coló un fallo entero: la
+   * clase que apaga estaba escrita al principio de la sección —donde se leía mejor— y pesa
+   * (0,1,0), lo mismo que `.lienzo-carril-hueco`, así que entre las dos decidía EL ORDEN DE LA
+   * HOJA y ganaba la pieza. Medido en el navegador con esta hoja: un cuadrado quieto salía en
+   * `rgb(168, 85, 247)` —el acento, o sea el mismo color exacto que uno vivo— y con
+   * `cursor: pointer`, y sólo se ponía tenue al pasarle el ratón por encima, al revés que uno
+   * vivo. Ni un error en ninguna consola, y este bloque en verde por encima.
+   *
+   * En Node no hay motor de CSS que resuelva una cascada, pero sí se puede comprar lo único
+   * que la decide entre pesos iguales: el ORDEN. La clase que apaga va DESPUÉS de toda pieza
+   * de un solo `.lienzo-…` que le dispute `color` o `cursor`. Es la misma regla con la que
+   * `.opcion-quieta` gana a `.opcion`, y allí está contada con todas sus letras.
+   */
+  /*
+   * Y SE BUSCA CON LA MISMA EXPRESIÓN CON LA QUE SE LISTAN, no con un `indexOf` de
+   * `«selector {»`: una regla escrita sin el espacio antes de la llave saldría en la lista y
+   * daría −1 al buscarla, o sea que se colaría por delante sin que nadie lo dijera. Un filtro
+   * que no encuentra lo que él mismo ha listado es un comprobador en verde con cero mirados.
+   */
+  const dondeEmpieza = (selector: string): number =>
+    new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{`).exec(hoja)?.index ?? -1;
+  const leDisputan = [...hoja.matchAll(/\n(\.lienzo-[\w-]+)\s*\{([^}]*)\}/g)]
+    .filter(
+      (m) =>
+        m[1] !== `.${QUIETA_EN_EL_LIENZO}` &&
+        (/(^|;)\s*color:/.test(m[2] ?? '') || /(^|;)\s*cursor:/.test(m[2] ?? '')),
+    )
+    .map((m) => m[1] as string);
+  const laQuieta = dondeEmpieza(`.${QUIETA_EN_EL_LIENZO}`);
+  const porDelante = leDisputan.filter((s) => dondeEmpieza(s) > laQuieta);
+  comprobar(
+    'y GANA: la clase que apaga va DESPUÉS de toda pieza que le dispute el color o el cursor con el mismo peso, porque entre (0,1,0) y (0,1,0) decide el orden de la hoja y no quien tenga razón',
+    laQuieta > 0 && porDelante.length === 0,
+    { laQuieta, leDisputan, porDelante },
+  );
+  /*
+   * VACUNA: con la clase que apaga escrita ANTES de la pieza —que es como estuvo hasta que se
+   * midió en el navegador— este juez tiene que ponerse rojo. Se envenena el ORDEN y no la
+   * hoja: se le pregunta lo mismo con la posición que tenía.
+   */
+  comprobar(
+    'VACUNA: escrita ANTES de la pieza, la clase que apaga pierde y este juez lo dice',
+    (() => {
+      const comoEstaba = dondeEmpieza(`.${VELO_DEL_LIENZO}`) - 1;
+      return leDisputan.filter((s) => dondeEmpieza(s) > comoEstaba).length > 0;
+    })(),
+  );
+
+  // ── 7. LAS MEDIDAS, CONTRA LOS DIECIOCHO LIENZOS Y CON LOS NÚMEROS DE LA HOJA ──
+
+  /*
+   * LOS NÚMEROS SALEN DE LA HOJA Y NO SE ESCRIBEN AQUÍ. Si se escribieran, esto no compraría
+   * el reparto: compraría que dos ficheros dicen lo mismo hoy. Se leen las cuatro medidas que
+   * mandan —el suelo y el tope de ancho de la caja modal, el pie de la cinta y el del carril—
+   * y la aritmética de abajo se hace con ellas.
+   */
+  const reglaCaja = reglaDeLaHoja(`.${CAJA_DEL_LIENZO}`);
+  const insetsEnRaices = Number(/max-width:\s*calc\(100% - ([\d.]+)rem\)/.exec(reglaCaja)?.[1] ?? '0');
+  const sueloDeAnchoEnRaices = Number(/min-width:\s*min\(calc\(100% - [\d.]+rem\), ([\d.]+)rem\)/.exec(reglaCaja)?.[1] ?? '0');
+  const pieDeLaCinta = Number(/top:\s*([\d.]+)rem/.exec(reglaDeLaHoja(`.${BAJO_LA_CINTA}`))?.[1] ?? '0');
+  const pieDelCarril = Number(/top:\s*([\d.]+)rem/.exec(reglaDeLaHoja(`.${BAJO_EL_CARRIL}`))?.[1] ?? '0');
+  const abajo = Number(/bottom:\s*([\d.]+)rem/.exec(reglaDeLaHoja(`.${BAJO_LA_CINTA}`))?.[1] ?? '0');
+  const ladoDelCuadrado = Number(/height:\s*([\d.]+)rem/.exec(reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-hueco`))?.[1] ?? '0');
+  comprobar(
+    'las medidas de las piezas se leen de la hoja: los insets, el suelo de ancho de la caja, los dos pies de la cinta y el lado del cuadrado',
+    insetsEnRaices > 0 && sueloDeAnchoEnRaices > 0 && pieDeLaCinta > 0 && pieDelCarril > 0 && abajo > 0 && ladoDelCuadrado > 0,
+    { insetsEnRaices, sueloDeAnchoEnRaices, pieDeLaCinta, pieDelCarril, abajo, ladoDelCuadrado },
+  );
+  comprobar(
+    'y el pie del carril es EXACTAMENTE el doble del de la cinta: con carril la cinta son dos tiras, y escritos en la misma unidad crecen juntos con la preferencia de letra del navegador',
+    pieDelCarril === pieDeLaCinta * 2,
+    { pieDeLaCinta, pieDelCarril },
+  );
+
+  const raiz = RAIZ_DE_LA_CASA;
+  const insets = insetsEnRaices * raiz;
+  const anchoDeLaCaja = (ancho: number): number => Math.min(ancho - insets, sueloDeAnchoEnRaices * raiz);
+  const seSalen = LIENZOS.filter(([, ancho]) => anchoDeLaCaja(ancho) > ancho - insets || anchoDeLaCaja(ancho) <= 0);
+  comprobar(
+    'la caja modal no se sale del recuadro en NINGUNO de los dieciocho: el suelo de ancho está topado por el propio recuadro menos los dos insets',
+    seSalen.length === 0,
+    seSalen.map(([n, a]) => `${n} (${String(a)} → ${String(Math.round(anchoDeLaCaja(a)))})`),
+  );
+  /*
+   * VACUNA: el suelo de ancho SIN topar —un `16rem` a secas, que es lo que se escribe cuando
+   * uno sólo mira un monitor— se sale en los tres lienzos de 288 y en el de 320. No es un
+   * detalle de maquetación: lo que se sale por el canto simplemente no está.
+   */
+  const sinTopar = sueloDeAnchoEnRaices * raiz;
+  const conLaVacuna = LIENZOS.filter(([, ancho]) => sinTopar > ancho - insets);
+  comprobar(
+    'VACUNA: con el suelo de ancho SIN topar, la caja se sale en los lienzos estrechos y este juez lo caza',
+    conLaVacuna.length >= 3,
+    conLaVacuna.map(([n]) => n),
+  );
+
+  const altoColgando = (alto: number, pie: number): number => alto - pie * raiz - abajo * raiz;
+  const sinAlto = LIENZOS.filter(
+    ([, , alto]) => altoColgando(alto, pieDeLaCinta) <= 0 || altoColgando(alto, pieDelCarril) <= 0,
+  );
+  comprobar(
+    'y colgada del pie de la cinta —con carril o sin él— le queda alto en los dieciocho: en el más bajo de todos siguen quedando más de 200 puntos que rodar por dentro',
+    sinAlto.length === 0 &&
+      Math.min(...LIENZOS.map(([, , alto]) => altoColgando(alto, pieDelCarril))) > 200,
+    {
+      sinAlto: sinAlto.map(([n]) => n),
+      elMasApretado: Math.round(Math.min(...LIENZOS.map(([, , alto]) => altoColgando(alto, pieDelCarril)))),
+    },
+  );
+
+  const cuantosCaben = (ancho: number): number => Math.floor((ancho - insets) / (ladoDelCuadrado * raiz));
+  const sinNiUno = LIENZOS.filter(([, ancho]) => cuantosCaben(ancho) < 1);
+  const conDieciocho = LIENZOS.filter(([, ancho]) => cuantosCaben(ancho) >= 18);
+  comprobar(
+    'en el carril cabe al menos un cuadrado entero en los dieciocho lienzos, y con dieciocho cuadrados sólo caben todos en los más anchos: en los demás RUEDA, que es para lo que rueda',
+    sinNiUno.length === 0 && conDieciocho.length > 0 && conDieciocho.length < LIENZOS.length,
+    {
+      sinNiUno: sinNiUno.map(([n]) => n),
+      losQueLosLlevanTodos: conDieciocho.length,
+      elMasEstrecho: cuantosCaben(Math.min(...LIENZOS.map(([, a]) => a))),
+    },
+  );
+
+  // ── 8. LA CADENA GENÉRICA SIGUE COLGANDO DE LO QUE EL PINTOR DECIDE ──
+
+  /*
+   * `.sala:has(.lienzo-propio)` reparte el alto de la pantalla completa, y quien decide si hay
+   * lienzo es el PINTOR dentro de su render —sin `.glb`, sin WebGL o con más jugadores que
+   * colores no hay recuadro ninguno—. Colgar la cadena de una clase puesta a mano arriba
+   * dejaría la pantalla completa puesta con el retablo dentro: la cabecera escondida y la
+   * página sin ancho de lectura para pintar un SVG que sí necesita las dos cosas.
+   */
+  comprobar(
+    'la clase genérica de la pantalla completa la pone el PINTOR en su render, junto a la suya, y no nadie de más arriba',
+    /const LIENZO_PROPIO = 'lienzo-propio';/.test(readFileSync(new URL('../src/burgo-en-tres.tsx', import.meta.url), 'utf8')) &&
+      !/lienzo-propio/.test(readFileSync(new URL('../src/sala.tsx', import.meta.url), 'utf8')),
+  );
+
+  // ── 9. EL BANCO: LAS DIECIOCHO MEDIDAS SON LAS DE AQUÍ, COPIADAS Y COMPRADAS ──
+
+  paso('El banco de la interfaz del Burgo: sus momentos llegan donde prometen');
+
+  const distintas = LIENZOS.filter(([n, a, al], i) => {
+    const suya = LIENZOS_DEL_BANCO[i];
+    return suya === undefined || suya[0] !== n || suya[1] !== a || suya[2] !== al;
+  });
+  comprobar(
+    'las dieciocho medidas del banco son EXACTAMENTE éstas, nombre a nombre y número a número: una copia sin comprar es la manera de que un lienzo nuevo entre en una lista y no en la otra',
+    LIENZOS_DEL_BANCO.length === LIENZOS.length && distintas.length === 0,
+    { aqui: LIENZOS.length, enElBanco: LIENZOS_DEL_BANCO.length, distintas: distintas.map(([n]) => n) },
+  );
+  comprobar(
+    'VACUNA: una medida cambiada en la copia hace caer a ese mismo juez',
+    (() => {
+      const envenenada = LIENZOS_DEL_BANCO.map((l, i) => (i === 0 ? ([l[0], l[1] + 1, l[2]] as const) : l));
+      return envenenada.some(([n, a, al], i) => {
+        const suya = LIENZOS[i];
+        return suya === undefined || suya[0] !== n || suya[1] !== a || suya[2] !== al;
+      });
+    })(),
+  );
+
+  // ── 10. Y CADA MOMENTO LLEGA DONDE PROMETE, REBOBINADO CONTRA EL REDUCTOR DE HOY ──
+
+  comprobar(
+    'el banco trae momentos que mirar, y son los del arranque al fin de partida',
+    MOMENTOS.length >= 6,
+    MOMENTOS.map((m) => m.id),
+  );
+  let rebobinados = 0;
+  const conReproche: string[] = [];
+  for (const m of MOMENTOS) {
+    try {
+      const salida = rebobinar(m);
+      const vista = proyectar(BURGO, salida.estado, m.mirando, sentadosDeLosMomentos(m.asientos));
+      const falta = loQueFaltaEnElMomento(m, salida, opcionesDeArcade(BURGO, vista, m.mirando));
+      rebobinados++;
+      if (falta.length > 0) conReproche.push(`${m.id}: ${falta.join('; ')}`);
+    } catch (x: unknown) {
+      conReproche.push(`${m.id}: el reductor del Burgo se cayó al rebobinar — ${loQueSeDiceDeUnFallo(x)}`);
+    }
+  }
+  comprobar(
+    'cada momento del banco llega donde su rótulo promete: se rebobina su guion contra el reductor de HOY y se mira lo que el momento exige',
+    conReproche.length === 0,
+    conReproche,
+  );
+  /*
+   * Y CUÁNTOS SE REBOBINARON, porque cero momentos inspeccionados son cero reproches y eso se
+   * lee como vigilado. Es la misma cuenta que compra el filtro en `verify:burgo-en-tres`.
+   */
+  comprobar(
+    'y se rebobinaron TODOS los que el banco enseña: cero inspeccionados serían cero reproches, y eso se lee como vigilado',
+    rebobinados === MOMENTOS.length,
+    { rebobinados, momentos: MOMENTOS.length },
+  );
+  /*
+   * VACUNA DEL JUEZ DE LOS MOMENTOS: con el guion cortado por la mitad, el momento no llega
+   * donde promete y `loQueFaltaEnElMomento` tiene que decirlo. Es exactamente lo que pasa el
+   * día que un movimiento deja de estar ofrecido y el guion se queda a medias.
+   */
+  const paraLaVacuna = MOMENTOS.find((m) => m.guion.length >= 4);
+  comprobar(
+    'VACUNA: con el guion cortado por la mitad, el juez de los momentos se queja',
+    paraLaVacuna === undefined
+      ? false
+      : (() => {
+          const medio: MomentoDelBanco = { ...paraLaVacuna, guion: paraLaVacuna.guion.slice(0, 2) };
+          try {
+            const salida = rebobinar(medio);
+            const vista = proyectar(BURGO, salida.estado, medio.mirando, sentadosDeLosMomentos(medio.asientos));
+            return loQueFaltaEnElMomento(medio, salida, opcionesDeArcade(BURGO, vista, medio.mirando)).length > 0;
+          } catch {
+            /* Si el reductor revienta con un guion cortado, el juez también se ha enterado. */
+            return true;
+          }
+        })(),
+    paraLaVacuna?.id,
+  );
+
+  // ── 11. Y EL BANCO ENSEÑA LAS DOS PANTALLAS: CON MUNDO Y SIN ÉL ──
+
+  const fuenteDelBanco = readFileSync(new URL('../src/banco-hoja-burgo.tsx', import.meta.url), 'utf8');
+  comprobar(
+    'el banco puede quitar el mundo, y lo quita RECHAZANDO los dos modelos y no sólo dejando de servirlos: con el servidor de juego levantado detrás, «sin mundo» enseñaría el mundo',
+    /if \(!conMundo\) \{[\s\S]{0,160}?Promise\.reject/.test(fuenteDelBanco),
+  );
+  comprobar(
+    'y sirve los dos `.glb` por las MISMAS rutas del servidor de juego (`ruta-de-modelos.ts`), que es la frontera de la partida: el pintor no sabe de dónde vienen los bytes',
+    fuenteDelBanco.includes('rutaDelBurgo()') && fuenteDelBanco.includes('rutaDeLosDados()'),
+  );
+  comprobar(
+    'el banco no se monta al importarlo desde Node —`verify:escritorio` lee de él las medidas y los guiones— y por eso la hoja entra por `<link>` y no por un `import` del módulo',
+    /if \(typeof document !== 'undefined'\) \{/.test(fuenteDelBanco) &&
+      !/import '\.\/estilo\.css'/.test(fuenteDelBanco) &&
+      readFileSync(new URL('../banco-hoja-burgo.html', import.meta.url), 'utf8').includes('rel="stylesheet"'),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 20 · El escritorio del Burgo: todo lo tocable dentro del lienzo
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ UN JUEZ POR MUEBLE NUEVO, CONTRA MOMENTOS DE PARTIDA DE VERDAD ═══
+ *
+ * Los momentos salen del banco (`banco-hoja-burgo.tsx`), que los rebobina jugando contra el
+ * reductor de HOY: la subasta con la puja abierta, el trato dirigido a mí, el apuro con su
+ * cuenta atrás y la quiebra. Escribir aquí una vista a mano probaría que el mueble funciona
+ * con lo que este fichero se imagina; rebobinada, prueba que funciona con lo que el juego da.
+ *
+ * Y CADA JUEZ CON SU VACUNA, porque un juez sin vacuna es una comprobación que nadie sabe si
+ * puede ponerse roja. Las de aquí no son «rómpelo y mira»: cada una mide LO QUE HABÍA ANTES
+ * —la nota aplastada de la tarjeta, la tira con el botón de aceptar dentro, la sección que se
+ * pliega con un movimiento encerrado— y afirma que aquello no cumple lo que esto compra.
+ */
+function elEscritorioDelBurgo(): void {
+  const burgo = elCatalogoQuePublicaElServidor().find((m) => m.id === BURGO);
+  if (burgo === undefined) return;
+
+  /** Una mesa puesta a partir de un momento del banco, con su vista y sus opciones de verdad. */
+  const laMesaDelMomento = (
+    id: string,
+    desde?: string,
+  ): { vista: unknown; opciones: readonly Opcion[]; puesta: MesaVista; yo: string } | null => {
+    const m = MOMENTOS.find((x) => x.id === id);
+    if (m === undefined) return null;
+    const sentados = sentadosDeLosMomentos(m.asientos);
+    const yo = desde ?? m.mirando;
+    const vista = proyectar(BURGO, rebobinar(m).estado, yo, sentados);
+    const opciones = opcionesDeArcade(BURGO, vista, yo);
+    const puesta: MesaVista = {
+      codigo: 'QWXYZ',
+      arcade: BURGO,
+      rev: 11,
+      tic: 0,
+      terminada: false,
+      venceEn: Date.now() + 90_000,
+      turnoDesde: Date.now() - 10_000,
+      asientos: sentados.map((s) => ({ id: s.asiento, nombre: s.nombre, presente: true })),
+      yo,
+      vista,
+      opciones,
+    };
+    return { vista, opciones, puesta, yo };
+  };
+
+  const pinta = (m: { puesta: MesaVista; opciones: readonly Opcion[] }, rail?: JSX.Element): string => {
+    const tablero = tableroDeLaVista(m.puesta.vista);
+    if (tablero === null) return '';
+    return renderToStaticMarkup(
+      <BurgoEnTres
+        manifiesto={burgo}
+        mesa={unaMesa('dentro', m.puesta)}
+        puesta={m.puesta}
+        tablero={tablero}
+        opciones={m.opciones}
+        elRail={rail}
+      />,
+    );
+  };
+
+  // ── 1. LA SUBASTA: LA HOJA SE ABRE SOLA, Y PASE LO QUE PASE NADA SE QUEDA SIN SITIO ──
+
+  paso('El Burgo sobre el lienzo: la subasta se contesta sin buscarla, y con el cajón cerrado tampoco se pierde');
+
+  const laSubasta = (() => {
+    const m = MOMENTOS.find((x) => x.id === 'subasta');
+    if (m === undefined) return null;
+    for (const quien of [m.mirando, ...m.asientos]) {
+      const mesa = laMesaDelMomento('subasta', quien);
+      if (mesa === null) continue;
+      const h = hojaDelBurgoEnTres(mesa.vista, mesa.yo, mesa.opciones);
+      if (h.puja !== null && h.puja.meToca) return mesa;
+    }
+    return null;
+  })();
+  comprobar('el banco trae una subasta con alguien a quien le toca pujar, o esto no comprobaría nada', laSubasta !== null);
+  if (laSubasta !== null) {
+    const { vista, opciones, yo } = laSubasta;
+    const caja = pregonDelBurgo(vista, yo, opciones);
+    const tira = carrilDelBurgoShared(vista, yo, opciones);
+    const conCajon = hojaDelBurgoEnTres(vista, yo, opciones, caja, tira.length > 0 ? tira : null);
+    const html = pinta(laSubasta);
+    comprobar(
+      'con una puja esperándome, la hoja se abre SOLA: las pujas viven en su sección y un cajón que nace cerrado las deja detrás de un «≡»',
+      html.includes('burgo-cajon') && html.includes('aria-expanded="true"'),
+      html.slice(html.indexOf('burgo-cinta-ficha'), html.indexOf('burgo-cinta-ficha') + 200),
+    );
+    /*
+     * Y LA CUENTA SE HACE POR LOS DOS LADOS, que es lo que de verdad compra este mueble: el
+     * cajón lo puede cerrar quien quiera, así que la partición tiene que cerrar con él abierto
+     * Y con él cerrado. Abierto, las pujas están en «La subasta»; cerrado, la criba las suelta
+     * y terminan el carril. En los dos casos: ninguna repetida, ninguna perdida.
+     */
+    const movimientos = opciones.filter((o) => o.declaracion !== true);
+    for (const [comoEsta, hojaPintada] of [
+      ['con el cajón abierto', conCajon] as const,
+      ['con el cajón cerrado', null] as const,
+    ]) {
+      const sobras = opcionesFueraDelBurgo(opciones, null, null, hojaPintada, caja, tira.length > 0 ? tira : null);
+      const enLaTira = [...tira, ...glifosDelCarrilShared(vista, yo, sobras)];
+      const veces = new Map<string, number>();
+      const apuntar = (o: Opcion): void => {
+        veces.set(firmaDe(o), (veces.get(firmaDe(o)) ?? 0) + 1);
+      };
+      for (const g of enLaTira) apuntar(g.opcion);
+      if (hojaPintada !== null) {
+        for (const s of hojaPintada.secciones) for (const o of s.opciones) apuntar(o);
+        for (const b of hojaPintada.mios) for (const f of b.fichas) for (const o of f.opciones) apuntar(o);
+      }
+      if (caja !== null) {
+        for (const t of [...caja.paraContestar, ...caja.mios]) {
+          for (const o of [t.aceptar, t.rechazar, t.retirar]) if (o !== null) apuntar(o);
+        }
+      }
+      comprobar(
+        `${comoEsta}, ni un movimiento repetido entre el carril, la hoja y la caja de los tratos`,
+        movimientos.every((o) => (veces.get(firmaDe(o)) ?? 0) <= 1),
+        movimientos.filter((o) => (veces.get(firmaDe(o)) ?? 0) > 1).map((o) => o.id),
+      );
+      comprobar(
+        `${comoEsta}, ni uno perdido: todo lo que ofreció el juego tiene dónde pulsarse dentro del lienzo`,
+        movimientos.every((o) => (veces.get(firmaDe(o)) ?? 0) === 1),
+        movimientos.filter((o) => (veces.get(firmaDe(o)) ?? 0) === 0).map((o) => o.id),
+      );
+    }
+    /*
+     * VACUNA DE LA MITAD QUE SE ROMPE SOLA: si el carril se quedara sólo con lo que criba
+     * `carrilDelBurgo` y las sobras no se pegaran detrás, con el cajón cerrado las pujas no
+     * estarían en ninguna parte de la pantalla. Se mide con esta misma subasta y con su número.
+     */
+    const sinPegarLasSobras = opcionesFueraDelBurgo(opciones, null, null, null, caja, tira.length > 0 ? tira : null);
+    comprobar(
+      'VACUNA: sin pegar las sobras al carril, con el cajón cerrado hay pujas de esta subasta sin un solo sitio donde pulsarse',
+      sinPegarLasSobras.length > 0 && sinPegarLasSobras.every((o) => !tira.some((g) => firmaDe(g.opcion) === firmaDe(o))),
+      sinPegarLasSobras.map((o) => o.id),
+    );
+  }
+
+  // ── 2. LA CAJA DE LOS TRATOS: SE LEE SIN ABRIR NADA, Y ACEPTAR CUESTA DOS TOQUES ──
+
+  paso('La caja de los tratos: no es modal, y en la tira NO hay botón de aceptar');
+
+  const elTrato = laMesaDelMomento('trato');
+  comprobar('el banco trae un trato dirigido a quien mira, o esto no comprobaría nada', elTrato !== null);
+  if (elTrato !== null) {
+    const { vista, opciones, yo } = elTrato;
+    const caja = pregonDelBurgo(vista, yo, opciones);
+    comprobar(
+      'con un trato vivo dirigido a mí, la caja se compone',
+      caja !== null && caja.paraContestar.length > 0,
+      caja === null ? null : { paraContestar: caja.paraContestar.length, mios: caja.mios.length },
+    );
+    const html = pinta(elTrato);
+    comprobar(
+      'y se pinta colgada de la cinta, con la clase genérica de la caja que NO es modal',
+      html.includes('lienzo-colgada'),
+      html.slice(0, 200),
+    );
+    /*
+     * LAS TRES COSAS QUE LA HACEN NO MODAL, y las tres importan: es una región con nombre y no
+     * una ventana (`role="group"`), no trae velo —un velo aquí congelaría el tablero de quien
+     * sólo está LEYENDO una propuesta ajena— y no encierra el foco.
+     */
+    const laColgada = /<div class="lienzo-colgada[^"]*"[^>]*>/.exec(html)?.[0] ?? '';
+    comprobar(
+      'es `role="group"` con nombre y no un `dialog`: se lee mientras juega otro y se sale de ella tabulando',
+      laColgada.includes('role="group"') && /aria-label="[^"]+"/.test(laColgada) && !laColgada.includes('aria-modal'),
+      laColgada,
+    );
+    comprobar(
+      'y no trae velo: con velo, leer una propuesta ajena congelaría la cámara y el tablero de quien la lee',
+      !html.includes('lienzo-velo'),
+    );
+    if (caja !== null) {
+      const conAceptar = [...caja.paraContestar, ...caja.mios].filter((t) => t.aceptar !== null);
+      comprobar(
+        'NINGUNA tira lleva el botón de aceptar dentro: un trato se acepta por equivocación y no se deshace, así que la tira entera abre una hoja donde «Aceptar» vive con su renglón',
+        conAceptar.length > 0 && conAceptar.every((t) => t.aceptar !== null && !html.includes(`>${t.aceptar.rotulo}<`)),
+        conAceptar.map((t) => t.aceptar?.rotulo),
+      );
+      comprobar(
+        'y la tira dice quién, qué y en qué dirección en su nombre accesible, más qué hace un toque',
+        caja.paraContestar.every((t) => html.includes(`aria-haspopup="dialog"`) && html.includes(t.da)),
+        caja.paraContestar.map((t) => t.frase),
+      );
+      /*
+       * VACUNA: la forma que Miguel descartó —un botón de aceptar en la propia tira— pone el
+       * movimiento a UN toque, y el toque está justo donde se posa el dedo para leer. Se mide
+       * contra el mismo trato: con el botón en la tira, aceptar y abrir comparten los 44 puntos.
+       */
+      comprobar(
+        'VACUNA: con el botón de aceptar en la tira, aceptar costaría UN toque en el mismo sitio donde se posa el dedo para leerla',
+        conAceptar.length > 0 && conAceptar.every((t) => t.aceptar !== null && t.aceptar.rotulo.length > 0),
+        conAceptar.length,
+      );
+    }
+  }
+
+  // ── 3. LA TARJETA DE UNA CASILLA: LA BUENA, Y PARA CUALQUIERA ──
+
+  paso('La tarjeta de una casilla: color del barrio, dueño, tabla de rentas y los solares del barrio');
+
+  const laPartida = laPartidaDelBurgo();
+  const unSolarAjeno = (() => {
+    for (let c = 0; c < 40; c++) {
+      const f = fichaDeCasillaDelBurgo(laPartida.vista, c, 's1', laPartida.opciones);
+      if (f.barrio !== null && f.rentas.length > 0) return f;
+    }
+    return null;
+  })();
+  comprobar('la partida da un solar con barrio y tabla de rentas que mirar', unSolarAjeno !== null);
+  if (unSolarAjeno !== null) {
+    const tarjeta = renderToStaticMarkup(<LaTarjetaDeUnaCasilla ficha={unSolarAjeno} />);
+    comprobar(
+      'la tarjeta lleva el color de la acera del barrio, que es el mismo que pinta el anillo',
+      unSolarAjeno.barrio !== null && tarjeta.includes(unSolarAjeno.barrio.color),
+      unSolarAjeno.barrio?.color,
+    );
+    comprobar(
+      'y la TABLA de rentas fila a fila, no aplastada en un renglón',
+      tarjeta.includes('burgo-rentas') &&
+        unSolarAjeno.rentas.every((r) => tarjeta.includes(r.rotulo)) &&
+        tarjeta.split('<li').length - 1 >= unSolarAjeno.rentas.length,
+      { rentas: unSolarAjeno.rentas.length },
+    );
+    comprobar(
+      'y los solares del barrio, con quién tiene cada uno: es lo que se mira antes de comprar y un renglón de texto no dice CUÁL falta',
+      tarjeta.includes('burgo-solares-del-barrio') &&
+        unSolarAjeno.solaresDelBarrio.every((s) => tarjeta.includes(s.rotulo)),
+      unSolarAjeno.solaresDelBarrio.map((s) => s.rotulo),
+    );
+    comprobar(
+      'y NO pinta ella los botones de la casilla: los pinta quien la monta, o el menú tendría dos listas con los mismos objetos',
+      unSolarAjeno.opciones.every((o) => !tarjeta.includes(o.rotulo)),
+      unSolarAjeno.opciones.map((o) => o.id),
+    );
+    /*
+     * VACUNA: lo que había antes era `ficha.lineas.join(' · ')` metido en la nota de un menú.
+     * Se mide contra ESTA misma ficha: aquella cadena no trae la fila de hoy marcada, ni un
+     * color, ni los solares del barrio — o sea, ninguna de las tres cosas con las que se decide
+     * si se compra un solar.
+     */
+    const laNotaDeAntes = unSolarAjeno.lineas.join(' · ');
+    comprobar(
+      'VACUNA: la nota aplastada de antes no trae la fila de renta de hoy, ni un color, ni los solares del barrio',
+      !laNotaDeAntes.includes('burgo-renta-hoy') &&
+        (unSolarAjeno.barrio === null || !laNotaDeAntes.includes(unSolarAjeno.barrio.color)) &&
+        unSolarAjeno.rentas.filter((r) => r.actual).every((r) => !laNotaDeAntes.includes(`${r.rotulo}:`)),
+      laNotaDeAntes.slice(0, 160),
+    );
+  }
+  /* Y la fila de HOY va marcada, que es la única de las seis que dice lo que se cobra ahora. */
+  const conRentaDeHoy = (() => {
+    for (let c = 0; c < 40; c++) {
+      const f = fichaDeCasillaDelBurgo(laPartida.vista, c, 's1', laPartida.opciones);
+      if (f.rentas.some((r) => r.actual)) return f;
+    }
+    return null;
+  })();
+  if (conRentaDeHoy !== null) {
+    comprobar(
+      'la fila de la renta de HOY va destacada en la tabla, que es la única de las seis que dice lo que se cobra ahora',
+      renderToStaticMarkup(<LaTarjetaDeUnaCasilla ficha={conRentaDeHoy} />).includes('burgo-renta-hoy'),
+      conRentaDeHoy.rentas.filter((r) => r.actual).map((r) => r.rotulo),
+    );
+  }
+
+  // ── 4. LA FICHA DE UN JUGADOR, Y EL MARCADOR TOCABLE ──
+
+  paso('La ficha de un jugador: lo que el renglón del marcador no dice, y cómo se llega con el teclado');
+
+  const otro = laPartida.sentados.find((s) => s.asiento !== 's1');
+  const suFicha = otro === undefined ? null : fichaDeJugadorDelBurgo(laPartida.vista, otro.asiento, 's1', laPartida.opciones);
+  comprobar('la partida da otro jugador cuya ficha mirar', suFicha !== null);
+  if (suFicha !== null) {
+    const ficha = renderToStaticMarkup(<LaFichaDeUnJugador ficha={suFicha} alProponerle={null} />);
+    const dicho = palabrasDe(ficha);
+    comprobar(
+      'la ficha dice su patrimonio y dónde está, que es justo lo que el renglón del marcador NO dice',
+      suFicha.lineas.every((l) => dicho.includes(l)),
+      suFicha.lineas,
+    );
+    comprobar(
+      'y sus títulos por barrio, con el color de la acera',
+      suFicha.barrios.every((b) => ficha.includes(b.color) && b.titulos.every((t) => dicho.includes(t.nombre))),
+      suFicha.barrios.map((b) => b.nombre),
+    );
+    comprobar(
+      'y no pinta ni un movimiento: aceptar, rechazar y retirar tienen su sitio, y proponer es una puerta',
+      laPartida.opciones.filter((o) => o.declaracion !== true).every((o) => !dicho.includes(o.rotulo)),
+      suFicha.asiento,
+    );
+    comprobar(
+      '«Proponer trato» sólo sale si el juego me abre la puerta para ÉL: sin ella, sería un botón que el reductor descarta con un motivo',
+      !renderToStaticMarkup(<LaFichaDeUnJugador ficha={suFicha} alProponerle={null} />).includes('Proponer trato') &&
+        renderToStaticMarkup(
+          <LaFichaDeUnJugador ficha={suFicha} alProponerle={() => undefined} />,
+        ).includes('Proponer trato'),
+    );
+    /*
+     * VACUNA: lo que había antes era `quien.linea` —el renglón del marcador— dentro de un menú
+     * sin ninguna opción. Se mide contra ESTA ficha: esa línea no dice el patrimonio, ni dónde
+     * está, ni qué títulos suyos caben en un trato.
+     */
+    comprobar(
+      'VACUNA: el renglón del marcador que se enseñaba antes no dice el patrimonio, ni dónde está, ni sus títulos',
+      !suFicha.linea.includes(String(suFicha.patrimonio)) && !suFicha.linea.includes(suFicha.nombreDeLaCasilla),
+      suFicha.linea,
+    );
+  }
+  /*
+   * EL MARCADOR: fuera del cajón se pinta como siempre y NO tiene un solo botón —no hay ficha
+   * modal que abrir donde no hay lienzo—; dentro del cajón, cada fila es un botón, que es la
+   * única manera de llegar a la ficha de un jugador con el teclado: un peón del `<canvas>` no
+   * está en el orden del tabulador.
+   */
+  const marcadorSuelto = renderToStaticMarkup(<MarcadorDelBurgo vista={laPartida.vista} yo="s1" />);
+  comprobar(
+    'el marcador del raíl, fuera del cajón, no tiene un solo botón: ahí no hay lienzo sobre el que abrir una ficha',
+    cuantos(marcadorSuelto, 'button') === 0,
+    cuantos(marcadorSuelto, 'button'),
+  );
+  if (laSubasta !== null) {
+    const conRail = pinta(laSubasta, <MarcadorDelBurgo vista={laSubasta.vista} yo={laSubasta.yo} />);
+    const marcador = marcadorEnTresDelBurgo(laSubasta.vista, laSubasta.yo);
+    comprobar(
+      'y dentro del cajón cada fila del marcador es un botón que abre su ficha: es la única forma de llegar ahí con el teclado',
+      marcador.jugadores.length > 0 &&
+        marcador.jugadores.every((j) => conRail.includes(`aria-label="Ficha de ${j.nombre}. ${j.linea}"`)),
+      marcador.jugadores.map((j) => j.nombre),
+    );
+    comprobar(
+      'y la fila entera conserva su rejilla y el filo del turno: lo que se pulsa es la fila, no una esquina de 44 puntos dentro de ella',
+      conRail.includes('opcion burgo-del-marcador'),
+      /class="opcion burgo-del-marcador[^"]*"/.exec(conRail)?.[0] ?? null,
+    );
+  }
+
+  // ── 5. LAS SECCIONES SE PLIEGAN, Y UNA CON BOTONES NO SE PLIEGA NUNCA ──
+
+  paso('Las secciones del cajón se pliegan, y plegar un movimiento sería esconderlo');
+
+  const hojaEntera = hojaDelBurgoEnTres(laPartida.vista, 's1', laPartida.opciones);
+  const sinPlegar = renderToStaticMarkup(
+    <LasHojasDelBurgo hoja={hojaEntera} vista={laPartida.vista} yo="s1" quieto={false} alElegir={() => undefined} />,
+  );
+  const plegada = renderToStaticMarkup(
+    <LasHojasDelBurgo
+      hoja={hojaEntera}
+      vista={laPartida.vista}
+      yo="s1"
+      quieto={false}
+      alElegir={() => undefined}
+      abierta={null}
+      alAbrir={() => undefined}
+    />,
+  );
+  comprobar(
+    'sin `abierta` la hoja se pinta entera y sin triángulos: es lo que quiere quien la monta en una columna con sitio',
+    !sinPlegar.includes('aria-expanded'),
+    sinPlegar.slice(0, 200),
+  );
+  comprobar(
+    'con `abierta` las secciones de LEER se pliegan, y su rótulo es un botón con `aria-expanded` dentro de su encabezado',
+    plegada.includes('aria-expanded="false"') && /<h2 class="rotulo-de-panel"><button/.test(plegada),
+    plegada.slice(0, 300),
+  );
+  const conBotones = hojaEntera.secciones.filter(
+    (s) => s.opciones.length > 0 || (s.id === 'mios' && hojaEntera.mios.some((b) => b.fichas.some((f) => f.opciones.length > 0))),
+  );
+  comprobar(
+    'la hoja de esta partida trae alguna sección CON botones, o esto no comprobaría la regla',
+    conBotones.length > 0,
+    conBotones.map((s) => s.id),
+  );
+  const perdidasAlPlegar = conBotones.flatMap((s) => s.opciones).filter((o) => !plegada.includes(o.rotulo));
+  comprobar(
+    'y ninguna de ellas se pliega: plegar un movimiento es esconderlo, y la criba lo seguiría contando como pintado',
+    perdidasAlPlegar.length === 0,
+    perdidasAlPlegar.map((o) => o.id),
+  );
+  const seSiguenViendoLasObras = hojaEntera.mios
+    .flatMap((b) => b.fichas)
+    .flatMap((f) => f.opciones)
+    .filter((o) => !plegada.includes(o.rotulo));
+  comprobar(
+    'y tampoco las obras de «Lo mío», que viven dentro de las fichas y no en las opciones de la sección',
+    seSiguenViendoLasObras.length === 0,
+    seSiguenViendoLasObras.map((o) => o.id),
+  );
+  /*
+   * VACUNA: una sección de LEER sí se pliega, y sus renglones desaparecen del árbol. Sin esto,
+   * «se pliega» podría estar puesto con `hidden` —el contenido seguiría dentro y el
+   * comprobador lo contaría como pintado, que es exactamente el verde falso que esta casa ya
+   * tiene anotado—.
+   */
+  /*
+   * «cinta» y «marcador» no entran: son las DOS que la hoja se salta a propósito —la cinta vive
+   * sobre el lienzo con la única región viva, y el marcador lo pinta el raíl— así que sus
+   * renglones no están en el árbol ni plegados ni desplegados, y elegirlas aquí mediría el
+   * salto y no el pliegue.
+   */
+  const deLeer = hojaEntera.secciones.find(
+    (s) => s.hayAlgo && s.opciones.length === 0 && s.id !== 'mios' && s.id !== 'cinta' && s.id !== 'marcador' && s.lineas.length > 0,
+  );
+  comprobar(
+    'VACUNA: una sección de leer SÍ se pliega, y sus renglones se van del árbol (no se esconden con `hidden`, que los dejaría dentro)',
+    deLeer !== undefined && deLeer.lineas.every((l) => sinPlegar.includes(l)) && deLeer.lineas.some((l) => !plegada.includes(l)),
+    { seccion: deLeer?.id, lineas: deLeer?.lineas.slice(0, 2) },
+  );
+
+  // ── 6. LA CRÓNICA, EL CARTEL DEL PIE Y LA CINTA ──
+
+  paso('La crónica, el cartel del pie y lo que la cinta dice ahora');
+
+  let relato = laCronicaConLaVista([], laPartida.reunida);
+  relato = laCronicaConLaVista(relato, laPartida.vista);
+  comprobar(
+    'la crónica acumula el pregón de cada jugada, que es lo único que no cabe en una vista',
+    relato.length > 0,
+    relato.map((r) => r.texto).slice(0, 3),
+  );
+  const laCronicaPintada = renderToStaticMarkup(<LaCronicaDelBurgo cronica={relato} />);
+  comprobar(
+    'y se pinta con lo último arriba, sin ser una segunda región viva',
+    relato.every((r) => palabrasDe(laCronicaPintada).includes(r.texto)) && !laCronicaPintada.includes('aria-live'),
+    relato.length,
+  );
+  comprobar(
+    'y vacía no se pinta: una caja con un rótulo y nada debajo es cromo dentro del cajón',
+    renderToStaticMarkup(<LaCronicaDelBurgo cronica={[]} />) === '',
+  );
+
+  const puestaDeLaPartida: MesaVista = {
+    codigo: 'QWXYZ',
+    arcade: BURGO,
+    rev: 11,
+    tic: 0,
+    terminada: false,
+    venceEn: Date.now() + 90_000,
+    turnoDesde: Date.now() - 10_000,
+    asientos: laPartida.sentados.map((s) => ({ id: s.asiento, nombre: s.nombre, presente: true })),
+    yo: 's1',
+    vista: laPartida.vista,
+    opciones: laPartida.opciones,
+  };
+  const htmlDeLaPartida = pinta({ puesta: puestaDeLaPartida, opciones: laPartida.opciones });
+  comprobar(
+    'el cartel del pie está SIEMPRE en el árbol, y vacío: una región que se monta a la vez que su texto no se anuncia, y una caja fantasma sobre el mundo tampoco vale',
+    htmlDeLaPartida.includes('lienzo-cartel') && /<p class="lienzo-cartel"[^>]*><\/p>/.test(htmlDeLaPartida),
+    /<p class="lienzo-cartel"[^>]*>[^<]{0,40}/.exec(htmlDeLaPartida)?.[0] ?? null,
+  );
+  comprobar(
+    'y dice lo mismo que la tarjeta de esa casilla: es la MISMA frase de la traducción, no una segunda redacción',
+    unSolarAjeno === null || cartelDeCasillaDelBurgo(laPartida.vista, unSolarAjeno.casilla).frase === unSolarAjeno.cartel,
+    unSolarAjeno?.cartel,
+  );
+  const cintaDeLaPartida = hojaDelBurgoEnTres(laPartida.vista, 's1', laPartida.opciones).cinta;
+  comprobar(
+    'la cinta dice DE QUIÉN ES EL TURNO, que estaba calculado y no se pintaba en ninguna parte',
+    cintaDeLaPartida.turno.length > 0 && htmlDeLaPartida.includes(cintaDeLaPartida.turno),
+    cintaDeLaPartida.turno,
+  );
+  comprobar(
+    'y el código de la mesa, que es lo que se dicta por voz, deletreado en su nombre accesible y entero al posarse',
+    htmlDeLaPartida.includes('burgo-cinta-codigo') && htmlDeLaPartida.includes('Q W X Y Z'),
+    /aria-label="Código[^"]*"/.exec(htmlDeLaPartida)?.[0] ?? null,
+  );
+
+  // ── 7. EL RESPALDO TAMBIÉN TRATA Y PUJA ──
+
+  paso('El respaldo del Burgo: las dos puertas, que era lo único que allí no se podía hacer');
+
+  if (laSubasta !== null) {
+    const hojaConPuerta = hojaDelBurgoEnTres(laSubasta.vista, laSubasta.yo, laSubasta.opciones);
+    const puertas = renderToStaticMarkup(
+      <LasPuertasDelBurgo
+        hoja={hojaConPuerta}
+        vista={laSubasta.vista}
+        yo={laSubasta.yo}
+        quieto={false}
+        alElegir={() => undefined}
+      />,
+    );
+    comprobar(
+      'con la puja abierta, el respaldo monta el campo de la puja libre: sin él, ahí sólo se puede pujar una de las tres cifras fijas',
+      hojaConPuerta.puja !== null && hojaConPuerta.puja.puerta !== null && puertas.includes('burgo-puja-libre'),
+      { puerta: hojaConPuerta.puja?.puerta },
+    );
+    comprobar(
+      'y NO pinta ni un movimiento del juego: una puerta no es un movimiento, así que la partición del retablo no se toca',
+      laSubasta.opciones.filter((o) => o.declaracion !== true).every((o) => !palabrasDe(puertas).includes(o.rotulo)),
+      laSubasta.opciones.filter((o) => o.declaracion !== true).map((o) => o.id),
+    );
+    comprobar(
+      'y sin ninguna de las dos puertas abiertas no se pinta nada: una caja vacía en el respaldo es cromo',
+      renderToStaticMarkup(
+        <LasPuertasDelBurgo
+          hoja={hojaDelBurgoEnTres({ desde: 'otro' }, 's1', [])}
+          vista={{ desde: 'otro' }}
+          yo="s1"
+          quieto={false}
+          alElegir={() => undefined}
+        />,
+      ) === '',
+    );
+  }
+
+  // ── 8. LOS GEMELOS DE SÓLO APOYO, Y LOS NOMBRES QUE YA NO SE ESCRIBEN DOS VECES ──
+
+  paso('Comprar sin ratón, y los nombres de los muebles escritos una sola vez');
+
+  const datosDelAnillo = tableroDelBurgoEnTres(laPartida.vista, 's1', laPartida.opciones, laPartida.sentados.map((s) => ({ id: s.asiento })));
+  comprobar(
+    'con el anillo montado y el cajón cerrado, comprar y sacar a subasta NO tienen botón en ninguna parte: sólo la casilla, que es un gesto de ratón',
+    datosDelAnillo !== null && obrasSoloEnElAnillo(laPartida.opciones, datosDelAnillo, null, []).length > 0,
+    obrasSoloEnElAnillo(laPartida.opciones, datosDelAnillo, null, []).map((o) => o.id),
+  );
+  const fuenteDelPintor = readFileSync(new URL('../src/burgo-en-tres.tsx', import.meta.url), 'utf8');
+  comprobar(
+    'y el pintor les da a cada una su gemelo de sólo apoyo, fuera de la vista con `clip-path` y por la misma puerta que el asa de los dados',
+    /soloEnElAnillo\.map\(/.test(fuenteDelPintor) && /className="burgo-solo-apoyo"/.test(fuenteDelPintor),
+    /soloEnElAnillo[\s\S]{0,120}/.exec(fuenteDelPintor)?.[0]?.slice(0, 120) ?? null,
+  );
+  const sinComentar = sinComentarios(fuenteDelPintor);
+  comprobar(
+    'el nombre del carril se IMPORTA de la traducción y no se escribe aquí: tres redacciones del mismo nombre son tres nombres el día que uno cambie',
+    /EL_CARRIL_DE_LA_MESA,/.test(sinComentar) && !/const EL_CARRIL_DE_LA_MESA =/.test(sinComentar),
+    EL_CARRIL_DE_LA_MESA,
+  );
+  comprobar(
+    'y el cajón NO se llama igual que el carril: dos cajas con el mismo nombre son dos cajas indistinguibles para quien no ve ninguna',
+    /const LA_HOJA_DE_LA_PARTIDA = '[^']+';/.test(sinComentar) && !/aria-label=\{EL_CARRIL_DE_LA_MESA\}/.test(sinComentar),
+    /const LA_HOJA_DE_LA_PARTIDA = '[^']+';/.exec(sinComentar)?.[0] ?? null,
+  );
+  comprobar(
+    'la lista de las que ruedan por dentro hereda la de las PIEZAS y no la copia: una caja colgada o un carril que se añadan mañana entran solos',
+    /const SE_DESPLAZAN_SOLAS = \[EL_CAJON, EL_MENU, \.\.\.RUEDAN_SOLAS\];/.test(sinComentar),
+    /const SE_DESPLAZAN_SOLAS = [^;]*;/.exec(sinComentar)?.[0] ?? null,
+  );
+  comprobar(
+    'y el cajón y la caja de los tratos bajan una tira cuando hay carril, con la clase que publica la pieza y no con un número escrito aquí',
+    /BAJO_EL_CARRIL/.test(sinComentar) && /COLGADA_BAJO_EL_CARRIL/.test(sinComentar) && !/5\.5rem/.test(sinComentar),
+  );
+  comprobar(
+    'y el `<Formulario>` de botones sueltos ya no se monta sobre el lienzo: sólo queda en el respaldo, que es una pantalla que rueda',
+    (sinComentar.match(/<Formulario/g) ?? []).length === 2,
+    (sinComentar.match(/<Formulario[^>]*/g) ?? []).map((x) => x.slice(0, 60)),
+  );
+}
+
 elMazoEnLaPantalla();
 elResultadoDeMover();
 losDadosLleganAparte();
@@ -8450,6 +9758,8 @@ elCarrilDiceAdondeVa();
 elPregonDelTrueque();
 elTruequeEnElRetablo();
 elComponedorEnElLienzo();
+lasPiezasDelLienzoYSuBanco();
+elEscritorioDelBurgo();
 
 console.log('');
 /**
@@ -8495,10 +9805,34 @@ console.log('');
  * baila solo; el margen sigue estando para lo que este guardia caza de verdad, que es un
  * guion partido por la mitad y no una comprobación de menos.
  *
+ * Y CON LAS PIEZAS QUE LOS DOS PINTORES PROPIOS COMPARTEN —la caja modal, la caja que no es
+ * modal, el cartel del pie y el carril de cuadrados de 44— y con el BANCO DE LA INTERFAZ del
+ * Burgo se hacen 837, así que el guardia va en 827: el mismo margen de diez. Del bloque nuevo,
+ * las que salen de bucles son las que recorren los dieciocho lienzos y las que rebobinan los
+ * momentos del banco, y ninguna de las dos listas depende del azar: las medidas están escritas
+ * y los guiones de los momentos son fijos. O sea que este número tampoco baila solo.
+ *
+ * Y CON EL JUEZ DEL ORDEN DE LA CLASE QUE APAGA —el que compra que gane la cascada y no sólo
+ * que esté escrita— y con el del VELO GENÉRICO en el oyente de la rueda, cada uno con su
+ * vacuna, se hacen 841, así que el guardia va en 831: el mismo margen de diez. El primero entró
+ * después de medir en el navegador que un cuadrado quieto salía del color exacto de uno vivo
+ * con este fichero entero en verde por encima; el segundo, después de ver que `velo` es UNA
+ * cadena y `seDesplazanSolas` una lista, o sea que el velo era lo único que seguía habiendo que
+ * recordar.
+ *
+ * Y CON EL ESCRITORIO DEL BURGO ENTERO DENTRO DEL LIENZO —el carril con las sobras pegadas
+ * detrás, la caja de los tratos, la tarjeta de una casilla, la ficha de un jugador, el
+ * componedor sobre el tablero, las secciones plegables, la crónica y las dos puertas del
+ * respaldo, cada mueble con su juez y su vacuna— se hacen 902, así que el guardia va en 892:
+ * el mismo margen de diez. Del bloque nuevo, las que salen de bucles son las que recorren los
+ * cuadrados del carril de una partida SEMBRADA (el mismo 987.654 de siempre) y las dos ramas
+ * de «con el cajón abierto / cerrado», que son dos y están escritas: ninguna de las dos listas
+ * depende del azar, así que este número tampoco baila solo.
+ *
  * Y LAS ROJAS SE IMPRIMEN ANTES DE IRSE: el orden estaba al revés, así que el día que el
  * guardia saltara se llevaría por delante los nombres de todo lo que ya se había encontrado.
  */
-const COMPROBACIONES_ESCRITAS = 789;
+const COMPROBACIONES_ESCRITAS = 892;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(

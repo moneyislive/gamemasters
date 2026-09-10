@@ -15,9 +15,69 @@
  * NO HAY NINGUNA REGLA AQUÍ. Qué se puede hacer en una casilla lo dice
  * `obraPosibleEnCasilla` leyendo las mismas `opciones()` que el reductor exige; qué se
  * manda al tocar viene ya montado dentro de cada opción; qué dice cada sección de la hoja
- * lo redacta `hojaEnTres`. Este fichero recoge y manda. Un `if` sobre un hotel, una
- * renta o una hipoteca escrito aquí sería una segunda traducción, y el día que las dos
- * discreparan nadie se enteraría.
+ * lo redacta `hojaEnTres`; qué va en el carril lo criba `carrilDelBurgo`. Este fichero
+ * recoge y manda. Un `if` sobre un hotel, una renta o una hipoteca escrito aquí sería una
+ * segunda traducción, y el día que las dos discreparan nadie se enteraría.
+ *
+ * ═══ TODO LO TOCABLE VIVE DENTRO DEL RECUADRO, Y ESO ES EL CAMBIO GRANDE ═══
+ *
+ * ═══ EL FALLO, CON SU SITIO EXACTO ═══
+ *
+ * Hasta hoy este pintor terminaba con un `<Formulario>` de botones sueltos EN FLUJO, por
+ * debajo del recuadro del lienzo, y su cabecera lo defendía diciendo que «caben en flujo
+ * donde la mesa genérica ya los pone». No caben, y no es cuestión de cuántos sean: desde la
+ * página de pie (`.sala:has(.lienzo-propio)`) el recuadro vale la VENTANA ENTERA menos la
+ * cabecera de la Sala, así que «debajo del recuadro» está debajo del canto de la pantalla.
+ * Es exactamente el sitio del que Riberas sacó los suyos cuando la partida se paraba sin un
+ * solo error, y el commit que lo arregló allí lo dejó escrito: «NINGÚN COMPROBADOR SE PONÍA
+ * ROJO… los que había miran la LISTA DE OPCIONES y esa cuenta seguía saliendo bien. Nadie
+ * miraba la PANTALLA.»
+ *
+ * Y había un segundo agujero por debajo del primero: lo que la criba deja fuera se iba a la
+ * sección «Ahora» de la hoja, y la hoja vive dentro de un cajón que NACE CERRADO. Con la
+ * mesa recién abierta eso llegaba a ser una partida que no arranca —«Empezar la partida» es
+ * una opción del momento— detrás de un «≡» que nadie tiene motivo para pulsar.
+ *
+ * ═══ CÓMO QUEDA REPARTIDO, Y EN QUÉ ORDEN SE COMPONE ═══
+ *
+ * El recuadro es lo único que hay, y dentro de él, colocado con `position: absolute` encima
+ * del `<canvas>`:
+ *
+ *   · LA CINTA (44 puntos, arriba): salir, el plazo, DE QUIÉN ES EL TURNO y el aviso, el
+ *     CÓDIGO DE LA MESA —que es lo que se dicta por voz para que alguien se siente— y mi
+ *     dinero con mi color, que además es la puerta del cajón.
+ *   · EL CARRIL (otros 44, colgado de la cinta): lo que puedo hacer AHORA MISMO, a la vista
+ *     y sin abrir nada, un cuadrado por movimiento. Lo criba `carrilDelBurgo`.
+ *   · LA CAJA DE LOS TRATOS (no modal, colgada del carril): lo que me han propuesto y lo que
+ *     yo propuse, legible MIENTRAS JUEGA OTRO y con el burgo girando por debajo.
+ *   · EL CAJÓN (modal, del pie de la cinta al canto): la hoja entera con sus secciones
+ *     plegables, el raíl de la Sala y la crónica.
+ *   · EL CARTEL DEL PIE: lo que dice una casilla sin abrir nada, y se va solo.
+ *   · LAS CAJAS MODALES: la tarjeta de una casilla, la ficha de un jugador, el componedor de
+ *     un trato, la confirmación de un trato y la de lo irreversible.
+ *
+ * Y el orden de composición NO es libre; lo dice el contrato de la traducción y lo dice el
+ * hecho de que la criba es la única que mira a las otras:
+ *
+ *     const pregon = pregonDelBurgo(...);            // 1. la caja de los tratos
+ *     const carril = carrilDelBurgo(...);            // 2. el carril
+ *     const hoja   = hojaEnTres(..., pregon, carril);// 3. la hoja, que suelta lo que ya pintan
+ *     const fuera  = opcionesFueraDelTablero(..., tablero, dados, hoja, pregon, carril); // 4.
+ *
+ * ═══ Y LO QUE LA CRIBA DEJA FUERA TERMINA EL CARRIL, QUE ES LO QUE CIERRA EL AGUJERO ═══
+ *
+ * `opcionesFueraDelTablero` recibe LOS OBJETOS que se pintan y no interruptores, así que con
+ * el cajón cerrado la hoja no cuenta y lo suyo vuelve como suelto —las pujas de una subasta,
+ * y sin mundo también las obras—. Eso ya no baja al flujo: se le pone forma con
+ * `glifosDelCarrilDelBurgo`, que la traducción exporta justamente para poder llamarlo con
+ * CUALQUIER lista, y se pegan al final de la misma tira. Como `fuera` se compone DESPUÉS de
+ * todos los demás muebles, esos cuadrados son por construcción los que no están en ninguna
+ * otra parte: ni uno se repite, ni uno se pierde, y no queda nada en flujo por debajo.
+ *
+ * Lo IRREVERSIBLE va al final de la tira y se pregunta antes de mandarlo: declararse en
+ * quiebra se lleva por delante la partida de quien lo pulsa, y un cuadrado de 44 puntos en
+ * medio de una fila es demasiado fácil de rozar. Es el precedente de «Tirar la mesa» de la
+ * Sala, dicho aquí dentro.
  *
  * ═══ EL RETABLO NO SE VA: ES EL RESPALDO, Y NO ES OPCIONAL ═══
  *
@@ -29,6 +89,13 @@
  * de por qué. Es la regla del §5 del Muelle llevada a la partida: si el mundo no arranca,
  * se juega igual. Y en el Burgo eso importa el doble, porque el retablo del anillo son
  * cuatro tiras de diez casillas que se JUEGAN por acciones y paneles (decisión 9).
+ *
+ * AHÍ TAMBIÉN SE TRATA Y SE PUJA. Lo que al respaldo le faltaba no era un movimiento —los
+ * tiene todos, entre las acciones del tablero y los sueltos, y eso ya estaba comprado— sino
+ * las dos PUERTAS: sin ellas no se puede proponer un trato ni pujar una cifra que no sea una
+ * de las tres fijas. Como una puerta no es un movimiento, montarlas no toca la partición de
+ * esa pantalla: `LasPuertasDelBurgo` monta exactamente esas dos y ni un botón más. Con cinco
+ * o seis sentados el respaldo no es un respaldo, es la única pantalla que hay.
  *
  * ═══ SIN CARAS NO ES LO MISMO QUE SIN MUNDO: SON DOS PREGUNTAS ═══
  *
@@ -45,6 +112,10 @@
  * guarda la anterior en una `ref` y `sucesosEnTres` hace el resto —la lista tal cual si
  * saltó una, una lista GRUESA comparando las dos vistas si saltó más—. Sin la vista
  * anterior no se puede saber dónde estaba cada peón, y la nueva no lo dice.
+ *
+ * La CRÓNICA se acumula por el mismo camino y con la misma `ref`: la vista trae sólo el
+ * último pregón, y `laCronicaConLaVista` apunta uno por jugada. Escrito en `shared/` para
+ * que la app y el escritorio no cuenten dos partidas distintas.
  *
  * ═══ EL MODELO SE PIDE UNA VEZ POR PESTAÑA, Y LOS AVENTUREROS LOS TRAE EL MUELLE ═══
  *
@@ -77,18 +148,19 @@
  *
  * ═══ LO QUE LA REVISIÓN DE LA MESA NO TOCA ═══
  *
- * La cámara. Al cambiar `rev` se suelta lo que se tenía abierto —la ficha de una casilla,
- * el menú de «¿qué haces aquí?»— y NO se recoloca la vista: quien está mirando su barrio
- * de cerca se queda donde estaba aunque juegue otro. Una cámara que salta con cada jugada
- * ajena marea, y el sondeo trae una revisión nueva cada pocos segundos.
+ * La cámara. Al cambiar `rev` se suelta lo que se tenía abierto —la tarjeta de una casilla,
+ * la ficha de un jugador— y NO se recoloca la vista: quien está mirando su barrio de cerca
+ * se queda donde estaba aunque juegue otro. Una cámara que salta con cada jugada ajena
+ * marea, y el sondeo trae una revisión nueva cada pocos segundos.
  *
  * ═══ LO QUE ESTO NO IMPORTA ═══
  *
  * Nada de `app/` (lo vigila `verify:fronteras`), nada de `drei`, y ni un color copiado de
- * la paleta de la app: los `.burgo-*` de `estilo.css` llevan los suyos escritos.
+ * la paleta de la app: los `.burgo-*` y los `.lienzo-*` de `estilo.css` llevan los suyos
+ * escritos.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
 import type { Cercania } from '../../escenas/acercar';
@@ -110,36 +182,79 @@ import type { CatalogoDeModelos } from '../../escenas/modelos';
 import { unirCatalogos } from '../../escenas/modelos';
 import { rutaDeLosDados, rutaDelBurgo } from '../../escenas/ruta-de-modelos';
 import type { Opcion } from '../../shared/arcade';
+/*
+ * EL TIPO DE MOVIMIENTO QUE NO TIENE VUELTA ATRÁS, importado del juego y no escrito aquí.
+ * Es un NOMBRE de movimiento, no una regla: qué hace la quiebra lo decide el reductor y qué
+ * se ofrece lo decide `opciones()`. Lo único que este cliente saca de él es si antes de
+ * mandarlo hay que preguntar, que es una decisión de pantalla —la misma que la Sala toma con
+ * «Tirar la mesa»— y no del reglamento.
+ */
+import { RENDIRSE } from '../../shared/arcade/juegos/burgo';
 import {
   camaraSigueA,
+  carrilDelBurgo,
+  cartelDeCasilla,
   dadosEnTres,
+  EL_CARRIL_DE_LA_MESA,
   esperaA,
   fichaDeCasilla,
+  fichaDeJugador,
   firmaDelTablero,
+  glifosDelCarrilDelBurgo,
   hojaEnTres,
+  laCronicaConLaVista,
+  LOS_MIOS,
+  LOS_TRATOS_DE_LA_MESA,
   marcadorEnTres,
   maravedies,
   obraPosibleEnCasilla,
+  obrasSoloEnElAnillo,
   opcionesFueraDelTablero,
+  PARA_CONTESTAR,
+  pregonDelBurgo,
   seVeEnTres,
   sucesosEnTres,
   tableroEnTres,
   tirarEnTres,
+  tratoEnTres,
 } from '../../shared/arcade/juegos/burgo-en-tres';
-import type { DadosEnTres } from '../../shared/arcade/juegos/burgo-en-tres';
+import type {
+  DadosEnTres,
+  GlifoDelCarrilDelBurgo,
+  PregonDelBurgo,
+  RenglonDeLaCronica,
+  TiraDelTrato,
+} from '../../shared/arcade/juegos/burgo-en-tres';
 import type { MovimientoDeclarado, TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { Formulario, hayAlgoQuePintar } from './formulario';
-import { LasHojasDelBurgo } from './hojas-del-burgo';
 import {
+  ElComponedorDelTrato,
+  LaCronicaDelBurgo,
+  LaFichaDeUnJugador,
+  LasHojasDelBurgo,
+  LasPuertasDelBurgo,
+  LaTarjetaDeUnaCasilla,
+  usarLaSeccionAbierta,
+} from './hojas-del-burgo';
+import {
+  BAJO_EL_CARRIL,
+  CajaColgadaDelLienzo,
+  CajaEnElLienzo,
   CamaraAerea,
+  CARTEL_DEL_LIENZO,
+  CarrilDelLienzo,
+  CartelAlPie,
+  COLGADA_BAJO_EL_CARRIL,
   ElijeUna,
   LimiteDelMundo,
   raizDelNavegador,
   recordada,
+  RUEDAN_SOLAS,
   traerUnGlb,
   usarLaTrampaDeFoco,
   usarLosModelos,
 } from './lienzo-propio';
+import type { CuadradoDelCarril } from './lienzo-propio';
 import type { LaMesa, MesaVista } from './mesa';
 import { traer } from './muelle';
 import type { ArcadeDelCatalogo } from './muebles';
@@ -191,10 +306,15 @@ const LIENZO_PROPIO = 'lienzo-propio';
  *
  * El oyente de la rueda cuelga del recuadro y llama a `preventDefault` SIEMPRE, que es lo
  * que impide que la Sala se desplace mientras uno cree estar acercándose. Dentro del
- * recuadro hay cajas que se desplazan por dentro —el cajón, con las ocho secciones de la
- * hoja y el raíl entero—, y sobre ellas ese `preventDefault` se lo comería: girar la rueda
- * sobre «Lo mío» acercaría el anillo detrás del cajón sin mover un renglón. Nombradas
- * aquí, la rueda no hace nada de nada sobre ellas.
+ * recuadro hay cajas que se desplazan por dentro —el cajón con la hoja entera, el menú de
+ * una tarjeta, y las tres piezas genéricas del lienzo: la caja modal, la caja colgada y el
+ * carril—, y sobre ellas ese `preventDefault` se lo comería: girar la rueda sobre «Lo mío»
+ * acercaría el anillo detrás del cajón sin mover un renglón. Nombradas aquí, la rueda no
+ * hace nada de nada sobre ellas.
+ *
+ * `RUEDAN_SOLAS` viene puesta desde `lienzo-propio.tsx` y no se copia: las clases son de las
+ * PIEZAS, así que una caja colgada o un carril que se añadan mañana entran solos en la lista.
+ * Lo que se suma aquí son las dos que este pintor pinta con clase propia.
  *
  * Sobre el VELO se llama a `preventDefault` y se para ahí: lo que hay abierto es modal, y
  * modal incluye la cámara.
@@ -203,16 +323,43 @@ const EL_CAJON = 'burgo-cajon';
 const EL_VELO = 'burgo-velo';
 const EL_MENU = 'burgo-elige';
 /** Las que se desplazan por dentro: la rueda es suya y no de la cámara. */
-const SE_DESPLAZAN_SOLAS = [EL_CAJON, EL_MENU];
+const SE_DESPLAZAN_SOLAS = [EL_CAJON, EL_MENU, ...RUEDAN_SOLAS];
 
 const SALIR_DE_LA_MESA = 'Volver a la Sala de Arcade';
 const ABRIR_EL_CAJON = 'Abre la hoja de la partida';
 const CERRAR_EL_CAJON = 'Cierra la hoja de la partida';
-/** El nombre del cajón, que es un `dialog` y sin nombre se anuncia «diálogo» a secas. */
-const EL_CARRIL_DE_LA_MESA = 'El carril de la mesa';
+/**
+ * EL NOMBRE DEL CAJÓN, que es un `dialog` y sin nombre se anuncia «diálogo» a secas.
+ *
+ * Aquí ponía `EL_CARRIL_DE_LA_MESA` —la misma cadena que ahora nombra el carril—, y era un
+ * nombre equivocado desde antes de que el carril existiera: lo que el cajón lleva dentro es
+ * LA HOJA de la partida, no una tira de cuadrados. Con los dos muebles en pantalla a la vez,
+ * dos cajas llamadas igual son dos cajas indistinguibles para quien no ve ninguna.
+ */
+const LA_HOJA_DE_LA_PARTIDA = 'La hoja de la partida';
+
+/** Lo que la caja de los tratos dice cuando la tira entera es el botón. Es cromo, no una regla. */
+const ABRIR_EL_TRATO = 'Ábrelo para contestar';
+const ABRIR_EL_TRATO_SIN_CONTESTAR = 'Ábrelo para verlo entero';
+/** Y lo que se dice antes de mandar algo que no tiene vuelta atrás. También cromo. */
+const ESTO_NO_SE_DESHACE = 'Esto no se puede deshacer.';
 
 /** Lo que el cajón puede llegar a medir de ancho, en partes de la raíz de la casa. */
 const ANCHO_DEL_CAJON_EN_RAICES = 26;
+
+/**
+ * DESDE QUÉ ANCHO DE LIENZO CABE EL CÓDIGO EN LA CINTA, y de dónde sale el número.
+ *
+ * La cinta reparte 44 puntos de alto entre cuatro cosas que no ceden —salir, el plazo, el
+ * código y mi dinero— y una que sí, la frase, que se recorta con puntos suspensivos. En los
+ * dos lienzos más estrechos de los dieciocho que mide `verify:escritorio` (288 de ancho) a la
+ * frase le quedan menos de cien puntos con el código puesto, o sea dos palabras: ahí el
+ * código estorba más de lo que sirve, y sigue estando en el raíl, dentro del cajón. 360 es el
+ * ancho del «móvil corriente» de esa misma lista, que es donde la frase vuelve a ser una
+ * frase. Con el lienzo sin medir (`0`, que es lo que vale en Node y en el primer fotograma)
+ * se pinta: no medir no es lo mismo que no caber.
+ */
+const ANCHO_DESDE_EL_QUE_CABE_EL_CODIGO = 360;
 
 /**
  * CUÁNTO SE MIRA ANTES DE BAJAR A `sobria`, y de dónde sale.
@@ -289,13 +436,13 @@ export interface LoQueVeElBurgo {
    * EL RAÍL ENTERO, PARA METERLO EN EL CAJÓN.
    *
    * Dentro van el marcador, la ficha de la mesa con su código y su reloj, las dos salidas y
-   * la crónica: todo lo que la Sala ya monta y sabe montar, con sus estados y sus efectos.
-   * Escribir aquí una segunda versión sería tener dos raíles, y el día que uno gane un dato
-   * el otro no lo tendría.
+   * lo que la Sala ya monta y sabe montar, con sus estados y sus efectos. Escribir aquí una
+   * segunda versión sería tener dos raíles, y el día que uno gane un dato el otro no lo
+   * tendría.
    *
    * OPCIONAL por lo mismo que `foco`: el comprobador monta este pintor sin Sala alrededor.
    * La ficha de la cinta sigue abriendo el cajón —es la puerta y no depende de lo que haya
-   * dentro— y sin raíl lo que se abre trae sólo la hoja.
+   * dentro— y sin raíl lo que se abre trae sólo la hoja y la crónica.
    */
   elRail?: ReactNode;
   /**
@@ -306,11 +453,45 @@ export interface LoQueVeElBurgo {
   laSalida?: string;
 }
 
-/** Lo que se pregunta cuando un gesto admite varias respuestas, o cuando sólo hay que leer. */
-interface Preguntando {
-  titulo: string;
-  nota?: string;
-  opciones: readonly Opcion[];
+/**
+ * ═══ QUIÉN ABRE LA FICHA DE UN JUGADOR DESDE EL MARCADOR DEL RAÍL ═══
+ *
+ * El marcador lo monta la Sala dentro del raíl y el raíl entra en el cajón de este pintor
+ * como `children`: o sea que este fichero pinta el marcador SIN poder pasarle una prop, y el
+ * marcador es la única manera de llegar con el teclado a la ficha de un jugador —un peón
+ * del anillo se toca con el ratón y no está en el orden del tabulador—.
+ *
+ * Un contexto es lo que resuelve exactamente eso: el cajón envuelve el raíl y publica el
+ * gesto; el marcador lo lee si está dentro. Fuera del cajón —el raíl de la Sala junto al
+ * respaldo, donde no hay ficha modal que abrir porque no hay lienzo sobre el que abrirla— el
+ * valor por omisión es `null` y el marcador se pinta como siempre, con sus renglones y sin
+ * un solo botón. No es un interruptor sobre el juego: es a quién se le avisa de un toque.
+ */
+const ElTactoDelMarcador = createContext<((asiento: string) => void) | null>(null);
+
+/** Lo que está abierto encima del anillo. Uno cada vez: abrir uno cierra el anterior y el cajón. */
+type LoAbierto =
+  | { readonly que: 'casilla'; readonly casilla: number }
+  | { readonly que: 'jugador'; readonly asiento: string }
+  | { readonly que: 'trato'; readonly id: number }
+  | { readonly que: 'componedor'; readonly a: string | null }
+  | { readonly que: 'confirmar'; readonly opcion: Opcion };
+
+/** La casilla que el cartel del pie está diciendo, con el sello que rearma su reloj. */
+interface LoSenalado {
+  readonly casilla: number;
+  /**
+   * EL SELLO, QUE ES LO QUE HACE QUE UN CARTEL REPETIDO VUELVA A APARECER.
+   *
+   * `CartelAlPie` cuelga su reloj del TEXTO pegado (`[texto, msQueDura]`), y eso es lo
+   * correcto para no rearmarlo sesenta veces por segundo; el precio es que señalar DOS VECES
+   * la misma casilla no repinta nada: el texto es idéntico, el efecto no vuelve a correr, y
+   * el cartel que ya se fue no vuelve. Se ve como un cartel que deja de funcionar a la
+   * segunda, que es peor que no tenerlo. Con el sello por `key`, el cartel se monta de nuevo
+   * —estado limpio, reloj nuevo— y eso sí es un cartel nuevo. Sube uno por señalada, así que
+   * dos señaladas seguidas de la misma casilla son dos carteles.
+   */
+  readonly sello: number;
 }
 
 /** La jugada que trae una vista, o cero. Es el sello con el que la escena sabe qué ha visto. */
@@ -322,6 +503,19 @@ function jugadaDe(vista: unknown): number {
 /** ¿Son la misma pose? Es una igualdad, no una cuenta de cámara: las cuentas están en `acercar.ts`. */
 function laMismaPose(a: Cercania, b: Cercania): boolean {
   return a.factor === b.factor && a.centro.x === b.centro.x && a.centro.z === b.centro.z;
+}
+
+/**
+ * ¿ESTE MOVIMIENTO SE PREGUNTA ANTES DE MANDARLO?
+ *
+ * Sólo la quiebra, y por lo que la quiebra hace: quien la pulsa deja de jugar esta partida y
+ * no hay ningún camino de vuelta. Es la misma decisión de pantalla que la Sala toma con
+ * «Tirar la mesa» —se pregunta y se pinta en `.opcion-sobria`— y no una regla del juego: el
+ * reductor la acepta igual se pregunte o no. Va por TIPO y nunca por rótulo, que es texto y
+ * cambia.
+ */
+function seConfirmaAntes(o: Opcion): boolean {
+  return o.tipo === RENDIRSE;
 }
 
 export function BurgoEnTres({
@@ -382,30 +576,79 @@ export function BurgoEnTres({
     return { jugada, lista };
   }, [vista]);
 
+  /*
+   * ═══ LA CRÓNICA, ACUMULADA POR EL MISMO CAMINO Y POR EL MISMO MOTIVO ═══
+   *
+   * La vista trae SÓLO el último pregón —el estado del juego no puede llevar histórico—, así
+   * que el relato lo acumula quien mira. Lo hace `laCronicaConLaVista`, escrito en `shared/`
+   * para que la app y esta pantalla no cuenten dos partidas distintas, y devuelve LA MISMA
+   * lista por identidad cuando no hay nada nuevo: sin eso, cada vuelta del sondeo repintaría
+   * la crónica entera.
+   *
+   * En una `ref` y no en el estado por lo mismo que la vista anterior: es un apunte, no un
+   * estado que decida qué se monta, y guardarlo en un `useState` con un efecto sería un render
+   * de más por sondeo — y encima no funcionaría en Node, donde los efectos no corren y donde
+   * `verify:escritorio` cuenta lo que hay en el árbol.
+   */
+  const loApuntado = useRef<readonly RenglonDeLaCronica[]>([]);
+  const cronica = useMemo(() => {
+    const ahora = laCronicaConLaVista(loApuntado.current, vista);
+    loApuntado.current = ahora;
+    return ahora;
+  }, [vista]);
+
   // -------------------------------------------------------------------------
   // Lo que se tiene en la mano
   // -------------------------------------------------------------------------
 
   /**
-   * LO QUE ESTÁ ABIERTO ENCIMA DEL ANILLO: la pregunta de «¿qué haces aquí?», la ficha de
-   * una casilla o la de un jugador. Vive aquí y no en la vista porque es DÓNDE ESTÁ MIRANDO
-   * LA PERSONA, no estado del juego.
+   * LO QUE ESTÁ ABIERTO ENCIMA DEL ANILLO: la tarjeta de una casilla, la ficha de un
+   * jugador, la hoja de un trato, el componedor o una confirmación. Vive aquí y no en la
+   * vista porque es DÓNDE ESTÁ MIRANDO LA PERSONA, no estado del juego. UNO CADA VEZ: abrir
+   * cualquiera cierra el anterior y cierra el cajón, para que nunca haya dos trampas de foco
+   * encima del tablero ni dos componedores en el mismo árbol.
    */
-  const [preguntando, ponerPreguntando] = useState<Preguntando | null>(null);
-  const [cajonAbierto, ponerCajonAbierto] = useState(false);
+  const [abierto, ponerAbierto] = useState<LoAbierto | null>(null);
+  /**
+   * EL CAJÓN, EN TRES ESTADOS Y NO EN DOS.
+   *
+   * `null` es «no lo he tocado, decide el juego»; `true` y `false` son lo que la persona
+   * pidió. La diferencia importa por la subasta: cuando me toca pujar, las pujas viven en la
+   * sección «La subasta» de la hoja y la hoja vive aquí dentro, así que un cajón que nace
+   * cerrado deja lo que hay que contestar detrás de un «≡». Con `null` el cajón se abre solo
+   * exactamente entonces, y quien lo cierre a mano manda: sus pujas terminan el carril, que
+   * es la red que hay debajo de todo esto.
+   *
+   * Y se vuelve a `null` cuando la petición del juego CAMBIA (el efecto de más abajo), que es
+   * lo que hace que abrirse solo sea una vez por subasta y no una vez por sondeo.
+   */
+  const [aMano, ponerAMano] = useState<boolean | null>(null);
+  /** La casilla que dice el cartel del pie, con su sello. Ver `LoSenalado`. */
+  const [senalado, ponerSenalado] = useState<LoSenalado | null>(null);
+  const sellos = useRef(0);
 
   const elRecuadro = useRef<HTMLDivElement | null>(null);
   const laFichaDeLaCinta = useRef<HTMLButtonElement | null>(null);
 
+  const senalar = useCallback((casilla: number | null) => {
+    if (casilla === null) {
+      ponerSenalado(null);
+      return;
+    }
+    sellos.current += 1;
+    ponerSenalado({ casilla, sello: sellos.current });
+  }, []);
+
   /**
-   * SOLTARLO TODO: la pregunta abierta y la ficha que se estaba leyendo.
+   * SOLTARLO TODO: lo que estuviera abierto y el cartel del pie.
    *
    * El cajón NO entra, y no es un olvido: no es algo que se tenga en la mano, es una caja que
    * alguien abrió para leer el marcador y la crónica. Cerrarlo porque otro ha jugado sería
    * arrancarle la página de las manos a quien está mirando cuánto dinero le queda a Bea.
    */
   const soltarTodo = useCallback(() => {
-    ponerPreguntando(null);
+    ponerAbierto(null);
+    ponerSenalado(null);
   }, []);
 
   /*
@@ -417,16 +660,21 @@ export function BurgoEnTres({
     soltarTodo();
   }, [puesta.rev, soltarTodo]);
 
-  const cerrarLaPregunta = useCallback(() => {
-    ponerPreguntando(null);
+  const cerrarLoAbierto = useCallback(() => {
+    ponerAbierto(null);
     elRecuadro.current?.focus();
   }, []);
+  /** Abrir una caja sobre el lienzo: cierra la anterior Y el cajón, para que el tablero se vea. */
+  const abrir = useCallback((que: LoAbierto) => {
+    ponerAMano(false);
+    ponerSenalado(null);
+    ponerAbierto(que);
+  }, []);
   const cerrarElCajon = useCallback(() => {
-    ponerCajonAbierto(false);
+    ponerAMano(false);
     laFichaDeLaCinta.current?.focus();
   }, []);
   const elCajon = useRef<HTMLDivElement | null>(null);
-  usarLaTrampaDeFoco(cajonAbierto, elCajon, cerrarElCajon);
 
   // -------------------------------------------------------------------------
   // El recuadro: se mide, y de paso se avisa de dónde ha quedado
@@ -553,7 +801,7 @@ export function BurgoEnTres({
   }, [alAcercarse]);
 
   // -------------------------------------------------------------------------
-  // Las cribas: qué enseña la escena, qué la hoja, y qué queda como botón
+  // Las cribas: qué enseña la escena, qué la caja, qué el carril, qué la hoja
   // -------------------------------------------------------------------------
 
   /*
@@ -561,24 +809,48 @@ export function BurgoEnTres({
    *
    * `opcionesFueraDelTablero` recibe LOS OBJETOS que se pintan y no interruptores: quita
    * TIRAR cuando hay asa de dados, quita una obra cuando su casilla está encendida en el
-   * anillo, y quita lo que la hoja ya enseña. Y el reparto no es el mismo con mundo que sin
-   * él, así que se le pasa lo que de verdad hay en pantalla:
+   * anillo, y quita lo que la hoja, la caja de los tratos y el carril ya enseñan. Y el
+   * reparto no es el mismo con mundo que sin él, así que se le pasa lo que de verdad hay en
+   * pantalla:
    *
    *   · EL ANILLO Y LOS DADOS sólo existen con mundo. Pasárselos sin mirarlo —en Node,
    *     mientras el `.glb` viaja, o en un navegador sin WebGL— quitaría TIRAR y las obras de
-   *     los botones sin que hubiera un dado ni una casilla que tocar: la partida parada y
-   *     ningún error en ninguna consola.
-   *   · LA HOJA se pinta cuando el CAJÓN ESTÁ ABIERTO, y sólo entonces. La regla de la casa
-   *     es que la criba recibe los objetos QUE SE PINTAN y no interruptores, y una hoja
-   *     dentro de un cajón cerrado no se pinta: pasarla igualmente deja «Empezar la partida»
-   *     —la única opción de una mesa recién abierta— detrás de un «≡» que nadie tiene motivo
-   *     para pulsar, o sea una partida que no puede empezar sin un error en ninguna consola.
-   *     Con el cajón abierto los botones sueltos se van a sus secciones, que es donde se leen
-   *     con su rótulo largo; al cerrarlo vuelven. Nunca están en los dos sitios a la vez.
+   *     los botones sin que hubiera un dado ni una casilla que tocar.
+   *   · LA HOJA se pinta cuando el CAJÓN ESTÁ ABIERTO, y sólo entonces.
+   *   · LA CAJA DE LOS TRATOS y EL CARRIL se pintan siempre que no estén vacíos, con mundo y
+   *     sin él: son marcado, no `<canvas>`, así que están ahí también bajo el telón.
    */
   const conMundo = typeof window !== 'undefined' && modelos !== null;
   const dados = useMemo((): DadosEnTres<Opcion> | null => dadosEnTres(vista, yo, opciones), [vista, yo, opciones]);
-  const hoja = useMemo(() => hojaEnTres(vista, yo, opciones), [vista, yo, opciones]);
+  /* 1. La caja de los tratos. No depende de nadie. */
+  const pregon = useMemo(() => pregonDelBurgo(vista, yo, opciones), [vista, yo, opciones]);
+  /* 2. El carril de lo que puedo hacer ahora mismo. Tampoco. */
+  const delMomento = useMemo(() => carrilDelBurgo(vista, yo, opciones), [vista, yo, opciones]);
+  const hayCarrilDelMomento = delMomento.length > 0;
+  /* 3. La hoja, que suelta los botones de las secciones que los dos de arriba ya pintan. */
+  const hoja = useMemo(
+    () => hojaEnTres(vista, yo, opciones, pregon, hayCarrilDelMomento ? delMomento : null),
+    [vista, yo, opciones, pregon, delMomento, hayCarrilDelMomento],
+  );
+
+  /*
+   * EL CAJÓN SE ABRE SOLO CUANDO EL JUEGO ESPERA UNA RESPUESTA QUE SÓLO VIVE AQUÍ DENTRO.
+   *
+   * Hoy eso es exactamente la subasta: las pujas fijas y el pasar son de la sección «La
+   * subasta», y la puja libre es una PUERTA que sólo se compone con su campo. Se decide EN EL
+   * RENDER y no en un efecto, y eso no es estilo: la criba de más abajo mira `cajonAbierto`,
+   * así que si la apertura llegara un fotograma tarde habría un render con las pujas sin sitio
+   * — y en Node, donde los efectos no corren y donde `verify:escritorio` cuenta lo que hay en
+   * el árbol, no llegaría nunca.
+   */
+  const elJuegoPideLaHoja = hoja.puja !== null && hoja.puja.meToca;
+  const cajonAbierto = aMano === null ? elJuegoPideLaHoja : aMano;
+  useEffect(() => {
+    /* Al cambiar lo que el juego pide, se vuelve a «decide el juego»: una vez por subasta, no una por sondeo. */
+    ponerAMano(null);
+  }, [elJuegoPideLaHoja]);
+
+  /* 4. Y la criba, que es la única que mira a las otras y por eso va la última. */
   const fuera = useMemo(
     () =>
       opcionesFueraDelTablero(
@@ -586,8 +858,50 @@ export function BurgoEnTres({
         conMundo ? datos : null,
         conMundo ? dados : null,
         cajonAbierto ? hoja : null,
+        pregon,
+        hayCarrilDelMomento ? delMomento : null,
       ),
-    [opciones, conMundo, datos, dados, hoja, cajonAbierto],
+    [opciones, conMundo, datos, dados, hoja, cajonAbierto, pregon, delMomento, hayCarrilDelMomento],
+  );
+
+  /*
+   * ═══ LO QUE LA CRIBA DEJA FUERA TERMINA EL CARRIL, Y ASÍ NO QUEDA NADA EN FLUJO ═══
+   *
+   * `glifosDelCarrilDelBurgo` le pone forma a CUALQUIER lista —la traducción lo exporta
+   * justamente para eso— sin decidir qué entra: misma longitud, mismo orden, y la opción por
+   * identidad. Como `fuera` se compone DESPUÉS de la escena, de la caja, del carril y de la
+   * hoja, estos cuadrados son por construcción los que no tienen sitio en ninguna otra parte.
+   *
+   * Y LO IRREVERSIBLE VA AL FINAL. La quiebra llega entre lo del momento, o sea en medio de
+   * la fila, y un cuadrado de 44 puntos entre otros es demasiado fácil de rozar cuando lo que
+   * hay al lado es «pasar el turno». Al final se roza mucho menos, el sitio es estable (no se
+   * mueve según cuántas opciones haya) y además se pregunta antes de mandarlo.
+   */
+  const cuadrados = useMemo((): readonly GlifoDelCarrilDelBurgo<Opcion>[] => {
+    const todos = [...delMomento, ...glifosDelCarrilDelBurgo(vista, yo, fuera)];
+    const corrientes = todos.filter((g) => !seConfirmaAntes(g.opcion));
+    const alFinal = todos.filter((g) => seConfirmaAntes(g.opcion));
+    return [...corrientes, ...alFinal];
+  }, [delMomento, vista, yo, fuera]);
+
+  /*
+   * ═══ LAS OBRAS QUE SÓLO TIENE EL ANILLO, PARA QUIEN NO PUEDE HACER EL GESTO ═══
+   *
+   * Con el mundo montado, la criba quita toda obra cuya casilla esté encendida —la marca del
+   * acento ya la ofrece— y la hoja recoge las de MIS títulos en sus fichas. Pero COMPRAR y
+   * SACAR A SUBASTA no son de un título mío todavía, así que no tienen ficha: se les quitaba
+   * el botón y no se les daba ninguno. O sea que comprar —el movimiento que decide la partida
+   * entera— sólo se podía hacer con el ratón sobre el anillo; con teclado, con lector o con
+   * el `.glb` a medio cargar, no había forma, y no fallaba nada.
+   *
+   * `obrasSoloEnElAnillo` devuelve exactamente ésas, mirando lo que la hoja Y EL CARRIL
+   * pintan de verdad (el cuarto parámetro: sin él pediría gemelos para las obras del apuro,
+   * que ya tienen su cuadrado). Se les pinta un botón fuera de la vista con `clip-path`, como
+   * el de TIRAR: no es un segundo botón, es el mismo dicho para quien no puede hacer el gesto.
+   */
+  const soloEnElAnillo = useMemo(
+    () => obrasSoloEnElAnillo(opciones, conMundo ? datos : null, cajonAbierto ? hoja : null, cuadrados),
+    [opciones, conMundo, datos, hoja, cajonAbierto, cuadrados],
   );
 
   /*
@@ -602,6 +916,9 @@ export function BurgoEnTres({
    */
   const aQuienSigue = useMemo(() => camaraSigueA(vista), [vista]);
 
+  /* Qué sección de la hoja está abierta, con memoria por mesa. Ver `usarLaSeccionAbierta`. */
+  const { abierta, alAbrir } = usarLaSeccionAbierta(puesta.codigo, hoja.abre, hoja.cinta.espera, hoja.cinta.meToca);
+
   // -------------------------------------------------------------------------
   // Lo que se manda
   // -------------------------------------------------------------------------
@@ -614,41 +931,59 @@ export function BurgoEnTres({
     [mover, quieto],
   );
 
+  /** Mandar una opción entera, preguntando antes si no tiene vuelta atrás. */
+  const alPulsarUnaOpcion = useCallback(
+    (o: Opcion) => {
+      if (seConfirmaAntes(o)) {
+        abrir({ que: 'confirmar', opcion: o });
+        return;
+      }
+      alElegir({ tipo: o.tipo, carga: o.carga });
+    },
+    [abrir, alElegir],
+  );
+
   /*
-   * AL TOCAR UNA CASILLA. Con UNA obra se manda; con VARIAS se pregunta con el mismo menú
-   * que ya sirve para leer una ficha, porque es la misma pregunta con otro título; con
-   * NINGUNA se abre la ficha de lectura, que es lo que hace de mapa: nombre, barrio, precio,
-   * la tabla de rentas con la fila de hoy y quién la tiene.
+   * AL TOCAR UNA CASILLA, Y SON TRES CAMINOS Y NO DOS.
    *
-   * Los rótulos de dentro los escribió el JUEGO. Aquí no se redacta ni una palabra sobre la
-   * jugada, y el «¿qué haces aquí?» es chrome de la Sala: no nombra ninguna regla.
+   * Con UNA obra se manda, que es el atajo de siempre. Con VARIAS se abre la tarjeta entera
+   * con sus botones, porque hay que decidir. Y con NINGUNA —que es la mayoría de los toques—
+   * NO se abre nada: se SEÑALA, y el cartel del pie dice el nombre, el barrio, el precio, el
+   * estado y la renta de hoy, y se va solo.
+   *
+   * ═══ POR QUÉ ESE TERCER CAMINO, CON EL NÚMERO DE MIGUEL ═══
+   *
+   * «Hoy para leer eso hay que TOCAR la casilla y abrir un modal, y eso se hace veinte veces
+   * por turno.» Veinte modales por turno son veinte velos, veinte trampas de foco y veinte
+   * cierres para leer dos renglones. Lo que hace falta es un cartel, y un cartel de verdad
+   * aparece al POSAR el cursor: la escena no publica ese aviso (`PropsDelBurgo` tiene
+   * `alTocarCasilla` y no tiene `alSenalarCasilla`) y no es de esta tanda, así que se resuelve
+   * con lo que la escena da: el primer toque señala, y sólo el SEGUNDO sobre la misma casilla
+   * —mientras su cartel sigue puesto— abre la tarjeta entera. Leer cuesta un toque y ningún
+   * modal; la tarjeta sigue estando a dos.
    */
   const alTocarCasilla = useCallback(
     (indice: number) => {
       const obras = obraPosibleEnCasilla(vista, yo, opciones, indice);
-      const ficha = fichaDeCasilla(vista, indice, yo, opciones);
       if (obras.length === 1 && !quieto) {
         const sola = obras[0] as Opcion;
         void mover({ tipo: sola.tipo, carga: sola.carga });
         return;
       }
-      ponerPreguntando({
-        titulo: ficha.nombre,
-        nota: ficha.lineas.join(' · '),
-        opciones: obras as readonly Opcion[],
-      });
+      if (obras.length === 0 && senalado?.casilla !== indice) {
+        senalar(indice);
+        return;
+      }
+      abrir({ que: 'casilla', casilla: indice });
     },
-    [vista, yo, opciones, quieto, mover],
+    [vista, yo, opciones, quieto, mover, senalado, senalar, abrir],
   );
 
   const alTocarFigura = useCallback(
     (asiento: string) => {
-      const marcador = marcadorEnTres(vista, yo);
-      const quien = marcador.jugadores.find((j) => j.asiento === asiento);
-      if (quien === undefined) return;
-      ponerPreguntando({ titulo: quien.nombre, nota: quien.linea, opciones: [] });
+      abrir({ que: 'jugador', asiento });
     },
-    [vista, yo],
+    [abrir],
   );
 
   const alTocarLosDados = useCallback((): Promise<'hecho' | 'rechazado' | 'sin-red'> => {
@@ -702,6 +1037,9 @@ export function BurgoEnTres({
     [lienzo.ancho, raizDeLaLetra],
   );
 
+  /* La trampa del cajón se arma sólo cuando el cajón es lo de encima: si hay una caja abierta, no lo es. */
+  usarLaTrampaDeFoco(cajonAbierto && abierto === null, elCajon, cerrarElCajon);
+
   // -------------------------------------------------------------------------
   // Las salidas
   // -------------------------------------------------------------------------
@@ -739,14 +1077,37 @@ export function BurgoEnTres({
         {hayAlgoQuePintar(sueltas) ? (
           <Formulario opciones={sueltas} alElegir={mover} quieto={quieto} titulo="Y además puedes" atajos={false} />
         ) : null}
+        {/*
+          LAS DOS PUERTAS, que es lo único que aquí faltaba: proponer un trato y pujar una
+          cifra libre. No pintan ni un movimiento —una puerta mandada tal cual no juega—, así
+          que la partición de esta pantalla, que ya estaba comprada, no se toca.
+        */}
+        <LasPuertasDelBurgo
+          hoja={hojaEnTres(vista, yo, opciones)}
+          vista={vista}
+          yo={yo}
+          quieto={quieto}
+          alElegir={alElegir}
+        />
+        <LaCronicaDelBurgo cronica={cronica} />
       </>
     );
   }
 
+  /* La ficha del jugador que se esté mirando, y el componedor atado a él si el juego lo ofrece. */
+  const elJugadorAbierto = abierto?.que === 'jugador' ? fichaDeJugador(vista, abierto.asiento, yo, opciones) : null;
+  const elTratoAbierto: TiraDelTrato<Opcion> | null =
+    abierto?.que === 'trato' && pregon !== null
+      ? ([...pregon.paraContestar, ...pregon.mios].find((t) => t.id === abierto.id) ?? null)
+      : null;
+  const elComponedor = abierto?.que === 'componedor' ? tratoEnTres(vista, yo, opciones) : null;
+  const laCasillaAbierta = abierto?.que === 'casilla' ? fichaDeCasilla(vista, abierto.casilla, yo, opciones) : null;
+  const elCartel = senalado === null ? [] : cartelDeCasilla(vista, senalado.casilla).frases;
+
   return (
     <div className="burgo-en-tres">
       {/*
-        ═══ EL RECUADRO, QUE ES DONDE ATERRIZA EL FOCO AL SENTARSE ═══
+        ═══ EL RECUADRO, QUE ES DONDE ATERRIZA EL FOCO AL SENTARSE Y DONDE VIVE TODO ═══
 
         Con la página de pie el `<h1>` de la mesa sale del flujo, así que el destino del
         efecto de `sala.tsx` se muda aquí. `tabIndex={-1}` no lo mete en el orden del
@@ -769,12 +1130,13 @@ export function BurgoEnTres({
         {/*
           ═══ LA CINTA (§6.3, sección 1) ═══
 
-          Salir, el reloj del plazo, el aviso del juego y mi dinero con mi color, en una tira
-          sobre el lienzo y no en flujo por encima de él: así no le quita un punto de alto al
-          anillo. Va FUERA de `conMundo` a propósito —mientras el modelo se descarga ya hay
-          aviso que leer y ya hay hoja que abrir, y el telón tapa el tablero, no la partida—,
-          y de paso esto se puede RENDERIZAR en Node, que es lo que permite que
-          `verify:escritorio` la cuente contra una partida de verdad.
+          Salir, el reloj del plazo, DE QUIÉN ES EL TURNO con el aviso del juego, el código de
+          la mesa y mi dinero con mi color, en una tira sobre el lienzo y no en flujo por
+          encima de él: así no le quita un punto de alto al anillo. Va FUERA de `conMundo` a
+          propósito —mientras el modelo se descarga ya hay aviso que leer y ya hay hoja que
+          abrir, y el telón tapa el tablero, no la partida—, y de paso esto se puede
+          RENDERIZAR en Node, que es lo que permite que `verify:escritorio` la cuente contra
+          una partida de verdad.
         */}
         <div className="burgo-cinta">
           {laSalida === undefined ? null : (
@@ -804,10 +1166,44 @@ export function BurgoEnTres({
             esta pantalla: dos con el mismo texto se anuncian dos veces. Está SIEMPRE en el
             árbol, vacía cuando no hay nada que decir, porque una región viva que se monta a la
             vez que su texto no se anuncia en la mayoría de los lectores.
+
+            ═══ Y AHORA DICE DE QUIÉN ES EL TURNO, QUE ESTABA CALCULADO Y NO SE PINTABA ═══
+
+            `hoja.cinta.turno` («Turno de Ana · puja Bea») lo redacta la traducción, distingue
+            el dueño del turno de quien tiene que contestar —que en el Burgo se separan a
+            menudo (decisión 4)— y no salía en ninguna parte de esta pantalla: el aviso solo
+            dice lo que acaba de pasar, no de quién se está esperando. Van los dos en el MISMO
+            párrafo y no en dos, porque dos regiones vivas con el mismo cambio se anuncian dos
+            veces, y porque la cinta es la línea de sus botones: lo que no cabe se recorta con
+            puntos suspensivos y sigue entero en el `title` y en el árbol.
           */}
-          <p className="burgo-cinta-frase" aria-live="polite" title={tablero.aviso}>
-            {tablero.aviso}
+          <p
+            className="burgo-cinta-frase"
+            aria-live="polite"
+            title={[hoja.cinta.turno, tablero.aviso].filter((x) => x.length > 0).join(' · ')}
+          >
+            {[hoja.cinta.turno, tablero.aviso].filter((x) => x.length > 0).join(' · ')}
           </p>
+          {/*
+            EL CÓDIGO DE LA MESA, que es lo que se dicta por voz para que alguien se siente.
+            Estaba sólo dentro del raíl, o sea detrás del «≡»: para decírselo a alguien por
+            teléfono había que abrir un cajón modal encima del tablero.
+
+            El nombre accesible lo deletrea con espacios y el `title` lo dice entero: un lector
+            que lea «QWXYZ» de corrido dice una palabra que no se puede repetir al otro lado
+            del teléfono. `letra-chica` es la clase de la casa para esto; el sitio y el hueco
+            van en línea porque son reparto de ESTA cinta y no una forma que se repita.
+          */}
+          {lienzo.ancho > 0 && lienzo.ancho < ANCHO_DESDE_EL_QUE_CABE_EL_CODIGO ? null : (
+            <span
+              className="letra-chica burgo-cinta-codigo"
+              style={EL_HUECO_DEL_CODIGO}
+              aria-label={`Código de la mesa: ${puesta.codigo.split('').join(' ')}`}
+              title={`Código de la mesa: ${puesta.codigo}`}
+            >
+              <span aria-hidden="true">{puesta.codigo}</span>
+            </span>
+          )}
           {/*
             LA FICHA DE MI DINERO: mi color y mis euros a la vista sin abrir nada, y la
             PUERTA del cajón. Para un mirón que no está sentado no hay color ni cifra, y
@@ -828,7 +1224,10 @@ export function BurgoEnTres({
             }
             onClick={() => {
               if (cajonAbierto) cerrarElCajon();
-              else ponerCajonAbierto(true);
+              else {
+                ponerAbierto(null);
+                ponerAMano(true);
+              }
             }}
           >
             {hoja.cinta.miDinero.length === 0 ? (
@@ -845,17 +1244,67 @@ export function BurgoEnTres({
         </div>
 
         {/*
-          ═══ EL CAJÓN: LA HOJA ENTERA Y EL RAÍL, COLGANDO DE LA CINTA ═══
+          ═══ EL CARRIL: LO QUE PUEDO HACER AHORA MISMO, SIN ABRIR NADA ═══
+
+          Una tira de cuadrados del suelo de toque colgada del pie de la cinta. Dentro va lo
+          que criba `carrilDelBurgo` —los botones del momento y, en mi apuro, vender e
+          hipotecar título a título— y detrás lo que la criba dejó fuera, que con el cajón
+          cerrado son las pujas de una subasta. Vacío NO SE PINTA: una tira de vidrio sin nada
+          dentro es una caja fantasma atravesada sobre el tablero, y por eso la pieza devuelve
+          `null` sola.
+
+          LO QUE SE MANDA ES LA OPCIÓN ENTERA, tal como vino: `{tipo, carga}` y nada montado
+          aquí. Lo único que este cliente decide es si antes hay que preguntar.
+        */}
+        <CarrilDelLienzo
+          nombre={EL_CARRIL_DE_LA_MESA}
+          cuadrados={cuadrados.map((g) => elCuadradoQueSePinta(g, quieto))}
+          alTocar={(c) => {
+            const suyo = cuadrados.find((g) => g.opcion.id === c.clave);
+            if (suyo === undefined) return;
+            alPulsarUnaOpcion(suyo.opcion);
+          }}
+        />
+
+        {/*
+          ═══ LA CAJA DE LOS TRATOS: SE LEE MIENTRAS JUEGA OTRO ═══
+
+          Un trato del Burgo CADUCA al cambiar el turno, así que una oferta que sólo se ve
+          abriendo un cajón es una oferta que casi nadie contesta: llega mientras juega otro,
+          no interrumpe nada, y muere sin respuesta. Ésta es la caja NO MODAL colgada del pie
+          de la cinta —o del carril, si hay—: se ve sin abrir nada, no roba el foco, y por
+          debajo se sigue girando el burgo.
+
+          Y LA TIRA NO LLEVA BOTÓN DE ACEPTAR. Un trato se acepta por equivocación y es
+          irreversible; la garantía no es un diálogo detrás del botón, es que en la tira NO HAY
+          botón: la tira entera abre una hoja donde «Aceptar» y «Rechazar» viven cada uno con
+          su renglón. Es lo mismo que hace el pregón de Riberas y por lo mismo.
+        */}
+        {pregon === null ? null : (
+          <CajaColgadaDelLienzo
+            nombre={LOS_TRATOS_DE_LA_MESA}
+            clase={cuadrados.length > 0 ? COLGADA_BAJO_EL_CARRIL : undefined}
+            estilo={elEstiloDeLaCinta(anchoDelCajon)}
+          >
+            <LaCajaDeLosTratos pregon={pregon} abierta={elTratoAbierto?.id ?? null} alAbrir={(id) => { abrir({ que: 'trato', id }); }} />
+          </CajaColgadaDelLienzo>
+        )}
+
+        {/*
+          ═══ EL CAJÓN: LA HOJA ENTERA, EL RAÍL Y LA CRÓNICA, COLGANDO DE LA CINTA ═══
 
           Dentro van las seis secciones de la hoja que no están ya en pantalla —«Ahora», la
-          carta, la subasta con su puja libre, los tratos con su componedor, «Lo mío» con la
-          ficha de cada título y la mesa entera— y el raíl que monta la Sala con el marcador,
-          el código de la mesa, las dos salidas y la crónica.
+          carta, la subasta con su puja libre, los tratos, «Lo mío» con la ficha de cada
+          título y la mesa entera—, el raíl que monta la Sala y el relato de la partida.
 
           EL VELO ES LA MITAD QUE SE OLVIDA: sin él, un clic fuera del cajón llega al anillo,
           se cierra el cajón Y se toca una casilla donde estaba el dedo. Va `aria-hidden`
           porque para un lector el cajón ya es modal y un `<div>` sin texto en medio sólo sería
           ruido.
+
+          Con carril arranca una tira más abajo, y esa línea de geometría NO se escribe aquí:
+          `BAJO_EL_CARRIL` la publica `lienzo-propio.tsx` con sus dos números en `rem`, para que
+          crezcan con la preferencia de letra del navegador y no haya dos altos que cuadrar.
         */}
         {cajonAbierto ? (
           <>
@@ -863,15 +1312,32 @@ export function BurgoEnTres({
             <div
               id={nombreDelCajon}
               ref={elCajon}
-              className={EL_CAJON}
+              className={cuadrados.length > 0 ? `${EL_CAJON} ${BAJO_EL_CARRIL}` : EL_CAJON}
               role="dialog"
               aria-modal="true"
-              aria-label={EL_CARRIL_DE_LA_MESA}
+              aria-label={LA_HOJA_DE_LA_PARTIDA}
               tabIndex={-1}
               style={elEstiloDeLaCinta(anchoDelCajon)}
             >
-              <LasHojasDelBurgo hoja={hoja} vista={vista} yo={yo} quieto={quieto} alElegir={alElegir} />
-              {elRail}
+              <LasHojasDelBurgo
+                hoja={hoja}
+                vista={vista}
+                yo={yo}
+                quieto={quieto}
+                alElegir={alElegir}
+                abierta={abierta}
+                alAbrir={alAbrir}
+                alTocarJugador={(asiento) => { abrir({ que: 'jugador', asiento }); }}
+                alSenalarCasilla={senalar}
+                alComponerElTrato={() => { abrir({ que: 'componedor', a: null }); }}
+              />
+              {/*
+                EL RAÍL, ENVUELTO EN EL AVISO DEL MARCADOR: dentro de él, cada fila de jugador
+                es un botón que abre su ficha. Fuera —el raíl que la Sala pinta al lado del
+                respaldo— el contexto vale `null` y el marcador se pinta como siempre.
+              */}
+              <ElTactoDelMarcador.Provider value={alTocarFigura}>{elRail}</ElTactoDelMarcador.Provider>
+              <LaCronicaDelBurgo cronica={cronica} />
             </div>
           </>
         ) : null}
@@ -902,6 +1368,26 @@ export function BurgoEnTres({
                 Tirar los dados
               </button>
             ) : null}
+            {/*
+              Y LAS OBRAS QUE SÓLO TIENE EL ANILLO, por el mismo camino y por el mismo motivo:
+              comprar y sacar a subasta no cuelgan de ninguna ficha, así que sin esto sólo se
+              pueden hacer con el ratón encima del `<canvas>`. El rótulo es el del juego.
+            */}
+            {soloEnElAnillo.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className="burgo-solo-apoyo"
+                aria-disabled={quieto}
+                title={o.ayuda}
+                onClick={() => {
+                  if (quieto) return;
+                  alPulsarUnaOpcion(o);
+                }}
+              >
+                {o.rotulo}
+              </button>
+            ))}
             {/* Y a quién se espera, que en el lienzo lo dice una marca de color y nada más. */}
             <p className="burgo-solo-apoyo">{esperaA(vista)}</p>
             <LimiteDelMundo alFallar={alFallarElLienzo}>
@@ -955,7 +1441,12 @@ export function BurgoEnTres({
               propio `<canvas>`.
             */}
             {alPrincipio ? null : (
-              <button type="button" className="burgo-volver" onClick={volverAlBurgoEntero}>
+              <button
+                type="button"
+                className="burgo-volver"
+                style={cuadrados.length > 0 ? EL_SITIO_DE_VOLVER_CON_CARRIL : undefined}
+                onClick={volverAlBurgoEntero}
+              >
                 {VOLVER_AL_BURGO_ENTERO}
               </button>
             )}
@@ -969,58 +1460,394 @@ export function BurgoEnTres({
         )}
 
         {/*
-          ═══ LA FICHA Y EL «¿QUÉ HACES AQUÍ?», MODALES Y DENTRO DEL RECUADRO ═══
+          ═══ EL CARTEL DEL PIE: LO QUE DICE UNA CASILLA SIN QUE SE ABRA NADA ═══
 
-          En flujo por debajo del lienzo no hay sitio: con la página de pie el recuadro vale la
-          ventana entera menos nada, así que «debajo» está fuera de la pantalla. Es la misma
-          caja que la Sala ya sabe pintar —velo, `role="dialog"` con nombre, trampa de foco
-          escrita UNA vez y `Escape`—, con los rótulos que redactó el juego.
+          Nombre, barrio, precio, estado y renta de HOY, redactados por la traducción —la
+          MISMA frase que lleva dentro la tarjeta, para que los dos muebles no puedan
+          discrepar—. No se pulsa (`pointer-events: none` en la hoja), así que no tapa el toque
+          de la casilla que cubre, y se va solo.
+
+          `vivo={false}` porque la región viva de esta pantalla es el aviso de la cinta, y dos
+          con el mismo cambio se anuncian dos veces. Y `key` con el sello: ver `LoSenalado`.
         */}
-        {preguntando === null ? null : (
+        <CartelAlPie key={senalado?.sello ?? 0} frases={elCartel} vivo={false} estilo={EL_SITIO_DEL_CARTEL} />
+
+        {/*
+          ═══ LAS CAJAS QUE SE ABREN ENCIMA DEL ANILLO ═══
+
+          Todas dentro del recuadro y ninguna en flujo: con la página de pie el recuadro vale
+          la ventana entera menos nada, así que «debajo» está fuera de la pantalla. Y UNA CADA
+          VEZ: `abrir` cierra la anterior y cierra el cajón, para que nunca haya dos trampas de
+          foco encima del tablero.
+        */}
+        {laCasillaAbierta === null ? null : (
+          /*
+            ═══ LA TARJETA DE UNA CASILLA, EN LA MISMA CAJA QUE LAS OTRAS DOS ═══
+
+            En la caja genérica y no en `ElijeUna`, y la razón se vio en el banco: `ElijeUna`
+            pinta SIEMPRE un `<h2>` con el título que se le da, y el título de esta pregunta es
+            el nombre de la casilla, que es también lo primero que pinta la tarjeta —con la
+            mota de la acera de su barrio al lado, que es información y no adorno—. Medido con
+            «El Descanso»: salía el nombre tres veces seguidas, dos de ellas sin decir nada.
+            Aquí el nombre lo pone la tarjeta, una vez y con su color, y la caja se queda con
+            el nombre ACCESIBLE, que es lo que un `dialog` necesita para no anunciarse
+            «diálogo» a secas.
+
+            Y los botones son los de la ficha, en su propia lista: son LOS MISMOS objetos que
+            la casilla del anillo manda —la traducción los devuelve por identidad—, así que la
+            obra tiene un botón y un atajo, y la partición los cuenta como uno.
+          */
+          <CajaEnElLienzo nombre={laCasillaAbierta.nombre} estilo={EL_SITIO_DE_UNA_CAJA_CON_CARTEL} alCerrar={cerrarLoAbierto}>
+            <LaTarjetaDeUnaCasilla ficha={laCasillaAbierta} alSenalarCasilla={senalar}>
+              {laCasillaAbierta.opciones.length === 0 ? null : (
+                <ul className="opciones">
+                  {laCasillaAbierta.opciones.map((o) => (
+                    <li key={o.id}>
+                      <button
+                        type="button"
+                        className={quieto ? 'opcion opcion-quieta' : 'opcion opcion-secundaria'}
+                        aria-disabled={quieto}
+                        title={o.ayuda}
+                        onClick={() => {
+                          if (quieto) return;
+                          cerrarLoAbierto();
+                          alPulsarUnaOpcion(o);
+                        }}
+                      >
+                        <span className="opcion-texto">
+                          <span className="opcion-rotulo">{o.rotulo}</span>
+                          {o.ayuda.length > 0 ? <span className="opcion-ayuda">{o.ayuda}</span> : null}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </LaTarjetaDeUnaCasilla>
+            <button type="button" className="opcion opcion-sobria" onClick={cerrarLoAbierto}>
+              <span className="opcion-texto">
+                <span className="opcion-rotulo">Dejarlo</span>
+              </span>
+            </button>
+          </CajaEnElLienzo>
+        )}
+
+        {elJugadorAbierto === null ? null : (
+          <CajaEnElLienzo nombre={elJugadorAbierto.nombre} estilo={EL_SITIO_DE_UNA_CAJA_CON_CARTEL} alCerrar={cerrarLoAbierto}>
+            <h2 className="rotulo-de-panel">{elJugadorAbierto.nombre}</h2>
+            <LaFichaDeUnJugador
+              ficha={elJugadorAbierto}
+              alSenalarCasilla={senalar}
+              alProponerle={
+                elJugadorAbierto.trato === null
+                  ? null
+                  : () => { abrir({ que: 'componedor', a: elJugadorAbierto.asiento }); }
+              }
+            />
+            <button type="button" className="opcion opcion-sobria" onClick={cerrarLoAbierto}>
+              <span className="opcion-texto">
+                <span className="opcion-rotulo">Dejarlo</span>
+              </span>
+            </button>
+          </CajaEnElLienzo>
+        )}
+
+        {/*
+          ═══ EL COMPONEDOR SOBRE EL LIENZO Y NO DENTRO DEL CAJÓN ═══
+
+          Para proponer un trato hay que mirar qué tiene el otro y DÓNDE están sus solares, y
+          el cajón cuelga de la cinta hasta el canto: con él abierto el tablero no se ve. La
+          caja modal genérica nace centrada y sólo tan alta como su contenido, así que el
+          anillo se sigue viendo alrededor; y cada título del componedor SEÑALA su casilla en
+          el cartel del pie, que es cómo se sabe dónde cae sin cerrar nada.
+        */}
+        {elComponedor === null || abierto?.que !== 'componedor' ? null : (
+          <CajaEnElLienzo
+            nombre={elComponedor.puerta?.rotulo ?? LOS_TRATOS_DE_LA_MESA}
+            estilo={EL_SITIO_DE_UNA_CAJA_CON_CARTEL}
+            alCerrar={cerrarLoAbierto}
+          >
+            <ElComponedorDelTrato
+              trato={elComponedor}
+              vista={vista}
+              yo={yo}
+              quieto={quieto}
+              aQuienDeSalida={abierto.a}
+              alSenalarCasilla={senalar}
+              alElegir={(m) => {
+                cerrarLoAbierto();
+                alElegir(m);
+              }}
+            />
+            <button type="button" className="opcion opcion-sobria" onClick={cerrarLoAbierto}>
+              <span className="opcion-texto">
+                <span className="opcion-rotulo">Dejarlo</span>
+              </span>
+            </button>
+          </CajaEnElLienzo>
+        )}
+
+        {/*
+          LA HOJA DE UN TRATO: lo que la tira abre. «Aceptar» y «Rechazar» viven aquí, cada uno
+          con su renglón, y no en la tira: un trato aceptado por equivocación no se deshace.
+        */}
+        {elTratoAbierto === null ? null : (
           <ElijeUna
-            titulo={preguntando.titulo}
-            nota={preguntando.nota}
-            opciones={preguntando.opciones}
+            titulo={elTratoAbierto.frase}
+            nota={elTratoAbierto.comoAnda}
+            opciones={[elTratoAbierto.aceptar, elTratoAbierto.rechazar, elTratoAbierto.retirar].filter(
+              (o): o is Opcion => o !== null,
+            )}
             quieto={quieto}
             velo={EL_VELO}
             menu={EL_MENU}
             alElegir={(o) => {
-              cerrarLaPregunta();
-              alElegir({ tipo: o.tipo, carga: o.carga });
+              cerrarLoAbierto();
+              alPulsarUnaOpcion(o);
             }}
-            alDejarlo={cerrarLaPregunta}
+            alDejarlo={cerrarLoAbierto}
           />
         )}
+
+        {/*
+          LO IRREVERSIBLE SE PREGUNTA. La quiebra se lleva por delante la partida de quien la
+          pulsa, y el cuadrado del carril está a un roce de distancia. Se pinta en
+          `.opcion-sobria` —el precedente de «Tirar la mesa» de la Sala— y la salida es lo
+          primero que encuentra el tabulador después del rótulo.
+        */}
+        {abierto?.que !== 'confirmar' ? null : (
+          <CajaEnElLienzo nombre={abierto.opcion.rotulo} alCerrar={cerrarLoAbierto}>
+            <h2 className="rotulo-de-panel">{abierto.opcion.rotulo}</h2>
+            {abierto.opcion.ayuda.length === 0 ? null : <p className="letra-chica">{abierto.opcion.ayuda}</p>}
+            <p className="letra-chica">{ESTO_NO_SE_DESHACE}</p>
+            <ul className="opciones">
+              <li>
+                <button type="button" className="opcion opcion-secundaria" onClick={cerrarLoAbierto}>
+                  <span className="opcion-texto">
+                    <span className="opcion-rotulo">Dejarlo</span>
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className={quieto ? 'opcion opcion-quieta' : 'opcion opcion-sobria'}
+                  aria-disabled={quieto}
+                  onClick={() => {
+                    if (quieto) return;
+                    const o = abierto.opcion;
+                    cerrarLoAbierto();
+                    alElegir({ tipo: o.tipo, carga: o.carga });
+                  }}
+                >
+                  <span className="opcion-texto">
+                    <span className="opcion-rotulo">{abierto.opcion.rotulo}</span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </CajaEnElLienzo>
+        )}
       </div>
-      {/*
-        ═══ LOS BOTONES SUELTOS VAN EN FLUJO, DEBAJO DEL LIENZO, Y NO DENTRO DEL CAJÓN ═══
-
-        El §6.2 los dibuja dentro del cajón. No caben ahí, y el caso que lo demuestra es el
-        primero de todos: mientras la mesa se REÚNE, la única opción del juego es «Empezar la
-        partida» —el Burgo declara sus cuarenta casillas desde el primer momento, así que el
-        anillo se pinta ya y no hay formulario suelto que lo sustituya—, y metida en un cajón
-        que nace cerrado eso deja la partida detrás de un «≡» que nadie tiene motivo para
-        pulsar. Riberas no tiene ese problema porque pinta las suyas DOS veces: en el carril
-        de la cinta, siempre a la vista, y otra vez en el cajón con su rótulo largo.
-
-        Aquí no hace falta un segundo carril: `opcionesFueraDelTablero` deja fuera muy poco
-        —«Pasar el turno», «Declararse en quiebra», «Empezar»; las obras las enseña la casilla
-        y todo lo demás la hoja—, así que caben en flujo donde la mesa genérica ya los pone. El
-        recuadro es `flex: 1 1 auto` con suelo en la mitad del mueble, o sea que encoge lo que
-        haga falta y no se sale nada de la pantalla; con los dieciocho destinos de un siete de
-        Riberas esto no valdría, y por eso allí hay carril y aquí no.
-
-        Cada opción sigue saliendo EXACTAMENTE UNA VEZ: la lista es lo que `fuera` deja, y
-        `fuera` se compone DESPUÉS de la escena y de la hoja, con los objetos que se pintan y
-        no con interruptores.
-
-        Con atajos: es la única lista de esta pantalla que los escucha, así que las teclas 1-9
-        no se las disputa nadie.
-      */}
-      {hayAlgoQuePintar(fuera) ? (
-        <Formulario opciones={fuera} alElegir={mover} quieto={quieto} titulo={TITULO_DE_LO_QUE_SE_HACE} />
-      ) : null}
     </div>
+  );
+}
+
+/**
+ * DÓNDE SE POSA EL CARTEL DEL PIE, y por qué va en línea y no en la hoja.
+ *
+ * `.lienzo-cartel` trae lo que no depende del juego —el fondo, el filo, los tres números del
+ * presupuesto de renglones y el `pointer-events: none`— y deja el SITIO a quien lo monta,
+ * porque cuánto cabe y dónde estorba depende del reparto de cada pantalla. Aquí va al pie y a
+ * todo lo ancho menos el inset del cromo de este cliente (`0.75rem` por lado, el mismo con el
+ * que se colocan el cajón y la caja de los tratos): a los lados del anillo no hay nada que
+ * tapar, y el pie es donde menos casillas se pierden — las de abajo son justo las que se
+ * tocan primero, y por eso el cartel no se pulsa.
+ */
+const EL_SITIO_DEL_CARTEL: CSSProperties = { right: '0.75rem', bottom: '0.75rem', left: '0.75rem' };
+
+/**
+ * DÓNDE SE PONE «VER EL BURGO ENTERO» CUANDO HAY CARRIL, y esto está MEDIDO en el banco.
+ *
+ * `.burgo-volver` vive en `top: 3.75rem`, o sea a un rem del pie de la cinta, y eso era
+ * correcto cuando la cinta era lo único que había arriba. Con el carril puesto no lo es:
+ * medido en el banco con el momento del trato y el lienzo de 288×317, el botón caía en
+ * y=293,9 y el cuadrado del carril ocupaba de y=276,9 a y=323,7 —los dos con `z-index: 2` y
+ * el botón después en el marcado, así que gana el botón— y el único cuadrado que había en la
+ * tira, la quiebra, quedaba TAPADO. No es un error de nadie: es un botón encima de otro, que
+ * es la clase de fallo que sólo se ve mirando la pantalla.
+ *
+ * Baja UNA TIRA, que es exactamente lo que el carril mide (`2.75rem`, el suelo de toque de la
+ * casa, escrito en `rem` como todo lo demás de esta cadena para que crezca con la preferencia
+ * de letra del navegador). Se suma en `calc` sobre el `3.75rem` de la hoja en vez de escribir
+ * un `6.5rem` suelto: así el día que la cinta cambie de alto, esto lo sigue.
+ */
+const EL_SITIO_DE_VOLVER_CON_CARRIL: CSSProperties = { top: 'calc(3.75rem + 2.75rem)' };
+
+/**
+ * LAS TRES CAJAS QUE SEÑALAN DEJAN EL PIE LIBRE, Y ESO TAMBIÉN SE MIDIÓ EN EL BANCO.
+ *
+ * La tarjeta de una casilla, la ficha de un jugador y el componedor tienen todos filas que
+ * SEÑALAN una casilla, y lo que esa señal pinta es el cartel del pie: es cómo se sabe dónde
+ * cae un solar sin cerrar lo que se está mirando. `.lienzo-caja` nace centrada y crece hasta
+ * `calc(100% - 1.5rem)`, así que con contenido largo llega al canto de abajo Y TAPA EL CARTEL:
+ * medido en el banco con el componedor y el lienzo de 768×640, la caja iba del canto de arriba
+ * al de abajo del recuadro y el cartel quedaba debajo. La señal seguía funcionando y no se veía
+ * nada, que es la peor de las dos formas de fallar.
+ *
+ * Los 5rem de abajo son el cartel de DOS renglones, que es el tamaño para el que está medida
+ * la caja del cartel: doce puntos de relleno por lado más dos renglones de `0.82rem × 1.35`
+ * dan 61,7 puntos, más el inset de `0.75rem` del cromo, 74,5 — o sea 4,4rem con la raíz de esta
+ * casa, redondeados a 5 para que un cartel con la letra del navegador en grande siga cabiendo.
+ * Y el centro sube la mitad de eso, para que la caja no se pegue al canto de arriba al encoger.
+ */
+const EL_SITIO_DE_UNA_CAJA_CON_CARTEL: CSSProperties = {
+  top: 'calc(50% - 2.5rem)',
+  maxHeight: 'calc(100% - 1.5rem - 5rem)',
+};
+
+/** El hueco del código en la cinta: reparto de ESTA cinta, no una forma que se repita. Ver la cinta. */
+const EL_HUECO_DEL_CODIGO: CSSProperties = {
+  flex: '0 0 auto',
+  padding: '0 0.35rem',
+  fontVariantNumeric: 'tabular-nums',
+  letterSpacing: '0.1em',
+  whiteSpace: 'nowrap',
+};
+
+/**
+ * DE UN GLIFO DEL JUEGO A UN CUADRADO DE LA PIEZA, y ni una palabra inventada por el camino.
+ *
+ * `nombre` es el rótulo ENTERO que escribió el juego («Comprar Calle Mayor por 350 €»): es lo
+ * que se oye y lo que sale al posar el ratón, que es donde de verdad se lee qué hace cada
+ * cuadrado. `glifo` es la o las dos letras que caben dentro, y `marca` el color de la acera
+ * del barrio o el del peón del otro en un trato — el mismo `#rrggbb` con el que se pinta esa
+ * acera y ese peón, no un código nuevo.
+ *
+ * LO QUE NO CABE, DICHO: `GlifoDelCarrilDelBurgo` trae además un `rotulo` corto —el nombre de
+ * seis letras de la casilla, la cifra de una puja— que es lo que distingue dos cuadrados del
+ * mismo verbo de un vistazo, y `CuadradoDelCarril` no tiene dónde ponerlo: la pieza pinta un
+ * glifo y nada más. Hoy eso se paga en la subasta, donde tres pujas fijas salen como tres «Pu»
+ * iguales que sólo se distinguen al posarse o al oírlas. La pieza no es de esta tanda; queda
+ * anotado.
+ *
+ * La CLAVE es el `id` de la opción, que es estable entre revisiones y es lo que el manejador
+ * usa para volver de un cuadrado a su opción entera.
+ */
+function elCuadradoQueSePinta(g: GlifoDelCarrilDelBurgo<Opcion>, quieto: boolean): CuadradoDelCarril {
+  return {
+    clave: g.opcion.id,
+    glifo: g.glifo,
+    nombre: g.ayuda,
+    /*
+     * EL RÓTULO CORTO SÓLO SI AÑADE ALGO. La pieza pega `nombre` y `ayuda` en el `title`, y en
+     * casi todos los cuadrados el rótulo corto ya está DENTRO del largo («Comprar Calle Mayor
+     * por 350 €» contiene «Mayor»): pegarlo igual dejaría un «… por 350 €. Mayor» que se lee
+     * como una errata. Donde no está —la cifra de una puja, «Fijo» y «10 %» del Impuesto— sí
+     * añade, y entonces va.
+     */
+    ayuda: g.ayuda.includes(g.rotulo) ? undefined : g.rotulo,
+    marca: g.color,
+    quieto,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// La caja de los tratos
+// ---------------------------------------------------------------------------
+
+/**
+ * LOS DOS BLOQUES DE LA CAJA, y por qué son dos y no uno.
+ *
+ * En Riberas sólo propone quien tiene el turno, así que «para contestar» y «tuyos» no se daban
+ * a la vez nunca. Aquí SÍ: el juego deja proponer sin turno al dueño del turno, o sea que tres
+ * jugadores pueden tener a la vez una propuesta viva hacia el mismo y él tener las tres para
+ * contestar mientras las suyas esperan. Un bloque vacío no se pinta: un rótulo con nada debajo
+ * es cromo encima del tablero.
+ *
+ * Los tratos entre OTROS DOS no salen aquí —no hay nada que yo pueda hacer con ellos— y siguen
+ * enteros en los renglones de la sección «El trato», que es donde se leen las cosas que sólo se
+ * miran. Eso lo decide `pregonDelBurgo`, no este mueble.
+ */
+function LaCajaDeLosTratos({
+  pregon,
+  abierta,
+  alAbrir,
+}: {
+  pregon: PregonDelBurgo<Opcion>;
+  abierta: number | null;
+  alAbrir: (id: number) => void;
+}): JSX.Element {
+  return (
+    <>
+      {pregon.paraContestar.length === 0 ? null : (
+        <UnBloqueDeTratos rotulo={PARA_CONTESTAR} tiras={pregon.paraContestar} abierta={abierta} alAbrir={alAbrir} />
+      )}
+      {pregon.mios.length === 0 ? null : (
+        <UnBloqueDeTratos rotulo={LOS_MIOS} tiras={pregon.mios} abierta={abierta} alAbrir={alAbrir} />
+      )}
+      <p className="letra-chica burgo-renglon" style={EL_HUECO_DE_LA_CAJA}>
+        {pregon.caduca}
+      </p>
+    </>
+  );
+}
+
+/** El hueco a los lados de la caja colgada: la pieza no lleva relleno horizontal, y aquí dentro hace falta. */
+const EL_HUECO_DE_LA_CAJA: CSSProperties = { padding: '0 0.5rem' };
+
+function UnBloqueDeTratos({
+  rotulo,
+  tiras,
+  abierta,
+  alAbrir,
+}: {
+  rotulo: string;
+  tiras: readonly TiraDelTrato<Opcion>[];
+  abierta: number | null;
+  alAbrir: (id: number) => void;
+}): JSX.Element {
+  return (
+    <>
+      <h3 className="letra-chica burgo-barrio-rotulo" style={EL_HUECO_DE_LA_CAJA}>
+        {rotulo}
+      </h3>
+      <ul className="opciones" style={EL_HUECO_DE_LA_CAJA}>
+        {tiras.map((t) => {
+          /*
+           * EL NOMBRE ACCESIBLE ES LA FRASE ENTERA Y NO LO QUE SE PINTA: quién, qué, en qué
+           * dirección y qué hace un toque. `frase` está escrita DESDE DONDE MIRA quien la lee
+           * —«Ana te ofrece…» a quien contesta, «Le ofreces a Ana…» a quien la propuso—, que es
+           * justo lo que una lista de resúmenes en tercera persona no decía.
+           */
+          const seContesta = t.aceptar !== null || t.rechazar !== null;
+          const seOye = `${t.frase}. ${t.comoAnda}. ${seContesta ? ABRIR_EL_TRATO : ABRIR_EL_TRATO_SIN_CONTESTAR}`;
+          return (
+            <li key={t.id}>
+              <button
+                type="button"
+                className="opcion"
+                aria-haspopup="dialog"
+                aria-expanded={abierta === t.id}
+                aria-label={seOye}
+                title={seOye}
+                onClick={() => {
+                  alAbrir(t.id);
+                }}
+              >
+                <span className="opcion-texto">
+                  <span className="opcion-rotulo">
+                    <span className="mota-de-color" style={{ background: t.color }} aria-hidden="true" />
+                    {`${t.da} → ${t.pide}`}
+                  </span>
+                  <span className="opcion-ayuda">{t.comoAndaSinNombre}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 
@@ -1042,45 +1869,80 @@ export function BurgoEnTres({
  *
  * Va con `aria-hidden` en las cajas de arriba y la frase entera en la lista de apoyo, y no
  * al revés, para que no se oiga dos veces lo mismo.
+ *
+ * ═══ Y CADA FILA ES UN BOTÓN CUANDO HAY DÓNDE ABRIR SU FICHA ═══
+ *
+ * Era una `<ul>` sin un solo botón, y eso dejaba la ficha de un jugador —y con ella el
+ * componedor de un trato— detrás de un gesto que no todo el mundo puede hacer: tocar su peón
+ * en el `<canvas>`, que no está en el orden del tabulador. Quién recoge el toque no llega por
+ * props —la Sala monta este marcador dentro del raíl y el raíl entra en el cajón como
+ * `children`— sino por el contexto que el cajón publica. Fuera del cajón vale `null` y las
+ * filas se pintan como siempre: no hay ficha modal que abrir donde no hay lienzo.
  */
 export function MarcadorDelBurgo({ vista, yo }: { vista: unknown; yo: string | null }): JSX.Element | null {
+  const alTocar = useContext(ElTactoDelMarcador);
   const marcador = marcadorEnTres(vista, yo);
   if (marcador.jugadores.length === 0) return null;
   return (
     <section className="panel burgo-marcador">
       <h2 className="rotulo-de-panel">El marcador</h2>
       <ul className="renglones" role="list">
-        {marcador.jugadores.map((j) => (
-          <li
-            key={j.asiento}
-            className={[
-              'burgo-del-marcador',
-              j.soyYo ? 'soy-yo' : '',
-              j.esSuTurno ? 'burgo-le-toca' : '',
-              j.quebrado ? 'burgo-quebrado' : '',
-            ]
-              .filter((c) => c.length > 0)
-              .join(' ')}
-          >
-            <span className="mota-de-color" style={{ background: j.color }} aria-hidden="true" />
-            <span className="burgo-ficha-del-jugador" aria-hidden="true">
-              <span className="burgo-nombre-del-jugador">
-                {j.nombre}
-                {j.soyYo ? ' (tú)' : ''}
-                {j.seLeEspera && !j.esSuTurno ? ' ·' : ''}
+        {marcador.jugadores.map((j) => {
+          const clases = [
+            'burgo-del-marcador',
+            j.soyYo ? 'soy-yo' : '',
+            j.esSuTurno ? 'burgo-le-toca' : '',
+            j.quebrado ? 'burgo-quebrado' : '',
+          ]
+            .filter((c) => c.length > 0)
+            .join(' ');
+          const dentro = (
+            <>
+              <span className="mota-de-color" style={{ background: j.color }} aria-hidden="true" />
+              <span className="burgo-ficha-del-jugador" aria-hidden="true">
+                <span className="burgo-nombre-del-jugador">
+                  {j.nombre}
+                  {j.soyYo ? ' (tú)' : ''}
+                  {j.seLeEspera && !j.esSuTurno ? ' ·' : ''}
+                </span>
+                <span className="letra-chica burgo-lo-del-jugador">
+                  {`${String(j.titulos)} ${j.titulos === 1 ? 'título' : 'títulos'}${j.presa ? ' · en la Comisaría' : ''}${
+                    j.indultos > 0 ? ` · ${String(j.indultos)} ${j.indultos === 1 ? 'Salvoconducto' : 'Salvoconductos'}` : ''
+                  }`}
+                </span>
               </span>
-              <span className="letra-chica burgo-lo-del-jugador">
-                {`${String(j.titulos)} ${j.titulos === 1 ? 'título' : 'títulos'}${j.presa ? ' · en la Comisaría' : ''}${
-                  j.indultos > 0 ? ` · ${String(j.indultos)} ${j.indultos === 1 ? 'Salvoconducto' : 'Salvoconductos'}` : ''
-                }`}
+              <span className="burgo-dinero-del-jugador" aria-hidden="true">
+                {maravedies(j.mrs)}
               </span>
-            </span>
-            <span className="burgo-dinero-del-jugador" aria-hidden="true">
-              {maravedies(j.mrs)}
-            </span>
-            <span className="burgo-solo-apoyo">{j.linea}</span>
-          </li>
-        ))}
+              <span className="burgo-solo-apoyo">{j.linea}</span>
+            </>
+          );
+          return alTocar === null ? (
+            <li key={j.asiento} className={clases}>
+              {dentro}
+            </li>
+          ) : (
+            <li key={j.asiento}>
+              {/*
+                LA REJILLA DE TRES COLUMNAS SE MUDA AL BOTÓN, y con ella el filo del turno: la
+                fila entera es lo que se pulsa, no una esquina de 44 puntos dentro de ella.
+                `.opcion` pone lo que un botón de esta casa tiene —el filo, el redondeo, el
+                suelo de toque y el `:hover`— y `.burgo-del-marcador`, que va después en la
+                hoja, se queda con la rejilla y el relleno.
+              */}
+              <button
+                type="button"
+                className={`opcion ${clases}`}
+                aria-label={`Ficha de ${j.nombre}. ${j.linea}`}
+                onClick={() => {
+                  alTocar(j.asiento);
+                }}
+              >
+                {dentro}
+              </button>
+            </li>
+          );
+        })}
       </ul>
       {/*
         LO QUE LE QUEDA AL AYUNTAMIENTO, que es información pública del juego y parte de lo que se

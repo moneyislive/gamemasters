@@ -609,6 +609,26 @@ export const AZUL_DE_LAS_FICHAS: readonly [number, number, number] = [36, 126, 1
  *      calabazas   halloween-bits pumpkin_*        (el cementerio no es de Halloween)
  *      esqueletos  halloween-bits skull / bone / ribcage
  *      cactus      furniture-bits cactus_*
+ *
+ * ── NO HAY HOTEL, Y SE BUSCÓ PIEZA A PIEZA ANTES DE ESCALAR LA CASA ──
+ *
+ * Al dar volumen propio al hotel (`TALLA_DEL_HOTEL` en `anillo-en-3d.ts`) lo primero fue
+ * mirar si el disco tenía un modelo mejor que estirar la casa. Board Game Bits es el único
+ * pack con la MISMA pieza en cuatro colores, que es lo que hace falta para derivar la máscara
+ * de tinte (la azul y la roja, ver `PIEZAS_QUE_SE_TINEN`), y de sus piezas con color sólo hay
+ * éstas: `building` (la casa que ya entra), `pawn_A` y `pawn_B`, `meeple`, `token`, `tile`,
+ * `cube`, `flag_A` y `flag_B`, `playerstand`, `playercard_*` y los dados. Ninguna es un
+ * edificio mayor.
+ *
+ * Los `container_A/B/C` —lo más parecido a un bloque grande que hay en el pack— vienen en UN
+ * solo color, así que no se les puede derivar máscara y no se pueden teñir del color del
+ * dueño; y un hotel que no lleve el color de su dueño no dice lo único que tiene que decir. Un
+ * edificio del City Builder (`bloque-*`, `cuerpo-*`) tampoco vale: son piezas de ciudad, con
+ * su color horneado, y puesto en la franja del barrio no se leería como ficha de tablero sino
+ * como un edificio caído dentro de la casilla.
+ *
+ * Así que el hotel se hace estirando la casa, y esa decisión ahorra además 12 instancias de
+ * otra pieza y una llamada de dibujo (ver la decisión 12 en `presupuesto.ts`).
  */
 export const PIEZAS_EN_ESPERA: readonly string[] = [
   'muralla',

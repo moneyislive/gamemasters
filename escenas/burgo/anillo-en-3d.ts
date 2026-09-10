@@ -64,9 +64,10 @@
  * Las cuatro son la banda de antes multiplicada por 2,25 y redondeada a entero (9→21, 4→9,
  * 27→60, 8→18): la casilla crece pero se lee IGUAL, porque lo que la define es la
  * proporción entre sus bandas y no su tamaño. Lo que NO se multiplica por 2,25 es lo que
- * mide una pieza del pack —un peón sigue midiendo 1,272 y un aventurero 2,543—, y de ahí
- * salen las dos consecuencias que hay que decidir a mano: el CARRIL del avatar (que se
- * mide en peones, no en casillas) y el RITMO de la marcha (ver `peon.ts`).
+ * mide una pieza del pack —un peón viene midiendo 1,272 y un aventurero 2,543—, y de ahí
+ * salen las consecuencias que hay que decidir a mano: el CARRIL del avatar (que se mide en
+ * peones, no en casillas), el RITMO de la marcha (ver `peon.ts`) y la TALLA a la que se
+ * instancian el peón, la casa y el hotel, que tiene su propia sección más abajo.
  *
  * El reborde de la franja mide 0,6, que es lo que mide un bordillo de acera del City
  * Builder (medido en `road_straight`): la casilla se lee como casilla y no como una loseta
@@ -76,9 +77,9 @@
  * −36 a +36, con `+u` en el sentido de la marcha; `v` radial, de 0 (el borde de la ciudad)
  * a 108 (el borde del campo). `v = radial − BORDE_INTERIOR`.
  *
- *     v = 10,5    las cuatro casas, en fila con 12 de paso, y la posada en el medio
+ *     v = 10,5    las cuatro casas (10,34 de frente, 12 de paso) y el hotel en el medio
  *     v = 15      la bandera del dueño
- *     v = 25,5    la fila de seis peones, centrada en el filete claro, con 7 de paso
+ *     v = 25,5    la fila de seis peones (3,375 de huella), centrada en el filete, con 7 de paso
  *     v = 45      el precio, en dígitos de 27 de alto
  *     v = 60..90  el atrezo: la mitad exterior de la superficie, entera y sin pisar el marco
  *
@@ -90,14 +91,17 @@
  * pieza puede pisar.
  *
  * Y aquí está la diferencia con todo lo demás: el carril NO se multiplica por 2,25 al
- * crecer el tablero, porque lo que tiene que caber dentro son un peón (1,272 de huella) y
- * un aventurero (2,543 de alto, puesto `AVENTURERO_HACIA_EL_SOLAR` = 1,2 hacia fuera), y
- * esas dos piezas siguen midiendo lo mismo. Seis unidades de carril son cuatro peones y
- * medio: sobra. Lo que el tablero grande regala no es carril, es SITIO ALREDEDOR del
- * carril, y por eso la bandera del dueño puede subir de 6,5 a 15 (donde de verdad se ve,
- * en medio de la franja del barrio) sin acercarse a la marcha: llega a 16,7 y el carril
- * empieza en 23, o sea 6,3 de holgura, diez veces medio peón. La vacuna del comprobador
- * es ponerla en `v = 22`, pegada al filete, donde SÍ invade.
+ * crecer el tablero, porque lo que tiene que caber dentro son un peón y un aventurero
+ * (2,543 de alto, puesto `AVENTURERO_HACIA_EL_SOLAR` = 1,2 hacia fuera), y el aventurero
+ * mide lo que mide una persona en este mundo, que no depende del tamaño de la casilla.
+ * Seis unidades de carril daban para cuatro peones y medio de los de talla 1; con el peón a
+ * `DIAMETRO_DEL_PEON` (3,375) dan para uno y tres cuartos, y el peón centrado en 25,5 llega
+ * de 23,81 a 27,19 con el carril de 23 a 29: sigue cabiendo, y es el carril quien pone el
+ * techo de 5,0 al diámetro del peón. Lo que el tablero grande regala no es carril, es SITIO
+ * ALREDEDOR del carril, y por eso la bandera del dueño puede subir de 6,5 a 15 (donde de
+ * verdad se ve, en medio de la franja del barrio) sin acercarse a la marcha: llega a 16,7 y
+ * el carril empieza en 23, o sea 6,3 de holgura. La vacuna del comprobador es ponerla en
+ * `v = 22`, pegada al filete, donde SÍ invade.
  *
  * ═══ EL ATREZO CABE EN LA SUPERFICIE, Y NO PISA EL MARCO ═══
  *
@@ -253,11 +257,17 @@ export const ATREZO = { desde: 60, hasta: 90, centro: 75 } as const;
 /**
  * EL CARRIL DEL AVATAR: lo que ninguna pieza puede pisar. NO crece con la casilla.
  *
- * Se mide en PEONES, no en casillas: el peón mide 1,272 de huella (medido en el `.glb`) y el
- * aventurero se pone `AVENTURERO_HACIA_EL_SOLAR` hacia fuera y mide 1,8 de ancho, así que el
- * carril tiene que cubrir de 25,5 − 0,64 − holgura a 25,5 + 1,2 + 0,9 + holgura. Seis
- * unidades bastan y sobran; el tablero grande no necesita un carril grande, necesita que
- * nada se meta en él.
+ * Se mide en PEONES, no en casillas: el aventurero se pone `AVENTURERO_HACIA_EL_SOLAR` hacia
+ * fuera y mide 1,8 de ancho, así que el carril tiene que cubrir de 25,5 − radio del peón −
+ * holgura a 25,5 + 1,2 + 0,9 + holgura. Con el peón del pack a talla 1 (0,636 de radio) seis
+ * unidades bastaban y sobraban.
+ *
+ * Al crecer el peón el carril NO se toca, y ahora es al revés: el carril es quien manda. Con
+ * el peón centrado en 25,5 y el borde de dentro en 23, el diámetro no puede pasar de 5,0 sin
+ * que el peón invada su propio carril por la parte de la ciudad. `DIAMETRO_DEL_PEON` es 3,375
+ * —el patio de la cárcel aprieta antes—, así que el peón llega a 23,81 y quedan 0,81 de
+ * holgura. Ensanchar el carril sí sería posible por fuera (llega a 27,19 de 29), pero por
+ * dentro se comería la holgura de la bandera del dueño, que acaba en 16,7.
  */
 export const CARRIL_DEL_AVATAR = { desde: 23, hasta: 29 } as const;
 
@@ -415,16 +425,36 @@ export function largoDelTramo(i: number): number {
 
 /* ────────────────────────── Los huecos de una casilla ────────────────────────── */
 
-/** Seis huecos de peón en FILA sobre el filete, con 5 de paso: caben seis sin tocarse en los 32. */
+/**
+ * SEIS HUECOS DE PEÓN EN FILA SOBRE EL FILETE, CON 7 DE PASO.
+ *
+ * El paso NO cambia al crecer el peón, y conviene decirlo con los dos números delante. Con
+ * el peón a talla 1 —1,272 de huella, que es lo que trae el pack— los seis ocupaban 36,3 de
+ * los 72 del frente y entre dos había 5,73 de hueco: cuatro peones y medio de aire entre
+ * mota y mota, que es justo lo que hacía que una casilla con seis jugadores no se leyera
+ * como seis jugadores. Con el peón a `DIAMETRO_DEL_PEON` (3,375) los seis ocupan 38,4 y el
+ * hueco baja a 3,625, o sea un peón justo. Ésa es la fila que se lee como fila: seis fichas
+ * separadas por una ficha.
+ *
+ * Que el paso siga valiendo es una comprobación, no una suposición: `verify:burgo-escena`
+ * mide la huella en el `.glb`, la multiplica por la talla y exige que dos peones de la misma
+ * casilla no se toquen.
+ */
 export const REJILLA_DE_PEONES = { columnas: 6, filas: 1, paso: 7 } as const;
-/** Cuatro huecos de casa en FILA sobre la franja del barrio, con 12 de paso (la casa mide 2,504). */
+/**
+ * CUATRO HUECOS DE CASA EN FILA SOBRE LA FRANJA DEL BARRIO, CON 12 DE PASO.
+ *
+ * El paso tampoco cambia, y por la misma razón: lo que cambia es la CASA. A talla 1 medía
+ * 2,504 de frente, y cuatro con 12 de paso eran cuatro puntitos con 9,50 de hueco entre
+ * ellos —casi cuatro casas de aire— sobre una franja de 21 de fondo. A `TALLA_DE_LA_CASA`
+ * mide 10,34 y el hueco queda en 1,66, un sexto de casa: cuatro casas SEGUIDAS, que es como
+ * están en un tablero de verdad y lo que el encargo pedía.
+ */
 export const REJILLA_DE_CASAS = { columnas: 4, filas: 1, paso: 12 } as const;
 /** El aventurero se pone en el hueco de peón de su asiento, 1,2 hacia el campo. */
 export const AVENTURERO_HACIA_EL_SOLAR = 1.2;
 /** La bandera de dueño, en la esquina de «adelante» de la franja, lejos del carril (ver la cabecera). */
 export const HUECO_DE_LA_BANDERA = { u: 30, v: V_DE_LA_BANDERA } as const;
-/** La bandera de la posada va clavada en el tejado de la casa central. */
-export const BANDERA_SOBRE_LA_POSADA = { alza: 2.45, u: 0.6 } as const;
 
 /** El hueco `asiento` de una rejilla de `columnas × filas`, centrado: devuelve el desplazamiento (columna, fila). */
 function huecoDeRejilla(asiento: number, columnas: number, filas: number, pasoColumna: number, pasoFila: number): { readonly c: number; readonly f: number } {
@@ -441,13 +471,33 @@ function huecoDeRejilla(asiento: number, columnas: number, filas: number, pasoCo
  * En una esquina no hay filete, y la tentación es apartarlos a la parte de dentro; pero
  * entonces el aventurero que se queda quieto en su hueco aparece lejos de la polilínea, y
  * eso es exactamente lo que `verify:burgo-escena` llama «salirse». Así que van pegados al
- * tramo por el que se SALE de la esquina (`u = 349,5`), en 3 × 2, con el paso corto en
- * radial —1,4, que es lo justo para que dos peones de 1,272 de huella no se toquen— para que
- * ni el aventurero (1,2 hacia fuera) se despegue de la línea más de dos unidades. El centro
- * radial es el medio del brazo (`(324 + 349,5) / 2 = 336,75`, redondeado a 337). Están en la
- * ele a propósito: la ele es SU sitio, y lo que no puede pisarla es el decorado.
+ * tramo por el que se SALE de la esquina (`u = 349,5`), y en FILA INDIA por ese brazo.
+ *
+ * ═══ ERA 3 × 2, Y EL PEÓN GRANDE LA MATÓ (decisión de esta tanda) ═══
+ *
+ * La rejilla vieja era de tres columnas por dos filas, con las dos filas separadas 1,4 a lo
+ * largo de `u` —«lo justo para que dos peones de 1,272 de huella no se toquen»—. Ese 1,4 es
+ * el número que ató la rejilla a un peón de 1,272 y a ningún otro: con el peón a 3,375 las
+ * dos filas se solapan, y ensancharlas no es una opción, porque el aventurero se pone 1,2
+ * hacia fuera del hueco y con dos filas separadas `p` se despega de la línea `p/2 + 1,2`.
+ * Para no pasar de las dos unidades que el comprobador exige haría falta `p ≤ 1,6`, que es
+ * menos de medio peón. O sea: con dos filas no cabe ningún peón que se vea.
+ *
+ * Con UNA fila el problema desaparece entero: los seis van todos en `u = 349,5`, el
+ * aventurero se despega exactamente 1,2 —la mitad del tope— y no hay nada que ensanchar.
+ * Y de paso la esquina se lee igual que un lateral: seis fichas en fila por donde se anda.
+ *
+ * El brazo de salida va de 324 (el borde de la ciudad) a 349,5 (el punto de la esquina): 25,5
+ * de largo. Seis peones de 3,375 con 4 de paso ocupan 20 de centro a centro, y centrados en
+ * 337,5 caen de 327,5 a 347,5; el de más adentro llega a 325,81 con 1,81 de sobra hasta la
+ * ciudad, y el de más afuera a 349,19, dentro del brazo. El paso 4 deja 0,625 de hueco entre
+ * peón y peón —y 0,29 entre disco y disco, que es lo que de verdad aprieta—. Están en la ele
+ * a propósito: la ele es SU sitio, y lo que no puede pisarla es el decorado.
+ *
+ * `pasoU` queda en 0 porque con una sola fila no hay nada que separar a lo largo de `u`; se
+ * deja el campo para que la rejilla siga teniendo la misma forma que la de visitas.
  */
-export const REJILLA_DE_PEONES_DE_ESQUINA = { columnas: 3, filas: 2, centroU: LINEA_DE_LA_MARCHA, centroV: 337, pasoU: 1.4, pasoV: 3.2 } as const;
+export const REJILLA_DE_PEONES_DE_ESQUINA = { columnas: 6, filas: 1, centroU: LINEA_DE_LA_MARCHA, centroV: 337.5, pasoU: 0, pasoV: 4 } as const;
 
 /**
  * EL HUECO DE PEÓN de un asiento en una casilla. En la Mazmorra (10) es el hueco de VISITA:
@@ -578,6 +628,162 @@ export function anchoDelPrecio(casilla: number): number {
   return (String(precio).length - 1) * AVANCE_DEL_PRECIO + ANCHO_DEL_GUARISMO;
 }
 
+/* ──────────────── La talla de las piezas que son de un jugador ──────────────── */
+
+/**
+ * LAS PIEZAS DEL PACK NO SON PIEZAS DE ESTE TABLERO, Y SE VE EN LA PRIMERA CAPTURA.
+ *
+ * `burgo.glb` trae las fichas de Board Game Bits horneadas a la escala del MUNDO —una
+ * casa-ficha mide una persona, 2,543— y hasta esta tanda se instanciaban a talla 1. Sobre un
+ * tablero cuya casilla mide 72 × 108 eso da esto, medido con `@gltf-transform` sobre el
+ * fichero de verdad:
+ *
+ *     peón      1,272 de huella  ·  2,326 de alto   →  el 1,8 % del frente de su casilla
+ *     casa      2,504 × 2,543    ·  2,543 de alto   →  el 12 % del fondo de la franja
+ *     hotel     LA MISMA CASA, a talla 1
+ *
+ * Y al lado, en la misma casilla, el dígito del precio mide 20,25 de ancho: DIECISÉIS VECES
+ * la huella del peón. Desde la vista de tablero un jugador no era una ficha, era una mota; las
+ * cuatro casas eran cuatro puntos separados por nueve unidades de hueco; y cuatro casas y un
+ * hotel —la decisión económica más cara del juego— eran indistinguibles, porque el hotel ERA
+ * una casa con una bandera encima.
+ *
+ * Aquí están las tres tallas que lo arreglan, cada una con el número de dónde sale. Escalar no
+ * cuesta un triángulo ni una llamada de dibujo: son las mismas mallas instanciadas, con otra
+ * matriz. `verify:burgo-escena` mide las huellas en el `.glb`, las multiplica por estas tallas
+ * y comprueba que nada se sale de su casilla, que nada pisa el carril del avatar y que un
+ * hotel se distingue de una casa.
+ *
+ * ═══ POR QUÉ ESTAS MEDIDAS SE ESCRIBEN AQUÍ Y NO SE LEEN ═══
+ *
+ * Este fichero no abre un `.glb`: es aritmética pura que corre en Node y en los dos clientes.
+ * Así que la huella del pack se escribe como constante MEDIDA, igual que `ALTURA_DEL_REBORDE`
+ * escribe el bordillo del City Builder. Que lo escrito sea lo que el fichero trae no es una
+ * promesa: es una comprobación de `verify:burgo-escena`, con su vacuna.
+ */
+export const HUELLA_DEL_PEON = 1.272;
+export const ALTO_DEL_PEON_EN_EL_PACK = 2.326;
+export const HUELLA_DE_LA_CASA = { ancho: 2.504, fondo: 2.543, alto: 2.543 } as const;
+
+/**
+ * EL PEÓN: LA SEXTA PARTE DE UN DÍGITO, QUE ES LO QUE EL PATIO DE LA CÁRCEL DEJA.
+ *
+ * El dígito del precio es la única referencia honrada de «lo que se lee a esta distancia»: se
+ * midió en píxeles con `proyecta` desde la pose de salida —16,3 px en un PC 16:9, 9,9 en una
+ * tableta y 5,0 en el móvil— y de ahí salió su alto de 27, con 20,25 de ancho. Un peón no
+ * tiene por qué ser tan ancho como un precio; pero a un dieciseisavo era invisible, y un
+ * octavo (2,53) tampoco se ve.
+ *
+ * La sexta parte —3,375— es a la vez la fracción que se ve y el TECHO que el tablero permite,
+ * y las dos cosas coinciden por casualidad. Los tres sitios que ponen techo, de más apretado a
+ * menos:
+ *
+ *     el patio de la cárcel   12 × 12 con tres presos de frente   →  3,4 con aire, 4,0 a tope
+ *     el brazo de una esquina 25,5 de largo con seis en fila      →  4,3
+ *     el carril del avatar    de v = 23 a v = 29, centrado en 25,5 →  5,0
+ *
+ * Así que el peón crece 2,65 veces: de 1,272 a 3,375 de huella y de 2,326 a 6,17 de alto. A
+ * 55° de altura de cámara —los `MIRADOR_DEL_BURGO`— lo que se ve de una pieza es su huella por
+ * 0,82 más su alto por 0,57, de modo que el peón pasa de tapar 3,0 unidades cuadradas de
+ * lienzo a tapar 21,3: siete veces. Sigue siendo la vigésima parte de un dígito en superficie,
+ * y ésa es la verdad: el peón no puede competir con el precio mientras la cárcel mida 12.
+ *
+ * Se escala UNIFORME a propósito. Un peón estirado a lo alto se leería algo mejor —el alto es
+ * lo único que no tiene techo, porque encima del peón no hay nada—, pero deja de ser la pieza
+ * del pack y empieza a ser otra; y con la cámara a 55° la huella pesa más que el alto de todos
+ * modos.
+ */
+export const DIAMETRO_DEL_PEON = ANCHO_DEL_GUARISMO / 6; // 3,375
+export const TALLA_DEL_PEON = DIAMETRO_DEL_PEON / HUELLA_DEL_PEON; // 2,6533
+export const ALTO_DEL_PEON = ALTO_DEL_PEON_EN_EL_PACK * TALLA_DEL_PEON; // 6,1716
+
+/**
+ * EL DISCO DE CONTACTO crece con el peón o deja de estar debajo de la pieza.
+ *
+ * Era 0,7 de radio para un peón de 0,636 de RADIO —la huella es el doble, 1,272—: o sea 1,1
+ * veces el radio de la pieza, que es lo que hace que la sombra asome un poco por fuera en vez
+ * de quedar escondida debajo. Se conserva esa proporción, no el número. Con el paso 4 de las
+ * rejillas de esquina y el 3,9 del patio, dos discos vecinos quedan a 0,29 y a 0,19 de
+ * distancia: no se tocan, y eso lo mide el comprobador.
+ *
+ * OJO AL SEGUNDO CLIENTE: esta misma malla es el disco del AVENTURERO en calidad plena
+ * (`Burgo.tsx`, «el disco del aventurero en pie»), que la instancia con un 1,1 más encima. La
+ * figura de KayKit NO ha crecido con el peón —mide lo que mide una persona en este mundo—,
+ * así que su disco pasó de 1,54 de diámetro a 4,08 bajo una figura de 1,8 de ancho. Está
+ * anotado con el resto de lo que el peón grande deja abierto en §13.5 de `docs/burgo/DISENO-3.md`.
+ */
+export const RADIO_DEL_DISCO_DEL_PEON = (DIAMETRO_DEL_PEON / 2) * 1.1; // 1,85625
+
+/**
+ * LA CASA: LA MITAD DEL FONDO DE LA FRANJA DEL BARRIO.
+ *
+ * La franja es la banda de color del grupo, 21 de fondo (`BANDA.franja`), y es el sitio de la
+ * casa: ahí y sólo ahí se posan. Una casa que ocupe la MITAD de ese fondo —10,5— deja 5,25
+ * libres hacia la ciudad y 5,25 hacia el filete, o sea la casa centrada en su banda con un
+ * cuarto de banda a cada lado. Es la proporción de un tablero de mesa, donde la casita ocupa
+ * el grueso de la tira de color y no un punto en medio de ella.
+ *
+ * A esa talla la casa mide 10,34 de frente, y con el paso 12 que la rejilla ya tenía quedan
+ * 1,66 entre casa y casa: cuatro casas seguidas que ocupan 46,3 de los 72 del frente. Antes
+ * ocupaban 38,5 de los cuales 28,4 eran hueco.
+ *
+ * No crece más por dos razones que se pueden señalar: a dos tercios de la franja (14 de fondo)
+ * la casa mediría 13,8 de frente y ya no cabrían cuatro con paso 12 —habría que abrir la
+ * rejilla a 14, y entonces la de más afuera llegaría a 28, a tres décimas del mástil de la
+ * bandera del dueño—; y la mitad es lo que deja al hotel un tercio más de fondo por delante
+ * sin salirse tampoco.
+ */
+export const FONDO_DE_LA_CASA = BANDA.franja / 2; // 10,5
+export const TALLA_DE_LA_CASA = FONDO_DE_LA_CASA / HUELLA_DE_LA_CASA.fondo; // 4,129
+export const ANCHO_DE_LA_CASA = HUELLA_DE_LA_CASA.ancho * TALLA_DE_LA_CASA; // 10,339
+export const ALTO_DE_LA_CASA = HUELLA_DE_LA_CASA.alto * TALLA_DE_LA_CASA; // 10,5
+
+/**
+ * EL HOTEL: LA MISMA PIEZA ESTIRADA, PORQUE NO HAY HOTEL EN NINGÚN PACK.
+ *
+ * La decisión 12 del presupuesto ya decía que la posada se pinta con la geometría de la casa:
+ * los ocho packs del disco no traen un hotel, y meter un modelo nuevo cuesta triángulos y una
+ * llamada de dibujo más. Lo que la decisión 12 NO decía es a qué talla, y por eso hasta ahora
+ * un hotel era literalmente una casa a talla 1 con una bandera clavada encima: la diferencia
+ * entre tener cuatro casas y tener un hotel —la más cara del reglamento— no se veía.
+ *
+ * Se arregla sin modelo nuevo y sin un triángulo más, dándole al hotel un VOLUMEN propio: la
+ * misma malla con una escala distinta en cada eje, que es lo que la convierte de cubo en
+ * bloque alargado. Los tres números salen de lo que el hotel SUSTITUYE y de la banda en la que
+ * vive:
+ *
+ *     frente  22,34  = lo que ocupan dos casas seguidas de borde a borde (10,34 + el paso 12)
+ *     fondo   14     = dos tercios de la franja, frente a la mitad que ocupa una casa
+ *     alto    14     = tanto como hondo: un tercio más alto que una casa
+ *
+ * O sea: 2,16 veces más ancho, 1,33 más hondo y 1,33 más alto que una casa; casi el triple de
+ * huella y cerca de cuatro veces el volumen. Cuatro casas son cuatro cubos repartidos por 46,3
+ * de frente; un hotel es un bloque largo y más alto plantado en el medio con la bandera del
+ * dueño en el tejado. A un vistazo son dos cosas distintas, que es lo que se pedía.
+ *
+ * La pieza se estira a lo largo de `u` —el sentido de la marcha— porque su `+X` local cae ahí
+ * cuando mira hacia dentro del anillo, y es la dirección en la que la casilla tiene 72 y la
+ * franja sólo 21. Estirarla en fondo la sacaría de la franja al tercer intento.
+ */
+export const ANCHO_DEL_HOTEL = ANCHO_DE_LA_CASA + REJILLA_DE_CASAS.paso; // 22,339
+export const FONDO_DEL_HOTEL = (BANDA.franja * 2) / 3; // 14
+export const ALTO_DEL_HOTEL = FONDO_DEL_HOTEL; // 14
+/** Lo que `Burgo.tsx` le pone a la matriz del hotel, eje por eje, sobre la malla de la casa. */
+export const TALLA_DEL_HOTEL = {
+  ancho: ANCHO_DEL_HOTEL / HUELLA_DE_LA_CASA.ancho, // 8,921
+  alto: ALTO_DEL_HOTEL / HUELLA_DE_LA_CASA.alto, // 5,505
+  fondo: FONDO_DEL_HOTEL / HUELLA_DE_LA_CASA.fondo, // 5,505
+} as const;
+
+/**
+ * LA BANDERA DEL HOTEL va clavada en su tejado, y el tejado ha subido de 2,543 a 14. El `alza`
+ * se deriva del alto del hotel para que no puedan discrepar: una bandera flotando a 2,45 sobre
+ * un bloque de 14 sería un fallo que nadie ve en el código y que se ve en la primera captura.
+ * El desplazamiento de 0,6 a lo largo de `u` se queda: sobre un tejado de 22,34 de frente es
+ * prácticamente el centro, y es lo que aparta el mástil del caballete de la cubierta.
+ */
+export const BANDERA_SOBRE_LA_POSADA = { alza: ALTO_DEL_HOTEL, u: 0.6 } as const;
+
 /* ─────────────────────────────── Las esquinas ─────────────────────────────── */
 
 export const PUERTA_MAYOR = 0;
@@ -605,15 +811,36 @@ export const SUBIDA_DE_LA_REJA = 4;
  * seis de visita, otra sobre el tramo de entrada de la marcha, a siete celdas de allí.
  */
 export const CELDA = { u: celdaDeEsquina(6), v: celdaDeEsquina(6), lado: RETICULA_DE_LA_CIUDAD } as const; // 402 · 402 · 12
-export const REJILLA_DE_PRESOS = { columnas: 3, filas: 2, pasoU: 3.2, pasoV: 4 } as const;
+/**
+ * LOS SEIS PRESOS EN EL PATIO, Y POR QUÉ ESTE PATIO ES EL TECHO DEL PEÓN ENTERO.
+ *
+ * El patio mide una celda de la retícula: 12 × 12. Seis presos en 3 × 2 quieren tres peones
+ * de frente, y tres de frente en 12 es la cuenta más apretada que hay en todo el tablero:
+ * `3 · D + 2 · hueco + 2 · holgura ≤ 12`. Con `D = 3,375`, paso 3,9 y 0,41 hasta la verja,
+ * sale 11,18 de los 12. Con `D = 4` no queda ni un pelo, y con `D = 4,5` —lo que el carril
+ * del avatar admitiría de sobra— los presos atraviesan la verja.
+ *
+ * Por eso `DIAMETRO_DEL_PEON` vale lo que vale: no lo decide la casilla, que da para mucho
+ * más; lo decide la habitación más pequeña del tablero. Queda escrito aquí para que el día
+ * que alguien quiera un peón mayor sepa dónde tiene que mirar primero.
+ *
+ * El paso de las filas es 4,2 y no 3,9 porque a lo largo de `v` sobra sitio (dos filas usan
+ * 4,2 de los 12) y un poco más de aire entre las dos hileras se lee mejor desde arriba.
+ */
+export const REJILLA_DE_PRESOS = { columnas: 3, filas: 2, pasoU: 3.9, pasoV: 4.2 } as const;
 /**
  * LOS SEIS DE VISITA van sobre el tramo por el que se ENTRA en la esquina (`v = 349,5`), o
  * sea en la acera de delante de la cárcel y no en mitad del patio. Por el mismo motivo que
  * los peones de esquina: quien está de visita no está preso, y su aventurero se mide contra
  * la polilínea. El tramo de entrada es el otro brazo de la ele, así que no se pisan con
  * nadie, y con el patio a siete celdas de allí no hay manera de confundirlos.
+ *
+ * Es la rejilla de esquina reflejada, y ha cambiado por lo mismo: era 3 × 2 con las dos
+ * filas a 1,4 en radial, un número calibrado para el peón de 1,272 y para ninguno más. Ahora
+ * son seis en FILA INDIA por el brazo de entrada, con el mismo paso 4 y el mismo centro
+ * 337,5, de 327,5 a 347,5. Así ningún visitante se despega de la línea de la marcha.
  */
-export const REJILLA_DE_VISITAS = { centroU: 337, centroV: LINEA_DE_LA_MARCHA, columnas: 3, filas: 2, pasoU: 3.2, pasoV: 1.4 } as const;
+export const REJILLA_DE_VISITAS = { centroU: 337.5, centroV: LINEA_DE_LA_MARCHA, columnas: 6, filas: 1, pasoU: 4, pasoV: 0 } as const;
 
 export function huecoDePreso(asiento: number): Punto {
   const m = marcoDeCasilla(MAZMORRA);

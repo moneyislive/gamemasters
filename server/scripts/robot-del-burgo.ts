@@ -68,7 +68,7 @@ import {
   USAR_INDULTO,
 } from '../../shared/arcade/juegos/burgo';
 import type { EstadoDelBurgo, LadoDelTrato, VistaDelBurgo } from '../../shared/arcade/juegos/burgo';
-import { barrioDe, CASILLAS, PASO_DE_PUJA, POSADA } from '../../shared/arcade/juegos/burgo-tablero';
+import { barrioDe, CASILLAS, decimaDelPatrimonio, PASO_DE_PUJA, POSADA } from '../../shared/arcade/juegos/burgo-tablero';
 
 /** Lo que el robot decidió: el movimiento entero y de qué familia es, para contarlo. */
 export interface DecisionDelRobot {
@@ -252,13 +252,31 @@ export function loQueHaceElRobot(
   const fianza = porTipo(opciones, PAGAR_FIANZA, false);
   if (fianza !== null && yo.mrs >= RESERVA_PARA_LA_FIANZA) return { azar, decision: decision(fianza, 'pagar-fianza') };
 
-  /* 5. Comprar todo lo que se pueda pagar; lo que no, a subasta. */
+  /*
+   * 5. EL IMPUESTO, que desde la regla oficial se ELIGE: el robot paga lo que menos le
+   * cuesta, que es lo que haría cualquiera que juegue a ganar; a igualdad, la cantidad
+   * fija, que no depende de contar el patrimonio. Las dos ramas se ejercitan solas en
+   * una partida: al principio el patrimonio son los 1.500 de salida y la décima sale
+   * más barata; en cuanto hay calles y casas, la fija.
+   */
+  const impuestoFijo = porId(opciones, 'impuesto:fijo');
+  const impuestoDecima = porId(opciones, 'impuesto:decima');
+  if (impuestoFijo !== null || impuestoDecima !== null) {
+    const fila = CASILLAS[yo.casilla];
+    const laFija = fila === undefined ? 0 : fila.precio;
+    if (impuestoDecima !== null && (impuestoFijo === null || decimaDelPatrimonio(yo.patrimonio) < laFija)) {
+      return { azar, decision: decision(impuestoDecima, 'impuesto-decima') };
+    }
+    if (impuestoFijo !== null) return { azar, decision: decision(impuestoFijo, 'impuesto-fijo') };
+  }
+
+  /* 6. Comprar todo lo que se pueda pagar; lo que no, a subasta. */
   const compras = conPrefijo(opciones, 'comprar:');
   if (compras.length > 0) return { azar, decision: decision(compras[0] as Opcion, 'comprar') };
   const almonedas = conPrefijo(opciones, 'a-almoneda:');
   if (almonedas.length > 0) return { azar, decision: decision(almonedas[0] as Opcion, 'a-almoneda') };
 
-  /* 6. Alzar en cuanto hay barrio: la casilla con menos casas primero (el parejo lo exige igual). */
+  /* 7. Alzar en cuanto hay barrio: la casilla con menos casas primero (el parejo lo exige igual). */
   const alzables = conPrefijo(opciones, 'alzar:');
   let mejorAlza: Opcion | null = null;
   let menosCasas = POSADA + 1;
@@ -275,7 +293,7 @@ export function loQueHaceElRobot(
   }
   if (mejorAlza !== null) return { azar, decision: decision(mejorAlza, 'alzar') };
 
-  /* 7. Deshipotecar si voy sobrado. */
+  /* 8. Deshipotecar si voy sobrado. */
   for (const o of conPrefijo(opciones, 'desempenar:')) {
     const c = enteroDe((o.carga as { casilla?: unknown }).casilla);
     const fila = CASILLAS[c];
@@ -283,7 +301,7 @@ export function loQueHaceElRobot(
     if (yo.mrs - Math.floor(fila.precio / 2) >= RESERVA_PARA_DESEMPENAR) return { azar, decision: decision(o, 'desempenar') };
   }
 
-  /* 8. Proponer un trato por lo que me falta del barrio, una vez por turno. */
+  /* 9. Proponer un trato por lo que me falta del barrio, una vez por turno. */
   if (conTrato) {
     const puerta = porTipo(opciones, PROPONER, true);
     const falta = loQueMeFalta(v, quien);
@@ -300,7 +318,7 @@ export function loQueHaceElRobot(
     }
   }
 
-  /* 9. Tirar siempre que se pueda; pasar sólo cuando no queda otra. */
+  /* 10. Tirar siempre que se pueda; pasar sólo cuando no queda otra. */
   const tirar = porTipo(opciones, TIRAR, false);
   if (tirar !== null) return { azar, decision: decision(tirar, 'tirar') };
   const pasar = porTipo(opciones, PASAR, false);

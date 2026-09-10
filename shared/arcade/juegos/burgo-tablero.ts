@@ -247,6 +247,34 @@ export const INTERES_DEL_EMPENO = 10;
 /** Vender un edificio al Ayuntamiento devuelve esta fracción del precio de la casa (la mitad). */
 export const PARTES_DE_LA_CASA_AL_VENDER = 2;
 
+/**
+ * LA PARTE DEL PATRIMONIO QUE EL IMPUESTO ADMITE EN VEZ DE LA CANTIDAD FIJA: una
+ * décima, que es el 10 % del reglamento §3. Va aquí y no en el reductor por lo mismo
+ * que la hipoteca: es una cuenta de un renglón sobre un número de la tabla, la miran
+ * los dos lados (el botón dice cuánto y el reductor cobra cuánto) y si cada uno la
+ * escribiera por su cuenta el botón podría prometer una cifra y el cobro ser otra.
+ */
+export const PARTE_DEL_IMPUESTO = 10;
+
+/**
+ * EL 10 % DEL PATRIMONIO, redondeado HACIA ABAJO y nunca negativo.
+ *
+ * Hacia abajo y no hacia arriba —al revés que el interés de la hipoteca, que redondea
+ * hacia arriba— porque el que cobra es distinto: el interés lo cobra el Ayuntamiento
+ * sobre un préstamo que él hizo, y el 10 % es una ALTERNATIVA que se le ofrece a quien
+ * paga; si la cuenta se redondeara hacia arriba, la alternativa podría costar más que
+ * la décima que promete el rótulo. Y entera porque `hacienda.transferir` sólo mueve
+ * enteros: un pago con coma se pierde al sumar y deja saldos que no cuadran.
+ *
+ * `Number.isFinite` de guarda porque esta función la llama también `opciones()` con el
+ * patrimonio que trae la VISTA, y una vista de ayer o un banco de pruebas pueden no
+ * traerlo: sin la guarda el rótulo diría «NaN €» y el botón seguiría pulsándose.
+ */
+export function decimaDelPatrimonio(patrimonio: number): number {
+  if (!Number.isFinite(patrimonio) || patrimonio <= 0) return 0;
+  return Math.floor(patrimonio / PARTE_DEL_IMPUESTO);
+}
+
 /** Hipoteca = mitad del precio. Todos los precios son pares, así que es entera sin redondear. */
 export function valorDeEmpeno(precio: number): number {
   return Math.floor(precio / 2);

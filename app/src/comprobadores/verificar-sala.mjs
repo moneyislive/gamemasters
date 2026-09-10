@@ -1770,6 +1770,28 @@ paso('El mueble de opciones de la app no pinta una DECLARACIÓN como si fuera un
  * escrita— y lo que no: que React haga con ella lo que se espera lo compra el banco del
  * escritorio, que monta el mismo `<Burgo>`.
  *
+ * ═══ Y LA TANDA DE PANTALLA COMPLETA TRAJO OTROS SEIS DE LA MISMA FAMILIA ═══
+ *
+ * Todos con la misma forma: la partida se para o se pierde un movimiento, y no hay un solo
+ * error en ninguna consola.
+ *
+ *   · EL CARRIL DENTRO DEL CAJÓN. «Empezar la partida» es una opción del momento, o sea de
+ *     la sección «Ahora», y «Ahora» nace plegada dentro de un cajón que nace cerrado: con
+ *     una mesa recién abierta la única jugada posible del juego queda detrás de dos toques
+ *     que nadie tiene motivo para dar. Una partida que no arranca.
+ *   · UNA LISTA SIN `keyboardShouldPersistTaps` alrededor del único campo de texto de la
+ *     partida: el primer toque en «Pujar» sólo cierra el teclado, y una subasta con plazo
+ *     se pierde por un toque que no hizo nada. No se ve NUNCA con un ratón.
+ *   · LA CRIBA CONTANDO UNA HOJA QUE NO SE PINTA: con el cajón cerrado, lo que sólo enseña
+ *     la hoja se queda sin botón en toda la pantalla.
+ *   · UN INTERRUPTOR EN LUGAR DEL MUEBLE en `hojaEnTres`: un `true` con la caja o el carril
+ *     sin pintar deja el movimiento sin sitio, que es el mismo fallo dicho por el contrato.
+ *   · UNA CAJA MODAL SIN VELO sobre un tablero que se toca: cerrar la tarjeta deja el dedo
+ *     encima de una casilla, y una casilla con UNA obra posible manda el movimiento sin
+ *     preguntar. Cerrar una tarjeta no puede comprar un solar.
+ *   · Y LA CRÓNICA COMPARANDO EL TEXTO en vez de la jugada: dos sucesos iguales seguidos
+ *     eran uno solo en el relato, y el segundo desaparecía sin que nadie lo notara.
+ *
  * ═══ Y CADA REGLA SE VE CAER ═══
  *
  * `reglaDelFuente` afirma la regla sobre el fichero de VERDAD y vuelve a aplicarla sobre
@@ -1778,7 +1800,10 @@ paso('El mueble de opciones de la app no pinta una DECLARACIÓN como si fuera un
  * alguien le rompe la expresión regular, y en este árbol eso ya pasó dos veces: un `sed`
  * que dejó `/bLETRA./` y un filtro que no inspeccionaba ni un fichero.
  */
-paso('El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin plataforma y con las hojas fuera del gesto');
+paso(
+  'El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin plataforma, hojas fuera del gesto, ' +
+    'y de pantalla completa —el carril a la vista, el cajón con sus cuatro mitades y el teclado que no se come el primer toque—',
+);
 {
   const envoltura = leer(path.join(SRC, 'arcade', 'burgo-en-tres.tsx'));
   const escena = leer(path.join(SRC, 'arcade', 'burgo-en-tres-escena.tsx'));
@@ -1972,7 +1997,7 @@ paso('El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin 
       const c = soloCodigo(t);
       return (
         /const dados = useMemo\(\(\) => dadosEnTres\(laVista, yo, opciones\), \[laVista, yo, opciones\]\);/.test(c) &&
-        /opcionesFueraDelTablero\(opciones, datos, dados, hoja\)/.test(c) &&
+        /opcionesFueraDelTablero\(opciones, datos, dados, cajonAbierto \? hoja : null, pregon, carril\)/.test(c) &&
         /from '\.\.\/\.\.\/\.\.\/shared\/arcade\/juegos\/burgo-en-tres'/.test(t)
       );
     },
@@ -1982,6 +2007,109 @@ paso('El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin 
       'const dados = useMemo(() => dadosEnTres(laVista, yo, fuera), [laVista, yo, fuera]);',
     ),
     'al revés, `porTirar` es siempre falso: el asa no se monta y nadie puede tirar en toda la tarde',
+  );
+
+  /*
+   * ═══ EL ORDEN DE LAS SEIS COMPOSICIONES, QUE ES LO QUE NO SE VE FALLAR ═══
+   *
+   * `shared/arcade/juegos/burgo-en-tres.ts` dice el orden con todas las letras: los tres
+   * muebles primero, la hoja recibiendo los DOS que ya pintan movimientos suyos, y la
+   * criba SIEMPRE la última porque es la única que mira a las demás. Compuesta antes que
+   * el carril, quitaría por un mueble que todavía no existe y el movimiento se quedaría
+   * sin sitio en toda la pantalla. Nada de esto lo caza `tsc` —los seis argumentos son del
+   * tipo correcto en cualquier orden— ni `verify:burgo-en-tres`, que mide la TRADUCCIÓN.
+   */
+  reglaDelFuente(
+    'la pantalla compone en el orden del contrato: la caja de los tratos, el carril, la hoja con LOS DOS, y la criba la última',
+    (t) => {
+      const c = soloCodigo(t);
+      const laCaja = c.indexOf('const pregon = useMemo(() => pregonDelBurgo(laVista, yo, opciones)');
+      const elCarril = c.indexOf('const carril = useMemo(() => carrilDelBurgo(laVista, yo, opciones)');
+      const laHoja = c.indexOf('hojaEnTres(laVista, yo, opciones, pregon, carril)');
+      const laCriba = c.indexOf('opcionesFueraDelTablero(opciones, datos, dados,');
+      return laCaja >= 0 && elCarril > laCaja && laHoja > elCarril && laCriba > laHoja;
+    },
+    escena,
+    escena.replace('hojaEnTres(laVista, yo, opciones, pregon, carril)', 'hojaEnTres(laVista, yo, opciones)'),
+    'sin pasarle los dos muebles, «Ahora» y «El trato» conservan sus botones y los mismos movimientos se pintan dos veces en la misma pantalla',
+  );
+  reglaDelFuente(
+    'y a la hoja se le pasan LOS OBJETOS que se pintan, nunca un booleano',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /hojaEnTres\(laVista, yo, opciones, pregon, carril\)/.test(c) &&
+        /usarLaSeccionAbierta\(vista\.codigo, hoja\.abre, hoja\.cinta\.espera, hoja\.cinta\.meToca, carril, pregon\)/.test(c) &&
+        !/hojaEnTres\([^)]*(true|false)\)/.test(c)
+      );
+    },
+    escena,
+    escena.replace('hojaEnTres(laVista, yo, opciones, pregon, carril)', 'hojaEnTres(laVista, yo, opciones, true, true)'),
+    'un interruptor se queda en `true` con el mueble sin pintar, y entonces contestar un trato o empezar la partida no se puede hacer en ninguna parte',
+  );
+  reglaDelFuente(
+    'la criba cuenta la hoja SÓLO con el cajón abierto, en las dos ramas',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /opcionesFueraDelTablero\(opciones, datos, dados, cajonAbierto \? hoja : null, pregon, carril\)/.test(c) &&
+        /opcionesFueraDelTablero\(\s*sinElRetablo,\s*null,\s*null,\s*cajonAbierto \? hoja : null,\s*pregon,\s*carril,\s*\)/.test(c) &&
+        /obrasSoloEnElAnillo\(opciones, datos, cajonAbierto \? hoja : null, carril\)/.test(c)
+      );
+    },
+    escena,
+    escena.replace(
+      'opcionesFueraDelTablero(opciones, datos, dados, cajonAbierto ? hoja : null, pregon, carril)',
+      'opcionesFueraDelTablero(opciones, datos, dados, hoja, pregon, carril)',
+    ),
+    'una hoja dentro de un cajón cerrado no se pinta: contándola, lo que sólo enseña la hoja —las pujas de una subasta— se queda sin botón en toda la pantalla',
+  );
+
+  /* ─── El carril: la sección «Ahora» puesta a la vista ─── */
+
+  /*
+   * ═══ EL FALLO QUE ESTO COMPRA, Y NO ES TEÓRICO ═══
+   *
+   * «Empezar la partida» es una opción del momento, o sea de la sección «Ahora», y
+   * «Ahora» nace plegada dentro de una hoja que nace cerrada: con una mesa recién abierta
+   * la ÚNICA jugada posible del juego quedaba detrás de dos toques que nadie tiene motivo
+   * para dar. Una partida parada, sin un error en ninguna consola y sin nada rojo. Lo que
+   * lo arregla es que el carril se pinte FUERA del cajón; lo que lo volvería a romper es
+   * meterlo dentro, y eso es lo que la vacuna mete.
+   */
+  reglaDelFuente(
+    'el carril se pinta en el PIE, fuera del cajón, y el cajón sólo lleva la hoja y la crónica',
+    (t) => {
+      const c = soloCodigo(t);
+      const pie = c.indexOf('const elPie = (sueltas: readonly OpcionDeMesa[]): JSX.Element => (');
+      const carrilEnElPie = c.indexOf('<ElCarrilDeLaMesa carril={carril}');
+      const cajon = c.indexOf('const elCajon = ()');
+      return (
+        pie >= 0 &&
+        carrilEnElPie > pie &&
+        cajon > carrilEnElPie &&
+        /<LaCintaDelBurgo cinta=\{hoja\.cinta\} cajonAbierto=\{cajonAbierto\}/.test(c) &&
+        !/<ElCarrilDeLaMesa[\s\S]*<ElCajonDeLaHoja/.test(c.slice(cajon))
+      );
+    },
+    escena,
+    escena.replace('<ElCarrilDeLaMesa carril={carril} quieto={mesa.quieto} alElegir={alElegirOpcion} />', ''),
+    'sin carril en el pie, «Empezar la partida» vuelve detrás de un «≡» que nadie tiene motivo para pulsar: una mesa recién abierta no puede empezar',
+  );
+  reglaDelFuente(
+    'un carril vacío no se pinta —ni el hueco ni el filo— y cada cuadrado manda LA OPCIÓN ENTERA',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /export function ElCarrilDeLaMesa\(\{[\s\S]*?if \(carril\.length === 0\) return null;/.test(c) &&
+        /onPress=\{\(\) => \{\s*alElegir\(g\.opcion\);\s*\}\}/.test(c) &&
+        /accessibilityLabel=\{g\.ayuda\}/.test(c) &&
+        !/tipo: g\.opcion\.tipo/.test(c)
+      );
+    },
+    hojas,
+    hojas.replace('if (carril.length === 0) return null;', ''),
+    'una tira vacía encima del tablero es cromo que no dice nada y tapa casillas, y además el carril vacío es la condición con la que «Ahora» conserva sus botones',
   );
 
   /* ─── El respaldo, que no es opcional ─── */
@@ -1998,7 +2126,9 @@ paso('El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin 
         /if \(elMundoNoLlego !== null\) \{/.test(c) &&
         /seVeEnTres\(laVista\)/.test(c) &&
         /opcionesSueltas\(tablero, opciones\)/.test(c) &&
-        /opcionesFueraDelTablero\(sinElRetablo, null, null, hoja\)/.test(c)
+        /opcionesFueraDelTablero\(\s*sinElRetablo,\s*null,\s*null,\s*cajonAbierto \? hoja : null,\s*pregon,\s*carril,\s*\)/.test(
+          c,
+        )
       );
     },
     escena,
@@ -2006,22 +2136,42 @@ paso('El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin 
     'sin la rama del `.glb` que no llega, un túnel de treinta segundos deja la partida en un telón para siempre',
   );
 
-  /* ─── El lienzo tiene suelo, y la ruta del modelo es la de la casa ─── */
+  /* ─── El tablero es la pantalla, y la ruta del modelo es la de la casa ─── */
 
+  /*
+   * ═══ AQUÍ HABÍA UN 58 %, Y AHORA NO HAY NINGUNA FRACCIÓN ═══
+   *
+   * El lienzo se llevaba el 58 % del alto porque debajo iba la hoja, en flujo, y había que
+   * repartir. La decisión es que el juego se hace de pantalla completa desde el principio:
+   * la hoja sube desde el pie como cajón y el lienzo se lleva todo lo que queda bajo la
+   * barra de la mesa. Lo que la regla vieja compraba —que la caja del lienzo no se
+   * encogiera a cero— lo compra ahora otra cosa: es el ÚNICO hijo que crece de una columna
+   * que ya tiene alto, así que se le exige `flex: 1` y que no quede ni rastro de la
+   * fracción, porque un `PARTE_DEL_ALTO` olvidado en el fichero sería el reparto viejo
+   * volviendo por una línea que nadie mira.
+   *
+   * Y LO QUE HAY QUE VOLVER A MEDIR NO ESTÁ AQUÍ: `verify:burgo-escena` proyecta las cuatro
+   * esquinas del anillo en una ventana que llama «9:19,5 al 58 %» (390 × 490). Esa ventana
+   * describe una pantalla que ya no existe; la buena es 390 × 725. Ese fichero no es de
+   * esta tanda y no se toca: las esquinas siguen cayendo dentro con más margen que antes
+   * —x ∈ [−0,778, 0,712], y ∈ [−0,362, 0,299]—, así que allí no hay nada rojo, sólo un
+   * nombre desfasado.
+   */
   reglaDelFuente(
-    'el lienzo se lleva el 58 % del alto con suelo de 360 y su caja NO es `flex: 1`',
+    'el lienzo se lleva TODO el alto que queda —ni fracción ni suelo— y el pie flota encima sin comerse el gesto',
     (t) => {
       const c = soloCodigo(t);
       return (
-        /const PARTE_DEL_ALTO = 0\.58;/.test(c) &&
-        /const ALTO_MINIMO_DEL_LIENZO = 360;/.test(c) &&
-        /Math\.max\(ALTO_MINIMO_DEL_LIENZO, Math\.round\(altoDeLaPantalla \* PARTE_DEL_ALTO\)\)/.test(c) &&
-        /cajaDelLienzo: \{ width: '100%', overflow: 'hidden' \}/.test(c)
+        !/PARTE_DEL_ALTO/.test(c) &&
+        !/ALTO_MINIMO_DEL_LIENZO/.test(c) &&
+        /cajaDelLienzo: \{ flex: 1, width: '100%', overflow: 'hidden' \}/.test(c) &&
+        /pieFlotante: \{ position: 'absolute', left: 0, right: 0, bottom: 0 \}/.test(c) &&
+        /<View style=\{estilos\.pieFlotante\} pointerEvents="box-none">/.test(c)
       );
     },
     escena,
-    escena.replace("cajaDelLienzo: { width: '100%', overflow: 'hidden' }", "cajaDelLienzo: { flex: 1, overflow: 'hidden' }"),
-    'un `flex: 1` sin suelo se encoge hasta cero antes de que nada se desplace, y un lienzo a cero de alto es un contexto de GL que se crea y se destruye por nada',
+    escena.replace('<View style={estilos.pieFlotante} pointerEvents="box-none">', '<View style={estilos.pieFlotante}>'),
+    'sin `box-none`, el hueco entre los muebles del pie deja de ser tablero y la franja de abajo del anillo no responde al gesto, sin que se vea por qué',
   );
   reglaDelFuente(
     'la ruta de `burgo.glb` sale de `escenas/ruta-de-modelos.ts` y no hay ninguna escrita a mano',
@@ -2087,6 +2237,280 @@ paso('El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin 
     ),
     'una sección guardada por una versión anterior dejaría la hoja entera plegada y sin manera de saber por qué',
   );
+
+  /* ─── El teclado, que es el segundo fallo de esta tanda y no se ve con un ratón ─── */
+
+  /*
+   * ═══ EL FALLO, CON SU CASO Y SU COSTE ═══
+   *
+   * La puja libre es el ÚNICO campo de texto de toda la partida, y vive dentro de una
+   * lista que se desplaza. Una lista sin `keyboardShouldPersistTaps` se come el PRIMER
+   * toque para cerrar el teclado: hay que pulsar «Pujar» dos veces, y la primera no hace
+   * nada visible. Con el plazo de una subasta corriendo, eso es la subasta perdida — y no
+   * hay error, ni aviso, ni nada rojo. No se ve NUNCA con un ratón, que es exactamente por
+   * qué esto se lee del fuente: las dos listas que pueden llevar un campo dentro tienen que
+   * escucharlo.
+   */
+  reglaDelFuente(
+    'las dos listas que pueden llevar un campo dentro escuchan los toques con el teclado abierto',
+    (t) => {
+      const c = soloCodigo(t);
+      const enElCajon = c.indexOf('style={estilos.cajonLista}');
+      const enLaHoja = c.indexOf('style={estilos.sobreElLienzoLista}');
+      const persistentes = (c.match(/keyboardShouldPersistTaps="handled"/g) ?? []).length;
+      return enElCajon >= 0 && enLaHoja >= 0 && persistentes >= 2;
+    },
+    hojas,
+    hojas.replace(/keyboardShouldPersistTaps="handled"/g, ''),
+    'sin esto el primer toque en «Pujar» sólo cierra el teclado, y una subasta con plazo se pierde por un toque que no hizo nada',
+  );
+
+  /* ─── El cajón: las cuatro mitades de una caja modal, escritas para esta plataforma ─── */
+
+  reglaDelFuente(
+    'el cajón lleva velo que se come el toque, papel con nombre, y la lista que se desplaza dentro',
+    (t) => {
+      const c = soloCodigo(t);
+      const cajon = c.indexOf('export function ElCajonDeLaHoja(');
+      if (cajon < 0) return false;
+      const cuerpo = c.slice(cajon, cajon + 1400);
+      return (
+        /<Pressable style=\{estilos\.velo\} onPress=\{alCerrar\} accessible=\{false\} \/>/.test(cuerpo) &&
+        /accessibilityViewIsModal accessibilityLabel=\{LA_HOJA_DE_LA_PARTIDA\}/.test(cuerpo) &&
+        /velo: \{ position: 'absolute'[\s\S]*?backgroundColor: conAlfa\(SALA\.suelo, 0\.72\) \}/.test(c)
+      );
+    },
+    hojas,
+    hojas.replace('<Pressable style={estilos.velo} onPress={alCerrar} accessible={false} />', ''),
+    'sin velo, cerrar el cajón deja el dedo sobre lo que hubiera debajo — y debajo hay cuarenta casillas que con una obra posible MANDAN el movimiento sin preguntar',
+  );
+  reglaDelFuente(
+    'y la trampa de foco apaga lo de debajo con LAS DOS mitades, la de iOS y la de Android',
+    (t) => {
+      const c = soloCodigo(t);
+      const conLasDos =
+        c.match(
+          /accessibilityElementsHidden=\{cajonAbierto\}\s*importantForAccessibility=\{cajonAbierto \? 'no-hide-descendants' : 'auto'\}/g,
+        ) ?? [];
+      /* Las dos ramas —la del anillo y la del respaldo— tienen que llevarla; si no, una de las dos se escapa. */
+      return conLasDos.length >= 2 && /debajoDelCajon: \{ flex: 1 \}/.test(c);
+    },
+    escena,
+    escena.replace(/importantForAccessibility=\{cajonAbierto \? 'no-hide-descendants' : 'auto'\}/g, ''),
+    'con una sola mitad, en la otra plataforma el lector se sale del cajón y se pone a leer el tablero: un modal que no atrapa nada',
+  );
+  /*
+   * ═══ EL ORDEN DE LOS HERMANOS ES QUIÉN PINTA ENCIMA, Y AQUÍ NO HAY `z-index` ═══
+   *
+   * En esta plataforma pinta encima el hermano que va DESPUÉS. Con el pie escrito detrás
+   * de las tres hojas, la cinta, el carril y la caja de los tratos quedaban POR ENCIMA del
+   * velo de una hoja modal: encendidos, legibles y pulsables con una tarjeta abierta
+   * delante. Eso es exactamente lo que un velo existe para impedir, y no se ve en ninguna
+   * consola: se ve mirando la pantalla y sabiendo qué mirar.
+   */
+  reglaDelFuente(
+    'el pie se escribe ANTES que las tres hojas, para quedar DEBAJO de su velo',
+    (t) => {
+      const c = soloCodigo(t);
+      const pie = c.indexOf('<View style={estilos.pieFlotante} pointerEvents="box-none">');
+      const primeraHoja = c.indexOf('<LaHojaSobreElLienzo');
+      return pie >= 0 && primeraHoja > pie;
+    },
+    escena,
+    /* Envenenado: una hoja modal ANTES del pie, o sea el pie pintándose encima de su velo. */
+    escena.replace(
+      '<View style={estilos.pieFlotante} pointerEvents="box-none">',
+      '<LaHojaSobreElLienzo titulo="" alDejarlo={soltarTodo} />\n          <View style={estilos.pieFlotante} pointerEvents="box-none">',
+    ),
+    'con el pie detrás, sus botones se ven encendidos y se pulsan con una tarjeta modal abierta delante',
+  );
+
+  reglaDelFuente(
+    'la cinta lleva el asa del cajón con su estado, y la hoja ya no la pinta dentro',
+    (t) => {
+      const c = soloCodigo(t);
+      const cinta = c.indexOf('export function LaCintaDelBurgo(');
+      const hojaEntera = c.indexOf('export function LaHojaDelBurgo(');
+      return (
+        cinta >= 0 &&
+        hojaEntera >= 0 &&
+        /accessibilityState=\{\{ expanded: cajonAbierto \}\}/.test(c) &&
+        /onPress=\{alAlternarElCajon\}/.test(c) &&
+        !/<LaCinta cinta=\{hoja\.cinta\} \/>/.test(c)
+      );
+    },
+    hojas,
+    hojas.replace('accessibilityState={{ expanded: cajonAbierto }}', ''),
+    'un asa que no dice si está abierta o cerrada obliga a pulsarla para saberlo, y con lector de pantalla eso es abrir el cajón para averiguar que ya estaba abierto',
+  );
+
+  /* ─── El cajón sube solo únicamente por lo que NO se ve fuera ─── */
+
+  reglaDelFuente(
+    'el cajón sube solo mirando los muebles que se pintan, no dos banderas',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /if \(carril\.length > 0\) cubiertas\.push\('ahora'\);/.test(c) &&
+        /if \(pregon !== null\) cubiertas\.push\('trato'\);/.test(c) &&
+        /if \(abre !== null && seVeFuera\.current\.indexOf\(abre\) < 0\) ponerCajonAbierto\(true\);/.test(c)
+      );
+    },
+    hojas,
+    hojas.replace(
+      'if (abre !== null && seVeFuera.current.indexOf(abre) < 0) ponerCajonAbierto(true);',
+      'if (abre !== null) ponerCajonAbierto(true);',
+    ),
+    '`abre` vale «ahora» en cuanto me toca el turno: sin mirar el carril, el cajón se levantaría encima del anillo en cada vuelta para enseñar botones que ya están a la vista',
+  );
+
+  /* ─── Aceptar un trato: dos toques, y el mismo objeto ─── */
+
+  reglaDelFuente(
+    'aceptar un trato se pregunta antes, y lo que se manda es EL MISMO objeto del juego',
+    (t) => {
+      const c = soloCodigo(t);
+      const tira = c.indexOf('function LaTiraDelTrato(');
+      if (tira < 0) return false;
+      const cuerpo = c.slice(tira);
+      return (
+        /const \[preguntando, ponerPreguntando\] = useState<number \| null>\(null\);/.test(c) &&
+        /onPress=\{\(\) => \{\s*alPreguntar\(tira\.id\);\s*\}\}/.test(cuerpo) &&
+        /alPreguntar\(null\);\s*alElegir\(aceptar\);/.test(cuerpo) &&
+        !/tipo: aceptar\.tipo/.test(cuerpo)
+      );
+    },
+    hojas,
+    hojas.replace('alPreguntar(tira.id);', 'alElegir(aceptar);'),
+    'aceptar mueve dinero y títulos y no se puede deshacer, y esta caja vive pegada al pie de un tablero que se gira con el dedo: un toque de más no puede regalar un solar',
+  );
+
+  /* ─── Lo que sólo tiene el anillo, para quien no puede tocar el anillo ─── */
+
+  reglaDelFuente(
+    'las obras que sólo tiene el anillo salen por las acciones del lienzo, la misma puerta que tirar',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /obrasSoloEnElAnillo\(opciones, datos, cajonAbierto \? hoja : null, carril\)/.test(c) &&
+        /lista\.push\(\{ name: `obra:\$\{String\(i\)\}`, label: o\.rotulo \}\)/.test(c) &&
+        /accessibilityActions=\{accionesDelLienzo\}/.test(c) &&
+        /const obra = soloEnElAnillo\[donde\];\s*if \(obra !== undefined\) alElegirOpcion\(obra\);/.test(c) &&
+        /return lista\.length === 0 \? undefined : lista;/.test(c)
+      );
+    },
+    escena,
+    escena.replace('for (const [i, o] of soloEnElAnillo.entries()) lista.push({ name: `obra:${String(i)}`, label: o.rotulo });', ''),
+    'comprar es el movimiento que decide la partida y no tiene ficha en «Lo mío»: sin esto sólo se puede hacer con el dedo sobre una escena, que para un lector de pantalla es UN elemento con una etiqueta',
+  );
+
+  /* ─── El cartel de la casilla señalada ─── */
+
+  reglaDelFuente(
+    'tocar una casilla sin obras SEÑALA y no abre una caja modal, y la señalada no se suelta con la revisión',
+    (t) => {
+      const c = soloCodigo(t);
+      const tocar = c.indexOf('const alTocarCasilla = useCallback(');
+      if (tocar < 0) return false;
+      const cuerpo = c.slice(tocar, c.indexOf('[laInterfazSeLoQueda, mesa, laVista, yo, opciones, soltarTodo],', tocar));
+      const soltar = c.indexOf('const soltarTodo = useCallback(');
+      /* Del `useCallback` a su cierre, y ni una línea más: detrás está la declaración de la señalada. */
+      const cuerpoDeSoltar = c.slice(soltar, c.indexOf('}, []);', soltar));
+      return (
+        /ponerLaCasilla\(null\);\s*ponerLaSenalada\(indice\);/.test(cuerpo) &&
+        /cartelDeCasilla\(laVista, laSenalada\)/.test(c) &&
+        !/ponerLaSenalada/.test(cuerpoDeSoltar)
+      );
+    },
+    escena,
+    escena.replace('ponerLaCasilla(null);\n      ponerLaSenalada(indice);', 'ponerLaCasilla(indice);'),
+    'tocar una casilla en la que no hay nada que hacer es lo más frecuente del juego —«¿de quién es?»— y abría la tarjeta entera con velo y cierre: veinte cajas modales por turno para leer dos renglones',
+  );
+
+  /* ─── La crónica ya no la acumula esta pantalla ─── */
+
+  reglaDelFuente(
+    'la crónica sale de `laCronicaConLaVista` y no de comparar el texto con el anterior',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /ponerCronicaDelBurgo\(\(antes\) => laCronicaConLaVista\(antes, laVista\)\);/.test(c) &&
+        !/ultimoPregon/.test(c) &&
+        !/elPregonEnTres/.test(c)
+      );
+    },
+    escena,
+    escena.replace(
+      'ponerCronicaDelBurgo((antes) => laCronicaConLaVista(antes, laVista));',
+      'const ultimoPregon = elPregonEnTres(laVista);',
+    ),
+    'comparando el TEXTO, dos sucesos iguales seguidos —dos «Ana tira», dos cobros idénticos— eran uno solo en el relato, y el segundo desaparecía sin que nadie lo notara',
+  );
+
+  /* ─── La ficha de una casilla, contra lo nuevo del contrato ─── */
+
+  reglaDelFuente(
+    'la ficha de una casilla enseña los solares del barrio, que es lo que se mira antes de comprar',
+    (t) =>
+      /<LosSolaresDelBarrio solares=\{ficha\.solaresDelBarrio\} \/>/.test(t) &&
+      /function LosSolaresDelBarrio\(\{ solares \}/.test(t) &&
+      /if \(solares\.length === 0\) return null;/.test(t),
+    hojas,
+    hojas.replace('<LosSolaresDelBarrio solares={ficha.solaresDelBarrio} />', ''),
+    'sin eso, la tarjeta de una casilla AJENA no dice cuánto le falta a alguien para el barrio entero, que es lo único que decide si comprar el tercer solar vale trescientos euros o la partida',
+  );
+
+  /* ─── Y que los muebles se MONTEN, que es lo que ninguna de las de arriba compraba ─── */
+
+  /*
+   * ═══ UN MUEBLE QUE NO SE MONTA NO DA ERROR, Y AQUÍ NO DABA NI ROJO ═══
+   *
+   * Las reglas de arriba vigilan que el CARRIL y la CINTA estén en el pie, y ahí se
+   * quedaban. Probado una a una sobre el fichero de verdad, con el guion en 249 de 249:
+   * borrar `<LaCajaDeLosTratos>` del pie, borrar el cartel, borrar las sueltas, dejar el
+   * pie fuera de la rama del respaldo o hacer que `elCajon()` devolviera `null` siempre
+   * salían las cinco VERDES. Y no son cromo que falta: la criba YA HA CONTADO ese mueble
+   * —`opcionesFueraDelTablero` recibe `pregon`, y `hojaEnTres` con `pregon` deja «El
+   * trato» sin botones—, así que lo que ese mueble pintaba se queda SIN UN SOLO BOTÓN en
+   * toda la pantalla:
+   *
+   *   · sin la caja, contestar un trato que caduca al cambiar el turno;
+   *   · sin el cajón montado, las pujas de una subasta y «Lo mío» entero, porque con
+   *     `cajonAbierto` en cierto la criba se los descuenta a la hoja que nadie pinta;
+   *   · y sin el pie en la rama del respaldo, empezar la partida sobre el retablo.
+   *
+   * Es el mismo fallo que esta tanda vino a matar, entrando por la puerta de al lado: una
+   * partida parada y sin un error en ninguna consola. Por eso el inventario del pie y el
+   * montaje del cajón se leen enteros y en su sitio, y no sólo dos de sus cinco piezas.
+   */
+  reglaDelFuente(
+    'el pie monta su inventario ENTERO —cartel, caja de los tratos, sueltas, carril y cinta— en las dos ramas, y el cajón se monta con la hoja y la crónica dentro',
+    (t) => {
+      const c = soloCodigo(t);
+      const pie = c.indexOf('const elPie = (sueltas: readonly OpcionDeMesa[]): JSX.Element => (');
+      const cajon = c.indexOf('const elCajon = ()');
+      if (pie < 0 || cajon < 0 || cajon < pie) return false;
+      const dentroDelPie = c.slice(pie, cajon);
+      const dentroDelCajon = c.slice(cajon, cajon + 900);
+      return (
+        /<ElCartelDeLaCasilla\b/.test(dentroDelPie) &&
+        /<LaCajaDeLosTratos pregon=\{pregon\}/.test(dentroDelPie) &&
+        /hayAlgoQuePintar\(sueltas\) \?/.test(dentroDelPie) &&
+        /<ElCarrilDeLaMesa carril=\{carril\}/.test(dentroDelPie) &&
+        /<LaCintaDelBurgo cinta=\{hoja\.cinta\}/.test(dentroDelPie) &&
+        /!cajonAbierto \? null : \(/.test(dentroDelCajon) &&
+        /<ElCajonDeLaHoja alCerrar=\{cerrarElCajon\} abajo=\{abajo\}>/.test(dentroDelCajon) &&
+        /<LaHojaDelBurgo/.test(dentroDelCajon) &&
+        /<LaCronica cronica=\{cronica\} \/>/.test(dentroDelCajon) &&
+        /\{elPie\(sueltas\)\}/.test(c) &&
+        /\{elPie\(fuera\)\}/.test(c) &&
+        (c.match(/\{elCajon\(\)\}/g) ?? []).length >= 2
+      );
+    },
+    escena,
+    escena.replace('<LaCajaDeLosTratos pregon={pregon} quieto={mesa.quieto} alElegir={alElegirOpcion} />', ''),
+    'con la caja fuera del pie, «El trato» ya ha soltado sus botones y la criba ya los ha descontado: aceptar, rechazar y retirar se quedan sin un solo botón en toda la pantalla, y el trato muere de viejo',
+  );
 }
 
 /**
@@ -2099,9 +2523,11 @@ paso('El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin 
  * añadir comprobaciones; un guardia desfasado no guarda nada.
  */
 /*
- * Y VA CON MARGEN Y NO AL RAS: hoy se hacen 217 —el Burgo trajo treinta y cinco, la mitad
- * de ellas vacunas— y el guardia está en 207. Al ras hace lo contrario de lo que quiere:
- * una comprobación que se cae de su bloque dispara el guardia en vez de la roja.
+ * Y VA CON MARGEN Y NO AL RAS: hoy se hacen 251 —el Burgo trajo treinta y cinco al llegar,
+ * otras treinta y dos cuando se hizo de pantalla completa y dos más para que un mueble que no
+ * se monta se vea rojo, la mitad de ellas vacunas— y el guardia
+ * está en 239. Al ras hace lo contrario de lo que quiere: una comprobación que se cae de su
+ * bloque dispara el guardia en vez de la roja.
  *
  * ═══ Y LAS ROJAS SE IMPRIMEN ANTES DE QUE EL GUARDIA SALGA ═══
  *
@@ -2110,7 +2536,7 @@ paso('El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin 
  * que hace falta para arreglarlo. Ahora las rojas se cuentan primero y el guardia habla
  * después, con su propio código de salida (2) para que se distinga de una roja de verdad.
  */
-const COMPROBACIONES_ESCRITAS = 207;
+const COMPROBACIONES_ESCRITAS = 239;
 
 if (fallos.length > 0) {
   console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);

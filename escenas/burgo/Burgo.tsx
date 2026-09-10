@@ -65,9 +65,16 @@
  *
  * `burgo.glb` trae el color por vértice (nada de texturas: Hermes no las decodifica) y
  * la escala de los siete packs ya aplicada (`burgo/piezas.ts`). Por eso aquí NO se usa
- * `matrizDePuesta` de `cargar.ts`, que multiplica por `ESCALA_DEL_PACK`: las puestas se
- * instancian a talla 1 con `matrizDelBurgo`. Una pieza multiplicada por 5,47 sería una
+ * `matrizDePuesta` de `cargar.ts`, que multiplica por `ESCALA_DEL_PACK`: el DECORADO se
+ * instancia a talla 1 con `matrizDelBurgo`. Una pieza multiplicada por 5,47 sería una
  * silla del tamaño de una iglesia, sin error.
+ *
+ * Las tres piezas que son de un JUGADOR son la excepción, y tienen su talla escrita con el
+ * porqué en `anillo-en-3d.ts`: el peón va a `TALLA_DEL_PEON`, la casa a `TALLA_DE_LA_CASA` y
+ * el hotel a `TALLA_DEL_HOTEL`, que además estira la malla de la casa eje a eje para que un
+ * hotel no sea una casa. A la escala del pack el peón medía el 1,8 % del frente de su casilla
+ * y un hotel era exactamente una casa: dos fallos que no dan error y se ven en la primera
+ * captura del banco.
  *
  * ═══ NINGUNA ANIMACIÓN DECIDE NADA ═══
  *
@@ -192,9 +199,13 @@ import {
   LINEA_DE_LA_MARCHA,
   MEDIO_LADO,
   RADIO_DEL_ASA_DE_LOS_DADOS,
+  RADIO_DEL_DISCO_DEL_PEON,
   SUBIDA_DE_LA_REJA,
   SUPERFICIE,
   SUELO_DE_DADOS,
+  TALLA_DEL_HOTEL,
+  TALLA_DEL_PEON,
+  TALLA_DE_LA_CASA,
   campo,
   huecoDeBandera,
   huecoDeCasa,
@@ -327,8 +338,6 @@ const NAIPE = { ancho: 3, alto: 4.2, parteDelAlto: 0.28, margenArriba: 0.05 } as
 const MARCA = { interior: 2.2, exterior: 3.0, alza: 0.06 } as const;
 /** Lo que mide la moneda en vuelo (la pieza mide 2,64 de diámetro: se instancia a esto). */
 const TALLA_DE_LA_MONEDA = 0.45;
-/** El disco de contacto de un peón. */
-const RADIO_DEL_DISCO_DEL_PEON = 0.7;
 /** Los discos del trato: doce de 0,5 en línea entre los dos peones. */
 const LADO_DEL_DISCO_DEL_TRATO = 0.5;
 const COLOR_DEL_TRATO = '#f2e8cf';
@@ -639,6 +648,19 @@ const pinza = (x: number, a: number, b: number): number => Math.min(b, Math.max(
 /** La matriz de una puesta del Burgo: SIN `ESCALA_DEL_PACK`, que ya va horneada (ver la cabecera). */
 function matrizDelBurgo(x: number, y: number, z: number, giro: number, talla: number, destino = new THREE.Matrix4()): THREE.Matrix4 {
   return destino.compose(auxPosicion.set(x, y, z), auxGiro.setFromAxisAngle(EJE_Y, giro), auxEscala.set(talla, talla, talla));
+}
+
+/**
+ * LA MATRIZ DE UNA PIEZA ESTIRADA, que hoy sólo usa el HOTEL.
+ *
+ * `compose` monta `T · R · S`: la escala se aplica en los ejes LOCALES de la pieza y luego se
+ * gira, que es justo lo que hace falta. La malla de la casa mira hacia dentro del anillo, así
+ * que su `+X` local cae a lo largo de la casilla y estirarlo alarga el hotel por el frente, no
+ * por el fondo (ver `TALLA_DEL_HOTEL` en `anillo-en-3d.ts`). Con la escala en el mundo pasaría
+ * lo contrario en dos de los cuatro lados del tablero.
+ */
+function matrizEstiradaDelBurgo(x: number, y: number, z: number, giro: number, ancho: number, alto: number, fondo: number, destino = new THREE.Matrix4()): THREE.Matrix4 {
+  return destino.compose(auxPosicion.set(x, y, z), auxGiro.setFromAxisAngle(EJE_Y, giro), auxEscala.set(ancho, alto, fondo));
 }
 
 /** ¿Es el botón derecho o el del medio? Ésos son de la cámara. Copia de `delta.tsx`. */
@@ -1750,15 +1772,22 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           const alzaAqui = alza !== undefined && alza.suceso.que === 'alza' && alza.suceso.casilla === c.indice ? alza : undefined;
           const t = alzaAqui === undefined ? 0 : ahora - alzaAqui.desde;
           if (esPosada && alzaAqui !== undefined && t < HUNDIR_CASAS) {
-            /* Las cuatro se hunden antes de que brote la posada. */
+            /* Las cuatro se hunden antes de que brote el hotel. */
             for (let k = 0; k < 4 && nCasas < CAPACIDAD.casas; k++) {
               const h = huecoDeCasa(c.indice, k);
               const e = hundirse(t);
-              mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, 0, h.z, giro, Math.max(0.001, e), auxMatriz));
+              mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, 0, h.z, giro, TALLA_DE_LA_CASA * Math.max(0.001, e), auxMatriz));
               mc.setColorAt(nCasas, auxColor);
               nCasas++;
             }
           } else {
+            /*
+             * LA MISMA MALLA, DOS VOLÚMENES. Cuatro casas son cuatro cubos de 10,34 de frente
+             * repartidos por 46,3 de la casilla; un hotel es UN bloque de 22,34 × 14 × 14 en el
+             * medio. La animación de brote multiplica la talla, no la sustituye: si aquí se
+             * escribiera la escala de brotar a secas —que es lo que había— la pieza volvería a
+             * salir del tamaño que trae el pack, que es el fallo que esta tanda arregla.
+             */
             for (let k = 0; k < cuantas && nCasas < CAPACIDAD.casas; k++) {
               const h = esPosada ? huecoDePosada(c.indice) : huecoDeCasa(c.indice, k);
               let escala = 1;
@@ -1766,7 +1795,11 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
                 const brota = esPosada ? 0 : cuantas - 1;
                 if (k === brota) escala = backOut((t - (esPosada ? HUNDIR_CASAS : 0)) / POR_CASA);
               }
-              mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, Math.max(0.001, escala), auxMatriz));
+              const brote = Math.max(0.001, escala);
+              const m = esPosada
+                ? matrizEstiradaDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, TALLA_DEL_HOTEL.ancho * brote, TALLA_DEL_HOTEL.alto * brote, TALLA_DEL_HOTEL.fondo * brote, auxMatriz)
+                : matrizDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, TALLA_DE_LA_CASA * brote, auxMatriz);
+              mc.setMatrixAt(nCasas, m);
               mc.setColorAt(nCasas, auxColor);
               nCasas++;
             }
@@ -1782,7 +1815,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           const k = Math.min(3, vende.suceso.casas);
           const h = huecoDeCasa(c.indice, k);
           auxColor.set(suyo);
-          mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, Math.max(0.001, hundirse(ahora - vende.desde, vende.hasta - vende.desde)), auxMatriz));
+          mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, TALLA_DE_LA_CASA * Math.max(0.001, hundirse(ahora - vende.desde, vende.hasta - vende.desde)), auxMatriz));
           mc.setColorAt(nCasas, auxColor);
           nCasas++;
         }
@@ -1852,9 +1885,18 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         if (!p.visible) {
           mp.setMatrixAt(k, NADA);
         } else {
+          /*
+           * EL PEÓN VA A `TALLA_DEL_PEON`, NO A 1. Aquí había un `set(1, 1, 1)` literal, y con él
+           * el peón salía del tamaño que trae el pack: 1,272 de huella sobre un frente de 72, el
+           * 1,8 %, con el dígito del precio al lado midiendo dieciséis veces eso. La talla y de
+           * dónde sale su número están en `anillo-en-3d.ts`; aquí sólo se aplica.
+           *
+           * Uniforme, y la escala va DENTRO del giro de tumbarse, que es lo que `compose` hace
+           * (`T · R · S`): un peón derribado es el mismo peón derribado, no uno aplastado.
+           */
           auxEuler.set((Math.PI / 2) * p.tumbado, 0, 0);
           auxGiro.setFromEuler(auxEuler);
-          mp.setMatrixAt(k, auxMatriz.compose(auxPosicion.set(x, y, p.z), auxGiro, auxEscala.set(1, 1, 1)));
+          mp.setMatrixAt(k, auxMatriz.compose(auxPosicion.set(x, y, p.z), auxGiro, auxEscala.set(TALLA_DEL_PEON, TALLA_DEL_PEON, TALLA_DEL_PEON)));
           if (md !== null && nDiscos < CAPACIDAD.discos) {
             auxEuler.set(-Math.PI / 2, 0, 0);
             md.setMatrixAt(nDiscos, auxMatriz.compose(auxPosicion.set(x, 0.03, p.z), auxGiro.setFromEuler(auxEuler), auxEscala.set(1, 1, 1)));

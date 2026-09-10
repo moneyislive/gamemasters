@@ -19,6 +19,19 @@
  * (8,29 de frente), una torre metida en la calle, una tabla con la taberna como posada,
  * un alcance de cámara corto. Un comprobador que no se ha visto caer no vigila nada.
  *
+ * ═══ LAS PIEZAS SE MIDEN PUESTAS, NO EN EL PACK ═══
+ *
+ * Durante meses este guion midió las huellas del `.glb` TAL CUAL y las comparó con las bandas
+ * de la casilla, y todo salía verde: un peón de 1,272 cabe en cualquier sitio. Lo que no
+ * medía es lo único que importaba —cuánto se VE—, y así pasó un tablero en el que un jugador
+ * era una mota del 1,8 % del frente de su casilla y un hotel era literalmente una casa.
+ *
+ * Ahora la huella del fichero se multiplica por la TALLA a la que la escena instancia cada
+ * pieza (`TALLA_DEL_PEON`, `TALLA_DE_LA_CASA`, `TALLA_DEL_HOTEL` de `anillo-en-3d.ts`), y
+ * además hay un paso propio que afirma lo que ninguna banda afirmaba: que el peón pasa del
+ * octavo del ancho de un dígito, que las cuatro casas van seguidas y no sueltas, y que un
+ * hotel es de otro tamaño que una casa. Las vacunas de ese paso son las piezas de antes.
+ *
  * ═══ LO QUE NO PRUEBA ═══
  *
  * Que se VEA bien: ni el color, ni el tinte, ni si el móvil aguanta. Para eso está el
@@ -36,6 +49,10 @@ import { sorteo } from '../embarcadero/cala';
 import { PIEZA, nombresDelBurgo } from '../burgo/piezas';
 import {
   ALTO_DEL_GUARISMO,
+  ALTO_DEL_HOTEL,
+  ALTO_DEL_PEON,
+  ALTO_DEL_PEON_EN_EL_PACK,
+  ALTO_DE_LA_CASA,
   ALTURA_DEL_MANTO,
   ALTURA_DE_LAS_NUBES,
   ALTURA_DEL_REBORDE,
@@ -44,11 +61,14 @@ import {
   ANCHO_DEL_BULEVAR,
   ANCHO_DE_LA_AVENIDA,
   ANCHO_DEL_GUARISMO,
+  ANCHO_DEL_HOTEL,
+  ANCHO_DE_LA_CASA,
   ANILLO_DEL_BURGO,
   ARISTA_DE_LOS_DADOS,
   ATREZO,
   ATREZO_DE_LA_CASILLA,
   BANDA,
+  BANDERA_SOBRE_LA_POSADA,
   BORDE_CLARO,
   BORDE_INTERIOR,
   CARRIL_DEL_AVATAR,
@@ -60,13 +80,18 @@ import {
   CELDAS_DE_LA_GLORIETA,
   CELDAS_POR_ESQUINA,
   CORONA,
+  DIAMETRO_DEL_PEON,
   ESQUINAS,
   FILETE,
   FONDO_DE_CASILLA,
+  FONDO_DEL_HOTEL,
+  FONDO_DE_LA_CASA,
   FRANJA,
   FRENTE_MAXIMO_DEL_ATREZO,
   HOLGURA_DE_LA_MARCHA,
   HUECOS_DE_LOS_DADOS,
+  HUELLA_DEL_PEON,
+  HUELLA_DE_LA_CASA,
   LADO_DE_ESQUINA,
   LADO_DEL_EMBLEMA,
   LADO_EXTERIOR,
@@ -82,10 +107,20 @@ import {
   PRECIO_DE_LA_CASILLA,
   PUERTAS,
   PUERTAS_DE_LA_CIUDAD,
+  RADIO_DEL_DISCO_DEL_PEON,
   RECINTO_DE_LA_CIUDAD,
+  REJILLA_DE_CASAS,
+  REJILLA_DE_PEONES,
+  REJILLA_DE_PEONES_DE_ESQUINA,
+  REJILLA_DE_PRESOS,
+  REJILLA_DE_VISITAS,
   SUELO_DE_DADOS,
   SUPERFICIE,
+  TALLA_DEL_HOTEL,
+  TALLA_DEL_PEON,
+  TALLA_DE_LA_CASA,
   V_DEL_PRECIO,
+  V_DE_LAS_CASAS,
   anchoDelPrecio,
   campo,
   candidatasDelCampo,
@@ -120,7 +155,18 @@ import {
 import type { PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
-import { MULTIPLICIDADES_PLENA, MULTIPLICIDADES_SOBRIA, TOPE_PLENA, TOPE_SOBRIA, TRIANGULOS_POR_EMBLEMA, TRIANGULOS_POR_GUARISMO, guarismosDelTablero, sumaDelPresupuesto } from '../burgo/presupuesto';
+import {
+  CASAS_DEL_CONCEJO,
+  MULTIPLICIDADES_PLENA,
+  MULTIPLICIDADES_SOBRIA,
+  POSADAS_DEL_CONCEJO,
+  TOPE_PLENA,
+  TOPE_SOBRIA,
+  TRIANGULOS_POR_EMBLEMA,
+  TRIANGULOS_POR_GUARISMO,
+  guarismosDelTablero,
+  sumaDelPresupuesto,
+} from '../burgo/presupuesto';
 import {
   CASILLAS_ANDANDO,
   TOPE_DEL_RECORRIDO,
@@ -410,17 +456,162 @@ comprobar('la polilínea tiene 40 puntos', POLILINEA.length === 40, POLILINEA.le
 }
 
 // ---------------------------------------------------------------------------
-paso('Cada rejilla de huecos cabe en su banda con la huella medida, y nada pisa el carril del avatar');
+paso('Las piezas de un jugador —peón, casa y hotel— se instancian a una talla que se lee, y un hotel no es una casa');
 // ---------------------------------------------------------------------------
 
-const peon = huella(PIEZA.peon);
+/*
+ * ESTE PASO EXISTE PORQUE UNA PIEZA A LA TALLA DEL PACK NO DA ERROR: SE VE.
+ *
+ * `burgo.glb` trae las fichas horneadas a la escala del mundo (una casa-ficha mide una
+ * persona) y hasta esta tanda la escena las instanciaba a talla 1 sobre casillas de 72 × 108.
+ * Resultado medido en el fichero: el peón ocupaba el 1,8 % del frente de su casilla y el
+ * dígito del precio que tiene al lado dieciséis veces eso; las cuatro casas eran cuatro
+ * puntos con 9,50 de hueco entre ellos; y un hotel era LITERALMENTE una casa, la misma
+ * geometría a la misma talla, distinta sólo por ir centrada y llevar bandera.
+ *
+ * `anillo-en-3d.ts` escribe ahora las huellas del pack como constantes y deriva de ellas las
+ * tres tallas. Lo primero que se comprueba es lo más aburrido y lo más importante: que lo
+ * ESCRITO es lo que el `.glb` trae de verdad. Si mañana se recompila el fichero con otra
+ * ficha, esta línea se pone roja antes de que nadie mire una captura.
+ */
+const peonEnElPack = huella(PIEZA.peon);
+const casaEnElPack = huella(PIEZA.casa);
+comprobar(
+  `lo escrito en anillo-en-3d.ts es lo que trae el fichero: el peón mide ${r(peonEnElPack.ancho)} × ${r(peonEnElPack.alto)} y la casa ${r(casaEnElPack.ancho)} × ${r(casaEnElPack.fondo)} × ${r(casaEnElPack.alto)}`,
+  Math.abs(HUELLA_DEL_PEON - peonEnElPack.ancho) < 1e-3 &&
+    Math.abs(HUELLA_DEL_PEON - peonEnElPack.fondo) < 1e-3 &&
+    Math.abs(ALTO_DEL_PEON_EN_EL_PACK - peonEnElPack.alto) < 1e-3 &&
+    Math.abs(HUELLA_DE_LA_CASA.ancho - casaEnElPack.ancho) < 1e-3 &&
+    Math.abs(HUELLA_DE_LA_CASA.fondo - casaEnElPack.fondo) < 1e-3 &&
+    Math.abs(HUELLA_DE_LA_CASA.alto - casaEnElPack.alto) < 1e-3,
+  { escrito: { HUELLA_DEL_PEON, ALTO_DEL_PEON_EN_EL_PACK, HUELLA_DE_LA_CASA }, medido: { peon: peonEnElPack, casa: casaEnElPack } },
+);
+/* La vacuna es el error de verdad: copiar la huella de la ficha de al lado (el `meeple`, 2,543). */
+comprobar('se ve fallar: con la huella de la figura (2,543) escrita en vez de la del peón, la línea de arriba caería', Math.abs(huella(PIEZA.figura).ancho - peonEnElPack.ancho) > 1e-3, r(huella(PIEZA.figura).ancho));
+
+/*
+ * QUE EL PEÓN SE VEA NO ES UNA OPINIÓN: SE MIDE CONTRA EL DÍGITO DEL PRECIO.
+ *
+ * El dígito es la única referencia honrada de «lo que se lee a esta distancia», porque su
+ * alto de 27 salió de contar píxeles con `proyecta` en las tres ventanas. El encargo puso el
+ * suelo con el dedo: «un octavo de eso es invisible». Así que el peón tiene que pasar del
+ * octavo, y `DIAMETRO_DEL_PEON` es la sexta parte —que además es lo máximo que el patio de la
+ * cárcel admite—. La vacuna es el peón de antes: a talla 1 no llega ni al octavo.
+ */
+const octavoDeUnDigito = ANCHO_DEL_GUARISMO / 8;
+console.log(`  el peón mide ${r(DIAMETRO_DEL_PEON)} de huella y ${r(ALTO_DEL_PEON)} de alto; un dígito mide ${r(ANCHO_DEL_GUARISMO)} de ancho, o sea ${r(ANCHO_DEL_GUARISMO / DIAMETRO_DEL_PEON)} peones`);
+comprobar(
+  `el peón se ve: su huella (${r(DIAMETRO_DEL_PEON)}) pasa del octavo del ancho de un dígito (${r(octavoDeUnDigito)}), que es lo que el encargo llama invisible`,
+  DIAMETRO_DEL_PEON > octavoDeUnDigito && TALLA_DEL_PEON > 1,
+  { DIAMETRO_DEL_PEON, octavoDeUnDigito, TALLA_DEL_PEON: r(TALLA_DEL_PEON) },
+);
+comprobar('se ve fallar: el peón a la talla del pack (1,272) no llegaba ni al octavo de un dígito', peonEnElPack.ancho < octavoDeUnDigito, r(peonEnElPack.ancho));
+/*
+ * Y EL TECHO, que es lo que impide subirlo más: el carril del avatar. El peón va centrado en
+ * `LINEA_DE_LA_MARCHA`, que está a 2,5 del borde de dentro del carril, así que su diámetro no
+ * puede pasar de 5. Se afirma con el número para que el día que alguien suba la talla sepa
+ * contra qué chocó.
+ */
+comprobar(
+  `el peón cabe entero en el carril del avatar: centrado en v = ${vDeRadial(LINEA_DE_LA_MARCHA)} llega de ${r(vDeRadial(LINEA_DE_LA_MARCHA) - DIAMETRO_DEL_PEON / 2)} a ${r(vDeRadial(LINEA_DE_LA_MARCHA) + DIAMETRO_DEL_PEON / 2)} y el carril va de ${CARRIL_DEL_AVATAR.desde} a ${CARRIL_DEL_AVATAR.hasta}`,
+  vDeRadial(LINEA_DE_LA_MARCHA) - DIAMETRO_DEL_PEON / 2 >= CARRIL_DEL_AVATAR.desde && vDeRadial(LINEA_DE_LA_MARCHA) + DIAMETRO_DEL_PEON / 2 <= CARRIL_DEL_AVATAR.hasta,
+  r(vDeRadial(LINEA_DE_LA_MARCHA) - DIAMETRO_DEL_PEON / 2),
+);
+comprobar('se ve fallar: un peón de 6 de huella se saldría del carril por el lado de la ciudad', vDeRadial(LINEA_DE_LA_MARCHA) - 3 < CARRIL_DEL_AVATAR.desde);
+/* El disco de contacto es la sombra bajo la pieza: si no crece con ella, deja de estar debajo. */
+comprobar(
+  `el disco de contacto sigue midiendo 1,1 veces el radio del peón, como cuando el peón era de 1,272 (${r(RADIO_DEL_DISCO_DEL_PEON)} sobre ${r(DIAMETRO_DEL_PEON / 2)})`,
+  Math.abs(RADIO_DEL_DISCO_DEL_PEON / (DIAMETRO_DEL_PEON / 2) - 1.1) < 1e-9 && RADIO_DEL_DISCO_DEL_PEON > DIAMETRO_DEL_PEON / 2,
+  r(RADIO_DEL_DISCO_DEL_PEON),
+);
+comprobar('se ve fallar: el disco de 0,7 de antes se quedaría escondido bajo un peón de 3,375', 0.7 < DIAMETRO_DEL_PEON / 2);
+
+/*
+ * LAS CUATRO CASAS TIENEN QUE SER CUATRO CASAS SEGUIDAS, no cuatro puntos en una banda.
+ *
+ * «Seguidas» se mide: el hueco entre dos vecinas tiene que ser menor que media casa. Con la
+ * casa del pack y el paso 12 el hueco era 9,50 —casi cuatro casas de aire— y por eso la fila
+ * no se leía como una fila. Con `TALLA_DE_LA_CASA` el hueco baja a 1,66.
+ */
+const huecoEntreCasas = REJILLA_DE_CASAS.paso - ANCHO_DE_LA_CASA;
+console.log(`  la casa mide ${r(ANCHO_DE_LA_CASA)} × ${r(FONDO_DE_LA_CASA)} × ${r(ALTO_DE_LA_CASA)}; con el paso ${REJILLA_DE_CASAS.paso} quedan ${r(huecoEntreCasas)} entre dos, y las cuatro ocupan ${r(3 * REJILLA_DE_CASAS.paso + ANCHO_DE_LA_CASA)} de ${ANCHO_DE_CASILLA}`);
+comprobar(
+  `la casa llena la mitad del fondo de la franja del barrio (${r(FONDO_DE_LA_CASA)} de ${BANDA.franja}) y las cuatro van SEGUIDAS: ${r(huecoEntreCasas)} de hueco, menos de media casa`,
+  Math.abs(FONDO_DE_LA_CASA - BANDA.franja / 2) < 1e-9 && huecoEntreCasas > 0 && huecoEntreCasas < ANCHO_DE_LA_CASA / 2,
+  { FONDO_DE_LA_CASA, huecoEntreCasas: r(huecoEntreCasas), ANCHO_DE_LA_CASA: r(ANCHO_DE_LA_CASA) },
+);
+comprobar(
+  'se ve fallar: con la casa a la talla del pack el hueco entre dos era 9,50, casi cuatro casas de aire',
+  REJILLA_DE_CASAS.paso - casaEnElPack.ancho >= casaEnElPack.ancho / 2,
+  r(REJILLA_DE_CASAS.paso - casaEnElPack.ancho),
+);
+
+/*
+ * UN HOTEL NO ES UNA CASA, Y ESO ES LO QUE HABÍA QUE ARREGLAR.
+ *
+ * La diferencia entre cuatro casas y un hotel es la decisión más cara del reglamento, y hasta
+ * esta tanda compartían geometría Y talla. Ahora el hotel es la misma malla con una escala por
+ * eje: más ancha, más honda y más alta. Se exige que la diferencia sea de bulto —al menos vez
+ * y media de frente, un cuarto más de alto y el doble de huella— y no un matiz.
+ */
+const huellaDeLaCasa = ANCHO_DE_LA_CASA * FONDO_DE_LA_CASA;
+const huellaDelHotel = ANCHO_DEL_HOTEL * FONDO_DEL_HOTEL;
+console.log(`  el hotel mide ${r(ANCHO_DEL_HOTEL)} × ${r(FONDO_DEL_HOTEL)} × ${r(ALTO_DEL_HOTEL)}: ${r(ANCHO_DEL_HOTEL / ANCHO_DE_LA_CASA)} veces el frente de una casa, ${r(ALTO_DEL_HOTEL / ALTO_DE_LA_CASA)} su alto y ${r(huellaDelHotel / huellaDeLaCasa)} su huella`);
+comprobar(
+  `el hotel tiene volumen propio: ${r(ANCHO_DEL_HOTEL / ANCHO_DE_LA_CASA)} veces el frente de una casa, ${r(ALTO_DEL_HOTEL / ALTO_DE_LA_CASA)} su alto y ${r(huellaDelHotel / huellaDeLaCasa)} su huella`,
+  ANCHO_DEL_HOTEL >= ANCHO_DE_LA_CASA * 1.5 && ALTO_DEL_HOTEL >= ALTO_DE_LA_CASA * 1.25 && FONDO_DEL_HOTEL > FONDO_DE_LA_CASA && huellaDelHotel >= 2 * huellaDeLaCasa,
+  { ANCHO_DEL_HOTEL: r(ANCHO_DEL_HOTEL), FONDO_DEL_HOTEL, ALTO_DEL_HOTEL },
+);
+/* La vacuna: el hotel que había, que era la casa a su propia talla. */
+comprobar(
+  'se ve fallar: un hotel a la talla de la casa —que es lo que había— no se distingue de una casa',
+  !(ANCHO_DE_LA_CASA >= ANCHO_DE_LA_CASA * 1.5 || ALTO_DE_LA_CASA >= ALTO_DE_LA_CASA * 1.25),
+);
+/* Y que el frente sea el que el diseño dice: lo que ocupan dos casas seguidas, de borde a borde. */
+comprobar(
+  'el frente del hotel es exactamente lo que ocupan dos casas seguidas (una casa más el paso de la rejilla)',
+  Math.abs(ANCHO_DEL_HOTEL - (ANCHO_DE_LA_CASA + REJILLA_DE_CASAS.paso)) < 1e-9,
+  r(ANCHO_DEL_HOTEL),
+);
+/* La bandera del hotel va clavada en SU tejado, y el tejado ha subido de 2,543 a 14. */
+comprobar(
+  `la bandera del hotel se planta en su tejado (alza ${BANDERA_SOBRE_LA_POSADA.alza}), no a la altura del tejado viejo`,
+  Math.abs(BANDERA_SOBRE_LA_POSADA.alza - ALTO_DEL_HOTEL) < 1e-9,
+  BANDERA_SOBRE_LA_POSADA.alza,
+);
+comprobar('se ve fallar: el alza de 2,45 que había dejaría la bandera flotando a un quinto del alto del hotel', 2.45 < ALTO_DEL_HOTEL / 2);
+
+/*
+ * ESCALAR NO CUESTA UN TRIÁNGULO NI UNA LLAMADA: son las mismas mallas con otra matriz, y por
+ * eso el presupuesto no se mueve. Se afirma con la tabla delante: los 44 edificios de un
+ * tablero lleno —32 casas y 12 hoteles— siguen contándose como `casa`. El día que alguien meta
+ * un modelo propio de hotel, esta línea se pone roja y le recuerda que hay que sumarlo.
+ */
+comprobar(
+  `el hotel se pinta con la geometría de la casa (decisión 12): la tabla cuenta ${CASAS_DEL_CONCEJO + POSADAS_DEL_CONCEJO} casas y ninguna pieza propia de hotel`,
+  (MULTIPLICIDADES_PLENA[PIEZA.casa] ?? 0) === CASAS_DEL_CONCEJO + POSADAS_DEL_CONCEJO,
+  MULTIPLICIDADES_PLENA[PIEZA.casa],
+);
+
+// ---------------------------------------------------------------------------
+paso('Cada rejilla de huecos cabe en su banda con la huella medida a su talla, y nada pisa el carril del avatar');
+// ---------------------------------------------------------------------------
+
+/*
+ * TODO LO QUE SIGUE SE MIDE CON LA PIEZA PUESTA, no con la pieza del pack: la huella del
+ * `.glb` por la talla a la que la escena la instancia. Medir la del pack era lo que dejaba
+ * pasar rejillas calibradas para un peón que ya no existe.
+ */
+const peon = { ancho: peonEnElPack.ancho * TALLA_DEL_PEON, fondo: peonEnElPack.fondo * TALLA_DEL_PEON, alto: peonEnElPack.alto * TALLA_DEL_PEON };
 const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
 
 {
-  const casa = huella(PIEZA.casa);
+  const casa = { ancho: casaEnElPack.ancho * TALLA_DE_LA_CASA, fondo: casaEnElPack.fondo * TALLA_DE_LA_CASA, alto: casaEnElPack.alto * TALLA_DE_LA_CASA };
   const mediaCasa = Math.max(casa.ancho, casa.fondo) / 2;
+  const hotel = { ancho: casaEnElPack.ancho * TALLA_DEL_HOTEL.ancho, fondo: casaEnElPack.fondo * TALLA_DEL_HOTEL.fondo, alto: casaEnElPack.alto * TALLA_DEL_HOTEL.alto };
   const fueraDelCarril: string[] = [];
   const solapados: string[] = [];
+  const discosSolapados: string[] = [];
   const aventureroFuera: string[] = [];
   for (let i = 0; i < CASILLAS; i++) {
     if (i === MAZMORRA) continue;
@@ -439,7 +630,9 @@ const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
       }
       for (const [b, o] of huecos.entries()) {
         if (b <= a) continue;
-        if (Math.hypot(h.x - o.x, h.z - o.z) < 2 * medioPeon) solapados.push(`${i}: ${a} y ${b}`);
+        const entre = Math.hypot(h.x - o.x, h.z - o.z);
+        if (entre < 2 * medioPeon) solapados.push(`${i}: ${a} y ${b} a ${r(entre)}`);
+        if (entre < 2 * RADIO_DEL_DISCO_DEL_PEON) discosSolapados.push(`${i}: ${a} y ${b} a ${r(entre)}`);
       }
       const av = huecoDeAventurero(i, a);
       const rav = m.esEsquina ? Math.abs(enLaEsquina(m, av).u - LINEA_DE_LA_MARCHA) : enElMarco(m, av).v;
@@ -447,9 +640,22 @@ const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
       if (rav > tope) aventureroFuera.push(`${i}/${a}: ${r(rav)}`);
     }
   }
-  comprobar(`los seis huecos de peón (huella ${r(peon.ancho)} × ${r(peon.fondo)}) van en fila en el carril de las 39 casillas que lo tienen, y en las esquinas en la franja de dentro`, fueraDelCarril.length === 0, fueraDelCarril.slice(0, 5));
-  comprobar('y no se pisan entre sí', solapados.length === 0, solapados.slice(0, 5));
+  comprobar(`los seis huecos de peón (huella ${r(peon.ancho)} × ${r(peon.fondo)} PUESTA, no la del pack) van en fila en el carril de las 39 casillas que lo tienen, y en las esquinas en la franja de dentro`, fueraDelCarril.length === 0, fueraDelCarril.slice(0, 5));
+  comprobar('y dos peones de la misma casilla no se pisan, en ninguna de las 39', solapados.length === 0, solapados.slice(0, 5));
+  comprobar('ni se pisan sus discos de contacto, que son 1,1 veces más anchos que la pieza', discosSolapados.length === 0, discosSolapados.slice(0, 5));
+  /*
+   * LAS DOS VACUNAS DE LAS REJILLAS, que son los dos errores que esta tanda ha tenido que
+   * arreglar de verdad y no dos inventados: la rejilla de esquina era de dos filas separadas
+   * 1,4 —un número calibrado para el peón de 1,272 y para ninguno más— y la del patio tenía
+   * las columnas a 3,2. Con el peón puesto, las dos solapan.
+   */
+  comprobar('se ve fallar: con el paso 1,4 de la rejilla de esquina vieja, dos peones puestos se solaparían', 1.4 < 2 * medioPeon, r(2 * medioPeon));
+  comprobar('se ve fallar: con el paso 3,2 de la rejilla de presos vieja, dos presos puestos se solaparían', 3.2 < 2 * medioPeon, r(2 * medioPeon));
   comprobar(`el hueco del aventurero está 1,2 hacia el campo y no se sale del carril (${CARRIL_DEL_AVATAR.desde}..${CARRIL_DEL_AVATAR.hasta})`, aventureroFuera.length === 0, aventureroFuera.slice(0, 5));
+
+  /* El radio de la bandera de dueño se mide una vez y se usa dos: aquí y en la holgura al carril. */
+  const cajaDeLaBandera = caja(PIEZA.bandera);
+  const radioDeLaBandera = Math.max(Math.abs(cajaDeLaBandera.min[0]), Math.abs(cajaDeLaBandera.max[0]), Math.abs(cajaDeLaBandera.min[2]), Math.abs(cajaDeLaBandera.max[2]));
 
   const casasFuera: string[] = [];
   const casasSolapadas: string[] = [];
@@ -467,19 +673,47 @@ const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
         if (Math.hypot(h.x - o.x, h.z - o.z) < 2 * mediaCasa) casasSolapadas.push(`${i}: ${k} y ${b}`);
       }
     }
+    /*
+     * EL HOTEL SE MIDE CON SU PROPIO BULTO, no con el de una casa. Es la trampa que esta
+     * comprobación tenía: usaba `mediaCasa` para la posada porque la posada ERA una casa, y
+     * así un hotel el doble de ancho habría pasado sin que nadie lo mirase.
+     */
     const posada = enElMarco(m, huecoDePosada(i));
-    if (posada.radial - mediaCasa < FRANJA.desde || posada.radial + mediaCasa > FRANJA.hasta || Math.abs(posada.aLoLargo) > 1e-9) posadasMal.push(`${i}: ${JSON.stringify(posada)}`);
+    if (
+      posada.radial - hotel.fondo / 2 < FRANJA.desde ||
+      posada.radial + hotel.fondo / 2 > FRANJA.hasta ||
+      hotel.ancho / 2 > ANCHO_DE_CASILLA / 2 ||
+      posada.v + hotel.fondo / 2 >= CARRIL_DEL_AVATAR.desde ||
+      Math.abs(posada.aLoLargo) > 1e-9
+    ) {
+      posadasMal.push(`${i}: ${JSON.stringify(posada)}`);
+    }
     const b = enElMarco(m, huecoDeBandera(i));
     if (b.radial < FRANJA.desde || b.radial > FRANJA.hasta || Math.abs(b.aLoLargo) > ANCHO_DE_CASILLA / 2) banderasMal.push(`${i}: fuera de la franja ${JSON.stringify(b)}`);
     for (const h of huecos) {
       const d = enElMarco(m, h);
       if (Math.abs(d.aLoLargo - b.aLoLargo) < mediaCasa && Math.abs(d.radial - b.radial) < mediaCasa) banderasMal.push(`${i}: la bandera pisa una casa`);
     }
+    /* Y el hotel, que es dos veces más ancho que una casa, tampoco puede llegar al mástil. */
+    if (hotel.ancho / 2 > Math.abs(b.aLoLargo) - radioDeLaBandera) banderasMal.push(`${i}: el hotel llega hasta la bandera`);
   }
-  comprobar(`los cuatro huecos de casa (huella ${r(casa.ancho)} × ${r(casa.fondo)}, paso 12) van en FILA en la franja del barrio de las 36 casillas laterales`, casasFuera.length === 0, casasFuera.slice(0, 5));
+  comprobar(`los cuatro huecos de casa (huella ${r(casa.ancho)} × ${r(casa.fondo)}, paso ${REJILLA_DE_CASAS.paso}) van en FILA en la franja del barrio de las 36 casillas laterales`, casasFuera.length === 0, casasFuera.slice(0, 5));
   comprobar('y no se pisan', casasSolapadas.length === 0, casasSolapadas.slice(0, 5));
-  comprobar('la posada va centrada en la franja', posadasMal.length === 0, posadasMal.slice(0, 3));
-  comprobar('la bandera del dueño está en la franja y no pisa ninguna casa', banderasMal.length === 0, banderasMal.slice(0, 3));
+  comprobar(`el hotel (${r(hotel.ancho)} × ${r(hotel.fondo)} × ${r(hotel.alto)}) va centrado en la franja, cabe en el frente de la casilla y no llega al carril del avatar`, posadasMal.length === 0, posadasMal.slice(0, 3));
+  comprobar('la bandera del dueño está en la franja, y ni las cuatro casas ni el hotel llegan a su mástil', banderasMal.length === 0, banderasMal.slice(0, 3));
+  /*
+   * LAS VACUNAS DE LA FRANJA. Los dos errores que de verdad se cometen al dar talla a estas
+   * piezas son pasarse de fondo —y meterse en el carril por el que anda el aventurero— y
+   * pasarse de frente, hasta comerse el mástil de la bandera del dueño.
+   */
+  const V_ENVENENADO_DEL_HOTEL = 26;
+  comprobar('se ve fallar: un hotel de 26 de fondo se saldría de la franja y pisaría el carril del avatar', V_DE_LAS_CASAS + V_ENVENENADO_DEL_HOTEL / 2 >= CARRIL_DEL_AVATAR.desde, V_DE_LAS_CASAS + V_ENVENENADO_DEL_HOTEL / 2);
+  const ANCHO_ENVENENADO_DEL_HOTEL = 60;
+  comprobar(
+    'se ve fallar: un hotel de 60 de frente se comería el mástil de la bandera del dueño',
+    ANCHO_ENVENENADO_DEL_HOTEL / 2 > Math.abs(enElMarco(marcoDeCasilla(1), huecoDeBandera(1)).aLoLargo) - radioDeLaBandera,
+    r(Math.abs(enElMarco(marcoDeCasilla(1), huecoDeBandera(1)).aLoLargo) - radioDeLaBandera),
+  );
 
   /*
    * LA BANDERA NO PISA EL CARRIL, Y EL CARRIL NO CRECIÓ CON LA CASILLA.
@@ -490,8 +724,6 @@ const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
    * carril empezando en 23: seis unidades de holgura. La vacuna es ponerla pegada al filete,
    * en `v = 22`, que es el error que de verdad se puede cometer al mover una banda.
    */
-  const cajaDeLaBandera = caja(PIEZA.bandera);
-  const radioDeLaBandera = Math.max(Math.abs(cajaDeLaBandera.min[0]), Math.abs(cajaDeLaBandera.max[0]), Math.abs(cajaDeLaBandera.min[2]), Math.abs(cajaDeLaBandera.max[2]));
   const vDeLaBandera = enElMarco(marcoDeCasilla(1), huecoDeBandera(1)).v;
   const holguraDeLaBandera = CARRIL_DEL_AVATAR.desde - (vDeLaBandera + radioDeLaBandera);
   console.log(`  la bandera va en v = ${r(vDeLaBandera)}, llega a ${r(vDeLaBandera + radioDeLaBandera)} y el carril empieza en ${CARRIL_DEL_AVATAR.desde}: ${r(holguraDeLaBandera)} de holgura`);
@@ -505,7 +737,25 @@ const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
   const presosFuera = [0, 1, 2, 3, 4, 5]
     .map((a) => enLaEsquina(m, huecoDePreso(a)))
     .filter((q) => q.u - medioPeon < (patio.u[0] as number) || q.u + medioPeon > (patio.u[1] as number) || q.v - medioPeon < (patio.v[0] as number) || q.v + medioPeon > (patio.v[1] as number));
-  comprobar(`los seis huecos de preso caben dentro del patio (${CELDA.lado} × ${CELDA.lado} en la celda (${CELDA.u}, ${CELDA.v}))`, presosFuera.length === 0, presosFuera);
+  comprobar(`los seis huecos de preso caben dentro del patio (${CELDA.lado} × ${CELDA.lado} en la celda (${CELDA.u}, ${CELDA.v})) con el peón a su talla`, presosFuera.length === 0, presosFuera);
+  /*
+   * EL PATIO ES LA HABITACIÓN MÁS PEQUEÑA DEL TABLERO, y por eso es la que pone el techo al
+   * peón entero: tres presos de frente en 12. Aquí se afirma lo que de verdad importa —que los
+   * seis quepan sin tocarse y sin que se toquen sus discos— y se imprime lo que sobra, que es
+   * el margen que le queda a quien mañana quiera un peón mayor.
+   */
+  const presosSolapados: string[] = [];
+  for (let a = 0; a < 6; a++) {
+    for (let b = a + 1; b < 6; b++) {
+      const entre = Math.hypot(huecoDePreso(a).x - huecoDePreso(b).x, huecoDePreso(a).z - huecoDePreso(b).z);
+      if (entre < 2 * medioPeon) presosSolapados.push(`presos ${a} y ${b} a ${r(entre)}`);
+      if (entre < 2 * RADIO_DEL_DISCO_DEL_PEON) presosSolapados.push(`discos de ${a} y ${b} a ${r(entre)}`);
+    }
+  }
+  const holguraEnElPatio = Math.min(...[0, 1, 2, 3, 4, 5].map((a) => enLaEsquina(m, huecoDePreso(a))).flatMap((q) => [q.u - medioPeon - (patio.u[0] as number), (patio.u[1] as number) - q.u - medioPeon, q.v - medioPeon - (patio.v[0] as number), (patio.v[1] as number) - q.v - medioPeon]));
+  console.log(`  en el patio caben los seis con ${r(holguraEnElPatio)} de sobra hasta la verja y ${r(REJILLA_DE_PRESOS.pasoU - 2 * medioPeon)} entre dos presos`);
+  comprobar('y los seis presos no se pisan, ni se pisan sus discos', presosSolapados.length === 0, presosSolapados.slice(0, 4));
+  comprobar('se ve fallar: un peón de 4,5 no dejaría meter tres de frente en un patio de 12', 3 * 4.5 > CELDA.lado);
   const visitasMal = [0, 1, 2, 3, 4, 5]
     .map((a) => enLaEsquina(m, huecoDeVisita(a)))
     .filter((q) => {
@@ -516,6 +766,32 @@ const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
       return enElPatio || fueraDeLaEsquina || fueraDeLaAcera;
     });
   comprobar('y los seis de visita quedan en la acera de delante de la cárcel, sobre el tramo de entrada y fuera del patio', visitasMal.length === 0, visitasMal);
+  /* Los seis de visita van en fila india por el brazo de entrada: tampoco pueden pisarse. */
+  const visitasSolapadas: string[] = [];
+  for (let a = 0; a < 6; a++) {
+    for (let b = a + 1; b < 6; b++) {
+      const entre = Math.hypot(huecoDeVisita(a).x - huecoDeVisita(b).x, huecoDeVisita(a).z - huecoDeVisita(b).z);
+      if (entre < 2 * medioPeon) visitasSolapadas.push(`visitas ${a} y ${b} a ${r(entre)}`);
+      if (entre < 2 * RADIO_DEL_DISCO_DEL_PEON) visitasSolapadas.push(`discos de ${a} y ${b} a ${r(entre)}`);
+    }
+  }
+  comprobar('y los seis de visita no se pisan entre sí ni con sus discos', visitasSolapadas.length === 0, visitasSolapadas.slice(0, 4));
+  /*
+   * LAS DOS REJILLAS DE ESQUINA SON DE UNA SOLA FILA, y eso no es un detalle de forma: con dos
+   * filas el aventurero del que está quieto se despega de la polilínea la mitad del paso más
+   * 1,2, y con un peón que se vea el paso ya no cabe en las dos unidades que se toleran.
+   */
+  comprobar(
+    'las dos rejillas de esquina —la de peones y la de visitas— son de una sola fila, que es lo que permite un peón de 3,375',
+    REJILLA_DE_PEONES_DE_ESQUINA.filas === 1 && REJILLA_DE_VISITAS.filas === 1 && REJILLA_DE_PEONES_DE_ESQUINA.columnas === 6 && REJILLA_DE_VISITAS.columnas === 6,
+    { esquina: REJILLA_DE_PEONES_DE_ESQUINA, visitas: REJILLA_DE_VISITAS },
+  );
+  comprobar('se ve fallar: con dos filas, el aventurero de la fila de fuera se despegaría más de 2 de la línea de la marcha', medioPeon + 1.2 > 2, r(medioPeon + 1.2));
+  /* Y los seis en fila india tienen que caber en el brazo, que mide 25,5 de la ciudad a la esquina. */
+  const largoDelBrazo = LINEA_DE_LA_MARCHA - BORDE_INTERIOR;
+  const filaDeSeis = (REJILLA_DE_PEONES_DE_ESQUINA.columnas - 1) * REJILLA_DE_PEONES_DE_ESQUINA.pasoV + 2 * medioPeon;
+  console.log(`  los seis en fila india por el brazo ocupan ${r(filaDeSeis)} de los ${largoDelBrazo} que mide, con ${r(REJILLA_DE_PEONES_DE_ESQUINA.pasoV - 2 * medioPeon)} entre dos`);
+  comprobar(`los seis en fila india caben en el brazo de la esquina (${r(filaDeSeis)} de ${largoDelBrazo})`, filaDeSeis <= largoDelBrazo, r(filaDeSeis));
   const presosYVisitas = [0, 1, 2, 3, 4, 5].every((a) => Math.hypot(huecoDePreso(a).x - huecoDeVisita(a).x, huecoDePreso(a).z - huecoDeVisita(a).z) > CELDA.lado / 2);
   comprobar('y ningún preso comparte sitio con una visita: el patio está lejos de la acera', presosYVisitas);
   const huecoDelDiez = [0, 1, 2, 3, 4, 5].every((a) => {
@@ -1449,6 +1725,50 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   comprobar('los dos llevan `import * as React`', /import \* as React from 'react'/.test(codigoDelBurgo) && /import \* as React from 'react'/.test(codigoDelAventurero));
   comprobar('ninguno decide por Platform.OS', !/Platform\.OS/.test(codigoDelBurgo) && !/Platform\.OS/.test(codigoDelAventurero));
   comprobar('Burgo.tsx no usa matrizDePuesta (la escala va horneada en el .glb)', !/\bmatrizDePuesta\s*\(/.test(codigoDelBurgo));
+  /*
+   * ═══ Y QUE LA ESCENA APLIQUE LAS TRES TALLAS, QUE ES DONDE ESTUVO EL FALLO ═══
+   *
+   * El paso de las tallas juzga la ARITMÉTICA de `anillo-en-3d.ts` pieza por pieza y con sus
+   * vacunas, y aun así no habría visto el fallo que esta escena tuvo durante toda la fase: un
+   * peón del tamaño del pack NO era un error de cuentas. Las constantes de las que se deriva
+   * `TALLA_DEL_PEON` ya estaban, `anillo-en-3d.ts` ya era un fichero puro, y lo que fallaba
+   * era que `Burgo.tsx` instanciaba con un `auxEscala.set(1, 1, 1)` literal. Se comprobó a
+   * mano devolviendo ese literal a la escena: el guion entero seguía dando verde, y con lo
+   * mismo para la casa y para el hotel. Un juez que sólo mire constantes no vigila la escena.
+   *
+   * Por eso se lee aquí el CÓDIGO. El regex del hotel pide sus tres ejes EN ORDEN —ancho,
+   * alto, fondo—, porque ese orden es lo único que dice que el bloque se estira A LO LARGO de
+   * la casilla y no hacia el carril: `compose` escala en los ejes LOCALES de la malla, y el
+   * `+X` local de la casa cae sobre `adelante` cuando la pieza mira hacia dentro del anillo.
+   * Cambiar dos argumentos de sitio daría un hotel de 22,34 de fondo sobre una franja de 21.
+   */
+  const TALLAS_EN_LA_ESCENA: readonly { readonly que: string; readonly regex: RegExp; readonly cuantas: number }[] = [
+    { que: 'peón', regex: /auxEscala\.set\(\s*TALLA_DEL_PEON\s*,\s*TALLA_DEL_PEON\s*,\s*TALLA_DEL_PEON\s*\)/g, cuantas: 1 },
+    /* Tres sitios ponen una casa —la que brota, las cuatro que se hunden y la que se vende—, y las tres tienen que ir a la misma talla. */
+    { que: 'casa', regex: /matrizDelBurgo\([^)]*TALLA_DE_LA_CASA\s*\*/g, cuantas: 3 },
+    { que: 'hotel', regex: /matrizEstiradaDelBurgo\([^)]*TALLA_DEL_HOTEL\.ancho[^)]*TALLA_DEL_HOTEL\.alto[^)]*TALLA_DEL_HOTEL\.fondo[^)]*\)/g, cuantas: 1 },
+    { que: 'disco', regex: /CircleGeometry\(RADIO_DEL_DISCO_DEL_PEON\b/g, cuantas: 1 },
+  ];
+  const aSuTalla = (fuente: string): string[] => TALLAS_EN_LA_ESCENA.filter((t) => (fuente.match(t.regex) ?? []).length >= t.cuantas).map((t) => t.que);
+  comprobar(
+    'la ESCENA aplica las tallas de anillo-en-3d.ts: el peón, la casa, el hotel (con sus tres ejes en orden) y el disco de contacto',
+    aSuTalla(codigoDelBurgo).length === TALLAS_EN_LA_ESCENA.length,
+    aSuTalla(codigoDelBurgo),
+  );
+  comprobar(
+    'se ve fallar: la escena de antes de la tanda —peón a `set(1, 1, 1)`, casa y posada a la escala de brotar a secas, disco de 0,7— no enciende ninguna de las cuatro',
+    aSuTalla(
+      'mp.setMatrixAt(k, auxMatriz.compose(auxPosicion.set(x, y, p.z), auxGiro, auxEscala.set(1, 1, 1)));\n' +
+        'mc.setMatrixAt(nCasas, matrizDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, Math.max(0.001, escala), auxMatriz));\n' +
+        'disco: new THREE.CircleGeometry(0.7, SEGMENTOS_DEL_DISCO),',
+    ).length === 0,
+  );
+  /* Y los dos errores que no dan error: el hotel con los ejes cambiados de sitio, y dos casas de tres a su talla. */
+  comprobar(
+    'se ve fallar: un hotel con el fondo donde va el ancho, o dos casas de las tres a su talla, no encienden lo suyo',
+    !aSuTalla('matrizEstiradaDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, TALLA_DEL_HOTEL.fondo * brote, TALLA_DEL_HOTEL.alto * brote, TALLA_DEL_HOTEL.ancho * brote, auxMatriz)').includes('hotel') &&
+      !aSuTalla('matrizDelBurgo(a, TALLA_DE_LA_CASA * x, m);\nmatrizDelBurgo(b, TALLA_DE_LA_CASA * y, m);').includes('casa'),
+  );
   /* Una posición, rotación o escala de JSX empieza por `[`: es una terna, no un Vector3 ni un objeto de otra copia de three. */
   const CON_VECTOR = /(position|rotation|scale)=\{\s*(?!\[)[^}]*\}/;
   const CON_PRIORIDAD = /useFrame\([\s\S]*?\},\s*-?\d+\s*\)/;
@@ -1888,7 +2208,7 @@ if (fallos.length > 0) {
  * a la mitad termina con código cero y una lista corta de aciertos. El número va a mano,
  * con margen, y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 200;
+const COMPROBACIONES_ESCRITAS = 235;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(`Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: se ha caído por el camino sin decirlo. Si has añadido comprobaciones nuevas, sube el número.`);
   process.exit(2);
@@ -1900,7 +2220,9 @@ if (fallos.length === 0) {
     '\nLa aritmética del Burgo cuadra con el fichero real: el anillo mide 864 con casilla de 72 × 108 y\n' +
       'esquina de 108, el recinto de la ciudad es 648 —nueve veces el centro original, que es lo que se\n' +
       'pidió—, las cuatro bandas de la casilla suman su fondo, cada rejilla de huecos cabe en la suya con\n' +
-      'la huella medida, el frente de manzana de dos cuerpos no se sale ni pisa el carril del avatar, el\n' +
+      'la huella medida A SU TALLA —el peón es la sexta parte de un dígito y no la dieciseisava, las\n' +
+      'cuatro casas van seguidas con 1,66 de hueco y el hotel es un bloque de otro tamaño, no una casa—,\n' +
+      'el frente de manzana de dos cuerpos no se sale ni pisa el carril del avatar, el\n' +
       'precio es el del reglamento y se lee en los mismos píxeles que antes porque creció con el tablero,\n' +
       'no queda una sola pieza medieval en el anillo, las cuatro esquinas son manzanas de nueve por nueve\n' +
       'celdas que no tocan la ele de la marcha, el campo es un manto continuo con las nubes fuera y el\n' +

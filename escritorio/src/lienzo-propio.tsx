@@ -39,7 +39,7 @@
  * pasos y que cada navegador cuenta a su manera.
  */
 import { Component, useEffect, useRef, useState } from 'react';
-import type { ReactNode, RefObject } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Fog, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -467,7 +467,20 @@ export function CamaraAerea({
       const donde = e.target instanceof Element ? e.target : null;
       if (seDesplazanSolas.some((clase) => donde?.closest(`.${clase}`) != null)) return;
       e.preventDefault();
-      if (donde?.closest(`.${velo}`) != null) return;
+      /*
+       * EL VELO GENÉRICO SE PARA SIEMPRE, SIN QUE EL PINTOR TENGA QUE DECIRLO, y eso arregla
+       * el único cabo que quedaba suelto de la decisión de publicar `RUEDAN_SOLAS`.
+       *
+       * Las cajas que ruedan por dentro viajan en una LISTA y por eso el pintor puede pasar
+       * las suyas y las de las piezas juntas; el velo viaja en `velo`, que es UNA sola cadena.
+       * Un pintor que ya tenga velo propio —el Burgo pasa `burgo-velo`, por su `ElijeUna`— y
+       * monte además una `CajaEnElLienzo`, que trae el suyo puesto, no tiene dónde nombrar el
+       * segundo: la rueda sobre el velo genérico caería en `preventDefault` y acercaría el
+       * mundo DE DETRÁS de una caja modal abierta, que es el mismo fallo silencioso de la
+       * crónica y el carril por el otro lado. Como la clase es de la pieza, la pieza la
+       * defiende: se mira siempre, además de la que diga el pintor.
+       */
+      if (donde?.closest(`.${velo}`) != null || donde?.closest(`.${VELO_DEL_LIENZO}`) != null) return;
       alAcercarse(acercando(cercania.current, pasosDeLaRueda(e), limites));
     };
     /* Sin esto, el primer arrastre con el botón derecho abre el menú del navegador encima del mundo. */
@@ -618,6 +631,19 @@ export function usarLaTrampaDeFoco(
  *
  * `Dejarlo` NO se apaga con `quieto`: cerrar el menú no manda nada, y dejar sin salida a
  * quien lo abrió mientras una petición viaja es encerrarlo delante de botones apagados.
+ *
+ * ═══ Y ADMITE CONTENIDO, PORQUE UNA PREGUNTA NO SIEMPRE ES SÓLO UNA LISTA ═══
+ *
+ * `children` va ENTRE la nota y la lista, y ese sitio no es una casualidad de maquetación:
+ * es el orden en que se lee y en que un lector lo dicta. Primero de qué va la pregunta
+ * (título), luego cómo anda la cosa (nota), luego LO QUE SE ESTÁ MIRANDO —la ficha de una
+ * casilla con su renta, su barrio y su dueño, que es una tarjeta entera y no cabe en el
+ * rótulo de un botón—, y al final lo que se puede hacer con ello. Al revés, la lista de
+ * opciones se leería antes de saber sobre qué se decide.
+ *
+ * Esto no abre la puerta a que aquí entre una regla del juego: lo que se pasa dentro lo
+ * REDACTA el juego (`shared/`) y lo pinta quien monta el menú. Este fichero sigue sin saber
+ * qué es una renta.
  */
 export function ElijeUna({
   titulo,
@@ -629,6 +655,7 @@ export function ElijeUna({
   menu,
   alElegir,
   alDejarlo,
+  children,
 }: {
   titulo: string;
   /** Un renglón en tenue bajo el título, para las preguntas que tienen estado que contar. */
@@ -641,6 +668,8 @@ export function ElijeUna({
   menu: string;
   alElegir: (o: Opcion) => void;
   alDejarlo: () => void;
+  /** La tarjeta que se está mirando, si la pregunta tiene una. Va entre la nota y la lista. */
+  children?: ReactNode;
 }): JSX.Element {
   const caja = useRef<HTMLDivElement | null>(null);
   usarLaTrampaDeFoco(true, caja, alDejarlo);
@@ -657,6 +686,7 @@ export function ElijeUna({
       >
         <h2 className="rotulo-de-panel">{titulo}</h2>
         {nota === undefined ? null : <p className="letra-chica">{nota}</p>}
+        {children}
         <ul className="opciones">
           {opciones.map((o) => (
             <li key={o.id}>
@@ -694,5 +724,449 @@ export function ElijeUna({
         </ul>
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// La gramática de las cajas sobre el lienzo: los nombres, escritos una vez
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ LAS CLASES SON DE LAS PIEZAS Y NO DEL PINTOR, Y ESO ARREGLA UN FALLO CONCRETO ═══
+ *
+ * `ElijeUna` recibe `velo` y `menu` por props —cada pintor traía las suyas— y eso obliga a
+ * quien monta el menú a acordarse de DOS cosas: ponerle la clase y, además, nombrarla en el
+ * `seDesplazanSolas` de la cámara. Riberas lo hace bien porque su lista está escrita al lado
+ * de las cinco constantes (`SE_DESPLAZAN_SOLAS`, `riberas-en-tres.tsx:407`), pero el segundo
+ * pintor llegó con DOS de las suyas —`burgo-cajon` y `burgo-elige`— y la lista no es un sitio
+ * al que se vuelva: un carril que se añada mañana, o una caja colgada, entra sin que nada
+ * avise. El fallo que sale de ahí no es un error en ninguna consola: es que girar la rueda
+ * sobre la caja acerca el mundo DE DETRÁS y la caja no se mueve un renglón (la cabecera de
+ * `LoQueVeLaCamara.seDesplazanSolas` cuenta las tres veces que ya ha pasado: la crónica, el
+ * carril y el componedor).
+ *
+ * Así que las piezas de aquí abajo traen su clase PUESTA, la publican, y publican también la
+ * lista de las que ruedan por dentro. Quien monte una de estas piezas pasa `RUEDAN_SOLAS` a
+ * la cámara y no tiene nada que recordar; las clases propias del pintor (las que colocan y
+ * miden) se le añaden por `clase`, que no participa de esta cuenta.
+ *
+ * El prefijo es `lienzo-` y no el nombre de un juego, por lo mismo que `lienzo-propio`: la
+ * decisión 18 dice que la cadena de pantalla completa se engancha a la clase GENÉRICA para
+ * que el tercer pintor no vuelva a pagarla, y estas cajas viven dentro de esa misma pantalla.
+ */
+export const VELO_DEL_LIENZO = 'lienzo-velo';
+export const CAJA_DEL_LIENZO = 'lienzo-caja';
+export const COLGADA_DEL_LIENZO = 'lienzo-colgada';
+export const CARTEL_DEL_LIENZO = 'lienzo-cartel';
+export const CARRIL_DEL_LIENZO = 'lienzo-carril';
+
+/**
+ * LAS TRES VARIANTES DE SITIO, QUE TAMBIÉN SE PUBLICAN, y no es un detalle.
+ *
+ * La caja modal nace CENTRADA en el recuadro, que es la forma que vale en las dieciocho
+ * medidas de lienzo sin presuponer que arriba hay una cinta. Pero la caja que ES la hoja de
+ * la partida cuelga del pie de la cinta y llega al canto, y con carril cuelga una tira más
+ * abajo. Esas dos líneas de geometría viven en la hoja —`.lienzo-caja-bajo-la-cinta` y
+ * `.lienzo-caja-bajo-el-carril`— y sus nombres se publican AQUÍ para que quien monte la caja
+ * no los escriba a mano: una clase escrita a mano que no exista en la hoja no falla, deja la
+ * caja centrada encima del tablero y se lee como una decisión de diseño.
+ *
+ * Los dos números —`2.75rem` y su doble— están en la hoja y en `rem`, nunca en píxeles: la
+ * cinta se pinta con el suelo de toque de la casa y con la preferencia de letra del navegador
+ * eso deja de ser 44 puntos. Escritos los dos en la misma unidad crecen juntos; escrito uno
+ * en `px`, la caja se mete por debajo de la cinta, que es el fallo que el cajón del delta ya
+ * pagó por 2,75 puntos.
+ */
+export const BAJO_LA_CINTA = 'lienzo-caja-bajo-la-cinta';
+export const BAJO_EL_CARRIL = 'lienzo-caja-bajo-el-carril';
+export const COLGADA_BAJO_EL_CARRIL = 'lienzo-colgada-bajo-el-carril';
+
+/**
+ * LAS QUE RUEDAN POR DENTRO: la rueda es suya y no de la cámara.
+ *
+ * El cartel NO está, y no es un olvido: no rueda —lo que no cabe no se pinta— y encima lleva
+ * `pointer-events: none`, así que ni siquiera es blanco de un suceso de rueda. El VELO
+ * tampoco: sobre él la rueda se para (`preventDefault` y punto), que es lo contrario de
+ * dejarla pasar, y por eso viaja por la prop `velo` de la cámara y no por ésta.
+ */
+export const RUEDAN_SOLAS: readonly string[] = [CAJA_DEL_LIENZO, COLGADA_DEL_LIENZO, CARRIL_DEL_LIENZO];
+
+/**
+ * LA CLASE QUE APAGA, que es una clase QUIETA y nunca `opacity`.
+ *
+ * Un `opacity: 0.4` sobre un botón apagado apaga también su filo y su fondo, y en esta paleta
+ * —`--teja-alta` sobre `--suelo`, dos grises que se llevan cuatro puntos de luminancia— eso
+ * deja un rectángulo que ya no se distingue del fondo: no se lee «esto no se puede pulsar
+ * ahora», se lee «aquí no hay nada». Con una clase que baja el color de la LETRA a `--tenue`
+ * y deja el filo donde estaba, el botón sigue siendo un botón y se ve apagado.
+ *
+ * Y quien ignora la pulsación es el `onClick`, no el atributo: `aria-disabled` y NUNCA
+ * `disabled` nativo (ver la nota de `ElijeUna`).
+ */
+export const QUIETA_EN_EL_LIENZO = 'lienzo-quieta';
+
+// ---------------------------------------------------------------------------
+// La caja modal sobre el lienzo
+// ---------------------------------------------------------------------------
+
+/**
+ * UNA CAJA MODAL SOBRE EL LIENZO, CON LAS CUATRO MITADES Y SIN QUE NINGUNA SE PUEDA OLVIDAR.
+ *
+ * Esto existe porque las cuatro se han escrito ya cuatro veces a mano —el cajón de Riberas,
+ * su componedor, el cajón del Burgo y `ElijeUna`— y la cuarta es la que se olvida. Enteras:
+ *
+ *   1. EL VELO, que se come el clic de fuera. Sin él, cerrar una caja tocando al lado cierra
+ *      la caja Y toca el mundo de debajo: en Riberas eso fundaba una choza donde estaba el
+ *      dedo, y en un anillo de casillas compra un solar. El velo es también quien para la
+ *      rueda: la cámara lo busca por `VELO_DEL_LIENZO` y sobre él llama a `preventDefault` y
+ *      se detiene, porque modal incluye la cámara.
+ *   2. `role="dialog"` + `aria-modal="true"` + NOMBRE. Sin `aria-modal` un lector sigue
+ *      leyendo lo de debajo como si nada; sin nombre, un `dialog` se anuncia «diálogo» a
+ *      secas y no dice de qué. El nombre lo escribe quien la monta, que es quien sabe de qué
+ *      va; aquí no se inventa ni una palabra.
+ *   3. LA TRAMPA DE FOCO, que es LA PILA COMPARTIDA de `riberas-en-tres.tsx` y no una segunda:
+ *      con dos pilas, `Escape` cerraría de un golpe la caja de encima y la de debajo.
+ *   4. EL FOCO DE VUELTA AL CERRAR, y ADÓNDE VUELVE LO SABE `alCerrar`, no la trampa. No es
+ *      una comodidad: el destino depende de quién abrió. El cajón vuelve a la ficha de la
+ *      cinta que lo abre; un menú que abre una casilla del `<canvas>` no tiene botón al que
+ *      volver —un `<canvas>` no recibe foco— y vuelve al RECUADRO, que para eso lleva
+ *      `tabIndex={-1}`. Una trampa que «devolviera el foco» sola acertaría en el primer caso
+ *      y en el segundo soltaría el foco al `<body>`, o sea tabular la cabecera entera de la
+ *      Sala en cada carta que se juega.
+ *
+ * ═══ EL TAMAÑO Y EL SITIO NO SE DECIDEN AQUÍ ═══
+ *
+ * `clase` y `estilo` los pone quien la monta, y por la misma razón por la que el ancho de la
+ * cinta de Riberas no está en `estilo.css`: cuánto se lleva una caja depende del reparto de
+ * SU pantalla —a los lados de la cinta hay dos manos con cartas que se arrastran, y en el
+ * anillo del Burgo no hay ninguna—, y un porcentaje escrito aquí sería un segundo reparto que
+ * el día que el primero cambie no se pondrá rojo. Lo que sí vive en la hoja es lo que no
+ * depende del juego: que ruede por dentro, con el dedo, sin llevarse la mesa detrás.
+ */
+export function CajaEnElLienzo({
+  nombre,
+  clase,
+  estilo,
+  alCerrar,
+  children,
+}: {
+  /** Cómo se anuncia. Lo escribe quien la monta. */
+  nombre: string;
+  /** Las clases del pintor que la colocan y la miden. La suya la pone la pieza. */
+  clase?: string;
+  estilo?: CSSProperties;
+  /** Cerrar Y devolver el foco: adónde vuelve lo sabe quien abrió, no la trampa. */
+  alCerrar: () => void;
+  children: ReactNode;
+}): JSX.Element {
+  const caja = useRef<HTMLDivElement | null>(null);
+  usarLaTrampaDeFoco(true, caja, alCerrar);
+  return (
+    <>
+      {/*
+        `aria-hidden` en el velo: para un lector la caja ya es modal, y un `<div>` sin texto
+        en medio del árbol sólo sería ruido. Lo que hace es comerse el clic, y eso no se
+        anuncia.
+      */}
+      <div className={VELO_DEL_LIENZO} onClick={alCerrar} aria-hidden="true" />
+      <div
+        ref={caja}
+        className={clase === undefined ? CAJA_DEL_LIENZO : `${CAJA_DEL_LIENZO} ${clase}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={nombre}
+        tabIndex={-1}
+        style={estilo}
+      >
+        {children}
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// La caja que NO es modal
+// ---------------------------------------------------------------------------
+
+/**
+ * UNA CAJA COLGADA DEL PIE DE LA CINTA QUE **NO** ES MODAL, Y ÉSA ES TODA SU RAZÓN DE SER.
+ *
+ * Se lee MIENTRAS JUEGA OTRO. Lo que va dentro —las propuestas de trueque del pregón, y en el
+ * Burgo lo mismo— le llega a quien NO tiene el turno, así que tiene que verse sin abrir nada
+ * y el tablero tiene que seguir girando por debajo. De ahí sale, una a una, cada diferencia
+ * con `CajaEnElLienzo`:
+ *
+ *   · SIN VELO. Un velo aquí es exactamente el fallo que esta caja viene a evitar: con él,
+ *     leer una propuesta ajena congelaría la cámara y el tablero de quien la lee.
+ *   · SIN TRAMPA DE FOCO Y SIN `aria-modal`. Encerrar el foco dentro de algo que nadie ha
+ *     abierto es secuestrarlo: quien estaba tabulando hacia los botones del turno se
+ *     encontraría dando vueltas dentro de un aviso que no pidió.
+ *   · `role="group"` CON NOMBRE Y NO `dialog`. Es una región de la pantalla, no una ventana:
+ *     el lector la anuncia al entrar y se sale de ella tabulando, que es lo que se quiere.
+ *   · Y VIVE EN EL NIVEL DE LA CINTA (`z-index: 2`, el mismo del carril) y no en el del velo:
+ *     por debajo se sigue tocando el mundo.
+ *
+ * Rueda por dentro, y por eso está en `RUEDAN_SOLAS`. Lo demás —hasta dónde cuelga, cuánto
+ * mide de ancho— lo pone quien la monta por `estilo`, por lo mismo que en la caja modal: es
+ * reparto de SU pantalla. Y aquí hay una asimetría que conviene tener escrita: la caja modal
+ * SÍ puede pasar por encima de las manos porque con ella abierta no hay nada que arrastrar;
+ * ésta no, y por eso no lleva el suelo de ancho que sí tiene aquélla.
+ */
+export function CajaColgadaDelLienzo({
+  nombre,
+  clase,
+  estilo,
+  children,
+}: {
+  nombre: string;
+  clase?: string;
+  estilo?: CSSProperties;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <div
+      className={clase === undefined ? COLGADA_DEL_LIENZO : `${COLGADA_DEL_LIENZO} ${clase}`}
+      role="group"
+      aria-label={nombre}
+      style={estilo}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// El cartel del pie, que aparece y se va solo
+// ---------------------------------------------------------------------------
+
+/** El separador con el que las frases del cartel viajan pegadas. Ver `CartelAlPie`. */
+const RENGLON_DEL_CARTEL = '\n';
+
+/**
+ * CUÁNTO SE QUEDA UN CARTEL, y de dónde sale el número.
+ *
+ * Cuatro segundos y medio: es lo que tarda en leerse despacio un cartel de dos renglones
+ * cortos, que es el tamaño para el que está medida la caja (`elCartelQueCabe` reparte por
+ * RENGLONES, no por caracteres). Menos, y quien mira el tablero en vez del pie se lo pierde;
+ * más, y un cartel viejo sigue puesto cuando ya ha pasado otra cosa, que es peor que no
+ * haberlo pintado: se lee como el estado de AHORA.
+ */
+export const LO_QUE_DURA_UN_CARTEL = 4500;
+
+/**
+ * EL CARTEL DEL PIE: aparece, se lee, y se va SOLO.
+ *
+ * ═══ NO SE PULSA, Y POR ESO NO TIENE BOTÓN DE CERRAR ═══
+ *
+ * `pointer-events: none` en la hoja, siempre. El cartel vive al pie, ENCIMA del mundo, y la
+ * única manera de que una ayuda no cambie el juego es que no sea pulsable: un rectángulo
+ * opaco ahí es un cartel que impide tocar la casilla que tapa, y en un anillo de cuarenta
+ * casillas las de abajo son justamente las que se tocan primero. Un botón de cerrar sería
+ * además un blanco de toque de 44 puntos encima del tablero para quitar algo que se va solo.
+ *
+ * ═══ ESTÁ SIEMPRE EN EL ÁRBOL, TAMBIÉN VACÍO ═══
+ *
+ * Y eso es lo que hace que se OIGA cuando es la región viva de la pantalla: una región
+ * `aria-live` que se monta A LA VEZ que su texto no se anuncia en la mayoría de los lectores,
+ * porque el lector no vigila lo que todavía no existía. Vacío no se ve —`:empty` le quita
+ * fondo, filo y relleno en la hoja— y no deja una caja fantasma sobre el mundo.
+ *
+ * ═══ `vivo` ES UN INTERRUPTOR, Y AQUÍ SÍ ESTÁ JUSTIFICADO ═══
+ *
+ * La regla de la casa dice UNA sola región `aria-live` por pantalla: dos con el mismo texto
+ * se anuncian dos veces y el aviso ya se anuncia solo cada vez que juega otro. Cuál de las
+ * cajas de una pantalla es LA región no lo puede saber una pieza que no ve a sus hermanas, así
+ * que lo dice quien monta la pantalla. No es un interruptor sobre el JUEGO —de esos no hay
+ * ninguno en este fichero—: es un dato del árbol accesible, y el que lo pone es el único que
+ * lo tiene. Quien ya tenga su región en la cinta monta el cartel con `vivo={false}`.
+ *
+ * ═══ EL RELOJ CUELGA DEL CONTENIDO Y NO DE LA IDENTIDAD DE LA LISTA ═══
+ *
+ * Esto es la trampa de este componente y por eso va escrita. Un efecto atado a `frases` —el
+ * array— se rearma en CADA render, porque quien lo monta casi siempre compone la lista dentro
+ * del render; y un temporizador que se rearma sesenta veces por segundo no vence nunca: el
+ * cartel se queda puesto para siempre y no falla nada. Atado al TEXTO pegado, el efecto se
+ * rearma cuando cambia lo que dice, que es cuando de verdad empieza un cartel nuevo. Con
+ * `msQueDura` en 0 no se va solo, que es lo que quiere un cartel que explica lo que se tiene
+ * en la mano y se cierra al soltarlo.
+ */
+export function CartelAlPie({
+  frases,
+  vivo,
+  clase,
+  estilo,
+  msQueDura = LO_QUE_DURA_UN_CARTEL,
+}: {
+  /** Cada frase en su renglón. Las escribe el juego; aquí no se redacta ninguna. */
+  frases: readonly string[];
+  /** ¿Es ÉSTA la única región viva de esta pantalla? Lo sabe quien monta la pantalla. */
+  vivo: boolean;
+  clase?: string;
+  estilo?: CSSProperties;
+  /** 0 = no se va solo. */
+  msQueDura?: number;
+}): JSX.Element {
+  const texto = frases.join(RENGLON_DEL_CARTEL);
+  const [puesto, ponerPuesto] = useState(texto);
+  useEffect(() => {
+    ponerPuesto(texto);
+    if (texto === '' || msQueDura <= 0) return undefined;
+    const reloj = setTimeout(() => {
+      ponerPuesto('');
+    }, msQueDura);
+    return () => {
+      clearTimeout(reloj);
+    };
+  }, [texto, msQueDura]);
+
+  const renglones = puesto === '' ? [] : puesto.split(RENGLON_DEL_CARTEL);
+  return (
+    <p
+      className={clase === undefined ? CARTEL_DEL_LIENZO : `${CARTEL_DEL_LIENZO} ${clase}`}
+      aria-live={vivo ? 'polite' : undefined}
+      style={estilo}
+    >
+      {/*
+        CADA FRASE EN SU RENGLÓN, y por eso son `<span>` en bloque y no un párrafo corrido: el
+        presupuesto de quien reparte el cartel cuenta RENGLONES por separado, y un párrafo
+        corrido pintaría otra cosa que la que se midió.
+      */}
+      {/*
+        LA CLAVE LLEVA EL SITIO Y NO SÓLO EL TEXTO: dos renglones IGUALES son perfectamente
+        posibles —el juego escribe «Pagas 50 €» dos veces seguidas sin despeinarse— y con la
+        frase por clave React se encuentra dos hermanos con la misma y avisa por consola de
+        algo que no es el fallo que se esté buscando. Aquí la lista no se reordena nunca (se
+        pinta entera o no se pinta), así que el índice es una clave honrada.
+      */}
+      {renglones.map((frase, i) => (
+        <span key={`${String(i)}·${frase}`} className={`${CARTEL_DEL_LIENZO}-frase`}>
+          {frase}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// El carril de cuadrados de 44
+// ---------------------------------------------------------------------------
+
+/** Un cuadrado del carril. Todo lo que lleva dentro lo redacta el juego. */
+export interface CuadradoDelCarril {
+  /** Estable entre revisiones: es la clave de React y la de la lista de la criba. */
+  clave: string;
+  /**
+   * LO QUE SE VE DENTRO: una cifra, una letra, una flecha. Va `aria-hidden`, porque en 44
+   * puntos no cabe una frase y un lector que dictara «7» no diría nada.
+   */
+  glifo: string;
+  /** EL NOMBRE LARGO: es lo que oye un lector y lo que sale al posar el ratón. Lo escribe el juego. */
+  nombre: string;
+  /** Un renglón más de explicación, si el juego la tiene. Se pega al `title`. */
+  ayuda?: string;
+  /** Un color al canto del cuadrado, o nada. Es `background`, así que llega como color. */
+  marca?: string | null;
+  /** Apagado: se pinta quieto y el `onClick` ignora la pulsación. Nunca `disabled` nativo. */
+  quieto?: boolean;
+}
+
+/**
+ * UNA TIRA DE CUADRADOS DEL SUELO DE TOQUE, QUE RUEDA A LO ANCHO Y TAMBIÉN CON EL DEDO.
+ *
+ * ═══ POR QUÉ CUADRADOS DE 44 Y NO UNA LISTA ═══
+ *
+ * Porque va DENTRO del recuadro, encima del mundo, y ahí el alto es lo único que no sobra: en
+ * el lienzo más bajo de los dieciocho (288×317 menos la cabecera de la Sala) una lista de
+ * renglones se come la mitad del tablero. Una tira de 44 puntos —el suelo de toque de la casa,
+ * `2.75rem`, que con la raíz de esta casa pinta 46,75— cuesta una tira y no crece con el número
+ * de opciones: cuando no caben, RUEDA. Ese es todo el trato, y lo que se paga por él es que en
+ * el cuadrado sólo cabe un glifo; QUÉ hace cada uno vive entero en su nombre accesible y en su
+ * `title`, escritos por el juego.
+ *
+ * ═══ `touch-action: auto` NO ES ADORNO, Y NO SE VE FALLAR CON UN RATÓN ═══
+ *
+ * El recuadro lleva `touch-action: none` porque el gesto de la cámara es suyo, y los
+ * descendientes lo HEREDAN. Sin devolvérselo aquí, con el dedo no se puede rodar: se ven los
+ * dos o tres primeros cuadrados, no hay manera de llegar a los demás, y no hay un error en
+ * ninguna consola ni nada que se mueva en un monitor. Y `overscroll-behavior: contain` para
+ * que al llegar al final el gesto no se lo lleve la mesa de detrás. Las dos están en la hoja,
+ * en `.lienzo-carril`.
+ *
+ * ═══ VACÍO NO SE PINTA, Y POR ESO LA CRIBA RECIBE LOS CUADRADOS ═══
+ *
+ * Con la lista vacía devuelve `null`: una tira de vidrio sin nada dentro es una caja fantasma
+ * atravesada sobre el tablero. Y eso es justamente por lo que la criba de «cada movimiento se
+ * enseña exactamente una vez» tiene que recibir LOS CUADRADOS y no un interruptor: pasarle un
+ * `true` mientras la tira no se pinta quitaría esos movimientos de los botones sueltos sin que
+ * hubiera dónde pulsarlos, o sea una partida parada y ningún error en ninguna parte.
+ *
+ * LA BARRA DE DESPLAZAMIENTO SE ESCONDE, y hay que decir lo que cuesta: una barra pintada
+ * dentro de 44 puntos le come al botón justo el suelo de toque que el botón existe para tener.
+ * Lo que queda como señal de que hay más es que el último cuadrado se ve CORTADO por el canto
+ * —el ancho de la tira casi nunca es un múltiplo del botón— y que con el tabulador el
+ * navegador los trae a la vista de uno en uno.
+ */
+export function CarrilDelLienzo({
+  nombre,
+  cuadrados,
+  clase,
+  estilo,
+  alTocar,
+}: {
+  /** Cómo se anuncia la tira entera. Lo escribe quien la monta. */
+  nombre: string;
+  cuadrados: readonly CuadradoDelCarril[];
+  clase?: string;
+  estilo?: CSSProperties;
+  alTocar: (c: CuadradoDelCarril) => void;
+}): JSX.Element | null {
+  if (cuadrados.length === 0) return null;
+  return (
+    <div
+      className={clase === undefined ? CARRIL_DEL_LIENZO : `${CARRIL_DEL_LIENZO} ${clase}`}
+      role="group"
+      aria-label={nombre}
+      style={estilo}
+    >
+      {cuadrados.map((c) => {
+        const apagado = c.quieto === true;
+        return (
+          /*
+           * `aria-disabled` Y NUNCA `disabled`: un `<button>` al que se le pone `disabled`
+           * TENIENDO EL FOCO lo pierde, y el foco cae al `<body>`. Aquí eso es peor que en un
+           * formulario de página, porque la tira vive dentro del recuadro y volver cuesta
+           * tabular la cabecera entera de la Sala. Y estos cuadrados se apagan solos: basta
+           * que el de al lado deje de ser legal en mitad de un turno.
+           */
+          <button
+            key={c.clave}
+            type="button"
+            className={
+              apagado ? `${CARRIL_DEL_LIENZO}-hueco ${QUIETA_EN_EL_LIENZO}` : `${CARRIL_DEL_LIENZO}-hueco`
+            }
+            aria-disabled={apagado}
+            aria-label={c.nombre}
+            title={c.ayuda === undefined || c.ayuda.length === 0 ? c.nombre : `${c.nombre}. ${c.ayuda}`}
+            onClick={() => {
+              if (apagado) return;
+              alTocar(c);
+            }}
+          >
+            {c.marca === undefined || c.marca === null ? null : (
+              /*
+               * LA MARCA SE POSA DENTRO DEL CUADRADO y no puede ser `border`: un filo le
+               * comería al glifo el sitio que tiene, y empujar en el flujo correría el número
+               * de su centro. Va detrás del glifo (`z-index`) y centrada en el cuadrado ENTERO,
+               * para que la fila no se lea ondulada según qué cuadrado tenga marca.
+               */
+              <span className={`${CARRIL_DEL_LIENZO}-marca`} style={{ background: c.marca }} aria-hidden="true" />
+            )}
+            <span className={`${CARRIL_DEL_LIENZO}-glifo`} aria-hidden="true">
+              {c.glifo}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

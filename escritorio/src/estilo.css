@@ -4595,3 +4595,590 @@ code {
     height: 52vh;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAS CAJAS GENÉRICAS DE UN PINTOR PROPIO (`lienzo-propio.tsx`)
+
+   Esto es la mitad de hoja de las piezas que `lienzo-propio.tsx` publica: la caja
+   modal, la caja que NO es modal, el cartel del pie y el carril de cuadrados. Son
+   las mismas cuatro formas que `riberas-en-tres.tsx` tiene escritas para sí —el
+   cajón, el pregón, el cartel de los naipes y el carril de la cinta— con el prefijo
+   GENÉRICO y no el del juego, por lo mismo que la cadena de `.sala:has(.lienzo-
+   propio)`: el tercer pintor no tiene que volver a pagar esto.
+
+   NO SUSTITUYEN A LAS DE RIBERAS, y eso hay que dejarlo dicho para que nadie las
+   borre creyendo que sobran: `riberas-en-tres.tsx` no se toca en esta fase —sus
+   comprobaciones lo atan por regex literales sobre su fuente— así que sus clases
+   siguen vivas y estos bloques son los que usará quien venga. El día que Riberas
+   pase a estas piezas, sus cinco bloques se borran y no cambia nada más.
+
+   LAS TRES REGLAS DE LA CASA QUE SE PAGAN AQUÍ, y las tres se han pagado ya caras
+   en este cliente:
+
+     · APAGADO CON UNA CLASE QUIETA Y NUNCA CON `opacity`. Ver `.lienzo-quieta`.
+     · MÍNIMO TOCABLE 44 PUNTOS, que en esta casa se escribe `2.75rem` y no `44px`:
+       la hoja abre con `html { font-size: 106.25% }` en PORCENTAJE para que la
+       preferencia del navegador siga mandando, así que un `44px` clavado deja de
+       ser el suelo de toque en cuanto alguien sube la letra. Escritos todos en
+       `rem`, crecen juntos y no hay dos números que cuadrar — que es el fallo que
+       el cajón de Riberas pagó por 2,75 puntos.
+     · `touch-action: auto` EN TODO LO QUE RUEDA POR DENTRO. El recuadro lleva
+       `touch-action: none` porque el gesto de la cámara es suyo, y los
+       descendientes lo HEREDAN: sin devolvérselo, con el dedo no se puede
+       desplazar nada de esto, y eso NO se ve fallar con un ratón.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * LA CLASE QUE APAGA VIVE AL FINAL DE ESTA SECCIÓN, y no aquí arriba donde se leería mejor:
+ * ver el bloque `.lienzo-quieta`, debajo del carril. Escrita antes que las piezas, PIERDE.
+ */
+
+/*
+ * ═══ EL VELO: LA MITAD DE LO MODAL QUE SE OLVIDA ═══
+ *
+ * Sin él, un clic fuera de la caja llega al mundo: se cierra la caja Y se toca lo que había
+ * debajo del dedo. En el delta eso fundaba una choza; en un anillo de casillas compra un
+ * solar. Cubre el recuadro entero —`inset: 0` sobre un antepasado colocado, que es lo que es
+ * el recuadro de cualquier pintor propio— y su único trabajo es comerse ese clic.
+ *
+ * `touch-action: auto` porque el recuadro lo tiene en `none` para que el gesto de la cámara
+ * no se lo lleve el navegador; heredado aquí, un dedo sobre el velo no dispararía ni el
+ * `click` que lo cierra en algunos navegadores.
+ *
+ * Y la rueda: la cámara lo busca por esta clase y sobre él llama a `preventDefault` y SE PARA
+ * —no acerca nada—, porque lo que hay abierto es modal y modal incluye la cámara.
+ */
+.lienzo-velo {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: var(--velo);
+  touch-action: auto;
+}
+
+/*
+ * ═══ LA CAJA MODAL: CENTRADA EN EL RECUADRO, TOPADA, Y RODANDO POR DENTRO ═══
+ *
+ * CENTRADA y no colgando de la cinta, que es la decisión que hay que explicar. Las dos cajas
+ * modales que ya existen en este cliente cuelgan del pie de la cinta, pero eso es una forma
+ * de LA PANTALLA DEL JUEGO y no de la pieza: presupone que hay una cinta de 44 puntos arriba,
+ * y una caja genérica no puede presuponerla. Centrada vale en las dieciocho formas de lienzo
+ * y sin saber qué más hay en la pantalla; para colgarla está `.lienzo-caja-bajo-la-cinta`,
+ * que es una línea y no una segunda caja.
+ *
+ * TOPADA POR LOS DOS LADOS y rodando por dentro, y esto es lo que la hace servir en el lienzo
+ * más bajo de los dieciocho (288×317 menos la cabecera de la Sala, que deja un recuadro de
+ * poco más de 250 puntos de alto): un alto en `vh`, o ninguno, prometería alto que ahí no
+ * existe y la caja se saldría por los dos cantos con la mitad del contenido fuera de la
+ * pantalla y sin manera de llegar a él. El `1.5rem` son los dos insets del cromo de este
+ * cliente, el mismo margen con el que pone sus botones sobre el lienzo.
+ *
+ * EL SUELO DE ANCHO ES `16rem`, que es lo que un `.panel` necesita para leerse con su
+ * relleno, topado por el ancho del propio recuadro menos los dos insets: así nunca se sale.
+ * Y esto SÍ se lo puede permitir una caja modal y no una que no lo sea: con ella abierta hay
+ * un velo por delante que se come los punteros, la rueda no llega a la cámara y no hay nada
+ * que arrastrar debajo — eso es lo que significa modal. Medido: con la ventana en 288×420 el
+ * recuadro se queda en 254 de ancho, y una caja que midiera «el tercio central» sería de 84
+ * puntos, donde no se lee un marcador sino «EL MARCA…».
+ *
+ * `overscroll-behavior: contain` para que al llegar al final la rueda no se la lleve la
+ * página de detrás; que la rueda dentro de la caja no acerque la cámara lo hace el oyente de
+ * `CamaraAerea`, que mira de quién es el suceso y para eso la clase está en `RUEDAN_SOLAS`.
+ */
+.lienzo-caja {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: min(calc(100% - 1.5rem), 16rem);
+  max-width: calc(100% - 1.5rem);
+  max-height: calc(100% - 1.5rem);
+  padding: 1rem;
+  background: var(--teja);
+  color: var(--palabra);
+  border-radius: var(--radio-ficha);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 24px 50px -24px var(--sombra);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+}
+
+/*
+ * Y COLGANDO DEL PIE DE LA CINTA, para la caja que ES la hoja de la partida: ahí no se quiere
+ * una tarjeta centrada sino una columna que llegue hasta el canto, porque dentro va todo lo
+ * que no es el tablero y lo que no quepa tiene que rodar.
+ *
+ * Los dos números en `rem` y no en píxeles, por lo que dice la cabecera de arriba: la cinta
+ * mide `2.75rem` y con la raíz de esta casa eso pinta 46,75 puntos, no 44. Escrito `44px`
+ * aquí, la caja se le metería por debajo de la cinta — que es exactamente el fallo que el
+ * cajón de Riberas tuvo y que se arregló poniendo los dos altos en la misma unidad.
+ *
+ * `bottom: 0.75rem` en vez de un alto propio: así la caja es todo lo alta que el lienzo dé,
+ * en un monitor y en una ventana de 288×317. `max-height: none` porque el tope de arriba lo
+ * ponen ya `top` y `bottom` juntos, y dejarlo sumaría dos topes.
+ */
+.lienzo-caja-bajo-la-cinta {
+  top: 2.75rem;
+  bottom: 0.75rem;
+  transform: translateX(-50%);
+  max-height: none;
+}
+
+/*
+ * Y UNA TIRA MÁS ABAJO CUANDO LA CINTA LLEVA CARRIL. Cuelga del PIE de la cinta, y con carril
+ * la cinta son dos tiras: sin esto se mete por debajo del carril, que es de vidrio, y los
+ * cuadrados se leerían a través del primer renglón de la caja — que es justamente el que se
+ * lee sin desplazar. El doble exacto del de arriba, en la misma unidad, para que crezcan
+ * juntos con la preferencia de tamaño de letra del navegador.
+ *
+ * LA CLASE LA PONE EL MARCADO Y NO UN `:has`, para que un navegador sin `:has` no vea una
+ * cosa distinta: es la misma decisión que `.riberas-cinta-con-carril`.
+ */
+.lienzo-caja-bajo-el-carril {
+  top: 5.5rem;
+  bottom: 0.75rem;
+  transform: translateX(-50%);
+  max-height: none;
+}
+
+/*
+ * ═══ LA CAJA QUE NO ES MODAL: MISMO SITIO, OTRO NIVEL, Y SIN VELO ═══
+ *
+ * Cuelga del mismo pie de cinta y mide lo que le digan, pero NO es modal, y de ahí sale cada
+ * línea de este bloque. Lo que va dentro se lee MIENTRAS JUEGA OTRO —una propuesta que me
+ * hacen, un pregón—, así que tiene que verse sin abrir nada y el tablero tiene que seguir
+ * girando por debajo.
+ *
+ *   · `z-index: 2`, EL DE LA CINTA Y EL DEL CARRIL, y no el 4 del cajón ni el 3 del velo: por
+ *     debajo se toca el mundo, se gira la cámara y se pulsa lo que haya. Un velo aquí sería
+ *     exactamente el fallo que esta caja viene a evitar.
+ *   · NO CUELGA HASTA EL CANTO. El tope de aquí es el suelo —lo que queda del recuadro
+ *     quitando la cinta y el inset de abajo— para que no se salga si nadie se lo dice; quien
+ *     la monta le pasa el suyo por `style`, que es donde vive el reparto de SU pantalla.
+ *     Hasta el canto taparía todo lo que se pulsa para jugar, o sea cromo opaco encima de lo
+ *     único que hace avanzar la partida.
+ *   · SIN EL SUELO DE `16rem` que sí tiene la caja modal. Aquel suelo es legítimo porque con
+ *     la modal abierta no hay nada que arrastrar debajo; aquí sí lo hay.
+ *   · RUEDA POR DENTRO Y CON EL DEDO, por lo mismo que todo lo demás de esta hoja.
+ *
+ * Redondeada sólo por abajo: es la misma caja de vidrio que la cinta, continuada hacia abajo.
+ * Con las esquinas de arriba redondeadas asomarían dos cuernos de tablero entre las dos.
+ */
+.lienzo-colgada {
+  position: absolute;
+  top: 2.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: calc(100% - 1.5rem);
+  max-height: calc(100% - 3.5rem);
+  padding: 0.5rem 0;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border-radius: 0 0 var(--radio-mando) var(--radio-mando);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 14px 30px -18px var(--sombra);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+}
+
+/* Y con carril arranca una tira más abajo, por lo mismo que la caja modal y con el mismo número. */
+.lienzo-colgada-bajo-el-carril {
+  top: 5.5rem;
+  max-height: calc(100% - 6.25rem);
+}
+
+/*
+ * ═══ EL CARTEL DEL PIE: NO SE PULSA, Y VACÍO NO SE VE ═══
+ *
+ * `pointer-events: none`, siempre y sin botón de cerrar. El cartel vive encima del mundo, y
+ * la única manera de que una ayuda no cambie el juego es que no sea pulsable: un rectángulo
+ * opaco ahí impide tocar justo lo que tapa. Se va solo (lo cuenta `CartelAlPie`).
+ *
+ * `:empty` le quita fondo, filo y relleno, y ésa es la mitad que hace que pueda estar SIEMPRE
+ * en el árbol: una región `aria-live` que se monta a la vez que su texto no se anuncia en la
+ * mayoría de los lectores, porque el lector no vigila lo que todavía no existía. Montado
+ * siempre y vacío, no deja una caja fantasma sobre el mundo.
+ *
+ * `0.82rem` son 13,94 puntos con la raíz de esta casa, o sea por encima del suelo de 13 de la
+ * casa; y el sitio —arriba, abajo, cuánto de ancho— lo pone quien lo monta por `style`,
+ * porque cuánto cabe depende del reparto de SU pantalla.
+ *
+ * Y LOS ÚNICOS TRES NÚMEROS DE ESTA SECCIÓN QUE NO ESTÁN EN `rem` SON ÉSTOS, a propósito y no
+ * por descuido: `padding: 12px` y `line-height: 1.35` son las dos ENTRADAS del presupuesto de
+ * renglones de quien reparte el cartel (doce puntos de margen por lado, renglón de
+ * `ceil(cuerpo · 1,35)`), igual que en `.riberas-cartel`, donde está contado entero. Tocar
+ * cualquiera de los tres sin tocar la función que reparte descuadra la cuenta y el cartel se
+ * sale de lo medido. El suelo de toque —que es lo que la cabecera de la sección manda escribir
+ * en `rem`— no entra aquí: esto no se pulsa.
+ */
+.lienzo-cartel {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  padding: 12px;
+  overflow: hidden;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border-radius: var(--radio-mando);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 14px 30px -18px var(--sombra);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+/* Cada frase en su renglón: es como está medido el presupuesto, y como se lee. */
+.lienzo-cartel-frase {
+  display: block;
+}
+
+.lienzo-cartel:empty {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/*
+ * ═══ EL CARRIL: UNA TIRA DE 44, QUE RUEDA A LO ANCHO Y TAMBIÉN CON EL DEDO ═══
+ *
+ * Arranca al pie de la cinta y mide otra tira igual. Los dos altos en `rem` y el mismo
+ * número, porque son el mismo suelo de toque de la casa.
+ *
+ * RUEDA A LO ANCHO, Y CON EL DEDO. `touch-action: auto` no es adorno: el recuadro lleva
+ * `touch-action: none` por el gesto de la cámara y el carril lo heredaría, así que con el
+ * dedo no se podría rodar — se verían dos o tres cuadrados y no habría manera de llegar a los
+ * demás, sin un error en ninguna consola. Y `overscroll-behavior: contain` para que al llegar
+ * al final no se lo lleve la mesa.
+ *
+ * LA BARRA DE DESPLAZAMIENTO SE ESCONDE, y hay que decir lo que cuesta: una barra pintada
+ * dentro de 44 puntos le come al botón justo el suelo de toque que el botón existe para
+ * tener. Lo que queda como señal de que hay más es que el último cuadrado se ve CORTADO por
+ * el canto, y que con el tabulador el navegador los trae a la vista de uno en uno.
+ */
+.lienzo-carril {
+  position: absolute;
+  top: 2.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  gap: 0;
+  height: 2.75rem;
+  max-width: calc(100% - 1.5rem);
+  padding: 0;
+  background: var(--teja-alta);
+  border-radius: 0 0 var(--radio-mando) var(--radio-mando);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 14px 30px -18px var(--sombra);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  touch-action: auto;
+  scrollbar-width: none;
+}
+
+.lienzo-carril::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * CADA CUADRADO, EL SUELO DE TOQUE DE LA CASA. Sin caja propia: la tira ya es la caja.
+ *
+ * `flex: 0 0 auto` para que el flex NO los encoja al no caber — encogerlos es perder el suelo
+ * de toque justo cuando hay muchos, que es cuando más falta hace: lo que pasa cuando no caben
+ * es que el carril rueda.
+ *
+ * `font-variant-numeric: tabular-nums` porque lo que va dentro suele ser una cifra, y con
+ * cifras de anchos distintos la fila de cuadrados se lee ondulada.
+ *
+ * `position: relative` porque la marca de color se posa DENTRO del cuadrado: no puede ser
+ * `border`, que le comería al glifo el sitio que tiene, ni puede empujar en el flujo, que
+ * correría el glifo de su centro.
+ */
+.lienzo-carril-hueco {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  background: none;
+  color: var(--acento);
+  border: 0;
+  border-radius: var(--radio-mando);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.lienzo-carril-hueco:hover {
+  color: var(--palabra);
+}
+
+/*
+ * LA CLASE QUE APAGA. `--tenue` sobre el mismo fondo, y el filo donde estaba.
+ *
+ * Un `opacity: 0.4` apaga también el filo y el fondo, y en esta paleta —`--teja-alta`
+ * sobre `--suelo`, dos grises que se llevan cuatro puntos de luminancia— eso deja un
+ * rectángulo que ya no se distingue del fondo: no se lee «esto no se puede pulsar ahora»
+ * sino «aquí no hay nada». Y `cursor: default` porque una manita encima de algo que no
+ * responde es la otra mitad de la misma mentira.
+ *
+ * Quien ignora la pulsación es el `onClick`; el atributo es `aria-disabled` y jamás
+ * `disabled` nativo: un `<button>` al que se le pone `disabled` TENIENDO EL FOCO lo pierde,
+ * y dentro de una caja modal eso es escaparse de la trampa de foco.
+ *
+ * ═══ Y VA AQUÍ ABAJO, DESPUÉS DE TODAS LAS PIEZAS, Y ESO NO ES ORDEN SINO PESO ═══
+ *
+ * Escrita al principio de la sección —que es donde se leía mejor— PERDÍA, y perdía en
+ * silencio. `.lienzo-quieta` pesa (0,1,0) y `.lienzo-carril-hueco` pesa lo mismo, así que
+ * entre las dos decide EL ORDEN DE LA HOJA: con la clase que apaga escrita antes, un cuadrado
+ * quieto salía en `--acento` y con la manita puesta, o sea EXACTAMENTE igual que uno vivo, y
+ * sólo se ponía tenue al pasarle el ratón por encima —al revés de lo que hace uno vivo—.
+ * Medido en el navegador con esta misma hoja: vivo y quieto daban los dos `rgb(168, 85, 247)`
+ * y los dos `cursor: pointer`. Es el mismo fallo de peso que `.opcion-quieta` tiene contado
+ * arriba con todas sus letras, y la casa lo resuelve igual: el apagado gana siempre porque va
+ * DESPUÉS. Quien añada una pieza nueva a esta sección la escribe ENCIMA de este bloque.
+ */
+.lienzo-quieta {
+  color: var(--tenue);
+  cursor: default;
+}
+
+/*
+ * Y APAGADO NO CAMBIA AL PASAR EL RATÓN. Esto sigue haciendo falta con el bloque de arriba en
+ * su sitio: `.lienzo-carril-hueco:hover` pesa (0,2,0) y le ganaría igual al (0,1,0) de la
+ * clase que apaga. Sin esta línea, un cuadrado quieto se aclara bajo el cursor exactamente
+ * igual que uno vivo: la única señal de que no se puede pulsar desaparecería justo en el
+ * momento en que se va a pulsar.
+ */
+.lienzo-carril-hueco.lienzo-quieta:hover {
+  color: var(--tenue);
+}
+
+/*
+ * EL GLIFO va por encima de la marca (`z-index`) y centrado en el cuadrado ENTERO, no en lo
+ * que queda libre: correrlo hacia arriba por la marca dejaría la fila descuadrada según qué
+ * cuadrado tenga marca y cuál no.
+ */
+.lienzo-carril-glifo {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * LA MARCA DE COLOR, al pie del cuadrado y de dos puntos. Dos y no uno: un pelo de color al
+ * lado de una cifra no se ve en una tira que rueda. El color lo pone el juego en línea, que
+ * es el único sitio donde se sabe de quién es.
+ */
+.lienzo-carril-marca {
+  position: absolute;
+  right: 0.35rem;
+  bottom: 0.3rem;
+  left: 0.35rem;
+  height: 2px;
+  border-radius: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EL BANCO DE LA INTERFAZ DEL BURGO (`banco-hoja-burgo.tsx`)
+
+   No es una pantalla del producto y por eso vive al final de la hoja, con su
+   propio prefijo y sin tocar nada de lo de arriba: lo que el banco enseña tiene
+   que ser EXACTAMENTE lo que la Sala enseña, así que aquí sólo hay el marco de
+   alrededor —los mandos y la ventana de mentira— y ni una línea que cambie el
+   aspecto de lo que va dentro.
+
+   LA ÚNICA REGLA DE LA SALA QUE EL BANCO NO PUEDE HONRAR es el alto de `.sala`.
+   La cadena de pantalla completa la mide contra la ventana (`height: 100dvh`) y
+   dentro de una caja de 390×490 eso son los 900 puntos de la ventana de verdad,
+   o sea que el banco enseñaría un mueble que se sale por abajo justo en las
+   medidas para las que existe. Se sustituye por `height: 100%` DEBAJO de
+   `.banco-ventana`, que es lo más cerca que se puede estar de aquella regla sin
+   una ventana de verdad. Está escrito aquí y no en la cadena para que quien lea
+   la cadena la lea entera y sin excepciones.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.banco-hoja {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--suelo);
+  color: var(--palabra);
+  min-height: 100vh;
+}
+
+.banco-mandos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.banco-grupo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  background: var(--teja);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
+}
+
+/*
+ * LOS MANDOS DEL BANCO SON MANDOS DE VERDAD Y NO ADORNOS: el suelo de toque de la casa,
+ * porque este banco también se abre desde un móvil —ningún juego de esta casa es sólo para
+ * PC, y tampoco lo es la pantalla desde la que se juzga uno—.
+ */
+.banco-mando {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  font: inherit;
+  font-size: var(--letra-minima);
+  cursor: pointer;
+}
+
+.banco-mando:hover {
+  border-color: var(--acento);
+}
+
+/*
+ * EL QUE ESTÁ PUESTO SE MARCA CON EL FILO Y CON LA LETRA, nunca con el fondo del acento:
+ * este cliente pinta el acento en morado y la letra de encima tendría que ser blanca, que es
+ * justo lo que la casa no hace. Y lleva además `aria-pressed`, que es lo que lo dice sin
+ * mirar: el color es la segunda señal, no la única.
+ */
+.banco-mando-puesto {
+  color: var(--acento);
+  border-color: var(--acento);
+}
+
+.banco-rotulo {
+  padding: 0 0.35rem;
+  font-size: var(--letra-minima);
+  color: var(--tenue);
+}
+
+.banco-lista {
+  min-height: 2.75rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  font: inherit;
+  font-size: var(--letra-minima);
+}
+
+/* El renglón de estado: qué se mira, y las dos medidas —la que se pide y la que sale—. */
+.banco-renglon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  font-size: var(--letra-minima);
+}
+
+.banco-porque {
+  color: var(--palabra);
+}
+
+.banco-cifras {
+  color: var(--tenue);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * LO QUE FALTA, CUANDO FALTA. En rojo y con filo, porque es lo contrario de un adorno: dice
+ * que el momento que se está mirando NO es el que el rótulo promete, o sea que lo que se
+ * juzgue encima no vale. El rojo es el del tema de la Sala (`--acento` cuando el tema es el
+ * rojo) escrito a pelo aquí porque este renglón no puede depender del tema: en el tema verde
+ * un aviso «de acento» se leería como un visto bueno.
+ */
+.banco-falta {
+  margin: 0;
+  padding: 0.6rem 0.75rem 0.6rem 1.75rem;
+  background: var(--teja);
+  color: #f87171;
+  border: 1px solid #f87171;
+  border-radius: var(--radio-mando);
+  font-size: var(--letra-minima);
+}
+
+/*
+ * LA VENTANA DE MENTIRA. El ancho y el alto los pone el banco en línea con la medida elegida;
+ * aquí sólo el filo que la hace visible y el `overflow: hidden`, que es lo que la convierte en
+ * una ventana: sin él, lo que no cabe se sale por los cantos y se lee como que cabía.
+ *
+ * `resize: both` para poder estirarla a mano y encontrar el punto exacto en el que una pieza
+ * deja de caber, que es el número que hace falta para arreglarla y el que ninguna lista de
+ * dieciocho medidas te da.
+ */
+/*
+ * EL FILO VA EN `outline` Y NO EN `border`, Y ESA LÍNEA LA ENCONTRÓ EL PROPIO BANCO.
+ *
+ * Esta hoja pone `box-sizing: border-box` en todo, así que un `border: 1px` se come dos puntos
+ * de ANCHO y dos de ALTO por dentro: pidiendo 844×390 la caja daba 842×388, y el aviso de «la
+ * ventana no mide lo que dice» saltaba siempre —o sea que se habría aprendido a no leerlo, que
+ * es como muere un aviso—. Un `outline` se dibuja fuera y no ocupa layout: la caja mide
+ * exactamente lo que su rótulo dice, y el aviso sólo sale cuando de verdad hay algo que decir.
+ */
+.banco-ventana {
+  position: relative;
+  overflow: hidden;
+  resize: both;
+  background: var(--suelo);
+  border: 0;
+  outline: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
+}
+
+/*
+ * SIN `max-width: 100%`, Y ESO ES UNA DECISIÓN. Con él, pedir el monitor de 1.920 en una
+ * pantalla más estrecha daba una ventana recortada con el rótulo «1.920×1.080» al lado: un
+ * banco que enseña una medida y pinta otra es exactamente la clase de mentira que este banco
+ * existe para no cometer. Sin él la página del banco se desplaza a lo ancho, que es feo y es
+ * verdad. Y por si alguien la estira a mano con `resize`, el renglón de estado imprime la
+ * medida MEDIDA al lado de la pedida y avisa cuando no coinciden.
+ */
+
+/*
+ * LA ÚNICA LÍNEA DE LA CADENA QUE UNA CAJA NO PUEDE HONRAR, y son DOS declaraciones y no una:
+ * `.sala:has(.lienzo-propio)` pone `height: 100dvh`, pero `.sala` a secas lleva ADEMÁS
+ * `min-height: 100vh`, y un mínimo gana siempre a un alto. Con sólo `height: 100%` la caja
+ * medía 390 puntos y la Sala de dentro 637 —los de la ventana de verdad—, o sea que el banco
+ * enseñaba el mueble de un monitor dentro del marco de un móvil y lo que sobraba se lo comía
+ * el `overflow`. Medido aquí mismo, en el navegador, antes de arreglarlo: se pedía una ventana
+ * de 844×390 y el recuadro salía de 667×496, más alto que la ventana que lo contenía.
+ */
+.banco-ventana .sala {
+  height: 100%;
+  min-height: 0;
+}

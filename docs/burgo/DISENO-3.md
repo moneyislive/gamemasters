@@ -108,6 +108,10 @@ en la pose de salida y a `masCerca` una casilla ocupa ≥ 45 % del alto; `acerca
 límites del Burgo acota y con los de siempre sigue dando lo de `verify:escena`; imports de
 `escenas/burgo/` sin drei/DOM/Expo/fetch. `COMPROBACIONES_ESCRITAS` real.
 
+Desde la tanda de las proporciones (§13) las piezas se miden **puestas** —la huella del `.glb`
+por la talla a la que la escena las instancia— y hay un paso propio para el peón, las casas y
+el hotel. Ese paso y las diez vacunas que lo prueban están contados en §13.4.
+
 ### 8.5 Los que se tocan a mano (verde falso si no)
 
 - `server/scripts/verificar-mesa.ts`: `BURGO` en el bucle de `reprochesDeSecretos`
@@ -341,3 +345,279 @@ sin almoneda»; (2) los nombres de los ocho barrios (`BARRIOS[].nombre`: El Arra
 Tenerías…) que hoy sólo salen en la hoja; (3) las tres frases del Muelle («A las puertas del
 Burgo», «Las puertas se abren cuando estéis todos.», «Se abre el Burgo»); (4) el `gancho`
 de la tienda.
+
+
+## 13. La talla de las piezas de un jugador (tanda de las proporciones)
+
+Miguel, mirando el banco: «proporción de las piezas que representan a los jugadores,
+construcciones de casas y hoteles». Lo que había, medido con `@gltf-transform` sobre
+`escenas/modelos/burgo.glb` y contra una casilla de 72 × 108:
+
+| pieza | en el pack | qué era en el tablero |
+|---|---|---|
+| peón (`pawn_A_blue`) | 1,272 × 1,272 × 2,326 | el **1,8 %** del frente de su casilla |
+| casa (`building_blue`) | 2,504 × 2,543 × 2,543 | el 12 % del fondo de la franja del barrio |
+| hotel | **la misma casa, a la misma talla** | indistinguible de una casa |
+| dígito del precio (referencia) | 20,25 de ancho | **dieciséis veces** la huella del peón |
+
+Las piezas venían horneadas a la escala del MUNDO (una casa-ficha mide una persona, 2,543) y
+la escena las instanciaba a talla 1 con un `auxEscala.set(1, 1, 1)` literal. Ninguna
+comprobación lo veía porque todas medían la huella del `.glb` **tal cual**: un peón de 1,272
+cabe en cualquier sitio.
+
+### 13.1 Las tres tallas y de dónde sale cada número
+
+Están en `escenas/burgo/anillo-en-3d.ts`, sección «La talla de las piezas que son de un
+jugador», cada una derivada y no elegida a ojo:
+
+- **`DIAMETRO_DEL_PEON = ANCHO_DEL_GUARISMO / 6` = 3,375** (`TALLA_DEL_PEON` = 2,653; alto
+  6,17). La sexta parte del ancho de un dígito del precio, que es la única referencia medida
+  en píxeles que hay. El encargo puso el suelo: «un octavo de eso es invisible» (2,53).
+  Y resulta ser también el **techo**, porque tres sitios lo aprietan: el patio de la cárcel
+  (12 × 12 con tres presos de frente → 3,4 con aire), el brazo de una esquina (25,5 con seis
+  en fila → 4,3) y el carril del avatar (v de 23 a 29, centrado en 25,5 → 5,0). Manda el
+  patio. Escala **uniforme**: a 55° de altura de cámara la huella pesa más que el alto.
+- **`FONDO_DE_LA_CASA = BANDA.franja / 2` = 10,5** (`TALLA_DE_LA_CASA` = 4,129; 10,34 de
+  frente). La casa llena la mitad del fondo de la franja del barrio, centrada, con un cuarto
+  de banda libre a cada lado. Con el paso 12 que la rejilla ya tenía quedan **1,66** entre
+  casa y casa (antes 9,50): cuatro casas **seguidas** que ocupan 46,3 de los 72 del frente.
+- **`TALLA_DEL_HOTEL` → 22,34 × 14 × 14.** Frente = lo que ocupan dos casas seguidas de borde
+  a borde (10,34 + el paso 12); fondo = dos tercios de la franja (frente a la mitad de una
+  casa); alto = tanto como hondo. O sea 2,16 veces el frente de una casa, 1,33 su alto y 2,88
+  su huella. Es la **misma malla** con una escala por eje (`matrizEstiradaDelBurgo`), estirada
+  a lo largo de `u` porque su `+X` local cae ahí al mirar hacia dentro del anillo.
+
+### 13.2 Lo que hubo que mover con ellas
+
+- **`RADIO_DEL_DISCO_DEL_PEON`** pasa de 0,7 a 1,856 y se muda de `Burgo.tsx` a
+  `anillo-en-3d.ts`: conserva la proporción que tenía (1,1 veces el radio del peón) para que
+  la sombra siga estando debajo de la pieza, y ahora el comprobador puede medirla.
+- **`REJILLA_DE_PEONES_DE_ESQUINA` y `REJILLA_DE_VISITAS` dejan de ser 3 × 2 y pasan a 6 × 1**
+  (paso 4, centro 337,5). El 1,4 que separaba las dos filas era «lo justo para que dos peones
+  de 1,272 no se toquen»: con un peón que se vea no cabe **ningún** paso, porque el aventurero
+  se pone 1,2 hacia fuera del hueco y con dos filas se despegaría de la polilínea más de las
+  dos unidades que se toleran. En fila india el aventurero se despega exactamente 1,2.
+- **`REJILLA_DE_PRESOS`** pasa de 3,2/4 a **3,9/4,2**: seis presos de 3,375 en el patio de
+  12 × 12 con 0,53 entre dos y 0,41 hasta la verja.
+- **`BANDERA_SOBRE_LA_POSADA.alza`** deja de ser 2,45 y se deriva de `ALTO_DEL_HOTEL` (14):
+  el tejado ha subido y la bandera va clavada en él, no flotando donde estaba el tejado viejo.
+- `REJILLA_DE_PEONES` (paso 7) y `REJILLA_DE_CASAS` (paso 12) **no cambian de valor**: con las
+  piezas puestas siguen dando 3,63 y 1,66 de aire. Lo que cambia es su comentario, que ahora
+  dice el número con la pieza puesta.
+
+### 13.3 El presupuesto no se mueve, y ésa es media decisión
+
+Escalar no cuesta un triángulo ni una llamada: son las mismas `InstancedMesh`. Los 44
+edificios de un tablero lleno (32 casas + 12 hoteles) se siguen contando como `casa`, y la
+suma sigue en 207.949 en plena (tope 900.000) y 145.595 en sobria (tope 230.000).
+
+Antes de estirar la casa se buscó un modelo de hotel pieza a pieza (anotado en `piezas.ts`):
+Board Game Bits es el único pack con la misma pieza en cuatro colores —lo que hace falta para
+derivar la máscara de tinte— y no tiene ningún edificio mayor que `building`; los
+`container_*`, que serían lo más parecido, vienen en un solo color y no se pueden teñir del
+color del dueño, y un hotel que no lleve el color de su dueño no dice lo único que tiene que
+decir. Un edificio del City Builder es una pieza de ciudad, con su color horneado, y en la
+franja del barrio no se leería como ficha.
+
+### 13.4 Lo que vigila esto, con sus vacunas
+
+`verify:burgo-escena` pasa de 205 a **235 comprobaciones** (`COMPROBACIONES_ESCRITAS = 235`).
+El cambio de fondo es que **las piezas se miden PUESTAS**: la huella del `.glb` multiplicada
+por la talla a la que la escena las instancia. Además hay un paso propio, «Las piezas de un
+jugador se instancian a una talla que se lee, y un hotel no es una casa», que afirma:
+
+- que lo escrito en `anillo-en-3d.ts` es lo que el `.glb` trae de verdad;
+- que la huella del peón pasa del octavo del ancho de un dígito, y que cabe entera en el
+  carril del avatar;
+- que el disco de contacto conserva su proporción con la pieza;
+- que la casa llena media franja y que las cuatro van seguidas (hueco < media casa);
+- que el hotel es vez y media más ancho, un cuarto más alto y el doble de huella que una
+  casa, que su frente es el de dos casas seguidas, y que cabe en la franja sin llegar al
+  carril ni al mástil de la bandera del dueño;
+- que dos peones de la misma casilla no se pisan **ni ellos ni sus discos**, en las 39
+  casillas, en el patio de la cárcel y en la acera de las visitas.
+
+Diez venenos, diez cazados (probado a mano envenenando `anillo-en-3d.ts` una constante cada
+vez y restaurándola): peón a talla 1, peón de 5,5, rejilla de esquina de vuelta a 3 × 2 con
+paso 1,4, presos de vuelta a 3,2, casa a talla 1, hotel con el frente de una casa, hotel de 26
+de fondo, disco en 0,7, alza de bandera en 2,45 y huella escrita que no es la del fichero.
+
+**Y un undécimo veneno que los diez primeros no habrían cazado, porque no estaba en las
+constantes: la ESCENA.** Devolviendo a `Burgo.tsx` el `auxEscala.set(1, 1, 1)` del peón, la
+casa a la escala de brotar a secas y el hotel con dos ejes cambiados de sitio, el guion seguía
+dando verde con sus 232 comprobaciones: las constantes eran las buenas y nadie miraba si se
+usaban, que es exactamente el fallo que esta tanda arregla. Se añadió a la revisión un juez
+sobre el CÓDIGO de la escena (paso «Los dos .tsx de la escena y el tinte»): que `Burgo.tsx`
+instancie el peón a `TALLA_DEL_PEON`, las **tres** casas a `TALLA_DE_LA_CASA`, el hotel con
+sus tres ejes **en orden** (ancho, alto, fondo — el orden es lo único que dice que se estira a
+lo largo de la casilla y no hacia el carril) y el disco con `RADIO_DEL_DISCO_DEL_PEON`; con
+dos vacunas, la escena de antes de la tanda y el hotel con los ejes permutados.
+
+### 13.5 Lo que queda abierto
+
+El **aventurero** sigue midiendo lo que mide una persona en este mundo (2,543) y el peón que
+lo sustituye mide ahora 6,17 de alto. Los seis asientos están siempre como peón y sólo uno se
+levanta como aventurero (decisión 11), así que en calidad plena el que mueve se ve más pequeño
+que los cinco que están quietos. Arreglarlo pide tocar `escenas/burgo/Aventurero.tsx` o
+`peon.ts`, que no entraban en esta tanda: el número que haría falta es una escala de 2,43
+sobre la figura, o bajar el peón, y es una decisión de tanda, no de fichero.
+
+Y con el aventurero se quedaron dos cosas suyas que el peón grande arrastró y que **hay que
+mirar en el banco antes de tocarlas**, porque son proporciones y no cuentas:
+
+- **El disco del aventurero.** Es la misma malla que la del peón, instanciada con un 1,1 más
+  encima (`Burgo.tsx`, «el disco del aventurero en pie»): pasó de 1,54 de diámetro a **4,08**,
+  bajo una figura que sigue midiendo 1,8 de ancho. La sombra es hoy más del doble de ancha que
+  quien la proyecta. Se arregla dándole un radio propio al disco del aventurero —el que tenía,
+  0,77— en vez de heredar el del peón, o subiendo la figura junto con el peón (que es la misma
+  decisión de arriba).
+- **El anillo de la casilla destacada cuando marca a un PEÓN.** `Burgo.tsx` lo pinta con la
+  geometría `MARCA` (2,2 a 3,0 de radio) a talla **0,55** cuando los dados ruedan por un
+  asiento en el sorteo: eso es un anillo de 1,21 a 1,65, y el peón puesto tiene 1,69 de radio
+  de base y 1,86 de disco de contacto. O sea que el anillo ya no RODEA al peón: cae entero
+  dentro de su silueta. No desaparece —el material de la marca va con `depthTest: false` y se
+  pinta encima— pero pasa de ser un halo alrededor de la ficha a ser una raya pintada sobre su
+  base, que es justo lo contrario de señalarla. Ese 0,55 estaba calibrado para el peón de
+  0,636 de radio, donde el anillo empezaba a 1,73 veces el radio del disco; conservando esa
+  proporción con el peón de ahora, la talla sale **1,46**. No se cambió aquí porque es un
+  número que se decide mirando el banco, que es lo que a esta tanda le faltó.
+
+---
+
+## 14. Las cuatro reglas oficiales que estaban fuera de alcance (y ya no lo están)
+
+El §12 de este documento daba por fuera de alcance cuatro divergencias con el juego oficial.
+Miguel las metió en alcance —«que el monopoli sea el juego oficial jugable y que funcione todo
+de verdad»— y esta tanda las cierra. Lo que sigue es lo que se decidió donde el reglamento
+callaba, con el fallo que cada decisión evita. **No sustituye a lo que dice el §12: lo
+continúa.** El sitio donde vive cada regla es `shared/arcade/juegos/burgo.ts`, y el juez de
+cada una, con su vacuna, es el bloque 15 de `server/scripts/verificar-burgo.ts`.
+
+### 14.1 Obrar fuera del propio turno
+
+Alzar, vender, hipotecar y deshipotecar se hacen **en cualquier momento**, también durante el
+turno de otro. Antes hacían falta `esElDelTurno` y un paso de obrar, y con seis sentados eso
+era obrar una vez cada seis turnos: la mitad de la táctica del juego —alzar de golpe antes de
+que el rival caiga en tu barrio— no existía.
+
+La guarda nueva es `puedeObrarAhora`, escrita **una vez** sobre `LaMesaAhora`, una forma que el
+estado y la vista comparten, y llamada por `opciones()` y por el reductor. Deja fuera **tres
+momentos**, que son aquellos en los que la mesa espera una respuesta concreta con su plazo:
+
+| Momento | Quién puede obrar | Por qué |
+| --- | --- | --- |
+| Subasta abierta | nadie | El dinero decide quién gana la puja, y un pago de un tercero en medio cambia el resultado sin que a ese tercero le toque nada. Ya hay una rama entera en el cierre para el único camino que queda abierto a eso (un trato aceptado durante la subasta). |
+| Apuro abierto | sólo el endeudado, y sólo vender e hipotecar | Es el reglamento §9, y es lo que ya se hacía. Alzar y deshipotecar siguen fuera: gastan dinero cuando lo que falta es dinero. |
+| El del turno con la casilla sin resolver (`comprar`) | sólo él | `comprar` no cabe en `luego` —no se puede reanudar una compra con el dinero cambiado— y una obra de un tercero que abriera la subasta de la última casa se llevaría la compra por delante. |
+
+Efecto secundario que hubo que arreglar: `alzar` decidía si el pago había fallado mirando
+`s.apuro !== null`, y eso deja de ser cierto en cuanto hay un apuro **de otro** abierto —con la
+regla nueva, un caso corriente—. Se cambió por `pagoHecho`, que mira el saldo. Sin eso, alzar
+con el apuro de otro abierto habría cobrado la casa y no la habría puesto.
+
+### 14.2 Tratos entre dos jugadores cualesquiera
+
+`puedeProponer` exigía que uno de los dos tuviera el turno. Ya no: cualquiera vivo le propone a
+cualquiera vivo, con el tope de siempre (tres abiertos por proponente) y la prohibición de
+siempre (nunca durante una subasta).
+
+**La caducidad al relevar se conserva**, y ahora significa otra cosa: no «tus tratos mueren
+cuando dejas de tener el turno» sino «una propuesta vale para la vuelta en que se hizo». Se
+conserva por tres razones: un trato es una foto de un tablero que cambia —y ahora cambia más,
+porque cualquiera obra en cualquier momento—; el aviso de cada asiento enseña el trato
+pendiente, y un trato inmortal taparía para siempre lo que de verdad le concierne a quien mira;
+y el tic no sabe contestar tratos, así que un ausente acumularía propuestas hasta el final de
+la partida. Volver a proponer cuesta un gesto.
+
+### 14.3 La subasta de la última casa (y del último hotel)
+
+Antes, sin casas en el Ayuntamiento no se alzaba, y el primero que pulsaba se llevaba la
+última. Con la regla 14.1 eso deja de ser una rareza y pasa a ser una carrera: seis pueden
+pedir la misma casa en el mismo instante.
+
+Ahora, cuando **queda una** y **hay al menos otro que podría alzarla**, `ALZAR` no alza: abre
+una subasta por ese edificio.
+
+- Quien la pidió **abre la puja al precio de lista de su barrio**, así que si los demás pasan
+  se la lleva por lo que le habría costado: la regla nueva no le quita nada a nadie.
+- En pie van sólo los que **podrían alzar ese mismo tipo de edificio ahora mismo** (barrio
+  entero, parejo, sin hipotecas y con dinero para el precio de lista). Es lo más cerca que se
+  puede estar del «los que quieran comprarla» del reglamento sin preguntárselo a cada uno, que
+  costaría una fase entera y un plazo por cabeza.
+- Cada uno puja **por su propio solar** —la almoneda apunta al del mejor postor— y nadie puede
+  pujar por debajo del precio de casa de su propio barrio: el Ayuntamiento no vende una casa de
+  200 por 60 porque el barrio del otro sea barato.
+- **Un solar por pujador**, el que toca por parejo (menos casas, y a igualdad casilla menor).
+  No es una lista porque el portillo busca UNA puerta por tipo de movimiento: con una por solar,
+  `estaOfrecido` se quedaría con la primera y las demás no se podrían mandar. Con el parejo
+  obligatorio casi nunca hay más de un solar donde se pueda alzar.
+- Sin rival que la quiera **no se abre nada**: una subasta de uno solo son seis pases de trámite.
+
+La subasta del edificio reusa `AlmonedaDelBurgo` con un campo más, `edificio`, que se lee
+siempre con `esAlmonedaDeObra` (`=== true`, no `!== false`): una mesa guardada de antes de esta
+regla no lo trae, y `undefined` tiene que leerse como la subasta del título de siempre.
+
+**Lo que no se hizo, a sabiendas:** no hay un miembro nuevo en `SucesoDelBurgo` para la subasta
+de edificio. La coreografía de la escena (`escenas/burgo/coreografia.ts`) y su comprobador no
+son de esta tanda. La crónica distingue las dos subastas con lo que sí está en el estado —la
+almoneda abierta dice si es de obra, y una cerrada dejó un `alza` en el mismo cambio y en la
+misma casilla— y por eso dice «el edificio» donde hay que decirlo.
+
+### 14.4 La elección del 10 % en el Impuesto
+
+Caer en el Impuesto ya no cobra: enciende `impuestoSinPagar` —una marca del turno, como
+`dobles`— y ofrece los dos pagos, la cantidad fija de la casilla o el 10 % del patrimonio.
+Quien **tira o pasa sin elegir paga la fija**, que es la que la casilla anuncia y la que el
+reglamento pone por defecto; el 10 % hay que pedirlo. El tic, que juega **por** el ausente,
+paga lo más barato de los dos, y es lo único que hace ese tic.
+
+**Una marca y no un paso nuevo, y esto está medido.** El primer intento añadió `'impuesto'` a
+`PasoDelTurno`. `shared/arcade/juegos/burgo-en-tres.ts` —que no es de esta tanda— normaliza a
+`por-tirar` cualquier paso que no conozca, así que los dados de la escena habrían dicho que no
+se ha tirado cuando ya se tiró; y el robot de `verificar-burgo-en-tres.ts` sólo sabe contestar
+a los pasos que ya existían, así que la mesa por el cable se quedaba parada: **11 movimientos
+de los 30** que su comprobador exige. Reusar `comprar` (el segundo intento) dejaba la misma
+mesa parada por la misma razón. Con la marca, `TIRAR` y `PASAR` se siguen ofreciendo y son
+ellos los que cobran, y ni la escena ni su robot notan la regla nueva.
+
+La cuenta del 10 % vive en `burgo-tablero.ts` (`decimaDelPatrimonio`) por la misma razón que la
+hipoteca: la miran los dos lados —el rótulo del botón dice cuánto y el reductor cobra cuánto— y
+si cada uno la escribiera por su cuenta, el botón prometería una cifra y el cobro sería otra.
+Redondea **hacia abajo**, al revés que el interés de la hipoteca: el interés lo cobra el
+Ayuntamiento sobre un préstamo suyo, y el 10 % es una alternativa que se le ofrece a quien
+paga; redondeando hacia arriba, la «décima» podría costar más que una décima.
+
+Con el Impuesto sin pagar **sí se obra**, que es lo contrario de lo que parecería: vender casas
+a mitad de precio para bajar la décima pierde 100 por ahorrar 20, e hipotecar no mueve el
+patrimonio ni un euro (quita medio precio en título y pone medio precio en efectivo). No hay
+nada que ganar, así que no había nada que cerrar.
+
+### 14.5 El tope de vueltas
+
+Sigue como lo dejó el §12: el reductor lo admite en la carga de `EMPEZAR` (entero entre 0 y
+`TOPE_DE_VUELTAS_MAXIMO`, comprobado por el portillo), el fin por patrimonio está escrito y
+comprobado, y la hoja del Muelle sigue ofreciendo sólo `empezar` con `topeDeVueltas: 0`. **No se
+tocó nada de las reglas**: el camino ya estaba abierto, y ofrecer la variante es de quien toque
+`hoja-del-muelle.tsx`, porque «ningún juego sólo para PC» impide ofrecerla sólo en el raíl.
+
+Lo que sí se hizo es **verlo andar entero**, que no estaba: el relevo que alcanza el tope
+termina la partida con `fin: 'tope-de-vueltas'`, gana el mayor patrimonio aunque no sea quien
+pasó el turno, dos patrimonios iguales comparten el Burgo sin desempate inventado, un quebrado
+no gana por rico, y con `topeDeVueltas: 0` —lo que ofrece el Muelle hoy— noventa y nueve
+vueltas no acaban nada. La vacuna es una vuelta por debajo del tope: la partida sigue.
+
+### 14.6 Lo que estas cuatro reglas movieron fuera de sus ficheros
+
+- **`server/scripts/oro-arcade/burgo.json` se volvió a capturar.** Es lo que manda hacer la
+  cabecera de `oro-arcade.ts` cuando el cambio es a propósito, y aquí lo es: con la regla 14.1
+  la vista de quien no tiene el turno lleva botones nuevos, y con la 14.4 el robot juega otra
+  partida. Tras recapturar, los 346 movimientos reejecutan byte a byte y los tres movimientos
+  que devuelven el mismo objeto siguen siendo tres (los tics de después del final).
+- **La semilla de la partida de seis de `verify:burgo` pasó de 13 a 19.** Con la política nueva
+  del robot, la 13 sólo mandaba a un jugador a la Comisaría de los dos que exige el mínimo de
+  §8.1 F4. Se probaron veinte semillas: diecisiete cumplen los seis mínimos.
+- **Lo que la escena todavía no sabe decir**, y es de otra tanda: `burgo-en-tres.ts` no conoce
+  la marca del Impuesto, así que su hoja no lo nombra (los dos botones sí bajan, como «botones
+  del momento»); y la subasta del último edificio se pinta con el nombre del solar al que
+  iría, que es lo que `almoneda.casilla` lleva. Ninguna de las dos cosas rompe nada
+  —`verify:burgo-en-tres` pasa entero— pero las dos se leerían mejor con dos líneas allí.
