@@ -188,6 +188,27 @@ import {
   truequesPosibles,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
+/*
+ * ═══ Y EL SEGUNDO PINTOR PROPIO: EL BURGO ═══
+ *
+ * Con apellido donde choca —`tableroEnTres`, `seVeEnTres`, `opcionesFueraDelTablero` y
+ * `marcadorEnTres` los exportan las DOS traducciones con la misma firma y distinto
+ * significado—, por el mismo motivo por el que `juegos/index.ts` le pone `_BURGO` a las
+ * suyas: este fichero es donde los nombres se cruzan. Un alias mal puesto aquí compraría
+ * el burgo contra la traducción de Riberas y saldría verde.
+ */
+import { BURGO } from '../../shared/arcade/juegos';
+import {
+  dadosEnTres as dadosDelBurgoEnTres,
+  hojaEnTres as hojaDelBurgoEnTres,
+  obraPosibleEnCasilla,
+  opcionesFueraDelTablero as opcionesFueraDelBurgo,
+  seVeEnTres as elBurgoSeVeEnTres,
+  tableroEnTres as tableroDelBurgoEnTres,
+} from '../../shared/arcade/juegos/burgo-en-tres';
+import { BurgoEnTres, MarcadorDelBurgo } from '../src/burgo-en-tres';
+import { LasHojasDelBurgo } from '../src/hojas-del-burgo';
+import { PINTORES_PROPIOS } from '../src/pintores';
 
 /**
  * EL FUENTE SIN SUS COMENTARIOS, Y POR QUÉ ESTO ESTÁ ARRIBA DEL TODO.
@@ -1633,6 +1654,516 @@ function riberasEnTres(): void {
   comprobar(
     'y las mayúsculas no cambian el mundo: «qwxyz» y «QWXYZ» son la misma mesa',
     semillaDelCodigo('qwxyz') === semillaDelCodigo('QWXYZ') && semillaDeCodigo('abcde') === semillaDeCodigo('ABCDE'),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 6 bis · El Burgo en tres dimensiones: la misma vara con el segundo pintor
+// ---------------------------------------------------------------------------
+
+/**
+ * UNA PARTIDA DEL BURGO DE VERDAD, jugada aquí con el reductor de `shared/`, hasta que a
+ * quien mira le toque decidir SI COMPRA.
+ *
+ * ═══ POR QUÉ SE JUEGA HASTA AHÍ Y NO SE PARA EN LA PRIMERA TIRADA ═══
+ *
+ * La partición que este bloque compra tiene TRES cajones —la escena, la hoja y los botones
+ * sueltos— y en el primer turno el de la escena está vacío: nadie ha caído todavía en un
+ * solar que se pueda comprar, así que ninguna casilla es tocable. Una comprobación de
+ * partición con un cajón vacío no compra la partición: compra dos tercios de ella, y el
+ * tercio que falta es justamente el que la traducción advierte que se rompe al revés (una
+ * obra que se pinta como botón Y como casilla encendida).
+ *
+ * Se juega con el azar SEMBRADO del contexto —el mismo 987.654 que la partida de Riberas—,
+ * así que la mesa que sale es la misma en cada vuelta del comprobador: sin eso, un bloque
+ * que unas veces encuentra un solar y otras no es un bloque que unas veces comprueba.
+ *
+ * El bucle elige SIEMPRE la primera de tirar/comprar/pasar, que es lo mínimo para que la
+ * partida avance sin decidir nada interesante por nadie. Y tiene tope: un bucle sin tope
+ * dentro de un comprobador es un guion colgado, que se lee como una batería lenta.
+ */
+const TOPE_DE_PASOS_DEL_BURGO = 60;
+
+function laPartidaDelBurgo(cuantosAsientos = 4): {
+  sentados: { asiento: string; nombre: string }[];
+  vista: unknown;
+  opciones: readonly Opcion[];
+  reunida: unknown;
+  opcionesReunida: readonly Opcion[];
+} {
+  const sentados = sentadosDePrueba(cuantosAsientos);
+  const asientos = sentados.map((s) => s.asiento);
+  const ctx = (quien: string | null): ContextoMovimiento => ({ quien, azar: 987_654, tic: 0, asientos });
+
+  const reunida = proyectar(BURGO, undefined, 's1', sentados);
+  const opcionesReunida = opcionesDeArcade(BURGO, reunida, 's1');
+  let estado: unknown = undefined;
+  /*
+   * EMPEZAR se manda con LA CARGA QUE EL JUEGO COMPUSO y no con `{}`: la opción trae
+   * `topeDeVueltas`, y `cabeEnLaPuerta` cuenta los campos. Un `{}` escrito aquí se
+   * rechazaría en silencio y la mesa se quedaría reunida, que es exactamente lo que pasó la
+   * primera vez que se escribió este bloque: todo verde con la partida sin empezar.
+   */
+  const empezar = opcionesReunida[0];
+  if (empezar !== undefined) estado = avanzar(BURGO, estado, { tipo: empezar.tipo, carga: empezar.carga }, ctx('s1'));
+
+  for (let pasos = 0; pasos < TOPE_DE_PASOS_DEL_BURGO; pasos++) {
+    const mias = opcionesDeArcade(BURGO, proyectar(BURGO, estado, 's1', sentados), 's1');
+    if (mias.some((o) => o.tipo === 'burgo:comprar')) break;
+    const donde = proyectar(BURGO, estado, 's1', sentados) as { turnoDe?: string | null };
+    const quien = donde.turnoDe ?? 's1';
+    const suyas = opcionesDeArcade(BURGO, proyectar(BURGO, estado, quien, sentados), quien);
+    const elige =
+      suyas.find((o) => o.tipo === 'burgo:tirar') ??
+      suyas.find((o) => o.tipo === 'burgo:comprar') ??
+      suyas.find((o) => o.tipo === 'burgo:pasar');
+    if (elige === undefined) break;
+    estado = avanzar(BURGO, estado, { tipo: elige.tipo, carga: elige.carga }, ctx(quien));
+  }
+
+  const vista = proyectar(BURGO, estado, 's1', sentados);
+  return { sentados, vista, opciones: opcionesDeArcade(BURGO, vista, 's1'), reunida, opcionesReunida };
+}
+
+/** La firma canónica de lo que se mandaría al pulsar una opción. Es lo que compara el portillo. */
+function firmaDe(o: Opcion): string {
+  return canonico({ tipo: o.tipo, carga: o.carga ?? null });
+}
+
+/**
+ * EL PINTOR PROPIO DEL BURGO, renderizado en Node como el del delta y por lo mismo.
+ *
+ * Aquí no hay `window`, así que el `Canvas` no puede montarse —lo protege un `typeof window`
+ * en `burgo-en-tres.tsx`— y lo que se cuenta es lo que queda alrededor: el telón con el
+ * nombre, la cinta con el aviso y el reloj, y la puerta del cajón.
+ *
+ * ═══ LA COMPROBACIÓN QUE IMPORTA ES LA PARTICIÓN, Y SE COMPRA POR LOS DOS LADOS ═══
+ *
+ * La cabecera de `burgo-en-tres.ts` promete que CUATRO sitios pueden enseñar una opción y
+ * que cada una va a UNO: los dados, la casilla tocable, la hoja y los botones sueltos. Un
+ * botón de más no da error en ninguna consola —se ve como una lista larga— y uno de menos
+ * tampoco: se ve como una partida parada. Así que se compra:
+ *
+ *   1. QUE LA PARTICIÓN SEA UNA PARTICIÓN, con las funciones puras y las opciones de una
+ *      partida de verdad: cada opción del juego en exactamente uno de los tres cajones, y
+ *      ninguna fuera de los tres.
+ *   2. QUE LO QUE SE PINTA SEA ESO, renderizando los DOS hijos que el cajón lleva dentro
+ *      —el formulario de lo suelto y las secciones de la hoja— y contando los rótulos.
+ *
+ * ═══ POR QUÉ NO SE CUENTAN LOS BOTONES DEL RENDER PRINCIPAL ═══
+ *
+ * Porque con el cajón CERRADO —que es como nace, igual que el de Riberas— no hay ninguno, y
+ * eso es a propósito y se compra también: encima del anillo no se pinta ni un botón de
+ * opción, para que un clic perdido no compre un solar. La puerta es la ficha de la cinta, y
+ * que exista con su `aria-expanded` y su `aria-controls` es lo que hace que lo de dentro sea
+ * alcanzable con teclado y con lector.
+ */
+function burgoEnTres(): void {
+  paso('El Burgo en tres dimensiones: sin ventana no hay Canvas, y sí lo demás');
+
+  const burgo = elCatalogoQuePublicaElServidor().find((m) => m.id === BURGO);
+  comprobar('El Burgo está instalado', burgo !== undefined);
+  if (burgo === undefined) return;
+
+  const partida = laPartidaDelBurgo();
+  const { vista, opciones, sentados } = partida;
+  const tablero = tableroDeLaVista(vista);
+  comprobar(
+    'la partida jugada aquí llega a un turno con algo que comprar, que es el que ejercita la casilla tocable',
+    opciones.some((o) => o.tipo === 'burgo:comprar'),
+    opciones.map((o) => o.id),
+  );
+  comprobar(
+    'su proyección trae tablero declarado con las cuarenta casillas y NINGUNA cara que se toque (decisión 9: el retablo es mapa)',
+    tablero !== null && tablero.caras.length === 40 && tablero.caras.every((c) => c.toque === null),
+    { caras: tablero?.caras.length, conToque: tablero?.caras.filter((c) => c.toque !== null).length },
+  );
+  if (tablero === null) return;
+  const datos = tableroDelBurgoEnTres(vista, 's1', opciones, sentados.map((s) => ({ id: s.asiento })));
+  comprobar(
+    'y la traducción dice que la mesa cabe en tres y da el anillo con sus cuarenta casillas y sus figuras',
+    elBurgoSeVeEnTres(vista) && datos !== null && datos.casillas.length === 40 && datos.figuras.length === sentados.length,
+    { casillas: datos?.casillas.length, figuras: datos?.figuras.length },
+  );
+  if (datos === null) return;
+
+  const puesta: MesaVista = {
+    codigo: 'QWXYZ',
+    arcade: BURGO,
+    rev: 7,
+    tic: 0,
+    terminada: false,
+    /* Con plazo, para que la cinta tenga reloj que pintar: sin él esa rama no se mide nunca. */
+    venceEn: Date.now() + 90_000,
+    turnoDesde: Date.now() - 10_000,
+    asientos: sentados.map((s) => ({ id: s.asiento, nombre: s.nombre, presente: true })),
+    yo: 's1',
+    vista,
+    opciones,
+  };
+  const html = renderToStaticMarkup(
+    <BurgoEnTres
+      manifiesto={burgo}
+      mesa={unaMesa('dentro', puesta)}
+      puesta={puesta}
+      tablero={tablero}
+      opciones={opciones}
+    />,
+  );
+  const texto = palabrasDe(html);
+  comprobar('no hay ningún <canvas>', !html.includes('<canvas'), html.slice(0, 300));
+  comprobar('pero sí el telón con el nombre del juego', html.includes('burgo-telon') && texto.includes(burgo.nombre));
+  comprobar('y no se cae al retablo sin que haya fallado nada', cuantos(html, 'svg') === 0);
+  comprobar(
+    'el aviso del tablero, que es del juego, sigue en pantalla',
+    tablero.aviso.length > 0 && texto.includes(tablero.aviso),
+    tablero.aviso,
+  );
+  /*
+   * UNA SOLA REGIÓN VIVA. Dos con el mismo texto se anuncian DOS VECES, y el aviso ya se
+   * anuncia solo cada vez que juega otro. Es el mismo cuidado que el pintor del delta paga
+   * con su `<p>` de la cinta, y aquí importa más porque el burgo no tiene mano de cartas que
+   * cuente nada por su lado.
+   */
+  comprobar(
+    'y la región viva es UNA sola en toda la pantalla',
+    html.split('aria-live="polite"').length - 1 === 1,
+    html.split('aria-live="polite"').length - 1,
+  );
+  comprobar(
+    'el reloj del plazo va como `role="timer"` —una región que se lee cuando se quiere— y no como una segunda región viva',
+    html.includes('role="timer"') && html.includes('burgo-cinta-reloj'),
+  );
+  /*
+   * LA PUERTA DEL CAJÓN, con las dos mitades que hacen que lo de dentro sea alcanzable sin
+   * ratón: `aria-expanded` dice si está abierto —cerrado, aquí— y `aria-controls` nombra lo
+   * que abre. Y el nombre accesible NO es un glifo: dice cuánto dinero tengo y qué hace el
+   * botón, porque el «≡» no se oye.
+   */
+  comprobar(
+    'la ficha de la cinta es la puerta del cajón: `aria-expanded="false"`, `aria-controls` y un nombre que se oye',
+    /aria-expanded="false"/.test(html) &&
+      /aria-controls="[^"]+"/.test(html) &&
+      /aria-label="[^"]*hoja de la partida"/.test(html),
+    /<button[^>]*burgo-cinta-ficha[^>]*>/.exec(html)?.[0]?.slice(0, 300) ?? null,
+  );
+  /*
+   * LOS BOTONES SUELTOS VAN EN FLUJO Y FUERA DEL RECUADRO, no encima del anillo: un botón
+   * sobre el tablero es un clic perdido que compra un solar. Se compra que el `.formulario`
+   * empiece DESPUÉS de que el recuadro se cierre, contando el trozo del HTML donde está.
+   */
+  const dondeElRecuadro = html.indexOf('burgo-lienzo');
+  const dondeElFormulario = html.indexOf('class="formulario"');
+  comprobar(
+    'los botones sueltos van en flujo por debajo del recuadro y no encima del anillo',
+    dondeElRecuadro >= 0 && dondeElFormulario > dondeElRecuadro,
+    { recuadro: dondeElRecuadro, formulario: dondeElFormulario },
+  );
+  comprobar(
+    'el recuadro lleva las DOS clases: la suya, que la cámara busca, y la genérica `lienzo-propio` de la que cuelga la pantalla completa',
+    html.includes('burgo-lienzo') && html.includes('lienzo-propio'),
+    /class="[^"]*burgo-lienzo[^"]*"/.exec(html)?.[0] ?? null,
+  );
+
+  paso('Y cada movimiento sale exactamente una vez: la escena, la hoja y los botones sueltos');
+
+  const dados = dadosDelBurgoEnTres(vista, 's1', opciones);
+  const hoja = hojaDelBurgoEnTres(vista, 's1', opciones);
+  const sueltos = opcionesFueraDelBurgo(opciones, datos, dados, hoja);
+
+  const porLaEscena: Opcion[] = [];
+  for (let casilla = 0; casilla < datos.casillas.length; casilla++) {
+    for (const o of obraPosibleEnCasilla(vista, 's1', opciones, casilla)) porLaEscena.push(o);
+  }
+  if (dados !== null && dados.porTirar && dados.movimiento !== null) porLaEscena.push(dados.movimiento);
+  const porLaHoja: Opcion[] = [];
+  for (const s of hoja.secciones) for (const o of s.opciones) porLaHoja.push(o);
+  for (const b of hoja.mios) for (const f of b.fichas) for (const o of f.opciones) porLaHoja.push(o);
+
+  comprobar(
+    'la escena ofrece algo, o esto no habría comprobado el camino del anillo',
+    porLaEscena.length > 0,
+    porLaEscena.map((o) => o.id),
+  );
+  comprobar(
+    'la hoja ofrece algo, o esto no habría comprobado el camino de las secciones',
+    porLaHoja.length > 0,
+    porLaHoja.map((o) => o.id),
+  );
+  /*
+   * LAS PUERTAS NO SE PINTAN NUNCA: son declaraciones y mandadas tal cual no juegan. Salen
+   * de la cuenta por arriba —no cuentan como movimiento— y por abajo: `opcionesFueraDelTablero`
+   * las quita, y la hoja las convierte en un componedor, no en un botón.
+   */
+  const movimientos = opciones.filter((o) => o.declaracion !== true);
+  const cuantasVeces = new Map<string, number>();
+  for (const o of [...porLaEscena, ...porLaHoja, ...sueltos]) {
+    const firma = firmaDe(o);
+    cuantasVeces.set(firma, (cuantasVeces.get(firma) ?? 0) + 1);
+  }
+  const repetidas = movimientos.filter((o) => (cuantasVeces.get(firmaDe(o)) ?? 0) > 1);
+  const perdidas = movimientos.filter((o) => (cuantasVeces.get(firmaDe(o)) ?? 0) === 0);
+  comprobar(
+    'ninguna opción sale por dos sitios a la vez',
+    repetidas.length === 0,
+    repetidas.map((o) => o.id),
+  );
+  comprobar(
+    'y no se pierde ni una: todo lo que ofreció el juego sale por la escena, por la hoja o por un botón suelto',
+    perdidas.length === 0,
+    perdidas.map((o) => o.id),
+  );
+  comprobar(
+    'y las PUERTAS no salen por ninguno de los tres: son declaraciones, y mandadas tal cual no juegan',
+    opciones
+      .filter((o) => o.declaracion === true)
+      .every((o) => (cuantasVeces.get(firmaDe(o)) ?? 0) === 0),
+    opciones.filter((o) => o.declaracion === true).map((o) => o.id),
+  );
+
+  /*
+   * Y LO QUE SE PINTA ES ESO, por los dos sitios donde se pinta:
+   *
+   *   · LOS SUELTOS, en el render de arriba: salen EN FLUJO por debajo del recuadro, y son
+   *     exactamente los que la criba dejó fuera. Ni uno más —una lista larga— ni uno menos
+   *     —una partida parada—, y las dos cosas se ven bien en una captura.
+   *   · LA HOJA, renderizando el hijo que el cajón lleva dentro con el MISMO objeto que el
+   *     pintor le pasa. Con el cajón cerrado no está en el árbol, así que se monta aparte:
+   *     una partición correcta con un cajón que no pinta lo suyo sería verde por un lado y
+   *     una partida parada por el otro.
+   */
+  /*
+   * ═══ Y CON EL MUNDO SIN MONTAR Y EL CAJÓN CERRADO, EL REPARTO ES OTRO ═══
+   *
+   * Ésa es la pantalla que este render enseña —y la que se ve en un navegador mientras el
+   * `.glb` de tres megas viaja, que no es un instante—: no hay anillo que tocar, no hay dados,
+   * y la hoja está dentro de un cajón que nace cerrado. La criba recibe los objetos QUE SE
+   * PINTAN y no interruptores, así que ahí NO se pinta ninguno de los tres y TODO vuelve como
+   * botón suelto. Es la promesa del respaldo dicha en su caso más corriente: si el mundo no
+   * ha llegado, se juega igual.
+   *
+   * Lo que esto caza es el fallo que ya se cometió al escribir este pintor: con la hoja
+   * pasada a la criba sin mirar si el cajón está abierto, «Empezar la partida» —la ÚNICA
+   * opción de una mesa recién abierta— desaparecía de la pantalla y se quedaba detrás del
+   * «≡». La partida no podía empezar y no fallaba nada.
+   */
+  const sinMundo = opcionesFueraDelBurgo(opciones, null, null, null);
+  comprobar(
+    'con el mundo sin montar y el cajón cerrado, TODO movimiento del juego vuelve como botón suelto',
+    movimientos.every((o) => sinMundo.some((s) => firmaDe(s) === firmaDe(o))),
+    { conMundo: sueltos.map((o) => o.id), sinMundo: sinMundo.map((o) => o.id) },
+  );
+  comprobar(
+    'y las puertas siguen sin pintarse ni ahí: mandadas tal cual no juegan',
+    sinMundo.every((o) => o.declaracion !== true),
+    sinMundo.filter((o) => o.declaracion === true).map((o) => o.id),
+  );
+  comprobar(
+    'salen como botón exactamente esas, ni una de más ni una de menos',
+    html.split('class="opcion-rotulo"').length - 1 === loQueSePuedePintar(sinMundo).length,
+    { botones: html.split('class="opcion-rotulo"').length - 1, sinMundo: sinMundo.map((o) => o.id) },
+  );
+  for (const o of sinMundo) {
+    comprobar(`el rótulo suelto «${o.rotulo}» sale tal cual`, texto.includes(o.rotulo), o.id);
+  }
+  const dentroDelCajon = renderToStaticMarkup(
+    <LasHojasDelBurgo hoja={hoja} vista={vista} yo="s1" quieto={false} alElegir={() => undefined} />,
+  );
+  const textoDelCajon = palabrasDe(dentroDelCajon);
+  for (const o of porLaHoja) {
+    comprobar(`el botón «${o.rotulo}» de la hoja sale tal cual dentro del cajón`, textoDelCajon.includes(o.rotulo), o.id);
+  }
+  for (const o of porLaEscena) {
+    comprobar(
+      `«${o.rotulo}» lo enseña la casilla del anillo y no se repite dentro del cajón`,
+      !textoDelCajon.includes(o.rotulo),
+      o.id,
+    );
+  }
+  /*
+   * Y CON EL CAJÓN ABIERTO Y EL MUNDO MONTADO, LO DE LA HOJA SE VA DE LOS BOTONES: el mismo
+   * movimiento no puede estar en su sección y en la lista de abajo a la vez.
+   */
+  comprobar(
+    'con el cajón abierto y el anillo montado, lo que la hoja enseña deja de salir como botón suelto',
+    porLaHoja.every((o) => !sueltos.some((s) => firmaDe(s) === firmaDe(o))),
+    porLaHoja.filter((o) => sueltos.some((s) => firmaDe(s) === firmaDe(o))).map((o) => o.id),
+  );
+  comprobar(
+    'y la hoja dice cuál es la sección que hay que mirar ahora, marcada y no escondida',
+    hoja.abre === null || dentroDelCajon.includes('burgo-seccion-toca'),
+    hoja.abre,
+  );
+
+  paso('Con la mesa reunida y con el mundo caído se juega igual: formulario y retablo');
+
+  /*
+   * ═══ LA MESA REUNIDA, QUE ES DONDE ESTO SE ROMPIÓ Y POR ESO SE COMPRA ═══
+   *
+   * El Burgo declara sus CUARENTA casillas desde el primer momento —el anillo es el mismo
+   * antes y después de empezar—, así que aquí no existe la rama de «tablero sin caras» que
+   * en Riberas saca un formulario a secas: la mesa reunida se pinta con su anillo y su telón,
+   * y lo único que ofrece el juego es «Empezar la partida».
+   *
+   * Y ESE BOTÓN TIENE QUE VERSE. La primera versión de este pintor metía los sueltos dentro
+   * del cajón, y el cajón nace cerrado: la única opción de una mesa recién abierta quedaba
+   * detrás de un «≡» que nadie tiene motivo para pulsar, o sea una partida que no puede
+   * empezar sin un error en ninguna consola. Se compra que salga en el árbol y que salga UNA
+   * vez.
+   */
+  const tableroReunido = tableroDeLaVista(partida.reunida);
+  comprobar(
+    'la mesa reunida trae ya el anillo declarado entero: el Burgo no tiene rama de «tablero sin caras»',
+    tableroReunido !== null && tableroReunido.caras.length === 40,
+    tableroReunido?.caras.length,
+  );
+  if (tableroReunido !== null) {
+    const puestaReunida: MesaVista = { ...puesta, vista: partida.reunida, opciones: partida.opcionesReunida };
+    const htmlReunida = renderToStaticMarkup(
+      <BurgoEnTres
+        manifiesto={burgo}
+        mesa={unaMesa('dentro', puestaReunida)}
+        puesta={puestaReunida}
+        tablero={tableroReunido}
+        opciones={partida.opcionesReunida}
+      />,
+    );
+    comprobar(
+      'y «Empezar la partida» se ve sin abrir nada: es la única opción de la mesa reunida, y encerrada en el cajón la partida no podría empezar',
+      partida.opcionesReunida.length > 0 &&
+        palabrasDe(htmlReunida).includes(partida.opcionesReunida[0]?.rotulo ?? 'no-hay') &&
+        htmlReunida.split('class="opcion-rotulo"').length - 1 === partida.opcionesReunida.length,
+      {
+        botones: htmlReunida.split('class="opcion-rotulo"').length - 1,
+        opciones: partida.opcionesReunida.map((o) => o.id),
+      },
+    );
+    comprobar(
+      'y se pinta el telón con el anillo detrás, no el retablo: no ha fallado nada, sólo falta el modelo',
+      htmlReunida.includes('burgo-telon') && !htmlReunida.includes('<svg'),
+    );
+  }
+
+  /*
+   * ═══ EL MUNDO CAÍDO, Y CÓMO SE ALCANZA DESDE NODE ═══
+   *
+   * Los dos motivos de verdad —`burgo.glb` que no llega y el `Canvas` que revienta al
+   * nacer— viven en un efecto y en un límite de error, y ninguno de los dos corre en
+   * `renderToStaticMarkup`. El tercero SÍ se alcanza: una vista que la traducción no sabe
+   * leer deja `datos` en `null`, y el pintor cae por el mismo camino y con la misma letra
+   * chica. Es la rama que hay que comprar —que exista un respaldo JUGABLE y que diga por
+   * qué—, y se compra con el tablero declarado DE VERDAD debajo, no con uno inventado.
+   */
+  const puestaSinMundo: MesaVista = { ...puesta, vista: { desde: 'otro-juego' } };
+  const htmlSinMundo = renderToStaticMarkup(
+    <BurgoEnTres
+      manifiesto={burgo}
+      mesa={unaMesa('dentro', puestaSinMundo)}
+      puesta={puestaSinMundo}
+      tablero={tablero}
+      opciones={opciones}
+    />,
+  );
+  const textoSinMundo = palabrasDe(htmlSinMundo);
+  comprobar('sin mundo sale el retablo de siempre', htmlSinMundo.includes('<svg'), htmlSinMundo.slice(0, 200));
+  comprobar('y ningún <canvas> ni telón: no se está esperando a ningún modelo', !htmlSinMundo.includes('<canvas') && !htmlSinMundo.includes('burgo-telon'));
+  comprobar(
+    'y la letra chica dice por qué, sin sonar a error: la mesa está entera, sólo falta el mundo',
+    htmlSinMundo.includes('burgo-sin-mundo') && textoSinMundo.includes('se juega sobre el tablero dibujado'),
+  );
+  /*
+   * ═══ Y EN EL RESPALDO NO SE PIERDE NI UNA, QUE ES LO QUE HAY QUE COMPRAR ═══
+   *
+   * El retablo del Burgo es MAPA: sus caras no se tocan (decisión 9), y lo que se juega son
+   * las ACCIONES que el tablero declara más las opciones que ninguna acción recoge
+   * (`opcionesSueltas`). Los dos sitios se pintan y entre los dos tienen que salir TODOS los
+   * movimientos del juego exactamente una vez: si el reparto se torciera, aquí no habría
+   * anillo que lo supliera y la mesa se quedaría parada.
+   */
+  const accionesDelRespaldo = tablero.acciones.filter((a) => String(a.rotulo ?? '').length > 0);
+  const sueltasSinMundo = loQueSePuedePintar(opcionesSueltas(tablero, opciones));
+  comprobar(
+    'y los botones del respaldo son las ACCIONES del tablero más lo que ninguna recoge, sin uno de más ni de menos',
+    htmlSinMundo.split('class="opcion-rotulo"').length - 1 === accionesDelRespaldo.length + sueltasSinMundo.length,
+    {
+      botones: htmlSinMundo.split('class="opcion-rotulo"').length - 1,
+      acciones: accionesDelRespaldo.length,
+      sueltas: sueltasSinMundo.length,
+    },
+  );
+  comprobar(
+    'y todo movimiento del juego se alcanza desde el respaldo: ninguno se queda sin botón cuando no hay mundo',
+    movimientos.every(
+      (o) =>
+        accionesDelRespaldo.some((a) => canonico(a.toque ?? null) === firmaDe(o)) ||
+        sueltasSinMundo.some((p) => canonico(p.movimiento) === firmaDe(o)),
+    ),
+    movimientos
+      .filter(
+        (o) =>
+          !accionesDelRespaldo.some((a) => canonico(a.toque ?? null) === firmaDe(o)) &&
+          !sueltasSinMundo.some((p) => canonico(p.movimiento) === firmaDe(o)),
+      )
+      .map((o) => o.id),
+  );
+
+  paso('El marcador del Burgo: quién es quién, con su color y su dinero');
+
+  const enElRail = renderToStaticMarkup(<MarcadorDelBurgo vista={vista} yo="s1" />);
+  const textoDelRail = palabrasDe(enElRail);
+  const marcador = hoja.marcador;
+  comprobar(
+    'nombra a todos los sentados, con su color y su dinero',
+    marcador.jugadores.every((j) => textoDelRail.includes(j.nombre) && enElRail.includes(j.color)),
+    marcador.jugadores.map((j) => j.nombre),
+  );
+  comprobar(
+    'distingue el mío y marca de quién es el turno, y las dos cosas por separado (decisión 4: `turnoDe` no es `duenoDelTurno`)',
+    enElRail.includes('soy-yo') && enElRail.includes('burgo-le-toca'),
+  );
+  comprobar(
+    'y dice lo que le queda al Concejo y a los dos mazos, que es información pública del juego',
+    textoDelRail.includes('El Concejo guarda') && textoDelRail.includes('Arca del Concejo'),
+  );
+  comprobar(
+    'una vista que no es del Burgo no pinta un marcador vacío: no pinta nada',
+    renderToStaticMarkup(<MarcadorDelBurgo vista={{ desde: 'otro' }} yo="s1" />) === '',
+  );
+
+  paso('Y el escritorio elige el pintor por TABLA, no por el nombre de un juego');
+
+  /*
+   * LA DECISIÓN 18, comprada donde se rompe: `sala.tsx` tenía CINCO puntos cableados a
+   * Riberas y el segundo pintor los habría hecho diez. Lo que se compra es que la tabla
+   * exista, que las dos filas traigan lo suyo, y que `sala.tsx` no vuelva a nombrar a
+   * ningún juego. Esto último se mira en el fuente porque es lo único que no se ve
+   * renderizando: una pantalla con un `if` por dentro pinta exactamente igual.
+   */
+  const laSala = sinComentarios(readFileSync(new URL('../src/sala.tsx', import.meta.url), 'utf8'));
+  comprobar(
+    'el Burgo tiene fila en `PINTORES_PROPIOS`, con su pintor y su marcador',
+    PINTORES_PROPIOS[BURGO]?.Pintor === BurgoEnTres && PINTORES_PROPIOS[BURGO]?.Marcador === MarcadorDelBurgo,
+  );
+  comprobar(
+    'Riberas conserva la suya, con sus cuatro piezas: pintor, marcador, pregón y paneles',
+    PINTORES_PROPIOS[RIBERAS]?.Pintor === RiberasEnTres &&
+      PINTORES_PROPIOS[RIBERAS]?.Marcador === MarcadorDeRiberas &&
+      typeof PINTORES_PROPIOS[RIBERAS]?.pregonDe === 'function' &&
+      typeof PINTORES_PROPIOS[RIBERAS]?.panelesDe === 'function',
+  );
+  comprobar(
+    'y los pintores propios son exactamente esos dos: un arcade sin fila se pinta con su mueble genérico y no se entera',
+    Object.keys(PINTORES_PROPIOS).sort().join(',') === [BURGO, RIBERAS].sort().join(','),
+    Object.keys(PINTORES_PROPIOS),
+  );
+  comprobar(
+    '`sala.tsx` monta el pintor por la tabla y ya no nombra a ningún juego: ni `RIBERAS`, ni `<RiberasEnTres`, ni `esRiberas`',
+    laSala.includes('const pintor = PINTORES_PROPIOS[manifiesto.id];') &&
+      /<ElPintor\b/.test(laSala) &&
+      !/\besRiberas\b/.test(laSala) &&
+      !/<RiberasEnTres\b/.test(laSala) &&
+      !/\bRIBERAS\b/.test(laSala),
+    /PINTORES_PROPIOS\[[^\]]*\]/.exec(laSala)?.[0] ?? null,
   );
 }
 
@@ -4229,6 +4760,100 @@ function laPaginaDePie(): void {
   );
 
   /*
+   * ═══ Y LA MISMA CADENA COLGADA DE `.lienzo-propio`, QUE ES LA GENÉRICA (decisión 18) ═══
+   *
+   * La pantalla completa no puede quedarse atada al nombre de un juego: el segundo pintor
+   * —el Burgo— tiene su recuadro y necesita el mismo reparto de alto, y el tercero también.
+   * Por eso el recuadro de un pintor propio lleva DOS clases: la suya, que su cámara busca
+   * con `closest` para colgar el oyente de la rueda, y `lienzo-propio`, de la que cuelga
+   * esta cadena.
+   *
+   * Está DUPLICADA en la hoja a propósito y por una fase: `riberas-en-tres.tsx` no se toca
+   * en el trabajo del Burgo, así que su recuadro todavía no lleva la clase genérica. Y una
+   * sola regla con los dos selectores en lista no vale: `reglaDe` busca cada eslabón por su
+   * selector EXACTO al ras del margen —eso es lo que distingue la regla base de sus
+   * excepciones dentro de las `@media`— y una lista los dejaría a los dos sin encontrar.
+   *
+   * Se compra ENTERA y no «que exista alguna regla»: una cadena a medias no falla, reparte
+   * mal, y eso se ve como un tablero que no llega al canto, que es exactamente lo que este
+   * bloque existe para no volver a tener.
+   */
+  const RAIZ_GENERICA = '.sala:has(.lienzo-propio)';
+  const ESLABONES_DEL_BURGO: Array<[string, string]> = [
+    ['la ventana', RAIZ_GENERICA],
+    ['la página', `${RAIZ_GENERICA} > .mesa-puesta`],
+    ['la rejilla del mueble y el raíl', `${RAIZ_GENERICA} .tablero-y-panel`],
+    ['el mueble', `${RAIZ_GENERICA} .el-mueble`],
+    ['el pintor del Burgo', `${RAIZ_GENERICA} .burgo-en-tres`],
+    ['el recuadro del lienzo', `${RAIZ_GENERICA} .burgo-lienzo`],
+  ];
+  const sinReglaGenerica = ESLABONES_DEL_BURGO.filter(([, selector]) => reglaDe(selector).length === 0);
+  comprobar(
+    'y la cadena genérica —la que cuelga de `.lienzo-propio`— tiene sus SEIS eslabones igual, para que el pintor del Burgo llegue al canto',
+    sinReglaGenerica.length === 0,
+    sinReglaGenerica.map(([nombre, selector]) => `${nombre} (${selector})`),
+  );
+  const sinSueloCeroGenerica = ESLABONES_DEL_BURGO.slice(1, -1).filter(
+    ([, selector]) => !/min-height:\s*0/.test(reglaDe(selector)),
+  );
+  comprobar(
+    'y los cuatro de en medio de esa cadena llevan `min-height: 0`, sin la cual el reparto sigue escrito y no reparte',
+    sinSueloCeroGenerica.length === 0,
+    sinSueloCeroGenerica.map(([nombre]) => nombre),
+  );
+  comprobar(
+    'la cabecera de la Sala tampoco se pinta en la pantalla del Burgo, y la página suelta su ancho de lectura y sus márgenes',
+    /display:\s*none/.test(reglaDe(`${RAIZ_GENERICA} > .cabecera`)) &&
+      /max-width:\s*none/.test(reglaDe(`${RAIZ_GENERICA} > .mesa-puesta`)) &&
+      /padding-inline:\s*0/.test(reglaDe(`${RAIZ_GENERICA} > .mesa-puesta`)),
+    reglaDe(`${RAIZ_GENERICA} > .cabecera`).replace(/\s+/g, ' '),
+  );
+  comprobar(
+    'el título del Burgo sale del FLUJO y no del árbol: recortado como la lista de apoyo, nunca `display: none`',
+    /clip-path:\s*inset\(50%\)/.test(reglaDe(`${RAIZ_GENERICA} .el-mueble > .titulo`)) &&
+      !/display:\s*none/.test(reglaDe(`${RAIZ_GENERICA} .el-mueble > .titulo`)),
+    reglaDe(`${RAIZ_GENERICA} .el-mueble > .titulo`).replace(/\s+/g, ' '),
+  );
+  comprobar(
+    'y el recuadro del Burgo crece desde su `62vh` sin bajar de la mitad del mueble, con el marco quitado',
+    /flex:\s*1\s+1\s+auto/.test(reglaDe(`${RAIZ_GENERICA} .burgo-lienzo`)) &&
+      /min-height:\s*50%/.test(reglaDe(`${RAIZ_GENERICA} .burgo-lienzo`)) &&
+      /border:\s*0/.test(reglaDe(`${RAIZ_GENERICA} .burgo-lienzo`)) &&
+      /height:\s*62vh/.test(reglaDe('.burgo-lienzo')),
+    { enLaCadena: reglaDe(`${RAIZ_GENERICA} .burgo-lienzo`).replace(/\s+/g, ' '), suelta: reglaDe('.burgo-lienzo').replace(/\s+/g, ' ') },
+  );
+  /*
+   * Y LAS TRES LÍNEAS QUE NO SE VEN FALLAR EN UN RATÓN: el recuadro se queda el gesto
+   * (`touch-action: none`) y las dos cajas que ruedan por dentro lo devuelven (`auto`). Sin
+   * la segunda mitad, con el dedo NO se puede desplazar la hoja: el marcador se ve y la
+   * crónica no, sin un error en ninguna consola y sin que nada se mueva en un monitor.
+   */
+  comprobar(
+    'el recuadro del Burgo se queda el gesto y el cajón y el menú lo devuelven: sin eso, con el dedo la hoja no se desplaza y en un ratón no se nota',
+    /touch-action:\s*none/.test(reglaDe('.burgo-lienzo')) &&
+      /touch-action:\s*auto/.test(reglaDe('.burgo-cajon')) &&
+      /overscroll-behavior:\s*contain/.test(reglaDe('.burgo-cajon')) &&
+      /touch-action:\s*auto/.test(reglaDe('.burgo-elige')),
+    { lienzo: reglaDe('.burgo-lienzo').replace(/\s+/g, ' '), cajon: reglaDe('.burgo-cajon').replace(/\s+/g, ' ') },
+  );
+  /*
+   * LA GRAMÁTICA DE LA CASA EN LOS `.burgo-*`: lo apagado NUNCA con `opacity` —un botón al
+   * 40 % es texto ilegible, no un botón apagado— y la lista de apoyo NUNCA con `display:
+   * none`, que los lectores saltan. Las dos se rompen sin que nada falle.
+   */
+  const loDelBurgo = hojaPelada.slice(hojaPelada.indexOf('.burgo-en-tres {'));
+  comprobar(
+    'y en las reglas del Burgo no hay un solo `opacity` apagando nada: lo apagado se apaga con su clase quieta',
+    loDelBurgo.length > 0 && !/opacity:/.test(loDelBurgo),
+    /[^\n]*opacity:[^\n]*/.exec(loDelBurgo)?.[0] ?? null,
+  );
+  comprobar(
+    'y la lista de apoyo del Burgo se saca de la vista con `clip-path`, nunca con `display: none`',
+    /clip-path:\s*inset\(50%\)/.test(reglaDe('.burgo-solo-apoyo')) && !/display:\s*none/.test(reglaDe('.burgo-solo-apoyo')),
+    reglaDe('.burgo-solo-apoyo').replace(/\s+/g, ' '),
+  );
+
+  /*
    * `min-height: 0` EN LOS CINCO QUE SON HIJOS, y es la línea que se borra sin querer. Sin
    * ella el mínimo automático de un hijo de flex es su contenido, así que la caja se niega a
    * encoger y la de dentro no recibe el alto que le tocaba: el reparto sigue escrito y no
@@ -5216,7 +5841,13 @@ function laCintaYElCajon(): void {
    * rojo por documentar bien.
    */
   const dentroDelRail = sinComentarios(/const railCon = \(conPaneles: boolean\) => \(([\s\S]*?)\n  \);/.exec(laSala)?.[1] ?? '');
-  const sitios = ['<MarcadorDeRiberas', '<LaFicha', "{conPaneles && pintado.que === 'tablero' ? (", 'Levantarse de la mesa', 'Tirar la mesa', '<LaCronica'];
+  /*
+   * EL MARCADOR YA NO SE NOMBRA POR SU JUEGO: lo trae la fila de `PINTORES_PROPIOS` como
+   * `Marcador` y `sala.tsx` lo monta como `<ElMarcador>` (decisión 18). Lo que este orden
+   * compra sigue siendo lo mismo —qué va antes de qué dentro del raíl—, y quién es ese
+   * marcador lo compra el bloque del Burgo contra la tabla.
+   */
+  const sitios = ['<ElMarcador', '<LaFicha', "{conPaneles && pintado.que === 'tablero' ? (", 'Levantarse de la mesa', 'Tirar la mesa', '<LaCronica'];
   const posiciones = sitios.map((s) => dentroDelRail.indexOf(s));
   /*
    * ═══ EL RAÍL SE MONTA CON `railCon(conPaneles)`, Y EL CAJÓN DEL LIENZO VA SIN LOS PANELES ═══
@@ -5231,7 +5862,7 @@ function laCintaYElCajon(): void {
     'el raíl se monta una vez, con `railCon(conPaneles)`: `elRail` con paneles para el aside del respaldo y `elRailDelCajon` sin ellos para el cajón del lienzo',
     laSala.includes('const elRail = railCon(true);') &&
       laSala.includes('const elRailDelCajon = railCon(false);') &&
-      /<RiberasEnTres[\s\S]*?elRail=\{elRailDelCajon\}/.test(laSala) &&
+      /<ElPintor[\s\S]*?elRail=\{elRailDelCajon\}/.test(laSala) &&
       /<aside className="rail" aria-label="El carril de la mesa">\s+\{elRail\}/.test(laSala),
   );
   comprobar(
@@ -5353,11 +5984,26 @@ function laCintaYElCajon(): void {
       conOculto: cifrasDeLosPuntos({ ...unColono, puntos: 12, puntosConLoOculto: 15 }),
     },
   );
+  /*
+   * ═══ LAS DOS CRIBAS SIGUEN VIVAS, Y AHORA VIVEN EN LA FILA DEL PINTOR ═══
+   *
+   * Estaban escritas en `sala.tsx` detrás de un `esRiberas`. Con la tabla (decisión 18) el
+   * criterio se muda a `pintores.ts`, que es donde el juego declara lo suyo, y `sala.tsx`
+   * llama a `panelesDe` sin saber de qué juego habla. Lo que se compra es lo mismo que
+   * antes: que la llamada exista, con las dos cribas compuestas y en este orden, y que el
+   * criterio siga viniendo de `shared/` y no escrito en el cliente.
+   */
+  const losPintores = readFileSync(new URL('../src/pintores.ts', import.meta.url), 'utf8');
   comprobar(
     'los paneles que declara el juego van al cajón con «Lo mío» el primero y sin la cifra de bienes ajenos (decisión 17), y el criterio vive en `shared/`, no aquí',
-    /panelesFueraDelPregon\(panelesEnTres\(pintado\.tablero\.paneles\), elPregonSePinta\)/.test(laSala.replace(/\s+/g, ' ')) &&
-      /import \{ elPregonEnTres, panelesEnTres, panelesFueraDelPregon \} from '\.\.\/\.\.\/shared\/arcade\/juegos\/riberas-en-tres';/.test(laSala),
-    /paneles=\{esRiberas[^\n]*/.exec(laSala)?.[0] ?? null,
+    /panelesFueraDelPregon\(panelesEnTres\(paneles\), pregon as PregonEnTres<Opcion> \| null\)/.test(
+      losPintores.replace(/\s+/g, ' '),
+    ) &&
+      /import \{\s*elPregonEnTres,\s*panelesEnTres,\s*panelesFueraDelPregon,?\s*\} from '\.\.\/\.\.\/shared\/arcade\/juegos\/riberas-en-tres';/.test(
+        losPintores,
+      ) &&
+      /paneles=\{pintor\?\.panelesDe\?\.\(pintado\.tablero\.paneles, elPregonSePinta\)\}/.test(laSala),
+    /paneles=\{pintor[^\n]*/.exec(laSala)?.[0] ?? null,
   );
 
   // ── 8. EL CARRIL: UN SIETE NO DEJA LA MESA PARADA ──
@@ -6614,10 +7260,22 @@ function elPregonDelTrueque(): void {
     /elPregonEnTres\(vista, yo, opciones\)/.test(codigo),
     /elPregonEnTres\([^)]*\)/.exec(codigo)?.[0] ?? null,
   );
+  /*
+   * Y DESDE LA TABLA DE PINTORES, LA CRIBA VIVE EN LA FILA DE RIBERAS y `sala.tsx` sólo la
+   * llama. Se compran las dos mitades —que la fila la componga y que la pantalla le pase el
+   * pregón que acaba de componer— porque separadas cada una pasaría sola: una fila que criba
+   * y nadie llama, o una llamada con `undefined` dentro.
+   */
+  const laFilaDeRiberas = sinComentarios(
+    readFileSync(new URL('../src/pintores.ts', import.meta.url), 'utf8'),
+  ).replace(/\s+/g, ' ');
   comprobar(
-    'y el panel «Trueques» del cajón se retira cuando el pregón lo hereda, compuesto con el otro filtro y sólo para Riberas',
-    /panelesFueraDelPregon\(panelesEnTres\(pintado\.tablero\.paneles\), elPregonSePinta\)/.test(sinComentarios(laSala).replace(/\s+/g, ' ')),
-    /panelesFueraDelPregon\([^;]*/.exec(sinComentarios(laSala).replace(/\s+/g, ' '))?.[0]?.slice(0, 160) ?? null,
+    'y el panel «Trueques» del cajón se retira cuando el pregón lo hereda, compuesto con el otro filtro y sólo en la fila de Riberas',
+    /panelesFueraDelPregon\(panelesEnTres\(paneles\), pregon as PregonEnTres<Opcion> \| null\)/.test(laFilaDeRiberas) &&
+      /paneles=\{pintor\?\.panelesDe\?\.\(pintado\.tablero\.paneles, elPregonSePinta\)\}/.test(
+        sinComentarios(laSala).replace(/\s+/g, ' '),
+      ),
+    /panelesFueraDelPregon\([^;]*/.exec(laFilaDeRiberas)?.[0]?.slice(0, 160) ?? null,
   );
 
   /*
@@ -7777,6 +8435,7 @@ loQueLaPantallaDecideSola();
 lasDirecciones();
 elMuelle();
 riberasEnTres();
+burgoEnTres();
 elAcercamientoDelDelta();
 elMazoEnLaPantalla();
 elResultadoDeMover();
@@ -7828,10 +8487,18 @@ console.log('');
  * `conLienzo &&` a `sala.tsx` —729 comprobaciones y 2 rojas—, o sea que ninguna se cae de su
  * bloque y el guardia no se pone delante de los nombres.
  *
+ * Y CON EL SEGUNDO PINTOR PROPIO —el Burgo, con su partición de tres cajones, su respaldo,
+ * su marcador y la cadena genérica de la pantalla completa— se hacen 799, así que el guardia
+ * va en 789: el mismo margen de diez. Del bloque nuevo, ocho comprobaciones salen de bucles
+ * que dependen de la partida que se juega —los rótulos sueltos, los de la hoja y los del
+ * anillo—, y la partida está SEMBRADA con el mismo azar en cada vuelta, así que ese número no
+ * baila solo; el margen sigue estando para lo que este guardia caza de verdad, que es un
+ * guion partido por la mitad y no una comprobación de menos.
+ *
  * Y LAS ROJAS SE IMPRIMEN ANTES DE IRSE: el orden estaba al revés, así que el día que el
  * guardia saltara se llevaría por delante los nombres de todo lo que ya se había encontrado.
  */
-const COMPROBACIONES_ESCRITAS = 719;
+const COMPROBACIONES_ESCRITAS = 789;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(
@@ -7874,6 +8541,22 @@ if (fallos.length === 0) {
       '  dice cuánto mide la cadena de veredas de cada uno con el mínimo sacado de la regla.\n' +
       '  Y lo que la escena no hace sola lo hace el cliente: coger un naipe suelta el bien y la\n' +
       '  pieza, cogerlo otra vez lo suelta, y una jugada ajena suelta la mano entera.\n' +
+      '\n  Y EL SEGUNDO PINTOR PROPIO, EL BURGO, con la misma vara: sin ventana no hay Canvas y sí\n' +
+      '  telón, cinta y hoja; el aviso del juego va en la ÚNICA región viva de la pantalla y el\n' +
+      '  plazo al lado con `role="timer"`, que no se anuncia solo encima de él. Cada movimiento\n' +
+      '  sale exactamente una vez entre las casillas tocables del anillo, las secciones de la hoja\n' +
+      '  y los botones sueltos, y las dos PUERTAS —la puja libre y el trato— no se pintan por\n' +
+      '  ninguno de los tres, que mandadas tal cual no juegan. Y las cribas reciben LOS OBJETOS\n' +
+      '  QUE SE PINTAN: con el modelo aún viajando y el cajón cerrado no hay anillo, ni dados, ni\n' +
+      '  hoja, así que TODO vuelve como botón —que es como «Empezar la partida» dejó de quedarse\n' +
+      '  detrás del «≡» en una mesa recién abierta—, y al abrir el cajón cada uno se va a su\n' +
+      '  sección. Sin burgo que pintar sale el retablo de siempre, entero y jugable, diciendo por\n' +
+      '  qué en letra chica, y allí las acciones del tablero más lo que ninguna recoge cubren\n' +
+      '  todos los movimientos. Su marcador nombra a cada cual con su color y su dinero, separa\n' +
+      '  de quién es el turno de a quién se espera —que en el Burgo no son lo mismo— y dice lo que\n' +
+      '  le queda al Concejo y a los dos mazos. Y el escritorio elige el pintor por TABLA:\n' +
+      '  `sala.tsx` no vuelve a nombrar a ningún juego, y la pantalla completa cuelga de una clase\n' +
+      '  genérica con sus seis eslabones medidos uno a uno.\n' +
       '\n  Y EL CARTEL QUE EXPLICA EL NAIPE: cae al pie del lienzo sin tapar un naipe del mazo, ni\n' +
       `  la mano de bienes, ni el asa de la barra en ninguno de los ${String(loQueMidioElCartel.lienzos)} lienzos medidos —contra\n` +
       '  lo que la escena PINTA y no contra la misma fórmula copiada—; enseña frases ENTERAS y en\n' +

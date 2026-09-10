@@ -73,8 +73,17 @@ const COPIADO_MS = 1600;
  * En desarrollo pasa por el proxy de Vite y en producción es el mismo Node que
  * sirve esta página (`vite.config.ts`). Vive fuera del componente para que su
  * identidad no cambie en cada render: la escena la recibe por props.
+ *
+ * ═══ Y SE EXPORTA, PORQUE LA CACHÉ DE AVENTUREROS ES POR IDENTIDAD DE ESTA FUNCIÓN ═══
+ *
+ * `cargadorPara(traer)` guarda lo que ya bajó en un mapa cuya llave es LA FUNCIÓN, no la
+ * ruta. Un pintor de tablero que declarase su propia `traer` idéntica letra por letra
+ * estrenaría caché: los seis aventureros y el `animaciones.glb` —1,7 MB— se volverían a
+ * bajar y a parsear justo al pasar del lobby a la partida, que es el momento en que la
+ * pantalla ya está enseñando un telón. Con ésta compartida, quien viene de zarpar los
+ * encuentra puestos.
  */
-const traer: Traer = async (ruta) => {
+export const traer: Traer = async (ruta) => {
   const r = await fetch(ruta);
   if (!r.ok) throw new Error(`${ruta} contestó ${String(r.status)}`);
   return r.arrayBuffer();

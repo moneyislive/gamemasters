@@ -45,9 +45,10 @@ import type { ComponentType } from 'react';
  */
 import { MUEBLES_DEL_CONTRATO } from '../../../shared/arcade/tipos';
 import type { ArcadeId, ManifiestoDeArcade, MuebleDeArcade } from '../../../shared/arcade';
-import { EL_ARCADE, FRENTE, PEONZA, RIBERAS } from '../../../shared/arcade/juegos';
+import { BURGO, EL_ARCADE, FRENTE, PEONZA, RIBERAS } from '../../../shared/arcade/juegos';
 import type { LoQuePintaEsteBinario } from './del-servidor';
 import { ElArcade } from './arcade';
+import { ElBurgoEnTres } from './burgo-en-tres';
 import { LaPeonza } from './escena';
 import { LaFrente } from './frente';
 import { MUEBLES } from './muebles';
@@ -127,6 +128,24 @@ export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {
    * y la escena, sin una regla del juego dentro.
    */
   [RIBERAS]: ElTableroEnTres,
+  /*
+   * EL BURGO, EL SEGUNDO PINTOR PROPIO SOBRE `tablero`, Y POR ESO ESTA FILA NO ES
+   * UN PRECEDENTE NUEVO SINO LA CONFIRMACIÓN DEL DE RIBERAS.
+   *
+   * Vale lo mismo que se dijo arriba, palabra por palabra: el Burgo sigue con
+   * `mueble: 'tablero'`, su vista y sus opciones no cambian, un arcade de FUERA con
+   * tablero se sigue pintando con `LOS_MUEBLES_GENERICOS.tablero` —que es
+   * `ElTableroEnLinea` y no esto—, y el `Retablo` SVG no se va: es lo que esta misma
+   * pantalla pinta si `burgo.glb` no llega o si el lienzo revienta al pintar, con la
+   * hoja entera debajo.
+   *
+   * Y lo que sabe del Burgo tampoco está en el componente: está en
+   * `shared/arcade/juegos/burgo-en-tres.ts`, la traducción única entre la vista y la
+   * escena, que es la MISMA que lee el escritorio. Aquí sólo hay un `React.lazy`
+   * para que `three` y las tres mil líneas de `escenas/burgo/` no lleguen a la
+   * portada, que es por donde pasa esta tabla.
+   */
+  [BURGO]: ElBurgoEnTres,
   /*
    * LA PEONZA, que es la puerta del mueble `escena` de la fase 5 y no un
    * juego-prueba. Va aquí y no en `LOS_MUEBLES_GENERICOS` porque `escena` es un

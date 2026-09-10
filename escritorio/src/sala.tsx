@@ -30,16 +30,15 @@ import type { ArcadeDelCatalogo } from './muebles';
 import { opcionesSueltas, queSePinta } from './plan';
 import type { Opcion } from '../../shared/arcade';
 /*
- * De `riberas.ts` y no del índice de `juegos/`: el índice INSTALA todos los arcades
- * al cargarse, y eso es cosa del servidor. Aquí sólo hace falta el nombre.
+ * QUIÉN PINTA CADA ARCADE, EN UNA TABLA Y NO EN CINCO `if` (decisión 18). Aquí ya no se
+ * nombra a ningún juego: la fila trae el pintor, su marcador, cómo compone su pregón y
+ * cómo criba sus paneles, y el que no tenga fila se pinta con su mueble genérico. El
+ * porqué entero, con lo que costaban los cinco puntos cableados, en `pintores.ts`.
  */
-import { RIBERAS } from '../../shared/arcade/juegos/riberas';
+import { PINTORES_PROPIOS } from './pintores';
 import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { cuantoQueda } from './relojes';
 import { AccionesDelTablero, Paneles, Retablo } from './retablo';
-import { MarcadorDeRiberas, RiberasEnTres } from './riberas-en-tres';
-/* Los dos retoques de pantalla del §1.11 y de la decisión 17, medibles desde Node. */
-import { elPregonEnTres, panelesEnTres, panelesFueraDelPregon } from '../../shared/arcade/juegos/riberas-en-tres';
 
 /** La acera de este cliente dentro del servicio. Ver `vite.config.ts`. */
 export const BASE = '/sala';
@@ -601,7 +600,19 @@ export function LaMesaPuesta({
    * nada que ofrecer ahora mismo, y `queSePinta` ya sabe decir las dos cosas.
    */
   const pintado = queSePinta(puesta.vista, puesta.opciones ?? []);
-  const esRiberas = manifiesto.id === RIBERAS;
+  /*
+   * ═══ EL PINTOR PROPIO, SI ESTE ARCADE TIENE UNO ═══
+   *
+   * Una sola lectura de la tabla, y de ella salen las cuatro cosas que antes eran cuatro
+   * `esRiberas` sueltos: quién ocupa el sitio del retablo, quién pinta el marcador del raíl,
+   * cómo se compone el pregón y cómo se criban los paneles. Un arcade sin fila deja las
+   * cuatro en nada y se pinta con su mueble genérico, que es lo que hacen los otros cuatro.
+   */
+  const pintor = PINTORES_PROPIOS[manifiesto.id];
+  const ElPintor = pintor?.Pintor;
+  const ElMarcador = pintor?.Marcador;
+  /** Lo que hace falta leer de la mesa: la vista, quién mira y las opciones ENTERAS. */
+  const laMesaQueSeLee = { vista: puesta.vista, yo: puesta.yo, opciones: puesta.opciones ?? [] };
 
   /*
    * ═══ SI EL PREGÓN VA A PINTARSE, EL PANEL «Trueques» NO ═══
@@ -637,9 +648,14 @@ export function LaMesaPuesta({
    * `boolean` calculado a mano aquí sí habría sido un segundo criterio — y `conLienzo` era
    * justamente eso: un segundo criterio, y encima uno que ya no coincidía con el primero.
    */
-  const elPregonSePinta = esRiberas
-    ? elPregonEnTres(puesta.vista, puesta.yo, puesta.opciones ?? [])
-    : null;
+  /*
+   * Y QUIÉN LO COMPONE ES EL PINTOR, no esta pantalla: `pregonDe` es la MISMA función pura
+   * que llama el propio pintor, con los mismos argumentos, y eso es lo contrario de dos
+   * criterios. Un arcade sin fila —o con fila y sin pregón, como el Burgo, donde lo que en
+   * Riberas cuelga de la cinta es una sección de su hoja— deja esto en `null`, y con `null`
+   * el panel se queda donde estaba.
+   */
+  const elPregonSePinta = pintor?.pregonDe?.(laMesaQueSeLee) ?? null;
 
   /*
    * ═══ EL RAÍL SE MONTA UNA VEZ Y VIVE EN DOS SITIOS ═══
@@ -682,47 +698,41 @@ export function LaMesaPuesta({
   const railCon = (conPaneles: boolean) => (
     <>
       {/*
-        ═══ EL MARCADOR DE RIBERAS, ANTES DE LOS PANELES QUE DECLARA EL JUEGO ═══
+        ═══ EL MARCADOR DEL PINTOR PROPIO, ANTES DE LOS PANELES QUE DECLARA EL JUEGO ═══
 
-        Se decide por QUIÉN es y no por si hay tablero en tres dimensiones: el marcador se
-        mira igual cuando la mesa cae al retablo SVG, y ahí es donde más falta hace, porque
-        el respaldo pinta los movimientos del mazo como botones sueltos y no dice de nadie
-        cuántos puntos lleva. Él mismo devuelve `null` si la vista no es de Riberas.
+        Se decide por QUIÉN es —lo dice la tabla— y no por si hay tablero en tres
+        dimensiones: el marcador se mira igual cuando la mesa cae al retablo SVG, y ahí es
+        donde más falta hace, porque el respaldo pinta los movimientos como botones sueltos y
+        no dice de nadie cómo va. Cada marcador devuelve `null` si la vista no es la suya.
 
         Va DELANTE de `Paneles` y no en su lugar: los paneles son texto que declara el juego
-        y que leen todos los clientes por igual —«Lo mío», «Mis cartas», los dos premios y
-        los trueques—, y quitarlos aquí dejaría a este cliente enseñando menos que el de al
-        lado. Lo que este marcador añade es lo que un renglón de texto no puede: el color de
-        cada colono, quién eres tú, y tus puntos ocultos marcados como tuyos.
+        y que leen todos los clientes por igual, y quitarlos aquí dejaría a este cliente
+        enseñando menos que el de al lado. Lo que un marcador propio añade es lo que un
+        renglón de texto no puede: el color de cada cual, quién eres tú, y lo que sólo cuentas
+        tú marcado como tuyo.
       */}
-      {pintado.que === 'tablero' && esRiberas ? <MarcadorDeRiberas vista={puesta.vista} /> : null}
+      {pintado.que === 'tablero' && ElMarcador !== undefined ? (
+        <ElMarcador vista={puesta.vista} yo={puesta.yo} />
+      ) : null}
       <LaFicha mesa={puesta} silla={silla} />
       {/*
         ═══ LOS SEIS PANELES, CON «Lo mío» EL PRIMERO Y SIN LOS BIENES AJENOS ═══
 
-        `panelesEnTres` hace las dos cosas, y las dos son de pantalla y no del juego: pone
-        delante el panel donde están MIS BIENES POR CLASE —que en la escena son cartas sin
-        número, así que «limo: 3» no se lee en ningún otro sitio— y le quita al panel «La
-        mesa» la cifra de bienes de cada colono, que es la decisión 17 de Miguel. Vive en
-        `shared/` y no aquí para que `verify:riberas-en-tres` pueda medirla desde Node con
-        los paneles de una partida de verdad.
+        QUIÉN LOS ORDENA Y LOS CRIBA ES EL PINTOR, con la función que declara en la tabla, y
+        la cuenta vive en `shared/` para que `verify:riberas-en-tres` pueda medirla desde Node
+        con los paneles de una partida de verdad. En Riberas son dos cribas compuestas: poner
+        delante MIS BIENES POR CLASE y quitarle a «La mesa» los bienes ajenos (decisión 17), y
+        retirar «Trueques» cuando el pregón lo hereda —y SÓLO entonces: sin pregón el panel es
+        el único sitio donde vive lo ya trocado—.
 
-        Sólo para Riberas: los títulos por los que busca son los que escribe `panelesDe` de
-        Riberas, y otro arcade con un panel llamado «La mesa» no tiene por qué querer nada
-        de esto.
-
-        Y SON SEIS O SON CINCO: `panelesFueraDelPregon` retira «Trueques» cuando el pregón lo
-        hereda, y sólo entonces. Las dos cribas se componen y el orden da igual, que las dos
-        son filtros. Ver `elPregonSePinta`, arriba.
+        Es del pintor y no de esta pantalla porque los títulos por los que busca son los que
+        escribe ESE juego, y otro arcade con un panel llamado «La mesa» no tiene por qué
+        querer nada de eso. Sin `panelesDe`, `Paneles` cae a los del tablero tal cual.
       */}
       {conPaneles && pintado.que === 'tablero' ? (
         <Paneles
           tablero={pintado.tablero}
-          paneles={
-            esRiberas
-              ? panelesFueraDelPregon(panelesEnTres(pintado.tablero.paneles), elPregonSePinta)
-              : undefined
-          }
+          paneles={pintor?.panelesDe?.(pintado.tablero.paneles, elPregonSePinta)}
         />
       ) : null}
       {/*
@@ -798,21 +808,21 @@ export function LaMesaPuesta({
             </p>
           ) : null}
 
-          {pintado.que === 'tablero' && manifiesto.id === RIBERAS ? (
+          {pintado.que === 'tablero' && ElPintor !== undefined ? (
             /*
              * ═══ EL PINTOR PROPIO, PARA QUIEN LO TIENE ═══
              *
-             * Quién tiene tablero en tres dimensiones lo dice EL ARCADE, no la
+             * Quién tiene tablero en tres dimensiones lo dice LA TABLA, no la
              * tabla de temas del muelle. La primera versión preguntaba a
              * `tieneMuelle`, y eso ataba el lobby al pintor: el día que otro
-             * arcade estrenase muelle sin tener delta, la Sala le habría montado
-             * el pintor de Riberas encima de un tablero que no es el suyo. Se
-             * decide por lo que HAY —`queSePinta` ya dijo tablero— y por QUIÉN
-             * es, con el identificador que publica `shared/`. Trae su propio
+             * arcade estrenase muelle sin tener escena propia, la Sala le habría
+             * montado el pintor de Riberas encima de un tablero que no es el suyo.
+             * Se decide por lo que HAY —`queSePinta` ya dijo tablero— y por QUIÉN
+             * es, con la fila de `PINTORES_PROPIOS`. Cada pintor trae su propio
              * formulario de lo que el tablero no enseña; `Paneles` sigue en el
              * raíl porque la vista sigue trayendo el tablero declarado. Y si el
              * mundo no arranca, o la mesa no cabe en sus colores, él mismo decide
-             * caer al retablo de siempre. Los demás arcades no cambian ni un píxel.
+             * caer al retablo de siempre. Los arcades sin fila no cambian ni un píxel.
              *
              * Y SE LE PASA EL RAÍL ENTERO, que es lo que va dentro del cajón de la
              * cinta cuando hay lienzo. Se le pasa SIEMPRE, también cuando este
@@ -820,7 +830,7 @@ export function LaMesaPuesta({
              * pinta entonces es el `<aside>` de abajo. La cuenta de quién de los
              * dos lo enseña la lleva `conLienzo`, y la decide el propio pintor.
              */
-            <RiberasEnTres
+            <ElPintor
               manifiesto={manifiesto}
               mesa={mesa}
               puesta={puesta}

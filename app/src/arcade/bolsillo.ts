@@ -103,6 +103,54 @@ export async function elSitioGuardado(arcade: string): Promise<SitioGuardado | n
 }
 
 /**
+ * ═══ Y LO SEGUNDO QUE ESTE BOLSILLO GUARDA: POR DÓNDE ESTABA MIRANDO ═══
+ *
+ * La hoja del Burgo tiene ocho secciones y sólo una abierta a la vez (§6.3 de
+ * `docs/burgo/DISENO-2.md`). Cuál estaba abierta NO es estado del juego ni una
+ * credencial: es dónde tenía puesto el ojo esta persona en ESTA mesa. Y se guarda
+ * POR MESA y no por arcade, porque una partida de días se abre y se cierra muchas
+ * veces y volver siempre a la primera sección obliga a buscar «Lo mío» cada vez,
+ * mientras que dos mesas del mismo juego pueden estar en momentos distintos.
+ *
+ * Va aquí y no en un fichero nuevo porque lo que se comparte son las MISMAS veinte
+ * líneas de fontanería de plataforma —`SecureStore` en el aparato, `localStorage`
+ * en la web, todo envuelto en `try`— y no una sola decisión que pueda
+ * desincronizarse: vocabulario, cero. Que un almacén seguro sea de sobra para una
+ * preferencia de interfaz es cierto y no cuesta nada; la alternativa era estrenar
+ * una dependencia de almacenamiento para guardar ocho letras.
+ *
+ * Un valor que no se pueda leer, o que ya no sea una sección conocida, deja la
+ * hoja como estaba: quien llama decide qué abre por defecto.
+ */
+function llaveDeLaSeccion(arcade: string, codigo: string): string {
+  return `arcade.seccion.${arcade}.${codigo}`;
+}
+
+/** Recuerda qué sección de la hoja estaba abierta en esta mesa. */
+export async function guardarLaSeccion(arcade: string, codigo: string, seccion: string): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(llaveDeLaSeccion(arcade, codigo), seccion);
+      return;
+    }
+    await SecureStore.setItemAsync(llaveDeLaSeccion(arcade, codigo), seccion);
+  } catch {
+    /* Modo privado o almacén lleno: la hoja abre por donde diga quien llama. */
+  }
+}
+
+/** Qué sección estaba abierta en esta mesa, o `null` si no hay nada guardado. */
+export async function laSeccionGuardada(arcade: string, codigo: string): Promise<string | null> {
+  try {
+    return Platform.OS === 'web'
+      ? (globalThis.localStorage?.getItem(llaveDeLaSeccion(arcade, codigo)) ?? null)
+      : await SecureStore.getItemAsync(llaveDeLaSeccion(arcade, codigo));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Olvida el sitio. Lo llaman TIRAR la mesa —tras la que no queda mesa a la que
  * volver— y el descubrir que la llave ya no vale.
  *

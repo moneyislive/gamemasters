@@ -3847,3 +3847,751 @@ code {
     height: 52vh;
   }
 }
+
+/* --- EL BURGO: el segundo pintor propio de este cliente -------------------- */
+
+/*
+ * ═══ LOS COLORES ESTÁN AQUÍ, COPIADOS, Y NO IMPORTADOS DE `app/` ═══
+ *
+ * Todo lo de este bloque se pinta con las variables de esta hoja —`--teja`, `--filo`,
+ * `--acento`, `--tenue`, `--alarma`— y ni una sola llega de la paleta de la app:
+ * `escritorio/` no puede importar de `app/src` y `verify:fronteras` lo vigila. Es la misma
+ * estética que los `.riberas-*` de arriba porque es la misma Sala, no porque compartan
+ * fichero.
+ *
+ * Y la gramática de la casa, que aquí se cumple entera: lo apagado se apaga con una CLASE
+ * QUIETA y nunca con `opacity` —un botón al 40 % es texto ilegible, no un botón apagado—,
+ * nunca hay blanco sobre el acento, y ningún cuerpo baja de `--letra-minima`, que es
+ * `max(13px, 0.78rem)`.
+ */
+.burgo-en-tres {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/*
+ * EL RECUADRO DEL MUNDO. `62vh` es el punto de PARTIDA y no el alto: dentro de la cadena de
+ * pantalla completa el recuadro es `flex: 1 1 auto` y crece hasta la ventana; fuera de ella
+ * —montado suelto, o en un contenedor sin alto que repartir— `62vh` es lo que hay, y sin él
+ * ese lienzo saldría de cero.
+ *
+ * `touch-action: none` para que el navegador no se lleve el gesto de girar el burgo. Lo que
+ * rueda por dentro —el cajón, el menú— lo vuelve a poner en `auto`, y esa línea no es
+ * adorno: heredada, con el dedo no se podría desplazar la hoja y nada fallaría en un ratón.
+ */
+.burgo-lienzo {
+  position: relative;
+  width: 100%;
+  height: 62vh;
+  background: var(--teja);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.burgo-lienzo canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+.burgo-lienzo canvas:active {
+  cursor: grabbing;
+}
+
+/* Con una petición en vuelo no se toca nada, y el cursor lo dice, como en el retablo. */
+.burgo-lienzo-quieto canvas {
+  cursor: progress;
+}
+
+/*
+ * ═══ LA PANTALLA COMPLETA CUELGA DE `.lienzo-propio`, QUE ES LA CLASE GENÉRICA ═══
+ *
+ * La cadena de seis eslabones que reparte el alto desde la ventana hasta el recuadro está
+ * escrita arriba para `.riberas-lienzo`, con su porqué entero (los 292,4 puntos de cromo que
+ * un `62vh` no podía vencer). Aquí se repite para `.lienzo-propio`, que es la clase que la
+ * decisión 18 pone en el recuadro de CUALQUIER pintor propio, y el recuadro del Burgo lleva
+ * las dos: la suya para el alto y el fondo, la genérica para engancharse a esta cadena.
+ *
+ * ═══ POR QUÉ ESTÁ DUPLICADA Y NO ES UNA SOLA ═══
+ *
+ * Porque `riberas-en-tres.tsx` NO SE TOCA en esta fase —lo dice el §6.2 del diseño del
+ * Burgo, y sus regex literales en `verificar-escritorio.tsx` lo atan—, así que su recuadro
+ * no puede ganar la clase genérica todavía. Y una sola regla con los dos selectores en una
+ * lista tampoco vale: `laPaginaDePie` busca cada eslabón por su selector EXACTO al ras del
+ * margen, y una lista los dejaría a los dos sin encontrar. El día que Riberas gane
+ * `.lienzo-propio`, esta mitad se queda y la de arriba se borra; hasta entonces las dos
+ * dicen exactamente lo mismo y `verify:escritorio` mide las dos cadenas por separado.
+ *
+ * Y en un navegador sin `:has` no se rompe nada: el bloque entero no se aplica y queda la
+ * página de siempre, con su `62vh` y su desplazamiento.
+ */
+.sala:has(.lienzo-propio) {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.sala:has(.lienzo-propio) > .mesa-puesta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  /*
+   * `width: 100%` NO ES REDUNDANTE: `.dentro` se centra con `margin: 0 auto`, y en cuanto
+   * esta caja pasa a ser hija de un flex esos márgenes automáticos APAGAN el estirado. Sin
+   * ella la caja se queda del tamaño de su contenido en vez de los 92rem del `max-width`, o
+   * sea que poner la página de pie ESTRECHARÍA el tablero justo donde más sitio hay.
+   */
+  width: 100%;
+  padding-block: 0;
+  max-width: none;
+  padding-inline: 0;
+  overflow: hidden auto;
+}
+
+/*
+ * La rejilla base es `minmax(0, 1fr) 22rem`: el mueble y el raíl. Aquí el raíl vive dentro
+ * del cajón, así que no hay segundo hijo y una rejilla de dos columnas dejaría las 22rem de
+ * la derecha VACÍAS, o sea 374 puntos de ventana en blanco justo en la pantalla que se puso
+ * de pie para no desperdiciar ninguno.
+ */
+.sala:has(.lienzo-propio) .tablero-y-panel {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+}
+
+.sala:has(.lienzo-propio) .el-mueble {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/*
+ * EL TÍTULO SALE DEL FLUJO, NO DE LA PÁGINA. Son los puntos que dicen el nombre del arcade
+ * al que se está jugando mientras se está mirando ese arcade, y el raíl ya lo nombra en la
+ * ficha de la mesa. Se queda en el ÁRBOL —es el `<h1>` del documento, y navegar por
+ * encabezados es como se recorre una página con lector de pantalla—, con la misma técnica
+ * que la lista de apoyo y NUNCA con `display: none`.
+ */
+.sala:has(.lienzo-propio) .el-mueble > .titulo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * LA CABECERA SE QUITA ENTERA, y sólo en esta pantalla: el enlace de vuelta ya está dentro
+ * del cajón («Levantarse de la mesa») y la silla en la ficha de la mesa. Con `display: none`
+ * y no con el truco del recorte, porque no hay nada ahí que un lector tenga que oír y no
+ * oiga dentro del cajón. El catálogo, el vestíbulo y el retablo del respaldo siguen con su
+ * cabecera y su ancho de lectura, que ahí sí son de una página.
+ */
+.sala:has(.lienzo-propio) > .cabecera {
+  display: none;
+}
+
+/*
+ * `gap: 0.5rem` y no `gap: 0` como en la cadena del delta, y es la única diferencia entre
+ * las dos: debajo del recuadro del Burgo hay una lista en FLUJO —los botones sueltos del
+ * momento, que aquí no caben en el cajón porque el cajón nace cerrado y «Empezar la partida»
+ * se quedaría detrás de un «≡»—. Sin ese medio renglón de aire, los botones salen pegados al
+ * canto del anillo y se leen como parte del tablero.
+ */
+.sala:has(.lienzo-propio) .burgo-en-tres {
+  flex: 1;
+  min-height: 0;
+  gap: 0.5rem;
+}
+
+/*
+ * `flex: 1 1 auto` y no `flex: 1`: la base es el `62vh` de arriba, no cero. Con base cero un
+ * antepasado que no tenga alto que repartir dejaría el recuadro en cero puntos y la mesa en
+ * negro, sin un error en ninguna consola.
+ *
+ * Y EL SUELO ES UNA REGLA Y NO UN NÚMERO: la mitad del mueble. Con `min-height: 0` a secas,
+ * en una ventana baja el aviso y los botones se llevan el resto y el recuadro se queda en una
+ * raya, que no es «la partida entra en la pantalla» sino que ya no hay partida. En porcentaje
+ * del MUEBLE y no en `vh`, porque lo que se reparte es el mueble y ahí la cabecera ya está
+ * descontada.
+ */
+.sala:has(.lienzo-propio) .burgo-lienzo {
+  flex: 1 1 auto;
+  border: 0;
+  border-radius: 0;
+  min-height: 50%;
+}
+
+/*
+ * El telón: `--suelo` con el nombre del juego hasta que el modelo llega. Es el mismo telón
+ * que el del muelle y en la misma letra: quien viene de zarpar no ve cambiar de sitio nada.
+ */
+.burgo-telon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 2rem;
+  background: var(--suelo);
+}
+
+.burgo-nombre {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+
+.burgo-telon .letra-chica {
+  margin: 0;
+}
+
+/*
+ * LA SALIDA DEL ACERCAMIENTO. Cromo de la Sala sobre el lienzo —teja alta, filo en reposo,
+ * acento al pasar el ratón, el `:focus-visible` de la cabecera y `2.75rem` de mínimo de
+ * dedo—, no un objeto del mundo. Arriba a la derecha, que es la esquina que este cliente ya
+ * usa para el cromo del lienzo, y sólo cuando hay algo a lo que volver.
+ */
+.burgo-volver {
+  position: absolute;
+  top: 3.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: var(--letra-minima);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+
+.burgo-volver:hover {
+  border-color: var(--acento);
+  box-shadow: 0 0 20px -8px var(--halo);
+}
+
+/*
+ * SÓLO para tecnologías de apoyo: fuera de la vista y del flujo, pero EN EL ÁRBOL y —si es un
+ * mando— enfocable. Nunca `display: none` ni `visibility: hidden`: los lectores los saltan.
+ *
+ * La llevan dos cosas del lienzo del Burgo, y las dos porque dentro de un `<canvas>` no se
+ * oye nada: el botón de TIRAR —un dado que sólo se pudiera tocar con el ratón sería el primer
+ * movimiento del juego inaccesible— y la frase de a quién se espera, que en el lienzo la dice
+ * una marca de color y nada más.
+ */
+.burgo-solo-apoyo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+/*
+ * ═══ LA CINTA: SALIR, EL PLAZO, EL AVISO Y MI DINERO, EN 44 PUNTOS ═══
+ *
+ * Va DENTRO del recuadro y encima del lienzo —no en flujo por encima de él—, que es lo que
+ * hace que no le quite un punto de alto al anillo. Y a TODO EL ANCHO, al contrario que la de
+ * Riberas: allí el ancho se mide con muchísimo cuidado porque a los lados del lienzo hay dos
+ * manos de cartas que se arrastran, y una caja opaca encima taparía una carta que hay que
+ * poder coger. En el burgo no hay manos: lo que hay a los lados es campo, y una cinta más
+ * ancha es una frase de estado más larga.
+ *
+ * `z-index` por encima del lienzo y por debajo del velo: sin él queda al mismo nivel que el
+ * `<canvas>` y gana el que se pinte después, que es un accidente del JSX y no una decisión.
+ *
+ * Redondeada sólo por abajo: está pegada al canto de arriba del recuadro, y un redondeo
+ * arriba dejaría ver dos cuernos de tablero entre la cinta y el borde.
+ */
+.burgo-cinta {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 2.75rem;
+  padding: 0;
+  background: var(--teja-alta);
+  border-radius: 0 0 var(--radio-mando) var(--radio-mando);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 14px 30px -18px var(--sombra);
+}
+
+/*
+ * LOS DOS BOTONES DE LA CINTA: del suelo de toque y SIN caja propia. No llevan fondo ni filo
+ * porque la cinta ya es la caja; lo que dice que se pueden tocar es lo mismo que en el resto
+ * de la Sala: el acento al pasar el ratón y el `:focus-visible` de la cabecera.
+ *
+ * `flex: 0 0 auto` en los dos: lo que se encoge es la frase, nunca un botón. Sin esto, en un
+ * lienzo estrecho el flex reparte la falta entre los tres y los botones bajan de los 44, o
+ * sea que el suelo de toque se pierde justo donde se juega con el dedo.
+ */
+.burgo-cinta-salir,
+.burgo-cinta-ficha {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  padding: 0 0.4rem;
+  overflow: hidden;
+  background: none;
+  color: var(--palabra);
+  border: 0;
+  border-radius: var(--radio-mando);
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.burgo-cinta-salir:hover,
+.burgo-cinta-ficha:hover {
+  color: var(--acento);
+}
+
+/*
+ * LA FRASE: la única línea de estado de esta pantalla, y la única región viva. Se recorta con
+ * puntos suspensivos en vez de partirse en dos renglones —la cinta es la línea de sus
+ * botones—, y el texto NO se pierde: el `<p>` lleva la frase entera en el árbol, así que un
+ * lector la lee completa y el ratón la ve al posarse.
+ *
+ * `min-width: 0` no es adorno: un hijo de flex no baja de su ancho de contenido por omisión,
+ * así que sin esto la frase larga EMPUJA la cinta en vez de recortarse. Es el fallo clásico
+ * del `text-overflow` dentro de un flex, y no se ve como un texto que no cabe: se ve como una
+ * cinta que cambia de tamaño sola.
+ */
+.burgo-cinta-frase {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--palabra);
+}
+
+/*
+ * EL RELOJ DEL PLAZO: `flex: 0 0 auto` porque un reloj recortado no es un plazo más corto,
+ * es otro número. `tabular-nums` porque es una cuenta atrás: con cifras de anchos distintos
+ * el rótulo baila cada segundo y arrastra con él la frase de al lado.
+ */
+.burgo-cinta-reloj {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0.3rem 0 0.15rem;
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--tenue);
+}
+
+/*
+ * EL ÚLTIMO MINUTO, EN `--alarma`. Esta hoja reserva ese color para «lo que de verdad se
+ * acaba», y esto es literalmente eso: pasado el plazo, la mesa juega sola. Se enciende en el
+ * último minuto y ni uno antes, porque un color de alarma encendido media partida deja de
+ * significar nada. EL COLOR NO ES LA ÚNICA SEÑAL: el número sigue bajando y el nombre
+ * accesible dice la frase entera.
+ */
+.burgo-cinta-reloj-aprieta {
+  color: var(--alarma);
+  font-weight: 600;
+}
+
+/* Mi color, en barra, porque va al lado de una cifra y no delante de un nombre. */
+.burgo-cinta-rail {
+  width: 0.25rem;
+  height: 1.15rem;
+  border-radius: 2px;
+}
+
+/*
+ * MI DINERO. En `0.95rem` y no en el `1.1rem` que hereda de la cinta: lo peor que puede
+ * escribirse ahí son cinco cifras y su rótulo («12.000 mrs»), y con la letra de la casa a
+ * 1,1rem eso empuja el trozo de la frase hasta dejarla en dos palabras. `tabular-nums` por lo
+ * mismo que el reloj: el dinero cambia con cada renta y sin cifras de ancho fijo la ficha
+ * baila.
+ */
+.burgo-cinta-dinero {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * EL VELO DE LAS DOS CAJAS MODALES. Sin él, un clic fuera del cajón llega al anillo: se
+ * cierra el cajón Y se toca una casilla donde estaba el dedo.
+ *
+ * `touch-action: auto` porque el recuadro lo tiene en `none` para que el gesto del burgo no
+ * se lo lleve el navegador; heredado aquí, un dedo sobre el velo no dispararía ni el `click`
+ * que lo cierra en algunos navegadores.
+ */
+.burgo-velo {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: var(--velo);
+  touch-action: auto;
+}
+
+/*
+ * ═══ EL CAJÓN: LA HOJA ENTERA Y EL RAÍL, COLGANDO DE LA CINTA ═══
+ *
+ * Cuelga del PIE de la cinta —`top` y el alto de la cinta escritos los dos en `rem`, para que
+ * crezcan juntos con la preferencia de tamaño de letra del navegador y no haya dos números
+ * que cuadrar— y llega hasta el canto menos el inset del cromo de este cliente: así es todo
+ * lo alto que el lienzo dé, en un monitor y en una ventana estrecha, y lo que no quepa rueda
+ * POR DENTRO.
+ *
+ * El ancho lo pone `elEstiloDeLaCinta` desde el pintor, topado por el recuadro; el suelo de
+ * aquí impide que baje de legible: `16rem` es lo que un `.panel` necesita para leerse con su
+ * relleno. Puede pasar por encima de lo que haya debajo porque es MODAL: con él abierto hay
+ * un velo que se come los punteros y la rueda no llega a la cámara.
+ *
+ * `touch-action: auto` ES OBLIGATORIO Y NO SE VE FALLAR EN UN RATÓN: el recuadro lleva
+ * `touch-action: none` por el gesto del burgo, el cajón es descendiente suyo y lo heredaría,
+ * así que con el dedo NO SE PODRÍA DESPLAZAR la hoja. `overscroll-behavior: contain` para que
+ * al llegar al final la rueda no se la lleve la mesa de detrás; que la rueda dentro del cajón
+ * no acerque la cámara lo hace el oyente de `lienzo-propio.tsx`, que mira de quién es el
+ * suceso (`SE_DESPLAZAN_SOLAS`).
+ */
+.burgo-cajon {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 2.75rem;
+  bottom: 0.75rem;
+  min-width: min(calc(100% - 1.5rem), 16rem);
+  max-width: calc(100% - 1.5rem);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--teja);
+  border-radius: var(--radio-ficha);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 24px 50px -24px var(--sombra);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+}
+
+/*
+ * ═══ EL MENÚ DE UNA PREGUNTA: LA FICHA DE UNA CASILLA Y EL «¿QUÉ HACES AQUÍ?» ═══
+ *
+ * Colocado sobre el recuadro y no en flujo por debajo: con la página de pie el recuadro vale
+ * la ventana entera, así que DEBAJO NO HAY NADA. Por encima del velo en `z-index`: la
+ * pregunta es lo último que se ha abierto y va delante.
+ *
+ * TOPADO POR EL RECUADRO Y DESPLAZABLE POR DENTRO: la ficha de un solar lleva seis renglones
+ * de rentas más sus obras, y en un lienzo bajo eso no cabe. Sin `max-height` y
+ * `overflow-y: auto` las opciones de abajo se salen del recuadro y vuelven a estar donde no
+ * se ve, que es el fallo que este bloque viene a arreglar.
+ */
+.burgo-elige {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  width: min(calc(100% - 1.5rem), 22rem);
+  max-height: calc(100% - 1.5rem);
+  margin: 0;
+  padding: 1rem;
+  background: var(--teja);
+  border-radius: var(--radio-ficha);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 24px 50px -24px var(--sombra);
+}
+
+/*
+ * En columna y no en fila porque lo que se lee es el RÓTULO ENTERO: «Empeñar la Ribera de los
+ * Curtidores por 350 mrs» en fila se corta y hay que adivinar cuál es cuál.
+ */
+.burgo-elige .opciones {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+/*
+ * Por qué se está jugando sobre el retablo. Va ENCIMA del tablero dibujado y en gris, sin
+ * `--alarma`: no se ha perdido nada, la mesa está entera; sólo falta el mundo.
+ */
+.burgo-sin-mundo {
+  margin: 0 0 0.75rem;
+}
+
+/* --- La hoja: las secciones del §6.3 dentro del cajón --------------------- */
+
+.burgo-hoja {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/*
+ * Cada sección es un `.panel` de la Sala, con su rótulo. No se pliegan: el cajón se ve entero
+ * y rueda por dentro, así que plegarlas sería esconder lo que ya cabe. Lo que sí se pliega es
+ * una sección SIN NADA que enseñar, y eso lo decide `hojaEnTres` con `hayAlgo`, no esta hoja.
+ */
+.burgo-seccion {
+  margin: 0;
+}
+
+/*
+ * LA QUE HAY QUE MIRAR AHORA —la almoneda si me toca pujar, el trato si me proponen uno, «Lo
+ * mío» en mi apuro, «Ahora» si me toca— se marca con su filo en el acento. Es un FILO y no un
+ * fondo: un panel con fondo de acento pediría texto blanco encima, y esta casa no pinta
+ * blanco sobre acento. `aria-current="step"` dice lo mismo a quien no ve el filo.
+ */
+.burgo-seccion-toca {
+  box-shadow: 0 0 0 1px var(--acento);
+}
+
+.burgo-renglon {
+  margin: 0.35rem 0 0;
+  color: var(--tenue);
+}
+
+/* --- La puja libre y el componedor del trato: las dos puertas del juego ---- */
+
+/*
+ * LAS DOS PUERTAS SE MONTAN, NO SE MANDAN. El campo numérico y las fichas de aquí abajo
+ * componen la carga con `montar()`, que es quien conoce los campos EXACTOS que la puerta
+ * declara y quien devuelve `null` cuando lo pedido no cabe. Por eso el botón se apaga con la
+ * CLASE QUIETA de la casa y no con `opacity`: apagado sigue teniendo su contraste y sigue
+ * pudiendo tener el foco.
+ */
+.burgo-puja-libre,
+.burgo-componedor,
+.burgo-lado {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.burgo-componedor {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--filo);
+}
+
+.burgo-componedor-rotulo {
+  margin: 0;
+  color: var(--palabra);
+  font-size: var(--letra-minima);
+  font-weight: 600;
+}
+
+/*
+ * EL CAMPO NUMÉRICO. `inputmode="numeric"` saca el teclado de cifras en una tableta sin
+ * prohibir pegar; el filtro de lo que se escribe está en el pintor, que borra lo que no es
+ * dígito. `tabular-nums` para que la cifra no baile mientras se teclea.
+ */
+.burgo-campo {
+  font-variant-numeric: tabular-nums;
+}
+
+.burgo-con-quien {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+/*
+ * LO ELEGIDO SE MARCA CON EL FILO EN EL ACENTO Y CON `aria-pressed`, nunca con un fondo de
+ * acento y texto blanco encima. Dos señales y no una: quien no distinga el violeta lee el
+ * estado del botón igual.
+ */
+.burgo-elegido {
+  border-color: var(--acento);
+}
+
+/* --- «Lo mío»: mis títulos por barrio, con su ficha ----------------------- */
+
+.burgo-barrio {
+  margin-top: 0.75rem;
+}
+
+.burgo-barrio-rotulo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.4rem;
+  color: var(--palabra);
+  font-size: var(--letra-minima);
+  font-weight: 600;
+}
+
+.burgo-ficha {
+  margin: 0 0 0.6rem;
+  padding: 0.6rem;
+  background: var(--teja-alta);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+}
+
+.burgo-ficha-nombre {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/*
+ * LA TABLA DE RENTAS. Dos columnas —qué y cuánto— con la cifra a la derecha y en cifras de
+ * ancho fijo, para que las seis filas se puedan comparar de un vistazo: es exactamente la
+ * pregunta que se hace mirándolas («¿cuánto sube si alzo otra casa?»).
+ */
+.burgo-rentas {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.6rem;
+  font-size: var(--letra-minima);
+  color: var(--tenue);
+}
+
+.burgo-rentas > li {
+  display: contents;
+}
+
+.burgo-renta-cifra {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * LA FILA QUE SE COBRA HOY, en el color de la palabra y en negrita. No lleva fondo de acento
+ * porque el renglón es texto y el acento pediría blanco encima; el contraste de la fila viva
+ * contra las apagadas ya es de 2:1 largo, y además va con más peso, que es una segunda señal.
+ */
+.burgo-renta-hoy > .burgo-renta-rotulo,
+.burgo-renta-hoy > .burgo-renta-cifra {
+  color: var(--palabra);
+  font-weight: 600;
+}
+
+/* --- El marcador del raíl ------------------------------------------------- */
+
+/*
+ * UNA FILA POR JUGADOR: mota de color, nombre con lo suyo debajo, y su dinero a la derecha.
+ * Es la misma rejilla de tres columnas que el marcador de Riberas, porque es el mismo raíl.
+ */
+.burgo-del-marcador {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+}
+
+.burgo-ficha-del-jugador {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.burgo-nombre-del-jugador {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.burgo-lo-del-jugador {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--tenue);
+}
+
+.burgo-dinero-del-jugador {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/*
+ * DE QUIÉN ES EL TURNO, con el filo del acento a la izquierda de su fila. Va en `box-shadow`
+ * y no en `border-left` para no correr las tres columnas medio punto cada vez que cambia el
+ * turno: un marcador que se mueve solo se lee como un marcador roto.
+ */
+.burgo-le-toca {
+  box-shadow: inset 2px 0 0 var(--acento);
+}
+
+/*
+ * QUIEN QUEBRÓ SIGUE EN LA LISTA, en tenue y con la cifra tachada. No se borra: saber quién
+ * quebró y con cuánto es parte de la partida, y una fila que desaparece se lee como un fallo
+ * del sondeo. Se apaga con el COLOR y con el tachado —dos señales— y nunca con `opacity`.
+ */
+.burgo-quebrado .burgo-nombre-del-jugador,
+.burgo-quebrado .burgo-dinero-del-jugador {
+  color: var(--tenue);
+  text-decoration: line-through;
+}
+
+/* Lo que le queda al Concejo. Separado por un filo: no es de ningún jugador. */
+.burgo-lo-del-concejo {
+  margin: 0.75rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--filo);
+}
+
+@media (max-width: 900px) {
+  .burgo-lienzo {
+    height: 52vh;
+  }
+}

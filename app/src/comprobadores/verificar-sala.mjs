@@ -75,7 +75,7 @@ const { dondeSePinta, loQueLlega, queSeEnsena } = await cargarModuloTs(
  * coherente consigo misma, que no es lo que hay que comprar.
  */
 const BINARIO = {
-  juegos: ['frente', 'el-arcade', 'riberas', 'peonza'],
+  juegos: ['frente', 'el-arcade', 'riberas', 'peonza', 'burgo'],
   muebles: ['formulario', 'tablero', 'lienzo', 'escena'],
   genericosDelContrato: ['formulario', 'tablero'],
   genericos: ['tablero'],
@@ -279,7 +279,7 @@ paso('Y el binario con el que se juzga es el de verdad');
     entradas.length === BINARIO.juegos.length,
     { enLaTabla: entradas.length, conLosQueSeJuzga: BINARIO.juegos.length },
   );
-  for (const constante of ['FRENTE', 'EL_ARCADE', 'RIBERAS', 'PEONZA']) {
+  for (const constante of ['FRENTE', 'EL_ARCADE', 'RIBERAS', 'PEONZA', 'BURGO']) {
     comprobar(`y «${constante}» esta entre ellos`, new RegExp(`\\[${constante}\\]:`).test(pintados), constante);
   }
 }
@@ -1744,6 +1744,352 @@ paso('El mueble de opciones de la app no pinta una DECLARACIÓN como si fuera un
 }
 
 /**
+ * ═══ EL BURGO EN TRES DIMENSIONES: LAS MISMAS REGLAS QUE YA SE LE EXIGEN A RIBERAS ═══
+ *
+ * Es el SEGUNDO pintor propio sobre el mueble `tablero`, y eso quiere decir que cada
+ * fallo silencioso que costó una tarde con el delta cabe otra vez aquí, entero y sin que
+ * nada se ponga rojo:
+ *
+ *   · un `React.lazy` creado DENTRO del componente: la escena se desmonta y se vuelve a
+ *     bajar en cada vuelta del sondeo, y no hay ningún error en ninguna parte;
+ *   · un `Canvas` fuera de la red: un `throw` al pintar —una textura que expo-gl no
+ *     quiere, un fundido que se queda sin memoria— cierra la app en mitad de la partida;
+ *   · un `Platform.OS` que mande el teléfono al retablo: dos dimensiones en el móvil y
+ *     tres en el PC, sin un solo aviso, que es exactamente lo que pasó con `tablero.glb`
+ *     durante meses;
+ *   · un manejador que no llame a `laInterfazSeLoQueda()` LO PRIMERO: en el móvil el giro
+ *     del tablero le roba el dedo al asa de los dados y el toque no llega nunca;
+ *   · una hoja modal DENTRO del `GestureDetector`: sus botones le pelean el toque al giro;
+ *   · y el orden de composición al revés —filtrar las opciones ANTES de dárselas a
+ *     `dadosEnTres`—, con lo que `porTirar` es siempre falso y nadie puede tirar en toda
+ *     la tarde.
+ *
+ * Ninguno de los seis lo caza `tsc`; ninguno lo caza `verify:burgo-en-tres`, que mide la
+ * TRADUCCIÓN con mesas de verdad y no la pantalla; y ninguno se ve sin un teléfono en la
+ * mano. Se leen del fuente, y se leen sabiendo lo que eso compra —que la forma está
+ * escrita— y lo que no: que React haga con ella lo que se espera lo compra el banco del
+ * escritorio, que monta el mismo `<Burgo>`.
+ *
+ * ═══ Y CADA REGLA SE VE CAER ═══
+ *
+ * `reglaDelFuente` afirma la regla sobre el fichero de VERDAD y vuelve a aplicarla sobre
+ * una copia ENVENENADA —el mismo texto con el fallo dentro— exigiendo que ahí falle. Un
+ * comprobador de fuente que sólo mira el caso bueno se queda verde para siempre el día que
+ * alguien le rompe la expresión regular, y en este árbol eso ya pasó dos veces: un `sed`
+ * que dejó `/bLETRA./` y un filtro que no inspeccionaba ni un fichero.
+ */
+paso('El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin plataforma y con las hojas fuera del gesto');
+{
+  const envoltura = leer(path.join(SRC, 'arcade', 'burgo-en-tres.tsx'));
+  const escena = leer(path.join(SRC, 'arcade', 'burgo-en-tres-escena.tsx'));
+  const hojas = leer(path.join(SRC, 'arcade', 'hojas-del-burgo.tsx'));
+  const laTabla = leer(path.join(SRC, 'arcade', 'pintados.ts'));
+
+  /*
+   * TODA REGLA DE PROHIBICIÓN MIRA EL CÓDIGO, NUNCA EL FICHERO ENTERO. Es la misma
+   * corrección que ya se pagó dos veces en este guion: en esta casa las cabeceras CUENTAN
+   * los fallos que se arreglaron —la del Burgo nombra `Platform.OS` para decir que no
+   * aparece— y una regla que castiga hablar de algo enseña a no hablar de ello.
+   */
+  const soloCodigo = (texto) =>
+    texto
+      .split('\n')
+      .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+      .join('\n');
+
+  /** Afirma la regla sobre el fichero de verdad, y la ve CAER con el caso envenenado. */
+  const reglaDelFuente = (que, prueba, bueno, envenenado, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    comprobar(
+      `y «${que}» se ve CAER con el caso envenenado`,
+      !prueba(envenenado),
+      'una regla que no se ve caer puede estar mirando otra cosa, y entonces es verde para siempre',
+    );
+  };
+
+  /** El cuerpo de un manejador, de su `=> {` al cierre del `useCallback`. Las dos formas de escribirlo. */
+  const cuerpoDelManejador = (texto, nombre) => {
+    const codigo = soloCodigo(texto);
+    const desde = codigo.indexOf(`const ${nombre} = useCallback(`);
+    if (desde < 0) return '';
+    const cierres = [codigo.indexOf('\n  );', desde), codigo.indexOf('\n  }, [', desde)].filter((i) => i > 0);
+    if (cierres.length === 0) return '';
+    const hasta = Math.min(...cierres);
+    const cuerpo = codigo.slice(desde, hasta);
+    const llave = cuerpo.indexOf('=> {');
+    return llave < 0 ? '' : cuerpo.slice(llave + '=> {'.length);
+  };
+  const primeraLineaDe = (texto, nombre) =>
+    cuerpoDelManejador(texto, nombre)
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)[0] ?? '';
+
+  const LOS_MANEJADORES = ['alElegirOpcion', 'alMandar', 'alTocarCasilla', 'alTocarLosDados', 'alTocarFigura'];
+  const LOS_QUE_MUEVEN = ['alElegirOpcion', 'alMandar', 'alTocarCasilla', 'alTocarLosDados'];
+
+  /* ─── La envoltura perezosa, que es lo que protege la portada ─── */
+
+  reglaDelFuente(
+    'la envoltura del Burgo crea el `lazy` en ÁMBITO DE MÓDULO y no arrastra `three` a la portada',
+    /*
+     * Las dos prohibiciones miran el CÓDIGO y no el fichero: la cabecera de esta
+     * envoltura EXPLICA que con un `import` normal entrarían `three` y
+     * `@react-three/fiber` en la portada, que es documentación correcta y la primera
+     * versión de esta regla se ponía roja por ella. Es el mismo filo que ya se pagó
+     * con `lookAt(0, 0, 0)` unas secciones más arriba.
+     */
+    (t) =>
+      /^const LaPantalla = lazy\(\(\) => import\('\.\/burgo-en-tres-escena'\)\);$/m.test(soloCodigo(t)) &&
+      !/from 'three'/.test(soloCodigo(t)) &&
+      !/@react-three\/fiber/.test(soloCodigo(t)),
+    envoltura,
+    envoltura.replace(/^const LaPantalla = lazy/m, '  const LaPantalla = lazy'),
+    'creado dentro del componente, cada sondeo desmonta la escena y la vuelve a bajar entera, y sin un error en ninguna parte',
+  );
+  reglaDelFuente(
+    'y la tabla de pintores monta la ENVOLTURA y no la escena',
+    (t) => /\[BURGO\]: ElBurgoEnTres,/.test(t) && /from '\.\/burgo-en-tres'/.test(t) && !/burgo-en-tres-escena/.test(t),
+    laTabla,
+    laTabla.replace("from './burgo-en-tres'", "from './burgo-en-tres-escena'"),
+    'con la escena en la tabla, `three` y las tres mil líneas de `escenas/burgo/` entran en la portada',
+  );
+
+  /* ─── La red bajo el lienzo ─── */
+
+  reglaDelFuente(
+    'el `Canvas` del Burgo va DENTRO de la red que cae al retablo si el lienzo revienta al pintar, y la red apunta el fallo',
+    (t) => {
+      const c = soloCodigo(t);
+      const abre = c.indexOf('<RedDelLienzo alCaer={ponerElLienzoCayo}>');
+      const lienzo = c.indexOf('<Canvas');
+      const cierra = c.indexOf('</RedDelLienzo>');
+      return (
+        abre >= 0 &&
+        lienzo > abre &&
+        cierra > lienzo &&
+        /class RedDelLienzo[\s\S]*?apuntarFallo\([^)]*'render'/.test(c) &&
+        /if \(elLienzoCayo !== null\) \{[\s\S]*?respaldoSobreElRetablo\(/.test(c)
+      );
+    },
+    escena,
+    escena.replace('<RedDelLienzo alCaer={ponerElLienzoCayo}>', '<View>').replace('</RedDelLienzo>', '</View>'),
+    'sin la red, un `throw` al pintar cierra la app en mitad de una partida de tres días',
+  );
+
+  /* ─── Ninguna decisión por plataforma ─── */
+
+  reglaDelFuente(
+    'en el código de la pantalla del Burgo `Platform.OS` no aparece ni una vez',
+    (t) => !/Platform\.OS/.test(soloCodigo(t)),
+    escena,
+    `${escena}\nconst enLaWeb = Platform.OS === 'web';\n`,
+    'un `Platform.OS` que decidiera si se pinta el anillo dejaría al teléfono en dos dimensiones sin que nada se pusiera rojo',
+  );
+
+  /* ─── El dedo es de la interfaz antes que del giro ─── */
+
+  reglaDelFuente(
+    'los cinco manejadores del Burgo llaman a `laInterfazSeLoQueda()` LO PRIMERO',
+    (t) => LOS_MANEJADORES.every((n) => primeraLineaDe(t, n) === 'laInterfazSeLoQueda();'),
+    escena,
+    escena.replace('laInterfazSeLoQueda();', ''),
+    'sin esto, en el móvil el giro del tablero le roba el dedo al asa y el toque no llega nunca',
+  );
+  reglaDelFuente(
+    'y ninguno manda un movimiento sin volver a mirar `mesa.quieto` antes',
+    (t) =>
+      LOS_QUE_MUEVEN.every((n) => {
+        const cuerpo = cuerpoDelManejador(t, n);
+        const mueve = cuerpo.indexOf('mesa.mover(');
+        const quieto = cuerpo.indexOf('mesa.quieto');
+        return cuerpo.length > 0 && mueve > 0 && quieto > 0 && quieto < mueve;
+      }),
+    escena,
+    escena.replace(
+      'if (mesa.quieto) return;\n      soltarTodo();\n      void mesa.mover({ tipo: o.tipo, carga: o.carga });',
+      'void mesa.mover({ tipo: o.tipo, carga: o.carga });',
+    ),
+    '`quieto` es estado y no cerrojo: entre el toque y la respuesta que acaba de llegar hay una carrera, y dos movimientos seguidos vuelven rancios',
+  );
+  reglaDelFuente(
+    'y lo que se manda es la OPCIÓN ENTERA del juego, nunca un `tipo` escrito en la pantalla',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /void mesa\.mover\(\{ tipo: o\.tipo, carga: o\.carga \}\);/.test(c) &&
+        /return mesa\.mover\(\{ tipo: tirar\.tipo, carga: tirar\.carga \}\);/.test(c) &&
+        !/tipo: 'burgo:/.test(c)
+      );
+    },
+    escena,
+    escena.replace('return mesa.mover({ tipo: tirar.tipo, carga: tirar.carga });', "return mesa.mover({ tipo: 'burgo:tirar', carga: {} });"),
+    'montar la carga aquí escribiría la forma del movimiento en un segundo sitio, y el segundo no lo comprueba nadie',
+  );
+
+  /* ─── Las hojas, hermanas del gesto ─── */
+
+  reglaDelFuente(
+    'las hojas del Burgo se montan HERMANAS del `GestureDetector` y nunca dentro',
+    (t) => {
+      const cierra = t.indexOf('</GestureDetector>');
+      const primera = t.indexOf('<LaHojaSobreElLienzo');
+      return cierra >= 0 && primera > cierra;
+    },
+    escena,
+    escena.replace('<Canvas', '<LaHojaSobreElLienzo titulo="" alDejarlo={soltarTodo} />\n<Canvas'),
+    'un `Pressable` dentro del detector le pelea el toque al giro del tablero',
+  );
+
+  /* ─── La cámara del cliente, antes de la escena y con prioridad 0 ─── */
+
+  reglaDelFuente(
+    'el ojo del cliente se monta ANTES de `<Burgo>`, con prioridad 0, y compone `ojoYMira` con las constantes del Burgo',
+    (t) => {
+      const c = soloCodigo(t);
+      const ojo = c.indexOf('<ElOjoDelBurgo');
+      const burgo = c.indexOf('<Burgo\n');
+      return (
+        ojo >= 0 &&
+        burgo > ojo &&
+        /useFrame\(\(\) => \{[\s\S]*?\}, 0\);/.test(c) &&
+        /ojoYMira\(\s*cercania\.current,\s*ALCANCE_DEL_BURGO,\s*\(d\) => ojoDelMirador\(mirador\.current, d, proporcion\),\s*ALTURA_MINIMA_DEL_OJO_DEL_BURGO,\s*\)/.test(
+          c,
+        ) &&
+        /poseDeSalida\(ventana\)/.test(c)
+      );
+    },
+    escena,
+    escena.replace('<ElOjoDelBurgo mirador={mirador} cercania={cercania} />', ''),
+    'r3f corre los suscriptores de igual prioridad en orden de montaje: montado después, el seguimiento de la escena iría siempre un fotograma por detrás',
+  );
+
+  /* ─── El orden de composición, que es el fallo que no se ve ─── */
+
+  reglaDelFuente(
+    'los dados reciben las opciones ENTERAS y el filtro de los botones sueltos se aplica DESPUÉS',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /const dados = useMemo\(\(\) => dadosEnTres\(laVista, yo, opciones\), \[laVista, yo, opciones\]\);/.test(c) &&
+        /opcionesFueraDelTablero\(opciones, datos, dados, hoja\)/.test(c) &&
+        /from '\.\.\/\.\.\/\.\.\/shared\/arcade\/juegos\/burgo-en-tres'/.test(t)
+      );
+    },
+    escena,
+    escena.replace(
+      'const dados = useMemo(() => dadosEnTres(laVista, yo, opciones), [laVista, yo, opciones]);',
+      'const dados = useMemo(() => dadosEnTres(laVista, yo, fuera), [laVista, yo, fuera]);',
+    ),
+    'al revés, `porTirar` es siempre falso: el asa no se monta y nadie puede tirar en toda la tarde',
+  );
+
+  /* ─── El respaldo, que no es opcional ─── */
+
+  reglaDelFuente(
+    'hay UNA rama de respaldo sobre el retablo, con sus tres motivos y los DOS filtros compuestos',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /const respaldoSobreElRetablo = \(nota: string\): JSX\.Element => \{/.test(c) &&
+        /<Retablo tablero=\{tablero\} alTocar=\{mesa\.mover\} quieto=\{mesa\.quieto\} \/>/.test(c) &&
+        /if \(datos === null\) \{/.test(c) &&
+        /if \(elLienzoCayo !== null\) \{/.test(c) &&
+        /if \(elMundoNoLlego !== null\) \{/.test(c) &&
+        /seVeEnTres\(laVista\)/.test(c) &&
+        /opcionesSueltas\(tablero, opciones\)/.test(c) &&
+        /opcionesFueraDelTablero\(sinElRetablo, null, null, hoja\)/.test(c)
+      );
+    },
+    escena,
+    escena.replace('if (elMundoNoLlego !== null) {', 'if (elMundoNoLlego !== null && false) {'),
+    'sin la rama del `.glb` que no llega, un túnel de treinta segundos deja la partida en un telón para siempre',
+  );
+
+  /* ─── El lienzo tiene suelo, y la ruta del modelo es la de la casa ─── */
+
+  reglaDelFuente(
+    'el lienzo se lleva el 58 % del alto con suelo de 360 y su caja NO es `flex: 1`',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /const PARTE_DEL_ALTO = 0\.58;/.test(c) &&
+        /const ALTO_MINIMO_DEL_LIENZO = 360;/.test(c) &&
+        /Math\.max\(ALTO_MINIMO_DEL_LIENZO, Math\.round\(altoDeLaPantalla \* PARTE_DEL_ALTO\)\)/.test(c) &&
+        /cajaDelLienzo: \{ width: '100%', overflow: 'hidden' \}/.test(c)
+      );
+    },
+    escena,
+    escena.replace("cajaDelLienzo: { width: '100%', overflow: 'hidden' }", "cajaDelLienzo: { flex: 1, overflow: 'hidden' }"),
+    'un `flex: 1` sin suelo se encoge hasta cero antes de que nada se desplace, y un lienzo a cero de alto es un contexto de GL que se crea y se destruye por nada',
+  );
+  reglaDelFuente(
+    'la ruta de `burgo.glb` sale de `escenas/ruta-de-modelos.ts` y no hay ninguna escrita a mano',
+    (t) =>
+      /import \{ rutaDelBurgo \} from '\.\.\/\.\.\/\.\.\/escenas\/ruta-de-modelos'/.test(t) &&
+      /motivo\.includes\(rutaDelBurgo\(\)\)/.test(soloCodigo(t)) &&
+      !/burgo\.glb/.test(soloCodigo(t)),
+    escena,
+    escena.replace('motivo.includes(rutaDelBurgo())', "motivo.includes('/burgo.glb')"),
+    'una ruta escrita a mano se separa de la del servidor y el respaldo deja de dispararse el día que cambie',
+  );
+
+  /* ─── La hoja: sin lógica propia, y con la gramática de la casa ─── */
+
+  reglaDelFuente(
+    'la hoja del Burgo no sabe reglas: no toca `three`, no mueve la mesa, no lee la tabla de casillas y compone por las dos puertas',
+    (t) =>
+      !/from 'three'/.test(t) &&
+      !/mesa\.mover/.test(t) &&
+      !/burgo-tablero/.test(t) &&
+      /from '\.\.\/\.\.\/\.\.\/shared\/arcade\/juegos\/burgo-en-tres'/.test(t) &&
+      /puja\.montar\(cuanto\)/.test(t) &&
+      /trato\.montar\(destino\.asiento, doy, pido\)/.test(t),
+    hojas,
+    hojas.replace('puja.montar(cuanto)', "cuanto % 10 === 0 ? { tipo: 'pujar', carga: { cuanto } } : null"),
+    'componer la carga aquí sería una segunda aritmética de qué cabe, y la que se rompe es la del cliente',
+  );
+  reglaDelFuente(
+    'y pinta las ocho secciones EN EL ORDEN de la traducción, con su caso para las cuatro que no son texto',
+    (t) =>
+      /hoja\.secciones\.map\(\(s\) =>/.test(t) &&
+      /case 'marcador':/.test(t) &&
+      /case 'almoneda':/.test(t) &&
+      /case 'trato':/.test(t) &&
+      /case 'mios':/.test(t),
+    hojas,
+    hojas.replace('hoja.secciones.map((s) =>', 'ORDEN_DE_LA_HOJA.map((s) =>'),
+    'reordenarlas aquí sería una segunda versión del §6.3 que se separa de la del escritorio el primer día',
+  );
+  reglaDelFuente(
+    'lo apagado se apaga con `BOTON.quieto` y nunca con opacidad, y nada de lo que se toca baja de 44',
+    (t) =>
+      /const DEDO = 44;/.test(t) &&
+      /minHeight: DEDO/.test(t) &&
+      /BOTON\.quieto\.fondo/.test(t) &&
+      !/opacity/.test(soloCodigo(t)),
+    hojas,
+    hojas.replace('backgroundColor: BOTON.quieto.fondo, borderColor: BOTON.quieto.borde', 'opacity: 0.4'),
+    'apagar con opacidad apaga también la letra: una ayuda en tenue cae de 5,95 a 2,32:1',
+  );
+  reglaDelFuente(
+    'la sección abierta se recuerda POR MESA en el bolsillo y lo guardado se contrasta con la lista de verdad',
+    (t) =>
+      /import \{ guardarLaSeccion, laSeccionGuardada \} from '\.\/bolsillo'/.test(t) &&
+      /laSeccionGuardada\(BURGO, codigo\)/.test(t) &&
+      /guardarLaSeccion\(BURGO, codigo, id\)/.test(t) &&
+      /for \(const id of ORDEN_DE_LA_HOJA\) if \(id === guardada\) ponerAbierta\(id\);/.test(t) &&
+      /ponerAbierta\(abre \?\? 'ahora'\);/.test(t),
+    hojas,
+    hojas.replace(
+      'for (const id of ORDEN_DE_LA_HOJA) if (id === guardada) ponerAbierta(id);',
+      'ponerAbierta(guardada as IdDeSeccion);',
+    ),
+    'una sección guardada por una versión anterior dejaría la hoja entera plegada y sin manera de saber por qué',
+  );
+}
+
+/**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», el mismo que llevan el servidor y la escena.
  *
  * Este guion no lo tuvo nunca, y la fase que metió aquí las comprobaciones del empate del
@@ -1753,26 +2099,34 @@ paso('El mueble de opciones de la app no pinta una DECLARACIÓN como si fuera un
  * añadir comprobaciones; un guardia desfasado no guarda nada.
  */
 /*
- * Y VA CON MARGEN Y NO AL RAS: hoy se hacen 182 —el trueque del retablo trajo once, y el
- * panel que se retira con el pregón, dos más— y el guardia está en 178. Al ras hace lo
- * contrario de lo que quiere —una comprobación que se cae de su bloque dispara el guardia
- * en vez de la roja, y con el guardia delante nadie ve el nombre de lo que se rompió.
+ * Y VA CON MARGEN Y NO AL RAS: hoy se hacen 217 —el Burgo trajo treinta y cinco, la mitad
+ * de ellas vacunas— y el guardia está en 207. Al ras hace lo contrario de lo que quiere:
+ * una comprobación que se cae de su bloque dispara el guardia en vez de la roja.
+ *
+ * ═══ Y LAS ROJAS SE IMPRIMEN ANTES DE QUE EL GUARDIA SALGA ═══
+ *
+ * Estaban al revés: con el guardia delante, un bloque que se cayera a la mitad terminaba
+ * con «sólo se han hecho N» y SIN el nombre de lo que se había roto, que es justo el dato
+ * que hace falta para arreglarlo. Ahora las rojas se cuentan primero y el guardia habla
+ * después, con su propio código de salida (2) para que se distinga de una roja de verdad.
  */
-const COMPROBACIONES_ESCRITAS = 178;
+const COMPROBACIONES_ESCRITAS = 207;
+
+if (fallos.length > 0) {
+  console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);
+  for (const f of fallos) console.error(`   · ${f}`);
+}
+
 if (cuantas < COMPROBACIONES_ESCRITAS) {
   console.error(
-    `Solo se han hecho ${cuantas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
+    `\nSolo se han hecho ${cuantas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
       'tiene escritas este guion: se ha caído por el camino sin decirlo. ' +
       'Si has añadido comprobaciones nuevas, sube el número.',
   );
   process.exit(2);
 }
 
-if (fallos.length > 0) {
-  console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);
-  for (const f of fallos) console.error(`   · ${f}`);
-  process.exit(1);
-}
+if (fallos.length > 0) process.exit(1);
 
 console.log(
   `\n✔ ${cuantas} comprobaciones. La Sala de la portada enseña lo que trae el binario Y lo que\n` +
