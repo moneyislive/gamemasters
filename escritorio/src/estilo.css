@@ -4252,7 +4252,7 @@ code {
 
 /*
  * MI DINERO. En `0.95rem` y no en el `1.1rem` que hereda de la cinta: lo peor que puede
- * escribirse ahí son cinco cifras y su rótulo («12.000 mrs»), y con la letra de la casa a
+ * escribirse ahí son cinco cifras y su rótulo («12.000 €»), y con la letra de la casa a
  * 1,1rem eso empuja el trozo de la frase hasta dejarla en dos palabras. `tabular-nums` por lo
  * mismo que el reloj: el dinero cambia con cada renta y sin cifras de ancho fijo la ficha
  * baila.
@@ -4357,8 +4357,8 @@ code {
 }
 
 /*
- * En columna y no en fila porque lo que se lee es el RÓTULO ENTERO: «Empeñar la Ribera de los
- * Curtidores por 350 mrs» en fila se corta y hay que adivinar cuál es cuál.
+ * En columna y no en fila porque lo que se lee es el RÓTULO ENTERO: «Hipotecar la Calle de
+ * las Grúas por 350 €» en fila se corta y hay que adivinar cuál es cuál.
  */
 .burgo-elige .opciones {
   flex-direction: column;
@@ -4391,7 +4391,7 @@ code {
 }
 
 /*
- * LA QUE HAY QUE MIRAR AHORA —la almoneda si me toca pujar, el trato si me proponen uno, «Lo
+ * LA QUE HAY QUE MIRAR AHORA —la subasta si me toca pujar, el trato si me proponen uno, «Lo
  * mío» en mi apuro, «Ahora» si me toca— se marca con su filo en el acento. Es un FILO y no un
  * fondo: un panel con fondo de acento pediría texto blanco encima, y esta casa no pinta
  * blanco sobre acento. `aria-current="step"` dice lo mismo a quien no ve el filo.
@@ -4583,7 +4583,7 @@ code {
   text-decoration: line-through;
 }
 
-/* Lo que le queda al Concejo. Separado por un filo: no es de ningún jugador. */
+/* Lo que le queda al Ayuntamiento. Separado por un filo: no es de ningún jugador. */
 .burgo-lo-del-concejo {
   margin: 0.75rem 0 0;
   padding-top: 0.6rem;

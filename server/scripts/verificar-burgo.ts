@@ -1,5 +1,5 @@
 /**
- * ¿SE SOSTIENE EL BURGO? — RENTAS, DADOS, MAZMORRA, CARTAS, ALMONEDA, APURO, TRATOS Y EL TIC
+ * ¿SE SOSTIENE EL BURGO? — RENTAS, DADOS, COMISARÍA, CARTAS, SUBASTA, APURO, TRATOS Y EL TIC
  *
  *   npm run verify:burgo
  *
@@ -9,7 +9,7 @@
  * lo que le pasa a un juego nuevo con la batería en verde: nada lo juega. `verify:mesa`
  * y `verify:larga` lo cubren en lo genérico; `oro:arcade` y `verify:determinismo` lo
  * congelan y lo comparan entre motores DESDE HOY; pero ninguno de ellos afirma que
- * una posada cobre lo que dice la tabla, que el tercer intento en la Mazmorra pague y
+ * un hotel cobre lo que dice la tabla, que el tercer intento en la Comisaría pague y
  * mueva, o que el tic liquide al ausente en un solo tic. Eso no se cae: se juega mal, y
  * se descubre a mitad de partida.
  *
@@ -20,33 +20,33 @@
  *      de un estado viejo (existe desde el primer commit, con vacuna).
  *   2. EMPEZAR: el aforo, el sorteo dentro, el tope de vueltas por carga, y que
  *      `ctx.azar` sólo se lee ahí.
- *   3. LAS RENTAS: suelto, barrio entero (doble), casas, posada, puertas ×1..4 con la
- *      empeñada contando, oficio ×4/×10, empeñado no cobra, presa cobra, propio no paga.
- *   4. DOBLES Y MAZMORRA: dobles repite, tres dobles encierran sin mover ni cobrar,
- *      fianza, Indulto (que vuelve al FONDO de su mazo), dados, tercer intento paga y
+ *   3. LAS RENTAS: suelto, barrio entero (doble), casas, hotel, puertas ×1..4 con la
+ *      hipotecada contando, oficio ×4/×10, hipotecado no cobra, presa cobra, propio no paga.
+ *   4. DOBLES Y COMISARÍA: dobles repite, tres dobles encierran sin mover ni cobrar,
+ *      fianza, Salvoconducto (que vuelve al FONDO de su mazo), dados, tercer intento paga y
  *      mueve (o abre apuro y mueve igual), de visita no pasa nada.
  *   5. LAS 32 CARTAS, aplicadas UNA A UNA desde estados montados, y el mazo que rota.
  *   6. EL EMPEÑO, con el interés por tabla y el trato que lo cobra.
- *   7. LA ALMONEDA: relevo por asiento, mínimo y múltiplos, las tres fijas, la puja
+ *   7. LA SUBASTA: relevo por asiento, mínimo y múltiplos, las tres fijas, la puja
  *      libre por la puerta con campos EXACTOS, ganador que paga, nadie puja, el que
  *      declinó no vuelve.
- *   8. EL APURO Y LA QUIEBRA: no se pasa en apuro, vender y empeñar saldan solos,
+ *   8. EL APURO Y LA QUIEBRA: no se pasa en apuro, vender y hipotecar saldan solos,
  *      varios acreedores, quiebra con jugador (todo a él, interés en el acto) y con el
- *      Concejo (almonedas en cola, Indultos al fondo), rendirse en y fuera de apuro.
+ *      Ayuntamiento (subastas en cola, Salvoconductos al fondo), rendirse en y fuera de apuro.
  *   9. LOS TRATOS: por puerta, del turno y AL del turno, campos exactos, tope 3,
  *      aceptar revalida, retirar, rechazar, caducan al relevar, y el que cae por otro.
- *  10. LAS OBRAS: parejo al alzar y al vender, la posada devuelve cuatro casas, sin
- *      casas en el Concejo no se alza.
+ *  10. LAS OBRAS: parejo al alzar y al vender, el hotel devuelve cuatro casas, sin
+ *      casas en el Ayuntamiento no se alza.
  *  11. EL TIC, caso a caso, y una mesa de seis con NADIE moviendo que acaba sola.
  *  12. «SÓLO SI»: cada tipo mandado fuera de su momento devuelve EL MISMO objeto con
  *      motivo, y ningún motivo lleva un secreto (vacuna con `'p07'`).
  *  13. PARTIDAS ENTERAS DE 2, 3 Y 6 jugadas por el robot, contadas desde los `sucesos`
- *      de la vista: quiebras, rentas, almonedas ganadas, Mazmorra, barrios alzados,
+ *      de la vista: quiebras, rentas, subastas ganadas, Comisaría, barrios alzados,
  *      tratos aceptados y un ganador; reejecutadas del diario; con secretos, forma y
  *      canónico mirados EN CADA REVISIÓN de siete miradas; y con la vacuna del robot
  *      que sólo pasa, que se ve caer.
  *  14. TAMAÑOS Y PRESUPUESTO: el peor estado, la peor vista, las peores opciones, la
- *      carga más gorda, la cascada de 28 almonedas, y las cifras impresas.
+ *      carga más gorda, la cascada de 28 subastas, y las cifras impresas.
  *
  * ═══ LAS VACUNAS ═══
  *
@@ -63,7 +63,7 @@
  *
  *   · «Seis sentados, nadie mueve, ≤ 2.500 tics» del diseño es de OTRA mesa. Medido
  *     aquí: seis con tope 30 cuestan 7.846 tics; cuatro con tope 10, 1.615; dos con
- *     tope 6, 357. Sin nadie que compre, cada título pisado sale a almoneda y los
+ *     tope 6, 357. Sin nadie que compre, cada título pisado sale a subasta y los
  *     seis pasan uno a uno. Se afirman las tres con su tope propio (lo medido más un
  *     tercio) y se IMPRIMEN; lo que de verdad se exige es que TERMINEN.
  *   · La tabla (§2.2) no se repite: la afirma `verify:mecanicas-burgo`.
@@ -229,7 +229,7 @@ const TOPE_DE_MS = 25;
  * Los topes salen de medir y de subir un tercio (ver el bloque 11). No son «2.500»,
  * que es lo que decía el diseño para una mesa distinta de la que aquí se juega.
  */
-/** Tope de tics de la cascada de quiebra al Concejo: 28 almonedas con los demás pasando. */
+/** Tope de tics de la cascada de quiebra al Ayuntamiento: 28 subastas con los demás pasando. */
 const TOPE_DE_CASCADA = 400;
 
 const MESAS_SIN_NADIE: ReadonlyArray<readonly [number, number, number]> = [
@@ -321,14 +321,14 @@ function conTitulo(e: EstadoDelBurgo, casilla: number, cambios: Partial<TituloDe
   return { ...e, titulos: e.titulos.map((t) => (t.casilla === casilla ? { ...t, ...cambios } : t)) };
 }
 
-/** Varios títulos de golpe: `[casilla, dueño, casas, empeñado]`. */
+/** Varios títulos de golpe: `[casilla, dueño, casas, hipotecado]`. */
 function conTitulos(e: EstadoDelBurgo, filas: ReadonlyArray<readonly [number, AsientoId | null, number, boolean]>): EstadoDelBurgo {
   let s = e;
   for (const [casilla, dueno, casas, empenado] of filas) s = conTitulo(s, casilla, { dueno, casas, empenado });
   return s;
 }
 
-/** El turno para `asiento`, en el paso que se diga, sin apuro ni almoneda. */
+/** El turno para `asiento`, en el paso que se diga, sin apuro ni subasta. */
 function turnoDe(e: EstadoDelBurgo, asiento: AsientoId, pasoDelTurno: EstadoDelBurgo['paso'] = 'por-tirar'): EstadoDelBurgo {
   const turno = e.jugadores.findIndex((j) => j.asiento === asiento);
   return { ...e, turno, paso: pasoDelTurno, luego: 'por-pasar', dobles: 0, apuro: null, almoneda: null, colaDeApuros: [], colaDeAlmonedas: [] };
@@ -594,13 +594,13 @@ paso('2. EMPEZAR: el aforo, el sorteo dentro, el tope por carga, y ctx.azar sól
     e.jugadores.map((j) => j.asiento).join() === CUATRO.join() && e.jugadores.every((j, i) => j.color === COLORES_DEL_BURGO[i]),
   );
   comprobar(
-    'todos en la Puerta Mayor, libres, con 1.500 mrs, sin Indultos y sin vueltas',
+    'todos en la Salida, libres, con 1.500 €, sin Salvoconductos y sin vueltas',
     e.jugadores.every((j) => j.casilla === 0 && j.presa === LIBRE && j.mrs === DINERO_DE_SALIDA && j.indultos.length === 0 && !j.quebrado && j.vueltas === 0),
   );
-  comprobar('28 títulos del Concejo, sin casas ni empeños, en orden de casilla', e.titulos.length === 28 && e.titulos.every((t, i) => t.casilla === TITULOS[i] && t.dueno === null && t.casas === 0 && !t.empenado));
-  comprobar('el Concejo guarda 32 casas y 12 posadas', e.casasEnElConcejo === CASAS_DEL_CONCEJO && e.posadasEnElConcejo === POSADAS_DEL_CONCEJO);
-  comprobar('el Pregón son las 16 series barajadas, sin repetir', e.pregon.length === 16 && new Set(e.pregon).size === 16 && [...e.pregon].sort().join() === seriesDe('pregon').join());
-  comprobar('y el Arca igual, con sus 16', e.arca.length === 16 && new Set(e.arca).size === 16 && [...e.arca].sort().join() === seriesDe('arca').join());
+  comprobar('28 títulos del Ayuntamiento, sin casas ni hipotecas, en orden de casilla', e.titulos.length === 28 && e.titulos.every((t, i) => t.casilla === TITULOS[i] && t.dueno === null && t.casas === 0 && !t.empenado));
+  comprobar('el Ayuntamiento guarda 32 casas y 12 hoteles', e.casasEnElConcejo === CASAS_DEL_CONCEJO && e.posadasEnElConcejo === POSADAS_DEL_CONCEJO);
+  comprobar('Sucesos son las 16 series barajadas, sin repetir', e.pregon.length === 16 && new Set(e.pregon).size === 16 && [...e.pregon].sort().join() === seriesDe('pregon').join());
+  comprobar('y el Fondo Vecinal igual, con sus 16', e.arca.length === 16 && new Set(e.arca).size === 16 && [...e.arca].sort().join() === seriesDe('arca').join());
   comprobar('y barajados de verdad: no en orden de tabla', e.pregon.join() !== seriesDe('pregon').join() && e.arca.join() !== seriesDe('arca').join());
   const sale = sucesosDe(e, 'sale');
   comprobar('el sorteo dejó un `sale` por candidato y ronda', sale.length >= 4);
@@ -667,7 +667,7 @@ paso('2. EMPEZAR: el aforo, el sorteo dentro, el tope por carga, y ctx.azar sól
 }
 
 // ---------------------------------------------------------------------------
-paso('3. LAS RENTAS: suelto, barrio entero, casas, posada, puertas, oficios, empeñado, presa, propio');
+paso('3. LAS RENTAS: suelto, barrio entero, casas, hotel, puertas, oficios, hipotecado, presa, propio');
 // ---------------------------------------------------------------------------
 
 /** Un par que suma siete y no es dobles: la tirada de casi todos los montajes. */
@@ -675,7 +675,7 @@ const SIETE: ParDeDados = [3, 4];
 
 /**
  * Pone a `quien` siete casillas antes de `hasta`, tira `SIETE` y devuelve lo que
- * salió. Si `hasta` está antes de la salida, se cruza la Puerta Mayor y se cobran
+ * salió. Si `hasta` está antes de la salida, se cruza la Salida y se cobran
  * 200: se devuelve para que quien mira el dinero lo descuente.
  */
 function alCaerEn(id: string, base: EstadoDelBurgo, quien: AsientoId, hasta: number, pares: readonly ParDeDados[] = [SIETE]): { s: EstadoDelBurgo; cruza: boolean } {
@@ -687,7 +687,7 @@ function alCaerEn(id: string, base: EstadoDelBurgo, quien: AsientoId, hasta: num
 
 /**
  * LOS REPROCHES DE UNA RENTA: quien cae paga exactamente `cuanto` al dueño por
- * `renta`, el dueño lo cobra, y el dinero de los dos cuadra (con la Puerta Mayor
+ * `renta`, el dueño lo cobra, y el dinero de los dos cuadra (con la Salida
  * descontada). Con `cuanto === 0` se exige que NO haya pago. Es la función que se
  * aplica al caso bueno y al envenenado.
  */
@@ -716,23 +716,23 @@ function reprochesDeRenta(antes: EstadoDelBurgo, s: EstadoDelBurgo, quien: Asien
   const casos: Array<{ que: string; titulos: readonly Fila[]; hasta: number; dueno: AsientoId | null; cuanto: number; antes?: (e: EstadoDelBurgo) => EstadoDelBurgo; pares?: readonly ParDeDados[] }> = [
     { que: 'un solar suelto cobra la renta de la tabla', titulos: [[1, BRUNO, 0, false]], hasta: 1, dueno: BRUNO, cuanto: 2 },
     { que: 'el barrio entero sin casas cobra el DOBLE', titulos: [[1, BRUNO, 0, false], [3, BRUNO, 0, false]], hasta: 1, dueno: BRUNO, cuanto: 4 },
-    { que: 'y sigue cobrando el doble aunque OTRO solar del barrio esté empeñado (regla oficial)', titulos: [[1, BRUNO, 0, false], [3, BRUNO, 0, true]], hasta: 1, dueno: BRUNO, cuanto: 4 },
+    { que: 'y sigue cobrando el doble aunque OTRO solar del barrio esté hipotecado (regla oficial)', titulos: [[1, BRUNO, 0, false], [3, BRUNO, 0, true]], hasta: 1, dueno: BRUNO, cuanto: 4 },
     { que: 'con una casa cobra la renta de una casa', titulos: [[1, BRUNO, 1, false], [3, BRUNO, 1, false]], hasta: 1, dueno: BRUNO, cuanto: 10 },
     { que: 'con dos casas', titulos: [[1, BRUNO, 2, false], [3, BRUNO, 2, false]], hasta: 1, dueno: BRUNO, cuanto: 30 },
     { que: 'con tres casas', titulos: [[1, BRUNO, 3, false], [3, BRUNO, 3, false]], hasta: 1, dueno: BRUNO, cuanto: 90 },
     { que: 'con cuatro casas', titulos: [[1, BRUNO, 4, false], [3, BRUNO, 4, false]], hasta: 1, dueno: BRUNO, cuanto: 160 },
-    { que: 'con posada cobra la renta de posada', titulos: [[1, BRUNO, POSADA, false], [3, BRUNO, 4, false]], hasta: 1, dueno: BRUNO, cuanto: 250 },
-    { que: 'la Calle Mayor con posada cobra 2.000 (a quien los tiene)', titulos: [[39, BRUNO, POSADA, false], [37, BRUNO, POSADA, false]], hasta: 39, dueno: BRUNO, cuanto: 2000, antes: (e) => conJugador(e, ANA, { mrs: 2500 }) },
+    { que: 'con hotel cobra la renta de hotel', titulos: [[1, BRUNO, POSADA, false], [3, BRUNO, 4, false]], hasta: 1, dueno: BRUNO, cuanto: 250 },
+    { que: 'la Calle Mayor con hotel cobra 2.000 (a quien los tiene)', titulos: [[39, BRUNO, POSADA, false], [37, BRUNO, POSADA, false]], hasta: 39, dueno: BRUNO, cuanto: 2000, antes: (e) => conJugador(e, ANA, { mrs: 2500 }) },
     { que: 'una puerta sola cobra 25', titulos: [[5, BRUNO, 0, false]], hasta: 5, dueno: BRUNO, cuanto: RENTA_DE_PUERTA[1] as number },
     { que: 'dos puertas cobran 50', titulos: [[5, BRUNO, 0, false], [15, BRUNO, 0, false]], hasta: 5, dueno: BRUNO, cuanto: RENTA_DE_PUERTA[2] as number },
     { que: 'tres puertas cobran 100', titulos: [[5, BRUNO, 0, false], [15, BRUNO, 0, false], [25, BRUNO, 0, false]], hasta: 5, dueno: BRUNO, cuanto: RENTA_DE_PUERTA[3] as number },
     { que: 'las cuatro puertas cobran 200', titulos: [[5, BRUNO, 0, false], [15, BRUNO, 0, false], [25, BRUNO, 0, false], [35, BRUNO, 0, false]], hasta: 5, dueno: BRUNO, cuanto: RENTA_DE_PUERTA[4] as number },
-    { que: 'la puerta EMPEÑADA cuenta para el número: con cuatro y una empeñada, la libre cobra 200', titulos: [[5, BRUNO, 0, false], [15, BRUNO, 0, true], [25, BRUNO, 0, false], [35, BRUNO, 0, false]], hasta: 5, dueno: BRUNO, cuanto: RENTA_DE_PUERTA[4] as number },
-    { que: 'pero la empeñada misma no cobra nada', titulos: [[5, BRUNO, 0, false], [15, BRUNO, 0, true], [25, BRUNO, 0, false], [35, BRUNO, 0, false]], hasta: 15, dueno: BRUNO, cuanto: 0 },
+    { que: 'la puerta HIPOTECADA cuenta para el número: con cuatro y una hipotecada, la libre cobra 200', titulos: [[5, BRUNO, 0, false], [15, BRUNO, 0, true], [25, BRUNO, 0, false], [35, BRUNO, 0, false]], hasta: 5, dueno: BRUNO, cuanto: RENTA_DE_PUERTA[4] as number },
+    { que: 'pero la hipotecada misma no cobra nada', titulos: [[5, BRUNO, 0, false], [15, BRUNO, 0, true], [25, BRUNO, 0, false], [35, BRUNO, 0, false]], hasta: 15, dueno: BRUNO, cuanto: 0 },
     { que: 'un oficio cobra cuatro veces la tirada', titulos: [[12, BRUNO, 0, false]], hasta: 12, dueno: BRUNO, cuanto: (MULTIPLO_DE_OFICIO[1] as number) * 7 },
     { que: 'los dos oficios cobran diez veces la tirada', titulos: [[12, BRUNO, 0, false], [28, BRUNO, 0, false]], hasta: 12, dueno: BRUNO, cuanto: (MULTIPLO_DE_OFICIO[2] as number) * 7 },
     { que: 'y con otra tirada, otra renta: con 2 y 6 son 32', titulos: [[12, BRUNO, 0, false]], hasta: 12, dueno: BRUNO, cuanto: (MULTIPLO_DE_OFICIO[1] as number) * 8, pares: [[2, 6]] },
-    { que: 'un solar empeñado no cobra', titulos: [[1, BRUNO, 0, true]], hasta: 1, dueno: BRUNO, cuanto: 0 },
+    { que: 'un solar hipotecado no cobra', titulos: [[1, BRUNO, 0, true]], hasta: 1, dueno: BRUNO, cuanto: 0 },
     { que: 'el dueño PRESA cobra igual', titulos: [[1, BRUNO, 0, false]], hasta: 1, dueno: BRUNO, cuanto: 2, antes: (e) => conJugador(e, BRUNO, { casilla: LA_MAZMORRA, presa: 0 }) },
     { que: 'lo propio no se paga', titulos: [[1, ANA, 0, false]], hasta: 1, dueno: ANA, cuanto: 0 },
     { que: 'un dueño quebrado ya no cobra: el título es de nadie a efectos de renta', titulos: [[1, BRUNO, 0, false]], hasta: 1, dueno: BRUNO, cuanto: 0, antes: (e) => conJugador(e, BRUNO, { quebrado: true, mrs: 0 }) },
@@ -762,7 +762,7 @@ function reprochesDeRenta(antes: EstadoDelBurgo, s: EstadoDelBurgo, quien: Asien
 
   /* Sin dueño, no hay renta: se abre `comprar`. */
   const { s: sinDueno } = alCaerEn('REN-CONCEJO', base, ANA, 1);
-  comprobar('un título del Concejo no cobra: abre el paso de comprar', sinDueno.paso === 'comprar' && pagosDe(sinDueno, ANA).length === 0);
+  comprobar('un título del Ayuntamiento no cobra: abre el paso de comprar', sinDueno.paso === 'comprar' && pagosDe(sinDueno, ANA).length === 0);
   comprobar('y la vista marca barrioEntero en los dos solares cuando son del mismo dueño', (() => {
     const e = conTitulos(base, [[1, BRUNO, 0, false], [3, BRUNO, 0, false]]);
     const v = vistaDe(e, ESPECTADOR);
@@ -779,7 +779,7 @@ function reprochesDeRenta(antes: EstadoDelBurgo, s: EstadoDelBurgo, quien: Asien
 }
 
 // ---------------------------------------------------------------------------
-paso('4. LAS OBRAS: parejo al alzar y al vender, la posada, y el Concejo sin casas');
+paso('4. LAS OBRAS: parejo al alzar y al vender, el hotel, y el Ayuntamiento sin casas');
 // ---------------------------------------------------------------------------
 
 {
@@ -788,62 +788,62 @@ paso('4. LAS OBRAS: parejo al alzar y al vender, la posada, y el Concejo sin cas
   let mesa = mesaSobre('OBR-1', conBarrio, CUATRO);
   const ids0 = idsDe(estadoDe(mesa), BRUNO);
   comprobar('con el barrio entero y sin casas se ofrece alzar en los dos solares', ids0.includes('alzar:1') && ids0.includes('alzar:3'), ids0);
-  comprobar('y empeñar los dos, y vender ninguno', ids0.includes('empenar:1') && ids0.includes('empenar:3') && !ids0.some((id) => id.startsWith('vender:')), ids0);
+  comprobar('y hipotecar los dos, y vender ninguno', ids0.includes('empenar:1') && ids0.includes('empenar:3') && !ids0.some((id) => id.startsWith('vender:')), ids0);
   const sinBarrio = turnoDe(conTitulos(base, [[1, BRUNO, 0, false]]), BRUNO, 'por-pasar');
   comprobar('sin el barrio entero no se ofrece alzar', !idsDe(sinBarrio, BRUNO).some((id) => id.startsWith('alzar:')));
   const conEmpeno = turnoDe(conTitulos(base, [[1, BRUNO, 0, false], [3, BRUNO, 0, true]]), BRUNO, 'por-pasar');
-  comprobar('ni con un solar del barrio empeñado', !idsDe(conEmpeno, BRUNO).some((id) => id.startsWith('alzar:')));
+  comprobar('ni con un solar del barrio hipotecado', !idsDe(conEmpeno, BRUNO).some((id) => id.startsWith('alzar:')));
 
   const alza1 = mover(mesa, BRUNO, { tipo: ALZAR, carga: { casilla: 1 } });
   mesa = alza1.mesa;
   let e = estadoDe(mesa);
-  comprobar('alzar la primera casa cambia el estado, cobra 50 y baja el Concejo a 31', alza1.cambio && tituloDe(e, 1).casas === 1 && e.casasEnElConcejo === CASAS_DEL_CONCEJO - 1 && pagosDe(e, BRUNO).some((p) => p.porque === 'casa' && p.cuanto === 50));
+  comprobar('alzar la primera casa cambia el estado, cobra 50 y baja el Ayuntamiento a 31', alza1.cambio && tituloDe(e, 1).casas === 1 && e.casasEnElConcejo === CASAS_DEL_CONCEJO - 1 && pagosDe(e, BRUNO).some((p) => p.porque === 'casa' && p.cuanto === 50));
   comprobar('con un suceso `alza` con casas 1', sucesosDe(e, 'alza').length === 1 && (sucesosDe(e, 'alza')[0] as { casas: number }).casas === 1);
   const ids1 = idsDe(e, BRUNO);
   comprobar('PAREJO: la segunda casa en el 1 no se ofrece hasta que el 3 tenga una', !ids1.includes('alzar:1') && ids1.includes('alzar:3'), ids1);
-  comprobar('y ya no se puede empeñar ninguno de los dos: hay edificios en el barrio', !ids1.includes('empenar:1') && !ids1.includes('empenar:3'), ids1);
+  comprobar('y ya no se puede hipotecar ninguno de los dos: hay edificios en el barrio', !ids1.includes('empenar:1') && !ids1.includes('empenar:3'), ids1);
   comprobar('vender se ofrece sólo donde hay casa', ids1.includes('vender:1') && !ids1.includes('vender:3'), ids1);
   const segunda = mover(mesa, BRUNO, { tipo: ALZAR, carga: { casilla: 1 } });
   comprobar('mandar la segunda casa en el 1 se rechaza con motivo y no cambia nada', !segunda.cambio && segunda.motivo !== null, segunda.motivo);
 
-  /* Hasta cuatro y cuatro, alternando, y la posada. */
+  /* Hasta cuatro y cuatro, alternando, y el hotel. */
   for (const c of [3, 1, 3, 1, 3, 1, 3]) {
     const r = mover(mesa, BRUNO, { tipo: ALZAR, carga: { casilla: c } });
     if (!r.cambio) fallos.push(`no se pudo alzar en ${c}: ${String(r.motivo)}`);
     mesa = r.mesa;
   }
   e = estadoDe(mesa);
-  comprobar('con ocho alzas hay cuatro casas en cada solar y 24 en el Concejo', tituloDe(e, 1).casas === 4 && tituloDe(e, 3).casas === 4 && e.casasEnElConcejo === CASAS_DEL_CONCEJO - 8);
+  comprobar('con ocho alzas hay cuatro casas en cada solar y 24 en el Ayuntamiento', tituloDe(e, 1).casas === 4 && tituloDe(e, 3).casas === 4 && e.casasEnElConcejo === CASAS_DEL_CONCEJO - 8);
   const idsPosada = idsDe(e, BRUNO);
   const opPosada = opcionPorId(e, BRUNO, 'alzar:1');
-  comprobar('la quinta se ofrece como posada, con el precio de una casa más', opPosada !== null && opPosada.rotulo.indexOf('posada') >= 0 && opPosada.rotulo.indexOf('50 mrs') >= 0, idsPosada);
+  comprobar('la quinta se ofrece como hotel, con el precio de una casa más', opPosada !== null && opPosada.rotulo.indexOf('hotel') >= 0 && opPosada.rotulo.indexOf('50 €') >= 0, idsPosada);
   const posada = mover(mesa, BRUNO, { tipo: ALZAR, carga: { casilla: 1 } });
   mesa = posada.mesa;
   e = estadoDe(mesa);
-  comprobar('la posada sustituye a las cuatro casas: casas 5, el Concejo recupera cuatro y da una posada', posada.cambio && tituloDe(e, 1).casas === POSADA && e.casasEnElConcejo === CASAS_DEL_CONCEJO - 4 && e.posadasEnElConcejo === POSADAS_DEL_CONCEJO - 1);
+  comprobar('el hotel sustituye a las cuatro casas: casas 5, el Ayuntamiento recupera cuatro y da un hotel', posada.cambio && tituloDe(e, 1).casas === POSADA && e.casasEnElConcejo === CASAS_DEL_CONCEJO - 4 && e.posadasEnElConcejo === POSADAS_DEL_CONCEJO - 1);
   comprobar('y se paga por `posada`', pagosDe(e, BRUNO).some((p) => p.porque === 'posada' && p.cuanto === 50));
   const idsTrasPosada = idsDe(e, BRUNO);
-  comprobar('PAREJO al vender: con posada en el 1 y cuatro casas en el 3, sólo se vende del 1', idsTrasPosada.includes('vender:1') && !idsTrasPosada.includes('vender:3'), idsTrasPosada);
+  comprobar('PAREJO al vender: con hotel en el 1 y cuatro casas en el 3, sólo se vende del 1', idsTrasPosada.includes('vender:1') && !idsTrasPosada.includes('vender:3'), idsTrasPosada);
   const opVenta = opcionPorId(e, BRUNO, 'vender:1');
-  comprobar('y la venta de la posada se rotula «por cuatro casas» porque el Concejo las tiene', opVenta !== null && opVenta.rotulo.indexOf('por cuatro casas') >= 0, opVenta?.rotulo);
+  comprobar('y la venta de el hotel se rotula «por cuatro casas» porque el Ayuntamiento las tiene', opVenta !== null && opVenta.rotulo.indexOf('por cuatro casas') >= 0, opVenta?.rotulo);
   const venta = mover(mesa, BRUNO, { tipo: VENDER, carga: { casilla: 1 } });
   e = estadoDe(venta.mesa);
-  comprobar('vender la posada la degrada a cuatro casas y devuelve la mitad de una casa (25)', venta.cambio && tituloDe(e, 1).casas === 4 && e.posadasEnElConcejo === POSADAS_DEL_CONCEJO && e.casasEnElConcejo === CASAS_DEL_CONCEJO - 8 && cobrosDe(e, BRUNO).some((c) => c.porque === 'venta' && c.cuanto === 25));
+  comprobar('vender el hotel la degrada a cuatro casas y devuelve la mitad de una casa (25)', venta.cambio && tituloDe(e, 1).casas === 4 && e.posadasEnElConcejo === POSADAS_DEL_CONCEJO && e.casasEnElConcejo === CASAS_DEL_CONCEJO - 8 && cobrosDe(e, BRUNO).some((c) => c.porque === 'venta' && c.cuanto === 25));
 
-  /* La posada ENTERA cuando el Concejo no tiene cuatro casas que devolver. */
+  /* El hotel ENTERO cuando el Ayuntamiento no tiene cuatro casas que devolver. */
   const sinCasas: EstadoDelBurgo = { ...estadoDe(mesa), casasEnElConcejo: 2 };
   const opEntera = opcionPorId(sinCasas, BRUNO, 'vender:1');
-  comprobar('sin cuatro casas en el Concejo, la posada se vende ENTERA: rótulo y 125 mrs', opEntera !== null && opEntera.rotulo.indexOf('la posada entera') >= 0 && opEntera.rotulo.indexOf('125 mrs') >= 0, opEntera?.rotulo);
+  comprobar('sin cuatro casas en el Ayuntamiento, el hotel se vende ENTERA: rótulo y 125 €', opEntera !== null && opEntera.rotulo.indexOf('el hotel entero') >= 0 && opEntera.rotulo.indexOf('125 €') >= 0, opEntera?.rotulo);
   const entera = mover(mesaSobre('OBR-ENTERA', sinCasas, CUATRO), BRUNO, { tipo: VENDER, carga: { casilla: 1 } });
   const eEntera = estadoDe(entera.mesa);
-  comprobar('y al venderla quedan cero casas y el Concejo recupera la posada', entera.cambio && tituloDe(eEntera, 1).casas === 0 && eEntera.posadasEnElConcejo === POSADAS_DEL_CONCEJO && cobrosDe(eEntera, BRUNO).some((c) => c.cuanto === 5 * 25));
+  comprobar('y al venderla quedan cero casas y el Ayuntamiento recupera el hotel', entera.cambio && tituloDe(eEntera, 1).casas === 0 && eEntera.posadasEnElConcejo === POSADAS_DEL_CONCEJO && cobrosDe(eEntera, BRUNO).some((c) => c.cuanto === 5 * 25));
 
-  /* Sin casas en el Concejo no se alza; sin posadas tampoco la posada. */
+  /* Sin casas en el Ayuntamiento no se alza; sin hoteles tampoco el hotel. */
   const concejoVacio: EstadoDelBurgo = { ...conBarrio, casasEnElConcejo: 0 };
-  comprobar('con el Concejo sin casas no se ofrece alzar', !idsDe(concejoVacio, BRUNO).some((id) => id.startsWith('alzar:')));
+  comprobar('con el Ayuntamiento sin casas no se ofrece alzar', !idsDe(concejoVacio, BRUNO).some((id) => id.startsWith('alzar:')));
   const aPuntoDePosada = conTitulos({ ...conBarrio, casasEnElConcejo: 0 }, [[1, BRUNO, 4, false], [3, BRUNO, 4, false]]);
-  comprobar('pero con cuatro y cuatro la posada sí, aunque no haya casas', idsDe(aPuntoDePosada, BRUNO).includes('alzar:1'));
-  comprobar('y sin posadas en el Concejo, no', !idsDe({ ...aPuntoDePosada, posadasEnElConcejo: 0 }, BRUNO).some((id) => id.startsWith('alzar:')));
+  comprobar('pero con cuatro y cuatro el hotel sí, aunque no haya casas', idsDe(aPuntoDePosada, BRUNO).includes('alzar:1'));
+  comprobar('y sin hoteles en el Ayuntamiento, no', !idsDe({ ...aPuntoDePosada, posadasEnElConcejo: 0 }, BRUNO).some((id) => id.startsWith('alzar:')));
   const desparejo = conTitulos(conBarrio, [[1, BRUNO, 2, false], [3, BRUNO, 1, false]]);
   comprobar('se vende de donde hay más: con 2 y 1 sólo se ofrece vender del 1', idsDe(desparejo, BRUNO).includes('vender:1') && !idsDe(desparejo, BRUNO).includes('vender:3'));
   comprobar('y se alza donde hay menos: sólo el 3', idsDe(desparejo, BRUNO).includes('alzar:3') && !idsDe(desparejo, BRUNO).includes('alzar:1'));
@@ -857,18 +857,18 @@ paso('4. LAS OBRAS: parejo al alzar y al vender, la posada, y el Concejo sin cas
 }
 
 // ---------------------------------------------------------------------------
-paso('5. DOBLES Y MAZMORRA: repetir, tres dobles, fianza, Indulto, dados, tercer intento, visita');
+paso('5. DOBLES Y COMISARÍA: repetir, tres dobles, fianza, Salvoconducto, dados, tercer intento, visita');
 // ---------------------------------------------------------------------------
 
-/** Los reproches de un encierro: en la Mazmorra, presa 0, sin cobrar la Puerta Mayor, y con el suceso. */
+/** Los reproches de un encierro: en la Comisaría, presa 0, sin cobrar la Salida, y con el suceso. */
 function reprochesDeEncierro(s: EstadoDelBurgo, quien: AsientoId, porque: 'casilla' | 'carta' | 'tres-dobles'): string[] {
   const r: string[] = [];
   const j = jugadorDe(s, quien);
-  if (j.casilla !== LA_MAZMORRA) r.push(`está en ${j.casilla} y no en la Mazmorra`);
+  if (j.casilla !== LA_MAZMORRA) r.push(`está en ${j.casilla} y no en la Comisaría`);
   if (j.presa !== 0) r.push(`presa es ${j.presa} y no 0`);
   const enc = sucesosDe(s, 'a-la-mazmorra') as Array<{ quien: string; porque: string }>;
   if (!enc.some((x) => x.quien === quien && x.porque === porque)) r.push(`no hay suceso a-la-mazmorra por ${porque}`);
-  if (cobrosDe(s, quien).some((c) => c.porque === 'puerta-mayor')) r.push('cobró la Puerta Mayor de camino');
+  if (cobrosDe(s, quien).some((c) => c.porque === 'puerta-mayor')) r.push('cobró la Salida de camino');
   if (s.dobles !== 0) r.push('los dobles no se pusieron a cero');
   return r;
 }
@@ -889,7 +889,7 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
   /* Dobles repite. */
   const { s: dobles } = alCaerEn('DOB-1', base, ANA, 4, [[2, 2]]);
   comprobar('con dobles se mueve, se resuelve la casilla y se queda en por-tirar con dobles 1', dobles.dobles === 1 && dobles.paso === 'por-tirar' && dobles.tiradasDelTurno === 1 && jugadorDe(dobles, ANA).casilla === 4);
-  comprobar('y pagó el Diezmo al caer en el 4', pagosDe(dobles, ANA).some((p) => p.porque === 'diezmo' && p.cuanto === EL_DIEZMO));
+  comprobar('y pagó el Impuesto al caer en el 4', pagosDe(dobles, ANA).some((p) => p.porque === 'diezmo' && p.cuanto === EL_DIEZMO));
   comprobar('la vista ofrece tirar otra vez y NO pasar', idsDe(dobles, ANA).includes('tirar') && !idsDe(dobles, ANA).includes('pasar'), idsDe(dobles, ANA));
   comprobar('y el suceso `tira` lleva dobles: true con el PAR entero', (sucesosDe(dobles, 'tira')[0] as { dobles: boolean; dados: ParDeDados }).dobles && (sucesosDe(dobles, 'tira')[0] as { dados: ParDeDados }).dados.join() === '2,2');
   const { s: sinDobles } = alCaerEn('DOB-0', base, ANA, LA_FERIA);
@@ -899,29 +899,29 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
 
   /*
    * Tres dobles seguidos encierran sin mover ni cobrar. Se sale del 34 para que las
-   * dos primeras caídas sean la Puerta Mayor y el Diezmo: ni un título (que abriría
+   * dos primeras caídas sean la Salida y el Impuesto: ni un título (que abriría
    * `comprar` y pararía la cadena) ni una carta (que gastaría azar).
    */
   let mesa = listoParaTirar('DOB-3', base, ANA, 34, [[3, 3], [2, 2], [1, 1]]);
   mesa = tira(mesa, ANA);
-  comprobar('primer dobles: la Puerta Mayor, dobles 1', jugadorDe(estadoDe(mesa), ANA).casilla === 0 && estadoDe(mesa).dobles === 1);
+  comprobar('primer dobles: la Salida, dobles 1', jugadorDe(estadoDe(mesa), ANA).casilla === 0 && estadoDe(mesa).dobles === 1);
   mesa = tira(mesa, ANA);
-  comprobar('segundo dobles: el Diezmo, dobles 2', jugadorDe(estadoDe(mesa), ANA).casilla === 4 && estadoDe(mesa).dobles === 2);
+  comprobar('segundo dobles: el Impuesto, dobles 2', jugadorDe(estadoDe(mesa), ANA).casilla === 4 && estadoDe(mesa).dobles === 2);
   mesa = tira(mesa, ANA);
   const tres = estadoDe(mesa);
-  comprobar('tercer dobles: a la Mazmorra sin mover ni cobrar', reprochesDeEncierro(tres, ANA, 'tres-dobles').length === 0 && sucesosDe(tres, 'mueve').length === 0, reprochesDeEncierro(tres, ANA, 'tres-dobles'));
+  comprobar('tercer dobles: a la Comisaría sin mover ni cobrar', reprochesDeEncierro(tres, ANA, 'tres-dobles').length === 0 && sucesosDe(tres, 'mueve').length === 0, reprochesDeEncierro(tres, ANA, 'tres-dobles'));
   comprobar('y el turno queda en por-pasar: se ofrece pasar y no tirar', tres.paso === 'por-pasar' && idsDe(tres, ANA).includes('pasar') && !idsDe(tres, ANA).includes('tirar'));
   comprobar('rev 3 y jugada subida tres veces: una por tirada', mesa.rev === 3 && tres.jugada === base.jugada + 3);
   /* La vacuna: un estado que dejara al de los tres dobles libre en la calle se ve caer. */
   const noEncerrado = conJugador(tres, ANA, { casilla: 12, presa: LIBRE });
   comprobar('la vacuna: sin el tope de tres dobles (libre en el 12) los reproches del encierro caen', reprochesDeEncierro(noEncerrado, ANA, 'tres-dobles').length > 0);
-  comprobar('y el dinero cuadra: cobró 200 en la Puerta Mayor, pagó 200 de Diezmo y nada más', jugadorDe(tres, ANA).mrs === DINERO_DE_SALIDA);
+  comprobar('y el dinero cuadra: cobró 200 en la Salida, pagó 200 de Impuesto y nada más', jugadorDe(tres, ANA).mrs === DINERO_DE_SALIDA);
 
-  /* Presa: fianza, Indulto, dados. */
+  /* Presa: fianza, Salvoconducto, dados. */
   const presa = turnoDe(conJugador(base, ANA, { casilla: LA_MAZMORRA, presa: 0 }), ANA);
   const idsPresa = idsDe(presa, ANA);
-  comprobar('presa con dinero: se ofrece tirar y pagar la fianza, no usar Indulto', idsPresa.includes('tirar') && idsPresa.includes('pagar-fianza') && !idsPresa.includes('usar-indulto'), idsPresa);
-  comprobar('y el aviso lo dice con el intento', vistaDe(presa, ANA).aviso.indexOf('Mazmorra') >= 0 && vistaDe(presa, ANA).aviso.indexOf('intento 1 de 3') >= 0, vistaDe(presa, ANA).aviso);
+  comprobar('presa con dinero: se ofrece tirar y pagar la fianza, no usar Salvoconducto', idsPresa.includes('tirar') && idsPresa.includes('pagar-fianza') && !idsPresa.includes('usar-indulto'), idsPresa);
+  comprobar('y el aviso lo dice con el intento', vistaDe(presa, ANA).aviso.indexOf('Comisaría') >= 0 && vistaDe(presa, ANA).aviso.indexOf('intento 1 de 3') >= 0, vistaDe(presa, ANA).aviso);
   const fianza = mover(mesaSobre('MAZ-FIANZA', presa, CUATRO), ANA, { tipo: PAGAR_FIANZA, carga: {} });
   const trasFianza = estadoDe(fianza.mesa);
   comprobar('pagar la fianza cuesta 50, libera y deja por-tirar', fianza.cambio && jugadorDe(trasFianza, ANA).presa === LIBRE && jugadorDe(trasFianza, ANA).mrs === DINERO_DE_SALIDA - FIANZA && trasFianza.paso === 'por-tirar' && pagosDe(trasFianza, ANA).some((p) => p.porque === 'fianza'));
@@ -929,7 +929,7 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
   const tiraLibre = tira(mesaSobre('MAZ-TRAS-FIANZA', { ...trasFianza, azar: azarQueSaca([[2, 2]]) }, CUATRO), ANA);
   comprobar('y ya tira con normalidad: con dobles repite', estadoDe(tiraLibre).dobles === 1 && jugadorDe(estadoDe(tiraLibre), ANA).casilla === 14);
   const presaPobre = conJugador(presa, ANA, { mrs: FIANZA - 1 });
-  comprobar('presa sin 50 mrs: no se ofrece la fianza', !idsDe(presaPobre, ANA).includes('pagar-fianza'));
+  comprobar('presa sin 50 €: no se ofrece la fianza', !idsDe(presaPobre, ANA).includes('pagar-fianza'));
   const fianzaPobre = mover(mesaSobre('MAZ-POBRE', presaPobre, CUATRO), ANA, { tipo: PAGAR_FIANZA, carga: {} });
   comprobar('y mandarla se rechaza con motivo', !fianzaPobre.cambio && fianzaPobre.motivo !== null);
   const libreFianza = mover(mesaSobre('MAZ-LIBRE', turnoDe(base, ANA), CUATRO), ANA, { tipo: PAGAR_FIANZA, carga: {} });
@@ -939,19 +939,19 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
     const serie = serieDeCarta(mazo, mazo === 'pregon' ? 10 : 5);
     const lista = (mazo === 'pregon' ? presa.pregon : presa.arca).filter((s) => s !== serie);
     const conIndulto: EstadoDelBurgo = { ...conJugador(presa, ANA, { indultos: [mazo] }), [mazo]: lista };
-    comprobar(`presa con Indulto ${mazo}: se ofrece usarlo`, idsDe(conIndulto, ANA).includes('usar-indulto'));
+    comprobar(`presa con Salvoconducto ${mazo}: se ofrece usarlo`, idsDe(conIndulto, ANA).includes('usar-indulto'));
     const uso = mover(mesaSobre(`MAZ-IND-${mazo}`, conIndulto, CUATRO), ANA, { tipo: USAR_INDULTO, carga: {} });
     const trasUso = estadoDe(uso.mesa);
     const mazoTras = mazo === 'pregon' ? trasUso.pregon : trasUso.arca;
-    comprobar(`usar el Indulto ${mazo} libera sin pagar y la carta vuelve al FONDO de su mazo`, uso.cambio && jugadorDe(trasUso, ANA).presa === LIBRE && jugadorDe(trasUso, ANA).indultos.length === 0 && jugadorDe(trasUso, ANA).mrs === DINERO_DE_SALIDA && reprochesDeMazo(lista, mazoTras, serie).length === 0, reprochesDeMazo(lista, mazoTras, serie));
-    comprobar(`  con el suceso sale-de-la-mazmorra por indulto y la vista contando 0 Indultos`, (sucesosDe(trasUso, 'sale-de-la-mazmorra')[0] as { como: string } | undefined)?.como === 'indulto' && vistaDe(trasUso, ANA).jugadores.find((j) => j.asiento === ANA)?.indultos === 0);
+    comprobar(`usar el Salvoconducto ${mazo} libera sin pagar y la carta vuelve al FONDO de su mazo`, uso.cambio && jugadorDe(trasUso, ANA).presa === LIBRE && jugadorDe(trasUso, ANA).indultos.length === 0 && jugadorDe(trasUso, ANA).mrs === DINERO_DE_SALIDA && reprochesDeMazo(lista, mazoTras, serie).length === 0, reprochesDeMazo(lista, mazoTras, serie));
+    comprobar(`  con el suceso sale-de-la-mazmorra por indulto y la vista contando 0 Salvoconductos`, (sucesosDe(trasUso, 'sale-de-la-mazmorra')[0] as { como: string } | undefined)?.como === 'indulto' && vistaDe(trasUso, ANA).jugadores.find((j) => j.asiento === ANA)?.indultos === 0);
   }
   comprobar('la vacuna: un mazo al que la carta no vuelve se ve caer', reprochesDeMazo(presa.pregon.filter((s) => s !== 'p10'), presa.pregon.filter((s) => s !== 'p10'), 'p10').length > 0);
   comprobar('y uno al que vuelve arriba en vez de al fondo también', reprochesDeMazo(presa.pregon.filter((s) => s !== 'p10'), ['p10', ...presa.pregon.filter((s) => s !== 'p10')], 'p10').length > 0);
   const libreIndulto = mover(mesaSobre('MAZ-LIBRE-IND', conJugador(turnoDe(base, ANA), ANA, { indultos: ['arca'] }), CUATRO), ANA, { tipo: USAR_INDULTO, carga: {} });
-  comprobar('un libre con Indulto no lo usa: se rechaza', !libreIndulto.cambio && libreIndulto.motivo !== null);
+  comprobar('un libre con Salvoconducto no lo usa: se rechaza', !libreIndulto.cambio && libreIndulto.motivo !== null);
 
-  /* Los dados desde la Mazmorra. */
+  /* Los dados desde la Comisaría. */
   const conDobles = tira(mesaSobre('MAZ-DADOS-1', { ...presa, azar: azarQueSaca([[2, 2]]) }, CUATRO), ANA);
   const sD = estadoDe(conDobles);
   comprobar('presa que saca dobles: sale, mueve 4 hasta el 14 y NO repite', jugadorDe(sD, ANA).presa === LIBRE && jugadorDe(sD, ANA).casilla === 14 && sD.dobles === 0 && (sD.paso === 'comprar' || sD.paso === 'por-pasar') && !idsDe(sD, ANA).includes('tirar'), { paso: sD.paso, ids: idsDe(sD, ANA) });
@@ -964,19 +964,19 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
   comprobar('al tercer intento sin dobles paga la fianza Y mueve igual: casilla 13, 50 menos', jugadorDe(sT, ANA).presa === LIBRE && jugadorDe(sT, ANA).casilla === 13 && jugadorDe(sT, ANA).mrs === DINERO_DE_SALIDA - FIANZA && (sucesosDe(sT, 'sale-de-la-mazmorra')[0] as { como: string } | undefined)?.como === 'tercer-intento');
   const terceroPobre = tira(mesaSobre('MAZ-DADOS-4', { ...conJugador(presa, ANA, { presa: 2, mrs: 0 }), azar: azarQueSaca([[1, 2]]) }, CUATRO), ANA);
   const sP = estadoDe(terceroPobre);
-  comprobar('y sin dinero para la fianza abre su apuro con la deuda de 50 al Concejo y mueve igual', sP.paso === 'apuro' && sP.apuro !== null && sP.apuro.quien === ANA && sP.apuro.deudas.some((d) => d.porque === 'fianza' && d.cuanto === FIANZA && d.a === null) && jugadorDe(sP, ANA).casilla === 13);
+  comprobar('y sin dinero para la fianza abre su apuro con la deuda de 50 al Ayuntamiento y mueve igual', sP.paso === 'apuro' && sP.apuro !== null && sP.apuro.quien === ANA && sP.apuro.deudas.some((d) => d.porque === 'fianza' && d.cuanto === FIANZA && d.a === null) && jugadorDe(sP, ANA).casilla === 13);
 
   /* De visita no pasa nada; el Cepo encierra. */
   const { s: visita } = alCaerEn('MAZ-VISITA', base, ANA, LA_MAZMORRA);
-  comprobar('caer en la Mazmorra de visita no encierra', jugadorDe(visita, ANA).presa === LIBRE && jugadorDe(visita, ANA).casilla === LA_MAZMORRA && sucesosDe(visita, 'a-la-mazmorra').length === 0 && visita.paso === 'por-pasar');
+  comprobar('caer en la Comisaría de visita no encierra', jugadorDe(visita, ANA).presa === LIBRE && jugadorDe(visita, ANA).casilla === LA_MAZMORRA && sucesosDe(visita, 'a-la-mazmorra').length === 0 && visita.paso === 'por-pasar');
   const { s: cepo } = alCaerEn('MAZ-CEPO', base, ANA, 30);
-  comprobar('caer en el Cepo (30) manda a la Mazmorra sin pasar por la Puerta Mayor', reprochesDeEncierro(cepo, ANA, 'casilla').length === 0, reprochesDeEncierro(cepo, ANA, 'casilla'));
+  comprobar('caer en el Cepo (30) manda a la Comisaría sin pasar por la Salida', reprochesDeEncierro(cepo, ANA, 'casilla').length === 0, reprochesDeEncierro(cepo, ANA, 'casilla'));
   comprobar('y el `mueve` del Cepo llega al 30 antes del encierro: la escena lo anima', (sucesosDe(cepo, 'mueve')[0] as { hasta: number } | undefined)?.hasta === 30);
 
   /* Presa obra y trata. */
   const presaConBarrio = conTitulos(presa, [[1, ANA, 0, false], [3, ANA, 0, false]]);
   const idsObra = idsDe(presaConBarrio, ANA);
-  comprobar('presa con barrio entero: alza y propone desde la Mazmorra', idsObra.includes('alzar:1') && idsObra.includes('proponer'), idsObra);
+  comprobar('presa con barrio entero: alza y propone desde la Comisaría', idsObra.includes('alzar:1') && idsObra.includes('proponer'), idsObra);
   const alzaPresa = mover(mesaSobre('MAZ-ALZA', presaConBarrio, CUATRO), ANA, { tipo: ALZAR, carga: { casilla: 1 } });
   comprobar('y la casa se alza de verdad estando presa', alzaPresa.cambio && tituloDe(estadoDe(alzaPresa.mesa), 1).casas === 1 && jugadorDe(estadoDe(alzaPresa.mesa), ANA).presa === 0);
 }
@@ -990,17 +990,17 @@ const CASILLA_DE_MAZO: Readonly<Record<MazoId, number>> = { pregon: 7, arca: 17 
 
 /**
  * UN TRES QUE NO ES DOBLES, y la razón de que las cartas se prueben con él y no con
- * el siete de los demás bloques: con siete, caer en el Pregón (7) obliga a salir del
- * 39 y a CRUZAR la Puerta Mayor de camino, y entonces cada cuenta de dinero de las
- * treinta y dos cartas lleva doscientos maravedíes de propina que no son de la carta.
+ * el siete de los demás bloques: con siete, caer en Sucesos (7) obliga a salir del
+ * 39 y a CRUZAR la Salida de camino, y entonces cada cuenta de dinero de las
+ * treinta y dos cartas lleva doscientos euros de propina que no son de la carta.
  * Con tres se sale del 4, del 14 y del 33, y lo único que mueve el dinero es la carta.
  */
 const TRES_PASOS: ParDeDados = [1, 2];
 
-/** La casilla del Diezmo, que es donde se abre el apuro que se salda. */
+/** La casilla del Impuesto, que es donde se abre el apuro que se salda. */
 const EL_DIEZMO_CASILLA = 4;
 
-/** ¿Ir de `desde` a `hasta` hacia delante pasa por la Puerta Mayor? */
+/** ¿Ir de `desde` a `hasta` hacia delante pasa por la Salida? */
 function cruzaAlIr(desde: number, hasta: number): boolean {
   return cruzaLaSalida(desde, distanciaAdelante(desde, hasta, CUANTAS_CASILLAS), CUANTAS_CASILLAS);
 }
@@ -1016,7 +1016,7 @@ function conLaCartaArriba(e: EstadoDelBurgo, mazo: MazoId, numero: number): Esta
 /**
  * LOS REPROCHES DE UNA CARTA CUMPLIDA, sin mirar todavía su efecto: la carta salió
  * por su NÚMERO (nunca la serie), hay un suceso `carta`, y el mazo rotó —la serie
- * al fondo y ni una carta perdida— salvo el Indulto, que SALE del mazo.
+ * al fondo y ni una carta perdida— salvo el Salvoconducto, que SALE del mazo.
  */
 function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: MazoId, numero: number, quien: AsientoId): string[] {
   const r: string[] = [];
@@ -1028,7 +1028,7 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
   if (!sucesos.some((x) => x.mazo === mazo && x.carta === numero && x.quien === quien)) r.push('no hay suceso `carta` con ese número');
   /*
    * `ultimaCarta` es la ÚLTIMA que salió, y no siempre la que se pidió: «tres pasos
-   * atrás» desde el 36 cae en el Arca del 33 y saca una segunda. Se exige que cuadre
+   * atrás» desde el 36 cae en el Fondo Vecinal del 33 y saca una segunda. Se exige que cuadre
    * con el último suceso `carta`, que es lo que de verdad afirma el contrato.
    */
   const ultima = sucesos[sucesos.length - 1];
@@ -1037,8 +1037,8 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
     r.push(`ultimaCarta es ${JSON.stringify(s.ultimaCarta)} y el último suceso ${JSON.stringify(ultima)}`);
   }
   if (ficha !== undefined && ficha.efecto.que === 'indulto') {
-    if (deAhora.length !== deAntes.length - 1) r.push(`el Indulto no salió del mazo: ${deAntes.length} → ${deAhora.length}`);
-    if (deAhora.indexOf(serie) >= 0) r.push('el Indulto sigue en el mazo');
+    if (deAhora.length !== deAntes.length - 1) r.push(`el Salvoconducto no salió del mazo: ${deAntes.length} → ${deAhora.length}`);
+    if (deAhora.indexOf(serie) >= 0) r.push('el Salvoconducto sigue en el mazo');
   } else {
     if (deAhora.length !== deAntes.length) r.push(`el mazo cambió de tamaño: ${deAntes.length} → ${deAhora.length}`);
     if (deAhora[deAhora.length - 1] !== serie) r.push(`la carta no fue al fondo: el fondo es ${String(deAhora[deAhora.length - 1])}`);
@@ -1059,7 +1059,7 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
     for (const ficha of cartasDe(mazo)) {
       const donde = CASILLA_DE_MAZO[mazo];
       const numero = ficha.numero;
-      /* El «tres pasos atrás» se prueba desde el 36, que es el único Pregón que cae en un Arca (33). */
+      /* El «tres pasos atrás» se prueba desde el 36, que es el único Sucesos que cae en un Fondo Vecinal (33). */
       const salida = ficha.efecto.que === 'retrocede' ? 36 : donde;
       const partida = conLaCartaArriba(rico, mazo, numero);
       const { s, cruza } = alCaerEn(`CAR-${mazo}-${numero}`, partida, ANA, salida, [TRES_PASOS]);
@@ -1071,7 +1071,7 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
       const efecto = ficha.efecto;
       switch (efecto.que) {
         case 'ir':
-          comprobar(`  y lleva a la casilla ${efecto.a}, cobrando la Puerta Mayor sólo si se pasa`, ahora.casilla === efecto.a && ahora.mrs === antesMrs + (cruzaAlIr(salida, efecto.a) ? PAGA_DE_LA_PUERTA_MAYOR : 0), {
+          comprobar(`  y lleva a la casilla ${efecto.a}, cobrando la Salida sólo si se pasa`, ahora.casilla === efecto.a && ahora.mrs === antesMrs + (cruzaAlIr(salida, efecto.a) ? PAGA_DE_LA_PUERTA_MAYOR : 0), {
             casilla: ahora.casilla,
             mrs: ahora.mrs,
             antesMrs,
@@ -1079,7 +1079,7 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
           break;
         case 'puerta-cercana': {
           const puerta = masCercana(salida, PUERTAS, CUANTAS_CASILLAS);
-          comprobar(`  y lleva a la puerta más cercana (${puerta}), que es del Concejo y se abre para comprar`, ahora.casilla === puerta && s.paso === 'comprar');
+          comprobar(`  y lleva a la puerta más cercana (${puerta}), que es del Ayuntamiento y se abre para comprar`, ahora.casilla === puerta && s.paso === 'comprar');
           /* Con dueño: el DOBLE de la renta de puerta. */
           const conDueno = conTitulo(conLaCartaArriba(rico, mazo, numero), puerta, { dueno: BRUNO });
           const { s: s2 } = alCaerEn(`CAR-PC-${mazo}-${numero}`, conDueno, ANA, salida, [TRES_PASOS]);
@@ -1089,7 +1089,7 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
         }
         case 'oficio-cercano': {
           const oficio = masCercana(salida, OFICIOS, CUANTAS_CASILLAS);
-          comprobar(`  y lleva al oficio más cercano (${oficio}), del Concejo, y se abre para comprar`, ahora.casilla === oficio && s.paso === 'comprar');
+          comprobar(`  y lleva al oficio más cercano (${oficio}), del Ayuntamiento, y se abre para comprar`, ahora.casilla === oficio && s.paso === 'comprar');
           const conDueno = conTitulo(conLaCartaArriba(rico, mazo, numero), oficio, { dueno: BRUNO });
           /* La segunda tirada del par sale de la MISMA cadena: [2,6] mueve y [1,3] es la del oficio. */
           const { s: s2 } = alCaerEn(`CAR-OC-${mazo}-${numero}`, conDueno, ANA, salida, [TRES_PASOS, [1, 3]]);
@@ -1100,26 +1100,26 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
           break;
         }
         case 'cobra':
-          comprobar(`  y cobra ${efecto.cuanto} del Concejo`, ahora.mrs === antesMrs + efecto.cuanto && cobrosDe(s, ANA).some((c) => c.porque === 'carta' && c.cuanto === efecto.cuanto && c.de === null), ahora.mrs);
+          comprobar(`  y cobra ${efecto.cuanto} del Ayuntamiento`, ahora.mrs === antesMrs + efecto.cuanto && cobrosDe(s, ANA).some((c) => c.porque === 'carta' && c.cuanto === efecto.cuanto && c.de === null), ahora.mrs);
           break;
         case 'paga':
-          comprobar(`  y paga ${efecto.cuanto} al Concejo`, ahora.mrs === antesMrs - efecto.cuanto && pagosDe(s, ANA).some((p) => p.porque === 'carta' && p.cuanto === efecto.cuanto && p.a === null), ahora.mrs);
+          comprobar(`  y paga ${efecto.cuanto} al Ayuntamiento`, ahora.mrs === antesMrs - efecto.cuanto && pagosDe(s, ANA).some((p) => p.porque === 'carta' && p.cuanto === efecto.cuanto && p.a === null), ahora.mrs);
           break;
         case 'indulto':
-          comprobar('  y el Indulto queda en la mano, contado en la vista y sin gastar un maravedí', ahora.indultos.length === 1 && ahora.indultos[0] === mazo && ahora.mrs === antesMrs && vistaDe(s, ESPECTADOR).jugadores.find((j) => j.asiento === ANA)?.indultos === 1);
+          comprobar('  y el Salvoconducto queda en la mano, contado en la vista y sin gastar un euro', ahora.indultos.length === 1 && ahora.indultos[0] === mazo && ahora.mrs === antesMrs && vistaDe(s, ESPECTADOR).jugadores.find((j) => j.asiento === ANA)?.indultos === 1);
           break;
         case 'retrocede':
-          comprobar(`  y retrocede ${efecto.casillas} hasta el 33, que es un Arca, y la resuelve (sale una carta más)`, ahora.casilla === 33 && sucesosDe(s, 'carta').length === 2 && (sucesosDe(s, 'carta')[1] as { mazo: MazoId }).mazo === 'arca', {
+          comprobar(`  y retrocede ${efecto.casillas} hasta el 33, que es un Fondo Vecinal, y la resuelve (sale una carta más)`, ahora.casilla === 33 && sucesosDe(s, 'carta').length === 2 && (sucesosDe(s, 'carta')[1] as { mazo: MazoId }).mazo === 'arca', {
             casilla: ahora.casilla,
             cartas: sucesosDe(s, 'carta').length,
           });
-          comprobar('  y el `mueve` de retroceder lo dice: como «retrocede» y sin cobrar la Puerta Mayor', (sucesosDe(s, 'mueve')[1] as { como: string; porLaPuertaMayor: boolean } | undefined)?.como === 'retrocede' && (sucesosDe(s, 'mueve')[1] as { porLaPuertaMayor: boolean } | undefined)?.porLaPuertaMayor === false);
+          comprobar('  y el `mueve` de retroceder lo dice: como «retrocede» y sin cobrar la Salida', (sucesosDe(s, 'mueve')[1] as { como: string; porLaPuertaMayor: boolean } | undefined)?.como === 'retrocede' && (sucesosDe(s, 'mueve')[1] as { porLaPuertaMayor: boolean } | undefined)?.porLaPuertaMayor === false);
           break;
         case 'a-la-mazmorra':
-          comprobar('  y va derecho a la Mazmorra, por carta', reprochesDeEncierro(s, ANA, 'carta').length === 0, reprochesDeEncierro(s, ANA, 'carta'));
+          comprobar('  y va derecho a la Comisaría, por carta', reprochesDeEncierro(s, ANA, 'carta').length === 0, reprochesDeEncierro(s, ANA, 'carta'));
           break;
         case 'reparaciones': {
-          /* Con tres casas en el barrio pardo y una posada en el azul: la cuenta de la tabla. */
+          /* Con tres casas en el barrio pardo y un hotel en el azul: la cuenta de la tabla. */
           const conObra = conTitulos(conLaCartaArriba(rico, mazo, numero), [
             [1, ANA, 2, false],
             [3, ANA, 1, false],
@@ -1171,7 +1171,7 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
       cola: s.colaDeApuros,
     });
     comprobar('y los dos apuros son de los dos pobres, con la deuda entera', [s.apuro?.quien, s.colaDeApuros[0]?.quien].sort().join() === [BRUNO, CARLA].sort().join());
-    comprobar('y quien la jugó cobró SÓLO del que podía pagar: de los otros dos no se mueve un maravedí', jugadorDe(s, ANA).mrs === DINERO_DE_SALIDA + 10 && jugadorDe(s, DIEGO).mrs === DINERO_DE_SALIDA - 10 && jugadorDe(s, BRUNO).mrs === 0, {
+    comprobar('y quien la jugó cobró SÓLO del que podía pagar: de los otros dos no se mueve un euro', jugadorDe(s, ANA).mrs === DINERO_DE_SALIDA + 10 && jugadorDe(s, DIEGO).mrs === DINERO_DE_SALIDA - 10 && jugadorDe(s, BRUNO).mrs === 0, {
       ana: jugadorDe(s, ANA).mrs,
       diego: jugadorDe(s, DIEGO).mrs,
     });
@@ -1191,7 +1191,7 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
 }
 
 // ---------------------------------------------------------------------------
-paso('7. EL EMPEÑO: mitad, desempeño por TABLA, el barrio con edificios, y el interés del trato');
+paso('7. EL EMPEÑO: mitad, deshipoteca por TABLA, el barrio con edificios, y el interés del trato');
 // ---------------------------------------------------------------------------
 
 {
@@ -1215,7 +1215,7 @@ paso('7. EL EMPEÑO: mitad, desempeño por TABLA, el barrio con edificios, y el 
     [400, 200, 20],
   ];
   for (const [precio, empeno, interes] of TABLA_DEL_EMPENO) {
-    comprobar(`un título de ${precio} se empeña por ${empeno} y se desempeña por ${empeno + interes}`, valorDeEmpeno(precio) === empeno && interesDelEmpeno(precio) === interes && costeDeDesempeno(precio) === empeno + interes, {
+    comprobar(`un título de ${precio} se hipoteca por ${empeno} y se deshipoteca por ${empeno + interes}`, valorDeEmpeno(precio) === empeno && interesDelEmpeno(precio) === interes && costeDeDesempeno(precio) === empeno + interes, {
       empeno: valorDeEmpeno(precio),
       interes: interesDelEmpeno(precio),
     });
@@ -1223,40 +1223,40 @@ paso('7. EL EMPEÑO: mitad, desempeño por TABLA, el barrio con edificios, y el 
   comprobar('el 10 % se redondea HACIA ARRIBA: 175 no da 17', interesDelEmpeno(350) === 18 && interesDelEmpeno(60) === 3);
 
   const opEmpeno = opcionPorId(suyos, ANA, 'empenar:39');
-  comprobar('la opción de empeñar la Calle Mayor dice sus 200 mrs', opEmpeno !== null && opEmpeno.rotulo.indexOf('200 mrs') >= 0, opEmpeno?.rotulo);
+  comprobar('la opción de hipotecar la Calle Mayor dice sus 200 €', opEmpeno !== null && opEmpeno.rotulo.indexOf('200 €') >= 0, opEmpeno?.rotulo);
   const empenado = mover(mesaSobre('EMP-1', suyos, CUATRO), ANA, { tipo: EMPENAR, carga: { casilla: 39 } });
   const trasEmpeno = estadoDe(empenado.mesa);
-  comprobar('empeñar la Calle Mayor da 200 y la marca', empenado.cambio && tituloDe(trasEmpeno, 39).empenado && jugadorDe(trasEmpeno, ANA).mrs === DINERO_DE_SALIDA + valorDeEmpeno(400) && cobrosDe(trasEmpeno, ANA).some((c) => c.porque === 'empeno' && c.cuanto === 200));
+  comprobar('hipotecar la Calle Mayor da 200 y la marca', empenado.cambio && tituloDe(trasEmpeno, 39).empenado && jugadorDe(trasEmpeno, ANA).mrs === DINERO_DE_SALIDA + valorDeEmpeno(400) && cobrosDe(trasEmpeno, ANA).some((c) => c.porque === 'empeno' && c.cuanto === 200));
   comprobar('con su suceso `empena` y la vista marcándolo', sucesosDe(trasEmpeno, 'empena').length === 1 && vistaDe(trasEmpeno, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.empenado === true);
-  comprobar('y ya no se ofrece empeñarlo otra vez, sino desempeñarlo', !idsDe(trasEmpeno, ANA).includes('empenar:39') && idsDe(trasEmpeno, ANA).includes('desempenar:39'));
+  comprobar('y ya no se ofrece hipotecarlo otra vez, sino deshipotecarlo', !idsDe(trasEmpeno, ANA).includes('empenar:39') && idsDe(trasEmpeno, ANA).includes('desempenar:39'));
   const opDes = opcionPorId(trasEmpeno, ANA, 'desempenar:39');
-  comprobar('y la de desempeñar dice el empeño MÁS el interés (220 mrs)', opDes !== null && opDes.rotulo.indexOf('220 mrs') >= 0, opDes?.rotulo);
+  comprobar('y la de deshipotecar dice la hipoteca MÁS el interés (220 €)', opDes !== null && opDes.rotulo.indexOf('220 €') >= 0, opDes?.rotulo);
   const desempenado = mover(mesaSobre('EMP-2', trasEmpeno, CUATRO), ANA, { tipo: DESEMPENAR, carga: { casilla: 39 } });
   const trasDes = estadoDe(desempenado.mesa);
-  comprobar('desempeñar cuesta 220 y lo libera', desempenado.cambio && !tituloDe(trasDes, 39).empenado && jugadorDe(trasDes, ANA).mrs === DINERO_DE_SALIDA + 200 - 220 && pagosDe(trasDes, ANA).some((p) => p.porque === 'desempeno' && p.cuanto === 220));
-  comprobar('empeñado no cobra y desempeñado vuelve a cobrar (y con el barrio azul entero, el doble)', vistaDe(trasEmpeno, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora === 0 && vistaDe(trasDes, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora === 2 * 50, {
+  comprobar('deshipotecar cuesta 220 y lo libera', desempenado.cambio && !tituloDe(trasDes, 39).empenado && jugadorDe(trasDes, ANA).mrs === DINERO_DE_SALIDA + 200 - 220 && pagosDe(trasDes, ANA).some((p) => p.porque === 'desempeno' && p.cuanto === 220));
+  comprobar('hipotecado no cobra y deshipotecado vuelve a cobrar (y con el barrio azul entero, el doble)', vistaDe(trasEmpeno, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora === 0 && vistaDe(trasDes, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora === 2 * 50, {
     empenado: vistaDe(trasEmpeno, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora,
     libre: vistaDe(trasDes, ESPECTADOR).titulos.find((t) => t.casilla === 39)?.rentaAhora,
   });
   const sinDinero = conJugador(trasEmpeno, ANA, { mrs: 219 });
-  comprobar('sin los 220 no se ofrece desempeñar', !idsDe(sinDinero, ANA).includes('desempenar:39'));
+  comprobar('sin los 220 no se ofrece deshipotecar', !idsDe(sinDinero, ANA).includes('desempenar:39'));
   comprobar('y mandarlo se rechaza con motivo', (() => {
     const r = mover(mesaSobre('EMP-3', sinDinero, CUATRO), ANA, { tipo: DESEMPENAR, carga: { casilla: 39 } });
     return !r.cambio && r.motivo !== null;
   })());
 
-  /* Con edificios en el barrio no se empeña NINGUNO de sus solares. */
+  /* Con edificios en el barrio no se hipoteca NINGUNO de sus solares. */
   const conCasa = conTitulo(suyos, 1, { casas: 1 });
   const idsConCasa = idsDe(conCasa, ANA);
-  comprobar('con una casa en el barrio pardo no se empeña ni el 1 ni el 3', !idsConCasa.includes('empenar:1') && !idsConCasa.includes('empenar:3'), idsConCasa);
+  comprobar('con una casa en el barrio pardo no se hipoteca ni el 1 ni el 3', !idsConCasa.includes('empenar:1') && !idsConCasa.includes('empenar:3'), idsConCasa);
   comprobar('pero sí los de otros barrios', idsConCasa.includes('empenar:5') && idsConCasa.includes('empenar:39'));
   const forzado = mover(mesaSobre('EMP-4', conCasa, CUATRO), ANA, { tipo: EMPENAR, carga: { casilla: 3 } });
   comprobar('y mandarlo igual se rechaza con motivo', !forzado.cambio && forzado.motivo !== null);
   const ajeno = mover(mesaSobre('EMP-5', suyos, CUATRO), BRUNO, { tipo: EMPENAR, carga: { casilla: 39 } });
-  comprobar('un título que no es tuyo no se empeña', !ajeno.cambio && ajeno.motivo !== null);
+  comprobar('un título que no es tuyo no se hipoteca', !ajeno.cambio && ajeno.motivo !== null);
 
   /*
-   * EL INTERÉS DEL TRATO: quien RECIBE un título empeñado paga el 10 % en el acto, y
+   * EL INTERÉS DEL TRATO: quien RECIBE un título hipotecado paga el 10 % en el acto, y
    * si no le alcanza para ese interés el trato se rechaza CON MOTIVO (y sin decir qué
    * hay en la mano de nadie: aquí no hay manos, pero el motivo se pasa por la criba).
    */
@@ -1266,12 +1266,12 @@ paso('7. EL EMPEÑO: mitad, desempeño por TABLA, el barrio con edificios, y el 
       tipo: PROPONER,
       carga: { a: BRUNO, doy: { mrs: 0, titulos: [39], indultos: 0 }, pido: { mrs: 100, titulos: [], indultos: 0 } },
     });
-    comprobar('se propone dar la Calle Mayor EMPEÑADA por 100 mrs', propuesta.cambio && estadoDe(propuesta.mesa).tratos.length === 1);
+    comprobar('se propone dar la Calle Mayor HIPOTECADA por 100 €', propuesta.cambio && estadoDe(propuesta.mesa).tratos.length === 1);
     const id = (estadoDe(propuesta.mesa).tratos[0] as TratoDelBurgo).id;
     const aceptado = mover(propuesta.mesa, BRUNO, { tipo: ACEPTAR, carga: { trato: id } });
     const s = estadoDe(aceptado.mesa);
-    comprobar('al aceptarlo, quien recibe el empeñado paga el interés (20) EN EL ACTO', aceptado.cambio && tituloDe(s, 39).dueno === BRUNO && tituloDe(s, 39).empenado && jugadorDe(s, BRUNO).mrs === 500 - 100 - interesDelEmpeno(400), jugadorDe(s, BRUNO).mrs);
-    comprobar('y el pago se anota como `interes` al Concejo', pagosDe(s, BRUNO).some((p) => p.porque === 'interes' && p.cuanto === 20 && p.a === null));
+    comprobar('al aceptarlo, quien recibe el hipotecado paga el interés (20) EN EL ACTO', aceptado.cambio && tituloDe(s, 39).dueno === BRUNO && tituloDe(s, 39).empenado && jugadorDe(s, BRUNO).mrs === 500 - 100 - interesDelEmpeno(400), jugadorDe(s, BRUNO).mrs);
+    comprobar('y el pago se anota como `interes` al Ayuntamiento', pagosDe(s, BRUNO).some((p) => p.porque === 'interes' && p.cuanto === 20 && p.a === null));
     /* Y si no le alcanza para el interés: rechazo con motivo, sin mover nada. */
     const pelado = conJugador(conEmpenado, BRUNO, { mrs: 10 });
     const p2 = mover(mesaSobre('EMP-TRATO-2', pelado, CUATRO), ANA, {
@@ -1280,25 +1280,25 @@ paso('7. EL EMPEÑO: mitad, desempeño por TABLA, el barrio con edificios, y el 
     });
     const id2 = (estadoDe(p2.mesa).tratos[0] as TratoDelBurgo).id;
     const fallido = mover(p2.mesa, BRUNO, { tipo: ACEPTAR, carga: { trato: id2 } });
-    comprobar('con 10 mrs y un interés de 20, aceptar se rechaza con motivo y el título no se mueve', !fallido.cambio && fallido.motivo !== null && fallido.motivo.indexOf('interés') >= 0, fallido.motivo);
+    comprobar('con 10 € y un interés de 20, aceptar se rechaza con motivo y el título no se mueve', !fallido.cambio && fallido.motivo !== null && fallido.motivo.indexOf('interés') >= 0, fallido.motivo);
     comprobar('y ese motivo no lleva ningún secreto ni ninguna marca dentro', reprochesDeTexto(String(fallido.motivo), estadoDe(p2.mesa)).length === 0);
   }
 }
 
 // ---------------------------------------------------------------------------
-paso('8. LA ALMONEDA: relevo, mínimo y múltiplos, las fijas, la puja libre por la puerta, el cierre');
+paso('8. LA SUBASTA: relevo, mínimo y múltiplos, las fijas, la puja libre por la puerta, el cierre');
 // ---------------------------------------------------------------------------
 
 {
   const base = estadoDe(empezada('ALM', CUATRO, 41));
-  /* ANA cae en la Calle Mayor (39), que es del Concejo, y la manda a almoneda. */
+  /* ANA cae en la Calle Mayor (39), que es del Ayuntamiento, y la manda a subasta. */
   const { s: enCompra } = alCaerEn('ALM-0', base, ANA, 39);
-  comprobar('caer en un título del Concejo abre `comprar` con las dos opciones', enCompra.paso === 'comprar' && idsDe(enCompra, ANA).includes('comprar:39') && idsDe(enCompra, ANA).includes('a-almoneda:39'));
+  comprobar('caer en un título del Ayuntamiento abre `comprar` con las dos opciones', enCompra.paso === 'comprar' && idsDe(enCompra, ANA).includes('comprar:39') && idsDe(enCompra, ANA).includes('a-almoneda:39'));
   const abierta = mover(mesaSobre('ALM-1', enCompra, CUATRO), ANA, { tipo: A_ALMONEDA, carga: { casilla: 39 } });
   let mesa = abierta.mesa;
   let e = estadoDe(mesa);
   const a0 = e.almoneda as AlmonedaDelBurgo;
-  comprobar('se abre la almoneda, sin pujas, con los cuatro en pie', abierta.cambio && e.paso === 'almoneda' && a0.casilla === 39 && a0.puja === 0 && a0.quienPuja === null && a0.enPie.length === 4);
+  comprobar('se abre la subasta, sin pujas, con los cuatro en pie', abierta.cambio && e.paso === 'almoneda' && a0.casilla === 39 && a0.puja === 0 && a0.quienPuja === null && a0.enPie.length === 4);
   comprobar('EL RELEVO EMPIEZA POR EL SIGUIENTE al dueño del turno, que va el ÚLTIMO', a0.enPie.join() === [BRUNO, CARLA, DIEGO, ANA].join() && a0.pujaDe === BRUNO && a0.abiertaPor === ANA, a0.enPie);
   comprobar('y `turnoDe` de la vista es a quien se espera, con `duenoDelTurno` aparte', vistaDe(e, ESPECTADOR).turnoDe === BRUNO && vistaDe(e, ESPECTADOR).duenoDelTurno === ANA);
   comprobar('quien no tiene el relevo no recibe ninguna opción de puja', !idsDe(e, CARLA).some((id) => id.indexOf('pujar') === 0 || id === 'pasar-puja'), idsDe(e, CARLA));
@@ -1350,33 +1350,33 @@ paso('8. LA ALMONEDA: relevo, mínimo y múltiplos, las fijas, la puja libre por
   comprobar('con dos fuera, el relevo llega al dueño del turno, que también puja', (antesDelCierre.almoneda as AlmonedaDelBurgo).pujaDe === ANA && (antesDelCierre.almoneda as AlmonedaDelBurgo).enPie.join() === [BRUNO, ANA].join());
   const cierre = mover(mesa, ANA, { tipo: PASAR_PUJA, carga: { casilla: 39 } });
   const cerrada = estadoDe(cierre.mesa);
-  comprobar('cuando queda uno en pie y es el mejor postor, la almoneda se cierra sola', cerrada.almoneda === null && cerrada.paso === 'por-pasar');
+  comprobar('cuando queda uno en pie y es el mejor postor, la subasta se cierra sola', cerrada.almoneda === null && cerrada.paso === 'por-pasar');
   comprobar('el ganador paga su puja y se lleva el título', tituloDe(cerrada, 39).dueno === BRUNO && jugadorDe(cerrada, BRUNO).mrs === DINERO_DE_SALIDA - 300 && pagosDe(cerrada, BRUNO).some((p) => p.porque === 'almoneda' && p.cuanto === 300));
   comprobar('con los sucesos `almoneda-cerrada` y `cambia-de-mano`', (sucesosDe(cerrada, 'almoneda-cerrada')[0] as { ganador: AsientoId | null; cuanto: number } | undefined)?.ganador === BRUNO && sucesosDe(cerrada, 'cambia-de-mano').length === 1);
 
-  /* Nadie puja: el título se queda en el Concejo. */
+  /* Nadie puja: el título se queda en el Ayuntamiento. */
   {
     let sinPujas = mesaSobre('ALM-NADIE', estadoDe(abierta.mesa), CUATRO);
     for (const quien of [BRUNO, CARLA, DIEGO, ANA]) {
       const r = mover(sinPujas, quien, { tipo: PASAR_PUJA, carga: { casilla: 39 } });
-      comprobar(`  ${quien} pasa en la almoneda`, r.cambio, r.motivo);
+      comprobar(`  ${quien} pasa en la subasta`, r.cambio, r.motivo);
       sinPujas = r.mesa;
     }
     const s = estadoDe(sinPujas);
-    comprobar('sin una sola puja el título se queda en el Concejo y la mesa vuelve al turno', s.almoneda === null && tituloDe(s, 39).dueno === null && s.paso === 'por-pasar' && (sucesosDe(s, 'almoneda-cerrada')[0] as { ganador: AsientoId | null } | undefined)?.ganador === null);
+    comprobar('sin una sola puja el título se queda en el Ayuntamiento y la mesa vuelve al turno', s.almoneda === null && tituloDe(s, 39).dueno === null && s.paso === 'por-pasar' && (sucesosDe(s, 'almoneda-cerrada')[0] as { ganador: AsientoId | null } | undefined)?.ganador === null);
   }
 
   /*
-   * LA COLA: al cerrar una almoneda, `reanudar` abre la siguiente encolada y no
+   * LA COLA: al cerrar una subasta, `reanudar` abre la siguiente encolada y no
    * devuelve el turno hasta que la cola está vacía. Es el camino de la cascada de
-   * quiebra al Concejo, y se prueba aquí sobre una almoneda normal con dos detrás.
+   * quiebra al Ayuntamiento, y se prueba aquí sobre una subasta normal con dos detrás.
    */
   {
     const conCola: EstadoDelBurgo = { ...estadoDe(abierta.mesa), colaDeAlmonedas: [1, 5] };
     let conLaCola = mesaSobre('ALM-COLA', conCola, CUATRO);
     for (const quien of [BRUNO, CARLA, DIEGO, ANA]) conLaCola = mover(conLaCola, quien, { tipo: PASAR_PUJA, carga: { casilla: 39 } }).mesa;
     const s = estadoDe(conLaCola);
-    comprobar('al cerrarse una almoneda con la cola llena se abre la SIGUIENTE, en orden de casilla', s.paso === 'almoneda' && (s.almoneda as AlmonedaDelBurgo).casilla === 1 && s.colaDeAlmonedas.join() === '5', {
+    comprobar('al cerrarse una subasta con la cola llena se abre la SIGUIENTE, en orden de casilla', s.paso === 'almoneda' && (s.almoneda as AlmonedaDelBurgo).casilla === 1 && s.colaDeAlmonedas.join() === '5', {
       paso: s.paso,
       almoneda: s.almoneda,
       cola: s.colaDeAlmonedas,
@@ -1396,36 +1396,36 @@ paso('8. LA ALMONEDA: relevo, mínimo y múltiplos, las fijas, la puja libre por
 }
 
 // ---------------------------------------------------------------------------
-paso('9. EL APURO Y LA QUIEBRA: no se pasa, vender y empeñar saldan, varios acreedores, y las dos quiebras');
+paso('9. EL APURO Y LA QUIEBRA: no se pasa, vender y hipotecar saldan, varios acreedores, y las dos quiebras');
 // ---------------------------------------------------------------------------
 
 {
   const base = estadoDe(empezada('APU', CUATRO, 41));
 
   /*
-   * EL APURO QUE SE SALDA SOLO. ANA con 50 mrs cae en el Diezmo (200 al Concejo):
-   * no alcanza, no se mueve un maravedí y se abre su apuro por la deuda ENTERA
-   * (reglamento §9: quien no alcanza vende y empeña, no paga lo que puede).
+   * EL APURO QUE SE SALDA SOLO. ANA con 50 € cae en el Impuesto (200 al Ayuntamiento):
+   * no alcanza, no se mueve un euro y se abre su apuro por la deuda ENTERA
+   * (reglamento §9: quien no alcanza vende y hipoteca, no paga lo que puede).
    */
   const conPuertas = conTitulos(conJugador(base, ANA, { mrs: 50 }), [[5, ANA, 0, false], [15, ANA, 0, false]]);
   const { s: enApuro } = alCaerEn('APU-1', conPuertas, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
-  comprobar('con 50 mrs, el Diezmo abre el apuro por los 200 enteros y no se paga nada', enApuro.paso === 'apuro' && enApuro.apuro !== null && enApuro.apuro.quien === ANA && enApuro.apuro.deudas.length === 1 && enApuro.apuro.deudas[0]?.cuanto === EL_DIEZMO && enApuro.apuro.deudas[0]?.a === null && jugadorDe(enApuro, ANA).mrs === 50, enApuro.apuro);
+  comprobar('con 50 €, el Impuesto abre el apuro por los 200 enteros y no se paga nada', enApuro.paso === 'apuro' && enApuro.apuro !== null && enApuro.apuro.quien === ANA && enApuro.apuro.deudas.length === 1 && enApuro.apuro.deudas[0]?.cuanto === EL_DIEZMO && enApuro.apuro.deudas[0]?.a === null && jugadorDe(enApuro, ANA).mrs === 50, enApuro.apuro);
   comprobar('con el suceso `apuro` diciendo lo que debe', (sucesosDe(enApuro, 'apuro')[0] as { debe: number } | undefined)?.debe === EL_DIEZMO);
   comprobar('y la vista dice a quién se espera y cuánto debe', vistaDe(enApuro, ESPECTADOR).turnoDe === ANA && vistaDe(enApuro, ESPECTADOR).apuro?.debe === EL_DIEZMO && vistaDe(enApuro, ESPECTADOR).apuro?.enCola === 0);
   const idsApuro = idsDe(enApuro, ANA);
-  comprobar('EN APURO NO SE PASA NI SE TIRA: sólo empeñar, vender, tratar y rendirse', !idsApuro.includes('pasar') && !idsApuro.includes('tirar') && idsApuro.includes('empenar:5') && idsApuro.includes('rendirse'), idsApuro);
-  comprobar('ni se alza ni se desempeña estando en apuro', !idsApuro.some((id) => id.indexOf('alzar:') === 0 || id.indexOf('desempenar:') === 0));
+  comprobar('EN APURO NO SE PASA NI SE TIRA: sólo hipotecar, vender, tratar y rendirse', !idsApuro.includes('pasar') && !idsApuro.includes('tirar') && idsApuro.includes('empenar:5') && idsApuro.includes('rendirse'), idsApuro);
+  comprobar('ni se alza ni se deshipoteca estando en apuro', !idsApuro.some((id) => id.indexOf('alzar:') === 0 || id.indexOf('desempenar:') === 0));
   for (const tipo of [PASAR, TIRAR]) {
     const r = mover(mesaSobre(`APU-NO-${tipo}`, enApuro, CUATRO), ANA, { tipo, carga: {} });
     comprobar(`  y mandar ${tipo} en apuro se rechaza con motivo y no cambia nada`, !r.cambio && r.motivo !== null, r.motivo);
   }
   const otroEnApuro = mover(mesaSobre('APU-OTRO', enApuro, CUATRO), BRUNO, { tipo: EMPENAR, carga: { casilla: 5 } });
-  comprobar('y otro asiento no empeña lo del endeudado', !otroEnApuro.cambio && otroEnApuro.motivo !== null);
+  comprobar('y otro asiento no hipoteca lo del endeudado', !otroEnApuro.cambio && otroEnApuro.motivo !== null);
 
   let saldando = mesaSobre('APU-2', enApuro, CUATRO);
   saldando = mover(saldando, ANA, { tipo: EMPENAR, carga: { casilla: 5 } }).mesa;
   const aMedias = estadoDe(saldando);
-  comprobar('empeñar una puerta da 100 y el apuro SIGUE abierto: 150 no llega a 200', aMedias.paso === 'apuro' && aMedias.apuro !== null && jugadorDe(aMedias, ANA).mrs === 150);
+  comprobar('hipotecar una puerta da 100 y el apuro SIGUE abierto: 150 no llega a 200', aMedias.paso === 'apuro' && aMedias.apuro !== null && jugadorDe(aMedias, ANA).mrs === 150);
   saldando = mover(saldando, ANA, { tipo: EMPENAR, carga: { casilla: 15 } }).mesa;
   const saldado = estadoDe(saldando);
   comprobar('con la segunda puerta llega a 250, y el apuro SE SALDA SOLO: paga 200 y se cierra', saldado.apuro === null && jugadorDe(saldado, ANA).mrs === 50 && pagosDe(saldado, ANA).some((p) => p.porque === 'diezmo' && p.cuanto === EL_DIEZMO), {
@@ -1455,7 +1455,7 @@ paso('9. EL APURO Y LA QUIEBRA: no se pasa, vender y empeñar saldan, varios acr
   }
 
   /*
-   * VARIOS ACREEDORES: «te nombran regidor, paga 50 a cada jugador» con 20 mrs deja
+   * VARIOS ACREEDORES: «te nombran regidor, paga 50 a cada jugador» con 20 € deja
    * TRES deudas en el mismo apuro, una por acreedor, y ninguna se pierde.
    */
   const REGIDOR = (EL_PREGON.find((c) => c.efecto.que === 'paga-a-cada-uno') as CartaDelBurgo).numero;
@@ -1463,7 +1463,7 @@ paso('9. EL APURO Y LA QUIEBRA: no se pasa, vender y empeñar saldan, varios acr
     const conCarta = conLaCartaArriba(conJugador(base, ANA, { mrs: 20 }), 'pregon', REGIDOR);
     return alCaerEn('APU-3', conCarta, ANA, CASILLA_DE_MAZO.pregon, [TRES_PASOS]).s;
   })();
-  comprobar('«paga 50 a cada uno» con 20 mrs deja un apuro con TRES deudas, una por acreedor', conTres.apuro !== null && conTres.apuro.quien === ANA && conTres.apuro.deudas.length === 3 && conTres.apuro.deudas.every((d) => d.cuanto === 50), conTres.apuro);
+  comprobar('«paga 50 a cada uno» con 20 € deja un apuro con TRES deudas, una por acreedor', conTres.apuro !== null && conTres.apuro.quien === ANA && conTres.apuro.deudas.length === 3 && conTres.apuro.deudas.every((d) => d.cuanto === 50), conTres.apuro);
   comprobar('y la vista suma las tres: debe 150', vistaDe(conTres, ESPECTADOR).apuro?.debe === 150);
   comprobar('y nadie ha cobrado todavía: es todo o nada', [BRUNO, CARLA, DIEGO].every((a) => jugadorDe(conTres, a).mrs === DINERO_DE_SALIDA));
 
@@ -1477,24 +1477,24 @@ paso('9. EL APURO Y LA QUIEBRA: no se pasa, vender y empeñar saldan, varios acr
     const s = estadoDe(rendida.mesa);
     comprobar('rendirse en apuro con tres deudas iguales manda todo al PRIMERO en orden de mesa', rendida.cambio && jugadorDe(s, ANA).quebrado && (sucesosDe(s, 'quiebra')[0] as { acreedor: AsientoId | null } | undefined)?.acreedor === BRUNO);
     const botin = 20 + 2 * 75;
-    comprobar('los edificios se venden al Concejo por la mitad y el botín entero va al acreedor', tituloDe(s, 21).casas === 0 && s.casasEnElConcejo === conBienes.casasEnElConcejo + 2 && cobrosDe(s, BRUNO).some((c) => c.porque === 'quiebra' && c.cuanto === botin && c.de === ANA), cobrosDe(s, BRUNO));
-    comprobar('y su bolsa queda con el botín menos el interés del empeño heredado, pagado en el acto', jugadorDe(s, BRUNO).mrs === DINERO_DE_SALIDA + botin - interesDelEmpeno(60), jugadorDe(s, BRUNO).mrs);
-    comprobar('los títulos pasan tal cual, y el EMPEÑADO sigue empeñado', tituloDe(s, 1).dueno === BRUNO && tituloDe(s, 3).dueno === BRUNO && tituloDe(s, 3).empenado && tituloDe(s, 21).dueno === BRUNO);
-    comprobar('y el acreedor paga EN EL ACTO el interés del empeño que recibe', pagosDe(s, BRUNO).some((p) => p.porque === 'interes' && p.cuanto === interesDelEmpeno(60)));
-    comprobar('el quebrado queda con 0, sin Indultos, y ya no recibe opciones', jugadorDe(s, ANA).mrs === 0 && jugadorDe(s, ANA).indultos.length === 0 && opcionesEn(s, ANA).length === 0);
+    comprobar('los edificios se venden al Ayuntamiento por la mitad y el botín entero va al acreedor', tituloDe(s, 21).casas === 0 && s.casasEnElConcejo === conBienes.casasEnElConcejo + 2 && cobrosDe(s, BRUNO).some((c) => c.porque === 'quiebra' && c.cuanto === botin && c.de === ANA), cobrosDe(s, BRUNO));
+    comprobar('y su bolsa queda con el botín menos el interés dla hipoteca heredado, pagado en el acto', jugadorDe(s, BRUNO).mrs === DINERO_DE_SALIDA + botin - interesDelEmpeno(60), jugadorDe(s, BRUNO).mrs);
+    comprobar('los títulos pasan tal cual, y el HIPOTECADO sigue hipotecado', tituloDe(s, 1).dueno === BRUNO && tituloDe(s, 3).dueno === BRUNO && tituloDe(s, 3).empenado && tituloDe(s, 21).dueno === BRUNO);
+    comprobar('y el acreedor paga EN EL ACTO el interés dla hipoteca que recibe', pagosDe(s, BRUNO).some((p) => p.porque === 'interes' && p.cuanto === interesDelEmpeno(60)));
+    comprobar('el quebrado queda con 0, sin Salvoconductos, y ya no recibe opciones', jugadorDe(s, ANA).mrs === 0 && jugadorDe(s, ANA).indultos.length === 0 && opcionesEn(s, ANA).length === 0);
     comprobar('y el turno pasa a otro: no se espera a quien ya no juega', s.momento === 'jugando' && vistaDe(s, ESPECTADOR).turnoDe !== ANA && s.apuro === null);
     comprobar('ni un reproche de forma tras la quiebra', reprochesDeLasMiradas(s, CUATRO, true).length === 0, reprochesDeLasMiradas(s, CUATRO, true));
 
-    /* El acreedor que no alcanza para el interés entra ÉL en apuro con el Concejo. */
-    /* Con la Calle Mayor empeñada (interés 20) y un botín de cero, el acreedor no puede pagarlo. */
+    /* El acreedor que no alcanza para el interés entra ÉL en apuro con el Ayuntamiento. */
+    /* Con la Calle Mayor hipotecada (interés 20) y un botín de cero, el acreedor no puede pagarlo. */
     const acreedorPelado = conJugador(conJugador(conTitulos(conTres, [[39, ANA, 0, true]]), ANA, { mrs: 0 }), BRUNO, { mrs: 0 });
     const s2 = estadoDe(mover(mesaSobre('APU-Q1B', acreedorPelado, CUATRO), ANA, { tipo: RENDIRSE, carga: {} }).mesa);
-    comprobar('un acreedor sin un maravedí para el interés hereda todo y entra ÉL en apuro con el Concejo', jugadorDe(s2, ANA).quebrado && s2.apuro !== null && s2.apuro.quien === BRUNO && s2.apuro.deudas.some((d) => d.porque === 'interes' && d.a === null), s2.apuro);
+    comprobar('un acreedor sin un euro para el interés hereda todo y entra ÉL en apuro con el Ayuntamiento', jugadorDe(s2, ANA).quebrado && s2.apuro !== null && s2.apuro.quien === BRUNO && s2.apuro.deudas.some((d) => d.porque === 'interes' && d.a === null), s2.apuro);
   }
 
   /*
-   * LA QUIEBRA CON EL CONCEJO: la caja se pierde, los títulos vuelven DESEMPEÑADOS y
-   * salen a almoneda uno por uno en orden de casilla, y los Indultos al fondo de su
+   * LA QUIEBRA CON EL AYUNTAMIENTO: la caja se pierde, los títulos vuelven SIN HIPOTECA y
+   * salen a subasta uno por uno en orden de casilla, y los Salvoconductos al fondo de su
    * mazo. Es la cascada del §8.6, y aquí se mira de cerca con tres títulos.
    */
   {
@@ -1508,19 +1508,19 @@ paso('9. EL APURO Y LA QUIEBRA: no se pasa, vender y empeñar saldan, varios acr
     const conTodo = turnoDe(conTitulos(conIndultos, [[1, ANA, 0, true], [21, ANA, 3, false], [35, ANA, 0, false]]), ANA, 'por-pasar');
     const rendida = mover(mesaSobre('APU-Q2', conTodo, CUATRO), ANA, { tipo: RENDIRSE, carga: {} });
     const s = estadoDe(rendida.mesa);
-    comprobar('rendirse FUERA de apuro se puede: la opción está siempre y el acreedor es el Concejo', rendida.cambio && jugadorDe(s, ANA).quebrado && (sucesosDe(s, 'quiebra')[0] as { acreedor: AsientoId | null } | undefined)?.acreedor === null);
+    comprobar('rendirse FUERA de apuro se puede: la opción está siempre y el acreedor es el Ayuntamiento', rendida.cambio && jugadorDe(s, ANA).quebrado && (sucesosDe(s, 'quiebra')[0] as { acreedor: AsientoId | null } | undefined)?.acreedor === null);
     comprobar('nadie hereda la caja: los otros tres siguen con lo suyo', [BRUNO, CARLA, DIEGO].every((a) => jugadorDe(s, a).mrs === DINERO_DE_SALIDA));
-    comprobar('los títulos vuelven al Concejo DESEMPEÑADOS y sin edificios', s.titulos.filter((t) => [1, 21, 35].indexOf(t.casilla) >= 0).every((t) => t.dueno === null && !t.empenado && t.casas === 0));
-    comprobar('y salen a almoneda: la primera abierta y las otras dos en cola, en orden de casilla', s.paso === 'almoneda' && (s.almoneda as AlmonedaDelBurgo).casilla === 1 && s.colaDeAlmonedas.join() === '21,35', {
+    comprobar('los títulos vuelven al Ayuntamiento SIN HIPOTECA y sin edificios', s.titulos.filter((t) => [1, 21, 35].indexOf(t.casilla) >= 0).every((t) => t.dueno === null && !t.empenado && t.casas === 0));
+    comprobar('y salen a subasta: la primera abierta y las otras dos en cola, en orden de casilla', s.paso === 'almoneda' && (s.almoneda as AlmonedaDelBurgo).casilla === 1 && s.colaDeAlmonedas.join() === '21,35', {
       almoneda: s.almoneda,
       cola: s.colaDeAlmonedas,
     });
     comprobar('la vista dice cuántas quedan en cola', vistaDe(s, ESPECTADOR).almoneda?.enCola === 2);
-    comprobar('los dos Indultos vuelven al FONDO de su mazo, cada uno al suyo', reprochesDeMazo(sinPregon, s.pregon, serieDeCarta('pregon', 10)).length === 0 && reprochesDeMazo(sinArca, s.arca, serieDeCarta('arca', 5)).length === 0, {
+    comprobar('los dos Salvoconductos vuelven al FONDO de su mazo, cada uno al suyo', reprochesDeMazo(sinPregon, s.pregon, serieDeCarta('pregon', 10)).length === 0 && reprochesDeMazo(sinArca, s.arca, serieDeCarta('arca', 5)).length === 0, {
       pregon: reprochesDeMazo(sinPregon, s.pregon, serieDeCarta('pregon', 10)),
       arca: reprochesDeMazo(sinArca, s.arca, serieDeCarta('arca', 5)),
     });
-    comprobar('y en la almoneda que se abrió el quebrado NO está en pie', (s.almoneda as AlmonedaDelBurgo).enPie.indexOf(ANA) < 0, (s.almoneda as AlmonedaDelBurgo).enPie);
+    comprobar('y en la subasta que se abrió el quebrado NO está en pie', (s.almoneda as AlmonedaDelBurgo).enPie.indexOf(ANA) < 0, (s.almoneda as AlmonedaDelBurgo).enPie);
   }
 
   /* Con dos a la mesa, la quiebra de uno termina la partida. */
@@ -1553,7 +1553,7 @@ function ultimoTrato(e: EstadoDelBurgo): TratoDelBurgo | null {
 
   const puerta = opcionesEn(repartido, ANA).find((o) => o.declaracion === true && o.tipo === PROPONER);
   comprobar('el dueño del turno recibe la PUERTA de proponer, que no se pinta como botón', puerta !== undefined && puerta.declaracion === true && puerta.id === 'proponer');
-  comprobar('con los cuatro campos exactos: a quién, cuánto, qué títulos y cuántos Indultos', canonico(puerta?.carga) === canonico({ a: [BRUNO, CARLA, DIEGO], mrsMaximo: DINERO_DE_SALIDA, titulos: [1, 5], indultos: 0 }), puerta?.carga);
+  comprobar('con los cuatro campos exactos: a quién, cuánto, qué títulos y cuántos Salvoconductos', canonico(puerta?.carga) === canonico({ a: [BRUNO, CARLA, DIEGO], mrsMaximo: DINERO_DE_SALIDA, titulos: [1, 5], indultos: 0 }), puerta?.carga);
   const deOtro = opcionesEn(repartido, BRUNO).find((o) => o.declaracion === true && o.tipo === PROPONER);
   comprobar('y quien NO tiene el turno también, pero SÓLO puede proponer AL del turno', canonico((deOtro?.carga as { a: AsientoId[] }).a) === canonico([ANA]), deOtro?.carga);
   comprobar('un tercero tampoco puede proponerle a otro tercero', canonico((opcionesEn(repartido, CARLA).find((o) => o.declaracion === true && o.tipo === PROPONER)?.carga as { a: AsientoId[] }).a) === canonico([ANA]));
@@ -1569,9 +1569,9 @@ function ultimoTrato(e: EstadoDelBurgo): TratoDelBurgo | null {
   for (const [que, carga] of [
     ['con un campo de más', { ...buena, relleno: 'x'.repeat(8192) }],
     ['con un lado de cuatro campos', { a: BRUNO, doy: { mrs: 100, titulos: [], indultos: 0, extra: 1 }, pido: { mrs: 0, titulos: [3], indultos: 0 } }],
-    ['con más maravedíes de los que tiene', { ...buena, doy: { mrs: 99999, titulos: [], indultos: 0 } }],
+    ['con más euros de los que tiene', { ...buena, doy: { mrs: 99999, titulos: [], indultos: 0 } }],
     ['dando un título que no es suyo', { ...buena, doy: { mrs: 0, titulos: [21], indultos: 0 } }],
-    ['dando Indultos que no tiene', { ...buena, doy: { mrs: 0, titulos: [1], indultos: 1 } }],
+    ['dando Salvoconductos que no tiene', { ...buena, doy: { mrs: 0, titulos: [1], indultos: 1 } }],
     ['a alguien que no está sentado', { ...buena, a: 'a-nadie' }],
     ['con los DOS lados vacíos', { a: BRUNO, doy: { mrs: 0, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [], indultos: 0 } }],
     ['con una casilla que no es un título', { ...buena, doy: { mrs: 0, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [4], indultos: 0 } }],
@@ -1609,7 +1609,7 @@ function ultimoTrato(e: EstadoDelBurgo): TratoDelBurgo | null {
 
     const aceptado = mover(mesa, BRUNO, { tipo: ACEPTAR, carga: { trato: trato.id } });
     const s = estadoDe(aceptado.mesa);
-    comprobar('aceptar mueve las dos partes de golpe: 100 mrs por el Corral', aceptado.cambio && tituloDe(s, 3).dueno === ANA && jugadorDe(s, ANA).mrs === DINERO_DE_SALIDA - 100 && jugadorDe(s, BRUNO).mrs === DINERO_DE_SALIDA + 100);
+    comprobar('aceptar mueve las dos partes de golpe: 100 € por el Corral', aceptado.cambio && tituloDe(s, 3).dueno === ANA && jugadorDe(s, ANA).mrs === DINERO_DE_SALIDA - 100 && jugadorDe(s, BRUNO).mrs === DINERO_DE_SALIDA + 100);
     comprobar('con los sucesos `trato` aceptado y `cambia-de-mano`', (sucesosDe(s, 'trato')[0] as { fin: string } | undefined)?.fin === 'aceptado' && sucesosDe(s, 'cambia-de-mano').length === 1);
     comprobar('y el trato desaparece de la lista', s.tratos.length === 0);
     comprobar('y quien reunió el barrio pardo entero ya puede alzar en los dos solares', idsDe(s, ANA).includes('alzar:1') && idsDe(s, ANA).includes('alzar:3'));
@@ -1632,7 +1632,7 @@ function ultimoTrato(e: EstadoDelBurgo): TratoDelBurgo | null {
     comprobar('y el motivo NO dice de quién es ahora: no enseña lo que la vista de quien mueve no daba', reprochesDeTexto(String(caido.motivo), vendidoEnMedio).length === 0 && String(caido.motivo).indexOf(CARLA) < 0, caido.motivo);
     const sinDinero = conJugador(estadoDe(mesa), ANA, { mrs: 10 });
     const caido2 = mover(mesaSobre('TRA-REV2', sinDinero, CUATRO), BRUNO, { tipo: ACEPTAR, carga: { trato: trato.id } });
-    comprobar('y si el proponente ya no tiene los maravedíes que prometía, también', !caido2.cambio && caido2.motivo !== null);
+    comprobar('y si el proponente ya no tiene los euros que prometía, también', !caido2.cambio && caido2.motivo !== null);
     const quebrado = conJugador(estadoDe(mesa), ANA, { quebrado: true, mrs: 0 });
     const caido3 = mover(mesaSobre('TRA-REV3', quebrado, CUATRO), BRUNO, { tipo: ACEPTAR, carga: { trato: trato.id } });
     comprobar('y si el proponente quebró entre medias, también', !caido3.cambio && caido3.motivo !== null);
@@ -1663,14 +1663,14 @@ function ultimoTrato(e: EstadoDelBurgo): TratoDelBurgo | null {
     comprobar('y aceptar un trato caducado se rechaza con motivo', !tarde.cambio && tarde.motivo !== null);
   }
 
-  /* En almoneda no se propone. */
+  /* En subasta no se propone. */
   {
     const enAlmoneda: EstadoDelBurgo = {
       ...repartido,
       paso: 'almoneda',
       almoneda: { casilla: 39, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, CARLA, DIEGO, ANA], abiertaPor: ANA },
     };
-    comprobar('con una almoneda abierta nadie recibe la puerta de proponer', [ANA, BRUNO, CARLA, DIEGO].every((a) => !opcionesEn(enAlmoneda, a).some((o) => o.tipo === PROPONER)));
+    comprobar('con una subasta abierta nadie recibe la puerta de proponer', [ANA, BRUNO, CARLA, DIEGO].every((a) => !opcionesEn(enAlmoneda, a).some((o) => o.tipo === PROPONER)));
     const r = mover(mesaSobre('TRA-ALM', enAlmoneda, CUATRO), ANA, { tipo: PROPONER, carga: buena });
     comprobar('y mandarlo se rechaza con motivo', !r.cambio && r.motivo !== null);
   }
@@ -1751,15 +1751,15 @@ function unaPartidaTerminada(): EstadoDelBurgo {
     comprobar('y SIN dobles pasa el turno al siguiente', s2.turno !== sinDobles.turno && s2.turnosAbiertos === sinDobles.turnosAbiertos + 1 && (sucesosDe(s2, 'turno')[0] as { de: AsientoId } | undefined)?.de === BRUNO);
   }
 
-  /* `comprar`: el tic manda el título a almoneda, que es lo que no bloquea la mesa. */
+  /* `comprar`: el tic manda el título a subasta, que es lo que no bloquea la mesa. */
   {
     const { s: enCompra } = alCaerEn('TIC-4', base, ANA, 39);
     const s = estadoDe(tic(mesaSobre('TIC-4B', enCompra, CUATRO)));
-    comprobar('en `comprar` el tic saca el título a almoneda: no compra por nadie', s.paso === 'almoneda' && (s.almoneda as AlmonedaDelBurgo).casilla === 39 && tituloDe(s, 39).dueno === null);
+    comprobar('en `comprar` el tic saca el título a subasta: no compra por nadie', s.paso === 'almoneda' && (s.almoneda as AlmonedaDelBurgo).casilla === 39 && tituloDe(s, 39).dueno === null);
     comprobar('y `turnoDe` cambia al primero que puja: el plazo se reprograma', vistaDe(s, ESPECTADOR).turnoDe !== vistaDe(enCompra, ESPECTADOR).turnoDe);
   }
 
-  /* `almoneda`: el tic pasa por quien tiene el relevo, uno por tic. */
+  /* `almoneda`: el tic pasa por quien tiene el relevo en la subasta, uno por tic. */
   {
     const abierta: EstadoDelBurgo = {
       ...turnoDe(base, ANA, 'por-pasar'),
@@ -1767,26 +1767,26 @@ function unaPartidaTerminada(): EstadoDelBurgo {
       almoneda: { casilla: 39, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [BRUNO, CARLA, DIEGO, ANA], abiertaPor: ANA },
     };
     const s1 = estadoDe(tic(mesaSobre('TIC-5', abierta, CUATRO)));
-    comprobar('en almoneda el tic PASA por el que tiene el relevo, y sólo por él', (s1.almoneda as AlmonedaDelBurgo).enPie.join() === [CARLA, DIEGO, ANA].join() && (s1.almoneda as AlmonedaDelBurgo).pujaDe === CARLA);
+    comprobar('en subasta el tic PASA por el que tiene el relevo, y sólo por él', (s1.almoneda as AlmonedaDelBurgo).enPie.join() === [CARLA, DIEGO, ANA].join() && (s1.almoneda as AlmonedaDelBurgo).pujaDe === CARLA);
     comprobar('y `turnoDe` cambia en cada tic que resuelve algo', vistaDe(s1, ESPECTADOR).turnoDe === CARLA);
     let mesa = mesaSobre('TIC-5B', s1, CUATRO);
     for (let k = 0; k < 3; k++) mesa = tic(mesa);
     const s2 = estadoDe(mesa);
-    comprobar('con cuatro tics —menos que los ocho de una lectura— la almoneda entera se cierra sin ganador', s2.almoneda === null && tituloDe(s2, 39).dueno === null && s2.paso === 'por-pasar', { paso: s2.paso });
+    comprobar('con cuatro tics —menos que los ocho de una lectura— la subasta entera se cierra sin ganador', s2.almoneda === null && tituloDe(s2, 39).dueno === null && s2.paso === 'por-pasar', { paso: s2.paso });
   }
 
   /* `apuro`: UN tic liquida al ausente entero. */
   {
     const enApuro = conTitulos(conJugador(base, ANA, { mrs: 50 }), [[5, ANA, 0, false], [15, ANA, 0, false]]);
     const { s } = alCaerEn('TIC-6', enApuro, ANA, EL_DIEZMO_CASILLA, [TRES_PASOS]);
-    comprobar('hay un apuro abierto de 200 con dos puertas que empeñar', s.paso === 'apuro' && s.apuro !== null);
+    comprobar('hay un apuro abierto de 200 con dos puertas que hipotecar', s.paso === 'apuro' && s.apuro !== null);
     const s2 = estadoDe(tic(mesaSobre('TIC-6B', s, CUATRO)));
-    comprobar('UN SOLO TIC liquida al ausente: empeña lo que hace falta y salda', s2.apuro === null && tituloDe(s2, 5).empenado && jugadorDe(s2, ANA).mrs === 50 + 2 * 100 - EL_DIEZMO, { mrs: jugadorDe(s2, ANA).mrs, apuro: s2.apuro });
+    comprobar('UN SOLO TIC liquida al ausente: hipoteca lo que hace falta y salda', s2.apuro === null && tituloDe(s2, 5).empenado && jugadorDe(s2, ANA).mrs === 50 + 2 * 100 - EL_DIEZMO, { mrs: jugadorDe(s2, ANA).mrs, apuro: s2.apuro });
     const conDeudaEnorme = conTitulos(conJugador(base, ANA, { mrs: 0 }), [[1, ANA, 0, false], [39, BRUNO, POSADA, false], [37, BRUNO, POSADA, false]]);
     const { s: s3 } = alCaerEn('TIC-7', conDeudaEnorme, ANA, 39, [[1, 1]]);
     comprobar('y con una renta de 2.000 y nada que vender, el apuro queda abierto', s3.paso === 'apuro' && s3.apuro !== null, s3.paso);
     const s4 = estadoDe(tic(mesaSobre('TIC-7B', s3, CUATRO)));
-    comprobar('el mismo tic lo empeña todo y, como no llega, lo quiebra con su acreedor', jugadorDe(s4, ANA).quebrado && (sucesosDe(s4, 'quiebra')[0] as { acreedor: AsientoId | null } | undefined)?.acreedor === BRUNO, sucesosDe(s4, 'quiebra'));
+    comprobar('el mismo tic lo hipoteca todo y, como no llega, lo quiebra con su acreedor', jugadorDe(s4, ANA).quebrado && (sucesosDe(s4, 'quiebra')[0] as { acreedor: AsientoId | null } | undefined)?.acreedor === BRUNO, sucesosDe(s4, 'quiebra'));
   }
 
   /* El tic NO contesta tratos: los caduca al relevar, que es otra cosa. */
@@ -1802,7 +1802,7 @@ function unaPartidaTerminada(): EstadoDelBurgo {
    *
    * El diseño (§8.1 F7) escribió «una mesa con `plazoSegundos: 1` y todos ausentes
    * termina en ≤ 2.500 tics». MEDIDO, con seis sentados y tope de vueltas 30 son
-   * unos ocho mil: sin nadie que compre, cada título pisado sale a almoneda y los
+   * unos ocho mil: sin nadie que compre, cada título pisado sale a subasta y los
    * seis pasan uno a uno —hasta nueve tics para resolver un solo turno—, y con tope
    * 30 hay que dar treinta vueltas al anillo con los seis. La cifra del diseño no
    * era falsa: era de otra mesa.
@@ -1923,7 +1923,7 @@ const TODOS_LOS_TIPOS: ReadonlyArray<readonly [string, unknown]> = [
   comprobar(`se han recogido ${motivos.length} motivos de rechazo`, motivos.length >= 40, motivos.length);
   comprobar('ninguno lleva dentro una serie de carta, un secreto ni una marca', motivos.every((m) => reprochesDeTexto(m, base).length === 0), motivos.filter((m) => reprochesDeTexto(m, base).length > 0));
   comprobar('ninguno es una cadena vacía: un motivo mudo no explica nada', motivos.every((m) => m.trim().length > 0));
-  comprobar('LA VACUNA: un motivo envenenado con «p07» se ve caer', reprochesDeTexto('No puedes: la siguiente del Pregón es la "p07".', base).length > 0);
+  comprobar('LA VACUNA: un motivo envenenado con «p07» se ve caer', reprochesDeTexto('No puedes: la siguiente de Sucesos es la "p07".', base).length > 0);
   comprobar('y otro con una marca registrada dentro, también', reprochesDeTexto(`Eso no se puede: esto no es ${(MARCAS_VETADAS[0] as { nombre: string }).nombre}.`, base).length > 0);
 }
 
@@ -2056,8 +2056,8 @@ function reprochesDePartida(p: PartidaVigilada): string[] {
   if (p.estado.ganadores.length === 0) r.push('terminó sin ganador');
   if ((p.cuenta.quiebra ?? 0) < MINIMOS_DE_UNA_PARTIDA.quiebras) r.push(`sólo ${p.cuenta.quiebra ?? 0} quiebras`);
   if (p.rentas < MINIMOS_DE_UNA_PARTIDA.rentas) r.push(`sólo ${p.rentas} rentas cobradas`);
-  if (p.almonedasGanadas < MINIMOS_DE_UNA_PARTIDA.almonedasGanadas) r.push(`sólo ${p.almonedasGanadas} almonedas ganadas`);
-  if ((p.cuenta['a-la-mazmorra'] ?? 0) < MINIMOS_DE_UNA_PARTIDA.mazmorra) r.push(`sólo ${p.cuenta['a-la-mazmorra'] ?? 0} entradas en la Mazmorra`);
+  if (p.almonedasGanadas < MINIMOS_DE_UNA_PARTIDA.almonedasGanadas) r.push(`sólo ${p.almonedasGanadas} subastas ganadas`);
+  if ((p.cuenta['a-la-mazmorra'] ?? 0) < MINIMOS_DE_UNA_PARTIDA.mazmorra) r.push(`sólo ${p.cuenta['a-la-mazmorra'] ?? 0} entradas en la Comisaría`);
   if (p.alzas < MINIMOS_DE_UNA_PARTIDA.alzas) r.push(`ninguna casa alzada sobre un barrio entero (${p.alzas})`);
   if (p.tratosAceptados < MINIMOS_DE_UNA_PARTIDA.tratosAceptados) r.push(`sólo ${p.tratosAceptados} tratos aceptados`);
   return r;
@@ -2069,7 +2069,7 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
   [3, 20260902, 40, 11, 4000],
   /*
    * La semilla de la de seis está ELEGIDA: con seis comprándolo todo, la mayoría de
-   * las partidas no llegan a una almoneda GANADA —el que la abre suele poder pagar el
+   * las partidas no llegan a una subasta GANADA —el que la abre suele poder pagar el
    * título— y el mínimo de §8.1 F4 exige una. Se probaron quince semillas y se escogió
    * una que las tiene; la partida sigue siendo la que el robot juega, no una guiada.
    */
@@ -2115,14 +2115,14 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
     /* DETERMINISMO, ESCALÓN 1: el diario reejecutado da el MISMO estado, byte a byte. */
     const otraVez = reejecutarEn(BURGO, undefined, p.mesa.diario);
     comprobar(`  y su diario de ${p.mesa.diario.length} entradas reejecuta el mismo estado byte a byte`, canonico(otraVez) === canonico(p.estado));
-    resumen.push(`    ${cuantos} a la mesa · ${String(p.movimientos).padStart(4)} movs · ${String(p.tics).padStart(3)} tics · ${String(p.cuenta.quiebra ?? 0)} quiebras · ${String(p.rentas).padStart(3)} rentas · ${p.almonedasGanadas} almonedas · ${p.alzas} alzas · ${p.tratosAceptados} tratos · ${ms.toFixed(0)} ms`);
+    resumen.push(`    ${cuantos} a la mesa · ${String(p.movimientos).padStart(4)} movs · ${String(p.tics).padStart(3)} tics · ${String(p.cuenta.quiebra ?? 0)} quiebras · ${String(p.rentas).padStart(3)} rentas · ${p.almonedasGanadas} subastas · ${p.alzas} alzas · ${p.tratosAceptados} tratos · ${ms.toFixed(0)} ms`);
   }
   console.log('  partidas jugadas de verdad:');
   for (const r of resumen) console.log(r);
 
   /*
    * LA VACUNA DEL BUCLE QUE DICE JUGAR Y NO JUEGA. El robot mudo tira porque no le
-   * queda otra, no compra nada, pasa en toda almoneda y se rinde en su apuro. Que la
+   * queda otra, no compra nada, pasa en toda subasta y se rinde en su apuro. Que la
    * partida TERMINE no prueba nada; lo que se exige es que los mínimos NO se cumplan,
    * porque si se cumplieran con esta política los mínimos no medirían nada.
    */
@@ -2236,7 +2236,7 @@ function percentil(muestras: readonly number[], parte: number): number {
 
   /*
    * EL PEOR TIC QUE PUEDE HABER: el apuro del ausente con los 28 títulos y las 22
-   * posadas encima, liquidado en UN SOLO tic —vende, empeña y quiebra—. Es la
+   * hoteles encima, liquidado en UN SOLO tic —vende, hipoteca y quiebra—. Es la
    * cascada del §8.6, y el único sitio donde un tic hace decenas de cosas de golpe.
    */
   {
@@ -2247,29 +2247,29 @@ function percentil(muestras: readonly number[], parte: number): number {
       filas.push([casilla, ANA, fila !== undefined && fila.clase === 'solar' ? POSADA : 0, false]);
     }
     e = conJugador(conTitulos(e, filas), ANA, { mrs: 0 });
-        /* La deuda es CON EL CONCEJO: es lo que manda los títulos a la cola de almonedas en vez de a un heredero. */
+        /* La deuda es CON EL AYUNTAMIENTO: es lo que manda los títulos a la cola de subastas en vez de a un heredero. */
     const deuda: ApuroDelBurgo = { quien: ANA, deudas: [{ a: null, cuanto: 999999, porque: 'diezmo' }] };
     const alBorde: EstadoDelBurgo = { ...turnoDe(e, ANA, 'por-pasar'), paso: 'apuro', apuro: deuda };
     const t0 = performance.now();
     const trasTic = tic(mesaSobre('PRE-T2', alBorde, SEIS));
     const ms = performance.now() - t0;
     const s = estadoDe(trasTic);
-    comprobar('el peor tic (28 títulos y 22 posadas liquidados) acaba en quiebra, y en UN solo tic', jugadorDe(s, ANA).quebrado, { paso: s.paso });
+    comprobar('el peor tic (28 títulos y 22 hoteles liquidados) acaba en quiebra, y en UN solo tic', jugadorDe(s, ANA).quebrado, { paso: s.paso });
     anota('avanzar() por tic, el peor caso medido', `${ms.toFixed(2)} ms`, `${TOPE_DE_MS} ms`, ms < TOPE_DE_MS);
     anota('el estado tras esa cascada', `${(canonico(s).length / 1024).toFixed(1)} KiB`, `${TOPE_DE_ESTADO / 1024} KiB`, canonico(s).length < TOPE_DE_ESTADO);
 
-    /* LA CASCADA ENTERA: cuántos tics cuesta vaciar las almonedas con los demás pasando. */
+    /* LA CASCADA ENTERA: cuántos tics cuesta vaciar las subastas con los demás pasando. */
     let cascada = trasTic;
     let tics = 0;
     let peorEstado = canonico(s).length;
     const pendientes = (m: Mesa): number => estadoDe(m).colaDeAlmonedas.length + (estadoDe(m).almoneda === null ? 0 : 1);
-    comprobar('la quiebra al Concejo encola TODOS los títulos del quebrado, ninguno perdido', pendientes(trasTic) === TITULOS.length, pendientes(trasTic));
+    comprobar('la quiebra al Ayuntamiento encola TODOS los títulos del quebrado, ninguno perdido', pendientes(trasTic) === TITULOS.length, pendientes(trasTic));
     while (tics < TOPE_DE_CASCADA && pendientes(cascada) > 0 && estadoDe(cascada).momento === 'jugando') {
       cascada = tic(cascada);
       tics++;
       peorEstado = Math.max(peorEstado, canonico(estadoDe(cascada)).length);
     }
-    anota('la cascada de 28 almonedas con los demás pasando', `${tics} tics · estado mayor ${(peorEstado / 1024).toFixed(1)} KiB`, `${TOPE_DE_CASCADA} tics y ${TOPE_DE_ESTADO / 1024} KiB`, tics < TOPE_DE_CASCADA && peorEstado < TOPE_DE_ESTADO);
+    anota('la cascada de 28 subastas con los demás pasando', `${tics} tics · estado mayor ${(peorEstado / 1024).toFixed(1)} KiB`, `${TOPE_DE_CASCADA} tics y ${TOPE_DE_ESTADO / 1024} KiB`, tics < TOPE_DE_CASCADA && peorEstado < TOPE_DE_ESTADO);
     comprobar('y la cola queda vacía: ningún título del quebrado se queda por el camino', pendientes(cascada) === 0, estadoDe(cascada).colaDeAlmonedas);
   }
 
@@ -2304,9 +2304,9 @@ if (hechas < COMPROBACIONES_ESCRITAS) {
 
 if (fallos.length === 0) {
   console.log(`✔ ${hechas} comprobaciones. El Burgo se sostiene: las rentas son las de la tabla y el barrio entero cobra el doble,`);
-  console.log('  los dobles repiten y los tres dobles encierran sin cobrar, la Mazmorra se paga o se sale con dobles o al tercero,');
-  console.log('  las treinta y dos cartas hacen lo que dicen y el mazo rota, la almoneda releva por asiento y la puja libre cabe');
-  console.log('  sólo por su puerta, el apuro se salda vendiendo y empeñando o acaba en quiebra con quien más reclama, los tratos');
+  console.log('  los dobles repiten y los tres dobles encierran sin cobrar, la Comisaría se paga o se sale con dobles o al tercero,');
+  console.log('  las treinta y dos cartas hacen lo que dicen y el mazo rota, la subasta releva por asiento y la puja libre cabe');
+  console.log('  sólo por su puerta, el apuro se salda vendiendo y hipotecando o acaba en quiebra con quien más reclama, los tratos');
   console.log('  caducan al relevar, el tic juega por el ausente y una mesa sin nadie termina sola — y tres partidas enteras de');
   console.log('  2, 3 y 6 jugadas por el robot quiebran, cobran, pujan, encierran y alzan, reejecutadas byte a byte, con');
   console.log('  ningún secreto en ninguna de las siete miradas de ninguna revisión.');

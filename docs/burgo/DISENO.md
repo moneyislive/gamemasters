@@ -27,9 +27,9 @@
 ## 0. Qué es y por qué se construye así
 
 **El Burgo** (`id: 'burgo'`) es el sexto arcade de la Sala: un juego de comprar solares
-de un burgo medieval, cobrar rentas a quien cae en ellos, alzar casas y posadas, con dos
-dados, la Mazmorra, dos mazos de cartas (el Pregón y el Arca del Concejo), empeños,
-almonedas, tratos y quiebra. Lo gobierna entero el reglamento
+de una ciudad de hoy —«El Burgo» es también su topónimo—, cobrar rentas a quien cae en
+ellos, alzar casas y hoteles, con dos dados, la Comisaría, dos mazos de cartas (Sucesos y
+el Fondo Vecinal), hipotecas, subastas, tratos y quiebra. Lo gobierna entero el reglamento
 `REGLAS-EL-BURGO.md` (§0 vocabulario, §1 las cuarenta casillas, §2–§10 el juego, §11 las
 treinta y dos cartas, §12 las decisiones para la mesa en línea); este diseño no repite el
 reglamento: dice cómo se convierte en código.
@@ -39,7 +39,8 @@ público: la patente del juego del que desciende caducó en 1921, y las reglas d
 son objeto de copyright ni de patente. Lo que la ley y las tiendas protegen es la
 EXPRESIÓN —nombre, marca, arte, textos— y aquí la expresión es nuestra entera: el nombre
 visible, las cuarenta calles, los textos de las cartas, las piezas (KayKit, CC0) y la
-escena. Ninguna marca ajena se nombra en este documento, en el código ni en los textos
+escena, con los cuarenta nombres de calle inventados y sin parecido con los de ninguna
+edición comercial. Ninguna marca ajena se nombra en este documento, en el código ni en los textos
 visibles, ni siquiera para decir que no se nombra (commit `a61c77c`); `verify:procedencia`
 barre las cadenas literales de `shared/arcade/juegos/**` contra
 `server/scripts/marcas-registradas.ts`, y `verify:burgo-modelos` barre con las marcas
@@ -65,10 +66,15 @@ por filtro roto y por un robot que decía jugar y no jugaba. La escena reutiliza
 anillo del burgo con las 73 piezas ya compiladas en `burgo.glb`.
 
 **Vocabulario que se lee en pantalla** (del reglamento §0, y es el ÚNICO admitido en
-rótulos, ayudas, pregón y aviso): maravedíes («mrs»), el Concejo, solar, barrio, puerta,
-oficio, casa, posada, empeño/empeñar/desempeñar, almoneda, la Mazmorra, la Puerta Mayor,
-la Feria, ¡A la Mazmorra!, el Diezmo, la Alcabala, el Pregón, el Arca del Concejo,
-«barrio entero» / «la calle es tuya», el Indulto, quiebra, apuro.
+rótulos, ayudas, crónica y aviso): euros («€»), el Ayuntamiento, solar, barrio, estación,
+servicio, casa, hotel, hipoteca/hipotecar/deshipotecar, subasta, la Comisaría, la Salida,
+el Descanso, ¡A comisaría!, el Impuesto, la Tasa, Sucesos, el Fondo Vecinal,
+«barrio entero» / «la calle es tuya», el Salvoconducto, quiebra, apuro.
+
+El juego SIGUE LLAMÁNDOSE «El Burgo»: los identificadores del código no se tocan
+(`BURGO`, `MazoId: 'pregon' | 'arca'`, `presa`, `posada`, `almoneda`, `empeno`…), y lo que
+cambió es sólo lo que se LEE. Un identificador viejo con un rótulo nuevo no es una deuda:
+es lo que evita reescribir el diario, el oro y las mesas guardadas.
 
 ---
 
@@ -219,7 +225,7 @@ export const BURGO: ArcadeId = 'burgo';
 export const MANIFIESTO_BURGO: ManifiestoDeArcade = {
   id: BURGO,
   nombre: 'El Burgo',
-  gancho: 'Compra solares, cobra rentas, alza casas y posadas; el último que no quiebra se queda con el burgo.',
+  gancho: 'Compra calles, cobra rentas, alza casas y hoteles; el último que no quiebra se queda con el Burgo.',
   icono: 'mando',
   jugadores: { minimo: 2, maximo: 6 },
   sede: 'servidor',
@@ -278,17 +284,17 @@ export type MazoId = 'pregon' | 'arca';
 export interface CasillaDelBurgo {
   readonly indice: number;            // 0..39, sentido de la marcha
   readonly clase: ClaseDeCasilla;
-  readonly nombre: string;            // 'Callejón del Lodo'
-  readonly rotulo: string;            // ≤ 6 letras para la cara del retablo: 'Lodo'
+  readonly nombre: string;            // 'Callejón de las Latas'
+  readonly rotulo: string;            // ≤ 6 letras para la cara del retablo: 'Latas'
   readonly barrio: BarrioId | null;   // sólo 'solar'
-  readonly precio: number;            // 0 si no se compra; el Diezmo y la Alcabala llevan aquí lo que cobran
-  readonly rentas: readonly [number, number, number, number, number, number]; // solar/1/2/3/4/posada; [0,0,0,0,0,0] en las demás
+  readonly precio: number;            // 0 si no se compra; el Impuesto y la Tasa llevan aquí lo que cobran
+  readonly rentas: readonly [number, number, number, number, number, number]; // solar/1/2/3/4/hotel; [0,0,0,0,0,0] en las demás
   readonly casa: number;              // precio de la casa del barrio; 0 fuera de solares
 }
 
 export interface BarrioDelBurgo {
   readonly id: BarrioId;
-  readonly nombre: string;            // 'El Arrabal', 'Las Tenerías'… (rótulos propios, para la hoja)
+  readonly nombre: string;            // 'El Poblado', 'Las Naves'… (rótulos propios, para la hoja)
   readonly color: string;             // '#rrggbb' de la acera y del relleno del retablo (§2.1 de la parte 2)
   readonly solares: readonly number[];// índices de casilla, en orden
 }
@@ -311,16 +317,16 @@ export const INTENTOS_EN_LA_MAZMORRA = 3;
 export const DOBLES_QUE_ENCIERRAN = 3;
 export const CASAS_DEL_CONCEJO = 32;
 export const POSADAS_DEL_CONCEJO = 12;
-export const POSADA = 5;                              // `casas === 5` es una posada
-export const RENTA_DE_PUERTA: readonly number[] = [0, 25, 50, 100, 200];   // por número de puertas del dueño
-export const MULTIPLO_DE_OFICIO: readonly number[] = [0, 4, 10];           // por número de oficios del dueño
+export const POSADA = 5;                              // `casas === 5` es un hotel
+export const RENTA_DE_PUERTA: readonly number[] = [0, 25, 50, 100, 200];   // por número de estaciones del dueño
+export const MULTIPLO_DE_OFICIO: readonly number[] = [0, 4, 10];           // por número de servicios del dueño
 export const MULTIPLO_DE_OFICIO_POR_CARTA = 10;
 export const PUJA_MINIMA = 10;
 export const PASO_DE_PUJA = 10;
 export const ESCALONES_DE_PUJA: readonly number[] = [50, 100];             // además del mínimo legal
 export const INTERES_DEL_EMPENO = 10;                                      // por ciento
 
-/** Empeño = mitad del precio (todos los precios son pares: entero). Desempeño = empeño + 10 % redondeado hacia arriba. */
+/** Hipoteca = mitad del precio (todos los precios son pares: entera). Deshipoteca = hipoteca + 10 % redondeado hacia arriba. */
 export function valorDeEmpeno(precio: number): number;       // precio / 2
 export function interesDelEmpeno(precio: number): number;    // Math.ceil(valorDeEmpeno(precio) / 10): 60→3, 100→5, 140→7…
 export function costeDeDesempeno(precio: number): number;    // valorDeEmpeno + interesDelEmpeno
@@ -341,7 +347,7 @@ export type EfectoDeCarta =
 export interface CartaDelBurgo {
   readonly numero: number;     // 1..16 dentro de su mazo: lo que se PUBLICA al salir
   readonly mazo: MazoId;
-  readonly titulo: string;     // 'Dividendo del Concejo'
+  readonly titulo: string;     // 'Dividendo de acciones'
   readonly texto: string;      // el texto propio del reglamento §11
   readonly efecto: EfectoDeCarta;
 }
@@ -371,13 +377,13 @@ export function medioLado(ancho: number, fondo: number, porLado: number): number
 `shared/mecanicas/hacienda.ts`: `transferir(saldos, de, a, cuanto): { saldos, pagado, deuda }`
 en enteros, claves `Object.keys(...).sort(comparador)`; `shared/mecanicas/mazo.ts`:
 `robar(mazo)` (rota al fondo), `sacar(mazo, serie)` y `devolverAlFondo(mazo, serie)` para el
-Indulto. Cada una con comprobador propio en `verify:mecanicas` (o bloque en `verify:burgo`).
+Salvoconducto. Cada una con comprobador propio en `verify:mecanicas` (o bloque en `verify:burgo`).
 
 `verify:burgo` afirma sobre la tabla: 40 filas con `indice === i`, 22 solares en 8 barrios de
-2–3, puertas en 5/15/25/35, oficios en 12/28, 3 arcas (2, 17, 33) y 3 pregones (7, 22, 36),
-16 + 16 cartas con `numero` 1..16 sin huecos, rentas crecientes, precios pares, la tabla
-entera de desempeño (28 valores escritos a mano), y ningún `nombre`/`texto`/`titulo` con
-una marca vetada.
+2–3, estaciones en 5/15/25/35, servicios en 12/28, 3 del Fondo Vecinal (2, 17, 33) y 3 de
+Sucesos (7, 22, 36), 16 + 16 cartas con `numero` 1..16 sin huecos, rentas crecientes,
+precios pares, la tabla entera de deshipoteca (28 valores escritos a mano), y ningún
+`nombre`/`texto`/`titulo` con una marca vetada.
 
 ### 2.3 `EstadoDelBurgo` y `MomentoDelBurgo`: todo entero, todo llano
 
@@ -848,7 +854,7 @@ export interface VistaDelBurgo {
   readonly jugada: number;
   readonly sucesos: readonly SucesoDelBurgo[];
   readonly ganadores: readonly AsientoId[];
-  readonly pregon: string;                   // la frase de la mesa, igual para todos: «Bea cae en la Calle de la Cera y paga 50 mrs a Ana.»
+  readonly pregon: string;                   // la frase de la mesa, igual para todos: «Bea llega a la Calle de la Frutería y paga 50 € a Ana.»
   readonly aviso: string;                    // lo que ME concierne: «Debes 340 mrs: vende o empeña.»
   readonly tablero: TableroDeclarado;        // el respaldo (§3.2), ya resuelto para `quien`
 }

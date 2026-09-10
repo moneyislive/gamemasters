@@ -1468,9 +1468,9 @@ paso('En proceso: una partida ENTERA del Burgo, con sus secretos mirados en cada
  * dos arcades mientras había cuatro instalados, y que Riberas «no apareciera ni una
  * vez» mientras la frase de cierre se leía como si cubriera todo. El Burgo es el
  * sexto, tiene `secretos: true`, y lo que tapa son DOS MAZOS de dieciséis cartas
- * cada uno más el azar entero: si su proyección dejara pasar el orden del Pregón,
+ * cada uno más el azar entero: si su proyección dejara pasar el orden de Sucesos,
  * cualquiera con el código de la mesa sabría qué carta le va a salir a quien caiga
- * en el Pregón, que es la mitad del juego.
+ * en Sucesos, que es la mitad del juego.
  *
  * Las series son distinguibles a propósito (`p07`, `a12`), que es lo que hace que la
  * búsqueda por aparición de este fichero valga para ellas: un número pequeño daría
@@ -2919,8 +2919,8 @@ try {
     comprobar('y el tablero declarado del Burgo baja con sus cuarenta caras', (tirar.datos.mesa.vista.tablero?.caras ?? []).length === 40, (tirar.datos.mesa.vista.tablero?.caras ?? []).length);
 
     /*
-     * COMPRAR, si la tirada cayó en un título del Concejo. Con dos dados desde la
-     * Puerta Mayor casi siempre lo hace, pero «casi siempre» no es una comprobación:
+     * COMPRAR, si la tirada cayó en un título del Ayuntamiento. Con dos dados desde la
+     * Salida casi siempre lo hace, pero «casi siempre» no es una comprobación:
      * si esta vez no toca, se dice, y lo que se afirma es que lo ofrecido y lo que el
      * servidor acepta coinciden, que es lo que se está mirando.
      */
@@ -2937,7 +2937,7 @@ try {
         const mio = (r.datos.mesa.vista.titulos ?? []).find((t: any) => t.casilla === compra.carga.casilla);
         comprobar('y el título baja con su dueño puesto en la vista de todos', mio !== undefined && mio.dueno === deTurno.asiento, mio);
       } else {
-        comprobar('esta tirada no cayó en un título del Concejo: no se ofrece comprar y no se manda', true);
+        comprobar('esta tirada no cayó en un título del Ayuntamiento: no se ofrece comprar y no se manda', true);
         comprobar('y lo que sí se ofrece se puede mandar', (trasTirar.datos.mesa.opciones ?? []).length > 0);
       }
     }

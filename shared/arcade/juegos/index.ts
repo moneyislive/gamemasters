@@ -504,12 +504,12 @@ instalarArcade<EstadoDeLaPeonza | undefined>({
 });
 
 /**
- * «EL BURGO», el sexto: solares, rentas, almonedas, tratos y quiebra.
+ * «EL BURGO», el sexto: solares, rentas, subastas, tratos y quiebra.
  *
  * ═══ ENTRA POR LA MISMA PUERTA QUE RIBERAS, CON LA MISMA ALTA ═══
  *
- * Es el juego con más fases de la Sala —almoneda con relevo, apuros en cola,
- * quiebra que encola almonedas, un tic que liquida por el ausente— y su alta es
+ * Es el juego con más fases de la Sala —subasta con relevo, apuros en cola,
+ * quiebra que encola subastas, un tic que liquida por el ausente— y su alta es
  * literalmente la de Riberas: manifiesto, reductor, proyección, `loSecreto`,
  * `opciones` y `seAcabo`. Ni un campo nuevo en el manifiesto ni un parámetro más.
  *

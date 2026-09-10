@@ -15,8 +15,8 @@
  * NO HAY NINGUNA REGLA AQUÍ. Qué se puede hacer en una casilla lo dice
  * `obraPosibleEnCasilla` leyendo las mismas `opciones()` que el reductor exige; qué se
  * manda al tocar viene ya montado dentro de cada opción; qué dice cada sección de la hoja
- * lo redacta `hojaEnTres`. Este fichero recoge y manda. Un `if` sobre una posada, una
- * renta o un empeño escrito aquí sería una segunda traducción, y el día que las dos
+ * lo redacta `hojaEnTres`. Este fichero recoge y manda. Un `if` sobre un hotel, una
+ * renta o una hipoteca escrito aquí sería una segunda traducción, y el día que las dos
  * discreparan nadie se enteraría.
  *
  * ═══ EL RETABLO NO SE VA: ES EL RESPALDO, Y NO ES OPCIONAL ═══
@@ -809,7 +809,7 @@ export function BurgoEnTres({
             {tablero.aviso}
           </p>
           {/*
-            LA FICHA DE MI DINERO: mi color y mis maravedíes a la vista sin abrir nada, y la
+            LA FICHA DE MI DINERO: mi color y mis euros a la vista sin abrir nada, y la
             PUERTA del cajón. Para un mirón que no está sentado no hay color ni cifra, y
             entonces es «≡» a secas: no se inventa un cero que no es de nadie.
           */}
@@ -848,7 +848,7 @@ export function BurgoEnTres({
           ═══ EL CAJÓN: LA HOJA ENTERA Y EL RAÍL, COLGANDO DE LA CINTA ═══
 
           Dentro van las seis secciones de la hoja que no están ya en pantalla —«Ahora», la
-          carta, la almoneda con su puja libre, los tratos con su componedor, «Lo mío» con la
+          carta, la subasta con su puja libre, los tratos con su componedor, «Lo mío» con la
           ficha de cada título y la mesa entera— y el raíl que monta la Sala con el marcador,
           el código de la mesa, las dos salidas y la crónica.
 
@@ -1070,8 +1070,8 @@ export function MarcadorDelBurgo({ vista, yo }: { vista: unknown; yo: string | n
                 {j.seLeEspera && !j.esSuTurno ? ' ·' : ''}
               </span>
               <span className="letra-chica burgo-lo-del-jugador">
-                {`${String(j.titulos)} ${j.titulos === 1 ? 'título' : 'títulos'}${j.presa ? ' · en la Mazmorra' : ''}${
-                  j.indultos > 0 ? ` · ${String(j.indultos)} ${j.indultos === 1 ? 'Indulto' : 'Indultos'}` : ''
+                {`${String(j.titulos)} ${j.titulos === 1 ? 'título' : 'títulos'}${j.presa ? ' · en la Comisaría' : ''}${
+                  j.indultos > 0 ? ` · ${String(j.indultos)} ${j.indultos === 1 ? 'Salvoconducto' : 'Salvoconductos'}` : ''
                 }`}
               </span>
             </span>
@@ -1083,12 +1083,12 @@ export function MarcadorDelBurgo({ vista, yo }: { vista: unknown; yo: string | n
         ))}
       </ul>
       {/*
-        LO QUE LE QUEDA AL CONCEJO, que es información pública del juego y parte de lo que se
-        juega: una mesa que sabe que quedan dos posadas sabe que no puede alzar la tercera.
+        LO QUE LE QUEDA AL AYUNTAMIENTO, que es información pública del juego y parte de lo que se
+        juega: una mesa que sabe que quedan dos hoteles sabe que no puede alzar el tercero.
       */}
       <p className="letra-chica burgo-lo-del-concejo">
-        {`El Concejo guarda ${String(marcador.concejo.casas)} casas y ${String(marcador.concejo.posadas)} posadas. ` +
-          `Quedan ${String(marcador.quedan.pregon)} cartas en el Pregón y ${String(marcador.quedan.arca)} en el Arca del Concejo.`}
+        {`El Ayuntamiento guarda ${String(marcador.concejo.casas)} casas y ${String(marcador.concejo.posadas)} hoteles. ` +
+          `Quedan ${String(marcador.quedan.pregon)} cartas en Sucesos y ${String(marcador.quedan.arca)} en el Fondo Vecinal.`}
       </p>
     </section>
   );

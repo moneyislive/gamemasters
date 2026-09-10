@@ -5,7 +5,7 @@
  *
  * ═══ QUÉ ES ESTO Y QUÉ NO ═══
  *
- * La escena del burgo (`escenas/burgo/Burgo.tsx`) no sabe que existe el Burgo: pinta
+ * La escena de la ciudad (`escenas/burgo/Burgo.tsx`) no sabe que existe el Burgo: pinta
  * un `TableroDelBurgoEn3D` —cuarenta casillas, seis figuras, unos dados— y anima una
  * lista de sucesos. Todo eso lo tiene que decir alguien que SÍ sepa del Burgo, y ese
  * alguien no puede ser la pantalla de cada cliente: habría dos traducciones —la de la
@@ -37,11 +37,11 @@
  *
  *   · LOS DADOS (`dadosEnTres`): TIRAR. El asa del lienzo.
  *   · LAS CASILLAS TOCABLES (`tableroEnTres` → `tocable`, y `obraPosibleEnCasilla` al
- *     tocar): las obras de esa casilla —comprar, sacar a almoneda, alzar, vender,
- *     empeñar, desempeñar—. La marca del acento se enciende donde hay algo que hacer.
- *   · LA HOJA (`hojaEnTres`): las pujas fijas y el pasar de la almoneda, contestar y
+ *     tocar): las obras de esa casilla —comprar, sacar a subasta, alzar, vender,
+ *     hipotecar, deshipotecar—. La marca del acento se enciende donde hay algo que hacer.
+ *   · LA HOJA (`hojaEnTres`): las pujas fijas y el pasar de la subasta, contestar y
  *     retirar tratos, y los botones del momento —tirar cuando no hay dados, pagar la
- *     fianza, usar el Indulto, pasar el turno, declararse en quiebra, empezar—. En «Lo
+ *     fianza, usar el Salvoconducto, pasar el turno, declararse en quiebra, empezar—. En «Lo
  *     mío» cada título lleva su FICHA con sus obras: son LOS MISMOS objetos que la
  *     casilla tocable abre al tocarla (una sola → se manda; varias → «¿qué haces
  *     aquí?»), así que la obra tiene UN botón, el de la ficha, y un atajo, la casilla.
@@ -76,9 +76,9 @@
  *
  * ═══ EL VOCABULARIO ═══
  *
- * Los textos usan SÓLO las palabras del reglamento §0: maravedíes («mrs»), el Concejo,
- * solar, barrio, puerta, oficio, casa, posada, empeño, almoneda, la Mazmorra, la Puerta
- * Mayor, el Pregón, el Arca del Concejo, «barrio entero», el Indulto, quiebra, apuro.
+ * Los textos usan SÓLO las palabras del reglamento §0: euros («€»), el Ayuntamiento,
+ * solar, barrio, estación, servicio, casa, hotel, hipoteca, subasta, la Comisaría, la
+ * Salida, Sucesos, el Fondo Vecinal, «barrio entero», el Salvoconducto, quiebra, apuro.
  * Ninguna marca ajena, ni para decir que no se nombra.
  *
  * ═══ EN QUÉ SE APARTA ESTO DEL §4 DEL DISEÑO, Y POR QUÉ ═══
@@ -108,7 +108,7 @@
  *     la ficha de «Lo mío» y como casilla tocable en el anillo (§4 y §6.3 piden las
  *     dos cosas). Son EL MISMO objeto —la ficha y `obraPosibleEnCasilla` devuelven la
  *     opción del juego por identidad— y la partición los cuenta como un botón y su
- *     atajo, no como dos botones. Comprar y sacar a almoneda, que no son de un título
+ *     atajo, no como dos botones. Comprar y sacar a subasta, que no son de un título
  *     mío, sólo tienen la casilla.
  *   · `pujaEnTres` y `tratoEnTres` traen más campos de los que el §4 enumera (nombres,
  *     líneas redactadas, `meToca`, `soyElDestinatario`…): son texto derivado para que
@@ -529,9 +529,9 @@ function filaDe(casilla: number): CasillaDelBurgo | null {
   return fila === undefined ? null : fila;
 }
 
-/** Cómo se llama un asiento SEGÚN LA VISTA: su nombre, o el id si no consta; «el Concejo» para `null`. */
+/** Cómo se llama un asiento SEGÚN LA VISTA: su nombre, o el id si no consta; «el Ayuntamiento» para `null`. */
 function nombreDe(l: Lectura, quien: AsientoId | null): string {
-  if (quien === null) return 'el Concejo';
+  if (quien === null) return 'el Ayuntamiento';
   const j = jugadorEn(l, quien);
   return j === null || j.nombre.length === 0 ? quien : j.nombre;
 }
@@ -628,7 +628,7 @@ function cartaVigente(l: Lectura): CartaQueSePinta | null {
 }
 
 /**
- * DE QUÉ CASILLA SALIÓ LA CARTA: la del Pregón o del Arca que pisa quien la sacó, o
+ * DE QUÉ CASILLA SALIÓ LA CARTA: la de Sucesos o la del Fondo Vecinal que pisa quien la sacó, o
  * la última de ese mazo que dejó atrás si la carta le movió. La vista no guarda dónde
  * se robó; esto es lo más cerca que se puede estar sin inventar.
  */
@@ -787,7 +787,7 @@ function conElRelevo(l: Lectura, base: readonly SucesoDelBurgo[]): SucesoDelBurg
 /**
  * LA LISTA GRUESA: lo que cambió a la vista entre dos lecturas, sin saber cómo. Un
  * `mueve` por figura que no está donde estaba (`viaja`: la escena la lleva sin
- * pisar casillas), un `cobra` o `paga` con el Concejo por bolsa que cambió, un
+ * pisar casillas), un `cobra` o `paga` con el Ayuntamiento por bolsa que cambió, un
  * `cambia-de-mano` por título con otro dueño, `alza`/`vende` por casas, `empena`/
  * `desempena`, `a-la-mazmorra`/`sale-de-la-mazmorra` por presa, `quiebra` por
  * quebrado nuevo, y los tratos que aparecieron o se fueron.
@@ -953,7 +953,7 @@ export interface FichaDeCasilla<O extends OpcionQueLlega = OpcionQueLlega> {
   readonly casa: number;
   readonly rentas: readonly RenglonDeRenta[];
   readonly dueno: DuenoVisto | null;
-  /** «Del Concejo», «Empeñado», «En almoneda», «Barrio entero», «Posada», «Tuyo»… */
+  /** «Del Ayuntamiento», «Hipotecado», «En subasta», «Barrio entero», «Hotel», «Tuyo»… */
   readonly estado: string;
   readonly casas: number;
   readonly esPosada: boolean;
@@ -961,7 +961,7 @@ export interface FichaDeCasilla<O extends OpcionQueLlega = OpcionQueLlega> {
   readonly enAlmoneda: boolean;
   readonly barrioEntero: boolean;
   readonly rentaAhora: number;
-  /** Lo que da empeñarlo y lo que cuesta desempeñarlo, por tabla. 0 si no se compra. */
+  /** Lo que da hipotecarlo y lo que cuesta deshipotecarlo, por tabla. 0 si no se compra. */
   readonly empeno: number;
   readonly desempeno: number;
   readonly esMio: boolean;
@@ -984,17 +984,17 @@ function rentasDe(fila: CasillaDelBurgo, t: TituloQueSePinta | null, tirada: Par
       const cuanto = r[k] ?? 0;
       filas.push({ rotulo: k === 1 ? '1 casa' : `${k} casas`, cuanto, actual: marca(cuanto, t !== null && t.casas === k) });
     }
-    filas.push({ rotulo: 'Posada', cuanto: r[5], actual: marca(r[5], t !== null && t.casas === POSADA) });
+    filas.push({ rotulo: 'Hotel', cuanto: r[5], actual: marca(r[5], t !== null && t.casas === POSADA) });
   } else if (fila.clase === 'puerta') {
     for (let n = 1; n < RENTA_DE_PUERTA.length; n++) {
       const cuanto = RENTA_DE_PUERTA[n] ?? 0;
-      filas.push({ rotulo: n === 1 ? '1 puerta' : `${n} puertas`, cuanto, actual: marca(cuanto, true) });
+      filas.push({ rotulo: n === 1 ? '1 estación' : `${n} estaciones`, cuanto, actual: marca(cuanto, true) });
     }
   } else if (fila.clase === 'oficio') {
     const suma = tirada === null ? 0 : tirada[0] + tirada[1];
     for (let n = 1; n < MULTIPLO_DE_OFICIO.length; n++) {
       const veces = MULTIPLO_DE_OFICIO[n] ?? 0;
-      filas.push({ rotulo: `${n === 1 ? '1 oficio' : `${n} oficios`}: ${veces} × la tirada`, cuanto: veces * suma, actual: marca(veces * suma, suma > 0) });
+      filas.push({ rotulo: `${n === 1 ? '1 servicio' : `${n} servicios`}: ${veces} × la tirada`, cuanto: veces * suma, actual: marca(veces * suma, suma > 0) });
     }
   }
   return filas;
@@ -1004,31 +1004,31 @@ function estadoDeLaCasilla(l: Lectura, fila: CasillaDelBurgo, t: TituloQueSePint
   if (fila.clase !== 'solar' && fila.clase !== 'puerta' && fila.clase !== 'oficio') {
     switch (fila.clase) {
       case 'salida':
-        return 'La Puerta Mayor';
+        return 'La Salida';
       case 'mazmorra':
-        return 'La Mazmorra';
+        return 'La Comisaría';
       case 'feria':
-        return 'La Feria';
+        return 'El Descanso';
       case 'a-la-mazmorra':
-        return '¡A la Mazmorra!';
+        return '¡A comisaría!';
       case 'diezmo':
-        return `El Diezmo: ${maravedies(fila.precio)}`;
+        return `El Impuesto: ${maravedies(fila.precio)}`;
       case 'alcabala':
-        return `La Alcabala: ${maravedies(fila.precio)}`;
+        return `La Tasa: ${maravedies(fila.precio)}`;
       case 'pregon':
-        return 'El Pregón';
+        return 'Sucesos';
       case 'arca':
-        return 'El Arca del Concejo';
+        return 'El Fondo Vecinal';
       default:
         return '';
     }
   }
-  if (l.almoneda !== null && l.almoneda.casilla === fila.indice) return 'En almoneda';
-  if (t === null || t.dueno === null) return 'Del Concejo';
+  if (l.almoneda !== null && l.almoneda.casilla === fila.indice) return 'En subasta';
+  if (t === null || t.dueno === null) return 'Del Ayuntamiento';
   const partes: string[] = [];
   partes.push(l.yo !== null && t.dueno === l.yo ? 'Tuyo' : `De ${nombreDe(l, t.dueno)}`);
-  if (t.empenado) partes.push('empeñado');
-  else if (t.casas === POSADA) partes.push('posada');
+  if (t.empenado) partes.push('hipotecado');
+  else if (t.casas === POSADA) partes.push('hotel');
   else if (t.casas > 0) partes.push(t.casas === 1 ? '1 casa' : `${t.casas} casas`);
   else if (t.barrioEntero) partes.push('barrio entero');
   return partes.join(' · ');
@@ -1046,14 +1046,14 @@ export function fichaDeCasilla<O extends OpcionQueLlega>(vista: unknown, casilla
   const barrio = fila.clase === 'solar' ? barrioDe(casilla) : null;
   const dueno = l === null || t === null ? null : jugadorEn(l, t.dueno);
   const seCompra = fila.clase === 'solar' || fila.clase === 'puerta' || fila.clase === 'oficio';
-  const estado = l === null ? (seCompra ? 'Del Concejo' : '') : estadoDeLaCasilla(l, fila, t);
+  const estado = l === null ? (seCompra ? 'Del Ayuntamiento' : '') : estadoDeLaCasilla(l, fila, t);
   const lineas: string[] = [];
   if (barrio !== null) lineas.push(`Barrio: ${barrio.nombre}`);
   if (seCompra) lineas.push(`Precio: ${maravedies(fila.precio)}`);
   if (fila.casa > 0) lineas.push(`Cada casa: ${maravedies(fila.casa)}`);
   if (estado.length > 0) lineas.push(estado);
   if (t !== null && t.dueno !== null && !t.empenado) lineas.push(`Renta hoy: ${maravedies(t.rentaAhora)}`);
-  if (seCompra) lineas.push(`Empeño: ${maravedies(valorDeEmpeno(fila.precio))} · desempeñar: ${maravedies(costeDeDesempeno(fila.precio))}`);
+  if (seCompra) lineas.push(`Hipoteca: ${maravedies(valorDeEmpeno(fila.precio))} · deshipotecar: ${maravedies(costeDeDesempeno(fila.precio))}`);
   return {
     casilla: fila.indice,
     nombre: fila.nombre,
@@ -1092,7 +1092,7 @@ export interface JugadorDelMarcador {
   /** Cuántos títulos tiene. */
   readonly titulos: number;
   readonly presa: boolean;
-  /** Intentos hechos en la Mazmorra (0 si libre). */
+  /** Intentos hechos en la Comisaría (0 si libre). */
   readonly intentos: number;
   readonly indultos: number;
   readonly quebrado: boolean;
@@ -1103,7 +1103,7 @@ export interface JugadorDelMarcador {
   /** Se le espera a él (puja, apuro): el punto. */
   readonly seLeEspera: boolean;
   readonly soyYo: boolean;
-  /** «Ana · 1.500 mrs · 3 títulos · en la Mazmorra · 1 Indulto». */
+  /** «Ana · 1.500 € · 3 títulos · en la Comisaría · 1 Salvoconducto». */
   readonly linea: string;
 }
 
@@ -1119,12 +1119,12 @@ export interface MarcadorDelBurgo {
 function lineaDelMarcador(j: JugadorQueSePinta, nombre: string): string {
   let linea = `${nombre} · ${maravedies(j.mrs)} · ${j.titulos.length} ${j.titulos.length === 1 ? 'título' : 'títulos'}`;
   if (j.quebrado) linea += ' · quebró';
-  else if (j.presa >= 0) linea += ' · en la Mazmorra';
-  if (j.indultos > 0) linea += ` · ${j.indultos} ${j.indultos === 1 ? 'Indulto' : 'Indultos'}`;
+  else if (j.presa >= 0) linea += ' · en la Comisaría';
+  if (j.indultos > 0) linea += ` · ${j.indultos} ${j.indultos === 1 ? 'Salvoconducto' : 'Salvoconductos'}`;
   return linea;
 }
 
-/** EL MARCADOR que se enseña siempre: por jugador y el Concejo. Vacío para una vista que no es del Burgo. */
+/** EL MARCADOR que se enseña siempre: por jugador y el Ayuntamiento. Vacío para una vista que no es del Burgo. */
 export function marcadorEnTres(vista: unknown, yo: QuienMira): MarcadorDelBurgo {
   const l = leer(vista);
   if (l === null) {
@@ -1184,7 +1184,7 @@ export interface PujaComponible<O extends OpcionQueLlega = OpcionQueLlega> {
   readonly escalon: number;
   /** Las pujas fijas (mínimo, +50, +100), enteras, en el orden del juego. Vacías si no me toca. */
   readonly fijas: readonly O[];
-  /** Pasar en la almoneda, entera; `null` si no me toca. */
+  /** Pasar en la subasta, entera; `null` si no me toca. */
   readonly pasar: O | null;
   /** La puerta, o `null` si el juego no me la abrió (no me toca, o no me alcanza para el mínimo). */
   readonly puerta: PuertaDeLaPuja | null;
@@ -1214,7 +1214,7 @@ function duenoVisto(l: Lectura, quien: AsientoId | null): DuenoVisto | null {
 }
 
 /**
- * LA ALMONEDA para `yo`, o `null` si no hay ninguna abierta. Para todos trae la
+ * LA SUBASTA para `yo`, o `null` si no hay ninguna abierta. Para todos trae la
  * cifra, quién gana y quiénes siguen en pie; para quien puja, además las fijas, el
  * pasar y la puerta. `montar` compone la puja libre con los campos EXACTOS de la
  * puerta y devuelve `null` fuera de sus límites: lo que sale de aquí entra por el
@@ -1285,7 +1285,7 @@ export interface TratoAbierto<O extends OpcionQueLlega = OpcionQueLlega> {
   readonly a: DuenoVisto;
   readonly doy: LadoQueSePinta;
   readonly pido: LadoQueSePinta;
-  /** «Ana da 200 mrs, Callejón del Lodo y pide un Indulto.» */
+  /** «Ana da 200 €, Callejón de las Latas y pide un Salvoconducto.» */
   readonly resumen: string;
   readonly da: string;
   readonly pide: string;
@@ -1339,7 +1339,7 @@ function resumenDeLado(lado: LadoQueSePinta): string {
   const partes: string[] = [];
   if (lado.mrs > 0) partes.push(maravedies(lado.mrs));
   for (const c of lado.titulos) partes.push(nombreDeCasilla(c));
-  if (lado.indultos > 0) partes.push(lado.indultos === 1 ? 'un Indulto' : `${lado.indultos} Indultos`);
+  if (lado.indultos > 0) partes.push(lado.indultos === 1 ? 'un Salvoconducto' : `${lado.indultos} Salvoconductos`);
   return partes.length === 0 ? 'nada' : partes.join(', ');
 }
 
@@ -1464,7 +1464,7 @@ export function tratoEnTres<O extends OpcionQueLlega>(vista: unknown, yo: QuienM
 }
 
 // ---------------------------------------------------------------------------
-// LA CARTA, EL PREGÓN, A QUIÉN SE ESPERA
+// LA CARTA, LA CRÓNICA, A QUIÉN SE ESPERA
 // ---------------------------------------------------------------------------
 
 export interface CartelDelBurgo {
@@ -1474,7 +1474,7 @@ export interface CartelDelBurgo {
   readonly texto: string;
   readonly quien: AsientoId | null;
   readonly nombre: string;
-  /** «del Pregón» / «del Arca del Concejo». */
+  /** «de Sucesos» / «del Fondo Vecinal». */
   readonly deDonde: string;
 }
 
@@ -1493,7 +1493,7 @@ export function cartelEnTres(vista: unknown): CartelDelBurgo | null {
     texto: ficha.texto,
     quien: c.quien,
     nombre: c.quien === null ? '' : nombreDe(l, c.quien),
-    deDonde: c.mazo === 'pregon' ? 'del Pregón' : 'del Arca del Concejo',
+    deDonde: c.mazo === 'pregon' ? 'de Sucesos' : 'del Fondo Vecinal',
   };
 }
 
@@ -1516,7 +1516,7 @@ export function esperaA(vista: unknown): string {
   if (l.momento === 'reuniendo') return 'La mesa se está reuniendo.';
   if (l.momento === 'terminada') {
     return l.ganadores.length === 1
-      ? `Se acabó: ${nombreDe(l, l.ganadores[0] as AsientoId)} se queda con el burgo.`
+      ? `Se acabó: ${nombreDe(l, l.ganadores[0] as AsientoId)} se queda con el Burgo.`
       : l.ganadores.length === 0
         ? 'Se acabó.'
         : `Se acabó: empate entre ${l.ganadores.map((g) => nombreDe(l, g)).join(', ')}.`;
@@ -1526,7 +1526,7 @@ export function esperaA(vista: unknown): string {
   switch (l.paso) {
     case 'por-tirar': {
       const j = jugadorEn(l, l.turnoDe);
-      return j !== null && j.presa >= 0 ? `${quien} decide cómo salir de la Mazmorra…` : `${quien} tira…`;
+      return j !== null && j.presa >= 0 ? `${quien} decide cómo salir de la Comisaría…` : `${quien} tira…`;
     }
     case 'comprar':
       return `${quien} decide si compra…`;
@@ -1589,11 +1589,11 @@ export interface HojaDelBurgo<O extends OpcionQueLlega = OpcionQueLlega> {
   readonly trato: TratoComponible<O> | null;
   /** Mis títulos por barrio, cada uno con su ficha y sus obras enteras. */
   readonly mios: readonly BarrioDeLoMio<O>[];
-  /** La sección que conviene abrir ahora: la almoneda si pujo, el trato si me proponen, «Lo mío» en mi apuro, «Ahora» si me toca. */
+  /** La sección que conviene abrir ahora: la subasta si pujo, el trato si me proponen, «Lo mío» en mi apuro, «Ahora» si me toca. */
   readonly abre: IdDeSeccion | null;
 }
 
-/** Las opciones que no van a los dados, a las casillas, a la almoneda ni a los tratos: los botones del momento. */
+/** Las opciones que no van a los dados, a las casillas, a la subasta ni a los tratos: los botones del momento. */
 function esDelMomento(o: OpcionQueLlega): boolean {
   if (esPuerta(o)) return false;
   if (o.tipo === TIRAR) return false;
@@ -1603,8 +1603,8 @@ function esDelMomento(o: OpcionQueLlega): boolean {
   return true;
 }
 
-/** Las puertas y los oficios no tienen barrio: van juntos al final de «Lo mío», con el gris de las puertas del retablo. */
-const SIN_BARRIO = { id: 'sueltos', nombre: 'Puertas y oficios', color: '#6e6a63' } as const;
+/** Las estaciones y los servicios no tienen barrio: van juntos al final de «Lo mío», con el gris de las estaciones del retablo. */
+const SIN_BARRIO = { id: 'sueltos', nombre: 'Estaciones y servicios', color: '#6e6a63' } as const;
 
 function losMios<O extends OpcionQueLlega>(vista: unknown, l: Lectura, yo: QuienMira, opciones: readonly O[]): BarrioDeLoMio<O>[] {
   const j = jugadorEn(l, yo);
@@ -1653,19 +1653,19 @@ function lineasDeAhora(vista: unknown, l: Lectura, yo: QuienMira): string[] {
   if (l.apuro !== null && l.apuro.quien === yo) {
     lineas.push(`Debes ${maravedies(l.apuro.debe)}.`);
     const faltan = l.apuro.debe - j.mrs;
-    if (faltan > 0) lineas.push(`Te faltan ${maravedies(faltan)}: vende o empeña en «Lo mío», o declárate en quiebra.`);
+    if (faltan > 0) lineas.push(`Te faltan ${maravedies(faltan)}: vende o hipoteca en «Lo mío», o declárate en quiebra.`);
     for (const d of l.apuro.deudas) lineas.push(`${maravedies(d.cuanto)} a ${nombreDe(l, d.a)}.`);
     return lineas;
   }
   if (l.turnoDe === yo) {
     if (l.paso === 'por-tirar') {
-      lineas.push(j.presa >= 0 ? `Estás en la Mazmorra: intento ${j.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}.` : 'Te toca tirar.');
+      lineas.push(j.presa >= 0 ? `Estás en la Comisaría: intento ${j.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}.` : 'Te toca tirar.');
     } else if (l.paso === 'comprar') {
-      lineas.push(`Has caído en ${nombreDeCasilla(j.casilla)}: compra o sácala a almoneda.`);
+      lineas.push(`Has caído en ${nombreDeCasilla(j.casilla)}: compra o sácala a subasta.`);
     } else if (l.paso === 'por-pasar') {
       lineas.push(l.dobles > 0 ? 'Dobles: vuelve a tirar.' : 'Puedes obrar, tratar o pasar el turno.');
     } else if (l.paso === 'almoneda') {
-      lineas.push('Te toca pujar: mira la almoneda.');
+      lineas.push('Te toca pujar: mira la subasta.');
     }
   } else {
     lineas.push(esperaA(vista));
@@ -1681,8 +1681,8 @@ function lineasDeLaMesa(l: Lectura): string[] {
   for (const j of l.jugadores) {
     lineas.push(`${nombreDe(l, j.asiento)}: ${maravedies(j.mrs)} en mano, ${maravedies(j.patrimonio)} de patrimonio${j.quebrado ? ' · quebró' : ''}.`);
   }
-  lineas.push(`El Concejo guarda ${l.concejo.casas} casas y ${l.concejo.posadas} posadas.`);
-  lineas.push(`Quedan ${l.quedan.pregon} cartas en el Pregón y ${l.quedan.arca} en el Arca del Concejo.`);
+  lineas.push(`El Ayuntamiento guarda ${l.concejo.casas} casas y ${l.concejo.posadas} hoteles.`);
+  lineas.push(`Quedan ${l.quedan.pregon} cartas en Sucesos y ${l.quedan.arca} en el Fondo Vecinal.`);
   if (l.topeDeVueltas > 0) lineas.push(`Se juega a ${l.topeDeVueltas} ${l.topeDeVueltas === 1 ? 'vuelta' : 'vueltas'}.`);
   return lineas;
 }
@@ -1778,7 +1778,7 @@ function tituloDeSeccion(id: IdDeSeccion): string {
     case 'carta':
       return 'La carta';
     case 'almoneda':
-      return 'La almoneda';
+      return 'La subasta';
     case 'trato':
       return 'El trato';
     case 'mios':

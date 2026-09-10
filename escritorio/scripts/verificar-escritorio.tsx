@@ -2122,8 +2122,8 @@ function burgoEnTres(): void {
     enElRail.includes('soy-yo') && enElRail.includes('burgo-le-toca'),
   );
   comprobar(
-    'y dice lo que le queda al Concejo y a los dos mazos, que es información pública del juego',
-    textoDelRail.includes('El Concejo guarda') && textoDelRail.includes('Arca del Concejo'),
+    'y dice lo que le queda al Ayuntamiento y a los dos mazos, que es información pública del juego',
+    textoDelRail.includes('El Ayuntamiento guarda') && textoDelRail.includes('Fondo Vecinal'),
   );
   comprobar(
     'una vista que no es del Burgo no pinta un marcador vacío: no pinta nada',
@@ -8554,7 +8554,7 @@ if (fallos.length === 0) {
       '  qué en letra chica, y allí las acciones del tablero más lo que ninguna recoge cubren\n' +
       '  todos los movimientos. Su marcador nombra a cada cual con su color y su dinero, separa\n' +
       '  de quién es el turno de a quién se espera —que en el Burgo no son lo mismo— y dice lo que\n' +
-      '  le queda al Concejo y a los dos mazos. Y el escritorio elige el pintor por TABLA:\n' +
+      '  le queda al Ayuntamiento y a los dos mazos. Y el escritorio elige el pintor por TABLA:\n' +
       '  `sala.tsx` no vuelve a nombrar a ningún juego, y la pantalla completa cuelga de una clase\n' +
       '  genérica con sus seis eslabones medidos uno a uno.\n' +
       '\n  Y EL CARTEL QUE EXPLICA EL NAIPE: cae al pie del lienzo sin tapar un naipe del mazo, ni\n' +

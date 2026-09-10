@@ -22,9 +22,9 @@
  * que el turno acabe: tira siempre que puede, compra todo lo que puede pagar, alza
  * en cuanto tiene el barrio entero, puja hasta el precio del título, propone un
  * trato cuando le falta UN solar para el barrio y acepta los que le salen a cuenta,
- * empeña y vende en el apuro antes que rendirse, y sólo pasa cuando no queda otra.
+ * hipoteca y vende en el apuro antes que rendirse, y sólo pasa cuando no queda otra.
  * `verify:burgo` cuenta desde los `sucesos` de la vista —no desde el robot— que
- * con esta política salen rentas, almonedas ganadas, Mazmorra, barrios alzados y
+ * con esta política salen rentas, subastas ganadas, Comisaría, barrios alzados y
  * quiebras; y lleva la vacuna de un robot que sólo pasa, que se ve caer.
  *
  * ═══ SÓLO ELIGE ENTRE LO QUE `opcionesDelBurgo` OFRECE ═══
@@ -76,14 +76,14 @@ export interface DecisionDelRobot {
   familia: string;
 }
 
-/** Cuánto efectivo quiere conservar el robot antes de comprar una casa o desempeñar. */
+/** Cuánto efectivo quiere conservar el robot antes de comprar una casa o deshipotecar. */
 const RESERVA_PARA_ALZAR = 100;
 const RESERVA_PARA_DESEMPENAR = 400;
 /** Cuánto quiere que le sobre para pagar la fianza en vez de probar con los dados. */
 const RESERVA_PARA_LA_FIANZA = 300;
 /** Cuánto paga en un trato por el solar que le falta: precio × 3 / 2 (sin coma flotante). */
 const PAGA_POR_EL_SOLAR_QUE_FALTA = [3, 2] as const;
-/** Cuánto vale un Indulto en un trato, para decidir si sale a cuenta. */
+/** Cuánto vale un Salvoconducto en un trato, para decidir si sale a cuenta. */
 const VALOR_DE_UN_INDULTO = 50;
 /** Acepta un trato si lo que recibe vale al menos 4/5 de lo que da. */
 const ACEPTA_SI_RECIBE = [4, 5] as const;
@@ -117,7 +117,7 @@ function decision(o: Opcion, familia: string): DecisionDelRobot {
   return { movimiento: { tipo: o.tipo, carga: o.carga }, familia };
 }
 
-/** Lo que vale un lado de trato para el robot, en maravedíes enteros. */
+/** Lo que vale un lado de trato para el robot, en euros enteros. */
 function valorDelLado(lado: LadoDelTrato): number {
   let total = lado.mrs + lado.indultos * VALOR_DE_UN_INDULTO;
   for (const c of lado.titulos) total += precioDe(c);
@@ -206,7 +206,7 @@ export function loQueHaceElRobot(
     if (rechazo !== null) return { azar, decision: decision(rechazo, 'rechazar') };
   }
 
-  /* 2. En mi apuro: empeñar primero (es más barato deshacerlo), vender después, rendirse al final. */
+  /* 2. En mi apuro: hipotecar primero (es más barato deshacerlo), vender después, rendirse al final. */
   if (v.paso === 'apuro' && v.apuro !== null && v.apuro.quien === quien) {
     const empenos = conPrefijo(opciones, 'empenar:');
     if (empenos.length > 0) return { azar, decision: decision(empenos[0] as Opcion, 'empenar') };
@@ -216,7 +216,7 @@ export function loQueHaceElRobot(
     if (rendirse !== null) return { azar, decision: decision(rendirse, 'rendirse') };
   }
 
-  /* 3. La almoneda: pujo hasta el precio del título, dejando algo en la bolsa; si no, paso. */
+  /* 3. La subasta: pujo hasta el precio del título, dejando algo en la bolsa; si no, paso. */
   if (v.paso === 'almoneda' && v.almoneda !== null && v.almoneda.pujaDe === quien) {
     const a = v.almoneda;
     const tope = precioDe(a.casilla);
@@ -246,13 +246,13 @@ export function loQueHaceElRobot(
 
   if (v.turnoDe !== quien) return { azar, decision: null };
 
-  /* 4. Preso: fianza si voy sobrado, Indulto si lo tengo, los dados si no. */
+  /* 4. Preso: fianza si voy sobrado, Salvoconducto si lo tengo, los dados si no. */
   const indulto = porTipo(opciones, USAR_INDULTO, false);
   if (indulto !== null) return { azar, decision: decision(indulto, 'usar-indulto') };
   const fianza = porTipo(opciones, PAGAR_FIANZA, false);
   if (fianza !== null && yo.mrs >= RESERVA_PARA_LA_FIANZA) return { azar, decision: decision(fianza, 'pagar-fianza') };
 
-  /* 5. Comprar todo lo que se pueda pagar; lo que no, a almoneda. */
+  /* 5. Comprar todo lo que se pueda pagar; lo que no, a subasta. */
   const compras = conPrefijo(opciones, 'comprar:');
   if (compras.length > 0) return { azar, decision: decision(compras[0] as Opcion, 'comprar') };
   const almonedas = conPrefijo(opciones, 'a-almoneda:');
@@ -275,7 +275,7 @@ export function loQueHaceElRobot(
   }
   if (mejorAlza !== null) return { azar, decision: decision(mejorAlza, 'alzar') };
 
-  /* 7. Desempeñar si voy sobrado. */
+  /* 7. Deshipotecar si voy sobrado. */
   for (const o of conPrefijo(opciones, 'desempenar:')) {
     const c = enteroDe((o.carga as { casilla?: unknown }).casilla);
     const fila = CASILLAS[c];
@@ -310,7 +310,7 @@ export function loQueHaceElRobot(
 
 /**
  * EL ROBOT QUE SÓLO PASA: la vacuna. Tira porque no le queda otra, no compra nada
- * (todo a almoneda), pasa en toda almoneda, se rinde en el apuro y pasa el turno.
+ * (todo a subasta), pasa en toda subasta, se rinde en el apuro y pasa el turno.
  * `verify:burgo` exige que con esta política los mínimos de una partida jugada de
  * verdad NO se cumplan: si se cumplieran, los mínimos no medirían nada.
  */
@@ -322,7 +322,7 @@ export function loQueHaceElRobotMudo(vista: unknown, quien: AsientoId): Decision
   const rechazos = conPrefijo(opciones, 'rechazar:');
   if (rechazos.length > 0) return decision(rechazos[0] as Opcion, 'rechazar');
   if (v.turnoDe !== quien) return null;
-  /* En su apuro no vende ni empeña: se rinde, que es lo único que un mudo sabe hacer con una deuda. */
+  /* En su apuro no vende ni hipoteca: se rinde, que es lo único que un mudo sabe hacer con una deuda. */
   const enMiApuro = v.paso === 'apuro' && v.apuro !== null && v.apuro.quien === quien;
   const orden = enMiApuro ? [RENDIRSE] : [PASAR_PUJA, A_ALMONEDA, TIRAR, PASAR];
   for (const tipo of orden) {

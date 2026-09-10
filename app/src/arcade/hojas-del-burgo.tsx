@@ -5,7 +5,7 @@
  *
  * Todo lo que se lee en esta hoja —los títulos de las secciones, las líneas de
  * cada una, los rótulos de cada botón, la tabla de rentas, quién puja, qué dice un
- * trato, cuánto es un maravedí— lo escribe `shared/arcade/juegos/burgo-en-tres.ts`,
+ * trato, cuánto es un euro— lo escribe `shared/arcade/juegos/burgo-en-tres.ts`,
  * que es donde lo lee también el escritorio. Este fichero coge esa estructura y le
  * pone `View`, `Pressable` y `Text` encima. Si mañana el Burgo cambia una renta o
  * una frase, aquí no se toca nada; y si alguien redacta aquí una sola palabra del
@@ -26,7 +26,7 @@
  * cierra muchas veces y volver siempre al principio obliga a buscar «Lo mío» cada
  * vez. Lo único que se salta esa memoria es el momento de actuar: cuando cambia el
  * PASO de la partida y me toca a mí, la hoja abre sola lo que haya que contestar
- * —la almoneda si pujo, el trato si me proponen, «Lo mío» en mi apuro, «Ahora» si
+ * —la subasta si pujo, el trato si me proponen, «Lo mío» en mi apuro, «Ahora» si
  * no hay nada de eso—, y eso lo decide `hojaEnTres` con su campo `abre` y no esta
  * pantalla.
  *
@@ -66,7 +66,7 @@ import { conAlfa } from '../tema';
 /** El alto mínimo de cualquier cosa que se toque. El de la casa. */
 const DEDO = 44;
 
-/** Cuántos maravedíes suma o resta un toque en el componedor de tratos. El del reglamento. */
+/** Cuántos euros suma o resta un toque en el componedor de tratos. El del reglamento. */
 const PASO_DEL_DINERO = 10;
 
 /**
@@ -91,7 +91,7 @@ const MRS_QUE_SE_PUEDEN_PEDIR = 10000;
  * partida —quien llama le pasa `hoja.cinta.espera`, que `esperaA` deriva de
  * `l.paso`, del turno y del momento—. Cuando esa cadena cambia Y me toca a mí, la
  * hoja abre lo que `hojaEnTres` diga en `abre`, que ya lleva la prioridad escrita:
- * la almoneda si pujo, el trato si me proponen, «Lo mío» en mi apuro y «Ahora» si
+ * la subasta si pujo, el trato si me proponen, «Lo mío» en mi apuro y «Ahora» si
  * no hay nada más urgente.
  *
  * NO se abre sola cuando le toca a otro: en una mesa de seis eso sería la hoja
@@ -374,7 +374,7 @@ function LosBotones({
  * que la propia se busque por el sitio y no leyendo los nombres.
  *
  * El marco del acento es de quien tiene el turno de verdad (`esSuTurno`); el punto
- * es de a quien se espera ahora mismo (`seLeEspera`), que en una almoneda o en un
+ * es de a quien se espera ahora mismo (`seLeEspera`), que en una subasta o en un
  * apuro puede ser otro. Los dos datos los da `marcadorEnTres` y aquí no se
  * recalcula ninguno.
  */
@@ -406,10 +406,10 @@ function ElMarcador({
             </Text>
             <Text style={estilos.fichaCifra}>{maravedies(j.mrs)}</Text>
             <Text style={estilos.fichaPie} numberOfLines={1}>
-              {`${String(j.titulos)} ${j.titulos === 1 ? 'título' : 'títulos'}${j.indultos > 0 ? ` · ${String(j.indultos)} Indulto${j.indultos === 1 ? '' : 's'}` : ''}`}
+              {`${String(j.titulos)} ${j.titulos === 1 ? 'título' : 'títulos'}${j.indultos > 0 ? ` · ${String(j.indultos)} Salvoconducto${j.indultos === 1 ? '' : 's'}` : ''}`}
             </Text>
             {j.quebrado ? <Text style={estilos.fichaPie}>quebró</Text> : null}
-            {!j.quebrado && j.presa ? <Text style={estilos.fichaPie}>en la Mazmorra</Text> : null}
+            {!j.quebrado && j.presa ? <Text style={estilos.fichaPie}>en la Comisaría</Text> : null}
             {j.seLeEspera && !j.esSuTurno ? <Text style={estilos.fichaPie}>se le espera</Text> : null}
           </View>
         </Pressable>
@@ -445,7 +445,7 @@ function LaPujaLibre({
 }): JSX.Element | null {
   const [tecleado, ponerTecleado] = useState('');
   const puerta = puja.puerta;
-  /* Cuando la puerta se va —pasó el turno, se cerró la almoneda— el campo se vacía. */
+  /* Cuando la puerta se va —pasó el turno, se cerró la subasta— el campo se vacía. */
   useEffect(() => {
     if (puerta === null) ponerTecleado('');
   }, [puerta]);
@@ -491,7 +491,7 @@ function LaPujaLibre({
  * EL COMPONEDOR DE TRATOS: con quién, lo que doy y lo que pido.
  *
  * La otra puerta del juego. `tratoEnTres.puerta` dice a quién se le puede proponer,
- * cuánto dinero cabe, qué títulos míos pueden ir y cuántos Indultos; y de cada
+ * cuánto dinero cabe, qué títulos míos pueden ir y cuántos Salvoconductos; y de cada
  * destino, qué títulos suyos se pueden pedir SEGÚN LA VISTA. `montar` compone con
  * los campos exactos y devuelve `null` si algo no cabe —un título en los dos lados,
  * los dos lados vacíos, más dinero del que tengo—, así que «Proponer» apagado
@@ -594,7 +594,7 @@ function ElComponedorDelTrato({
   );
 }
 
-/** Un lado del trato: dinero de diez en diez, títulos que se encienden, Indultos. */
+/** Un lado del trato: dinero de diez en diez, títulos que se encienden, Salvoconductos. */
 function ElLadoDelTrato({
   rotulo,
   lado,
@@ -627,7 +627,7 @@ function ElLadoDelTrato({
         </Text>
         <ElMando
           rotulo="−"
-          seOye={`Quitar ${String(PASO_DEL_DINERO)} maravedíes de ${rotulo}`}
+          seOye={`Quitar ${String(PASO_DEL_DINERO)} euros de ${rotulo}`}
           apagado={quieto || menosDinero === null}
           alPulsar={() => {
             if (menosDinero !== null) ponerLado({ ...lado, mrs: menosDinero });
@@ -635,7 +635,7 @@ function ElLadoDelTrato({
         />
         <ElMando
           rotulo="+"
-          seOye={`Poner ${String(PASO_DEL_DINERO)} maravedíes más en ${rotulo}`}
+          seOye={`Poner ${String(PASO_DEL_DINERO)} euros más en ${rotulo}`}
           apagado={quieto || masDinero === null}
           alPulsar={() => {
             if (masDinero !== null) ponerLado({ ...lado, mrs: masDinero });
@@ -644,11 +644,11 @@ function ElLadoDelTrato({
       </View>
       <View style={estilos.fila}>
         <Text style={estilos.lineaQueCede} numberOfLines={1}>
-          {`${String(lado.indultos)} ${lado.indultos === 1 ? 'Indulto' : 'Indultos'}`}
+          {`${String(lado.indultos)} ${lado.indultos === 1 ? 'Salvoconducto' : 'Salvoconductos'}`}
         </Text>
         <ElMando
           rotulo="−"
-          seOye={`Quitar un Indulto de ${rotulo}`}
+          seOye={`Quitar un Salvoconducto de ${rotulo}`}
           apagado={quieto || menosIndultos === null}
           alPulsar={() => {
             if (menosIndultos !== null) ponerLado({ ...lado, indultos: menosIndultos });
@@ -656,7 +656,7 @@ function ElLadoDelTrato({
         />
         <ElMando
           rotulo="+"
-          seOye={`Poner un Indulto más en ${rotulo}`}
+          seOye={`Poner un Salvoconducto más en ${rotulo}`}
           apagado={quieto || masIndultos === null}
           alPulsar={() => {
             if (masIndultos !== null) ponerLado({ ...lado, indultos: masIndultos });

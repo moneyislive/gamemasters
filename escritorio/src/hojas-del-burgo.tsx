@@ -239,7 +239,7 @@ function conTitulo(lado: LadoQueSePinta, casilla: number): LadoQueSePinta {
  * EL COMPONEDOR DE UN TRATO: con quién, lo que doy y lo que pido.
  *
  * Lo que se puede poner en cada lado lo declara LA PUERTA —mis títulos sin edificios, mi
- * tope de dinero, mis Indultos; y de él, lo que la vista dice que tiene—, y `montar`
+ * tope de dinero, mis Salvoconductos; y de él, lo que la vista dice que tiene—, y `montar`
  * devuelve `null` en cuanto algo no cabe. El reductor lo vuelve a validar entero: aquí no
  * se comprueba una regla, se compone una carga con los campos exactos.
  *
@@ -297,7 +297,7 @@ function ElComponedorDelTrato({
 
       <div className="burgo-lado">
         <label className="letra-chica" htmlFor={campoDoy}>
-          {`Doy en maravedíes (hasta ${maravedies(puerta.mrsMaximo)})`}
+          {`Doy en euros (hasta ${maravedies(puerta.mrsMaximo)})`}
         </label>
         <input
           id={campoDoy}
@@ -321,7 +321,7 @@ function ElComponedorDelTrato({
             }}
           >
             <span className="opcion-texto">
-              <span className="opcion-rotulo">Doy un Indulto</span>
+              <span className="opcion-rotulo">Doy un Salvoconducto</span>
             </span>
           </button>
         ) : null}
@@ -347,7 +347,7 @@ function ElComponedorDelTrato({
 
       <div className="burgo-lado">
         <label className="letra-chica" htmlFor={campoPido}>
-          Pido en maravedíes
+          Pido en euros
         </label>
         <input
           id={campoPido}
@@ -371,7 +371,7 @@ function ElComponedorDelTrato({
             }}
           >
             <span className="opcion-texto">
-              <span className="opcion-rotulo">Pido un Indulto</span>
+              <span className="opcion-rotulo">Pido un Salvoconducto</span>
             </span>
           </button>
         ) : null}

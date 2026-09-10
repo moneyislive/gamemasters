@@ -1,10 +1,10 @@
 /**
  * «EL BURGO»: el sexto arcade de la Sala, y el primero de solares, rentas y quiebra.
  *
- * De dos a seis personas compran los solares de un burgo medieval, cobran renta a
- * quien cae en ellos, alzan casas y posadas, roban cartas del Pregón y del Arca del
- * Concejo, pasan por la Mazmorra, empeñan, sacan títulos a almoneda, hacen tratos y
- * quiebran. El último que no quiebra se queda con el burgo. Lo gobierna entero el
+ * De dos a seis personas compran los solares de una ciudad, cobran renta a
+ * quien cae en ellos, alzan casas y hoteles, roban cartas de Sucesos y del Fondo
+ * Vecinal, pasan por la Comisaría, hipotecan, sacan títulos a subasta, hacen tratos y
+ * quiebran. El último que no quiebra se queda con el Burgo. Lo gobierna entero el
  * reglamento `REGLAS-EL-BURGO.md`; el contrato de cómo se convierte en código es
  * `docs/burgo/DISENO.md`, y este fichero es ese contrato escrito.
  *
@@ -28,7 +28,7 @@
  * `momento` + `paso` + `luego`, sin reloj: el plazo lo lleva la mesa y aquí sólo se
  * dice qué significa que venza. La mesa reprograma el plazo cuando cambia `turnoDe`
  * en la vista del espectador, así que `turnoDe` apunta SIEMPRE al asiento del que se
- * espera algo —el pujador en la almoneda, el endeudado en el apuro, el del turno en
+ * espera algo —el pujador en la subasta, el endeudado en el apuro, el del turno en
  * los demás pasos— y `duenoDelTurno` dice de quién es el turno de verdad. Si el
  * pujador no fuera `turnoDe`, un tercero pujando prorrogaría sin límite el plazo del
  * ausente; está medido en Riberas y por eso es la decisión 4 del diseño.
@@ -47,18 +47,18 @@
  *
  * ═══ EL TIC JUEGA POR EL AUSENTE LO MÍNIMO, Y GASTA AZAR DONDE ÉL LO GASTARÍA ═══
  *
- * Tira y resuelve, no compra (manda a almoneda), en la almoneda pasa, en el apuro
+ * Tira y resuelve, no compra (manda a subasta), en la subasta pasa, en el apuro
  * liquida en orden determinista y si no llega quiebra, y en `por-pasar` pasa. Se
  * aparta de Riberas —cuyo tic no gasta azar— a sabiendas y por el reglamento §12:
  * el ausente tiene que mover, y mover son dados. Es reproducible porque cada tic va
  * al diario con su contexto y se reejecuta en el mismo sitio. Lo que no puede pasar
  * nunca es que el tic deje la mesa en un estado del que sólo sale un humano: por
- * eso el apuro se liquida entero en un tic y la quiebra al Concejo encola las
- * almonedas y las cierra solas.
+ * eso el apuro se liquida entero en un tic y la quiebra al Ayuntamiento encola las
+ * subastas y las cierra solas.
  *
  * ═══ LOS SECRETOS: EL AZAR Y LOS DOS MAZOS, Y NADA MÁS ═══
  *
- * El dinero, los títulos, los edificios, la posición y los Indultos en mano son
+ * El dinero, los títulos, los edificios, la posición y los Salvoconductos en mano son
  * públicos: en la mesa real se ven. Lo secreto es el objeto `azar` entero y el orden
  * de las dos barajas, que viajan como series (`'p07'`, `'a12'`) distinguibles con
  * comillas para que `verify:mesa` las cace. La carta que sale se publica como NÚMERO
@@ -74,27 +74,27 @@
  *
  * ═══ DECISIONES TOMADAS AQUÍ DONDE EL DISEÑO CALLABA (para quien escriba el comprobador) ═══
  *
- *   · En el tercer intento de la Mazmorra la fianza se paga ANTES de mover (el
+ *   · En el tercer intento de la Comisaría la fianza se paga ANTES de mover (el
  *     reglamento §5 lo dice en ese orden: «paga 50 obligatoriamente y mueve»). Si no
  *     alcanza, se abre el apuro y el jugador sale y mueve igual; un título sin dueño
  *     en el que caiga con el apuro abierto NO abre `comprar` (no caben dos pasos):
- *     va a `colaDeAlmonedas` y sale a almoneda cuando el apuro se cierra.
- *   · Un trato ACEPTADO durante una almoneda puede dejar sin dinero al mejor postor.
- *     Al cerrar, si no alcanza, el título se queda en el Concejo (`ganador: null`) en
+ *     va a `colaDeAlmonedas` y sale a subasta cuando el apuro se cierra.
+ *   · Un trato ACEPTADO durante una subasta puede dejar sin dinero al mejor postor.
+ *     Al cerrar, si no alcanza, el título se queda en el Ayuntamiento (`ganador: null`) en
  *     vez de abrir un apuro por una puja: es el único cierre que no deja deuda.
  *   · Varios acreedores en un apuro: el que más reclama; empate, el jugador que va
- *     antes en orden de mesa; el Concejo sólo si nadie reclama más que él.
+ *     antes en orden de mesa; el Ayuntamiento sólo si nadie reclama más que él.
  *   · El tope de vueltas se mira en cada relevo: cuando el MÍNIMO de vueltas de los
  *     vivos alcanza el tope, gana el patrimonio. No se guarda quién empezó.
  *   · `sorteoDeSalida` guarda la ÚLTIMA tirada de cada jugador (una por jugador, en
  *     orden de asiento), también la de los que quedaron fuera en rondas anteriores.
  *   · `tiradasDelTurno` vuelve a 0 en cada relevo: es el sello de los dados de ESTE
  *     turno y sumado a `100 · turnosAbiertos` sigue siendo único.
- *   · Un acreedor que ya quebró cobra el Concejo: la deuda no se pierde, se destruye.
- *   · La quiebra de quien puja en una almoneda abierta (RENDIRSE cabe en cualquier
+ *   · Un acreedor que ya quebró cobra el Ayuntamiento: la deuda no se pierde, se destruye.
+ *   · La quiebra de quien puja en una subasta abierta (RENDIRSE cabe en cualquier
  *     momento) lo saca de `enPie`; si era el mejor postor, la puja vuelve a cero.
  *   · `encuadre` se importa de `malla-hexagonal.ts` (donde vive) y no de `anillo.ts`.
- *   · Dentro de un trato, los Indultos que se dan son los PRIMEROS de la lista del que
+ *   · Dentro de un trato, los Salvoconductos que se dan son los PRIMEROS de la lista del que
  *     los da; como hay uno por mazo, nadie puede recibir dos del mismo mazo.
  */
 import { barajar, enteroEntre, sembrar } from '../../mecanicas/azar';
@@ -181,7 +181,7 @@ export const BURGO: ArcadeId = 'burgo';
 export const MANIFIESTO_BURGO: ManifiestoDeArcade = {
   id: BURGO,
   nombre: 'El Burgo',
-  gancho: 'Compra solares, cobra rentas, alza casas y posadas; el último que no quiebra se queda con el burgo.',
+  gancho: 'Compra calles, cobra rentas, alza casas y hoteles; el último que no quiebra se queda con el Burgo.',
   icono: 'mando',
   jugadores: { minimo: 2, maximo: 6 },
   sede: 'servidor',
@@ -230,7 +230,7 @@ export const TOPE_DE_VUELTAS_MAXIMO = 1000;
 export const TOPE_DE_SUCESOS = 64;
 /** Un trato no puede pedir más que esto: acota la puerta de la declaración. */
 export const TOPE_DE_MRS_EN_UN_TRATO = 100000;
-/** Cuántos Indultos puede haber en una mano: uno por mazo. */
+/** Cuántos Salvoconductos puede haber en una mano: uno por mazo. */
 export const INDULTOS_QUE_EXISTEN = 2;
 /** A partir de cuántas casillas un `mueve` por carta se anima como viaje y no como paseo. */
 export const PASOS_DE_UN_PASEO = 12;
@@ -249,12 +249,12 @@ export type MomentoDelBurgo = 'reuniendo' | 'jugando' | 'terminada';
 /** El subestado del turno. Uno solo: no hay dos relojes en la mesa. */
 export type PasoDelTurno =
   | 'por-tirar' // el del turno tiene que tirar (si está presa: elegir cómo salir)
-  | 'comprar' // cayó en un título sin dueño: comprar o mandarlo a almoneda
-  | 'almoneda' // hay una almoneda abierta; turnoDe = almoneda.pujaDe
+  | 'comprar' // cayó en un título sin dueño: comprar o mandarlo a subasta
+  | 'almoneda' // hay una subasta abierta; turnoDe = almoneda.pujaDe
   | 'apuro' // alguien debe más de lo que tiene; turnoDe = apuro.quien
   | 'por-pasar'; // ya tiró y resolvió; puede obrar, tratar y pasar (o tirar otra vez si dobles)
 
-/** A qué paso vuelve el turno cuando se cierra comprar/almoneda/apuro. */
+/** A qué paso vuelve el turno cuando se cierra comprar/subasta/apuro. */
 export type PasoDeVuelta = 'por-tirar' | 'por-pasar';
 
 /** El par de una tirada. Los dobles son regla: nunca se guarda la suma. */
@@ -268,21 +268,21 @@ export interface JugadorDelBurgo {
   readonly casilla: number;
   /** Efectivo, entero ≥ 0. */
   readonly mrs: number;
-  /** `LIBRE` (−1) libre; 0, 1, 2 = intentos fallidos hechos en la Mazmorra. */
+  /** `LIBRE` (−1) libre; 0, 1, 2 = intentos fallidos hechos en la Comisaría. */
   readonly presa: number;
   /** Públicos: de qué mazo es cada uno (la serie se deduce: hay uno por mazo). */
   readonly indultos: readonly MazoId[];
   readonly quebrado: boolean;
-  /** Pasos por la Puerta Mayor (tope de vueltas). */
+  /** Pasos por la Salida (tope de vueltas). */
   readonly vueltas: number;
 }
 
 export interface TituloDelBurgo {
-  /** 28 entradas en orden de casilla: 22 solares, 4 puertas, 2 oficios. */
+  /** 28 entradas en orden de casilla: 22 solares, 4 estaciones, 2 servicios. */
   readonly casilla: number;
-  /** `null` = el Concejo. */
+  /** `null` = el Ayuntamiento. */
   readonly dueno: AsientoId | null;
-  /** 0..4; `POSADA` (5) = posada. */
+  /** 0..4; `POSADA` (5) = hotel. */
   readonly casas: number;
   readonly empenado: boolean;
 }
@@ -362,7 +362,7 @@ export interface CartaSalida {
  * LO QUE SE DESTRUYE AL RESOLVER, GUARDADO PARA VERSE.
  *
  * La proyección es pura: si el estado sólo guardara la casilla final, ningún cliente
- * sabría si se pasó la Puerta Mayor o se fue derecho a la Mazmorra. Cada movimiento
+ * sabría si se pasó la Salida o se fue derecho a la Comisaría. Cada movimiento
  * que cambia el estado SUSTITUYE la lista (no acumula) y sube `jugada`; la escena
  * anima lo que hay entre la `jugada` que vio y la que llega, y el retablo la ignora
  * salvo el aviso. Con más de `TOPE_DE_SUCESOS` se cortan los PRIMEROS y se conserva
@@ -404,7 +404,7 @@ export type SucesoDelBurgo =
       readonly casilla: number;
     }
   | { readonly que: 'compra'; readonly quien: AsientoId; readonly casilla: number; readonly cuanto: number }
-  /** `casas` tras alzar (5 = posada). */
+  /** `casas` tras alzar (5 = hotel). */
   | { readonly que: 'alza'; readonly quien: AsientoId; readonly casilla: number; readonly casas: number }
   | { readonly que: 'vende'; readonly quien: AsientoId; readonly casilla: number; readonly casas: number }
   | { readonly que: 'empena'; readonly quien: AsientoId; readonly casilla: number }
@@ -458,7 +458,7 @@ export interface EstadoDelBurgo {
   readonly version: 1;
   readonly momento: MomentoDelBurgo;
   readonly paso: PasoDelTurno;
-  /** A qué paso vuelve el turno al cerrar comprar/almoneda/apuro. */
+  /** A qué paso vuelve el turno al cerrar comprar/subasta/apuro. */
   readonly luego: PasoDeVuelta;
   /** Orden de `ctx.asientos` al EMPEZAR; NO se reordena nunca. */
   readonly jugadores: readonly JugadorDelBurgo[];
@@ -482,7 +482,7 @@ export interface EstadoDelBurgo {
   readonly arca: readonly string[];
   readonly ultimaCarta: CartaSalida | null;
   readonly almoneda: AlmonedaDelBurgo | null;
-  /** La quiebra al Concejo (y un título sin dueño pisado con apuro abierto) encola títulos, en orden de casilla. */
+  /** La quiebra al Ayuntamiento (y un título sin dueño pisado con apuro abierto) encola títulos, en orden de casilla. */
   readonly colaDeAlmonedas: readonly number[];
   readonly apuro: ApuroDelBurgo | null;
   /** «Cada jugador te paga 10» puede endeudar a varios. */
@@ -662,7 +662,7 @@ function titulosDe(e: EstadoDelBurgo, asiento: AsientoId): number[] {
   return salida;
 }
 
-/** ¿`asiento` tiene todos los solares del barrio? Los empeñados cuentan como suyos. */
+/** ¿`asiento` tiene todos los solares del barrio? Los hipotecados cuentan como suyos. */
 function barrioEntero(m: ConTitulos, asiento: AsientoId | null, barrio: BarrioDelBurgo | null): boolean {
   if (asiento === null || barrio === null) return false;
   for (const c of barrio.solares) {
@@ -672,7 +672,7 @@ function barrioEntero(m: ConTitulos, asiento: AsientoId | null, barrio: BarrioDe
   return true;
 }
 
-/** ¿Hay algún edificio en el barrio? Empeñar y tratar exigen que no. */
+/** ¿Hay algún edificio en el barrio? Hipotecar y tratar exigen que no. */
 function barrioConEdificios(m: ConTitulos, barrio: BarrioDelBurgo | null): boolean {
   if (barrio === null) return false;
   for (const c of barrio.solares) {
@@ -693,7 +693,7 @@ function cuantasTiene(m: ConTitulos, asiento: AsientoId | null, entre: readonly 
   return n;
 }
 
-/** Casas y posadas de un jugador, para las reparaciones. */
+/** Casas y hoteles de un jugador, para las reparaciones. */
 function edificiosDe(e: EstadoDelBurgo, asiento: AsientoId): { casas: number; posadas: number } {
   let casas = 0;
   let posadas = 0;
@@ -705,7 +705,7 @@ function edificiosDe(e: EstadoDelBurgo, asiento: AsientoId): { casas: number; po
   return { casas, posadas };
 }
 
-/** Efectivo + precio de lo no empeñado + mitad de lo empeñado + coste de cada edificio (posada = 5). */
+/** Efectivo + precio de lo no hipotecado + mitad de lo hipotecado + coste de cada edificio (hotel = 5). */
 function patrimonioDe(e: EstadoDelBurgo, j: JugadorDelBurgo): number {
   let total = j.mrs;
   for (const t of e.titulos) {
@@ -738,7 +738,7 @@ function sumaDeDeudasDel(apuro: ApuroDelBurgo): number {
   return total;
 }
 
-/** Los tres pasos en los que el dueño del turno puede obrar (alzar, empeñar, desempeñar, comprar…). */
+/** Los tres pasos en los que el dueño del turno puede obrar (alzar, hipotecar, deshipotecar, comprar…). */
 function pasoDeObrar(paso: PasoDelTurno): boolean {
   return paso === 'por-tirar' || paso === 'por-pasar' || paso === 'comprar';
 }
@@ -752,10 +752,10 @@ function pasoDeObrar(paso: PasoDelTurno): boolean {
  *
  * Un juego de solares mueve dinero en treinta sitios y el fallo de dinero no se
  * cae: se juega mal. Aquí hay UNA función que paga, apoyada en `hacienda.transferir`
- * (todo o nada, en enteros, con el Concejo como caja infinita), y es la única que
+ * (todo o nada, en enteros, con el Ayuntamiento como caja infinita), y es la única que
  * escribe `mrs`. Si quien paga no alcanza, no se mueve NADA y se abre —o se
- * engorda— su apuro: el reglamento §9 dice que quien no alcanza vende y empeña, no
- * que paga lo que puede. Un acreedor que ya quebró cobra el Concejo: la deuda no se
+ * engorda— su apuro: el reglamento §9 dice que quien no alcanza vende e hipoteca, no
+ * que paga lo que puede. Un acreedor que ya quebró cobra el Ayuntamiento: la deuda no se
  * pierde, se destruye, que es lo que la banca hace con el dinero de un muerto.
  */
 
@@ -789,7 +789,7 @@ function apurar(e: EstadoDelBurgo, quien: number, deuda: DeudaDelBurgo, cronica:
      * El apuro INTERRUMPE el paso que hubiera: se guarda en `luego` para volver a él
      * al saldar. Un `comprar` no cabe en `luego` (no se puede reanudar una compra con
      * el dinero cambiado), así que el título sin dueño del dueño del turno pasa a la
-     * cola de almonedas y sale a almoneda cuando el apuro se cierre.
+     * cola de subastas y sale a subasta cuando el apuro se cierre.
      */
     let luego: PasoDeVuelta = e.luego;
     let colaDeAlmonedas = e.colaDeAlmonedas;
@@ -825,7 +825,7 @@ function apurar(e: EstadoDelBurgo, quien: number, deuda: DeudaDelBurgo, cronica:
 }
 
 /**
- * Transfiere `cuanto` de `de` a `a` (índices en `jugadores`; `null` = el Concejo).
+ * Transfiere `cuanto` de `de` a `a` (índices en `jugadores`; `null` = el Ayuntamiento).
  * Si `de` no alcanza, abre su apuro y no mueve nada. Sucesos `paga` y `cobra`.
  */
 function transferirEntre(
@@ -840,7 +840,7 @@ function transferirEntre(
   const importe = Math.trunc(cuanto);
   if (!(importe > 0)) return e;
   const deAsiento = de === null ? null : asientoDe(e, de);
-  /* Un acreedor quebrado ya no está en la mesa: cobra el Concejo. */
+  /* Un acreedor quebrado ya no está en la mesa: cobra el Ayuntamiento. */
   const aAsiento = a === null || !estaVivo(e, a) ? null : asientoDe(e, a);
   if (de !== null && deAsiento === null) return e;
   const t = transferir(saldosDe(e), deAsiento, aAsiento, importe);
@@ -873,11 +873,11 @@ function saldar(e: EstadoDelBurgo, cronica: Cronica): EstadoDelBurgo {
 }
 
 /**
- * QUÉ PASO TOCA AHORA, después de cerrar un apuro, una almoneda o una quiebra.
+ * QUÉ PASO TOCA AHORA, después de cerrar un apuro, una subasta o una quiebra.
  *
  * Es la única función que decide el paso cuando algo se cierra, para que el orden
  * de precedencia esté escrito una vez: primero un apuro vigente, luego los apuros en
- * cola, luego una almoneda abierta, luego las almonedas en cola, luego el relevo si
+ * cola, luego una subasta abierta, luego las subastas en cola, luego el relevo si
  * el dueño del turno ya quebró, y si no, `luego`.
  */
 function reanudar(e: EstadoDelBurgo, cronica: Cronica): EstadoDelBurgo {
@@ -908,13 +908,13 @@ function reanudar(e: EstadoDelBurgo, cronica: Cronica): EstadoDelBurgo {
 }
 
 // ---------------------------------------------------------------------------
-// Mover, la Mazmorra, las rentas, las cartas y resolver la casilla
+// Mover, la Comisaría, las rentas, las cartas y resolver la casilla
 // ---------------------------------------------------------------------------
 
 /**
  * Mueve la figura de `i` hasta `hasta`, en sentido de la marcha (o hacia atrás si
- * `como === 'retrocede'`). Cobra la Puerta Mayor al pasar o caer si `cobraAlPasar`,
- * y sube `vueltas`. Ir a la Mazmorra NUNCA pasa por aquí: ver `aLaMazmorra`.
+ * `como === 'retrocede'`). Cobra la Salida al pasar o caer si `cobraAlPasar`,
+ * y sube `vueltas`. Ir a la Comisaría NUNCA pasa por aquí: ver `aLaMazmorra`.
  */
 function mover(
   e: EstadoDelBurgo,
@@ -948,7 +948,7 @@ function mover(
   return s;
 }
 
-/** Los dados: `pasos` casillas hacia delante, cobrando la Puerta Mayor. */
+/** Los dados: `pasos` casillas hacia delante, cobrando la Salida. */
 function andar(e: EstadoDelBurgo, i: number, pasos: number, cronica: Cronica): EstadoDelBurgo {
   const j = jugadorEn(e, i);
   if (j === null) return e;
@@ -964,7 +964,7 @@ function viajar(e: EstadoDelBurgo, i: number, hasta: number, cobraAlPasar: boole
 }
 
 /**
- * A la Mazmorra, derecho: sin pasar por la Puerta Mayor, sin cobrar, sin resolver.
+ * A la Comisaría, derecho: sin pasar por la Salida, sin cobrar, sin resolver.
  * Termina el turno (`por-pasar`, `dobles 0`), salvo que haya un apuro abierto, que
  * manda sobre cualquier paso.
  */
@@ -981,13 +981,13 @@ function aLaMazmorra(
   return { ...s, dobles: 0, luego: 'por-pasar', paso: s.apuro !== null ? 'apuro' : 'por-pasar' };
 }
 
-/** Cómo se cobra una casilla: como siempre, el doble (carta de puerta) o diez veces una tirada nueva (carta de oficio). */
+/** Cómo se cobra una casilla: como siempre, el doble (carta de estación) o diez veces una tirada nueva (carta de servicio). */
 type ModoDeRenta = 'normal' | 'doble' | 'x10';
 
 /**
- * LA RENTA DE UN TÍTULO con la tirada dada. Empeñado → 0. Solar sin casas: el doble
- * si el barrio es entero (aunque otro solar del barrio esté empeñado: regla oficial).
- * Puertas y oficios cuentan las EMPEÑADAS del dueño; sólo la casilla empeñada no cobra.
+ * LA RENTA DE UN TÍTULO con la tirada dada. Hipotecado → 0. Solar sin casas: el doble
+ * si el barrio es entero (aunque otro solar del barrio esté hipotecado: regla oficial).
+ * Estaciones y servicios cuentan las HIPOTECADAS del dueño; sólo la hipotecada no cobra.
  */
 function rentaDe(e: EstadoDelBurgo, t: TituloDelBurgo, tirada: ParDeDados | null, modo: ModoDeRenta): number {
   if (t.empenado || t.dueno === null) return 0;
@@ -1025,7 +1025,7 @@ function tirarDosDados(azar: Azar): { azar: Azar; par: ParDeDados } {
  * ROBA LA CARTA DE ARRIBA de un mazo, la publica por su NÚMERO y la cumple.
  *
  * El mazo rota (la carta va al fondo con la misma serie: reproducible y el
- * reglamento §4 lo dice así), salvo el Indulto, que SALE del mazo y se queda en la
+ * reglamento §4 lo dice así), salvo el Salvoconducto, que SALE del mazo y se queda en la
  * mano como cuenta pública. La serie no sale de aquí: lo que va a la crónica y a
  * `ultimaCarta` es el número de la tabla.
  */
@@ -1050,7 +1050,7 @@ function robarCarta(e: EstadoDelBurgo, i: number, mazo: MazoId, cronica: Cronica
   return cumplirLaCarta(s, i, efecto, cronica);
 }
 
-/** Los diez efectos de carta, uno por rama. Ninguna carta cae en un Pregón ni un Arca, así que la recursión es finita. */
+/** Los diez efectos de carta, uno por rama. Ninguna carta cae en Sucesos ni en el Fondo Vecinal, así que la recursión es finita. */
 function cumplirLaCarta(
   e: EstadoDelBurgo,
   i: number,
@@ -1113,8 +1113,8 @@ function cumplirLaCarta(
 /**
  * RESOLVER LA CASILLA donde acaba de caer `i`, por su clase. Diez clases, un efecto
  * cada una. Un título sin dueño abre `comprar`, salvo que haya un apuro abierto —no
- * caben dos pasos—, y entonces va a la cola de almonedas. El dueño presa cobra igual;
- * el Concejo cobra la renta solo (reglamento §12).
+ * caben dos pasos—, y entonces va a la cola de subastas. El dueño presa cobra igual;
+ * el Ayuntamiento cobra la renta solo (reglamento §12).
  */
 function resolverCasilla(e: EstadoDelBurgo, i: number, modo: ModoDeRenta, cronica: Cronica): EstadoDelBurgo {
   const j = jugadorEn(e, i);
@@ -1167,7 +1167,7 @@ function resolverCasilla(e: EstadoDelBurgo, i: number, modo: ModoDeRenta, cronic
 }
 
 // ---------------------------------------------------------------------------
-// La almoneda: una fase con relevo por asiento, un solo plazo por mesa
+// La subasta: una fase con relevo por asiento, un solo plazo por mesa
 // ---------------------------------------------------------------------------
 
 /*
@@ -1175,12 +1175,12 @@ function resolverCasilla(e: EstadoDelBurgo, i: number, modo: ModoDeRenta, cronic
  *
  * Porque la mesa tiene UN plazo, y `turnoDe` es lo único que lo reprograma. Con
  * pujas simultáneas habría que elegir a quién esperar, y el que no está bloquearía
- * la almoneda para siempre. Con relevo, `pujaDe` rota entre los que siguen en pie,
- * el tic pasa por el ausente, y la almoneda se cierra sola cuando queda uno en pie
+ * la subasta para siempre. Con relevo, `pujaDe` rota entre los que siguen en pie,
+ * el tic pasa por el ausente, y la subasta se cierra sola cuando queda uno en pie
  * y es el mejor postor, o cuando todos han pasado sin pujar.
  */
 
-/** Abre la almoneda de `casilla`: en pie todos los vivos desde el siguiente al dueño del turno, que va el último. */
+/** Abre la subasta de `casilla`: en pie todos los vivos desde el siguiente al dueño del turno, que va el último. */
 function abrirAlmoneda(e: EstadoDelBurgo, casilla: number, cronica: Cronica): EstadoDelBurgo {
   const n = e.jugadores.length;
   const enPie: AsientoId[] = [];
@@ -1214,7 +1214,7 @@ function siguienteEnPie(enPie: readonly AsientoId[], tras: AsientoId): AsientoId
   return enPie[(donde + 1) % enPie.length] as AsientoId;
 }
 
-/** Cierra la almoneda si ya no hay a quién esperar: nadie en pie, o uno solo y es el mejor postor. */
+/** Cierra la subasta si ya no hay a quién esperar: nadie en pie, o uno solo y es el mejor postor. */
 function cerrarSiToca(e: EstadoDelBurgo, cronica: Cronica): EstadoDelBurgo {
   const a = e.almoneda;
   if (a === null) return e;
@@ -1223,9 +1223,9 @@ function cerrarSiToca(e: EstadoDelBurgo, cronica: Cronica): EstadoDelBurgo {
 }
 
 /**
- * CIERRA LA ALMONEDA: el mejor postor paga y se lleva el título; sin pujas, queda
- * en el Concejo. Si el postor ya no alcanza (un trato aceptado entre medias), el
- * título se queda en el Concejo: es el único cierre que no deja deuda. Después,
+ * CIERRA LA SUBASTA: el mejor postor paga y se lleva el título; sin pujas, queda
+ * en el Ayuntamiento. Si el postor ya no alcanza (un trato aceptado entre medias), el
+ * título se queda en el Ayuntamiento: es el único cierre que no deja deuda. Después,
  * `reanudar` abre la siguiente de la cola o devuelve el turno a `luego`.
  */
 function cerrarAlmoneda(e: EstadoDelBurgo, cronica: Cronica): EstadoDelBurgo {
@@ -1264,7 +1264,7 @@ function pujar(e: EstadoDelBurgo, i: number, casilla: number, cuanto: number, cr
   return cerrarSiToca(s, cronica);
 }
 
-/** Pasar en la almoneda: sale de `enPie` y el relevo sigue por donde iba. */
+/** Pasar en la subasta: sale de `enPie` y el relevo sigue por donde iba. */
 function pasarPuja(e: EstadoDelBurgo, i: number, casilla: number, cronica: Cronica): EstadoDelBurgo {
   const a = e.almoneda;
   const j = jugadorEn(e, i);
@@ -1281,26 +1281,26 @@ function pasarPuja(e: EstadoDelBurgo, i: number, casilla: number, cronica: Croni
 }
 
 // ---------------------------------------------------------------------------
-// Las obras: alzar, vender, empeñar, desempeñar (guardas sobre estado O vista)
+// Las obras: alzar, vender, hipotecar, deshipotecar (guardas sobre estado O vista)
 // ---------------------------------------------------------------------------
 
 /*
  * ═══ LAS GUARDAS SE ESCRIBEN UNA VEZ SOBRE «LO QUE SE MIRA» ═══
  *
  * `opciones()` recibe la VISTA y el reductor el ESTADO, y las reglas de qué se puede
- * alzar o empeñar tienen que ser las mismas en los dos sitios o el botón se enciende
+ * alzar o hipotecar tienen que ser las mismas en los dos sitios o el botón se enciende
  * donde el reductor dice que no. Todo lo que estas guardas necesitan es público
- * —títulos, existencias del Concejo, el efectivo del que obra—, así que se escriben
+ * —títulos, existencias del Ayuntamiento, el efectivo del que obra—, así que se escriben
  * sobre una forma que el estado y la vista comparten y se llaman desde los dos.
  */
 
-/** Lo que las guardas de obra necesitan: los títulos y las existencias del Concejo. */
+/** Lo que las guardas de obra necesitan: los títulos y las existencias del Ayuntamiento. */
 interface LoQueSeMira extends ConTitulos {
   readonly casasEnElConcejo: number;
   readonly posadasEnElConcejo: number;
 }
 
-/** ¿Puede `asiento`, con `mrs`, alzar una casa (o la posada) en `casilla`? */
+/** ¿Puede `asiento`, con `mrs`, alzar una casa (o el hotel) en `casilla`? */
 function puedeAlzar(m: LoQueSeMira, asiento: AsientoId, mrs: number, casilla: number): boolean {
   const t = tituloDe(m, casilla);
   const fila = filaDe(casilla);
@@ -1333,14 +1333,14 @@ function puedeVender(m: LoQueSeMira, asiento: AsientoId, casilla: number): boole
   return true;
 }
 
-/** ¿Puede `asiento` empeñar `casilla`? Propio, no empeñado, sin casas y con el barrio sin edificios. */
+/** ¿Puede `asiento` hipotecar `casilla`? Propio, sin hipoteca, sin casas y con el barrio sin edificios. */
 function puedeEmpenar(m: LoQueSeMira, asiento: AsientoId, casilla: number): boolean {
   const t = tituloDe(m, casilla);
   if (t === null || t.dueno !== asiento || t.empenado || t.casas > 0) return false;
   return !barrioConEdificios(m, barrioDe(casilla));
 }
 
-/** ¿Puede `asiento`, con `mrs`, desempeñar `casilla`? */
+/** ¿Puede `asiento`, con `mrs`, deshipotecar `casilla`? */
 function puedeDesempenar(m: LoQueSeMira, asiento: AsientoId, mrs: number, casilla: number): boolean {
   const t = tituloDe(m, casilla);
   const fila = filaDe(casilla);
@@ -1348,7 +1348,7 @@ function puedeDesempenar(m: LoQueSeMira, asiento: AsientoId, mrs: number, casill
   return mrs >= costeDeDesempeno(fila.precio);
 }
 
-/** Lo que cobra `asiento` por vender UN edificio de `casilla` (una posada entera si no hay casas para degradarla). */
+/** Lo que cobra `asiento` por vender UN edificio de `casilla` (un hotel entero si no hay casas para degradarlo). */
 function loQueDaVender(m: LoQueSeMira, casilla: number): number {
   const t = tituloDe(m, casilla);
   const fila = filaDe(casilla);
@@ -1451,7 +1451,7 @@ function tratosAbiertosDe(tratos: readonly TratoDelBurgo[], de: AsientoId): numb
   return n;
 }
 
-/** Interés que paga quien RECIBE cada título empeñado de un lado. */
+/** Interés que paga quien RECIBE cada título hipotecado de un lado. */
 function interesDeLosEmpenos(m: LoQueSeMira, titulos: readonly number[]): number {
   let total = 0;
   for (const c of titulos) {
@@ -1462,7 +1462,7 @@ function interesDeLosEmpenos(m: LoQueSeMira, titulos: readonly number[]): number
   return total;
 }
 
-/** ¿Puede `de` proponer ahora a `a`? El dueño del turno a cualquiera vivo; cualquiera vivo al dueño del turno. Nunca en almoneda. */
+/** ¿Puede `de` proponer ahora a `a`? El dueño del turno a cualquiera vivo; cualquiera vivo al dueño del turno. Nunca en subasta. */
 function puedeProponer(e: EstadoDelBurgo, de: number, a: number): boolean {
   if (e.momento !== 'jugando' || e.paso === 'almoneda') return false;
   if (de === a || !estaVivo(e, de) || !estaVivo(e, a)) return false;
@@ -1508,7 +1508,7 @@ function sinElTrato(tratos: readonly TratoDelBurgo[], id: number): TratoDelBurgo
   return salida;
 }
 
-/** Mueve los `cuantos` primeros Indultos de `de` a `a`. */
+/** Mueve los `cuantos` primeros Salvoconductos de `de` a `a`. */
 function pasarIndultos(e: EstadoDelBurgo, de: number, a: number, cuantos: number): EstadoDelBurgo {
   if (cuantos <= 0) return e;
   const jd = jugadorEn(e, de);
@@ -1528,7 +1528,7 @@ function pasarIndultos(e: EstadoDelBurgo, de: number, a: number, cuantos: number
 
 /**
  * ACEPTAR UN TRATO: revalida mercancía y dinero de las DOS partes con el estado de
- * ahora, cobra el interés de cada empeño que cambia de mano, y borra ese trato y
+ * ahora, cobra el interés de cada hipoteca que cambia de mano, y borra ese trato y
  * cualquier otro que incluya alguno de esos títulos. Los dos motivos de rechazo son
  * los únicos que la vista del que acepta no podía ver.
  */
@@ -1546,8 +1546,8 @@ function aceptar(e: EstadoDelBurgo, i: number, id: number, cronica: Cronica): Es
   const interesDeDe = interesDeLosEmpenos(e, trato.pido.titulos);
   const mrsDeA = ja.mrs - trato.pido.mrs + trato.doy.mrs;
   const mrsDeDe = jd.mrs - trato.doy.mrs + trato.pido.mrs;
-  if (mrsDeA < interesDeA) return rechazar(e, 'No te alcanza para el interés de los empeños.');
-  if (mrsDeDe < interesDeDe) return rechazar(e, 'A la otra parte no le alcanza para el interés de los empeños.');
+  if (mrsDeA < interesDeA) return rechazar(e, 'No te alcanza para el interés de las hipotecas.');
+  if (mrsDeDe < interesDeDe) return rechazar(e, 'A la otra parte no le alcanza para el interés de las hipotecas.');
 
   let s: EstadoDelBurgo = { ...e, tratos: sinElTrato(e.tratos, id) };
   cronica.push({ que: 'trato', id, de: trato.de, a: trato.a, fin: 'aceptado' });
@@ -1611,7 +1611,7 @@ function sinLosTratosDe(e: EstadoDelBurgo, asiento: AsientoId, cronica: Cronica)
 
 /**
  * A QUIÉN LE DEBE MÁS el que va a quebrar: el acreedor que más reclama; empate, el
- * jugador que va antes en orden de mesa; el Concejo sólo si nadie reclama más que
+ * jugador que va antes en orden de mesa; el Ayuntamiento sólo si nadie reclama más que
  * él. Regla de la casa, dicha en la ayuda de «Declararse en quiebra».
  */
 function acreedorDe(e: EstadoDelBurgo, apuro: ApuroDelBurgo | null): number | null {
@@ -1637,14 +1637,14 @@ function acreedorDe(e: EstadoDelBurgo, apuro: ApuroDelBurgo | null): number | nu
 }
 
 /**
- * QUIEBRA de `i` con un acreedor (jugador o Concejo).
+ * QUIEBRA de `i` con un acreedor (jugador o Ayuntamiento).
  *
- * Los edificios se venden al Concejo por la mitad; con acreedor jugador ese dinero
- * y el efectivo van a él, y los títulos tal cual —los empeñados siguen empeñados y
+ * Los edificios se venden al Ayuntamiento por la mitad; con acreedor jugador ese dinero
+ * y el efectivo van a él, y los títulos tal cual —los hipotecados siguen hipotecados y
  * el acreedor paga el interés de cada uno EN EL ACTO, o entra él en apuro con el
- * Concejo—; con el Concejo la caja se pierde, los títulos vuelven desempeñados y
- * salen a almoneda uno por uno, y los Indultos al fondo de su mazo. El quebrado
- * queda fuera con 0 mrs; sus tratos caducan; si pujaba, sale de la almoneda. Después,
+ * Ayuntamiento—; con el Ayuntamiento la caja se pierde, los títulos vuelven sin hipoteca y
+ * salen a subasta uno por uno, y los Salvoconductos al fondo de su mazo. El quebrado
+ * queda fuera con 0 €; sus tratos caducan; si pujaba, sale de la subasta. Después,
  * `puedeHaberAcabado` y `reanudar`, que hace el relevo si el turno era suyo.
  */
 function quebrar(e: EstadoDelBurgo, i: number, acreedor: number | null, cronica: Cronica): EstadoDelBurgo {
@@ -1655,7 +1655,7 @@ function quebrar(e: EstadoDelBurgo, i: number, acreedor: number | null, cronica:
   let s = e;
   let caja = 0;
 
-  /* 1. Los edificios, al Concejo por la mitad. */
+  /* 1. Los edificios, al Ayuntamiento por la mitad. */
   for (const t of e.titulos) {
     if (t.dueno !== j.asiento || t.casas === 0) continue;
     const fila = filaDe(t.casilla);
@@ -1719,7 +1719,7 @@ function quebrar(e: EstadoDelBurgo, i: number, acreedor: number | null, cronica:
     s = { ...s, almoneda: { ...a, enPie, pujaDe, quienPuja, puja: quienPuja === null ? 0 : a.puja } };
   }
 
-  /* 4. El interés de los empeños que recibe el acreedor, en el acto o en apuro. */
+  /* 4. El interés de las hipotecas que recibe el acreedor, en el acto o en apuro. */
   if (aQuien !== null && ja !== null) {
     for (const c of misTitulos) {
       const t = tituloDe(s, c);
@@ -1735,7 +1735,7 @@ function quebrar(e: EstadoDelBurgo, i: number, acreedor: number | null, cronica:
   return reanudar(s, cronica);
 }
 
-/** El número de tabla del Indulto de cada mazo (hay uno por mazo): la serie que vuelve al fondo se deduce de él. */
+/** El número de tabla del Salvoconducto de cada mazo (hay uno por mazo): la serie que vuelve al fondo se deduce de él. */
 function numeroDelIndulto(mazo: MazoId): number {
   for (const c of cartasDe(mazo)) if (c.efecto.que === 'indulto') return c.numero;
   return 0;
@@ -1821,7 +1821,7 @@ function terminar(e: EstadoDelBurgo, ganadores: readonly AsientoId[]): EstadoDel
 }
 
 // ---------------------------------------------------------------------------
-// EMPEZAR (con el sorteo dentro) y TIRAR (con dobles y Mazmorra)
+// EMPEZAR (con el sorteo dentro) y TIRAR (con dobles y Comisaría)
 // ---------------------------------------------------------------------------
 
 /**
@@ -1921,7 +1921,7 @@ function empezar(e: EstadoDelBurgo, ctx: ContextoMovimiento, topeDeVueltas: numb
 }
 
 /**
- * TIRAR: dos dados encadenados. Libre: tres dobles seguidos mandan a la Mazmorra
+ * TIRAR: dos dados encadenados. Libre: tres dobles seguidos mandan a la Comisaría
  * antes de mover; si no, mueve, resuelve, y con dobles repite. Presa: con dobles
  * sale y mueve sin repetir; sin dobles suma un intento y pasa; al tercer fallo paga
  * la fianza (o entra en apuro) y mueve igual. El paso final lo decide la precedencia:
@@ -2332,7 +2332,7 @@ function despachar(
   }
 }
 
-/** Vender y empeñar: el dueño del turno en un paso de obrar, o el endeudado durante su apuro. */
+/** Vender e hipotecar: el dueño del turno en un paso de obrar, o el endeudado durante su apuro. */
 function puedeObrarEnApuro(e: EstadoDelBurgo, yo: number): boolean {
   if (e.turno === yo && pasoDeObrar(e.paso)) return true;
   return e.paso === 'apuro' && e.apuro !== null && e.apuro.quien === asientoDe(e, yo);
@@ -2348,9 +2348,9 @@ function puedeObrarEnApuro(e: EstadoDelBurgo, yo: number): boolean {
  *   · `reuniendo`, `terminada` → EL MISMO objeto (cada lectura mete su tic).
  *   · `almoneda` → pasa por `pujaDe`.
  *   · `apuro` → liquida a `apuro.quien` en UN tic: vende el edificio del solar con
- *     más casas (empate: casilla más alta), empeña el título de mayor precio (empate:
+ *     más casas (empate: casilla más alta), hipoteca el título de mayor precio (empate:
  *     casilla más alta), y si con todo no llega, quiebra con su acreedor.
- *   · `comprar` → a almoneda.
+ *   · `comprar` → a subasta.
  *   · `por-tirar` → tira por él (gasta azar: lo mismo que gastaría él).
  *   · `por-pasar` con dobles → tira otra vez; sin dobles → pasa.
  *
@@ -2362,19 +2362,19 @@ function venceElPlazo(e: EstadoDelBurgo): EstadoDelBurgo {
   const cronica: Cronica = [];
   let s = e;
   /*
-   * ═══ LA ALMONEDA Y EL APURO SE MIRAN ANTES QUE «EL DEL TURNO YA NO JUEGA» ═══
+   * ═══ LA SUBASTA Y EL APURO SE MIRAN ANTES QUE «EL DEL TURNO YA NO JUEGA» ═══
    *
    * Aquí `!estaVivo(e, e.turno)` iba EL PRIMERO y dejaba la mesa muerta en el caso
-   * más previsible de todos: quien quiebra CON EL CONCEJO durante su propio turno
-   * deja sus veintiocho títulos en la cola de almonedas, y `quebrar` abre la primera
+   * más previsible de todos: quien quiebra CON EL AYUNTAMIENTO durante su propio turno
+   * deja sus veintiocho títulos en la cola de subastas, y `quebrar` abre la primera
    * sin tocar `turno` —el relevo llega después, cuando la cola se vacía—. Con el
    * turno apuntando a un quebrado, cada tic entraba por esta primera rama, llamaba a
-   * `reanudar`, y `reanudar` con una almoneda abierta devuelve EL MISMO objeto: el
-   * tic no cambiaba nada, la almoneda no avanzaba nunca y la mesa se quedaba
+   * `reanudar`, y `reanudar` con una subasta abierta devuelve EL MISMO objeto: el
+   * tic no cambiaba nada, la subasta no avanzaba nunca y la mesa se quedaba
    * esperando para siempre a gente que no estaba. Medido: cuatrocientos tics para
-   * cerrar UNA de las veintiocho almonedas, y las veintisiete restantes intactas.
+   * cerrar UNA de las veintiocho subastas, y las veintisiete restantes intactas.
    *
-   * La almoneda y el apuro no son del dueño del turno —tienen su propio `pujaDe` y
+   * La subasta y el apuro no son del dueño del turno —tienen su propio `pujaDe` y
    * su propio `quien`—, así que se resuelven aunque el turno esté vacante; sólo
    * cuando no hay ninguna de las dos importa que el del turno siga jugando.
    */
@@ -2481,12 +2481,12 @@ export interface JugadorVisto {
 export interface TituloVisto {
   readonly casilla: number;
   readonly dueno: AsientoId | null;
-  /** 0..4; 5 = posada. */
+  /** 0..4; 5 = hotel. */
   readonly casas: number;
   readonly empenado: boolean;
   /** Derivado. */
   readonly barrioEntero: boolean;
-  /** Lo que cobraría hoy con la última tirada (0 sin dueño o empeñado); derivado. */
+  /** Lo que cobraría hoy con la última tirada (0 sin dueño o hipotecado); derivado. */
   readonly rentaAhora: number;
 }
 
@@ -2550,7 +2550,7 @@ export interface VistaDelBurgo {
 /** La vista sin el tablero: lo que el portillo y `opciones()` miran. El tablero es un dibujo de esto. */
 export type VistaSinTablero = Omit<VistaDelBurgo, 'tablero'>;
 
-/** «1.500 mrs». Sin regex ni `toLocaleString`: el separador es siempre el punto. */
+/** «1.500 €». Sin regex ni `toLocaleString`: el separador es siempre el punto. */
 export function maravedies(n: number): string {
   const negativo = n < 0;
   let entero = String(Math.trunc(Math.abs(n)));
@@ -2559,7 +2559,7 @@ export function maravedies(n: number): string {
     cola = `.${entero.slice(entero.length - 3)}${cola}`;
     entero = entero.slice(0, entero.length - 3);
   }
-  return `${negativo ? '-' : ''}${entero}${cola} mrs`;
+  return `${negativo ? '-' : ''}${entero}${cola} €`;
 }
 
 /** «1.ª», «2.ª»… para «la 2.ª casa». */
@@ -2585,7 +2585,7 @@ function jugadorVisto(v: VistaSinTablero, asiento: AsientoId | null): JugadorVis
 
 /** Cómo se llama este asiento SEGÚN LA VISTA, y sólo según la vista. */
 function nombreEnLaVista(v: VistaSinTablero, asiento: AsientoId | null): string {
-  if (asiento === null) return 'el Concejo';
+  if (asiento === null) return 'el Ayuntamiento';
   const j = jugadorVisto(v, asiento);
   return j === null || j.nombre.length === 0 ? asiento : j.nombre;
 }
@@ -2596,31 +2596,31 @@ function porqueEnPalabras(porque: PorqueDelDinero): string {
     case 'renta':
       return 'de renta';
     case 'puerta-mayor':
-      return 'por pasar la Puerta Mayor';
+      return 'por pasar la Salida';
     case 'carta':
       return 'por la carta';
     case 'diezmo':
-      return 'del Diezmo';
+      return 'del Impuesto';
     case 'alcabala':
-      return 'de Alcabala';
+      return 'de la Tasa';
     case 'fianza':
       return 'de fianza';
     case 'compra':
       return 'por la compra';
     case 'almoneda':
-      return 'por la almoneda';
+      return 'por la subasta';
     case 'casa':
       return 'por la casa';
     case 'posada':
-      return 'por la posada';
+      return 'por el hotel';
     case 'venta':
       return 'por la venta';
     case 'empeno':
-      return 'por el empeño';
+      return 'por la hipoteca';
     case 'desempeno':
-      return 'por desempeñar';
+      return 'por deshipotecar';
     case 'interes':
-      return 'de interés del empeño';
+      return 'de interés de la hipoteca';
     case 'trato':
       return 'por el trato';
     case 'quiebra':
@@ -2634,7 +2634,7 @@ function porqueEnPalabras(porque: PorqueDelDinero): string {
   }
 }
 
-/** Una frase por suceso; `''` para los que no se cuentan en el pregón. */
+/** Una frase por suceso; `''` para los que no se cuentan en la crónica. */
 function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string): string {
   switch (s.que) {
     case 'sale':
@@ -2645,7 +2645,7 @@ function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string): st
       return `${nombre(s.quien)} saca ${s.dados[0]} y ${s.dados[1]}${s.dobles ? ', dobles' : ''}.`;
     case 'mueve':
       return `${nombre(s.quien)} ${s.como === 'retrocede' ? 'retrocede hasta' : 'llega a'} ${nombreDeCasilla(s.hasta)}${
-        s.porLaPuertaMayor ? ' pasando por la Puerta Mayor' : ''
+        s.porLaPuertaMayor ? ' pasando por la Salida' : ''
       }.`;
     case 'cobra':
       return s.de === null ? `${nombre(s.quien)} cobra ${maravedies(s.cuanto)} ${porqueEnPalabras(s.porque)}.` : '';
@@ -2655,38 +2655,38 @@ function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string): st
       return `${nombre(s.quien)} compra ${nombreDeCasilla(s.casilla)} por ${maravedies(s.cuanto)}.`;
     case 'alza':
       return s.casas === POSADA
-        ? `${nombre(s.quien)} alza una posada en ${nombreDeCasilla(s.casilla)}.`
+        ? `${nombre(s.quien)} alza un hotel en ${nombreDeCasilla(s.casilla)}.`
         : `${nombre(s.quien)} alza la ${ordinal(s.casas)} casa en ${nombreDeCasilla(s.casilla)}.`;
     case 'vende':
-      return `${nombre(s.quien)} vende al Concejo en ${nombreDeCasilla(s.casilla)}.`;
+      return `${nombre(s.quien)} vende al Ayuntamiento en ${nombreDeCasilla(s.casilla)}.`;
     case 'empena':
-      return `${nombre(s.quien)} empeña ${nombreDeCasilla(s.casilla)}.`;
+      return `${nombre(s.quien)} hipoteca ${nombreDeCasilla(s.casilla)}.`;
     case 'desempena':
-      return `${nombre(s.quien)} desempeña ${nombreDeCasilla(s.casilla)}.`;
+      return `${nombre(s.quien)} deshipoteca ${nombreDeCasilla(s.casilla)}.`;
     case 'carta': {
       const ficha = carta(s.mazo, s.carta);
-      const de = s.mazo === 'pregon' ? 'del Pregón' : 'del Arca del Concejo';
+      const de = s.mazo === 'pregon' ? 'de Sucesos' : 'del Fondo Vecinal';
       return `${nombre(s.quien)} saca ${de}: «${ficha === null ? '' : ficha.titulo}».`;
     }
     case 'tirada-de-oficio':
-      return `${nombre(s.quien)} tira para el oficio: ${s.dados[0]} y ${s.dados[1]}.`;
+      return `${nombre(s.quien)} tira para el servicio: ${s.dados[0]} y ${s.dados[1]}.`;
     case 'a-la-mazmorra':
-      return `${nombre(s.quien)} va a la Mazmorra${s.porque === 'tres-dobles' ? ' por tres dobles seguidos' : ''}.`;
+      return `${nombre(s.quien)} va a comisaría${s.porque === 'tres-dobles' ? ' por tres dobles seguidos' : ''}.`;
     case 'sale-de-la-mazmorra':
-      return `${nombre(s.quien)} sale de la Mazmorra${
-        s.como === 'fianza' ? ' pagando la fianza' : s.como === 'indulto' ? ' con un Indulto' : s.como === 'dobles' ? ' con dobles' : ''
+      return `${nombre(s.quien)} sale de la Comisaría${
+        s.como === 'fianza' ? ' pagando la fianza' : s.como === 'indulto' ? ' con un Salvoconducto' : s.como === 'dobles' ? ' con dobles' : ''
       }.`;
     case 'sigue-presa':
-      return `${nombre(s.quien)} sigue en la Mazmorra (intento ${s.intento} de ${INTENTOS_EN_LA_MAZMORRA}).`;
+      return `${nombre(s.quien)} sigue en la Comisaría (intento ${s.intento} de ${INTENTOS_EN_LA_MAZMORRA}).`;
     case 'almoneda-abierta':
-      return `Sale a almoneda ${nombreDeCasilla(s.casilla)}.`;
+      return `Sale a subasta ${nombreDeCasilla(s.casilla)}.`;
     case 'puja':
       return `${nombre(s.quien)} puja ${maravedies(s.cuanto)} por ${nombreDeCasilla(s.casilla)}.`;
     case 'pasa-puja':
-      return `${nombre(s.quien)} pasa en la almoneda.`;
+      return `${nombre(s.quien)} pasa en la subasta.`;
     case 'almoneda-cerrada':
       return s.ganador === null
-        ? `${nombreDeCasilla(s.casilla)} se queda en el Concejo.`
+        ? `${nombreDeCasilla(s.casilla)} se queda en el Ayuntamiento.`
         : `${nombre(s.ganador)} se lleva ${nombreDeCasilla(s.casilla)} por ${maravedies(s.cuanto)}.`;
     case 'apuro':
       return `${nombre(s.quien)} debe ${maravedies(s.debe)} y no le alcanza: en apuro.`;
@@ -2708,14 +2708,14 @@ function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string): st
       return `Turno de ${nombre(s.de)}.`;
     case 'fin':
       return s.ganadores.length === 1
-        ? `Se acabó: ${nombre(s.ganadores[0] as AsientoId)} se queda con el burgo.`
+        ? `Se acabó: ${nombre(s.ganadores[0] as AsientoId)} se queda con el Burgo.`
         : `Se acabó: empate entre ${s.ganadores.map(nombre).join(', ')}.`;
     default:
       return '';
   }
 }
 
-/** Cuántas frases del último cambio caben en el pregón. */
+/** Cuántas frases del último cambio caben en la crónica. */
 const FRASES_DEL_PREGON = 3;
 
 /** La frase de la mesa: las últimas frases del último cambio. Nunca vacía en `jugando`. */
@@ -2738,12 +2738,12 @@ function redactarAviso(e: EstadoDelBurgo, quien: QuienMira, nombre: (a: AsientoI
   if (quien === ESPECTADOR) return '';
   const i = indiceDelJugador(e, quien);
   if (e.momento === 'reuniendo') return 'Cuando estéis todos, cualquiera puede empezar la partida.';
-  if (e.momento === 'terminada') return e.ganadores.indexOf(quien) >= 0 ? 'Te quedas con el burgo.' : '';
+  if (e.momento === 'terminada') return e.ganadores.indexOf(quien) >= 0 ? 'Te quedas con el Burgo.' : '';
   const j = jugadorEn(e, i);
   if (j === null) return '';
   if (j.quebrado) return 'Has quebrado: miras la partida desde fuera.';
   if (e.paso === 'apuro' && e.apuro !== null && e.apuro.quien === quien) {
-    return `Debes ${maravedies(sumaDeDeudasDel(e.apuro))}: vende, empeña o declárate en quiebra.`;
+    return `Debes ${maravedies(sumaDeDeudasDel(e.apuro))}: vende, hipoteca o declárate en quiebra.`;
   }
   if (e.paso === 'almoneda' && e.almoneda !== null && e.almoneda.pujaDe === quien) {
     return `Te toca pujar por ${nombreDeCasilla(e.almoneda.casilla)}: mínimo ${maravedies(pujaMinimaDe(e.almoneda))}.`;
@@ -2754,14 +2754,14 @@ function redactarAviso(e: EstadoDelBurgo, quien: QuienMira, nombre: (a: AsientoI
   if (aQuienSeEspera(e) === quien) {
     if (e.paso === 'por-tirar') {
       return j.presa >= 0
-        ? `Estás en la Mazmorra: paga la fianza, usa un Indulto o prueba con los dados (intento ${j.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}).`
+        ? `Estás en la Comisaría: paga la fianza, usa un Salvoconducto o prueba con los dados (intento ${j.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}).`
         : 'Te toca tirar.';
     }
     if (e.paso === 'comprar') {
       const fila = filaDe(j.casilla);
       return fila === null
-        ? 'Puedes comprar o sacar a almoneda.'
-        : `Puedes comprar ${fila.nombre} por ${maravedies(fila.precio)}, o sacarla a almoneda.`;
+        ? 'Puedes comprar o sacar a subasta.'
+        : `Puedes comprar ${fila.nombre} por ${maravedies(fila.precio)}, o sacarla a subasta.`;
     }
     if (e.paso === 'por-pasar') return e.dobles > 0 ? 'Dobles: vuelve a tirar.' : 'Puedes obrar, tratar o pasar el turno.';
     return '';
@@ -2776,7 +2776,7 @@ function redactarAviso(e: EstadoDelBurgo, quien: QuienMira, nombre: (a: AsientoI
  * patrimonio, barrio entero y renta de hoy. Los nombres entran por `sentados`.
  */
 function loQueSeVe(e: EstadoDelBurgo, quien: QuienMira, sentados: LosSentados): VistaSinTablero {
-  const nombre = (a: AsientoId | null): string => (a === null ? 'el Concejo' : comoSeLlama(sentados, a));
+  const nombre = (a: AsientoId | null): string => (a === null ? 'el Ayuntamiento' : comoSeLlama(sentados, a));
   const jugadores: JugadorVisto[] = [];
   for (const j of e.jugadores) {
     jugadores.push({
@@ -2937,7 +2937,7 @@ function opcionesDeReunion(): readonly Opcion[] {
   ];
 }
 
-/** Las obras que `yo` puede hacer ahora: en apuro sólo vender y empeñar; con el turno, las cuatro. */
+/** Las obras que `yo` puede hacer ahora: en apuro sólo vender e hipotecar; con el turno, las cuatro. */
 function opcionesDeObra(v: VistaSinTablero, yo: JugadorVisto, enApuro: boolean): Opcion[] {
   const m = loQueSeMiraDe(v);
   const salida: Opcion[] = [];
@@ -2953,11 +2953,11 @@ function opcionesDeObra(v: VistaSinTablero, yo: JugadorVisto, enApuro: boolean):
           ALZAR,
           { casilla: c },
           seraPosada
-            ? `Alzar una posada en ${fila.nombre} (${maravedies(fila.casa)})`
+            ? `Alzar un hotel en ${fila.nombre} (${maravedies(fila.casa)})`
             : `Alzar la ${ordinal(t.casas + 1)} casa en ${fila.nombre} (${maravedies(fila.casa)})`,
           seraPosada
-            ? 'La posada sustituye a las cuatro casas, que vuelven al Concejo.'
-            : 'Barrio entero, por parejo y con casas en el Concejo.',
+            ? 'El hotel sustituye a las cuatro casas, que vuelven al Ayuntamiento.'
+            : 'Barrio entero, por parejo y con casas en el Ayuntamiento.',
         ),
       );
     }
@@ -2969,9 +2969,9 @@ function opcionesDeObra(v: VistaSinTablero, yo: JugadorVisto, enApuro: boolean):
           VENDER,
           { casilla: c },
           t.casas === POSADA
-            ? `Vender ${m.casasEnElConcejo >= POSADA - 1 ? 'la posada por cuatro casas' : 'la posada entera'} de ${fila.nombre} (+${maravedies(da)})`
+            ? `Vender ${m.casasEnElConcejo >= POSADA - 1 ? 'el hotel por cuatro casas' : 'el hotel entero'} de ${fila.nombre} (+${maravedies(da)})`
             : `Vender una casa de ${fila.nombre} (+${maravedies(da)})`,
-          'El Concejo paga la mitad del precio de la casa; se quita de donde haya más.',
+          'El Ayuntamiento paga la mitad del precio de la casa; se quita de donde haya más.',
         ),
       );
     }
@@ -2981,8 +2981,8 @@ function opcionesDeObra(v: VistaSinTablero, yo: JugadorVisto, enApuro: boolean):
           `empenar:${c}`,
           EMPENAR,
           { casilla: c },
-          `Empeñar ${fila.nombre} por ${maravedies(valorDeEmpeno(fila.precio))}`,
-          'Un título empeñado no cobra renta. Desempeñar cuesta el empeño más el 10 %.',
+          `Hipotecar ${fila.nombre} por ${maravedies(valorDeEmpeno(fila.precio))}`,
+          'Un título hipotecado no cobra renta. Deshipotecar cuesta la hipoteca más el 10 %.',
         ),
       );
     }
@@ -2992,7 +2992,7 @@ function opcionesDeObra(v: VistaSinTablero, yo: JugadorVisto, enApuro: boolean):
           `desempenar:${c}`,
           DESEMPENAR,
           { casilla: c },
-          `Desempeñar ${fila.nombre} (${maravedies(costeDeDesempeno(fila.precio))})`,
+          `Deshipotecar ${fila.nombre} (${maravedies(costeDeDesempeno(fila.precio))})`,
           'Vuelve a cobrar renta.',
         ),
       );
@@ -3058,7 +3058,7 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
         carga: { a: destinos, mrsMaximo: yo.mrs, titulos, indultos: yo.indultos },
         declaracion: true,
         rotulo: 'Proponer un trato',
-        ayuda: 'Títulos sin edificios, maravedíes e Indultos, por lo que pidas. Caduca al cambiar el turno.',
+        ayuda: 'Títulos sin edificios, euros y Salvoconductos, por lo que pidas. Caduca al cambiar el turno.',
       });
     }
   }
@@ -3072,17 +3072,17 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
             TIRAR,
             {},
             'Probar con los dados',
-            `Con dobles sales y mueves sin repetir; si no, sigues en la Mazmorra (intento ${yo.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}; al tercero pagas la fianza y mueves).`,
+            `Con dobles sales y mueves sin repetir; si no, sigues en la Comisaría (intento ${yo.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}; al tercero pagas la fianza y mueves).`,
           ),
         );
         if (yo.mrs >= FIANZA) {
           salida.push(opcion('pagar-fianza', PAGAR_FIANZA, {}, `Pagar ${maravedies(FIANZA)} de fianza`, 'Sales y tiras con normalidad; con dobles repites.'));
         }
         if (yo.indultos > 0) {
-          salida.push(opcion('usar-indulto', USAR_INDULTO, {}, 'Usar un Indulto', 'Sales y tiras con normalidad; la carta vuelve al fondo de su mazo.'));
+          salida.push(opcion('usar-indulto', USAR_INDULTO, {}, 'Usar un Salvoconducto', 'Sales y tiras con normalidad; la carta vuelve al fondo de su mazo.'));
         }
       } else {
-        salida.push(opcion('tirar', TIRAR, {}, 'Tirar los dados', 'Mueves lo que sumen; con dobles repites, y a los tres dobles seguidos, a la Mazmorra.'));
+        salida.push(opcion('tirar', TIRAR, {}, 'Tirar los dados', 'Mueves lo que sumen; con dobles repites, y a los tres dobles seguidos, a comisaría.'));
       }
       for (const o of opcionesDeObra(v, yo, false)) salida.push(o);
     } else if (v.paso === 'comprar') {
@@ -3096,7 +3096,7 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
           );
         }
         salida.push(
-          opcion(`a-almoneda:${yo.casilla}`, A_ALMONEDA, { casilla: yo.casilla }, `Sacar ${fila.nombre} a almoneda`, 'Pujan todos, tú también; sin pujas se queda en el Concejo.'),
+          opcion(`a-almoneda:${yo.casilla}`, A_ALMONEDA, { casilla: yo.casilla }, `Sacar ${fila.nombre} a subasta`, 'Pujan todos, tú también; sin pujas se queda en el Ayuntamiento.'),
         );
       }
       for (const o of opcionesDeObra(v, yo, false)) salida.push(o);
@@ -3125,10 +3125,10 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
             ayuda: `Entre ${maravedies(minimo)} y ${maravedies(maximo)}, de ${PASO_DE_PUJA} en ${PASO_DE_PUJA}.`,
           });
         }
-        salida.push(opcion('pasar-puja', PASAR_PUJA, { casilla: a.casilla }, 'Pasar en la almoneda', 'Ya no pujas por este título.'));
+        salida.push(opcion('pasar-puja', PASAR_PUJA, { casilla: a.casilla }, 'Pasar en la subasta', 'Ya no pujas por este título.'));
       }
     } else if (v.paso === 'por-pasar') {
-      if (v.dobles > 0) salida.push(opcion('tirar', TIRAR, {}, 'Volver a tirar (dobles)', 'Sacaste dobles: tiras otra vez. Tres seguidos, a la Mazmorra.'));
+      if (v.dobles > 0) salida.push(opcion('tirar', TIRAR, {}, 'Volver a tirar (dobles)', 'Sacaste dobles: tiras otra vez. Tres seguidos, a comisaría.'));
       else salida.push(opcion('pasar', PASAR, {}, 'Pasar el turno', 'Tus tratos abiertos caducan al pasar.'));
       for (const o of opcionesDeObra(v, yo, false)) salida.push(o);
     }
@@ -3143,7 +3143,7 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
       {},
       'Declararse en quiebra',
       acreedor === null
-        ? 'Todo lo tuyo vuelve al Concejo y sale a almoneda. Quedas fuera de la partida.'
+        ? 'Todo lo tuyo vuelve al Ayuntamiento y sale a subasta. Quedas fuera de la partida.'
         : `Todo lo tuyo pasa a ${nombreEnLaVista(v, acreedor)}, que es a quien más debes. Quedas fuera de la partida.`,
     ),
   );
@@ -3175,7 +3175,7 @@ function resumenDeLado(lado: LadoDelTrato): string {
   const partes: string[] = [];
   if (lado.mrs > 0) partes.push(maravedies(lado.mrs));
   for (const c of lado.titulos) partes.push(nombreDeCasilla(c));
-  if (lado.indultos > 0) partes.push(lado.indultos === 1 ? 'un Indulto' : `${lado.indultos} Indultos`);
+  if (lado.indultos > 0) partes.push(lado.indultos === 1 ? 'un Salvoconducto' : `${lado.indultos} Salvoconductos`);
   return partes.length === 0 ? 'nada' : partes.join(', ');
 }
 
@@ -3210,7 +3210,7 @@ const MARGEN_DEL_ENCUADRE = 20;
 const RADIO_DE_FICHA = 14;
 const RADIO_DE_CASA = 6;
 const RADIO_DE_POSADA = 10;
-/** Cuánto se oscurece el relleno de un título empeñado (una quinta parte). */
+/** Cuánto se oscurece el relleno de un título hipotecado (una quinta parte). */
 const PENUMBRA_DEL_EMPENO = 0.2;
 
 /** Rellenos por clase; los solares llevan el color de su barrio. */
@@ -3277,11 +3277,11 @@ function puntosDeCara(i: number): PuntoDeTablero[] {
   ];
 }
 
-/** La cifra de una cara: precio sin dueño, renta de hoy con dueño, «E» si empeñado, «P» si posada. */
+/** La cifra de una cara: precio sin dueño, renta de hoy con dueño, «Hp» si hipotecado, «Ht» si hotel. */
 function cifraDe(fila: CasillaDelBurgo, t: TituloVisto | null): string {
   if (t === null) return fila.precio > 0 ? String(fila.precio) : '';
   if (t.dueno === null) return String(fila.precio);
-  const marca = t.empenado ? 'E ' : t.casas === POSADA ? 'P ' : '';
+  const marca = t.empenado ? 'Hp ' : t.casas === POSADA ? 'Ht ' : '';
   return `${marca}${t.rentaAhora}`;
 }
 
@@ -3357,11 +3357,11 @@ function panelesDe(v: VistaSinTablero, quien: QuienMira): PanelDeTablero[] {
   for (const j of v.jugadores) {
     let linea = `${j.nombre} · ${maravedies(j.mrs)} · ${j.titulos.length} ${j.titulos.length === 1 ? 'título' : 'títulos'}`;
     if (j.quebrado) linea += ' · quebrado';
-    else if (j.presa >= 0) linea += ' · en la Mazmorra';
-    if (j.indultos > 0) linea += ` · ${j.indultos} ${j.indultos === 1 ? 'Indulto' : 'Indultos'}`;
+    else if (j.presa >= 0) linea += ' · en la Comisaría';
+    if (j.indultos > 0) linea += ` · ${j.indultos} ${j.indultos === 1 ? 'Salvoconducto' : 'Salvoconductos'}`;
     mesa.push(linea);
   }
-  mesa.push(`El Concejo guarda ${v.concejo.casas} casas y ${v.concejo.posadas} posadas.`);
+  mesa.push(`El Ayuntamiento guarda ${v.concejo.casas} casas y ${v.concejo.posadas} hoteles.`);
   paneles.push({ titulo: 'La mesa', lineas: mesa });
 
   const mio: string[] = [];
@@ -3372,8 +3372,8 @@ function panelesDe(v: VistaSinTablero, quien: QuienMira): PanelDeTablero[] {
     for (const c of yo.titulos) {
       const t = tituloVisto(v, c);
       if (t === null) continue;
-      const edificios = t.casas === POSADA ? 'posada' : t.casas === 0 ? 'sin casas' : `${t.casas} ${t.casas === 1 ? 'casa' : 'casas'}`;
-      mio.push(`${nombreDeCasilla(c)}: ${edificios}${t.empenado ? ' · empeñado' : ''} · renta ${maravedies(t.rentaAhora)}`);
+      const edificios = t.casas === POSADA ? 'hotel' : t.casas === 0 ? 'sin casas' : `${t.casas} ${t.casas === 1 ? 'casa' : 'casas'}`;
+      mio.push(`${nombreDeCasilla(c)}: ${edificios}${t.empenado ? ' · hipotecado' : ''} · renta ${maravedies(t.rentaAhora)}`);
     }
     if (mio.length === 0) mio.push('Todavía no tienes ningún título.');
     mio.push('Los tratos y la puja libre se hacen desde el tablero completo; aquí se puja por escalones.');
@@ -3384,7 +3384,7 @@ function panelesDe(v: VistaSinTablero, quien: QuienMira): PanelDeTablero[] {
   if (v.ultimaCarta !== null) {
     const ficha = carta(v.ultimaCarta.mazo, v.ultimaCarta.carta);
     if (ficha !== null) {
-      ultima.push(`${nombreEnLaVista(v, v.ultimaCarta.quien)} sacó ${v.ultimaCarta.mazo === 'pregon' ? 'del Pregón' : 'del Arca del Concejo'}: ${ficha.titulo}`);
+      ultima.push(`${nombreEnLaVista(v, v.ultimaCarta.quien)} sacó ${v.ultimaCarta.mazo === 'pregon' ? 'de Sucesos' : 'del Fondo Vecinal'}: ${ficha.titulo}`);
       ultima.push(ficha.texto);
     }
   }
@@ -3401,7 +3401,7 @@ function panelesDe(v: VistaSinTablero, quien: QuienMira): PanelDeTablero[] {
     const enPie: string[] = [];
     for (const x of a.enPie) enPie.push(nombreEnLaVista(v, x));
     paneles.push({
-      titulo: 'La almoneda',
+      titulo: 'La subasta',
       lineas: [
         `${nombreDeCasilla(a.casilla)} · ${a.quienPuja === null ? 'sin pujas' : `${maravedies(a.puja)} de ${nombreEnLaVista(v, a.quienPuja)}`}`,
         `Puja ${nombreEnLaVista(v, a.pujaDe)}. En pie: ${enPie.join(', ')}.`,
@@ -3426,13 +3426,13 @@ function panelesDe(v: VistaSinTablero, quien: QuienMira): PanelDeTablero[] {
   return paneles;
 }
 
-/** El aviso del retablo: fin de partida, lo mío y el pregón, en ese orden. */
+/** El aviso del retablo: fin de partida, lo mío y la crónica, en ese orden. */
 function avisoDe(v: VistaSinTablero): string {
   const partes: string[] = [];
   if (v.momento === 'terminada') {
     partes.push(
       v.ganadores.length === 1
-        ? `Se acabó: ${nombreEnLaVista(v, v.ganadores[0] as AsientoId)} se queda con el burgo.`
+        ? `Se acabó: ${nombreEnLaVista(v, v.ganadores[0] as AsientoId)} se queda con el Burgo.`
         : v.ganadores.length === 0
           ? 'Se acabó sin ganador.'
           : `Se acabó: empate entre ${v.ganadores.map((g) => nombreEnLaVista(v, g)).join(', ')}.`,

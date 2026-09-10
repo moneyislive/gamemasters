@@ -13,8 +13,8 @@
  * ═══ EL TABLERO ES FIJO Y NO ALEATORIO ═══
  *
  * Se monta a mano con `?jugadores=6&lleno=1&semilla=ABCDE`: seis asientos con los
- * colores del Burgo, todos los títulos con dueño, casas y posadas repartidas, dos
- * empeñados y uno en almoneda. Un reparto al azar haría bonita la captura y quitaría lo
+ * colores del Burgo, todos los títulos con dueño, casas y hoteles repartidos, dos
+ * hipotecados y uno en subasta. Un reparto al azar haría bonita la captura y quitaría lo
  * único que esto vale: comparar dos ejecuciones y ver que cambió lo que se tocó.
  *
  * ═══ LA CÁMARA ES LA DEL CLIENTE, ESCRITA AQUÍ ═══
@@ -147,7 +147,7 @@ function casillasDePrueba(jugadores: number, lleno: boolean): CasillaEn3D[] {
     const clase = claseDe(i);
     const titulo = conTitulo(i);
     const dueno = lleno && titulo ? (COLORES_DEL_BURGO[k % Math.max(1, jugadores)] as string) : null;
-    /* Las casas: 0..4 y posadas repartidas, sólo en solares; dos empeñados y una almoneda. */
+    /* Las casas: 0..4 y hoteles repartidos, sólo en solares; dos hipotecados y una subasta. */
     const casas = lleno && clase === 'solar' ? [1, 2, 3, 4, 5, 0][k % 6] ?? 0 : 0;
     const empenada = lleno && (i === 13 || i === 26);
     const enAlmoneda = lleno && i === 29;
@@ -189,7 +189,7 @@ function figurasDePrueba(jugadores: number): FiguraEn3D[] {
  * LA CÁMARA AÉREA DEL BANCO: arrastre para girar, rueda para acercar, botón derecho para
  * pasear. El mirador y la cercanía van por `ref` (sesenta cambios por segundo), la
  * aritmética es la de `escenas/camara.ts` y `escenas/acercar.ts`, y la pose la compone
- * `poseDelBurgo`. Al abrir, nace sobre la Puerta Mayor y en `APERTURA` segundos se abre
+ * `poseDelBurgo`. Al abrir, nace sobre la Salida y en `APERTURA` segundos se abre
  * a la salida, como la partida.
  */
 function CamaraDelBanco({ ventana, verEntero, acercarA }: { ventana: Ventana; verEntero: number; acercarA: { readonly id: number; readonly x: number; readonly z: number; readonly factor: number } | null }): null {
@@ -521,13 +521,13 @@ function Banco(): JSX.Element {
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'carta', quien: yo.asiento, mazo: 'pregon', carta: 1 }])}>
-            Carta del Pregón
+            Carta de Sucesos
           </button>
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'carta', quien: yo.asiento, mazo: 'arca', carta: 2 }])}>
             Carta del Arca
           </button>
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'cobra', quien: yo.asiento, de: null, cuanto: 200, porque: 'puerta-mayor', casilla: yo.casilla }])}>
-            Cobrar 200 del Concejo
+            Cobrar 200 del Ayuntamiento
           </button>
           <button
             type="button"
@@ -587,7 +587,7 @@ function Banco(): JSX.Element {
               manda([{ que: empenada ? 'empena' : 'desempena', quien: yo.asiento, casilla: c.indice }], () => cambiaCasilla(c.indice, { empenada }));
             }}
           >
-            Empeñar / desempeñar
+            Hipotecar / deshipotecar
           </button>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
@@ -602,7 +602,7 @@ function Banco(): JSX.Element {
               });
             }}
           >
-            Abrir almoneda
+            Abrir subasta
           </button>
           <button
             type="button"
@@ -616,13 +616,13 @@ function Banco(): JSX.Element {
               });
             }}
           >
-            Cerrar almoneda (gana)
+            Cerrar subasta (gana)
           </button>
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'a-la-mazmorra', quien: yo.asiento, desde: yo.casilla, porque: 'casilla' }], () => mueveFigura(yo.asiento, { casilla: MAZMORRA, presa: true }))}>
-            A la Mazmorra
+            A comisaría
           </button>
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'sale-de-la-mazmorra', quien: yo.asiento, como: 'fianza' }, { que: 'mueve', quien: yo.asiento, desde: MAZMORRA, hasta: 14, recorrido: recorrido(MAZMORRA, 4), porLaPuertaMayor: false, como: 'anda' }], () => mueveFigura(yo.asiento, { casilla: 14, presa: false }))}>
-            Sale de la Mazmorra + 4
+            Sale de la Comisaría + 4
           </button>
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'sigue-presa', quien: yo.asiento, intento: 1 }])}>
             Sigue presa

@@ -12,12 +12,12 @@
  * aquello cuyo fallo sería SILENCIOSO cuando el reductor llegue encima:
  *
  *  1. LA TABLA SE LEE POR POSICIÓN. `CASILLAS[i].indice === i`, las esquinas donde
- *     el reglamento dice, las puertas en 5/15/25/35, los oficios en 12/28, tres arcas
- *     y tres pregones donde toca, 22 solares en 8 barrios de 2 o 3. Una fila movida
+ *     el reglamento dice, las estaciones en 5/15/25/35, los servicios en 12/28, tres del
+ *     Fondo Vecinal y tres de Sucesos donde toca, 22 solares en 8 barrios de 2 o 3. Una fila movida
  *     no lanza: cobra la renta de otra calle.
- *  2. LOS NÚMEROS SON LOS DEL REGLAMENTO Y SON ENTEROS. Precios pares (el empeño es
- *     la mitad y no puede llevar coma), rentas que crecen de solar a posada, el
- *     precio de la casa igual en todo el barrio, y la tabla ENTERA de desempeño
+ *  2. LOS NÚMEROS SON LOS DEL REGLAMENTO Y SON ENTEROS. Precios pares (la hipoteca es
+ *     la mitad y no puede llevar coma), rentas que crecen de solar a hotel, el
+ *     precio de la casa igual en todo el barrio, y la tabla ENTERA de deshipoteca
  *     escrita a mano —28 valores— contra `costeDeDesempeno`: un `Math.floor` donde
  *     va `Math.ceil` cambia el 350 de 193 a 192 y nadie lo ve en una partida.
  *  3. LAS CARTAS SON 16 + 16, NUMERADAS 1..16 SIN HUECOS, y la serie y el número van
@@ -34,11 +34,11 @@
  *     mal sin ningún error.
  *  6. EL ANILLO: módulo positivo (retroceder desde la 1 da 38, no −2), el recorrido
  *     en orden y sin la casilla de partida, cruzar la salida sólo hacia delante y
- *     también al caer justo en la 0, la puerta más cercana desde la 39 es la 5, y
+ *     también al caer justo en la 0, la estación más cercana desde la 39 es la 5, y
  *     la geometría del anillo cuadrado de 8 × 14 con 11 por lado: esquinas en ±43,
  *     lados en su banda, paso de 8 entre vecinas, 11 de la esquina a la primera,
  *     cuatro cuartos que dan la vuelta, y `medioLado` = 50.
- *  7. LA HACIENDA: todo o nada, enteros, claves ordenadas, el Concejo con caja
+ *  7. LA HACIENDA: todo o nada, enteros, claves ordenadas, el Ayuntamiento con caja
  *     infinita, y el no-op devuelve EL MISMO objeto por identidad — que es lo que la
  *     mesa compara.
  *  8. EL MAZO: robar rota al fondo y no pierde ni duplica; sacar y devolver son
@@ -158,20 +158,20 @@ function reprochesDeLaTabla(casillas: readonly CasillaDelBurgo[], barrios: reado
   const clase = (i: number): string => casillas[i]?.clase ?? '(no hay)';
   const precio = (i: number): number => casillas[i]?.precio ?? -1;
   if (clase(0) !== 'salida') r.push('la 0 no es la salida');
-  if (clase(10) !== 'mazmorra') r.push('la 10 no es la Mazmorra');
-  if (clase(20) !== 'feria') r.push('la 20 no es la Feria');
-  if (clase(30) !== 'a-la-mazmorra') r.push('la 30 no es ¡A la Mazmorra!');
-  if (clase(4) !== 'diezmo' || precio(4) !== 200) r.push('el Diezmo no está en la 4 cobrando 200');
-  if (clase(38) !== 'alcabala' || precio(38) !== 100) r.push('la Alcabala no está en la 38 cobrando 100');
-  for (const p of [5, 15, 25, 35]) if (clase(p) !== 'puerta' || precio(p) !== 200) r.push(`la ${p} no es una puerta de 200`);
-  for (const o of [12, 28]) if (clase(o) !== 'oficio' || precio(o) !== 150) r.push(`la ${o} no es un oficio de 150`);
-  for (const a of [2, 17, 33]) if (clase(a) !== 'arca') r.push(`la ${a} no es el Arca`);
-  for (const p of [7, 22, 36]) if (clase(p) !== 'pregon') r.push(`la ${p} no es el Pregón`);
+  if (clase(10) !== 'mazmorra') r.push('la 10 no es la Comisaría');
+  if (clase(20) !== 'feria') r.push('la 20 no es el Descanso');
+  if (clase(30) !== 'a-la-mazmorra') r.push('la 30 no es ¡A comisaría!');
+  if (clase(4) !== 'diezmo' || precio(4) !== 200) r.push('el Impuesto no está en la 4 cobrando 200');
+  if (clase(38) !== 'alcabala' || precio(38) !== 100) r.push('la Tasa no está en la 38 cobrando 100');
+  for (const p of [5, 15, 25, 35]) if (clase(p) !== 'puerta' || precio(p) !== 200) r.push(`la ${p} no es una estación de 200`);
+  for (const o of [12, 28]) if (clase(o) !== 'oficio' || precio(o) !== 150) r.push(`la ${o} no es un servicio de 150`);
+  for (const a of [2, 17, 33]) if (clase(a) !== 'arca') r.push(`la ${a} no es del Fondo Vecinal`);
+  for (const p of [7, 22, 36]) if (clase(p) !== 'pregon') r.push(`la ${p} no es de Sucesos`);
   const cuantasDe = (que: string): number => casillas.filter((c) => c.clase === que).length;
-  if (cuantasDe('puerta') !== 4) r.push(`hay ${cuantasDe('puerta')} puertas`);
-  if (cuantasDe('oficio') !== 2) r.push(`hay ${cuantasDe('oficio')} oficios`);
-  if (cuantasDe('arca') !== 3) r.push(`hay ${cuantasDe('arca')} arcas`);
-  if (cuantasDe('pregon') !== 3) r.push(`hay ${cuantasDe('pregon')} pregones`);
+  if (cuantasDe('puerta') !== 4) r.push(`hay ${cuantasDe('puerta')} estaciones`);
+  if (cuantasDe('oficio') !== 2) r.push(`hay ${cuantasDe('oficio')} servicios`);
+  if (cuantasDe('arca') !== 3) r.push(`hay ${cuantasDe('arca')} casillas del Fondo Vecinal`);
+  if (cuantasDe('pregon') !== 3) r.push(`hay ${cuantasDe('pregon')} casillas de Sucesos`);
   if (cuantasDe('solar') !== 22) r.push(`hay ${cuantasDe('solar')} solares`);
 
   for (const c of casillas) {
@@ -240,7 +240,7 @@ function reprochesDeLaTabla(casillas: readonly CasillaDelBurgo[], barrios: reado
   movida[5] = movida[6] as CasillaDelBurgo;
   movida[6] = cinco;
   const r1 = reprochesDeLaTabla(movida, BARRIOS);
-  comprobar('se ve fallar: dos filas cambiadas de sitio', r1.some((x) => /la fila 5 dice ser la 6/.test(x)) && r1.some((x) => /la 5 no es una puerta/.test(x)), r1);
+  comprobar('se ve fallar: dos filas cambiadas de sitio', r1.some((x) => /la fila 5 dice ser la 6/.test(x)) && r1.some((x) => /la 5 no es una estación/.test(x)), r1);
 
   const impar = copiaDeCasillas();
   impar[1] = { ...(impar[1] as CasillaDelBurgo), precio: 61 };
@@ -258,7 +258,7 @@ function reprochesDeLaTabla(casillas: readonly CasillaDelBurgo[], barrios: reado
   comprobar('se ve fallar: un barrio de cuatro solares', r4.some((x) => /barrio pardo tiene 4 solares/.test(x)) && r4.some((x) => /no cuadran/.test(x)), r4);
 
   const largo = copiaDeCasillas();
-  largo[38] = { ...(largo[38] as CasillaDelBurgo), rotulo: 'Alcabala' };
+  largo[38] = { ...(largo[38] as CasillaDelBurgo), rotulo: 'Impuesto' };
   const r5 = reprochesDeLaTabla(largo, BARRIOS);
   comprobar('se ve fallar: un rótulo de más de seis letras', r5.some((x) => /rótulo de la 38/.test(x)), r5);
 
@@ -273,10 +273,10 @@ function reprochesDeLaTabla(casillas: readonly CasillaDelBurgo[], barrios: reado
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-paso('2. Empeño, interés y desempeño: la tabla entera escrita a mano');
+paso('2. Hipoteca, interés y deshipoteca: la tabla entera escrita a mano');
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** casilla → [precio, empeño, interés, desempeño]. Del reglamento §1 y §7, a mano, sin derivar nada. */
+/** casilla → [precio, hipoteca, interés, deshipoteca]. Del reglamento §1 y §7, a mano, sin derivar nada. */
 const DESEMPENO_A_MANO: readonly (readonly [number, number, number, number, number])[] = [
   [1, 60, 30, 3, 33],
   [3, 60, 30, 3, 33],
@@ -314,17 +314,17 @@ const DESEMPENO_A_MANO: readonly (readonly [number, number, number, number, numb
   for (const [casilla, precio, empeno, interes, coste] of DESEMPENO_A_MANO) {
     const fila = CASILLAS[casilla] as CasillaDelBurgo;
     if (fila.precio !== precio) malas.push(`la ${casilla} vale ${fila.precio} y no ${precio}`);
-    if (valorDeEmpeno(fila.precio) !== empeno) malas.push(`empeño de la ${casilla}: ${valorDeEmpeno(fila.precio)} ≠ ${empeno}`);
+    if (valorDeEmpeno(fila.precio) !== empeno) malas.push(`hipoteca de la ${casilla}: ${valorDeEmpeno(fila.precio)} ≠ ${empeno}`);
     if (interesDelEmpeno(fila.precio) !== interes) malas.push(`interés de la ${casilla}: ${interesDelEmpeno(fila.precio)} ≠ ${interes}`);
-    if (costeDeDesempeno(fila.precio) !== coste) malas.push(`desempeño de la ${casilla}: ${costeDeDesempeno(fila.precio)} ≠ ${coste}`);
+    if (costeDeDesempeno(fila.precio) !== coste) malas.push(`deshipoteca de la ${casilla}: ${costeDeDesempeno(fila.precio)} ≠ ${coste}`);
   }
-  comprobar('los 28 empeños, intereses y desempeños son los escritos a mano', malas.length === 0, malas);
-  comprobar('todo desempeño es entero', DESEMPENO_A_MANO.every((f) => Number.isInteger(costeDeDesempeno(f[1]))));
+  comprobar('las 28 hipotecas, intereses y deshipotecas son los escritos a mano', malas.length === 0, malas);
+  comprobar('toda deshipoteca es entera', DESEMPENO_A_MANO.every((f) => Number.isInteger(costeDeDesempeno(f[1]))));
   comprobar(
     'se ve fallar: redondear el interés hacia abajo cambia el 350 (17,5 → 18, no 17)',
     Math.floor(valorDeEmpeno(350) / 10) + valorDeEmpeno(350) !== costeDeDesempeno(350) && costeDeDesempeno(350) === 193,
   );
-  comprobar('se ve fallar: el 150 del oficio también redondea arriba (7,5 → 8)', interesDelEmpeno(150) === 8 && Math.floor(7.5) !== 8);
+  comprobar('se ve fallar: el 150 del servicio también redondea arriba (7,5 → 8)', interesDelEmpeno(150) === 8 && Math.floor(7.5) !== 8);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -348,18 +348,18 @@ function reprochesDelMazo(mazo: MazoId, cartas: readonly CartaDelBurgo[]): strin
     }
   });
   const indultos = cartas.filter((c) => c.efecto.que === 'indulto').length;
-  if (indultos !== 1) r.push(`${mazo} tiene ${indultos} Indultos y no uno`);
+  if (indultos !== 1) r.push(`${mazo} tiene ${indultos} Salvoconductos y no uno`);
   return r;
 }
 
 {
   const rp = reprochesDelMazo('pregon', EL_PREGON);
   const ra = reprochesDelMazo('arca', EL_ARCA);
-  comprobar('el Pregón no merece reproche', rp.length === 0, rp);
-  comprobar('el Arca no merece reproche', ra.length === 0, ra);
+  comprobar('Sucesos no merece reproche', rp.length === 0, rp);
+  comprobar('el Fondo Vecinal no merece reproche', ra.length === 0, ra);
   comprobar('cartasDe devuelve cada tabla', cartasDe('pregon') === EL_PREGON && cartasDe('arca') === EL_ARCA);
-  comprobar('el Pregón manda a la Mazmorra, al oficio y a las puertas cercanas', EL_PREGON.some((c) => c.efecto.que === 'a-la-mazmorra') && EL_PREGON.filter((c) => c.efecto.que === 'puerta-cercana').length === 2 && EL_PREGON.some((c) => c.efecto.que === 'oficio-cercano'));
-  comprobar('el Arca tiene las dos de «cada jugador te paga» y una reparación', EL_ARCA.filter((c) => c.efecto.que === 'cobra-de-cada-uno').length === 2 && EL_ARCA.some((c) => c.efecto.que === 'reparaciones'));
+  comprobar('Sucesos manda a comisaría, al servicio y a las estaciones cercanas', EL_PREGON.some((c) => c.efecto.que === 'a-la-mazmorra') && EL_PREGON.filter((c) => c.efecto.que === 'puerta-cercana').length === 2 && EL_PREGON.some((c) => c.efecto.que === 'oficio-cercano'));
+  comprobar('el Fondo Vecinal tiene las dos de «cada jugador te paga» y una obra', EL_ARCA.filter((c) => c.efecto.que === 'cobra-de-cada-uno').length === 2 && EL_ARCA.some((c) => c.efecto.que === 'reparaciones'));
 
   const idaYVuelta: string[] = [];
   for (const mazo of ['pregon', 'arca'] as const) {
@@ -379,17 +379,17 @@ function reprochesDelMazo(mazo: MazoId, cartas: readonly CartaDelBurgo[]): strin
   comprobar('carta() devuelve null fuera de 1..16', carta('pregon', 0) === null && carta('arca', 17) === null && carta('pregon', 2.5) === null);
   const series = seriesDe('pregon');
   comprobar("seriesDe('pregon') son 16 distintas de 'p01' a 'p16'", series.length === 16 && new Set(series).size === 16 && series[0] === 'p01' && series[15] === 'p16');
-  comprobar('las series del Arca no se confunden con las del Pregón', seriesDe('arca').every((s) => !contiene(series, s)));
+  comprobar('las series del Fondo Vecinal no se confunden con las de Sucesos', seriesDe('arca').every((s) => !contiene(series, s)));
 
   const conHueco = EL_ARCA.map((c) => (c.numero === 9 ? { ...c, numero: 10 } : c));
   const r1 = reprochesDelMazo('arca', conHueco);
-  comprobar('se ve fallar: un número repetido en el Arca', r1.some((x) => /la carta 8 de arca lleva el número 10/.test(x)), r1);
+  comprobar('se ve fallar: un número repetido en el Fondo Vecinal', r1.some((x) => /la carta 8 de arca lleva el número 10/.test(x)), r1);
   const aOtraCarta = EL_PREGON.map((c) => (c.numero === 5 ? { ...c, efecto: { que: 'ir' as const, a: 7, cobraAlPasar: true } } : c));
   const r2 = reprochesDelMazo('pregon', aOtraCarta);
   comprobar('se ve fallar: una carta que manda a otra carta', r2.some((x) => /manda a otra carta/.test(x)), r2);
   const dosIndultos = EL_PREGON.map((c) => (c.numero === 9 ? { ...c, efecto: { que: 'indulto' as const } } : c));
   const r3 = reprochesDelMazo('pregon', dosIndultos);
-  comprobar('se ve fallar: dos Indultos en un mazo', r3.some((x) => /2 Indultos/.test(x)), r3);
+  comprobar('se ve fallar: dos Salvoconductos en un mazo', r3.some((x) => /2 Salvoconductos/.test(x)), r3);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -574,7 +574,7 @@ paso('6. El anillo: módulo positivo, recorrido, salida, la puerta más cercana,
 
   comprobar('cruzaLaSalida: 39 + 3 sí, 5 + 3 no, 37 + 3 (cae en la 0) sí, 0 + 5 no', cruzaLaSalida(39, 3, N) && !cruzaLaSalida(5, 3, N) && cruzaLaSalida(37, 3, N) && !cruzaLaSalida(0, 5, N));
   comprobar('cruzaLaSalida: hacia atrás nunca, ni desde la 1', !cruzaLaSalida(1, -3, N) && !cruzaLaSalida(0, -1, N) && !cruzaLaSalida(5, 0, N));
-  comprobar('cruzaLaSalida: una carta desde el Pregón 36 hasta la Puerta del Río (5) la cruza; hasta la Vega (35) no', cruzaLaSalida(36, distanciaAdelante(36, 5, N), N) && !cruzaLaSalida(22, distanciaAdelante(22, 35, N), N));
+  comprobar('cruzaLaSalida: una carta desde Sucesos 36 hasta la Estación del Puerto (5) la cruza; hasta la Central (35) no', cruzaLaSalida(36, distanciaAdelante(36, 5, N), N) && !cruzaLaSalida(22, distanciaAdelante(22, 35, N), N));
   const sinCaerEnLaCero = (d: number, p: number, n: number): boolean => d + p > n;
   comprobar('se ve fallar: un «>» donde va «≥» no cobra al caer justo en la 0 desde la 37', !sinCaerEnLaCero(37, 3, N) && cruzaLaSalida(37, 3, N));
   const porLaFinal = (d: number, p: number, n: number): boolean => casillaTras(d, p, n) < d;
@@ -582,7 +582,7 @@ paso('6. El anillo: módulo positivo, recorrido, salida, la puerta más cercana,
 
   comprobar('distanciaAdelante: 39→5 son 6, 5→39 son 34, 7→7 es 0', distanciaAdelante(39, 5, N) === 6 && distanciaAdelante(5, 39, N) === 34 && distanciaAdelante(7, 7, N) === 0);
   comprobar('masCercana desde la 39 con las puertas es la 5 (no la 35)', masCercana(39, PUERTAS, N) === 5);
-  comprobar('masCercana desde cada Pregón: puertas 15/25/5, oficios 12/28/12', masCercana(7, PUERTAS, N) === 15 && masCercana(22, PUERTAS, N) === 25 && masCercana(36, PUERTAS, N) === 5 && masCercana(7, OFICIOS, N) === 12 && masCercana(22, OFICIOS, N) === 28 && masCercana(36, OFICIOS, N) === 12);
+  comprobar('masCercana desde cada Sucesos: estaciones 15/25/5, servicios 12/28/12', masCercana(7, PUERTAS, N) === 15 && masCercana(22, PUERTAS, N) === 25 && masCercana(36, PUERTAS, N) === 5 && masCercana(7, OFICIOS, N) === 12 && masCercana(22, OFICIOS, N) === 28 && masCercana(36, OFICIOS, N) === 12);
   comprobar('masCercana no cuenta la propia casilla como «hacia delante»', masCercana(5, PUERTAS, N) === 15 && masCercana(5, [5], N) === 5);
   comprobar('masCercana sin candidatas devuelve la propia', masCercana(9, [], N) === 9);
   const porMinimoAbsoluto = (d: number, cs: readonly number[]): number => cs.reduce((m, c) => (Math.abs(c - d) < Math.abs(m - d) ? c : m), cs[0] as number);
@@ -677,11 +677,11 @@ function reprochesDeSaldos(s: Saldos): string[] {
 {
   const mesa: Saldos = { b: 300, a: 1500, c: 40 };
   comprobar('asientosDe ordena las claves', mismaLista(asientosDe(mesa).map((k) => k.charCodeAt(0)), ['a', 'b', 'c'].map((k) => k.charCodeAt(0))));
-  comprobar('saldoDe da 0 al que no consta y al Concejo', saldoDe(mesa, 'z') === 0 && saldoDe(mesa, null) === 0 && saldoDe(mesa, 'a') === 1500);
+  comprobar('saldoDe da 0 al que no consta y al Ayuntamiento', saldoDe(mesa, 'z') === 0 && saldoDe(mesa, null) === 0 && saldoDe(mesa, 'a') === 1500);
 
   const t1 = transferir(mesa, 'a', 'b', 100);
   comprobar('a paga 100 a b: pagado 100, deuda 0, saldos nuevos', t1.pagado === 100 && t1.deuda === 0 && t1.saldos !== mesa && t1.saldos.a === 1400 && t1.saldos.b === 400 && t1.saldos.c === 40);
-  comprobar('y no se ha creado ni perdido un maravedí', totalEnMesa(t1.saldos) === totalEnMesa(mesa) && totalEnMesa(mesa) === 1840);
+  comprobar('y no se ha creado ni perdido un euro', totalEnMesa(t1.saldos) === totalEnMesa(mesa) && totalEnMesa(mesa) === 1840);
   comprobar('los saldos nuevos salen con las claves en orden y enteros', reprochesDeSaldos(t1.saldos).length === 0 && mismaLista(Object.keys(t1.saldos).map((k) => k.charCodeAt(0)), [97, 98, 99]));
   comprobar('el objeto de entrada no se ha tocado', mesa.a === 1500 && mesa.b === 300);
 
@@ -691,9 +691,9 @@ function reprochesDeSaldos(s: Saldos): string[] {
   comprobar('c paga justo lo que tiene y se queda a cero', t3.saldos.c === 0 && t3.saldos.a === 1540 && t3.deuda === 0);
 
   const t4 = transferir(mesa, null, 'd', 200);
-  comprobar('cobrar del Concejo crea dinero y da de alta al asiento, en su sitio', t4.saldos.d === 200 && totalEnMesa(t4.saldos) === 2040 && mismaLista(Object.keys(t4.saldos).map((k) => k.charCodeAt(0)), [97, 98, 99, 100]));
+  comprobar('cobrar del Ayuntamiento crea dinero y da de alta al asiento, en su sitio', t4.saldos.d === 200 && totalEnMesa(t4.saldos) === 2040 && mismaLista(Object.keys(t4.saldos).map((k) => k.charCodeAt(0)), [97, 98, 99, 100]));
   const t5 = transferir(mesa, 'a', null, 200);
-  comprobar('pagar al Concejo destruye dinero', t5.saldos.a === 1300 && totalEnMesa(t5.saldos) === 1640 && t5.pagado === 200);
+  comprobar('pagar al Ayuntamiento destruye dinero', t5.saldos.a === 1300 && totalEnMesa(t5.saldos) === 1640 && t5.pagado === 200);
   const t6 = transferir(mesa, 'z', 'a', 50);
   comprobar('quien no consta tiene 0 y debe', t6.saldos === mesa && t6.deuda === 50);
   const t7 = transferir(mesa, null, 'aa', 10);
@@ -701,7 +701,7 @@ function reprochesDeSaldos(s: Saldos): string[] {
 
   comprobar('pagarse a uno mismo, o cero, o negativo, o NaN: el mismo objeto', [transferir(mesa, 'a', 'a', 100), transferir(mesa, 'a', 'b', 0), transferir(mesa, 'a', 'b', -5), transferir(mesa, 'a', 'b', Number.NaN), transferir(mesa, null, null, 100)].every((t) => t.saldos === mesa && t.pagado === 0 && t.deuda === 0));
   comprobar('una cantidad con decimales se trunca (12,9 → 12)', transferir(mesa, 'a', 'b', 12.9).pagado === 12 && transferir(mesa, 'a', 'b', 12.9).saldos.a === 1488);
-  comprobar('puedePagar: a sí, c no, el Concejo siempre', puedePagar(mesa, 'a', 1500) && !puedePagar(mesa, 'c', 41) && puedePagar(mesa, null, 999999));
+  comprobar('puedePagar: a sí, c no, el Ayuntamiento siempre', puedePagar(mesa, 'a', 1500) && !puedePagar(mesa, 'c', 41) && puedePagar(mesa, null, 999999));
   comprobar('sumaDeDeudas suma enteros y trata lo raro como 0', sumaDeDeudas([{ a: null, cuanto: 50 }, { a: 'b', cuanto: 25.7 }, { a: 'c', cuanto: -3 }]) === 75 && sumaDeDeudas([]) === 0);
 
   const r1 = reprochesDeSaldos({ b: 1, a: 2 });
@@ -790,7 +790,7 @@ if (fallos.length > 0) process.exit(1);
 
 console.log(
   `\n✔ ${hechas} comprobaciones. La tabla del Burgo tiene sus 40 casillas donde el reglamento dice, con los\n` +
-    '  precios pares y las rentas crecientes, las 28 cuentas de desempeño escritas a mano, 16 + 16 cartas\n' +
+    '  precios pares y las rentas crecientes, las 28 cuentas de deshipoteca escritas a mano, 16 + 16 cartas\n' +
     '  numeradas sin huecos cuya serie va y vuelve, ningún nombre ajeno ni en los comentarios, y ocho aceras\n' +
     '  que se distinguen de los seis asientos y dejan leer el blanco. El anillo suma en módulo positivo,\n' +
     '  cruza la salida sólo hacia delante y pone las 40 casillas del cuadrado 8 × 14 en su banda; la\n' +

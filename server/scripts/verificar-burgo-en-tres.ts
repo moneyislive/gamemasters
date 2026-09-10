@@ -30,7 +30,7 @@
  * que ya está pintado, que los dados y la hoja no comparten nada, y que las obras de
  * las fichas de «Lo mío» son LOS MISMOS objetos que las casillas tocables abren: la
  * ficha es el botón y la casilla su atajo (§4 y §6.3 piden los dos), y por eso se
- * cuentan como uno; comprar y sacar a almoneda, que no son de un título mío, sólo
+ * cuentan como uno; comprar y sacar a subasta, que no son de un título mío, sólo
  * tienen la casilla. Se afirma con los OBJETOS pintados y también con `null` en cada
  * hueco: con todo a `null` vuelven todas menos las puertas.
  *
@@ -173,10 +173,10 @@ function seriesSecretas(mesa: Mesa): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Juega a ganar: tira, compra casi todo, saca a almoneda una de cada seis veces,
+ * Juega a ganar: tira, compra casi todo, saca a subasta una de cada seis veces,
  * puja hasta cerca del precio (y una de cada tres por la puerta, con `montar`),
  * alza en cuanto puede, propone tratos cuando le falta poco para un barrio (con
- * `montar`), acepta la mitad, en el apuro vende y empeña antes de rendirse, y sólo
+ * `montar`), acepta la mitad, en el apuro vende y hipoteca antes de rendirse, y sólo
  * pasa cuando no le queda otra. Determinista con el azar sembrado de la casa.
  */
 interface Robot {
@@ -210,14 +210,14 @@ function decideElRobot(robot: Robot, vista: VistaDelBurgo, quien: AsientoId, opc
     return de(robot, 2) === 0 ? aceptar : (rechazar ?? aceptar);
   }
 
-  /* Mi apuro: vender, empeñar, y si no hay nada, la quiebra. */
+  /* Mi apuro: vender, hipotecar, y si no hay nada, la quiebra. */
   if (vista.paso === 'apuro' && vista.apuro !== null && vista.apuro.quien === quien) {
     return porTipo(opciones, VENDER) ?? porTipo(opciones, EMPENAR) ?? porTipo(opciones, RENDIRSE);
   }
 
   if (vista.turnoDe !== quien) return null;
 
-  /* Obras con el turno: alzar si hay dinero, desempeñar si sobra. */
+  /* Obras con el turno: alzar si hay dinero, deshipotecar si sobra. */
   const alzar = porTipo(opciones, ALZAR);
   if (alzar !== null && yo.mrs > 250) return alzar;
   const desempenar = porTipo(opciones, DESEMPENAR);
@@ -343,7 +343,7 @@ function reprochesDeLaParticion(opciones: readonly Opcion[], p: Particion): stri
   /*
    * Las obras de las fichas de «Lo mío» son LOS MISMOS objetos que las casillas
    * abren (un botón y su atajo, no dos botones): toda obra de una ficha es una
-   * casilla tocable, y toda casilla tocable que no sea comprar ni sacar a almoneda
+   * casilla tocable, y toda casilla tocable que no sea comprar ni sacar a subasta
    * —las dos obras sobre un título que aún no es mío— está en una ficha por
    * identidad. Cuando no hay tablero (`tocables` vacío) la ficha es el único sitio.
    */
@@ -382,8 +382,8 @@ function reprochesDelTablero(vista: VistaDelBurgo, quien: QuienMira, opciones: r
     const dueno = tit === undefined ? null : colorDe(tit.dueno);
     if (c.dueno !== dueno) r.push(`el dueño de ${i} sale ${c.dueno} y la vista dice ${dueno}`);
     if (c.casas !== (tit?.casas ?? 0)) r.push(`las casas de ${i}: ${c.casas} frente a ${tit?.casas ?? 0}`);
-    if (c.empenada !== (tit?.empenado ?? false)) r.push(`el empeño de ${i}`);
-    if (c.enAlmoneda !== (vista.almoneda !== null && vista.almoneda.casilla === i)) r.push(`la almoneda de ${i}`);
+    if (c.empenada !== (tit?.empenado ?? false)) r.push(`la hipoteca de ${i}`);
+    if (c.enAlmoneda !== (vista.almoneda !== null && vista.almoneda.casilla === i)) r.push(`la subasta de ${i}`);
     const obras = obraPosibleEnCasilla(vista, quien, opciones, i);
     if (c.tocable !== obras.length > 0) r.push(`la casilla ${i} ${c.tocable ? 'se enciende sin' : 'no se enciende con'} obra`);
     for (const o of obras) {
@@ -405,7 +405,7 @@ function reprochesDelTablero(vista: VistaDelBurgo, quien: QuienMira, opciones: r
   }
   const delTurno = vista.jugadores.find((j) => j.asiento === vista.duenoDelTurno);
   if (t.destacada !== (delTurno === undefined ? null : delTurno.casilla)) r.push(`destacada ${t.destacada}`);
-  if (t.almoneda !== (vista.almoneda === null ? null : vista.almoneda.casilla)) r.push(`almoneda ${t.almoneda}`);
+  if (t.almoneda !== (vista.almoneda === null ? null : vista.almoneda.casilla)) r.push(`subasta ${t.almoneda}`);
   const vigente = vista.ultimaCarta !== null && vista.ultimaCarta.enElTurno === vista.turnosAbiertos && vista.momento === 'jugando';
   if ((t.carta !== null) !== vigente) r.push(`carta ${llano(t.carta)} con ultimaCarta ${llano(vista.ultimaCarta)}`);
   if (t.carta !== null && vista.ultimaCarta !== null) {
@@ -459,7 +459,7 @@ function reprochesDeLaHoja(vista: VistaDelBurgo, quien: QuienMira, opciones: rea
   for (const serie of secretos) if (texto.indexOf(serie) >= 0) r.push(`la hoja enseña la serie ${serie}`);
   /*
    * La carta vigente se salta POR TEXTO y no por número: hay cartas gemelas (dos «A
-   * la puerta más cercana» en el Pregón; el Indulto y «¡A la Mazmorra!» en los dos
+   * la puerta más cercana» en Sucesos; el Salvoconducto y «¡A la Comisaría!» en los dos
    * mazos) y la hoja, que enseña título y texto, no puede distinguir cuál de las dos
    * salió ni tiene por qué: lo que se vigila es que no cuente una que NO ha salido.
    */
@@ -501,7 +501,7 @@ function reprochesDeLaHoja(vista: VistaDelBurgo, quien: QuienMira, opciones: rea
       if (!f.esMio) r.push(`la ficha ${f.casilla} de «Lo mío» no es mía`);
     }
   }
-  /* La almoneda y los tratos de la hoja son los de las funciones sueltas. */
+  /* La subasta y los tratos de la hoja son los de las funciones sueltas. */
   const puja = pujaEnTres(vista, quien, opciones);
   if ((h.puja === null) !== (puja === null)) r.push('la hoja y pujaEnTres no coinciden');
   if (puja !== null && vista.almoneda !== null && puja.casilla !== vista.almoneda.casilla) r.push('la puja es de otra casilla');
@@ -544,7 +544,7 @@ function reprochesDeLasFichas(vista: VistaDelBurgo, quien: QuienMira, opciones: 
     const dueno = tit === undefined ? null : vista.jugadores.find((j) => j.asiento === tit.dueno);
     if ((f.dueno === null) !== (dueno === undefined || dueno === null)) r.push(`el dueño de la ficha ${i}`);
     if (f.dueno !== null && dueno !== undefined && dueno !== null && (f.dueno.color !== dueno.color || f.dueno.nombre !== dueno.nombre)) r.push(`el dueño de la ficha ${i} con otro color`);
-    if (tit !== undefined && (f.casas !== tit.casas || f.empenado !== tit.empenado || f.rentaAhora !== tit.rentaAhora || f.esPosada !== (tit.casas === POSADA))) r.push(`la ficha ${i} miente en casas/empeño/renta`);
+    if (tit !== undefined && (f.casas !== tit.casas || f.empenado !== tit.empenado || f.rentaAhora !== tit.rentaAhora || f.esPosada !== (tit.casas === POSADA))) r.push(`la ficha ${i} miente en casas/hipoteca/renta`);
     const actuales = f.rentas.filter((x) => x.actual);
     if (actuales.length > 1) r.push(`la ficha ${i} destaca ${actuales.length} filas`);
     if (tit !== undefined && tit.dueno !== null && !tit.empenado && fila.clase === 'solar' && actuales.length !== 1) r.push(`la ficha ${i} con dueño no destaca la fila de hoy`);
@@ -839,14 +839,14 @@ for (const p of PARTIDAS) {
   comprobar(`${p.id}: y con +2 derivó listas gruesas con viajes y cambios de mano`, cuentas.saltosDeDos >= 50 && cuentas.gruesasConMueve >= 10 && cuentas.gruesasConCambioDeMano >= 3, [cuentas.saltosDeDos, cuentas.gruesasConMueve, cuentas.gruesasConCambioDeMano]);
   comprobar(`${p.id}: la firma fue estable en todas las vistas`, cuentas.firmasIguales === cuentas.vistas, [cuentas.firmasIguales, cuentas.vistas]);
   comprobar(`${p.id}: se tiró, se movió y se cobró renta`, (cuentas.hitos['tira'] ?? 0) >= 40 && (cuentas.hitos['mueve'] ?? 0) >= 40 && (cuentas.hitos['cobra'] ?? 0) >= 5, cuentas.hitos);
-  comprobar(`${p.id}: hubo almonedas abiertas y compras`, (cuentas.hitos['almoneda-abierta'] ?? 0) >= 1 && (cuentas.hitos['compra'] ?? 0) >= 5, cuentas.hitos);
-  comprobar(`${p.id}: alguien pasó por la Mazmorra`, (cuentas.hitos['a-la-mazmorra'] ?? 0) >= 1, cuentas.hitos);
+  comprobar(`${p.id}: hubo subastas abiertas y compras`, (cuentas.hitos['almoneda-abierta'] ?? 0) >= 1 && (cuentas.hitos['compra'] ?? 0) >= 5, cuentas.hitos);
+  comprobar(`${p.id}: alguien pasó por la Comisaría`, (cuentas.hitos['a-la-mazmorra'] ?? 0) >= 1, cuentas.hitos);
   comprobar(`${p.id}: salieron cartas`, (cuentas.hitos['carta'] ?? 0) >= 2, cuentas.hitos);
   if (p.tic > 0) comprobar(`${p.id}: el tic entró y jugó por el ausente`, cuentas.tics >= 20, cuentas.tics);
 }
 comprobar('entre las tres partidas: pujas libres montadas por la puerta y ACEPTADAS por el reductor', cuentasDeTodas.reduce((s, c) => s + c.pujasLibresAceptadas, 0) >= 2, cuentasDeTodas.map((c) => c.pujasLibresAceptadas));
 comprobar('entre las tres partidas: tratos montados por la puerta y ACEPTADOS por el reductor (propuestos de verdad)', cuentasDeTodas.reduce((s, c) => s + c.tratosMontadosAceptados, 0) >= 2 && (hitosDeTodas['trato-propuesto'] ?? 0) >= 2, [cuentasDeTodas.map((c) => c.tratosMontadosAceptados), hitosDeTodas['trato-propuesto']]);
-comprobar('entre las tres partidas: se ganó alguna almoneda y se alzó', (hitosDeTodas['almoneda-ganada'] ?? 0) >= 1 && (hitosDeTodas['alza'] ?? 0) >= 1, hitosDeTodas);
+comprobar('entre las tres partidas: se ganó alguna subasta y se alzó', (hitosDeTodas['almoneda-ganada'] ?? 0) >= 1 && (hitosDeTodas['alza'] ?? 0) >= 1, hitosDeTodas);
 comprobar('entre las tres partidas: hubo apuro', (hitosDeTodas['apuro'] ?? 0) >= 1, hitosDeTodas);
 comprobar('entre las tres partidas: hubo un trato aceptado o rechazado (los robots contestan)', (hitosDeTodas['trato-aceptado'] ?? 0) + (hitosDeTodas['trato'] ?? 0) >= 2, hitosDeTodas);
 comprobar('ningún montar() dio algo que el reductor rechazara', cuentasDeTodas.every((c) => c.montarNuloFuera === 0), cuentasDeTodas.flatMap((c) => c.montadosRechazados));
@@ -907,7 +907,7 @@ paso('Quiebra y fin: un apuro sin salida, la quiebra por rendirse, y el último 
     const tableroFin = tableroEnTres(vistaFin, a.asiento, opcionesEn(rendido.mesa, a.asiento));
     comprobar('el tablero del fin nombra al ganador y a la figura quebrada', tableroFin?.ganador === a.asiento && tableroFin?.figuras.find((f) => f.asiento === b.asiento)?.quebrada === true);
     comprobar('los sucesos del fin traen la quiebra y el fin, y la cámara no sigue a nadie', vistaFin.sucesos.some((s) => s.que === 'quiebra') && vistaFin.sucesos.some((s) => s.que === 'fin') && camaraSigueA(vistaFin) === null);
-    comprobar('la frase de espera es el fin', esperaA(vistaFin).indexOf('se queda con el burgo') >= 0, esperaA(vistaFin));
+    comprobar('la frase de espera es el fin', esperaA(vistaFin).indexOf('se queda con el Burgo') >= 0, esperaA(vistaFin));
     comprobar('terminada: sin dados, sin tocables, hoja con «Ahora» sin botones', dadosEnTres(vistaFin, a.asiento, []) === null && tableroFin?.casillas.every((x) => !x.tocable) === true && hojaEnTres(vistaFin, a.asiento, []).secciones[2]?.opciones.length === 0);
     /* La gruesa entre el apuro y el fin: quiebra por quebrado nuevo. */
     const gruesa = sucesosEnTres(vistaB.jugada - 1, vistaFin, vistaB);
@@ -918,10 +918,10 @@ paso('Quiebra y fin: un apuro sin salida, la quiebra por rendirse, y el último 
   }
 }
 
-/* ═══ 4. LA ALMONEDA Y EL TRATO, POR SUS PUERTAS, CONTRA EL PORTILLO ═══ */
+/* ═══ 4. LA SUBASTA Y EL TRATO, POR SUS PUERTAS, CONTRA EL PORTILLO ═══ */
 paso('La puja libre y el trato: montar() cabe en la puerta y el reductor los acepta; lo que no cabe es null');
 {
-  /* Se llega a una almoneda jugando: un jugador manda a almoneda lo primero que pisa. */
+  /* Se llega a una subasta jugando: un jugador manda a subasta lo primero que pisa. */
   let mesa = abrirMesa({ id: 'BUR-3D-A', arcade: BURGO, semilla: 42, asientos: ['A', 'B', 'C'] });
   mesa = mover(mesa, 'A', { tipo: EMPEZAR, carga: { topeDeVueltas: 0 } }).mesa;
   let vueltas = 0;
@@ -942,22 +942,22 @@ paso('La puja libre y el trato: montar() cabe en la puerta y el reductor los ace
     if (!movio) mesa = avanzarElReloj(mesa);
   }
   const alm = estadoDe(mesa).almoneda;
-  comprobar('se llegó a una almoneda jugando', alm !== null, vueltas);
+  comprobar('se llegó a una subasta jugando', alm !== null, vueltas);
   if (alm !== null) {
     const quien = alm.pujaDe;
     const vista = vistaEn(mesa, quien);
     const opciones = opcionesEn(mesa, quien);
     const puja = pujaEnTres(vista, quien, opciones);
-    comprobar('a quien puja le sale la almoneda con la puerta, las fijas y el pasar', puja !== null && puja.meToca && puja.puerta !== null && puja.fijas.length >= 1 && puja.pasar !== null && puja.pasar.tipo === PASAR_PUJA, puja && [puja.meToca, puja.puerta, puja.fijas.length]);
+    comprobar('a quien puja le sale la subasta con la puerta, las fijas y el pasar', puja !== null && puja.meToca && puja.puerta !== null && puja.fijas.length >= 1 && puja.pasar !== null && puja.pasar.tipo === PASAR_PUJA, puja && [puja.meToca, puja.puerta, puja.fijas.length]);
     const otro = mesa.asientos.find((x) => x !== quien) as AsientoId;
     const pujaDeOtro = pujaEnTres(vistaEn(mesa, otro), otro, opcionesEn(mesa, otro));
-    comprobar('a los demás les sale la misma almoneda pero sin botones ni puerta', pujaDeOtro !== null && !pujaDeOtro.meToca && pujaDeOtro.fijas.length === 0 && pujaDeOtro.pasar === null && pujaDeOtro.puerta === null && pujaDeOtro.casilla === alm.casilla);
+    comprobar('a los demás les sale la misma subasta pero sin botones ni puerta', pujaDeOtro !== null && !pujaDeOtro.meToca && pujaDeOtro.fijas.length === 0 && pujaDeOtro.pasar === null && pujaDeOtro.puerta === null && pujaDeOtro.casilla === alm.casilla);
     comprobar('y un mirón, lo mismo que los demás', pujaEnTres(vistaEn(mesa, null), null, [])?.meToca === false);
     const hojaDeOtro = hojaEnTres(vistaEn(mesa, otro), otro, opcionesEn(mesa, otro));
-    comprobar('la hoja de quien no puja abre otra cosa, y la de quien puja abre la almoneda', hojaDeOtro.abre !== 'almoneda' && hojaEnTres(vista, quien, opciones).abre === 'almoneda');
+    comprobar('la hoja de quien no puja abre otra cosa, y la de quien puja abre la subasta', hojaDeOtro.abre !== 'almoneda' && hojaEnTres(vista, quien, opciones).abre === 'almoneda');
     if (puja !== null && puja.puerta !== null) {
       const p = puja.puerta;
-      comprobar('la puerta declara casilla, mínimo, máximo y escalón de la almoneda', p.casilla === alm.casilla && p.minimo >= 10 && p.maximo >= p.minimo && p.escalon === 10, p);
+      comprobar('la puerta declara casilla, mínimo, máximo y escalón de la subasta', p.casilla === alm.casilla && p.minimo >= 10 && p.maximo >= p.minimo && p.escalon === 10, p);
       const bien = puja.montar(p.minimo);
       comprobar('montar(mínimo) da una puja con EXACTAMENTE `casilla` y `cuanto`', bien !== null && bien.tipo === PUJAR && Object.keys(bien.carga as object).sort().join(',') === 'casilla,cuanto', bien);
       comprobar('montar por debajo del mínimo, por encima del máximo, fuera del escalón, con decimales o NaN es null', puja.montar(p.minimo - 10) === null && puja.montar(p.maximo + 10) === null && puja.montar(p.minimo + 5) === null && puja.montar(p.minimo + 0.5) === null && puja.montar(NaN) === null);
@@ -1073,7 +1073,7 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
   const unaCasilla = tablero.casillas[1] as TableroDelBurgoEn3D['casillas'][number];
   const conCasa = { ...tablero, casillas: tablero.casillas.map((c) => (c.indice === 1 ? { ...c, casas: c.casas + 1 } : c)) };
   comprobar('y distinta si cambia una casa', firmaDelTablero(conCasa) !== firmaDelTablero(tablero) && unaCasilla.casas + 1 === (conCasa.casillas[1]?.casas ?? -1));
-  comprobar('o el dueño, una figura, la destacada, la almoneda, el trato o el ganador', [
+  comprobar('o el dueño, una figura, la destacada, la subasta, el trato o el ganador', [
     { ...tablero, casillas: tablero.casillas.map((c) => (c.indice === 1 ? { ...c, dueno: '#123456' } : c)) },
     { ...tablero, figuras: tablero.figuras.map((f, k) => (k === 0 ? { ...f, casilla: (f.casilla + 1) % 40 } : f)) },
     { ...tablero, destacada: tablero.destacada === 5 ? 6 : 5 },
@@ -1087,11 +1087,11 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
   const conCarta = { ...vista, momento: 'jugando', turnosAbiertos: 9, ultimaCarta: { mazo: 'pregon', carta: 6, quien, enElTurno: 9 }, aviso: '', pregon: '', sucesos: [] } as unknown as VistaDelBurgo;
   const cartel = cartelEnTres(conCarta);
   const seis = carta('pregon', 6);
-  comprobar('cartelEnTres da el título y el texto DE LA TABLA por el número', cartel !== null && seis !== null && cartel.titulo === seis.titulo && cartel.texto === seis.texto && cartel.deDonde === 'del Pregón');
+  comprobar('cartelEnTres da el título y el texto DE LA TABLA por el número', cartel !== null && seis !== null && cartel.titulo === seis.titulo && cartel.texto === seis.texto && cartel.deDonde === 'de Sucesos');
   comprobar('y en el turno siguiente ya no hay cartel', cartelEnTres({ ...conCarta, turnosAbiertos: 10 }) === null);
   comprobar('un número que no es de la tabla no da cartel', cartelEnTres({ ...conCarta, ultimaCarta: { mazo: 'arca', carta: 99, quien, enElTurno: 9 } }) === null);
   const tableroConCarta = tableroEnTres(conCarta, quien, opciones);
-  comprobar('el tablero dice de qué casilla del Pregón sale el naipe', tableroConCarta?.carta !== null && CASILLAS[tableroConCarta?.carta?.enCasilla ?? 0]?.clase === 'pregon');
+  comprobar('el tablero dice de qué casilla de Sucesos sale el naipe', tableroConCarta?.carta !== null && CASILLAS[tableroConCarta?.carta?.enCasilla ?? 0]?.clase === 'pregon');
   const hojaConCarta = hojaEnTres(conCarta, quien, opciones);
   comprobar('la hoja lleva la carta vigente en su sección y no la de ninguna otra', reprochesDeLaHoja(conCarta, quien, opciones, hojaConCarta, secretos).length === 0 && hojaConCarta.secciones[3]?.lineas[0] === seis?.titulo, reprochesDeLaHoja(conCarta, quien, opciones, hojaConCarta, secretos));
   const otra = carta('arca', 3);
@@ -1103,14 +1103,14 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
 
   /* La ficha. */
   const f39 = fichaDeCasilla(vista, 39, quien, opciones);
-  comprobar('la ficha de la Calle Mayor: nombre, barrio de La Corte, precio 400, casa 200, siete filas de renta', f39.nombre === 'Calle Mayor' && f39.barrio?.nombre === 'La Corte' && f39.precio === 400 && f39.casa === 200 && f39.rentas.length === 7, f39);
-  comprobar('las filas van Solar, Barrio entero (el doble), 1..4 casas, Posada', f39.rentas.map((r) => r.rotulo).join('|') === 'Solar|Barrio entero|1 casa|2 casas|3 casas|4 casas|Posada' && f39.rentas[1]?.cuanto === 2 * (f39.rentas[0]?.cuanto ?? 0));
+  comprobar('la ficha de la Avenida de las Acacias: nombre, barrio de Los Paseos, precio 400, casa 200, siete filas de renta', f39.nombre === 'Avenida de las Acacias' && f39.barrio?.nombre === 'Los Paseos' && f39.precio === 400 && f39.casa === 200 && f39.rentas.length === 7, f39);
+  comprobar('las filas van Solar, Barrio entero (el doble), 1..4 casas, Hotel', f39.rentas.map((r) => r.rotulo).join('|') === 'Solar|Barrio entero|1 casa|2 casas|3 casas|4 casas|Hotel' && f39.rentas[1]?.cuanto === 2 * (f39.rentas[0]?.cuanto ?? 0));
   const f5 = fichaDeCasilla(vista, 5, quien, opciones);
-  comprobar('la ficha de una puerta: cuatro filas por puertas del dueño, sin barrio', f5.barrio === null && f5.rentas.length === 4 && f5.rentas[3]?.cuanto === 200 && f5.rentas[0]?.rotulo === '1 puerta');
+  comprobar('la ficha de una estación: cuatro filas por estaciones del dueño, sin barrio', f5.barrio === null && f5.rentas.length === 4 && f5.rentas[3]?.cuanto === 200 && f5.rentas[0]?.rotulo === '1 estación');
   const f12 = fichaDeCasilla({ ...vista, tirada: [2, 3] }, 12, quien, opciones);
-  comprobar('la ficha de un oficio: dos filas con el múltiplo por la tirada de la vista', f12.rentas.length === 2 && f12.rentas[0]?.cuanto === 4 * 5 && f12.rentas[1]?.cuanto === 10 * 5, f12.rentas);
+  comprobar('la ficha de un servicio: dos filas con el múltiplo por la tirada de la vista', f12.rentas.length === 2 && f12.rentas[0]?.cuanto === 4 * 5 && f12.rentas[1]?.cuanto === 10 * 5, f12.rentas);
   const f10 = fichaDeCasilla(vista, 10, quien, opciones);
-  comprobar('la ficha de la Mazmorra no se compra: sin rentas, sin empeño, estado con su nombre', f10.rentas.length === 0 && f10.empeno === 0 && f10.estado === 'La Mazmorra' && f10.opciones.length === 0);
+  comprobar('la ficha de la Comisaría no se compra: sin rentas, sin hipoteca, estado con su nombre', f10.rentas.length === 0 && f10.empeno === 0 && f10.estado === 'La Comisaría' && f10.opciones.length === 0);
   comprobar('las cuarenta fichas de la última mesa no tienen reproche', reprochesDeLasFichas(vista, quien, opciones).length === 0, reprochesDeLasFichas(vista, quien, opciones));
   const conDuenoFalso = { ...vista, titulos: vista.titulos.map((t) => (t.casilla === 39 ? { ...t, dueno: quien, casas: 2, empenado: false, rentaAhora: 5 } : t)) } as VistaDelBurgo;
   comprobar('la vacuna de la ficha: una renta que no cuadra con la fila se ve caer', reprochesDeLasFichas(conDuenoFalso, quien, opciones).some((r) => r.indexOf('39') >= 0));
@@ -1145,14 +1145,14 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
   const obras = todas.filter((o) => [COMPRAR, A_ALMONEDA, ALZAR, VENDER, EMPENAR, DESEMPENAR].indexOf(o.tipo) >= 0);
   const obrasDeLasFichas = hoja.mios.reduce((s, b) => s + b.fichas.reduce((t, f) => t + f.opciones.length, 0), 0);
   comprobar('con el tablero, caen exactamente las obras de las casillas tocables', opcionesFueraDelTablero(opciones, tablero, null, null).length === todas.length - obras.length);
-  comprobar('con la hoja, caen las pujas, los tratos, los botones del momento y las obras de las fichas; comprar y sacar a almoneda, que no son de una ficha mía, se quedan', opcionesFueraDelTablero(opciones, null, null, hoja).length === todas.length - hoja.secciones.reduce((s, x) => s + x.opciones.length, 0) - obrasDeLasFichas, [opcionesFueraDelTablero(opciones, null, null, hoja).map((o) => o.id), obrasDeLasFichas]);
+  comprobar('con la hoja, caen las pujas, los tratos, los botones del momento y las obras de las fichas; comprar y sacar a subasta, que no son de una ficha mía, se quedan', opcionesFueraDelTablero(opciones, null, null, hoja).length === todas.length - hoja.secciones.reduce((s, x) => s + x.opciones.length, 0) - obrasDeLasFichas, [opcionesFueraDelTablero(opciones, null, null, hoja).map((o) => o.id), obrasDeLasFichas]);
   comprobar('las tres cribas juntas no dejan botón suelto en una partida en marcha', opcionesFueraDelTablero(opciones, tablero, dados, hoja).length === 0, opcionesFueraDelTablero(opciones, tablero, dados, hoja).map((o) => o.id));
   const hojaSinObras: HojaDelBurgo<Opcion> = { ...hoja, mios: [] };
   comprobar('y si la hoja no trae las fichas pero el tablero sí las enciende, las obras siguen sin salir dos veces', opcionesFueraDelTablero(opciones, tablero, dados, hojaSinObras).length === 0);
   comprobar('sin tablero ni hoja, las obras vuelven como botones', opcionesFueraDelTablero(opciones, null, dados, null).filter((o) => [COMPRAR, A_ALMONEDA, ALZAR, VENDER, EMPENAR, DESEMPENAR].indexOf(o.tipo) >= 0).length === obras.length);
 
   /* Textos. */
-  comprobar('cardinal y maravedíes', cardinal(2) === 'dos' && cardinal(12) === 'doce' && cardinal(13) === '13' && maravedies(1500) === '1.500 mrs' && maravedies(50) === '50 mrs');
+  comprobar('cardinal y euros', cardinal(2) === 'dos' && cardinal(12) === 'doce' && cardinal(13) === '13' && maravedies(1500) === '1.500 €' && maravedies(50) === '50 €');
   comprobar('las frases de espera cubren cada paso y nombran a quien se espera', ['por-tirar', 'comprar', 'almoneda', 'apuro', 'por-pasar'].every((p) => esperaA({ ...vista, momento: 'jugando', paso: p, turnoDe: quien }).indexOf(vista.jugadores.find((j) => j.asiento === quien)?.nombre ?? quien) >= 0));
   comprobar('el recorrido de un mueve sin pisadas se deriva: hacia delante y hacia atrás', llano(recorridoEnTres({ que: 'mueve', quien, desde: 38, hasta: 2, recorrido: [], porLaPuertaMayor: true, como: 'anda' })) === '[39,0,1,2]' && llano(recorridoEnTres({ que: 'mueve', quien, desde: 1, hasta: 38, recorrido: [], porLaPuertaMayor: false, como: 'retrocede' })) === '[0,39,38]');
   comprobar('los textos de la última mesa no tienen reproche', reprochesDeLosTextos(vista, quien).length === 0, reprochesDeLosTextos(vista, quien));
@@ -1267,7 +1267,7 @@ try {
   /* ── EL MODELO ── */
   {
     const fichero = path.join(REPO, 'escenas', 'modelos', 'burgo.glb');
-    comprobar('el burgo existe en el repositorio: `escenas/modelos/burgo.glb`', fs.existsSync(fichero), fichero);
+    comprobar('el modelo del Burgo existe en el repositorio: `escenas/modelos/burgo.glb`', fs.existsSync(fichero), fichero);
     const real = fs.existsSync(fichero) ? fs.readFileSync(fichero) : Buffer.alloc(0);
     const r = await fetch(`${BASE}/arcade/modelos/burgo.glb`);
     const bytes = Buffer.from(await r.arrayBuffer());
@@ -1405,7 +1405,7 @@ if (hechas < MINIMO) {
 }
 
 if (fallos.length === 0) {
-  console.log(`✔ burgo-en-tres: ${hechas} comprobaciones — la escena dice lo mismo que las reglas, y el servidor sirve el burgo`);
+  console.log(`✔ burgo-en-tres: ${hechas} comprobaciones — la escena dice lo mismo que las reglas, y el servidor sirve el Burgo`);
   process.exit(0);
 }
 console.log(`✘ ${fallos.length} de ${hechas} comprobaciones han fallado:\n`);
