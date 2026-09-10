@@ -215,12 +215,17 @@ import {
   RECINTO_DEL_BURGO,
   TRIANGULOS_DEL_TABIQUE,
   TRIANGULOS_DEL_TABIQUE_CON_PUERTA,
+  TRIANGULOS_DE_LA_CUBIERTA,
   TRIANGULOS_DE_LA_ESCALERA,
   TRIANGULOS_DE_LA_LOSA,
+  TRIANGULOS_DE_LA_MEDIANERA,
+  cascaraAbierta,
   ciudadDelCodigo,
   cocheEnElInstante,
   montarLaCiudad,
   salasDelEdificio,
+  tonoDeLaFachada,
+  tonoDelEdificio,
 } from './ciudad';
 import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
 import { claveDelBulto, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
@@ -523,6 +528,9 @@ function construirLaCiudad(ciudad: LaCiudad, catalogo: CatalogoDeModelos, materi
   }
   /* La losa de una sala es un bulto CON grueso, no un plano: `GRUESO_DE_LA_LOSA` es 0,5. */
   subeBulto(TRIANGULOS_DE_LA_LOSA, false, BULTOS_POR_EDIFICIO * EDIFICIOS_ABIERTOS);
+  /* Y la casa de muñecas: por edificio abierto, su tejado —que va tumbado— y tres medianeras. */
+  subeBulto(TRIANGULOS_DE_LA_CUBIERTA, true, EDIFICIOS_ABIERTOS);
+  subeBulto(TRIANGULOS_DE_LA_MEDIANERA, false, 3 * EDIFICIOS_ABIERTOS);
 
   const piezas: MallaDeLaCiudad[] = [];
   for (const [nombre, capacidad] of [...topeDePieza].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
@@ -585,6 +593,41 @@ const auxEuler = new THREE.Euler();
 const auxEscala = new THREE.Vector3();
 const auxMatriz = new THREE.Matrix4();
 const auxColor = new THREE.Color();
+
+/**
+ * LOS COLORES YA LEÍDOS: un hexadecimal se lee UNA vez, no cada vez que se escribe.
+ *
+ * `Color.set(cadena)` es `setStyle`, que son dos expresiones regulares sobre el texto. Un
+ * hexadecimal siempre da el mismo color, así que leerlo dos veces es trabajo tirado, y desde
+ * que cada casa tiene su propio tono (`tonoDeLaFachada`) las cadenas distintas pasaron de
+ * diecisiete a unas setecientas.
+ *
+ * ═══ LO QUE ESTO AHORRA, MEDIDO, Y LO QUE NO ═══
+ *
+ * Contando las llamadas desde la consola del banco, misma pose y misma semilla, en diez
+ * segundos con la cámara quieta: sin la tabla, 21.362 lecturas de color; con ella, 13.440 —y
+ * esas trece mil que quedan no son de la ciudad, son de los peones, las casas y las marcas,
+ * que escriben su color en cada fotograma por su cuenta. El fotograma pasó de 18,0 ms a 17,5.
+ *
+ * O sea: es media milésima, no un rescate. Queda escrito con el número pequeño A PROPÓSITO,
+ * porque durante un rato pareció valer setenta y cinco milésimas: el banco llegó a marcar 92
+ * ms con el color por casa y 17 sin él, tres veces seguidas, y no era el color — era la
+ * máquina, que tenía otra escena 3D abierta y la batería de comprobadores corriendo. Un
+ * cronómetro de fotograma en una máquina ocupada miente con mucha convicción. Lo que no
+ * miente es contar llamadas: eso no depende de quién más esté usando la CPU.
+ *
+ * La tabla tiene tantas entradas como colores distintos hay en la ciudad —unos mil— y no
+ * crece con los fotogramas. No hace falta soltarla: no son objetos de la tarjeta.
+ */
+const coloresLeidos = new Map<string, THREE.Color>();
+function colorLeido(hex: string): THREE.Color {
+  const hecho = coloresLeidos.get(hex);
+  if (hecho !== undefined) return hecho;
+  const nuevo = new THREE.Color(hex);
+  coloresLeidos.set(hex, nuevo);
+  return nuevo;
+}
+
 const auxVector = new THREE.Vector3();
 const auxVector2 = new THREE.Vector3();
 const auxRayo = new THREE.Ray();
@@ -1277,6 +1320,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     /** Los índices de los edificios abiertos, en orden, y sus salas ya pedidas. */
     abiertos: [] as number[],
     salas: [] as PuestaDeSala[],
+    /** Y lo que les queda de cáscara: el tejado y las tres medianeras (`cascaraAbierta`). */
+    caparazones: [] as BultoPropio[],
     /** Cuántos repartos se han hecho, y si ya se avisó de un desbordamiento de capacidad. */
     repartos: 0,
     avisadoElDesborde: false,
@@ -1389,7 +1434,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
    * triángulos de bulto, con el contador puesto al final. El que se pasa de capacidad NO
    * desborda: se para y lo dice una vez por `alFallar`.
    */
-  const escribirLaCiudad = (c: CiudadEn3D, montaje: MontajeDeLaCiudad, abiertos: readonly number[], salas: readonly PuestaDeSala[]): void => {
+  const escribirLaCiudad = (c: CiudadEn3D, montaje: MontajeDeLaCiudad, abiertos: readonly number[], salas: readonly PuestaDeSala[], caparazones: readonly BultoPropio[]): void => {
     const mallas = mallasDeLaCiudad.current;
     const cuenta = new Map<string, number>();
     const ocultas = new Set<string>();
@@ -1407,7 +1452,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         return;
       }
       malla.setMatrixAt(n, auxMatriz);
-      if (color !== null) malla.setColorAt(n, auxColor.set(color));
+      if (color !== null) malla.setColorAt(n, colorLeido(color));
       cuenta.set(clave, n + 1);
     };
     const ponPuesta = (p: PuestaEnLaCiudad): void => {
@@ -1432,6 +1477,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       for (const b of sala.bultos) ponBulto(b);
       for (const m of sala.muebles) ponPuesta(m);
     }
+    /* Y lo que le queda por fuera al edificio abierto, que es lo que lo sigue haciendo un edificio. */
+    for (const b of caparazones) ponBulto(b);
     for (const [clave, malla] of mallas) {
       const n = cuenta.get(clave) ?? 0;
       malla.count = n;
@@ -1465,22 +1512,34 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     if (!mismos) {
       r.abiertos = abiertos;
       const salas: PuestaDeSala[] = [];
+      const caparazones: BultoPropio[] = [];
       for (const indice of abiertos) {
         let hechas = salasPorEdificio.current.get(indice);
+        const e: EdificioDeLaCiudad | undefined = c.ciudad.edificios[indice];
         if (hechas === undefined) {
-          const e: EdificioDeLaCiudad | undefined = c.ciudad.edificios[indice];
           hechas = e === undefined ? [] : salasDelEdificio(e, c.ciudad.semilla);
           salasPorEdificio.current.set(indice, hechas);
         }
         salas.push(...hechas);
+        /*
+         * Y el edificio no desaparece por abrirse: le queda su tejado y las tres medianeras
+         * que no dan a la calle, del mismo color con el que se pintaba de lejos. Ver
+         * `cascaraAbierta` para el fallo que esto arregla.
+         */
+        if (e !== undefined) {
+          const primera = e.celdas[0];
+          const color = primera === undefined ? tonoDelEdificio(e.cascara) : tonoDeLaFachada(tonoDelEdificio(e.cascara), primera.i, primera.j);
+          caparazones.push(...cascaraAbierta(e, color));
+        }
       }
       r.salas = salas;
+      r.caparazones = caparazones;
     }
     const montaje = montarLaCiudad(c.ciudad, x, z, r.niveles.length === c.ciudad.grupos.length ? r.niveles : undefined);
     r.montaje = montaje;
     r.niveles = [...montaje.nivelDelGrupo];
     r.repartos++;
-    escribirLaCiudad(c, montaje, r.abiertos, r.salas);
+    escribirLaCiudad(c, montaje, r.abiertos, r.salas, r.caparazones);
   };
 
   // -------------------------------------------------------------------------

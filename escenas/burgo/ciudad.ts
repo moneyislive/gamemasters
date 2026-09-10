@@ -464,6 +464,9 @@ export type ClaseDeBulto =
   | 'tabique'
   | 'techo'
   | 'escalera'
+  /* La casa de muñecas: lo que le queda a un edificio cuando se le abre el frente. */
+  | 'cubierta'
+  | 'medianera'
   | 'torre'
   | 'jardin'
   | 'pradera'
@@ -1241,6 +1244,37 @@ export function distanciaAlCentro(celdas: number, i: number, j: number): number 
   return Math.max(Math.abs(i - medio), Math.abs(j - medio));
 }
 
+/**
+ * EL PULSO DE UNA PARCELA: un número de 0 a 1 que sólo depende de DÓNDE ESTÁ.
+ *
+ * ═══ POR QUÉ ESTO NO ES `azar()` ═══
+ *
+ * `azar()` es un chorro: lo que sale depende de cuántas veces se ha pedido antes, o sea del
+ * ORDEN en que se recorre la retícula. Vale para elegir el modelo de un portal, donde lo único
+ * que importa es que no se repita. No vale para la SILUETA, porque la silueta es una propiedad
+ * del sitio: la casa de la esquina noroeste tiene que salir igual de alta en las seis
+ * pantallas de la mesa y en las dos aplicaciones, y tiene que seguir saliendo igual el día que
+ * alguien meta un distrito nuevo que gaste el chorro de otra manera. Con un revoltillo de las
+ * coordenadas eso es cierto por construcción y no por disciplina.
+ *
+ * `veta` separa preguntas distintas sobre la misma parcela —la altura, el color— para que no
+ * vayan de la mano; sin ella la casa alta sería siempre la casa clara, y eso se lee como un
+ * patrón aunque cada cosa por separado parezca bien repartida.
+ *
+ * Es aritmética entera de 32 bits (`Math.imul` multiplica como lo haría C, sin perder los bits
+ * de arriba en un `double`), así que da lo mismo bit a bit en cualquier motor.
+ */
+export function pulsoDeLaParcela(i: number, j: number, veta: number): number {
+  let h = Math.imul(i + 0x9e37, 0x85eb) ^ Math.imul(j + 0x79b9, 0xc2b2) ^ Math.imul(veta + 0x1656, 0x27d4);
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+  h = Math.imul(h ^ (h >>> 13), 0x297a2d39);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Las vetas del pulso: una por pregunta, para que la altura y el color no vayan de la mano. */
+export const VETA_DE_LA_ALTURA = 1;
+export const VETA_DE_LA_FACHADA = 2;
+
 function trazarLaReticula(recinto: RecintoDeLaCiudad, azar: () => number): Trazado {
   const n = recinto.celdas;
   const clase: ClaseDeCelda[] = new Array(n * n).fill('parcela');
@@ -1724,15 +1758,29 @@ export const ACERA_DEL_CHALET = 3.2;
  * ocho veces. Así que lo que distingue un barrio de otro no es el color: es QUÉ modelos,
  * qué mobiliario y qué arbolado. Ésta es la primera de las tres tablas.
  */
+/*
+ * ═══ Y CADA LISTA TIENE MODELOS DE DOS ALTURAS, QUE ES LO QUE SALVA LA SILUETA ═══
+ *
+ * `ensanche` decía `['a', 'b']` y `chalets` decía lo mismo: las dos letras de DOS plantas. Y
+ * como el modelo se elige filtrando la lista por las plantas que pide el sitio, cuando el
+ * sitio pedía tres no había ninguna, el filtro se quedaba vacío y volvía a caer en `a` o `b`.
+ * O sea que el ensanche —que es el tejido más grande de la ciudad— salía entero de dos
+ * plantas y de 9,30 clavado, casa por casa, manzana por manzana. Desde el aire eso no es un
+ * barrio: es un pavimento. Es la mitad de lo que Miguel vio como «todos muy repetidos».
+ *
+ * Con dos alturas en cada lista, el escalón de `plantasQueTocan` tiene por fin dónde caer, y
+ * la manzana sale con dientes. La otra mitad —que las de la misma altura fueran además del
+ * mismo color— la arregla `tonoDeLaFachada`.
+ */
 export const LETRAS_DEL_DISTRITO: Readonly<Record<string, readonly string[]>> = {
-  ensanche: ['a', 'b'],
+  ensanche: ['a', 'b', 'c', 'd'],
   'vivienda-alta': ['c', 'd', 'g', 'h'],
   ocio: ['c', 'e', 'b', 'f'],
   poligono: ['f', 'h'],
   centro: ['g', 'h'],
   /* Los tejidos nuevos: las naves del cuadrante del motor y los chalets del tranquilo. */
   naves: ['b', 'f'],
-  chalets: ['a', 'b'],
+  chalets: ['a', 'b', 'c'],
 };
 
 const BLOQUE_DE_LETRA: Readonly<Record<string, NombreDePieza>> = {
@@ -1758,13 +1806,31 @@ export function plantasDeLaLetra(letra: string): number {
   return (CUERPO_DEL_MODELO[BLOQUE_DE_LETRA[letra] as string] as CuerpoDelPack).plantas;
 }
 
+/** Cada cuántas parcelas, más o menos, le toca a una descolgarse una planta de sus vecinas. */
+export const PARCELAS_QUE_SE_DESCUELGAN = 0.42;
+
 /**
- * LA ALTURA LA DECIDE LA DISTANCIA AL CENTRO, no un sorteo.
+ * LA ALTURA LA DECIDE LA DISTANCIA AL CENTRO, no un sorteo — Y LUEGO LA DESMIENTE LA PARCELA.
  *
  * Distancia de Chebyshev en celdas al centro de la ciudad. Sale sola la silueta que tiene
  * una ciudad —alta en el centro, bajando hacia el borde, con las avenidas marcadas por una
  * cornisa más alta— y sale IGUAL en las seis pantallas de la mesa, porque no depende de
  * nada más que de dónde está.
+ *
+ * ═══ Y POR QUÉ ESO SOLO NO BASTA ═══
+ *
+ * Porque una función de la distancia da el MISMO número a todas las parcelas que están a la
+ * misma distancia, y ésas son un anillo entero de la ciudad. La regla decía la verdad sobre la
+ * silueta grande y mentía sobre la pequeña: en la manzana, todos los tejados a la misma cota,
+ * y una manzana de tejados a la misma cota vista desde el aire es una losa con juntas
+ * pintadas. Eso es lo que Miguel vio.
+ *
+ * Así que la distancia sigue mandando —el centro es alto y el borde es bajo, y eso no se
+ * negocia—, pero cerca de dos de cada cinco parcelas se descuelgan una planta de lo que les
+ * tocaba. Cuál se descuelga lo dice `pulsoDeLaParcela`, que es del SITIO: la misma parcela da
+ * el mismo tejado en las seis pantallas, hoy y cuando alguien meta un distrito nuevo. Y va
+ * hacia abajo y nunca hacia arriba porque hacia arriba se comería el escalón de la avenida,
+ * que es lo que hace que las avenidas se lean desde el aire.
  */
 export function plantasQueTocan(recinto: RecintoDeLaCiudad, i: number, j: number, daAAvenida: boolean, daAVerde: boolean): number {
   const d = distanciaAlCentro(recinto.celdas, i, j);
@@ -1777,6 +1843,7 @@ export function plantasQueTocan(recinto: RecintoDeLaCiudad, i: number, j: number
   let plantas = d <= RADIO_DEL_CENTRO ? 4 : d <= 16 ? 3 : 2;
   if (daAAvenida) plantas += 1;
   if (daAVerde) plantas -= 1;
+  if (pulsoDeLaParcela(i, j, VETA_DE_LA_ALTURA) < PARCELAS_QUE_SE_DESCUELGAN) plantas -= 1;
   return Math.max(2, Math.min(4, plantas));
 }
 
@@ -1918,7 +1985,9 @@ function levantarLosEdificios(recinto: RecintoDeLaCiudad, t: Trazado, azar: () =
     if (frente === null) return;
     const alto = ALTURA_DEL_BORDILLO + plantas * ALTURA_DE_PLANTA;
     const v = vectorDelRumbo(frente);
-    torres.push({ clase: 'torre', x: centro.x, y: 0, z: centro.z, giro: giroMirandoA(frente), ancho: huella, alto, fondo: huella, color: TONO_DE_LA_TORRE, triangulos: triangulosDeUnaTorre(plantas) });
+    /* El mismo gris de siempre, apartado lo suyo por la parcela — y con el MISMO apartamiento en L2. */
+    const primera = celdas[0] as { readonly i: number; readonly j: number };
+    torres.push({ clase: 'torre', x: centro.x, y: 0, z: centro.z, giro: giroMirandoA(frente), ancho: huella, alto, fondo: huella, color: tonoDeLaFachada(TONO_DE_LA_TORRE, primera.i, primera.j), triangulos: triangulosDeUnaTorre(plantas) });
     edificios.push({
       indice: edificios.length,
       celdas: celdas.map((b) => ({ i: b.i, j: b.j })),
@@ -1997,8 +2066,18 @@ function levantarLosEdificios(recinto: RecintoDeLaCiudad, t: Trazado, azar: () =
       const distritoDeLaCelda = (t.distrito[k] ?? 'ensanche') as NombreDeDistrito;
       const letras = (LETRAS_DEL_DISTRITO[distritoDeLaCelda] ?? LETRAS_DEL_DISTRITO['ensanche']) as readonly string[];
       const quiere = plantasQueTocan(recinto, i, j, daAAvenida, daAVerde);
-      const aMedida = letras.filter((l) => plantasDeLaLetra(l) === quiere);
-      const candidatas = aMedida.length > 0 ? aMedida : letras;
+      /*
+       * Y SI EL DISTRITO NO TIENE ESA ALTURA, SE COGE LA MÁS CERCANA — no la lista entera.
+       *
+       * El respaldo era `letras`, o sea todas, o sea que en cuanto el sitio pedía una altura
+       * que el distrito no tenía, la petición se tiraba a la basura y volvía a valer cualquier
+       * cosa. Con las listas de una sola altura que había antes eso pasaba SIEMPRE menos en un
+       * caso, y por eso la altura no se veía por ningún lado. Ahora las listas tienen dos
+       * alturas y el respaldo se queda con la que menos se aleja, así que el escalón de la
+       * avenida y el descuelgue de la parcela siguen leyéndose aunque el distrito no llegue.
+       */
+      const cerca = letras.reduce((mejor, l) => Math.min(mejor, Math.abs(plantasDeLaLetra(l) - quiere)), Number.POSITIVE_INFINITY);
+      const candidatas = letras.filter((l) => Math.abs(plantasDeLaLetra(l) - quiere) === cerca);
       const manzana = t.manzana[k] as number;
       let estado = manzanarios.get(manzana);
       if (estado === undefined) {
@@ -2505,7 +2584,7 @@ function amueblar(sala: Sala, uso: UsoDeSala, anclaje: Rumbo, azar: () => number
 /** Un tabique liso son 10 triángulos (los 12 de una caja menos los 2 que dan al suelo); con hueco de puerta, 30. */
 export const TRIANGULOS_DEL_TABIQUE = 10;
 export const TRIANGULOS_DEL_TABIQUE_CON_PUERTA = 30;
-/** La losa de una sala: dos triángulos. El techo NO se monta mientras el edificio está abierto. */
+/** La losa de una sala: dos triángulos. La cubierta la pone la cáscara abierta, no la sala. */
 export const TRIANGULOS_DE_LA_LOSA = 2;
 /** La escalera es propia: doce peldaños de 0,375 de alzada y 0,5 de huella, 4 triángulos cada uno. */
 export const TRIANGULOS_DE_LA_ESCALERA = 48;
@@ -2608,6 +2687,76 @@ export function salasDelEdificio(edificio: EdificioDeLaCiudad, semilla: number):
     }
   }
   return salas;
+}
+
+/** Lo que gruesa una medianera de la casa de muñecas. La misma que un tabique: es un muro. */
+export const GRUESO_DE_LA_MEDIANERA = GRUESO_DEL_TABIQUE;
+/** La cubierta de un edificio abierto: una losa, como cualquier otra cosa tumbada. */
+export const TRIANGULOS_DE_LA_CUBIERTA = 2;
+/** Y cada una de sus tres medianeras, un tabique liso. */
+export const TRIANGULOS_DE_LA_MEDIANERA = TRIANGULOS_DEL_TABIQUE;
+/** Lo que cuesta abrir un edificio, aparte de sus salas: tres muros y un tejado. */
+export const TRIANGULOS_DE_LA_CASCARA_ABIERTA = TRIANGULOS_DE_LA_CUBIERTA + 3 * TRIANGULOS_DE_LA_MEDIANERA;
+
+/**
+ * LA CÁSCARA DE UN EDIFICIO ABIERTO: LA CASA DE MUÑECAS.
+ *
+ * ═══ EL FALLO QUE ESTO ARREGLA ═══
+ *
+ * Cuando la cámara baja a la calle, los tres edificios más cercanos a lo que se mira se
+ * ABREN: la escena esconde su cáscara del pack y monta en su sitio las salas, con sus suelos
+ * de colores, sus tabiques y sus muebles. La idea es buena y el resultado era malo, porque
+ * esconder la cáscara escondía el edificio ENTERO. Lo que quedaba, entre dos vecinos con su
+ * fachada y su tejado, era una rejilla de tabiques blancos con muebles dentro flotando al
+ * aire. Miguel lo dijo al verlo: «algunos quedan solo el interior».
+ *
+ * Una maqueta de arquitecto no se abre así: se le quita UNA fachada y se deja lo demás. Eso
+ * es esto. El edificio abierto conserva su tejado y las tres medianeras que NO dan a su
+ * calle, del color de su fachada, y se abre por el frente — que es justo por donde lo mira
+ * quien va andando por la acera. Así sigue siendo un edificio con su silueta y su volumen, y
+ * al pasar por delante se le ve dentro.
+ *
+ * Cuesta 32 triángulos por edificio, y como mucho hay tres abiertos a la vez: 96 de los
+ * 900.000 del tope. La alternativa —dejar la cáscara del pack y meter los muebles debajo— no
+ * era una alternativa: no se vería nada, que es lo que había antes de abrirlos.
+ */
+export function cascaraAbierta(edificio: EdificioDeLaCiudad, color: string): BultoPropio[] {
+  const alto = edificio.plantas * ALTURA_DE_PLANTA;
+  const bultos: BultoPropio[] = [
+    {
+      clase: 'cubierta',
+      x: edificio.centro.x,
+      y: ALTURA_DEL_BORDILLO + alto,
+      z: edificio.centro.z,
+      giro: edificio.giro,
+      ancho: edificio.ancho,
+      alto: 0,
+      fondo: edificio.fondo,
+      color,
+      triangulos: TRIANGULOS_DE_LA_CUBIERTA,
+    },
+  ];
+  for (const r of RUMBOS) {
+    /* La del frente es la que se quita: es la que da a la calle y la que se está mirando. */
+    if (r === edificio.frente) continue;
+    const d = vectorDelRumbo(r);
+    const alLargo = r % 2 === 0 ? edificio.ancho : edificio.fondo;
+    const distancia = (r % 2 === 0 ? edificio.fondo : edificio.ancho) / 2 - GRUESO_DE_LA_MEDIANERA / 2;
+    const pl = giraElPunto(d.x * distancia, d.z * distancia, edificio.giro);
+    bultos.push({
+      clase: 'medianera',
+      x: edificio.centro.x + pl.x,
+      y: ALTURA_DEL_BORDILLO,
+      z: edificio.centro.z + pl.z,
+      giro: edificio.giro + radianesDeCuartos(cuartosMirandoA(r)),
+      ancho: alLargo,
+      alto,
+      fondo: GRUESO_DE_LA_MEDIANERA,
+      color,
+      triangulos: TRIANGULOS_DE_LA_MEDIANERA,
+    });
+  }
+  return bultos;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -3405,7 +3554,7 @@ function montarLaFeria(caja: CajaEnPlanta, azar: () => number, calidad: Calidad)
       const mira: Rumbo = f === 0 ? 1 : 3;
       obra.puestas.push({ pieza: PIEZA.mesaLarga, x, y: ALTURA_DEL_BORDILLO, z, giro: giroMirandoA(mira), talla: 1 });
       for (const s of [-1, 1]) obra.puestas.push({ pieza: PIEZA.banqueta, x: x + s * 2.2, y: ALTURA_DEL_BORDILLO, z: z + (f === 0 ? -1.6 : 1.6), giro: giroMirandoA(mira), talla: 1 });
-      obra.bultos.push({ clase: 'toldo', x, y: ALTURA_DEL_BORDILLO + 3.4, z, giro: 0, ancho: 5, alto: 0.3, fondo: 4, color: '#c05a4a', triangulos: 8 });
+      obra.bultos.push({ clase: 'toldo', x, y: ALTURA_DEL_BORDILLO + 3.4, z, giro: 0, ancho: 5, alto: 0.3, fondo: 4, color: '#c05a4a', triangulos: 10 });
       if (calidad === 'plena') obra.puestas.push({ pieza: encimera[Math.floor(azar() * encimera.length) % encimera.length] as NombreDePieza, x, y: ALTURA_DEL_BORDILLO + 1, z, giro: 0, talla: 1 });
     }
   }
@@ -3526,7 +3675,7 @@ function montarLaGasolinera(caja: CajaEnPlanta, haciaElCentro: Rumbo): ObraDeDis
   }
   for (let k = 0; k < 4; k++) {
     const a = (k - 1.5) * 4;
-    obra.bultos.push({ clase: 'surtidor', x: isla.x + lado.x * a, y: ALTURA_DEL_BORDILLO, z: isla.z + lado.z * a, giro: giroMirandoA(haciaElCentro), ancho: 1.2, alto: 2.4, fondo: 0.8, color: '#c8412f', triangulos: 8 });
+    obra.bultos.push({ clase: 'surtidor', x: isla.x + lado.x * a, y: ALTURA_DEL_BORDILLO, z: isla.z + lado.z * a, giro: giroMirandoA(haciaElCentro), ancho: 1.2, alto: 2.4, fondo: 0.8, color: '#c8412f', triangulos: 10 });
   }
   obra.volumenes.push({ pieza: PIEZA.bloqueA, x: caja.cx - v.x * (caja.ancho / 2 - 6), y: 0, z: caja.cz - v.z * (caja.fondo / 2 - 6), giro: giroMirandoA(haciaElCentro), talla: 1 });
   for (const s of [-1, 1]) {
@@ -4414,9 +4563,51 @@ export const TOLERANCIA_DEL_TONO = 12;
  */
 export const TONO_POR_DEFECTO = TONO_DE_LA_TORRE;
 
-/** El tono con el que se pinta de lejos la cáscara `pieza`. */
+/** El tono con el que se pinta de lejos la cáscara `pieza`. Es la MEDIDA del `.glb`: no se toca. */
 export function tonoDelEdificio(pieza: NombreDePieza | null): string {
   return (pieza === null ? undefined : TONO_DEL_EDIFICIO[pieza]) ?? TONO_POR_DEFECTO;
+}
+
+/** Cuánto se aparta del tono de su modelo la fachada de una casa concreta: ±16 %. */
+export const VARIACION_DE_LA_FACHADA = 0.16;
+/** Y cuánto se puede templar hacia el ladrillo o hacia la piedra: la mitad, y sólo en rojo contra azul. */
+export const TEMPLE_DE_LA_FACHADA = 0.08;
+/** La veta del pulso que decide el temple, aparte de la que decide el brillo. */
+export const VETA_DEL_TEMPLE = 3;
+
+function aCanal(v: number): string {
+  const c = Math.max(0, Math.min(255, Math.round(v)));
+  return (c < 16 ? '0' : '') + c.toString(16);
+}
+
+/**
+ * EL TONO DE ESTA CASA, que es el de su modelo pero no exactamente.
+ *
+ * ═══ DIECISÉIS COLORES PARA SEISCIENTOS EDIFICIOS SON DIECISÉIS COLORES ═══
+ *
+ * `TONO_DEL_EDIFICIO` no es una paleta: es la MEDIDA del color horneado de cada `.glb`, y
+ * `verify:la-ciudad` vuelve a abrir los modelos para comprobar que no se ha quedado vieja. Así
+ * que esa tabla no se toca. Pero de lejos un edificio no es su modelo: es un prisma, y todos
+ * los prismas del mismo modelo salían del mismo hexadecimal exacto. Con dos modelos por
+ * distrito, eso son dos colores para un barrio entero, y una manzana se veía como una tira de
+ * cromos repetidos. La otra mitad de lo que Miguel llamó «todos muy repetidos».
+ *
+ * Se arregla sin gastar nada: el color va en `instanceColor`, que ya es un color POR INSTANCIA,
+ * así que seiscientas fachadas distintas cuestan las mismas llamadas de dibujo que seiscientas
+ * iguales. Cada casa se aparta de su modelo un ±16 % de brillo y se templa un poco hacia el
+ * ladrillo o hacia la piedra, y las dos cosas las decide el SITIO —`pulsoDeLaParcela`, con dos
+ * vetas distintas—, no el orden de recorrido: la misma parcela sale del mismo color en las seis
+ * pantallas de la mesa. Sigue siendo la paleta medida, con la casa de al lado un punto más
+ * clara, que es exactamente lo que hace una calle de verdad.
+ */
+export function tonoDeLaFachada(base: string, i: number, j: number): string {
+  const n = parseInt(base.slice(1), 16);
+  const brillo = 1 + (pulsoDeLaParcela(i, j, VETA_DE_LA_FACHADA) * 2 - 1) * VARIACION_DE_LA_FACHADA;
+  const temple = (pulsoDeLaParcela(i, j, VETA_DEL_TEMPLE) * 2 - 1) * TEMPLE_DE_LA_FACHADA;
+  const r = ((n >> 16) & 255) * (brillo + temple);
+  const v = ((n >> 8) & 255) * brillo;
+  const a = (n & 255) * (brillo - temple);
+  return `#${aCanal(r)}${aCanal(v)}${aCanal(a)}`;
 }
 
 /** El prisma con el que se pinta de lejos una cáscara del pack, sacado de su caja medida. */
@@ -4588,7 +4779,9 @@ function agruparLaCiudad(recinto: RecintoDeLaCiudad, t: Trazado, calidad: Calida
     const primera = e.celdas[0] as { i: number; j: number };
     const g = enObra[grupoDeCelda[idx(primera.i, primera.j)] as number] as EnObra;
     const alto = e.alto;
-    const prisma = (triangulos: number): BultoPropio => ({ clase: triangulos === TRIANGULOS_DEL_PRISMA ? 'prisma' : 'manzana-fundida', x: e.centro.x, y: 0, z: e.centro.z, giro: e.giro, ancho: e.ancho, alto, fondo: e.fondo, color: tonoDelEdificio(e.cascara), triangulos });
+    /* La fachada de ESTA casa, no la de su modelo: ver `tonoDeLaFachada`. Cuesta cero. */
+    const fachada = tonoDeLaFachada(tonoDelEdificio(e.cascara), primera.i, primera.j);
+    const prisma = (triangulos: number): BultoPropio => ({ clase: triangulos === TRIANGULOS_DEL_PRISMA ? 'prisma' : 'manzana-fundida', x: e.centro.x, y: 0, z: e.centro.z, giro: e.giro, ancho: e.ancho, alto, fondo: e.fondo, color: fachada, triangulos });
     /*
      * UNA TORRE SE QUEDA ENTERA EN L2, y es la única excepción a «en L2 todo es un prisma».
      *
@@ -4602,7 +4795,7 @@ function agruparLaCiudad(recinto: RecintoDeLaCiudad, t: Trazado, calidad: Calida
      * de ventanas no llega a un píxel.
      */
     if (e.cascara === null) {
-      (g.montones[1] as Monton).bultos.push({ clase: 'torre', x: e.centro.x, y: 0, z: e.centro.z, giro: e.giro, ancho: e.ancho, alto, fondo: e.fondo, color: TONO_DE_LA_TORRE, triangulos: triangulosDeUnaTorre(e.plantas) });
+      (g.montones[1] as Monton).bultos.push({ clase: 'torre', x: e.centro.x, y: 0, z: e.centro.z, giro: e.giro, ancho: e.ancho, alto, fondo: e.fondo, color: fachada, triangulos: triangulosDeUnaTorre(e.plantas) });
     } else {
       (g.montones[1] as Monton).bultos.push(prisma(TRIANGULOS_DEL_PRISMA));
     }

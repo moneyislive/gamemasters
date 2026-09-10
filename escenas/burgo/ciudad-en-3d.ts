@@ -20,21 +20,23 @@
  * presupuesto dice 30, o un templete de 400 donde dice 112— el comprobador seguiría en
  * verde y el móvil se caería igual. Así que `geometriaDeUnBulto(n)` construye una
  * geometría con EXACTAMENTE `n` triángulos, y `verify:burgo-escena` lo vuelve a contar
- * para las once cuentas que la ciudad usa y para las nueve alturas de torre.
+ * para todas las cuentas que la ciudad usa y para las nueve alturas de torre.
  *
  * La forma sale del número, y no al revés, con una sola regla:
  *
  *     n = 2   → un cuadro tumbado (praderas, céspedes, agua, mantas de asfalto, losas)
- *     n = 8   → el anillo de cuatro caras, sin tapas (surtidores, toldos)
  *     n = 10  → la caja sin fondo (tabiques, isletas, andenes, cantiles, prismas de L3)
  *     n ≥ 12  → la caja (12) + k BANDAS de ventanas (8 cada una) + r cornisas (2 cada una)
  *
- * con `k = ⌊(n − 12) / 8⌋` y `r = (n − 12 − 8k) / 2`. Las once cuentas de la ciudad caen
+ * con `k = ⌊(n − 12) / 8⌋` y `r = (n − 12 − 8k) / 2`. Las diez cuentas de la ciudad caen
  * solas: 16 = caja + 2 cornisas, 20 = caja + 1 banda, 30 = el prisma del plano (12 de
  * prisma, 16 de dos bandas y 2 de cornisa, §8), 40 la nave, 48 la escalera, 112 el
  * templete, 180 las gradas, y una torre de `p` plantas 12 + 8p + 20, que es 12 + 8(p+2) + 4.
  * O sea que una torre de seis plantas lleva ocho bandas: las seis de sus plantas y dos del
  * remate, que es exactamente lo que `triangulosDeUnaTorre` dice que se paga.
+ *
+ * Entre 2 y 10 no hay nada: ver `cuentaDeBulto`. Ocho triángulos eran cuatro paredes sin
+ * techo, y desde el aire eso no es una caja sino un cajón abierto.
  *
  * ═══ LA BANDA SE PINTA CON EL COLOR DE LA INSTANCIA, MULTIPLICADO ═══
  *
@@ -157,17 +159,63 @@ function anillo(y0: number, y1: number, radio: number, tono: number): Cara[] {
   ];
 }
 
-/** Un cuadro tumbado de lado `2r` a la cota `y`, mirando arriba. */
+/**
+ * UN CUADRO TUMBADO de lado `2r` a la cota `y`, mirando arriba o abajo.
+ *
+ * ═══ EL ORDEN DE LOS CUATRO PUNTOS DECIDE SI EL TECHO EXISTE ═══
+ *
+ * El material de los bultos es `MeshStandardMaterial` sin `side`, o sea `FrontSide`, o sea
+ * que `three` TIRA las caras que se ven por detrás. Y «por detrás» lo decide el orden de los
+ * puntos: la normal es `(b − a) × (c − a)`, así que para que una cara horizontal mire hacia
+ * arriba hay que recorrerla en sentido antihorario VISTA DESDE ARRIBA, que en un eje `z` que
+ * crece hacia el espectador es empezar por la esquina de `z` mayor.
+ *
+ * Este orden estuvo al revés y no falló nada: los prismas seguían teniendo sus doce
+ * triángulos, `verify:burgo-escena` los contaba, la ciudad cabía en el presupuesto y desde el
+ * suelo la manzana se veía entera, porque las paredes sí estaban bien. Lo único que pasaba es
+ * que el techo se tiraba, y también el suelo de cada distrito, y el césped, y el agua, y las
+ * plazas de aparcamiento — todo lo tumbado. Miguel lo vio a la primera desde el aire:
+ * «prismas inacabados sin techo ni el resto de paredes». Contra eso hay ahora una lupa
+ * cenital en `verify:burgo-escena`, porque contar triángulos nunca lo habría cazado.
+ */
 function tapa(y: number, radio: number, tono: number, arriba: boolean): Cara {
   const r = radio;
-  return arriba ? cuadro([-r, y, -r], [r, y, -r], [r, y, r], [-r, y, r], tono) : cuadro([-r, y, r], [r, y, r], [r, y, -r], [-r, y, -r], tono);
+  return arriba ? cuadro([-r, y, r], [r, y, r], [r, y, -r], [-r, y, -r], tono) : cuadro([-r, y, -r], [r, y, -r], [r, y, r], [-r, y, r], tono);
 }
 
 const cacheDeBultos = new Map<string, THREE.BufferGeometry>();
 
+/** Cuatro paredes y una tapa: lo menos que se puede mirar desde el aire sin verle el hueco. */
+export const MINIMO_DE_UN_VOLUMEN = 10;
+
+/**
+ * LA CUENTA QUE DE VERDAD SE CONSTRUYE, que no es siempre la que se pide.
+ *
+ * Ocho triángulos son CUATRO PAREDES Y NADA MÁS: un anillo hueco por arriba y por abajo.
+ * Desde el suelo pasa por una caja; desde el aire —que es como se mira este tablero— se le ve
+ * el interior, y encima las dos paredes del fondo desaparecen, porque el material tira lo que
+ * se ve por detrás. Eso no es un volumen: es un decorado de teatro.
+ *
+ * Así que la regla la pone la geometría y no quien la pide: **un bulto con altura se
+ * construye cerrado por arriba, cueste lo que cueste**. Diez es lo mínimo que lo consigue; el
+ * fondo se queda fuera porque se apoya en el suelo y no se ve nunca. Lo tumbado (`llano`) no
+ * entra en el trato: una losa es una losa y le basta un cuadro.
+ *
+ * Quien pida menos de diez recibe diez, y esta función es lo que mantiene diciendo el mismo
+ * número al presupuesto y a la geometría: de aquí salen la clave de la malla, la capacidad que
+ * se reserva y los triángulos que `verify:burgo-escena` cuenta. Ese mismo guion exige
+ * además que ningún bulto con altura declare menos, para que el presupuesto de `ciudad.ts` no
+ * se quede corto por la promoción.
+ */
+export function cuentaDeBulto(triangulos: number, llano: boolean): number {
+  const n = Math.max(2, Math.round(triangulos / 2) * 2);
+  if (llano || n === 2) return n;
+  return n < MINIMO_DE_UN_VOLUMEN ? MINIMO_DE_UN_VOLUMEN : n;
+}
+
 /** La clave de la caché (y de la malla instanciada) de un bulto: su cuenta, y si va tumbado. */
 export function claveDelBulto(triangulos: number, llano: boolean): string {
-  return `bulto-${String(Math.max(2, Math.round(triangulos / 2) * 2))}${llano ? '-llano' : ''}`;
+  return `bulto-${String(cuentaDeBulto(triangulos, llano))}${llano ? '-llano' : ''}`;
 }
 
 /**
@@ -184,7 +232,7 @@ export function claveDelBulto(triangulos: number, llano: boolean): string {
  * distintas. Quien la pida NO la suelta: las suelta `soltarLosBultos`.
  */
 export function geometriaDeUnBulto(triangulos: number, llano = false): THREE.BufferGeometry {
-  const n = Math.max(2, Math.round(triangulos / 2) * 2);
+  const n = cuentaDeBulto(triangulos, llano);
   const clave = claveDelBulto(n, llano);
   const hecha = cacheDeBultos.get(clave);
   if (hecha !== undefined) return hecha;
@@ -195,15 +243,15 @@ export function geometriaDeUnBulto(triangulos: number, llano = false): THREE.Buf
     for (let k = 0; k < cuantos; k++) {
       const x0 = -0.5 + k / cuantos;
       const x1 = -0.5 + (k + 1) / cuantos;
-      caras.push(cuadro([x0, 1, -0.5], [x1, 1, -0.5], [x1, 1, 0.5], [x0, 1, 0.5], 1));
+      /* Antihorario visto desde arriba, como la tapa: si se recorre al revés, el distrito entero se tira. */
+      caras.push(cuadro([x0, 1, 0.5], [x1, 1, 0.5], [x1, 1, -0.5], [x0, 1, -0.5], 1));
     }
   } else if (n === 2) {
+    /* La losa suelta: una pradera, un forjado, una plaza de aparcamiento. Sólo se mira desde arriba. */
     caras.push(tapa(1, 0.5, 1, true));
-  } else if (n === 4) {
-    caras.push(tapa(1, 0.5, 1, true), tapa(0, 0.5, 1, false));
-  } else if (n <= 10) {
-    caras.push(...anillo(0, 1, 0.5, 1));
-    if (n === 10) caras.push(tapa(1, 0.5, 1, true));
+  } else if (n === MINIMO_DE_UN_VOLUMEN) {
+    /* Cuatro paredes y el techo. El fondo se lo come el suelo, y por eso no se paga. */
+    caras.push(...anillo(0, 1, 0.5, 1), tapa(1, 0.5, 1, true));
   } else {
     caras.push(...anillo(0, 1, 0.5, 1), tapa(1, 0.5, 1, true), tapa(0, 0.5, 1, false));
     const { bandas, cornisas } = repartoDeLaCaja(n);
@@ -229,7 +277,7 @@ export function geometriaDeUnBulto(triangulos: number, llano = false): THREE.Buf
 }
 
 /** Las cuentas de triángulos que la ciudad usa hoy. La comprueba `verify:burgo-escena`. */
-export const CUENTAS_DE_BULTO: readonly number[] = [2, 8, 10, 12, 16, 20, 30, 40, 48, 112, 180];
+export const CUENTAS_DE_BULTO: readonly number[] = [2, 10, 12, 16, 20, 30, 40, 48, 112, 180];
 
 /** Suelta la caché de bultos. La escena la llama al desmontar. */
 export function soltarLosBultos(): void {

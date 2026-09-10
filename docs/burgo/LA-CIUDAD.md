@@ -464,6 +464,7 @@ La altura de un bloque la decide su distancia de Chebyshev al centro de la ciuda
   17 <= d        BAJA           `bloque-a` y `bloque-b` (2 plantas)
   + 1 planta si el bloque da a una avenida o al bulevar
   − 1 planta si el bloque da a un parque, al cementerio o al canal (y nunca baja de 2)
+  − 1 planta si a la parcela le toca DESCOLGARSE (42 de cada 100, y nunca baja de 2)
 ```
 
 Los tres tramos son los de antes multiplicados por 2,25 y redondeados, por la misma razón que
@@ -472,16 +473,39 @@ sola la que tiene una ciudad —alta en el centro, bajando hacia el borde, con l
 marcadas por una cornisa más alta— y sale **igual en las seis pantallas de la mesa**, porque
 no depende de nada más que de la posición.
 
+**Y por eso hizo falta el descuelgue.** Una función de la distancia da el MISMO número a todas
+las parcelas que están a la misma distancia, y ésas son un anillo entero de la ciudad: la
+regla decía la verdad sobre la silueta grande y mentía sobre la pequeña. En la manzana, todos
+los tejados a la misma cota, y una manzana de tejados a la misma cota vista desde el aire es
+una losa con juntas pintadas:
+
+> «además todos son muy repetidos»
+
+Así que cerca de dos de cada cinco parcelas bajan una planta de lo que les tocaba. Cuál baja
+lo dice `pulsoDeLaParcela`, un revoltillo entero de `(i, j)` — **del sitio, no del sorteo**:
+la misma parcela da el mismo tejado en las seis pantallas, hoy y el día que alguien meta un
+distrito nuevo que gaste el chorro de `azar()` de otra manera. Y baja, nunca sube, porque
+subir se comería el escalón de la avenida, que es lo que hace que las avenidas se lean desde
+el aire.
+
 ### Qué pieza de las ocho, y con qué regla
 
 El pack trae ocho bloques y ninguno se puede teñir (el color va horneado en el atlas, y el
 horno no reserva máscara para ellos). El **carácter** de un distrito, entonces, no lo da el
 color del edificio: lo dan **qué modelos**, **qué mobiliario** y **qué arbolado**.
 
+Y **la lista de cada distrito tiene modelos de dos alturas**, que es lo que salva la silueta.
+El ensanche decía `a, b` y el barrio de chalets decía lo mismo: las dos letras de dos plantas.
+Como el modelo se elige filtrando la lista por las plantas que pide el sitio, cuando el sitio
+pedía tres no había ninguna, el filtro se quedaba vacío y volvía a caer en `a` o `b` — así que
+el tejido más grande de la ciudad salía **entero de dos plantas y de 9,30 clavado**, casa por
+casa. Con dos alturas en la lista, el escalón y el descuelgue tienen dónde caer; y cuando el
+distrito no llega a la altura que se pide, se coge **la más cercana**, no la lista entera.
+
 | Distrito | Modelos | Mobiliario | Arbolado |
 | --- | --- | --- | --- |
 | Centro | torres propias + `bloque-g`, `bloque-h` | `semaforo-c`, `farola-de-calle` doble, `papelera` cada celda | `arbusto` en alcorque, cada 2 celdas |
-| Ensanche residencial | `bloque-a`, `bloque-b`, `cuerpo-a`, `cuerpo-b` | `farola-de-calle`, `contenedor` uno por manzana, `boca-de-riego` en esquina | `pino-pequeno` cada 3 celdas |
+| Ensanche residencial | `bloque-a`, `bloque-b` (2 plantas), `bloque-c`, `bloque-d` (3) | `farola-de-calle`, `contenedor` uno por manzana, `boca-de-riego` en esquina | `pino-pequeno` cada 3 celdas |
 | Restaurantes y ocio | `bloque-c`, `bloque-e`, `cuerpo-c`, `cuerpo-e` | terrazas: `mesa-pequena` + 2 `silla` en la acera, `farola-de-calle` cada celda | `arbusto` en jardinera |
 | Centro comercial | nave propia + aparcamiento | 40 plazas pintadas, 20 coches, 10 `farola-de-calle`, 6 `papelera` | `pino` en las islas del aparcamiento |
 | Parque | ninguno | ver abajo | ver abajo |
@@ -618,6 +642,20 @@ tiene ese punto a menos de **420**, la cáscara se **desmonta** (no se pone `vis
 que ya ha pasado en este árbol) y en su lugar se montan las plantas con su interior. Al
 alejarse, al revés. Nunca hay más de **tres** edificios abiertos a la vez.
 
+**Y NO SE ABRE DEL TODO: SE ABRE COMO UNA CASA DE MUÑECAS.** Desmontar la cáscara desmontaba
+el edificio entero, y lo que quedaba entre dos vecinos con su fachada y su tejado era una
+rejilla de tabiques blancos con muebles flotando al aire. Se vio a la primera:
+
+> «cuando nos acercamos a los edificios y se muestran en versión detallada, algunos quedan
+> solo el interior»
+
+Una maqueta de arquitecto no se abre así: se le quita **una** fachada y se deja lo demás. Así
+que al abrirse, el edificio conserva **su tejado y las tres medianeras que no dan a su calle**
+(`cascaraAbierta`), del mismo color con el que se pintaba de lejos, y el hueco queda por el
+**frente** — que es por donde lo mira quien va andando por la acera. Cuesta 32 triángulos por
+edificio: 2 de cubierta y 10 por cada medianera, o sea 96 con los tres abiertos, de los
+900.000 del tope.
+
 > **Esta regla era otra, y el banco la tumbó.** Decía «a menos de 60 y con el ojo por debajo
 > de 40 de ALTURA». Al montarla y medirla resultó ser una regla que **no puede cumplirse
 > nunca** con la cámara que hay: con la cercanía más corta que `LIMITES_DEL_BURGO` admite
@@ -659,8 +697,9 @@ módulo de sala (4):
 - **Tabiques**: cajas de 0,3 de grueso y 4,0 de alto, 10 triángulos cada una (los 12 de una
   caja menos los 2 de la cara que da al suelo). Un hueco de puerta de 2,4 × 2,8 se hace con
   tres cajas en vez de una: 30 triángulos.
-- **Techo**: un rectángulo de 2 triángulos, **que no se monta mientras el edificio está
-  abierto**. Es lo que deja ver dentro desde arriba.
+- **Techo**: las salas no llevan techo propio. El que se ve es **la cubierta de la casa de
+  muñecas**, un rectángulo de 2 triángulos a la cota de la última planta, y tapa el edificio
+  entero en vez de sala por sala. Dentro se ve por el frente abierto, no desde arriba.
 - **Escalera**: no se usa `escalera` del Dungeon —sube 4,0 y la planta mide 4,5, y quedaría un
   escalón de medio módulo al llegar—. Es geometría propia: 12 peldaños de 0,375 de alzada y
   0,5 de huella, 4 triángulos cada uno, **48 triángulos** por tramo. `escalera`,
@@ -1199,6 +1238,16 @@ todas las matrices de una vez y no se ve.
    manda el detalle (una ventana tiene tantos vértices que un paño de muro) y los dieciséis
    salían del mismo marrón sucio; sin descartar las horizontales manda el tejado, que en este
    pack es oscuro en todos. `verify:la-ciudad` vuelve a medirlo.
+
+   **Y dieciséis colores para seiscientos edificios siguen siendo dieciséis colores.** Con dos
+   modelos por distrito, eso eran dos tonos para un barrio entero, y una manzana se veía como
+   una tira de cromos repetidos. Esa tabla no se toca —es la medida del `.glb`—, pero cada casa
+   se aparta de ella un **±16 % de brillo** y se templa un poco hacia el ladrillo o hacia la
+   piedra, y las dos cosas las decide el SITIO (`pulsoDeLaParcela`, con dos vetas distintas), no
+   el orden de recorrido. **No cuesta nada**: el color va en `instanceColor`, que ya es un color
+   por instancia, así que seiscientas fachadas distintas se dibujan con las mismas llamadas que
+   seiscientas iguales. Las torres del centro se apartan del mismo modo, y el apartamiento es el
+   mismo en L1 y en L2, que es lo que evita que una torre cambie de color al cruzar los 156.
 6. **El centro de la ciudad era un amasijo de losas grises.** Una torre en L2 pasaba a un
    prisma de 30 triángulos con dos rayas. Ahora **se queda entera** (80 a 144 triángulos): son
    unas veintiséis torres, dos mil triángulos de 692.000, y a cambio hay una silueta de
@@ -1209,6 +1258,30 @@ todas las matrices de una vez y no se ve.
    dos de las de 100 o más — **pero sólo en un PC**: con esa regla en las dos calidades, seis
    de las veinte semillas se pasaban de los 84.000 del móvil (hasta 93.369). El móvil se queda
    con la regla estricta.
+8. **La ciudad entera no tenía tejado, y tampoco suelo.** Los cuatro puntos de toda cara
+   horizontal iban en orden inverso, así que su normal apuntaba hacia abajo y el material
+   —`FrontSide`— las tiraba: los tejados de los prismas, los suelos de los catorce distritos,
+   el césped, el agua y las plazas de aparcamiento. Desde el suelo la calle se veía entera,
+   porque las PAREDES sí estaban bien; desde el aire, que es como se mira un tablero, no:
+
+   > «al tener una vista aérea vemos prismas inacabados sin techo ni el resto de paredes»
+
+   **No falló nada.** El triángulo estaba: los prismas seguían teniendo sus doce, el juez que
+   los cuenta pasaba, el presupuesto cuadraba y las 87 comprobaciones de la ciudad seguían en
+   verde. La señal, cuando se buscó, fue el volumen firmado de la caja unitaria: **1/3 en vez
+   de 1**. De aquí salen dos reglas nuevas:
+
+   - **Todo volumen con altura se cierra por arriba.** Ocho triángulos eran cuatro paredes sin
+     tapa —lo que llevaban el toldo del mercadillo y el surtidor de la gasolinera—, y desde el
+     aire eso es un cajón abierto. El mínimo pasa a **diez**, y quien declare menos recibe diez
+     (`cuentaDeBulto`), con un juez que exige que lo declarado y lo construido sigan siendo el
+     mismo número, para que el presupuesto no se quede corto por la promoción.
+   - **La lupa cenital.** Contar triángulos no prueba que se vean. `verify:burgo-escena` deja
+     caer una rejilla de 81 rayos verticales sobre la huella de cada volumen que la ciudad
+     monta, se queda con la cara horizontal más alta que corta cada rayo, y exige que exista y
+     que mire hacia arriba. Con la avería puesta se pone roja en las diecinueve clases de bulto
+     y en las nueve alturas de torre. Sus dos vacunas son los dos fallos de verdad: quitarle la
+     tapa a una caja de diez, y darle la vuelta a las normales.
 
 ### Lo que se midió y NO se cambió
 

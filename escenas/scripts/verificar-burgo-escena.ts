@@ -28,6 +28,7 @@ import { NodeIO } from '@gltf-transform/core';
 import type { Node } from '@gltf-transform/core';
 import fs from 'node:fs';
 import path from 'node:path';
+import * as THREE from 'three';
 import { CLIP } from '../embarcadero/figuras';
 import { DURACION } from '../embarcadero/gestos';
 import { proyecta } from '../embarcadero/camara';
@@ -117,7 +118,7 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
-import { PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
+import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
 import { MULTIPLICIDADES_PLENA, MULTIPLICIDADES_SOBRIA, TOPE_PLENA, TOPE_SOBRIA, TRIANGULOS_POR_EMBLEMA, TRIANGULOS_POR_GUARISMO, guarismosDelTablero, sumaDelPresupuesto } from '../burgo/presupuesto';
 import {
@@ -1519,8 +1520,8 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
  * `ShapePath` son aritmética), así que aquí se pueden pedir las geometrías de verdad.
  */
 {
-  const { claveDelBulto, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
-  const { HISTERESIS_DEL_NIVEL, TONO_DEL_EDIFICIO, TONO_POR_DEFECTO, UMBRALES_DE_NIVEL, ciudadDelCodigo, cocheEnElInstante, montarLaCiudad, nivelDelGrupo, triangulosDeUnaTorre, ANCHO_DEL_CARRIL, ANCHO_DEL_BORDILLO, EJE_DEL_CARRIL } = await import('../burgo/ciudad');
+  const { MINIMO_DE_UN_VOLUMEN, claveDelBulto, cuentaDeBulto, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
+  const { ALTURA_DEL_BORDILLO, HISTERESIS_DEL_NIVEL, TONO_DEL_EDIFICIO, TONO_POR_DEFECTO, TRIANGULOS_DE_LA_CASCARA_ABIERTA, TRIANGULOS_DE_LA_CUBIERTA, TRIANGULOS_DE_LA_MEDIANERA, UMBRALES_DE_NIVEL, VETA_DE_LA_ALTURA, cascaraAbierta, ciudadDelCodigo, cocheEnElInstante, montarLaCiudad, nivelDelGrupo, pulsoDeLaParcela, tonoDeLaFachada, tonoDelEdificio, triangulosDeUnaTorre, ANCHO_DEL_CARRIL, ANCHO_DEL_BORDILLO, EJE_DEL_CARRIL } = await import('../burgo/ciudad');
   /* La retícula es de `piezas.ts` y `ciudad.ts` no la reexporta: pedírsela a `ciudad` devolvía `undefined` en silencio y el juez del carril se caía comparando con NaN. */
   const RETICULA = RETICULA_DE_LA_CIUDAD;
   const { cuantosTriangulos } = await import('../formas');
@@ -1549,6 +1550,138 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   comprobar('el reparto de una caja es exacto: 30 triángulos son dos bandas y una cornisa, y vuelven a sumar 30', repartoDeLaCaja(30).bandas === 2 && repartoDeLaCaja(30).cornisas === 1 && triangulosDeUnaCaja(2, 1) === 30);
   /* La vacuna: una cuenta que la regla NO puede construir tiene que salir distinta. */
   comprobar('se ve fallar: pedir un bulto de 13 triángulos devuelve 14, y el juez lo vería', cuantosTriangulos(geometriaDeUnBulto(13, false)) !== 13);
+  /*
+   * ── 1 bis. LA LUPA CENITAL: desde arriba no se le ve el hueco a ningún volumen ──
+   *
+   * ═══ EL FALLO QUE ESTO COMPRA, Y POR QUÉ NINGÚN OTRO JUEZ LO VEÍA ═══
+   *
+   * El material de los bultos es `MeshStandardMaterial` sin `side`, o sea `FrontSide`, o sea
+   * que `three` tira toda cara que se vea POR DETRÁS, y por detrás lo decide el orden de los
+   * cuatro puntos. Ese orden estuvo al revés en las caras horizontales de toda la ciudad: los
+   * tejados, los suelos de los distritos, el césped, el agua, las plazas de aparcamiento. Y no
+   * falló nada. Los prismas seguían teniendo sus doce triángulos, el juez de aquí arriba los
+   * contaba uno a uno, la ciudad cabía en el presupuesto, `verify:la-ciudad` medía sus ochenta
+   * y siete cosas en verde y desde el suelo la calle se veía entera, porque las PAREDES sí
+   * estaban bien. Sólo se veía desde el aire, que es como se mira un tablero. Lo vio Miguel:
+   * «prismas inacabados sin techo ni el resto de paredes».
+   *
+   * Contar triángulos nunca lo habría cazado, porque el triángulo estaba ahí. Así que este
+   * juez no cuenta: MIRA. Deja caer una rejilla de rayos verticales sobre la huella de cada
+   * volumen y, para cada rayo, se queda con la cara horizontal MÁS ALTA que le sale al paso.
+   * Dos preguntas, y las dos tienen que salir bien:
+   *
+   *   · que HAYA alguna — si no, el volumen está abierto por arriba y se le ve el interior;
+   *   · que esa cara MIRE ARRIBA — si no, existe pero `three` la tira, que es peor, porque en
+   *     el fichero está y en la pantalla no.
+   *
+   * La rejilla se queda dentro de la huella del cuerpo (`MARGEN_DE_LA_LUPA`) a propósito: una
+   * banda de ventanas vuela doce milésimas por delante de la fachada y una cornisa cinco
+   * centésimas, y ni una ni otra son techo de nada. Lo que se juzga es el volumen, no sus
+   * molduras.
+   */
+  const RAYOS_DE_LA_LUPA = 9;
+  const MARGEN_DE_LA_LUPA = 0.06;
+
+  /** Qué le pasa a un rayo vertical que cae sobre `geometria` en (x, z): nada, techo, o techo del revés. */
+  const loQueSeVeDesdeArriba = (geometria: THREE.BufferGeometry, x: number, z: number): 'hueco' | 'techo' | 'del-reves' => {
+    const pos = geometria.getAttribute('position') as THREE.BufferAttribute;
+    const nor = geometria.getAttribute('normal') as THREE.BufferAttribute;
+    let mejorY = Number.NEGATIVE_INFINITY;
+    let mejorNy = 0;
+    for (let t = 0; t * 3 + 2 < pos.count; t++) {
+      const a = t * 3;
+      const ny = nor.getY(a);
+      /* Una pared no es techo: un rayo vertical la roza y no la corta. */
+      if (Math.abs(ny) < 1e-6) continue;
+      const ax = pos.getX(a);
+      const az = pos.getZ(a);
+      const bx = pos.getX(a + 1) - ax;
+      const bz = pos.getZ(a + 1) - az;
+      const cx = pos.getX(a + 2) - ax;
+      const cz = pos.getZ(a + 2) - az;
+      const det = bx * cz - bz * cx;
+      if (Math.abs(det) < 1e-12) continue;
+      const u = ((x - ax) * cz - (z - az) * cx) / det;
+      const v = ((z - az) * bx - (x - ax) * bz) / det;
+      if (u < 0 || v < 0 || u + v > 1) continue;
+      const y = pos.getY(a) + u * (pos.getY(a + 1) - pos.getY(a)) + v * (pos.getY(a + 2) - pos.getY(a));
+      if (y <= mejorY) continue;
+      mejorY = y;
+      mejorNy = ny;
+    }
+    if (mejorY === Number.NEGATIVE_INFINITY) return 'hueco';
+    return mejorNy > 0 ? 'techo' : 'del-reves';
+  };
+
+  /** Pasa la lupa por toda la huella y devuelve la lista de lo que sale mal. */
+  const lupaCenital = (geometria: THREE.BufferGeometry): string[] => {
+    const malos: string[] = [];
+    for (let a = 0; a < RAYOS_DE_LA_LUPA; a++) {
+      for (let b = 0; b < RAYOS_DE_LA_LUPA; b++) {
+        const x = -0.5 + MARGEN_DE_LA_LUPA + ((1 - 2 * MARGEN_DE_LA_LUPA) * a) / (RAYOS_DE_LA_LUPA - 1);
+        const z = -0.5 + MARGEN_DE_LA_LUPA + ((1 - 2 * MARGEN_DE_LA_LUPA) * b) / (RAYOS_DE_LA_LUPA - 1);
+        const que = loQueSeVeDesdeArriba(geometria, x, z);
+        if (que !== 'techo') malos.push(`(${x.toFixed(2)}, ${z.toFixed(2)}): ${que}`);
+      }
+    }
+    return malos;
+  };
+
+  const destapados: string[] = [];
+  for (const [clave, v] of cuentas) {
+    const malos = lupaCenital(geometriaDeUnBulto(v.triangulos, v.llano));
+    if (malos.length > 0) destapados.push(`${clave}: ${String(malos.length)} de ${String(RAYOS_DE_LA_LUPA * RAYOS_DE_LA_LUPA)} rayos — ${malos[0] as string}`);
+  }
+  comprobar(`y ninguna de las ${cuentas.size} se le ve por dentro desde el aire: los ${String(RAYOS_DE_LA_LUPA * RAYOS_DE_LA_LUPA)} rayos de la lupa cenital dan todos en una cara que mira arriba`, destapados.length === 0, destapados.slice(0, 5));
+  const torresDestapadas: number[] = [];
+  for (let plantas = 6; plantas <= 14; plantas++) {
+    if (lupaCenital(geometriaDeUnBulto(triangulosDeUnaTorre(plantas), false)).length > 0) torresDestapadas.push(plantas);
+  }
+  comprobar('las nueve alturas de torre tampoco: por muchas bandas de ventana que lleven, arriba tienen tejado', torresDestapadas.length === 0, torresDestapadas);
+
+  /*
+   * LAS DOS VACUNAS, que son los dos fallos de verdad y no dos fallos inventados: uno es el
+   * volumen sin tapa (los ocho triángulos que había en el toldo y en el surtidor) y el otro es
+   * la tapa con los puntos al revés (lo que tenía la ciudad entera).
+   */
+  const sinLaTapa = (n: number): THREE.BufferGeometry => {
+    const g = geometriaDeUnBulto(n, false);
+    const pos = g.getAttribute('position') as THREE.BufferAttribute;
+    const nor = g.getAttribute('normal') as THREE.BufferAttribute;
+    const enferma = new THREE.BufferGeometry();
+    /* Los últimos seis vértices de una caja de diez son su tapa: se la quitamos y ya está abierta. */
+    enferma.setAttribute('position', new THREE.BufferAttribute((pos.array as Float32Array).slice(0, (pos.count - 6) * 3), 3));
+    enferma.setAttribute('normal', new THREE.BufferAttribute((nor.array as Float32Array).slice(0, (nor.count - 6) * 3), 3));
+    return enferma;
+  };
+  const delReves = (n: number): THREE.BufferGeometry => {
+    const g = geometriaDeUnBulto(n, false);
+    const pos = g.getAttribute('position') as THREE.BufferAttribute;
+    const nor = g.getAttribute('normal') as THREE.BufferAttribute;
+    const enferma = new THREE.BufferGeometry();
+    enferma.setAttribute('position', new THREE.BufferAttribute((pos.array as Float32Array).slice(), 3));
+    const vueltas = (nor.array as Float32Array).slice();
+    for (let i = 0; i < vueltas.length; i++) vueltas[i] = -(vueltas[i] as number);
+    enferma.setAttribute('normal', new THREE.BufferAttribute(vueltas, 3));
+    return enferma;
+  };
+  comprobar('se ve fallar: a una caja de diez se le quita la tapa y la lupa cenital ve el hueco', lupaCenital(sinLaTapa(10)).length > 0);
+  comprobar('y se ve fallar otra vez: con las caras horizontales del revés —el fallo que había— la lupa ve el techo que se tira', lupaCenital(delReves(30)).some((m) => m.endsWith('del-reves')));
+
+  /*
+   * Y EL PRESUPUESTO NO SE QUEDA CORTO POR HABER CERRADO NADA. `cuentaDeBulto` sube a diez
+   * cualquier volumen que pida menos, porque menos no se puede cerrar. Si `ciudad.ts` siguiera
+   * declarando ocho, la escena dibujaría diez y el presupuesto contaría ocho — y la diferencia
+   * se la comería el móvil sin que nadie la sumara. Así que se exige que lo declarado y lo
+   * construido sean el MISMO número, que es el trato de todo este fichero.
+   */
+  const cortos: string[] = [];
+  for (const [clave, v] of cuentas) {
+    if (cuentaDeBulto(v.triangulos, v.llano) !== v.triangulos) cortos.push(`${clave} declara ${String(v.triangulos)} y hace falta construir ${String(cuentaDeBulto(v.triangulos, v.llano))}`);
+  }
+  comprobar('ningún bulto con altura declara menos triángulos de los que hacen falta para cerrarlo por arriba', cortos.length === 0, cortos);
+  comprobar(`se ve fallar: un volumen de ocho triángulos se construye con ${String(MINIMO_DE_UN_VOLUMEN)}, así que declararlo con ocho sería quedarse corto`, cuentaDeBulto(8, false) === MINIMO_DE_UN_VOLUMEN && cuentaDeBulto(8, true) === 8);
+
   /* Y las nueve cintas: cada una gasta exactamente lo que declara, repartido entre sus tramos. */
   const cintasMal: string[] = [];
   for (const c of laCiudad.cintas) {
@@ -1651,11 +1784,81 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   );
   comprobar('y el carril mide la mitad de la calzada, que es lo que hace que dos coches se crucen sin tocarse', Math.abs(ANCHO_DEL_CARRIL * 2 - (RETICULA - 2 * ANCHO_DEL_BORDILLO)) < 1e-9);
 
+  /* La fuente de la escena, que la miran el juez del color (5 quater) y el de la muralla (6). */
+  const fuenteDeLaEscena = sinComentarios(fs.readFileSync(path.join(CARPETA, 'Burgo.tsx'), 'utf8'));
+
   /* ── 5. Los tonos de los edificios lejanos son los del pack, medidos ── */
   comprobar('los dieciséis volúmenes del pack tienen tono propio para su prisma de lejos, y ninguno repite el gris por defecto', Object.keys(TONO_DEL_EDIFICIO).length === 16 && !Object.values(TONO_DEL_EDIFICIO).includes(TONO_POR_DEFECTO));
 
+  /*
+   * ── 5 bis. LA CIUDAD NO SE REPITE: cada casa tiene su altura y su color ──
+   *
+   * Las dos mitades de lo que Miguel llamó «todos muy repetidos». Antes el ensanche —el tejido
+   * más grande— salía entero de dos plantas y de dos colores, porque su lista de modelos tenía
+   * las dos letras de la misma altura y porque el prisma de lejos se pintaba del hexadecimal
+   * exacto de su modelo. Se mide sobre la ciudad de verdad y no sobre la regla: se cuentan las
+   * alturas y los colores que salen, que es lo que se ve.
+   */
+  const alturasDelEnsanche = new Set<number>();
+  const coloresDeLosPrismas = new Set<string>();
+  for (const e of laCiudad.edificios) {
+    if (e.cascara === null) continue;
+    coloresDeLosPrismas.add(tonoDeLaFachada(tonoDelEdificio(e.cascara), (e.celdas[0] as { i: number }).i, (e.celdas[0] as { j: number }).j));
+    if (e.distrito === 'ensanche') alturasDelEnsanche.add(e.plantas);
+  }
+  comprobar('el ensanche tiene edificios de más de una altura: una manzana con todos los tejados a la misma cota es un pavimento, no un barrio', alturasDelEnsanche.size >= 2, [...alturasDelEnsanche]);
+  comprobar(
+    `y los ${String(laCiudad.edificios.filter((e) => e.cascara !== null).length)} edificios se pintan de lejos con más de cien tonos distintos, y no con los dieciséis del pack`,
+    coloresDeLosPrismas.size > 100,
+    coloresDeLosPrismas.size,
+  );
+  /* La vacuna: el tono de una casa tiene que depender de DÓNDE está, o la variedad es de mentira. */
+  comprobar('se ve fallar: dos parcelas distintas con el mismo modelo dan tonos distintos, y la misma parcela da siempre el mismo', tonoDeLaFachada('#808080', 3, 7) !== tonoDeLaFachada('#808080', 4, 7) && tonoDeLaFachada('#808080', 3, 7) === tonoDeLaFachada('#808080', 3, 7));
+  comprobar('y el pulso de una parcela no se sale de [0, 1) ni depende del orden en que se pregunte', [0, 1, 2, 30, 53].every((i) => [0, 1, 2, 30, 53].every((j) => { const p = pulsoDeLaParcela(i, j, VETA_DE_LA_ALTURA); return p >= 0 && p < 1; })));
+
+  /*
+   * ── 5 ter. LA CASA DE MUÑECAS: un edificio abierto sigue siendo un edificio ──
+   *
+   * Al bajar a la calle, los tres edificios más cercanos a lo que se mira esconden su cáscara
+   * y enseñan sus salas. Escondían el edificio ENTERO, y lo que quedaba entre dos vecinos con
+   * su fachada era una rejilla de tabiques con muebles flotando: «algunos quedan solo el
+   * interior». Ahora conservan el tejado y las tres medianeras que no dan a su calle.
+   */
+  const abiertosMal: string[] = [];
+  for (const e of laCiudad.edificios.filter((x) => x.cascara !== null).slice(0, 40)) {
+    const piel = cascaraAbierta(e, '#808080');
+    const cubiertas = piel.filter((b) => b.clase === 'cubierta');
+    const muros = piel.filter((b) => b.clase === 'medianera');
+    const alto = ALTURA_DEL_BORDILLO + e.plantas * ALTURA_DE_PLANTA;
+    if (cubiertas.length !== 1) abiertosMal.push(`#${String(e.indice)}: ${String(cubiertas.length)} tejados`);
+    else if (Math.abs((cubiertas[0] as { y: number }).y - alto) > 1e-6) abiertosMal.push(`#${String(e.indice)}: el tejado a ${String((cubiertas[0] as { y: number }).y)} y la última planta acaba en ${String(alto)}`);
+    if (muros.length !== 3) abiertosMal.push(`#${String(e.indice)}: ${String(muros.length)} medianeras`);
+    if (piel.reduce((a, b) => a + b.triangulos, 0) !== TRIANGULOS_DE_LA_CASCARA_ABIERTA) abiertosMal.push(`#${String(e.indice)}: no cuesta ${String(TRIANGULOS_DE_LA_CASCARA_ABIERTA)}`);
+  }
+  comprobar('a un edificio abierto le quedan su tejado a la cota de su última planta y las TRES medianeras que no dan a su calle', abiertosMal.length === 0, abiertosMal.slice(0, 4));
+  /* La vacuna: si se abriera por un rumbo que no es su frente, el hueco daría a la medianera del vecino. */
+  {
+    const e = laCiudad.edificios.find((x) => x.cascara !== null);
+    const piel = e === undefined ? [] : cascaraAbierta(e, '#808080');
+    const giros = piel.filter((b) => b.clase === 'medianera').map((b) => Math.round(((b.giro - (e?.giro ?? 0)) * 2) / Math.PI) & 3);
+    comprobar('se ve fallar: el hueco que queda es el del FRENTE, y las medianeras son los otros tres rumbos', e !== undefined && giros.length === 3 && new Set(giros).size === 3, giros);
+  }
+  comprobar(`abrir un edificio cuesta ${String(TRIANGULOS_DE_LA_CASCARA_ABIERTA)} triángulos de más, y como mucho hay tres abiertos a la vez`, TRIANGULOS_DE_LA_CASCARA_ABIERTA === TRIANGULOS_DE_LA_CUBIERTA + 3 * TRIANGULOS_DE_LA_MEDIANERA && TRIANGULOS_DE_LA_CASCARA_ABIERTA * 3 < 200);
+
+  /*
+   * ── 5 quater. UN COLOR NO SE VUELVE A LEER DE SU TEXTO EN CADA ESCRITURA ──
+   *
+   * `Color.set(cadena)` son dos expresiones regulares, y un hexadecimal siempre da el mismo
+   * color. Desde que cada casa tiene su tono son unas setecientas cadenas distintas, y la
+   * tabla de colores ya leídos ahorró 7.922 lecturas en diez segundos, CONTANDO las llamadas
+   * en el banco: media milésima de fotograma. Poco, cierto y barato — y contado, no
+   * cronometrado, que es lo que hay que hacer en una máquina ocupada. Lo vigila un juez de
+   * fuente porque no lo ve ningún otro: contar triángulos no lo ve, y el presupuesto tampoco.
+   */
+  comprobar('la escena no vuelve a leer un color de su texto por cada bulto: `pon` usa la tabla de colores ya leídos', /malla\.setColorAt\(n, colorLeido\(color\)\)/.test(fuenteDeLaEscena));
+  comprobar('se ve fallar: si volviera a poner `auxColor.set(color)` ahí, el juez lo vería', !/malla\.setColorAt\(n, auxColor\.set\(/.test(fuenteDeLaEscena) && /malla\.setColorAt\(n, auxColor\.set\(color\)\)/.test('      malla.setColorAt(n, auxColor.set(color));'));
+
   /* ── 6. Ni muralla ni rastro de ella ── */
-  const fuenteDeLaEscena = sinComentarios(fs.readFileSync(path.join(CARPETA, 'Burgo.tsx'), 'utf8'));
   const fuenteDelAnillo = sinComentarios(fs.readFileSync(path.join(CARPETA, 'anillo-en-3d.ts'), 'utf8'));
   /*
    * En el CÓDIGO, ni una muralla. En los comentarios sí se nombra, y tiene que seguir
@@ -1685,7 +1888,7 @@ if (fallos.length > 0) {
  * a la mitad termina con código cero y una lista corta de aciertos. El número va a mano,
  * con margen, y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 184;
+const COMPROBACIONES_ESCRITAS = 200;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(`Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: se ha caído por el camino sin decirlo. Si has añadido comprobaciones nuevas, sube el número.`);
   process.exit(2);
