@@ -71,14 +71,17 @@ import { canonico } from '../../shared/mecanicas/canonico';
 import '../../shared/arcade/juegos';
 import {
   ACIERTO,
+  BURGO,
   EMPEZAR,
   FRENTE,
   OTRA_RONDA,
   partidaNueva,
+  partidaNuevaDelBurgo,
   PASO,
   TICS_DE_RONDA,
   TICS_PARA_COLOCARSE,
 } from '../../shared/arcade/juegos';
+import { asientosDelRobot, jugarConElRobot } from './robot-del-burgo';
 
 const AQUI = path.resolve(import.meta.dirname ?? __dirname, 'oro-arcade');
 
@@ -184,6 +187,23 @@ interface GuionDeArcade {
   miradas: Array<string | null>;
   /** La partida entera, movimiento a movimiento y tic a tic. */
   guion: () => Apunte[];
+  /**
+   * Si los retratos guardan la HUELLA de cada texto canónico en vez del texto.
+   *
+   * ═══ POR QUÉ EXISTE, Y POR QUÉ NO ES MENOS FUERTE ═══
+   *
+   * La Frente son veintidós retratos de dos vistas cortas: 85 KB. El Burgo son
+   * trescientos y pico retratos de cinco vistas que llevan el tablero declarado
+   * dentro —caras, nudos, paneles, botones—: TREINTA MEGABYTES en la primera
+   * captura, que no caben en git ni en un diff que nadie vaya a leer. Con la huella
+   * (sha256 de la cadena canónica entera) la referencia baja a decenas de
+   * kilobytes y la comparación sigue siendo byte a byte: dos cadenas distintas dan
+   * huellas distintas. Lo que se pierde es el «difieren en el carácter N» de cada
+   * retrato, y por eso el ESTADO FINAL y sus vistas van enteros siempre: es lo
+   * primero que se mira cuando algo se rompe, y ahí el carácter exacto sigue
+   * estando. La Frente no lo declara y su referencia no cambia ni un byte.
+   */
+  retratosPorHuella?: true;
 }
 
 /**
@@ -259,7 +279,71 @@ const LA_FRENTE: GuionDeArcade = {
   },
 };
 
-const GUIONES: GuionDeArcade[] = [LA_FRENTE];
+/**
+ * EL BURGO: una partida de cuatro jugada por el robot, con tics cada siete apuntes.
+ *
+ * ═══ POR QUÉ EL GUION LO ESCRIBE UN ROBOT Y NO UNA LISTA A MANO ═══
+ *
+ * La Frente son quince gestos en tics feos; el Burgo son varios cientos de
+ * movimientos con carga, asiento y contexto, y escribirlos a mano sería escribir
+ * una partida que nadie ha jugado. El robot de `robot-del-burgo.ts` —el mismo que
+ * juega en `verify:burgo` y en `verify:determinismo`— la juega EN PROCESO al
+ * generar el guion, y lo que se congela es la lista de apuntes que salió de esa
+ * partida. Al verificar manda el registro congelado, como siempre: si el robot
+ * cambia de política, el guion deja de coincidir y se dice con mensaje propio; si
+ * el REDUCTOR cambia, la reejecución del congelado difiere en el carácter exacto.
+ *
+ * Los tics van intercalados cada siete apuntes para que el registro congele el tic
+ * del Burgo entrando por la misma puerta que los gestos: en `por-tirar` tira por el
+ * ausente y gasta azar —es la decisión 5 del diseño, y ésta es la referencia que la
+ * clava—, en la almoneda pasa, en `comprar` manda a almoneda y en `reuniendo` y
+ * `terminada` devuelve el mismo objeto (`sinTocar` lo cuenta).
+ *
+ * `inicial` es `partidaNueva()` y no `undefined` —el diseño decía `undefined`—
+ * porque `canonico(undefined)` lanza y este fichero canoniza el estado inicial;
+ * es la MISMA partida que la del servidor, que hace `estado ?? partidaNueva()` en
+ * el primer movimiento.
+ *
+ * Cuatro jugadores y tope de 20 vueltas: acota la partida por si el robot no
+ * quebrara a nadie; medido, termina por último en pie mucho antes.
+ */
+const CUANTOS_EN_EL_BURGO = 4;
+const TOPE_DE_VUELTAS_DEL_BURGO = 20;
+const UN_TIC_CADA = 7;
+const TOPE_DE_PASOS_DEL_BURGO = 4000;
+const TICS_TRAS_EL_FINAL = 3;
+
+const EL_BURGO: GuionDeArcade = {
+  arcade: BURGO,
+  titulo: 'El Burgo · cuatro a la mesa, jugada por el robot hasta el último en pie, con tics cada siete',
+  semilla: 20260909,
+  inicial: () => partidaNuevaDelBurgo(),
+  miradas: [ESPECTADOR, ...asientosDelRobot(CUANTOS_EN_EL_BURGO)],
+  retratosPorHuella: true,
+  guion: () => {
+    const partida = jugarConElRobot(20260909, CUANTOS_EN_EL_BURGO, TOPE_DE_VUELTAS_DEL_BURGO, UN_TIC_CADA, TOPE_DE_PASOS_DEL_BURGO);
+    const apuntes: Apunte[] = [];
+    let ultimoTic = 0;
+    for (const a of partida.apuntes) {
+      const apunte: Apunte = { tipo: a.tipo, tic: a.tic };
+      if (a.carga !== undefined) apunte.carga = a.carga;
+      if (a.quien !== undefined && a.quien !== null) apunte.quien = a.quien;
+      if (a.asientos !== undefined && a.asientos.length > 0) apunte.asientos = a.asientos;
+      apuntes.push(apunte);
+      if (a.tic > ultimoTic) ultimoTic = a.tic;
+    }
+    /*
+     * Y TRES TICS DESPUÉS DEL FINAL, para congelar que en `terminada` el tic devuelve
+     * EL MISMO objeto: sin ellos `sinTocar` sería cero en toda la partida —cada tic en
+     * `jugando` hace algo— y el contador que caza el `{ ...estado }` gratuito no
+     * contaría nada.
+     */
+    for (let t = 1; t <= TICS_TRAS_EL_FINAL; t++) apuntes.push({ tipo: 'arcade:tic', tic: ultimoTic + t });
+    return apuntes;
+  },
+};
+
+const GUIONES: GuionDeArcade[] = [LA_FRENTE, EL_BURGO];
 
 // ---------------------------------------------------------------------------
 // La instantánea
@@ -346,10 +430,23 @@ function comoSeLlama(quien: string | null): string {
   return quien === ESPECTADOR ? 'espectador' : quien;
 }
 
-function vistasDe(arcade: ArcadeId, estado: unknown, miradas: Array<string | null>): Record<string, string> {
+function vistasDe(
+  arcade: ArcadeId,
+  estado: unknown,
+  miradas: Array<string | null>,
+  porHuella = false,
+): Record<string, string> {
   const salida: Record<string, string> = {};
-  for (const quien of miradas) salida[comoSeLlama(quien)] = canonico(vistaDeAsiento(arcade, estado, quien));
+  for (const quien of miradas) {
+    const texto = canonico(vistaDeAsiento(arcade, estado, quien));
+    salida[comoSeLlama(quien)] = porHuella ? huella(texto) : texto;
+  }
   return salida;
+}
+
+/** El texto de un retrato: entero o su huella, según el guion. Ver `GuionDeArcade.retratosPorHuella`. */
+function comoRetrato(g: GuionDeArcade, texto: string): string {
+  return g.retratosPorHuella === true ? huella(texto) : texto;
 }
 
 /**
@@ -364,11 +461,12 @@ function jugar(g: GuionDeArcade, registro: string[]): Instantanea {
   let estado: unknown = g.inicial();
   let anterior = canonico(estado);
 
+  const porHuella = g.retratosPorHuella === true;
   const retratos: Retrato[] = [
     {
       tras: '(el principio)',
-      estado: anterior,
-      vistas: vistasDe(g.arcade, estado, g.miradas),
+      estado: comoRetrato(g, anterior),
+      vistas: vistasDe(g.arcade, estado, g.miradas, porHuella),
       esconde: loSecretoDe(g.arcade, estado).length,
     },
   ];
@@ -410,8 +508,8 @@ function jugar(g: GuionDeArcade, registro: string[]): Instantanea {
     anterior = ahora;
     retratos.push({
       tras: linea,
-      estado: ahora,
-      vistas: vistasDe(g.arcade, estado, g.miradas),
+      estado: comoRetrato(g, ahora),
+      vistas: vistasDe(g.arcade, estado, g.miradas, porHuella),
       esconde: loSecretoDe(g.arcade, estado).length,
     });
   }
@@ -453,6 +551,10 @@ function comoRegistro(apuntes: Apunte[]): string[] {
  * ahora pone `"monton":["Topo"` » es un minuto.
  */
 function dondeDifieren(antes: string, ahora: string): string {
+  /* Dos huellas (ver `retratosPorHuella`): no hay carácter que señalar, sólo que cambió. */
+  if (antes.length === 16 && ahora.length === 16 && !antes.startsWith('{') && !ahora.startsWith('{')) {
+    return `la huella cambió: ${antes} → ${ahora} (el estado final, que va entero, dice dónde)`;
+  }
   let i = 0;
   while (i < antes.length && i < ahora.length && antes[i] === ahora[i]) i++;
   const desde = Math.max(0, i - 30);

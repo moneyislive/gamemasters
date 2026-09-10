@@ -531,6 +531,48 @@ const BATERIA = [
       'la barra se enciende exactamente cuando las reglas ofrecen la obra, cada sitio del anillo es un vértice o una arista que `opcionesDeRiberas` ofrece y su movimiento es el de la opción sin montar nada, la mano traduce los cinco bienes y vuelve, y una vista que no es de Riberas devuelve nada en vez de un delta vacío',
   },
   /*
+   * ═══ EL BURGO, PASO 1 DE 3: LA TABLA Y LAS MECÁNICAS, ANTES DEL REDUCTOR ═══
+   *
+   * Va detrás de Riberas y delante de La Larga porque es el sexto arcade en
+   * construcción y todavía no juega: lo que hay que vigilar antes de que exista
+   * el reductor es que el DATO sobre el que se va a escribir sea el del
+   * reglamento (una fila movida cobra la renta de otra calle) y que las tres
+   * mecánicas nuevas de `shared/mecanicas/` —el anillo, la hacienda y el mazo—
+   * hagan aritmética entera sin sorpresas. `verify:burgo` (el paso 3) jugará
+   * partidas encima de esto; si esto está mal, aquello no significa nada.
+   */
+  {
+    nombre: 'Burgo · tabla y mecánicas',
+    donde: 'server',
+    guion: 'verify:mecanicas-burgo',
+    porque:
+      'las 40 casillas del Burgo están donde el reglamento dice y se leen por posición, con precios pares, rentas crecientes, 22 solares en 8 barrios de 2 o 3, y las 28 cuentas de desempeño escritas a mano; las 16 + 16 cartas van numeradas sin huecos y su serie secreta va y vuelve al número público; ningún texto ni comentario nuevo nombra una marca ajena; las ocho aceras se distinguen de los seis colores de asiento y dejan leer el blanco, medido; el anillo suma en módulo positivo, cruza la salida sólo hacia delante y pone las 40 casillas del cuadrado 8 × 14 en su banda; la hacienda paga todo o nada en enteros y el mazo rota al fondo sin perder una serie — y cada regla se ha visto caer con su veneno',
+  },
+  /*
+   * ═══ EL BURGO EN TRES: LA TRADUCCIÓN A LA ESCENA, Y EL SERVIDOR SIRVIENDO EL BURGO ═══
+   *
+   * Va detrás de las reglas del Burgo por lo mismo que «Riberas en tres» va detrás
+   * de Riberas: el anillo 3D no es un juego, es el pintor propio del Burgo, y lo
+   * único suyo que puede mentir en silencio es `burgo-en-tres.ts`, la traducción de
+   * la vista a lo que la escena recibe. Una casilla encendida sin obra, una bandera
+   * del color de otro, un par de dados inventado o un botón pintado dos veces no
+   * dan error en ninguna consola: se juega mal. Se mide con mesas de verdad y un
+   * robot que sólo elige entre lo que `opcionesDelBurgo` ofrece.
+   *
+   * Es `lento` porque además levanta el servidor: la mitad de lo que un cliente
+   * necesita —`burgo.glb` por HTTP con su tipo y sus bytes, el ciclo entero de una
+   * mesa de seis por el sondeo, el 409 al vestir en vuelo, el motivo de un rechazo
+   * que llega en la respuesta y no en la lectura— no se ve en proceso.
+   */
+  {
+    nombre: 'El Burgo en tres',
+    donde: 'server',
+    guion: 'verify:burgo-en-tres',
+    lento: true,
+    porque:
+      'en tres partidas de verdad (2, 4 y 6 asientos) y en cada lectura de cada asiento y del mirón, el tablero de la escena dice casilla a casilla lo que dice la vista, cada casilla tocable es una obra que `opcionesDelBurgo` ofrece y su movimiento es la opción sin montar nada, cada movimiento se pinta exactamente una vez entre dados, casillas, hoja y botones sueltos, la puja libre y el trato montados por su puerta entran por el portillo, los sucesos con una jugada de salto son la lista y con dos una gruesa que no pierde posiciones ni dinero, la firma del tablero es estable e inestable cuando toca, los dados traen el par y nunca lo inventan, la hoja no cuenta una carta que no ha salido, una vista de otro juego da nada — y con el servidor levantado, `burgo.glb` llega con sus bytes, seis sentados juegan treinta movimientos por el cable, un movimiento en vuelo al vestir vuelve 409 y se reintenta, y un rechazo trae su motivo en la respuesta y null en la lectura',
+  },
+  /*
    * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.
    *
    * Aquí abajo, después del núcleo, se leería como «y además una cosa larga». Va
@@ -749,6 +791,21 @@ const BATERIA = [
     guion: 'verify:burgo-modelos',
     porque:
       '`burgo.glb` trae exactamente las piezas que `burgo/piezas.ts` declara, de siete packs, todas con el color horneado y ninguna con textura ni UV; las de asiento llevan su máscara de tinte —las fichas y el estandarte enteras, la casa grande, la posada y la bandera a medias—; la escala va horneada en los vértices y es la del mundo del Muelle, medida: la casa-ficha mide una persona, la casa grande dos, la tesela lo que la del tablero, la losa una casilla y el muro lo que la muralla, y el juez de tallas se ve caer con cajas sin escalar y con cajas escaladas dos veces; carga con el GLTFLoader de verdad sin atributos entrelazados; pesa menos del tope de la tabla; y ningún fichero del Burgo nombra una marca ajena',
+  },
+  /*
+   * LA ESCENA DEL BURGO SON DOS COMPROBADORES, como el embarcadero: el de arriba
+   * abre el `.glb` y éste hace la aritmética CONTRA ese `.glb`: las cajas y los
+   * triángulos medidos entran en cada juicio. Un edificio metido en la calle, un
+   * aventurero en T-pose, una vuelta al anillo de veinte segundos, un tablero
+   * lleno que no cabe en un móvil o una esquina fuera del lienzo no dan error en
+   * ninguna consola: se ven. Aquí se miden en Node sin abrir un contexto de dibujo.
+   */
+  {
+    nombre: 'burgo · escena',
+    donde: 'escenas',
+    guion: 'verify:burgo-escena',
+    porque:
+      'la aritmética de `escenas/burgo/` cuadra con `burgo.glb`: ningún fichero de la escena trae drei, DOM, Expo ni fetch; la polilínea tiene 40 puntos con las esquinas en ±43,25 y las casillas donde dicen las cuatro fórmulas; cada rejilla de huecos (peones 3 × 2, casas 2 × 2, posada, bandera, presos y visitas) cabe en su banda con la huella medida; ningún solar pasa de 7,6 de frente ni de 9 de fondo salvo la ribera, que entra en el agua a sabiendas; las cuatro puertas de la muralla quedan a ±0,5 del eje de las casillas 5, 15, 25 y 35; ninguna pieza de esquina pisa la ele de la marcha; el tablero LLENO cabe en 110.000 triángulos en plena y 90.000 en sobria con las cifras impresas, y una tabla con la taberna como posada se ve caer; el peón anda diez mil pasos sin T-pose ni clip inexistente, sobre la polilínea, con doce casillas en 8 s, tres en 6,75 y la Mazmorra sin pisar casillas; una jugada real cabe en 14 s y saltarla deja el estado final; los dados obedecen al par y un solo número no es un par; y las cuatro esquinas del anillo caen en el lienzo en 16:9, 3:4 y 9:19,5, con una casilla llenando el 45 % del alto de cerca',
   },
   {
     nombre: 'escritorio honrado',

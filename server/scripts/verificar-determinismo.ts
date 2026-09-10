@@ -90,6 +90,22 @@
  * grita cuando no pasa nada acaba desactivado, que es peor que no tenerlo.
  * `shared/mecanicas/canonico.ts` ordena las claves y además RECHAZA lo que
  * `JSON.stringify` se traga en silencio.
+ *
+ * ═══ Y EL BURGO, QUE ENTRÓ EL SEXTO Y POR LA PUERTA QUE LA MEMORIA SEÑALA ═══
+ *
+ * Este fichero comparaba UN reductor y la memoria de la casa dice lo que eso vale
+ * para un juego nuevo: verde falso por lista fija. Desde el Burgo, la tanda lleva
+ * además cuatro partidas de solares jugadas por `robot-del-burgo.ts` —de dos, tres,
+ * cuatro y seis a la mesa, con tics intercalados que tiran por el ausente— y los
+ * escalones 1 y 2 comparan también sus huellas. El 3 no: es de El Arcade, que sube
+ * repeticiones; el Burgo reejecuta su diario en `verify:burgo`.
+ *
+ * PISTA MALA, dicha para que no cueste otra tarde: si al meter un juego nuevo esto
+ * dice «Hermes ejecuta el paquete sin caerse: código 1», casi nunca es una
+ * divergencia de motores. Es SINTAXIS o API que Hermes 0.12 no tiene —`class` sin
+ * bajar, `Array.prototype.at`, `Object.hasOwn`, `replaceAll`, `toSorted`,
+ * `structuredClone`, `padStart` en según qué versión— colada en `shared/` o en el
+ * robot. Se lee la salida de Hermes, que nombra la función que falta.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -103,8 +119,16 @@ import { movimientoDeTic, reejecutarEn } from '../../shared/arcade';
 import type { MovimientoRegistrado } from '../../shared/arcade';
 import { movimientosDe } from '../src/arcade/repeticiones';
 import type { Repeticion } from '../src/arcade/repeticiones';
-import { jugarGrabando, jugarLaTanda, jugarUna, SEMILLAS, segundosDeLaTanda, TOPE_DE_PASOS } from './guion-determinismo';
-import type { Jugada, Tanda } from './guion-determinismo';
+import {
+  CUANTOS_EN_EL_BURGO,
+  jugarGrabando,
+  jugarLaTanda,
+  jugarUna,
+  SEMILLAS,
+  segundosDeLaTanda,
+  TOPE_DE_PASOS,
+} from './guion-determinismo';
+import type { Jugada, JugadaDelBurgo, Tanda } from './guion-determinismo';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 
@@ -234,6 +258,51 @@ for (let i = 0; i < primera.jugadas.length; i++) {
     sola.huella === enLaTanda.huella,
     sola.huella === enLaTanda.huella ? undefined : dondeDifieren(sola.huella, enLaTanda.huella),
   );
+}
+
+/*
+ * ═══ Y LAS PARTIDAS DEL BURGO, DOS VECES EN NODE ═══
+ *
+ * Las mismas dos tandas de arriba traen cuatro partidas del Burgo. Antes de
+ * comparar huellas se exige que las partidas SEAN partidas —terminan con ganador,
+ * con cientos de movimientos y con quiebras— porque cuatro partidas que se
+ * cortaran en el sorteo compararían el sorteo, y eso es el verde por conjunto
+ * vacío que esta casa tiene apuntado.
+ */
+paso('Las partidas del Burgo, dos veces en Node');
+
+comprobar(
+  `la tanda trae ${CUANTOS_EN_EL_BURGO.length} partidas del Burgo, una por semilla`,
+  primera.burgo.length === SEMILLAS.length && CUANTOS_EN_EL_BURGO.length === SEMILLAS.length,
+  { burgo: primera.burgo.length, semillas: SEMILLAS.length },
+);
+{
+  let movimientosDelBurgo = 0;
+  let quebradosDelBurgo = 0;
+  for (let i = 0; i < primera.burgo.length; i++) {
+    const a = primera.burgo[i] as JugadaDelBurgo;
+    const b = segunda.burgo[i] as JugadaDelBurgo;
+    movimientosDelBurgo += a.movimientos;
+    quebradosDelBurgo += a.quebrados;
+    console.log(
+      `  semilla ${String(a.semilla).padStart(10)} · ${a.cuantos} a la mesa · ${String(a.movimientos).padStart(5)} movimientos · ` +
+        `${String(a.tics).padStart(4)} tics · ${a.quebrados} quiebras · ${a.terminada ? 'termina' : 'NO TERMINA'}`,
+    );
+    comprobar(`la partida del Burgo de la semilla ${a.semilla} termina con ganador`, a.terminada, a);
+    comprobar(
+      `la partida del Burgo de la semilla ${a.semilla} da el mismo estado dos veces`,
+      b !== undefined && a.huella === b.huella,
+      b === undefined ? 'falta la segunda' : a.huella === b.huella ? undefined : dondeDifieren(a.huella, b.huella),
+    );
+  }
+  comprobar(
+    'las cuatro partidas del Burgo son largas: cientos de movimientos entre todas',
+    movimientosDelBurgo >= 800,
+    { movimientosDelBurgo },
+  );
+  comprobar('y en ellas quiebra alguien: se compara dinero que se mueve, no un sorteo', quebradosDelBurgo >= 3, {
+    quebradosDelBurgo,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -460,13 +529,42 @@ if (enNode !== null && enHermes !== null) {
   }
 
   /*
+   * ═══ Y EL BURGO EN LOS DOS MOTORES, QUE ES LO QUE ESTE FICHERO NO HACÍA ═══
+   *
+   * Un paquete de Hermes viejo, o uno que se cayera a mitad del Burgo, traería
+   * `burgo` vacío o ausente: eso es rojo, no «no aplica».
+   */
+  const burgoEnNode = Array.isArray(enNode.burgo) ? enNode.burgo : [];
+  const burgoEnHermes = Array.isArray(enHermes.burgo) ? enHermes.burgo : [];
+  comprobar(
+    'las dos tandas traen las partidas del Burgo, y las mismas',
+    burgoEnNode.length === SEMILLAS.length && burgoEnHermes.length === SEMILLAS.length,
+    `Node ${burgoEnNode.length} · Hermes ${burgoEnHermes.length}`,
+  );
+  const cuantasDelBurgo = Math.min(burgoEnNode.length, burgoEnHermes.length);
+  for (let i = 0; i < cuantasDelBurgo; i++) {
+    const a = burgoEnNode[i] as JugadaDelBurgo;
+    const b = burgoEnHermes[i] as JugadaDelBurgo;
+    comprobar(
+      `el Burgo con la semilla ${a.semilla} da el MISMO estado final en Node y en Hermes`,
+      a.huella === b.huella,
+      a.huella === b.huella ? undefined : dondeDifieren(a.huella, b.huella),
+    );
+    comprobar(
+      `el Burgo con la semilla ${a.semilla} dura lo mismo y quiebra a los mismos en los dos motores`,
+      a.movimientos === b.movimientos && a.tics === b.tics && a.jugada === b.jugada && a.quebrados === b.quebrados,
+      `Node: ${a.movimientos} mov / ${a.jugada} jugadas / ${a.quebrados} quiebras · Hermes: ${b.movimientos} / ${b.jugada} / ${b.quebrados}`,
+    );
+  }
+
+  /*
    * Y lo mismo contra la tanda que se jugó EN PROCESO al principio. Node fuera y
    * Node dentro deberían coincidir siempre; que no coincidieran significaría que
    * el empaquetado cambia el comportamiento —una optimización de esbuild, un
    * `target` que reescribe la aritmética— y eso es una noticia por sí sola.
    */
-  const enProceso = canonico(primera.jugadas.map((j) => j.huella));
-  const deFuera = canonico(enNode.jugadas.map((j) => j.huella));
+  const enProceso = canonico([...primera.jugadas.map((j) => j.huella), ...primera.burgo.map((j) => j.huella)]);
+  const deFuera = canonico([...enNode.jugadas.map((j) => j.huella), ...burgoEnNode.map((j) => j.huella)]);
   comprobar(
     'el paquete de esbuild da lo mismo que el mismo código sin empaquetar',
     enProceso === deFuera,
@@ -609,7 +707,9 @@ if (fallos.length === 0) {
   console.log(
     `✔ ${hechas} comprobaciones. El mismo registro da el mismo estado dos veces, da el mismo\n` +
       '  estado en Node y en Hermes, y la partida expandida desde su repetición da el mismo\n' +
-      '  estado que la partida jugada — comparado con `canonico.ts`, no con `JSON.stringify`.',
+      '  estado que la partida jugada — comparado con `canonico.ts`, no con `JSON.stringify`.\n' +
+      '  Y el Burgo también: cuatro partidas de solares jugadas por su robot, con tics que tiran\n' +
+      '  por el ausente, dan el mismo estado final en los dos motores.',
   );
   process.exit(0);
 }

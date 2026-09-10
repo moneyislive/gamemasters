@@ -50,6 +50,7 @@ import {
   TICK_HZ,
 } from '../../shared/arcade/juegos/arcade';
 import type { EstadoDelArcade, Rumbo } from '../../shared/arcade/juegos/arcade';
+import { jugarConElRobot } from './robot-del-burgo';
 
 /**
  * Las semillas con las que se juega. Cuatro, y ninguna redonda.
@@ -103,6 +104,50 @@ export interface Jugada {
   huella: string;
 }
 
+/**
+ * LO QUE SALE DE UNA PARTIDA DEL BURGO jugada por su robot. Todo comparable como texto.
+ *
+ * ═══ POR QUÉ EL BURGO ENTRA AQUÍ, Y POR QUÉ CON SU PROPIO ROBOT ═══
+ *
+ * Este comprobador comparaba UN reductor —El Arcade— y la memoria de la casa tiene
+ * apuntado lo que eso vale para un sexto juego: nada. El Burgo mueve dinero en
+ * treinta sitios, baraja dos mazos, encadena dados, ordena con comparadores y
+ * redondea intereses con `Math.ceil` sobre enteros; cualquiera de esas cosas puede
+ * dar distinto en Hermes y en V8 sin que ningún test escrito a mano lo vea. Aquí el
+ * robot de `robot-del-burgo.ts` JUEGA la partida en los dos motores: decide sobre la
+ * vista, mueve, y vuelve a decidir; si el reductor divergiera un maravedí en el
+ * turno cien, las dos partidas se separarían del todo.
+ *
+ * Lo que NO se afirma: el tercer escalón (la repetición expandida) es de El
+ * Arcade, que tiene marcador y sube repeticiones; el Burgo es de servidor, no tiene
+ * repetición que expandir, y su diario lo reejecuta `verify:burgo`.
+ */
+export interface JugadaDelBurgo {
+  semilla: number;
+  /** Cuántos a la mesa. */
+  cuantos: number;
+  /** Cuántos movimientos de asiento cambiaron el estado, y cuántos tics entraron. */
+  movimientos: number;
+  tics: number;
+  /** `jugada` final del estado: cuántos cambios hubo. */
+  jugada: number;
+  /** Cuántos quebraron. */
+  quebrados: number;
+  /** Si terminó con ganador. */
+  terminada: boolean;
+  /** EL ESTADO FINAL, serializado con `canonico.ts`. Es lo que se compara. */
+  huella: string;
+}
+
+/** Cuántos se sientan en cada partida del Burgo: una por semilla, en este orden. */
+export const CUANTOS_EN_EL_BURGO: readonly number[] = [2, 3, 4, 6];
+/** Tope de vueltas de cada partida del Burgo: acota, no decide (medido: acaban por último en pie). */
+export const TOPE_DE_VUELTAS_DEL_BURGO = 20;
+/** Un tic cada tantos apuntes: el tic del Burgo tira por el ausente y gasta azar, y eso se compara también. */
+export const UN_TIC_DEL_BURGO_CADA = 7;
+/** Tope de pasos del robot por partida: un cambio de reglas que lo dejara dando vueltas no bloquea la batería. */
+export const TOPE_DE_PASOS_DEL_BURGO = 4000;
+
 /** Y lo que sale de jugarlas todas, más quién las jugó. */
 export interface Tanda {
   /**
@@ -123,6 +168,8 @@ export interface Tanda {
    */
   motor: string;
   jugadas: Jugada[];
+  /** Las partidas del Burgo, una por semilla. */
+  burgo: JugadaDelBurgo[];
 }
 
 /** Cómo se llama el motor que está ejecutando esto. Ver `Tanda.motor`. */
@@ -256,11 +303,32 @@ export function jugarGrabando(
   };
 }
 
+/** Una partida entera del Burgo con esa semilla y los que le tocan a la mesa. Ver `JugadaDelBurgo`. */
+export function jugarUnaDelBurgo(semilla: number, cuantos: number): JugadaDelBurgo {
+  const p = jugarConElRobot(semilla, cuantos, TOPE_DE_VUELTAS_DEL_BURGO, UN_TIC_DEL_BURGO_CADA, TOPE_DE_PASOS_DEL_BURGO);
+  let quebrados = 0;
+  for (const j of p.estado.jugadores) if (j.quebrado) quebrados++;
+  return {
+    semilla,
+    cuantos,
+    movimientos: p.movimientos,
+    tics: p.tics,
+    jugada: p.estado.jugada,
+    quebrados,
+    terminada: p.estado.momento === 'terminada' && p.estado.ganadores.length > 0,
+    huella: canonico(p.estado),
+  };
+}
+
 /** Todas las partidas, con el nombre del motor delante. */
 export function jugarLaTanda(): Tanda {
   const jugadas: Jugada[] = [];
   for (const semilla of SEMILLAS) jugadas.push(jugarUna(semilla));
-  return { motor: queMotorSoy(), jugadas };
+  const burgo: JugadaDelBurgo[] = [];
+  for (let i = 0; i < SEMILLAS.length; i++) {
+    burgo.push(jugarUnaDelBurgo(SEMILLAS[i] as number, CUANTOS_EN_EL_BURGO[i] as number));
+  }
+  return { motor: queMotorSoy(), jugadas, burgo };
 }
 
 /**
