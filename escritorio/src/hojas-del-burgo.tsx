@@ -77,6 +77,11 @@ import type {
   SolarDelBarrio,
   TratoComponible,
 } from '../../shared/arcade/juegos/burgo-en-tres';
+/*
+ * EL BOLSILLO DE ESTE CLIENTE, que es lo que hace que la sección abierta sobreviva a un F5.
+ * Síncrono y envuelto en `try` allí dentro: aquí no se comprueba nada antes de llamarlo.
+ */
+import { guardarLaSeccion, laSeccionGuardada } from './bolsillo';
 
 /**
  * LAS DOS QUE YA ESTÁN EN PANTALLA ANTES DE ABRIR EL CAJÓN. Ver la cabecera: la cinta es
@@ -106,19 +111,53 @@ const UNA_CASA = '■';
 const UN_HOTEL = '⌂';
 
 /**
- * LA MEMORIA DE QUÉ SECCIÓN SE DEJÓ ABIERTA, POR MESA Y POR PESTAÑA.
+ * ═══ LA MEMORIA DE QUÉ SECCIÓN SE DEJÓ ABIERTA, AHORA EN EL BOLSILLO ═══
  *
- * Vive en un mapa de módulo y no en `bolsillo.ts` —que es el almacén de verdad de este
- * cliente y no es de esta tanda— a propósito, y hay que decir lo que eso cuesta: se conserva
- * mientras la pestaña esté abierta (que es cuando de verdad importa: el pintor se
- * desmonta y se vuelve a montar con cada ida y vuelta a la Sala) y se pierde al recargar. La
- * app lo guarda de verdad con `guardarLaSeccion`; aquí queda pendiente el hueco equivalente.
+ * ═══ EL FALLO: UNA MITAD QUE FALTABA, NO UNA ROTA ═══
  *
- * Se guarda por CÓDIGO DE MESA y no a secas: quien juega dos mesas del Burgo a la vez tiene
- * una hoja distinta en cada una, y una sola memoria le movería la sección de debajo del dedo
- * al cambiar de pestaña.
+ * Aquí vivía un `Map` de módulo. Eso conserva la sección mientras la pestaña siga abierta —que
+ * es cuando más importa, porque el pintor se desmonta y se vuelve a montar en cada ida y vuelta
+ * a la Sala— y la pierde ENTERA al recargar. Y recargar en un PC no es el caso raro que es en
+ * un teléfono: es F5, es un `Ctrl+W` sin querer, es el navegador que se actualiza. Cada una de
+ * esas veces la hoja volvía a abrir por donde dijera quien la monta y había que ir a buscar «Lo
+ * mío» otra vez, en una partida que dura días. La app ya lo guardaba de verdad; el hueco era de
+ * este cliente y estaba anotado aquí mismo como pendiente. Esto es ese hueco.
+ *
+ * El bolsillo es SÍNCRONO (`localStorage`, no el almacén seguro de la app), así que lo guardado
+ * se lee en el primer render y no hace falta un efecto que lo traiga: no hay ninguna ventana en
+ * la que la hoja se pinte por la sección equivocada y salte a la buena un fotograma después.
+ *
+ * ═══ Y NO SE QUEDA ADEMÁS EL MAPA DE MÓDULO ═══
+ *
+ * Dos memorias del mismo dato son dos memorias que se separan: bastaría un `try` que falle en
+ * el bolsillo —ventana privada de Safari, almacenamiento bloqueado— para que el mapa dijera una
+ * sección y el bolsillo otra, y quién gana dependería del orden de lectura. Se queda UNA. Lo
+ * que se pierde donde el bolsillo no puede escribir es la memoria entre montajes, y eso es
+ * exactamente lo que ya se pierde entre recargas: la hoja abre por donde diga quien la monta.
+ *
+ * POR MESA Y POR SILLA, que es la llave que compone `bolsillo.ts`: dos mesas del mismo juego
+ * están en momentos distintos, y dos ventanas del mismo navegador en la MISMA mesa comparten
+ * `localStorage`. Sin la silla, abrir «Lo mío» en una le movería la sección a la otra.
  */
-const LO_QUE_SE_DEJO_ABIERTO = new Map<string, IdDeSeccion | null>();
+
+/**
+ * QUÉ SECCIÓN ABRE LO QUE HAY GUARDADO, o `null` si no abre ninguna.
+ *
+ * `laSeccionGuardada` devuelve LA CADENA TAL CUAL y no valida nada —lo dice su cabecera: quien
+ * conoce la lista es la hoja—, así que la lista se mira aquí. Y no vale con mirar
+ * `ORDEN_DE_LA_HOJA`: la cinta y el marcador están en ese orden y esta pantalla NO los pinta
+ * (ver `YA_ESTAN_FUERA`), o sea que una memoria con «cinta» dentro dejaría la hoja con todo
+ * plegado y sin ninguna manera de saber por qué. Lo que se acepta es lo que esta pantalla sabe
+ * abrir; cualquier otra cosa —una sección de una versión anterior, un valor a mano— es `null`,
+ * que es «abre por donde digas tú».
+ */
+export function laSeccionQueSeAbre(guardada: string | null): IdDeSeccion | null {
+  if (guardada === null) return null;
+  for (const id of ORDEN_DE_LA_HOJA) {
+    if (id === guardada && !YA_ESTAN_FUERA.includes(id)) return id;
+  }
+  return null;
+}
 
 /**
  * QUÉ SECCIÓN ESTÁ ABIERTA: la que se dejó de esta mesa, hasta que cambia el momento y me
@@ -128,14 +167,22 @@ const LO_QUE_SE_DEJO_ABIERTO = new Map<string, IdDeSeccion | null>();
  * llama le pasa `hoja.cinta.espera`, que `esperaA` deriva del paso, del turno y del momento—.
  * La primera vuelta NO cuenta: es cuando se monta la pantalla, y ahí manda lo que estuviera
  * guardado.
+ *
+ * `arcade` y `silla` son los dos tramos de la llave del bolsillo que no salen de la partida:
+ * quién es este juego y qué ventana es ésta. Se reciben y no se adivinan aquí — la silla la
+ * sabe la dirección, y quien la parte es la Sala.
  */
 export function usarLaSeccionAbierta(
+  arcade: string,
+  silla: string,
   codigo: string,
   abre: IdDeSeccion | null,
   paso: string,
   meToca: boolean,
 ): { readonly abierta: IdDeSeccion | null; readonly alAbrir: (id: IdDeSeccion) => void } {
-  const [abierta, ponerAbierta] = useState<IdDeSeccion | null>(() => LO_QUE_SE_DEJO_ABIERTO.get(codigo) ?? null);
+  const [abierta, ponerAbierta] = useState<IdDeSeccion | null>(() =>
+    laSeccionQueSeAbre(laSeccionGuardada(arcade, silla, codigo)),
+  );
   const pasoVisto = useRef<string | null>(null);
 
   useEffect(() => {
@@ -144,19 +191,25 @@ export function usarLaSeccionAbierta(
     pasoVisto.current = paso;
     if (esLaPrimera || !meToca) return;
     const cual = abre ?? 'ahora';
-    LO_QUE_SE_DEJO_ABIERTO.set(codigo, cual);
+    guardarLaSeccion(arcade, silla, codigo, cual);
     ponerAbierta(cual);
-  }, [codigo, paso, meToca, abre]);
+  }, [arcade, silla, codigo, paso, meToca, abre]);
 
   const alAbrir = useCallback(
     (id: IdDeSeccion) => {
       ponerAbierta((antes) => {
         const cual = antes === id ? null : id;
-        LO_QUE_SE_DEJO_ABIERTO.set(codigo, cual);
+        /*
+         * PLEGARLA TAMBIÉN SE GUARDA, y con la cadena vacía: `laSeccionQueSeAbre` no la
+         * encuentra en la lista y devuelve `null`, o sea «ninguna abierta». Guardar sólo cuando
+         * se abre dejaría lo de antes puesto, y al recargar volvería a salir abierta la que se
+         * acaba de cerrar a mano.
+         */
+        guardarLaSeccion(arcade, silla, codigo, cual ?? '');
         return cual;
       });
     },
-    [codigo],
+    [arcade, silla, codigo],
   );
 
   return { abierta, alAbrir };

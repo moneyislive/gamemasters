@@ -91,6 +91,41 @@
  * juntos miden unos 144: el pie flota sobre lienzo vacío y no sobre casillas. Las
  * cuatro esquinas siguen dentro con margen en las tres ventanas de la casa.
  *
+ * ═══ LAS CUATRO MITADES DE UNA CAJA MODAL SE PAGAN EN QUIEN LA MONTA ═══
+ *
+ * Las tres hojas que se abren sobre el lienzo tenían DOS de las cuatro: velo y
+ * `accessibilityViewIsModal`. Faltaban la trampa de foco y la devolución del foco, y
+ * la primera no es un detalle de la hoja sino de esta pantalla, porque lo que hay que
+ * apagar es lo que queda DEBAJO. `accessibilityViewIsModal` es de iOS y sólo hace
+ * ignorar a los HERMANOS de la vista que la lleva —o sea al velo—: con «¿Qué haces en
+ * Calle Mayor?» abierta, un lector salía a la cinta, al carril, a la caja de los tratos
+ * y a «Salir» y «Tirar la mesa»; en Android no atrapaba absolutamente nada. Ahora la
+ * trampa es una sola línea, `hayCajaModal`, y vive donde ya vivía la del cajón: encima
+ * de la barra de la mesa, que es hasta dónde llega lo que una tarjeta modal tapa. El
+ * foco vuelve porque nada de lo de debajo se mueve de sitio al cerrar.
+ *
+ * Y las tres hojas se han salido de `cajaDelLienzo` para que su VELO llegue igual de
+ * lejos que la trampa: `tapaTodo` es absoluto respecto de su padre, y con la caja del
+ * lienzo por padre el velo tapaba el anillo y dejaba la barra de la mesa encendida y
+ * pulsable con el dedo. «Tirar la mesa» acaba la partida de todos.
+ *
+ * ═══ UNA SOLA REGIÓN VIVA POR PANTALLA, Y AQUÍ HABÍA HASTA TRES ═══
+ *
+ * Medido en la rama del respaldo con el cajón cerrado: `LineaDelTurno` (viva, cortés),
+ * `ElAviso` (viva, tajante) y el aviso que el `Retablo` pinta dentro de sí (viva,
+ * cortés). Tres a la vez se pisan y acaban leyéndose a destiempo, que es justo lo que
+ * una región viva viene a evitar. Y `ElAviso` devuelve `null` con el texto vacío: la
+ * región NACE a la vez que su texto, y una región que se monta con su contenido dentro
+ * no anuncia nada — o sea que el aviso de la mesa no se oía nunca.
+ *
+ * Lo que se arregla desde aquí es no montar `<ElAviso>` en las dos ramas de mesa: su
+ * texto se lo lleva LA CINTA, que está siempre en el árbol, en las dos ramas, y por
+ * delante del aviso del juego y de la espera. Quedan dos regiones en el respaldo
+ * —`LineaDelTurno` y la del `Retablo`— y una sola en la rama del anillo. Las dos que
+ * quedan son de `tablero-en-linea.tsx` y de `retablo.tsx`, que no son de esta tanda; el
+ * arreglo exacto está escrito en `verify:sala`, junto a la regla que cuenta las que
+ * esta pantalla monta.
+ *
  * ═══ Y NINGUNA DECISIÓN DE ESTA PANTALLA MIRA LA PLATAFORMA ═══
  *
  * `Platform.OS` no aparece ni una vez, ni siquiera en las sombras: van a `false` en
@@ -962,16 +997,32 @@ function LaMesaEnTres({
    * la puerta para proponerle un trato. No manda ningún movimiento, así que no mira
    * `quieto`: leer quién va ganando mientras una jugada está en vuelo no rompe nada
    * y es justo cuando más se mira.
+   *
+   * ═══ Y BAJA EL CAJÓN, PORQUE ESTE TOQUE LLEGA DESDE DENTRO DEL CAJÓN ═══
+   *
+   * A este manejador se entra por DOS puertas: tocando el peón en el anillo —con el
+   * cajón cerrado, porque con el cajón abierto el anillo no se puede tocar— y tocando
+   * un renglón del MARCADOR, que vive dentro de la hoja, que vive dentro del cajón.
+   * Por la segunda, la hoja que esto abre se pintaba DEBAJO del cajón: el cajón es el
+   * último hermano de la pantalla y en esta plataforma pinta encima el que va después.
+   * O sea que pulsar a Ana en el marcador ponía el jugador elegido, mataba el cartel y
+   * no enseñaba nada — un botón muerto, y sin un solo error en ninguna consola.
+   *
+   * Bajar el cajón es lo que hace que la ficha aparezca donde se puede ver, y es
+   * exactamente el camino inverso del que ya estaba escrito: «Proponer trato» suelta la
+   * hoja y SUBE el cajón con `alAbrirEnElCajon('trato')`. Por la puerta del anillo esta
+   * línea no hace nada, porque ahí el cajón ya estaba cerrado.
    */
   const alTocarFigura = useCallback(
     (asiento: string) => {
       laInterfazSeLoQueda();
+      cerrarElCajon();
       ponerQueHacesAqui(null);
       ponerLaCasilla(null);
       ponerLaSenalada(null);
       ponerElJugador(asiento);
     },
-    [laInterfazSeLoQueda],
+    [laInterfazSeLoQueda, cerrarElCajon],
   );
 
   /**
@@ -987,18 +1038,57 @@ function LaMesaEnTres({
     ponerSeguir(false);
   }, [verElTableroEntero, cercania, mirador, ventana]);
 
-  /* ─── El pie y el cajón, que son los mismos en las dos ramas ─── */
+  /* ─── El pie, las hojas y el cajón, que son los mismos en las dos ramas ─── */
+
+  /*
+   * ═══ LO QUE CADA HOJA PINTA, COMPUESTO ANTES QUE NADIE Y UNA SOLA VEZ ═══
+   *
+   * Estos tres estaban al final del fichero, entre los `return` del respaldo y el de la
+   * mesa con anillo, o sea SÓLO en la rama del anillo. Suben aquí porque tres cosas
+   * distintas los necesitan antes: la rama del respaldo —que ahora también monta las
+   * hojas, ver `lasHojas`—, el cartel, y sobre todo `hayHojaAbierta`.
+   *
+   * Y `hayHojaAbierta` se deriva de LOS OBJETOS QUE SE PINTAN y no de los tres estados
+   * del dedo, que es la regla de la casa dicha para una trampa de foco. La diferencia
+   * se ve en un caso real: `elJugador` guarda un asiento y `buscarJugador` devuelve
+   * `null` si esa persona ya no está en la mesa —se fue mientras su ficha estaba
+   * abierta—. Mirando el estado, la pantalla se apagaría entera para un lector con
+   * NINGUNA hoja delante que leer: una pantalla muda y sin un solo error. Mirando el
+   * objeto, no hay hoja, no hay trampa.
+   */
+  const laFicha = laCasilla === null ? null : fichaDeCasilla(laVista, laCasilla, yo, opciones);
+  const elDelJugador = elJugador === null ? null : buscarJugador(hoja, elJugador);
+  const suDestino = elJugador === null ? null : destinoDelTrato(hoja, elJugador);
+  const hayHojaAbierta = queHacesAqui !== null || laFicha !== null || elDelJugador !== null;
+
+  /*
+   * ═══ HAY UNA CAJA MODAL DELANTE: EL CAJÓN O UNA DE LAS TRES HOJAS ═══
+   *
+   * Esta línea es la trampa de foco de las hojas, que era la mitad que faltaba. Cada
+   * hoja se declaraba modal con `accessibilityViewIsModal` y ahí se acababa: esa
+   * propiedad es de iOS y sólo hace ignorar a los HERMANOS de la vista que la lleva
+   * —o sea al velo, y a nada más—, y en Android no atrapa nada en absoluto. Con «¿Qué
+   * haces en Calle Mayor?» abierta y una tarjeta modal delante, un lector de pantalla
+   * salía a la cinta, al carril, a la caja de los tratos y a «Salir» y «Tirar la mesa»
+   * de la barra de la mesa: los cuatro muebles que la tarjeta viene a tapar.
+   *
+   * Las DOS mitades de verdad son apagar de un golpe lo que queda debajo
+   * —`accessibilityElementsHidden` en iOS e `importantForAccessibility` en Android, y
+   * ninguna sola vale—, y eso ya estaba escrito para el cajón. Aquí sólo se le suma la
+   * otra causa: si tapa el cajón o tapa una hoja, debajo no hay nada que leer.
+   */
+  const hayCajaModal = cajonAbierto || hayHojaAbierta;
 
   /*
    * EL CARTEL DE LA CASILLA SEÑALADA, y no se pinta si hay una hoja abierta encima:
    * las tres hojas son modales y llevan velo, así que un cartel debajo del velo es
-   * cromo apagado que sigue ocupando el pie. Las frases las escribe `cartelDeCasilla`
-   * y aquí no se redacta ninguna.
+   * cromo apagado que sigue ocupando el pie. Se pregunta por `hayHojaAbierta` —lo que
+   * SE PINTA— y no por los tres estados: con una ficha de jugador abierta sobre alguien
+   * que acaba de irse de la mesa no hay velo ninguno, y el cartel no tiene por qué
+   * apagarse. Las frases las escribe `cartelDeCasilla` y aquí no se redacta ninguna.
    */
   const elCartel =
-    laSenalada === null || queHacesAqui !== null || laCasilla !== null || elJugador !== null
-      ? null
-      : cartelDeCasilla(laVista, laSenalada);
+    laSenalada === null || hayHojaAbierta ? null : cartelDeCasilla(laVista, laSenalada);
 
   /*
    * ═══ EL PIE: LO QUE SE VE Y SE PULSA SIN ABRIR NADA ═══
@@ -1044,7 +1134,18 @@ function LaMesaEnTres({
         </ScrollView>
       ) : null}
       <ElCarrilDeLaMesa carril={carril} quieto={mesa.quieto} alElegir={alElegirOpcion} />
-      <LaCintaDelBurgo cinta={hoja.cinta} cajonAbierto={cajonAbierto} alAlternarElCajon={alternarElCajon} />
+      {/*
+        LA CINTA SE LLEVA TAMBIÉN EL AVISO DE LA MESA, y por eso ya no se monta
+        `ElAviso` en ninguna de las dos ramas: ver la cabecera del fichero. Es el
+        único mueble de esta pantalla que está SIEMPRE en el árbol y en las dos ramas,
+        que es lo que un aviso necesita para poder anunciarse.
+      */}
+      <LaCintaDelBurgo
+        cinta={hoja.cinta}
+        cajonAbierto={cajonAbierto}
+        alAlternarElCajon={alternarElCajon}
+        avisoDeLaMesa={mesa.aviso}
+      />
     </View>
   );
 
@@ -1069,6 +1170,83 @@ function LaMesaEnTres({
         <LaCronica cronica={cronica} />
       </ElCajonDeLaHoja>
     );
+
+  /*
+   * ═══ LAS TRES HOJAS, EN LAS DOS RAMAS Y FUERA DE LA CAJA DEL LIENZO ═══
+   *
+   * Eran tres bloques escritos a mano DENTRO de `cajaDelLienzo`, y eso costaba dos
+   * fallos medidos a la vez:
+   *
+   *   · EL VELO NO LLEGABA A LA BARRA DE LA MESA. `tapaTodo` es absoluto respecto de su
+   *     padre, y su padre era la caja del lienzo: el velo tapaba el anillo y nada más.
+   *     Con «¿Qué haces en Calle Mayor?» delante, «Salir» y «Tirar la mesa» seguían
+   *     pulsándose con el dedo — y «Tirar la mesa» acaba la partida de todos. Escritas
+   *     aquí, hermanas de todo lo que hay debajo, el velo llena la pantalla entera. De
+   *     paso dejan de recortarse contra el `overflow: hidden` de la caja del lienzo.
+   *   · Y EN EL RESPALDO NO EXISTÍAN. `respaldoSobreElRetablo` monta el pie y el cajón,
+   *     y dentro del cajón la hoja con su marcador y su `alTocarJugador`; pero las tres
+   *     hojas vivían sólo en la rama del anillo, que en el respaldo no se pinta. Así que
+   *     sobre el retablo, pulsar a un jugador en el marcador ponía el jugador elegido,
+   *     mataba el cartel de la casilla señalada y no pintaba NADA. Un botón muerto en la
+   *     rama a la que se llega justo cuando algo ya ha ido mal: sin cobertura, con un
+   *     `.glb` que no baja o con el lienzo caído.
+   *
+   * Se monta en las DOS ramas y no se recorta la del respaldo, por lo mismo que `elPie`
+   * es una función y no dos copias: dos ramas que pintan distinto se separan solas el
+   * día que alguien retoque una. Que en el respaldo sólo pueda abrirse la del jugador
+   * —no hay anillo que tocar, así que no hay casilla señalada ni «¿qué haces aquí?»— no
+   * es motivo para escribir una versión corta: las otras dos devuelven `null` solas y no
+   * cuestan un fotograma.
+   *
+   * Van escritas DESPUÉS de todo lo que tapan y ANTES del cajón, y ese orden es quién
+   * pinta encima: aquí no hay `z-index` y manda el hermano que va después.
+   */
+  const lasHojas = (): JSX.Element => (
+    <>
+      {queHacesAqui === null ? null : (
+        <LaHojaSobreElLienzo
+          titulo={`¿Qué haces en ${nombreDeCasilla(queHacesAqui.casilla)}?`}
+          alDejarlo={soltarTodo}
+        >
+          <LaFichaDeUnaCasilla
+            ficha={fichaDeCasilla(laVista, queHacesAqui.casilla, yo, opciones)}
+            quieto={mesa.quieto}
+            alElegir={alElegirOpcion}
+          />
+        </LaHojaSobreElLienzo>
+      )}
+
+      {laFicha === null ? null : (
+        <LaHojaSobreElLienzo titulo={laFicha.rotulo} alDejarlo={soltarTodo}>
+          <LaFichaDeUnaCasilla ficha={laFicha} quieto={mesa.quieto} alElegir={alElegirOpcion} />
+        </LaHojaSobreElLienzo>
+      )}
+
+      {elDelJugador === null ? null : (
+        <LaHojaSobreElLienzo titulo={elDelJugador.nombre} alDejarlo={soltarTodo}>
+          <LaFichaDelJugador
+            jugador={elDelJugador}
+            destino={suDestino}
+            nombreDeCasilla={nombreDeCasilla}
+            alProponerle={
+              suDestino === null
+                ? null
+                : () => {
+                    soltarTodo();
+                    /*
+                      SUBE EL CAJÓN Y ABRE «El trato» DE UNA VEZ. Antes bastaba con
+                      abrir la sección porque la hoja estaba siempre en pantalla;
+                      desde que vive en un cajón, abrir la sección sola manda al
+                      componedor a un sitio que no se ve.
+                    */
+                    alAbrirEnElCajon('trato');
+                  }
+            }
+          />
+        </LaHojaSobreElLienzo>
+      )}
+    </>
+  );
 
   /* ─── El respaldo: el retablo SVG de siempre, y por qué ─── */
 
@@ -1103,8 +1281,8 @@ function LaMesaEnTres({
         {/* La misma trampa de foco que la otra rama: las DOS mitades, o una plataforma se escapa. */}
         <View
           style={estilos.debajoDelCajon}
-          accessibilityElementsHidden={cajonAbierto}
-          importantForAccessibility={cajonAbierto ? 'no-hide-descendants' : 'auto'}
+          accessibilityElementsHidden={hayCajaModal}
+          importantForAccessibility={hayCajaModal ? 'no-hide-descendants' : 'auto'}
         >
           <BarraDeLaMesa
             juego={juego}
@@ -1115,7 +1293,17 @@ function LaMesaEnTres({
             arriba={arriba}
           />
           <LineaDelTurno mesa={vista} nombres={nombres} />
-          <ElAviso texto={mesa.aviso} />
+          {/*
+            AQUÍ IBA `ElAviso` CON EL AVISO DE LA MESA, Y ERA LA SEGUNDA REGIÓN VIVA DE
+            ESTA PANTALLA. Ver la cabecera del fichero: en esta rama llegaban a coincidir
+            tres —la línea del turno, este aviso y el que el `Retablo` pinta dentro—
+            cuando la casa pide UNA por pantalla, y además ésta devuelve `null` con el
+            texto vacío, o sea que la región nace a la vez que su texto y por eso no se
+            anuncia. El aviso de la mesa no se pierde: se lo lleva la CINTA, que está
+            siempre en el árbol y en las dos ramas, por delante del aviso del juego y de
+            la espera. Un «No ha salido el movimiento» manda sobre un «Espera a que Ana
+            tire».
+          */}
           {/*
             LA NOTA DEL RESPALDO, en tenue y no en alarma: no es un peligro, es un
             cambio de pincel. Dice el motivo porque «no se ha podido» sin motivo manda
@@ -1129,6 +1317,7 @@ function LaMesaEnTres({
           )}
           {elPie(sueltas)}
         </View>
+        {lasHojas()}
         {elCajon()}
       </View>
     );
@@ -1161,25 +1350,26 @@ function LaMesaEnTres({
 
   /* ─── La mesa con el anillo ─── */
 
-  const laFicha = laCasilla === null ? null : fichaDeCasilla(laVista, laCasilla, yo, opciones);
-  const elDelJugador = elJugador === null ? null : buscarJugador(hoja, elJugador);
-  const suDestino = elJugador === null ? null : destinoDelTrato(hoja, elJugador);
-
   return (
     <View style={estilos.todo}>
       {/*
-        ═══ TODO LO QUE QUEDA DEBAJO DEL CAJÓN SE APAGA DE UN GOLPE ═══
+        ═══ TODO LO QUE QUEDA DEBAJO DE UNA CAJA MODAL SE APAGA DE UN GOLPE ═══
 
         Es la trampa de foco de esta plataforma, y hacen falta LAS DOS mitades:
         `accessibilityElementsHidden` es de iOS y `importantForAccessibility` es de
-        Android. Con una sola, en la otra plataforma el lector se sale del cajón y se
+        Android. Con una sola, en la otra plataforma el lector se sale del modal y se
         pone a leer el tablero y la barra de la mesa — que es exactamente lo que un
         modal existe para impedir.
+
+        Y lo que la enciende es `hayCajaModal` y no `cajonAbierto`, que era la mitad que
+        les faltaba a LAS TRES HOJAS: ver dónde se declara. Va aquí arriba y no dentro
+        de la caja del lienzo porque debajo de una tarjeta modal no se apaga sólo el
+        anillo: se apagan también «Salir» y «Tirar la mesa».
       */}
       <View
         style={estilos.debajoDelCajon}
-        accessibilityElementsHidden={cajonAbierto}
-        importantForAccessibility={cajonAbierto ? 'no-hide-descendants' : 'auto'}
+        accessibilityElementsHidden={hayCajaModal}
+        importantForAccessibility={hayCajaModal ? 'no-hide-descendants' : 'auto'}
       >
         <BarraDeLaMesa
           juego={juego}
@@ -1190,7 +1380,11 @@ function LaMesaEnTres({
           arriba={arriba}
         />
         <LineaDelTurno mesa={vista} nombres={nombres} />
-        <ElAviso texto={mesa.aviso} />
+        {/*
+          AQUÍ IBA `ElAviso` con el aviso de la mesa, la segunda región viva de esta
+          pantalla. Se lo lleva la CINTA, que está siempre en el árbol y en las dos
+          ramas: ver la nota igual en la rama del respaldo y la cabecera del fichero.
+        */}
 
         <View style={estilos.cajaDelLienzo}>
           <RedDelLienzo alCaer={ponerElLienzoCayo}>
@@ -1338,14 +1532,14 @@ function LaMesaEnTres({
             tablero que se gira con el dedo. En la rama del respaldo el mismo `elPie` va
             en FLUJO bajo el retablo, que ahí no hay nada sobre lo que flotar.
 
-            ═══ Y VA ANTES QUE LAS TRES HOJAS, QUE ES UNA DECISIÓN Y NO UN ORDEN ═══
+            ═══ Y ES EL ÚLTIMO DE LA CAJA DEL LIENZO, QUE ES UNA DECISIÓN Y NO UN ORDEN ═══
 
             Aquí no hay `z-index`: en esta plataforma pinta encima el hermano que va
-            DESPUÉS. Escrito detrás de las hojas, el pie —la cinta, el carril, la caja de
-            los tratos— quedaba por encima del velo de una hoja modal: los botones de
-            debajo se verían encendidos y se podrían pulsar con una tarjeta abierta
-            delante, que es exactamente lo que un velo existe para impedir. Delante, la
-            hoja lo tapa con su velo y lo de debajo se adivina y no se toca.
+            DESPUÉS. El pie tiene que quedar por encima del anillo, del telón y de
+            «Ver el burgo entero», y por DEBAJO de las tres hojas y del cajón — que ya no
+            son hermanos suyos, sino hermanos de toda esta columna: escritas dentro de
+            esta caja, sus velos tapaban el anillo y dejaban «Salir» y «Tirar la mesa»
+            encendidos y pulsables con una tarjeta modal delante.
           */}
           <View style={estilos.pieFlotante} pointerEvents="box-none">
             {/*
@@ -1357,59 +1551,9 @@ function LaMesaEnTres({
             {laEscenaVaDetras ? <Text style={estilos.alDia}>El burgo se está poniendo al día…</Text> : null}
             {elPie(fuera)}
           </View>
-
-          {/*
-            LAS TRES HOJAS, HERMANAS DEL `GestureDetector` Y NUNCA DENTRO: un
-            `Pressable` dentro del detector le pelea el toque al giro del tablero. Se
-            escriben una detrás de otra y no en un `if/else` para que el día que dos
-            puedan salir a la vez se vea el solape en pantalla en vez de que una
-            desaparezca en silencio; hoy no pueden, porque cada manejador suelta las
-            otras dos antes de abrir la suya.
-          */}
-          {queHacesAqui === null ? null : (
-            <LaHojaSobreElLienzo
-              titulo={`¿Qué haces en ${nombreDeCasilla(queHacesAqui.casilla)}?`}
-              alDejarlo={soltarTodo}
-            >
-              <LaFichaDeUnaCasilla
-                ficha={fichaDeCasilla(laVista, queHacesAqui.casilla, yo, opciones)}
-                quieto={mesa.quieto}
-                alElegir={alElegirOpcion}
-              />
-            </LaHojaSobreElLienzo>
-          )}
-
-          {laFicha === null ? null : (
-            <LaHojaSobreElLienzo titulo={laFicha.rotulo} alDejarlo={soltarTodo}>
-              <LaFichaDeUnaCasilla ficha={laFicha} quieto={mesa.quieto} alElegir={alElegirOpcion} />
-            </LaHojaSobreElLienzo>
-          )}
-
-          {elDelJugador === null ? null : (
-            <LaHojaSobreElLienzo titulo={elDelJugador.nombre} alDejarlo={soltarTodo}>
-              <LaFichaDelJugador
-                jugador={elDelJugador}
-                destino={suDestino}
-                nombreDeCasilla={nombreDeCasilla}
-                alProponerle={
-                  suDestino === null
-                    ? null
-                    : () => {
-                        soltarTodo();
-                        /*
-                          SUBE EL CAJÓN Y ABRE «El trato» DE UNA VEZ. Antes bastaba con
-                          abrir la sección porque la hoja estaba siempre en pantalla;
-                          desde que vive en un cajón, abrir la sección sola manda al
-                          componedor a un sitio que no se ve.
-                        */
-                        alAbrirEnElCajon('trato');
-                      }
-                }
-              />
-            </LaHojaSobreElLienzo>
-          )}
         </View>
       </View>
+      {lasHojas()}
       {elCajon()}
     </View>
   );
@@ -1521,10 +1665,32 @@ const estilos = StyleSheet.create({
    */
   pieDeLaMesa: { flexShrink: 1, gap: 8, paddingHorizontal: 12 },
   /*
-   * DÓNDE FLOTA EL PIE: pegado al borde de abajo del lienzo, y sólo lo que ocupa. Sin
-   * `top`, así que no se estira ni tapa el anillo más de lo que miden sus muebles.
+   * ═══ DÓNDE FLOTA EL PIE, Y POR QUÉ AHORA TIENE TECHO ═══
+   *
+   * Esto era `{ position: 'absolute', left: 0, right: 0, bottom: 0 }` —sin `top`—, y eso
+   * quiere decir que su alto lo ponía el CONTENIDO y que quien lo recortaba era el
+   * `overflow: hidden` de `cajaDelLienzo`, POR ARRIBA. El `flexShrink: 1` de
+   * `pieDeLaMesa` no hacía nada, porque una caja absoluta sin `top` no tiene contra qué
+   * ceder: su comentario ya lo admitía y decía «flotando, esto no hace nada».
+   *
+   * MEDIDO: el peor pie real son 460 puntos de los 725 del lienzo en retrato, así que en
+   * un teléfono en pie no se recorta nada. Pero el techo del mueble son unos 728 —cartel
+   * 60, caja de los tratos 290, sueltas 180, carril 106, cinta 60 y 32 de huecos— y esta
+   * app corre TAMBIÉN en la web, donde la ventana la elige quien mira y puede ser baja.
+   * Y lo que se recorta por arriba es, por ese orden, EL CARTEL y LA CAJA DE LOS TRATOS:
+   * los tres movimientos de la caja —aceptar, rechazar y retirar— ya se los ha descontado
+   * la criba a la sección «El trato», así que contestar un trato desaparece de la
+   * pantalla entera sin un solo error. Es el fallo de siempre, entrando por el alto.
+   *
+   * Con `top: 0` la caja mide todo el lienzo y con `justifyContent: 'flex-end'` la pila
+   * sigue pegada al pie exactamente igual que antes; lo que cambia es que ahora HAY
+   * contra qué ceder, y ceden las dos listas que ya tienen tope y ruedan —`sueltasDelPie`
+   * aquí y `cajaLista` en la caja de los tratos— en vez de irse un mueble entero por
+   * arriba. El `pointerEvents="box-none"` de quien la usa es lo que impide que este
+   * rectángulo, ahora del tamaño del lienzo, se coma el gesto del tablero: la caja no
+   * coge toques y sus muebles sí.
    */
-  pieFlotante: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  pieFlotante: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end' },
   /*
    * LOS BOTONES QUE NO RECOGIÓ NINGÚN MUEBLE, con tope y desplazables. Con el cajón
    * cerrado aquí caen sobre todo las pujas de una subasta: cuatro botones con su

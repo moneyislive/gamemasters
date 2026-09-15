@@ -112,10 +112,16 @@
  *
  * ═══ EL VOCABULARIO ═══
  *
- * Los textos usan SÓLO las palabras del reglamento §0: euros («€»), el Ayuntamiento,
- * solar, barrio, estación, servicio, casa, hotel, hipoteca, subasta, la Comisaría, la
- * Salida, Sucesos, el Fondo Vecinal, «barrio entero», el Salvoconducto, quiebra, apuro.
+ * Los textos usan SÓLO las palabras del reglamento §0, y aquí va la lista ENTERA porque una
+ * lista recortada es la manera de que la palabra que falta se escriba con un sinónimo: euros
+ * («€»), el Ayuntamiento, solar, barrio, estación, servicio, casa, hotel, hipoteca (hipotecar,
+ * deshipotecar), subasta, la Comisaría, la Salida, el Descanso, ¡A comisaría!, el Impuesto, la
+ * Tasa, Sucesos, el Fondo Vecinal, «barrio entero», el Salvoconducto, quiebra, apuro.
  * Ninguna marca ajena, ni para decir que no se nombra.
+ *
+ * Y NINGÚN NÚMERO DE DINERO SE ESCRIBE A MANO: pasa por `maravedies`, que es el formato del
+ * §0.1 («1.500 €»). La concordancia tampoco: pasa por `plural`. Las dos cosas se leen igual de
+ * bien escritas mal, y por eso son las dos que se escapan.
  *
  * ═══ EN QUÉ SE APARTA ESTO DEL §4 DEL DISEÑO, Y POR QUÉ ═══
  *
@@ -586,6 +592,20 @@ function nombreDe(l: Lectura, quien: AsientoId | null): string {
 function nombreDeCasilla(casilla: number): string {
   const fila = filaDe(casilla);
   return fila === null ? `la casilla ${casilla}` : fila.nombre;
+}
+
+/**
+ * A QUIÉN, CON LA CONTRACCIÓN HECHA: «a Ana», «al Ayuntamiento».
+ *
+ * `nombreDe(l, null)` da «el Ayuntamiento», que es como se llama en el §0 y como tiene que
+ * salir cuando el nombre abre la frase («el Ayuntamiento guarda…»). Pegado detrás de una
+ * preposición ese mismo nombre daba «200 € a el Ayuntamiento», y salía de verdad: las deudas
+ * del apuro por el Impuesto, por la Tasa y por el interés de la hipoteca llevan `a: null`, o
+ * sea que la línea que más se lee cuando corre la cuenta atrás estaba mal escrita en
+ * castellano. Se contrae aquí y no en cada sitio, que es donde se olvidaría en el siguiente.
+ */
+function aQuien(l: Lectura, quien: AsientoId | null): string {
+  return quien === null ? 'al Ayuntamiento' : `a ${nombreDe(l, quien)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1076,6 +1096,36 @@ export interface FichaDeCasilla<O extends OpcionQueLlega = OpcionQueLlega> {
  * La vista se proyecta PARA alguien y ella misma dice quién es (`yo`). Un segundo `yo` por
  * parámetro sería un sitio donde el cartel podría decir «Tuyo» de un título ajeno; con uno
  * solo eso no se puede escribir.
+ *
+ * ═══ Y NO TRAE SELLO NI CONTADOR: MIRADO Y DESCARTADO, CON EL MOTIVO ═══
+ *
+ * El cliente de escritorio cuelga el reloj de su cartel del TEXTO pegado (`CartelAlPie`: el
+ * efecto se ata a `[texto, msQueDura]` para no rearmarse sesenta veces por segundo), y el
+ * precio es que señalar otra vez algo que dice LO MISMO no repinta nada: el cartel que ya se
+ * fue no vuelve. Lo apañó con un contador propio (`LoSenalado.sello`, un `useRef` que sube
+ * uno por señalada) usado como `key` de React.
+ *
+ * Se miró bajar ese sello aquí —que el cartel trajera algo que cambiara aunque el texto
+ * repita: la casilla, la jugada, las dos— y NO SE HACE, porque sería un sello que parece
+ * servir y no sirve:
+ *
+ *   · `casilla` y `jugada` ya están donde el cliente puede leerlos —`CartelDeCasilla.casilla`
+ *     es un campo de este mismo objeto y la jugada viene en la vista—, así que bajarlos
+ *     compuestos no le daría al cliente ni un dato que no tenga. No sería un sello nuevo:
+ *     sería el mismo dato con otro nombre.
+ *   · Y sobre todo: el sello que hace falta cuenta GESTOS, no casillas. Dos señaladas
+ *     seguidas de la MISMA casilla en la MISMA jugada son dos carteles, y un sello derivado
+ *     de la vista vale igual en las dos. Hoy este cliente no llega a ese caso porque el
+ *     segundo toque sobre la casilla señalada abre la tarjeta en vez de volver a señalar,
+ *     pero un cartel de verdad aparece al POSAR el cursor (la escena todavía no publica ese
+ *     aviso) y sacar y volver a meter el ratón en la misma casilla es exactamente ese caso, y
+ *     es el corriente. O sea que bajarlo aquí invitaría a tirar el contador del cliente por un
+ *     campo que falla justo donde el contador no falla, y sin que se caiga nada.
+ *
+ * Este cartel es UNA FUNCIÓN DE `(vista, casilla)` y de nada más: dos llamadas iguales dan un
+ * cartel idéntico, que es lo que hace que la tarjeta y el cartel puedan compararse por frase
+ * (`verify:escritorio` lo hace) y lo que impide que un contador se cuele aquí dentro.
+ * `verify:burgo-en-tres` lo afirma, con su vacuna.
  */
 export interface CartelDeCasilla {
   readonly casilla: number;
@@ -1131,7 +1181,7 @@ function lineaDelBarrio(l: Lectura, barrio: BarrioDelBurgo): string {
   }
   const cuantos = barrio.solares.length;
   const partes = cuentas.map((x) => `${x.nombre} ${x.cuantos}`);
-  return `${barrio.nombre}: ${cuantos} ${cuantos === 1 ? 'solar' : 'solares'} · ${partes.join(' · ')}`;
+  return `${barrio.nombre}: ${cuantos} ${plural(cuantos, 'solar', 'solares')} · ${partes.join(' · ')}`;
 }
 
 /** El cartel, ya con la vista leída: lo llaman `cartelDeCasilla` y `fichaDeCasilla`, para que digan lo mismo. */
@@ -1193,19 +1243,19 @@ function rentasDe(fila: CasillaDelBurgo, t: TituloQueSePinta | null, tirada: Par
     filas.push({ rotulo: 'Barrio entero', cuanto: r[0] * 2, actual: marca(r[0] * 2, t !== null && t.casas === 0 && t.barrioEntero) });
     for (let k = 1; k <= 4; k++) {
       const cuanto = r[k] ?? 0;
-      filas.push({ rotulo: k === 1 ? '1 casa' : `${k} casas`, cuanto, actual: marca(cuanto, t !== null && t.casas === k) });
+      filas.push({ rotulo: plural(k, '1 casa', `${k} casas`), cuanto, actual: marca(cuanto, t !== null && t.casas === k) });
     }
     filas.push({ rotulo: 'Hotel', cuanto: r[5], actual: marca(r[5], t !== null && t.casas === POSADA) });
   } else if (fila.clase === 'puerta') {
     for (let n = 1; n < RENTA_DE_PUERTA.length; n++) {
       const cuanto = RENTA_DE_PUERTA[n] ?? 0;
-      filas.push({ rotulo: n === 1 ? '1 estación' : `${n} estaciones`, cuanto, actual: marca(cuanto, true) });
+      filas.push({ rotulo: plural(n, '1 estación', `${n} estaciones`), cuanto, actual: marca(cuanto, true) });
     }
   } else if (fila.clase === 'oficio') {
     const suma = tirada === null ? 0 : tirada[0] + tirada[1];
     for (let n = 1; n < MULTIPLO_DE_OFICIO.length; n++) {
       const veces = MULTIPLO_DE_OFICIO[n] ?? 0;
-      filas.push({ rotulo: `${n === 1 ? '1 servicio' : `${n} servicios`}: ${veces} × la tirada`, cuanto: veces * suma, actual: marca(veces * suma, suma > 0) });
+      filas.push({ rotulo: `${plural(n, '1 servicio', `${n} servicios`)}: ${veces} × la tirada`, cuanto: veces * suma, actual: marca(veces * suma, suma > 0) });
     }
   }
   return filas;
@@ -1240,7 +1290,7 @@ function estadoDeLaCasilla(l: Lectura, fila: CasillaDelBurgo, t: TituloQueSePint
   partes.push(l.yo !== null && t.dueno === l.yo ? 'Tuyo' : `De ${nombreDe(l, t.dueno)}`);
   if (t.empenado) partes.push('hipotecado');
   else if (t.casas === POSADA) partes.push('hotel');
-  else if (t.casas > 0) partes.push(t.casas === 1 ? '1 casa' : `${t.casas} casas`);
+  else if (t.casas > 0) partes.push(plural(t.casas, '1 casa', `${t.casas} casas`));
   else if (t.barrioEntero) partes.push('barrio entero');
   return partes.join(' · ');
 }
@@ -1276,9 +1326,36 @@ export function fichaDeCasilla<O extends OpcionQueLlega>(vista: unknown, casilla
   if (barrio !== null && l !== null) lineas.push(lineaDelBarrio(l, barrio));
   if (seCompra) lineas.push(`Precio: ${maravedies(fila.precio)}`);
   if (fila.casa > 0) lineas.push(`Cada casa: ${maravedies(fila.casa)}`);
-  if (estado.length > 0) lineas.push(estado);
+  /*
+   * ═══ EL ESTADO NO SE REPITE CUANDO YA ES EL NOMBRE, Y LO ERA EN DIEZ DE LAS CUARENTA ═══
+   *
+   * La tarjeta lleva el nombre en el encabezado y `lineas` debajo. En las casillas que no se
+   * compran, `estadoDeLaCasilla` devuelve el nombre de la casilla TAL CUAL —«El Descanso»,
+   * «La Salida», «La Comisaría», «¡A comisaría!», los tres «Sucesos» y los tres «El Fondo
+   * Vecinal»: diez de las cuarenta— así que la tarjeta decía «El Descanso» arriba y «El
+   * Descanso» otra vez en el primer renglón. El cartel al pie (`cartelDe`) ya llevaba la
+   * guarda desde el principio; aquí faltaba, y son los dos muebles que dicen lo mismo de la
+   * misma casilla, que es precisamente el par que esta traducción existe para no dejar
+   * discrepar.
+   *
+   * No se filtra desde el cliente y no puede filtrarse: los renglones los redacta el juego, y
+   * un cliente que comparase el renglón con el encabezado estaría redactando por su cuenta.
+   *
+   * Y LA GUARDA NO SE COME UN ESTADO QUE SÍ APORTA: es una igualdad, no un «empieza por». Las
+   * dos casillas que cobran —el Impuesto («El Impuesto: 200 €») y la Tasa («La Tasa: 100 €»)—
+   * traen la cifra pegada al nombre, así que no son iguales al nombre y su renglón se queda,
+   * que es donde se lee lo único que hay que saber al caer en ellas.
+   */
+  if (estado.length > 0 && estado !== fila.nombre) lineas.push(estado);
   if (t !== null && t.dueno !== null && !t.empenado) lineas.push(`Renta hoy: ${maravedies(t.rentaAhora)}`);
-  if (seCompra) lineas.push(`Hipoteca: ${maravedies(valorDeEmpeno(fila.precio))} · deshipotecar: ${maravedies(costeDeDesempeno(fila.precio))}`);
+  /*
+   * QUÉ DA Y QUÉ CUESTA, DICHO CON EL VERBO. «Hipoteca: 200 € · deshipotecar: 220 €» son dos
+   * cifras y ningún sentido: la primera se lee como lo que la hipoteca CUESTA, que es lo
+   * contrario de lo que es. Un renglón de una tarjeta se lee solo, sin la tabla de al lado.
+   */
+  if (seCompra) {
+    lineas.push(`Hipotecarlo da ${maravedies(valorDeEmpeno(fila.precio))} · deshipotecarlo cuesta ${maravedies(costeDeDesempeno(fila.precio))}`);
+  }
   return {
     casilla: fila.indice,
     nombre: fila.nombre,
@@ -1345,10 +1422,10 @@ export interface MarcadorDelBurgo {
 }
 
 function lineaDelMarcador(j: JugadorQueSePinta, nombre: string): string {
-  let linea = `${nombre} · ${maravedies(j.mrs)} · ${j.titulos.length} ${j.titulos.length === 1 ? 'título' : 'títulos'}`;
+  let linea = `${nombre} · ${maravedies(j.mrs)} · ${j.titulos.length} ${plural(j.titulos.length, 'título', 'títulos')}`;
   if (j.quebrado) linea += ' · quebró';
   else if (j.presa >= 0) linea += ' · en la Comisaría';
-  if (j.indultos > 0) linea += ` · ${j.indultos} ${j.indultos === 1 ? 'Salvoconducto' : 'Salvoconductos'}`;
+  if (j.indultos > 0) linea += ` · ${j.indultos} ${plural(j.indultos, 'Salvoconducto', 'Salvoconductos')}`;
   return linea;
 }
 
@@ -1473,10 +1550,33 @@ export function pujaEnTres<O extends OpcionQueLlega>(vista: unknown, yo: QuienMi
   }
   const nombre = nombreDeCasilla(a.casilla);
   const lineas: string[] = [];
-  lineas.push(a.quienPuja === null ? `${nombre}: sin pujas.` : `${nombre}: ${maravedies(a.puja)} de ${nombreDe(l, a.quienPuja)}.`);
-  lineas.push(`${meToca ? 'Te toca pujar' : `Puja ${nombreDe(l, a.pujaDe)}`}. En pie: ${enPie.map((d) => d.nombre).join(', ')}.`);
-  if (a.enCola > 0) lineas.push(`${a.enCola} ${a.enCola === 1 ? 'título más en cola' : 'títulos más en cola'}.`);
-  if (meToca && puerta !== null) lineas.push(`Puja libre entre ${maravedies(puerta.minimo)} y ${maravedies(puerta.maximo)}, de ${puerta.escalon} en ${puerta.escalon}.`);
+  lineas.push(
+    a.quienPuja === null ? `${nombre}: sin pujas todavía.` : `${nombre}: la mejor puja es ${maravedies(a.puja)}, de ${nombreDe(l, a.quienPuja)}.`,
+  );
+  /*
+   * A QUIÉN SE ESPERA Y QUIÉN SIGUE EN PIE, CADA UNO CON SU GUARDA, Y LAS DOS HACÍAN FALTA.
+   *
+   * «Puja ${nombreDe(l, a.pujaDe)}» sin guarda daba «Puja el Ayuntamiento» cuando la subasta
+   * se está cerrando y ya no se espera a nadie —el Ayuntamiento no puja en toda la partida—, y
+   * «En pie: ${…join(', ')}» daba «En pie: .» cuando el último pasa. Las dos frases se leen
+   * solas en la sección «La subasta», así que las dos tenían que dejar de escribirse en vez de
+   * escribirse vacías.
+   */
+  const partes: string[] = [];
+  if (meToca) partes.push('Te toca pujar.');
+  else if (a.pujaDe !== null) partes.push(`Puja ${nombreDe(l, a.pujaDe)}.`);
+  if (enPie.length > 0) partes.push(`Siguen en pie: ${enPie.map((d) => d.nombre).join(', ')}.`);
+  if (partes.length > 0) lineas.push(partes.join(' '));
+  if (a.enCola > 0) lineas.push(`${a.enCola} ${plural(a.enCola, 'título más en cola', 'títulos más en cola')}.`);
+  /*
+   * EL ESCALÓN ES DINERO Y SE ESCRIBE COMO EL DINERO. Iba en crudo —«de 10 en 10»— al lado de
+   * dos cifras con su «€» y su punto de millar, o sea el único número del juego escrito de otra
+   * manera; y en una frase sobre cuánto se puede pujar, un número sin moneda se lee como un
+   * número de veces. La palabra es la del reglamento (§3.2: «múltiplo de 10 €»).
+   */
+  if (meToca && puerta !== null) {
+    lineas.push(`Puja libre entre ${maravedies(puerta.minimo)} y ${maravedies(puerta.maximo)}, en múltiplos de ${maravedies(puerta.escalon)}.`);
+  }
   return {
     casilla: a.casilla,
     nombre,
@@ -1513,8 +1613,14 @@ export interface TratoAbierto<O extends OpcionQueLlega = OpcionQueLlega> {
   readonly a: DuenoVisto;
   readonly doy: LadoQueSePinta;
   readonly pido: LadoQueSePinta;
-  /** «Ana da 200 €, Callejón de las Latas y pide un Salvoconducto.» */
+  /** «Ana da 200 €, Callejón de las Latas y pide un Salvoconducto.»: en tercera persona, para quien mire. */
   readonly resumen: string;
+  /**
+   * LA MISMA FRASE QUE LA TIRA DE LA CAJA, escrita desde donde mira quien la lee: «Ana te
+   * ofrece Calle Mayor por 350 €» a quien tiene que contestarla, «Le ofreces a Ana…» a quien
+   * la propuso. La compone `fraseDelTrato`, que es la única redacción de esto que hay.
+   */
+  readonly frase: string;
   readonly da: string;
   readonly pide: string;
   readonly soyElDestinatario: boolean;
@@ -1567,8 +1673,72 @@ function resumenDeLado(lado: LadoQueSePinta): string {
   const partes: string[] = [];
   if (lado.mrs > 0) partes.push(maravedies(lado.mrs));
   for (const c of lado.titulos) partes.push(nombreDeCasilla(c));
-  if (lado.indultos > 0) partes.push(lado.indultos === 1 ? 'un Salvoconducto' : `${lado.indultos} Salvoconductos`);
+  if (lado.indultos > 0) partes.push(plural(lado.indultos, 'un Salvoconducto', `${lado.indultos} Salvoconductos`));
   return partes.length === 0 ? 'nada' : partes.join(', ');
+}
+
+/**
+ * ═══ UNA PROPUESTA DE TRATO, ESCRITA DESDE DONDE MIRA QUIEN LA LEE, Y UNA SOLA VEZ ═══
+ *
+ * La misma propuesta se lee distinta según de qué lado de la mesa esté quien la mira, y ésa es
+ * justo la información que un resumen en tercera persona no da: «Ana te ofrece» dice que hay
+ * que contestar; «Le ofreces a Ana» dice que estás esperando.
+ *
+ * ═══ Y ESTABA ESCRITA DOS VECES, CON DOS RESULTADOS DISTINTOS ═══
+ *
+ * La caja de los tratos la redactaba así (`tiraDelTrato`), y la sección «El trato» de la hoja
+ * redactaba lo mismo por su cuenta pegando un prefijo delante del resumen en tercera persona:
+ * «De Ana a ti: Ana da 350 € y pide Calle Mayor.» El nombre de Ana salía DOS VECES en el mismo
+ * renglón y en dos papeles distintos —una vez como remitente y otra como sujeto—, que es de las
+ * cosas que se leen dos veces para entenderse una. Ahora las dos mitades llaman aquí, y quien
+ * cambie la redacción la cambia en los dos muebles a la vez, que es la regla de esta casa.
+ *
+ * ═══ Y UN LADO VACÍO NO SE DICE METIENDO «NADA» EN EL HUECO ═══
+ *
+ * Un trato con un lado vacío es LEGAL —`montar` sólo rechaza los dos vacíos a la vez—, o sea
+ * que se propone un regalo («toma esto y no me des nada») y se propone una petición («dame
+ * esto y no te doy nada»), que son dos jugadas de verdad cuando alguien va a quebrar. Pegando
+ * el «nada» de `resumenDeLado` en el hueco salía «Ana te ofrece nada por 350 €», que no es
+ * castellano y que además dice lo contrario de lo que pasa: lo que Ana hace ahí es PEDIR. Cada
+ * uno de los dos casos tiene su frase, y así un regalo se lee como un regalo.
+ *
+ * Va SIN punto final: es el nombre accesible de la tira de la caja, y un nombre no es una
+ * frase. Quien la ponga en un renglón le añade el punto.
+ */
+function fraseDelTrato(t: {
+  readonly de: string;
+  readonly a: string;
+  readonly da: string;
+  readonly pide: string;
+  readonly daNada: boolean;
+  readonly pideNada: boolean;
+  readonly soyElDestinatario: boolean;
+  readonly soyElProponente: boolean;
+}): string {
+  if (t.pideNada) {
+    if (t.soyElDestinatario) return `${t.de} te ofrece ${t.da} y no te pide nada`;
+    if (t.soyElProponente) return `Le ofreces a ${t.a} ${t.da} sin pedirle nada`;
+    return `${t.de} le ofrece a ${t.a} ${t.da} sin pedirle nada`;
+  }
+  if (t.daNada) {
+    if (t.soyElDestinatario) return `${t.de} te pide ${t.pide} y no te da nada a cambio`;
+    if (t.soyElProponente) return `Le pides a ${t.a} ${t.pide} sin darle nada`;
+    return `${t.de} le pide a ${t.a} ${t.pide} sin darle nada`;
+  }
+  if (t.soyElDestinatario) return `${t.de} te ofrece ${t.da} por ${t.pide}`;
+  if (t.soyElProponente) return `Le ofreces a ${t.a} ${t.da} por ${t.pide}`;
+  return `${t.de} le ofrece a ${t.a} ${t.da} por ${t.pide}`;
+}
+
+/**
+ * EL RESUMEN EN TERCERA PERSONA, para quien mira un trato que no es suyo. Mismo cuidado con el
+ * lado vacío: «Ana da nada y pide 350 €» era la frase que salía, y la que hace falta es «Ana no
+ * da nada y pide 350 €».
+ */
+function resumenDelTrato(quienPropone: string, doy: LadoQueSePinta, pido: LadoQueSePinta): string {
+  const da = ladoVacio(doy) ? 'no da nada' : `da ${resumenDeLado(doy)}`;
+  const pide = ladoVacio(pido) ? 'no pide nada' : `pide ${resumenDeLado(pido)}`;
+  return `${quienPropone} ${da} y ${pide}.`;
 }
 
 function puertaDelTrato(l: Lectura, opciones: readonly OpcionQueLlega[]): PuertaDelTrato | null {
@@ -1643,15 +1813,27 @@ export function tratoEnTres<O extends OpcionQueLlega>(vista: unknown, yo: QuienM
       if (o.tipo === RECHAZAR) rechazar = o;
       if (o.tipo === RETIRAR) retirar = o;
     }
+    const da = resumenDeLado(t.doy);
+    const pide = resumenDeLado(t.pido);
     abiertos.push({
       id: t.id,
       de,
       a,
       doy: t.doy,
       pido: t.pido,
-      resumen: `${de.nombre} da ${resumenDeLado(t.doy)} y pide ${resumenDeLado(t.pido)}.`,
-      da: resumenDeLado(t.doy),
-      pide: resumenDeLado(t.pido),
+      resumen: resumenDelTrato(de.nombre, t.doy, t.pido),
+      frase: fraseDelTrato({
+        de: de.nombre,
+        a: a.nombre,
+        da,
+        pide,
+        daNada: ladoVacio(t.doy),
+        pideNada: ladoVacio(t.pido),
+        soyElDestinatario: t.a === yo,
+        soyElProponente: t.de === yo,
+      }),
+      da,
+      pide,
       soyElDestinatario: t.a === yo,
       soyElProponente: t.de === yo,
       aceptar,
@@ -1783,7 +1965,7 @@ export interface FichaDeJugador {
 function estadoDelTitulo(t: TituloQueSePinta, fila: CasillaDelBurgo): string {
   if (t.empenado) return 'hipotecado';
   if (t.casas === POSADA) return 'hotel';
-  if (t.casas > 0) return t.casas === 1 ? '1 casa' : `${t.casas} casas`;
+  if (t.casas > 0) return plural(t.casas, '1 casa', `${t.casas} casas`);
   if (t.barrioEntero) return 'barrio entero';
   return fila.clase === 'solar' ? 'solar' : fila.clase === 'puerta' ? 'estación' : 'servicio';
 }
@@ -1867,7 +2049,7 @@ export function fichaDeJugador<O extends OpcionQueLlega>(
   }
   if (sueltos.length > 0) lineas.push(`${SIN_BARRIO.nombre}: ${sueltos.map((t) => t.rotulo).join(', ')}`);
   if (j.titulos.length === 0) lineas.push('Todavía no tiene ningún título.');
-  if (j.indultos > 0) lineas.push(`${j.indultos === 1 ? 'Un Salvoconducto' : `${j.indultos} Salvoconductos`} en la mano.`);
+  if (j.indultos > 0) lineas.push(`${plural(j.indultos, 'Un Salvoconducto', `${j.indultos} Salvoconductos`)} en la mano.`);
 
   /*
    * EL COMPONEDOR SÓLO SI EL JUEGO ABRE LA PUERTA PARA ÉL. `tratoEnTres` da la puerta que
@@ -2077,17 +2259,17 @@ function tiraDelTrato<O extends OpcionQueLlega>(l: Lectura, t: TratoQueSePinta, 
   const pide = resumenDeLado(t.pido);
   const soyElDestinatario = t.a === yo;
   const soyElProponente = t.de === yo;
-  /*
-   * TRES REDACCIONES Y NO UNA CON UN «SI» DENTRO: la misma propuesta se lee distinta según
-   * de qué lado de la mesa esté quien la mira, y ésa es justo la información que una lista
-   * de resúmenes en tercera persona no daba. «Ana te ofrece» dice que hay que contestar;
-   * «Le ofreces a Ana» dice que estás esperando.
-   */
-  const frase = soyElDestinatario
-    ? `${de.nombre} te ofrece ${da} por ${pide}`
-    : soyElProponente
-      ? `Le ofreces a ${a.nombre} ${da} por ${pide}`
-      : `${de.nombre} le ofrece a ${a.nombre} ${da} por ${pide}`;
+  /* Las redacciones viven en `fraseDelTrato`, que es de donde las saca también la hoja. */
+  const frase = fraseDelTrato({
+    de: de.nombre,
+    a: a.nombre,
+    da,
+    pide,
+    daNada: ladoVacio(t.doy),
+    pideNada: ladoVacio(t.pido),
+    soyElDestinatario,
+    soyElProponente,
+  });
   /*
    * SIN ACEPTAR, EL RENGLÓN DICE POR QUÉ. Hoy el juego ofrece siempre las dos al
    * destinatario, así que este caso no se da jugando; se escribe igual porque una tira con
@@ -2330,7 +2512,14 @@ function lineasDeAhora(vista: unknown, l: Lectura, yo: QuienMira): string[] {
      * `hojaEnTres`), así que el texto tiene que apuntar a donde están de verdad.
      */
     if (faltan > 0) lineas.push(`Te faltan ${maravedies(faltan)}: vende o hipoteca aquí mismo, o declárate en quiebra.`);
-    for (const d of l.apuro.deudas) lineas.push(`${maravedies(d.cuanto)} a ${nombreDe(l, d.a)}.`);
+    /*
+     * CADA DEUDA, CON VERBO Y CON LA CONTRACCIÓN. «350 € a Ana.» son dos datos sin frase, y
+     * con el Ayuntamiento de acreedor —el Impuesto, la Tasa, el interés de la hipoteca, que
+     * llevan `a: null`— salía «200 € a el Ayuntamiento.» Es el renglón que se lee mientras
+     * corre la cuenta atrás del apuro, así que es el que menos puede costar una segunda
+     * lectura.
+     */
+    for (const d of l.apuro.deudas) lineas.push(`Le debes ${maravedies(d.cuanto)} ${aQuien(l, d.a)}.`);
     return lineas;
   }
   if (l.turnoDe === yo) {
@@ -2358,13 +2547,16 @@ function lineasDeAhora(vista: unknown, l: Lectura, yo: QuienMira): string[] {
     } else if (l.paso === 'por-pasar') {
       lineas.push(l.dobles > 0 ? 'Dobles: vuelve a tirar.' : 'Puedes obrar, tratar o pasar el turno.');
     } else if (l.paso === 'almoneda') {
-      lineas.push('Te toca pujar: mira la subasta.');
+      /* Las pujas NO suben nunca al carril (`esDelMomento` las deja fuera): están siempre en su sección, y se dice cuál con su nombre, como «El trato» y «Ahora» dicen el suyo. */
+      lineas.push(`Te toca pujar: las pujas están en «${tituloDeSeccion('almoneda')}».`);
     }
   } else {
     lineas.push(esperaA(vista));
   }
   if (l.tirada !== null && l.paso !== 'por-tirar') {
-    lineas.push(`Última tirada: ${l.tirada[0]} y ${l.tirada[1]}${l.tirada[0] === l.tirada[1] ? ' (dobles)' : ''}.`);
+    /* CON LA SUMA, que es lo que de verdad se mira: los dos dados dicen si hubo dobles y la suma dice cuánto se anduvo (y cuánto cobra un servicio, §1). */
+    const suma = l.tirada[0] + l.tirada[1];
+    lineas.push(`Última tirada: ${l.tirada[0]} y ${l.tirada[1]}, ${suma} en total${l.tirada[0] === l.tirada[1] ? ' (dobles)' : ''}.`);
   }
   return lineas;
 }
@@ -2374,9 +2566,20 @@ function lineasDeLaMesa(l: Lectura): string[] {
   for (const j of l.jugadores) {
     lineas.push(`${nombreDe(l, j.asiento)}: ${maravedies(j.mrs)} en mano, ${maravedies(j.patrimonio)} de patrimonio${j.quebrado ? ' · quebró' : ''}.`);
   }
-  lineas.push(`El Ayuntamiento guarda ${l.concejo.casas} casas y ${l.concejo.posadas} hoteles.`);
-  lineas.push(`Quedan ${l.quedan.pregon} cartas en Sucesos y ${l.quedan.arca} en el Fondo Vecinal.`);
-  if (l.topeDeVueltas > 0) lineas.push(`Se juega a ${l.topeDeVueltas} ${l.topeDeVueltas === 1 ? 'vuelta' : 'vueltas'}.`);
+  lineas.push(
+    `El Ayuntamiento guarda ${l.concejo.casas} ${plural(l.concejo.casas, 'casa', 'casas')} y ${l.concejo.posadas} ${plural(l.concejo.posadas, 'hotel', 'hoteles')}.`,
+  );
+  /*
+   * EL VERBO CONCUERDA CON LOS DOS MAZOS SUMADOS, que es lo que pide un sujeto coordinado:
+   * «Quedan 1 carta en Sucesos y 9 en el Fondo Vecinal» es correcto, y «Queda 1 carta … y 0»
+   * también. Con el plural escrito a mano salía «Quedan 1 cartas», y salía justo al final de
+   * la partida, que es cuando esos dos números son lo que se está mirando.
+   */
+  const cartas = l.quedan.pregon + l.quedan.arca;
+  lineas.push(
+    `${plural(cartas, 'Queda', 'Quedan')} ${l.quedan.pregon} ${plural(l.quedan.pregon, 'carta', 'cartas')} en Sucesos y ${l.quedan.arca} en el Fondo Vecinal.`,
+  );
+  if (l.topeDeVueltas > 0) lineas.push(`Se juega a ${l.topeDeVueltas} ${plural(l.topeDeVueltas, 'vuelta', 'vueltas')}.`);
   return lineas;
 }
 
@@ -2459,13 +2662,37 @@ export function hojaEnTres<O extends OpcionQueLlega>(
   }
   const lineasDelTrato: string[] = [];
   if (trato !== null) {
-    for (const t of trato.abiertos) lineasDelTrato.push(`${t.soyElProponente ? 'Tuyo' : `De ${t.de.nombre}`} a ${t.soyElDestinatario ? 'ti' : t.a.nombre}: ${t.resumen}`);
+    /*
+     * LA MISMA FRASE QUE LA TIRA DE LA CAJA, y antes eran dos redacciones del mismo trato: aquí
+     * se pegaba un remite delante del resumen en tercera persona y salía «De Ana a ti: Ana da
+     * 350 € y pide Calle Mayor», con Ana dos veces en el mismo renglón. Ver `fraseDelTrato`.
+     */
+    for (const t of trato.abiertos) lineasDelTrato.push(`${t.frase}.`);
     if (trato.puerta !== null) lineasDelTrato.push(trato.puerta.ayuda);
   }
   /* Con la caja puesta, la sección dice DÓNDE se contesta: los renglones sin botones se leen como una sección rota. */
   if (pregon !== null && lineasDelTrato.length > 0) lineasDelTrato.push(`Se contestan en «${LOS_TRATOS_DE_LA_MESA}». ${pregon.caduca}`);
+  /*
+   * ═══ EN «LO MÍO» NO SE REPITE «TUYO» EN CADA RENGLÓN ═══
+   *
+   * `f.estado` es el estado de la TARJETA, y empieza por de quién es: «Tuyo · 2 casas». En una
+   * sección que se titula «Lo mío» y donde todos los títulos son míos por construcción, eso es
+   * la misma palabra repetida tantas veces como títulos tenga —hasta veintiocho—, y la que
+   * sobra es siempre la primera, que es donde empieza a leerse. Lo que hace falta es lo que
+   * distingue un renglón del siguiente, y eso es `estadoDelTitulo`: la función que esta casa ya
+   * tiene escrita para decir un título DENTRO DE UNA LISTA («2 casas», «hipotecado», «barrio
+   * entero», «solar», «estación», «servicio»). El dueño lo dice el título de la sección.
+   */
   const lineasDeLoMio: string[] = [];
-  for (const b of mios) for (const f of b.fichas) lineasDeLoMio.push(`${f.nombre} (${b.nombre}): ${f.estado}${f.rentaAhora > 0 ? ` · renta ${maravedies(f.rentaAhora)}` : ''}`);
+  for (const b of mios) {
+    for (const f of b.fichas) {
+      const t = tituloEn(l, f.casilla);
+      const fila = filaDe(f.casilla);
+      const enLaLista = t === null || fila === null ? '' : estadoDelTitulo(t, fila);
+      const renta = f.rentaAhora > 0 ? ` · renta ${maravedies(f.rentaAhora)}` : '';
+      lineasDeLoMio.push(enLaLista.length === 0 ? `${f.nombre} (${b.nombre})${renta}` : `${f.nombre} (${b.nombre}): ${enLaLista}${renta}`);
+    }
+  }
   if (j !== null && lineasDeLoMio.length === 0) lineasDeLoMio.push('Todavía no tienes ningún título.');
   /*
    * Con el carril puesto, la sección dice DÓNDE se pulsa, igual que «El trato» con la caja:
@@ -2481,7 +2708,15 @@ export function hojaEnTres<O extends OpcionQueLlega>(
     {
       id: 'carta',
       titulo: tituloDeSeccion('carta'),
-      lineas: cartel === null ? ['Ninguna en este turno.'] : [cartel.titulo, cartel.texto, `La sacó ${cartel.nombre} ${cartel.deDonde}.`],
+      /*
+       * QUIÉN LA SACÓ, SÓLO SI SE SABE. `cartelEnTres` deja el nombre vacío cuando la vista no
+       * dice de quién es la carta, y el renglón salía «La sacó  de Sucesos.», con el hueco
+       * dentro. Sin nombre se dice lo único que se sabe, que es de qué mazo salió.
+       */
+      lineas:
+        cartel === null
+          ? ['Ninguna en este turno.']
+          : [cartel.titulo, cartel.texto, cartel.nombre.length === 0 ? `Una carta ${cartel.deDonde}.` : `La sacó ${cartel.nombre} ${cartel.deDonde}.`],
       opciones: [],
       hayAlgo: cartel !== null,
     },
@@ -3016,4 +3251,20 @@ export function cardinal(n: number): string {
   const entero = Math.trunc(n);
   const palabra = CARDINALES[entero];
   return palabra === undefined || entero < 0 ? String(entero) : palabra;
+}
+
+/**
+ * LA CONCORDANCIA NO SE ESCRIBE A MANO, y esto es lo que costaba escribirla a mano.
+ *
+ * La sección «La mesa entera» decía «El Ayuntamiento guarda 1 casas y 1 hoteles» y «Quedan 1
+ * cartas en Sucesos» en cuanto los contadores bajaban a uno, que es justo el final de partida
+ * —cuando esos números son lo que se mira—. No fallaba nada: un plural escrito a mano se lee
+ * igual de bien y dice otra cosa. Es la misma función que Riberas ya usa por el mismo motivo,
+ * y aquí sustituye además a los ternarios sueltos que hacían la concordancia cada uno por su
+ * cuenta —los títulos y los Salvoconductos del marcador, los solares de un barrio, los títulos
+ * en cola de la subasta, las casas de un título, las vueltas de la mesa—, que eran otros tantos
+ * sitios donde el siguiente se escribiría a mano otra vez.
+ */
+export function plural(n: number, uno: string, varios: string): string {
+  return n === 1 ? uno : varios;
 }

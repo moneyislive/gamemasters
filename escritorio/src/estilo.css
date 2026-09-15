@@ -4097,6 +4097,39 @@ code {
 }
 
 /*
+ * ═══ Y UNA TIRA MÁS ABAJO CUANDO HAY CARRIL, QUE ESTÁ MEDIDO Y NO ESTIMADO ═══
+ *
+ * `.burgo-volver` cuelga a `top: 3.75rem`, o sea a un rem del pie de la cinta, y eso era
+ * correcto mientras la cinta era lo único que había arriba. Con el carril puesto NO lo es:
+ * medido en el banco con el momento del trato y el lienzo de 288×317, el botón caía en
+ * y=293,9 y el único cuadrado de la tira —la quiebra— ocupaba de y=276,9 a y=323,7. Los dos
+ * llevan `z-index: 2` y el botón va después en el marcado, así que gana el botón y el
+ * cuadrado quedaba TAPADO. No es un error de nadie ni sale en ninguna consola: es un botón
+ * encima de otro, que es la clase de fallo que sólo se ve mirando la pantalla.
+ *
+ * ═══ POR QUÉ ES UNA CLASE Y NO EL `style` EN LÍNEA QUE HABÍA ═══
+ *
+ * Porque el número de esta regla y el alto del carril tienen que crecer juntos, y escritos en
+ * dos ficheros distintos —uno en la hoja y otro en un `CSSProperties` del pintor— no hay
+ * manera de comprarlo: `verify:escritorio` puede leer los dos `top` y el `height` del carril
+ * de ESTA hoja y afirmar que el segundo es exactamente el primero más el alto de la tira; de
+ * un objeto de JavaScript dentro de un `.tsx` no lee nadie. Es la misma decisión, y por la
+ * misma razón, que la de `.lienzo-caja-bajo-el-carril` frente a `.lienzo-caja-bajo-la-cinta`.
+ *
+ * SE SUMA EN `calc` Y NO SE ESCRIBE UN `6.5rem` SUELTO: así el día que la cinta cambie de
+ * alto, esto lo sigue solo. Y los dos sumandos en `rem`, nunca en píxeles, porque el suelo de
+ * toque de esta casa crece con la preferencia de letra del navegador y en `px` se quedaría
+ * quieto — que es el descuadre de 2,75 puntos que el cajón del delta ya pagó.
+ *
+ * VA DESPUÉS de `.burgo-volver` y eso no es orden sino peso: las dos pesan (0,1,0), así que
+ * entre ellas decide el orden de la hoja. Escrita antes, este `top` pierde en silencio y el
+ * botón vuelve a caer encima del carril.
+ */
+.burgo-volver-con-carril {
+  top: calc(3.75rem + 2.75rem);
+}
+
+/*
  * SÓLO para tecnologías de apoyo: fuera de la vista y del flujo, pero EN EL ÁRBOL y —si es un
  * mando— enfocable. Nunca `display: none` ni `visibility: hidden`: los lectores los saltan.
  *
@@ -4211,6 +4244,41 @@ code {
   text-align: center;
   font-size: 0.82rem;
   color: var(--palabra);
+}
+
+/*
+ * ═══ EL CÓDIGO DE LA MESA: LO QUE SE DICTA POR TELÉFONO, Y POR QUÉ TIENE REGLA PROPIA ═══
+ *
+ * Estas cinco declaraciones vivían en un `CSSProperties` en línea dentro del pintor. Se leían
+ * como «reparto de ESTA cinta y no una forma que se repita», que es una razón buena para no
+ * inventar una clase... hasta que la cinta tuvo cinco huecos y CUATRO de ellos con regla en
+ * esta hoja: entonces el que va en línea es el único que no se puede mirar desde aquí, el
+ * único que no aparece al buscar `.burgo-cinta-` y el único cuyo `flex` no se puede comparar
+ * con el de sus vecinos. Un estilo en línea además pesa (1,0,0,0), así que es el único hueco
+ * de la cinta que una regla de esta hoja no puede corregir sin `!important`.
+ *
+ * `flex: 0 0 auto` es la línea que importa y es la misma que llevan los dos botones y el
+ * reloj: lo que se encoge en esta cinta es LA FRASE y nada más. Sin ella, en un lienzo
+ * estrecho el flex reparte la falta entre todos y el código se parte o se recorta — y un
+ * código de mesa recortado no es un código más corto, es otro código, que es exactamente el
+ * fallo del reloj contado tres bloques más arriba.
+ *
+ * `white-space: nowrap` por lo mismo, contra el reparto en dos renglones dentro de una cinta
+ * que es la línea de sus botones. `tabular-nums` porque son cifras y letras de ancho fijo y la
+ * cinta no debe bailar al cambiar de mesa. Y `letter-spacing: 0.1em` porque el código se DICTA:
+ * separado se leen cinco caracteres uno a uno, junto se lee una palabra que no se puede
+ * repetir al otro lado del teléfono — que es lo mismo que el nombre accesible hace con los
+ * espacios para quien lo oye.
+ *
+ * El color y el cuerpo NO se escriben aquí: los pone `letra-chica`, que es la clase de la casa
+ * para esto y la que el marcado ya lleva puesta.
+ */
+.burgo-cinta-codigo {
+  flex: 0 0 auto;
+  padding: 0 0.35rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
 /*
@@ -4522,6 +4590,96 @@ code {
 .burgo-renta-hoy > .burgo-renta-cifra {
   color: var(--palabra);
   font-weight: 600;
+}
+
+/*
+ * ═══ LOS SOLARES DEL BARRIO: EL TERCER BLOQUE DE LA TARJETA, QUE NO SE VEÍA COMO UNO ═══
+ *
+ * El pintor lo monta como `class="renglones burgo-solares-del-barrio"` y hasta hoy sólo había
+ * regla para la primera de las dos: `.renglones` quita las viñetas, quita el relleno y le pone
+ * a cada `<li>` un filo por debajo. Lo que NO da es la separación con lo de arriba, y lo de
+ * arriba es `.burgo-rentas`, que es una REJILLA de dos columnas con sus propias filas
+ * separadas por filos. Sin nada en medio, la lista de solares empieza justo debajo de la
+ * última renta con exactamente el mismo filo entre las dos, así que las seis filas de la tabla
+ * de rentas y los tres solares del barrio se leen como UNA sola lista de nueve renglones: dos
+ * cosas que no se comparan —cuánto cobro si construyo, y a quién le falta un solar— pegadas
+ * como si fueran columnas de lo mismo.
+ *
+ * El filo de arriba y el hueco son los mismos `--filo` y los mismos 0,5rem con los que
+ * `.burgo-componedor` se separa de lo que tiene encima dentro de la misma caja: aquí no se
+ * estrena una forma nueva, se usa la que la hoja ya tiene para «hasta aquí una cosa, desde
+ * aquí otra».
+ *
+ * ═══ Y EL SOLAR QUE SE ESTÁ MIRANDO SE VE, QUE ES LA MITAD QUE FALTABA ═══
+ *
+ * El pintor le pone `aria-current` al solar de la casilla abierta, y la cabecera de
+ * `LosSolaresDelBarrio` dice por qué no lo marca con EL COLOR: en un barrio de tres solares
+ * del mismo color, otro color más no distingue nada. Cierto, y aun así el resultado era que
+ * quien no usa lector no tenía NINGUNA señal: la tarjeta de Calle Mayor listaba sus tres
+ * hermanas sin decir cuál de las tres es la que se está mirando. Se marca con el filo en el
+ * acento —no con un fondo, que pediría texto blanco encima, y esta casa no pinta blanco sobre
+ * acento— que es exactamente lo que `.burgo-elegido` hace con `aria-pressed` en el componedor:
+ * dos señales y no una, y la de la vista no es un color de barrio ni de dueño.
+ *
+ * Pesa (0,2,0) contra el (0,1,0) de `.opcion`, así que el filo del acento gana esté donde esté
+ * escrita esta regla; y le gana también a `.opcion:hover:not(…)`, que pesa lo mismo pero va
+ * antes en la hoja.
+ */
+.burgo-solares-del-barrio {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--filo);
+}
+
+.burgo-solares-del-barrio [aria-current] {
+  border-color: var(--acento);
+}
+
+/*
+ * ═══ LA FICHA DE UN JUGADOR: UN `<div>` A SECAS, Y ESO SE VEÍA ═══
+ *
+ * Lo que `LaFichaDeUnJugador` monta dentro son CUATRO bloques —el nombre con su mota, los
+ * renglones de lo suyo, un `.burgo-barrio` por barrio con su lista de títulos, y la lista de
+ * los solares sueltos— y el envoltorio no tenía regla ninguna, así que quien ponía la
+ * separación era cada hijo por su cuenta. Dos de los cuatro no la ponen: `.renglones` no
+ * lleva margen —es la lista pelada de la casa— y `.opcion` tampoco, así que la lista de
+ * sueltos empezaba pegada al último título del último barrio, con el mismo filo entre medias
+ * que separa dos títulos del MISMO barrio, y el botón de proponer trato salía cosido al
+ * último renglón de la lista. O sea: los solares sueltos se leían como un barrio más.
+ *
+ * ═══ POR QUÉ ES UNA TARJETA, Y POR QUÉ CON `--radio-ficha` Y NO CON `--radio-mando` ═══
+ *
+ * Porque se monta dentro de una `.lienzo-caja` que ya tiene su fondo y su filo, y dentro de
+ * ella hay OTRA tarjeta —`.burgo-ficha`, la de una casilla, que sale por cada título—: sin
+ * caja propia, el nivel de en medio no existe y las tarjetas de los títulos parecen colgar
+ * del cajón. Es la misma anidación que la tarjeta de una casilla ya usa, y aquí se distingue
+ * por el redondeo: `--radio-ficha` (14) contra el `--radio-mando` (8) de las de dentro, que
+ * es la señal con la que esta hoja separa «una ficha» de «un mando» sin estrenar un color.
+ *
+ * Y EL NOMBRE NO ES UN RENGLÓN MÁS: el pintor lo escribe con `.burgo-renglon`, que es
+ * `--tenue`, o sea del mismo color y del mismo peso que las líneas de lo suyo que van debajo.
+ * En el respaldo —donde esta ficha se monta SIN el `<h2>` de la caja— eso deja la tarjeta de
+ * un jugador sin ningún rótulo que se lea como tal: cinco renglones grises seguidos y el
+ * primero resulta ser el nombre. Aquí se le devuelve el color de la palabra y el peso, y se le
+ * quita el margen de arriba, que contra el canto de la tarjeta sobra.
+ */
+.burgo-ficha-de-jugador {
+  margin: 0 0 0.6rem;
+  padding: 0.6rem;
+  background: var(--teja-alta);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
+}
+
+.burgo-ficha-de-jugador > .burgo-renglon:first-child {
+  margin-top: 0;
+  color: var(--palabra);
+  font-weight: 600;
+}
+
+.burgo-ficha-de-jugador > .renglones,
+.burgo-ficha-de-jugador > .opcion {
+  margin-top: 0.75rem;
 }
 
 /* --- El marcador del raíl ------------------------------------------------- */
@@ -4933,6 +5091,98 @@ code {
 
 .lienzo-carril-hueco:hover {
   color: var(--palabra);
+}
+
+/*
+ * ═══ EL CUADRADO ANCHO: EL QUE DICE CUÁL ES Y NO SÓLO QUÉ HACE ═══
+ *
+ * ═══ EL FALLO, CONTADO CON LOS NÚMEROS DEL BANCO ═══
+ *
+ * El cuadrado pintaba el glifo de dos letras —que es el VERBO— y nada más. En el apuro del
+ * Burgo salen SEIS «Hi» seguidos, uno por título que hipotecar, y a la vista sólo se
+ * distinguen por la barra de dos puntos de `.lienzo-carril-marca`, que lleva el color de la
+ * acera del barrio: dos solares del MISMO barrio la tienen idéntica, así que ahí no distingue
+ * nada. Y en una subasta con el cajón cerrado salen TRES «Pu» iguales —las tres cifras fijas
+ * de la puja— sin ni siquiera esa barra. El rótulo entero estaba en `aria-label` y en `title`,
+ * o sea que con lector y con ratón la tira se leía perfectamente; A LA VISTA no, y con el dedo
+ * tampoco, porque un `title` no se posa con el dedo. La tira es justo el mueble que existe
+ * para poder jugar sin abrir nada.
+ *
+ * ═══ ANCHO Y NO ALTO, Y ESO NO ES ESTÉTICA ═══
+ *
+ * El renglón de abajo cabe DENTRO de los mismos 2,75rem de alto, y la tira sigue midiendo una
+ * tira: el alto es lo único que no sobra dentro del recuadro —en el lienzo de 288×317 una
+ * segunda tira se come otro 15 % del tablero—, mientras que a lo ancho ya está resuelto,
+ * porque esto RUEDA. La cuenta del alto, con la raíz de esta casa en 17 y `box-sizing:
+ * border-box` global: 46,75 de caja menos los 5,95 de `padding-bottom` dejan 40,8 de hueco;
+ * dentro van el glifo (0,95rem × interlineado 1 = 16,15), el `gap` (1,7) y el rótulo
+ * (`--letra-minima`, que a esta raíz son 13,26) — 31,11 en total. Sobran nueve puntos y pico,
+ * que es lo que hace falta para que con la letra del navegador un punto más grande siga
+ * cabiendo.
+ *
+ * Y EL `padding-bottom` NO ES UN HUECO DE ADORNO: sin él el contenido se centra en los 46,75
+ * enteros y el pie del rótulo cae a 7,8 puntos del canto de abajo, donde `.lienzo-carril-marca`
+ * ocupa de 5,1 a 7,1 — o sea 0,7 puntos de aire entre la letra y la barra de color, que a la
+ * vista es la barra pegada a la palabra. Con los 0,35rem el pie del rótulo se va a 10,8 y
+ * quedan 3,7 limpios.
+ *
+ * ═══ LOS DOS TOPES DE ANCHO ═══
+ *
+ * `min-width: 3.5rem` son 59,5 puntos: más que el suelo de toque de 44, y lo bastante para una
+ * palabra de seis letras a 13,26 (unos 42 de caja de texto) más los 0,8rem de relleno. O sea
+ * que el rótulo que este mueble promete cabe SIN estirar el cuadrado, y los que se repiten se
+ * leen todos igual de anchos.
+ *
+ * `max-width: 6.5rem` son 110,5, y ése es el tope contra lo que el juego escriba de más: sin
+ * él, UN rótulo largo se lleva la tira entera —en el lienzo de 288 hay 262,5 puntos de ancho
+ * útil— y los demás cuadrados quedan fuera del canto sin que nada falle. Lo que pase de ahí lo
+ * recorta el rótulo con puntos suspensivos, y el nombre entero sigue en `aria-label` y en el
+ * `title`, que es donde no se recorta nunca.
+ *
+ * ═══ Y CUÁNTOS CABEN, MEDIDO ═══
+ *
+ * En el lienzo más estrecho de los dieciocho (288) caben CUATRO cuadrados anchos en su medida
+ * mínima, contra los CINCO de 44. Con los CATORCE del apuro no caben de ninguna de las dos
+ * formas: la tira RUEDA POR DENTRO, que es para lo que rueda, y su clase está en `RUEDAN_SOLAS`
+ * para que la cámara del pintor no se le coma el gesto.
+ */
+.lienzo-carril-hueco-ancho {
+  flex-direction: column;
+  gap: 0.1rem;
+  width: auto;
+  min-width: 3.5rem;
+  max-width: 6.5rem;
+  padding: 0 0.4rem 0.35rem;
+}
+
+/*
+ * EL RÓTULO CORTO, Y LO QUE NO LLEVA ES LA MITAD DE LA REGLA.
+ *
+ * NO LLEVA `color`, y no es un olvido: la clase que apaga vive en el `<button>` y llega a este
+ * `<span>` POR HERENCIA. Un `color` escrito aquí gana siempre a lo heredado —da igual el peso
+ * y da igual el orden de la hoja, porque no compiten: uno es una declaración sobre este
+ * elemento y lo otro es el valor del padre— así que un cuadrado quieto saldría con el verbo
+ * en `--tenue` y el rótulo en `--acento`, encendido. Es el mismo fallo que `.lienzo-quieta`
+ * tiene contado ahí abajo —apagado que no se lee como apagado— entrando por otra puerta.
+ *
+ * `--letra-minima` es el cuerpo mínimo de esta casa (`max(13px, 0.78rem)`): el 13 es el suelo
+ * y el `rem` es lo que crece con la preferencia del navegador. Escrito en `px` a secas dejaría
+ * de crecer justo en el renglón más pequeño de la pantalla.
+ *
+ * Los puntos suspensivos necesitan las tres líneas juntas —`overflow`, `white-space` y
+ * `text-overflow`— y un ancho que las tope, que es el `max-width` del cuadrado: sin una de las
+ * cuatro, el rótulo largo no se recorta, se sale.
+ */
+.lienzo-carril-rotulo {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--letra-minima);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /*

@@ -129,13 +129,19 @@
  * milisegundos (cada fotograma acotado a 100 ms). `alTerminarLaCola` cuando la cola y
  * todas las máquinas de peón han quedado en reposo tras una jugada con sucesos.
  *
+ * `alSenalarCasilla` sale de las MISMAS asas que el toque, y sólo cuando la casilla señalada
+ * CAMBIA: sesenta avisos de puntero sobre la misma casilla son UN aviso, no sesenta (quién lo
+ * decide y por qué: `senaladoTrasElGesto` en `tipos.ts`, y el bloque de «el señalado» aquí
+ * abajo). Con el dedo se avisa `null` al levantarlo; con ratón, el cartel se queda donde el
+ * cursor lo dejó.
+ *
  * ═══ LO QUE NO HAY, A PROPÓSITO ═══
  *
  * Ni `drei`, ni `document`, ni `window`, ni `fetch`, ni Expo: sólo `three`, React y el
  * núcleo de r3f. Ni sombras (2048 baja un móvil de 60 a 20 fps): discos de contacto. Ni
  * texto en el lienzo: el nombre, el precio y la carta van a la hoja. Ni `visible=false`
  * para quitar un toque: el asa de los dados se DESMONTA cuando no hay que tirar, y las
- * asas de las casillas sólo se montan si hay quien atienda el toque. Ni `Vector3` en
+ * asas de las casillas sólo se montan si hay quien atienda el toque o el señalado. Ni `Vector3` en
  * props: ternas. Ni estado escrito tras desmontar: cada promesa mira `vivo`. Ni las
  * partículas de la lluvia de monedas del `fin` (§5.7): queda anotado como pendiente.
  */
@@ -271,7 +277,8 @@ import type { EstadoDeLosDadosDelBurgo, SucesoDeLosDadosDelBurgo, VistaDeLosDado
 import { ALCANCE_DEL_BURGO, ALTURA_MINIMA_DEL_OJO_DEL_BURGO, AMORTIGUACION_DEL_SEGUIMIENTO, CERCANIA_DE_SEGUIMIENTO, REPOSO_TRAS_SEGUIR } from './camara-del-burgo';
 import { AMBAR_DEL_CONCEJO, coloresDeLasBanderas, geometriaParaInstanciar, geometriaTenidaDe, soltarTintesDeGeometrias } from './tinte-del-burgo';
 import { Aventurero } from './Aventurero';
-import type { CasillaEn3D, FiguraEn3D, PropsDelBurgo } from './tipos';
+import { gestoAlSalir, senaladoTrasElGesto } from './tipos';
+import type { CasillaEn3D, FiguraEn3D, GestoDeSenalado, PropsDelBurgo } from './tipos';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
@@ -667,6 +674,18 @@ function matrizEstiradaDelBurgo(x: number, y: number, z: number, giro: number, a
 function noEsElPrimario(e: { nativeEvent: { button?: number } }): boolean {
   const boton = e.nativeEvent.button;
   return boton !== undefined && boton !== 0;
+}
+
+/**
+ * ¿ESTE PUNTERO ES UN DEDO? Todo lo que no sea un ratón lo es, y lo que no se sabe también.
+ *
+ * El mismo apaño que `Embarcadero.tsx`: `pointerType` se lee de un objeto ensanchado porque
+ * el suceso sintético de `expo-gl` en la app no siempre lo trae, y ahí el puntero es SIEMPRE
+ * un dedo. Suponer `mouse` cuando falta dejaría el cartel encendido para siempre en el móvil,
+ * que es el único sitio donde no hay manera de apagarlo moviendo la mano.
+ */
+function esDeDedo(e: { nativeEvent: unknown }): boolean {
+  return ((e.nativeEvent as { pointerType?: string }).pointerType ?? 'touch') !== 'mouse';
 }
 
 /* ─────────────────────────── La carga, con caché por `traer` ─────────────────────────── */
@@ -1387,7 +1406,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     }
     m.instanceMatrix.needsUpdate = true;
     m.computeBoundingSphere();
-  }, [props.alTocarCasilla]);
+    /* Las dos props son las que montan y desmontan la malla: si cambia una, hay `asas` nuevas que escribir. */
+  }, [props.alTocarCasilla, props.alSenalarCasilla]);
 
   const tamano = useThree((s) => s.size);
   const reloj = useThree((s) => s.clock);
@@ -2210,7 +2230,57 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     const dy = ((e.pointer.y - p.y) * tamano.height) / 2;
     return Math.hypot(dx, dy) < MINIMO_PARA_GIRAR && p.instancia === e.instanceId;
   };
+
+  /*
+   * ═══ EL SEÑALADO: QUÉ CASILLA MIRA EL PUNTERO, SIN TOCAR NADA ═══
+   *
+   * EL HUECO QUE ESTO TAPA. El cartel del pie del escritorio —nombre, barrio, precio, renta de
+   * hoy y estado— tenía que salir AL POSAR EL CURSOR, «eso se hace veinte veces por turno», y
+   * la escena no publicaba ningún aviso de señalado: sólo `alTocarCasilla`. El cliente lo
+   * resolvió con lo que había —el primer toque señala y el segundo abre la tarjeta—, que
+   * funciona y no es lo pedido: con ratón, veinte lecturas por turno eran veinte clics.
+   *
+   * CUÁNDO SALE EL AVISO NO SE DECIDE AQUÍ. Lo dicen `senaladoTrasElGesto` y `gestoAlSalir`
+   * (`tipos.ts`, sin `three`): no se avisa dos veces seguidas del mismo índice, salir de una
+   * casilla para entrar en la vecina no apaga nada —ni llegando la salida delante, que es lo
+   * que r3f hace hoy, ni llegando detrás—, y un `instanceId` que no es una casilla se manda
+   * como `null`. Están allí para que `verify:burgo-escena` los pueda correr con recorridos de
+   * puntero de verdad; aquí sólo se guarda el último y se llama.
+   *
+   * EL SEÑALADO NO ES UN TOQUE, y por eso hace tres cosas MENOS que `tocaCasilla`:
+   *
+   *   · NO salta la cola. Mover el ratón por encima del tablero acabaría con todas las
+   *     animaciones del turno antes de que se vieran; el toque sí la salta, a propósito.
+   *   · NO para la propagación ni marca el gesto como de la interfaz: posar no le quita el
+   *     gesto a nadie. Con el dedo, arrastrar por el anillo va leyendo casillas y el toque
+   *     sigue funcionando igual, porque el señalado no le toca el `pulsado`.
+   *   · NO lo apaga `props.quieto`. `quieto` está para que las asas no MANDEN mientras hay un
+   *     movimiento en vuelo —una orden a medias es una jugada perdida—, y leer una casilla no
+   *     manda nada: es justo mientras el peón anda cuando apetece mirar adónde va.
+   */
+  const senalada = useRef<number | null>(null);
+  const senala = (gesto: GestoDeSenalado): void => {
+    const paso = senaladoTrasElGesto(senalada.current, gesto, CASILLAS);
+    if (!paso.avisa) return;
+    senalada.current = paso.ahora;
+    avisos.current.alSenalarCasilla?.(paso.ahora);
+  };
+  const senalaLaCasilla = (e: ThreeEvent<PointerEvent>): void => {
+    senala({ que: 'posa', sobre: e.instanceId });
+  };
+  const dejaDeSenalarLaCasilla = (e: ThreeEvent<PointerEvent>): void => {
+    /* Salir de una casilla casi siempre es entrar en la vecina, y el aviso ya trae debajo cuál: `gestoAlSalir`. */
+    senala(gestoAlSalir(e.instanceId, e.intersections, e.eventObject));
+  };
+
   const tocaCasilla = (e: ThreeEvent<PointerEvent>): void => {
+    /*
+     * CON EL DEDO NO HAY CURSOR POSADO: al levantarlo, el señalado se apaga. Va ANTES del
+     * `esUnToque`, que se come el gesto cuando fue un arrastre: un dedo que arrastró por el
+     * anillo y se levanta también deja de señalar. Con ratón NO se apaga nada — el cursor
+     * sigue donde estaba y el cartel tiene que seguir puesto después de hacer clic.
+     */
+    if (esDeDedo(e)) senala({ que: 'levanta' });
     if (!esUnToque(e)) return;
     e.stopPropagation();
     const i = e.instanceId;
@@ -2424,9 +2494,21 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       </group>
       <instancedMesh ref={tratoMalla} args={[geometrias.trato, materiales.trato, CAPACIDAD.trato]} frustumCulled={false} raycast={() => null} />
 
-      {/* Las asas de las casillas: UNA malla instanciada, `instanceId → casilla`, sólo si hay quien atienda. */}
-      {props.alTocarCasilla === undefined ? null : (
-        <instancedMesh ref={asas} args={[geometrias.asaDeCasilla, materiales.asa, CASILLAS]} onPointerDown={empiezaElToque} onPointerUp={tocaCasilla} />
+      {/*
+        Las asas de las casillas: UNA malla instanciada, `instanceId → casilla`, y sólo si hay
+        quien atienda el toque O el señalado. Con el señalado basta: un cliente que sólo quiera
+        el cartel al posar el cursor —o una vista de mirón, que no manda nada— necesita estas
+        asas igual, y sin esa segunda condición las montaría un `alTocarCasilla` de mentira.
+      */}
+      {props.alTocarCasilla === undefined && props.alSenalarCasilla === undefined ? null : (
+        <instancedMesh
+          ref={asas}
+          args={[geometrias.asaDeCasilla, materiales.asa, CASILLAS]}
+          onPointerDown={empiezaElToque}
+          onPointerUp={tocaCasilla}
+          onPointerMove={senalaLaCasilla}
+          onPointerOut={dejaDeSenalarLaCasilla}
+        />
       )}
 
       {/* Los dados en el suelo de dados de la plaza, y su asa sólo cuando hay que tirar. */}

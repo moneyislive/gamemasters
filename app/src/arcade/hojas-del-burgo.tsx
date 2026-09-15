@@ -73,7 +73,14 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+/*
+ * `Platform` sólo para el `behavior` del `KeyboardAvoidingView`, que es la receta ya
+ * medida en `piezas.tsx`: en iOS el teclado se superpone y hay que empujar; en Android
+ * la ventana ya se redimensiona sola y empujar otra vez deja un hueco muerto. No decide
+ * qué se pinta ni cómo se juega — eso es lo que la pantalla del Burgo tiene prohibido,
+ * y `verify:sala` lo vigila allí.
+ */
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { BURGO } from '../../../shared/arcade/juegos';
 import {
   EL_CARRIL_DE_LA_MESA,
@@ -303,9 +310,23 @@ export function LaHojaDelBurgo(props: LoQueSabeLaHoja): JSX.Element {
  * color, que es el mismo del peón en el anillo: sin eso, en una mesa de seis hay
  * que leer el nombre para saber cuál de las seis cifras del marcador es la propia.
  *
- * El aviso va como texto y NO como región viva: la pantalla ya tiene la suya
- * —`ElAviso` del mueble genérico, con el aviso de la mesa— y dos regiones vivas en
- * la misma pantalla se pisan y acaban leyéndose a destiempo.
+ * El aviso va como texto y NO como región viva: dos regiones vivas en la misma
+ * pantalla se pisan y acaban leyéndose a destiempo, y la casa pide UNA.
+ *
+ * ═══ Y AHORA EL AVISO DE LA MESA TAMBIÉN CAE AQUÍ, PORQUE ERA UNA REGIÓN DE MÁS ═══
+ *
+ * Esta línea decía que la pantalla ya tenía la suya —`ElAviso` del mueble genérico— y
+ * eso era verdad y era el problema: en la rama del respaldo del Burgo coincidían TRES
+ * regiones vivas a la vez (la línea del turno, `ElAviso` y el aviso que el `Retablo`
+ * pinta dentro), y `ElAviso` además devuelve `null` con el texto vacío, o sea que la
+ * región nace a la vez que su texto y por eso no se anuncia nunca. La pantalla del
+ * Burgo ya no lo monta y le pasa aquí el texto: esta cinta es el único mueble suyo que
+ * está SIEMPRE en el árbol y en las DOS ramas, y ya tenía el renglón donde ponerlo.
+ *
+ * El orden es aviso de la mesa, aviso del juego y espera, y no es alfabético: «No ha
+ * salido el movimiento» y «Se ha perdido la mesa» dicen que lo que se acaba de pulsar
+ * no ha llegado a ninguna parte, y eso manda sobre «Espera a que Ana tire». Los tres
+ * son cadenas ajenas —dos del servidor y una del juego— y aquí no se redacta ninguna.
  *
  * ═══ EL ASA ES LA CIFRA, Y CUANDO NO HAY CIFRA SIGUE HABIENDO ASA ═══
  *
@@ -321,13 +342,19 @@ export function LaCintaDelBurgo({
   cinta,
   cajonAbierto,
   alAlternarElCajon,
+  avisoDeLaMesa,
 }: {
   cinta: HojaDelBurgo<OpcionDeMesa>['cinta'];
   cajonAbierto: boolean;
   alAlternarElCajon: () => void;
+  /** El aviso de la MESA —el de la red, no el del juego—, que ya no tiene región propia. */
+  avisoDeLaMesa: string;
 }): JSX.Element {
   const hayCifra = cinta.miDinero.length > 0;
   const loQueHaceElAsa = cajonAbierto ? CERRAR_LA_HOJA : ABRIR_LA_HOJA;
+  /* Lo que se acaba de pulsar y no ha llegado manda sobre lo que hay que esperar. Ver la cabecera. */
+  const dicho =
+    avisoDeLaMesa.length > 0 ? avisoDeLaMesa : cinta.aviso.length > 0 ? cinta.aviso : cinta.espera;
   return (
     <View style={estilos.cinta}>
       <View style={estilos.cintaDicho}>
@@ -335,7 +362,7 @@ export function LaCintaDelBurgo({
           {cinta.turno}
         </Text>
         <Text style={estilos.cintaEspera} numberOfLines={2}>
-          {cinta.aviso.length > 0 ? cinta.aviso : cinta.espera}
+          {dicho}
         </Text>
       </View>
       <Pressable
@@ -1427,6 +1454,25 @@ export function ElCartelDeLaCasilla({
  * (`keyboardShouldPersistTaps`), que es el segundo fallo de esta tanda: sin eso, el
  * primer toque en «Pujar» sólo cierra el teclado y hay que pulsar dos veces. Con el
  * plazo de una subasta corriendo, eso es la subasta perdida.
+ *
+ * ═══ Y EL CAJÓN SUBE CON EL TECLADO, QUE ES EL MISMO CAMPO POR EL OTRO LADO ═══
+ *
+ * Aquel arreglo dejaba «Pujar» pulsable al primer toque, y quedaba el otro medio fallo
+ * del ÚNICO campo de texto de la partida: que se pueda VER lo que se teclea. Este cajón
+ * está pegado al borde de abajo de la pantalla (`tapaTodo` con `flex-end`) y no llega
+ * al techo —86 % de alto—, así que lo de dentro se lee en la mitad de abajo. En Android
+ * eso no importa: la ventana se redimensiona sola (`adjustResize`, el modo por defecto,
+ * que esta app no cambia) y el cajón se encoge por encima del teclado. En iOS el teclado
+ * NO redimensiona nada: se pone encima y se come unos 336 de los 845 puntos de un
+ * teléfono en pie, o sea los 336 de abajo del cajón. Con la subasta abierta, el campo de
+ * la puja y su «Pujar» caen ahí dentro: se escribe a ciegas una cifra que decide un
+ * solar, con el plazo corriendo, y no hay error ni aviso ninguno.
+ *
+ * La receta es la de la casa y ya está medida en `piezas.tsx`: `KeyboardAvoidingView`
+ * con `padding` SÓLO en iOS —en Android empuja dos veces y deja un hueco muerto encima
+ * del teclado—. Con ella el cajón entero sube, en vez de que el campo se busque rodando
+ * dentro de un marco que sigue medio tapado. Y el `maxHeight: '86%'` se mide contra lo
+ * que quede, que es lo que hace que el cajón encoja en vez de salirse por arriba.
  */
 export function ElCajonDeLaHoja({
   alCerrar,
@@ -1441,26 +1487,38 @@ export function ElCajonDeLaHoja({
   return (
     <View style={estilos.tapaTodo}>
       <Pressable style={estilos.velo} onPress={alCerrar} accessible={false} />
-      <View style={estilos.cajon} accessibilityViewIsModal accessibilityLabel={LA_HOJA_DE_LA_PARTIDA}>
-        <View style={estilos.cajonCabecera}>
-          <Text style={estilos.sobreElLienzoRotulo}>{LA_HOJA_DE_LA_PARTIDA}</Text>
-          <Pressable
-            style={estilos.dejarlo}
-            onPress={alCerrar}
-            accessibilityRole="button"
-            accessibilityLabel={CERRAR_LA_HOJA}
+      {/*
+        EL MARCO QUE SUBE CON EL TECLADO. Ver la cabecera: en iOS el teclado se pone
+        encima y se comería el campo de la puja; en Android la ventana ya se
+        redimensiona sola y un `behavior` aquí empujaría dos veces. Va por DENTRO del
+        velo para que el velo siga tapando la pantalla entera aunque el cajón suba.
+      */}
+      <KeyboardAvoidingView
+        style={estilos.subeConElTeclado}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        pointerEvents="box-none"
+      >
+        <View style={estilos.cajon} accessibilityViewIsModal accessibilityLabel={LA_HOJA_DE_LA_PARTIDA}>
+          <View style={estilos.cajonCabecera}>
+            <Text style={estilos.sobreElLienzoRotulo}>{LA_HOJA_DE_LA_PARTIDA}</Text>
+            <Pressable
+              style={estilos.dejarlo}
+              onPress={alCerrar}
+              accessibilityRole="button"
+              accessibilityLabel={CERRAR_LA_HOJA}
+            >
+              <Text style={estilos.dejarloRotulo}>Cerrar</Text>
+            </Pressable>
+          </View>
+          <ScrollView
+            style={estilos.cajonLista}
+            contentContainerStyle={{ paddingBottom: abajo + 16 }}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={estilos.dejarloRotulo}>Cerrar</Text>
-          </Pressable>
+            {children}
+          </ScrollView>
         </View>
-        <ScrollView
-          style={estilos.cajonLista}
-          contentContainerStyle={{ paddingBottom: abajo + 16 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {children}
-        </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -1483,6 +1541,22 @@ export function ElCajonDeLaHoja({
  * con qué comerse el toque: pulsar «Dejarlo» soltaba el dedo encima del anillo, que
  * está justo detrás, y el toque llegaba a una casilla. Con una obra posible eso no
  * abre nada: MANDA EL MOVIMIENTO. Cerrar una tarjeta no puede comprar un solar.
+ *
+ * ═══ LAS OTRAS DOS MITADES NO SON SUYAS, Y POR ESO NO ESTABAN ═══
+ *
+ * Con el velo eran DOS de las cuatro, y las dos que faltaban —la trampa de foco y la
+ * devolución del foco— no se pueden escribir aquí dentro, igual que no se escriben
+ * dentro del cajón: lo que hay que apagar es lo que queda DEBAJO, y eso lo monta quien
+ * monta la hoja. `accessibilityViewIsModal` no vale por trampa y hay que decirlo con
+ * todas las letras: es de iOS y sólo hace ignorar a los HERMANOS de esta vista, o sea
+ * al velo y a nada más; en Android no atrapa nada en absoluto. Medido con «¿Qué haces
+ * en Calle Mayor?» abierta, un lector salía a la cinta, al carril, a la caja de los
+ * tratos y a «Salir» y «Tirar la mesa» de la barra de la mesa.
+ *
+ * Las pone `burgo-en-tres-escena.tsx` con `hayCajaModal`, sobre la columna entera y no
+ * sobre la caja del lienzo; y por lo mismo estas hojas se montan FUERA de esa caja, que
+ * es lo que hace que su velo llegue hasta la barra. El foco vuelve solo: nada de lo que
+ * queda debajo se mueve de sitio mientras la hoja está puesta.
  */
 export function LaHojaSobreElLienzo({
   titulo,
@@ -1637,7 +1711,19 @@ const estilos = StyleSheet.create({
    * propuestas vivas a la vez —que en este juego pasa, porque se propone sin turno—
    * sin tope se comería el tablero entero; con tope, se desplaza por dentro.
    */
+  /*
+   * ═══ Y CEDE, PORQUE EN REACT NATIVE EL `flexShrink` POR DEFECTO ES CERO ═══
+   *
+   * Sin esta línea, esta caja se plantaba en sus 290 puntos de peor caso —tres tratos
+   * vivos con el reloj debajo— y quien se recortaba era el mueble entero, por arriba,
+   * contra el `overflow: hidden` de la caja del lienzo. Y no es cromo: la criba ya le ha
+   * quitado a la sección «El trato» sus tres botones porque esta caja se pinta, así que
+   * lo que se va con ella es contestar un trato — aceptar, rechazar y retirar sin un
+   * solo botón en toda la pantalla, y sin un error en ninguna consola. Cediendo, quien
+   * encoge es `cajaLista`, que ya tiene tope y rueda por dentro.
+   */
   caja: {
+    flexShrink: 1,
     gap: 6,
     padding: 10,
     borderRadius: RADIO.ficha,
@@ -1850,6 +1936,14 @@ const estilos = StyleSheet.create({
     borderColor: conAlfa(SALA.blanco, 0.4),
     backgroundColor: SALA.pared,
   },
+  /*
+   * EL MARCO QUE SUBE CON EL TECLADO: llena `tapaTodo` y pega el cajón al pie, que es
+   * lo que hacía antes el `justifyContent` del propio `tapaTodo`. Sin `flex: 1` no
+   * tendría alto contra el que medir el 86 % del cajón ni contra el que descontar el
+   * teclado, y con `box-none` el hueco de arriba —el que deja ver que la partida sigue
+   * ahí detrás— lo sigue cogiendo el velo, que es quien cierra el cajón al tocarlo.
+   */
+  subeConElTeclado: { flex: 1, justifyContent: 'flex-end' },
   cajonCabecera: {
     flexDirection: 'row',
     alignItems: 'center',

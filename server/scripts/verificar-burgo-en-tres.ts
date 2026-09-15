@@ -153,6 +153,7 @@ import {
   opcionesDelCarrilDelBurgo,
   opcionesFueraDelTablero,
   ORDEN_DE_LA_HOJA,
+  plural,
   pregonDelBurgo,
   pujaEnTres,
   recorridoEnTres,
@@ -165,6 +166,7 @@ import {
 } from '../../shared/arcade/juegos/burgo-en-tres';
 import type {
   CartelDeCasilla,
+  FichaDeCasilla,
   FichaDeJugador,
   GlifoDelCarrilDelBurgo,
   HojaDelBurgo,
@@ -677,14 +679,45 @@ function reprochesDeLosTextos(vista: VistaDelBurgo, quien: QuienMira): string[] 
   return r;
 }
 
-/** LAS FICHAS de las cuarenta casillas: nombre y tabla de la casilla, fila de hoy, dueño y obras. */
-function reprochesDeLasFichas(vista: VistaDelBurgo, quien: QuienMira, opciones: readonly Opcion[]): string[] {
+/**
+ * LAS FICHAS de las cuarenta casillas: nombre y tabla de la casilla, fila de hoy, dueño y obras.
+ * El cuarto parámetro es QUIÉN REDACTA la tarjeta, y existe para poder envenenarla: un juez cuyo
+ * testigo se saca él mismo del mismo sitio no se puede ver caer.
+ */
+function reprochesDeLasFichas(
+  vista: VistaDelBurgo,
+  quien: QuienMira,
+  opciones: readonly Opcion[],
+  haz: (casilla: number) => FichaDeCasilla<Opcion> = (casilla) => fichaDeCasilla(vista, casilla, quien, opciones),
+): string[] {
   const r: string[] = [];
   for (let i = 0; i < CUANTAS_CASILLAS; i++) {
-    const f = fichaDeCasilla(vista, i, quien, opciones);
+    const f = haz(i);
     const fila = CASILLAS[i];
     if (fila === undefined) continue;
     if (f.nombre !== fila.nombre || f.precio !== fila.precio || f.clase !== fila.clase) r.push(`la ficha ${i} no es la de la tabla`);
+    /*
+     * ═══ NI UN RENGLÓN QUE SEA EL NOMBRE QUE YA LLEVA EL ENCABEZADO ═══
+     *
+     * La tarjeta pinta `nombre` arriba y `lineas` debajo, y en las DIEZ casillas que no se
+     * compran el estado ES el nombre de la casilla («El Descanso», «Sucesos», «El Fondo
+     * Vecinal», «La Comisaría», «La Salida», «¡A comisaría!»): la tarjeta decía «El Descanso»
+     * y «El Descanso» otra vez en el primer renglón. No lo puede arreglar el cliente —los
+     * renglones los redacta el juego—, y no lo cazaba nada porque un renglón de más no rompe
+     * ninguna cuenta: sólo se lee dos veces.
+     */
+    for (const linea of f.lineas) {
+      if (linea === fila.nombre) r.push(`la tarjeta ${i} repite en un renglón el nombre que ya lleva el encabezado`);
+    }
+    /*
+     * Y LA GUARDA NO SE COME UN ESTADO QUE SÍ APORTA: el Impuesto y la Tasa traen la cifra
+     * pegada al nombre, así que su renglón tiene que seguir ahí. Sin este clavo, «no repitas el
+     * nombre» se cumpliría igual de bien borrando lo único que hay que saber al caer en ellas.
+     */
+    if (fila.clase === 'diezmo' || fila.clase === 'alcabala') {
+      const loQueCobra = f.lineas.some((x) => x.indexOf(fila.nombre) === 0 && x.indexOf(maravedies(fila.precio)) > 0);
+      if (!loQueCobra) r.push(`la tarjeta ${i} ya no dice lo que cobra la casilla`);
+    }
     const tit = vista.titulos.find((x) => x.casilla === i);
     const dueno = tit === undefined ? null : vista.jugadores.find((j) => j.asiento === tit.dueno);
     if ((f.dueno === null) !== (dueno === undefined || dueno === null)) r.push(`el dueño de la ficha ${i}`);
@@ -2059,6 +2092,285 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
   comprobar('y con el cajón cerrado el anillo se queda con TODAS las obras, que es lo que hay que decirle al cliente', obrasSoloEnElAnillo(opciones, tablero, null).length >= gemelos.length);
   comprobar('un gemelo es la opción ENTERA del juego, no una montada', gemelos.every((o) => opciones.indexOf(o) >= 0));
 
+  /* ── EL TEXTO QUE SE REPITE, Y EL QUE NO SE LEE SOLO ── */
+  /*
+   * ═══ POR QUÉ HAY UN BLOQUE ENTERO PARA MIRAR FRASES ═══
+   *
+   * Todo lo de arriba mide ESTRUCTURA —qué opción va a qué mueble, qué casilla se enciende,
+   * qué cifra sale de la vista—, y ninguna de esas cuentas se entera de que un renglón dice
+   * dos veces lo mismo, de que un plural no concuerda o de que una frase se lee sola y no se
+   * entiende. Son fallos que no rompen nada: se juega igual y se lee peor, que es exactamente
+   * la clase de cosa que se queda en un juego durante meses porque no hay nada rojo.
+   *
+   * Lo que se afirma aquí, con su caso envenenado donde el juez no se lo puede sacar de sí
+   * mismo: que ningún renglón repite lo que ya lleva el encabezado, que la concordancia sale
+   * de `plural` y no de un ternario, que el dinero se escribe siempre igual, que ninguna
+   * frase se compone con un hueco dentro («La sacó  de Sucesos», «En pie: .», «a el
+   * Ayuntamiento») y que una redacción vive en UN sitio y los dos muebles que la usan la
+   * sacan de allí.
+   */
+  const otroAsiento = (mesa.asientos.find((a) => a !== quien) ?? quien) as AsientoId;
+  const comoSeLlamaElOtro = vista.jugadores.find((j) => j.asiento === otroAsiento)?.nombre ?? otroAsiento;
+  /** La misma vista con `quien` en pie y jugando: las de las partidas jugadas acaban con alguien quebrado o preso. */
+  const enPieYJugando = (extra: Record<string, unknown>): VistaDelBurgo =>
+    ({
+      ...vista,
+      momento: 'jugando',
+      apuro: null,
+      jugadores: vista.jugadores.map((j) => (j.asiento === quien ? { ...j, quebrado: false, presa: -1 } : j)),
+      ...extra,
+    }) as unknown as VistaDelBurgo;
+  const lineasDe = (v: VistaDelBurgo, id: string): readonly string[] => hojaEnTres(v, quien, opciones).secciones.find((s) => s.id === id)?.lineas ?? [];
+
+  /* 1. La tarjeta no repite en un renglón el nombre que ya lleva el encabezado. */
+  const elDescanso = fichaDeCasilla(vista, 20, quien, opciones);
+  comprobar(
+    'la tarjeta de una casilla sin título no repite su nombre en un renglón: «El Descanso / El Descanso» era el encabezado y el primer renglón',
+    elDescanso.estado === elDescanso.nombre && !elDescanso.lineas.some((l) => l === elDescanso.nombre),
+    elDescanso.lineas,
+  );
+  const elImpuesto = fichaDeCasilla(vista, 4, quien, opciones);
+  comprobar(
+    'y la guarda es una IGUALDAD, no un «empieza por»: el Impuesto sigue diciendo lo que cobra, que es lo único que hay que saber al caer',
+    elImpuesto.lineas.some((l) => l === `${CASILLAS[4]?.nombre ?? ''}: ${maravedies(CASILLAS[4]?.precio ?? 0)}`),
+    elImpuesto.lineas,
+  );
+  const conElRenglonRepetido = reprochesDeLasFichas(vista, quien, opciones, (casilla) => {
+    const f = fichaDeCasilla(vista, casilla, quien, opciones);
+    return { ...f, lineas: [...f.lineas, f.estado] };
+  }).filter((x) => x.indexOf('repite en un renglón') >= 0);
+  comprobar(
+    'la vacuna: una tarjeta que mete el estado sin mirar el nombre se ve caer en DIEZ de las cuarenta —la Salida, la Comisaría, el Descanso, ¡A comisaría!, los tres Sucesos y los tres del Fondo Vecinal—',
+    conElRenglonRepetido.length === 10,
+    conElRenglonRepetido,
+  );
+  const sinLoQueCobra = reprochesDeLasFichas(vista, quien, opciones, (casilla) => {
+    const f = fichaDeCasilla(vista, casilla, quien, opciones);
+    return { ...f, lineas: f.lineas.filter((l) => l !== f.estado) };
+  });
+  comprobar(
+    'y la del otro lado: una tarjeta que se coma el estado del Impuesto y la Tasa también, para que «no repitas» no se cumpla borrando',
+    sinLoQueCobra.filter((x) => x.indexOf('ya no dice lo que cobra') >= 0).length === 2,
+    sinLoQueCobra,
+  );
+  comprobar(
+    'la tarjeta dice con VERBO qué da hipotecar y qué cuesta deshipotecar: «Hipoteca: 200 € · deshipotecar: 220 €» se leía como lo que la hipoteca cuesta',
+    ((): boolean => {
+      const f = fichaDeCasilla(vista, 39, quien, opciones);
+      return f.empeno > 0 && f.empeno < f.desempeno && f.lineas.some((l) => l === `Hipotecarlo da ${maravedies(f.empeno)} · deshipotecarlo cuesta ${maravedies(f.desempeno)}`);
+    })(),
+    fichaDeCasilla(vista, 39, quien, opciones).lineas,
+  );
+
+  /* 2. El cartel es una función de (vista, casilla) y de nada más: por eso el sello del cliente no baja de aquí. */
+  comprobar(
+    'el cartel de una casilla es una función de (vista, casilla): dos llamadas iguales dan el MISMO cartel, y por eso la tarjeta y el cartel se pueden comparar por frase',
+    llano(cartelDeCasilla(vista, 39)) === llano(cartelDeCasilla(vista, 39)) && llano(cartelDeCasilla(vista, 20)) === llano(cartelDeCasilla(vista, 20)),
+    cartelDeCasilla(vista, 39).frase,
+  );
+  let cuantosCarteles = 0;
+  const conContadorDentro = reprochesDeLosCarteles(vista, quien, opciones, (casilla) => {
+    cuantosCarteles++;
+    const c = cartelDeCasilla(vista, casilla);
+    return { ...c, frase: `${c.frase} ${cuantosCarteles}`, frases: [...c.frases, String(cuantosCarteles)] };
+  });
+  comprobar(
+    'la vacuna: un cartel con un contador dentro —el sello que el cliente cuenta por señalada— se ve caer, y por eso ese sello se queda en el cliente, que es quien cuenta gestos',
+    conContadorDentro.some((x) => x.indexOf('no dicen lo mismo') >= 0) && cuantosCarteles === CUANTAS_CASILLAS,
+    { reproches: conContadorDentro.length, inspeccionados: cuantosCarteles },
+  );
+
+  /* 3. La frase de un trato: UNA redacción para la caja y para la sección de la hoja. */
+  const conDosTratos = enPieYJugando({
+    tratos: [
+      { id: 71, de: otroAsiento, a: quien, doy: { mrs: 350, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [1], indultos: 0 }, enElTurno: 0 },
+      { id: 72, de: quien, a: otroAsiento, doy: { mrs: 0, titulos: [3], indultos: 0 }, pido: { mrs: 100, titulos: [], indultos: 0 }, enElTurno: 0 },
+    ],
+  });
+  const losDosTratos = tratoEnTres(conDosTratos, quien, opciones);
+  const laCajaDeLosDos = pregonDelBurgo(conDosTratos, quien, opciones);
+  const meOfrecen = losDosTratos?.abiertos.find((t) => t.id === 71);
+  const yoOfrezco = losDosTratos?.abiertos.find((t) => t.id === 72);
+  comprobar(
+    'un trato abierto trae la frase escrita desde donde mira quien la lee: «Ana te ofrece…» a quien contesta, «Le ofreces a Ana…» a quien la propuso',
+    meOfrecen !== undefined &&
+      yoOfrezco !== undefined &&
+      meOfrecen.frase === `${comoSeLlamaElOtro} te ofrece ${maravedies(350)} por ${CASILLAS[1]?.nombre ?? ''}` &&
+      yoOfrezco.frase.indexOf(`Le ofreces a ${comoSeLlamaElOtro}`) === 0,
+    [meOfrecen?.frase, yoOfrezco?.frase],
+  );
+  comprobar(
+    'y es LA MISMA que la tira de la caja de los tratos, letra por letra: una redacción y no dos que un día se separan',
+    laCajaDeLosDos !== null && laCajaDeLosDos.paraContestar[0]?.frase === meOfrecen?.frase && laCajaDeLosDos.mios[0]?.frase === yoOfrezco?.frase,
+    [laCajaDeLosDos?.paraContestar[0]?.frase, laCajaDeLosDos?.mios[0]?.frase],
+  );
+  const renglonesDelTrato = lineasDe(conDosTratos, 'trato');
+  comprobar(
+    'la sección «El trato» pinta esa misma frase, y ya no un remite delante de un resumen en tercera persona («De Ana a ti: Ana da…», con Ana dos veces en el mismo renglón)',
+    renglonesDelTrato.some((l) => l === `${meOfrecen?.frase ?? '·'}.`) && !renglonesDelTrato.some((l) => l.indexOf(' a ti: ') >= 0),
+    renglonesDelTrato,
+  );
+
+  /*
+   * 3 bis. UN LADO VACÍO NO SE DICE METIENDO «NADA» EN EL HUECO. Un regalo y una petición son
+   * tratos legales —`montar` sólo rechaza los dos lados vacíos a la vez— y son la jugada de
+   * quien va a quebrar, así que las dos frases se escriben de verdad en una partida.
+   */
+  const conRegaloYPeticion = enPieYJugando({
+    tratos: [
+      { id: 81, de: otroAsiento, a: quien, doy: { mrs: 350, titulos: [], indultos: 0 }, pido: { mrs: 0, titulos: [], indultos: 0 }, enElTurno: 0 },
+      { id: 82, de: otroAsiento, a: quien, doy: { mrs: 0, titulos: [], indultos: 0 }, pido: { mrs: 350, titulos: [], indultos: 0 }, enElTurno: 0 },
+    ],
+  });
+  const losRaros = tratoEnTres(conRegaloYPeticion, quien, opciones);
+  const elRegalo = losRaros?.abiertos.find((t) => t.id === 81);
+  const laPeticion = losRaros?.abiertos.find((t) => t.id === 82);
+  comprobar(
+    'un trato que no pide nada se lee como un regalo, y uno que no da nada se lee como una petición: «Ana te ofrece nada por 350 €» decía lo contrario de lo que pasaba',
+    elRegalo?.frase === `${comoSeLlamaElOtro} te ofrece ${maravedies(350)} y no te pide nada` &&
+      laPeticion?.frase === `${comoSeLlamaElOtro} te pide ${maravedies(350)} y no te da nada a cambio`,
+    [elRegalo?.frase, laPeticion?.frase],
+  );
+  comprobar(
+    'y el resumen en tercera persona tampoco pega el «nada» en el hueco: «Ana da nada y pide 350 €» no es castellano',
+    elRegalo?.resumen === `${comoSeLlamaElOtro} da ${maravedies(350)} y no pide nada.` &&
+      laPeticion?.resumen === `${comoSeLlamaElOtro} no da nada y pide ${maravedies(350)}.` &&
+      elRegalo?.da === maravedies(350) &&
+      laPeticion?.da === 'nada',
+    [elRegalo?.resumen, laPeticion?.resumen],
+  );
+
+  /* 4. La concordancia sale de `plural`, y el clavo la sujeta desde fuera. */
+  comprobar('la concordancia sale de `plural`, escrito a mano AQUÍ para que lo de abajo no se componga consigo mismo', plural(1, 'casa', 'casas') === 'casa' && plural(0, 'casa', 'casas') === 'casas' && plural(2, 'casa', 'casas') === 'casas');
+  const alFinalDeTodo = enPieYJugando({ concejo: { casas: 1, posadas: 1 }, quedan: { pregon: 1, arca: 0 }, topeDeVueltas: 1 });
+  const conTodoEnElConcejo = enPieYJugando({ concejo: { casas: 32, posadas: 12 }, quedan: { pregon: 16, arca: 16 }, topeDeVueltas: 5 });
+  comprobar(
+    'con un solo edificio y una sola carta, «La mesa entera» concuerda en singular: decía «guarda 1 casas y 1 hoteles» y «Quedan 1 cartas», y decía eso justo al final de la partida',
+    lineasDe(alFinalDeTodo, 'mesa').some((l) => l === 'El Ayuntamiento guarda 1 casa y 1 hotel.') &&
+      lineasDe(alFinalDeTodo, 'mesa').some((l) => l === `Queda 1 carta en Sucesos y 0 en el Fondo Vecinal.`) &&
+      lineasDe(alFinalDeTodo, 'mesa').some((l) => l === 'Se juega a 1 vuelta.'),
+    lineasDe(alFinalDeTodo, 'mesa'),
+  );
+  comprobar(
+    'y con muchos, en plural: es el MISMO renglón compuesto por la misma función, no dos textos que se parecen',
+    lineasDe(conTodoEnElConcejo, 'mesa').some((l) => l === 'El Ayuntamiento guarda 32 casas y 12 hoteles.') &&
+      lineasDe(conTodoEnElConcejo, 'mesa').some((l) => l === 'Quedan 16 cartas en Sucesos y 16 en el Fondo Vecinal.') &&
+      lineasDe(conTodoEnElConcejo, 'mesa').some((l) => l === 'Se juega a 5 vueltas.'),
+    lineasDe(conTodoEnElConcejo, 'mesa'),
+  );
+
+  /* 5. La subasta: ni una frase con un hueco dentro, y el escalón escrito como dinero. */
+  const subastaSinNadie = enPieYJugando({
+    almoneda: { casilla: 39, puja: 0, quienPuja: null, pujaDe: null, enPie: [], abiertaPor: otroAsiento, enCola: 0 },
+  });
+  const pujaVacia = pujaEnTres(subastaSinNadie, quien, opciones);
+  comprobar(
+    'una subasta a la que ya no se espera a nadie no escribe «Puja el Ayuntamiento» —que no puja en toda la partida— ni «En pie: .»: las dos frases dejan de escribirse en vez de escribirse vacías',
+    pujaVacia !== null &&
+      pujaVacia.lineas[0] === `${CASILLAS[39]?.nombre ?? ''}: sin pujas todavía.` &&
+      pujaVacia.lineas.every((l) => l.indexOf('el Ayuntamiento') < 0 && l.indexOf(': .') < 0),
+    pujaVacia?.lineas,
+  );
+  const meTocaLaPuja = enPieYJugando({
+    paso: 'almoneda',
+    turnoDe: quien,
+    almoneda: { casilla: 39, puja: 100, quienPuja: otroAsiento, pujaDe: quien, enPie: [quien, otroAsiento], abiertaPor: otroAsiento, enCola: 2 },
+  });
+  const puertaDePuja = { id: 'pujar', tipo: PUJAR, carga: { casilla: 39, minimo: 110, maximo: 500, escalon: 10 }, rotulo: 'Pujar lo que quieras', ayuda: '', declaracion: true } as unknown as Opcion;
+  const conEscalon = pujaEnTres(meTocaLaPuja, quien, [puertaDePuja]);
+  comprobar(
+    'el escalón de la puja libre se escribe como dinero, igual que el mínimo y el máximo: iba en crudo («de 10 en 10») y era el único número del juego escrito sin su moneda',
+    conEscalon !== null && conEscalon.lineas.some((l) => l === `Puja libre entre ${maravedies(110)} y ${maravedies(500)}, en múltiplos de ${maravedies(10)}.`),
+    conEscalon?.lineas,
+  );
+  comprobar(
+    'y la subasta con gente dice por cuánto va y de quién, a quién se espera, quiénes siguen y cuántos títulos faltan',
+    conEscalon !== null &&
+      conEscalon.lineas[0] === `${CASILLAS[39]?.nombre ?? ''}: la mejor puja es ${maravedies(100)}, de ${comoSeLlamaElOtro}.` &&
+      conEscalon.lineas.some((l) => l.indexOf('Te toca pujar.') === 0 && l.indexOf('Siguen en pie:') > 0) &&
+      conEscalon.lineas.some((l) => l === '2 títulos más en cola.'),
+    conEscalon?.lineas,
+  );
+  const tituloDeLaSubasta = hojaEnTres(meTocaLaPuja, quien, opciones).secciones.find((s) => s.id === 'almoneda')?.titulo ?? '';
+  comprobar(
+    'y «Ahora» manda a esa sección NOMBRÁNDOLA como se titula —sale de la hoja, no de una cadena escrita al lado—, igual que hace con la caja y con el carril',
+    tituloDeLaSubasta.length > 0 && lineasDe(meTocaLaPuja, 'ahora').some((l) => l === `Te toca pujar: las pujas están en «${tituloDeLaSubasta}».`),
+    lineasDe(meTocaLaPuja, 'ahora'),
+  );
+
+  /* 6. El apuro: cada deuda se lee sola, y con la contracción hecha. */
+  const conDeudas = enPieYJugando({
+    paso: 'apuro',
+    turnoDe: quien,
+    apuro: {
+      quien,
+      debe: 300,
+      enCola: 0,
+      deudas: [
+        { a: null, cuanto: 200, porque: 'diezmo' },
+        { a: otroAsiento, cuanto: 100, porque: 'renta' },
+      ],
+    },
+  });
+  const renglonesDelApuro = lineasDe(conDeudas, 'ahora');
+  comprobar(
+    'cada deuda del apuro se lee sola y con la contracción hecha: era «200 € a el Ayuntamiento», y es el renglón que se lee mientras corre la cuenta atrás',
+    renglonesDelApuro.some((l) => l === `Le debes ${maravedies(200)} al Ayuntamiento.`) && renglonesDelApuro.every((l) => l.indexOf('a el Ayuntamiento') < 0),
+    renglonesDelApuro,
+  );
+  comprobar(
+    'y la que se le debe a alguien lo nombra, con el nombre de la vista',
+    renglonesDelApuro.some((l) => l === `Le debes ${maravedies(100)} a ${comoSeLlamaElOtro}.`),
+    renglonesDelApuro,
+  );
+
+  /* 7. «Lo mío» no repite «Tuyo» en cada renglón. */
+  const conMisTitulos = enPieYJugando({
+    jugadores: vista.jugadores.map((j) => (j.asiento === quien ? { ...j, quebrado: false, presa: -1, titulos: [1, 3] } : j)),
+    titulos: vista.titulos.map((t) =>
+      t.casilla === 1
+        ? { ...t, dueno: quien, casas: 2, empenado: false, rentaAhora: 30, barrioEntero: true }
+        : t.casilla === 3
+          ? { ...t, dueno: quien, casas: 0, empenado: true, rentaAhora: 0, barrioEntero: true }
+          : t,
+    ),
+  });
+  const renglonesDeLoMio = lineasDe(conMisTitulos, 'mios');
+  comprobar(
+    '«Lo mío» no repite «Tuyo» en cada renglón: en una sección donde todo es mío por construcción, la palabra que sobra es la primera de cada línea, y podían ser veintiocho',
+    renglonesDeLoMio.length === 2 && renglonesDeLoMio.every((l) => l.indexOf('Tuyo') < 0),
+    renglonesDeLoMio,
+  );
+  comprobar(
+    'y cada renglón dice lo que distingue ese título del de al lado: las casas, la hipoteca y la renta de hoy',
+    renglonesDeLoMio.some((l) => l === `${CASILLAS[1]?.nombre ?? ''} (${barrioDe(1)?.nombre ?? ''}): 2 casas · renta ${maravedies(30)}`) &&
+      renglonesDeLoMio.some((l) => l === `${CASILLAS[3]?.nombre ?? ''} (${barrioDe(3)?.nombre ?? ''}): hipotecado`),
+    renglonesDeLoMio,
+  );
+
+  /* 8. Ni una frase compuesta con un hueco dentro. */
+  const cartaDeNadie = enPieYJugando({ turnosAbiertos: 9, ultimaCarta: { mazo: 'arca', carta: 3, quien: null, enElTurno: 9 } });
+  const renglonesDeLaCarta = lineasDe(cartaDeNadie, 'carta');
+  comprobar(
+    'una carta cuya vista no dice quién la sacó no deja el hueco dentro de la frase («La sacó  de Sucesos.»): se dice de qué mazo salió y ya',
+    renglonesDeLaCarta.some((l) => l === 'Una carta del Fondo Vecinal.') && renglonesDeLaCarta.every((l) => l.indexOf('  ') < 0),
+    renglonesDeLaCarta,
+  );
+
+  /* 9. La última tirada, con la suma. */
+  const trasTirar = enPieYJugando({ paso: 'por-pasar', turnoDe: quien, tirada: [3, 4], dobles: 0 });
+  comprobar(
+    'el renglón de la última tirada trae la suma: es lo que se anduvo, y lo que cobra un servicio (§1)',
+    lineasDe(trasTirar, 'ahora').some((l) => l === 'Última tirada: 3 y 4, 7 en total.'),
+    lineasDe(trasTirar, 'ahora'),
+  );
+  const conDobles = enPieYJugando({ paso: 'por-pasar', turnoDe: quien, tirada: [5, 5], dobles: 1 });
+  comprobar(
+    'y los dobles se siguen diciendo, que es lo que cambia el turno',
+    lineasDe(conDobles, 'ahora').some((l) => l === 'Última tirada: 5 y 5, 10 en total (dobles).'),
+    lineasDe(conDobles, 'ahora'),
+  );
+
   /* ── LA CRÓNICA ── */
   const v1 = { ...vista, jugada: 10, pregon: 'Ana tira y saca un cinco.' } as VistaDelBurgo;
   const v2 = { ...vista, jugada: 11, pregon: 'Ana tira y saca un cinco.' } as VistaDelBurgo;
@@ -2318,14 +2630,15 @@ try {
 
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
 /*
- * VA CON MARGEN Y NO AL RAS: hoy se hacen 293 —eran 274 antes de que el carril dejara de
- * venir vacío, y 180 antes del carril, la caja de los tratos, el cartel al pie, las dos
- * fichas y la crónica—, y el guardia está veintiocho por debajo: más que el bloque
- * condicional más pequeño. Al ras hace lo contrario de lo que quiere: una comprobación que
- * se cae de un `if` dispara el guardia antes que la roja, y con el guardia delante nadie ve
- * el nombre de lo que se rompió. Por eso las rojas se imprimen ANTES de irse.
+ * VA CON MARGEN Y NO AL RAS: hoy se hacen 317 —eran 293 antes del repaso del texto que se
+ * repite, 274 antes de que el carril dejara de venir vacío, y 180 antes del carril, la caja
+ * de los tratos, el cartel al pie, las dos fichas y la crónica—, y el guardia está veintiocho
+ * por debajo: más que el bloque condicional más pequeño. Al ras hace lo contrario de lo que
+ * quiere: una comprobación que se cae de un `if` dispara el guardia antes que la roja, y con
+ * el guardia delante nadie ve el nombre de lo que se rompió. Por eso las rojas se imprimen
+ * ANTES de irse.
  */
-const MINIMO = 265;
+const MINIMO = 289;
 if (hechas < MINIMO) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);

@@ -1792,6 +1792,39 @@ paso('El mueble de opciones de la app no pinta una DECLARACIÓN como si fuera un
  *   · Y LA CRÓNICA COMPARANDO EL TEXTO en vez de la jugada: dos sucesos iguales seguidos
  *     eran uno solo en el relato, y el segundo desaparecía sin que nadie lo notara.
  *
+ * ═══ Y LOS CUATRO REPAROS DE LA APP TRAJERON OTROS CUATRO DE LA MISMA FAMILIA ═══
+ *
+ * Los cuatro medidos por un revisor adversario, y los cuatro con la misma forma: algo deja
+ * de poder hacerse y no hay un error en ninguna consola.
+ *
+ *   · DOS DE LAS CUATRO MITADES EN LAS TRES HOJAS. Tenían velo y
+ *     `accessibilityViewIsModal`, que no es una trampa de foco: es de iOS y sólo hace
+ *     ignorar a los HERMANOS de la vista que lo lleva —o sea al velo—, y en Android no
+ *     atrapa nada. Con una tarjeta modal abierta, un lector salía a la cinta, al carril, a
+ *     la caja de los tratos y a «Salir» y «Tirar la mesa». Y su velo tampoco llegaba: vivían
+ *     dentro de `cajaDelLienzo` y `tapaTodo` es absoluto respecto de SU padre, así que la
+ *     barra de la mesa seguía pulsable CON EL DEDO. «Tirar la mesa» acaba la partida de
+ *     todos.
+ *   · EL PIE FLOTANTE SIN TECHO DE ALTO. Absoluto sin `top`: medía lo que su contenido y lo
+ *     recortaba el `overflow` de la caja del lienzo, POR ARRIBA. Peor pie real 460 de 725 en
+ *     retrato, pero el techo del mueble son 728 y esto corre también en la web. Lo primero
+ *     que se cae es el cartel y lo segundo la caja de los tratos, cuyos tres movimientos la
+ *     criba ya descontó: contestar un trato desaparece de la pantalla entera.
+ *   · TOCAR UN JUGADOR NO ABRÍA NADA EN EL RESPALDO. Las tres hojas vivían sólo dentro de
+ *     `cajaDelLienzo`, que en esa rama no existe, y el marcador con su `alTocarJugador` sí
+ *     se monta: pulsar una ficha ponía el jugador elegido, mataba el cartel y no pintaba
+ *     nada. Y en la rama del anillo el mismo toque desde el marcador abría la hoja DEBAJO
+ *     del cajón, que es el mismo botón muerto por la puerta de al lado.
+ *   · HASTA TRES REGIONES VIVAS A LA VEZ, cuando la casa pide UNA por pantalla: la línea del
+ *     turno, el aviso de la mesa y el que el retablo pinta dentro. Y el de la mesa devuelve
+ *     `null` con el texto vacío, o sea que la región nace con su contenido y no se anuncia
+ *     nunca. Dos de los tres muebles no son de esta tanda; su arreglo exacto está escrito
+ *     junto a la regla.
+ *
+ * Y con ellos el otro medio fallo del ÚNICO campo de texto de la partida: que «Pujar» se
+ * pueda pulsar al primer toque no sirve de nada si en iOS el teclado se pone encima del
+ * campo, que es lo que hace con un cajón pegado al borde de abajo.
+ *
  * ═══ Y CADA REGLA SE VE CAER ═══
  *
  * `reglaDelFuente` afirma la regla sobre el fichero de VERDAD y vuelve a aplicarla sobre
@@ -1802,7 +1835,8 @@ paso('El mueble de opciones de la app no pinta una DECLARACIÓN como si fuera un
  */
 paso(
   'El Burgo en tres dimensiones: envoltura perezosa, red bajo el lienzo, sin plataforma, hojas fuera del gesto, ' +
-    'y de pantalla completa —el carril a la vista, el cajón con sus cuatro mitades y el teclado que no se come el primer toque—',
+    'y de pantalla completa —el carril a la vista, el cajón con sus cuatro mitades y el teclado que no se come el primer toque—; ' +
+    'y los cuatro reparos: la trampa de foco de las tres hojas, el techo del pie, las hojas en las dos ramas y una sola región viva',
 );
 {
   const envoltura = leer(path.join(SRC, 'arcade', 'burgo-en-tres.tsx'));
@@ -1952,18 +1986,55 @@ paso(
     'montar la carga aquí escribiría la forma del movimiento en un segundo sitio, y el segundo no lo comprueba nadie',
   );
 
-  /* ─── Las hojas, hermanas del gesto ─── */
+  /* ─── Las hojas, fuera del gesto y fuera de la caja del lienzo ─── */
 
+  /**
+   * El cuerpo de una función local de la pantalla, de su `= (` a la línea que la cierra
+   * al mismo nivel. Es como se leen `elPie`, `elCajon` y `lasHojas`, que son tres
+   * funciones y no tres componentes a propósito: sin ganchos dentro se pueden llamar
+   * detrás de los `return` de las ramas de respaldo.
+   */
+  const bloqueDe = (texto, cabecera) => {
+    const c = soloCodigo(texto);
+    const desde = c.indexOf(cabecera);
+    if (desde < 0) return '';
+    const hasta = c.indexOf('\n  );', desde);
+    return hasta < 0 ? '' : c.slice(desde, hasta);
+  };
+
+  const CABECERA_DE_LAS_HOJAS = 'const lasHojas = (): JSX.Element => (';
+
+  /*
+   * ═══ LAS TRES HOJAS VIVEN EN UN SOLO SITIO, Y ESE SITIO NO ES LA CAJA DEL LIENZO ═══
+   *
+   * Dos fallos distintos con la misma cura. El viejo: una hoja DENTRO del
+   * `GestureDetector` le pelea el toque al giro del tablero. Y el que este comprobador
+   * no veía: escritas dentro de `cajaDelLienzo`, su velo —`tapaTodo`, que es absoluto
+   * respecto de SU PADRE— tapaba el anillo y nada más, así que con «¿Qué haces en Calle
+   * Mayor?» delante «Salir» y «Tirar la mesa» de la barra de la mesa seguían encendidos
+   * y pulsables con el dedo. «Tirar la mesa» acaba la partida de todos.
+   *
+   * Se compra leyendo que las tres están dentro de `lasHojas` —las tres, y ninguna
+   * suelta por ahí— y que ese bloque no contiene ni el detector ni el lienzo.
+   */
   reglaDelFuente(
-    'las hojas del Burgo se montan HERMANAS del `GestureDetector` y nunca dentro',
+    'las tres hojas del Burgo se escriben en `lasHojas` y ahí dentro no hay ni gesto ni lienzo',
     (t) => {
-      const cierra = t.indexOf('</GestureDetector>');
-      const primera = t.indexOf('<LaHojaSobreElLienzo');
-      return cierra >= 0 && primera > cierra;
+      const c = soloCodigo(t);
+      const bloque = bloqueDe(t, CABECERA_DE_LAS_HOJAS);
+      const todas = (c.match(/<LaHojaSobreElLienzo/g) ?? []).length;
+      const dentro = (bloque.match(/<LaHojaSobreElLienzo/g) ?? []).length;
+      return (
+        bloque.length > 0 &&
+        todas === 3 &&
+        dentro === 3 &&
+        !/GestureDetector/.test(bloque) &&
+        !/<Canvas/.test(bloque)
+      );
     },
     escena,
     escena.replace('<Canvas', '<LaHojaSobreElLienzo titulo="" alDejarlo={soltarTodo} />\n<Canvas'),
-    'un `Pressable` dentro del detector le pelea el toque al giro del tablero',
+    'un `Pressable` dentro del detector le pelea el toque al giro del tablero, y una hoja escrita dentro de la caja del lienzo lleva un velo que no llega a la barra de la mesa',
   );
 
   /* ─── La cámara del cliente, antes de la escena y con prioridad 0 ─── */
@@ -2088,7 +2159,7 @@ paso(
         pie >= 0 &&
         carrilEnElPie > pie &&
         cajon > carrilEnElPie &&
-        /<LaCintaDelBurgo cinta=\{hoja\.cinta\} cajonAbierto=\{cajonAbierto\}/.test(c) &&
+        /<LaCintaDelBurgo\s+cinta=\{hoja\.cinta\}\s+cajonAbierto=\{cajonAbierto\}/.test(c) &&
         !/<ElCarrilDeLaMesa[\s\S]*<ElCajonDeLaHoja/.test(c.slice(cajon))
       );
     },
@@ -2165,13 +2236,70 @@ paso(
         !/PARTE_DEL_ALTO/.test(c) &&
         !/ALTO_MINIMO_DEL_LIENZO/.test(c) &&
         /cajaDelLienzo: \{ flex: 1, width: '100%', overflow: 'hidden' \}/.test(c) &&
-        /pieFlotante: \{ position: 'absolute', left: 0, right: 0, bottom: 0 \}/.test(c) &&
+        /pieFlotante: \{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end' \}/.test(
+          c,
+        ) &&
         /<View style=\{estilos\.pieFlotante\} pointerEvents="box-none">/.test(c)
       );
     },
     escena,
     escena.replace('<View style={estilos.pieFlotante} pointerEvents="box-none">', '<View style={estilos.pieFlotante}>'),
     'sin `box-none`, el hueco entre los muebles del pie deja de ser tablero y la franja de abajo del anillo no responde al gesto, sin que se vea por qué',
+  );
+
+  /*
+   * ═══ EL PIE FLOTANTE TENÍA SUELO Y NO TENÍA TECHO, Y LO QUE SE CAÍA ERA UN MOVIMIENTO ═══
+   *
+   * Era `{ position: 'absolute', left: 0, right: 0, bottom: 0 }`, sin `top`. Una caja
+   * absoluta sin `top` mide lo que mida su CONTENIDO y no tiene contra qué ceder: el
+   * `flexShrink: 1` de `pieDeLaMesa` no hacía nada —su propio comentario lo admitía— y
+   * quien recortaba era el `overflow: hidden` de `cajaDelLienzo`, POR ARRIBA.
+   *
+   * Medido: el peor pie real son 460 puntos de los 725 del lienzo en un teléfono en pie,
+   * así que en retrato no se cae nada. Pero el techo del mueble son unos 728 —cartel 60,
+   * caja de los tratos 290, sueltas 180, carril 106, cinta 60 y 32 de huecos— y esta app
+   * corre TAMBIÉN en la web, donde el alto de la ventana lo elige quien mira. Y lo que se
+   * recorta por arriba es, por ese orden, el CARTEL y la CAJA DE LOS TRATOS: los tres
+   * movimientos de la caja ya se los ha descontado la criba a la sección «El trato»
+   * —`opcionesFueraDelTablero` recibe `pregon`—, así que contestar un trato se queda sin
+   * un solo botón en toda la pantalla. Es el fallo que esta tanda vino a matar, entrando
+   * por el alto de la ventana y sin un error en ninguna consola.
+   *
+   * El techo son `top: 0` más `justifyContent: 'flex-end'` —la pila sigue pegada al pie,
+   * pero ahora HAY contra qué ceder— y el `flexShrink: 1` de la caja de los tratos, que
+   * en React Native vale cero por defecto. Cediendo, encogen las DOS listas que ya tienen
+   * tope y ruedan por dentro (`sueltasDelPie` y `cajaLista`) en vez de irse un mueble
+   * entero por arriba.
+   */
+  reglaDelFuente(
+    'el pie flotante tiene techo y cede, y quien encoge son las dos listas que ya ruedan, no un mueble entero',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /pieFlotante: \{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end' \}/.test(
+          c,
+        ) &&
+        /pieDeLaMesa: \{ flexShrink: 1,/.test(c) &&
+        /sueltasDelPie: \{ flexGrow: 0, flexShrink: 1, maxHeight: 180 \}/.test(c)
+      );
+    },
+    escena,
+    /* Envenenado: el pie flotante vuelve a no tener techo, que es como estaba. */
+    escena.replace(
+      "pieFlotante: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end' }",
+      "pieFlotante: { position: 'absolute', left: 0, right: 0, bottom: 0 }",
+    ),
+    'sin techo el pie mide lo que mide su contenido y lo recorta el `overflow` de la caja del lienzo POR ARRIBA: se van el cartel y la caja de los tratos, y contestar un trato desaparece de la pantalla entera',
+  );
+  reglaDelFuente(
+    'y la caja de los tratos cede, porque en React Native el `flexShrink` por defecto es cero',
+    (t) => {
+      const c = soloCodigo(t);
+      return /caja: \{\s*flexShrink: 1,/.test(c) && /cajaLista: \{ flexGrow: 0, flexShrink: 1, maxHeight: 220 \}/.test(c);
+    },
+    hojas,
+    hojas.replace('caja: {\n    flexShrink: 1,', 'caja: {'),
+    'sin ceder, la caja se planta en sus 290 puntos y quien se recorta es el mueble entero: la criba ya le quitó a «El trato» sus tres botones porque esta caja se pinta',
   );
   reglaDelFuente(
     'la ruta de `burgo.glb` sale de `escenas/ruta-de-modelos.ts` y no hay ninguna escrita a mano',
@@ -2290,39 +2418,87 @@ paso(
       const c = soloCodigo(t);
       const conLasDos =
         c.match(
-          /accessibilityElementsHidden=\{cajonAbierto\}\s*importantForAccessibility=\{cajonAbierto \? 'no-hide-descendants' : 'auto'\}/g,
+          /accessibilityElementsHidden=\{hayCajaModal\}\s*importantForAccessibility=\{hayCajaModal \? 'no-hide-descendants' : 'auto'\}/g,
         ) ?? [];
       /* Las dos ramas —la del anillo y la del respaldo— tienen que llevarla; si no, una de las dos se escapa. */
       return conLasDos.length >= 2 && /debajoDelCajon: \{ flex: 1 \}/.test(c);
     },
     escena,
-    escena.replace(/importantForAccessibility=\{cajonAbierto \? 'no-hide-descendants' : 'auto'\}/g, ''),
-    'con una sola mitad, en la otra plataforma el lector se sale del cajón y se pone a leer el tablero: un modal que no atrapa nada',
+    escena.replace(/importantForAccessibility=\{hayCajaModal \? 'no-hide-descendants' : 'auto'\}/g, ''),
+    'con una sola mitad, en la otra plataforma el lector se sale del modal y se pone a leer el tablero: un modal que no atrapa nada',
+  );
+
+  /*
+   * ═══ Y LA TRAMPA VALE PARA LAS CUATRO CAJAS MODALES, NO SÓLO PARA EL CAJÓN ═══
+   *
+   * La regla de arriba compraba la trampa del CAJÓN y ahí se quedaba. Las tres hojas
+   * —«¿Qué haces en …?», la ficha de una casilla y la de un jugador— tenían DOS de las
+   * cuatro mitades: velo y `accessibilityViewIsModal`. Y eso segundo no es una trampa:
+   * es de iOS y sólo hace ignorar a los HERMANOS de la vista que lo lleva, o sea al velo
+   * y a nada más; en Android no atrapa absolutamente nada. Medido con una tarjeta modal
+   * abierta, un lector de pantalla salía a la cinta, al carril, a la caja de los tratos y
+   * a «Salir» y «Tirar la mesa». Cuatro muebles vivos detrás de un velo, y «Tirar la
+   * mesa» acaba la partida de todos.
+   *
+   * Y `hayHojaAbierta` se lee de LOS OBJETOS QUE SE PINTAN y no de los tres estados del
+   * dedo, que es la regla de la casa dicha para una trampa de foco: `elJugador` guarda un
+   * asiento y `buscarJugador` devuelve `null` si esa persona ya se ha ido de la mesa. Con
+   * el estado, la pantalla se apagaría entera para un lector sin NINGUNA hoja delante que
+   * leer — una pantalla muda, y sin un solo error.
+   */
+  reglaDelFuente(
+    'la trampa se enciende también con una de las tres hojas, y se lee de los objetos que se pintan',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /const hayHojaAbierta = queHacesAqui !== null \|\| laFicha !== null \|\| elDelJugador !== null;/.test(c) &&
+        /const hayCajaModal = cajonAbierto \|\| hayHojaAbierta;/.test(c) &&
+        /* `\b` a propósito: `elDelJugador` LLEVA DENTRO `elJugador`, y sin el filo esto se pone rojo con el fichero bueno. */
+        !/hayHojaAbierta = [^\n]*\belJugador !== null/.test(c)
+      );
+    },
+    escena,
+    escena.replace(
+      'const hayCajaModal = cajonAbierto || hayHojaAbierta;',
+      'const hayCajaModal = cajonAbierto;',
+    ),
+    'con la trampa atada sólo al cajón, una tarjeta modal delante deja «Salir» y «Tirar la mesa» a un toque del lector de pantalla, y `accessibilityViewIsModal` no atrapa nada en Android',
   );
   /*
    * ═══ EL ORDEN DE LOS HERMANOS ES QUIÉN PINTA ENCIMA, Y AQUÍ NO HAY `z-index` ═══
    *
-   * En esta plataforma pinta encima el hermano que va DESPUÉS. Con el pie escrito detrás
-   * de las tres hojas, la cinta, el carril y la caja de los tratos quedaban POR ENCIMA del
-   * velo de una hoja modal: encendidos, legibles y pulsables con una tarjeta abierta
-   * delante. Eso es exactamente lo que un velo existe para impedir, y no se ve en ninguna
-   * consola: se ve mirando la pantalla y sabiendo qué mirar.
+   * En esta plataforma pinta encima el hermano que va DESPUÉS, y las cuatro cajas modales
+   * de esta pantalla se apilan en un orden que no es libre:
+   *
+   *     la columna de debajo  →  las tres hojas  →  el cajón
+   *
+   * Con las hojas dentro de la columna —que es donde estaban, dentro de `cajaDelLienzo`—
+   * su velo tapaba el anillo y dejaba la cinta, el carril, la caja de los tratos y la
+   * barra de la mesa encendidos y pulsables con una tarjeta modal delante. Y con las
+   * hojas DETRÁS del cajón, la ficha de un jugador que se abre desde el marcador —que
+   * vive dentro del cajón— se pintaría debajo de él: el botón muerto que esta tanda vino
+   * a matar, otra vez.
+   *
+   * Se compra leyendo las dos ramas: en las dos, `{lasHojas()}` va entre el cierre de la
+   * columna y `{elCajon()}`, y no hay ningún `{elCajon()}` sin su `{lasHojas()}` delante.
    */
   reglaDelFuente(
-    'el pie se escribe ANTES que las tres hojas, para quedar DEBAJO de su velo',
+    'las tres hojas se montan en LAS DOS ramas, entre la columna de debajo y el cajón',
     (t) => {
-      const c = soloCodigo(t);
-      const pie = c.indexOf('<View style={estilos.pieFlotante} pointerEvents="box-none">');
-      const primeraHoja = c.indexOf('<LaHojaSobreElLienzo');
-      return pie >= 0 && primeraHoja > pie;
+      const lineas = soloCodigo(t)
+        .split('\n')
+        .map((l) => l.trim());
+      const cajones = [];
+      for (const [i, l] of lineas.entries()) if (l === '{elCajon()}') cajones.push(i);
+      return (
+        cajones.length === 2 &&
+        cajones.every((i) => lineas[i - 1] === '{lasHojas()}' && lineas[i - 2] === '</View>')
+      );
     },
     escena,
-    /* Envenenado: una hoja modal ANTES del pie, o sea el pie pintándose encima de su velo. */
-    escena.replace(
-      '<View style={estilos.pieFlotante} pointerEvents="box-none">',
-      '<LaHojaSobreElLienzo titulo="" alDejarlo={soltarTodo} />\n          <View style={estilos.pieFlotante} pointerEvents="box-none">',
-    ),
-    'con el pie detrás, sus botones se ven encendidos y se pulsan con una tarjeta modal abierta delante',
+    /* Envenenado: la rama del respaldo se queda sin hojas, que es como estaba. */
+    escena.replace('{lasHojas()}', ''),
+    'sin las hojas en el respaldo, tocar un jugador en el marcador pone el jugador elegido, mata el cartel y no pinta nada: un botón muerto justo en la rama a la que se llega cuando algo ya ha ido mal',
   );
 
   reglaDelFuente(
@@ -2497,7 +2673,7 @@ paso(
         /<LaCajaDeLosTratos pregon=\{pregon\}/.test(dentroDelPie) &&
         /hayAlgoQuePintar\(sueltas\) \?/.test(dentroDelPie) &&
         /<ElCarrilDeLaMesa carril=\{carril\}/.test(dentroDelPie) &&
-        /<LaCintaDelBurgo cinta=\{hoja\.cinta\}/.test(dentroDelPie) &&
+        /<LaCintaDelBurgo\s+cinta=\{hoja\.cinta\}/.test(dentroDelPie) &&
         /!cajonAbierto \? null : \(/.test(dentroDelCajon) &&
         /<ElCajonDeLaHoja alCerrar=\{cerrarElCajon\} abajo=\{abajo\}>/.test(dentroDelCajon) &&
         /<LaHojaDelBurgo/.test(dentroDelCajon) &&
@@ -2511,6 +2687,143 @@ paso(
     escena.replace('<LaCajaDeLosTratos pregon={pregon} quieto={mesa.quieto} alElegir={alElegirOpcion} />', ''),
     'con la caja fuera del pie, «El trato» ya ha soltado sus botones y la criba ya los ha descontado: aceptar, rechazar y retirar se quedan sin un solo botón en toda la pantalla, y el trato muere de viejo',
   );
+
+  /* ─── Tocar un jugador: la hoja tiene que quedar donde se pueda ver ─── */
+
+  /*
+   * ═══ UNA HOJA QUE SE ABRE DEBAJO DEL CAJÓN ES UN BOTÓN MUERTO ═══
+   *
+   * A `alTocarFigura` se entra por DOS puertas: el peón en el anillo —con el cajón
+   * cerrado, porque con el cajón abierto no se puede tocar el anillo— y un renglón del
+   * MARCADOR, que vive dentro de la hoja, que vive dentro del cajón. Por la segunda, la
+   * hoja que esto abre se pintaba debajo del cajón, porque el cajón es el último hermano
+   * de la pantalla y aquí pinta encima el que va después: pulsar a Ana en el marcador
+   * ponía el jugador elegido, mataba el cartel de la casilla señalada y no enseñaba nada.
+   *
+   * Bajar el cajón es el camino inverso del que ya estaba escrito —«Proponer trato»
+   * suelta la hoja y SUBE el cajón con `alAbrirEnElCajon`— y por la puerta del anillo no
+   * hace nada, porque ahí el cajón ya estaba cerrado.
+   */
+  reglaDelFuente(
+    'tocar un jugador baja el cajón, para que su ficha no se pinte debajo de él',
+    (t) => {
+      const cuerpo = cuerpoDelManejador(t, 'alTocarFigura');
+      const cierra = cuerpo.indexOf('cerrarElCajon();');
+      const pone = cuerpo.indexOf('ponerElJugador(asiento);');
+      return cuerpo.length > 0 && cierra > 0 && pone > cierra;
+    },
+    escena,
+    escena.replace('      cerrarElCajon();\n', ''),
+    'desde el marcador —que vive dentro del cajón— la ficha del jugador se abre detrás del cajón: se pone el jugador elegido, se mata el cartel y no se pinta nada',
+  );
+
+  /* ─── Una sola región viva por pantalla ─── */
+
+  /*
+   * ═══ HASTA TRES REGIONES VIVAS A LA VEZ, CUANDO LA CASA PIDE UNA ═══
+   *
+   * Medido en la rama del respaldo con el cajón cerrado, y son tres muebles distintos:
+   * `LineaDelTurno` (viva, cortés), `ElAviso` (viva, tajante) y el aviso que el `Retablo`
+   * pinta dentro de sí (viva, cortés). Tres regiones en la misma pantalla se pisan y
+   * acaban leyéndose a destiempo, que es justo lo que una región viva viene a evitar. Y
+   * `ElAviso` devuelve `null` con el texto vacío: la región NACE a la vez que su texto, y
+   * una región que se monta con su contenido dentro no anuncia nada — o sea que el aviso
+   * de la mesa no se oía nunca, ni siquiera solo.
+   *
+   * LO QUE SE ARREGLA DESDE AQUÍ: la pantalla del Burgo no monta `<ElAviso>` en sus dos
+   * ramas de mesa y le pasa el texto a LA CINTA, que está siempre en el árbol, en las dos
+   * ramas, y por delante del aviso del juego y de la espera. Quedan DOS en el respaldo y
+   * UNA en la rama del anillo. El vestíbulo sí lo monta, y ahí es la única.
+   *
+   * LO QUE NO ES DE ESTA TANDA, CON SU ARREGLO EXACTO ESCRITO:
+   *
+   *   · `tablero-en-linea.tsx` → `ElAviso` tiene que pintar SIEMPRE la vista con
+   *     `accessibilityLiveRegion` y meter el `Text` dentro condicionado, en vez de
+   *     devolver `null`: una región que aparece con su texto no se anuncia. Y para que la
+   *     pantalla se quede en UNA, el aviso de la mesa debería ir dentro del
+   *     `accessibilityLabel` de `LineaDelTurno`, que ya compone la frase entera.
+   *   · `retablo.tsx` → su aviso necesita un interruptor (`avisoVivo`, cierto por
+   *     defecto) para que una pantalla que ya tiene su región pida el texto pelado. Sin
+   *     él, el respaldo del Burgo se queda con dos regiones corteses a la vez.
+   */
+  reglaDelFuente(
+    'la pantalla del Burgo no monta `ElAviso` sobre la mesa: el aviso se lo lleva la cinta, que está siempre en el árbol',
+    (t) => {
+      const c = soloCodigo(t);
+      /* En el vestíbulo sí, y ahí es la única de esa pantalla: una y sólo una en todo el fichero. */
+      const cuantos = (c.match(/<ElAviso texto=\{mesa\.aviso\} \/>/g) ?? []).length;
+      const vestibulo = c.indexOf('<ElAviso texto={mesa.aviso} />');
+      const laMesa = c.indexOf('function LaMesaEnTres(');
+      return cuantos === 1 && vestibulo > 0 && laMesa > vestibulo && /avisoDeLaMesa=\{mesa\.aviso\}/.test(c);
+    },
+    escena,
+    escena.replace(
+      '        <LineaDelTurno mesa={vista} nombres={nombres} />',
+      '        <LineaDelTurno mesa={vista} nombres={nombres} />\n        <ElAviso texto={mesa.aviso} />',
+    ),
+    'en el respaldo llegaban a coincidir tres regiones vivas —la línea del turno, este aviso y el del retablo— y se pisan; y ésta además nace con su texto, así que no se anuncia nunca',
+  );
+  reglaDelFuente(
+    'y la cinta dice el aviso de la mesa por delante del del juego y de la espera, sin redactar ninguno',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /avisoDeLaMesa: string;/.test(c) &&
+        /const dicho =\s*avisoDeLaMesa\.length > 0 \? avisoDeLaMesa : cinta\.aviso\.length > 0 \? cinta\.aviso : cinta\.espera;/.test(
+          c,
+        ) &&
+        !/accessibilityLiveRegion/.test(c)
+      );
+    },
+    hojas,
+    hojas.replace(
+      'avisoDeLaMesa.length > 0 ? avisoDeLaMesa : cinta.aviso.length > 0 ? cinta.aviso : cinta.espera',
+      'cinta.aviso.length > 0 ? cinta.aviso : cinta.espera',
+    ),
+    'sin la mesa por delante, «No ha salido el movimiento» se queda debajo de «Espera a que Ana tire» y no se ve en ninguna parte: lo que se acaba de pulsar manda sobre lo que hay que esperar',
+  );
+
+  /* ─── El teclado y el único campo de texto de la partida, por el otro lado ─── */
+
+  /*
+   * ═══ QUE «PUJAR» SE PUEDA PULSAR NO SIRVE SI EL CAMPO NO SE VE ═══
+   *
+   * La tanda anterior arregló que el primer toque en «Pujar» no se lo comiera el teclado
+   * (`keyboardShouldPersistTaps`). Queda la otra mitad del mismo campo: que se VEA lo que
+   * se teclea. El cajón está pegado al borde de abajo (`tapaTodo` con `flex-end`) y se
+   * queda en el 86 % del alto, así que lo suyo se lee en la mitad de abajo de la
+   * pantalla. En Android da igual: la ventana se redimensiona sola (`adjustResize`, el
+   * modo por defecto, y `app.json` no lo cambia). En iOS el teclado NO redimensiona nada
+   * —se pone encima y se lleva unos 336 de los 845 puntos de un teléfono en pie—, o sea
+   * justo la franja donde caen el campo de la puja y su botón con la subasta abierta:
+   * se teclea a ciegas una cifra que decide un solar, con el plazo corriendo.
+   *
+   * La receta es la de la casa, ya medida en `piezas.tsx`: `KeyboardAvoidingView` con
+   * `padding` SÓLO en iOS —en Android empuja dos veces y deja un hueco muerto—. Sube el
+   * cajón entero, que es distinto de que el campo se busque rodando dentro de un marco
+   * que sigue medio tapado. Y `Platform` aquí no decide qué se pinta ni cómo se juega:
+   * eso es lo que la PANTALLA del Burgo tiene prohibido, y se vigila allí.
+   */
+  reglaDelFuente(
+    'el cajón sube con el teclado, que es lo que deja ver el único campo de texto de la partida',
+    (t) => {
+      const c = soloCodigo(t);
+      const cajon = c.indexOf('export function ElCajonDeLaHoja(');
+      if (cajon < 0) return false;
+      const cuerpo = c.slice(cajon, cajon + 1800);
+      const marco = cuerpo.indexOf('<KeyboardAvoidingView');
+      const dentro = cuerpo.indexOf('<View style={estilos.cajon}');
+      return (
+        marco > 0 &&
+        dentro > marco &&
+        /behavior=\{Platform\.OS === 'ios' \? 'padding' : undefined\}/.test(cuerpo) &&
+        /subeConElTeclado: \{ flex: 1, justifyContent: 'flex-end' \}/.test(c)
+      );
+    },
+    hojas,
+    hojas.replace("behavior={Platform.OS === 'ios' ? 'padding' : undefined}", ''),
+    'en iOS el teclado se pone encima y se come los 336 de abajo: con la subasta abierta, el campo de la puja y su botón quedan detrás del teclado y se escribe a ciegas la cifra que decide un solar',
+  );
 }
 
 /**
@@ -2523,11 +2836,14 @@ paso(
  * añadir comprobaciones; un guardia desfasado no guarda nada.
  */
 /*
- * Y VA CON MARGEN Y NO AL RAS: hoy se hacen 251 —el Burgo trajo treinta y cinco al llegar,
- * otras treinta y dos cuando se hizo de pantalla completa y dos más para que un mueble que no
- * se monta se vea rojo, la mitad de ellas vacunas— y el guardia
- * está en 239. Al ras hace lo contrario de lo que quiere: una comprobación que se cae de su
- * bloque dispara el guardia en vez de la roja.
+ * Y VA CON MARGEN Y NO AL RAS: hoy se hacen 265 —el Burgo trajo treinta y cinco al llegar,
+ * otras treinta y dos cuando se hizo de pantalla completa, dos más para que un mueble que no
+ * se monta se vea rojo y catorce en la tanda de los cuatro reparos de la app (la trampa de
+ * foco de las tres hojas, el techo del pie flotante y lo que cede debajo, las hojas montadas
+ * en las dos ramas, el cajón que baja al tocar un jugador, la región viva que sobraba y el
+ * teclado que tapaba la puja), la mitad de todas ellas vacunas— y el guardia está en 253. Al
+ * ras hace lo contrario de lo que quiere: una comprobación que se cae de su bloque dispara el
+ * guardia en vez de la roja.
  *
  * ═══ Y LAS ROJAS SE IMPRIMEN ANTES DE QUE EL GUARDIA SALGA ═══
  *
@@ -2536,7 +2852,7 @@ paso(
  * que hace falta para arreglarlo. Ahora las rojas se cuentan primero y el guardia habla
  * después, con su propio código de salida (2) para que se distinga de una roja de verdad.
  */
-const COMPROBACIONES_ESCRITAS = 239;
+const COMPROBACIONES_ESCRITAS = 253;
 
 if (fallos.length > 0) {
   console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);

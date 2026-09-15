@@ -212,18 +212,45 @@ import {
   obraPosibleEnCasilla,
   obrasSoloEnElAnillo,
   opcionesFueraDelTablero as opcionesFueraDelBurgo,
+  ORDEN_DE_LA_HOJA,
+  /* La concordancia de todo el Burgo, con apellido: es la que el marcador del raíl tiene que usar. */
+  plural as pluralDelBurgo,
   pregonDelBurgo,
   seVeEnTres as elBurgoSeVeEnTres,
   tableroEnTres as tableroDelBurgoEnTres,
 } from '../../shared/arcade/juegos/burgo-en-tres';
 /* El tipo del único movimiento que este cliente pregunta antes de mandar. Ver `seConfirmaAntes`. */
 import { RENDIRSE as RENDIRSE_DEL_BURGO } from '../../shared/arcade/juegos/burgo';
-import { BurgoEnTres, MarcadorDelBurgo } from '../src/burgo-en-tres';
+/*
+ * EL BOLSILLO SE IMPORTA Y SE EJERCITA DE VERDAD, no se lee como texto: lo que hay que comprar
+ * es que lo guardado VUELVE y que dos ventanas de la misma mesa no se pisan, y eso son dos
+ * llamadas y una comparación. `localStorage` no existe en Node, así que el bloque le pone uno
+ * de mentira y lo retira al salir.
+ */
+import { guardarLaSeccion, laSeccionGuardada } from '../src/bolsillo';
+/*
+ * Y LA MEMORIA DEL CARTEL DEL PIE, que el pintor exporta por lo mismo que la escena exporta su
+ * filtro: dentro del componente sólo se podría probar con un navegador y punteros de verdad, y
+ * un filtro de repetición que no se prueba se rompe en silencio — sigue avisando, sólo que mal.
+ */
+import {
+  BurgoEnTres,
+  EL_CARTEL_EN_BLANCO,
+  loQueDiceLaCinta,
+  loQueHaceElToque,
+  MarcadorDelBurgo,
+  trasElSenalado,
+} from '../src/burgo-en-tres';
+import type { LaMemoriaDelCartel } from '../src/burgo-en-tres';
+/* El otro extremo del mismo contrato: quién decide que un gesto de puntero es noticia. Sin `three`. */
+import { senaladoTrasElGesto } from '../../escenas/burgo/tipos';
+import type { GestoDeSenalado } from '../../escenas/burgo/tipos';
 import {
   LaCronicaDelBurgo,
   LaFichaDeUnJugador,
   LasHojasDelBurgo,
   LasPuertasDelBurgo,
+  laSeccionQueSeAbre,
   LaTarjetaDeUnaCasilla,
 } from '../src/hojas-del-burgo';
 import { PINTORES_PROPIOS } from '../src/pintores';
@@ -8820,6 +8847,114 @@ function lasPiezasDelLienzoYSuBanco(): void {
     renderToStaticMarkup(<div className={CARRIL_DEL_LIENZO} role="group" aria-label="Nada" />) !== '',
   );
 
+  // ── 4 bis. EL RÓTULO CORTO: EL CUADRADO QUE DICE CUÁL ES Y NO SÓLO QUÉ HACE ──
+
+  /*
+   * ═══ EL FALLO QUE COMPRA ESTE BLOQUE, Y POR QUÉ NINGUNO DE LOS DE ARRIBA LO CAZABA ═══
+   *
+   * El cuadrado pintaba el glifo —que es el VERBO— y nada más, y los jueces de arriba lo daban
+   * por bueno porque todo lo que ellos miran estaba: el botón salía, el nombre largo iba en
+   * `aria-label`, el `title` decía la frase entera y el apagado llevaba su `aria-disabled`.
+   * Con lector y con ratón la tira se leía perfectamente.
+   *
+   * A LA VISTA no. En el apuro del Burgo salen SEIS «Hi» seguidos, uno por título que
+   * hipotecar, y sólo se distinguen por la barra de dos puntos con el color de la acera —que
+   * en dos solares del MISMO barrio es idéntica—; en una subasta con el cajón cerrado salen
+   * TRES «Pu» iguales sin ni siquiera esa barra. Y con el dedo tampoco hay `title` que se pose,
+   * que es justo el aparato para el que existe este mueble.
+   *
+   * La lista de abajo es ese apuro y esa subasta en pequeño: DOS «Hi» del mismo barrio —misma
+   * marca, o sea que el color no los separa—, DOS «Pu» sin marca ninguna, uno sin rótulo
+   * porque su verbo ya es único, y uno con el rótulo VACÍO, que es lo que sale de una tabla el
+   * día que a un movimiento nuevo no se le escribe rótulo.
+   */
+  const conRotulos = [
+    { clave: 'h1', glifo: 'Hi', rotulo: 'Mayor', nombre: 'Hipotecar Calle Mayor por 175 €', marca: '#c5e84a' },
+    { clave: 'h2', glifo: 'Hi', rotulo: 'Prado', nombre: 'Hipotecar Calle del Prado por 175 €', marca: '#c5e84a' },
+    { clave: 'p1', glifo: 'Pu', rotulo: '120', nombre: 'Pujar 120 €' },
+    { clave: 'p2', glifo: 'Pu', rotulo: '160', nombre: 'Pujar 160 €', quieto: true },
+    { clave: 'ti', glifo: 'Ti', nombre: 'Tirar los dados' },
+    { clave: 've', glifo: 'Ve', rotulo: '', nombre: 'Vender lo que sea' },
+  ];
+  const carrilConRotulos = renderToStaticMarkup(
+    <CarrilDelLienzo nombre="Lo que puedes hacer" cuadrados={conRotulos} alTocar={() => undefined} />,
+  );
+  const cuantosRotulos = carrilConRotulos.split(`class="${CARRIL_DEL_LIENZO}-rotulo"`).length - 1;
+  const cuantosAnchos = carrilConRotulos.split(`${CARRIL_DEL_LIENZO}-hueco-ancho`).length - 1;
+  comprobar(
+    'el cuadrado con rótulo lo pinta A LA VISTA, y por eso los «Hi» del apuro dejan de ser cuadrados iguales: cada uno dice de qué solar habla',
+    cuantosRotulos === 4 && ['Mayor', 'Prado', '120', '160'].every((r) => carrilConRotulos.includes(`>${r}</span>`)),
+    { rotulos: cuantosRotulos, html: carrilConRotulos.slice(0, 300) },
+  );
+  comprobar(
+    'y sólo ensancha el que lo trae: el verbo que ya es único —«Ti»— se queda en sus 44 puntos y no le quita sitio en la tira a los que sí lo necesitan',
+    cuantosAnchos === 4 && cuantos(carrilConRotulos, 'button') === 6,
+    { anchos: cuantosAnchos, botones: cuantos(carrilConRotulos, 'button') },
+  );
+  /*
+   * VACUNA DEL RÓTULO VACÍO, con la aritmética envenenada y no con el marcado sano: si la
+   * condición fuera `rotulo !== undefined` —que es lo que se escribe sin pensarlo— el sexto
+   * cuadrado saldría ancho para pintar un renglón EN BLANCO, o sea 59,5 puntos de tira a
+   * cambio de nada y un cuadrado menos a la vista en el lienzo de 288.
+   */
+  const comoSiBastaraConEstarDeclarado = conRotulos.filter((c) => c.rotulo !== undefined).length;
+  comprobar(
+    'VACUNA: si bastara con que `rotulo` estuviera declarado, el rótulo VACÍO ensancharía un cuadrado para no pintar nada, y la cuenta lo dice',
+    comoSiBastaraConEstarDeclarado === 5 && comoSiBastaraConEstarDeclarado > cuantosAnchos,
+    { siBastara: comoSiBastaraConEstarDeclarado, anchos: cuantosAnchos },
+  );
+  comprobar(
+    'el rótulo va `aria-hidden` y DESPUÉS del glifo: el cuadrado ancho es una columna y el orden del marcado es el de arriba abajo, «Hi» y debajo «Mayor»',
+    new RegExp(`class="${CARRIL_DEL_LIENZO}-rotulo" aria-hidden="true"`).test(carrilConRotulos) &&
+      carrilConRotulos.indexOf(`${CARRIL_DEL_LIENZO}-glifo`) < carrilConRotulos.indexOf(`${CARRIL_DEL_LIENZO}-rotulo`),
+    {
+      glifo: carrilConRotulos.indexOf(`${CARRIL_DEL_LIENZO}-glifo`),
+      rotulo: carrilConRotulos.indexOf(`${CARRIL_DEL_LIENZO}-rotulo`),
+    },
+  );
+  /*
+   * Y LO QUE SE OYE NO CAMBIA NI UNA LETRA. El renglón nuevo es cromo repetido: el nombre
+   * accesible sigue siendo el rótulo ENTERO que escribió el juego. Un cuadrado que se anunciara
+   * «Mayor» sería el mismo fallo de antes al revés —seis letras en vez de una frase— y encima
+   * en el único sitio donde hasta hoy la tira sí se leía bien.
+   */
+  const losNombresDelCarril = [...carrilConRotulos.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1] ?? '');
+  comprobar(
+    'y lo que se OYE no cambia: el nombre accesible sigue siendo el rótulo entero del juego, y ninguno se queda en las seis letras del renglón',
+    losNombresDelCarril.includes('Hipotecar Calle Mayor por 175 €') &&
+      losNombresDelCarril.includes('Hipotecar Calle del Prado por 175 €') &&
+      !losNombresDelCarril.some((n) => n === 'Mayor' || n === 'Prado'),
+    losNombresDelCarril,
+  );
+  comprobar(
+    'y un cuadrado quieto CON rótulo lleva las tres clases —la pieza, el ancho y la que apaga— y su `aria-disabled`: tres clases sobre el mismo botón es donde una cascada se rompe callando',
+    new RegExp(
+      `class="${CARRIL_DEL_LIENZO}-hueco ${CARRIL_DEL_LIENZO}-hueco-ancho ${QUIETA_EN_EL_LIENZO}" aria-disabled="true"`,
+    ).test(carrilConRotulos),
+    /class="lienzo-carril-hueco[^"]*" aria-disabled="true"/.exec(carrilConRotulos)?.[0] ?? null,
+  );
+
+  /*
+   * ═══ Y EL RÓTULO NO PUEDE LLEVAR `color` EN LA HOJA, QUE ES LA MITAD QUE NO SE VE ═══
+   *
+   * La clase que apaga vive en el `<button>` y llega al `<span>` del rótulo POR HERENCIA. Un
+   * `color` escrito en la regla del rótulo gana SIEMPRE —no compiten por peso ni por orden:
+   * una declaración sobre el elemento le gana a lo heredado del padre, esté donde esté
+   * escrita— así que un cuadrado quieto saldría con el verbo en `--tenue` y el renglón de
+   * abajo encendido. Es el fallo de `.lienzo-quieta` entrando por otra puerta, y el juez del
+   * ORDEN de más abajo NO lo caza: ahí sólo se miran las reglas que le disputan por peso.
+   */
+  comprobar(
+    'el rótulo NO lleva `color` propio en la hoja: heredarlo del botón es lo único que hace que un cuadrado apagado salga apagado ENTERO y no a medias',
+    reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-rotulo`).length > 0 &&
+      !/(^|;)\s*color:/.test(reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-rotulo`)),
+    reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-rotulo`).replace(/\s+/g, ' '),
+  );
+  comprobar(
+    'VACUNA: con un `color` propio en esa regla, el renglón de un cuadrado quieto seguiría encendido y este juez se pone rojo',
+    /(^|;)\s*color:/.test(`${reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-rotulo`)};\n  color: var(--acento);`),
+  );
+
   // ── 5. `ElijeUna` ADMITE CONTENIDO, Y VA ENTRE LA NOTA Y LA LISTA ──
 
   const unaOpcion: Opcion[] = [{ id: 'x', tipo: 'burgo:comprar', carga: {}, rotulo: 'Comprar', ayuda: 'por 100 €' }];
@@ -9073,6 +9208,164 @@ function lasPiezasDelLienzoYSuBanco(): void {
       losQueLosLlevanTodos: conDieciocho.length,
       elMasEstrecho: cuantosCaben(Math.min(...LIENZOS.map(([, a]) => a))),
     },
+  );
+
+  // ── 7 bis. EL CUADRADO ANCHO, MEDIDO: EL SUELO DE TOQUE, EL CUERPO MÍNIMO Y LOS CATORCE ──
+
+  /*
+   * ═══ LAS DOS MANERAS DE QUE UN RENGLÓN DE MÁS ROMPA UN MUEBLE QUE YA ESTABA BIEN ═══
+   *
+   * La primera es POR ALTO: el rótulo va dentro de los mismos 2,75rem, así que si la pila
+   * —glifo, hueco y rótulo— no cabe, lo que pasa no es que se vea apretado, es que el
+   * navegador la desborda por abajo y el renglón se sale de la tira o queda medio cortado por
+   * `overflow-y: hidden`. Y aunque quepa, ahí abajo ya vive `.lienzo-carril-marca`, la barra
+   * de dos puntos con el color de la acera: sin hueco reservado, la palabra se pinta ENCIMA de
+   * la barra que es justo la otra señal que distingue dos cuadrados del mismo verbo.
+   *
+   * La segunda es POR ANCHO, y es la que hay que decir en voz alta porque no se arregla: con
+   * los CATORCE cuadrados del apuro no caben ni de lejos en el lienzo de 288. Eso NO es un
+   * fallo: es para lo que la tira rueda por dentro. Lo que sí se compra aquí es que siga
+   * cabiendo AL MENOS UNO entero en los dieciocho —un cuadrado que no quepa entero no se puede
+   * pulsar del todo por mucho que se ruede— y que el suelo de toque de 44 no se pierda por el
+   * camino.
+   *
+   * TODOS LOS NÚMEROS SALEN DE LA HOJA. Escritos aquí, esto no compraría el reparto: compraría
+   * que dos ficheros dicen lo mismo hoy.
+   */
+  const reglaAncha = reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-hueco-ancho`);
+  const sueloDelAncho = Number(/min-width:\s*([\d.]+)rem/.exec(reglaAncha)?.[1] ?? '0');
+  const techoDelAncho = Number(/max-width:\s*([\d.]+)rem/.exec(reglaAncha)?.[1] ?? '0');
+  const huecoEntreRenglones = Number(/gap:\s*([\d.]+)rem/.exec(reglaAncha)?.[1] ?? '0');
+  const reservadoAbajo = Number(/padding:\s*0 [\d.]+rem ([\d.]+)rem/.exec(reglaAncha)?.[1] ?? '0');
+  const cuerpoDelGlifo = Number(/font-size:\s*([\d.]+)rem/.exec(reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-hueco`))?.[1] ?? '0');
+  /*
+   * EL CUERPO MÍNIMO DE LA CASA ES `max(13px, 0.78rem)` y hay que leer LAS DOS MITADES: el 13
+   * es el suelo que no se baja nunca y el `rem` es lo que crece con la preferencia del
+   * navegador. Con la raíz de esta casa manda el segundo (13,26), pero con la raíz por debajo
+   * de 16,67 manda el primero, y es el mismo número el que tiene que caber en los dos casos.
+   */
+  const elCuerpoMinimo = /--letra-minima:\s*max\((\d+)px,\s*([\d.]+)rem\)/.exec(hoja);
+  const cuerpoDelRotulo = Math.max(Number(elCuerpoMinimo?.[1] ?? '0'), Number(elCuerpoMinimo?.[2] ?? '0') * raiz);
+  comprobar(
+    'las medidas del cuadrado ancho se leen de la hoja: sus dos topes de ancho, el hueco entre renglones, lo que reserva abajo y los dos cuerpos de letra',
+    sueloDelAncho > 0 && techoDelAncho > 0 && huecoEntreRenglones > 0 && reservadoAbajo > 0 && cuerpoDelGlifo > 0 && cuerpoDelRotulo > 0,
+    { sueloDelAncho, techoDelAncho, huecoEntreRenglones, reservadoAbajo, cuerpoDelGlifo, cuerpoDelRotulo },
+  );
+  comprobar(
+    'el rótulo va en el CUERPO MÍNIMO de la casa y no en un número clavado: `--letra-minima` es `max(13px, …rem)`, o sea que nunca baja de 13 y crece con la letra del navegador',
+    /font-size:\s*var\(--letra-minima\)/.test(reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-rotulo`)) && cuerpoDelRotulo >= 13,
+    { cuerpoDelRotulo: +cuerpoDelRotulo.toFixed(2) },
+  );
+  comprobar(
+    'y el cuadrado ancho NO pierde el suelo de toque: su ancho mínimo es mayor que el lado de 44 que tiene el cuadrado normal, así que ensanchar nunca encoge',
+    sueloDelAncho > ladoDelCuadrado && techoDelAncho > sueloDelAncho,
+    {
+      anchoMinimo: +(sueloDelAncho * raiz).toFixed(1),
+      anchoMaximo: +(techoDelAncho * raiz).toFixed(1),
+      ladoDeSiempre: +(ladoDelCuadrado * raiz).toFixed(1),
+    },
+  );
+
+  /*
+   * LA PILA DE DENTRO, PUNTO A PUNTO. `box-sizing: border-box` es global en esta hoja, así que
+   * el `padding-bottom` se come alto de dentro: el hueco es el lado del cuadrado menos lo
+   * reservado, y la pila son los dos renglones con su hueco en medio. Los dos interlineados
+   * son 1 —está escrito en las dos reglas—, que es lo que hace que esta cuenta sea la del
+   * navegador y no una aproximación.
+   */
+  const huecoDeDentro = ladoDelCuadrado * raiz - reservadoAbajo * raiz;
+  const laPila = cuerpoDelGlifo * raiz + huecoEntreRenglones * raiz + cuerpoDelRotulo;
+  const reglaDeLaMarca = reglaDeLaHoja(`.${CARRIL_DEL_LIENZO}-marca`);
+  const laMarcaEmpieza =
+    Number(/bottom:\s*([\d.]+)rem/.exec(reglaDeLaMarca)?.[1] ?? '0') * raiz +
+    Number(/height:\s*(\d+)px/.exec(reglaDeLaMarca)?.[1] ?? '0');
+  /* El pie del rótulo, contado desde el canto de abajo del botón: lo reservado más lo que sobra repartido. */
+  const pieDelRotulo = reservadoAbajo * raiz + (huecoDeDentro - laPila) / 2;
+  comprobar(
+    'los dos renglones caben DENTRO de los mismos 44 puntos de alto, y sobra hueco: la tira sigue midiendo una tira, que es lo único que no puede crecer encima del tablero',
+    laPila < huecoDeDentro && huecoDeDentro - laPila > 5,
+    { huecoDeDentro: +huecoDeDentro.toFixed(2), laPila: +laPila.toFixed(2), sobra: +(huecoDeDentro - laPila).toFixed(2) },
+  );
+  /*
+   * DOS PUNTOS DE AIRE Y NO «QUE NO SE TOQUEN», y la diferencia es la que hace que este juez
+   * sirva de algo: sin el `padding-bottom` el pie del rótulo cae a 7,8 y el canto de arriba de
+   * la marca está en 7,1, o sea que NO se tocan por 0,7 puntos —y a la vista eso es la barra de
+   * color pegada a la palabra—. Un juez escrito como «uno por encima del otro» habría dado
+   * verde con el fallo puesto, que es la manera de comprar cero.
+   */
+  const AIRE_BAJO_EL_ROTULO = 2;
+  comprobar(
+    'y el rótulo no se echa encima de la barra de color: quedan dos puntos limpios entre el pie de la palabra y el canto de arriba de la marca, que es la OTRA señal que distingue dos cuadrados del mismo verbo',
+    pieDelRotulo > laMarcaEmpieza + AIRE_BAJO_EL_ROTULO && laMarcaEmpieza > 0,
+    { pieDelRotulo: +pieDelRotulo.toFixed(2), laMarcaEmpieza: +laMarcaEmpieza.toFixed(2) },
+  );
+  /*
+   * VACUNA: se envenena EL NÚMERO —lo reservado abajo pasa a cero, que es lo que se escribe
+   * cuando uno centra la columna y se queda tan tranquilo— y se le pasa LA MISMA aritmética.
+   */
+  comprobar(
+    'VACUNA: sin lo reservado abajo el pie del rótulo cae a 0,7 puntos de la barra de color, que a la vista es estar pegados, y esta misma cuenta se pone roja',
+    (() => {
+      const sinReservar = 0 + (ladoDelCuadrado * raiz - 0 - laPila) / 2;
+      return !(sinReservar > laMarcaEmpieza + AIRE_BAJO_EL_ROTULO);
+    })(),
+    { sinReservar: +((ladoDelCuadrado * raiz - laPila) / 2).toFixed(2), laMarcaEmpieza: +laMarcaEmpieza.toFixed(2) },
+  );
+
+  /*
+   * ═══ Y LOS CATORCE DEL APURO, QUE ES DONDE ESTE MUEBLE DE VERDAD SE USA ═══
+   *
+   * Doce títulos entre vender e hipotecar, más pasar y la quiebra. Se mide con el ancho MÍNIMO
+   * del cuadrado, que es el mejor caso: cualquier rótulo más largo que las seis letras que este
+   * mueble promete lo estira, así que si no caben en el mejor caso, no caben.
+   */
+  const CATORCE_DEL_APURO = 14;
+  /* `cuantos` con el ancho que se le pase, que es lo que permite preguntar lo mismo en el mejor caso y en el peor. */
+  const anchosQueCaben = (ancho: number, ladoEnRaices: number): number =>
+    Math.floor((ancho - insets) / (ladoEnRaices * raiz));
+  const elMasEstrechoDeTodos = Math.min(...LIENZOS.map(([, a]) => a));
+  /*
+   * «AL MENOS UNO ENTERO» SE PREGUNTA CON EL ANCHO MÁXIMO Y NO CON EL MÍNIMO, que es el detalle
+   * que convierte esto en una promesa: el cuadrado mide lo que mida su rótulo, así que lo único
+   * que se puede garantizar es lo que cabe en el PEOR caso. Un cuadrado cortado por el canto no
+   * se puede pulsar del todo por mucho que se ruede.
+   */
+  const sinNiUnoAncho = LIENZOS.filter(([, ancho]) => anchosQueCaben(ancho, techoDelAncho) < 1);
+  const conLosCatorce = LIENZOS.filter(([, ancho]) => anchosQueCaben(ancho, sueloDelAncho) >= CATORCE_DEL_APURO);
+  comprobar(
+    'con rótulo cabe al menos UN cuadrado entero en los dieciocho AUNQUE llegue a su ancho máximo, y en el más estrecho caben menos que sin rótulo: lo que se paga por el renglón es un cuadrado de cada cinco',
+    sinNiUnoAncho.length === 0 &&
+      anchosQueCaben(elMasEstrechoDeTodos, sueloDelAncho) < cuantosCaben(elMasEstrechoDeTodos),
+    {
+      sinNiUno: sinNiUnoAncho.map(([n]) => n),
+      enElDe288ConRotulo: anchosQueCaben(elMasEstrechoDeTodos, sueloDelAncho),
+      enElDe288SinRotulo: cuantosCaben(elMasEstrechoDeTodos),
+      enElPeorCaso: anchosQueCaben(elMasEstrechoDeTodos, techoDelAncho),
+    },
+  );
+  comprobar(
+    'y los CATORCE del apuro no caben en el lienzo de 288 ni en su medida mínima: eso NO se arregla, se RUEDA por dentro, y por eso la clase del carril está en `RUEDAN_SOLAS`',
+    anchosQueCaben(elMasEstrechoDeTodos, sueloDelAncho) < CATORCE_DEL_APURO &&
+      conLosCatorce.length > 0 &&
+      conLosCatorce.length < LIENZOS.length &&
+      RUEDAN_SOLAS.includes(CARRIL_DEL_LIENZO),
+    {
+      enElDe288: anchosQueCaben(elMasEstrechoDeTodos, sueloDelAncho),
+      losQueLosLlevanTodos: conLosCatorce.length,
+      deDieciocho: LIENZOS.length,
+    },
+  );
+  /*
+   * VACUNA DEL TOPE DE ANCHO: sin `max-width` el ancho de un cuadrado es el de su rótulo y no
+   * tiene techo, así que «cabe al menos uno entero» deja de poder prometerse — UN rótulo largo
+   * se lleva la tira del lienzo de 288 y los demás cuadrados quedan fuera del canto sin que
+   * nada falle ni salga en ninguna consola. Se envenena EL TECHO y se le pasa LA MISMA
+   * aritmética que acaba de comprar la promesa.
+   */
+  comprobar(
+    'VACUNA: sin tope de ancho no se puede prometer que quepa NI UNO entero en ningún lienzo, y la misma cuenta se pone roja en los dieciocho',
+    LIENZOS.filter(([, ancho]) => anchosQueCaben(ancho, Number.POSITIVE_INFINITY) < 1).length === LIENZOS.length,
+    { conTopeEnElDe288: anchosQueCaben(elMasEstrechoDeTodos, techoDelAncho) },
   );
 
   // ── 8. LA CADENA GENÉRICA SIGUE COLGANDO DE LO QUE EL PINTOR DECIDE ──
@@ -9743,6 +10036,773 @@ function elEscritorioDelBurgo(): void {
     (sinComentar.match(/<Formulario/g) ?? []).length === 2,
     (sinComentar.match(/<Formulario[^>]*/g) ?? []).map((x) => x.slice(0, 60)),
   );
+
+  // ── 9. EL CARTEL SALE AL POSAR, Y CON EL DEDO SIGUE COSTANDO DOS TOQUES ──
+
+  /*
+   * ═══ LAS DOS MITADES SE CORREN DE VERDAD, CADA UNA CON LA FUNCIÓN DE SU LADO ═══
+   *
+   * El aviso de señalado lo decide la ESCENA (`senaladoTrasElGesto`, sin `three`, en
+   * `escenas/burgo/tipos.ts`) y qué hace un toque lo decide el CLIENTE (`loQueHaceElToque`,
+   * exportado del pintor por lo mismo: dentro del componente sólo se podría probar con un
+   * navegador y punteros de verdad). Aquí se encadenan las dos: entran gestos de puntero y sale
+   * lo que la pantalla hace. Ninguna de las dos se reescribe en este fichero — reescribirlas
+   * sería probar que este guion está de acuerdo consigo mismo.
+   */
+  paso('El cartel del pie sale al POSAR el cursor, y con el dedo sigue costando dos toques');
+
+  const CASILLAS_DEL_ANILLO = 40;
+  type PasoDelPuntero = { readonly gesto: GestoDeSenalado } | { readonly toque: number };
+  /** Corre una secuencia de gestos y toques y devuelve qué hizo la pantalla en cada toque. */
+  const loQuePasaEnLaPantalla = (
+    pasos: readonly PasoDelPuntero[],
+    veneno?: (m: LaMemoriaDelCartel) => LaMemoriaDelCartel,
+  ): readonly string[] => {
+    let enLaEscena: number | null = null;
+    let memoria: LaMemoriaDelCartel = EL_CARTEL_EN_BLANCO;
+    const recuerda = (m: LaMemoriaDelCartel): void => {
+      memoria = veneno === undefined ? m : veneno(m);
+    };
+    const hechos: string[] = [];
+    for (const p of pasos) {
+      if ('toque' in p) {
+        const r = loQueHaceElToque(memoria, p.toque);
+        recuerda(r.memoria);
+        hechos.push(r.que);
+        /* Y lo que la pantalla hace al señalar por un toque: el mismo `senalar` de arriba. */
+        if (r.que === 'senala') recuerda(trasElSenalado(memoria, p.toque));
+        continue;
+      }
+      const aviso = senaladoTrasElGesto(enLaEscena, p.gesto, CASILLAS_DEL_ANILLO);
+      enLaEscena = aviso.ahora;
+      if (aviso.avisa) recuerda(trasElSenalado(memoria, aviso.ahora));
+    }
+    return hechos;
+  };
+
+  /* Las tres secuencias del contrato, escritas como las manda la escena. */
+  const conElRaton: readonly PasoDelPuntero[] = [{ gesto: { que: 'posa', sobre: 7 } }, { toque: 7 }];
+  const unToqueDelDedo: readonly PasoDelPuntero[] = [
+    /* El dedo se mueve dos puntos al posarse: `onPointerMove` sale con el primer píxel. */
+    { gesto: { que: 'posa', sobre: 7 } },
+    /* Y al levantarlo, la escena apaga el señalado ANTES de avisar del toque. */
+    { gesto: { que: 'levanta' } },
+    { toque: 7 },
+  ];
+  const dosToquesDelDedo: readonly PasoDelPuntero[] = [...unToqueDelDedo, ...unToqueDelDedo];
+
+  comprobar(
+    'con RATÓN, el cartel ya está puesto al posarse y el primer clic abre la tarjeta: leer deja de costar un clic, que era el encargo entero',
+    loQuePasaEnLaPantalla(conElRaton).join(',') === 'abre',
+    loQuePasaEnLaPantalla(conElRaton),
+  );
+  comprobar(
+    'con el DEDO, el primer toque LEE y no abre nada: son los veinte modales por turno que el cartel vino a quitar, y ahí no hay cursor que posar',
+    loQuePasaEnLaPantalla(unToqueDelDedo).join(',') === 'senala',
+    loQuePasaEnLaPantalla(unToqueDelDedo),
+  );
+  comprobar(
+    'y el SEGUNDO toque del dedo sobre la misma casilla abre la tarjeta, aunque el levantar haya apagado el cartel por en medio',
+    loQuePasaEnLaPantalla(dosToquesDelDedo).join(',') === 'senala,abre',
+    loQuePasaEnLaPantalla(dosToquesDelDedo),
+  );
+  comprobar(
+    'y con el dedo en OTRA casilla se vuelve a leer: el segundo toque es el segundo sobre LA MISMA, no el segundo a secas',
+    loQuePasaEnLaPantalla([
+      ...unToqueDelDedo,
+      { gesto: { que: 'posa', sobre: 12 } },
+      { gesto: { que: 'levanta' } },
+      { toque: 12 },
+    ]).join(',') === 'senala,senala',
+  );
+  comprobar(
+    'y un toque limpio, sin arrastre, se comporta igual: la escena no avisa de un apagado que no apaga nada, y el toque lee',
+    loQuePasaEnLaPantalla([{ gesto: { que: 'levanta' } }, { toque: 7 }]).join(',') === 'senala',
+  );
+  /*
+   * VACUNA 1: la memoria con UN solo campo, que es lo que sale de enchufar el aviso sin mirar el
+   * orden. Se envenena quitándole `porUnToque` después de cada paso —o sea, decidiendo sólo por
+   * lo que el cartel dice— y se le pasa LA MISMA secuencia: con el dedo, la tarjeta de una
+   * casilla sin obras deja de abrirse para siempre, porque el apagado del levantar borra lo que
+   * el primer toque señaló.
+   */
+  comprobar(
+    'VACUNA: decidiendo sólo por lo que el cartel DICE, el segundo toque del dedo tampoco abre —el apagado del levantar borró el primero— y la tarjeta se queda inalcanzable',
+    loQuePasaEnLaPantalla(dosToquesDelDedo, (m) => ({ dice: m.dice, porUnToque: null })).join(',') === 'senala,senala',
+    loQuePasaEnLaPantalla(dosToquesDelDedo, (m) => ({ dice: m.dice, porUnToque: null })),
+  );
+  /*
+   * VACUNA 2: el apagado del `levanta` es lo ÚNICO que separa aquí un dedo de un ratón. Sin él
+   * —quitándolo de la secuencia, que es lo que pasaría el día que la escena dejara de mandarlo—
+   * el primer toque del dedo abre la tarjeta, y vuelven los veinte modales por turno.
+   */
+  comprobar(
+    'VACUNA: sin el apagado que la escena manda al levantar el dedo, la misma secuencia abre la tarjeta al PRIMER toque, que es el fallo que el cartel vino a quitar',
+    loQuePasaEnLaPantalla([{ gesto: { que: 'posa', sobre: 7 } }, { toque: 7 }]).join(',') === 'abre',
+  );
+  /*
+   * SE MIRA EL `<Burgo>` Y NO EL FICHERO ENTERO, que es donde este juez se habría quedado en
+   * verde sin comprobar nada: `alSenalarCasilla={senalar}` ya estaba escrito CINCO veces en este
+   * pintor —la hoja, la tarjeta, la ficha de un jugador, el componedor— desde antes de que la
+   * escena publicara el aviso. Lo que esta tanda enchufa es el SEXTO, el de la escena.
+   */
+  const elBurgoMontado = /<Burgo\b[\s\S]*?\/>/.exec(sinComentar)?.[0] ?? '';
+  comprobar(
+    'el pintor le pasa A LA ESCENA el aviso de señalado, y es el MISMO `senalar` que usan las filas que señalan: un cartel es uno, y dos caminos hasta él serían dos relojes',
+    elBurgoMontado.length > 0 && /alSenalarCasilla=\{senalar\}/.test(elBurgoMontado),
+    elBurgoMontado.slice(0, 200),
+  );
+  comprobar(
+    'y el toque decide con la memoria en `ref`: el apagado del dedo y el toque llegan en el MISMO gesto, así que un estado se leería por el render de antes del apagado',
+    /loQueHaceElToque\(memoriaDelCartel\.current, indice\)/.test(sinComentar) &&
+      !/senalado\?\.casilla !== indice/.test(sinComentar),
+    /loQueHaceElToque\([^)]*\)/.exec(sinComentar)?.[0] ?? null,
+  );
+  comprobar(
+    'VACUNA: sin esas dos líneas en el pintor —el aviso enchufado al `<Burgo>` y el toque decidiendo con la `ref`— los cinco jueces de arriba miden una pantalla que no existe, y esto lo dice',
+    !/alSenalarCasilla=\{senalar\}/.test(elBurgoMontado.replace('alSenalarCasilla={senalar}', '')) &&
+      !/loQueHaceElToque\(memoriaDelCartel\.current, indice\)/.test(
+        sinComentar.replace('loQueHaceElToque(memoriaDelCartel.current, indice)', ''),
+      ),
+  );
+
+  // ── 10. EL CUADRADO DEL CARRIL DICE CUÁL ES, Y NO SÓLO QUÉ HACE ──
+
+  paso('El rótulo corto del carril: los «Hi» del apuro dejan de ser cuadrados iguales');
+
+  const elApuro = laMesaDelMomento('apuro');
+  comprobar('el banco trae un apuro, que es donde el mismo verbo sale repetido en la tira', elApuro !== null);
+  if (elApuro !== null) {
+    const { vista, opciones, yo } = elApuro;
+    const caja = pregonDelBurgo(vista, yo, opciones);
+    const tira = carrilDelBurgoShared(vista, yo, opciones);
+    const sobras = opcionesFueraDelBurgo(opciones, null, null, null, caja, tira.length > 0 ? tira : null);
+    const enLaTira = [...tira, ...glifosDelCarrilShared(vista, yo, sobras)];
+    const html = pinta(elApuro);
+    const glifos = enLaTira.map((g) => g.glifo);
+    const conRotulo = enLaTira.map((g) => `${g.glifo}·${g.rotulo}`);
+    comprobar(
+      'en el apuro la tira trae cuadrados con el MISMO glifo: hipotecar es «Hi» para todos los títulos, así que hay gemelos que distinguir',
+      enLaTira.length > 1 && new Set(glifos).size < glifos.length,
+      { cuadrados: enLaTira.length, glifosDistintos: new Set(glifos).size, glifos },
+    );
+    /*
+     * EL RÓTULO SALE EN EL MARCADO Y NO SÓLO EN EL OBJETO. La pieza lo pinta en un `<span>`
+     * propio; que el pintor lo pase se compra contra el HTML que de verdad sale, que es lo que
+     * este fichero entero existe para hacer.
+     */
+    /*
+     * SE EMPAREJA CUADRADO A CUADRADO Y NO POR EL ORDEN DE LA LISTA, y no es comodidad: lo
+     * irreversible va al FINAL de la tira —la quiebra llega entre lo del momento y un cuadrado
+     * de 44 puntos al lado de «pasar el turno» es demasiado fácil de rozar—, así que el orden
+     * pintado NO es el de la criba. Cada botón se lee entero y se le compara SU nombre con SU
+     * rótulo, que es lo que hay que comprar: que el renglón de abajo sea el de ese cuadrado.
+     */
+    const cadaCuadrado = [...html.matchAll(/<button type="button" class="lienzo-carril-hueco[\s\S]*?<\/button>/g)].map(
+      (m) => ({
+        nombre: /aria-label="([^"]*)"/.exec(m[0])?.[1] ?? '',
+        rotulo: /class="lienzo-carril-rotulo"[^>]*>([^<]*)</.exec(m[0])?.[1] ?? null,
+      }),
+    );
+    comprobar(
+      'y cada cuadrado pinta SU rótulo corto, el que escribe el juego, debajo de su glifo: es el renglón que dice CUÁL es, no qué hace',
+      cadaCuadrado.length === enLaTira.length &&
+        enLaTira.every((g) => cadaCuadrado.some((c) => c.nombre === g.ayuda && c.rotulo === g.rotulo)),
+      { pintados: cadaCuadrado, delJuego: enLaTira.map((g) => ({ nombre: g.ayuda, rotulo: g.rotulo })) },
+    );
+    comprobar(
+      'con él, los cuadrados de la tira se distinguen A LA VISTA uno a uno; con lector y con ratón ya se distinguían, y con el dedo no hay `title` que se pose',
+      new Set(conRotulo).size === enLaTira.length,
+      { conRotulo },
+    );
+    comprobar(
+      `VACUNA: sin el rótulo, esos ${String(enLaTira.length)} cuadrados se ven como ${String(new Set(glifos).size)} distintos —seis «Hi» seguidos con la misma barra de color en dos solares del mismo barrio— y nadie se pone rojo`,
+      new Set(glifos).size < enLaTira.length,
+    );
+    comprobar(
+      'y el cuadrado con rótulo se ensancha con la clase que pone la PIEZA sola, que es la que la hoja mide: nadie la escribe a mano en el pintor',
+      html.includes('lienzo-carril-hueco-ancho') && !/lienzo-carril-hueco-ancho/.test(sinComentar),
+      /class="lienzo-carril-hueco[^"]*"/.exec(html)?.[0] ?? null,
+    );
+    comprobar(
+      'y el rótulo va `aria-hidden`: el nombre accesible sigue siendo el rótulo ENTERO del juego, o sea que un lector no oye «Hi Mayor» sino la frase',
+      /class="lienzo-carril-rotulo" aria-hidden="true"/.test(html) &&
+        enLaTira.every((g) => html.includes(`aria-label="${g.ayuda}"`)),
+      /class="lienzo-carril-rotulo"[^>]*/.exec(html)?.[0] ?? null,
+    );
+  }
+
+  // ── 11. LO QUE ESTABA EN LÍNEA SE VA A LA HOJA, Y EL MARCADOR DEJA DE HACER PLURALES ──
+
+  paso('Los estilos en línea que la hoja ya tiene, y la concordancia del marcador');
+
+  const elCodigoEnLaCinta = /<span class="letra-chica burgo-cinta-codigo"([^>]*)>/.exec(htmlDeLaPartida)?.[1] ?? null;
+  comprobar(
+    'el hueco del código de la mesa sale de la HOJA y no de un `style` en línea: en línea pesa (1,0,0,0) y era el único hueco de esta cinta que ninguna regla podía alcanzar sin `!important`',
+    elCodigoEnLaCinta !== null && !elCodigoEnLaCinta.includes('style='),
+    elCodigoEnLaCinta,
+  );
+  comprobar(
+    'VACUNA: con el `style` de vuelta en ese mismo `<span>` —se envenena el marcado que salió, no la pregunta— la misma pregunta lo encuentra, o sea que el juez de arriba se pondría rojo',
+    `${elCodigoEnLaCinta ?? ''} style="flex:0 0 auto"`.includes('style='),
+  );
+  comprobar(
+    'y los dos `CSSProperties` que suplían a las clases ya no están escritos en el pintor: el del código y el sitio de «Ver el burgo entero» con carril',
+    !/EL_HUECO_DEL_CODIGO/.test(sinComentar) && !/EL_SITIO_DE_VOLVER_CON_CARRIL/.test(sinComentar),
+    { hueco: /EL_HUECO_DEL_CODIGO/.test(sinComentar), sitio: /EL_SITIO_DE_VOLVER_CON_CARRIL/.test(sinComentar) },
+  );
+  comprobar(
+    'y «Ver el burgo entero» baja una tira NOMBRANDO la clase de la hoja, que es la que ata su `calc` al alto del carril; el número no vuelve a este fichero',
+    /burgo-volver-con-carril/.test(sinComentar) && !/calc\(3\.75rem/.test(sinComentar),
+    /const EL_BOTON_DE_VOLVER_CON_CARRIL = '[^']*';/.exec(sinComentar)?.[0] ?? null,
+  );
+  comprobar(
+    'VACUNA: con el objeto en línea de vuelta, el juez de arriba lo dice —y el `calc` volvería a estar en un sitio del que la hoja no puede leer',
+    /EL_SITIO_DE_VOLVER_CON_CARRIL/.test(`${sinComentar}\nconst EL_SITIO_DE_VOLVER_CON_CARRIL = { top: 'calc(3.75rem + 2.75rem)' };`),
+  );
+  /*
+   * Y LA CONCORDANCIA DEL MARCADOR. Aquí había dos ternarios de plural escritos a mano y un
+   * renglón que decía «El Ayuntamiento guarda 1 casas y 1 hoteles» en cuanto los contadores
+   * bajaban a uno, que es justo el final de partida, cuando esos cuatro números son lo que se
+   * mira. No falla nada: un plural a mano se lee igual de bien y dice otra cosa.
+   */
+  const elMarcadorPintado = renderToStaticMarkup(<MarcadorDelBurgo vista={laPartida.vista} yo="s1" />);
+  const elConcejo = marcadorEnTresDelBurgo(laPartida.vista, 's1').concejo;
+  comprobar(
+    'el renglón del Ayuntamiento concuerda con `plural`, de la traducción, y no con un ternario escrito en el cliente',
+    elMarcadorPintado.includes(
+      `guarda ${String(elConcejo.casas)} ${pluralDelBurgo(elConcejo.casas, 'casa', 'casas')} ` +
+        `y ${String(elConcejo.posadas)} ${pluralDelBurgo(elConcejo.posadas, 'hotel', 'hoteles')}`,
+    ),
+    palabrasDe(elMarcadorPintado).slice(-160),
+  );
+  comprobar(
+    'y en el pintor no queda ni un ternario de plural: la concordancia tiene UN sitio en toda la casa, que es lo único que impide que el siguiente se escriba a mano otra vez',
+    !/=== 1 \? '[^']+' : '[^']+'/.test(sinComentar) && /plural\(/.test(sinComentar),
+    (sinComentar.match(/=== 1 \? '[^']+' : '[^']+'/g) ?? []).slice(0, 3),
+  );
+  comprobar(
+    'VACUNA: con un contador en 1 —el final de partida, cuando esos números son lo que se mira— el plural a mano decía «1 casas» y `plural` dice «1 casa», y ningún comprobador de texto lo cazaba',
+    pluralDelBurgo(1, 'casa', 'casas') === 'casa' && pluralDelBurgo(2, 'casa', 'casas') === 'casas',
+  );
+
+  /*
+   * Y LA LÍNEA DE ESTADO NO DICE DOS VECES LO MISMO. Medido en el banco con el fin de partida:
+   * `turno` vale «Se acabó» y el aviso del tablero empieza por «Se acabó: …», así que pegados
+   * con « · » la línea era «Se acabó · Se acabó: Ana…» — y en los dos lienzos de 288 a la frase
+   * le caben DOS PALABRAS, o sea que lo único que se leía al terminar la partida era la misma
+   * palabra dos veces y ni una letra de quién ganó.
+   */
+  const elFinal = laMesaDelMomento('fin');
+  comprobar('el banco trae el fin de la partida, que es donde el turno y el aviso dicen lo mismo', elFinal !== null);
+  if (elFinal !== null) {
+    const cintaDelFinal = hojaDelBurgoEnTres(elFinal.vista, elFinal.yo, elFinal.opciones).cinta;
+    const tableroDelFinal = tableroDeLaVista(elFinal.puesta.vista);
+    const avisoDelFinal = tableroDelFinal?.aviso ?? '';
+    comprobar(
+      'en el fin de la partida el aviso EMPIEZA por lo que dice el turno, o esta pareja no comprobaría nada',
+      cintaDelFinal.turno.length > 0 && avisoDelFinal.startsWith(cintaDelFinal.turno),
+      { turno: cintaDelFinal.turno, aviso: avisoDelFinal.slice(0, 60) },
+    );
+    comprobar(
+      'y la línea de estado no lo repite: se lee «Se acabó: Ana se queda con el Burgo» y no «Se acabó · Se ac…», que es lo único que cabía en 288',
+      loQueDiceLaCinta(cintaDelFinal.turno, avisoDelFinal) === avisoDelFinal &&
+        pinta(elFinal).includes(`class="burgo-cinta-frase" aria-live="polite" title="${avisoDelFinal}"`),
+      loQueDiceLaCinta(cintaDelFinal.turno, avisoDelFinal).slice(0, 80),
+    );
+    comprobar(
+      'y donde el aviso NO empieza por el turno se dicen los dos, que es el caso corriente: quién juega y qué acaba de pasar',
+      loQueDiceLaCinta('Turno de Ana', 'Bea paga 50 € a Ana.') === 'Turno de Ana · Bea paga 50 € a Ana.' &&
+        loQueDiceLaCinta('', 'Bea paga.') === 'Bea paga.' &&
+        loQueDiceLaCinta('Turno de Ana', '') === 'Turno de Ana',
+    );
+    comprobar(
+      'y sólo se quita por el PREFIJO: «Turno de Ana» dentro de un aviso a media frase no borra de quién se espera, que es lo que la línea vino a añadir',
+      loQueDiceLaCinta('Turno de Ana', 'Bea pasa y le toca a Turno de Ana') ===
+        'Turno de Ana · Bea pasa y le toca a Turno de Ana',
+    );
+    comprobar(
+      `VACUNA: pegándolos a ciegas —como estaban— la línea del final es «${`${cintaDelFinal.turno} · ${avisoDelFinal}`.slice(0, 24)}…», o sea la misma palabra dos veces en el sitio donde sólo caben dos`,
+      `${cintaDelFinal.turno} · ${avisoDelFinal}`.startsWith(`${cintaDelFinal.turno} · ${cintaDelFinal.turno}`),
+    );
+  }
+
+  // ── 12. LA SECCIÓN QUE SE DEJÓ ABIERTA VUELVE TRAS UN F5 ──
+
+  paso('La sección de la hoja vuelve del bolsillo, y una que no existe no deja la hoja muda');
+
+  comprobar(
+    'lo guardado se contrasta con la lista de esta pantalla: `mios` abre «Lo mío», que es la sección que se va a buscar en una partida de días',
+    laSeccionQueSeAbre('mios') === 'mios',
+    laSeccionQueSeAbre('mios'),
+  );
+  comprobar(
+    'y una sección que esta pantalla NO pinta —la cinta y el marcador viven fuera del cajón— no abre nada, en vez de dejar la hoja con todo plegado y sin saber por qué',
+    laSeccionQueSeAbre('cinta') === null && laSeccionQueSeAbre('marcador') === null,
+    { cinta: laSeccionQueSeAbre('cinta'), marcador: laSeccionQueSeAbre('marcador') },
+  );
+  comprobar(
+    'y un valor que no es ninguna sección —el nombre de una versión anterior, una cadena a mano— tampoco: `laSeccionGuardada` devuelve lo que haya, sin validar, y quien valida es la hoja',
+    laSeccionQueSeAbre('la-de-antes') === null && laSeccionQueSeAbre('') === null && laSeccionQueSeAbre(null) === null,
+  );
+  comprobar(
+    'VACUNA: sin contrastar contra la lista, «cinta» sería una sección abierta que esta pantalla no pinta, y la hoja se quedaría entera plegada sin un solo error',
+    ORDEN_DE_LA_HOJA.includes('cinta') && laSeccionQueSeAbre('cinta') === null,
+    { enElOrden: [...ORDEN_DE_LA_HOJA] },
+  );
+  if (laSubasta !== null) {
+    /*
+     * ═══ Y LLEGA PINTADA, QUE ES LA MITAD QUE UNA FUNCIÓN PURA NO COMPRA ═══
+     *
+     * El bolsillo es SÍNCRONO, así que la sección guardada se lee en el PRIMER render y esto se
+     * puede contar en el marcado. Con `localStorage` de mentira, puesto y retirado aquí mismo:
+     * Node no lo trae, y dejarlo puesto sería cambiarle el mundo a lo que venga después.
+     */
+    const elMundo = globalThis as unknown as { localStorage?: unknown };
+    const loQueHabia = elMundo.localStorage;
+    const cajon = new Map<string, string>();
+    elMundo.localStorage = {
+      getItem: (k: string): string | null => cajon.get(k) ?? null,
+      setItem: (k: string, v: string): void => void cajon.set(k, v),
+      removeItem: (k: string): void => void cajon.delete(k),
+    };
+    try {
+      const laAbiertaDe = (html: string): string | null =>
+        /<button type="button" class="opcion opcion-sobria" aria-expanded="true"[^>]*><span class="opcion-texto"><span class="opcion-rotulo">([^<]*)</.exec(
+          html,
+        )?.[1] ?? null;
+      const lasQueSePliegan = (html: string): string[] =>
+        [...html.matchAll(/aria-expanded="(?:true|false)"[^>]*><span class="opcion-texto"><span class="opcion-rotulo">([^<]*)</g)].map(
+          (m) => m[1] ?? '',
+        );
+      const sinNada = pinta(laSubasta);
+      const plegables = lasQueSePliegan(sinNada);
+      const unaQueSePliega = plegables.find((t) => t.length > 0) ?? null;
+      comprobar(
+        'con el cajón abierto hay secciones plegables que recordar, o esto no comprobaría nada',
+        unaQueSePliega !== null,
+        plegables,
+      );
+      comprobar(
+        'sin nada en el bolsillo la hoja abre por donde diga quien la monta: ninguna sección se despliega sola',
+        laAbiertaDe(sinNada) === null,
+        laAbiertaDe(sinNada),
+      );
+      const hojaDeLaSubasta = hojaDelBurgoEnTres(laSubasta.vista, laSubasta.yo, laSubasta.opciones);
+      const suId = hojaDeLaSubasta.secciones.find((s) => s.titulo === unaQueSePliega)?.id ?? null;
+      comprobar('y esa sección tiene su `id` en la hoja, que es lo que se guarda', suId !== null, {
+        titulo: unaQueSePliega,
+        id: suId,
+      });
+      if (suId !== null) {
+        guardarLaSeccion(BURGO, '', 'QWXYZ', suId);
+        const conMemoria = pinta(laSubasta);
+        comprobar(
+          `lo guardado VUELVE PINTADO: tras un F5, «${String(unaQueSePliega)}» sale desplegada en el primer render y no hay que ir a buscarla otra vez en una partida de días`,
+          laAbiertaDe(conMemoria) === unaQueSePliega,
+          { esperada: unaQueSePliega, abierta: laAbiertaDe(conMemoria) },
+        );
+        comprobar(
+          'y la llave es la del bolsillo de este cliente: el arcade del MANIFIESTO, la mesa y la silla de esta ventana, que en Node es la de siempre',
+          [...cajon.keys()].every((k) => k.startsWith(`escritorio.seccion.${BURGO}.QWXYZ`)),
+          [...cajon.keys()],
+        );
+        /*
+         * VACUNA: se guarda una sección que no existe —lo que queda en el bolsillo de una
+         * versión anterior— y la hoja tiene que abrir por donde diga quien la monta, no quedarse
+         * con todo plegado esperando una sección que ya no está.
+         */
+        guardarLaSeccion(BURGO, '', 'QWXYZ', 'la-de-antes');
+        comprobar(
+          'VACUNA: con una sección que ya no existe guardada, la hoja abre por donde diga quien la monta y no se queda esperando a una sección que no está',
+          laAbiertaDe(pinta(laSubasta)) === null,
+          laAbiertaDe(pinta(laSubasta)),
+        );
+      }
+      /*
+       * Y EL LADO QUE ESCRIBE: plegar a mano TAMBIÉN se guarda, y con la cadena vacía. Guardar
+       * sólo al abrir dejaría lo de antes puesto, y al recargar volvería a salir desplegada la
+       * que se acaba de cerrar. No se puede pulsar un botón desde Node, así que esto se compra
+       * en la fuente de la hoja, que es donde la app compra la suya (`verify:sala`).
+       */
+      const fuenteDeLaHoja = sinComentarios(
+        readFileSync(new URL('../src/hojas-del-burgo.tsx', import.meta.url), 'utf8'),
+      );
+      comprobar(
+        'y el lado que escribe está enchufado: abrir una sección a mano la guarda, y plegarla guarda la cadena vacía en vez de dejar puesta la de antes',
+        /guardarLaSeccion\(arcade, silla, codigo, cual \?\? ''\)/.test(fuenteDeLaHoja) &&
+          /guardarLaSeccion\(arcade, silla, codigo, cual\)/.test(fuenteDeLaHoja),
+        (fuenteDeLaHoja.match(/guardarLaSeccion\([^)]*\)/g) ?? []).slice(0, 3),
+      );
+      comprobar(
+        'y el mapa de módulo que había SE VA: dos memorias del mismo dato se separan en cuanto una de las dos falla, y quién gana depende del orden de lectura',
+        !/LO_QUE_SE_DEJO_ABIERTO/.test(fuenteDeLaHoja),
+        (fuenteDeLaHoja.match(/LO_QUE_SE_DEJO_ABIERTO/g) ?? []).length,
+      );
+    } finally {
+      delete (elMundo as { localStorage?: unknown }).localStorage;
+      if (loQueHabia !== undefined) elMundo.localStorage = loQueHabia;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 21 · Las clases que el marcado nombra y la hoja no tenía, y la memoria de la sección
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ TRES CLASES QUE ESTABAN EN EL MARCADO Y NO EXISTÍAN EN NINGUNA PARTE ═══
+ *
+ * Y ésta es la forma de fallo que este fichero entero está para cazar, porque NO SE CAE: una
+ * clase escrita en un `className` que no tiene regla no da un error, no sale en ninguna
+ * consola, no rompe el render y no la caza el `typecheck` —es una cadena—. Lo único que hace
+ * es que el mueble se pinte con lo que herede, que casi siempre es «algo parecido a lo que se
+ * quería», y por eso se queda meses.
+ *
+ * Las tres, con lo que se veía en cada una:
+ *
+ *   · `.burgo-cinta-codigo` se apañaba con un `CSSProperties` en línea dentro del pintor. Un
+ *     estilo en línea pesa (1,0,0,0), o sea que es el único hueco de la cinta que una regla de
+ *     esta hoja no puede corregir sin `!important`, y el único cuyo `flex` no se puede comparar
+ *     con el de sus cuatro vecinos.
+ *   · `.burgo-solares-del-barrio` se apoyaba en `.renglones`, que quita las viñetas y pone un
+ *     filo por `<li>` — pero no separa la lista de la TABLA de rentas que tiene justo encima,
+ *     así que las seis filas de la tabla y los tres solares del barrio se leían como una sola
+ *     lista de nueve renglones. Y el solar que se está mirando iba marcado sólo con
+ *     `aria-current`: quien no usa lector no tenía ninguna señal.
+ *   · `.burgo-ficha-de-jugador` era un `<div>` a secas. Dos de sus cuatro bloques —la lista de
+ *     solares sueltos y el botón de proponer— no traen margen propio, así que los sueltos
+ *     salían pegados al último título del último barrio y con el mismo filo entre medias que
+ *     separa dos títulos del mismo barrio: se leían como un barrio más.
+ *
+ * Y LA CUARTA, que no faltaba sino que estaba en el sitio que no se puede comprar: dónde se
+ * pone «Ver el Burgo entero» cuando hay carril vivía en un objeto de JavaScript del pintor. Un
+ * número de esa cadena escrito en otro fichero no se puede atar al alto del carril, y el fallo
+ * que eso deja está medido en el banco: el botón caía ENCIMA del único cuadrado de la tira.
+ *
+ * ═══ Y LA MEMORIA DE LA SECCIÓN, QUE ES EL HUECO QUE LA APP YA NO TIENE ═══
+ *
+ * La app guarda de verdad qué sección de la hoja se dejó abierta; este cliente la tenía en un
+ * mapa de módulo, o sea que la perdía en cada recarga — y recargar en un PC es F5, un `Ctrl+W`
+ * sin querer o un navegador que se actualiza, no el caso raro que es en un teléfono.
+ */
+function lasClasesQueOtroNombraYLaMemoriaDeLaSeccion(): void {
+  paso('Las clases que el marcado nombra y la hoja no tenía, y la memoria de la sección');
+
+  const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
+  const reglaDeLaHoja = (selector: string): string =>
+    new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(hoja)?.[1] ?? '';
+  const dondeEmpieza = (selector: string): number =>
+    new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{`).exec(hoja)?.index ?? -1;
+
+  // ── 1. EL CÓDIGO DE LA MESA: LO QUE SE DICTA POR TELÉFONO, CON REGLA PROPIA ──
+
+  const reglaDelCodigo = reglaDeLaHoja('.burgo-cinta-codigo');
+  comprobar(
+    'el código de la mesa tiene regla en la hoja y no un estilo en línea: es el hueco que se DICTA por teléfono, y en línea pesa (1,0,0,0), o sea que ninguna regla de esta hoja lo alcanza sin `!important`',
+    reglaDelCodigo.length > 0,
+    reglaDelCodigo.replace(/\s+/g, ' '),
+  );
+  /*
+   * LAS DOS LÍNEAS QUE IMPORTAN Y POR QUÉ. `flex: 0 0 auto` es la misma que llevan los dos
+   * botones y el reloj de esta cinta: lo que se encoge aquí es LA FRASE y nada más. Sin ella,
+   * en un lienzo estrecho el flex reparte la falta entre todos y el código se recorta — y un
+   * código de mesa recortado no es un código más corto, es OTRO código, que es el mismo fallo
+   * que el reloj ya tiene contado en su bloque.
+   */
+  comprobar(
+    'y no se encoge ni se parte: `flex: 0 0 auto` como los botones y el reloj de la misma cinta, y `white-space: nowrap` — un código de mesa recortado no es más corto, es otro código',
+    /flex:\s*0 0 auto/.test(reglaDelCodigo) && /white-space:\s*nowrap/.test(reglaDelCodigo),
+    reglaDelCodigo.replace(/\s+/g, ' '),
+  );
+  comprobar(
+    'y se lee para dictarlo: cifras de ancho fijo y las letras separadas, que es lo mismo que el nombre accesible hace con los espacios para quien lo oye',
+    /font-variant-numeric:\s*tabular-nums/.test(reglaDelCodigo) && /letter-spacing:/.test(reglaDelCodigo),
+    reglaDelCodigo.replace(/\s+/g, ' '),
+  );
+  /*
+   * VACUNA: se le quita `flex: 0 0 auto` a la regla que de verdad hay y se le pasa LA MISMA
+   * pregunta. Con `flex` sin declarar, un hijo de flex arranca en `0 1 auto`, o sea que SÍ
+   * encoge, que es exactamente lo que este juez existe para impedir.
+   */
+  comprobar(
+    'VACUNA: sin `flex: 0 0 auto` el código encoge con la cinta —`0 1 auto` es lo que trae un hijo de flex por omisión— y este juez lo dice',
+    !/flex:\s*0 0 auto/.test(reglaDelCodigo.replace(/flex:\s*0 0 auto;?/, '')),
+  );
+
+  // ── 2. «VER EL BURGO ENTERO» BAJA UNA TIRA, Y EL NÚMERO SALE DE LA HOJA ──
+
+  const arribaSinCarril = Number(/top:\s*([\d.]+)rem/.exec(reglaDeLaHoja('.burgo-volver'))?.[1] ?? '0');
+  const laTiraDelCarril = Number(/height:\s*([\d.]+)rem/.exec(reglaDeLaHoja('.lienzo-carril'))?.[1] ?? '0');
+  const conCarril = /top:\s*calc\(([\d.]+)rem \+ ([\d.]+)rem\)/.exec(reglaDeLaHoja('.burgo-volver-con-carril'));
+  comprobar(
+    'con carril, «Ver el Burgo entero» baja EXACTAMENTE una tira, y los dos sumandos salen de esta hoja: el suyo de siempre más el alto del carril',
+    conCarril !== null &&
+      arribaSinCarril > 0 &&
+      laTiraDelCarril > 0 &&
+      Number(conCarril[1]) === arribaSinCarril &&
+      Number(conCarril[2]) === laTiraDelCarril,
+    { arribaSinCarril, laTiraDelCarril, conCarril: conCarril?.[0] },
+  );
+  /*
+   * LOS DOS SUMANDOS EN `rem` Y NUNCA EN PÍXELES, y se suman en `calc` en vez de escribir el
+   * total: el suelo de toque de esta casa crece con la preferencia de letra del navegador, así
+   * que un `px` se queda quieto mientras el carril crece y el botón vuelve a caerle encima. Es
+   * el descuadre de 2,75 puntos que el cajón del delta ya pagó una vez.
+   */
+  comprobar(
+    'y se suman en `calc` con los dos en `rem`, no en un total escrito a mano ni en píxeles: así el día que la cinta cambie de alto, esto lo sigue solo',
+    /top:\s*calc\([^)]*rem[^)]*\+[^)]*rem[^)]*\)/.test(reglaDeLaHoja('.burgo-volver-con-carril')) &&
+      !/px/.test(reglaDeLaHoja('.burgo-volver-con-carril')),
+    reglaDeLaHoja('.burgo-volver-con-carril').replace(/\s+/g, ' '),
+  );
+  /*
+   * Y GANA POR ORDEN, que es lo que decide entre dos (0,1,0). Escrita ANTES de `.burgo-volver`
+   * este `top` pierde EN SILENCIO y el botón vuelve a caer encima del carril: medido en el
+   * banco con el momento del trato y el lienzo de 288×317, el botón en y=293,9 y el cuadrado
+   * de la quiebra de y=276,9 a y=323,7, los dos con `z-index: 2` y el botón después en el
+   * marcado. Es el mismo juez que la clase que apaga tiene en el bloque de las piezas.
+   */
+  comprobar(
+    'y GANA la cascada: va DESPUÉS de `.burgo-volver`, porque las dos pesan (0,1,0) y ahí decide el orden de la hoja y no quién tenga razón',
+    dondeEmpieza('.burgo-volver-con-carril') > dondeEmpieza('.burgo-volver') && dondeEmpieza('.burgo-volver') > 0,
+    { volver: dondeEmpieza('.burgo-volver'), conCarril: dondeEmpieza('.burgo-volver-con-carril') },
+  );
+  comprobar(
+    'VACUNA: escrita ANTES, el `top` del carril pierde y el botón vuelve a taparle el cuadrado de la quiebra —medido en el banco a 288×317— y este juez lo dice',
+    (() => {
+      /* Se envenena LA POSICIÓN y no la hoja: se le pregunta lo mismo con la que tendría escrita antes. */
+      const comoSiEstuvieraAntes = dondeEmpieza('.burgo-volver') - 1;
+      return !(comoSiEstuvieraAntes > dondeEmpieza('.burgo-volver'));
+    })(),
+    { volver: dondeEmpieza('.burgo-volver') },
+  );
+
+  // ── 3. LOS SOLARES DEL BARRIO SE SEPARAN DE LA TABLA, Y EL QUE SE MIRA SE VE ──
+
+  const laPartida = laPartidaDelBurgo();
+  const unSolarConHermanos = (() => {
+    for (let c = 0; c < 40; c++) {
+      const f = fichaDeCasillaDelBurgo(laPartida.vista, c, 's1', laPartida.opciones);
+      if (f.solaresDelBarrio.length >= 2 && f.solaresDelBarrio.some((s) => s.esEsta)) return f;
+    }
+    return null;
+  })();
+  comprobar(
+    'la partida da un solar con hermanos de barrio y con uno de ellos marcado como el que se mira',
+    unSolarConHermanos !== null,
+    unSolarConHermanos?.nombre,
+  );
+  const reglaDeLosSolares = reglaDeLaHoja('.burgo-solares-del-barrio');
+  comprobar(
+    'la lista de solares se separa de la TABLA de rentas que tiene encima: sin filo ni hueco, las seis filas de rentas y los tres solares se leen como UNA lista de nueve renglones',
+    /border-top:\s*1px solid var\(--filo\)/.test(reglaDeLosSolares) && /padding-top:/.test(reglaDeLosSolares),
+    reglaDeLosSolares.replace(/\s+/g, ' '),
+  );
+  if (unSolarConHermanos !== null) {
+    const laTarjeta = renderToStaticMarkup(<LaTarjetaDeUnaCasilla ficha={unSolarConHermanos} />);
+    /*
+     * EL `aria-current` TIENE QUE ESTAR EN EL MARCADO QUE SALE, y no basta con que la regla lo
+     * espere: una regla que apunta a un atributo que nadie pone es cero inspeccionados, y eso
+     * se lee como vigilado. Se cuenta contra la tarjeta DE VERDAD.
+     */
+    comprobar(
+      'y el solar que se está mirando lleva `aria-current` en el marcado que de verdad sale, no sólo en la regla que lo espera',
+      (laTarjeta.match(/aria-current/g) ?? []).length === 1 && laTarjeta.includes('burgo-solares-del-barrio'),
+      { cuantos: (laTarjeta.match(/aria-current/g) ?? []).length },
+    );
+    comprobar(
+      'y la hoja lo marca A LA VISTA con el filo en el acento —dos señales y no una, como `.burgo-elegido` con `aria-pressed`— y no con otro color de barrio, que en tres solares del mismo color no distingue nada',
+      /border-color:\s*var\(--acento\)/.test(reglaDeLaHoja('.burgo-solares-del-barrio [aria-current]')),
+      reglaDeLaHoja('.burgo-solares-del-barrio [aria-current]').replace(/\s+/g, ' '),
+    );
+    /*
+     * VACUNA: con `aria-current` puesto y NADA que lo pinte —que es como estaba— quien no usa
+     * lector no tiene ninguna señal. Se envenena el marcado quitándole el atributo y se le pasa
+     * la misma cuenta: sin él no hay a qué agarrar el filo.
+     */
+    comprobar(
+      'VACUNA: sin `aria-current` en el marcado no hay a qué agarrar el filo, y la cuenta de arriba se pone a cero',
+      (laTarjeta.replace(/aria-current="[^"]*"/g, '').match(/aria-current/g) ?? []).length === 0,
+    );
+  }
+
+  // ── 4. LA FICHA DE UN JUGADOR ES UNA TARJETA, Y SU NOMBRE SE LEE COMO UN NOMBRE ──
+
+  const otroDeLaMesa = laPartida.sentados.find((s) => s.asiento !== 's1');
+  const laFichaDeOtro =
+    otroDeLaMesa === undefined
+      ? null
+      : fichaDeJugadorDelBurgo(laPartida.vista, otroDeLaMesa.asiento, 's1', laPartida.opciones);
+  comprobar('la partida da otro jugador cuya ficha mirar', laFichaDeOtro !== null);
+  const reglaDeLaFicha = reglaDeLaHoja('.burgo-ficha-de-jugador');
+  comprobar(
+    'la ficha de un jugador es una TARJETA y no un `<div>` a secas: dentro de la caja del lienzo hay otra tarjeta por cada título, y sin el nivel de en medio los títulos parecen colgar del cajón',
+    /background:\s*var\(--teja-alta\)/.test(reglaDeLaFicha) &&
+      /border:\s*1px solid var\(--filo\)/.test(reglaDeLaFicha) &&
+      /padding:/.test(reglaDeLaFicha),
+    reglaDeLaFicha.replace(/\s+/g, ' '),
+  );
+  comprobar(
+    'y se distingue de las tarjetas de dentro por el REDONDEO y no por un color nuevo: `--radio-ficha` fuera contra el `--radio-mando` de las de dentro',
+    /border-radius:\s*var\(--radio-ficha\)/.test(reglaDeLaFicha) &&
+      /border-radius:\s*var\(--radio-mando\)/.test(reglaDeLaHoja('.burgo-ficha')),
+    { fuera: reglaDeLaFicha.replace(/\s+/g, ' '), dentro: reglaDeLaHoja('.burgo-ficha').replace(/\s+/g, ' ') },
+  );
+  if (laFichaDeOtro !== null) {
+    const suTarjeta = renderToStaticMarkup(
+      <LaFichaDeUnJugador ficha={laFichaDeOtro} alProponerle={() => undefined} />,
+    );
+    /*
+     * EL NOMBRE ES EL PRIMER HIJO Y ES UN `.burgo-renglon`, que es `--tenue`: el mismo color y
+     * el mismo peso que las líneas de lo suyo que van debajo. En el respaldo —donde esta ficha
+     * se monta SIN el `<h2>` de la caja— eso deja cinco renglones grises seguidos y el primero
+     * resulta ser el nombre. La regla se lo devuelve, y aquí se compra que el marcado siga
+     * siendo ese: una regla `:first-child` que apunte a otra cosa no falla, no pinta.
+     */
+    comprobar(
+      'el nombre del jugador es el PRIMER hijo de la ficha y es un `.burgo-renglon`, que es a lo que la regla del nombre se engancha: una regla `:first-child` que apunte a otra cosa no falla, deja de pintar',
+      /^<div class="burgo-ficha-de-jugador"><p class="burgo-renglon"/.test(suTarjeta) &&
+        suTarjeta.includes(laFichaDeOtro.nombre),
+      suTarjeta.slice(0, 160),
+    );
+    comprobar(
+      'y la hoja le devuelve el color de la palabra y el peso, para que en el respaldo —donde no hay `<h2>` encima— la tarjeta de un jugador no sean cinco renglones grises de los que el primero resulta ser el nombre',
+      /color:\s*var\(--palabra\)/.test(reglaDeLaHoja('.burgo-ficha-de-jugador > .burgo-renglon:first-child')) &&
+        /font-weight:/.test(reglaDeLaHoja('.burgo-ficha-de-jugador > .burgo-renglon:first-child')),
+      reglaDeLaHoja('.burgo-ficha-de-jugador > .burgo-renglon:first-child').replace(/\s+/g, ' '),
+    );
+    /*
+     * Y LOS DOS BLOQUES QUE NO TRAEN MARGEN PROPIO: `.renglones` es la lista pelada de la casa
+     * y `.opcion` no lleva margen ninguno, así que los solares SUELTOS salían pegados al último
+     * título del último barrio —con el mismo filo entre medias que separa dos títulos del mismo
+     * barrio, o sea leyéndose como un barrio más— y el botón de proponer, cosido a la lista.
+     */
+    const elGrupoDeLosDos =
+      /\n\.burgo-ficha-de-jugador > \.renglones,\s*\n\.burgo-ficha-de-jugador > \.opcion\s*\{([^}]*)\}/.exec(hoja)?.[1] ??
+      '';
+    comprobar(
+      'y los dos bloques que no traen margen propio —la lista de solares sueltos y el botón de proponer— lo reciben de la ficha: pegados, los sueltos se leen como un barrio más',
+      /margin-top:/.test(elGrupoDeLosDos),
+      elGrupoDeLosDos.replace(/\s+/g, ' '),
+    );
+    comprobar(
+      'VACUNA: ninguno de los dos se separa por su cuenta —`.renglones` declara `margin: 0` y `.opcion` no declara ninguno—, que es por lo que la ficha se lo tiene que poner',
+      /margin:\s*0/.test(reglaDeLaHoja('.renglones')) && !/margin/.test(reglaDeLaHoja('.opcion')),
+      { renglones: reglaDeLaHoja('.renglones').replace(/\s+/g, ' '), opcion: reglaDeLaHoja('.opcion').replace(/\s+/g, ' ') },
+    );
+  }
+
+  // ── 5. LA MEMORIA DE LA SECCIÓN SOBREVIVE A UNA RECARGA, Y NO SE PISA ENTRE VENTANAS ──
+
+  /*
+   * ═══ SE EJERCITA DE VERDAD, CON UN `localStorage` DE MENTIRA ═══
+   *
+   * Leer el fichero y comprobar que la cadena `setItem` aparece no compra nada: lo que falla en
+   * un bolsillo es la LLAVE, y una llave mal compuesta escribe y lee sin quejarse — en el mismo
+   * cajón que otra cosa. Así que se le pone a `globalThis` un almacén de mentira, se guarda, se
+   * lee y se compara, y se retira al salir. Node no trae `localStorage`, y dejarlo puesto sería
+   * cambiarle el mundo a los bloques que vinieran después.
+   */
+  const elMundo = globalThis as unknown as { localStorage?: unknown };
+  const loQueHabia = elMundo.localStorage;
+  const cajon = new Map<string, string>();
+  elMundo.localStorage = {
+    getItem: (k: string): string | null => cajon.get(k) ?? null,
+    setItem: (k: string, v: string): void => void cajon.set(k, v),
+    removeItem: (k: string): void => void cajon.delete(k),
+  };
+  try {
+    comprobar(
+      'sin nada guardado, la sección es `null` y la hoja abre por donde diga quien la monta: un valor que no está no puede parecerse a una sección',
+      laSeccionGuardada(BURGO, '', 'QWXYZ') === null,
+    );
+    guardarLaSeccion(BURGO, '', 'QWXYZ', 'lo-mio');
+    comprobar(
+      'lo guardado VUELVE: ésta es la mitad que el mapa de módulo no tenía, y por eso hasta hoy un F5 devolvía la hoja a la primera sección en una partida de días',
+      laSeccionGuardada(BURGO, '', 'QWXYZ') === 'lo-mio',
+      { guardado: laSeccionGuardada(BURGO, '', 'QWXYZ') },
+    );
+    /*
+     * POR MESA: dos mesas del mismo juego están en momentos distintos, y una sola memoria le
+     * movería la sección de debajo del dedo a quien juega dos a la vez.
+     */
+    guardarLaSeccion(BURGO, '', 'ABCDE', 'ahora');
+    comprobar(
+      'y va POR MESA: dos mesas del mismo juego están en momentos distintos, y una memoria sola le movería la sección de debajo del dedo a quien juega las dos',
+      laSeccionGuardada(BURGO, '', 'QWXYZ') === 'lo-mio' && laSeccionGuardada(BURGO, '', 'ABCDE') === 'ahora',
+      { mesaA: laSeccionGuardada(BURGO, '', 'QWXYZ'), mesaB: laSeccionGuardada(BURGO, '', 'ABCDE') },
+    );
+    /*
+     * ═══ Y POR SILLA, QUE ES LO QUE LA APP NO NECESITA Y AQUÍ ES EL FALLO ENTERO ═══
+     *
+     * Un teléfono es de UNA persona; un PC no. Dos ventanas del mismo navegador comparten
+     * `localStorage`, y dos personas alrededor del mismo monitor están en LA MISMA mesa, o sea
+     * con el MISMO código. Sin la silla en la llave, abrir «Lo mío» en una ventana le mueve la
+     * sección a la otra en cuanto recargue.
+     */
+    guardarLaSeccion(BURGO, 'b', 'QWXYZ', 'la-mesa');
+    comprobar(
+      'y también POR SILLA: dos ventanas del mismo navegador en la MISMA mesa comparten `localStorage`, y sin la silla en la llave abrir «Lo mío» en una le movería la sección a la otra',
+      laSeccionGuardada(BURGO, '', 'QWXYZ') === 'lo-mio' && laSeccionGuardada(BURGO, 'b', 'QWXYZ') === 'la-mesa',
+      { sinSilla: laSeccionGuardada(BURGO, '', 'QWXYZ'), sillaB: laSeccionGuardada(BURGO, 'b', 'QWXYZ') },
+    );
+    /*
+     * VACUNA DE LA LLAVE, y es la que de verdad compra este bloque: se recompone la llave SIN
+     * la mesa y SIN la silla —que es lo que sale de copiar la de la app sin mirar— y se
+     * comprueba que los tres cajones de arriba colapsan en UNO. Con la llave así, las tres
+     * escrituras se pisan y el último gana: no falla nada, no sale nada en ninguna consola, y
+     * la sección se mueve sola de debajo del dedo.
+     */
+    const comoSiLaLlaveFueraSoloDelJuego = new Set(
+      [...cajon.keys()].map((k) => k.replace(/\.QWXYZ|\.ABCDE/g, '').replace(/#b$/, '')),
+    );
+    comprobar(
+      'VACUNA: con la llave sin la mesa y sin la silla —que es lo que sale de copiar la de la app— los tres cajones colapsan en UNO y el último en escribir gana, sin que nada falle',
+      cajon.size === 3 && comoSiLaLlaveFueraSoloDelJuego.size === 1,
+      { cajones: [...cajon.keys()], colapsados: [...comoSiLaLlaveFueraSoloDelJuego] },
+    );
+    /*
+     * Y NO SE MEZCLA CON EL ASIENTO, que es lo único de este fichero que perder cuesta la
+     * partida: los dos prefijos son fijos y distintos en el segundo tramo, así que ni un arcade
+     * que se llamara `seccion` podría meter una preferencia de interfaz donde vive una llave.
+     */
+    comprobar(
+      'y su cajón no se cruza con el del ASIENTO: los dos prefijos son fijos y se separan en el segundo tramo, así que ni un arcade llamado «seccion» metería una preferencia donde vive una llave',
+      [...cajon.keys()].every((k) => k.startsWith('escritorio.seccion.') && !k.startsWith('escritorio.arcade.')),
+      [...cajon.keys()],
+    );
+  } finally {
+    elMundo.localStorage = loQueHabia;
+  }
+  /*
+   * Y CON UN ALMACÉN QUE LANZA no se cae nada. `localStorage` LANZA —no devuelve `null`— en una
+   * ventana privada de Safari y con el almacenamiento del sitio bloqueado. Un `SecurityError`
+   * aquí tumbaría la pantalla del Burgo entera, y el síntoma sería una página en blanco: no
+   * poder recordar la sección es una molestia; no poder abrir la mesa, no.
+   */
+  Object.defineProperty(elMundo, 'localStorage', {
+    configurable: true,
+    get: (): never => {
+      throw new Error('SecurityError');
+    },
+  });
+  try {
+    let sePudo = false;
+    try {
+      guardarLaSeccion(BURGO, '', 'QWXYZ', 'lo-mio');
+      sePudo = laSeccionGuardada(BURGO, '', 'QWXYZ') === null;
+    } catch {
+      sePudo = false;
+    }
+    comprobar(
+      'y con el almacenamiento bloqueado —ventana privada de Safari, cookies de terceros cortadas— no se cae nada: se pierde la memoria y se sigue jugando, que es lo contrario de una página en blanco',
+      sePudo,
+    );
+  } finally {
+    delete (elMundo as { localStorage?: unknown }).localStorage;
+    if (loQueHabia !== undefined) elMundo.localStorage = loQueHabia;
+  }
 }
 
 elMazoEnLaPantalla();
@@ -9760,6 +10820,7 @@ elTruequeEnElRetablo();
 elComponedorEnElLienzo();
 lasPiezasDelLienzoYSuBanco();
 elEscritorioDelBurgo();
+lasClasesQueOtroNombraYLaMemoriaDeLaSeccion();
 
 console.log('');
 /**
@@ -9829,10 +10890,32 @@ console.log('');
  * de «con el cajón abierto / cerrado», que son dos y están escritas: ninguna de las dos listas
  * depende del azar, así que este número tampoco baila solo.
  *
+ * Y CON EL CUADRADO DEL CARRIL QUE DICE CUÁL ES —el rótulo corto, sus dos topes de ancho y la
+ * cuenta de lo que cabe dentro de los 44 puntos de alto— y con LAS TRES CLASES QUE EL MARCADO
+ * NOMBRABA Y LA HOJA NO TENÍA más la memoria de la sección en el bolsillo, se hacen 946, así
+ * que el guardia va en 936: el mismo margen de diez. Del bloque nuevo, las que salen de bucles
+ * son las que recorren los dieciocho lienzos midiendo el cuadrado ancho, y esa lista está
+ * escrita: no depende del azar. Las del bolsillo son cinco llamadas contra un `localStorage`
+ * de mentira que el propio bloque pone y retira, así que tampoco bailan — y si el almacén no
+ * se pusiera, las cinco se pondrían ROJAS en vez de dejar de contarse, que es la diferencia
+ * entre un juez que se cae y un juez que desaparece.
+ *
+ * Y CON LO QUE EL ESCRITORIO ACABA DE ENCHUFAR —el cartel del pie AL POSAR el cursor (las tres
+ * secuencias de puntero del contrato, corridas de punta a punta: el filtro de la escena y la
+ * memoria del cliente encadenados), el rótulo corto de cada cuadrado del carril, los dos estilos
+ * en línea que se mudan a la hoja, la concordancia del marcador, la línea de estado que dejó de
+ * decir dos veces «Se acabó» y la sección que sobrevive a un F5— se hacen 989, así que el
+ * guardia va en 979: el mismo margen de diez. Del bloque nuevo, las
+ * que salen de un bucle son las del carril del apuro, que se cuentan contra los cuadrados que la
+ * criba compone en un momento SEMBRADO del banco: ni esa lista ni la de las secuencias de
+ * puntero dependen del azar. Las cuatro del bolsillo llevan un `localStorage` de mentira que el
+ * propio bloque pone y retira; sin él se pondrían ROJAS en vez de dejar de contarse, que es la
+ * diferencia entre un juez que se cae y un juez que desaparece.
+ *
  * Y LAS ROJAS SE IMPRIMEN ANTES DE IRSE: el orden estaba al revés, así que el día que el
  * guardia saltara se llevaría por delante los nombres de todo lo que ya se había encontrado.
  */
-const COMPROBACIONES_ESCRITAS = 892;
+const COMPROBACIONES_ESCRITAS = 979;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(

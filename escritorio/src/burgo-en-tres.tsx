@@ -211,6 +211,7 @@ import {
   obrasSoloEnElAnillo,
   opcionesFueraDelTablero,
   PARA_CONTESTAR,
+  plural,
   pregonDelBurgo,
   seVeEnTres,
   sucesosEnTres,
@@ -260,6 +261,15 @@ import { traer } from './muelle';
 import type { ArcadeDelCatalogo } from './muebles';
 import { opcionesSueltas } from './plan';
 import { loQueSeDiceDeUnFallo } from './red-de-seguridad';
+/*
+ * DE QUÉ VENTANA ES ESTA PANTALLA, LEÍDO DONDE YA SE LEE. `loQuePide` es la función pura con
+ * la que la Sala parte su propia dirección, y de ella sale la silla que va en la llave del
+ * bolsillo. Escribir aquí un segundo `URLSearchParams(location.search).get('silla')` sería el
+ * sitio donde el día que la silla cambie de nombre se quedaría la mitad vieja — y la mitad
+ * vieja es justo la que decide si dos ventanas del mismo navegador comparten cajón. Ver
+ * `laSillaDeEstaVentana`, aquí abajo.
+ */
+import { loQuePide } from './sala';
 import { elEstiloDeLaCinta, RAIZ_DE_LA_CASA } from './riberas-en-tres';
 import { cuantoQuedaEnLaCinta, elPlazoAprieta, msHastaQueCambieElRotulo, cuantoQueda } from './relojes';
 import { AccionesDelTablero, Retablo } from './retablo';
@@ -282,6 +292,19 @@ const TITULO_DE_LO_QUE_SE_HACE = 'Lo que puedes hacer';
  * del sitio y está en el vocabulario del reglamento (§0).
  */
 const VOLVER_AL_BURGO_ENTERO = 'Ver el burgo entero';
+
+/**
+ * SUS DOS CLASES, Y LA SEGUNDA ES LA QUE SUSTITUYE A UN `CSSProperties`.
+ *
+ * `burgo-volver` es la de siempre. `burgo-volver-con-carril` es el sitio que ocupa cuando hay
+ * tira debajo de la cinta, y hasta hoy vivía en un objeto de JavaScript de este fichero con un
+ * `calc(3.75rem + 2.75rem)` dentro: los dos sumandos son de `estilo.css` —el `top` del botón y
+ * el `height` del carril— y escritos aquí no se pueden atar a ellos. Ahora es una clase, la
+ * hoja la escribe DESPUÉS de `.burgo-volver` (las dos pesan (0,1,0), así que decide el orden) y
+ * el comprobador compara los tres números leyendo la hoja.
+ */
+const EL_BOTON_DE_VOLVER = 'burgo-volver';
+const EL_BOTON_DE_VOLVER_CON_CARRIL = 'burgo-volver-con-carril';
 
 /**
  * EL RECUADRO DEL MUNDO, con su nombre escrito UNA vez, y con DOS clases.
@@ -494,6 +517,127 @@ interface LoSenalado {
   readonly sello: number;
 }
 
+/**
+ * ═══ QUÉ RECUERDA EL CARTEL DEL PIE, Y POR QUÉ SON DOS CASILLAS Y NO UNA ═══
+ *
+ * Desde esta tanda el cartel sale AL POSAR EL CURSOR: la escena publica `alSenalarCasilla`
+ * (`escenas/burgo/tipos.ts`) y esta pantalla lo engancha. Lo que NO cambia es el toque, porque
+ * con el dedo no hay cursor que posar: el primer toque lee y el segundo abre la tarjeta entera.
+ *
+ * ═══ EL FALLO QUE ESTO EVITA, CON EL ORDEN EXACTO QUE PROMETE LA ESCENA ═══
+ *
+ * Las dos cosas juntas, enchufadas a lo bruto, se pisan. El contrato de la escena dice cuándo,
+ * y con dos líneas suyas:
+ *
+ *   · «LEVANTAR EL DEDO (`pointerType` distinto de 'mouse') → `null`, incluso si el gesto acabó
+ *     siendo un arrastre. Con RATÓN, soltar el botón NO apaga nada.»
+ *   · «ORDEN cuando el dedo levanta sobre una casilla tocable: primero `alSenalarCasilla(null)`,
+ *     después `alTocarCasilla(i)`.»
+ *
+ * O sea: con el DEDO llega un apagado justo ANTES de cada toque, y con el RATÓN no llega
+ * ninguno. Y un dedo que se mueve dos puntos sobre la casilla —que es lo normal y no el caso
+ * raro: `onPointerMove` sale con el primer píxel de arrastre— manda además su `posa` antes de
+ * ese apagado. Con UNA sola casilla recordada hay un fallo en cada aparato, y los dos son de
+ * los que no dan error:
+ *
+ *   · mirando lo que el POSAR dejó, con el dedo el PRIMER toque abriría la tarjeta. Son los
+ *     veinte modales por turno que el cartel vino a quitar, contados en `alTocarCasilla`.
+ *   · mirando lo que el cartel dice DESPUÉS del apagado, con el dedo el segundo toque no
+ *     abriría NUNCA: el `null` del levantar borra lo que el primer toque señaló, y la tarjeta
+ *     de una casilla sin obras se queda sin una sola forma de abrirse con el dedo.
+ *
+ * Por eso se recuerdan DOS cosas. `dice` es lo que el cartel está diciendo —espeja el estado,
+ * así que el apagado del dedo la borra— y es la que manda con el ratón: el cursor sigue encima,
+ * el cartel sigue puesto, ya se ha leído, y el clic significa «quiero más», o sea la tarjeta al
+ * PRIMER clic. `porUnToque` es la casilla que un toque señaló y el apagado NO la borra, que es
+ * lo que hace que el segundo toque sea el segundo.
+ *
+ * ═══ Y VIVE FUERA DEL COMPONENTE PARA PODERSE MEDIR DESDE NODE ═══
+ *
+ * Dos funciones puras sobre una memoria de dos campos: `verify:escritorio` les pasa las
+ * secuencias de avisos que el contrato promete —la del ratón y las dos del dedo— y afirma qué
+ * sale de cada una. Metido dentro del componente esto sólo se podría probar con un navegador y
+ * punteros de verdad, que es exactamente como se rompen en silencio los filtros de este
+ * contrato — lo dice `senaladoTrasElGesto` en el otro extremo, y por eso vive él también fuera.
+ */
+export interface LaMemoriaDelCartel {
+  /** La casilla que el cartel dice AHORA MISMO, o `null`. Espeja el estado que se pinta. */
+  readonly dice: number | null;
+  /** La casilla que UN TOQUE señaló. El apagado del dedo no la borra: ver la cabecera. */
+  readonly porUnToque: number | null;
+}
+
+/** Sin cartel y sin toques: lo de salida, y a lo que se vuelve al cambiar la revisión. */
+export const EL_CARTEL_EN_BLANCO: LaMemoriaDelCartel = { dice: null, porUnToque: null };
+
+/** Tras un aviso de señalado de la escena (o de una fila que señala). `null` apaga el cartel y nada más. */
+export function trasElSenalado(memoria: LaMemoriaDelCartel, casilla: number | null): LaMemoriaDelCartel {
+  return memoria.dice === casilla ? memoria : { dice: casilla, porUnToque: memoria.porUnToque };
+}
+
+/**
+ * QUÉ HACE UN TOQUE EN UNA CASILLA SIN OBRAS: leerla o abrir su tarjeta.
+ *
+ * Abre si esa casilla YA SE ESTÁ LEYENDO —el cartel la dice, que es el caso del ratón— o si un
+ * toque anterior la señaló, que es el caso del dedo. En cualquier otro caso se señala, y se
+ * apunta el toque para que el siguiente sobre LA MISMA casilla sí abra.
+ */
+export function loQueHaceElToque(
+  memoria: LaMemoriaDelCartel,
+  indice: number,
+): { readonly que: 'abre' | 'senala'; readonly memoria: LaMemoriaDelCartel } {
+  if (memoria.dice === indice || memoria.porUnToque === indice) {
+    return { que: 'abre', memoria: { dice: memoria.dice, porUnToque: null } };
+  }
+  return { que: 'senala', memoria: { dice: memoria.dice, porUnToque: indice } };
+}
+
+/**
+ * ═══ LO QUE DICE LA LÍNEA DE ESTADO: DE QUIÉN SE ESPERA, Y QUÉ ACABA DE PASAR ═══
+ *
+ * Las dos cosas en el MISMO párrafo, que es la única región viva de esta pantalla. Y no se
+ * pegan a ciegas, porque al final de la partida se pegaban dos veces la misma frase.
+ *
+ * ═══ EL FALLO, MEDIDO EN EL BANCO Y EN EL LIENZO MÁS ESTRECHO ═══
+ *
+ * Con la mesa terminada, la traducción dice `turno` = «Se acabó» y el tablero declarado trae
+ * `aviso` = «Se acabó: Ana se queda con el Burgo…». Pegados con « · » eso es «Se acabó · Se
+ * acabó: Ana…», y en los dos lienzos más estrechos de los dieciocho (288 de ancho) a la frase
+ * le caben DOS PALABRAS antes de los puntos suspensivos: lo único que se leía en la línea de
+ * estado del final de la partida era «Se acabó · Se ac…», o sea la misma palabra dos veces y
+ * ni una letra de quién ganó. No falla nada y no lo caza ningún comprobador de partición: es
+ * texto correcto pegado dos veces.
+ *
+ * ═══ EL REMEDIO, Y POR QUÉ ES ESTRICTO ═══
+ *
+ * Si el aviso YA EMPIEZA por lo que dice el turno, el turno no se repite: el aviso lo dice y
+ * además sigue. Sólo el PREFIJO, y no «lo contiene»: «Turno de Ana» aparece dentro de muchos
+ * avisos de esta mesa a media frase («… y le toca a Ana»), y quitar el turno por eso dejaría
+ * la línea sin decir de quién se espera, que es justo lo que este párrafo vino a añadir.
+ *
+ * No redacta nada: las dos frases son de la traducción y del tablero declarado. Lo único que
+ * decide esto es si la segunda hace falta detrás de la primera.
+ */
+export function loQueDiceLaCinta(turno: string, aviso: string): string {
+  if (turno.length === 0) return aviso;
+  if (aviso.length === 0) return turno;
+  return aviso.startsWith(turno) ? aviso : `${turno} · ${aviso}`;
+}
+
+/**
+ * LA SILLA DE ESTA VENTANA, que es lo que separa dos ventanas del mismo navegador en la MISMA
+ * mesa. Sale de `?silla=` y la parte `loQuePide`, que es la misma función con la que la Sala
+ * decide qué pantalla es ésta; aquí no se vuelve a parsear nada.
+ *
+ * Sin ventana —Node, `verify:escritorio`— es la cadena vacía, que es la silla de siempre: la
+ * llave del bolsillo se compone igual y sin sufijo. Un `window` supuesto aquí reventaría el
+ * comprobador, que monta este pintor para contar lo que hay en el árbol.
+ */
+function laSillaDeEstaVentana(): string {
+  if (typeof window === 'undefined') return '';
+  return loQuePide(window.location.pathname, window.location.search).silla;
+}
+
 /** La jugada que trae una vista, o cero. Es el sello con el que la escena sabe qué ha visto. */
 function jugadaDe(vista: unknown): number {
   const v = vista as { jugada?: unknown };
@@ -626,11 +770,20 @@ export function BurgoEnTres({
   /** La casilla que dice el cartel del pie, con su sello. Ver `LoSenalado`. */
   const [senalado, ponerSenalado] = useState<LoSenalado | null>(null);
   const sellos = useRef(0);
+  /**
+   * LO QUE EL CARTEL RECUERDA, EN UNA `ref` Y NO EN EL ESTADO, y no es una optimización: el
+   * apagado del dedo y el toque llegan EN EL MISMO gesto y en este orden —`alSenalarCasilla(null)`
+   * y después `alTocarCasilla(i)`—, así que el manejador del toque tiene que leer lo que el
+   * apagado acaba de dejar. Un estado se lee por el render que ya se hizo, o sea el de antes del
+   * apagado, y con eso el primer toque del dedo abriría la tarjeta. Ver `LaMemoriaDelCartel`.
+   */
+  const memoriaDelCartel = useRef<LaMemoriaDelCartel>(EL_CARTEL_EN_BLANCO);
 
   const elRecuadro = useRef<HTMLDivElement | null>(null);
   const laFichaDeLaCinta = useRef<HTMLButtonElement | null>(null);
 
   const senalar = useCallback((casilla: number | null) => {
+    memoriaDelCartel.current = trasElSenalado(memoriaDelCartel.current, casilla);
     if (casilla === null) {
       ponerSenalado(null);
       return;
@@ -649,6 +802,8 @@ export function BurgoEnTres({
   const soltarTodo = useCallback(() => {
     ponerAbierto(null);
     ponerSenalado(null);
+    /* Y la memoria del cartel con él: lo que se leía era de la mesa anterior, toque incluido. */
+    memoriaDelCartel.current = EL_CARTEL_EN_BLANCO;
   }, []);
 
   /*
@@ -668,6 +823,8 @@ export function BurgoEnTres({
   const abrir = useCallback((que: LoAbierto) => {
     ponerAMano(false);
     ponerSenalado(null);
+    /* El cartel se apaga y la memoria lo espeja: si no, diría que se lee lo que ya no se ve. */
+    memoriaDelCartel.current = trasElSenalado(memoriaDelCartel.current, null);
     ponerAbierto(que);
   }, []);
   const cerrarElCajon = useCallback(() => {
@@ -916,8 +1073,20 @@ export function BurgoEnTres({
    */
   const aQuienSigue = useMemo(() => camaraSigueA(vista), [vista]);
 
-  /* Qué sección de la hoja está abierta, con memoria por mesa. Ver `usarLaSeccionAbierta`. */
-  const { abierta, alAbrir } = usarLaSeccionAbierta(puesta.codigo, hoja.abre, hoja.cinta.espera, hoja.cinta.meToca);
+  /*
+   * QUÉ SECCIÓN DE LA HOJA ESTÁ ABIERTA, con memoria en el bolsillo: por MESA (el código) y por
+   * VENTANA (la silla), que son los dos tramos que la llave necesita y que no salen de la
+   * partida. El arcade es el del MANIFIESTO y no una cadena escrita aquí: este pintor se elige
+   * por tabla, así que el día que sirva a otro juego la llave se muda sola con él.
+   */
+  const { abierta, alAbrir } = usarLaSeccionAbierta(
+    manifiesto.id,
+    laSillaDeEstaVentana(),
+    puesta.codigo,
+    hoja.abre,
+    hoja.cinta.espera,
+    hoja.cinta.meToca,
+  );
 
   // -------------------------------------------------------------------------
   // Lo que se manda
@@ -956,11 +1125,22 @@ export function BurgoEnTres({
    * «Hoy para leer eso hay que TOCAR la casilla y abrir un modal, y eso se hace veinte veces
    * por turno.» Veinte modales por turno son veinte velos, veinte trampas de foco y veinte
    * cierres para leer dos renglones. Lo que hace falta es un cartel, y un cartel de verdad
-   * aparece al POSAR el cursor: la escena no publica ese aviso (`PropsDelBurgo` tiene
-   * `alTocarCasilla` y no tiene `alSenalarCasilla`) y no es de esta tanda, así que se resuelve
-   * con lo que la escena da: el primer toque señala, y sólo el SEGUNDO sobre la misma casilla
-   * —mientras su cartel sigue puesto— abre la tarjeta entera. Leer cuesta un toque y ningún
-   * modal; la tarjeta sigue estando a dos.
+   * aparece AL POSAR el cursor.
+   *
+   * ═══ Y AHORA EL POSAR ESTÁ ENCHUFADO, ASÍ QUE ESTE TOQUE ES SÓLO PARA EL DEDO ═══
+   *
+   * Cuando esto se escribió, la escena no publicaba ningún aviso de señalado y el cartel se
+   * resolvía con lo único que había: el primer toque señalaba y el segundo abría. O sea que con
+   * ratón las veinte lecturas por turno seguían siendo veinte CLICS, que es el encargo sin
+   * cumplir. Hoy `PropsDelBurgo.alSenalarCasilla` existe y este pintor se lo pasa a `<Burgo>`,
+   * así que con ratón se lee POSÁNDOSE y sin pulsar nada, y un clic sobre lo que ya se está
+   * leyendo abre la tarjeta a la primera.
+   *
+   * Con el dedo no hay cursor que posar, y ahí el camino de los dos toques se queda tal cual:
+   * el primero lee y el segundo abre. Cuál de los dos aparatos es no se pregunta con un `if`
+   * sobre el puntero —esta pantalla no ve el suceso— sino con lo que la escena manda y en qué
+   * orden, que es el contrato entero de `LaMemoriaDelCartel`: ahí está el porqué, con los dos
+   * fallos que cada mitad evita.
    */
   const alTocarCasilla = useCallback(
     (indice: number) => {
@@ -970,13 +1150,17 @@ export function BurgoEnTres({
         void mover({ tipo: sola.tipo, carga: sola.carga });
         return;
       }
-      if (obras.length === 0 && senalado?.casilla !== indice) {
-        senalar(indice);
-        return;
+      if (obras.length === 0) {
+        const paso = loQueHaceElToque(memoriaDelCartel.current, indice);
+        memoriaDelCartel.current = paso.memoria;
+        if (paso.que === 'senala') {
+          senalar(indice);
+          return;
+        }
       }
       abrir({ que: 'casilla', casilla: indice });
     },
-    [vista, yo, opciones, quieto, mover, senalado, senalar, abrir],
+    [vista, yo, opciones, quieto, mover, senalar, abrir],
   );
 
   const alTocarFigura = useCallback(
@@ -1094,6 +1278,9 @@ export function BurgoEnTres({
     );
   }
 
+  /* Lo que dice la línea de estado, compuesto una sola vez. Ver `loQueDiceLaCinta`. */
+  const laFraseDeLaCinta = loQueDiceLaCinta(hoja.cinta.turno, tablero.aviso);
+
   /* La ficha del jugador que se esté mirando, y el componedor atado a él si el juego lo ofrece. */
   const elJugadorAbierto = abierto?.que === 'jugador' ? fichaDeJugador(vista, abierto.asiento, yo, opciones) : null;
   const elTratoAbierto: TiraDelTrato<Opcion> | null =
@@ -1176,13 +1363,13 @@ export function BurgoEnTres({
             párrafo y no en dos, porque dos regiones vivas con el mismo cambio se anuncian dos
             veces, y porque la cinta es la línea de sus botones: lo que no cabe se recorta con
             puntos suspensivos y sigue entero en el `title` y en el árbol.
+
+            Y SE COMPONE UNA VEZ, en `loQueDiceLaCinta`: escrita dos veces —una para el texto y
+            otra para el `title`— era la clase de pareja en la que el día que una gane una
+            palabra la otra no la tiene, y encima el aviso se lee entero al posarse.
           */}
-          <p
-            className="burgo-cinta-frase"
-            aria-live="polite"
-            title={[hoja.cinta.turno, tablero.aviso].filter((x) => x.length > 0).join(' · ')}
-          >
-            {[hoja.cinta.turno, tablero.aviso].filter((x) => x.length > 0).join(' · ')}
+          <p className="burgo-cinta-frase" aria-live="polite" title={laFraseDeLaCinta}>
+            {laFraseDeLaCinta}
           </p>
           {/*
             EL CÓDIGO DE LA MESA, que es lo que se dicta por voz para que alguien se siente.
@@ -1191,13 +1378,15 @@ export function BurgoEnTres({
 
             El nombre accesible lo deletrea con espacios y el `title` lo dice entero: un lector
             que lea «QWXYZ» de corrido dice una palabra que no se puede repetir al otro lado
-            del teléfono. `letra-chica` es la clase de la casa para esto; el sitio y el hueco
-            van en línea porque son reparto de ESTA cinta y no una forma que se repita.
+            del teléfono. `letra-chica` es la clase de la casa para el color y el cuerpo, y
+            `burgo-cinta-codigo` trae el hueco: ESTABA EN LÍNEA y ahora está en la hoja, porque
+            un estilo en línea pesa (1,0,0,0) y era el único hueco de esta cinta que ninguna
+            regla podía corregir sin `!important` —ni comparar su `flex` con el de sus cuatro
+            vecinos, que es de lo que depende que un código dictado por teléfono no se recorte—.
           */}
           {lienzo.ancho > 0 && lienzo.ancho < ANCHO_DESDE_EL_QUE_CABE_EL_CODIGO ? null : (
             <span
               className="letra-chica burgo-cinta-codigo"
-              style={EL_HUECO_DEL_CODIGO}
               aria-label={`Código de la mesa: ${puesta.codigo.split('').join(' ')}`}
               title={`Código de la mesa: ${puesta.codigo}`}
             >
@@ -1427,6 +1616,14 @@ export function BurgoEnTres({
                   seguirAlQueMueve={siguiendo && aQuienSigue !== null}
                   quieto={quieto}
                   alTocarCasilla={alTocarCasilla}
+                  /*
+                    EL SEÑALADO, QUE ES EL CARTEL AL POSAR EL CURSOR. Es el MISMO `senalar` que
+                    usan las filas de la tarjeta, de la ficha de un jugador y del componedor: un
+                    cartel es uno, y dos caminos hasta él serían dos sellos y dos relojes. La
+                    escena avisa sólo cuando la casilla CAMBIA y nunca de un índice que no sea
+                    una de las cuarenta (`senaladoTrasElGesto`), así que aquí no se compara nada.
+                  */
+                  alSenalarCasilla={senalar}
                   alTocarLosDados={alTocarLosDados}
                   alTocarFigura={alTocarFigura}
                   alFallar={alFallarElLienzo}
@@ -1443,8 +1640,18 @@ export function BurgoEnTres({
             {alPrincipio ? null : (
               <button
                 type="button"
-                className="burgo-volver"
-                style={cuadrados.length > 0 ? EL_SITIO_DE_VOLVER_CON_CARRIL : undefined}
+                /*
+                  CON CARRIL BAJA UNA TIRA, Y EL NÚMERO NO SE ESCRIBE AQUÍ. Era un
+                  `CSSProperties` con un `calc` dentro de este fichero, y ese `calc` suma el alto
+                  del carril: escrito en JavaScript no hay manera de atarlo al `height` de
+                  `.lienzo-carril`, y el día que las dos cifras se separen el botón vuelve a caer
+                  ENCIMA del único cuadrado de la tira —medido en el banco con el momento del
+                  trato y el lienzo de 288×317: el botón en y=293,9 y la quiebra de y=276,9 a
+                  y=323,7—. En la hoja, `verify:escritorio` lee los tres números y los compara.
+                */
+                className={
+                  cuadrados.length > 0 ? `${EL_BOTON_DE_VOLVER} ${EL_BOTON_DE_VOLVER_CON_CARRIL}` : EL_BOTON_DE_VOLVER
+                }
                 onClick={volverAlBurgoEntero}
               >
                 {VOLVER_AL_BURGO_ENTERO}
@@ -1667,24 +1874,6 @@ export function BurgoEnTres({
 const EL_SITIO_DEL_CARTEL: CSSProperties = { right: '0.75rem', bottom: '0.75rem', left: '0.75rem' };
 
 /**
- * DÓNDE SE PONE «VER EL BURGO ENTERO» CUANDO HAY CARRIL, y esto está MEDIDO en el banco.
- *
- * `.burgo-volver` vive en `top: 3.75rem`, o sea a un rem del pie de la cinta, y eso era
- * correcto cuando la cinta era lo único que había arriba. Con el carril puesto no lo es:
- * medido en el banco con el momento del trato y el lienzo de 288×317, el botón caía en
- * y=293,9 y el cuadrado del carril ocupaba de y=276,9 a y=323,7 —los dos con `z-index: 2` y
- * el botón después en el marcado, así que gana el botón— y el único cuadrado que había en la
- * tira, la quiebra, quedaba TAPADO. No es un error de nadie: es un botón encima de otro, que
- * es la clase de fallo que sólo se ve mirando la pantalla.
- *
- * Baja UNA TIRA, que es exactamente lo que el carril mide (`2.75rem`, el suelo de toque de la
- * casa, escrito en `rem` como todo lo demás de esta cadena para que crezca con la preferencia
- * de letra del navegador). Se suma en `calc` sobre el `3.75rem` de la hoja en vez de escribir
- * un `6.5rem` suelto: así el día que la cinta cambie de alto, esto lo sigue.
- */
-const EL_SITIO_DE_VOLVER_CON_CARRIL: CSSProperties = { top: 'calc(3.75rem + 2.75rem)' };
-
-/**
  * LAS TRES CAJAS QUE SEÑALAN DEJAN EL PIE LIBRE, Y ESO TAMBIÉN SE MIDIÓ EN EL BANCO.
  *
  * La tarjeta de una casilla, la ficha de un jugador y el componedor tienen todos filas que
@@ -1706,15 +1895,6 @@ const EL_SITIO_DE_UNA_CAJA_CON_CARTEL: CSSProperties = {
   maxHeight: 'calc(100% - 1.5rem - 5rem)',
 };
 
-/** El hueco del código en la cinta: reparto de ESTA cinta, no una forma que se repita. Ver la cinta. */
-const EL_HUECO_DEL_CODIGO: CSSProperties = {
-  flex: '0 0 auto',
-  padding: '0 0.35rem',
-  fontVariantNumeric: 'tabular-nums',
-  letterSpacing: '0.1em',
-  whiteSpace: 'nowrap',
-};
-
 /**
  * DE UN GLIFO DEL JUEGO A UN CUADRADO DE LA PIEZA, y ni una palabra inventada por el camino.
  *
@@ -1724,12 +1904,25 @@ const EL_HUECO_DEL_CODIGO: CSSProperties = {
  * del barrio o el del peón del otro en un trato — el mismo `#rrggbb` con el que se pinta esa
  * acera y ese peón, no un código nuevo.
  *
- * LO QUE NO CABE, DICHO: `GlifoDelCarrilDelBurgo` trae además un `rotulo` corto —el nombre de
- * seis letras de la casilla, la cifra de una puja— que es lo que distingue dos cuadrados del
- * mismo verbo de un vistazo, y `CuadradoDelCarril` no tiene dónde ponerlo: la pieza pinta un
- * glifo y nada más. Hoy eso se paga en la subasta, donde tres pujas fijas salen como tres «Pu»
- * iguales que sólo se distinguen al posarse o al oírlas. La pieza no es de esta tanda; queda
- * anotado.
+ * ═══ Y EL RÓTULO CORTO, QUE ES LO QUE AQUÍ FALTABA Y YA TIENE DÓNDE IR ═══
+ *
+ * `GlifoDelCarrilDelBurgo` trae además un `rotulo` corto —el nombre de seis letras que lleva
+ * pintada la cara de la casilla («Mayor»), la cifra de una puja, el nombre del otro en un
+ * trato—, y hasta hoy se quedaba fuera porque `CuadradoDelCarril` pintaba el glifo y nada más.
+ * Lo que eso costaba está medido: en el apuro del Burgo salen SEIS «Hi» seguidos —hipotecar,
+ * uno por título— que a la vista sólo se distinguen por la barra del color de la acera, y dos
+ * solares del mismo barrio la tienen IGUAL; en una subasta con el cajón cerrado salen TRES «Pu»
+ * idénticos, las tres cifras fijas, sin ni siquiera esa barra. Con lector y con ratón se
+ * distinguían perfectamente —el rótulo entero está en `aria-label` y en `title`—; A LA VISTA
+ * no, y con el dedo no hay `title` que se pose, que es justo el aparato para el que esta tira
+ * existe.
+ *
+ * SE LE PASA TAL CUAL Y NO SE RECORTA AQUÍ: la pieza decide con él si el cuadrado se ensancha
+ * (`lienzo-carril-hueco-ancho`), y lo que no quepa lo recorta la hoja con puntos suspensivos.
+ * Se le pasa a TODOS y no sólo a los gemelos, y eso hay que decirlo porque cuesta: el cuadrado
+ * ancho mide de 3,5 a 6,5rem, o sea que en el lienzo de 288 caben cuatro en vez de cinco. Una
+ * tira con unos anchos y otros no se lee como dos tiras pegadas, y CUÁL es cada cuadrado se
+ * necesita en los catorce del apuro, no sólo en los seis que repiten verbo.
  *
  * La CLAVE es el `id` de la opción, que es estable entre revisiones y es lo que el manejador
  * usa para volver de un cuadrado a su opción entera.
@@ -1738,15 +1931,16 @@ function elCuadradoQueSePinta(g: GlifoDelCarrilDelBurgo<Opcion>, quieto: boolean
   return {
     clave: g.opcion.id,
     glifo: g.glifo,
+    rotulo: g.rotulo,
     nombre: g.ayuda,
     /*
-     * EL RÓTULO CORTO SÓLO SI AÑADE ALGO. La pieza pega `nombre` y `ayuda` en el `title`, y en
-     * casi todos los cuadrados el rótulo corto ya está DENTRO del largo («Comprar Calle Mayor
-     * por 350 €» contiene «Mayor»): pegarlo igual dejaría un «… por 350 €. Mayor» que se lee
-     * como una errata. Donde no está —la cifra de una puja, «Fijo» y «10 %» del Impuesto— sí
-     * añade, y entonces va.
+     * Y NO SE LE PONE `ayuda`. Aquí iba el rótulo corto cuando no cabía en ninguna otra parte:
+     * la pieza pega `nombre` y `ayuda` en el `title`, así que «Fijo» y «10 %» del Impuesto —los
+     * únicos que no están dentro del rótulo largo— se colaban por ahí para poder distinguirlos
+     * al posarse. Ahora el rótulo se PINTA, o sea que pegarlo además al `title` sería decir dos
+     * veces lo mismo a un palmo de distancia, y el `title` se queda con el rótulo entero del
+     * juego, que es lo único que dice algo que no esté ya en el cuadrado.
      */
-    ayuda: g.ayuda.includes(g.rotulo) ? undefined : g.rotulo,
     marca: g.color,
     quieto,
   };
@@ -1905,9 +2099,18 @@ export function MarcadorDelBurgo({ vista, yo }: { vista: unknown; yo: string | n
                   {j.soyYo ? ' (tú)' : ''}
                   {j.seLeEspera && !j.esSuTurno ? ' ·' : ''}
                 </span>
+                {/*
+                  LA CONCORDANCIA LA HACE `plural`, DE LA TRADUCCIÓN, y no un ternario escrito
+                  aquí. Aquí había dos —los títulos y los Salvoconductos—, y no estaban mal:
+                  estaban en el sitio donde el siguiente se escribe a mano otra vez, que es
+                  exactamente lo que la cabecera de `plural` cuenta que costó en «La mesa
+                  entera» («guarda 1 casas y 1 hoteles»). Un plural a mano se lee igual de bien
+                  y dice otra cosa, así que no hay comprobador que lo cace: lo único que lo
+                  evita es que la concordancia tenga UN solo sitio en toda la casa.
+                */}
                 <span className="letra-chica burgo-lo-del-jugador">
-                  {`${String(j.titulos)} ${j.titulos === 1 ? 'título' : 'títulos'}${j.presa ? ' · en la Comisaría' : ''}${
-                    j.indultos > 0 ? ` · ${String(j.indultos)} ${j.indultos === 1 ? 'Salvoconducto' : 'Salvoconductos'}` : ''
+                  {`${String(j.titulos)} ${plural(j.titulos, 'título', 'títulos')}${j.presa ? ' · en la Comisaría' : ''}${
+                    j.indultos > 0 ? ` · ${String(j.indultos)} ${plural(j.indultos, 'Salvoconducto', 'Salvoconductos')}` : ''
                   }`}
                 </span>
               </span>
@@ -1947,10 +2150,22 @@ export function MarcadorDelBurgo({ vista, yo }: { vista: unknown; yo: string | n
       {/*
         LO QUE LE QUEDA AL AYUNTAMIENTO, que es información pública del juego y parte de lo que se
         juega: una mesa que sabe que quedan dos hoteles sabe que no puede alzar el tercero.
+
+        ═══ Y LA CONCORDANCIA SALE DE `plural`, PORQUE AQUÍ DECÍA «1 casas» ═══
+
+        Este renglón estaba escrito con los plurales pegados a la palabra —«guarda 1 casas y 1
+        hoteles», «Quedan 1 cartas en Sucesos»— y eso no se ve mal: se ve como un renglón normal
+        que dice otra cosa. Y pasa justo al FINAL de la partida, que es cuando esos cuatro
+        números son lo que se mira: quedan pocas casas, queda una carta. Es el mismo fallo, con
+        las mismas palabras, que la traducción cuenta en la cabecera de `plural` para la sección
+        «La mesa entera» de la hoja; aquí es el marcador del raíl, que redacta su propio renglón
+        porque el marcador da los cuatro números y no la frase.
       */}
       <p className="letra-chica burgo-lo-del-concejo">
-        {`El Ayuntamiento guarda ${String(marcador.concejo.casas)} casas y ${String(marcador.concejo.posadas)} hoteles. ` +
-          `Quedan ${String(marcador.quedan.pregon)} cartas en Sucesos y ${String(marcador.quedan.arca)} en el Fondo Vecinal.`}
+        {`El Ayuntamiento guarda ${String(marcador.concejo.casas)} ${plural(marcador.concejo.casas, 'casa', 'casas')} ` +
+          `y ${String(marcador.concejo.posadas)} ${plural(marcador.concejo.posadas, 'hotel', 'hoteles')}. ` +
+          `${plural(marcador.quedan.pregon, 'Queda', 'Quedan')} ${String(marcador.quedan.pregon)} ` +
+          `${plural(marcador.quedan.pregon, 'carta', 'cartas')} en Sucesos y ${String(marcador.quedan.arca)} en el Fondo Vecinal.`}
       </p>
     </section>
   );

@@ -200,6 +200,8 @@ import {
   poseDelBurgo,
   seguir,
 } from '../burgo/camara-del-burgo';
+import { gestoAlSalir, senaladoTrasElGesto } from '../burgo/tipos';
+import type { GestoDeSenalado } from '../burgo/tipos';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 
 let hechas = 0;
@@ -2195,6 +2197,173 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
 }
 
 // ---------------------------------------------------------------------------
+paso('El señalado: la escena dice qué casilla mira el puntero, y no dos veces la misma');
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ QUÉ SE COMPRA AQUÍ, Y POR QUÉ NO LO VE NINGÚN OTRO JUEZ ═══
+ *
+ * El cartel del pie del escritorio —nombre, barrio, precio, renta de hoy y estado— tenía que
+ * salir AL POSAR EL CURSOR («eso se hace veinte veces por turno»), y la escena no publicaba
+ * ningún aviso de señalado: `PropsDelBurgo` tenía `alTocarCasilla` y nada más. El cliente lo
+ * resolvió con lo que había —el primer toque señala, el segundo abre la tarjeta—, o sea
+ * veinte clics por turno para leer dos renglones.
+ *
+ * Lo que se añade es un aviso, y un aviso tiene DOS maneras de estar mal que no dan error:
+ *
+ *   · QUE SALGA DE MÁS. `onPointerMove` sobre una malla instanciada se dispara con cada
+ *     movimiento del ratón y casi todos caen en la misma casilla. Sin filtro, el recorrido de
+ *     aquí abajo —64 gestos— manda 64 avisos en lugar de 3, y el cartel del escritorio, que
+ *     se remonta con una llave nueva por cambio, reaparecería sesenta veces por segundo.
+ *   · QUE APAGUE LO QUE ACABA DE ENCENDER. Al cruzar de una casilla a la vecina llegan la
+ *     entrada en la nueva y la salida de la vieja, y r3f no promete el orden; con la salida
+ *     por detrás, un adiós a secas apaga el cartel al que el cursor acaba de llegar. Es el
+ *     mismo fallo que costó una tanda en la mano de cartas del Delta.
+ *
+ * Ninguna de las dos se ve contando triángulos ni mirando el `.glb`, y ninguna se puede medir
+ * dentro de `Burgo.tsx` —que trae `three`— así que la decisión vive en `tipos.ts`, sin `three`,
+ * y aquí se corre con recorridos de puntero de verdad. Los jueces de fuente que van detrás son
+ * los que aseguran que la escena de verdad pasa por ahí y no avisa por su cuenta.
+ */
+{
+  const fuenteDeTipos = fs.readFileSync(path.join(CARPETA, 'tipos.ts'), 'utf8');
+  const laFirma = /readonly alSenalarCasilla\?: \(indice: number \| null\) => void;/;
+  comprobar('el contrato publica `alSenalarCasilla` y es OPCIONAL: los dos clientes de hoy no lo pasan y siguen montando igual', laFirma.test(fuenteDeTipos));
+  comprobar('se ve fallar: sin la interrogación —o sea, obligatorio— el mismo juez lo caza', !laFirma.test('  readonly alSenalarCasilla: (indice: number | null) => void;'));
+
+  /** Pasa una lista de gestos por un filtro y devuelve LOS AVISOS que le habrían llegado al cliente. */
+  const avisosDe = (
+    gestos: readonly GestoDeSenalado[],
+    filtro: (ultimo: number | null, gesto: GestoDeSenalado) => { readonly avisa: boolean; readonly ahora: number | null },
+  ): (number | null)[] => {
+    let ultimo: number | null = null;
+    const salieron: (number | null)[] = [];
+    for (const g of gestos) {
+      const d = filtro(ultimo, g);
+      if (!d.avisa) continue;
+      ultimo = d.ahora;
+      salieron.push(d.ahora);
+    }
+    return salieron;
+  };
+  const laMaquina = (ultimo: number | null, g: GestoDeSenalado): { readonly avisa: boolean; readonly ahora: number | null } => senaladoTrasElGesto(ultimo, g, CASILLAS);
+  const posa = (sobre: number | undefined): GestoDeSenalado => ({ que: 'posa', sobre });
+  const sale = (sobre: number | undefined): GestoDeSenalado => ({ que: 'sale', sobre });
+
+  /* ── El recorrido de un ratón que cruza dos casillas y se va ── */
+  const elRecorrido: GestoDeSenalado[] = [...Array.from({ length: 60 }, () => posa(7)), ...Array.from({ length: 3 }, () => posa(8)), sale(8)];
+  comprobar(
+    `sesenta avisos de puntero sobre la 7, tres sobre la 8 y la salida —${String(elRecorrido.length)} gestos— son TRES avisos: 7, 8 y nulo`,
+    JSON.stringify(avisosDe(elRecorrido, laMaquina)) === '[7,8,null]',
+    avisosDe(elRecorrido, laMaquina),
+  );
+  /* La vacuna: sin el filtro del cambio salen los sesenta y cuatro. */
+  const elIngenuo = (ultimo: number | null, g: GestoDeSenalado): { readonly avisa: boolean; readonly ahora: number | null } => ({ avisa: true, ahora: senaladoTrasElGesto(ultimo, g, CASILLAS).ahora });
+  comprobar(
+    `se ve fallar: avisando en cada aviso de puntero salen los ${String(elRecorrido.length)} —el cartel del pie repintado sesenta veces por segundo para decir lo mismo—`,
+    avisosDe(elRecorrido, elIngenuo).length === elRecorrido.length,
+    avisosDe(elRecorrido, elIngenuo).length,
+  );
+
+  /*
+   * ── El cruce de una casilla a la vecina, EN EL ORDEN EN QUE R3F LO MANDA ──
+   *
+   * Que es con la salida DELANTE: `cancelPointer(hits)` corre antes que `onIntersect`. La
+   * salida trae las intersecciones frescas, y ahí ya está la 8: eso no es un adiós.
+   */
+  const laMalla = { asas: true };
+  const otraMalla = { naipe: true };
+  const bajoElPuntero = (i: number, de: object = laMalla): readonly { readonly eventObject: object; readonly instanceId?: number }[] => [{ eventObject: de, instanceId: i }];
+  const elCruce: GestoDeSenalado[] = [posa(7), gestoAlSalir(7, bajoElPuntero(8), laMalla), posa(8)];
+  comprobar('al cruzar de la 7 a la 8 —salida delante, como hace r3f— salen DOS avisos, 7 y 8, y ningún apagado entre medias', JSON.stringify(avisosDe(elCruce, laMaquina)) === '[7,8]', avisosDe(elCruce, laMaquina));
+  /* La vacuna: una salida que no mira lo que queda debajo es exactamente el parpadeo. */
+  comprobar(
+    'se ve fallar: tomando la salida por un adiós sin mirar lo que queda debajo, el mismo cruce manda 7, nulo y 8 — y recorrer el anillo entero serían 39 apagados y 39 encendidos',
+    JSON.stringify(avisosDe([posa(7), sale(7), posa(8)], laMaquina)) === '[7,null,8]',
+    avisosDe([posa(7), sale(7), posa(8)], laMaquina),
+  );
+  comprobar(
+    'y una salida de verdad —al cielo, o fuera del lienzo, donde las intersecciones vienen vacías— sí apaga; la de otra malla que esté debajo no la salva',
+    JSON.stringify(avisosDe([posa(7), gestoAlSalir(7, [], laMalla)], laMaquina)) === '[7,null]' && JSON.stringify(avisosDe([posa(7), gestoAlSalir(7, bajoElPuntero(3, otraMalla), laMalla)], laMaquina)) === '[7,null]',
+  );
+  /* ── Y el orden CONTRARIO, el que r3f no usa hoy: la salida de la 7 llegando DETRÁS ── */
+  const elCruceAlReves: GestoDeSenalado[] = [posa(7), posa(8), sale(7), posa(8)];
+  comprobar('con la salida llegando detrás de la entrada —el orden que r3f no usa hoy— la de la 7 se tira igual: dos avisos, 7 y 8', JSON.stringify(avisosDe(elCruceAlReves, laMaquina)) === '[7,8]', avisosDe(elCruceAlReves, laMaquina));
+  /* La vacuna: tratar TODA salida como un adiós es el mismo parpadeo por el otro lado. */
+  const elCiego = (ultimo: number | null, g: GestoDeSenalado): { readonly avisa: boolean; readonly ahora: number | null } => senaladoTrasElGesto(ultimo, g.que === 'sale' ? { que: 'levanta' } : g, CASILLAS);
+  comprobar('se ve fallar: con una salida ciega ese cruce manda 7, 8, nulo y 8 — el cartel se apaga y se vuelve a encender al pasar a la casilla de al lado', JSON.stringify(avisosDe(elCruceAlReves, elCiego)) === '[7,8,null,8]', avisosDe(elCruceAlReves, elCiego));
+
+  /* ── El dedo: no hay cursor posado, así que al levantarlo se apaga ── */
+  comprobar('con el dedo, levantarlo avisa con nulo y una segunda levantada ya no repite el aviso', JSON.stringify(avisosDe([posa(12), { que: 'levanta' }, { que: 'levanta' }], laMaquina)) === '[12,null]');
+
+  /* ── Un `instanceId` que no es una casilla ── */
+  const fueraDelAnillo: GestoDeSenalado[] = [posa(7), posa(undefined), posa(7), posa(CASILLAS), posa(7), posa(-1), posa(7), posa(7.5)];
+  comprobar(
+    `un instanceId que no es casilla —sin instancia debajo, ${String(CASILLAS)}, -1 o con decimales— sale como nulo y no como número`,
+    JSON.stringify(avisosDe(fueraDelAnillo, laMaquina)) === '[7,null,7,null,7,null,7,null]',
+    avisosDe(fueraDelAnillo, laMaquina),
+  );
+  /* La vacuna: sin mirar el anillo, el cliente recibe índices que su lista de cuarenta no tiene. */
+  const elConfiado = (ultimo: number | null, g: GestoDeSenalado): { readonly avisa: boolean; readonly ahora: number | null } => {
+    const ahora = g.que === 'posa' ? (g.sobre ?? null) : null;
+    return { avisa: ahora !== ultimo, ahora };
+  };
+  comprobar(
+    `se ve fallar: sin mirar el anillo el mismo recorrido le manda al cliente un ${String(CASILLAS)}, un -1 y un 7,5, y \`casillas[${String(CASILLAS)}]\` no existe`,
+    JSON.stringify(avisosDe(fueraDelAnillo, elConfiado)) === `[7,null,7,${String(CASILLAS)},7,-1,7,7.5]`,
+    avisosDe(fueraDelAnillo, elConfiado),
+  );
+
+  /* ── Y que la escena de verdad pase por ahí: los jueces de fuente ── */
+  const fuenteDelBurgo = sinComentarios(fs.readFileSync(path.join(CARPETA, 'Burgo.tsx'), 'utf8'));
+  comprobar(
+    'el señalado sale de las MISMAS asas que ya raycastean para el toque, con el aviso de posar y el de salir',
+    /onPointerMove=\{senalaLaCasilla\}/.test(fuenteDelBurgo) && /onPointerOut=\{dejaDeSenalarLaCasilla\}/.test(fuenteDelBurgo),
+  );
+  comprobar(
+    'y la salida le pasa a `gestoAlSalir` las intersecciones FRESCAS del aviso y la malla que atiende, que es lo único que sabe si el puntero ya está en la casilla de al lado',
+    /senala\(gestoAlSalir\(e\.instanceId, e\.intersections, e\.eventObject\)\);/.test(fuenteDelBurgo),
+  );
+  comprobar(
+    'y las asas se montan también cuando SÓLO hay señalado: un cliente que sólo quiera leer no tiene que fingir un `alTocarCasilla`',
+    /props\.alTocarCasilla === undefined && props\.alSenalarCasilla === undefined \? null/.test(fuenteDelBurgo),
+  );
+  const laLlamada = /alSenalarCasilla\?\.\(/g;
+  const cuantasLlamadas = (fuente: string): number => (fuente.match(laLlamada) ?? []).length;
+  comprobar(
+    'el aviso sale por UN solo sitio, y ese sitio es el que pregunta a `senaladoTrasElGesto` y calla cuando la respuesta es que no hay noticia',
+    cuantasLlamadas(fuenteDelBurgo) === 1 && /senaladoTrasElGesto\(senalada\.current, gesto, CASILLAS\)/.test(fuenteDelBurgo) && /if \(!paso\.avisa\) return;/.test(fuenteDelBurgo),
+  );
+  /* La vacuna del contador, escrita con dos líneas propias: mide UNO uno y DOS dos, aunque el fuente esté ya envenenado. */
+  comprobar(
+    'se ve fallar: un segundo `alSenalarCasilla?.(` suelto por la escena —que se saltaría el filtro entero— lo caza el mismo contador',
+    cuantasLlamadas('avisos.current.alSenalarCasilla?.(paso.ahora);') === 1 && cuantasLlamadas('avisos.current.alSenalarCasilla?.(paso.ahora);\navisos.current.alSenalarCasilla?.(e.instanceId ?? null);') === 2,
+  );
+
+  const elSenalado = fuenteDelBurgo.slice(fuenteDelBurgo.indexOf('const senala = ('), fuenteDelBurgo.indexOf('const senalaLaCasilla'));
+  const senaladoLimpio = (cuerpo: string): boolean => cuerpo.length > 0 && !/saltarTodo/.test(cuerpo) && !/quieto/.test(cuerpo);
+  comprobar(
+    'posar el cursor no salta la cola de animaciones y no lo apaga `quieto`: `quieto` está para que las asas no MANDEN con un movimiento en vuelo, y leer una casilla no manda nada',
+    senaladoLimpio(elSenalado),
+    elSenalado.slice(0, 120),
+  );
+  comprobar(
+    'se ve fallar: el mismo juez con un `quieto` o un `saltarTodo` metidos dentro, y con el cuerpo vacío por si el corte se pierde',
+    !senaladoLimpio(`${elSenalado}\n    if (avisos.current.quieto) return;`) && !senaladoLimpio(`${elSenalado}\n    saltarTodo(reloj.elapsedTime);`) && !senaladoLimpio(''),
+  );
+
+  const elToque = fuenteDelBurgo.slice(fuenteDelBurgo.indexOf('const tocaCasilla = ('), fuenteDelBurgo.indexOf('const tocaPeon'));
+  comprobar(
+    'al levantar el DEDO se avisa con nulo, y ANTES del filtro del arrastre: un dedo que arrastró por el anillo y se levanta también deja de señalar',
+    /if \(esDeDedo\(e\)\) senala\(\{ que: 'levanta' \}\);/.test(elToque) && elToque.indexOf('esDeDedo') < elToque.indexOf('esUnToque'),
+  );
+  comprobar(
+    'y con ratón no se apaga nada al soltar el botón —el cursor sigue donde estaba—, con lo desconocido contando como dedo: en la app el suceso de expo-gl no siempre trae `pointerType`',
+    /\.pointerType \?\? 'touch'\) !== 'mouse'/.test(fuenteDelBurgo),
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 console.log('');
 if (fallos.length > 0) {
@@ -2208,7 +2377,7 @@ if (fallos.length > 0) {
  * a la mitad termina con código cero y una lista corta de aciertos. El número va a mano,
  * con margen, y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 235;
+const COMPROBACIONES_ESCRITAS = 256;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(`Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: se ha caído por el camino sin decirlo. Si has añadido comprobaciones nuevas, sube el número.`);
   process.exit(2);
@@ -2234,7 +2403,10 @@ if (fallos.length === 0) {
       'cintas también, los dígitos y los emblemas están fundidos en una geometría y se leen del derecho,\n' +
       'la histéresis de los niveles existe y se ve fallar sin ella, desde la pose de salida la ciudad\n' +
       'entera se monta en L2 y no en manchas, los coches de calle van por el eje de su carril y en el\n' +
-      'código no queda ni una muralla.\n' +
+      'código no queda ni una muralla. Y la escena dice qué casilla mira el puntero sin decirlo dos\n' +
+      'veces: sesenta gestos sobre la misma casilla son un aviso, cruzar a la vecina no apaga el\n' +
+      'cartel por en medio —llegue la salida delante o detrás—, un instanceId que no es casilla sale\n' +
+      'como nulo, y con el dedo el señalado se va al levantarlo.\n' +
       'Lo que esto NO prueba es que se vea bien.',
   );
   process.exit(0);

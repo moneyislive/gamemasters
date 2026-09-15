@@ -1060,6 +1060,41 @@ export interface CuadradoDelCarril {
    * puntos no cabe una frase y un lector que dictara «7» no diría nada.
    */
   glifo: string;
+  /**
+   * ═══ EL RÓTULO CORTO, Y ES LO QUE LE FALTABA A ESTE MUEBLE PARA DECIR CUÁL ES ═══
+   *
+   * ═══ EL FALLO, MEDIDO EN EL BANCO ═══
+   *
+   * El cuadrado pintaba el glifo Y NADA MÁS, y el glifo es el VERBO. En el apuro del Burgo
+   * salen SEIS «Hi» seguidos —hipotecar, uno por título— que a la vista sólo se distinguen
+   * por la barra de dos puntos del color de la acera, y dos solares del mismo barrio la
+   * tienen IGUAL; en una subasta con el cajón cerrado salen TRES «Pu» idénticos, las tres
+   * cifras fijas de la puja, sin ni siquiera esa barra. El rótulo entero estaba en
+   * `aria-label` y en `title`, así que con lector y con ratón se distinguían perfectamente;
+   * A LA VISTA, NO. Y con el dedo no hay `title` que se pose: la tira es justo el mueble que
+   * existe para poder jugar SIN abrir nada.
+   *
+   * Así que el cuadrado admite un renglón más: el nombre de seis letras que lleva PINTADA LA
+   * CARA de la casilla («Mayor»), la cifra de una puja, el nombre del otro en un trato. Sale
+   * de donde ya está escrito —`GlifoDelCarrilDelBurgo.rotulo`, que el juego redacta— y aquí
+   * no se recorta ni se abrevia nada: lo que no cabe lo recorta la hoja con puntos
+   * suspensivos, y el nombre entero sigue en `nombre` y en el `title`.
+   *
+   * ═══ POR QUÉ ES OPCIONAL Y NO OBLIGATORIO ═══
+   *
+   * Porque el cuadrado ANCHO cuesta ancho: con rótulo el cuadrado deja de medir 44×44 y pasa
+   * a medir de 59,5 a 110,5 puntos de ancho (`min-width: 3.5rem`, `max-width: 6.5rem` en la
+   * hoja, con la raíz de esta casa en 17), o sea que en el lienzo de 288 caben CUATRO en vez
+   * de CINCO. Donde el verbo ya es único —«Ti» de tirar, «Pa» de pasar el turno, «Qu» de la
+   * quiebra— un rótulo no distingue nada de nada y sólo quita sitio a los que sí lo necesitan.
+   * Quien compone los cuadrados es quien sabe cuáles se repiten, y por eso lo decide él.
+   *
+   * VA `aria-hidden` COMO EL GLIFO, y no es por ahorrar: el botón lleva `aria-label` con el
+   * rótulo ENTERO del juego, y un `aria-label` sustituye al contenido, así que un lector no
+   * oiría el renglón aunque no lo lleváramos. Marcarlo dice lo que es —cromo repetido— y no
+   * deja que el día que se quite el `aria-label` se oiga «Hi Mayor» en vez de la frase.
+   */
+  rotulo?: string;
   /** EL NOMBRE LARGO: es lo que oye un lector y lo que sale al posar el ratón. Lo escribe el juego. */
   nombre: string;
   /** Un renglón más de explicación, si el juego la tiene. Se pega al `title`. */
@@ -1105,6 +1140,30 @@ export interface CuadradoDelCarril {
  * Lo que queda como señal de que hay más es que el último cuadrado se ve CORTADO por el canto
  * —el ancho de la tira casi nunca es un múltiplo del botón— y que con el tabulador el
  * navegador los trae a la vista de uno en uno.
+ *
+ * ═══ Y EL CUADRADO ANCHO, QUE ES LO QUE ROMPE «SÓLO CABE UN GLIFO» A PROPÓSITO ═══
+ *
+ * El párrafo de arriba dice que en el cuadrado sólo cabe un glifo y que QUÉ hace cada uno vive
+ * en el nombre accesible y en el `title`. Eso era verdad y era insuficiente, y lo que faltaba
+ * está contado con sus números en `CuadradoDelCarril.rotulo`: con lector y con ratón los seis
+ * «Hi» del apuro se distinguen, A LA VISTA no, y con el dedo no hay `title` que se pose. El
+ * cuadrado que trae rótulo mide de 3,5 a 6,5rem de ancho —sigue teniendo sus 44 de alto y más
+ * de 44 de ancho, o sea que el suelo de toque no se toca— y pinta dos renglones dentro.
+ *
+ * ═══ QUÉ PASA CUANDO NO CABEN, QUE ES LO NORMAL Y NO EL CASO RARO ═══
+ *
+ * MEDIDO, con la raíz de esta casa en 17 y el lienzo más estrecho de los dieciocho (288, que
+ * es el escritorio de pie): a la tira le quedan 262,5 puntos de ancho útil —el recuadro menos
+ * el `max-width: calc(100% - 1.5rem)` de la hoja—, así que caben CINCO cuadrados de 44 o
+ * CUATRO de los anchos en su medida mínima. Con los CATORCE que da el apuro del Burgo —doce
+ * títulos entre vender e hipotecar, más pasar y la quiebra— no caben ni de lejos en ninguna de
+ * las dos formas, y eso NO es un fallo que haya que arreglar aquí: la tira RUEDA POR DENTRO, y
+ * ésa es la razón entera por la que este mueble es una tira y no una lista. Rueda con la rueda
+ * del ratón, con el dedo (`touch-action: auto`, que es la línea que no se ve fallar con un
+ * ratón) y con el tabulador, que trae los cuadrados a la vista de uno en uno; y la clase está
+ * en `RUEDAN_SOLAS`, así que la cámara del pintor no se le come el gesto. Lo que se paga por
+ * el rótulo es un cuadrado menos a la vista de cada cinco; lo que se compra es saber CUÁL es
+ * cada uno de los catorce, que hasta hoy sólo se sabía posándose encima.
  */
 export function CarrilDelLienzo({
   nombre,
@@ -1130,6 +1189,22 @@ export function CarrilDelLienzo({
     >
       {cuadrados.map((c) => {
         const apagado = c.quieto === true;
+        /*
+         * EL RÓTULO VACÍO NO ES UN RÓTULO, y esto no es puntillismo: quien compone los
+         * cuadrados los saca de una tabla del juego, y una cadena vacía es exactamente lo que
+         * sale de ahí el día que a un movimiento nuevo no se le escribe rótulo. Con la clase
+         * ancha puesta y nada dentro, el cuadrado mediría 59,5 puntos de ancho para pintar un
+         * renglón en blanco: dos cuadrados menos en el lienzo de 288 a cambio de nada.
+         */
+        const conRotulo = c.rotulo !== undefined && c.rotulo.length > 0;
+        /*
+         * LAS CLASES SE COMPONEN EN UNA LISTA Y NO CON TERNARIOS ANIDADOS: son tres estados
+         * independientes —la pieza, el ancho y el apagado— y en cuanto se cruzan dos, la
+         * cadena de ternarios tiene cuatro ramas de las que sólo se leen dos.
+         */
+        const clases = [`${CARRIL_DEL_LIENZO}-hueco`];
+        if (conRotulo) clases.push(`${CARRIL_DEL_LIENZO}-hueco-ancho`);
+        if (apagado) clases.push(QUIETA_EN_EL_LIENZO);
         return (
           /*
            * `aria-disabled` Y NUNCA `disabled`: un `<button>` al que se le pone `disabled`
@@ -1141,9 +1216,7 @@ export function CarrilDelLienzo({
           <button
             key={c.clave}
             type="button"
-            className={
-              apagado ? `${CARRIL_DEL_LIENZO}-hueco ${QUIETA_EN_EL_LIENZO}` : `${CARRIL_DEL_LIENZO}-hueco`
-            }
+            className={clases.join(' ')}
             aria-disabled={apagado}
             aria-label={c.nombre}
             title={c.ayuda === undefined || c.ayuda.length === 0 ? c.nombre : `${c.nombre}. ${c.ayuda}`}
@@ -1164,6 +1237,22 @@ export function CarrilDelLienzo({
             <span className={`${CARRIL_DEL_LIENZO}-glifo`} aria-hidden="true">
               {c.glifo}
             </span>
+            {/*
+              EL RENGLÓN DE ABAJO, cuando lo hay. Va DESPUÉS del glifo en el marcado porque el
+              cuadrado ancho es una columna y el orden del marcado es el orden de arriba abajo:
+              el verbo primero y de qué va después, que es como se lee «Hi / Mayor».
+
+              Y SIN COLOR PROPIO EN LA HOJA, que es la mitad que no se ve: un `color` puesto en
+              este `<span>` gana SIEMPRE a la clase que apaga —que va en el `<button>` y llega
+              aquí sólo por herencia—, y un cuadrado quieto saldría con el verbo tenue y el
+              rótulo encendido. Eso no es apagado a medias: es la señal de «esto no se puede
+              pulsar» rota justo en el renglón que se acaba de añadir para que se lea.
+            */}
+            {conRotulo ? (
+              <span className={`${CARRIL_DEL_LIENZO}-rotulo`} aria-hidden="true">
+                {c.rotulo}
+              </span>
+            ) : null}
           </button>
         );
       })}
