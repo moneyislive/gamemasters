@@ -724,6 +724,18 @@ function reprochesDeLaHoja(
   if (!enMiApuro) for (const o of enAhora) if ([ALZAR, VENDER, EMPENAR, DESEMPENAR].indexOf(o.tipo) >= 0) r.push(`«Ahora» lleva una obra fuera del apuro: ${o.id}`);
   const deLaCompra = opciones.filter((o) => o.declaracion !== true && (o.tipo === COMPRAR || o.tipo === A_ALMONEDA));
   for (const o of deLaCompra) if (!enAhora.some((x) => x === o)) r.push(`la compra no está a la vista: ${o.id} sólo tiene la casilla del anillo`);
+  /*
+   * «AHORA» NO REPITE EL AVISO. Los dos se leen a la vez en la misma pantalla —el aviso en la
+   * cinta, «Ahora» dentro del cajón o en el carril— y decían la misma frase letra por letra:
+   * «Te toca tirar.», «Puedes obrar, tratar o pasar el turno.». El aviso dice QUÉ SE PUEDE HACER
+   * y esta sección DÓNDE ESTOY y CON QUÉ CUENTO; si vuelven a coincidir, esto lo dice.
+   */
+  const elAviso = vista.aviso;
+  if (elAviso.length > 0) {
+    for (const l of h.secciones.find((s) => s.id === 'ahora')?.lineas ?? []) {
+      if (l === elAviso) r.push(`«Ahora» repite el aviso palabra por palabra: «${l.slice(0, 60)}»`);
+    }
+  }
   if (deLaCompra.length > 0 && !deLaCompra.every((o) => { const k = enAhora.indexOf(o); return k >= 0 && k < deLaCompra.length; })) r.push('la compra no va en cabeza de «Ahora»');
   /* La subasta y los tratos de la hoja son los de las funciones sueltas. */
   const puja = pujaEnTres(vista, quien, opciones);
@@ -2253,6 +2265,21 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
         conElDeAntes.some((x) => x.indexOf('la compra no está a la vista') >= 0),
         conElDeAntes.slice(0, 3),
       );
+      /*
+       * Y LA VACUNA DEL AVISO REPETIDO, sobre la misma mirada de verdad: una hoja cuya sección
+       * «Ahora» diga exactamente el aviso —que es como estaba antes del 16-sep-2026— tiene que
+       * verse caer. La mirada trae aviso porque es la de la compra: sin él, esto no probaría nada.
+       */
+      const conElAvisoRepetido = {
+        ...m.hoja,
+        secciones: m.hoja.secciones.map((s) => (s.id === 'ahora' ? { ...s, lineas: [m.vista.aviso] } : s)),
+      };
+      const reprochesDelEco = reprochesDeLaHoja(m.vista, m.quien, m.opciones, conElAvisoRepetido, m.secretos, m.carril);
+      comprobar(
+        'VACUNA: una sección «Ahora» que diga exactamente el aviso se ve caer',
+        m.vista.aviso.length > 0 && reprochesDelEco.some((x) => x.indexOf('repite el aviso') >= 0),
+        { aviso: m.vista.aviso.slice(0, 60), reproches: reprochesDelEco.slice(0, 3) },
+      );
     }
   }
 
@@ -2502,15 +2529,34 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
   });
   const renglonesDelApuro = lineasDe(conDeudas, 'ahora');
   comprobar(
-    'cada deuda del apuro se lee sola y con la contracción hecha: era «200 € a el Ayuntamiento», y es el renglón que se lee mientras corre la cuenta atrás',
-    renglonesDelApuro.some((l) => l === `Le debes ${maravedies(200)} al Ayuntamiento.`) && renglonesDelApuro.every((l) => l.indexOf('a el Ayuntamiento') < 0),
+    'cada deuda del apuro se lee sola, con la contracción hecha y DICIENDO DE QUÉ ES: era «200 € a el Ayuntamiento», y es el renglón que se lee mientras corre la cuenta atrás',
+    renglonesDelApuro.some((l) => l === `Le debes ${maravedies(200)} del Impuesto al Ayuntamiento.`) && renglonesDelApuro.every((l) => l.indexOf('a el Ayuntamiento') < 0),
     renglonesDelApuro,
   );
   comprobar(
-    'y la que se le debe a alguien lo nombra, con el nombre de la vista',
-    renglonesDelApuro.some((l) => l === `Le debes ${maravedies(100)} a ${comoSeLlamaElOtro}.`),
+    'y la que se le debe a alguien lo nombra, con el nombre de la vista y con su motivo',
+    renglonesDelApuro.some((l) => l === `Le debes ${maravedies(100)} de renta a ${comoSeLlamaElOtro}.`),
     renglonesDelApuro,
   );
+  /*
+   * EL MOTIVO SALE DE LA TABLA DE `burgo.ts` (`porqueEnPalabras`), no de una segunda escrita aquí:
+   * un motivo que este cliente no conozca devuelve cadena vacía y la frase se queda como estaba,
+   * sin un hueco en medio. Se prueba con un motivo inventado, que es lo que mandaría un servidor
+   * más nuevo que el binario.
+   */
+  {
+    const conMotivoRaro = enPieYJugando({
+      paso: 'apuro',
+      turnoDe: quien,
+      apuro: { quien, debe: 50, enCola: 0, deudas: [{ a: null, cuanto: 50, porque: 'lo-que-sea' }] },
+    });
+    const renglones = lineasDe(conMotivoRaro, 'ahora');
+    comprobar(
+      'con un motivo que este cliente no conoce, la deuda se lee igual y sin huecos',
+      renglones.some((l) => l === `Le debes ${maravedies(50)} al Ayuntamiento.`) && renglones.every((l) => l.indexOf('  ') < 0),
+      renglones,
+    );
+  }
 
   /* 7. «Lo mío» no repite «Tuyo» en cada renglón. */
   const conMisTitulos = enPieYJugando({
@@ -2818,10 +2864,11 @@ try {
 
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
 /*
- * VA CON MARGEN Y NO AL RAS: hoy se hacen 317 —eran 293 antes del repaso del texto que se
- * repite, 274 antes de que el carril dejara de venir vacío, y 180 antes del carril, la caja
- * de los tratos, el cartel al pie, las dos fichas y la crónica—, y el guardia está veintiocho
- * por debajo: más que el bloque condicional más pequeño. Al ras hace lo contrario de lo que
+ * VA CON MARGEN Y NO AL RAS: hoy se hacen 334 —eran 317 antes de la tarjeta del final y de la
+ * regla del aviso repetido, 293 antes del repaso del texto que se repite, 274 antes de que el
+ * carril dejara de venir vacío, y 180 antes del carril, la caja de los tratos, el cartel al
+ * pie, las dos fichas y la crónica—, y el guardia está treinta y dos por debajo: más que el
+ * bloque condicional más pequeño. Al ras hace lo contrario de lo que
  * quiere: una comprobación que se cae de un `if` dispara el guardia antes que la roja, y con
  * el guardia delante nadie ve el nombre de lo que se rompió. Por eso las rojas se imprimen
  * ANTES de irse.

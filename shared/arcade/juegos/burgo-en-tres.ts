@@ -183,6 +183,7 @@ import {
   PAGAR_IMPUESTO,
   PASAR,
   PASAR_PUJA,
+  porqueEnPalabras,
   PROPONER,
   PUJAR,
   RECHAZAR,
@@ -192,7 +193,7 @@ import {
   USAR_INDULTO,
   VENDER,
 } from './burgo';
-import type { PasoDelTurno, SucesoDelBurgo } from './burgo';
+import type { PasoDelTurno, PorqueDelDinero, SucesoDelBurgo } from './burgo';
 import {
   BARRIOS,
   barrioDe,
@@ -2657,7 +2658,18 @@ function lineasDeAhora(vista: unknown, l: Lectura, yo: QuienMira): string[] {
     return lineas;
   }
   if (j.quebrado) {
-    lineas.push('Has quebrado: miras la partida desde fuera.');
+    /*
+     * QUEBRADO: AQUÍ TAMPOCO SE REPITE EL AVISO. Esta sección decía «Has quebrado: miras la
+     * partida desde fuera.», que es LETRA POR LETRA el aviso del juego (`avisoDe` en burgo.ts)
+     * pintado en la cinta justo encima: la misma frase dos veces en la misma pantalla. El aviso
+     * dice qué puedo hacer —ya nada—, y «Ahora» dice cómo va la partida que me quedo mirando.
+     * Lo cazó la regla general de `verify:burgo-en-tres`, no yo: este renglón no era ninguno de
+     * los tres que fui a arreglar, y por eso la regla es general y no tres parches.
+     */
+    const enPie = l.jugadores.filter((x) => !x.quebrado).length;
+    lineas.push(`Ya no juegas: siguen en pie ${enPie} ${plural(enPie, 'jugador', 'jugadores')}.`);
+    const espera = esperaA(vista);
+    if (espera.length > 0) lineas.push(espera);
     return lineas;
   }
   if (l.apuro !== null && l.apuro.quien === yo) {
@@ -2678,12 +2690,42 @@ function lineasDeAhora(vista: unknown, l: Lectura, yo: QuienMira): string[] {
      * corre la cuenta atrás del apuro, así que es el que menos puede costar una segunda
      * lectura.
      */
-    for (const d of l.apuro.deudas) lineas.push(`Le debes ${maravedies(d.cuanto)} ${aQuien(l, d.a)}.`);
+    /*
+     * Y DE QUÉ ES CADA DEUDA. «Le debes 350 € a Ana» no dice si es una renta, el Impuesto o el
+     * interés de una hipoteca, que es justo lo que se mira para decidir qué vender. La tabla es
+     * LA MISMA que usa la crónica (`porqueEnPalabras`, exportada de `burgo.ts`): escribirla aquí
+     * otra vez sería el segundo sitio donde se redacta lo mismo. Un motivo que este cliente no
+     * conozca devuelve cadena vacía, y entonces la frase se queda como estaba en vez de colar un
+     * hueco en medio.
+     */
+    for (const d of l.apuro.deudas) {
+      const porque = porqueEnPalabras(d.porque as PorqueDelDinero);
+      lineas.push(
+        porque.length === 0
+          ? `Le debes ${maravedies(d.cuanto)} ${aQuien(l, d.a)}.`
+          : `Le debes ${maravedies(d.cuanto)} ${porque} ${aQuien(l, d.a)}.`,
+      );
+    }
     return lineas;
   }
   if (l.turnoDe === yo) {
     if (l.paso === 'por-tirar') {
-      lineas.push(j.presa >= 0 ? `Estás en la Comisaría: intento ${j.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}.` : 'Te toca tirar.');
+      /*
+       * ═══ «AHORA» DICE DÓNDE ESTOY; LO QUE PUEDO HACER YA LO DICE EL AVISO ═══
+       *
+       * «Te toca tirar.» era, letra por letra, el aviso del juego que la cinta pinta encima, y
+       * lo mismo pasaba en `por-pasar` con «Puedes obrar, tratar o pasar el turno.»: dos muebles
+       * de la misma pantalla diciendo la misma frase. Lo que NO estaba en ninguna parte es en
+       * qué casilla estoy parado —el anillo tiene cuarenta y el peón se ve a lo lejos— y con qué
+       * cuento. Eso es lo que esta sección dice ahora, y el aviso sigue diciendo qué se puede
+       * hacer. Lo vigila `verify:burgo-en-tres`: ninguna línea de «Ahora» es el aviso.
+       */
+      const donde = filaDe(j.casilla);
+      lineas.push(
+        j.presa >= 0
+          ? `Estás en la Comisaría: intento ${j.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}.`
+          : `Estás en ${donde === null ? nombreDeCasilla(j.casilla) : donde.nombre}.`,
+      );
     } else if (l.paso === 'comprar') {
       /*
        * EL PASO `comprar` YA NO ES SÓLO COMPRAR. Desde que el Impuesto se paga a elegir
@@ -2704,7 +2746,10 @@ function lineasDeAhora(vista: unknown, l: Lectura, yo: QuienMira): string[] {
               : `Has caído en ${fila.nombre}: hay algo que decidir.`,
       );
     } else if (l.paso === 'por-pasar') {
-      lineas.push(l.dobles > 0 ? 'Dobles: vuelve a tirar.' : 'Puedes obrar, tratar o pasar el turno.');
+      /* Ídem: el aviso dice «Dobles: vuelve a tirar.» o «Puedes obrar, tratar o pasar el turno.»; aquí, dónde estoy y con qué cuento. */
+      const donde = filaDe(j.casilla);
+      lineas.push(`Estás en ${donde === null ? nombreDeCasilla(j.casilla) : donde.nombre}.`);
+      lineas.push(`Llevas ${maravedies(j.mrs)} y ${j.titulos.length} ${plural(j.titulos.length, 'título', 'títulos')}.`);
     } else if (l.paso === 'almoneda') {
       /* Las pujas NO suben nunca al carril (`esDelMomento` las deja fuera): están siempre en su sección, y se dice cuál con su nombre, como «El trato» y «Ahora» dicen el suyo. */
       lineas.push(`Te toca pujar: las pujas están en «${tituloDeSeccion('almoneda')}».`);

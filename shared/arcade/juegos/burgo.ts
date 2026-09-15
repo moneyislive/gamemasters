@@ -3026,8 +3026,16 @@ function nombreEnLaVista(v: VistaSinTablero, asiento: AsientoId | null): string 
   return j === null || j.nombre.length === 0 ? asiento : j.nombre;
 }
 
-/** Cómo se llama `porque` cuando se cuenta un pago. */
-function porqueEnPalabras(porque: PorqueDelDinero): string {
+/**
+ * Cómo se llama `porque` cuando se cuenta un pago.
+ *
+ * SE EXPORTA, y es la razón por la que no hay una segunda tabla: la traducción a pantalla
+ * (`burgo-en-tres.ts`) enseña las deudas del apuro y sin esto decía «Le debes 350 € a Ana» —el
+ * renglón que se lee mientras corre la cuenta atrás, y el que menos puede costar una segunda
+ * lectura—. Escribir allí «de renta», «del Impuesto», «de interés de la hipoteca» otra vez sería
+ * el segundo sitio donde se redacta lo mismo, que es como empiezan a decir cosas distintas.
+ */
+export function porqueEnPalabras(porque: PorqueDelDinero): string {
   switch (porque) {
     case 'renta':
       return 'de renta';
