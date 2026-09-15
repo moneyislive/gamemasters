@@ -4130,6 +4130,63 @@ code {
 }
 
 /*
+ * --- La tarjeta del final -------------------------------------------------
+ *
+ * Sale sola al acabar la partida, encima del anillo y con el velo de las cajas del lienzo. La
+ * frase va en cuerpo grande porque es LO ÚNICO que hay que leer; los puestos son fichas como
+ * las del marcador —mota de color, línea— y quien quebró se lee tachado y en tenue, la misma
+ * gramática que su fila del marcador. El mío lleva el filo del acento, que es como esta casa
+ * marca «éste eres tú» en todas partes.
+ */
+/*
+ * La caja: no más ancha que lo que se lee de un vistazo. `CajaEnElLienzo` no decide su tamaño
+ * —cuánto se lleva depende del reparto de cada pantalla—, así que el ancho lo pone quien la
+ * monta, y aquí lo que hay dentro son seis renglones cortos.
+ */
+.burgo-final {
+  max-width: 26rem;
+}
+
+.burgo-final-frase {
+  margin: 0.25rem 0 0.5rem;
+  color: var(--palabra);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.burgo-final-puestos {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.burgo-final-puesto {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
+  background: var(--teja-alta);
+}
+
+.burgo-final-puesto[aria-current] {
+  border-color: var(--acento);
+}
+
+.burgo-final-quebrado {
+  color: var(--tenue);
+  text-decoration: line-through;
+}
+
+/* Un enlace con forma de opción: el subrayado del navegador sobraría dentro del botón. */
+.burgo-final-salir {
+  text-decoration: none;
+}
+
+/*
  * SÓLO para tecnologías de apoyo: fuera de la vista y del flujo, pero EN EL ÁRBOL y —si es un
  * mando— enfocable. Nunca `display: none` ni `visibility: hidden`: los lectores los saltan.
  *

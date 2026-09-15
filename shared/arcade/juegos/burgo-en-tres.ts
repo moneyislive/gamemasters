@@ -1462,6 +1462,139 @@ export function marcadorEnTres(vista: unknown, yo: QuienMira): MarcadorDelBurgo 
 }
 
 // ---------------------------------------------------------------------------
+// EL FINAL DE LA PARTIDA
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ LA PARTIDA TERMINABA Y LA PANTALLA NO LO DECÍA ═══
+ *
+ * Jugando una mesa entera el 16-sep-2026: al quedar uno en pie, el escritorio se quedaba en la
+ * vista del anillo con la cinta diciendo «Se acabó: Ana se queda con el Burgo…» recortada a dos
+ * palabras, y la clasificación —quién quedó segundo, con cuánto patrimonio, quién quebró—
+ * detrás del «≡» del cajón. Esto compone la tarjeta del final UNA vez para los dos clientes:
+ * la frase, por qué acabó, lo que me toca a mí y los puestos. Los clientes la pintan; aquí no
+ * se pinta nada, y allí no se ordena ni se cuenta nada.
+ */
+
+/** Un puesto de la clasificación final. */
+export interface PuestoDelFinal {
+  /** 1, 2, 3…, con los empates compartiendo número (1, 1, 3); `null` para quien quebró. */
+  readonly puesto: number | null;
+  readonly asiento: AsientoId;
+  readonly nombre: string;
+  readonly color: string;
+  readonly patrimonio: number;
+  readonly mrs: number;
+  readonly titulos: number;
+  readonly quebrado: boolean;
+  readonly gana: boolean;
+  readonly soyYo: boolean;
+  /** «1.º · Ana · 2.340 € de patrimonio · 12 títulos», o «Bea · quebró». */
+  readonly linea: string;
+}
+
+export interface FinalDelBurgo {
+  /** «Se acabó». */
+  readonly titulo: string;
+  /** «Ana se queda con el Burgo.», «Ana y Bea comparten el Burgo.» o «Nadie se queda con el Burgo.» */
+  readonly frase: string;
+  /** Por qué acabó, en una frase: el último en pie, o el tope de vueltas. */
+  readonly porque: string;
+  /** Lo que me toca: «Te quedas con el Burgo.», «Quedas 2.º de 4.», «Quebraste…»; `''` para quien mira sin asiento. */
+  readonly paraMi: string;
+  /** Quien gana primero, luego los vivos por patrimonio, y quien quebró al final en orden de asiento. */
+  readonly puestos: readonly PuestoDelFinal[];
+}
+
+/** «Ana», «Ana y Bea», «Ana, Bea y Carla». */
+function listaDeNombres(nombres: readonly string[]): string {
+  if (nombres.length <= 1) return nombres.length === 0 ? '' : (nombres[0] as string);
+  return `${nombres.slice(0, nombres.length - 1).join(', ')} y ${nombres[nombres.length - 1] as string}`;
+}
+
+/** LA TARJETA DEL FINAL, o `null` mientras la partida no ha terminado. */
+export function finalEnTres(vista: unknown, yo: QuienMira): FinalDelBurgo | null {
+  const l = leer(vista);
+  if (l === null || l.momento !== 'terminada') return null;
+  const gana = (a: AsientoId): boolean => l.ganadores.indexOf(a) >= 0;
+  const conOrden = l.jugadores.map((j, k) => ({ j, k }));
+  /* Quien gana delante; entre iguales, más patrimonio delante; y a igualdad, el orden de asiento, que no cambia entre sondeos. */
+  const delante = (x: { j: JugadorQueSePinta; k: number }, y: { j: JugadorQueSePinta; k: number }): number => {
+    if (gana(x.j.asiento) !== gana(y.j.asiento)) return gana(x.j.asiento) ? -1 : 1;
+    if (x.j.patrimonio !== y.j.patrimonio) return y.j.patrimonio - x.j.patrimonio;
+    return x.k - y.k;
+  };
+  const vivos = conOrden.filter((x) => !x.j.quebrado).sort(delante);
+  const quebrados = conOrden.filter((x) => x.j.quebrado);
+  const puestos: PuestoDelFinal[] = [];
+  for (const x of vivos) {
+    /* El puesto es cuántos van por delante más uno: dos empatados son 1.º y 1.º, y el siguiente 3.º. */
+    let porDelante = 0;
+    for (const y of vivos) {
+      const antes = gana(y.j.asiento) !== gana(x.j.asiento) ? gana(y.j.asiento) : y.j.patrimonio > x.j.patrimonio;
+      if (antes) porDelante++;
+    }
+    const puesto = porDelante + 1;
+    puestos.push({
+      puesto,
+      asiento: x.j.asiento,
+      nombre: x.j.nombre,
+      color: x.j.color,
+      patrimonio: x.j.patrimonio,
+      mrs: x.j.mrs,
+      titulos: x.j.titulos.length,
+      quebrado: false,
+      gana: gana(x.j.asiento),
+      soyYo: yo !== null && x.j.asiento === yo,
+      linea: `${puesto}.º · ${x.j.nombre} · ${maravedies(x.j.patrimonio)} de patrimonio · ${x.j.titulos.length} ${plural(x.j.titulos.length, 'título', 'títulos')}`,
+    });
+  }
+  for (const x of quebrados) {
+    puestos.push({
+      puesto: null,
+      asiento: x.j.asiento,
+      nombre: x.j.nombre,
+      color: x.j.color,
+      patrimonio: x.j.patrimonio,
+      mrs: x.j.mrs,
+      titulos: x.j.titulos.length,
+      quebrado: true,
+      gana: false,
+      soyYo: yo !== null && x.j.asiento === yo,
+      linea: `${x.j.nombre} · quebró`,
+    });
+  }
+  const ganadores: string[] = [];
+  for (const p of puestos) if (p.gana) ganadores.push(p.nombre);
+  const frase =
+    ganadores.length === 0
+      ? 'Nadie se queda con el Burgo.'
+      : ganadores.length === 1
+        ? `${ganadores[0] as string} se queda con el Burgo.`
+        : `${listaDeNombres(ganadores)} comparten el Burgo.`;
+  /* Por qué acabó lo dice el suceso `fin`, que la crónica conserva siempre (el tope de sucesos respeta el final). */
+  let porqueFin: 'ultimo-en-pie' | 'tope-de-vueltas' | null = null;
+  for (const s of l.sucesos) if (s.que === 'fin') porqueFin = s.porque;
+  const porque =
+    porqueFin === 'tope-de-vueltas'
+      ? `Se llegó al tope de ${l.topeDeVueltas} ${plural(l.topeDeVueltas, 'vuelta', 'vueltas')}: gana el mayor patrimonio.`
+      : 'Quedó uno en pie: los demás quebraron.';
+  let mio: PuestoDelFinal | null = null;
+  for (const p of puestos) if (p.soyYo) mio = p;
+  const paraMi =
+    mio === null
+      ? ''
+      : mio.gana
+        ? ganadores.length === 1
+          ? 'Te quedas con el Burgo.'
+          : 'Compartes el Burgo.'
+        : mio.quebrado
+          ? 'Quebraste: la partida siguió sin ti.'
+          : `Quedas ${mio.puesto === null ? 0 : mio.puesto}.º de ${puestos.length}.`;
+  return { titulo: 'Se acabó', frase, porque, paraMi, puestos };
+}
+
+// ---------------------------------------------------------------------------
 // LA PUJA: las fijas, pasar, y la libre por la puerta
 // ---------------------------------------------------------------------------
 

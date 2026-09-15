@@ -138,6 +138,7 @@ import {
   fichaDeCasilla,
   fichaDeJugador,
   figurasEnTres,
+  finalEnTres,
   firmaDelTablero,
   glifosDelCarrilDelBurgo,
   hojaEnTres,
@@ -168,7 +169,9 @@ import type {
   CartelDeCasilla,
   FichaDeCasilla,
   FichaDeJugador,
+  FinalDelBurgo,
   GlifoDelCarrilDelBurgo,
+  PuestoDelFinal,
   HojaDelBurgo,
   OpcionQueLlega,
   PregonDelBurgo,
@@ -471,6 +474,66 @@ function reprochesDeLaParticion(opciones: readonly Opcion[], p: Particion): stri
     if (!opciones.some((o) => o === x.o)) r.push(`se pintó una opción montada, no la del juego: ${x.firma.slice(0, 80)}`);
     if (x.o.declaracion === true) r.push(`se pintó una puerta: ${x.o.id}`);
   }
+  return r;
+}
+
+/**
+ * LA TARJETA DEL FINAL, contra la vista. Todos una vez; quien gana delante y en el puesto 1; los
+ * vivos por patrimonio de mayor a menor; quien quebró al final y sin puesto; cada línea dice su
+ * puesto y su patrimonio; la frase nombra a quien se queda con el Burgo; «para mí» vacío para
+ * quien mira sin asiento. Y con la partida sin terminar, NO hay tarjeta.
+ */
+function reprochesDelFinal(vista: VistaDelBurgo, quien: QuienMira, f: FinalDelBurgo | null): string[] {
+  const r: string[] = [];
+  if (vista.momento !== 'terminada') {
+    if (f !== null) r.push('hay tarjeta del final con la partida sin terminar');
+    return r;
+  }
+  if (f === null) return ['la partida terminó y no hay tarjeta del final'];
+  if (f.titulo !== 'Se acabó') r.push(`el final se titula «${f.titulo}»`);
+  if (f.porque.length === 0) r.push('el final no dice por qué acabó');
+  if (f.puestos.length !== vista.jugadores.length) r.push(`el final trae ${f.puestos.length} puestos para ${vista.jugadores.length} jugadores`);
+  if (new Set(f.puestos.map((p) => p.asiento)).size !== f.puestos.length) r.push('un jugador sale dos veces en el final');
+  for (const j of vista.jugadores) {
+    const p = f.puestos.find((x) => x.asiento === j.asiento);
+    if (p === undefined) {
+      r.push(`${j.asiento} no está en el final`);
+      continue;
+    }
+    if (p.patrimonio !== j.patrimonio || p.mrs !== j.mrs || p.titulos !== j.titulos.length || p.quebrado !== j.quebrado || p.color !== j.color) {
+      r.push(`el final miente sobre ${j.asiento}`);
+    }
+    if (p.gana !== (vista.ganadores.indexOf(j.asiento) >= 0)) r.push(`el final dice mal si gana ${j.asiento}`);
+    if (p.soyYo !== (quien !== null && j.asiento === quien)) r.push(`el final marca mal quién soy en ${j.asiento}`);
+    if (p.quebrado && (p.puesto !== null || p.linea.indexOf('quebró') < 0)) r.push(`${j.asiento} quebró y el final le da puesto o no lo dice`);
+    if (!p.quebrado && (p.puesto === null || p.linea.indexOf(`${p.puesto}.º`) !== 0 || p.linea.indexOf(maravedies(p.patrimonio)) < 0)) {
+      r.push(`la línea de ${j.asiento} no empieza por su puesto o no dice su patrimonio`);
+    }
+    if (p.gana && p.puesto !== 1) r.push(`${j.asiento} gana y no va en el puesto 1`);
+  }
+  let hayQuebradoDelante = false;
+  let hayPerdedorDelante = false;
+  let patrimonioAnterior = Number.MAX_SAFE_INTEGER;
+  for (const p of f.puestos) {
+    if (p.quebrado) {
+      hayQuebradoDelante = true;
+      continue;
+    }
+    if (hayQuebradoDelante) r.push(`${p.asiento} sigue vivo y va detrás de quien quebró`);
+    if (p.gana && hayPerdedorDelante) r.push(`${p.asiento} gana y va detrás de quien no gana`);
+    if (!p.gana) {
+      if (p.patrimonio > patrimonioAnterior) r.push(`los puestos no van por patrimonio en ${p.asiento}`);
+      hayPerdedorDelante = true;
+      patrimonioAnterior = p.patrimonio;
+    }
+  }
+  const ganadores: PuestoDelFinal[] = f.puestos.filter((p) => p.gana);
+  if (ganadores.length === 1 && f.frase !== `${(ganadores[0] as PuestoDelFinal).nombre} se queda con el Burgo.`) {
+    r.push(`la frase del final no nombra al ganador: «${f.frase}»`);
+  }
+  const mio = f.puestos.find((p) => p.soyYo);
+  if (mio === undefined && f.paraMi !== '') r.push('quien mira sin asiento recibe una frase «para mí»');
+  if (mio !== undefined && mio.gana && ganadores.length === 1 && f.paraMi !== 'Te quedas con el Burgo.') r.push(`al que gana le dice «${f.paraMi}»`);
   return r;
 }
 
@@ -983,6 +1046,8 @@ interface Cuentas {
    * jugaba igual, así que sin un mínimo aquí devolverla a la casilla pasaría en verde.
    */
   comprasALaVista: number;
+  /** Cuántas miradas tuvieron la tarjeta del final puesta: sin una sola, sus juicios no miran nada. */
+  finales: number;
   /**
    * EL CARRIL, MEDIDO. `carrilesConCuadrados` es cuántas vistas tuvieron al menos un cuadrado
    * que pulsar; los otros dos son para leer de un vistazo si el mueble se está usando de
@@ -1016,6 +1081,7 @@ function cuentasNuevas(): Cuentas {
     cajasDeTratos: 0,
     gemelosDeApoyo: 0,
     comprasALaVista: 0,
+    finales: 0,
     carrilesConCuadrados: 0,
     cuadradosDelCarril: 0,
     carrilMasLargo: 0,
@@ -1045,6 +1111,14 @@ interface MomentoDeLaCompra {
   carril: readonly GlifoDelCarrilDelBurgo<Opcion>[];
 }
 let momentoDeLaCompra: MomentoDeLaCompra | null = null;
+
+/** La primera mirada con la partida terminada: sobre ella se montan las vacunas de la tarjeta del final. */
+interface MomentoDelFinal {
+  vista: VistaDelBurgo;
+  quien: QuienMira;
+  final: FinalDelBurgo;
+}
+let momentoDelFinal: MomentoDelFinal | null = null;
 
 function revisarLaMesa(mesa: Mesa, c: Cuentas, anteriores: Map<string, VistaDelBurgo[]>): void {
   const secretos = seriesSecretas(mesa);
@@ -1086,6 +1160,12 @@ function revisarLaMesa(mesa: Mesa, c: Cuentas, anteriores: Map<string, VistaDelB
     if (carril !== null && carril.some((g) => g.opcion.tipo === COMPRAR)) {
       c.comprasALaVista++;
       if (momentoDeLaCompra === null) momentoDeLaCompra = { vista, quien, opciones, hoja, secretos, carril };
+    }
+    const laTarjetaDelFinal = finalEnTres(vista, quien);
+    anota(c, donde, reprochesDelFinal(vista, quien, laTarjetaDelFinal));
+    if (laTarjetaDelFinal !== null) {
+      c.finales++;
+      if (momentoDelFinal === null) momentoDelFinal = { vista, quien, final: laTarjetaDelFinal };
     }
     /*
      * CUÁNTAS VISTAS TUVIERON ALGO QUE PINTAR EN EL CARRIL. Este contador es lo que compra
@@ -1340,6 +1420,7 @@ for (const p of PARTIDAS) {
    */
   comprobar(`${p.id}: comprar salió a la vista en el carril en muchas miradas`, cuentas.comprasALaVista >= 5, cuentas.comprasALaVista);
   comprobar(`${p.id}: y con la hoja y el carril compuestos ninguna obra pidió gemelo de sólo apoyo`, cuentas.gemelosDeApoyo === 0, cuentas.gemelosDeApoyo);
+  comprobar(`${p.id}: la partida acabó, y sus miradas del final traen la tarjeta con la clasificación`, cuentas.finales >= 1, cuentas.finales);
   /*
    * ═══ EL CARRIL SE LLENÓ, Y ÉSTA ES LA CUENTA QUE COMPRA QUE NO VUELVA EL FALLO ═══
    *
@@ -2175,6 +2256,30 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
     }
   }
 
+  /* ── LA TARJETA DEL FINAL (16-sep-2026) ── */
+  {
+    /* La aserción, por lo mismo que arriba: TypeScript sólo la ve asignada dentro de `revisarLaMesa`. */
+    const mf = momentoDelFinal as MomentoDelFinal | null;
+    comprobar('las partidas llegaron al final con su tarjeta, o las vacunas de abajo no probarían nada', mf !== null);
+    if (mf !== null) {
+      const alReves = { ...mf.final, puestos: [...mf.final.puestos].reverse() };
+      const conElOrdenRoto = reprochesDelFinal(mf.vista, mf.quien, alReves);
+      comprobar('VACUNA del final: con los puestos al revés —quien quebró delante— se ve caer', conElOrdenRoto.length > 0, conElOrdenRoto.slice(0, 3));
+      comprobar('VACUNA del final: la partida terminada SIN tarjeta se ve caer', reprochesDelFinal(mf.vista, mf.quien, null).length > 0);
+    }
+    /*
+     * Y CON LA PARTIDA EN MARCHA, NINGUNA TARJETA. Se pregunta sobre una mirada de verdad de
+     * media partida —la del momento de la compra— y no sobre la vista de este bloque, que viene
+     * de la última mesa jugada y está TERMINADA: preguntárselo a ella era pedir lo contrario.
+     */
+    const enMarcha = momentoDeLaCompra as MomentoDeLaCompra | null;
+    comprobar(
+      'y con la partida en marcha no hay tarjeta del final que pintar',
+      enMarcha !== null && enMarcha.vista.momento !== 'terminada' && finalEnTres(enMarcha.vista, enMarcha.quien) === null,
+      enMarcha === null ? 'sin mirada de compra' : enMarcha.vista.momento,
+    );
+  }
+
   /* ── EL TEXTO QUE SE REPITE, Y EL QUE NO SE LEE SOLO ── */
   /*
    * ═══ POR QUÉ HAY UN BLOQUE ENTERO PARA MIRAR FRASES ═══
@@ -2721,7 +2826,7 @@ try {
  * el guardia delante nadie ve el nombre de lo que se rompió. Por eso las rojas se imprimen
  * ANTES de irse.
  */
-const MINIMO = 295;
+const MINIMO = 302;
 if (hechas < MINIMO) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);

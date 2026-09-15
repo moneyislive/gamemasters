@@ -160,6 +160,7 @@ import {
   dadosEnTres,
   esVistaQueSePinta,
   fichaDeCasilla,
+  finalEnTres,
   firmaDelTablero,
   hojaEnTres,
   laCronicaConLaVista,
@@ -208,6 +209,7 @@ import {
   ElCajonDeLaHoja,
   ElCarrilDeLaMesa,
   ElCartelDeLaCasilla,
+  ElFinalDelBurgo,
   LaCajaDeLosTratos,
   LaCintaDelBurgo,
   LaFichaDeUnaCasilla,
@@ -554,6 +556,12 @@ function LaMesaEnTres({
   const [queHacesAqui, ponerQueHacesAqui] = useState<QueHacesAqui | null>(null);
   const [laCasilla, ponerLaCasilla] = useState<number | null>(null);
   const [elJugador, ponerElJugador] = useState<string | null>(null);
+  /*
+   * La tarjeta del final sale sola al acabar la partida y se deja ir con «Dejarlo», para mirar
+   * la ciudad; lo que dice sigue en el marcador del cajón. Es un estado y no una vista más
+   * porque lo que hay que recordar es que ya se leyó.
+   */
+  const [finalDejado, ponerFinalDejado] = useState(false);
   const soltarTodo = useCallback(() => {
     ponerQueHacesAqui(null);
     ponerLaCasilla(null);
@@ -1063,7 +1071,8 @@ function LaMesaEnTres({
   const laFicha = laCasilla === null ? null : fichaDeCasilla(laVista, laCasilla, yo, opciones);
   const elDelJugador = elJugador === null ? null : buscarJugador(hoja, elJugador);
   const suDestino = elJugador === null ? null : destinoDelTrato(hoja, elJugador);
-  const hayHojaAbierta = queHacesAqui !== null || laFicha !== null || elDelJugador !== null;
+  const elFinal = finalDejado ? null : finalEnTres(laVista, yo);
+  const hayHojaAbierta = queHacesAqui !== null || laFicha !== null || elDelJugador !== null || elFinal !== null;
 
   /*
    * ═══ HAY UNA CAJA MODAL DELANTE: EL CAJÓN O UNA DE LAS TRES HOJAS ═══
@@ -1247,6 +1256,12 @@ function LaMesaEnTres({
                   }
             }
           />
+        </LaHojaSobreElLienzo>
+      )}
+
+      {elFinal === null ? null : (
+        <LaHojaSobreElLienzo titulo={elFinal.titulo} alDejarlo={() => ponerFinalDejado(true)}>
+          <ElFinalDelBurgo final={elFinal} />
         </LaHojaSobreElLienzo>
       )}
     </>

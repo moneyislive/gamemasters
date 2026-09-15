@@ -2018,16 +2018,17 @@ paso(
    * suelta por ahí— y que ese bloque no contiene ni el detector ni el lienzo.
    */
   reglaDelFuente(
-    'las tres hojas del Burgo se escriben en `lasHojas` y ahí dentro no hay ni gesto ni lienzo',
+    'las cuatro hojas del Burgo se escriben en `lasHojas` y ahí dentro no hay ni gesto ni lienzo',
     (t) => {
       const c = soloCodigo(t);
       const bloque = bloqueDe(t, CABECERA_DE_LAS_HOJAS);
       const todas = (c.match(/<LaHojaSobreElLienzo/g) ?? []).length;
       const dentro = (bloque.match(/<LaHojaSobreElLienzo/g) ?? []).length;
+      /* Cuatro desde el 16-sep-2026: las tres de siempre y la tarjeta del final de la partida. */
       return (
         bloque.length > 0 &&
-        todas === 3 &&
-        dentro === 3 &&
+        todas === 4 &&
+        dentro === 4 &&
         !/GestureDetector/.test(bloque) &&
         !/<Canvas/.test(bloque)
       );
@@ -2451,7 +2452,8 @@ paso(
     (t) => {
       const c = soloCodigo(t);
       return (
-        /const hayHojaAbierta = queHacesAqui !== null \|\| laFicha !== null \|\| elDelJugador !== null;/.test(c) &&
+        /const hayHojaAbierta = queHacesAqui !== null \|\| laFicha !== null \|\| elDelJugador !== null \|\| elFinal !== null;/.test(c) &&
+        /const elFinal = finalDejado \? null : finalEnTres\(laVista, yo\);/.test(c) &&
         /const hayCajaModal = cajonAbierto \|\| hayHojaAbierta;/.test(c) &&
         /* `\b` a propósito: `elDelJugador` LLEVA DENTRO `elJugador`, y sin el filo esto se pone rojo con el fichero bueno. */
         !/hayHojaAbierta = [^\n]*\belJugador !== null/.test(c)

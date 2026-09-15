@@ -199,6 +199,7 @@ import {
   esperaA,
   fichaDeCasilla,
   fichaDeJugador,
+  finalEnTres,
   firmaDelTablero,
   glifosDelCarrilDelBurgo,
   hojaEnTres,
@@ -826,6 +827,23 @@ export function BurgoEnTres({
   const memoriaDelCartel = useRef<LaMemoriaDelCartel>(EL_CARTEL_EN_BLANCO);
 
   const elRecuadro = useRef<HTMLDivElement | null>(null);
+
+  /*
+   * ═══ EL FINAL, DICHO Y NO ADIVINADO ═══
+   *
+   * Al terminar la partida, esta pantalla se quedaba en la vista del anillo con la cinta
+   * diciendo «Se acabó: …» —dos palabras en el lienzo más estrecho— y la clasificación detrás
+   * del «≡». Ahora sale sola la tarjeta del final, con quién se queda con el Burgo, por qué
+   * acabó, lo que me toca y los puestos; «Ver el tablero» la deja ir, y lo mismo sigue en el
+   * marcador del cajón. NO se abre si hay otra caja encima: dos trampas de foco a la vez se
+   * cerrarían las dos con un solo `Escape`. Lo redacta `finalEnTres`; aquí no se ordena nada.
+   */
+  const elFinal = useMemo(() => finalEnTres(vista, yo), [vista, yo]);
+  const [finalDejado, ponerFinalDejado] = useState(false);
+  const dejarElFinal = useCallback(() => {
+    ponerFinalDejado(true);
+    elRecuadro.current?.focus();
+  }, []);
   const laFichaDeLaCinta = useRef<HTMLButtonElement | null>(null);
 
   const senalar = useCallback((casilla: number | null) => {
@@ -1903,6 +1921,51 @@ export function BurgoEnTres({
                   </span>
                 </button>
               </li>
+            </ul>
+          </CajaEnElLienzo>
+        )}
+
+        {/*
+          LA TARJETA DEL FINAL. Sale sola al acabar la partida y se va con «Ver el tablero»;
+          no se pinta si hay otra caja encima (dos trampas de foco a la vez se cerrarían las
+          dos con un `Escape`) ni cuando ya se dejó ir. Lo que dice lo redacta `finalEnTres`:
+          aquí no se ordena, no se cuenta y no se conjuga nada.
+        */}
+        {elFinal === null || finalDejado || abierto !== null ? null : (
+          <CajaEnElLienzo nombre={elFinal.titulo} clase="burgo-final" alCerrar={dejarElFinal}>
+            <h2 className="rotulo-de-panel">{elFinal.titulo}</h2>
+            <p className="burgo-final-frase">{elFinal.frase}</p>
+            {elFinal.paraMi.length === 0 ? null : <p className="letra-chica">{elFinal.paraMi}</p>}
+            <ol className="burgo-final-puestos">
+              {elFinal.puestos.map((p) => (
+                <li
+                  key={p.asiento}
+                  className={p.quebrado ? 'burgo-final-puesto burgo-final-quebrado' : 'burgo-final-puesto'}
+                  aria-current={p.soyYo ? 'true' : undefined}
+                >
+                  <span className="mota-de-color" style={{ background: p.color }} aria-hidden="true" />
+                  <span>{p.linea}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="letra-chica">{elFinal.porque}</p>
+            <ul className="opciones">
+              <li>
+                <button type="button" className="opcion opcion-secundaria" onClick={dejarElFinal}>
+                  <span className="opcion-texto">
+                    <span className="opcion-rotulo">Ver el tablero</span>
+                  </span>
+                </button>
+              </li>
+              {laSalida === undefined ? null : (
+                <li>
+                  <a className="opcion burgo-final-salir" href={laSalida}>
+                    <span className="opcion-texto">
+                      <span className="opcion-rotulo">{SALIR_DE_LA_MESA}</span>
+                    </span>
+                  </a>
+                </li>
+              )}
             </ul>
           </CajaEnElLienzo>
         )}

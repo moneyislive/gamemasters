@@ -650,6 +650,13 @@ campo contra el anterior: registro, estado inicial, estado final, secreto y las 
 estado son idénticos; en las vistas finales sólo cambian `pregon` y `tablero.aviso`, y sólo en
 «a el» → «al» y en la frase de «Se acabó» repetida.
 
-**Lo que queda de esta partida, sin hacer todavía:** al terminar no hay tarjeta de final —quién
-gana, la clasificación por patrimonio, volver a la Sala—: sólo la cinta sobre la vista cenital, y
-todo lo demás detrás del cajón.
+**Y LA SEXTA, que se vio en la misma partida y se cerró después:** al quedar uno en pie, las dos
+pantallas se quedaban en la vista del anillo con la cinta recortada y nada más; la clasificación,
+el patrimonio y quién había quebrado vivían detrás del «≡». Ahora la compone `finalEnTres` en la
+traducción —título, frase de quien se queda con el Burgo, por qué acabó, lo que me toca, y los
+puestos: el ganador primero y en el puesto 1, los vivos por patrimonio, quien quebró al final sin
+puesto— y la pintan los dos clientes: el escritorio como caja sobre el lienzo, con «Ver el
+tablero» y la salida a la Sala, y la app como una cuarta hoja que entra en la trampa de foco.
+La juzgan `verify:burgo-en-tres` (en cada mirada de las tres partidas enteras, con dos vacunas),
+`verify:escritorio` (pintada en el momento «fin» del banco, y ausente en «mi turno») y
+`verify:sala` (cuatro hojas y `elFinal` dentro de `hayHojaAbierta`).

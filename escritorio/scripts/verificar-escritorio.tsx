@@ -202,6 +202,7 @@ import {
   carrilDelBurgo as carrilDelBurgoShared,
   cartelDeCasilla as cartelDeCasillaDelBurgo,
   dadosEnTres as dadosDelBurgoEnTres,
+  finalEnTres as finalDelBurgoEnTres,
   EL_CARRIL_DE_LA_MESA,
   fichaDeCasilla as fichaDeCasillaDelBurgo,
   fichaDeJugador as fichaDeJugadorDelBurgo,
@@ -9581,7 +9582,12 @@ function elEscritorioDelBurgo(): void {
     return { vista, opciones, puesta, yo };
   };
 
-  const pinta = (m: { puesta: MesaVista; opciones: readonly Opcion[] }, rail?: JSX.Element): string => {
+  /*
+   * `salida` es opcional y por defecto no se pasa, que es como estaba: la Sala se la da al pintor
+   * sólo cuando hay adónde volver. La tarjeta del final la necesita para comprar su enlace, y sin
+   * este tercer parámetro habría que repetir aquí el `renderToStaticMarkup` entero.
+   */
+  const pinta = (m: { puesta: MesaVista; opciones: readonly Opcion[] }, rail?: JSX.Element, salida?: string): string => {
     const tablero = tableroDeLaVista(m.puesta.vista);
     if (tablero === null) return '';
     return renderToStaticMarkup(
@@ -9592,6 +9598,7 @@ function elEscritorioDelBurgo(): void {
         tablero={tablero}
         opciones={m.opciones}
         elRail={rail}
+        laSalida={salida}
       />,
     );
   };
@@ -10402,6 +10409,39 @@ function elEscritorioDelBurgo(): void {
       `VACUNA: pegándolos a ciegas —como estaban— la línea del final es «${`${cintaDelFinal.turno} · ${avisoDelFinal}`.slice(0, 24)}…», o sea la misma palabra dos veces en el sitio donde sólo caben dos`,
       `${cintaDelFinal.turno} · ${avisoDelFinal}`.startsWith(`${cintaDelFinal.turno} · ${cintaDelFinal.turno}`),
     );
+
+    /*
+     * ═══ LA TARJETA DEL FINAL, PINTADA ═══
+     *
+     * Jugando una mesa de verdad (16-sep-2026), al quedar uno en pie esta pantalla se quedaba en
+     * la vista del anillo con la cinta recortada y nada más: quién se queda con el Burgo, con
+     * cuánto patrimonio y quién quebró vivían detrás del «≡». Ahora la tarjeta sale sola. Se
+     * compra sobre el marcado que sale del momento «fin» del banco, y por los dos lados: que la
+     * traducción la componga, y que este pintor la pinte entera con su salida a la Sala.
+     */
+    const laTarjeta = finalDelBurgoEnTres(elFinal.vista, elFinal.yo);
+    comprobar('la traducción compone la tarjeta del final en el momento «fin» del banco', laTarjeta !== null, laTarjeta === null ? 'null' : laTarjeta.frase);
+    if (laTarjeta !== null) {
+      const html = pinta(elFinal, undefined, '/sala/');
+      comprobar(
+        'y el pintor la saca sola: caja con su nombre, la frase de quien se queda con el Burgo, un renglón por puesto y la salida a la Sala',
+        html.includes('aria-label="Se acabó"') &&
+          html.includes(laTarjeta.frase) &&
+          laTarjeta.puestos.every((p) => html.includes(p.linea)) &&
+          html.includes('class="opcion burgo-final-salir" href="/sala/"'),
+        { frase: laTarjeta.frase, puestos: laTarjeta.puestos.map((p) => p.linea) },
+      );
+      comprobar(
+        'y cada puesto lleva su mota de color, que es como esta casa dice de quién es cada fila',
+        laTarjeta.puestos.every((p) => html.includes(`background:${p.color}`) || html.includes(`background: ${p.color}`)),
+        laTarjeta.puestos.map((p) => p.color),
+      );
+    }
+    const enJuego = laMesaDelMomento('mi-turno');
+    comprobar(
+      'y con la partida en marcha no hay tarjeta del final en la pantalla',
+      enJuego !== null && finalDelBurgoEnTres(enJuego.vista, enJuego.yo) === null && !pinta(enJuego).includes('burgo-final'),
+    );
   }
 
   // ── 12. LA SECCIÓN QUE SE DEJÓ ABIERTA VUELVE TRAS UN F5 ──
@@ -10992,7 +11032,7 @@ console.log('');
  * Y LAS ROJAS SE IMPRIMEN ANTES DE IRSE: el orden estaba al revés, así que el día que el
  * guardia saltara se llevaría por delante los nombres de todo lo que ya se había encontrado.
  */
-const COMPROBACIONES_ESCRITAS = 986;
+const COMPROBACIONES_ESCRITAS = 990;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(

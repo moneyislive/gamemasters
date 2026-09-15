@@ -95,6 +95,7 @@ import type {
   CartelDeCasilla,
   DestinoDelTrato,
   FichaDeCasilla,
+  FinalDelBurgo,
   GlifoDelCarrilDelBurgo,
   HojaDelBurgo,
   IdDeSeccion,
@@ -1332,6 +1333,38 @@ export function LaFichaDelJugador({
           <Text style={estilos.botonRotulo}>Proponer trato</Text>
         </Pressable>
       )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// La tarjeta del final de la partida
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ LA PARTIDA ACABABA Y LA PANTALLA NO LO DECÍA ═══
+ *
+ * Al quedar uno en pie, lo único que cambiaba era la frase de la cinta; quién se queda con el
+ * Burgo, con cuánto patrimonio y quién quebró vivían en el marcador, dentro del cajón. Esta
+ * tarjeta lo dice de una vez, con los mismos muebles que la ficha de un jugador: el disco del
+ * color, la frase y un renglón por puesto. Lo redacta `finalEnTres` en la traducción —aquí no
+ * se ordena ni se cuenta nada— y la pantalla la monta como una hoja más sobre el lienzo, con
+ * su velo y su «Dejarlo», que es lo que la deja ir para mirar la ciudad.
+ */
+export function ElFinalDelBurgo({ final }: { final: FinalDelBurgo }): JSX.Element {
+  return (
+    <View style={estilos.pila}>
+      <Text style={estilos.tarjetaNombre}>{final.frase}</Text>
+      {final.paraMi.length === 0 ? null : <Text style={estilos.linea}>{final.paraMi}</Text>}
+      <View style={estilos.pilaEstrecha}>
+        {final.puestos.map((p) => (
+          <View key={p.asiento} style={estilos.fila} accessible accessibilityLabel={p.linea}>
+            <View style={[estilos.discoDelColor, { backgroundColor: p.color }]} />
+            <Text style={estilos.linea}>{p.linea}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={estilos.linea}>{final.porque}</Text>
     </View>
   );
 }
