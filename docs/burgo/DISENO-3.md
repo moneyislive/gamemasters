@@ -621,3 +621,35 @@ vueltas no acaban nada. La vacuna es una vuelta por debajo del tope: la partida 
   del momento»); y la subasta del último edificio se pinta con el nombre del solar al que
   iría, que es lo que `almoneda.casilla` lleva. Ninguna de las dos cosas rompe nada
   —`verify:burgo-en-tres` pasa entero— pero las dos se leerían mejor con dos líneas allí.
+
+## 15. Lo que se vio jugando una mesa de verdad (16-sep-2026)
+
+Hasta aquí todo se había medido con comprobadores y bancos. El 16 de septiembre se jugó por
+primera vez una mesa ENTERA con servidor real: la Sala web del escritorio sentada en un asiento
+y tres robots por HTTP en los otros (`server/scripts/robot-del-burgo.ts` conducido desde fuera),
+desde el Muelle hasta que quedó uno en pie. Cuatro jugadores, 636 revisiones, cero movimientos
+rechazados. Salieron cinco cosas que ninguna de las 82 entradas de la batería veía, y las cinco
+son de las que sólo aparecen jugando:
+
+| # | Lo que se vio | Por qué ningún comprobador lo veía | Qué se hizo |
+|---|---|---|---|
+| H1 | La crónica decía «paga 120 € por la subasta **a el** Ayuntamiento». | Los comprobadores de texto buscan secretos, marcas e ids crudos; nadie leía la gramática del pregón. | `aQuienRecibe` en `burgo.ts`; `verify:burgo` busca «a el»/«de el» en TODO texto de cada revisión de las siete miradas, con vacuna. |
+| H2 | La cinta del escritorio: «Turno de Ana · Te toca tirar. **Turno de Ana.**» | El aviso del tablero lleva la crónica detrás, y la crónica cierra cada relevo con esa frase; la regla del prefijo sólo miraba el principio. | `sinLaFraseDelTurno` quita la frase ENTERA; el prefijo exige ahora borde de palabra («Turno de Anabel» no es «Turno de Ana»). |
+| H3 | **Al caer en una calle libre no había un solo botón de comprar a la vista.** El carril enseñaba «Quiebra» como único cuadrado; comprar vivía sólo en la casilla del anillo, de unos veinte píxeles desde la pose de salida. | La partición seguía cerrando: la compra tenía «su sitio». Pero su sitio era un gesto sobre una casilla diminuta. | La compra sube a «Ahora» y al carril, en cabeza («Co · 60 €», «Su · Subasta»); la casilla pasa a ser su ATAJO. `verify:burgo-en-tres` exige que la compra esté a la vista y en cabeza, y su vacuna es el carril de antes sobre una mirada real. |
+| H7 | Al terminar, la línea de estado decía «Se acabó: Ana se queda con el Burgo» dos veces. | La cabeza del aviso y la frase del suceso `fin` son letra a letra la misma; nadie contaba repeticiones. | `avisoDe` quita de la crónica la frase entera de la cabeza, y en la reunión no repite el aviso; `verify:burgo` lo cuenta al final de cada partida entera, con vacuna. |
+| H5 | Tras «Empezar la partida», UNA vez, la pestaña hizo una recarga completa a `/sala/`. | — | No se reprodujo con la pestaña instrumentada (navegación, clics y `pushState` vigilados): la transición salió limpia. El enlace «‹» se intercepta y no recarga. Queda anotado sin tocar código. |
+
+**La decisión de H3 revoca a sabiendas la de la ronda 2** («comprar y sacar a subasta sólo en
+la casilla, con un gemelo de sólo apoyo»). Aquella se tomó cuando la cuenta de la partición
+sumaba la casilla encendida como un botón más; desde que la cuenta separa botones de atajos (la
+misma que ya permitía vender e hipotecar en «Ahora» durante el apuro), el argumento de «dos
+sitios donde comprar» dejó de existir y lo que quedaba era el fallo.
+
+**El maestro de oro se recapturó** (`server/scripts/oro-arcade/burgo.json`) y se comprobó campo a
+campo contra el anterior: registro, estado inicial, estado final, secreto y las 344 huellas de
+estado son idénticos; en las vistas finales sólo cambian `pregon` y `tablero.aviso`, y sólo en
+«a el» → «al» y en la frase de «Se acabó» repetida.
+
+**Lo que queda de esta partida, sin hacer todavía:** al terminar no hay tarjeta de final —quién
+gana, la clasificación por patrimonio, volver a la Sala—: sólo la cinta sobre la vista cenital, y
+todo lo demás detrás del cajón.

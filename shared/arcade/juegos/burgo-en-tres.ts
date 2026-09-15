@@ -156,7 +156,8 @@
  *     dos cosas). Son EL MISMO objeto —la ficha y `obraPosibleEnCasilla` devuelven la
  *     opción del juego por identidad— y la partición los cuenta como un botón y su
  *     atajo, no como dos botones. Comprar y sacar a subasta, que no son de un título
- *     mío, sólo tienen la casilla.
+ *     mío, tienen su botón en «Ahora» —y por tanto en el carril— desde el 16-sep-2026,
+ *     y la casilla es su atajo (ver «LA COMPRA SUBE A "AHORA"» en `loDelMomento`).
  *   · `pujaEnTres` y `tratoEnTres` traen más campos de los que el §4 enumera (nombres,
  *     líneas redactadas, `meToca`, `soyElDestinatario`…): son texto derivado para que
  *     los dos clientes no redacten nada; los campos del §4 están todos y con su nombre.
@@ -2428,13 +2429,19 @@ function esDelMomento(o: OpcionQueLlega): boolean {
   return true;
 }
 
-/** Lo que se pinta «ahora»: los botones del momento y, en mi apuro, las obras que dan dinero. */
+/** Lo que se pinta «ahora»: la decisión de la casilla, los botones del momento y, en mi apuro, las obras que dan dinero. */
 interface LoDelMomento<O extends OpcionQueLlega> {
+  /**
+   * COMPRAR Y SACAR A SUBASTA, cuando la casilla en la que acabo de caer espera mi decisión.
+   * Van DELANTE de todo, porque es la decisión del turno. Vacío el resto del tiempo: el juego
+   * sólo las ofrece en el paso `comprar` y al del turno. Ver «LA COMPRA SUBE A "AHORA"» abajo.
+   */
+  readonly compra: readonly O[];
   /** Empezar, la fianza, el Salvoconducto, el Impuesto, pasar el turno, la quiebra. */
   readonly botones: readonly O[];
   /** Vender e hipotecar, que SUBEN aquí en mi apuro y por eso salen de las fichas de «Lo mío». Vacío el resto del tiempo. */
   readonly obrasDelApuro: readonly O[];
-  /** Las dos juntas y en orden: es EXACTAMENTE la lista que se pinta, en la sección o en el carril. */
+  /** Las tres juntas y en orden: es EXACTAMENTE la lista que se pinta, en la sección o en el carril. */
   readonly todo: readonly O[];
 }
 
@@ -2446,12 +2453,31 @@ interface LoDelMomento<O extends OpcionQueLlega> {
  * de que un día se separen: bastaría con que alguien añadiera un tipo a `esDelMomento` y no
  * al otro sitio para que el mismo movimiento saliera dos veces, o ninguna, sin un error en
  * ninguna parte. Se compone aquí y los dos reciben LA MISMA lista, por identidad.
+ *
+ * ═══ LA COMPRA SUBE A «AHORA», Y LA CASILLA ENCENDIDA PASA A SER SU ATAJO ═══
+ *
+ * Hasta el 16-sep-2026 comprar y sacar a subasta vivían SÓLO en la casilla del anillo, con
+ * un gemelo invisible para el lector de pantalla. Jugando una mesa de verdad en la Sala web
+ * (1.440 × 900, pose de salida) eso resultó ser la decisión más importante del juego sin un
+ * solo botón a la vista: la casilla mide unos veinte píxeles desde la pose de salida, el
+ * carril enseñaba «Quiebra» como ÚNICO cuadrado, y la sección «Ahora» decía «se pulsan en el
+ * carril» cuando en el carril no estaban. No fallaba nada y la partición seguía cerrando.
+ *
+ * El argumento que las había dejado fuera —«dos sitios donde comprar la misma casilla»— dejó
+ * de valer cuando la cuenta aprendió a separar botones de atajos (ver `particionDe` en
+ * `verificar-burgo-en-tres.ts`): la casilla encendida no es un botón, es el atajo de uno que
+ * está en otro sitio, igual que ya pasaba con vender e hipotecar en mi apuro. Así que la
+ * compra entra aquí, delante, y el carril la pinta a la vista; la casilla la sigue
+ * encendiendo como atajo, por identidad, y `obrasSoloEnElAnillo` deja de pedir gemelos para
+ * ella en cuanto el carril o la hoja la recogen.
  */
 function loDelMomento<O extends OpcionQueLlega>(l: Lectura, yo: QuienMira, opciones: readonly O[]): LoDelMomento<O> {
+  const compra = opciones.filter((o) => !esPuerta(o) && (o.tipo === COMPRAR || o.tipo === A_ALMONEDA));
   const botones = opciones.filter(esDelMomento);
   const enMiApuro = yo !== null && l.apuro !== null && l.apuro.quien === yo;
-  const obrasDelApuro = enMiApuro ? opciones.filter((o) => !esPuerta(o) && esObra(o.tipo)) : [];
-  return { botones, obrasDelApuro, todo: obrasDelApuro.length === 0 ? botones : [...botones, ...obrasDelApuro] };
+  const obrasDelApuro = enMiApuro ? opciones.filter((o) => !esPuerta(o) && esObra(o.tipo) && compra.indexOf(o) < 0) : [];
+  const todo = compra.length === 0 && obrasDelApuro.length === 0 ? botones : [...compra, ...botones, ...obrasDelApuro];
+  return { compra, botones, obrasDelApuro, todo };
 }
 
 /** Las estaciones y los servicios no tienen barrio: van juntos al final de «Lo mío», con el gris de las estaciones del retablo. */
@@ -2856,15 +2882,17 @@ export function opcionesFueraDelTablero<O extends OpcionQueLlega>(
  * cargar, no había forma. Y no fallaba nada: la partición seguía siendo una partición, y el
  * movimiento seguía teniendo su sitio; su sitio era un gesto que no todo el mundo puede hacer.
  *
- * ═══ POR QUÉ UN GEMELO DE SÓLO APOYO Y NO UN BOTÓN EN «AHORA» ═══
+ * ═══ POR QUÉ HUBO UN GEMELO DE SÓLO APOYO, Y POR QUÉ HOY CASI NUNCA HACE FALTA ═══
  *
- * Se probaron los dos. Subirlas a la sección «Ahora» pone el movimiento en DOS muebles que
- * se pintan a la vez —el botón de la sección y la casilla encendida—, y eso, para las cribas
- * que cuentan por firma, es una opción repetida: `verify:escritorio` la caza y se pone rojo,
- * y tiene razón en cazarla, porque en la pantalla se ven dos sitios donde comprar la misma
- * casilla. Las obras de MIS títulos no caen ahí porque la ficha y la casilla devuelven EL
- * MISMO objeto y la partición las cuenta como un botón y su atajo; comprar no tiene ficha
- * donde ser ese botón.
+ * Primero se probó a subirlas a «Ahora», y `verify:escritorio` lo cazó como una opción
+ * repetida: aquella cuenta sumaba la casilla encendida como un botón más, y no como el atajo
+ * que es. Se optó entonces por el gemelo de sólo apoyo. Desde que las cuentas separan botones
+ * de atajos —la misma separación que ya dejaba vender e hipotecar en «Ahora» durante el apuro—
+ * la compra vive en «Ahora» y en el carril (16-sep-2026: jugando una mesa de verdad no había un
+ * solo botón de comprar a la vista, ver `loDelMomento`). Así que en cuanto el cliente le pasa
+ * la hoja o el carril, esto ya no devuelve la compra; lo que queda es un cliente que no pinte
+ * ninguno de los dos muebles, o una obra que algún día se quede sin botón, y entonces esto lo
+ * dirá solo.
  *
  * El gemelo de sólo apoyo es la solución que esta casa ya usa para el otro movimiento que
  * vive en un gesto: TIRAR. Los dados son un asa del lienzo, y al lado del lienzo hay un
@@ -3038,6 +3066,13 @@ const VERBOS_DEL_CARRIL: Readonly<Record<string, string>> = {
   [TIRAR]: 'Tirar',
   [PAGAR_FIANZA]: 'Fianza',
   [USAR_INDULTO]: 'Salvoconducto',
+  /*
+   * SACAR A SUBASTA dice el verbo y no el solar: en el momento de la compra los dos cuadrados
+   * son de LA MISMA casilla —la que la cinta ya nombra—, y «Co / Charco» al lado de «Su /
+   * Charco» no distinguía nada. Comprar dice la CIFRA, que es lo que se decide (ver la rama de
+   * `COMPRAR` en `glifosDelCarrilDelBurgo`).
+   */
+  [A_ALMONEDA]: 'Subasta',
   [PASAR_PUJA]: 'Pasar',
   [PASAR]: 'Pasar',
   [RENDIRSE]: 'Quiebra',
@@ -3091,6 +3126,7 @@ export function glifosDelCarrilDelBurgo<O extends OpcionQueLlega>(
     else if (otro !== null) rotulo = otro.nombre;
     else if (o.tipo === PUJAR && typeof cuanto === 'number') rotulo = maravedies(cuanto);
     else if (o.tipo === PAGAR_IMPUESTO) rotulo = como === 'decima' ? '10 %' : 'Fijo';
+    else if (o.tipo === COMPRAR && fila !== null && fila.precio > 0) rotulo = maravedies(fila.precio);
     else if (fila !== null) rotulo = fila.rotulo;
     else rotulo = o.rotulo;
     salida.push({

@@ -617,11 +617,57 @@ export function loQueHaceElToque(
  *
  * No redacta nada: las dos frases son de la traducción y del tablero declarado. Lo único que
  * decide esto es si la segunda hace falta detrás de la primera.
+ *
+ * ═══ Y LA FRASE ENTERA DEL TURNO, QUE LA CRÓNICA TRAE AL FINAL ═══
+ *
+ * El aviso del tablero declarado es el aviso del juego MÁS la crónica, y la crónica cierra
+ * cada relevo con la frase del suceso `turno`: «Turno de Ana.». En una mesa de verdad la línea
+ * decía «Turno de Ana · Te toca tirar. Turno de Ana.» (16-sep-2026). Esa frase se quita, pero
+ * sólo ENTERA —de principio de frase a su punto— y sólo si es la misma cabeza que la cinta ya
+ * pinta: «Turno de Anabel.» no es «Turno de Ana.», y «le toca a Turno de Ana» a media frase
+ * sigue sin tocarse, por lo mismo que arriba.
  */
 export function loQueDiceLaCinta(turno: string, aviso: string): string {
   if (turno.length === 0) return aviso;
   if (aviso.length === 0) return turno;
-  return aviso.startsWith(turno) ? aviso : `${turno} · ${aviso}`;
+  /*
+   * El prefijo cuenta sólo si acaba en BORDE DE PALABRA: «Turno de Anabel.» empieza por las
+   * letras de «Turno de Ana» y no es su turno. Detrás del prefijo tiene que venir el final,
+   * un signo o un espacio, nunca una letra ni un número.
+   */
+  if (aviso.startsWith(turno) && !/[\p{L}\p{N}]/u.test(aviso.charAt(turno.length))) return aviso;
+  const resto = sinLaFraseDelTurno(aviso, turno);
+  return resto.length === 0 ? turno : `${turno} · ${resto}`;
+}
+
+/**
+ * El aviso sin la frase ENTERA «<cabeza del turno>.», donde la cabeza es lo que la cinta dice
+ * antes de su primer « · » («Turno de Ana · puja Bea» → «Turno de Ana»). Devuelve el aviso tal
+ * cual si no la trae.
+ */
+export function sinLaFraseDelTurno(aviso: string, turno: string): string {
+  const corte = turno.indexOf(' · ');
+  const cabeza = corte < 0 ? turno : turno.slice(0, corte);
+  if (cabeza.length === 0) return aviso;
+  const frase = `${cabeza}.`;
+  let salida = aviso;
+  let desde = 0;
+  for (;;) {
+    const i = salida.indexOf(frase, desde);
+    if (i < 0) break;
+    const fin = i + frase.length;
+    const empiezaFrase = i === 0 || salida.charAt(i - 1) === ' ';
+    const acabaFrase = fin === salida.length || salida.charAt(fin) === ' ';
+    if (empiezaFrase && acabaFrase) {
+      const antes = salida.slice(0, i).trimEnd();
+      const despues = salida.slice(fin).trimStart();
+      salida = antes.length === 0 ? despues : despues.length === 0 ? antes : `${antes} ${despues}`;
+      desde = antes.length;
+    } else {
+      desde = i + 1;
+    }
+  }
+  return salida;
 }
 
 /**
@@ -1050,6 +1096,11 @@ export function BurgoEnTres({
    * el botón y no se les daba ninguno. O sea que comprar —el movimiento que decide la partida
    * entera— sólo se podía hacer con el ratón sobre el anillo; con teclado, con lector o con
    * el `.glb` a medio cargar, no había forma, y no fallaba nada.
+   *
+   * Desde el 16-sep-2026 la compra vive además en «Ahora» y en el carril (la sube la
+   * traducción, `loDelMomento`), así que con los cuadrados puestos esto ya no la devuelve y
+   * no se pinta gemelo para ella: su botón está a la vista. El gemelo queda para lo que
+   * ningún mueble recoja.
    *
    * `obrasSoloEnElAnillo` devuelve exactamente ésas, mirando lo que la hoja Y EL CARRIL
    * pintan de verdad (el cuarto parámetro: sin él pediría gemelos para las obras del apuro,

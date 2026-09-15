@@ -237,6 +237,7 @@ import {
   BurgoEnTres,
   EL_CARTEL_EN_BLANCO,
   loQueDiceLaCinta,
+  sinLaFraseDelTurno,
   loQueHaceElToque,
   MarcadorDelBurgo,
   trasElSenalado,
@@ -2007,8 +2008,23 @@ function burgoEnTres(): void {
    * las quita, y la hoja las convierte en un componedor, no en un botón.
    */
   const movimientos = opciones.filter((o) => o.declaracion !== true);
+  /*
+   * LA CASILLA ENCENDIDA ES UN ATAJO CUANDO LA HOJA TIENE EL MISMO OBJETO. Esta cuenta sumaba la
+   * escena como un sitio más, y eso sólo cerraba porque la partida se para en el momento de
+   * comprar y comprar vivía SÓLO en la casilla. Desde el 16-sep-2026 la compra sube a «Ahora»
+   * (se jugó una mesa de verdad y comprar no tenía un solo botón a la vista), y entonces la
+   * casilla es el atajo de ese botón, igual que ya lo era de las obras de «Lo mío»: el mismo
+   * objeto por identidad, que es lo que `verify:burgo-en-tres` cuenta en su partición.
+   */
+  const atajos = porLaEscena.filter((o) => porLaHoja.indexOf(o) >= 0);
+  const soloEnLaEscena = porLaEscena.filter((o) => porLaHoja.indexOf(o) < 0);
+  comprobar(
+    'la compra tiene su botón en la hoja y la casilla del anillo es su atajo: el MISMO objeto, por identidad',
+    atajos.some((o) => o.tipo === 'burgo:comprar') && atajos.some((o) => o.tipo === 'burgo:a-almoneda'),
+    { atajos: atajos.map((o) => o.id), soloEnLaEscena: soloEnLaEscena.map((o) => o.id) },
+  );
   const cuantasVeces = new Map<string, number>();
-  for (const o of [...porLaEscena, ...porLaHoja, ...sueltos]) {
+  for (const o of [...soloEnLaEscena, ...porLaHoja, ...sueltos]) {
     const firma = firmaDe(o);
     cuantasVeces.set(firma, (cuantasVeces.get(firma) ?? 0) + 1);
   }
@@ -2151,12 +2167,35 @@ function burgoEnTres(): void {
    * cerrada suelta no tendrían dónde pulsarse. Se mide con la partida de verdad y con el
    * número: son los que están.
    */
-  const sinLasSobras = loDelMomento.map((g) => firmaDe(g.opcion));
+  /*
+   * EN LA COMPRA YA NO SOBRA NADA, y eso se afirma en vez de dejar que la vacuna de abajo se
+   * quede sin premisa: comprar y sacar a subasta van con lo del momento, así que con el cajón
+   * cerrado y sin mundo el carril las pinta sin pegar sobras. Las sobras de verdad están donde
+   * la hoja se lleva botones que no son del momento: las pujas de una subasta.
+   */
   comprobar(
-    'VACUNA: sin pegar las sobras al carril, hay movimientos del juego que no se pueden pulsar en ninguna parte de la pantalla',
-    fueraDeTodo.length > 0 && fueraDeTodo.some((o) => sinLasSobras.indexOf(firmaDe(o)) < 0),
+    'y en la compra, comprar y sacar a subasta van con lo del momento: con el cajón cerrado y sin mundo no sobra nada',
+    fueraDeTodo.length === 0 && loDelMomento.some((g) => g.opcion.tipo === 'burgo:comprar') && loDelMomento.some((g) => g.opcion.tipo === 'burgo:a-almoneda'),
     { sobras: fueraDeTodo.map((o) => o.id), delMomento: loDelMomento.map((g) => g.opcion.id) },
   );
+  {
+    const laSubasta = MOMENTOS.find((x) => x.id === 'subasta');
+    comprobar('el banco trae el momento de la subasta, que es donde hay sobras que pegar', laSubasta !== undefined);
+    if (laSubasta !== undefined) {
+      const sentadosS = sentadosDeLosMomentos(laSubasta.asientos);
+      const vistaS = proyectar(BURGO, rebobinar(laSubasta).estado, laSubasta.mirando, sentadosS);
+      const opcionesS = opcionesDeArcade(BURGO, vistaS, laSubasta.mirando);
+      const cajaS = pregonDelBurgo(vistaS, laSubasta.mirando, opcionesS);
+      const delMomentoS = carrilDelBurgoShared(vistaS, laSubasta.mirando, opcionesS);
+      const fueraS = opcionesFueraDelBurgo(opcionesS, null, null, null, cajaS, delMomentoS.length > 0 ? delMomentoS : null);
+      const sinLasSobras = delMomentoS.map((g) => firmaDe(g.opcion));
+      comprobar(
+        'VACUNA: sin pegar las sobras al carril, en la subasta las pujas no se podrían pulsar en ninguna parte de la pantalla',
+        fueraS.length > 0 && fueraS.some((o) => sinLasSobras.indexOf(firmaDe(o)) < 0) && fueraS.some((o) => o.tipo === 'burgo:pujar'),
+        { sobras: fueraS.map((o) => o.id), delMomento: delMomentoS.map((g) => g.opcion.id) },
+      );
+    }
+  }
   /*
    * LO IRREVERSIBLE VA AL FINAL DE LA TIRA. La quiebra llega entre lo del momento, o sea en
    * medio de la fila y al lado de «pasar el turno»; un cuadrado de 44 puntos ahí es demasiado
@@ -2178,13 +2217,23 @@ function burgoEnTres(): void {
   for (const o of porLaHoja) {
     comprobar(`el botón «${o.rotulo}» de la hoja sale tal cual dentro del cajón`, textoDelCajon.includes(o.rotulo), o.id);
   }
-  for (const o of porLaEscena) {
+  /*
+   * Lo que enseña SÓLO la casilla no se repite dentro del cajón; lo que la casilla enciende como
+   * ATAJO de un botón de la hoja —la compra— sí sale dentro, porque ahí está su botón. Las dos
+   * mitades se compran: la segunda no es vacía en este momento, que es el de comprar.
+   */
+  for (const o of soloEnLaEscena) {
     comprobar(
       `«${o.rotulo}» lo enseña la casilla del anillo y no se repite dentro del cajón`,
       !textoDelCajon.includes(o.rotulo),
       o.id,
     );
   }
+  comprobar(
+    'y lo que la casilla enciende como atajo de la hoja SÍ sale dentro del cajón, que es donde está su botón',
+    atajos.length > 0 && atajos.every((o) => textoDelCajon.includes(o.rotulo)),
+    atajos.map((o) => o.rotulo),
+  );
   /*
    * Y CON EL CAJÓN ABIERTO Y EL MUNDO MONTADO, LO DE LA HOJA SE VA DE LOS BOTONES: el mismo
    * movimiento no puede estar en su sección y en la lista de abajo a la vez.
@@ -10321,6 +10370,34 @@ function elEscritorioDelBurgo(): void {
       loQueDiceLaCinta('Turno de Ana', 'Bea pasa y le toca a Turno de Ana') ===
         'Turno de Ana · Bea pasa y le toca a Turno de Ana',
     );
+    /*
+     * LA FRASE ENTERA DEL TURNO QUE LA CRÓNICA TRAE AL FINAL. En una mesa de verdad (16-sep-2026)
+     * la línea decía «Turno de Ana · Te toca tirar. Turno de Ana.»: el aviso del tablero lleva la
+     * crónica detrás, y la crónica cierra cada relevo con la frase del suceso `turno`.
+     */
+    comprobar(
+      'y la frase ENTERA del turno que la crónica trae se quita, también detrás de «· puja Bea», pero sólo entera',
+      loQueDiceLaCinta('Turno de Ana', 'Te toca tirar. Turno de Ana.') === 'Turno de Ana · Te toca tirar.' &&
+        loQueDiceLaCinta('Turno de Ana · puja Bea', 'Bea puja 20 € por Pasaje de los Charcos. Turno de Ana.') ===
+          'Turno de Ana · puja Bea · Bea puja 20 € por Pasaje de los Charcos.' &&
+        loQueDiceLaCinta('Turno de Ana', 'Ana saca 3 y 4. Turno de Ana. Ana llega a Latas.') === 'Turno de Ana · Ana saca 3 y 4. Ana llega a Latas.' &&
+        loQueDiceLaCinta('Turno de Ana', 'Turno de Anabel.') === 'Turno de Ana · Turno de Anabel.',
+      [
+        loQueDiceLaCinta('Turno de Ana', 'Te toca tirar. Turno de Ana.'),
+        loQueDiceLaCinta('Turno de Ana · puja Bea', 'Bea puja 20 € por Pasaje de los Charcos. Turno de Ana.'),
+        loQueDiceLaCinta('Turno de Ana', 'Ana saca 3 y 4. Turno de Ana. Ana llega a Latas.'),
+        loQueDiceLaCinta('Turno de Ana', 'Turno de Anabel.'),
+      ],
+    );
+    comprobar(
+      'y si la crónica sólo traía esa frase, la línea se queda en el turno y no en «Turno de Ana · »',
+      sinLaFraseDelTurno('Turno de Ana.', 'Turno de Ana') === '' && loQueDiceLaCinta('Turno de Ana', 'Turno de Ana.') === 'Turno de Ana.',
+    );
+    comprobar(
+      'VACUNA: pegando la crónica a ciegas, «Turno de Ana» sale dos veces en la misma línea',
+      'Turno de Ana · Te toca tirar. Turno de Ana.'.split('Turno de Ana').length - 1 === 2 &&
+        loQueDiceLaCinta('Turno de Ana', 'Te toca tirar. Turno de Ana.').split('Turno de Ana').length - 1 === 1,
+    );
     comprobar(
       `VACUNA: pegándolos a ciegas —como estaban— la línea del final es «${`${cintaDelFinal.turno} · ${avisoDelFinal}`.slice(0, 24)}…», o sea la misma palabra dos veces en el sitio donde sólo caben dos`,
       `${cintaDelFinal.turno} · ${avisoDelFinal}`.startsWith(`${cintaDelFinal.turno} · ${cintaDelFinal.turno}`),
@@ -10915,7 +10992,7 @@ console.log('');
  * Y LAS ROJAS SE IMPRIMEN ANTES DE IRSE: el orden estaba al revés, así que el día que el
  * guardia saltara se llevaría por delante los nombres de todo lo que ya se había encontrado.
  */
-const COMPROBACIONES_ESCRITAS = 979;
+const COMPROBACIONES_ESCRITAS = 986;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(

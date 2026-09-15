@@ -3088,6 +3088,19 @@ function casillasDeObraSubastadas(e: EstadoDelBurgo): number[] {
   return salida;
 }
 
+/**
+ * «a Ana» o «al Ayuntamiento», con la contracción hecha.
+ *
+ * `a el` no se escribe en castellano, y la crónica lo escribía cada vez que alguien pagaba al
+ * Ayuntamiento o quebraba con él: «Diego paga 120 € por la subasta a el Ayuntamiento», visto
+ * en una mesa de verdad el 16-sep-2026. `null` ES el Ayuntamiento en todo este fichero, así que
+ * la decisión se toma por el asiento y no mirando si el nombre empieza por «el»: un jugador que
+ * se llame «El Pícaro» se escribe «a El Pícaro», con mayúscula y sin contraer.
+ */
+function aQuienRecibe(a: AsientoId | null, nombre: (a: AsientoId | null) => string): string {
+  return a === null ? 'al Ayuntamiento' : `a ${nombre(a)}`;
+}
+
 /** Una frase por suceso; `''` para los que no se cuentan en la crónica. `deObra` sólo lo miran los tres de la subasta. */
 function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string, deObra: (casilla: number) => boolean = () => false): string {
   switch (s.que) {
@@ -3104,7 +3117,7 @@ function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string, deO
     case 'cobra':
       return s.de === null ? `${nombre(s.quien)} cobra ${maravedies(s.cuanto)} ${porqueEnPalabras(s.porque)}.` : '';
     case 'paga':
-      return `${nombre(s.quien)} paga ${maravedies(s.cuanto)} ${porqueEnPalabras(s.porque)} a ${nombre(s.a)}.`;
+      return `${nombre(s.quien)} paga ${maravedies(s.cuanto)} ${porqueEnPalabras(s.porque)} ${aQuienRecibe(s.a, nombre)}.`;
     case 'compra':
       return `${nombre(s.quien)} compra ${nombreDeCasilla(s.casilla)} por ${maravedies(s.cuanto)}.`;
     case 'alza':
@@ -3154,7 +3167,7 @@ function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string, deO
     case 'apuro':
       return `${nombre(s.quien)} debe ${maravedies(s.debe)} y no le alcanza: en apuro.`;
     case 'quiebra':
-      return `${nombre(s.quien)} quiebra; todo lo suyo pasa a ${nombre(s.acreedor)}.`;
+      return `${nombre(s.quien)} quiebra; todo lo suyo pasa ${aQuienRecibe(s.acreedor, nombre)}.`;
     case 'cambia-de-mano':
       return '';
     case 'trato':
@@ -3972,7 +3985,7 @@ function panelesDe(v: VistaSinTablero, quien: QuienMira): PanelDeTablero[] {
 
   if (v.apuro !== null) {
     const lineas: string[] = [`${nombreEnLaVista(v, v.apuro.quien)} debe ${maravedies(v.apuro.debe)}.`];
-    for (const d of v.apuro.deudas) lineas.push(`${maravedies(d.cuanto)} a ${nombreEnLaVista(v, d.a)} ${porqueEnPalabras(d.porque)}.`);
+    for (const d of v.apuro.deudas) lineas.push(`${maravedies(d.cuanto)} ${aQuienRecibe(d.a, (x) => nombreEnLaVista(v, x))} ${porqueEnPalabras(d.porque)}.`);
     if (v.apuro.enCola > 0) lineas.push(`${v.apuro.enCola} más en apuro después.`);
     paneles.push({ titulo: 'El apuro', lineas });
   }
@@ -3989,18 +4002,58 @@ function panelesDe(v: VistaSinTablero, quien: QuienMira): PanelDeTablero[] {
 /** El aviso del retablo: fin de partida, lo mío y la crónica, en ese orden. */
 function avisoDe(v: VistaSinTablero): string {
   const partes: string[] = [];
+  let cabeza = '';
   if (v.momento === 'terminada') {
-    partes.push(
+    cabeza =
       v.ganadores.length === 1
         ? `Se acabó: ${nombreEnLaVista(v, v.ganadores[0] as AsientoId)} se queda con el Burgo.`
         : v.ganadores.length === 0
           ? 'Se acabó sin ganador.'
-          : `Se acabó: empate entre ${v.ganadores.map((g) => nombreEnLaVista(v, g)).join(', ')}.`,
-    );
+          : `Se acabó: empate entre ${v.ganadores.map((g) => nombreEnLaVista(v, g)).join(', ')}.`;
+    partes.push(cabeza);
   }
   if (v.aviso.length > 0) partes.push(v.aviso);
-  if (v.pregon.length > 0) partes.push(v.pregon);
+  /*
+   * ═══ LA CRÓNICA NO REPITE LO QUE EL AVISO YA HA DICHO ═══
+   *
+   * El aviso del tablero es cabeza + aviso + crónica, y dos de esas juntas decían lo mismo:
+   * al terminar, la crónica cierra con la frase del suceso `fin`, que es LETRA A LETRA la
+   * cabeza («Se acabó: Ana se queda con el Burgo. Te quedas con el Burgo. … Se acabó: Ana se
+   * queda con el Burgo.», visto en una mesa de verdad el 16-sep-2026); y en la reunión aviso y
+   * crónica dicen «cuando estéis todos, cualquiera puede empezar» con otras palabras. Así que al
+   * terminar se quita de la crónica la frase ENTERA de la cabeza, y en la reunión la crónica
+   * sólo sale para quien no tiene aviso (el espectador).
+   */
+  const pregon = v.momento === 'reuniendo' && v.aviso.length > 0 ? '' : sinLaFrase(v.pregon, cabeza);
+  if (pregon.length > 0) partes.push(pregon);
   return partes.join(' ');
+}
+
+/**
+ * `texto` sin la FRASE ENTERA `frase`, de principio de frase a su punto, dondequiera que esté.
+ * Las frases de la crónica se juntan con un espacio, así que basta con mirar los bordes: una
+ * frase más larga que empiece igual no se toca. ES2015 llano —sin `trimStart` ni lookbehind—,
+ * porque este fichero corre también en Hermes.
+ */
+function sinLaFrase(texto: string, frase: string): string {
+  if (frase.length === 0) return texto;
+  let salida = texto;
+  let desde = 0;
+  for (;;) {
+    const i = salida.indexOf(frase, desde);
+    if (i < 0) return salida;
+    const fin = i + frase.length;
+    const empieza = i === 0 || salida.charAt(i - 1) === ' ';
+    const acaba = fin === salida.length || salida.charAt(fin) === ' ';
+    if (!empieza || !acaba) {
+      desde = i + 1;
+      continue;
+    }
+    const antes = salida.slice(0, i).replace(/\s+$/, '');
+    const despues = salida.slice(fin).replace(/^\s+/, '');
+    salida = antes.length === 0 ? despues : despues.length === 0 ? antes : `${antes} ${despues}`;
+    desde = antes.length;
+  }
 }
 
 /**

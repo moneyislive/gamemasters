@@ -716,6 +716,10 @@ function LaMesaEnTres({
    * pantalla, el lienzo entero es UN elemento, y ahí dentro no hay cuarenta casillas:
    * hay una etiqueta.
    *
+   * Desde el 16-sep-2026 la compra está además en «Ahora» y en el carril (la sube la
+   * traducción), así que con el carril puesto esto ya no la devuelve: su botón está a
+   * la vista. El gemelo queda para lo que ningún mueble recoja.
+   *
    * `obrasSoloEnElAnillo` devuelve exactamente esas —y ni una más: se le pasa también
    * EL CARRIL, porque en mi apuro vender e hipotecar se van de las fichas a «Ahora» y
    * de «Ahora» al carril, y sin decírselo pediría un gemelo para cada una—. Aquí se

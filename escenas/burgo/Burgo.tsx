@@ -181,6 +181,7 @@ import type { FiguraId } from '../embarcadero/figuras';
 import { DURACION } from '../embarcadero/gestos';
 import { ATRIBUTO_DE_TINTE_CARGADO } from '../embarcadero/piezas';
 import type { Traer } from '../embarcadero/tipos';
+import { catalogoDelBurgoDe } from './catalogo-del-burgo';
 import { PIEZA, RETICULA_DE_LA_CIUDAD } from './piezas';
 import type { NombreDePieza } from './piezas';
 import {
@@ -690,23 +691,11 @@ function esDeDedo(e: { nativeEvent: unknown }): boolean {
 
 /* ─────────────────────────── La carga, con caché por `traer` ─────────────────────────── */
 
-const catalogosDelBurgo = new WeakMap<Traer, Promise<CatalogoDeModelos>>();
+/*
+ * El de `burgo.glb` vive en `./catalogo-del-burgo`, compartido con la plaza del lobby: dos
+ * cachés del mismo fichero serían 2,8 MB bajados dos veces justo al zarpar.
+ */
 const catalogosDeLosDados = new WeakMap<Traer, Promise<CatalogoDeModelos | null>>();
-
-/** El catálogo de `burgo.glb`, una vez por función `traer`; el fallo no se queda en la caché. */
-function catalogoDelBurgoDe(traer: Traer): Promise<CatalogoDeModelos> {
-  const hecho = catalogosDelBurgo.get(traer);
-  if (hecho !== undefined) return hecho;
-  const promesa = traer(rutaDelBurgo())
-    .then((bytes) => abrirGlb(bytes))
-    .then((gltf) => catalogoDeModelos(gltf.scene))
-    .catch((fallo: unknown) => {
-      catalogosDelBurgo.delete(traer);
-      throw fallo instanceof Error ? fallo : new Error(String(fallo));
-    });
-  catalogosDelBurgo.set(traer, promesa);
-  return promesa;
-}
 
 /** El catálogo de `dados.glb`, o `null` si no llega: entonces se pinta el respaldo. */
 function catalogoDeLosDadosDe(traer: Traer, alFallar: (motivo: string) => void): Promise<CatalogoDeModelos | null> {

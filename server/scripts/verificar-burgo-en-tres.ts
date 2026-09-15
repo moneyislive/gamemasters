@@ -365,6 +365,8 @@ type Puntos = { firma: string; o: OpcionQueLlega }[];
  * `gemelos` tampoco es un botón: son las obras que el anillo enciende y que NINGÚN botón
  * recoge —comprar y sacar a subasta, que no tienen ficha porque el título no es mío—, y a
  * las que el cliente le debe un gemelo de sólo apoyo para que se puedan hacer con teclado.
+ * Desde el 16-sep-2026 la compra está en «Ahora» y en el carril, así que con la hoja y el
+ * carril compuestos esta lista sale VACÍA, y las partidas lo exigen.
  *
  * `carril` SÍ ES UN BOTÓN, y es el sexto: cada cuadrado de 44 puntos se pulsa y manda. Entra
  * en la cuenta de «uno y sólo uno» con los demás, que es lo que caza que la sección «Ahora»
@@ -442,10 +444,11 @@ function reprochesDeLaParticion(opciones: readonly Opcion[], p: Particion): stri
   repetido(p.tocables, 'las casillas');
   /*
    * EL ATAJO SIEMPRE TIENE SU BOTÓN. Toda casilla encendida está, POR IDENTIDAD, o en un
-   * botón (la ficha de «Lo mío», o «Ahora» en mi apuro) o en la lista de gemelos —comprar y
-   * sacar a subasta, que no tienen ficha porque el título no es mío todavía—. Sin esta
-   * cuenta, una obra alcanzable sólo con el ratón pasa desapercibida: la partición seguiría
-   * siendo una partición y el movimiento seguiría teniendo sitio.
+   * botón (la ficha de «Lo mío», «Ahora» en mi apuro, o «Ahora» y el carril en la compra) o en
+   * la lista de gemelos —lo que el anillo enciende cuando a la criba no se le dice dónde está
+   * el botón: comprar y sacar a subasta, que no tienen ficha porque el título no es mío
+   * todavía—. Sin esta cuenta, una obra alcanzable sólo con el ratón pasa desapercibida: la
+   * partición seguiría siendo una partición y el movimiento seguiría teniendo sitio.
    */
   const deTituloAjeno = (o: OpcionQueLlega): boolean => o.tipo === COMPRAR || o.tipo === A_ALMONEDA;
   for (const t of p.tocables) {
@@ -647,7 +650,18 @@ function reprochesDeLaHoja(
       if (enMiApuro) for (const o of obras) if (!enAhora.some((x) => x === o)) r.push(`en el apuro, la obra de ${f.casilla} no subió a «Ahora»`);
     }
   }
-  if (!enMiApuro) for (const o of enAhora) if ([COMPRAR, A_ALMONEDA, ALZAR, VENDER, EMPENAR, DESEMPENAR].indexOf(o.tipo) >= 0) r.push(`«Ahora» lleva una obra fuera del apuro: ${o.id}`);
+  /*
+   * FUERA DE MI APURO, «AHORA» NO LLEVA OBRAS SOBRE UN TÍTULO… SALVO LA COMPRA, que desde el
+   * 16-sep-2026 sube aquí delante de todo (ver «LA COMPRA SUBE A "AHORA"» en `burgo-en-tres.ts`).
+   * Y la regla tiene su otra mitad, que es la que caza el fallo que la trajo: si el juego ofrece
+   * comprar o sacar a subasta, las dos ESTÁN en el sitio que toca —la sección o el carril—, por
+   * identidad y en cabeza. Sin esta mitad, volver a dejarlas sólo en la casilla del anillo
+   * pasaría en verde, que es exactamente como estuvo.
+   */
+  if (!enMiApuro) for (const o of enAhora) if ([ALZAR, VENDER, EMPENAR, DESEMPENAR].indexOf(o.tipo) >= 0) r.push(`«Ahora» lleva una obra fuera del apuro: ${o.id}`);
+  const deLaCompra = opciones.filter((o) => o.declaracion !== true && (o.tipo === COMPRAR || o.tipo === A_ALMONEDA));
+  for (const o of deLaCompra) if (!enAhora.some((x) => x === o)) r.push(`la compra no está a la vista: ${o.id} sólo tiene la casilla del anillo`);
+  if (deLaCompra.length > 0 && !deLaCompra.every((o) => { const k = enAhora.indexOf(o); return k >= 0 && k < deLaCompra.length; })) r.push('la compra no va en cabeza de «Ahora»');
   /* La subasta y los tratos de la hoja son los de las funciones sueltas. */
   const puja = pujaEnTres(vista, quien, opciones);
   if ((h.puja === null) !== (puja === null)) r.push('la hoja y pujaEnTres no coinciden');
@@ -964,6 +978,12 @@ interface Cuentas {
   cajasDeTratos: number;
   gemelosDeApoyo: number;
   /**
+   * Cuántas miradas tuvieron COMPRAR a la vista, en el carril. Es la cuenta que compra que no
+   * vuelva lo del 16-sep-2026: la compra vivía sólo en la casilla del anillo y la partida se
+   * jugaba igual, así que sin un mínimo aquí devolverla a la casilla pasaría en verde.
+   */
+  comprasALaVista: number;
+  /**
    * EL CARRIL, MEDIDO. `carrilesConCuadrados` es cuántas vistas tuvieron al menos un cuadrado
    * que pulsar; los otros dos son para leer de un vistazo si el mueble se está usando de
    * verdad o si sale siempre con el mismo botón solitario. Sin un mínimo sobre el primero, un
@@ -995,6 +1015,7 @@ function cuentasNuevas(): Cuentas {
     ganador: false,
     cajasDeTratos: 0,
     gemelosDeApoyo: 0,
+    comprasALaVista: 0,
     carrilesConCuadrados: 0,
     cuadradosDelCarril: 0,
     carrilMasLargo: 0,
@@ -1010,6 +1031,21 @@ function hito(c: Cuentas, nombre: string): void {
 }
 
 /** Las siete miradas de una mesa: cada asiento y el espectador, con la traducción entera encima. */
+/**
+ * La primera mirada de las partidas en la que el carril llevó COMPRAR. La vacuna de «la compra
+ * a la vista» se monta sobre ella —con el carril de antes del 16-sep-2026 tiene que verse
+ * caer—, y así se prueba sobre una vista de verdad y no sobre una fabricada.
+ */
+interface MomentoDeLaCompra {
+  vista: VistaDelBurgo;
+  quien: QuienMira;
+  opciones: readonly Opcion[];
+  hoja: HojaDelBurgo<Opcion>;
+  secretos: ReturnType<typeof seriesSecretas>;
+  carril: readonly GlifoDelCarrilDelBurgo<Opcion>[];
+}
+let momentoDeLaCompra: MomentoDeLaCompra | null = null;
+
 function revisarLaMesa(mesa: Mesa, c: Cuentas, anteriores: Map<string, VistaDelBurgo[]>): void {
   const secretos = seriesSecretas(mesa);
   const miradas: QuienMira[] = [...mesa.asientos, ESPECTADOR];
@@ -1047,6 +1083,10 @@ function revisarLaMesa(mesa: Mesa, c: Cuentas, anteriores: Map<string, VistaDelB
     anota(c, donde, reprochesDeLosTextos(vista, quien));
     if (pregon !== null) c.cajasDeTratos++;
     if (obrasSoloEnElAnillo(opciones, tablero, hoja, carril).length > 0) c.gemelosDeApoyo++;
+    if (carril !== null && carril.some((g) => g.opcion.tipo === COMPRAR)) {
+      c.comprasALaVista++;
+      if (momentoDeLaCompra === null) momentoDeLaCompra = { vista, quien, opciones, hoja, secretos, carril };
+    }
     /*
      * CUÁNTAS VISTAS TUVIERON ALGO QUE PINTAR EN EL CARRIL. Este contador es lo que compra
      * que no vuelva el fallo que trajo el mueble: el carril se alimentaba de
@@ -1223,6 +1263,7 @@ function resumen(c: Cuentas): Record<string, unknown> {
     gruesas: [c.gruesasConMueve, c.gruesasConCambioDeMano, c.gruesasVacias],
     cajas: c.cajasDeTratos,
     gemelos: c.gemelosDeApoyo,
+    compras: c.comprasALaVista,
     carriles: [c.carrilesConCuadrados, c.cuadradosDelCarril, c.carrilMasLargo],
     pujasLibres: c.pujasLibresAceptadas,
     tratosMontados: c.tratosMontadosAceptados,
@@ -1290,7 +1331,15 @@ for (const p of PARTIDAS) {
   comprobar(`${p.id}: hubo subastas abiertas y compras`, (cuentas.hitos['almoneda-abierta'] ?? 0) >= 1 && (cuentas.hitos['compra'] ?? 0) >= 5, cuentas.hitos);
   comprobar(`${p.id}: alguien pasó por la Comisaría`, (cuentas.hitos['a-la-mazmorra'] ?? 0) >= 1, cuentas.hitos);
   comprobar(`${p.id}: salieron cartas`, (cuentas.hitos['carta'] ?? 0) >= 2, cuentas.hitos);
-  comprobar(`${p.id}: hubo obras que sólo tenía el anillo y pidieron gemelo de apoyo`, cuentas.gemelosDeApoyo >= 5, cuentas.gemelosDeApoyo);
+  /*
+   * COMPRAR, A LA VISTA. Hasta el 16-sep-2026 aquí se exigía lo contrario —que comprar y sacar
+   * a subasta pidieran gemelo de sólo apoyo, porque no tenían más botón que la casilla—, y eso
+   * era medir que el fallo seguía puesto. Ahora la compra está en el carril y la casilla es su
+   * atajo: se exige que haya salido muchas veces a la vista, y que con la hoja y el carril
+   * compuestos NINGUNA obra se quede sin botón.
+   */
+  comprobar(`${p.id}: comprar salió a la vista en el carril en muchas miradas`, cuentas.comprasALaVista >= 5, cuentas.comprasALaVista);
+  comprobar(`${p.id}: y con la hoja y el carril compuestos ninguna obra pidió gemelo de sólo apoyo`, cuentas.gemelosDeApoyo === 0, cuentas.gemelosDeApoyo);
   /*
    * ═══ EL CARRIL SE LLENÓ, Y ÉSTA ES LA CUENTA QUE COMPRA QUE NO VUELVA EL FALLO ═══
    *
@@ -1782,11 +1831,29 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
   const desconocido = glifosDelCarrilDelBurgo(vista, quien, [{ id: 'z', tipo: 'burgo:algo-que-no-existe', carga: {}, rotulo: 'Hacer algo nuevo', ayuda: '' }]);
   comprobar('un movimiento que este cliente no conoce cae a las dos primeras letras de su rótulo, no a un hueco', desconocido[0]?.glifo === 'Ha' && desconocido[0]?.rotulo === 'Hacer algo nuevo', desconocido);
   comprobar('y sin rótulo tampoco se queda en blanco', glifosDelCarrilDelBurgo(vista, quien, [{ id: 'z', tipo: 'burgo:otro', carga: {}, rotulo: '', ayuda: '' }])[0]?.glifo === '?');
-  const conObra = glifosDelCarrilDelBurgo(vista, quien, [{ id: 'c39', tipo: COMPRAR, carga: { casilla: 39 }, rotulo: 'Comprar Avenida de las Acacias por 400 €', ayuda: '' }])[0];
+  const conObra = glifosDelCarrilDelBurgo(vista, quien, [{ id: 'a39', tipo: ALZAR, carga: { casilla: 39 }, rotulo: 'Alzar una casa en Avenida de las Acacias (200 €)', ayuda: '' }])[0];
   comprobar(
     'el cuadrado de una obra dice el verbo dentro, el rótulo de SEIS LETRAS de la cara debajo, y el filo de la acera',
-    conObra?.glifo === 'Co' && conObra.rotulo === (CASILLAS[39]?.rotulo ?? '') && conObra.color === (barrioDe(39)?.color ?? null) && conObra.casilla === 39,
+    conObra?.glifo === 'Al' && conObra.rotulo === (CASILLAS[39]?.rotulo ?? '') && conObra.color === (barrioDe(39)?.color ?? null) && conObra.casilla === 39,
     conObra,
+  );
+  /*
+   * EN LA COMPRA, LA CIFRA Y EL VERBO. Los dos cuadrados del momento de comprar son de LA MISMA
+   * casilla, la que la cinta ya nombra: con el rótulo de seis letras salían «Co / Acacia» y «Su /
+   * Acacia», que no distinguen nada. Comprar dice lo que cuesta y sacar a subasta dice qué hace.
+   */
+  const conCompra = glifosDelCarrilDelBurgo(vista, quien, [
+    { id: 'c39', tipo: COMPRAR, carga: { casilla: 39 }, rotulo: 'Comprar Avenida de las Acacias por 400 €', ayuda: '' },
+    { id: 's39', tipo: A_ALMONEDA, carga: { casilla: 39 }, rotulo: 'Sacar Avenida de las Acacias a subasta', ayuda: '' },
+  ]);
+  comprobar(
+    'y en la compra, comprar dice la CIFRA y sacar a subasta el VERBO, los dos con el filo de la acera',
+    conCompra[0]?.glifo === 'Co' &&
+      conCompra[0].rotulo === maravedies(CASILLAS[39]?.precio ?? -1) &&
+      conCompra[1]?.glifo === 'Su' &&
+      conCompra[1].rotulo === 'Subasta' &&
+      conCompra.every((g) => g.color === (barrioDe(39)?.color ?? null) && g.casilla === 39),
+    conCompra,
   );
   const conPuja = glifosDelCarrilDelBurgo(vista, quien, [{ id: 'p', tipo: PUJAR, carga: { casilla: 5, cuanto: 120 }, rotulo: 'Pujar 120 € por la Estación', ayuda: '' }])[0];
   comprobar('el de una puja dice la cifra, que es lo que la distingue de la puja de al lado', conPuja?.glifo === 'Pu' && conPuja.rotulo === maravedies(120), conPuja);
@@ -2091,6 +2158,22 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
   comprobar('sin anillo montado no hay gemelo que pintar: todo vuelve como botón suelto', obrasSoloEnElAnillo(opciones, null, hoja).length === 0);
   comprobar('y con el cajón cerrado el anillo se queda con TODAS las obras, que es lo que hay que decirle al cliente', obrasSoloEnElAnillo(opciones, tablero, null).length >= gemelos.length);
   comprobar('un gemelo es la opción ENTERA del juego, no una montada', gemelos.every((o) => opciones.indexOf(o) >= 0));
+
+  /* ── LA COMPRA, A LA VISTA (16-sep-2026) ── */
+  {
+    /* La aserción no es un descuido: TypeScript estrecha la variable a `null` porque sólo la ve asignada dentro de `revisarLaMesa`. */
+    const m = momentoDeLaCompra as MomentoDeLaCompra | null;
+    comprobar('las partidas pasaron por una mirada con COMPRAR en el carril, o la vacuna de abajo no probaría nada', m !== null);
+    if (m !== null) {
+      const carrilDeAntes = m.carril.filter((g) => g.opcion.tipo !== COMPRAR && g.opcion.tipo !== A_ALMONEDA);
+      const conElDeAntes = reprochesDeLaHoja(m.vista, m.quien, m.opciones, m.hoja, m.secretos, carrilDeAntes);
+      comprobar(
+        'VACUNA: con el carril de antes —comprar y sacar a subasta sólo en la casilla del anillo— la regla de la hoja se ve caer',
+        conElDeAntes.some((x) => x.indexOf('la compra no está a la vista') >= 0),
+        conElDeAntes.slice(0, 3),
+      );
+    }
+  }
 
   /* ── EL TEXTO QUE SE REPITE, Y EL QUE NO SE LEE SOLO ── */
   /*
@@ -2638,7 +2721,7 @@ try {
  * el guardia delante nadie ve el nombre de lo que se rompió. Por eso las rojas se imprimen
  * ANTES de irse.
  */
-const MINIMO = 289;
+const MINIMO = 295;
 if (hechas < MINIMO) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);

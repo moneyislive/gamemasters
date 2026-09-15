@@ -437,6 +437,19 @@ function reprochesDeSecretos(e: EstadoDelBurgo | undefined, asientos: readonly A
   return reproches;
 }
 
+/**
+ * «a el» y «de el» sin contraer, que en castellano son «al» y «del». Con «El» en mayúscula
+ * —el nombre propio de un jugador, «a El Pícaro»— no se contrae, y por eso sólo se mira la
+ * minúscula. La crónica escribía «paga 120 € por la subasta a el Ayuntamiento» y ninguna de
+ * las 590 comprobaciones lo veía: se vio jugando una mesa de verdad el 16-sep-2026.
+ */
+function contraccionesSinHacer(texto: string): string[] {
+  const conBorde = ` ${texto}`;
+  const salida: string[] = [];
+  for (const mal of [' a el ', ' de el ']) if (conBorde.indexOf(mal) >= 0) salida.push(mal.trim());
+  return salida;
+}
+
 /** Un texto con un secreto dentro: un motivo, un rótulo, una ayuda. */
 function reprochesDeTexto(texto: string, e: EstadoDelBurgo): string[] {
   const reproches: string[] = [];
@@ -512,6 +525,7 @@ function reprochesDeForma(vista: unknown, opciones: readonly Opcion[], quien: Qu
   for (const c of t.caras) textos.push(c.rotulo, c.cifra);
   for (const texto of textos) {
     for (const m of marcasEn(texto)) reproches.push(`«${texto.slice(0, 40)}» nombra ${m}`);
+    for (const mal of contraccionesSinHacer(texto)) reproches.push(`«${texto.slice(0, 60)}» escribe «${mal}» sin contraer`);
     if (conNombres) {
       for (const j of v.jugadores) if (texto.indexOf(j.asiento) >= 0) reproches.push(`«${texto.slice(0, 60)}» enseña el id crudo ${j.asiento}`);
     }
@@ -2157,6 +2171,7 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
   const resumen: string[] = [];
   for (const [cuantos, semilla, vueltas, cadaCuantos, topePasos] of PARTIDAS_DE_VERDAD) {
     let revisadas = 0;
+    let conContraccion = 0;
     let reprochesEnVuelo: string[] = [];
     const desde = performance.now();
     const p = partidaVigilada(
@@ -2169,6 +2184,8 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
       loQueHaceElRobot,
       (e, asientos) => {
         revisadas++;
+        /* Que la crónica diga «al Ayuntamiento» en alguna revisión es lo que prueba que la regla de arriba miró la frase que fallaba. */
+        if ((vistaDeAsiento(BURGO, e, ESPECTADOR, undefined) as VistaDelBurgo).pregon.indexOf('al Ayuntamiento') >= 0) conContraccion++;
         if (reprochesEnVuelo.length > 0) return;
         /*
          * `conNombres: false`: la mesa del robot no tiene registro de nombres, así que
@@ -2185,6 +2202,20 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
     const reproches = reprochesDePartida(p);
     comprobar(`la partida de ${cuantos} se juega DE VERDAD hasta el final y trae de todo`, reproches.length === 0, { reproches, cuenta: p.cuenta, corte: p.corte });
     comprobar(`  y en sus ${revisadas} revisiones no hay ni un secreto ni un reproche de forma en las ${cuantos + 1} miradas`, reprochesEnVuelo.length === 0, reprochesEnVuelo.slice(0, 6));
+    comprobar(`  y la crónica contrae «al Ayuntamiento» (${conContraccion} revisiones lo dicen), que es la frase que salía «a el»`, conContraccion >= 1, conContraccion);
+    /*
+     * EL AVISO DEL FINAL DICE «SE ACABÓ» UNA VEZ. Era cabeza + aviso + crónica, y la crónica
+     * cierra con la frase del suceso `fin`, letra a letra la cabeza: la línea de estado de una
+     * mesa de verdad decía «Se acabó: Ana se queda con el Burgo. Te quedas con el Burgo. … Se
+     * acabó: Ana se queda con el Burgo.» (16-sep-2026). La vacuna es la crónica, que sigue
+     * trayendo la frase: pegada entera, «Se acabó» sale dos veces.
+     */
+    {
+      const alFinal = vistaDeAsiento(BURGO, p.estado, ESPECTADOR, undefined) as VistaDelBurgo;
+      const veces = (texto: string): number => texto.split('Se acabó').length - 1;
+      comprobar('  y el aviso del final dice «Se acabó» una sola vez', veces(alFinal.tablero.aviso) === 1, alFinal.tablero.aviso);
+      comprobar('  VACUNA: la crónica del final trae la misma frase, así que pegada entera saldría dos veces', veces(`${alFinal.tablero.aviso} ${alFinal.pregon}`) >= 2, alFinal.pregon);
+    }
     comprobar('  `jugada` sube exactamente una vez por revisión, y los sucesos nunca pasan del tope', p.estado.jugada === p.revisiones && p.estado.sucesos.length <= TOPE_DE_SUCESOS, { jugada: p.estado.jugada, revisiones: p.revisiones, sucesos: p.estado.sucesos.length });
     comprobar('  hay ganador, sigue vivo, y `seAcabo` lo dice', p.estado.ganadores.length >= 1 && p.estado.ganadores.every((g) => !jugadorDe(p.estado, g).quebrado) && seAcabo(p.estado) === true, p.estado.ganadores);
     comprobar('  y el último suceso es el `fin`: la crónica no se corta por el tope y pierde el final', (p.estado.sucesos[p.estado.sucesos.length - 1] as SucesoDelBurgo | undefined)?.que === 'fin', p.estado.sucesos.length);
@@ -2196,6 +2227,11 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
   }
   console.log('  partidas jugadas de verdad:');
   for (const r of resumen) console.log(r);
+  comprobar(
+    'LA VACUNA de la contracción: «a el» y «de el» se ven caer en un texto de la vista',
+    contraccionesSinHacer('Diego paga 120 € por la subasta a el Ayuntamiento.').length === 1 && contraccionesSinHacer('Las llaves de el Ayuntamiento.').length === 1,
+  );
+  comprobar('  y un nombre propio en mayúscula no se contrae: «a El Pícaro» se queda así', contraccionesSinHacer('Bea paga 50 € a El Pícaro.').length === 0);
 
   /*
    * LA VACUNA DEL BUCLE QUE DICE JUGAR Y NO JUEGA. El robot mudo tira porque no le
@@ -2659,7 +2695,7 @@ if (fallos.length > 0) {
  * fichero) y DESPUÉS de imprimir las rojas: al ras dispara antes que la roja y se
  * lleva por delante los nombres de lo que ya se había encontrado.
  */
-const COMPROBACIONES_ESCRITAS = 590;
+const COMPROBACIONES_ESCRITAS = 601;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: ` +
