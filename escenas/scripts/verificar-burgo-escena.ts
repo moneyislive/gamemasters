@@ -1387,6 +1387,36 @@ const triangulosDeUnAventurero = await (async (): Promise<number> => {
   comprobar(`y en sobria baja de ${TOPE_SOBRIA.toLocaleString('es-ES')}`, sobria.total <= TOPE_SOBRIA, sobria.total);
   comprobar('la sobria quita de verdad: decorado del campo, atrezo menudo, aventurero y monedas', plena.total - sobria.total > 15_000, plena.total - sobria.total);
   /*
+   * LA CABECERA DE `presupuesto.ts` DICE LO QUE ESTA SUMA DA.
+   *
+   * La cabecera apunta las cifras del tablero «que `verify:burgo-escena` imprime hoy», y dos veces se
+   * quedaron viejas sin que nada lo notara: estuvo diciendo 181.333 cuando la suma daba 199.078, y
+   * a la media hora de corregirla la dejaron vieja los nombres de las estaciones. Una cifra que un
+   * documento da por actual o se compara o miente; así que se compara, con el manto de teselas.
+   */
+  const cifrasDeLaCabecera = (fuente: string): { readonly plena: number; readonly sobria: number; readonly teselas: number } | null => {
+    const numero = (texto: string | undefined): number => Number((texto ?? '').replace(/\./g, ''));
+    const plenaEscrita = /TABLERO en plena \.+ ([\d.]+)\s+de los cuales el manto de teselas son ([\d.]+)/.exec(fuente);
+    const sobriaEscrita = /TABLERO en sobria \.+ ([\d.]+)/.exec(fuente);
+    if (plenaEscrita === null || sobriaEscrita === null) return null;
+    return { plena: numero(plenaEscrita[1]), sobria: numero(sobriaEscrita[1]), teselas: numero(plenaEscrita[2]) };
+  };
+  const fuenteDelPresupuesto = fs.readFileSync(path.join(CARPETA, 'presupuesto.ts'), 'utf8');
+  const escritas = cifrasDeLaCabecera(fuenteDelPresupuesto);
+  const teselasSumadas = plena.renglones.filter((x) => x.que === PIEZA.tesela).reduce((n, x) => n + x.triangulos, 0);
+  comprobar(
+    `la cabecera de presupuesto.ts dice lo que suma el tablero: ${plena.total.toLocaleString('es-ES')} en plena, ${sobria.total.toLocaleString('es-ES')} en sobria y ${teselasSumadas.toLocaleString('es-ES')} de teselas`,
+    escritas !== null && escritas.plena === plena.total && escritas.sobria === sobria.total && escritas.teselas === teselasSumadas && teselasSumadas > 0,
+    { escritas, sumadas: { plena: plena.total, sobria: sobria.total, teselas: teselasSumadas } },
+  );
+  comprobar(
+    'se ve fallar: con las cifras que tuvo hasta hoy (181.333 y 136.547) la cabecera no casaría',
+    ((): boolean => {
+      const vieja = cifrasDeLaCabecera(fuenteDelPresupuesto.replace(/TABLERO en plena \.+ [\d.]+/, 'TABLERO en plena ... 181.333').replace(/TABLERO en sobria \.+ [\d.]+/, 'TABLERO en sobria .. 136.547'));
+      return vieja !== null && (vieja.plena !== plena.total || vieja.sobria !== sobria.total);
+    })(),
+  );
+  /*
    * LA VACUNA: la ciudad de 648 generada SIN nivel de detalle.
    *
    * El veneno tiene que ser el error que de verdad se puede cometer con el recinto nuevo, y

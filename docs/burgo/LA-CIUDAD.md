@@ -288,8 +288,9 @@ la casilla sigue siendo la franja de color, el filete, el marco y el precio gran
 
 De propina, el tablero adelgazó al quitarlos: quedó en **172.808** triángulos en plena. Con los
 NOMBRES de las casillas encima (8.525 triángulos de letras, §2 bis) iba entonces por **181.333**, de
-un tope de 900.000, así que el sitio para lo que venga después seguía ahí entero (con las obras, la
-vía, los textos y las piezas vivas de `LAS-CASILLAS.md`, hoy va por 199.438).
+un tope de 900.000, así que el sitio para lo que venga después seguía ahí entero (la cifra de hoy, con
+lo que añadió `LAS-CASILLAS.md`, está en la cabecera de `presupuesto.ts`, que el comprobador
+compara con la suma en cada pasada).
 
 El emblema mide **27** de lado (creció con el dígito, por la misma razón) y va a `u = −14`
 cuando la casilla lleva pieza, centrado cuando no.

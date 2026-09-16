@@ -761,6 +761,11 @@ export function altoDelRotulo(palabra: string, esEsquina = false): number {
  * Cortos porque la casilla mide 72 y cada letra de más encoge a todas las demás. El nombre largo
  * —«el Fondo Vecinal», «la Central Eléctrica»— sigue donde siempre se ha leído: en la hoja y en
  * el cartel del pie, que tienen texto de verdad y no tres píxeles de tinta.
+ *
+ * Las cuatro ESTACIONES entraron tarde: estos nombres nacieron al quitar los emblemas planos de
+ * las casillas especiales, y las estaciones nunca llevaron emblema —llevaban su atrezo—, así que
+ * se quedaron sin nombre en el suelo cuando todas las demás lo tenían. Llevan su rótulo del
+ * reglamento, como la Luz y el Agua, en la franja, que su obra deja libre (va de 76 a 107).
  */
 export const ROTULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
   0: 'SALIDA',
@@ -769,12 +774,16 @@ export const ROTULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
   30: '¡A COMISARÍA!',
   2: 'FONDO',
   4: 'IMPUESTO',
+  5: 'PUERTO',
   7: 'SUCESOS',
   12: 'LUZ',
+  15: 'BUSES',
   17: 'FONDO',
   22: 'SUCESOS',
+  25: 'CARGA',
   28: 'AGUA',
   33: 'FONDO',
+  35: 'TREN',
   36: 'SUCESOS',
   38: 'TASA',
 };

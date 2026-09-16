@@ -37,15 +37,17 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 199.438   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 164.194   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 202.538   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 167.294   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
  * Miguel—, que descontó unos 35.000; después fueron 181.333 y 136.547, y desde entonces suben con
  * lo que pidió para las casillas: las obras fundidas, la vía con sus dos trenes, los nombres y el
- * texto pequeño —28.830 de letras— y las piezas vivas, que hasta la moneda de la recaudación no
- * estaban contadas. Los de arriba son los que `verify:burgo-escena` imprime hoy.)
+ * texto pequeño y los nombres de las estaciones —31.930 de letras— y las piezas vivas, que hasta la
+ * moneda de la recaudación no estaban contadas. Los de arriba son los que `verify:burgo-escena`
+ * imprime hoy, y ahora también los COMPARA con esta cabecera: dos veces se quedaron viejos sin que
+ * nada lo notara, y la segunda fue a la media hora de corregirlos.)
  *
  * `TOPE_PLENA = 900.000`: el tablero más 692.000 para lo que la ciudad tenga montado. Sigue
  * siendo el 45 % de los 2.000.000 que ya mueve el delta de Riberas en un PC.

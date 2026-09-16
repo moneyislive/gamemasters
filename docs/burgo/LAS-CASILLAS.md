@@ -42,8 +42,9 @@ Dos reglas transversales, que valen para todo lo de abajo:
 | Llamadas de dibujo, pose de salida | 92 | 150 | 58 |
 | Llamadas de dibujo, cámara cerca | 114 | 150 | 36 |
 
-Con el plan hecho —obras, vía y trenes, textos y piezas vivas— el tablero va por 199.438
-triángulos en plena y 164.194 en sobria: sigue sobrando de lo uno y escaseando lo otro.
+Con el plan hecho —obras, vía y trenes, textos y piezas vivas— sigue sobrando de lo uno y
+escaseando lo otro. La cifra de hoy está en la cabecera de `presupuesto.ts`, y `verify:burgo-escena`
+la compara con la suma: no se copia aquí para que no se quede vieja.
 
 Y de ahí sale **la decisión que gobierna todo este documento**:
 
@@ -124,6 +125,14 @@ Así que el suelo dice lo que dice el reglamento:
 | 30 | ¡A COMISARÍA! | RETENIDO | el cuartel con su celda |
 | 2 · 17 · 33 | FONDO | COGE CARTA | el cofre |
 | 7 · 22 · 36 | SUCESOS | COGE CARTA | el casino |
+| 4 | IMPUESTO | — (su cifra: 200) | la oficina del estado |
+| 38 | TASA | — (su cifra: 100) | la joya en su escaparate |
+| 12 · 28 | LUZ · AGUA | — (su precio) | la central y el canal de aguas |
+| 5 · 15 · 25 · 35 | PUERTO · BUSES · CARGA · TREN | — (su precio) | las cuatro estaciones |
+
+Las cuatro estaciones se quedaron un tiempo sin nombre: los nombres nacieron al quitar los
+emblemas planos de las casillas especiales, y las estaciones nunca llevaron emblema. Llevan su
+rótulo del reglamento, en la franja, que su obra deja libre.
 
 Lo que Miguel pidió con sus palabras está en lo CONSTRUIDO: el recinto de la 10 parece lo que él
 llamó una cárcel de verdad, y el cartel del aparcamiento dice PARKING, porque es un letrero y no
