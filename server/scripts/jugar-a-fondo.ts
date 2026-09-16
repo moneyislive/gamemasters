@@ -237,7 +237,30 @@ function variantesDe(
   const crudas = opcionesDelCampo(vista, accion.id, primero.campo);
   const opciones = esGente ? sinMi(crudas, vista) : crudas;
   if (opciones.length <= 1) return [base];
-  return opciones.map((o) => ({ ...base, [primero.campo]: o.id }));
+  /*
+   * ═══ Y SE ROTAN POR JUGADOR, POR LA MISMA RAZÓN QUE EN `datosPara` ═══
+   *
+   * El bucle de abajo CORTA en cuanto una variante se acepta —«aceptada una vez, ya está
+   * viva»—, así que con la lista siempre en el mismo orden la que se ejecuta de verdad es
+   * SIEMPRE LA PRIMERA, para los seis jugadores y en todas las rondas. Eso no falsea el
+   * veredicto, pero estrecha el estado al que llega la partida, y con el estado estrecho hay
+   * acciones que no se pueden ejercitar NUNCA.
+   *
+   * Medido en la Momia, que es donde salía: los seis entraban siempre en la primera cámara,
+   * y una marca sólo la deja la cámara PROFANADA —una por vigilia entre cinco, al azar—. O
+   * sea que sólo había marcas si la profanada caía en la primera: 1−(4/5)³ ≈ 49 %. Sin
+   * marcas, `ofrendar` da siempre la misma excusa («No tiene ninguna marca que quitarle») y
+   * la regla de ahí abajo la declaraba TAPIADA. La acción estaba viva: lo estrecho era el
+   * recorrido, y por eso la batería salía 82/82 o 81/82 según la tirada.
+   *
+   * ESTO NO AFLOJA EL DETECTOR, que es lo que había que cuidar: el corte sólo ocurre cuando
+   * alguna variante ACIERTA. En una acción que no acierta nunca no hay corte, se prueban
+   * todas igual y el conjunto de excusas sale idéntico. Rotar cambia CUÁL se ejecuta, no
+   * cuántas se prueban cuando no se ejecuta ninguna.
+   */
+  const giro = desplazamiento % opciones.length;
+  const rotadas = [...opciones.slice(giro), ...opciones.slice(0, giro)];
+  return rotadas.map((o) => ({ ...base, [primero.campo]: o.id }));
 }
 
 async function jugarUno(m: ManifiestoDeJuego): Promise<void> {
