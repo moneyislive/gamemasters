@@ -246,16 +246,21 @@ import {
   tonoDelEdificio,
 } from './ciudad';
 import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
-import { claveDelBulto, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
-import { largoDeLaVia, paradasDelTren, puntoEnLaVia } from './obras';
+import { claveDelBulto, geometriaDeLaJoya, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
+import { bisagrasDeLosCofres, ejeDeLaJoya, ejesDeLasRuletas, largoDeLaVia, paradasDelTren, puntoEnLaVia } from './obras';
 import { CASAS_DEL_CONCEJO, DISCOS_DEL_TRATO, DISCOS_DE_CONTACTO, MONEDAS_EN_VUELO, POSADAS_DEL_CONCEJO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DEL_DISCO, TITULOS } from './presupuesto';
 import {
   HUNDIR_CASAS,
   LUMINANCIA_EMPENADA,
   POR_CASA,
+  TAPA_DEL_COFRE,
   TREN,
   alzadoDeLaReja,
+  aperturaDelCofre,
   avanceDelTren,
+  giroDeLaJoya,
+  giroDeLaRuleta,
+  loQueAnimaUnaCarta,
   arcoDeMoneda,
   avanzarLaCola,
   backOut,
@@ -604,6 +609,7 @@ function construirLaCiudad(ciudad: LaCiudad, catalogo: CatalogoDeModelos, materi
   };
 }
 
+const EJE_X = new THREE.Vector3(1, 0, 0);
 const EJE_Y = new THREE.Vector3(0, 1, 0);
 const EJE_Z = new THREE.Vector3(0, 0, 1);
 const auxPosicion = new THREE.Vector3();
@@ -1223,6 +1229,22 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   useEffect(() => () => trenGeometria?.dispose(), [trenGeometria]);
   const trenes = useRef<THREE.InstancedMesh>(null);
   const laVia = useMemo(() => ({ largo: largoDeLaVia(), paradas: paradasDelTren() }), []);
+  /* Las tres piezas vivas de las casillas: las tapas de los cofres, las ruletas y la joya. */
+  const tapaGeometria = useMemo(geometriaDeLaTapa, []);
+  const ruletaGeometria = useMemo(geometriaDeLaRuleta, []);
+  const joyaGeometria = useMemo(geometriaDeLaJoya, []);
+  useEffect(
+    () => () => {
+      tapaGeometria?.dispose();
+      ruletaGeometria?.dispose();
+      joyaGeometria?.dispose();
+    },
+    [tapaGeometria, ruletaGeometria, joyaGeometria],
+  );
+  const tapas = useRef<THREE.InstancedMesh>(null);
+  const ruletas = useRef<THREE.InstancedMesh>(null);
+  const joya = useRef<THREE.InstancedMesh>(null);
+  const sitiosVivos = useMemo(() => ({ cofres: bisagrasDeLosCofres(), ruletas: ejesDeLasRuletas(), joya: ejeDeLaJoya() }), []);
 
   const materiales = useMemo(
     () => ({
@@ -2046,6 +2068,56 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     }
 
     /*
+     * ─ LAS TRES PIEZAS VIVAS DE LAS CASILLAS ─
+     *
+     * La tapa del cofre se abre cuando el que mueve coge una carta del ARCA, y la ruleta gira
+     * cuando la coge del PREGÓN; la joya da una vuelta cuando alguien paga la Tasa. El suceso de
+     * la carta no dice en qué casilla se cogió —hay tres de cada—, así que se mira dónde está el
+     * peón de quien la coge: es el único sitio donde esa carta puede haber salido.
+     */
+    {
+      const carta = enCursoDe('carta');
+      const dondeEstaEl = (quien: string): number => peones.current.get(quien)?.enCasilla ?? -1;
+      const casillaDeLaCarta = carta !== undefined && carta.suceso.que === 'carta' ? dondeEstaEl(carta.suceso.quien) : -1;
+      const mazo = carta !== undefined && carta.suceso.que === 'carta' ? carta.suceso.mazo : null;
+      const desdeLaCarta = carta === undefined ? 0 : ahora - carta.desde;
+      const queSeAnima = loQueAnimaUnaCarta(mazo, casillaDeLaCarta);
+      const mt = tapas.current;
+      if (mt !== null) {
+        sitiosVivos.cofres.forEach((sitio, i) => {
+          const abierta = queSeAnima.cofre === sitio.casilla ? aperturaDelCofre(desdeLaCarta) : 0;
+          auxGiro.setFromAxisAngle(EJE_Y, sitio.giro);
+          auxGiro.multiply(auxGiro2.setFromAxisAngle(EJE_X, -abierta * TAPA_DEL_COFRE.angulo));
+          auxMatriz.compose(auxPosicion.set(sitio.x, sitio.y, sitio.z), auxGiro, auxEscala.set(1, 1, 1));
+          mt.setMatrixAt(i, auxMatriz);
+        });
+        mt.count = sitiosVivos.cofres.length;
+        mt.instanceMatrix.needsUpdate = true;
+      }
+      const mr = ruletas.current;
+      if (mr !== null) {
+        sitiosVivos.ruletas.forEach((sitio, i) => {
+          const girada = queSeAnima.ruleta === sitio.casilla ? giroDeLaRuleta(desdeLaCarta) : 0;
+          auxGiro.setFromAxisAngle(EJE_Y, sitio.giro + girada);
+          auxMatriz.compose(auxPosicion.set(sitio.x, sitio.y, sitio.z), auxGiro, auxEscala.set(1, 1, 1));
+          mr.setMatrixAt(i, auxMatriz);
+        });
+        mr.count = sitiosVivos.ruletas.length;
+        mr.instanceMatrix.needsUpdate = true;
+      }
+      const mj = joya.current;
+      if (mj !== null) {
+        const tasa = sonando.find((x) => (x.suceso.que === 'paga' || x.suceso.que === 'cobra') && x.suceso.porque === 'alcabala');
+        const girada = tasa === undefined ? 0 : giroDeLaJoya(ahora - tasa.desde);
+        auxGiro.setFromAxisAngle(EJE_Y, sitiosVivos.joya.giro + girada);
+        auxMatriz.compose(auxPosicion.set(sitiosVivos.joya.x, sitiosVivos.joya.y, sitiosVivos.joya.z), auxGiro, auxEscala.set(1, 1, 1));
+        mj.setMatrixAt(0, auxMatriz);
+        mj.count = 1;
+        mj.instanceMatrix.needsUpdate = true;
+      }
+    }
+
+    /*
      * ─ LOS DOS TRENES, que no esperan a nadie ─
      *
      * Van por la MISMA polilínea que se ve dibujada —`puntoEnLaVia`—, así que no pueden ir por un
@@ -2390,6 +2462,9 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       {/* Los precios y los emblemas de las casillas: fundidos en una sola geometría, tinta plana. */}
       {obras === null ? null : <mesh geometry={obras} material={materiales.bulto} position={[0, 0, 0]} raycast={() => null} />}
       {trenGeometria === null ? null : <instancedMesh ref={trenes} args={[trenGeometria, materiales.bulto, TREN.cuantos]} frustumCulled={false} raycast={() => null} />}
+      {tapaGeometria === null ? null : <instancedMesh ref={tapas} args={[tapaGeometria, materiales.bulto, sitiosVivos.cofres.length]} frustumCulled={false} raycast={() => null} />}
+      {ruletaGeometria === null ? null : <instancedMesh ref={ruletas} args={[ruletaGeometria, materiales.bulto, sitiosVivos.ruletas.length]} frustumCulled={false} raycast={() => null} />}
+      {joyaGeometria === null ? null : <instancedMesh ref={joya} args={[joyaGeometria, materiales.bulto, 1]} frustumCulled={false} raycast={() => null} />}
       {rotulos === null ? null : <mesh geometry={rotulos.geometria} material={materiales.rotulo} position={[0, 0, 0]} raycast={() => null} />}
 
       {/*

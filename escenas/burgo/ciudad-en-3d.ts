@@ -78,7 +78,7 @@ import {
 } from '../iconos';
 import { geometriaDeContornos } from '../formas';
 import { ALZA_DEL_ROTULO, CASILLAS, FERIA, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo } from './anillo-en-3d';
-import { COLOR_DE_OBRA, carasDeLaObraEnElMundo, carasDelTren, casillasConObra, letrasDeLosCarteles } from './obras';
+import { COLOR_DE_OBRA, carasDeLaJoyaViva, carasDeLaObraEnElMundo, carasDeLaRuleta, carasDeLaTapa, carasDelTren, casillasConObra, letrasDeLosCarteles } from './obras';
 import type { CaraEnElMundo } from './obras';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
 
@@ -586,6 +586,22 @@ function geometriaDeCarasConColor(caras: readonly CaraEnElMundo[]): THREE.Buffer
  */
 export function geometriaDeUnTren(): THREE.BufferGeometry | null {
   return geometriaDeCarasConColor(carasDelTren());
+}
+
+/**
+ * LAS TRES PIEZAS VIVAS, cada una en su propio marco y sin fundir con nada.
+ *
+ * Igual que el tren: se mueven, así que la escena las monta en `InstancedMesh` —tres tapas, tres
+ * ruletas, una joya— y les cambia la matriz. Tres llamadas de dibujo para siete piezas.
+ */
+export function geometriaDeLaTapa(): THREE.BufferGeometry | null {
+  return geometriaDeCarasConColor(carasDeLaTapa());
+}
+export function geometriaDeLaRuleta(): THREE.BufferGeometry | null {
+  return geometriaDeCarasConColor(carasDeLaRuleta());
+}
+export function geometriaDeLaJoya(): THREE.BufferGeometry | null {
+  return geometriaDeCarasConColor(carasDeLaJoyaViva());
 }
 
 export function geometriaDeLosRotulos(): Rotulos | null {

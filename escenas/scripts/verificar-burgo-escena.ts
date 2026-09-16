@@ -202,7 +202,7 @@ import {
   velocidadDelClip,
 } from '../burgo/peon';
 import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
-import { TREN, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, finDeLaCola, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
+import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, finDeLaCola, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
   ALCANCE_DEL_BURGO,
@@ -2563,6 +2563,44 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
     }
   }
 
+  /*
+   * ── 2 septies. LAS TRES PIEZAS VIVAS DE LAS CASILLAS ──
+   *
+   * La tapa del cofre, la ruleta del casino y la joya de la Tasa se mueven, así que no se funden
+   * con las demás obras: van en tres `InstancedMesh` y la escena les cambia la matriz. Lo que se
+   * mide aquí es lo único que puede medirse sin pintar: que las tres CURVAS empiecen y acaben
+   * quietas —una animación que no vuelve a su sitio deja la tapa abierta para siempre—, que duren
+   * lo que dicen, y que la regla que decide QUIÉN se anima con una carta acierte.
+   */
+  {
+    comprobar(
+      'la tapa del cofre empieza y acaba cerrada, y se abre del todo por en medio',
+      aperturaDelCofre(0) === 0 && aperturaDelCofre(TAPA_DEL_COFRE.total) === 0 && aperturaDelCofre(TAPA_DEL_COFRE.abre) === 1 && aperturaDelCofre(TAPA_DEL_COFRE.total + 5) === 0,
+      { alPrincipio: aperturaDelCofre(0), abierta: aperturaDelCofre(TAPA_DEL_COFRE.abre), alFinal: aperturaDelCofre(TAPA_DEL_COFRE.total) },
+    );
+    comprobar('y no da tirones: entre dos instantes seguidos no salta más de un décimo', (() => {
+      let mayor = 0;
+      for (let t = 0; t < TAPA_DEL_COFRE.total; t += 0.01) mayor = Math.max(mayor, Math.abs(aperturaDelCofre(t + 0.01) - aperturaDelCofre(t)));
+      return mayor < 0.1;
+    })());
+    comprobar(
+      `la ruleta da ${String(RULETA.vueltas)} vueltas y se para: al final no se mueve`,
+      Math.abs(giroDeLaRuleta(RULETA.total) - RULETA.vueltas * Math.PI * 2) < 1e-9 && Math.abs(giroDeLaRuleta(RULETA.total) - giroDeLaRuleta(RULETA.total + 1)) < 1e-9,
+    );
+    comprobar('y frena: el último décimo gira menos que el primero', giroDeLaRuleta(RULETA.total) - giroDeLaRuleta(RULETA.total - 0.08) < giroDeLaRuleta(0.08) - giroDeLaRuleta(0));
+    comprobar('la joya da una vuelta entera y se queda como estaba', Math.abs(giroDeLaJoya(JOYA_QUE_GIRA.total) - Math.PI * 2) < 1e-9);
+    /* Y la regla que decide quién se anima, que vivía dentro del bucle de fotogramas. */
+    comprobar('una carta del Arca en la 17 abre ese cofre y ninguna ruleta', loQueAnimaUnaCarta('arca', 17).cofre === 17 && loQueAnimaUnaCarta('arca', 17).ruleta === null);
+    comprobar('una del Pregón en la 22 gira esa ruleta y ningún cofre', loQueAnimaUnaCarta('pregon', 22).ruleta === 22 && loQueAnimaUnaCarta('pregon', 22).cofre === null);
+    comprobar(
+      'se ve fallar: una carta del Arca cogida en una casilla que no tiene cofre no anima nada',
+      loQueAnimaUnaCarta('arca', 22).cofre === null && loQueAnimaUnaCarta('arca', 22).ruleta === null && loQueAnimaUnaCarta(null, 17).cofre === null,
+    );
+    comprobar(
+      'y las casillas que la regla nombra son las mismas que levantan cofre y ruleta',
+      CASILLAS_DEL_ARCA.every((c) => casillasConObra().includes(c)) && CASILLAS_DEL_PREGON.every((c) => casillasConObra().includes(c)),
+    );
+  }
 
   /*
    * La vacuna de la vía es la cuenta que se hizo mal dos veces: el punto más adentro de una curva

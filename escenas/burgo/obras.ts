@@ -33,7 +33,7 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MAZMORRA, PUERTAS, SUPERFICIE, giroHaciaDentro, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MAZMORRA, PUERTAS, SUPERFICIE, giroHaciaDentro, giroHaciaFuera, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
 /** Un punto de una obra en las coordenadas de su casilla: `u` y `v` como en `puntoEnEsquina`, `y` a plomo. */
@@ -424,6 +424,11 @@ function carasDeLaComisaria(): CaraDeObra[] {
  * La tapa va escrita aparte del cuerpo aunque hoy esté fundida con él: cuando se anime —abrirse
  * al caer en la casilla— tendrá que salir de la malla, y así ya está escrita sola.
  */
+/** Las tres casillas del Fondo, las tres de Sucesos y la de la Tasa: se nombran una vez. */
+export const CASILLAS_CON_COFRE: readonly number[] = [2, 17, 33];
+export const CASILLAS_CON_CASINO: readonly number[] = [7, 22, 36];
+export const CASILLA_DE_LA_TASA = 38;
+
 const COFRE = {
   base: { u: 12, v0: 63, v1: 87, alto: 1.2 },
   cuerpo: { u: 8, v0: 67, v1: 83, desde: 1.2, hasta: 8 },
@@ -438,10 +443,14 @@ function carasDelCofre(casilla: number): CaraDeObra[] {
   salida.push(...caja(casilla, -b.u, b.u, b.v0, b.v1, 0, b.alto, COLOR_DE_OBRA.piedra));
   const c = COFRE.cuerpo;
   salida.push(...caja(casilla, -c.u, c.u, c.v0, c.v1, c.desde, c.hasta, COLOR_DE_OBRA.madera));
+  /*
+   * La TAPA no se funde con el cofre: se abre, así que vive aparte (ver «piezas vivas») y con ella
+   * los dos herrajes que la cruzan. Lo que queda aquí son los herrajes del CUERPO, que no se
+   * mueven, y así el cofre cerrado se sigue leyendo igual.
+   */
   const t = COFRE.tapa;
-  salida.push(...caja(casilla, -t.u, t.u, t.v0, t.v1, t.desde, t.hasta, COLOR_DE_OBRA.maderaClara));
   for (const u of COFRE.herraje.en) {
-    salida.push(...caja(casilla, u - COFRE.herraje.ancho / 2, u + COFRE.herraje.ancho / 2, t.v0 - 0.2, t.v1 + 0.2, c.desde, t.hasta, COLOR_DE_OBRA.hierro));
+    salida.push(...caja(casilla, u - COFRE.herraje.ancho / 2, u + COFRE.herraje.ancho / 2, t.v0 - 0.2, t.v1 + 0.2, c.desde, c.hasta, COLOR_DE_OBRA.hierro));
   }
   const ce = COFRE.cerradura;
   salida.push(...caja(casilla, -ce.u, ce.u, c.v0 - ce.fondo, c.v0, ce.desde, ce.hasta, COLOR_DE_OBRA.laton));
@@ -529,7 +538,7 @@ function carasDeLaTasa(casilla: number): CaraDeObra[] {
   salida.push(losa(casilla, -a.u, a.u, a.v0, a.v1, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.alfombra));
   const p = TASA_DE_LUJO.pedestal;
   salida.push(...caja(casilla, -p.u, p.u, p.v0, p.v1, ALZA_DEL_ASFALTO, p.alto, COLOR_DE_OBRA.marmol));
-  salida.push(...carasDeLaJoya(casilla, 0, JOYA.centroV));
+  /* La JOYA tampoco: gira sobre su eje y vive aparte (ver «piezas vivas»). */
   return salida;
 }
 
@@ -681,10 +690,12 @@ function carasDelCasino(casilla: number): CaraDeObra[] {
     const y = b.desde + paso * k;
     salida.push(...caja(casilla, r.u - b.lado / 2, r.u + b.lado / 2, r.v - r.ancho / 2 - 0.3, r.v - r.ancho / 2, y - b.lado / 2, y + b.lado / 2, COLOR_DE_OBRA.bombilla));
   }
-  /* Y la ruleta en el suelo, con su plato oscuro y el buje claro en medio. */
+  /*
+   * La RULETA no se funde: gira, así que vive aparte (ver «piezas vivas»). Lo que queda aquí es su
+   * foso, que es lo que hace que un disco en el suelo se lea como una ruleta y no como una tapa.
+   */
   const ru = CASINO.ruleta;
-  salida.push(...disco(casilla, ru.u, ru.v, ru.radio, ALZA_DEL_ASFALTO, ru.segmentos, COLOR_DE_OBRA.ruleta));
-  salida.push(...disco(casilla, ru.u, ru.v, ru.radio * 0.34, ALZA_DEL_ASFALTO + 0.05, ru.segmentos, COLOR_DE_OBRA.laton));
+  salida.push(...disco(casilla, ru.u, ru.v, ru.radio * 1.22, ALZA_DEL_ASFALTO - 0.01, ru.segmentos, COLOR_DE_OBRA.piedra));
   return salida;
 }
 
@@ -1137,6 +1148,119 @@ export function paradasDelTren(): number[] {
     salida.push(acumulado[mejor] as number);
   }
   return salida.sort((a, b) => a - b);
+}
+
+/* ─────────────── Lo que se mueve: piezas vivas, fuera de la malla fundida ─────────────── */
+
+/**
+ * LAS PIEZAS VIVAS, Y POR QUÉ NO PUEDEN IR CON LAS DEMÁS.
+ *
+ * Todo lo que levanta este fichero se FUNDE en una sola malla: una llamada de dibujo para las
+ * catorce casillas amuebladas y el ferrocarril entero. Una pieza que se mueve no puede entrar ahí
+ * —fundida está clavada— así que sale, se lleva su propia malla y la escena le cambia la matriz.
+ *
+ * Son tres, y las tres se ven SIEMPRE (no sólo mientras dura su animación), así que cuestan tres
+ * llamadas de dibujo permanentes. Se instancian por tipo y no por casilla: los tres cofres son la
+ * misma tapa puesta tres veces, y las tres ruletas la misma ruleta. Tres llamadas para siete
+ * piezas.
+ *
+ * Cada una se escribe en SU PROPIO MARCO, con el origen donde está su eje de giro:
+ *
+ *  · LA TAPA DEL COFRE gira sobre su BISAGRA, o sea sobre el canto de atrás. Su origen es esa
+ *    bisagra y la tapa se extiende hacia `+z`, que es hacia quien mira la casilla desde fuera del
+ *    anillo: al abrirse levanta el canto de delante y enseña el interior, que es lo que tiene que
+ *    verse desde arriba. Con el origen en el centro giraría como una tapa de olla al aire.
+ *  · LA RULETA gira sobre su eje, así que su origen es su centro.
+ *  · LA JOYA también, y además se escribe entera aquí —sus ocho caras— porque gira sobre sí misma.
+ */
+export interface PiezaViva {
+  readonly casilla: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  /** El `rotation.y` que lleva el `+z` del modelo al `+v` de su casilla. */
+  readonly giro: number;
+}
+
+/** La tapa, en el marco de su bisagra: de 0 a `largo` hacia el que mira, y su grueso hacia arriba. */
+export function carasDeLaTapa(): CaraDeObra[] {
+  const t = COFRE.tapa;
+  const largo = t.v1 - t.v0;
+  const grueso = t.hasta - t.desde;
+  const salida: CaraDeObra[] = [];
+  salida.push(...barra({ x: 0, z: 0 }, { x: 0, z: largo }, t.u * 2, 0, grueso, COLOR_DE_OBRA.maderaClara));
+  /* Los dos herrajes siguen con la tapa: son los que la cruzan. */
+  for (const u of COFRE.herraje.en) {
+    salida.push(...barra({ x: u, z: 0 }, { x: u, z: largo }, COFRE.herraje.ancho, grueso, grueso + 0.25, COLOR_DE_OBRA.hierro));
+  }
+  return salida;
+}
+
+/** Dónde está la bisagra de cada cofre, en el mundo: el canto de atrás de su tapa. */
+export function bisagrasDeLosCofres(): PiezaViva[] {
+  return CASILLAS_CON_COFRE.map((casilla) => {
+    const m = marcoDeCasilla(casilla);
+    const p = puntoEnLaCasillaPorV(m, 0, COFRE.tapa.v0);
+    return { casilla, x: p.x, y: COFRE.tapa.desde, z: p.z, giro: giroHaciaFuera(m) };
+  });
+}
+
+/** La ruleta, en el marco de su eje: el plato oscuro y el buje de latón. */
+export function carasDeLaRuleta(): CaraDeObra[] {
+  const r = CASINO.ruleta;
+  return [
+    ...disco(DEL_MUNDO, 0, 0, r.radio, 0, r.segmentos, COLOR_DE_OBRA.ruleta),
+    ...disco(DEL_MUNDO, 0, 0, r.radio * 0.34, 0.05, r.segmentos, COLOR_DE_OBRA.laton),
+    /* Una marca en el borde: sin ella, un disco que gira no se ve girar. */
+    ...barra({ x: r.radio * 0.45, z: 0 }, { x: r.radio * 0.95, z: 0 }, 0.9, 0.06, 0.12, COLOR_DE_OBRA.bombilla),
+  ];
+}
+
+export function ejesDeLasRuletas(): PiezaViva[] {
+  return CASILLAS_CON_CASINO.map((casilla) => {
+    const m = marcoDeCasilla(casilla);
+    const p = puntoEnLaCasillaPorV(m, CASINO.ruleta.u, CASINO.ruleta.v);
+    return { casilla, x: p.x, y: ALZA_DEL_ASFALTO, z: p.z, giro: giroHaciaFuera(m) };
+  });
+}
+
+/** La joya, centrada en su propio eje para que pueda girar sobre él. */
+export function carasDeLaJoyaViva(): CaraDeObra[] {
+  const r = JOYA.radio;
+  const medio = (JOYA.punta + JOYA.culata) / 2;
+  const cintura: readonly PuntoDeObra[] = [
+    [r, JOYA.cintura - medio, 0],
+    [0, JOYA.cintura - medio, r],
+    [-r, JOYA.cintura - medio, 0],
+    [0, JOYA.cintura - medio, -r],
+  ];
+  const punta: PuntoDeObra = [0, JOYA.punta - medio, 0];
+  const culata: PuntoDeObra = [0, JOYA.culata - medio, 0];
+  const salida: CaraDeObra[] = [];
+  for (let k = 0; k < 4; k++) {
+    const a = cintura[k] as PuntoDeObra;
+    const b = cintura[(k + 1) % 4] as PuntoDeObra;
+    /*
+     * Ojo con las vueltas: aquí NO estamos en el marco de una casilla (determinante −1) sino en el
+     * del modelo, que llega al mundo sin reflejarse. Así que el recorrido va al revés que en
+     * `carasDeLaJoya`, y por eso ésta no puede reusar aquélla.
+     */
+    salida.push(triangulo(DEL_MUNDO, b, a, punta, COLOR_DE_OBRA.joya));
+    salida.push(triangulo(DEL_MUNDO, a, b, culata, COLOR_DE_OBRA.joyaOscura));
+  }
+  return salida;
+}
+
+export function ejeDeLaJoya(): PiezaViva {
+  const m = marcoDeCasilla(CASILLA_DE_LA_TASA);
+  const p = puntoEnLaCasillaPorV(m, 0, JOYA.centroV);
+  return { casilla: CASILLA_DE_LA_TASA, x: p.x, y: (JOYA.punta + JOYA.culata) / 2, z: p.z, giro: giroHaciaFuera(m) };
+}
+
+/** Los triángulos de cada pieza viva: el presupuesto las cuenta una a una. */
+export function triangulosDeLasPiezasVivas(): { readonly tapa: number; readonly ruleta: number; readonly joya: number } {
+  const cuenta = (caras: readonly CaraDeObra[]): number => caras.reduce((n, cara) => n + (esTriangulo(cara) ? 1 : 2), 0);
+  return { tapa: cuenta(carasDeLaTapa()), ruleta: cuenta(carasDeLaRuleta()), joya: cuenta(carasDeLaJoyaViva()) };
 }
 
 /** Qué levanta cada casilla lateral. Las que no están aquí todavía no tienen obra. */

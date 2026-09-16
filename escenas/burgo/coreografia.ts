@@ -261,6 +261,11 @@ export function finDeLaCola(cola: ColaDeSucesos): number {
 /* ─────────────────────────────── Las curvas ─────────────────────────────── */
 
 const pinza = (u: number): number => Math.min(1, Math.max(0, u));
+/** Suavizado clásico: arranca y frena solo, que es lo que hace que una tapa no dé un tirón. */
+const suave = (u: number): number => {
+  const v = pinza(u);
+  return v * v * (3 - 2 * v);
+};
 
 /** El arco de una moneda entre dos puntos: altura `MONEDAS.altura · sin(πu)`. */
 export function arcoDeMoneda(u: number): number {
@@ -380,6 +385,64 @@ export function avanceDelTren(reloj: number, largo: number, paradas: readonly nu
 export function vueltaDelTren(largo: number, paradas: readonly number[]): number {
   if (paradas.length === 0) return largo / TREN.velocidad;
   return tramosDelTren(largo, paradas).reduce((a, b) => a + b / TREN.velocidad, 0) + paradas.length * TREN.parada;
+}
+
+/**
+ * LAS TRES ANIMACIONES DE CASILLA QUE SE VEN SIEMPRE, Y LO CORTAS QUE TIENEN QUE SER.
+ *
+ * Miguel lo pidió tres veces y con las mismas palabras: «las animaciones siempre deben ser muy
+ * breves». Aquí eso no es una opinión de estilo sino una cuenta: el tablero encola los sucesos de
+ * una jugada uno detrás de otro, y una tapa que tarde en abrirse más de lo que dura el suceso de
+ * la carta retrasa la partida entera. Así que las tres caben dentro de su suceso.
+ *
+ * Las tres son PURAS —de un tiempo a un número— y valen cero fuera de su ventana, que es lo que
+ * deja a la escena preguntar sin condiciones: «cuánto está abierta esta tapa ahora mismo».
+ */
+export const TAPA_DEL_COFRE = { abre: 0.22, quieta: 0.24, cierra: 0.24, total: 0.7, angulo: (72 * Math.PI) / 180 } as const;
+export const RULETA = { total: 0.8, vueltas: 1.5 } as const;
+export const JOYA_QUE_GIRA = { total: 0.5, vueltas: 1 } as const;
+
+/**
+ * QUIÉN SE ANIMA CUANDO ALGUIEN COGE UNA CARTA, Y POR QUÉ ESTO ES UNA FUNCIÓN Y NO UN `if`.
+ *
+ * El suceso de la carta dice el MAZO pero no la casilla —hay tres del Arca y tres de Sucesos—, así
+ * que hay que mirar dónde está el peón de quien la coge: es el único sitio de donde esa carta
+ * puede haber salido. Esa regla vivía dentro del bucle de fotogramas, que es el único rincón de
+ * esta escena al que el comprobador no llega; aquí sí llega, y de paso se lee sola.
+ *
+ * Devuelve la casilla que se anima o `null`: cero condiciones en quien la usa.
+ */
+export function loQueAnimaUnaCarta(mazo: 'arca' | 'pregon' | null, casillaDelQueLaCoge: number): { readonly cofre: number | null; readonly ruleta: number | null } {
+  if (mazo === 'arca' && CASILLAS_DEL_ARCA.includes(casillaDelQueLaCoge)) return { cofre: casillaDelQueLaCoge, ruleta: null };
+  if (mazo === 'pregon' && CASILLAS_DEL_PREGON.includes(casillaDelQueLaCoge)) return { cofre: null, ruleta: casillaDelQueLaCoge };
+  return { cofre: null, ruleta: null };
+}
+
+/** Las tres del Fondo Vecinal y las tres de Sucesos, que es donde están los cofres y las ruletas. */
+export const CASILLAS_DEL_ARCA: readonly number[] = [2, 17, 33];
+export const CASILLAS_DEL_PREGON: readonly number[] = [7, 22, 36];
+
+/** Cuánto está abierta la tapa del cofre: 0 cerrada, 1 abierta del todo. */
+export function aperturaDelCofre(transcurrido: number): number {
+  if (transcurrido <= 0) return 0;
+  if (transcurrido < TAPA_DEL_COFRE.abre) return suave(transcurrido / TAPA_DEL_COFRE.abre);
+  if (transcurrido < TAPA_DEL_COFRE.abre + TAPA_DEL_COFRE.quieta) return 1;
+  const cayendo = (transcurrido - TAPA_DEL_COFRE.abre - TAPA_DEL_COFRE.quieta) / TAPA_DEL_COFRE.cierra;
+  return cayendo >= 1 ? 0 : 1 - suave(cayendo);
+}
+
+/** Lo que ha girado la ruleta: vuelta y media frenando, y se queda donde la deja el freno. */
+export function giroDeLaRuleta(transcurrido: number): number {
+  if (transcurrido <= 0) return 0;
+  const u = pinza(transcurrido / RULETA.total);
+  /* Frenada cuadrática: arranca rápido y se para sola, como una ruleta de verdad. */
+  return RULETA.vueltas * Math.PI * 2 * (1 - (1 - u) ** 2);
+}
+
+/** Lo que ha girado la joya sobre su pedestal: una vuelta entera, y vuelve a quedarse de frente. */
+export function giroDeLaJoya(transcurrido: number): number {
+  if (transcurrido <= 0) return 0;
+  return JOYA_QUE_GIRA.vueltas * Math.PI * 2 * suave(pinza(transcurrido / JOYA_QUE_GIRA.total));
 }
 
 /** El quebrado se desvanece en los últimos 0,8 s de su huida. */

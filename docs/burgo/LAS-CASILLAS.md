@@ -163,5 +163,13 @@ trece edificios de código a ~1.500 son 20.000 de los 718.000 que sobran.
    - **La fase 5 está hecha.** Queda la 6: las animaciones.
 5. **Las animaciones** (fase 6): una función pura por animación en `coreografia.ts` —que el
    comprobador puede medir sin `three`— y el bucle de `Burgo.tsx` moviéndolas.
+   - **Hechas las tres primeras**: la tapa del cofre (0,7 s), la ruleta del casino (0,8) y la joya
+     de la Tasa (0,5). Con ellas entra la regla de que **lo que se mueve sale de la malla fundida**
+     y se escribe en su propio marco, con el origen DONDE ESTÁ SU EJE: la tapa gira sobre su
+     bisagra y no sobre su centro, o se abriría como una tapa de olla al aire.
+   - Y la de que la lógica de «quién se anima» no vive en el bucle de fotogramas —el único rincón
+     al que el comprobador no llega— sino en una función pura: `loQueAnimaUnaCarta`.
+   - Faltan: la moneda del Impuesto, el humo de la central, la onda de la alberca, el coche que
+     aparca y el peón entrando en la celda de la comisaría.
 
 Cada fase es un commit con la batería entera en verde.
