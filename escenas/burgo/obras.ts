@@ -33,7 +33,7 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, CELDA_DEL_CUARTEL, FERIA, SOBRE_EL_EMPEDRADO, MARGEN_DEL_TEXTO, MAZMORRA, PUERTAS, SUPERFICIE, anchoDeLaPalabra, giroHaciaDentro, giroHaciaFuera, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, CELDA_DEL_CUARTEL, FERIA, HUECO_ENTRE_RENGLONES, SOBRE_EL_EMPEDRADO, MARGEN_DEL_TEXTO, MAZMORRA, PUERTAS, SUPERFICIE, anchoDeLaPalabra, giraElPunto, giroHaciaDentro, giroHaciaFuera, letrasDelRotulo, letrasDelSubtitulo, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
@@ -208,27 +208,86 @@ const PARKING = {
   /* La raya pintada: 0,5 de ancho, que a la escala del coche es un palmo. */
   raya: 0.5,
   alzaDeLaRaya: 0.12,
+  /* Lo que se deja de una raya recortada contra el nombre: menos de dos anchos es un punto, no una raya. */
+  trozoMinimo: 1,
   /*
-   * El cartel: un poste de 11 y un panel tumbado de 12 x 12 encima. Va en el CARRIL de entrada,
-   * del lado de dentro, donde no pisa ninguna plaza ni la ele de la marcha (que cruza a 349,5).
+   * El cartel: un poste de 13 y un panel tumbado de 22 × 22 encima, al FONDO del aparcamiento y
+   * en la diagonal de la esquina: el nombre en el centro, el texto pequeño detrás y el cartel
+   * detrás de los dos, los tres en fila hacia el campo.
+   *
+   * Estuvo en el carril de entrada, en `(336, 396)`, y tapaba letras de las dos maneras de mirar.
+   * Desde arriba, el 84 % de la O de DESCANSO: el nombre acaba justo en ese carril. Y desde la
+   * cámara del juego, que mira a 55° desde el sur, peor: un panel a 13 de altura se ve corrido
+   * unos 9 hacia el fondo, encima de la S y la O del nombre y de la T y la A del texto pequeño.
+   * Bajándolo por el carril hasta librar la vista de arriba seguía tapando la N y la S desde la
+   * cámara. Al fondo, lo que se corre se aleja de las letras con cualquier rumbo, y los peones,
+   * que esperan en la ele, quedan a sesenta. Debajo quedan las plazas del fondo de las hileras C
+   * y D, que por eso no llevan coche (`PIEZAS_DE_LA_ESQUINA`).
    */
-  poste: { u: 336, v: 396, grosor: 1.4, alto: 13 },
+  poste: { u: 403, v: 403, grosor: 1.4, alto: 13 },
   /*
    * 22 de lado y no 12: el cartel dice PARKING entero —es lo que pidió Miguel, «que ponga
    * PARKING»— y siete letras por la diagonal de un panel de 12 salen a dos de alto, que desde el
    * tablero son una raya. A 22 la diagonal útil con margen es de 23,7 y la palabra sale a 3,7.
-   * Cabe entre el canto de la ciudad (324) y el carril de la marcha (347,5) con medio punto libre.
    */
   panel: { lado: 22, grueso: 0.9 },
 } as const;
 
-/** Las dieciséis rayas de una hilera que empieza en `v0`: quince plazas de 3,6 en los 54 de asfalto. */
-function rayasDeLaHilera(casilla: number, v0: number): CaraDeObra[] {
+/**
+ * LAS RAYAS NO PASAN POR ENCIMA DEL NOMBRE.
+ *
+ * El nombre de la esquina y su texto pequeño cruzan el aparcamiento en diagonal, con la tinta a
+ * 0,08 del suelo, y las rayas van a 0,12: donde se cruzaban, la raya se pintaba ENCIMA de la letra.
+ * La A de DESCANSO tenía rayado de amarillo el 15 % de su caja, y la I de QUITA el 13 %.
+ *
+ * Así que las rayas se recortan contra la FRANJA de los dos renglones: de la caja más baja de sus
+ * letras a la más alta, medidas en `u + v`, que es la dirección en la que se apilan los renglones
+ * de una esquina, y ensanchada por los dos lados el mismo hueco que hay entre un renglón y el otro.
+ * Las rayas acaban así en una diagonal limpia, paralela al texto; las plazas que quedan partidas
+ * se quedan sin coche (`PIEZAS_DE_LA_ESQUINA`).
+ */
+function franjaDelNombre(): { readonly desde: number; readonly hasta: number } {
+  const m = marcoDeCasilla(FERIA);
+  let desde = Infinity;
+  let hasta = -Infinity;
+  for (const letra of [...letrasDelRotulo(FERIA), ...letrasDelSubtitulo(FERIA)]) {
+    const ancho = (AVANCE_DE_LA_LETRA[letra.letra] ?? ALTO_DE_LA_LETRA / 2) * (letra.alto / ALTO_DE_LA_LETRA);
+    for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+      const g = giraElPunto((a * ancho) / 2, (b * letra.alto) / 2, letra.giro);
+      const x = letra.x + g.x;
+      const z = letra.z + g.z;
+      /* Del mundo a la esquina: `u` va a lo largo de `fuera` y `v` a lo largo de `−adelante`. */
+      const suma = m.fuera.x * x + m.fuera.z * z - (m.adelante.x * x + m.adelante.z * z);
+      desde = Math.min(desde, suma);
+      hasta = Math.max(hasta, suma);
+    }
+  }
+  /* Un paso de `d` hacia fuera de la franja suma `d √2` a `u + v`. */
+  const hueco = HUECO_ENTRE_RENGLONES * Math.SQRT2;
+  return { desde: desde - hueco, hasta: hasta + hueco };
+}
+
+/**
+ * Las dieciséis rayas de una hilera que empieza en `v0` —quince plazas de 3,6 en los 54 de
+ * asfalto—, cada una con lo que le quede fuera de la franja del nombre: el trozo de debajo lo
+ * corta el canto de la raya que más suma, y el de encima el que menos. Los dos trozos no pueden
+ * pisarse, porque la franja es más ancha que la raya.
+ */
+function rayasDeLaHilera(casilla: number, v0: number, franja: { readonly desde: number; readonly hasta: number }): CaraDeObra[] {
   const salida: CaraDeObra[] = [];
   const cuantas = Math.round((PARKING.hasta - PARKING.desde) / PARKING.plaza);
+  const v1 = v0 + PARKING.fondoDeLaHilera;
   for (let k = 0; k <= cuantas; k++) {
     const u = PARKING.desde + k * PARKING.plaza;
-    salida.push(losa(casilla, u - PARKING.raya / 2, u + PARKING.raya / 2, v0, v0 + PARKING.fondoDeLaHilera, PARKING.alzaDeLaRaya, COLOR_DE_OBRA.linea));
+    const u0 = u - PARKING.raya / 2;
+    const u1 = u + PARKING.raya / 2;
+    const trozos: readonly (readonly [number, number])[] = [
+      [v0, Math.min(v1, franja.desde - u1)],
+      [Math.max(v0, franja.hasta - u0), v1],
+    ];
+    for (const [desde, hasta] of trozos) {
+      if (hasta - desde >= PARKING.trozoMinimo) salida.push(losa(casilla, u0, u1, desde, hasta, PARKING.alzaDeLaRaya, COLOR_DE_OBRA.linea));
+    }
   }
   return salida;
 }
@@ -240,7 +299,8 @@ function carasDelAparcamiento(): CaraDeObra[] {
   const a = PARKING.asfalto;
   salida.push(losa(c, a.rincon, a.hasta, a.desde, a.hasta, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.asfalto));
   salida.push(losa(c, a.desde, a.rincon, a.rincon, a.hasta, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.asfalto));
-  for (const v0 of PARKING.hileras) salida.push(...rayasDeLaHilera(c, v0));
+  const franja = franjaDelNombre();
+  for (const v0 of PARKING.hileras) salida.push(...rayasDeLaHilera(c, v0, franja));
   /* El cartel: poste y panel tumbado. */
   const p = PARKING.poste;
   salida.push(...caja(c, p.u - p.grosor / 2, p.u + p.grosor / 2, p.v - p.grosor / 2, p.v + p.grosor / 2, ALZA_DEL_ASFALTO, p.alto, COLOR_DE_OBRA.poste));

@@ -37,8 +37,8 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 202.662   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 167.418   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 196.560   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 161.316   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de

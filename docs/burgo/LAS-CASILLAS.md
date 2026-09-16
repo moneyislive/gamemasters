@@ -85,7 +85,7 @@ sin cambiar ni una palabra de las que se leen. Lo que se lee sí va con el regla
 | --- | --- | --- | --- | --- |
 | 0 | SALIDA ✅ | SALIDA por la diagonal (101 × 18,4) y la flecha roja de 28 en el pico de fuera | Sólo rótulo fundido; el cruce entero fuera | — |
 | 10 | CÁRCEL ✅ | Muro, dos torretas con tejadillo, seis barrotes, dos pabellones y un ala; patio de hormigón | Código fundido + `verja` (que se anima) | La reja ya sube y baja tras el peón |
-| 20 | PARKING ✅ | La esquina entera asfaltada, sesenta plazas amarillas, catorce coches y el cartel tumbado que dice PARKING | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
+| 20 | PARKING ✅ | La esquina entera asfaltada, plazas amarillas que se apartan del nombre, nueve coches y, al fondo, el cartel tumbado que dice PARKING | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
 | 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo | Código fundido + la avenida y su patrulla; la reja, pieza viva | ✅ quien cae aquí corre a la celda por el paso de la avenida, entra bajo la reja subida y se desvanece dentro (0,8 más) |
 | 2·17·33 | FONDO VECINAL ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra | Código fundido; la tapa, pieza viva | ✅ la tapa se abre al coger carta del Fondo (0,7) |
 | 7·22·36 | SUCESOS ✅ | Casino: cuerpo, marquesina que vuela, rótulo vertical con cinco bombillas y la ruleta tumbada en el suelo | Código fundido (discos); la ruleta, pieza viva | ✅ la ruleta gira al coger carta de Sucesos (0,8) |
@@ -254,6 +254,16 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
      de las obras daba verde porque la tapa miraba arriba como debe; preguntaba si lo primero que se
      ve mira arriba, no QUÉ es. La alberca es ahora hueca, y una regla exige que el agua y las bocas
      de las torres de la central sean lo primero que corta cada rayo que cae sobre ellas.
+   - **Y letras tapadas en dos esquinas, que ninguna regla medía:** siete coches y una farola del
+     Descanso aparcados encima de DESCANSO y de NI DA NI QUITA; una berlina de la avenida de la 30
+     sobre la T de RETENIDO; las rayas del aparcamiento pintadas ENCIMA de la tinta (0,12 contra
+     0,08); y el panel del PARKING, que desde arriba tapaba el 84 % de la O de DESCANSO y desde la
+     cámara del juego, a 55°, la S, la O, la T y la A. Las rayas se cortan ahora a 2,5 del texto, el
+     cartel está al fondo de la diagonal —detrás del texto pequeño— y los coches en plazas enteras
+     que no queden debajo de él. Tres reglas lo miden: las piezas por muestreo, las obras EXACTAS
+     contra la caja de cada letra con 2,5 de hueco, y las obras proyectadas con la cámara de los
+     clientes, siguiendo en cada casilla y desde la salida. La primera versión de la regla de obras
+     se saltaba las caras tumbadas y no vio ni las rayas ni el panel.
    - **Y dos losas bajo el empedrado:** la 10 y la 30 van llenas de `solera` y `calzada` del pack,
      que suben a 0,6, y el patio de hormigón de la Comisaría y el suelo de la celda del cuartel
      estaban a 0,05. El patio no se veía nada y la celda salía mitad losa de acera. Van ahora a

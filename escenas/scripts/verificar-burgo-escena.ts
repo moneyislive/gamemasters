@@ -87,6 +87,8 @@ import {
   CELDAS_DE_LA_CIUDAD,
   CELDAS_DE_LA_GLORIETA,
   CELDAS_POR_ESQUINA,
+  COCHE_SOBRE_EL_ASFALTO,
+  celdaDeEsquina,
   CORONA,
   DIAMETRO_DEL_PEON,
   ESQUINAS,
@@ -95,8 +97,10 @@ import {
   FONDO_DEL_HOTEL,
   FONDO_DE_LA_CASA,
   FRANJA,
+  FERIA,
   FRENTE_MAXIMO_DEL_ATREZO,
   HOLGURA_DE_LA_MARCHA,
+  HUECO_ENTRE_RENGLONES,
   HUECOS_DE_LOS_DADOS,
   HUELLA_DEL_PEON,
   HUELLA_DE_LA_CASA,
@@ -1225,13 +1229,13 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
   );
   /*
    * EL APARCAMIENTO, que era una plaza arbolada con tres terrazas hasta que Miguel pidió «un
-   * parking que se vea real». Lo que lo hace legible desde el aire son los HUECOS: catorce coches
-   * en sesenta plazas. Lleno se leería como un atasco, y vacío como una pista de tenis.
+   * parking que se vea real». Lo que lo hace legible desde el aire son los HUECOS: nueve coches en
+   * dieciocho plazas. Lleno se leería como un atasco, y vacío como una pista de tenis.
    */
   const cochesDelAparcamiento = cuenta(20, PIEZA.cocheBerlina) + cuenta(20, PIEZA.cocheUtilitario) + cuenta(20, PIEZA.cocheFamiliar) + cuenta(20, PIEZA.cocheTaxi);
   comprobar(
-    'el aparcamiento tiene catorce coches en sus sesenta plazas, dos farolas en la calle de en medio y su rincón verde',
-    cochesDelAparcamiento === 14 &&
+    'el aparcamiento tiene nueve coches, dos farolas en la calle de en medio y su rincón verde',
+    cochesDelAparcamiento === 9 &&
       cuenta(20, PIEZA.farolaDeCalle) === 2 &&
       cuenta(20, PIEZA.pinoPequeno) === 2 &&
       cuenta(20, PIEZA.arbusto) === 1 &&
@@ -1252,9 +1256,13 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
    */
   comprobar('cada esquina son 9 × 9 celdas de la retícula de la ciudad', CELDAS_POR_ESQUINA === 9 && LADO_DE_ESQUINA === 9 * RETICULA_DE_LA_CIUDAD, CELDAS_POR_ESQUINA);
   const piezasPorEsquina = ESQUINAS.map((e) => piezasDeLaEsquina(e).length);
-  /* Las TRES amuebladas; la salida se quedó a propósito sin nada y la vigila su propia regla. */
+  /*
+   * Las TRES amuebladas; la salida se quedó a propósito sin nada y la vigila su propia regla. El tope
+   * era veinte y bajó a quince con el Descanso: su escena es casi toda obra —asfalto, rayas y el
+   * cartel—, y sus piezas son los nueve coches que caben a la vista y el rincón verde.
+   */
   const amuebladas = ESQUINAS.filter((e) => e !== 0).map((e) => piezasDeLaEsquina(e).length);
-  comprobar('y ninguna de las otras tres se queda en cuatro losas: las tres pasan de veinte piezas', amuebladas.every((n) => n >= 20), piezasPorEsquina);
+  comprobar('y ninguna de las otras tres se queda en cuatro losas: las tres llegan a quince piezas', amuebladas.every((n) => n >= 15), piezasPorEsquina);
   comprobar('las dos flechas del sentido de la marcha están en la salida y en la casilla que manda a la cárcel', huecosDeLosEmblemas().filter((e) => e.emblema === 'flecha').map((e) => e.casilla).join() === '0,30');
 
   /*
@@ -2728,7 +2736,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
    *
    * Así que se miden: la caja de cada pieza —a su talla, en el marco de su casilla— contra la caja
    * de cada cara de obra que TENGA ALTURA. Las caras tumbadas se saltan a propósito: el asfalto
-   * del aparcamiento cubre su esquina entera y los catorce coches están encima, que es lo que
+   * del aparcamiento cubre su esquina entera y los coches están encima, que es lo que
    * tiene que pasar.
    */
   const choques: string[] = [];
@@ -2798,6 +2806,349 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
         );
       });
     comprobar(`se ve fallar: una obra plantada encima de un «${unCoche?.pieza ?? '?'}» del aparcamiento da choque`, pisa, unCoche?.pieza);
+  }
+  /*
+   * ── 2 quinquies bis. NINGUNA PIEZA NI OBRA TAPA UNA LETRA DEL SUELO ──
+   *
+   * El nombre y el texto pequeño de las esquinas cruzan su cuadro en diagonal, y lo que hay encima se
+   * come letras. Nadie lo medía —las reglas de texto miran el margen y el rombo, y la de piezas mira
+   * que no se pisen entre ellas—, y en cuanto se midió salieron cuatro:
+   *
+   *   · siete coches y una farola del Descanso, aparcados sobre DESCANSO y NI DA NI QUITA;
+   *   · una berlina de la avenida de la 30 sobre la T de RETENIDO, un 16 %;
+   *   · las rayas amarillas del aparcamiento, a 0,12, pintadas ENCIMA de la tinta, que va a 0,08;
+   *   · y el panel del PARKING, que mirado desde arriba tapaba el 84 % de la O de DESCANSO.
+   *
+   * LAS PIEZAS se muestrean: cada letra con 11 × 11 puntos DENTRO de su rectángulo girado —en una
+   * esquina va en diagonal, y su caja alineada exagera el solape—, y la unión de lo que tapan las
+   * que suben por encima de ella no puede pasar del 3 %. Ese 3 % es la punta del brazo de un
+   * semáforo o de una farola, que vuela sobre la letra a seis de altura; un coche encima no cabe.
+   *
+   * LAS OBRAS no, y las dos últimas son la razón. La primera versión de esta regla medía las obras
+   * como las piezas, con la caja de cada cara QUE TUVIERA ALTURA, y no vio ninguna de las dos: una
+   * raya es una cara tumbada, el techo del panel también, y los lados de una caja a plomo proyectan
+   * una línea, que no tapa nada. Y aunque las hubiera mirado, una raya de 0,5 cabe entre dos puntos
+   * de la rejilla. Así que cada cara de obra que suba por encima de la letra se proyecta al suelo tal
+   * cual y se mide EXACTAMENTE contra el rectángulo de la letra, por ejes separadores. Y como una obra
+   * está hecha en código a la décima, no se le perdona nada: ninguna puede quedar a menos de
+   * `HUECO_ENTRE_RENGLONES` de una letra, el mismo hueco que hay entre sus dos renglones. La
+   * separación por ejes nunca pasa de la distancia de verdad: si dice 2,5, hay por lo menos 2,5.
+   */
+  {
+    type Rectangulo = { readonly que: string; readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number; readonly arriba: number };
+    const rectanguloDeLaPuesta = (puesta: Puesta): Rectangulo => {
+      const esquinas = esquinasDeLaPuesta(puesta);
+      return {
+        que: `${puesta.pieza} en (${r(puesta.x)}, ${r(puesta.z)})`,
+        x0: Math.min(...esquinas.map((q) => q.x)),
+        x1: Math.max(...esquinas.map((q) => q.x)),
+        z0: Math.min(...esquinas.map((q) => q.z)),
+        z1: Math.max(...esquinas.map((q) => q.z)),
+        arriba: puesta.y + caja(puesta.pieza).max[1] * puesta.talla,
+      };
+    };
+    const estorbosDeLasLetras: Rectangulo[] = [...puestasDeLasEsquinas('plena'), ...puestasDelAtrezo('plena')].filter((puesta) => !esSuelo(puesta.pieza)).map(rectanguloDeLaPuesta);
+    const TOPE_TAPADO = 0.03;
+    const letrasTapadas = (estorbos: readonly Rectangulo[]): string[] => {
+      const salida: string[] = [];
+      for (let casilla = 0; casilla < CASILLAS; casilla++) {
+        for (const letra of [...letrasDelRotulo(casilla), ...letrasDelSubtitulo(casilla)]) {
+          const ancho = (AVANCE_DE_LA_LETRA[letra.letra] ?? ALTO_DE_LA_LETRA / 2) * (letra.alto / ALTO_DE_LA_LETRA);
+          const encima = estorbos.filter((e) => e.arriba > letra.alza + 0.01);
+          let tapados = 0;
+          let muestras = 0;
+          const quien = new Set<string>();
+          for (let i = 0; i <= 10; i++) {
+            for (let j = 0; j <= 10; j++) {
+              const g = giraElPunto(-ancho / 2 + (ancho * i) / 10, -letra.alto / 2 + (letra.alto * j) / 10, letra.giro);
+              const x = letra.x + g.x;
+              const z = letra.z + g.z;
+              muestras++;
+              const tapa = encima.find((e) => x > e.x0 && x < e.x1 && z > e.z0 && z < e.z1);
+              if (tapa !== undefined) {
+                tapados++;
+                quien.add(tapa.que);
+              }
+            }
+          }
+          if (tapados / muestras > TOPE_TAPADO) salida.push(`${String(casilla)}: la ${letra.letra} tapada un ${String(Math.round((100 * tapados) / muestras))} % por ${[...quien].join(', ')}`);
+        }
+      }
+      return salida;
+    };
+    const tapadas = letrasTapadas(estorbosDeLasLetras);
+    const letrasMiradas = Array.from({ length: CASILLAS }, (_, c) => letrasDelRotulo(c).length + letrasDelSubtitulo(c).length).reduce((a, b) => a + b, 0);
+    comprobar(
+      `ninguna de las ${String(letrasMiradas)} letras del suelo queda tapada más de un ${String(TOPE_TAPADO * 100)} % por una de las ${String(estorbosDeLasLetras.length)} piezas que no son suelo`,
+      tapadas.length === 0 && letrasMiradas > 150 && estorbosDeLasLetras.length > 50,
+      tapadas.slice(0, 4),
+    );
+    /* La vacuna es la berlina de la 30 donde estuvo, en la celda de la cebra, sobre RETENIDO. */
+    const marcoDeLa30 = marcoDeCasilla(30);
+    const sitioDeAntes = puntoEnEsquina(marcoDeLa30, celdaDeEsquina(5) - 2.7, celdaDeEsquina(3));
+    const berlinaDeAntes = rectanguloDeLaPuesta({ pieza: PIEZA.cocheBerlina, x: sitioDeAntes.x, y: COCHE_SOBRE_EL_ASFALTO, z: sitioDeAntes.z, giro: giroHaciaFuera(marcoDeLa30) + radianesDeCuartos(3), talla: 1 });
+    const conLaDeAntes = letrasTapadas([...estorbosDeLasLetras, berlinaDeAntes]);
+    comprobar('se ve fallar: con la berlina de la 30 donde estuvo, la T de RETENIDO sale tapada', conLaDeAntes.some((x) => x.startsWith('30: la T')), conLaDeAntes);
+
+    /* Las obras: su sombra de verdad contra el rectángulo de cada letra. */
+    type Sombra = { readonly que: string; readonly puntos: readonly Punto[]; readonly arriba: number };
+    const areaDeLaSombra = (puntos: readonly Punto[]): number =>
+      puntos.reduce((suma, p, i) => {
+        const q = puntos[(i + 1) % puntos.length] as Punto;
+        return suma + p.x * q.z - q.x * p.z;
+      }, 0) / 2;
+    /* La mayor separación entre las proyecciones de dos convexos sobre las normales de sus lados: negativa si se meten uno en otro. */
+    const separacion = (a: readonly Punto[], b: readonly Punto[]): number => {
+      let mayor = -Infinity;
+      for (const poligono of [a, b]) {
+        for (let i = 0; i < poligono.length; i++) {
+          const p = poligono[i] as Punto;
+          const q = poligono[(i + 1) % poligono.length] as Punto;
+          const largo = Math.hypot(q.x - p.x, q.z - p.z);
+          if (largo < 1e-9) continue;
+          const n = { x: -(q.z - p.z) / largo, z: (q.x - p.x) / largo };
+          const enA = a.map((w) => w.x * n.x + w.z * n.z);
+          const enB = b.map((w) => w.x * n.x + w.z * n.z);
+          mayor = Math.max(mayor, Math.min(...enA) - Math.max(...enB), Math.min(...enB) - Math.max(...enA));
+        }
+      }
+      return mayor;
+    };
+    const sombraDeLaCara = (que: string, puntos: readonly (readonly [number, number, number])[]): Sombra => ({
+      que,
+      puntos: puntos.map((q) => ({ x: q[0], z: q[2] })),
+      arriba: Math.max(...puntos.map((q) => q[1])),
+    });
+    /* Una cara a plomo proyecta una línea: desde arriba no tapa nada, y se deja fuera. */
+    const sombrasDeLasObras: Sombra[] = [...casillasConObra(), DEL_MUNDO]
+      .flatMap((casilla) => carasDeLaObraEnElMundo(casilla).map((cara) => sombraDeLaCara(`obra de la ${String(casilla)} (${cara.color})`, cara.puntos)))
+      .filter((sombra) => Math.abs(areaDeLaSombra(sombra.puntos)) > 1e-6);
+    const obrasPegadasALasLetras = (sombras: readonly Sombra[]): string[] => {
+      const salida = new Set<string>();
+      for (let casilla = 0; casilla < CASILLAS; casilla++) {
+        for (const letra of [...letrasDelRotulo(casilla), ...letrasDelSubtitulo(casilla)]) {
+          const ancho = (AVANCE_DE_LA_LETRA[letra.letra] ?? ALTO_DE_LA_LETRA / 2) * (letra.alto / ALTO_DE_LA_LETRA);
+          const rectangulo = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => {
+            const g = giraElPunto(((a as number) * ancho) / 2, ((b as number) * letra.alto) / 2, letra.giro);
+            return { x: letra.x + g.x, z: letra.z + g.z };
+          });
+          for (const sombra of sombras) {
+            if (sombra.arriba <= letra.alza + 0.01) continue;
+            const d = separacion(rectangulo, sombra.puntos);
+            if (d < HUECO_ENTRE_RENGLONES - 1e-6) salida.add(`${String(casilla)}: la ${letra.letra} ${d < 0 ? 'tapada' : `a ${d.toFixed(2)}`} por la ${sombra.que}, a ${r(sombra.arriba)}`);
+          }
+        }
+      }
+      return [...salida];
+    };
+    const pegadas = obrasPegadasALasLetras(sombrasDeLasObras);
+    comprobar(
+      `ninguna de las ${String(sombrasDeLasObras.length)} caras de obra que se ven desde arriba tapa una letra ni se le acerca a menos de ${String(HUECO_ENTRE_RENGLONES)}`,
+      pegadas.length === 0 && sombrasDeLasObras.length > 1000,
+      pegadas.slice(0, 4),
+    );
+    /* Tres vacunas, las tres en el Descanso: el techo del panel donde estuvo, una raya sin cortar y un punto de pintura a 1 de la C. */
+    const marcoDelDescanso = marcoDeCasilla(FERIA);
+    const losaEnElDescanso = (que: string, u0: number, u1: number, v0: number, v1: number, y: number): Sombra => ({
+      que,
+      puntos: [puntoEnEsquina(marcoDelDescanso, u0, v0), puntoEnEsquina(marcoDelDescanso, u1, v0), puntoEnEsquina(marcoDelDescanso, u1, v1), puntoEnEsquina(marcoDelDescanso, u0, v1)],
+      arriba: y,
+    });
+    const conElPanelDeAntes = obrasPegadasALasLetras([losaEnElDescanso('el panel de antes', 325, 347, 385, 407, 13.9)]);
+    comprobar('se ve fallar: con el panel del PARKING donde estuvo, la O de DESCANSO sale tapada', conElPanelDeAntes.some((x) => x.startsWith('20: la O tapada')), conElPanelDeAntes);
+    const conUnaRayaEntera = obrasPegadasALasLetras([losaEnElDescanso('una raya sin cortar', 374.15, 374.65, 360, 367, 0.12)]);
+    comprobar('se ve fallar: con una raya de la hilera A sin cortar, la C de DESCANSO sale tapada', conUnaRayaEntera.some((x) => x.startsWith('20: la C tapada')), conUnaRayaEntera);
+    const laC = letrasDelRotulo(FERIA).find((l) => l.letra === 'C');
+    const puntoCerca: Sombra[] =
+      laC === undefined
+        ? []
+        : [
+            {
+              que: 'un punto de pintura',
+              puntos: [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => {
+                const g = giraElPunto((a as number) * 0.25, -(laC.alto / 2 + 1.25) + (b as number) * 0.25, laC.giro);
+                return { x: laC.x + g.x, z: laC.z + g.z };
+              }),
+              arriba: 0.12,
+            },
+          ];
+    const conElPuntoCerca = obrasPegadasALasLetras(puntoCerca);
+    comprobar('se ve fallar: un punto de pintura a 1 por debajo de la C, sin tocarla, sale a 1.00', conElPuntoCerca.some((x) => x.startsWith('20: la C a 1.00')), conElPuntoCerca);
+  }
+  /*
+   * Y NINGÚN COCHE EN UNA PLAZA PARTIDA NI DEBAJO DEL CARTEL. Las rayas del aparcamiento se cortan a
+   * un hueco del nombre, así que quedan plazas con una raya a medias o sin ninguna, y un coche ahí se
+   * lee como aparcado de cualquier manera. Una plaza es entera si las dos rayas que la cierran cubren
+   * el fondo de su hilera. Y el panel del PARKING vuela a 13 sobre el fondo de las hileras C y D:
+   * lo que quede debajo no se ve desde arriba, ni coche ni farola ni nada.
+   */
+  {
+    const PLAZA = 3.6;
+    const FONDO = 7;
+    const rayas = carasDeLasObras()
+      .filter((cara) => cara.casilla === FERIA && cara.color === COLOR_DE_OBRA.linea)
+      .map((cara) => ({
+        u: (Math.min(...cara.puntos.map((q) => q[0])) + Math.max(...cara.puntos.map((q) => q[0]))) / 2,
+        v0: Math.min(...cara.puntos.map((q) => q[2])),
+        v1: Math.max(...cara.puntos.map((q) => q[2])),
+      }));
+    const rayaEntera = (u: number, v0: number, v1: number): boolean => rayas.some((x) => Math.abs(x.u - u) < 0.01 && x.v0 <= v0 + 0.01 && x.v1 >= v1 - 0.01);
+    const plazaEntera = (u: number, v: number): boolean => rayaEntera(u - PLAZA / 2, v - FONDO / 2, v + FONDO / 2) && rayaEntera(u + PLAZA / 2, v - FONDO / 2, v + FONDO / 2);
+    /* El panel: las caras azules de la esquina, en `(u, v)`. */
+    const carasDelPanel = carasDeLasObras().filter((cara) => cara.casilla === FERIA && cara.color === COLOR_DE_OBRA.carteloAzul);
+    const techoDelPanel = Math.max(...carasDelPanel.flatMap((cara) => cara.puntos.map((q) => q[1])));
+    const panel = {
+      u0: Math.min(...carasDelPanel.flatMap((cara) => cara.puntos.map((q) => q[0]))),
+      u1: Math.max(...carasDelPanel.flatMap((cara) => cara.puntos.map((q) => q[0]))),
+      v0: Math.min(...carasDelPanel.flatMap((cara) => cara.puntos.map((q) => q[2]))),
+      v1: Math.max(...carasDelPanel.flatMap((cara) => cara.puntos.map((q) => q[2]))),
+    };
+    const MODELOS_DE_COCHE: readonly string[] = [PIEZA.cocheBerlina, PIEZA.cocheFamiliar, PIEZA.cocheTaxi, PIEZA.cocheUtilitario];
+    /* Lo que ocupa en planta una pieza de la esquina, con el cuarto de vuelta impar cambiando ancho por fondo. */
+    const plantaDe = (p: { readonly pieza: string; readonly u: number; readonly v: number; readonly giroEnCuartos: number }) => {
+      const h = huella(p.pieza);
+      const ancho = p.giroEnCuartos % 2 === 0 ? h.ancho : h.fondo;
+      const fondo = p.giroEnCuartos % 2 === 0 ? h.fondo : h.ancho;
+      return { u0: p.u - ancho / 2, u1: p.u + ancho / 2, v0: p.v - fondo / 2, v1: p.v + fondo / 2 };
+    };
+    const bajoElPanel = (q: { readonly u0: number; readonly u1: number; readonly v0: number; readonly v1: number }): boolean => q.u1 > panel.u0 && q.u0 < panel.u1 && q.v1 > panel.v0 && q.v0 < panel.v1;
+    const enteras = [360, 367, 388, 395]
+      .flatMap((v0) => Array.from({ length: 15 }, (_, k) => ({ u: 361.8 + PLAZA * k, v: v0 + FONDO / 2 })))
+      .filter((p) => plazaEntera(p.u, p.v) && !bajoElPanel({ u0: p.u - PLAZA / 2, u1: p.u + PLAZA / 2, v0: p.v - FONDO / 2, v1: p.v + FONDO / 2 }));
+    const coches = (PIEZAS_DE_LA_ESQUINA[FERIA] ?? []).filter((p) => MODELOS_DE_COCHE.includes(p.pieza));
+    const malAparcados = coches.filter((p) => !plazaEntera(p.u, p.v)).map((p) => `${p.pieza} en (${String(p.u)}, ${String(p.v)})`);
+    comprobar(
+      `los ${String(coches.length)} coches del aparcamiento están en plazas con sus dos rayas enteras, y no pasan de la mitad de las ${String(enteras.length)} que quedan así a la vista`,
+      malAparcados.length === 0 && coches.length === 9 && enteras.length >= 2 * coches.length,
+      { malAparcados, enteras: enteras.length },
+    );
+    comprobar('se ve fallar: la berlina de la hilera D en la plaza 1, donde estuvo, está en una plaza partida', !plazaEntera(365.4, 398.5));
+    const debajo = (PIEZAS_DE_LA_ESQUINA[FERIA] ?? []).filter((p) => !esSuelo(p.pieza) && bajoElPanel(plantaDe(p))).map((p) => `${p.pieza} en (${String(p.u)}, ${String(p.v)})`);
+    comprobar(
+      `ninguna pieza del Descanso queda debajo del panel del PARKING, que vuela a ${r(techoDelPanel)} sobre u ${r(panel.u0)}..${r(panel.u1)} y v ${r(panel.v0)}..${r(panel.v1)}`,
+      debajo.length === 0 && carasDelPanel.length >= 6 && panel.u1 - panel.u0 > 20,
+      debajo,
+    );
+    comprobar('se ve fallar: un utilitario en la plaza 11 de la hilera D queda debajo del panel', bajoElPanel(plantaDe({ pieza: PIEZA.cocheUtilitario, u: 401.4, v: 398.5, giroEnCuartos: 1 })));
+  }
+  /*
+   * ── 2 quinquies ter. Y NINGUNA OBRA TAPA UNA LETRA DESDE LA CÁMARA DEL JUEGO ──
+   *
+   * Las reglas de arriba miran el tablero desde el cielo, y el juego no lo mira así: la cámara está a
+   * 55° desde el sur (`MIRADOR_DEL_BURGO`), y una obra alta se ve corrida hacia el fondo lo que mide
+   * por la cotangente de esos 55°. Así se escapó el panel del PARKING. En el carril de entrada, con
+   * la vista de arriba ya limpia, seguía tapando la N y la S de DESCANSO: un 20 % al seguir al que
+   * mueve y un 85 % desde la pose de salida. Y donde estuvo al principio, la S, la O, la T y la A.
+   *
+   * Se proyecta con la cuenta de los clientes (`poseDelBurgo` y `proyecta`), en 16:9 y en el móvil,
+   * siguiendo al que mueve en cada casilla con letras y desde la pose de salida. Cada letra se
+   * muestrea con 11 × 11 puntos, y ninguno puede caer dentro de una cara de obra que suba por encima
+   * de ella: la letra está en el suelo, así que lo que la cubre en pantalla está DELANTE. Se saltan
+   * las caras con algún punto detrás del ojo, que son tramos de vía de 860 de largo: proyectados así
+   * dan polígonos sin sentido —la primera sonda los vio «tapando» la M de la 30—, y ninguno pasa
+   * cerca de una letra.
+   */
+  {
+    type Pantalla = { readonly x: number; readonly y: number };
+    type CaraViva = { readonly que: string; readonly puntos: readonly (readonly [number, number, number])[] };
+    const dentroDelConvexo = (p: Pantalla, poligono: readonly Pantalla[]): boolean => {
+      let signo = 0;
+      for (let i = 0; i < poligono.length; i++) {
+        const a = poligono[i] as Pantalla;
+        const b = poligono[(i + 1) % poligono.length] as Pantalla;
+        const c = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+        if (Math.abs(c) < 1e-9) continue;
+        if (signo === 0) signo = Math.sign(c);
+        else if (Math.sign(c) !== signo) return false;
+      }
+      return signo !== 0;
+    };
+    const carasDeTodasLasObras: CaraViva[] = [...casillasConObra(), DEL_MUNDO].flatMap((casilla) => carasDeLaObraEnElMundo(casilla).map((cara) => ({ que: `obra de la ${String(casilla)} (${cara.color})`, puntos: cara.puntos })));
+    const VENTANAS_DEL_JUEGO = [VENTANAS[0], VENTANAS[2]] as readonly { nombre: string; ancho: number; alto: number }[];
+    const tapadasDesdeLaCamara = (caras: readonly CaraViva[]): string[] => {
+      const salida = new Set<string>();
+      for (const v of VENTANAS_DEL_JUEGO) {
+        const ventana = { ancho: v.ancho, alto: v.alto, franjaInferior: 0 };
+        const aspecto = v.ancho / v.alto;
+        const poses = [
+          { nombre: 'desde la salida', pose: poseDelBurgo(poseDeSalida(ventana), MIRADOR_DEL_BURGO, ventana), casillas: Array.from({ length: CASILLAS }, (_, i) => i) },
+          ...Array.from({ length: CASILLAS }, (_, i) => {
+            const m = marcoDeCasilla(i);
+            return { nombre: 'siguiendo', pose: poseDelBurgo({ factor: CERCANIA_DE_SEGUIMIENTO, centro: { x: m.centro.x, z: m.centro.z } }, MIRADOR_DEL_BURGO, ventana), casillas: [i] };
+          }),
+        ];
+        for (const { nombre, pose, casillas } of poses) {
+          const enPantalla = (x: number, y: number, z: number): Pantalla | null => {
+            const p = proyecta(pose, aspecto, { x, y, z });
+            return p.delante ? { x: (p.x * v.ancho) / 2, y: (p.y * v.alto) / 2 } : null;
+          };
+          const proyectadas = caras.flatMap((cara) => {
+            const puntos = cara.puntos.map((q) => enPantalla(q[0], q[1], q[2]));
+            if (puntos.some((q) => q === null)) return [];
+            const enLaPantalla = puntos as Pantalla[];
+            return [
+              {
+                que: cara.que,
+                arriba: Math.max(...cara.puntos.map((q) => q[1])),
+                puntos: enLaPantalla,
+                x0: Math.min(...enLaPantalla.map((q) => q.x)),
+                x1: Math.max(...enLaPantalla.map((q) => q.x)),
+                y0: Math.min(...enLaPantalla.map((q) => q.y)),
+                y1: Math.max(...enLaPantalla.map((q) => q.y)),
+              },
+            ];
+          });
+          for (const casilla of casillas) {
+            for (const letra of [...letrasDelRotulo(casilla), ...letrasDelSubtitulo(casilla)]) {
+              const ancho = (AVANCE_DE_LA_LETRA[letra.letra] ?? ALTO_DE_LA_LETRA / 2) * (letra.alto / ALTO_DE_LA_LETRA);
+              const muestras: Pantalla[] = [];
+              for (let i = 0; i <= 10; i++) {
+                for (let j = 0; j <= 10; j++) {
+                  const g = giraElPunto(-ancho / 2 + (ancho * i) / 10, -letra.alto / 2 + (letra.alto * j) / 10, letra.giro);
+                  const p = enPantalla(letra.x + g.x, letra.alza, letra.z + g.z);
+                  if (p !== null) muestras.push(p);
+                }
+              }
+              if (muestras.length === 0) continue;
+              const x0 = Math.min(...muestras.map((q) => q.x));
+              const x1 = Math.max(...muestras.map((q) => q.x));
+              const y0 = Math.min(...muestras.map((q) => q.y));
+              const y1 = Math.max(...muestras.map((q) => q.y));
+              const cerca = proyectadas.filter((c) => c.arriba > letra.alza + 0.01 && c.x1 >= x0 && c.x0 <= x1 && c.y1 >= y0 && c.y0 <= y1);
+              if (cerca.length === 0) continue;
+              let tapados = 0;
+              const quien = new Set<string>();
+              for (const p of muestras) {
+                const tapa = cerca.find((c) => dentroDelConvexo(p, c.puntos));
+                if (tapa !== undefined) {
+                  tapados++;
+                  quien.add(tapa.que);
+                }
+              }
+              if (tapados > 0) salida.add(`${String(casilla)}: la ${letra.letra} ${String(Math.round((100 * tapados) / muestras.length))} % ${nombre} en ${v.nombre}, por la ${[...quien].join(', ')}`);
+            }
+          }
+        }
+      }
+      return [...salida];
+    };
+    const tapadasEnPantalla = tapadasDesdeLaCamara(carasDeTodasLasObras);
+    comprobar(
+      `ninguna de las ${String(carasDeTodasLasObras.length)} caras de obra tapa un punto de una letra desde la cámara del juego: siguiendo en cada casilla y desde la salida, en 16:9 y en el móvil`,
+      tapadasEnPantalla.length === 0 && carasDeTodasLasObras.length > 2000,
+      tapadasEnPantalla.slice(0, 4),
+    );
+    /* La vacuna: el panel del PARKING bajado por el carril de entrada, a 13, que desde arriba ya no tapaba nada. */
+    const marcoDelDescanso = marcoDeCasilla(FERIA);
+    const panelEnElCarril: CaraViva[] = cajaDeObra(FERIA, 325, 347, 355, 377, 13, 13.9, '#000000').map((cara) => ({
+      que: 'el panel en el carril',
+      puntos: cara.puntos.map((q) => {
+        const p = puntoEnEsquina(marcoDelDescanso, q[0], q[2]);
+        return [p.x, q[1], p.z] as const;
+      }),
+    }));
+    const conElPanelEnElCarril = tapadasDesdeLaCamara(panelEnElCarril);
+    comprobar('se ve fallar: con el panel en el carril de entrada, la N de DESCANSO sale tapada siguiendo al que mueve', conElPanelEnElCarril.some((x) => x.startsWith('20: la N') && x.includes('siguiendo')), conElPanelEnElCarril);
   }
   /*
    * ── 2 sexies. EL TREN: QUE ANDE, QUE PARE Y QUE NO SE SALGA DE LA VÍA ──

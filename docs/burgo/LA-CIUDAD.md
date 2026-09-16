@@ -395,11 +395,14 @@ acera. Quedan setenta y dos celdas libres.
   dentro, que se queda de zona verde con dos `pino-pequeno` y un `arbusto` —sin ese recorte los
   árboles saldrían plantados en alquitrán—. En el cuadro de fuera van **cuatro hileras de quince
   plazas** de 3,6 × 7 (la medida sale del coche del pack: 2,51 × 5,63), espalda contra espalda y
-  con su calle de 14 en medio; en ellas, **catorce coches** y sesenta plazas: un aparcamiento
-  lleno se lee como un atasco y uno vacío como una pista de tenis. El nombre va en **blanco**
-  sobre el asfalto y las rayas en **amarillo**, porque dos blancos sobre negro se pelean. Y el
-  cartel es un panel TUMBADO de 12 × 12 sobre un poste de 11, con la `P` impresa encima: un panel
-  a plomo, que es como son los de la calle, desde un tablero no se ve.
+  con su calle de 14 en medio. El nombre va en **blanco** sobre el asfalto y las rayas en
+  **amarillo**, porque dos blancos sobre negro se pelean; y las rayas se CORTAN a 2,5 de los dos
+  renglones, que cruzan la mitad de dentro en diagonal. Quedan treinta y dos plazas enteras, y de
+  ésas dieciocho a la vista: en ellas, **nueve coches**, porque un aparcamiento lleno se lee como un
+  atasco y uno vacío como una pista de tenis. Y el cartel es un panel TUMBADO de 22 × 22 sobre un
+  poste de 13, con PARKING impreso encima —un panel a plomo, que es como son los de la calle, desde
+  un tablero no se ve—, al **fondo** de la diagonal y detrás del texto pequeño: en el carril de
+  entrada tapaba letras desde arriba y desde la cámara, que lo ve corrido 9 hacia el fondo.
 - **La comisaría (30, noreste)**: sigue siendo una **avenida de dos carriles** (24 de ancho) con
   sus cuatro cebras, dos `semaforo-c`, el `coche-patrulla` con el morro hacia la cárcel, una
   berlina, un taxi y la `flecha` apuntando a la 10 —el coche patrulla mirando allá cuenta lo que

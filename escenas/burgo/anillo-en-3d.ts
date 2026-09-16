@@ -1381,34 +1381,38 @@ export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsqui
    * `obras.ts` en código —fundidos, cero llamadas de dibujo—; lo que va aquí son los COCHES, que
    * son piezas del pack y ya estaban instanciadas por la ciudad, así que tampoco cuestan ninguna.
    *
-   * Catorce coches en sesenta plazas: un aparcamiento lleno no se lee como aparcamiento, se lee
-   * como un atasco. Los huecos son lo que hace que se entienda de un vistazo.
+   * Nueve coches en dieciocho plazas: un aparcamiento lleno no se lee como aparcamiento, se lee como
+   * un atasco. Los huecos son lo que hace que se entienda de un vistazo, y por eso no pasa de la mitad.
+   *
+   * Y las plazas no son sesenta, que es lo que salía de cuatro hileras de quince. El nombre y el
+   * texto pequeño cruzan en diagonal la mitad de dentro del aparcamiento: siete coches y una farola
+   * estaban aparcados encima de DESCANSO y de NI DA NI QUITA —hasta un 7 % de una letra—, y las
+   * rayas pasaban por encima de las letras. Ahora `obras.ts` corta las rayas a un hueco del texto
+   * y quedan treinta y dos plazas con sus dos rayas enteras; y de ésas, las catorce del fondo de
+   * las hileras C y D quedan debajo del cartel del PARKING, y un coche ahí no se vería desde arriba.
+   * `verify:burgo-escena` mide las tres cosas: que ninguna pieza tape una letra, que ningún coche
+   * esté en una plaza partida y que ninguno quede debajo del cartel.
    *
    * Y el rincón de dentro —las celdas por debajo de 347,5, que es lo único que la ele de la
    * marcha deja libre de ese lado— se queda con su arbolito, que es lo que tiene la entrada de
    * cualquier aparcamiento de barrio.
    */
   [FERIA]: [
-    /* Hilera A, de morro a −v. */
-    { pieza: PIEZA.cocheBerlina, u: 365.4, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    { pieza: PIEZA.cocheUtilitario, u: 372.6, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    { pieza: PIEZA.cocheFamiliar, u: 383.4, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    { pieza: PIEZA.cocheTaxi, u: 401.4, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    /* Hilera B, de morro a +v. */
-    { pieza: PIEZA.cocheUtilitario, u: 361.8, v: 370.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    { pieza: PIEZA.cocheBerlina, u: 376.2, v: 370.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    { pieza: PIEZA.cocheFamiliar, u: 390.6, v: 370.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    /* Hilera A, de morro a −v: plazas enteras de la 12 a la 14. La plaza `k` tiene el centro en 361,8 + 3,6 k. */
+    { pieza: PIEZA.cocheFamiliar, u: 405.0, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheUtilitario, u: 412.2, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    /* Hilera B, de morro a +v: de la 10 a la 14. */
+    { pieza: PIEZA.cocheFamiliar, u: 397.8, v: 370.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
     { pieza: PIEZA.cocheUtilitario, u: 408.6, v: 370.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    /* Hilera C, de morro a −v. */
-    { pieza: PIEZA.cocheFamiliar, u: 369.0, v: 391.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    /* Hilera C, de morro a −v: de la 4 a la 7; de la 8 en adelante, debajo del cartel. */
+    { pieza: PIEZA.cocheFamiliar, u: 379.8, v: 391.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
     { pieza: PIEZA.cocheTaxi, u: 387.0, v: 391.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    { pieza: PIEZA.cocheBerlina, u: 405.0, v: 391.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    /* Hilera D, de morro a +v. */
-    { pieza: PIEZA.cocheBerlina, u: 365.4, v: 398.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    { pieza: PIEZA.cocheUtilitario, u: 394.2, v: 398.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
-    { pieza: PIEZA.cocheFamiliar, u: 412.2, v: 398.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    /* Hilera D, de morro a +v: de la 2 a la 7. */
+    { pieza: PIEZA.cocheBerlina, u: 369.0, v: 398.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheBerlina, u: 376.2, v: 398.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheTaxi, u: 383.4, v: 398.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
     /* Dos farolas en la calle de en medio, que es donde van las de un aparcamiento. */
-    { pieza: PIEZA.farolaDeCalle, u: 376.2, v: 381, giroEnCuartos: 0, menudo: true },
+    { pieza: PIEZA.farolaDeCalle, u: 383.4, v: 381, giroEnCuartos: 0, menudo: true },
     { pieza: PIEZA.farolaDeCalle, u: 397.8, v: 381, giroEnCuartos: 2, menudo: true },
     /* El rincón verde de la entrada. */
     { pieza: PIEZA.pinoPequeno, u: 332, v: 332, giroEnCuartos: 0, menudo: true },
@@ -1458,7 +1462,8 @@ export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsqui
     { pieza: PIEZA.semaforoC, u: 397.4, v: cel(3), giroEnCuartos: 3 },
     /* El coche patrulla, en el carril que va hacia la cárcel. */
     { pieza: PIEZA.cochePatrulla, u: cel(4) + 2.7, v: cel(6), giroEnCuartos: 1, alza: COCHE_SOBRE_EL_ASFALTO },
-    { pieza: PIEZA.cocheBerlina, u: cel(5) - 2.7, v: cel(3), giroEnCuartos: 3, alza: COCHE_SOBRE_EL_ASFALTO },
+    /* La berlina, una celda más allá de la cebra: en `cel(3)` tapaba la T de RETENIDO. */
+    { pieza: PIEZA.cocheBerlina, u: cel(5) - 2.7, v: cel(4), giroEnCuartos: 3, alza: COCHE_SOBRE_EL_ASFALTO },
     { pieza: PIEZA.cocheTaxi, u: cel(5) - 2.7, v: cel(7), giroEnCuartos: 3, alza: COCHE_SOBRE_EL_ASFALTO },
     { pieza: PIEZA.farolaDeCalle, u: 370.6, v: cel(3), giroEnCuartos: 1, menudo: true },
     { pieza: PIEZA.farolaDeCalle, u: 370.6, v: cel(7), giroEnCuartos: 1, menudo: true },
