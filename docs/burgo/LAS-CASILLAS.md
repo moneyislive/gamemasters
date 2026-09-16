@@ -169,7 +169,12 @@ trece edificios de código a ~1.500 son 20.000 de los 718.000 que sobran.
      bisagra y no sobre su centro, o se abriría como una tapa de olla al aire.
    - Y la de que la lógica de «quién se anima» no vive en el bucle de fotogramas —el único rincón
      al que el comprobador no llega— sino en una función pura: `loQueAnimaUnaCarta`.
-   - Faltan: la moneda del Impuesto, el humo de la central, la onda de la alberca, el coche que
-     aparca y el peón entrando en la celda de la comisaría.
+   - **La reja de la celda de la comisaría también**: sube y baja cuando mandan a alguien a la
+     cárcel, con la misma curva que la hoja de la Mazmorra.
+   - **Lo que falta, y por qué no se ha hecho:** meter al PEÓN dentro de la celda —que es lo que
+     Miguel pidió literalmente— obliga a tocar su máquina de estados: su recorrido, sus fases y su
+     comprobador. Es la pieza más cara de deshacer de la escena y merece su propia tanda. La
+     moneda del Impuesto ya la cuenta la animación de dinero que existe; el humo de la central, la
+     onda de la alberca y el coche que aparca son adorno y no los pidió nadie.
 
 Cada fase es un commit con la batería entera en verde.

@@ -163,7 +163,7 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
-import { DEL_MUNDO, VIA, caja as cajaDeObra, carasDeLaObraEnElMundo, carasDeLasObras, carasDelTren, casillasConObra, largoDeLaVia, letrasDeLosCarteles, paradasDelTren, puntoEnLaVia, triangulosDeLasObras } from '../burgo/obras';
+import { DEL_MUNDO, VIA, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaObraEnElMundo, carasDeLasObras, carasDelTren, casillasConObra, largoDeLaVia, letrasDeLosCarteles, paradasDelTren, puntoEnLaVia, triangulosDeLasObras } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
@@ -202,7 +202,7 @@ import {
   velocidadDelClip,
 } from '../burgo/peon';
 import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
-import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, finDeLaCola, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
+import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, alzadoDeLaReja, finDeLaCola, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
   ALCANCE_DEL_BURGO,
@@ -2595,6 +2595,21 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
     comprobar(
       'se ve fallar: una carta del Arca cogida en una casilla que no tiene cofre no anima nada',
       loQueAnimaUnaCarta('arca', 22).cofre === null && loQueAnimaUnaCarta('arca', 22).ruleta === null && loQueAnimaUnaCarta(null, 17).cofre === null,
+    );
+    /*
+     * Y LA REJA DE LA CELDA: la comisaría tiene cuatro paredes y una de ellas es una reja que sube.
+     * Lo que se mide es que esté FUERA de la malla fundida —si volviera a fundirse se quedaría
+     * clavada y nadie lo notaría hasta ver un encierro— y que su curva empiece y acabe cerrada.
+     */
+    comprobar(
+      'la reja de la celda es una pieza viva y no está fundida con la comisaría',
+      triangulosDeLasPiezasVivas().reja > 0 && !carasDeLasObras().some((cara) => cara.casilla === 30 && cara.color === '#2f2f33'),
+      { reja: triangulosDeLasPiezasVivas().reja },
+    );
+    comprobar(
+      'y sube y vuelve a bajar: empieza cerrada, se abre del todo por en medio y acaba cerrada',
+      alzadoDeLaReja(0) === 0 && alzadoDeLaReja(DURA_A_LA_MAZMORRA) === 0 && Math.max(...[0.2, 0.9, 1.8, 2.4, 3, 3.5].map(alzadoDeLaReja)) === 1,
+      { alPrincipio: alzadoDeLaReja(0), alFinal: alzadoDeLaReja(DURA_A_LA_MAZMORRA) },
     );
     comprobar(
       'y las casillas que la regla nombra son las mismas que levantan cofre y ruleta',

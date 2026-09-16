@@ -389,13 +389,10 @@ function carasDeLaComisaria(): CaraDeObra[] {
   salida.push(...caja(c, ce.u0, ce.u1, ce.v1 - ce.pared, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
   salida.push(...caja(c, ce.u0, ce.u0 + ce.pared, ce.v0, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
   salida.push(...caja(c, ce.u1 - ce.pared, ce.u1, ce.v0, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
-  const paso = (ce.u1 - ce.u0) / (ce.barrotes + 1);
-  for (let k = 1; k <= ce.barrotes; k++) {
-    const u = ce.u0 + paso * k;
-    salida.push(...caja(c, u - ce.barrote / 2, u + ce.barrote / 2, ce.v0, ce.v0 + ce.barrote, 0, ce.alto, COLOR_DE_OBRA.barrote));
-  }
-  /* Y el dintel que las remata arriba, que es lo que hace que se lean como una reja y no como palos. */
-  salida.push(...caja(c, ce.u0, ce.u1, ce.v0, ce.v0 + ce.barrote, ce.alto - 0.9, ce.alto, COLOR_DE_OBRA.barrote));
+  /*
+   * Los BARROTES no se funden con la celda: suben y bajan cuando encierran a alguien, igual que la
+   * hoja de la verja de la cárcel. Viven en `carasDeLaRejaDeLaCelda`.
+   */
   return salida;
 }
 
@@ -1257,10 +1254,42 @@ export function ejeDeLaJoya(): PiezaViva {
   return { casilla: CASILLA_DE_LA_TASA, x: p.x, y: (JOYA.punta + JOYA.culata) / 2, z: p.z, giro: giroHaciaFuera(m) };
 }
 
+/**
+ * LA REJA DE LA CELDA DE LA COMISARÍA, que sube y baja.
+ *
+ * Miguel: «quiero ver cómo entra en la celda». Meter al PEÓN dentro obliga a tocar su máquina de
+ * estados —su recorrido, sus fases, su comprobador— y eso es otra tanda. Lo que sí cuenta la
+ * historia con lo que ya hay es la REJA: se abre y se cierra cuando mandan a alguien a la cárcel,
+ * exactamente como la hoja de la verja de la Mazmorra, que lleva funcionando desde su tanda.
+ *
+ * Va en el marco de la celda con el origen en el suelo, y sube en `y`.
+ */
+export function carasDeLaRejaDeLaCelda(): CaraDeObra[] {
+  const ce = COMISARIA.celda;
+  const salida: CaraDeObra[] = [];
+  const ancho = ce.u1 - ce.u0;
+  const paso = ancho / (ce.barrotes + 1);
+  for (let k = 1; k <= ce.barrotes; k++) {
+    const u = -ancho / 2 + paso * k;
+    salida.push(...barra({ x: u, z: 0 }, { x: u, z: ce.barrote }, ce.barrote, 0, ce.alto, COLOR_DE_OBRA.barrote));
+  }
+  /* El dintel que las remata: es lo que hace que se lean como una reja y no como cinco palos. */
+  salida.push(...barra({ x: -ancho / 2, z: ce.barrote / 2 }, { x: ancho / 2, z: ce.barrote / 2 }, ce.barrote, ce.alto - 0.9, ce.alto, COLOR_DE_OBRA.barrote));
+  return salida;
+}
+
+/** Dónde va esa reja, en el mundo: el cuarto lado de la celda, el que da al patio. */
+export function sitioDeLaRejaDeLaCelda(): PiezaViva {
+  const m = marcoDeCasilla(A_LA_MAZMORRA);
+  const ce = COMISARIA.celda;
+  const p = puntoEnEsquina(m, (ce.u0 + ce.u1) / 2, ce.v0);
+  return { casilla: A_LA_MAZMORRA, x: p.x, y: 0, z: p.z, giro: giroHaciaFuera(m) };
+}
+
 /** Los triángulos de cada pieza viva: el presupuesto las cuenta una a una. */
-export function triangulosDeLasPiezasVivas(): { readonly tapa: number; readonly ruleta: number; readonly joya: number } {
+export function triangulosDeLasPiezasVivas(): { readonly tapa: number; readonly ruleta: number; readonly joya: number; readonly reja: number } {
   const cuenta = (caras: readonly CaraDeObra[]): number => caras.reduce((n, cara) => n + (esTriangulo(cara) ? 1 : 2), 0);
-  return { tapa: cuenta(carasDeLaTapa()), ruleta: cuenta(carasDeLaRuleta()), joya: cuenta(carasDeLaJoyaViva()) };
+  return { tapa: cuenta(carasDeLaTapa()), ruleta: cuenta(carasDeLaRuleta()), joya: cuenta(carasDeLaJoyaViva()), reja: cuenta(carasDeLaRejaDeLaCelda()) };
 }
 
 /** Qué levanta cada casilla lateral. Las que no están aquí todavía no tienen obra. */

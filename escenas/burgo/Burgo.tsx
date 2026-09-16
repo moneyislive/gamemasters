@@ -246,8 +246,8 @@ import {
   tonoDelEdificio,
 } from './ciudad';
 import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
-import { claveDelBulto, geometriaDeLaJoya, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
-import { bisagrasDeLosCofres, ejeDeLaJoya, ejesDeLasRuletas, largoDeLaVia, paradasDelTren, puntoEnLaVia } from './obras';
+import { claveDelBulto, geometriaDeLaJoya, geometriaDeLaRejaDeLaCelda, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
+import { bisagrasDeLosCofres, ejeDeLaJoya, ejesDeLasRuletas, largoDeLaVia, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda } from './obras';
 import { CASAS_DEL_CONCEJO, DISCOS_DEL_TRATO, DISCOS_DE_CONTACTO, MONEDAS_EN_VUELO, POSADAS_DEL_CONCEJO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DEL_DISCO, TITULOS } from './presupuesto';
 import {
   HUNDIR_CASAS,
@@ -1233,18 +1233,21 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   const tapaGeometria = useMemo(geometriaDeLaTapa, []);
   const ruletaGeometria = useMemo(geometriaDeLaRuleta, []);
   const joyaGeometria = useMemo(geometriaDeLaJoya, []);
+  const rejaDeLaCeldaGeometria = useMemo(geometriaDeLaRejaDeLaCelda, []);
   useEffect(
     () => () => {
       tapaGeometria?.dispose();
       ruletaGeometria?.dispose();
       joyaGeometria?.dispose();
+      rejaDeLaCeldaGeometria?.dispose();
     },
-    [tapaGeometria, ruletaGeometria, joyaGeometria],
+    [tapaGeometria, ruletaGeometria, joyaGeometria, rejaDeLaCeldaGeometria],
   );
   const tapas = useRef<THREE.InstancedMesh>(null);
   const ruletas = useRef<THREE.InstancedMesh>(null);
   const joya = useRef<THREE.InstancedMesh>(null);
-  const sitiosVivos = useMemo(() => ({ cofres: bisagrasDeLosCofres(), ruletas: ejesDeLasRuletas(), joya: ejeDeLaJoya() }), []);
+  const rejaDeLaCelda = useRef<THREE.Mesh>(null);
+  const sitiosVivos = useMemo(() => ({ cofres: bisagrasDeLosCofres(), ruletas: ejesDeLasRuletas(), joya: ejeDeLaJoya(), reja: sitioDeLaRejaDeLaCelda() }), []);
 
   const materiales = useMemo(
     () => ({
@@ -2105,6 +2108,18 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         mr.count = sitiosVivos.ruletas.length;
         mr.instanceMatrix.needsUpdate = true;
       }
+      /*
+       * LA REJA DE LA CELDA DE LA COMISARÍA: se abre y se cierra cuando mandan a alguien a la
+       * cárcel. Usa la MISMA curva que la hoja de la verja de la Mazmorra —`alzadoDeLaReja`—
+       * porque es el mismo gesto contado desde el otro lado: allí se cierra detrás del preso y
+       * aquí se abre para que entre.
+       */
+      const rc = rejaDeLaCelda.current;
+      if (rc !== null) {
+        const encierro = enCursoDe('a-la-mazmorra');
+        const alzada = encierro === undefined ? 0 : alzadoDeLaReja(ahora - encierro.desde);
+        rc.position.y = sitiosVivos.reja.y + alzada * SUBIDA_DE_LA_REJA;
+      }
       const mj = joya.current;
       if (mj !== null) {
         const tasa = sonando.find((x) => (x.suceso.que === 'paga' || x.suceso.que === 'cobra') && x.suceso.porque === 'alcabala');
@@ -2465,6 +2480,16 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       {tapaGeometria === null ? null : <instancedMesh ref={tapas} args={[tapaGeometria, materiales.bulto, sitiosVivos.cofres.length]} frustumCulled={false} raycast={() => null} />}
       {ruletaGeometria === null ? null : <instancedMesh ref={ruletas} args={[ruletaGeometria, materiales.bulto, sitiosVivos.ruletas.length]} frustumCulled={false} raycast={() => null} />}
       {joyaGeometria === null ? null : <instancedMesh ref={joya} args={[joyaGeometria, materiales.bulto, 1]} frustumCulled={false} raycast={() => null} />}
+      {rejaDeLaCeldaGeometria === null ? null : (
+        <mesh
+          ref={rejaDeLaCelda}
+          geometry={rejaDeLaCeldaGeometria}
+          material={materiales.bulto}
+          position={[sitiosVivos.reja.x, sitiosVivos.reja.y, sitiosVivos.reja.z]}
+          rotation={[0, sitiosVivos.reja.giro, 0]}
+          raycast={() => null}
+        />
+      )}
       {rotulos === null ? null : <mesh geometry={rotulos.geometria} material={materiales.rotulo} position={[0, 0, 0]} raycast={() => null} />}
 
       {/*

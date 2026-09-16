@@ -78,7 +78,7 @@ import {
 } from '../iconos';
 import { geometriaDeContornos } from '../formas';
 import { ALZA_DEL_ROTULO, CASILLAS, FERIA, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo } from './anillo-en-3d';
-import { COLOR_DE_OBRA, carasDeLaJoyaViva, carasDeLaObraEnElMundo, carasDeLaRuleta, carasDeLaTapa, carasDelTren, casillasConObra, letrasDeLosCarteles } from './obras';
+import { COLOR_DE_OBRA, carasDeLaJoyaViva, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDelTren, casillasConObra, letrasDeLosCarteles } from './obras';
 import type { CaraEnElMundo } from './obras';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
 
@@ -602,6 +602,9 @@ export function geometriaDeLaRuleta(): THREE.BufferGeometry | null {
 }
 export function geometriaDeLaJoya(): THREE.BufferGeometry | null {
   return geometriaDeCarasConColor(carasDeLaJoyaViva());
+}
+export function geometriaDeLaRejaDeLaCelda(): THREE.BufferGeometry | null {
+  return geometriaDeCarasConColor(carasDeLaRejaDeLaCelda());
 }
 
 export function geometriaDeLosRotulos(): Rotulos | null {
