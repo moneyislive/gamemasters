@@ -711,7 +711,7 @@ function ElCuerpoDeLaSeccion({
         </View>
       );
     case 'mios':
-      return <LoMio barrios={hoja.mios} quieto={quieto} alElegir={alElegir} />;
+      return <LoMio barrios={hoja.mios} lineas={seccion.lineas} quieto={quieto} alElegir={alElegir} />;
     default:
       return (
         <View style={estilos.pila}>
@@ -1145,15 +1145,24 @@ function ElMando({
 /** «Lo mío»: mis títulos por barrio, cada uno con su ficha y sus obras. */
 function LoMio({
   barrios,
+  lineas,
   quieto,
   alElegir,
 }: {
   barrios: readonly BarrioDeLoMio<OpcionDeMesa>[];
+  /**
+   * LOS RENGLONES DE LA TRADUCCIÓN, Y NO UNA FRASE ESCRITA AQUÍ. Sin un solo título esta
+   * sección tiene UNA cosa que decir —«Todavía no tienes ningún título.»— y estaba escrita a
+   * mano en este fichero, cuando `lineasDeLoMio` ya la manda: la misma frase en dos sitios, y
+   * el día que cambie una la otra se queda. Con títulos mandan las fichas, que dicen eso y más,
+   * y los renglones no se pintan; el escritorio hace lo mismo desde el 16-sep-2026.
+   */
+  lineas: readonly string[];
   quieto: boolean;
   alElegir: (o: OpcionDeMesa) => void;
 }): JSX.Element {
   if (barrios.length === 0) {
-    return <Text style={estilos.linea}>Todavía no tienes ningún título.</Text>;
+    return <LasLineas lineas={lineas} />;
   }
   return (
     <View style={estilos.pila}>

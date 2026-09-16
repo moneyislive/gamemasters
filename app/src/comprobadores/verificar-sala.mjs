@@ -2341,6 +2341,15 @@ paso(
     'reordenarlas aquí sería una segunda versión del §6.3 que se separa de la del escritorio el primer día',
   );
   reglaDelFuente(
+    'y «Lo mío» sin ningún título dice la frase DE LA TRADUCCIÓN, no una escrita aquí',
+    /* `soloCodigo` y no el fichero entero: el comentario que explica por qué la frase no se
+       escribe aquí LA CITA, y una regla que mire los comentarios se caza a sí misma. */
+    (t) => !/Todavía no tienes ningún título\./.test(soloCodigo(t)) && /<LoMio barrios=\{hoja\.mios\} lineas=\{seccion\.lineas\}/.test(t),
+    hojas,
+    hojas.replace('return <LasLineas lineas={lineas} />;', 'return <Text style={estilos.linea}>Todavía no tienes ningún título.</Text>;'),
+    'la misma frase escrita en dos sitios: `lineasDeLoMio` ya la manda, y el día que cambie una la otra se queda atrás',
+  );
+  reglaDelFuente(
     'lo apagado se apaga con `BOTON.quieto` y nunca con opacidad, y nada de lo que se toca baja de 44',
     (t) =>
       /const DEDO = 44;/.test(t) &&
