@@ -246,13 +246,16 @@ import {
   tonoDelEdificio,
 } from './ciudad';
 import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
-import { claveDelBulto, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
+import { claveDelBulto, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
+import { largoDeLaVia, paradasDelTren, puntoEnLaVia } from './obras';
 import { CASAS_DEL_CONCEJO, DISCOS_DEL_TRATO, DISCOS_DE_CONTACTO, MONEDAS_EN_VUELO, POSADAS_DEL_CONCEJO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DEL_DISCO, TITULOS } from './presupuesto';
 import {
   HUNDIR_CASAS,
   LUMINANCIA_EMPENADA,
   POR_CASA,
+  TREN,
   alzadoDeLaReja,
+  avanceDelTren,
   arcoDeMoneda,
   avanzarLaCola,
   backOut,
@@ -1215,6 +1218,11 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   /* Las obras de las casillas: asfalto, rayas y carteles, todas en una malla y una llamada. */
   const obras = useMemo(geometriaDeLasObras, []);
   useEffect(() => () => obras?.dispose(), [obras]);
+  /* Y el tren, que va aparte porque anda: una malla, dos instancias, una llamada. */
+  const trenGeometria = useMemo(geometriaDeUnTren, []);
+  useEffect(() => () => trenGeometria?.dispose(), [trenGeometria]);
+  const trenes = useRef<THREE.InstancedMesh>(null);
+  const laVia = useMemo(() => ({ largo: largoDeLaVia(), paradas: paradasDelTren() }), []);
 
   const materiales = useMemo(
     () => ({
@@ -2037,6 +2045,29 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       }
     }
 
+    /*
+     * ─ LOS DOS TRENES, que no esperan a nadie ─
+     *
+     * Van por la MISMA polilínea que se ve dibujada —`puntoEnLaVia`—, así que no pueden ir por un
+     * sitio distinto del que hay vía. El segundo va a media vuelta del primero, que es lo que hace
+     * que casi siempre haya uno a la vista sin que se pisen en las paradas.
+     */
+    {
+      const malla = trenes.current;
+      if (malla !== null && trenGeometria !== null) {
+        const vuelta = laVia.largo / TREN.velocidad + laVia.paradas.length * TREN.parada;
+        for (let i = 0; i < TREN.cuantos; i++) {
+          const avance = avanceDelTren(ahora, laVia.largo, laVia.paradas, (vuelta * i) / TREN.cuantos);
+          const p = puntoEnLaVia(avance);
+          auxGiro.setFromAxisAngle(EJE_Y, p.rumbo);
+          auxMatriz.compose(auxPosicion.set(p.x, 0, p.z), auxGiro, auxEscala.set(1, 1, 1));
+          malla.setMatrixAt(i, auxMatriz);
+        }
+        malla.count = TREN.cuantos;
+        malla.instanceMatrix.needsUpdate = true;
+      }
+    }
+
     /* ─ La reja de la Mazmorra, las aspas, las nubes, el agua quieta. ─ */
     {
       const rg = rejaGrupo.current;
@@ -2358,6 +2389,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
       {/* Los precios y los emblemas de las casillas: fundidos en una sola geometría, tinta plana. */}
       {obras === null ? null : <mesh geometry={obras} material={materiales.bulto} position={[0, 0, 0]} raycast={() => null} />}
+      {trenGeometria === null ? null : <instancedMesh ref={trenes} args={[trenGeometria, materiales.bulto, TREN.cuantos]} frustumCulled={false} raycast={() => null} />}
       {rotulos === null ? null : <mesh geometry={rotulos.geometria} material={materiales.rotulo} position={[0, 0, 0]} raycast={() => null} />}
 
       {/*

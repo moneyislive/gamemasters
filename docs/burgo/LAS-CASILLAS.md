@@ -153,7 +153,14 @@ trece edificios de código a ~1.500 son 20.000 de los 718.000 que sobran.
    - Con ellas entra también la regla de que **ninguna obra se come una pieza del pack**, que es
      la que habría cazado sin mirar coordenadas los dos choques que hubo que arreglar a mano: los
      bancos enterrados en la comisaría y la carbonera plantada sobre un paso de cebra.
-   - Falta el TREN, que es lo único de esta fase que se mueve.
+   - **Los trenes, hechos.** Dos, en una `InstancedMesh` de dos instancias —una llamada de dibujo
+     para los dos—, por la misma polilínea que se ve dibujada y a media vuelta uno de otro. A 40
+     por segundo, que es más despacio que un peón (48): un tren más rápido que los peón le roba la
+     vista al juego. La vuelta dura 90,2 s con sus cuatro paradas de 2,5.
+   - Y dos fallos que ninguna captura habría enseñado: el tren daba la vuelta **de lado** —estaba
+     construido sobre `+x` y aquí todas las piezas miran a `+z`— y con **una sola** estación no se
+     movía nunca, porque el tramo de una parada a sí misma da cero por el módulo.
+   - **La fase 5 está hecha.** Queda la 6: las animaciones.
 5. **Las animaciones** (fase 6): una función pura por animación en `coreografia.ts` —que el
    comprobador puede medir sin `three`— y el bucle de `Burgo.tsx` moviéndolas.
 

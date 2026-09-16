@@ -163,7 +163,7 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
-import { DEL_MUNDO, VIA, caja as cajaDeObra, carasDeLaObraEnElMundo, carasDeLasObras, casillasConObra, letrasDeLosCarteles, triangulosDeLasObras } from '../burgo/obras';
+import { DEL_MUNDO, VIA, caja as cajaDeObra, carasDeLaObraEnElMundo, carasDeLasObras, carasDelTren, casillasConObra, largoDeLaVia, letrasDeLosCarteles, paradasDelTren, puntoEnLaVia, triangulosDeLasObras } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
@@ -202,7 +202,7 @@ import {
   velocidadDelClip,
 } from '../burgo/peon';
 import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
-import { avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, finDeLaCola, saltar, terminada as colaTerminada } from '../burgo/coreografia';
+import { TREN, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, finDeLaCola, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
   ALCANCE_DEL_BURGO,
@@ -2477,6 +2477,92 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       });
     comprobar(`se ve fallar: una obra plantada encima de un «${unCoche?.pieza ?? '?'}» del aparcamiento da choque`, pisa, unCoche?.pieza);
   }
+  /*
+   * ── 2 sexies. EL TREN: QUE ANDE, QUE PARE Y QUE NO SE SALGA DE LA VÍA ──
+   *
+   * Es la única animación del tablero que no espera a un suceso de la partida: da vueltas sin
+   * parar, así que un fallo suyo se ve siempre y en cualquier pose. Tres cosas, y las tres se
+   * miden sobre la función pura y sobre la polilínea de verdad:
+   *
+   *  · que PARE en las cuatro estaciones el tiempo que dice, y no pase de largo;
+   *  · que no ande hacia atrás nunca —un tren que retrocede medio metro en una vuelta es un fallo
+   *    de resto que no se ve mirando una captura—;
+   *  · y que el punto donde se le pone esté SOBRE la vía, que es lo que hace que no flote por el
+   *    campo el día que alguien cambie el trazado y se olvide del tren.
+   */
+  {
+    const largo = largoDeLaVia();
+    const paradas = paradasDelTren();
+    const vuelta = vueltaDelTren(largo, paradas);
+    comprobar(
+      `la vía mide ${largo.toFixed(0)} y el tren la recorre con cuatro paradas en ${vuelta.toFixed(1)} s`,
+      paradas.length === 4 && Math.abs(vuelta - (largo / TREN.velocidad + 4 * TREN.parada)) < 1e-6,
+      { largo, paradas: paradas.map((d) => Math.round(d)), vuelta },
+    );
+    /* Se muestrea una vuelta entera en pasos de una décima. */
+    const PASOS = Math.ceil(vuelta * 10);
+    let atras = 0;
+    let quietoEnEstacion = 0;
+    let fueraDeLaVia = 0;
+    let anterior = avanceDelTren(0, largo, paradas);
+    for (let k = 1; k <= PASOS; k++) {
+      const t = (vuelta * k) / PASOS;
+      const d = avanceDelTren(t, largo, paradas);
+      const paso = ((d - anterior) % largo + largo) % largo;
+      if (paso > largo / 2) atras++;
+      if (paso < 1e-9 && paradas.some((p) => Math.abs(p - d) < 1e-6)) quietoEnEstacion++;
+      const p = puntoEnLaVia(d);
+      const lejos = Math.max(Math.abs(p.x), Math.abs(p.z));
+      if (lejos < MEDIO_LADO || lejos > MANCHAS_LEJOS_DEL_TABLERO) fueraDeLaVia++;
+      anterior = d;
+    }
+    comprobar(`en una vuelta muestreada en ${String(PASOS)} pasos el tren no anda hacia atrás ni una vez`, atras === 0, atras);
+    comprobar('y se para en las estaciones: hay pasos en los que no avanza, y todos son en una parada', quietoEnEstacion >= 4 * Math.floor(TREN.parada * 10) - 8, quietoEnEstacion);
+    comprobar('y en toda la vuelta se mantiene sobre la vía, sin salirse al campo ni meterse en el tablero', fueraDeLaVia === 0, fueraDeLaVia);
+    /*
+     * LAS DOS VACUNAS. Sin paradas el tren no se para nunca —o sea que los pasos quietos de arriba
+     * son de verdad las paradas y no un redondeo—, y con una sola parada la vuelta dura justo el
+     * viaje más una parada.
+     */
+    let quietoSinParadas = 0;
+    let previo = avanceDelTren(0, largo, []);
+    for (let k = 1; k <= 200; k++) {
+      const d = avanceDelTren((vuelta * k) / 200, largo, []);
+      if (Math.abs(d - previo) < 1e-9) quietoSinParadas++;
+      previo = d;
+    }
+    comprobar('se ve fallar: sin estaciones el tren no se para ni una vez en toda la vuelta', quietoSinParadas === 0, quietoSinParadas);
+    comprobar('y con una sola estación la vuelta dura el viaje entero más una parada', Math.abs(vueltaDelTren(largo, [0]) - (largo / TREN.velocidad + TREN.parada)) < 1e-6);
+    /*
+     * ═══ Y QUE EL MORRO MIRE HACIA DONDE ANDA ═══
+     *
+     * El tren se construyó primero a lo largo de `+x` y en este tablero todas las piezas miran a
+     * `+z` —`rumboDeLaMarcha` devuelve `atan2(dx, dz)`—, así que daba la vuelta al burgo DE LADO:
+     * se movía perfectamente y miraba a noventa grados de su marcha. En una captura desde arriba
+     * eso no se distingue, y ninguna cuenta de las de más arriba lo veía. Ésta sí: coge el morro
+     * del modelo, lo gira con el rumbo que se le pone y lo compara con hacia dónde va la vía.
+     */
+    const caras = carasDelTren();
+    const alLargo = Math.max(...caras.flatMap((c) => c.puntos.map((q) => q[2])));
+    const aLoAncho = Math.max(...caras.flatMap((c) => c.puntos.map((q) => q[0])));
+    comprobar('el tren se construye a lo largo de +z, como todas las piezas de este tablero', alLargo > aLoAncho * 2, { alLargo, aLoAncho });
+    const enElMorro = Math.max(...caras.filter((c) => c.puntos.some((q) => Math.abs(q[2] - alLargo) < 0.01)).flatMap((c) => c.puntos.map((q) => q[1])));
+    const loMasAlto = Math.max(...caras.flatMap((c) => c.puntos.map((q) => q[1])));
+    comprobar('y su punto más adelantado es el morro, más bajo que la cabina', enElMorro < loMasAlto - 1, { enElMorro, loMasAlto });
+    {
+      const donde = puntoEnLaVia(paradas[0] as number);
+      const unPasoMas = puntoEnLaVia((paradas[0] as number) + 2);
+      const dx = unPasoMas.x - donde.x;
+      const dz = unPasoMas.z - donde.z;
+      const largoDelPaso = Math.hypot(dx, dz) || 1;
+      /* El `+z` del modelo, girado por el rumbo que se le pone: `(sin θ, cos θ)`. */
+      const morro = { x: Math.sin(donde.rumbo), z: Math.cos(donde.rumbo) };
+      const alineado = (morro.x * dx + morro.z * dz) / largoDelPaso;
+      comprobar('el morro del tren mira exactamente hacia donde avanza la vía', alineado > 0.999, { alineado });
+      comprobar('se ve fallar: girado un cuarto —que es como estaba— el morro y la marcha no se parecen en nada', Math.abs((Math.sin(donde.rumbo + Math.PI / 2) * dx + Math.cos(donde.rumbo + Math.PI / 2) * dz) / largoDelPaso) < 0.02);
+    }
+  }
+
 
   /*
    * La vacuna de la vía es la cuenta que se hizo mal dos veces: el punto más adentro de una curva

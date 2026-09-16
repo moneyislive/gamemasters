@@ -33,7 +33,7 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MAZMORRA, SUPERFICIE, giroHaciaDentro, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MAZMORRA, PUERTAS, SUPERFICIE, giroHaciaDentro, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
 /** Un punto de una obra en las coordenadas de su casilla: `u` y `v` como en `puntoEnEsquina`, `y` a plomo. */
@@ -103,6 +103,11 @@ export const COLOR_DE_OBRA = {
   esfera: '#f0ece0',
   cristal: '#a9c7d4',
   carbon: '#26262a',
+  /* El tren. */
+  locomotora: '#2f4a5c',
+  cabina: '#3d6076',
+  vagon: '#6b4a3a',
+  rueda: '#3a3a3e',
 } as const;
 
 /**
@@ -969,6 +974,169 @@ function remateDelApeadero(casilla: number): CaraDeObra[] {
     ...caja(casilla, h.u0 + 3.2, h.u1 - 3.2, h.v0 + 3.2, h.v1 - 3.2, h.alto + 2.2, h.alto + 3.1, COLOR_DE_OBRA.tejado),
     ...caja(casilla, 8, 18, 96, 98.4, ESTACION.anden.alto, ESTACION.anden.alto + 1.6, COLOR_DE_OBRA.madera),
   ];
+}
+
+/* ──────────────────────────── El tren, que es lo que se mueve ──────────────────────────── */
+
+/**
+ * EL TREN NO ES UNA OBRA: ES UNA PIEZA QUE ANDA, Y POR ESO SE ESCRIBE APARTE.
+ *
+ * Todo lo demás de este fichero se FUNDE en una malla y no se vuelve a tocar. Un tren no puede:
+ * se mueve, así que va en su propia malla —una `InstancedMesh` de dos instancias, o sea UNA
+ * llamada de dibujo para los dos trenes— y quien la mueve es el bucle de fotogramas con la
+ * función pura de `coreografia.ts`.
+ *
+ * ═══ SU GEOMETRÍA VA EN EL MARCO DEL TREN, Y ESO DECIDE DOS COSAS ═══
+ *
+ * La primera, las VUELTAS: las cajas de las casillas (`caja`) las tienen derivadas para un marco
+ * que llega al mundo con determinante −1, y el tren no —su geometría es local y la matriz de cada
+ * instancia la lleva al mundo sin reflejarla—. Con `caja` saldría entero del revés, así que se
+ * construye con `barra`, que es la que ya está derivada para el mundo.
+ *
+ * La segunda, HACIA DÓNDE MIRA: el morro va sobre **`+z`**, que es la convención de todas las
+ * piezas de este tablero —`rumboDeLaMarcha` devuelve `atan2(dx, dz)`, que es el giro que lleva
+ * `+z` al rumbo—. Construído sobre `+x`, que fue el primer intento, el tren daba la vuelta al
+ * burgo **de lado**: se movió bien desde el primer fotograma y miraba a noventa grados de su
+ * marcha. Lo cazó la cuenta del giro, porque en una captura desde arriba no se distingue.
+ */
+export const TREN = {
+  ancho: 5,
+  locomotora: { largo: 14, alto: 5.4, morro: { largo: 4.5, alto: 3.6 }, cabina: { largo: 5, alto: 3.2, ancho: 4.6 }, chimenea: { radio: 0.9, alto: 3, en: 3.2 } },
+  vagon: { largo: 12, alto: 4.6, cuantos: 2 },
+  enganche: 1.6,
+  /* Las ruedas: dos hileras de discos bajos, que a esta talla es lo que se ve de un bogie. */
+  rueda: { radio: 1.1, ancho: 0.8, en: [-4.5, 4.5] as readonly number[] },
+  /* El tren se posa sobre el carril: balasto + traviesa + carril. */
+  alza: 0.02 + 0.26 + 0.65,
+} as const;
+
+/** El tren entero, en su propio marco: el morro mira a `+z` y el `0` es el centro del convoy. */
+export function carasDelTren(): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  const t = TREN;
+  const largoTotal = t.locomotora.largo + t.vagon.cuantos * (t.enganche + t.vagon.largo);
+  let x = largoTotal / 2;
+  const en = (a: number, b: number): { desde: { x: number; z: number }; hasta: { x: number; z: number } } => ({ desde: { x: 0, z: a }, hasta: { x: 0, z: b } });
+  /* La locomotora: cuerpo, morro más bajo delante, cabina detrás y chimenea. */
+  const loco = en(x - t.locomotora.largo, x);
+  salida.push(...barra(loco.desde, { x: 0, z: x - t.locomotora.morro.largo }, t.ancho, t.alza, t.alza + t.locomotora.alto, COLOR_DE_OBRA.locomotora));
+  salida.push(...barra({ x: 0, z: x - t.locomotora.morro.largo }, loco.hasta, t.ancho - 0.6, t.alza, t.alza + t.locomotora.morro.alto, COLOR_DE_OBRA.locomotora));
+  salida.push(
+    ...barra(
+      { x: 0, z: x - t.locomotora.largo + 0.6 },
+      { x: 0, z: x - t.locomotora.largo + 0.6 + t.locomotora.cabina.largo },
+      t.locomotora.cabina.ancho,
+      t.alza + t.locomotora.alto,
+      t.alza + t.locomotora.alto + t.locomotora.cabina.alto,
+      COLOR_DE_OBRA.cabina,
+    ),
+  );
+  /*
+   * La chimenea y las ruedas van en CAJA y no en tronco de cono, y no por pereza: `tronco` tiene
+   * las vueltas derivadas para el marco de una casilla —determinante −1— y aquí estamos en el
+   * marco del tren, que llega al mundo sin reflejarse. Un tronco puesto aquí saldría del revés.
+   * A la talla a la que se ve un tren en este tablero, una chimenea de ocho caras y una de cuatro
+   * son la misma chimenea.
+   */
+  const chimenea = x - t.locomotora.morro.largo - t.locomotora.chimenea.en;
+  salida.push(
+    ...barra(
+      { x: 0, z: chimenea },
+      { x: 0, z: chimenea + 0.1 },
+      t.locomotora.chimenea.radio * 2,
+      t.alza + t.locomotora.alto,
+      t.alza + t.locomotora.alto + t.locomotora.chimenea.alto,
+      COLOR_DE_OBRA.hierro,
+    ),
+  );
+  x -= t.locomotora.largo;
+  for (let k = 0; k < t.vagon.cuantos; k++) {
+    x -= t.enganche;
+    salida.push(...barra({ x: 0, z: x - t.vagon.largo }, { x: 0, z: x }, t.ancho, t.alza, t.alza + t.vagon.alto, COLOR_DE_OBRA.vagon));
+    x -= t.vagon.largo;
+  }
+  /* Las ruedas, a lo largo del convoy: dos por bogie y un bogie cada nueve. */
+  for (let centro = -largoTotal / 2 + 3; centro < largoTotal / 2 - 2; centro += 9) {
+    salida.push(
+      ...barra({ x: 0, z: centro - t.rueda.radio }, { x: 0, z: centro + t.rueda.radio }, t.ancho + 0.4, t.alza - t.rueda.radio * 2, t.alza, COLOR_DE_OBRA.rueda),
+    );
+  }
+  return salida;
+}
+
+/** Dos triángulos por cuadro, como en las obras: lo que el presupuesto guarda para UN tren. */
+export function triangulosDelTren(): number {
+  return carasDelTren().reduce((n, cara) => n + (esTriangulo(cara) ? 1 : 2), 0);
+}
+
+/** Lo que mide la vía dando la vuelta entera, y dónde cae cada punto de su eje. */
+let largoGuardado: { readonly largo: number; readonly acumulado: readonly number[] } | null = null;
+
+function medidaDeLaVia(): { readonly largo: number; readonly acumulado: readonly number[] } {
+  if (largoGuardado !== null) return largoGuardado;
+  const eje = ejeDeLaVia();
+  const acumulado: number[] = [];
+  let suma = 0;
+  for (let k = 0; k < eje.length; k++) {
+    acumulado.push(suma);
+    const p = eje[k] as PuntoDeLaVia;
+    const q = eje[(k + 1) % eje.length] as PuntoDeLaVia;
+    suma += Math.hypot(q.x - p.x, q.z - p.z);
+  }
+  largoGuardado = { largo: suma, acumulado };
+  return largoGuardado;
+}
+
+export function largoDeLaVia(): number {
+  return medidaDeLaVia().largo;
+}
+
+/** El punto de la vía a `distancia` de su origen, y el rumbo que lleva ahí. Da la vuelta sola. */
+export function puntoEnLaVia(distancia: number): { readonly x: number; readonly z: number; readonly rumbo: number } {
+  const eje = ejeDeLaVia();
+  const { largo, acumulado } = medidaDeLaVia();
+  const d = ((distancia % largo) + largo) % largo;
+  /* Búsqueda binaria sobre los acumulados: el eje tiene casi seiscientos puntos. */
+  let bajo = 0;
+  let alto = acumulado.length - 1;
+  while (bajo < alto) {
+    const medio = Math.ceil((bajo + alto) / 2);
+    if ((acumulado[medio] as number) <= d) bajo = medio;
+    else alto = medio - 1;
+  }
+  const p = eje[bajo] as PuntoDeLaVia;
+  const q = eje[(bajo + 1) % eje.length] as PuntoDeLaVia;
+  const tramo = Math.hypot(q.x - p.x, q.z - p.z) || 1;
+  const s = (d - (acumulado[bajo] as number)) / tramo;
+  return { x: p.x + (q.x - p.x) * s, z: p.z + (q.z - p.z) * s, rumbo: Math.atan2(p.dx, p.dz) };
+}
+
+/**
+ * DÓNDE PARA EL TREN: en el punto de la vía más cercano al andén de cada estación.
+ *
+ * No se escribe a mano por la misma razón por la que el eje de la vía no se escribe a mano: si
+ * mañana cambia el trazado, una lista de cuatro distancias copiadas se queda apuntando al campo.
+ */
+export function paradasDelTren(): number[] {
+  const eje = ejeDeLaVia();
+  const { acumulado } = medidaDeLaVia();
+  const salida: number[] = [];
+  for (const casilla of PUERTAS) {
+    const m = marcoDeCasilla(casilla);
+    const anden = puntoEnLaCasillaPorV(m, 0, 100);
+    let mejor = 0;
+    let mejorDistancia = Infinity;
+    for (let k = 0; k < eje.length; k++) {
+      const p = eje[k] as PuntoDeLaVia;
+      const d = (p.x - anden.x) ** 2 + (p.z - anden.z) ** 2;
+      if (d < mejorDistancia) {
+        mejorDistancia = d;
+        mejor = k;
+      }
+    }
+    salida.push(acumulado[mejor] as number);
+  }
+  return salida.sort((a, b) => a - b);
 }
 
 /** Qué levanta cada casilla lateral. Las que no están aquí todavía no tienen obra. */

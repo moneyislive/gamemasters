@@ -78,7 +78,7 @@ import {
 } from '../iconos';
 import { geometriaDeContornos } from '../formas';
 import { ALZA_DEL_ROTULO, CASILLAS, FERIA, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo } from './anillo-en-3d';
-import { COLOR_DE_OBRA, carasDeLaObraEnElMundo, casillasConObra, letrasDeLosCarteles } from './obras';
+import { COLOR_DE_OBRA, carasDeLaObraEnElMundo, carasDelTren, casillasConObra, letrasDeLosCarteles } from './obras';
 import type { CaraEnElMundo } from './obras';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
 
@@ -523,6 +523,11 @@ export interface Rotulos {
 export function geometriaDeLasObras(): THREE.BufferGeometry | null {
   const caras: CaraEnElMundo[] = [];
   for (const casilla of casillasConObra()) caras.push(...carasDeLaObraEnElMundo(casilla));
+  return geometriaDeCarasConColor(caras);
+}
+
+/** El fusor: una lista de caras con color, una malla. Lo usan las obras y el tren. */
+function geometriaDeCarasConColor(caras: readonly CaraEnElMundo[]): THREE.BufferGeometry | null {
   if (caras.length === 0) return null;
   /* Tres puntos por triángulo y seis por cuadro: una cara con el cuarto punto repetido es un triángulo. */
   const trianguloDe = (cara: CaraEnElMundo): boolean => {
@@ -570,6 +575,17 @@ export function geometriaDeLasObras(): THREE.BufferGeometry | null {
   g.setAttribute('normal', new THREE.BufferAttribute(normales, 3));
   g.computeBoundingSphere();
   return g;
+}
+
+/**
+ * LA MALLA DE UN TREN, en su propio marco y sin fundir con nada.
+ *
+ * Va aparte porque se MUEVE: la escena la monta en una `InstancedMesh` de dos instancias —una
+ * llamada de dibujo para los dos trenes— y les cambia la matriz en cada fotograma. Fundirla con
+ * las obras la dejaría clavada en el campo.
+ */
+export function geometriaDeUnTren(): THREE.BufferGeometry | null {
+  return geometriaDeCarasConColor(carasDelTren());
 }
 
 export function geometriaDeLosRotulos(): Rotulos | null {

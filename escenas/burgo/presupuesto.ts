@@ -95,7 +95,7 @@
  * afirma que la cuenta de `casa` sigue siendo 44 justamente para que ese día se note.
  */
 import { PIEZA } from './piezas';
-import { letrasDeLosCarteles, triangulosDeLasObras } from './obras';
+import { letrasDeLosCarteles, triangulosDeLasObras, triangulosDelTren } from './obras';
 import type { NombreDePieza } from './piezas';
 import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, ROTULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
@@ -119,6 +119,8 @@ export const TITULOS = 28;
 export const ASIENTOS = 6;
 export const MONEDAS_EN_VUELO = 6;
 export const DADOS = 2;
+/** Los dos trenes que dan vueltas por la vía del campo. */
+export const TRENES = 2;
 /** Discos de contacto: seis peones, el aventurero y uno de más para el que se despide. */
 export const DISCOS_DE_CONTACTO = ASIENTOS + 2;
 
@@ -265,6 +267,8 @@ export function sumaDelPresupuesto(
   renglones.push({ que: 'letras de los rótulos', cuantos: letras, triangulos: letras * TRIANGULOS_POR_LETRA });
   /* Y las obras de las casillas: dos triángulos por cuadro, contados de `obras.ts`. */
   renglones.push({ que: 'obras de las casillas', cuantos: 1, triangulos: triangulosDeLasObras() });
+  /* Y los dos trenes, que van aparte porque se mueven: una malla instanciada dos veces. */
+  renglones.push({ que: 'trenes', cuantos: TRENES, triangulos: TRENES * triangulosDelTren() });
   renglones.push({ que: 'discos de contacto', cuantos: DISCOS_DE_CONTACTO, triangulos: DISCOS_DE_CONTACTO * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'dados', cuantos: DADOS, triangulos: DADOS * triangulosDelDado });
   renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });

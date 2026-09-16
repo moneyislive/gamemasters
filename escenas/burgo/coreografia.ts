@@ -325,6 +325,63 @@ export function alzadoDeLaReja(transcurrido: number): number {
   return 1 - pinza((transcurrido - baja) / PASO_DE_LA_REJA);
 }
 
+/**
+ * EL TREN, QUE ES LA ÚNICA ANIMACIÓN DEL TABLERO QUE NO ESPERA A NADIE.
+ *
+ * Todo lo demás que se mueve aquí arranca con un suceso de la partida —una tirada, una compra, un
+ * encierro— y dura lo que dura ese suceso. El tren no: da vueltas, pare quien pare. Por eso su
+ * función no toma un «transcurrido desde que empezó algo» sino el reloj de la escena a secas.
+ *
+ * Y por eso mismo va DESPACIO: 40 por segundo, cuando un peón cruza una casilla de 72 en segundo y
+ * medio, o sea a 48. Un tren más rápido que los peón es que le roba la vista al juego.
+ *
+ * La vuelta entera mide 3.510 y tiene cuatro paradas: 87,7 segundos de viaje más cuatro paradas de
+ * 2,5 son 97,7 segundos por vuelta. Los dos trenes van a media vuelta uno de otro.
+ */
+export const TREN = { velocidad: 40, parada: 2.5, cuantos: 2 } as const;
+
+/**
+ * A qué distancia del origen de la vía está el tren en el instante `reloj`.
+ *
+ * Se escribe con las paradas como parámetro y no leídas de `obras.ts` para que el comprobador
+ * pueda ejercitarla con paradas inventadas —una sola, ninguna, dos pegadas— sin tocar el tablero.
+ */
+/**
+ * LO QUE HAY DE CADA PARADA A LA SIGUIENTE, dando la vuelta.
+ *
+ * Con el módulo a secas hay un caso que sale MAL y que no se ve mirando el tablero: con UNA sola
+ * parada, el tramo de ella a sí misma da 0 en vez de la vuelta entera, o sea que el tren se queda
+ * clavado en la estación para siempre. Lo cazó la vacuna del comprobador, no una captura.
+ */
+function tramosDelTren(largo: number, paradas: readonly number[]): number[] {
+  return paradas.map((d, i) => {
+    const bruto = ((((paradas[(i + 1) % paradas.length] as number) - d) % largo) + largo) % largo;
+    return bruto === 0 ? largo : bruto;
+  });
+}
+
+export function avanceDelTren(reloj: number, largo: number, paradas: readonly number[], desfase = 0): number {
+  if (largo <= 0) return 0;
+  if (paradas.length === 0) return (((reloj * TREN.velocidad + desfase) % largo) + largo) % largo;
+  const tramos = tramosDelTren(largo, paradas);
+  const periodo = tramos.reduce((a, b) => a + b / TREN.velocidad, 0) + paradas.length * TREN.parada;
+  let resto = (((reloj + desfase) % periodo) + periodo) % periodo;
+  for (let i = 0; i < paradas.length; i++) {
+    if (resto < TREN.parada) return paradas[i] as number;
+    resto -= TREN.parada;
+    const viaje = (tramos[i] as number) / TREN.velocidad;
+    if (resto < viaje) return ((paradas[i] as number) + resto * TREN.velocidad) % largo;
+    resto -= viaje;
+  }
+  return paradas[0] as number;
+}
+
+/** Lo que tarda el tren en dar una vuelta con sus paradas: lo usa el comprobador y el desfase. */
+export function vueltaDelTren(largo: number, paradas: readonly number[]): number {
+  if (paradas.length === 0) return largo / TREN.velocidad;
+  return tramosDelTren(largo, paradas).reduce((a, b) => a + b / TREN.velocidad, 0) + paradas.length * TREN.parada;
+}
+
 /** El quebrado se desvanece en los últimos 0,8 s de su huida. */
 export function desvanecidoAlQuebrar(transcurrido: number): number {
   return pinza((transcurrido - (QUIEBRA - DESVANECER_AL_QUEBRAR)) / DESVANECER_AL_QUEBRAR);
