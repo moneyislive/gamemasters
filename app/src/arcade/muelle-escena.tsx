@@ -49,6 +49,8 @@ import type { ManifiestoDeArcade } from '../../../shared/arcade';
 /* Instala los arcades del binario, por si se llega aquí por enlace directo. Ver `pintar.tsx`. */
 import '../../../shared/arcade/juegos';
 import { Embarcadero } from '../../../escenas/embarcadero/Embarcadero';
+/* La escena hermana del Burgo: mismo contrato, y el tema dice cuál de las dos se monta. */
+import { Plaza } from '../../../escenas/plaza/Plaza';
 /*
  * El juez de la calidad vivía aquí y se fue a `escenas/` el día que el Burgo lo quiso
  * también en el escritorio, que no puede importar de `app/`. Ver su cabecera.
@@ -293,6 +295,14 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
   const figuraQuePruebo =
     figura === null ? undefined : miAsiento === undefined || miAsiento.figura !== figura ? figura : undefined;
 
+  /*
+   * LA ESCENA QUE PIDE EL TEMA, igual que en el escritorio (ver `muelle.tsx`): las dos hermanas
+   * cumplen `PropsDelEmbarcadero`, así que se elige el componente y las props se escriben una
+   * sola vez. `escena` vive en el tema porque el manifiesto de arcade está sellado y un lobby
+   * no es una regla del juego.
+   */
+  const Escena = tema.escena === 'plaza' ? Plaza : Embarcadero;
+
   return (
     <View style={estilos.todo} onLayout={medirTodo}>
       {lienzoMontado && figura !== null ? (
@@ -310,7 +320,7 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
             gl.toneMappingExposure = 0.95;
           }}
         >
-          <Embarcadero
+          <Escena
             mesa={mesaEnElMuelle}
             ventana={ventana}
             traer={traer}

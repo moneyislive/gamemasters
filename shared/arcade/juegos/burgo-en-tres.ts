@@ -1418,6 +1418,14 @@ export interface MarcadorDelBurgo {
   readonly jugadores: readonly JugadorDelMarcador[];
   readonly concejo: { readonly casas: number; readonly posadas: number };
   readonly quedan: { readonly pregon: number; readonly arca: number };
+  /**
+   * LAS DOS FRASES PÚBLICAS, YA REDACTADAS: «El Ayuntamiento guarda 1 casa y 1 hotel.» y
+   * «Quedan 1 carta en Sucesos y 9 en el Fondo Vecinal.» Van hechas por lo mismo que la `linea`
+   * de cada jugador: quien recibe los cuatro números sueltos vuelve a escribir la frase, y el
+   * raíl del escritorio la escribía con el verbo concordando con un solo mazo. Ver
+   * `frasesDelConcejo`.
+   */
+  readonly loDelConcejo: readonly string[];
   readonly turnoDe: AsientoId | null;
   readonly duenoDelTurno: AsientoId | null;
   readonly topeDeVueltas: number;
@@ -1435,7 +1443,7 @@ function lineaDelMarcador(j: JugadorQueSePinta, nombre: string): string {
 export function marcadorEnTres(vista: unknown, yo: QuienMira): MarcadorDelBurgo {
   const l = leer(vista);
   if (l === null) {
-    return { jugadores: [], concejo: { casas: 0, posadas: 0 }, quedan: { pregon: 0, arca: 0 }, turnoDe: null, duenoDelTurno: null, topeDeVueltas: 0 };
+    return { jugadores: [], concejo: { casas: 0, posadas: 0 }, quedan: { pregon: 0, arca: 0 }, loDelConcejo: [], turnoDe: null, duenoDelTurno: null, topeDeVueltas: 0 };
   }
   const jugadores: JugadorDelMarcador[] = [];
   for (const j of l.jugadores) {
@@ -1459,7 +1467,7 @@ export function marcadorEnTres(vista: unknown, yo: QuienMira): MarcadorDelBurgo 
       linea: lineaDelMarcador(j, nombre),
     });
   }
-  return { jugadores, concejo: l.concejo, quedan: l.quedan, turnoDe: l.turnoDe, duenoDelTurno: l.duenoDelTurno, topeDeVueltas: l.topeDeVueltas };
+  return { jugadores, concejo: l.concejo, quedan: l.quedan, loDelConcejo: frasesDelConcejo(l), turnoDe: l.turnoDe, duenoDelTurno: l.duenoDelTurno, topeDeVueltas: l.topeDeVueltas };
 }
 
 // ---------------------------------------------------------------------------
@@ -2765,24 +2773,37 @@ function lineasDeAhora(vista: unknown, l: Lectura, yo: QuienMira): string[] {
   return lineas;
 }
 
+/**
+ * LO QUE LE QUEDA AL AYUNTAMIENTO Y A LOS DOS MAZOS, REDACTADO EN UN SOLO SITIO.
+ *
+ * Es información pública del juego y parte de lo que se juega: una mesa que sabe que quedan dos
+ * hoteles sabe que no puede alzar el tercero. Sale por DOS caminos —la sección «La mesa entera»
+ * de la hoja y el marcador del raíl—, y hasta hoy cada camino la redactaba por su cuenta.
+ *
+ * EL VERBO CONCUERDA CON LOS DOS MAZOS SUMADOS, que es lo que pide un sujeto coordinado:
+ * «Quedan 1 carta en Sucesos y 9 en el Fondo Vecinal» es correcto, y «Queda 1 carta … y 0»
+ * también. Con el plural escrito a mano salía «Quedan 1 cartas», y salía justo al final de
+ * la partida, que es cuando esos dos números son lo que se está mirando.
+ *
+ * Y ESO ES EXACTAMENTE LO QUE VOLVIÓ A PASAR en la copia del raíl del escritorio, que hacía la
+ * concordancia con UN SOLO mazo (`plural(quedan.pregon, …)`) y escribía «Queda 1 carta en
+ * Sucesos y 9 en el Fondo Vecinal». Por eso la frase se da hecha, como la `linea` de cada
+ * jugador del marcador: al que recibe cuatro números le toca redactar, y redactando se falla.
+ */
+function frasesDelConcejo(l: Lectura): string[] {
+  const cartas = l.quedan.pregon + l.quedan.arca;
+  return [
+    `El Ayuntamiento guarda ${l.concejo.casas} ${plural(l.concejo.casas, 'casa', 'casas')} y ${l.concejo.posadas} ${plural(l.concejo.posadas, 'hotel', 'hoteles')}.`,
+    `${plural(cartas, 'Queda', 'Quedan')} ${l.quedan.pregon} ${plural(l.quedan.pregon, 'carta', 'cartas')} en Sucesos y ${l.quedan.arca} en el Fondo Vecinal.`,
+  ];
+}
+
 function lineasDeLaMesa(l: Lectura): string[] {
   const lineas: string[] = [];
   for (const j of l.jugadores) {
     lineas.push(`${nombreDe(l, j.asiento)}: ${maravedies(j.mrs)} en mano, ${maravedies(j.patrimonio)} de patrimonio${j.quebrado ? ' · quebró' : ''}.`);
   }
-  lineas.push(
-    `El Ayuntamiento guarda ${l.concejo.casas} ${plural(l.concejo.casas, 'casa', 'casas')} y ${l.concejo.posadas} ${plural(l.concejo.posadas, 'hotel', 'hoteles')}.`,
-  );
-  /*
-   * EL VERBO CONCUERDA CON LOS DOS MAZOS SUMADOS, que es lo que pide un sujeto coordinado:
-   * «Quedan 1 carta en Sucesos y 9 en el Fondo Vecinal» es correcto, y «Queda 1 carta … y 0»
-   * también. Con el plural escrito a mano salía «Quedan 1 cartas», y salía justo al final de
-   * la partida, que es cuando esos dos números son lo que se está mirando.
-   */
-  const cartas = l.quedan.pregon + l.quedan.arca;
-  lineas.push(
-    `${plural(cartas, 'Queda', 'Quedan')} ${l.quedan.pregon} ${plural(l.quedan.pregon, 'carta', 'cartas')} en Sucesos y ${l.quedan.arca} en el Fondo Vecinal.`,
-  );
+  lineas.push(...frasesDelConcejo(l));
   if (l.topeDeVueltas > 0) lineas.push(`Se juega a ${l.topeDeVueltas} ${plural(l.topeDeVueltas, 'vuelta', 'vueltas')}.`);
   return lineas;
 }

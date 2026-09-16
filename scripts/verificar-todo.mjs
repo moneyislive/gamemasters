@@ -835,6 +835,19 @@ const BATERIA = [
       'la aritmética de `escenas/burgo/` cuadra con `burgo.glb`: ningún fichero de la escena trae drei, DOM, Expo ni fetch; el anillo mide 864 con casilla de 72 × 108 y esquina de 108, el recinto que le queda a la ciudad es 648 —nueve veces el centro del primer tablero, que es lo que se pidió— y la polilínea tiene 40 puntos donde dicen las cuatro fórmulas; cada rejilla de huecos (peones, casas, posada, bandera, presos y visitas) cabe en su banda con la huella medida y el frente de manzana de dos cuerpos no pisa el carril del avatar; las cuatro avenidas de 48 entran encaradas a las casillas 5, 15, 25 y 35 y ninguna pieza de esquina pisa la ele de la marcha; el precio de cada casilla es el del reglamento, mide 27 de alto y se lee en los mismos píxeles que cuando el tablero era más pequeño; el TABLERO lleno cabe en 900.000 triángulos en plena y 230.000 en sobria dejando sitio a la ciudad, y una tabla con la taberna como posada se ve caer; el peón anda diez mil pasos sin T-pose ni clip inexistente, sobre la polilínea, con doce casillas en 8 s; una jugada real cabe en 14 s y saltarla deja el estado final; los dados obedecen al par; las cuatro esquinas del anillo caen en el lienzo en 16:9, 3:4 y 9:19,5; y lo que la escena MONTA cuadra con lo que el presupuesto cuenta —cada bulto y cada cinta de la ciudad se dibujan con sus triángulos exactos, los dígitos y los emblemas están fundidos en una geometría y se leen del derecho, la histéresis de los niveles existe y se ve fallar sin ella, desde la pose de salida la ciudad entera se monta en L2 y no en manchas, los coches de calle van por el eje de su carril y en el código no queda ni una muralla',
   },
   /*
+   * Y LA PLAZA ES EL LOBBY DEL BURGO: la escena HERMANA del embarcadero, que cumple el mismo
+   * contrato (`PropsDelEmbarcadero`) y que el tema elige por `escena`. Va detrás de la escena
+   * del anillo porque comparte con ella `burgo.glb` y la caché que lo trae, así que si el
+   * modelo se mueve las dos se caen y conviene leerlas seguidas.
+   */
+  {
+    nombre: 'plaza del Burgo',
+    donde: 'escenas',
+    guion: 'verify:plaza',
+    porque:
+      'la plaza donde la mesa se junta antes de empezar cabe y se ve: la composición es pura y sembrada —el mismo código da la misma plaza—, el peor presupuesto de nueve semillas con seis sentados cabe en los 110.000 triángulos, los seis puestos y el monumento entran enteros en 9:19,5, 3:4 y 16:9 con la hoja encima y sin taparse unos a otros, nadie llega atravesando su propio estandarte ni se cruza con una farola, y ningún fichero de la escena trae drei, DOM, Expo ni fetch',
+  },
+  /*
    * Y LA CIUDAD ES EL TERCERO DEL BURGO, porque lo que hay DENTRO del anillo ya no
    * es un patio vacío: son 2.916 celdas de calles, manzanas, edificios de varias
    * plantas con sus salas amuebladas y dieciséis distritos, generados con el código

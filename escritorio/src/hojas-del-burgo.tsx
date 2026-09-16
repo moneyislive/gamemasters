@@ -316,6 +316,7 @@ function UnaSeccion({
   alAbrir,
   quieto,
   alElegir,
+  renglones = true,
   children,
 }: {
   seccion: SeccionDeLaHoja<Opcion>;
@@ -325,6 +326,14 @@ function UnaSeccion({
   alAbrir: (() => void) | null;
   quieto: boolean;
   alElegir: (movimiento: MovimientoDeclarado) => void;
+  /**
+   * ¿SE PINTAN LOS RENGLONES DE LA SECCIÓN? Sí en todas menos en «Lo mío» con títulos, donde
+   * lo que cuelga YA ES el mismo texto: la traducción escribe «Calle X (Los Paseos): 2 casas ·
+   * renta 60 €» para quien no pinta fichas —lo explica la cabecera de `lineasDeLoMio`—, y aquí
+   * se pintan las dos cosas, así que cada título se decía dos veces y el barrio otras dos (el
+   * paréntesis del renglón y el `<h3>` del barrio). La ficha dice todo eso y más.
+   */
+  renglones?: boolean;
   children?: ReactNode;
 }): JSX.Element {
   const dentro = useId();
@@ -355,11 +364,13 @@ function UnaSeccion({
       <div id={dentro}>
         {sePinta ? (
           <>
-            {seccion.lineas.map((linea, i) => (
-              <p className="letra-chica burgo-renglon" key={`${seccion.id}:${String(i)}`}>
-                {linea}
-              </p>
-            ))}
+            {renglones
+              ? seccion.lineas.map((linea, i) => (
+                  <p className="letra-chica burgo-renglon" key={`${seccion.id}:${String(i)}`}>
+                    {linea}
+                  </p>
+                ))
+              : null}
             {seccion.opciones.length > 0 ? (
               <ul className="opciones">
                 {seccion.opciones.map((o) => (
@@ -1090,8 +1101,21 @@ export function LasHojasDelBurgo({
           );
         }
         if (id === 'mios') {
+          /*
+           * SIN RENGLONES: AQUÍ LAS FICHAS SON LOS RENGLONES. Lo que cuelga debajo son los
+           * mismos títulos que la traducción manda como renglones de la sección —los manda para
+           * quien NO pinta fichas, y lo explica la cabecera de `lineasDeLoMio`—, así que
+           * pintando las dos cosas cada título se decía dos veces, y el barrio otras dos: en el
+           * paréntesis del renglón y en el `<h3>` del barrio.
+           *
+           * Y NO HAY QUE GUARDARSE DEL CASO VACÍO, aunque lo parezca: la traducción manda
+           * «Todavía no tienes ningún título.» como único renglón cuando no tienes ninguno, pero
+           * esa sección NO LLEGA hasta aquí —arriba se devuelve `null` en cuanto `!hayAlgo`, y
+           * para «Lo mío» `hayAlgo` es `mios.length > 0`—. Esa frase no se pinta en este cliente
+           * ni antes ni ahora; quien la enseña es la app, que no filtra por `hayAlgo`.
+           */
           return (
-            <UnaSeccion key={id} seccion={seccion} esLaQueAbre={esLaQueAbre} abierta={estaAbierta} alAbrir={abrir} quieto={quieto} alElegir={alElegir}>
+            <UnaSeccion key={id} seccion={seccion} esLaQueAbre={esLaQueAbre} abierta={estaAbierta} alAbrir={abrir} quieto={quieto} alElegir={alElegir} renglones={false}>
               {hoja.mios.map((barrio) => (
                 <div className="burgo-barrio" key={barrio.id}>
                   <h3 className="letra-chica burgo-barrio-rotulo">

@@ -2265,22 +2265,19 @@ export function MarcadorDelBurgo({ vista, yo }: { vista: unknown; yo: string | n
         LO QUE LE QUEDA AL AYUNTAMIENTO, que es información pública del juego y parte de lo que se
         juega: una mesa que sabe que quedan dos hoteles sabe que no puede alzar el tercero.
 
-        ═══ Y LA CONCORDANCIA SALE DE `plural`, PORQUE AQUÍ DECÍA «1 casas» ═══
+        ═══ Y LA FRASE VIENE HECHA, PORQUE AQUÍ SE REDACTABA MAL ═══
 
-        Este renglón estaba escrito con los plurales pegados a la palabra —«guarda 1 casas y 1
-        hoteles», «Quedan 1 cartas en Sucesos»— y eso no se ve mal: se ve como un renglón normal
-        que dice otra cosa. Y pasa justo al FINAL de la partida, que es cuando esos cuatro
-        números son lo que se mira: quedan pocas casas, queda una carta. Es el mismo fallo, con
-        las mismas palabras, que la traducción cuenta en la cabecera de `plural` para la sección
-        «La mesa entera» de la hoja; aquí es el marcador del raíl, que redacta su propio renglón
-        porque el marcador da los cuatro números y no la frase.
+        Este renglón se escribía aquí a mano, con los cuatro números del marcador, y la
+        concordancia la hacía con UN SOLO mazo: con 1 carta en Sucesos y 9 en el Fondo Vecinal
+        decía «Queda 1 carta en Sucesos y 9 en el Fondo Vecinal», cuando el sujeto es coordinado
+        y pide «Quedan». Es LITERALMENTE el fallo que la traducción ya tenía anotado y arreglado
+        para la sección «La mesa entera», repetido en la copia; y sale justo al final de la
+        partida, que es cuando esos cuatro números son lo que se mira.
+
+        Ahora la frase la da `marcadorEnTres` hecha, como la `linea` de cada jugador: un sitio
+        que redacta y todos los demás que pintan. Ver `frasesDelConcejo` en la traducción.
       */}
-      <p className="letra-chica burgo-lo-del-concejo">
-        {`El Ayuntamiento guarda ${String(marcador.concejo.casas)} ${plural(marcador.concejo.casas, 'casa', 'casas')} ` +
-          `y ${String(marcador.concejo.posadas)} ${plural(marcador.concejo.posadas, 'hotel', 'hoteles')}. ` +
-          `${plural(marcador.quedan.pregon, 'Queda', 'Quedan')} ${String(marcador.quedan.pregon)} ` +
-          `${plural(marcador.quedan.pregon, 'carta', 'cartas')} en Sucesos y ${String(marcador.quedan.arca)} en el Fondo Vecinal.`}
-      </p>
+      <p className="letra-chica burgo-lo-del-concejo">{marcador.loDelConcejo.join(' ')}</p>
     </section>
   );
 }

@@ -2387,8 +2387,24 @@ function burgoEnTres(): void {
     enElRail.includes('soy-yo') && enElRail.includes('burgo-le-toca'),
   );
   comprobar(
-    'y dice lo que le queda al Ayuntamiento y a los dos mazos, que es información pública del juego',
-    textoDelRail.includes('El Ayuntamiento guarda') && textoDelRail.includes('Fondo Vecinal'),
+    'y dice lo que le queda al Ayuntamiento y a los dos mazos CON LAS FRASES DE LA TRADUCCIÓN, sin volver a redactarlas aquí',
+    marcador.loDelConcejo.length === 2 && marcador.loDelConcejo.every((f) => textoDelRail.includes(f)),
+    marcador.loDelConcejo,
+  );
+  /*
+   * VACUNA DEL VERBO, con el caso exacto que este raíl escribía mal. El sujeto es coordinado
+   * —«1 carta en Sucesos y 9 en el Fondo Vecinal»— y el verbo va en plural; la copia que vivía
+   * aquí concordaba con UN SOLO mazo (`plural(quedan.pregon, …)`) y escribía «Queda 1 carta … y
+   * 9». Con 1 y 9 las dos formas se separan, y una partida de verdad no siempre da esa pareja:
+   * por eso la vista se retoca a mano en vez de esperar a que salga sola. La afirmación de
+   * arriba, con los números que toquen, pasaría con las dos.
+   */
+  const conUnaYNueve = { ...(vista as Record<string, unknown>), quedan: { pregon: 1, arca: 9 } };
+  const railDeUnaYNueve = palabrasDe(renderToStaticMarkup(<MarcadorDelBurgo vista={conUnaYNueve} yo="s1" />));
+  comprobar(
+    'VACUNA: con 1 carta en Sucesos y 9 en el Fondo Vecinal el raíl dice «Quedan», no el «Queda» que escribía la copia',
+    railDeUnaYNueve.includes('Quedan 1 carta en Sucesos y 9 en el Fondo Vecinal.') && !railDeUnaYNueve.includes('Queda 1 carta en Sucesos y 9'),
+    railDeUnaYNueve.slice(-140),
   );
   comprobar(
     'una vista que no es del Burgo no pinta un marcador vacío: no pinta nada',
@@ -9904,6 +9920,55 @@ function elEscritorioDelBurgo(): void {
     'sin `abierta` la hoja se pinta entera y sin triángulos: es lo que quiere quien la monta en una columna con sitio',
     !sinPlegar.includes('aria-expanded'),
     sinPlegar.slice(0, 200),
+  );
+  /*
+   * «LO MÍO» NO DICE CADA TÍTULO DOS VECES. La traducción manda los renglones de la sección
+   * —«Calle X (Los Paseos): 2 casas · renta 60 €»— para quien NO pinta fichas, y lo explica la
+   * cabecera de `lineasDeLoMio`. Aquí debajo van las FICHAS, que dicen eso y más (el dueño con
+   * su mota, lo construido, la tabla de rentas y los solares del barrio). Pintando las dos
+   * cosas, cada título salía dos veces y el barrio otras dos: en el paréntesis del renglón y en
+   * el `<h3>` del barrio. La app ya lo hacía bien —`case 'mios'` pinta `LoMio` y no las
+   * líneas—, así que el raro era el escritorio.
+   */
+  /*
+   * EL ASIENTO NO PUEDE SER `s1`: la partida de prueba se PARA en cuanto s1 puede comprar, así
+   * que s1 no tiene ni un título y su «Lo mío» no llega ni a pintarse (`hayAlgo` es
+   * `mios.length > 0`). Se busca el asiento que sí compró durante el paseo; si no hubiera
+   * ninguno, esto se cae en vez de pasar sin mirar nada, que es como se fabrica un verde falso.
+   */
+  const asientoConBienes =
+    laPartida.sentados.map((s) => s.asiento).find((a) => hojaDelBurgoEnTres(laPartida.vista, a, []).mios.length > 0) ?? null;
+  const hojaConBienes = asientoConBienes === null ? null : hojaDelBurgoEnTres(laPartida.vista, asientoConBienes, []);
+  const pintadaConBienes =
+    hojaConBienes === null || asientoConBienes === null
+      ? ''
+      : renderToStaticMarkup(
+          <LasHojasDelBurgo hoja={hojaConBienes} vista={laPartida.vista} yo={asientoConBienes} quieto={false} alElegir={() => undefined} />,
+        );
+  const deLoMio = hojaConBienes?.secciones.find((s) => s.id === 'mios') ?? null;
+  const renglonesRepetidos = (deLoMio?.lineas ?? []).filter((l) => pintadaConBienes.includes(l));
+  comprobar(
+    'con títulos en la mano, «Lo mío» pinta las fichas y NO repite sus renglones: el mismo título no se dice dos veces',
+    hojaConBienes !== null && hojaConBienes.mios.length > 0 && (deLoMio?.lineas.length ?? 0) > 0 && renglonesRepetidos.length === 0,
+    { asiento: asientoConBienes, barrios: hojaConBienes?.mios.length ?? 0, renglones: deLoMio?.lineas.length ?? 0, repetidos: renglonesRepetidos.slice(0, 2) },
+  );
+  comprobar(
+    'y lo que decían esos renglones no se pierde: el nombre de cada título y el de su barrio siguen saliendo, en las fichas',
+    hojaConBienes !== null &&
+      hojaConBienes.mios.every((b) => pintadaConBienes.includes(b.nombre) && b.fichas.every((f) => pintadaConBienes.includes(f.nombre))),
+    hojaConBienes?.mios.map((b) => b.nombre) ?? [],
+  );
+  /*
+   * VACUNA: en ESA MISMA pintada, una sección de leer SÍ enseña sus renglones. Sin ella, «los
+   * renglones de "Lo mío" no aparecen» seguiría en verde el día que la hoja dejara de pintar
+   * renglones en todas partes: diría que no hay repetición porque no hay nada, que es el verde
+   * falso que esta casa ya tiene anotado dos veces.
+   */
+  const otraDeLeer = hojaConBienes?.secciones.find((s) => s.id === 'mesa' && s.lineas.length > 0) ?? null;
+  comprobar(
+    'VACUNA: en la misma hoja, «La mesa entera» sí pinta sus renglones, así que lo de arriba mide una excepción y no una hoja muda',
+    otraDeLeer !== null && otraDeLeer.lineas.every((l) => pintadaConBienes.includes(l)),
+    otraDeLeer?.lineas.slice(0, 2) ?? [],
   );
   comprobar(
     'con `abierta` las secciones de LEER se pliegan, y su rótulo es un botón con `aria-expanded` dentro de su encabezado',

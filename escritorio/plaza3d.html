@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE PRUEBAS DE LA PLAZA DEL BURGO.
+
+      Entrada APARTE de `index.html`, como `lobby3d.html` y `banco-burgo.html`, y por lo
+      mismo: la Sala tiene su enrutador probado por `verify:escritorio`, y meter una ruta
+      nueva para mirar una escena obligaría a tocarlo. Esto no es una pantalla del
+      producto: es donde se juzga si la plaza SE VE bien, que es lo único que ningún
+      comprobador de Node puede decir — el bronce del monumento a contraluz, las farolas
+      encendiéndose puesto a puesto, si el aventurero local queda entero sobre la hoja del
+      móvil, y cuántas llamadas de dibujo salen de verdad.
+
+      Sin servidor: los modelos entran por las direcciones que da Vite, y la mesa es de
+      mentira, con botones para sentar, levantar, ausentar, vestir y zarpar.
+      Se abre en /sala/plaza3d.html del Vite del escritorio, y acepta
+      ?jugadores=1..6&codigo=ABCDE&aspecto=retrato para abrirlo en un estado concreto.
+    -->
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
+    <title>Banco de pruebas · la plaza del Burgo en 3D</title>
+    <meta name="theme-color" content="#080a0e" />
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/banco-plaza.tsx"></script>
+  </body>
+</html>

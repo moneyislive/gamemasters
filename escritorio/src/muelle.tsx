@@ -54,6 +54,7 @@ import { esFigura, FIGURAS, figura as datosDeFigura, figuraQueSePinta } from '..
 import type { FiguraId } from '../../escenas/embarcadero/figuras';
 import type { TemaDelMuelle } from '../../escenas/embarcadero/tema';
 import type { MesaEnElMuelle, Traer, Ventana } from '../../escenas/embarcadero/tipos';
+import { Plaza } from '../../escenas/plaza/Plaza';
 import { esLaOpcionDeEmpezar, haEmpezado } from './empezada';
 import { figuraDeEstreno, guardarFigura } from './figura';
 import type { LaMesa, MesaVista } from './mesa';
@@ -274,6 +275,13 @@ export function Muelle({
 
   // -------------------------------------------------------------------------
 
+  /*
+   * CUÁL DE LAS DOS ESCENAS HERMANAS SE MONTA. Las dos cumplen `PropsDelEmbarcadero`, así que
+   * aquí se elige el COMPONENTE y las props se escriben una sola vez: un `if` alrededor del
+   * bloque entero sería el mismo JSX copiado con otro nombre dentro, y el día que el contrato
+   * crezca se arreglaría una de las dos copias. Lo decide el tema, no el nombre del arcade.
+   */
+  const Escena = tema.escena === 'plaza' ? Plaza : Embarcadero;
   const conMundo = typeof window !== 'undefined' && mundoPedido;
 
   return (
@@ -294,7 +302,7 @@ export function Muelle({
                 gl.toneMappingExposure = 0.95;
               }}
             >
-              <Embarcadero
+              <Escena
                 mesa={mesaEnElMuelle}
                 ventana={ventana}
                 traer={traer}

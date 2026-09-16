@@ -41,6 +41,13 @@
 export interface TemaDelMuelle {
   /** El identificador del arcade al que sirve. */
   readonly arcade: string;
+  /**
+   * CUÁL DE LAS DOS ESCENAS HERMANAS SE MONTA. Las dos cumplen el mismo contrato
+   * (`PropsDelEmbarcadero`), así que quien pinta el muelle elige por este campo y no por el
+   * nombre del arcade: un `if (arcade === 'burgo')` en los dos clientes sería la misma
+   * decisión escrita dos veces y en el sitio donde no se ve.
+   */
+  readonly escena: 'embarcadero' | 'plaza';
   /** Cómo se llama el lugar. Sale en el HUD encima del código. */
   readonly lugar: string;
   /** La frase que se lee mientras se espera. Voz de la casa. */
@@ -53,6 +60,7 @@ export interface TemaDelMuelle {
 
 const RIBERAS: TemaDelMuelle = {
   arcade: 'riberas',
+  escena: 'embarcadero',
   lugar: 'El embarcadero',
   espera: 'Los barcos zarpan cuando estéis todos.',
   zarpar: 'Se reparte el delta',
@@ -62,6 +70,7 @@ const RIBERAS: TemaDelMuelle = {
 
 const BURGO: TemaDelMuelle = {
   arcade: 'burgo',
+  escena: 'plaza',
   lugar: 'A la entrada del Burgo',
   espera: 'La ciudad abre cuando estéis todos.',
   zarpar: 'Se abre el Burgo',
