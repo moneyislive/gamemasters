@@ -37,14 +37,15 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 181.333   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 136.547   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 199.438   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 164.194   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
- * (Eran 207.949 y 145.595 hasta esta tanda, y los dos cambios que los mueven van en direcciones
- * contrarias: los solares se quedaron SIN CUERPOS —los edificios de las propiedades se confundían
- * con las casas y las posadas del Concejo, y se quitaron a petición de Miguel—, que descuenta
- * unos 35.000; y los NOMBRES de las casillas entran con 8.525. Los de arriba son los que
- * `verify:burgo-escena` imprime hoy, y esa cifra la vuelve a sumar en cada pasada.)
+ * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
+ * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
+ * Miguel—, que descontó unos 35.000; después fueron 181.333 y 136.547, y desde entonces suben con
+ * lo que pidió para las casillas: las obras fundidas, la vía con sus dos trenes, los nombres y el
+ * texto pequeño —28.830 de letras— y las piezas vivas, que hasta la moneda de la recaudación no
+ * estaban contadas. Los de arriba son los que `verify:burgo-escena` imprime hoy.)
  *
  * `TOPE_PLENA = 900.000`: el tablero más 692.000 para lo que la ciudad tenga montado. Sigue
  * siendo el 45 % de los 2.000.000 que ya mueve el delta de Riberas en un PC.
@@ -95,7 +96,7 @@
  * afirma que la cuenta de `casa` sigue siendo 44 justamente para que ese día se note.
  */
 import { PIEZA } from './piezas';
-import { letrasDeLosCarteles, triangulosDeLasObras, triangulosDelTren } from './obras';
+import { CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLosCarteles, triangulosDeLasObras, triangulosDelTren, triangulosDeLasPiezasVivas } from './obras';
 import type { NombreDePieza } from './piezas';
 import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
@@ -269,6 +270,16 @@ export function sumaDelPresupuesto(
   renglones.push({ que: 'obras de las casillas', cuantos: 1, triangulos: triangulosDeLasObras() });
   /* Y los dos trenes, que van aparte porque se mueven: una malla instanciada dos veces. */
   renglones.push({ que: 'trenes', cuantos: TRENES, triangulos: TRENES * triangulosDelTren() });
+  /*
+   * Y las piezas vivas de las casillas, que tampoco van en el fundido: una tapa por cofre, una ruleta
+   * por casino, la joya, la reja de la celda y la moneda de la recaudación. No estaban contadas.
+   */
+  const vivas = triangulosDeLasPiezasVivas();
+  renglones.push({
+    que: 'piezas vivas de las casillas',
+    cuantos: CASILLAS_CON_COFRE.length + CASILLAS_CON_CASINO.length + 3,
+    triangulos: CASILLAS_CON_COFRE.length * vivas.tapa + CASILLAS_CON_CASINO.length * vivas.ruleta + vivas.joya + vivas.reja + vivas.moneda,
+  });
   renglones.push({ que: 'discos de contacto', cuantos: DISCOS_DE_CONTACTO, triangulos: DISCOS_DE_CONTACTO * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'dados', cuantos: DADOS, triangulos: DADOS * triangulosDelDado });
   renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });

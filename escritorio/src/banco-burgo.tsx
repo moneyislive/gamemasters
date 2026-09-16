@@ -675,6 +675,13 @@ function Banco(): JSX.Element {
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'cobra', quien: yo.asiento, de: null, cuanto: 200, porque: 'puerta-mayor', casilla: yo.casilla }])}>
             Cobrar 200 del Ayuntamiento
           </button>
+          {/* Los dos impuestos van al Ayuntamiento y cada uno tiene su animación en su casilla: la moneda que sube la escalinata y la joya. */}
+          <button type="button" style={BOTON} onClick={() => manda([{ que: 'paga', quien: yo.asiento, a: null, cuanto: 200, porque: 'diezmo', casilla: 4 }])}>
+            Pagar el Impuesto
+          </button>
+          <button type="button" style={BOTON} onClick={() => manda([{ que: 'paga', quien: yo.asiento, a: null, cuanto: 100, porque: 'alcabala', casilla: 38 }])}>
+            Pagar la Tasa
+          </button>
           <button
             type="button"
             style={BOTON}

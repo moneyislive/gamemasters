@@ -33,7 +33,7 @@ Dos reglas transversales, que valen para todo lo de abajo:
 
 ---
 
-## 2. Lo que el tablero aguanta, medido hoy
+## 2. Lo que el tablero aguanta, medido el día del plan
 
 | | Medido | Tope | Sobra |
 | --- | --- | --- | --- |
@@ -41,6 +41,9 @@ Dos reglas transversales, que valen para todo lo de abajo:
 | Triángulos, calidad sobria | 136.547 | 230.000 | 93.453 |
 | Llamadas de dibujo, pose de salida | 92 | 150 | 58 |
 | Llamadas de dibujo, cámara cerca | 114 | 150 | 36 |
+
+Con el plan hecho —obras, vía y trenes, textos y piezas vivas— el tablero va por 199.438
+triángulos en plena y 164.194 en sobria: sigue sobrando de lo uno y escaseando lo otro.
 
 Y de ahí sale **la decisión que gobierna todo este documento**:
 
@@ -86,7 +89,7 @@ corrige en la fase 4.
 | 7·22·36 | SUCESOS ✅ | Casino: cuerpo, marquesina que vuela, rótulo vertical con cinco bombillas y la ruleta tumbada en el suelo | Código fundido (discos); la ruleta, pieza viva | ✅ la ruleta gira al coger carta de Sucesos (0,8) |
 | 12 | CENTRAL ELÉCTRICA ✅ | Dos torres de refrigeración CON CINTURA (dos troncos pegados), chimenea con banda roja y nave de turbinas | Código fundido (troncos) | pendiente: el humo (0,3) |
 | 28 | CANAL DE AGUAS ✅ | Depósito elevado sobre cuatro patas, alberca con agua y caseta de bombas | Código fundido (troncos) | pendiente: la onda (0,5) |
-| 4 | IMPUESTO ✅ | Escalinata de dos peldaños, cuatro columnas, cornisa y ático escalonado | Código fundido | pendiente: la moneda sube la escalinata (0,6) |
+| 4 | IMPUESTO ✅ | Escalinata de dos peldaños que es también basamento, cuatro columnas, puerta, cornisa y ático escalonado | Código fundido; la moneda, pieza viva | ✅ al pagar el Impuesto, una moneda grande sube rodando la escalinata y entra por la puerta (0,6) |
 | 38 | TASA DE LUJO ✅ | Alfombra granate, pedestal de mármol y una joya de ocho caras —la única pieza que no es un prisma— | Código fundido (triángulos); la joya, pieza viva | ✅ la joya da una vuelta al pagar la Tasa (0,5) |
 | 5·15·25·35 | LAS CUATRO ESTACIONES ✅ | Andén, marquesina sobre cuatro columnas y casa de viajeros; y el remate que las distingue: torre del reloj (5), aguada y carbonera (15), bóveda escalonada (25) y apeadero de madera (35) | Código fundido | ✅ los trenes paran 2,5 s en cada una |
 | — | EL FERROCARRIL ✅ | Balasto, 584 traviesas y dos carriles dando la vuelta entera, con curvas de radio 15 en las esquinas | Código fundido (3.072 triángulos con todo lo demás) | ✅ dos trenes dan la vuelta sin esperar a nadie |
@@ -218,8 +221,24 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
        instante que está bajo la reja la reja está más alta que el aventurero más alto de los
        seis (la maga, 2,655). Con sus vacunas: la puerta vieja, la línea recta sin paso, la reja
        adelantada y la verja con el compás de siempre. Y visto caer con cuatro mutaciones.
-   - **Lo que no se ha hecho, y por qué:** la moneda del Impuesto ya la cuenta la animación de
-     dinero que existe; el humo de la central, la onda de la alberca y el coche que aparca son
-     adorno y no los pidió nadie.
+   - **Y la recaudación de la oficina**, que se había dado por contada con las monedas de
+     cualquier pago y no lo estaba: esas monedas vuelan al Concejo y, a la cercanía a la que se
+     juega, son puntos de tres píxeles. Ahora, al pagar el Impuesto, aparece al pie de la
+     escalinata una moneda de latón de 4,6 de canto, sube rodando los dos peldaños —girando sobre
+     cada arista, que no es un salto— y entra por la puerta. 0,6 s, dentro del pago más corto.
+     - La oficina gana **basamento** (los peldaños llegan al fondo del cuerpo: cuerpo y columnas
+       empezaban a 1,6 sin nada debajo) y **puerta**.
+     - `verify:burgo-escena` mide que en todo el recorrido esté apoyada —ni hundida en un peldaño
+       ni flotando—, que pase entre las columnas y quepa por la puerta, que acabe entera dentro
+       del cuerpo, que no pise el precio al empezar y que sólo la mueva el Impuesto pagado al
+       Ayuntamiento. Vistas caer con seis mutaciones.
+   - **Y un fallo de antes, arreglado por el camino:** la ruleta del casino tenía los 24
+     triángulos de su plato y su buje mirando al SUELO —`disco` está escrito para el marco de una
+     casilla, que lleva espejo, y la ruleta vive en uno que no— y su material sólo pinta la cara de
+     delante: desde el aire se veía girar la rayita amarilla sobre nada. Ahora las seis piezas
+     vivas pasan por una lupa cenital exacta, triángulo a triángulo, con la ruleta de antes de
+     vacuna.
+   - **Lo que no se ha hecho, y por qué:** el humo de la central, la onda de la alberca y el coche
+     que aparca son adorno y no los pidió nadie.
 
 Cada fase es un commit con la batería entera en verde.

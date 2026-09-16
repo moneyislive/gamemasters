@@ -78,6 +78,9 @@ export const COLOR_DE_OBRA = {
   maderaClara: '#8d6136',
   hierro: '#4a4640',
   laton: '#c9a227',
+  /* La moneda de la recaudación va en cuartos de dos oros, que es lo que deja verla rodar. */
+  latonOscuro: '#9c7a17',
+  puertaDeLaOficina: '#3b2b20',
   alfombra: '#7b2230',
   marmol: '#e6e2d8',
   joya: '#57c8d8',
@@ -491,16 +494,23 @@ function carasDelCofre(casilla: number): CaraDeObra[] {
  *
  * El remate va escalonado —dos cajas— y no en frontón triangular a propósito: desde los 55° a los
  * que mira la cámara, un frontón se ve de canto y desaparece; un ático se ve siempre.
+ *
+ * Los dos peldaños son también el BASAMENTO y llegan hasta el fondo del cuerpo. Acababan en 66, y
+ * el cuerpo y las columnas empezaban a 1,6 sin nada debajo de 66 a 88: desde arriba no se notaba,
+ * pero por ahí tiene que rodar la moneda de la recaudación, y no se rueda sobre el aire. Y en la
+ * fachada hay PUERTA, que es por donde entra.
  */
 const OFICINA = {
   escalones: [
-    { u: 13, v0: 62, v1: 66, desde: 0, hasta: 0.8 },
-    { u: 12, v0: 64, v1: 66, desde: 0.8, hasta: 1.6 },
+    { u: 13, v0: 62, v1: 88, desde: 0, hasta: 0.8 },
+    { u: 12, v0: 64, v1: 88, desde: 0.8, hasta: 1.6 },
   ] as readonly { u: number; v0: number; v1: number; desde: number; hasta: number }[],
   cuerpo: { u: 11, v0: 70, v1: 88, desde: 1.6, hasta: 11 },
   columna: { lado: 1.8, v: 67.4, desde: 1.6, hasta: 10, en: [-8, -2.7, 2.7, 8] as readonly number[] },
   cornisa: { u: 12, v0: 65.5, v1: 88.5, desde: 10, hasta: 11.4 },
   atico: { u: 7, v0: 68, v1: 86, desde: 11.4, hasta: 13.2 },
+  /* La puerta: una hoja oscura una décima por delante de la fachada, entre las dos columnas de en medio. */
+  puerta: { u: 2.2, v0: 69.9, v1: 70, desde: 1.6, hasta: 7.2 },
 } as const;
 
 function carasDeLaOficina(casilla: number): CaraDeObra[] {
@@ -508,6 +518,8 @@ function carasDeLaOficina(casilla: number): CaraDeObra[] {
   for (const e of OFICINA.escalones) salida.push(...caja(casilla, -e.u, e.u, e.v0, e.v1, e.desde, e.hasta, COLOR_DE_OBRA.piedra));
   const c = OFICINA.cuerpo;
   salida.push(...caja(casilla, -c.u, c.u, c.v0, c.v1, c.desde, c.hasta, COLOR_DE_OBRA.sillar));
+  const p = OFICINA.puerta;
+  salida.push(...caja(casilla, -p.u, p.u, p.v0, p.v1, p.desde, p.hasta, COLOR_DE_OBRA.puertaDeLaOficina));
   const co = OFICINA.columna;
   for (const u of co.en) salida.push(...caja(casilla, u - co.lado / 2, u + co.lado / 2, co.v - co.lado / 2, co.v + co.lado / 2, co.desde, co.hasta, COLOR_DE_OBRA.piedra));
   const cor = OFICINA.cornisa;
@@ -600,14 +612,22 @@ export function tronco(
   return salida;
 }
 
-/** Un disco tumbado a la cota `y`, mirando arriba: un abanico de triángulos desde el centro. */
+/**
+ * Un disco tumbado a la cota `y`, mirando arriba: un abanico de triángulos desde el centro.
+ *
+ * MIRA ARRIBA EN LOS DOS MARCOS, y eso pide dos órdenes. En el de una casilla, `(u, v)` llega al
+ * mundo con determinante −1 y el orden `a0 → a1` sale hacia arriba; en `DEL_MUNDO` —el de la vía y
+ * el de las piezas vivas— no hay espejo, y ese mismo orden mira al SUELO. Así estuvo la ruleta del
+ * casino: sus 24 triángulos, plato y buje, del revés, y como su material sólo pinta la cara de
+ * delante, desde el aire se veía girar la rayita amarilla sobre nada.
+ */
 export function disco(casilla: number, cu: number, cv: number, radio: number, y: number, segmentos: number, color: string): CaraDeObra[] {
   const salida: CaraDeObra[] = [];
   const en = (angulo: number): PuntoDeObra => [cu + radio * Math.cos(angulo), y, cv + radio * Math.sin(angulo)];
   for (let k = 0; k < segmentos; k++) {
     const a0 = (k / segmentos) * Math.PI * 2;
     const a1 = ((k + 1) / segmentos) * Math.PI * 2;
-    salida.push(triangulo(casilla, [cu, y, cv], en(a0), en(a1), color));
+    salida.push(casilla === DEL_MUNDO ? triangulo(casilla, [cu, y, cv], en(a1), en(a0), color) : triangulo(casilla, [cu, y, cv], en(a0), en(a1), color));
   }
   return salida;
 }
@@ -1282,6 +1302,110 @@ export function ejeDeLaJoya(): PiezaViva {
 }
 
 /**
+ * LA MONEDA DE LA RECAUDACIÓN (casilla 4): la animación de la oficina del estado.
+ *
+ * Miguel pidió la oficina «con animación de recaudación». Las monedas de cualquier pago vuelan al
+ * Concejo, y a la cercanía a la que se juega son puntos de tres píxeles que no cuentan nada. Así que
+ * la oficina tiene SU moneda, grande —4,6 de canto, dos tercios de su puerta—: cuando alguien paga
+ * el Impuesto aparece al pie de la escalinata, sube rodando los dos peldaños y entra por la puerta.
+ *
+ * Va de canto, con su eje a lo largo de `x` del modelo y rodando hacia `+z`, que la escena lleva a
+ * `+v` de la casilla, hacia la puerta. El origen está en su EJE, que es alrededor de lo que gira. Las
+ * dos caras van en cuartos de dos oros: una moneda lisa que rueda no se ve rodar.
+ */
+export const CASILLA_DE_LA_OFICINA = 4;
+export const MONEDA_DE_LA_RECAUDACION = { radio: 2.3, grueso: 0.8, segmentos: 16 } as const;
+
+export function carasDeLaMonedaDeLaRecaudacion(): CaraDeObra[] {
+  const { radio, grueso, segmentos } = MONEDA_DE_LA_RECAUDACION;
+  const salida: CaraDeObra[] = [];
+  const en = (x: number, angulo: number): PuntoDeObra => [x, radio * Math.cos(angulo), radio * Math.sin(angulo)];
+  const g = grueso / 2;
+  for (let k = 0; k < segmentos; k++) {
+    const a0 = (k / segmentos) * Math.PI * 2;
+    const a1 = ((k + 1) / segmentos) * Math.PI * 2;
+    const oro = Math.floor((k * 4) / segmentos) % 2 === 0 ? COLOR_DE_OBRA.laton : COLOR_DE_OBRA.latonOscuro;
+    /* En este marco no hay espejo: `a0 → a1` gira de `+y` a `+z`, y visto desde `+x` eso mira a `+x`. */
+    salida.push(triangulo(DEL_MUNDO, [g, 0, 0], en(g, a0), en(g, a1), oro));
+    salida.push(triangulo(DEL_MUNDO, [-g, 0, 0], en(-g, a1), en(-g, a0), oro));
+    /* El canto, mirando hacia fuera del eje. */
+    salida.push({ casilla: DEL_MUNDO, puntos: [en(-g, a0), en(-g, a1), en(g, a1), en(g, a0)], color: COLOR_DE_OBRA.laton });
+  }
+  return salida;
+}
+
+/**
+ * POR DÓNDE RUEDA, en el marco de la casilla: a `u` (0..1) de su recorrido, dónde está su eje y
+ * cuánto ha girado.
+ *
+ * Rueda sin deslizar y sube cada peldaño GIRANDO SOBRE SU ARISTA, que no es un salto: mientras la
+ * arista está a menos de un radio por delante, el eje va por el arco de radio `radio` alrededor de
+ * ella. La altura del eje es la mayor de las que le imponen el suelo que tiene debajo y las aristas
+ * que tiene delante, y eso basta para que nunca se hunda en un peldaño. El giro es lo que lleva
+ * andado el eje entre el radio, que en un arco alrededor de una arista también es verdad.
+ *
+ * Empieza donde toca la arista del primer peldaño —ni antes, que pisaría el precio, ni después,
+ * que aparecería a medio subir— y acaba con la moneda entera DENTRO del cuerpo, ya escondida.
+ */
+function alturaDelEjeDeLaMoneda(v: number): number {
+  const r: number = MONEDA_DE_LA_RECAUDACION.radio;
+  let y = r;
+  for (const e of OFICINA.escalones) {
+    if (v >= e.v0) y = Math.max(y, e.hasta + r);
+    else if (e.v0 - v < r) y = Math.max(y, e.hasta + Math.sqrt(r * r - (e.v0 - v) ** 2));
+  }
+  return y;
+}
+
+const primerPeldano = OFICINA.escalones[0] as { readonly v0: number; readonly hasta: number };
+export const RECORRIDO_DE_LA_MONEDA = {
+  desde: primerPeldano.v0 - Math.sqrt(2 * MONEDA_DE_LA_RECAUDACION.radio * primerPeldano.hasta - primerPeldano.hasta ** 2),
+  hasta: OFICINA.cuerpo.v0 + MONEDA_DE_LA_RECAUDACION.radio + 0.2,
+} as const;
+
+export function monedaEnLaEscalinata(u: number): { readonly v: number; readonly y: number; readonly rodado: number } {
+  const t = Math.min(1, Math.max(0, u));
+  const v = RECORRIDO_DE_LA_MONEDA.desde + (RECORRIDO_DE_LA_MONEDA.hasta - RECORRIDO_DE_LA_MONEDA.desde) * t;
+  /* Lo andado por el eje, en tramos de una décima: sobra para un arco de radio 2,3. */
+  const tramos = Math.max(1, Math.ceil((v - RECORRIDO_DE_LA_MONEDA.desde) / 0.1));
+  let andado = 0;
+  let vAntes = RECORRIDO_DE_LA_MONEDA.desde;
+  let yAntes = alturaDelEjeDeLaMoneda(vAntes);
+  for (let k = 1; k <= tramos; k++) {
+    const vk = RECORRIDO_DE_LA_MONEDA.desde + ((v - RECORRIDO_DE_LA_MONEDA.desde) * k) / tramos;
+    const yk = alturaDelEjeDeLaMoneda(vk);
+    andado += Math.hypot(vk - vAntes, yk - yAntes);
+    vAntes = vk;
+    yAntes = yk;
+  }
+  return { v, y: alturaDelEjeDeLaMoneda(v), rodado: andado / MONEDA_DE_LA_RECAUDACION.radio };
+}
+
+/** Lo mismo, en el mundo: dónde va su eje, hacia dónde mira su `+z` y cuánto ha rodado sobre su `x`. */
+export function monedaDeLaRecaudacionEnElMundo(u: number): { readonly x: number; readonly y: number; readonly z: number; readonly giro: number; readonly rodado: number } {
+  const m = marcoDeCasilla(CASILLA_DE_LA_OFICINA);
+  const en = monedaEnLaEscalinata(u);
+  const p = puntoEnLaCasillaPorV(m, 0, en.v);
+  return { x: p.x, y: en.y, z: p.z, giro: giroHaciaFuera(m), rodado: en.rodado };
+}
+
+/** Las cajas de la oficina que la moneda tiene que respetar, en `(u, v, y)` de su casilla: para medirla. */
+export function cajasDeLaOficina(): {
+  readonly peldanos: readonly { readonly u: number; readonly v0: number; readonly v1: number; readonly desde: number; readonly hasta: number }[];
+  readonly columnas: readonly { readonly u0: number; readonly u1: number; readonly v0: number; readonly v1: number }[];
+  readonly cuerpo: { readonly u: number; readonly v0: number; readonly desde: number; readonly hasta: number };
+  readonly puerta: { readonly u: number; readonly desde: number; readonly hasta: number };
+} {
+  const co = OFICINA.columna;
+  return {
+    peldanos: OFICINA.escalones,
+    columnas: co.en.map((u) => ({ u0: u - co.lado / 2, u1: u + co.lado / 2, v0: co.v - co.lado / 2, v1: co.v + co.lado / 2 })),
+    cuerpo: OFICINA.cuerpo,
+    puerta: OFICINA.puerta,
+  };
+}
+
+/**
  * LA REJA DE LA CELDA DE LA COMISARÍA, que sube y baja.
  *
  * Miguel: «quiero ver cómo entra en la celda». Quien cae en ¡A comisaría! corre hasta ella
@@ -1314,9 +1438,9 @@ export function sitioDeLaRejaDeLaCelda(): PiezaViva {
 }
 
 /** Los triángulos de cada pieza viva: el presupuesto las cuenta una a una. */
-export function triangulosDeLasPiezasVivas(): { readonly tapa: number; readonly ruleta: number; readonly joya: number; readonly reja: number } {
+export function triangulosDeLasPiezasVivas(): { readonly tapa: number; readonly ruleta: number; readonly joya: number; readonly reja: number; readonly moneda: number } {
   const cuenta = (caras: readonly CaraDeObra[]): number => caras.reduce((n, cara) => n + (esTriangulo(cara) ? 1 : 2), 0);
-  return { tapa: cuenta(carasDeLaTapa()), ruleta: cuenta(carasDeLaRuleta()), joya: cuenta(carasDeLaJoyaViva()), reja: cuenta(carasDeLaRejaDeLaCelda()) };
+  return { tapa: cuenta(carasDeLaTapa()), ruleta: cuenta(carasDeLaRuleta()), joya: cuenta(carasDeLaJoyaViva()), reja: cuenta(carasDeLaRejaDeLaCelda()), moneda: cuenta(carasDeLaMonedaDeLaRecaudacion()) };
 }
 
 /** Qué levanta cada casilla lateral. Las que no están aquí todavía no tienen obra. */

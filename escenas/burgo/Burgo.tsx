@@ -246,8 +246,8 @@ import {
   tonoDelEdificio,
 } from './ciudad';
 import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
-import { claveDelBulto, geometriaDeLaJoya, geometriaDeLaRejaDeLaCelda, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
-import { bisagrasDeLosCofres, ejeDeLaJoya, ejesDeLasRuletas, largoDeLaVia, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda } from './obras';
+import { claveDelBulto, geometriaDeLaJoya, geometriaDeLaMonedaDeLaRecaudacion, geometriaDeLaRejaDeLaCelda, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
+import { bisagrasDeLosCofres, ejeDeLaJoya, ejesDeLasRuletas, largoDeLaVia, monedaDeLaRecaudacionEnElMundo, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda } from './obras';
 import { CASAS_DEL_CONCEJO, DISCOS_DEL_TRATO, DISCOS_DE_CONTACTO, MONEDAS_EN_VUELO, POSADAS_DEL_CONCEJO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DEL_DISCO, TITULOS } from './presupuesto';
 import {
   HUNDIR_CASAS,
@@ -262,6 +262,8 @@ import {
   giroDeLaJoya,
   giroDeLaRuleta,
   loQueAnimaUnaCarta,
+  esRecaudacion,
+  momentoDeLaRecaudacion,
   arcoDeMoneda,
   avanzarLaCola,
   backOut,
@@ -1235,19 +1237,22 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   const ruletaGeometria = useMemo(geometriaDeLaRuleta, []);
   const joyaGeometria = useMemo(geometriaDeLaJoya, []);
   const rejaDeLaCeldaGeometria = useMemo(geometriaDeLaRejaDeLaCelda, []);
+  const monedaDeLaOficinaGeometria = useMemo(geometriaDeLaMonedaDeLaRecaudacion, []);
   useEffect(
     () => () => {
       tapaGeometria?.dispose();
       ruletaGeometria?.dispose();
       joyaGeometria?.dispose();
       rejaDeLaCeldaGeometria?.dispose();
+      monedaDeLaOficinaGeometria?.dispose();
     },
-    [tapaGeometria, ruletaGeometria, joyaGeometria, rejaDeLaCeldaGeometria],
+    [tapaGeometria, ruletaGeometria, joyaGeometria, rejaDeLaCeldaGeometria, monedaDeLaOficinaGeometria],
   );
   const tapas = useRef<THREE.InstancedMesh>(null);
   const ruletas = useRef<THREE.InstancedMesh>(null);
   const joya = useRef<THREE.InstancedMesh>(null);
   const rejaDeLaCelda = useRef<THREE.Mesh>(null);
+  const monedaDeLaOficina = useRef<THREE.Mesh>(null);
   const sitiosVivos = useMemo(() => ({ cofres: bisagrasDeLosCofres(), ruletas: ejesDeLasRuletas(), joya: ejeDeLaJoya(), reja: sitioDeLaRejaDeLaCelda() }), []);
 
   const materiales = useMemo(
@@ -2131,6 +2136,24 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         mj.count = 1;
         mj.instanceMatrix.needsUpdate = true;
       }
+      /*
+       * LA MONEDA DE LA RECAUDACIÓN: sube rodando la escalinata de la oficina y entra por la puerta
+       * cuando alguien paga el Impuesto. Fuera de esos 0,6 s no se pinta, y no cuesta ni la llamada.
+       */
+      const mo = monedaDeLaOficina.current;
+      if (mo !== null) {
+        const pago = sonando.find((x) => esRecaudacion(x.suceso));
+        const momento = pago === undefined ? null : momentoDeLaRecaudacion(ahora - pago.desde);
+        mo.visible = momento !== null;
+        if (momento !== null) {
+          const p = monedaDeLaRecaudacionEnElMundo(momento.u);
+          mo.position.set(p.x, p.y, p.z);
+          auxGiro.setFromAxisAngle(EJE_Y, p.giro);
+          auxGiro.multiply(auxGiro2.setFromAxisAngle(EJE_X, p.rodado));
+          mo.quaternion.copy(auxGiro);
+          mo.scale.setScalar(Math.max(0.001, momento.escala));
+        }
+      }
     }
 
     /*
@@ -2491,6 +2514,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           raycast={() => null}
         />
       )}
+      {monedaDeLaOficinaGeometria === null ? null : <mesh ref={monedaDeLaOficina} geometry={monedaDeLaOficinaGeometria} material={materiales.bulto} visible={false} raycast={() => null} />}
       {rotulos === null ? null : <mesh geometry={rotulos.geometria} material={materiales.rotulo} position={[0, 0, 0]} raycast={() => null} />}
 
       {/*

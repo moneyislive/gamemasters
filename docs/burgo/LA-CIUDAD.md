@@ -287,8 +287,9 @@ las casas (`v = 10,5`), así que da escala sin disputarle el sitio a lo que cuen
 la casilla sigue siendo la franja de color, el filete, el marco y el precio grande.
 
 De propina, el tablero adelgazó al quitarlos: quedó en **172.808** triángulos en plena. Con los
-NOMBRES de las casillas encima (8.525 triángulos de letras, §2 bis) va hoy por **181.333**, de un
-tope de 900.000, así que el sitio para lo que venga después sigue ahí entero.
+NOMBRES de las casillas encima (8.525 triángulos de letras, §2 bis) iba entonces por **181.333**, de
+un tope de 900.000, así que el sitio para lo que venga después seguía ahí entero (con las obras, la
+vía, los textos y las piezas vivas de `LAS-CASILLAS.md`, hoy va por 199.438).
 
 El emblema mide **27** de lado (creció con el dígito, por la misma razón) y va a `u = −14`
 cuando la casilla lleva pieza, centrado cuando no.
@@ -413,7 +414,7 @@ acera. Quedan setenta y dos celdas libres.
 
 El asfalto del aparcamiento, sus rayas y su cartel no son piezas: los describe `burgo/obras.ts`
 cuadro a cuadro —sin `three`— y `ciudad-en-3d.ts` los funde en UNA malla. La razón es la moneda
-que escasea: el tablero va por 181.333 triángulos de 900.000, o sea que **triángulos sobran**;
+que escasea: el tablero iba por 181.333 triángulos de 900.000, o sea que **triángulos sobran**;
 y por 92 llamadas de dibujo de 150 en la pose de salida, o sea que **llamadas no**. Una pieza
 nueva del pack cuesta una llamada para siempre —una `InstancedMesh` por pieza distinta en
 pantalla—; un volumen construido en código y fundido cuesta **cero**, y las trece casillas que

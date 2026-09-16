@@ -473,6 +473,28 @@ export function giroDeLaJoya(transcurrido: number): number {
   return JOYA_QUE_GIRA.vueltas * Math.PI * 2 * suave(pinza(transcurrido / JOYA_QUE_GIRA.total));
 }
 
+/**
+ * LA RECAUDACIÓN DEL IMPUESTO: cuándo sube la moneda de la oficina, dentro del pago.
+ *
+ * Suena con el `paga` del Impuesto al Ayuntamiento y rueda 0,6 s a partir de los 0,3: después de que
+ * quien paga haga el gesto de lanzar, y dentro del pago más corto que puede haber —una sola moneda,
+ * 0,97 s—, porque cuando el suceso acaba la escena deja de preguntar, y una moneda a medio camino
+ * desaparecería de golpe. Crece en sus primeras 0,08 para no salir de la nada.
+ */
+export const RECAUDACION = { empieza: 0.3, rueda: 0.6, crece: 0.08 } as const;
+
+/** ¿Este suceso es pagar el Impuesto al Ayuntamiento? Sólo ése mueve la moneda de la oficina. */
+export function esRecaudacion(s: SucesoDelBurgo): boolean {
+  return s.que === 'paga' && s.porque === 'diezmo' && s.a === null;
+}
+
+/** Dónde va la moneda a `transcurrido` del pago: `null` si no se ve; si no, su avance (0..1) y su escala. */
+export function momentoDeLaRecaudacion(transcurrido: number): { readonly u: number; readonly escala: number } | null {
+  const t = transcurrido - RECAUDACION.empieza;
+  if (t < 0 || t >= RECAUDACION.rueda) return null;
+  return { u: t / RECAUDACION.rueda, escala: suave(t / RECAUDACION.crece) };
+}
+
 /** El quebrado se desvanece en los últimos 0,8 s de su huida. */
 export function desvanecidoAlQuebrar(transcurrido: number): number {
   return pinza((transcurrido - (QUIEBRA - DESVANECER_AL_QUEBRAR)) / DESVANECER_AL_QUEBRAR);

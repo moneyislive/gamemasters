@@ -171,7 +171,8 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
-import { DEL_MUNDO, VIA, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLasObras, carasDelTren, casillasConObra, largoDeLaVia, letrasDeLosCarteles, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda, triangulosDeLasObras } from '../burgo/obras';
+import { CASILLA_DE_LA_OFICINA, DEL_MUNDO, MONEDA_DE_LA_RECAUDACION, RECORRIDO_DE_LA_MONEDA, VIA, cajasDeLaOficina, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDeLasObras, carasDelTren, casillasConObra, disco, esTriangulo, largoDeLaVia, letrasDeLosCarteles, monedaEnLaEscalinata, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda, triangulosDeLasObras } from '../burgo/obras';
+import type { CaraDeObra } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO, PAGA_DE_LA_PUERTA_MAYOR } from '../../shared/arcade/juegos/burgo-tablero';
@@ -218,7 +219,7 @@ import {
   velocidadDelClip,
 } from '../burgo/peon';
 import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
-import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelEncierro, duracionDelSuceso, finDeLaCola, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
+import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, RECAUDACION, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelDinero, duracionDelEncierro, duracionDelSuceso, esRecaudacion, finDeLaCola, momentoDeLaRecaudacion, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
   ALCANCE_DEL_BURGO,
@@ -2897,6 +2898,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       'la carrera a la celda': A_LA_CELDA,
       'la reja de la celda al subir': PASO_DE_LA_REJA,
       'la reja de la celda al bajar': DESVANECER,
+      'la moneda de la recaudación': RECAUDACION.rueda,
     };
     comprobar(
       `ninguna animación de casilla pasa de ${String(TOPE_DE_UNA_ANIMACION_DE_CASILLA).replace('.', ',')} s: ${Object.keys(animacionesDeCasilla).join(', ')}`,
@@ -2904,6 +2906,77 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       lasQuePasan(animacionesDeCasilla),
     );
     comprobar('se ve fallar: con la carrera a la celda de la primera versión, 0,9 s, la misma cuenta la señala', lasQuePasan({ ...animacionesDeCasilla, 'la carrera a la celda': 0.9 }).length === 1);
+    /*
+     * Y QUE SE VEAN DESDE EL AIRE. Las piezas vivas se escriben en su propio marco, SIN el espejo que
+     * tiene el de una casilla, y un ayudante escrito para el otro marco las pone del revés sin que
+     * falle nada: la ruleta estuvo así desde que se hizo, con los 24 triángulos de su plato y su buje
+     * mirando al suelo, y como su material sólo pinta la cara de delante, desde arriba se veía girar
+     * la rayita amarilla sobre nada. La lupa de las obras no llegaba: mira las fundidas.
+     *
+     * Ésta es exacta, triángulo a triángulo y no por cajas: una rejilla de rayos verticales sobre la
+     * huella de cada pieza, y el primer triángulo que corta cada rayo tiene que mirar ARRIBA.
+     */
+    const lupaDeUnaPiezaViva = (caras: readonly CaraDeObra[]): { readonly rayos: number; readonly alReves: number } => {
+      const triangulos = caras.flatMap((cara) => {
+        const [a, b, c, d] = cara.puntos;
+        return esTriangulo(cara) ? [[a, b, c] as const] : [[a, b, c] as const, [a, c, d] as const];
+      });
+      const xs = caras.flatMap((cara) => cara.puntos.map((q) => q[0]));
+      const zs = caras.flatMap((cara) => cara.puntos.map((q) => q[2]));
+      const x0 = Math.min(...xs);
+      const x1 = Math.max(...xs);
+      const z0 = Math.min(...zs);
+      const z1 = Math.max(...zs);
+      const RAYOS_POR_LADO = 15;
+      let rayos = 0;
+      let alReves = 0;
+      for (let i = 0; i < RAYOS_POR_LADO; i++) {
+        for (let j = 0; j < RAYOS_POR_LADO; j++) {
+          const x = x0 + ((x1 - x0) * (i + 0.5)) / RAYOS_POR_LADO;
+          const z = z0 + ((z1 - z0) * (j + 0.5)) / RAYOS_POR_LADO;
+          let mejorY = Number.NEGATIVE_INFINITY;
+          let mejorNormalY = 0;
+          for (const [a, b, c] of triangulos) {
+            const ux = b[0] - a[0];
+            const uz = b[2] - a[2];
+            const wx = c[0] - a[0];
+            const wz = c[2] - a[2];
+            const det = ux * wz - uz * wx;
+            /* Una pared no es techo: un rayo vertical la roza y no la corta. */
+            if (Math.abs(det) < 1e-9) continue;
+            const s = ((x - a[0]) * wz - (z - a[2]) * wx) / det;
+            const t = ((z - a[2]) * ux - (x - a[0]) * uz) / det;
+            if (s < 0 || t < 0 || s + t > 1) continue;
+            const y = a[1] + s * (b[1] - a[1]) + t * (c[1] - a[1]);
+            if (y <= mejorY) continue;
+            mejorY = y;
+            /* La `y` de (b − a) × (c − a) es −det: positiva cuando el triángulo mira arriba. */
+            mejorNormalY = -det;
+          }
+          if (mejorY === Number.NEGATIVE_INFINITY) continue;
+          rayos++;
+          if (mejorNormalY <= 0) alReves++;
+        }
+      }
+      return { rayos, alReves };
+    };
+    const piezasVivas: readonly (readonly [string, readonly CaraDeObra[]])[] = [
+      ['la tapa del cofre', carasDeLaTapa()],
+      ['la ruleta', carasDeLaRuleta()],
+      ['la joya', carasDeLaJoyaViva()],
+      ['la reja de la celda', carasDeLaRejaDeLaCelda()],
+      ['el tren', carasDelTren()],
+      ['la moneda de la recaudación', carasDeLaMonedaDeLaRecaudacion()],
+    ];
+    const lupasVivas = piezasVivas.map(([que, caras]) => ({ que, ...lupaDeUnaPiezaViva(caras) }));
+    comprobar(
+      `las ${String(piezasVivas.length)} piezas vivas se ven desde el aire: cada rayo de la lupa da primero en una cara que mira arriba, y cada una recibe rayos`,
+      lupasVivas.every((l) => l.rayos >= 20 && l.alReves === 0),
+      lupasVivas.filter((l) => l.rayos < 20 || l.alReves > 0),
+    );
+    /* La vacuna es la ruleta como estuvo: el mismo disco, pero con el orden del marco de una casilla. */
+    const ruletaDeAntes = lupaDeUnaPiezaViva(disco(CASILLAS_DEL_PREGON[0] as number, 0, 0, 4.2, 0, 12, '#000000'));
+    comprobar('se ve fallar: el plato de la ruleta con el orden de una casilla, como estuvo, sale entero del revés', ruletaDeAntes.rayos > 0 && ruletaDeAntes.alReves === ruletaDeAntes.rayos, ruletaDeAntes);
     /* Y la regla que decide quién se anima, que vivía dentro del bucle de fotogramas. */
     comprobar('una carta del Arca en la 17 abre ese cofre y ninguna ruleta', loQueAnimaUnaCarta('arca', 17).cofre === 17 && loQueAnimaUnaCarta('arca', 17).ruleta === null);
     comprobar('una del Pregón en la 22 gira esa ruleta y ningún cofre', loQueAnimaUnaCarta('pregon', 22).ruleta === 22 && loQueAnimaUnaCarta('pregon', 22).cofre === null);
@@ -2933,6 +3006,107 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       'y las casillas que la regla nombra son las mismas que levantan cofre y ruleta',
       CASILLAS_DEL_ARCA.every((c) => casillasConObra().includes(c)) && CASILLAS_DEL_PREGON.every((c) => casillasConObra().includes(c)),
     );
+
+    /*
+     * LA RECAUDACIÓN: la moneda que sube la escalinata de la oficina del Impuesto.
+     *
+     * Rueda por un sitio que ya estaba construido, así que lo que se mide es que el sitio y la moneda
+     * se entiendan: que en TODO el recorrido esté apoyada —ni hundida en un peldaño ni flotando—,
+     * que pase entre las columnas y quepa por la puerta, que acabe entera dentro del cuerpo (y por
+     * eso escondida), que empiece sin pisar el precio, y que sólo la mueva el pago del Impuesto, en
+     * una ventana que cabe dentro del pago más corto que hay.
+     *
+     * Todo en el plano `(v, y)` de la casilla, que es donde rueda: los peldaños son rectángulos ahí, y
+     * una moneda de canto es un círculo de radio `radio` con su grueso a lo largo de `u`.
+     */
+    {
+      const { radio, grueso } = MONEDA_DE_LA_RECAUDACION;
+      const coma = (x: number): string => String(r(x)).replace('.', ',');
+      const oficina = cajasDeLaOficina();
+      const hastaUnRectangulo = (v: number, y: number, r: { readonly v0: number; readonly v1: number; readonly desde: number; readonly hasta: number }): number =>
+        Math.hypot(Math.max(r.v0 - v, 0, v - r.v1), Math.max(r.desde - y, 0, y - r.hasta));
+      /* Lo que la aguanta: el suelo (y = 0) y los peldaños. La distancia de su eje a lo más cercano. */
+      const apoyo = (v: number, y: number, peldanos: typeof oficina.peldanos): number => Math.min(y, ...peldanos.map((p) => hastaUnRectangulo(v, y, p)));
+      const recorrer = (alturaDe: (u: number) => { readonly v: number; readonly y: number }, peldanos: typeof oficina.peldanos): { hundida: string[]; flotando: string[] } => {
+        const hundida: string[] = [];
+        const flotando: string[] = [];
+        for (let k = 0; k <= 400; k++) {
+          const u = k / 400;
+          const { v, y } = alturaDe(u);
+          /* Mientras no ha llegado a la fachada: después va entrando en el cuerpo, que es a lo que va. */
+          if (v + radio > oficina.cuerpo.v0) continue;
+          const d = apoyo(v, y, peldanos);
+          if (d < radio - 1e-6) hundida.push(`u ${r(u)}: eje en (${r(v)}, ${r(y)}), a ${r(d)} de un peldaño`);
+          if (d > radio + 1e-3) flotando.push(`u ${r(u)}: eje en (${r(v)}, ${r(y)}), a ${r(d - radio)} del apoyo`);
+        }
+        return { hundida, flotando };
+      };
+      const deVerdad = recorrer((u) => monedaEnLaEscalinata(u), oficina.peldanos);
+      comprobar('la moneda de la recaudación sube la escalinata apoyada: en 400 instantes, ni hundida en un peldaño ni flotando', deVerdad.hundida.length === 0 && deVerdad.flotando.length === 0, [...deVerdad.hundida, ...deVerdad.flotando].slice(0, 4));
+      comprobar(
+        'se ve fallar: rodando a ras de suelo, sin subir, se hunde en los peldaños',
+        recorrer((u) => ({ v: monedaEnLaEscalinata(u).v, y: radio }), oficina.peldanos).hundida.length > 0,
+      );
+      comprobar(
+        'se ve fallar: con los peldaños de antes, que acababan en 66, el último tramo antes de la puerta va por el aire',
+        recorrer((u) => monedaEnLaEscalinata(u), oficina.peldanos.map((p) => ({ ...p, v1: 66 }))).flotando.length > 0,
+      );
+      /* Las columnas y la puerta: la moneda es un disco de grueso `grueso` centrado en `u = 0`. */
+      const medioGrueso = grueso / 2;
+      comprobar('pasa entre las dos columnas del centro sin rozarlas', oficina.columnas.every((c) => c.u0 > medioGrueso || c.u1 < -medioGrueso), oficina.columnas);
+      const porLaPuerta: string[] = [];
+      for (let k = 0; k <= 400; k++) {
+        const { v, y } = monedaEnLaEscalinata(k / 400);
+        if (v + radio <= oficina.cuerpo.v0) continue;
+        if (medioGrueso > oficina.puerta.u || y - radio < oficina.puerta.desde - 1e-6 || y + radio > oficina.puerta.hasta) porLaPuerta.push(`u ${r(k / 400)}: de ${r(y - radio)} a ${r(y + radio)}`);
+      }
+      comprobar(`entra por la puerta: cuando cruza la fachada cabe entera en el hueco (${coma(oficina.puerta.u * 2)} de ancho, de ${coma(oficina.puerta.desde)} a ${coma(oficina.puerta.hasta)})`, porLaPuerta.length === 0, porLaPuerta.slice(0, 3));
+      const alFinal = monedaEnLaEscalinata(1);
+      const alPrincipio = monedaEnLaEscalinata(0);
+      comprobar(
+        'y acaba entera dentro del cuerpo, que es lo que la esconde',
+        alFinal.v - radio >= oficina.cuerpo.v0 && alFinal.y + radio <= oficina.cuerpo.hasta && medioGrueso <= oficina.cuerpo.u,
+        { borde: r(alFinal.v - radio), fachada: oficina.cuerpo.v0 },
+      );
+      comprobar(
+        `empieza en el suelo y sin pisar el precio: su borde en ${coma(alPrincipio.v - radio)}, y el precio acaba en ${coma(V_DEL_PRECIO + ALTO_DEL_GUARISMO / 2)}`,
+        Math.abs(alPrincipio.y - radio) < 1e-9 && alPrincipio.v - radio >= V_DEL_PRECIO + ALTO_DEL_GUARISMO / 2 && Math.abs(RECORRIDO_DE_LA_MONEDA.desde - alPrincipio.v) < 1e-9,
+      );
+      comprobar(
+        'rueda sin deslizar: lo girado crece siempre y al final es lo andado por el eje entre el radio, más que la distancia en llano',
+        [0.1, 0.3, 0.5, 0.7, 0.9, 1].every((u, k, us) => k === 0 || monedaEnLaEscalinata(u).rodado > monedaEnLaEscalinata(us[k - 1] as number).rodado) &&
+          alFinal.rodado > (alFinal.v - alPrincipio.v) / radio,
+      );
+      /* La pieza: un sólido convexo alrededor de su eje, con todas las caras hacia fuera. */
+      const carasDeLaMoneda = carasDeLaMonedaDeLaRecaudacion();
+      const haciaDentro = carasDeLaMoneda.filter((cara) => {
+        const [a, b, c] = cara.puntos;
+        const n = [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])];
+        const puntos = cara.puntos.slice(0, esTriangulo(cara) ? 3 : 4);
+        const centro = [0, 1, 2].map((i) => puntos.reduce((s, q) => s + (q[i] as number), 0) / puntos.length);
+        return (n[0] as number) * (centro[0] as number) + (n[1] as number) * (centro[1] as number) + (n[2] as number) * (centro[2] as number) <= 1e-9;
+      });
+      comprobar(`la moneda es un sólido bien vuelto: sus ${String(carasDeLaMoneda.length)} caras miran hacia fuera de su eje`, carasDeLaMoneda.length > 0 && haciaDentro.length === 0, haciaDentro.length);
+      /* Cuándo: sólo el Impuesto, y dentro del pago más corto. */
+      const pagoDelImpuesto: Extract<SucesoDelBurgo, { que: 'paga' }> = { que: 'paga', quien: A, a: null, cuanto: 200, porque: 'diezmo', casilla: CASILLA_DE_LA_OFICINA };
+      comprobar(
+        'sólo la mueve pagar el Impuesto al Ayuntamiento: ni la Tasa, ni una renta, ni un Impuesto que no vaya al Ayuntamiento, ni un cobro',
+        esRecaudacion(pagoDelImpuesto) &&
+          !esRecaudacion({ ...pagoDelImpuesto, porque: 'alcabala' }) &&
+          !esRecaudacion({ ...pagoDelImpuesto, porque: 'renta' as never }) &&
+          !esRecaudacion({ ...pagoDelImpuesto, a: 'asiento-b' }) &&
+          !esRecaudacion({ que: 'cobra', quien: A, de: null, cuanto: 200, porque: 'diezmo', casilla: CASILLA_DE_LA_OFICINA }),
+      );
+      const pagoMasCorto = duracionDelDinero(1);
+      comprobar(
+        `rueda de ${coma(RECAUDACION.empieza)} a ${coma(RECAUDACION.empieza + RECAUDACION.rueda)} s, dentro del pago más corto (${coma(pagoMasCorto)} s), y fuera de esa ventana no se ve`,
+        RECAUDACION.empieza + RECAUDACION.rueda <= pagoMasCorto &&
+          momentoDeLaRecaudacion(RECAUDACION.empieza - 0.01) === null &&
+          momentoDeLaRecaudacion(RECAUDACION.empieza + RECAUDACION.rueda + 1e-6) === null &&
+          (momentoDeLaRecaudacion(RECAUDACION.empieza + 0.3)?.escala ?? 0) === 1 &&
+          (momentoDeLaRecaudacion(RECAUDACION.empieza)?.escala ?? 1) === 0,
+      );
+    }
   }
 
   /*
