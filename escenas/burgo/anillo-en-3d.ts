@@ -764,6 +764,7 @@ export function altoDelRotulo(palabra: string, esEsquina = false): number {
  */
 export const ROTULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
   0: 'SALIDA',
+  10: 'CÁRCEL',
   20: 'PARKING',
   2: 'FONDO',
   4: 'IMPUESTO',
@@ -818,7 +819,7 @@ function letrasDeLaEsquina(m: MarcoDeCasilla, palabra: string): LetraEnElTablero
     const avance = avanceDelCaracter(letra) * escala;
     const d = (t + avance / 2) / Math.SQRT2;
     const p = puntoEnEsquina(m, CENTRO_DEL_SUELO_DE_LA_ESQUINA - d, CENTRO_DEL_SUELO_DE_LA_ESQUINA + d);
-    salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO });
+    salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO_DE_LA_ESQUINA[m.indice] ?? ALZA_DEL_ROTULO });
     t += avance;
   }
   return salida;
@@ -1017,6 +1018,17 @@ export const MAZMORRA = 10;
 export const FERIA = 20;
 export const A_LA_MAZMORRA = 30;
 export const ESQUINAS: readonly number[] = [PUERTA_MAYOR, MAZMORRA, FERIA, A_LA_MAZMORRA];
+
+/**
+ * LA COTA DEL RÓTULO DE UNA ESQUINA, QUE NO ES LA MISMA EN LAS CUATRO.
+ *
+ * Un rótulo se posa a 0,08 sobre el suelo de su casilla, que es lo justo para no pelearse con él
+ * en profundidad. Pero dos esquinas tienen el suelo EMPEDRADO —la cárcel y ¡a la Mazmorra! van
+ * llenas de `solera` y `calzada`, cuyas caras de arriba están a 0,6 y 0,42—, así que ahí las
+ * letras quedarían DEBAJO del pavimento: invisibles, sin que fallara nada en ninguna cuenta.
+ * En esas dos el nombre va sobre la solera, como la pintura de una calzada de verdad.
+ */
+export const ALZA_DEL_ROTULO_DE_LA_ESQUINA: Readonly<Partial<Record<number, number>>> = { [MAZMORRA]: 0.66, [A_LA_MAZMORRA]: 0.66 };
 /** Las cuatro puertas del juego. Son los ejes de las dos avenidas de la ciudad. */
 export const PUERTAS: readonly number[] = [5, 15, 25, 35];
 
@@ -1232,15 +1244,13 @@ export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsqui
       [5, 8],
     ]),
     /*
-     * LA MANZANA DE LA COMISARÍA: cuatro bloques del pack cerrando el patio por dos lados.
-     * Ninguno de los anchos es 12 clavado —el `bloque-d` mide 12,123 y los `e`..`h` 12,04—,
-     * así que ninguno de ésos puede ir centrado en la celda 8: se saldría del cuadrado de la
-     * esquina por seis centésimas y el comprobador lo dice. Ahí sólo van los de 12 justos.
+     * LA MANZANA YA NO ES DE PISOS. Aquí había cuatro bloques del pack —`bloque-d`, `-b`, `-c` y
+     * `-a`— cerrando el patio, y desde el aire eso no era una cárcel: era una manzana con el
+     * patio vallado, igual que cualquier otra esquina del recinto. Miguel pidió «una cárcel de
+     * verdad», y lo que la hace serlo —muro, torretas de vigilancia, barrotes y dos pabellones—
+     * lo levanta ahora `obras.ts` en código, fundido con las demás obras y sin una llamada de
+     * dibujo nueva. Lo que sigue aquí son las piezas que se MUEVEN o que ya estaban instanciadas.
      */
-    { pieza: PIEZA.bloqueD, u: cel(7), v: cel(6), giroEnCuartos: 2 },
-    { pieza: PIEZA.bloqueB, u: cel(6), v: cel(7), giroEnCuartos: 0 },
-    { pieza: PIEZA.bloqueC, u: cel(7), v: cel(7), giroEnCuartos: 0 },
-    { pieza: PIEZA.bloqueA, u: cel(8), v: cel(7), giroEnCuartos: 0 },
     /* La verja del patio: el lado que da a la calle, con la hoja que sube en medio. */
     { pieza: PIEZA.verja, u: 396, v: 398, giroEnCuartos: 0 },
     { pieza: PIEZA.verjaPuerta, u: 396, v: 402, giroEnCuartos: 0, papel: 'reja' },

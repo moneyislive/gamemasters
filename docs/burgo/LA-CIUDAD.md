@@ -371,11 +371,21 @@ acera. Quedan setenta y dos celdas libres.
   (`#b3261e`) y de 28, en el pico de fuera —por el de dentro cruza la ele de la marcha y ahí se
   planta el peón de quien acaba de mover—. **Cero piezas**: las dos cosas van fundidas con los
   precios y los emblemas, o sea en la llamada de dibujo que ya se pagaba.
-- **La cárcel (10, suroeste)**: la comisaría entera. Cuatro bloques del pack (`bloque-d`,
-  `bloque-b`, `bloque-c`, `bloque-a`) cerrando una manzana; el patio en la celda (6, 6),
-  cerrado con cuatro tramos de `verja` y dos `verja-puerta` —una de ellas es la que sube al
-  encerrar a un peón—; dos `coche-patrulla` aparcados en su acera; la calle de delante con
-  su cebra, dos `semaforo-a` y cuatro farolas.
+- **La cárcel (10, suroeste)**: era una manzana de pisos con el patio vallado —cuatro bloques del
+  pack— y desde el aire eso no es una cárcel, es cualquier otra esquina del recinto. Miguel pidió
+  «una cárcel de verdad», y lo que la hace serlo desde arriba no es el edificio sino tres cosas:
+  el **muro** (1,6 de grueso, 7 de alto, por fuera de las dos verjas), las dos **torretas de
+  vigilancia** (5 de lado, 17 de alto, con tejadillo que vuela 1,4) y los seis **barrotes** de la
+  cara del pabellón que da al patio. Más dos pabellones y un ala que cierran el patio por sus
+  otros tres lados, y el patio de hormigón. Todo eso lo levanta `obras.ts` en código.
+  **Lo que sigue siendo pieza del pack es lo que se mueve o ya estaba instanciado**: los cuatro
+  tramos de `verja` y sus dos `verja-puerta` —una sube al encerrar a un peón—, los dos
+  `coche-patrulla`, los semáforos y la calle de delante con su cebra.
+  El patio NO se tocó: sigue siendo la celda (6, 6) de la retícula (12 × 12, centro 402, 402),
+  porque ahí dentro caen los seis huecos de preso.
+  Y su nombre va **sobre la solera** (0,66) y no sobre la losa: el suelo de esta esquina está
+  empedrado, y a 0,08 las letras quedarían debajo del pavimento —invisibles, sin que fallara
+  ninguna cuenta—.
 - **El aparcamiento (20, noroeste)**: era una plaza arbolada con tres terrazas hasta que Miguel
   pidió «un parking que se vea real … con un cartel visible desde arriba que ponga PARKING». Hoy
   la esquina ENTERA es el aparcamiento: el asfalto cubre su cuadro de suelo menos el rincón de

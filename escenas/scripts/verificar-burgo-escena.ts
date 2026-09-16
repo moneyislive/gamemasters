@@ -1157,9 +1157,21 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
    * lo único que un día de prisa puede deshacerse sin querer añadiendo «algo de ambiente».
    */
   comprobar('la salida no lleva ni una pieza: es la flecha y la palabra, y nada más', piezasDeLaEsquina(0).length === 0, piezasDeLaEsquina(0).map((p) => p.pieza));
+  /*
+   * LA CÁRCEL YA NO ES UNA MANZANA DE PISOS. Esta regla contaba cuatro bloques del pack —los
+   * mismos con los que se construye la ciudad— y por eso no veía el problema que vio Miguel: con
+   * ellos, la esquina se leía desde el aire como una manzana con el patio vallado y no como una
+   * cárcel. Los bloques se fueron; el muro, las torretas, los barrotes y los dos pabellones los
+   * levanta `obras.ts`. Lo que esta regla vigila ahora es lo que NO puede irse: la verja con su
+   * hoja que sube —que es una pieza porque se anima— y las dos patrullas.
+   */
   comprobar(
-    'la cárcel es una manzana entera: cuatro bloques, cuatro tramos de verja, dos hojas de puerta, dos patrullas y dos semáforos',
-    cuenta(10, PIEZA.bloqueD) === 1 && cuenta(10, PIEZA.bloqueB) === 1 && cuenta(10, PIEZA.bloqueC) === 1 && cuenta(10, PIEZA.bloqueA) === 1 && cuenta(10, PIEZA.verja) === 4 && cuenta(10, PIEZA.verjaPuerta) === 2 && cuenta(10, PIEZA.cochePatrulla) === 2 && cuenta(10, PIEZA.semaforoA) === 2,
+    'la cárcel conserva sus cuatro tramos de verja, sus dos hojas de puerta, dos patrullas y dos semáforos, y ya no lleva bloques de pisos',
+    cuenta(10, PIEZA.verja) === 4 &&
+      cuenta(10, PIEZA.verjaPuerta) === 2 &&
+      cuenta(10, PIEZA.cochePatrulla) === 2 &&
+      cuenta(10, PIEZA.semaforoA) === 2 &&
+      cuenta(10, PIEZA.bloqueA) + cuenta(10, PIEZA.bloqueB) + cuenta(10, PIEZA.bloqueC) + cuenta(10, PIEZA.bloqueD) === 0,
     piezasDeLaEsquina(10).map((p) => p.pieza),
   );
   /*
@@ -2192,7 +2204,12 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
    * exactamente lo que hacía hasta esta tanda—, las dos reglas de abajo se quedarían en verde
    * sin haber mirado una sola letra, que es la forma más silenciosa de perder un comprobador.
    */
-  comprobar('las reglas de la esquina han mirado las trece letras de SALIDA y PARKING, y no cero', letrasDeEsquinaMiradas === 13, letrasDeEsquinaMiradas);
+  const letrasQueLasEsquinasDeclaran = ESQUINAS.reduce((n, e) => n + [...(ROTULO_DE_LA_CASILLA[e] ?? '')].filter((c) => c !== ' ').length, 0);
+  comprobar(
+    `las reglas de la esquina han mirado las ${String(letrasQueLasEsquinasDeclaran)} letras que las esquinas declaran, y no cero`,
+    letrasDeEsquinaMiradas === letrasQueLasEsquinasDeclaran && letrasQueLasEsquinasDeclaran > 0,
+    { miradas: letrasDeEsquinaMiradas, declaradas: letrasQueLasEsquinasDeclaran },
+  );
   /*
    * ── 2 quater. EL MARGEN DEL TEXTO, QUE ES LO QUE SEPARA UN RÓTULO DE UNA ETIQUETA ──
    *
@@ -2269,8 +2286,9 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
    * de rayos verticales sobre el aparcamiento, y para cada rayo la cara horizontal MÁS ALTA que
    * le sale al paso tiene que mirar al cielo.
    */
-  const carasDeObra = casillasConObra().flatMap((casilla) =>
-    carasDeLaObraEnElMundo(casilla).map((cara) => {
+  const carasDeObraPorCasilla = casillasConObra().map((casilla) => ({
+    casilla,
+    caras: carasDeLaObraEnElMundo(casilla).map((cara) => {
       const [a, b, c] = cara.puntos as readonly (readonly [number, number, number])[];
       const ux = (b as readonly number[])[0]! - (a as readonly number[])[0]!;
       const uy = (b as readonly number[])[1]! - (a as readonly number[])[1]!;
@@ -2293,39 +2311,71 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
         z1: Math.max(...zs),
       };
     }),
-  );
+  }));
+  const carasDeObra = carasDeObraPorCasilla.flatMap((x) => x.caras);
   comprobar('las obras del tablero tienen caras, y ninguna degenerada', carasDeObra.length > 0 && carasDeObra.every((c) => Number.isFinite(c.normalY)), carasDeObra.length);
-  /* La rejilla, sobre la huella de todas las obras juntas. */
-  const huella = {
-    x0: Math.min(...carasDeObra.map((c) => c.x0)),
-    x1: Math.max(...carasDeObra.map((c) => c.x1)),
-    z0: Math.min(...carasDeObra.map((c) => c.z0)),
-    z1: Math.max(...carasDeObra.map((c) => c.z1)),
-  };
+  /*
+   * Y NINGUNA OBRA SE SALE DE SU CASILLA. Es la misma regla que ya tenían las piezas del pack
+   * —«caben enteras en su cuadrado de 108»—, y hacía falta escribirla otra vez porque una obra no
+   * es una pieza: no pasa por `puestasDeLasEsquinas` y aquella regla no la mira. La primera
+   * torreta de vigilancia de la cárcel se salió por aquí: su tejadillo volaba hasta 435 y el
+   * cuadro de una esquina acaba en 432, o sea que asomaba por el borde del tablero al campo.
+   */
+  const obrasFuera: string[] = [];
+  for (const cara of carasDeLasObras()) {
+    const esEsquina = marcoDeCasilla(cara.casilla).esEsquina;
+    for (const [u, , v] of cara.puntos) {
+      if (esEsquina) {
+        if (u < BORDE_INTERIOR - 0.001 || u > MEDIO_LADO + 0.001 || v < BORDE_INTERIOR - 0.001 || v > MEDIO_LADO + 0.001) {
+          obrasFuera.push(`${String(cara.casilla)}: (${u.toFixed(1)}, ${v.toFixed(1)}) fuera de [${String(BORDE_INTERIOR)}, ${String(MEDIO_LADO)}]`);
+        }
+      } else if (Math.abs(u) > ANCHO_DE_CASILLA / 2 + 0.001 || v < -0.001 || v > FONDO_DE_CASILLA + 0.001) {
+        obrasFuera.push(`${String(cara.casilla)}: (${u.toFixed(1)}, ${v.toFixed(1)}) fuera de su casilla`);
+      }
+    }
+  }
+  comprobar('ninguna obra se sale del cuadro de su casilla', obrasFuera.length === 0, obrasFuera.slice(0, 4));
+  comprobar('se ve fallar: un punto a 435 en una esquina estaría fuera, y el cuadro acaba en 432', 435 > MEDIO_LADO);
+
+  /*
+   * La rejilla va POR CASILLA y no sobre la huella de todas juntas: con dos esquinas amuebladas
+   * en extremos opuestos del anillo, una huella única cubre medio tablero y casi todos los rayos
+   * caen en el vacío —se vio: 29 de 289—. Una regla que mira veintinueve rayos no es la lupa
+   * que se quiso escribir.
+   */
   const RAYOS = 17;
   const miradaCenital = (voltearLaDeArriba: boolean): { rayos: number; alReves: number } => {
     let rayos = 0;
     let alReves = 0;
-    for (let i = 0; i < RAYOS; i++) {
-      for (let j = 0; j < RAYOS; j++) {
-        const x = huella.x0 + ((huella.x1 - huella.x0) * (i + 0.5)) / RAYOS;
-        const z = huella.z0 + ((huella.z1 - huella.z0) * (j + 0.5)) / RAYOS;
-        let mejor: (typeof carasDeObra)[number] | null = null;
-        for (const cara of carasDeObra) {
-          if (!cara.horizontal) continue;
-          if (x < cara.x0 || x > cara.x1 || z < cara.z0 || z > cara.z1) continue;
-          if (mejor === null || cara.y > mejor.y) mejor = cara;
+    for (const { caras } of carasDeObraPorCasilla) {
+      if (caras.length === 0) continue;
+      const huella = {
+        x0: Math.min(...caras.map((c) => c.x0)),
+        x1: Math.max(...caras.map((c) => c.x1)),
+        z0: Math.min(...caras.map((c) => c.z0)),
+        z1: Math.max(...caras.map((c) => c.z1)),
+      };
+      for (let i = 0; i < RAYOS; i++) {
+        for (let j = 0; j < RAYOS; j++) {
+          const x = huella.x0 + ((huella.x1 - huella.x0) * (i + 0.5)) / RAYOS;
+          const z = huella.z0 + ((huella.z1 - huella.z0) * (j + 0.5)) / RAYOS;
+          let mejor: (typeof caras)[number] | null = null;
+          for (const cara of caras) {
+            if (!cara.horizontal) continue;
+            if (x < cara.x0 || x > cara.x1 || z < cara.z0 || z > cara.z1) continue;
+            if (mejor === null || cara.y > mejor.y) mejor = cara;
+          }
+          if (mejor === null) continue;
+          rayos++;
+          const normal = voltearLaDeArriba ? -mejor.normalY : mejor.normalY;
+          if (normal <= 0) alReves++;
         }
-        if (mejor === null) continue;
-        rayos++;
-        const normal = voltearLaDeArriba ? -mejor.normalY : mejor.normalY;
-        if (normal <= 0) alReves++;
       }
     }
     return { rayos, alReves };
   };
   const cenital = miradaCenital(false);
-  comprobar(`la lupa cenital de las obras ha mirado ${String(cenital.rayos)} rayos, y no cero`, cenital.rayos >= 100, cenital.rayos);
+  comprobar(`la lupa cenital de las obras ha mirado ${String(cenital.rayos)} rayos sobre ${String(carasDeObraPorCasilla.length)} casillas, y no cero`, cenital.rayos >= 200 && carasDeObraPorCasilla.length >= 2, { rayos: cenital.rayos, casillas: carasDeObraPorCasilla.length });
   comprobar('y ninguna de las caras que se ven desde arriba está del revés', cenital.alReves === 0, cenital.alReves);
   comprobar('se ve fallar: con la de arriba volteada, la lupa las caza todas', miradaCenital(true).alReves === cenital.rayos);
 

@@ -33,7 +33,7 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, BORDE_INTERIOR, FERIA, SUPERFICIE, giroHaciaDentro, marcoDeCasilla, puntoEnEsquina } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, BORDE_INTERIOR, FERIA, MAZMORRA, SUPERFICIE, giroHaciaDentro, marcoDeCasilla, puntoEnEsquina } from './anillo-en-3d';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
 /** Un punto de una obra en las coordenadas de su casilla: `u` y `v` como en `puntoEnEsquina`, `y` a plomo. */
@@ -54,6 +54,12 @@ export const COLOR_DE_OBRA = {
   poste: '#55585c',
   carteloAzul: '#1f4fa8',
   carteloTinta: '#f2f3f5',
+  /* La cárcel: muro y torretas de hormigón, pabellón más oscuro, barrotes casi negros. */
+  muro: '#8e8980',
+  tejado: '#5c584f',
+  pabellon: '#6f6c66',
+  barrote: '#2f2f33',
+  hormigon: '#a6a19a',
 } as const;
 
 /** Un cuadro tumbado a la cota `y`, mirando ARRIBA. El orden sale de la cuenta de la cabecera. */
@@ -189,13 +195,93 @@ export function letrasDeLosCarteles(): LetraEnElTablero[] {
   return [{ letra: 'P', x: p.x, z: p.z, giro: giroHaciaDentro(m) + Math.PI / 4, alto: LA_P_DEL_CARTEL.alto, alza: LA_P_DEL_CARTEL.alza }];
 }
 
+/* ─────────────────── La cárcel (casilla 10) ────────────────── */
+
+/**
+ * LA CÁRCEL, QUE HASTA HOY ERA UNA MANZANA DE PISOS CON UNA VERJA DELANTE.
+ *
+ * Lo pidió Miguel: «la cárcel quiero que se vea como una cárcel de verdad». Y lo que había eran
+ * CUATRO BLOQUES DEL PACK —los mismos `bloque-a`..`bloque-d` con los que se construye la ciudad—
+ * cerrando un patio. Desde el aire eso no es una cárcel: es una manzana con el patio vallado, que
+ * es exactamente lo que se ve en cualquier otra esquina del recinto.
+ *
+ * Lo que hace que una cárcel se lea como cárcel desde arriba no es el edificio, son tres cosas:
+ * el MURO que rodea el recinto, las TORRETAS en sus esquinas y los BARROTES del pabellón. Las
+ * tres se construyen aquí y las tres caben en la malla única de las obras: cero llamadas nuevas.
+ *
+ * Lo que NO se toca: el patio sigue siendo la celda (6, 6) de la retícula —`CELDA`, 12 × 12 con
+ * su centro en (402, 402)— porque ahí dentro caen los seis huecos de preso; la verja y su hoja
+ * que sube siguen siendo piezas del pack, porque la hoja se ANIMA y lo que se mueve no se funde;
+ * y la calle, el aparcamiento y las dos patrullas se quedan donde estaban.
+ */
+const CARCEL = {
+  /* El patio: la celda de la retícula, de 396 a 408 en los dos ejes. */
+  patio: { desde: 396, hasta: 408 },
+  /* El pabellón de celdas, a lo largo del borde de fuera, y el de entrada, al este del patio. */
+  pabellon: { u0: 408, u1: 431, v0: 409, v1: 424, alto: 15 },
+  entrada: { u0: 409, u1: 421, v0: 396, v1: 407, alto: 10 },
+  /* Y el ala que cierra el patio por el cuarto lado, donde estaba el `bloque-b`. */
+  ala: { u0: 396, u1: 408, v0: 409, v1: 421, alto: 12 },
+  /*
+   * El muro: 1,6 de grueso y 7 de alto, por fuera de las dos verjas y sin tocarlas. Acaba en 427
+   * y no en 431 porque en su punta va una torreta, y una torreta son 2,5 de cuerpo más 1,4 de
+   * tejadillo: puesta en 431 asomaba hasta 434,9 y el cuadro de una esquina acaba en 432, o sea
+   * que la cárcel sacaba una esquina al campo. Lo dijo el comprobador antes que el ojo.
+   */
+  muro: { grueso: 1.6, alto: 7, desde: 408, hasta: 427 },
+  /* Las torretas, en las dos puntas del muro: 5 de lado, 17 de alto y un tejadillo que vuela. */
+  torreta: { lado: 5, alto: 17, tejado: { vuelo: 1.4, grueso: 1.2 } },
+  /* Los barrotes del pabellón, en su cara al patio: seis ranuras de 0,9 que vuelan 0,2. */
+  barrotes: { cuantos: 6, ancho: 0.9, vuelo: 0.2, desde: 4, hasta: 12 },
+} as const;
+
+function torreDeVigilancia(casilla: number, u: number, v: number): CaraDeObra[] {
+  const t = CARCEL.torreta;
+  const medio = t.lado / 2;
+  const vuelo = medio + t.tejado.vuelo;
+  return [
+    ...caja(casilla, u - medio, u + medio, v - medio, v + medio, 0, t.alto, COLOR_DE_OBRA.muro),
+    ...caja(casilla, u - vuelo, u + vuelo, v - vuelo, v + vuelo, t.alto, t.alto + t.tejado.grueso, COLOR_DE_OBRA.tejado),
+  ];
+}
+
+function carasDeLaCarcel(): CaraDeObra[] {
+  const c = MAZMORRA;
+  const salida: CaraDeObra[] = [];
+  /* El patio, de hormigón: es lo que se ve debajo de los presos. */
+  salida.push(losa(c, CARCEL.patio.desde, CARCEL.patio.hasta, CARCEL.patio.desde, CARCEL.patio.hasta, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.hormigon));
+  /* Los dos pabellones. */
+  const p = CARCEL.pabellon;
+  salida.push(...caja(c, p.u0, p.u1, p.v0, p.v1, 0, p.alto, COLOR_DE_OBRA.pabellon));
+  const e = CARCEL.entrada;
+  salida.push(...caja(c, e.u0, e.u1, e.v0, e.v1, 0, e.alto, COLOR_DE_OBRA.pabellon));
+  const a = CARCEL.ala;
+  salida.push(...caja(c, a.u0, a.u1, a.v0, a.v1, 0, a.alto, COLOR_DE_OBRA.pabellon));
+  /* Los barrotes, en la cara del pabellón que da al patio. */
+  const b = CARCEL.barrotes;
+  const paso = (p.u1 - p.u0) / (b.cuantos + 1);
+  for (let k = 1; k <= b.cuantos; k++) {
+    const u = p.u0 + paso * k;
+    salida.push(...caja(c, u - b.ancho / 2, u + b.ancho / 2, p.v0 - b.vuelo, p.v0, b.desde, b.hasta, COLOR_DE_OBRA.barrote));
+  }
+  /* El muro, por los dos lados que no cierran los pabellones, empezando donde acaba la verja. */
+  const m = CARCEL.muro;
+  salida.push(...caja(c, m.desde, m.hasta, CARCEL.patio.desde - m.grueso, CARCEL.patio.desde, 0, m.alto, COLOR_DE_OBRA.muro));
+  salida.push(...caja(c, CARCEL.patio.desde - m.grueso, CARCEL.patio.desde, m.desde, m.hasta, 0, m.alto, COLOR_DE_OBRA.muro));
+  /* Y las dos torretas, en las puntas de ese muro. */
+  salida.push(...torreDeVigilancia(c, m.hasta, CARCEL.patio.desde - m.grueso / 2));
+  salida.push(...torreDeVigilancia(c, CARCEL.patio.desde - m.grueso / 2, m.hasta));
+  return salida;
+}
+
+
 /* ──────────────────────────────── Todas las obras ──────────────────────────────── */
 
 let hechas: CaraDeObra[] | null = null;
 
 /** Todas las caras de todas las obras del anillo, en coordenadas de casilla. */
 export function carasDeLasObras(): CaraDeObra[] {
-  if (hechas === null) hechas = [...carasDelAparcamiento()];
+  if (hechas === null) hechas = [...carasDelAparcamiento(), ...carasDeLaCarcel()];
   return hechas;
 }
 
