@@ -1640,6 +1640,334 @@ const GUARISMOS_SUELTOS: readonly Dibujo[] = '0123456789'.split('').map((d) => (
 // ---------------------------------------------------------------------------
 
 /**
+ * ═══ EL ALFABETO DEL TABLERO ═══
+ *
+ * El Burgo tenía diez guarismos y seis emblemas, y ni una letra. Con eso una casilla que no
+ * se compra sólo podía decirse con un dibujo, y las especiales —el Fondo Vecinal, Sucesos,
+ * el Impuesto, la Central Eléctrica— se quedaban en un emblema y un bulto minúsculo. Estas
+ * veintisiete letras son lo que permite ponerles su NOMBRE encima.
+ *
+ * ═══ POR QUÉ SE PUEDEN LEER, QUE ERA LA DUDA ═══
+ *
+ * `LA-CIUDAD.md` mide un glifo de 27 unidades desde la pose de salida: 16,3 px en un PC, 9,9
+ * en una tableta y 5,0 en el móvil — una mancha. Pero mide también a la CERCANÍA DE
+ * SEGUIMIENTO, que es la que la cámara toma sola cada vez que alguien mueve: 82,8 px, 32,8 y
+ * 16,6. Un rótulo se lee cuando se está mirando esa casilla, que es cuando hace falta. Lo que
+ * NO cabe es el renglón de explicación: a la mitad de talla son seis píxeles en el móvil, y
+ * eso sigue yendo al cartel del pie.
+ *
+ * ═══ SE DIBUJAN COMO LOS GUARISMOS, Y POR LA MISMA RAZÓN ═══
+ *
+ * Con `trazo` y con arcos, no con trazos de SVG: analizar SVG en ejecución pide `DOMParser`,
+ * que no existe en React Native, y un rótulo analizado al vuelo se vería en el escritorio y
+ * saldría VACÍO en la app sin un error en ninguna consola. Aquí el arte acaba siendo código.
+ *
+ * ═══ Y NO PASAN POR `revisa`, QUE ES UNA REVISIÓN DE ICONOS ═══
+ *
+ * `revisa` exige que el dibujo llene medio lienzo, que no sea más estrecho que el 55 % de su
+ * lado mayor y que dé ocho triángulos. Son las reglas correctas para un ICONO, que «se
+ * normaliza por su lado mayor al pintarlo»: uno alargado saldría flaco al lado de sus
+ * compañeros. Una letra no se normaliza así —se normaliza por la CAJA COMÚN, como los
+ * guarismos— y es estrecha por naturaleza: la `I` mide 52 de ancho por 400 de alto y sería
+ * rechazada por hacer exactamente lo que tiene que hacer. Por eso llevan `revisaGlifo`, que
+ * comprueba lo que sí importa en una letra: que no se salga del lienzo, que ningún contorno
+ * se pierda al enhebrar y que dé geometría.
+ */
+const ALTO_DE_LA_LETRA = ALTO_DEL_GUARISMO;
+const ANCHO_DE_LA_LETRA = 260;
+
+/** Más fina que la del guarismo (64): una letra tiene más trazos dentro de la misma caja. */
+const GROSOR_DE_LA_LETRA = 52;
+
+const CAJA_DE_LA_LETRA = {
+  x: (LIENZO - ANCHO_DE_LA_LETRA) / 2,
+  y: (LIENZO - ALTO_DE_LA_LETRA) / 2,
+  ancho: ANCHO_DE_LA_LETRA,
+  alto: ALTO_DE_LA_LETRA,
+} as const;
+
+/** El paso de una letra a la siguiente al componer una palabra: la caja más su aire. */
+const AVANCE_DE_LA_LETRA = CAJA_DE_LA_LETRA.ancho + 30;
+
+/** Los cuatro bordes de la caja de una letra, ya metidos medio grosor: se escriben una vez. */
+interface CajaDeLetra {
+  readonly l: number;
+  readonly r: number;
+  readonly t: number;
+  readonly b: number;
+  readonly cx: number;
+  readonly m: number;
+}
+function cajaDeLetra(x: number, y: number, w: number, g: number): CajaDeLetra {
+  return {
+    l: x + g / 2,
+    r: x + w - g / 2,
+    t: y + g / 2,
+    b: y + ALTO_DE_LA_LETRA - g / 2,
+    cx: x + w / 2,
+    m: y + ALTO_DE_LA_LETRA / 2,
+  };
+}
+
+/**
+ * UN ARCO DE ELIPSE: como `arco`, pero con dos radios.
+ *
+ * `arco` es circular, y con él una `C` de 348 de alto saldría del ancho de una moneda. Las
+ * letras son bastante más altas que anchas, así que sus panzas son óvalos. Mismo convenio que
+ * `elipse`: la `y` crece hacia abajo, 90° es arriba y 0° es la derecha.
+ */
+function arcoOval(cx: number, cy: number, rx: number, ry: number, desde: number, hasta: number, lados: number): Punto[] {
+  const puntos: Punto[] = [];
+  for (let i = 0; i <= lados; i++) {
+    const a = ((desde + ((hasta - desde) * i) / lados) * Math.PI) / 180;
+    puntos.push([cx + rx * Math.cos(a), cy - ry * Math.sin(a)]);
+  }
+  return puntos;
+}
+
+/**
+ * LAS VEINTISIETE, cada una en su caja de `ancho × 400` con el origen arriba a la izquierda.
+ *
+ * La `I` lleva pie y sombrero, como el `1` lleva pie: sin ellos es una raya, y una raya al
+ * lado de una `M` no se lee como letra.
+ */
+const LETRAS: Readonly<Record<string, Guarismo>> = {
+  A: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.b], [k.cx, k.t], [k.r, k.b]], g), trazo([[x + w * 0.19, y + ALTO_DE_LA_LETRA * 0.68], [x + w * 0.81, y + ALTO_DE_LA_LETRA * 0.68]], g)];
+  },
+  B: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    const ry = (k.b - k.t) / 4;
+    const rx = Math.min(ry, (k.r - k.l) * 0.62);
+    return [
+      trazo([[k.l, k.t], [k.l, k.b]], g),
+      /* El arco pone él su primer punto: escribirlo aquí además deja dos puntos pegados. */
+      trazo([[k.l, k.t], ...arcoOval(k.l + rx * 0.2, k.t + ry, rx, ry, 90, -90, 10), [k.l, k.t + 2 * ry]], g),
+      trazo([[k.l, k.m], ...arcoOval(k.l + rx * 0.3, k.m + ry, rx, ry, 90, -90, 10), [k.l, k.b]], g),
+    ];
+  },
+  C: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo(arcoOval(k.cx, k.m, (k.r - k.l) / 2, (k.b - k.t) / 2, 55, 305, 18), g)];
+  },
+  D: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [
+      trazo([[k.l, k.t], [k.l, k.b]], g),
+      trazo([[k.l, k.t], ...arcoOval(k.cx - (k.r - k.l) * 0.1, k.m, (k.r - k.l) * 0.6, (k.b - k.t) / 2, 90, -90, 14), [k.l, k.b]], g),
+    ];
+  },
+  E: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.r, k.t], [k.l, k.t], [k.l, k.b], [k.r, k.b]], g), trazo([[k.l, k.m], [k.r - (k.r - k.l) * 0.16, k.m]], g)];
+  },
+  F: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.r, k.t], [k.l, k.t], [k.l, k.b]], g), trazo([[k.l, k.m], [k.r - (k.r - k.l) * 0.16, k.m]], g)];
+  },
+  G: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    const rx = (k.r - k.l) / 2;
+    return [
+      trazo(arcoOval(k.cx, k.m, rx, (k.b - k.t) / 2, 55, 310, 18), g),
+      trazo([[k.r, k.m + (k.b - k.t) * 0.06], [k.r, k.m], [k.cx + rx * 0.1, k.m]], g),
+    ];
+  },
+  H: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.t], [k.l, k.b]], g), trazo([[k.r, k.t], [k.r, k.b]], g), trazo([[k.l, k.m], [k.r, k.m]], g)];
+  },
+  I: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    const a = (k.r - k.l) * 0.32;
+    return [trazo([[k.cx, k.t], [k.cx, k.b]], g), trazo([[k.cx - a, k.t], [k.cx + a, k.t]], g), trazo([[k.cx - a, k.b], [k.cx + a, k.b]], g)];
+  },
+  J: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    const ry = (k.b - k.t) * 0.22;
+    return [trazo([[k.r, k.t], ...arcoOval(k.r - (k.r - k.l) * 0.36, k.b - ry, (k.r - k.l) * 0.36, ry, 0, -160, 10)], g)];
+  },
+  K: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.t], [k.l, k.b]], g), trazo([[k.r, k.t], [k.l, k.m]], g), trazo([[k.l, k.m], [k.r, k.b]], g)];
+  },
+  L: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.t], [k.l, k.b], [k.r, k.b]], g)];
+  },
+  M: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.b], [k.l, k.t], [k.cx, k.m], [k.r, k.t], [k.r, k.b]], g)];
+  },
+  N: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.b], [k.l, k.t], [k.r, k.b], [k.r, k.t]], g)];
+  },
+  O: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return anillo(k.cx, k.m, (k.r - k.l) / 2 + g / 2, (k.b - k.t) / 2 + g / 2, g);
+  },
+  P: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    const ry = (k.b - k.t) / 4;
+    const rx = Math.min(ry * 1.2, (k.r - k.l) * 0.66);
+    return [
+      trazo([[k.l, k.t], [k.l, k.b]], g),
+      trazo([[k.l, k.t], ...arcoOval(k.l + rx * 0.25, k.t + ry, rx, ry, 90, -90, 10), [k.l, k.t + 2 * ry]], g),
+    ];
+  },
+  Q: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [
+      ...anillo(k.cx, k.m - (k.b - k.t) * 0.04, (k.r - k.l) / 2 + g / 2, (k.b - k.t) / 2 - (k.b - k.t) * 0.04 + g / 2, g),
+      trazo([[k.cx + (k.r - k.l) * 0.12, k.b - (k.b - k.t) * 0.22], [k.r, k.b]], g),
+    ];
+  },
+  R: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    const ry = (k.b - k.t) / 4;
+    const rx = Math.min(ry * 1.2, (k.r - k.l) * 0.6);
+    return [
+      trazo([[k.l, k.t], [k.l, k.b]], g),
+      trazo([[k.l, k.t], ...arcoOval(k.l + rx * 0.25, k.t + ry, rx, ry, 90, -90, 10), [k.l, k.t + 2 * ry]], g),
+      trazo([[k.l + (k.r - k.l) * 0.28, k.t + 2 * ry], [k.r, k.b]], g),
+    ];
+  },
+  S: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    const rx = (k.r - k.l) / 2;
+    const ry = (k.b - k.t) / 4;
+    return [
+      trazo([...arcoOval(k.cx, k.t + ry, rx, ry, 20, 200, 12), ...arcoOval(k.cx, k.b - ry, rx, ry, 180, 380, 12)], g),
+    ];
+  },
+  T: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.t], [k.r, k.t]], g), trazo([[k.cx, k.t], [k.cx, k.b]], g)];
+  },
+  U: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    const ry = (k.b - k.t) * 0.3;
+    return [trazo([[k.l, k.t], ...arcoOval(k.cx, k.b - ry, (k.r - k.l) / 2, ry, 180, 360, 12), [k.r, k.t]], g)];
+  },
+  V: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.t], [k.cx, k.b], [k.r, k.t]], g)];
+  },
+  W: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.t], [x + w * 0.29, k.b], [k.cx, y + ALTO_DE_LA_LETRA * 0.52], [x + w * 0.71, k.b], [k.r, k.t]], g)];
+  },
+  X: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    /*
+     * EL ASPA ENTERA Y LA OTRA EN DOS MITADES, y no dos diagonales cruzadas.
+     *
+     * Todo lo que sale de `trazo` es MACIZO (acaba en `macizo`), así que dos cintas largas
+     * que se cruzan tienen el mismo enrollado y se solapan: `toShapes` descarta una «por
+     * repetición» —lo avisa la cabecera de `tira`— y la equis se quedaba con un aspa, sin que
+     * fallara nada en pantalla. Lo cazó `revisaGlifo` contando contornos a la entrada y a la
+     * salida.
+     *
+     * Partida en tres trozos que se TOCAN pero no se montan, las tres son formas propias. El
+     * hueco de `g * 0.7` es el que deja la primera cinta al pasar por el centro.
+     */
+    const d = g * 0.7;
+    return [
+      trazo([[k.l, k.t], [k.r, k.b]], g),
+      trazo([[k.r, k.t], [k.cx + d, k.m - d]], g),
+      trazo([[k.cx - d, k.m + d], [k.l, k.b]], g),
+    ];
+  },
+  Y: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.t], [k.cx, k.m], [k.r, k.t]], g), trazo([[k.cx, k.m], [k.cx, k.b]], g)];
+  },
+  Z: (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    return [trazo([[k.l, k.t], [k.r, k.t], [k.l, k.b], [k.r, k.b]], g)];
+  },
+  /* La eñe: la ene encogida hacia el pie y la tilde encima, con su onda de tres puntos. */
+  'N~': (x, y, w, g) => {
+    const k = cajaDeLetra(x, y, w, g);
+    const encoge = (v: number, i: number): number => (i % 2 === 0 ? v : k.b - (k.b - v) * 0.8);
+    const ene = [trazo([[k.l, k.b], [k.l, k.t], [k.r, k.b], [k.r, k.t]], g)].map((c) => c.map(encoge));
+    const ty = y + ALTO_DE_LA_LETRA * 0.08;
+    return [...ene, trazo([[x + w * 0.24, ty + 14], [x + w * 0.38, ty - 8], [x + w * 0.62, ty + 14], [x + w * 0.76, ty - 8]], g * 0.8)];
+  },
+};
+
+/** Una letra, como `guarismo`: se busca por su llave y se dibuja donde le digan. */
+function letra(cual: string, x0: number, ancho: number, grosor: number): number[][] {
+  const traza = LETRAS[cual];
+  if (!traza) {
+    console.error(`no hay dibujo para la letra «${cual}».`);
+    process.exit(2);
+  }
+  return traza(x0, CAJA_DE_LA_LETRA.y, ancho, grosor);
+}
+
+/**
+ * LA REVISIÓN DE UN GLIFO, que no es la de un icono. Ver la cabecera del alfabeto.
+ *
+ * Comprueba lo que de verdad puede salir mal en una letra: que se salga del lienzo, que un
+ * contorno se pierda en silencio al enhebrar —`toShapes` descarta sin avisar lo que no cambia
+ * nada— y que dé geometría. Lo que NO comprueba es la proporción ni el tamaño: una letra es
+ * estrecha a propósito y se normaliza por la caja común, no por su lado mayor.
+ */
+function revisaGlifo(nombre: string, contornos: readonly number[][]): { contornos: number; puntos: number; triangulos: number } {
+  const donde = `la letra ${nombre}`;
+  if (contornos.length === 0 || contornos.length > 12) {
+    console.error(`${donde} tiene ${String(contornos.length)} contornos, y el trato son doce como mucho.`);
+    process.exit(2);
+  }
+  let puntos = 0;
+  for (const contorno of contornos) {
+    if (contorno.length < 6) {
+      console.error(`${donde} trae un contorno de menos de tres puntos.`);
+      process.exit(2);
+    }
+    for (let i = 0; i + 1 < contorno.length; i += 2) {
+      const px = contorno[i] as number;
+      const py = contorno[i + 1] as number;
+      if (px < 0 || px > LIENZO || py < 0 || py > LIENZO) {
+        console.error(`${donde} se sale del lienzo por (${String(Math.round(px))}, ${String(Math.round(py))}).`);
+        process.exit(2);
+      }
+      puntos++;
+    }
+  }
+  const camino = new ShapePath();
+  for (const contorno of contornos) {
+    camino.moveTo(contorno[0] as number, contorno[1] as number);
+    for (let i = 2; i + 1 < contorno.length; i += 2) camino.lineTo(contorno[i] as number, contorno[i + 1] as number);
+  }
+  const formas = camino.toShapes();
+  const aprovechados = formas.reduce((total, f) => total + 1 + f.holes.length, 0);
+  if (aprovechados !== contornos.length) {
+    console.error(`${donde} entra con ${String(contornos.length)} contornos y sale con ${String(aprovechados)}: `.concat('`toShapes` ha descartado alguno por no cambiar nada.'));
+    process.exit(2);
+  }
+  const geometria = geometriaDeContornos(contornos);
+  if (geometria === null) {
+    console.error(`${donde} no da geometría.`);
+    process.exit(2);
+  }
+  const triangulos = cuantosTriangulos(geometria);
+  geometria.dispose();
+  return { contornos: contornos.length, puntos, triangulos };
+}
+
+const LETRAS_SUELTAS: readonly { llave: string; que: string; contornos: number[][] }[] = Object.keys(LETRAS).map((c) => ({
+  llave: c === 'N~' ? 'Ñ' : c,
+  que: `La letra ${c === 'N~' ? 'Ñ' : c}, en la caja común de todas: ${String(ANCHO_DE_LA_LETRA)} × ${String(ALTO_DE_LA_LETRA)} centrada en el lienzo.`,
+  contornos: letra(c, CAJA_DE_LA_LETRA.x, CAJA_DE_LA_LETRA.ancho, GROSOR_DE_LA_LETRA),
+}));
+
+// ---------------------------------------------------------------------------
+
+/**
  * ═══ LOS EMBLEMAS DE LAS CASILLAS QUE NO SE COMPRAN ═══
  *
  * De las cuarenta casillas del Burgo, veintiocho llevan un precio y con eso se leen. Las
@@ -1840,6 +2168,16 @@ for (const dibujo of [...CARTAS, SAL, ...CIFRAS, ...GUARISMOS_SUELTOS, ...EMBLEM
   revisiones.set(dibujo.carta, revisa(dibujo));
 }
 
+/* Las letras van por su propia revisión, y el porqué está en la cabecera del alfabeto. */
+const revisionesDeLetras = new Map<string, ReturnType<typeof revisaGlifo>>();
+for (const l of LETRAS_SUELTAS) {
+  if (revisionesDeLetras.has(l.llave)) {
+    console.error(`Hay dos letras con la llave ${l.llave}.`);
+    process.exit(2);
+  }
+  revisionesDeLetras.set(l.llave, revisaGlifo(l.llave, l.contornos));
+}
+
 // ---------------------------------------------------------------------------
 
 function comoTira(contorno: readonly number[]): string {
@@ -1878,6 +2216,10 @@ const cuerpoDeLosGuarismos = GUARISMOS_SUELTOS.map(
 
 const cuerpoDeLosEmblemas = EMBLEMAS.map(
   (d) => `  /** ${d.que} */\n  ${llaveDe(d)}: [\n${d.contornos.map(comoTira).join('\n')}\n  ],`,
+).join('\n');
+
+const cuerpoDeLasLetras = LETRAS_SUELTAS.map(
+  (d) => `  /** ${d.que} */\n  '${d.llave}': [\n${d.contornos.map(comoTira).join('\n')}\n  ],`,
 ).join('\n');
 
 const salida = `/**
@@ -2046,6 +2388,39 @@ export const CAJA_DEL_GUARISMO = {
 export const AVANCE_DEL_GUARISMO = ${String(AVANCE_DEL_GUARISMO)};
 
 /**
+ * ═══ EL ALFABETO DEL TABLERO: LAS VEINTISIETE LETRAS ═══
+ *
+ * Con esto una casilla puede llevar su NOMBRE encima y no sólo un emblema. Se componen igual
+ * que un precio: se escalan TODAS por \`CAJA_DE_LA_LETRA\` —no por la caja de cada una, que
+ * pondría la \`I\` tan ancha como la \`M\`— y se separan \`AVANCE_DE_LA_LETRA\`.
+ *
+ * La eñe está bajo la llave \`Ñ\`. No hay vocales acentuadas: un rótulo de tablero va en
+ * mayúsculas y el acento, a esta talla, es un punto de tres píxeles que ensucia más que ayuda.
+ *
+ * Lo que se lee y lo que no está medido en \`docs/burgo/LA-CIUDAD.md\`: desde la pose de salida
+ * un glifo de 27 unidades es una mancha (5 px en el móvil), pero a la cercanía de seguimiento
+ * —la que la cámara toma sola al mover— son 16,6 px en el móvil y 82,8 en un PC. Un NOMBRE se
+ * lee; un renglón de explicación, no, y ése va al cartel del pie.
+ */
+export const CONTORNOS_DE_LA_LETRA: Readonly<Record<string, readonly (readonly number[])[]>> = {
+${cuerpoDeLasLetras}
+};
+
+/** Las letras que tienen dibujo. Sirve para comprobar que no falta ninguna. */
+export const LETRAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_LETRA);
+
+/** La caja común de todas las letras, dentro del lienzo de ${String(LIENZO)}: por aquí se escalan todas. */
+export const CAJA_DE_LA_LETRA = {
+  x: ${String(CAJA_DE_LA_LETRA.x)},
+  y: ${String(CAJA_DE_LA_LETRA.y)},
+  ancho: ${String(CAJA_DE_LA_LETRA.ancho)},
+  alto: ${String(CAJA_DE_LA_LETRA.alto)},
+} as const;
+
+/** Cuánto avanza el sitio de una letra a la siguiente al componer una palabra. */
+export const AVANCE_DE_LA_LETRA = ${String(AVANCE_DE_LA_LETRA)};
+
+/**
  * LOS EMBLEMAS DE LAS CASILLAS DEL BURGO QUE NO SE COMPRAN.
  *
  * De las cuarenta casillas, veintiocho llevan precio y con eso se leen; cuatro son las
@@ -2075,7 +2450,8 @@ fs.writeFileSync(DESTINO, salida, 'utf8');
 const kb = (salida.length / 1024).toFixed(1);
 console.log(
   `\n  ${String(iconos.length + 1)} bienes + ${String(CARTAS.length)} cartas + ${String(CIFRAS.length)} cifras + ` +
-    `${String(GUARISMOS_SUELTOS.length)} guarismos + ${String(EMBLEMAS.length)} emblemas · ${kb} kB en ` +
+    `${String(GUARISMOS_SUELTOS.length)} guarismos + ${String(EMBLEMAS.length)} emblemas + ` +
+    `${String(LETRAS_SUELTAS.length)} letras · ${kb} kB en ` +
     `${path.relative(RAIZ, DESTINO)}`,
 );
 for (const i of iconos) {
@@ -2091,3 +2467,15 @@ for (const [carta, medida] of revisiones) {
       `${carta === SAL.carta ? '   (bien, dibujada en casa)' : ''}`,
   );
 }
+
+/*
+ * Y LAS LETRAS EN UN RENGLÓN, que son veintisiete y una por línea sería media pantalla. Lo
+ * que interesa de ellas en conjunto es el coste: se compone una PALABRA, no una letra.
+ */
+const trianguloDeLaLetra = [...revisionesDeLetras.values()].reduce((total, m) => total + m.triangulos, 0);
+console.log(
+  `    ${'alfabeto'.padEnd(14)} ${String(revisionesDeLetras.size)} letras · ` +
+    `${String(trianguloDeLaLetra)} triángulos en total · ` +
+    `${String(Math.round(trianguloDeLaLetra / Math.max(1, revisionesDeLetras.size)))} por letra ` +
+    `(${[...revisionesDeLetras.keys()].join('')})`,
+);
