@@ -1229,6 +1229,13 @@ export const COCHE_SOBRE_EL_ASFALTO = 0.786;
 export const RUEDAS_BAJO_EL_ORIGEN = 0.366;
 /** Lo que se alza el asfalto pintado de una obra sobre el suelo de su casilla, sin pelearse en profundidad. */
 export const ALZA_DEL_ASFALTO = 0.05;
+/**
+ * Lo que se alza una LOSA de obra en las dos esquinas empedradas (la 10 y la 30): justo por encima
+ * de la cara de arriba de la `solera` y la `calzada` del pack, que están a 0,6, y por debajo de los
+ * rótulos, a 0,66. A `ALZA_DEL_ASFALTO` quedaban debajo del empedrado: el patio de hormigón de la
+ * Comisaría no se veía nada, y el suelo de la celda del cuartel salía mitad losa de acera.
+ */
+export const SOBRE_EL_EMPEDRADO = 0.62;
 /** Y lo que sube un coche aparcado encima de ese asfalto. */
 export const COCHE_SOBRE_EL_APARCAMIENTO = ALZA_DEL_ASFALTO + RUEDAS_BAJO_EL_ORIGEN;
 /** Y lo que sube sobre una `solera`, cuya cara de arriba está a 0,6 y no a 0,42. */

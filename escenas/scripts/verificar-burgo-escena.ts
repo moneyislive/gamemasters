@@ -56,11 +56,13 @@ import {
   ALTURA_DEL_MANTO,
   ALTURA_DE_LAS_NUBES,
   ALTURA_DEL_REBORDE,
+  ALZA_DEL_ASFALTO,
   A_LA_MAZMORRA,
   CELDA_DEL_CUARTEL,
   DENTRO_DE_LA_CELDA,
   PASO_HACIA_LA_CELDA,
   PUERTA_DE_LA_CELDA,
+  SOBRE_EL_EMPEDRADO,
   SUBIDA_DE_LA_REJA,
   ANCHO_DE_CASILLA,
   ANCHO_DE_TESELA,
@@ -3332,6 +3334,51 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       cara.color !== COLOR_DE_OBRA.agua ? [cara] : [cara, { color: COLOR_DE_OBRA.hormigon, puntos: cara.puntos.map((q) => [q[0], q[1] + 0.25, q[2]] as const) as unknown as CaraEnElMundoDeObra['puntos'] }],
     );
     comprobar('se ve fallar: con la tapa de hormigón por encima, como estuvo, el agua no se ve en ningún rayo', loQueSeVeDe(conTapa, COLOR_DE_OBRA.agua).vistos === 0);
+  }
+
+  /*
+   * Y LO QUE UNA OBRA PONE EN EL SUELO DE UNA ESQUINA EMPEDRADA NO QUEDA DEBAJO DEL EMPEDRADO.
+   *
+   * La 10 y la 30 van llenas de `solera` y `calzada` del pack, que suben a 0,6, y el patio de hormigón
+   * de la Comisaría y el suelo de la celda del cuartel estaban a 0,05: el patio no se veía nada y la
+   * celda salía mitad losa de acera. Así que toda losa de obra de esas dos esquinas se compara con
+   * las cajas de verdad de las piezas de suelo que pisa, sacadas del `burgo.glb`.
+   */
+  {
+    const tapadasPorElEmpedrado = (caras: readonly { readonly casilla: number; readonly puntos: readonly (readonly number[])[] }[]): string[] => {
+      const salida: string[] = [];
+      for (const esquina of [MAZMORRA, A_LA_MAZMORRA]) {
+        const suelos = (PIEZAS_DE_LA_ESQUINA[esquina] ?? [])
+          .filter((pieza) => esSuelo(pieza.pieza))
+          .map((pieza) => {
+            const h = huella(pieza.pieza);
+            const ancho = pieza.giroEnCuartos % 2 === 0 ? h.ancho : h.fondo;
+            const fondo = pieza.giroEnCuartos % 2 === 0 ? h.fondo : h.ancho;
+            return { u0: pieza.u - ancho / 2, u1: pieza.u + ancho / 2, v0: pieza.v - fondo / 2, v1: pieza.v + fondo / 2, arriba: (pieza.alza ?? 0) + caja(pieza.pieza).max[1] };
+          });
+        for (const cara of caras.filter((x) => x.casilla === esquina)) {
+          const ys = cara.puntos.map((q) => q[1] as number);
+          const y = ys[0] as number;
+          if (Math.max(...ys) - Math.min(...ys) > 1e-6 || y <= 0.001) continue;
+          const us = cara.puntos.map((q) => q[0] as number);
+          const vs = cara.puntos.map((q) => q[2] as number);
+          const [u0, u1, v0, v1] = [Math.min(...us), Math.max(...us), Math.min(...vs), Math.max(...vs)];
+          if ((u1 - u0) * (v1 - v0) < 1) continue;
+          const tapada = suelos
+            .filter((suelo) => suelo.arriba > y + 1e-3)
+            .reduce((area, suelo) => area + Math.max(0, Math.min(u1, suelo.u1) - Math.max(u0, suelo.u0)) * Math.max(0, Math.min(v1, suelo.v1) - Math.max(v0, suelo.v0)), 0);
+          if (tapada > 0.01) salida.push(`${String(esquina)}: la losa a ${String(y)} de ${String(r(u0))}..${String(r(u1))} × ${String(r(v0))}..${String(r(v1))} tiene ${String(r(tapada))} debajo del empedrado`);
+        }
+      }
+      return salida;
+    };
+    const tapadas = tapadasPorElEmpedrado(carasDeLasObras());
+    comprobar('ninguna losa de obra de la 10 ni de la 30 queda debajo del empedrado del pack', tapadas.length === 0, tapadas.slice(0, 3));
+    /* La vacuna: las mismas losas a la cota de antes, `ALZA_DEL_ASFALTO`. */
+    const comoEstaban = carasDeLasObras().map((cara) =>
+      cara.puntos.every((q) => q[1] === SOBRE_EL_EMPEDRADO) ? { ...cara, puntos: cara.puntos.map((q) => [q[0], ALZA_DEL_ASFALTO, q[2]]) } : cara,
+    );
+    comprobar('se ve fallar: con el patio y el suelo de la celda a 0,05, como estuvieron, los dos quedan debajo', tapadasPorElEmpedrado(comoEstaban).length === 2, tapadasPorElEmpedrado(comoEstaban));
   }
 
   comprobar('y avanza hacia −(fuera + adelante), que es la derecha de quien mira una esquina desde su diagonal', delRevesEnEsquina.length === 0, delRevesEnEsquina);

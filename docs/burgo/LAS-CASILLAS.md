@@ -254,6 +254,11 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
      de las obras daba verde porque la tapa miraba arriba como debe; preguntaba si lo primero que se
      ve mira arriba, no QUÉ es. La alberca es ahora hueca, y una regla exige que el agua y las bocas
      de las torres de la central sean lo primero que corta cada rayo que cae sobre ellas.
+   - **Y dos losas bajo el empedrado:** la 10 y la 30 van llenas de `solera` y `calzada` del pack,
+     que suben a 0,6, y el patio de hormigón de la Comisaría y el suelo de la celda del cuartel
+     estaban a 0,05. El patio no se veía nada y la celda salía mitad losa de acera. Van ahora a
+     `SOBRE_EL_EMPEDRADO` (0,62, por debajo de los rótulos), y una regla compara cada losa de obra de
+     esas dos esquinas con las cajas de verdad de las piezas de suelo que pisa.
    - **Y los dos servicios, que eran las únicas casillas especiales sin movimiento:** al pagar la
      renta de la Luz salen tres bocanadas por la chimenea, y al pagar la del Agua se abre una onda en
      la alberca. Las bocanadas van en gris carbón: el gris claro no se distinguía del crema del

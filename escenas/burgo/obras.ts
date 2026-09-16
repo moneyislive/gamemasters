@@ -33,7 +33,7 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, CELDA_DEL_CUARTEL, FERIA, MARGEN_DEL_TEXTO, MAZMORRA, PUERTAS, SUPERFICIE, anchoDeLaPalabra, giroHaciaDentro, giroHaciaFuera, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, CELDA_DEL_CUARTEL, FERIA, SOBRE_EL_EMPEDRADO, MARGEN_DEL_TEXTO, MAZMORRA, PUERTAS, SUPERFICIE, anchoDeLaPalabra, giroHaciaDentro, giroHaciaFuera, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
@@ -347,8 +347,8 @@ function torreDeVigilancia(casilla: number, u: number, v: number): CaraDeObra[] 
 function carasDeLaMazmorra(): CaraDeObra[] {
   const c = MAZMORRA;
   const salida: CaraDeObra[] = [];
-  /* El patio, de hormigón: es lo que se ve debajo de los presos. */
-  salida.push(losa(c, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.hormigon));
+  /* El patio, de hormigón: es lo que se ve debajo de los presos. Por encima del empedrado, que si no lo tapa. */
+  salida.push(losa(c, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, SOBRE_EL_EMPEDRADO, COLOR_DE_OBRA.hormigon));
   /* Los dos pabellones. */
   const p = RECINTO_DE_LA_MAZMORRA.pabellon;
   salida.push(...caja(c, p.u0, p.u1, p.v0, p.v1, 0, p.alto, COLOR_DE_OBRA.pabellon));
@@ -418,7 +418,7 @@ function carasDeLaComisaria(): CaraDeObra[] {
   salida.push(...caja(c, mu - f.lado / 2, mu + f.lado / 2, mv - f.lado / 2, mv + f.lado / 2, f.desde, f.hasta, COLOR_DE_OBRA.farolAzul));
   /* La celda: suelo, tres paredes y la reja del cuarto lado. Sin techo, que es el porqué de todo. */
   const ce = COMISARIA.celda;
-  salida.push(losa(c, ce.u0, ce.u1, ce.v0, ce.v1, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.hormigon));
+  salida.push(losa(c, ce.u0, ce.u1, ce.v0, ce.v1, SOBRE_EL_EMPEDRADO, COLOR_DE_OBRA.hormigon));
   /* Tres paredes —la de atrás, la del cuartel y la del fondo—; el cuarto lado, el `u0`, es la reja. */
   salida.push(...caja(c, ce.u0, ce.u1, ce.v1 - ce.pared, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
   salida.push(...caja(c, ce.u0, ce.u1, ce.v0, ce.v0 + ce.pared, 0, ce.alto, COLOR_DE_OBRA.muro));
