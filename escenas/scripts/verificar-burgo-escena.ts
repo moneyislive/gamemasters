@@ -123,6 +123,11 @@ import {
   TALLA_DE_LA_CASA,
   V_DEL_PRECIO,
   V_DE_LAS_CASAS,
+  ALTO_MAXIMO_DEL_ROTULO,
+  ANCHO_DEL_ROTULO,
+  MARGEN_DEL_PRECIO,
+  MARGEN_DEL_TEXTO,
+  ROTULO_DE_LA_CASILLA,
   altoDelRotulo,
   anchoDeLaPalabra,
   anchoDelPrecio,
@@ -158,6 +163,8 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
+import { carasDeLaObraEnElMundo, carasDeLasObras, casillasConObra, letrasDeLosCarteles, triangulosDeLasObras } from '../burgo/obras';
+import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
 import {
@@ -408,18 +415,31 @@ comprobar(
   { FRANJA, FILETE, SUPERFICIE, BORDE_CLARO },
 );
 comprobar('la línea de la marcha es el centro del filete (349,5), o sea v = 25,5', LINEA_DE_LA_MARCHA === 349.5 && vDeRadial(LINEA_DE_LA_MARCHA) === 25.5);
-comprobar('el reborde de la franja mide lo que un bordillo del pack (0,6) y el precio va a v = 45 con dígitos de 27', ALTURA_DEL_REBORDE === 0.6 && V_DEL_PRECIO === 45 && ALTO_DEL_GUARISMO === 27);
+comprobar('el reborde de la franja mide lo que un bordillo del pack (0,6) y el precio va a v = 45 con dígitos de 25', ALTURA_DEL_REBORDE === 0.6 && V_DEL_PRECIO === 45 && ALTO_DEL_GUARISMO === 25);
 /*
- * EL DÍGITO CRECE CON EL TABLERO O DEJA DE LEERSE. Lo que se ve en pantalla no es el alto en
- * unidades: es el cociente `alto / alcance de la cámara`. Si el tablero se hace 2,25 veces
- * más grande y el dígito no, el precio pierde 2,25 veces sus píxeles sin que nada falle.
- * Esta línea afirma que el cociente NO ha cambiado desde el tablero de 384, que es lo que
- * hace que los píxeles medidos más abajo salgan iguales que entonces.
+ * EL DÍGITO, ENTRE DOS PAREDES: EL MARGEN DE SU CASILLA Y LOS PÍXELES QUE SE MIDIERON.
+ *
+ * Este número fue 27, y su razón estaba escrita como una proporción: 27/570,24 es exactamente
+ * 12/253,44, o sea que el dígito conservaba los píxeles del tablero de 384 al crecer el recinto.
+ * Lo que esa cuenta no miraba lo vio Miguel: «los textos tienen que tener un margen para que
+ * queden estéticos, ahora mismo ocupan de extremo a extremo». Y a 27 no hay margen que dar: tres
+ * dígitos miden 66,15 de los 72 de la casilla, y aunque se juntaran hasta TOCARSE seguirían
+ * midiendo 60,75. Así que el 27 cae, y con él la proporción exacta con el tablero de 384.
+ *
+ * Lo que lo sustituye no es un número a ojo, son dos paredes: el mayor alto que deja el 7 % de la
+ * casilla libre a cada lado, y el menor que las dos medidas de píxeles de más abajo aguantan
+ * —4,63 px desde la pose de salida y 15,4 al seguir, contra los suelos medidos de 4,5 y 15—.
+ * Entre las dos sólo cabe el 25. Y el 12 % que tienen los nombres pediría 22,3, que deja el móvil
+ * en 4,1 y 13,7: por debajo de los dos. Eso es una decisión de Miguel, no una cuenta.
  */
 comprobar(
-  'el dígito conserva su proporción con el alcance: 27/570,24 es lo mismo que 12/253,44',
-  Math.abs(ALTO_DEL_GUARISMO / ALCANCE_DEL_BURGO - 12 / 253.44) < 1e-9,
-  { ahora: ALTO_DEL_GUARISMO / ALCANCE_DEL_BURGO, antes: 12 / 253.44 },
+  `el dígito es el mayor que deja margen en su casilla: tres cifras miden ${anchoDelPrecio(37).toFixed(2)} de los 72`,
+  ALTO_DEL_GUARISMO === 25 && Math.abs(anchoDelPrecio(37) - 61.25) < 1e-9,
+  { alto: ALTO_DEL_GUARISMO, tresCifras: anchoDelPrecio(37) },
+);
+comprobar(
+  'se ve fallar: con el 27 de ayer, tres cifras medirían 66,15 y no cabrían en el margen',
+  66.15 > ANCHO_DE_CASILLA * (1 - 2 * MARGEN_DEL_PRECIO) && 61.25 <= ANCHO_DE_CASILLA * (1 - 2 * MARGEN_DEL_PRECIO),
 );
 comprobar('la polilínea tiene 40 puntos', POLILINEA.length === 40, POLILINEA.length);
 
@@ -1142,14 +1162,20 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
     cuenta(10, PIEZA.bloqueD) === 1 && cuenta(10, PIEZA.bloqueB) === 1 && cuenta(10, PIEZA.bloqueC) === 1 && cuenta(10, PIEZA.bloqueA) === 1 && cuenta(10, PIEZA.verja) === 4 && cuenta(10, PIEZA.verjaPuerta) === 2 && cuenta(10, PIEZA.cochePatrulla) === 2 && cuenta(10, PIEZA.semaforoA) === 2,
     piezasDeLaEsquina(10).map((p) => p.pieza),
   );
+  /*
+   * EL APARCAMIENTO, que era una plaza arbolada con tres terrazas hasta que Miguel pidió «un
+   * parking que se vea real». Lo que lo hace legible desde el aire son los HUECOS: catorce coches
+   * en sesenta plazas. Lleno se leería como un atasco, y vacío como una pista de tenis.
+   */
+  const cochesDelAparcamiento = cuenta(20, PIEZA.cocheBerlina) + cuenta(20, PIEZA.cocheUtilitario) + cuenta(20, PIEZA.cocheFamiliar) + cuenta(20, PIEZA.cocheTaxi);
   comprobar(
-    'el descanso es una plaza arbolada: tres mesas, doce sillas, seis arbustos, cuatro bancos, cuatro farolas de parque y siete árboles',
-    cuenta(20, PIEZA.mesaRedonda) === 3 &&
-      cuenta(20, PIEZA.silla) === 12 &&
-      cuenta(20, PIEZA.arbusto) === 6 &&
-      cuenta(20, PIEZA.bancoDeParque) === 4 &&
-      cuenta(20, PIEZA.farolaDeParque) === 4 &&
-      cuenta(20, PIEZA.pino) + cuenta(20, PIEZA.pinoGrande) + cuenta(20, PIEZA.pinoPequeno) === 7,
+    'el aparcamiento tiene catorce coches en sus sesenta plazas, dos farolas en la calle de en medio y su rincón verde',
+    cochesDelAparcamiento === 14 &&
+      cuenta(20, PIEZA.farolaDeCalle) === 2 &&
+      cuenta(20, PIEZA.pinoPequeno) === 2 &&
+      cuenta(20, PIEZA.arbusto) === 1 &&
+      cuenta(20, PIEZA.mesaRedonda) === 0 &&
+      cuenta(20, PIEZA.silla) === 0,
     piezasDeLaEsquina(20).map((p) => p.pieza),
   );
   comprobar(
@@ -1167,7 +1193,7 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
   const piezasPorEsquina = ESQUINAS.map((e) => piezasDeLaEsquina(e).length);
   /* Las TRES amuebladas; la salida se quedó a propósito sin nada y la vigila su propia regla. */
   const amuebladas = ESQUINAS.filter((e) => e !== 0).map((e) => piezasDeLaEsquina(e).length);
-  comprobar('y ninguna de las otras tres se queda en cuatro losas: las tres pasan de treinta piezas', amuebladas.every((n) => n >= 30), piezasPorEsquina);
+  comprobar('y ninguna de las otras tres se queda en cuatro losas: las tres pasan de veinte piezas', amuebladas.every((n) => n >= 20), piezasPorEsquina);
   comprobar('las dos flechas del sentido de la marcha están en la salida y en la casilla que manda a la cárcel', huecosDeLosEmblemas().filter((e) => e.emblema === 'flecha').map((e) => e.casilla).join() === '0,30');
 
   /*
@@ -2132,7 +2158,8 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
    *    derecha de quien mira una esquina desde su diagonal es `−(fuera + adelante)`, o sea `u`
    *    bajando y `v` subiendo A LA VEZ. Al revés, «SALIDA» se lee «ADILAS».
    */
-  const medioRombo = (LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2) / 2;
+  /* El rombo, ya descontado el margen: lo que se juzga es que la palabra no ENTRE en él. */
+  const medioRombo = (LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2) / 2 - LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2 * MARGEN_DEL_TEXTO;
   const seSalen: string[] = [];
   const delRevesEnEsquina: string[] = [];
   let letrasDeEsquinaMiradas = 0;
@@ -2144,30 +2171,164 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
     const enEsquina = (x: number, z: number): { u: number; v: number } => ({ u: x * m.fuera.x + z * m.fuera.z, v: -(x * m.adelante.x + z * m.adelante.z) });
     for (const l of letras) {
       const c = enEsquina(l.x, l.z);
-      const media = l.alto / 2;
-      for (const a of [-1, 1]) {
-        for (const b of [-1, 1]) {
-          /* La caja de la letra está girada un octavo: sus esquinas salen por las dos diagonales. */
-          const u = c.u + ((a + b) * media) / Math.SQRT2;
-          const v = c.v + ((b - a) * media) / Math.SQRT2;
-          const alfa = (u - CENTRO_DEL_SUELO_DE_LA_ESQUINA + (v - CENTRO_DEL_SUELO_DE_LA_ESQUINA)) / Math.SQRT2;
-          const lado = (u - CENTRO_DEL_SUELO_DE_LA_ESQUINA - (v - CENTRO_DEL_SUELO_DE_LA_ESQUINA)) / Math.SQRT2;
-          if (Math.abs(alfa) + Math.abs(lado) > medioRombo) seSalen.push(`${String(esquina)}/${l.letra}: ${(Math.abs(alfa) + Math.abs(lado)).toFixed(1)} de ${medioRombo.toFixed(1)}`);
-        }
-      }
+      /*
+       * La caja de una letra de esquina va girada un octavo: su ALTO cae por la diagonal (α) y su
+       * AVANCE por el renglón (b). Medirla como un cuadrado de su alto —que fue el primer
+       * intento— hace de más: la `S` no ocupa a lo ancho lo que mide a lo alto.
+       */
+      const alfa = (c.u - CENTRO_DEL_SUELO_DE_LA_ESQUINA + (c.v - CENTRO_DEL_SUELO_DE_LA_ESQUINA)) / Math.SQRT2;
+      const lado = (c.u - CENTRO_DEL_SUELO_DE_LA_ESQUINA - (c.v - CENTRO_DEL_SUELO_DE_LA_ESQUINA)) / Math.SQRT2;
+      const media = ((AVANCE_DE_LA_LETRA[l.letra] ?? ALTO_DE_LA_LETRA / 2) * (l.alto / ALTO_DE_LA_LETRA)) / 2;
+      const pico = Math.abs(alfa) + l.alto / 2 + Math.abs(lado) + media;
+      if (pico > medioRombo + 0.001) seSalen.push(`${String(esquina)}/${l.letra}: ${pico.toFixed(1)} de ${medioRombo.toFixed(1)}`);
     }
     const a = enEsquina((letras[0] as LetraEnElTablero).x, (letras[0] as LetraEnElTablero).z);
     const b = enEsquina((letras[letras.length - 1] as LetraEnElTablero).x, (letras[letras.length - 1] as LetraEnElTablero).z);
     if (!(b.u < a.u && b.v > a.v)) delRevesEnEsquina.push(`${String(esquina)}: de (${a.u.toFixed(0)}, ${a.v.toFixed(0)}) a (${b.u.toFixed(0)}, ${b.v.toFixed(0)})`);
   }
   /*
-   * Y ANTES QUE LAS DOS, LA QUE DICE QUE HAN MIRADO ALGO. Hoy sólo la SALIDA lleva nombre de
+   * Y ANTES QUE LAS DOS, LA QUE DICE QUE HAN MIRADO ALGO. Hoy sólo la SALIDA y el PARKING llevan nombre de
    * esquina: si un día `letrasDelRotulo` volviera a devolver vacío para una esquina —que es
    * exactamente lo que hacía hasta esta tanda—, las dos reglas de abajo se quedarían en verde
    * sin haber mirado una sola letra, que es la forma más silenciosa de perder un comprobador.
    */
-  comprobar('las reglas de la esquina han mirado las seis letras de SALIDA, y no cero', letrasDeEsquinaMiradas === 6, letrasDeEsquinaMiradas);
+  comprobar('las reglas de la esquina han mirado las trece letras de SALIDA y PARKING, y no cero', letrasDeEsquinaMiradas === 13, letrasDeEsquinaMiradas);
+  /*
+   * ── 2 quater. EL MARGEN DEL TEXTO, QUE ES LO QUE SEPARA UN RÓTULO DE UNA ETIQUETA ──
+   *
+   * Lo pidió Miguel viendo el tablero: «los textos tienen que tener un margen para que queden
+   * estéticos, ahora mismo ocupan de extremo a extremo». Y no era un descuido de una casilla: el
+   * alto de un rótulo se calcula para LLENAR su hueco, así que cualquier palabra que no llegue al
+   * techo sale tocando los dos bordes POR CONSTRUCCIÓN. Por eso esto no mira la constante
+   * —`ANCHO_DEL_ROTULO` podría volver a ser 72 y la cuenta seguiría cuadrando consigo misma—:
+   * mide la caja de cada letra PUESTA, en las coordenadas de su casilla, contra los bordes.
+   */
+  const MARGEN_LATERAL = ANCHO_DE_CASILLA * MARGEN_DEL_TEXTO;
+  const apretados: string[] = [];
+  let letrasLateralesMiradas = 0;
+  for (let i = 0; i < CASILLAS; i++) {
+    const m = marcoDeCasilla(i);
+    if (m.esEsquina) continue;
+    const letras = letrasDelRotulo(i);
+    if (letras.length === 0) continue;
+    for (const l of letras) {
+      letrasLateralesMiradas++;
+      const enMarco = enElMarco(m, { x: l.x, z: l.z });
+      const media = ((AVANCE_DE_LA_LETRA[l.letra] ?? ALTO_DE_LA_LETRA / 2) * (l.alto / ALTO_DE_LA_LETRA)) / 2;
+      const borde = ANCHO_DE_CASILLA / 2 - MARGEN_LATERAL;
+      if (Math.abs(enMarco.aLoLargo) + media > borde + 0.001) apretados.push(`${String(i)}/${l.letra}: llega a ${(Math.abs(enMarco.aLoLargo) + media).toFixed(1)} y el margen empieza en ${borde.toFixed(1)}`);
+      /* Y a lo ancho de la franja: el renglón va centrado en ella, con el mismo margen arriba y abajo. */
+      if (l.alto > ALTO_MAXIMO_DEL_ROTULO + 0.001) apretados.push(`${String(i)}/${l.letra}: alto ${l.alto.toFixed(1)} pasa del máximo ${ALTO_MAXIMO_DEL_ROTULO.toFixed(1)}`);
+    }
+  }
+  comprobar(`el margen se ha medido en las ${String(letrasLateralesMiradas)} letras de las casillas laterales, y no en cero`, letrasLateralesMiradas === 55, letrasLateralesMiradas);
+  comprobar(`ningún rótulo lateral se mete en el margen del ${String(Math.round(MARGEN_DEL_TEXTO * 100))} % de su casilla`, apretados.length === 0, apretados.slice(0, 4));
+  /* Y LOS PRECIOS, con la misma vara: son el otro texto del tablero y no pueden ser la excepción. */
+  const preciosApretados: string[] = [];
+  let digitosMirados = 0;
+  for (let i = 0; i < CASILLAS; i++) {
+    const m = marcoDeCasilla(i);
+    for (const d of guarismosDelPrecio(i)) {
+      digitosMirados++;
+      const enMarco = enElMarco(m, { x: d.x, z: d.z });
+      /* El precio va con SU margen, el 7 %: el 12 % de los nombres lo tiraría por debajo de los dos suelos de píxeles. */
+      const borde = ANCHO_DE_CASILLA / 2 - ANCHO_DE_CASILLA * MARGEN_DEL_PRECIO;
+      if (Math.abs(enMarco.aLoLargo) + ANCHO_DEL_GUARISMO / 2 > borde + 0.001) {
+        preciosApretados.push(`${String(i)}/${d.guarismo}: llega a ${(Math.abs(enMarco.aLoLargo) + ANCHO_DEL_GUARISMO / 2).toFixed(1)} y el margen empieza en ${borde.toFixed(1)}`);
+      }
+    }
+  }
+  comprobar(`y el margen se ha medido también en los ${String(digitosMirados)} dígitos de los precios`, digitosMirados === guarismosDelTablero(), digitosMirados);
+  comprobar('ningún precio se mete en el margen de su casilla', preciosApretados.length === 0, preciosApretados.slice(0, 4));
+
+  /*
+   * La vacuna: la palabra más ancha del tablero tiene que quedarse CORTA del borde, y con el
+   * hueco de antes —los 62 de ancho útil, que era el 86 % de la casilla— no se quedaba.
+   */
+  const laMasAncha = Object.values(ROTULO_DE_LA_CASILLA).reduce((a, b) => (anchoDeLaPalabra(b, altoDelRotulo(b)) > anchoDeLaPalabra(a, altoDelRotulo(a)) ? b : a));
+  const anchoDeLaMasAncha = anchoDeLaPalabra(laMasAncha, altoDelRotulo(laMasAncha));
+  comprobar(
+    `se ve fallar: «${laMasAncha}» mide ${anchoDeLaMasAncha.toFixed(1)} y cabría en los 62 de antes, pero el margen la deja en ${ANCHO_DEL_ROTULO.toFixed(1)}`,
+    anchoDeLaMasAncha <= ANCHO_DEL_ROTULO + 0.001 && ANCHO_DEL_ROTULO < 62,
+    { ancho: anchoDeLaMasAncha, util: ANCHO_DEL_ROTULO },
+  );
+
   comprobar('el rótulo de una esquina cabe entero en el rombo de su suelo, letra a letra y por sus cuatro picos', seSalen.length === 0, seSalen.slice(0, 4));
+  /*
+   * ── 2 ter. LAS OBRAS: NINGUNA CARA DEL REVÉS, MIRADAS DESDE ARRIBA ──
+   *
+   * Las obras de las casillas —el asfalto del aparcamiento, sus rayas, el poste y el panel del
+   * cartel— se construyen en código, cuadro a cuadro, y el material con el que se dibujan es
+   * `FrontSide`: `three` TIRA toda cara que se vea por detrás, y «por detrás» lo decide el orden
+   * de los cuatro puntos. Eso ya costó una vez los tejados de la ciudad entera con 277
+   * comprobaciones en verde encima, porque contar triángulos no lo ve: el triángulo está ahí.
+   *
+   * Y aquí hay un motivo extra para no fiarse del ojo: el marco de una casilla lleva `(u, v)` al
+   * mundo con determinante −1 —es un reflejo—, así que el orden que uno escribiría mirando el
+   * plano sale justo del revés. Por eso no se juzga el código: se MIRA desde arriba. Una rejilla
+   * de rayos verticales sobre el aparcamiento, y para cada rayo la cara horizontal MÁS ALTA que
+   * le sale al paso tiene que mirar al cielo.
+   */
+  const carasDeObra = casillasConObra().flatMap((casilla) =>
+    carasDeLaObraEnElMundo(casilla).map((cara) => {
+      const [a, b, c] = cara.puntos as readonly (readonly [number, number, number])[];
+      const ux = (b as readonly number[])[0]! - (a as readonly number[])[0]!;
+      const uy = (b as readonly number[])[1]! - (a as readonly number[])[1]!;
+      const uz = (b as readonly number[])[2]! - (a as readonly number[])[2]!;
+      const wx = (c as readonly number[])[0]! - (a as readonly number[])[0]!;
+      const wy = (c as readonly number[])[1]! - (a as readonly number[])[1]!;
+      const wz = (c as readonly number[])[2]! - (a as readonly number[])[2]!;
+      const n = { x: uy * wz - uz * wy, y: uz * wx - ux * wz, z: ux * wy - uy * wx };
+      const largo = Math.hypot(n.x, n.y, n.z) || 1;
+      const xs = cara.puntos.map((q) => (q as readonly number[])[0]!);
+      const zs = cara.puntos.map((q) => (q as readonly number[])[2]!);
+      const ys = cara.puntos.map((q) => (q as readonly number[])[1]!);
+      return {
+        normalY: n.y / largo,
+        horizontal: Math.max(...ys) - Math.min(...ys) < 1e-6,
+        y: ys[0]!,
+        x0: Math.min(...xs),
+        x1: Math.max(...xs),
+        z0: Math.min(...zs),
+        z1: Math.max(...zs),
+      };
+    }),
+  );
+  comprobar('las obras del tablero tienen caras, y ninguna degenerada', carasDeObra.length > 0 && carasDeObra.every((c) => Number.isFinite(c.normalY)), carasDeObra.length);
+  /* La rejilla, sobre la huella de todas las obras juntas. */
+  const huella = {
+    x0: Math.min(...carasDeObra.map((c) => c.x0)),
+    x1: Math.max(...carasDeObra.map((c) => c.x1)),
+    z0: Math.min(...carasDeObra.map((c) => c.z0)),
+    z1: Math.max(...carasDeObra.map((c) => c.z1)),
+  };
+  const RAYOS = 17;
+  const miradaCenital = (voltearLaDeArriba: boolean): { rayos: number; alReves: number } => {
+    let rayos = 0;
+    let alReves = 0;
+    for (let i = 0; i < RAYOS; i++) {
+      for (let j = 0; j < RAYOS; j++) {
+        const x = huella.x0 + ((huella.x1 - huella.x0) * (i + 0.5)) / RAYOS;
+        const z = huella.z0 + ((huella.z1 - huella.z0) * (j + 0.5)) / RAYOS;
+        let mejor: (typeof carasDeObra)[number] | null = null;
+        for (const cara of carasDeObra) {
+          if (!cara.horizontal) continue;
+          if (x < cara.x0 || x > cara.x1 || z < cara.z0 || z > cara.z1) continue;
+          if (mejor === null || cara.y > mejor.y) mejor = cara;
+        }
+        if (mejor === null) continue;
+        rayos++;
+        const normal = voltearLaDeArriba ? -mejor.normalY : mejor.normalY;
+        if (normal <= 0) alReves++;
+      }
+    }
+    return { rayos, alReves };
+  };
+  const cenital = miradaCenital(false);
+  comprobar(`la lupa cenital de las obras ha mirado ${String(cenital.rayos)} rayos, y no cero`, cenital.rayos >= 100, cenital.rayos);
+  comprobar('y ninguna de las caras que se ven desde arriba está del revés', cenital.alReves === 0, cenital.alReves);
+  comprobar('se ve fallar: con la de arriba volteada, la lupa las caza todas', miradaCenital(true).alReves === cenital.rayos);
+
   comprobar('y avanza hacia −(fuera + adelante), que es la derecha de quien mira una esquina desde su diagonal', delRevesEnEsquina.length === 0, delRevesEnEsquina);
   /*
    * LAS DOS VACUNAS. La primera es la palabra que NO cabe: `altoDelRotulo` tiene que encogerla
@@ -2519,7 +2680,7 @@ if (fallos.length === 0) {
     '\nLa aritmética del Burgo cuadra con el fichero real: el anillo mide 864 con casilla de 72 × 108 y\n' +
       'esquina de 108, el recinto de la ciudad es 648 —nueve veces el centro original, que es lo que se\n' +
       'pidió—, las cuatro bandas de la casilla suman su fondo, cada rejilla de huecos cabe en la suya con\n' +
-      'la huella medida A SU TALLA —el peón es la sexta parte de un dígito y no la dieciseisava, las\n' +
+      'la huella medida A SU TALLA —el peón mide 3,375 —y ya no la sexta parte de un dígito—, las\n' +
       'cuatro casas van seguidas con 1,66 de hueco y el hotel es un bloque de otro tamaño, no una casa—,\n' +
       'el frente de manzana de dos cuerpos no se sale ni pisa el carril del avatar, el\n' +
       'precio es el del reglamento y se lee en los mismos píxeles que antes porque creció con el tablero,\n' +

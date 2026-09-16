@@ -77,7 +77,9 @@ import {
   ORIGEN_DE_LA_LETRA,
 } from '../iconos';
 import { geometriaDeContornos } from '../formas';
-import { ALZA_DEL_ROTULO, CASILLAS, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo } from './anillo-en-3d';
+import { ALZA_DEL_ROTULO, CASILLAS, FERIA, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo } from './anillo-en-3d';
+import { COLOR_DE_OBRA, carasDeLaObraEnElMundo, casillasConObra, letrasDeLosCarteles } from './obras';
+import type { CaraEnElMundo } from './obras';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
 
 /* ─────────────────────────────── Los bultos ─────────────────────────────── */
@@ -389,6 +391,11 @@ export const TINTA_DEL_EMBLEMA = '#5b5145';
  * cosa del anillo que no dice qué es una casilla sino HACIA DÓNDE se va, y Miguel la pidió roja.
  */
 export const TINTA_DE_LA_FLECHA = '#b3261e';
+/**
+ * Y la de un nombre escrito SOBRE UNA OBRA, que no es papel sino asfalto: el aparcamiento tiene
+ * su esquina entera en gris oscuro, y la tinta del tablero encima no se vería.
+ */
+const TINTA_DEL_ROTULO_DE: Readonly<Partial<Record<number, string>>> = { [FERIA]: COLOR_DE_OBRA.carteloTinta };
 const TINTA_POR_EMBLEMA: Readonly<Partial<Record<string, string>>> = { flecha: TINTA_DE_LA_FLECHA };
 
 /**
@@ -505,6 +512,60 @@ export interface Rotulos {
  * y tantos dígitos y los doce emblemas. Instanciarlos habrían sido quince llamadas (una por
  * silueta distinta) a cambio de nada.
  */
+/**
+ * TODAS LAS OBRAS DEL ANILLO EN UNA SOLA MALLA.
+ *
+ * Las describe `obras.ts` sin `three`, cuadro a cuadro y con su color; aquí sólo se funden. Va
+ * con el material de los bultos de la ciudad —`MeshStandardMaterial` con color por vértice—, o
+ * sea que las obras se iluminan como volúmenes y no como tinta: son UNA llamada de dibujo para
+ * todas las casillas amuebladas, y ni una más cuando se añadan las trece que faltan.
+ */
+export function geometriaDeLasObras(): THREE.BufferGeometry | null {
+  const caras: CaraEnElMundo[] = [];
+  for (const casilla of casillasConObra()) caras.push(...carasDeLaObraEnElMundo(casilla));
+  if (caras.length === 0) return null;
+  const posiciones = new Float32Array(caras.length * 6 * 3);
+  const colores = new Float32Array(caras.length * 6 * 3);
+  const normales = new Float32Array(caras.length * 6 * 3);
+  const tinta = new THREE.Color();
+  let v = 0;
+  for (const cara of caras) {
+    const [a, b, c, d] = cara.puntos;
+    const ux = (b[0] as number) - (a[0] as number);
+    const uy = (b[1] as number) - (a[1] as number);
+    const uz = (b[2] as number) - (a[2] as number);
+    const wx = (c[0] as number) - (a[0] as number);
+    const wy = (c[1] as number) - (a[1] as number);
+    const wz = (c[2] as number) - (a[2] as number);
+    let nx = uy * wz - uz * wy;
+    let ny = uz * wx - ux * wz;
+    let nz = ux * wy - uy * wx;
+    const largo = Math.hypot(nx, ny, nz) || 1;
+    nx /= largo;
+    ny /= largo;
+    nz /= largo;
+    tinta.set(cara.color);
+    for (const punto of [a, b, c, a, c, d]) {
+      posiciones[v * 3] = punto[0] as number;
+      posiciones[v * 3 + 1] = punto[1] as number;
+      posiciones[v * 3 + 2] = punto[2] as number;
+      colores[v * 3] = tinta.r;
+      colores[v * 3 + 1] = tinta.g;
+      colores[v * 3 + 2] = tinta.b;
+      normales[v * 3] = nx;
+      normales[v * 3 + 1] = ny;
+      normales[v * 3 + 2] = nz;
+      v++;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(posiciones, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(colores, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(normales, 3));
+  g.computeBoundingSphere();
+  return g;
+}
+
 export function geometriaDeLosRotulos(): Rotulos | null {
   const partes: THREE.BufferGeometry[] = [];
   const propias: THREE.BufferGeometry[] = [];
@@ -584,9 +645,24 @@ export function geometriaDeLosRotulos(): Rotulos | null {
         silueta = nueva;
         siluetasDeLetra.set(l.letra, nueva);
       }
-      pon(silueta, l.x, l.z, l.giro, l.alto, TINTA_DEL_PRECIO, l.alza);
+      pon(silueta, l.x, l.z, l.giro, l.alto, TINTA_DEL_ROTULO_DE[i] ?? TINTA_DEL_PRECIO, l.alza);
       letras++;
     }
+  }
+  /*
+   * Y LAS LETRAS QUE VAN SOBRE UN CARTEL, que son tinta igual que las del suelo: lo único que
+   * cambia es la cota y el color. La `P` del aparcamiento va blanca sobre su panel azul.
+   */
+  for (const l of letrasDeLosCarteles()) {
+    let silueta = siluetasDeLetra.get(l.letra);
+    if (silueta === undefined) {
+      const nueva = geometriaDeUnaLetra(l.letra);
+      if (nueva === null) continue;
+      silueta = nueva;
+      siluetasDeLetra.set(l.letra, nueva);
+    }
+    pon(silueta, l.x, l.z, l.giro, l.alto, COLOR_DE_OBRA.carteloTinta, l.alza);
+    letras++;
   }
   for (const g of siluetasDeGuarismo.values()) g.dispose();
   for (const g of siluetasDeEmblema.values()) g.dispose();

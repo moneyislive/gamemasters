@@ -246,7 +246,7 @@ import {
   tonoDelEdificio,
 } from './ciudad';
 import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
-import { claveDelBulto, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
+import { claveDelBulto, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
 import { CASAS_DEL_CONCEJO, DISCOS_DEL_TRATO, DISCOS_DE_CONTACTO, MONEDAS_EN_VUELO, POSADAS_DEL_CONCEJO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DEL_DISCO, TITULOS } from './presupuesto';
 import {
   HUNDIR_CASAS,
@@ -1212,6 +1212,9 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   /* Los precios y los emblemas: no cambian con la partida, así que van fundidos y son UNA llamada. */
   const rotulos = useMemo(geometriaDeLosRotulos, []);
   useEffect(() => () => rotulos?.geometria.dispose(), [rotulos]);
+  /* Las obras de las casillas: asfalto, rayas y carteles, todas en una malla y una llamada. */
+  const obras = useMemo(geometriaDeLasObras, []);
+  useEffect(() => () => obras?.dispose(), [obras]);
 
   const materiales = useMemo(
     () => ({
@@ -2354,6 +2357,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       <mesh geometry={suelo.geometria} material={materiales.suelo} raycast={() => null} />
 
       {/* Los precios y los emblemas de las casillas: fundidos en una sola geometría, tinta plana. */}
+      {obras === null ? null : <mesh geometry={obras} material={materiales.bulto} position={[0, 0, 0]} raycast={() => null} />}
       {rotulos === null ? null : <mesh geometry={rotulos.geometria} material={materiales.rotulo} position={[0, 0, 0]} raycast={() => null} />}
 
       {/*

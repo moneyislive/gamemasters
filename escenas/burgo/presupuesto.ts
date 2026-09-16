@@ -95,6 +95,7 @@
  * afirma que la cuenta de `casa` sigue siendo 44 justamente para que ese día se note.
  */
 import { PIEZA } from './piezas';
+import { letrasDeLosCarteles, triangulosDeLasObras } from './obras';
 import type { NombreDePieza } from './piezas';
 import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, ROTULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
@@ -157,11 +158,12 @@ export const TRIANGULOS_POR_EMBLEMA = 120;
  * LAS LETRAS DE LOS RÓTULOS. Cada glifo sale del tipo con las curvas a seis tramos, y medido uno
  * a uno va de los 84 de la `Z` a los 201 de la `P`; 155 es la media MEDIDA sobre las 55 que hoy
  * pone el anillo. Se cuentan las de verdad: las de `ROTULO_DE_LA_CASILLA`, letra a letra y sin
- * los espacios, porque un espacio no trae glifo y por tanto no llega a montarse.
+ * los espacios, porque un espacio no trae glifo y por tanto no llega a montarse. Y las de los
+ * CARTELES de las obras —la `P` del aparcamiento—, que son la misma tinta a otra cota.
  */
 export const TRIANGULOS_POR_LETRA = 155;
 export function letrasDelTablero(): number {
-  let cuantas = 0;
+  let cuantas = letrasDeLosCarteles().length;
   for (const palabra of Object.values(ROTULO_DE_LA_CASILLA)) for (const caracter of palabra) if (caracter !== ' ') cuantas++;
   return cuantas;
 }
@@ -261,6 +263,8 @@ export function sumaDelPresupuesto(
   renglones.push({ que: 'dígitos del precio', cuantos: guarismos, triangulos: guarismos * TRIANGULOS_POR_GUARISMO });
   renglones.push({ que: 'emblemas', cuantos: emblemas, triangulos: emblemas * TRIANGULOS_POR_EMBLEMA });
   renglones.push({ que: 'letras de los rótulos', cuantos: letras, triangulos: letras * TRIANGULOS_POR_LETRA });
+  /* Y las obras de las casillas: dos triángulos por cuadro, contados de `obras.ts`. */
+  renglones.push({ que: 'obras de las casillas', cuantos: 1, triangulos: triangulosDeLasObras() });
   renglones.push({ que: 'discos de contacto', cuantos: DISCOS_DE_CONTACTO, triangulos: DISCOS_DE_CONTACTO * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'dados', cuantos: DADOS, triangulos: DADOS * triangulosDelDado });
   renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });

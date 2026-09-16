@@ -80,7 +80,7 @@ corrige en la fase 4.
 | --- | --- | --- | --- | --- |
 | 0 | SALIDA ✅ | SALIDA por la diagonal (101 × 18,4) y la flecha roja de 28 en el pico de fuera | Sólo rótulo fundido; el cruce entero fuera | — |
 | 10 | CÁRCEL / VISITA | Muro con dos torretas, patio con verja, celda abierta por arriba | Código + `verja` (ya está) | La reja baja tras el peón (0,6) |
-| 20 | PARKING | Asfalto con plazas pintadas, tres coches y un **cartel horizontal** que se lee desde arriba | Código + coches del pack | El coche del que cae aparca (0,6) |
+| 20 | PARKING ✅ | La esquina entera asfaltada, sesenta plazas amarillas, catorce coches y el cartel tumbado con la `P` | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
 | 30 | A LA COMISARÍA | Comisaría con puerta y celda vista desde arriba | Código + `coche-patrulla` | El peón cruza la puerta y aparece tras los barrotes (0,7) |
 | 2·17·33 | FONDO VECINAL | Cofre de madera con herrajes sobre el zócalo del ayuntamiento | Código | La tapa se abre y sale una moneda (0,7) |
 | 7·22·36 | SUCESOS | Casino: cuerpo con marquesina, rótulo vertical de bombillas y ruleta en el suelo | Código | La ruleta gira vuelta y media y para (0,8) |
@@ -113,6 +113,12 @@ trece edificios de código a ~1.500 son 20.000 de los 718.000 que sobran.
    **cero piezas**, y lo que la sustituye no cuesta ninguna llamada: va fundido con los rótulos.
 2. **Las tres esquinas restantes** (fase 3): cárcel, parking y comisaría. Comparten el problema de
    la esquina —108 × 108, la ele de la marcha por en medio— y conviene resolverlo una vez.
+   - **El aparcamiento, hecho.** Con él entra la máquina que van a usar las once casillas que
+     quedan: `burgo/obras.ts` describe volumen en código, cuadro a cuadro y sin `three`;
+     `geometriaDeLasObras()` lo funde en UNA malla y UNA llamada de dibujo; el presupuesto lo
+     cuenta a dos triángulos por cuadro; y la lupa cenital del comprobador mira desde arriba que
+     ninguna cara esté del revés, que es el fallo que no se ve en ninguna cuenta.
+   - Faltan la cárcel y la comisaría, las dos con celda y animación de entrada.
 3. **Las laterales** (fase 4): fondo vecinal, sucesos, eléctrica, aguas, impuesto y tasa. Aquí
    entra también el arreglo de los nombres viejos.
 4. **El ferrocarril** (fase 5): las cuatro estaciones, la vía del perímetro y los trenes. Es la

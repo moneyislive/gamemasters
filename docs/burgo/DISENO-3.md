@@ -377,6 +377,11 @@ jugador», cada una derivada y no elegida a ojo:
   (12 × 12 con tres presos de frente → 3,4 con aire), el brazo de una esquina (25,5 con seis
   en fila → 4,3) y el carril del avatar (v de 23 a 29, centrado en 25,5 → 5,0). Manda el
   patio. Escala **uniforme**: a 55° de altura de cámara la huella pesa más que el alto.
+  **Al día de hoy ya no se escribe como una sexta parte del dígito, sino como el número 3,375**:
+  cuando el dígito bajó de 27 a 25 para que el precio dejara margen en su casilla
+  (`LA-CIUDAD.md` §2), el peón habría encogido con él —y su disco de contacto, y las rejillas del
+  patio— sin que nadie lo pidiera. La sexta parte era una coincidencia cómoda; la razón es la que
+  dice este mismo párrafo: **manda el patio**.
 - **`FONDO_DE_LA_CASA = BANDA.franja / 2` = 10,5** (`TALLA_DE_LA_CASA` = 4,129; 10,34 de
   frente). La casa llena la mitad del fondo de la franja del barrio, centrada, con un cuarto
   de banda libre a cada lado. Con el paso 12 que la rejilla ya tenía quedan **1,66** entre

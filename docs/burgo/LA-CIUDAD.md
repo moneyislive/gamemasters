@@ -216,19 +216,30 @@ Los dígitos son contornos compilados (`escenas/iconos.ts`, `CONTORNOS_DEL_GUARI
 **en el lienzo no hay texto**. Se normalizan por `CAJA_DEL_GUARISMO` (300 × 400 del lienzo de
 512) y se separan `AVANCE_DEL_GUARISMO` (340).
 
-El alto pasa de 12 a **27**, y la razón es aritmética: lo que se ve en pantalla no es el alto
-en unidades, es el cociente `alto / alcance de la cámara`. Si el tablero se hace 2,25 veces
-más grande y el dígito no, el precio pierde 2,25 veces sus píxeles **sin que nada falle**.
-27/570,24 es exactamente 12/253,44, y por eso los píxeles salen idénticos a los de antes.
+El alto subió primero de 12 a **27** por una razón aritmética: lo que se ve en pantalla no es el
+alto en unidades, es el cociente `alto / alcance de la cámara`, y 27/570,24 es exactamente
+12/253,44, o sea los mismos píxeles que en el tablero de 384. Y bajó después a **25** por una
+razón que esa cuenta no miraba y que vio Miguel: **el margen**. A 27, tres dígitos miden 66,15 de
+los 72 de la casilla —y aunque se juntaran hasta TOCARSE seguirían midiendo 60,75—, o sea que a
+ese alto no hay margen que dar.
 
 ```
-  alto del dígito ....... 27,00
-  ancho del dígito ...... 20,25   (300/400 × 27)
-  avance ................ 22,95   (340/400 × 27)
-  tres dígitos .......... 66,15   caben en los 72 de la casilla con 2,93 de margen a cada lado
+  alto del dígito ....... 25,00   (era 27)
+  ancho del dígito ...... 18,75   (300/400 × 25)
+  avance ................ 21,25   (340/400 × 25)
+  tres dígitos .......... 61,25   de los 72: 5,38 de margen a cada lado, el 7,5 %
 ```
 
-A 30 ya no caben: **27 es el techo, no una elección tímida.**
+**25 es el único número entre dos paredes**: es el mayor que deja ese margen y el menor que las
+dos medidas de abajo aguantan. El 12 % que tienen los nombres pediría 22,3, y ahí el móvil cae a
+4,1 px de salida y 13,7 al seguir, por debajo de los dos suelos comprobados (4,5 y 15). Subirlo
+otra vez a 27 es perder el margen; bajarlo a 22,3 es perder el móvil. Es una decisión de Miguel,
+y las dos ramas están medidas.
+
+Y una trampa que se vio al bajarlo: **el peón se escribía como `ANCHO_DEL_GUARISMO / 6`**, así que
+habría encogido con el dígito —y con él su disco de contacto y las rejillas del patio— sin que
+nadie lo pidiera. La sexta parte era una coincidencia cómoda, no la razón: la razón es el patio de
+la cárcel. Ahora `DIAMETRO_DEL_PEON` es 3,375 escrito como número.
 
 Medido con `proyecta` desde la **pose de salida** (que es escorzada, a 55° de altura, y en el
 móvil con el lienzo al 58 % del alto: la cuenta de servilleta de «el tablero llena el ancho»
@@ -236,14 +247,14 @@ no vale):
 
 | Ventana | Dígito | Franja del barrio |
 | --- | --- | --- |
-| 16:9 (1920 × 1080) | **16,3 px** | 13,0 px |
-| 3:4 (768 × 1024) | **9,9 px** | 7,8 px |
-| 9:19,5 (390 × 490 de lienzo) | **5,0 px** | 3,9 px |
+| 16:9 (1920 × 1080) | **15,1 px** | 13,0 px |
+| 3:4 (768 × 1024) | **9,2 px** | 7,8 px |
+| 9:19,5 (390 × 490 de lienzo) | **4,6 px** | 3,9 px |
 
 O sea que desde la pose de salida, en un móvil, el precio es una mancha de tres cifras y no
 un número que se lea. **Se lee acercándose**, y por eso la medida que de verdad manda es la
 segunda: a la cercanía de seguimiento (0,42), que es la que la cámara toma sola cada vez que
-alguien mueve, el dígito mide **82,8 px** en un PC, **32,8** en una tableta y **16,6** en el
+alguien mueve, el dígito mide **76,6 px** en un PC, **30,3** en una tableta y **15,4** en el
 móvil. Las dos medidas están en el comprobador para que nadie vuelva a suponer la primera.
 
 Los precios del reglamento van de 60 a 400: tres dígitos como mucho. Las rentas, que llegan a
@@ -290,9 +301,32 @@ con el reborde. Hoy dicen FONDO (2, 17, 33), IMPUESTO (4), SUCESOS (7, 22, 36), 
 (28) y TASA (38) —los nombres del reglamento; la escena todavía llama a algunas de estas casillas
 Arca, Pregón, Molino o Alcabala por dentro, y esa deriva se corrige al amueblarlas—.
 
-El renglón se ajusta solo: `ALTO_MAXIMO_DEL_ROTULO = 17`, y si la palabra no cabe en los
-`ANCHO_DEL_ROTULO = 62` útiles, encoge hasta caber. Cada letra se agarra **por el centro de su
-avance**, no por su caja, que es lo que hace que una palabra quede ópticamente centrada.
+El renglón se ajusta solo, y **deja margen**: `MARGEN_DEL_TEXTO = 0,12` es la regla de todo el
+tablero, un 12 % del hueco a cada lado. De ahí salen los tres anchos útiles —**54,7** de los 72 de
+una casilla, **16** de los 21 de su franja y **96,7** de los 127,3 de la diagonal de una
+esquina— y dentro de ellos la palabra encoge hasta caber. Cada letra se agarra **por el centro de
+su avance**, no por su caja, que es lo que hace que quede ópticamente centrada.
+
+Lo pidió Miguel viendo el tablero —«los textos tienen que tener un margen para que queden
+estéticos, ahora mismo ocupan de extremo a extremo»— y tenía que pasar por cómo estaba escrito: el
+alto se calcula para LLENAR el hueco, así que toda palabra que no llegue al techo sale tocando los
+dos bordes por construcción. Un renglón que toca el borde no parece grande: parece apretado.
+
+**Lo que cuesta, con la medida delante.** El ancho de la casilla es el límite de verdad, no la
+banda, así que la palabra larga es la que paga: con el margen puesto, IMPUESTO sale a 6,9 de alto,
+SUCESOS a 7,9, FONDO a 9,5, AGUA a 12,4, TASA a 14,3 y LUZ a 16 (ésta la topa la banda, no el
+ancho). Proyectado con las medidas de §2, un 6,9 se lee a unos 21 px en un PC a la distancia a la
+que la cámara se pone al mover, y a unos 4 px en el móvil. **La única palanca para que los
+nombres largos crezcan es acortarlos**: cada letra de más encoge a todas las demás.
+
+Y el margen no se cree: se MIDE. `verify:burgo-escena` toma la caja de cada letra puesta —su
+avance real, no su alto— en las coordenadas de su casilla y comprueba que no entra en el margen,
+con su vacuna delante.
+
+El ALTO DEL PRECIO (27) no sale de esta regla: sale de la medida de legibilidad de más arriba, y
+encogerlo al 76 % lo dejaría por debajo del suelo que se midió para el móvil. Su margen ya lo
+cumple por el otro lado: un precio de tres cifras mide 49,7 de los 72, o sea el 15 % libre a cada
+lado.
 
 **Una esquina lo escribe en diagonal**, porque no tiene franja: su suelo es un cuadro de 90 (de
 324 a 414) y el renglón va por su diagonal, que es además desde donde se mira una esquina. Ahí el
@@ -342,14 +376,39 @@ acera. Quedan setenta y dos celdas libres.
   cerrado con cuatro tramos de `verja` y dos `verja-puerta` —una de ellas es la que sube al
   encerrar a un peón—; dos `coche-patrulla` aparcados en su acera; la calle de delante con
   su cebra, dos `semaforo-a` y cuatro farolas.
-- **El descanso (20, noroeste)**: una plaza arbolada de 3 × 3 celdas con tres terrazas
-  (`mesa-redonda` + cuatro `silla` cada una), seis `arbusto`, cuatro `banco-de-parque`,
-  cuatro `farola-de-parque` y **siete árboles** (`pino-grande` ×2, `pino` ×3,
-  `pino-pequeno` ×2).
+- **El aparcamiento (20, noroeste)**: era una plaza arbolada con tres terrazas hasta que Miguel
+  pidió «un parking que se vea real … con un cartel visible desde arriba que ponga PARKING». Hoy
+  la esquina ENTERA es el aparcamiento: el asfalto cubre su cuadro de suelo menos el rincón de
+  dentro, que se queda de zona verde con dos `pino-pequeno` y un `arbusto` —sin ese recorte los
+  árboles saldrían plantados en alquitrán—. En el cuadro de fuera van **cuatro hileras de quince
+  plazas** de 3,6 × 7 (la medida sale del coche del pack: 2,51 × 5,63), espalda contra espalda y
+  con su calle de 14 en medio; en ellas, **catorce coches** y sesenta plazas: un aparcamiento
+  lleno se lee como un atasco y uno vacío como una pista de tenis. El nombre va en **blanco**
+  sobre el asfalto y las rayas en **amarillo**, porque dos blancos sobre negro se pelean. Y el
+  cartel es un panel TUMBADO de 12 × 12 sobre un poste de 11, con la `P` impresa encima: un panel
+  a plomo, que es como son los de la calle, desde un tablero no se ve.
 - **A la cárcel (30, noreste)**: una **avenida de dos carriles** (dos columnas de losas, 24
   de ancho) cruzando la esquina entera, con cuatro `calzada-paso`, dos `semaforo-c` de brazo,
   el `coche-patrulla` con el morro hacia la cárcel, una berlina, un taxi y el emblema
   `flecha` apuntando a la 10.
+
+### 2 quater. Las obras: volumen construido en código, y por qué no con piezas del pack
+
+El asfalto del aparcamiento, sus rayas y su cartel no son piezas: los describe `burgo/obras.ts`
+cuadro a cuadro —sin `three`— y `ciudad-en-3d.ts` los funde en UNA malla. La razón es la moneda
+que escasea: el tablero va por 181.333 triángulos de 900.000, o sea que **triángulos sobran**;
+y por 92 llamadas de dibujo de 150 en la pose de salida, o sea que **llamadas no**. Una pieza
+nueva del pack cuesta una llamada para siempre —una `InstancedMesh` por pieza distinta en
+pantalla—; un volumen construido en código y fundido cuesta **cero**, y las trece casillas que
+faltan por amueblar cabrán en esa misma malla.
+
+Con una trampa que conviene tener escrita: el marco de una casilla lleva `(u, v)` al mundo con
+**determinante −1** —en la esquina de la salida, `x = v` y `z = u`—, o sea que es un reflejo, y
+una cara que se recorre al derecho en el plano sale del revés en el mundo. Como el material es
+`FrontSide`, una cara del revés no falla: **desaparece**, que es lo que pasó con los tejados de
+la ciudad entera. Por eso `verify:burgo-escena` no juzga el código sino que MIRA: una rejilla de
+rayos verticales sobre las obras, y la cara horizontal más alta que cada rayo encuentra tiene que
+mirar al cielo —con su vacuna, que voltea la de arriba y las caza todas—.
 
 Ninguna pieza que no sea suelo puede pisar la ele engordada `HOLGURA_DE_LA_MARCHA` (2), y
 ninguna puede salirse del cuadrado de 108. Las dos cosas las mide `verify:burgo-escena` con

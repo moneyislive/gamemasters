@@ -560,7 +560,27 @@ export function huecoDeBandera(casilla: number): Punto {
  * que mueve (cercanía 0,42), que es cuando de verdad se lee, el dígito pasa de 16 px en el
  * móvil. `verify:burgo-escena` vuelve a proyectar las dos medidas en las tres ventanas.
  */
-export const ALTO_DEL_GUARISMO = 27;
+/**
+ * ═══ Y EL DÍGITO BAJA DE 27 A 25, QUE ES TODO LO QUE EL MARGEN PUEDE PEDIRLE ═══
+ *
+ * El precio es el único texto del tablero que NO puede encoger libremente: su alto sale de una
+ * medida —a cuántos píxeles se ve en las tres ventanas— y tiene dos suelos comprobados, 4,5 px
+ * desde la pose de salida y 15 px a la cercanía de seguimiento, que es donde de verdad se lee.
+ *
+ * Y a 27 no hay margen que valga: tres dígitos miden 66,15 de los 72, y aunque se JUNTARAN hasta
+ * tocarse seguirían midiendo 60,75. El 12 % del tablero (54,7) pide bajar el dígito a 22,3, y ahí
+ * el móvil cae a 4,1 px de salida y 13,7 al seguir: por debajo de los dos suelos.
+ *
+ * Así que se baja hasta donde se puede sin romper ninguno: **25**. Tres dígitos pasan de 66,15 a
+ * 61,25 y el margen de 2,93 a 5,38 a cada lado —del 4 % al 7,5 %—, con el móvil en 4,63 px de
+ * salida y 15,4 al seguir. Si algún día se decide que la pose de salida no tiene que leerse en el
+ * móvil —el documento ya dice que ahí el precio es «una mancha de tres cifras»—, este número
+ * puede bajar a 22,3 y el precio tendrá el mismo 12 % que los nombres. Es una decisión de Miguel,
+ * no una cuenta.
+ */
+export const ALTO_DEL_GUARISMO = 25;
+/** Lo que el precio deja libre a cada lado con ese alto: el 7,5 %, y es el máximo que permite. */
+export const MARGEN_DEL_PRECIO = 0.07;
 export const ANCHO_DEL_GUARISMO = (ALTO_DEL_GUARISMO * CAJA_DEL_GUARISMO.ancho) / CAJA_DEL_GUARISMO.alto;
 export const AVANCE_DEL_PRECIO = (ALTO_DEL_GUARISMO * AVANCE_DEL_GUARISMO) / CAJA_DEL_GUARISMO.alto;
 
@@ -658,9 +678,33 @@ export function anchoDelPrecio(casilla: number): number {
  * Los anchos son los del TIPO, uno por glifo, así que «IMPUESTO» ocupa lo que de verdad ocupa y
  * no ocho veces la letra más ancha.
  */
-export const V_DEL_ROTULO = 11;
-export const ALTO_MAXIMO_DEL_ROTULO = 17;
-export const ANCHO_DEL_ROTULO = 62;
+/**
+ * EL MARGEN DEL TEXTO, QUE ES UNA REGLA DE TODO EL TABLERO Y NO DE UNA CASILLA.
+ *
+ * Lo pidió Miguel viendo el tablero: «los textos tienen que tener un margen para que queden
+ * estéticos, ahora mismo ocupan de extremo a extremo sin margen tanto en las casillas como en los
+ * títulos». Y tenía que pasar por cómo estaba escrito: el alto de un rótulo se calcula para LLENAR
+ * el hueco —`min(techo, hueco / anchoPorUnidad)`—, así que toda palabra que no llegue al techo
+ * sale TOCANDO los dos bordes por definición. Y un renglón que toca el borde no parece grande:
+ * parece apretado, que es lo contrario de lo que se buscaba al hacerlo crecer.
+ *
+ * Así que el hueco deja de ser el trozo libre y pasa a ser el trozo libre MENOS el margen. Un
+ * mismo número para todo el tablero —el 12 % de lo que mida el hueco, a cada lado—, y de ahí
+ * salen los tres anchos útiles: 54,7 de los 72 de una casilla, 15,9 de los 21 de su franja y 96,7
+ * de los 127,3 de la diagonal de una esquina.
+ *
+ * ═══ LO QUE ESTE MARGEN NO TOCA, Y POR QUÉ ═══
+ *
+ * El ALTO DEL PRECIO (27) no sale de aquí: sale de una medida de legibilidad —a cuántos píxeles
+ * se ve un dígito en las tres ventanas, `LA-CIUDAD.md` §2— y encogerlo al 76 % lo dejaría en 20,5
+ * y por debajo del suelo que se midió para el móvil. Su margen ya lo cumple de sobra por el otro
+ * lado: un precio de tres cifras mide 49,7 de los 72, o sea el 15 % libre a cada lado.
+ */
+export const MARGEN_DEL_TEXTO = 0.12;
+/** El centro de la franja, que es donde va el nombre: 21 de banda, 10,5 de eje. */
+export const V_DEL_ROTULO = BANDA.franja / 2;
+export const ALTO_MAXIMO_DEL_ROTULO = BANDA.franja * (1 - 2 * MARGEN_DEL_TEXTO);
+export const ANCHO_DEL_ROTULO = ANCHO_DE_CASILLA * (1 - 2 * MARGEN_DEL_TEXTO);
 /** Lo que se alza un rótulo sobre la SUPERFICIE de su casilla, para no pelearse en profundidad. */
 export const ALZA_DEL_ROTULO = 0.08;
 /** Sobre el reborde de la franja (0,6), que es lo más alto que el rótulo tiene debajo. */
@@ -685,8 +729,8 @@ export const ALZA_DEL_ROTULO_EN_LA_FRANJA = 0.7;
  */
 export const LADO_DEL_SUELO_DE_LA_ESQUINA = SUPERFICIE.hasta - BORDE_INTERIOR;
 export const CENTRO_DEL_SUELO_DE_LA_ESQUINA = (SUPERFICIE.hasta + BORDE_INTERIOR) / 2;
-/** La diagonal de ese cuadro, con un dedo de margen para no acabar pisando el marco. */
-export const DIAGONAL_DEL_ROTULO_DE_ESQUINA = LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2 - 8;
+/** La diagonal de ese cuadro, con el margen de todo el tablero: ni toca los picos ni el marco. */
+export const DIAGONAL_DEL_ROTULO_DE_ESQUINA = LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2 * (1 - 2 * MARGEN_DEL_TEXTO);
 export const ALTO_MAXIMO_DEL_ROTULO_DE_ESQUINA = 26;
 
 /** El avance de un carácter, en unidades del lienzo. El de la caja para lo que no esté en la tabla. */
@@ -720,6 +764,7 @@ export function altoDelRotulo(palabra: string, esEsquina = false): number {
  */
 export const ROTULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
   0: 'SALIDA',
+  20: 'PARKING',
   2: 'FONDO',
   4: 'IMPUESTO',
   7: 'SUCESOS',
@@ -864,7 +909,17 @@ export const HUELLA_DE_LA_CASA = { ancho: 2.504, fondo: 2.543, alto: 2.543 } as 
  * del pack y empieza a ser otra; y con la cámara a 55° la huella pesa más que el alto de todos
  * modos.
  */
-export const DIAMETRO_DEL_PEON = ANCHO_DEL_GUARISMO / 6; // 3,375
+/**
+ * Y SE ESCRIBE COMO NÚMERO, NO COMO UNA SEXTA PARTE DEL DÍGITO.
+ *
+ * Hasta hoy era `ANCHO_DEL_GUARISMO / 6`, que daba este mismo 3,375 pero ataba el peón al precio.
+ * El día que el dígito bajó de 27 a 25 —para que el precio dejara margen en su casilla— el peón
+ * habría encogido con él sin que nadie lo pidiera, y con él su disco de contacto y las rejillas
+ * del patio. La sexta parte era una coincidencia cómoda, no la razón: la razón está escrita ocho
+ * párrafos más abajo y es el PATIO DE LA CÁRCEL, doce de lado y tres columnas, que es la
+ * habitación más pequeña del tablero.
+ */
+export const DIAMETRO_DEL_PEON = 3.375;
 export const TALLA_DEL_PEON = DIAMETRO_DEL_PEON / HUELLA_DEL_PEON; // 2,6533
 export const ALTO_DEL_PEON = ALTO_DEL_PEON_EN_EL_PACK * TALLA_DEL_PEON; // 6,1716
 
@@ -1065,6 +1120,12 @@ export function esSuelo(pieza: NombreDePieza): boolean {
 
 /** Lo que sube un coche del pack sobre el asfalto: 0,42 de calzada más los 0,366 que las ruedas bajan del origen. */
 export const COCHE_SOBRE_EL_ASFALTO = 0.786;
+/** Los 0,366 solos, para lo que no se posa sobre una losa de calzada sino sobre una obra. */
+export const RUEDAS_BAJO_EL_ORIGEN = 0.366;
+/** Lo que se alza el asfalto pintado de una obra sobre el suelo de su casilla, sin pelearse en profundidad. */
+export const ALZA_DEL_ASFALTO = 0.05;
+/** Y lo que sube un coche aparcado encima de ese asfalto. */
+export const COCHE_SOBRE_EL_APARCAMIENTO = ALZA_DEL_ASFALTO + RUEDAS_BAJO_EL_ORIGEN;
 /** Y lo que sube sobre una `solera`, cuya cara de arriba está a 0,6 y no a 0,42. */
 export const COCHE_SOBRE_LA_SOLERA = 0.966;
 
@@ -1202,52 +1263,48 @@ export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsqui
     { pieza: PIEZA.arbusto, u: cel(3), v: cel(8), giroEnCuartos: 0, menudo: true },
     { pieza: PIEZA.arbusto, u: cel(8), v: cel(8), giroEnCuartos: 1, menudo: true },
   ],
+  /*
+   * EL APARCAMIENTO (antes El Descanso, una plaza arbolada con tres terrazas).
+   *
+   * Lo pidió Miguel: «El Parking quiero que se vea real … con un cartel visible desde arriba que
+   * ponga PARKING». El asfalto, las quince plazas por hilera y el cartel tumbado los levanta
+   * `obras.ts` en código —fundidos, cero llamadas de dibujo—; lo que va aquí son los COCHES, que
+   * son piezas del pack y ya estaban instanciadas por la ciudad, así que tampoco cuestan ninguna.
+   *
+   * Catorce coches en sesenta plazas: un aparcamiento lleno no se lee como aparcamiento, se lee
+   * como un atasco. Los huecos son lo que hace que se entienda de un vistazo.
+   *
+   * Y el rincón de dentro —las celdas por debajo de 347,5, que es lo único que la ele de la
+   * marcha deja libre de ese lado— se queda con su arbolito, que es lo que tiene la entrada de
+   * cualquier aparcamiento de barrio.
+   */
   [FERIA]: [
-    /* La plaza: tres por tres celdas de acera en el medio, y cuatro rincones pavimentados. */
-    ...soleras([
-      [4, 4],
-      [4, 5],
-      [4, 6],
-      [5, 4],
-      [5, 5],
-      [5, 6],
-      [6, 4],
-      [6, 5],
-      [6, 6],
-      [3, 3],
-      [7, 3],
-      [3, 7],
-      [7, 7],
-    ]),
-    /* Tres terrazas con sus cuatro sillas cada una. Las sillas miran a su mesa. */
-    { pieza: PIEZA.mesaRedonda, u: 382, v: 382, giroEnCuartos: 0 },
-    ...sillasAlrededor(382, 382),
-    { pieza: PIEZA.mesaRedonda, u: 398, v: 382, giroEnCuartos: 0 },
-    ...sillasAlrededor(398, 382),
-    { pieza: PIEZA.mesaRedonda, u: 382, v: 398, giroEnCuartos: 0 },
-    ...sillasAlrededor(382, 398),
-    /* El arbolado de la plaza: siete árboles en grupos, nunca en línea. */
-    { pieza: PIEZA.pinoGrande, u: cel(7), v: cel(5), giroEnCuartos: 0 },
-    { pieza: PIEZA.pinoGrande, u: cel(8), v: cel(6), giroEnCuartos: 1 },
-    { pieza: PIEZA.pino, u: cel(5), v: cel(8), giroEnCuartos: 0 },
-    { pieza: PIEZA.pino, u: cel(6), v: cel(8), giroEnCuartos: 2 },
-    { pieza: PIEZA.pino, u: cel(8), v: cel(3), giroEnCuartos: 1 },
-    { pieza: PIEZA.pinoPequeno, u: cel(3), v: cel(5), giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.pinoPequeno, u: cel(3), v: cel(8), giroEnCuartos: 3, menudo: true },
-    { pieza: PIEZA.arbusto, u: cel(4), v: cel(8), giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.arbusto, u: cel(8), v: cel(4), giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.arbusto, u: cel(7), v: cel(8), giroEnCuartos: 2, menudo: true },
-    { pieza: PIEZA.arbusto, u: cel(8), v: cel(7), giroEnCuartos: 3, menudo: true },
-    { pieza: PIEZA.arbusto, u: cel(4), v: cel(3), giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.arbusto, u: cel(3), v: cel(4), giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.bancoDeParque, u: 366, v: cel(5), giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.bancoDeParque, u: cel(5), v: 366, giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.bancoDeParque, u: 402, v: cel(7), giroEnCuartos: 3, menudo: true },
-    { pieza: PIEZA.bancoDeParque, u: cel(7), v: 402, giroEnCuartos: 2, menudo: true },
-    { pieza: PIEZA.farolaDeParque, u: 372, v: 372, giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.farolaDeParque, u: 396, v: 372, giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.farolaDeParque, u: 372, v: 396, giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.farolaDeParque, u: 408, v: 408, giroEnCuartos: 0, menudo: true },
+    /* Hilera A, de morro a −v. */
+    { pieza: PIEZA.cocheBerlina, u: 365.4, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheUtilitario, u: 372.6, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheFamiliar, u: 383.4, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheTaxi, u: 401.4, v: 363.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    /* Hilera B, de morro a +v. */
+    { pieza: PIEZA.cocheUtilitario, u: 361.8, v: 370.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheBerlina, u: 376.2, v: 370.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheFamiliar, u: 390.6, v: 370.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheUtilitario, u: 408.6, v: 370.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    /* Hilera C, de morro a −v. */
+    { pieza: PIEZA.cocheFamiliar, u: 369.0, v: 391.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheTaxi, u: 387.0, v: 391.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheBerlina, u: 405.0, v: 391.5, giroEnCuartos: 3, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    /* Hilera D, de morro a +v. */
+    { pieza: PIEZA.cocheBerlina, u: 365.4, v: 398.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheUtilitario, u: 394.2, v: 398.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    { pieza: PIEZA.cocheFamiliar, u: 412.2, v: 398.5, giroEnCuartos: 1, alza: COCHE_SOBRE_EL_APARCAMIENTO },
+    /* Dos farolas en la calle de en medio, que es donde van las de un aparcamiento. */
+    { pieza: PIEZA.farolaDeCalle, u: 376.2, v: 381, giroEnCuartos: 0, menudo: true },
+    { pieza: PIEZA.farolaDeCalle, u: 397.8, v: 381, giroEnCuartos: 2, menudo: true },
+    /* El rincón verde de la entrada. */
+    { pieza: PIEZA.pinoPequeno, u: 332, v: 332, giroEnCuartos: 0, menudo: true },
+    { pieza: PIEZA.pinoPequeno, u: 342, v: 330, giroEnCuartos: 2, menudo: true },
+    { pieza: PIEZA.arbusto, u: 330, v: 342, giroEnCuartos: 1, menudo: true },
+    { pieza: PIEZA.papelera, u: 340, v: 340, giroEnCuartos: 0, menudo: true },
   ],
   [A_LA_MAZMORRA]: [
     /*
