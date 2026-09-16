@@ -33,7 +33,7 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MAZMORRA, SUPERFICIE, giroHaciaDentro, marcoDeCasilla, puntoEnEsquina } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MAZMORRA, SUPERFICIE, giroHaciaDentro, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
 /** Un punto de una obra en las coordenadas de su casilla: `u` y `v` como en `puntoEnEsquina`, `y` a plomo. */
@@ -64,7 +64,33 @@ export const COLOR_DE_OBRA = {
   comisaria: '#5f6a7a',
   visera: '#b9b5ab',
   farolAzul: '#2f6fd0',
+  /* El cofre del Fondo, la oficina del Impuesto y el escaparate de la Tasa. */
+  piedra: '#b3ac9e',
+  sillar: '#c8c1b1',
+  madera: '#7a5230',
+  maderaClara: '#8d6136',
+  hierro: '#4a4640',
+  laton: '#c9a227',
+  alfombra: '#7b2230',
+  marmol: '#e6e2d8',
+  joya: '#57c8d8',
+  joyaOscura: '#2e8fa0',
 } as const;
+
+/**
+ * UNA CARA DE TRES PUNTOS se escribe repitiendo el cuarto, y quien funde la malla se salta el
+ * triángulo que sobra. Hace falta para lo que no es una caja: el fronton de una oficina, las ocho
+ * caras de una joya. El presupuesto también lo cuenta: dos triángulos por cuadro y UNO por éstas.
+ */
+export function esTriangulo(cara: CaraDeObra): boolean {
+  const c = cara.puntos[2];
+  const d = cara.puntos[3];
+  return c[0] === d[0] && c[1] === d[1] && c[2] === d[2];
+}
+
+export function triangulo(casilla: number, a: PuntoDeObra, b: PuntoDeObra, c: PuntoDeObra, color: string): CaraDeObra {
+  return { casilla, puntos: [a, b, c, c], color };
+}
 
 /** Un cuadro tumbado a la cota `y`, mirando ARRIBA. El orden sale de la cuenta de la cabecera. */
 export function losa(casilla: number, u0: number, u1: number, v0: number, v1: number, y: number, color: string): CaraDeObra {
@@ -341,19 +367,166 @@ function carasDeLaComisaria(): CaraDeObra[] {
 }
 
 
+/* ─────────── Las casillas laterales que no se compran ─────────── */
+
+/**
+ * LA BANDA EN LA QUE CABE UN EDIFICIO DE CASILLA, Y POR QUÉ ES ÉSA.
+ *
+ * Una casilla lateral mide 72 × 108 y sus bandas están repartidas: la FRANJA (0..21) lleva el
+ * nombre, la SUPERFICIE lleva el precio arriba (31,5..58,5) y el ATREZO abajo (60..90), y el
+ * carril del avatar (23..29) no lo pisa nada. O sea que lo único libre para volumen es el atrezo:
+ * **30 de fondo por 72 de ancho**, y de esos 72 hay que descontar el margen del tablero.
+ *
+ * Los edificios de aquí se escriben en ese marco: `u` de −36 a +36 con el cero en el eje de la
+ * casilla, `v` de 60 a 90. Lo mismo que en una esquina, con otra vara.
+ */
+
+/**
+ * EL COFRE DEL FONDO VECINAL (casillas 2, 17 y 33).
+ *
+ * Miguel: «para la casilla de CAJA DE LA COMUNIDAD me gustaría que hubiera un cofre». Un cofre de
+ * verdad se reconoce desde arriba por tres cosas y no por su forma: la TAPA que sobresale del
+ * cuerpo, los HERRAJES que lo cruzan y la CERRADURA. Sin ellas es una caja de madera.
+ *
+ * La tapa va escrita aparte del cuerpo aunque hoy esté fundida con él: cuando se anime —abrirse
+ * al caer en la casilla— tendrá que salir de la malla, y así ya está escrita sola.
+ */
+const COFRE = {
+  base: { u: 12, v0: 63, v1: 87, alto: 1.2 },
+  cuerpo: { u: 8, v0: 67, v1: 83, desde: 1.2, hasta: 8 },
+  tapa: { u: 8.6, v0: 66.4, v1: 83.6, desde: 8, hasta: 10.4 },
+  herraje: { ancho: 1, en: [-4, 4] as readonly number[] },
+  cerradura: { u: 1.3, fondo: 1.2, desde: 4.8, hasta: 7.4 },
+} as const;
+
+function carasDelCofre(casilla: number): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  const b = COFRE.base;
+  salida.push(...caja(casilla, -b.u, b.u, b.v0, b.v1, 0, b.alto, COLOR_DE_OBRA.piedra));
+  const c = COFRE.cuerpo;
+  salida.push(...caja(casilla, -c.u, c.u, c.v0, c.v1, c.desde, c.hasta, COLOR_DE_OBRA.madera));
+  const t = COFRE.tapa;
+  salida.push(...caja(casilla, -t.u, t.u, t.v0, t.v1, t.desde, t.hasta, COLOR_DE_OBRA.maderaClara));
+  for (const u of COFRE.herraje.en) {
+    salida.push(...caja(casilla, u - COFRE.herraje.ancho / 2, u + COFRE.herraje.ancho / 2, t.v0 - 0.2, t.v1 + 0.2, c.desde, t.hasta, COLOR_DE_OBRA.hierro));
+  }
+  const ce = COFRE.cerradura;
+  salida.push(...caja(casilla, -ce.u, ce.u, c.v0 - ce.fondo, c.v0, ce.desde, ce.hasta, COLOR_DE_OBRA.laton));
+  return salida;
+}
+
+/**
+ * LA OFICINA DEL ESTADO (casilla 4, el Impuesto).
+ *
+ * Miguel: «para la casilla de impuestos me gustaría que hubiera un edificio que parezca una
+ * oficina del estado». Lo que hace que un edificio parezca oficial no es su tamaño: es la
+ * ESCALINATA, las COLUMNAS y el ático escalonado encima de la cornisa. Con eso, un prisma de once
+ * de alto ya se lee como un ministerio.
+ *
+ * El remate va escalonado —dos cajas— y no en frontón triangular a propósito: desde los 55° a los
+ * que mira la cámara, un frontón se ve de canto y desaparece; un ático se ve siempre.
+ */
+const OFICINA = {
+  escalones: [
+    { u: 13, v0: 62, v1: 66, desde: 0, hasta: 0.8 },
+    { u: 12, v0: 64, v1: 66, desde: 0.8, hasta: 1.6 },
+  ] as readonly { u: number; v0: number; v1: number; desde: number; hasta: number }[],
+  cuerpo: { u: 11, v0: 70, v1: 88, desde: 1.6, hasta: 11 },
+  columna: { lado: 1.8, v: 67.4, desde: 1.6, hasta: 10, en: [-8, -2.7, 2.7, 8] as readonly number[] },
+  cornisa: { u: 12, v0: 65.5, v1: 88.5, desde: 10, hasta: 11.4 },
+  atico: { u: 7, v0: 68, v1: 86, desde: 11.4, hasta: 13.2 },
+} as const;
+
+function carasDeLaOficina(casilla: number): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  for (const e of OFICINA.escalones) salida.push(...caja(casilla, -e.u, e.u, e.v0, e.v1, e.desde, e.hasta, COLOR_DE_OBRA.piedra));
+  const c = OFICINA.cuerpo;
+  salida.push(...caja(casilla, -c.u, c.u, c.v0, c.v1, c.desde, c.hasta, COLOR_DE_OBRA.sillar));
+  const co = OFICINA.columna;
+  for (const u of co.en) salida.push(...caja(casilla, u - co.lado / 2, u + co.lado / 2, co.v - co.lado / 2, co.v + co.lado / 2, co.desde, co.hasta, COLOR_DE_OBRA.piedra));
+  const cor = OFICINA.cornisa;
+  salida.push(...caja(casilla, -cor.u, cor.u, cor.v0, cor.v1, cor.desde, cor.hasta, COLOR_DE_OBRA.piedra));
+  const a = OFICINA.atico;
+  salida.push(...caja(casilla, -a.u, a.u, a.v0, a.v1, a.desde, a.hasta, COLOR_DE_OBRA.sillar));
+  return salida;
+}
+
+/**
+ * LA TASA DE LUJO (casilla 38). «Te dejo que seas creativo», dijo Miguel.
+ *
+ * Una tasa de lujo no es un edificio: es lo que te cobran por tener algo caro. Así que aquí no hay
+ * edificio, hay un ESCAPARATE: alfombra granate, pedestal de mármol y encima una joya tallada de
+ * ocho caras, que es la única pieza del tablero que no es un prisma.
+ *
+ * La joya se hace con dos pirámides pegadas por su cintura, y sus ocho caras son triángulos —el
+ * cuarto punto repetido—. Las vueltas salen de la misma cuenta que todo lo demás: un recorrido que
+ * va al derecho en `(u, v)` mira hacia ARRIBA en el mundo, así que la cintura se recorre al derecho
+ * para las caras de arriba y al revés para las de abajo.
+ */
+const JOYA = { radio: 3.4, cintura: 10.6, punta: 13.4, culata: 8.2, centroV: 74 } as const;
+const TASA_DE_LUJO = {
+  alfombra: { u: 10, v0: 60.5, v1: 90 },
+  pedestal: { u: 4, v0: 70, v1: 78, alto: 7 },
+} as const;
+
+function carasDeLaJoya(casilla: number, centroU: number, centroV: number): CaraDeObra[] {
+  const r = JOYA.radio;
+  /* La cintura, al derecho en `(u, v)`: cuatro puntos sobre los dos ejes. */
+  const cintura: readonly PuntoDeObra[] = [
+    [centroU + r, JOYA.cintura, centroV],
+    [centroU, JOYA.cintura, centroV + r],
+    [centroU - r, JOYA.cintura, centroV],
+    [centroU, JOYA.cintura, centroV - r],
+  ];
+  const punta: PuntoDeObra = [centroU, JOYA.punta, centroV];
+  const culata: PuntoDeObra = [centroU, JOYA.culata, centroV];
+  const salida: CaraDeObra[] = [];
+  for (let k = 0; k < 4; k++) {
+    const a = cintura[k] as PuntoDeObra;
+    const b = cintura[(k + 1) % 4] as PuntoDeObra;
+    salida.push(triangulo(casilla, a, b, punta, COLOR_DE_OBRA.joya));
+    salida.push(triangulo(casilla, b, a, culata, COLOR_DE_OBRA.joyaOscura));
+  }
+  return salida;
+}
+
+function carasDeLaTasa(casilla: number): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  const a = TASA_DE_LUJO.alfombra;
+  salida.push(losa(casilla, -a.u, a.u, a.v0, a.v1, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.alfombra));
+  const p = TASA_DE_LUJO.pedestal;
+  salida.push(...caja(casilla, -p.u, p.u, p.v0, p.v1, ALZA_DEL_ASFALTO, p.alto, COLOR_DE_OBRA.marmol));
+  salida.push(...carasDeLaJoya(casilla, 0, JOYA.centroV));
+  return salida;
+}
+
+/** Qué levanta cada casilla lateral. Las que no están aquí todavía no tienen obra. */
+const OBRA_DE_LA_CASILLA: Readonly<Record<number, (casilla: number) => CaraDeObra[]>> = {
+  2: carasDelCofre,
+  4: carasDeLaOficina,
+  17: carasDelCofre,
+  33: carasDelCofre,
+  38: carasDeLaTasa,
+};
+
+function carasDeLasCasillas(): CaraDeObra[] {
+  return Object.entries(OBRA_DE_LA_CASILLA).flatMap(([clave, hace]) => hace(Number(clave)));
+}
+
+
 /* ──────────────────────────────── Todas las obras ──────────────────────────────── */
 
 let hechas: CaraDeObra[] | null = null;
 
 /** Todas las caras de todas las obras del anillo, en coordenadas de casilla. */
 export function carasDeLasObras(): CaraDeObra[] {
-  if (hechas === null) hechas = [...carasDelAparcamiento(), ...carasDeLaCarcel(), ...carasDeLaComisaria()];
+  if (hechas === null) hechas = [...carasDelAparcamiento(), ...carasDeLaCarcel(), ...carasDeLaComisaria(), ...carasDeLasCasillas()];
   return hechas;
 }
 
-/** Dos triángulos por cuadro: lo que el presupuesto guarda para las obras. */
+/** Dos triángulos por cuadro y uno por cara de tres puntos: lo que el presupuesto guarda. */
 export function triangulosDeLasObras(): number {
-  return carasDeLasObras().length * 2;
+  return carasDeLasObras().reduce((n, cara) => n + (esTriangulo(cara) ? 1 : 2), 0);
 }
 
 /** Una cara ya en el mundo: los mismos cuatro puntos, en `[x, y, z]`. */
@@ -369,7 +542,17 @@ export interface CaraEnElMundo {
  */
 export function carasDeLaObraEnElMundo(casilla: number): CaraEnElMundo[] {
   const m = marcoDeCasilla(casilla);
-  const alMundo = ([u, y, v]: PuntoDeObra): PuntoDeObra => [m.fuera.x * u + m.adelante.x * -v, y, m.fuera.z * u + m.adelante.z * -v];
+  /*
+   * Una esquina y una casilla lateral no usan el mismo marco: en la esquina, `(u, v)` son las dos
+   * distancias al centro del tablero (324..432); en una lateral, `u` va a lo largo de la marcha
+   * —de −36 a +36— y `v` es la profundidad de las bandas (0..108). Las dos, eso sí, llevan al
+   * mundo con determinante −1, así que las vueltas de `losa` y `caja` valen para las dos.
+   */
+  const alMundo = ([u, y, v]: PuntoDeObra): PuntoDeObra => {
+    if (m.esEsquina) return [m.fuera.x * u + m.adelante.x * -v, y, m.fuera.z * u + m.adelante.z * -v];
+    const p = puntoEnLaCasillaPorV(m, u, v);
+    return [p.x, y, p.z];
+  };
   return carasDeLasObras()
     .filter((cara) => cara.casilla === casilla)
     .map((cara) => ({

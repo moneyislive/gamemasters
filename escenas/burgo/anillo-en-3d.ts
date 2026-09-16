@@ -1460,8 +1460,8 @@ const puerta: readonly PiezaDeCasilla[] = [
   { pieza: PIEZA.semaforoC, giroEnCuartos: 2, sitio: [-28, ATREZO.centro] },
 ];
 
-/** El Arca del Concejo: su emblema y un contenedor. */
-const arca: readonly PiezaDeCasilla[] = [{ pieza: PIEZA.contenedor, giroEnCuartos: 0, sitio: [18, ATREZO.centro] }];
+/** El Fondo Vecinal: el cofre lo levanta `obras.ts`, y al lado no va nada más. */
+const arca: readonly PiezaDeCasilla[] = [];
 /** El Pregón: su emblema y una papelera. */
 const pregon: readonly PiezaDeCasilla[] = [{ pieza: PIEZA.papelera, giroEnCuartos: 0, sitio: [18, ATREZO.centro], menudo: true }];
 /** El Molino y el Pozo: su emblema y una boca de riego. */
@@ -1580,19 +1580,25 @@ export const SEPARACION_DE_LA_FLECHA = 33;
  * El contorno `puerta` de `iconos.ts` sigue compilado para la hoja, que sí tiene texto.
  */
 const EMBLEMA_DE_LA_CASILLA: Readonly<Record<number, EmblemaDelBurgo>> = {
-  2: 'arca',
-  4: 'tasa',
   7: 'pregon',
   12: 'oficio',
-  17: 'arca',
   22: 'pregon',
   28: 'oficio',
-  33: 'arca',
   36: 'pregon',
-  38: 'tasa',
 };
 
-/** Dónde va el emblema dentro de la casilla: a la izquierda si hay pieza al lado, centrado si no. */
+/**
+ * Dónde va el emblema dentro de la casilla: a la izquierda si hay pieza al lado, centrado si no.
+ *
+ * ═══ Y POR QUÉ YA NO LO LLEVAN LAS DIEZ ═══
+ *
+ * Un emblema es un icono PLANO de 27 de lado tumbado en la banda de atrezo, o sea justo donde
+ * ahora se levantan los edificios de `obras.ts`. Puestos los dos, el cofre se come media arca y lo
+ * que queda asomando no se lee ni como icono ni como sombra. Así que la casilla que ya tiene
+ * volumen propio pierde su emblema: **el edificio es el icono**. Lo conservan las que todavía no
+ * lo tienen —y lo perderán cuando les toque— y las dos flechas de la marcha, que no dicen qué es
+ * una casilla sino hacia dónde se va.
+ */
 export function huecosDeLosEmblemas(): EmblemaEnElTablero[] {
   const salida: EmblemaEnElTablero[] = [];
   for (const [clave, emblema] of Object.entries(EMBLEMA_DE_LA_CASILLA)) {

@@ -82,12 +82,12 @@ corrige en la fase 4.
 | 10 | CÁRCEL ✅ | Muro, dos torretas con tejadillo, seis barrotes, dos pabellones y un ala; patio de hormigón | Código fundido + `verja` (que se anima) | La reja ya sube y baja tras el peón |
 | 20 | PARKING ✅ | La esquina entera asfaltada, sesenta plazas amarillas, catorce coches y el cartel tumbado con la `P` | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
 | 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo | Código fundido + la avenida y su patrulla | pendiente: el peón entra en la celda (0,7) |
-| 2·17·33 | FONDO VECINAL | Cofre de madera con herrajes sobre el zócalo del ayuntamiento | Código | La tapa se abre y sale una moneda (0,7) |
+| 2·17·33 | FONDO VECINAL ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra | Código fundido | pendiente: la tapa se abre (0,7) |
 | 7·22·36 | SUCESOS | Casino: cuerpo con marquesina, rótulo vertical de bombillas y ruleta en el suelo | Código | La ruleta gira vuelta y media y para (0,8) |
 | 12 | CENTRAL ELÉCTRICA | Dos torres de refrigeración, chimenea y un poste de alta tensión | Código | Chispazo entre los postes (0,3) |
 | 28 | CANAL DE AGUAS | Depósito elevado y alberca | `torre-de-agua` (del pack) + código | Onda en la alberca (0,5) |
-| 4 | IMPUESTO | Oficina del estado: frontón, cuatro columnas y escalinata | Código + `columna` | Una moneda sube la escalinata y entra (0,6) |
-| 38 | TASA DE LUJO | Joya sobre pedestal bajo campana de cristal, con alfombra | Código | La joya gira y la campana baja (0,5) |
+| 4 | IMPUESTO ✅ | Escalinata de dos peldaños, cuatro columnas, cornisa y ático escalonado | Código fundido | pendiente: la moneda sube la escalinata (0,6) |
+| 38 | TASA DE LUJO ✅ | Alfombra granate, pedestal de mármol y una joya de ocho caras —la única pieza que no es un prisma— | Código fundido (triángulos) | pendiente: la joya gira (0,5) |
 | 5·15·25·35 | LAS CUATRO ESTACIONES | Cuatro estaciones DISTINTAS con andén y marquesina | Código | El tren para 1,5 s en el andén |
 | — | EL FERROCARRIL | Vía de traviesas y dos carriles por **todo el perímetro**, por fuera del borde | Código, fundido | Dos trenes dando la vuelta, continuo |
 
@@ -127,6 +127,14 @@ trece edificios de código a ~1.500 son 20.000 de los 718.000 que sobran.
      demás, en la fase 6). Con ella, **las cuatro esquinas están**.
 3. **Las laterales** (fase 4): fondo vecinal, sucesos, eléctrica, aguas, impuesto y tasa. Aquí
    entra también el arreglo de los nombres viejos.
+   - **Hechas: el cofre (2, 17, 33), la oficina del Impuesto (4) y la joya de la Tasa (38).** Con
+     ellas la máquina aprendió dos cosas que le faltaban: el marco de una casilla LATERAL —otra
+     vara que la de una esquina, mismo determinante −1, mismas vueltas— y las caras de TRES
+     puntos, que se escriben repitiendo el cuarto.
+   - Y una regla de composición que vale para las cinco que faltan: **la casilla que tiene obra
+     pierde su emblema plano**, porque el emblema ocupa exactamente la banda donde se levanta el
+     edificio. El edificio es el icono.
+   - Faltan el casino (7, 22, 36), la central eléctrica (12) y el canal de aguas (28).
 4. **El ferrocarril** (fase 5): las cuatro estaciones, la vía del perímetro y los trenes. Es la
    más cara y la única que toca el mundo fuera del anillo.
 5. **Las animaciones** (fase 6): una función pura por animación en `coreografia.ts` —que el

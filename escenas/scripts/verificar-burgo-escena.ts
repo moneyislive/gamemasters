@@ -877,8 +877,23 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
   const laterales = Array.from({ length: CASILLAS }, (_, i) => i).filter((i) => !ESQUINAS.includes(i));
   const sinFila = laterales.filter((i) => ATREZO_DE_LA_CASILLA[i] === undefined);
   comprobar('las 36 casillas laterales tienen fila en ATREZO_DE_LA_CASILLA (el Diezmo y la Alcabala, vacía a propósito: sólo emblema y cifra)', sinFila.length === 0, sinFila);
-  const mudas = laterales.filter((i) => (ATREZO_DE_LA_CASILLA[i] ?? []).length === 0 && !huecosDeLosEmblemas().some((e) => e.casilla === i) && guarismosDelPrecio(i).length === 0);
-  comprobar('y ninguna se queda muda: o lleva atrezo, o emblema, o cifra', mudas.length === 0, mudas);
+  /*
+   * NINGUNA CASILLA SE QUEDA MUDA, y la lista de formas de hablar ha crecido. Eran tres —atrezo,
+   * emblema o cifra— y ahora son cinco: una casilla puede decir lo que es con una OBRA de
+   * `obras.ts` (el cofre del Fondo no lleva ni pieza ni emblema: lleva cofre) o con su NOMBRE
+   * escrito en la franja. Lo que la regla vigila sigue siendo lo mismo: que no haya una casilla en
+   * la que no se vea nada.
+   */
+  const conObra = new Set(casillasConObra());
+  const mudas = laterales.filter(
+    (i) =>
+      (ATREZO_DE_LA_CASILLA[i] ?? []).length === 0 &&
+      !huecosDeLosEmblemas().some((e) => e.casilla === i) &&
+      guarismosDelPrecio(i).length === 0 &&
+      !conObra.has(i) &&
+      letrasDelRotulo(i).length === 0,
+  );
+  comprobar('y ninguna se queda muda: o lleva atrezo, o emblema, o cifra, o obra, o su nombre', mudas.length === 0, mudas);
 
   const todos = laterales.flatMap((i) => problemasDelAtrezo(i, ATREZO_DE_LA_CASILLA[i] ?? []));
   const de = (etiqueta: string): string[] => todos.filter((q) => q.startsWith(`${etiqueta}:`));
@@ -962,7 +977,13 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
     const { v, aLoLargo } = enElMarco(m, { x: e.x, z: e.z });
     return v - LADO_DEL_EMBLEMA / 2 < ATREZO.desde || v + LADO_DEL_EMBLEMA / 2 > ATREZO.hasta || Math.abs(aLoLargo) + LADO_DEL_EMBLEMA / 2 > ANCHO_DE_CASILLA / 2;
   });
-  comprobar('los diez emblemas de casilla y las dos flechas están puestos, y caben en la banda de atrezo sin salirse', emblemas.length === 12 && emblemasMal.length === 0, emblemasMal.map((e) => `${e.casilla}/${e.emblema}`));
+  /* Los emblemas que quedan —los de las casillas sin obra todavía— más las dos flechas de la marcha. */
+  const emblemasDeclarados = emblemas.filter((e) => !ESQUINAS.includes(e.casilla)).length;
+  comprobar(
+    `los ${String(emblemasDeclarados)} emblemas de casilla y las dos flechas están puestos, y caben en la banda de atrezo sin salirse`,
+    emblemas.length === emblemasDeclarados + 2 && emblemasDeclarados > 0 && emblemasMal.length === 0,
+    emblemasMal.map((e) => `${e.casilla}/${e.emblema}`),
+  );
   const barriosDelReglamento = BARRIOS.flatMap((b) => b.solares);
   /*
    * LOS 22 SOLARES, TODOS IGUALES Y SIN EDIFICIO.
@@ -2111,7 +2132,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   comprobar('los rótulos del tablero se funden en UNA geometría con triángulos dentro', rotulos !== null && rotulos.triangulos > 0, rotulos === null ? 'null' : rotulos.triangulos);
   if (rotulos !== null) {
     comprobar(
-      `están los ${String(guarismosDelTablero())} dígitos del reglamento, los doce emblemas y las ${String(letrasDelTablero())} letras de los rótulos, ni una menos`,
+      `están los ${String(guarismosDelTablero())} dígitos del reglamento, los ${String(huecosDeLosEmblemas().length)} emblemas y las ${String(letrasDelTablero())} letras de los rótulos, ni una menos`,
       rotulos.guarismos === guarismosDelTablero() && rotulos.emblemas === huecosDeLosEmblemas().length && rotulos.letras === letrasDelTablero(),
       { guarismos: rotulos.guarismos, emblemas: rotulos.emblemas, letras: rotulos.letras },
     );

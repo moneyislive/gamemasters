@@ -524,9 +524,15 @@ export function geometriaDeLasObras(): THREE.BufferGeometry | null {
   const caras: CaraEnElMundo[] = [];
   for (const casilla of casillasConObra()) caras.push(...carasDeLaObraEnElMundo(casilla));
   if (caras.length === 0) return null;
-  const posiciones = new Float32Array(caras.length * 6 * 3);
-  const colores = new Float32Array(caras.length * 6 * 3);
-  const normales = new Float32Array(caras.length * 6 * 3);
+  /* Tres puntos por triángulo y seis por cuadro: una cara con el cuarto punto repetido es un triángulo. */
+  const trianguloDe = (cara: CaraEnElMundo): boolean => {
+    const [, , c, d] = cara.puntos;
+    return c[0] === d[0] && c[1] === d[1] && c[2] === d[2];
+  };
+  const vertices = caras.reduce((n, cara) => n + (trianguloDe(cara) ? 3 : 6), 0);
+  const posiciones = new Float32Array(vertices * 3);
+  const colores = new Float32Array(vertices * 3);
+  const normales = new Float32Array(vertices * 3);
   const tinta = new THREE.Color();
   let v = 0;
   for (const cara of caras) {
@@ -545,7 +551,7 @@ export function geometriaDeLasObras(): THREE.BufferGeometry | null {
     ny /= largo;
     nz /= largo;
     tinta.set(cara.color);
-    for (const punto of [a, b, c, a, c, d]) {
+    for (const punto of trianguloDe(cara) ? [a, b, c] : [a, b, c, a, c, d]) {
       posiciones[v * 3] = punto[0] as number;
       posiciones[v * 3 + 1] = punto[1] as number;
       posiciones[v * 3 + 2] = punto[2] as number;
