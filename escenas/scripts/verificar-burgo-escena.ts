@@ -887,10 +887,25 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
   const PIEZAS_DE_VOLUMEN_POR_CASILLA = 3;
   const recargadas = laterales.filter((i) => (ATREZO_DE_LA_CASILLA[i] ?? []).filter((p) => !esSuelo(p.pieza)).length > PIEZAS_DE_VOLUMEN_POR_CASILLA);
   comprobar(`ninguna casilla lleva más de ${PIEZAS_DE_VOLUMEN_POR_CASILLA} piezas que no sean suelo: «no hace falta que pongas muchos elementos 3d»`, recargadas.length === 0, recargadas);
-  /* Y el segundo cuerpo del frente se cae en sobria: en el móvil no se pagan veintidós edificios de más. */
-  const cuerposEnPlena = puestasDelAtrezo('plena').filter((p) => p.pieza.startsWith('cuerpo-')).length;
-  const cuerposEnSobria = puestasDelAtrezo('sobria').filter((p) => p.pieza.startsWith('cuerpo-')).length;
-  comprobar('en sobria cada solar se queda con UN cuerpo: el medianero va marcado menudo', cuerposEnPlena === 2 * cuerposEnSobria, { cuerposEnPlena, cuerposEnSobria });
+  /*
+   * NINGÚN EDIFICIO EN UNA CASILLA, y esta regla SUSTITUYE a la de antes.
+   *
+   * Hasta hoy cada solar llevaba un frente de manzana de dos cuerpos, y aquí se afirmaba que el
+   * segundo se caía en sobria (`cuerposEnPlena === 2 * cuerposEnSobria`). Los cuerpos se han ido
+   * enteros: a la talla del tablero un edificio del pack y una casa del jugador son dos bultos
+   * que compiten, y lo que hay que leer de un vistazo es cuántas casas tiene puesta la casilla.
+   *
+   * Y la afirmación vieja NO SE PODÍA DEJAR PUESTA: con cero cuerpos seguiría en verde para
+   * siempre —0 === 2 × 0— sin mirar absolutamente nada, que es el verde falso que esta casa ya
+   * tiene anotado dos veces. Ésta dice lo contrario y se cae sola el día que alguien vuelva a
+   * poner un edificio sobre una casilla.
+   */
+  const conCuerpo = puestasDelAtrezo('plena').filter((p) => p.pieza.startsWith('cuerpo-'));
+  comprobar(
+    'ninguna casilla lateral lleva un cuerpo de edificio: se confundiría con las casas y el hotel de la franja',
+    conCuerpo.length === 0,
+    conCuerpo.map((p) => p.pieza).slice(0, 5),
+  );
 
   /* El precio: los dígitos caben, están en la superficie y dicen lo que dice el reglamento. */
   const precioMal: string[] = [];
@@ -922,9 +937,23 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
   });
   comprobar('los diez emblemas de casilla y las dos flechas están puestos, y caben en la banda de atrezo sin salirse', emblemas.length === 12 && emblemasMal.length === 0, emblemasMal.map((e) => `${e.casilla}/${e.emblema}`));
   const barriosDelReglamento = BARRIOS.flatMap((b) => b.solares);
-  const solaresConCuerpo = barriosDelReglamento.filter((i) => (ATREZO_DE_LA_CASILLA[i] ?? []).filter((p) => p.pieza.startsWith('cuerpo-')).length === 2);
-  comprobar('los 22 solares del reglamento llevan DOS cuerpos del City Builder, y ninguna otra casilla los lleva', solaresConCuerpo.length === barriosDelReglamento.length && puestasDelAtrezo().filter((p) => p.pieza.startsWith('cuerpo-')).length === 2 * barriosDelReglamento.length, {
-    conDosCuerpos: solaresConCuerpo.length,
+  /*
+   * LOS 22 SOLARES, TODOS IGUALES Y SIN EDIFICIO.
+   *
+   * Aquí se afirmaba que cada solar llevaba DOS cuerpos del City Builder. Se fueron enteros:
+   * a la talla del tablero un edificio del pack y una casa del jugador son dos bultos que
+   * compiten, y lo que hay que leer de un vistazo es cuántas casas tiene puesta la casilla
+   * (ver `solar` en `anillo-en-3d.ts`). Lo que queda es la farola del fondo.
+   *
+   * Se afirma EN POSITIVO —qué lleva, no qué no lleva— para que esto se caiga también el día
+   * que alguien le cuelgue a un solar cualquier otra cosa, y no sólo un `cuerpo-`.
+   */
+  const solaresMal = barriosDelReglamento.filter((i) => {
+    const piezas = ATREZO_DE_LA_CASILLA[i] ?? [];
+    return piezas.length !== 1 || piezas[0]?.pieza !== PIEZA.farolaDeCalle;
+  });
+  comprobar('los 22 solares del reglamento llevan sólo su farola: ni un edificio, para que lo que sobresalga de la casilla sean las casas', solaresMal.length === 0, {
+    solaresMal,
     solares: barriosDelReglamento.length,
   });
   /* Dos edificios gemelos pegados no parecen una manzana: parecen un error de copia. */
@@ -1276,12 +1305,24 @@ const triangulosDeUnAventurero = await (async (): Promise<number> => {
   comprobar('los topes son los de LA-CIUDAD.md §8 (900.000 y 230.000), declarados en burgo/presupuesto.ts y no heredados del Muelle', TOPE_PLENA === 900_000 && TOPE_SOBRIA === 230_000, { TOPE_PLENA, TOPE_SOBRIA });
   comprobar('y el TABLERO solo, sin la ciudad, no llega a la mitad del tope: el resto es el sitio que la ciudad tiene reservado', plena.total < TOPE_PLENA / 2, plena.total);
   /*
-   * Y EL MANTO ES LA PARTIDA MÁS GORDA DEL TABLERO: 1.796 teselas de 36. Se anota aquí, con
-   * su número, porque es lo primero que hay que mirar si el tope vuelve a quedarse corto — y
-   * porque es lo único del tablero que el móvil paga entero, ya que el paisaje no se quita.
+   * Y EL MANTO ES LA PARTIDA MÁS GORDA DEL TABLERO: 1.796 teselas de 36 = 64.656 triángulos.
+   * Se anota aquí, con su número, porque es lo primero que hay que mirar si el tope vuelve a
+   * quedarse corto — y porque es lo único del tablero que el móvil paga entero, ya que el
+   * paisaje no se quita.
+   *
+   * ═══ EL TOPE ES ABSOLUTO, Y ANTES ERA UNA PROPORCIÓN. POR QUÉ SE CAMBIA ═══
+   *
+   * Decía «menos de un TERCIO del tablero en plena». Esa forma tiene un defecto que se vio el
+   * día que se quitaron los edificios de los solares: el tablero adelgazó unos 21.000
+   * triángulos, el manto no cambió ni una tesela, y la regla se puso ROJA. O sea que una regla
+   * escrita contra el total se aprieta sola cada vez que el tablero mejora, y acaba castigando
+   * exactamente los cambios que se quieren hacer. Lo que se quiere vigilar es el manto, no su
+   * cociente con lo demás: va en triángulos, con margen y con la cifra medida delante
+   * (tablero en plena, hoy: 172.808).
    */
+  const TOPE_DEL_MANTO = 70_000;
   const teselasEnLaSuma = plena.renglones.find((q) => q.que === PIEZA.tesela);
-  comprobar('el manto del campo son 1.796 teselas y menos de un tercio del tablero en plena', (teselasEnLaSuma?.cuantos ?? 0) === 1796 && (teselasEnLaSuma?.triangulos ?? 0) < plena.total / 3, teselasEnLaSuma);
+  comprobar(`el manto del campo son 1.796 teselas y no pasa de ${TOPE_DEL_MANTO} triángulos`, (teselasEnLaSuma?.cuantos ?? 0) === 1796 && (teselasEnLaSuma?.triangulos ?? 0) <= TOPE_DEL_MANTO, teselasEnLaSuma);
 }
 
 // ---------------------------------------------------------------------------

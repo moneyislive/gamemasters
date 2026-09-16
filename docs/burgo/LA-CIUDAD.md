@@ -253,20 +253,26 @@ Los precios del reglamento van de 60 a 400: tres dígitos como mucho. Las rentas
 
 | Clase | Atrezo, en la banda `v = 60..90` |
 | --- | --- |
-| Solar de barrio (22) | Un **frente de manzana** de DOS `cuerpo-*` del City Builder a `u = ±13`, mirando hacia dentro, más una `farola-de-calle` en la esquina de atrás (`u = −31`, `v = 84`). Tres piezas, ni una más. |
+| Solar de barrio (22) | **Sin edificio.** Sólo una `farola-de-calle` en la esquina de atrás (`u = −31`, `v = 84`): una pieza. Lo que sobresale de un solar son las casas y el hotel del jugador, en la franja. |
 | Las cuatro Puertas (5, 15, 25, 35) | **Cuatro** `calzada-paso` de cebra a `u = ±6` y `±18` —que cubren los 48 de la avenida sin dejar hueco— y **dos** `semaforo-c` con el brazo sobre la calzada, uno por sentido, en la acera de 12 que queda a cada lado. |
 | Arca del Concejo (2, 17, 33) | El emblema `arca` a `u = −14` y un `contenedor` a `u = +18`. |
 | Pregón (7, 22, 36) | El emblema `pregon` y una `papelera`. |
 | Molino y Pozo (12, 28) | El emblema `oficio` y una `boca-de-riego`. |
 | Diezmo y Alcabala (4, 38) | El emblema `tasa` y su cifra. Sin volumen. |
 
-**Por qué dos cuerpos y no uno.** Con la casilla en 32 de frente, un edificio suelto llenaba
-la casilla. Con 72 se lee como una maqueta olvidada en mitad de un descampado. Dos cuerpos a
-±13 ocupan de 14,5 a 32 de los 70 que la casilla permite, y siguen sin ser «muchos elementos
-3D»: lo que define la casilla es la franja de color, el filete, el marco y el precio grande.
-El **segundo cuerpo va marcado `menudo`** y se cae en calidad sobria, donde el móvil no puede
-pagar veintidós edificios de más. Los dos de un mismo frente son siempre **distintos**: dos
-edificios gemelos pegados no parecen una manzana, parecen un error de copia.
+**Por qué ningún edificio.** Hasta el 16 de septiembre de 2026 cada solar llevaba un frente de
+manzana de DOS `cuerpo-*` a `u = ±13`, y se quitó por una razón de **lectura**, no de
+presupuesto: a la talla del tablero un edificio del pack y una casa del jugador son dos bultos
+del mismo tamaño compitiendo en la misma casilla, y contar las casas de un vistazo —que es lo
+que se hace cien veces por partida— se volvía un ejercicio de vista. Con el frente quitado, lo
+único que sobresale de una casilla es **lo que el jugador ha construido**.
+
+La farola se queda porque no es un edificio: va al fondo, contra el marco, y lejos del carril de
+las casas (`v = 10,5`), así que da escala sin disputarle el sitio a lo que cuenta. Lo que define
+la casilla sigue siendo la franja de color, el filete, el marco y el precio grande.
+
+De propina, el tablero adelgazó unos **21.000 triángulos** en plena —172.808 hoy, de un tope de
+900.000—, que es sitio para lo que venga después.
 
 El emblema mide **27** de lado (creció con el dígito, por la misma razón) y va a `u = −14`
 cuando la casilla lleva pieza, centrado cuando no.

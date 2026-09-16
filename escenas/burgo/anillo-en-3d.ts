@@ -1221,23 +1221,24 @@ export interface PiezaDeCasilla {
 export const CUERPO_SOBRE_LA_CASILLA = -0.6;
 
 /**
- * UN SOLAR: un FRENTE DE MANZANA de dos cuerpos del City Builder mirando hacia dentro y una
- * farola detrás. Nada más.
+ * UN SOLAR: SIN EDIFICIO, y a propósito. Lo que hay que ver en una casilla de propiedad es
+ * CUÁNTAS CASAS tiene puestas, y eso vive en la franja de color.
  *
- * Eran uno solo cuando la casilla medía 32 de frente; con 72 un edificio suelto se lee como
- * una maqueta olvidada en mitad de un descampado. Dos a `u = ±13` ocupan de 14,5 a 32 de los
- * 70 que la casilla permite —los `cuerpo-e`..`h` miden 12,04 de frente y los `a`..`d` de 7,24
- * a 9,64— y siguen sin ser «muchos elementos 3d»: lo que define la casilla es la franja de
- * color, el filete, el marco y el precio. El SEGUNDO va marcado `menudo` y se cae en calidad
- * sobria, que es donde el móvil no puede pagar veintidós edificios de más.
+ * Hasta hoy cada solar llevaba un frente de manzana de dos cuerpos del City Builder a
+ * `u = ±13`. Se van enteros, y no por presupuesto sino por LECTURA: a la talla del tablero un
+ * edificio del pack y una casa del jugador son dos bultos del mismo tamaño compitiendo en la
+ * misma casilla, y contar las casas de un vistazo —que es lo que se hace cien veces por
+ * partida— se volvía un ejercicio de vista. Con el frente quitado, lo único que sobresale de
+ * una casilla es lo que el jugador ha construido.
+ *
+ * Queda la farola: no es un edificio, va al fondo (`v = 84`, contra el marco) y lejos del
+ * carril de las casas (`v = 10,5`), así que da escala y sombra sin disputarle el sitio a lo que
+ * de verdad cuenta. Lo que define la casilla sigue siendo la franja, el filete, el marco y el
+ * precio.
  */
-function solar(cuerpo: NombreDePieza, medianero: NombreDePieza): readonly PiezaDeCasilla[] {
-  return [
-    { pieza: cuerpo, giroEnCuartos: 0, sitio: [-13, ATREZO.centro], alza: CUERPO_SOBRE_LA_CASILLA },
-    { pieza: medianero, giroEnCuartos: 0, sitio: [13, ATREZO.centro], alza: CUERPO_SOBRE_LA_CASILLA, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, giroEnCuartos: 0, sitio: [-31, 84], menudo: true },
-  ];
-}
+const solar: readonly PiezaDeCasilla[] = [
+  { pieza: PIEZA.farolaDeCalle, giroEnCuartos: 0, sitio: [-31, 84], menudo: true },
+];
 
 /**
  * UNA PUERTA: el paso de cebra de la avenida que entra por ahí, con sus dos semáforos.
@@ -1283,42 +1284,42 @@ const tributo: readonly PiezaDeCasilla[] = [];
  * que la silueta de la casilla escalone y no sea un muro.
  */
 export const ATREZO_DE_LA_CASILLA: Readonly<Record<number, readonly PiezaDeCasilla[]>> = {
-  1: solar(PIEZA.cuerpoA, PIEZA.cuerpoB), // Lodo — pardo, 2 plantas
+  1: solar, // Lodo — pardo, 2 plantas
   2: arca,
-  3: solar(PIEZA.cuerpoB, PIEZA.cuerpoA), // Corral — pardo
+  3: solar, // Corral — pardo
   4: tributo, // El Diezmo
   5: puerta,
-  6: solar(PIEZA.cuerpoB, PIEZA.cuerpoA), // Tejedores — celeste, 2 plantas
+  6: solar, // Tejedores — celeste, 2 plantas
   7: pregon,
-  8: solar(PIEZA.cuerpoA, PIEZA.cuerpoB), // Tintoreros — celeste
-  9: solar(PIEZA.cuerpoB, PIEZA.cuerpoA), // Ribera — celeste
-  11: solar(PIEZA.cuerpoA, PIEZA.cuerpoB), // Cera — rosa, 2 plantas
+  8: solar, // Tintoreros — celeste
+  9: solar, // Ribera — celeste
+  11: solar, // Cera — rosa, 2 plantas
   12: oficio, // El Molino
-  13: solar(PIEZA.cuerpoB, PIEZA.cuerpoA), // Bordadores — rosa
-  14: solar(PIEZA.cuerpoA, PIEZA.cuerpoB), // Ciegos — rosa
+  13: solar, // Bordadores — rosa
+  14: solar, // Ciegos — rosa
   15: puerta,
-  16: solar(PIEZA.cuerpoC, PIEZA.cuerpoD), // Herreros — naranja, 3 plantas
+  16: solar, // Herreros — naranja, 3 plantas
   17: arca,
-  18: solar(PIEZA.cuerpoD, PIEZA.cuerpoC), // Caldereros — naranja
-  19: solar(PIEZA.cuerpoC, PIEZA.cuerpoD), // Espaderos — naranja
-  21: solar(PIEZA.cuerpoD, PIEZA.cuerpoF), // Mercaderes — rojo, 3 plantas
+  18: solar, // Caldereros — naranja
+  19: solar, // Espaderos — naranja
+  21: solar, // Mercaderes — rojo, 3 plantas
   22: pregon,
-  23: solar(PIEZA.cuerpoC, PIEZA.cuerpoG), // Mercado — rojo
-  24: solar(PIEZA.cuerpoD, PIEZA.cuerpoE), // Lonja — rojo
+  23: solar, // Mercado — rojo
+  24: solar, // Lonja — rojo
   25: puerta,
-  26: solar(PIEZA.cuerpoC, PIEZA.cuerpoE), // Plateros — amarillo, 3 plantas
-  27: solar(PIEZA.cuerpoE, PIEZA.cuerpoC), // Libreros — amarillo
+  26: solar, // Plateros — amarillo, 3 plantas
+  27: solar, // Libreros — amarillo
   28: oficio, // El Pozo
-  29: solar(PIEZA.cuerpoC, PIEZA.cuerpoG), // Cambistas — amarillo
-  31: solar(PIEZA.cuerpoH, PIEZA.cuerpoG), // Hospital — verde, 4 plantas
-  32: solar(PIEZA.cuerpoH, PIEZA.cuerpoF), // Colegiata — verde
+  29: solar, // Cambistas — amarillo
+  31: solar, // Hospital — verde, 4 plantas
+  32: solar, // Colegiata — verde
   33: arca,
-  34: solar(PIEZA.cuerpoH, PIEZA.cuerpoG), // Escribanos — verde
+  34: solar, // Escribanos — verde
   35: puerta,
   36: pregon,
-  37: solar(PIEZA.cuerpoH, PIEZA.cuerpoF), // Alcázar — azul, 4 plantas
+  37: solar, // Alcázar — azul, 4 plantas
   38: tributo, // La Alcabala
-  39: solar(PIEZA.cuerpoH, PIEZA.cuerpoG), // Calle Mayor — azul
+  39: solar, // Calle Mayor — azul
 };
 
 /** La puesta de UNA pieza de atrezo de una casilla, en el mundo. */
