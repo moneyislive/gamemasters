@@ -171,7 +171,7 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
-import { CASILLA_DE_LA_OFICINA, DEL_MUNDO, MONEDA_DE_LA_RECAUDACION, RECORRIDO_DE_LA_MONEDA, VIA, cajasDeLaOficina, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDeLasObras, carasDelTren, casillasConObra, disco, esTriangulo, largoDeLaVia, letrasDeLosCarteles, monedaEnLaEscalinata, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda, triangulosDeLasObras } from '../burgo/obras';
+import { CASILLA_DE_LA_OFICINA, COLOR_DE_OBRA, DEL_MUNDO, MONEDA_DE_LA_RECAUDACION, RECORRIDO_DE_LA_MONEDA, VIA, cajasDeLaOficina, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDeLasObras, carasDelTren, casillasConObra, disco, esTriangulo, largoDeLaVia, letrasDeLosCarteles, monedaEnLaEscalinata, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda, triangulosDeLasObras } from '../burgo/obras';
 import type { CaraDeObra } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
@@ -3193,6 +3193,78 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   comprobar(`la lupa cenital de las obras ha mirado ${String(cenital.rayos)} rayos sobre ${String(carasDeObraPorCasilla.length)} casillas, y no cero`, cenital.rayos >= 200 && carasDeObraPorCasilla.length >= 2, { rayos: cenital.rayos, casillas: carasDeObraPorCasilla.length });
   comprobar('y ninguna de las caras que se ven desde arriba está del revés', cenital.alReves === 0, cenital.alReves);
   comprobar('se ve fallar: con la de arriba volteada, la lupa las caza todas', miradaCenital(true).alReves === cenital.rayos);
+
+  /*
+   * LO QUE ESTÁ DENTRO DE UN HUECO SE VE DESDE ARRIBA.
+   *
+   * La lupa de arriba pregunta si lo primero que se ve mira arriba, y no QUÉ es: el agua de la
+   * alberca del Canal estuvo a 1,15 debajo de la tapa de hormigón de su propia caja, a 1,40, y la
+   * lupa daba verde porque la tapa miraba arriba como debe. Desde el aire, la «alberca con agua» era
+   * un bloque gris. Así que las superficies que existen para verse dentro de algo —el agua, las
+   * bocas oscuras de las torres de la central— se miran con rayos EXACTOS, triángulo a triángulo,
+   * y lo primero que corta cada rayo tiene que ser de su color.
+   */
+  {
+    type CaraEnElMundoDeObra = ReturnType<typeof carasDeLaObraEnElMundo>[number];
+    const primeraDesdeArriba = (caras: readonly CaraEnElMundoDeObra[], x: number, z: number): string | null => {
+      let mejorY = Number.NEGATIVE_INFINITY;
+      let color: string | null = null;
+      for (const cara of caras) {
+        const [a, b, c, d] = cara.puntos;
+        const esTri = c[0] === d[0] && c[1] === d[1] && c[2] === d[2];
+        for (const [t0, t1, t2] of esTri ? [[a, b, c] as const] : [[a, b, c] as const, [a, c, d] as const]) {
+          const ux = t1[0] - t0[0];
+          const uz = t1[2] - t0[2];
+          const wx = t2[0] - t0[0];
+          const wz = t2[2] - t0[2];
+          const det = ux * wz - uz * wx;
+          if (Math.abs(det) < 1e-9) continue;
+          const s = ((x - t0[0]) * wz - (z - t0[2]) * wx) / det;
+          const t = ((z - t0[2]) * ux - (x - t0[0]) * uz) / det;
+          if (s < 0 || t < 0 || s + t > 1) continue;
+          const y = t0[1] + s * (t1[1] - t0[1]) + t * (t2[1] - t0[1]);
+          if (y > mejorY) {
+            mejorY = y;
+            color = cara.color;
+          }
+        }
+      }
+      return color;
+    };
+    /* La parte de una superficie que se ve: rayos por dentro de su huella, a `margen` de sus bordes. */
+    const loQueSeVeDe = (caras: readonly CaraEnElMundoDeObra[], color: string): { readonly rayos: number; readonly vistos: number } => {
+      let rayos = 0;
+      let vistos = 0;
+      for (const cara of caras.filter((x) => x.color === color)) {
+        const [a, b, c, d] = cara.puntos;
+        const esTri = c[0] === d[0] && c[1] === d[1] && c[2] === d[2];
+        const vertices = esTri ? [a, b, c] : [a, b, c, d];
+        const centro = { x: vertices.reduce((s, q) => s + q[0], 0) / vertices.length, z: vertices.reduce((s, q) => s + q[2], 0) / vertices.length };
+        /* Hacia el centro de la cara desde cada vértice, al 30 % y al 70 %: dentro y lejos del borde. */
+        for (const q of vertices) {
+          for (const f of [0.3, 0.7]) {
+            rayos++;
+            if (primeraDesdeArriba(caras, centro.x + (q[0] - centro.x) * f, centro.z + (q[2] - centro.z) * f) === color) vistos++;
+          }
+        }
+      }
+      return { rayos, vistos };
+    };
+    const delCanal = carasDeLaObraEnElMundo(28);
+    const deLaCentral = carasDeLaObraEnElMundo(12);
+    const agua = loQueSeVeDe(delCanal, COLOR_DE_OBRA.agua);
+    const bocas = loQueSeVeDe(deLaCentral, COLOR_DE_OBRA.boca);
+    comprobar(
+      `el agua de la alberca y las bocas de las torres se ven desde arriba: ${String(agua.vistos)} de ${String(agua.rayos)} y ${String(bocas.vistos)} de ${String(bocas.rayos)} rayos dan primero en ellas`,
+      agua.rayos >= 8 && agua.vistos === agua.rayos && bocas.rayos >= 16 && bocas.vistos === bocas.rayos,
+      { agua, bocas },
+    );
+    /* La vacuna es la alberca de antes: una tapa de hormigón un cuarto por encima del agua. */
+    const conTapa = delCanal.flatMap((cara) =>
+      cara.color !== COLOR_DE_OBRA.agua ? [cara] : [cara, { color: COLOR_DE_OBRA.hormigon, puntos: cara.puntos.map((q) => [q[0], q[1] + 0.25, q[2]] as const) as unknown as CaraEnElMundoDeObra['puntos'] }],
+    );
+    comprobar('se ve fallar: con la tapa de hormigón por encima, como estuvo, el agua no se ve en ningún rayo', loQueSeVeDe(conTapa, COLOR_DE_OBRA.agua).vistos === 0);
+  }
 
   comprobar('y avanza hacia −(fuera + adelante), que es la derecha de quien mira una esquina desde su diagonal', delRevesEnEsquina.length === 0, delRevesEnEsquina);
   /*

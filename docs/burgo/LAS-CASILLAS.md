@@ -249,6 +249,11 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
      delante: desde el aire se veía girar la rayita amarilla sobre nada. Ahora las seis piezas
      vivas pasan por una lupa cenital exacta, triángulo a triángulo, con la ruleta de antes de
      vacuna.
+   - **Y otro fallo de antes, del mismo tipo:** el agua de la alberca del Canal estaba DEBAJO de la
+     tapa de hormigón de su propia caja (1,15 contra 1,40): desde el aire, un bloque gris. La lupa
+     de las obras daba verde porque la tapa miraba arriba como debe; preguntaba si lo primero que se
+     ve mira arriba, no QUÉ es. La alberca es ahora hueca, y una regla exige que el agua y las bocas
+     de las torres de la central sean lo primero que corta cada rayo que cae sobre ellas.
    - **Lo que no se ha hecho, y por qué:** el humo de la central, la onda de la alberca y el coche
      que aparca son adorno y no los pidió nadie.
 

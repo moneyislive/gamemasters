@@ -676,10 +676,15 @@ function carasDeLaCentral(casilla: number): CaraDeObra[] {
  * O sea: reconocible por su silueta y no por un cartel. La de una compañía de aguas es el
  * DEPÓSITO ELEVADO —un cilindro sobre cuatro patas— y la alberca. Van los dos, con la caseta de
  * bombas al lado para que el conjunto tenga escala.
+ *
+ * LA ALBERCA ES HUECA. Era una caja maciza de 1,4 con el agua a 1,15, o sea DEBAJO de su propia
+ * tapa de hormigón: desde el aire se veía un bloque gris, y ninguna regla lo notaba porque la tapa
+ * miraba arriba como debe. Ahora son un fondo que llega hasta el agua y cuatro bordes que la
+ * rodean, y `verify:burgo-escena` exige que el agua se vea desde arriba.
  */
 const AGUAS = {
   deposito: { u: -7, v: 76, radio: 5.2, patas: 7.5, alto: 6.5, segmentos: 12, pata: 0.8, separacion: 3.4 },
-  alberca: { u0: 1, u1: 13, v0: 68, v1: 84, borde: 0.9, alto: 1.4 },
+  alberca: { u0: 1, u1: 13, v0: 68, v1: 84, borde: 0.9, alto: 1.4, agua: 1.15 },
   caseta: { u0: -13, u1: -3, v0: 61, v1: 66.5, alto: 4.5 },
 } as const;
 
@@ -694,8 +699,14 @@ function carasDeLasAguas(casilla: number): CaraDeObra[] {
   salida.push(...tronco(casilla, d.u, d.v, d.radio, d.radio, d.patas, d.patas + d.alto, d.segmentos, COLOR_DE_OBRA.deposito));
   salida.push(...disco(casilla, d.u, d.v, d.radio, d.patas + d.alto, d.segmentos, COLOR_DE_OBRA.depositoTapa));
   const a = AGUAS.alberca;
-  salida.push(...caja(casilla, a.u0, a.u1, a.v0, a.v1, 0, a.alto, COLOR_DE_OBRA.hormigon));
-  salida.push(losa(casilla, a.u0 + a.borde, a.u1 - a.borde, a.v0 + a.borde, a.v1 - a.borde, a.alto - 0.25, COLOR_DE_OBRA.agua));
+  /* El fondo, hasta cinco centésimas por debajo del agua: pegado a ella pelearía en profundidad. */
+  salida.push(...caja(casilla, a.u0, a.u1, a.v0, a.v1, 0, a.agua - 0.05, COLOR_DE_OBRA.hormigon));
+  /* Los cuatro bordes, del fondo a lo alto: dos a lo largo de `v` y dos entre ellos. */
+  salida.push(...caja(casilla, a.u0, a.u0 + a.borde, a.v0, a.v1, a.agua - 0.05, a.alto, COLOR_DE_OBRA.hormigon));
+  salida.push(...caja(casilla, a.u1 - a.borde, a.u1, a.v0, a.v1, a.agua - 0.05, a.alto, COLOR_DE_OBRA.hormigon));
+  salida.push(...caja(casilla, a.u0 + a.borde, a.u1 - a.borde, a.v0, a.v0 + a.borde, a.agua - 0.05, a.alto, COLOR_DE_OBRA.hormigon));
+  salida.push(...caja(casilla, a.u0 + a.borde, a.u1 - a.borde, a.v1 - a.borde, a.v1, a.agua - 0.05, a.alto, COLOR_DE_OBRA.hormigon));
+  salida.push(losa(casilla, a.u0 + a.borde, a.u1 - a.borde, a.v0 + a.borde, a.v1 - a.borde, a.agua, COLOR_DE_OBRA.agua));
   const c = AGUAS.caseta;
   salida.push(...caja(casilla, c.u0, c.u1, c.v0, c.v1, 0, c.alto, COLOR_DE_OBRA.nave));
   return salida;
