@@ -47,6 +47,7 @@ import { DURACION } from '../embarcadero/gestos';
 import { proyecta } from '../embarcadero/camara';
 import { sorteo } from '../embarcadero/cala';
 import { PIEZA, nombresDelBurgo } from '../burgo/piezas';
+import type { NombreDePieza } from '../burgo/piezas';
 import {
   ALTO_DEL_HOTEL,
   ALTO_DEL_PEON,
@@ -61,7 +62,6 @@ import {
   DENTRO_DE_LA_CELDA,
   PASO_HACIA_LA_CELDA,
   PUERTA_DE_LA_CELDA,
-  SOBRE_EL_EMPEDRADO,
   SUBIDA_DE_LA_REJA,
   ANCHO_DE_CASILLA,
   ANCHO_DE_TESELA,
@@ -86,6 +86,7 @@ import {
   CELDAS_DE_LA_GLORIETA,
   CELDAS_POR_ESQUINA,
   COCHE_SOBRE_EL_ASFALTO,
+  RUEDAS_BAJO_EL_ORIGEN,
   celdaDeEsquina,
   CORONA,
   DIAMETRO_DEL_PEON,
@@ -1037,15 +1038,16 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
    * YA NO QUEDA NINGÚN EMBLEMA DE CASILLA: las diez que los llevaban tienen obra propia, y un
    * icono plano de 27 tumbado justo donde se levanta el edificio no se lee ni como icono ni como
    * sombra. Lo que queda del emblema son las DOS FLECHAS de la marcha, que no dicen qué es una
-   * casilla sino hacia dónde se va, y por eso no compiten con nada.
+   * casilla sino hacia dónde se va, y por eso no compiten con nada. Hoy es UNA: la de la Salida; la de
+   * la comisaría la quitó Miguel.
    *
    * La regla de que una casilla no se quede muda sigue en pie unas líneas más arriba, y ahora
    * cuenta cinco formas de hablar en vez de tres: atrezo, emblema, cifra, OBRA o NOMBRE.
    */
   const emblemasDeCasilla = emblemas.filter((e) => !ESQUINAS.includes(e.casilla)).length;
   comprobar(
-    'las dos flechas de la marcha están puestas, ninguna casilla lleva ya emblema plano, y lo que hay cabe en su banda',
-    emblemas.length === 2 && emblemasDeCasilla === 0 && emblemasMal.length === 0,
+    'la flecha de la marcha está puesta, ninguna casilla lleva ya emblema plano, y lo que hay cabe en su banda',
+    emblemas.length === 1 && emblemasDeCasilla === 0 && emblemasMal.length === 0,
     { emblemas: emblemas.length, deCasilla: emblemasDeCasilla, mal: emblemasMal.map((e) => `${e.casilla}/${e.emblema}`) },
   );
   comprobar('y las diez casillas que los llevaban tienen obra: cofre, oficina, casino, central, aguas y joya', [2, 4, 7, 12, 17, 22, 28, 33, 36, 38].every((i) => casillasConObra().includes(i)), casillasConObra());
@@ -1265,11 +1267,11 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
    * hoja que sube —que es una pieza porque se anima— y las dos patrullas.
    */
   comprobar(
-    'la cárcel conserva sus cuatro tramos de verja, sus dos hojas de puerta, dos patrullas y dos semáforos, y ya no lleva bloques de pisos',
+    'la cárcel conserva sus cuatro tramos de verja, sus dos hojas de puerta y dos patrullas, y ya no lleva ni bloques de pisos ni semáforos',
     cuenta(10, PIEZA.verja) === 4 &&
       cuenta(10, PIEZA.verjaPuerta) === 2 &&
       cuenta(10, PIEZA.cochePatrulla) === 2 &&
-      cuenta(10, PIEZA.semaforoA) === 2 &&
+      cuenta(10, PIEZA.semaforoA) === 0 &&
       cuenta(10, PIEZA.bloqueA) + cuenta(10, PIEZA.bloqueB) + cuenta(10, PIEZA.bloqueC) + cuenta(10, PIEZA.bloqueD) === 0,
     piezasDeLaEsquina(10).map((p) => p.pieza),
   );
@@ -1289,9 +1291,20 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
       cuenta(20, PIEZA.silla) === 0,
     piezasDeLaEsquina(20).map((p) => p.pieza),
   );
+  /*
+   * SIN CALLE EN LA CÁRCEL NI EN LA COMISARÍA. Miguel, mirando el tablero: «quita los trozos de
+   * carretera tanto de la comisaría como de la cárcel para que se vea bien el texto». La calle de la
+   * 10 y la avenida de la 30 cruzaban el nombre y el texto pequeño por la diagonal. Con ellas se fue
+   * todo lo que sólo tenía sentido en una calle: cebras, aceras, semáforos, farolas y los coches que
+   * circulaban. Queda el coche patrulla de la 30, aparcado y con el morro hacia la cárcel.
+   */
+  const deCalle: readonly string[] = [PIEZA.calzada, PIEZA.calzadaPaso, PIEZA.calzadaCruce, PIEZA.calzadaCurva, PIEZA.calzadaCurvaSuave, PIEZA.calzadaTe, PIEZA.solera, PIEZA.semaforoA, PIEZA.semaforoC, PIEZA.farolaDeCalle];
+  const callejeras = [10, 30].flatMap((e) => piezasDeLaEsquina(e).filter((p) => deCalle.includes(p.pieza)).map((p) => `${String(e)}/${p.pieza}`));
+  comprobar('la cárcel y la comisaría no llevan ni un trozo de calle: ni calzada, ni cebra, ni acera, ni semáforo, ni farola', callejeras.length === 0, callejeras);
+  const patrulla = (PIEZAS_DE_LA_ESQUINA[30] ?? []).filter((p) => p.pieza === PIEZA.cochePatrulla);
   comprobar(
-    '¡a la Mazmorra! es una avenida de dos carriles: cuatro cebras, dos semáforos de brazo y el coche patrulla con el morro hacia la cárcel',
-    cuenta(30, PIEZA.calzadaPaso) === 4 && cuenta(30, PIEZA.semaforoC) === 2 && cuenta(30, PIEZA.cochePatrulla) === 1,
+    '¡A comisaría! conserva su coche patrulla, aparcado sobre el suelo y con el morro hacia la cárcel, y ningún otro coche',
+    patrulla.length === 1 && patrulla[0]?.giroEnCuartos === 1 && patrulla[0]?.alza === RUEDAS_BAJO_EL_ORIGEN && cuenta(30, PIEZA.cocheBerlina) + cuenta(30, PIEZA.cocheTaxi) === 0,
     piezasDeLaEsquina(30).map((p) => p.pieza),
   );
   /*
@@ -1303,13 +1316,14 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
   comprobar('cada esquina son 9 × 9 celdas de la retícula de la ciudad', CELDAS_POR_ESQUINA === 9 && LADO_DE_ESQUINA === 9 * RETICULA_DE_LA_CIUDAD, CELDAS_POR_ESQUINA);
   const piezasPorEsquina = ESQUINAS.map((e) => piezasDeLaEsquina(e).length);
   /*
-   * Las TRES amuebladas; la salida se quedó a propósito sin nada y la vigila su propia regla. El tope
-   * era veinte y bajó a quince con el Descanso: su escena es casi toda obra —asfalto, rayas y el
-   * cartel—, y sus piezas son los nueve coches que caben a la vista y el rincón verde.
+   * Las TRES amuebladas; la salida se quedó a propósito sin nada y la vigila su propia regla. Esto
+   * contaba piezas —veinte, y después quince—, y dejó de tener sentido cuando lo que hay en cada
+   * esquina pasó a ser OBRA: el aparcamiento, la cárcel y la comisaría. Así que lo que se mira es que
+   * ninguna de las tres se quede sin la suya.
    */
-  const amuebladas = ESQUINAS.filter((e) => e !== 0).map((e) => piezasDeLaEsquina(e).length);
-  comprobar('y ninguna de las otras tres se queda en cuatro losas: las tres llegan a quince piezas', amuebladas.every((n) => n >= 15), piezasPorEsquina);
-  comprobar('las dos flechas del sentido de la marcha están en la salida y en la casilla que manda a la cárcel', huecosDeLosEmblemas().filter((e) => e.emblema === 'flecha').map((e) => e.casilla).join() === '0,30');
+  const conObraEnLaEsquina = new Set(casillasConObra());
+  comprobar('y ninguna de las otras tres se queda vacía: el aparcamiento, la cárcel y la comisaría llevan su obra', [10, 20, 30].every((e) => conObraEnLaEsquina.has(e)), piezasPorEsquina);
+  comprobar('la flecha del sentido de la marcha sólo está en la salida: la de la comisaría se quitó', huecosDeLosEmblemas().filter((e) => e.emblema === 'flecha').map((e) => e.casilla).join() === '0');
 
   /*
    * NADA MEDIEVAL EN EL ANILLO, y esto es lo que Miguel corrigió dos veces.
@@ -1805,7 +1819,15 @@ function mueve(desde: number, pasos: number, como: 'anda' | 'viaja' | 'retrocede
         v1: Math.max(...esquinas.map((q) => q.v)),
       });
     }
-    comprobar(`se miden ${String(obrasMedidas)} caras de obra y ${String(estorbos.length - obrasMedidas)} piezas de la esquina, y no cero`, obrasMedidas > 20 && estorbos.length - obrasMedidas > 5, { obras: obrasMedidas, piezas: estorbos.length - obrasMedidas });
+    /*
+     * Eran más de cinco piezas mientras esta esquina fue una avenida; sin ella quedan tres —el coche
+     * patrulla, el arbusto y la papelera—, y las tres tienen que entrar en la cuenta.
+     */
+    comprobar(
+      `se miden ${String(obrasMedidas)} caras de obra y ${String(estorbos.length - obrasMedidas)} piezas de la esquina, y no cero`,
+      obrasMedidas > 20 && estorbos.length - obrasMedidas >= 3,
+      { obras: obrasMedidas, piezas: estorbos.slice(obrasMedidas).map((o) => o.que) },
+    );
     const choquesEn = (u: number, v: number): string[] =>
       estorbos.filter((o) => u > o.u0 - radio && u < o.u1 + radio && v > o.v0 - radio && v < o.v1 + radio).map((o) => `${o.que} en (${r(u)}, ${r(v)})`);
 
@@ -1898,9 +1920,14 @@ function mueve(desde: number, pasos: number, como: 'anda' | 'viaja' | 'retrocede
       [0.8, 1.2, 1.5].some((t) => alzadoDeLaReja(t, 33) > 0 && t > DURACION.golpe && t < DURACION.golpe + A_LA_CELDA),
     );
     /*
-     * Las dos vacunas del camino son los dos caminos que hubo antes que éste: la puerta del lado `v0`,
-     * donde estuvo la reja, que obliga a cruzar el cuartel; y la línea recta de su sitio a la puerta,
-     * sin el paso, con la que cinco de los seis asientos se llevaban por delante la farola o el arbusto.
+     * Las dos vacunas del camino ven fallar las dos cosas contra las que se mide: una OBRA —la puerta
+     * en el lado `v0`, donde estuvo la reja, obliga a atravesar el cuartel— y una PIEZA —un camino que
+     * pase por donde está aparcado el coche patrulla choca con él—.
+     *
+     * Hubo otra: la línea recta de su sitio a la puerta, sin el paso, con la que cinco de los seis
+     * asientos se llevaban por delante una farola o un arbusto de la avenida. La avenida se quitó para
+     * que se leyera ¡A COMISARÍA!, y con ella la línea recta dejó de chocar con nada: esa vacuna ya no
+     * probaba nada, y la del coche patrulla prueba lo mismo con lo que hay.
      */
     {
       type EnLa30 = { readonly u: number; readonly v: number };
@@ -1917,8 +1944,9 @@ function mueve(desde: number, pasos: number, como: 'anda' | 'viaja' | 'retrocede
       const sitioDe = (asiento: number): EnLa30 => enLa30(huecoDeAventurero(A_LA_MAZMORRA, asiento));
       const puertaVieja = { u: DENTRO_DE_LA_CELDA.u, v: CELDA_DEL_CUARTEL.v0 - 6 };
       comprobar('se ve fallar: con la puerta en el lado del cuartel, el camino atravesaría el edificio', choquesDelCamino([sitioDe(0), puertaVieja, DENTRO_DE_LA_CELDA]).length > 0);
-      const enLineaRecta = [0, 1, 2, 3, 4, 5].filter((asiento) => choquesDelCamino([sitioDe(asiento), PUERTA_DE_LA_CELDA, DENTRO_DE_LA_CELDA]).length > 0);
-      comprobar(`se ve fallar: en línea recta de su sitio a la puerta, sin el paso, chocan ${String(enLineaRecta.length)} de los seis asientos`, enLineaRecta.length > 0, enLineaRecta);
+      const elPatrulla = estorbos.slice(obrasMedidas).find((o) => o.que === `pieza ${PIEZA.cochePatrulla}`);
+      const porElPatrulla = elPatrulla === undefined ? [] : choquesDelCamino([sitioDe(0), PASO_HACIA_LA_CELDA, { u: (elPatrulla.u0 + elPatrulla.u1) / 2, v: (elPatrulla.v0 + elPatrulla.v1) / 2 }, PUERTA_DE_LA_CELDA, DENTRO_DE_LA_CELDA]);
+      comprobar('se ve fallar: con el camino desviado por donde está aparcado el coche patrulla, choca con él', porElPatrulla.some((x) => x.startsWith(`pieza ${PIEZA.cochePatrulla} en `)), porElPatrulla.slice(0, 2));
       comprobar(
         'y el camino de la máquina es el declarado: su sitio, el paso, la puerta y dentro',
         [0, 1, 2, 3, 4, 5].every((asiento) => choquesDelCamino([sitioDe(asiento), PASO_HACIA_LA_CELDA, PUERTA_DE_LA_CELDA, DENTRO_DE_LA_CELDA]).length === 0) &&
@@ -3781,18 +3809,23 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   }
 
   /*
-   * Y LO QUE UNA OBRA PONE EN EL SUELO DE UNA ESQUINA EMPEDRADA NO QUEDA DEBAJO DEL EMPEDRADO.
+   * Y LO QUE UNA OBRA PONE EN EL SUELO DE UNA ESQUINA NO QUEDA DEBAJO DE UNA PIEZA DE SUELO DEL PACK.
    *
-   * La 10 y la 30 van llenas de `solera` y `calzada` del pack, que suben a 0,6, y el patio de hormigón
-   * de la Comisaría y el suelo de la celda del cuartel estaban a 0,05: el patio no se veía nada y la
-   * celda salía mitad losa de acera. Así que toda losa de obra de esas dos esquinas se compara con
-   * las cajas de verdad de las piezas de suelo que pisa, sacadas del `burgo.glb`.
+   * Pasó en la 10 y en la 30 cuando iban llenas de `solera` y `calzada`, que suben a 0,6: el patio de
+   * hormigón de la cárcel y el suelo de la celda de la comisaría estaban a 0,05, y el patio no se veía
+   * nada y la celda salía mitad losa de acera. Se subieron por encima del empedrado; y después el
+   * empedrado se fue entero, porque Miguel quitó la calle de las dos esquinas para que se leyera el
+   * texto, y los dos volvieron a ras. La regla sigue mirando las cuatro esquinas, con las cajas de
+   * verdad de las piezas de suelo del `burgo.glb`, por si alguien vuelve a empedrar una.
    */
   {
-    const tapadasPorElEmpedrado = (caras: readonly { readonly casilla: number; readonly puntos: readonly (readonly number[])[] }[]): string[] => {
+    type PiezaDeSuelo = { readonly esquina: number; readonly pieza: NombreDePieza; readonly u: number; readonly v: number; readonly giroEnCuartos: number; readonly alza?: number };
+    let losasMiradas = 0;
+    const tapadasPorElEmpedrado = (caras: readonly { readonly casilla: number; readonly puntos: readonly (readonly number[])[] }[], extra: readonly PiezaDeSuelo[] = []): string[] => {
       const salida: string[] = [];
-      for (const esquina of [MAZMORRA, A_LA_MAZMORRA]) {
-        const suelos = (PIEZAS_DE_LA_ESQUINA[esquina] ?? [])
+      losasMiradas = 0;
+      for (const esquina of ESQUINAS) {
+        const suelos = [...(PIEZAS_DE_LA_ESQUINA[esquina] ?? []).map((pieza) => ({ ...pieza, esquina })), ...extra.filter((x) => x.esquina === esquina)]
           .filter((pieza) => esSuelo(pieza.pieza))
           .map((pieza) => {
             const h = huella(pieza.pieza);
@@ -3808,6 +3841,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
           const vs = cara.puntos.map((q) => q[2] as number);
           const [u0, u1, v0, v1] = [Math.min(...us), Math.max(...us), Math.min(...vs), Math.max(...vs)];
           if ((u1 - u0) * (v1 - v0) < 1) continue;
+          losasMiradas++;
           const tapada = suelos
             .filter((suelo) => suelo.arriba > y + 1e-3)
             .reduce((area, suelo) => area + Math.max(0, Math.min(u1, suelo.u1) - Math.max(u0, suelo.u0)) * Math.max(0, Math.min(v1, suelo.v1) - Math.max(v0, suelo.v0)), 0);
@@ -3817,12 +3851,10 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       return salida;
     };
     const tapadas = tapadasPorElEmpedrado(carasDeLasObras());
-    comprobar('ninguna losa de obra de la 10 ni de la 30 queda debajo del empedrado del pack', tapadas.length === 0, tapadas.slice(0, 3));
-    /* La vacuna: las mismas losas a la cota de antes, `ALZA_DEL_ASFALTO`. */
-    const comoEstaban = carasDeLasObras().map((cara) =>
-      cara.puntos.every((q) => q[1] === SOBRE_EL_EMPEDRADO) ? { ...cara, puntos: cara.puntos.map((q) => [q[0], ALZA_DEL_ASFALTO, q[2]]) } : cara,
-    );
-    comprobar('se ve fallar: con el patio y el suelo de la celda a 0,05, como estuvieron, los dos quedan debajo', tapadasPorElEmpedrado(comoEstaban).length === 2, tapadasPorElEmpedrado(comoEstaban));
+    comprobar(`ninguna de las ${String(losasMiradas)} losas de obra de las esquinas queda debajo de una pieza de suelo del pack`, tapadas.length === 0 && losasMiradas > 20, tapadas.slice(0, 3));
+    /* La vacuna: la solera que tuvo el patio de la cárcel, en su celda (6, 6), vuelta a poner. */
+    const conLaSoleraDeAntes = tapadasPorElEmpedrado(carasDeLasObras(), [{ esquina: 10, pieza: PIEZA.solera, u: celdaDeEsquina(6), v: celdaDeEsquina(6), giroEnCuartos: 0 }]);
+    comprobar('se ve fallar: con la solera que tuvo el patio de la cárcel vuelta a su celda, el patio queda debajo', conLaSoleraDeAntes.some((x) => x.startsWith('10:')), conLaSoleraDeAntes);
   }
 
   comprobar('y avanza hacia −(fuera + adelante), que es la derecha de quien mira una esquina desde su diagonal', delRevesEnEsquina.length === 0, delRevesEnEsquina);

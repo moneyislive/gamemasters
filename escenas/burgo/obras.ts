@@ -33,7 +33,7 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, CELDA_DEL_CUARTEL, FERIA, HUECO_ENTRE_RENGLONES, SOBRE_EL_EMPEDRADO, MARGEN_DEL_TEXTO, MAZMORRA, PUERTAS, SUPERFICIE, anchoDeLaPalabra, giraElPunto, giroHaciaDentro, giroHaciaFuera, letrasDelRotulo, letrasDelSubtitulo, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, CELDA_DEL_CUARTEL, FERIA, HUECO_ENTRE_RENGLONES, MARGEN_DEL_TEXTO, MAZMORRA, PUERTAS, SUPERFICIE, anchoDeLaPalabra, giraElPunto, giroHaciaDentro, giroHaciaFuera, letrasDelRotulo, letrasDelSubtitulo, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
@@ -380,7 +380,8 @@ export function letrasDeLosCarteles(): LetraEnElTablero[] {
  * Lo que NO se toca: el patio sigue siendo la celda (6, 6) de la retícula —`CELDA`, 12 × 12 con
  * su centro en (402, 402)— porque ahí dentro caen los seis huecos de preso; la verja y su hoja
  * que sube siguen siendo piezas del pack, porque la hoja se ANIMA y lo que se mueve no se funde;
- * y la calle, el aparcamiento y las dos patrullas se quedan donde estaban.
+ * y las dos patrullas se quedan donde estaban. La calle de delante y el empedrado se fueron después,
+ * para que se leyera el texto de la esquina.
  */
 const RECINTO_DE_LA_MAZMORRA = {
   /* El patio: la celda de la retícula, de 396 a 408 en los dos ejes. */
@@ -416,8 +417,8 @@ function torreDeVigilancia(casilla: number, u: number, v: number): CaraDeObra[] 
 function carasDeLaMazmorra(): CaraDeObra[] {
   const c = MAZMORRA;
   const salida: CaraDeObra[] = [];
-  /* El patio, de hormigón: es lo que se ve debajo de los presos. Por encima del empedrado, que si no lo tapa. */
-  salida.push(losa(c, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, SOBRE_EL_EMPEDRADO, COLOR_DE_OBRA.hormigon));
+  /* El patio, de hormigón: es lo que se ve debajo de los presos. A ras, que la esquina ya no lleva empedrado. */
+  salida.push(losa(c, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.hormigon));
   /* Los dos pabellones. */
   const p = RECINTO_DE_LA_MAZMORRA.pabellon;
   salida.push(...caja(c, p.u0, p.u1, p.v0, p.v1, 0, p.alto, COLOR_DE_OBRA.pabellon));
@@ -454,14 +455,14 @@ function carasDeLaMazmorra(): CaraDeObra[] {
  * y una reja, abierto por arriba, con su suelo de hormigón —que es como se dibujan las celdas en
  * los tableros de mesa y en los cómics, por la misma razón—.
  *
- * Lo que había en esta esquina era una avenida de dos carriles con su coche patrulla apuntando a
- * la cárcel, y se queda: es la casilla que te MANDA a la cárcel, y el coche patrulla con el morro
- * hacia allá lo cuenta mejor que ningún edificio. Lo que entra es el edificio del que sale.
+ * En esta esquina hubo una avenida de dos carriles, y se fue para que se leyera ¡A COMISARÍA!
+ * (ver `PIEZAS_DE_LA_ESQUINA`). Se queda el coche patrulla con el morro hacia la cárcel: es la
+ * casilla que te MANDA a la cárcel, y eso lo cuenta mejor que ningún edificio.
  */
 const COMISARIA = {
-  /* El cuerpo, al otro lado de la avenida (que ocupa de 372 a 396). */
+  /* El cuerpo, al fondo de la esquina, donde la avenida no llegaba (iba de 372 a 396). */
   cuerpo: { u0: 400, u1: 428, v0: 372, v1: 400, alto: 13 },
-  /* El porche de la entrada, mirando a la avenida, con sus dos columnas. */
+  /* El porche de la entrada, mirando a la marcha, con sus dos columnas. */
   porche: { u0: 394, u1: 400, v0: 379, v1: 393, alto: 8, grueso: 1.1, columna: 1.2 },
   /* El farol azul encima del porche: lo único que dice «policía» desde lejos. */
   farol: { lado: 2.2, desde: 9.1, hasta: 11.3 },
@@ -487,7 +488,7 @@ function carasDeLaComisaria(): CaraDeObra[] {
   salida.push(...caja(c, mu - f.lado / 2, mu + f.lado / 2, mv - f.lado / 2, mv + f.lado / 2, f.desde, f.hasta, COLOR_DE_OBRA.farolAzul));
   /* La celda: suelo, tres paredes y la reja del cuarto lado. Sin techo, que es el porqué de todo. */
   const ce = COMISARIA.celda;
-  salida.push(losa(c, ce.u0, ce.u1, ce.v0, ce.v1, SOBRE_EL_EMPEDRADO, COLOR_DE_OBRA.hormigon));
+  salida.push(losa(c, ce.u0, ce.u1, ce.v0, ce.v1, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.hormigon));
   /* Tres paredes —la de atrás, la del cuartel y la del fondo—; el cuarto lado, el `u0`, es la reja. */
   salida.push(...caja(c, ce.u0, ce.u1, ce.v1 - ce.pared, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
   salida.push(...caja(c, ce.u0, ce.u1, ce.v0, ce.v0 + ce.pared, 0, ce.alto, COLOR_DE_OBRA.muro));

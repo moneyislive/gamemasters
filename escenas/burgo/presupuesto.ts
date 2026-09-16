@@ -37,8 +37,8 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 244.475   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 209.231   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 235.865   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 203.117   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
@@ -48,6 +48,8 @@
  * laterales llevan su nombre arriba y su precio abajo, y el tablero pasó de 206 letras a más de mil.
  * A seis tramos por curva eso ponía la calidad sobria en 280.000, por encima de su tope; a tres
  * —que a la talla de un nombre no se distinguen— las letras son 81.000 y cabe con 20.000 de sobra.
+ * Eran 244.475 y 209.231 hasta que la cárcel y la comisaría se quedaron sin calle, para que se
+ * leyera su texto: se fueron las losas de calzada y de acera, los semáforos, las farolas y dos coches.
  * Los de arriba son los que `verify:burgo-escena` imprime hoy, y ahora también los COMPARA con esta
  * cabecera: dos veces se quedaron viejos sin que nada lo notara, y la segunda fue a la media hora de
  * corregirlos.)

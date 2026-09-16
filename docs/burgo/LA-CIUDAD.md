@@ -353,13 +353,16 @@ acera. Quedan setenta y dos celdas libres.
   cara del pabellón que da al patio. Más dos pabellones y un ala que cierran el patio por sus
   otros tres lados, y el patio de hormigón. Todo eso lo levanta `obras.ts` en código.
   **Lo que sigue siendo pieza del pack es lo que se mueve o ya estaba instanciado**: los cuatro
-  tramos de `verja` y sus dos `verja-puerta` —una sube al encerrar a un peón—, los dos
-  `coche-patrulla`, los semáforos y la calle de delante con su cebra.
+  tramos de `verja` y sus dos `verja-puerta` —una sube al encerrar a un peón— y los dos
+  `coche-patrulla`, aparcados sobre el suelo del tablero.
   El patio NO se tocó: sigue siendo la celda (6, 6) de la retícula (12 × 12, centro 402, 402),
   porque ahí dentro caen los seis huecos de preso.
-  Y su nombre va **sobre la solera** (0,66) y no sobre la losa: el suelo de esta esquina está
-  empedrado, y a 0,08 las letras quedarían debajo del pavimento —invisibles, sin que fallara
-  ninguna cuenta—.
+  **Sin calle.** Tuvo delante una calle con su cebra, dos semáforos y cuatro farolas, y el suelo del
+  patio y del aparcamiento empedrado; por eso su nombre iba sobre la solera, a 0,66, para no quedar
+  debajo del pavimento. La calle cruzaba el nombre y el texto pequeño por la diagonal, y Miguel la
+  quitó el 16 de septiembre de 2026: «quita los trozos de carretera tanto de la comisaría como de la
+  cárcel para que se vea bien el texto». El nombre vuelve a 0,08, como en las demás esquinas, y el
+  patio a ras.
 - **El aparcamiento (20, noroeste)**: era una plaza arbolada con tres terrazas hasta que Miguel
   pidió «un parking que se vea real … con un cartel visible desde arriba que ponga PARKING». Hoy
   la esquina ENTERA es el aparcamiento: el asfalto cubre su cuadro de suelo menos el rincón de
@@ -374,17 +377,21 @@ acera. Quedan setenta y dos celdas libres.
   poste de 13, con PARKING impreso encima —un panel a plomo, que es como son los de la calle, desde
   un tablero no se ve—, al **fondo** de la diagonal y detrás del texto pequeño: en el carril de
   entrada tapaba letras desde arriba y desde la cámara, que lo ve corrido 9 hacia el fondo.
-- **La comisaría (30, noreste)**: sigue siendo una **avenida de dos carriles** (24 de ancho) con
-  sus cuatro cebras, dos `semaforo-c`, el `coche-patrulla` con el morro hacia la cárcel, una
-  berlina, un taxi y la `flecha` apuntando a la 10 —el coche patrulla mirando allá cuenta lo que
-  hace esta casilla mejor que ningún edificio—. Lo que se añade es el edificio del que sale: un
-  cuerpo de 28 × 28 al otro lado de la avenida, su porche con dos columnas y el **farol azul**
-  encima, que es lo único que dice «policía» desde lejos.
+- **La comisaría (30, noreste)**: el **edificio**, un cuerpo de 28 × 28 al fondo de la esquina con
+  su porche de dos columnas y el **farol azul** encima, que es lo único que dice «policía» desde
+  lejos; y delante, el `coche-patrulla` aparcado con el morro hacia la cárcel —mirando allá cuenta
+  lo que hace esta casilla mejor que ningún edificio—, un arbusto y una papelera.
   Y la **celda**, que Miguel pidió ver: un cubículo de 12 × 12 con tres paredes, cinco barrotes
   con su dintel y **sin techo**. Eso último no es un olvido: en un tablero que se mira desde el
   aire, un calabozo cerrado es una caja opaca en la que no se ve entrar a nadie.
-  Los dos bancos y la papelera de esa acera se fueron: el edificio los habría enterrado dentro de
-  una pared.
+  Los dos bancos y la papelera que había a ese lado se fueron cuando llegó el edificio: los habría
+  enterrado dentro de una pared.
+  **Sin avenida y sin flecha.** Hasta el 16 de septiembre de 2026 fue una avenida de dos carriles
+  (24 de ancho) con sus cebras, dos `semaforo-c`, cuatro farolas, sus aceras, una berlina, un taxi y
+  una `flecha` apuntando a la 10. La avenida cruzaba ¡A COMISARÍA! y RETENIDO por la diagonal, y
+  Miguel la quitó con la flecha, igual que la calle de la cárcel. Con ella se fue el arbusto que se
+  quedaba solo encima del nombre. El paso por el que el peón corre a la celda sigue en su sitio:
+  nació para esquivar una farola y un arbusto de la avenida, y el camino por él sigue libre.
 
 ### 2 quater. Las obras: volumen construido en código, y por qué no con piezas del pack
 

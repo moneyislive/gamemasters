@@ -84,9 +84,9 @@ sin cambiar ni una palabra de las que se leen. Lo que se lee sí va con el regla
 | # | Casilla | Qué se ve | Hecho de | Animación (dura) |
 | --- | --- | --- | --- | --- |
 | 0 | SALIDA ✅ | SALIDA por la diagonal (101 × 18,4) y la flecha roja de 28 en el pico de fuera | Sólo rótulo fundido; el cruce entero fuera | — |
-| 10 | CÁRCEL ✅ | Muro, dos torretas con tejadillo, seis barrotes, dos pabellones y un ala; patio de hormigón | Código fundido + `verja` (que se anima) | La reja ya sube y baja tras el peón |
+| 10 | CÁRCEL ✅ | Muro, dos torretas con tejadillo, seis barrotes, dos pabellones y un ala; patio de hormigón y dos patrullas aparcadas, sin calle delante | Código fundido + `verja` (que se anima) y las dos patrullas | La reja ya sube y baja tras el peón |
 | 20 | PARKING ✅ | La esquina entera asfaltada, plazas amarillas que se apartan del nombre, nueve coches y, al fondo, el cartel tumbado que dice PARKING | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
-| 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo | Código fundido + la avenida y su patrulla; la reja, pieza viva | ✅ quien cae aquí corre a la celda por el paso de la avenida, entra bajo la reja subida y se desvanece dentro (0,8 más) |
+| 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo; delante, el coche patrulla aparcado, sin avenida ni flecha | Código fundido + la patrulla, un arbusto y una papelera; la reja, pieza viva | ✅ quien cae aquí corre a la celda, entra bajo la reja subida y se desvanece dentro (0,8 más) |
 | 2·17·33 | CAJA DE COMUNIDAD ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra, centrado entre el nombre y COGE CARTA | Código fundido; la tapa, pieza viva | ✅ la tapa se abre al coger carta de la Caja (0,7) |
 | 7·22·36 | SUERTE ✅ | Casino centrado: cuerpo, marquesina, y en la azotea un LETRERO DE NEÓN tumbado —panel oscuro, marco cian, CASINO en rosa y orla de bombillas— con la ruleta al lado, en el suelo | Código fundido (discos) + tinta sin luz para el neón; la ruleta, pieza viva | ✅ la ruleta gira al coger carta de Suerte (0,8) |
 | 12 | COMPAÑÍA DE ELECTRICIDAD ✅ | Dos torres de refrigeración CON CINTURA (dos troncos pegados), chimenea con banda roja y nave de turbinas | Código fundido (troncos); el humo, pieza viva | ✅ al pagar la renta de la Luz, tres bocanadas salen por la chimenea (0,8) |
@@ -188,7 +188,8 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
      DISCO tumbado, que es la ruleta y la tapa de un depósito. Las vueltas de las dos van
      derivadas y escritas, no probadas a ojo.
    - Y con la última obra **desaparece el emblema plano de casilla**: las diez que lo llevaban
-     tienen volumen propio. De los doce emblemas quedan las dos flechas de la marcha.
+     tienen volumen propio. De los doce emblemas quedan las dos flechas de la marcha (y después,
+     una: la de la comisaría se fue con su avenida).
    - **La fase 4 está hecha.** Falta el ferrocarril (fase 5) y las animaciones (fase 6).
 4. **El ferrocarril** (fase 5): las cuatro estaciones, la vía del perímetro y los trenes. Es la
    más cara y la única que toca el mundo fuera del anillo.
@@ -272,7 +273,9 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
      que suben a 0,6, y el patio de hormigón de la Comisaría y el suelo de la celda del cuartel
      estaban a 0,05. El patio no se veía nada y la celda salía mitad losa de acera. Van ahora a
      `SOBRE_EL_EMPEDRADO` (0,62, por debajo de los rótulos), y una regla compara cada losa de obra de
-     esas dos esquinas con las cajas de verdad de las piezas de suelo que pisa.
+     esas dos esquinas con las cajas de verdad de las piezas de suelo que pisa. Después las dos
+     esquinas se quedaron sin calle (más abajo), el patio y la celda volvieron a ras y la constante
+     se fue; la regla se quedó, y mira ya las cuatro esquinas.
    - **Y los dos servicios, que eran las únicas casillas especiales sin movimiento:** al pagar la
      renta de la Luz salen tres bocanadas por la chimenea, y al pagar la del Agua se abre una onda en
      la alberca. Las bocanadas van en gris carbón: el gris claro no se distinguía del crema del
@@ -295,6 +298,18 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
      - el precio ya no se lee desde la pose de salida —tampoco en un tablero de mesa mirado de lejos—:
        se lee siguiendo al que mueve en un PC (11,9 px el nombre en la casilla peor) y, en el móvil,
        acercándose del todo (6,7 px). `verify:burgo-escena` mide los dos suelos.
+   - **Y sin calle en la cárcel ni en la comisaría (16 de septiembre de 2026).** Miguel, mirando el
+     tablero: «quita la flecha roja de la comisaría y quita los trozos de carretera tanto de la
+     comisaría como de la cárcel para que se vea bien el texto». La calle de la 10 y la avenida de la
+     30 cruzaban el nombre y el texto pequeño por la diagonal. Se fueron con todo lo que sólo tenía
+     sentido en una calle —las losas de calzada, cebra y acera, los semáforos, las farolas y los dos
+     coches que circulaban—, y la flecha de la 30 con ellas: queda la de la Salida. Las patrullas se
+     quedan, aparcadas sobre el suelo del tablero; el nombre de las dos esquinas baja a 0,08, como en
+     las demás, y el patio y la celda vuelven a ras. El paso por el que el peón corre a la celda
+     también se queda: nació para esquivar una farola y un arbusto de la avenida, y el camino por él
+     sigue libre. El tablero baja a 235.865 triángulos en plena y 203.117 en sobria, y
+     `verify:burgo-escena` mide que no quede un trozo de calle en esas dos esquinas y que la flecha
+     esté sólo en la Salida.
    - **Lo que no se ha hecho, y por qué:** el coche que aparca en el Descanso. No es una animación
      de 0,6 s sino un estado —un coche por jugador, que se queda mientras esté ahí y se va cuando se
      vaya—, y nadie lo pidió.

@@ -160,10 +160,9 @@
  * La ele de la marcha se come las celdas `a ≤ 2` de los dos brazos, así que las nueve celdas
  * del rincón interior (`a ≤ 2` en los DOS ejes) sólo admiten SUELO —una cebra, una acera—; y
  * a cambio quedan setenta y dos celdas libres para levantar en cada esquina lo que antes no
- * cabía: un cruce con semáforos y coches parados en la Salida, una comisaría con su patio
- * cerrado y su aparcamiento en la Mazmorra, una plaza arbolada con terrazas en la Feria y
- * una avenida de dos carriles en ¡A la Mazmorra! Las cuatro se escriben con generadores
- * (`calleEnU`, `calleEnV`, `soleras`) y no a mano, celda a celda, para que se lean.
+ * cabía. Hoy casi todo lo que hay en una esquina es OBRA de `obras.ts` —la cárcel, el
+ * aparcamiento, la comisaría con su celda—, y de calle no queda nada: ni en la Salida, ni en la
+ * cárcel ni en la comisaría, porque Miguel quiso que se leyera el texto (ver `PIEZAS_DE_LA_ESQUINA`).
  *
  * ═══ EL CAMPO ES UN MANTO, NO UN PUÑADO DE HEXÁGONOS ═══
  *
@@ -865,7 +864,7 @@ function renglonDeEsquina(m: MarcoDeCasilla, palabra: string, alto: number, alfa
     const d = (t + avance / 2) / Math.SQRT2;
     const p = puntoEnEsquina(m, CENTRO_DEL_SUELO_DE_LA_ESQUINA + e - d, CENTRO_DEL_SUELO_DE_LA_ESQUINA + e + d);
     /* Un espacio mueve el cursor y no es una letra: no trae glifo, así que no se emite. */
-    if (letra !== ' ') salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO_DE_LA_ESQUINA[m.indice] ?? ALZA_DEL_ROTULO });
+    if (letra !== ' ') salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO });
     t += avance;
   }
   return salida;
@@ -1114,16 +1113,6 @@ export const FERIA = 20;
 export const A_LA_MAZMORRA = 30;
 export const ESQUINAS: readonly number[] = [PUERTA_MAYOR, MAZMORRA, FERIA, A_LA_MAZMORRA];
 
-/**
- * LA COTA DEL RÓTULO DE UNA ESQUINA, QUE NO ES LA MISMA EN LAS CUATRO.
- *
- * Un rótulo se posa a 0,08 sobre el suelo de su casilla, que es lo justo para no pelearse con él
- * en profundidad. Pero dos esquinas tienen el suelo EMPEDRADO —la cárcel y ¡a la Mazmorra! van
- * llenas de `solera` y `calzada`, cuyas caras de arriba están a 0,6 y 0,42—, así que ahí las
- * letras quedarían DEBAJO del pavimento: invisibles, sin que fallara nada en ninguna cuenta.
- * En esas dos el nombre va sobre la solera, como la pintura de una calzada de verdad.
- */
-export const ALZA_DEL_ROTULO_DE_LA_ESQUINA: Readonly<Partial<Record<number, number>>> = { [MAZMORRA]: 0.66, [A_LA_MAZMORRA]: 0.66 };
 /** Las cuatro puertas del juego. Son los ejes de las dos avenidas de la ciudad. */
 export const PUERTAS: readonly number[] = [5, 15, 25, 35];
 
@@ -1231,76 +1220,41 @@ export const COCHE_SOBRE_EL_ASFALTO = 0.786;
 export const RUEDAS_BAJO_EL_ORIGEN = 0.366;
 /** Lo que se alza el asfalto pintado de una obra sobre el suelo de su casilla, sin pelearse en profundidad. */
 export const ALZA_DEL_ASFALTO = 0.05;
-/**
- * Lo que se alza una LOSA de obra en las dos esquinas empedradas (la 10 y la 30): justo por encima
- * de la cara de arriba de la `solera` y la `calzada` del pack, que están a 0,6, y por debajo de los
- * rótulos, a 0,66. A `ALZA_DEL_ASFALTO` quedaban debajo del empedrado: el patio de hormigón de la
- * Comisaría no se veía nada, y el suelo de la celda del cuartel salía mitad losa de acera.
- */
-export const SOBRE_EL_EMPEDRADO = 0.62;
 /** Y lo que sube un coche aparcado encima de ese asfalto. */
 export const COCHE_SOBRE_EL_APARCAMIENTO = ALZA_DEL_ASFALTO + RUEDAS_BAJO_EL_ORIGEN;
-/** Y lo que sube sobre una `solera`, cuya cara de arriba está a 0,6 y no a 0,42. */
+/**
+ * Y lo que sube sobre una `solera`, cuya cara de arriba está a 0,6 y no a 0,42. Ninguna esquina lleva
+ * ya soleras —la cárcel y la comisaría se quedaron sin calle—, pero es del contrato con la ciudad
+ * (LA-CIUDAD.md, «Los coches aparcados»).
+ */
 export const COCHE_SOBRE_LA_SOLERA = 0.966;
 
-/**
- * LOS GENERADORES DE UNA ESQUINA, y por qué la esquina no se escribe celda a celda.
- *
- * Una esquina son nueve celdas por lado: ochenta y una. Escritas a mano son ochenta y una
- * líneas por esquina en las que nadie ve un error, y cuatro esquinas son trescientas
- * veinticuatro. Con tres generadores —una calle a lo largo de `u`, una calle a lo largo de
- * `v`, y un puñado de aceras— cada escena cabe en veinte líneas que SE LEEN, y el giro de
- * cada losa lo pone el generador y no el dedo.
- *
- * El convenio del giro es el que ya usaba la tabla anterior y lo comprueba el juez de la
- * ele: una losa de una calle que corre a lo largo de `u` (o sea, `v` fijo) va con
- * `giroEnCuartos = 0`; la que corre a lo largo de `v` (`u` fijo), con 1.
- */
+/** El centro de la celda `a` de la retícula de una esquina, en corto. */
 const cel = (a: number): number => celdaDeEsquina(a);
-
-/** Una calle a lo largo de `u`, en la fila `av`: una losa por cada `au`, con la pieza que se le diga. */
-function calleEnU(av: number, tramos: readonly (readonly [number, NombreDePieza])[]): PiezaDeEsquina[] {
-  return tramos.map(([au, pieza]) => ({ pieza, u: cel(au), v: cel(av), giroEnCuartos: 0 }));
-}
-
-/** Una calle a lo largo de `v`, en la columna `au`. */
-function calleEnV(au: number, tramos: readonly (readonly [number, NombreDePieza])[]): PiezaDeEsquina[] {
-  return tramos.map(([av, pieza]) => ({ pieza, u: cel(au), v: cel(av), giroEnCuartos: 1 }));
-}
-
-/** Aceras: una `solera` en cada celda de la lista. */
-function soleras(celdas: readonly (readonly [number, number])[]): PiezaDeEsquina[] {
-  return celdas.map(([au, av]) => ({ pieza: PIEZA.solera, u: cel(au), v: cel(av), giroEnCuartos: 0 }));
-}
-
-/** Cuatro sillas alrededor de una mesa de terraza, a 2,5 de su centro. */
-function sillasAlrededor(u: number, v: number): PiezaDeEsquina[] {
-  return [
-    { pieza: PIEZA.silla, u: u - 2.5, v, giroEnCuartos: 3, menudo: true },
-    { pieza: PIEZA.silla, u: u + 2.5, v, giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.silla, u, v: v - 2.5, giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.silla, u, v: v + 2.5, giroEnCuartos: 2, menudo: true },
-  ];
-}
 
 /**
  * LAS CUATRO ESCENAS DE ESQUINA (LA-CIUDAD.md §2). Nada medieval, y nada dentro de la ele.
  *
- * Con 108 de lado cada esquina deja de ser un rincón con cuatro losas y pasa a ser una
- * MANZANA. Eso es lo que cambia respecto de la versión de 48, y lo que se aprovecha:
+ * Con 108 de lado cada esquina es una MANZANA, pero lo que se levanta en ella es casi todo OBRA de
+ * `obras.ts`, fundida y sin llamadas de dibujo. Lo que queda aquí son las piezas del pack:
  *
- * · SALIDA (0, sureste): un cruce de verdad, con los dos brazos entrando hasta la celda 2
- *   —donde la marcha los cruza, y ahí van las cebras—, cuatro farolas en las esquinas del
- *   cruce, dos semáforos de brazo, un taxi parado en la cebra y una berlina esperando en el
- *   otro brazo.
- * · LA CÁRCEL (10, suroeste): la comisaría entera. Cuatro bloques del pack cerrando una
- *   manzana, el patio en la celda (6, 6) cerrado con verja y dos hojas —una sube—, dos
- *   coches patrulla aparcados en su acera, la calle de delante con su cebra y dos semáforos.
- * · EL DESCANSO (20, noroeste): una plaza arbolada de tres por tres celdas con tres
- *   terrazas de cuatro sillas, bancos, farolas de parque, arbustos y siete árboles.
- * · ¡A LA MAZMORRA! (30, noreste): una avenida de DOS carriles (dos columnas de losas, 24 de
- *   ancho) con dos pasos de cebra, dos semáforos de brazo, el coche patrulla con el morro
- *   hacia la cárcel y otros dos coches.
+ * · SALIDA (0): ninguna. La flecha roja y la palabra.
+ * · LA CÁRCEL (10): la verja del patio con sus dos hojas —una sube—, dos patrullas aparcadas, un
+ *   contenedor, una papelera y dos arbustos. El muro, las torretas y los pabellones son obra.
+ * · EL DESCANSO (20): los coches del aparcamiento, sus dos farolas y el rincón verde.
+ * · ¡A COMISARÍA! (30): el coche patrulla con el morro hacia la cárcel, un arbusto y una papelera.
+ *   La comisaría y su celda son obra.
+ *
+ * ═══ SIN CALLE, PARA QUE SE LEA EL TEXTO ═══
+ *
+ * La cárcel tenía delante una calle con su cebra, dos semáforos, cuatro farolas y el suelo del patio
+ * y del aparcamiento empedrado; la comisaría, una avenida de dos carriles con dos cebras, dos
+ * semáforos, cuatro farolas, sus aceras y tres coches. Las dos calles cruzaban el nombre y el texto
+ * pequeño por la diagonal, y Miguel lo dijo mirando el tablero: «quita los trozos de carretera tanto
+ * de la comisaría como de la cárcel para que se vea bien el texto». Es lo mismo que pidió para la
+ * Salida. Con la calle se fue todo lo que sólo tenía sentido en ella —cebras, aceras, semáforos,
+ * farolas y los coches que circulaban—, y el suelo de las dos esquinas vuelve a ser el del tablero:
+ * el nombre, a 0,08 como en las demás, y el patio y la celda, a ras.
  */
 export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsquina[]>> = {
   /*
@@ -1320,31 +1274,6 @@ export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsqui
    */
   [PUERTA_MAYOR]: [],
   [MAZMORRA]: [
-    /* La calle de delante de la comisaría, con su cebra en la celda que la marcha cruza. */
-    ...calleEnU(4, [
-      [2, PIEZA.calzadaPaso],
-      [3, PIEZA.calzada],
-      [4, PIEZA.calzada],
-      [5, PIEZA.calzada],
-      [6, PIEZA.calzada],
-      [7, PIEZA.calzada],
-      [8, PIEZA.calzada],
-    ]),
-    /* El aparcamiento y el patio, pavimentados. */
-    ...soleras([
-      [4, 5],
-      [4, 6],
-      [4, 7],
-      [5, 5],
-      [5, 6],
-      [5, 7],
-      [6, 5],
-      [6, 6],
-      [7, 5],
-      [8, 5],
-      [4, 8],
-      [5, 8],
-    ]),
     /*
      * LA MANZANA YA NO ES DE PISOS. Aquí había cuatro bloques del pack —`bloque-d`, `-b`, `-c` y
      * `-a`— cerrando el patio, y desde el aire eso no era una cárcel: era una manzana con el
@@ -1353,7 +1282,7 @@ export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsqui
      * lo levanta ahora `obras.ts` en código, fundido con las demás obras y sin una llamada de
      * dibujo nueva. Lo que sigue aquí son las piezas que se MUEVEN o que ya estaban instanciadas.
      */
-    /* La verja del patio: el lado que da a la calle, con la hoja que sube en medio. */
+    /* La verja del patio: el lado que mira a las patrullas, con la hoja que sube en medio. */
     { pieza: PIEZA.verja, u: 396, v: 398, giroEnCuartos: 0 },
     { pieza: PIEZA.verjaPuerta, u: 396, v: 402, giroEnCuartos: 0, papel: 'reja' },
     { pieza: PIEZA.verja, u: 396, v: 406, giroEnCuartos: 0 },
@@ -1361,15 +1290,9 @@ export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsqui
     { pieza: PIEZA.verja, u: 398, v: 396, giroEnCuartos: 1 },
     { pieza: PIEZA.verjaPuerta, u: 402, v: 396, giroEnCuartos: 1, papel: 'reja-fija' },
     { pieza: PIEZA.verja, u: 406, v: 396, giroEnCuartos: 1 },
-    /* Dos patrullas aparcadas en línea sobre la acera del aparcamiento. */
-    { pieza: PIEZA.cochePatrulla, u: cel(4), v: cel(6), giroEnCuartos: 1, alza: COCHE_SOBRE_LA_SOLERA },
-    { pieza: PIEZA.cochePatrulla, u: cel(4), v: cel(7), giroEnCuartos: 1, alza: COCHE_SOBRE_LA_SOLERA },
-    { pieza: PIEZA.semaforoA, u: cel(3), v: 371.4, giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.semaforoA, u: cel(6), v: 371.4, giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: cel(4), v: 371.4, giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: cel(7), v: 371.4, giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: cel(5), v: 384.6, giroEnCuartos: 3, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: cel(8), v: 384.6, giroEnCuartos: 3, menudo: true },
+    /* Dos patrullas aparcadas en línea junto al patio, sobre el suelo del tablero. */
+    { pieza: PIEZA.cochePatrulla, u: cel(4), v: cel(6), giroEnCuartos: 1, alza: RUEDAS_BAJO_EL_ORIGEN },
+    { pieza: PIEZA.cochePatrulla, u: cel(4), v: cel(7), giroEnCuartos: 1, alza: RUEDAS_BAJO_EL_ORIGEN },
     { pieza: PIEZA.contenedor, u: cel(5), v: 420, giroEnCuartos: 0 },
     { pieza: PIEZA.papelera, u: cel(3), v: cel(6), giroEnCuartos: 0, menudo: true },
     { pieza: PIEZA.arbusto, u: cel(3), v: cel(8), giroEnCuartos: 0, menudo: true },
@@ -1423,60 +1346,14 @@ export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsqui
     { pieza: PIEZA.papelera, u: 340, v: 340, giroEnCuartos: 0, menudo: true },
   ],
   [A_LA_MAZMORRA]: [
-    /*
-     * LA AVENIDA: dos columnas de losas, o sea 24 de ancho —la misma sección que las cuatro
-     * avenidas de la ciudad—, cruzando la esquina entera. La cebra de la celda 2 es la que
-     * la marcha atraviesa; la de la 5, la del cruce de peatones de en medio.
-     */
-    ...calleEnV(4, [
-      [2, PIEZA.calzadaPaso],
-      [3, PIEZA.calzada],
-      [4, PIEZA.calzada],
-      [5, PIEZA.calzadaPaso],
-      [6, PIEZA.calzada],
-      [7, PIEZA.calzada],
-      [8, PIEZA.calzada],
-    ]),
-    ...calleEnV(5, [
-      [2, PIEZA.calzadaPaso],
-      [3, PIEZA.calzada],
-      [4, PIEZA.calzada],
-      [5, PIEZA.calzadaPaso],
-      [6, PIEZA.calzada],
-      [7, PIEZA.calzada],
-      [8, PIEZA.calzada],
-    ]),
-    ...soleras([
-      [3, 3],
-      [3, 5],
-      [3, 7],
-      [6, 3],
-      [6, 5],
-      [6, 7],
-      [7, 4],
-      [7, 6],
-      [8, 3],
-      [8, 5],
-      [8, 7],
-    ]),
-    /* Dos semáforos de brazo, uno por sentido, con el brazo sobre su calzada. */
-    { pieza: PIEZA.semaforoC, u: 370.6, v: cel(5), giroEnCuartos: 1 },
-    { pieza: PIEZA.semaforoC, u: 397.4, v: cel(3), giroEnCuartos: 3 },
-    /* El coche patrulla, en el carril que va hacia la cárcel. */
-    { pieza: PIEZA.cochePatrulla, u: cel(4) + 2.7, v: cel(6), giroEnCuartos: 1, alza: COCHE_SOBRE_EL_ASFALTO },
-    /* La berlina, una celda más allá de la cebra: en `cel(3)` tapaba la T de RETENIDO. */
-    { pieza: PIEZA.cocheBerlina, u: cel(5) - 2.7, v: cel(4), giroEnCuartos: 3, alza: COCHE_SOBRE_EL_ASFALTO },
-    { pieza: PIEZA.cocheTaxi, u: cel(5) - 2.7, v: cel(7), giroEnCuartos: 3, alza: COCHE_SOBRE_EL_ASFALTO },
-    { pieza: PIEZA.farolaDeCalle, u: 370.6, v: cel(3), giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: 370.6, v: cel(7), giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: 397.4, v: cel(4), giroEnCuartos: 3, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: 397.4, v: cel(8), giroEnCuartos: 3, menudo: true },
+    /* El coche patrulla, aparcado junto a la comisaría y con el morro hacia la cárcel. */
+    { pieza: PIEZA.cochePatrulla, u: cel(4) + 2.7, v: cel(6), giroEnCuartos: 1, alza: RUEDAS_BAJO_EL_ORIGEN },
     /*
      * Los dos bancos y la papelera que había a este lado se han ido: la comisaría que levanta
-     * `obras.ts` ocupa ahora ese trozo de acera —de 400 a 428— y los habría enterrado dentro
-     * de una pared. Los dos arbustos se quedan, que caen fuera.
+     * `obras.ts` ocupa ahora ese trozo —de 400 a 428— y los habría enterrado dentro de una pared.
+     * Y el arbusto de la celda (3, 3) también: con la avenida quitada se quedaba solo encima de
+     * ¡A COMISARÍA!, que es lo que había que dejar leerse.
      */
-    { pieza: PIEZA.arbusto, u: cel(3), v: cel(3), giroEnCuartos: 0, menudo: true },
     { pieza: PIEZA.arbusto, u: cel(8), v: cel(7), giroEnCuartos: 1, menudo: true },
     { pieza: PIEZA.papelera, u: cel(3), v: cel(6), giroEnCuartos: 0, menudo: true },
   ],
@@ -1672,8 +1549,9 @@ export const SEPARACION_DE_LA_FLECHA = 33;
 /**
  * QUÉ CASILLA LLEVA QUÉ EMBLEMA.
  *
- * Las cuatro Puertas NO llevan emblema: llevan el paso de cebra de su avenida, que es lo
- * que el documento pone en su fila de atrezo y lo que de verdad dice «por aquí se entra».
+ * Las cuatro Puertas NO llevan emblema: llevan su edificio de viajeros (`obras.ts`), que es lo
+ * que de verdad dice «aquí hay una estación». Hasta que el tablero llevó el nombre arriba y el
+ * precio abajo llevaron el paso de cebra de su avenida.
  * El contorno `puerta` de `iconos.ts` sigue compilado para la hoja, que sí tiene texto.
  */
 const EMBLEMA_DE_LA_CASILLA: Readonly<Record<number, EmblemaDelBurgo>> = {};
@@ -1700,26 +1578,18 @@ export function huecosDeLosEmblemas(): EmblemaEnElTablero[] {
     salida.push({ casilla, emblema, x: p.x, z: p.z, giro: giroHaciaDentro(m), lado: LADO_DEL_EMBLEMA });
   }
   /*
-   * LA FLECHA DEL SENTIDO DE LA MARCHA, en la salida y en la casilla que manda a la cárcel.
+   * LA FLECHA DEL SENTIDO DE LA MARCHA, sólo en la SALIDA.
    *
-   * En ¡a la Mazmorra! sigue donde estaba: en la acera de la celda (1, 5), pegada al brazo por el
-   * que se sale de la esquina, que es justo donde la mira quien acaba de mover.
-   *
-   * En la SALIDA ya no hay acera ni brazo —esa esquina se quedó sin calle—, así que la flecha
-   * pasa a ser lo que Miguel pidió que fuera: roja y a la vista. Va en el pico de FUERA del suelo
-   * de la esquina, a 33 del centro por la diagonal —que es lo que la palabra deja libre, ver
-   * `LADO_DE_LA_FLECHA_DE_SALIDA`—, y sigue mirando como la de la Mazmorra.
+   * Hubo otra en ¡A comisaría!, en la acera de la celda (1, 5), y Miguel pidió quitarla: «quita la
+   * flecha roja de la comisaría». La de la Salida es lo que él pidió que fuera: roja y a la vista.
+   * Va en el pico de FUERA del suelo de la esquina, a 33 del centro por la diagonal —que es lo que
+   * la palabra deja libre, ver `LADO_DE_LA_FLECHA_DE_SALIDA`—.
    */
   {
     const m = marcoDeCasilla(PUERTA_MAYOR);
     const d = SEPARACION_DE_LA_FLECHA / Math.SQRT2;
     const p = puntoEnEsquina(m, CENTRO_DEL_SUELO_DE_LA_ESQUINA + d, CENTRO_DEL_SUELO_DE_LA_ESQUINA + d);
     salida.push({ casilla: PUERTA_MAYOR, emblema: 'flecha', x: p.x, z: p.z, giro: giroHaciaFuera(m), lado: LADO_DE_LA_FLECHA_DE_SALIDA });
-  }
-  {
-    const m = marcoDeCasilla(A_LA_MAZMORRA);
-    const p = puntoEnEsquina(m, cel(1), cel(5));
-    salida.push({ casilla: A_LA_MAZMORRA, emblema: 'flecha', x: p.x, z: p.z, giro: giroHaciaFuera(m), lado: LADO_DEL_EMBLEMA });
   }
   return salida;
 }
@@ -2090,18 +1960,18 @@ export function mundoEstatico(semilla: number, calidad: 'plena' | 'sobria' = 'pl
  * La levanta `obras.ts`, pero su sitio se declara aquí porque lo necesita también la máquina del
  * peón —que corre hasta ella—, y `obras.ts` ya importa de este fichero: al revés sería un ciclo.
  *
- * La reja va en el lado `u0`, el que da a la AVENIDA, y no en el `v0` donde estuvo: ese lado está
+ * La reja va en el lado `u0`, el que mira a la marcha, y no en el `v0` donde estuvo: ese lado está
  * pegado a la pared del cuartel (`v` 372..400), así que para entrar por él un peón tendría que
- * atravesar el edificio. Por `u0` se llega desde la marcha cruzando la avenida y pasando por delante
- * del porche sin pisarlo.
+ * atravesar el edificio. Por `u0` se llega desde la marcha pasando por delante del porche sin pisarlo.
  *
- * El camino tiene CUATRO puntos: su sitio, el PASO por el que cruza a la avenida, la PUERTA y
- * DENTRO. El paso no es adorno: en línea recta de su sitio a la puerta, cinco de los seis asientos
- * se llevaban por delante la farola o el arbusto de la acera de enfrente (`farola-de-calle` en
- * 370,6 × 366 y `arbusto` en 366 × 366). Por (362; 368,5) pasan los seis al norte de los dos y al
- * sur del semáforo con 3 de holgura como poco, y el camino más largo mide 106,5 en vez de 104.
- * Lo mide `verify:burgo-escena` contra las cajas del `burgo.glb`, y si alguien mueve una pieza de
- * esa esquina y la pone en medio, cae.
+ * El camino tiene CUATRO puntos: su sitio, un PASO, la PUERTA y DENTRO. El paso nació con la avenida
+ * de dos carriles que cruzaba esta esquina: en línea recta de su sitio a la puerta, cinco de los seis
+ * asientos se llevaban por delante una farola o un arbusto de su acera, y por (362; 368,5) pasaban
+ * los seis. La avenida se quitó para que se leyera ¡A COMISARÍA!, y hoy la línea recta tampoco
+ * chocaría con nada; el paso se queda porque el camino por él sigue libre, y quitarlo sería tocar la
+ * máquina del peón sin que cambiara nada de lo que se ve. El camino más largo mide 106,5.
+ * Lo mide `verify:burgo-escena` contra las cajas del `burgo.glb`, y si alguien pone en medio una
+ * pieza o una obra, cae.
  */
 export const CELDA_DEL_CUARTEL = { u0: 404, u1: 416, v0: 400, v1: 412, alto: 7 } as const;
 export const PASO_HACIA_LA_CELDA = { u: 362, v: 368.5 } as const;
