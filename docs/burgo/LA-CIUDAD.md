@@ -297,11 +297,12 @@ cuando la casilla lleva pieza, centrado cuando no.
 
 ### 2 bis. El nombre de la casilla, y de dónde salen sus letras
 
-Las diez casillas que no se compran llevan su **nombre escrito en la franja**, donde un solar
-lleva su color: `V_DEL_ROTULO = 11`, alzado `0,7` sobre la franja para no pelearse en profundidad
-con el reborde. Hoy dicen FONDO (2, 17, 33), IMPUESTO (4), SUCESOS (7, 22, 36), LUZ (12), AGUA
-(28) y TASA (38) —los nombres del reglamento; la escena todavía llama a algunas de estas casillas
-Arca, Pregón, Molino o Alcabala por dentro, y esa deriva se corrige al amueblarlas—.
+Las catorce casillas especiales de los lados llevan su **nombre escrito en la franja**, donde un
+solar lleva su color: `V_DEL_ROTULO = 10,5`, alzado `0,7` sobre la franja para no pelearse en
+profundidad con el reborde. Hoy dicen FONDO (2, 17, 33), IMPUESTO (4), PUERTO (5), SUCESOS (7, 22,
+36), LUZ (12), BUSES (15), CARGA (25), AGUA (28), TREN (35) y TASA (38) —los rótulos del reglamento;
+el código sigue llamando a algunas `arca`, `pregon`, `diezmo` o `alcabala` por dentro, y el §0.3 del
+reglamento lo deja así a propósito—.
 
 El renglón se ajusta solo, y **deja margen**: `MARGEN_DEL_TEXTO = 0,12` es la regla de todo el
 tablero, un 12 % del hueco a cada lado. De ahí salen los tres anchos útiles —**54,7** de los 72 de

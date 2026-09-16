@@ -76,15 +76,16 @@ ele engordada de la marcha.
 
 ## 3. El reparto, casilla por casilla
 
-Los nombres son los del reglamento (`docs/burgo/REGLAS-EL-BURGO.md`). La escena todavía llama a
-algunas por su nombre viejo —Arca, Pregón, Molino, Pozo, Diezmo, Alcabala— y esa deriva se
-corrige en la fase 4.
+Los nombres son los del reglamento (`docs/burgo/REGLAS-EL-BURGO.md`). El código llama a algunas
+por su identificador viejo —`arca`, `pregon`, `diezmo`, `alcabala`— y así se queda: el §0.3 del
+reglamento decide no tocarlos, porque cambiarlos obligaría a migrar el diario y las mesas guardadas
+sin cambiar ni una palabra de las que se leen. Lo que se lee sí va con el reglamento (§3 bis).
 
 | # | Casilla | Qué se ve | Hecho de | Animación (dura) |
 | --- | --- | --- | --- | --- |
 | 0 | SALIDA ✅ | SALIDA por la diagonal (101 × 18,4) y la flecha roja de 28 en el pico de fuera | Sólo rótulo fundido; el cruce entero fuera | — |
 | 10 | CÁRCEL ✅ | Muro, dos torretas con tejadillo, seis barrotes, dos pabellones y un ala; patio de hormigón | Código fundido + `verja` (que se anima) | La reja ya sube y baja tras el peón |
-| 20 | PARKING ✅ | La esquina entera asfaltada, sesenta plazas amarillas, catorce coches y el cartel tumbado con la `P` | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
+| 20 | PARKING ✅ | La esquina entera asfaltada, sesenta plazas amarillas, catorce coches y el cartel tumbado que dice PARKING | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
 | 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo | Código fundido + la avenida y su patrulla; la reja, pieza viva | ✅ quien cae aquí corre a la celda por el paso de la avenida, entra bajo la reja subida y se desvanece dentro (0,8 más) |
 | 2·17·33 | FONDO VECINAL ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra | Código fundido; la tapa, pieza viva | ✅ la tapa se abre al coger carta del Fondo (0,7) |
 | 7·22·36 | SUCESOS ✅ | Casino: cuerpo, marquesina que vuela, rótulo vertical con cinco bombillas y la ruleta tumbada en el suelo | Código fundido (discos); la ruleta, pieza viva | ✅ la ruleta gira al coger carta de Sucesos (0,8) |
@@ -95,8 +96,9 @@ corrige en la fase 4.
 | 5·15·25·35 | LAS CUATRO ESTACIONES ✅ | Andén, marquesina sobre cuatro columnas y casa de viajeros; y el remate que las distingue: torre del reloj (5), aguada y carbonera (15), bóveda escalonada (25) y apeadero de madera (35) | Código fundido | ✅ los trenes paran 2,5 s en cada una |
 | — | EL FERROCARRIL ✅ | Balasto, 584 traviesas y dos carriles dando la vuelta entera, con curvas de radio 15 en las esquinas | Código fundido (3.072 triángulos con todo lo demás) | ✅ dos trenes dan la vuelta sin esperar a nadie |
 
-Cada casilla lleva además su **texto pequeño** debajo del nombre (alto 9 contra los 17 del
-nombre): lo que hace al caer en ella, en cuatro palabras.
+Las casillas SIN precio llevan además su **texto pequeño** debajo del nombre —hasta 8 de alto,
+cuando el nombre llega a 16 en una lateral y a 26 en una esquina—: lo que hace al caer en ella, en
+dos o tres palabras. Las que tienen precio no lo llevan, porque su explicación es la cifra (§3 bis).
 
 ### El coste de todo esto, contado antes de escribirlo
 
@@ -198,7 +200,7 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
    - **Los trenes, hechos.** Dos, en una `InstancedMesh` de dos instancias —una llamada de dibujo
      para los dos—, por la misma polilínea que se ve dibujada y a media vuelta uno de otro. A 40
      por segundo, que es más despacio que un peón (48): un tren más rápido que los peón le roba la
-     vista al juego. La vuelta dura 90,2 s con sus cuatro paradas de 2,5.
+     vista al juego. La vuelta dura 97,7 s con sus cuatro paradas de 2,5.
    - Y dos fallos que ninguna captura habría enseñado: el tren daba la vuelta **de lado** —estaba
      construido sobre `+x` y aquí todas las piezas miran a `+z`— y con **una sola** estación no se
      movía nunca, porque el tramo de una parada a sí misma da cero por el módulo.
