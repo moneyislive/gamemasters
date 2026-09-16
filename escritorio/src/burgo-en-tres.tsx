@@ -2268,8 +2268,8 @@ export function MarcadorDelBurgo({ vista, yo }: { vista: unknown; yo: string | n
         ═══ Y LA FRASE VIENE HECHA, PORQUE AQUÍ SE REDACTABA MAL ═══
 
         Este renglón se escribía aquí a mano, con los cuatro números del marcador, y la
-        concordancia la hacía con UN SOLO mazo: con 1 carta en Sucesos y 9 en el Fondo Vecinal
-        decía «Queda 1 carta en Sucesos y 9 en el Fondo Vecinal», cuando el sujeto es coordinado
+        concordancia la hacía con UN SOLO mazo: con 1 carta en Suerte y 9 en la Caja de Comunidad
+        decía «Queda 1 carta en Suerte y 9 en la Caja de Comunidad», cuando el sujeto es coordinado
         y pide «Quedan». Es LITERALMENTE el fallo que la traducción ya tenía anotado y arreglado
         para la sección «La mesa entera», repetido en la copia; y sale justo al final de la
         partida, que es cuando esos cuatro números son lo que se mira.

@@ -170,13 +170,13 @@ function reprochesDeLaTabla(casillas: readonly CasillaDelBurgo[], barrios: reado
   if (clase(38) !== 'alcabala' || precio(38) !== 100) r.push('la Tasa no está en la 38 cobrando 100');
   for (const p of [5, 15, 25, 35]) if (clase(p) !== 'puerta' || precio(p) !== 200) r.push(`la ${p} no es una estación de 200`);
   for (const o of [12, 28]) if (clase(o) !== 'oficio' || precio(o) !== 150) r.push(`la ${o} no es un servicio de 150`);
-  for (const a of [2, 17, 33]) if (clase(a) !== 'arca') r.push(`la ${a} no es del Fondo Vecinal`);
-  for (const p of [7, 22, 36]) if (clase(p) !== 'pregon') r.push(`la ${p} no es de Sucesos`);
+  for (const a of [2, 17, 33]) if (clase(a) !== 'arca') r.push(`la ${a} no es de la Caja de Comunidad`);
+  for (const p of [7, 22, 36]) if (clase(p) !== 'pregon') r.push(`la ${p} no es de Suerte`);
   const cuantasDe = (que: string): number => casillas.filter((c) => c.clase === que).length;
   if (cuantasDe('puerta') !== 4) r.push(`hay ${cuantasDe('puerta')} estaciones`);
   if (cuantasDe('oficio') !== 2) r.push(`hay ${cuantasDe('oficio')} servicios`);
-  if (cuantasDe('arca') !== 3) r.push(`hay ${cuantasDe('arca')} casillas del Fondo Vecinal`);
-  if (cuantasDe('pregon') !== 3) r.push(`hay ${cuantasDe('pregon')} casillas de Sucesos`);
+  if (cuantasDe('arca') !== 3) r.push(`hay ${cuantasDe('arca')} casillas de la Caja de Comunidad`);
+  if (cuantasDe('pregon') !== 3) r.push(`hay ${cuantasDe('pregon')} casillas de Suerte`);
   if (cuantasDe('solar') !== 22) r.push(`hay ${cuantasDe('solar')} solares`);
 
   for (const c of casillas) {
@@ -390,11 +390,11 @@ function reprochesDelMazo(mazo: MazoId, cartas: readonly CartaDelBurgo[]): strin
 {
   const rp = reprochesDelMazo('pregon', EL_PREGON);
   const ra = reprochesDelMazo('arca', EL_ARCA);
-  comprobar('Sucesos no merece reproche', rp.length === 0, rp);
-  comprobar('el Fondo Vecinal no merece reproche', ra.length === 0, ra);
+  comprobar('Suerte no merece reproche', rp.length === 0, rp);
+  comprobar('la Caja de Comunidad no merece reproche', ra.length === 0, ra);
   comprobar('cartasDe devuelve cada tabla', cartasDe('pregon') === EL_PREGON && cartasDe('arca') === EL_ARCA);
-  comprobar('Sucesos manda a comisaría, al servicio y a las estaciones cercanas', EL_PREGON.some((c) => c.efecto.que === 'a-la-mazmorra') && EL_PREGON.filter((c) => c.efecto.que === 'puerta-cercana').length === 2 && EL_PREGON.some((c) => c.efecto.que === 'oficio-cercano'));
-  comprobar('el Fondo Vecinal tiene las dos de «cada jugador te paga» y una obra', EL_ARCA.filter((c) => c.efecto.que === 'cobra-de-cada-uno').length === 2 && EL_ARCA.some((c) => c.efecto.que === 'reparaciones'));
+  comprobar('Suerte manda a comisaría, al servicio y a las estaciones cercanas', EL_PREGON.some((c) => c.efecto.que === 'a-la-mazmorra') && EL_PREGON.filter((c) => c.efecto.que === 'puerta-cercana').length === 2 && EL_PREGON.some((c) => c.efecto.que === 'oficio-cercano'));
+  comprobar('la Caja de Comunidad tiene las dos de «cada jugador te paga» y una obra', EL_ARCA.filter((c) => c.efecto.que === 'cobra-de-cada-uno').length === 2 && EL_ARCA.some((c) => c.efecto.que === 'reparaciones'));
 
   const idaYVuelta: string[] = [];
   for (const mazo of ['pregon', 'arca'] as const) {
@@ -414,11 +414,11 @@ function reprochesDelMazo(mazo: MazoId, cartas: readonly CartaDelBurgo[]): strin
   comprobar('carta() devuelve null fuera de 1..16', carta('pregon', 0) === null && carta('arca', 17) === null && carta('pregon', 2.5) === null);
   const series = seriesDe('pregon');
   comprobar("seriesDe('pregon') son 16 distintas de 'p01' a 'p16'", series.length === 16 && new Set(series).size === 16 && series[0] === 'p01' && series[15] === 'p16');
-  comprobar('las series del Fondo Vecinal no se confunden con las de Sucesos', seriesDe('arca').every((s) => !contiene(series, s)));
+  comprobar('las series de la Caja de Comunidad no se confunden con las de Suerte', seriesDe('arca').every((s) => !contiene(series, s)));
 
   const conHueco = EL_ARCA.map((c) => (c.numero === 9 ? { ...c, numero: 10 } : c));
   const r1 = reprochesDelMazo('arca', conHueco);
-  comprobar('se ve fallar: un número repetido en el Fondo Vecinal', r1.some((x) => /la carta 8 de arca lleva el número 10/.test(x)), r1);
+  comprobar('se ve fallar: un número repetido en la Caja de Comunidad', r1.some((x) => /la carta 8 de arca lleva el número 10/.test(x)), r1);
   const aOtraCarta = EL_PREGON.map((c) => (c.numero === 5 ? { ...c, efecto: { que: 'ir' as const, a: 7, cobraAlPasar: true } } : c));
   const r2 = reprochesDelMazo('pregon', aOtraCarta);
   comprobar('se ve fallar: una carta que manda a otra carta', r2.some((x) => /manda a otra carta/.test(x)), r2);
@@ -609,7 +609,7 @@ paso('6. El anillo: módulo positivo, recorrido, salida, la puerta más cercana,
 
   comprobar('cruzaLaSalida: 39 + 3 sí, 5 + 3 no, 37 + 3 (cae en la 0) sí, 0 + 5 no', cruzaLaSalida(39, 3, N) && !cruzaLaSalida(5, 3, N) && cruzaLaSalida(37, 3, N) && !cruzaLaSalida(0, 5, N));
   comprobar('cruzaLaSalida: hacia atrás nunca, ni desde la 1', !cruzaLaSalida(1, -3, N) && !cruzaLaSalida(0, -1, N) && !cruzaLaSalida(5, 0, N));
-  comprobar('cruzaLaSalida: una carta desde Sucesos 36 hasta la Estación del Puerto (5) la cruza; hasta la Central (35) no', cruzaLaSalida(36, distanciaAdelante(36, 5, N), N) && !cruzaLaSalida(22, distanciaAdelante(22, 35, N), N));
+  comprobar('cruzaLaSalida: una carta desde la Suerte del 36 hasta la Estación de Goya (5) la cruza; hasta la del Norte (35) no', cruzaLaSalida(36, distanciaAdelante(36, 5, N), N) && !cruzaLaSalida(22, distanciaAdelante(22, 35, N), N));
   const sinCaerEnLaCero = (d: number, p: number, n: number): boolean => d + p > n;
   comprobar('se ve fallar: un «>» donde va «≥» no cobra al caer justo en la 0 desde la 37', !sinCaerEnLaCero(37, 3, N) && cruzaLaSalida(37, 3, N));
   const porLaFinal = (d: number, p: number, n: number): boolean => casillaTras(d, p, n) < d;
@@ -617,7 +617,7 @@ paso('6. El anillo: módulo positivo, recorrido, salida, la puerta más cercana,
 
   comprobar('distanciaAdelante: 39→5 son 6, 5→39 son 34, 7→7 es 0', distanciaAdelante(39, 5, N) === 6 && distanciaAdelante(5, 39, N) === 34 && distanciaAdelante(7, 7, N) === 0);
   comprobar('masCercana desde la 39 con las puertas es la 5 (no la 35)', masCercana(39, PUERTAS, N) === 5);
-  comprobar('masCercana desde cada Sucesos: estaciones 15/25/5, servicios 12/28/12', masCercana(7, PUERTAS, N) === 15 && masCercana(22, PUERTAS, N) === 25 && masCercana(36, PUERTAS, N) === 5 && masCercana(7, OFICIOS, N) === 12 && masCercana(22, OFICIOS, N) === 28 && masCercana(36, OFICIOS, N) === 12);
+  comprobar('masCercana desde cada Suerte: estaciones 15/25/5, servicios 12/28/12', masCercana(7, PUERTAS, N) === 15 && masCercana(22, PUERTAS, N) === 25 && masCercana(36, PUERTAS, N) === 5 && masCercana(7, OFICIOS, N) === 12 && masCercana(22, OFICIOS, N) === 28 && masCercana(36, OFICIOS, N) === 12);
   comprobar('masCercana no cuenta la propia casilla como «hacia delante»', masCercana(5, PUERTAS, N) === 15 && masCercana(5, [5], N) === 5);
   comprobar('masCercana sin candidatas devuelve la propia', masCercana(9, [], N) === 9);
   const porMinimoAbsoluto = (d: number, cs: readonly number[]): number => cs.reduce((m, c) => (Math.abs(c - d) < Math.abs(m - d) ? c : m), cs[0] as number);

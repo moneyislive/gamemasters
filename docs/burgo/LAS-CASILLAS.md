@@ -87,18 +87,20 @@ sin cambiar ni una palabra de las que se leen. Lo que se lee sí va con el regla
 | 10 | CÁRCEL ✅ | Muro, dos torretas con tejadillo, seis barrotes, dos pabellones y un ala; patio de hormigón | Código fundido + `verja` (que se anima) | La reja ya sube y baja tras el peón |
 | 20 | PARKING ✅ | La esquina entera asfaltada, plazas amarillas que se apartan del nombre, nueve coches y, al fondo, el cartel tumbado que dice PARKING | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
 | 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo | Código fundido + la avenida y su patrulla; la reja, pieza viva | ✅ quien cae aquí corre a la celda por el paso de la avenida, entra bajo la reja subida y se desvanece dentro (0,8 más) |
-| 2·17·33 | FONDO VECINAL ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra | Código fundido; la tapa, pieza viva | ✅ la tapa se abre al coger carta del Fondo (0,7) |
-| 7·22·36 | SUCESOS ✅ | Casino: cuerpo, marquesina que vuela, rótulo vertical con cinco bombillas y la ruleta tumbada en el suelo | Código fundido (discos); la ruleta, pieza viva | ✅ la ruleta gira al coger carta de Sucesos (0,8) |
-| 12 | CENTRAL ELÉCTRICA ✅ | Dos torres de refrigeración CON CINTURA (dos troncos pegados), chimenea con banda roja y nave de turbinas | Código fundido (troncos); el humo, pieza viva | ✅ al pagar la renta de la Luz, tres bocanadas salen por la chimenea (0,8) |
-| 28 | CANAL DE AGUAS ✅ | Depósito elevado sobre cuatro patas, alberca con agua y caseta de bombas | Código fundido (troncos); la onda, pieza viva | ✅ al pagar la renta del Agua, una onda se abre en la alberca (0,6) |
-| 4 | IMPUESTO ✅ | Escalinata de dos peldaños que es también basamento, cuatro columnas, puerta, cornisa y ático escalonado | Código fundido; la moneda, pieza viva | ✅ al pagar el Impuesto, una moneda grande sube rodando la escalinata y entra por la puerta (0,6) |
-| 38 | TASA DE LUJO ✅ | Alfombra granate, pedestal de mármol y una joya de ocho caras —la única pieza que no es un prisma— | Código fundido (triángulos); la joya, pieza viva | ✅ la joya da una vuelta al pagar la Tasa (0,5) |
-| 5·15·25·35 | LAS CUATRO ESTACIONES ✅ | Andén, marquesina sobre cuatro columnas y casa de viajeros; y el remate que las distingue: torre del reloj (5), aguada y carbonera (15), bóveda escalonada (25) y apeadero de madera (35) | Código fundido | ✅ los trenes paran 2,5 s en cada una |
+| 2·17·33 | CAJA DE COMUNIDAD ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra, centrado entre el nombre y COGE CARTA | Código fundido; la tapa, pieza viva | ✅ la tapa se abre al coger carta de la Caja (0,7) |
+| 7·22·36 | SUERTE ✅ | Casino centrado: cuerpo, marquesina, y en la azotea un LETRERO DE NEÓN tumbado —panel oscuro, marco cian, CASINO en rosa y orla de bombillas— con la ruleta al lado, en el suelo | Código fundido (discos) + tinta sin luz para el neón; la ruleta, pieza viva | ✅ la ruleta gira al coger carta de Suerte (0,8) |
+| 12 | COMPAÑÍA DE ELECTRICIDAD ✅ | Dos torres de refrigeración CON CINTURA (dos troncos pegados), chimenea con banda roja y nave de turbinas | Código fundido (troncos); el humo, pieza viva | ✅ al pagar la renta de la Luz, tres bocanadas salen por la chimenea (0,8) |
+| 28 | COMPAÑÍA DE AGUAS ✅ | Depósito elevado sobre cuatro patas, alberca con agua y caseta de bombas | Código fundido (troncos); la onda, pieza viva | ✅ al pagar la renta del Agua, una onda se abre en la alberca (0,6) |
+| 4 | IMPUESTO SOBRE EL CAPITAL ✅ | Escalinata de dos peldaños que es también basamento, cuatro columnas, puerta, cornisa y ático escalonado, más baja para no tapar su nombre de tres renglones | Código fundido; la moneda, pieza viva | ✅ al pagar el Impuesto, una moneda grande sube rodando la escalinata y entra por la puerta (0,6) |
+| 38 | IMPUESTO DE LUJO ✅ | Alfombra granate, pedestal de mármol y una joya de ocho caras —la única pieza que no es un prisma— | Código fundido (triángulos); la joya, pieza viva | ✅ la joya da una vuelta al pagar el Impuesto de Lujo (0,5) |
+| 5·15·25·35 | LAS CUATRO ESTACIONES ✅ | Andén con su marquesina junto a la vía, y un edificio de viajeros distinto en cada una: GOYA, ladrillo con torre del reloj; DELICIAS, nave de hierro y cristal con bóveda; MEDIODÍA, fachada del gran arco entre dos torres con cúpula; NORTE, edificio largo con dos torres de tejado en pirámide | Código fundido | ✅ los trenes paran 2,5 s en cada una |
 | — | EL FERROCARRIL ✅ | Balasto, 584 traviesas y dos carriles dando la vuelta entera, con curvas de radio 15 en las esquinas | Código fundido (3.072 triángulos con todo lo demás) | ✅ dos trenes dan la vuelta sin esperar a nadie |
 
-Las casillas SIN precio llevan además su **texto pequeño** debajo del nombre —hasta 8 de alto,
-cuando el nombre llega a 16 en una lateral y a 26 en una esquina—: lo que hace al caer en ella, en
-dos o tres palabras. Las que tienen precio no lo llevan, porque su explicación es la cifra (§3 bis).
+Cada casilla LATERAL se lee como la del tablero de mesa: su **nombre arriba** de la parte blanca y
+su **pie abajo** —el precio, lo que se paga o COGE CARTA—, los dos centrados, con la obra en medio si
+la hay. Los treinta y seis nombres van al mismo alto, 4,7 —el de la palabra más ancha, AYUNTAMIENTO,
+puesta en el ancho útil—, y el pie a 4,2. Las ESQUINAS siguen con su nombre en diagonal y su texto
+pequeño debajo (§3 bis).
 
 ### El coste de todo esto, contado antes de escribirlo
 
@@ -119,30 +121,32 @@ cartel del pie decía «La Comisaría» mientras el suelo de la misma casilla de
 
 Así que el suelo dice lo que dice el reglamento:
 
-| Casilla | En el suelo | Texto pequeño | Lo que hay construido |
+| Casilla | Arriba | Abajo | Lo que hay construido |
 | --- | --- | --- | --- |
-| 0 | SALIDA | COBRA 200 | flecha roja |
-| 10 | COMISARÍA | DE VISITA | el recinto con muro, torretas y barrotes |
-| 20 | DESCANSO | NI DA NI QUITA | el aparcamiento, con su cartel PARKING |
-| 30 | ¡A COMISARÍA! | RETENIDO | el cuartel con su celda |
-| 2 · 17 · 33 | FONDO | COGE CARTA | el cofre |
-| 7 · 22 · 36 | SUCESOS | COGE CARTA | el casino |
-| 4 | IMPUESTO | — (su cifra: 200) | la oficina del estado |
-| 38 | TASA | — (su cifra: 100) | la joya en su escaparate |
-| 12 · 28 | LUZ · AGUA | — (su precio) | la central y el canal de aguas |
-| 5 · 15 · 25 · 35 | PUERTO · BUSES · CARGA · TREN | — (su precio) | las cuatro estaciones |
+| 0 | SALIDA (diagonal) | COBRA 200 | flecha roja |
+| 10 | COMISARÍA (diagonal) | DE VISITA | el recinto con muro, torretas y barrotes |
+| 20 | DESCANSO (diagonal) | NI DA NI QUITA | el aparcamiento, con su cartel PARKING |
+| 30 | ¡A COMISARÍA! (diagonal) | RETENIDO | el cuartel con su celda |
+| los 22 solares | su nombre entero: CALLEJÓN DE LAS LATAS… | PRECIO 60 € … PRECIO 400 € | nada: se ven sus casas |
+| 2 · 17 · 33 | CAJA DE COMUNIDAD | COGE CARTA | el cofre |
+| 7 · 22 · 36 | SUERTE | COGE CARTA | el casino con su neón |
+| 4 | IMPUESTO SOBRE EL CAPITAL | PAGA 200 € O 10 % | la oficina del estado |
+| 38 | IMPUESTO DE LUJO | PAGA 100 € | la joya en su escaparate |
+| 12 · 28 | COMPAÑÍA DE ELECTRICIDAD · COMPAÑÍA DE AGUAS | PRECIO 150 € | la central y el canal de aguas |
+| 5 · 15 · 25 · 35 | ESTACIÓN DE GOYA · DE DELICIAS · DEL MEDIODÍA · DEL NORTE | PRECIO 200 € | las cuatro estaciones |
 
-Las cuatro estaciones se quedaron un tiempo sin nombre: los nombres nacieron al quitar los
-emblemas planos de las casillas especiales, y las estaciones nunca llevaron emblema. Llevan su
-rótulo del reglamento, en la franja, que su obra deja libre.
+Los nombres de las casillas especiales son los del tablero clásico desde el 16 de septiembre de
+2026, por decisión de Miguel y con el aviso dado de que eso contradecía el §0.2 del reglamento, que
+se cambió a la vez (su nota del principio lo cuenta). Antes eran FONDO, SUCESOS, IMPUESTO, TASA, LUZ,
+AGUA y PUERTO, BUSES, CARGA y TREN.
 
 Lo que Miguel pidió con sus palabras está en lo CONSTRUIDO: el recinto de la 10 parece lo que él
 llamó una cárcel de verdad, y el cartel del aparcamiento dice PARKING, porque es un letrero y no
-el nombre de la casilla —igual que el casino no le cambia el nombre a los Sucesos—.
+el nombre de la casilla —igual que el letrero del casino no le cambia el nombre a Suerte—.
 
-El texto pequeño sólo lo llevan las casillas **sin precio**: en las que tienen, la explicación ya
-está escrita y en grande, que es la cifra. Sus palabras también son del reglamento —«no da ni quita
-nada» es su definición del Descanso—, y los 200 de la Salida son `PAGA_DE_LA_PUERTA_MAYOR`.
+Las palabras del texto pequeño también son del reglamento —«no da ni quita nada» es su definición
+del Descanso—, los 200 de la Salida son `PAGA_DE_LA_PUERTA_MAYOR`, y el pie de cada lateral se
+reconstruye en `verify:burgo-escena` desde el reglamento: su clase, su precio, el 10 % y `maravedies`.
 
 **Y ya no se puede volver a desviar sin que se vea**: `verify:burgo-escena` compara cada nombre del
 suelo con el reglamento —tiene que ser su rótulo o un trozo de su nombre— y barre todo el texto
@@ -275,6 +279,22 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
      tablero, y el medio se confundía con la nave de turbinas (visto en el banco). Las dos entran en la
      lupa de las piezas vivas y en el tope de 0,8, y el comprobador mide que sólo las suelta la renta
      de su casilla, que el humo sale de la BOCA de la chimenea y que la onda no se sale del agua.
+   - **Y el tablero de mesa (16 de septiembre de 2026).** Miguel mandó la foto del tablero clásico y
+     pidió que las casillas se leyeran como él: el nombre arriba del blanco y el precio abajo, los dos
+     centrados, en vez de los dígitos gordos; los nombres de las especiales, los del tablero clásico;
+     el cofre centrado con COGE CARTA debajo; el casino más evidente, con neón; y las cuatro estaciones
+     distintas entre sí. Lo que salió al medirlo:
+     - un solo alto para los treinta y seis nombres —4,7, el de AYUNTAMIENTO— y el pie a 4,2, con el
+       margen de las laterales al 8 % para que las letras crezcan; y los renglones partidos en los
+       menos posibles y, de ésos, los más iguales;
+     - el tablero pasó de 206 letras a más de mil, y a seis tramos por curva la calidad sobria se iba a
+       280.000 con un tope de 230.000: las letras van ahora a tres tramos, 81 triángulos la letra;
+     - todas las obras especiales se recolocaron entre el nombre y el pie, y con la cámara del juego
+       delante: lo alto se ve corrido hacia el fondo siete décimas de su altura, así que la oficina bajó
+       y las torres de las estaciones se apartan del texto al que apuntan;
+     - el precio ya no se lee desde la pose de salida —tampoco en un tablero de mesa mirado de lejos—:
+       se lee siguiendo al que mueve en un PC (11,9 px el nombre en la casilla peor) y, en el móvil,
+       acercándose del todo (6,7 px). `verify:burgo-escena` mide los dos suelos.
    - **Lo que no se ha hecho, y por qué:** el coche que aparca en el Descanso. No es una animación
      de 0,6 s sino un estado —un coche por jugador, que se queda mientras esté ahí y se va cuando se
      vaya—, y nadie lo pidió.

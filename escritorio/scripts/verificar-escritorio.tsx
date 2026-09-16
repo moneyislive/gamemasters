@@ -2393,7 +2393,7 @@ function burgoEnTres(): void {
   );
   /*
    * VACUNA DEL VERBO, con el caso exacto que este raíl escribía mal. El sujeto es coordinado
-   * —«1 carta en Sucesos y 9 en el Fondo Vecinal»— y el verbo va en plural; la copia que vivía
+   * —«1 carta en Suerte y 9 en la Caja de Comunidad»— y el verbo va en plural; la copia que vivía
    * aquí concordaba con UN SOLO mazo (`plural(quedan.pregon, …)`) y escribía «Queda 1 carta … y
    * 9». Con 1 y 9 las dos formas se separan, y una partida de verdad no siempre da esa pareja:
    * por eso la vista se retoca a mano en vez de esperar a que salga sola. La afirmación de
@@ -2402,8 +2402,8 @@ function burgoEnTres(): void {
   const conUnaYNueve = { ...(vista as Record<string, unknown>), quedan: { pregon: 1, arca: 9 } };
   const railDeUnaYNueve = palabrasDe(renderToStaticMarkup(<MarcadorDelBurgo vista={conUnaYNueve} yo="s1" />));
   comprobar(
-    'VACUNA: con 1 carta en Sucesos y 9 en el Fondo Vecinal el raíl dice «Quedan», no el «Queda» que escribía la copia',
-    railDeUnaYNueve.includes('Quedan 1 carta en Sucesos y 9 en el Fondo Vecinal.') && !railDeUnaYNueve.includes('Queda 1 carta en Sucesos y 9'),
+    'VACUNA: con 1 carta en Suerte y 9 en la Caja de Comunidad el raíl dice «Quedan», no el «Queda» que escribía la copia',
+    railDeUnaYNueve.includes('Quedan 1 carta en Suerte y 9 en la Caja de Comunidad.') && !railDeUnaYNueve.includes('Queda 1 carta en Suerte y 9'),
     railDeUnaYNueve.slice(-140),
   );
   comprobar(

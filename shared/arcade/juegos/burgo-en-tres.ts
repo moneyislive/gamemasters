@@ -1275,13 +1275,13 @@ function estadoDeLaCasilla(l: Lectura, fila: CasillaDelBurgo, t: TituloQueSePint
       case 'a-la-mazmorra':
         return '¡A comisaría!';
       case 'diezmo':
-        return `El Impuesto: ${maravedies(fila.precio)}`;
+        return `El Impuesto sobre el Capital: ${maravedies(fila.precio)}`;
       case 'alcabala':
-        return `La Tasa: ${maravedies(fila.precio)}`;
+        return `El Impuesto de Lujo: ${maravedies(fila.precio)}`;
       case 'pregon':
-        return 'Sucesos';
+        return 'Suerte';
       case 'arca':
-        return 'El Fondo Vecinal';
+        return 'La Caja de Comunidad';
       default:
         return '';
     }
@@ -2254,7 +2254,7 @@ export interface CartelDelBurgo {
   readonly texto: string;
   readonly quien: AsientoId | null;
   readonly nombre: string;
-  /** «de Sucesos» / «del Fondo Vecinal». */
+  /** «de Suerte» / «de la Caja de Comunidad». */
   readonly deDonde: string;
 }
 
@@ -2273,7 +2273,7 @@ export function cartelEnTres(vista: unknown): CartelDelBurgo | null {
     texto: ficha.texto,
     quien: c.quien,
     nombre: c.quien === null ? '' : nombreDe(l, c.quien),
-    deDonde: c.mazo === 'pregon' ? 'de Sucesos' : 'del Fondo Vecinal',
+    deDonde: c.mazo === 'pregon' ? 'de Suerte' : 'de la Caja de Comunidad',
   };
 }
 
@@ -2794,7 +2794,7 @@ function frasesDelConcejo(l: Lectura): string[] {
   const cartas = l.quedan.pregon + l.quedan.arca;
   return [
     `El Ayuntamiento guarda ${l.concejo.casas} ${plural(l.concejo.casas, 'casa', 'casas')} y ${l.concejo.posadas} ${plural(l.concejo.posadas, 'hotel', 'hoteles')}.`,
-    `${plural(cartas, 'Queda', 'Quedan')} ${l.quedan.pregon} ${plural(l.quedan.pregon, 'carta', 'cartas')} en Sucesos y ${l.quedan.arca} en el Fondo Vecinal.`,
+    `${plural(cartas, 'Queda', 'Quedan')} ${l.quedan.pregon} ${plural(l.quedan.pregon, 'carta', 'cartas')} en Suerte y ${l.quedan.arca} en la Caja de Comunidad.`,
   ];
 }
 

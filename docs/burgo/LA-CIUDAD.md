@@ -193,7 +193,8 @@ Origen en el centro de la casilla, `u` a lo largo del anillo (de −36 a +36), `
 | La posada | `v` = 10,5, `u` = 0 | una `casa` teñida + un `estandarte` clavado (y = 2,45) | sustituye a las cuatro; no hay pieza propia (§9) |
 | La bandera del dueño | `v` = 15, `u` = +30 | 2,61 × 3,63 × 1,91 | en medio de la franja, no en su borde |
 | Los seis peones | `v` = 25,5, `u` = −17,5 + 7·i | 1,27 × 2,33 de huella | fila de seis, con 7 de paso |
-| El precio | `v` = 45, centrado en `u` | dígitos de **27** de alto | entre el carril y el atrezo |
+| El nombre | arriba del blanco: su primer renglón empieza en `v` = 33, centrado en `u` | letra de **4,7**, renglones cada 7,05 | el mismo alto en las 36 laterales |
+| El pie | abajo del blanco: acaba en `v` = 87, centrado en `u` | letra de **4,2** | «PRECIO 60 €», «PAGA 100 €» o «COGE CARTA» |
 | El atrezo | `v` = 60 a 90 | ver abajo | la mitad exterior, sin subirse al marco |
 
 ### El carril del avatar no crece con la casilla
@@ -210,55 +211,39 @@ mástil sale 1,655 por un lado, así que la bandera llega a 16,66). La vacuna de
 es ponerla en `v = 22`, pegada al filete, que es el error que de verdad se comete al mover
 una banda.
 
-### El precio se lee, y esto es lo que se midió
+### El nombre y el precio, como en el tablero de mesa
 
-Los dígitos son contornos compilados (`escenas/iconos.ts`, `CONTORNOS_DEL_GUARISMO`), porque
-**en el lienzo no hay texto**. Se normalizan por `CAJA_DEL_GUARISMO` (300 × 400 del lienzo de
-512) y se separan `AVANCE_DEL_GUARISMO` (340).
-
-El alto subió primero de 12 a **27** por una razón aritmética: lo que se ve en pantalla no es el
-alto en unidades, es el cociente `alto / alcance de la cámara`, y 27/570,24 es exactamente
-12/253,44, o sea los mismos píxeles que en el tablero de 384. Y bajó después a **25** por una
-razón que esa cuenta no miraba y que vio Miguel: **el margen**. A 27, tres dígitos miden 66,15 de
-los 72 de la casilla —y aunque se juntaran hasta TOCARSE seguirían midiendo 60,75—, o sea que a
-ese alto no hay margen que dar.
+Hasta el 16 de septiembre de 2026 el precio eran **dígitos gordos** —contornos propios de 25 de
+alto, `CONTORNOS_DEL_GUARISMO`— en medio del blanco, y el nombre de las casillas especiales iba en la
+franja de color. Ese día Miguel mandó la foto del tablero clásico y pidió lo que hace él: **el nombre
+arriba del blanco y el precio abajo**, los dos centrados, el precio «ligeramente más pequeño que el
+nombre», y los nombres cortos del mismo tamaño que los largos. Los treinta y seis de los lados:
 
 ```
-  alto del dígito ....... 25,00   (era 27)
-  ancho del dígito ...... 18,75   (300/400 × 25)
-  avance ................ 21,25   (340/400 × 25)
-  tres dígitos .......... 61,25   de los 72: 5,38 de margen a cada lado, el 7,5 %
+  alto del nombre ....... 4,70   el de AYUNTAMIENTO, la palabra más ancha, en el ancho útil
+  ancho útil ............ 60,48  de los 72: el 8 % de margen a cada lado
+  paso de renglón ....... 7,05   vez y media el alto, que deja sitio a las tildes
+  alto del pie .......... 4,20   un 10 % menos
+  el nombre empieza ..... v = 33 y el pie acaba en v = 87: a 3 del blanco por los dos lados
 ```
 
-**25 es el único número entre dos paredes**: es el mayor que deja ese margen y el menor que las
-dos medidas de abajo aguantan. El 12 % que tienen los nombres pediría 22,3, y ahí el móvil cae a
-4,1 px de salida y 13,7 al seguir, por debajo de los dos suelos comprobados (4,5 y 15). Subirlo
-otra vez a 27 es perder el margen; bajarlo a 22,3 es perder el móvil. Es una decisión de Miguel,
-y las dos ramas están medidas.
+**El precio ya no se lee desde la pose de salida**, y se dice aquí en vez de esconderlo: un tablero
+de mesa mirado desde el otro lado de la habitación tampoco se lee. Se lee siguiendo al que mueve, que
+es cuando la cámara se acerca sola, y `verify:burgo-escena` lo mide en la casilla PEOR de las treinta
+y seis —las de delante y detrás, que se ven escorzadas—:
 
-Y una trampa que se vio al bajarlo: **el peón se escribía como `ANCHO_DEL_GUARISMO / 6`**, así que
-habría encogido con el dígito —y con él su disco de contacto y las rejillas del patio— sin que
-nadie lo pidiera. La sexta parte era una coincidencia cómoda, no la razón: la razón es el patio de
-la cárcel. Ahora `DIAMETRO_DEL_PEON` es 3,375 escrito como número.
-
-Medido con `proyecta` desde la **pose de salida** (que es escorzada, a 55° de altura, y en el
-móvil con el lienzo al 58 % del alto: la cuenta de servilleta de «el tablero llena el ancho»
-no vale):
-
-| Ventana | Dígito | Franja del barrio |
+| Dónde | Nombre | Pie |
 | --- | --- | --- |
-| 16:9 (1920 × 1080) | **15,1 px** | 13,0 px |
-| 3:4 (768 × 1024) | **9,2 px** | 7,8 px |
-| 9:19,5 (390 × 490 de lienzo) | **4,6 px** | 3,9 px |
+| Siguiendo al que mueve, PC 16:9 | **11,9 px** | **9,4 px** |
+| Acercándose del todo, móvil 9:19,5 | **6,7 px** | **5,2 px** |
 
-O sea que desde la pose de salida, en un móvil, el precio es una mancha de tres cifras y no
-un número que se lea. **Se lee acercándose**, y por eso la medida que de verdad manda es la
-segunda: a la cercanía de seguimiento (0,42), que es la que la cámara toma sola cada vez que
-alguien mueve, el dígito mide **76,6 px** en un PC, **30,3** en una tableta y **15,4** en el
-móvil. Las dos medidas están en el comprobador para que nadie vuelva a suponer la primera.
+La franja del barrio, en cambio, se sigue viendo desde la salida en las tres ventanas (13,0, 7,8 y
+3,9 px): el color es lo que dice de quién es cada lado desde lejos.
 
-Los precios del reglamento van de 60 a 400: tres dígitos como mucho. Las rentas, que llegan a
-2.000, **no van al tablero**: van al HUD, que sí tiene texto.
+Y las obras de las casillas especiales van **entre el nombre y el pie**, con la cámara del juego
+delante: mira a 55° desde el sur, y lo alto se ve corrido hacia el fondo siete décimas de su altura,
+así que en el lado de delante tapa el nombre y en el de detrás el precio. `verify:burgo-escena`
+proyecta cada cara de obra con esa cámara y no deja que ningún punto de una letra caiga dentro.
 
 ### Qué atrezo lleva cada clase de casilla, y qué poco es
 
@@ -269,7 +254,7 @@ en [LAS-CASILLAS.md](LAS-CASILLAS.md).
 | Clase | Atrezo, en la banda `v = 60..90` |
 | --- | --- |
 | Solar de barrio (22) | **Sin edificio.** Sólo una `farola-de-calle` en la esquina de atrás (`u = −31`, `v = 84`): una pieza. Lo que sobresale de un solar son las casas y el hotel del jugador, en la franja. |
-| Las cuatro Puertas (5, 15, 25, 35) | **Cuatro** `calzada-paso` de cebra a `u = ±6` y `±18` —que cubren los 48 de la avenida sin dejar hueco— y **dos** `semaforo-c` con el brazo sobre la calzada, uno por sentido, en la acera de 12 que queda a cada lado. |
+| Las cuatro Puertas (5, 15, 25, 35) | **Ninguno.** Llevaban la cebra de la avenida y sus dos semáforos en medio del blanco, y ése es ahora el sitio del edificio de viajeros de cada estación (`obras.ts`). |
 | Arca del Concejo (2, 17, 33) | El emblema `arca` a `u = −14` y un `contenedor` a `u = +18`. |
 | Pregón (7, 22, 36) | El emblema `pregon` y una `papelera`. |
 | Molino y Pozo (12, 28) | El emblema `oficio` y una `boca-de-riego`. |
@@ -284,7 +269,7 @@ que se hace cien veces por partida— se volvía un ejercicio de vista. Con el f
 
 La farola se queda porque no es un edificio: va al fondo, contra el marco, y lejos del carril de
 las casas (`v = 10,5`), así que da escala sin disputarle el sitio a lo que cuenta. Lo que define
-la casilla sigue siendo la franja de color, el filete, el marco y el precio grande.
+la casilla sigue siendo la franja de color, el filete, el marco y lo que lleva escrito: su nombre y su precio.
 
 De propina, el tablero adelgazó al quitarlos: quedó en **172.808** triángulos en plena. Con los
 NOMBRES de las casillas encima (8.525 triángulos de letras, §2 bis) iba entonces por **181.333**, de
@@ -297,39 +282,24 @@ cuando la casilla lleva pieza, centrado cuando no.
 
 ### 2 bis. El nombre de la casilla, y de dónde salen sus letras
 
-Las catorce casillas especiales de los lados llevan su **nombre escrito en la franja**, donde un
-solar lleva su color: `V_DEL_ROTULO = 10,5`, alzado `0,7` sobre la franja para no pelearse en
-profundidad con el reborde. Hoy dicen FONDO (2, 17, 33), IMPUESTO (4), PUERTO (5), SUCESOS (7, 22,
-36), LUZ (12), BUSES (15), CARGA (25), AGUA (28), TREN (35) y TASA (38) —los rótulos del reglamento;
-el código sigue llamando a algunas `arca`, `pregon`, `diezmo` o `alcabala` por dentro, y el §0.3 del
-reglamento lo deja así a propósito—.
+Las treinta y seis casillas de los lados llevan su **nombre entero arriba del blanco** y su **pie
+abajo** (§2): CALLEJÓN DE LAS LATAS y PRECIO 60 €, CAJA DE COMUNIDAD y COGE CARTA, IMPUESTO SOBRE EL
+CAPITAL y PAGA 200 € O 10 %. Los nombres de las especiales son los del tablero clásico por decisión de
+Miguel (ver la nota del reglamento); el código sigue llamando a algunas `arca`, `pregon`, `diezmo` o
+`alcabala` por dentro, y el §0.3 del reglamento lo deja así a propósito.
 
-El renglón se ajusta solo, y **deja margen**: `MARGEN_DEL_TEXTO = 0,12` es la regla de todo el
-tablero, un 12 % del hueco a cada lado. De ahí salen los tres anchos útiles —**54,7** de los 72 de
-una casilla, **16** de los 21 de su franja y **96,7** de los 127,3 de la diagonal de una
-esquina— y dentro de ellos la palabra encoge hasta caber. Cada letra se agarra **por el centro de
-su avance**, no por su caja, que es lo que hace que quede ópticamente centrada.
+**Un solo alto para todos los nombres**, el de la palabra más ancha —una palabra no se parte—, y los
+renglones partidos en los menos posibles y, de ésos, en los más iguales: «CALLEJÓN DE / LAS LATAS» y
+no «CALLEJÓN DE LAS / LATAS». Cada letra se agarra **por el centro de su avance**, no por su caja,
+que es lo que hace que quede ópticamente centrada.
 
-Lo pidió Miguel viendo el tablero —«los textos tienen que tener un margen para que queden
-estéticos, ahora mismo ocupan de extremo a extremo»— y tenía que pasar por cómo estaba escrito: el
-alto se calcula para LLENAR el hueco, así que toda palabra que no llegue al techo sale tocando los
-dos bordes por construcción. Un renglón que toca el borde no parece grande: parece apretado.
-
-**Lo que cuesta, con la medida delante.** El ancho de la casilla es el límite de verdad, no la
-banda, así que la palabra larga es la que paga: con el margen puesto, IMPUESTO sale a 6,9 de alto,
-SUCESOS a 7,9, FONDO a 9,5, AGUA a 12,4, TASA a 14,3 y LUZ a 16 (ésta la topa la banda, no el
-ancho). Proyectado con las medidas de §2, un 6,9 se lee a unos 21 px en un PC a la distancia a la
-que la cámara se pone al mover, y a unos 4 px en el móvil. **La única palanca para que los
-nombres largos crezcan es acortarlos**: cada letra de más encoge a todas las demás.
-
-Y el margen no se cree: se MIDE. `verify:burgo-escena` toma la caja de cada letra puesta —su
-avance real, no su alto— en las coordenadas de su casilla y comprueba que no entra en el margen,
-con su vacuna delante.
-
-El ALTO DEL PRECIO (27) no sale de esta regla: sale de la medida de legibilidad de más arriba, y
-encogerlo al 76 % lo dejaría por debajo del suelo que se midió para el móvil. Su margen ya lo
-cumple por el otro lado: un precio de tres cifras mide 49,7 de los 72, o sea el 15 % libre a cada
-lado.
+Y **deja margen**. Lo pidió Miguel viendo el tablero —«los textos tienen que tener un margen para que
+queden estéticos, ahora mismo ocupan de extremo a extremo»—. En una lateral es el 8 % de la casilla a
+cada lado (**60,5** de los 72): con un solo alto para los treinta y seis, cada punto de margen es un
+punto de letra para todos, y al 12 % el nombre se quedaba en 4,3. En una esquina es el 12 % de la
+diagonal (**96,7** de los 127,3). El margen no se cree: `verify:burgo-escena` toma la caja de cada
+letra puesta —su avance real, no su alto— en las coordenadas de su casilla y comprueba que no entra
+en él, con su vacuna delante.
 
 **Una esquina lo escribe en diagonal**, porque no tiene franja: su suelo es un cuadro de 90 (de
 324 a 414) y el renglón va por su diagonal, que es además desde donde se mira una esquina. Ahí el
@@ -342,8 +312,8 @@ cuatro esquinas, contra el rombo de verdad.
 **Las letras salen de un tipo de verdad.** Los contornos se extraen de
 `arte/tipos/Cinzel_700Bold.ttf` —la familia con la que la app titula, con su licencia SIL OFL al
 lado— **al compilar**, con `opentype.js` como dependencia sólo de compilación. Treinta y nueve
-glifos: mayúsculas, eñe, vocales acentuadas, diéresis, apertura de interrogación y de admiración
-y puntuación. **Cambiar el juego de idioma es declarar sus caracteres en el charset de
+glifos: mayúsculas, eñe, vocales acentuadas, diéresis, apertura de interrogación y de admiración,
+puntuación, los diez dígitos, el euro y el tanto por ciento. **Cambiar el juego de idioma es declarar sus caracteres en el charset de
 `escenas/scripts/compilar-iconos.ts` y volver a compilar**; si el tipo no trae alguno, el
 compilador se para y dice cuál en vez de emitir un hueco.
 
@@ -351,11 +321,12 @@ Por qué el arte acaba siendo código y no se lee el `.ttf` en caliente: Metro n
 fichero como texto y **en React Native no existe `DOMParser`**, así que un tipo analizado al
 arrancar se vería en el escritorio y saldría **vacío en la app**, sin un error en ninguna consola.
 
-Cuestan **155 triángulos por glifo** de media —medidos uno a uno: 84 la `Z`, 201 la `P`, con las
-curvas a seis tramos—, y las 55 letras del anillo suman **8.525**. No cuestan ninguna llamada de
-dibujo: van fundidas en la misma geometría que los precios y los emblemas, que es **una sola**
-para los 88 dígitos, los 12 emblemas y las 55 letras. Bajar ese número de tramos es la única
-palanca si algún día estorban, y no obliga a tocar nada más.
+Cuestan **81 triángulos por glifo** de media, con las curvas a TRES tramos. Fueron seis —155 de
+media— hasta que el tablero llevó nombre y precio en las treinta y seis laterales: pasó de 206 letras
+a más de mil, y la calidad sobria se iba a 280.000 con un tope de 230.000. Bajar los tramos era la
+palanca que esta nota dejaba apuntada, y a la talla de un nombre tres no se distinguen de seis. No
+cuestan ninguna llamada de dibujo: van fundidas en una sola geometría con los emblemas, los carteles
+y el neón de los casinos.
 
 ### Las cuatro esquinas (108 × 108 = 9 × 9 celdas de retícula)
 

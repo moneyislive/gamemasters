@@ -1816,11 +1816,11 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
   const conCarta = { ...vista, momento: 'jugando', turnosAbiertos: 9, ultimaCarta: { mazo: 'pregon', carta: 6, quien, enElTurno: 9 }, aviso: '', pregon: '', sucesos: [] } as unknown as VistaDelBurgo;
   const cartel = cartelEnTres(conCarta);
   const seis = carta('pregon', 6);
-  comprobar('cartelEnTres da el título y el texto DE LA TABLA por el número', cartel !== null && seis !== null && cartel.titulo === seis.titulo && cartel.texto === seis.texto && cartel.deDonde === 'de Sucesos');
+  comprobar('cartelEnTres da el título y el texto DE LA TABLA por el número', cartel !== null && seis !== null && cartel.titulo === seis.titulo && cartel.texto === seis.texto && cartel.deDonde === 'de Suerte');
   comprobar('y en el turno siguiente ya no hay cartel', cartelEnTres({ ...conCarta, turnosAbiertos: 10 }) === null);
   comprobar('un número que no es de la tabla no da cartel', cartelEnTres({ ...conCarta, ultimaCarta: { mazo: 'arca', carta: 99, quien, enElTurno: 9 } }) === null);
   const tableroConCarta = tableroEnTres(conCarta, quien, opciones);
-  comprobar('el tablero dice de qué casilla de Sucesos sale el naipe', tableroConCarta?.carta !== null && CASILLAS[tableroConCarta?.carta?.enCasilla ?? 0]?.clase === 'pregon');
+  comprobar('el tablero dice de qué casilla de Suerte sale el naipe', tableroConCarta?.carta !== null && CASILLAS[tableroConCarta?.carta?.enCasilla ?? 0]?.clase === 'pregon');
   const hojaConCarta = hojaEnTres(conCarta, quien, opciones);
   comprobar('la hoja lleva la carta vigente en su sección y no la de ninguna otra', reprochesDeLaHoja(conCarta, quien, opciones, hojaConCarta, secretos).length === 0 && hojaConCarta.secciones[3]?.lineas[0] === seis?.titulo, reprochesDeLaHoja(conCarta, quien, opciones, hojaConCarta, secretos));
   const otra = carta('arca', 3);
@@ -2355,7 +2355,7 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
     return { ...f, lineas: [...f.lineas, f.estado] };
   }).filter((x) => x.indexOf('repite en un renglón') >= 0);
   comprobar(
-    'la vacuna: una tarjeta que mete el estado sin mirar el nombre se ve caer en DIEZ de las cuarenta —la Salida, la Comisaría, el Descanso, ¡A comisaría!, los tres Sucesos y los tres del Fondo Vecinal—',
+    'la vacuna: una tarjeta que mete el estado sin mirar el nombre se ve caer en DIEZ de las cuarenta —la Salida, la Comisaría, el Descanso, ¡A comisaría!, las tres de Suerte y las tres de la Caja de Comunidad—',
     conElRenglonRepetido.length === 10,
     conElRenglonRepetido,
   );
@@ -2462,14 +2462,14 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
   comprobar(
     'con un solo edificio y una sola carta, «La mesa entera» concuerda en singular: decía «guarda 1 casas y 1 hoteles» y «Quedan 1 cartas», y decía eso justo al final de la partida',
     lineasDe(alFinalDeTodo, 'mesa').some((l) => l === 'El Ayuntamiento guarda 1 casa y 1 hotel.') &&
-      lineasDe(alFinalDeTodo, 'mesa').some((l) => l === `Queda 1 carta en Sucesos y 0 en el Fondo Vecinal.`) &&
+      lineasDe(alFinalDeTodo, 'mesa').some((l) => l === `Queda 1 carta en Suerte y 0 en la Caja de Comunidad.`) &&
       lineasDe(alFinalDeTodo, 'mesa').some((l) => l === 'Se juega a 1 vuelta.'),
     lineasDe(alFinalDeTodo, 'mesa'),
   );
   comprobar(
     'y con muchos, en plural: es el MISMO renglón compuesto por la misma función, no dos textos que se parecen',
     lineasDe(conTodoEnElConcejo, 'mesa').some((l) => l === 'El Ayuntamiento guarda 32 casas y 12 hoteles.') &&
-      lineasDe(conTodoEnElConcejo, 'mesa').some((l) => l === 'Quedan 16 cartas en Sucesos y 16 en el Fondo Vecinal.') &&
+      lineasDe(conTodoEnElConcejo, 'mesa').some((l) => l === 'Quedan 16 cartas en Suerte y 16 en la Caja de Comunidad.') &&
       lineasDe(conTodoEnElConcejo, 'mesa').some((l) => l === 'Se juega a 5 vueltas.'),
     lineasDe(conTodoEnElConcejo, 'mesa'),
   );
@@ -2530,7 +2530,7 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
   const renglonesDelApuro = lineasDe(conDeudas, 'ahora');
   comprobar(
     'cada deuda del apuro se lee sola, con la contracción hecha y DICIENDO DE QUÉ ES: era «200 € a el Ayuntamiento», y es el renglón que se lee mientras corre la cuenta atrás',
-    renglonesDelApuro.some((l) => l === `Le debes ${maravedies(200)} del Impuesto al Ayuntamiento.`) && renglonesDelApuro.every((l) => l.indexOf('a el Ayuntamiento') < 0),
+    renglonesDelApuro.some((l) => l === `Le debes ${maravedies(200)} del Impuesto sobre el Capital al Ayuntamiento.`) && renglonesDelApuro.every((l) => l.indexOf('a el Ayuntamiento') < 0),
     renglonesDelApuro,
   );
   comprobar(
@@ -2586,8 +2586,8 @@ paso('El carril, la caja de los tratos, el cartel al pie, la ficha de un jugador
   const cartaDeNadie = enPieYJugando({ turnosAbiertos: 9, ultimaCarta: { mazo: 'arca', carta: 3, quien: null, enElTurno: 9 } });
   const renglonesDeLaCarta = lineasDe(cartaDeNadie, 'carta');
   comprobar(
-    'una carta cuya vista no dice quién la sacó no deja el hueco dentro de la frase («La sacó  de Sucesos.»): se dice de qué mazo salió y ya',
-    renglonesDeLaCarta.some((l) => l === 'Una carta del Fondo Vecinal.') && renglonesDeLaCarta.every((l) => l.indexOf('  ') < 0),
+    'una carta cuya vista no dice quién la sacó no deja el hueco dentro de la frase («La sacó  de Suerte.»): se dice de qué mazo salió y ya',
+    renglonesDeLaCarta.some((l) => l === 'Una carta de la Caja de Comunidad.') && renglonesDeLaCarta.every((l) => l.indexOf('  ') < 0),
     renglonesDeLaCarta,
   );
 

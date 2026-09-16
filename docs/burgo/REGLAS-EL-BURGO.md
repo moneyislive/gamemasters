@@ -40,11 +40,20 @@
 > barrios, los textos de las treinta y dos cartas. En este documento no se nombra ninguna
 > marca ajena, ni siquiera para decir que no se nombra; donde hace falta comparar, se dice
 > «el juego de mesa clásico del género» o «el reglamento oficial del género».
+>
+> **Y una excepción decidida, con fecha.** El 16 de septiembre de 2026 Miguel pidió que las casillas
+> especiales llevaran los nombres del tablero clásico tal cual —la Caja de Comunidad, el Impuesto sobre
+> el Capital, Suerte, la Compañía de Electricidad, la Compañía de Aguas, el Impuesto de Lujo y las
+> estaciones de Goya, Delicias, Mediodía y Norte—, y se le avisó antes de que eso era justo lo que
+> esta nota evitaba: son textos de una edición comercial. Lo confirmó («úsalos tal cual»). Así que
+> esos nombres son de esa edición; las calles, los barrios y los textos de las cartas siguen siendo
+> propios, y las MARCAS —el nombre del juego y el de sus editores— siguen prohibidas y vigiladas por
+> `verify:procedencia`.
 
 **Índice.** [§0 El vocabulario](#0-el-vocabulario) · [§1 Las cuarenta
 casillas](#1-las-cuarenta-casillas) · [§2 El turno](#2-el-turno-los-dados-los-dobles-y-el-movimiento)
-· [§3 La casilla que pide una decisión](#3-la-casilla-que-pide-una-decisión-comprar-la-subasta-el-impuesto-y-la-tasa)
-· [§4 Los dos mazos](#4-los-dos-mazos-sucesos-y-el-fondo-vecinal) · [§5 La Comisaría](#5-la-comisaría) ·
+· [§3 La casilla que pide una decisión](#3-la-casilla-que-pide-una-decisión-comprar-la-subasta-y-los-dos-impuestos)
+· [§4 Los dos mazos](#4-los-dos-mazos-suerte-y-la-caja-de-comunidad) · [§5 La Comisaría](#5-la-comisaría) ·
 [§6 Las rentas y las obras](#6-las-rentas-y-las-obras) · [§7 La hipoteca y el
 dinero](#7-la-hipoteca-y-el-dinero) · [§8 Los tratos](#8-los-tratos) · [§9 El apuro y la
 quiebra](#9-el-apuro-y-la-quiebra) · [§10 El final de la
@@ -68,11 +77,11 @@ mesa, la hoja, el retablo y este documento.
 | Palabra | Qué es |
 |---|---|
 | **euros**, **«€»** | La moneda. Se escribe con el separador de millar en punto y el símbolo detrás, separado por un espacio: «1.500 €». Lo formatea `maravedies(n)` de `burgo.ts`, que es un identificador viejo con salida nueva. |
-| **el Ayuntamiento** | Quien cobra el Impuesto y la Tasa, vende los títulos, paga las ventas de edificios, guarda las casas y los hoteles y se queda con lo que no tiene dueño. Su caja no se agota. En el código es el Concejo (`casasEnElConcejo`, `CASAS_DEL_CONCEJO`) y en la vista es `dueno: null`. |
+| **el Ayuntamiento** | Quien cobra los dos impuestos, vende los títulos, paga las ventas de edificios, guarda las casas y los hoteles y se queda con lo que no tiene dueño. Su caja no se agota. En el código es el Concejo (`casasEnElConcejo`, `CASAS_DEL_CONCEJO`) y en la vista es `dueno: null`. |
 | **solar** | Una de las 22 casillas de calle que se compran, se agrupan en barrios y admiten obras. |
 | **barrio** | Cada uno de los 8 grupos de solares. «Barrio entero» es tener todos los solares de un barrio. También se dice «la calle es tuya». |
-| **estación** | Una de las 4 casillas de transporte (5, 15, 25, 35). En el código, `puerta`. |
-| **servicio** | Una de las 2 casillas de servicio público (12, 28). En el código, `oficio`. |
+| **estación** | Una de las 4 casillas de transporte: la Estación de Goya (5), la de Delicias (15), la del Mediodía (25) y la del Norte (35). En el código, `puerta`. |
+| **servicio** | Una de las 2 casillas de servicio público: la Compañía de Electricidad (12) y la Compañía de Aguas (28). En el código, `oficio`. |
 | **casa** | El edificio pequeño. Hay 32 en el Ayuntamiento. |
 | **hotel** | El edificio grande: sustituye a cuatro casas. Hay 12 en el Ayuntamiento. En el código, `posada`, y `casas === 5` significa hotel. |
 | **hipoteca**, **hipotecar**, **deshipotecar** | Empeñar un título al Ayuntamiento por la mitad de su precio y recuperarlo pagando la hipoteca más el interés. En el código, `empeno`, `empenar`, `desempenar`. |
@@ -81,18 +90,20 @@ mesa, la hoja, el retablo y este documento.
 | **la Salida** | La casilla 0. Al pasarla o caer en ella se cobran 200 €. En el código, `PUERTA_MAYOR` y `PAGA_DE_LA_PUERTA_MAYOR`. |
 | **el Descanso** | La casilla 20. No da ni quita nada. En el código, `feria`. |
 | **¡A comisaría!** | La casilla 30, que manda derecho a la Comisaría. En el código, `a-la-mazmorra`. |
-| **el Impuesto** | La casilla 4: 200 € al Ayuntamiento. En el código, `diezmo` y `EL_DIEZMO`. |
-| **la Tasa** | La casilla 38: 100 € al Ayuntamiento. En el código, `alcabala` y `LA_ALCABALA`. |
-| **Sucesos** | Uno de los dos mazos (casillas 7, 22, 36). En el código, `pregon`, y las series son `'p01'`…`'p16'`. |
-| **el Fondo Vecinal** | El otro mazo (casillas 2, 17, 33). En el código, `arca`, series `'a01'`…`'a16'`. |
+| **el Impuesto sobre el Capital** | La casilla 4: 200 € o el 10 % del patrimonio al Ayuntamiento. En corto, **el Impuesto**. En el código, `diezmo` y `EL_DIEZMO`. |
+| **el Impuesto de Lujo** | La casilla 38: 100 € al Ayuntamiento. En el código, `alcabala` y `LA_ALCABALA`. |
+| **Suerte** | Uno de los dos mazos (casillas 7, 22, 36). En el código, `pregon`, y las series son `'p01'`…`'p16'`. |
+| **la Caja de Comunidad** | El otro mazo (casillas 2, 17, 33). En el código, `arca`, series `'a01'`…`'a16'`. |
 | **el Salvoconducto** | La carta que saca de la Comisaría. Hay una en cada mazo. En el código, `indulto`. |
 | **quiebra** | Quedarse fuera de la partida entregando todo. |
 | **apuro** | Deber más de lo que se tiene en efectivo, con la mesa parada esperando a que se venda, se hipoteque o se quiebre. |
 
 ### 0.2 Lo que NO se dice nunca
 
-Ningún nombre de ninguna edición comercial, en ningún texto visible, en ningún comentario y
-en ningún identificador — **ni siquiera para decir que no se nombra**. Lo barre
+Ninguna MARCA de ninguna edición comercial —el nombre del juego, el de sus editores—, en ningún
+texto visible, en ningún comentario y en ningún identificador — **ni siquiera para decir que no se
+nombra**. Los nombres de las casillas especiales son la excepción decidida que cuenta la nota del
+principio. Lo barre
 `verify:procedencia` sobre las cadenas literales de `shared/arcade/juegos/`, y
 `verify:burgo-modelos` barre con las marcas partidas en trozos los ficheros de
 `escenas/burgo/`. Y tampoco se usa un sinónimo para algo que ya tiene su palabra en el §0.1:
@@ -142,43 +153,43 @@ La columna «Renta» es la renta del solar SIN casas; con barrio entero se cobra
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 0 | La Salida | Salida | la Salida | — | — | — | — | — | — | — | — | — |
 | 1 | Callejón de las Latas | Latas | solar | El Poblado (pardo) | 60 | 2 | 10 | 30 | 90 | 160 | 250 | 50 |
-| 2 | El Fondo Vecinal | Fondo | el Fondo Vecinal | — | — | — | — | — | — | — | — | — |
+| 2 | La Caja de Comunidad | Caja | la Caja de Comunidad | — | — | — | — | — | — | — | — | — |
 | 3 | Pasaje de los Charcos | Charco | solar | El Poblado (pardo) | 60 | 4 | 20 | 60 | 180 | 320 | 450 | 50 |
 | 4 | El Impuesto | Fisco | el Impuesto | — | 200 | — | — | — | — | — | — | — |
-| 5 | Estación del Puerto | Puerto | estación | — | 200 | §6.3 | — | — | — | — | — | — |
+| 5 | Estación de Goya | Goya | estación | — | 200 | §6.3 | — | — | — | — | — | — |
 | 6 | Calle de los Talleres | Taller | solar | Las Naves (celeste) | 100 | 6 | 30 | 90 | 270 | 400 | 550 | 50 |
-| 7 | Sucesos | Suceso | Sucesos | — | — | — | — | — | — | — | — | — |
+| 7 | Suerte | Suerte | Suerte | — | — | — | — | — | — | — | — | — |
 | 8 | Calle de la Imprenta | Tinta | solar | Las Naves (celeste) | 100 | 6 | 30 | 90 | 270 | 400 | 550 | 50 |
 | 9 | Calle de las Grúas | Grúas | solar | Las Naves (celeste) | 120 | 8 | 40 | 100 | 300 | 450 | 600 | 50 |
 | 10 | La Comisaría | Visita | la Comisaría | — | — | — | — | — | — | — | — | — |
 | 11 | Calle de la Frutería | Fruta | solar | El Mercadillo (rosa) | 140 | 10 | 50 | 150 | 450 | 625 | 750 | 100 |
-| 12 | La Central Eléctrica | Luz | servicio | — | 150 | §6.4 | — | — | — | — | — | — |
+| 12 | La Compañía de Electricidad | Luz | servicio | — | 150 | §6.4 | — | — | — | — | — | — |
 | 13 | Calle de la Ferretería | Tuerca | solar | El Mercadillo (rosa) | 140 | 10 | 50 | 150 | 450 | 625 | 750 | 100 |
 | 14 | Plaza del Mercadillo | Puesto | solar | El Mercadillo (rosa) | 160 | 12 | 60 | 180 | 500 | 700 | 900 | 100 |
-| 15 | Estación de Autobuses | Buses | estación | — | 200 | §6.3 | — | — | — | — | — | — |
+| 15 | Estación de Delicias | Delic. | estación | — | 200 | §6.3 | — | — | — | — | — | — |
 | 16 | Calle de los Balcones | Balcón | solar | El Ensanche (naranja) | 180 | 14 | 70 | 200 | 550 | 750 | 950 | 100 |
-| 17 | El Fondo Vecinal | Fondo | el Fondo Vecinal | — | — | — | — | — | — | — | — | — |
+| 17 | La Caja de Comunidad | Caja | la Caja de Comunidad | — | — | — | — | — | — | — | — | — |
 | 18 | Calle de los Garajes | Garaje | solar | El Ensanche (naranja) | 180 | 14 | 70 | 200 | 550 | 750 | 950 | 100 |
 | 19 | Calle del Semáforo | Ámbar | solar | El Ensanche (naranja) | 200 | 16 | 80 | 220 | 600 | 800 | 1000 | 100 |
 | 20 | El Descanso | Pausa | el Descanso | — | — | — | — | — | — | — | — | — |
 | 21 | Calle de los Cines | Cine | solar | El Centro (rojo) | 220 | 18 | 90 | 250 | 700 | 875 | 1050 | 150 |
-| 22 | Sucesos | Suceso | Sucesos | — | — | — | — | — | — | — | — | — |
+| 22 | Suerte | Suerte | Suerte | — | — | — | — | — | — | — | — | — |
 | 23 | Plaza del Ayuntamiento | Plaza | solar | El Centro (rojo) | 220 | 18 | 90 | 250 | 700 | 875 | 1050 | 150 |
 | 24 | Calle del Teatro | Teatro | solar | El Centro (rojo) | 240 | 20 | 100 | 300 | 750 | 925 | 1100 | 150 |
-| 25 | Estación de Mercancías | Carga | estación | — | 200 | §6.3 | — | — | — | — | — | — |
+| 25 | Estación del Mediodía | Medio. | estación | — | 200 | §6.3 | — | — | — | — | — | — |
 | 26 | Calle del Cristal | Vidrio | solar | Las Torres (amarillo) | 260 | 22 | 110 | 330 | 800 | 975 | 1150 | 150 |
 | 27 | Calle de las Antenas | Antena | solar | Las Torres (amarillo) | 260 | 22 | 110 | 330 | 800 | 975 | 1150 | 150 |
-| 28 | El Canal de Aguas | Agua | servicio | — | 150 | §6.4 | — | — | — | — | — | — |
+| 28 | La Compañía de Aguas | Aguas | servicio | — | 150 | §6.4 | — | — | — | — | — | — |
 | 29 | Calle de la Bolsa | Bolsa | solar | Las Torres (amarillo) | 280 | 24 | 120 | 360 | 850 | 1025 | 1200 | 150 |
 | 30 | ¡A comisaría! | Cepo | ¡A comisaría! | — | — | — | — | — | — | — | — | — |
 | 31 | Calle del Hospital | Salud | solar | El Parque (verde) | 300 | 26 | 130 | 390 | 900 | 1100 | 1275 | 200 |
 | 32 | Calle de la Biblioteca | Libros | solar | El Parque (verde) | 300 | 26 | 130 | 390 | 900 | 1100 | 1275 | 200 |
-| 33 | El Fondo Vecinal | Fondo | el Fondo Vecinal | — | — | — | — | — | — | — | — | — |
+| 33 | La Caja de Comunidad | Caja | la Caja de Comunidad | — | — | — | — | — | — | — | — | — |
 | 34 | Calle de los Jardines | Jardín | solar | El Parque (verde) | 320 | 28 | 150 | 450 | 1000 | 1200 | 1400 | 200 |
-| 35 | Estación Central | Tren | estación | — | 200 | §6.3 | — | — | — | — | — | — |
-| 36 | Sucesos | Suceso | Sucesos | — | — | — | — | — | — | — | — | — |
+| 35 | Estación del Norte | Norte | estación | — | 200 | §6.3 | — | — | — | — | — | — |
+| 36 | Suerte | Suerte | Suerte | — | — | — | — | — | — | — | — | — |
 | 37 | Paseo de los Tilos | Tilos | solar | Los Paseos (azul) | 350 | 35 | 175 | 500 | 1100 | 1300 | 1500 | 200 |
-| 38 | La Tasa | Tasa | la Tasa | — | 100 | — | — | — | — | — | — | — |
+| 38 | El Impuesto de Lujo | Lujo | el Impuesto de Lujo | — | 100 | — | — | — | — | — | — | — |
 | 39 | Avenida de las Acacias | Acacia | solar | Los Paseos (azul) | 400 | 50 | 200 | 600 | 1400 | 1700 | 2000 | 200 |
 
 ### 1.1 Los ocho barrios
@@ -210,7 +221,7 @@ casa es del BARRIO, no del solar**: los tres solares de un barrio construyen al 
 | `DINERO_DE_SALIDA` | 1.500 € | Con lo que empieza cada jugador. |
 | `PAGA_DE_LA_PUERTA_MAYOR` | 200 € | Lo que paga la Salida al pasarla o caer en ella. |
 | `EL_DIEZMO` | 200 € | El Impuesto (casilla 4). |
-| `LA_ALCABALA` | 100 € | La Tasa (casilla 38). |
+| `LA_ALCABALA` | 100 € | El Impuesto de Lujo (casilla 38). |
 | `PRECIO_DE_PUERTA` | 200 € | Precio de cada estación. |
 | `PRECIO_DE_OFICIO` | 150 € | Precio de cada servicio. |
 | `FIANZA` | 50 € | Lo que cuesta salir de la Comisaría pagando. |
@@ -309,10 +320,10 @@ Al caer, y según la clase de la casilla:
 |---|---|
 | La Salida (0) | Nada más que el cobro del §2.5. |
 | Solar, estación, servicio | Sin dueño → se abre `comprar` (§3.1). Con dueño ajeno y sin hipoteca → se paga la renta (§6). Propio, o hipotecado → nada. |
-| Sucesos (7, 22, 36) | Se roba una carta del mazo de Sucesos y se cumple (§4). |
-| El Fondo Vecinal (2, 17, 33) | Ídem con el otro mazo. |
+| Suerte (7, 22, 36) | Se roba una carta del mazo de Suerte y se cumple (§4). |
+| La Caja de Comunidad (2, 17, 33) | Ídem con el otro mazo. |
 | El Impuesto (4) | Se elige con qué se paga: **200 € o el 10 % del patrimonio** (§3.4). |
-| La Tasa (38) | **100 € al Ayuntamiento**, sin elección (§3.5). |
+| El Impuesto de Lujo (38) | **100 € al Ayuntamiento**, sin elección (§3.5). |
 | La Comisaría (10) | Nada: se está de visita. |
 | El Descanso (20) | **Nada.** No se cobra ni se paga. |
 | ¡A comisaría! (30) | Derecho a la Comisaría (§5.1). |
@@ -321,7 +332,7 @@ Las tres casillas que **piden una decisión** —el título sin dueño, la casil
 desde la regla de la última casa, el edificio en disputa— comparten el mismo paso y están
 todas en el §3.
 
-**El Descanso no acumula nada.** Ni el Impuesto ni la Tasa ni las multas se amontonan en la
+**El Descanso no acumula nada.** Ni los dos impuestos ni las multas se amontonan en la
 casilla 20 para que alguien las recoja. Eso coincide con el reglamento oficial del género —la
 variante del bote es una costumbre de mesa, no una regla— y aquí además haría falta un
 depósito público más en el estado y en la vista, para el que no hay dueño.
@@ -338,7 +349,7 @@ vivo** en orden de asiento y el paso vuelve a `por-tirar`. Los quebrados se salt
 
 ---
 
-## 3. La casilla que pide una decisión: comprar, la subasta, el Impuesto y la Tasa
+## 3. La casilla que pide una decisión: comprar, la subasta y los dos impuestos
 
 Hay casillas que se resuelven solas (§2.6) y hay casillas que **paran la mesa a esperar una
 respuesta del que tiene el turno**. Son dos: el título sin dueño («¿lo compras o va a
@@ -439,7 +450,7 @@ Los dos importes se enseñan **antes de elegir**, calculados con la misma funci�
 cobra: si el botón y el cobro usaran cuentas distintas, el botón podría prometer una cifra y
 el Ayuntamiento llevarse otra.
 
-La Tasa **no** tiene elección (§3.5): el reglamento oficial del género tampoco se la da.
+El Impuesto de Lujo **no** tiene elección (§3.5): el reglamento oficial del género tampoco se la da.
 
 **Con el Impuesto sin pagar SÍ se obra**, y eso es lo contrario de lo que parecería. La marca no
 cierra ninguna puerta: cualquiera puede alzar, vender, hipotecar y deshipotecar mientras el del
@@ -453,9 +464,9 @@ al del turno sus seis obras y `avanzar` las acepta.
 reglamento pone por defecto: el 10 % hay que pedirlo. Si esa fija no le alcanza, se abre su
 apuro (§9.1) y el turno **no** se releva.
 
-### 3.5 La Tasa
+### 3.5 El Impuesto de Lujo
 
-Caer en la Tasa (casilla 38) paga **100 € al Ayuntamiento**, en el acto y sin elección. No hay
+Caer en el Impuesto de Lujo (casilla 38) paga **100 € al Ayuntamiento**, en el acto y sin elección. No hay
 nada que decidir, así que no abre ningún paso.
 
 ### 3.6 Lo que la subasta NO tiene
@@ -465,11 +476,11 @@ cierra por pases.
 
 ---
 
-## 4. Los dos mazos: Sucesos y el Fondo Vecinal
+## 4. Los dos mazos: Suerte y la Caja de Comunidad
 
 ### 4.1 Los mazos
 
-Dieciséis cartas cada uno. Sucesos se roba en las casillas 7, 22 y 36; el Fondo Vecinal, en la
+Dieciséis cartas cada uno. Suerte se roba en las casillas 7, 22 y 36; la Caja de Comunidad, en la
 2, 17 y 33. Las cartas están en el §11, una a una, con su texto y su efecto.
 
 ### 4.2 Cómo se roba: la carta va al FONDO y no se rebaraja nunca
@@ -494,9 +505,9 @@ implica: se cobra la renta, se abre la compra, se paga el Impuesto. Los casos co
 - Las cartas que mandan a una casilla concreta («A la Salida», «Al Paseo de los Tilos»…) nunca
   mandan a una casilla de carta, así que ahí la cadena se acaba.
 - **«Tres calles atrás» sí puede encadenar**: desde la casilla 36 se retrocede a la 33, que es
-  el Fondo Vecinal, y **se roba una segunda carta**. Desde la 22 se cae en la 19 (un solar) y
+  la Caja de Comunidad, y **se roba una segunda carta**. Desde la 22 se cae en la 19 (un solar) y
   desde la 7 en la 4 (el Impuesto). La cadena tiene como mucho dos cartas, porque ninguna carta
-  del Fondo Vecinal manda a una casilla de carta.
+  de la Caja de Comunidad manda a una casilla de carta.
 - «A la estación más cercana» y «Al servicio más cercano» buscan hacia delante desde la casilla
   de la carta, cobran la Salida si la cruzan, y cobran distinto (§6.3, §6.4).
 
@@ -1030,7 +1041,7 @@ el reductor hace de verdad, que es lo que manda cuando el texto es ambiguo.
 Lo común a todas: la carta se cumple en el acto; si manda a otra casilla, esa casilla se
 resuelve enseguida (§4.3); y la carta vuelve al fondo de su mazo salvo el Salvoconducto (§4.2).
 
-### 11.1 Sucesos
+### 11.1 Suerte
 
 | # | Título | Texto | Efecto |
 |---|---|---|---|
@@ -1038,20 +1049,20 @@ resuelve enseguida (§4.3); y la carta vuelve al fondo de su mazo salvo el Salvo
 | 2 | Al Paseo de los Tilos | «Avanza hasta el Paseo de los Tilos. Si pasas la Salida, cobra 200 €.» | Va a la 37; cobra 200 € si cruza la Salida; luego se resuelve la casilla (renta, o compra si no tiene dueño). |
 | 3 | A la Calle de los Balcones | «Avanza hasta la Calle de los Balcones. Si pasas la Salida, cobra 200 €.» | Va a la 16, igual que la anterior. |
 | 4 | A la Calle de la Frutería | «Avanza hasta la Calle de la Frutería. Si pasas la Salida, cobra 200 €.» | Va a la 11, igual. |
-| 5 | A la Estación del Puerto | «Avanza hasta la Estación del Puerto. Si pasas la Salida, cobra 200 €.» | Va a la 5; renta **normal** de estación (§6.3), no doble. |
+| 5 | A la Estación de Goya | «Avanza hasta la Estación de Goya. Si pasas la Salida, cobra 200 €.» | Va a la 5; renta **normal** de estación (§6.3), no doble. |
 | 6 | A la estación más cercana | «Avanza hasta la estación más cercana. Si tiene dueño, págale el doble de la renta; si no, puedes comprarla.» | Busca hacia delante entre las casillas 5, 15, 25 y 35; cobra la Salida si la cruza; con dueño, **renta doble**; sin dueño, se abre `comprar`. |
 | 7 | A la estación más cercana | «Avanza hasta la estación más cercana. Si tiene dueño, págale el doble de la renta; si no, puedes comprarla.» | Igual que la 6: hay dos cartas iguales en el mazo. |
 | 8 | Al servicio más cercano | «Avanza hasta el servicio público más cercano. Si tiene dueño, tira los dados y págale diez veces la tirada; si no, puedes comprarlo.» | Busca hacia delante entre las casillas 12 y 28; cobra la Salida si la cruza; con dueño, **10 × una tirada NUEVA** (§6.4); sin dueño, se abre `comprar`. |
 | 9 | Dividendo de acciones | «Tus acciones reparten dividendo: cobra 50 €.» | Cobra 50 € del Ayuntamiento. |
 | 10 | Salvoconducto | «Sales de la Comisaría cuando quieras. Guarda esta carta hasta usarla o cambiarla.» | La carta **sale del mazo** y se guarda en la mano (§4.2, §5.3). |
-| 11 | Tres calles atrás | «Retrocede tres casillas.» | Retrocede 3 **sin cobrar la Salida**; luego se resuelve la casilla. Desde la 36 cae en el Fondo Vecinal y se roba otra carta (§4.3). |
+| 11 | Tres calles atrás | «Retrocede tres casillas.» | Retrocede 3 **sin cobrar la Salida**; luego se resuelve la casilla. Desde la 36 cae en la Caja de Comunidad y se roba otra carta (§4.3). |
 | 12 | ¡A comisaría! | «Ve derecho a la Comisaría, sin pasar por la Salida ni cobrar 200 €.» | A la Comisaría, retenido; termina el turno (§5.1). |
 | 13 | Derrama de la comunidad | «Paga 25 € por cada casa y 100 € por cada hotel.» | 25 € por casa y 100 € por hotel, al Ayuntamiento. Un solar con hotel cuenta **como un hotel y ninguna casa**. |
 | 14 | Multa de tráfico | «Paga una multa de 15 € por aparcar en doble fila.» | Paga 15 € al Ayuntamiento. |
-| 15 | Viaje a la Estación Central | «Viaja hasta la Estación Central. Si pasas la Salida, cobra 200 €.» | Va a la 35; renta **normal** de estación. |
+| 15 | Viaje a la Estación del Norte | «Viaja hasta la Estación del Norte. Si pasas la Salida, cobra 200 €.» | Va a la 35; renta **normal** de estación. |
 | 16 | Presides la comunidad | «Te eligen presidente de la comunidad: paga 50 € a cada jugador.» | 50 € a cada jugador vivo, uno por uno. Si no alcanza, se abre un apuro con **todas** las deudas dentro (§9.1). |
 
-### 11.2 El Fondo Vecinal
+### 11.2 La Caja de Comunidad
 
 | # | Título | Texto | Efecto |
 |---|---|---|---|
@@ -1063,7 +1074,7 @@ resuelve enseguida (§4.3); y la carta vuelve al fondo de su mazo salvo el Salvo
 | 6 | ¡A comisaría! | «Ve derecho a la Comisaría, sin pasar por la Salida ni cobrar 200 €.» | A la Comisaría, retenido; termina el turno. |
 | 7 | Fiestas del barrio | «Fiestas del barrio: cada jugador te paga 10 €.» | Cada jugador vivo paga 10 €. Quien no pueda, entra en la cola de apuros (§9.1). |
 | 8 | Te toca la lotería | «Te toca un pellizco de la lotería: cobra 100 €.» | Cobra 100 € del Ayuntamiento. |
-| 9 | Devolución de la Tasa | «Te devuelven la Tasa: cobra 20 €.» | Cobra 20 € del Ayuntamiento. |
+| 9 | Devolución de impuestos | «El Ayuntamiento te devuelve impuestos: cobra 20 €.» | Cobra 20 € del Ayuntamiento. |
 | 10 | Es tu cumpleaños | «Es tu cumpleaños: cada jugador te paga 10 €.» | Igual que la 7. |
 | 11 | Vence el seguro | «Vence tu seguro de vida: cobra 100 €.» | Cobra 100 € del Ayuntamiento. |
 | 12 | Urgencias | «Paga 100 € en urgencias.» | Paga 100 € al Ayuntamiento. |
@@ -1074,10 +1085,10 @@ resuelve enseguida (§4.3); y la carta vuelve al fondo de su mazo salvo el Salvo
 
 ### 11.3 Las cuentas de las dos cartas de obras
 
-Las cartas 13 de Sucesos y 15 del Fondo Vecinal cuentan **casas y hoteles por separado**: un
+Las cartas 13 de Suerte y 15 de la Caja de Comunidad cuentan **casas y hoteles por separado**: un
 solar con hotel aporta un hotel y **cero** casas, no cinco casas. Con el tablero lleno de un
-jugador (por ejemplo cuatro solares con hotel), la 13 de Sucesos cuesta 400 € y la 15 del Fondo
-Vecinal, 460 €.
+jugador (por ejemplo cuatro solares con hotel), la 13 de Suerte cuesta 400 € y la 15 de la Caja
+de Comunidad, 460 €.
 
 ---
 

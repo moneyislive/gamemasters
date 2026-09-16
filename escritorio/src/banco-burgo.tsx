@@ -667,7 +667,7 @@ function Banco(): JSX.Element {
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'carta', quien: yo.asiento, mazo: 'pregon', carta: 1 }])}>
-            Carta de Sucesos
+            Carta de Suerte
           </button>
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'carta', quien: yo.asiento, mazo: 'arca', carta: 2 }])}>
             Carta del Arca
@@ -677,10 +677,10 @@ function Banco(): JSX.Element {
           </button>
           {/* Los dos impuestos van al Ayuntamiento y cada uno tiene su animación en su casilla: la moneda que sube la escalinata y la joya. */}
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'paga', quien: yo.asiento, a: null, cuanto: 200, porque: 'diezmo', casilla: 4 }])}>
-            Pagar el Impuesto
+            Pagar el Impuesto sobre el Capital
           </button>
           <button type="button" style={BOTON} onClick={() => manda([{ que: 'paga', quien: yo.asiento, a: null, cuanto: 100, porque: 'alcabala', casilla: 38 }])}>
-            Pagar la Tasa
+            Pagar el Impuesto de Lujo
           </button>
           <button
             type="button"

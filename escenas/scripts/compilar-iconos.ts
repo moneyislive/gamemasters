@@ -1703,24 +1703,25 @@ const TIPO_DEL_TABLERO = path.join(RAIZ, 'arte', 'tipos', 'Cinzel_700Bold.ttf');
  * compilar: si el tipo no trae alguno, esto se para y dice cuál, en vez de emitir un hueco.
  */
 /*
- * Con los DIEZ DÍGITOS del tipo, que no son los del precio: el precio va con `CONTORNOS_DEL_GUARISMO`,
- * que están dibujados para leerse a 25 de alto desde la otra punta de la mesa. Éstos son para el
- * texto pequeño —«COBRA 200»—, que tiene que salir en la misma letra que el resto del renglón. Sin
- * ellos el comprobador vio montar «COBRA» y tres huecos.
+ * Con los DIEZ DÍGITOS del tipo, el EURO y el TANTO POR CIENTO: son los del precio desde que el
+ * tablero lo escribe abajo, como el de mesa —«PRECIO 60 €», «PAGA 200 € O 10 %»—, en la misma letra
+ * que el nombre. Los dígitos gordos de `CONTORNOS_DEL_GUARISMO` ya no los monta el tablero. Sin los
+ * dígitos del tipo el comprobador vio montar «COBRA» y tres huecos.
  */
-const CHARSET_DEL_TABLERO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZÑÁÉÍÓÚÜ0123456789¿?¡!.,-·';
+const CHARSET_DEL_TABLERO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZÑÁÉÍÓÚÜ0123456789¿?¡!.,-·€%';
 
 /**
  * TRAMOS POR CURVA. Medido sobre este tipo y este charset: 2 tramos son 57 triángulos por
  * glifo, 3 son 81 y 6 son 153.
  *
- * Va en SEIS a propósito, y la decisión es de Miguel: que se vea bien ahora y se optimice
- * después, cuando el tablero esté entero. Son 7.500 triángulos el alfabeto completo, y un
- * rótulo de ocho letras cuesta 1.200 de un tope de 900.000: no es aquí donde se juega el
- * presupuesto. Si algún día hace falta, bajar este número es la palanca, y no hay que tocar
- * nada más.
+ * Fue SEIS, y la decisión fue de Miguel: que se vea bien ahora y se optimice después, cuando el
+ * tablero esté entero. Ese día llegó con el tablero de mesa: las treinta y seis laterales llevan
+ * su nombre y su precio escritos, el tablero pasó de 206 letras a más de mil, y a seis tramos la
+ * calidad sobria se iba a 280.000 triángulos con un tope de 230.000. A TRES vuelve a caber, y a la
+ * talla a la que se escribe un nombre —cuatro o cinco de alto— tres tramos no se distinguen de
+ * seis. Es la palanca que esta nota dejó apuntada, y no hubo que tocar nada más.
  */
-const TRAMOS_DE_CURVA = 6;
+const TRAMOS_DE_CURVA = 3;
 
 /** El alto de la CAJA a la que se normalizan todas: la altura de las mayúsculas del tipo. */
 const ALTO_DE_LA_LETRA = 360;

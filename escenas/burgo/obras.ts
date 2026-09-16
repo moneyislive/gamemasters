@@ -100,6 +100,12 @@ export const COLOR_DE_OBRA = {
   marquesina: '#d8b34a',
   bombilla: '#ffe9a8',
   ruleta: '#23252a',
+  /* El letrero de neón del casino: el panel casi negro para que brille lo que lleva encima. */
+  panelDelNeon: '#1b1030',
+  neonCian: '#2fe6ff',
+  /* Y lo que va ENCIMA del panel, que se funde con la tinta sin luz y por eso parece encendido. */
+  neonRosa: '#ff3ea5',
+  neonAmarillo: '#ffd23f',
   /* El ferrocarril. */
   balasto: '#6b6257',
   traviesa: '#4f4034',
@@ -110,7 +116,10 @@ export const COLOR_DE_OBRA = {
   ladrillo: '#9a5f4b',
   esfera: '#f0ece0',
   cristal: '#a9c7d4',
-  carbon: '#26262a',
+  estuco: '#d9c8a9',
+  pizarra: '#4b5563',
+  /* El cobre viejo de las cúpulas del Mediodía. */
+  cupula: '#5f9e8f',
   /* El tren. */
   locomotora: '#2f4a5c',
   cabina: '#3d6076',
@@ -520,10 +529,17 @@ export const CASILLAS_CON_COFRE: readonly number[] = [2, 17, 33];
 export const CASILLAS_CON_CASINO: readonly number[] = [7, 22, 36];
 export const CASILLA_DE_LA_TASA = 38;
 
+/*
+ * CENTRADO EN EL BLANCO, CON «COGE CARTA» DEBAJO. Miguel: «CAJA DE COMUNIDAD … en la parte de
+ * arriba donde ahora se ubica COGE CARTA, que pasaría a estar debajo del cofre intentando centrar
+ * más el cofre en la casilla blanca». El cofre iba de 63 a 87 y ahora de 56 a 76: el centro del
+ * hueco que dejan el nombre (acaba en 44,8) y el pie (empieza en 82,8), con la base dos más corta.
+ * Y no más arriba, porque en la 2 la cámara lo ve corrido hacia el nombre siete décimas de su alto.
+ */
 const COFRE = {
-  base: { u: 12, v0: 63, v1: 87, alto: 1.2 },
-  cuerpo: { u: 8, v0: 67, v1: 83, desde: 1.2, hasta: 8 },
-  tapa: { u: 8.6, v0: 66.4, v1: 83.6, desde: 8, hasta: 10.4 },
+  base: { u: 12, v0: 56, v1: 76, alto: 1.2 },
+  cuerpo: { u: 8, v0: 58, v1: 74, desde: 1.2, hasta: 8 },
+  tapa: { u: 8.6, v0: 57.4, v1: 74.6, desde: 8, hasta: 10.4 },
   herraje: { ancho: 1, en: [-4, 4] as readonly number[] },
   cerradura: { u: 1.3, fondo: 1.2, desde: 4.8, hasta: 7.4 },
 } as const;
@@ -564,17 +580,24 @@ function carasDelCofre(casilla: number): CaraDeObra[] {
  * pero por ahí tiene que rodar la moneda de la recaudación, y no se rueda sobre el aire. Y en la
  * fachada hay PUERTA, que es por donde entra.
  */
+/*
+ * ENTRE EL NOMBRE Y EL PIE, Y MÁS BAJA. El Impuesto sobre el Capital lleva el nombre más hondo del
+ * tablero —tres renglones, hasta 51,8— y el pie empieza en 82,8, así que la oficina tiene veintiséis
+ * de fondo donde tenía todo el blanco. Y está en el lado de delante, donde la cámara del juego ve lo
+ * alto corrido hacia el nombre siete décimas de su altura: con el ático a 13,2 tapaba CAPITAL. Baja
+ * a 10,8 y se aparta del nombre lo que pide cada pieza por su altura.
+ */
 const OFICINA = {
   escalones: [
-    { u: 13, v0: 62, v1: 88, desde: 0, hasta: 0.8 },
-    { u: 12, v0: 64, v1: 88, desde: 0.8, hasta: 1.6 },
+    { u: 13, v0: 59, v1: 80, desde: 0, hasta: 0.8 },
+    { u: 12, v0: 61, v1: 80, desde: 0.8, hasta: 1.6 },
   ] as readonly { u: number; v0: number; v1: number; desde: number; hasta: number }[],
-  cuerpo: { u: 11, v0: 70, v1: 88, desde: 1.6, hasta: 11 },
-  columna: { lado: 1.8, v: 67.4, desde: 1.6, hasta: 10, en: [-8, -2.7, 2.7, 8] as readonly number[] },
-  cornisa: { u: 12, v0: 65.5, v1: 88.5, desde: 10, hasta: 11.4 },
-  atico: { u: 7, v0: 68, v1: 86, desde: 11.4, hasta: 13.2 },
+  cuerpo: { u: 11, v0: 65.5, v1: 80, desde: 1.6, hasta: 9 },
+  columna: { lado: 1.8, v: 63.5, desde: 1.6, hasta: 8.2, en: [-8, -2.7, 2.7, 8] as readonly number[] },
+  cornisa: { u: 12, v0: 62.5, v1: 80.3, desde: 8.2, hasta: 9.4 },
+  atico: { u: 7, v0: 64.5, v1: 78, desde: 9.4, hasta: 10.8 },
   /* La puerta: una hoja oscura una décima por delante de la fachada, entre las dos columnas de en medio. */
-  puerta: { u: 2.2, v0: 69.9, v1: 70, desde: 1.6, hasta: 7.2 },
+  puerta: { u: 2.2, v0: 65.4, v1: 65.5, desde: 1.6, hasta: 7.2 },
 } as const;
 
 function carasDeLaOficina(casilla: number): CaraDeObra[] {
@@ -605,10 +628,11 @@ function carasDeLaOficina(casilla: number): CaraDeObra[] {
  * va al derecho en `(u, v)` mira hacia ARRIBA en el mundo, así que la cintura se recorre al derecho
  * para las caras de arriba y al revés para las de abajo.
  */
-const JOYA = { radio: 3.4, cintura: 10.6, punta: 13.4, culata: 8.2, centroV: 74 } as const;
+/* En medio del blanco, y la alfombra sin llegar al pie: la tinta del precio no se leería sobre granate. */
+const JOYA = { radio: 3.4, cintura: 10.6, punta: 13.4, culata: 8.2, centroV: 64 } as const;
 const TASA_DE_LUJO = {
-  alfombra: { u: 10, v0: 60.5, v1: 90 },
-  pedestal: { u: 4, v0: 70, v1: 78, alto: 7 },
+  alfombra: { u: 10, v0: 50, v1: 78 },
+  pedestal: { u: 4, v0: 60, v1: 68, alto: 7 },
 } as const;
 
 function carasDeLaJoya(casilla: number, centroU: number, centroV: number): CaraDeObra[] {
@@ -710,11 +734,12 @@ export function disco(casilla: number, cu: number, cv: number, radio: number, y:
  * talla a la que se ve desde el tablero, dieciséis no se distinguen de doce y cuestan un tercio
  * más.
  */
+/* Entre el nombre y el pie: la nave delante, la chimenea en medio y las torres detrás, lejos del pie. */
 const CENTRAL = {
   torres: [-7.5, 7.5] as readonly number[],
-  torre: { v: 76, radioPie: 5, radioCintura: 3.2, radioBoca: 4.1, cintura: 8.5, alto: 12, segmentos: 12 },
-  chimenea: { u: 0, v: 66, radio: 1.5, alto: 16, segmentos: 8, banda: { desde: 12.5, hasta: 14.5 } },
-  nave: { u0: -12, u1: 12, v0: 60.5, v1: 64, alto: 5 },
+  torre: { v: 69, radioPie: 5, radioCintura: 3.2, radioBoca: 4.1, cintura: 8.5, alto: 12, segmentos: 12 },
+  chimenea: { u: 0, v: 57, radio: 1.5, alto: 16, segmentos: 8, banda: { desde: 12.5, hasta: 14.5 } },
+  nave: { u0: -12, u1: 12, v0: 49.5, v1: 53, alto: 5 },
 } as const;
 
 function carasDeLaCentral(casilla: number): CaraDeObra[] {
@@ -746,10 +771,14 @@ function carasDeLaCentral(casilla: number): CaraDeObra[] {
  * miraba arriba como debe. Ahora son un fondo que llega hasta el agua y cuatro bordes que la
  * rodean, y `verify:burgo-escena` exige que el agua se vea desde arriba.
  */
+/*
+ * En el lado de detrás, donde la cámara ve lo alto corrido HACIA EL PIE: el depósito, que es lo más
+ * alto, va lo más lejos del pie que deja el nombre, y la caseta detrás de él.
+ */
 const AGUAS = {
-  deposito: { u: -7, v: 76, radio: 5.2, patas: 7.5, alto: 6.5, segmentos: 12, pata: 0.8, separacion: 3.4 },
-  alberca: { u0: 1, u1: 13, v0: 68, v1: 84, borde: 0.9, alto: 1.4, agua: 1.15 },
-  caseta: { u0: -13, u1: -3, v0: 61, v1: 66.5, alto: 4.5 },
+  deposito: { u: -7, v: 60, radio: 5.2, patas: 7.5, alto: 6.5, segmentos: 12, pata: 0.8, separacion: 3.4 },
+  alberca: { u0: 1, u1: 13, v0: 60, v1: 76, borde: 0.9, alto: 1.4, agua: 1.15 },
+  caseta: { u0: -13, u1: -3, v0: 69, v1: 74.5, alto: 4.5 },
 } as const;
 
 function carasDeLasAguas(casilla: number): CaraDeObra[] {
@@ -777,21 +806,38 @@ function carasDeLasAguas(casilla: number): CaraDeObra[] {
 }
 
 /**
- * EL CASINO (casillas 7, 22 y 36, los Sucesos).
+ * EL CASINO (casillas 7, 22 y 36, las de Suerte).
  *
- * Miguel: «para las casillas de suerte me gustaría que hubiera un CASINO». Un casino no se
- * reconoce por el edificio —es un cajón— sino por lo que le cuelga: la MARQUESINA que vuela sobre
- * la entrada, el RÓTULO vertical con bombillas y, ya en el suelo, la RULETA.
+ * Miguel: «para las casillas de suerte me gustaría que hubiera un CASINO». Y después, con el
+ * tablero de mesa delante: «tiene que ser más evidente que la construcción es un casino poniendo un
+ * letrero de NEÓN típico de Las Vegas; también lo centraremos y pondremos abajo COGE CARTA».
  *
- * La ruleta va tumbada en el suelo y no dentro del edificio por la misma razón que la celda de la
- * comisaría no tiene techo: lo que no se ve desde arriba, en un tablero, no existe.
+ * ═══ EL LETRERO VA TUMBADO EN LA AZOTEA ═══
+ *
+ * Por la misma razón que el cartel del PARKING: un letrero a plomo, que es como son en Las Vegas,
+ * desde un tablero NO SE VE —se mira desde arriba—, y alto, además, la cámara del juego lo ve corrido
+ * hacia el nombre de la casilla y lo tapa. Así que el letrero es la AZOTEA ENTERA: un panel casi
+ * negro con su marco de neón cian, CASINO en letras rosas y la orla de bombillas amarillas de un
+ * cartel de Las Vegas. Las letras y las bombillas no son obra: son tinta del tablero, que se pinta
+ * SIN LUZ, y por eso sobre el panel oscuro se ven encendidas desde cualquier lado.
+ *
+ * ═══ Y CENTRADO ═══
+ *
+ * El cuerpo va en medio del blanco, entre SUERTE (acaba en 37,7) y COGE CARTA (empieza en 82,8), con
+ * la marquesina de la entrada mirando al carril por el que llegan los peones. La RULETA sigue en el
+ * suelo, porque lo que no se ve desde arriba en un tablero no existe, y se va a un lado del cuerpo.
  */
 const CASINO = {
-  cuerpo: { u0: -12, u1: 12, v0: 70, v1: 88, alto: 9 },
-  marquesina: { u0: -9, u1: 9, v0: 66, v1: 70.5, desde: 6.2, hasta: 7.4 },
-  rotulo: { u: 10.5, v: 68, ancho: 2.4, desde: 0, hasta: 15 },
-  bombillas: { cuantas: 5, lado: 0.9, desde: 4 },
-  ruleta: { u: -4, v: 65, radio: 4.2, segmentos: 12 },
+  cuerpo: { u0: -14, u1: 8, v0: 51, v1: 69, alto: 8 },
+  marquesina: { u0: -9, u1: 3, v0: 48.5, v1: 51, desde: 5, hasta: 5.8 },
+  /* El panel del letrero, sobre la azotea, un pelo metido dentro del cuerpo por los cuatro lados. */
+  panel: { u0: -13.4, u1: 7.4, v0: 51.6, v1: 68.4, desde: 8, hasta: 8.5 },
+  /* El marco de neón, encima del canto del panel. */
+  neon: { grueso: 0.7, desde: 8.5, hasta: 8.8 },
+  /* CASINO, en el centro del panel; y las bombillas, por dentro del marco. */
+  letras: { alto: 3.2, alza: 8.58 },
+  bombillas: { paso: 2.4, alto: 3.3, dentroDelMarco: 1.5 },
+  ruleta: { u: 20, v: 60, radio: 4.2, segmentos: 12 },
 } as const;
 
 function carasDelCasino(casilla: number): CaraDeObra[] {
@@ -800,21 +846,72 @@ function carasDelCasino(casilla: number): CaraDeObra[] {
   salida.push(...caja(casilla, c.u0, c.u1, c.v0, c.v1, 0, c.alto, COLOR_DE_OBRA.casino));
   const m = CASINO.marquesina;
   salida.push(...caja(casilla, m.u0, m.u1, m.v0, m.v1, m.desde, m.hasta, COLOR_DE_OBRA.marquesina));
-  const r = CASINO.rotulo;
-  salida.push(...caja(casilla, r.u - r.ancho / 2, r.u + r.ancho / 2, r.v - r.ancho / 2, r.v + r.ancho / 2, r.desde, r.hasta, COLOR_DE_OBRA.casino));
-  /* Las bombillas del rótulo: cinco cubitos que vuelan un pelo sobre su cara. */
-  const b = CASINO.bombillas;
-  const paso = (r.hasta - b.desde) / (b.cuantas + 1);
-  for (let k = 1; k <= b.cuantas; k++) {
-    const y = b.desde + paso * k;
-    salida.push(...caja(casilla, r.u - b.lado / 2, r.u + b.lado / 2, r.v - r.ancho / 2 - 0.3, r.v - r.ancho / 2, y - b.lado / 2, y + b.lado / 2, COLOR_DE_OBRA.bombilla));
-  }
+  const p = CASINO.panel;
+  salida.push(...caja(casilla, p.u0, p.u1, p.v0, p.v1, p.desde, p.hasta, COLOR_DE_OBRA.panelDelNeon));
+  /* El marco de neón: cuatro tubos sobre los cantos del panel. */
+  const n = CASINO.neon;
+  salida.push(...caja(casilla, p.u0, p.u1, p.v0, p.v0 + n.grueso, n.desde, n.hasta, COLOR_DE_OBRA.neonCian));
+  salida.push(...caja(casilla, p.u0, p.u1, p.v1 - n.grueso, p.v1, n.desde, n.hasta, COLOR_DE_OBRA.neonCian));
+  salida.push(...caja(casilla, p.u0, p.u0 + n.grueso, p.v0 + n.grueso, p.v1 - n.grueso, n.desde, n.hasta, COLOR_DE_OBRA.neonCian));
+  salida.push(...caja(casilla, p.u1 - n.grueso, p.u1, p.v0 + n.grueso, p.v1 - n.grueso, n.desde, n.hasta, COLOR_DE_OBRA.neonCian));
   /*
    * La RULETA no se funde: gira, así que vive aparte (ver «piezas vivas»). Lo que queda aquí es su
    * foso, que es lo que hace que un disco en el suelo se lea como una ruleta y no como una tapa.
    */
   const ru = CASINO.ruleta;
   salida.push(...disco(casilla, ru.u, ru.v, ru.radio * 1.22, ALZA_DEL_ASFALTO - 0.01, ru.segmentos, COLOR_DE_OBRA.piedra));
+  return salida;
+}
+
+/** Una letra del letrero de neón con su color: la tinta del tablero, sin luz. */
+export interface LetraDeNeon extends LetraEnElTablero {
+  readonly color: string;
+}
+
+/**
+ * LO QUE BRILLA ENCIMA DEL LETRERO DE CADA CASINO: CASINO en rosa, en el centro del panel y leído
+ * desde fuera del anillo como todo el tablero, y la orla de bombillas —puntos del propio tipo, «·»—
+ * a un paso fijo por dentro del marco, con una en cada esquina.
+ */
+export function letrasDelNeon(): LetraDeNeon[] {
+  const salida: LetraDeNeon[] = [];
+  const p = CASINO.panel;
+  const l = CASINO.letras;
+  const b = CASINO.bombillas;
+  for (const casilla of CASILLAS_CON_CASINO) {
+    const m = marcoDeCasilla(casilla);
+    const giro = giroHaciaDentro(m);
+    const centroU = (p.u0 + p.u1) / 2;
+    const centroV = (p.v0 + p.v1) / 2;
+    const escala = l.alto / ALTO_DE_LA_LETRA;
+    /* Se escribe hacia `−adelante`, como todo el tablero: al revés sale espejado. */
+    let u = centroU + anchoDeLaPalabra('CASINO', l.alto) / 2;
+    for (const letra of 'CASINO') {
+      const avance = (AVANCE_DE_LA_LETRA[letra] ?? ALTO_DE_LA_LETRA / 2) * escala;
+      const q = puntoEnLaCasillaPorV(m, u - avance / 2, centroV);
+      salida.push({ letra, x: q.x, z: q.z, giro, alto: l.alto, alza: l.alza, color: COLOR_DE_OBRA.neonRosa });
+      u -= avance;
+    }
+    /* La orla: un rectángulo por dentro del marco, recorrido lado a lado, una bombilla cada `paso`. */
+    const u0 = p.u0 + b.dentroDelMarco;
+    const u1 = p.u1 - b.dentroDelMarco;
+    const v0 = p.v0 + b.dentroDelMarco;
+    const v1 = p.v1 - b.dentroDelMarco;
+    const tramo = (desde: number, hasta: number): number[] => {
+      const cuantas = Math.max(1, Math.round(Math.abs(hasta - desde) / b.paso));
+      return Array.from({ length: cuantas }, (_, k) => desde + ((hasta - desde) * k) / cuantas);
+    };
+    const puntos = [
+      ...tramo(u0, u1).map((uu) => ({ u: uu, v: v0 })),
+      ...tramo(v0, v1).map((vv) => ({ u: u1, v: vv })),
+      ...tramo(u1, u0).map((uu) => ({ u: uu, v: v1 })),
+      ...tramo(v1, v0).map((vv) => ({ u: u0, v: vv })),
+    ];
+    for (const punto of puntos) {
+      const q = puntoEnLaCasillaPorV(m, punto.u, punto.v);
+      salida.push({ letra: '·', x: q.x, z: q.z, giro, alto: b.alto, alza: l.alza, color: COLOR_DE_OBRA.neonAmarillo });
+    }
+  }
   return salida;
 }
 
@@ -1009,32 +1106,44 @@ function carasDeLaVia(): CaraDeObra[] {
 /**
  * LAS CUATRO ESTACIONES (casillas 5, 15, 25 y 35), Y POR QUÉ SON CUATRO Y NO UNA REPETIDA.
  *
- * Miguel: «4 estaciones 3d distintas y conectadas por una línea de vías». Lo de «distintas» no es
- * un adorno: son las cuatro casillas más parecidas del tablero —mismo precio, misma renta, mismo
- * nombre de clase— y un jugador que mira el tablero necesita saber en cuál está sin leer.
+ * Miguel: «4 estaciones 3d distintas y conectadas por una línea de vías». Y después, con el
+ * tablero de mesa delante: «personaliza mucho más las estaciones de tren, quiero que cada una se
+ * vea distinta pero que se siga reconociendo que es una estación de tren», con sus nombres: GOYA,
+ * DELICIAS, MEDIODÍA y NORTE.
  *
- * Todas comparten el esqueleto, que es lo que las hace reconocibles COMO estaciones: el andén
- * pegado al canto del tablero (la banda `v` 92..107, que es el marco y estaba libre), la
- * MARQUESINA que lo cubre sobre cuatro columnas —y por debajo de la cual pasa la avenida, que
- * entra por el eje de estas cuatro casillas y mide 48— y la casa de viajeros a un lado.
+ * ═══ LO QUE LAS HACE ESTACIONES: EL ANDÉN Y SU MARQUESINA, JUNTO A LA VÍA ═══
  *
- * Y cada una se distingue por su remate, que es lo único que cambia:
+ * Las cuatro comparten el andén pegado al canto del tablero —la banda `v` 92..107 del marco, que
+ * da a la vía del campo y es donde para el tren— y la marquesina que lo cubre sobre sus columnas.
+ * Eso es lo que se reconoce como estación desde cualquier lado.
  *
- *   ·  5  TORRE DEL RELOJ: la de una estación de ciudad, con su esfera clara.
- *   · 15  AGUADA Y CARBONERA: la de una estación de vapor.
- *   · 25  MARQUESINA ABOVEDADA: tres cajas escalonadas en vez de una plana.
- *   · 35  APEADERO DE MADERA: tejado a dos aguas escalonado, más pequeño que las demás.
+ * ═══ Y LO QUE LAS HACE DISTINTAS: EL EDIFICIO DE VIAJEROS ═══
+ *
+ * Va en medio del blanco, entre el nombre (acaba en 44,8) y el precio (empieza en 82,8), con la
+ * entrada mirando a la ciudad, y cada uno tiene una silueta que no se parece a las otras tres:
+ *
+ *   ·  5  GOYA: ladrillo con arcos y TORRE DEL RELOJ, con la esfera arriba, que es donde se ve.
+ *   · 15  DELICIAS: la NAVE DE HIERRO Y CRISTAL, una bóveda de vidrio escalonada con sus cerchas.
+ *   · 25  MEDIODÍA: la FACHADA DEL GRAN ARCO entre dos torres con cúpula, y la nave detrás.
+ *   · 35  NORTE: el edificio largo con su linterna de cristal y DOS TORRES de tejado en pirámide.
+ *
+ * Las alturas no son a ojo. La cámara del juego mira a 55° desde el sur, y lo alto se ve corrido
+ * siete décimas de su altura hacia el fondo: en la 5, que está delante, hacia el nombre; en la 25,
+ * que está detrás, hacia el precio. Por eso la torre del reloj va lejos del nombre y las cúpulas del
+ * Mediodía lejos del precio, y `verify:burgo-escena` proyecta cada cara con la cámara de verdad.
+ *
+ * El paso de cebra de la avenida y sus dos semáforos, que estaban en medio de estas cuatro casillas,
+ * se fueron con ellas: ése es ahora el sitio del edificio de viajeros, y la avenida llega a su puerta.
  */
 const ESTACION = {
   anden: { u: 32, v0: 92, v1: 107, alto: 0.9 },
-  marquesina: { u: 30, v0: 92, v1: 106, desde: 7, hasta: 8.2 },
-  columna: { lado: 1.3, en: [-27, 27] as readonly number[], v: [94, 104] as readonly number[] },
-  casa: { u0: -34, u1: -25, v0: 76, v1: 92, alto: 9 },
   /* El canto del andén, que es lo que lo separa de la vía y lo que hace que se lea como andén. */
   canto: { v0: 105.4, v1: 107, alto: 1.5 },
+  marquesina: { u: 30, v0: 93.5, v1: 106, desde: 7, hasta: 8.2 },
+  columna: { lado: 1.3, en: [-27, -9, 9, 27] as readonly number[], v: [95, 104] as readonly number[] },
 } as const;
 
-function carasDeLaEstacion(casilla: number, remate: (casilla: number) => CaraDeObra[]): CaraDeObra[] {
+function andenYMarquesina(casilla: number): CaraDeObra[] {
   const salida: CaraDeObra[] = [];
   const a = ESTACION.anden;
   salida.push(...caja(casilla, -a.u, a.u, a.v0, a.v1, 0, a.alto, COLOR_DE_OBRA.anden));
@@ -1044,66 +1153,107 @@ function carasDeLaEstacion(casilla: number, remate: (casilla: number) => CaraDeO
   salida.push(...caja(casilla, -m.u, m.u, m.v0, m.v1, m.desde, m.hasta, COLOR_DE_OBRA.marquesinaTren));
   for (const u of ESTACION.columna.en) {
     for (const v of ESTACION.columna.v) {
-      salida.push(...caja(casilla, u - ESTACION.columna.lado / 2, u + ESTACION.columna.lado / 2, v - ESTACION.columna.lado / 2, v + ESTACION.columna.lado / 2, a.alto, m.desde, COLOR_DE_OBRA.hierro));
+      const l = ESTACION.columna.lado / 2;
+      salida.push(...caja(casilla, u - l, u + l, v - l, v + l, a.alto, m.desde, COLOR_DE_OBRA.hierro));
     }
   }
-  const h = ESTACION.casa;
-  salida.push(...caja(casilla, h.u0, h.u1, h.v0, h.v1, 0, h.alto, COLOR_DE_OBRA.ladrillo));
-  salida.push(...remate(casilla));
   return salida;
 }
 
-/** 5 · La torre del reloj, encima de la casa de viajeros, con su esfera mirando a la avenida. */
-function remateDelReloj(casilla: number): CaraDeObra[] {
-  const t = { u: -29.5, v: 84, lado: 6.4, alto: 19 };
-  const medio = t.lado / 2;
-  return [
-    ...caja(casilla, t.u - medio, t.u + medio, t.v - medio, t.v + medio, 0, t.alto, COLOR_DE_OBRA.ladrillo),
-    ...caja(casilla, t.u - medio - 0.7, t.u + medio + 0.7, t.v - medio - 0.7, t.v + medio + 0.7, t.alto, t.alto + 1.1, COLOR_DE_OBRA.tejado),
-    ...disco(casilla, t.u + medio + 0.05, t.v, 2.1, t.alto - 4.5, 10, COLOR_DE_OBRA.esfera),
-  ];
+/**
+ * Un tejado a cuatro aguas que acaba en punta sobre el cuadro `u0..u1 × v0..v1`, de `desde` a `hasta`.
+ * Cuatro triángulos recorridos AL DERECHO en `(u, v)`, que en el marco de una casilla es lo que mira
+ * arriba (ver la cabecera del fichero).
+ */
+function piramide(casilla: number, u0: number, u1: number, v0: number, v1: number, desde: number, hasta: number, color: string): CaraDeObra[] {
+  const punta: PuntoDeObra = [(u0 + u1) / 2, hasta, (v0 + v1) / 2];
+  const a: PuntoDeObra = [u0, desde, v0];
+  const b: PuntoDeObra = [u1, desde, v0];
+  const c: PuntoDeObra = [u1, desde, v1];
+  const d: PuntoDeObra = [u0, desde, v1];
+  return [triangulo(casilla, a, b, punta, color), triangulo(casilla, b, c, punta, color), triangulo(casilla, c, d, punta, color), triangulo(casilla, d, a, punta, color)];
 }
 
-/** 15 · La aguada y la carbonera: una estación de vapor se conoce por el depósito, no por el andén. */
-function remateDeLaAguada(casilla: number): CaraDeObra[] {
-  const d = { u: -29, v: 70, radio: 3.4, patas: 7, alto: 4.6, pata: 0.7, separacion: 2.2 };
+/**
+ * Un medio disco A PLOMO sobre la fachada `v = v`, mirando a `−v` —a la ciudad—: el arco de una
+ * estación. Se recorre como el costado `v0` de una `caja`, que es el que mira a `−v`: al derecho en
+ * `(u, y)`.
+ */
+function arcoEnLaFachada(casilla: number, cu: number, cy: number, radio: number, v: number, segmentos: number, color: string): CaraDeObra[] {
   const salida: CaraDeObra[] = [];
-  for (const du of [-d.separacion, d.separacion]) {
-    for (const dv of [-d.separacion, d.separacion]) {
-      salida.push(...caja(casilla, d.u + du - d.pata / 2, d.u + du + d.pata / 2, d.v + dv - d.pata / 2, d.v + dv + d.pata / 2, 0, d.patas, COLOR_DE_OBRA.hierro));
-    }
+  for (let k = 0; k < segmentos; k++) {
+    const a0 = (k / segmentos) * Math.PI;
+    const a1 = ((k + 1) / segmentos) * Math.PI;
+    salida.push(triangulo(casilla, [cu, cy, v], [cu + radio * Math.cos(a0), cy + radio * Math.sin(a0), v], [cu + radio * Math.cos(a1), cy + radio * Math.sin(a1), v], color));
   }
-  salida.push(...tronco(casilla, d.u, d.v, d.radio, d.radio, d.patas, d.patas + d.alto, 10, COLOR_DE_OBRA.deposito));
-  salida.push(...disco(casilla, d.u, d.v, d.radio, d.patas + d.alto, 10, COLOR_DE_OBRA.depositoTapa));
-  /*
-   * La carbonera: un cajón abierto con el carbón dentro, que se ve desde arriba. Va de 84 a 92 y
-   * no de 76 a 88 porque las cuatro losas de cebra de la avenida son de 12 y llegan hasta `v = 81`:
-   * a 76 la carbonera se metía dentro del paso de peatones.
-   */
-  salida.push(...caja(casilla, 16, 28, 84, 92, 0, 2.6, COLOR_DE_OBRA.piedra));
-  salida.push(losa(casilla, 17.2, 26.8, 85.2, 90.8, 2.7, COLOR_DE_OBRA.carbon));
   return salida;
 }
 
-/** 25 · La marquesina abovedada: tres cajas escalonadas en vez de una plana. */
-function remateDeLaBoveda(casilla: number): CaraDeObra[] {
-  const m = ESTACION.marquesina;
-  return [
-    ...caja(casilla, -m.u + 3, m.u - 3, m.v0 + 1.5, m.v1 - 1.5, m.hasta, m.hasta + 1.3, COLOR_DE_OBRA.marquesinaTren),
-    ...caja(casilla, -m.u + 7, m.u - 7, m.v0 + 3.2, m.v1 - 3.2, m.hasta + 1.3, m.hasta + 2.4, COLOR_DE_OBRA.marquesinaTren),
-    ...caja(casilla, -m.u + 11, m.u - 11, m.v0 + 4.6, m.v1 - 4.6, m.hasta + 2.4, m.hasta + 3.1, COLOR_DE_OBRA.cristal),
-  ];
+/** 5 · GOYA: ladrillo, tres puertas en arco y la torre del reloj en medio, con la esfera en lo alto. */
+function estacionDeGoya(casilla: number): CaraDeObra[] {
+  const salida = andenYMarquesina(casilla);
+  salida.push(...caja(casilla, -20, 20, 60, 77, 0, 7, COLOR_DE_OBRA.ladrillo));
+  salida.push(...caja(casilla, -20.6, 20.6, 59.4, 77.6, 7, 7.8, COLOR_DE_OBRA.piedra));
+  salida.push(...caja(casilla, -19, 19, 61, 76, 7.8, 8.8, COLOR_DE_OBRA.tejado));
+  for (const u of [-13, 13]) salida.push(...arcoEnLaFachada(casilla, u, 3.2, 2.2, 59.9, 8, COLOR_DE_OBRA.hierro));
+  salida.push(...caja(casilla, -15.2, -10.8, 59.9, 60, 0, 3.2, COLOR_DE_OBRA.hierro), ...caja(casilla, 10.8, 15.2, 59.9, 60, 0, 3.2, COLOR_DE_OBRA.hierro));
+  /* La torre: un cuadro de siete que sube a 15, su remate de piedra y la esfera tumbada encima, con sus dos agujas. */
+  salida.push(...caja(casilla, -3.5, 3.5, 62, 69, 0, 15, COLOR_DE_OBRA.ladrillo));
+  salida.push(...caja(casilla, -4.2, 4.2, 61.3, 69.7, 15, 16, COLOR_DE_OBRA.piedra));
+  salida.push(...disco(casilla, 0, 65.5, 3.2, 16.05, 16, COLOR_DE_OBRA.esfera));
+  salida.push(...caja(casilla, -0.25, 0.25, 63.2, 65.5, 16.1, 16.3, COLOR_DE_OBRA.hierro), ...caja(casilla, 0, 2.2, 65.25, 65.75, 16.1, 16.3, COLOR_DE_OBRA.hierro));
+  return salida;
 }
 
-/** 35 · El apeadero de madera: tejado a dos aguas escalonado sobre la casa, y un banco en el andén. */
-function remateDelApeadero(casilla: number): CaraDeObra[] {
-  const h = ESTACION.casa;
-  return [
-    ...caja(casilla, h.u0 - 1, h.u1 + 1, h.v0 - 1, h.v1 + 1, h.alto, h.alto + 1.1, COLOR_DE_OBRA.tejado),
-    ...caja(casilla, h.u0 + 1.6, h.u1 - 1.6, h.v0 + 1.6, h.v1 - 1.6, h.alto + 1.1, h.alto + 2.2, COLOR_DE_OBRA.tejado),
-    ...caja(casilla, h.u0 + 3.2, h.u1 - 3.2, h.v0 + 3.2, h.v1 - 3.2, h.alto + 2.2, h.alto + 3.1, COLOR_DE_OBRA.tejado),
-    ...caja(casilla, 8, 18, 96, 98.4, ESTACION.anden.alto, ESTACION.anden.alto + 1.6, COLOR_DE_OBRA.madera),
+/** 15 · DELICIAS: la nave de hierro y cristal, con su bóveda de vidrio escalonada y cinco cerchas. */
+function estacionDeDelicias(casilla: number): CaraDeObra[] {
+  const salida = andenYMarquesina(casilla);
+  /* Los muros largos de ladrillo y los dos testeros, un poco más altos. */
+  salida.push(...caja(casilla, -24, 24, 53, 56, 0, 6, COLOR_DE_OBRA.ladrillo), ...caja(casilla, -24, 24, 72, 75, 0, 6, COLOR_DE_OBRA.ladrillo));
+  salida.push(...caja(casilla, -25, -23, 53, 75, 0, 7.2, COLOR_DE_OBRA.ladrillo), ...caja(casilla, 23, 25, 53, 75, 0, 7.2, COLOR_DE_OBRA.ladrillo));
+  /* La bóveda: tres pisos de cristal, cada uno más estrecho. */
+  const pisos = [
+    { v0: 54, v1: 74, desde: 6, hasta: 7.2 },
+    { v0: 56, v1: 72, desde: 7.2, hasta: 8.2 },
+    { v0: 59, v1: 69, desde: 8.2, hasta: 8.9 },
   ];
+  for (const p of pisos) salida.push(...caja(casilla, -23, 23, p.v0, p.v1, p.desde, p.hasta, COLOR_DE_OBRA.cristal));
+  /* Las cerchas: una costilla de hierro por encima de cada piso, a lo ancho de la nave. */
+  for (const u of [-18, -9, 0, 9, 18]) {
+    for (const p of pisos) salida.push(...caja(casilla, u - 0.35, u + 0.35, p.v0, p.v1, p.hasta, p.hasta + 0.15, COLOR_DE_OBRA.hierro));
+  }
+  return salida;
+}
+
+/** 25 · MEDIODÍA: la fachada del gran arco entre dos torres con cúpula, y la nave de cristal detrás. */
+function estacionDelMediodia(casilla: number): CaraDeObra[] {
+  const salida = andenYMarquesina(casilla);
+  for (const cu of [-18, 18]) {
+    salida.push(...caja(casilla, cu - 4, cu + 4, 52, 60, 0, 12, COLOR_DE_OBRA.ladrillo));
+    salida.push(...caja(casilla, cu - 4.5, cu + 4.5, 51.5, 60.5, 12, 12.8, COLOR_DE_OBRA.piedra));
+    salida.push(...tronco(casilla, cu, 56, 4.2, 0.6, 12.8, 15.5, 10, COLOR_DE_OBRA.cupula));
+  }
+  /* La fachada y su arco de cristal, que mira a la ciudad. */
+  salida.push(...caja(casilla, -14, 14, 55, 57, 0, 10, COLOR_DE_OBRA.estuco));
+  salida.push(...arcoEnLaFachada(casilla, 0, 3.4, 6, 54.9, 14, COLOR_DE_OBRA.cristal));
+  /* La nave, detrás y más baja: lo alto va delante, lejos del precio. */
+  salida.push(...caja(casilla, -14, 14, 57, 71, 0, 6, COLOR_DE_OBRA.ladrillo));
+  salida.push(...caja(casilla, -13, 13, 57.5, 70.5, 6, 7, COLOR_DE_OBRA.cristal));
+  salida.push(...caja(casilla, -13, 13, 59.5, 68.5, 7, 7.8, COLOR_DE_OBRA.cristal));
+  return salida;
+}
+
+/** 35 · NORTE: el edificio largo de estuco, su linterna de cristal y dos torres con tejado en pirámide. */
+function estacionDelNorte(casilla: number): CaraDeObra[] {
+  const salida = andenYMarquesina(casilla);
+  salida.push(...caja(casilla, -18, 18, 58, 72, 0, 6, COLOR_DE_OBRA.estuco));
+  salida.push(...caja(casilla, -17.5, 17.5, 58.5, 71.5, 6, 6.8, COLOR_DE_OBRA.pizarra));
+  salida.push(...caja(casilla, -9, 9, 60, 70, 6.8, 8, COLOR_DE_OBRA.cristal));
+  for (const cu of [-22, 22]) {
+    salida.push(...caja(casilla, cu - 4, cu + 4, 56, 64, 0, 10, COLOR_DE_OBRA.ladrillo));
+    salida.push(...piramide(casilla, cu - 4.6, cu + 4.6, 55.4, 64.6, 10, 14, COLOR_DE_OBRA.pizarra));
+  }
+  return salida;
 }
 
 /* ──────────────────────────── El tren, que es lo que se mueve ──────────────────────────── */
@@ -1588,10 +1738,10 @@ const OBRA_DE_LA_CASILLA: Readonly<Record<number, (casilla: number) => CaraDeObr
   33: carasDelCofre,
   36: carasDelCasino,
   38: carasDeLaTasa,
-  5: (c) => carasDeLaEstacion(c, remateDelReloj),
-  15: (c) => carasDeLaEstacion(c, remateDeLaAguada),
-  25: (c) => carasDeLaEstacion(c, remateDeLaBoveda),
-  35: (c) => carasDeLaEstacion(c, remateDelApeadero),
+  5: estacionDeGoya,
+  15: estacionDeDelicias,
+  25: estacionDelMediodia,
+  35: estacionDelNorte,
 };
 
 function carasDeLasCasillas(): CaraDeObra[] {

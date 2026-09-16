@@ -55,13 +55,13 @@
  *
  * ═══ LOS RÓTULOS DEL TABLERO LEEN AL REVÉS QUE UNA PIEZA EN PIE ═══
  *
- * `guarismosDelPrecio` y `huecosDeLosEmblemas` publican el `giro` de una PIEZA que mira a
+ * `letrasDelRotulo` y `huecosDeLosEmblemas` publican el `giro` de una PIEZA que mira a
  * +Z. Una silueta TUMBADA no mira: se lee, y lo que hay que decidir es a dónde apunta su
- * «arriba». Quien mira el tablero está FUERA del anillo, así que el arriba de un precio
+ * «arriba». Quien mira el tablero está FUERA del anillo, así que el arriba de un nombre
  * tiene que apuntar al centro. Con el cuarto de vuelta que tumba la silueta, eso es media
  * vuelta más que el giro de la pieza — y con la misma media vuelta la flecha del sentido de
  * la marcha apunta hacia adelante y no hacia atrás. Una sola regla, `giroDelRotulo`, y las
- * dos salen bien; sin ella, o los precios se leen desde la ciudad o la flecha señala al
+ * dos salen bien; sin ella, o los nombres se leen desde la ciudad o la flecha señala al
  * revés, y las dos cosas parecen una decisión de arte.
  */
 import * as THREE from 'three';
@@ -69,16 +69,14 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import {
   ALTO_DE_LA_LETRA,
   AVANCE_DE_LA_LETRA,
-  CAJA_DEL_GUARISMO,
   CONTORNOS_DEL_EMBLEMA,
-  CONTORNOS_DEL_GUARISMO,
   CONTORNOS_DE_LA_LETRA,
   LIENZO_DEL_ICONO,
   ORIGEN_DE_LA_LETRA,
 } from '../iconos';
 import { geometriaDeContornos } from '../formas';
-import { ALZA_DEL_ROTULO, CASILLAS, FERIA, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo, letrasDelSubtitulo } from './anillo-en-3d';
-import { COLOR_DE_OBRA, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaOnda, carasDeUnaBocanada, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDelTren, casillasConObra, letrasDeLosCarteles } from './obras';
+import { ALZA_DEL_ROTULO, CASILLAS, FERIA, huecosDeLosEmblemas, letrasDelRotulo, letrasDelSubtitulo } from './anillo-en-3d';
+import { COLOR_DE_OBRA, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaOnda, carasDeUnaBocanada, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDelTren, casillasConObra, letrasDeLosCarteles, letrasDelNeon } from './obras';
 import type { CaraEnElMundo } from './obras';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
 
@@ -383,8 +381,8 @@ export function giroDelRotulo(giroDeLaPieza: number): number {
   return giroDeLaPieza + Math.PI;
 }
 
-/** La tinta de un precio y la de un emblema: dos negros distintos, los dos del tablero. */
-export const TINTA_DEL_PRECIO = '#4a4238';
+/** La tinta de los nombres y los precios, y la de un emblema: dos negros distintos, los dos del tablero. */
+export const TINTA_DEL_TEXTO = '#4a4238';
 export const TINTA_DEL_EMBLEMA = '#5b5145';
 /**
  * Y la de la FLECHA del sentido de la marcha, que no es tinta de tablero sino señal: es la única
@@ -399,62 +397,17 @@ const TINTA_DEL_ROTULO_DE: Readonly<Partial<Record<number, string>>> = { [FERIA]
 const TINTA_POR_EMBLEMA: Readonly<Partial<Record<string, string>>> = { flecha: TINTA_DE_LA_FLECHA };
 
 /**
- * LA SILUETA DE UN GUARISMO, normalizada por `CAJA_DEL_GUARISMO` Y NO POR LA SUYA.
- *
- * Es la única regla que `iconos.ts` pide para los diez, y si se rompe no falla nada: sale un
- * precio con el `1` tan ancho como el `8` y los dígitos a alturas distintas. `formas.ts`
- * encaja por el lado mayor —que es lo que quieren los bienes y las cartas— así que aquí se
- * enhebra a mano: alto 1, ancho 0,75, centrada en la caja COMÚN.
- */
-export function geometriaDeUnGuarismo(guarismo: string): THREE.BufferGeometry | null {
-  const contornos = CONTORNOS_DEL_GUARISMO[guarismo];
-  if (contornos === undefined) return null;
-  const camino = new THREE.ShapePath();
-  for (const tira of contornos) {
-    if (tira.length < 6) continue;
-    camino.moveTo(tira[0] as number, tira[1] as number);
-    for (let i = 2; i + 1 < tira.length; i += 2) camino.lineTo(tira[i] as number, tira[i + 1] as number);
-  }
-  if (camino.subPaths.length === 0) return null;
-  const formas = camino.toShapes();
-  if (formas.length === 0) return null;
-  const g = new THREE.ShapeGeometry(formas);
-  const posicion = g.getAttribute('position') as THREE.BufferAttribute | undefined;
-  if (posicion === undefined || posicion.count === 0) {
-    g.dispose();
-    return null;
-  }
-  /* En SVG la `y` crece hacia abajo: sin darle la vuelta el precio sale cabeza abajo, y al reflejar hay que invertir el giro de cada triángulo. */
-  g.scale(1, -1, 1);
-  const indice = g.getIndex();
-  if (indice !== null) {
-    const a = indice.array as Uint16Array | Uint32Array;
-    for (let i = 0; i + 2 < a.length; i += 3) {
-      const t = a[i] as number;
-      a[i] = a[i + 2] as number;
-      a[i + 2] = t;
-    }
-    indice.needsUpdate = true;
-  }
-  const cx = CAJA_DEL_GUARISMO.x + CAJA_DEL_GUARISMO.ancho / 2;
-  const cy = CAJA_DEL_GUARISMO.y + CAJA_DEL_GUARISMO.alto / 2;
-  g.translate(-cx, cy, 0);
-  g.scale(1 / CAJA_DEL_GUARISMO.alto, 1 / CAJA_DEL_GUARISMO.alto, 1);
-  g.computeBoundingBox();
-  return g;
-}
-
-/**
  * LA SILUETA DE UNA LETRA, agarrada por el CENTRO DE SU AVANCE y no por su caja.
  *
- * Un guarismo se centra por la caja común porque todos miden lo mismo. Una letra de un tipo de
- * verdad no: la `I` avanza 121 y la `W` 350, así que centrarla por su dibujo la descolocaría
+ * Una letra de un tipo de verdad no mide lo que las demás: la `I` avanza 121 y la `W` 350, así
+ * que centrarla por su dibujo la descolocaría
  * dentro de la palabra —la `I` se iría al medio de su hueco y la `W` se saldría—. Se agarra por
  * el punto medio de su AVANCE sobre la línea de base, que es lo que hace que una palabra se
  * componga sumando anchos y nada más.
  *
- * El `scale(1, −1, 1)` y el giro de los triángulos son por lo mismo que en el guarismo: en el
- * lienzo la `y` crece hacia abajo, y sin darle la vuelta el rótulo sale cabeza abajo.
+ * El `scale(1, −1, 1)` y el giro de los triángulos: en el lienzo la `y` crece hacia abajo, y sin
+ * darle la vuelta el rótulo sale cabeza abajo; y al reflejar hay que invertir el giro de cada
+ * triángulo, o se ve por detrás.
  */
 export function geometriaDeUnaLetra(letra: string): THREE.BufferGeometry | null {
   const contornos = CONTORNOS_DE_LA_LETRA[letra];
@@ -498,7 +451,6 @@ export const LIENZO = LIENZO_DEL_ICONO;
 export interface Rotulos {
   readonly geometria: THREE.BufferGeometry;
   readonly triangulos: number;
-  readonly guarismos: number;
   readonly emblemas: number;
   readonly letras: number;
 }
@@ -506,11 +458,11 @@ export interface Rotulos {
 /**
  * TODOS LOS RÓTULOS DEL TABLERO EN UNA SOLA GEOMETRÍA.
  *
- * Los precios y los emblemas NO cambian con la partida —el precio de una casilla es del
- * reglamento y el emblema es del dibujo—, así que no hay ninguna razón para instanciarlos:
- * se funden una vez, con su color por vértice, y son UNA llamada de dibujo para los sesenta
- * y tantos dígitos y los doce emblemas. Instanciarlos habrían sido quince llamadas (una por
- * silueta distinta) a cambio de nada.
+ * Los nombres, los precios y los emblemas NO cambian con la partida —el nombre y el precio de
+ * una casilla son del reglamento y el emblema es del dibujo—, así que no hay ninguna razón para
+ * instanciarlos: se funden una vez, con su color por vértice, y son UNA llamada de dibujo para
+ * todas las letras del tablero y sus emblemas. Instanciarlos habrían sido cincuenta llamadas
+ * (una por silueta distinta) a cambio de nada.
  */
 /**
  * TODAS LAS OBRAS DEL ANILLO EN UNA SOLA MALLA.
@@ -619,7 +571,6 @@ export function geometriaDeLaOnda(): THREE.BufferGeometry | null {
 export function geometriaDeLosRotulos(): Rotulos | null {
   const partes: THREE.BufferGeometry[] = [];
   const propias: THREE.BufferGeometry[] = [];
-  let guarismos = 0;
   let emblemas = 0;
   let letras = 0;
   const tinta = new THREE.Color();
@@ -654,20 +605,6 @@ export function geometriaDeLosRotulos(): Rotulos | null {
     propias.push(copia);
   };
 
-  const siluetasDeGuarismo = new Map<string, THREE.BufferGeometry>();
-  for (let i = 0; i < CASILLAS; i++) {
-    for (const d of guarismosDelPrecio(i)) {
-      let silueta = siluetasDeGuarismo.get(d.guarismo);
-      if (silueta === undefined) {
-        const nueva = geometriaDeUnGuarismo(d.guarismo);
-        if (nueva === null) continue;
-        silueta = nueva;
-        siluetasDeGuarismo.set(d.guarismo, nueva);
-      }
-      pon(silueta, d.x, d.z, d.giro, d.alto, TINTA_DEL_PRECIO);
-      guarismos++;
-    }
-  }
   const siluetasDeEmblema = new Map<string, THREE.BufferGeometry>();
   for (const e of huecosDeLosEmblemas()) {
     let silueta = siluetasDeEmblema.get(e.emblema);
@@ -681,8 +618,8 @@ export function geometriaDeLosRotulos(): Rotulos | null {
     emblemas++;
   }
   /*
-   * Y LOS NOMBRES, en la misma geometría fundida. Una silueta por carácter distinto y no por
-   * carácter puesto: «SUCESOS» sale tres veces en el anillo y sus siete letras se clonan de las
+   * Y LOS NOMBRES Y LOS PRECIOS, en la misma geometría fundida. Una silueta por carácter distinto y
+   * no por carácter puesto: «SUERTE» sale tres veces en el anillo y sus seis letras se clonan de las
    * mismas cinco siluetas.
    */
   const siluetasDeLetra = new Map<string, THREE.BufferGeometry>();
@@ -695,7 +632,7 @@ export function geometriaDeLosRotulos(): Rotulos | null {
         silueta = nueva;
         siluetasDeLetra.set(l.letra, nueva);
       }
-      pon(silueta, l.x, l.z, l.giro, l.alto, TINTA_DEL_ROTULO_DE[i] ?? TINTA_DEL_PRECIO, l.alza);
+      pon(silueta, l.x, l.z, l.giro, l.alto, TINTA_DEL_ROTULO_DE[i] ?? TINTA_DEL_TEXTO, l.alza);
       letras++;
     }
   }
@@ -714,7 +651,21 @@ export function geometriaDeLosRotulos(): Rotulos | null {
     pon(silueta, l.x, l.z, l.giro, l.alto, COLOR_DE_OBRA.carteloTinta, l.alza);
     letras++;
   }
-  for (const g of siluetasDeGuarismo.values()) g.dispose();
+  /*
+   * Y EL NEÓN DE LOS CASINOS: CASINO y su orla de bombillas, cada una con su color. Van con la tinta
+   * y no con las obras porque la tinta se pinta sin luz, y eso es lo que las hace parecer encendidas.
+   */
+  for (const l of letrasDelNeon()) {
+    let silueta = siluetasDeLetra.get(l.letra);
+    if (silueta === undefined) {
+      const nueva = geometriaDeUnaLetra(l.letra);
+      if (nueva === null) continue;
+      silueta = nueva;
+      siluetasDeLetra.set(l.letra, nueva);
+    }
+    pon(silueta, l.x, l.z, l.giro, l.alto, l.color, l.alza);
+    letras++;
+  }
   for (const g of siluetasDeEmblema.values()) g.dispose();
   for (const g of siluetasDeLetra.values()) g.dispose();
   if (partes.length === 0) return null;
@@ -724,5 +675,5 @@ export function geometriaDeLosRotulos(): Rotulos | null {
   fundida.computeBoundingSphere();
   const indice = fundida.getIndex();
   const triangulos = indice !== null ? indice.count / 3 : (fundida.getAttribute('position') as THREE.BufferAttribute).count / 3;
-  return { geometria: fundida, triangulos, guarismos, emblemas, letras };
+  return { geometria: fundida, triangulos, emblemas, letras };
 }

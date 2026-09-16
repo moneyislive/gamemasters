@@ -625,8 +625,8 @@ paso('2. EMPEZAR: el aforo, el sorteo dentro, el tope por carga, y ctx.azar sól
   );
   comprobar('28 títulos del Ayuntamiento, sin casas ni hipotecas, en orden de casilla', e.titulos.length === 28 && e.titulos.every((t, i) => t.casilla === TITULOS[i] && t.dueno === null && t.casas === 0 && !t.empenado));
   comprobar('el Ayuntamiento guarda 32 casas y 12 hoteles', e.casasEnElConcejo === CASAS_DEL_CONCEJO && e.posadasEnElConcejo === POSADAS_DEL_CONCEJO);
-  comprobar('Sucesos son las 16 series barajadas, sin repetir', e.pregon.length === 16 && new Set(e.pregon).size === 16 && [...e.pregon].sort().join() === seriesDe('pregon').join());
-  comprobar('y el Fondo Vecinal igual, con sus 16', e.arca.length === 16 && new Set(e.arca).size === 16 && [...e.arca].sort().join() === seriesDe('arca').join());
+  comprobar('Suerte son las 16 series barajadas, sin repetir', e.pregon.length === 16 && new Set(e.pregon).size === 16 && [...e.pregon].sort().join() === seriesDe('pregon').join());
+  comprobar('y la Caja de Comunidad igual, con sus 16', e.arca.length === 16 && new Set(e.arca).size === 16 && [...e.arca].sort().join() === seriesDe('arca').join());
   comprobar('y barajados de verdad: no en orden de tabla', e.pregon.join() !== seriesDe('pregon').join() && e.arca.join() !== seriesDe('arca').join());
   const sale = sucesosDe(e, 'sale');
   comprobar('el sorteo dejó un `sale` por candidato y ronda', sale.length >= 4);
@@ -1121,7 +1121,7 @@ function reprochesDeCartaSalida(antes: EstadoDelBurgo, s: EstadoDelBurgo, mazo: 
     for (const ficha of cartasDe(mazo)) {
       const donde = CASILLA_DE_MAZO[mazo];
       const numero = ficha.numero;
-      /* El «tres pasos atrás» se prueba desde el 36, que es el único Sucesos que cae en un Fondo Vecinal (33). */
+      /* El «tres pasos atrás» se prueba desde el 36, que es la única de Suerte que cae en una Caja de Comunidad (33). */
       const salida = ficha.efecto.que === 'retrocede' ? 36 : donde;
       const partida = conLaCartaArriba(rico, mazo, numero);
       const { s, cruza } = alCaerEn(`CAR-${mazo}-${numero}`, partida, ANA, salida, [TRES_PASOS]);
@@ -2007,7 +2007,7 @@ const TODOS_LOS_TIPOS: ReadonlyArray<readonly [string, unknown]> = [
   comprobar(`se han recogido ${motivos.length} motivos de rechazo`, motivos.length >= 40, motivos.length);
   comprobar('ninguno lleva dentro una serie de carta, un secreto ni una marca', motivos.every((m) => reprochesDeTexto(m, base).length === 0), motivos.filter((m) => reprochesDeTexto(m, base).length > 0));
   comprobar('ninguno es una cadena vacía: un motivo mudo no explica nada', motivos.every((m) => m.trim().length > 0));
-  comprobar('LA VACUNA: un motivo envenenado con «p07» se ve caer', reprochesDeTexto('No puedes: la siguiente de Sucesos es la "p07".', base).length > 0);
+  comprobar('LA VACUNA: un motivo envenenado con «p07» se ve caer', reprochesDeTexto('No puedes: la siguiente de Suerte es la "p07".', base).length > 0);
   comprobar('y otro con una marca registrada dentro, también', reprochesDeTexto(`Eso no se puede: esto no es ${(MARCAS_VETADAS[0] as { nombre: string }).nombre}.`, base).length > 0);
 }
 

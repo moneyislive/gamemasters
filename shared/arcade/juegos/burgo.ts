@@ -1224,7 +1224,7 @@ function robarCarta(e: EstadoDelBurgo, i: number, mazo: MazoId, cronica: Cronica
   return cumplirLaCarta(s, i, efecto, cronica);
 }
 
-/** Los diez efectos de carta, uno por rama. Ninguna carta cae en Sucesos ni en el Fondo Vecinal, así que la recursión es finita. */
+/** Los diez efectos de carta, uno por rama. Ninguna carta cae en Suerte ni en la Caja de Comunidad, así que la recursión es finita. */
 function cumplirLaCarta(
   e: EstadoDelBurgo,
   i: number,
@@ -3044,9 +3044,9 @@ export function porqueEnPalabras(porque: PorqueDelDinero): string {
     case 'carta':
       return 'por la carta';
     case 'diezmo':
-      return 'del Impuesto';
+      return 'del Impuesto sobre el Capital';
     case 'alcabala':
-      return 'de la Tasa';
+      return 'del Impuesto de Lujo';
     case 'fianza':
       return 'de fianza';
     case 'compra':
@@ -3140,7 +3140,7 @@ function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string, deO
       return `${nombre(s.quien)} deshipoteca ${nombreDeCasilla(s.casilla)}.`;
     case 'carta': {
       const ficha = carta(s.mazo, s.carta);
-      const de = s.mazo === 'pregon' ? 'de Sucesos' : 'del Fondo Vecinal';
+      const de = s.mazo === 'pregon' ? 'de Suerte' : 'de la Caja de Comunidad';
       return `${nombre(s.quien)} saca ${de}: «${ficha === null ? '' : ficha.titulo}».`;
     }
     case 'tirada-de-oficio':
@@ -3247,7 +3247,7 @@ function redactarAviso(e: EstadoDelBurgo, quien: QuienMira, nombre: (a: AsientoI
     if (e.impuestoSinPagar) {
       const fila = filaDe(j.casilla);
       const fijo = fila === null ? 0 : fila.precio;
-      return `${fila === null ? 'El Impuesto' : fila.nombre}: paga ${maravedies(fijo)} o el 10 % de tu patrimonio (${maravedies(decimaDelPatrimonio(patrimonioDe(e, j)))}). Si tiras o pasas sin elegir, se cobra ${maravedies(fijo)}.`;
+      return `${fila === null ? 'El Impuesto sobre el Capital' : fila.nombre}: paga ${maravedies(fijo)} o el 10 % de tu patrimonio (${maravedies(decimaDelPatrimonio(patrimonioDe(e, j)))}). Si tiras o pasas sin elegir, se cobra ${maravedies(fijo)}.`;
     }
     if (e.paso === 'por-tirar') {
       return j.presa >= 0
@@ -3962,7 +3962,7 @@ function panelesDe(v: VistaSinTablero, quien: QuienMira): PanelDeTablero[] {
   if (v.ultimaCarta !== null) {
     const ficha = carta(v.ultimaCarta.mazo, v.ultimaCarta.carta);
     if (ficha !== null) {
-      ultima.push(`${nombreEnLaVista(v, v.ultimaCarta.quien)} sacó ${v.ultimaCarta.mazo === 'pregon' ? 'de Sucesos' : 'del Fondo Vecinal'}: ${ficha.titulo}`);
+      ultima.push(`${nombreEnLaVista(v, v.ultimaCarta.quien)} sacó ${v.ultimaCarta.mazo === 'pregon' ? 'de Suerte' : 'de la Caja de Comunidad'}: ${ficha.titulo}`);
       ultima.push(ficha.texto);
     }
   }

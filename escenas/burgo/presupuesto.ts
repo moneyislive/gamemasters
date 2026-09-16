@@ -37,17 +37,20 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 196.560   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 161.316   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 244.475   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 209.231   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
  * Miguel—, que descontó unos 35.000; después fueron 181.333 y 136.547, y desde entonces suben con
  * lo que pidió para las casillas: las obras fundidas, la vía con sus dos trenes, los nombres y el
- * texto pequeño y los nombres de las estaciones —31.930 de letras— y las piezas vivas, que hasta la
- * moneda de la recaudación no estaban contadas. Los de arriba son los que `verify:burgo-escena`
- * imprime hoy, y ahora también los COMPARA con esta cabecera: dos veces se quedaron viejos sin que
- * nada lo notara, y la segunda fue a la media hora de corregirlos.)
+ * texto pequeño y las piezas vivas. El salto grande es el TABLERO DE MESA: las treinta y seis
+ * laterales llevan su nombre arriba y su precio abajo, y el tablero pasó de 206 letras a más de mil.
+ * A seis tramos por curva eso ponía la calidad sobria en 280.000, por encima de su tope; a tres
+ * —que a la talla de un nombre no se distinguen— las letras son 81.000 y cabe con 20.000 de sobra.
+ * Los de arriba son los que `verify:burgo-escena` imprime hoy, y ahora también los COMPARA con esta
+ * cabecera: dos veces se quedaron viejos sin que nada lo notara, y la segunda fue a la media hora de
+ * corregirlos.)
  *
  * `TOPE_PLENA = 900.000`: el tablero más 692.000 para lo que la ciudad tenga montado. Sigue
  * siendo el 45 % de los 2.000.000 que ya mueve el delta de Riberas en un PC.
@@ -98,9 +101,9 @@
  * afirma que la cuenta de `casa` sigue siendo 44 justamente para que ese día se note.
  */
 import { PIEZA } from './piezas';
-import { BOCANADAS_DEL_HUMO, CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLosCarteles, triangulosDeLasObras, triangulosDelTren, triangulosDeLasPiezasVivas } from './obras';
+import { BOCANADAS_DEL_HUMO, CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLosCarteles, letrasDelNeon, triangulosDeLasObras, triangulosDelTren, triangulosDeLasPiezasVivas } from './obras';
 import type { NombreDePieza } from './piezas';
-import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
+import { CASILLAS, ESQUINAS, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
 
 /**
@@ -145,30 +148,24 @@ export function triangulosDelSuelo(): number {
   return laterales * TRIANGULOS_POR_CASILLA + ESQUINAS.length * TRIANGULOS_POR_ESQUINA + 2;
 }
 
-/**
- * LOS DÍGITOS DEL PRECIO. Cada guarismo es un contorno relleno; los diez de
- * `CONTORNOS_DEL_GUARISMO` se triangulan entre 40 y 90 triángulos, y 60 es la media medida.
- * Se cuentan los de verdad: los de las casillas que llevan cifra, dígito a dígito.
- */
-export const TRIANGULOS_POR_GUARISMO = 60;
-export function guarismosDelTablero(): number {
-  let cuantos = 0;
-  for (const precio of PRECIO_DE_LA_CASILLA) if (precio > 0) cuantos += String(precio).length;
-  return cuantos;
-}
-/** El emblema de una casilla que no se compra: otro contorno relleno, más gordo que un dígito. */
+/** El emblema de una esquina —la flecha de la marcha—: otro contorno relleno. */
 export const TRIANGULOS_POR_EMBLEMA = 120;
 
 /**
- * LAS LETRAS DE LOS RÓTULOS. Cada glifo sale del tipo con las curvas a seis tramos, y medido uno
- * a uno va de los 84 de la `Z` a los 201 de la `P`; 155 es la media MEDIDA sobre las 55 que hoy
- * pone el anillo. Se cuentan las de verdad: las de `ROTULO_DE_LA_CASILLA`, letra a letra y sin
- * los espacios, porque un espacio no trae glifo y por tanto no llega a montarse. Y las de los
- * CARTELES de las obras —la `P` del aparcamiento—, que son la misma tinta a otra cota.
+ * LAS LETRAS DE LOS RÓTULOS: los nombres, los precios y los textos pequeños. Se cuentan las de
+ * verdad: las de `ROTULO_DE_LA_CASILLA` y `SUBTITULO_DE_LA_CASILLA`, letra a letra y sin los
+ * espacios, porque un espacio no trae glifo y por tanto no llega a montarse. Y las de los CARTELES
+ * de las obras —PARKING—, que son la misma tinta a otra cota. Los precios se escriben con las
+ * letras del tipo desde que el tablero lleva el precio abajo, como el de mesa: los dígitos gordos
+ * de antes se fueron.
+ *
+ * Cada glifo sale del tipo con las curvas a TRES tramos (`TRAMOS_DE_CURVA` de `compilar-iconos.ts`,
+ * que fueron seis hasta que el tablero llevó mil letras), y 81 es la media MEDIDA sobre las que hoy
+ * pone el anillo: 81.399 triángulos para 1.005 letras y dos emblemas.
  */
-export const TRIANGULOS_POR_LETRA = 155;
+export const TRIANGULOS_POR_LETRA = 81;
 export function letrasDelTablero(): number {
-  let cuantas = letrasDeLosCarteles().length;
+  let cuantas = letrasDeLosCarteles().length + letrasDelNeon().length;
   for (const palabra of [...Object.values(ROTULO_DE_LA_CASILLA), ...Object.values(SUBTITULO_DE_LA_CASILLA)]) for (const caracter of palabra) if (caracter !== ' ') cuantas++;
   return cuantas;
 }
@@ -261,11 +258,9 @@ export function sumaDelPresupuesto(
     renglones.push({ que: pieza, cuantos, triangulos: cuantos * (t ?? 0) });
   }
   const plena = calidad === 'plena';
-  const guarismos = guarismosDelTablero();
   const emblemas = huecosDeLosEmblemas().length;
   const letras = letrasDelTablero();
   renglones.push({ que: 'suelo del anillo y marcos', cuantos: 1, triangulos: triangulosDelSuelo() });
-  renglones.push({ que: 'dígitos del precio', cuantos: guarismos, triangulos: guarismos * TRIANGULOS_POR_GUARISMO });
   renglones.push({ que: 'emblemas', cuantos: emblemas, triangulos: emblemas * TRIANGULOS_POR_EMBLEMA });
   renglones.push({ que: 'letras de los rótulos', cuantos: letras, triangulos: letras * TRIANGULOS_POR_LETRA });
   /* Y las obras de las casillas: dos triángulos por cuadro, contados de `obras.ts`. */

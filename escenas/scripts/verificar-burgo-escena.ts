@@ -48,7 +48,6 @@ import { proyecta } from '../embarcadero/camara';
 import { sorteo } from '../embarcadero/cala';
 import { PIEZA, nombresDelBurgo } from '../burgo/piezas';
 import {
-  ALTO_DEL_GUARISMO,
   ALTO_DEL_HOTEL,
   ALTO_DEL_PEON,
   ALTO_DEL_PEON_EN_EL_PACK,
@@ -68,7 +67,6 @@ import {
   ANCHO_DE_TESELA,
   ANCHO_DEL_BULEVAR,
   ANCHO_DE_LA_AVENIDA,
-  ANCHO_DEL_GUARISMO,
   ANCHO_DEL_HOTEL,
   ANCHO_DE_LA_CASA,
   ANILLO_DEL_BURGO,
@@ -133,17 +131,26 @@ import {
   TALLA_DEL_HOTEL,
   TALLA_DEL_PEON,
   TALLA_DE_LA_CASA,
-  V_DEL_PRECIO,
   V_DE_LAS_CASAS,
-  ALTO_MAXIMO_DEL_ROTULO,
   ANCHO_DEL_ROTULO,
-  MARGEN_DEL_PRECIO,
   MARGEN_DEL_TEXTO,
+  MARGEN_DEL_TEXTO_EN_LAS_LATERALES,
   ROTULO_DE_LA_CASILLA,
   SUBTITULO_DE_LA_CASILLA,
-  altoDelRotulo,
+  ALTO_DEL_NOMBRE,
+  ALTO_DEL_PIE,
+  CASILLAS_DE_CARTA,
+  CASILLA_DEL_IMPUESTO_DE_LUJO,
+  CASILLA_DEL_IMPUESTO_SOBRE_EL_CAPITAL,
+  PASO_DEL_NOMBRE,
+  POR_CIENTO_DEL_IMPUESTO,
+  V_DEL_NOMBRE,
+  V_DEL_PIE,
+  altoDelRotuloDeEsquina,
+  enEuros,
+  renglonesDelNombre,
+  vDelFinalDelNombre,
   anchoDeLaPalabra,
-  anchoDelPrecio,
   campo,
   candidatasDelCampo,
   centroDeCelda,
@@ -152,7 +159,6 @@ import {
   esSuelo,
   giraElPunto,
   giroHaciaFuera,
-  guarismosDelPrecio,
   huecoDeAventurero,
   huecoDeBandera,
   huecoDeCasa,
@@ -176,12 +182,13 @@ import {
   suelosDeLaCasilla,
   vDeRadial,
 } from '../burgo/anillo-en-3d';
-import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
+import type { LetraEnElTablero, MarcoDeCasilla, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
 import { BOCANADAS_DEL_HUMO as BOCANADAS_DEL_HUMO_EN_EL_COMPROBADOR, CASILLA_DEL_CANAL, CASILLA_DE_LA_CENTRAL, CASILLA_DE_LA_OFICINA, COLOR_DE_OBRA, DEL_MUNDO, MONEDA_DE_LA_RECAUDACION, ONDA_DEL_CANAL, bocaDeLaChimenea, carasDeLaOnda, carasDeUnaBocanada, centroDeLaAlberca, RECORRIDO_DE_LA_MONEDA, VIA, cajasDeLaOficina, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDeLasObras, carasDelTren, casillasConObra, disco, esTriangulo, largoDeLaVia, letrasDeLosCarteles, monedaEnLaEscalinata, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda, triangulosDeLasObras } from '../burgo/obras';
 import type { CaraDeObra } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
-import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO, PAGA_DE_LA_PUERTA_MAYOR } from '../../shared/arcade/juegos/burgo-tablero';
+import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO, PAGA_DE_LA_PUERTA_MAYOR, PARTE_DEL_IMPUESTO } from '../../shared/arcade/juegos/burgo-tablero';
+import { maravedies } from '../../shared/arcade/juegos/burgo';
 import {
   CASAS_DEL_CONCEJO,
   MULTIPLICIDADES_PLENA,
@@ -190,9 +197,7 @@ import {
   TOPE_PLENA,
   TOPE_SOBRIA,
   TRIANGULOS_POR_EMBLEMA,
-  TRIANGULOS_POR_GUARISMO,
   TRIANGULOS_POR_LETRA,
-  guarismosDelTablero,
   letrasDelTablero,
   sumaDelPresupuesto,
 } from '../burgo/presupuesto';
@@ -438,32 +443,41 @@ comprobar(
   { FRANJA, FILETE, SUPERFICIE, BORDE_CLARO },
 );
 comprobar('la línea de la marcha es el centro del filete (349,5), o sea v = 25,5', LINEA_DE_LA_MARCHA === 349.5 && vDeRadial(LINEA_DE_LA_MARCHA) === 25.5);
-comprobar('el reborde de la franja mide lo que un bordillo del pack (0,6) y el precio va a v = 45 con dígitos de 25', ALTURA_DEL_REBORDE === 0.6 && V_DEL_PRECIO === 45 && ALTO_DEL_GUARISMO === 25);
+comprobar('el reborde de la franja mide lo que un bordillo del pack (0,6)', ALTURA_DEL_REBORDE === 0.6);
 /*
- * EL DÍGITO, ENTRE DOS PAREDES: EL MARGEN DE SU CASILLA Y LOS PÍXELES QUE SE MIDIERON.
+ * EL NOMBRE ARRIBA Y EL PIE ABAJO, CON UN SOLO ALTO PARA LOS NOMBRES.
  *
- * Este número fue 27, y su razón estaba escrita como una proporción: 27/570,24 es exactamente
- * 12/253,44, o sea que el dígito conservaba los píxeles del tablero de 384 al crecer el recinto.
- * Lo que esa cuenta no miraba lo vio Miguel: «los textos tienen que tener un margen para que
- * queden estéticos, ahora mismo ocupan de extremo a extremo». Y a 27 no hay margen que dar: tres
- * dígitos miden 66,15 de los 72 de la casilla, y aunque se juntaran hasta TOCARSE seguirían
- * midiendo 60,75. Así que el 27 cae, y con él la proporción exacta con el tablero de 384.
+ * Miguel, con la foto del tablero de mesa delante: el nombre arriba de la parte blanca —no en el
+ * margen de color— y el precio abajo, los dos centrados, el precio «ligeramente más pequeño que
+ * el nombre», y los nombres cortos del mismo tamaño que los largos. Los números gordos de 25 que
+ * había se fueron.
  *
- * Lo que lo sustituye no es un número a ojo, son dos paredes: el mayor alto que deja el 7 % de la
- * casilla libre a cada lado, y el menor que las dos medidas de píxeles de más abajo aguantan
- * —4,63 px desde la pose de salida y 15,4 al seguir, contra los suelos medidos de 4,5 y 15—.
- * Entre las dos sólo cabe el 25. Y el 12 % que tienen los nombres pediría 22,3, que deja el móvil
- * en 4,1 y 13,7: por debajo de los dos. Eso es una decisión de Miguel, no una cuenta.
+ * El alto de los nombres no es un número a ojo: es el MAYOR, a la décima, con el que la palabra más
+ * ancha de todas las laterales cabe en el ancho útil —una palabra no se parte—. Se mide aquí por su
+ * cuenta, palabra a palabra, y no con la función que lo calcula.
  */
 comprobar(
-  `el dígito es el mayor que deja margen en su casilla: tres cifras miden ${anchoDelPrecio(37).toFixed(2)} de los 72`,
-  ALTO_DEL_GUARISMO === 25 && Math.abs(anchoDelPrecio(37) - 61.25) < 1e-9,
-  { alto: ALTO_DEL_GUARISMO, tresCifras: anchoDelPrecio(37) },
+  `el nombre empieza a 3 del blanco (v ${String(V_DEL_NOMBRE)}) y el pie acaba a 3 de su final (v ${String(V_DEL_PIE)})`,
+  V_DEL_NOMBRE === vDeRadial(SUPERFICIE.desde) + 3 && V_DEL_PIE === vDeRadial(SUPERFICIE.hasta) - 3,
+  { V_DEL_NOMBRE, V_DEL_PIE },
 );
-comprobar(
-  'se ve fallar: con el 27 de ayer, tres cifras medirían 66,15 y no cabrían en el margen',
-  66.15 > ANCHO_DE_CASILLA * (1 - 2 * MARGEN_DEL_PRECIO) && 61.25 <= ANCHO_DE_CASILLA * (1 - 2 * MARGEN_DEL_PRECIO),
-);
+{
+  const palabrasDeLasLaterales = Object.entries(ROTULO_DE_LA_CASILLA)
+    .filter(([clave]) => !ESQUINAS.includes(Number(clave)))
+    .flatMap(([, nombre]) => nombre.split(' '));
+  const cabeA = (alto: number): string[] => palabrasDeLasLaterales.filter((palabra) => anchoDeLaPalabra(palabra, alto) > ANCHO_DEL_ROTULO + 1e-9);
+  const laMasAncha = palabrasDeLasLaterales.reduce((a, b) => (anchoDeLaPalabra(b, 1) > anchoDeLaPalabra(a, 1) ? b : a));
+  comprobar(
+    `los nombres de las laterales van todos a ${String(ALTO_DEL_NOMBRE)}, el mayor alto a la décima con el que ${laMasAncha} cabe en los ${r(ANCHO_DEL_ROTULO)} útiles`,
+    palabrasDeLasLaterales.length > 80 && cabeA(ALTO_DEL_NOMBRE).length === 0 && cabeA(Math.round((ALTO_DEL_NOMBRE + 0.1) * 10) / 10).length > 0,
+    { alto: ALTO_DEL_NOMBRE, conUnaDecimaMas: cabeA(Math.round((ALTO_DEL_NOMBRE + 0.1) * 10) / 10) },
+  );
+  comprobar(
+    `y el pie va «ligeramente más pequeño»: ${String(ALTO_DEL_PIE)}, entre el 80 % y el 95 % del nombre`,
+    ALTO_DEL_PIE < ALTO_DEL_NOMBRE && ALTO_DEL_PIE >= 0.8 * ALTO_DEL_NOMBRE && ALTO_DEL_PIE <= 0.95 * ALTO_DEL_NOMBRE,
+    { ALTO_DEL_PIE, ALTO_DEL_NOMBRE },
+  );
+}
 comprobar('la polilínea tiene 40 puntos', POLILINEA.length === 40, POLILINEA.length);
 
 {
@@ -542,22 +556,23 @@ comprobar(
 comprobar('se ve fallar: con la huella de la figura (2,543) escrita en vez de la del peón, la línea de arriba caería', Math.abs(huella(PIEZA.figura).ancho - peonEnElPack.ancho) > 1e-3, r(huella(PIEZA.figura).ancho));
 
 /*
- * QUE EL PEÓN SE VEA NO ES UNA OPINIÓN: SE MIDE CONTRA EL DÍGITO DEL PRECIO.
+ * QUE EL PEÓN SE VEA NO ES UNA OPINIÓN: SE MIDE CONTRA EL FRENTE DE SU CASILLA.
  *
- * El dígito es la única referencia honrada de «lo que se lee a esta distancia», porque su
- * alto de 27 salió de contar píxeles con `proyecta` en las tres ventanas. El encargo puso el
- * suelo con el dedo: «un octavo de eso es invisible». Así que el peón tiene que pasar del
- * octavo, y `DIAMETRO_DEL_PEON` es la sexta parte —que además es lo máximo que el patio de la
- * cárcel admite—. La vacuna es el peón de antes: a talla 1 no llega ni al octavo.
+ * Se medía contra el dígito del precio —«un octavo de eso es invisible», puso el encargo—, que era
+ * la referencia de lo que se lee a esta distancia. Los dígitos gordos se fueron cuando el precio pasó
+ * a escribirse abajo, como en el tablero de mesa, y la vara se queda con el mismo tamaño y otro
+ * nombre: un treintaidosavo del frente de la casilla (2,25; el octavo del dígito de 18,75 era 2,34).
+ * `DIAMETRO_DEL_PEON` es además lo máximo que el patio de la cárcel admite. La vacuna es el peón de
+ * antes: a talla 1 no llegaba.
  */
-const octavoDeUnDigito = ANCHO_DEL_GUARISMO / 8;
-console.log(`  el peón mide ${r(DIAMETRO_DEL_PEON)} de huella y ${r(ALTO_DEL_PEON)} de alto; un dígito mide ${r(ANCHO_DEL_GUARISMO)} de ancho, o sea ${r(ANCHO_DEL_GUARISMO / DIAMETRO_DEL_PEON)} peones`);
+const lindeDeLoInvisible = ANCHO_DE_CASILLA / 32;
+console.log(`  el peón mide ${r(DIAMETRO_DEL_PEON)} de huella y ${r(ALTO_DEL_PEON)} de alto; el frente de su casilla, ${r(ANCHO_DE_CASILLA)}`);
 comprobar(
-  `el peón se ve: su huella (${r(DIAMETRO_DEL_PEON)}) pasa del octavo del ancho de un dígito (${r(octavoDeUnDigito)}), que es lo que el encargo llama invisible`,
-  DIAMETRO_DEL_PEON > octavoDeUnDigito && TALLA_DEL_PEON > 1,
-  { DIAMETRO_DEL_PEON, octavoDeUnDigito, TALLA_DEL_PEON: r(TALLA_DEL_PEON) },
+  `el peón se ve: su huella (${r(DIAMETRO_DEL_PEON)}) pasa de un treintaidosavo del frente de su casilla (${r(lindeDeLoInvisible)})`,
+  DIAMETRO_DEL_PEON > lindeDeLoInvisible && TALLA_DEL_PEON > 1,
+  { DIAMETRO_DEL_PEON, lindeDeLoInvisible, TALLA_DEL_PEON: r(TALLA_DEL_PEON) },
 );
-comprobar('se ve fallar: el peón a la talla del pack (1,272) no llegaba ni al octavo de un dígito', peonEnElPack.ancho < octavoDeUnDigito, r(peonEnElPack.ancho));
+comprobar('se ve fallar: el peón a la talla del pack (1,272) no llegaba', peonEnElPack.ancho < lindeDeLoInvisible, r(peonEnElPack.ancho));
 /*
  * Y EL TECHO, que es lo que impide subirlo más: el carril del avatar. El peón va centrado en
  * `LINEA_DE_LA_MARCHA`, que está a 2,5 del borde de dentro del carril, así que su diámetro no
@@ -901,22 +916,21 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
   const sinFila = laterales.filter((i) => ATREZO_DE_LA_CASILLA[i] === undefined);
   comprobar('las 36 casillas laterales tienen fila en ATREZO_DE_LA_CASILLA (el Diezmo y la Alcabala, vacía a propósito: sólo emblema y cifra)', sinFila.length === 0, sinFila);
   /*
-   * NINGUNA CASILLA SE QUEDA MUDA, y la lista de formas de hablar ha crecido. Eran tres —atrezo,
-   * emblema o cifra— y ahora son cinco: una casilla puede decir lo que es con una OBRA de
-   * `obras.ts` (el cofre del Fondo no lleva ni pieza ni emblema: lleva cofre) o con su NOMBRE
-   * escrito en la franja. Lo que la regla vigila sigue siendo lo mismo: que no haya una casilla en
-   * la que no se vea nada.
+   * NINGUNA CASILLA SE QUEDA MUDA. Una casilla puede decir lo que es con su atrezo, un emblema, una
+   * OBRA de `obras.ts` —el cofre de la Caja de Comunidad no lleva ni pieza ni emblema: lleva cofre—
+   * o con lo que tiene escrito: su NOMBRE arriba y su PIE abajo, que ahora llevan las treinta y seis.
+   * Lo que la regla vigila sigue siendo lo mismo: que no haya una casilla en la que no se vea nada.
    */
   const conObra = new Set(casillasConObra());
   const mudas = laterales.filter(
     (i) =>
       (ATREZO_DE_LA_CASILLA[i] ?? []).length === 0 &&
       !huecosDeLosEmblemas().some((e) => e.casilla === i) &&
-      guarismosDelPrecio(i).length === 0 &&
+      letrasDelSubtitulo(i).length === 0 &&
       !conObra.has(i) &&
       letrasDelRotulo(i).length === 0,
   );
-  comprobar('y ninguna se queda muda: o lleva atrezo, o emblema, o cifra, o obra, o su nombre', mudas.length === 0, mudas);
+  comprobar('y ninguna se queda muda: o lleva atrezo, o emblema, o obra, o su nombre y su pie', mudas.length === 0, mudas);
 
   const todos = laterales.flatMap((i) => problemasDelAtrezo(i, ATREZO_DE_LA_CASILLA[i] ?? []));
   const de = (etiqueta: string): string[] => todos.filter((q) => q.startsWith(`${etiqueta}:`));
@@ -928,7 +942,7 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
     });
   console.log(`  frente × fondo del atrezo por casilla: ${medidas.join('  ')}`);
   comprobar(`ningún atrezo pasa de ${FRENTE_MAXIMO_DEL_ATREZO} de frente ni se sale de su casilla`, de('frente').length === 0, de('frente'));
-  comprobar(`ninguno se sale de la banda de atrezo (v ${ATREZO.desde}..${ATREZO.hasta}): ni pisa el precio ni se sube al marco`, de('banda').length === 0, de('banda'));
+  comprobar(`ninguno se sale de la banda de atrezo (v ${ATREZO.desde}..${ATREZO.hasta}): ni pisa el nombre ni se sube al marco`, de('banda').length === 0, de('banda'));
   comprobar('y ninguna pieza flota ni se hunde: los cuerpos del pack vienen sin base y bajan 0,6', de('alza').length === 0, de('alza'));
 
   /* NADA pisa el carril por donde anda el avatar: ni atrezo, ni casas, ni bandera, ni dígitos. */
@@ -972,25 +986,44 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
     conCuerpo.map((p) => p.pieza).slice(0, 5),
   );
 
-  /* El precio: los dígitos caben, están en la superficie y dicen lo que dice el reglamento. */
-  const precioMal: string[] = [];
+  /*
+   * EL PIE DICE LO QUE DICE EL REGLAMENTO. La tabla de precios de la escena es una copia, y el pie se
+   * escribe con ella: «PRECIO 60 €» en los veintiocho títulos, «PAGA … €» en los dos impuestos —el de
+   * Capital con su 10 %, §3.4— y «COGE CARTA» en las seis de carta. Aquí cada pie se reconstruye
+   * desde el REGLAMENTO —su clase, su precio, `PARTE_DEL_IMPUESTO` y `maravedies`, que es como el
+   * juego escribe los euros— y no desde la tabla.
+   */
   const cifraMal: string[] = [];
+  const pieMal: string[] = [];
+  let piesMirados = 0;
   for (let i = 0; i < CASILLAS; i++) {
-    const delReglamento = (CASILLAS_DEL_REGLAMENTO[i]?.precio ?? 0) as number;
+    const fila = CASILLAS_DEL_REGLAMENTO[i];
+    const delReglamento = (fila?.precio ?? 0) as number;
     if ((PRECIO_DE_LA_CASILLA[i] ?? -1) !== delReglamento) cifraMal.push(`${i}: la tabla dice ${String(PRECIO_DE_LA_CASILLA[i])} y el reglamento ${String(delReglamento)}`);
-    const digitos = guarismosDelPrecio(i);
-    if (digitos.length === 0) continue;
-    const m = marcoDeCasilla(i);
-    if (anchoDelPrecio(i) > ANCHO_DE_CASILLA - 2) precioMal.push(`${i}: ${r(anchoDelPrecio(i))} de ancho en una casilla de ${ANCHO_DE_CASILLA}`);
-    for (const g of digitos) {
-      const { v, aLoLargo } = enElMarco(m, { x: g.x, z: g.z });
-      if (v - ALTO_DEL_GUARISMO / 2 < SUPERFICIE.desde - BORDE_INTERIOR || v + ALTO_DEL_GUARISMO / 2 > ATREZO.desde) precioMal.push(`${i}: el dígito va de v ${r(v - ALTO_DEL_GUARISMO / 2)} a ${r(v + ALTO_DEL_GUARISMO / 2)}`);
-      if (Math.abs(aLoLargo) + ANCHO_DEL_GUARISMO / 2 > ANCHO_DE_CASILLA / 2 - 1) precioMal.push(`${i}: el dígito se sale a lo largo (${r(aLoLargo)})`);
-    }
+    if (ESQUINAS.includes(i) || fila === undefined) continue;
+    piesMirados++;
+    const esperado =
+      fila.clase === 'arca' || fila.clase === 'pregon'
+        ? 'COGE CARTA'
+        : fila.clase === 'diezmo'
+          ? `PAGA ${maravedies(fila.precio)} O ${String(PARTE_DEL_IMPUESTO)} %`
+          : fila.clase === 'alcabala'
+            ? `PAGA ${maravedies(fila.precio)}`
+            : `PRECIO ${maravedies(fila.precio)}`;
+    if (SUBTITULO_DE_LA_CASILLA[i] !== esperado) pieMal.push(`${i}: el pie dice «${String(SUBTITULO_DE_LA_CASILLA[i])}» y el reglamento pide «${esperado}»`);
   }
   comprobar('el precio de cada casilla es EL DEL REGLAMENTO, copiado y vigilado casilla a casilla', cifraMal.length === 0, cifraMal.slice(0, 5));
-  comprobar('los dígitos del precio caben en la superficie, entre el carril y la banda de atrezo, y en los 32 de ancho', precioMal.length === 0, precioMal.slice(0, 5));
-  comprobar('llevan cifra las 28 comprables más el Diezmo y la Alcabala; las Arcas, los Pregones y las cuatro esquinas no', PRECIO_DE_LA_CASILLA.filter((x) => x > 0).length === 30, PRECIO_DE_LA_CASILLA.filter((x) => x > 0).length);
+  comprobar(`el pie de las ${String(piesMirados)} laterales dice lo del reglamento: su precio, lo que se paga o COGE CARTA`, pieMal.length === 0 && piesMirados === 36, pieMal.slice(0, 5));
+  comprobar('llevan cifra los 28 títulos y los dos impuestos; las seis de carta y las cuatro esquinas no', PRECIO_DE_LA_CASILLA.filter((x) => x > 0).length === 30, PRECIO_DE_LA_CASILLA.filter((x) => x > 0).length);
+  comprobar(
+    'los euros de la escena se escriben como los del juego, también con millar: 60, 400, 1.500 y 12.000',
+    [60, 400, 1500, 12000, 0].every((n) => enEuros(n) === maravedies(n)) && CASILLAS_DE_CARTA.length === 6 && POR_CIENTO_DEL_IMPUESTO === PARTE_DEL_IMPUESTO,
+    [60, 400, 1500, 12000].map((n) => [enEuros(n), maravedies(n)]),
+  );
+  comprobar(
+    'se ve fallar: un pie con el precio sin su símbolo, «PRECIO 60», no es el que pide el reglamento',
+    `PRECIO ${maravedies(60)}` !== 'PRECIO 60' && CASILLA_DEL_IMPUESTO_SOBRE_EL_CAPITAL === 4 && CASILLA_DEL_IMPUESTO_DE_LUJO === 38,
+  );
 
   /* Los emblemas: uno por casilla que no se compra, y caben en la mitad exterior. */
   const emblemas = huecosDeLosEmblemas();
@@ -1070,7 +1103,7 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
 }
 
 // ---------------------------------------------------------------------------
-paso('El precio y la franja del barrio se LEEN: proyectados en píxeles en 16:9, 3:4 y 9:19,5');
+paso('El nombre, el pie y la franja del barrio se LEEN: proyectados en píxeles en 16:9, 3:4 y 9:19,5');
 // ---------------------------------------------------------------------------
 
 const VENTANAS = [
@@ -1095,81 +1128,94 @@ function pixelesEntre(ventanaK: number, a: Punto, b: Punto): number {
 /**
  * CUÁNTO SE LEE, Y DÓNDE ESTÁ EL LÍMITE DE VERDAD.
  *
- * La cuenta de servilleta —«el tablero llena el ancho de la pantalla y se mira de frente»—
- * no vale: la cámara del Burgo mira desde 55° de altura y el lienzo del móvil es el 58 % del
- * alto, así que el tablero se ve escorzado y cabe por el alto, no por el ancho. Medido aquí
- * con `proyecta`, el dígito de 27 unidades sobre el tablero de 864 queda en 5,0 px en el
- * móvil, 9,9 en una tableta y 16,3 en un PC: EXACTAMENTE los mismos píxeles que daba el de
- * 12 sobre el tablero de 384, porque lo que manda es el cociente con el alcance y ese
- * cociente no ha cambiado.
+ * La cuenta de servilleta —«el tablero llena el ancho de la pantalla y se mira de frente»— no vale:
+ * la cámara del Burgo mira desde 55° de altura y el lienzo del móvil es el 58 % del alto, así que
+ * el tablero se ve escorzado. Se mide con `proyecta`, y en la casilla PEOR de las treinta y seis
+ * —las de los lados de delante y de detrás, que son las que se ven escorzadas—.
  *
- * Y 27 es el TECHO, no una elección tímida: tres dígitos ocupan 2,45 × alto, y a 27 son
- * 66,15 de los 72 de la casilla. A 30 ya no caben. O sea que desde la pose de salida, en un
- * móvil, el precio es una mancha de tres cifras y no un número que se lea: se lee
- * ACERCÁNDOSE, y por eso la segunda medida —a la cercanía de seguimiento, que es la que la
- * cámara toma sola cada vez que alguien mueve— es la que de verdad manda: ahí el dígito mide
- * 16,6 px en el móvil, 32,8 en una tableta y 82,8 en un PC. Las dos están escritas para que
- * nadie vuelva a suponer la primera.
+ * Hasta el cambio al tablero de mesa, el precio eran tres dígitos de 25 que se leían desde la pose
+ * de salida hasta en el móvil. Ahora el nombre y el precio van en letra de 4,3 y 3,7, como en la
+ * foto que mandó Miguel, y eso tiene un precio que se dice aquí en vez de esconderlo: desde la pose
+ * de salida no se leen —es el tablero entero, y en un tablero de mesa mirado desde lejos tampoco—.
+ * Se leen SIGUIENDO al que mueve en un PC, que es cuando la cámara se acerca sola a la casilla en la
+ * que se cae; y en el móvil, ACERCÁNDOSE del todo (`masCerca`). Las dos medidas tienen suelo.
+ *
+ * La franja del barrio, en cambio, se sigue viendo desde la salida en las tres ventanas: el color es
+ * lo que dice de quién es cada lado desde lejos.
  */
-const PIXELES_MINIMOS_DEL_DIGITO = 4.5;
 const PIXELES_MINIMOS_DE_LA_FRANJA = 3;
-/** Al seguir al que mueve la cámara se pone a 0,42: ahí el precio tiene que LEERSE. */
-const PIXELES_MINIMOS_AL_SEGUIR = 15;
+/**
+ * Siguiendo al que mueve, en un PC: el nombre se lee como un texto pequeño de pantalla. Medido en la
+ * casilla peor, 11,9 px el nombre y 9,4 el pie; el suelo queda justo debajo, para que cualquier cosa
+ * que los encoja se vea caer.
+ */
+const PIXELES_MINIMOS_DEL_NOMBRE_AL_SEGUIR = 11;
+const PIXELES_MINIMOS_DEL_PIE_AL_SEGUIR = 9;
+/**
+ * Y en el móvil, acercándose del todo: 6,7 y 5,2 px de CSS, que en una pantalla de densidad 3 son 20
+ * y 15 píxeles de verdad. Es lo justo, y es el precio de la letra del tablero de mesa en un teléfono.
+ */
+const PIXELES_MINIMOS_DEL_NOMBRE_DE_CERCA = 6.5;
+const PIXELES_MINIMOS_DEL_PIE_DE_CERCA = 5;
+
+/** Cuántos píxeles de ALTO ocupa en el lienzo un tramo de `v` de una casilla, desde una cercanía. */
+function pixelesDeUnTramo(ventana: { ancho: number; alto: number }, cercania: { factor: number; centro: { x: number; z: number } }, m: MarcoDeCasilla, v0: number, v1: number): number {
+  const conFranja = { ancho: ventana.ancho, alto: ventana.alto, franjaInferior: 0 };
+  const pose = poseDelBurgo(cercania, MIRADOR_DEL_BURGO, conFranja);
+  const a = puntoEnLaCasillaPorV(m, 0, v0);
+  const b = puntoEnLaCasillaPorV(m, 0, v1);
+  const pa = proyecta(pose, ventana.ancho / ventana.alto, { x: a.x, y: 0, z: a.z });
+  const pb = proyecta(pose, ventana.ancho / ventana.alto, { x: b.x, y: 0, z: b.z });
+  if (!pa.delante || !pb.delante) return 0;
+  return Math.hypot((pa.x - pb.x) * (ventana.ancho / 2), (pa.y - pb.y) * (ventana.alto / 2));
+}
 
 {
   const informe: string[] = [];
-  const digitosCortos: string[] = [];
   const franjasCortas: string[] = [];
   for (const [k, v] of VENTANAS.entries()) {
-    let peorDigito = Infinity;
     let peorFranja = Infinity;
     for (let i = 0; i < CASILLAS; i++) {
       if (ESQUINAS.includes(i)) continue;
       const m = marcoDeCasilla(i);
-      const alto = pixelesEntre(k, puntoEnLaCasillaPorV(m, 0, V_DEL_PRECIO - ALTO_DEL_GUARISMO / 2), puntoEnLaCasillaPorV(m, 0, V_DEL_PRECIO + ALTO_DEL_GUARISMO / 2));
-      const franja = pixelesEntre(k, puntoEnLaCasillaPorV(m, 0, 0), puntoEnLaCasillaPorV(m, 0, BANDA.franja));
-      if (guarismosDelPrecio(i).length > 0) peorDigito = Math.min(peorDigito, alto);
-      peorFranja = Math.min(peorFranja, franja);
+      peorFranja = Math.min(peorFranja, pixelesEntre(k, puntoEnLaCasillaPorV(m, 0, 0), puntoEnLaCasillaPorV(m, 0, BANDA.franja)));
     }
-    informe.push(`${v.nombre}: dígito ${r(peorDigito)} px, franja ${r(peorFranja)} px`);
-    if (peorDigito < PIXELES_MINIMOS_DEL_DIGITO) digitosCortos.push(`${v.nombre}: ${r(peorDigito)} px`);
+    informe.push(`${v.nombre}: franja ${r(peorFranja)} px`);
     if (peorFranja < PIXELES_MINIMOS_DE_LA_FRANJA) franjasCortas.push(`${v.nombre}: ${r(peorFranja)} px`);
   }
-  console.log(`  legibilidad desde la pose de salida — ${informe.join('; ')}`);
-  comprobar(`el dígito del precio mide al menos ${PIXELES_MINIMOS_DEL_DIGITO} px de alto en las tres ventanas, en las 36 casillas`, digitosCortos.length === 0, digitosCortos);
+  console.log(`  desde la pose de salida — ${informe.join('; ')}`);
   comprobar(`la franja del barrio mide al menos ${PIXELES_MINIMOS_DE_LA_FRANJA} px en las tres ventanas`, franjasCortas.length === 0, franjasCortas);
-  /*
-   * VACUNA, y es la del cambio de escala: un dígito que se quedase en los 12 de la escala
-   * anterior mediría 2,2 px en el móvil sobre este tablero. Nada fallaría; sólo dejaría de
-   * leerse el precio, que es la mitad de lo que hace que una casilla sea una casilla.
-   */
-  const m = marcoDeCasilla(1);
-  const enanito = pixelesEntre(2, puntoEnLaCasillaPorV(m, 0, V_DEL_PRECIO - 6), puntoEnLaCasillaPorV(m, 0, V_DEL_PRECIO + 6));
-  comprobar('se ve fallar: un dígito que se hubiera quedado en los 12 de la escala anterior no se lee en el móvil', enanito < PIXELES_MINIMOS_DEL_DIGITO, r(enanito));
 
-  /*
-   * Y LA MEDIDA QUE DE VERDAD IMPORTA: al seguir al que mueve, el precio se lee.
-   *
-   * La cámara se acerca sola a `CERCANIA_DE_SEGUIMIENTO` en cada `mueve` y vuelve 1,2 s
-   * después del salto. Es el momento en el que un jugador mira la casilla en la que ha caído.
-   */
-  const cerquita: string[] = [];
-  const informeCerca: string[] = [];
-  for (const [k, v] of VENTANAS.entries()) {
-    const ventana = { ancho: v.ancho, alto: v.alto, franjaInferior: 0 };
-    const marco = marcoDeCasilla(39);
-    const pose = poseDelBurgo({ factor: CERCANIA_DE_SEGUIMIENTO, centro: { x: marco.centro.x, z: marco.centro.z } }, MIRADOR_DEL_BURGO, ventana);
-    const a = puntoEnLaCasillaPorV(marco, 0, V_DEL_PRECIO - ALTO_DEL_GUARISMO / 2);
-    const b2 = puntoEnLaCasillaPorV(marco, 0, V_DEL_PRECIO + ALTO_DEL_GUARISMO / 2);
-    const pa = proyecta(pose, v.ancho / v.alto, { x: a.x, y: 0, z: a.z });
-    const pb = proyecta(pose, v.ancho / v.alto, { x: b2.x, y: 0, z: b2.z });
-    const px = Math.hypot((pa.x - pb.x) * (v.ancho / 2), (pa.y - pb.y) * (v.alto / 2));
-    informeCerca.push(`${v.nombre}: ${r(px)} px`);
-    if (!pa.delante || !pb.delante || px < PIXELES_MINIMOS_AL_SEGUIR) cerquita.push(`${v.nombre}: ${r(px)} px`);
-    void k;
-  }
-  console.log(`  el precio al seguir al que mueve (cercanía ${CERCANIA_DE_SEGUIMIENTO}) — ${informeCerca.join('; ')}`);
-  comprobar(`al seguir al que mueve el dígito pasa de ${PIXELES_MINIMOS_AL_SEGUIR} px en las tres ventanas: ahí es donde el precio se lee`, cerquita.length === 0, cerquita);
+  /* El nombre y el pie, en la casilla peor, a las dos cercanías que importan. */
+  const peorEn = (ventana: { ancho: number; alto: number }, factor: number, alto: number, v0DeLaCasilla: (i: number) => number): number => {
+    let peor = Infinity;
+    for (let i = 0; i < CASILLAS; i++) {
+      if (ESQUINAS.includes(i)) continue;
+      const m = marcoDeCasilla(i);
+      const v0 = v0DeLaCasilla(i);
+      peor = Math.min(peor, pixelesDeUnTramo(ventana, { factor, centro: { x: m.centro.x, z: m.centro.z } }, m, v0, v0 + alto));
+    }
+    return peor;
+  };
+  const pc = VENTANAS[0] as { nombre: string; ancho: number; alto: number };
+  const movil = VENTANAS[2] as { nombre: string; ancho: number; alto: number };
+  const nombreAlSeguir = peorEn(pc, CERCANIA_DE_SEGUIMIENTO, ALTO_DEL_NOMBRE, () => V_DEL_NOMBRE);
+  const pieAlSeguir = peorEn(pc, CERCANIA_DE_SEGUIMIENTO, ALTO_DEL_PIE, () => V_DEL_PIE - ALTO_DEL_PIE);
+  const nombreDeCerca = peorEn(movil, LIMITES_DEL_BURGO.masCerca, ALTO_DEL_NOMBRE, () => V_DEL_NOMBRE);
+  const pieDeCerca = peorEn(movil, LIMITES_DEL_BURGO.masCerca, ALTO_DEL_PIE, () => V_DEL_PIE - ALTO_DEL_PIE);
+  console.log(`  siguiendo en ${pc.nombre}: nombre ${r(nombreAlSeguir)} px, pie ${r(pieAlSeguir)} px; de cerca en ${movil.nombre}: nombre ${r(nombreDeCerca)} px, pie ${r(pieDeCerca)} px`);
+  comprobar(
+    `siguiendo al que mueve en un PC, el nombre pasa de ${PIXELES_MINIMOS_DEL_NOMBRE_AL_SEGUIR} px y el pie de ${PIXELES_MINIMOS_DEL_PIE_AL_SEGUIR} en las 36 casillas`,
+    nombreAlSeguir >= PIXELES_MINIMOS_DEL_NOMBRE_AL_SEGUIR && pieAlSeguir >= PIXELES_MINIMOS_DEL_PIE_AL_SEGUIR,
+    { nombreAlSeguir: r(nombreAlSeguir), pieAlSeguir: r(pieAlSeguir) },
+  );
+  comprobar(
+    `y en el móvil, acercándose del todo, el nombre pasa de ${PIXELES_MINIMOS_DEL_NOMBRE_DE_CERCA} px y el pie de ${PIXELES_MINIMOS_DEL_PIE_DE_CERCA}`,
+    nombreDeCerca >= PIXELES_MINIMOS_DEL_NOMBRE_DE_CERCA && pieDeCerca >= PIXELES_MINIMOS_DEL_PIE_DE_CERCA,
+    { nombreDeCerca: r(nombreDeCerca), pieDeCerca: r(pieDeCerca) },
+  );
+  /* La vacuna: un nombre de 2,5, que es lo que saldría si se partieran las palabras para agrandar las cortas, no se lee siguiendo. */
+  comprobar('se ve fallar: un nombre de 2,5 no llega a leerse siguiendo al que mueve', peorEn(pc, CERCANIA_DE_SEGUIMIENTO, 2.5, () => V_DEL_NOMBRE) < PIXELES_MINIMOS_DEL_NOMBRE_AL_SEGUIR);
 }
 
 // ---------------------------------------------------------------------------
@@ -1363,10 +1409,18 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
     return Math.abs(radial - BORDE_INTERIOR) > 1e-9 || Math.abs(aLoLargo) > 1e-9 || b2.ancho !== 48 || b2.celdas.join() !== CELDAS_DE_LA_AVENIDA.join();
   });
   comprobar('las cuatro avenidas entran por el borde del recinto encaradas EXACTAMENTE con las casillas 5, 15, 25 y 35, con 48 de ancho y por las celdas 25 a 28', bocas.length === 4 && bocasMal.length === 0 && bocas.map((b2) => b2.casilla).join() === '5,15,25,35', bocas.map((b2) => `${b2.casilla}: (${r(b2.entrada.x)}, ${r(b2.entrada.z)}) eje ${b2.eje}`));
-  comprobar('y la avenida (48) es más estrecha que la casilla (72): quedan 12 de acera a cada lado, que es donde van los dos semáforos de la Puerta', (ANCHO_DE_CASILLA - ANCHO_DE_LA_AVENIDA) / 2 === 12);
-  /* Y la cebra de la Puerta cubre la avenida ENTERA: cuatro losas de 12 son 48. */
-  const cebrasDeLaPuerta = (ATREZO_DE_LA_CASILLA[5] ?? []).filter((p) => p.pieza === PIEZA.calzadaPaso);
-  comprobar('la Puerta pone cuatro losas de cebra: cubren los 48 de la avenida sin dejar hueco', cebrasDeLaPuerta.length * RETICULA_DE_LA_CIUDAD === ANCHO_DE_LA_AVENIDA, cebrasDeLaPuerta.length);
+  comprobar('y la avenida (48) es más estrecha que la casilla (72): llega entera a su estación, con 12 de sobra a cada lado', (ANCHO_DE_CASILLA - ANCHO_DE_LA_AVENIDA) / 2 === 12);
+  /*
+   * Y en la casilla de la Puerta la espera su ESTACIÓN. Hasta el tablero de mesa la cruzaba un paso de
+   * cebra con dos semáforos en medio del blanco; ése es ahora el sitio del edificio de viajeros, así
+   * que las cuatro van sin atrezo y con su obra.
+   */
+  const conObraDeEstacion = new Set(casillasConObra());
+  comprobar(
+    'las cuatro estaciones llevan su obra y ningún atrezo: ni la cebra ni los semáforos que había en el sitio del edificio de viajeros',
+    PUERTAS.every((c) => conObraDeEstacion.has(c) && (ATREZO_DE_LA_CASILLA[c] ?? []).length === 0),
+    PUERTAS.map((c) => `${String(c)}: ${String((ATREZO_DE_LA_CASILLA[c] ?? []).length)} piezas`),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2401,25 +2455,24 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   }
   comprobar(`las ${String(laCiudad.cintas.length)} cintas se dibujan con los triángulos que declaran, aunque su polilínea tenga menos vértices que cuadros`, cintasMal.length === 0, cintasMal.slice(0, 4));
 
-  /* ── 2. Los precios y los emblemas están MONTADOS y se leen del derecho ── */
+  /* ── 2. Los nombres, los precios y los emblemas están MONTADOS y se leen del derecho ── */
   const rotulos = geometriaDeLosRotulos();
   comprobar('los rótulos del tablero se funden en UNA geometría con triángulos dentro', rotulos !== null && rotulos.triangulos > 0, rotulos === null ? 'null' : rotulos.triangulos);
   if (rotulos !== null) {
     comprobar(
-      `están los ${String(guarismosDelTablero())} dígitos del reglamento, los ${String(huecosDeLosEmblemas().length)} emblemas y las ${String(letrasDelTablero())} letras de los rótulos, ni una menos`,
-      rotulos.guarismos === guarismosDelTablero() && rotulos.emblemas === huecosDeLosEmblemas().length && rotulos.letras === letrasDelTablero(),
-      { guarismos: rotulos.guarismos, emblemas: rotulos.emblemas, letras: rotulos.letras },
+      `están los ${String(huecosDeLosEmblemas().length)} emblemas y las ${String(letrasDelTablero())} letras de los nombres, los pies y los carteles, ni una menos`,
+      rotulos.emblemas === huecosDeLosEmblemas().length && rotulos.letras === letrasDelTablero() && letrasDelTablero() > 700,
+      { emblemas: rotulos.emblemas, letras: rotulos.letras },
     );
     /*
      * LA VACUNA DE LA CUENTA DE ARRIBA, que si no sería decorado. Un carácter que el tipo no
      * trae no da geometría, y el bucle que funde los rótulos lo SALTA: el nombre saldría corto
-     * —«SUCSOS»— sin un error en ninguna consola. Es el modo de fallo del día que se añada un
+     * —«SURTE»— sin un error en ninguna consola. Es el modo de fallo del día que se añada un
      * idioma y se olvide su alfabeto en el charset del compilador.
      */
     comprobar('se ve fallar: una letra que el tipo no trae no da geometría, y ese rótulo se montaría corto', geometriaDeUnaLetra('Ω') === null);
-    /* El presupuesto los cuenta a 60, 120 y 155: la medida real no puede pasarse del doble. */
-    const presupuestados =
-      guarismosDelTablero() * TRIANGULOS_POR_GUARISMO + huecosDeLosEmblemas().length * TRIANGULOS_POR_EMBLEMA + letrasDelTablero() * TRIANGULOS_POR_LETRA;
+    /* El presupuesto los cuenta a 120 y a su media por letra: la medida real no puede pasarse del doble. */
+    const presupuestados = huecosDeLosEmblemas().length * TRIANGULOS_POR_EMBLEMA + letrasDelTablero() * TRIANGULOS_POR_LETRA;
     comprobar(
       `y pesan ${String(rotulos.triangulos)} triángulos, del orden de los ${String(presupuestados)} que el presupuesto les guarda`,
       rotulos.triangulos > presupuestados / 3 && rotulos.triangulos < presupuestados * 2,
@@ -2432,22 +2485,39 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
    *
    * Quien lee el tablero está FUERA del anillo. Para un ojo en `+fuera` mirando al centro, la
    * «derecha» de la pantalla proyectada en el suelo es `−adelante` (el producto vectorial de
-   * la mirada con la vertical). Así que el dígito `k + 1` de un precio tiene que caer hacia
-   * `−adelante` respecto del `k`. Escribiéndolos al revés —que es lo que hacía la primera
-   * versión— el 60 se lee «06» y el 400 «004»: se vio en el banco y no en ninguna cuenta.
+   * la mirada con la vertical), y el «abajo» es `+fuera`. Así que en un renglón la letra `k + 1`
+   * tiene que caer hacia `−adelante` respecto de la `k`, y el renglón siguiente del nombre —y el
+   * pie después de todos— hacia `+fuera`. Escribiéndolos al revés —que es lo que hacía la primera
+   * versión de los precios— el 60 se leía «06» y el 400 «004»: se vio en el banco y no en ninguna
+   * cuenta.
    */
   const alReves: string[] = [];
+  let renglonesMirados = 0;
   for (let i = 0; i < CASILLAS; i++) {
-    const digitos = guarismosDelPrecio(i);
-    if (digitos.length < 2) continue;
+    if (ESQUINAS.includes(i)) continue;
     const m = marcoDeCasilla(i);
-    const primero = digitos[0] as { x: number; z: number };
-    const segundo = digitos[1] as { x: number; z: number };
-    const haciaDonde = (segundo.x - primero.x) * m.adelante.x + (segundo.z - primero.z) * m.adelante.z;
-    if (haciaDonde >= 0) alReves.push(`${String(i)}: el segundo dígito cae hacia +adelante`);
+    const renglones = new Map<string, LetraEnElTablero[]>();
+    for (const l of [...letrasDelRotulo(i), ...letrasDelSubtitulo(i)]) {
+      const clave = r(enElMarco(m, { x: l.x, z: l.z }).v).toString();
+      renglones.set(clave, [...(renglones.get(clave) ?? []), l]);
+    }
+    let vDeAntes = -Infinity;
+    for (const [clave, letras] of renglones) {
+      renglonesMirados++;
+      if (Number(clave) <= vDeAntes) alReves.push(`${String(i)}: el renglón de v ${clave} no va debajo del anterior`);
+      vDeAntes = Number(clave);
+      for (let k = 1; k < letras.length; k++) {
+        const a = letras[k - 1] as LetraEnElTablero;
+        const b = letras[k] as LetraEnElTablero;
+        if ((b.x - a.x) * m.adelante.x + (b.z - a.z) * m.adelante.z >= 0) alReves.push(`${String(i)}: «${b.letra}» cae hacia +adelante de «${a.letra}»`);
+      }
+    }
   }
-  comprobar('los dígitos de un precio se escriben hacia −adelante, que es la derecha de quien mira desde fuera del anillo', alReves.length === 0, alReves.slice(0, 4));
-  comprobar('se ve fallar: con el orden de antes (+adelante) las treinta casillas con cifra caerían', PRECIO_DE_LA_CASILLA.filter((p) => p > 0 && String(p).length >= 2).length >= 25);
+  comprobar(
+    `los ${String(renglonesMirados)} renglones de las laterales se escriben hacia −adelante, uno debajo de otro hacia +fuera: la derecha y el abajo de quien mira desde fuera`,
+    alReves.length === 0 && renglonesMirados >= 36 * 2,
+    alReves.slice(0, 4),
+  );
 
   /*
    * ── 2 bis. EL RÓTULO DE UNA ESQUINA CABE EN SU ESQUINA, Y SE LEE DESDE LA DIAGONAL ──
@@ -2516,7 +2586,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
    * —`ANCHO_DEL_ROTULO` podría volver a ser 72 y la cuenta seguiría cuadrando consigo misma—:
    * mide la caja de cada letra PUESTA, en las coordenadas de su casilla, contra los bordes.
    */
-  const MARGEN_LATERAL = ANCHO_DE_CASILLA * MARGEN_DEL_TEXTO;
+  const MARGEN_LATERAL = ANCHO_DE_CASILLA * MARGEN_DEL_TEXTO_EN_LAS_LATERALES;
   const apretados: string[] = [];
   let letrasLateralesMiradas = 0;
   for (let i = 0; i < CASILLAS; i++) {
@@ -2530,19 +2600,20 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       const media = ((AVANCE_DE_LA_LETRA[l.letra] ?? ALTO_DE_LA_LETRA / 2) * (l.alto / ALTO_DE_LA_LETRA)) / 2;
       const borde = ANCHO_DE_CASILLA / 2 - MARGEN_LATERAL;
       if (Math.abs(enMarco.aLoLargo) + media > borde + 0.001) apretados.push(`${String(i)}/${l.letra}: llega a ${(Math.abs(enMarco.aLoLargo) + media).toFixed(1)} y el margen empieza en ${borde.toFixed(1)}`);
-      /* Y a lo ancho de la franja: el renglón va centrado en ella, con el mismo margen arriba y abajo. */
-      if (l.alto > ALTO_MAXIMO_DEL_ROTULO + 0.001) apretados.push(`${String(i)}/${l.letra}: alto ${l.alto.toFixed(1)} pasa del máximo ${ALTO_MAXIMO_DEL_ROTULO.toFixed(1)}`);
+      /* Y a lo hondo: el nombre y el pie van en el BLANCO, sin tocar el filete por arriba ni el marco por abajo, y con uno de los dos altos. */
+      if (enMarco.v - l.alto / 2 < vDeRadial(SUPERFICIE.desde) + 1 || enMarco.v + l.alto / 2 > vDeRadial(SUPERFICIE.hasta) - 1) apretados.push(`${String(i)}/${l.letra}: va de v ${(enMarco.v - l.alto / 2).toFixed(1)} a ${(enMarco.v + l.alto / 2).toFixed(1)}, fuera del blanco`);
+      if (Math.abs(l.alto - ALTO_DEL_NOMBRE) > 1e-9 && Math.abs(l.alto - ALTO_DEL_PIE) > 1e-9) apretados.push(`${String(i)}/${l.letra}: alto ${l.alto.toFixed(2)}, que no es ni el del nombre ni el del pie`);
     }
   }
   const letrasLateralesDeclaradas = Array.from({ length: CASILLAS }, (_, i) => i)
     .filter((i) => !ESQUINAS.includes(i))
     .reduce((n, i) => n + [...(ROTULO_DE_LA_CASILLA[i] ?? ''), ...(SUBTITULO_DE_LA_CASILLA[i] ?? '')].filter((c) => c !== ' ').length, 0);
   comprobar(
-    `el margen se ha medido en las ${String(letrasLateralesMiradas)} letras de las casillas laterales —nombres y texto pequeño—, y no en cero`,
+    `el margen se ha medido en las ${String(letrasLateralesMiradas)} letras de las casillas laterales —nombres y pies—, y no en cero`,
     letrasLateralesMiradas === letrasLateralesDeclaradas && letrasLateralesDeclaradas > 0,
     { miradas: letrasLateralesMiradas, declaradas: letrasLateralesDeclaradas },
   );
-  comprobar(`ningún rótulo lateral se mete en el margen del ${String(Math.round(MARGEN_DEL_TEXTO * 100))} % de su casilla`, apretados.length === 0, apretados.slice(0, 4));
+  comprobar(`ningún rótulo lateral se mete en el margen del ${String(Math.round(MARGEN_DEL_TEXTO_EN_LAS_LATERALES * 100))} % de su casilla ni se sale del blanco`, apretados.length === 0, apretados.slice(0, 4));
   /*
    * ── 2 octies. EL TABLERO HABLA COMO EL REGLAMENTO ──
    *
@@ -2600,34 +2671,56 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
     );
   }
 
-  /* Y LOS PRECIOS, con la misma vara: son el otro texto del tablero y no pueden ser la excepción. */
-  const preciosApretados: string[] = [];
-  let digitosMirados = 0;
-  for (let i = 0; i < CASILLAS; i++) {
-    const m = marcoDeCasilla(i);
-    for (const d of guarismosDelPrecio(i)) {
-      digitosMirados++;
-      const enMarco = enElMarco(m, { x: d.x, z: d.z });
-      /* El precio va con SU margen, el 7 %: el 12 % de los nombres lo tiraría por debajo de los dos suelos de píxeles. */
-      const borde = ANCHO_DE_CASILLA / 2 - ANCHO_DE_CASILLA * MARGEN_DEL_PRECIO;
-      if (Math.abs(enMarco.aLoLargo) + ANCHO_DEL_GUARISMO / 2 > borde + 0.001) {
-        preciosApretados.push(`${String(i)}/${d.guarismo}: llega a ${(Math.abs(enMarco.aLoLargo) + ANCHO_DEL_GUARISMO / 2).toFixed(1)} y el margen empieza en ${borde.toFixed(1)}`);
+  /*
+   * La vacuna del margen: el renglón más ancho del tablero tiene que quedarse CORTO del borde, y con
+   * el hueco de antes —los 62 de ancho útil, que era el 86 % de la casilla— no se quedaba.
+   */
+  const renglonesDeLasLaterales = Array.from({ length: CASILLAS }, (_, i) => i)
+    .filter((i) => !ESQUINAS.includes(i))
+    .flatMap((i) => [...renglonesDelNombre(ROTULO_DE_LA_CASILLA[i] ?? '').map((t) => ({ t, alto: ALTO_DEL_NOMBRE })), { t: SUBTITULO_DE_LA_CASILLA[i] ?? '', alto: ALTO_DEL_PIE }]);
+  const elMasAncho = renglonesDeLasLaterales.reduce((a, b) => (anchoDeLaPalabra(b.t, b.alto) > anchoDeLaPalabra(a.t, a.alto) ? b : a));
+  const anchoDelMasAncho = anchoDeLaPalabra(elMasAncho.t, elMasAncho.alto);
+  comprobar(
+    `se ve fallar: «${elMasAncho.t}» mide ${anchoDelMasAncho.toFixed(1)} y cabría en los 62 de antes, pero el margen la deja en ${ANCHO_DEL_ROTULO.toFixed(1)}`,
+    anchoDelMasAncho <= ANCHO_DEL_ROTULO + 0.001 && anchoDelMasAncho > 50 && ANCHO_DEL_ROTULO < 62,
+    { ancho: anchoDelMasAncho, util: ANCHO_DEL_ROTULO },
+  );
+  /*
+   * Y LOS RENGLONES: los menos posibles y, entre ésos, los más iguales. Se comprueba contra todos
+   * los cortes posibles de cada nombre, contados aquí con su propia cuenta.
+   */
+  const malPartidos: string[] = [];
+  for (const [clave, nombre] of Object.entries(ROTULO_DE_LA_CASILLA)) {
+    if (ESQUINAS.includes(Number(clave))) continue;
+    const puestos = renglonesDelNombre(nombre);
+    const palabras = nombre.split(' ');
+    let menos = Infinity;
+    let masIgual = Infinity;
+    for (let cortes = 0; cortes < 1 << (palabras.length - 1); cortes++) {
+      const renglones: string[][] = [[palabras[0] as string]];
+      for (let k = 1; k < palabras.length; k++) {
+        if ((cortes >> (k - 1)) & 1) renglones.push([palabras[k] as string]);
+        else (renglones[renglones.length - 1] as string[]).push(palabras[k] as string);
+      }
+      const anchos = renglones.map((rr) => anchoDeLaPalabra(rr.join(' '), ALTO_DEL_NOMBRE));
+      if (Math.max(...anchos) > ANCHO_DEL_ROTULO + 1e-9) continue;
+      if (renglones.length < menos || (renglones.length === menos && Math.max(...anchos) < masIgual)) {
+        menos = renglones.length;
+        masIgual = Math.max(...anchos);
       }
     }
+    const anchoPuesto = Math.max(...puestos.map((t) => anchoDeLaPalabra(t, ALTO_DEL_NOMBRE)));
+    if (puestos.join(' ') !== nombre || puestos.length !== menos || Math.abs(anchoPuesto - masIgual) > 1e-9) malPartidos.push(`${clave}: ${puestos.join(' / ')}`);
   }
-  comprobar(`y el margen se ha medido también en los ${String(digitosMirados)} dígitos de los precios`, digitosMirados === guarismosDelTablero(), digitosMirados);
-  comprobar('ningún precio se mete en el margen de su casilla', preciosApretados.length === 0, preciosApretados.slice(0, 4));
-
-  /*
-   * La vacuna: la palabra más ancha del tablero tiene que quedarse CORTA del borde, y con el
-   * hueco de antes —los 62 de ancho útil, que era el 86 % de la casilla— no se quedaba.
-   */
-  const laMasAncha = Object.values(ROTULO_DE_LA_CASILLA).reduce((a, b) => (anchoDeLaPalabra(b, altoDelRotulo(b)) > anchoDeLaPalabra(a, altoDelRotulo(a)) ? b : a));
-  const anchoDeLaMasAncha = anchoDeLaPalabra(laMasAncha, altoDelRotulo(laMasAncha));
   comprobar(
-    `se ve fallar: «${laMasAncha}» mide ${anchoDeLaMasAncha.toFixed(1)} y cabría en los 62 de antes, pero el margen la deja en ${ANCHO_DEL_ROTULO.toFixed(1)}`,
-    anchoDeLaMasAncha <= ANCHO_DEL_ROTULO + 0.001 && ANCHO_DEL_ROTULO < 62,
-    { ancho: anchoDeLaMasAncha, util: ANCHO_DEL_ROTULO },
+    'cada nombre va en los menos renglones que caben y, con ésos, en los más iguales; sin perder ni una palabra',
+    malPartidos.length === 0 && renglonesDelNombre('IMPUESTO SOBRE EL CAPITAL').length === 3 && renglonesDelNombre('CALLEJÓN DE LAS LATAS').join(' / ') === 'CALLEJÓN DE / LAS LATAS',
+    { malPartidos, impuesto: renglonesDelNombre('IMPUESTO SOBRE EL CAPITAL'), latas: renglonesDelNombre('CALLEJÓN DE LAS LATAS') },
+  );
+  comprobar(
+    `y el nombre acaba por encima de su pie con sitio para la obra: el más hondo, el de la 4, acaba en v ${r(vDelFinalDelNombre(4))}`,
+    Array.from({ length: CASILLAS }, (_, i) => i).filter((i) => !ESQUINAS.includes(i)).every((i) => vDelFinalDelNombre(i) + 20 < V_DEL_PIE - ALTO_DEL_PIE) && Math.abs(PASO_DEL_NOMBRE - 1.5 * ALTO_DEL_NOMBRE) < 1e-9,
+    Array.from({ length: CASILLAS }, (_, i) => i).filter((i) => !ESQUINAS.includes(i)).map((i) => r(vDelFinalDelNombre(i))),
   );
 
   comprobar('el rótulo de una esquina cabe entero en el rombo de su suelo, letra a letra y por sus cuatro picos', seSalen.length === 0, seSalen.slice(0, 4));
@@ -3435,8 +3528,8 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
         recorrer((u) => ({ v: monedaEnLaEscalinata(u).v, y: radio }), oficina.peldanos).hundida.length > 0,
       );
       comprobar(
-        'se ve fallar: con los peldaños de antes, que acababan en 66, el último tramo antes de la puerta va por el aire',
-        recorrer((u) => monedaEnLaEscalinata(u), oficina.peldanos.map((p) => ({ ...p, v1: 66 }))).flotando.length > 0,
+        'se ve fallar: con los peldaños de antes, que acababan cuatro antes de la fachada, el último tramo antes de la puerta va por el aire',
+        recorrer((u) => monedaEnLaEscalinata(u), oficina.peldanos.map((p) => ({ ...p, v1: oficina.cuerpo.v0 - 4 }))).flotando.length > 0,
       );
       /* Las columnas y la puerta: la moneda es un disco de grueso `grueso` centrado en `u = 0`. */
       const medioGrueso = grueso / 2;
@@ -3456,8 +3549,8 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
         { borde: r(alFinal.v - radio), fachada: oficina.cuerpo.v0 },
       );
       comprobar(
-        `empieza en el suelo y sin pisar el precio: su borde en ${coma(alPrincipio.v - radio)}, y el precio acaba en ${coma(V_DEL_PRECIO + ALTO_DEL_GUARISMO / 2)}`,
-        Math.abs(alPrincipio.y - radio) < 1e-9 && alPrincipio.v - radio >= V_DEL_PRECIO + ALTO_DEL_GUARISMO / 2 && Math.abs(RECORRIDO_DE_LA_MONEDA.desde - alPrincipio.v) < 1e-9,
+        `empieza en el suelo y sin pisar el nombre: su borde en ${coma(alPrincipio.v - radio)}, y el nombre acaba en ${coma(vDelFinalDelNombre(CASILLA_DE_LA_OFICINA))}`,
+        Math.abs(alPrincipio.y - radio) < 1e-9 && alPrincipio.v - radio >= vDelFinalDelNombre(CASILLA_DE_LA_OFICINA) + HUECO_ENTRE_RENGLONES && Math.abs(RECORRIDO_DE_LA_MONEDA.desde - alPrincipio.v) < 1e-9,
       );
       comprobar(
         'rueda sin deslizar: lo girado crece siempre y al final es lo andado por el eje entre el radio, más que la distancia en llano',
@@ -3734,16 +3827,16 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
 
   comprobar('y avanza hacia −(fuera + adelante), que es la derecha de quien mira una esquina desde su diagonal', delRevesEnEsquina.length === 0, delRevesEnEsquina);
   /*
-   * LAS DOS VACUNAS. La primera es la palabra que NO cabe: `altoDelRotulo` tiene que encogerla
+   * LAS DOS VACUNAS. La primera es la palabra que NO cabe: `altoDelRotuloDeEsquina` tiene que encogerla
    * hasta que `ancho + alto` quepa en la diagonal, y si alguien vuelve a escribir la cuenta con
    * el lado, una palabra larga se sale. La segunda es que la regla de arriba sepa ver un rombo
    * desbordado, con la misma cuenta y un alto imposible.
    */
   const larga = 'ESTACIONAMIENTO';
-  const altoLargo = altoDelRotulo(larga, true);
+  const altoLargo = altoDelRotuloDeEsquina(larga);
   comprobar(
     `se ve fallar: «${larga}» se encoge a ${altoLargo.toFixed(1)} para que ancho + alto quepan en la diagonal`,
-    anchoDeLaPalabra(larga, altoLargo) + altoLargo <= LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2 && altoLargo < altoDelRotulo('SALIDA', true),
+    anchoDeLaPalabra(larga, altoLargo) + altoLargo <= LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2 && altoLargo < altoDelRotuloDeEsquina('SALIDA'),
     { alto: altoLargo, ancho: anchoDeLaPalabra(larga, altoLargo) },
   );
   comprobar('y se ve fallar la otra: una letra de 60 de alto en el centro desborda el rombo y la cuenta lo dice', 60 / Math.SQRT2 + 60 / Math.SQRT2 > medioRombo);

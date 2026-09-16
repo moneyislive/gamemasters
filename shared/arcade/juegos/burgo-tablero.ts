@@ -102,7 +102,7 @@ export interface CasillaDelBurgo {
   readonly rotulo: string;
   /** Sólo en 'solar'. */
   readonly barrio: BarrioId | null;
-  /** 0 si no se compra; el Impuesto y la Tasa llevan aquí lo que cobran. */
+  /** 0 si no se compra; los dos impuestos llevan aquí lo que cobran. */
   readonly precio: number;
   /** solar/1/2/3/4/hotel; [0,0,0,0,0,0] en las demás. */
   readonly rentas: RentasDeSolar;
@@ -158,43 +158,43 @@ export const PRECIO_DE_OFICIO = 150;
 export const CASILLAS: readonly CasillaDelBurgo[] = [
   suelo(0, 'salida', 'La Salida', 'Salida'),
   solar(1, 'Callejón de las Latas', 'Latas', 'pardo', 60, [2, 10, 30, 90, 160, 250], 50),
-  suelo(2, 'arca', 'El Fondo Vecinal', 'Fondo'),
+  suelo(2, 'arca', 'La Caja de Comunidad', 'Caja'),
   solar(3, 'Pasaje de los Charcos', 'Charco', 'pardo', 60, [4, 20, 60, 180, 320, 450], 50),
-  suelo(4, 'diezmo', 'El Impuesto', 'Fisco', EL_DIEZMO),
-  suelo(5, 'puerta', 'Estación del Puerto', 'Puerto', PRECIO_DE_PUERTA),
+  suelo(4, 'diezmo', 'El Impuesto sobre el Capital', 'Fisco', EL_DIEZMO),
+  suelo(5, 'puerta', 'Estación de Goya', 'Goya', PRECIO_DE_PUERTA),
   solar(6, 'Calle de los Talleres', 'Taller', 'celeste', 100, [6, 30, 90, 270, 400, 550], 50),
-  suelo(7, 'pregon', 'Sucesos', 'Suceso'),
+  suelo(7, 'pregon', 'Suerte', 'Suerte'),
   solar(8, 'Calle de la Imprenta', 'Tinta', 'celeste', 100, [6, 30, 90, 270, 400, 550], 50),
   solar(9, 'Calle de las Grúas', 'Grúas', 'celeste', 120, [8, 40, 100, 300, 450, 600], 50),
   suelo(10, 'mazmorra', 'La Comisaría', 'Visita'),
   solar(11, 'Calle de la Frutería', 'Fruta', 'rosa', 140, [10, 50, 150, 450, 625, 750], 100),
-  suelo(12, 'oficio', 'La Central Eléctrica', 'Luz', PRECIO_DE_OFICIO),
+  suelo(12, 'oficio', 'La Compañía de Electricidad', 'Luz', PRECIO_DE_OFICIO),
   solar(13, 'Calle de la Ferretería', 'Tuerca', 'rosa', 140, [10, 50, 150, 450, 625, 750], 100),
   solar(14, 'Plaza del Mercadillo', 'Puesto', 'rosa', 160, [12, 60, 180, 500, 700, 900], 100),
-  suelo(15, 'puerta', 'Estación de Autobuses', 'Buses', PRECIO_DE_PUERTA),
+  suelo(15, 'puerta', 'Estación de Delicias', 'Delic.', PRECIO_DE_PUERTA),
   solar(16, 'Calle de los Balcones', 'Balcón', 'naranja', 180, [14, 70, 200, 550, 750, 950], 100),
-  suelo(17, 'arca', 'El Fondo Vecinal', 'Fondo'),
+  suelo(17, 'arca', 'La Caja de Comunidad', 'Caja'),
   solar(18, 'Calle de los Garajes', 'Garaje', 'naranja', 180, [14, 70, 200, 550, 750, 950], 100),
   solar(19, 'Calle del Semáforo', 'Ámbar', 'naranja', 200, [16, 80, 220, 600, 800, 1000], 100),
   suelo(20, 'feria', 'El Descanso', 'Pausa'),
   solar(21, 'Calle de los Cines', 'Cine', 'rojo', 220, [18, 90, 250, 700, 875, 1050], 150),
-  suelo(22, 'pregon', 'Sucesos', 'Suceso'),
+  suelo(22, 'pregon', 'Suerte', 'Suerte'),
   solar(23, 'Plaza del Ayuntamiento', 'Plaza', 'rojo', 220, [18, 90, 250, 700, 875, 1050], 150),
   solar(24, 'Calle del Teatro', 'Teatro', 'rojo', 240, [20, 100, 300, 750, 925, 1100], 150),
-  suelo(25, 'puerta', 'Estación de Mercancías', 'Carga', PRECIO_DE_PUERTA),
+  suelo(25, 'puerta', 'Estación del Mediodía', 'Medio.', PRECIO_DE_PUERTA),
   solar(26, 'Calle del Cristal', 'Vidrio', 'amarillo', 260, [22, 110, 330, 800, 975, 1150], 150),
   solar(27, 'Calle de las Antenas', 'Antena', 'amarillo', 260, [22, 110, 330, 800, 975, 1150], 150),
-  suelo(28, 'oficio', 'El Canal de Aguas', 'Agua', PRECIO_DE_OFICIO),
+  suelo(28, 'oficio', 'La Compañía de Aguas', 'Aguas', PRECIO_DE_OFICIO),
   solar(29, 'Calle de la Bolsa', 'Bolsa', 'amarillo', 280, [24, 120, 360, 850, 1025, 1200], 150),
   suelo(30, 'a-la-mazmorra', '¡A comisaría!', 'Cepo'),
   solar(31, 'Calle del Hospital', 'Salud', 'verde', 300, [26, 130, 390, 900, 1100, 1275], 200),
   solar(32, 'Calle de la Biblioteca', 'Libros', 'verde', 300, [26, 130, 390, 900, 1100, 1275], 200),
-  suelo(33, 'arca', 'El Fondo Vecinal', 'Fondo'),
+  suelo(33, 'arca', 'La Caja de Comunidad', 'Caja'),
   solar(34, 'Calle de los Jardines', 'Jardín', 'verde', 320, [28, 150, 450, 1000, 1200, 1400], 200),
-  suelo(35, 'puerta', 'Estación Central', 'Tren', PRECIO_DE_PUERTA),
-  suelo(36, 'pregon', 'Sucesos', 'Suceso'),
+  suelo(35, 'puerta', 'Estación del Norte', 'Norte', PRECIO_DE_PUERTA),
+  suelo(36, 'pregon', 'Suerte', 'Suerte'),
   solar(37, 'Paseo de los Tilos', 'Tilos', 'azul', 350, [35, 175, 500, 1100, 1300, 1500], 200),
-  suelo(38, 'alcabala', 'La Tasa', 'Tasa', LA_ALCABALA),
+  suelo(38, 'alcabala', 'El Impuesto de Lujo', 'Lujo', LA_ALCABALA),
   solar(39, 'Avenida de las Acacias', 'Acacia', 'azul', 400, [50, 200, 600, 1400, 1700, 2000], 200),
 ];
 
@@ -326,7 +326,7 @@ function arca(numero: number, titulo: string, texto: string, efecto: EfectoDeCar
   return { numero, mazo: 'arca', titulo, texto, efecto };
 }
 
-/** Las dieciséis de Sucesos, del reglamento §11, con texto propio. */
+/** Las dieciséis de Suerte, del reglamento §11, con texto propio. */
 export const EL_PREGON: readonly CartaDelBurgo[] = [
   pregon(1, 'A la Salida', 'Avanza hasta la Salida. Cobra 200 €.', { que: 'ir', a: 0, cobraAlPasar: true }),
   pregon(2, 'Al Paseo de los Tilos', 'Avanza hasta el Paseo de los Tilos. Si pasas la Salida, cobra 200 €.', {
@@ -344,7 +344,7 @@ export const EL_PREGON: readonly CartaDelBurgo[] = [
     a: 11,
     cobraAlPasar: true,
   }),
-  pregon(5, 'A la Estación del Puerto', 'Avanza hasta la Estación del Puerto. Si pasas la Salida, cobra 200 €.', {
+  pregon(5, 'A la Estación de Goya', 'Avanza hasta la Estación de Goya. Si pasas la Salida, cobra 200 €.', {
     que: 'ir',
     a: 5,
     cobraAlPasar: true,
@@ -379,7 +379,7 @@ export const EL_PREGON: readonly CartaDelBurgo[] = [
     porPosada: 100,
   }),
   pregon(14, 'Multa de tráfico', 'Paga una multa de 15 € por aparcar en doble fila.', { que: 'paga', cuanto: 15 }),
-  pregon(15, 'Viaje a la Estación Central', 'Viaja hasta la Estación Central. Si pasas la Salida, cobra 200 €.', {
+  pregon(15, 'Viaje a la Estación del Norte', 'Viaja hasta la Estación del Norte. Si pasas la Salida, cobra 200 €.', {
     que: 'ir',
     a: 35,
     cobraAlPasar: true,
@@ -387,7 +387,7 @@ export const EL_PREGON: readonly CartaDelBurgo[] = [
   pregon(16, 'Presides la comunidad', 'Te eligen presidente de la comunidad: paga 50 € a cada jugador.', { que: 'paga-a-cada-uno', cuanto: 50 }),
 ];
 
-/** Las dieciséis del Fondo Vecinal, del reglamento §11, con texto propio. */
+/** Las dieciséis de la Caja de Comunidad, del reglamento §11, con texto propio. */
 export const EL_ARCA: readonly CartaDelBurgo[] = [
   arca(1, 'A la Salida', 'Avanza hasta la Salida. Cobra 200 €.', { que: 'ir', a: 0, cobraAlPasar: true }),
   arca(2, 'Error del Ayuntamiento', 'Error del Ayuntamiento a tu favor: cobra 200 €.', { que: 'cobra', cuanto: 200 }),
@@ -399,7 +399,7 @@ export const EL_ARCA: readonly CartaDelBurgo[] = [
   }),
   arca(7, 'Fiestas del barrio', 'Fiestas del barrio: cada jugador te paga 10 €.', { que: 'cobra-de-cada-uno', cuanto: 10 }),
   arca(8, 'Te toca la lotería', 'Te toca un pellizco de la lotería: cobra 100 €.', { que: 'cobra', cuanto: 100 }),
-  arca(9, 'Devolución de la Tasa', 'Te devuelven la Tasa: cobra 20 €.', { que: 'cobra', cuanto: 20 }),
+  arca(9, 'Devolución de impuestos', 'El Ayuntamiento te devuelve impuestos: cobra 20 €.', { que: 'cobra', cuanto: 20 }),
   arca(10, 'Es tu cumpleaños', 'Es tu cumpleaños: cada jugador te paga 10 €.', { que: 'cobra-de-cada-uno', cuanto: 10 }),
   arca(11, 'Vence el seguro', 'Vence tu seguro de vida: cobra 100 €.', { que: 'cobra', cuanto: 100 }),
   arca(12, 'Urgencias', 'Paga 100 € en urgencias.', { que: 'paga', cuanto: 100 }),

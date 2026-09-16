@@ -196,7 +196,7 @@
 import { medioLado, sitioDeCasilla as sitioEnElAnillo, casillasDelAnillo } from '../../shared/mecanicas/anillo';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import { sorteo } from '../embarcadero/cala';
-import { ALTO_DE_LA_LETRA, AVANCE_DEL_GUARISMO, AVANCE_DE_LA_LETRA, CAJA_DEL_GUARISMO } from '../iconos';
+import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { PIEZA, RETICULA_DE_LA_CIUDAD } from './piezas';
 import type { NombreDePieza } from './piezas';
 
@@ -249,7 +249,6 @@ export function radialDeV(v: number): number {
 export const V_DE_LAS_CASAS = 10.5;
 export const V_DE_LA_BANDERA = 15;
 export const V_DE_LOS_PEONES = vDeRadial(LINEA_DE_LA_MARCHA); // 25,5
-export const V_DEL_PRECIO = 45;
 
 /** La banda del atrezo: la mitad exterior de la superficie, sin pisar el marco (ver la cabecera). */
 export const ATREZO = { desde: 60, hasta: 90, centro: 75 } as const;
@@ -538,51 +537,7 @@ export function huecoDeBandera(casilla: number): Punto {
   return puntoEnLaCasillaPorV(marcoDeCasilla(casilla), HUECO_DE_LA_BANDERA.u, HUECO_DE_LA_BANDERA.v);
 }
 
-/* ─────────────────────────── El precio, en dígitos ─────────────────────────── */
-
-/**
- * EL PRECIO SE LEE, Y ESO SE MIDIÓ.
- *
- * En el lienzo no hay texto: el precio son CONTORNOS compilados (`escenas/iconos.ts`,
- * `CONTORNOS_DEL_GUARISMO`), que se normalizan TODOS por `CAJA_DEL_GUARISMO` —no por la
- * caja de cada uno, o el `1` saldría tan ancho como el `8`— y se separan
- * `AVANCE_DEL_GUARISMO`.
- *
- * EL ALTO SE MULTIPLICA POR 2,25 CON LA CASILLA, Y ÉSA ES TODA LA RAZÓN. Un tablero 2,25
- * veces más grande se ve 2,25 veces más pequeño en la misma pantalla: un dígito que no
- * creciera perdería exactamente los píxeles que el tablero gana en unidades. 12 × 2,25 = 27.
- *
- * A 27 de alto: 20,25 de ancho, 22,95 de avance, y tres dígitos ocupan 66,15 de los 72 de la
- * casilla, con 2,93 de margen a cada lado (a 28 ya se quedan en 1,7 y a 30 no caben). Los
- * píxeles medidos con `proyecta` desde la pose de salida salen IGUALES que antes —16,3 px en
- * un PC 16:9, 9,9 en una tableta 3:4 y 5,0 en el móvil de 9:19,5 con el lienzo al 58 %—
- * porque el cociente `alto / alcance` no ha cambiado: 27/570,24 = 12/253,44. Y al seguir al
- * que mueve (cercanía 0,42), que es cuando de verdad se lee, el dígito pasa de 16 px en el
- * móvil. `verify:burgo-escena` vuelve a proyectar las dos medidas en las tres ventanas.
- */
-/**
- * ═══ Y EL DÍGITO BAJA DE 27 A 25, QUE ES TODO LO QUE EL MARGEN PUEDE PEDIRLE ═══
- *
- * El precio es el único texto del tablero que NO puede encoger libremente: su alto sale de una
- * medida —a cuántos píxeles se ve en las tres ventanas— y tiene dos suelos comprobados, 4,5 px
- * desde la pose de salida y 15 px a la cercanía de seguimiento, que es donde de verdad se lee.
- *
- * Y a 27 no hay margen que valga: tres dígitos miden 66,15 de los 72, y aunque se JUNTARAN hasta
- * tocarse seguirían midiendo 60,75. El 12 % del tablero (54,7) pide bajar el dígito a 22,3, y ahí
- * el móvil cae a 4,1 px de salida y 13,7 al seguir: por debajo de los dos suelos.
- *
- * Así que se baja hasta donde se puede sin romper ninguno: **25**. Tres dígitos pasan de 66,15 a
- * 61,25 y el margen de 2,93 a 5,38 a cada lado —del 4 % al 7,5 %—, con el móvil en 4,63 px de
- * salida y 15,4 al seguir. Si algún día se decide que la pose de salida no tiene que leerse en el
- * móvil —el documento ya dice que ahí el precio es «una mancha de tres cifras»—, este número
- * puede bajar a 22,3 y el precio tendrá el mismo 12 % que los nombres. Es una decisión de Miguel,
- * no una cuenta.
- */
-export const ALTO_DEL_GUARISMO = 25;
-/** Lo que el precio deja libre a cada lado con ese alto: el 7,5 %, y es el máximo que permite. */
-export const MARGEN_DEL_PRECIO = 0.07;
-export const ANCHO_DEL_GUARISMO = (ALTO_DEL_GUARISMO * CAJA_DEL_GUARISMO.ancho) / CAJA_DEL_GUARISMO.alto;
-export const AVANCE_DEL_PRECIO = (ALTO_DEL_GUARISMO * AVANCE_DEL_GUARISMO) / CAJA_DEL_GUARISMO.alto;
+/* ─────────────────────────── El precio, del reglamento ─────────────────────────── */
 
 /**
  * LO QUE CUESTA CADA CASILLA, COPIADO DEL REGLAMENTO Y VIGILADO.
@@ -595,9 +550,9 @@ export const AVANCE_DEL_PRECIO = (ALTO_DEL_GUARISMO * AVANCE_DEL_GUARISMO) / CAJ
  * (el comprobador SÍ puede importar `shared/`, como hace `verificar-escena.ts`): una
  * divergencia se ve caer en la batería, no en la mesa.
  *
- * Un 0 quiere decir «esta casilla no lleva cifra»: las tres Arcas, los tres Pregones y las
- * cuatro esquinas. El Diezmo y la Alcabala no son títulos pero sí llevan cifra —lo que
- * cobran— y usan el mismo hueco.
+ * Un 0 quiere decir «esta casilla no lleva cifra»: las tres Cajas de Comunidad, las tres Suertes
+ * y las cuatro esquinas. Los dos impuestos no son títulos pero sí llevan cifra —lo que cobran—, y
+ * la escriben en su pie como lo que se PAGA y no como lo que cuesta.
  */
 export const PRECIO_DE_LA_CASILLA: readonly number[] = [
   0, 60, 0, 60, 200, 200, 100, 0, 100, 120, // 0..9
@@ -606,109 +561,71 @@ export const PRECIO_DE_LA_CASILLA: readonly number[] = [
   0, 300, 300, 0, 320, 200, 0, 350, 100, 400, // 30..39
 ];
 
-/** Un guarismo puesto en el tablero: el contorno que toca, dónde y de qué talla. */
-export interface GuarismoEnElTablero {
-  readonly guarismo: string;
-  readonly x: number;
-  readonly z: number;
-  /** El `rotation.y` con el que el contorno se lee desde fuera del anillo. */
-  readonly giro: number;
-  readonly alto: number;
-}
+/** Las seis casillas que mandan coger carta: las tres Cajas de Comunidad y las tres Suertes. */
+export const CASILLAS_DE_CARTA: readonly number[] = [2, 7, 17, 22, 33, 36];
+export const CASILLA_DEL_IMPUESTO_SOBRE_EL_CAPITAL = 4;
+export const CASILLA_DEL_IMPUESTO_DE_LUJO = 38;
+/** La parte del patrimonio que el Impuesto sobre el Capital admite en vez de la cifra: la del reglamento, vigilada. */
+export const POR_CIENTO_DEL_IMPUESTO = 10;
 
-/** Los dígitos del precio de una casilla, ya en el mundo. Vacío si la casilla no lleva cifra. */
-export function guarismosDelPrecio(casilla: number): GuarismoEnElTablero[] {
-  const m = marcoDeCasilla(casilla);
-  const precio = PRECIO_DE_LA_CASILLA[m.indice] ?? 0;
-  if (m.esEsquina || precio <= 0) return [];
-  const cifras = String(precio).split('');
-  const ancho = (cifras.length - 1) * AVANCE_DEL_PRECIO;
-  const giro = giroHaciaDentro(m);
-  /*
-   * LOS DÍGITOS SE ESCRIBEN HACIA −`adelante`, Y NO ES UN CAPRICHO: ES DÓNDE ESTÁ QUIEN LEE.
-   *
-   * Un rótulo TUMBADO se lee desde FUERA del anillo, que es donde está la cámara. Para un ojo
-   * puesto en `+fuera` mirando al centro, el «arriba» de la pantalla proyectado en el suelo es
-   * `−fuera` y la «derecha» es `−adelante` (el producto vectorial, con `adelante = unCuarto(fuera)`).
-   * Escribirlos hacia `+adelante` —que es lo que hacía la primera versión— sale ESPEJADO: en el
-   * banco el 60 se leía «06» y el 400 «004», y eso no parece un fallo de orientación sino una
-   * fuente rara. Se vio mirando, y por eso `verify:burgo-escena` lo mide ahora con el producto
-   * vectorial y no con los ojos.
-   */
-  return cifras.map((guarismo, k) => {
-    const p = puntoEnLaCasillaPorV(m, ancho / 2 - k * AVANCE_DEL_PRECIO, V_DEL_PRECIO);
-    return { guarismo, x: p.x, z: p.z, giro, alto: ALTO_DEL_GUARISMO };
-  });
-}
-
-/** Lo que ocupa el precio de una casilla a lo largo de `u`: `(cifras − 1) · avance + ancho`. */
-export function anchoDelPrecio(casilla: number): number {
-  const precio = PRECIO_DE_LA_CASILLA[marcoDeCasilla(casilla).indice] ?? 0;
-  if (precio <= 0) return 0;
-  return (String(precio).length - 1) * AVANCE_DEL_PRECIO + ANCHO_DEL_GUARISMO;
+/**
+ * Una cantidad en euros, como la escribe el reglamento (`maravedies` de `burgo.ts`, que la escena no
+ * puede importar): el millar con punto y el símbolo detrás, separado. A mano, sin `toLocaleString`
+ * —la app corre en Hermes, y el separador de un locale no es algo que dos motores tengan que dar
+ * igual— y sin expresión regular, igual que allí. `verify:burgo-escena` compara las dos.
+ */
+export function enEuros(cantidad: number): string {
+  let entero = String(Math.trunc(Math.abs(cantidad)));
+  let cola = '';
+  while (entero.length > 3) {
+    cola = `.${entero.slice(entero.length - 3)}${cola}`;
+    entero = entero.slice(0, entero.length - 3);
+  }
+  return `${cantidad < 0 ? '-' : ''}${entero}${cola} €`;
 }
 
 /* ─────────────────────────────── Los rótulos ─────────────────────────────── */
 
 /**
- * ═══ EL NOMBRE DE UNA CASILLA QUE NO SE COMPRA, SOBRE LA FRANJA ═══
+ * ═══ EL NOMBRE ARRIBA Y EL PRECIO ABAJO, COMO EN EL TABLERO DE MESA ═══
  *
- * Las especiales se leían por un emblema y poco más: el Arca era un contenedor, el Pregón una
- * papelera, el Diezmo ni eso. Con el alfabeto del tablero pueden llevar su NOMBRE, que es lo que
- * un tablero de mesa hace desde siempre.
+ * Lo pidió Miguel con una foto del tablero de toda la vida delante: «cambiar los números enormes
+ * de las casillas de propiedades por el contenido que se puede ver en la imagen … en la parte de
+ * arriba de la celda blanca (no en el margen de color) arriba el nombre de la propiedad y abajo el
+ * precio de la propiedad, ambos centrados … poniendo el precio un poco más grande para que se vea
+ * bien, siendo ligeramente más pequeño que el nombre». Y para las demás casillas laterales, lo
+ * mismo: el nombre arriba del blanco, «con un tamaño de fuente similar al resto aunque el nombre
+ * sea más corto», y lo que tengan de precio, abajo.
  *
- * ═══ VA EN LA FRANJA, Y NO EN LA SUPERFICIE, PORQUE ES EL ÚNICO SITIO LIBRE ═══
+ * Así que una casilla lateral se lee ahora de dentro afuera, que es de arriba abajo para quien la
+ * mira desde fuera del anillo: la FRANJA de color (0..21) con sus casas, el FILETE por el que se
+ * anda (21..30), y la SUPERFICIE blanca (30..90) con el NOMBRE arriba, la obra en medio si la hay,
+ * y el PIE abajo —el precio, lo que se paga o «COGE CARTA»—.
  *
- * La superficie (`v` 30..90) está repartida: el precio ocupa de 31,5 a 58,5 y el atrezo de 60 a
- * 90. No cabe un renglón más sin quitarle sitio a uno de los dos. La FRANJA (0..21) sí está
- * libre en estas casillas: es donde van las casas, y una casilla que no se compra no tiene
- * casas. Es además donde el tablero de verdad pone el nombre, pegado al color.
+ * ═══ UN SOLO ALTO PARA TODOS LOS NOMBRES ═══
  *
- * Y por eso lleva su propia alza: la franja está subida `ALTURA_DEL_REBORDE` (0,6) y el rótulo
- * de la superficie se posa a 0,08, así que unas letras puestas ahí quedarían ENTERRADAS dentro
- * del reborde sin que fallara nada en pantalla.
+ * Antes cada rótulo crecía hasta llenar su hueco, y «LUZ» salía gigante al lado de «IMPUESTO». El
+ * alto es ahora UNO, el de la palabra más ancha de todas las laterales puesta en el ancho útil
+ * (`ANCHO_DEL_ROTULO`): los nombres parten en renglones por palabras, pero una palabra no se parte,
+ * así que es la más ancha la que manda. Hoy es AYUNTAMIENTO. El pie va un 10 % más bajo.
  *
- * ═══ Y LA TALLA LA PONE LA PALABRA, NO UNA CONSTANTE ═══
- *
- * La casilla mide 72 de ancho. Con una talla fija, o los nombres cortos salen enanos o los
- * largos se salen — y salirse no falla: se monta sobre la casilla vecina. Así que se calcula la
- * talla con la que la palabra cabe en `ANCHO_DEL_ROTULO`, con el techo de
- * `ALTO_MAXIMO_DEL_ROTULO` para que «LUZ» no salga gigante.
- *
- * Los anchos son los del TIPO, uno por glifo, así que «IMPUESTO» ocupa lo que de verdad ocupa y
- * no ocho veces la letra más ancha.
- */
-/**
- * EL MARGEN DEL TEXTO, QUE ES UNA REGLA DE TODO EL TABLERO Y NO DE UNA CASILLA.
+ * ═══ EL MARGEN DEL TEXTO ═══
  *
  * Lo pidió Miguel viendo el tablero: «los textos tienen que tener un margen para que queden
- * estéticos, ahora mismo ocupan de extremo a extremo sin margen tanto en las casillas como en los
- * títulos». Y tenía que pasar por cómo estaba escrito: el alto de un rótulo se calcula para LLENAR
- * el hueco —`min(techo, hueco / anchoPorUnidad)`—, así que toda palabra que no llegue al techo
- * sale TOCANDO los dos bordes por definición. Y un renglón que toca el borde no parece grande:
- * parece apretado, que es lo contrario de lo que se buscaba al hacerlo crecer.
- *
- * Así que el hueco deja de ser el trozo libre y pasa a ser el trozo libre MENOS el margen. Un
- * mismo número para todo el tablero —el 12 % de lo que mida el hueco, a cada lado—, y de ahí
- * salen los tres anchos útiles: 54,7 de los 72 de una casilla, 15,9 de los 21 de su franja y 96,7
- * de los 127,3 de la diagonal de una esquina.
- *
- * ═══ LO QUE ESTE MARGEN NO TOCA, Y POR QUÉ ═══
- *
- * El ALTO DEL PRECIO (27) no sale de aquí: sale de una medida de legibilidad —a cuántos píxeles
- * se ve un dígito en las tres ventanas, `LA-CIUDAD.md` §2— y encogerlo al 76 % lo dejaría en 20,5
- * y por debajo del suelo que se midió para el móvil. Su margen ya lo cumple de sobra por el otro
- * lado: un precio de tres cifras mide 49,7 de los 72, o sea el 15 % libre a cada lado.
+ * estéticos, ahora mismo ocupan de extremo a extremo». En una ESQUINA es el 12 % de la diagonal a
+ * cada lado (96,7 de los 127,3). En una LATERAL es el 8 % de la casilla (60,5 de los 72): con un solo
+ * alto para los treinta y seis nombres, cada punto de margen es un punto de letra para todos, y al 12
+ * % el nombre se quedaba en 4,3 y el pie en 3,7 —10,9 y 8,3 px siguiendo al que mueve en un PC—.
+ * Al 8 % siguen quedando casi 6 a cada lado, que es más que el alto de una letra.
  */
 export const MARGEN_DEL_TEXTO = 0.12;
-/** El centro de la franja, que es donde va el nombre: 21 de banda, 10,5 de eje. */
-export const V_DEL_ROTULO = BANDA.franja / 2;
-export const ALTO_MAXIMO_DEL_ROTULO = BANDA.franja * (1 - 2 * MARGEN_DEL_TEXTO);
-export const ANCHO_DEL_ROTULO = ANCHO_DE_CASILLA * (1 - 2 * MARGEN_DEL_TEXTO);
+export const MARGEN_DEL_TEXTO_EN_LAS_LATERALES = 0.08;
+export const ANCHO_DEL_ROTULO = ANCHO_DE_CASILLA * (1 - 2 * MARGEN_DEL_TEXTO_EN_LAS_LATERALES);
 /** Lo que se alza un rótulo sobre la SUPERFICIE de su casilla, para no pelearse en profundidad. */
 export const ALZA_DEL_ROTULO = 0.08;
-/** Sobre el reborde de la franja (0,6), que es lo más alto que el rótulo tiene debajo. */
-export const ALZA_DEL_ROTULO_EN_LA_FRANJA = 0.7;
+/** Dónde empieza el nombre —el canto de arriba de su primer renglón— y dónde acaba el pie, en `v`: a 3 del blanco. */
+export const V_DEL_NOMBRE = vDeRadial(SUPERFICIE.desde) + 3;
+export const V_DEL_PIE = vDeRadial(SUPERFICIE.hasta) - 3;
 
 /**
  * EL RÓTULO DE UNA ESQUINA NO VA EN NINGUNA FRANJA: VA EN DIAGONAL, Y SOBRE TODO EL SUELO.
@@ -746,47 +663,163 @@ export function anchoDeLaPalabra(palabra: string, alto: number): number {
   return ancho;
 }
 
-/** El alto al que hay que poner esta palabra para que quepa en la casilla —o en la diagonal de una esquina—. */
-export function altoDelRotulo(palabra: string, esEsquina = false): number {
+/** El alto al que va el nombre de una ESQUINA para que quepa en la diagonal de su cuadro. */
+export function altoDelRotuloDeEsquina(palabra: string): number {
   if (palabra.length === 0) return 0;
   const porUnidadDeAlto = anchoDeLaPalabra(palabra, ALTO_DE_LA_LETRA) / ALTO_DE_LA_LETRA;
   /* En una esquina manda `W + h ≤ diagonal`, o sea `h (ancho por unidad + 1) ≤ diagonal`. */
-  if (esEsquina) return Math.min(ALTO_MAXIMO_DEL_ROTULO_DE_ESQUINA, DIAGONAL_DEL_ROTULO_DE_ESQUINA / (porUnidadDeAlto + 1));
-  return Math.min(ALTO_MAXIMO_DEL_ROTULO, ANCHO_DEL_ROTULO / porUnidadDeAlto);
+  return Math.min(ALTO_MAXIMO_DEL_ROTULO_DE_ESQUINA, DIAGONAL_DEL_ROTULO_DE_ESQUINA / (porUnidadDeAlto + 1));
 }
 
 /**
- * EL NOMBRE DE CADA CASILLA ESPECIAL, en corto y en mayúsculas.
+ * EL NOMBRE DE CADA CASILLA, en mayúsculas.
  *
- * Cortos porque la casilla mide 72 y cada letra de más encoge a todas las demás. El nombre largo
- * —«el Fondo Vecinal», «la Central Eléctrica»— sigue donde siempre se ha leído: en la hoja y en
- * el cartel del pie, que tienen texto de verdad y no tres píxeles de tinta.
+ * Las ESQUINAS llevan su nombre corto del reglamento, en la diagonal. Las LATERALES, el nombre
+ * entero, sin el artículo —«CAJA DE COMUNIDAD» de «La Caja de Comunidad»—, que es como lo escribe
+ * un tablero de mesa. `verify:burgo-escena` compara cada uno con el reglamento: tiene que ser su
+ * rótulo o un trozo de su nombre, no una palabra nueva.
  *
- * Las cuatro ESTACIONES entraron tarde: estos nombres nacieron al quitar los emblemas planos de
- * las casillas especiales, y las estaciones nunca llevaron emblema —llevaban su atrezo—, así que
- * se quedaron sin nombre en el suelo cuando todas las demás lo tenían. Llevan su rótulo del
- * reglamento, como la Luz y el Agua, en la franja, que su obra deja libre (va de 76 a 107).
+ * Los de las casillas especiales cambiaron el 16 de septiembre de 2026 por decisión de Miguel, que
+ * quiso los del tablero clásico tal cual («úsalos tal cual»): CAJA DE COMUNIDAD, IMPUESTO SOBRE
+ * EL CAPITAL, SUERTE, COMPAÑÍA DE ELECTRICIDAD, COMPAÑÍA DE AGUAS, IMPUESTO DE LUJO y las cuatro
+ * estaciones de GOYA, DELICIAS, MEDIODÍA y NORTE. Se le avisó antes de que el §0.2 del reglamento
+ * prohibía justamente eso; el reglamento está cambiado a la vez.
  */
 export const ROTULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
   0: 'SALIDA',
+  1: 'CALLEJÓN DE LAS LATAS',
+  2: 'CAJA DE COMUNIDAD',
+  3: 'PASAJE DE LOS CHARCOS',
+  4: 'IMPUESTO SOBRE EL CAPITAL',
+  5: 'ESTACIÓN DE GOYA',
+  6: 'CALLE DE LOS TALLERES',
+  7: 'SUERTE',
+  8: 'CALLE DE LA IMPRENTA',
+  9: 'CALLE DE LAS GRÚAS',
   10: 'COMISARÍA',
+  11: 'CALLE DE LA FRUTERÍA',
+  12: 'COMPAÑÍA DE ELECTRICIDAD',
+  13: 'CALLE DE LA FERRETERÍA',
+  14: 'PLAZA DEL MERCADILLO',
+  15: 'ESTACIÓN DE DELICIAS',
+  16: 'CALLE DE LOS BALCONES',
+  17: 'CAJA DE COMUNIDAD',
+  18: 'CALLE DE LOS GARAJES',
+  19: 'CALLE DEL SEMÁFORO',
   20: 'DESCANSO',
+  21: 'CALLE DE LOS CINES',
+  22: 'SUERTE',
+  23: 'PLAZA DEL AYUNTAMIENTO',
+  24: 'CALLE DEL TEATRO',
+  25: 'ESTACIÓN DEL MEDIODÍA',
+  26: 'CALLE DEL CRISTAL',
+  27: 'CALLE DE LAS ANTENAS',
+  28: 'COMPAÑÍA DE AGUAS',
+  29: 'CALLE DE LA BOLSA',
   30: '¡A COMISARÍA!',
-  2: 'FONDO',
-  4: 'IMPUESTO',
-  5: 'PUERTO',
-  7: 'SUCESOS',
-  12: 'LUZ',
-  15: 'BUSES',
-  17: 'FONDO',
-  22: 'SUCESOS',
-  25: 'CARGA',
-  28: 'AGUA',
-  33: 'FONDO',
-  35: 'TREN',
-  36: 'SUCESOS',
-  38: 'TASA',
+  31: 'CALLE DEL HOSPITAL',
+  32: 'CALLE DE LA BIBLIOTECA',
+  33: 'CAJA DE COMUNIDAD',
+  34: 'CALLE DE LOS JARDINES',
+  35: 'ESTACIÓN DEL NORTE',
+  36: 'SUERTE',
+  37: 'PASEO DE LOS TILOS',
+  38: 'IMPUESTO DE LUJO',
+  39: 'AVENIDA DE LAS ACACIAS',
 };
+
+/** ¿Es una esquina? Se cuenta con el índice y no con el marco porque esto se usa al cargar el módulo. */
+function esIndiceDeEsquina(casilla: number): boolean {
+  return casilla % (CASILLAS_POR_LADO - 1) === 0;
+}
+
+/**
+ * EL ALTO DE LOS NOMBRES DE LAS LATERALES: el de la palabra más ancha de todas puesta en el ancho
+ * útil, redondeado hacia abajo a la décima. Sale de los nombres y no de una constante, así que un
+ * nombre nuevo con una palabra más ancha encoge a todos a la vez —que es lo que se pidió: el mismo
+ * tamaño en todas— en vez de salirse del margen de su casilla.
+ */
+export const ALTO_DEL_NOMBRE = ((): number => {
+  let peor = Infinity;
+  for (const [clave, nombre] of Object.entries(ROTULO_DE_LA_CASILLA)) {
+    if (esIndiceDeEsquina(Number(clave))) continue;
+    for (const palabra of nombre.split(' ')) peor = Math.min(peor, ANCHO_DEL_ROTULO / (anchoDeLaPalabra(palabra, ALTO_DE_LA_LETRA) / ALTO_DE_LA_LETRA));
+  }
+  return Math.floor(peor * 10) / 10;
+})();
+/** El pie, «ligeramente más pequeño que el nombre»: un 10 % menos, a la décima. */
+export const ALTO_DEL_PIE = Math.round(ALTO_DEL_NOMBRE * 0.9 * 10) / 10;
+/** De renglón a renglón del nombre, de centro a centro: vez y media el alto, que deja sitio a las tildes. */
+export const PASO_DEL_NOMBRE = ALTO_DEL_NOMBRE * 1.5;
+
+/**
+ * LOS RENGLONES DE UN NOMBRE: los menos posibles y, entre esos, los más iguales.
+ *
+ * Una palabra no se parte. Con eso, se buscan todos los cortes entre palabras que dejen cada
+ * renglón dentro del ancho útil, se quedan los de menos renglones y de ésos el que tenga el renglón
+ * más largo más corto. «CALLEJÓN DE / LAS LATAS» y no «CALLEJÓN DE LAS / LATAS»; «IMPUESTO / SOBRE
+ * EL / CAPITAL», que es lo que hace la foto.
+ */
+export function renglonesDelNombre(nombre: string): string[] {
+  const palabras = nombre.split(' ');
+  let mejor: string[] | null = null;
+  let mejorAncho = Infinity;
+  /* Cada corte posible es un número de `palabras − 1` bits: un 1 corta antes de esa palabra. */
+  for (let cortes = 0; cortes < 1 << (palabras.length - 1); cortes++) {
+    const renglones: string[] = [palabras[0] as string];
+    for (let k = 1; k < palabras.length; k++) {
+      if ((cortes >> (k - 1)) & 1) renglones.push(palabras[k] as string);
+      else renglones[renglones.length - 1] = `${renglones[renglones.length - 1] as string} ${palabras[k] as string}`;
+    }
+    const anchos = renglones.map((r) => anchoDeLaPalabra(r, ALTO_DEL_NOMBRE));
+    const masAncho = Math.max(...anchos);
+    if (masAncho > ANCHO_DEL_ROTULO + 1e-9) continue;
+    if (mejor === null || renglones.length < mejor.length || (renglones.length === mejor.length && masAncho < mejorAncho - 1e-9)) {
+      mejor = renglones;
+      mejorAncho = masAncho;
+    }
+  }
+  return mejor ?? palabras;
+}
+
+/**
+ * EL PIE DE CADA CASILLA LATERAL.
+ *
+ * Los títulos, su PRECIO —«PRECIO 60 €», como el tablero de la foto—; los dos impuestos, lo que se
+ * PAGA —el de Capital con su elección del 10 %, §3.4—; y las seis de carta, «COGE CARTA», que era su
+ * texto pequeño y ahora va debajo de la obra. Todo sale de `PRECIO_DE_LA_CASILLA`, que es la copia
+ * vigilada del reglamento.
+ */
+function pieDeLaLateral(casilla: number): string {
+  if (CASILLAS_DE_CARTA.includes(casilla)) return 'COGE CARTA';
+  const cifra = PRECIO_DE_LA_CASILLA[casilla] ?? 0;
+  if (casilla === CASILLA_DEL_IMPUESTO_SOBRE_EL_CAPITAL) return `PAGA ${enEuros(cifra)} O ${String(POR_CIENTO_DEL_IMPUESTO)} %`;
+  if (casilla === CASILLA_DEL_IMPUESTO_DE_LUJO) return `PAGA ${enEuros(cifra)}`;
+  return `PRECIO ${enEuros(cifra)}`;
+}
+
+/**
+ * EL TEXTO PEQUEÑO DE CADA CASILLA.
+ *
+ * Miguel: «cada casilla con su nombre y un texto pequeño que explique la casilla». En las ESQUINAS
+ * es un renglón paralelo al nombre y más cerca del que mira, con palabras del reglamento —«no da ni
+ * quita nada» es su definición del Descanso, «de visita» es como se pasa por la Comisaría, y los
+ * 200 de la Salida son `PAGA_DE_LA_PUERTA_MAYOR`—. En las LATERALES es el pie.
+ */
+export const SUBTITULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
+  0: 'COBRA 200',
+  10: 'DE VISITA',
+  20: 'NI DA NI QUITA',
+  30: 'RETENIDO',
+  ...Object.fromEntries(
+    Array.from({ length: CASILLAS }, (_, i) => i)
+      .filter((i) => !esIndiceDeEsquina(i))
+      .map((i) => [i, pieDeLaLateral(i)]),
+  ),
+};
+export const ALTO_MAXIMO_DEL_SUBTITULO_DE_ESQUINA = 8;
+/** Lo que separa el nombre de su renglón pequeño en una esquina. */
+export const HUECO_ENTRE_RENGLONES = 2.5;
 
 /** Una letra puesta en el tablero: cuál, dónde, con qué giro, de qué talla y a qué altura. */
 export interface LetraEnElTablero {
@@ -799,13 +832,6 @@ export interface LetraEnElTablero {
   readonly alza: number;
 }
 
-/**
- * Las letras del nombre de una casilla, ya en el mundo. Vacío si la casilla no lleva rótulo.
- *
- * Se escriben hacia `−adelante` por lo mismo que el precio, y el porqué está en
- * `guarismosDelPrecio`: al revés salen ESPEJADAS, y eso no se lee como un fallo de orientación
- * sino como una fuente rara.
- */
 /**
  * LAS LETRAS DE UNA ESQUINA, EN LA DIAGONAL DE SU CUADRO DE SUPERFICIE.
  *
@@ -820,7 +846,7 @@ export interface LetraEnElTablero {
  * son los mismos 0..108 y el renglón no va paralelo a ningún borde.
  */
 function letrasDeLaEsquina(m: MarcoDeCasilla, palabra: string): LetraEnElTablero[] {
-  return renglonDeEsquina(m, palabra, altoDelRotulo(palabra, true), 0);
+  return renglonDeEsquina(m, palabra, altoDelRotuloDeEsquina(palabra), 0);
 }
 
 /**
@@ -846,53 +872,42 @@ function renglonDeEsquina(m: MarcoDeCasilla, palabra: string, alto: number, alfa
 }
 
 /**
- * EL TEXTO PEQUEÑO DE CADA CASILLA, y por qué sólo lo llevan las que no tienen precio.
+ * UN RENGLÓN DE UNA LATERAL, centrado en el eje de la casilla a la altura `v` de su centro.
  *
- * Miguel: «cada casilla con su nombre y un texto pequeño que explique la casilla». En las que tienen
- * PRECIO —los títulos, el Impuesto y la Tasa— la explicación ya está escrita, y en grande: es la
- * cifra. En las que no, la casilla dice cómo se llama y nada de lo que pasa al caer en ella, que
- * es justo lo que un jugador nuevo no sabe. Esas diez llevan su renglón.
- *
- * Las palabras son las del reglamento y no otras: «no da ni quita nada» es su definición del
- * Descanso, «de visita» es como se pasa por la Comisaría, y los 200 de la Salida son
- * `PAGA_DE_LA_PUERTA_MAYOR`. La escena no importa el reglamento en ejecución —no arrastra el
- * reductor al móvil—, así que esto es una copia, y `verify:burgo-escena` la compara contra él.
- *
- * VA DEBAJO DEL NOMBRE desde el punto de vista de quien lee: en una casilla lateral, en el hueco
- * del precio (`V_DEL_PRECIO`), que en éstas está libre; en una esquina, en un renglón paralelo al
- * del nombre y más cerca del que mira.
+ * Se escribe hacia `−adelante`, que es la derecha de quien mira desde fuera del anillo: al revés
+ * sale ESPEJADO, y eso no se lee como un fallo de orientación sino como una fuente rara (en el banco
+ * el 60 se leyó «06» la primera vez). Cada letra se agarra por el centro de su avance, así que se
+ * empieza por el borde y se resta.
  */
-export const SUBTITULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
-  0: 'COBRA 200',
-  2: 'COGE CARTA',
-  7: 'COGE CARTA',
-  10: 'DE VISITA',
-  17: 'COGE CARTA',
-  20: 'NI DA NI QUITA',
-  22: 'COGE CARTA',
-  30: 'RETENIDO',
-  33: 'COGE CARTA',
-  36: 'COGE CARTA',
-};
-export const ALTO_MAXIMO_DEL_SUBTITULO = 8;
-/** Lo que separa el nombre de su renglón pequeño en una esquina. */
-export const HUECO_ENTRE_RENGLONES = 2.5;
+function renglonDeLateral(m: MarcoDeCasilla, renglon: string, alto: number, v: number): LetraEnElTablero[] {
+  const escala = alto / ALTO_DE_LA_LETRA;
+  const giro = giroHaciaDentro(m);
+  const salida: LetraEnElTablero[] = [];
+  let u = anchoDeLaPalabra(renglon, alto) / 2;
+  for (const letra of renglon) {
+    const avance = avanceDelCaracter(letra) * escala;
+    const p = puntoEnLaCasillaPorV(m, u - avance / 2, v);
+    if (letra !== ' ') salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO });
+    u -= avance;
+  }
+  return salida;
+}
 
-/**
- * El alto del texto pequeño. En una lateral, lo que quepa en el ancho útil con su techo. En una
- * esquina, lo que deje el ROMBO a esa altura de la diagonal: un renglón a `a0` del centro con alto
- * `s` y ancho `k s` mete su pico en `a0 + s + k s / 2`, y eso no puede pasar del medio rombo con
- * margen; despejando, `s ≤ (diagonal − 2 a0) / (k + 2)`.
- */
+/** El alto del texto pequeño: el del pie en una lateral; en una esquina, lo que deje el rombo. */
 export function altoDelSubtitulo(casilla: number): number {
   const m = marcoDeCasilla(casilla);
   const texto = SUBTITULO_DE_LA_CASILLA[m.indice];
   if (texto === undefined || texto.length === 0) return 0;
+  if (!m.esEsquina) return ALTO_DEL_PIE;
+  /*
+   * En una esquina, un renglón a `a0` del centro con alto `s` y ancho `k s` mete su pico en
+   * `a0 + s + k s / 2`, y eso no puede pasar del medio rombo con margen; despejando,
+   * `s ≤ (diagonal − 2 a0) / (k + 2)`.
+   */
   const porUnidad = anchoDeLaPalabra(texto, ALTO_DE_LA_LETRA) / ALTO_DE_LA_LETRA;
-  if (!m.esEsquina) return Math.min(ALTO_MAXIMO_DEL_SUBTITULO, ANCHO_DEL_ROTULO / porUnidad);
   const nombre = ROTULO_DE_LA_CASILLA[m.indice] ?? '';
-  const a0 = altoDelRotulo(nombre, true) / 2 + HUECO_ENTRE_RENGLONES;
-  return Math.min(ALTO_MAXIMO_DEL_SUBTITULO, (DIAGONAL_DEL_ROTULO_DE_ESQUINA - 2 * a0) / (porUnidad + 2));
+  const a0 = altoDelRotuloDeEsquina(nombre) / 2 + HUECO_ENTRE_RENGLONES;
+  return Math.min(ALTO_MAXIMO_DEL_SUBTITULO_DE_ESQUINA, (DIAGONAL_DEL_ROTULO_DE_ESQUINA - 2 * a0) / (porUnidad + 2));
 }
 
 export function letrasDelSubtitulo(casilla: number): LetraEnElTablero[] {
@@ -902,40 +917,27 @@ export function letrasDelSubtitulo(casilla: number): LetraEnElTablero[] {
   const alto = altoDelSubtitulo(casilla);
   if (m.esEsquina) {
     const nombre = ROTULO_DE_LA_CASILLA[m.indice] ?? '';
-    const alfa = altoDelRotulo(nombre, true) / 2 + HUECO_ENTRE_RENGLONES + alto / 2;
+    const alfa = altoDelRotuloDeEsquina(nombre) / 2 + HUECO_ENTRE_RENGLONES + alto / 2;
     return renglonDeEsquina(m, texto, alto, alfa);
   }
-  const escala = alto / ALTO_DE_LA_LETRA;
-  const giro = giroHaciaDentro(m);
-  const salida: LetraEnElTablero[] = [];
-  let u = anchoDeLaPalabra(texto, alto) / 2;
-  for (const letra of texto) {
-    const avance = avanceDelCaracter(letra) * escala;
-    const p = puntoEnLaCasillaPorV(m, u - avance / 2, V_DEL_PRECIO);
-    if (letra !== ' ') salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO });
-    u -= avance;
-  }
-  return salida;
+  /* El pie, con su canto de abajo en `V_DEL_PIE`. */
+  return renglonDeLateral(m, texto, alto, V_DEL_PIE - alto / 2);
 }
 
 export function letrasDelRotulo(casilla: number): LetraEnElTablero[] {
   const m = marcoDeCasilla(casilla);
-  const palabra = ROTULO_DE_LA_CASILLA[m.indice];
-  if (palabra === undefined || palabra.length === 0) return [];
-  if (m.esEsquina) return letrasDeLaEsquina(m, palabra);
-  const alto = altoDelRotulo(palabra);
-  const escala = alto / ALTO_DE_LA_LETRA;
-  const giro = giroHaciaDentro(m);
-  const salida: LetraEnElTablero[] = [];
-  /* Cada letra se agarra por el centro de su avance, así que se empieza por el borde y se resta. */
-  let u = anchoDeLaPalabra(palabra, alto) / 2;
-  for (const letra of palabra) {
-    const avance = avanceDelCaracter(letra) * escala;
-    const p = puntoEnLaCasillaPorV(m, u - avance / 2, V_DEL_ROTULO);
-    if (letra !== ' ') salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO_EN_LA_FRANJA });
-    u -= avance;
-  }
-  return salida;
+  const nombre = ROTULO_DE_LA_CASILLA[m.indice];
+  if (nombre === undefined || nombre.length === 0) return [];
+  if (m.esEsquina) return letrasDeLaEsquina(m, nombre);
+  /* El nombre, con el canto de arriba de su primer renglón en `V_DEL_NOMBRE`. */
+  return renglonesDelNombre(nombre).flatMap((renglon, k) => renglonDeLateral(m, renglon, ALTO_DEL_NOMBRE, V_DEL_NOMBRE + ALTO_DEL_NOMBRE / 2 + k * PASO_DEL_NOMBRE));
+}
+
+/** Dónde acaba el nombre de una lateral por abajo: el canto de abajo de su último renglón. */
+export function vDelFinalDelNombre(casilla: number): number {
+  const nombre = ROTULO_DE_LA_CASILLA[marcoDeCasilla(casilla).indice] ?? '';
+  const renglones = nombre.length === 0 ? 0 : renglonesDelNombre(nombre).length;
+  return renglones === 0 ? V_DEL_NOMBRE : V_DEL_NOMBRE + ALTO_DEL_NOMBRE + (renglones - 1) * PASO_DEL_NOMBRE;
 }
 
 /* ──────────────── La talla de las piezas que son de un jugador ──────────────── */
@@ -1548,21 +1550,12 @@ const solar: readonly PiezaDeCasilla[] = [
 ];
 
 /**
- * UNA PUERTA: el paso de cebra de la avenida que entra por ahí, con sus dos semáforos.
- *
- * La avenida mide 48 (cuatro celdas de la retícula: dos carriles por sentido) y entra
- * exactamente por el eje de esta casilla, que mide 72. Cuatro losas de cebra de 12 puestas a
- * ±6 y ±18 cubren la avenida entera y dejan 12 de acera a cada lado, que es donde se plantan
- * los dos semáforos de brazo, uno por sentido.
+ * UNA PUERTA —una estación—: sin atrezo. La avenida de la ciudad entra por el eje de esta casilla,
+ * y hasta que el tablero llevó el nombre arriba y el precio abajo la cruzaba un paso de cebra con sus
+ * dos semáforos en medio del blanco. Ese sitio es ahora el del edificio de viajeros de cada estación
+ * (`obras.ts`), y la avenida llega a su puerta.
  */
-const puerta: readonly PiezaDeCasilla[] = [
-  { pieza: PIEZA.calzadaPaso, giroEnCuartos: 0, sitio: [-18, ATREZO.centro] },
-  { pieza: PIEZA.calzadaPaso, giroEnCuartos: 0, sitio: [-6, ATREZO.centro] },
-  { pieza: PIEZA.calzadaPaso, giroEnCuartos: 0, sitio: [6, ATREZO.centro] },
-  { pieza: PIEZA.calzadaPaso, giroEnCuartos: 0, sitio: [18, ATREZO.centro] },
-  { pieza: PIEZA.semaforoC, giroEnCuartos: 0, sitio: [28, ATREZO.centro] },
-  { pieza: PIEZA.semaforoC, giroEnCuartos: 2, sitio: [-28, ATREZO.centro] },
-];
+const puerta: readonly PiezaDeCasilla[] = [];
 
 /** El Fondo Vecinal: el cofre lo levanta `obras.ts`, y al lado no va nada más. */
 const arca: readonly PiezaDeCasilla[] = [];
