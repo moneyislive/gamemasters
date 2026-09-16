@@ -34,6 +34,7 @@
     "@gltf-transform/functions": "^4.5.0",
     "@react-three/fiber": "^9.7.0",
     "@types/three": "^0.185.4",
+    "opentype.js": "^2.0.0",
     "pngjs": "3.4.0",
     "three": "^0.185.1"
   }

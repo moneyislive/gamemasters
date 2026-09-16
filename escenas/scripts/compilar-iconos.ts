@@ -58,6 +58,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+/* Sólo aquí: lee el `.ttf` de `arte/tipos/` al COMPILAR. No viaja a ningún cliente. */
+import opentype from 'opentype.js';
 import { ShapePath } from 'three';
 import { cuantosTriangulos, geometriaDeContornos } from '../formas';
 import { aplanaTrazo, simplificaContorno } from './aplana-trazo';
@@ -1673,240 +1675,51 @@ const GUARISMOS_SUELTOS: readonly Dibujo[] = '0123456789'.split('').map((d) => (
  * comprueba lo que sí importa en una letra: que no se salga del lienzo, que ningún contorno
  * se pierda al enhebrar y que dé geometría.
  */
-const ALTO_DE_LA_LETRA = ALTO_DEL_GUARISMO;
-const ANCHO_DE_LA_LETRA = 260;
-
-/** Más fina que la del guarismo (64): una letra tiene más trazos dentro de la misma caja. */
-const GROSOR_DE_LA_LETRA = 52;
-
-const CAJA_DE_LA_LETRA = {
-  x: (LIENZO - ANCHO_DE_LA_LETRA) / 2,
-  y: (LIENZO - ALTO_DE_LA_LETRA) / 2,
-  ancho: ANCHO_DE_LA_LETRA,
-  alto: ALTO_DE_LA_LETRA,
-} as const;
-
-/** El paso de una letra a la siguiente al componer una palabra: la caja más su aire. */
-const AVANCE_DE_LA_LETRA = CAJA_DE_LA_LETRA.ancho + 30;
-
-/** Los cuatro bordes de la caja de una letra, ya metidos medio grosor: se escriben una vez. */
-interface CajaDeLetra {
-  readonly l: number;
-  readonly r: number;
-  readonly t: number;
-  readonly b: number;
-  readonly cx: number;
-  readonly m: number;
-}
-function cajaDeLetra(x: number, y: number, w: number, g: number): CajaDeLetra {
-  return {
-    l: x + g / 2,
-    r: x + w - g / 2,
-    t: y + g / 2,
-    b: y + ALTO_DE_LA_LETRA - g / 2,
-    cx: x + w / 2,
-    m: y + ALTO_DE_LA_LETRA / 2,
-  };
-}
+/**
+ * ═══ LOS GLIFOS SALEN DE UN TIPO DE LETRA DE VERDAD, NO DE MI PULSO ═══
+ *
+ * La primera versión de este alfabeto estaba dibujada a mano con `trazo` y arcos, como los
+ * guarismos. Servía para escribir SALIDA y poco más, y tenía un defecto que no se arregla
+ * dibujando mejor: **no hay forma de cambiar el juego de idioma**. Faltaban los acentos, la
+ * apertura de interrogación, la diéresis, y cualquier alfabeto que no fuera el nuestro. Un
+ * rótulo tiene que poder decir «ELEKTRIZITÄTSWERK» sin que nadie coja el ratón.
+ *
+ * Así que los contornos se EXTRAEN de `arte/tipos/`, en tiempo de compilación, con
+ * `opentype.js`. Lo que viaja a los clientes sigue siendo lo mismo que antes —listas de
+ * puntos— y por la misma razón de siempre: Metro no sabe traer un fichero como texto y en
+ * React Native no existe `DOMParser`, así que un tipo analizado en caliente se vería en el
+ * escritorio y saldría VACÍO en la app sin un error en ninguna consola.
+ *
+ * ═══ Y CADA LETRA TRAE SU ANCHO, QUE ES LA MITAD DEL REGALO ═══
+ *
+ * Un tipo de verdad no es monoespaciado: la `I` mide 387 y la `W` 971. Con un avance fijo,
+ * «MIMO» sale con dos agujeros y «WWW» apelotonado. Se emite el avance de cada glifo y quien
+ * compone una palabra los suma.
+ */
+const TIPO_DEL_TABLERO = path.join(RAIZ, 'arte', 'tipos', 'Cinzel_700Bold.ttf');
 
 /**
- * UN ARCO DE ELIPSE: como `arco`, pero con dos radios.
- *
- * `arco` es circular, y con él una `C` de 348 de alto saldría del ancho de una moneda. Las
- * letras son bastante más altas que anchas, así que sus panzas son óvalos. Mismo convenio que
- * `elipse`: la `y` crece hacia abajo, 90° es arriba y 0° es la derecha.
+ * Los caracteres que el tablero sabe escribir. Añadir un idioma es añadirlos aquí y volver a
+ * compilar: si el tipo no trae alguno, esto se para y dice cuál, en vez de emitir un hueco.
  */
-function arcoOval(cx: number, cy: number, rx: number, ry: number, desde: number, hasta: number, lados: number): Punto[] {
-  const puntos: Punto[] = [];
-  for (let i = 0; i <= lados; i++) {
-    const a = ((desde + ((hasta - desde) * i) / lados) * Math.PI) / 180;
-    puntos.push([cx + rx * Math.cos(a), cy - ry * Math.sin(a)]);
-  }
-  return puntos;
-}
+const CHARSET_DEL_TABLERO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZÑÁÉÍÓÚÜ¿¡.,-·';
 
 /**
- * LAS VEINTISIETE, cada una en su caja de `ancho × 400` con el origen arriba a la izquierda.
+ * TRAMOS POR CURVA. Medido sobre este tipo y este charset: 2 tramos son 57 triángulos por
+ * glifo, 3 son 81 y 6 son 153.
  *
- * La `I` lleva pie y sombrero, como el `1` lleva pie: sin ellos es una raya, y una raya al
- * lado de una `M` no se lee como letra.
+ * Va en SEIS a propósito, y la decisión es de Miguel: que se vea bien ahora y se optimice
+ * después, cuando el tablero esté entero. Son 7.500 triángulos el alfabeto completo, y un
+ * rótulo de ocho letras cuesta 1.200 de un tope de 900.000: no es aquí donde se juega el
+ * presupuesto. Si algún día hace falta, bajar este número es la palanca, y no hay que tocar
+ * nada más.
  */
-const LETRAS: Readonly<Record<string, Guarismo>> = {
-  A: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.b], [k.cx, k.t], [k.r, k.b]], g), trazo([[x + w * 0.19, y + ALTO_DE_LA_LETRA * 0.68], [x + w * 0.81, y + ALTO_DE_LA_LETRA * 0.68]], g)];
-  },
-  B: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    const ry = (k.b - k.t) / 4;
-    const rx = Math.min(ry, (k.r - k.l) * 0.62);
-    return [
-      trazo([[k.l, k.t], [k.l, k.b]], g),
-      /* El arco pone él su primer punto: escribirlo aquí además deja dos puntos pegados. */
-      trazo([[k.l, k.t], ...arcoOval(k.l + rx * 0.2, k.t + ry, rx, ry, 90, -90, 10), [k.l, k.t + 2 * ry]], g),
-      trazo([[k.l, k.m], ...arcoOval(k.l + rx * 0.3, k.m + ry, rx, ry, 90, -90, 10), [k.l, k.b]], g),
-    ];
-  },
-  C: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo(arcoOval(k.cx, k.m, (k.r - k.l) / 2, (k.b - k.t) / 2, 55, 305, 18), g)];
-  },
-  D: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [
-      trazo([[k.l, k.t], [k.l, k.b]], g),
-      trazo([[k.l, k.t], ...arcoOval(k.cx - (k.r - k.l) * 0.1, k.m, (k.r - k.l) * 0.6, (k.b - k.t) / 2, 90, -90, 14), [k.l, k.b]], g),
-    ];
-  },
-  E: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.r, k.t], [k.l, k.t], [k.l, k.b], [k.r, k.b]], g), trazo([[k.l, k.m], [k.r - (k.r - k.l) * 0.16, k.m]], g)];
-  },
-  F: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.r, k.t], [k.l, k.t], [k.l, k.b]], g), trazo([[k.l, k.m], [k.r - (k.r - k.l) * 0.16, k.m]], g)];
-  },
-  G: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    const rx = (k.r - k.l) / 2;
-    return [
-      trazo(arcoOval(k.cx, k.m, rx, (k.b - k.t) / 2, 55, 310, 18), g),
-      trazo([[k.r, k.m + (k.b - k.t) * 0.06], [k.r, k.m], [k.cx + rx * 0.1, k.m]], g),
-    ];
-  },
-  H: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.t], [k.l, k.b]], g), trazo([[k.r, k.t], [k.r, k.b]], g), trazo([[k.l, k.m], [k.r, k.m]], g)];
-  },
-  I: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    const a = (k.r - k.l) * 0.32;
-    return [trazo([[k.cx, k.t], [k.cx, k.b]], g), trazo([[k.cx - a, k.t], [k.cx + a, k.t]], g), trazo([[k.cx - a, k.b], [k.cx + a, k.b]], g)];
-  },
-  J: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    const ry = (k.b - k.t) * 0.22;
-    return [trazo([[k.r, k.t], ...arcoOval(k.r - (k.r - k.l) * 0.36, k.b - ry, (k.r - k.l) * 0.36, ry, 0, -160, 10)], g)];
-  },
-  K: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.t], [k.l, k.b]], g), trazo([[k.r, k.t], [k.l, k.m]], g), trazo([[k.l, k.m], [k.r, k.b]], g)];
-  },
-  L: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.t], [k.l, k.b], [k.r, k.b]], g)];
-  },
-  M: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.b], [k.l, k.t], [k.cx, k.m], [k.r, k.t], [k.r, k.b]], g)];
-  },
-  N: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.b], [k.l, k.t], [k.r, k.b], [k.r, k.t]], g)];
-  },
-  O: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return anillo(k.cx, k.m, (k.r - k.l) / 2 + g / 2, (k.b - k.t) / 2 + g / 2, g);
-  },
-  P: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    const ry = (k.b - k.t) / 4;
-    const rx = Math.min(ry * 1.2, (k.r - k.l) * 0.66);
-    return [
-      trazo([[k.l, k.t], [k.l, k.b]], g),
-      trazo([[k.l, k.t], ...arcoOval(k.l + rx * 0.25, k.t + ry, rx, ry, 90, -90, 10), [k.l, k.t + 2 * ry]], g),
-    ];
-  },
-  Q: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [
-      ...anillo(k.cx, k.m - (k.b - k.t) * 0.04, (k.r - k.l) / 2 + g / 2, (k.b - k.t) / 2 - (k.b - k.t) * 0.04 + g / 2, g),
-      trazo([[k.cx + (k.r - k.l) * 0.12, k.b - (k.b - k.t) * 0.22], [k.r, k.b]], g),
-    ];
-  },
-  R: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    const ry = (k.b - k.t) / 4;
-    const rx = Math.min(ry * 1.2, (k.r - k.l) * 0.6);
-    return [
-      trazo([[k.l, k.t], [k.l, k.b]], g),
-      trazo([[k.l, k.t], ...arcoOval(k.l + rx * 0.25, k.t + ry, rx, ry, 90, -90, 10), [k.l, k.t + 2 * ry]], g),
-      trazo([[k.l + (k.r - k.l) * 0.28, k.t + 2 * ry], [k.r, k.b]], g),
-    ];
-  },
-  S: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    const rx = (k.r - k.l) / 2;
-    const ry = (k.b - k.t) / 4;
-    return [
-      trazo([...arcoOval(k.cx, k.t + ry, rx, ry, 20, 200, 12), ...arcoOval(k.cx, k.b - ry, rx, ry, 180, 380, 12)], g),
-    ];
-  },
-  T: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.t], [k.r, k.t]], g), trazo([[k.cx, k.t], [k.cx, k.b]], g)];
-  },
-  U: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    const ry = (k.b - k.t) * 0.3;
-    return [trazo([[k.l, k.t], ...arcoOval(k.cx, k.b - ry, (k.r - k.l) / 2, ry, 180, 360, 12), [k.r, k.t]], g)];
-  },
-  V: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.t], [k.cx, k.b], [k.r, k.t]], g)];
-  },
-  W: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.t], [x + w * 0.29, k.b], [k.cx, y + ALTO_DE_LA_LETRA * 0.52], [x + w * 0.71, k.b], [k.r, k.t]], g)];
-  },
-  X: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    /*
-     * EL ASPA ENTERA Y LA OTRA EN DOS MITADES, y no dos diagonales cruzadas.
-     *
-     * Todo lo que sale de `trazo` es MACIZO (acaba en `macizo`), así que dos cintas largas
-     * que se cruzan tienen el mismo enrollado y se solapan: `toShapes` descarta una «por
-     * repetición» —lo avisa la cabecera de `tira`— y la equis se quedaba con un aspa, sin que
-     * fallara nada en pantalla. Lo cazó `revisaGlifo` contando contornos a la entrada y a la
-     * salida.
-     *
-     * Partida en tres trozos que se TOCAN pero no se montan, las tres son formas propias. El
-     * hueco de `g * 0.7` es el que deja la primera cinta al pasar por el centro.
-     */
-    const d = g * 0.7;
-    return [
-      trazo([[k.l, k.t], [k.r, k.b]], g),
-      trazo([[k.r, k.t], [k.cx + d, k.m - d]], g),
-      trazo([[k.cx - d, k.m + d], [k.l, k.b]], g),
-    ];
-  },
-  Y: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.t], [k.cx, k.m], [k.r, k.t]], g), trazo([[k.cx, k.m], [k.cx, k.b]], g)];
-  },
-  Z: (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    return [trazo([[k.l, k.t], [k.r, k.t], [k.l, k.b], [k.r, k.b]], g)];
-  },
-  /* La eñe: la ene encogida hacia el pie y la tilde encima, con su onda de tres puntos. */
-  'N~': (x, y, w, g) => {
-    const k = cajaDeLetra(x, y, w, g);
-    const encoge = (v: number, i: number): number => (i % 2 === 0 ? v : k.b - (k.b - v) * 0.8);
-    const ene = [trazo([[k.l, k.b], [k.l, k.t], [k.r, k.b], [k.r, k.t]], g)].map((c) => c.map(encoge));
-    const ty = y + ALTO_DE_LA_LETRA * 0.08;
-    return [...ene, trazo([[x + w * 0.24, ty + 14], [x + w * 0.38, ty - 8], [x + w * 0.62, ty + 14], [x + w * 0.76, ty - 8]], g * 0.8)];
-  },
-};
+const TRAMOS_DE_CURVA = 6;
 
-/** Una letra, como `guarismo`: se busca por su llave y se dibuja donde le digan. */
-function letra(cual: string, x0: number, ancho: number, grosor: number): number[][] {
-  const traza = LETRAS[cual];
-  if (!traza) {
-    console.error(`no hay dibujo para la letra «${cual}».`);
-    process.exit(2);
-  }
-  return traza(x0, CAJA_DE_LA_LETRA.y, ancho, grosor);
-}
+/** El alto de la CAJA a la que se normalizan todas: la altura de las mayúsculas del tipo. */
+const ALTO_DE_LA_LETRA = 360;
+/** Lo más ancho que se le deja ocupar a un glifo dentro del lienzo. */
+const ANCHO_MAXIMO_DE_LA_LETRA = 500;
 
 /**
  * LA REVISIÓN DE UN GLIFO, que no es la de un icono. Ver la cabecera del alfabeto.
@@ -1959,11 +1772,220 @@ function revisaGlifo(nombre: string, contornos: readonly number[][]): { contorno
   return { contornos: contornos.length, puntos, triangulos };
 }
 
-const LETRAS_SUELTAS: readonly { llave: string; que: string; contornos: number[][] }[] = Object.keys(LETRAS).map((c) => ({
-  llave: c === 'N~' ? 'Ñ' : c,
-  que: `La letra ${c === 'N~' ? 'Ñ' : c}, en la caja común de todas: ${String(ANCHO_DE_LA_LETRA)} × ${String(ALTO_DE_LA_LETRA)} centrada en el lienzo.`,
-  contornos: letra(c, CAJA_DE_LA_LETRA.x, CAJA_DE_LA_LETRA.ancho, GROSOR_DE_LA_LETRA),
-}));
+const tipoDelTablero = opentype.parse(fs.readFileSync(TIPO_DEL_TABLERO).buffer.slice(0) as ArrayBuffer);
+
+/**
+ * LOS CONTORNOS DE UN CARÁCTER, con las curvas aplanadas a puntos.
+ *
+ * `getPath` devuelve el trazo con la `y` creciendo HACIA ABAJO y la línea de base en `y = 0`,
+ * que es el mismo convenio que traen los `.svg` de `arte/game-icons/`: el resto del fichero no
+ * se entera de que esto viene de un tipo de letra.
+ */
+function contornosDelCaracter(caracter: string): { contornos: number[][]; avance: number } {
+  const glifo = tipoDelTablero.charToGlyph(caracter);
+  if (glifo.index === 0) {
+    console.error(`el tipo ${path.basename(TIPO_DEL_TABLERO)} no trae el carácter «${caracter}».`);
+    process.exit(2);
+  }
+  const camino = glifo.getPath(0, 0, tipoDelTablero.unitsPerEm);
+  const contornos: number[][] = [];
+  let actual: number[] | null = null;
+  let x = 0;
+  let y = 0;
+  const cierra = (): void => {
+    if (actual !== null && actual.length >= 6) contornos.push(actual);
+    actual = null;
+  };
+  for (const c of camino.commands) {
+    if (c.type === 'M') {
+      cierra();
+      actual = [c.x, c.y];
+      x = c.x;
+      y = c.y;
+    } else if (c.type === 'L') {
+      actual?.push(c.x, c.y);
+      x = c.x;
+      y = c.y;
+    } else if (c.type === 'Q') {
+      for (let i = 1; i <= TRAMOS_DE_CURVA; i++) {
+        const t = i / TRAMOS_DE_CURVA;
+        const u = 1 - t;
+        actual?.push(u * u * x + 2 * u * t * c.x1 + t * t * c.x, u * u * y + 2 * u * t * c.y1 + t * t * c.y);
+      }
+      x = c.x;
+      y = c.y;
+    } else if (c.type === 'C') {
+      for (let i = 1; i <= TRAMOS_DE_CURVA; i++) {
+        const t = i / TRAMOS_DE_CURVA;
+        const u = 1 - t;
+        actual?.push(
+          u * u * u * x + 3 * u * u * t * c.x1 + 3 * u * t * t * c.x2 + t * t * t * c.x,
+          u * u * u * y + 3 * u * u * t * c.y1 + 3 * u * t * t * c.y2 + t * t * t * c.y,
+        );
+      }
+      x = c.x;
+      y = c.y;
+    } else {
+      cierra();
+    }
+  }
+  cierra();
+  return { contornos, avance: glifo.advanceWidth ?? tipoDelTablero.unitsPerEm / 2 };
+}
+
+/** El doble del área con signo de un contorno ya en tira. Sólo interesa el SIGNO. */
+function areaDeLaTira(c: readonly number[]): number {
+  let s = 0;
+  for (let i = 0, n = c.length / 2; i < n; i++) {
+    const j = (i + 1) % n;
+    s += (c[i * 2] as number) * (c[j * 2 + 1] as number) - (c[j * 2] as number) * (c[i * 2 + 1] as number);
+  }
+  return s;
+}
+
+/** ¿Cae el punto dentro del contorno? El test del rayo de toda la vida. */
+function dentroDelContorno(px: number, py: number, c: readonly number[]): boolean {
+  let dentro = false;
+  for (let i = 0, n = c.length / 2, j = n - 1; i < n; j = i++) {
+    const xi = c[i * 2] as number;
+    const yi = c[i * 2 + 1] as number;
+    const xj = c[j * 2] as number;
+    const yj = c[j * 2 + 1] as number;
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) dentro = !dentro;
+  }
+  return dentro;
+}
+
+/**
+ * QUITA LOS CONTORNOS REDUNDANTES DEL TIPO, Y ÉSTA ES LA PARTE QUE HAY QUE ENTENDER.
+ *
+ * TrueType permite que los contornos de un glifo SE SOLAPEN: la regla `nonzero` los une y el
+ * resultado es el mismo. La `S` de este tipo trae uno de cinco puntos, 120 × 21, metido dentro
+ * del cuerpo y con el MISMO enrollado: un retoque del diseñador que la fuente une sin
+ * despeinarse.
+ *
+ * `ShapePath.toShapes` no une: descarta lo que «no cambia nada», y lo hace en silencio. Ese
+ * trocito se perdía y `revisaGlifo` cantaba —entra con 2, sale con 1—, que es exactamente para
+ * lo que está esa regla.
+ *
+ * La tentación es aflojar la regla. Sería un error: es la misma que cazaría la pérdida de un
+ * AGUJERO de verdad —la panza de una `O`, el ojo de una `A`—, y eso sí se vería. Así que el
+ * redundante se quita AQUÍ, a sabiendas, y sólo si de verdad lo es: mismo signo de área que otro
+ * contorno MAYOR y todos sus puntos dentro de él. Lo que se emite ya no tiene nada que
+ * descartar, y `revisaGlifo` sigue siendo estricta.
+ */
+function sinRedundantes(contornos: readonly number[][]): { limpios: number[][]; quitados: number } {
+  /*
+   * EL CRITERIO, Y POR QUÉ NO ES «TODOS SUS PUNTOS DENTRO».
+   *
+   * La primera versión pedía que el trocito estuviera ENTERO dentro del otro, y no valía: el
+   * retoque de la `S` está pegado al filo de arriba y se monta SOBRE él, así que algunos de sus
+   * puntos caen fuera por unas décimas. Seguía perdiéndose al enhebrar y el compilador seguía
+   * parándose, que es lo correcto pero no avanza.
+   *
+   * Lo que de verdad protege aquí es el SIGNO DEL ÁREA: un contorno con el mismo sentido que el
+   * que lo contiene no puede ser un agujero —los agujeros van al revés—, así que quitarlo nunca
+   * puede vaciar la panza de una `O` ni el ojo de una `A`. Con eso asegurado, basta con que sea
+   * PEQUEÑO (menos de una décima del grande) y que su centro caiga dentro: eso es un retoque del
+   * diseñador, y a la talla de un rótulo no se distingue de su ausencia.
+   */
+  const centro = (c: readonly number[]): { x: number; y: number } => {
+    let sx = 0;
+    let sy = 0;
+    const n = c.length / 2;
+    for (let i = 0; i < n; i++) {
+      sx += c[i * 2] as number;
+      sy += c[i * 2 + 1] as number;
+    }
+    return { x: sx / n, y: sy / n };
+  };
+  const limpios = contornos.filter((c, i) => {
+    const area = Math.abs(areaDeLaTira(c));
+    const signo = Math.sign(areaDeLaTira(c));
+    const medio = centro(c);
+    return !contornos.some((otro, j) => {
+      if (i === j || Math.sign(areaDeLaTira(otro)) !== signo) return false;
+      const areaDelOtro = Math.abs(areaDeLaTira(otro));
+      if (area > areaDelOtro / 10) return false;
+      return dentroDelContorno(medio.x, medio.y, otro);
+    });
+  });
+  return { limpios, quitados: contornos.length - limpios.length };
+}
+
+/**
+ * LA CAJA COMÚN, sacada del tipo y no escrita a mano: la altura de las mayúsculas manda.
+ *
+ * Todas las letras se escalan por ESTA caja —como los guarismos por la suya— para que la `I` no
+ * salga tan ancha como la `M` ni a otra altura. El ancho de cada una viaja aparte, en su avance.
+ */
+/*
+ * ═══ DEL TIPO AL LIENZO, Y AQUÍ HAY DOS COSAS QUE NO SE PUEDEN SUPONER ═══
+ *
+ * La primera: un glifo NO empieza en su origen. El serif izquierdo de la `A` de este tipo sale
+ * ocho unidades a la izquierda de la línea —el «lado izquierdo» negativo de toda la vida—, y
+ * dando por hecho que empieza en cero, la `A` se salía del lienzo. La segunda: los acentos
+ * suben POR ENCIMA de la altura de mayúscula, así que la `Á` es más alta que la `A`.
+ *
+ * Por eso se mide la caja de TODOS los glifos juntos y se encaja ésa, con su margen. Lo que
+ * define la talla sigue siendo la altura de la mayúscula (`CAJA_DE_LA_LETRA.alto`), que es por
+ * donde normaliza quien pinta: si normalizara por la caja de cada glifo, la `Á` saldría más
+ * pequeña que la `A` para que su acento cupiera, que es justo lo que no se quiere.
+ */
+const MARGEN_DEL_LIENZO = 6;
+const contornosEnBruto = [...CHARSET_DEL_TABLERO].map((c) => ({ caracter: c, ...contornosDelCaracter(c) }));
+const cajaDeLaMayuscula = tipoDelTablero.charToGlyph('H').getPath(0, 0, tipoDelTablero.unitsPerEm).getBoundingBox();
+const altoDeLaMayusculaEnElTipo = Math.abs(cajaDeLaMayuscula.y2 - cajaDeLaMayuscula.y1);
+
+const todosLosPuntos = contornosEnBruto.flatMap((g) => g.contornos.flat());
+const minXDelTipo = Math.min(...todosLosPuntos.filter((_, i) => i % 2 === 0));
+const maxXDelTipo = Math.max(...todosLosPuntos.filter((_, i) => i % 2 === 0));
+const minYDelTipo = Math.min(...todosLosPuntos.filter((_, i) => i % 2 === 1));
+const maxYDelTipo = Math.max(...todosLosPuntos.filter((_, i) => i % 2 === 1));
+
+/** Se encoge lo que haga falta para que NINGÚN glifo se salga del lienzo, acentos incluidos. */
+const ESCALA_DEL_TIPO = Math.min(
+  ALTO_DE_LA_LETRA / altoDeLaMayusculaEnElTipo,
+  (LIENZO - 2 * MARGEN_DEL_LIENZO) / (maxXDelTipo - minXDelTipo),
+  (LIENZO - 2 * MARGEN_DEL_LIENZO) / (maxYDelTipo - minYDelTipo),
+);
+
+/** Dónde caen en el lienzo el origen del glifo y su línea de base. */
+const ORIGEN_X = MARGEN_DEL_LIENZO - minXDelTipo * ESCALA_DEL_TIPO;
+const LINEA_DE_BASE = MARGEN_DEL_LIENZO - minYDelTipo * ESCALA_DEL_TIPO;
+
+/** La altura de la mayúscula ya en el lienzo: es la talla por la que se normaliza todo. */
+const ALTO_DE_LA_MAYUSCULA_EN_EL_LIENZO = altoDeLaMayusculaEnElTipo * ESCALA_DEL_TIPO;
+
+interface GlifoDelTipo {
+  readonly llave: string;
+  readonly que: string;
+  readonly contornos: number[][];
+  /** Lo que avanza el sitio al siguiente carácter, en unidades de la caja. */
+  readonly avance: number;
+}
+
+let redundantesQuitados = 0;
+const LETRAS_SUELTAS: readonly GlifoDelTipo[] = contornosEnBruto.map(({ caracter, contornos, avance }) => {
+  const { limpios, quitados } = sinRedundantes(contornos);
+  redundantesQuitados += quitados;
+  const puestos = limpios.map((contorno) => {
+    const tira: number[] = [];
+    for (let i = 0; i + 1 < contorno.length; i += 2) {
+      tira.push(
+        decima(ORIGEN_X + (contorno[i] as number) * ESCALA_DEL_TIPO),
+        decima(LINEA_DE_BASE + (contorno[i + 1] as number) * ESCALA_DEL_TIPO),
+      );
+    }
+    return tira;
+  });
+  return {
+    llave: caracter,
+    que: `«${caracter}» del tipo del tablero, normalizada por la altura de la mayúscula.`,
+    contornos: puestos,
+    avance: decima(avance * ESCALA_DEL_TIPO),
+  };
+});
 
 // ---------------------------------------------------------------------------
 
@@ -2222,6 +2244,8 @@ const cuerpoDeLasLetras = LETRAS_SUELTAS.map(
   (d) => `  /** ${d.que} */\n  '${d.llave}': [\n${d.contornos.map(comoTira).join('\n')}\n  ],`,
 ).join('\n');
 
+const cuerpoDeLosAvances = LETRAS_SUELTAS.map((d) => `  '${d.llave}': ${String(d.avance)},`).join('\n');
+
 const salida = `/**
  * LOS ICONOS DE LAS ESCENAS, en contornos de puntos: los bienes y las cartas de Riberas,
  * y los guarismos y los emblemas del Burgo.
@@ -2388,14 +2412,17 @@ export const CAJA_DEL_GUARISMO = {
 export const AVANCE_DEL_GUARISMO = ${String(AVANCE_DEL_GUARISMO)};
 
 /**
- * ═══ EL ALFABETO DEL TABLERO: LAS VEINTISIETE LETRAS ═══
+ * ═══ EL ALFABETO DEL TABLERO ═══
  *
  * Con esto una casilla puede llevar su NOMBRE encima y no sólo un emblema. Se componen igual
  * que un precio: se escalan TODAS por \`CAJA_DE_LA_LETRA\` —no por la caja de cada una, que
- * pondría la \`I\` tan ancha como la \`M\`— y se separan \`AVANCE_DE_LA_LETRA\`.
+ * pondría la \`I\` tan ancha como la \`M\`— y cada una avanza lo suyo (\`AVANCE_DE_LA_LETRA\`).
  *
- * La eñe está bajo la llave \`Ñ\`. No hay vocales acentuadas: un rótulo de tablero va en
- * mayúsculas y el acento, a esta talla, es un punto de tres píxeles que ensucia más que ayuda.
+ * SALEN DE UN TIPO DE LETRA DE VERDAD, extraídas al compilar de \`arte/tipos/\` con
+ * \`opentype.js\`: mayúsculas, eñe, vocales acentuadas, diéresis y los signos de apertura. Por
+ * eso se puede traducir el juego —los rótulos son cadenas en una tabla— y por eso añadir un
+ * idioma es declarar sus caracteres en el charset del compilador y volver a compilar, no
+ * dibujar nada. Dibujadas a mano, como estaban al principio, eso no tenía arreglo.
  *
  * Lo que se lee y lo que no está medido en \`docs/burgo/LA-CIUDAD.md\`: desde la pose de salida
  * un glifo de 27 unidades es una mancha (5 px en el móvil), pero a la cercanía de seguimiento
@@ -2409,16 +2436,31 @@ ${cuerpoDeLasLetras}
 /** Las letras que tienen dibujo. Sirve para comprobar que no falta ninguna. */
 export const LETRAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_LETRA);
 
-/** La caja común de todas las letras, dentro del lienzo de ${String(LIENZO)}: por aquí se escalan todas. */
-export const CAJA_DE_LA_LETRA = {
-  x: ${String(CAJA_DE_LA_LETRA.x)},
-  y: ${String(CAJA_DE_LA_LETRA.y)},
-  ancho: ${String(CAJA_DE_LA_LETRA.ancho)},
-  alto: ${String(CAJA_DE_LA_LETRA.alto)},
-} as const;
+/**
+ * DÓNDE ESTÁ EL ORIGEN DE UN GLIFO dentro del lienzo de ${String(LIENZO)}, y cuánto mide una
+ * mayúscula. Con esas dos cosas se compone una palabra y no hace falta nada más.
+ *
+ * NO es una caja que encierre el dibujo —los acentos suben por encima y algún serif sale a la
+ * izquierda—: es el PUNTO por el que se agarra cada glifo, el mismo para todos, sobre la línea
+ * de base. Quien pinta lo lleva al origen, escala por \`ALTO_DE_LA_LETRA\` y va sumando los
+ * avances: así la \`Á\` no sale más pequeña que la \`A\` para que le quepa el acento.
+ */
+export const ORIGEN_DE_LA_LETRA = { x: ${String(decima(ORIGEN_X))}, y: ${String(decima(LINEA_DE_BASE))} } as const;
 
-/** Cuánto avanza el sitio de una letra a la siguiente al componer una palabra. */
-export const AVANCE_DE_LA_LETRA = ${String(AVANCE_DE_LA_LETRA)};
+/** Lo que mide una mayúscula en el lienzo: la talla por la que se normalizan todos los glifos. */
+export const ALTO_DE_LA_LETRA = ${String(decima(ALTO_DE_LA_MAYUSCULA_EN_EL_LIENZO))};
+
+/**
+ * CUÁNTO AVANZA EL SITIO AL SIGUIENTE CARÁCTER, POR GLIFO, en unidades de la caja.
+ *
+ * Un tipo de verdad no es monoespaciado: aquí la \`I\` mide mucho menos que la \`W\`. Con un
+ * avance único, «MIMO» sale con dos agujeros y «WWW» apelotonado. Quien componga una palabra
+ * suma estos anchos, y para el que no esté en la tabla —no debería haber ninguno— vale el de la
+ * caja entera.
+ */
+export const AVANCE_DE_LA_LETRA: Readonly<Record<string, number>> = {
+${cuerpoDeLosAvances}
+};
 
 /**
  * LOS EMBLEMAS DE LAS CASILLAS DEL BURGO QUE NO SE COMPRAN.
@@ -2474,8 +2516,9 @@ for (const [carta, medida] of revisiones) {
  */
 const trianguloDeLaLetra = [...revisionesDeLetras.values()].reduce((total, m) => total + m.triangulos, 0);
 console.log(
-  `    ${'alfabeto'.padEnd(14)} ${String(revisionesDeLetras.size)} letras · ` +
-    `${String(trianguloDeLaLetra)} triángulos en total · ` +
-    `${String(Math.round(trianguloDeLaLetra / Math.max(1, revisionesDeLetras.size)))} por letra ` +
-    `(${[...revisionesDeLetras.keys()].join('')})`,
+  `    ${'alfabeto'.padEnd(14)} ${String(revisionesDeLetras.size)} glifos de ${path.basename(TIPO_DEL_TABLERO)} · ` +
+    `${String(trianguloDeLaLetra)} triángulos · ` +
+    `${String(Math.round(trianguloDeLaLetra / Math.max(1, revisionesDeLetras.size)))} por glifo · ` +
+    `${String(redundantesQuitados)} contorno(s) redundante(s) del tipo quitados`,
 );
+console.log(`    ${''.padEnd(14)} ${[...revisionesDeLetras.keys()].join('')}`);
