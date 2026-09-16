@@ -233,6 +233,8 @@ Cada asiento tiene un peón (instancia) SIEMPRE en su hueco de casilla; el color
    de espera: `reposo-b`, o `saludar` si le toca tirar a él.
 6. `a-la-mazmorra`: `golpe` (0,667 s) donde está, se desvanece (0,4 s), la reja SUBE 4
    unidades (0,6 s), `aparecer` en su hueco de preso (1,3 s), la reja BAJA (0,6 s) ≈ 3,5 s.
+   Desde la 30 (¡A comisaría!), entre el golpe y el desvanecerse, corre 0,8 s a la celda del
+   cuartel de esa esquina y se desvanece DENTRO (≈ 4,4 s; ver `LAS-CASILLAS.md`).
    Sin viaje por la plaza: es más barato, más claro y no cruza edificios. `sale-de-la-mazmorra`:
    la reja sube, `salto`, y sigue el recorrido normal de la tirada (fianza/indulto: monedas o
    el naipe al fondo). `sigue-presa`: `golpe` contra la reja. De visita (cae en la 10 por la
@@ -378,7 +380,7 @@ minutos y nadie lo ve).
 | `vende` | la casa se hunde y unas monedas vuelan al peón | 0,4 s |
 | `empena` / `desempena` | la bandera baja a media asta y la acera se apaga al 55 % de luminancia (color por vértice reescrito; nunca opacidad) / sube y recobra | 0,5 s |
 | `carta` | §5.5 | 0,4 + 2,4 + 0,4 s |
-| `a-la-mazmorra` / `sale-de-la-mazmorra` / `sigue-presa` | §5.3 | ≈ 3,5 s / 0,6 s + salto / 0,667 s |
+| `a-la-mazmorra` / `sale-de-la-mazmorra` / `sigue-presa` | §5.3 | ≈ 3,5 s (≈ 4,4 desde la 30) / 0,6 s + salto / 0,667 s |
 | `trato` propuesto | una línea de 12 discos en el suelo entre los dos peones; la hoja abre «El trato» | mientras dure |
 | `trato` aceptado | monedas y banderas cambian de sitio: las banderas de los títulos giran 180° cambiando de color | 1,0 s |
 | `apuro` | el peón del deudor tiembla (`sacudida`) y su fila del marcador se pone en rojo; la hoja abre «Lo mío» con vender/empeñar | 0,6 s |

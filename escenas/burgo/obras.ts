@@ -33,7 +33,7 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MARGEN_DEL_TEXTO, MAZMORRA, PUERTAS, SUPERFICIE, anchoDeLaPalabra, giroHaciaDentro, giroHaciaFuera, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, CELDA_DEL_CUARTEL, FERIA, MARGEN_DEL_TEXTO, MAZMORRA, PUERTAS, SUPERFICIE, anchoDeLaPalabra, giroHaciaDentro, giroHaciaFuera, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
@@ -389,12 +389,9 @@ const COMISARIA = {
   porche: { u0: 394, u1: 400, v0: 379, v1: 393, alto: 8, grueso: 1.1, columna: 1.2 },
   /* El farol azul encima del porche: lo único que dice «policía» desde lejos. */
   farol: { lado: 2.2, desde: 9.1, hasta: 11.3 },
-  /* La celda: tres paredes, cinco barrotes y NADA encima. */
-  celda: { u0: 404, u1: 416, v0: 400, v1: 412, pared: 1.2, alto: 7, barrotes: 5, barrote: 0.7 },
+  /* La celda: tres paredes, cinco barrotes y NADA encima. Su sitio es `CELDA_DEL_CUARTEL` del anillo; aquí, lo que la construye. */
+  celda: { ...CELDA_DEL_CUARTEL, pared: 1.2, barrotes: 5, barrote: 0.7 },
 } as const;
-
-/** El centro de la celda de la comisaría: ahí se planta el peón al que mandan a la cárcel. */
-export const HUECO_DE_LA_CELDA = { u: (COMISARIA.celda.u0 + COMISARIA.celda.u1) / 2, v: (COMISARIA.celda.v0 + COMISARIA.celda.v1) / 2 } as const;
 
 function carasDeLaComisaria(): CaraDeObra[] {
   const c = A_LA_MAZMORRA;
@@ -415,8 +412,9 @@ function carasDeLaComisaria(): CaraDeObra[] {
   /* La celda: suelo, tres paredes y la reja del cuarto lado. Sin techo, que es el porqué de todo. */
   const ce = COMISARIA.celda;
   salida.push(losa(c, ce.u0, ce.u1, ce.v0, ce.v1, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.hormigon));
+  /* Tres paredes —la de atrás, la del cuartel y la del fondo—; el cuarto lado, el `u0`, es la reja. */
   salida.push(...caja(c, ce.u0, ce.u1, ce.v1 - ce.pared, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
-  salida.push(...caja(c, ce.u0, ce.u0 + ce.pared, ce.v0, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
+  salida.push(...caja(c, ce.u0, ce.u1, ce.v0, ce.v0 + ce.pared, 0, ce.alto, COLOR_DE_OBRA.muro));
   salida.push(...caja(c, ce.u1 - ce.pared, ce.u1, ce.v0, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
   /*
    * Los BARROTES no se funden con la celda: suben y bajan cuando encierran a alguien, igual que la
@@ -1286,17 +1284,17 @@ export function ejeDeLaJoya(): PiezaViva {
 /**
  * LA REJA DE LA CELDA DE LA COMISARÍA, que sube y baja.
  *
- * Miguel: «quiero ver cómo entra en la celda». Meter al PEÓN dentro obliga a tocar su máquina de
- * estados —su recorrido, sus fases, su comprobador— y eso es otra tanda. Lo que sí cuenta la
- * historia con lo que ya hay es la REJA: se abre y se cierra cuando mandan a alguien a la cárcel,
- * exactamente como la hoja de la verja de la Mazmorra, que lleva funcionando desde su tanda.
+ * Miguel: «quiero ver cómo entra en la celda». Quien cae en ¡A comisaría! corre hasta ella
+ * (`peon.ts`, la etapa «a la celda») y pasa por DEBAJO de esta reja, que sube durante su golpe y
+ * baja mientras se desvanece dentro, con su propia curva: `alzadoDeLaRejaDeLaCelda`.
  *
  * Va en el marco de la celda con el origen en el suelo, y sube en `y`.
  */
 export function carasDeLaRejaDeLaCelda(): CaraDeObra[] {
   const ce = COMISARIA.celda;
   const salida: CaraDeObra[] = [];
-  const ancho = ce.u1 - ce.u0;
+  /* La reja corre a lo largo de `v`, por el lado `u0`: su ancho es el fondo de la celda. */
+  const ancho = ce.v1 - ce.v0;
   const paso = ancho / (ce.barrotes + 1);
   for (let k = 1; k <= ce.barrotes; k++) {
     const u = -ancho / 2 + paso * k;
@@ -1311,7 +1309,7 @@ export function carasDeLaRejaDeLaCelda(): CaraDeObra[] {
 export function sitioDeLaRejaDeLaCelda(): PiezaViva {
   const m = marcoDeCasilla(A_LA_MAZMORRA);
   const ce = COMISARIA.celda;
-  const p = puntoEnEsquina(m, (ce.u0 + ce.u1) / 2, ce.v0);
+  const p = puntoEnEsquina(m, ce.u0, (ce.v0 + ce.v1) / 2);
   return { casilla: A_LA_MAZMORRA, x: p.x, y: 0, z: p.z, giro: giroHaciaFuera(m) };
 }
 

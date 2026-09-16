@@ -2070,6 +2070,30 @@ export function mundoEstatico(semilla: number, calidad: 'plena' | 'sobria' = 'pl
   ];
 }
 
+/**
+ * LA CELDA DEL CUARTEL DE ¡A COMISARÍA! (casilla 30), EN EL ANILLO Y NO EN LAS OBRAS.
+ *
+ * La levanta `obras.ts`, pero su sitio se declara aquí porque lo necesita también la máquina del
+ * peón —que corre hasta ella—, y `obras.ts` ya importa de este fichero: al revés sería un ciclo.
+ *
+ * La reja va en el lado `u0`, el que da a la AVENIDA, y no en el `v0` donde estuvo: ese lado está
+ * pegado a la pared del cuartel (`v` 372..400), así que para entrar por él un peón tendría que
+ * atravesar el edificio. Por `u0` se llega desde la marcha cruzando la avenida y pasando por delante
+ * del porche sin pisarlo.
+ *
+ * El camino tiene CUATRO puntos: su sitio, el PASO por el que cruza a la avenida, la PUERTA y
+ * DENTRO. El paso no es adorno: en línea recta de su sitio a la puerta, cinco de los seis asientos
+ * se llevaban por delante la farola o el arbusto de la acera de enfrente (`farola-de-calle` en
+ * 370,6 × 366 y `arbusto` en 366 × 366). Por (362; 368,5) pasan los seis al norte de los dos y al
+ * sur del semáforo con 3 de holgura como poco, y el camino más largo mide 106,5 en vez de 104.
+ * Lo mide `verify:burgo-escena` contra las cajas del `burgo.glb`, y si alguien mueve una pieza de
+ * esa esquina y la pone en medio, cae.
+ */
+export const CELDA_DEL_CUARTEL = { u0: 404, u1: 416, v0: 400, v1: 412, alto: 7 } as const;
+export const PASO_HACIA_LA_CELDA = { u: 362, v: 368.5 } as const;
+export const PUERTA_DE_LA_CELDA = { u: 398, v: 406 } as const;
+export const DENTRO_DE_LA_CELDA = { u: 410, v: 406 } as const;
+
 /** Lo que la escena usa para colocar peones y aventureros: la polilínea y los huecos. Es lo que `peon.ts` recibe. */
 export interface AnilloEn3D {
   readonly polilinea: readonly Punto[];
@@ -2079,6 +2103,10 @@ export interface AnilloEn3D {
   readonly huecoDeVisita: (asiento: number) => Punto;
   readonly rumboDeLaMarcha: (casilla: number) => number;
   readonly fuera: (casilla: number) => Punto;
+  /** El camino a la celda del cuartel de la 30, en el mundo, sin el sitio de salida: el paso, la puerta y dentro. */
+  readonly pasoHaciaLaCelda: Punto;
+  readonly puertaDeLaCelda: Punto;
+  readonly dentroDeLaCelda: Punto;
 }
 
 export const ANILLO_DEL_BURGO: AnilloEn3D = {
@@ -2089,4 +2117,7 @@ export const ANILLO_DEL_BURGO: AnilloEn3D = {
   huecoDeVisita,
   rumboDeLaMarcha: (casilla) => rumboDeLaMarcha(marcoDeCasilla(casilla)),
   fuera: (casilla) => marcoDeCasilla(casilla).fuera,
+  pasoHaciaLaCelda: puntoEnEsquina(marcoDeCasilla(A_LA_MAZMORRA), PASO_HACIA_LA_CELDA.u, PASO_HACIA_LA_CELDA.v),
+  puertaDeLaCelda: puntoEnEsquina(marcoDeCasilla(A_LA_MAZMORRA), PUERTA_DE_LA_CELDA.u, PUERTA_DE_LA_CELDA.v),
+  dentroDeLaCelda: puntoEnEsquina(marcoDeCasilla(A_LA_MAZMORRA), DENTRO_DE_LA_CELDA.u, DENTRO_DE_LA_CELDA.v),
 };

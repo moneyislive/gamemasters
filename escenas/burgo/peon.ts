@@ -34,7 +34,9 @@
  *     pagando      → `lanzar` cortado a 0,6 y el resto quieto: 0,9
  *     alzando      → `usar` mientras brotan las casas: 0,45 por casa
  *     preso        → `golpe`, se desvanece, la reja sube, `aparecer` en el hueco de preso,
- *                    la reja baja (≈ 3,5 s); después encerrado, con `golpe` contra la reja si sigue
+ *                    la reja baja (≈ 3,5 s); desde la 30, entre el golpe y el desvanecerse,
+ *                    `correr` 0,8 hasta la celda del cuartel (≈ 4,4 s); después encerrado,
+ *                    con `golpe` contra la reja si sigue
  *     quebrando    → `golpe`, `correr` 72 unidades hacia FUERA cruzando su solar y se desvanece
  *     despidiendose→ 0,4 s de `reposo-a` encogiendo a escala 0 (un aventurero fundido no tiene opacidad)
  *
@@ -59,6 +61,13 @@
  * celda. Es más barato, más claro, y no cruza edificios. `verify:burgo-escena` afirma que
  * en toda la transición la posición está en la casilla de origen o en la Mazmorra.
  *
+ * Con UNA excepción, y es la casilla que manda: quien cae en ¡A comisaría! (la 30) no se
+ * desvanece en su sitio. Corre a la celda del cuartel que hay en esa misma esquina —cruza la
+ * avenida por su paso, llega a la puerta y entra, bajo la reja subida— y se desvanece dentro.
+ * Sigue sin pisar otra casilla, porque la celda está en la 30. El camino lo declara el anillo
+ * (`pasoHaciaLaCelda`, `puertaDeLaCelda`, `dentroDeLaCelda`), y el comprobador mide que no
+ * atraviese ninguna obra ni ninguna pieza.
+ *
  * ═══ SIN `three` ═══
  *
  * El `giroCorto` de `escenas/aventureros/marioneta.ts` es el que se quiere, pero ese
@@ -72,7 +81,7 @@ import { amortiguado } from '../embarcadero/camara';
 import { PASO_POR_SEGUNDO } from '../escala';
 import { ASENTAR, reboteDelDado } from '../dados';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
-import { ANILLO_DEL_BURGO, MAZMORRA, PUERTA_MAYOR } from './anillo-en-3d';
+import { ANILLO_DEL_BURGO, A_LA_MAZMORRA, MAZMORRA, PUERTA_MAYOR } from './anillo-en-3d';
 import type { AnilloEn3D, Punto } from './anillo-en-3d';
 
 export type FaseDelPeon =
@@ -196,6 +205,15 @@ export const POR_CASA_ALZADA = 0.45;
 export const DESVANECER = 0.4;
 export const DESVANECER_AL_QUEBRAR = 0.8;
 export const PASO_DE_LA_REJA = 0.6;
+/**
+ * Lo que tarda en correr de su sitio de la 30 a la celda del cuartel: 0,8, que es el tope de
+ * TODA animación de casilla (Miguel: «las animaciones siempre deben ser muy breves»). El camino
+ * mide de 88 a 106,5 según el asiento, así que va a entre 110 y 133 u/s: el clip de correr, a
+ * entre 1,14 y 1,39, algo más deprisa que su paso y dentro del tope de 1,5.
+ */
+export const A_LA_CELDA = 0.8;
+/** En cuántas unidades de camino gira: al arrancar, y en cada vértice del camino. */
+export const GIRO_EN_EL_CAMINO = 4;
 export const DURACION_DE_LA_DESPEDIDA = 0.4;
 export const HUNDIDO_DEL_PEON = 0.4;
 export const TIEMPO_DE_HUNDIRSE = 0.3;
@@ -330,6 +348,72 @@ export function duracionDelMovimiento(s: Extract<SucesoDelBurgo, { que: 'mueve' 
   return (enPie ? 0 : DURACION.aparecer) + CORTE_DEL_RECOGER + recorrido + salto;
 }
 
+/* ─────────────────────────── La celda del cuartel ─────────────────────────── */
+
+/** ¿Le mandan desde la casilla que tiene la celda? Entonces corre a ella antes de desvanecerse. */
+export function pasaPorLaCelda(desde: number): boolean {
+  return desde === A_LA_MAZMORRA;
+}
+
+/** El camino de la 30 a la celda: su sitio, el paso por el que cruza a la avenida, la puerta y dentro. */
+export function caminoALaCelda(anillo: AnilloEn3D, asiento: number): readonly Punto[] {
+  return [anillo.huecoDeAventurero(A_LA_MAZMORRA, asiento), anillo.pasoHaciaLaCelda, anillo.puertaDeLaCelda, anillo.dentroDeLaCelda];
+}
+
+/** Los tramos de ese camino, con lo que mide cada uno y hacia dónde va. */
+function tramosDelCamino(puntos: readonly Punto[]): { readonly de: Punto; readonly a: Punto; readonly largo: number; readonly rumbo: number }[] {
+  const tramos: { readonly de: Punto; readonly a: Punto; readonly largo: number; readonly rumbo: number }[] = [];
+  for (let k = 1; k < puntos.length; k++) {
+    const de = puntos[k - 1] as Punto;
+    const a = puntos[k] as Punto;
+    tramos.push({ de, a, largo: Math.hypot(a.x - de.x, a.z - de.z), rumbo: Math.atan2(a.x - de.x, a.z - de.z) });
+  }
+  return tramos;
+}
+
+/** Lo que mide ese camino. */
+export function largoDelCaminoALaCelda(anillo: AnilloEn3D, asiento: number): number {
+  return tramosDelCamino(caminoALaCelda(anillo, asiento)).reduce((suma, t) => suma + t.largo, 0);
+}
+
+/** El `timeScale` del clip de correr para cubrir `largo` en `A_LA_CELDA`: nunca más del tope. */
+export function velocidadALaCelda(largo: number): number {
+  return Math.min(TOPE_DE_VELOCIDAD, Math.max(0.5, largo / A_LA_CELDA / VELOCIDAD_CORRIENDO));
+}
+
+/**
+ * Dónde va y hacia dónde mira a `u` (0..1) del camino a la celda, a paso constante. El rumbo gira
+ * en `GIRO_EN_EL_CAMINO` unidades al arrancar —desde `rumboAlArrancar`, el que traía— y otras
+ * tantas alrededor de cada vértice, centradas en él: sin eso daría la vuelta en un fotograma. Un
+ * tramo de largo cero no gira a nadie, que su `atan2(0, 0)` no es un rumbo.
+ */
+export function enElCaminoALaCelda(anillo: AnilloEn3D, asiento: number, u: number, rumboAlArrancar: number): { readonly x: number; readonly z: number; readonly rumbo: number } {
+  const tramos = tramosDelCamino(caminoALaCelda(anillo, asiento));
+  const total = tramos.reduce((suma, t) => suma + t.largo, 0);
+  const recorrido = Math.min(1, Math.max(0, u)) * total;
+  const ultimo = tramos[tramos.length - 1];
+  let x = ultimo === undefined ? 0 : ultimo.a.x;
+  let z = ultimo === undefined ? 0 : ultimo.a.z;
+  let rumbo = rumboAlArrancar;
+  let acumulado = 0;
+  let colocado = false;
+  tramos.forEach((t, k) => {
+    if (t.largo > 0) {
+      /* El primero gira desde que arranca; los demás, a caballo de su vértice. */
+      const desde = k === 0 ? 0 : acumulado - GIRO_EN_EL_CAMINO / 2;
+      rumbo += giroCorto(rumbo, t.rumbo) * Math.min(1, Math.max(0, (recorrido - desde) / GIRO_EN_EL_CAMINO));
+    }
+    if (!colocado && (recorrido <= acumulado + t.largo || k === tramos.length - 1)) {
+      const f = t.largo > 0 ? Math.min(1, Math.max(0, (recorrido - acumulado) / t.largo)) : 1;
+      x = t.de.x + (t.a.x - t.de.x) * f;
+      z = t.de.z + (t.a.z - t.de.z) * f;
+      colocado = true;
+    }
+    acumulado += t.largo;
+  });
+  return { x, z, rumbo };
+}
+
 /* ─────────────────────────────── Las etapas ─────────────────────────────── */
 
 export interface Etapa {
@@ -356,6 +440,8 @@ export function etapasDe(e: EstadoDelPeon): readonly Etapa[] {
     case 'preso':
       return [
         { nombre: 'golpe', dura: DURACION.golpe },
+        /* Desde la 30, antes de desvanecerse corre a la celda del cuartel. */
+        ...(pasaPorLaCelda(e.enCasilla) ? [{ nombre: 'a-la-celda', dura: A_LA_CELDA }] : []),
         { nombre: 'desvanecer', dura: DESVANECER },
         { nombre: 'reja-sube', dura: PASO_DE_LA_REJA },
         { nombre: 'aparecer', dura: DURACION.aparecer },
@@ -458,8 +544,13 @@ function arranca(e: EstadoDelPeon, anillo: AnilloEn3D, s: SucesoDelBurgo, ahora:
       return entraEn(e, 'pagando', ahora);
     case 'alza':
       return entraEn(e, 'alzando', ahora, { casas: s.casas === 5 ? 2 : 1 });
-    case 'a-la-mazmorra':
-      return entraEn(e, 'preso', ahora, { enPie: true, presa: true, enCasilla: s.desde, haciaCasilla: MAZMORRA, camino: [MAZMORRA], u: 0 });
+    case 'a-la-mazmorra': {
+      const preso: Partial<EstadoDelPeon> = { enPie: true, presa: true, enCasilla: s.desde, haciaCasilla: MAZMORRA, camino: [MAZMORRA], u: 0 };
+      if (!pasaPorLaCelda(s.desde)) return entraEn(e, 'preso', ahora, preso);
+      /* Desde la 30 corre a la celda: el largo y el paso del clip, medidos una vez aquí. */
+      const largo = largoDelCaminoALaCelda(anillo, e.asiento);
+      return entraEn(e, 'preso', ahora, { ...preso, largo, velocidad: velocidadALaCelda(largo) });
+    }
     case 'sale-de-la-mazmorra':
       return entraEn(e, 'saltando', ahora, { salto: 'salida', presa: false, enPie: true, enCasilla: MAZMORRA, haciaCasilla: MAZMORRA, camino: [], u: 0 });
     case 'sigue-presa':
@@ -713,7 +804,10 @@ export function clipQueToca(e: EstadoDelPeon, ahora = e.desde): ClipDelPeon {
     case 'preso': {
       if (!e.enPie) return e.gesto !== null ? una(e.gesto.clip, e.gesto.desde) : reposo;
       const etapa = etapaActual(e, ahora);
-      if (etapa.nombre === 'golpe' || etapa.nombre === 'desvanecer') return una(CLIP.golpe);
+      if (etapa.nombre === 'golpe') return una(CLIP.golpe);
+      if (etapa.nombre === 'a-la-celda') return { clip: CLIP.correr, bucle: true, desde: etapa.desde, velocidad: e.velocidad };
+      /* Se desvanece con el golpe donde lo recibió; o, si ha corrido a la celda, parado dentro. */
+      if (etapa.nombre === 'desvanecer') return pasaPorLaCelda(e.enCasilla) ? { ...reposo, desde: etapa.desde } : una(CLIP.golpe);
       if (etapa.nombre === 'aparecer') return una(CLIP.aparecer, etapa.desde);
       return { ...reposo, desde: etapa.desde };
     }
@@ -775,6 +869,12 @@ export function posicionYRumbo(e: EstadoDelPeon, anillo: AnilloEn3D, ahora = e.d
       if (!e.enPie) return quieto(anillo.huecoDePreso(e.asiento), 1, anillo.rumboDeLaMarcha(MAZMORRA));
       const etapa = etapaActual(e, ahora);
       if (etapa.nombre === 'golpe') return quieto(anillo.huecoDeAventurero(e.enCasilla, e.asiento));
+      /* Corriendo a la celda, y desvaneciéndose dentro de ella al final del camino. */
+      if (etapa.nombre === 'a-la-celda' || (etapa.nombre === 'desvanecer' && pasaPorLaCelda(e.enCasilla))) {
+        const corriendo = etapa.nombre === 'a-la-celda';
+        const p = enElCaminoALaCelda(anillo, e.asiento, corriendo ? etapa.u : 1, e.rumbo);
+        return quieto(p, corriendo ? 1 : 1 - etapa.u, p.rumbo);
+      }
       if (etapa.nombre === 'desvanecer') return quieto(anillo.huecoDeAventurero(e.enCasilla, e.asiento), 1 - etapa.u);
       if (etapa.nombre === 'reja-sube') return quieto(anillo.huecoDePreso(e.asiento), 0, anillo.rumboDeLaMarcha(MAZMORRA));
       return quieto(anillo.huecoDePreso(e.asiento), 1, anillo.rumboDeLaMarcha(MAZMORRA));
@@ -835,7 +935,7 @@ export function posicionDelPeon(e: EstadoDelPeon, anillo: AnilloEn3D, ahora = e.
     case 'preso': {
       if (!e.enPie) return en(anillo.huecoDePreso(e.asiento));
       const etapa = etapaActual(e, ahora);
-      if (etapa.nombre === 'golpe' || etapa.nombre === 'desvanecer') return en(anillo.huecoDePeon(e.enCasilla, e.asiento), 0, false);
+      if (etapa.nombre === 'golpe' || etapa.nombre === 'a-la-celda' || etapa.nombre === 'desvanecer') return en(anillo.huecoDePeon(e.enCasilla, e.asiento), 0, false);
       return en(anillo.huecoDePreso(e.asiento), 0, etapa.nombre !== 'reja-sube');
     }
     case 'quebrando': {

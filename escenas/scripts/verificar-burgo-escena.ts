@@ -42,7 +42,7 @@ import type { Node } from '@gltf-transform/core';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as THREE from 'three';
-import { CLIP } from '../embarcadero/figuras';
+import { CLIP, FIGURAS } from '../embarcadero/figuras';
 import { DURACION } from '../embarcadero/gestos';
 import { proyecta } from '../embarcadero/camara';
 import { sorteo } from '../embarcadero/cala';
@@ -56,6 +56,12 @@ import {
   ALTURA_DEL_MANTO,
   ALTURA_DE_LAS_NUBES,
   ALTURA_DEL_REBORDE,
+  A_LA_MAZMORRA,
+  CELDA_DEL_CUARTEL,
+  DENTRO_DE_LA_CELDA,
+  PASO_HACIA_LA_CELDA,
+  PUERTA_DE_LA_CELDA,
+  SUBIDA_DE_LA_REJA,
   ANCHO_DE_CASILLA,
   ANCHO_DE_TESELA,
   ANCHO_DEL_BULEVAR,
@@ -165,7 +171,7 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
-import { DEL_MUNDO, VIA, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaObraEnElMundo, carasDeLasObras, carasDelTren, casillasConObra, largoDeLaVia, letrasDeLosCarteles, paradasDelTren, puntoEnLaVia, triangulosDeLasObras } from '../burgo/obras';
+import { DEL_MUNDO, VIA, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLasObras, carasDelTren, casillasConObra, largoDeLaVia, letrasDeLosCarteles, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda, triangulosDeLasObras } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO, PAGA_DE_LA_PUERTA_MAYOR } from '../../shared/arcade/juegos/burgo-tablero';
@@ -184,7 +190,10 @@ import {
   sumaDelPresupuesto,
 } from '../burgo/presupuesto';
 import {
+  A_LA_CELDA,
   CASILLAS_ANDANDO,
+  DESVANECER,
+  PASO_DE_LA_REJA,
   TOPE_DEL_RECORRIDO,
   TOPE_DE_VELOCIDAD,
   TOPE_POR_CASILLA_ANDANDO,
@@ -193,10 +202,15 @@ import {
   avanzar,
   clipQueToca,
   despedir,
+  duracionDeLaFase,
   duracionDelRecorrido,
   encolar,
+  etapaActual,
+  etapasDe,
+  largoDelCaminoALaCelda,
   largoDelRecorrido,
   nacer,
+  pasaPorLaCelda,
   posicionDelPeon,
   posicionYRumbo,
   saltarLaCola,
@@ -204,7 +218,7 @@ import {
   velocidadDelClip,
 } from '../burgo/peon';
 import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
-import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, alzadoDeLaReja, finDeLaCola, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
+import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelEncierro, duracionDelSuceso, finDeLaCola, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
   ALCANCE_DEL_BURGO,
@@ -1622,6 +1636,214 @@ function mueve(desde: number, pasos: number, como: 'anda' | 'viaja' | 'retrocede
   const enLaCelda = enLaEsquina(marcoDeCasilla(MAZMORRA), posicionYRumbo(e, anillo, ahora));
   comprobar('y su aventurero y su peón están en el patio de la cárcel', Math.abs(enLaCelda.u - CELDA.u) < CELDA.lado && Math.abs(enLaCelda.v - CELDA.v) < CELDA.lado && posicionDelPeon(e, anillo, ahora).visible, enLaCelda);
 
+  /*
+   * DESDE LA 30, A LA CELDA DEL CUARTEL: SE VE ENTRAR.
+   *
+   * Quien cae en ¡A comisaría! no se desvanece donde está: corre a la celda del cuartel de esa
+   * misma esquina, pasa bajo la reja subida y se desvanece dentro. Se mide con la máquina de
+   * verdad, paso a paso, y con los SEIS asientos, porque cada uno sale de un sitio:
+   *
+   *  · la etapa está entre el golpe y el desvanecerse, y la fase dura lo que dice la coreografía;
+   *  · corre con el clip de correr al paso del camino, y el peón no se ve mientras lo lleva;
+   *  · no sale de la esquina de la 30, pasa por la PUERTA y acaba DENTRO de la celda;
+   *  · no atraviesa ninguna obra ni ninguna pieza de la esquina;
+   *  · cada instante en que está bajo la reja de la celda, la reja está más alta que él;
+   *  · y la verja de la Comisaría no se abre hasta que se ha desvanecido, ni desde la 30 ni desde otra.
+   *
+   * Las medidas que hacen falta se toman de donde viven: el alto del aventurero MÁS ALTO de los
+   * seis `.glb`, el radio de su disco de `Aventurero.tsx`, la reja de su geometría viva y las
+   * piezas de sus cajas del `burgo.glb`.
+   */
+  {
+    let altoDelMasAlto = 0;
+    const faltan: string[] = [];
+    for (const f of FIGURAS) {
+      const ruta = path.join(RAIZ, 'modelos', 'aventureros', f.fichero);
+      if (!fs.existsSync(ruta)) {
+        faltan.push(f.id);
+        continue;
+      }
+      const d = await io.read(ruta);
+      for (const malla of d.getRoot().listMeshes()) {
+        for (const prim of malla.listPrimitives()) {
+          const pos = prim.getAttribute('POSITION');
+          if (pos === null) continue;
+          const v = [0, 0, 0];
+          for (let i = 0; i < pos.getCount(); i++) altoDelMasAlto = Math.max(altoDelMasAlto, pos.getElement(i, v)[1] as number);
+        }
+      }
+    }
+    comprobar(`los ${String(FIGURAS.length)} aventureros están y se miden: el más alto, ${r(altoDelMasAlto)}`, faltan.length === 0 && altoDelMasAlto > 2 && altoDelMasAlto < 3, { faltan, altoDelMasAlto });
+    const radioLeido = /RADIO_DEL_DISCO_DEL_AVENTURERO\s*=\s*([\d.]+)/.exec(fs.readFileSync(path.join(CARPETA, 'Aventurero.tsx'), 'utf8'));
+    const radio = radioLeido === null ? NaN : Number(radioLeido[1]);
+    comprobar('el radio del disco del aventurero se lee de Aventurero.tsx', Number.isFinite(radio) && radio > 0.3 && radio < 2, radioLeido?.[0]);
+
+    const marco30 = marcoDeCasilla(A_LA_MAZMORRA);
+    const enLa30 = (p: Punto): { readonly u: number; readonly v: number } => enLaEsquina(marco30, p);
+
+    /* Lo que no se puede atravesar: las caras de obra con altura y las piezas de la esquina, en (u, v). */
+    interface Estorbo {
+      readonly que: string;
+      readonly u0: number;
+      readonly u1: number;
+      readonly v0: number;
+      readonly v1: number;
+    }
+    const estorbos: Estorbo[] = [];
+    for (const cara of carasDeLasObras()) {
+      if (cara.casilla !== A_LA_MAZMORRA) continue;
+      const ys = cara.puntos.map((q) => q[1]);
+      if (Math.max(...ys) - Math.min(...ys) < 0.001 || Math.min(...ys) >= altoDelMasAlto) continue;
+      const us = cara.puntos.map((q) => q[0]);
+      const vs = cara.puntos.map((q) => q[2]);
+      estorbos.push({ que: `obra ${cara.color}`, u0: Math.min(...us), u1: Math.max(...us), v0: Math.min(...vs), v1: Math.max(...vs) });
+    }
+    const obrasMedidas = estorbos.length;
+    for (const puesta of piezasDeLaEsquina(A_LA_MAZMORRA)) {
+      if (esSuelo(puesta.pieza) || puesta.y + caja(puesta.pieza).min[1] >= altoDelMasAlto) continue;
+      const esquinas = esquinasDeLaPuesta(puesta).map(enLa30);
+      estorbos.push({
+        que: `pieza ${puesta.pieza}`,
+        u0: Math.min(...esquinas.map((q) => q.u)),
+        u1: Math.max(...esquinas.map((q) => q.u)),
+        v0: Math.min(...esquinas.map((q) => q.v)),
+        v1: Math.max(...esquinas.map((q) => q.v)),
+      });
+    }
+    comprobar(`se miden ${String(obrasMedidas)} caras de obra y ${String(estorbos.length - obrasMedidas)} piezas de la esquina, y no cero`, obrasMedidas > 20 && estorbos.length - obrasMedidas > 5, { obras: obrasMedidas, piezas: estorbos.length - obrasMedidas });
+    const choquesEn = (u: number, v: number): string[] =>
+      estorbos.filter((o) => u > o.u0 - radio && u < o.u1 + radio && v > o.v0 - radio && v < o.v1 + radio).map((o) => `${o.que} en (${r(u)}, ${r(v)})`);
+
+    /* La reja de la celda, de su geometría viva puesta en su sitio: la franja que ocupa en el suelo. */
+    const sitioDeLaReja = sitioDeLaRejaDeLaCelda();
+    const pieDeLaReja = carasDeLaRejaDeLaCelda()
+      .flatMap((cara) => cara.puntos)
+      .map((q) => {
+        const g = giraElPunto(q[0], q[2], sitioDeLaReja.giro);
+        return enLa30({ x: sitioDeLaReja.x + g.x, z: sitioDeLaReja.z + g.z });
+      });
+    const franja = { u0: Math.min(...pieDeLaReja.map((q) => q.u)), u1: Math.max(...pieDeLaReja.map((q) => q.u)), v0: Math.min(...pieDeLaReja.map((q) => q.v)), v1: Math.max(...pieDeLaReja.map((q) => q.v)) };
+    comprobar(
+      'la reja de la celda está puesta en el lado de la puerta: entre la puerta y el fondo, a lo largo de toda la celda',
+      franja.u0 > PUERTA_DE_LA_CELDA.u && franja.u1 < DENTRO_DE_LA_CELDA.u && franja.v0 <= CELDA_DEL_CUARTEL.v0 + 1e-6 && franja.v1 >= CELDA_DEL_CUARTEL.v1 - 1e-6,
+      franja,
+    );
+    const bajoLaReja = (u: number, v: number): boolean => u > franja.u0 - radio && u < franja.u1 + radio && v > franja.v0 - radio && v < franja.v1 + radio;
+
+    const ETAPAS_DESDE_LA_30 = ['golpe', 'a-la-celda', 'desvanecer', 'reja-sube', 'aparecer', 'reja-baja'];
+    const suceso30: SucesoDelBurgo = { que: 'a-la-mazmorra', quien: A, desde: A_LA_MAZMORRA, porque: 'casilla' };
+    const PASO = 0.004;
+    const malas: string[] = [];
+    const choques: string[] = [];
+    const sinPuerta: string[] = [];
+    const fueraDeLaCelda: string[] = [];
+    const rejaBaja: string[] = [];
+    const verjaAntes: string[] = [];
+    let instantesBajoLaReja = 0;
+    let instantesCorriendo = 0;
+    /* La vacuna de la reja: la misma curva, pero adelantada lo que dura la carrera. */
+    let conLaRejaAdelantada = 0;
+    for (let asiento = 0; asiento < 6; asiento++) {
+      let c = encolar(nacer(A_LA_MAZMORRA, 5 + asiento, 0, asiento), [suceso30]);
+      let t = 0;
+      c = avanzar(c, t, PASO, anillo);
+      const dura = duracionDeLaFase(c);
+      const etapas: string[] = [];
+      let alaPuerta = Infinity;
+      let ultimo: { readonly u: number; readonly v: number } | null = null;
+      const largo = largoDelCaminoALaCelda(anillo, asiento);
+      while (c.fase === 'preso' && c.enPie && t < 10) {
+        const etapa = etapaActual(c, t);
+        if (etapas[etapas.length - 1] !== etapa.nombre) etapas.push(etapa.nombre);
+        const p = posicionYRumbo(c, anillo, t);
+        const uv = enLa30(p);
+        const clip = clipQueToca(c, t);
+        if ((etapa.nombre === 'golpe' || etapa.nombre === 'a-la-celda' || etapa.nombre === 'desvanecer') && posicionDelPeon(c, anillo, t).visible) malas.push(`${String(asiento)}: el peón se ve en «${etapa.nombre}»`);
+        if ((etapa.nombre === 'golpe' || etapa.nombre === 'a-la-celda' || etapa.nombre === 'desvanecer') && alzadoDeLaReja(t, A_LA_MAZMORRA) > 0) verjaAntes.push(`${String(asiento)}: la verja ya sube en «${etapa.nombre}» a ${r(t)}`);
+        if (etapa.nombre === 'aparecer' && alzadoDeLaReja(t, A_LA_MAZMORRA) < 1) verjaAntes.push(`${String(asiento)}: aparece con la verja a ${r(alzadoDeLaReja(t, A_LA_MAZMORRA))}`);
+        if (etapa.nombre === 'a-la-celda') {
+          instantesCorriendo++;
+          if (clip.clip !== CLIP.correr || !clip.bucle || clip.velocidad <= 0 || clip.velocidad > TOPE_DE_VELOCIDAD) malas.push(`${String(asiento)}: clip ${clip.clip} a ${r(clip.velocidad)}`);
+          if (Math.abs(clip.velocidad * VELOCIDAD_CORRIENDO * A_LA_CELDA - largo) > 0.5) malas.push(`${String(asiento)}: el clip a ${r(clip.velocidad)} no va al paso de ${r(largo)} en ${String(A_LA_CELDA)} s`);
+        }
+        if (etapa.nombre === 'a-la-celda' || etapa.nombre === 'desvanecer') {
+          if (uv.u < BORDE_INTERIOR + radio || uv.u > MEDIO_LADO - radio || uv.v < BORDE_INTERIOR + radio || uv.v > MEDIO_LADO - radio) malas.push(`${String(asiento)}: sale de la esquina en (${r(uv.u)}, ${r(uv.v)})`);
+          choques.push(...choquesEn(uv.u, uv.v).map((x) => `${String(asiento)}: ${x}`));
+          alaPuerta = Math.min(alaPuerta, Math.hypot(p.x - anillo.puertaDeLaCelda.x, p.z - anillo.puertaDeLaCelda.z));
+          ultimo = uv;
+          if (bajoLaReja(uv.u, uv.v) && p.escala > 0.001) {
+            instantesBajoLaReja++;
+            const alto = altoDelMasAlto * p.escala;
+            if (alzadoDeLaRejaDeLaCelda(t, A_LA_MAZMORRA) * SUBIDA_DE_LA_REJA <= alto) rejaBaja.push(`${String(asiento)}: a ${r(t)} la reja está a ${r(alzadoDeLaRejaDeLaCelda(t, A_LA_MAZMORRA) * SUBIDA_DE_LA_REJA)} y él mide ${r(alto)}`);
+            if (alzadoDeLaRejaDeLaCelda(t + A_LA_CELDA, A_LA_MAZMORRA) * SUBIDA_DE_LA_REJA <= alto) conLaRejaAdelantada++;
+          }
+        }
+        t += PASO;
+        c = avanzar(c, t, PASO, anillo);
+      }
+      if (JSON.stringify(etapas) !== JSON.stringify(ETAPAS_DESDE_LA_30)) malas.push(`${String(asiento)}: etapas ${etapas.join(' → ')}`);
+      if (dura === null || Math.abs(dura - duracionDelEncierro(A_LA_MAZMORRA)) > 1e-9 || Math.abs(dura - duracionDelSuceso(suceso30, false, anillo)) > 1e-9) malas.push(`${String(asiento)}: la fase dura ${String(dura)} y la coreografía ${r(duracionDelSuceso(suceso30, false, anillo))}`);
+      if (t < duracionDelEncierro(A_LA_MAZMORRA) - 1e-9 || t > duracionDelEncierro(A_LA_MAZMORRA) + PASO + 1e-9) malas.push(`${String(asiento)}: la entrada acabó a ${r(t)}`);
+      if (!c.presa || c.enCasilla !== MAZMORRA || c.enPie) malas.push(`${String(asiento)}: no acaba presa en la Comisaría`);
+      if (alaPuerta > 0.5) sinPuerta.push(`${String(asiento)}: pasa a ${r(alaPuerta)} de la puerta`);
+      const dentro = ultimo;
+      if (dentro === null || !(dentro.u > CELDA_DEL_CUARTEL.u0 + radio && dentro.u < CELDA_DEL_CUARTEL.u1 - radio && dentro.v > CELDA_DEL_CUARTEL.v0 + radio && dentro.v < CELDA_DEL_CUARTEL.v1 - radio)) {
+        fueraDeLaCelda.push(`${String(asiento)}: acaba en ${dentro === null ? 'ningún sitio' : `(${r(dentro.u)}, ${r(dentro.v)})`}`);
+      }
+    }
+    comprobar(`desde la 30, en los seis asientos: golpe → a la celda → desvanecer → reja → aparecer → reja, en ${r(duracionDelEncierro(A_LA_MAZMORRA))} s como dice la coreografía, corriendo al paso y con el peón escondido`, malas.length === 0, malas.slice(0, 4));
+    comprobar(`y corre de verdad: ${String(instantesCorriendo)} instantes corriendo, y no cero`, instantesCorriendo > 6 * (A_LA_CELDA / PASO) * 0.9, instantesCorriendo);
+    comprobar('pasa por la puerta de la celda y acaba dentro, lejos de sus cuatro lados', sinPuerta.length === 0 && fueraDeLaCelda.length === 0, [...sinPuerta, ...fueraDeLaCelda].slice(0, 4));
+    comprobar('y en el camino no atraviesa ninguna obra ni ninguna pieza de la esquina', choques.length === 0, [...new Set(choques)].slice(0, 4));
+    comprobar(`cada instante bajo la reja de la celda (${String(instantesBajoLaReja)}, y no cero), la reja está más alta que el aventurero más alto`, instantesBajoLaReja > 0 && rejaBaja.length === 0, rejaBaja.slice(0, 3));
+    comprobar('se ve fallar: con la reja adelantada lo que dura la carrera, se le cierra encima', conLaRejaAdelantada > 0, conLaRejaAdelantada);
+    comprobar('la verja de la Comisaría no sube hasta que se ha desvanecido en la celda, y está arriba cuando aparece', verjaAntes.length === 0, verjaAntes.slice(0, 3));
+    comprobar(
+      'se ve fallar: con el compás de siempre —el de quien no pasa por la celda— la verja subiría mientras corre',
+      [0.8, 1.2, 1.5].some((t) => alzadoDeLaReja(t, 33) > 0 && t > DURACION.golpe && t < DURACION.golpe + A_LA_CELDA),
+    );
+    /*
+     * Las dos vacunas del camino son los dos caminos que hubo antes que éste: la puerta del lado `v0`,
+     * donde estuvo la reja, que obliga a cruzar el cuartel; y la línea recta de su sitio a la puerta,
+     * sin el paso, con la que cinco de los seis asientos se llevaban por delante la farola o el arbusto.
+     */
+    {
+      type EnLa30 = { readonly u: number; readonly v: number };
+      const choquesDelCamino = (puntos: readonly EnLa30[]): string[] => {
+        const salida: string[] = [];
+        for (let k = 1; k < puntos.length; k++) {
+          const de = puntos[k - 1] as EnLa30;
+          const a = puntos[k] as EnLa30;
+          const pasos = Math.ceil(Math.hypot(a.u - de.u, a.v - de.v) / 0.25);
+          for (let i = 0; i <= pasos; i++) salida.push(...choquesEn(de.u + ((a.u - de.u) * i) / pasos, de.v + ((a.v - de.v) * i) / pasos));
+        }
+        return salida;
+      };
+      const sitioDe = (asiento: number): EnLa30 => enLa30(huecoDeAventurero(A_LA_MAZMORRA, asiento));
+      const puertaVieja = { u: DENTRO_DE_LA_CELDA.u, v: CELDA_DEL_CUARTEL.v0 - 6 };
+      comprobar('se ve fallar: con la puerta en el lado del cuartel, el camino atravesaría el edificio', choquesDelCamino([sitioDe(0), puertaVieja, DENTRO_DE_LA_CELDA]).length > 0);
+      const enLineaRecta = [0, 1, 2, 3, 4, 5].filter((asiento) => choquesDelCamino([sitioDe(asiento), PUERTA_DE_LA_CELDA, DENTRO_DE_LA_CELDA]).length > 0);
+      comprobar(`se ve fallar: en línea recta de su sitio a la puerta, sin el paso, chocan ${String(enLineaRecta.length)} de los seis asientos`, enLineaRecta.length > 0, enLineaRecta);
+      comprobar(
+        'y el camino de la máquina es el declarado: su sitio, el paso, la puerta y dentro',
+        [0, 1, 2, 3, 4, 5].every((asiento) => choquesDelCamino([sitioDe(asiento), PASO_HACIA_LA_CELDA, PUERTA_DE_LA_CELDA, DENTRO_DE_LA_CELDA]).length === 0) &&
+          Math.hypot(anillo.pasoHaciaLaCelda.x - puntoEnEsquina(marco30, PASO_HACIA_LA_CELDA.u, PASO_HACIA_LA_CELDA.v).x, anillo.pasoHaciaLaCelda.z - puntoEnEsquina(marco30, PASO_HACIA_LA_CELDA.u, PASO_HACIA_LA_CELDA.v).z) < 1e-9,
+      );
+    }
+    /* Y desde otra casilla nadie entra: ni etapa, ni reja de la celda, ni un segundo más. */
+    const suceso33: SucesoDelBurgo = { que: 'a-la-mazmorra', quien: A, desde: 33, porque: 'carta' };
+    const desde33 = avanzar(encolar(nacer(33, 1, 0, 0), [suceso33]), 0, PASO, anillo);
+    comprobar(
+      'desde otra casilla no hay carrera: sin etapa «a la celda», la reja de la celda quieta y el encierro de siempre',
+      !etapasDe(desde33).some((x) => x.nombre === 'a-la-celda') &&
+        [0.3, 0.9, 1.5, 2.5, 3.5].every((t) => alzadoDeLaRejaDeLaCelda(t, 33) === 0) &&
+        duracionDelSuceso(suceso33, false, anillo) === DURA_A_LA_MAZMORRA &&
+        Math.abs(duracionDelEncierro(A_LA_MAZMORRA) - DURA_A_LA_MAZMORRA - A_LA_CELDA) < 1e-9 &&
+        !pasaPorLaCelda(33) &&
+        pasaPorLaCelda(A_LA_MAZMORRA),
+    );
+  }
+
   /* Sigue presa: golpe contra la reja; sale: la reja sube, salto, libre. */
   e = encolar(e, [{ que: 'sigue-presa', quien: A, intento: 1 }]);
   ahora += 0.05;
@@ -2656,6 +2878,32 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
     );
     comprobar('y frena: el último décimo gira menos que el primero', giroDeLaRuleta(RULETA.total) - giroDeLaRuleta(RULETA.total - 0.08) < giroDeLaRuleta(0.08) - giroDeLaRuleta(0));
     comprobar('la joya da una vuelta entera y se queda como estaba', Math.abs(giroDeLaJoya(JOYA_QUE_GIRA.total) - Math.PI * 2) < 1e-9);
+    /*
+     * «LAS ANIMACIONES SIEMPRE MUY BREVES», con la cifra que el plan le puso (LAS-CASILLAS.md §1):
+     * ninguna animación de casilla pasa de 0,8 s. Hasta hoy la regla vivía sólo en el documento, y
+     * la carrera a la celda del cuartel se escribió con 0,9 sin que nada lo notara. Se miden todas
+     * las que tiene una casilla —tapa, ruleta, joya, la carrera y los dos gestos de la reja de la
+     * celda—; el tren no, que es continuo y no espera a nadie.
+     */
+    const TOPE_DE_UNA_ANIMACION_DE_CASILLA = 0.8;
+    const lasQuePasan = (tabla: Readonly<Record<string, number>>): string[] =>
+      Object.entries(tabla)
+        .filter(([, dura]) => !(dura > 0 && dura <= TOPE_DE_UNA_ANIMACION_DE_CASILLA + 1e-9))
+        .map(([que, dura]) => `${que}: ${String(dura).replace('.', ',')} s`);
+    const animacionesDeCasilla = {
+      'la tapa del cofre': TAPA_DEL_COFRE.total,
+      'la ruleta': RULETA.total,
+      'la joya': JOYA_QUE_GIRA.total,
+      'la carrera a la celda': A_LA_CELDA,
+      'la reja de la celda al subir': PASO_DE_LA_REJA,
+      'la reja de la celda al bajar': DESVANECER,
+    };
+    comprobar(
+      `ninguna animación de casilla pasa de ${String(TOPE_DE_UNA_ANIMACION_DE_CASILLA).replace('.', ',')} s: ${Object.keys(animacionesDeCasilla).join(', ')}`,
+      lasQuePasan(animacionesDeCasilla).length === 0,
+      lasQuePasan(animacionesDeCasilla),
+    );
+    comprobar('se ve fallar: con la carrera a la celda de la primera versión, 0,9 s, la misma cuenta la señala', lasQuePasan({ ...animacionesDeCasilla, 'la carrera a la celda': 0.9 }).length === 1);
     /* Y la regla que decide quién se anima, que vivía dentro del bucle de fotogramas. */
     comprobar('una carta del Arca en la 17 abre ese cofre y ninguna ruleta', loQueAnimaUnaCarta('arca', 17).cofre === 17 && loQueAnimaUnaCarta('arca', 17).ruleta === null);
     comprobar('una del Pregón en la 22 gira esa ruleta y ningún cofre', loQueAnimaUnaCarta('pregon', 22).ruleta === 22 && loQueAnimaUnaCarta('pregon', 22).cofre === null);
@@ -2666,17 +2914,20 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
     /*
      * Y LA REJA DE LA CELDA: la comisaría tiene cuatro paredes y una de ellas es una reja que sube.
      * Lo que se mide es que esté FUERA de la malla fundida —si volviera a fundirse se quedaría
-     * clavada y nadie lo notaría hasta ver un encierro— y que su curva empiece y acabe cerrada.
+     * clavada y nadie lo notaría hasta ver un encierro— y que su curva empiece y acabe cerrada. Que
+     * esté arriba justo cuando el aventurero pasa por debajo lo mide el paso del peón, con la máquina.
      */
     comprobar(
       'la reja de la celda es una pieza viva y no está fundida con la comisaría',
       triangulosDeLasPiezasVivas().reja > 0 && !carasDeLasObras().some((cara) => cara.casilla === 30 && cara.color === '#2f2f33'),
       { reja: triangulosDeLasPiezasVivas().reja },
     );
+    const alzadaDesdeLa30 = (t: number): number => alzadoDeLaRejaDeLaCelda(t, A_LA_MAZMORRA);
+    const finDelEncierro = duracionDelEncierro(A_LA_MAZMORRA);
     comprobar(
       'y sube y vuelve a bajar: empieza cerrada, se abre del todo por en medio y acaba cerrada',
-      alzadoDeLaReja(0) === 0 && alzadoDeLaReja(DURA_A_LA_MAZMORRA) === 0 && Math.max(...[0.2, 0.9, 1.8, 2.4, 3, 3.5].map(alzadoDeLaReja)) === 1,
-      { alPrincipio: alzadoDeLaReja(0), alFinal: alzadoDeLaReja(DURA_A_LA_MAZMORRA) },
+      alzadaDesdeLa30(0) === 0 && alzadaDesdeLa30(finDelEncierro) === 0 && Math.max(...[0.2, 0.9, 1.2, 1.5, 2.4, 3, 3.5].map(alzadaDesdeLa30)) === 1,
+      { alPrincipio: alzadaDesdeLa30(0), alFinal: alzadaDesdeLa30(finDelEncierro) },
     );
     comprobar(
       'y las casillas que la regla nombra son las mismas que levantan cofre y ruleta',

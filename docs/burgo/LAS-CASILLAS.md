@@ -81,15 +81,15 @@ corrige en la fase 4.
 | 0 | SALIDA ✅ | SALIDA por la diagonal (101 × 18,4) y la flecha roja de 28 en el pico de fuera | Sólo rótulo fundido; el cruce entero fuera | — |
 | 10 | CÁRCEL ✅ | Muro, dos torretas con tejadillo, seis barrotes, dos pabellones y un ala; patio de hormigón | Código fundido + `verja` (que se anima) | La reja ya sube y baja tras el peón |
 | 20 | PARKING ✅ | La esquina entera asfaltada, sesenta plazas amarillas, catorce coches y el cartel tumbado con la `P` | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
-| 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo | Código fundido + la avenida y su patrulla | pendiente: el peón entra en la celda (0,7) |
-| 2·17·33 | FONDO VECINAL ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra | Código fundido | pendiente: la tapa se abre (0,7) |
-| 7·22·36 | SUCESOS ✅ | Casino: cuerpo, marquesina que vuela, rótulo vertical con cinco bombillas y la ruleta tumbada en el suelo | Código fundido (discos) | pendiente: la ruleta gira (0,8) |
+| 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo | Código fundido + la avenida y su patrulla; la reja, pieza viva | ✅ quien cae aquí corre a la celda por el paso de la avenida, entra bajo la reja subida y se desvanece dentro (0,8 más) |
+| 2·17·33 | FONDO VECINAL ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra | Código fundido; la tapa, pieza viva | ✅ la tapa se abre al coger carta del Fondo (0,7) |
+| 7·22·36 | SUCESOS ✅ | Casino: cuerpo, marquesina que vuela, rótulo vertical con cinco bombillas y la ruleta tumbada en el suelo | Código fundido (discos); la ruleta, pieza viva | ✅ la ruleta gira al coger carta de Sucesos (0,8) |
 | 12 | CENTRAL ELÉCTRICA ✅ | Dos torres de refrigeración CON CINTURA (dos troncos pegados), chimenea con banda roja y nave de turbinas | Código fundido (troncos) | pendiente: el humo (0,3) |
 | 28 | CANAL DE AGUAS ✅ | Depósito elevado sobre cuatro patas, alberca con agua y caseta de bombas | Código fundido (troncos) | pendiente: la onda (0,5) |
 | 4 | IMPUESTO ✅ | Escalinata de dos peldaños, cuatro columnas, cornisa y ático escalonado | Código fundido | pendiente: la moneda sube la escalinata (0,6) |
-| 38 | TASA DE LUJO ✅ | Alfombra granate, pedestal de mármol y una joya de ocho caras —la única pieza que no es un prisma— | Código fundido (triángulos) | pendiente: la joya gira (0,5) |
-| 5·15·25·35 | LAS CUATRO ESTACIONES ✅ | Andén, marquesina sobre cuatro columnas y casa de viajeros; y el remate que las distingue: torre del reloj (5), aguada y carbonera (15), bóveda escalonada (25) y apeadero de madera (35) | Código fundido | pendiente: el tren para 1,5 s |
-| — | EL FERROCARRIL ✅ | Balasto, 584 traviesas y dos carriles dando la vuelta entera, con curvas de radio 15 en las esquinas | Código fundido (3.072 triángulos con todo lo demás) | pendiente: los trenes |
+| 38 | TASA DE LUJO ✅ | Alfombra granate, pedestal de mármol y una joya de ocho caras —la única pieza que no es un prisma— | Código fundido (triángulos); la joya, pieza viva | ✅ la joya da una vuelta al pagar la Tasa (0,5) |
+| 5·15·25·35 | LAS CUATRO ESTACIONES ✅ | Andén, marquesina sobre cuatro columnas y casa de viajeros; y el remate que las distingue: torre del reloj (5), aguada y carbonera (15), bóveda escalonada (25) y apeadero de madera (35) | Código fundido | ✅ los trenes paran 2,5 s en cada una |
+| — | EL FERROCARRIL ✅ | Balasto, 584 traviesas y dos carriles dando la vuelta entera, con curvas de radio 15 en las esquinas | Código fundido (3.072 triángulos con todo lo demás) | ✅ dos trenes dan la vuelta sin esperar a nadie |
 
 Cada casilla lleva además su **texto pequeño** debajo del nombre (alto 9 contra los 17 del
 nombre): lo que hace al caer en ella, en cuatro palabras.
@@ -200,11 +200,26 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
    - Y la de que la lógica de «quién se anima» no vive en el bucle de fotogramas —el único rincón
      al que el comprobador no llega— sino en una función pura: `loQueAnimaUnaCarta`.
    - **La reja de la celda de la comisaría también**: sube y baja cuando mandan a alguien a la
-     cárcel, con la misma curva que la hoja de la Mazmorra.
-   - **Lo que falta, y por qué no se ha hecho:** meter al PEÓN dentro de la celda —que es lo que
-     Miguel pidió literalmente— obliga a tocar su máquina de estados: su recorrido, sus fases y su
-     comprobador. Es la pieza más cara de deshacer de la escena y merece su propia tanda. La
-     moneda del Impuesto ya la cuenta la animación de dinero que existe; el humo de la central, la
-     onda de la alberca y el coche que aparca son adorno y no los pidió nadie.
+     cárcel.
+   - **Y se ve entrar en la celda**, que es lo que Miguel pidió literalmente. Quien cae en ¡A
+     comisaría! ya no se desvanece en su sitio: tras el golpe CORRE a la celda del cuartel de esa
+     misma esquina —0,8 s, el tope de toda animación de casilla—, entra bajo la reja subida y se
+     desvanece dentro mientras la reja baja; después aparece en la Comisaría como siempre. Desde
+     cualquier otra casilla (una carta, tres dobles) todo sigue igual, sin carrera.
+     - La celda **cambió de lado**: la reja estaba en el lado pegado al cuartel, y para entrar por
+       ahí había que atravesar el edificio. Ahora da a la avenida.
+     - El camino tiene un **paso** en medio: en línea recta de su sitio a la puerta, cinco de los
+       seis asientos se llevaban por delante la farola o el arbusto de la acera de enfrente.
+     - La reja de la celda lleva **su propia curva** (`alzadoDeLaRejaDeLaCelda`) y la verja de la
+       Comisaría **espera** a que se haya desvanecido, que desde la 30 es 0,8 s más tarde.
+     - `verify:burgo-escena` lo mide con la máquina de verdad y los seis asientos: la etapa y su
+       duración contra la coreografía, que pasa por la puerta y acaba dentro, que no atraviesa
+       ninguna obra ni ninguna pieza de la esquina (con las cajas del `burgo.glb`), y que cada
+       instante que está bajo la reja la reja está más alta que el aventurero más alto de los
+       seis (la maga, 2,655). Con sus vacunas: la puerta vieja, la línea recta sin paso, la reja
+       adelantada y la verja con el compás de siempre. Y visto caer con cuatro mutaciones.
+   - **Lo que no se ha hecho, y por qué:** la moneda del Impuesto ya la cuenta la animación de
+     dinero que existe; el humo de la central, la onda de la alberca y el coche que aparca son
+     adorno y no los pidió nadie.
 
 Cada fase es un commit con la batería entera en verde.

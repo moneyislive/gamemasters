@@ -256,6 +256,7 @@ import {
   TAPA_DEL_COFRE,
   TREN,
   alzadoDeLaReja,
+  alzadoDeLaRejaDeLaCelda,
   aperturaDelCofre,
   avanceDelTren,
   giroDeLaJoya,
@@ -2109,15 +2110,15 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         mr.instanceMatrix.needsUpdate = true;
       }
       /*
-       * LA REJA DE LA CELDA DE LA COMISARÍA: se abre y se cierra cuando mandan a alguien a la
-       * cárcel. Usa la MISMA curva que la hoja de la verja de la Mazmorra —`alzadoDeLaReja`—
-       * porque es el mismo gesto contado desde el otro lado: allí se cierra detrás del preso y
-       * aquí se abre para que entre.
+       * LA REJA DE LA CELDA DEL CUARTEL DE LA 30: sube para que entre quien cae en ¡A comisaría!,
+       * y baja cuando está dentro. Lleva su PROPIA curva —`alzadoDeLaRejaDeLaCelda`— y no la de la
+       * verja de la Comisaría, porque va al compás del que corre a la celda; y desde otra casilla
+       * se queda quieta, que nadie entra en ella.
        */
       const rc = rejaDeLaCelda.current;
       if (rc !== null) {
         const encierro = enCursoDe('a-la-mazmorra');
-        const alzada = encierro === undefined ? 0 : alzadoDeLaReja(ahora - encierro.desde);
+        const alzada = encierro === undefined || encierro.suceso.que !== 'a-la-mazmorra' ? 0 : alzadoDeLaRejaDeLaCelda(ahora - encierro.desde, encierro.suceso.desde);
         rc.position.y = sitiosVivos.reja.y + alzada * SUBIDA_DE_LA_REJA;
       }
       const mj = joya.current;
@@ -2162,7 +2163,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         let alzado = 0;
         const entra = enCursoDe('a-la-mazmorra');
         const sale = enCursoDe('sale-de-la-mazmorra');
-        if (entra !== undefined) alzado = alzadoDeLaReja(ahora - entra.desde);
+        if (entra !== undefined && entra.suceso.que === 'a-la-mazmorra') alzado = alzadoDeLaReja(ahora - entra.desde, entra.suceso.desde);
         else if (sale !== undefined) {
           const t = ahora - sale.desde;
           alzado = t < PASO_DE_LA_REJA ? t / PASO_DE_LA_REJA : Math.max(0, 1 - (t - PASO_DE_LA_REJA) / (sale.hasta - sale.desde - PASO_DE_LA_REJA));

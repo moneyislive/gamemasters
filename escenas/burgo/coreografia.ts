@@ -22,7 +22,8 @@
  *     alza                        0,45 por casa; la posada hunde cuatro y brota una
  *     vende                       0,4; empeña / desempeña 0,5
  *     carta                       0,4 + 2,4 + 0,4: sube, se lee, vuelve
- *     a-la-mazmorra               ≈ 3,5; sale-de-la-mazmorra 0,6 + salto; sigue-presa 0,667
+ *     a-la-mazmorra               ≈ 3,5 (+ 0,8 desde la 30, corriendo a la celda del cuartel);
+ *                                 sale-de-la-mazmorra 0,6 + salto; sigue-presa 0,667
  *     trato                       propuesto: mientras dure (aquí, 0,4); aceptado 1,0
  *     apuro                       0,6; quiebra ≈ 2,4 (golpe, huida, desvanecer)
  *     fin                         3,0
@@ -48,7 +49,7 @@ import { ASENTAR, RODAR_MINIMO, reboteDelDado } from '../dados';
 import { DURACION } from '../embarcadero/gestos';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 import { SALTO_EXTRA_DEL_DOBLE } from './dados-del-burgo';
-import { DESVANECER, DESVANECER_AL_QUEBRAR, HUIDA_AL_QUEBRAR, PASO_DE_LA_REJA, VELOCIDAD_CORRIENDO, duracionDelMovimiento } from './peon';
+import { A_LA_CELDA, DESVANECER, DESVANECER_AL_QUEBRAR, HUIDA_AL_QUEBRAR, PASO_DE_LA_REJA, VELOCIDAD_CORRIENDO, duracionDelMovimiento, pasaPorLaCelda } from './peon';
 import type { AnilloEn3D } from './anillo-en-3d';
 import { ANILLO_DEL_BURGO } from './anillo-en-3d';
 
@@ -78,6 +79,10 @@ export const VENTA = 0.4;
 export const EMPENO = 0.5;
 export const CARTA = { sube: 0.4, seLee: 2.4, vuelve: 0.4, total: 3.2 } as const;
 export const A_LA_MAZMORRA = DURACION.golpe + DESVANECER + PASO_DE_LA_REJA + DURACION.aparecer + PASO_DE_LA_REJA;
+/** Lo que dura un encierro mandado desde `desde`: el de siempre, y desde la 30 además la carrera a la celda. */
+export function duracionDelEncierro(desde: number): number {
+  return A_LA_MAZMORRA + (pasaPorLaCelda(desde) ? A_LA_CELDA : 0);
+}
 export const SALE_DE_LA_MAZMORRA = PASO_DE_LA_REJA + DURACION.salto;
 export const SIGUE_PRESA = DURACION.golpe;
 export const TRATO_PROPUESTO = 0.4;
@@ -148,7 +153,7 @@ export function duracionDelSuceso(s: SucesoDelBurgo, enPie = false, anillo: Anil
     case 'carta':
       return CARTA.total;
     case 'a-la-mazmorra':
-      return A_LA_MAZMORRA;
+      return duracionDelEncierro(s.desde);
     case 'sale-de-la-mazmorra':
       return SALE_DE_LA_MAZMORRA;
     case 'sigue-presa':
@@ -319,15 +324,38 @@ export function escalaDelNaipe(transcurrido: number): number {
   return 1;
 }
 
-/** La reja: sube 1 (de 0 a `SUBIDA`) en 0,6 y baja igual; devuelve la fracción alzada para un instante dentro de `a-la-mazmorra`. */
-export function alzadoDeLaReja(transcurrido: number): number {
-  const sube = DURACION.golpe + DESVANECER;
+/**
+ * La reja de la Comisaría: sube 1 (de 0 a `SUBIDA`) en 0,6 y baja igual; devuelve la fracción
+ * alzada para un instante dentro de `a-la-mazmorra` mandado desde `desde`. Sube cuando el preso ya
+ * se ha desvanecido donde estaba, así que desde la 30 espera también a que corra a su celda.
+ */
+export function alzadoDeLaReja(transcurrido: number, desde: number): number {
+  const sube = DURACION.golpe + (pasaPorLaCelda(desde) ? A_LA_CELDA : 0) + DESVANECER;
   const arriba = sube + PASO_DE_LA_REJA;
   const baja = arriba + DURACION.aparecer;
   if (transcurrido < sube) return 0;
   if (transcurrido < arriba) return pinza((transcurrido - sube) / PASO_DE_LA_REJA);
   if (transcurrido < baja) return 1;
   return 1 - pinza((transcurrido - baja) / PASO_DE_LA_REJA);
+}
+
+/**
+ * LA REJA DE LA CELDA DEL CUARTEL DE LA 30, que es otra y lleva otro compás: el de quien entra.
+ *
+ * Sube durante el golpe —en los últimos 0,6, para estar arriba cuando echa a correr—, se queda
+ * arriba mientras corre a la celda y pasa por debajo, y baja mientras se desvanece dentro: 0,4, lo
+ * que dura desvanecerse, porque una reja que cae va más deprisa que una que se levanta. Sólo se
+ * mueve si le mandan desde la 30; desde cualquier otra casilla nadie entra en esa celda.
+ */
+export function alzadoDeLaRejaDeLaCelda(transcurrido: number, desde: number): number {
+  if (!pasaPorLaCelda(desde)) return 0;
+  const arriba = DURACION.golpe;
+  const sube = arriba - PASO_DE_LA_REJA;
+  const baja = arriba + A_LA_CELDA;
+  if (transcurrido < sube) return 0;
+  if (transcurrido < arriba) return pinza((transcurrido - sube) / PASO_DE_LA_REJA);
+  if (transcurrido < baja) return 1;
+  return 1 - pinza((transcurrido - baja) / DESVANECER);
 }
 
 /**
