@@ -81,6 +81,10 @@ export const COLOR_DE_OBRA = {
   /* La moneda de la recaudación va en cuartos de dos oros, que es lo que deja verla rodar. */
   latonOscuro: '#9c7a17',
   puertaDeLaOficina: '#3b2b20',
+  /* El humo de la central y la onda del canal. */
+  /* Gris carbón: uno claro no se distingue del crema del tablero, y uno medio se confunde con la nave de turbinas. */
+  humo: '#4d5055',
+  onda: '#b9e3ee',
   alfombra: '#7b2230',
   marmol: '#e6e2d8',
   joya: '#57c8d8',
@@ -1417,6 +1421,56 @@ export function cajasDeLaOficina(): {
 }
 
 /**
+ * EL HUMO DE LA CENTRAL (casilla 12) Y LA ONDA DEL CANAL (casilla 28): los servicios, cuando alguien
+ * paga su renta.
+ *
+ * La central echa tres BOCANADAS por la chimenea y la alberca del canal abre una ONDA en el agua. Las
+ * dos son piezas vivas —una malla cada una— que no se pintan fuera de su ventana. Aquí van su forma
+ * y su sitio; cuándo y cuánto, en `coreografia.ts`.
+ *
+ * La bocanada es un cubo de lado 1 centrado en su origen: la escena lo escala, lo sube y lo gira, y
+ * un humo de cubos es el humo de un mundo de cajas. La onda es un anillo tumbado mirando arriba, de
+ * radio `radio` a su escala entera, que la escena abre desde el centro.
+ */
+export const CASILLA_DE_LA_CENTRAL = 12;
+export const CASILLA_DEL_CANAL = 28;
+export const BOCANADAS_DEL_HUMO = 3;
+export const ONDA_DEL_CANAL = { radio: 4.4, grueso: 0.55, segmentos: 20 } as const;
+
+export function carasDeUnaBocanada(): CaraDeObra[] {
+  return barra({ x: 0, z: -0.5 }, { x: 0, z: 0.5 }, 1, -0.5, 0.5, COLOR_DE_OBRA.humo);
+}
+
+export function carasDeLaOnda(): CaraDeObra[] {
+  const { radio, grueso, segmentos } = ONDA_DEL_CANAL;
+  const salida: CaraDeObra[] = [];
+  const en = (r: number, angulo: number): PuntoDeObra => [r * Math.cos(angulo), 0, r * Math.sin(angulo)];
+  for (let k = 0; k < segmentos; k++) {
+    const a0 = (k / segmentos) * Math.PI * 2;
+    const a1 = ((k + 1) / segmentos) * Math.PI * 2;
+    /* Sin espejo en este marco: de fuera a dentro y girando `a0 → a1`, el cuadro mira arriba. */
+    salida.push({ casilla: DEL_MUNDO, puntos: [en(radio, a0), en(radio - grueso, a0), en(radio - grueso, a1), en(radio, a1)], color: COLOR_DE_OBRA.onda });
+  }
+  return salida;
+}
+
+/** La boca de la chimenea de la central, en el mundo: de ahí salen las bocanadas. */
+export function bocaDeLaChimenea(): PiezaViva {
+  const m = marcoDeCasilla(CASILLA_DE_LA_CENTRAL);
+  const c = CENTRAL.chimenea;
+  const p = puntoEnLaCasillaPorV(m, c.u, c.v);
+  return { casilla: CASILLA_DE_LA_CENTRAL, x: p.x, y: c.alto, z: p.z, giro: giroHaciaFuera(m) };
+}
+
+/** El centro del agua de la alberca, tres centésimas por encima de ella: ahí se abre la onda. */
+export function centroDeLaAlberca(): PiezaViva {
+  const m = marcoDeCasilla(CASILLA_DEL_CANAL);
+  const a = AGUAS.alberca;
+  const p = puntoEnLaCasillaPorV(m, (a.u0 + a.u1) / 2, (a.v0 + a.v1) / 2);
+  return { casilla: CASILLA_DEL_CANAL, x: p.x, y: a.agua + 0.03, z: p.z, giro: giroHaciaFuera(m) };
+}
+
+/**
  * LA REJA DE LA CELDA DE LA COMISARÍA, que sube y baja.
  *
  * Miguel: «quiero ver cómo entra en la celda». Quien cae en ¡A comisaría! corre hasta ella
@@ -1449,9 +1503,17 @@ export function sitioDeLaRejaDeLaCelda(): PiezaViva {
 }
 
 /** Los triángulos de cada pieza viva: el presupuesto las cuenta una a una. */
-export function triangulosDeLasPiezasVivas(): { readonly tapa: number; readonly ruleta: number; readonly joya: number; readonly reja: number; readonly moneda: number } {
+export function triangulosDeLasPiezasVivas(): { readonly tapa: number; readonly ruleta: number; readonly joya: number; readonly reja: number; readonly moneda: number; readonly bocanada: number; readonly onda: number } {
   const cuenta = (caras: readonly CaraDeObra[]): number => caras.reduce((n, cara) => n + (esTriangulo(cara) ? 1 : 2), 0);
-  return { tapa: cuenta(carasDeLaTapa()), ruleta: cuenta(carasDeLaRuleta()), joya: cuenta(carasDeLaJoyaViva()), reja: cuenta(carasDeLaRejaDeLaCelda()), moneda: cuenta(carasDeLaMonedaDeLaRecaudacion()) };
+  return {
+    tapa: cuenta(carasDeLaTapa()),
+    ruleta: cuenta(carasDeLaRuleta()),
+    joya: cuenta(carasDeLaJoyaViva()),
+    reja: cuenta(carasDeLaRejaDeLaCelda()),
+    moneda: cuenta(carasDeLaMonedaDeLaRecaudacion()),
+    bocanada: cuenta(carasDeUnaBocanada()),
+    onda: cuenta(carasDeLaOnda()),
+  };
 }
 
 /** Qué levanta cada casilla lateral. Las que no están aquí todavía no tienen obra. */

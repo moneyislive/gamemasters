@@ -89,8 +89,8 @@ sin cambiar ni una palabra de las que se leen. Lo que se lee sí va con el regla
 | 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo | Código fundido + la avenida y su patrulla; la reja, pieza viva | ✅ quien cae aquí corre a la celda por el paso de la avenida, entra bajo la reja subida y se desvanece dentro (0,8 más) |
 | 2·17·33 | FONDO VECINAL ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra | Código fundido; la tapa, pieza viva | ✅ la tapa se abre al coger carta del Fondo (0,7) |
 | 7·22·36 | SUCESOS ✅ | Casino: cuerpo, marquesina que vuela, rótulo vertical con cinco bombillas y la ruleta tumbada en el suelo | Código fundido (discos); la ruleta, pieza viva | ✅ la ruleta gira al coger carta de Sucesos (0,8) |
-| 12 | CENTRAL ELÉCTRICA ✅ | Dos torres de refrigeración CON CINTURA (dos troncos pegados), chimenea con banda roja y nave de turbinas | Código fundido (troncos) | pendiente: el humo (0,3) |
-| 28 | CANAL DE AGUAS ✅ | Depósito elevado sobre cuatro patas, alberca con agua y caseta de bombas | Código fundido (troncos) | pendiente: la onda (0,5) |
+| 12 | CENTRAL ELÉCTRICA ✅ | Dos torres de refrigeración CON CINTURA (dos troncos pegados), chimenea con banda roja y nave de turbinas | Código fundido (troncos); el humo, pieza viva | ✅ al pagar la renta de la Luz, tres bocanadas salen por la chimenea (0,8) |
+| 28 | CANAL DE AGUAS ✅ | Depósito elevado sobre cuatro patas, alberca con agua y caseta de bombas | Código fundido (troncos); la onda, pieza viva | ✅ al pagar la renta del Agua, una onda se abre en la alberca (0,6) |
 | 4 | IMPUESTO ✅ | Escalinata de dos peldaños que es también basamento, cuatro columnas, puerta, cornisa y ático escalonado | Código fundido; la moneda, pieza viva | ✅ al pagar el Impuesto, una moneda grande sube rodando la escalinata y entra por la puerta (0,6) |
 | 38 | TASA DE LUJO ✅ | Alfombra granate, pedestal de mármol y una joya de ocho caras —la única pieza que no es un prisma— | Código fundido (triángulos); la joya, pieza viva | ✅ la joya da una vuelta al pagar la Tasa (0,5) |
 | 5·15·25·35 | LAS CUATRO ESTACIONES ✅ | Andén, marquesina sobre cuatro columnas y casa de viajeros; y el remate que las distingue: torre del reloj (5), aguada y carbonera (15), bóveda escalonada (25) y apeadero de madera (35) | Código fundido | ✅ los trenes paran 2,5 s en cada una |
@@ -254,7 +254,14 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
      de las obras daba verde porque la tapa miraba arriba como debe; preguntaba si lo primero que se
      ve mira arriba, no QUÉ es. La alberca es ahora hueca, y una regla exige que el agua y las bocas
      de las torres de la central sean lo primero que corta cada rayo que cae sobre ellas.
-   - **Lo que no se ha hecho, y por qué:** el humo de la central, la onda de la alberca y el coche
-     que aparca son adorno y no los pidió nadie.
+   - **Y los dos servicios, que eran las únicas casillas especiales sin movimiento:** al pagar la
+     renta de la Luz salen tres bocanadas por la chimenea, y al pagar la del Agua se abre una onda en
+     la alberca. Las bocanadas van en gris carbón: el gris claro no se distinguía del crema del
+     tablero, y el medio se confundía con la nave de turbinas (visto en el banco). Las dos entran en la
+     lupa de las piezas vivas y en el tope de 0,8, y el comprobador mide que sólo las suelta la renta
+     de su casilla, que el humo sale de la BOCA de la chimenea y que la onda no se sale del agua.
+   - **Lo que no se ha hecho, y por qué:** el coche que aparca en el Descanso. No es una animación
+     de 0,6 s sino un estado —un coche por jugador, que se queda mientras esté ahí y se va cuando se
+     vaya—, y nadie lo pidió.
 
 Cada fase es un commit con la batería entera en verde.

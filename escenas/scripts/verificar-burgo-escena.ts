@@ -171,7 +171,7 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
-import { CASILLA_DE_LA_OFICINA, COLOR_DE_OBRA, DEL_MUNDO, MONEDA_DE_LA_RECAUDACION, RECORRIDO_DE_LA_MONEDA, VIA, cajasDeLaOficina, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDeLasObras, carasDelTren, casillasConObra, disco, esTriangulo, largoDeLaVia, letrasDeLosCarteles, monedaEnLaEscalinata, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda, triangulosDeLasObras } from '../burgo/obras';
+import { BOCANADAS_DEL_HUMO as BOCANADAS_DEL_HUMO_EN_EL_COMPROBADOR, CASILLA_DEL_CANAL, CASILLA_DE_LA_CENTRAL, CASILLA_DE_LA_OFICINA, COLOR_DE_OBRA, DEL_MUNDO, MONEDA_DE_LA_RECAUDACION, ONDA_DEL_CANAL, bocaDeLaChimenea, carasDeLaOnda, carasDeUnaBocanada, centroDeLaAlberca, RECORRIDO_DE_LA_MONEDA, VIA, cajasDeLaOficina, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDeLasObras, carasDelTren, casillasConObra, disco, esTriangulo, largoDeLaVia, letrasDeLosCarteles, monedaEnLaEscalinata, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda, triangulosDeLasObras } from '../burgo/obras';
 import type { CaraDeObra } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
@@ -219,7 +219,7 @@ import {
   velocidadDelClip,
 } from '../burgo/peon';
 import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
-import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, RECAUDACION, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelDinero, duracionDelEncierro, duracionDelSuceso, esRecaudacion, finDeLaCola, momentoDeLaRecaudacion, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
+import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, HUMO, ONDA_DEL_AGUA, RECAUDACION, bocanadaDelHumo, duracionDelHumo, esRentaDe, ondaDelAgua, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelDinero, duracionDelEncierro, duracionDelSuceso, esRecaudacion, finDeLaCola, momentoDeLaRecaudacion, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
   ALCANCE_DEL_BURGO,
@@ -2929,6 +2929,8 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       'la reja de la celda al subir': PASO_DE_LA_REJA,
       'la reja de la celda al bajar': DESVANECER,
       'la moneda de la recaudación': RECAUDACION.rueda,
+      'el humo de la central': duracionDelHumo(),
+      'la onda del canal': ONDA_DEL_AGUA.dura,
     };
     comprobar(
       `ninguna animación de casilla pasa de ${String(TOPE_DE_UNA_ANIMACION_DE_CASILLA).replace('.', ',')} s: ${Object.keys(animacionesDeCasilla).join(', ')}`,
@@ -2997,6 +2999,8 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       ['la reja de la celda', carasDeLaRejaDeLaCelda()],
       ['el tren', carasDelTren()],
       ['la moneda de la recaudación', carasDeLaMonedaDeLaRecaudacion()],
+      ['una bocanada del humo', carasDeUnaBocanada()],
+      ['la onda del canal', carasDeLaOnda()],
     ];
     const lupasVivas = piezasVivas.map(([que, caras]) => ({ que, ...lupaDeUnaPiezaViva(caras) }));
     comprobar(
@@ -3136,6 +3140,70 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
           (momentoDeLaRecaudacion(RECAUDACION.empieza + 0.3)?.escala ?? 0) === 1 &&
           (momentoDeLaRecaudacion(RECAUDACION.empieza)?.escala ?? 1) === 0,
       );
+    }
+
+    /*
+     * EL HUMO DE LA CENTRAL Y LA ONDA DEL CANAL.
+     *
+     * Suenan con la renta de su casilla y con nada más; salen de donde tienen que salir —el humo de
+     * la BOCA de la chimenea, no de su pie; la onda del centro del agua, por debajo del borde de la
+     * alberca y sin salirse del agua al abrirse del todo—, empiezan y acaban donde dicen, y caben en
+     * la renta más corta.
+     */
+    {
+      const renta = (casilla: number): SucesoDelBurgo => ({ que: 'paga', quien: A, a: 'asiento-b', cuanto: 8, porque: 'renta', casilla });
+      comprobar(
+        'el humo sólo lo suelta la renta de la Luz y la onda sólo la del Agua: ni la otra, ni un cobro, ni un pago que no sea renta',
+        esRentaDe(renta(CASILLA_DE_LA_CENTRAL), CASILLA_DE_LA_CENTRAL) &&
+          esRentaDe(renta(CASILLA_DEL_CANAL), CASILLA_DEL_CANAL) &&
+          !esRentaDe(renta(CASILLA_DEL_CANAL), CASILLA_DE_LA_CENTRAL) &&
+          !esRentaDe({ que: 'cobra', quien: A, de: 'asiento-b', cuanto: 8, porque: 'renta', casilla: CASILLA_DE_LA_CENTRAL }, CASILLA_DE_LA_CENTRAL) &&
+          !esRentaDe({ que: 'paga', quien: A, a: null, cuanto: 150, porque: 'compra', casilla: CASILLA_DE_LA_CENTRAL }, CASILLA_DE_LA_CENTRAL),
+      );
+      const ultima = BOCANADAS_DEL_HUMO_EN_EL_COMPROBADOR - 1;
+      const alAcabar = bocanadaDelHumo(0, HUMO.dura - 1e-6);
+      comprobar(
+        `las ${String(BOCANADAS_DEL_HUMO_EN_EL_COMPROBADOR)} bocanadas salen escalonadas, crecen, se deshacen del todo y caben en la renta más corta (${String(r(duracionDelHumo())).replace('.', ',')} de ${String(r(duracionDelDinero(1))).replace('.', ',')} s)`,
+        bocanadaDelHumo(0, -0.01) === null &&
+          bocanadaDelHumo(1, HUMO.escalon - 0.01) === null &&
+          bocanadaDelHumo(ultima, ultima * HUMO.escalon + HUMO.dura) === null &&
+          Math.abs((bocanadaDelHumo(0, 0)?.lado ?? 0) - HUMO.ladoAlSalir) < 1e-9 &&
+          (bocanadaDelHumo(0, HUMO.dura * 0.66)?.lado ?? 0) > HUMO.ladoAlSalir &&
+          alAcabar !== null &&
+          alAcabar.lado < 0.01 &&
+          [0.1, 0.2, 0.3, 0.4, 0.5].every((t, k, ts) => k === 0 || (bocanadaDelHumo(0, t)?.sube ?? 0) > (bocanadaDelHumo(0, ts[k - 1] as number)?.sube ?? 0)) &&
+          duracionDelHumo() <= duracionDelDinero(1),
+      );
+      comprobar(
+        'la onda se abre de un quinto a entera en su ventana, y fuera no está',
+        ondaDelAgua(-0.01) === null && ondaDelAgua(ONDA_DEL_AGUA.dura) === null && Math.abs((ondaDelAgua(0) ?? 0) - ONDA_DEL_AGUA.desde) < 1e-9 && (ondaDelAgua(ONDA_DEL_AGUA.dura - 1e-6) ?? 0) > 0.999 && ONDA_DEL_AGUA.dura <= duracionDelDinero(1),
+      );
+      /* De dónde sale el humo: la boca es lo más alto de la chimenea. */
+      const chimenea = bocaDeLaChimenea();
+      const deLaChimenea = carasDeLaObraEnElMundo(CASILLA_DE_LA_CENTRAL).filter((cara) => cara.puntos.every((q) => Math.hypot(q[0] - chimenea.x, q[2] - chimenea.z) < 2));
+      const bocaMedida = Math.max(...deLaChimenea.flatMap((cara) => cara.puntos.map((q) => q[1])));
+      comprobar(`el humo sale de la boca de la chimenea (a ${String(bocaMedida).replace('.', ',')}) y no de su pie`, deLaChimenea.length > 8 && Math.abs(bocaMedida - chimenea.y) < 1e-9, { caras: deLaChimenea.length, bocaMedida, sale: chimenea.y });
+      /* Dónde se abre la onda: dentro del agua y por debajo del borde. */
+      const alberca = centroDeLaAlberca();
+      const caraDelAgua = carasDeLaObraEnElMundo(CASILLA_DEL_CANAL).find((cara) => cara.color === COLOR_DE_OBRA.agua);
+      const cabeLaOnda = (radio: number): boolean => {
+        if (caraDelAgua === undefined) return false;
+        const xs = caraDelAgua.puntos.map((q) => q[0]);
+        const zs = caraDelAgua.puntos.map((q) => q[2]);
+        return alberca.x - radio >= Math.min(...xs) && alberca.x + radio <= Math.max(...xs) && alberca.z - radio >= Math.min(...zs) && alberca.z + radio <= Math.max(...zs);
+      };
+      const aguaY = caraDelAgua?.puntos[0][1] ?? Number.NaN;
+      const bordeY = Math.max(
+        ...carasDeLaObraEnElMundo(CASILLA_DEL_CANAL)
+          .filter((cara) => cara.color === COLOR_DE_OBRA.hormigon && cara.puntos.every((q) => Math.hypot(q[0] - alberca.x, q[2] - alberca.z) < 12))
+          .flatMap((cara) => cara.puntos.map((q) => q[1])),
+      );
+      comprobar(
+        `la onda se abre en el centro del agua, por encima de ella y por debajo del borde, y abierta del todo (radio ${String(ONDA_DEL_CANAL.radio).replace('.', ',')}) no se sale del agua`,
+        caraDelAgua !== undefined && cabeLaOnda(ONDA_DEL_CANAL.radio) && alberca.y > aguaY && alberca.y < aguaY + 0.1 && alberca.y < bordeY,
+        { aguaY, sale: alberca.y, bordeY },
+      );
+      comprobar('se ve fallar: una onda de radio 6 ya se saldría del agua', !cabeLaOnda(6));
     }
   }
 

@@ -246,8 +246,8 @@ import {
   tonoDelEdificio,
 } from './ciudad';
 import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
-import { claveDelBulto, geometriaDeLaJoya, geometriaDeLaMonedaDeLaRecaudacion, geometriaDeLaRejaDeLaCelda, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
-import { bisagrasDeLosCofres, ejeDeLaJoya, ejesDeLasRuletas, largoDeLaVia, monedaDeLaRecaudacionEnElMundo, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda } from './obras';
+import { claveDelBulto, geometriaDeLaJoya, geometriaDeLaMonedaDeLaRecaudacion, geometriaDeLaOnda, geometriaDeUnaBocanada, geometriaDeLaRejaDeLaCelda, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
+import { BOCANADAS_DEL_HUMO, CASILLA_DE_LA_CENTRAL, CASILLA_DEL_CANAL, bisagrasDeLosCofres, bocaDeLaChimenea, centroDeLaAlberca, ejeDeLaJoya, ejesDeLasRuletas, largoDeLaVia, monedaDeLaRecaudacionEnElMundo, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda } from './obras';
 import { CASAS_DEL_CONCEJO, DISCOS_DEL_TRATO, DISCOS_DE_CONTACTO, MONEDAS_EN_VUELO, POSADAS_DEL_CONCEJO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DEL_DISCO, TITULOS } from './presupuesto';
 import {
   HUNDIR_CASAS,
@@ -264,6 +264,9 @@ import {
   loQueAnimaUnaCarta,
   esRecaudacion,
   momentoDeLaRecaudacion,
+  bocanadaDelHumo,
+  esRentaDe,
+  ondaDelAgua,
   arcoDeMoneda,
   avanzarLaCola,
   backOut,
@@ -1238,6 +1241,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   const joyaGeometria = useMemo(geometriaDeLaJoya, []);
   const rejaDeLaCeldaGeometria = useMemo(geometriaDeLaRejaDeLaCelda, []);
   const monedaDeLaOficinaGeometria = useMemo(geometriaDeLaMonedaDeLaRecaudacion, []);
+  const bocanadaGeometria = useMemo(geometriaDeUnaBocanada, []);
+  const ondaGeometria = useMemo(geometriaDeLaOnda, []);
   useEffect(
     () => () => {
       tapaGeometria?.dispose();
@@ -1245,15 +1250,19 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       joyaGeometria?.dispose();
       rejaDeLaCeldaGeometria?.dispose();
       monedaDeLaOficinaGeometria?.dispose();
+      bocanadaGeometria?.dispose();
+      ondaGeometria?.dispose();
     },
-    [tapaGeometria, ruletaGeometria, joyaGeometria, rejaDeLaCeldaGeometria, monedaDeLaOficinaGeometria],
+    [tapaGeometria, ruletaGeometria, joyaGeometria, rejaDeLaCeldaGeometria, monedaDeLaOficinaGeometria, bocanadaGeometria, ondaGeometria],
   );
   const tapas = useRef<THREE.InstancedMesh>(null);
   const ruletas = useRef<THREE.InstancedMesh>(null);
   const joya = useRef<THREE.InstancedMesh>(null);
   const rejaDeLaCelda = useRef<THREE.Mesh>(null);
   const monedaDeLaOficina = useRef<THREE.Mesh>(null);
-  const sitiosVivos = useMemo(() => ({ cofres: bisagrasDeLosCofres(), ruletas: ejesDeLasRuletas(), joya: ejeDeLaJoya(), reja: sitioDeLaRejaDeLaCelda() }), []);
+  const humo = useRef<THREE.InstancedMesh>(null);
+  const onda = useRef<THREE.Mesh>(null);
+  const sitiosVivos = useMemo(() => ({ cofres: bisagrasDeLosCofres(), ruletas: ejesDeLasRuletas(), joya: ejeDeLaJoya(), reja: sitioDeLaRejaDeLaCelda(), chimenea: bocaDeLaChimenea(), alberca: centroDeLaAlberca() }), []);
 
   const materiales = useMemo(
     () => ({
@@ -2154,6 +2163,34 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           mo.scale.setScalar(Math.max(0.001, momento.escala));
         }
       }
+      /*
+       * EL HUMO DE LA CENTRAL Y LA ONDA DEL CANAL: cuando alguien paga la renta de la Luz, tres
+       * bocanadas por la chimenea; cuando la del Agua, una onda que se abre en la alberca. Fuera de
+       * su ventana no se pintan.
+       */
+      const mh = humo.current;
+      if (mh !== null) {
+        const renta = sonando.find((x) => esRentaDe(x.suceso, CASILLA_DE_LA_CENTRAL));
+        let n = 0;
+        for (let k = 0; renta !== undefined && k < BOCANADAS_DEL_HUMO; k++) {
+          const b = bocanadaDelHumo(k, ahora - renta.desde);
+          if (b === null || b.lado < 0.01) continue;
+          auxGiro.setFromAxisAngle(EJE_Y, sitiosVivos.chimenea.giro + k * 0.7);
+          auxMatriz.compose(auxPosicion.set(sitiosVivos.chimenea.x, sitiosVivos.chimenea.y + b.lado / 2 + b.sube, sitiosVivos.chimenea.z), auxGiro, auxEscala.set(b.lado, b.lado, b.lado));
+          mh.setMatrixAt(n, auxMatriz);
+          n++;
+        }
+        mh.count = n;
+        mh.visible = n > 0;
+        mh.instanceMatrix.needsUpdate = true;
+      }
+      const mw = onda.current;
+      if (mw !== null) {
+        const renta = sonando.find((x) => esRentaDe(x.suceso, CASILLA_DEL_CANAL));
+        const escala = renta === undefined ? null : ondaDelAgua(ahora - renta.desde);
+        mw.visible = escala !== null;
+        if (escala !== null) mw.scale.set(escala, 1, escala);
+      }
     }
 
     /*
@@ -2515,6 +2552,10 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         />
       )}
       {monedaDeLaOficinaGeometria === null ? null : <mesh ref={monedaDeLaOficina} geometry={monedaDeLaOficinaGeometria} material={materiales.bulto} visible={false} raycast={() => null} />}
+      {bocanadaGeometria === null ? null : <instancedMesh ref={humo} args={[bocanadaGeometria, materiales.bulto, BOCANADAS_DEL_HUMO]} visible={false} frustumCulled={false} raycast={() => null} />}
+      {ondaGeometria === null ? null : (
+        <mesh ref={onda} geometry={ondaGeometria} material={materiales.bulto} position={[sitiosVivos.alberca.x, sitiosVivos.alberca.y, sitiosVivos.alberca.z]} visible={false} raycast={() => null} />
+      )}
       {rotulos === null ? null : <mesh geometry={rotulos.geometria} material={materiales.rotulo} position={[0, 0, 0]} raycast={() => null} />}
 
       {/*

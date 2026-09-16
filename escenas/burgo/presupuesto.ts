@@ -37,8 +37,8 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 202.586   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 167.342   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 202.662   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 167.418   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
@@ -98,7 +98,7 @@
  * afirma que la cuenta de `casa` sigue siendo 44 justamente para que ese día se note.
  */
 import { PIEZA } from './piezas';
-import { CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLosCarteles, triangulosDeLasObras, triangulosDelTren, triangulosDeLasPiezasVivas } from './obras';
+import { BOCANADAS_DEL_HUMO, CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLosCarteles, triangulosDeLasObras, triangulosDelTren, triangulosDeLasPiezasVivas } from './obras';
 import type { NombreDePieza } from './piezas';
 import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
@@ -274,13 +274,15 @@ export function sumaDelPresupuesto(
   renglones.push({ que: 'trenes', cuantos: TRENES, triangulos: TRENES * triangulosDelTren() });
   /*
    * Y las piezas vivas de las casillas, que tampoco van en el fundido: una tapa por cofre, una ruleta
-   * por casino, la joya, la reja de la celda y la moneda de la recaudación. No estaban contadas.
+   * por casino, la joya, la reja de la celda, la moneda de la recaudación, las bocanadas del humo y
+   * la onda del canal. No estaban contadas.
    */
   const vivas = triangulosDeLasPiezasVivas();
   renglones.push({
     que: 'piezas vivas de las casillas',
-    cuantos: CASILLAS_CON_COFRE.length + CASILLAS_CON_CASINO.length + 3,
-    triangulos: CASILLAS_CON_COFRE.length * vivas.tapa + CASILLAS_CON_CASINO.length * vivas.ruleta + vivas.joya + vivas.reja + vivas.moneda,
+    cuantos: CASILLAS_CON_COFRE.length + CASILLAS_CON_CASINO.length + 4 + BOCANADAS_DEL_HUMO,
+    triangulos:
+      CASILLAS_CON_COFRE.length * vivas.tapa + CASILLAS_CON_CASINO.length * vivas.ruleta + vivas.joya + vivas.reja + vivas.moneda + BOCANADAS_DEL_HUMO * vivas.bocanada + vivas.onda,
   });
   renglones.push({ que: 'discos de contacto', cuantos: DISCOS_DE_CONTACTO, triangulos: DISCOS_DE_CONTACTO * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'dados', cuantos: DADOS, triangulos: DADOS * triangulosDelDado });

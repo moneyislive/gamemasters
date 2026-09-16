@@ -52,6 +52,7 @@ import { SALTO_EXTRA_DEL_DOBLE } from './dados-del-burgo';
 import { A_LA_CELDA, DESVANECER, DESVANECER_AL_QUEBRAR, HUIDA_AL_QUEBRAR, PASO_DE_LA_REJA, VELOCIDAD_CORRIENDO, duracionDelMovimiento, pasaPorLaCelda } from './peon';
 import type { AnilloEn3D } from './anillo-en-3d';
 import { ANILLO_DEL_BURGO } from './anillo-en-3d';
+import { BOCANADAS_DEL_HUMO } from './obras';
 
 /* ─────────────────────────────── Los tiempos ─────────────────────────────── */
 
@@ -493,6 +494,43 @@ export function momentoDeLaRecaudacion(transcurrido: number): { readonly u: numb
   const t = transcurrido - RECAUDACION.empieza;
   if (t < 0 || t >= RECAUDACION.rueda) return null;
   return { u: t / RECAUDACION.rueda, escala: suave(t / RECAUDACION.crece) };
+}
+
+/**
+ * EL HUMO DE LA CENTRAL Y LA ONDA DEL CANAL: cuándo suenan, dentro de la renta de un servicio.
+ *
+ * Suenan con el `paga` de la renta de su casilla y arrancan con él, como la joya con la Tasa. El humo
+ * son tres bocanadas escalonadas una décima, que suben 7 desde la boca de la chimenea: cada una crece
+ * durante dos tercios de su vida y se deshace en el último, 0,6 cada una y 0,8 las tres. La onda se
+ * abre desde un quinto de su radio hasta entero en 0,6. Las dos caben en la renta más corta que hay
+ * —una moneda, 0,97—, por lo mismo que la moneda de la oficina.
+ */
+export const HUMO = { escalon: 0.1, dura: 0.6, sube: 7, ladoAlSalir: 1.2, ladoMayor: 3.4 } as const;
+export const ONDA_DEL_AGUA = { dura: 0.6, desde: 0.2 } as const;
+
+/** Lo que duran las tres bocanadas, de la primera que sale a la última que se deshace. */
+export function duracionDelHumo(): number {
+  return HUMO.escalon * (BOCANADAS_DEL_HUMO - 1) + HUMO.dura;
+}
+
+/** ¿Este suceso es pagar la renta de ESTA casilla? */
+export function esRentaDe(s: SucesoDelBurgo, casilla: number): boolean {
+  return s.que === 'paga' && s.porque === 'renta' && s.casilla === casilla;
+}
+
+/** La bocanada `k` a `transcurrido` de la renta: `null` si no está; si no, lo que ha subido y su lado. */
+export function bocanadaDelHumo(k: number, transcurrido: number): { readonly sube: number; readonly lado: number } | null {
+  const t = transcurrido - k * HUMO.escalon;
+  if (t < 0 || t >= HUMO.dura) return null;
+  const u = t / HUMO.dura;
+  const lado = u < 2 / 3 ? HUMO.ladoAlSalir + (HUMO.ladoMayor - HUMO.ladoAlSalir) * suave(u * 1.5) : HUMO.ladoMayor * (1 - suave((u - 2 / 3) * 3));
+  return { sube: HUMO.sube * suave(u), lado };
+}
+
+/** La escala del radio de la onda a `transcurrido` de la renta, o `null` si no está. */
+export function ondaDelAgua(transcurrido: number): number | null {
+  if (transcurrido < 0 || transcurrido >= ONDA_DEL_AGUA.dura) return null;
+  return ONDA_DEL_AGUA.desde + (1 - ONDA_DEL_AGUA.desde) * suave(transcurrido / ONDA_DEL_AGUA.dura);
 }
 
 /** El quebrado se desvanece en los últimos 0,8 s de su huida. */
