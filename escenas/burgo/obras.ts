@@ -75,6 +75,17 @@ export const COLOR_DE_OBRA = {
   marmol: '#e6e2d8',
   joya: '#57c8d8',
   joyaOscura: '#2e8fa0',
+  /* La central, el canal de aguas y el casino. */
+  boca: '#3a3a3c',
+  bandaRoja: '#b3352a',
+  nave: '#7f8a93',
+  deposito: '#9fb3bf',
+  depositoTapa: '#8aa0ad',
+  agua: '#2f7fa8',
+  casino: '#5a2e4d',
+  marquesina: '#d8b34a',
+  bombilla: '#ffe9a8',
+  ruleta: '#23252a',
 } as const;
 
 /**
@@ -500,12 +511,172 @@ function carasDeLaTasa(casilla: number): CaraDeObra[] {
   return salida;
 }
 
+/**
+ * LO QUE NO ES UNA CAJA: TRONCOS DE CONO Y DISCOS.
+ *
+ * Las torres de refrigeración de una central y el depósito de un canal de aguas son redondos, y
+ * una ruleta es un disco. Los tres salen del mismo par de funciones, y las dos tienen la vuelta
+ * DERIVADA y no probada a ojo, como todo lo demás de este fichero:
+ *
+ * · el costado de un tronco se recorre `a1 → a0` (de mayor ángulo a menor) de abajo arriba, que es
+ *   lo que deja la normal mirando hacia FUERA del eje. Al revés —que es lo que uno escribe
+ *   primero— la torre se ve por dentro y desde fuera no está;
+ * · un disco tumbado es un abanico de triángulos desde su centro recorriendo los ángulos AL
+ *   DERECHO, por la misma cuenta que hace que una `losa` mire al cielo.
+ */
+export function tronco(
+  casilla: number,
+  cu: number,
+  cv: number,
+  radioAbajo: number,
+  radioArriba: number,
+  y0: number,
+  y1: number,
+  segmentos: number,
+  color: string,
+): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  const en = (angulo: number, radio: number, y: number): PuntoDeObra => [cu + radio * Math.cos(angulo), y, cv + radio * Math.sin(angulo)];
+  for (let k = 0; k < segmentos; k++) {
+    const a0 = (k / segmentos) * Math.PI * 2;
+    const a1 = ((k + 1) / segmentos) * Math.PI * 2;
+    salida.push({ casilla, puntos: [en(a1, radioAbajo, y0), en(a1, radioArriba, y1), en(a0, radioArriba, y1), en(a0, radioAbajo, y0)], color });
+  }
+  return salida;
+}
+
+/** Un disco tumbado a la cota `y`, mirando arriba: un abanico de triángulos desde el centro. */
+export function disco(casilla: number, cu: number, cv: number, radio: number, y: number, segmentos: number, color: string): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  const en = (angulo: number): PuntoDeObra => [cu + radio * Math.cos(angulo), y, cv + radio * Math.sin(angulo)];
+  for (let k = 0; k < segmentos; k++) {
+    const a0 = (k / segmentos) * Math.PI * 2;
+    const a1 = ((k + 1) / segmentos) * Math.PI * 2;
+    salida.push(triangulo(casilla, [cu, y, cv], en(a0), en(a1), color));
+  }
+  return salida;
+}
+
+/**
+ * LA CENTRAL ELÉCTRICA (casilla 12, la Luz).
+ *
+ * Miguel: «para la casilla de la compañía eléctrica me gustaría que hubiera un edificio
+ * característico de una central eléctrica». Lo característico de una central, lo que la hace
+ * reconocible de un vistazo y desde cualquier ángulo, son las TORRES DE REFRIGERACIÓN: dos
+ * troncos con cintura, no dos cilindros. La cintura se hace con dos troncos pegados —el de abajo
+ * cerrando de 5 a 3,2 y el de arriba abriendo de 3,2 a 4,1—, que es la silueta que todo el mundo
+ * dibuja cuando dibuja una central.
+ *
+ * Al lado, la chimenea con su banda roja y la nave de turbinas. Doce segmentos por torre: a la
+ * talla a la que se ve desde el tablero, dieciséis no se distinguen de doce y cuestan un tercio
+ * más.
+ */
+const CENTRAL = {
+  torres: [-7.5, 7.5] as readonly number[],
+  torre: { v: 76, radioPie: 5, radioCintura: 3.2, radioBoca: 4.1, cintura: 8.5, alto: 12, segmentos: 12 },
+  chimenea: { u: 0, v: 66, radio: 1.5, alto: 16, segmentos: 8, banda: { desde: 12.5, hasta: 14.5 } },
+  nave: { u0: -12, u1: 12, v0: 60.5, v1: 64, alto: 5 },
+} as const;
+
+function carasDeLaCentral(casilla: number): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  const t = CENTRAL.torre;
+  for (const u of CENTRAL.torres) {
+    salida.push(...tronco(casilla, u, t.v, t.radioPie, t.radioCintura, 0, t.cintura, t.segmentos, COLOR_DE_OBRA.hormigon));
+    salida.push(...tronco(casilla, u, t.v, t.radioCintura, t.radioBoca, t.cintura, t.alto, t.segmentos, COLOR_DE_OBRA.hormigon));
+    /* La boca, oscura: una torre sin boca es un cono y no una torre. */
+    salida.push(...disco(casilla, u, t.v, t.radioBoca - 0.4, t.alto - 0.3, t.segmentos, COLOR_DE_OBRA.boca));
+  }
+  const c = CENTRAL.chimenea;
+  salida.push(...tronco(casilla, c.u, c.v, c.radio, c.radio * 0.82, 0, c.alto, c.segmentos, COLOR_DE_OBRA.hormigon));
+  salida.push(...tronco(casilla, c.u, c.v, c.radio * 0.9, c.radio * 0.87, c.banda.desde, c.banda.hasta, c.segmentos, COLOR_DE_OBRA.bandaRoja));
+  const n = CENTRAL.nave;
+  salida.push(...caja(casilla, n.u0, n.u1, n.v0, n.v1, 0, n.alto, COLOR_DE_OBRA.nave));
+  return salida;
+}
+
+/**
+ * EL CANAL DE AGUAS (casilla 28). «La compañía de Agua igual que la eléctrica.»
+ *
+ * O sea: reconocible por su silueta y no por un cartel. La de una compañía de aguas es el
+ * DEPÓSITO ELEVADO —un cilindro sobre cuatro patas— y la alberca. Van los dos, con la caseta de
+ * bombas al lado para que el conjunto tenga escala.
+ */
+const AGUAS = {
+  deposito: { u: -7, v: 76, radio: 5.2, patas: 7.5, alto: 6.5, segmentos: 12, pata: 0.8, separacion: 3.4 },
+  alberca: { u0: 1, u1: 13, v0: 68, v1: 84, borde: 0.9, alto: 1.4 },
+  caseta: { u0: -13, u1: -3, v0: 61, v1: 66.5, alto: 4.5 },
+} as const;
+
+function carasDeLasAguas(casilla: number): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  const d = AGUAS.deposito;
+  for (const du of [-d.separacion, d.separacion]) {
+    for (const dv of [-d.separacion, d.separacion]) {
+      salida.push(...caja(casilla, d.u + du - d.pata / 2, d.u + du + d.pata / 2, d.v + dv - d.pata / 2, d.v + dv + d.pata / 2, 0, d.patas, COLOR_DE_OBRA.hierro));
+    }
+  }
+  salida.push(...tronco(casilla, d.u, d.v, d.radio, d.radio, d.patas, d.patas + d.alto, d.segmentos, COLOR_DE_OBRA.deposito));
+  salida.push(...disco(casilla, d.u, d.v, d.radio, d.patas + d.alto, d.segmentos, COLOR_DE_OBRA.depositoTapa));
+  const a = AGUAS.alberca;
+  salida.push(...caja(casilla, a.u0, a.u1, a.v0, a.v1, 0, a.alto, COLOR_DE_OBRA.hormigon));
+  salida.push(losa(casilla, a.u0 + a.borde, a.u1 - a.borde, a.v0 + a.borde, a.v1 - a.borde, a.alto - 0.25, COLOR_DE_OBRA.agua));
+  const c = AGUAS.caseta;
+  salida.push(...caja(casilla, c.u0, c.u1, c.v0, c.v1, 0, c.alto, COLOR_DE_OBRA.nave));
+  return salida;
+}
+
+/**
+ * EL CASINO (casillas 7, 22 y 36, los Sucesos).
+ *
+ * Miguel: «para las casillas de suerte me gustaría que hubiera un CASINO». Un casino no se
+ * reconoce por el edificio —es un cajón— sino por lo que le cuelga: la MARQUESINA que vuela sobre
+ * la entrada, el RÓTULO vertical con bombillas y, ya en el suelo, la RULETA.
+ *
+ * La ruleta va tumbada en el suelo y no dentro del edificio por la misma razón que la celda de la
+ * comisaría no tiene techo: lo que no se ve desde arriba, en un tablero, no existe.
+ */
+const CASINO = {
+  cuerpo: { u0: -12, u1: 12, v0: 70, v1: 88, alto: 9 },
+  marquesina: { u0: -9, u1: 9, v0: 66, v1: 70.5, desde: 6.2, hasta: 7.4 },
+  rotulo: { u: 10.5, v: 68, ancho: 2.4, desde: 0, hasta: 15 },
+  bombillas: { cuantas: 5, lado: 0.9, desde: 4 },
+  ruleta: { u: -4, v: 65, radio: 4.2, segmentos: 12 },
+} as const;
+
+function carasDelCasino(casilla: number): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  const c = CASINO.cuerpo;
+  salida.push(...caja(casilla, c.u0, c.u1, c.v0, c.v1, 0, c.alto, COLOR_DE_OBRA.casino));
+  const m = CASINO.marquesina;
+  salida.push(...caja(casilla, m.u0, m.u1, m.v0, m.v1, m.desde, m.hasta, COLOR_DE_OBRA.marquesina));
+  const r = CASINO.rotulo;
+  salida.push(...caja(casilla, r.u - r.ancho / 2, r.u + r.ancho / 2, r.v - r.ancho / 2, r.v + r.ancho / 2, r.desde, r.hasta, COLOR_DE_OBRA.casino));
+  /* Las bombillas del rótulo: cinco cubitos que vuelan un pelo sobre su cara. */
+  const b = CASINO.bombillas;
+  const paso = (r.hasta - b.desde) / (b.cuantas + 1);
+  for (let k = 1; k <= b.cuantas; k++) {
+    const y = b.desde + paso * k;
+    salida.push(...caja(casilla, r.u - b.lado / 2, r.u + b.lado / 2, r.v - r.ancho / 2 - 0.3, r.v - r.ancho / 2, y - b.lado / 2, y + b.lado / 2, COLOR_DE_OBRA.bombilla));
+  }
+  /* Y la ruleta en el suelo, con su plato oscuro y el buje claro en medio. */
+  const ru = CASINO.ruleta;
+  salida.push(...disco(casilla, ru.u, ru.v, ru.radio, ALZA_DEL_ASFALTO, ru.segmentos, COLOR_DE_OBRA.ruleta));
+  salida.push(...disco(casilla, ru.u, ru.v, ru.radio * 0.34, ALZA_DEL_ASFALTO + 0.05, ru.segmentos, COLOR_DE_OBRA.laton));
+  return salida;
+}
+
 /** Qué levanta cada casilla lateral. Las que no están aquí todavía no tienen obra. */
 const OBRA_DE_LA_CASILLA: Readonly<Record<number, (casilla: number) => CaraDeObra[]>> = {
   2: carasDelCofre,
   4: carasDeLaOficina,
+  7: carasDelCasino,
+  12: carasDeLaCentral,
   17: carasDelCofre,
+  22: carasDelCasino,
+  28: carasDeLasAguas,
   33: carasDelCofre,
+  36: carasDelCasino,
   38: carasDeLaTasa,
 };
 

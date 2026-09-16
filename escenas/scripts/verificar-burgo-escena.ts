@@ -977,13 +977,22 @@ function problemasDelAtrezo(casilla: number, piezas: readonly PiezaDeCasilla[]):
     const { v, aLoLargo } = enElMarco(m, { x: e.x, z: e.z });
     return v - LADO_DEL_EMBLEMA / 2 < ATREZO.desde || v + LADO_DEL_EMBLEMA / 2 > ATREZO.hasta || Math.abs(aLoLargo) + LADO_DEL_EMBLEMA / 2 > ANCHO_DE_CASILLA / 2;
   });
-  /* Los emblemas que quedan —los de las casillas sin obra todavía— más las dos flechas de la marcha. */
-  const emblemasDeclarados = emblemas.filter((e) => !ESQUINAS.includes(e.casilla)).length;
+  /*
+   * YA NO QUEDA NINGÚN EMBLEMA DE CASILLA: las diez que los llevaban tienen obra propia, y un
+   * icono plano de 27 tumbado justo donde se levanta el edificio no se lee ni como icono ni como
+   * sombra. Lo que queda del emblema son las DOS FLECHAS de la marcha, que no dicen qué es una
+   * casilla sino hacia dónde se va, y por eso no compiten con nada.
+   *
+   * La regla de que una casilla no se quede muda sigue en pie unas líneas más arriba, y ahora
+   * cuenta cinco formas de hablar en vez de tres: atrezo, emblema, cifra, OBRA o NOMBRE.
+   */
+  const emblemasDeCasilla = emblemas.filter((e) => !ESQUINAS.includes(e.casilla)).length;
   comprobar(
-    `los ${String(emblemasDeclarados)} emblemas de casilla y las dos flechas están puestos, y caben en la banda de atrezo sin salirse`,
-    emblemas.length === emblemasDeclarados + 2 && emblemasDeclarados > 0 && emblemasMal.length === 0,
-    emblemasMal.map((e) => `${e.casilla}/${e.emblema}`),
+    'las dos flechas de la marcha están puestas, ninguna casilla lleva ya emblema plano, y lo que hay cabe en su banda',
+    emblemas.length === 2 && emblemasDeCasilla === 0 && emblemasMal.length === 0,
+    { emblemas: emblemas.length, deCasilla: emblemasDeCasilla, mal: emblemasMal.map((e) => `${e.casilla}/${e.emblema}`) },
   );
+  comprobar('y las diez casillas que los llevaban tienen obra: cofre, oficina, casino, central, aguas y joya', [2, 4, 7, 12, 17, 22, 28, 33, 36, 38].every((i) => casillasConObra().includes(i)), casillasConObra());
   const barriosDelReglamento = BARRIOS.flatMap((b) => b.solares);
   /*
    * LOS 22 SOLARES, TODOS IGUALES Y SIN EDIFICIO.

@@ -1462,10 +1462,10 @@ const puerta: readonly PiezaDeCasilla[] = [
 
 /** El Fondo Vecinal: el cofre lo levanta `obras.ts`, y al lado no va nada más. */
 const arca: readonly PiezaDeCasilla[] = [];
-/** El Pregón: su emblema y una papelera. */
-const pregon: readonly PiezaDeCasilla[] = [{ pieza: PIEZA.papelera, giroEnCuartos: 0, sitio: [18, ATREZO.centro], menudo: true }];
-/** El Molino y el Pozo: su emblema y una boca de riego. */
-const oficio: readonly PiezaDeCasilla[] = [{ pieza: PIEZA.bocaDeRiego, giroEnCuartos: 0, sitio: [18, ATREZO.centro], menudo: true }];
+/** Los Sucesos: el casino lo levanta `obras.ts`, y al lado no va nada más. */
+const pregon: readonly PiezaDeCasilla[] = [];
+/** La Luz y el Agua: la central y el depósito los levanta `obras.ts`. */
+const oficio: readonly PiezaDeCasilla[] = [];
 /** El Diezmo y la Alcabala: sólo el emblema y la cifra. Sin volumen. */
 const tributo: readonly PiezaDeCasilla[] = [];
 
@@ -1579,13 +1579,7 @@ export const SEPARACION_DE_LA_FLECHA = 33;
  * que el documento pone en su fila de atrezo y lo que de verdad dice «por aquí se entra».
  * El contorno `puerta` de `iconos.ts` sigue compilado para la hoja, que sí tiene texto.
  */
-const EMBLEMA_DE_LA_CASILLA: Readonly<Record<number, EmblemaDelBurgo>> = {
-  7: 'pregon',
-  12: 'oficio',
-  22: 'pregon',
-  28: 'oficio',
-  36: 'pregon',
-};
+const EMBLEMA_DE_LA_CASILLA: Readonly<Record<number, EmblemaDelBurgo>> = {};
 
 /**
  * Dónde va el emblema dentro de la casilla: a la izquierda si hay pieza al lado, centrado si no.

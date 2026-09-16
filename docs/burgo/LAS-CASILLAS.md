@@ -83,9 +83,9 @@ corrige en la fase 4.
 | 20 | PARKING ✅ | La esquina entera asfaltada, sesenta plazas amarillas, catorce coches y el cartel tumbado con la `P` | Código fundido + coches del pack | pendiente: el coche del que cae aparca (0,6) |
 | 30 | COMISARÍA ✅ | Cuerpo, porche con dos columnas, farol azul y una celda de tres paredes y cinco barrotes, sin techo | Código fundido + la avenida y su patrulla | pendiente: el peón entra en la celda (0,7) |
 | 2·17·33 | FONDO VECINAL ✅ | Cofre de madera con tapa, dos herrajes y cerradura, sobre zócalo de piedra | Código fundido | pendiente: la tapa se abre (0,7) |
-| 7·22·36 | SUCESOS | Casino: cuerpo con marquesina, rótulo vertical de bombillas y ruleta en el suelo | Código | La ruleta gira vuelta y media y para (0,8) |
-| 12 | CENTRAL ELÉCTRICA | Dos torres de refrigeración, chimenea y un poste de alta tensión | Código | Chispazo entre los postes (0,3) |
-| 28 | CANAL DE AGUAS | Depósito elevado y alberca | `torre-de-agua` (del pack) + código | Onda en la alberca (0,5) |
+| 7·22·36 | SUCESOS ✅ | Casino: cuerpo, marquesina que vuela, rótulo vertical con cinco bombillas y la ruleta tumbada en el suelo | Código fundido (discos) | pendiente: la ruleta gira (0,8) |
+| 12 | CENTRAL ELÉCTRICA ✅ | Dos torres de refrigeración CON CINTURA (dos troncos pegados), chimenea con banda roja y nave de turbinas | Código fundido (troncos) | pendiente: el humo (0,3) |
+| 28 | CANAL DE AGUAS ✅ | Depósito elevado sobre cuatro patas, alberca con agua y caseta de bombas | Código fundido (troncos) | pendiente: la onda (0,5) |
 | 4 | IMPUESTO ✅ | Escalinata de dos peldaños, cuatro columnas, cornisa y ático escalonado | Código fundido | pendiente: la moneda sube la escalinata (0,6) |
 | 38 | TASA DE LUJO ✅ | Alfombra granate, pedestal de mármol y una joya de ocho caras —la única pieza que no es un prisma— | Código fundido (triángulos) | pendiente: la joya gira (0,5) |
 | 5·15·25·35 | LAS CUATRO ESTACIONES | Cuatro estaciones DISTINTAS con andén y marquesina | Código | El tren para 1,5 s en el andén |
@@ -134,7 +134,14 @@ trece edificios de código a ~1.500 son 20.000 de los 718.000 que sobran.
    - Y una regla de composición que vale para las cinco que faltan: **la casilla que tiene obra
      pierde su emblema plano**, porque el emblema ocupa exactamente la banda donde se levanta el
      edificio. El edificio es el icono.
-   - Faltan el casino (7, 22, 36), la central eléctrica (12) y el canal de aguas (28).
+   - **Hechas también el casino (7, 22, 36), la central (12) y el canal de aguas (28).** Con ellas
+     entran las dos formas que no son cajas: el TRONCO DE CONO —la cintura de una torre de
+     refrigeración son dos troncos pegados, que es como todo el mundo dibuja una central— y el
+     DISCO tumbado, que es la ruleta y la tapa de un depósito. Las vueltas de las dos van
+     derivadas y escritas, no probadas a ojo.
+   - Y con la última obra **desaparece el emblema plano de casilla**: las diez que lo llevaban
+     tienen volumen propio. De los doce emblemas quedan las dos flechas de la marcha.
+   - **La fase 4 está hecha.** Falta el ferrocarril (fase 5) y las animaciones (fase 6).
 4. **El ferrocarril** (fase 5): las cuatro estaciones, la vía del perímetro y los trenes. Es la
    más cara y la única que toca el mundo fuera del anillo.
 5. **Las animaciones** (fase 6): una función pura por animación en `coreografia.ts` —que el
