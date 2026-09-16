@@ -196,7 +196,7 @@
 import { medioLado, sitioDeCasilla as sitioEnElAnillo, casillasDelAnillo } from '../../shared/mecanicas/anillo';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import { sorteo } from '../embarcadero/cala';
-import { AVANCE_DEL_GUARISMO, CAJA_DEL_GUARISMO } from '../iconos';
+import { ALTO_DE_LA_LETRA, AVANCE_DEL_GUARISMO, AVANCE_DE_LA_LETRA, CAJA_DEL_GUARISMO } from '../iconos';
 import { PIEZA, RETICULA_DE_LA_CIUDAD } from './piezas';
 import type { NombreDePieza } from './piezas';
 
@@ -626,6 +626,119 @@ export function anchoDelPrecio(casilla: number): number {
   const precio = PRECIO_DE_LA_CASILLA[marcoDeCasilla(casilla).indice] ?? 0;
   if (precio <= 0) return 0;
   return (String(precio).length - 1) * AVANCE_DEL_PRECIO + ANCHO_DEL_GUARISMO;
+}
+
+/* ─────────────────────────────── Los rótulos ─────────────────────────────── */
+
+/**
+ * ═══ EL NOMBRE DE UNA CASILLA QUE NO SE COMPRA, SOBRE LA FRANJA ═══
+ *
+ * Las especiales se leían por un emblema y poco más: el Arca era un contenedor, el Pregón una
+ * papelera, el Diezmo ni eso. Con el alfabeto del tablero pueden llevar su NOMBRE, que es lo que
+ * un tablero de mesa hace desde siempre.
+ *
+ * ═══ VA EN LA FRANJA, Y NO EN LA SUPERFICIE, PORQUE ES EL ÚNICO SITIO LIBRE ═══
+ *
+ * La superficie (`v` 30..90) está repartida: el precio ocupa de 31,5 a 58,5 y el atrezo de 60 a
+ * 90. No cabe un renglón más sin quitarle sitio a uno de los dos. La FRANJA (0..21) sí está
+ * libre en estas casillas: es donde van las casas, y una casilla que no se compra no tiene
+ * casas. Es además donde el tablero de verdad pone el nombre, pegado al color.
+ *
+ * Y por eso lleva su propia alza: la franja está subida `ALTURA_DEL_REBORDE` (0,6) y el rótulo
+ * de la superficie se posa a 0,08, así que unas letras puestas ahí quedarían ENTERRADAS dentro
+ * del reborde sin que fallara nada en pantalla.
+ *
+ * ═══ Y LA TALLA LA PONE LA PALABRA, NO UNA CONSTANTE ═══
+ *
+ * La casilla mide 72 de ancho. Con una talla fija, o los nombres cortos salen enanos o los
+ * largos se salen — y salirse no falla: se monta sobre la casilla vecina. Así que se calcula la
+ * talla con la que la palabra cabe en `ANCHO_DEL_ROTULO`, con el techo de
+ * `ALTO_MAXIMO_DEL_ROTULO` para que «LUZ» no salga gigante.
+ *
+ * Los anchos son los del TIPO, uno por glifo, así que «IMPUESTO» ocupa lo que de verdad ocupa y
+ * no ocho veces la letra más ancha.
+ */
+export const V_DEL_ROTULO = 11;
+export const ALTO_MAXIMO_DEL_ROTULO = 17;
+export const ANCHO_DEL_ROTULO = 62;
+/** Sobre el reborde de la franja (0,6), que es lo más alto que el rótulo tiene debajo. */
+export const ALZA_DEL_ROTULO_EN_LA_FRANJA = 0.7;
+
+/** El avance de un carácter, en unidades del lienzo. El de la caja para lo que no esté en la tabla. */
+function avanceDelCaracter(caracter: string): number {
+  return AVANCE_DE_LA_LETRA[caracter] ?? ALTO_DE_LA_LETRA / 2;
+}
+
+/** Lo que mide una palabra puesta a este alto, a lo largo de `u`. */
+export function anchoDeLaPalabra(palabra: string, alto: number): number {
+  const escala = alto / ALTO_DE_LA_LETRA;
+  let ancho = 0;
+  for (const c of palabra) ancho += avanceDelCaracter(c) * escala;
+  return ancho;
+}
+
+/** El alto al que hay que poner esta palabra para que quepa en la casilla. */
+export function altoDelRotulo(palabra: string): number {
+  if (palabra.length === 0) return 0;
+  const porUnidadDeAlto = anchoDeLaPalabra(palabra, ALTO_DE_LA_LETRA) / ALTO_DE_LA_LETRA;
+  return Math.min(ALTO_MAXIMO_DEL_ROTULO, ANCHO_DEL_ROTULO / porUnidadDeAlto);
+}
+
+/**
+ * EL NOMBRE DE CADA CASILLA ESPECIAL, en corto y en mayúsculas.
+ *
+ * Cortos porque la casilla mide 72 y cada letra de más encoge a todas las demás. El nombre largo
+ * —«el Fondo Vecinal», «la Central Eléctrica»— sigue donde siempre se ha leído: en la hoja y en
+ * el cartel del pie, que tienen texto de verdad y no tres píxeles de tinta.
+ */
+export const ROTULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
+  2: 'FONDO',
+  4: 'IMPUESTO',
+  7: 'SUCESOS',
+  12: 'LUZ',
+  17: 'FONDO',
+  22: 'SUCESOS',
+  28: 'AGUA',
+  33: 'FONDO',
+  36: 'SUCESOS',
+  38: 'TASA',
+};
+
+/** Una letra puesta en el tablero: cuál, dónde, con qué giro, de qué talla y a qué altura. */
+export interface LetraEnElTablero {
+  readonly letra: string;
+  readonly x: number;
+  readonly z: number;
+  /** El `rotation.y` con el que se lee desde fuera del anillo. */
+  readonly giro: number;
+  readonly alto: number;
+  readonly alza: number;
+}
+
+/**
+ * Las letras del nombre de una casilla, ya en el mundo. Vacío si la casilla no lleva rótulo.
+ *
+ * Se escriben hacia `−adelante` por lo mismo que el precio, y el porqué está en
+ * `guarismosDelPrecio`: al revés salen ESPEJADAS, y eso no se lee como un fallo de orientación
+ * sino como una fuente rara.
+ */
+export function letrasDelRotulo(casilla: number): LetraEnElTablero[] {
+  const m = marcoDeCasilla(casilla);
+  const palabra = ROTULO_DE_LA_CASILLA[m.indice];
+  if (m.esEsquina || palabra === undefined || palabra.length === 0) return [];
+  const alto = altoDelRotulo(palabra);
+  const escala = alto / ALTO_DE_LA_LETRA;
+  const giro = giroHaciaDentro(m);
+  const salida: LetraEnElTablero[] = [];
+  /* Cada letra se agarra por el centro de su avance, así que se empieza por el borde y se resta. */
+  let u = anchoDeLaPalabra(palabra, alto) / 2;
+  for (const letra of palabra) {
+    const avance = avanceDelCaracter(letra) * escala;
+    const p = puntoEnLaCasillaPorV(m, u - avance / 2, V_DEL_ROTULO);
+    salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO_EN_LA_FRANJA });
+    u -= avance;
+  }
+  return salida;
 }
 
 /* ──────────────── La talla de las piezas que son de un jugador ──────────────── */
@@ -1267,57 +1380,54 @@ const oficio: readonly PiezaDeCasilla[] = [{ pieza: PIEZA.bocaDeRiego, giroEnCua
 const tributo: readonly PiezaDeCasilla[] = [];
 
 /**
- * EL ATREZO, CASILLA A CASILLA. Ningún solar lleva más de UNA pieza de volumen y UNA de
- * mobiliario: es lo que Miguel pidió («no hace falta que pongas muchos elementos 3d para que
- * parezcan de verdad casillas») y lo que el presupuesto de `presupuesto.ts` cuenta.
+ * EL ATREZO, CASILLA A CASILLA. Ninguna casilla lleva más de UNA pieza de volumen: es lo que
+ * Miguel pidió («no hace falta que pongas muchos elementos 3d para que parezcan de verdad
+ * casillas») y lo que el presupuesto de `presupuesto.ts` cuenta.
  *
- * El cuerpo de cada solar sale de su barrio, y la regla es la del documento: dos plantas en
- * los tres primeros barrios (pardo, celeste, rosa), tres en los tres siguientes (naranja,
- * rojo, amarillo) y cuatro en los dos últimos (verde, azul). Dentro de un barrio se alterna
- * el modelo para que tres casillas seguidas no sean el mismo edificio, y dentro de una
- * casilla los DOS cuerpos del frente son siempre distintos: dos edificios gemelos pegados no
- * parecen una manzana, parecen un error de copia.
- *
- * En los dos barrios caros el primer cuerpo es siempre el `cuerpo-h` —el único de cuatro
- * plantas del pack—, porque lo que se quiere ver ahí es justo eso: que la Corte es la más
- * alta del anillo. El medianero es un `cuerpo-f` o un `cuerpo-g` de tres, que además hace
- * que la silueta de la casilla escalone y no sea un muro.
+ * Y un SOLAR no lleva ninguna: sólo su farola de fondo. Hasta el 16 de septiembre de 2026 cada
+ * uno llevaba un frente de manzana de dos `cuerpo-*` elegidos por barrio —dos plantas en los
+ * tres primeros, tres en los tres siguientes, cuatro en los dos caros—, y se fueron enteros por
+ * LECTURA, no por presupuesto: a la talla del tablero un edificio del pack y una casa del
+ * jugador son dos bultos del mismo tamaño en la misma casilla, y contar las casas de un vistazo
+ * se volvía un ejercicio de vista. Lo único que sobresale de un solar es lo que su dueño ha
+ * construido. El comentario de cada renglón dice el barrio, que sigue mandando sobre el COLOR
+ * de la franja.
  */
 export const ATREZO_DE_LA_CASILLA: Readonly<Record<number, readonly PiezaDeCasilla[]>> = {
-  1: solar, // Lodo — pardo, 2 plantas
+  1: solar, // Lodo — pardo
   2: arca,
   3: solar, // Corral — pardo
   4: tributo, // El Diezmo
   5: puerta,
-  6: solar, // Tejedores — celeste, 2 plantas
+  6: solar, // Tejedores — celeste
   7: pregon,
   8: solar, // Tintoreros — celeste
   9: solar, // Ribera — celeste
-  11: solar, // Cera — rosa, 2 plantas
+  11: solar, // Cera — rosa
   12: oficio, // El Molino
   13: solar, // Bordadores — rosa
   14: solar, // Ciegos — rosa
   15: puerta,
-  16: solar, // Herreros — naranja, 3 plantas
+  16: solar, // Herreros — naranja
   17: arca,
   18: solar, // Caldereros — naranja
   19: solar, // Espaderos — naranja
-  21: solar, // Mercaderes — rojo, 3 plantas
+  21: solar, // Mercaderes — rojo
   22: pregon,
   23: solar, // Mercado — rojo
   24: solar, // Lonja — rojo
   25: puerta,
-  26: solar, // Plateros — amarillo, 3 plantas
+  26: solar, // Plateros — amarillo
   27: solar, // Libreros — amarillo
   28: oficio, // El Pozo
   29: solar, // Cambistas — amarillo
-  31: solar, // Hospital — verde, 4 plantas
+  31: solar, // Hospital — verde
   32: solar, // Colegiata — verde
   33: arca,
   34: solar, // Escribanos — verde
   35: puerta,
   36: pregon,
-  37: solar, // Alcázar — azul, 4 plantas
+  37: solar, // Alcázar — azul
   38: tributo, // La Alcabala
   39: solar, // Calle Mayor — azul
 };

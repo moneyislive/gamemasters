@@ -409,7 +409,8 @@ jugador», cada una derivada y no elegida a ojo:
 
 Escalar no cuesta un triángulo ni una llamada: son las mismas `InstancedMesh`. Los 44
 edificios de un tablero lleno (32 casas + 12 hoteles) se siguen contando como `casa`, y la
-suma sigue en 207.949 en plena (tope 900.000) y 145.595 en sobria (tope 230.000).
+suma sigue en 207.949 en plena (tope 900.000) y 145.595 en sobria (tope 230.000) —la de aquel
+día: hoy son 181.333 y 136.547, que es lo que `verify:burgo-escena` imprime en cada pasada—.
 
 Antes de estirar la casa se buscó un modelo de hotel pieza a pieza (anotado en `piezas.ts`):
 Board Game Bits es el único pack con la misma pieza en cuatro colores —lo que hace falta para

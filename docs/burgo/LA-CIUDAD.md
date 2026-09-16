@@ -251,6 +251,10 @@ Los precios del reglamento van de 60 a 400: tres dígitos como mucho. Las rentas
 
 ### Qué atrezo lleva cada clase de casilla, y qué poco es
 
+Esto es lo que hay HOY. Lo que estas casillas van a ser —cofre, casino, central eléctrica,
+estaciones con su ferrocarril, cárcel, parking— está planeado, con su coste contado por delante,
+en [LAS-CASILLAS.md](LAS-CASILLAS.md).
+
 | Clase | Atrezo, en la banda `v = 60..90` |
 | --- | --- |
 | Solar de barrio (22) | **Sin edificio.** Sólo una `farola-de-calle` en la esquina de atrás (`u = −31`, `v = 84`): una pieza. Lo que sobresale de un solar son las casas y el hotel del jugador, en la franja. |
@@ -271,11 +275,42 @@ La farola se queda porque no es un edificio: va al fondo, contra el marco, y lej
 las casas (`v = 10,5`), así que da escala sin disputarle el sitio a lo que cuenta. Lo que define
 la casilla sigue siendo la franja de color, el filete, el marco y el precio grande.
 
-De propina, el tablero adelgazó unos **21.000 triángulos** en plena —172.808 hoy, de un tope de
-900.000—, que es sitio para lo que venga después.
+De propina, el tablero adelgazó al quitarlos: quedó en **172.808** triángulos en plena. Con los
+NOMBRES de las casillas encima (8.525 triángulos de letras, §2 bis) va hoy por **181.333**, de un
+tope de 900.000, así que el sitio para lo que venga después sigue ahí entero.
 
 El emblema mide **27** de lado (creció con el dígito, por la misma razón) y va a `u = −14`
 cuando la casilla lleva pieza, centrado cuando no.
+
+### 2 bis. El nombre de la casilla, y de dónde salen sus letras
+
+Las diez casillas que no se compran llevan su **nombre escrito en la franja**, donde un solar
+lleva su color: `V_DEL_ROTULO = 11`, alzado `0,7` sobre la franja para no pelearse en profundidad
+con el reborde. Hoy dicen FONDO (2, 17, 33), IMPUESTO (4), SUCESOS (7, 22, 36), LUZ (12), AGUA
+(28) y TASA (38) —los nombres del reglamento; la escena todavía llama a algunas de estas casillas
+Arca, Pregón, Molino o Alcabala por dentro, y esa deriva se corrige al amueblarlas—.
+
+El renglón se ajusta solo: `ALTO_MAXIMO_DEL_ROTULO = 17`, y si la palabra no cabe en los
+`ANCHO_DEL_ROTULO = 62` útiles, encoge hasta caber. Cada letra se agarra **por el centro de su
+avance**, no por su caja, que es lo que hace que una palabra quede ópticamente centrada.
+
+**Las letras salen de un tipo de verdad.** Los contornos se extraen de
+`arte/tipos/Cinzel_700Bold.ttf` —la familia con la que la app titula, con su licencia SIL OFL al
+lado— **al compilar**, con `opentype.js` como dependencia sólo de compilación. Treinta y nueve
+glifos: mayúsculas, eñe, vocales acentuadas, diéresis, apertura de interrogación y de admiración
+y puntuación. **Cambiar el juego de idioma es declarar sus caracteres en el charset de
+`escenas/scripts/compilar-iconos.ts` y volver a compilar**; si el tipo no trae alguno, el
+compilador se para y dice cuál en vez de emitir un hueco.
+
+Por qué el arte acaba siendo código y no se lee el `.ttf` en caliente: Metro no sabe traer un
+fichero como texto y **en React Native no existe `DOMParser`**, así que un tipo analizado al
+arrancar se vería en el escritorio y saldría **vacío en la app**, sin un error en ninguna consola.
+
+Cuestan **155 triángulos por glifo** de media —medidos uno a uno: 84 la `Z`, 201 la `P`, con las
+curvas a seis tramos—, y las 55 letras del anillo suman **8.525**. No cuestan ninguna llamada de
+dibujo: van fundidas en la misma geometría que los precios y los emblemas, que es **una sola**
+para los 88 dígitos, los 12 emblemas y las 55 letras. Bajar ese número de tramos es la única
+palanca si algún día estorban, y no obliga a tocar nada más.
 
 ### Las cuatro esquinas (108 × 108 = 9 × 9 celdas de retícula)
 

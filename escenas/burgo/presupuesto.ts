@@ -37,12 +37,14 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 207.949   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 145.595   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 181.333   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 136.547   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
- * (Eran 207.877 y 145.523 hasta que se añadió la LÍNEA que separa dos casillas: 72 triángulos
- * en todo el anillo, contados por `triangulosDelSuelo` pero no traídos aquí. Los de arriba son
- * los que `verify:burgo-escena` imprime hoy.)
+ * (Eran 207.949 y 145.595 hasta esta tanda, y los dos cambios que los mueven van en direcciones
+ * contrarias: los solares se quedaron SIN CUERPOS —los edificios de las propiedades se confundían
+ * con las casas y las posadas del Concejo, y se quitaron a petición de Miguel—, que descuenta
+ * unos 35.000; y los NOMBRES de las casillas entran con 8.525. Los de arriba son los que
+ * `verify:burgo-escena` imprime hoy, y esa cifra la vuelve a sumar en cada pasada.)
  *
  * `TOPE_PLENA = 900.000`: el tablero más 692.000 para lo que la ciudad tenga montado. Sigue
  * siendo el 45 % de los 2.000.000 que ya mueve el delta de Riberas en un PC.
@@ -94,7 +96,7 @@
  */
 import { PIEZA } from './piezas';
 import type { NombreDePieza } from './piezas';
-import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
+import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, ROTULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
 
 /**
@@ -150,6 +152,19 @@ export function guarismosDelTablero(): number {
 }
 /** El emblema de una casilla que no se compra: otro contorno relleno, más gordo que un dígito. */
 export const TRIANGULOS_POR_EMBLEMA = 120;
+
+/**
+ * LAS LETRAS DE LOS RÓTULOS. Cada glifo sale del tipo con las curvas a seis tramos, y medido uno
+ * a uno va de los 84 de la `Z` a los 201 de la `P`; 155 es la media MEDIDA sobre las 55 que hoy
+ * pone el anillo. Se cuentan las de verdad: las de `ROTULO_DE_LA_CASILLA`, letra a letra y sin
+ * los espacios, porque un espacio no trae glifo y por tanto no llega a montarse.
+ */
+export const TRIANGULOS_POR_LETRA = 155;
+export function letrasDelTablero(): number {
+  let cuantas = 0;
+  for (const palabra of Object.values(ROTULO_DE_LA_CASILLA)) for (const caracter of palabra) if (caracter !== ' ') cuantas++;
+  return cuantas;
+}
 
 export const SEGMENTOS_DEL_DISCO = 18;
 export const SEGMENTOS_DEL_CIELO = { ancho: 24, alto: 12 } as const;
@@ -241,9 +256,11 @@ export function sumaDelPresupuesto(
   const plena = calidad === 'plena';
   const guarismos = guarismosDelTablero();
   const emblemas = huecosDeLosEmblemas().length;
+  const letras = letrasDelTablero();
   renglones.push({ que: 'suelo del anillo y marcos', cuantos: 1, triangulos: triangulosDelSuelo() });
   renglones.push({ que: 'dígitos del precio', cuantos: guarismos, triangulos: guarismos * TRIANGULOS_POR_GUARISMO });
   renglones.push({ que: 'emblemas', cuantos: emblemas, triangulos: emblemas * TRIANGULOS_POR_EMBLEMA });
+  renglones.push({ que: 'letras de los rótulos', cuantos: letras, triangulos: letras * TRIANGULOS_POR_LETRA });
   renglones.push({ que: 'discos de contacto', cuantos: DISCOS_DE_CONTACTO, triangulos: DISCOS_DE_CONTACTO * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'dados', cuantos: DADOS, triangulos: DADOS * triangulosDelDado });
   renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });

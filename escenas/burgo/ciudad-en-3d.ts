@@ -66,9 +66,18 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { CAJA_DEL_GUARISMO, CONTORNOS_DEL_EMBLEMA, CONTORNOS_DEL_GUARISMO, LIENZO_DEL_ICONO } from '../iconos';
+import {
+  ALTO_DE_LA_LETRA,
+  AVANCE_DE_LA_LETRA,
+  CAJA_DEL_GUARISMO,
+  CONTORNOS_DEL_EMBLEMA,
+  CONTORNOS_DEL_GUARISMO,
+  CONTORNOS_DE_LA_LETRA,
+  LIENZO_DEL_ICONO,
+  ORIGEN_DE_LA_LETRA,
+} from '../iconos';
 import { geometriaDeContornos } from '../formas';
-import { CASILLAS, guarismosDelPrecio, huecosDeLosEmblemas } from './anillo-en-3d';
+import { CASILLAS, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo } from './anillo-en-3d';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
 
 /* ─────────────────────────────── Los bultos ─────────────────────────────── */
@@ -424,6 +433,54 @@ export function geometriaDeUnGuarismo(guarismo: string): THREE.BufferGeometry | 
   return g;
 }
 
+/**
+ * LA SILUETA DE UNA LETRA, agarrada por el CENTRO DE SU AVANCE y no por su caja.
+ *
+ * Un guarismo se centra por la caja común porque todos miden lo mismo. Una letra de un tipo de
+ * verdad no: la `I` avanza 121 y la `W` 350, así que centrarla por su dibujo la descolocaría
+ * dentro de la palabra —la `I` se iría al medio de su hueco y la `W` se saldría—. Se agarra por
+ * el punto medio de su AVANCE sobre la línea de base, que es lo que hace que una palabra se
+ * componga sumando anchos y nada más.
+ *
+ * El `scale(1, −1, 1)` y el giro de los triángulos son por lo mismo que en el guarismo: en el
+ * lienzo la `y` crece hacia abajo, y sin darle la vuelta el rótulo sale cabeza abajo.
+ */
+export function geometriaDeUnaLetra(letra: string): THREE.BufferGeometry | null {
+  const contornos = CONTORNOS_DE_LA_LETRA[letra];
+  if (contornos === undefined) return null;
+  const camino = new THREE.ShapePath();
+  for (const tira of contornos) {
+    if (tira.length < 6) continue;
+    camino.moveTo(tira[0] as number, tira[1] as number);
+    for (let i = 2; i + 1 < tira.length; i += 2) camino.lineTo(tira[i] as number, tira[i + 1] as number);
+  }
+  if (camino.subPaths.length === 0) return null;
+  const formas = camino.toShapes();
+  if (formas.length === 0) return null;
+  const g = new THREE.ShapeGeometry(formas);
+  const posicion = g.getAttribute('position') as THREE.BufferAttribute | undefined;
+  if (posicion === undefined || posicion.count === 0) {
+    g.dispose();
+    return null;
+  }
+  g.scale(1, -1, 1);
+  const indice = g.getIndex();
+  if (indice !== null) {
+    const a = indice.array as Uint16Array | Uint32Array;
+    for (let i = 0; i + 2 < a.length; i += 3) {
+      const t = a[i] as number;
+      a[i] = a[i + 2] as number;
+      a[i + 2] = t;
+    }
+    indice.needsUpdate = true;
+  }
+  const avance = AVANCE_DE_LA_LETRA[letra] ?? ALTO_DE_LA_LETRA / 2;
+  g.translate(-(ORIGEN_DE_LA_LETRA.x + avance / 2), ORIGEN_DE_LA_LETRA.y, 0);
+  g.scale(1 / ALTO_DE_LA_LETRA, 1 / ALTO_DE_LA_LETRA, 1);
+  g.computeBoundingBox();
+  return g;
+}
+
 /** Lo que ocupa el lienzo del icono, para saber si un guarismo se salió de su caja. */
 export const LIENZO = LIENZO_DEL_ICONO;
 
@@ -432,6 +489,7 @@ export interface Rotulos {
   readonly triangulos: number;
   readonly guarismos: number;
   readonly emblemas: number;
+  readonly letras: number;
 }
 
 /**
@@ -448,16 +506,22 @@ export function geometriaDeLosRotulos(): Rotulos | null {
   const propias: THREE.BufferGeometry[] = [];
   let guarismos = 0;
   let emblemas = 0;
+  let letras = 0;
   const tinta = new THREE.Color();
   const matriz = new THREE.Matrix4();
   const cuaternion = new THREE.Quaternion();
   const euler = new THREE.Euler();
-  const pon = (silueta: THREE.BufferGeometry, x: number, z: number, giro: number, lado: number, hex: string): void => {
+  /*
+   * `alza` viene con valor por defecto porque casi todo se posa en la superficie, que está a
+   * ras. Los RÓTULOS no: van sobre la franja, que está subida 0,6, y puestos a 0,08 quedarían
+   * enterrados dentro del reborde sin que fallara nada en pantalla.
+   */
+  const pon = (silueta: THREE.BufferGeometry, x: number, z: number, giro: number, lado: number, hex: string, alza = ALZA_DEL_ROTULO): void => {
     const copia = silueta.clone();
     euler.set(-Math.PI / 2, 0, 0);
     cuaternion.setFromEuler(euler);
     cuaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), giroDelRotulo(giro)));
-    matriz.compose(new THREE.Vector3(x, ALZA_DEL_ROTULO, z), cuaternion, new THREE.Vector3(lado, lado, lado));
+    matriz.compose(new THREE.Vector3(x, alza, z), cuaternion, new THREE.Vector3(lado, lado, lado));
     copia.applyMatrix4(matriz);
     if (copia.getAttribute('normal') === undefined) copia.computeVertexNormals();
     const cuenta = (copia.getAttribute('position') as THREE.BufferAttribute).count;
@@ -501,8 +565,28 @@ export function geometriaDeLosRotulos(): Rotulos | null {
     pon(silueta, e.x, e.z, e.giro, e.lado, TINTA_DEL_EMBLEMA);
     emblemas++;
   }
+  /*
+   * Y LOS NOMBRES, en la misma geometría fundida. Una silueta por carácter distinto y no por
+   * carácter puesto: «SUCESOS» sale tres veces en el anillo y sus siete letras se clonan de las
+   * mismas cinco siluetas.
+   */
+  const siluetasDeLetra = new Map<string, THREE.BufferGeometry>();
+  for (let i = 0; i < CASILLAS; i++) {
+    for (const l of letrasDelRotulo(i)) {
+      let silueta = siluetasDeLetra.get(l.letra);
+      if (silueta === undefined) {
+        const nueva = geometriaDeUnaLetra(l.letra);
+        if (nueva === null) continue;
+        silueta = nueva;
+        siluetasDeLetra.set(l.letra, nueva);
+      }
+      pon(silueta, l.x, l.z, l.giro, l.alto, TINTA_DEL_PRECIO, l.alza);
+      letras++;
+    }
+  }
   for (const g of siluetasDeGuarismo.values()) g.dispose();
   for (const g of siluetasDeEmblema.values()) g.dispose();
+  for (const g of siluetasDeLetra.values()) g.dispose();
   if (partes.length === 0) return null;
   const fundida = mergeGeometries(partes, false) as THREE.BufferGeometry | null;
   for (const g of propias) g.dispose();
@@ -510,5 +594,5 @@ export function geometriaDeLosRotulos(): Rotulos | null {
   fundida.computeBoundingSphere();
   const indice = fundida.getIndex();
   const triangulos = indice !== null ? indice.count / 3 : (fundida.getAttribute('position') as THREE.BufferAttribute).count / 3;
-  return { geometria: fundida, triangulos, guarismos, emblemas };
+  return { geometria: fundida, triangulos, guarismos, emblemas, letras };
 }

@@ -164,7 +164,9 @@ import {
   TOPE_SOBRIA,
   TRIANGULOS_POR_EMBLEMA,
   TRIANGULOS_POR_GUARISMO,
+  TRIANGULOS_POR_LETRA,
   guarismosDelTablero,
+  letrasDelTablero,
   sumaDelPresupuesto,
 } from '../burgo/presupuesto';
 import {
@@ -1313,12 +1315,12 @@ const triangulosDeUnAventurero = await (async (): Promise<number> => {
    * ═══ EL TOPE ES ABSOLUTO, Y ANTES ERA UNA PROPORCIÓN. POR QUÉ SE CAMBIA ═══
    *
    * Decía «menos de un TERCIO del tablero en plena». Esa forma tiene un defecto que se vio el
-   * día que se quitaron los edificios de los solares: el tablero adelgazó unos 21.000
-   * triángulos, el manto no cambió ni una tesela, y la regla se puso ROJA. O sea que una regla
+   * día que se quitaron los edificios de los solares: el tablero adelgazó de golpe, el manto no
+   * cambió ni una tesela, y la regla se puso ROJA. O sea que una regla
    * escrita contra el total se aprieta sola cada vez que el tablero mejora, y acaba castigando
    * exactamente los cambios que se quieren hacer. Lo que se quiere vigilar es el manto, no su
    * cociente con lo demás: va en triángulos, con margen y con la cifra medida delante
-   * (tablero en plena, hoy: 172.808).
+   * (tablero en plena, hoy: 181.333).
    */
   const TOPE_DEL_MANTO = 70_000;
   const teselasEnLaSuma = plena.renglones.find((q) => q.que === PIEZA.tesela);
@@ -1883,7 +1885,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
  * `ShapePath` son aritmética), así que aquí se pueden pedir las geometrías de verdad.
  */
 {
-  const { MINIMO_DE_UN_VOLUMEN, claveDelBulto, cuentaDeBulto, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
+  const { MINIMO_DE_UN_VOLUMEN, claveDelBulto, cuentaDeBulto, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaLetra, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
   const { ALTURA_DEL_BORDILLO, HISTERESIS_DEL_NIVEL, TONO_DEL_EDIFICIO, TONO_POR_DEFECTO, TRIANGULOS_DE_LA_CASCARA_ABIERTA, TRIANGULOS_DE_LA_CUBIERTA, TRIANGULOS_DE_LA_MEDIANERA, UMBRALES_DE_NIVEL, VETA_DE_LA_ALTURA, cascaraAbierta, ciudadDelCodigo, cocheEnElInstante, montarLaCiudad, nivelDelGrupo, pulsoDeLaParcela, tonoDeLaFachada, tonoDelEdificio, triangulosDeUnaTorre, ANCHO_DEL_CARRIL, ANCHO_DEL_BORDILLO, EJE_DEL_CARRIL } = await import('../burgo/ciudad');
   /* La retícula es de `piezas.ts` y `ciudad.ts` no la reexporta: pedírsela a `ciudad` devolvía `undefined` en silencio y el juez del carril se caía comparando con NaN. */
   const RETICULA = RETICULA_DE_LA_CIUDAD;
@@ -2060,12 +2062,20 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   comprobar('los rótulos del tablero se funden en UNA geometría con triángulos dentro', rotulos !== null && rotulos.triangulos > 0, rotulos === null ? 'null' : rotulos.triangulos);
   if (rotulos !== null) {
     comprobar(
-      `están los ${String(guarismosDelTablero())} dígitos del reglamento y los doce emblemas, ni uno menos`,
-      rotulos.guarismos === guarismosDelTablero() && rotulos.emblemas === huecosDeLosEmblemas().length,
-      { guarismos: rotulos.guarismos, emblemas: rotulos.emblemas },
+      `están los ${String(guarismosDelTablero())} dígitos del reglamento, los doce emblemas y las ${String(letrasDelTablero())} letras de los rótulos, ni una menos`,
+      rotulos.guarismos === guarismosDelTablero() && rotulos.emblemas === huecosDeLosEmblemas().length && rotulos.letras === letrasDelTablero(),
+      { guarismos: rotulos.guarismos, emblemas: rotulos.emblemas, letras: rotulos.letras },
     );
-    /* El presupuesto los cuenta a 60 y 120: la medida real no puede pasarse del doble. */
-    const presupuestados = guarismosDelTablero() * TRIANGULOS_POR_GUARISMO + huecosDeLosEmblemas().length * TRIANGULOS_POR_EMBLEMA;
+    /*
+     * LA VACUNA DE LA CUENTA DE ARRIBA, que si no sería decorado. Un carácter que el tipo no
+     * trae no da geometría, y el bucle que funde los rótulos lo SALTA: el nombre saldría corto
+     * —«SUCSOS»— sin un error en ninguna consola. Es el modo de fallo del día que se añada un
+     * idioma y se olvide su alfabeto en el charset del compilador.
+     */
+    comprobar('se ve fallar: una letra que el tipo no trae no da geometría, y ese rótulo se montaría corto', geometriaDeUnaLetra('Ω') === null);
+    /* El presupuesto los cuenta a 60, 120 y 155: la medida real no puede pasarse del doble. */
+    const presupuestados =
+      guarismosDelTablero() * TRIANGULOS_POR_GUARISMO + huecosDeLosEmblemas().length * TRIANGULOS_POR_EMBLEMA + letrasDelTablero() * TRIANGULOS_POR_LETRA;
     comprobar(
       `y pesan ${String(rotulos.triangulos)} triángulos, del orden de los ${String(presupuestados)} que el presupuesto les guarda`,
       rotulos.triangulos > presupuestados / 3 && rotulos.triangulos < presupuestados * 2,
