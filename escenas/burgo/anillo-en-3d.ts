@@ -764,9 +764,9 @@ export function altoDelRotulo(palabra: string, esEsquina = false): number {
  */
 export const ROTULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
   0: 'SALIDA',
-  10: 'CÁRCEL',
-  20: 'PARKING',
-  30: 'COMISARÍA',
+  10: 'COMISARÍA',
+  20: 'DESCANSO',
+  30: '¡A COMISARÍA!',
   2: 'FONDO',
   4: 'IMPUESTO',
   7: 'SUCESOS',
@@ -811,17 +811,100 @@ export interface LetraEnElTablero {
  * son los mismos 0..108 y el renglón no va paralelo a ningún borde.
  */
 function letrasDeLaEsquina(m: MarcoDeCasilla, palabra: string): LetraEnElTablero[] {
-  const alto = altoDelRotulo(palabra, true);
+  return renglonDeEsquina(m, palabra, altoDelRotulo(palabra, true), 0);
+}
+
+/**
+ * UN RENGLÓN DE ESQUINA a `alfa` del centro por la diagonal: 0 es el nombre, y un número positivo
+ * lo acerca a quien mira —o sea lo pone DEBAJO, que es donde va el texto pequeño—. El
+ * desplazamiento por la diagonal se reparte a partes iguales entre `u` y `v`.
+ */
+function renglonDeEsquina(m: MarcoDeCasilla, palabra: string, alto: number, alfa: number): LetraEnElTablero[] {
   const escala = alto / ALTO_DE_LA_LETRA;
   const giro = giroHaciaDentro(m) + Math.PI / 4;
   const salida: LetraEnElTablero[] = [];
+  const e = alfa / Math.SQRT2;
   let t = -anchoDeLaPalabra(palabra, alto) / 2;
   for (const letra of palabra) {
     const avance = avanceDelCaracter(letra) * escala;
     const d = (t + avance / 2) / Math.SQRT2;
-    const p = puntoEnEsquina(m, CENTRO_DEL_SUELO_DE_LA_ESQUINA - d, CENTRO_DEL_SUELO_DE_LA_ESQUINA + d);
-    salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO_DE_LA_ESQUINA[m.indice] ?? ALZA_DEL_ROTULO });
+    const p = puntoEnEsquina(m, CENTRO_DEL_SUELO_DE_LA_ESQUINA + e - d, CENTRO_DEL_SUELO_DE_LA_ESQUINA + e + d);
+    /* Un espacio mueve el cursor y no es una letra: no trae glifo, así que no se emite. */
+    if (letra !== ' ') salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO_DE_LA_ESQUINA[m.indice] ?? ALZA_DEL_ROTULO });
     t += avance;
+  }
+  return salida;
+}
+
+/**
+ * EL TEXTO PEQUEÑO DE CADA CASILLA, y por qué sólo lo llevan las que no tienen precio.
+ *
+ * Miguel: «cada casilla con su nombre y un texto pequeño que explique la casilla». En las que tienen
+ * PRECIO —los títulos, el Impuesto y la Tasa— la explicación ya está escrita, y en grande: es la
+ * cifra. En las que no, la casilla dice cómo se llama y nada de lo que pasa al caer en ella, que
+ * es justo lo que un jugador nuevo no sabe. Esas diez llevan su renglón.
+ *
+ * Las palabras son las del reglamento y no otras: «no da ni quita nada» es su definición del
+ * Descanso, «de visita» es como se pasa por la Comisaría, y los 200 de la Salida son
+ * `PAGA_DE_LA_PUERTA_MAYOR`. La escena no importa el reglamento en ejecución —no arrastra el
+ * reductor al móvil—, así que esto es una copia, y `verify:burgo-escena` la compara contra él.
+ *
+ * VA DEBAJO DEL NOMBRE desde el punto de vista de quien lee: en una casilla lateral, en el hueco
+ * del precio (`V_DEL_PRECIO`), que en éstas está libre; en una esquina, en un renglón paralelo al
+ * del nombre y más cerca del que mira.
+ */
+export const SUBTITULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
+  0: 'COBRA 200',
+  2: 'COGE CARTA',
+  7: 'COGE CARTA',
+  10: 'DE VISITA',
+  17: 'COGE CARTA',
+  20: 'NI DA NI QUITA',
+  22: 'COGE CARTA',
+  30: 'RETENIDO',
+  33: 'COGE CARTA',
+  36: 'COGE CARTA',
+};
+export const ALTO_MAXIMO_DEL_SUBTITULO = 8;
+/** Lo que separa el nombre de su renglón pequeño en una esquina. */
+export const HUECO_ENTRE_RENGLONES = 2.5;
+
+/**
+ * El alto del texto pequeño. En una lateral, lo que quepa en el ancho útil con su techo. En una
+ * esquina, lo que deje el ROMBO a esa altura de la diagonal: un renglón a `a0` del centro con alto
+ * `s` y ancho `k s` mete su pico en `a0 + s + k s / 2`, y eso no puede pasar del medio rombo con
+ * margen; despejando, `s ≤ (diagonal − 2 a0) / (k + 2)`.
+ */
+export function altoDelSubtitulo(casilla: number): number {
+  const m = marcoDeCasilla(casilla);
+  const texto = SUBTITULO_DE_LA_CASILLA[m.indice];
+  if (texto === undefined || texto.length === 0) return 0;
+  const porUnidad = anchoDeLaPalabra(texto, ALTO_DE_LA_LETRA) / ALTO_DE_LA_LETRA;
+  if (!m.esEsquina) return Math.min(ALTO_MAXIMO_DEL_SUBTITULO, ANCHO_DEL_ROTULO / porUnidad);
+  const nombre = ROTULO_DE_LA_CASILLA[m.indice] ?? '';
+  const a0 = altoDelRotulo(nombre, true) / 2 + HUECO_ENTRE_RENGLONES;
+  return Math.min(ALTO_MAXIMO_DEL_SUBTITULO, (DIAGONAL_DEL_ROTULO_DE_ESQUINA - 2 * a0) / (porUnidad + 2));
+}
+
+export function letrasDelSubtitulo(casilla: number): LetraEnElTablero[] {
+  const m = marcoDeCasilla(casilla);
+  const texto = SUBTITULO_DE_LA_CASILLA[m.indice];
+  if (texto === undefined || texto.length === 0) return [];
+  const alto = altoDelSubtitulo(casilla);
+  if (m.esEsquina) {
+    const nombre = ROTULO_DE_LA_CASILLA[m.indice] ?? '';
+    const alfa = altoDelRotulo(nombre, true) / 2 + HUECO_ENTRE_RENGLONES + alto / 2;
+    return renglonDeEsquina(m, texto, alto, alfa);
+  }
+  const escala = alto / ALTO_DE_LA_LETRA;
+  const giro = giroHaciaDentro(m);
+  const salida: LetraEnElTablero[] = [];
+  let u = anchoDeLaPalabra(texto, alto) / 2;
+  for (const letra of texto) {
+    const avance = avanceDelCaracter(letra) * escala;
+    const p = puntoEnLaCasillaPorV(m, u - avance / 2, V_DEL_PRECIO);
+    if (letra !== ' ') salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO });
+    u -= avance;
   }
   return salida;
 }
@@ -840,7 +923,7 @@ export function letrasDelRotulo(casilla: number): LetraEnElTablero[] {
   for (const letra of palabra) {
     const avance = avanceDelCaracter(letra) * escala;
     const p = puntoEnLaCasillaPorV(m, u - avance / 2, V_DEL_ROTULO);
-    salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO_EN_LA_FRANJA });
+    if (letra !== ' ') salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO_EN_LA_FRANJA });
     u -= avance;
   }
   return salida;

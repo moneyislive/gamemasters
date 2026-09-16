@@ -128,6 +128,7 @@ import {
   MARGEN_DEL_PRECIO,
   MARGEN_DEL_TEXTO,
   ROTULO_DE_LA_CASILLA,
+  SUBTITULO_DE_LA_CASILLA,
   altoDelRotulo,
   anchoDeLaPalabra,
   anchoDelPrecio,
@@ -150,6 +151,7 @@ import {
   huecosDeLosEmblemas,
   largoDelTramo,
   letrasDelRotulo,
+  letrasDelSubtitulo,
   marcoDeCasilla,
   mundoEstatico,
   puestaDeLaPiezaDeLaCasilla,
@@ -166,7 +168,7 @@ import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/a
 import { DEL_MUNDO, VIA, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaObraEnElMundo, carasDeLasObras, carasDelTren, casillasConObra, largoDeLaVia, letrasDeLosCarteles, paradasDelTren, puntoEnLaVia, triangulosDeLasObras } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
-import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
+import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO, PAGA_DE_LA_PUERTA_MAYOR } from '../../shared/arcade/juegos/burgo-tablero';
 import {
   CASAS_DEL_CONCEJO,
   MULTIPLICIDADES_PLENA,
@@ -2206,7 +2208,8 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   const delRevesEnEsquina: string[] = [];
   let letrasDeEsquinaMiradas = 0;
   for (const esquina of ESQUINAS) {
-    const letras = letrasDelRotulo(esquina);
+    /* El nombre y su texto pequeño, que tiene que caber en el mismo rombo. */
+    const letras = [...letrasDelRotulo(esquina), ...letrasDelSubtitulo(esquina)];
     if (letras.length === 0) continue;
     letrasDeEsquinaMiradas += letras.length;
     const m = marcoDeCasilla(esquina);
@@ -2234,7 +2237,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
    * exactamente lo que hacía hasta esta tanda—, las dos reglas de abajo se quedarían en verde
    * sin haber mirado una sola letra, que es la forma más silenciosa de perder un comprobador.
    */
-  const letrasQueLasEsquinasDeclaran = ESQUINAS.reduce((n, e) => n + [...(ROTULO_DE_LA_CASILLA[e] ?? '')].filter((c) => c !== ' ').length, 0);
+  const letrasQueLasEsquinasDeclaran = ESQUINAS.reduce((n, e) => n + [...(ROTULO_DE_LA_CASILLA[e] ?? ''), ...(SUBTITULO_DE_LA_CASILLA[e] ?? '')].filter((c) => c !== ' ').length, 0);
   comprobar(
     `las reglas de la esquina han mirado las ${String(letrasQueLasEsquinasDeclaran)} letras que las esquinas declaran, y no cero`,
     letrasDeEsquinaMiradas === letrasQueLasEsquinasDeclaran && letrasQueLasEsquinasDeclaran > 0,
@@ -2256,7 +2259,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   for (let i = 0; i < CASILLAS; i++) {
     const m = marcoDeCasilla(i);
     if (m.esEsquina) continue;
-    const letras = letrasDelRotulo(i);
+    const letras = [...letrasDelRotulo(i), ...letrasDelSubtitulo(i)];
     if (letras.length === 0) continue;
     for (const l of letras) {
       letrasLateralesMiradas++;
@@ -2268,8 +2271,72 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       if (l.alto > ALTO_MAXIMO_DEL_ROTULO + 0.001) apretados.push(`${String(i)}/${l.letra}: alto ${l.alto.toFixed(1)} pasa del máximo ${ALTO_MAXIMO_DEL_ROTULO.toFixed(1)}`);
     }
   }
-  comprobar(`el margen se ha medido en las ${String(letrasLateralesMiradas)} letras de las casillas laterales, y no en cero`, letrasLateralesMiradas === 55, letrasLateralesMiradas);
+  const letrasLateralesDeclaradas = Array.from({ length: CASILLAS }, (_, i) => i)
+    .filter((i) => !ESQUINAS.includes(i))
+    .reduce((n, i) => n + [...(ROTULO_DE_LA_CASILLA[i] ?? ''), ...(SUBTITULO_DE_LA_CASILLA[i] ?? '')].filter((c) => c !== ' ').length, 0);
+  comprobar(
+    `el margen se ha medido en las ${String(letrasLateralesMiradas)} letras de las casillas laterales —nombres y texto pequeño—, y no en cero`,
+    letrasLateralesMiradas === letrasLateralesDeclaradas && letrasLateralesDeclaradas > 0,
+    { miradas: letrasLateralesMiradas, declaradas: letrasLateralesDeclaradas },
+  );
   comprobar(`ningún rótulo lateral se mete en el margen del ${String(Math.round(MARGEN_DEL_TEXTO * 100))} % de su casilla`, apretados.length === 0, apretados.slice(0, 4));
+  /*
+   * ── 2 octies. EL TABLERO HABLA COMO EL REGLAMENTO ──
+   *
+   * Los nombres y el texto pequeño de las casillas son una COPIA —la escena no importa el
+   * reglamento en ejecución para no arrastrar el reductor al móvil—, y una copia se desvía sin
+   * avisar. Se desvió: durante unas horas la casilla 10 dijo «CÁRCEL» en el tablero mientras el
+   * cartel del pie decía «La Comisaría», y el §0.2 del reglamento lo prohíbe con esas palabras
+   * exactas: «ni "cárcel" por la Comisaría, ni "propiedad" por solar, ni "peón" por la ficha de un
+   * jugador. La lista del §0.1 es cerrada». Ningún comprobador lo vio, porque ninguno comparaba.
+   *
+   * Dos reglas, las dos contra el reglamento de verdad:
+   *
+   *  · el NOMBRE de cada casilla en el tablero es su `rotulo` del reglamento o un trozo de su
+   *    `nombre` —«FONDO» de «El Fondo Vecinal», «LUZ» del rótulo «Luz»—; no una palabra nueva;
+   *  · y ningún texto del tablero —nombres, texto pequeño ni carteles— usa un sinónimo prohibido.
+   */
+  {
+    const enMayusculas = (texto: string): string => texto.toLocaleUpperCase('es');
+    const nombresQueNoSonDelReglamento: string[] = [];
+    for (const [clave, palabra] of Object.entries(ROTULO_DE_LA_CASILLA)) {
+      const fila = CASILLAS_DEL_REGLAMENTO[Number(clave)];
+      if (fila === undefined) {
+        nombresQueNoSonDelReglamento.push(`${clave}: «${palabra}» y el reglamento no tiene esa casilla`);
+        continue;
+      }
+      const esSuRotulo = enMayusculas(fila.rotulo) === palabra;
+      const esDeSuNombre = enMayusculas(fila.nombre).includes(palabra);
+      if (!esSuRotulo && !esDeSuNombre) nombresQueNoSonDelReglamento.push(`${clave}: «${palabra}» no es ni «${fila.rotulo}» ni un trozo de «${fila.nombre}»`);
+    }
+    comprobar(
+      `los ${String(Object.keys(ROTULO_DE_LA_CASILLA).length)} nombres del tablero salen del reglamento: su rótulo o un trozo de su nombre`,
+      nombresQueNoSonDelReglamento.length === 0,
+      nombresQueNoSonDelReglamento,
+    );
+    const PROHIBIDAS = ['CÁRCEL', 'CARCEL', 'PROPIEDAD', 'PEÓN', 'PEON'] as const;
+    const todoLoEscrito = [
+      ...Object.entries(ROTULO_DE_LA_CASILLA).map(([c, t]) => `${c}/nombre: ${t}`),
+      ...Object.entries(SUBTITULO_DE_LA_CASILLA).map(([c, t]) => `${c}/texto: ${t}`),
+      `20/cartel: ${letrasDeLosCarteles().map((l) => l.letra).join('')}`,
+    ];
+    const conSinonimo = todoLoEscrito.filter((linea) => PROHIBIDAS.some((p) => enMayusculas(linea).includes(p)));
+    comprobar('y ningún texto del tablero usa un sinónimo que el §0.2 prohíbe', conSinonimo.length === 0, conSinonimo);
+    /* Las dos vacunas: el nombre que estuvo puesto, y la palabra prohibida en un texto pequeño. */
+    const fila10 = CASILLAS_DEL_REGLAMENTO[10];
+    comprobar(
+      'se ve fallar: «CÁRCEL» en la 10 no es ni su rótulo ni un trozo de «La Comisaría»',
+      fila10 !== undefined && enMayusculas(fila10.rotulo) !== 'CÁRCEL' && !enMayusculas(fila10.nombre).includes('CÁRCEL'),
+    );
+    comprobar('y un texto «LA CÁRCEL» caería por la palabra prohibida', PROHIBIDAS.some((p) => 'LA CÁRCEL'.includes(p)));
+    /* Y la cifra del texto pequeño de la Salida es la del reglamento, no otra. */
+    comprobar(
+      `el texto pequeño de la Salida cobra lo que dice el reglamento: ${String(PAGA_DE_LA_PUERTA_MAYOR)}`,
+      (SUBTITULO_DE_LA_CASILLA[0] ?? '').includes(String(PAGA_DE_LA_PUERTA_MAYOR)),
+      SUBTITULO_DE_LA_CASILLA[0],
+    );
+  }
+
   /* Y LOS PRECIOS, con la misma vara: son el otro texto del tablero y no pueden ser la excepción. */
   const preciosApretados: string[] = [];
   let digitosMirados = 0;

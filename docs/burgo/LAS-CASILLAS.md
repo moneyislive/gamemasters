@@ -104,6 +104,36 @@ trece edificios de código a ~1.500 son 20.000 de los 718.000 que sobran.
 
 ---
 
+## 3 bis. El tablero habla como el reglamento
+
+Los nombres de las cuatro esquinas se escribieron primero con las palabras del encargo —CÁRCEL
+en la 10, PARKING en la 20, COMISARÍA en la 30— y dos de las tres eran un error: el §0.2 del
+reglamento dice literalmente «ni "cárcel" por la Comisaría», y la lista de nombres es cerrada. El
+cartel del pie decía «La Comisaría» mientras el suelo de la misma casilla decía CÁRCEL.
+
+Así que el suelo dice lo que dice el reglamento:
+
+| Casilla | En el suelo | Texto pequeño | Lo que hay construido |
+| --- | --- | --- | --- |
+| 0 | SALIDA | COBRA 200 | flecha roja |
+| 10 | COMISARÍA | DE VISITA | el recinto con muro, torretas y barrotes |
+| 20 | DESCANSO | NI DA NI QUITA | el aparcamiento, con su cartel PARKING |
+| 30 | ¡A COMISARÍA! | RETENIDO | el cuartel con su celda |
+| 2 · 17 · 33 | FONDO | COGE CARTA | el cofre |
+| 7 · 22 · 36 | SUCESOS | COGE CARTA | el casino |
+
+Lo que Miguel pidió con sus palabras está en lo CONSTRUIDO: el recinto de la 10 parece lo que él
+llamó una cárcel de verdad, y el cartel del aparcamiento dice PARKING, porque es un letrero y no
+el nombre de la casilla —igual que el casino no le cambia el nombre a los Sucesos—.
+
+El texto pequeño sólo lo llevan las casillas **sin precio**: en las que tienen, la explicación ya
+está escrita y en grande, que es la cifra. Sus palabras también son del reglamento —«no da ni quita
+nada» es su definición del Descanso—, y los 200 de la Salida son `PAGA_DE_LA_PUERTA_MAYOR`.
+
+**Y ya no se puede volver a desviar sin que se vea**: `verify:burgo-escena` compara cada nombre del
+suelo con el reglamento —tiene que ser su rótulo o un trozo de su nombre— y barre todo el texto
+del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
+
 ## 4. El orden, y por qué éste
 
 1. **SALIDA** (fase 2) — **hecha**. Quitar piezas y escribir letras, que era lo más barato, y de

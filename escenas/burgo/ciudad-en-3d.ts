@@ -77,7 +77,7 @@ import {
   ORIGEN_DE_LA_LETRA,
 } from '../iconos';
 import { geometriaDeContornos } from '../formas';
-import { ALZA_DEL_ROTULO, CASILLAS, FERIA, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo } from './anillo-en-3d';
+import { ALZA_DEL_ROTULO, CASILLAS, FERIA, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo, letrasDelSubtitulo } from './anillo-en-3d';
 import { COLOR_DE_OBRA, carasDeLaJoyaViva, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDelTren, casillasConObra, letrasDeLosCarteles } from './obras';
 import type { CaraEnElMundo } from './obras';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
@@ -678,7 +678,7 @@ export function geometriaDeLosRotulos(): Rotulos | null {
    */
   const siluetasDeLetra = new Map<string, THREE.BufferGeometry>();
   for (let i = 0; i < CASILLAS; i++) {
-    for (const l of letrasDelRotulo(i)) {
+    for (const l of [...letrasDelRotulo(i), ...letrasDelSubtitulo(i)]) {
       let silueta = siluetasDeLetra.get(l.letra);
       if (silueta === undefined) {
         const nueva = geometriaDeUnaLetra(l.letra);

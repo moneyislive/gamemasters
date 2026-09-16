@@ -33,7 +33,8 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MAZMORRA, PUERTAS, SUPERFICIE, giroHaciaDentro, giroHaciaFuera, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MARGEN_DEL_TEXTO, MAZMORRA, PUERTAS, SUPERFICIE, anchoDeLaPalabra, giroHaciaDentro, giroHaciaFuera, marcoDeCasilla, puntoEnEsquina, puntoEnLaCasillaPorV } from './anillo-en-3d';
+import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
 /** Un punto de una obra en las coordenadas de su casilla: `u` y `v` como en `puntoEnEsquina`, `y` a plomo. */
@@ -204,8 +205,14 @@ const PARKING = {
    * El cartel: un poste de 11 y un panel tumbado de 12 x 12 encima. Va en el CARRIL de entrada,
    * del lado de dentro, donde no pisa ninguna plaza ni la ele de la marcha (que cruza a 349,5).
    */
-  poste: { u: 336, v: 396, grosor: 1.4, alto: 11 },
-  panel: { lado: 12, grueso: 0.9 },
+  poste: { u: 336, v: 396, grosor: 1.4, alto: 13 },
+  /*
+   * 22 de lado y no 12: el cartel dice PARKING entero —es lo que pidió Miguel, «que ponga
+   * PARKING»— y siete letras por la diagonal de un panel de 12 salen a dos de alto, que desde el
+   * tablero son una raya. A 22 la diagonal útil con margen es de 23,7 y la palabra sale a 3,7.
+   * Cabe entre el canto de la ciudad (324) y el carril de la marcha (347,5) con medio punto libre.
+   */
+  panel: { lado: 22, grueso: 0.9 },
 } as const;
 
 /** Las dieciséis rayas de una hilera que empieza en `v0`: quince plazas de 3,6 en los 54 de asfalto. */
@@ -235,12 +242,19 @@ function carasDelAparcamiento(): CaraDeObra[] {
   return salida;
 }
 
-/** Dónde va la `P` del cartel y a qué altura: la imprime `ciudad-en-3d.ts` con las demás letras. */
-export const LA_P_DEL_CARTEL = {
+/**
+ * EL CARTEL DEL APARCAMIENTO Y LO QUE PONE.
+ *
+ * Pone PARKING porque es un LETRERO, no el nombre de la casilla: la casilla sigue llamándose como
+ * dice el reglamento —el Descanso—, y eso es lo que está escrito en su suelo. Lo que hay
+ * construido encima es un aparcamiento, y un aparcamiento lleva su cartel, igual que el casino de
+ * los Sucesos no cambia el nombre de su casilla.
+ */
+export const EL_CARTEL_DEL_APARCAMIENTO = {
   casilla: FERIA,
+  texto: 'PARKING',
   u: PARKING.poste.u,
   v: PARKING.poste.v,
-  alto: 8,
   alza: PARKING.poste.alto + PARKING.panel.grueso + 0.08,
   color: COLOR_DE_OBRA.carteloTinta,
 } as const;
@@ -253,9 +267,24 @@ export const LA_P_DEL_CARTEL = {
  * pone quien las funde. Se leen desde la diagonal, como el nombre de la esquina.
  */
 export function letrasDeLosCarteles(): LetraEnElTablero[] {
-  const m = marcoDeCasilla(LA_P_DEL_CARTEL.casilla);
-  const p = puntoEnEsquina(m, LA_P_DEL_CARTEL.u, LA_P_DEL_CARTEL.v);
-  return [{ letra: 'P', x: p.x, z: p.z, giro: giroHaciaDentro(m) + Math.PI / 4, alto: LA_P_DEL_CARTEL.alto, alza: LA_P_DEL_CARTEL.alza }];
+  const c = EL_CARTEL_DEL_APARCAMIENTO;
+  const m = marcoDeCasilla(c.casilla);
+  /* La misma cuenta del rombo que el nombre de una esquina, en el cuadro del panel: `ancho + alto ≤ diagonal útil`. */
+  const diagonal = PARKING.panel.lado * Math.SQRT2 * (1 - 2 * MARGEN_DEL_TEXTO);
+  const porUnidad = anchoDeLaPalabra(c.texto, ALTO_DE_LA_LETRA) / ALTO_DE_LA_LETRA;
+  const alto = diagonal / (porUnidad + 1);
+  const escala = alto / ALTO_DE_LA_LETRA;
+  const giro = giroHaciaDentro(m) + Math.PI / 4;
+  const salida: LetraEnElTablero[] = [];
+  let t = -anchoDeLaPalabra(c.texto, alto) / 2;
+  for (const letra of c.texto) {
+    const avance = (AVANCE_DE_LA_LETRA[letra] ?? ALTO_DE_LA_LETRA / 2) * escala;
+    const d = (t + avance / 2) / Math.SQRT2;
+    const p = puntoEnEsquina(m, c.u - d, c.v + d);
+    salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: c.alza });
+    t += avance;
+  }
+  return salida;
 }
 
 /* ─────────────────── La cárcel (casilla 10) ────────────────── */
@@ -277,7 +306,7 @@ export function letrasDeLosCarteles(): LetraEnElTablero[] {
  * que sube siguen siendo piezas del pack, porque la hoja se ANIMA y lo que se mueve no se funde;
  * y la calle, el aparcamiento y las dos patrullas se quedan donde estaban.
  */
-const CARCEL = {
+const RECINTO_DE_LA_MAZMORRA = {
   /* El patio: la celda de la retícula, de 396 a 408 en los dos ejes. */
   patio: { desde: 396, hasta: 408 },
   /* El pabellón de celdas, a lo largo del borde de fuera, y el de entrada, al este del patio. */
@@ -299,7 +328,7 @@ const CARCEL = {
 } as const;
 
 function torreDeVigilancia(casilla: number, u: number, v: number): CaraDeObra[] {
-  const t = CARCEL.torreta;
+  const t = RECINTO_DE_LA_MAZMORRA.torreta;
   const medio = t.lado / 2;
   const vuelo = medio + t.tejado.vuelo;
   return [
@@ -308,32 +337,32 @@ function torreDeVigilancia(casilla: number, u: number, v: number): CaraDeObra[] 
   ];
 }
 
-function carasDeLaCarcel(): CaraDeObra[] {
+function carasDeLaMazmorra(): CaraDeObra[] {
   const c = MAZMORRA;
   const salida: CaraDeObra[] = [];
   /* El patio, de hormigón: es lo que se ve debajo de los presos. */
-  salida.push(losa(c, CARCEL.patio.desde, CARCEL.patio.hasta, CARCEL.patio.desde, CARCEL.patio.hasta, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.hormigon));
+  salida.push(losa(c, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, RECINTO_DE_LA_MAZMORRA.patio.desde, RECINTO_DE_LA_MAZMORRA.patio.hasta, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.hormigon));
   /* Los dos pabellones. */
-  const p = CARCEL.pabellon;
+  const p = RECINTO_DE_LA_MAZMORRA.pabellon;
   salida.push(...caja(c, p.u0, p.u1, p.v0, p.v1, 0, p.alto, COLOR_DE_OBRA.pabellon));
-  const e = CARCEL.entrada;
+  const e = RECINTO_DE_LA_MAZMORRA.entrada;
   salida.push(...caja(c, e.u0, e.u1, e.v0, e.v1, 0, e.alto, COLOR_DE_OBRA.pabellon));
-  const a = CARCEL.ala;
+  const a = RECINTO_DE_LA_MAZMORRA.ala;
   salida.push(...caja(c, a.u0, a.u1, a.v0, a.v1, 0, a.alto, COLOR_DE_OBRA.pabellon));
   /* Los barrotes, en la cara del pabellón que da al patio. */
-  const b = CARCEL.barrotes;
+  const b = RECINTO_DE_LA_MAZMORRA.barrotes;
   const paso = (p.u1 - p.u0) / (b.cuantos + 1);
   for (let k = 1; k <= b.cuantos; k++) {
     const u = p.u0 + paso * k;
     salida.push(...caja(c, u - b.ancho / 2, u + b.ancho / 2, p.v0 - b.vuelo, p.v0, b.desde, b.hasta, COLOR_DE_OBRA.barrote));
   }
   /* El muro, por los dos lados que no cierran los pabellones, empezando donde acaba la verja. */
-  const m = CARCEL.muro;
-  salida.push(...caja(c, m.desde, m.hasta, CARCEL.patio.desde - m.grueso, CARCEL.patio.desde, 0, m.alto, COLOR_DE_OBRA.muro));
-  salida.push(...caja(c, CARCEL.patio.desde - m.grueso, CARCEL.patio.desde, m.desde, m.hasta, 0, m.alto, COLOR_DE_OBRA.muro));
+  const m = RECINTO_DE_LA_MAZMORRA.muro;
+  salida.push(...caja(c, m.desde, m.hasta, RECINTO_DE_LA_MAZMORRA.patio.desde - m.grueso, RECINTO_DE_LA_MAZMORRA.patio.desde, 0, m.alto, COLOR_DE_OBRA.muro));
+  salida.push(...caja(c, RECINTO_DE_LA_MAZMORRA.patio.desde - m.grueso, RECINTO_DE_LA_MAZMORRA.patio.desde, m.desde, m.hasta, 0, m.alto, COLOR_DE_OBRA.muro));
   /* Y las dos torretas, en las puntas de ese muro. */
-  salida.push(...torreDeVigilancia(c, m.hasta, CARCEL.patio.desde - m.grueso / 2));
-  salida.push(...torreDeVigilancia(c, CARCEL.patio.desde - m.grueso / 2, m.hasta));
+  salida.push(...torreDeVigilancia(c, m.hasta, RECINTO_DE_LA_MAZMORRA.patio.desde - m.grueso / 2));
+  salida.push(...torreDeVigilancia(c, RECINTO_DE_LA_MAZMORRA.patio.desde - m.grueso / 2, m.hasta));
   return salida;
 }
 
@@ -1321,7 +1350,7 @@ let hechas: CaraDeObra[] | null = null;
 
 /** Todas las caras de todas las obras del anillo, en coordenadas de casilla. */
 export function carasDeLasObras(): CaraDeObra[] {
-  if (hechas === null) hechas = [...carasDelAparcamiento(), ...carasDeLaCarcel(), ...carasDeLaComisaria(), ...carasDeLasCasillas(), ...carasDeLaVia()];
+  if (hechas === null) hechas = [...carasDelAparcamiento(), ...carasDeLaMazmorra(), ...carasDeLaComisaria(), ...carasDeLasCasillas(), ...carasDeLaVia()];
   return hechas;
 }
 

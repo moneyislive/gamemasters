@@ -1702,7 +1702,13 @@ const TIPO_DEL_TABLERO = path.join(RAIZ, 'arte', 'tipos', 'Cinzel_700Bold.ttf');
  * Los caracteres que el tablero sabe escribir. Añadir un idioma es añadirlos aquí y volver a
  * compilar: si el tipo no trae alguno, esto se para y dice cuál, en vez de emitir un hueco.
  */
-const CHARSET_DEL_TABLERO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZÑÁÉÍÓÚÜ¿¡.,-·';
+/*
+ * Con los DIEZ DÍGITOS del tipo, que no son los del precio: el precio va con `CONTORNOS_DEL_GUARISMO`,
+ * que están dibujados para leerse a 25 de alto desde la otra punta de la mesa. Éstos son para el
+ * texto pequeño —«COBRA 200»—, que tiene que salir en la misma letra que el resto del renglón. Sin
+ * ellos el comprobador vio montar «COBRA» y tres huecos.
+ */
+const CHARSET_DEL_TABLERO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZÑÁÉÍÓÚÜ0123456789¿?¡!.,-·';
 
 /**
  * TRAMOS POR CURVA. Medido sobre este tipo y este charset: 2 tramos son 57 triángulos por

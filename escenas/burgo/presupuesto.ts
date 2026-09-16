@@ -97,7 +97,7 @@
 import { PIEZA } from './piezas';
 import { letrasDeLosCarteles, triangulosDeLasObras, triangulosDelTren } from './obras';
 import type { NombreDePieza } from './piezas';
-import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, ROTULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
+import { CASILLAS, ESQUINAS, PRECIO_DE_LA_CASILLA, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
 
 /**
@@ -166,7 +166,7 @@ export const TRIANGULOS_POR_EMBLEMA = 120;
 export const TRIANGULOS_POR_LETRA = 155;
 export function letrasDelTablero(): number {
   let cuantas = letrasDeLosCarteles().length;
-  for (const palabra of Object.values(ROTULO_DE_LA_CASILLA)) for (const caracter of palabra) if (caracter !== ' ') cuantas++;
+  for (const palabra of [...Object.values(ROTULO_DE_LA_CASILLA), ...Object.values(SUBTITULO_DE_LA_CASILLA)]) for (const caracter of palabra) if (caracter !== ' ') cuantas++;
   return cuantas;
 }
 
