@@ -163,7 +163,7 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
-import { carasDeLaObraEnElMundo, carasDeLasObras, casillasConObra, letrasDeLosCarteles, triangulosDeLasObras } from '../burgo/obras';
+import { DEL_MUNDO, VIA, caja as cajaDeObra, carasDeLaObraEnElMundo, carasDeLasObras, casillasConObra, letrasDeLosCarteles, triangulosDeLasObras } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
@@ -1964,7 +1964,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
  * `ShapePath` son aritmética), así que aquí se pueden pedir las geometrías de verdad.
  */
 {
-  const { MINIMO_DE_UN_VOLUMEN, claveDelBulto, cuentaDeBulto, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaLetra, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
+  const { MINIMO_DE_UN_VOLUMEN, claveDelBulto, cuentaDeBulto, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaLetra, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
   const { ALTURA_DEL_BORDILLO, HISTERESIS_DEL_NIVEL, TONO_DEL_EDIFICIO, TONO_POR_DEFECTO, TRIANGULOS_DE_LA_CASCARA_ABIERTA, TRIANGULOS_DE_LA_CUBIERTA, TRIANGULOS_DE_LA_MEDIANERA, UMBRALES_DE_NIVEL, VETA_DE_LA_ALTURA, cascaraAbierta, ciudadDelCodigo, cocheEnElInstante, montarLaCiudad, nivelDelGrupo, pulsoDeLaParcela, tonoDeLaFachada, tonoDelEdificio, triangulosDeUnaTorre, ANCHO_DEL_CARRIL, ANCHO_DEL_BORDILLO, EJE_DEL_CARRIL } = await import('../burgo/ciudad');
   /* La retícula es de `piezas.ts` y `ciudad.ts` no la reexporta: pedírsela a `ciudad` devolvía `undefined` en silencio y el juez del carril se caía comparando con NaN. */
   const RETICULA = RETICULA_DE_LA_CIUDAD;
@@ -2345,6 +2345,22 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   const carasDeObra = carasDeObraPorCasilla.flatMap((x) => x.caras);
   comprobar('las obras del tablero tienen caras, y ninguna degenerada', carasDeObra.length > 0 && carasDeObra.every((c) => Number.isFinite(c.normalY)), carasDeObra.length);
   /*
+   * Y PESAN EXACTAMENTE LO QUE EL PRESUPUESTO CUENTA. Con los rótulos esta regla tiene que ser de
+   * orden —una letra triangulada no cae siempre en los mismos triángulos—, pero aquí no: una cara
+   * de cuatro puntos son dos triángulos y una de tres es uno, así que la cuenta puede ser EXACTA.
+   * Lo que caza es que la malla y el presupuesto se separen, que es lo que pasaría el día que
+   * `geometriaDeLasObras` dejara de saltarse el triángulo que sobra en una cara de tres puntos.
+   */
+  {
+    const fundidas = geometriaDeLasObras();
+    comprobar(
+      `las ${String(carasDeLasObras().length)} caras de las obras se funden en UNA malla de ${String(triangulosDeLasObras())} triángulos, los mismos que cuenta el presupuesto`,
+      fundidas !== null && cuantosTriangulos(fundidas) === triangulosDeLasObras(),
+      { medidos: fundidas === null ? null : cuantosTriangulos(fundidas), presupuestados: triangulosDeLasObras() },
+    );
+    fundidas?.dispose();
+  }
+  /*
    * Y NINGUNA OBRA SE SALE DE SU CASILLA. Es la misma regla que ya tenían las piezas del pack
    * —«caben enteras en su cuadrado de 108»—, y hacía falta escribirla otra vez porque una obra no
    * es una pieza: no pasa por `puestasDeLasEsquinas` y aquella regla no la mira. La primera
@@ -2353,6 +2369,19 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
    */
   const obrasFuera: string[] = [];
   for (const cara of carasDeLasObras()) {
+    /*
+     * El ferrocarril no es de ninguna casilla: sus caras ya vienen en coordenadas del mundo, y lo
+     * que tienen que cumplir es otra cosa —quedarse en el pasillo limpio que el campo deja entre
+     * el canto del tablero y la primera mancha de arbolado—. Ahí se cazó que la curva de las
+     * esquinas, con radio 40, se metía por debajo del tablero.
+     */
+    if (cara.casilla === DEL_MUNDO) {
+      for (const [x, , z] of cara.puntos) {
+        const lejos = Math.max(Math.abs(x), Math.abs(z));
+        if (lejos < MEDIO_LADO + 1 || lejos > MANCHAS_LEJOS_DEL_TABLERO) obrasFuera.push(`vía: (${x.toFixed(1)}, ${z.toFixed(1)}) a ${lejos.toFixed(1)} del centro`);
+      }
+      continue;
+    }
     const esEsquina = marcoDeCasilla(cara.casilla).esEsquina;
     for (const [u, , v] of cara.puntos) {
       if (esEsquina) {
@@ -2364,7 +2393,102 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
       }
     }
   }
-  comprobar('ninguna obra se sale del cuadro de su casilla', obrasFuera.length === 0, obrasFuera.slice(0, 4));
+  comprobar('ninguna obra se sale del cuadro de su casilla, y la vía se queda en el pasillo limpio del campo', obrasFuera.length === 0, obrasFuera.slice(0, 4));
+  /*
+   * ── 2 quinquies. NINGUNA OBRA SE COME UNA PIEZA ──
+   *
+   * Una obra y una pieza del pack viven en mundos distintos —una la describe `obras.ts` cuadro a
+   * cuadro y la otra sale del `.glb` con su caja medida— y hasta hoy nadie comparaba las dos. Eso
+   * ya ha costado dos arreglos a mano en esta misma tanda: la comisaría enterró dos bancos y una
+   * papelera dentro de una pared, y la carbonera de la estación de vapor se plantó encima del paso
+   * de cebra de la avenida. Las dos veces lo vi leyendo coordenadas, que es exactamente la forma
+   * de encontrar las cosas que no escala.
+   *
+   * Así que se miden: la caja de cada pieza —a su talla, en el marco de su casilla— contra la caja
+   * de cada cara de obra que TENGA ALTURA. Las caras tumbadas se saltan a propósito: el asfalto
+   * del aparcamiento cubre su esquina entera y los catorce coches están encima, que es lo que
+   * tiene que pasar.
+   */
+  const choques: string[] = [];
+  let paresMirados = 0;
+  for (const casilla of casillasConObra()) {
+    if (casilla === DEL_MUNDO) continue;
+    const m = marcoDeCasilla(casilla);
+    const suyas = carasDeLasObras().filter((cara) => cara.casilla === casilla);
+    const piezas = m.esEsquina
+      ? (PIEZAS_DE_LA_ESQUINA[casilla] ?? []).map((p) => ({ pieza: p.pieza, u: p.u, v: p.v, giro: p.giroEnCuartos, alza: p.alza ?? 0 }))
+      : (ATREZO_DE_LA_CASILLA[casilla] ?? []).map((p) => ({ pieza: p.pieza, u: (p.sitio[0] as number), v: (p.sitio[1] as number), giro: p.giroEnCuartos, alza: p.alza ?? 0 }));
+    for (const p of piezas) {
+      if (esSuelo(p.pieza)) continue;
+      const h = huella(p.pieza);
+      /* Un cuarto de vuelta impar cambia el ancho por el fondo. */
+      const ancho = p.giro % 2 === 0 ? h.ancho : h.fondo;
+      const fondo = p.giro % 2 === 0 ? h.fondo : h.ancho;
+      const pu = [p.u - ancho / 2, p.u + ancho / 2] as const;
+      const pv = [p.v - fondo / 2, p.v + fondo / 2] as const;
+      const py = [p.alza, p.alza + h.alto] as const;
+      for (const cara of suyas) {
+        const ys = cara.puntos.map((q) => q[1]);
+        const y0 = Math.min(...ys);
+        const y1 = Math.max(...ys);
+        if (y1 - y0 < 0.001) continue;
+        const us = cara.puntos.map((q) => q[0]);
+        const vs = cara.puntos.map((q) => q[2]);
+        paresMirados++;
+        const pisa =
+          Math.min(...us) < pu[1] - 0.05 &&
+          Math.max(...us) > pu[0] + 0.05 &&
+          Math.min(...vs) < pv[1] - 0.05 &&
+          Math.max(...vs) > pv[0] + 0.05 &&
+          y0 < py[1] - 0.05 &&
+          y1 > py[0] + 0.05;
+        if (pisa) choques.push(`${String(casilla)}: la obra se come «${p.pieza}» en (${p.u.toFixed(1)}, ${p.v.toFixed(1)})`);
+      }
+    }
+  }
+  comprobar(`se han mirado ${String(paresMirados)} pares de obra y pieza, y no cero`, paresMirados > 500, paresMirados);
+  comprobar('ninguna obra se come una pieza del pack', choques.length === 0, [...new Set(choques)].slice(0, 4));
+  /*
+   * LA VACUNA: se planta una caja de obra ENCIMA de una pieza de verdad —el primer coche del
+   * aparcamiento— y la misma cuenta tiene que cazarla. Sin esto, la regla de arriba estaría en
+   * verde igual el día que alguien le cambiara un signo.
+   */
+  {
+    const unCoche = (PIEZAS_DE_LA_ESQUINA[20] ?? []).find((x) => !esSuelo(x.pieza));
+    const h = unCoche === undefined ? null : huella(unCoche.pieza);
+    /* `caja` a secas es el medidor de piezas de este comprobador; la de las obras entra con su nombre largo. */
+    const encima = unCoche === undefined || h === null ? [] : cajaDeObra(20, unCoche.u - 2, unCoche.u + 2, unCoche.v - 2, unCoche.v + 2, 0, 5, '#000000');
+    const pisa =
+      unCoche !== undefined &&
+      h !== null &&
+      encima.some((cara) => {
+        const us = cara.puntos.map((q) => q[0]);
+        const vs = cara.puntos.map((q) => q[2]);
+        const ys = cara.puntos.map((q) => q[1]);
+        return (
+          Math.max(...ys) - Math.min(...ys) > 0.001 &&
+          Math.min(...us) < unCoche.u + h.ancho / 2 &&
+          Math.max(...us) > unCoche.u - h.ancho / 2 &&
+          Math.min(...vs) < unCoche.v + h.fondo / 2 &&
+          Math.max(...vs) > unCoche.v - h.fondo / 2 &&
+          Math.min(...ys) < (unCoche.alza ?? 0) + h.alto &&
+          Math.max(...ys) > (unCoche.alza ?? 0)
+        );
+      });
+    comprobar(`se ve fallar: una obra plantada encima de un «${unCoche?.pieza ?? '?'}» del aparcamiento da choque`, pisa, unCoche?.pieza);
+  }
+
+  /*
+   * La vacuna de la vía es la cuenta que se hizo mal dos veces: el punto más adentro de una curva
+   * no es `eje − 0,293 r`, es eso MENOS el medio ancho del balasto en diagonal. Con los números de
+   * la primera versión —radio 40, balasto 13— sale por debajo del tablero, y con los de hoy no.
+   */
+  const masAdentro = (radio: number, balasto: number): number => VIA.eje - 0.2929 * radio - 0.7071 * (balasto / 2);
+  comprobar(
+    `se ve fallar: con el radio 40 y el balasto 13 de la primera versión, la vía entraba a ${masAdentro(40, 13).toFixed(1)} del centro y el tablero acaba en ${String(MEDIO_LADO)}`,
+    masAdentro(40, 13) < MEDIO_LADO && masAdentro(VIA.radioDeCurva, VIA.balasto) > MEDIO_LADO,
+    { antes: masAdentro(40, 13), ahora: masAdentro(VIA.radioDeCurva, VIA.balasto) },
+  );
   comprobar('se ve fallar: un punto a 435 en una esquina estaría fuera, y el cuadro acaba en 432', 435 > MEDIO_LADO);
 
   /*

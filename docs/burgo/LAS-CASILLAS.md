@@ -88,8 +88,8 @@ corrige en la fase 4.
 | 28 | CANAL DE AGUAS ✅ | Depósito elevado sobre cuatro patas, alberca con agua y caseta de bombas | Código fundido (troncos) | pendiente: la onda (0,5) |
 | 4 | IMPUESTO ✅ | Escalinata de dos peldaños, cuatro columnas, cornisa y ático escalonado | Código fundido | pendiente: la moneda sube la escalinata (0,6) |
 | 38 | TASA DE LUJO ✅ | Alfombra granate, pedestal de mármol y una joya de ocho caras —la única pieza que no es un prisma— | Código fundido (triángulos) | pendiente: la joya gira (0,5) |
-| 5·15·25·35 | LAS CUATRO ESTACIONES | Cuatro estaciones DISTINTAS con andén y marquesina | Código | El tren para 1,5 s en el andén |
-| — | EL FERROCARRIL | Vía de traviesas y dos carriles por **todo el perímetro**, por fuera del borde | Código, fundido | Dos trenes dando la vuelta, continuo |
+| 5·15·25·35 | LAS CUATRO ESTACIONES ✅ | Andén, marquesina sobre cuatro columnas y casa de viajeros; y el remate que las distingue: torre del reloj (5), aguada y carbonera (15), bóveda escalonada (25) y apeadero de madera (35) | Código fundido | pendiente: el tren para 1,5 s |
+| — | EL FERROCARRIL ✅ | Balasto, 584 traviesas y dos carriles dando la vuelta entera, con curvas de radio 15 en las esquinas | Código fundido (3.072 triángulos con todo lo demás) | pendiente: los trenes |
 
 Cada casilla lleva además su **texto pequeño** debajo del nombre (alto 9 contra los 17 del
 nombre): lo que hace al caer en ella, en cuatro palabras.
@@ -144,6 +144,16 @@ trece edificios de código a ~1.500 son 20.000 de los 718.000 que sobran.
    - **La fase 4 está hecha.** Falta el ferrocarril (fase 5) y las animaciones (fase 6).
 4. **El ferrocarril** (fase 5): las cuatro estaciones, la vía del perímetro y los trenes. Es la
    más cara y la única que toca el mundo fuera del anillo.
+   - **La vía y las cuatro estaciones, hechas.** La vía no va por el marco del tablero —ahí se
+     levantan la cárcel y la comisaría— sino por el **pasillo limpio** que el campo deja entre el
+     canto (432) y la primera mancha de arbolado (448). Con curvas de verdad en las esquinas, y
+     con una cuenta que hubo que hacer dos veces: el punto más adentro de una curva no es
+     `eje − 0,293 r`, es eso menos el medio ancho del balasto en diagonal. La primera versión
+     metía la vía por debajo de la losa de la cárcel.
+   - Con ellas entra también la regla de que **ninguna obra se come una pieza del pack**, que es
+     la que habría cazado sin mirar coordenadas los dos choques que hubo que arreglar a mano: los
+     bancos enterrados en la comisaría y la carbonera plantada sobre un paso de cebra.
+   - Falta el TREN, que es lo único de esta fase que se mueve.
 5. **Las animaciones** (fase 6): una función pura por animación en `coreografia.ts` —que el
    comprobador puede medir sin `three`— y el bucle de `Burgo.tsx` moviéndolas.
 

@@ -39,6 +39,12 @@ import type { LetraEnElTablero } from './anillo-en-3d';
 /** Un punto de una obra en las coordenadas de su casilla: `u` y `v` como en `puntoEnEsquina`, `y` a plomo. */
 export type PuntoDeObra = readonly [number, number, number];
 
+/**
+ * LA CASILLA DE UNA OBRA QUE NO ES DE NINGUNA CASILLA. El ferrocarril da la vuelta al tablero por
+ * el campo, así que sus caras ya vienen en coordenadas del MUNDO y no hay marco que aplicarles.
+ */
+export const DEL_MUNDO = -1;
+
 export interface CaraDeObra {
   readonly casilla: number;
   readonly puntos: readonly [PuntoDeObra, PuntoDeObra, PuntoDeObra, PuntoDeObra];
@@ -86,6 +92,17 @@ export const COLOR_DE_OBRA = {
   marquesina: '#d8b34a',
   bombilla: '#ffe9a8',
   ruleta: '#23252a',
+  /* El ferrocarril. */
+  balasto: '#6b6257',
+  traviesa: '#4f4034',
+  carril: '#8e8f93',
+  /* Las cuatro estaciones. */
+  anden: '#b8b2a5',
+  marquesinaTren: '#7d8a8f',
+  ladrillo: '#9a5f4b',
+  esfera: '#f0ece0',
+  cristal: '#a9c7d4',
+  carbon: '#26262a',
 } as const;
 
 /**
@@ -666,6 +683,294 @@ function carasDelCasino(casilla: number): CaraDeObra[] {
   return salida;
 }
 
+/* ──────────────────── El ferrocarril, que no es de ninguna casilla ──────────────────── */
+
+/**
+ * LA VÍA DA LA VUELTA AL BURGO, Y POR AQUÍ ES POR DONDE CABE.
+ *
+ * Miguel: «una línea de vías de tren que recorra todo el perímetro del tablero». El sitio que
+ * parecía natural era el marco de fuera del propio tablero —la banda `v` 90..108 de cada
+ * casilla—, y ahí NO cabe: en dos esquinas ese marco es justo donde se levantan el pabellón de la
+ * cárcel y el cuerpo de la comisaría, recién puestos.
+ *
+ * Donde sí cabe es en el campo, y no en un sitio cualquiera: entre el canto del tablero (432) y
+ * los 448 a partir de los cuales se siembran las manchas de arbolado
+ * (`MANCHAS_LEJOS_DEL_TABLERO`). Esa franja de dieciséis está LIMPIA a propósito —«el borde del
+ * tablero se ve limpio, y el paño de dados también»— así que la vía se mete ahí por su eje, a 440,
+ * sin desalojar nada y sin tocar el manto, que corre por debajo a −0,05.
+ *
+ * ═══ Y TIENE CURVAS, QUE NO ES UN CAPRICHO ═══
+ *
+ * Cuatro rectas que se cruzaran en las esquinas serían cuatro cruces de vía, y un tren que da la
+ * vuelta a un tablero no cruza: GIRA. Las esquinas son cuartos de círculo de radio 40, y de ahí
+ * sale el eje entero como una polilínea: se muestrea cada `PASO_DE_TRAVIESA` y sobre cada punto se
+ * planta una traviesa perpendicular; los carriles son barras que unen los puntos de igual rumbo.
+ *
+ * Es además lo que hace que el tren pueda andar: la misma polilínea le sirve de carril al que se
+ * mueve, y así el tren no puede ir por un sitio distinto del que se ve dibujado.
+ */
+export const VIA = {
+  /*
+   * ═══ TODOS ESTOS NÚMEROS SALEN DE UN PASILLO DE DIECISÉIS ═══
+   *
+   * La vía tiene que caber entre el canto del tablero (432) y la primera mancha de arbolado (448).
+   * Dieciséis, y de ahí sale todo lo demás con una cuenta que hubo que hacer DOS veces:
+   *
+   * · una curva de radio `r` centrada en `(eje − r, eje − r)` pasa por su punto de 45° a
+   *   `eje − 0,293 r` del centro, y ahí hay que descontar ADEMÁS el medio ancho del balasto, que
+   *   en diagonal entra otro `0,707 × medio`. La primera versión —eje 440, radio 40, balasto 13—
+   *   metía la vía a 429,5 del centro: por DEBAJO de la losa de la esquina de la cárcel;
+   * · con el eje en 442, el balasto en 9,5 y el radio en 15, el punto más adentro de la curva cae
+   *   en 433,9 medido —la fórmula da 434,2 y el muestreo se queda un pelo por dentro— y el más
+   *   afuera de la recta en 446,8. Dentro del pasillo, y con un dedo a cada lado.
+   *
+   * Las dos veces lo dijo el comprobador —«ninguna obra se sale de su sitio»— y no una captura.
+   */
+  eje: 442,
+  radioDeCurva: 15,
+  anchoDeTraviesa: 8,
+  gruesoDeTraviesa: 1.5,
+  pasoDeTraviesa: 6,
+  /* Los dos carriles, a 2,4 del eje: la misma proporción de vía y traviesa que una de verdad. */
+  carril: { separacion: 2.4, ancho: 0.7, alto: 0.65 },
+  balasto: 9.5,
+  alza: 0.02,
+} as const;
+
+/** Un punto del eje de la vía, con el rumbo que lleva la vía ahí. */
+export interface PuntoDeLaVia {
+  readonly x: number;
+  readonly z: number;
+  /** Unitario, en el sentido de la marcha del tren. */
+  readonly dx: number;
+  readonly dz: number;
+}
+
+let ejeGuardado: PuntoDeLaVia[] | null = null;
+
+/**
+ * EL EJE DE LA VÍA, muestreado cada paso de traviesa: cuatro rectas y cuatro cuartos de círculo.
+ * Se recorre en el sentido de la marcha del tablero para que el tren y los peones vayan al mismo.
+ */
+export function ejeDeLaVia(): PuntoDeLaVia[] {
+  if (ejeGuardado !== null) return ejeGuardado;
+  const e = VIA.eje;
+  const r = VIA.radioDeCurva;
+  const recta = e - r;
+  const salida: PuntoDeLaVia[] = [];
+  /* Cuatro tramos: cada uno es una recta y la curva que la remata, en sentido antihorario. */
+  const tramos: readonly { desde: { x: number; z: number }; hasta: { x: number; z: number }; centro: { x: number; z: number } }[] = [
+    { desde: { x: -recta, z: e }, hasta: { x: recta, z: e }, centro: { x: recta, z: recta } },
+    { desde: { x: e, z: recta }, hasta: { x: e, z: -recta }, centro: { x: recta, z: -recta } },
+    { desde: { x: recta, z: -e }, hasta: { x: -recta, z: -e }, centro: { x: -recta, z: -recta } },
+    { desde: { x: -e, z: -recta }, hasta: { x: -e, z: recta }, centro: { x: -recta, z: recta } },
+  ];
+  for (let t = 0; t < tramos.length; t++) {
+    const tramo = tramos[t] as (typeof tramos)[number];
+    const largo = Math.hypot(tramo.hasta.x - tramo.desde.x, tramo.hasta.z - tramo.desde.z);
+    const dx = (tramo.hasta.x - tramo.desde.x) / largo;
+    const dz = (tramo.hasta.z - tramo.desde.z) / largo;
+    const pasos = Math.round(largo / VIA.pasoDeTraviesa);
+    for (let k = 0; k < pasos; k++) {
+      const s = (k * largo) / pasos;
+      salida.push({ x: tramo.desde.x + dx * s, z: tramo.desde.z + dz * s, dx, dz });
+    }
+    /* El cuarto de círculo que enlaza con el tramo siguiente. */
+    const desdeAngulo = Math.atan2(tramo.hasta.z - tramo.centro.z, tramo.hasta.x - tramo.centro.x);
+    const siguiente = tramos[(t + 1) % tramos.length] as (typeof tramos)[number];
+    const hastaAngulo = Math.atan2(siguiente.desde.z - tramo.centro.z, siguiente.desde.x - tramo.centro.x);
+    let giro = hastaAngulo - desdeAngulo;
+    while (giro > Math.PI) giro -= Math.PI * 2;
+    while (giro < -Math.PI) giro += Math.PI * 2;
+    const pasosDeCurva = Math.max(2, Math.round((Math.abs(giro) * r) / VIA.pasoDeTraviesa));
+    for (let k = 0; k < pasosDeCurva; k++) {
+      const a = desdeAngulo + (giro * k) / pasosDeCurva;
+      const signo = giro >= 0 ? 1 : -1;
+      salida.push({ x: tramo.centro.x + r * Math.cos(a), z: tramo.centro.z + r * Math.sin(a), dx: -Math.sin(a) * signo, dz: Math.cos(a) * signo });
+    }
+  }
+  ejeGuardado = salida;
+  return salida;
+}
+
+/**
+ * UNA BARRA ENTRE DOS PUNTOS DEL MUNDO, de `ancho` y de `y0` a `y1`.
+ *
+ * Aquí las vueltas NO son las de `caja`: eso está escrito en coordenadas de casilla, que llegan al
+ * mundo con determinante −1. Esto ya está en el mundo, así que la regla se invierte y hay que
+ * derivarla otra vez: con la normal `(b − a) × (c − a)`, una cara mira ARRIBA si se recorre
+ * `(x0,z0) → (x0,z1) → (x1,z1) → (x1,z0)`, o sea al revés que en el plano de una casilla.
+ */
+function barra(p0: { x: number; z: number }, p1: { x: number; z: number }, ancho: number, y0: number, y1: number, color: string): CaraDeObra[] {
+  const largo = Math.hypot(p1.x - p0.x, p1.z - p0.z) || 1;
+  const dx = (p1.x - p0.x) / largo;
+  const dz = (p1.z - p0.z) / largo;
+  const nx = -dz * (ancho / 2);
+  const nz = dx * (ancho / 2);
+  const p = (extremo: { x: number; z: number }, signo: number, y: number): PuntoDeObra => [extremo.x + nx * signo, y, extremo.z + nz * signo];
+  const cara = (puntos: readonly [PuntoDeObra, PuntoDeObra, PuntoDeObra, PuntoDeObra]): CaraDeObra => ({ casilla: DEL_MUNDO, puntos, color });
+  return [
+    cara([p(p0, 1, y1), p(p1, 1, y1), p(p1, -1, y1), p(p0, -1, y1)]),
+    cara([p(p0, -1, y0), p(p1, -1, y0), p(p1, 1, y0), p(p0, 1, y0)]),
+    cara([p(p1, 1, y0), p(p1, 1, y1), p(p0, 1, y1), p(p0, 1, y0)]),
+    cara([p(p0, -1, y0), p(p0, -1, y1), p(p1, -1, y1), p(p1, -1, y0)]),
+    cara([p(p0, 1, y0), p(p0, 1, y1), p(p0, -1, y1), p(p0, -1, y0)]),
+    cara([p(p1, -1, y0), p(p1, -1, y1), p(p1, 1, y1), p(p1, 1, y0)]),
+  ];
+}
+
+/** Una losa tumbada girada con el rumbo de la vía: una traviesa. Mismas vueltas que `barra`. */
+function losaGirada(centro: { x: number; z: number }, dx: number, dz: number, largo: number, ancho: number, y: number, color: string): CaraDeObra {
+  const ex = (dx * largo) / 2;
+  const ez = (dz * largo) / 2;
+  const nx = (-dz * ancho) / 2;
+  const nz = (dx * ancho) / 2;
+  const punto = (a: number, b: number): PuntoDeObra => [centro.x + ex * a + nx * b, y, centro.z + ez * a + nz * b];
+  return { casilla: DEL_MUNDO, puntos: [punto(-1, 1), punto(1, 1), punto(1, -1), punto(-1, -1)], color };
+}
+
+/**
+ * LA VÍA ENTERA, Y LA CUENTA QUE OBLIGA A AGRUPAR.
+ *
+ * Con una caja por traviesa y una barra por tramo entre punto y punto, la vuelta al tablero salía
+ * por **24.000 triángulos**: más que toda la ciudad del recinto junta, y para una vía decorativa.
+ * Así que dos decisiones, las dos medidas:
+ *
+ * · la TRAVIESA es una losa tumbada (2 triángulos) y no una caja (12): desde el aire, una traviesa
+ *   de 0,3 de alto y una pintada en el balasto son la misma cosa;
+ * · los CARRILES y el BALASTO se agrupan por rumbo: en una recta de 800 hay un solo carril de 800
+ *   en vez de ciento catorce de a siete. Las curvas siguen segmento a segmento, que es donde el
+ *   rumbo cambia de verdad.
+ *
+ * Quedan unos 2.200 triángulos para la vuelta entera.
+ */
+function carasDeLaVia(): CaraDeObra[] {
+  const eje = ejeDeLaVia();
+  const salida: CaraDeObra[] = [];
+  for (const p of eje) {
+    salida.push(losaGirada(p, p.dx, p.dz, VIA.gruesoDeTraviesa, VIA.anchoDeTraviesa, VIA.alza + 0.13, COLOR_DE_OBRA.traviesa));
+  }
+  /* Los tramos de rumbo constante: en una recta, uno solo; en una curva, uno por muestra. */
+  let inicio = 0;
+  for (let k = 1; k <= eje.length; k++) {
+    const previo = eje[k - 1] as PuntoDeLaVia;
+    const actual = eje[k % eje.length] as PuntoDeLaVia;
+    const cambia = Math.abs(actual.dx - previo.dx) > 1e-9 || Math.abs(actual.dz - previo.dz) > 1e-9;
+    if (!cambia && k < eje.length) continue;
+    const a = eje[inicio] as PuntoDeLaVia;
+    const b = actual;
+    salida.push(losaGirada({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }, a.dx, a.dz, Math.hypot(b.x - a.x, b.z - a.z), VIA.balasto, VIA.alza, COLOR_DE_OBRA.balasto));
+    for (const lado of [-1, 1]) {
+      const d = VIA.carril.separacion * lado;
+      const p0 = { x: a.x - a.dz * d, z: a.z + a.dx * d };
+      const p1 = { x: b.x - b.dz * d, z: b.z + b.dx * d };
+      salida.push(...barra(p0, p1, VIA.carril.ancho, VIA.alza + 0.26, VIA.alza + 0.26 + VIA.carril.alto, COLOR_DE_OBRA.carril));
+    }
+    inicio = k % eje.length;
+  }
+  return salida;
+}
+
+/**
+ * LAS CUATRO ESTACIONES (casillas 5, 15, 25 y 35), Y POR QUÉ SON CUATRO Y NO UNA REPETIDA.
+ *
+ * Miguel: «4 estaciones 3d distintas y conectadas por una línea de vías». Lo de «distintas» no es
+ * un adorno: son las cuatro casillas más parecidas del tablero —mismo precio, misma renta, mismo
+ * nombre de clase— y un jugador que mira el tablero necesita saber en cuál está sin leer.
+ *
+ * Todas comparten el esqueleto, que es lo que las hace reconocibles COMO estaciones: el andén
+ * pegado al canto del tablero (la banda `v` 92..107, que es el marco y estaba libre), la
+ * MARQUESINA que lo cubre sobre cuatro columnas —y por debajo de la cual pasa la avenida, que
+ * entra por el eje de estas cuatro casillas y mide 48— y la casa de viajeros a un lado.
+ *
+ * Y cada una se distingue por su remate, que es lo único que cambia:
+ *
+ *   ·  5  TORRE DEL RELOJ: la de una estación de ciudad, con su esfera clara.
+ *   · 15  AGUADA Y CARBONERA: la de una estación de vapor.
+ *   · 25  MARQUESINA ABOVEDADA: tres cajas escalonadas en vez de una plana.
+ *   · 35  APEADERO DE MADERA: tejado a dos aguas escalonado, más pequeño que las demás.
+ */
+const ESTACION = {
+  anden: { u: 32, v0: 92, v1: 107, alto: 0.9 },
+  marquesina: { u: 30, v0: 92, v1: 106, desde: 7, hasta: 8.2 },
+  columna: { lado: 1.3, en: [-27, 27] as readonly number[], v: [94, 104] as readonly number[] },
+  casa: { u0: -34, u1: -25, v0: 76, v1: 92, alto: 9 },
+  /* El canto del andén, que es lo que lo separa de la vía y lo que hace que se lea como andén. */
+  canto: { v0: 105.4, v1: 107, alto: 1.5 },
+} as const;
+
+function carasDeLaEstacion(casilla: number, remate: (casilla: number) => CaraDeObra[]): CaraDeObra[] {
+  const salida: CaraDeObra[] = [];
+  const a = ESTACION.anden;
+  salida.push(...caja(casilla, -a.u, a.u, a.v0, a.v1, 0, a.alto, COLOR_DE_OBRA.anden));
+  const c = ESTACION.canto;
+  salida.push(...caja(casilla, -a.u, a.u, c.v0, c.v1, 0, c.alto, COLOR_DE_OBRA.piedra));
+  const m = ESTACION.marquesina;
+  salida.push(...caja(casilla, -m.u, m.u, m.v0, m.v1, m.desde, m.hasta, COLOR_DE_OBRA.marquesinaTren));
+  for (const u of ESTACION.columna.en) {
+    for (const v of ESTACION.columna.v) {
+      salida.push(...caja(casilla, u - ESTACION.columna.lado / 2, u + ESTACION.columna.lado / 2, v - ESTACION.columna.lado / 2, v + ESTACION.columna.lado / 2, a.alto, m.desde, COLOR_DE_OBRA.hierro));
+    }
+  }
+  const h = ESTACION.casa;
+  salida.push(...caja(casilla, h.u0, h.u1, h.v0, h.v1, 0, h.alto, COLOR_DE_OBRA.ladrillo));
+  salida.push(...remate(casilla));
+  return salida;
+}
+
+/** 5 · La torre del reloj, encima de la casa de viajeros, con su esfera mirando a la avenida. */
+function remateDelReloj(casilla: number): CaraDeObra[] {
+  const t = { u: -29.5, v: 84, lado: 6.4, alto: 19 };
+  const medio = t.lado / 2;
+  return [
+    ...caja(casilla, t.u - medio, t.u + medio, t.v - medio, t.v + medio, 0, t.alto, COLOR_DE_OBRA.ladrillo),
+    ...caja(casilla, t.u - medio - 0.7, t.u + medio + 0.7, t.v - medio - 0.7, t.v + medio + 0.7, t.alto, t.alto + 1.1, COLOR_DE_OBRA.tejado),
+    ...disco(casilla, t.u + medio + 0.05, t.v, 2.1, t.alto - 4.5, 10, COLOR_DE_OBRA.esfera),
+  ];
+}
+
+/** 15 · La aguada y la carbonera: una estación de vapor se conoce por el depósito, no por el andén. */
+function remateDeLaAguada(casilla: number): CaraDeObra[] {
+  const d = { u: -29, v: 70, radio: 3.4, patas: 7, alto: 4.6, pata: 0.7, separacion: 2.2 };
+  const salida: CaraDeObra[] = [];
+  for (const du of [-d.separacion, d.separacion]) {
+    for (const dv of [-d.separacion, d.separacion]) {
+      salida.push(...caja(casilla, d.u + du - d.pata / 2, d.u + du + d.pata / 2, d.v + dv - d.pata / 2, d.v + dv + d.pata / 2, 0, d.patas, COLOR_DE_OBRA.hierro));
+    }
+  }
+  salida.push(...tronco(casilla, d.u, d.v, d.radio, d.radio, d.patas, d.patas + d.alto, 10, COLOR_DE_OBRA.deposito));
+  salida.push(...disco(casilla, d.u, d.v, d.radio, d.patas + d.alto, 10, COLOR_DE_OBRA.depositoTapa));
+  /*
+   * La carbonera: un cajón abierto con el carbón dentro, que se ve desde arriba. Va de 84 a 92 y
+   * no de 76 a 88 porque las cuatro losas de cebra de la avenida son de 12 y llegan hasta `v = 81`:
+   * a 76 la carbonera se metía dentro del paso de peatones.
+   */
+  salida.push(...caja(casilla, 16, 28, 84, 92, 0, 2.6, COLOR_DE_OBRA.piedra));
+  salida.push(losa(casilla, 17.2, 26.8, 85.2, 90.8, 2.7, COLOR_DE_OBRA.carbon));
+  return salida;
+}
+
+/** 25 · La marquesina abovedada: tres cajas escalonadas en vez de una plana. */
+function remateDeLaBoveda(casilla: number): CaraDeObra[] {
+  const m = ESTACION.marquesina;
+  return [
+    ...caja(casilla, -m.u + 3, m.u - 3, m.v0 + 1.5, m.v1 - 1.5, m.hasta, m.hasta + 1.3, COLOR_DE_OBRA.marquesinaTren),
+    ...caja(casilla, -m.u + 7, m.u - 7, m.v0 + 3.2, m.v1 - 3.2, m.hasta + 1.3, m.hasta + 2.4, COLOR_DE_OBRA.marquesinaTren),
+    ...caja(casilla, -m.u + 11, m.u - 11, m.v0 + 4.6, m.v1 - 4.6, m.hasta + 2.4, m.hasta + 3.1, COLOR_DE_OBRA.cristal),
+  ];
+}
+
+/** 35 · El apeadero de madera: tejado a dos aguas escalonado sobre la casa, y un banco en el andén. */
+function remateDelApeadero(casilla: number): CaraDeObra[] {
+  const h = ESTACION.casa;
+  return [
+    ...caja(casilla, h.u0 - 1, h.u1 + 1, h.v0 - 1, h.v1 + 1, h.alto, h.alto + 1.1, COLOR_DE_OBRA.tejado),
+    ...caja(casilla, h.u0 + 1.6, h.u1 - 1.6, h.v0 + 1.6, h.v1 - 1.6, h.alto + 1.1, h.alto + 2.2, COLOR_DE_OBRA.tejado),
+    ...caja(casilla, h.u0 + 3.2, h.u1 - 3.2, h.v0 + 3.2, h.v1 - 3.2, h.alto + 2.2, h.alto + 3.1, COLOR_DE_OBRA.tejado),
+    ...caja(casilla, 8, 18, 96, 98.4, ESTACION.anden.alto, ESTACION.anden.alto + 1.6, COLOR_DE_OBRA.madera),
+  ];
+}
+
 /** Qué levanta cada casilla lateral. Las que no están aquí todavía no tienen obra. */
 const OBRA_DE_LA_CASILLA: Readonly<Record<number, (casilla: number) => CaraDeObra[]>> = {
   2: carasDelCofre,
@@ -678,6 +983,10 @@ const OBRA_DE_LA_CASILLA: Readonly<Record<number, (casilla: number) => CaraDeObr
   33: carasDelCofre,
   36: carasDelCasino,
   38: carasDeLaTasa,
+  5: (c) => carasDeLaEstacion(c, remateDelReloj),
+  15: (c) => carasDeLaEstacion(c, remateDeLaAguada),
+  25: (c) => carasDeLaEstacion(c, remateDeLaBoveda),
+  35: (c) => carasDeLaEstacion(c, remateDelApeadero),
 };
 
 function carasDeLasCasillas(): CaraDeObra[] {
@@ -691,7 +1000,7 @@ let hechas: CaraDeObra[] | null = null;
 
 /** Todas las caras de todas las obras del anillo, en coordenadas de casilla. */
 export function carasDeLasObras(): CaraDeObra[] {
-  if (hechas === null) hechas = [...carasDelAparcamiento(), ...carasDeLaCarcel(), ...carasDeLaComisaria(), ...carasDeLasCasillas()];
+  if (hechas === null) hechas = [...carasDelAparcamiento(), ...carasDeLaCarcel(), ...carasDeLaComisaria(), ...carasDeLasCasillas(), ...carasDeLaVia()];
   return hechas;
 }
 
@@ -712,7 +1021,7 @@ export interface CaraEnElMundo {
  * cuatro —que es un casteo que TypeScript rechaza con razón, porque nada garantiza el largo—.
  */
 export function carasDeLaObraEnElMundo(casilla: number): CaraEnElMundo[] {
-  const m = marcoDeCasilla(casilla);
+  const m = marcoDeCasilla(casilla === DEL_MUNDO ? 0 : casilla);
   /*
    * Una esquina y una casilla lateral no usan el mismo marco: en la esquina, `(u, v)` son las dos
    * distancias al centro del tablero (324..432); en una lateral, `u` va a lo largo de la marcha
@@ -720,6 +1029,7 @@ export function carasDeLaObraEnElMundo(casilla: number): CaraEnElMundo[] {
    * mundo con determinante −1, así que las vueltas de `losa` y `caja` valen para las dos.
    */
   const alMundo = ([u, y, v]: PuntoDeObra): PuntoDeObra => {
+    if (casilla === DEL_MUNDO) return [u, y, v];
     if (m.esEsquina) return [m.fuera.x * u + m.adelante.x * -v, y, m.fuera.z * u + m.adelante.z * -v];
     const p = puntoEnLaCasillaPorV(m, u, v);
     return [p.x, y, p.z];
