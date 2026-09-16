@@ -9,7 +9,7 @@
  *    línea que separa una de otra (`anillo-en-3d.ts` da los sitios; aquí sólo se instancia),
  *    el frente de manzana de cada solar, las cuatro esquinas —que son manzanas urbanas de
  *    9 × 9 celdas: un cruce, una comisaría, una plaza y una avenida—, el precio y el emblema
- *    de cada casilla fundidos en una sola geometría de tinta, el paño de dados, el campo de
+ *    de cada casilla fundidos en una sola geometría de tinta, el campo de
  *    teselas sembrado con el código de la mesa, cinco nubes derivando, la cúpula de mediodía
  *    y la niebla. Nada de esto cambia durante la partida.
  *  · LA CIUDAD de dentro del recinto de 648 (`ciudad.ts`): 2.916 celdas, 691 edificios,
@@ -19,7 +19,8 @@
  *    abajo). El presupuesto es 900.000 en un PC y 230.000 en un móvil, para las dos cosas.
  *
  * Y encima lo que cambia con la partida: casas y posadas, banderas de dueño, seis peones,
- * UN aventurero (el que mueve), los dos dados, las monedas que vuelan, el naipe de la carta,
+ * UN aventurero (el que mueve), los dos dados en su bandeja pegada a la pantalla, las monedas
+ * que vuelan, el naipe de la carta,
  * la marca de la casilla que se puede tocar y la reja de la Comisaría.
  *
  * ═══ LA CIUDAD SE REPARTE POR CERCANÍA, Y ES LO ÚNICO QUE HACE QUE EXISTA ═══
@@ -190,7 +191,6 @@ import {
   ALTURA_DEL_REBORDE,
   ANCHO_DE_CASILLA,
   ANILLO_DEL_BURGO,
-  ARISTA_DE_LOS_DADOS,
   BANDERA_SOBRE_LA_POSADA,
   BORDE_CLARO,
   BORDE_INTERIOR,
@@ -198,18 +198,15 @@ import {
   CONFIN_DE_LAS_NUBES,
   DERIVA_DE_LAS_NUBES,
   EL_CONCEJO,
-  HUECOS_DE_LOS_DADOS,
   FILETE,
   FRANJA,
   LADO_DE_ESQUINA,
   LADO_INTERIOR,
   LINEA_DE_LA_MARCHA,
   MEDIO_LADO,
-  RADIO_DEL_ASA_DE_LOS_DADOS,
   RADIO_DEL_DISCO_DEL_PEON,
   SUBIDA_DE_LA_REJA,
   SUPERFICIE,
-  SUELO_DE_DADOS,
   TALLA_DEL_HOTEL,
   TALLA_DEL_PEON,
   TALLA_DE_LA_CASA,
@@ -289,6 +286,17 @@ import { PASO_DE_LA_REJA, avanzar, despedir, encolar as encolarAlPeon, esSucesoD
 import type { EstadoDelPeon } from './peon';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, saltoDelDoble } from './dados-del-burgo';
 import type { EstadoDeLosDadosDelBurgo, SucesoDeLosDadosDelBurgo, VistaDeLosDadosDelBurgo } from './dados-del-burgo';
+import {
+  ARISTA_DE_LOS_DADOS,
+  BANDEJA,
+  HUECOS_DE_LOS_DADOS,
+  MOVIMIENTO_DE_LOS_DADOS,
+  SITIO_DE_LA_BANDEJA_POR_DEFECTO,
+  cajaDelAsaDeLosDados,
+  colorDelFieltro,
+  cuadrosDeLaBandeja,
+  poseDeLaBandeja,
+} from './bandeja-de-los-dados';
 import { ALCANCE_DEL_BURGO, ALTURA_MINIMA_DEL_OJO_DEL_BURGO, AMORTIGUACION_DEL_SEGUIMIENTO, CERCANIA_DE_SEGUIMIENTO, REPOSO_TRAS_SEGUIR } from './camara-del-burgo';
 import { AMBAR_DEL_CONCEJO, coloresDeLasBanderas, geometriaParaInstanciar, geometriaTenidaDe, soltarTintesDeGeometrias } from './tinte-del-burgo';
 import { Aventurero } from './Aventurero';
@@ -367,8 +375,8 @@ const COLOR_DEL_TRATO = '#f2e8cf';
 const GIRO_DE_LAS_ASPAS = 0.9;
 /** Desde qué altura caen los peones en el sorteo. */
 const CAIDA_DEL_SORTEO = 4;
-/** El asa de los dados: un cilindro invisible de radio 5 y este alto. */
-const ALTO_DEL_ASA_DE_LOS_DADOS = 6;
+/** El asa de los dados: una caja invisible que cubre la bandeja y el aire donde saltan los dados. */
+const ASA_DE_LOS_DADOS = cajaDelAsaDeLosDados();
 /** El asa de una casilla: un plano invisible de su tamaño, un pelo sobre el suelo. */
 const ALZA_DEL_ASA = 0.4;
 /** Cuánto pesa la mezcla hacia la pose de `fin`: a plomo sobre la plaza, a este alto. */
@@ -946,13 +954,44 @@ interface Suelo {
  * dos verdades sobre lo mismo, y sólo una vigilada. Ahora hay una: `anillo-en-3d.ts` dice
  * dónde van los cuadros y aquí sólo se les da color y se enhebran.
  *
- * Lo que se añade encima son los tres cuadros que NO son del anillo: el paño de dados de la
- * plaza, el suelo del recinto de la ciudad y la tierra bajo el campo.
+ * Lo que se añade encima son los dos cuadros que NO son del anillo: el suelo del recinto de la
+ * ciudad y la tierra bajo el campo. El paño de dados que hubo en el campo se fue con los dados a la
+ * pantalla (`construirBandeja`).
  *
  * El color de la FRANJA es el del barrio y se REESCRIBE por vértice cuando cambia la vista o
  * se empeña (nunca con opacidad), así que de cada casilla se guarda el tramo de vértices de
  * sus cuadros `franja` y `reborde`. Las cuentas están en `presupuesto.ts`.
  */
+/**
+ * UN CUADRO ENHEBRADO EN DOS TRIÁNGULOS, con su color y su normal en cada vértice. Devuelve cuántos
+ * vértices añade: seis, o ninguno si le faltan puntos. Lo usan el suelo y la bandeja de los dados.
+ */
+function enhebrarCuadro(
+  destino: { readonly posiciones: number[]; readonly colores: number[]; readonly normales: number[] },
+  puntos: readonly (readonly [number, number, number])[],
+  color: THREE.Color,
+  normal: readonly [number, number, number],
+): number {
+  const [a, b, c, d] = puntos as readonly [number, number, number][];
+  if (a === undefined || b === undefined || c === undefined || d === undefined) return 0;
+  /*
+   * EL SENTIDO DE GIRO SE DERIVA DE LA NORMAL PEDIDA, no se supone: la primera versión
+   * escribía los cuatro puntos en un orden fijo y en las casillas laterales la cara
+   * salía mirando hacia ABAJO (el producto vectorial daba −y), así que la calle y el
+   * solar se pintaban a oscuras —iluminados por el suelo del hemisferio— sin error.
+   */
+  const nx = (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]);
+  const ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
+  const nz = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const alDerecho = nx * normal[0] + ny * normal[1] + nz * normal[2] >= 0;
+  for (const v of alDerecho ? [a, b, c, c, d, a] : [a, d, c, c, b, a]) {
+    destino.posiciones.push(v[0], v[1], v[2]);
+    destino.colores.push(color.r, color.g, color.b);
+    destino.normales.push(normal[0], normal[1], normal[2]);
+  }
+  return 6;
+}
+
 function construirSuelo(): Suelo {
   const posiciones: number[] = [];
   const colores: number[] = [];
@@ -961,25 +1000,8 @@ function construirSuelo(): Suelo {
   let vertices = 0;
   const color = new THREE.Color();
   const cuadro = (puntos: readonly (readonly [number, number, number])[], hex: string, normal: readonly [number, number, number]): void => {
-    const [a, b, c, d] = puntos as readonly [number, number, number][];
-    if (a === undefined || b === undefined || c === undefined || d === undefined) return;
     color.set(hex);
-    /*
-     * EL SENTIDO DE GIRO SE DERIVA DE LA NORMAL PEDIDA, no se supone: la primera versión
-     * escribía los cuatro puntos en un orden fijo y en las casillas laterales la cara
-     * salía mirando hacia ABAJO (el producto vectorial daba −y), así que la calle y el
-     * solar se pintaban a oscuras —iluminados por el suelo del hemisferio— sin error.
-     */
-    const nx = (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]);
-    const ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
-    const nz = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-    const alDerecho = nx * normal[0] + ny * normal[1] + nz * normal[2] >= 0;
-    for (const v of alDerecho ? [a, b, c, c, d, a] : [a, d, c, c, b, a]) {
-      posiciones.push(v[0], v[1], v[2]);
-      colores.push(color.r, color.g, color.b);
-      normales.push(normal[0], normal[1], normal[2]);
-      vertices++;
-    }
+    vertices += enhebrarCuadro({ posiciones, colores, normales }, puntos, color, normal);
   };
   let casillaEnCurso = -1;
   let desdeDeLaAcera = 0;
@@ -991,7 +1013,7 @@ function construirSuelo(): Suelo {
     cuadro(q.puntos, COLOR_DEL_SUELO[q.papel], q.normal);
     if (q.papel === 'reborde' && casillaEnCurso === q.casilla) aceras.set(q.casilla, { desde: desdeDeLaAcera, hasta: vertices });
   }
-  /* El paño de dados, el suelo del recinto y la tierra bajo el campo: no son del anillo. */
+  /* El suelo del recinto y la tierra bajo el campo: no son del anillo. */
   const llano = (lado: number, y: number, hex: string): void => {
     const m = lado / 2;
     cuadro(
@@ -1005,17 +1027,6 @@ function construirSuelo(): Suelo {
       [0, 1, 0],
     );
   };
-  const d = SUELO_DE_DADOS.lado / 2;
-  cuadro(
-    [
-      [SUELO_DE_DADOS.x - d, SUELO_DE_DADOS.y, SUELO_DE_DADOS.z - d],
-      [SUELO_DE_DADOS.x - d, SUELO_DE_DADOS.y, SUELO_DE_DADOS.z + d],
-      [SUELO_DE_DADOS.x + d, SUELO_DE_DADOS.y, SUELO_DE_DADOS.z + d],
-      [SUELO_DE_DADOS.x + d, SUELO_DE_DADOS.y, SUELO_DE_DADOS.z - d],
-    ],
-    SUELO_DE_DADOS.color,
-    [0, 1, 0],
-  );
   llano(LADO_INTERIOR, 0, COLOR_DEL_SUELO.recinto);
   llano(LADO_DE_LA_TIERRA, -0.03, COLOR_DE_LA_TIERRA);
 
@@ -1025,6 +1036,42 @@ function construirSuelo(): Suelo {
   geometria.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normales), 3));
   geometria.computeBoundingSphere();
   return { geometria, aceras };
+}
+
+interface Bandeja {
+  readonly geometria: THREE.BufferGeometry;
+  /** Los vértices del fieltro, que son los primeros: los que se repintan con el color del turno. */
+  readonly verticesDelFieltro: number;
+}
+
+/**
+ * LA BANDEJA DE LOS DADOS, GEOMETRÍA PROPIA CON COLOR POR VÉRTICE, como el suelo: los cuadros de
+ * `cuadrosDeLaBandeja` con el nogal del borde y el fieltro sin turno, en UNA geometría que se pinta
+ * con el material del suelo. El fieltro va el primero, así que sus vértices son los primeros.
+ */
+function construirBandeja(): Bandeja {
+  const destino = { posiciones: [] as number[], colores: [] as number[], normales: [] as number[] };
+  let verticesDelFieltro = 0;
+  const color = new THREE.Color();
+  for (const q of cuadrosDeLaBandeja()) {
+    color.set(q.papel === 'fieltro' ? colorDelFieltro(null) : BANDEJA.color.borde);
+    const puestos = enhebrarCuadro(destino, q.puntos, color, q.normal);
+    if (q.papel === 'fieltro') verticesDelFieltro += puestos;
+  }
+  const geometria = new THREE.BufferGeometry();
+  geometria.setAttribute('position', new THREE.BufferAttribute(new Float32Array(destino.posiciones), 3));
+  geometria.setAttribute('color', new THREE.BufferAttribute(new Float32Array(destino.colores), 3));
+  geometria.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(destino.normales), 3));
+  geometria.computeBoundingSphere();
+  return { geometria, verticesDelFieltro };
+}
+
+/** Pinta el fieltro de la bandeja del color de quien tiene el turno (`colorDelFieltro`). */
+function pintaElFieltro(bandeja: Bandeja, hex: string): void {
+  const color = bandeja.geometria.getAttribute('color') as THREE.BufferAttribute;
+  auxColor.set(hex);
+  for (let i = 0; i < bandeja.verticesDelFieltro; i++) color.setXYZ(i, auxColor.r, auxColor.g, auxColor.b);
+  color.needsUpdate = true;
 }
 
 /** Pinta la acera de una casilla con su color, apagado al tanto que se diga (1 = entera). */
@@ -1210,6 +1257,30 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   useEffect(() => () => suelo.geometria.dispose(), [suelo]);
 
   /*
+   * ─ LA BANDEJA DE LOS DADOS (`bandeja-de-los-dados.ts`). ─
+   *
+   * Su sitio en la pantalla se recalcula al cambiar el lienzo o la esquina, no por fotograma; y su
+   * fieltro se repinta con el color de quien tira: el del sorteo mientras se sortea, y si no el de
+   * quien tiene el turno.
+   */
+  const bandeja = useMemo(construirBandeja, []);
+  useEffect(() => () => bandeja.geometria.dispose(), [bandeja]);
+  const tamanoDelLienzo = useThree((s) => s.size);
+  const campoDeLaCamara = useThree((s) => (s.camera as THREE.PerspectiveCamera).fov);
+  const esquinaDeLaBandeja = props.bandejaDeLosDados?.esquina ?? SITIO_DE_LA_BANDEJA_POR_DEFECTO.esquina;
+  const margenDeLaBandeja = props.bandejaDeLosDados?.margen ?? SITIO_DE_LA_BANDEJA_POR_DEFECTO.margen;
+  const poseDeLaBandejaEnPantalla = useMemo(
+    () => poseDeLaBandeja(Math.max(1, tamanoDelLienzo.width), Math.max(1, tamanoDelLienzo.height), campoDeLaCamara, { esquina: esquinaDeLaBandeja, margen: margenDeLaBandeja }),
+    [tamanoDelLienzo.width, tamanoDelLienzo.height, campoDeLaCamara, esquinaDeLaBandeja, margenDeLaBandeja],
+  );
+  const delanteDeLaTirada = dados?.delanteDe ?? null;
+  const colorDeLaTirada =
+    (delanteDeLaTirada === null ? undefined : tablero.figuras.find((f) => f.asiento === delanteDeLaTirada)?.color) ?? tablero.figuras.find((f) => f.leToca)?.color ?? null;
+  useLayoutEffect(() => {
+    pintaElFieltro(bandeja, colorDelFieltro(colorDeLaTirada));
+  }, [bandeja, colorDeLaTirada]);
+
+  /*
    * ─ LA CIUDAD: se genera de la semilla de la mesa y se pasa a geometría con el catálogo. ─
    *
    * `ciudadDelCodigo` es aritmética pura y tarda unas decenas de milisegundos: se hace UNA
@@ -1292,7 +1363,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       trato: new THREE.PlaneGeometry(LADO_DEL_DISCO_DEL_TRATO, LADO_DEL_DISCO_DEL_TRATO),
       naipe: new THREE.PlaneGeometry(NAIPE.ancho, NAIPE.alto),
       asaDeCasilla: new THREE.PlaneGeometry(1, 1),
-      asaDeDados: new THREE.CylinderGeometry(RADIO_DEL_ASA_DE_LOS_DADOS, RADIO_DEL_ASA_DE_LOS_DADOS, ALTO_DEL_ASA_DE_LOS_DADOS, 12),
+      asaDeDados: new THREE.BoxGeometry(ASA_DE_LOS_DADOS.ancho, ASA_DE_LOS_DADOS.alto, ASA_DE_LOS_DADOS.fondo),
       dadoCuerpo: geometriaDelCuerpoDelDado(ARISTA_DE_LOS_DADOS),
       dadoPuntos: geometriaDeLosPuntosDelDado(ARISTA_DE_LOS_DADOS),
     }),
@@ -1425,6 +1496,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   const naipe = useRef<THREE.Mesh>(null);
   const cupula = useRef<THREE.Mesh>(null);
   const dadosGrupos = useRef<(THREE.Group | null)[]>([null, null]);
+  const grupoDeLaBandeja = useRef<THREE.Group>(null);
   const dadoEnReposo = useRef([new THREE.Quaternion(), new THREE.Quaternion()]);
   const dadoAlDejarDeRodar = useRef([new THREE.Quaternion(), new THREE.Quaternion()]);
   const dadoObjetivo = useRef([new THREE.Quaternion(), new THREE.Quaternion()]);
@@ -1767,7 +1839,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         const g = dadosGrupos.current[i];
         if (g === null || g === undefined) continue;
         const hueco = HUECOS_DE_LOS_DADOS[i] as Punto;
-        g.position.set(hueco.x, SUELO_DE_DADOS.y + ARISTA_DE_LOS_DADOS / 2, hueco.z);
+        g.position.set(hueco.x, ARISTA_DE_LOS_DADOS / 2, hueco.z);
         const reposo = dadoEnReposo.current[i] as THREE.Quaternion;
         const alDejar = dadoAlDejarDeRodar.current[i] as THREE.Quaternion;
         const objetivo = dadoObjetivo.current[i] as THREE.Quaternion;
@@ -1777,23 +1849,23 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           auxEuler.set(angulo * (i === 0 ? 1 : 0.8), 0, angulo * (i === 0 ? 0.7 : -1));
           auxGiro.setFromEuler(auxEuler);
           g.quaternion.copy(reposo).premultiply(auxGiro);
-          g.position.y += saltoDelDado(transcurrido) * ARISTA_DE_LOS_DADOS * 2;
+          g.position.y += saltoDelDado(transcurrido) * ARISTA_DE_LOS_DADOS * MOVIMIENTO_DE_LOS_DADOS.salto;
           alDejar.copy(g.quaternion);
           continue;
         }
         if (fase.fase === 'asentando') {
           const transcurrido = ahora - fase.desde;
           g.quaternion.slerpQuaternions(alDejar, objetivo, avanceDelAsentado(transcurrido));
-          g.position.y += reboteDelDado(transcurrido) * ARISTA_DE_LOS_DADOS * 6;
+          g.position.y += reboteDelDado(transcurrido) * ARISTA_DE_LOS_DADOS * MOVIMIENTO_DE_LOS_DADOS.rebote;
           continue;
         }
         g.quaternion.copy(objetivo);
         reposo.copy(g.quaternion);
         alDejar.copy(g.quaternion);
-        if (asentadoEn.current >= 0) g.position.y += saltoDelDoble(par, ahora - asentadoEn.current) * ARISTA_DE_LOS_DADOS;
+        if (asentadoEn.current >= 0) g.position.y += saltoDelDoble(par, ahora - asentadoEn.current) * ARISTA_DE_LOS_DADOS * MOVIMIENTO_DE_LOS_DADOS.doble;
         if (disponible) {
           const sac = sacudida(ahora + i * 0.05);
-          g.position.x += sac * SACUDIDA.traslacion * ARISTA_DE_LOS_DADOS * 2;
+          g.position.x += sac * SACUDIDA.traslacion * ARISTA_DE_LOS_DADOS * MOVIMIENTO_DE_LOS_DADOS.sacudida;
           auxGiro.setFromAxisAngle(EJE_Y, sac * SACUDIDA.giro);
           g.quaternion.premultiply(auxGiro);
         }
@@ -2382,6 +2454,22 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     cam.lookAt(miraMezclada);
   });
 
+  /*
+   * ─ La bandeja de los dados, pegada a la cámara: EL ÚLTIMO `useFrame` DE LA ESCENA. ─
+   *
+   * Aparte y después del seguimiento, porque el seguimiento se sale antes de terminar cuando no
+   * sigue a nadie y porque es el que mueve la cámara. Copiada en el `useFrame` de la escena —el
+   * primero—, la bandeja se pintaría con la cámara del fotograma anterior: justo al tirar, que es
+   * cuando la cámara corre detrás del peón, los dados temblarían en la esquina. Con la misma
+   * prioridad que todos, que r3f corre en orden de montaje.
+   */
+  useFrame((s) => {
+    const b = grupoDeLaBandeja.current;
+    if (b === null) return;
+    b.position.copy(s.camera.position);
+    b.quaternion.copy(s.camera.quaternion);
+  });
+
   // -------------------------------------------------------------------------
   // Los toques
   // -------------------------------------------------------------------------
@@ -2480,6 +2568,16 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       const suceso = sucesoDelResultado(resultado);
       if (suceso !== null && suceso.que === 'rechazado' && vivo.current) sucesosDeDados.current.push({ que: 'rechazado' });
     });
+  };
+  /*
+   * LA BANDEJA PARA EL TOQUE A LO DE DETRÁS, como la tapa de la mesa de Riberas: en r3f sólo se lanzan
+   * rayos contra lo que tiene manejadores, así que sin estos una bandeja delante de una casilla
+   * dejaría pasar el clic y el cartel a la casilla que no se ve. No marca `loCogeLaInterfaz`: arrastrar
+   * desde la bandeja sigue girando el tablero. Y lleva `onPointerOver`/`onPointerOut`, que son los
+   * que la meten en la lista de «señalados» de r3f y apagan lo que había detrás.
+   */
+  const paraElToque = (e: ThreeEvent<PointerEvent>): void => {
+    e.stopPropagation();
   };
   const cierraElNaipe = (e: ThreeEvent<PointerEvent>): void => {
     if (noEsElPrimario(e)) return;
@@ -2702,27 +2800,41 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         />
       )}
 
-      {/* Los dados en el suelo de dados de la plaza, y su asa sólo cuando hay que tirar. */}
-      {([0, 1] as const).map((i) => (
+      {/*
+        LA BANDEJA DE LOS DADOS, pegada a la pantalla (`bandeja-de-los-dados.ts`). El grupo de fuera
+        copia la cámara en el último `useFrame`; el de dentro pone la bandeja en su esquina, inclinada
+        hacia el ojo y a su escala. Todo lo que cuelga de él va en unidades de bandeja: el fieltro y el
+        borde, los dos dados y el asa, que sólo se monta cuando hay que tirar y cubre la bandeja entera.
+      */}
+      <group ref={grupoDeLaBandeja}>
         <group
-          key={`dado-${String(i)}`}
-          ref={(g) => {
-            dadosGrupos.current[i] = g;
-          }}
+          position={[poseDeLaBandejaEnPantalla.x, poseDeLaBandejaEnPantalla.y, poseDeLaBandejaEnPantalla.z]}
+          rotation={[poseDeLaBandejaEnPantalla.inclinacion, 0, 0]}
+          scale={[poseDeLaBandejaEnPantalla.escala, poseDeLaBandejaEnPantalla.escala, poseDeLaBandejaEnPantalla.escala]}
         >
-          {dadoDelPack !== null ? (
-            <mesh geometry={dadoDelPack.geometria} material={dadoDelPack.material} scale={[ARISTA_DE_LOS_DADOS / ARISTA_DEL_D6_EN_EL_PACK, ARISTA_DE_LOS_DADOS / ARISTA_DEL_D6_EN_EL_PACK, ARISTA_DE_LOS_DADOS / ARISTA_DEL_D6_EN_EL_PACK]} raycast={() => null} />
-          ) : (
-            <>
-              <mesh geometry={geometrias.dadoCuerpo} material={materiales.dadoCuerpo} raycast={() => null} />
-              <mesh geometry={geometrias.dadoPuntos} material={materiales.dadoPuntos} raycast={() => null} />
-            </>
-          )}
+          <mesh geometry={bandeja.geometria} material={materiales.suelo} onPointerDown={paraElToque} onPointerUp={paraElToque} onPointerMove={paraElToque} onPointerOver={paraElToque} onPointerOut={paraElToque} />
+          {([0, 1] as const).map((i) => (
+            <group
+              key={`dado-${String(i)}`}
+              ref={(g) => {
+                dadosGrupos.current[i] = g;
+              }}
+            >
+              {dadoDelPack !== null ? (
+                <mesh geometry={dadoDelPack.geometria} material={dadoDelPack.material} scale={[ARISTA_DE_LOS_DADOS / ARISTA_DEL_D6_EN_EL_PACK, ARISTA_DE_LOS_DADOS / ARISTA_DEL_D6_EN_EL_PACK, ARISTA_DE_LOS_DADOS / ARISTA_DEL_D6_EN_EL_PACK]} raycast={() => null} />
+              ) : (
+                <>
+                  <mesh geometry={geometrias.dadoCuerpo} material={materiales.dadoCuerpo} raycast={() => null} />
+                  <mesh geometry={geometrias.dadoPuntos} material={materiales.dadoPuntos} raycast={() => null} />
+                </>
+              )}
+            </group>
+          ))}
+          {dados?.porTirar === true ? (
+            <mesh position={[0, ASA_DE_LOS_DADOS.y, 0]} geometry={geometrias.asaDeDados} material={materiales.asa} onPointerDown={empiezaElToque} onPointerUp={tocaLosDados} />
+          ) : null}
         </group>
-      ))}
-      {dados?.porTirar === true ? (
-        <mesh position={[0, SUELO_DE_DADOS.y + ALTO_DEL_ASA_DE_LOS_DADOS / 2, 0]} geometry={geometrias.asaDeDados} material={materiales.asa} onPointerDown={empiezaElToque} onPointerUp={tocaLosDados} />
-      ) : null}
+      </group>
 
       {/* El naipe de la carta, pegado a la cámara, en su capa. */}
       <group ref={naipeGrupo} visible={false} renderOrder={ORDEN_DE_LAS_CARTAS}>

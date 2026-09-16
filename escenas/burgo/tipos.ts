@@ -37,6 +37,7 @@ import type { FiguraId } from '../embarcadero/figuras';
 import type { Traer, Ventana, Calidad } from '../embarcadero/tipos';
 import type { ParDeDados } from '../dados';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
+import type { SitioDeLaBandeja } from './bandeja-de-los-dados';
 
 export type ClaseDeCasillaEn3D =
   | 'salida'
@@ -118,6 +119,12 @@ export interface PropsDelBurgo {
   readonly traer: Traer;
   readonly calidad: Calidad;
   readonly camara: ModoDeCamara;
+  /**
+   * EN QUÉ ESQUINA DEL LIENZO VA LA BANDEJA DE LOS DADOS, y a cuántos puntos de sus bordes. La
+   * escena no sabe qué tiene el cliente encima del lienzo, así que lo dice él: el escritorio abajo a
+   * la derecha, la app arriba a la derecha. Sin él, abajo a la derecha a 12 puntos.
+   */
+  readonly bandejaDeLosDados?: SitioDeLaBandeja;
   readonly seguirAlQueMueve: boolean;
   /** Un movimiento en vuelo: las asas no mandan. */
   readonly quieto: boolean;

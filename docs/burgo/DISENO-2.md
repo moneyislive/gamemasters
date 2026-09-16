@@ -300,12 +300,14 @@ export function faseDeLosDadosConPar(estado: EstadoDeLosDadosDelBurgo, suceso: S
 
 con la misma regla de «la primera vista nunca es nueva» y `[1, 1]` en reposo cuando `par ===
 null`. Vacuna en `verify:burgo-escena`: cambiar el par y ver que cambia; una vista con un
-solo número → `dadosEnTres` devuelve `null`. Los dados viven en el suelo de dados de la
-plaza, arista 3 (desde la vista aérea miden ≥ 22 px en un móvil, `DADO_MINIMO`); el asa de
-tocar es un cilindro invisible (`colorWrite: false`) de radio 5 sobre ellos, montado sólo
-cuando `porTirar` (lo que no debe pulsarse SE DESMONTA: `visible=false` no quita el toque).
-En el sorteo de salida ruedan en la plaza una vez por jugador y la marca se enciende en el
-peón de `delanteDe`. Un doble se subraya: salto extra de 0,25 s y el aviso de la hoja lo
+solo número → `dadosEnTres` devuelve `null`. Los dados vivían en el suelo de dados de la
+plaza, arista 3; hoy van en una **bandeja pegada a la pantalla** (`bandeja-de-los-dados.ts`, y
+LA-CIUDAD.md §8, «La bandeja de los dados»), con arista 20 en unidades de bandeja y nunca menos de
+22 puntos (`DADO_MINIMO`). El asa de tocar es una caja invisible (`colorWrite: false`) del tamaño
+de la bandeja, montada sólo cuando `porTirar` (lo que no debe pulsarse SE DESMONTA:
+`visible=false` no quita el toque). En el sorteo de salida ruedan en la bandeja una vez por
+jugador, con el fieltro del color de quien tira, y la marca se enciende en el peón de
+`delanteDe`. Un doble se subraya: salto extra de 0,25 s y el aviso de la hoja lo
 dice.
 
 ### 5.5 Las cartas

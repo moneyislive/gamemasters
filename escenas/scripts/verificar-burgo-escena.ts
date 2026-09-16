@@ -70,7 +70,6 @@ import {
   ANCHO_DEL_HOTEL,
   ANCHO_DE_LA_CASA,
   ANILLO_DEL_BURGO,
-  ARISTA_DE_LOS_DADOS,
   ATREZO,
   ATREZO_DE_LA_CASILLA,
   BANDA,
@@ -100,7 +99,6 @@ import {
   FRENTE_MAXIMO_DEL_ATREZO,
   HOLGURA_DE_LA_MARCHA,
   HUECO_ENTRE_RENGLONES,
-  HUECOS_DE_LOS_DADOS,
   HUELLA_DEL_PEON,
   HUELLA_DE_LA_CASA,
   LADO_DE_ESQUINA,
@@ -126,8 +124,9 @@ import {
   REJILLA_DE_PRESOS,
   REJILLA_DE_VISITAS,
   CENTRO_DEL_SUELO_DE_LA_ESQUINA,
+  CLARO_DEL_CONCEJO,
+  EL_CONCEJO,
   LADO_DEL_SUELO_DE_LA_ESQUINA,
-  SUELO_DE_DADOS,
   SUPERFICIE,
   TALLA_DEL_HOTEL,
   TALLA_DEL_PEON,
@@ -189,7 +188,7 @@ import type { CaraDeObra } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO, PAGA_DE_LA_PUERTA_MAYOR, PARTE_DEL_IMPUESTO } from '../../shared/arcade/juegos/burgo-tablero';
-import { maravedies } from '../../shared/arcade/juegos/burgo';
+import { COLORES_DEL_BURGO, maravedies } from '../../shared/arcade/juegos/burgo';
 import {
   CASAS_DEL_CONCEJO,
   MULTIPLICIDADES_PLENA,
@@ -234,7 +233,26 @@ import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
 import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, HUMO, ONDA_DEL_AGUA, RECAUDACION, bocanadaDelHumo, duracionDelHumo, esRentaDe, ondaDelAgua, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelDinero, duracionDelEncierro, duracionDelSuceso, esRecaudacion, finDeLaCola, momentoDeLaRecaudacion, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
+  ARISTA_DE_LOS_DADOS,
+  BANDEJA,
+  HUECOS_DE_LOS_DADOS,
+  MEDIA_DIAGONAL_DEL_DADO,
+  MEDIA_DIAGONAL_DE_LA_CARA,
+  MOVIMIENTO_DE_LOS_DADOS,
+  alzaMaximaDeLosDados,
+  cajaDeLaBandeja,
+  colorDelFieltro,
+  distanciaEntreColores,
+  poseDeLaBandeja,
+  puntoDeLaBandejaEnLaCamara,
+  puntoDeLaCamaraEnElLienzo,
+  sacudidaMaximaDeLosDados,
+} from '../burgo/bandeja-de-los-dados';
+import type { EsquinaDeLaBandeja } from '../burgo/bandeja-de-los-dados';
+import { DADO_MINIMO, PUNTO_DEL_DADO, PUNTO_MINIMO, reboteDelDado, saltoDelDado } from '../dados';
+import {
   ALCANCE_DEL_BURGO,
+  CAMPO_DE_LA_CAMARA,
   CERCANIA_DE_SEGUIMIENTO,
   CORRIMIENTO_EN_APAISADO,
   LIMITES_DEL_BURGO,
@@ -293,7 +311,7 @@ const FICHEROS = fs
   .readdirSync(CARPETA)
   .filter((f) => /\.tsx?$/.test(f))
   .map((f) => path.join(CARPETA, f));
-const PUROS = ['tipos.ts', 'anillo-en-3d.ts', 'presupuesto.ts', 'coreografia.ts', 'peon.ts', 'dados-del-burgo.ts', 'camara-del-burgo.ts', 'piezas.ts'];
+const PUROS = ['tipos.ts', 'anillo-en-3d.ts', 'presupuesto.ts', 'coreografia.ts', 'peon.ts', 'dados-del-burgo.ts', 'bandeja-de-los-dados.ts', 'camara-del-burgo.ts', 'piezas.ts'];
 
 {
   const conAlgo = FICHEROS.flatMap((f) => loProhibidoEn(fs.readFileSync(f, 'utf8')).map((q) => `${path.basename(f)}: ${q}`));
@@ -302,9 +320,9 @@ const PUROS = ['tipos.ts', 'anillo-en-3d.ts', 'presupuesto.ts', 'coreografia.ts'
   comprobar('se ve fallar: un fuente con drei, window, fetch, expo y document enciende los cinco', loProhibidoEn(envenenado).length === 5, loProhibidoEn(envenenado));
   comprobar('y el barrido no se traga los comentarios: un `// window` no cuenta', loProhibidoEn('// window y document\n/* fetch( */\nconst a = 1;').length === 0);
   const conThree = PUROS.filter((f) => fs.existsSync(path.join(CARPETA, f)) && /from\s+['"]three['"]|from\s+['"]three\//.test(sinComentarios(fs.readFileSync(path.join(CARPETA, f), 'utf8'))));
-  comprobar('los siete ficheros de aritmética (y piezas.ts) no importan three', conThree.length === 0, conThree);
+  comprobar(`los ${String(PUROS.length - 1)} ficheros de aritmética (y piezas.ts) no importan three`, conThree.length === 0, conThree);
   const faltan = PUROS.filter((f) => !fs.existsSync(path.join(CARPETA, f)));
-  comprobar('y los ocho existen', faltan.length === 0, faltan);
+  comprobar(`y los ${String(PUROS.length)} existen`, faltan.length === 0, faltan);
 }
 
 // ---------------------------------------------------------------------------
@@ -1346,17 +1364,138 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
   const sueloFuera = suelos.flat().filter((q) => q.puntos.some((pt) => Math.max(Math.abs(pt[0]), Math.abs(pt[2])) > MEDIO_LADO + 1e-9 || Math.max(Math.abs(pt[0]), Math.abs(pt[2])) < BORDE_INTERIOR - 1e-9));
   comprobar('y ningún cuadro de suelo se sale del anillo ni se mete en el recinto de la ciudad', sueloFuera.length === 0, sueloFuera.map((q) => q.papel).slice(0, 4));
 
-  /* Los dados y el Concejo, en el campo delante del lado sur. */
-  const medioDado = ARISTA_DE_LOS_DADOS / 2;
-  const dadosDentro = HUECOS_DE_LOS_DADOS.every((d) => Math.abs(d.x - SUELO_DE_DADOS.x) < SUELO_DE_DADOS.lado / 2 - medioDado && Math.abs(d.z - SUELO_DE_DADOS.z) < SUELO_DE_DADOS.lado / 2 - medioDado);
-  comprobar(`el paño de dados está FUERA del anillo (z ${SUELO_DE_DADOS.z}) y los dos dados de arista ${ARISTA_DE_LOS_DADOS} caen dentro de sus ${SUELO_DE_DADOS.lado}`, SUELO_DE_DADOS.z - SUELO_DE_DADOS.lado / 2 > MEDIO_LADO && dadosDentro, HUECOS_DE_LOS_DADOS);
-  const panoEnElLienzo = VENTANAS.map((v, k) => {
-    const ventana = { ancho: v.ancho, alto: v.alto, franjaInferior: 0 };
-    const pose = poseDelBurgo(poseDeSalida(ventana), MIRADOR_DEL_BURGO, ventana);
-    const q = proyecta(pose, v.ancho / v.alto, { x: SUELO_DE_DADOS.x, y: 0, z: SUELO_DE_DADOS.z + SUELO_DE_DADOS.lado / 2 });
-    return { nombre: v.nombre, dentro: q.delante && Math.abs(q.x) <= 1 && Math.abs(q.y) <= 1, y: r(q.y), k };
-  });
-  comprobar('y el paño se ve entero desde la pose de salida en las tres ventanas', panoEnElLienzo.every((q) => q.dentro), panoEnElLienzo);
+  /*
+   * LOS DADOS, EN SU BANDEJA DE LA PANTALLA (`bandeja-de-los-dados.ts`). Miguel no quería tener que
+   * buscarlos en el mapa, así que ya no hay paño en el campo: la bandeja va pegada a la cámara, en la
+   * esquina que diga el cliente. Lo que se mide aquí es lo que una captura no enseña: que en las tres
+   * ventanas y en las dos esquinas la bandeja ENTERA —con los dados en lo alto del salto y girados—
+   * cabe en el lienzo y queda pegada a su esquina; que la caja con la que se posa llega de verdad a
+   * lo más alto de las curvas; que un dado quieto se lee; que los dos caben en el fieltro sin
+   * tocarse; y que la bandeja está delante del plano cercano de los tres lienzos.
+   */
+  {
+    /*
+     * Quietos, pero GIRADOS sobre la vertical lo que diga su sello: a 45° un dado ocupa media diagonal de
+     * su cara de cada lado, no media arista. Medido con media arista, los huecos de ±12 del paño
+     * pasaban esta regla y en el banco los dos dados salían uno dentro del otro.
+     */
+    const medioDado = ARISTA_DE_LOS_DADOS / 2;
+    const temblor = sacudidaMaximaDeLosDados();
+    const cabenEnElFieltro = (huecos: readonly Punto[]): boolean => huecos.every((h) => Math.abs(h.x) + MEDIA_DIAGONAL_DE_LA_CARA + temblor <= BANDEJA.fieltro.ancho / 2 - 2 && Math.abs(h.z) + MEDIA_DIAGONAL_DE_LA_CARA <= BANDEJA.fieltro.fondo / 2 - 2);
+    const noSeTocan = (huecos: readonly Punto[]): boolean => Math.abs((huecos[1]?.x ?? 0) - (huecos[0]?.x ?? 0)) >= 2 * MEDIA_DIAGONAL_DE_LA_CARA + 2 * temblor;
+    comprobar(
+      `los dos dados de arista ${String(ARISTA_DE_LOS_DADOS)} caben quietos en el fieltro de ${String(BANDEJA.fieltro.ancho)} × ${String(BANDEJA.fieltro.fondo)} con 2 de aire, y no se tocan, aun girados a 45° y temblando`,
+      HUECOS_DE_LOS_DADOS.length === 2 && cabenEnElFieltro(HUECOS_DE_LOS_DADOS) && noSeTocan(HUECOS_DE_LOS_DADOS),
+      HUECOS_DE_LOS_DADOS,
+    );
+    comprobar(
+      'se ve fallar: con los huecos de ±12 del paño, dos dados girados a 45° se meten uno dentro del otro',
+      !noSeTocan([
+        { x: -12, z: 0 },
+        { x: 12, z: 0 },
+      ]),
+    );
+    /* Las tres curvas de verdad, recorridas: no los números que la bandeja dice que usan. */
+    let alzaMedida = 0;
+    for (let k = 0; k <= 3000; k++) {
+      const t = (k / 3000) * 1.5;
+      alzaMedida = Math.max(
+        alzaMedida,
+        saltoDelDado(t) * ARISTA_DE_LOS_DADOS * MOVIMIENTO_DE_LOS_DADOS.salto,
+        reboteDelDado(t) * ARISTA_DE_LOS_DADOS * MOVIMIENTO_DE_LOS_DADOS.rebote,
+        saltoDelDoble([4, 4], t) * ARISTA_DE_LOS_DADOS * MOVIMIENTO_DE_LOS_DADOS.doble,
+      );
+    }
+    const caja = cajaDeLaBandeja();
+    comprobar(
+      `la caja con la que se posa la bandeja llega a lo más alto de un dado de verdad —recorridas las tres curvas, el centro sube ${r(alzaMedida)}, y la caja reserva ${r(alzaMaximaDeLosDados())} más la media diagonal— y a lo más ancho de uno que da vueltas y tiembla`,
+      alzaMedida <= alzaMaximaDeLosDados() + 1e-9 &&
+        alzaMedida > alzaMaximaDeLosDados() - 0.05 &&
+        caja.y1 >= medioDado + alzaMaximaDeLosDados() + MEDIA_DIAGONAL_DEL_DADO - 1e-9 &&
+        HUECOS_DE_LOS_DADOS.every((h) => Math.abs(h.x) + MEDIA_DIAGONAL_DEL_DADO + temblor <= caja.x1 && Math.abs(h.z) + MEDIA_DIAGONAL_DEL_DADO <= caja.z1),
+      { alzaMedida, caja },
+    );
+
+    const ESQUINAS_DE_LA_BANDEJA: readonly EsquinaDeLaBandeja[] = ['abajo-derecha', 'arriba-derecha'];
+    const MARGEN = 12;
+    const fuera: string[] = [];
+    let poses = 0;
+    for (const v of VENTANAS) {
+      for (const esquina of ESQUINAS_DE_LA_BANDEJA) {
+        const q = poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA, { esquina, margen: MARGEN }).rectangulo;
+        poses++;
+        const dentro = q.x0 >= 0 && q.y0 >= 0 && q.x1 <= v.ancho && q.y1 <= v.alto;
+        const pegada = Math.abs(q.x1 - (v.ancho - MARGEN)) < 0.5 && (esquina === 'abajo-derecha' ? Math.abs(q.y1 - (v.alto - MARGEN)) < 0.5 : Math.abs(q.y0 - MARGEN) < 0.5);
+        if (!dentro || !pegada) fuera.push(`${v.nombre} ${esquina}: ${r(q.x0)}..${r(q.x1)} × ${r(q.y0)}..${r(q.y1)}`);
+      }
+    }
+    comprobar(`en las tres ventanas y en las dos esquinas (${String(poses)} poses) la bandeja entera cabe en el lienzo y queda a ${String(MARGEN)} puntos de su esquina`, poses === 6 && fuera.length === 0, fuera);
+
+    const aristas = VENTANAS.map((v) => ({ ventana: v.nombre, arista: poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA).aristaEnPuntos }));
+    comprobar(
+      `un dado quieto se lee en las tres ventanas: su arista no baja de ${String(DADO_MINIMO)} puntos ni su punto de ${String(PUNTO_MINIMO)} (${aristas.map((x) => `${x.ventana} ${r(x.arista)}`).join(', ')})`,
+      aristas.every((x) => x.arista >= DADO_MINIMO && x.arista * PUNTO_DEL_DADO >= PUNTO_MINIMO),
+      aristas,
+    );
+
+    /* El plano cercano, leído de los tres lienzos que montan la escena: no un 0,5 copiado aquí. */
+    const LIENZOS = ['../escritorio/src/burgo-en-tres.tsx', '../escritorio/src/banco-burgo.tsx', '../app/src/arcade/burgo-en-tres-escena.tsx'];
+    const cercanos = LIENZOS.map((f) => {
+      const texto = fs.readFileSync(path.join(RAIZ, f), 'utf8');
+      const m = /<Canvas[\s\S]*?camera=\{\{[^}]*near:\s*([\d.]+)/.exec(texto);
+      return m === null ? NaN : Number(m[1]);
+    });
+    const cercano = Math.max(...cercanos);
+    let loMasCerca = Infinity;
+    for (const v of VENTANAS) {
+      for (const esquina of ESQUINAS_DE_LA_BANDEJA) {
+        const pose = poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA, { esquina, margen: MARGEN });
+        for (const x of [caja.x0, caja.x1]) for (const y of [caja.y0, caja.y1]) for (const z of [caja.z0, caja.z1]) loMasCerca = Math.min(loMasCerca, -puntoDeLaBandejaEnLaCamara([x, y, z], pose, pose.escala, pose.inclinacion)[2]);
+      }
+    }
+    comprobar(
+      `la bandeja está entera delante del plano cercano de los tres lienzos (${cercanos.join(', ')}): lo más cerca del ojo que llega es ${r(loMasCerca)}, más del doble`,
+      cercanos.every((c) => Number.isFinite(c)) && loMasCerca > 2 * cercano,
+      { cercanos, loMasCerca },
+    );
+
+    /*
+     * LAS DOS VACUNAS. Posada con la bandeja QUIETA, arriba a la derecha el dado en lo alto del salto
+     * se saldría del lienzo por arriba; y con una escala fija —la que le toca en un monitor—, en el
+     * móvil el dado ya no se lee.
+     */
+    /*
+     * EL FIELTRO NUNCA SE CONFUNDE CON EL BORDE. La primera bandeja llevaba el borde crema y el fieltro
+     * del primer asiento, `#f2e8cf`, salió del mismo tostado: la bandeja no decía de quién era el turno.
+     * Se mide con los seis colores del reglamento y con el fieltro sin turno.
+     */
+    const fieltros = [...COLORES_DEL_BURGO.map((c) => colorDelFieltro(c)), colorDelFieltro(null)];
+    const cercaDelBorde = (borde: string): string[] => fieltros.filter((f) => distanciaEntreColores(f, borde) < 100).map((f) => `${f} a ${r(distanciaEntreColores(f, borde))}`);
+    comprobar(
+      `ninguno de los ${String(fieltros.length)} fieltros posibles —los seis colores del reglamento y el de sin turno— queda a menos de 100 del borde de la bandeja`,
+      COLORES_DEL_BURGO.length === 6 && fieltros.every((f) => /^#[0-9a-f]{6}$/.test(f)) && cercaDelBorde(BANDEJA.color.borde).length === 0 && colorDelFieltro('#F2E8CF') === '#f2e8cf',
+      cercaDelBorde(BANDEJA.color.borde),
+    );
+    comprobar('se ve fallar: con el borde crema de la primera bandeja, el fieltro del primer asiento queda a menos de 100', cercaDelBorde('#efe6cc').some((x) => x.startsWith('#f2e8cf')), cercaDelBorde('#efe6cc'));
+
+    const movil = VENTANAS[2] as { readonly ancho: number; readonly alto: number };
+    const arriba = poseDeLaBandeja(movil.ancho, movil.alto, CAMPO_DE_LA_CAMARA, { esquina: 'arriba-derecha', margen: MARGEN });
+    const enElLienzo = (p: readonly [number, number, number]): number => puntoDeLaCamaraEnElLienzo(puntoDeLaBandejaEnLaCamara(p, arriba, arriba.escala, arriba.inclinacion), movil.ancho, movil.alto, CAMPO_DE_LA_CAMARA)?.y ?? NaN;
+    const cimaQuieta = Math.min(enElLienzo([12, ARISTA_DE_LOS_DADOS, -medioDado]), enElLienzo([12, BANDEJA.borde.alto, caja.z0]));
+    /* Lo más alto de un dado en lo alto del salto y girado: su centro más la media diagonal hacia arriba de la pantalla. */
+    const alzado = medioDado + alzaMaximaDeLosDados();
+    const cimaEnElAire = enElLienzo([12, alzado + MEDIA_DIAGONAL_DEL_DADO * Math.cos(BANDEJA.inclinacion), -MEDIA_DIAGONAL_DEL_DADO * Math.sin(BANDEJA.inclinacion)]);
+    const sobresale = cimaQuieta - cimaEnElAire;
+    comprobar(
+      `se ve fallar: posada con la bandeja QUIETA contra el canto de arriba, el dado en lo alto del salto se saldría ${r(sobresale)} puntos del lienzo`,
+      sobresale > 8,
+      { cimaQuieta, cimaEnElAire },
+    );
+    const monitor = poseDeLaBandeja(VENTANAS[0]?.ancho ?? 1920, VENTANAS[0]?.alto ?? 1080, CAMPO_DE_LA_CAMARA);
+    const focalDelMovil = movil.alto / 2 / Math.tan((CAMPO_DE_LA_CAMARA * Math.PI) / 360);
+    const aristaFija = (monitor.escala * ARISTA_DE_LOS_DADOS * focalDelMovil) / BANDEJA.distancia;
+    comprobar(`se ve fallar: con la escala de un monitor, en el móvil el dado mediría ${r(aristaFija)} puntos y su punto ${r(aristaFija * PUNTO_DEL_DADO)}`, aristaFija * PUNTO_DEL_DADO < PUNTO_MINIMO, aristaFija);
+  }
 
   /* El campo: un MANTO contiguo, no un puñado de teselas sueltas. */
   const a = campo(7);
@@ -1370,13 +1509,18 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
   comprobar(`las ${MANCHAS_DEL_CAMPO} manchas van en grupos de dos o tres piezas y todas lejos del tablero (${MANCHAS_LEJOS_DEL_TABLERO})`, a.decorado.length === otro.decorado.length && a.decorado.every((d) => Math.max(Math.abs(d.x), Math.abs(d.z)) > MEDIO_LADO + 2), a.decorado.length);
   comprobar(`las nubes van a ${ALTURA_DE_LAS_NUBES} de alto y FUERA del anillo: ninguna encima del tablero`, a.nubes.length === 5 && a.nubes.every((n) => n.y === ALTURA_DE_LAS_NUBES && Math.hypot(n.x, n.z) >= NUBES_LEJOS_DEL_TABLERO - 1e-9), a.nubes.map((n) => `${r(Math.hypot(n.x, n.z))}`));
   /*
-   * Y NINGUNA MANCHA ENCIMA DEL PAÑO DE DADOS. La corona del manto es estrecha comparada con
-   * el tablero, y con las manchas sembradas al azar una arboleda caía sobre el paño y tapaba
-   * los dados: no daba error, sólo escondía la tirada. Se mide con el paño engordado.
+   * Y NINGUNA MANCHA ENCIMA DEL CLARO DEL CONCEJO. La corona del manto es estrecha comparada con el
+   * tablero, y con las manchas sembradas al azar una arboleda caía sobre el paño de dados que hubo
+   * ahí y los tapaba; hoy escondería las monedas que vuelan al Concejo. El claro está fuera del anillo
+   * y dentro del manto, y el Concejo, dentro del claro.
    */
-  const enElPano = (p: Punto): boolean => Math.abs(p.x - SUELO_DE_DADOS.x) < SUELO_DE_DADOS.lado / 2 && Math.abs(p.z - SUELO_DE_DADOS.z) < SUELO_DE_DADOS.lado / 2;
-  const sobreElPano = [7, 8, 99, 1234].flatMap((s) => campo(s).decorado.filter((d) => enElPano({ x: d.x, z: d.z })));
-  comprobar('y con cuatro semillas distintas ninguna mancha del campo cae sobre el paño de dados', sobreElPano.length === 0, sobreElPano.slice(0, 4).map((d) => `${d.pieza} (${r(d.x)}, ${r(d.z)})`));
+  const enElClaro = (p: Punto): boolean => Math.abs(p.x - CLARO_DEL_CONCEJO.x) < CLARO_DEL_CONCEJO.lado / 2 && Math.abs(p.z - CLARO_DEL_CONCEJO.z) < CLARO_DEL_CONCEJO.lado / 2;
+  const sobreElClaro = [7, 8, 99, 1234].flatMap((s) => campo(s).decorado.filter((d) => enElClaro({ x: d.x, z: d.z })));
+  comprobar(
+    'y con cuatro semillas distintas ninguna mancha del campo cae sobre el claro del Concejo, que está fuera del anillo y sobre el manto, con el Concejo dentro',
+    sobreElClaro.length === 0 && CLARO_DEL_CONCEJO.z - CLARO_DEL_CONCEJO.lado / 2 > MEDIO_LADO && CLARO_DEL_CONCEJO.z + CLARO_DEL_CONCEJO.lado / 2 < CORONA.hasta && enElClaro(EL_CONCEJO),
+    sobreElClaro.slice(0, 4).map((d) => `${d.pieza} (${r(d.x)}, ${r(d.z)})`),
+  );
   /* Vacuna: la siembra vieja —treinta teselas barajadas— dejaría huecos y se ve caer. */
   comprobar('se ve fallar: con treinta teselas sueltas el manto no es continuo', vecindadDelManto(a.teselas.slice(0, 30)) < 4, vecindadDelManto(a.teselas.slice(0, 30)));
 
@@ -2246,6 +2390,92 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   comprobar('ninguna posición, rotación ni escala de JSX recibe algo que no sea una terna', !CON_VECTOR.test(codigoDelBurgo) && !CON_VECTOR.test(codigoDelAventurero));
   comprobar('el asa de los dados se desmonta con porTirar, no se esconde', /porTirar === true \? \(/.test(codigoDelBurgo) && !/visible=\{[^}]*porTirar/.test(codigoDelBurgo));
   comprobar('ningún useFrame pide prioridad: r3f dejaría de pintar solo', !CON_PRIORIDAD.test(codigoDelBurgo) && !CON_PRIORIDAD.test(codigoDelAventurero));
+  /*
+   * LA BANDEJA DE LOS DADOS SE PEGA A LA CÁMARA EN EL ÚLTIMO `useFrame`, Y LOS DADOS Y SU ASA VAN
+   * DENTRO DE ELLA.
+   *
+   * Lo primero no se ve en una captura quieta: copiada en el `useFrame` de la escena, la bandeja iría
+   * un fotograma por detrás de la cámara, y temblaría justo al tirar, que es cuando la cámara corre
+   * detrás del peón. Lo segundo es el fallo que había: el asa de los dados era un cilindro en el
+   * centro de la GLORIETA mientras los dados estaban en el paño de delante de la Estación de Goya, y
+   * en el banco un clic sobre los dados no tiraba y uno sobre la glorieta sí.
+   */
+  const pegadoDeLaBandeja = (codigo: string): boolean => {
+    const seguimiento = codigo.indexOf('cam.lookAt(miraMezclada)');
+    const siguiente = seguimiento < 0 ? -1 : codigo.indexOf('useFrame(', seguimiento);
+    if (siguiente < 0) return false;
+    const cuerpo = codigo.slice(siguiente, siguiente + 400);
+    const despues = codigo.slice(siguiente + 400);
+    return (
+      /grupoDeLaBandeja\.current/.test(cuerpo) &&
+      /\.position\.copy\(s\.camera\.position\)/.test(cuerpo) &&
+      /\.quaternion\.copy\(s\.camera\.quaternion\)/.test(cuerpo) &&
+      !/\.lookAt\(|\b(cam|camera)\.(position|quaternion)\.(copy|set)\(/.test(despues)
+    );
+  };
+  comprobar('la bandeja de los dados copia la cámara en el useFrame que sigue al seguimiento, y ninguno de después mueve la cámara', pegadoDeLaBandeja(codigoDelBurgo));
+  comprobar(
+    'se ve fallar: con la bandeja copiada antes del seguimiento, o con un useFrame de después que mueve la cámara, cae',
+    !pegadoDeLaBandeja('useFrame((s) => { const b = grupoDeLaBandeja.current; b.position.copy(s.camera.position); b.quaternion.copy(s.camera.quaternion); });\nuseFrame((s) => { cam.lookAt(miraMezclada); });') &&
+      !pegadoDeLaBandeja(
+        'useFrame((s) => { cam.lookAt(miraMezclada); });\nuseFrame((s) => { const b = grupoDeLaBandeja.current; b.position.copy(s.camera.position); b.quaternion.copy(s.camera.quaternion); });\n' +
+          ' '.repeat(400) +
+          'useFrame((s) => { s.camera.position.set(0, 9, 0); });',
+      ),
+  );
+  /*
+   * Cuelgan DENTRO: el asa es el último hijo de la bandeja, así que justo detrás de ella se cierran
+   * los dos grupos de la bandeja; y los dados van entre la apertura de la bandeja y el asa. Una sola
+   * asa de tirar y un solo sitio donde se apuntan los dados en todo el fichero.
+   */
+  const dentroDeLaBandeja = (codigo: string): boolean => {
+    const desde = codigo.indexOf('<group ref={grupoDeLaBandeja}>');
+    const cierre = /onPointerUp=\{tocaLosDados\}[^<]*?\/>\s*\)\s*:\s*null\}\s*<\/group>\s*<\/group>/.exec(codigo);
+    if (desde < 0 || cierre === null || cierre.index < desde) return false;
+    const trozo = codigo.slice(desde, cierre.index);
+    const unaVez = (x: RegExp): boolean => (codigo.match(new RegExp(x.source, 'g')) ?? []).length === 1;
+    return unaVez(/onPointerUp=\{tocaLosDados\}/) && unaVez(/dadosGrupos\.current\[i\] = g/) && /dadosGrupos\.current\[i\] = g/.test(trozo) && /geometry=\{bandeja\.geometria\}/.test(trozo);
+  };
+  comprobar('los dos dados y el asa de tirar cuelgan de la bandeja, y de ningún otro sitio: tocar lo que se ve es tirar', dentroDeLaBandeja(codigoDelBurgo));
+  comprobar(
+    'se ve fallar: con el asa suelta en el mundo, como estuvo, cae',
+    !dentroDeLaBandeja(
+      '<group ref={grupoDeLaBandeja}><group><mesh geometry={bandeja.geometria} /><group ref={(g) => { dadosGrupos.current[i] = g; }} /></group></group>\n{dados?.porTirar === true ? (<mesh position={[0, 3, 0]} onPointerUp={tocaLosDados} />) : null}\n<group ref={naipeGrupo}>',
+    ) &&
+      dentroDeLaBandeja(
+        '<group ref={grupoDeLaBandeja}><group><mesh geometry={bandeja.geometria} /><group ref={(g) => { dadosGrupos.current[i] = g; }} />{dados?.porTirar === true ? (<mesh position={[0, 3, 0]} onPointerUp={tocaLosDados} />) : null}</group></group>',
+      ),
+  );
+  /*
+   * LOS NÚMEROS DEL MOVIMIENTO SON LOS DE LA BANDEJA. La caja con la que se posa la bandeja se mide con
+   * `MOVIMIENTO_DE_LOS_DADOS`; si la escena multiplicara el salto por otro número escrito a mano, un
+   * dado saltaría más de lo reservado y se saldría del lienzo sin que fallara ninguna cuenta.
+   */
+  const movimientosDeLaBandeja = (codigo: string): string[] => ['salto', 'rebote', 'doble', 'sacudida'].filter((m) => new RegExp(`ARISTA_DE_LOS_DADOS \\* MOVIMIENTO_DE_LOS_DADOS\\.${m}\\b`).test(codigo));
+  comprobar(
+    'la escena mueve los dados con los cuatro números de la bandeja —salto, rebote, doble y sacudida— y con ninguno escrito a mano',
+    movimientosDeLaBandeja(codigoDelBurgo).length === 4 && !/ARISTA_DE_LOS_DADOS \* \d/.test(codigoDelBurgo),
+    movimientosDeLaBandeja(codigoDelBurgo),
+  );
+  const conElSaltoAMano = codigoDelBurgo.replace('ARISTA_DE_LOS_DADOS * MOVIMIENTO_DE_LOS_DADOS.salto', 'ARISTA_DE_LOS_DADOS * 2');
+  comprobar('se ve fallar: con el salto escrito a mano, como estaba, cae', conElSaltoAMano !== codigoDelBurgo && (movimientosDeLaBandeja(conElSaltoAMano).length < 4 || /ARISTA_DE_LOS_DADOS \* \d/.test(conElSaltoAMano)));
+  /*
+   * Y LOS DOS CLIENTES DICEN DÓNDE VA: el escritorio abajo a la derecha —y su cartel del pie se para
+   * antes, medido con la misma pose—, y la app arriba a la derecha, porque abajo flota su pie. Sin el
+   * sitio, la app la pondría abajo, debajo del carril y de la cinta, y los dados no se verían.
+   */
+  const fuenteDelCliente = (f: string): string => sinComentarios(fs.readFileSync(path.join(RAIZ, f), 'utf8'));
+  const elEscritorio = fuenteDelCliente('../escritorio/src/burgo-en-tres.tsx');
+  const laApp = fuenteDelCliente('../app/src/arcade/burgo-en-tres-escena.tsx');
+  const ponenLaBandeja = (codigo: string, esquina: string): boolean =>
+    /bandejaDeLosDados=\{SITIO_DE_LA_BANDEJA\}/.test(codigo) && new RegExp(`const SITIO_DE_LA_BANDEJA: SitioDeLaBandeja = \\{ esquina: '${esquina}', margen: \\d+ \\}`).test(codigo);
+  comprobar(
+    'el escritorio pone la bandeja abajo a la derecha y el cartel del pie se para antes de ella; la app, arriba a la derecha',
+    ponenLaBandeja(elEscritorio, 'abajo-derecha') && /estilo=\{sitioDelCartel\}/.test(elEscritorio) && /poseDeLaBandeja\(lienzo\.ancho, lienzo\.alto, FOV, SITIO_DE_LA_BANDEJA\)/.test(elEscritorio) && ponenLaBandeja(laApp, 'arriba-derecha'),
+  );
+  comprobar('se ve fallar: una app que no pasa el sitio de la bandeja cae', !ponenLaBandeja(laApp.replace(/bandejaDeLosDados=\{SITIO_DE_LA_BANDEJA\}/, ''), 'arriba-derecha'));
+  const elAnillo = await import('../burgo/anillo-en-3d');
+  comprobar('y ya no hay paño de dados en el campo: anillo-en-3d.ts no lo exporta y Burgo.tsx no lo pinta', !('SUELO_DE_DADOS' in elAnillo) && !/SUELO_DE_DADOS/.test(codigoDelBurgo));
   comprobar('computeBoundingSphere se llama tras escribir matrices instanciadas', (codigoDelBurgo.match(/computeBoundingSphere\(\)/g) ?? []).length >= 3);
   comprobar('alEstarListo se avisa desde el hilo de dibujo con tope de quince segundos', /TOPE_DE_ARRANQUE_MS = 15_000/.test(codigoDelBurgo) && /alEstarListo\?\.\(\)/.test(codigoDelBurgo));
   comprobar('el modo tercera-persona se ignora a sabiendas y la cabecera lo dice', /tercera-persona/.test(burgo) && !/tercera-persona/.test(codigoDelBurgo));
@@ -4214,7 +4444,9 @@ if (fallos.length === 0) {
       'precio es el del reglamento y se lee en los mismos píxeles que antes porque creció con el tablero,\n' +
       'no queda una sola pieza medieval en el anillo, las cuatro esquinas son manzanas de nueve por nueve\n' +
       'celdas que no tocan la ele de la marcha, el campo es un manto continuo con las nubes fuera y el\n' +
-      'paño de dados despejado, las cuatro avenidas de 48 entran encaradas a las casillas 5, 15, 25 y 35,\n' +
+      'claro del Concejo despejado, los dados van en una bandeja pegada a la pantalla que cabe en su\n' +
+      'esquina con los dados en el aire, las cuatro avenidas de 48 entran encaradas a las casillas 5, 15,\n' +
+      '25 y 35,\n' +
       'el tablero cabe en el presupuesto dejando sitio a la ciudad, el peón cruza una casilla en 1,5 s y\n' +
       'anda diez mil pasos sin T-pose ni salirse de la polilínea, una jugada real cabe en 14 s y las\n' +
       'cuatro esquinas caen en el lienzo en las tres ventanas. Y lo que la escena MONTA cuadra con lo\n' +

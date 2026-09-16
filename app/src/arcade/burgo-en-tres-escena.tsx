@@ -180,6 +180,7 @@ import type {
 } from '../../../shared/arcade/juegos/burgo-en-tres';
 import { Burgo } from '../../../escenas/burgo/Burgo';
 import type { ModoDeCamara, TableroDelBurgoEn3D } from '../../../escenas/burgo/tipos';
+import type { SitioDeLaBandeja } from '../../../escenas/burgo/bandeja-de-los-dados';
 /*
  * LAS CONSTANTES DE LA CÁMARA DEL BURGO, Y NINGUNA ESCRITA AQUÍ. `camara.ts` dice
  * desde qué rumbo y qué altura se mira; `acercar.ts`, cuánto se acerca y adónde;
@@ -271,6 +272,14 @@ const FRANJA_QUE_TAPA_LA_HOJA = 0;
 
 /** Hoy la escena sólo sabe la aérea; el otro modo está reservado en `tipos.ts`. Objeto de módulo: no se refabrica por fotograma. */
 const CAMARA_AEREA: ModoDeCamara = { modo: 'aerea' };
+
+/**
+ * LA BANDEJA DE LOS DADOS, ARRIBA A LA DERECHA DEL LIENZO. Miguel quería los dados en la pantalla y
+ * no en el mapa (`escenas/burgo/bandeja-de-los-dados.ts`). Abajo flota el pie —cartel, tratos, carril
+ * y cinta, que en el peor caso medido sube 460 de los 725 puntos del lienzo—, y arriba a la izquierda
+ * sale «Ver el burgo entero»; arriba a la derecha no hay nada. Objeto de módulo, como la cámara.
+ */
+const SITIO_DE_LA_BANDEJA: SitioDeLaBandeja = { esquina: 'arriba-derecha', margen: 12 };
 
 /** La clave con la que los pregones entran en la crónica del mueble. Ver `AvisoDeMesa`. */
 const CLAVE_DEL_PREGON = 'burgo:pregon';
@@ -1487,6 +1496,7 @@ function LaMesaEnTres({
                     traer={traer}
                     calidad={calidad}
                     camara={CAMARA_AEREA}
+                    bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
                     seguirAlQueMueve={seguirAlQueMueve}
                     quieto={mesa.quieto}
                     alTocarCasilla={alTocarCasilla}

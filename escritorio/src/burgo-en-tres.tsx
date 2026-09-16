@@ -166,6 +166,8 @@ import { ACESFilmicToneMapping } from 'three';
 import type { Cercania } from '../../escenas/acercar';
 import { CERCANIA_DE_SALIDA } from '../../escenas/acercar';
 import { Burgo } from '../../escenas/burgo/Burgo';
+import { poseDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
+import type { SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import {
   ALCANCE_DEL_BURGO,
   ALTURA_MINIMA_DEL_OJO_DEL_BURGO,
@@ -902,6 +904,17 @@ export function BurgoEnTres({
   // -------------------------------------------------------------------------
 
   const [lienzo, ponerLienzo] = useState({ ancho: 0, alto: 0 });
+  /*
+   * EL CARTEL DEL PIE SE PARA ANTES DE LA BANDEJA DE LOS DADOS: su canto derecho queda 12 puntos a
+   * la izquierda de lo que ocupa la bandeja con los dados en el aire, medido con la misma cuenta con
+   * la que la escena la posa. Sin lienzo medido —en Node, o antes del primer `ResizeObserver`— va
+   * como iba.
+   */
+  const sitioDelCartel = useMemo((): CSSProperties => {
+    if (lienzo.ancho <= 0 || lienzo.alto <= 0) return EL_SITIO_DEL_CARTEL;
+    const bandeja = poseDeLaBandeja(lienzo.ancho, lienzo.alto, FOV, SITIO_DE_LA_BANDEJA).rectangulo;
+    return { ...EL_SITIO_DEL_CARTEL, right: `${String(Math.ceil(lienzo.ancho - bandeja.x0 + SITIO_DE_LA_BANDEJA.margen))}px` };
+  }, [lienzo.ancho, lienzo.alto]);
   const [raizDeLaLetra, ponerRaizDeLaLetra] = useState(RAIZ_DE_LA_CASA);
   const observadorDelRecuadro = useRef<ResizeObserver | null>(null);
   const medirElRecuadro = useCallback(
@@ -1682,6 +1695,7 @@ export function BurgoEnTres({
                   traer={traer}
                   calidad={calidad}
                   camara={{ modo: 'aerea' }}
+                  bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
                   seguirAlQueMueve={siguiendo && aQuienSigue !== null}
                   quieto={quieto}
                   alTocarCasilla={alTocarCasilla}
@@ -1746,7 +1760,7 @@ export function BurgoEnTres({
           `vivo={false}` porque la región viva de esta pantalla es el aviso de la cinta, y dos
           con el mismo cambio se anuncian dos veces. Y `key` con el sello: ver `LoSenalado`.
         */}
-        <CartelAlPie key={senalado?.sello ?? 0} frases={elCartel} vivo={false} estilo={EL_SITIO_DEL_CARTEL} />
+        <CartelAlPie key={senalado?.sello ?? 0} frases={elCartel} vivo={false} estilo={sitioDelCartel} />
 
         {/*
           ═══ LAS CAJAS QUE SE ABREN ENCIMA DEL ANILLO ═══
@@ -1986,6 +2000,14 @@ export function BurgoEnTres({
  * tocan primero, y por eso el cartel no se pulsa.
  */
 const EL_SITIO_DEL_CARTEL: CSSProperties = { right: '0.75rem', bottom: '0.75rem', left: '0.75rem' };
+
+/**
+ * LA BANDEJA DE LOS DADOS, ABAJO A LA DERECHA DEL LIENZO. Miguel quería los dados en la pantalla y no
+ * en el mapa (`escenas/burgo/bandeja-de-los-dados.ts`); arriba están la cinta, el carril y «Ver el
+ * burgo entero», y el pie sólo lo usa el cartel, que se acorta para dejarle su hueco
+ * (`sitioDelCartel`). Los 12 puntos son el mismo `0.75rem` de los demás cromos con la letra de la casa.
+ */
+const SITIO_DE_LA_BANDEJA: SitioDeLaBandeja = { esquina: 'abajo-derecha', margen: 12 };
 
 /**
  * LAS TRES CAJAS QUE SEÑALAN DEJAN EL PIE LIBRE, Y ESO TAMBIÉN SE MIDIÓ EN EL BANCO.

@@ -40,7 +40,7 @@ que son las que costó trabajo ver y las que hay que respetar:
 | Las cuatro bandas de la casilla (§2) | **El carril del avatar**: se mide en peones (1,272) y aventureros (2,543), y esas piezas siguen midiendo lo mismo |
 | El alto del precio, 12 → **27** (§2) | **Los umbrales de nivel de detalle** (§8): salen de píxeles por unidad a una distancia, no del tamaño del tablero |
 | La esquina, 48 → **108** (§2) | **La velocidad de la marcha**… que precisamente por no crecer sola hay que subirla a mano (§7) |
-| El paño de dados y la corona del campo (§8) | **Las piezas del pack**: un `cuerpo-h` mide 12,04 aquí y en la ciudad |
+| El claro del Concejo y la corona del campo (§8) | **Las piezas del pack**: un `cuerpo-h` mide 12,04 aquí y en la ciudad |
 
 ---
 
@@ -1118,19 +1118,47 @@ campo pasa de 738 teselas a 1.796** al crecer el perímetro del tablero —38.00
 más—, y el resto es el atrezo de cuarenta casillas que ahora miden 72 × 108. La ciudad entera
 en L3 son unos 29.000, así que cabe de sobra en los 84.477 reservados.
 
-### El paño de dados, que es lo que ata la corona del campo
+### El claro del Concejo, que es lo que ata la corona del campo
 
-Un detalle de aritmética que conviene dejar escrito porque cuesta media hora encontrarlo: el
-paño de dados tiene que caber **entero** entre el borde del tablero (432) y el final de la
-corona de teselas, o queda un fieltro flotando sobre el vacío. Con la corona de **cuatro**
-teselas el manto acaba en 482,52, así que el paño va de 433 a 481: **lado 48, centrado en
-457**. Y con un paño de 48 caben dos dados de **arista 20** a ±12 del eje, con 4 entre ellos
-para que rueden sin encajarse. La arista sube de 12 a 20 por lo mismo que el dígito del
-precio: para no perder la mancha en pantalla.
+Un detalle de aritmética que conviene dejar escrito porque cuesta media hora encontrarlo. La
+corona de teselas es de **cuatro** porque ahí delante del lado sur estuvo el **paño de dados**, y
+tenía que caber entero entre el borde del tablero (432) y el final del manto, o quedaba un
+fieltro flotando sobre el vacío: con cuatro teselas el manto acaba en 482,52 y el paño iba de 433
+a 481, **lado 48, centrado en 457**.
 
-Las manchas del campo se siembran **fuera del paño** (se comprueba con cuatro semillas
-distintas): con la corona tan estrecha comparada con el tablero, una arboleda sembrada al
-azar caía encima y tapaba los dados sin que nada fallara.
+Los dados ya no están ahí. Miguel no quería tener que buscarlos en el mapa, y se fueron a una
+**bandeja pegada a la pantalla** (`escenas/burgo/bandeja-de-los-dados.ts`): abajo a la derecha en
+el escritorio, arriba a la derecha en la app. Lo que queda en el campo es el **Concejo**, el punto a
+donde vuelan las monedas que se le pagan, en 475: con tres teselas caería más allá del manto. El
+cuadro de 48 se queda con sus mismos números como **claro del Concejo**, y las manchas del campo se
+siembran fuera de él (se comprueba con cuatro semillas distintas): una arboleda encima escondería
+las monedas al aterrizar, como antes tapaba los dados. Por eso el campo de cada mesa es el mismo que
+era con el paño.
+
+### La bandeja de los dados
+
+Una bandeja de juego de mesa con los dos dados dentro, pegada a la cámara como la mesa de Riberas
+pero del tamaño de una esquina: la mesa de Riberas es ancha porque lleva las piezas de construir, y
+aquí no hay nada que poner encima. El fieltro es del **color del peón de quien tira** —el del sorteo
+mientras se sortea— y verde de mesa cuando no tira nadie; el borde es de nogal, porque los seis
+colores del Burgo van del casi negro al casi blanco y un borde crema se confundía con el primero.
+
+- **Cuánto mide**: el 18 % del lado corto del lienzo, entre 108 y 160 puntos de ancho. Un dado
+  quieto mide de 29 a 43 puntos: nunca menos de los 22 de `DADO_MINIMO`.
+- **Dónde va**: la esquina la dice el cliente (`bandejaDeLosDados`), porque la escena no sabe qué
+  tiene encima. Se pega a su esquina a 12 puntos la caja de la bandeja CON LOS DADOS EN LO ALTO DEL
+  SALTO y girados, medida con la perspectiva de verdad; el escritorio acorta el cartel del pie con
+  esa misma cuenta.
+- **Tocarla es tirar**: el asa es una caja invisible del tamaño de la bandeja, montada sólo cuando
+  toca tirar. Mientras estuvieron en el paño, el asa era un cilindro en el centro de la GLORIETA:
+  un clic sobre los dados no tiraba y uno sobre la glorieta sí.
+- **No tiembla**: se pega a la cámara en el `useFrame` que sigue al seguimiento. Medido en el banco
+  con la cámara corriendo a 108 unidades por segundo detrás del peón: el borde de la bandeja no se
+  movió un píxel en 230 fotogramas.
+- **Los dados, a ±16** y no a ±12: se asientan girados sobre la vertical lo que diga su sello, y a
+  45° dos dados a ±12 se metían uno dentro del otro.
+- **Cuesta** 26 triángulos de bandeja y 12 del asa, una llamada de dibujo, y los 2 del paño que se
+  fueron.
 
 ### Llamadas de dibujo
 

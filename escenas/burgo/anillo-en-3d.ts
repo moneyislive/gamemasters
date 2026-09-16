@@ -174,16 +174,19 @@
  * paisaje se lee por sus masas, no por sus unidades. Y las nubes van fuera del anillo y a
  * 216 de alto, no encima del tablero.
  *
- * La corona es de CUATRO teselas (50,52 de fondo) y no de tres, porque el paño de dados
- * tiene que caber ENTERO sobre el manto: con tres, el manto acaba en 469,9 y el paño llega
- * a 481. Cuatro teselas son 1.796 losas de 36 triángulos (64.656), que es la partida más
- * gorda del tablero; el precio de que el tablero no flote sobre un plano.
+ * La corona es de CUATRO teselas (50,52 de fondo) y no de tres. Se pusieron cuatro para que el
+ * paño de dados cupiera ENTERO sobre el manto —con tres, el manto acaba en 469,9 y el paño llegaba
+ * a 481—; los dados se fueron después a la pantalla, pero las monedas del Concejo siguen cayendo
+ * en 475, y con tres caerían más allá del manto, sobre el vacío. Cuatro teselas son 1.796 losas de
+ * 36 triángulos (64.656), que es la partida más gorda del tablero; el precio de que el tablero no
+ * flote sobre un plano.
  *
- * ═══ LOS DADOS SE HAN IDO DEL CENTRO, Y NO ES UN CAPRICHO ═══
+ * ═══ LOS DADOS SE HAN IDO DEL TABLERO ═══
  *
- * El centro del tablero es ahora la glorieta de la ciudad. El paño de dados y el Concejo
- * bajan al CAMPO, delante del lado sur, que es el más cercano a la cámara desde la pose de
- * salida: se leen como lo que son, la banca y los dados sobre la mesa, al lado del tablero.
+ * Estuvieron en el centro hasta que el centro fue la glorieta de la ciudad; después, en un paño
+ * del campo delante del lado sur. Ahora van en una bandeja pegada a la pantalla
+ * (`bandeja-de-los-dados.ts`), porque Miguel no quería tener que buscarlos en el mapa. En el campo
+ * sigue el CONCEJO, que es a donde vuelan las monedas que se le pagan.
  *
  * ═══ EL CAMPO SE SIEMBRA CON LA SEMILLA DEL CÓDIGO ═══
  *
@@ -1780,36 +1783,22 @@ export const PUERTAS_DE_LA_CIUDAD: readonly PuertaDeLaCiudad[] = PUERTAS.map((ca
   };
 });
 
-/* ─────────────────────────────── Los dados y el Concejo ─────────────────────────────── */
+/* ─────────────────────────────── El Concejo ─────────────────────────────── */
 
 /**
- * EL PAÑO DE DADOS Y EL CONCEJO, EN EL CAMPO.
+ * EL CLARO DEL CONCEJO, EN EL CAMPO, DELANTE DEL LADO SUR.
  *
- * El centro del tablero es la glorieta de la ciudad: los dados ya no caben ahí. Bajan al
- * campo, delante del lado SUR —el más cercano a la cámara desde la pose de salida— y sobre
- * el manto de teselas. `verify:burgo-escena` proyecta el borde lejano del paño en las tres
- * ventanas y exige que caiga dentro del lienzo.
- *
- * ═══ LO QUE ATA EL TAMAÑO DEL PAÑO NO ES EL GUSTO: ES EL MANTO ═══
- *
- * El paño tiene que caber ENTERO entre el borde del tablero (432) y el final de la corona de
- * teselas, o queda un paño de fieltro flotando sobre el vacío. Con la corona de CUATRO
- * teselas el manto acaba en 482,52, así que el paño va de 433 a 481: lado 48, centrado en
- * 457. Y con un paño de 48 caben dos dados de arista 20 a ±12 del eje, con 4 entre ellos
- * para que rueden sin encajarse. Arista 20 sobre un tablero de 864 es la misma mancha en
- * pantalla que 8,9 sobre el de 384: se ha subido de 12 a 20 justo para no perder esa mancha.
+ * Aquí estuvo el PAÑO DE DADOS: 48 de lado, de 433 a 481, con los dos dados encima. Miguel pidió
+ * que los dados se vieran en la pantalla y no delante de la Estación de Goya, y se fueron a una
+ * bandeja pegada a la cámara (`bandeja-de-los-dados.ts`). Lo que queda en el campo es el CONCEJO,
+ * el punto a donde vuelan las monedas que se le pagan y de donde salen las que cobra alguien, y
+ * alrededor el mismo cuadro sin arbolado: una arboleda sembrada encima escondería las monedas al
+ * aterrizar. Son los números del paño, sin tocar uno, para que el campo de cada mesa —que se
+ * siembra evitando este cuadro— siga siendo el mismo.
  */
-export const SUELO_DE_DADOS = { x: 0, z: MEDIO_LADO + 25, lado: 48, y: 0.02, color: '#e6dcc3' } as const;
-/** Arista 20: lo más grande que cabe en el paño, y el paño es lo más grande que cabe en el manto. */
-export const ARISTA_DE_LOS_DADOS = 20;
-export const HUECOS_DE_LOS_DADOS: readonly Punto[] = [
-  { x: -12, z: SUELO_DE_DADOS.z },
-  { x: 12, z: SUELO_DE_DADOS.z },
-];
-/** El asa invisible sobre los dados: un cilindro de este radio. */
-export const RADIO_DEL_ASA_DE_LOS_DADOS = 26;
+export const CLARO_DEL_CONCEJO = { x: 0, z: MEDIO_LADO + 25, lado: 48 } as const;
 /** El Concejo: a él vuelan las monedas que se pagan al Concejo y de él salen las que se cobran. */
-export const EL_CONCEJO: Punto = { x: 0, z: SUELO_DE_DADOS.z + 18 };
+export const EL_CONCEJO: Punto = { x: 0, z: CLARO_DEL_CONCEJO.z + 18 };
 
 /* ─────────────────────────────── El campo ─────────────────────────────── */
 
@@ -1828,7 +1817,7 @@ export const TESELAS_DE_LA_CORONA = 4;
 export const CORONA = { desde: MEDIO_LADO - 4, hasta: MEDIO_LADO + LARGO_DE_TESELA * TESELAS_DE_LA_CORONA } as const;
 /** Las manchas de arbolado, colinas y rocas: nunca piezas sueltas. Suben de 16 a 24 porque la corona es 2,4 veces más larga. */
 export const MANCHAS_DEL_CAMPO = 24;
-/** Ninguna mancha más cerca del tablero que esto: el borde del tablero se ve limpio, y el paño de dados también. */
+/** Ninguna mancha más cerca del tablero que esto: el borde del tablero se ve limpio, y el claro del Concejo también. */
 export const MANCHAS_LEJOS_DEL_TABLERO = MEDIO_LADO + 16;
 export const ALTURA_DE_LAS_NUBES = 216;
 export const DERIVA_DE_LAS_NUBES = 2;
@@ -1902,14 +1891,15 @@ export function campo(semilla: number): Campo {
   const candidatas = candidatasDelCampo();
   const teselas = candidatas.map((p): Puesta => ({ pieza: PIEZA.tesela, x: p.x, y: ALTURA_DEL_MANTO, z: p.z, giro: 0, talla: 1 }));
   /*
-   * Las manchas van lejos del tablero Y fuera del paño de dados: con la corona tan estrecha
-   * comparada con el tablero, una arboleda sembrada al azar caía encima del paño y tapaba
-   * los dados. El paño se engorda media tesela para que ni las ramas asomen.
+   * Las manchas van lejos del tablero Y fuera del claro del Concejo: con la corona tan estrecha
+   * comparada con el tablero, una arboleda sembrada al azar caía encima del paño de dados que hubo
+   * ahí y los tapaba; hoy escondería las monedas. El claro se engorda media tesela para que ni las
+   * ramas asomen.
    */
-  const margenDelPano = ANCHO_DE_TESELA / 2;
-  const enElPano = (p: Punto): boolean =>
-    Math.abs(p.x - SUELO_DE_DADOS.x) < SUELO_DE_DADOS.lado / 2 + margenDelPano && Math.abs(p.z - SUELO_DE_DADOS.z) < SUELO_DE_DADOS.lado / 2 + margenDelPano;
-  const lejanas = candidatas.filter((p) => Math.max(Math.abs(p.x), Math.abs(p.z)) >= MANCHAS_LEJOS_DEL_TABLERO && !enElPano(p));
+  const margenDelClaro = ANCHO_DE_TESELA / 2;
+  const enElClaro = (p: Punto): boolean =>
+    Math.abs(p.x - CLARO_DEL_CONCEJO.x) < CLARO_DEL_CONCEJO.lado / 2 + margenDelClaro && Math.abs(p.z - CLARO_DEL_CONCEJO.z) < CLARO_DEL_CONCEJO.lado / 2 + margenDelClaro;
+  const lejanas = candidatas.filter((p) => Math.max(Math.abs(p.x), Math.abs(p.z)) >= MANCHAS_LEJOS_DEL_TABLERO && !enElClaro(p));
   const decorado: Puesta[] = [];
   for (let k = 0; k < MANCHAS_DEL_CAMPO; k++) {
     const sobre = lejanas[Math.floor(azar() * lejanas.length)] ?? { x: MANCHAS_LEJOS_DEL_TABLERO, z: 0 };

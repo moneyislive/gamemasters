@@ -37,8 +37,8 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 235.865   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 203.117   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 235.901   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 203.153   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
@@ -50,6 +50,8 @@
  * —que a la talla de un nombre no se distinguen— las letras son 81.000 y cabe con 20.000 de sobra.
  * Eran 244.475 y 209.231 hasta que la cárcel y la comisaría se quedaron sin calle, para que se
  * leyera su texto: se fueron las losas de calzada y de acera, los semáforos, las farolas y dos coches.
+ * Y suben 36 con la bandeja de los dados, que llevó los dados a la pantalla: 26 de la bandeja y 12 de
+ * su asa, menos los 2 del paño que había en el campo.
  * Los de arriba son los que `verify:burgo-escena` imprime hoy, y ahora también los COMPARA con esta
  * cabecera: dos veces se quedaron viejos sin que nada lo notara, y la segunda fue a la media hora de
  * corregirlos.)
@@ -107,6 +109,7 @@ import { BOCANADAS_DEL_HUMO, CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLo
 import type { NombreDePieza } from './piezas';
 import { CASILLAS, ESQUINAS, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
+import { TRIANGULOS_DEL_ASA_DE_LOS_DADOS, triangulosDeLaBandeja } from './bandeja-de-los-dados';
 
 /**
  * LOS TOPES. Ver la cabecera: la cuenta que los justifica está en `LA-CIUDAD.md` §8, y
@@ -137,7 +140,8 @@ export const DISCOS_DE_CONTACTO = ASIENTOS + 2;
 /**
  * EL SUELO DEL ANILLO. Por casilla lateral, cuatro bandas de dos triángulos, el canto del
  * reborde de la franja (dos) y la LÍNEA que la separa de la siguiente (dos). Por esquina, la
- * losa entera y los dos tramos de marco. Y el paño de dados, que ahora vive en el campo.
+ * losa entera y los dos tramos de marco. Los dos triángulos del paño de dados que hubo en el campo
+ * se fueron con los dados a la pantalla; la bandeja se cuenta en su renglón.
  *
  * La línea se añadió después de mirar la captura del tablero entero: sin ella los nueve
  * frentes de un lado son una banda continua con precios encima. Cuesta 72 triángulos en todo
@@ -147,7 +151,7 @@ export const TRIANGULOS_POR_CASILLA = 4 * 2 + 2 + 2;
 export const TRIANGULOS_POR_ESQUINA = 2 + 2 * 2;
 export function triangulosDelSuelo(): number {
   const laterales = CASILLAS - ESQUINAS.length;
-  return laterales * TRIANGULOS_POR_CASILLA + ESQUINAS.length * TRIANGULOS_POR_ESQUINA + 2;
+  return laterales * TRIANGULOS_POR_CASILLA + ESQUINAS.length * TRIANGULOS_POR_ESQUINA;
 }
 
 /** El emblema de una esquina —la flecha de la marcha—: otro contorno relleno. */
@@ -283,6 +287,7 @@ export function sumaDelPresupuesto(
   });
   renglones.push({ que: 'discos de contacto', cuantos: DISCOS_DE_CONTACTO, triangulos: DISCOS_DE_CONTACTO * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'dados', cuantos: DADOS, triangulos: DADOS * triangulosDelDado });
+  renglones.push({ que: 'la bandeja de los dados y su asa', cuantos: 1, triangulos: triangulosDeLaBandeja() + TRIANGULOS_DEL_ASA_DE_LOS_DADOS });
   renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });
   renglones.push({ que: 'la cúpula del cielo', cuantos: 1, triangulos: triangulosDelCielo() });
   renglones.push({ que: 'aventurero (exploradora)', cuantos: plena ? 1 : 0, triangulos: plena ? triangulosDeUnAventurero : 0 });
