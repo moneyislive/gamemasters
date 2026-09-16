@@ -294,6 +294,14 @@ El renglón se ajusta solo: `ALTO_MAXIMO_DEL_ROTULO = 17`, y si la palabra no ca
 `ANCHO_DEL_ROTULO = 62` útiles, encoge hasta caber. Cada letra se agarra **por el centro de su
 avance**, no por su caja, que es lo que hace que una palabra quede ópticamente centrada.
 
+**Una esquina lo escribe en diagonal**, porque no tiene franja: su suelo es un cuadro de 90 (de
+324 a 414) y el renglón va por su diagonal, que es además desde donde se mira una esquina. Ahí el
+hueco **no es el lado**: un cuadro girado un octavo es un rombo, y a `α` del centro quedan
+`L√2/2 − |α|` a cada lado, así que lo que tiene que caber es **`ancho + alto ≤ L√2`**. Con el
+lado —que fue el primer intento— la palabra cabe de mentira y se sale por los picos, justo donde
+el tablero levanta su marco. `verify:burgo-escena` mide la caja de cada letra puesta, por sus
+cuatro esquinas, contra el rombo de verdad.
+
 **Las letras salen de un tipo de verdad.** Los contornos se extraen de
 `arte/tipos/Cinzel_700Bold.ttf` —la familia con la que la app titula, con su licencia SIL OFL al
 lado— **al compilar**, con `opentype.js` como dependencia sólo de compilación. Treinta y nueve
@@ -319,12 +327,16 @@ la marcha —entra por `v = 349,5`, sale por `u = 349,5`— se come las celdas `
 brazos, así que las **nueve celdas del rincón interior sólo admiten suelo**: una cebra, una
 acera. Quedan setenta y dos celdas libres.
 
-- **Salida (0, sureste)**: un cruce de verdad en la celda (5, 5), con los dos brazos bajando
-  hasta la celda 2 —donde la marcha los cruza, y ahí va la cebra por la que el peón pasa—.
-  Seis `calzada-paso`, un `calzada-cruce`, cuatro `farola-de-calle` en las esquinas del
-  cruce, dos `semaforo-c`, un `coche-taxi` parado en la cebra y una `coche-berlina`
-  esperando en el otro brazo. El emblema `flecha` marca la marcha en la acera de la celda
-  (1, 5).
+- **Salida (0, sureste)**: **ninguna pieza**. Fue un cruce urbano entero —seis cebras, un
+  `calzada-cruce`, cuatro farolas, dos semáforos, un taxi y una berlina— hasta que Miguel pidió
+  lo contrario: «en vez de fragmentos de carretera únicamente una flecha roja y el mensaje del
+  tablero con SALIDA en grande». Y tiene razón de fondo: la salida no es una calle, es la casilla
+  por la que se pasa cuarenta veces por partida y en la que se cobra; lo que hay que ver desde el
+  otro lado de la mesa es eso y no un semáforo. Quedan **SALIDA** escrito por la diagonal (101 de
+  ancho, 18,4 de alto: el rótulo más grande del tablero) y el emblema `flecha`, ahora **rojo**
+  (`#b3261e`) y de 28, en el pico de fuera —por el de dentro cruza la ele de la marcha y ahí se
+  planta el peón de quien acaba de mover—. **Cero piezas**: las dos cosas van fundidas con los
+  precios y los emblemas, o sea en la llamada de dibujo que ya se pagaba.
 - **La cárcel (10, suroeste)**: la comisaría entera. Cuatro bloques del pack (`bloque-d`,
   `bloque-b`, `bloque-c`, `bloque-a`) cerrando una manzana; el patio en la celda (6, 6),
   cerrado con cuatro tramos de `verja` y dos `verja-puerta` —una de ellas es la que sube al

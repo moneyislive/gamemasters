@@ -77,7 +77,7 @@ import {
   ORIGEN_DE_LA_LETRA,
 } from '../iconos';
 import { geometriaDeContornos } from '../formas';
-import { CASILLAS, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo } from './anillo-en-3d';
+import { ALZA_DEL_ROTULO, CASILLAS, guarismosDelPrecio, huecosDeLosEmblemas, letrasDelRotulo } from './anillo-en-3d';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
 
 /* ─────────────────────────────── Los bultos ─────────────────────────────── */
@@ -384,8 +384,12 @@ export function giroDelRotulo(giroDeLaPieza: number): number {
 /** La tinta de un precio y la de un emblema: dos negros distintos, los dos del tablero. */
 export const TINTA_DEL_PRECIO = '#4a4238';
 export const TINTA_DEL_EMBLEMA = '#5b5145';
-/** Lo que se alza un rótulo sobre la superficie de su casilla, para no pelear en profundidad. */
-export const ALZA_DEL_ROTULO = 0.08;
+/**
+ * Y la de la FLECHA del sentido de la marcha, que no es tinta de tablero sino señal: es la única
+ * cosa del anillo que no dice qué es una casilla sino HACIA DÓNDE se va, y Miguel la pidió roja.
+ */
+export const TINTA_DE_LA_FLECHA = '#b3261e';
+const TINTA_POR_EMBLEMA: Readonly<Partial<Record<string, string>>> = { flecha: TINTA_DE_LA_FLECHA };
 
 /**
  * LA SILUETA DE UN GUARISMO, normalizada por `CAJA_DEL_GUARISMO` Y NO POR LA SUYA.
@@ -562,7 +566,7 @@ export function geometriaDeLosRotulos(): Rotulos | null {
       silueta = nueva;
       siluetasDeEmblema.set(e.emblema, nueva);
     }
-    pon(silueta, e.x, e.z, e.giro, e.lado, TINTA_DEL_EMBLEMA);
+    pon(silueta, e.x, e.z, e.giro, e.lado, TINTA_POR_EMBLEMA[e.emblema] ?? TINTA_DEL_EMBLEMA);
     emblemas++;
   }
   /*

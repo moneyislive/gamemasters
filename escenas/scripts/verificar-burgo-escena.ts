@@ -114,6 +114,8 @@ import {
   REJILLA_DE_PEONES_DE_ESQUINA,
   REJILLA_DE_PRESOS,
   REJILLA_DE_VISITAS,
+  CENTRO_DEL_SUELO_DE_LA_ESQUINA,
+  LADO_DEL_SUELO_DE_LA_ESQUINA,
   SUELO_DE_DADOS,
   SUPERFICIE,
   TALLA_DEL_HOTEL,
@@ -121,6 +123,8 @@ import {
   TALLA_DE_LA_CASA,
   V_DEL_PRECIO,
   V_DE_LAS_CASAS,
+  altoDelRotulo,
+  anchoDeLaPalabra,
   anchoDelPrecio,
   campo,
   candidatasDelCampo,
@@ -140,6 +144,7 @@ import {
   huecoDeVisita,
   huecosDeLosEmblemas,
   largoDelTramo,
+  letrasDelRotulo,
   marcoDeCasilla,
   mundoEstatico,
   puestaDeLaPiezaDeLaCasilla,
@@ -152,7 +157,7 @@ import {
   suelosDeLaCasilla,
   vDeRadial,
 } from '../burgo/anillo-en-3d';
-import type { PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
+import type { LetraEnElTablero, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
 import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
 import {
@@ -1123,11 +1128,15 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
   comprobar('y las cuatro escenas caben enteras en su cuadrado de 108', fueraDeLaEsquina.length === 0, fueraDeLaEsquina.slice(0, 6));
 
   const cuenta = (esquina: number, pieza: string): number => piezasDeLaEsquina(esquina).filter((p) => p.pieza === pieza).length;
-  comprobar(
-    'la salida es un cruce urbano de nueve por nueve celdas: un cruce, seis cebras, cuatro farolas, dos semáforos, un taxi y una berlina',
-    cuenta(0, PIEZA.calzadaCruce) === 1 && cuenta(0, PIEZA.calzadaPaso) === 6 && cuenta(0, PIEZA.farolaDeCalle) === 4 && cuenta(0, PIEZA.semaforoC) === 2 && cuenta(0, PIEZA.cocheTaxi) === 1 && cuenta(0, PIEZA.cocheBerlina) === 1,
-    piezasDeLaEsquina(0).map((p) => p.pieza),
-  );
+  /*
+   * LA SALIDA NO LLEVA NI UNA PIEZA, y esto lo vigila porque era un cruce urbano entero.
+   *
+   * Lo pidió Miguel: «en vez de fragmentos de carretera únicamente una flecha roja y el mensaje
+   * del tablero con SALIDA en grande». La regla de antes contaba el cruce, las seis cebras, las
+   * cuatro farolas, los dos semáforos, el taxi y la berlina; ésta cuenta que no hay NADA, que es
+   * lo único que un día de prisa puede deshacerse sin querer añadiendo «algo de ambiente».
+   */
+  comprobar('la salida no lleva ni una pieza: es la flecha y la palabra, y nada más', piezasDeLaEsquina(0).length === 0, piezasDeLaEsquina(0).map((p) => p.pieza));
   comprobar(
     'la cárcel es una manzana entera: cuatro bloques, cuatro tramos de verja, dos hojas de puerta, dos patrullas y dos semáforos',
     cuenta(10, PIEZA.bloqueD) === 1 && cuenta(10, PIEZA.bloqueB) === 1 && cuenta(10, PIEZA.bloqueC) === 1 && cuenta(10, PIEZA.bloqueA) === 1 && cuenta(10, PIEZA.verja) === 4 && cuenta(10, PIEZA.verjaPuerta) === 2 && cuenta(10, PIEZA.cochePatrulla) === 2 && cuenta(10, PIEZA.semaforoA) === 2,
@@ -1156,7 +1165,9 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
    */
   comprobar('cada esquina son 9 × 9 celdas de la retícula de la ciudad', CELDAS_POR_ESQUINA === 9 && LADO_DE_ESQUINA === 9 * RETICULA_DE_LA_CIUDAD, CELDAS_POR_ESQUINA);
   const piezasPorEsquina = ESQUINAS.map((e) => piezasDeLaEsquina(e).length);
-  comprobar('y ninguna se queda en cuatro losas: las cuatro pasan de treinta piezas', piezasPorEsquina.every((n) => n >= 30), piezasPorEsquina);
+  /* Las TRES amuebladas; la salida se quedó a propósito sin nada y la vigila su propia regla. */
+  const amuebladas = ESQUINAS.filter((e) => e !== 0).map((e) => piezasDeLaEsquina(e).length);
+  comprobar('y ninguna de las otras tres se queda en cuatro losas: las tres pasan de treinta piezas', amuebladas.every((n) => n >= 30), piezasPorEsquina);
   comprobar('las dos flechas del sentido de la marcha están en la salida y en la casilla que manda a la cárcel', huecosDeLosEmblemas().filter((e) => e.emblema === 'flecha').map((e) => e.casilla).join() === '0,30');
 
   /*
@@ -2104,6 +2115,74 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
   }
   comprobar('los dígitos de un precio se escriben hacia −adelante, que es la derecha de quien mira desde fuera del anillo', alReves.length === 0, alReves.slice(0, 4));
   comprobar('se ve fallar: con el orden de antes (+adelante) las treinta casillas con cifra caerían', PRECIO_DE_LA_CASILLA.filter((p) => p > 0 && String(p).length >= 2).length >= 25);
+
+  /*
+   * ── 2 bis. EL RÓTULO DE UNA ESQUINA CABE EN SU ESQUINA, Y SE LEE DESDE LA DIAGONAL ──
+   *
+   * Una esquina escribe su nombre por la DIAGONAL de su cuadro de suelo (90 de lado), y ahí hay
+   * dos formas de equivocarse que ninguna cuenta de triángulos ve:
+   *
+   *  · QUE NO QUEPA. El hueco de un cuadro girado un octavo no es su lado: a `α` del centro por
+   *    la diagonal quedan `L√2/2 − |α|` a cada lado, así que lo que tiene que caber es
+   *    `ancho + alto ≤ L√2`. Con el lado —que fue el primer intento— la palabra se sale por los
+   *    picos, justo donde el tablero levanta su marco, y en pantalla se ve una letra cortada.
+   *    Aquí se mide la CAJA de cada letra puesta, sus cuatro esquinas, contra el rombo de verdad.
+   *
+   *  · QUE SE LEA AL REVÉS. Es el mismo fallo que el de los precios, pero girado un octavo: la
+   *    derecha de quien mira una esquina desde su diagonal es `−(fuera + adelante)`, o sea `u`
+   *    bajando y `v` subiendo A LA VEZ. Al revés, «SALIDA» se lee «ADILAS».
+   */
+  const medioRombo = (LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2) / 2;
+  const seSalen: string[] = [];
+  const delRevesEnEsquina: string[] = [];
+  let letrasDeEsquinaMiradas = 0;
+  for (const esquina of ESQUINAS) {
+    const letras = letrasDelRotulo(esquina);
+    if (letras.length === 0) continue;
+    letrasDeEsquinaMiradas += letras.length;
+    const m = marcoDeCasilla(esquina);
+    const enEsquina = (x: number, z: number): { u: number; v: number } => ({ u: x * m.fuera.x + z * m.fuera.z, v: -(x * m.adelante.x + z * m.adelante.z) });
+    for (const l of letras) {
+      const c = enEsquina(l.x, l.z);
+      const media = l.alto / 2;
+      for (const a of [-1, 1]) {
+        for (const b of [-1, 1]) {
+          /* La caja de la letra está girada un octavo: sus esquinas salen por las dos diagonales. */
+          const u = c.u + ((a + b) * media) / Math.SQRT2;
+          const v = c.v + ((b - a) * media) / Math.SQRT2;
+          const alfa = (u - CENTRO_DEL_SUELO_DE_LA_ESQUINA + (v - CENTRO_DEL_SUELO_DE_LA_ESQUINA)) / Math.SQRT2;
+          const lado = (u - CENTRO_DEL_SUELO_DE_LA_ESQUINA - (v - CENTRO_DEL_SUELO_DE_LA_ESQUINA)) / Math.SQRT2;
+          if (Math.abs(alfa) + Math.abs(lado) > medioRombo) seSalen.push(`${String(esquina)}/${l.letra}: ${(Math.abs(alfa) + Math.abs(lado)).toFixed(1)} de ${medioRombo.toFixed(1)}`);
+        }
+      }
+    }
+    const a = enEsquina((letras[0] as LetraEnElTablero).x, (letras[0] as LetraEnElTablero).z);
+    const b = enEsquina((letras[letras.length - 1] as LetraEnElTablero).x, (letras[letras.length - 1] as LetraEnElTablero).z);
+    if (!(b.u < a.u && b.v > a.v)) delRevesEnEsquina.push(`${String(esquina)}: de (${a.u.toFixed(0)}, ${a.v.toFixed(0)}) a (${b.u.toFixed(0)}, ${b.v.toFixed(0)})`);
+  }
+  /*
+   * Y ANTES QUE LAS DOS, LA QUE DICE QUE HAN MIRADO ALGO. Hoy sólo la SALIDA lleva nombre de
+   * esquina: si un día `letrasDelRotulo` volviera a devolver vacío para una esquina —que es
+   * exactamente lo que hacía hasta esta tanda—, las dos reglas de abajo se quedarían en verde
+   * sin haber mirado una sola letra, que es la forma más silenciosa de perder un comprobador.
+   */
+  comprobar('las reglas de la esquina han mirado las seis letras de SALIDA, y no cero', letrasDeEsquinaMiradas === 6, letrasDeEsquinaMiradas);
+  comprobar('el rótulo de una esquina cabe entero en el rombo de su suelo, letra a letra y por sus cuatro picos', seSalen.length === 0, seSalen.slice(0, 4));
+  comprobar('y avanza hacia −(fuera + adelante), que es la derecha de quien mira una esquina desde su diagonal', delRevesEnEsquina.length === 0, delRevesEnEsquina);
+  /*
+   * LAS DOS VACUNAS. La primera es la palabra que NO cabe: `altoDelRotulo` tiene que encogerla
+   * hasta que `ancho + alto` quepa en la diagonal, y si alguien vuelve a escribir la cuenta con
+   * el lado, una palabra larga se sale. La segunda es que la regla de arriba sepa ver un rombo
+   * desbordado, con la misma cuenta y un alto imposible.
+   */
+  const larga = 'ESTACIONAMIENTO';
+  const altoLargo = altoDelRotulo(larga, true);
+  comprobar(
+    `se ve fallar: «${larga}» se encoge a ${altoLargo.toFixed(1)} para que ancho + alto quepan en la diagonal`,
+    anchoDeLaPalabra(larga, altoLargo) + altoLargo <= LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2 && altoLargo < altoDelRotulo('SALIDA', true),
+    { alto: altoLargo, ancho: anchoDeLaPalabra(larga, altoLargo) },
+  );
+  comprobar('y se ve fallar la otra: una letra de 60 de alto en el centro desborda el rombo y la cuenta lo dice', 60 / Math.SQRT2 + 60 / Math.SQRT2 > medioRombo);
 
   /* ── 3. Las capas por cercanía, y la histéresis que hace que no parpadeen ── */
   const unGrupo = laCiudad.grupos.find((g) => g.clase === 'manzana');

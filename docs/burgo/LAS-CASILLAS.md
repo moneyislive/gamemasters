@@ -78,7 +78,7 @@ corrige en la fase 4.
 
 | # | Casilla | Qué se ve | Hecho de | Animación (dura) |
 | --- | --- | --- | --- | --- |
-| 0 | SALIDA | Flecha roja grande en diagonal + SALIDA en letras de 24 + «COBRA 200 AL PASAR» | Sólo rótulo fundido. **Se quita el cruce entero** | — |
+| 0 | SALIDA ✅ | SALIDA por la diagonal (101 × 18,4) y la flecha roja de 28 en el pico de fuera | Sólo rótulo fundido; el cruce entero fuera | — |
 | 10 | CÁRCEL / VISITA | Muro con dos torretas, patio con verja, celda abierta por arriba | Código + `verja` (ya está) | La reja baja tras el peón (0,6) |
 | 20 | PARKING | Asfalto con plazas pintadas, tres coches y un **cartel horizontal** que se lee desde arriba | Código + coches del pack | El coche del que cae aparca (0,6) |
 | 30 | A LA COMISARÍA | Comisaría con puerta y celda vista desde arriba | Código + `coche-patrulla` | El peón cruza la puerta y aparece tras los barrotes (0,7) |
@@ -106,8 +106,11 @@ trece edificios de código a ~1.500 son 20.000 de los 718.000 que sobran.
 
 ## 4. El orden, y por qué éste
 
-1. **SALIDA** (fase 2). Es la que Miguel nombró primero y la más barata: quitar piezas y escribir
-   letras. Prueba de paso el sitio de los rótulos en las **esquinas**, que hoy no llevan ninguno.
+1. **SALIDA** (fase 2) — **hecha**. Quitar piezas y escribir letras, que era lo más barato, y de
+   paso resolver el sitio de los rótulos en las **esquinas**, que hasta entonces no llevaban
+   ninguno: van por la diagonal del cuadro de suelo de 90, con la cuenta del rombo
+   (`ancho + alto ≤ L√2`) que `verify:burgo-escena` mide letra a letra. La esquina se quedó en
+   **cero piezas**, y lo que la sustituye no cuesta ninguna llamada: va fundido con los rótulos.
 2. **Las tres esquinas restantes** (fase 3): cárcel, parking y comisaría. Comparten el problema de
    la esquina —108 × 108, la ele de la marcha por en medio— y conviene resolverlo una vez.
 3. **Las laterales** (fase 4): fondo vecinal, sucesos, eléctrica, aguas, impuesto y tasa. Aquí

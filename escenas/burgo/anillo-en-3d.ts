@@ -661,8 +661,33 @@ export function anchoDelPrecio(casilla: number): number {
 export const V_DEL_ROTULO = 11;
 export const ALTO_MAXIMO_DEL_ROTULO = 17;
 export const ANCHO_DEL_ROTULO = 62;
+/** Lo que se alza un rótulo sobre la SUPERFICIE de su casilla, para no pelearse en profundidad. */
+export const ALZA_DEL_ROTULO = 0.08;
 /** Sobre el reborde de la franja (0,6), que es lo más alto que el rótulo tiene debajo. */
 export const ALZA_DEL_ROTULO_EN_LA_FRANJA = 0.7;
+
+/**
+ * EL RÓTULO DE UNA ESQUINA NO VA EN NINGUNA FRANJA: VA EN DIAGONAL, Y SOBRE TODO EL SUELO.
+ *
+ * Una esquina no tiene bandas —ni franja, ni filete, ni precio—: su suelo es UN cuadro de 90, de
+ * `BORDE_INTERIOR` (324) a `SUPERFICIE.hasta` (414), con la ele de la marcha cruzándolo a 349,5.
+ * El renglón va por su DIAGONAL, que es además desde donde se mira una esquina y por lo que los
+ * tableros de verdad escriben así sus cuatro. Cruzar la ele no estorba: las letras son suelo, y
+ * un peón plantado encima de la palabra es exactamente lo que se ve en un tablero de mesa.
+ *
+ * ═══ Y EL HUECO NO ES LA DIAGONAL: ES LA DIAGONAL MENOS EL ALTO ═══
+ *
+ * Un cuadro de lado `L` girado un octavo es un rombo: a `α` de su centro por la diagonal, lo que
+ * queda a los lados es `L√2/2 − |α|`, y no `L`. Una palabra de alto `h` y ancho `W` mete sus
+ * cuatro esquinas a `α = ±h/2`, así que lo que tiene que caber no es `W` sino **`W + h ≤ L√2`**.
+ * Escrito con el lado —que fue el primer intento— la palabra cabe de mentira y se sale por los
+ * picos, que es justo donde empieza el marco levantado del tablero.
+ */
+export const LADO_DEL_SUELO_DE_LA_ESQUINA = SUPERFICIE.hasta - BORDE_INTERIOR;
+export const CENTRO_DEL_SUELO_DE_LA_ESQUINA = (SUPERFICIE.hasta + BORDE_INTERIOR) / 2;
+/** La diagonal de ese cuadro, con un dedo de margen para no acabar pisando el marco. */
+export const DIAGONAL_DEL_ROTULO_DE_ESQUINA = LADO_DEL_SUELO_DE_LA_ESQUINA * Math.SQRT2 - 8;
+export const ALTO_MAXIMO_DEL_ROTULO_DE_ESQUINA = 26;
 
 /** El avance de un carácter, en unidades del lienzo. El de la caja para lo que no esté en la tabla. */
 function avanceDelCaracter(caracter: string): number {
@@ -677,10 +702,12 @@ export function anchoDeLaPalabra(palabra: string, alto: number): number {
   return ancho;
 }
 
-/** El alto al que hay que poner esta palabra para que quepa en la casilla. */
-export function altoDelRotulo(palabra: string): number {
+/** El alto al que hay que poner esta palabra para que quepa en la casilla —o en la diagonal de una esquina—. */
+export function altoDelRotulo(palabra: string, esEsquina = false): number {
   if (palabra.length === 0) return 0;
   const porUnidadDeAlto = anchoDeLaPalabra(palabra, ALTO_DE_LA_LETRA) / ALTO_DE_LA_LETRA;
+  /* En una esquina manda `W + h ≤ diagonal`, o sea `h (ancho por unidad + 1) ≤ diagonal`. */
+  if (esEsquina) return Math.min(ALTO_MAXIMO_DEL_ROTULO_DE_ESQUINA, DIAGONAL_DEL_ROTULO_DE_ESQUINA / (porUnidadDeAlto + 1));
   return Math.min(ALTO_MAXIMO_DEL_ROTULO, ANCHO_DEL_ROTULO / porUnidadDeAlto);
 }
 
@@ -692,6 +719,7 @@ export function altoDelRotulo(palabra: string): number {
  * el cartel del pie, que tienen texto de verdad y no tres píxeles de tinta.
  */
 export const ROTULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
+  0: 'SALIDA',
   2: 'FONDO',
   4: 'IMPUESTO',
   7: 'SUCESOS',
@@ -722,10 +750,40 @@ export interface LetraEnElTablero {
  * `guarismosDelPrecio`: al revés salen ESPEJADAS, y eso no se lee como un fallo de orientación
  * sino como una fuente rara.
  */
+/**
+ * LAS LETRAS DE UNA ESQUINA, EN LA DIAGONAL DE SU CUADRO DE SUPERFICIE.
+ *
+ * Quien lee una esquina la mira desde su diagonal de fuera, que es `fuera` girado un octavo. Y
+ * la regla de la lectura es la misma que la de una casilla lateral —la derecha de quien mira es
+ * su dirección girada otro cuarto: `fuera` → `−adelante`—, así que el renglón avanza hacia
+ * `−(fuera + adelante)`: en coordenadas de esquina, `u` BAJA y `v` SUBE a la vez, cada una a un
+ * raíz de dos del avance. Sale de esa cuenta y no del ojo: escrito al revés, «SALIDA» se lee
+ * «ADILAS» desde el único sitio desde el que se mira esa esquina.
+ *
+ * No se escribe con `puntoEnLaCasillaPorV` porque una esquina no tiene `v` de banda: sus dos ejes
+ * son los mismos 0..108 y el renglón no va paralelo a ningún borde.
+ */
+function letrasDeLaEsquina(m: MarcoDeCasilla, palabra: string): LetraEnElTablero[] {
+  const alto = altoDelRotulo(palabra, true);
+  const escala = alto / ALTO_DE_LA_LETRA;
+  const giro = giroHaciaDentro(m) + Math.PI / 4;
+  const salida: LetraEnElTablero[] = [];
+  let t = -anchoDeLaPalabra(palabra, alto) / 2;
+  for (const letra of palabra) {
+    const avance = avanceDelCaracter(letra) * escala;
+    const d = (t + avance / 2) / Math.SQRT2;
+    const p = puntoEnEsquina(m, CENTRO_DEL_SUELO_DE_LA_ESQUINA - d, CENTRO_DEL_SUELO_DE_LA_ESQUINA + d);
+    salida.push({ letra, x: p.x, z: p.z, giro, alto, alza: ALZA_DEL_ROTULO });
+    t += avance;
+  }
+  return salida;
+}
+
 export function letrasDelRotulo(casilla: number): LetraEnElTablero[] {
   const m = marcoDeCasilla(casilla);
   const palabra = ROTULO_DE_LA_CASILLA[m.indice];
-  if (m.esEsquina || palabra === undefined || palabra.length === 0) return [];
+  if (palabra === undefined || palabra.length === 0) return [];
+  if (m.esEsquina) return letrasDeLaEsquina(m, palabra);
   const alto = altoDelRotulo(palabra);
   const escala = alto / ALTO_DE_LA_LETRA;
   const giro = giroHaciaDentro(m);
@@ -1070,61 +1128,22 @@ function sillasAlrededor(u: number, v: number): PiezaDeEsquina[] {
  *   hacia la cárcel y otros dos coches.
  */
 export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsquina[]>> = {
-  [PUERTA_MAYOR]: [
-    /*
-     * El cruce está en la celda (5, 5) y sus dos brazos bajan hasta la celda 2, que es la que
-     * la ELE de la marcha atraviesa: ahí, y sólo ahí, va la cebra por la que el peón cruza la
-     * calzada. Las otras dos cebras son las de antes del cruce, una por brazo.
-     */
-    ...calleEnU(5, [
-      [2, PIEZA.calzadaPaso],
-      [3, PIEZA.calzada],
-      [4, PIEZA.calzadaPaso],
-      [5, PIEZA.calzadaCruce],
-      [6, PIEZA.calzadaPaso],
-      [7, PIEZA.calzada],
-      [8, PIEZA.calzada],
-    ]),
-    ...calleEnV(5, [
-      [2, PIEZA.calzadaPaso],
-      [3, PIEZA.calzada],
-      [4, PIEZA.calzadaPaso],
-      [6, PIEZA.calzadaPaso],
-      [7, PIEZA.calzada],
-      [8, PIEZA.calzada],
-    ]),
-    ...soleras([
-      [4, 4],
-      [6, 4],
-      [4, 6],
-      [6, 6],
-      [3, 3],
-      [7, 3],
-      [3, 7],
-      [7, 7],
-      [8, 3],
-      [3, 8],
-      [8, 7],
-      [7, 8],
-    ]),
-    /* Las cuatro farolas, en las cuatro esquinas del cruce, a 6,6 de su eje: el bordillo. */
-    { pieza: PIEZA.farolaDeCalle, u: 383.4, v: 383.4, giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: 383.4, v: 396.6, giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: 396.6, v: 383.4, giroEnCuartos: 3, menudo: true },
-    { pieza: PIEZA.farolaDeCalle, u: 396.6, v: 396.6, giroEnCuartos: 3, menudo: true },
-    /* Dos semáforos de brazo, uno por eje, en el bordillo de antes del cruce. */
-    { pieza: PIEZA.semaforoC, u: 396.6, v: cel(4), giroEnCuartos: 3 },
-    { pieza: PIEZA.semaforoC, u: cel(4), v: 396.6, giroEnCuartos: 1 },
-    /* El taxi, parado en la cebra de antes del cruce: en el carril derecho, a 2,7 del eje. */
-    { pieza: PIEZA.cocheTaxi, u: cel(5) + 2.7, v: cel(4), giroEnCuartos: 1, alza: COCHE_SOBRE_EL_ASFALTO },
-    /* Y una berlina esperando en el otro brazo, en su carril. */
-    { pieza: PIEZA.cocheBerlina, u: cel(3), v: cel(5) - 2.7, giroEnCuartos: 0, alza: COCHE_SOBRE_EL_ASFALTO },
-    { pieza: PIEZA.bancoDeCalle, u: cel(3), v: cel(3), giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.bancoDeCalle, u: cel(7), v: cel(7), giroEnCuartos: 2, menudo: true },
-    { pieza: PIEZA.arbusto, u: cel(3), v: cel(7), giroEnCuartos: 0, menudo: true },
-    { pieza: PIEZA.arbusto, u: cel(7), v: cel(3), giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.papelera, u: cel(8), v: cel(7), giroEnCuartos: 0, menudo: true },
-  ],
+  /*
+   * LA SALIDA NO LLEVA NADA. Lo pidió Miguel con estas palabras: «en vez de fragmentos de
+   * carretera únicamente una flecha roja y el mensaje del tablero con SALIDA en grande».
+   *
+   * Hasta hoy era un cruce urbano entero —un `calzada-cruce`, seis cebras, cuatro farolas, dos
+   * semáforos, un taxi y una berlina—, y el cruce tenía un problema que no se arregla
+   * añadiendo piezas: la SALIDA no es una calle, es la casilla por la que se pasa cuarenta
+   * veces por partida y en la que se cobra. Lo que hay que ver desde el otro lado de la mesa es
+   * eso, no un semáforo. Un tablero de verdad pone ahí dos cosas: una flecha y una palabra.
+   *
+   * Así que se va el cruce entero y quedan las dos: la flecha, que ahora es ROJA y va al pico de
+   * fuera de la esquina (`huecosDeLosEmblemas`), y SALIDA escrito por la diagonal, 101 de ancho y
+   * 18,4 de alto —el rótulo más grande del tablero: el segundo es LUZ, a 17—. Cero piezas y cero
+   * llamadas de dibujo: las dos van fundidas con los precios y los emblemas.
+   */
+  [PUERTA_MAYOR]: [],
   [MAZMORRA]: [
     /* La calle de delante de la comisaría, con su cebra en la celda que la marcha cruza. */
     ...calleEnU(4, [
@@ -1467,6 +1486,20 @@ export interface EmblemaEnElTablero {
 
 /** Lo que mide de lado el emblema de una casilla: cabe en la banda de atrezo (30 de fondo) sin tocar el precio. */
 export const LADO_DEL_EMBLEMA = 27;
+/**
+ * LA FLECHA DE LA SALIDA, Y POR QUÉ NO ES TAN GRANDE COMO PARECE QUE CABE.
+ *
+ * El cuadro libre de la esquina mide 60 de lado y 84,8 de diagonal, y el renglón va por la
+ * diagonal. Pero el hueco que queda a los lados de la diagonal NO es constante: a `k` del centro,
+ * el ancho que queda es `84,8 − 2k`. Con la palabra centrada ocupando 78 de los 84,8, lo que
+ * queda para la flecha es el pico de dentro, y por eso mide 30 y no 48: a 30 del centro el hueco
+ * es de 24,8 y una flecha de 30 de ancho ya lo llena.
+ *
+ * Va al pico de FUERA y no al de dentro: por el de dentro cruza la ele de la marcha (349,5) y
+ * ahí se planta el peón de quien acaba de mover, que taparia justo la señal.
+ */
+export const LADO_DE_LA_FLECHA_DE_SALIDA = 28;
+export const SEPARACION_DE_LA_FLECHA = 33;
 
 /**
  * QUÉ CASILLA LLEVA QUÉ EMBLEMA.
@@ -1499,14 +1532,26 @@ export function huecosDeLosEmblemas(): EmblemaEnElTablero[] {
     salida.push({ casilla, emblema, x: p.x, z: p.z, giro: giroHaciaDentro(m), lado: LADO_DEL_EMBLEMA });
   }
   /*
-   * La flecha del sentido de la marcha, en la salida y en la casilla que manda a la cárcel:
-   * en la acera de la celda (1, 5), pegada al brazo por el que se sale de la esquina, que es
-   * justo donde la mira quien acaba de mover.
+   * LA FLECHA DEL SENTIDO DE LA MARCHA, en la salida y en la casilla que manda a la cárcel.
+   *
+   * En ¡a la Mazmorra! sigue donde estaba: en la acera de la celda (1, 5), pegada al brazo por el
+   * que se sale de la esquina, que es justo donde la mira quien acaba de mover.
+   *
+   * En la SALIDA ya no hay acera ni brazo —esa esquina se quedó sin calle—, así que la flecha
+   * pasa a ser lo que Miguel pidió que fuera: roja y a la vista. Va en el pico de FUERA del suelo
+   * de la esquina, a 33 del centro por la diagonal —que es lo que la palabra deja libre, ver
+   * `LADO_DE_LA_FLECHA_DE_SALIDA`—, y sigue mirando como la de la Mazmorra.
    */
-  for (const esquina of [PUERTA_MAYOR, A_LA_MAZMORRA]) {
-    const m = marcoDeCasilla(esquina);
+  {
+    const m = marcoDeCasilla(PUERTA_MAYOR);
+    const d = SEPARACION_DE_LA_FLECHA / Math.SQRT2;
+    const p = puntoEnEsquina(m, CENTRO_DEL_SUELO_DE_LA_ESQUINA + d, CENTRO_DEL_SUELO_DE_LA_ESQUINA + d);
+    salida.push({ casilla: PUERTA_MAYOR, emblema: 'flecha', x: p.x, z: p.z, giro: giroHaciaFuera(m), lado: LADO_DE_LA_FLECHA_DE_SALIDA });
+  }
+  {
+    const m = marcoDeCasilla(A_LA_MAZMORRA);
     const p = puntoEnEsquina(m, cel(1), cel(5));
-    salida.push({ casilla: esquina, emblema: 'flecha', x: p.x, z: p.z, giro: giroHaciaFuera(m), lado: LADO_DEL_EMBLEMA });
+    salida.push({ casilla: A_LA_MAZMORRA, emblema: 'flecha', x: p.x, z: p.z, giro: giroHaciaFuera(m), lado: LADO_DEL_EMBLEMA });
   }
   return salida;
 }
