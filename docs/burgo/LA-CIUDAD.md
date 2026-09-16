@@ -397,10 +397,17 @@ acera. Quedan setenta y dos celdas libres.
   sobre el asfalto y las rayas en **amarillo**, porque dos blancos sobre negro se pelean. Y el
   cartel es un panel TUMBADO de 12 × 12 sobre un poste de 11, con la `P` impresa encima: un panel
   a plomo, que es como son los de la calle, desde un tablero no se ve.
-- **A la cárcel (30, noreste)**: una **avenida de dos carriles** (dos columnas de losas, 24
-  de ancho) cruzando la esquina entera, con cuatro `calzada-paso`, dos `semaforo-c` de brazo,
-  el `coche-patrulla` con el morro hacia la cárcel, una berlina, un taxi y el emblema
-  `flecha` apuntando a la 10.
+- **La comisaría (30, noreste)**: sigue siendo una **avenida de dos carriles** (24 de ancho) con
+  sus cuatro cebras, dos `semaforo-c`, el `coche-patrulla` con el morro hacia la cárcel, una
+  berlina, un taxi y la `flecha` apuntando a la 10 —el coche patrulla mirando allá cuenta lo que
+  hace esta casilla mejor que ningún edificio—. Lo que se añade es el edificio del que sale: un
+  cuerpo de 28 × 28 al otro lado de la avenida, su porche con dos columnas y el **farol azul**
+  encima, que es lo único que dice «policía» desde lejos.
+  Y la **celda**, que Miguel pidió ver: un cubículo de 12 × 12 con tres paredes, cinco barrotes
+  con su dintel y **sin techo**. Eso último no es un olvido: en un tablero que se mira desde el
+  aire, un calabozo cerrado es una caja opaca en la que no se ve entrar a nadie.
+  Los dos bancos y la papelera de esa acera se fueron: el edificio los habría enterrado dentro de
+  una pared.
 
 ### 2 quater. Las obras: volumen construido en código, y por qué no con piezas del pack
 

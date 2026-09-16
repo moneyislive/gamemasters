@@ -33,7 +33,7 @@
  * contrario de lo que uno escribiría mirando el plano. Las seis caras de una caja salen de la
  * misma cuenta, y `verify:burgo-escena` las vuelve a medir una a una en el mundo.
  */
-import { ALZA_DEL_ASFALTO, BORDE_INTERIOR, FERIA, MAZMORRA, SUPERFICIE, giroHaciaDentro, marcoDeCasilla, puntoEnEsquina } from './anillo-en-3d';
+import { ALZA_DEL_ASFALTO, A_LA_MAZMORRA, BORDE_INTERIOR, FERIA, MAZMORRA, SUPERFICIE, giroHaciaDentro, marcoDeCasilla, puntoEnEsquina } from './anillo-en-3d';
 import type { LetraEnElTablero } from './anillo-en-3d';
 
 /** Un punto de una obra en las coordenadas de su casilla: `u` y `v` como en `puntoEnEsquina`, `y` a plomo. */
@@ -60,6 +60,10 @@ export const COLOR_DE_OBRA = {
   pabellon: '#6f6c66',
   barrote: '#2f2f33',
   hormigon: '#a6a19a',
+  /* La comisaría: cuerpo azulado, visera clara y el farol azul de la entrada. */
+  comisaria: '#5f6a7a',
+  visera: '#b9b5ab',
+  farolAzul: '#2f6fd0',
 } as const;
 
 /** Un cuadro tumbado a la cota `y`, mirando ARRIBA. El orden sale de la cuenta de la cabecera. */
@@ -275,13 +279,75 @@ function carasDeLaCarcel(): CaraDeObra[] {
 }
 
 
+/* ───────────────── La comisaría (casilla 30) ──────────────── */
+
+/**
+ * LA COMISARÍA, Y LA CELDA QUE SE VE DESDE ARRIBA.
+ *
+ * «Lo mismo con la Comisaría, quiero ver cómo entra en la celda». Y «ver cómo entra» en un tablero
+ * que se mira desde el aire manda una decisión de forma: **la celda no tiene techo**. Un calabozo
+ * cerrado es una caja opaca en la que no se ve entrar a nadie; éste es un cubículo de tres paredes
+ * y una reja, abierto por arriba, con su suelo de hormigón —que es como se dibujan las celdas en
+ * los tableros de mesa y en los cómics, por la misma razón—.
+ *
+ * Lo que había en esta esquina era una avenida de dos carriles con su coche patrulla apuntando a
+ * la cárcel, y se queda: es la casilla que te MANDA a la cárcel, y el coche patrulla con el morro
+ * hacia allá lo cuenta mejor que ningún edificio. Lo que entra es el edificio del que sale.
+ */
+const COMISARIA = {
+  /* El cuerpo, al otro lado de la avenida (que ocupa de 372 a 396). */
+  cuerpo: { u0: 400, u1: 428, v0: 372, v1: 400, alto: 13 },
+  /* El porche de la entrada, mirando a la avenida, con sus dos columnas. */
+  porche: { u0: 394, u1: 400, v0: 379, v1: 393, alto: 8, grueso: 1.1, columna: 1.2 },
+  /* El farol azul encima del porche: lo único que dice «policía» desde lejos. */
+  farol: { lado: 2.2, desde: 9.1, hasta: 11.3 },
+  /* La celda: tres paredes, cinco barrotes y NADA encima. */
+  celda: { u0: 404, u1: 416, v0: 400, v1: 412, pared: 1.2, alto: 7, barrotes: 5, barrote: 0.7 },
+} as const;
+
+/** El centro de la celda de la comisaría: ahí se planta el peón al que mandan a la cárcel. */
+export const HUECO_DE_LA_CELDA = { u: (COMISARIA.celda.u0 + COMISARIA.celda.u1) / 2, v: (COMISARIA.celda.v0 + COMISARIA.celda.v1) / 2 } as const;
+
+function carasDeLaComisaria(): CaraDeObra[] {
+  const c = A_LA_MAZMORRA;
+  const salida: CaraDeObra[] = [];
+  const q = COMISARIA.cuerpo;
+  salida.push(...caja(c, q.u0, q.u1, q.v0, q.v1, 0, q.alto, COLOR_DE_OBRA.comisaria));
+  /* El porche: la visera y sus dos columnas. */
+  const po = COMISARIA.porche;
+  salida.push(...caja(c, po.u0, po.u1, po.v0, po.v1, po.alto, po.alto + po.grueso, COLOR_DE_OBRA.visera));
+  for (const v of [po.v0 + po.columna / 2, po.v1 - po.columna / 2]) {
+    salida.push(...caja(c, po.u0, po.u0 + po.columna, v - po.columna / 2, v + po.columna / 2, 0, po.alto, COLOR_DE_OBRA.visera));
+  }
+  /* El farol azul, centrado sobre la visera. */
+  const f = COMISARIA.farol;
+  const mu = (po.u0 + po.u1) / 2;
+  const mv = (po.v0 + po.v1) / 2;
+  salida.push(...caja(c, mu - f.lado / 2, mu + f.lado / 2, mv - f.lado / 2, mv + f.lado / 2, f.desde, f.hasta, COLOR_DE_OBRA.farolAzul));
+  /* La celda: suelo, tres paredes y la reja del cuarto lado. Sin techo, que es el porqué de todo. */
+  const ce = COMISARIA.celda;
+  salida.push(losa(c, ce.u0, ce.u1, ce.v0, ce.v1, ALZA_DEL_ASFALTO, COLOR_DE_OBRA.hormigon));
+  salida.push(...caja(c, ce.u0, ce.u1, ce.v1 - ce.pared, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
+  salida.push(...caja(c, ce.u0, ce.u0 + ce.pared, ce.v0, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
+  salida.push(...caja(c, ce.u1 - ce.pared, ce.u1, ce.v0, ce.v1, 0, ce.alto, COLOR_DE_OBRA.muro));
+  const paso = (ce.u1 - ce.u0) / (ce.barrotes + 1);
+  for (let k = 1; k <= ce.barrotes; k++) {
+    const u = ce.u0 + paso * k;
+    salida.push(...caja(c, u - ce.barrote / 2, u + ce.barrote / 2, ce.v0, ce.v0 + ce.barrote, 0, ce.alto, COLOR_DE_OBRA.barrote));
+  }
+  /* Y el dintel que las remata arriba, que es lo que hace que se lean como una reja y no como palos. */
+  salida.push(...caja(c, ce.u0, ce.u1, ce.v0, ce.v0 + ce.barrote, ce.alto - 0.9, ce.alto, COLOR_DE_OBRA.barrote));
+  return salida;
+}
+
+
 /* ──────────────────────────────── Todas las obras ──────────────────────────────── */
 
 let hechas: CaraDeObra[] | null = null;
 
 /** Todas las caras de todas las obras del anillo, en coordenadas de casilla. */
 export function carasDeLasObras(): CaraDeObra[] {
-  if (hechas === null) hechas = [...carasDelAparcamiento(), ...carasDeLaCarcel()];
+  if (hechas === null) hechas = [...carasDelAparcamiento(), ...carasDeLaCarcel(), ...carasDeLaComisaria()];
   return hechas;
 }
 

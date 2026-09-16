@@ -766,6 +766,7 @@ export const ROTULO_DE_LA_CASILLA: Readonly<Record<number, string>> = {
   0: 'SALIDA',
   10: 'CÁRCEL',
   20: 'PARKING',
+  30: 'COMISARÍA',
   2: 'FONDO',
   4: 'IMPUESTO',
   7: 'SUCESOS',
@@ -1364,11 +1365,14 @@ export const PIEZAS_DE_LA_ESQUINA: Readonly<Record<number, readonly PiezaDeEsqui
     { pieza: PIEZA.farolaDeCalle, u: 370.6, v: cel(7), giroEnCuartos: 1, menudo: true },
     { pieza: PIEZA.farolaDeCalle, u: 397.4, v: cel(4), giroEnCuartos: 3, menudo: true },
     { pieza: PIEZA.farolaDeCalle, u: 397.4, v: cel(8), giroEnCuartos: 3, menudo: true },
-    { pieza: PIEZA.bancoDeCalle, u: cel(7), v: cel(4), giroEnCuartos: 3, menudo: true },
-    { pieza: PIEZA.bancoDeCalle, u: cel(7), v: cel(6), giroEnCuartos: 3, menudo: true },
+    /*
+     * Los dos bancos y la papelera que había a este lado se han ido: la comisaría que levanta
+     * `obras.ts` ocupa ahora ese trozo de acera —de 400 a 428— y los habría enterrado dentro
+     * de una pared. Los dos arbustos se quedan, que caen fuera.
+     */
     { pieza: PIEZA.arbusto, u: cel(3), v: cel(3), giroEnCuartos: 0, menudo: true },
     { pieza: PIEZA.arbusto, u: cel(8), v: cel(7), giroEnCuartos: 1, menudo: true },
-    { pieza: PIEZA.papelera, u: cel(6), v: cel(5), giroEnCuartos: 0, menudo: true },
+    { pieza: PIEZA.papelera, u: cel(3), v: cel(6), giroEnCuartos: 0, menudo: true },
   ],
 };
 
