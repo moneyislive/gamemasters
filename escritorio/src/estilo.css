@@ -5490,6 +5490,21 @@ code {
   min-height: 0;
 }
 
+/*
+ * ═══ AQUÍ ACABAN LAS REGLAS DEL BURGO ═══
+ *
+ * Y conviene decirlo, aunque ya no haga falta ninguna marca: `verify:escritorio`
+ * juzgaba la gramática de los `.burgo-*` cortando la hoja desde `.burgo-en-tres {`
+ * HASTA EL FINAL DEL FICHERO, porque cuando se escribió el Burgo era lo último que
+ * había. En cuanto un juego nuevo escribió debajo, sus reglas entraron en ese corte
+ * y se juzgaron como si fueran del Burgo — las de Las Lindes lo estrenaron, con un
+ * `opacity` legítimo en un texto secundario saliendo como «el Burgo apaga con
+ * opacity».
+ *
+ * Hoy el comprobador recoge las reglas por SU SELECTOR y no por dónde están, así que
+ * escribir debajo de aquí ya no le hace nada a nadie.
+ */
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * LAS LINDES
  * ═══════════════════════════════════════════════════════════════════════════
@@ -5619,11 +5634,18 @@ code {
   font-weight: 600;
 }
 
+/*
+ * LO SECUNDARIO SE APAGA CON COLOR, NUNCA CON `opacity`.
+ *
+ * Es la gramática de la casa y está medida: un texto al 78 % sobre la ficha baja el
+ * contraste por debajo de lo que se lee, y además apaga el borde y el fondo con él.
+ * `--tenue` da 6,50 sobre el suelo y es lo que existe justo para esto.
+ */
 .lindes-mano-lados,
 .lindes-pista {
   margin: 0.2rem 0 0;
   font-size: 0.85rem;
-  opacity: 0.78;
+  color: var(--tenue);
 }
 
 .lindes-girar {
@@ -5652,7 +5674,7 @@ code {
 
 .lindes-vale {
   font-size: 0.8rem;
-  opacity: 0.7;
+  color: var(--tenue);
 }
 
 .lindes-marcador li {
@@ -5693,7 +5715,7 @@ code {
 
 .lindes-labriegos {
   font-size: 0.78rem;
-  opacity: 0.7;
+  color: var(--tenue);
 }
 
 .lindes-le-toca {
@@ -5703,7 +5725,7 @@ code {
 .lindes-bolsa {
   margin: 0.5rem 0 0;
   font-size: 0.82rem;
-  opacity: 0.75;
+  color: var(--tenue);
 }
 
 .lindes-respaldo {

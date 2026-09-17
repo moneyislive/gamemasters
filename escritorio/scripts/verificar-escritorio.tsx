@@ -255,6 +255,8 @@ import {
   laSeccionQueSeAbre,
   LaTarjetaDeUnaCasilla,
 } from '../src/hojas-del-burgo';
+import { LINDES } from '../../shared/arcade/juegos';
+import { LindesEnTres, MarcadorDeLasLindes } from '../src/lindes-en-tres';
 import { PINTORES_PROPIOS } from '../src/pintores';
 /*
  * LAS PIEZAS GENÉRICAS DEL LIENZO Y EL BANCO DE LA INTERFAZ, importados de verdad y no leídos
@@ -1323,15 +1325,18 @@ function elMuelle(): void {
   );
   /*
    * QUIÉN TIENE MUELLE, POR LISTA CERRADA. Decía «Riberas y ningún otro» mientras Riberas
-   * fue el único; con el Burgo son dos, y se sigue escribiendo la lista entera en vez de
-   * «al menos uno»: dar un tema del muelle a un arcade es mandarlo a un lobby con seis
-   * amarres y una coreografía de zarpar, y eso tiene que pasar por aquí a sabiendas. Se
-   * exige contra los INSTALADOS: mientras `burgo` no esté dado de alta en
-   * `shared/arcade/juegos/index.ts`, esto está en rojo y dice cuál falta.
+   * fue el único; con el Burgo fueron dos; con Las Lindes son tres, y se sigue escribiendo
+   * la lista entera en vez de «al menos uno»: dar un tema del muelle a un arcade es
+   * mandarlo a un lobby con seis amarres y una coreografía de zarpar, y eso tiene que
+   * pasar por aquí a sabiendas. Se exige contra los INSTALADOS: mientras un juego no esté
+   * dado de alta en `shared/arcade/juegos/index.ts`, esto está en rojo y dice cuál falta.
+   *
+   * Y el orden es el alfabético porque la comparación ordena los dos lados: escribir la
+   * lista en otro orden no la rompe, pero leerla ordenada evita la duda.
    */
-  const CON_MUELLE = ['burgo', 'riberas'];
+  const CON_MUELLE = ['burgo', 'lindes', 'riberas'];
   comprobar(
-    `los arcades instalados con muelle son exactamente ${CON_MUELLE.join(' y ')}, y ninguno más`,
+    `los arcades instalados con muelle son exactamente ${CON_MUELLE.join(', ')}, y ninguno más`,
     JSON.stringify(arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id).sort()) === JSON.stringify(CON_MUELLE),
     { conMuelle: arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id), instalados: arcadesInstalados().map((m) => m.id) },
   );
@@ -2432,9 +2437,28 @@ function burgoEnTres(): void {
       typeof PINTORES_PROPIOS[RIBERAS]?.pregonDe === 'function' &&
       typeof PINTORES_PROPIOS[RIBERAS]?.panelesDe === 'function',
   );
+  /*
+   * ═══ Y LA FILA QUE LA CABECERA DE `pintores.ts` PROMETIÓ QUE SERÍA GRATIS ═══
+   *
+   * Aquel fichero se escribió diciendo que «el tercer pintor no volverá a pagar esto:
+   * escribe su fila y ya está». Las Lindes es ese tercero y aquí se cobra la promesa:
+   * dos claves en la tabla, y la afirmación de abajo —la que exige que `sala.tsx` no
+   * nombre a ningún juego— sigue en verde sin tocarla.
+   *
+   * Sin `pregonDe` ni `panelesDe`, y eso también se mide: si un día alguien le añade
+   * un pregón a Las Lindes sin escribirlo en su fila, el mueble genérico se lo comería
+   * en silencio.
+   */
   comprobar(
-    'y los pintores propios son exactamente esos dos: un arcade sin fila se pinta con su mueble genérico y no se entera',
-    Object.keys(PINTORES_PROPIOS).sort().join(',') === [BURGO, RIBERAS].sort().join(','),
+    'Las Lindes tiene fila, con su pintor y su marcador, y sin pregón ni paneles propios',
+    PINTORES_PROPIOS[LINDES]?.Pintor === LindesEnTres &&
+      PINTORES_PROPIOS[LINDES]?.Marcador === MarcadorDeLasLindes &&
+      PINTORES_PROPIOS[LINDES]?.pregonDe === undefined &&
+      PINTORES_PROPIOS[LINDES]?.panelesDe === undefined,
+  );
+  comprobar(
+    'y los pintores propios son exactamente esos tres: un arcade sin fila se pinta con su mueble genérico y no se entera',
+    Object.keys(PINTORES_PROPIOS).sort().join(',') === [BURGO, LINDES, RIBERAS].sort().join(','),
     Object.keys(PINTORES_PROPIOS),
   );
   comprobar(
@@ -5122,7 +5146,43 @@ function laPaginaDePie(): void {
    * 40 % es texto ilegible, no un botón apagado— y la lista de apoyo NUNCA con `display:
    * none`, que los lectores saltan. Las dos se rompen sin que nada falle.
    */
-  const loDelBurgo = hojaPelada.slice(hojaPelada.indexOf('.burgo-en-tres {'));
+  /*
+   * ═══ DE DÓNDE A DÓNDE SON «LAS REGLAS DEL BURGO» ═══
+   *
+   * Esto era `slice(indexOf('.burgo-en-tres {'))`: desde ahí HASTA EL FINAL DEL
+   * FICHERO. Valía mientras el Burgo fuera lo último que había escrito en la hoja, y
+   * dejó de valer en cuanto un juego nuevo escribió debajo: sus reglas entraban en el
+   * corte y se juzgaban como si fueran del Burgo. Lo estrenó Las Lindes, con un
+   * `opacity` legítimo en un texto secundario saliendo como «el Burgo apaga con
+   * opacity».
+   *
+   * Ahora no se corta un trozo de fichero: se recogen LAS REGLAS CUYO SELECTOR
+   * NOMBRA AL BURGO, estén donde estén. Eso es exactamente lo que «las reglas del
+   * Burgo» significa, no depende de dónde escriba el siguiente, y no se afloja con el
+   * tiempo. Y lleva su vacuna: si el recorrido no encuentra ni una, lo dice.
+   */
+  const reglasConSelector = (contiene: string): string => {
+    let junto = '';
+    let cuantas = 0;
+    const bloques = /(^|\n)\s*([^{}@]*?)\{([^{}]*)\}/g;
+    let hallazgo = bloques.exec(hojaPelada);
+    while (hallazgo !== null) {
+      const selector = hallazgo[2] ?? '';
+      if (selector.includes(contiene)) {
+        junto += `${selector}{${hallazgo[3] ?? ''}}\n`;
+        cuantas++;
+      }
+      hallazgo = bloques.exec(hojaPelada);
+    }
+    /*
+     * La otra mitad de la vacuna, y no es teórica: si el recorrido no encuentra
+     * ninguna regla, esto no está mirando donde cree. Cero reglas inspeccionadas es
+     * cero fallos y se lee como verde — que es el peor de los fallos posibles.
+     */
+    comprobar(`la hoja trae reglas de «${contiene}» que juzgar`, cuantas > 0, { cuantas });
+    return junto;
+  };
+  const loDelBurgo = reglasConSelector('.burgo');
   comprobar(
     'y en las reglas del Burgo no hay un solo `opacity` apagando nada: lo apagado se apaga con su clase quieta',
     loDelBurgo.length > 0 && !/opacity:/.test(loDelBurgo),

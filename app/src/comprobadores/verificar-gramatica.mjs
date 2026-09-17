@@ -100,10 +100,43 @@ function estilosDe(texto) {
   const fuera = [];
   const patron = /(\w+)\s*:\s*\{([^{}]*)\}/g;
   let m;
-  while ((m = patron.exec(texto)) !== null) {
+  while ((m = patron.exec(sinComentarios(texto))) !== null) {
     fuera.push({ clave: m[1], cuerpo: m[2], donde: linea(texto, m.index) });
   }
   return fuera;
+}
+
+/**
+ * EL FICHERO SIN SUS COMENTARIOS, Y CON LOS RENGLONES EN SU SITIO.
+ *
+ * ═══ POR QUÉ HACE FALTA ═══
+ *
+ * Porque esta casa explica sus decisiones DONDE se toman, y una regla que prohíbe
+ * un literal acaba cazando al comentario que explica por qué está prohibido. Ya
+ * pasó en el escritorio con una regla de fuente, y volvió a pasar aquí en cuanto
+ * una pantalla escribió, encima de su estilo apagado, qué llevaba antes:
+ *
+ *     // Esto era `botonQuieto: { opacity: 0.4 }`, y se cambió por color.
+ *     botonQuieto: { backgroundColor: SALA.teja },
+ *
+ * El estilo está BIEN y el comprobador lo daba por malo. Y el arreglo evidente
+ * —no nombrar lo viejo en la prosa— es el peor de los dos: deja la regla mirando
+ * comentarios para siempre, y paga con la única documentación que explica por qué
+ * el estilo es como es.
+ *
+ * ═══ POR QUÉ SE RELLENA CON ESPACIOS Y NO SE BORRA ═══
+ *
+ * Porque `donde` cuenta los saltos de línea que hay por delante, y borrar un
+ * comentario de treinta renglones movería hacia arriba todo lo que viene detrás:
+ * el fallo señalaría a la línea equivocada, que es la forma más rápida de que
+ * alguien decida que el comprobador miente. Los saltos se conservan, y cada
+ * carácter de dentro se sustituye por un espacio.
+ */
+function sinComentarios(texto) {
+  const enBlanco = (trozo) => trozo.replace(/[^\n]/g, ' ');
+  return texto
+    .replace(/\/\*[\s\S]*?\*\//g, enBlanco)
+    .replace(/(^|[^:])\/\/[^\n]*/g, (t, antes) => antes + enBlanco(t.slice(antes.length)));
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +501,36 @@ paso('Y el comprobador muerde: casos fabricados que tienen que ponerlo rojo');
     'y no se queja del apagado bien hecho',
     !sano.some((e) => APAGADO.test(e.clave) && /\bopacity\s*:/.test(e.cuerpo)),
     'un falso rojo se desactiva, y entonces la regla desaparece',
+  );
+
+  /*
+   * ═══ Y NO SE CAZA A SÍ MISMO: EL COMENTARIO QUE EXPLICA LO PROHIBIDO ═══
+   *
+   * Los dos casos de verdad, uno en cada dirección. El primero es el falso rojo que
+   * puso esto en rojo con la pantalla bien escrita; el segundo es la vacuna del
+   * arreglo, porque tapar comentarios es exactamente la manera de dejar de mirar el
+   * código que va detrás.
+   */
+  const enProsa = estilosDe(
+    '  /* Esto era `botonQuieto: { opacity: 0.4 }`, y se cambio por color. */\n' +
+      '  botonQuieto: { backgroundColor: SALA.teja },',
+  );
+  comprobar(
+    'y NO se queja de un `opacity` que sólo vive dentro de un comentario',
+    !enProsa.some((e) => APAGADO.test(e.clave) && /\bopacity\s*:/.test(e.cuerpo)),
+    'explicar por qué algo está prohibido no puede ser la forma de romperlo',
+  );
+
+  const trasLaProsa = estilosDe(
+    '  /* Un comentario\n     de tres\n     renglones. */\n' +
+      '  botonQuieto: { opacity: 0.4 },',
+  );
+  comprobar(
+    'y SIGUE cazando el de después, y lo señala en su renglón —el 4, no el 1—',
+    trasLaProsa.some(
+      (e) => APAGADO.test(e.clave) && /\bopacity\s*:/.test(e.cuerpo) && e.donde === 4,
+    ),
+    JSON.stringify(trasLaProsa),
   );
 
   const parProhibido = estilosDe('  boton: { backgroundColor: SALA.acento, color: SALA.blanco },');

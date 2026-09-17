@@ -229,29 +229,49 @@ dependencia. Es la lección de La Ronda del §7.
 La escena vive en `escenas/lindes/` y **no sabe que existe Las Lindes**: recibe
 una lista de losas puestas con su clase y su giro, y las levanta.
 
-**Todo es procedural y todo sale de lo que ya hay.** Una losa mide una retícula
-de campo; dentro:
+### La losa mide 175, y de ahí sale todo lo demás
 
-- el **suelo** se teja con `tesela` del pack, y el color sale del atlas ya
-  horneado (`escenas/paleta.ts`);
-- las **sendas** las pone `piezaDeSenda(lados)` de `escenas/sendas.ts`, que es
-  literalmente la misma pregunta que hace una losa: «con estos lados abiertos,
-  qué pieza y con qué giro»;
-- las **murallas** se levantan con `muro`, `muro-esquina`, `muro-puerta` y
-  `atalaya`, y por dentro llevan casas del pack;
-- los **prados** se pueblan con lo que ya puebla el delta —`arbol-a`, `trigal`,
-  `almiar`, `valla`, `carro`— con la densidad que decide `poblar.ts`;
-- la **ermita** es `iglesia`, con su cerca.
+Treinta y dos unidades de pack, ocho veces lo que medía en la primera versión.
+Con veintidós unidades las piezas del pack cabían y no cabía una COMPOSICIÓN;
+con 175 —sesenta y nueve personas de lado— caben manzanas con calles, murallas
+con torres y puertas, y campos partidos en parcelas. El razonamiento entero, con
+las medidas, está en `escenas/lindes/medidas.ts`.
 
-El sorteo de todo eso cuelga de `semillaDelCodigo(codigo) + (x,y)`, nunca de
-`ctx.azar` —que es secreto y filtraría la bolsa—, así que los seis aparatos de
-una mesa ven exactamente el mismo paisaje y otra mesa ve otro. Es la regla que ya
-tiene escrita `escenas/burgo/ciudad.ts`.
+### Qué lleva una losa
 
-**El tablero crece**, así que el nivel de detalle no es un ahorro: es la
-condición para que quepa. Cada losa trae tres montajes —de cerca todo, de lejos
-el suelo y las siluetas, de muy lejos una manta— y `verify:lindes-escena` mide el
-conjunto desde varias poses.
+- el **suelo** se construye por celdas y se funde en rectángulos: una retícula de
+  48 × 48 decide si cada punto es villa, senda o prado, y las celdas seguidas de
+  la misma clase se juntan en un rectángulo antes de hacerse geometría;
+- las **villas** son bandas desde cada muralla, **con chaflán en las esquinas**:
+  eso es lo que hace que dos losas que las reglas dejan pegar casen también en el
+  dibujo, y está explicado donde se decide;
+- las **murallas** salen del borde villa/prado —nunca de los lados de la losa,
+  que es por donde la villa CONTINÚA— con `muro`, `muro-puerta` donde llega un
+  camino, y `atalaya` o `vigia` en los extremos de los tramos largos;
+- las **sendas** salen rectas de su borde antes de doblar, para que la huella que
+  dejan en la raya sea el ancho del camino;
+- los **prados** se parten en parcelas con un uso cada una —trigo, barbecho,
+  pasto, arboleda, erial— y en la raya entre dos parcelas hay un **seto**, que es
+  literalmente lo que el juego se llama;
+- la **ermita** es la pieza `ermita` del pack, con su cerca y su pozo.
+
+El sorteo de todo eso cuelga de `semillaDelCodigo(codigo)` mezclado con las
+coordenadas de la losa, nunca de `ctx.azar` —que es secreto y filtraría la
+bolsa—, así que los cinco aparatos de una mesa ven exactamente el mismo paisaje y
+otra mesa ve otro. Es la regla que ya tiene escrita `escenas/burgo/ciudad.ts`.
+
+### El nivel de detalle no es un ahorro: es la condición
+
+**El tablero crece.** Con las setenta y dos losas puestas y todo pintado harían
+falta millones de triángulos, así que hay dos anillos alrededor de donde mira la
+cámara: hasta 1,8 losas se pinta todo; hasta 4, lo que tiene bulto; más allá,
+sólo lo que cuenta una regla —murallas, torres, ermitas—. Un tablero sin árboles
+al fondo sigue siendo el tablero; uno sin la muralla de una villa cerrada es el
+tablero mintiendo sobre la partida.
+
+`verify:lindes-escena` mide las dos cuentas —el peor caso desnudo y el tablero
+con el recorte puesto— con los triángulos REALES leídos del `.glb`, y es la
+segunda la que manda.
 
 ---
 
@@ -291,7 +311,7 @@ cual**, para que se vean entre ellos.
 |---|---|
 | `verify:lindes` | Las reglas: el reparto, los casamientos, las cuentas y una partida entera jugada de principio a fin |
 | `verify:lindes-en-tres` | La traducción de la vista a la escena, desde Node |
-| `verify:lindes-escena` | La geometría: que ninguna pieza flote, que las sendas casen en el borde y que el presupuesto se cumpla |
+| `verify:lindes-escena` | La geometría: que ni una cara del suelo mire hacia abajo, que las 24 losas por sus 4 giros casen celda a celda en la raya, que ningún muro parta una villa, que nada se plante en un camino, que el presupuesto se cumpla con los triángulos del `.glb`, y que el lobby se vea |
 
 Y los que ya existen y lo cogen solo: `verify:juegos`, `verify:mesa`,
 `verify:procedencia`, `verify:pureza`, `verify:fronteras`, `oro:arcade`.

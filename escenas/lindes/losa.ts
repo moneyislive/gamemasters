@@ -897,9 +897,22 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
      */
     const pasoDeManzana = CELDAS_DE_MANZANA + CELDAS_DE_CALLE;
     const desplaza = Math.floor(tirada() * pasoDeManzana);
-    let casas = 0;
-    for (let j = 0; j < CELDAS_POR_LOSA && casas < TOPE_DE_CASAS; j += 2) {
-      for (let i = 0; i < CELDAS_POR_LOSA && casas < TOPE_DE_CASAS; i += 2) {
+
+    /*
+     * ═══ PRIMERO SE RECOGEN TODOS LOS SOLARES Y LUEGO SE ELIGEN DOCE ═══
+     *
+     * La primera versión iba poniendo casas según recorría y paraba al llegar al
+     * tope, y eso llenaba las manzanas del NOROESTE y dejaba el resto de la villa
+     * empedrada y vacía: la esquina por la que empieza el bucle salía como un casco
+     * viejo y el resto como una explanada. No lo dice ningún comprobador —doce casas
+     * son doce casas, estén donde estén— y se ve a la primera.
+     *
+     * Recogiendo todos los solares posibles y tomando uno de cada `salto`, las doce
+     * quedan repartidas por la villa entera, sea del tamaño que sea.
+     */
+    const solares: { readonly i: number; readonly j: number }[] = [];
+    for (let j = 0; j < CELDAS_POR_LOSA; j += 2) {
+      for (let i = 0; i < CELDAS_POR_LOSA; i += 2) {
         if (claseEn(i, j) !== 'villa') continue;
         /*
          * Y no pegada a la muralla: entre el lienzo y la primera casa hay una RONDA,
@@ -921,28 +934,35 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
         const centro = centroDeCelda(i, j);
         /* Ni en la plaza, que es el hueco que deja ver el edificio que manda. */
         if (distanciaAlSegmento(centro, plaza, plaza) < radioDeLaPlaza * radioDeLaPlaza) continue;
-        if (tirada() > 0.62) continue;
-        const donde = {
-          x: centro.x + (tirada() - 0.5) * paso * 0.9,
-          z: centro.z + (tirada() - 0.5) * paso * 0.9,
-        };
-        if (relleno.some((p) => cerca(p, donde, aMundo(paso * 1.8)))) continue;
-        const grande = tirada() < 0.12;
-        relleno.push({
-          pieza: grande
-            ? (LO_QUE_ACOMPANA[Math.floor(tirada() * LO_QUE_ACOMPANA.length)] as string)
-            : MODELO.casa,
-          x: aMundo(donde.x),
-          z: aMundo(donde.z),
-          y: 0,
-          giro: (Math.PI / 2) * Math.floor(tirada() * 4),
-          escala: ESCALA_DE_LA_CASA * (grande ? 1.05 : 1) * (0.92 + tirada() * 0.22),
-          largo: 1,
-          porque: 'villa',
-          menuda: false,
-        });
-        casas++;
+        solares.push({ i, j });
       }
+    }
+
+    const cuantas = Math.min(TOPE_DE_CASAS, solares.length);
+    const salto = cuantas === 0 ? 1 : Math.max(1, Math.floor(solares.length / cuantas));
+    for (let k = 0; k < cuantas; k++) {
+      const solar = solares[Math.min(solares.length - 1, k * salto + Math.floor(tirada() * salto))];
+      if (solar === undefined) continue;
+      const centro = centroDeCelda(solar.i, solar.j);
+      const donde = {
+        x: centro.x + (tirada() - 0.5) * paso * 0.9,
+        z: centro.z + (tirada() - 0.5) * paso * 0.9,
+      };
+      if (relleno.some((p) => cerca(p, donde, aMundo(paso * 1.8)))) continue;
+      const grande = tirada() < 0.12;
+      relleno.push({
+        pieza: grande
+          ? (LO_QUE_ACOMPANA[Math.floor(tirada() * LO_QUE_ACOMPANA.length)] as string)
+          : MODELO.casa,
+        x: aMundo(donde.x),
+        z: aMundo(donde.z),
+        y: 0,
+        giro: (Math.PI / 2) * Math.floor(tirada() * 4),
+        escala: ESCALA_DE_LA_CASA * (grande ? 1.05 : 1) * (0.92 + tirada() * 0.22),
+        largo: 1,
+        porque: 'villa',
+        menuda: false,
+      });
     }
   }
 

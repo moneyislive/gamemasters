@@ -194,13 +194,15 @@ export default function LasLindesPorDentro(): JSX.Element {
             accessibilityLabel="Tu nombre en la mesa"
           />
           <Pressable
-            style={[estilos.boton, noPuedeAbrir && estilos.botonApagado]}
+            style={[estilos.boton, noPuedeAbrir && estilos.botonQuieto]}
             disabled={noPuedeAbrir}
             accessibilityRole="button"
             accessibilityState={{ disabled: noPuedeAbrir }}
             onPress={() => mesa.abrir(nombre.trim())}
           >
-            <Text style={estilos.botonTexto}>Volcar la bolsa</Text>
+            <Text style={[estilos.botonTexto, noPuedeAbrir && estilos.botonTextoQuieto]}>
+              Volcar la bolsa
+            </Text>
           </Pressable>
           <Text style={estilos.rotulo}>O SENTARSE EN UNA MESA ABIERTA</Text>
           <TextInput
@@ -214,13 +216,15 @@ export default function LasLindesPorDentro(): JSX.Element {
             accessibilityLabel="Código de la mesa"
           />
           <Pressable
-            style={[estilos.boton, noPuedeEntrar && estilos.botonApagado]}
+            style={[estilos.boton, noPuedeEntrar && estilos.botonQuieto]}
             disabled={noPuedeEntrar}
             accessibilityRole="button"
             accessibilityState={{ disabled: noPuedeEntrar }}
             onPress={() => mesa.entrar(codigo.trim().toUpperCase(), nombre.trim())}
           >
-            <Text style={estilos.botonTexto}>Sentarse</Text>
+            <Text style={[estilos.botonTexto, noPuedeEntrar && estilos.botonTextoQuieto]}>
+              Sentarse
+            </Text>
           </Pressable>
           {mesa.aviso.length > 0 ? <Text style={estilos.aviso}>{mesa.aviso}</Text> : null}
         </View>
@@ -324,12 +328,14 @@ export default function LasLindesPorDentro(): JSX.Element {
               </Text>
             </View>
             <Pressable
-              style={[estilos.girar, girosAqui.length < 2 && estilos.botonApagado]}
+              style={[estilos.girar, girosAqui.length < 2 && estilos.botonQuieto]}
               disabled={girosAqui.length < 2 || mesa.quieto}
               accessibilityRole="button"
               onPress={() => ponerGiro((g) => elSiguienteGiro(girosAqui, g))}
             >
-              <Text style={estilos.botonTexto}>Girar</Text>
+              <Text style={[estilos.botonTexto, girosAqui.length < 2 && estilos.botonTextoQuieto]}>
+                Girar
+              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -364,13 +370,15 @@ export default function LasLindesPorDentro(): JSX.Element {
             {tablero.acciones.map((a) => (
               <Pressable
                 key={a.id}
-                style={[estilos.chip, !a.disponible && estilos.botonApagado]}
+                style={[estilos.chip, !a.disponible && estilos.chipQuieto]}
                 disabled={!a.disponible || mesa.quieto}
                 accessibilityRole="button"
                 accessibilityLabel={`${a.rotulo}. ${a.ayuda}`}
                 onPress={() => alTocar(a.toque)}
               >
-                <Text style={estilos.chipTexto}>{a.rotulo}</Text>
+                <Text style={[estilos.chipTexto, !a.disponible && estilos.botonTextoQuieto]}>
+                  {a.rotulo}
+                </Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -417,7 +425,25 @@ const estilos = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
-  botonApagado: { opacity: 0.4 },
+  /*
+   * ═══ LO APAGADO SE APAGA CON COLOR, Y POR ESO SON TRES Y NO UNO ═══
+   *
+   * Esto era `botonApagado: { opacity: 0.4 }`, y `verify:gramatica` lo cazó: una
+   * placa al 40 % apaga TAMBIÉN el rótulo que lleva encima, y el rótulo apagado es
+   * justo lo que hay que poder leer para saber por qué no se puede pulsar.
+   *
+   * Son tres y no uno porque el apagado cuelga de tres fondos distintos, y el estilo
+   * único era lo que el `opacity` permitía disimular:
+   *
+   *   · la placa de acento cae a `teja`, que es el fondo muerto de la casa;
+   *   · el rótulo que iba OSCURO sobre el acento tiene que pasar a `tenue`, o se
+   *     queda negro sobre casi negro —`suelo` sobre `teja` da 1,2:1—;
+   *   · y el cromo, que YA es `teja`, tiene que caer a `suelo`: apagarlo a `teja`
+   *     habría sido no apagarlo, y con la opacidad ni se notaba.
+   */
+  botonQuieto: { backgroundColor: SALA.teja },
+  botonTextoQuieto: { color: SALA.tenue },
+  chipQuieto: { backgroundColor: SALA.suelo, borderColor: SALA.filo },
   botonTexto: { color: SALA.suelo, fontSize: 15, ...LETRA.rotuloChico },
   aviso: { color: SALA.palabra, fontSize: 14, lineHeight: 19, ...LETRA.cuerpo },
   camaras: { position: 'absolute', top: 8, right: 8, flexDirection: 'row', gap: 6 },
@@ -430,7 +456,7 @@ const estilos = StyleSheet.create({
     borderColor: 'rgba(243, 236, 216, 0.45)',
   },
   camaraPuesta: { backgroundColor: '#f3ecd8', borderColor: '#f3ecd8' },
-  camaraTexto: { color: '#f3ecd8', fontSize: 12, ...LETRA.rotuloChico },
+  camaraTexto: { color: '#f3ecd8', fontSize: 13, ...LETRA.rotuloChico },
   camaraTextoPuesto: { color: '#1b2411' },
   hoja: {
     backgroundColor: SALA.pared,
@@ -443,7 +469,7 @@ const estilos = StyleSheet.create({
   fila: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   manoTexto: { flex: 1, minWidth: 0 },
   manoNombre: { color: SALA.palabra, fontSize: 15, ...LETRA.rotuloChico },
-  manoLados: { color: SALA.tenue, fontSize: 12, ...LETRA.cuerpo },
+  manoLados: { color: SALA.tenue, fontSize: 13, ...LETRA.cuerpo },
   girar: {
     backgroundColor: SALA.acento,
     borderRadius: 8,
@@ -462,8 +488,8 @@ const estilos = StyleSheet.create({
     gap: 2,
   },
   chipTexto: { color: SALA.palabra, fontSize: 13, ...LETRA.cuerpo },
-  chipCifra: { color: SALA.tenue, fontSize: 11, ...LETRA.cuerpo },
+  chipCifra: { color: SALA.tenue, fontSize: 13, ...LETRA.cuerpo },
   marcador: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   enLaMesa: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  enLaMesaNombre: { color: SALA.tenue, fontSize: 12, ...LETRA.cuerpo },
+  enLaMesaNombre: { color: SALA.tenue, fontSize: 13, ...LETRA.cuerpo },
 });
