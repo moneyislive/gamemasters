@@ -47,7 +47,7 @@ export interface TemaDelMuelle {
    * nombre del arcade: un `if (arcade === 'burgo')` en los dos clientes sería la misma
    * decisión escrita dos veces y en el sitio donde no se ve.
    */
-  readonly escena: 'embarcadero' | 'plaza';
+  readonly escena: 'embarcadero' | 'plaza' | 'linde';
   /** Cómo se llama el lugar. Sale en el HUD encima del código. */
   readonly lugar: string;
   /** La frase que se lee mientras se espera. Voz de la casa. */
@@ -78,9 +78,27 @@ const BURGO: TemaDelMuelle = {
   colonos: ['#f2e8cf', '#26262e', '#7d3fd6', '#2fe0d0', '#ff8f6b', '#c5e84a'],
 };
 
+/**
+ * LA LINDE ALTA: el altozano sobre el valle vacío desde el que se abre Las Lindes.
+ *
+ * El tercer lobby, y el primero que no es un sitio de llegada sino un MIRADOR: lo
+ * que se ve desde aquí es el valle donde va a crecer el tablero. Por eso la frase de
+ * espera habla del valle y no de la gente.
+ */
+const LINDES: TemaDelMuelle = {
+  arcade: 'lindes',
+  escena: 'linde',
+  lugar: 'La Linde Alta',
+  espera: 'El valle está vacío. Se vuelca la bolsa cuando estéis todos.',
+  zarpar: 'Se vuelca la bolsa',
+  /* El mismo orden que `COLORES_DE_LAS_LINDES` en lindes.ts: carmín, índigo, ocre, musgo, hueso. */
+  colonos: ['#c8303a', '#2f5fd0', '#e0a32e', '#3f9a56', '#ece3cf'],
+};
+
 const TEMAS: Readonly<Record<string, TemaDelMuelle>> = {
   [RIBERAS.arcade]: RIBERAS,
   [BURGO.arcade]: BURGO,
+  [LINDES.arcade]: LINDES,
 };
 
 /** ¿Tiene este arcade un muelle en tres dimensiones antes de la partida? */

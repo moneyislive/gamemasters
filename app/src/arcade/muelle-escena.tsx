@@ -51,6 +51,7 @@ import '../../../shared/arcade/juegos';
 import { Embarcadero } from '../../../escenas/embarcadero/Embarcadero';
 /* La escena hermana del Burgo: mismo contrato, y el tema dice cuál de las dos se monta. */
 import { Plaza } from '../../../escenas/plaza/Plaza';
+import { LindeAlta } from '../../../escenas/linde-alta/LindeAlta';
 /*
  * El juez de la calidad vivía aquí y se fue a `escenas/` el día que el Burgo lo quiso
  * también en el escritorio, que no puede importar de `app/`. Ver su cabecera.
@@ -301,7 +302,16 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
    * sola vez. `escena` vive en el tema porque el manifiesto de arcade está sellado y un lobby
    * no es una regla del juego.
    */
-  const Escena = tema.escena === 'plaza' ? Plaza : Embarcadero;
+  /*
+   * ═══ TRES ESCENAS HERMANAS, Y LA TABLA LAS ELIGE POR NOMBRE ═══
+   *
+   * Las tres cumplen `PropsDelEmbarcadero` letra por letra, así que aquí no hay más
+   * que escoger. Un `escena` que esta versión no conozca cae al embarcadero, que es
+   * el que siempre estuvo: un lobby de otro sitio es raro, y una pantalla en blanco
+   * es un fallo.
+   */
+  const ESCENAS = { plaza: Plaza, linde: LindeAlta, embarcadero: Embarcadero } as const;
+  const Escena = ESCENAS[tema.escena] ?? Embarcadero;
 
   return (
     <View style={estilos.todo} onLayout={medirTodo}>

@@ -55,6 +55,7 @@ import type { FiguraId } from '../../escenas/embarcadero/figuras';
 import type { TemaDelMuelle } from '../../escenas/embarcadero/tema';
 import type { MesaEnElMuelle, Traer, Ventana } from '../../escenas/embarcadero/tipos';
 import { Plaza } from '../../escenas/plaza/Plaza';
+import { LindeAlta } from '../../escenas/linde-alta/LindeAlta';
 import { esLaOpcionDeEmpezar, haEmpezado } from './empezada';
 import { figuraDeEstreno, guardarFigura } from './figura';
 import type { LaMesa, MesaVista } from './mesa';
@@ -281,7 +282,16 @@ export function Muelle({
    * bloque entero sería el mismo JSX copiado con otro nombre dentro, y el día que el contrato
    * crezca se arreglaría una de las dos copias. Lo decide el tema, no el nombre del arcade.
    */
-  const Escena = tema.escena === 'plaza' ? Plaza : Embarcadero;
+  /*
+   * ═══ TRES ESCENAS HERMANAS, Y LA TABLA LAS ELIGE POR NOMBRE ═══
+   *
+   * Las tres cumplen `PropsDelEmbarcadero` letra por letra, así que aquí no hay más
+   * que escoger. Un `escena` que esta versión no conozca cae al embarcadero, que es
+   * el que siempre estuvo: un lobby de otro sitio es raro, y una pantalla en blanco
+   * es un fallo.
+   */
+  const ESCENAS = { plaza: Plaza, linde: LindeAlta, embarcadero: Embarcadero } as const;
+  const Escena = ESCENAS[tema.escena] ?? Embarcadero;
   const conMundo = typeof window !== 'undefined' && mundoPedido;
 
   return (
