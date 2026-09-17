@@ -323,7 +323,7 @@ export type PasoDelTurno =
   | 'comprar' // cayó en un título sin dueño: comprar o mandarlo a subasta
   | 'almoneda' // hay una subasta abierta; turnoDe = almoneda.pujaDe
   | 'apuro' // alguien debe más de lo que tiene; turnoDe = apuro.quien
-  | 'por-pasar'; // ya tiró y resolvió; puede obrar, tratar y pasar (o tirar otra vez si dobles)
+  | 'por-pasar'; // ya tiró y resolvió; puede obrar, tratar y pasar (con dobles no se llega aquí: se vuelve a `por-tirar`)
 
 /** A qué paso vuelve el turno cuando se cierra comprar/subasta/apuro. */
 export type PasoDeVuelta = 'por-tirar' | 'por-pasar';
@@ -3218,6 +3218,41 @@ function redactarPregon(e: EstadoDelBurgo, nombre: (a: AsientoId | null) => stri
   return de === null ? 'La partida ha terminado.' : `Se espera a ${nombre(de)}.`;
 }
 
+/**
+ * LOS DOBLES, DICHOS EN EL PASO EN QUE DE VERDAD SE VUELVE A TIRAR.
+ *
+ * Con dobles, `tirar` deja el turno en `por-tirar` (`luego = 'por-tirar'`), no en `por-pasar`.
+ * Las frases de los dobles —«Dobles: vuelve a tirar.» en el aviso, «Volver a tirar (dobles)» en
+ * el botón, «vuelve a tirar…» en la espera— colgaban de `por-pasar` con dobles, un paso al que no
+ * lleva ninguna tirada, y no salieron nunca: quien sacaba dobles leía «Te toca tirar.», lo mismo
+ * que al empezar un turno, y al tercero la Comisaría llegaba sin una palabra fuera de la crónica.
+ * La regla estaba en el reductor desde el principio, pero no se veía, y el 17-sep-2026 Miguel la
+ * dio por olvidada. Las frases se escriben aquí UNA vez y las usan el aviso y el botón, en
+ * `por-tirar` y en `por-pasar`, que el tic y TIRAR siguen aceptando.
+ */
+function avisoDeLosDobles(dobles: number): string {
+  return dobles >= DOBLES_QUE_ENCIERRAN - 1
+    ? 'Dobles otra vez: vuelve a tirar. Si vuelven a salir dobles, vas a la Comisaría sin mover.'
+    : 'Dobles: vuelve a tirar. Si sacas tres dobles seguidos, vas a la Comisaría sin mover.';
+}
+
+/** La ayuda del botón de volver a tirar: lo mismo que el aviso, dicho desde el botón. */
+function ayudaDeLosDobles(dobles: number): string {
+  return dobles >= DOBLES_QUE_ENCIERRAN - 1
+    ? 'Llevas dos dobles seguidos: si vuelven a salir, vas a la Comisaría sin mover.'
+    : 'Sacaste dobles: tiras otra vez. Tres dobles seguidos te llevan a la Comisaría sin mover.';
+}
+
+/**
+ * ¿ACABA `quien` DE IR A LA COMISARÍA POR TRES DOBLES, en este mismo cambio? Se mira en los
+ * sucesos porque el estado no guarda por qué se entró: la casilla 30, una carta y el tercer doble
+ * dejan la misma celda. Con el siguiente cambio los sucesos son otros y el aviso vuelve a ser el
+ * de siempre, que es lo que tiene que durar: la explicación es de ESE momento.
+ */
+function acabaDeIrPorTresDobles(e: EstadoDelBurgo, quien: AsientoId): boolean {
+  return e.sucesos.some((s) => s.que === 'a-la-mazmorra' && s.quien === quien && s.porque === 'tres-dobles');
+}
+
 /** Lo que ME concierne ahora mismo. `''` para el espectador cuando no hay nada que decirle. */
 function redactarAviso(e: EstadoDelBurgo, quien: QuienMira, nombre: (a: AsientoId | null) => string): string {
   if (quien === ESPECTADOR) return '';
@@ -3250,9 +3285,10 @@ function redactarAviso(e: EstadoDelBurgo, quien: QuienMira, nombre: (a: AsientoI
       return `${fila === null ? 'El Impuesto sobre el Capital' : fila.nombre}: paga ${maravedies(fijo)} o el 10 % de tu patrimonio (${maravedies(decimaDelPatrimonio(patrimonioDe(e, j)))}). Si tiras o pasas sin elegir, se cobra ${maravedies(fijo)}.`;
     }
     if (e.paso === 'por-tirar') {
-      return j.presa >= 0
-        ? `Estás en la Comisaría: paga la fianza, usa un Salvoconducto o prueba con los dados (intento ${j.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}).`
-        : 'Te toca tirar.';
+      if (j.presa >= 0) {
+        return `Estás en la Comisaría: paga la fianza, usa un Salvoconducto o prueba con los dados (intento ${j.presa + 1} de ${INTENTOS_EN_LA_MAZMORRA}).`;
+      }
+      return e.dobles > 0 ? avisoDeLosDobles(e.dobles) : 'Te toca tirar.';
     }
     if (e.paso === 'comprar') {
       const fila = filaDe(j.casilla);
@@ -3260,7 +3296,12 @@ function redactarAviso(e: EstadoDelBurgo, quien: QuienMira, nombre: (a: AsientoI
         ? 'Puedes comprar o sacar a subasta.'
         : `Puedes comprar ${fila.nombre} por ${maravedies(fila.precio)}, o sacarla a subasta.`;
     }
-    if (e.paso === 'por-pasar') return e.dobles > 0 ? 'Dobles: vuelve a tirar.' : 'Puedes obrar, tratar o pasar el turno.';
+    if (e.paso === 'por-pasar') {
+      if (e.dobles > 0) return avisoDeLosDobles(e.dobles);
+      return acabaDeIrPorTresDobles(e, quien)
+        ? 'Tres dobles seguidos: a la Comisaría sin mover. Puedes obrar, tratar o pasar el turno.'
+        : 'Puedes obrar, tratar o pasar el turno.';
+    }
     return '';
   }
   const espera = aQuienSeEspera(e);
@@ -3637,6 +3678,8 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
         if (yo.indultos > 0) {
           salida.push(opcion('usar-indulto', USAR_INDULTO, {}, 'Usar un Salvoconducto', 'Sales y tiras con normalidad; la carta vuelve al fondo de su mazo.'));
         }
+      } else if (v.dobles > 0) {
+        salida.push(opcion('tirar', TIRAR, {}, 'Volver a tirar (dobles)', ayudaDeLosDobles(v.dobles)));
       } else {
         salida.push(opcion('tirar', TIRAR, {}, 'Tirar los dados', 'Mueves lo que sumen; con dobles repites, y a los tres dobles seguidos, a comisaría.'));
       }
@@ -3706,7 +3749,7 @@ export function opcionesDelBurgo(vista: unknown, quien: QuienMira): readonly Opc
         );
       }
     } else if (v.paso === 'por-pasar') {
-      if (v.dobles > 0) salida.push(opcion('tirar', TIRAR, {}, 'Volver a tirar (dobles)', 'Sacaste dobles: tiras otra vez. Tres seguidos, a comisaría.'));
+      if (v.dobles > 0) salida.push(opcion('tirar', TIRAR, {}, 'Volver a tirar (dobles)', ayudaDeLosDobles(v.dobles)));
       else salida.push(opcion('pasar', PASAR, {}, 'Pasar el turno', 'Tus tratos abiertos caducan al pasar.'));
     }
   }

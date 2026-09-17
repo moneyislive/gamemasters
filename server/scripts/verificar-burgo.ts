@@ -160,6 +160,7 @@ import {
   OFICIOS,
   PUERTAS,
   DINERO_DE_SALIDA,
+  DOBLES_QUE_ENCIERRAN,
   EL_ARCA,
   EL_DIEZMO,
   EL_PREGON,
@@ -899,6 +900,99 @@ function reprochesDeEncierro(s: EstadoDelBurgo, quien: AsientoId, porque: 'casil
   return r;
 }
 
+/**
+ * LOS DOBLES A LA VISTA de quien tiene el turno: el aviso y el botón de tirar.
+ *
+ * La regla estuvo entera en el reductor desde el principio, pero sus frases colgaban de `por-pasar`
+ * con dobles, un paso al que no lleva ninguna tirada (con dobles el turno vuelve a `por-tirar`): quien
+ * sacaba dobles leía «Te toca tirar.» y «Tirar los dados», lo mismo que al empezar un turno, y al
+ * tercero la Comisaría llegaba sin una palabra fuera de la crónica. El 17-sep-2026 Miguel dio la regla
+ * por olvidada. Esto exige, en `por-tirar` y `por-pasar` sin nada que interrumpa:
+ *
+ *   · con dobles, que el aviso diga que se vuelve a tirar y que el tercero lleva a la Comisaría sin
+ *     mover, y que el botón sea «Volver a tirar (dobles)»;
+ *   · justo después del tercer doble, que el aviso diga por qué se está en la Comisaría, sin botón de
+ *     tirar;
+ *   · sin dobles, que nadie mande volver a tirar, y que el botón de quien está libre sea «Tirar los dados».
+ *
+ * Un estado donde no toca decir nada de esto (otro paso, una subasta, un apuro, el Impuesto por elegir,
+ * otro asiento) no da reproches. La vista y las opciones entran por parámetro para poder envenenarlas
+ * con las frases de antes.
+ */
+function reprochesDeLosDoblesALaVista(
+  e: EstadoDelBurgo,
+  quien: AsientoId,
+  v: VistaDelBurgo = vistaDe(e, quien),
+  opciones: readonly Opcion[] = opcionesEn(e, quien),
+): string[] {
+  const r: string[] = [];
+  const i = e.jugadores.findIndex((x) => x.asiento === quien);
+  const j = e.jugadores[i];
+  if (j === undefined || j.quebrado || e.momento !== 'jugando' || e.turno !== i) return r;
+  if (e.apuro !== null || e.almoneda !== null || e.impuestoSinPagar || (e.paso !== 'por-tirar' && e.paso !== 'por-pasar')) return r;
+  /* Un trato que me proponen va antes en el aviso (`redactarAviso`): ahí sólo se mira el botón. */
+  const conTratoParaMi = e.tratos.some((t) => t.a === quien);
+  const tirar = opciones.find((o) => o.tipo === TIRAR) ?? null;
+  if (e.dobles > 0) {
+    if (!conTratoParaMi && v.aviso.indexOf('vuelve a tirar') < 0) r.push(`con ${e.dobles} dobles el aviso no dice que se vuelve a tirar: «${v.aviso}»`);
+    if (!conTratoParaMi && v.aviso.indexOf('Comisaría sin mover') < 0) r.push(`con ${e.dobles} dobles el aviso no dice que el tercero lleva a la Comisaría sin mover: «${v.aviso}»`);
+    if (tirar === null || tirar.rotulo !== 'Volver a tirar (dobles)') r.push(`con ${e.dobles} dobles el botón de tirar es «${String(tirar?.rotulo)}»`);
+  } else if (e.sucesos.some((s) => s.que === 'a-la-mazmorra' && s.quien === quien && s.porque === 'tres-dobles')) {
+    if (!conTratoParaMi && v.aviso.indexOf('Tres dobles seguidos') < 0) r.push(`tras el tercer doble el aviso no dice por qué está en la Comisaría: «${v.aviso}»`);
+    if (tirar !== null) r.push(`tras el tercer doble se ofrece «${tirar.rotulo}»`);
+  } else {
+    if (v.aviso.indexOf('vuelve a tirar') >= 0) r.push(`sin dobles el aviso manda volver a tirar: «${v.aviso}»`);
+    if (tirar !== null && j.presa < 0 && tirar.rotulo !== 'Tirar los dados') r.push(`sin dobles el botón de tirar es «${tirar.rotulo}»`);
+  }
+  return r;
+}
+
+/**
+ * LA REGLA DE LOS DOBLES entre dos revisiones seguidas de una mesa (`antes` es el estado justo antes
+ * del cambio). Si el cambio trae una tirada con dobles de alguien que no estaba en la Comisaría:
+ *
+ *   · si ya llevaba dos (el tercero), va a la Comisaría EN ESE MISMO CAMBIO, sin un solo `mueve`, sin
+ *     cobrar la Salida y con los dobles a cero: la tercera tirada no se juega;
+ *   · si no, anda, y —salvo que la casilla o una carta lo encierren, o quiebre— los dobles suben uno y
+ *     el turno sigue siendo suyo.
+ *
+ * Y en cualquier cambio: el turno no pasa a otro con dobles pendientes, salvo que quien los tenía haya
+ * quebrado o la partida se haya acabado.
+ */
+function reprochesDeLaReglaDeLosDobles(antes: EstadoDelBurgo, despues: EstadoDelBurgo): string[] {
+  const r: string[] = [];
+  const quienTenia = antes.jugadores[antes.turno];
+  if (antes.momento === 'jugando' && despues.momento === 'jugando' && antes.dobles > 0 && despues.turno !== antes.turno && quienTenia !== undefined) {
+    const ahora = despues.jugadores.find((x) => x.asiento === quienTenia.asiento);
+    if (ahora !== undefined && !ahora.quebrado) r.push(`el turno pasó de ${quienTenia.asiento} a otro con ${antes.dobles} dobles pendientes`);
+  }
+  const k = despues.sucesos.findIndex((s) => s.que === 'tira');
+  const tira = despues.sucesos[k];
+  if (tira === undefined || tira.que !== 'tira' || !tira.dobles || tira.enLaMazmorra) return r;
+  const quien = tira.quien;
+  const j = despues.jugadores.find((x) => x.asiento === quien);
+  if (j === undefined) return r;
+  const tras = despues.sucesos.slice(k + 1);
+  const porTresDobles = tras.some((s) => s.que === 'a-la-mazmorra' && s.quien === quien && s.porque === 'tres-dobles');
+  const encerrado = tras.some((s) => s.que === 'a-la-mazmorra' && s.quien === quien);
+  const anda = tras.filter((s) => s.que === 'mueve' && s.quien === quien).length;
+  if (antes.dobles + 1 >= DOBLES_QUE_ENCIERRAN) {
+    if (!porTresDobles) r.push(`el tercer doble seguido de ${quien} no lo llevó a la Comisaría`);
+    if (anda > 0) r.push(`con el tercer doble ${quien} anduvo (${anda} mueve)`);
+    if (tras.some((s) => s.que === 'cobra' && s.quien === quien && s.porque === 'puerta-mayor')) r.push(`con el tercer doble ${quien} cobró la Salida`);
+    if (j.casilla !== LA_MAZMORRA || j.presa !== 0) r.push(`tras el tercer doble ${quien} está en la ${j.casilla} con presa ${j.presa}`);
+    if (despues.dobles !== 0) r.push(`tras el tercer doble quedan ${despues.dobles} dobles`);
+  } else {
+    if (porTresDobles) r.push(`con el ${antes.dobles + 1}.º doble ${quien} fue a la Comisaría por tres dobles`);
+    if (anda === 0) r.push(`con el ${antes.dobles + 1}.º doble ${quien} no anduvo`);
+    if (!encerrado && !j.quebrado && despues.momento === 'jugando') {
+      if (despues.dobles !== antes.dobles + 1) r.push(`tras el ${antes.dobles + 1}.º doble el estado lleva ${despues.dobles} dobles`);
+      if (despues.turno !== antes.turno) r.push(`tras un doble el turno ya no es de ${quien}`);
+    }
+  }
+  return r;
+}
+
 /** Los reproches de un mazo tras devolver una serie al fondo: la serie está, está la última, y no falta ni sobra nada. */
 function reprochesDeMazo(antes: readonly string[], despues: readonly string[], serie: string): string[] {
   const r: string[] = [];
@@ -953,6 +1047,7 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
     paso: estadoDe(mesa).paso,
     mrs: jugadorDe(estadoDe(mesa), ANA).mrs,
   });
+  const conDosDobles = estadoDe(mesa);
   mesa = tira(mesa, ANA);
   const tres = estadoDe(mesa);
   comprobar('tercer dobles: a la Comisaría sin mover ni cobrar', reprochesDeEncierro(tres, ANA, 'tres-dobles').length === 0 && sucesosDe(tres, 'mueve').length === 0, reprochesDeEncierro(tres, ANA, 'tres-dobles'));
@@ -962,6 +1057,50 @@ function reprochesDeMazo(antes: readonly string[], despues: readonly string[], s
   const noEncerrado = conJugador(tres, ANA, { casilla: 12, presa: LIBRE });
   comprobar('la vacuna: sin el tope de tres dobles (libre en el 12) los reproches del encierro caen', reprochesDeEncierro(noEncerrado, ANA, 'tres-dobles').length > 0);
   comprobar('y el dinero cuadra: cobró 200 en la Salida, pagó 200 de Impuesto y nada más', jugadorDe(tres, ANA).mrs === DINERO_DE_SALIDA);
+
+  /*
+   * LA REGLA ENTRE DOS REVISIONES: la función que vigila las partidas enteras del bloque 13, aplicada
+   * aquí a los cambios de verdad y a sus venenos. El tercer doble no se juega; los otros andan y suman.
+   */
+  const antesDelDoble = listoParaTirar('DOB-1-REGLA', base, ANA, LA_FERIA - 4, [[2, 2]]);
+  const trasElDoble = estadoDe(tira(antesDelDoble, ANA));
+  comprobar('la regla entre revisiones: el primer doble anda, suma uno y deja el turno a quien lo sacó', reprochesDeLaReglaDeLosDobles(estadoDe(antesDelDoble), trasElDoble).length === 0 && trasElDoble.dobles === 1, reprochesDeLaReglaDeLosDobles(estadoDe(antesDelDoble), trasElDoble));
+  comprobar('y el tercero, sin andar, a la Comisaría en el mismo cambio', reprochesDeLaReglaDeLosDobles(conDosDobles, tres).length === 0, reprochesDeLaReglaDeLosDobles(conDosDobles, tres));
+  {
+    const andando: EstadoDelBurgo = {
+      ...conJugador(tres, ANA, { casilla: (jugadorDe(conDosDobles, ANA).casilla + 2) % CUANTAS_CASILLAS, presa: LIBRE }),
+      sucesos: [...tres.sucesos.filter((s) => s.que !== 'a-la-mazmorra'), { que: 'mueve', quien: ANA, desde: jugadorDe(conDosDobles, ANA).casilla, hasta: (jugadorDe(conDosDobles, ANA).casilla + 2) % CUANTAS_CASILLAS, recorrido: [5, 6], porLaPuertaMayor: false, como: 'anda' }],
+    };
+    comprobar('VACUNA: un tercer doble que se juega —anda dos casillas y no va a la Comisaría— se ve caer', reprochesDeLaReglaDeLosDobles(conDosDobles, andando).length >= 3, reprochesDeLaReglaDeLosDobles(conDosDobles, andando));
+    const sinContar: EstadoDelBurgo = { ...trasElDoble, dobles: 0, paso: 'por-pasar' };
+    comprobar('VACUNA: un doble que no se cuenta también', reprochesDeLaReglaDeLosDobles(estadoDe(antesDelDoble), sinContar).length > 0);
+    const otroTurno: EstadoDelBurgo = { ...trasElDoble, turno: trasElDoble.jugadores.findIndex((x) => x.asiento === BRUNO), sucesos: [] };
+    comprobar('VACUNA: y un turno que pasa a otro con dobles pendientes también', reprochesDeLaReglaDeLosDobles(trasElDoble, otroTurno).length > 0);
+  }
+
+  /*
+   * Y LA PANTALLA LO DICE (17-sep-2026). Las frases de los dobles colgaban de `por-pasar`, adonde no
+   * lleva ninguna tirada: con dobles se leía «Te toca tirar.» y «Tirar los dados», como al empezar un
+   * turno, y la regla parecía no existir.
+   */
+  const alEmpezar = turnoDe(base, ANA);
+  comprobar('al empezar el turno, sin dobles: «Te toca tirar.» y «Tirar los dados»', reprochesDeLosDoblesALaVista(alEmpezar, ANA).length === 0 && vistaDe(alEmpezar, ANA).aviso === 'Te toca tirar.', reprochesDeLosDoblesALaVista(alEmpezar, ANA));
+  comprobar('con un doble el aviso manda volver a tirar y avisa de la Comisaría, y el botón es «Volver a tirar (dobles)»', reprochesDeLosDoblesALaVista(dobles, ANA).length === 0, { reproches: reprochesDeLosDoblesALaVista(dobles, ANA), aviso: vistaDe(dobles, ANA).aviso });
+  comprobar('con dos, lo mismo, y el aviso dice que son otra vez', reprochesDeLosDoblesALaVista(conDosDobles, ANA).length === 0 && vistaDe(conDosDobles, ANA).aviso.indexOf('otra vez') >= 0 && vistaDe(conDosDobles, ANA).aviso !== vistaDe(dobles, ANA).aviso, { reproches: reprochesDeLosDoblesALaVista(conDosDobles, ANA), aviso: vistaDe(conDosDobles, ANA).aviso });
+  comprobar('y tras el tercero el aviso dice por qué está en la Comisaría, sin botón de tirar', reprochesDeLosDoblesALaVista(tres, ANA).length === 0, { reproches: reprochesDeLosDoblesALaVista(tres, ANA), aviso: vistaDe(tres, ANA).aviso });
+  comprobar('el aviso de los dobles es de quien los sacó: los demás siguen esperando', vistaDe(dobles, BRUNO).aviso.indexOf('vuelve a tirar') < 0 && vistaDe(tres, BRUNO).aviso.indexOf('Tres dobles') < 0, [vistaDe(dobles, BRUNO).aviso, vistaDe(tres, BRUNO).aviso]);
+  comprobar('y la ayuda del botón también cuenta los dobles', (opcionesEn(dobles, ANA).find((o) => o.tipo === TIRAR)?.ayuda ?? '').indexOf('Comisaría sin mover') >= 0 && (opcionesEn(conDosDobles, ANA).find((o) => o.tipo === TIRAR)?.ayuda ?? '').indexOf('dos dobles seguidos') >= 0);
+  {
+    /* LAS VACUNAS, con EL COMPORTAMIENTO VIEJO: las frases de antes en cada uno de los tres momentos. */
+    const conLoDeAntes = (e: EstadoDelBurgo, aviso: string, rotulo: string | null): string[] => {
+      const v: VistaDelBurgo = { ...vistaDe(e, ANA), aviso };
+      const opciones = opcionesEn(e, ANA).map((o) => (o.tipo === TIRAR && rotulo !== null ? { ...o, rotulo } : o));
+      return reprochesDeLosDoblesALaVista(e, ANA, v, opciones);
+    };
+    comprobar('VACUNA: con un doble, «Te toca tirar.» y «Tirar los dados», como estuvo, se ve caer por las tres', conLoDeAntes(dobles, 'Te toca tirar.', 'Tirar los dados').length === 3, conLoDeAntes(dobles, 'Te toca tirar.', 'Tirar los dados'));
+    comprobar('VACUNA: tras el tercer doble, «Puedes obrar, tratar o pasar el turno.» a secas, como estuvo, también', conLoDeAntes(tres, 'Puedes obrar, tratar o pasar el turno.', null).length === 1);
+    comprobar('VACUNA: y sin dobles, un aviso que manda volver a tirar también', conLoDeAntes(alEmpezar, 'Dobles: vuelve a tirar.', null).length === 1);
+  }
 
   /* Presa: fianza, Salvoconducto, dados. */
   const presa = turnoDe(conJugador(base, ANA, { casilla: LA_MAZMORRA, presa: 0 }), ANA);
@@ -2169,10 +2308,16 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
 
 {
   const resumen: string[] = [];
+  let tercerosDoblesEntreLasTres = 0;
   for (const [cuantos, semilla, vueltas, cadaCuantos, topePasos] of PARTIDAS_DE_VERDAD) {
     let revisadas = 0;
     let conContraccion = 0;
     let reprochesEnVuelo: string[] = [];
+    let anterior: EstadoDelBurgo | null = null;
+    let reprochesDeDobles: string[] = [];
+    let doblesQueRepiten = 0;
+    let tercerosDobles = 0;
+    let vistasConDobles = 0;
     const desde = performance.now();
     const p = partidaVigilada(
       `VIVA-${cuantos}`,
@@ -2184,6 +2329,28 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
       loQueHaceElRobot,
       (e, asientos) => {
         revisadas++;
+        /*
+         * LA REGLA DE LOS DOBLES, entre esta revisión y la anterior, y lo que el del turno lee de ella.
+         * Cuenta cuántas tiradas la ejercieron, para que no se lea como vigilada una partida sin dobles.
+         */
+        if (anterior !== null) {
+          const tira = e.sucesos.find((s) => s.que === 'tira');
+          if (tira !== undefined && tira.que === 'tira' && tira.dobles && !tira.enLaMazmorra) {
+            if (anterior.dobles + 1 >= DOBLES_QUE_ENCIERRAN) tercerosDobles++;
+            else doblesQueRepiten++;
+          }
+          if (reprochesDeDobles.length === 0) {
+            const regla = reprochesDeLaReglaDeLosDobles(anterior, e);
+            if (regla.length > 0) reprochesDeDobles = [`en la jugada ${e.jugada}`, ...regla];
+          }
+        }
+        anterior = e;
+        const delTurno = e.momento === 'jugando' ? e.jugadores[e.turno] : undefined;
+        if (delTurno !== undefined && reprochesDeDobles.length === 0) {
+          if (e.dobles > 0 && e.paso === 'por-tirar' && e.apuro === null && e.almoneda === null && !e.impuestoSinPagar) vistasConDobles++;
+          const dichos = reprochesDeLosDoblesALaVista(e, delTurno.asiento);
+          if (dichos.length > 0) reprochesDeDobles = [`en la jugada ${e.jugada}, a la vista de ${delTurno.asiento}`, ...dichos];
+        }
         /* Que la crónica diga «al Ayuntamiento» en alguna revisión es lo que prueba que la regla de arriba miró la frase que fallaba. */
         if ((vistaDeAsiento(BURGO, e, ESPECTADOR, undefined) as VistaDelBurgo).pregon.indexOf('al Ayuntamiento') >= 0) conContraccion++;
         if (reprochesEnVuelo.length > 0) return;
@@ -2203,6 +2370,12 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
     comprobar(`la partida de ${cuantos} se juega DE VERDAD hasta el final y trae de todo`, reproches.length === 0, { reproches, cuenta: p.cuenta, corte: p.corte });
     comprobar(`  y en sus ${revisadas} revisiones no hay ni un secreto ni un reproche de forma en las ${cuantos + 1} miradas`, reprochesEnVuelo.length === 0, reprochesEnVuelo.slice(0, 6));
     comprobar(`  y la crónica contrae «al Ayuntamiento» (${conContraccion} revisiones lo dicen), que es la frase que salía «a el»`, conContraccion >= 1, conContraccion);
+    comprobar(
+      `  y la regla de los dobles se cumple en cada revisión, y se dice: ${doblesQueRepiten} dobles que repiten, ${tercerosDobles} terceros dobles, ${vistasConDobles} turnos que vuelven a tirar a la vista`,
+      reprochesDeDobles.length === 0 && doblesQueRepiten >= 1 && vistasConDobles >= 1,
+      reprochesDeDobles.slice(0, 6),
+    );
+    tercerosDoblesEntreLasTres += tercerosDobles;
     /*
      * EL AVISO DEL FINAL DICE «SE ACABÓ» UNA VEZ. Era cabeza + aviso + crónica, y la crónica
      * cierra con la frase del suceso `fin`, letra a letra la cabeza: la línea de estado de una
@@ -2223,10 +2396,18 @@ const PARTIDAS_DE_VERDAD: ReadonlyArray<readonly [number, number, number, number
     /* DETERMINISMO, ESCALÓN 1: el diario reejecutado da el MISMO estado, byte a byte. */
     const otraVez = reejecutarEn(BURGO, undefined, p.mesa.diario);
     comprobar(`  y su diario de ${p.mesa.diario.length} entradas reejecuta el mismo estado byte a byte`, canonico(otraVez) === canonico(p.estado));
-    resumen.push(`    ${cuantos} a la mesa · ${String(p.movimientos).padStart(4)} movs · ${String(p.tics).padStart(3)} tics · ${String(p.cuenta.quiebra ?? 0)} quiebras · ${String(p.rentas).padStart(3)} rentas · ${p.almonedasGanadas} subastas · ${p.alzas} alzas · ${p.tratosAceptados} tratos · ${ms.toFixed(0)} ms`);
+    resumen.push(`    ${cuantos} a la mesa · ${String(p.movimientos).padStart(4)} movs · ${String(p.tics).padStart(3)} tics · ${String(p.cuenta.quiebra ?? 0)} quiebras · ${String(p.rentas).padStart(3)} rentas · ${p.almonedasGanadas} subastas · ${p.alzas} alzas · ${p.tratosAceptados} tratos · ${doblesQueRepiten} dobles y ${tercerosDobles} terceros · ${ms.toFixed(0)} ms`);
   }
   console.log('  partidas jugadas de verdad:');
   for (const r of resumen) console.log(r);
+  /*
+   * UN TERCER DOBLE JUGADO DE VERDAD, al menos. El bloque 5 lo monta a mano; aquí se exige que la regla
+   * entre revisiones lo haya visto también en una partida del robot, porque una vigilancia que nunca
+   * se ejerce se lee como vigilada. Medido el 17-sep-2026: 30, 18 y 21 dobles que repiten, y dos
+   * terceros, los dos en la partida de tres. Si un cambio del robot los deja en cero, se busca otra
+   * semilla como se hizo con la de seis, no se quita esto.
+   */
+  comprobar(`entre las tres partidas hubo algún tercer doble jugado de verdad (${tercerosDoblesEntreLasTres}), y fue a la Comisaría sin andar`, tercerosDoblesEntreLasTres >= 1, tercerosDoblesEntreLasTres);
   comprobar(
     'LA VACUNA de la contracción: «a el» y «de el» se ven caer en un texto de la vista',
     contraccionesSinHacer('Diego paga 120 € por la subasta a el Ayuntamiento.').length === 1 && contraccionesSinHacer('Las llaves de el Ayuntamiento.').length === 1,

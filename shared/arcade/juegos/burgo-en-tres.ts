@@ -2329,7 +2329,9 @@ export function esperaA(vista: unknown): string {
   switch (l.paso) {
     case 'por-tirar': {
       const j = jugadorEn(l, l.turnoDe);
-      return j !== null && j.presa >= 0 ? `${quien} decide cómo salir de la Comisaría…` : `${quien} tira…`;
+      if (j !== null && j.presa >= 0) return `${quien} decide cómo salir de la Comisaría…`;
+      /* Con dobles el turno vuelve a `por-tirar`, y no a `por-pasar`: aquí es donde se dice (ver `avisoDeLosDobles` en el reductor). */
+      return l.dobles > 0 ? `${quien} ha sacado dobles y vuelve a tirar…` : `${quien} tira…`;
     }
     case 'comprar':
       return `${quien} decide si compra…`;
@@ -2338,7 +2340,7 @@ export function esperaA(vista: unknown): string {
     case 'apuro':
       return `${quien} busca dinero…`;
     case 'por-pasar':
-      return l.dobles > 0 ? `${quien} vuelve a tirar…` : `${quien} obra o pasa…`;
+      return l.dobles > 0 ? `${quien} ha sacado dobles y vuelve a tirar…` : `${quien} obra o pasa…`;
     default:
       return `Esperando a ${quien}…`;
   }
@@ -2777,7 +2779,7 @@ function lineasDeAhora(vista: unknown, l: Lectura, yo: QuienMira): string[] {
               : `Has caído en ${fila.nombre}: hay algo que decidir.`,
       );
     } else if (l.paso === 'por-pasar') {
-      /* Ídem: el aviso dice «Dobles: vuelve a tirar.» o «Puedes obrar, tratar o pasar el turno.»; aquí, dónde estoy y con qué cuento. */
+      /* Ídem: el aviso dice «Puedes obrar, tratar o pasar el turno.» (con dobles se vuelve a `por-tirar`); aquí, dónde estoy y con qué cuento. */
       const donde = filaDe(j.casilla);
       lineas.push(`Estás en ${donde === null ? nombreDeCasilla(j.casilla) : donde.nombre}.`);
       lineas.push(`Llevas ${maravedies(j.mrs)} y ${j.titulos.length} ${plural(j.titulos.length, 'título', 'títulos')}.`);
@@ -2788,10 +2790,21 @@ function lineasDeAhora(vista: unknown, l: Lectura, yo: QuienMira): string[] {
   } else {
     lineas.push(esperaA(vista));
   }
-  if (l.tirada !== null && l.paso !== 'por-tirar') {
+  /*
+   * LA ÚLTIMA TIRADA, también mientras se vuelve a tirar por dobles: en `por-tirar` con dobles la
+   * tirada es de ESTE turno y es la razón de que se tire otra vez. Sin dobles, en `por-tirar` es la
+   * del turno anterior (o no hay), y no se enseña.
+   */
+  if (l.tirada !== null && (l.paso !== 'por-tirar' || l.dobles > 0)) {
     /* CON LA SUMA, que es lo que de verdad se mira: los dos dados dicen si hubo dobles y la suma dice cuánto se anduvo (y cuánto cobra un servicio, §1). */
     const suma = l.tirada[0] + l.tirada[1];
-    lineas.push(`Última tirada: ${l.tirada[0]} y ${l.tirada[1]}, ${suma} en total${l.tirada[0] === l.tirada[1] ? ' (dobles)' : ''}.`);
+    /* Menos al tercer doble seguido, que no se anda: decir la suma ahí invita a buscar dónde habría caído. */
+    const porTresDobles = l.sucesos.some((s) => s.que === 'a-la-mazmorra' && s.quien === l.turnoDe && s.porque === 'tres-dobles');
+    lineas.push(
+      porTresDobles
+        ? `Última tirada: ${l.tirada[0]} y ${l.tirada[1]}, el tercer doble seguido: no se avanza.`
+        : `Última tirada: ${l.tirada[0]} y ${l.tirada[1]}, ${suma} en total${l.tirada[0] === l.tirada[1] ? ' (dobles)' : ''}.`,
+    );
   }
   return lineas;
 }

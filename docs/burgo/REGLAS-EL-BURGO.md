@@ -298,6 +298,13 @@ o se cae en ella (§2.5), y se resuelve la casilla de llegada (§2.6).
 - Los dobles se ponen a cero al relevar el turno, al ir a la Comisaría por cualquier motivo y
   al salir de ella con dobles.
 - Salir de la Comisaría sacando dobles **no da tirada extra** (§5.3).
+- **La pantalla lo dice en el momento**, porque una regla que no se lee parece que no existe: el
+  17-sep-2026 se dio por olvidada llevando en el reductor desde el principio. Mientras quedan
+  dobles, quien tira lee «Dobles: vuelve a tirar.» («Dobles otra vez…» con dos), con el aviso de
+  que el tercero lleva a la Comisaría sin mover, y su botón es «Volver a tirar (dobles)»; los demás
+  leen «Ana ha sacado dobles y vuelve a tirar…», y «Ahora» enseña la tirada que manda repetir. Al
+  tercero, el aviso dice «Tres dobles seguidos: a la Comisaría sin mover.» y la última tirada, que
+  no se avanza.
 
 ### 2.5 La Salida
 

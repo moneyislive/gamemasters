@@ -789,6 +789,47 @@ function reprochesDeLosTextos(vista: VistaDelBurgo, quien: QuienMira): string[] 
 }
 
 /**
+ * LOS DOBLES EN LA HOJA: la espera y la última tirada de «Ahora».
+ *
+ * Con dobles el turno vuelve a `por-tirar`, no a `por-pasar`, y las frases de los dobles colgaban de
+ * `por-pasar`: la espera decía «Ana tira…», como al empezar un turno, y «Ahora» escondía la tirada que
+ * mandaba repetir, porque en `por-tirar` la última tirada es la del turno anterior. Y tras el tercer
+ * doble «Ahora» decía la suma («2 en total»), que invita a buscar dónde se habría caído. Esto exige:
+ *
+ *   · con dobles pendientes en `por-tirar`, que la espera diga que el del turno vuelve a tirar y que
+ *     «Ahora» enseñe la tirada con «(dobles)» a quien tiene «Ahora» con renglones de la partida;
+ *   · sin dobles, que la espera no mande volver a tirar a nadie;
+ *   · justo después del tercer doble, que la última tirada diga que no se avanza, sin la suma.
+ *
+ * `ahora` y `espera` entran por parámetro para envenenarlos con lo que se leía antes del 17-sep-2026.
+ */
+function reprochesDeLosDoblesEnLaHoja(vista: VistaDelBurgo, quien: QuienMira, ahora: readonly string[], espera: string = esperaA(vista)): string[] {
+  const r: string[] = [];
+  if (vista.momento !== 'jugando' || vista.turnoDe === null) return r;
+  const delTurno = vista.jugadores.find((j) => j.asiento === vista.turnoDe);
+  if (delTurno === undefined) return r;
+  const yo = quien === null ? undefined : vista.jugadores.find((j) => j.asiento === quien);
+  /* Quien lee «Ahora» con renglones de la partida: sentado, en pie y sin un apuro suyo (los otros caminos de `lineasDeAhora` vuelven antes). */
+  const conRenglones = yo !== undefined && !yo.quebrado && !(vista.apuro !== null && vista.apuro.quien === quien);
+  const ultima = ahora.find((l) => l.startsWith('Última tirada:'));
+  if (vista.paso === 'por-tirar' && vista.dobles > 0 && delTurno.presa < 0) {
+    if (espera.indexOf('vuelve a tirar') < 0) r.push(`con dobles la espera no dice que vuelve a tirar: «${espera}»`);
+    if (conRenglones && vista.tirada !== null && (ultima === undefined || ultima.indexOf('(dobles)') < 0)) r.push(`con dobles «Ahora» no enseña la tirada que manda repetir: ${llano(ahora)}`);
+  }
+  if (vista.dobles === 0 && espera.indexOf('vuelve a tirar') >= 0) r.push(`sin dobles la espera manda volver a tirar: «${espera}»`);
+  const porTresDobles = vista.sucesos.some((s) => s.que === 'a-la-mazmorra' && s.quien === vista.turnoDe && s.porque === 'tres-dobles');
+  if (porTresDobles && conRenglones && vista.tirada !== null && (ultima === undefined || ultima.indexOf('no se avanza') < 0 || ultima.indexOf('en total') >= 0)) {
+    r.push(`tras el tercer doble la última tirada no dice que no se avanza: «${String(ultima)}»`);
+  }
+  return r;
+}
+
+/** Cuántas miradas de las partidas del robot tuvieron dobles pendientes en `por-tirar`, y la primera, para su vacuna; y cuántas llegaron justo tras un tercer doble. */
+let miradasConDoblesPendientes = 0;
+let miradasTrasUnTercerDoble = 0;
+let momentoDeLosDobles: { vista: VistaDelBurgo; quien: AsientoId; ahora: readonly string[] } | null = null;
+
+/**
  * LAS FICHAS de las cuarenta casillas: nombre y tabla de la casilla, fila de hoy, dueño y obras.
  * El cuarto parámetro es QUIÉN REDACTA la tarjeta, y existe para poder envenenarla: un juez cuyo
  * testigo se saca él mismo del mismo sitio no se puede ver caer.
@@ -1188,6 +1229,15 @@ function revisarLaMesa(mesa: Mesa, c: Cuentas, anteriores: Map<string, VistaDelB
     anota(c, donde, reprochesDeLaParticion(opciones, particionDe(vista, quien, opciones, tablero, dados, hoja, pregon, carril)));
     anota(c, donde, reprochesDelCarril(vista, quien, opcionesDelCarrilDelBurgo(vista, quien, opciones), carril));
     anota(c, donde, reprochesDeLosTextos(vista, quien));
+    {
+      const ahora = hoja.secciones.find((s) => s.id === 'ahora')?.lineas ?? [];
+      anota(c, donde, reprochesDeLosDoblesEnLaHoja(vista, quien, ahora));
+      if (vista.momento === 'jugando' && vista.paso === 'por-tirar' && vista.dobles > 0 && quien !== null && quien === vista.turnoDe) {
+        miradasConDoblesPendientes++;
+        if (momentoDeLosDobles === null) momentoDeLosDobles = { vista, quien, ahora };
+      }
+      if (vista.momento === 'jugando' && vista.sucesos.some((s) => s.que === 'a-la-mazmorra' && s.porque === 'tres-dobles')) miradasTrasUnTercerDoble++;
+    }
     if (pregon !== null) c.cajasDeTratos++;
     if (obrasSoloEnElAnillo(opciones, tablero, hoja, carril).length > 0) c.gemelosDeApoyo++;
     if (carril !== null && carril.some((g) => g.opcion.tipo === COMPRAR)) {
@@ -1486,6 +1536,23 @@ comprobar('entre las tres partidas: hubo apuro', (hitosDeTodas['apuro'] ?? 0) >=
 comprobar('entre las tres partidas: hubo un trato aceptado o rechazado (los robots contestan)', (hitosDeTodas['trato-aceptado'] ?? 0) + (hitosDeTodas['trato'] ?? 0) >= 2, hitosDeTodas);
 comprobar('ningún montar() dio algo que el reductor rechazara', cuentasDeTodas.every((c) => c.montarNuloFuera === 0), cuentasDeTodas.flatMap((c) => c.montadosRechazados));
 console.log(`  hitos: ${llano(hitosDeTodas)}`);
+console.log(`  dobles pendientes a la vista de quien vuelve a tirar: ${miradasConDoblesPendientes} miradas; justo tras un tercer doble: ${miradasTrasUnTercerDoble}`);
+/*
+ * Y UN TERCER DOBLE JUGADO DE VERDAD, al menos: la mesa montada de abajo lo cubre a mano, pero la regla de la
+ * última tirada se tiene que haber ejercido también en una partida del robot. Medido el 17-sep-2026: las tres
+ * partidas tienen uno (jugadas 121, 157 y 263), y un mutante que devuelve la suma cae en las tres.
+ */
+comprobar(`entre las tres partidas: alguna mirada llegó justo tras un tercer doble (${miradasTrasUnTercerDoble}), y dijo que no se avanza`, miradasTrasUnTercerDoble >= 1, miradasTrasUnTercerDoble);
+comprobar(`entre las tres partidas: el del turno volvió a tirar por dobles en ${miradasConDoblesPendientes} miradas, y todas lo dijeron`, miradasConDoblesPendientes >= 3, miradasConDoblesPendientes);
+{
+  const m = momentoDeLosDobles as { vista: VistaDelBurgo; quien: AsientoId; ahora: readonly string[] } | null;
+  const nombre = m === null ? '' : (m.vista.jugadores.find((j) => j.asiento === m.quien)?.nombre ?? m.quien);
+  comprobar(
+    'VACUNA sobre la primera de verdad: la espera «tira…» y «Ahora» sin la tirada, como se leía antes, se ven caer por las dos',
+    m !== null && reprochesDeLosDoblesEnLaHoja(m.vista, m.quien, m.ahora.filter((l) => !l.startsWith('Última tirada:')), `${nombre} tira…`).length === 2,
+    m === null ? null : reprochesDeLosDoblesEnLaHoja(m.vista, m.quien, m.ahora.filter((l) => !l.startsWith('Última tirada:')), `${nombre} tira…`),
+  );
+}
 
 /* ═══ 3. QUIEBRA Y FIN, MONTADOS SOBRE UN ESTADO JUGADO ═══ */
 paso('Quiebra y fin: un apuro sin salida, la quiebra por rendirse, y el último en pie');
@@ -1939,6 +2006,90 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
   comprobar('los textos de la última mesa no tienen reproche', reprochesDeLosTextos(vista, quien).length === 0, reprochesDeLosTextos(vista, quien));
   comprobar('la vacuna de los textos: un pregón que no es el de la vista se ve caer', reprochesDeLosTextos({ ...vista, pregon: `${vista.pregon} y algo más` }, quien).length > 0 || elPregonEnTres({ ...vista, pregon: 'otro' }).texto !== vista.pregon);
   comprobar('los ocho barrios de la tabla salen en «Lo mío» con su color cuando se tienen', BARRIOS.length === 8 && TITULOS.length === 28);
+}
+
+/* ═══ LOS DOBLES EN LA HOJA, EN UNA MESA DE VERDAD CON TRES DOBLES SEGUIDOS ═══ */
+paso('Los dobles en la hoja: se vuelve a tirar con la tirada a la vista, y el tercero no se anda');
+{
+  /* Un azar que saca estos pares, con los dos dados encadenados como los encadena el reductor (el mismo que usa verify:burgo). */
+  const azarQueSaca = (pares: ReadonlyArray<readonly [number, number]>): Azar => {
+    for (let semilla = 1; semilla < 5_000_000; semilla++) {
+      const raiz = sembrar(semilla);
+      let a = raiz;
+      let vale = true;
+      for (const [d1, d2] of pares) {
+        const uno = enteroEntre(a, 1, 6);
+        const dos = enteroEntre(uno.azar, 1, 6);
+        if (uno.valor !== d1 || dos.valor !== d2) {
+          vale = false;
+          break;
+        }
+        a = dos.azar;
+      }
+      if (vale) return raiz;
+    }
+    throw new Error(`no hay semilla que saque ${llano(pares)}`);
+  };
+  const juega = (m: Mesa, quien: AsientoId, tipo: string, carga: unknown): Mesa => {
+    const r = mover(m, quien, { tipo, carga });
+    if (!r.cambio) throw new Error(`${tipo} no cambió nada: ${String(r.motivo)}`);
+    return r.mesa;
+  };
+  const ahoraDe = (m: Mesa, quien: AsientoId): readonly string[] => hojaEnTres(vistaEn(m, quien), quien, opcionesEn(m, quien)).secciones.find((s) => s.id === 'ahora')?.lineas ?? [];
+
+  /* A en la 1 con el turno: 2 y 2 a la estación de la 5 (se compra), 3 y 3 a la 11 (se compra) y 1 y 1, el tercero. */
+  const empezada = estadoDe(juega(abrirMesa({ id: 'BUR-3D-DOB', arcade: BURGO, semilla: 5, asientos: ['A', 'B'] }), 'A', EMPEZAR, { topeDeVueltas: 0 }));
+  const deA = empezada.jugadores.findIndex((j) => j.asiento === 'A');
+  const lista: EstadoDelBurgo = {
+    ...empezada,
+    turno: deA,
+    paso: 'por-tirar',
+    luego: 'por-pasar',
+    dobles: 0,
+    apuro: null,
+    almoneda: null,
+    colaDeApuros: [],
+    colaDeAlmonedas: [],
+    jugadores: empezada.jugadores.map((j) => (j.asiento === 'A' ? { ...j, casilla: 1 } : j)),
+    azar: azarQueSaca([[2, 2], [3, 3], [1, 1]]),
+    tirada: null,
+  };
+  const alEmpezar = abrirMesa({ id: 'BUR-3D-DOB', arcade: BURGO, semilla: 5, asientos: ['A', 'B'], estado: lista });
+  const unDoble = juega(juega(alEmpezar, 'A', TIRAR, {}), 'A', COMPRAR, { casilla: 5 });
+  const dosDobles = juega(juega(unDoble, 'A', TIRAR, {}), 'A', COMPRAR, { casilla: 11 });
+  const tercero = juega(dosDobles, 'A', TIRAR, {});
+  comprobar(
+    'la mesa montada va donde dice: un doble, dos, y con el tercero de la 11 a la Comisaría sin un solo mueve',
+    estadoDe(unDoble).dobles === 1 && estadoDe(dosDobles).dobles === 2 && estadoDe(tercero).dobles === 0 && estadoDe(tercero).jugadores[deA]?.casilla === 10 && !estadoDe(tercero).sucesos.some((s) => s.que === 'mueve'),
+    { dobles: [estadoDe(unDoble).dobles, estadoDe(dosDobles).dobles, estadoDe(tercero).dobles], casilla: estadoDe(tercero).jugadores[deA]?.casilla, sucesos: estadoDe(tercero).sucesos.map((s) => s.que) },
+  );
+  for (const [momento, m] of [['al empezar', alEmpezar], ['con un doble', unDoble], ['con dos', dosDobles], ['tras el tercero', tercero]] as const) {
+    for (const quien of ['A', 'B'] as const) {
+      const reproches = reprochesDeLosDoblesEnLaHoja(vistaEn(m, quien), quien, ahoraDe(m, quien));
+      comprobar(`${momento}, lo que lee ${quien} de los dobles no tiene reproche`, reproches.length === 0, reproches);
+    }
+  }
+  comprobar('al empezar, «A tira…» y ninguna tirada en «Ahora»', esperaA(vistaEn(alEmpezar, 'B')) === 'A tira…' && !ahoraDe(alEmpezar, 'A').some((l) => l.startsWith('Última tirada:')), [esperaA(vistaEn(alEmpezar, 'B')), ahoraDe(alEmpezar, 'A')]);
+  comprobar(
+    'con un doble, la espera dice que A ha sacado dobles y vuelve a tirar, y «Ahora» enseña el 2 y 2 a los dos',
+    esperaA(vistaEn(unDoble, 'B')) === 'A ha sacado dobles y vuelve a tirar…' && ['A', 'B'].every((q) => ahoraDe(unDoble, q).includes('Última tirada: 2 y 2, 4 en total (dobles).')),
+    [esperaA(vistaEn(unDoble, 'B')), ahoraDe(unDoble, 'A'), ahoraDe(unDoble, 'B')],
+  );
+  comprobar(
+    'tras el tercero, la última tirada dice que no se avanza, y no la suma',
+    ahoraDe(tercero, 'A').includes('Última tirada: 1 y 1, el tercer doble seguido: no se avanza.') && !ahoraDe(tercero, 'A').some((l) => l.indexOf('2 en total') >= 0),
+    ahoraDe(tercero, 'A'),
+  );
+  /* LAS VACUNAS, con lo que se leía antes del 17-sep-2026 en cada momento. */
+  comprobar(
+    'VACUNA: con un doble, «A tira…» y «Ahora» sin la tirada, como estuvo, se ve caer por las dos',
+    reprochesDeLosDoblesEnLaHoja(vistaEn(unDoble, 'A'), 'A', ahoraDe(unDoble, 'A').filter((l) => !l.startsWith('Última tirada:')), 'A tira…').length === 2,
+  );
+  comprobar(
+    'VACUNA: tras el tercero, «Última tirada: 1 y 1, 2 en total (dobles).», como estuvo, también',
+    reprochesDeLosDoblesEnLaHoja(vistaEn(tercero, 'A'), 'A', [...ahoraDe(tercero, 'A').filter((l) => !l.startsWith('Última tirada:')), 'Última tirada: 1 y 1, 2 en total (dobles).']).length === 1,
+  );
+  comprobar('VACUNA: y sin dobles, una espera que manda volver a tirar también', reprochesDeLosDoblesEnLaHoja(vistaEn(alEmpezar, 'A'), 'A', ahoraDe(alEmpezar, 'A'), 'A ha sacado dobles y vuelve a tirar…').length === 1);
 }
 
 /* ═══ 5 bis. LOS CINCO MUEBLES NUEVOS: EL CARRIL, LA CAJA, EL CARTEL, LAS DOS FICHAS Y LA CRÓNICA ═══ */

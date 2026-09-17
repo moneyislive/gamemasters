@@ -666,3 +666,68 @@ tablero» y la salida a la Sala, y la app como una cuarta hoja que entra en la t
 La juzgan `verify:burgo-en-tres` (en cada mirada de las tres partidas enteras, con dos vacunas),
 `verify:escritorio` (pintada en el momento «fin» del banco, y ausente en «mi turno») y
 `verify:sala` (cuatro hojas y `elFinal` dentro de `hayHojaAbierta`).
+
+## 16. La regla de los dobles, que estaba y no se leía (17-sep-2026)
+
+Miguel, con el Burgo ya publicado: «se nos ha olvidado una regla importante: cuando sacas dos
+números iguales repites tirada, y si sacas tres iguales seguidos vas a la cárcel sin que se haga
+efectiva la tercera jugada».
+
+**La regla no se había olvidado.** El reductor la cumple desde la primera tanda (§2.4 del
+reglamento): con dobles `tirar` deja `luego = 'por-tirar'`, PASAR se rechaza mientras quedan dobles,
+el tic vuelve a tirar por el ausente, y al tercero `tirar` llama a `aLaMazmorra` ANTES de `andar`:
+no se avanza, no se cobra la Salida y no se resuelve casilla. Lo comprobaban `verify:burgo` (bloque
+5, con vacuna) y el reductor por el árbitro: desde la 1, 2 y 2 a la Estación de Goya (se compra), 3
+y 3 a la 11 (se compra), y 1 y 1 lleva de la 11 a la Comisaría sin un solo `mueve` y con el dinero
+intacto.
+
+**Lo que faltaba era decirla.** Las frases de los dobles —«Dobles: vuelve a tirar.» en el aviso,
+«Volver a tirar (dobles)» en el botón, «vuelve a tirar…» en la espera— colgaban de `por-pasar` con
+dobles, un paso al que no lleva ninguna tirada. Lo que se leía, momento a momento:
+
+| Momento | Antes | Ahora |
+|---|---|---|
+| Aviso de quien sacó dobles | «Te toca tirar.» (lo mismo que al empezar el turno) | «Dobles: vuelve a tirar. Si sacas tres dobles seguidos, vas a la Comisaría sin mover.»; con dos, «Dobles otra vez: vuelve a tirar. Si vuelven a salir dobles, vas a la Comisaría sin mover.» |
+| Su botón | «Tirar los dados» | «Volver a tirar (dobles)», con la ayuda que cuenta los dobles |
+| La espera de los demás | «Ana tira…» | «Ana ha sacado dobles y vuelve a tirar…» |
+| «Ahora» | sin la tirada: en `por-tirar` la última es la del turno anterior | «Última tirada: 2 y 2, 4 en total (dobles).» |
+| Aviso tras el tercero | «Puedes obrar, tratar o pasar el turno.» | «Tres dobles seguidos: a la Comisaría sin mover. Puedes obrar, tratar o pasar el turno.» |
+| Última tirada tras el tercero | «1 y 1, 2 en total (dobles).», que invita a buscar dónde se habría caído | «1 y 1, el tercer doble seguido: no se avanza.» |
+
+El aviso, el botón y su ayuda los redacta el servidor (`avisoDeLosDobles`, `ayudaDeLosDobles` y
+`acabaDeIrPorTresDobles` en `burgo.ts`): llegan a la web y a la app con el despliegue. La espera y
+«Ahora» los compone el cliente (`esperaA` y `lineasDeAhora` en `burgo-en-tres.ts`): la web los trae
+con el mismo despliegue y la app con su siguiente compilación. Las ramas de `por-pasar` con dobles
+se quedan, con las mismas frases: TIRAR y el tic todavía las aceptan.
+
+**Por qué ningún comprobador lo veía.** Las comprobaciones de la regla miraban identificadores —que
+se ofrezca `tirar` y no `pasar`—, nunca palabras; y la única que pasaba por `por-pasar` con dobles
+era la del tic, que monta ese estado a mano. La rama muerta parecía viva.
+
+**Lo que se vigila ahora:**
+
+- `verify:burgo`, bloque 5: `reprochesDeLosDoblesALaVista` (aviso y botón al empezar, con uno, con dos
+  y tras el tercero; los demás no leen el aviso de quien los sacó) y `reprochesDeLaReglaDeLosDobles`
+  entre dos revisiones (el tercero no se anda y va a la Comisaría en el mismo cambio; los otros andan
+  y suman uno; el turno no cambia de manos con dobles pendientes salvo quiebra). Cada una con vacunas:
+  las frases de antes en cada momento, un tercer doble que anda dos casillas, un doble que no se cuenta
+  y un turno que pasa con dobles.
+- `verify:burgo`, bloque 13: las dos en CADA revisión de las tres partidas enteras. Medido: 30, 18 y
+  21 dobles que repiten y dos terceros, los dos en la partida de tres; se exige al menos un tercero
+  entre las tres, para que la vigilancia no sea vacía.
+- `verify:burgo-en-tres`: `reprochesDeLosDoblesEnLaHoja` en cada mirada de las tres partidas del robot
+  (182 miradas con dobles pendientes y 22 justo tras un tercer doble, con un suelo exigido y la
+  vacuna sobre la primera de verdad), y una mesa montada por el árbitro con los tres dobles de arriba
+  y sus tres vacunas.
+
+Siete mutantes, cada uno con su fichero restaurado y md5 idéntico, y los siete caen: el aviso
+apagado, el botón con el rótulo de siempre y el aviso del tercero apagado, en el bloque 5 y en las
+tres partidas; el tercer doble que se juega (encierra el cuarto), en las comprobaciones de siempre y
+en la regla entre revisiones de la partida de tres, en su jugada 37; y la espera, «Ahora» sin la
+tirada y la suma del tercero, en la mesa montada y en las partidas del robot.
+
+**El maestro de oro se recapturó** (`server/scripts/oro-arcade/burgo.json`) después de comprobarlo
+campo a campo con el registro congelado: los 344 retratos, sus estados, lo escondido, `cambios`,
+`sinTocar`, el estado final y su secreto son idénticos; cambian 22 vistas de retratos, y las 22
+vuelven a su huella congelada al deshacer las frases de los dobles (86 apariciones). Las vistas
+finales no cambian.
