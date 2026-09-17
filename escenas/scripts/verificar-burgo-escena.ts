@@ -297,6 +297,7 @@ import {
 } from '../burgo/bandeja-de-los-dados';
 import type { CaraDeLaBandeja, EsquinaDeLaBandeja, FormaDeLaBandeja, VolumenDeLaBandeja } from '../burgo/bandeja-de-los-dados';
 import { DADO_MINIMO, PUNTO_DEL_DADO, PUNTO_MINIMO, reboteDelDado, saltoDelDado } from '../dados';
+import { APARTE_MAXIMO as APARTE_MAXIMO_DE_LA_MIRADA } from '../acercar';
 import {
   ALCANCE_DEL_BURGO,
   CAMPO_DE_LA_CAMARA,
@@ -1758,23 +1759,44 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
      * ojo no se aleja más de un 5 %; y en un móvil en vertical, donde la caja va arriba sin tapar nada,
      * la pose es la de siempre.
      */
-    const escritorios = [[900, 600], [1280, 720], [1440, 810], [1600, 900], [1920, 1080], [2560, 1400], [768, 1024]] as const;
+    /* Con los apaisados y bajos: el panel del banco, de 961 × 421, era donde la caja seguía tapando la salida. */
+    const escritorios = [[961, 421], [1000, 480], [1200, 500], [900, 600], [1280, 720], [1440, 810], [1600, 900], [1920, 1080], [2560, 1400], [768, 1024]] as const;
     const malEncuadrados = escritorios
       .filter(([ancho, alto]) => {
         const ventana = { ancho, alto, franjaInferior: 0 };
         const caja = poseDeLaBandeja(ancho, alto, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: MARGEN }).rectangulo;
         const c = poseDeSalidaAlLadoDeLaCaja(ventana, caja);
-        return !elAnilloSeVeJuntoALaCaja(c, ventana, caja, true) || c.factor > poseDeSalida(ventana).factor + 0.05 + 1e-9;
+        return !elAnilloSeVeJuntoALaCaja(c, ventana, caja, true) || c.factor > poseDeSalida(ventana).factor + 0.05 + 1e-9 || Math.hypot(c.centro.x, c.centro.z) > ALCANCE_DEL_BURGO * APARTE_MAXIMO_DE_LA_MIRADA + 1e-9;
       })
       .map(([ancho, alto]) => `${String(ancho)}×${String(alto)}`);
     comprobar(
-      `en ${String(escritorios.length)} lienzos de escritorio la pose de salida no deja ninguna casilla detrás de la caja, con las cuatro esquinas del anillo en el lienzo y el ojo alejado un 5 % como mucho`,
+      `en ${String(escritorios.length)} lienzos de escritorio —con el panel del banco y los apaisados bajos— la pose de salida no deja ninguna casilla detrás de la caja, con las cuatro esquinas del anillo en el lienzo, el ojo alejado un 5 % como mucho y la mirada dentro del tope del arrastre`,
       malEncuadrados.length === 0,
       malEncuadrados,
     );
     const ventanaDeMonitor = { ancho: 1600, alto: 900, franjaInferior: 0 };
     const cajaDeMonitor = poseDeLaBandeja(1600, 900, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: MARGEN }).rectangulo;
     comprobar('se ve fallar: con la pose de salida de siempre, en 1.600 × 900 la caja grande deja casillas detrás', !elAnilloSeVeJuntoALaCaja(poseDeSalida(ventanaDeMonitor), ventanaDeMonitor, cajaDeMonitor, false));
+    const ventanaDelPanel = { ancho: 961, alto: 421, franjaInferior: 0 };
+    const cajaDelPanel = poseDeLaBandeja(961, 421, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: MARGEN }).rectangulo;
+    comprobar(
+      'se ve fallar: con la mirada corrida sólo tres quintos de lado, como estuvo, en el panel del banco no hay pose que deje la salida libre',
+      ((): boolean => {
+        const base = poseDeSalida(ventanaDelPanel);
+        const pose = poseDelBurgo(base, MIRADOR_DEL_BURGO, ventanaDelPanel);
+        const frente = { x: pose.objetivo.x - pose.posicion.x, z: pose.objetivo.z - pose.posicion.z };
+        const largo = Math.hypot(frente.x, frente.z) || 1;
+        for (let lado = -30; lado <= 30; lado++) {
+          for (let arriba = -15; arriba <= 15; arriba++) {
+            const l = (lado / 50) * MEDIO_LADO;
+            const s = (arriba / 50) * MEDIO_LADO;
+            const centro = { x: base.centro.x + (-frente.z / largo) * l + (-frente.x / largo) * s, z: base.centro.z + (frente.x / largo) * l + (-frente.z / largo) * s };
+            if (elAnilloSeVeJuntoALaCaja({ factor: base.factor, centro }, ventanaDelPanel, cajaDelPanel, true)) return false;
+          }
+        }
+        return true;
+      })(),
+    );
     const movilesDePie = [[375, 812], [412, 915]] as const;
     comprobar(
       'en un móvil en vertical, con la caja arriba, la pose de salida es la de siempre',

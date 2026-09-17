@@ -1192,9 +1192,13 @@ Y cómo se pone:
   donde empiezan todos los peones. Los dos clientes salen, y vuelven con «Ver el burgo entero», con
   `poseDeSalidaAlLadoDeLaCaja`: la de siempre si no esconde nada, y si no, la mirada corrida lo justo
   —primero de lado, al hueco libre, sin que el anillo encoja— hasta que ninguna casilla quede detrás y
-  las cuatro esquinas del anillo sigan en el lienzo. En un móvil en vertical no se mueve. En los lienzos
-  apaisados y bajos (un móvil tumbado, 844 × 390) no hay forma de que quepan los dos, y se queda la de
-  siempre.
+  las cuatro esquinas del anillo sigan en el lienzo. La mirada se corre hasta un lado entero del tablero,
+  y nunca más allá del tope con el que la cámara acota el arrastre. En un móvil en vertical no se mueve.
+  En los lienzos apaisados y bajos hace falta correrla mucho: con tres quintos de lado, como estuvo, el
+  panel del banco (961 × 421) no encontraba ninguna pose y la caja seguía tapando la salida; con un
+  lado entero se corre nueve décimas y la salida queda libre. Sólo en un móvil tumbado con la caja
+  arriba (844 × 390) no hay forma de que quepan los dos —la fila del fondo queda detrás en cualquier
+  pose en la que el anillo quepa de alto— y se queda la de siempre, como estaba.
 - **No tiembla**: se pega a la cámara en el `useFrame` que sigue al seguimiento. Medido en el banco con
   la cámara corriendo a 108 unidades por segundo detrás del peón: el borde no se movió un píxel en 230
   fotogramas.

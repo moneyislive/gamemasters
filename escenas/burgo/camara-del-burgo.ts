@@ -47,7 +47,7 @@
  */
 import { LEJANIA, PROPORCION_DE_REFERENCIA, alejarseParaQueQuepa, ojoDelMirador } from '../camara';
 import type { Mirador } from '../camara';
-import { CERCANIA_DE_SALIDA, acotadoAlTablero, factorValido, ojoYMira } from '../acercar';
+import { APARTE_MAXIMO, CERCANIA_DE_SALIDA, acotadoAlTablero, factorValido, ojoYMira } from '../acercar';
 import type { Cercania, LimitesDeCercania } from '../acercar';
 import { amortiguado, proyecta } from '../embarcadero/camara';
 import type { Pose } from '../embarcadero/camara';
@@ -185,8 +185,17 @@ export function poseDelBurgo(cercania: Cercania, mirador: Mirador, ventana: Vent
  * libre y no encoge—, después subirlo o bajarlo, y sólo al final alejar el ojo, que es lo que más
  * cuesta porque el anillo se ve más pequeño. Si la de siempre ya no esconde nada, se devuelve tal cual:
  * en un móvil en vertical la caja va arriba sin tapar casillas, y ahí no se mueve nada.
+ *
+ * LA MIRADA SE PUEDE CORRER HASTA UN LADO ENTERO DEL TABLERO (`CORRIMIENTO_DE_LA_SALIDA`), y no más allá
+ * del tope con el que la cámara acota el arrastre (`ALCANCE_DEL_BURGO × APARTE_MAXIMO`): una pose de
+ * salida fuera de él saltaría al primer arrastre. El corrimiento se quedó corto una vez: hasta tres
+ * quintos de lado, en los lienzos apaisados y bajos —el panel del banco, de 961 × 421, o un móvil
+ * tumbado— no se encontraba ninguna pose y la caja seguía tapando la esquina de SALIDA; con 961 × 421
+ * hace falta correrla nueve décimas.
  */
 export const AIRE_ALREDEDOR_DE_LA_CAJA = 8;
+/** Lo más que se corre la mirada de lado, en lados del tablero; y arriba o abajo, en la mitad. */
+export const CORRIMIENTO_DE_LA_SALIDA = { deLado: 1, arribaOAbajo: 0.3 } as const;
 
 /** ¿Deja esta cercanía todas las casillas fuera de la caja y, si se pide, las cuatro esquinas del anillo en el lienzo? */
 export function elAnilloSeVeJuntoALaCaja(cercania: Cercania, ventana: Ventana, caja: RectanguloEnPuntos, conLasEsquinas: boolean): boolean {
@@ -227,13 +236,18 @@ export function poseDeSalidaAlLadoDeLaCaja(ventana: Ventana, caja: RectanguloEnP
   const derecha = { x: -frente.z / largo, z: frente.x / largo };
   const haciaElOjo = { x: -frente.x / largo, z: -frente.z / largo };
   const candidatas: { readonly cercania: Cercania; readonly coste: number }[] = [];
-  for (let lado = -30; lado <= 30; lado++) {
-    for (let arriba = -15; arriba <= 15; arriba++) {
+  const pasosDeLado = Math.round(50 * CORRIMIENTO_DE_LA_SALIDA.deLado);
+  const pasosArriba = Math.round(50 * CORRIMIENTO_DE_LA_SALIDA.arribaOAbajo);
+  const tope = ALCANCE_DEL_BURGO * APARTE_MAXIMO;
+  for (let lado = -pasosDeLado; lado <= pasosDeLado; lado++) {
+    for (let arriba = -pasosArriba; arriba <= pasosArriba; arriba++) {
       for (const retiro of [0, 0.05]) {
         const l = (lado / 50) * MEDIO_LADO;
         const s = (arriba / 50) * MEDIO_LADO;
+        const centro = { x: base.centro.x + derecha.x * l + haciaElOjo.x * s, z: base.centro.z + derecha.z * l + haciaElOjo.z * s };
+        if (Math.hypot(centro.x, centro.z) > tope) continue;
         candidatas.push({
-          cercania: { factor: factorValido(base.factor + retiro, LIMITES_DEL_BURGO), centro: { x: base.centro.x + derecha.x * l + haciaElOjo.x * s, z: base.centro.z + derecha.z * l + haciaElOjo.z * s } },
+          cercania: { factor: factorValido(base.factor + retiro, LIMITES_DEL_BURGO), centro },
           coste: Math.abs(lado) + 1.5 * Math.abs(arriba) + 200 * retiro,
         });
       }
