@@ -65,6 +65,8 @@ import {
   sitiosDeLaLinde,
 } from '../linde-alta/la-linde';
 import { ALTURA_DE_UNA_PERSONA } from '../escala';
+import { camaraDeMesa, loQueAbarca } from '../lindes/paseo';
+import { sitioDeLaMano } from '../lindes/mano';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -577,6 +579,193 @@ paso('La Linde Alta: el lobby');
       );
     }
   }
+}
+
+
+// ---------------------------------------------------------------------------
+paso('Lo que se ve CABE en el lienzo, y se mide donde se sale');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LA ÚNICA PARTE DE UNA ESCENA QUE SE PUEDE COMPROBAR DESDE NODE ═══
+ *
+ * Aquí no hay WebGL: nadie puede mirar un lienzo. Lo que sí se puede es proyectar a
+ * mano —la cuenta de la perspectiva son cuatro renglones— y preguntar si lo que tiene
+ * que verse queda entre −1 y 1. Por eso la aritmética de la cámara vive en `paseo.ts`
+ * y la de la losa de la mano en `mano.ts`, sueltas de `three`: para poder llamarlas.
+ *
+ * ═══ Y NO ES TEÓRICO: LAS DOS ESTABAN MAL ═══
+ *
+ * El tablero salía al 110 % del ancho en el banco de escritorio —los dos cantos
+ * cortados— porque `camaraDeMesa` despejaba la distancia en el CENTRO del tablero, y
+ * lo que se sale es el canto de acá, que está más cerca y se proyecta más ancho. Y la
+ * losa de la mano se colocaba por dos fracciones sueltas que no sabían su tamaño.
+ *
+ * Las dos son el mismo fallo de esta casa, ya apuntado con la caja del Burgo: medir
+ * desde donde es cómodo en vez de desde donde asoma. Y ninguna de las 22.000
+ * comprobaciones de aquí arriba lo veía, porque todas miran GEOMETRÍA y ninguna
+ * miraba ENCUADRE.
+ */
+
+/** Las formas de pantalla que este producto tiene de verdad. */
+const LIENZOS: readonly (readonly [string, number])[] = [
+  ['banco de escritorio', 961 / 922],
+  ['portatil apaisado', 1440 / 800],
+  ['tableta de pie', 768 / 1024],
+  ['movil de pie', 375 / 812],
+  ['movil tumbado', 812 / 375],
+  ['una franja rarisima', 2400 / 600],
+];
+
+/** Lo que abarca un tablero de N por M losas, que es lo que le cambia el encuadre. */
+const TABLEROS: readonly (readonly [string, number, number])[] = [
+  ['la primera losa', 0, 0],
+  ['media docena', 2, 2],
+  ['el del banco', 6, 5],
+  ['uno largo y estrecho', 11, 2],
+  ['uno alto y estrecho', 2, 11],
+  ['la bolsa entera', 9, 8],
+];
+
+const CAMPO_DE_LA_CAMARA = 45;
+const T_DEL_CAMPO = Math.tan(((CAMPO_DE_LA_CAMARA / 2) * Math.PI) / 180);
+
+/**
+ * PROYECTA UN PUNTO DEL SUELO A COORDENADAS DE LIENZO, con la cámara de mesa puesta.
+ *
+ * La cámara mira siempre al centro del tablero desde una recta que sube con su
+ * inclinación, así que sus tres ejes salen sin álgebra: el de la derecha es el X del
+ * mundo, y los otros dos son el seno y el coseno de lo que está inclinada.
+ */
+function enElLienzo(
+  pose: { x: number; y: number; z: number; miraX: number; miraY: number; miraZ: number },
+  aspecto: number,
+  punto: { x: number; z: number },
+): { x: number; y: number; hondo: number } {
+  /* El eje que mira: de la camara al tablero, normalizado. */
+  const mx = pose.miraX - pose.x;
+  const my = pose.miraY - pose.y;
+  const mz = pose.miraZ - pose.z;
+  const largo = Math.max(1e-9, Math.sqrt(mx * mx + my * my + mz * mz));
+  const fx = mx / largo;
+  const fy = my / largo;
+  const fz = mz / largo;
+
+  /* La derecha: `mira x arriba-del-mundo`, normalizado. */
+  const cx = fy * 0 - fz * 1;
+  const cy = fz * 0 - fx * 0;
+  const cz = fx * 1 - fy * 0;
+  const dc = Math.max(1e-9, Math.sqrt(cx * cx + cy * cy + cz * cz));
+  const ux = cx / dc;
+  const uy = cy / dc;
+  const uz = cz / dc;
+
+  /* Y el arriba de la camara: `derecha x mira`. */
+  const ax = uy * fz - uz * fy;
+  const ay = uz * fx - ux * fz;
+  const az = ux * fy - uy * fx;
+
+  const vx = punto.x - pose.x;
+  const vy = 0 - pose.y;
+  const vz = punto.z - pose.z;
+  const hondo = vx * fx + vy * fy + vz * fz;
+  const enDerecha = vx * ux + vy * uy + vz * uz;
+  const enArriba = vx * ax + vy * ay + vz * az;
+  return {
+    x: enDerecha / Math.max(1e-6, hondo * T_DEL_CAMPO * aspecto),
+    y: enArriba / Math.max(1e-6, hondo * T_DEL_CAMPO),
+    hondo,
+  };
+}
+
+for (const [comoEs, ancho, alto] of TABLEROS) {
+  const casillas = [
+    { x: 0, y: 0 },
+    { x: ancho, y: alto },
+  ];
+  const abarca = loQueAbarca(casillas);
+  for (const [pantalla, aspecto] of LIENZOS) {
+    const pose = camaraDeMesa(abarca, aspecto, CAMPO_DE_LA_CAMARA);
+    let peorX = 0;
+    let peorY = 0;
+    let masLejos = 0;
+    for (const ex of [abarca.minX - 0.5, abarca.maxX + 0.5]) {
+      for (const ey of [abarca.minY - 0.5, abarca.maxY + 0.5]) {
+        const v = enElLienzo(pose, aspecto, { x: ex * LADO_DE_LOSA, z: -ey * LADO_DE_LOSA });
+        peorX = Math.max(peorX, Math.abs(v.x));
+        peorY = Math.max(peorY, Math.abs(v.y));
+        masLejos = Math.max(masLejos, v.hondo);
+      }
+    }
+    comprobar(
+      `${comoEs} cabe entero en «${pantalla}»`,
+      peorX <= 1 && peorY <= 1,
+      { peorX: peorX.toFixed(3), peorY: peorY.toFixed(3) },
+    );
+    /*
+     * Y la otra mitad, que es la que nadie mira hasta que el tablero se pone grande: la
+     * esquina más lejana tiene que caer DELANTE del plano de fondo del lienzo. Si se
+     * pasa, la esquina del tablero desaparece y no falla nada — se ve, y tarde.
+     */
+    comprobar(
+      `${comoEs} no se sale por el fondo en «${pantalla}»`,
+      masLejos < pose.lejos,
+      { masLejos: Math.round(masLejos), lejos: Math.round(pose.lejos) },
+    );
+    /* Y no se queda diminuto: si ocupa menos de un tercio, el encuadre esta desperdiciado. */
+    comprobar(
+      `${comoEs} llena algo de «${pantalla}» y no se queda de sello`,
+      Math.max(peorX, peorY) > 0.33,
+      { peorX: peorX.toFixed(3), peorY: peorY.toFixed(3) },
+    );
+  }
+}
+
+/*
+ * LA LOSA DE LA MANO, en las mismas pantallas. Con su tamaño DENTRO de la cuenta del
+ * sitio, esto no puede salir mal por mucho que se toquen las fracciones — que es
+ * justamente lo que se compra: que tocarlas no vuelva a sacarla del lienzo.
+ */
+for (const [pantalla, aspecto] of LIENZOS) {
+  const m = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto);
+  const izquierda = (m.derecha - m.mediaEnAncho) / m.medioAncho;
+  const derecha = (m.derecha + m.mediaEnAncho) / m.medioAncho;
+  const abajo = (m.arriba - m.mediaEnAlto) / m.medioAlto;
+  const arriba = (m.arriba + m.mediaEnAlto) / m.medioAlto;
+  comprobar(
+    `la losa de la mano cabe entera en «${pantalla}»`,
+    izquierda >= -1 && derecha <= 1 && abajo >= -1 && arriba <= 1,
+    { x: [izquierda.toFixed(3), derecha.toFixed(3)], y: [abajo.toFixed(3), arriba.toFixed(3)] },
+  );
+  comprobar(
+    `y va al rincón de abajo a la izquierda en «${pantalla}», no en medio`,
+    derecha < 0 && arriba < 0,
+    { derecha: derecha.toFixed(3), arriba: arriba.toFixed(3) },
+  );
+  /*
+   * ═══ Y SE VE, MEDIDA CONTRA EL LADO CORTO DE LA PANTALLA ═══
+   *
+   * Una losa que cabe siempre porque mide cero cumpliría las dos de arriba, así que hay
+   * que exigirle un tamaño. Lo que NO vale es exigírselo en fracciones de cada lado: en
+   * una franja de cuatro a uno, una losa que ocupa un tercio del alto —perfectamente
+   * legible— sale al 15 % del ancho y el comprobador la daba por invisible. El tamaño de
+   * algo que se mira no se mide contra el lado largo de la pantalla; se mide contra el
+   * CORTO, que es el que decide cuántos milímetros son.
+   */
+  const corto = Math.min(m.medioAncho, m.medioAlto);
+  const deAncho = (m.mediaEnAncho * 2) / corto;
+  const deAlto = (m.mediaEnAlto * 2) / corto;
+  comprobar(
+    `y se ve lo bastante en «${pantalla}» para saber qué losa es`,
+    deAncho > 0.25 && deAlto > 0.25,
+    { deAncho: deAncho.toFixed(3), deAlto: deAlto.toFixed(3) },
+  );
+  /* Y no se come la pantalla: mas de tres cuartos del lado corto seria tapar el tablero. */
+  comprobar(
+    `y no se come «${pantalla}»`,
+    deAncho < 0.75 && deAlto < 0.75,
+    { deAncho: deAncho.toFixed(3), deAlto: deAlto.toFixed(3) },
+  );
 }
 
 // ---------------------------------------------------------------------------

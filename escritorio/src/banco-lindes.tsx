@@ -79,8 +79,23 @@ function unaPartida(codigo: string, cuantos: number, hastaLosas: number): Estado
   let estado = avanzarLasLindes(partidaNueva(), { tipo: EMPEZAR }, ctx(asientos[0] as string, semilla));
   if (esRechazo(estado)) return partidaNueva();
 
+  /*
+   * ═══ SE PARA CON UNA LOSA EN LA MANO, NO AL PONER LA ÚLTIMA ═══
+   *
+   * La condición era sólo «hasta que el tablero tenga N losas», y eso deja la partida
+   * parada en el instante EXACTO en que se acaba de poner una: la mano vacía, ningún
+   * hueco donde señalar, ningún fantasma y el botón «giro» girando una losa que no
+   * existe. O sea, la mitad de la pantalla del jugador sin poder mirarse en el banco
+   * que está para mirarla, y en verde, porque el tablero salía precioso.
+   *
+   * Ahora se sigue un movimiento más hasta que hay algo en la mano. Es lo que ve un
+   * jugador de verdad la mayor parte de su turno.
+   */
+  const conLaManoPuesta = (e: EstadoDeLasLindes): boolean =>
+    Object.keys(e.tablero).length >= hastaLosas && e.enMano !== '';
+
   let vueltas = 0;
-  while (!seAcabo(estado) && Object.keys(estado.tablero).length < hastaLosas && vueltas < 400) {
+  while (!seAcabo(estado) && !conLaManoPuesta(estado) && vueltas < 400) {
     vueltas++;
     const quien = deQuienEsElTurno(estado);
     if (quien === null) break;
@@ -167,6 +182,32 @@ function Banco(): JSX.Element {
     document.body.style.background = '#0d1408';
   }, []);
 
+  /*
+   * ═══ LA VENTANA SE MIDE CUANDO CAMBIA, Y NO UNA VEZ AL NACER ═══
+   *
+   * Esto era `ventana={{ ancho: window.innerWidth, … }}` escrito en el JSX. Se lee en cada
+   * pintado, sí, pero NADA repinta el banco cuando cambia el tamaño de la ventana: la
+   * escena se quedaba con el encuadre del arranque. Probando la pantalla estrecha de un
+   * móvil de pie, el tablero quedaba ENTERO fuera del lienzo y sólo se veía cielo — y no
+   * era la escena, era el banco jurándole que la ventana seguía siendo apaisada.
+   *
+   * Un banco que miente sobre la forma de la pantalla es peor que no tenerlo: es el único
+   * sitio donde se puede ver si algo se sale por un canto.
+   */
+  const [ventana, setVentana] = useState(() => ({
+    ancho: window.innerWidth,
+    alto: window.innerHeight,
+    franjaInferior: 0,
+  }));
+  useEffect(() => {
+    const alCambiar = (): void => {
+      setVentana({ ancho: window.innerWidth, alto: window.innerHeight, franjaInferior: 0 });
+    };
+    window.addEventListener('resize', alCambiar);
+    alCambiar();
+    return () => window.removeEventListener('resize', alCambiar);
+  }, []);
+
   if (datos === null) return <p style={{ color: 'white' }}>La vista no es de Las Lindes.</p>;
 
   return (
@@ -184,7 +225,7 @@ function Banco(): JSX.Element {
         <Lindes
           tablero={datos}
           codigo={CODIGO}
-          ventana={{ ancho: window.innerWidth, alto: window.innerHeight, franjaInferior: 0 }}
+          ventana={ventana}
           traer={traer}
           calidad="plena"
           camara={camara}

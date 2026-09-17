@@ -113,7 +113,7 @@
         "5241"
       ],
       "port": 5241,
-      "url": "http://localhost:5241/sala/banco-lindes.html",
+      "url": "http://localhost:5241",
       "autoPort": false
     }
   ]

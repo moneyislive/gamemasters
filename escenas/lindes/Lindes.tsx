@@ -56,6 +56,8 @@ import {
 } from './paseo';
 import type { Mandos, Paseante } from './paseo';
 import type { PropsDeLasLindes } from './tipos';
+import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
+import { INCLINACION_DE_LA_MANO, sitioDeLaMano } from './mano';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
@@ -92,6 +94,32 @@ const LOSAS_CON_RELLENO = 4;
 
 /** Lo que se levanta la última losa puesta, para que se vea cuál es. */
 const ALTO_DE_LA_ULTIMA = LADO_DE_LOSA * 0.03;
+
+/*
+ * ═══ LA LOSA DE LA MANO, PEGADA A LA CÁMARA ═══
+ *
+ * La pieza que toca poner, EN TRES DIMENSIONES y en una esquina del lienzo: se ve la losa
+ * de verdad —su villa, sus caminos, sus casas, sus árboles— en lugar de leer «La puerta de
+ * la villa · N muralla · E senda» en un renglón y tener que imaginársela.
+ *
+ * ═══ POR QUÉ COLGADA DE LA CÁMARA Y NO EN UN RINCÓN DEL MUNDO ═══
+ *
+ * Porque el tablero CRECE y la cámara se aleja con él: cualquier sitio del mundo que hoy
+ * caiga en una esquina del encuadre, con setenta losas puestas cae en medio o fuera.
+ * Colgada de la cámara ocupa siempre el mismo trozo de pantalla, que es lo que una pieza
+ * en la mano tiene que hacer. Es la misma decisión que la bandeja de los dados del Burgo,
+ * y por el mismo motivo.
+ *
+ * ═══ Y POR QUÉ NO ES UN SEGUNDO LIENZO ═══
+ *
+ * Porque un `<Canvas>` aparte serían DOS contextos de WebGL en la misma pantalla, y en
+ * esta casa ya está apuntado lo que pasa con eso en un móvil: el navegador tira uno de los
+ * dos y la escena desaparece sin que falle nada. Un grupo más en el lienzo que ya hay no
+ * cuesta ni un contexto ni una llamada de dibujo por losa.
+ *
+ * DÓNDE VA EXACTAMENTE no se decide aquí: está en `mano.ts`, que es aritmética sin
+ * `three` y por tanto lo único de esto que un comprobador puede mirar desde Node.
+ */
 
 /* ───────────────────────────────── Ayudas ───────────────────────────────── */
 
@@ -274,17 +302,26 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   }, [camara.modo]);
 
   useFrame((_, dt) => {
-    if (quieto === true && camara.modo === 'mesa') {
-      const pose = camaraDeMesa(abarca, size.width / Math.max(1, size.height));
-      camera.position.set(pose.x, pose.y, pose.z);
-      camera.lookAt(pose.miraX, pose.miraY, pose.miraZ);
-      mirandoA.current = { x: pose.miraX, z: pose.miraZ };
-      return;
-    }
     if (camara.modo === 'mesa') {
       const pose = camaraDeMesa(abarca, size.width / Math.max(1, size.height));
-      /* Se acerca poco a poco: el tablero crece y un salto de cámara marea. */
-      camera.position.lerp(new THREE.Vector3(pose.x, pose.y, pose.z), Math.min(1, dt * 2.5));
+      /*
+       * ═══ EL PLANO DE FONDO LO DICE LA POSE, Y SE PONE ANTES DE MOVER NADA ═══
+       *
+       * Estaba escrito a mano en quien monta la escena —`far: 6000`— y valía mientras el
+       * tablero fuera pequeño: con un tablero largo en una pantalla estrecha la cámara se
+       * va a cuatro mil y la esquina de allá queda a seis mil trescientos, o sea detrás del
+       * fondo. El tablero entero desaparece, se ve cielo, y no hay ni un error en la
+       * consola. Quien sabe a qué distancia se pone la cámara es `camaraDeMesa`, así que es
+       * ella la que dice hasta dónde hay que ver.
+       */
+      const camaraDeVerdad = camera as THREE.PerspectiveCamera;
+      if (camaraDeVerdad.isPerspectiveCamera === true && camaraDeVerdad.far < pose.lejos) {
+        camaraDeVerdad.far = pose.lejos;
+        camaraDeVerdad.updateProjectionMatrix();
+      }
+      if (quieto === true) camera.position.set(pose.x, pose.y, pose.z);
+      /* Si no, se acerca poco a poco: el tablero crece y un salto de cámara marea. */
+      else camera.position.lerp(new THREE.Vector3(pose.x, pose.y, pose.z), Math.min(1, dt * 2.5));
       camera.lookAt(pose.miraX, pose.miraY, pose.miraZ);
       mirandoA.current = { x: pose.miraX, z: pose.miraZ };
       return;
@@ -435,6 +472,10 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
         </mesh>
       ) : null}
 
+      {catalogo !== null && tablero.enMano !== '' ? (
+        <LaLosaEnLaMano catalogo={catalogo} losa={tablero.enMano} giro={giroEnMano} semilla={semilla} />
+      ) : null}
+
       {sueloDelFantasma !== null && fantasma !== null ? (
         <group position={[0, ALTO_DE_LA_ULTIMA, 0]}>
           <mesh geometry={sueloDelFantasma}>
@@ -520,6 +561,15 @@ const AUX_POSICION = new THREE.Vector3();
 const AUX_GIRO = new THREE.Quaternion();
 const AUX_EJE = new THREE.Vector3(0, 1, 0);
 const AUX_ESCALA = new THREE.Vector3();
+/*
+ * Los tres ejes de la cámara, reutilizados. Se declaran aquí y no dentro del
+ * `useFrame` de la mano por lo mismo que los de arriba: tres `Vector3` nuevos por
+ * fotograma son ciento ochenta objetos por segundo que el recolector tiene que
+ * barrer, y el tirón se nota justo en la escena que hay que mirar bonita.
+ */
+const AUX_ADELANTE = new THREE.Vector3();
+const AUX_DERECHA = new THREE.Vector3();
+const AUX_ARRIBA = new THREE.Vector3();
 
 /** Un modelo del pack, con todas sus copias del tablero en una sola malla por parte. */
 function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | null {
@@ -555,6 +605,155 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
       malla.instanceMatrix.needsUpdate = true;
     }
   });
+
+  if (partes.length === 0 || puestas.length === 0) return null;
+  return (
+    <group>
+      {partes.map((parte, k) => (
+        <instancedMesh
+          key={k}
+          ref={(m: THREE.InstancedMesh | null) => {
+            mallas.current[k] = m;
+          }}
+          args={[parte.geometria, parte.material, puestas.length]}
+          frustumCulled={false}
+        />
+      ))}
+    </group>
+  );
+}
+
+/* ──────────────────────────── La losa de la mano ──────────────────────────── */
+
+/**
+ * LA LOSA QUE SE VA A PONER, EN UNA ESQUINA DEL LIENZO.
+ *
+ * Se monta la MISMA losa que se pondría —mismo generador, misma semilla, mismo giro—
+ * a escala pequeña y siguiendo a la cámara. Que sea la misma y no un dibujo aparte es
+ * la mitad del asunto: lo que se ve en la mano es EXACTAMENTE lo que va a aparecer en
+ * el tablero, con las casas y los árboles que le tocaron. Un dibujo aparte se separa
+ * del generador en la primera semana y nadie se entera hasta que alguien compara.
+ *
+ * ═══ Y GIRA CON EL BOTÓN, QUE ES PARA LO QUE SIRVE ═══
+ *
+ * El giro entra por `props`: quien pulsa «Girar» cambia el número y la losa de la mano
+ * da un cuarto de vuelta. Sin esto, girar es una palabra en un botón y hay que
+ * imaginarse el resultado; con esto se ve antes de tocar el tablero.
+ */
+function LaLosaEnLaMano({
+  catalogo,
+  losa,
+  giro,
+  semilla,
+}: {
+  readonly catalogo: Catalogo;
+  readonly losa: string;
+  readonly giro: Giro;
+  readonly semilla: number;
+}): JSX.Element | null {
+  const grupo = useRef<THREE.Group>(null);
+  const { camera, size } = useThree();
+
+  const contenido = useMemo(() => montarLaLosa(losa, giro, semilla ^ 0x9e37), [giro, losa, semilla]);
+  const suelo = useMemo(() => geometriaDelSuelo([{ x: 0, y: 0, losa, giro }]), [giro, losa]);
+  useEffect(() => () => suelo?.dispose(), [suelo]);
+
+  const porModelo = useMemo(() => {
+    const salida = new Map<string, PuestaEnLaLosa[]>();
+    for (const p of contenido.puestas) {
+      const lista = salida.get(p.pieza);
+      if (lista === undefined) salida.set(p.pieza, [p]);
+      else lista.push(p);
+    }
+    return salida;
+  }, [contenido]);
+
+  /*
+   * ═══ SE RECOLOCA CADA FOTOGRAMA EN VEZ DE COLGAR DE LA CÁMARA ═══
+   *
+   * Colgarla como hija de `camera` sería más corto y tiene un problema: la niebla y
+   * las luces se calculan en coordenadas del MUNDO, así que una losa hija de la cámara
+   * se ilumina como si estuviera en el origen —de noche cerrada cuando el paseante se
+   * ha ido lejos, y sin niebla cuando todo lo demás la tiene—. Recolocándola a mano es
+   * un objeto del mundo que casualmente va donde va la cámara, y se ilumina con lo que
+   * tiene alrededor.
+   */
+  useFrame(() => {
+    const g = grupo.current;
+    if (g === null) return;
+    const camara = camera as THREE.PerspectiveCamera;
+    const sitio = sitioDeLaMano(camara.fov ?? 45, size.width / Math.max(1, size.height));
+
+    AUX_ADELANTE.set(0, 0, -1).applyQuaternion(camara.quaternion);
+    AUX_DERECHA.set(1, 0, 0).applyQuaternion(camara.quaternion);
+    AUX_ARRIBA.set(0, 1, 0).applyQuaternion(camara.quaternion);
+    g.position
+      .copy(camara.position)
+      .addScaledVector(AUX_ADELANTE, sitio.adelante)
+      .addScaledVector(AUX_DERECHA, sitio.derecha)
+      .addScaledVector(AUX_ARRIBA, sitio.arriba);
+    g.quaternion.copy(camara.quaternion);
+    g.rotateX(INCLINACION_DE_LA_MANO);
+    g.scale.setScalar(sitio.escala);
+  });
+
+  if (suelo === null) return null;
+  return (
+    <group ref={grupo}>
+      <mesh geometry={suelo}>
+        <meshStandardMaterial vertexColors roughness={0.95} metalness={0} />
+      </mesh>
+      {[...porModelo.keys()].sort().map((nombre) => (
+        <UnModeloSinRecorte
+          key={nombre}
+          partes={catalogo.partes.get(nombre) ?? []}
+          puestas={porModelo.get(nombre) ?? []}
+        />
+      ))}
+    </group>
+  );
+}
+
+/**
+ * UN MODELO DEL PACK SIN EL RECORTE POR DISTANCIA.
+ *
+ * El del tablero se recorta con los dos anillos; el de la mano NO puede. La losa de la
+ * mano vive en el ORIGEN del mundo —lo que se mueve es el grupo que la lleva—, así que
+ * la cuenta de la distancia la compararía contra un paseante que puede estar a miles
+ * de unidades y no pintaría ni un árbol: la pieza en la mano saldría pelada justo
+ * cuando el tablero está grande, que es cuando más falta hace verla.
+ *
+ * Son quince renglones y evitan meter una bandera dentro del otro, que tendría que
+ * mirarse en cada pieza de cada fotograma para un solo caso.
+ */
+function UnModeloSinRecorte({
+  partes,
+  puestas,
+}: {
+  readonly partes: readonly ParteDelModelo[];
+  readonly puestas: readonly PuestaEnLaLosa[];
+}): JSX.Element | null {
+  const mallas = useRef<(THREE.InstancedMesh | null)[]>([]);
+
+  useEffect(() => {
+    for (let k = 0; k < partes.length; k++) {
+      const malla = mallas.current[k];
+      if (malla === null || malla === undefined) continue;
+      for (let i = 0; i < puestas.length; i++) {
+        const p = puestas[i] as PuestaEnLaLosa;
+        AUX_POSICION.set(p.x, p.y, p.z);
+        AUX_GIRO.setFromAxisAngle(AUX_EJE, p.giro);
+        AUX_ESCALA.set(
+          p.escala * ESCALA_DEL_PACK * p.largo,
+          p.escala * ESCALA_DEL_PACK,
+          p.escala * ESCALA_DEL_PACK,
+        );
+        malla.setMatrixAt(i, AUX_MATRIZ.compose(AUX_POSICION, AUX_GIRO, AUX_ESCALA));
+      }
+      malla.count = puestas.length;
+      malla.instanceMatrix.needsUpdate = true;
+    }
+  }, [partes, puestas]);
 
   if (partes.length === 0 || puestas.length === 0) return null;
   return (

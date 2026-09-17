@@ -148,6 +148,19 @@ export interface PoseDeCamara {
   readonly miraZ: number;
 }
 
+/**
+ * LA POSE DE LA CÁMARA DE MESA, que ademas dice HASTA DONDE hay que ver.
+ *
+ * Las cámaras de paseo no lo dicen porque no encuadran nada: van pegadas al suelo y lo
+ * que se ve de lejos es niebla. La de mesa sí, y por eso el campo va aquí y no en el
+ * común: un campo opcional que en la práctica siempre está es la mejor manera de que un
+ * día se olvide justo donde importa.
+ */
+export interface PoseDeMesa extends PoseDeCamara {
+  /** El plano de fondo que hace falta para que la esquina de allá se vea. */
+  readonly lejos: number;
+}
+
 /** La cámara de ojos: donde está la cara, mirando adelante. */
 export function camaraDeOjos(quien: Paseante): PoseDeCamara {
   return {
@@ -187,19 +200,61 @@ export function camaraDeMesa(
   abarca: { readonly minX: number; readonly maxX: number; readonly minY: number; readonly maxY: number },
   aspecto: number,
   campoEnGrados = 45,
-): PoseDeCamara {
+): PoseDeMesa {
   const centroX = ((abarca.minX + abarca.maxX) / 2) * LADO_DE_LOSA;
   const centroZ = (-(abarca.minY + abarca.maxY) / 2) * LADO_DE_LOSA;
   const ancho = (abarca.maxX - abarca.minX + 1.6) * LADO_DE_LOSA;
   const alto = (abarca.maxY - abarca.minY + 1.6) * LADO_DE_LOSA;
 
-  const medioCampo = ((campoEnGrados / 2) * Math.PI) / 180;
-  const porAlto = alto / 2 / Math.tan(medioCampo);
-  const porAncho = ancho / 2 / Math.tan(medioCampo) / Math.max(0.35, aspecto);
-  const distancia = Math.max(porAlto, porAncho) * 1.05;
-
   /* Cincuenta grados de inclinación: se ve el grueso de las losas y no se pierde el plano. */
   const inclinacion = (50 * Math.PI) / 180;
+
+  /*
+   * ═══ LA DISTANCIA SE DESPEJA EN LA ESQUINA QUE SE SALE, NO EN EL CENTRO ═══
+   *
+   * Esto era `ancho / 2 / tan(medioCampo) / aspecto`: la distancia a la que el ancho del
+   * tablero cabe en el campo SI el tablero estuviera de frente y todo él a la misma
+   * distancia. No lo está: está tumbado y la cámara lo mira desde cincuenta grados, así que
+   * el canto de ACÁ queda bastante más cerca que el centro y se proyecta bastante más
+   * ancho. Medido: el tablero del banco salía al 110 % del lienzo —los dos cantos cortados—
+   * con la cuenta dando por buena la distancia.
+   *
+   * Es otra vez la lección de la caja del Burgo: medir desde el centro cuando lo que se
+   * sale es la esquina. Ahora se despeja la distancia CON la esquina dentro.
+   *
+   * Poniendo el origen en el centro del tablero, con la cámara a `d` sobre la recta que
+   * sube con `inclinacion`, para un punto del suelo `(x, z)` sale, y las dos son exactas:
+   *
+   *     hondo = d − z · cos(inclinacion)
+   *     en la pantalla: x / (hondo · t · aspecto) y −z · sen(inclinacion) / (hondo · t)
+   *
+   * Pedir que las dos se queden en uno y despejar `d` da los dos renglones de abajo. El
+   * caso peor es siempre el canto de acá —`z = +alto/2`, el más cercano—, y por eso el
+   * `cos` SUMA en los dos.
+   */
+  const t = Math.tan(((campoEnGrados / 2) * Math.PI) / 180);
+  const medioAncho = ancho / 2;
+  const medioAlto = alto / 2;
+  const porAncho = medioAncho / (t * Math.max(0.35, aspecto)) + medioAlto * Math.cos(inclinacion);
+  const porAlto = (medioAlto * Math.sin(inclinacion)) / t + medioAlto * Math.cos(inclinacion);
+  /* Un pelo de aire para que el canto no vaya pegado al borde del lienzo. */
+  const distancia = Math.max(porAlto, porAncho) * 1.04;
+
+  /*
+   * ═══ Y HASTA DÓNDE TIENE QUE LLEGAR EL LIENZO ═══
+   *
+   * El plano de fondo lo escribía a mano quien montaba la escena —`far: 6000` en el banco
+   * y en los dos clientes— y eso vale mientras el tablero sea pequeño. Con un tablero
+   * largo en una pantalla estrecha la cámara se va a cuatro mil y la esquina de allá queda
+   * a SEIS MIL TRESCIENTOS: detrás del fondo. El tablero entero desaparece, se ve cielo, y
+   * no hay un solo error en la consola — que es como se pierde una tarde.
+   *
+   * Quien sabe a qué distancia se pone la cámara es esta cuenta, así que es esta cuenta la
+   * que tiene que decir hasta dónde hay que ver. La esquina de allá está a `distancia` más
+   * media diagonal del tablero, con un tercio de sobra para el cielo del fondo.
+   */
+  const diagonal = Math.sqrt(ancho * ancho + alto * alto);
+  const lejos = (distancia + diagonal / 2) * 1.35;
   return {
     x: centroX,
     y: distancia * Math.sin(inclinacion),
@@ -207,6 +262,7 @@ export function camaraDeMesa(
     miraX: centroX,
     miraY: 0,
     miraZ: centroZ,
+    lejos,
   };
 }
 
