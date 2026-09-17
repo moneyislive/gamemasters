@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE PRUEBAS DE LAS LINDES EN TRES DIMENSIONES.
+
+      Entrada aparte de `index.html`, como los otros bancos y por lo mismo: la Sala
+      tiene su enrutador probado por `verify:escritorio` y meter aquí una ruta para
+      mirar una escena obligaría a tocarlo. Esto no es una pantalla del producto: es
+      el sitio donde se juzga que EL VALLE se ve —que una casa no está en mitad de la
+      senda, que la muralla se para donde la villa sigue en la losa de al lado, que
+      una ermita rodeada se distingue de una suelta—. `verify:lindes-escena` mide la
+      aritmética; esto mira lo demás.
+
+      LA PARTIDA ES DE VERDAD. No hay vistas inventadas: este banco llama al MISMO
+      reductor que el servidor, juega las jugadas que se le pidan y pinta lo que sale.
+      Una escena probada contra un estado escrito a mano es una escena probada contra
+      lo que su autor creía que el juego producía.
+
+      Se abre en http://localhost:5175/sala/banco-lindes.html (o el puerto que tenga
+      el Vite del escritorio). Mandos: ?losas=30&jugadores=4&semilla=LINDE
+    -->
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
+    <title>Banco de pruebas · Las Lindes en 3D</title>
+    <meta name="theme-color" content="#0d1408" />
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/banco-lindes.tsx"></script>
+  </body>
+</html>

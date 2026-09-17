@@ -99,6 +99,22 @@
       "port": 8091,
       "url": "http://localhost:8091",
       "autoPort": false
+    },
+    {
+      "name": "lindes-escritorio",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "escritorio",
+        "--",
+        "--port",
+        "5241"
+      ],
+      "port": 5241,
+      "url": "http://localhost:5241/sala/banco-lindes.html",
+      "autoPort": false
     }
   ]
 }

@@ -23,9 +23,9 @@ deja de servir para lo único que sirve.
 | 4 | El tablero declarado, dentro de `lindes.ts` | **hecho** |
 | 5 | Alta en `shared/arcade/juegos/index.ts` | **hecho** |
 | 6 | `server/scripts/verificar-lindes.ts` + entrada en la batería | **hecho** — 13.295 comprobaciones |
-| 7 | `escenas/lindes/` — la losa en tres dimensiones, procedural | pendiente |
-| 8 | `shared/arcade/juegos/lindes-en-tres.ts` — vista ⇄ escena | pendiente |
-| 9 | `escritorio/src/lindes-en-tres.tsx` + fila en `pintores.ts` | pendiente |
+| 7 | `escenas/lindes/` — la losa en tres dimensiones, procedural | **hecho** |
+| 8 | `shared/arcade/juegos/lindes-en-tres.ts` — vista ⇄ escena | **hecho** |
+| 9 | `escritorio/src/lindes-en-tres.tsx` + fila en `pintores.ts` | **hecho** (falta el CSS) |
 | 10 | `app/src/arcade/lindes-en-tres-escena.tsx` + fila en `pintados.ts` | pendiente |
 | 11 | El lobby propio + fila en `escenas/embarcadero/tema.ts` | pendiente |
 | 12 | El paseo en primera y tercera persona sobre el tablero | pendiente |
@@ -33,7 +33,34 @@ deja de servir para lo único que sirve.
 
 ## Siguiente paso
 
-Capa 7: `escenas/lindes/` — la losa en tres dimensiones.
+Capa 10: la pantalla de la app. Después el lobby, los comprobadores de la escena
+y la batería entera.
+
+## La losa mide 175, por decisión de Miguel
+
+Se levantó a las 23:50 del 17-sep mirando el banco: con la losa en 22 unidades
+las piezas del pack cabían pero no cabía una COMPOSICIÓN. Ocho veces el lado
+—sesenta y cuatro veces el suelo— es lo que deja sitio para manzanas con calles,
+murallas con torres y puertas, y campos partidos en parcelas con sus setos. El
+presupuesto de triángulos sube a 2,5 millones por lo mismo, y lo que lo sostiene
+es el nivel de detalle por distancia y no el número.
+
+## Lo que ya se ha visto en el banco, y lo que costó
+
+`http://localhost:5241/sala/banco-lindes.html?losas=16&jugadores=4&semilla=LINDE`
+
+Cuatro fallos que no dan ningún error y sólo se ven mirando, los cuatro
+apuntados en el código donde se arreglaron:
+
+1. `<color attach="background">` dentro de un `<group>` no pinta el cielo: se
+   engancha al grupo. El lienzo salía NEGRO con el tablero dentro.
+2. Las caras de arriba del suelo iban con el orden de vértices al revés y
+   miraban hacia abajo: el tablero salía con las casas flotando sobre el vacío.
+3. La junta entre losas se le aplicaba a CADA rectángulo del suelo y no sólo al
+   borde de la losa: abría rendijas por las que se veía la mesa, y desde arriba
+   el tablero salía rayado.
+4. Un `<instancedMesh>` con el material como HIJO en vez de en `args` nace sin
+   material: veintiséis labriegos plantados en el estado y ninguno a la vista.
 
 ## Lo medido hasta aquí
 
