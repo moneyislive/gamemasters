@@ -19,7 +19,8 @@
  *    abajo). El presupuesto es 900.000 en un PC y 230.000 en un móvil, para las dos cosas.
  *
  * Y encima lo que cambia con la partida: casas y posadas, banderas de dueño, seis peones,
- * UN aventurero (el que mueve), los dos dados en su bandeja pegada a la pantalla, las monedas
+ * UN aventurero (el que mueve), la caja del Burgo pegada a la pantalla —los dados, el dinero, el
+ * reloj de arena, los mazos y las casas del Concejo—, las monedas
  * que vuelan, el naipe de la carta,
  * la marca de la casilla que se puede tocar y la reja de la Comisaría.
  *
@@ -157,7 +158,10 @@ import { LEJANIA, loCogeLaInterfaz, MINIMO_PARA_GIRAR } from '../camara';
 import { ORDEN_DE_LAS_CARTAS, ORDEN_DE_LAS_CASILLAS } from '../capas';
 import { catalogoDeModelos, MODELO } from '../modelos';
 import type { CatalogoDeModelos } from '../modelos';
-import { rutaDeLosDados, rutaDelBurgo } from '../ruta-de-modelos';
+import { rutaDeLosDados, rutaDelBurgo, rutaDelReloj } from '../ruta-de-modelos';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { GIRO_DEL_RELOJ, RelojDeArena, VACIADO_DEL_RELOJ } from '../reloj';
+import type { RelojCargado } from '../reloj';
 import {
   ARISTA_DEL_D6_EN_EL_PACK,
   COLOR_DEL_NUMERO,
@@ -244,7 +248,7 @@ import {
   tonoDelEdificio,
 } from './ciudad';
 import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
-import { claveDelBulto, geometriaDelPrecinto, geometriaDeLaJoya, geometriaDeLaMonedaDeLaRecaudacion, geometriaDeLaOnda, geometriaDeUnaBocanada, geometriaDeLaRejaDeLaCelda, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
+import { claveDelBulto, geometriaDeLaCaja, geometriaDeLaPlacaConSuCantidad, geometriaDelColorDeUnBillete, geometriaDeLosMazos, geometriaDeUnaCasita, geometriaDeUnBillete, geometriaDeUnHotelito, geometriaDelPrecinto, geometriaDeLaJoya, geometriaDeLaMonedaDeLaRecaudacion, geometriaDeLaOnda, geometriaDeUnaBocanada, geometriaDeLaRejaDeLaCelda, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
 import { BOCANADAS_DEL_HUMO, CASILLA_DE_LA_CENTRAL, CASILLA_DEL_CANAL, bisagrasDeLosCofres, bocaDeLaChimenea, centroDeLaAlberca, ejeDeLaJoya, ejesDeLasRuletas, largoDeLaVia, monedaDeLaRecaudacionEnElMundo, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda } from './obras';
 import { CASAS_DEL_CONCEJO, DISCOS_DEL_TRATO, DISCOS_DE_CONTACTO, MONEDAS_EN_VUELO, POSADAS_DEL_CONCEJO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DEL_DISCO, TITULOS } from './presupuesto';
 import {
@@ -289,14 +293,25 @@ import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, saltoDelDoble } from './da
 import type { EstadoDeLosDadosDelBurgo, SucesoDeLosDadosDelBurgo, VistaDeLosDadosDelBurgo } from './dados-del-burgo';
 import {
   ARISTA_DE_LOS_DADOS,
-  BANDEJA,
-  HUECOS_DE_LOS_DADOS,
+  ASA_DEL_RELOJ_DE_ARENA,
+  BILLETES,
+  BILLETES_A_LA_VISTA,
+  ENVOLVENTE_DEL_RELOJ,
+  HOTELES_DEL_CONCEJO,
   MOVIMIENTO_DE_LOS_DADOS,
   SITIO_DE_LA_BANDEJA_POR_DEFECTO,
+  billetesDeLaCantidad,
   cajaDelAsaDeLosDados,
+  cajaDelAsaDelReloj,
   colorDelFieltro,
-  cuadrosDeLaBandeja,
+  huecosDeLosDados,
+  planoDeLaBandeja,
   poseDeLaBandeja,
+  sitioDeLaPlaca,
+  sitioDelBillete,
+  sitiosDeLasCasas,
+  sitiosDeLosHoteles,
+  textoDelDinero,
 } from './bandeja-de-los-dados';
 import { ALCANCE_DEL_BURGO, ALTURA_MINIMA_DEL_OJO_DEL_BURGO, AMORTIGUACION_DEL_SEGUIMIENTO, CERCANIA_DE_SEGUIMIENTO, REPOSO_TRAS_SEGUIR } from './camara-del-burgo';
 import { AMBAR_DEL_CONCEJO, coloresDeLasBanderas, geometriaParaInstanciar, geometriaTenidaDe, soltarTintesDeGeometrias } from './tinte-del-burgo';
@@ -376,8 +391,6 @@ const COLOR_DEL_TRATO = '#f2e8cf';
 const GIRO_DE_LAS_ASPAS = 0.9;
 /** Desde qué altura caen los peones en el sorteo. */
 const CAIDA_DEL_SORTEO = 4;
-/** El asa de los dados: una caja invisible que cubre la bandeja y el aire donde saltan los dados. */
-const ASA_DE_LOS_DADOS = cajaDelAsaDeLosDados();
 /** El asa de una casilla: un plano invisible de su tamaño, un pelo sobre el suelo. */
 const ALZA_DEL_ASA = 0.4;
 /** Cuánto pesa la mezcla hacia la pose de `fin`: a plomo sobre la plaza, a este alto. */
@@ -959,7 +972,7 @@ interface Suelo {
  *
  * Lo que se añade encima son los dos cuadros que NO son del anillo: el suelo del recinto de la
  * ciudad y la tierra bajo el campo. El paño de dados que hubo en el campo se fue con los dados a la
- * pantalla (`construirBandeja`).
+ * pantalla (la caja del Burgo, `bandeja-de-los-dados.ts`).
  *
  * El color de la FRANJA es el del barrio y se REESCRIBE por vértice cuando cambia la vista o
  * se empeña (nunca con opacidad), así que de cada casilla se guarda el tramo de vértices de
@@ -967,7 +980,7 @@ interface Suelo {
  */
 /**
  * UN CUADRO ENHEBRADO EN DOS TRIÁNGULOS, con su color y su normal en cada vértice. Devuelve cuántos
- * vértices añade: seis, o ninguno si le faltan puntos. Lo usan el suelo y la bandeja de los dados.
+ * vértices añade: seis, o ninguno si le faltan puntos.
  */
 function enhebrarCuadro(
   destino: { readonly posiciones: number[]; readonly colores: number[]; readonly normales: number[] },
@@ -1041,40 +1054,43 @@ function construirSuelo(): Suelo {
   return { geometria, aceras };
 }
 
-interface Bandeja {
-  readonly geometria: THREE.BufferGeometry;
-  /** Los vértices del fieltro, que son los primeros: los que se repintan con el color del turno. */
-  readonly verticesDelFieltro: number;
-}
+/** Los vértices del fieltro de la caja: la primera cara de `carasDeLaCaja`, seis vértices. */
+const VERTICES_DEL_FIELTRO = 6;
+/** Lo que hace el asa propia del reloj de arena, que en la caja del Burgo va apagada: nada. */
+const NADA_QUE_HACER = (): void => undefined;
 
-/**
- * LA BANDEJA DE LOS DADOS, GEOMETRÍA PROPIA CON COLOR POR VÉRTICE, como el suelo: los cuadros de
- * `cuadrosDeLaBandeja` con el nogal del borde y el fieltro sin turno, en UNA geometría que se pinta
- * con el material del suelo. El fieltro va el primero, así que sus vértices son los primeros.
- */
-function construirBandeja(): Bandeja {
-  const destino = { posiciones: [] as number[], colores: [] as number[], normales: [] as number[] };
-  let verticesDelFieltro = 0;
-  const color = new THREE.Color();
-  for (const q of cuadrosDeLaBandeja()) {
-    color.set(q.papel === 'fieltro' ? colorDelFieltro(null) : BANDEJA.color.borde);
-    const puestos = enhebrarCuadro(destino, q.puntos, color, q.normal);
-    if (q.papel === 'fieltro') verticesDelFieltro += puestos;
-  }
-  const geometria = new THREE.BufferGeometry();
-  geometria.setAttribute('position', new THREE.BufferAttribute(new Float32Array(destino.posiciones), 3));
-  geometria.setAttribute('color', new THREE.BufferAttribute(new Float32Array(destino.colores), 3));
-  geometria.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(destino.normales), 3));
-  geometria.computeBoundingSphere();
-  return { geometria, verticesDelFieltro };
-}
-
-/** Pinta el fieltro de la bandeja del color de quien tiene el turno (`colorDelFieltro`). */
-function pintaElFieltro(bandeja: Bandeja, hex: string): void {
-  const color = bandeja.geometria.getAttribute('color') as THREE.BufferAttribute;
+/** Pinta el fieltro de la caja del Burgo del color de quien tira (`colorDelFieltro`). */
+function pintaElFieltro(caja: THREE.BufferGeometry, hex: string): void {
+  const color = caja.getAttribute('color') as THREE.BufferAttribute;
   auxColor.set(hex);
-  for (let i = 0; i < bandeja.verticesDelFieltro; i++) color.setXYZ(i, auxColor.r, auxColor.g, auxColor.b);
+  for (let i = 0; i < VERTICES_DEL_FIELTRO; i++) color.setXYZ(i, auxColor.r, auxColor.g, auxColor.b);
   color.needsUpdate = true;
+}
+
+/*
+ * EL RELOJ DE ARENA DE RIBERAS, cargado para la calidad plena. En la sobria no se pide: pesa veinte mil
+ * triángulos y un móvil no los tiene; allí se pinta el reloj de conos de `escenas/reloj.tsx`, que cuenta
+ * lo mismo.
+ *
+ * SI NO LLEGA NO SE AVISA POR `alFallar`, y es a propósito: el escritorio del Burgo manda la partida
+ * entera al tablero dibujado con cualquier aviso de ésos, y un fichero de arte que no llega no puede
+ * tirar el anillo. Se pinta el de conos y se dice por consola, que es el trato que le da Riberas
+ * (`traerElRelojConSuClip`, en `riberas-en-tres.tsx`): un respaldo mudo es un fallo que nadie ve.
+ */
+const relojesDelBurgo = new WeakMap<Traer, Promise<RelojCargado | null>>();
+function relojDelBurgoDe(traer: Traer): Promise<RelojCargado | null> {
+  const hecho = relojesDelBurgo.get(traer);
+  if (hecho !== undefined) return hecho;
+  const promesa = traer(rutaDelReloj())
+    .then((bytes) => abrirGlb(bytes))
+    .then((gltf): RelojCargado => ({ escena: gltf.scene, clips: gltf.animations }))
+    .catch((fallo: unknown): null => {
+      relojesDelBurgo.delete(traer);
+      console.warn(`El reloj de arena no ha llegado (${rutaDelReloj()}: ${fallo instanceof Error ? fallo.message : String(fallo)}): se pinta el de conos.`);
+      return null;
+    });
+  relojesDelBurgo.set(traer, promesa);
+  return promesa;
 }
 
 /** Pinta la acera de una casilla con su color, apagado al tanto que se diga (1 = entera). */
@@ -1260,14 +1276,13 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   useEffect(() => () => suelo.geometria.dispose(), [suelo]);
 
   /*
-   * ─ LA BANDEJA DE LOS DADOS (`bandeja-de-los-dados.ts`). ─
+   * ─ LA CAJA DEL BURGO (`bandeja-de-los-dados.ts`). ─
    *
-   * Su sitio en la pantalla se recalcula al cambiar el lienzo o la esquina, no por fotograma; y su
-   * fieltro se repinta con el color de quien tira: el del sorteo mientras se sortea, y si no el de
-   * quien tiene el turno.
+   * Su sitio y su forma se recalculan al cambiar el lienzo o la esquina, no por fotograma; su fieltro
+   * se repinta con el color de quien tira —el del sorteo mientras se sortea, y si no el de quien tiene
+   * el turno—; y sus piezas se recolocan cuando cambia lo que enseñan: el dinero, las casas del
+   * Concejo y las cartas.
    */
-  const bandeja = useMemo(construirBandeja, []);
-  useEffect(() => () => bandeja.geometria.dispose(), [bandeja]);
   const tamanoDelLienzo = useThree((s) => s.size);
   const campoDeLaCamara = useThree((s) => (s.camera as THREE.PerspectiveCamera).fov);
   const esquinaDeLaBandeja = props.bandejaDeLosDados?.esquina ?? SITIO_DE_LA_BANDEJA_POR_DEFECTO.esquina;
@@ -1276,12 +1291,176 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     () => poseDeLaBandeja(Math.max(1, tamanoDelLienzo.width), Math.max(1, tamanoDelLienzo.height), campoDeLaCamara, { esquina: esquinaDeLaBandeja, margen: margenDeLaBandeja }),
     [tamanoDelLienzo.width, tamanoDelLienzo.height, campoDeLaCamara, esquinaDeLaBandeja, margenDeLaBandeja],
   );
+  const forma = poseDeLaBandejaEnPantalla.forma;
+  const plano = useMemo(() => planoDeLaBandeja(forma), [forma]);
+  const huecosDeLosDadosRef = useRef(huecosDeLosDados(forma));
+  huecosDeLosDadosRef.current = useMemo(() => huecosDeLosDados(forma), [forma]);
+  const cajaGeometria = useMemo(() => geometriaDeLaCaja(forma), [forma]);
+  useEffect(() => () => cajaGeometria?.dispose(), [cajaGeometria]);
+  const asaDeLosDados = useMemo(() => cajaDelAsaDeLosDados(forma), [forma]);
+  const asaDeLosDadosGeometria = useMemo(() => new THREE.BoxGeometry(asaDeLosDados.ancho, asaDeLosDados.alto, asaDeLosDados.fondo), [asaDeLosDados]);
+  useEffect(() => () => asaDeLosDadosGeometria.dispose(), [asaDeLosDadosGeometria]);
+  const asaParaPasar = useMemo(() => cajaDelAsaDelReloj(forma), [forma]);
+  const asaParaPasarGeometria = useMemo(() => new THREE.BoxGeometry(asaParaPasar.ancho, asaParaPasar.alto, asaParaPasar.fondo), [asaParaPasar]);
+  useEffect(() => () => asaParaPasarGeometria.dispose(), [asaParaPasarGeometria]);
+  const piezasDeLaCaja = useMemo(
+    () => ({
+      casita: geometriaDeUnaCasita(),
+      hotelito: geometriaDeUnHotelito(),
+      billete: geometriaDeUnBillete(),
+      colorDelBillete: geometriaDelColorDeUnBillete(),
+    }),
+    [],
+  );
+  useEffect(
+    () => () => {
+      const p = piezasDeLaCaja;
+      for (const g of [p.casita, p.hotelito, p.billete, p.colorDelBillete]) g?.dispose();
+    },
+    [piezasDeLaCaja],
+  );
   const delanteDeLaTirada = dados?.delanteDe ?? null;
   const colorDeLaTirada =
     (delanteDeLaTirada === null ? undefined : tablero.figuras.find((f) => f.asiento === delanteDeLaTirada)?.color) ?? tablero.figuras.find((f) => f.leToca)?.color ?? null;
   useLayoutEffect(() => {
-    pintaElFieltro(bandeja, colorDelFieltro(colorDeLaTirada));
-  }, [bandeja, colorDeLaTirada]);
+    if (cajaGeometria !== null) pintaElFieltro(cajaGeometria, colorDelFieltro(colorDeLaTirada));
+  }, [cajaGeometria, colorDeLaTirada]);
+  /* El dinero es el de quien mira; para un mirón, el de quien tiene el turno. */
+  const dineroALaVista = (tablero.figuras.find((f) => f.esLocal) ?? tablero.figuras.find((f) => f.leToca))?.dinero ?? null;
+  const textoDeLaPlaca = dineroALaVista === null ? '' : textoDelDinero(dineroALaVista);
+  const placaGeometria = useMemo(() => (textoDeLaPlaca === '' ? null : geometriaDeLaPlacaConSuCantidad(textoDeLaPlaca)), [textoDeLaPlaca]);
+  useEffect(() => () => placaGeometria?.dispose(), [placaGeometria]);
+  const casitas = useRef<THREE.InstancedMesh>(null);
+  const hotelitos = useRef<THREE.InstancedMesh>(null);
+  const billetes = useRef<THREE.InstancedMesh>(null);
+  const coloresDeLosBilletes = useRef<THREE.InstancedMesh>(null);
+  const { casas: casasDelConcejo, posadas: hotelesDelConcejo, cartas: cartasDelConcejo } = tablero.banca;
+  const mazosGeometria = useMemo(() => geometriaDeLosMazos(forma, { pregon: cartasDelConcejo.pregon, arca: cartasDelConcejo.arca }), [forma, cartasDelConcejo.pregon, cartasDelConcejo.arca]);
+  useEffect(() => () => mazosGeometria?.dispose(), [mazosGeometria]);
+  useLayoutEffect(() => {
+    const escribe = (malla: THREE.InstancedMesh | null, sitios: readonly Punto[], cuantos: number): void => {
+      if (malla === null) return;
+      const n = Math.max(0, Math.min(sitios.length, Math.floor(cuantos)));
+      for (let k = 0; k < n; k++) {
+        const s = sitios[k] as Punto;
+        malla.setMatrixAt(k, auxMatriz.compose(auxPosicion.set(s.x, 0, s.z), auxGiro.identity(), auxEscala.set(1, 1, 1)));
+      }
+      malla.count = n;
+      malla.instanceMatrix.needsUpdate = true;
+      malla.computeBoundingSphere();
+    };
+    escribe(casitas.current, sitiosDeLasCasas(forma), casasDelConcejo);
+    escribe(hotelitos.current, sitiosDeLosHoteles(forma), hotelesDelConcejo);
+  }, [forma, casasDelConcejo, hotelesDelConcejo, piezasDeLaCaja]);
+  useLayoutEffect(() => {
+    const papel = billetes.current;
+    const color = coloresDeLosBilletes.current;
+    if (papel === null || color === null) return;
+    let n = 0;
+    if (dineroALaVista !== null) {
+      billetesDeLaCantidad(dineroALaVista).forEach((cuantos, i) => {
+        const billete = BILLETES[i];
+        if (billete === undefined) return;
+        auxColor.set(billete.color);
+        for (let k = 0; k < cuantos && n < BILLETES_A_LA_VISTA; k++) {
+          const s = sitioDelBillete(forma, billete.valor, k);
+          auxMatriz.compose(auxPosicion.set(s.x, s.y, s.z), auxGiro.setFromAxisAngle(EJE_Y, s.giro), auxEscala.set(1, 1, 1));
+          papel.setMatrixAt(n, auxMatriz);
+          color.setMatrixAt(n, auxMatriz);
+          color.setColorAt(n, auxColor);
+          n++;
+        }
+      });
+    }
+    for (const malla of [papel, color]) {
+      malla.count = n;
+      malla.instanceMatrix.needsUpdate = true;
+      if (malla.instanceColor !== null) malla.instanceColor.needsUpdate = true;
+      malla.computeBoundingSphere();
+    }
+  }, [forma, dineroALaVista, piezasDeLaCaja]);
+
+  /*
+   * ─ EL RELOJ DE ARENA. ─ El de Riberas en la calidad plena, clonado, normalizado a una unidad de alto
+   * y con sus dos montones medidos por dónde están —el de arriba tiene el centro más alto—; en la
+   * sobria, los conos de `escenas/reloj.tsx`. Lo mueve el `useFrame` de la escena: la arena con la
+   * fracción de turno, el giro al cambiar de turno y el vaciado de golpe al pasarlo.
+   */
+  const [modeloDelReloj, ponerModeloDelReloj] = useState<RelojCargado | null>(null);
+  useEffect(() => {
+    if (!plena) return;
+    void relojDelBurgoDe(traer).then((m) => {
+      if (vivo.current) ponerModeloDelReloj(m);
+    });
+  }, [plena, traer]);
+  const relojMontado = useMemo(() => {
+    if (!plena || modeloDelReloj === null) return null;
+    const dentro = SkeletonUtils.clone(modeloDelReloj.escena);
+    const caja = new THREE.Box3().setFromObject(dentro);
+    const tamano = caja.getSize(new THREE.Vector3());
+    /*
+     * CABE EN EL CILINDRO DE `ENVOLVENTE_DEL_RELOJ`, que es lo que la composición le reserva: un lado de
+     * alto, y menos si por ancho no cupiera. Centrado de lado, y con la base en lo más bajo del cilindro,
+     * que es la mesa en la que apoya la caja.
+     */
+    const medida = Math.max(1e-6, tamano.y / ENVOLVENTE_DEL_RELOJ.alto, Math.max(tamano.x, tamano.z) / (2 * ENVOLVENTE_DEL_RELOJ.radio));
+    const centro = caja.getCenter(new THREE.Vector3());
+    dentro.position.set(-centro.x / medida, -caja.min.y / medida - ENVOLVENTE_DEL_RELOJ.alto / 2, -centro.z / medida);
+    dentro.scale.multiplyScalar(1 / medida);
+    const clon = new THREE.Group();
+    clon.add(dentro);
+    const mezclador = new THREE.AnimationMixer(dentro);
+    for (const clip of modeloDelReloj.clips) mezclador.clipAction(clip).play();
+    const conAltura: { malla: THREE.Mesh; altura: number }[] = [];
+    dentro.traverse((n) => {
+      const m = n as THREE.Mesh;
+      if (!m.isMesh || (m.morphTargetInfluences?.length ?? 0) === 0) return;
+      m.geometry.computeBoundingBox();
+      const c = m.geometry.boundingBox;
+      conAltura.push({ malla: m, altura: c === null ? 0 : (c.min.y + c.max.y) / 2 });
+    });
+    conAltura.sort((a, b) => b.altura - a.altura);
+    /*
+     * LOS GRANOS, EN UNA LLAMADA Y NO EN CINCUENTA. El modelo trae cincuenta nodos que comparten una malla
+     * de dos triángulos, y `three` dibuja cada uno por su lado: medido en el banco, el reloj sólo subía la
+     * escena de 117 a 207 llamadas de dibujo, con un tope de 150. Cada grano cuelga de su propio nodo, que
+     * es el que anima el clip, y todos esos nodos cuelgan de uno común. Así que los granos se apagan —el
+     * mezclador sigue moviendo sus nodos— y una malla instanciada colgada de ese nodo común copia en cada
+     * fotograma la matriz del nodo de cada grano por la del grano.
+     */
+    const granos: THREE.Mesh[] = [];
+    dentro.traverse((n) => {
+      const m = n as THREE.Mesh;
+      if (m.isMesh && (m.morphTargetInfluences?.length ?? 0) === 0 && /Instancer/i.test(m.name)) granos.push(m);
+    });
+    const primero = granos[0];
+    const comun = primero?.parent?.parent ?? null;
+    let chorro: THREE.InstancedMesh | null = null;
+    if (primero !== undefined && comun !== null && granos.every((g) => g.parent !== null && g.parent.parent === comun)) {
+      chorro = new THREE.InstancedMesh(primero.geometry, primero.material, granos.length);
+      chorro.frustumCulled = false;
+      chorro.raycast = () => undefined;
+      comun.add(chorro);
+      for (const g of granos) g.visible = false;
+    }
+    return { clon, mezclador, montones: conAltura.map((c, i) => ({ malla: c.malla, arriba: i === 0 })), granos: chorro === null ? [] : granos, chorro };
+  }, [plena, modeloDelReloj]);
+  useEffect(
+    () => () => {
+      if (relojMontado === null) return;
+      relojMontado.mezclador.stopAllAction();
+      relojMontado.mezclador.uncacheRoot(relojMontado.clon.children[0] ?? relojMontado.clon);
+    },
+    [relojMontado],
+  );
+  const relojMontadoRef = useRef(relojMontado);
+  relojMontadoRef.current = relojMontado;
+  const cuerpoDelReloj = useRef<THREE.Group>(null);
+  const arenaArriba = useRef<THREE.Group>(null);
+  const arenaAbajo = useRef<THREE.Group>(null);
+  const hiloDeArena = useRef<THREE.Mesh>(null);
+  const asaDelReloj = useRef<THREE.Mesh>(null);
+  const estadoDelReloj = useRef<{ vueltaPintada: number | null; girando: { desde: number } | null; vaciando: number | null; sePulso: boolean }>({ vueltaPintada: null, girando: null, vaciando: null, sePulso: false });
 
   /*
    * ─ LA CIUDAD: se genera de la semilla de la mesa y se pasa a geometría con el catálogo. ─
@@ -1370,7 +1549,6 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       trato: new THREE.PlaneGeometry(LADO_DEL_DISCO_DEL_TRATO, LADO_DEL_DISCO_DEL_TRATO),
       naipe: new THREE.PlaneGeometry(NAIPE.ancho, NAIPE.alto),
       asaDeCasilla: new THREE.PlaneGeometry(1, 1),
-      asaDeDados: new THREE.BoxGeometry(ASA_DE_LOS_DADOS.ancho, ASA_DE_LOS_DADOS.alto, ASA_DE_LOS_DADOS.fondo),
       dadoCuerpo: geometriaDelCuerpoDelDado(ARISTA_DE_LOS_DADOS),
       dadoPuntos: geometriaDeLosPuntosDelDado(ARISTA_DE_LOS_DADOS),
     }),
@@ -1845,7 +2023,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       for (const i of [0, 1] as const) {
         const g = dadosGrupos.current[i];
         if (g === null || g === undefined) continue;
-        const hueco = HUECOS_DE_LOS_DADOS[i] as Punto;
+        const hueco = huecosDeLosDadosRef.current[i] as Punto;
         g.position.set(hueco.x, ARISTA_DE_LOS_DADOS / 2, hueco.z);
         const reposo = dadoEnReposo.current[i] as THREE.Quaternion;
         const alDejar = dadoAlDejarDeRodar.current[i] as THREE.Quaternion;
@@ -2347,6 +2525,72 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       }
     }
 
+    /*
+     * ─ El reloj de arena: la caída con la fracción de turno, el giro al empezar otro y el vaciado de
+     * golpe al pasarlo. Como en `delta.tsx`, sin pasar por el estado de React. ─
+     */
+    {
+      const cuerpo = cuerpoDelReloj.current;
+      const reloj = avisos.current.reloj ?? null;
+      const er = estadoDelReloj.current;
+      if (cuerpo !== null) {
+        const vuelta = reloj?.vuelta ?? 0;
+        if (er.vueltaPintada !== vuelta) {
+          if (er.vueltaPintada !== null) er.girando = { desde: ahora };
+          er.vueltaPintada = vuelta;
+          er.vaciando = null;
+          er.sePulso = false;
+        }
+        if (er.girando === null) {
+          cuerpo.rotation.z = 0;
+        } else {
+          const va = (ahora - er.girando.desde) / GIRO_DEL_RELOJ;
+          if (va >= 1) {
+            cuerpo.rotation.z = 0;
+            er.girando = null;
+          } else {
+            cuerpo.rotation.z = Math.sin(va * Math.PI) * Math.PI;
+          }
+        }
+        let parte = 0;
+        if (reloj !== null && reloj.venceEn !== null && reloj.venceEn > reloj.desde) parte = (Date.now() - reloj.desde) / (reloj.venceEn - reloj.desde);
+        if (er.sePulso && er.vaciando === null) {
+          er.vaciando = ahora;
+          er.sePulso = false;
+        }
+        if (er.vaciando !== null) {
+          const va = (ahora - er.vaciando) / VACIADO_DEL_RELOJ;
+          parte = Math.max(parte, Math.min(1, parte + (1 - parte) * va));
+        }
+        parte = Math.min(1, Math.max(0, parte));
+        const montado = relojMontadoRef.current;
+        if (montado !== null) {
+          montado.mezclador.update(dt);
+          for (const monton of montado.montones) {
+            const pesos = monton.malla.morphTargetInfluences;
+            if (pesos !== undefined && pesos.length > 0) pesos[0] = monton.arriba ? parte : 1 - parte;
+          }
+          const chorro = montado.chorro;
+          if (chorro !== null) {
+            montado.granos.forEach((g, k) => {
+              const nodo = g.parent;
+              if (nodo === null) return;
+              nodo.updateMatrix();
+              g.updateMatrix();
+              chorro.setMatrixAt(k, auxMatriz.multiplyMatrices(nodo.matrix, g.matrix));
+            });
+            chorro.instanceMatrix.needsUpdate = true;
+          }
+        }
+        const arriba = arenaArriba.current;
+        if (arriba !== null) arriba.scale.y = Math.max(0.001, 1 - parte);
+        const abajo = arenaAbajo.current;
+        if (abajo !== null) abajo.scale.y = Math.max(0.001, parte);
+        const hilo = hiloDeArena.current;
+        if (hilo !== null) hilo.visible = parte > 0.001 && parte < 0.999;
+      }
+    }
+
     /* ─ El naipe, pegado a la cámara. ─ */
     {
       const ng = naipeGrupo.current;
@@ -2481,7 +2725,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   });
 
   /*
-   * ─ La bandeja de los dados, pegada a la cámara: EL ÚLTIMO `useFrame` DE LA ESCENA. ─
+   * ─ La caja del Burgo, pegada a la cámara: EL ÚLTIMO `useFrame` DE LA ESCENA. ─
    *
    * Aparte y después del seguimiento, porque el seguimiento se sale antes de terminar cuando no
    * sigue a nadie y porque es el que mueve la cámara. Copiada en el `useFrame` de la escena —el
@@ -2593,6 +2837,26 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       /* `sucesoDelResultado` sólo devuelve `rechazado` o nada: aquí se escribe con la vista del Burgo. */
       const suceso = sucesoDelResultado(resultado);
       if (suceso !== null && suceso.que === 'rechazado' && vivo.current) sucesosDeDados.current.push({ que: 'rechazado' });
+    });
+  };
+  /*
+   * TOCAR EL RELOJ DE ARENA ES PASAR EL TURNO, con el mismo toque que los dados: apretar y soltar sin
+   * arrastrar (`cajaDelAsaDelReloj` cuenta por qué no basta con apretar, como en Riberas). La arena se
+   * vacía de golpe al mandarlo, y vuelve a caer por donde iba si la mesa no lo toma y el turno sigue.
+   */
+  const tocaElReloj = (e: ThreeEvent<PointerEvent>): void => {
+    if (!esUnToque(e)) return;
+    e.stopPropagation();
+    if (avisos.current.quieto || avisos.current.reloj?.disponible !== true) return;
+    const pasar = avisos.current.alPasarElTurno;
+    if (pasar === undefined) return;
+    const er = estadoDelReloj.current;
+    const vuelta = er.vueltaPintada;
+    er.sePulso = true;
+    void pasar().then((resultado) => {
+      if (resultado === 'hecho' || !vivo.current || er.vueltaPintada !== vuelta) return;
+      er.sePulso = false;
+      er.vaciando = null;
     });
   };
   /*
@@ -2829,18 +3093,55 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       )}
 
       {/*
-        LA BANDEJA DE LOS DADOS, pegada a la pantalla (`bandeja-de-los-dados.ts`). El grupo de fuera
-        copia la cámara en el último `useFrame`; el de dentro pone la bandeja en su esquina, inclinada
-        hacia el ojo y a su escala. Todo lo que cuelga de él va en unidades de bandeja: el fieltro y el
-        borde, los dos dados y el asa, que sólo se monta cuando hay que tirar y cubre la bandeja entera.
+        LA CAJA DEL BURGO, pegada a la pantalla (`bandeja-de-los-dados.ts`). El grupo de fuera copia la
+        cámara en el último `useFrame`; el de dentro pone la caja en su esquina, cabeceada hacia el ojo
+        (`cabeceoHaciaElOjo`) y a su escala. Todo lo que cuelga de él va en unidades de bandeja: la caja
+        y sus piezas, el reloj, los dos dados y las dos asas, que sólo se montan cuando hay algo que mandar.
+
+        LAS LLAMADAS DE DIBUJO SE CUENTAN: en la calidad sobria la escena tiene 90, y con la caja recién
+        puesta hacía 92 (medido en el banco). Por eso los mazos van con sus emblemas en una geometría, la
+        placa con su cantidad en otra, y las dos asas con `visible={false}`: r3f no mira `visible` al tirar
+        rayos —es el fallo que contó una interfaz apagada que seguía cogiendo piezas—, así que un asa
+        escondida se sigue tocando y no se dibuja. Se DESMONTAN cuando no se puede mandar, que es lo que sí
+        le quita el toque.
       */}
       <group ref={grupoDeLaBandeja}>
         <group
           position={[poseDeLaBandejaEnPantalla.x, poseDeLaBandejaEnPantalla.y, poseDeLaBandejaEnPantalla.z]}
-          rotation={[poseDeLaBandejaEnPantalla.inclinacion, 0, 0]}
+          rotation={[poseDeLaBandejaEnPantalla.cabeceo, 0, 0]}
           scale={[poseDeLaBandejaEnPantalla.escala, poseDeLaBandejaEnPantalla.escala, poseDeLaBandejaEnPantalla.escala]}
         >
-          <mesh geometry={bandeja.geometria} material={materiales.suelo} onPointerDown={paraElToque} onPointerUp={paraElToque} onPointerMove={paraElToque} onPointerOver={paraElToque} onPointerOut={paraElToque} />
+          {cajaGeometria === null ? null : (
+            <mesh geometry={cajaGeometria} material={materiales.suelo} onPointerDown={paraElToque} onPointerUp={paraElToque} onPointerMove={paraElToque} onPointerOver={paraElToque} onPointerOut={paraElToque} />
+          )}
+          {/* Las casas y los hoteles que le quedan al Concejo. */}
+          {piezasDeLaCaja.casita === null ? null : <instancedMesh ref={casitas} args={[piezasDeLaCaja.casita, materiales.suelo, CASAS_DEL_CONCEJO]} frustumCulled={false} raycast={() => null} />}
+          {piezasDeLaCaja.hotelito === null ? null : <instancedMesh ref={hotelitos} args={[piezasDeLaCaja.hotelito, materiales.suelo, HOTELES_DEL_CONCEJO]} frustumCulled={false} raycast={() => null} />}
+          {/* Los dos mazos, tan altos como cartas les quedan, con su emblema encima. */}
+          {mazosGeometria === null ? null : <mesh geometry={mazosGeometria} material={materiales.suelo} raycast={() => null} />}
+          {/* El dinero: sus billetes en montones y la placa con la cantidad. */}
+          {piezasDeLaCaja.billete === null ? null : <instancedMesh ref={billetes} args={[piezasDeLaCaja.billete, materiales.suelo, BILLETES_A_LA_VISTA]} frustumCulled={false} raycast={() => null} />}
+          {piezasDeLaCaja.colorDelBillete === null ? null : <instancedMesh ref={coloresDeLosBilletes} args={[piezasDeLaCaja.colorDelBillete, materiales.suelo, BILLETES_A_LA_VISTA]} frustumCulled={false} raycast={() => null} />}
+          {placaGeometria === null ? null : <mesh geometry={placaGeometria} material={materiales.suelo} position={[sitioDeLaPlaca(forma).x, sitioDeLaPlaca(forma).y, sitioDeLaPlaca(forma).z]} raycast={() => null} />}
+          {/*
+            El reloj de arena, de pie junto a los dados: el modelo de Riberas en plena, los conos en sobria.
+            Su asa propia va APAGADA: pasar el turno es tocar el asa de la caja (`tocaElReloj`), que la
+            envuelve, y no apretar ésta.
+          */}
+          <group position={[plano.reloj.x, relojMontado === null ? plano.reloj.cinturaDeLosConos : plano.reloj.centroDelModelo, plano.reloj.z]}>
+            <RelojDeArena
+              cuerpo={cuerpoDelReloj}
+              arenaArriba={arenaArriba}
+              arenaAbajo={arenaAbajo}
+              hilo={hiloDeArena}
+              asa={asaDelReloj}
+              lado={plano.reloj.lado}
+              ancho={plano.reloj.lado * ASA_DEL_RELOJ_DE_ARENA.ancho}
+              encendido={false}
+              modelo={relojMontado?.clon ?? null}
+              onPulsar={NADA_QUE_HACER}
+            />
+          </group>
           {([0, 1] as const).map((i) => (
             <group
               key={`dado-${String(i)}`}
@@ -2858,8 +3159,11 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
               )}
             </group>
           ))}
+          {props.reloj?.disponible === true && props.alPasarElTurno !== undefined ? (
+            <mesh position={[asaParaPasar.x, asaParaPasar.y, asaParaPasar.z]} geometry={asaParaPasarGeometria} material={materiales.asa} visible={false} onPointerDown={empiezaElToque} onPointerUp={tocaElReloj} />
+          ) : null}
           {dados?.porTirar === true ? (
-            <mesh position={[0, ASA_DE_LOS_DADOS.y, 0]} geometry={geometrias.asaDeDados} material={materiales.asa} onPointerDown={empiezaElToque} onPointerUp={tocaLosDados} />
+            <mesh position={[asaDeLosDados.x, asaDeLosDados.y, asaDeLosDados.z]} geometry={asaDeLosDadosGeometria} material={materiales.asa} visible={false} onPointerDown={empiezaElToque} onPointerUp={tocaLosDados} />
           ) : null}
         </group>
       </group>

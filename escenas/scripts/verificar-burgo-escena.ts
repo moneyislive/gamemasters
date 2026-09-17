@@ -37,7 +37,7 @@
  * Que se VEA bien: ni el color, ni el tinte, ni si el móvil aguanta. Para eso está el
  * banco `banco-burgo.html` y hacen falta ojos.
  */
-import { NodeIO } from '@gltf-transform/core';
+import { NodeIO, getBounds } from '@gltf-transform/core';
 import type { Node } from '@gltf-transform/core';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -192,7 +192,7 @@ import { BOCANADAS_DEL_HUMO as BOCANADAS_DEL_HUMO_EN_EL_COMPROBADOR, CASILLA_DEL
 import type { CaraDeObra } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
 import { ALTURA_DE_PLANTA, PIEZAS_DEL_BURGO, RETICULA_DE_LA_CIUDAD } from '../burgo/piezas';
-import { BARRIOS, CASILLAS as CASILLAS_DEL_REGLAMENTO, PAGA_DE_LA_PUERTA_MAYOR, PARTE_DEL_IMPUESTO } from '../../shared/arcade/juegos/burgo-tablero';
+import { BARRIOS, CASAS_DEL_CONCEJO as CASAS_DEL_REGLAMENTO, CASILLAS as CASILLAS_DEL_REGLAMENTO, PAGA_DE_LA_PUERTA_MAYOR, PARTE_DEL_IMPUESTO, POSADAS_DEL_CONCEJO as POSADAS_DEL_REGLAMENTO } from '../../shared/arcade/juegos/burgo-tablero';
 import { COLORES_DEL_BURGO, maravedies } from '../../shared/arcade/juegos/burgo';
 import {
   CASAS_DEL_CONCEJO,
@@ -239,22 +239,61 @@ import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
 import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, HUMO, ONDA_DEL_AGUA, RECAUDACION, bocanadaDelHumo, duracionDelHumo, esRentaDe, ondaDelAgua, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelDinero, duracionDelEncierro, duracionDelSuceso, esRecaudacion, finDeLaCola, momentoDeLaRecaudacion, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, LUMINANCIA_EMPENADA, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
+  ALZA_DEL_RENGLON_DE_LA_PLACA,
   ARISTA_DE_LOS_DADOS,
-  BANDEJA,
-  HUECOS_DE_LOS_DADOS,
+  ASA_DEL_RELOJ_DE_ARENA,
+  BILLETE,
+  BILLETES,
+  BILLETES_A_LA_VISTA,
+  CAJA,
+  CASAS_DEL_CONCEJO as CASAS_DE_LA_CAJA,
+  CASITA,
+  ENVOLVENTE_DEL_RELOJ,
+  HOTELES_DEL_CONCEJO as HOTELES_DE_LA_CAJA,
+  HOTELITO,
+  LETRAS_DE_LA_PLACA,
+  MAZO,
   MEDIA_DIAGONAL_DEL_DADO,
   MEDIA_DIAGONAL_DE_LA_CARA,
   MOVIMIENTO_DE_LOS_DADOS,
+  PLACA,
+  PROPORCIONES_DEL_RELOJ,
+  TRIANGULOS_DEL_ASA_DE_LOS_DADOS,
+  TRIANGULOS_DEL_ASA_DEL_RELOJ,
+  TRIANGULOS_DEL_RELOJ_DE_CONOS,
+  TRIANGULOS_DEL_RELOJ_DE_RIBERAS,
+  altoDelMazo,
   alzaMaximaDeLosDados,
+  anchoDeLaBandejaEnPuntos,
+  billetesDeLaCantidad,
+  cabeceoHaciaElOjo,
   cajaDeLaBandeja,
+  cajaDelAsaDeLosDados,
+  cajaDelAsaDelReloj,
+  carasDeLaCaja,
+  carasDeUnEdificio,
   colorDelFieltro,
   distanciaEntreColores,
+  formaDeLaBandeja,
+  huecosDeLosDados,
+  planoDeLaBandeja,
   poseDeLaBandeja,
+  prisma,
   puntoDeLaBandejaEnLaCamara,
   puntoDeLaCamaraEnElLienzo,
+  rectanguloDeLaBandeja,
   sacudidaMaximaDeLosDados,
+  sitioDeLaPlaca,
+  sitioDelBillete,
+  sitiosDeLasCasas,
+  sitiosDeLosHoteles,
+  sitiosDeLosMazos,
+  textoDelDinero,
+  triangulosDeLaCaja,
+  triangulosDeLasCaras,
+  volumenesDeLaBandeja,
 } from '../burgo/bandeja-de-los-dados';
-import type { EsquinaDeLaBandeja } from '../burgo/bandeja-de-los-dados';
+import type { CaraDeLaBandeja, EsquinaDeLaBandeja, FormaDeLaBandeja, VolumenDeLaBandeja } from '../burgo/bandeja-de-los-dados';
 import { DADO_MINIMO, PUNTO_DEL_DADO, PUNTO_MINIMO, reboteDelDado, saltoDelDado } from '../dados';
 import {
   ALCANCE_DEL_BURGO,
@@ -1495,28 +1534,38 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
   comprobar('y ningún cuadro de suelo se sale del anillo ni se mete en el recinto de la ciudad', sueloFuera.length === 0, sueloFuera.map((q) => q.papel).slice(0, 4));
 
   /*
-   * LOS DADOS, EN SU BANDEJA DE LA PANTALLA (`bandeja-de-los-dados.ts`). Miguel no quería tener que
-   * buscarlos en el mapa, así que ya no hay paño en el campo: la bandeja va pegada a la cámara, en la
-   * esquina que diga el cliente. Lo que se mide aquí es lo que una captura no enseña: que en las tres
-   * ventanas y en las dos esquinas la bandeja ENTERA —con los dados en lo alto del salto y girados—
-   * cabe en el lienzo y queda pegada a su esquina; que la caja con la que se posa llega de verdad a
-   * lo más alto de las curvas; que un dado quieto se lee; que los dos caben en el fieltro sin
-   * tocarse; y que la bandeja está delante del plano cercano de los tres lienzos.
+   * LA CAJA DEL BURGO (`bandeja-de-los-dados.ts`): los dados, el dinero, el reloj de arena, los mazos y
+   * las casas del Concejo, pegados a la pantalla. Miguel no quería tener que buscar los dados en el
+   * mapa, y la primera bandeja —sólo los dados, vistos casi desde arriba— le pareció pobre. Lo que se
+   * mide aquí es lo que una captura no enseña: que en todos los lienzos y en las dos esquinas la
+   * composición ENTERA —con los dados en lo alto del salto y el reloj— cabe, mide lo pedido y queda
+   * pegada a su esquina; que se mira con la misma inclinación en todas partes; que cada pieza cabe en
+   * su compartimento y no se esconde detrás de una pared; y que el dinero que se pinta es el que hay.
    */
   {
+    const FORMAS: readonly FormaDeLaBandeja[] = ['completa', 'compacta'];
+    const medioDado = ARISTA_DE_LOS_DADOS / 2;
+    const temblor = sacudidaMaximaDeLosDados();
+    const cabeCon = (r: { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number }, x0: number, x1: number, z0: number, z1: number, aire: number): boolean =>
+      x0 >= r.x0 + aire - 1e-9 && x1 <= r.x1 - aire + 1e-9 && z0 >= r.z0 + aire - 1e-9 && z1 <= r.z1 - aire + 1e-9;
+    const seSolapan = (a: { x0: number; x1: number; z0: number; z1: number }, b: { x0: number; x1: number; z0: number; z1: number }): boolean => a.x0 < b.x1 - 1e-9 && b.x0 < a.x1 - 1e-9 && a.z0 < b.z1 - 1e-9 && b.z0 < a.z1 - 1e-9;
+
+    /* ── Los dados en su fieltro ── */
     /*
      * Quietos, pero GIRADOS sobre la vertical lo que diga su sello: a 45° un dado ocupa media diagonal de
      * su cara de cada lado, no media arista. Medido con media arista, los huecos de ±12 del paño
      * pasaban esta regla y en el banco los dos dados salían uno dentro del otro.
      */
-    const medioDado = ARISTA_DE_LOS_DADOS / 2;
-    const temblor = sacudidaMaximaDeLosDados();
-    const cabenEnElFieltro = (huecos: readonly Punto[]): boolean => huecos.every((h) => Math.abs(h.x) + MEDIA_DIAGONAL_DE_LA_CARA + temblor <= BANDEJA.fieltro.ancho / 2 - 2 && Math.abs(h.z) + MEDIA_DIAGONAL_DE_LA_CARA <= BANDEJA.fieltro.fondo / 2 - 2);
+    const cabenEnElFieltro = (forma: FormaDeLaBandeja, huecos: readonly Punto[]): boolean => {
+      const f = planoDeLaBandeja(forma).dados;
+      const lado = MEDIA_DIAGONAL_DE_LA_CARA + temblor;
+      return huecos.every((h) => cabeCon(f, h.x - lado, h.x + lado, h.z - lado, h.z + lado, 2));
+    };
     const noSeTocan = (huecos: readonly Punto[]): boolean => Math.abs((huecos[1]?.x ?? 0) - (huecos[0]?.x ?? 0)) >= 2 * MEDIA_DIAGONAL_DE_LA_CARA + 2 * temblor;
     comprobar(
-      `los dos dados de arista ${String(ARISTA_DE_LOS_DADOS)} caben quietos en el fieltro de ${String(BANDEJA.fieltro.ancho)} × ${String(BANDEJA.fieltro.fondo)} con 2 de aire, y no se tocan, aun girados a 45° y temblando`,
-      HUECOS_DE_LOS_DADOS.length === 2 && cabenEnElFieltro(HUECOS_DE_LOS_DADOS) && noSeTocan(HUECOS_DE_LOS_DADOS),
-      HUECOS_DE_LOS_DADOS,
+      `en las dos formas de la caja, los dos dados de arista ${String(ARISTA_DE_LOS_DADOS)} caben quietos en su fieltro con 2 de aire y no se tocan, aun girados a 45° y temblando`,
+      FORMAS.every((forma) => huecosDeLosDados(forma).length === 2 && cabenEnElFieltro(forma, huecosDeLosDados(forma)) && noSeTocan(huecosDeLosDados(forma))),
+      FORMAS.map((forma) => ({ forma, huecos: huecosDeLosDados(forma), fieltro: planoDeLaBandeja(forma).dados })),
     );
     comprobar(
       'se ve fallar: con los huecos de ±12 del paño, dos dados girados a 45° se meten uno dentro del otro',
@@ -1525,7 +1574,8 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
         { x: 12, z: 0 },
       ]),
     );
-    /* Las tres curvas de verdad, recorridas: no los números que la bandeja dice que usan. */
+
+    /* ── El aire de los dados: las tres curvas de verdad, recorridas, y no los números que la caja dice que usan ── */
     let alzaMedida = 0;
     for (let k = 0; k <= 3000; k++) {
       const t = (k / 3000) * 1.5;
@@ -1536,95 +1586,432 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
         saltoDelDoble([4, 4], t) * ARISTA_DE_LOS_DADOS * MOVIMIENTO_DE_LOS_DADOS.doble,
       );
     }
-    const caja = cajaDeLaBandeja();
+    const aireDeLosDados = (forma: FormaDeLaBandeja): VolumenDeLaBandeja | undefined => volumenesDeLaBandeja(forma)[1];
     comprobar(
-      `la caja con la que se posa la bandeja llega a lo más alto de un dado de verdad —recorridas las tres curvas, el centro sube ${r(alzaMedida)}, y la caja reserva ${r(alzaMaximaDeLosDados())} más la media diagonal— y a lo más ancho de uno que da vueltas y tiembla`,
+      `el aire que la composición reserva a los dados llega a lo más alto de un dado de verdad —recorridas las tres curvas, el centro sube ${r(alzaMedida)}, y se reservan ${r(alzaMaximaDeLosDados())} más la media diagonal— y a lo más ancho de uno que da vueltas y tiembla, en las dos formas`,
       alzaMedida <= alzaMaximaDeLosDados() + 1e-9 &&
         alzaMedida > alzaMaximaDeLosDados() - 0.05 &&
-        caja.y1 >= medioDado + alzaMaximaDeLosDados() + MEDIA_DIAGONAL_DEL_DADO - 1e-9 &&
-        HUECOS_DE_LOS_DADOS.every((h) => Math.abs(h.x) + MEDIA_DIAGONAL_DEL_DADO + temblor <= caja.x1 && Math.abs(h.z) + MEDIA_DIAGONAL_DEL_DADO <= caja.z1),
-      { alzaMedida, caja },
+        FORMAS.every((forma) => {
+          const v = aireDeLosDados(forma);
+          const lado = MEDIA_DIAGONAL_DEL_DADO + temblor;
+          return v !== undefined && v.y0 <= 0 && v.y1 >= medioDado + alzaMaximaDeLosDados() + MEDIA_DIAGONAL_DEL_DADO - 1e-9 && huecosDeLosDados(forma).every((h) => h.x - lado >= v.x0 - 1e-9 && h.x + lado <= v.x1 + 1e-9 && h.z - lado >= v.z0 - 1e-9 && h.z + lado <= v.z1 + 1e-9);
+        }),
+      { alzaMedida, aire: FORMAS.map(aireDeLosDados) },
     );
 
+    /* ── Lo que ocupa en el lienzo ── */
+    const LIENZOS_DE_LA_CAJA: readonly { readonly nombre: string; readonly ancho: number; readonly alto: number }[] = [
+      ...VENTANAS,
+      { nombre: 'móvil 375×812', ancho: 375, alto: 812 },
+      { nombre: 'apaisado 844×390', ancho: 844, alto: 390 },
+      { nombre: 'recuadro 288×317', ancho: 288, alto: 317 },
+      { nombre: 'justo completa 600×400', ancho: 600, alto: 400 },
+      { nombre: 'justo compacta 599×400', ancho: 599, alto: 400 },
+      { nombre: 'portátil 1280×720', ancho: 1280, alto: 720 },
+    ];
     const ESQUINAS_DE_LA_BANDEJA: readonly EsquinaDeLaBandeja[] = ['abajo-derecha', 'arriba-derecha'];
     const MARGEN = 12;
-    const fuera: string[] = [];
-    let poses = 0;
-    for (const v of VENTANAS) {
-      for (const esquina of ESQUINAS_DE_LA_BANDEJA) {
-        const q = poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA, { esquina, margen: MARGEN }).rectangulo;
-        poses++;
+    const poses = LIENZOS_DE_LA_CAJA.flatMap((v) => ESQUINAS_DE_LA_BANDEJA.map((esquina) => ({ v, esquina, pose: poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA, { esquina, margen: MARGEN }) })));
+    const malPosadas = poses
+      .filter(({ v, esquina, pose }) => {
+        const q = pose.rectangulo;
+        const pedido = Math.min(v.ancho - 2 * MARGEN, anchoDeLaBandejaEnPuntos(v.ancho, v.alto));
         const dentro = q.x0 >= 0 && q.y0 >= 0 && q.x1 <= v.ancho && q.y1 <= v.alto;
         const pegada = Math.abs(q.x1 - (v.ancho - MARGEN)) < 0.5 && (esquina === 'abajo-derecha' ? Math.abs(q.y1 - (v.alto - MARGEN)) < 0.5 : Math.abs(q.y0 - MARGEN) < 0.5);
-        if (!dentro || !pegada) fuera.push(`${v.nombre} ${esquina}: ${r(q.x0)}..${r(q.x1)} × ${r(q.y0)}..${r(q.y1)}`);
+        return !dentro || !pegada || Math.abs(q.x1 - q.x0 - pedido) >= 0.5 || pose.forma !== formaDeLaBandeja(v.ancho, v.alto);
+      })
+      .map(({ v, esquina, pose }) => `${v.nombre} ${esquina}: ${r(pose.rectangulo.x0)}..${r(pose.rectangulo.x1)} × ${r(pose.rectangulo.y0)}..${r(pose.rectangulo.y1)}`);
+    comprobar(
+      `en ${String(LIENZOS_DE_LA_CAJA.length)} lienzos y en las dos esquinas (${String(poses.length)} poses) la composición entera cabe, queda a ${String(MARGEN)} puntos de su esquina y mide de ancho lo pedido, medido proyectado`,
+      poses.length === LIENZOS_DE_LA_CAJA.length * 2 && malPosadas.length === 0,
+      malPosadas,
+    );
+    /*
+     * LA VACUNA ES LA CUENTA QUE HUBO: la escala sacada del ancho de la caja a la distancia del ojo, en el
+     * centro del lienzo. Con la perspectiva de verdad, lo que está más cerca del ojo y lo que queda lejos
+     * del centro mide más, y en un móvil la caja se salía por la izquierda.
+     */
+    const conLaEscalaDelCentro = (ancho: number, alto: number, esquina: EsquinaDeLaBandeja): { readonly x0: number; readonly x1: number } => {
+      const forma = formaDeLaBandeja(ancho, alto);
+      const d = CAJA.distancia;
+      const porPunto = d / (alto / 2 / Math.tan((CAMPO_DE_LA_CAMARA * Math.PI) / 360));
+      const c = cajaDeLaBandeja(forma);
+      const escala = (anchoDeLaBandejaEnPuntos(ancho, alto) * porPunto) / (c.x1 - c.x0);
+      const centro = { x: 0, y: 0, z: -d };
+      for (let k = 0; k < 12; k++) {
+        const q = rectanguloDeLaBandeja(forma, centro, escala, cabeceoHaciaElOjo(centro), ancho, alto, CAMPO_DE_LA_CAMARA);
+        centro.x += (ancho - MARGEN - q.x1) * porPunto;
+        centro.y -= (esquina === 'abajo-derecha' ? alto - MARGEN - q.y1 : MARGEN - q.y0) * porPunto;
+      }
+      return rectanguloDeLaBandeja(forma, centro, escala, cabeceoHaciaElOjo(centro), ancho, alto, CAMPO_DE_LA_CAMARA);
+    };
+    const conLaDeAntes = conLaEscalaDelCentro(375, 812, 'arriba-derecha');
+    const pedidoEnElMovil = anchoDeLaBandejaEnPuntos(375, 812);
+    comprobar(
+      `se ve fallar: con la escala medida en el centro del lienzo, en un móvil de 375 la composición mediría ${r(conLaDeAntes.x1 - conLaDeAntes.x0)} puntos y no ${String(pedidoEnElMovil)}`,
+      conLaDeAntes.x1 - conLaDeAntes.x0 > pedidoEnElMovil + 3,
+      conLaDeAntes,
+    );
+
+    /* ── La misma inclinación desde el ojo en todas partes, medida con un grupo de `three` como el de la escena ── */
+    const gradosDeLaCaja = (CAJA.inclinacion * 180) / Math.PI;
+    const inclinacionVista = (pose: { readonly x: number; readonly y: number; readonly z: number; readonly escala: number }, cabeceo: number): number => {
+      const grupo = new THREE.Object3D();
+      grupo.position.set(pose.x, pose.y, pose.z);
+      grupo.rotation.set(cabeceo, 0, 0);
+      grupo.scale.set(pose.escala, pose.escala, pose.escala);
+      grupo.updateMatrixWorld(true);
+      const normal = new THREE.Vector3(0, 1, 0).transformDirection(grupo.matrixWorld);
+      const alOjo = new THREE.Vector3(-pose.x, -pose.y, -pose.z).normalize();
+      return (Math.asin(normal.dot(alOjo)) * 180) / Math.PI;
+    };
+    const torcidas: string[] = [];
+    const desacuerdos: string[] = [];
+    for (const { v, esquina, pose } of poses) {
+      const vista = inclinacionVista(pose, pose.cabeceo);
+      if (Math.abs(vista - gradosDeLaCaja) > 0.01) torcidas.push(`${v.nombre} ${esquina}: ${r(vista)}°`);
+      const grupo = new THREE.Object3D();
+      grupo.position.set(pose.x, pose.y, pose.z);
+      grupo.rotation.set(pose.cabeceo, 0, 0);
+      grupo.scale.set(pose.escala, pose.escala, pose.escala);
+      grupo.updateMatrixWorld(true);
+      const camara = new THREE.PerspectiveCamera(CAMPO_DE_LA_CAMARA, v.ancho / v.alto, 0.5, 1000);
+      camara.updateMatrixWorld(true);
+      camara.updateProjectionMatrix();
+      const c = cajaDeLaBandeja(pose.forma);
+      for (const p of [[c.x0, c.y0, c.z0], [c.x1, c.y1, c.z1], [0, CAJA.alto, 0], [c.x1, c.y0, c.z0]] as const) {
+        const puro = puntoDeLaBandejaEnLaCamara(p, pose, pose.escala, pose.cabeceo);
+        const deThree = new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(grupo.matrixWorld);
+        const enElLienzo = puntoDeLaCamaraEnElLienzo(puro, v.ancho, v.alto, CAMPO_DE_LA_CAMARA);
+        const ndc = deThree.clone().project(camara);
+        const px = ((ndc.x + 1) / 2) * v.ancho;
+        const py = ((1 - ndc.y) / 2) * v.alto;
+        if (Math.hypot(puro[0] - deThree.x, puro[1] - deThree.y, puro[2] - deThree.z) > 1e-9 || enElLienzo === null || Math.hypot(enElLienzo.x - px, enElLienzo.y - py) > 1e-6) desacuerdos.push(`${v.nombre} ${esquina} ${p.join(',')}`);
       }
     }
-    comprobar(`en las tres ventanas y en las dos esquinas (${String(poses)} poses) la bandeja entera cabe en el lienzo y queda a ${String(MARGEN)} puntos de su esquina`, poses === 6 && fuera.length === 0, fuera);
-
-    const aristas = VENTANAS.map((v) => ({ ventana: v.nombre, arista: poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA).aristaEnPuntos }));
     comprobar(
-      `un dado quieto se lee en las tres ventanas: su arista no baja de ${String(DADO_MINIMO)} puntos ni su punto de ${String(PUNTO_MINIMO)} (${aristas.map((x) => `${x.ventana} ${r(x.arista)}`).join(', ')})`,
+      `en las ${String(poses.length)} poses el suelo de la caja se mira a ${r(gradosDeLaCaja)}° del rayo del ojo —abajo en el escritorio y arriba en la app—, medido con un grupo de three como el de la escena`,
+      torcidas.length === 0,
+      torcidas,
+    );
+    comprobar('y la cuenta pura lleva cada punto de la caja a la cámara y al lienzo donde lo llevan ese grupo y una PerspectiveCamera de three', desacuerdos.length === 0, desacuerdos.slice(0, 4));
+    const movilArriba = poseDeLaBandeja(390, Math.round(845 * 0.58), CAMPO_DE_LA_CAMARA, { esquina: 'arriba-derecha', margen: MARGEN });
+    const sinCompensar = inclinacionVista(movilArriba, CAJA.inclinacion);
+    comprobar(
+      `se ve fallar: inclinada ${r(gradosDeLaCaja)}° hacia la cámara a secas, como la bandeja, arriba en la app la caja se miraría a ${r(sinCompensar)}° y las paredes taparían lo de dentro`,
+      gradosDeLaCaja - sinCompensar > 10,
+      sinCompensar,
+    );
+
+    /* ── Un dado quieto se lee ── */
+    const aristas = LIENZOS_DE_LA_CAJA.map((v) => ({ lienzo: v.nombre, arista: poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA).aristaEnPuntos }));
+    comprobar(
+      `un dado quieto se lee en los ${String(aristas.length)} lienzos: su arista no baja de ${String(DADO_MINIMO)} puntos ni su punto de ${String(PUNTO_MINIMO)} (${aristas.map((x) => `${x.lienzo} ${r(x.arista)}`).join(', ')})`,
       aristas.every((x) => x.arista >= DADO_MINIMO && x.arista * PUNTO_DEL_DADO >= PUNTO_MINIMO),
       aristas,
     );
+    const movil = VENTANAS[2] as { readonly ancho: number; readonly alto: number };
+    const monitor = poseDeLaBandeja(VENTANAS[0]?.ancho ?? 1920, VENTANAS[0]?.alto ?? 1080, CAMPO_DE_LA_CAMARA);
+    const focalDelMovil = movil.alto / 2 / Math.tan((CAMPO_DE_LA_CAMARA * Math.PI) / 360);
+    const aristaFija = (monitor.escala * ARISTA_DE_LOS_DADOS * focalDelMovil) / CAJA.distancia;
+    comprobar(`se ve fallar: con la escala de un monitor, en el móvil el dado mediría ${r(aristaFija)} puntos y su punto ${r(aristaFija * PUNTO_DEL_DADO)}`, aristaFija * PUNTO_DEL_DADO < PUNTO_MINIMO, aristaFija);
 
-    /* El plano cercano, leído de los tres lienzos que montan la escena: no un 0,5 copiado aquí. */
+    /* ── El plano cercano, leído de los tres lienzos que montan la escena: no un 0,5 copiado aquí ── */
     const LIENZOS = ['../escritorio/src/burgo-en-tres.tsx', '../escritorio/src/banco-burgo.tsx', '../app/src/arcade/burgo-en-tres-escena.tsx'];
     const cercanos = LIENZOS.map((f) => {
       const texto = fs.readFileSync(path.join(RAIZ, f), 'utf8');
       const m = /<Canvas[\s\S]*?camera=\{\{[^}]*near:\s*([\d.]+)/.exec(texto);
       return m === null ? NaN : Number(m[1]);
     });
-    const cercano = Math.max(...cercanos);
     let loMasCerca = Infinity;
-    for (const v of VENTANAS) {
-      for (const esquina of ESQUINAS_DE_LA_BANDEJA) {
-        const pose = poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA, { esquina, margen: MARGEN });
-        for (const x of [caja.x0, caja.x1]) for (const y of [caja.y0, caja.y1]) for (const z of [caja.z0, caja.z1]) loMasCerca = Math.min(loMasCerca, -puntoDeLaBandejaEnLaCamara([x, y, z], pose, pose.escala, pose.inclinacion)[2]);
+    for (const { pose } of poses) {
+      for (const c of volumenesDeLaBandeja(pose.forma)) {
+        for (const x of [c.x0, c.x1]) for (const y of [c.y0, c.y1]) for (const z of [c.z0, c.z1]) loMasCerca = Math.min(loMasCerca, -puntoDeLaBandejaEnLaCamara([x, y, z], pose, pose.escala, pose.cabeceo)[2]);
       }
     }
     comprobar(
-      `la bandeja está entera delante del plano cercano de los tres lienzos (${cercanos.join(', ')}): lo más cerca del ojo que llega es ${r(loMasCerca)}, más del doble`,
-      cercanos.every((c) => Number.isFinite(c)) && loMasCerca > 2 * cercano,
+      `la composición está entera delante del plano cercano de los tres lienzos (${cercanos.join(', ')}): lo más cerca del ojo que llega es ${r(loMasCerca)}, más del doble`,
+      cercanos.every((c) => Number.isFinite(c)) && loMasCerca > 2 * Math.max(...cercanos),
       { cercanos, loMasCerca },
     );
 
     /*
-     * LAS DOS VACUNAS. Posada con la bandeja QUIETA, arriba a la derecha el dado en lo alto del salto
-     * se saldría del lienzo por arriba; y con una escala fija —la que le toca en un monitor—, en el
-     * móvil el dado ya no se lee.
-     */
-    /*
-     * EL FIELTRO NUNCA SE CONFUNDE CON EL BORDE. La primera bandeja llevaba el borde crema y el fieltro
-     * del primer asiento, `#f2e8cf`, salió del mismo tostado: la bandeja no decía de quién era el turno.
-     * Se mide con los seis colores del reglamento y con el fieltro sin turno.
+     * ── EL FIELTRO NUNCA SE CONFUNDE CON LA MADERA ── La primera bandeja llevaba el borde crema y el
+     * fieltro del primer asiento, `#f2e8cf`, salió del mismo tostado: no decía de quién era el turno. Se
+     * mide con los seis colores del reglamento y con el fieltro sin turno, contra el nogal de las paredes
+     * y el de sus cantos, que son lo que rodea al fieltro.
      */
     const fieltros = [...COLORES_DEL_BURGO.map((c) => colorDelFieltro(c)), colorDelFieltro(null)];
-    const cercaDelBorde = (borde: string): string[] => fieltros.filter((f) => distanciaEntreColores(f, borde) < 100).map((f) => `${f} a ${r(distanciaEntreColores(f, borde))}`);
+    const cercaDe = (madera: string): string[] => fieltros.filter((f) => distanciaEntreColores(f, madera) < 100).map((f) => `${f} a ${r(distanciaEntreColores(f, madera))}`);
     comprobar(
-      `ninguno de los ${String(fieltros.length)} fieltros posibles —los seis colores del reglamento y el de sin turno— queda a menos de 100 del borde de la bandeja`,
-      COLORES_DEL_BURGO.length === 6 && fieltros.every((f) => /^#[0-9a-f]{6}$/.test(f)) && cercaDelBorde(BANDEJA.color.borde).length === 0 && colorDelFieltro('#F2E8CF') === '#f2e8cf',
-      cercaDelBorde(BANDEJA.color.borde),
+      `ninguno de los ${String(fieltros.length)} fieltros posibles —los seis colores del reglamento y el de sin turno— queda a menos de 100 del nogal de la caja ni de sus cantos`,
+      COLORES_DEL_BURGO.length === 6 && fieltros.every((f) => /^#[0-9a-f]{6}$/.test(f)) && cercaDe(CAJA.color.madera).length === 0 && cercaDe(CAJA.color.canto).length === 0 && colorDelFieltro('#F2E8CF') === '#f2e8cf',
+      [...cercaDe(CAJA.color.madera), ...cercaDe(CAJA.color.canto)],
     );
-    comprobar('se ve fallar: con el borde crema de la primera bandeja, el fieltro del primer asiento queda a menos de 100', cercaDelBorde('#efe6cc').some((x) => x.startsWith('#f2e8cf')), cercaDelBorde('#efe6cc'));
+    comprobar('se ve fallar: con el borde crema de la primera bandeja, el fieltro del primer asiento queda a menos de 100', cercaDe('#efe6cc').some((x) => x.startsWith('#f2e8cf')), cercaDe('#efe6cc'));
 
-    const movil = VENTANAS[2] as { readonly ancho: number; readonly alto: number };
-    const arriba = poseDeLaBandeja(movil.ancho, movil.alto, CAMPO_DE_LA_CAMARA, { esquina: 'arriba-derecha', margen: MARGEN });
-    const enElLienzo = (p: readonly [number, number, number]): number => puntoDeLaCamaraEnElLienzo(puntoDeLaBandejaEnLaCamara(p, arriba, arriba.escala, arriba.inclinacion), movil.ancho, movil.alto, CAMPO_DE_LA_CAMARA)?.y ?? NaN;
-    const cimaQuieta = Math.min(enElLienzo([12, ARISTA_DE_LOS_DADOS, -medioDado]), enElLienzo([12, BANDEJA.borde.alto, caja.z0]));
-    /* Lo más alto de un dado en lo alto del salto y girado: su centro más la media diagonal hacia arriba de la pantalla. */
-    const alzado = medioDado + alzaMaximaDeLosDados();
-    const cimaEnElAire = enElLienzo([12, alzado + MEDIA_DIAGONAL_DEL_DADO * Math.cos(BANDEJA.inclinacion), -MEDIA_DIAGONAL_DEL_DADO * Math.sin(BANDEJA.inclinacion)]);
-    const sobresale = cimaQuieta - cimaEnElAire;
+    /* ── El dinero ── */
+    const sumaDe = (cuantos: readonly number[]): number => cuantos.reduce((n, c, i) => n + c * (BILLETES[i]?.valor ?? 0), 0);
+    const inexactas: number[] = [];
+    const pasadas: number[] = [];
+    for (let cantidad = 0; cantidad <= 40_000; cantidad += cantidad < 5_000 ? 1 : 37) {
+      const cuantos = billetesDeLaCantidad(cantidad);
+      if (cantidad < 3_500 && sumaDe(cuantos) !== cantidad) inexactas.push(cantidad);
+      if (cuantos.length !== BILLETES.length || cuantos.some((c, i) => c < 0 || c > (BILLETES[i]?.tope ?? 0)) || sumaDe(cuantos) > cantidad) pasadas.push(cantidad);
+    }
     comprobar(
-      `se ve fallar: posada con la bandeja QUIETA contra el canto de arriba, el dado en lo alto del salto se saldría ${r(sobresale)} puntos del lienzo`,
-      sobresale > 8,
-      { cimaQuieta, cimaEnElAire },
+      `los billetes que se pintan suman EXACTAMENTE el dinero hasta 3.499 —con 1.494, ${billetesDeLaCantidad(1494).join(', ')}—, y con cualquier cantidad hasta 40.000 ninguno pasa de su tope ni suman más de lo que hay`,
+      inexactas.length === 0 && pasadas.length === 0 && billetesDeLaCantidad(1494).join() === '2,4,1,2,0,0,4' && BILLETES_A_LA_VISTA === BILLETES.reduce((n, b) => n + b.tope, 0),
+      { inexactas: inexactas.slice(0, 5), pasadas: pasadas.slice(0, 5) },
     );
-    const monitor = poseDeLaBandeja(VENTANAS[0]?.ancho ?? 1920, VENTANAS[0]?.alto ?? 1080, CAMPO_DE_LA_CAMARA);
-    const focalDelMovil = movil.alto / 2 / Math.tan((CAMPO_DE_LA_CAMARA * Math.PI) / 360);
-    const aristaFija = (monitor.escala * ARISTA_DE_LOS_DADOS * focalDelMovil) / BANDEJA.distancia;
-    comprobar(`se ve fallar: con la escala de un monitor, en el móvil el dado mediría ${r(aristaFija)} puntos y su punto ${r(aristaFija * PUNTO_DEL_DADO)}`, aristaFija * PUNTO_DEL_DADO < PUNTO_MINIMO, aristaFija);
+    comprobar(
+      `la placa escribe la cantidad con los miles con punto —«${textoDelDinero(1494)}», «${textoDelDinero(0)}», «${textoDelDinero(1_234_567)}»— y la más larga de una partida, «${textoDelDinero(99_999)}», son las ${String(LETRAS_DE_LA_PLACA)} letras que cuenta el presupuesto`,
+      textoDelDinero(1494) === '1.494 €' && textoDelDinero(0) === '0 €' && textoDelDinero(-5) === '0 €' && textoDelDinero(1_234_567) === '1.234.567 €' && [...textoDelDinero(99_999)].filter((c) => c !== ' ').length === LETRAS_DE_LA_PLACA,
+    );
+    const huellaDelBillete = (forma: FormaDeLaBandeja, valor: number, k: number): { x0: number; x1: number; z0: number; z1: number; cima: number } => {
+      const s = sitioDelBillete(forma, valor, k);
+      const medioX = (BILLETE.ancho / 2) * Math.abs(Math.cos(s.giro)) + (BILLETE.largo / 2) * Math.abs(Math.sin(s.giro));
+      const medioZ = (BILLETE.ancho / 2) * Math.abs(Math.sin(s.giro)) + (BILLETE.largo / 2) * Math.abs(Math.cos(s.giro));
+      return { x0: s.x - medioX, x1: s.x + medioX, z0: s.z - medioZ, z1: s.z + medioZ, cima: s.y + BILLETE.grueso / 2 };
+    };
+    const billetesMal: string[] = [];
+    for (const forma of FORMAS) {
+      const compartimento = planoDeLaBandeja(forma).billetes;
+      const huellas = BILLETES.map((b) => Array.from({ length: b.tope }, (_, k) => huellaDelBillete(forma, b.valor, k)));
+      huellas.forEach((monton, i) => {
+        for (const h of monton) if (!cabeCon(compartimento, h.x0, h.x1, h.z0, h.z1, 1) || h.cima > CAJA.altoDelTabique) billetesMal.push(`${forma}: el de ${String(BILLETES[i]?.valor)} se sale`);
+        for (let j = i + 1; j < huellas.length; j++) if (monton.some((a) => (huellas[j] ?? []).some((b) => seSolapan(a, b)))) billetesMal.push(`${forma}: el montón de ${String(BILLETES[i]?.valor)} pisa el de ${String(BILLETES[j]?.valor)}`);
+      });
+    }
+    comprobar('en las dos formas, todos los billetes a la vista caben en su compartimento con 1 de aire y por debajo de los tabiques, y ningún montón pisa a otro', billetesMal.length === 0, billetesMal);
+
+    /* ── Los mazos, las casas y los hoteles ── */
+    const plano = planoDeLaBandeja('completa');
+    const mazos = sitiosDeLosMazos('completa');
+    const huellaDelMazo = (m: { readonly x: number; readonly z: number }): { x0: number; x1: number; z0: number; z1: number } => ({ x0: m.x - MAZO.ancho / 2, x1: m.x + MAZO.ancho / 2, z0: m.z - MAZO.fondo / 2, z1: m.z + MAZO.fondo / 2 });
+    comprobar(
+      `la completa lleva los dos mazos en su compartimento sin tocarse, con ${String(MAZO.cartas)} cartas bajo la pared (${r(altoDelMazo(MAZO.cartas))} de ${String(CAJA.alto)}), el emblema dentro de la carta, y un mazo vacío deja la marca de una`,
+      plano.mazos !== null &&
+        mazos.length === 2 &&
+        mazos.every((m) => plano.mazos !== null && cabeCon(plano.mazos, huellaDelMazo(m).x0, huellaDelMazo(m).x1, huellaDelMazo(m).z0, huellaDelMazo(m).z1, 1)) &&
+        !seSolapan(huellaDelMazo(mazos[0] as Punto), huellaDelMazo(mazos[1] as Punto)) &&
+        altoDelMazo(MAZO.cartas) + MAZO.alzaDelEmblema < CAJA.alto &&
+        altoDelMazo(0) === MAZO.gruesoDeUnaCarta &&
+        altoDelMazo(99) === altoDelMazo(MAZO.cartas) &&
+        MAZO.ladoDelEmblema <= Math.min(MAZO.ancho, MAZO.fondo) &&
+        sitiosDeLosMazos('compacta').length === 0,
+      { mazos, compartimento: plano.mazos },
+    );
+    const huellaDe = (s: Punto, pieza: typeof CASITA | typeof HOTELITO): { x0: number; x1: number; z0: number; z1: number } => ({ x0: s.x - pieza.ancho / 2, x1: s.x + pieza.ancho / 2, z0: s.z - pieza.fondo / 2, z1: s.z + pieza.fondo / 2 });
+    const obras = [...sitiosDeLasCasas('completa').map((s) => huellaDe(s, CASITA)), ...sitiosDeLosHoteles('completa').map((s) => huellaDe(s, HOTELITO))];
+    const obrasMal: string[] = [];
+    obras.forEach((h, i) => {
+      if (plano.obras === null || !cabeCon(plano.obras, h.x0, h.x1, h.z0, h.z1, 0.5)) obrasMal.push(`la ${String(i)} se sale`);
+      for (let j = i + 1; j < obras.length; j++) if (seSolapan(h, obras[j] as typeof h)) obrasMal.push(`la ${String(i)} pisa la ${String(j)}`);
+    });
+    comprobar(
+      `la completa guarda las ${String(CASAS_DEL_REGLAMENTO)} casas y los ${String(POSADAS_DEL_REGLAMENTO)} hoteles del reglamento en su compartimento, con medio de aire, sin pisarse y por debajo de la pared`,
+      CASAS_DE_LA_CAJA === CASAS_DEL_REGLAMENTO && HOTELES_DE_LA_CAJA === POSADAS_DEL_REGLAMENTO && sitiosDeLasCasas('completa').length === CASAS_DEL_REGLAMENTO && sitiosDeLosHoteles('completa').length === POSADAS_DEL_REGLAMENTO && obrasMal.length === 0 && CASITA.alto + CASITA.tejado < CAJA.alto && HOTELITO.alto + HOTELITO.tejado < CAJA.alto && sitiosDeLasCasas('compacta').length === 0,
+      obrasMal.slice(0, 6),
+    );
+    /* Una cara al revés no falla nada y se ve: el tejado de una casita se tiraría. Cada cara mira afuera de su pieza, que es convexa. */
+    const carasHaciaFuera = (caras: readonly CaraDeLaBandeja[]): boolean => {
+      const puntos = caras.flatMap((c) => c.puntos);
+      const centro = puntos.reduce((s, p) => [s[0] + p[0] / puntos.length, s[1] + p[1] / puntos.length, s[2] + p[2] / puntos.length] as [number, number, number], [0, 0, 0] as [number, number, number]);
+      return caras.every((c) => {
+        const [a, b, d] = c.puntos;
+        const n = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]).cross(new THREE.Vector3(d[0] - a[0], d[1] - a[1], d[2] - a[2]));
+        const medio = c.puntos.reduce((s, p) => [s[0] + p[0] / 4, s[1] + p[1] / 4, s[2] + p[2] / 4] as [number, number, number], [0, 0, 0] as [number, number, number]);
+        return n.dot(new THREE.Vector3(medio[0] - centro[0], medio[1] - centro[1], medio[2] - centro[2])) > 0;
+      });
+    };
+    const prismaDePrueba = prisma(-1, 3, -2, 5, -4, 1, '#000000');
+    const tumbadas = carasDeLaCaja('completa').filter((c) => c.puntos.every((p) => p[1] === c.puntos[0][1]));
+    const miraArriba = (c: CaraDeLaBandeja): boolean => {
+      const [a, b, d] = c.puntos;
+      return new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]).cross(new THREE.Vector3(d[0] - a[0], d[1] - a[1], d[2] - a[2])).y > 0;
+    };
+    comprobar(
+      `las caras de una casita y de un hotelito (${String(triangulosDeLasCaras(carasDeUnEdificio(CASITA)))} triángulos cada uno) y las de cada prisma de la caja miran hacia fuera, y las ${String(tumbadas.length)} tumbadas —los fondos y los cantos de arriba—, hacia arriba`,
+      carasHaciaFuera(carasDeUnEdificio(CASITA)) && carasHaciaFuera(carasDeUnEdificio(HOTELITO)) && carasHaciaFuera(prismaDePrueba) && tumbadas.length >= 4 && tumbadas.every(miraArriba),
+    );
+    const volteada = carasDeUnEdificio(CASITA).map((c, i) => (i === 5 ? { ...c, puntos: [c.puntos[0], c.puntos[3], c.puntos[2], c.puntos[1]] as typeof c.puntos } : c));
+    comprobar('se ve fallar: con un agua del tejado de la casita enhebrada al revés, cae', !carasHaciaFuera(volteada));
+
+    /*
+     * ── NADA DE DENTRO SE ESCONDE DETRÁS DE UNA PARED, VISTO DESDE EL OJO ── Por esto los billetes van en
+     * la mitad de atrás de su compartimento: vista a su inclinación, una pared de 10 tapa el suelo de
+     * detrás de ella. Se tira un rayo del ojo —llevado a unidades de bandeja con la pose de verdad— a lo
+     * que tiene que verse, y no puede cruzar ninguna pared ni tabique: la base de cada montón de
+     * billetes, la cima de cada dado quieto, el emblema de cada mazo, lleno y con una carta, el caballete
+     * de cada casa y de cada hotel, y el renglón de la placa, que va en la cara de delante.
+     */
+    const ojoEnLaBandeja = (pose: { readonly x: number; readonly y: number; readonly z: number; readonly escala: number; readonly cabeceo: number }): THREE.Vector3 => {
+      const grupo = new THREE.Object3D();
+      grupo.position.set(pose.x, pose.y, pose.z);
+      grupo.rotation.set(pose.cabeceo, 0, 0);
+      grupo.scale.set(pose.escala, pose.escala, pose.escala);
+      grupo.updateMatrixWorld(true);
+      return new THREE.Vector3(0, 0, 0).applyMatrix4(grupo.matrixWorld.clone().invert());
+    };
+    const paredesDe = (forma: FormaDeLaBandeja): THREE.Box3[] => {
+      const p = planoDeLaBandeja(forma);
+      const { pared, tabique, alto, altoDelTabique, bajo } = CAJA;
+      const k = p.caja;
+      const medio = (k.x0 + k.x1) / 2;
+      const cajas = [
+        new THREE.Box3(new THREE.Vector3(k.x0, -bajo, k.z0), new THREE.Vector3(k.x1, alto, k.z0 + pared)),
+        new THREE.Box3(new THREE.Vector3(k.x0, -bajo, k.z1 - pared), new THREE.Vector3(k.x1, alto, k.z1)),
+        new THREE.Box3(new THREE.Vector3(k.x0, -bajo, k.z0), new THREE.Vector3(k.x0 + pared, alto, k.z1)),
+        new THREE.Box3(new THREE.Vector3(k.x1 - pared, -bajo, k.z0), new THREE.Vector3(k.x1, alto, k.z1)),
+        new THREE.Box3(new THREE.Vector3(medio - tabique / 2, 0, k.z0), new THREE.Vector3(medio + tabique / 2, altoDelTabique, k.z1)),
+      ];
+      if (p.mazos !== null) cajas.push(new THREE.Box3(new THREE.Vector3(k.x0, 0, p.mazos.z1), new THREE.Vector3(k.x1, altoDelTabique, p.mazos.z1 + tabique)));
+      return cajas;
+    };
+    const loQueTieneQueVerse = (forma: FormaDeLaBandeja, filasDeBilletes: (valor: number, k: number) => { x: number; y: number; z: number }): { que: string; punto: THREE.Vector3 }[] => {
+      const salida: { que: string; punto: THREE.Vector3 }[] = [];
+      for (const b of BILLETES) {
+        const s = filasDeBilletes(b.valor, 0);
+        salida.push({ que: `el montón de ${String(b.valor)}`, punto: new THREE.Vector3(s.x, BILLETE.grueso, s.z) });
+      }
+      for (const h of huecosDeLosDados(forma)) salida.push({ que: 'la cima de un dado', punto: new THREE.Vector3(h.x, ARISTA_DE_LOS_DADOS, h.z) });
+      for (const m of sitiosDeLosMazos(forma)) for (const cartas of [MAZO.cartas, 1]) salida.push({ que: `el emblema de ${m.mazo} con ${String(cartas)}`, punto: new THREE.Vector3(m.x, altoDelMazo(cartas) + MAZO.alzaDelEmblema, m.z) });
+      for (const s of sitiosDeLasCasas(forma)) salida.push({ que: 'una casa', punto: new THREE.Vector3(s.x, CASITA.alto + CASITA.tejado, s.z) });
+      for (const s of sitiosDeLosHoteles(forma)) salida.push({ que: 'un hotel', punto: new THREE.Vector3(s.x, HOTELITO.alto + HOTELITO.tejado, s.z) });
+      const placa = sitioDeLaPlaca(forma);
+      salida.push({ que: 'la placa', punto: new THREE.Vector3(placa.x, placa.y, placa.z + PLACA.grueso + ALZA_DEL_RENGLON_DE_LA_PLACA) });
+      return salida;
+    };
+    const tapados = (filasDeBilletes: (forma: FormaDeLaBandeja) => (valor: number, k: number) => { x: number; y: number; z: number }): string[] => {
+      const salida = new Set<string>();
+      for (const { v, esquina, pose } of poses) {
+        const ojo = ojoEnLaBandeja(pose);
+        const paredes = paredesDe(pose.forma);
+        for (const { que, punto } of loQueTieneQueVerse(pose.forma, filasDeBilletes(pose.forma))) {
+          const hacia = punto.clone().sub(ojo);
+          const largo = hacia.length();
+          const rayo = new THREE.Ray(ojo, hacia.normalize());
+          const choca = paredes.some((caja) => {
+            const donde = rayo.intersectBox(caja, new THREE.Vector3());
+            return donde !== null && donde.distanceTo(ojo) < largo - 0.05 && !caja.containsPoint(punto);
+          });
+          if (choca) salida.add(`${que} (${v.nombre} ${esquina})`);
+        }
+      }
+      return [...salida];
+    };
+    const tapadosHoy = tapados((forma) => (valor, k) => sitioDelBillete(forma, valor, k));
+    comprobar(
+      'desde el ojo, en todas las poses, ninguna pared ni tabique tapa los montones de billetes, la cima de los dados, los emblemas de los mazos, las casas, los hoteles ni la placa',
+      tapadosHoy.length === 0 && poses.every(({ pose }) => ojoEnLaBandeja(pose).z > planoDeLaBandeja(pose.forma).caja.z1),
+      tapadosHoy.slice(0, 6),
+    );
+    const tapadosDelante = tapados((forma) => (valor, k) => {
+      const s = sitioDelBillete(forma, valor, k);
+      const r0 = planoDeLaBandeja(forma).billetes;
+      return { ...s, z: r0.z1 - 2 - BILLETE.largo / 2 };
+    });
+    comprobar('se ve fallar: con los billetes pegados a la pared de delante de su compartimento, la pared los tapa', tapadosDelante.some((t) => t.startsWith('el montón')), tapadosDelante.slice(0, 3));
+
+    /* ── El reloj de arena ── */
+    /*
+     * `tsx` carga los `.tsx` con el runtime clásico de JSX, y `escenas/reloj.tsx` no importa React —en
+     * Vite y en Metro no le hace falta—: para llamarlo desde aquí se le presta, en vez de tocar el
+     * componente de Riberas.
+     */
+    const react = await import('react');
+    (globalThis as { React?: unknown }).React ??= (react as { default?: unknown }).default ?? react;
+    const { ALTO_DEL_BULBO: ALTO_DEL_BULBO_DEL_RELOJ, GRUESO_DEL_MARCO: GRUESO_DEL_MARCO_DEL_RELOJ, RADIO_DEL_BULBO: RADIO_DEL_BULBO_DEL_RELOJ, RelojDeArena } = await import('../reloj');
+    const { cuantosTriangulos: cuantosTriangulosDeUnaGeometria } = await import('../formas');
+    const reloj = planoDeLaBandeja('completa').reloj;
+    const relojCompacto = planoDeLaBandeja('compacta').reloj;
+    comprobar(
+      `las proporciones del reloj que usa la caja son las de escenas/reloj.tsx, y el de conos cabe en el cilindro que se le reserva (${String(ENVOLVENTE_DEL_RELOJ.alto)} lado de alto y ${String(ENVOLVENTE_DEL_RELOJ.radio)} de radio) de pie en la mesa de la caja, fuera de ella`,
+      PROPORCIONES_DEL_RELOJ.altoDelBulbo === ALTO_DEL_BULBO_DEL_RELOJ &&
+        PROPORCIONES_DEL_RELOJ.radioDelBulbo === RADIO_DEL_BULBO_DEL_RELOJ &&
+        PROPORCIONES_DEL_RELOJ.gruesoDelMarco === GRUESO_DEL_MARCO_DEL_RELOJ &&
+        RADIO_DEL_BULBO_DEL_RELOJ * 1.15 <= ENVOLVENTE_DEL_RELOJ.radio &&
+        2 * (ALTO_DEL_BULBO_DEL_RELOJ + GRUESO_DEL_MARCO_DEL_RELOJ) <= ENVOLVENTE_DEL_RELOJ.alto &&
+        Math.abs(reloj.cinturaDeLosConos - (ALTO_DEL_BULBO_DEL_RELOJ + GRUESO_DEL_MARCO_DEL_RELOJ) * reloj.lado - reloj.suelo) < 1e-9 &&
+        Math.abs(reloj.centroDelModelo - (ENVOLVENTE_DEL_RELOJ.alto * reloj.lado) / 2 - reloj.suelo) < 1e-9 &&
+        reloj.suelo === -CAJA.bajo &&
+        [reloj, relojCompacto].every((x, i) => x.x - ENVOLVENTE_DEL_RELOJ.radio * x.lado > planoDeLaBandeja(FORMAS[i] as FormaDeLaBandeja).caja.x1 + 4),
+      { reloj, relojCompacto },
+    );
+    const triangulosDelArbol = (nodo: unknown): number => {
+      if (nodo === null || nodo === undefined || typeof nodo === 'boolean' || typeof nodo === 'string' || typeof nodo === 'number') return 0;
+      if (Array.isArray(nodo)) return nodo.reduce((n: number, hijo: unknown) => n + triangulosDelArbol(hijo), 0);
+      const e = nodo as { readonly type?: unknown; readonly props?: { readonly children?: unknown; readonly args?: readonly number[] } };
+      const args = [...(e.props?.args ?? [])] as number[];
+      const geometria =
+        e.type === 'cylinderGeometry'
+          ? new THREE.CylinderGeometry(...(args as [number, number, number, number]))
+          : e.type === 'coneGeometry'
+            ? new THREE.ConeGeometry(...(args as [number, number, number, number, boolean]))
+            : e.type === 'planeGeometry'
+              ? new THREE.PlaneGeometry(...(args as [number, number]))
+              : null;
+      if (geometria !== null) {
+        const n = cuantosTriangulosDeUnaGeometria(geometria);
+        geometria.dispose();
+        return n;
+      }
+      return triangulosDelArbol(e.props?.children);
+    };
+    const nadaDeReferencia = { current: null };
+    const arbolDelReloj = RelojDeArena({ cuerpo: nadaDeReferencia, arenaArriba: nadaDeReferencia, arenaAbajo: nadaDeReferencia, hilo: nadaDeReferencia, asa: nadaDeReferencia, lado: reloj.lado, ancho: reloj.lado * ASA_DEL_RELOJ_DE_ARENA.ancho, encendido: false, modelo: null, onPulsar: () => undefined });
+    const triangulosDeLosConos = triangulosDelArbol(arbolDelReloj);
+    comprobar(
+      `el reloj de conos, montado llamando a RelojDeArena y contando sus geometrías, son los ${String(TRIANGULOS_DEL_RELOJ_DE_CONOS)} triángulos que cuenta el presupuesto`,
+      triangulosDeLosConos === TRIANGULOS_DEL_RELOJ_DE_CONOS,
+      triangulosDeLosConos,
+    );
+    /* El de Riberas, abierto con `@gltf-transform`: sus triángulos nodo a nodo —los cincuenta granos comparten una malla— y su silueta. */
+    const RELOJ_GLB = path.join(RAIZ, 'modelos', 'reloj.glb');
+    const delGlb = await (async (): Promise<{ triangulos: number; radioPorAlto: number } | null> => {
+      if (!fs.existsSync(RELOJ_GLB)) return null;
+      const d = await io.read(RELOJ_GLB);
+      const escena = d.getRoot().getDefaultScene() ?? d.getRoot().listScenes()[0];
+      if (escena === undefined) return null;
+      let triangulos = 0;
+      escena.traverse((n) => {
+        const malla = n.getMesh();
+        if (malla === null) return;
+        for (const prim of malla.listPrimitives()) {
+          const pos = prim.getAttribute('POSITION');
+          if (pos !== null) triangulos += (prim.getIndices()?.getCount() ?? pos.getCount()) / 3;
+        }
+      });
+      const limites = getBounds(escena);
+      const alto = limites.max[1] - limites.min[1];
+      const radio = Math.max(limites.max[0] - limites.min[0], limites.max[2] - limites.min[2]) / 2;
+      return { triangulos: Math.round(triangulos), radioPorAlto: radio / alto };
+    })();
+    comprobar(
+      `el reloj de Riberas (reloj.glb) son los ${String(TRIANGULOS_DEL_RELOJ_DE_RIBERAS)} triángulos del presupuesto con su asa, y su silueta cabe en el cilindro sin encogerlo: ${delGlb === null ? '—' : r(delGlb.radioPorAlto)} de radio por lado`,
+      delGlb !== null && delGlb.triangulos + 2 === TRIANGULOS_DEL_RELOJ_DE_RIBERAS && delGlb.radioPorAlto <= ENVOLVENTE_DEL_RELOJ.radio,
+      delGlb,
+    );
+
+    /* ── Las dos asas ── */
+    const asasMal: string[] = [];
+    for (const forma of FORMAS) {
+      const r0 = planoDeLaBandeja(forma).reloj;
+      const asa = cajaDelAsaDelReloj(forma);
+      const media = (ASA_DEL_RELOJ_DE_ARENA.ancho * r0.lado) / 2;
+      for (const centro of [r0.cinturaDeLosConos, r0.centroDelModelo]) {
+        const cubre = asa.x - asa.ancho / 2 <= r0.x - media + 1e-9 && asa.x + asa.ancho / 2 >= r0.x + media - 1e-9 && asa.y - asa.alto / 2 <= centro - r0.lado / 2 + 1e-9 && asa.y + asa.alto / 2 >= centro + r0.lado / 2 - 1e-9 && Math.abs(asa.z - r0.z) < 1e-9;
+        if (!cubre) asasMal.push(`${forma}: el asa del reloj no envuelve la de RelojDeArena puesta a ${r(centro)}`);
+      }
+      const dados = cajaDelAsaDeLosDados(forma);
+      const f = planoDeLaBandeja(forma).dados;
+      if (Math.abs(dados.x - (f.x0 + f.x1) / 2) > 1e-9 || Math.abs(dados.ancho - (f.x1 - f.x0)) > 1e-9 || Math.abs(dados.fondo - (f.z1 - f.z0)) > 1e-9 || dados.y - dados.alto / 2 !== 0 || dados.alto < medioDado + alzaMaximaDeLosDados() + MEDIA_DIAGONAL_DEL_DADO - 1e-9) asasMal.push(`${forma}: el asa de los dados no cubre su compartimento hasta lo alto de un salto`);
+      const deLosDados = { x0: dados.x - dados.ancho / 2, x1: dados.x + dados.ancho / 2, z0: dados.z - dados.fondo / 2, z1: dados.z + dados.fondo / 2 };
+      const delReloj = { x0: asa.x - asa.ancho / 2, x1: asa.x + asa.ancho / 2, z0: asa.z - asa.fondo / 2, z1: asa.z + asa.fondo / 2 };
+      if (seSolapan(deLosDados, delReloj)) asasMal.push(`${forma}: las dos asas se pisan`);
+    }
+    comprobar('en las dos formas, el asa del reloj envuelve el asa de RelojDeArena con cualquiera de los dos relojes, el asa de los dados cubre su compartimento hasta lo alto de un salto, y las dos no se pisan', asasMal.length === 0, asasMal);
   }
 
   /* El campo: un MANTO contiguo, no un puñado de teselas sueltas. */
@@ -2554,9 +2941,11 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
       ),
   );
   /*
-   * Cuelgan DENTRO: el asa es el último hijo de la bandeja, así que justo detrás de ella se cierran
-   * los dos grupos de la bandeja; y los dados van entre la apertura de la bandeja y el asa. Una sola
-   * asa de tirar y un solo sitio donde se apuntan los dados en todo el fichero.
+   * Cuelgan DENTRO: el asa de los dados es el último hijo de la caja, así que justo detrás de ella se
+   * cierran los dos grupos; y la caja, el reloj, los dados y el asa del reloj van entre la apertura y el
+   * asa de los dados. Una sola asa de tirar, una sola de pasar, un solo reloj y un solo sitio donde se
+   * apuntan los dados en todo el fichero. Y el grupo de dentro se cabecea con lo que dice la pose, no con
+   * la inclinación a secas.
    */
   const dentroDeLaBandeja = (codigo: string): boolean => {
     const desde = codigo.indexOf('<group ref={grupoDeLaBandeja}>');
@@ -2564,18 +2953,103 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
     if (desde < 0 || cierre === null || cierre.index < desde) return false;
     const trozo = codigo.slice(desde, cierre.index);
     const unaVez = (x: RegExp): boolean => (codigo.match(new RegExp(x.source, 'g')) ?? []).length === 1;
-    return unaVez(/onPointerUp=\{tocaLosDados\}/) && unaVez(/dadosGrupos\.current\[i\] = g/) && /dadosGrupos\.current\[i\] = g/.test(trozo) && /geometry=\{bandeja\.geometria\}/.test(trozo);
+    return (
+      unaVez(/onPointerUp=\{tocaLosDados\}/) &&
+      unaVez(/onPointerUp=\{tocaElReloj\}/) &&
+      unaVez(/<RelojDeArena\b/) &&
+      unaVez(/dadosGrupos\.current\[i\] = g/) &&
+      /dadosGrupos\.current\[i\] = g/.test(trozo) &&
+      /geometry=\{cajaGeometria\}/.test(trozo) &&
+      /<RelojDeArena\b/.test(trozo) &&
+      /onPointerUp=\{tocaElReloj\}/.test(trozo) &&
+      /rotation=\{\[poseDeLaBandejaEnPantalla\.cabeceo, 0, 0\]\}/.test(trozo)
+    );
   };
-  comprobar('los dos dados y el asa de tirar cuelgan de la bandeja, y de ningún otro sitio: tocar lo que se ve es tirar', dentroDeLaBandeja(codigoDelBurgo));
+  comprobar('la caja, el reloj de arena, los dos dados y las dos asas cuelgan de la caja pegada a la pantalla, y de ningún otro sitio: tocar lo que se ve es tirar o pasar', dentroDeLaBandeja(codigoDelBurgo));
+  const cajaDePrueba = (asaDeLosDados: string, cabeceo = 'poseDeLaBandejaEnPantalla.cabeceo'): string =>
+    `<group ref={grupoDeLaBandeja}><group position={[1, 2, 3]} rotation={[${cabeceo}, 0, 0]}><mesh geometry={cajaGeometria} /><RelojDeArena lado={48} /><group ref={(g) => { dadosGrupos.current[i] = g; }} />{reloj ? (<mesh onPointerUp={tocaElReloj} />) : null}${asaDeLosDados}`;
   comprobar(
-    'se ve fallar: con el asa suelta en el mundo, como estuvo, cae',
-    !dentroDeLaBandeja(
-      '<group ref={grupoDeLaBandeja}><group><mesh geometry={bandeja.geometria} /><group ref={(g) => { dadosGrupos.current[i] = g; }} /></group></group>\n{dados?.porTirar === true ? (<mesh position={[0, 3, 0]} onPointerUp={tocaLosDados} />) : null}\n<group ref={naipeGrupo}>',
-    ) &&
-      dentroDeLaBandeja(
-        '<group ref={grupoDeLaBandeja}><group><mesh geometry={bandeja.geometria} /><group ref={(g) => { dadosGrupos.current[i] = g; }} />{dados?.porTirar === true ? (<mesh position={[0, 3, 0]} onPointerUp={tocaLosDados} />) : null}</group></group>',
-      ),
+    'se ve fallar: con el asa de los dados suelta en el mundo, como estuvo, o con la caja inclinada a secas, cae; y la caja bien montada pasa',
+    !dentroDeLaBandeja(`${cajaDePrueba('')}</group></group>\n{dados?.porTirar === true ? (<mesh position={[0, 3, 0]} onPointerUp={tocaLosDados} />) : null}\n<group ref={naipeGrupo}>`) &&
+      !dentroDeLaBandeja(`${cajaDePrueba('{dados?.porTirar === true ? (<mesh onPointerUp={tocaLosDados} />) : null}', 'CAJA.inclinacion')}</group></group>`) &&
+      dentroDeLaBandeja(`${cajaDePrueba('{dados?.porTirar === true ? (<mesh onPointerUp={tocaLosDados} />) : null}')}</group></group>`),
   );
+  /*
+   * PASAR EL TURNO ES TOCAR EL RELOJ, NO APRETARLO. El asa propia de `RelojDeArena` pasa al apretar, y va
+   * apagada; la de la caja lo envuelve (`cajaDelAsaDelReloj`), pide un toque sin arrastre como los dados,
+   * vuelve a mirar `quieto` y la disponibilidad, y sólo se monta cuando se puede pasar. Así quien empieza
+   * a girar el tablero desde el reloj no pierde el turno.
+   */
+  const elRelojPasaAlTocar = (codigo: string): boolean => {
+    const reloj = /<RelojDeArena\b[\s\S]*?\/>/.exec(codigo)?.[0] ?? '';
+    const cuerpo = /const tocaElReloj = \(e: ThreeEvent<PointerEvent>\): void => \{([\s\S]*?)\n {2}\};/.exec(codigo)?.[1] ?? '';
+    return (
+      /encendido=\{false\}/.test(reloj) &&
+      /^\s*if \(!esUnToque\(e\)\) return;/.test(cuerpo) &&
+      /avisos\.current\.quieto \|\| avisos\.current\.reloj\?\.disponible !== true/.test(cuerpo) &&
+      /avisos\.current\.alPasarElTurno/.test(cuerpo) &&
+      /props\.reloj\?\.disponible === true && props\.alPasarElTurno !== undefined \? \(\s*<mesh[^>]*onPointerDown=\{empiezaElToque\}[^>]*onPointerUp=\{tocaElReloj\}/.test(codigo)
+    );
+  };
+  comprobar('el reloj de arena pasa el turno con un toque sin arrastre sobre el asa de la caja, con su asa propia apagada, y el asa sólo existe cuando se puede pasar', elRelojPasaAlTocar(codigoDelBurgo));
+  /*
+   * LAS LLAMADAS DE DIBUJO QUE LA SOBRIA NO TIENE. Con la caja recién puesta la escena hacía 92 en sobria
+   * con un tope de 90 (medido en el banco); se bajó a 87 dejando de dibujar las dos asas —r3f no mira
+   * `visible` al tirar rayos, así que se siguen tocando— y fundiendo los mazos con sus emblemas y la
+   * placa con su cantidad. Nada de eso falla solo si se deshace: se pasaría del tope en silencio.
+   */
+  const pocasLlamadas = (codigo: string): boolean =>
+    /material=\{materiales\.asa\} visible=\{false\} onPointerDown=\{empiezaElToque\} onPointerUp=\{tocaElReloj\}/.test(codigo) &&
+    /material=\{materiales\.asa\} visible=\{false\} onPointerDown=\{empiezaElToque\} onPointerUp=\{tocaLosDados\}/.test(codigo) &&
+    /geometriaDeLosMazos\(forma, /.test(codigo) &&
+    /geometriaDeLaPlacaConSuCantidad\(textoDeLaPlaca\)/.test(codigo) &&
+    (codigo.match(/<mesh geometry=\{mazosGeometria\}/g) ?? []).length === 1;
+  comprobar('las dos asas de la caja no se dibujan, y los mazos con sus emblemas y la placa con su cantidad van en una geometría cada uno: son las llamadas que la sobria no tiene', pocasLlamadas(codigoDelBurgo));
+  comprobar('se ve fallar: con el asa de los dados dibujada, como estuvo, cae', !pocasLlamadas(codigoDelBurgo.replace('material={materiales.asa} visible={false} onPointerDown={empiezaElToque} onPointerUp={tocaLosDados}', 'material={materiales.asa} onPointerDown={empiezaElToque} onPointerUp={tocaLosDados}')));
+  comprobar(
+    'se ve fallar: con el asa propia del reloj encendida, o con el toque sin mirar si fue arrastre, cae',
+    !elRelojPasaAlTocar(codigoDelBurgo.replace('encendido={false}', 'encendido={props.reloj?.disponible === true}')) && !elRelojPasaAlTocar(codigoDelBurgo.replace(/(const tocaElReloj = \(e: ThreeEvent<PointerEvent>\): void => \{\s*)if \(!esUnToque\(e\)\) return;/, '$1')),
+  );
+  /*
+   * EL RELOJ DE RIBERAS SE NORMALIZA AL CILINDRO QUE LA CAJA LE RESERVA, sus cincuenta granos se pintan
+   * en UNA llamada —medido en el banco, sueltos subían la escena de 117 a 207 llamadas con un tope de
+   * 150— y, si no llega, no se avisa por `alFallar`: el escritorio mandaría la partida al tablero dibujado
+   * por un fichero de arte.
+   */
+  const relojBienMontado = (codigo: string): boolean => {
+    const carga = /function relojDelBurgoDe\(traer: Traer\): Promise<RelojCargado \| null> \{([\s\S]*?)\n\}/.exec(codigo)?.[1] ?? null;
+    return (
+      carga !== null &&
+      !/alFallar|falla\(/.test(carga) &&
+      /relojDelBurgoDe\(traer\)\.then/.test(codigo) &&
+      /tamano\.y \/ ENVOLVENTE_DEL_RELOJ\.alto, Math\.max\(tamano\.x, tamano\.z\) \/ \(2 \* ENVOLVENTE_DEL_RELOJ\.radio\)/.test(codigo) &&
+      /new THREE\.InstancedMesh\(primero\.geometry, primero\.material, granos\.length\)/.test(codigo) &&
+      /for \(const g of granos\) g\.visible = false;/.test(codigo) &&
+      /chorro\.setMatrixAt\(k, auxMatriz\.multiplyMatrices\(nodo\.matrix, g\.matrix\)\)/.test(codigo)
+    );
+  };
+  comprobar('el reloj de Riberas se normaliza al cilindro de la caja, pinta sus cincuenta granos en una llamada y, si no llega, no tumba el anillo', relojBienMontado(codigoDelBurgo));
+  comprobar(
+    'se ve fallar: con el reloj que no llega avisado por alFallar, o con los granos sueltos, cae',
+    !relojBienMontado(codigoDelBurgo.replace(/(function relojDelBurgoDe\(traer: Traer\): Promise<RelojCargado \| null> \{[\s\S]*?)console\.warn\(/, '$1alFallar(')) && !relojBienMontado(codigoDelBurgo.replace('for (const g of granos) g.visible = false;', '')),
+  );
+  /*
+   * `RelojDelBurgo` (`tipos.ts`) ES `RelojDeLaMesa` (`reloj.tsx`) CAMPO A CAMPO. Está escrito dos veces
+   * porque la traducción y el servidor leen `tipos.ts` y no compilan JSX; si el reloj de Riberas gana un
+   * campo, el de la caja no puede quedarse sin él sin que se vea.
+   */
+  const camposDe = (fuente: string, nombre: string): string => {
+    const cuerpo = new RegExp(`export interface ${nombre} \\{([\\s\\S]*?)\\n\\}`).exec(sinComentarios(fuente))?.[1] ?? '';
+    return [...cuerpo.matchAll(/readonly (\w+)(\??): ([^;]+);/g)].map((m) => `${m[1] ?? ''}${m[2] ?? ''}:${(m[3] ?? '').replace(/\s+/g, '')}`).sort().join('; ');
+  };
+  const fuenteDeLosTipos = fs.readFileSync(path.join(CARPETA, 'tipos.ts'), 'utf8');
+  const fuenteDelReloj = fs.readFileSync(path.join(RAIZ, 'reloj.tsx'), 'utf8');
+  comprobar(
+    `el reloj que recibe la caja (RelojDelBurgo) tiene los campos de RelojDeLaMesa de reloj.tsx: ${camposDe(fuenteDeLosTipos, 'RelojDelBurgo')}`,
+    camposDe(fuenteDeLosTipos, 'RelojDelBurgo').split('; ').length === 4 && camposDe(fuenteDeLosTipos, 'RelojDelBurgo') === camposDe(fuenteDelReloj, 'RelojDeLaMesa'),
+    { caja: camposDe(fuenteDeLosTipos, 'RelojDelBurgo'), riberas: camposDe(fuenteDelReloj, 'RelojDeLaMesa') },
+  );
+  comprobar('se ve fallar: un RelojDeLaMesa con un campo más no casa', camposDe(fuenteDelReloj.replace('readonly vuelta: number;', 'readonly vuelta: number;\n  readonly pausado: boolean;'), 'RelojDeLaMesa') !== camposDe(fuenteDeLosTipos, 'RelojDelBurgo'));
   /*
    * LOS NÚMEROS DEL MOVIMIENTO SON LOS DE LA BANDEJA. La caja con la que se posa la bandeja se mide con
    * `MOVIMIENTO_DE_LOS_DADOS`; si la escena multiplicara el salto por otro número escrito a mano, un
@@ -2591,7 +3065,8 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   comprobar('se ve fallar: con el salto escrito a mano, como estaba, cae', conElSaltoAMano !== codigoDelBurgo && (movimientosDeLaBandeja(conElSaltoAMano).length < 4 || /ARISTA_DE_LOS_DADOS \* \d/.test(conElSaltoAMano)));
   /*
    * Y LOS DOS CLIENTES DICEN DÓNDE VA: el escritorio abajo a la derecha —y su cartel del pie se para
-   * antes, medido con la misma pose—, y la app arriba a la derecha, porque abajo flota su pie. Sin el
+   * antes, medido con la misma pose—, y la app arriba a la derecha, porque abajo flota su pie; y su
+   * «Ver el burgo entero», que iba en la esquina de arriba a la izquierda, baja debajo de la caja. Sin el
    * sitio, la app la pondría abajo, debajo del carril y de la cinta, y los dados no se verían.
    */
   const fuenteDelCliente = (f: string): string => sinComentarios(fs.readFileSync(path.join(RAIZ, f), 'utf8'));
@@ -2600,10 +3075,38 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   const ponenLaBandeja = (codigo: string, esquina: string): boolean =>
     /bandejaDeLosDados=\{SITIO_DE_LA_BANDEJA\}/.test(codigo) && new RegExp(`const SITIO_DE_LA_BANDEJA: SitioDeLaBandeja = \\{ esquina: '${esquina}', margen: \\d+ \\}`).test(codigo);
   comprobar(
-    'el escritorio pone la bandeja abajo a la derecha y el cartel del pie se para antes de ella; la app, arriba a la derecha',
-    ponenLaBandeja(elEscritorio, 'abajo-derecha') && /estilo=\{sitioDelCartel\}/.test(elEscritorio) && /poseDeLaBandeja\(lienzo\.ancho, lienzo\.alto, FOV, SITIO_DE_LA_BANDEJA\)/.test(elEscritorio) && ponenLaBandeja(laApp, 'arriba-derecha'),
+    'el escritorio pone la caja abajo a la derecha y el cartel del pie se para antes de ella si al lado cabe uno que se lea; la app, arriba a la derecha, con «Ver el burgo entero» debajo',
+    ponenLaBandeja(elEscritorio, 'abajo-derecha') &&
+      /estilo=\{sitioDelCartel\}/.test(elEscritorio) &&
+      /poseDeLaBandeja\(lienzo\.ancho, lienzo\.alto, FOV, SITIO_DE_LA_BANDEJA\)/.test(elEscritorio) &&
+      /< ANCHO_MINIMO_DEL_CARTEL_AL_LADO\) return EL_SITIO_DEL_CARTEL;/.test(elEscritorio) &&
+      ponenLaBandeja(laApp, 'arriba-derecha') &&
+      /poseDeLaBandeja\(medida\.ancho, medida\.alto, CAMPO_DE_LA_CAMARA, SITIO_DE_LA_BANDEJA\)\.rectangulo/.test(laApp) &&
+      /style=\{\[estilos\.volver, \{ top: alturaDelBotonDeVolver \}\]\}/.test(laApp),
   );
-  comprobar('se ve fallar: una app que no pasa el sitio de la bandeja cae', !ponenLaBandeja(laApp.replace(/bandejaDeLosDados=\{SITIO_DE_LA_BANDEJA\}/, ''), 'arriba-derecha'));
+  comprobar('se ve fallar: una app que no pasa el sitio de la caja cae', !ponenLaBandeja(laApp.replace(/bandejaDeLosDados=\{SITIO_DE_LA_BANDEJA\}/, ''), 'arriba-derecha'));
+  {
+    /* En los lienzos de la completa, al lado de la caja cabe siempre un cartel de 220 puntos: sólo en los estrechos va a lo ancho. */
+    const alLado = (ancho: number, alto: number): number => poseDeLaBandeja(ancho, alto, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: 12 }).rectangulo.x0 - 2 * 12;
+    const completas = [[600, 400], [768, 1024], [1280, 720], [1920, 1080], [2560, 1400]] as const;
+    comprobar(
+      `en los lienzos de la caja completa el cartel del pie cabe al lado de ella con al menos 220 puntos (${completas.map(([a, h]) => `${String(a)}×${String(h)} ${r(alLado(a, h))}`).join(', ')}), y en uno de 288 va a lo ancho`,
+      completas.every(([a, h]) => alLado(a, h) >= 220) && alLado(288, 317) < 220,
+    );
+  }
+  /*
+   * EL RELOJ DE ARENA LO LLEVAN LOS DOS CLIENTES: los instantes de la mesa, la opción de pasar buscada
+   * en la traducción (`pasarEnTres`, la misma en los dos) y la vuelta de `turnosAbiertos`. Sin pasarlo, el
+   * reloj se pinta lleno y quieto, y tocarlo no hace nada: no fallaría ninguna cuenta.
+   */
+  const llevanElReloj = (codigo: string): boolean =>
+    /reloj=\{relojDeArena\}/.test(codigo) &&
+    /alPasarElTurno=\{alPasarElTurno\}/.test(codigo) &&
+    /disponible: !(mesa\.)?quieto && pasarEnTres\(opciones\) !== null/.test(codigo) &&
+    /vuelta: vueltaDelReloj\(/.test(codigo) &&
+    /const pasar = pasarEnTres\(opciones\);/.test(codigo);
+  comprobar('el escritorio y la app le dan a la caja su reloj de arena —los instantes de la mesa, la vuelta y si se puede pasar— y pasan el turno con la opción de pasarEnTres', llevanElReloj(elEscritorio) && llevanElReloj(laApp));
+  comprobar('se ve fallar: una app que no pasa el reloj cae', !llevanElReloj(laApp.replace('reloj={relojDeArena}', '')));
   /*
    * EL PRECINTO SE TIENDE CON LA HIPOTECA: uno por casilla hipotecada, en su sitio, estirado lo que diga
    * la curva de la bandera, en una malla de un precinto por título. Sin la llamada en el bucle de las
@@ -2685,7 +3188,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
  * `ShapePath` son aritmética), así que aquí se pueden pedir las geometrías de verdad.
  */
 {
-  const { MINIMO_DE_UN_VOLUMEN, claveDelBulto, cuentaDeBulto, geometriaDelPrecinto, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaLetra, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
+  const { MINIMO_DE_UN_VOLUMEN, claveDelBulto, cuentaDeBulto, geometriaDeLaCaja, geometriaDeLaPlaca, geometriaDeLaPlacaConSuCantidad, geometriaDelColorDeUnBillete, geometriaDeLosMazos, geometriaDelPrecinto, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBillete, geometriaDeUnBulto, geometriaDeUnHotelito, geometriaDeUnRenglonDePie, geometriaDeUnaCasita, geometriaDeUnaLetra, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
   const { ALTURA_DEL_BORDILLO, HISTERESIS_DEL_NIVEL, TONO_DEL_EDIFICIO, TONO_POR_DEFECTO, TRIANGULOS_DE_LA_CASCARA_ABIERTA, TRIANGULOS_DE_LA_CUBIERTA, TRIANGULOS_DE_LA_MEDIANERA, UMBRALES_DE_NIVEL, VETA_DE_LA_ALTURA, cascaraAbierta, ciudadDelCodigo, cocheEnElInstante, montarLaCiudad, nivelDelGrupo, pulsoDeLaParcela, tonoDeLaFachada, tonoDelEdificio, triangulosDeUnaTorre, ANCHO_DEL_CARRIL, ANCHO_DEL_BORDILLO, EJE_DEL_CARRIL } = await import('../burgo/ciudad');
   /* La retícula es de `piezas.ts` y `ciudad.ts` no la reexporta: pedírsela a `ciudad` devolvía `undefined` en silencio y el juez del carril se caía comparando con NaN. */
   const RETICULA = RETICULA_DE_LA_CIUDAD;
@@ -2895,6 +3398,66 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
         { triangulos, porPrecinto, fueraDeLaCinta, cotas: [...cotas] },
       );
       precinto?.dispose();
+    }
+    /*
+     * LA CAJA DEL BURGO SE MONTA CON LO QUE CUENTA SU PRESUPUESTO: cada geometría de `ciudad-en-3d.ts`
+     * tiene los triángulos de sus caras puras, la suma con sus multiplicidades es `triangulosDeLaCaja()`,
+     * los emblemas de los mazos y el renglón más largo de la placa caben en lo que les guarda
+     * `presupuesto.ts`, ese renglón cabe en la cara de latón, y los mazos fundidos son tan altos como
+     * cartas les quedan.
+     */
+    {
+      const medir = (g: THREE.BufferGeometry | null): number => {
+        const n = g === null ? -1 : cuantosTriangulos(g);
+        g?.dispose();
+        return n;
+      };
+      const caja = medir(geometriaDeLaCaja('completa'));
+      const casita = medir(geometriaDeUnaCasita());
+      const hotelito = medir(geometriaDeUnHotelito());
+      const mazo = triangulosDeLasCaras(prisma(0, 1, 0, 1, 0, 1, '#000000'));
+      const billete = medir(geometriaDeUnBillete());
+      const colorDelBillete = medir(geometriaDelColorDeUnBillete());
+      const placa = medir(geometriaDeLaPlaca());
+      const mazosFundidos = medir(geometriaDeLosMazos('completa', { pregon: MAZO.cartas, arca: 1 }));
+      const emblemas = mazosFundidos - 2 * mazo;
+      const cimaDeLosMazos = (cartas: { readonly pregon: number; readonly arca: number }): number => {
+        const g = geometriaDeLosMazos('completa', cartas);
+        g?.computeBoundingBox();
+        const cima = g?.boundingBox?.max.y ?? NaN;
+        g?.dispose();
+        return cima;
+      };
+      const placaConCantidad = medir(geometriaDeLaPlacaConSuCantidad(textoDelDinero(99_999)));
+      const renglon = geometriaDeUnRenglonDePie(textoDelDinero(99_999), PLACA.altoDelTexto, PLACA.color.tinta);
+      const posiciones = renglon?.getAttribute('position') as THREE.BufferAttribute | undefined;
+      let fueraDelLaton = 0;
+      for (let k = 0; posiciones !== undefined && k < posiciones.count; k++) {
+        if (Math.abs(posiciones.getX(k)) > PLACA.ancho / 2 - 1 || Math.abs(posiciones.getY(k)) > PLACA.alto / 2 - 0.5) fueraDelLaton++;
+      }
+      const letras = medir(renglon);
+      const sumada =
+        caja + CASAS_DE_LA_CAJA * casita + HOTELES_DE_LA_CAJA * hotelito + 2 * mazo + BILLETES_A_LA_VISTA * (billete + colorDelBillete) + placa + TRIANGULOS_DEL_ASA_DE_LOS_DADOS + TRIANGULOS_DEL_ASA_DEL_RELOJ;
+      comprobar(
+        `la caja del Burgo se monta con los triángulos que cuenta su presupuesto (${String(sumada)} medidos en las geometrías de verdad, ${String(triangulosDeLaCaja())} contados); los dos emblemas de los mazos (${String(emblemas)}) caben en los ${String(2 * TRIANGULOS_POR_EMBLEMA)} de dos, y «${textoDelDinero(99_999)}» (${String(letras)}) en las ${String(LETRAS_DE_LA_PLACA)} letras de la placa y dentro de su latón`,
+        caja === triangulosDeLasCaras(carasDeLaCaja('completa')) &&
+          casita === triangulosDeLasCaras(carasDeUnEdificio(CASITA)) &&
+          hotelito === triangulosDeLasCaras(carasDeUnEdificio(HOTELITO)) &&
+          sumada === triangulosDeLaCaja() &&
+          emblemas > 0 &&
+          emblemas <= 2 * TRIANGULOS_POR_EMBLEMA &&
+          letras > 0 &&
+          letras <= LETRAS_DE_LA_PLACA * TRIANGULOS_POR_LETRA &&
+          placaConCantidad === placa + letras &&
+          fueraDelLaton === 0,
+        { caja, casita, hotelito, mazo, billete, colorDelBillete, placa, emblemas, letras, placaConCantidad, fueraDelLaton },
+      );
+      comprobar(
+        `los mazos fundidos son tan altos como cartas les quedan —con dieciséis, el emblema a ${r(cimaDeLosMazos({ pregon: MAZO.cartas, arca: 1 }))}; con una en cada uno, a ${r(cimaDeLosMazos({ pregon: 1, arca: 1 }))}— y la caja compacta no los lleva`,
+        Math.abs(cimaDeLosMazos({ pregon: MAZO.cartas, arca: 1 }) - (altoDelMazo(MAZO.cartas) + MAZO.alzaDelEmblema)) < 0.01 &&
+          Math.abs(cimaDeLosMazos({ pregon: 1, arca: 1 }) - (altoDelMazo(1) + MAZO.alzaDelEmblema)) < 0.01 &&
+          geometriaDeLosMazos('compacta', { pregon: MAZO.cartas, arca: MAZO.cartas }) === null,
+      );
     }
     /* El presupuesto los cuenta a 120 y a su media por letra: la medida real no puede pasarse del doble. */
     const presupuestados = huecosDeLosEmblemas().length * TRIANGULOS_POR_EMBLEMA + letrasDelTablero() * TRIANGULOS_POR_LETRA;
@@ -4612,8 +5175,9 @@ if (fallos.length === 0) {
       'no queda una sola pieza medieval en el anillo, las cuatro esquinas son manzanas de nueve por nueve\n' +
       'celdas que no tocan la ele de la marcha, el campo es un manto continuo con las nubes fuera y el\n' +
       'claro del Concejo despejado, una casilla hipotecada lleva su precinto dentro de la franja y\n' +
-      'leyéndose como su nombre, los dados van en una bandeja pegada a la pantalla que cabe en su\n' +
-      'esquina con los dados en el aire, las cuatro avenidas de 48 entran encaradas a las casillas 5, 15,\n' +
+      'leyéndose como su nombre, los dados, el dinero y el reloj de arena van en una caja pegada a la\n' +
+      'pantalla que cabe en su esquina con los dados en el aire y se mira igual desde cualquiera, sin\n' +
+      'nada escondido detrás de sus paredes, las cuatro avenidas de 48 entran encaradas a las casillas 5, 15,\n' +
       '25 y 35,\n' +
       'el tablero cabe en el presupuesto dejando sitio a la ciudad, el peón cruza una casilla en 1,5 s y\n' +
       'anda diez mil pasos sin T-pose ni salirse de la polilínea, una jugada real cabe en 14 s y las\n' +

@@ -674,6 +674,26 @@ export function tirarEnTres<O extends OpcionQueLlega>(opciones: readonly O[]): O
   return null;
 }
 
+/**
+ * LA OPCIÓN DE PASAR EL TURNO, entera, o `null`: la gemela de `tirarEnTres`, y la que manda el reloj de
+ * arena de la caja del Burgo al tocarlo. Existe por lo mismo que la de Riberas (`riberas-en-tres.ts`):
+ * buscándola aquí, el escritorio y la app pulsan LA MISMA opción. Pasar en la subasta es `PASAR_PUJA`,
+ * y ése no lo pulsa el reloj.
+ */
+export function pasarEnTres<O extends OpcionQueLlega>(opciones: readonly O[]): O | null {
+  for (const o of opciones) if (o.tipo === PASAR && !esPuerta(o)) return o;
+  return null;
+}
+
+/**
+ * LA VUELTA DEL RELOJ DE ARENA: `turnosAbiertos` de la vista, que sólo crece y es el mismo número en
+ * todos los aparatos, así que el reloj se voltea a la vez en todas las pantallas sin mandar nada. `0` si
+ * la vista no se lee.
+ */
+export function vueltaDelReloj(vista: unknown): number {
+  return leer(vista)?.turnosAbiertos ?? 0;
+}
+
 // ---------------------------------------------------------------------------
 // EL TABLERO: cuarenta casillas, las figuras, y su firma
 // ---------------------------------------------------------------------------
@@ -726,6 +746,7 @@ function figurasDe(l: Lectura, asientos: readonly { readonly id: string; readonl
       quebrada: j.quebrado,
       esLocal: l.yo !== null && j.asiento === l.yo,
       leToca: l.turnoDe !== null && j.asiento === l.turnoDe,
+      dinero: j.mrs,
     });
   }
   return figuras;
@@ -794,6 +815,7 @@ export function tableroEnTres<O extends OpcionQueLlega>(
     carta: vigente === null ? null : { mazo: vigente.mazo, enCasilla: casillaDeLaCarta(l, vigente), jugada: vigente.enElTurno },
     trato: primerTrato === undefined ? null : { de: primerTrato.de, a: primerTrato.a },
     ganador: l.momento === 'terminada' && l.ganadores.length > 0 ? (l.ganadores[0] as AsientoId) : null,
+    banca: { casas: l.concejo.casas, posadas: l.concejo.posadas, cartas: { pregon: l.quedan.pregon, arca: l.quedan.arca } },
   };
 }
 
@@ -810,7 +832,7 @@ export function firmaDelTablero(t: TableroDelBurgoEn3D): string {
   }
   for (const f of t.figuras) {
     trozos.push(
-      `${f.asiento}:${f.color}:${f.figura}:${f.casilla}:${f.presa ? 'p' : ''}:${f.quebrada ? 'q' : ''}:${f.esLocal ? 'l' : ''}:${f.leToca ? 'x' : ''}`,
+      `${f.asiento}:${f.color}:${f.figura}:${f.casilla}:${f.presa ? 'p' : ''}:${f.quebrada ? 'q' : ''}:${f.esLocal ? 'l' : ''}:${f.leToca ? 'x' : ''}:${f.dinero}`,
     );
   }
   trozos.push(`d${t.destacada ?? '-'}`);
@@ -818,6 +840,7 @@ export function firmaDelTablero(t: TableroDelBurgoEn3D): string {
   trozos.push(t.carta === null ? 'c-' : `c${t.carta.mazo}:${t.carta.enCasilla}:${t.carta.jugada}`);
   trozos.push(t.trato === null ? 't-' : `t${t.trato.de}>${t.trato.a}`);
   trozos.push(`g${t.ganador ?? '-'}`);
+  trozos.push(`b${t.banca.casas}:${t.banca.posadas}:${t.banca.cartas.pregon}:${t.banca.cartas.arca}`);
   return trozos.join('|');
 }
 

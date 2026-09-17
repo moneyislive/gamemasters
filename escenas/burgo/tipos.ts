@@ -39,6 +39,23 @@ import type { ParDeDados } from '../dados';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 import type { SitioDeLaBandeja } from './bandeja-de-los-dados';
 
+/**
+ * LO QUE LA MESA LE DICE AL RELOJ DE ARENA DE LA CAJA DEL BURGO: la forma de `RelojDeLaMesa` de
+ * `escenas/reloj.tsx`, campo a campo, escrita aquí porque aquel fichero es un `.tsx` y éste lo leen el
+ * servidor y la traducción, que no compilan JSX —importada de allí, el `tsc` del servidor no arranca—.
+ * `verify:burgo-escena` compara las dos.
+ */
+export interface RelojDelBurgo {
+  /** Cuándo empezó el turno, en milisegundos de reloj de pared. */
+  readonly desde: number;
+  /** Cuándo vence, o `null` si la mesa no tiene plazo: entonces el reloj se pinta lleno y quieto. */
+  readonly venceEn: number | null;
+  /** Si se puede pasar el turno tocándolo. */
+  readonly disponible: boolean;
+  /** `turnosAbiertos` de la vista: sube al cambiar de turno, y eso lo voltea. */
+  readonly vuelta: number;
+}
+
 export type ClaseDeCasillaEn3D =
   | 'salida'
   | 'solar'
@@ -79,6 +96,8 @@ export interface FiguraEn3D {
   readonly quebrada: boolean;
   readonly esLocal: boolean;
   readonly leToca: boolean;
+  /** El efectivo, en euros: lo que enseñan los billetes de la caja del Burgo. */
+  readonly dinero: number;
 }
 
 export interface DadosDelBurgoEn3D {
@@ -102,6 +121,11 @@ export interface TableroDelBurgoEn3D {
   readonly carta: { readonly mazo: 'pregon' | 'arca'; readonly enCasilla: number; readonly jugada: number } | null;
   readonly trato: { readonly de: string; readonly a: string } | null;
   readonly ganador: string | null;
+  /**
+   * LO QUE LE QUEDA AL CONCEJO: las casas y los hoteles sin construir y las cartas de cada mazo. Lo
+   * enseña la caja del Burgo, que se va vaciando.
+   */
+  readonly banca: { readonly casas: number; readonly posadas: number; readonly cartas: { readonly pregon: number; readonly arca: number } };
 }
 
 /** El segundo modo está RESERVADO: hoy la escena ignora el valor y lo dice en cabecera. `peon.ts` ya da {x, z, rumbo} por fotograma. */
@@ -125,6 +149,17 @@ export interface PropsDelBurgo {
    * la derecha, la app arriba a la derecha. Sin él, abajo a la derecha a 12 puntos.
    */
   readonly bandejaDeLosDados?: SitioDeLaBandeja;
+  /**
+   * EL RELOJ DE ARENA DEL TURNO, como en Riberas (`escenas/reloj.tsx`): cuándo empezó el turno, cuándo
+   * vence, si se puede pasar y la vuelta que lo voltea. Sin él, el reloj se pinta lleno y quieto y no
+   * pasa nada al tocarlo.
+   */
+  readonly reloj?: RelojDelBurgo | null;
+  /**
+   * TOCAR EL RELOJ DE ARENA: pasar el turno. Sólo se llama con `reloj.disponible` y sin `quieto`, y dice
+   * cómo acabó, como `alTocarLosDados`: si no es `'hecho'` y el turno sigue, la arena vuelve a caer.
+   */
+  readonly alPasarElTurno?: () => Promise<'hecho' | 'rechazado' | 'sin-red'>;
   readonly seguirAlQueMueve: boolean;
   /** Un movimiento en vuelo: las asas no mandan. */
   readonly quieto: boolean;

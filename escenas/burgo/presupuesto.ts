@@ -37,8 +37,8 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 258.749   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 226.001   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 280.752   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 228.180   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
@@ -53,8 +53,11 @@
  * Y suben 36 con la bandeja de los dados, que llevó los dados a la pantalla: 26 de la bandeja y 12 de
  * su asa, menos los 2 del paño que había en el campo. Y 22.848 con los PRECINTOS de las hipotecas, que
  * se cuentan como si los 28 títulos estuvieran hipotecados a la vez: 816 cada uno, casi todo letras.
- * Con eso la sobria se queda a 4.000 de su tope: el próximo que añada algo al tablero tiene que mirar
- * antes esta cuenta.
+ * Y la bandeja se hizo CAJA DEL BURGO: la caja con sus 32 casas, sus 12 hoteles, los dos mazos, los 34
+ * billetes que caben a la vista, la placa y las dos asas son 1.148; los dos emblemas y las siete
+ * letras de la placa, 807; y el reloj de arena, el de Riberas en plena (20.086) y el de conos en sobria
+ * (262). La sobria sube 2.179 y se queda a 1.820 de su tope: el próximo que añada algo al tablero
+ * tiene que quitar antes.
  * Los de arriba son los que `verify:burgo-escena` imprime hoy, y ahora también los COMPARA con esta
  * cabecera: dos veces se quedaron viejos sin que nada lo notara, y la segunda fue a la media hora de
  * corregirlos.)
@@ -112,7 +115,7 @@ import { BOCANADAS_DEL_HUMO, CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLo
 import type { NombreDePieza } from './piezas';
 import { CASILLAS, ESQUINAS, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, cuadrosDelPrecinto, huecosDeLosEmblemas, letrasDelPrecinto, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
-import { TRIANGULOS_DEL_ASA_DE_LOS_DADOS, triangulosDeLaBandeja } from './bandeja-de-los-dados';
+import { LETRAS_DE_LA_PLACA, TRIANGULOS_DEL_RELOJ_DE_CONOS, TRIANGULOS_DEL_RELOJ_DE_RIBERAS, triangulosDeLaCaja } from './bandeja-de-los-dados';
 
 /**
  * LOS TOPES. Ver la cabecera: la cuenta que los justifica está en `LA-CIUDAD.md` §8, y
@@ -300,7 +303,12 @@ export function sumaDelPresupuesto(
   renglones.push({ que: 'discos de contacto', cuantos: DISCOS_DE_CONTACTO, triangulos: DISCOS_DE_CONTACTO * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'dados', cuantos: DADOS, triangulos: DADOS * triangulosDelDado });
   renglones.push({ que: 'precintos de las hipotecas', cuantos: TITULOS, triangulos: TITULOS * triangulosDelPrecinto() });
-  renglones.push({ que: 'la bandeja de los dados y su asa', cuantos: 1, triangulos: triangulosDeLaBandeja() + TRIANGULOS_DEL_ASA_DE_LOS_DADOS });
+  renglones.push({
+    que: 'la caja del Burgo: la caja, las casas y los hoteles del Concejo, los mazos con su emblema, los billetes y la placa',
+    cuantos: 1,
+    triangulos: triangulosDeLaCaja() + 2 * TRIANGULOS_POR_EMBLEMA + LETRAS_DE_LA_PLACA * TRIANGULOS_POR_LETRA,
+  });
+  renglones.push({ que: plena ? 'el reloj de arena de Riberas' : 'el reloj de arena de conos', cuantos: 1, triangulos: plena ? TRIANGULOS_DEL_RELOJ_DE_RIBERAS : TRIANGULOS_DEL_RELOJ_DE_CONOS });
   renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });
   renglones.push({ que: 'la cúpula del cielo', cuantos: 1, triangulos: triangulosDelCielo() });
   renglones.push({ que: 'aventurero (exploradora)', cuantos: plena ? 1 : 0, triangulos: plena ? triangulosDeUnAventurero : 0 });

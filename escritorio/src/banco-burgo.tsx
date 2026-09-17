@@ -49,6 +49,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Burgo } from '../../escenas/burgo/Burgo';
 import type { CasillaEn3D, ClaseDeCasillaEn3D, DadosDelBurgoEn3D, FiguraEn3D, TableroDelBurgoEn3D } from '../../escenas/burgo/tipos';
+import type { SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
+import type { RelojDeLaMesa } from '../../escenas/reloj';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 import type { FiguraId } from '../../escenas/embarcadero/figuras';
 import { FIGURAS, rutaDeLasAnimaciones, rutaDelAventurero } from '../../escenas/embarcadero/figuras';
@@ -73,9 +75,10 @@ import { INTERRUPTORES_DEL_BANCO } from '../../escenas/burgo/Burgo';
 import { RECINTO_DEL_BURGO, TOPE_DE_LA_CIUDAD, ciudadDelCodigo, montarLaCiudad } from '../../escenas/burgo/ciudad';
 import type { DistritoPuesto } from '../../escenas/burgo/ciudad';
 import { TOPE_DE_LLAMADAS, TOPE_DE_LLAMADAS_SOBRIA, TOPE_PLENA, TOPE_SOBRIA } from '../../escenas/burgo/presupuesto';
-import { rutaDeLosDados, rutaDelBurgo } from '../../escenas/ruta-de-modelos';
+import { rutaDeLosDados, rutaDelBurgo, rutaDelReloj } from '../../escenas/ruta-de-modelos';
 import burgoGlb from '../../escenas/modelos/burgo.glb?url';
 import dadosGlb from '../../escenas/modelos/dados.glb?url';
+import relojGlb from '../../escenas/modelos/reloj.glb?url';
 import caballeroGlb from '../../escenas/modelos/aventureros/caballero.glb?url';
 import barbaroGlb from '../../escenas/modelos/aventureros/barbaro.glb?url';
 import magaGlb from '../../escenas/modelos/aventureros/maga.glb?url';
@@ -100,6 +103,7 @@ const AVENTUREROS: Readonly<Record<string, string>> = {
 function ficheroDe(ruta: string): string | null {
   if (ruta === rutaDelBurgo()) return burgoGlb;
   if (ruta === rutaDeLosDados()) return dadosGlb;
+  if (ruta === rutaDelReloj()) return relojGlb;
   if (ruta === rutaDeLasAnimaciones()) return animacionesGlb;
   for (const f of FIGURAS) if (ruta === rutaDelAventurero(f.id)) return AVENTUREROS[f.fichero] ?? null;
   return null;
@@ -192,6 +196,7 @@ function figurasDePrueba(jugadores: number): FiguraEn3D[] {
       quebrada: false,
       esLocal: i === 0,
       leToca: i === 0,
+      dinero: [1494, 860, 2310, 45, 1500, 700][i] ?? 1500,
     });
   }
   return salida;
@@ -409,6 +414,10 @@ const parametros = new URLSearchParams(window.location.search);
 const JUGADORES = Math.max(1, Math.min(6, Number(parametros.get('jugadores') ?? '6') || 6));
 const LLENO = parametros.get('lleno') !== '0';
 const SEMILLA_DE_ARRANQUE = parametros.get('semilla') ?? 'BANCO';
+/** `?esquina=arriba` posa la caja del Burgo donde la posa la app; si no, donde el escritorio. */
+const SITIO_DE_LA_CAJA: SitioDeLaBandeja = { esquina: parametros.get('esquina') === 'arriba' ? 'arriba-derecha' : 'abajo-derecha', margen: 12 };
+/** `?plazo=N`: los segundos del turno del reloj de arena del banco, sesenta si no se dice. */
+const PLAZO_DEL_RELOJ_DEL_BANCO = 1000 * Math.max(2, Number(parametros.get('plazo') ?? '60') || 60);
 
 function Banco(): JSX.Element {
   const [casillas, ponerCasillas] = useState<CasillaEn3D[]>(() => casillasDePrueba(JUGADORES, LLENO));
@@ -489,7 +498,21 @@ function Banco(): JSX.Element {
   };
 
   const tablero = useMemo<TableroDelBurgoEn3D>(
-    () => ({ casillas, figuras, destacada, almoneda, carta: null, trato, ganador }),
+    () => ({
+      casillas,
+      figuras,
+      destacada,
+      almoneda,
+      carta: null,
+      trato,
+      ganador,
+      /* Lo que le queda al Concejo, contado del tablero del banco: las cartas, siempre enteras. */
+      banca: {
+        casas: Math.max(0, 32 - casillas.reduce((n, c) => n + (c.casas >= 1 && c.casas <= 4 ? c.casas : 0), 0)),
+        posadas: Math.max(0, 12 - casillas.filter((c) => c.casas === 5).length),
+        cartas: { pregon: 16, arca: 11 },
+      },
+    }),
     [casillas, figuras, destacada, almoneda, trato, ganador],
   );
   const sucesos = useMemo(() => ({ jugada, lista }), [jugada, lista]);
@@ -538,6 +561,25 @@ function Banco(): JSX.Element {
     });
   };
 
+  /*
+   * EL RELOJ DE ARENA DEL BANCO: un turno de `?plazo=` segundos que empieza al cargar. Tocar el reloj lo
+   * pasa como lo pasaría la mesa —la respuesta tarda lo que tarda la de los dados— y empieza otro, con
+   * la vuelta siguiente, que es lo que lo voltea.
+   */
+  const [reloj, ponerReloj] = useState<RelojDeLaMesa>(() => ({ desde: Date.now(), venceEn: Date.now() + PLAZO_DEL_RELOJ_DEL_BANCO, disponible: true, vuelta: 1 }));
+  const alPasarElTurno = useCallback(
+    (): Promise<'hecho' | 'rechazado' | 'sin-red'> =>
+      new Promise((resuelve) => {
+        window.setTimeout(() => {
+          const ahora = Date.now();
+          ponerReloj((r) => ({ desde: ahora, venceEn: ahora + PLAZO_DEL_RELOJ_DEL_BANCO, disponible: true, vuelta: r.vuelta + 1 }));
+          ponerTocado('reloj: turno pasado');
+          resuelve('hecho');
+        }, 400);
+      }),
+    [],
+  );
+
   const alTocarLosDados = useCallback(
     (): Promise<'hecho' | 'rechazado' | 'sin-red'> =>
       new Promise((resuelve) => {
@@ -581,6 +623,9 @@ function Banco(): JSX.Element {
           traer={traer}
           calidad={calidad}
           camara={{ modo: 'aerea' }}
+          bandejaDeLosDados={SITIO_DE_LA_CAJA}
+          reloj={reloj}
+          alPasarElTurno={alPasarElTurno}
           seguirAlQueMueve={seguir}
           quieto={false}
           alTocarCasilla={(i) => {

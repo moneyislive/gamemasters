@@ -168,6 +168,7 @@ import { CERCANIA_DE_SALIDA } from '../../escenas/acercar';
 import { Burgo } from '../../escenas/burgo/Burgo';
 import { poseDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
+import type { RelojDeLaMesa } from '../../escenas/reloj';
 import {
   ALCANCE_DEL_BURGO,
   ALTURA_MINIMA_DEL_OJO_DEL_BURGO,
@@ -214,6 +215,7 @@ import {
   obrasSoloEnElAnillo,
   opcionesFueraDelTablero,
   PARA_CONTESTAR,
+  pasarEnTres,
   plural,
   pregonDelBurgo,
   seVeEnTres,
@@ -221,6 +223,7 @@ import {
   tableroEnTres,
   tirarEnTres,
   tratoEnTres,
+  vueltaDelReloj,
 } from '../../shared/arcade/juegos/burgo-en-tres';
 import type {
   DadosEnTres,
@@ -905,15 +908,22 @@ export function BurgoEnTres({
 
   const [lienzo, ponerLienzo] = useState({ ancho: 0, alto: 0 });
   /*
-   * EL CARTEL DEL PIE SE PARA ANTES DE LA BANDEJA DE LOS DADOS: su canto derecho queda 12 puntos a
-   * la izquierda de lo que ocupa la bandeja con los dados en el aire, medido con la misma cuenta con
-   * la que la escena la posa. Sin lienzo medido —en Node, o antes del primer `ResizeObserver`— va
+   * EL CARTEL DEL PIE SE PARA ANTES DE LA CAJA DEL BURGO: su canto derecho queda 12 puntos a la
+   * izquierda de lo que ocupa la caja con los dados en el aire y el reloj, medido con la misma cuenta
+   * con la que la escena la posa. Sin lienzo medido —en Node, o antes del primer `ResizeObserver`— va
    * como iba.
+   *
+   * Y SI AL LADO NO CABE UN CARTEL QUE SE LEA, va a lo ancho como iba, por encima de la caja. Pasa en
+   * los lienzos de menos de 600 puntos, donde la caja compacta ocupa casi todo el pie: apretado en lo
+   * que queda, el cartel salía de una palabra por renglón. Tapar la caja mientras se lee una casilla
+   * cuesta poco —el cartel se va solo y no coge el toque, así que los dados se siguen tirando—.
    */
   const sitioDelCartel = useMemo((): CSSProperties => {
     if (lienzo.ancho <= 0 || lienzo.alto <= 0) return EL_SITIO_DEL_CARTEL;
-    const bandeja = poseDeLaBandeja(lienzo.ancho, lienzo.alto, FOV, SITIO_DE_LA_BANDEJA).rectangulo;
-    return { ...EL_SITIO_DEL_CARTEL, right: `${String(Math.ceil(lienzo.ancho - bandeja.x0 + SITIO_DE_LA_BANDEJA.margen))}px` };
+    const caja = poseDeLaBandeja(lienzo.ancho, lienzo.alto, FOV, SITIO_DE_LA_BANDEJA).rectangulo;
+    const derecha = Math.ceil(lienzo.ancho - caja.x0 + SITIO_DE_LA_BANDEJA.margen);
+    if (lienzo.ancho - derecha - SITIO_DE_LA_BANDEJA.margen < ANCHO_MINIMO_DEL_CARTEL_AL_LADO) return EL_SITIO_DEL_CARTEL;
+    return { ...EL_SITIO_DEL_CARTEL, right: `${String(derecha)}px` };
   }, [lienzo.ancho, lienzo.alto]);
   const [raizDeLaLetra, ponerRaizDeLaLetra] = useState(RAIZ_DE_LA_CASA);
   const observadorDelRecuadro = useRef<ResizeObserver | null>(null);
@@ -1258,6 +1268,13 @@ export function BurgoEnTres({
     if (tirar === null) return Promise.resolve('rechazado');
     return mover({ tipo: tirar.tipo, carga: tirar.carga });
   }, [quieto, opciones, mover]);
+  /* Tocar el reloj de arena de la caja del Burgo: la opción de pasar, la misma que el botón del carril. */
+  const alPasarElTurno = useCallback((): Promise<'hecho' | 'rechazado' | 'sin-red'> => {
+    if (quieto) return Promise.resolve('rechazado');
+    const pasar = pasarEnTres(opciones);
+    if (pasar === null) return Promise.resolve('rechazado');
+    return mover({ tipo: pasar.tipo, carga: pasar.carga });
+  }, [quieto, opciones, mover]);
 
   // -------------------------------------------------------------------------
   // El reloj de la cinta
@@ -1297,6 +1314,22 @@ export function BurgoEnTres({
           entero: cuantoQueda(venceEn - Date.now()),
           aprieta: elPlazoAprieta(venceEn - Date.now()),
         };
+
+  /*
+   * EL RELOJ DE ARENA DE LA CAJA DEL BURGO, el de Riberas: lo que queda de turno, y tocarlo lo pasa. Lleva
+   * los dos instantes de la MESA —los mismos de la cuenta atrás de la cinta— y la escena saca la
+   * fracción en su `useFrame`; la vuelta es `turnosAbiertos`, que lo voltea a la vez en todas las
+   * pantallas. El botón de pasar del carril se queda: el reloj es otra forma de llegar a lo mismo.
+   */
+  const relojDeArena = useMemo(
+    (): RelojDeLaMesa => ({
+      desde: puesta.turnoDesde,
+      venceEn,
+      disponible: !quieto && pasarEnTres(opciones) !== null,
+      vuelta: vueltaDelReloj(vista),
+    }),
+    [puesta.turnoDesde, venceEn, quieto, opciones, vista],
+  );
 
   const anchoDelCajon = useMemo(
     () => ({ ancho: Math.min(lienzo.ancho, Math.round(ANCHO_DEL_CAJON_EN_RAICES * raizDeLaLetra)) }),
@@ -1696,6 +1729,8 @@ export function BurgoEnTres({
                   calidad={calidad}
                   camara={{ modo: 'aerea' }}
                   bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
+                  reloj={relojDeArena}
+                  alPasarElTurno={alPasarElTurno}
                   seguirAlQueMueve={siguiendo && aQuienSigue !== null}
                   quieto={quieto}
                   alTocarCasilla={alTocarCasilla}
@@ -2000,11 +2035,13 @@ export function BurgoEnTres({
  * tocan primero, y por eso el cartel no se pulsa.
  */
 const EL_SITIO_DEL_CARTEL: CSSProperties = { right: '0.75rem', bottom: '0.75rem', left: '0.75rem' };
+/** Lo menos que tiene que medir de ancho el cartel del pie para ir al lado de la caja del Burgo, en puntos. */
+const ANCHO_MINIMO_DEL_CARTEL_AL_LADO = 220;
 
 /**
- * LA BANDEJA DE LOS DADOS, ABAJO A LA DERECHA DEL LIENZO. Miguel quería los dados en la pantalla y no
- * en el mapa (`escenas/burgo/bandeja-de-los-dados.ts`); arriba están la cinta, el carril y «Ver el
- * burgo entero», y el pie sólo lo usa el cartel, que se acorta para dejarle su hueco
+ * LA CAJA DEL BURGO, ABAJO A LA DERECHA DEL LIENZO: los dados, el dinero, el reloj de arena, los mazos
+ * y las casas del Concejo (`escenas/burgo/bandeja-de-los-dados.ts`). Arriba están la cinta, el carril y
+ * «Ver el burgo entero», y el pie sólo lo usa el cartel, que se acorta para dejarle su hueco
  * (`sitioDelCartel`). Los 12 puntos son el mismo `0.75rem` de los demás cromos con la letra de la casa.
  */
 const SITIO_DE_LA_BANDEJA: SitioDeLaBandeja = { esquina: 'abajo-derecha', margen: 12 };

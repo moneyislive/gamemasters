@@ -78,6 +78,8 @@ import { geometriaDeContornos } from '../formas';
 import { ALZA_DEL_ROTULO, CASILLAS, FERIA, PRECINTO, cuadrosDelPrecinto, huecosDeLosEmblemas, letrasDelPrecinto, letrasDelRotulo, letrasDelSubtitulo } from './anillo-en-3d';
 import { COLOR_DE_OBRA, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaOnda, carasDeUnaBocanada, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDelTren, casillasConObra, letrasDeLosCarteles, letrasDelNeon } from './obras';
 import type { CaraEnElMundo } from './obras';
+import { ALZA_DEL_RENGLON_DE_LA_PLACA, BILLETE, CASITA, COLOR_DEL_MAZO, HOTELITO, MAZO, PLACA, altoDelMazo, carasDeLaCaja, carasDeUnEdificio, prisma, sitiosDeLosMazos } from './bandeja-de-los-dados';
+import type { FormaDeLaBandeja } from './bandeja-de-los-dados';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
 
 /* ─────────────────────────────── Los bultos ─────────────────────────────── */
@@ -618,6 +620,160 @@ export function geometriaDelPrecinto(): THREE.BufferGeometry | null {
   }
   for (const g of siluetas.values()) g?.dispose();
   const fundida = completa ? (mergeGeometries(partes, false) as THREE.BufferGeometry | null) : null;
+  for (const g of partes) g.dispose();
+  if (fundida === null) return null;
+  fundida.computeBoundingSphere();
+  return fundida;
+}
+
+/* ─────────────────────────────── La caja del Burgo ─────────────────────────────── */
+
+/**
+ * LA CAJA DEL BURGO (`bandeja-de-los-dados.ts`): la caja con sus paredes, sus tabiques, los fondos y el
+ * fieltro de los dados, en UNA geometría con color por vértice. El fieltro es la primera cara, así que
+ * sus seis vértices son los seis primeros y la escena los repinta con el color de quien tira.
+ */
+export function geometriaDeLaCaja(forma: FormaDeLaBandeja): THREE.BufferGeometry | null {
+  return geometriaDeCarasConColor(carasDeLaCaja(forma));
+}
+
+/** Una casa del Concejo, verde; y un hotel, rojo. Una geometría cada una, instanciada tantas veces como queden. */
+export function geometriaDeUnaCasita(): THREE.BufferGeometry | null {
+  return geometriaDeCarasConColor(carasDeUnEdificio(CASITA));
+}
+export function geometriaDeUnHotelito(): THREE.BufferGeometry | null {
+  return geometriaDeCarasConColor(carasDeUnEdificio(HOTELITO));
+}
+
+/**
+ * UN BILLETE: el papel blanco con los cantos en gris, y aparte su recuadro de color, un pelo por encima,
+ * que la escena tiñe por instancia con el color de su valor. Van en dos mallas con las mismas matrices
+ * porque el tinte de una instancia lo tiñe todo: en una sola, el marco blanco saldría del color del billete.
+ */
+export function geometriaDeUnBillete(): THREE.BufferGeometry | null {
+  return geometriaDeCarasConColor(prisma(-BILLETE.ancho / 2, BILLETE.ancho / 2, 0, BILLETE.grueso, -BILLETE.largo / 2, BILLETE.largo / 2, '#fbf8ef', '#c9c3b2'));
+}
+export function geometriaDelColorDeUnBillete(): THREE.BufferGeometry | null {
+  const x = BILLETE.ancho / 2 - BILLETE.marco;
+  const z = BILLETE.largo / 2 - BILLETE.marco;
+  const y = BILLETE.grueso + 0.03;
+  return geometriaDeCarasConColor([{ color: '#ffffff', puntos: [[-x, y, -z], [-x, y, z], [x, y, z], [x, y, -z]] }]);
+}
+
+/**
+ * LOS DOS MAZOS DE LA CAJA, cada uno tan alto como cartas le quedan y con su emblema encima —el pregón
+ * de Suerte y el arca de la Caja de Comunidad, tumbados y leyéndose desde delante de la caja—, en UNA
+ * geometría: dos prismas y dos emblemas eran cuatro llamadas de dibujo, y en la calidad sobria la escena
+ * se pasaba de sus 90 (medido en el banco: 92). Se rehace cuando cambian las cartas, que es una vez cada
+ * muchos turnos. `null` en la compacta, que no lleva mazos, o si falta un emblema.
+ */
+export function geometriaDeLosMazos(forma: FormaDeLaBandeja, cartas: { readonly pregon: number; readonly arca: number }): THREE.BufferGeometry | null {
+  const sitios = sitiosDeLosMazos(forma);
+  if (sitios.length === 0) return null;
+  const partes: THREE.BufferGeometry[] = [];
+  let completa = true;
+  for (const m of sitios) {
+    const color = COLOR_DEL_MAZO[m.mazo];
+    const alto = altoDelMazo(cartas[m.mazo]);
+    const cuerpo = geometriaDeCarasConColor(prisma(m.x - MAZO.ancho / 2, m.x + MAZO.ancho / 2, 0, alto, m.z - MAZO.fondo / 2, m.z + MAZO.fondo / 2, color.carta, color.canto));
+    const silueta = geometriaDeContornos(CONTORNOS_DEL_EMBLEMA[m.mazo] ?? []);
+    if (cuerpo === null || silueta === null) {
+      cuerpo?.dispose();
+      silueta?.dispose();
+      completa = false;
+      break;
+    }
+    partes.push(cuerpo);
+    const emblema = siluetaPuesta(silueta, m.x, m.z, Math.PI, MAZO.ladoDelEmblema, color.emblema, alto + MAZO.alzaDelEmblema);
+    silueta.dispose();
+    if (emblema.index === null) {
+      partes.push(emblema);
+    } else {
+      partes.push(emblema.toNonIndexed());
+      emblema.dispose();
+    }
+  }
+  const fundida = completa ? (mergeGeometries(partes, false) as THREE.BufferGeometry | null) : null;
+  for (const g of partes) g.dispose();
+  if (fundida === null) return null;
+  fundida.computeBoundingSphere();
+  return fundida;
+}
+
+/** La placa de latón del dinero, de pie contra la cara de delante de la caja: su cara mira a `+z`. */
+export function geometriaDeLaPlaca(): THREE.BufferGeometry | null {
+  const x = PLACA.ancho / 2;
+  const y = PLACA.alto / 2;
+  const z = PLACA.grueso + 0.01;
+  return geometriaDeCarasConColor([
+    ...prisma(-x, x, -y, y, 0, PLACA.grueso, PLACA.color.canto, PLACA.color.canto),
+    { color: PLACA.color.laton, puntos: [[-x, -y, z], [x, -y, z], [x, y, z], [-x, y, z]] },
+  ]);
+}
+
+/**
+ * LA PLACA CON LA CANTIDAD, en UNA geometría por lo mismo que los mazos: la placa, su cara de latón y
+ * el renglón de pie sobre ella. Se rehace cuando cambia el dinero. `null` si el texto trae un carácter
+ * que el tipo no tiene.
+ */
+export function geometriaDeLaPlacaConSuCantidad(texto: string): THREE.BufferGeometry | null {
+  const placa = geometriaDeLaPlaca();
+  const renglon = geometriaDeUnRenglonDePie(texto, PLACA.altoDelTexto, PLACA.color.tinta);
+  if (placa === null || renglon === null) {
+    placa?.dispose();
+    renglon?.dispose();
+    return null;
+  }
+  renglon.translate(0, 0, PLACA.grueso + ALZA_DEL_RENGLON_DE_LA_PLACA);
+  const suelto = renglon.index === null ? renglon : renglon.toNonIndexed();
+  if (suelto !== renglon) renglon.dispose();
+  const fundida = mergeGeometries([placa, suelto], false) as THREE.BufferGeometry | null;
+  placa.dispose();
+  suelto.dispose();
+  if (fundida === null) return null;
+  fundida.computeBoundingSphere();
+  return fundida;
+}
+
+/**
+ * UN RENGLÓN DE PIE, centrado en su origen y mirando a `+z`: las letras tal como salen del tipo, en el
+ * plano `xy`, con la base a media altura por debajo del origen. Es el de la placa del dinero.
+ */
+export function geometriaDeUnRenglonDePie(texto: string, alto: number, hex: string): THREE.BufferGeometry | null {
+  const escala = alto / ALTO_DE_LA_LETRA;
+  const ancho = [...texto].reduce((a, c) => a + (AVANCE_DE_LA_LETRA[c] ?? ALTO_DE_LA_LETRA / 2) * escala, 0);
+  const partes: THREE.BufferGeometry[] = [];
+  const siluetas = new Map<string, THREE.BufferGeometry | null>();
+  const tinta = new THREE.Color(hex);
+  let x = -ancho / 2;
+  let completo = texto.trim().length > 0;
+  for (const c of texto) {
+    const avance = (AVANCE_DE_LA_LETRA[c] ?? ALTO_DE_LA_LETRA / 2) * escala;
+    if (c !== ' ') {
+      if (!siluetas.has(c)) siluetas.set(c, geometriaDeUnaLetra(c));
+      const silueta = siluetas.get(c) ?? null;
+      if (silueta === null) {
+        completo = false;
+        break;
+      }
+      const copia = silueta.clone();
+      copia.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x + avance / 2, -alto / 2, 0), new THREE.Quaternion(), new THREE.Vector3(alto, alto, alto)));
+      if (copia.getAttribute('normal') === undefined) copia.computeVertexNormals();
+      const cuenta = (copia.getAttribute('position') as THREE.BufferAttribute).count;
+      const colores = new Float32Array(cuenta * 3);
+      for (let i = 0; i < cuenta; i++) {
+        colores[i * 3] = tinta.r;
+        colores[i * 3 + 1] = tinta.g;
+        colores[i * 3 + 2] = tinta.b;
+      }
+      copia.setAttribute('color', new THREE.BufferAttribute(colores, 3));
+      copia.deleteAttribute('uv');
+      partes.push(copia);
+    }
+    x += avance;
+  }
+  for (const g of siluetas.values()) g?.dispose();
+  const fundida = completo && partes.length > 0 ? (mergeGeometries(partes, false) as THREE.BufferGeometry | null) : null;
   for (const g of partes) g.dispose();
   if (fundida === null) return null;
   fundida.computeBoundingSphere();

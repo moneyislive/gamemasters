@@ -146,6 +146,7 @@ import {
   LOS_MIOS,
   LOS_TRATOS_DE_LA_MESA,
   PARA_CONTESTAR,
+  pasarEnTres,
   maravedies,
   marcadorEnTres,
   meToca,
@@ -164,6 +165,7 @@ import {
   tirarEnTres,
   tratoEnTres,
   TOPE_DE_LA_CRONICA,
+  vueltaDelReloj,
 } from '../../shared/arcade/juegos/burgo-en-tres';
 import type {
   CartelDeCasilla,
@@ -579,7 +581,11 @@ function reprochesDelTablero(vista: VistaDelBurgo, quien: QuienMira, opciones: r
     if (f.esLocal !== (quien !== null && quien === j.asiento)) r.push(`la figura de ${j.asiento} miente en esLocal`);
     if (f.leToca !== (vista.turnoDe === j.asiento)) r.push(`la figura de ${j.asiento} miente en leToca`);
     if (f.figura !== figuraDeSerie(j.asiento)) r.push(`la figura de ${j.asiento} sin silla no es la de serie`);
+    if (f.dinero !== j.mrs) r.push(`la figura de ${j.asiento} lleva ${f.dinero} y la vista dice ${j.mrs}`);
   }
+  /* Lo que le queda al Concejo, que enseña la caja del Burgo: sus casas, sus hoteles y las cartas de cada mazo. */
+  if (t.banca.casas !== vista.concejo.casas || t.banca.posadas !== vista.concejo.posadas) r.push(`la banca dice ${t.banca.casas} casas y ${t.banca.posadas} hoteles y la vista ${vista.concejo.casas} y ${vista.concejo.posadas}`);
+  if (t.banca.cartas.pregon !== vista.quedan.pregon || t.banca.cartas.arca !== vista.quedan.arca) r.push(`las cartas de la banca: ${llano(t.banca.cartas)} frente a ${llano(vista.quedan)}`);
   const delTurno = vista.jugadores.find((j) => j.asiento === vista.duenoDelTurno);
   if (t.destacada !== (delTurno === undefined ? null : delTurno.casilla)) r.push(`destacada ${t.destacada}`);
   if (t.almoneda !== (vista.almoneda === null ? null : vista.almoneda.casilla)) r.push(`subasta ${t.almoneda}`);
@@ -615,6 +621,20 @@ function reprochesDeLosDados(vista: VistaDelBurgo, quien: QuienMira, opciones: r
   if (d.porTirar !== (tirar !== null)) r.push(`porTirar ${d.porTirar} con ${tirar === null ? 'ninguna' : 'una'} opción de tirar`);
   if (d.movimiento !== tirar) r.push('el movimiento de los dados no es la opción de tirar');
   if (tirar !== null && tirar.tipo !== TIRAR) r.push('tirarEnTres devuelve otro tipo');
+  return r;
+}
+
+/**
+ * EL RELOJ DE ARENA: pasar es exactamente la opción de pasar el turno del juego —no la de la subasta ni
+ * una puerta—, y la vuelta que lo voltea es `turnosAbiertos`.
+ */
+function reprochesDelReloj(vista: VistaDelBurgo, opciones: readonly Opcion[], pasar: Opcion | null = pasarEnTres(opciones), vuelta: number = vueltaDelReloj(vista)): string[] {
+  const r: string[] = [];
+  const deVerdad = opciones.filter((o) => o.tipo === PASAR && (o as { declaracion?: unknown }).declaracion !== true);
+  if (pasar !== null && !opciones.some((o) => o === pasar)) r.push('pasarEnTres no devuelve la opción del juego');
+  if (pasar !== null && pasar.tipo !== PASAR) r.push('pasarEnTres devuelve otro tipo');
+  if ((pasar !== null) !== deVerdad.length > 0) r.push(`pasarEnTres ${pasar === null ? 'no encuentra' : 'se inventa'} la opción de pasar`);
+  if (vuelta !== vista.turnosAbiertos) r.push(`la vuelta del reloj es ${vuelta} con ${vista.turnosAbiertos} turnos abiertos`);
   return r;
 }
 
@@ -1162,6 +1182,7 @@ function revisarLaMesa(mesa: Mesa, c: Cuentas, anteriores: Map<string, VistaDelB
     }
     anota(c, donde, reprochesDelTablero(vista, quien, opciones, tablero));
     anota(c, donde, reprochesDeLosDados(vista, quien, opciones, dados));
+    anota(c, donde, reprochesDelReloj(vista, opciones));
     anota(c, donde, reprochesDeLaHoja(vista, quien, opciones, hoja, secretos, carril));
     anota(c, donde, reprochesDelPregon(vista, quien, opciones, pregon));
     anota(c, donde, reprochesDeLaParticion(opciones, particionDe(vista, quien, opciones, tablero, dados, hoja, pregon, carril)));
@@ -1796,6 +1817,22 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
   comprobar('la vacuna de los dados: un par ajeno se ve caer', reprochesDeLosDados(conPar, quien, opciones, { ...(dadosEnTres(conPar, quien, opciones) as NonNullable<typeof d>), par: [2, 6] }).length > 0);
   comprobar('y un asa sin opción de tirar también', reprochesDeLosDados(conPar, quien, opciones, { ...(dadosEnTres(conPar, quien, opciones) as NonNullable<typeof d>), porTirar: !(d?.porTirar ?? false) }).length > 0);
 
+  /* El reloj de arena de la caja del Burgo. */
+  comprobar(
+    'pasarEnTres busca la opción de PASAR por tipo, y no coge la de pasar en la subasta ni una puerta',
+    pasarEnTres([{ id: 'otro-id', tipo: PASAR, carga: {}, rotulo: '', ayuda: '' }])?.id === 'otro-id' &&
+      pasarEnTres([{ id: 'pasar', tipo: PASAR_PUJA, carga: {}, rotulo: '', ayuda: '' }]) === null &&
+      pasarEnTres([{ id: 'pasar', tipo: PASAR, carga: {}, rotulo: '', ayuda: '', declaracion: true as const }]) === null,
+  );
+  comprobar('la vuelta del reloj es turnosAbiertos, y 0 con lo que no es una vista del Burgo', vueltaDelReloj(conPar) === 7 && vueltaDelReloj(null) === 0 && vueltaDelReloj({ turnosAbiertos: 'siete' }) === 0);
+  comprobar(
+    'la vacuna del reloj: pasar con una opción que no es la del juego —la de la subasta— o voltear con otra vuelta se ve caer',
+    reprochesDelReloj(conPar, opciones).length === 0 &&
+      reprochesDelReloj(conPar, opciones, { id: 'pasar', tipo: PASAR_PUJA, carga: {}, rotulo: '', ayuda: '' }).some((x) => x.indexOf('otro tipo') >= 0) &&
+      reprochesDelReloj(conPar, opciones, pasarEnTres(opciones), 8).some((x) => x.indexOf('vuelta del reloj') >= 0),
+    reprochesDelReloj(conPar, opciones),
+  );
+
   /* La firma. */
   const t2 = tableroEnTres(vistaEn(mesa, quien), quien, opciones) as TableroDelBurgoEn3D;
   comprobar('la firma es la misma para dos vistas iguales', firmaDelTablero(tablero) === firmaDelTablero(t2));
@@ -1809,6 +1846,13 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
     { ...tablero, almoneda: tablero.almoneda === 5 ? 6 : 5 },
     { ...tablero, trato: { de: 'x', a: 'y' } },
     { ...tablero, ganador: 'x' },
+  ].every((t) => firmaDelTablero(t) !== firmaDelTablero(tablero)));
+  comprobar('y distinta si cambia el dinero de una figura o lo que le queda al Concejo: casas, hoteles o cartas de un mazo, que es lo que pinta la caja del Burgo', [
+    { ...tablero, figuras: tablero.figuras.map((f, k) => (k === 0 ? { ...f, dinero: f.dinero + 1 } : f)) },
+    { ...tablero, banca: { ...tablero.banca, casas: tablero.banca.casas - 1 } },
+    { ...tablero, banca: { ...tablero.banca, posadas: tablero.banca.posadas - 1 } },
+    { ...tablero, banca: { ...tablero.banca, cartas: { ...tablero.banca.cartas, pregon: tablero.banca.cartas.pregon - 1 } } },
+    { ...tablero, banca: { ...tablero.banca, cartas: { ...tablero.banca.cartas, arca: tablero.banca.cartas.arca - 1 } } },
   ].every((t) => firmaDelTablero(t) !== firmaDelTablero(tablero)));
 
   /* La carta. */
@@ -1852,6 +1896,14 @@ paso('Dados con el par, la firma estable e inestable, la carta de la tabla, y la
   comprobar('y una casilla encendida sin obra también', reprochesDelTablero(vista, quien, opciones, encendida).some((r) => r.indexOf('se enciende sin') >= 0));
   const figuraMovida = { ...tablero, figuras: tablero.figuras.map((f, k) => (k === 0 ? { ...f, casilla: (f.casilla + 3) % 40 } : f)) };
   comprobar('y una figura donde la vista no la pone', reprochesDelTablero(vista, quien, opciones, figuraMovida).some((r) => r.indexOf('no está donde') >= 0));
+  const conOtroDinero = { ...tablero, figuras: tablero.figuras.map((f, k) => (k === 0 ? { ...f, dinero: f.dinero + 500 } : f)) };
+  const conOtraBanca = { ...tablero, banca: { casas: tablero.banca.casas + 1, posadas: tablero.banca.posadas, cartas: { pregon: tablero.banca.cartas.pregon, arca: 0 } } };
+  comprobar(
+    'y una figura con otro dinero, o una banca con otras casas y otras cartas, también: la caja del Burgo no pinta lo que la vista no dice',
+    reprochesDelTablero(vista, quien, opciones, conOtroDinero).some((r) => r.indexOf('lleva') >= 0) &&
+      reprochesDelTablero(vista, quien, opciones, conOtraBanca).some((r) => r.indexOf('la banca dice') >= 0) &&
+      (vista.quedan.arca === 0 || reprochesDelTablero(vista, quien, opciones, conOtraBanca).some((r) => r.indexOf('las cartas de la banca') >= 0)),
+  );
   comprobar('las figuras con las sillas de la mesa llevan la figura elegida, y sin silla la de serie', figurasEnTres(vista, [{ id: quien, figura: 'maga' }])[0]?.figura === 'maga' && figurasEnTres(vista, [{ id: quien, figura: 'un-dragon' }])[0]?.figura === figuraDeSerie(quien) && figurasEnTres(vista, [])[0]?.figura === figuraDeSerie(quien));
   comprobar('y tableroEnTres con las sillas pinta lo mismo que figurasEnTres', llano(tableroEnTres(vista, quien, opciones, [{ id: quien, figura: 'barbaro' }])?.figuras) === llano(figurasEnTres(vista, [{ id: quien, figura: 'barbaro' }])));
 

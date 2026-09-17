@@ -1126,39 +1126,68 @@ tenía que caber entero entre el borde del tablero (432) y el final del manto, o
 fieltro flotando sobre el vacío: con cuatro teselas el manto acaba en 482,52 y el paño iba de 433
 a 481, **lado 48, centrado en 457**.
 
-Los dados ya no están ahí. Miguel no quería tener que buscarlos en el mapa, y se fueron a una
-**bandeja pegada a la pantalla** (`escenas/burgo/bandeja-de-los-dados.ts`): abajo a la derecha en
-el escritorio, arriba a la derecha en la app. Lo que queda en el campo es el **Concejo**, el punto a
+Los dados ya no están ahí. Miguel no quería tener que buscarlos en el mapa, y se fueron a la
+**caja del Burgo**, pegada a la pantalla (`escenas/burgo/bandeja-de-los-dados.ts`): abajo a la derecha
+en el escritorio, arriba a la derecha en la app. Lo que queda en el campo es el **Concejo**, el punto a
 donde vuelan las monedas que se le pagan, en 475: con tres teselas caería más allá del manto. El
 cuadro de 48 se queda con sus mismos números como **claro del Concejo**, y las manchas del campo se
 siembran fuera de él (se comprueba con cuatro semillas distintas): una arboleda encima escondería
 las monedas al aterrizar, como antes tapaba los dados. Por eso el campo de cada mesa es el mismo que
 era con el paño.
 
-### La bandeja de los dados
+### La caja del Burgo
 
-Una bandeja de juego de mesa con los dos dados dentro, pegada a la cámara como la mesa de Riberas
-pero del tamaño de una esquina: la mesa de Riberas es ancha porque lleva las piezas de construir, y
-aquí no hay nada que poner encima. El fieltro es del **color del peón de quien tira** —el del sorteo
-mientras se sortea— y verde de mesa cuando no tira nadie; el borde es de nogal, porque los seis
-colores del Burgo van del casi negro al casi blanco y un borde crema se confundía con el primero.
+La primera respuesta a «los dados en la pantalla» fue una bandeja con los dos dados dentro, y Miguel la
+vio pobre y demasiado desde arriba: «no se si mostrar representaciones del dinero, un reloj de arena
+igual que el de Riberas también para mostrar lo que queda de turno, etc. […] creo que podemos intentar
+ser originales y integrarlos en un elemento más temático». Lo más reconocible de un juego de tablero,
+después del tablero, es su **caja abierta**, y eso es lo que va pegado a la pantalla: nogal por fuera,
+el crema del tablero por dentro y un compartimento para cada cosa que dice algo de la partida.
 
-- **Cuánto mide**: el 18 % del lado corto del lienzo, entre 108 y 160 puntos de ancho. Un dado
-  quieto mide de 29 a 43 puntos: nunca menos de los 22 de `DADO_MINIMO`.
-- **Dónde va**: la esquina la dice el cliente (`bandejaDeLosDados`), porque la escena no sabe qué
-  tiene encima. Se pega a su esquina a 12 puntos la caja de la bandeja CON LOS DADOS EN LO ALTO DEL
-  SALTO y girados, medida con la perspectiva de verdad; el escritorio acorta el cartel del pie con
-  esa misma cuenta.
-- **Tocarla es tirar**: el asa es una caja invisible del tamaño de la bandeja, montada sólo cuando
-  toca tirar. Mientras estuvieron en el paño, el asa era un cilindro en el centro de la GLORIETA:
-  un clic sobre los dados no tiraba y uno sobre la glorieta sí.
-- **No tiembla**: se pega a la cámara en el `useFrame` que sigue al seguimiento. Medido en el banco
-  con la cámara corriendo a 108 unidades por segundo detrás del peón: el borde de la bandeja no se
-  movió un píxel en 230 fotogramas.
-- **Los dados, a ±16** y no a ±12: se asientan girados sobre la vertical lo que diga su sello, y a
-  45° dos dados a ±12 se metían uno dentro del otro.
-- **Cuesta** 26 triángulos de bandeja y 12 del asa, una llamada de dibujo, y los 2 del paño que se
-  fueron.
+- **Los dados**, sobre un fieltro del color del peón de quien tira —el del sorteo mientras se sortea— y
+  verde de mesa cuando no tira nadie. Tocarlos es tirar: el asa es una caja invisible sobre su
+  compartimento, montada sólo cuando toca tirar. Mientras estuvieron en el paño, el asa era un cilindro
+  en el centro de la GLORIETA: un clic sobre los dados no tiraba y uno sobre la glorieta sí.
+- **Tu dinero**: montones de billetes de 500, 100, 50, 20, 10, 5 y 1, cada uno de su color y con tope
+  —dicen «mucho» o «poco» a simple vista—, y en la cara de delante una placa de latón con la cantidad
+  exacta. Un mirón ve la de quien tiene el turno. Hasta 3.499 los billetes suman lo que hay.
+- **Los dos mazos**, Suerte y Caja de Comunidad, con su emblema y tan gruesos como cartas les quedan; y
+  **las casas y los hoteles del Concejo**, los 32 y los 12 del reglamento, que se van vaciando: cuando
+  se acaban ya no se puede alzar, y se ve.
+- **El reloj de arena de Riberas**, de pie junto a la caja: lo que queda de turno, y tocarlo pasa el
+  turno. Tocarlo —apretar y soltar sin arrastrar, como los dados— y no apretarlo como en Riberas: la caja
+  está encima del tablero, y quien empieza a girar la cámara desde el reloj no puede perder el turno. Se
+  voltea al cambiar `turnosAbiertos`, a la vez en todas las pantallas. El de `reloj.glb` en plena, el de
+  conos en sobria; si el `.glb` no llega se pinta el de conos y se dice por consola, sin `alFallar`, que
+  en el escritorio mandaría la partida entera al tablero dibujado.
+
+Y cómo se pone:
+
+- **Dos formas**: la completa, con las dos filas de compartimentos, en los lienzos de al menos
+  600 × 400; la compacta, sólo el dinero y los dados, en los estrechos.
+- **Cuánto mide**, proyectada y con el reloj: la completa, el 30 % del ancho del lienzo entre 330 y 500
+  puntos; la compacta, el 90 % entre 220 y 400, y nunca más que el lienzo menos sus márgenes. Un dado
+  quieto mide de 23 a 39 puntos: nunca menos de los 22 de `DADO_MINIMO`. La primera cuenta medía el
+  ancho en el centro del lienzo, y en un móvil de 375 la caja se salía cinco puntos por la izquierda.
+- **Desde dónde se mira**: a 40° del rayo del ojo, en cualquier esquina (`cabeceoHaciaElOjo`). La
+  bandeja se inclinaba 55° hacia la cámara, y en su esquina el rayo bajaba otros 17°: casi cenital; y
+  arriba en la app, con la inclinación a secas, la caja quedaría rasante. Se probó también volverla de
+  lado hacia el ojo, y los cantos dejaban de ir horizontales: parecía torcida.
+- **Dónde va**: la esquina la dice el cliente (`bandejaDeLosDados`), porque la escena no sabe qué tiene
+  encima. El escritorio, abajo a la derecha, y su cartel del pie se para antes de la caja si al lado
+  cabe uno de 220 puntos; la app, arriba a la derecha, y su «Ver el burgo entero» baja debajo de ella.
+- **No tiembla**: se pega a la cámara en el `useFrame` que sigue al seguimiento. Medido en el banco con
+  la cámara corriendo a 108 unidades por segundo detrás del peón: el borde no se movió un píxel en 230
+  fotogramas.
+- **Nada se esconde detrás de una pared**: por eso los billetes van en la mitad de atrás de su
+  compartimento. `verify:burgo-escena` tira un rayo del ojo a cada cosa que tiene que verse, en todas
+  las poses.
+- **Cuesta** 1.148 triángulos la caja con sus piezas y sus dos asas, 807 los emblemas de los mazos y las
+  letras de la placa, y el reloj: 20.086 el de Riberas en plena, 262 el de conos en sobria. En llamadas
+  de dibujo, medidas en el banco, dieciséis en plena y veinte en sobria, dados y reloj incluidos: las
+  asas no se dibujan (`visible={false}`, que no les quita el toque), y los mazos con sus emblemas y la
+  placa con su cantidad van en una geometría cada uno. Recién puesta, la escena hacía 92 llamadas en
+  sobria, con un tope de 90; ahora 86.
 
 ### Llamadas de dibujo
 
@@ -1172,14 +1201,15 @@ tronco de visión la poda mal y la ciudad desaparece a medias).
   parque ..................  8      cementerio .............. 13
   polígono ................ 10      muebles (3 interiores) .. 26
   fichas de jugador .......  6      aventureros .............  6
-  geometrías propias ...... 16      dados ...................  1
+  geometrías propias ...... 16      caja del Burgo .......... 16
   -----------------------------------------------------------------
-  TOTAL esperado ........................................... 126
+  TOTAL esperado ........................................... 141
 ```
 
 Los distritos nuevos (estadio, estación, canal, feria, obra, gasolinera y chalets) añaden
 geometrías propias, no piezas nuevas del pack, así que el total sube poco y `TOPE_DE_LLAMADAS`
-se queda en **150** en plena y **90** en sobria. Riberas hace 1.279 en PC: 150 no es un número
+se queda en **150** en plena y **90** en sobria. La caja del Burgo es la partida que más aprieta la
+sobria: con el reloj de conos son veinte, y medido en el banco con el tablero lleno la escena hace 86. Riberas hace 1.279 en PC: 150 no es un número
 apretado, es un número que se nota si alguien se olvida de instanciar algo.
 
 ---

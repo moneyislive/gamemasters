@@ -167,11 +167,13 @@ import {
   obraPosibleEnCasilla,
   obrasSoloEnElAnillo,
   opcionesFueraDelTablero,
+  pasarEnTres,
   pregonDelBurgo,
   seVeEnTres,
   sucesosEnTres,
   tableroEnTres,
   tirarEnTres,
+  vueltaDelReloj,
 } from '../../../shared/arcade/juegos/burgo-en-tres';
 import type {
   DestinoDelTrato,
@@ -180,7 +182,9 @@ import type {
 } from '../../../shared/arcade/juegos/burgo-en-tres';
 import { Burgo } from '../../../escenas/burgo/Burgo';
 import type { ModoDeCamara, TableroDelBurgoEn3D } from '../../../escenas/burgo/tipos';
+import { poseDeLaBandeja } from '../../../escenas/burgo/bandeja-de-los-dados';
 import type { SitioDeLaBandeja } from '../../../escenas/burgo/bandeja-de-los-dados';
+import type { RelojDeLaMesa } from '../../../escenas/reloj';
 /*
  * LAS CONSTANTES DE LA CÁMARA DEL BURGO, Y NINGUNA ESCRITA AQUÍ. `camara.ts` dice
  * desde qué rumbo y qué altura se mira; `acercar.ts`, cuánto se acerca y adónde;
@@ -1014,6 +1018,49 @@ function LaMesaEnTres({
   }, [laInterfazSeLoQueda, mesa, opciones, soltarTodo]);
 
   /**
+   * SE HA TOCADO EL RELOJ DE ARENA DE LA CAJA DEL BURGO. Pasa el turno por la misma
+   * puerta que el botón y con el mismo trato que el asa de los dados: la interfaz se
+   * queda el dedo, se vuelve a mirar `quieto` y se le devuelve a la escena cómo acabó,
+   * que es lo que vuelve a llenar la arena si la mesa no lo tomó.
+   */
+  const alPasarElTurno = useCallback((): Promise<ResultadoDelMovimiento> => {
+    laInterfazSeLoQueda();
+    if (mesa.quieto) return Promise.resolve('rechazado');
+    const pasar = pasarEnTres(opciones);
+    if (pasar === null) return Promise.resolve('rechazado');
+    soltarTodo();
+    return mesa.mover({ tipo: pasar.tipo, carga: pasar.carga });
+  }, [laInterfazSeLoQueda, mesa, opciones, soltarTodo]);
+
+  /*
+   * EL RELOJ DE ARENA, el de Riberas: lo que queda de turno. Los dos instantes son los
+   * de la MESA y la escena saca la fracción en su `useFrame`; la vuelta es
+   * `turnosAbiertos`, que lo voltea a la vez en todas las pantallas. El botón de pasar
+   * del carril se queda: el reloj es otra forma de llegar a lo mismo.
+   */
+  const relojDeArena = useMemo(
+    (): RelojDeLaMesa => ({
+      desde: vista.turnoDesde,
+      venceEn: vista.terminada ? null : vista.venceEn,
+      disponible: !mesa.quieto && pasarEnTres(opciones) !== null,
+      vuelta: vueltaDelReloj(laVista),
+    }),
+    [vista.turnoDesde, vista.venceEn, vista.terminada, mesa.quieto, opciones, laVista],
+  );
+
+  /*
+   * «VER EL BURGO ENTERO» VA DEBAJO DE LA CAJA DEL BURGO. La caja va arriba a la derecha
+   * y en un teléfono en vertical ocupa casi todo el ancho, así que con el botón en su
+   * esquina de siempre —arriba a la izquierda— lo tapaba. Se mide con la misma cuenta
+   * con la que la escena la posa; sin lienzo medido, donde iba.
+   */
+  const alturaDelBotonDeVolver = useMemo(() => {
+    if (medida.ancho <= 0 || medida.alto <= 0) return estilos.volver.top;
+    const caja = poseDeLaBandeja(medida.ancho, medida.alto, CAMPO_DE_LA_CAMARA, SITIO_DE_LA_BANDEJA).rectangulo;
+    return Number.isFinite(caja.y1) ? Math.ceil(caja.y1) + SITIO_DE_LA_BANDEJA.margen : estilos.volver.top;
+  }, [medida.ancho, medida.alto]);
+
+  /**
    * SE HA TOCADO UN PEÓN. Abre la ficha de ese jugador: lo que tiene, dónde está y
    * la puerta para proponerle un trato. No manda ningún movimiento, así que no mira
    * `quieto`: leer quién va ganando mientras una jugada está en vuelo no rompe nada
@@ -1497,6 +1544,8 @@ function LaMesaEnTres({
                     calidad={calidad}
                     camara={CAMARA_AEREA}
                     bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
+                    reloj={relojDeArena}
+                    alPasarElTurno={alPasarElTurno}
                     seguirAlQueMueve={seguirAlQueMueve}
                     quieto={mesa.quieto}
                     alTocarCasilla={alTocarCasilla}
@@ -1541,11 +1590,13 @@ function LaMesaEnTres({
             para nada: el pie —cinta, carril, caja y cartel— es de abajo, las hojas son
             de abajo y el telón es de todo. Con el lienzo a pantalla entera esa esquina
             sigue libre porque la barra de la mesa NO flota: va en flujo, encima del
-            lienzo, y el lienzo empieza donde ella acaba.
+            lienzo, y el lienzo empieza donde ella acaba. Y bajo la caja del Burgo, que
+            va arriba a la derecha y en vertical ocupa casi todo el ancho
+            (`alturaDelBotonDeVolver`).
           */}
           {!llegando && seHaMovido ? (
             <Pressable
-              style={estilos.volver}
+              style={[estilos.volver, { top: alturaDelBotonDeVolver }]}
               onPress={verElBurgoEntero}
               accessibilityRole="button"
               accessibilityLabel="Ver el burgo entero"
