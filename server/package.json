@@ -69,6 +69,7 @@
     "verify:bucle": "tsx scripts/verificar-bucle.ts",
     "verify:riberas": "tsx scripts/verificar-riberas.ts",
     "verify:riberas-en-tres": "tsx scripts/verificar-riberas-en-tres.ts",
+    "verify:lindes": "tsx scripts/verificar-lindes.ts",
     "verify:mecanicas-burgo": "tsx scripts/verificar-mecanicas-del-burgo.ts",
     "verify:burgo": "tsx scripts/verificar-burgo.ts",
     "verify:burgo-en-tres": "tsx scripts/verificar-burgo-en-tres.ts",

@@ -600,6 +600,30 @@ const BATERIA = [
       'en tres partidas de verdad (2, 4 y 6 asientos) y en cada lectura de cada asiento y del mirón, el tablero de la escena dice casilla a casilla lo que dice la vista, cada casilla tocable es una obra que `opcionesDelBurgo` ofrece y su movimiento es la opción sin montar nada, cada movimiento se pinta exactamente una vez entre dados, casillas, hoja y botones sueltos, la puja libre y el trato montados por su puerta entran por el portillo, los sucesos con una jugada de salto son la lista y con dos una gruesa que no pierde posiciones ni dinero, la firma del tablero es estable e inestable cuando toca, los dados traen el par y nunca lo inventan, la hoja no cuenta una carta que no ha salido, una vista de otro juego da nada — y con el servidor levantado, `burgo.glb` llega con sus bytes, seis sentados juegan treinta movimientos por el cable, un movimiento en vuelo al vestir vuelve 409 y se reintenta, y un rechazo trae su motivo en la respuesta y null en la lectura',
   },
   /*
+   * ═══ LAS LINDES: EL SÉPTIMO, Y EL PRIMERO CUYO TABLERO NO EXISTE AL EMPEZAR ═══
+   *
+   * Va detrás del Burgo y delante del núcleo quieto, por el mismo orden que los
+   * dos de la fase 4: primero el juego y después la afirmación de que el núcleo
+   * no se movió, porque un núcleo quieto es trivialmente cierto si el juego que
+   * había encima no funcionaba.
+   *
+   * Lo que sólo mira éste: que el reparto de losas sea el que dice el diseño
+   * —una losa de más o de menos es coherente consigo misma y no la caza ninguna
+   * otra comprobación—, que la geometría de lados y huecos cierre en los dos
+   * sentidos, que los cuatro recuentos den lo que dicen las reglas sobre
+   * tableros puestos A MANO, y que diez partidas enteras no pierdan una losa ni
+   * un labriego. Y sobre todo: que en esas diez partidas se haya CERRADO algo de
+   * cada clase, porque un cero ahí es la diferencia entre un juego que funciona y
+   * uno que termina sin haber jugado.
+   */
+  {
+    nombre: 'Las Lindes',
+    donde: 'server',
+    guion: 'verify:lindes',
+    porque:
+      'el reparto son 24 clases y 72 losas con la de salida descontada de la bolsa, girar y desgirar vuelve al mismo lado y al mismo hueco, el hueco que toca al vecino es el de la mitad que de verdad comparte raya, una senda de tres losas entre encrucijadas vale tres y una villa de tres con blasón vale ocho, una ermita rodeada vale nueve, un prado al otro lado de la senda NO toca la muralla de su losa, la mayoría cobra y el empate cobra entero, y diez partidas se juegan hasta vaciar la bolsa sin perder una losa ni un labriego, cerrando villas, sendas, ermitas y prados — con la bolsa sin asomar en la vista de nadie, ni en la del mirón',
+  },
+  /*
    * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.
    *
    * Aquí abajo, después del núcleo, se leería como «y además una cosa larga». Va

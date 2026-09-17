@@ -67,6 +67,15 @@ import {
   seAcabo as seAcaboElBurgo,
 } from './burgo';
 import type { EstadoDelBurgo } from './burgo';
+import {
+  avanzarLasLindes,
+  loSecretoDeLasLindes,
+  MANIFIESTO_LINDES,
+  opcionesDeLasLindes,
+  proyectarLasLindes,
+  seAcabo as seAcaboLasLindes,
+} from './lindes';
+import type { EstadoDeLasLindes } from './lindes';
 import { laCifraDeElArcade } from './puntuaciones';
 
 export {
@@ -531,4 +540,124 @@ instalarArcade<EstadoDelBurgo | undefined, unknown>({
   loSecreto: loSecretoDelBurgo,
   opciones: opcionesDelBurgo,
   seAcabo: seAcaboElBurgo,
+});
+
+/*
+ * ═══ LAS LINDES SALEN CON APELLIDO DONDE CHOCAN, COMO EL BURGO ═══
+ *
+ * `EMPEZAR`, `PASAR`, `partidaNueva` y `seAcabo` ya están cogidos por juegos
+ * anteriores, y este fichero es la puerta común donde los nombres se cruzan. Se
+ * apellidan aquí y no dentro del juego, por lo mismo que allí: dentro de
+ * `lindes.ts` el nombre corto es el correcto y no tiene con quién chocar.
+ */
+export {
+  avanzarLasLindes,
+  CABEN as CABEN_EN_LAS_LINDES,
+  colorDeLabriego,
+  COLORES_DE_LAS_LINDES,
+  deQuienEsElTurno as deQuienEsElTurnoDeLasLindes,
+  dondeSePuedePlantar,
+  EMPEZAR as EMPEZAR_LINDES,
+  LABRIEGOS_POR_JUGADOR,
+  LINDES,
+  loQueSeVe as loQueSeVeDeLasLindes,
+  loSecretoDeLasLindes,
+  losaDeLaFicha,
+  losQueMandan,
+  MANIFIESTO_LINDES,
+  NOMBRES_DE_LOS_COLORES as NOMBRES_DE_LOS_COLORES_DE_LAS_LINDES,
+  opcionesDeLasLindes,
+  partidaNueva as partidaNuevaDeLasLindes,
+  PASAR as PASAR_LINDES,
+  PLANTAR,
+  PONER,
+  proyectarLasLindes,
+  puntoDeLaCosa,
+  seAcabo as seAcaboLasLindes,
+  tableroDeLasLindes,
+  valeElPrado,
+} from './lindes';
+export type {
+  Cobro,
+  CobroVisto,
+  DondePlantar,
+  EstadoDeLasLindes,
+  LabriegoVisto,
+  Labriego,
+  LosaVista,
+  MomentoDeLasLindes,
+  Plantado,
+  PlantadoVisto,
+  PuestaDeLosa,
+  VistaDeLasLindes,
+  VistaSinTablero as VistaSinTableroDeLasLindes,
+} from './lindes';
+export {
+  bolsaSinBarajar,
+  CLASES_DE_COSA,
+  GIROS,
+  HUECOS_POR_LOSA,
+  huecoGirado,
+  huecoQueToca,
+  huecosDelLado,
+  huecoSinGirar,
+  LADOS,
+  ladoGirado,
+  ladoOpuesto,
+  ladoSinGirar,
+  LAS_LOSAS,
+  LAS_OCHO,
+  lindeDelLado,
+  llaveDeCasilla,
+  LOSAS_EN_TOTAL,
+  LOSA_DE_SALIDA,
+  losaPorId,
+  NOMBRE_DEL_LADO,
+  NOMBRE_DE_LA_COSA,
+  pradoDelHueco,
+  sendaDelLado,
+  vecina,
+  villaDelLado,
+} from './lindes-losas';
+export type { ClaseDeCosa, Giro, Lado, Linde, Losa } from './lindes-losas';
+export {
+  cabe,
+  cosasDelTablero,
+  cosasQueTocan,
+  cuantasAlrededor,
+  dondeCabe,
+  huecosLibres,
+  nudoDeErmita,
+  nudoDeLoPlantado,
+  nudoDePrado,
+  nudoDeSenda,
+  nudoDeVilla,
+  porTexto,
+  villasDelPrado,
+} from './lindes-cosas';
+export type { Colocacion, Cosa, Cosas, LosaPuesta, Tablero } from './lindes-cosas';
+
+/**
+ * «LAS LINDES», el séptimo: un tablero que no existe hasta que lo ponen ellos.
+ *
+ * ═══ QUÉ EMPUJA, QUE ES LO ÚNICO QUE JUSTIFICA UN JUEGO MÁS ═══
+ *
+ * Riberas demostró que el núcleo admite un tablero. Éste demuestra que admite uno
+ * que CRECE: una topología que no existe al abrir la mesa, distinta en cada
+ * partida, y en la que un movimiento puede fundir dos regiones en una. Nada de
+ * eso asoma en el alta, que es —otra vez— exactamente la de Riberas y la del
+ * Burgo: manifiesto, reductor, proyección, `loSecreto`, `opciones` y `seAcabo`.
+ *
+ * El diff de `shared/arcade/` que trae este juego es VACÍO, y ésa es la medida.
+ *
+ * `secretos: true` por la bolsa, que viaja barajada y con número de serie; de ahí
+ * salen las dos funciones que tapan, y sin ellas el servidor no arrancaría.
+ */
+instalarArcade<EstadoDeLasLindes | undefined, unknown>({
+  manifiesto: MANIFIESTO_LINDES,
+  avanzar: avanzarLasLindes,
+  proyeccion: proyectarLasLindes,
+  loSecreto: loSecretoDeLasLindes,
+  opciones: opcionesDeLasLindes,
+  seAcabo: seAcaboLasLindes,
 });
