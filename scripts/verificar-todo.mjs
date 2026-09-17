@@ -624,6 +624,36 @@ const BATERIA = [
       'el reparto son 24 clases y 72 losas con la de salida descontada de la bolsa, girar y desgirar vuelve al mismo lado y al mismo hueco, el hueco que toca al vecino es el de la mitad que de verdad comparte raya, una senda de tres losas entre encrucijadas vale tres y una villa de tres con blasón vale ocho, una ermita rodeada vale nueve, un prado al otro lado de la senda NO toca la muralla de su losa, la mayoría cobra y el empate cobra entero, y diez partidas se juegan hasta vaciar la bolsa sin perder una losa ni un labriego, cerrando villas, sendas, ermitas y prados — con la bolsa sin asomar en la vista de nadie, ni en la del mirón',
   },
   /*
+   * Y LA TRADUCCIÓN A LA ESCENA DE LAS LINDES, detrás de sus reglas y delante del
+   * núcleo, por el mismo orden que Riberas y el Burgo: el valle en tres dimensiones
+   * no es un motor ni un juego nuevo, es el pintor propio de Las Lindes, y lo único
+   * suyo que puede mentir en silencio es la traducción de la vista a lo que la escena
+   * recibe. Se comprueba con partidas de verdad, no con vistas inventadas.
+   */
+  {
+    nombre: 'Las Lindes en tres',
+    donde: 'server',
+    guion: 'verify:lindes-en-tres',
+    porque:
+      'en cuatro partidas de verdad (2, 3, 4 y 5 asientos) y en cada revisión, la escena recibe exactamente las losas que hay con su giro y su número de serie, cada casilla que deja tocar es una colocación que `opcionesDeLasLindes` ofrece y su movimiento es la carga de la opción sin montar nada, lo que se ofrece plantar sale de las OPCIONES y no de la vista —así que a un mirón no se le pinta un botón—, cada labriego cae dentro de su losa con el color de su sitio, y una vista de otro juego devuelve nada en vez de un valle vacío',
+  },
+  /*
+   * Y EL VALLE MEDIDO, que es lo único que dice que el tablero SE VE.
+   *
+   * Va en `escenas` y no en `server` porque lo que mide es geometría, y porque lee
+   * los triángulos de verdad del `.glb` para la cuenta del presupuesto. Los tres
+   * fallos que encontró el día que se escribió —bandas de villa sin chaflán, caminos
+   * llegando al borde en diagonal y un tablero de diez millones de triángulos— no dan
+   * error en ninguna consola: se ven, y se ven tarde.
+   */
+  {
+    nombre: 'Las Lindes · el valle',
+    donde: 'escenas',
+    guion: 'verify:lindes-escena',
+    porque:
+      'ni un triángulo del suelo mira hacia abajo, las 24 losas por sus 4 giros casan celda a celda en la raya con todas las que las reglas dejan pegar, ningún muro parte una villa que continúa en la losa de al lado, nada se sale de su losa ni flota ni se planta en mitad de un camino, los muros cubren su tramo sin aplastarse, un tablero de nueve por nueve con el recorte por distancia puesto cabe en el presupuesto —contado con los triángulos reales del `.glb`— y en el lobby los cinco sitios están en corro, mirando a la piedra y sin nada sembrado encima',
+  },
+  /*
    * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.
    *
    * Aquí abajo, después del núcleo, se leería como «y además una cosa larga». Va

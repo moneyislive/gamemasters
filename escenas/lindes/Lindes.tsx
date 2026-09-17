@@ -74,16 +74,21 @@ const COLOR_DE_LA_NIEBLA = '#cfdae2';
  * Con uno solo hay que elegir entre un tablero pelado de cerca o uno que no cabe de
  * lejos. Con dos, lo que desaparece primero es lo que primero deja de verse:
  *
- *     hasta 2,6 losas .... todo, hasta el último barril
- *     hasta 7 losas ...... lo que tiene bulto: casas, edificios, árboles, mieses
+ *     hasta 1,8 losas .... todo, hasta el último barril
+ *     hasta 4 losas ...... lo que tiene bulto: casas, edificios, árboles, mieses
  *     más allá ........... sólo lo que cuenta una regla: murallas, torres, ermitas
+ *
+ * Los dos números salieron de MEDIR, no de elegir: con siete y dos con seis, un
+ * tablero de nueve por nueve pintaba cuatro millones y medio de triángulos contra un
+ * techo de tres. `verify:lindes-escena` hace esa cuenta con los triángulos reales del
+ * `.glb` y es la que manda.
  *
  * La tercera línea es la que no se puede tocar. Un tablero sin árboles al fondo
  * sigue siendo el tablero; uno sin la muralla de una villa cerrada es el tablero
  * mintiendo sobre la partida, y eso se paga en una jugada mal hecha.
  */
-const LOSAS_CON_MENUDO = 2.6;
-const LOSAS_CON_RELLENO = 7;
+const LOSAS_CON_MENUDO = 1.8;
+const LOSAS_CON_RELLENO = 4;
 
 /** Lo que se levanta la última losa puesta, para que se vea cuál es. */
 const ALTO_DE_LA_ULTIMA = LADO_DE_LOSA * 0.03;

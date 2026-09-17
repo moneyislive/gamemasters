@@ -112,11 +112,27 @@ export const CELDAS_POR_LOSA = 48;
 export const LADO_DE_CELDA = LADO_DE_LOSA / CELDAS_POR_LOSA;
 
 /**
- * HASTA DÓNDE ENTRA UNA VILLA DESDE SU MURALLA.
+ * HASTA DÓNDE ENTRA UNA VILLA DESDE SU MURALLA, y en CHAFLÁN.
  *
- * Tres décimas del lado. Con menos, una villa de un solo lado es una franja que
- * no sujeta ni tres casas; con más, la villa de tres lados se come el prado del
- * sur y el labriego que se planta ahí no tiene dónde ponerse.
+ * Con menos, una villa de un solo lado es una franja que no sujeta ni tres casas;
+ * con más, la villa de tres lados se come el prado del sur y el labriego que se
+ * planta ahí no tiene dónde ponerse.
+ *
+ * ═══ Y ENTRA EN CHAFLÁN, QUE ES LO QUE HACE QUE DOS LOSAS CASEN ═══
+ *
+ * La banda no es un rectángulo: a cada paso que entra, se estrecha lo mismo por los
+ * dos extremos. En el borde ocupa el lado entero y en el fondo ocupa lo que queda.
+ *
+ * Sin el chaflán, la villa de una losa con muralla al NORTE se derramaba por sus
+ * bordes ESTE y OESTE trece celdas de cuarenta y ocho — o sea que una losa con
+ * campo en su oeste pegada a ésta enseñaba muralla contra hierba en un cuarto de la
+ * raya, mientras las reglas contaban tan tranquilas que ahí había campo contra campo.
+ * Lo cazó `verify:lindes-escena` comparando las dos rayas celda a celda, y es
+ * exactamente la clase de fallo que no da error: se ve, y se ve raro sin que nadie
+ * sepa decir por qué.
+ *
+ * Con el chaflán, lo que hay en el borde de una losa depende SÓLO de lo que ese lado
+ * enseña, que es la única forma de que dos losas cualesquiera casen.
  */
 export const FONDO_DE_LA_VILLA = 0.27;
 
@@ -141,6 +157,36 @@ export const ANCHO_DEL_EJE = 0.22;
 export const TIRON_AL_CENTRO = 0.45;
 
 /**
+ * EL NÚCLEO DE UNA VILLA DE TRES O CUATRO MURALLAS.
+ *
+ * Las bandas de cada muralla entran en chaflán —ver `FONDO_DE_LA_VILLA`— y eso deja
+ * un hueco en medio cuando la villa ocupa tres o cuatro lados: la corona está
+ * empedrada y el centro sería prado, que es lo contrario de lo que esa losa enseña.
+ * El núcleo lo tapa, y su radio es el fondo más un pellizco para que solape con las
+ * bandas en vez de quedarse justo a tocar — un borde a tocar deja una raya de hierba
+ * de una celda que se ve como una grieta.
+ */
+export const NUCLEO_DE_LA_VILLA = FONDO_DE_LA_VILLA + 0.09;
+
+/**
+ * HASTA DÓNDE LLEGA EL CHAFLÁN DE UNA BANDA DE MURALLA.
+ *
+ * ═══ EL CHAFLÁN NO PUEDE SER LA BANDA ENTERA, Y LA PRIMERA VERSIÓN LO ERA ═══
+ *
+ * Lo que el chaflán tiene que garantizar es UNA cosa: que en el borde de los lados
+ * VECINOS no haya muralla, o dos losas que las reglas dejan pegar no casarían en el
+ * dibujo. Y para eso basta con que la banda se estreche cerca del canto: más adentro
+ * ya no hay borde vecino que proteger.
+ *
+ * Con el chaflán corriendo hasta el fondo —que es lo que se escribió primero— la
+ * villa de un solo lado salía como un trapecio de lados a cuarenta y cinco grados, y
+ * el tablero se veía lleno de puntas de flecha grises. Con el chaflán cortado a doce
+ * centésimas, la villa tiene las esquinas achaflanadas y el resto recto, que es como
+ * se dibuja el recinto de una villa y además sigue casando.
+ */
+export const CHAFLAN_DE_LA_VILLA = 0.12;
+
+/**
  * EL ANCHO DE UNA SENDA, en fracción del lado.
  *
  * Valía 0,11 con la losa en cuatro, y en 175 eso sería una calzada de diecinueve
@@ -148,6 +194,15 @@ export const TIRON_AL_CENTRO = 0.45;
  * de trigo. Un camino de carro mide dos carros de ancho y punto.
  */
 export const ANCHO_DE_LA_SENDA = 0.05;
+
+/**
+ * LO QUE UN CAMINO SALE RECTO DE SU BORDE ANTES DE DOBLAR.
+ *
+ * Una décima del lado: lo justo para que la huella que deja en la raya sea el ancho
+ * del camino y no una banda en diagonal. El porqué entero está en `haciaDentro`, en
+ * `losa.ts`, junto al código que lo hace.
+ */
+export const ENTRADA_RECTA_DE_LA_SENDA = 0.1;
 
 /**
  * CUÁNTO SE HUNDE UNA SENDA RESPECTO AL PRADO.
@@ -187,7 +242,7 @@ export const ALZADO_DE_LA_VILLA = ESCALA_DEL_PACK * 0.12;
  * Es la misma decisión que `ciudad.ts` tomó con sus tres niveles, tomada antes de
  * escribir la primera pieza y no después de que no quepa.
  */
-export const PIEZAS_POR_LOSA = 60;
+export const PIEZAS_POR_LOSA = 42;
 
 /**
  * EL PRESUPUESTO DE TRIÁNGULOS DEL TABLERO ENTERO.
@@ -201,12 +256,22 @@ export const PIEZAS_POR_LOSA = 60;
  * valle pelado, que es justo lo que este juego no puede permitirse: el tablero ES
  * el producto.
  *
- * Dos millones y medio, y lo que lo hace sostenible no es el número sino el NIVEL
- * DE DETALLE POR DISTANCIA: lo que cuenta una regla se pinta siempre, y el relleno
- * sólo cerca de donde mira la cámara. Sin eso, ampliar el techo es aplazar el
- * problema hasta la losa cuarenta.
+ * Tres millones y pico, y lo que lo hace sostenible no es el número sino el NIVEL DE
+ * DETALLE POR DISTANCIA: lo que cuenta una regla se pinta siempre, y el relleno sólo
+ * cerca de donde mira la cámara. Sin eso, ampliar el techo es aplazar el problema
+ * hasta la losa cuarenta.
+ *
+ * ═══ Y EL NÚMERO NO SE ELIGIÓ: SE MIDIÓ Y SE AJUSTÓ LO DE DEBAJO ═══
+ *
+ * La primera cuenta con las setenta y dos puestas daba nueve millones y medio, o sea
+ * cuatro veces lo que cabe. Lo que se subió fue el techo una vez; lo que se BAJÓ
+ * fueron tres cosas, que es de donde salió de verdad el hueco: las casas por villa de
+ * veintidós a doce, el cupo de relleno de sesenta a cuarenta y dos, y el anillo del
+ * relleno de siete losas a cuatro. `verify:lindes-escena` mide las dos cuentas —el
+ * peor caso desnudo y el tablero con el recorte puesto— y es la segunda la que manda,
+ * porque es la única que la pantalla pinta de verdad.
  */
-export const TOPE_DE_TRIANGULOS = 2_500_000;
+export const TOPE_DE_TRIANGULOS = 3_200_000;
 
 /**
  * LO QUE MIDE UN LABRIEGO, en unidades del mundo.

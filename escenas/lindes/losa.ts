@@ -47,6 +47,7 @@ import {
   ANCHO_DEL_EJE,
   ANCHO_DE_LA_SENDA,
   CELDAS_POR_LOSA,
+  CHAFLAN_DE_LA_VILLA,
   CELDAS_POR_MURO,
   CELDAS_POR_SETO,
   ESCALA_DEL_SETO,
@@ -57,6 +58,8 @@ import {
   ESCALA_DEL_QUE_MANDA,
   FONDO_DE_LA_VILLA,
   LADO_DE_LOSA,
+  NUCLEO_DE_LA_VILLA,
+  ENTRADA_RECTA_DE_LA_SENDA,
   PIEZAS_POR_LOSA,
   TIRON_AL_CENTRO,
 } from './medidas';
@@ -179,6 +182,48 @@ function fondoDesdeElLado(p: Punto, l: Lado): number {
   return p.x + 0.5;
 }
 
+/** Lo que se aparta un punto del centro del lado, a lo largo de él. */
+function aLoLargoDelLado(p: Punto, l: Lado): number {
+  return l === 0 || l === 2 ? Math.abs(p.x) : Math.abs(p.z);
+}
+
+/**
+ * ¿ESTÁ ESTE PUNTO DENTRO DE LA BANDA DE MURALLA DE ESE LADO?
+ *
+ * La banda entra en CHAFLÁN: en el borde ocupa el lado entero, y a cada paso que se
+ * mete se estrecha lo mismo por los dos extremos. El porqué está entero en
+ * `FONDO_DE_LA_VILLA`, y se resume en una línea: es lo que hace que lo que se ve en
+ * el borde de una losa dependa SÓLO de lo que ese lado enseña, que es la única forma
+ * de que dos losas cualesquiera casen en la raya.
+ */
+function enLaBandaDelLado(p: Punto, l: Lado): boolean {
+  const fondo = fondoDesdeElLado(p, l);
+  if (fondo < 0 || fondo > FONDO_DE_LA_VILLA) return false;
+  /*
+   * ═══ MEDIA CELDA DE SANGRADO, Y NO ES UN AJUSTE FINO ═══
+   *
+   * Sin él, la diagonal del chaflán pasa EXACTAMENTE por el centro de las celdas de
+   * las esquinas, y si entran o no lo decide el último bit de una resta: la esquina
+   * noroeste salía villa por el lado oeste y prado por el norte, en la misma losa.
+   * Y ahí está el problema de fondo, que ninguna cuenta puede resolver: la celda de
+   * una esquina pertenece a DOS bordes, y si sus dos lados enseñan cosas distintas
+   * no puede ser las dos.
+   *
+   * Con media celda de sangrado, las cuatro esquinas de cualquier losa son SIEMPRE
+   * prado. Deja de haber ambigüedad, dos losas cualesquiera casan celda a celda, y
+   * el precio es un cuadradito de hierba de una celda entre dos villas pegadas: un
+   * dos por ciento de la raya, que a la escala del tablero ni se busca.
+   */
+  const sangrado = 0.5 / CELDAS_POR_LOSA;
+  /*
+   * El chaflán se corta a `CHAFLAN_DE_LA_VILLA`: más adentro la banda sigue recta.
+   * Lo que el chaflán protege es el borde de los lados vecinos, y ése sólo está
+   * donde el fondo es casi cero. Ver la cabecera de esa constante.
+   */
+  const mordida = Math.min(fondo, CHAFLAN_DE_LA_VILLA);
+  return aLoLargoDelLado(p, l) <= 0.5 - mordida - sangrado;
+}
+
 /** La distancia AL CUADRADO de un punto a un segmento. Sin raíces: se compara al cuadrado. */
 export function distanciaAlSegmento(p: Punto, a: Punto, b: Punto): number {
   const vx = b.x - a.x;
@@ -223,12 +268,38 @@ export function juntaDeLaVilla(lados: readonly Lado[]): Punto {
 export function caminoDeLaSenda(lados: readonly Lado[]): readonly Punto[] {
   if (lados.length === 0) return [];
   const a = medioDelLado(lados[0] as Lado);
-  if (lados.length === 1) return [a, { x: 0, z: 0 }];
+  const aDentro = haciaDentro(a, lados[0] as Lado);
+  if (lados.length === 1) return [a, aDentro, { x: 0, z: 0 }];
   const b = medioDelLado(lados[1] as Lado);
   const enfrentados = ((lados[0] as number) + 2) % 4 === (lados[1] as number);
   if (enfrentados) return [a, b];
+  const bDentro = haciaDentro(b, lados[1] as Lado);
   const medio = { x: ((a.x + b.x) / 2) * 1.35, z: ((a.z + b.z) / 2) * 1.35 };
-  return [a, medio, b];
+  return [a, aDentro, medio, bDentro, b];
+}
+
+/**
+ * EL PRIMER PASO DE UN CAMINO, PERPENDICULAR A SU BORDE.
+ *
+ * ═══ POR QUÉ UN CAMINO NO PUEDE LLEGAR AL BORDE EN DIAGONAL ═══
+ *
+ * Porque la huella que deja en la raya es más ancha que el camino. Un tramo que
+ * llega a veintiséis grados deja en el borde una banda de cinco celdas y media
+ * cuando el camino mide dos y media; y la losa de al lado, con su camino llegando
+ * perpendicular, deja dos y media. Las dos casan por las REGLAS y no casan en el
+ * dibujo: se ve un camino que se ensancha justo en la raya y luego se estrecha.
+ *
+ * Lo cazó `verify:lindes-escena` comparando las rayas celda a celda —ochocientos
+ * sesenta y nueve pares—, y se arregla haciendo que todo camino salga recto de su
+ * borde antes de doblar. Que es, además, como se construye un camino de verdad:
+ * perpendicular a la linde que cruza.
+ */
+function haciaDentro(borde: Punto, l: Lado): Punto {
+  const paso = ENTRADA_RECTA_DE_LA_SENDA;
+  if (l === 0) return { x: borde.x, z: borde.z + paso };
+  if (l === 1) return { x: borde.x - paso, z: borde.z };
+  if (l === 2) return { x: borde.x, z: borde.z - paso };
+  return { x: borde.x + paso, z: borde.z };
 }
 
 /** ¿Está este punto dentro de alguna villa de la losa? */
@@ -236,13 +307,24 @@ function enLaVilla(losa: Losa, giro: Giro, p: Punto): boolean {
   for (const villa of losa.villas) {
     const lados = villa.lados.map((l) => ladoGirado(l, giro));
     for (const l of lados) {
-      if (fondoDesdeElLado(p, l) <= FONDO_DE_LA_VILLA) return true;
+      if (enLaBandaDelLado(p, l)) return true;
     }
     if (lados.length > 1) {
       const junta = juntaDeLaVilla(lados);
       const media = ANCHO_DEL_EJE / 2;
       for (const l of lados) {
         if (distanciaAlSegmento(p, medioDelLado(l), junta) <= media * media) return true;
+      }
+    }
+    /*
+     * Y el NÚCLEO, sólo con tres o cuatro murallas: con el chaflán, las bandas dejan
+     * un hueco en medio, y una villa que ocupa casi toda la losa con un claro de
+     * hierba en el centro no es lo que esa losa enseña.
+     */
+    if (lados.length >= 3) {
+      const junta = juntaDeLaVilla(lados);
+      if (distanciaAlSegmento(p, junta, junta) <= NUCLEO_DE_LA_VILLA * NUCLEO_DE_LA_VILLA) {
+        return true;
       }
     }
   }
@@ -595,12 +677,27 @@ export function usoDeLaParcela(a: number, b: number, semilla: number): string {
 // Montar la losa entera
 // ---------------------------------------------------------------------------
 
+/**
+ * EL TRAMO MÁS CORTO QUE SE CUBRE CON MURALLA.
+ *
+ * Tres celdas: menos de la mitad de lo que mide un `muro` del pack. Por debajo, el
+ * muro habría que encogerlo tanto que el aparejo deja de leerse como piedra.
+ */
+export const CELDAS_MINIMAS_DE_MURO = 3;
+
 /** Lo que mide una manzana y la calle que la separa de la siguiente, en celdas. */
 export const CELDAS_DE_MANZANA = 7;
 export const CELDAS_DE_CALLE = 2;
 
-/** Cuántas casas como mucho en una villa, por grande que sea. */
-export const TOPE_DE_CASAS = 22;
+/**
+ * CUÁNTAS CASAS COMO MUCHO EN UNA VILLA, por grande que sea.
+ *
+ * Doce, y bajó de veintidós al medir el presupuesto: una `casa` del pack cuesta 1.393
+ * triángulos, así que veintidós son treinta mil por losa y dos millones y medio en un
+ * tablero de nueve por nueve — el techo entero gastado en casas. Con doce, una villa
+ * grande sigue leyéndose como un pueblo y cabe el resto del valle.
+ */
+export const TOPE_DE_CASAS = 12;
 
 /**
  * LEVANTA UNA LOSA ENTERA.
@@ -626,6 +723,16 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
   /* ── 1 · Las murallas, con sus puertas y sus torres ──────────────────────── */
   const tramos = murallasDeLaLosa(losa, giro, celdas);
   for (const t of tramos) {
+    /*
+     * ═══ UN PICO DE VILLA DE UNA CELDA NO LLEVA MURALLA ═══
+     *
+     * El borde de una villa, recorrido celda a celda, deja escalones de una o dos
+     * celdas en las diagonales. Un `muro` del pack cubre siete, así que ahí había que
+     * encogerlo al catorce por ciento: un tramo de muralla con las piedras aplastadas
+     * a un séptimo, que se ve como un sillar derretido. Y no tapa nada que se note:
+     * son tres metros y medio de linde en una losa de ciento setenta y cinco.
+     */
+    if (t.celdas < CELDAS_MINIMAS_DE_MURO) continue;
     const cuantos = Math.max(1, Math.round(t.celdas / CELDAS_POR_MURO));
     const porMuro = t.celdas / cuantos;
     for (let k = 0; k < cuantos; k++) {
@@ -974,10 +1081,47 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
    * donde se puede olvidar, y el que se olvide no da error: deja un barril
    * dibujándose a media legua.
    */
-  const conTalla = (p: PuestaEnLaLosa): PuestaEnLaLosa => ({ ...p, menuda: esMenuda(p.pieza) });
+  /*
+   * ═══ Y NADA SE SALE DE SU LOSA ═══
+   *
+   * El empujón al azar que separa las piezas —hasta una celda y media— saca del canto
+   * a las que caen en la fila del borde. Son unos centímetros y no se ven en una losa
+   * suelta; en el tablero se ven como un árbol plantado en la losa de al lado, que es
+   * lo mismo que un árbol que aparece y desaparece cuando alguien pone una losa.
+   *
+   * Se acota aquí, al final y de una vez, y no en cada uno de los nueve sitios donde
+   * se empuja una pieza: por lo mismo que `menuda`, nueve copias son nueve sitios
+   * donde olvidarse.
+   */
+  const media = LADO_DE_LOSA / 2;
+  const acotar = (v: number): number => (v < -media ? -media : v > media ? media : v);
+  /*
+   * Y NADA ACABA DENTRO DE UNA CELDA DE CAMINO. El empujón al azar que separa las
+   * piezas puede meter en la calzada lo que se puso a su vera; se quita aquí, al
+   * final, mirando la celda donde de verdad ha caído. Las murallas y sus remates se
+   * salvan: una puerta en mitad del camino es lo que es una puerta.
+   */
+  const enCamino = (p: PuestaEnLaLosa): boolean => {
+    if (p.porque === 'muralla' || p.porque === 'remate' || p.porque === 'ermita') return false;
+    const i = Math.min(
+      CELDAS_POR_LOSA - 1,
+      Math.max(0, Math.floor((p.x / LADO_DE_LOSA + 0.5) * CELDAS_POR_LOSA)),
+    );
+    const j = Math.min(
+      CELDAS_POR_LOSA - 1,
+      Math.max(0, Math.floor((p.z / LADO_DE_LOSA + 0.5) * CELDAS_POR_LOSA)),
+    );
+    return claseEn(i, j) === 'senda';
+  };
+  const conTalla = (p: PuestaEnLaLosa): PuestaEnLaLosa => ({
+    ...p,
+    x: acotar(p.x),
+    z: acotar(p.z),
+    menuda: esMenuda(p.pieza),
+  });
   return {
     celdas,
-    puestas: [...obligadas, ...relleno.slice(0, PIEZAS_POR_LOSA)].map(conTalla),
+    puestas: [...obligadas, ...relleno.slice(0, PIEZAS_POR_LOSA)].map(conTalla).filter((p) => !enCamino(p)),
   };
 }
 

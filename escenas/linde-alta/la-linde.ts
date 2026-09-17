@@ -134,6 +134,15 @@ export function sitiosDeLaLinde(): readonly SitioDeLaLinde[] {
   return salida;
 }
 
+/** Por qué está puesta una pieza del altozano. */
+export type PorQueEstaEnLaLinde =
+  /** Encima de la piedra del centro: la bolsa y lo que la acompaña. */
+  | 'mesa'
+  /** Un mojón del corro. Marca un sitio, así que está pegado a él a propósito. */
+  | 'mojon'
+  /** Lo que crece en el alto. */
+  | 'campo';
+
 /** Una pieza del pack puesta en el altozano. */
 export interface PuestaEnLaLinde {
   readonly pieza: string;
@@ -142,6 +151,7 @@ export interface PuestaEnLaLinde {
   readonly y: number;
   readonly giro: number;
   readonly escala: number;
+  readonly porque: PorQueEstaEnLaLinde;
 }
 
 /** Un sorteo con semilla, el mismo de siempre en esta casa. */
@@ -181,6 +191,7 @@ export function loQueHayEnLaLinde(semilla: number): readonly PuestaEnLaLinde[] {
     y: ALTO_DE_LA_MESA,
     giro: tirada() * Math.PI * 2,
     escala: ESCALA_DEL_PACK * 2.4,
+    porque: 'mesa',
   });
   puestas.push({
     pieza: MODELO.caja,
@@ -189,6 +200,7 @@ export function loQueHayEnLaLinde(semilla: number): readonly PuestaEnLaLinde[] {
     y: ALTO_DE_LA_MESA,
     giro: tirada() * Math.PI * 2,
     escala: ESCALA_DEL_PACK * 2.1,
+    porque: 'mesa',
   });
   puestas.push({
     pieza: MODELO.barril,
@@ -197,6 +209,7 @@ export function loQueHayEnLaLinde(semilla: number): readonly PuestaEnLaLinde[] {
     y: ALTO_DE_LA_MESA,
     giro: tirada() * Math.PI * 2,
     escala: ESCALA_DEL_PACK * 1.8,
+    porque: 'mesa',
   });
 
   /* Los mojones: una piedra hincada por sitio. */
@@ -212,6 +225,7 @@ export function loQueHayEnLaLinde(semilla: number): readonly PuestaEnLaLinde[] {
        * 3,4 medía tres personas de ancho y el corro parecía un círculo de menhires.
        */
       escala: ESCALA_DEL_PACK * 1.7,
+      porque: 'mojon',
     });
   }
 
@@ -265,6 +279,7 @@ export function loQueHayEnLaLinde(semilla: number): readonly PuestaEnLaLinde[] {
       y: 0,
       giro: tirada() * Math.PI * 2,
       escala: ESCALA_DEL_PACK * que.escala * (0.85 + tirada() * 0.35),
+      porque: 'campo',
     });
   }
 
@@ -316,6 +331,7 @@ export function elValleDelFondo(semilla: number): readonly PuestaEnLaLinde[] {
       y: -ALTURA_DE_UNA_PERSONA * (2.2 + tirada() * 2.2),
       giro: tirada() * Math.PI * 2,
       escala: ESCALA_DEL_PACK * que.escala * (0.8 + tirada() * 0.5),
+      porque: 'campo',
     });
   }
   return puestas;
