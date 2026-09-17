@@ -25,8 +25,8 @@
  *   · LAS CASAS Y LOS HOTELES DEL CONCEJO: los que quedan por construir. Cuando se acaban no se puede
  *     alzar, y eso se ve vaciarse.
  *
- * Y de pie junto a los dados, el RELOJ DE ARENA de Riberas (`escenas/reloj.tsx`): lo que queda de
- * turno, y el botón de pasarlo.
+ * Y junto a los dados, de pie sobre un CAJÓN de nogal, el RELOJ DE ARENA de Riberas (`escenas/reloj.tsx`):
+ * lo que queda de turno, y el botón de pasarlo.
  *
  * ═══ MÁS DE FRENTE, Y LO MISMO EN CUALQUIER ESQUINA ═══
  *
@@ -56,8 +56,15 @@
  * esquina la decide el cliente: el escritorio, abajo a la derecha; la app, arriba a la derecha.
  *
  * Lo que se pega a la esquina es la caja con los dados en lo más alto de un salto y el reloj entero,
- * proyectada con la perspectiva de verdad; y lo que mide de ancho se mide ASÍ, proyectado, y no en el
- * centro del lienzo: medida en el centro, en un móvil de 375 la caja se salía 5 puntos por la izquierda.
+ * proyectada con la perspectiva de verdad; y lo que mide se mide ASÍ, proyectado, y no en el centro del
+ * lienzo: medida en el centro, en un móvil de 375 la caja se salía 5 puntos por la izquierda.
+ *
+ * ═══ GRANDE ═══
+ *
+ * La primera caja medía el 30 % del ancho del lienzo, entre 330 y 500 puntos, y Miguel la vio así: «es
+ * muy muy pequeño, debería ser más grande y tener mejor resolución para que el usuario lo vea mejor».
+ * Mide la MITAD del ancho, con un techo de alto para no comerse el tablero: con el lienzo que sea, se
+ * dibuja con más píxeles de verdad, que es lo único que le da resolución a lo que pinta la escena.
  *
  * Sin `three` y sin React: `Burgo.tsx` la monta, `presupuesto.ts` la cuenta y `verify:burgo-escena` la
  * mide.
@@ -150,6 +157,23 @@ export const CAJA = {
   color: { madera: '#8a6446', canto: '#9a7654', fondo: '#efe6cc', fieltroSinTurno: '#245843' },
 } as const;
 
+/**
+ * EL CAJÓN DEL RELOJ: un cajón de nogal a la derecha de la caja, con su frente rehundido, su tirador de
+ * latón y el reloj de arena de pie encima. Miguel vio el reloj «flotando»: estaba de pie en la cota del
+ * canto de abajo de la caja, sobre nada. Es tan alto como las paredes de la caja —de −4 a 10— y su
+ * frente va a haces con el de la caja, para leerse como una pieza del mismo juego.
+ */
+export const CAJON_DEL_RELOJ = {
+  ancho: 38,
+  fondo: 38,
+  /** Lo que se separa de la pared derecha de la caja. */
+  hueco: 3,
+  /** El marco del frente, alrededor del tablero rehundido. */
+  marcoDelFrente: 3,
+  tirador: { ancho: 9, alto: 2.6, saliente: 1.4 },
+  color: { frente: '#7a573a', tirador: '#c09a42' },
+} as const;
+
 /** Un rectángulo del fondo de la caja: `x` a lo ancho, `z` hacia quien mira. */
 export interface Rectangulo {
   readonly x0: number;
@@ -158,13 +182,13 @@ export interface Rectangulo {
   readonly z1: number;
 }
 
-/** El reloj de arena de pie, sobre la mesa en la que apoya la caja. */
+/** El reloj de arena de pie, sobre su cajón. */
 export interface SitioDelReloj {
   readonly x: number;
   readonly z: number;
   /** El alto del hueco del reloj, el `lado` de `RelojDeArena`. */
   readonly lado: number;
-  /** La cota de esa mesa: la del canto de abajo de la caja. */
+  /** La cota en la que apoya: la tapa de su cajón. */
   readonly suelo: number;
   /** A qué cota va la cintura del reloj de conos, cuyas tapas bajan 0,44 lados desde ella. */
   readonly cinturaDeLosConos: number;
@@ -181,13 +205,16 @@ export interface PlanoDeLaBandeja {
   readonly billetes: Rectangulo;
   readonly mazos: Rectangulo | null;
   readonly obras: Rectangulo | null;
+  /** El cajón del reloj, por fuera: de `−CAJA.bajo` a `CAJA.alto`, como las paredes. */
+  readonly cajon: Rectangulo;
   readonly reloj: SitioDelReloj;
 }
 
 /**
  * EL PLANO DE LA CAJA, con el origen en su centro. En la completa, la fila de atrás (mazos y obras)
- * va hacia `−z`, lejos de quien mira; la de delante (dinero y dados), hacia `+z`. El reloj va de pie
- * fuera de la caja, a la derecha de los dados.
+ * va hacia `−z`, lejos de quien mira; la de delante (dinero y dados), hacia `+z`. El cajón del reloj va
+ * fuera de la caja, a la derecha de los dados y con el frente a haces con el suyo; el reloj, de pie en
+ * el centro de su tapa.
  */
 export function planoDeLaBandeja(forma: FormaDeLaBandeja): PlanoDeLaBandeja {
   const { pared, tabique, columna, filas } = CAJA;
@@ -199,7 +226,9 @@ export function planoDeLaBandeja(forma: FormaDeLaBandeja): PlanoDeLaBandeja {
   const delante = { z0: caja.z1 - pared - filas.delante, z1: caja.z1 - pared };
   const atras = { z0: caja.z0 + pared, z1: caja.z0 + pared + filas.atras };
   const dados = { ...derecha, ...delante };
+  const cajon: Rectangulo = { x0: caja.x1 + CAJON_DEL_RELOJ.hueco, x1: caja.x1 + CAJON_DEL_RELOJ.hueco + CAJON_DEL_RELOJ.ancho, z0: caja.z1 - CAJON_DEL_RELOJ.fondo, z1: caja.z1 };
   const lado = 48;
+  const tapa = CAJA.alto;
   return {
     forma,
     caja,
@@ -207,13 +236,14 @@ export function planoDeLaBandeja(forma: FormaDeLaBandeja): PlanoDeLaBandeja {
     billetes: { ...izquierda, ...delante },
     mazos: forma === 'completa' ? { ...izquierda, ...atras } : null,
     obras: forma === 'completa' ? { ...derecha, ...atras } : null,
+    cajon,
     reloj: {
-      x: caja.x1 + 22,
-      z: (dados.z0 + dados.z1) / 2,
+      x: (cajon.x0 + cajon.x1) / 2,
+      z: (cajon.z0 + cajon.z1) / 2,
       lado,
-      suelo: -CAJA.bajo,
-      cinturaDeLosConos: -CAJA.bajo + (ALTO_DEL_BULBO + GRUESO_DEL_MARCO) * lado,
-      centroDelModelo: -CAJA.bajo + (ENVOLVENTE_DEL_RELOJ.alto * lado) / 2,
+      suelo: tapa,
+      cinturaDeLosConos: tapa + (ALTO_DEL_BULBO + GRUESO_DEL_MARCO) * lado,
+      centroDelModelo: tapa + (ENVOLVENTE_DEL_RELOJ.alto * lado) / 2,
     },
   };
 }
@@ -263,7 +293,8 @@ export function tumbado(x0: number, x1: number, y: number, z0: number, z1: numbe
 
 /**
  * LAS CARAS DE LA CAJA: el FIELTRO de los dados el primero —sus seis vértices se repintan con el color
- * de quien tira—, el fondo crema de los demás compartimentos, las cuatro paredes y los tabiques.
+ * de quien tira—, el fondo crema de los demás compartimentos, las cuatro paredes, los tabiques y el
+ * cajón del reloj, con su frente y su tirador. Todo en una geometría: el cajón no cuesta una llamada.
  */
 export function carasDeLaCaja(forma: FormaDeLaBandeja): CaraDeLaBandeja[] {
   const p = planoDeLaBandeja(forma);
@@ -280,6 +311,17 @@ export function carasDeLaCaja(forma: FormaDeLaBandeja): CaraDeLaBandeja[] {
   const medio = (caja.x0 + caja.x1) / 2;
   caras.push(...prisma(medio - tabique / 2, medio + tabique / 2, 0, altoDelTabique, caja.z0 + pared, caja.z1 - pared, color.canto, color.madera));
   if (p.mazos !== null) caras.push(...prisma(caja.x0 + pared, caja.x1 - pared, 0, altoDelTabique, p.mazos.z1, p.mazos.z1 + tabique, color.canto, color.madera));
+  /* El cajón del reloj: su cuerpo, el tablero rehundido del frente —un pelo por delante, que es lo que lo
+     dibuja— y el tirador de latón en medio. */
+  const k = p.cajon;
+  caras.push(...prisma(k.x0, k.x1, -bajo, alto, k.z0, k.z1, color.canto, color.madera));
+  const marco = CAJON_DEL_RELOJ.marcoDelFrente;
+  const frente = k.z1 + 0.05;
+  caras.push({ color: CAJON_DEL_RELOJ.color.frente, puntos: [[k.x0 + marco, -bajo + marco, frente], [k.x1 - marco, -bajo + marco, frente], [k.x1 - marco, alto - marco, frente], [k.x0 + marco, alto - marco, frente]] });
+  const t = CAJON_DEL_RELOJ.tirador;
+  const xt = (k.x0 + k.x1) / 2;
+  const yt = (alto - bajo) / 2;
+  caras.push(...prisma(xt - t.ancho / 2, xt + t.ancho / 2, yt - t.alto / 2, yt + t.alto / 2, frente, frente + t.saliente, CAJON_DEL_RELOJ.color.tirador));
   return caras;
 }
 
@@ -527,23 +569,30 @@ export interface SitioDeLaBandeja {
 export const SITIO_DE_LA_BANDEJA_POR_DEFECTO: SitioDeLaBandeja = { esquina: 'abajo-derecha', margen: 12 };
 
 /**
- * QUÉ FORMA LLEVA LA CAJA EN UN LIENZO: la completa si el lienzo mide al menos 600 × 400 puntos, y la
+ * QUÉ FORMA LLEVA LA CAJA EN UN LIENZO: la completa si el lienzo mide al menos 600 × 540 puntos, y la
  * compacta si no. Un móvil en vertical (390 de ancho) lleva la compacta; una tableta o un monitor, la
- * completa.
+ * completa. Y un lienzo apaisado y bajo también la compacta: con su techo de alto, la completa —que
+ * tiene dos filas— se quedaría en poco más de la mitad del tamaño de la compacta.
  */
 export function formaDeLaBandeja(ancho: number, alto: number): FormaDeLaBandeja {
-  return ancho >= 600 && alto >= 400 ? 'completa' : 'compacta';
+  return ancho >= 600 && alto >= 540 ? 'completa' : 'compacta';
 }
 
 /**
- * LO QUE MIDE DE ANCHO EN LA PANTALLA, en puntos y proyectada, reloj incluido: la completa, el 30 % del
- * ancho del lienzo entre 330 y 500; la compacta, el 90 % entre 220 y 400. Y nunca más que el lienzo
- * menos sus dos márgenes (`poseDeLaBandeja`).
+ * LO QUE MIDE DE ANCHO EN LA PANTALLA, en puntos y proyectada, con el cajón y el reloj: la completa, la
+ * mitad del ancho del lienzo entre 340 y 1.000; la compacta, el 94 % entre 240 y 600. Y nunca más que
+ * el lienzo menos sus dos márgenes ni más alta que su techo (`poseDeLaBandeja`).
  */
 export const ANCHO_DE_LA_BANDEJA_EN_PUNTOS = {
-  completa: { parte: 0.3, minimo: 330, maximo: 500 },
-  compacta: { parte: 0.9, minimo: 220, maximo: 400 },
+  completa: { parte: 0.5, minimo: 340, maximo: 1000 },
+  compacta: { parte: 0.94, minimo: 240, maximo: 600 },
 } as const;
+/**
+ * EL TECHO DE ALTO, en partes del alto del lienzo: la completa no pasa del 45 % ni la compacta del 36 %.
+ * Grande no puede ser tapar el tablero: en un portátil de 1.280 × 720 la mitad del ancho serían 640
+ * puntos y más de 300 de alto, y es el techo el que la para.
+ */
+export const ALTO_DE_LA_BANDEJA_EN_PARTES = { completa: 0.45, compacta: 0.36 } as const;
 export function anchoDeLaBandejaEnPuntos(ancho: number, alto: number): number {
   const medida = ANCHO_DE_LA_BANDEJA_EN_PUNTOS[formaDeLaBandeja(ancho, alto)];
   return Math.min(medida.maximo, Math.max(medida.minimo, Math.round(medida.parte * ancho)));
@@ -560,12 +609,12 @@ export interface VolumenDeLaBandeja {
 }
 
 /**
- * LO QUE OCUPA LA COMPOSICIÓN, en tres volúmenes y en unidades de bandeja, que son los que se proyectan
+ * LO QUE OCUPA LA COMPOSICIÓN, en cuatro volúmenes y en unidades de bandeja, que son los que se proyectan
  * para posarla: la caja de nogal con la placa atornillada delante; el aire de los dados, del fieltro a
- * lo más alto de un salto y de lado hasta lo que asoma un dado girado y sacudido; y el cilindro del
- * reloj. Las casas, los mazos y los billetes no asoman de la caja. Van por separado y no en un volumen
- * único porque la esquina de uno que juntara la cima del reloj con la placa no es de nada: proyectada,
- * dejaba sesenta puntos de aire a la derecha del reloj.
+ * lo más alto de un salto y de lado hasta lo que asoma un dado girado y sacudido; el cajón del reloj
+ * con su tirador; y el cilindro del reloj, de pie en su tapa. Las casas, los mazos y los billetes no
+ * asoman de la caja. Van por separado y no en un volumen único porque la esquina de uno que juntara la
+ * cima del reloj con la placa no es de nada: proyectada, dejaba sesenta puntos de aire a la derecha.
  */
 export function volumenesDeLaBandeja(forma: FormaDeLaBandeja): readonly VolumenDeLaBandeja[] {
   const p = planoDeLaBandeja(forma);
@@ -576,6 +625,7 @@ export function volumenesDeLaBandeja(forma: FormaDeLaBandeja): readonly VolumenD
   return [
     { x0: p.caja.x0, x1: p.caja.x1, y0: -CAJA.bajo, y1: CAJA.alto, z0: p.caja.z0, z1: p.caja.z1 + PLACA.grueso + ALZA_DEL_RENGLON_DE_LA_PLACA },
     { x0: dados.x - deLado, x1: dados.x + deLado, y0: 0, y1: ARISTA_DE_LOS_DADOS / 2 + alzaMaximaDeLosDados() + MEDIA_DIAGONAL_DEL_DADO, z0: dados.z - deFondo, z1: dados.z + deFondo },
+    { x0: p.cajon.x0, x1: p.cajon.x1, y0: -CAJA.bajo, y1: CAJA.alto, z0: p.cajon.z0, z1: p.cajon.z1 + 0.05 + CAJON_DEL_RELOJ.tirador.saliente },
     { x0: p.reloj.x - radio, x1: p.reloj.x + radio, y0: p.reloj.suelo, y1: p.reloj.suelo + ENVOLVENTE_DEL_RELOJ.alto * p.reloj.lado, z0: p.reloj.z - radio, z1: p.reloj.z + radio },
   ];
 }
@@ -724,10 +774,11 @@ const PASADAS_DE_LA_POSE = 12;
  * LA POSE DE LA CAJA para un lienzo de `ancho × alto` puntos y una cámara de `campoEnGrados` de campo
  * vertical —EN GRADOS, que es como lo lleva `CAMPO_DE_LA_CAMARA` y el `fov` de `three`—.
  *
- * El ancho pedido (`anchoDeLaBandejaEnPuntos`, y nunca más que el lienzo menos sus dos márgenes) es el
- * de la composición PROYECTADA. En cada pasada se cabecea la caja hacia el ojo desde donde está, se
- * proyecta, se corrige la escala por lo que sobra o falta de ancho, y se corre el centro lo que le falta
- * al canto de su esquina para quedar a `margen`, convertido a unidades de cámara a esa distancia.
+ * El ancho pedido (`anchoDeLaBandejaEnPuntos`, y nunca más que el lienzo menos sus dos márgenes) y el
+ * techo de alto (`ALTO_DE_LA_BANDEJA_EN_PARTES`) son los de la composición PROYECTADA. En cada pasada se
+ * cabecea la caja hacia el ojo desde donde está, se proyecta, se corrige la escala por lo que sobra o
+ * falta de ancho —o por lo que sobra de alto, si eso es lo que para—, y se corre el centro lo que le
+ * falta al canto de su esquina para quedar a `margen`, convertido a unidades de cámara a esa distancia.
  */
 export function poseDeLaBandeja(ancho: number, alto: number, campoEnGrados: number, sitio: SitioDeLaBandeja = SITIO_DE_LA_BANDEJA_POR_DEFECTO): PoseDeLaBandeja {
   const forma = formaDeLaBandeja(ancho, alto);
@@ -736,13 +787,14 @@ export function poseDeLaBandeja(ancho: number, alto: number, campoEnGrados: numb
   const porPunto = d / focal;
   const caja = cajaDeLaBandeja(forma);
   const pedido = Math.max(1, Math.min(ancho - 2 * sitio.margen, anchoDeLaBandejaEnPuntos(ancho, alto)));
+  const techo = Math.max(1, Math.min(alto - 2 * sitio.margen, ALTO_DE_LA_BANDEJA_EN_PARTES[forma] * alto));
   let escala = (pedido * porPunto) / (caja.x1 - caja.x0);
   const centro = { x: 0, y: 0, z: -d };
   for (let pasada = 0; pasada < PASADAS_DE_LA_POSE; pasada++) {
     const cabeceo = cabeceoHaciaElOjo(centro);
     const medido = rectanguloDeLaBandeja(forma, centro, escala, cabeceo, ancho, alto, campoEnGrados);
-    if (!(medido.x1 - medido.x0 > 0)) break;
-    escala *= pedido / (medido.x1 - medido.x0);
+    if (!(medido.x1 - medido.x0 > 0) || !(medido.y1 - medido.y0 > 0)) break;
+    escala *= Math.min(pedido / (medido.x1 - medido.x0), techo / (medido.y1 - medido.y0));
     const r = rectanguloDeLaBandeja(forma, centro, escala, cabeceo, ancho, alto, campoEnGrados);
     const faltaX = ancho - sitio.margen - r.x1;
     const faltaY = sitio.esquina === 'abajo-derecha' ? alto - sitio.margen - r.y1 : sitio.margen - r.y0;

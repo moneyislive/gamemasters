@@ -175,7 +175,7 @@ import {
   CAMPO_DE_LA_CAMARA,
   LIMITES_DEL_BURGO,
   MIRADOR_DEL_BURGO,
-  poseDeSalida,
+  poseDeSalidaAlLadoDeLaCaja,
 } from '../../escenas/burgo/camara-del-burgo';
 import type { TableroDelBurgoEn3D } from '../../escenas/burgo/tipos';
 import { juzgarCalidad } from '../../escenas/embarcadero/calidad';
@@ -1028,11 +1028,15 @@ export function BurgoEnTres({
    * apaisado para que las cuatro esquinas del anillo quepan—, así que se recalcula al medir.
    * Y sólo se recoloca la cámara de quien NO ha tocado nada: a quien está mirando su barrio
    * de cerca, estirar la ventana no debería moverle la vista.
+   *
+   * Y NO SE ESCONDE DETRÁS DE LA CAJA DEL BURGO: desde que la caja es grande, la de siempre dejaba
+   * la esquina de SALIDA detrás de ella, que es donde empiezan todos los peones. La mirada se corre
+   * lo justo (`poseDeSalidaAlLadoDeLaCaja`), medido con la misma pose con la que la escena la posa.
    */
   useEffect(() => {
     const nueva =
       lienzo.ancho > 0 && lienzo.alto > 0
-        ? poseDeSalida({ ancho: lienzo.ancho, alto: lienzo.alto, franjaInferior: 0 })
+        ? poseDeSalidaAlLadoDeLaCaja({ ancho: lienzo.ancho, alto: lienzo.alto, franjaInferior: 0 }, poseDeLaBandeja(lienzo.ancho, lienzo.alto, FOV, SITIO_DE_LA_BANDEJA).rectangulo)
         : CERCANIA_DE_SALIDA;
     laPoseDeSalida.current = nueva;
     if (eraAlPrincipio.current) cercania.current = nueva;

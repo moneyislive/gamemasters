@@ -49,6 +49,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Burgo } from '../../escenas/burgo/Burgo';
 import type { CasillaEn3D, ClaseDeCasillaEn3D, DadosDelBurgoEn3D, FiguraEn3D, TableroDelBurgoEn3D } from '../../escenas/burgo/tipos';
+import { poseDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { RelojDeLaMesa } from '../../escenas/reloj';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
@@ -67,7 +68,7 @@ import {
   LIMITES_DEL_BURGO,
   MIRADOR_DEL_BURGO,
   hacia,
-  poseDeSalida,
+  poseDeSalidaAlLadoDeLaCaja,
   poseDelBurgo,
 } from '../../escenas/burgo/camara-del-burgo';
 import { ESQUINAS, MAZMORRA, MEDIO_LADO, PUERTAS, huecoDePeon } from '../../escenas/burgo/anillo-en-3d';
@@ -262,9 +263,15 @@ function CamaraDelBanco({ ventana, verEntero, acercarA, alMoverse }: { ventana: 
   }, [alMoverse]);
   const ventanaRef = useRef(ventana);
   ventanaRef.current = ventana;
+  /* La pose de salida del escritorio: la de siempre, corrida lo justo para no dejar casillas detrás de la caja. */
+  const salida = (): Cercania => {
+    const v = ventanaRef.current;
+    return poseDeSalidaAlLadoDeLaCaja(v, v.ancho > 0 && v.alto > 0 ? poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA, SITIO_DE_LA_CAJA).rectangulo : null);
+  };
 
   useEffect(() => {
-    objetivo.current = poseDeSalida(ventanaRef.current);
+    objetivo.current = salida();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verEntero]);
   /* «Acercar a»: la cercanía objetivo pasa a la casilla pedida, para mirar una coreografía de cerca. */
   useEffect(() => {
@@ -337,7 +344,7 @@ function CamaraDelBanco({ ventana, verEntero, acercarA, alMoverse }: { ventana: 
     const t = s.clock.elapsedTime;
     if (nacida.current === null) {
       nacida.current = t;
-      objetivo.current = poseDeSalida(ventanaRef.current);
+      objetivo.current = salida();
     }
     const o = objetivo.current;
     if (o !== null) {

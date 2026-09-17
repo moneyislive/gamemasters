@@ -2038,7 +2038,13 @@ paso(
     'un `Pressable` dentro del detector le pelea el toque al giro del tablero, y una hoja escrita dentro de la caja del lienzo lleva un velo que no llega a la barra de la mesa',
   );
 
-  /* ─── La cámara del cliente, antes de la escena y con prioridad 0 ─── */
+  /*
+   * ─── La cámara del cliente, antes de la escena y con prioridad 0 ───
+   *
+   * Y la pose de salida es la del Burgo: `poseDeSalida(ventana)`, o la que la envuelve para no dejar
+   * casillas detrás de la caja del Burgo, `poseDeSalidaAlLadoDeLaCaja(ventana, …)` —que devuelve
+   * exactamente aquélla cuando la caja no esconde nada, como en un móvil en vertical—.
+   */
 
   reglaDelFuente(
     'el ojo del cliente se monta ANTES de `<Burgo>`, con prioridad 0, y compone `ojoYMira` con las constantes del Burgo',
@@ -2053,7 +2059,7 @@ paso(
         /ojoYMira\(\s*cercania\.current,\s*ALCANCE_DEL_BURGO,\s*\(d\) => ojoDelMirador\(mirador\.current, d, proporcion\),\s*ALTURA_MINIMA_DEL_OJO_DEL_BURGO,\s*\)/.test(
           c,
         ) &&
-        /poseDeSalida\(ventana\)/.test(c)
+        /poseDeSalida(?:AlLadoDeLaCaja)?\(ventana[,)]/.test(c)
       );
     },
     escena,

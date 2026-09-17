@@ -1154,8 +1154,11 @@ el crema del tablero por dentro y un compartimento para cada cosa que dice algo 
 - **Los dos mazos**, Suerte y Caja de Comunidad, con su emblema y tan gruesos como cartas les quedan; y
   **las casas y los hoteles del Concejo**, los 32 y los 12 del reglamento, que se van vaciando: cuando
   se acaban ya no se puede alzar, y se ve.
-- **El reloj de arena de Riberas**, de pie junto a la caja: lo que queda de turno, y tocarlo pasa el
-  turno. Tocarlo —apretar y soltar sin arrastrar, como los dados— y no apretarlo como en Riberas: la caja
+- **El reloj de arena de Riberas**, de pie sobre un **cajón** de nogal junto a la caja, con su frente
+  rehundido y su tirador de latón: lo que queda de turno, y tocarlo pasa el turno. El cajón llegó cuando
+  Miguel vio el reloj «flotando»: estaba de pie en la cota del canto de abajo de la caja, sobre nada.
+  Mide lo que las paredes de la caja y su frente va a haces con el de ella; va fundido en su geometría,
+  así que no cuesta una llamada. Tocarlo —apretar y soltar sin arrastrar, como los dados— y no apretarlo como en Riberas: la caja
   está encima del tablero, y quien empieza a girar la cámara desde el reloj no puede perder el turno. Se
   voltea al cambiar `turnosAbiertos`, a la vez en todas las pantallas. El de `reloj.glb` en plena, el de
   conos en sobria; si el `.glb` no llega se pinta el de conos y se dice por consola, sin `alFallar`, que
@@ -1164,11 +1167,19 @@ el crema del tablero por dentro y un compartimento para cada cosa que dice algo 
 Y cómo se pone:
 
 - **Dos formas**: la completa, con las dos filas de compartimentos, en los lienzos de al menos
-  600 × 400; la compacta, sólo el dinero y los dados, en los estrechos.
-- **Cuánto mide**, proyectada y con el reloj: la completa, el 30 % del ancho del lienzo entre 330 y 500
-  puntos; la compacta, el 90 % entre 220 y 400, y nunca más que el lienzo menos sus márgenes. Un dado
-  quieto mide de 23 a 39 puntos: nunca menos de los 22 de `DADO_MINIMO`. La primera cuenta medía el
-  ancho en el centro del lienzo, y en un móvil de 375 la caja se salía cinco puntos por la izquierda.
+  600 × 540; la compacta, sólo el dinero y los dados, en los estrechos y en los apaisados bajos, donde
+  la completa, con su techo de alto, se quedaría en poco más de la mitad.
+- **Cuánto mide**, proyectada y con el cajón y el reloj: la completa, la mitad del ancho del lienzo entre
+  340 y 1.000 puntos, sin pasar del 45 % del alto; la compacta, el 94 % del ancho entre 240 y 600, sin
+  pasar del 36 %; y nunca más que el lienzo menos sus márgenes. Un dado quieto mide 77 puntos en un
+  monitor de 1.920 × 1.080, 64 en uno de 1.600 × 900 y 51 en un portátil de 1.280 × 720, y nunca menos de
+  los 22 de `DADO_MINIMO` (23 en un lienzo de 288). La primera caja medía el 30 % del ancho, hasta 500
+  puntos, y Miguel la vio «muy muy pequeño»: el dado no pasaba de 39 puntos en ningún lienzo. Y la
+  primera cuenta medía el ancho en el centro del lienzo, y en un móvil de 375 la caja se salía cinco
+  puntos por la izquierda.
+- **La resolución** es la de los píxeles que ocupa: la escena se dibuja al `devicePixelRatio` del
+  aparato (`dpr={[1, 2]}` en los tres lienzos), así que una caja más grande es una caja con más detalle,
+  y no hay otra forma de ganarlo sin redibujar el tablero entero a más resolución.
 - **Desde dónde se mira**: a 40° del rayo del ojo, en cualquier esquina (`cabeceoHaciaElOjo`). La
   bandeja se inclinaba 55° hacia la cámara, y en su esquina el rayo bajaba otros 17°: casi cenital; y
   arriba en la app, con la inclinación a secas, la caja quedaría rasante. Se probó también volverla de
@@ -1176,13 +1187,21 @@ Y cómo se pone:
 - **Dónde va**: la esquina la dice el cliente (`bandejaDeLosDados`), porque la escena no sabe qué tiene
   encima. El escritorio, abajo a la derecha, y su cartel del pie se para antes de la caja si al lado
   cabe uno de 220 puntos; la app, arriba a la derecha, y su «Ver el burgo entero» baja debajo de ella.
+- **No esconde casillas**: grande y abajo a la derecha, la pose de salida de siempre dejaba detrás de la
+  caja la esquina de SALIDA y cuatro casillas —en 1.600 × 900, la 0, la 1, la 2, la 3 y la 39—, que es
+  donde empiezan todos los peones. Los dos clientes salen, y vuelven con «Ver el burgo entero», con
+  `poseDeSalidaAlLadoDeLaCaja`: la de siempre si no esconde nada, y si no, la mirada corrida lo justo
+  —primero de lado, al hueco libre, sin que el anillo encoja— hasta que ninguna casilla quede detrás y
+  las cuatro esquinas del anillo sigan en el lienzo. En un móvil en vertical no se mueve. En los lienzos
+  apaisados y bajos (un móvil tumbado, 844 × 390) no hay forma de que quepan los dos, y se queda la de
+  siempre.
 - **No tiembla**: se pega a la cámara en el `useFrame` que sigue al seguimiento. Medido en el banco con
   la cámara corriendo a 108 unidades por segundo detrás del peón: el borde no se movió un píxel en 230
   fotogramas.
 - **Nada se esconde detrás de una pared**: por eso los billetes van en la mitad de atrás de su
   compartimento. `verify:burgo-escena` tira un rayo del ojo a cada cosa que tiene que verse, en todas
   las poses.
-- **Cuesta** 1.148 triángulos la caja con sus piezas y sus dos asas, 807 los emblemas de los mazos y las
+- **Cuesta** 1.170 triángulos la caja con sus piezas, el cajón del reloj y sus dos asas, 807 los emblemas de los mazos y las
   letras de la placa, y el reloj: 20.086 el de Riberas en plena, 262 el de conos en sobria. En llamadas
   de dibujo, medidas en el banco, dieciséis en plena y veinte en sobria, dados y reloj incluidos: las
   asas no se dibujan (`visible={false}`, que no les quita el toque), y los mazos con sus emblemas y la

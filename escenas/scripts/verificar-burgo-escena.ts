@@ -239,6 +239,7 @@ import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
 import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, HUMO, ONDA_DEL_AGUA, RECAUDACION, bocanadaDelHumo, duracionDelHumo, esRentaDe, ondaDelAgua, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelDinero, duracionDelEncierro, duracionDelSuceso, esRecaudacion, finDeLaCola, momentoDeLaRecaudacion, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, LUMINANCIA_EMPENADA, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
+  ALTO_DE_LA_BANDEJA_EN_PARTES,
   ALZA_DEL_RENGLON_DE_LA_PLACA,
   ARISTA_DE_LOS_DADOS,
   ASA_DEL_RELOJ_DE_ARENA,
@@ -246,6 +247,7 @@ import {
   BILLETES,
   BILLETES_A_LA_VISTA,
   CAJA,
+  CAJON_DEL_RELOJ,
   CASAS_DEL_CONCEJO as CASAS_DE_LA_CAJA,
   CASITA,
   ENVOLVENTE_DEL_RELOJ,
@@ -302,7 +304,9 @@ import {
   CORRIMIENTO_EN_APAISADO,
   LIMITES_DEL_BURGO,
   MIRADOR_DEL_BURGO,
+  elAnilloSeVeJuntoALaCaja,
   poseDeSalida,
+  poseDeSalidaAlLadoDeLaCaja,
   poseDelBurgo,
   seguir,
 } from '../burgo/camara-del-burgo';
@@ -1605,9 +1609,11 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
       { nombre: 'móvil 375×812', ancho: 375, alto: 812 },
       { nombre: 'apaisado 844×390', ancho: 844, alto: 390 },
       { nombre: 'recuadro 288×317', ancho: 288, alto: 317 },
-      { nombre: 'justo completa 600×400', ancho: 600, alto: 400 },
-      { nombre: 'justo compacta 599×400', ancho: 599, alto: 400 },
+      { nombre: 'justo completa 600×540', ancho: 600, alto: 540 },
+      { nombre: 'justo compacta 599×540', ancho: 599, alto: 540 },
+      { nombre: 'el panel del banco 961×421', ancho: 961, alto: 421 },
       { nombre: 'portátil 1280×720', ancho: 1280, alto: 720 },
+      { nombre: 'monitor 1600×900', ancho: 1600, alto: 900 },
     ];
     const ESQUINAS_DE_LA_BANDEJA: readonly EsquinaDeLaBandeja[] = ['abajo-derecha', 'arriba-derecha'];
     const MARGEN = 12;
@@ -1616,13 +1622,16 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
       .filter(({ v, esquina, pose }) => {
         const q = pose.rectangulo;
         const pedido = Math.min(v.ancho - 2 * MARGEN, anchoDeLaBandejaEnPuntos(v.ancho, v.alto));
+        const techo = Math.min(v.alto - 2 * MARGEN, ALTO_DE_LA_BANDEJA_EN_PARTES[pose.forma] * v.alto);
         const dentro = q.x0 >= 0 && q.y0 >= 0 && q.x1 <= v.ancho && q.y1 <= v.alto;
         const pegada = Math.abs(q.x1 - (v.ancho - MARGEN)) < 0.5 && (esquina === 'abajo-derecha' ? Math.abs(q.y1 - (v.alto - MARGEN)) < 0.5 : Math.abs(q.y0 - MARGEN) < 0.5);
-        return !dentro || !pegada || Math.abs(q.x1 - q.x0 - pedido) >= 0.5 || pose.forma !== formaDeLaBandeja(v.ancho, v.alto);
+        /* O mide de ancho lo pedido sin pasar de su techo, o la para el techo y mide menos. */
+        const mide = Math.abs(q.x1 - q.x0 - pedido) < 0.5 ? q.y1 - q.y0 <= techo + 0.5 : Math.abs(q.y1 - q.y0 - techo) < 0.5 && q.x1 - q.x0 < pedido;
+        return !dentro || !pegada || !mide || pose.forma !== formaDeLaBandeja(v.ancho, v.alto);
       })
       .map(({ v, esquina, pose }) => `${v.nombre} ${esquina}: ${r(pose.rectangulo.x0)}..${r(pose.rectangulo.x1)} × ${r(pose.rectangulo.y0)}..${r(pose.rectangulo.y1)}`);
     comprobar(
-      `en ${String(LIENZOS_DE_LA_CAJA.length)} lienzos y en las dos esquinas (${String(poses.length)} poses) la composición entera cabe, queda a ${String(MARGEN)} puntos de su esquina y mide de ancho lo pedido, medido proyectado`,
+      `en ${String(LIENZOS_DE_LA_CAJA.length)} lienzos y en las dos esquinas (${String(poses.length)} poses) la composición entera cabe, queda a ${String(MARGEN)} puntos de su esquina y mide de ancho lo pedido —la mitad del lienzo en la completa— o lo que le deja su techo de alto, medido proyectado`,
       poses.length === LIENZOS_DE_LA_CAJA.length * 2 && malPosadas.length === 0,
       malPosadas,
     );
@@ -1703,6 +1712,25 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
       sinCompensar,
     );
 
+    /*
+     * ── GRANDE ── Miguel vio la primera caja «muy muy pequeño»: medía el 30 % del ancho del lienzo, entre 330
+     * y 500 puntos, y un dado quieto no pasaba de 39 puntos en ningún lienzo. En un monitor de escritorio
+     * tiene que medir la mitad del ancho, y el dado, por lo menos 60 puntos; en un portátil, 48.
+     */
+    const dadoEn = (ancho: number, alto: number): number => poseDeLaBandeja(ancho, alto, CAMPO_DE_LA_CAMARA).aristaEnPuntos;
+    const anchoEn = (ancho: number, alto: number): number => {
+      const q = poseDeLaBandeja(ancho, alto, CAMPO_DE_LA_CAMARA).rectangulo;
+      return q.x1 - q.x0;
+    };
+    comprobar(
+      `la caja es grande: en un monitor de 1.920 × 1.080 mide ${r(anchoEn(1920, 1080))} puntos de ancho y el dado ${r(dadoEn(1920, 1080))}; en uno de 1.600 × 900, ${r(anchoEn(1600, 900))} y ${r(dadoEn(1600, 900))}; en un portátil de 1.280 × 720, ${r(anchoEn(1280, 720))} y ${r(dadoEn(1280, 720))}`,
+      Math.abs(anchoEn(1920, 1080) - 960) < 1 && dadoEn(1920, 1080) >= 60 && Math.abs(anchoEn(1600, 900) - 800) < 1 && dadoEn(1600, 900) >= 60 && dadoEn(1280, 720) >= 48,
+    );
+    comprobar(
+      'se ve fallar: con las medidas de la primera caja —el 30 % del ancho, hasta 500 puntos—, en un monitor de 1.920 el dado no llegaría a 42 puntos',
+      (500 / anchoEn(1920, 1080)) * dadoEn(1920, 1080) < 42,
+    );
+
     /* ── Un dado quieto se lee ── */
     const aristas = LIENZOS_DE_LA_CAJA.map((v) => ({ lienzo: v.nombre, arista: poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA).aristaEnPuntos }));
     comprobar(
@@ -1711,10 +1739,51 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
       aristas,
     );
     const movil = VENTANAS[2] as { readonly ancho: number; readonly alto: number };
+    /*
+     * LA VACUNA DE UNA ESCALA FIJA. La que le toca a un monitor, llevada al móvil, no le sirve: la caja
+     * grande del monitor, con su misma escala, no cabe en el ancho del móvil. La escala se saca de cada
+     * lienzo.
+     */
     const monitor = poseDeLaBandeja(VENTANAS[0]?.ancho ?? 1920, VENTANAS[0]?.alto ?? 1080, CAMPO_DE_LA_CAMARA);
+    const focalDelMonitor = (VENTANAS[0]?.alto ?? 1080) / 2 / Math.tan((CAMPO_DE_LA_CAMARA * Math.PI) / 360);
     const focalDelMovil = movil.alto / 2 / Math.tan((CAMPO_DE_LA_CAMARA * Math.PI) / 360);
-    const aristaFija = (monitor.escala * ARISTA_DE_LOS_DADOS * focalDelMovil) / CAJA.distancia;
-    comprobar(`se ve fallar: con la escala de un monitor, en el móvil el dado mediría ${r(aristaFija)} puntos y su punto ${r(aristaFija * PUNTO_DEL_DADO)}`, aristaFija * PUNTO_DEL_DADO < PUNTO_MINIMO, aristaFija);
+    const anchoFijo = ((monitor.rectangulo.x1 - monitor.rectangulo.x0) * focalDelMovil) / focalDelMonitor;
+    comprobar(`se ve fallar: con la escala de un monitor, en el móvil la caja mediría ${r(anchoFijo)} puntos de ancho y no cabría en sus ${String(movil.ancho)}`, anchoFijo > movil.ancho - 2 * MARGEN, anchoFijo);
+
+    /*
+     * ── LA POSE DE SALIDA NO SE ESCONDE DETRÁS DE LA CAJA ── Grande y abajo a la derecha, la caja dejaba
+     * detrás la esquina de SALIDA y cuatro casillas en la pose de salida de siempre: donde empiezan todos
+     * los peones, y un clic ahí se lo quedaba la caja. Con `poseDeSalidaAlLadoDeLaCaja`, en los lienzos
+     * de escritorio ninguna casilla queda detrás, las cuatro esquinas del anillo siguen en el lienzo y el
+     * ojo no se aleja más de un 5 %; y en un móvil en vertical, donde la caja va arriba sin tapar nada,
+     * la pose es la de siempre.
+     */
+    const escritorios = [[900, 600], [1280, 720], [1440, 810], [1600, 900], [1920, 1080], [2560, 1400], [768, 1024]] as const;
+    const malEncuadrados = escritorios
+      .filter(([ancho, alto]) => {
+        const ventana = { ancho, alto, franjaInferior: 0 };
+        const caja = poseDeLaBandeja(ancho, alto, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: MARGEN }).rectangulo;
+        const c = poseDeSalidaAlLadoDeLaCaja(ventana, caja);
+        return !elAnilloSeVeJuntoALaCaja(c, ventana, caja, true) || c.factor > poseDeSalida(ventana).factor + 0.05 + 1e-9;
+      })
+      .map(([ancho, alto]) => `${String(ancho)}×${String(alto)}`);
+    comprobar(
+      `en ${String(escritorios.length)} lienzos de escritorio la pose de salida no deja ninguna casilla detrás de la caja, con las cuatro esquinas del anillo en el lienzo y el ojo alejado un 5 % como mucho`,
+      malEncuadrados.length === 0,
+      malEncuadrados,
+    );
+    const ventanaDeMonitor = { ancho: 1600, alto: 900, franjaInferior: 0 };
+    const cajaDeMonitor = poseDeLaBandeja(1600, 900, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: MARGEN }).rectangulo;
+    comprobar('se ve fallar: con la pose de salida de siempre, en 1.600 × 900 la caja grande deja casillas detrás', !elAnilloSeVeJuntoALaCaja(poseDeSalida(ventanaDeMonitor), ventanaDeMonitor, cajaDeMonitor, false));
+    const movilesDePie = [[375, 812], [412, 915]] as const;
+    comprobar(
+      'en un móvil en vertical, con la caja arriba, la pose de salida es la de siempre',
+      movilesDePie.every(([ancho, alto]) => {
+        const ventana = { ancho, alto, franjaInferior: 0 };
+        const caja = poseDeLaBandeja(ancho, alto, CAMPO_DE_LA_CAMARA, { esquina: 'arriba-derecha', margen: MARGEN }).rectangulo;
+        return JSON.stringify(poseDeSalidaAlLadoDeLaCaja(ventana, caja)) === JSON.stringify(poseDeSalida(ventana));
+      }),
+    );
 
     /* ── El plano cercano, leído de los tres lienzos que montan la escena: no un 0,5 copiado aquí ── */
     const LIENZOS = ['../escritorio/src/burgo-en-tres.tsx', '../escritorio/src/banco-burgo.tsx', '../app/src/arcade/burgo-en-tres-escena.tsx'];
@@ -1867,6 +1936,7 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
         new THREE.Box3(new THREE.Vector3(medio - tabique / 2, 0, k.z0), new THREE.Vector3(medio + tabique / 2, altoDelTabique, k.z1)),
       ];
       if (p.mazos !== null) cajas.push(new THREE.Box3(new THREE.Vector3(k.x0, 0, p.mazos.z1), new THREE.Vector3(k.x1, altoDelTabique, p.mazos.z1 + tabique)));
+      cajas.push(new THREE.Box3(new THREE.Vector3(p.cajon.x0, -bajo, p.cajon.z0), new THREE.Vector3(p.cajon.x1, alto, p.cajon.z1)));
       return cajas;
     };
     const loQueTieneQueVerse = (forma: FormaDeLaBandeja, filasDeBilletes: (valor: number, k: number) => { x: number; y: number; z: number }): { que: string; punto: THREE.Vector3 }[] => {
@@ -1927,7 +1997,7 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
     const reloj = planoDeLaBandeja('completa').reloj;
     const relojCompacto = planoDeLaBandeja('compacta').reloj;
     comprobar(
-      `las proporciones del reloj que usa la caja son las de escenas/reloj.tsx, y el de conos cabe en el cilindro que se le reserva (${String(ENVOLVENTE_DEL_RELOJ.alto)} lado de alto y ${String(ENVOLVENTE_DEL_RELOJ.radio)} de radio) de pie en la mesa de la caja, fuera de ella`,
+      `las proporciones del reloj que usa la caja son las de escenas/reloj.tsx, y el de conos cabe en el cilindro que se le reserva (${String(ENVOLVENTE_DEL_RELOJ.alto)} lado de alto y ${String(ENVOLVENTE_DEL_RELOJ.radio)} de radio), de pie fuera de la caja`,
       PROPORCIONES_DEL_RELOJ.altoDelBulbo === ALTO_DEL_BULBO_DEL_RELOJ &&
         PROPORCIONES_DEL_RELOJ.radioDelBulbo === RADIO_DEL_BULBO_DEL_RELOJ &&
         PROPORCIONES_DEL_RELOJ.gruesoDelMarco === GRUESO_DEL_MARCO_DEL_RELOJ &&
@@ -1935,9 +2005,37 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
         2 * (ALTO_DEL_BULBO_DEL_RELOJ + GRUESO_DEL_MARCO_DEL_RELOJ) <= ENVOLVENTE_DEL_RELOJ.alto &&
         Math.abs(reloj.cinturaDeLosConos - (ALTO_DEL_BULBO_DEL_RELOJ + GRUESO_DEL_MARCO_DEL_RELOJ) * reloj.lado - reloj.suelo) < 1e-9 &&
         Math.abs(reloj.centroDelModelo - (ENVOLVENTE_DEL_RELOJ.alto * reloj.lado) / 2 - reloj.suelo) < 1e-9 &&
-        reloj.suelo === -CAJA.bajo &&
         [reloj, relojCompacto].every((x, i) => x.x - ENVOLVENTE_DEL_RELOJ.radio * x.lado > planoDeLaBandeja(FORMAS[i] as FormaDeLaBandeja).caja.x1 + 4),
       { reloj, relojCompacto },
+    );
+    /*
+     * EL RELOJ APOYA EN SU CAJÓN. Miguel lo vio «flotando»: estaba de pie en la cota del canto de abajo de
+     * la caja, sobre nada. Su base es la tapa del cajón, su huella cabe en ella con aire, el cajón mide lo
+     * que las paredes y su frente va a haces con el de la caja, fuera de ella.
+     */
+    const apoyaEnSuCajon = (plano: { readonly caja: { readonly x1: number; readonly z1: number }; readonly cajon: { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number }; readonly reloj: { readonly x: number; readonly z: number; readonly lado: number; readonly suelo: number } }): boolean => {
+      const radio = ENVOLVENTE_DEL_RELOJ.radio * plano.reloj.lado;
+      const k = plano.cajon;
+      return (
+        plano.reloj.suelo === CAJA.alto &&
+        plano.reloj.x - radio >= k.x0 + 2 &&
+        plano.reloj.x + radio <= k.x1 - 2 &&
+        plano.reloj.z - radio >= k.z0 + 2 &&
+        plano.reloj.z + radio <= k.z1 - 2 &&
+        k.x0 >= plano.caja.x1 + 2 &&
+        k.z1 === plano.caja.z1 &&
+        k.x1 - k.x0 === CAJON_DEL_RELOJ.ancho
+      );
+    };
+    comprobar(
+      `en las dos formas el reloj apoya en la tapa de su cajón, a ${String(CAJA.alto)} de alto como las paredes, con su huella dentro y aire, y el cajón va fuera de la caja con el frente a haces con el suyo`,
+      FORMAS.every((forma) => apoyaEnSuCajon(planoDeLaBandeja(forma))),
+      FORMAS.map((forma) => ({ forma, cajon: planoDeLaBandeja(forma).cajon, reloj: planoDeLaBandeja(forma).reloj })),
+    );
+    const planoCompleto = planoDeLaBandeja('completa');
+    comprobar(
+      'se ve fallar: con el reloj de pie en el canto de abajo de la caja, como estuvo, o corrido fuera de la tapa, no apoya',
+      !apoyaEnSuCajon({ ...planoCompleto, reloj: { ...planoCompleto.reloj, suelo: -CAJA.bajo } }) && !apoyaEnSuCajon({ ...planoCompleto, reloj: { ...planoCompleto.reloj, x: planoCompleto.reloj.x + 12 } }),
     );
     const triangulosDelArbol = (nodo: unknown): number => {
       if (nodo === null || nodo === undefined || typeof nodo === 'boolean' || typeof nodo === 'string' || typeof nodo === 'number') return 0;
@@ -3088,7 +3186,7 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   {
     /* En los lienzos de la completa, al lado de la caja cabe siempre un cartel de 220 puntos: sólo en los estrechos va a lo ancho. */
     const alLado = (ancho: number, alto: number): number => poseDeLaBandeja(ancho, alto, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: 12 }).rectangulo.x0 - 2 * 12;
-    const completas = [[600, 400], [768, 1024], [1280, 720], [1920, 1080], [2560, 1400]] as const;
+    const completas = [[600, 540], [768, 1024], [900, 600], [1280, 720], [1920, 1080], [2560, 1400]] as const;
     comprobar(
       `en los lienzos de la caja completa el cartel del pie cabe al lado de ella con al menos 220 puntos (${completas.map(([a, h]) => `${String(a)}×${String(h)} ${r(alLado(a, h))}`).join(', ')}), y en uno de 288 va a lo ancho`,
       completas.every(([a, h]) => alLado(a, h) >= 220) && alLado(288, 317) < 220,
@@ -3107,6 +3205,14 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
     /const pasar = pasarEnTres\(opciones\);/.test(codigo);
   comprobar('el escritorio y la app le dan a la caja su reloj de arena —los instantes de la mesa, la vuelta y si se puede pasar— y pasan el turno con la opción de pasarEnTres', llevanElReloj(elEscritorio) && llevanElReloj(laApp));
   comprobar('se ve fallar: una app que no pasa el reloj cae', !llevanElReloj(laApp.replace('reloj={relojDeArena}', '')));
+  /* Y LOS DOS CLIENTES SALEN CON LA POSE QUE NO SE ESCONDE DETRÁS DE LA CAJA, y ninguno con la de siempre. */
+  const salenAlLadoDeLaCaja = (escritorio: string, app: string): boolean =>
+    /poseDeSalidaAlLadoDeLaCaja\(\{ ancho: lienzo\.ancho, alto: lienzo\.alto, franjaInferior: 0 \}, poseDeLaBandeja\(lienzo\.ancho, lienzo\.alto, FOV, SITIO_DE_LA_BANDEJA\)\.rectangulo\)/.test(escritorio) &&
+    !/\bposeDeSalida\(/.test(escritorio) &&
+    (app.match(/poseDeSalidaAlLadoDeLaCaja\(ventana, rectanguloDeLaCaja\)/g) ?? []).length === 2 &&
+    !/\bposeDeSalida\(/.test(app);
+  comprobar('el escritorio y la app salen, y vuelven con «Ver el burgo entero», a la pose que no deja casillas detrás de la caja', salenAlLadoDeLaCaja(elEscritorio, laApp));
+  comprobar('se ve fallar: un escritorio que vuelve a la pose de salida de siempre cae', !salenAlLadoDeLaCaja(elEscritorio.replace('poseDeSalidaAlLadoDeLaCaja({', 'poseDeSalida({'), laApp));
   /*
    * EL PRECINTO SE TIENDE CON LA HIPOTECA: uno por casilla hipotecada, en su sitio, estirado lo que diga
    * la curva de la bandera, en una malla de un precinto por título. Sin la llamada en el bucle de las

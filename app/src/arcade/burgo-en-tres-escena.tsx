@@ -196,7 +196,7 @@ import {
   ALTURA_MINIMA_DEL_OJO_DEL_BURGO,
   CAMPO_DE_LA_CAMARA,
   MIRADOR_DEL_BURGO,
-  poseDeSalida,
+  poseDeSalidaAlLadoDeLaCaja,
 } from '../../../escenas/burgo/camara-del-burgo';
 import { ojoYMira } from '../../../escenas/acercar';
 import type { Cercania } from '../../../escenas/acercar';
@@ -833,11 +833,20 @@ function LaMesaEnTres({
     (): Ventana => ({ ancho: medida.ancho, alto: medida.alto, franjaInferior: FRANJA_QUE_TAPA_LA_HOJA }),
     [medida.ancho, medida.alto],
   );
+  /*
+   * LO QUE OCUPA LA CAJA DEL BURGO EN EL LIENZO, con la misma cuenta con la que la escena la posa: la
+   * pose de salida no deja casillas detrás de ella (`poseDeSalidaAlLadoDeLaCaja`) y «Ver el burgo
+   * entero» baja debajo. Sin lienzo medido, nada.
+   */
+  const rectanguloDeLaCaja = useMemo(
+    () => (medida.ancho > 0 && medida.alto > 0 ? poseDeLaBandeja(medida.ancho, medida.alto, CAMPO_DE_LA_CAMARA, SITIO_DE_LA_BANDEJA).rectangulo : null),
+    [medida.ancho, medida.alto],
+  );
   useEffect(() => {
     if (seHaMovido) return;
     mirador.current = MIRADOR_DEL_BURGO;
-    cercania.current = poseDeSalida(ventana);
-  }, [seHaMovido, ventana, mirador, cercania]);
+    cercania.current = poseDeSalidaAlLadoDeLaCaja(ventana, rectanguloDeLaCaja);
+  }, [seHaMovido, ventana, mirador, cercania, rectanguloDeLaCaja]);
 
   /*
    * ═══ SEGUIR AL QUE MUEVE: SE APAGA AL TOCAR Y SE ENCIENDE AL TURNO SIGUIENTE ═══
@@ -1054,11 +1063,10 @@ function LaMesaEnTres({
    * esquina de siempre —arriba a la izquierda— lo tapaba. Se mide con la misma cuenta
    * con la que la escena la posa; sin lienzo medido, donde iba.
    */
-  const alturaDelBotonDeVolver = useMemo(() => {
-    if (medida.ancho <= 0 || medida.alto <= 0) return estilos.volver.top;
-    const caja = poseDeLaBandeja(medida.ancho, medida.alto, CAMPO_DE_LA_CAMARA, SITIO_DE_LA_BANDEJA).rectangulo;
-    return Number.isFinite(caja.y1) ? Math.ceil(caja.y1) + SITIO_DE_LA_BANDEJA.margen : estilos.volver.top;
-  }, [medida.ancho, medida.alto]);
+  const alturaDelBotonDeVolver = useMemo(
+    () => (rectanguloDeLaCaja !== null && Number.isFinite(rectanguloDeLaCaja.y1) ? Math.ceil(rectanguloDeLaCaja.y1) + SITIO_DE_LA_BANDEJA.margen : estilos.volver.top),
+    [rectanguloDeLaCaja],
+  );
 
   /**
    * SE HA TOCADO UN PEÓN. Abre la ficha de ese jugador: lo que tiene, dónde está y
@@ -1101,10 +1109,10 @@ function LaMesaEnTres({
    */
   const verElBurgoEntero = useCallback(() => {
     verElTableroEntero();
-    cercania.current = poseDeSalida(ventana);
+    cercania.current = poseDeSalidaAlLadoDeLaCaja(ventana, rectanguloDeLaCaja);
     mirador.current = MIRADOR_DEL_BURGO;
     ponerSeguir(false);
-  }, [verElTableroEntero, cercania, mirador, ventana]);
+  }, [verElTableroEntero, cercania, mirador, ventana, rectanguloDeLaCaja]);
 
   /* ─── El pie, las hojas y el cajón, que son los mismos en las dos ramas ─── */
 

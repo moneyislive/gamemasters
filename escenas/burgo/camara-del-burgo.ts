@@ -49,10 +49,11 @@ import { LEJANIA, PROPORCION_DE_REFERENCIA, alejarseParaQueQuepa, ojoDelMirador 
 import type { Mirador } from '../camara';
 import { CERCANIA_DE_SALIDA, acotadoAlTablero, factorValido, ojoYMira } from '../acercar';
 import type { Cercania, LimitesDeCercania } from '../acercar';
-import { amortiguado } from '../embarcadero/camara';
+import { amortiguado, proyecta } from '../embarcadero/camara';
 import type { Pose } from '../embarcadero/camara';
 import type { Ventana } from '../embarcadero/tipos';
-import { MEDIO_LADO } from './anillo-en-3d';
+import { BORDE_INTERIOR, CASILLAS, MEDIO_LADO, marcoDeCasilla } from './anillo-en-3d';
+import type { RectanguloEnPuntos } from './bandeja-de-los-dados';
 
 /** El radio del mundo que se encuadra: medio lado por 1,32. */
 export const ALCANCE_DEL_BURGO = MEDIO_LADO * 1.32;
@@ -167,6 +168,80 @@ export function poseDelBurgo(cercania: Cercania, mirador: Mirador, ventana: Vent
     objetivo: { x: mira[0], y: mira[1], z: mira[2] },
     fov: CAMPO_DE_LA_CAMARA,
   };
+}
+
+/**
+ * ═══ LA POSE DE SALIDA AL LADO DE LA CAJA DEL BURGO ═══
+ *
+ * La caja del Burgo va pegada a una esquina del lienzo, y desde que es grande —la mitad del ancho en el
+ * escritorio— la pose de salida dejaba detrás de ella la esquina de SALIDA y cuatro casillas: medido,
+ * en 1.600 × 900 las casillas 0, 1, 2, 3 y 39, que es donde empiezan todos los peones, y un clic ahí
+ * se lo quedaba la caja. Con la caja de antes, ninguna.
+ *
+ * Así que la pose de salida se corre lo justo para que ninguna casilla quede detrás: de cada una se
+ * miran tres puntos —el canto de dentro, el de la marcha y el canto de fuera— y ninguno puede caer en el
+ * rectángulo de la caja (con `AIRE_ALREDEDOR_DE_LA_CAJA` de aire), y las cuatro esquinas del anillo
+ * tienen que seguir en el lienzo. Se prueba primero correr la mirada de lado —el anillo se va al hueco
+ * libre y no encoge—, después subirlo o bajarlo, y sólo al final alejar el ojo, que es lo que más
+ * cuesta porque el anillo se ve más pequeño. Si la de siempre ya no esconde nada, se devuelve tal cual:
+ * en un móvil en vertical la caja va arriba sin tapar casillas, y ahí no se mueve nada.
+ */
+export const AIRE_ALREDEDOR_DE_LA_CAJA = 8;
+
+/** ¿Deja esta cercanía todas las casillas fuera de la caja y, si se pide, las cuatro esquinas del anillo en el lienzo? */
+export function elAnilloSeVeJuntoALaCaja(cercania: Cercania, ventana: Ventana, caja: RectanguloEnPuntos, conLasEsquinas: boolean): boolean {
+  const { ancho, alto } = ventana;
+  if (!(ancho > 0 && alto > 0)) return false;
+  const pose = poseDelBurgo(cercania, MIRADOR_DEL_BURGO, ventana);
+  const aspecto = ancho / alto;
+  const enElLienzo = (x: number, z: number): { readonly x: number; readonly y: number } | null => {
+    const p = proyecta(pose, aspecto, { x, y: 0, z });
+    return p.delante ? { x: ((p.x + 1) / 2) * ancho, y: ((1 - p.y) / 2) * alto } : null;
+  };
+  if (conLasEsquinas) {
+    for (const [x, z] of [[MEDIO_LADO, MEDIO_LADO], [-MEDIO_LADO, MEDIO_LADO], [-MEDIO_LADO, -MEDIO_LADO], [MEDIO_LADO, -MEDIO_LADO]] as const) {
+      const q = enElLienzo(x, z);
+      if (q === null || q.x < 0 || q.x > ancho || q.y < 0 || q.y > alto) return false;
+    }
+  }
+  const aire = AIRE_ALREDEDOR_DE_LA_CAJA;
+  for (let i = 0; i < CASILLAS; i++) {
+    const m = marcoDeCasilla(i);
+    const hondo = m.fuera.x * m.centro.x + m.fuera.z * m.centro.z;
+    for (const k of [BORDE_INTERIOR - hondo, 0, MEDIO_LADO - hondo]) {
+      const q = enElLienzo(m.centro.x + m.fuera.x * k, m.centro.z + m.fuera.z * k);
+      if (q !== null && q.x >= caja.x0 - aire && q.x <= caja.x1 + aire && q.y >= caja.y0 - aire && q.y <= caja.y1 + aire) return false;
+    }
+  }
+  return true;
+}
+
+export function poseDeSalidaAlLadoDeLaCaja(ventana: Ventana, caja: RectanguloEnPuntos | null): Cercania {
+  const base = poseDeSalida(ventana);
+  if (caja === null || !Number.isFinite(caja.x0) || !(ventana.ancho > 0 && ventana.alto > 0)) return base;
+  if (elAnilloSeVeJuntoALaCaja(base, ventana, caja, false)) return base;
+  /* La derecha de la pantalla, en el suelo: correr la mirada hacia ella lleva el anillo a la izquierda. */
+  const pose = poseDelBurgo(base, MIRADOR_DEL_BURGO, ventana);
+  const frente = { x: pose.objetivo.x - pose.posicion.x, z: pose.objetivo.z - pose.posicion.z };
+  const largo = Math.hypot(frente.x, frente.z) || 1;
+  const derecha = { x: -frente.z / largo, z: frente.x / largo };
+  const haciaElOjo = { x: -frente.x / largo, z: -frente.z / largo };
+  const candidatas: { readonly cercania: Cercania; readonly coste: number }[] = [];
+  for (let lado = -30; lado <= 30; lado++) {
+    for (let arriba = -15; arriba <= 15; arriba++) {
+      for (const retiro of [0, 0.05]) {
+        const l = (lado / 50) * MEDIO_LADO;
+        const s = (arriba / 50) * MEDIO_LADO;
+        candidatas.push({
+          cercania: { factor: factorValido(base.factor + retiro, LIMITES_DEL_BURGO), centro: { x: base.centro.x + derecha.x * l + haciaElOjo.x * s, z: base.centro.z + derecha.z * l + haciaElOjo.z * s } },
+          coste: Math.abs(lado) + 1.5 * Math.abs(arriba) + 200 * retiro,
+        });
+      }
+    }
+  }
+  candidatas.sort((a, b) => a.coste - b.coste);
+  for (const c of candidatas) if (elAnilloSeVeJuntoALaCaja(c.cercania, ventana, caja, true)) return c.cercania;
+  return base;
 }
 
 /** Lo lejos que queda el ojo del centro en la pose de salida, para una proporción: `alcance × LEJANIA × alejarse`. */

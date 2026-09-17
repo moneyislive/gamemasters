@@ -37,8 +37,8 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 280.752   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 228.180   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 280.774   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 228.202   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
@@ -54,10 +54,10 @@
  * su asa, menos los 2 del paño que había en el campo. Y 22.848 con los PRECINTOS de las hipotecas, que
  * se cuentan como si los 28 títulos estuvieran hipotecados a la vez: 816 cada uno, casi todo letras.
  * Y la bandeja se hizo CAJA DEL BURGO: la caja con sus 32 casas, sus 12 hoteles, los dos mazos, los 34
- * billetes que caben a la vista, la placa y las dos asas son 1.148; los dos emblemas y las siete
- * letras de la placa, 807; y el reloj de arena, el de Riberas en plena (20.086) y el de conos en sobria
- * (262). La sobria sube 2.179 y se queda a 1.820 de su tope: el próximo que añada algo al tablero
- * tiene que quitar antes.
+ * billetes que caben a la vista, la placa, el cajón del reloj y las dos asas son 1.170; los dos
+ * emblemas y las siete letras de la placa, 807; y el reloj de arena, el de Riberas en plena (20.086) y
+ * el de conos en sobria (262). La sobria sube 2.201 y se queda a 1.798 de su tope: el próximo que
+ * añada algo al tablero tiene que quitar antes.
  * Los de arriba son los que `verify:burgo-escena` imprime hoy, y ahora también los COMPARA con esta
  * cabecera: dos veces se quedaron viejos sin que nada lo notara, y la segunda fue a la media hora de
  * corregirlos.)
