@@ -1,0 +1,469 @@
+/**
+ * LAS LINDES EN EL MÓVIL: el valle, y la hoja desde la que se juega.
+ *
+ * ═══ QUÉ HACE ESTA PANTALLA ═══
+ *
+ * Abre o entra en una mesa, monta la escena (`escenas/lindes/Lindes.tsx`) con el
+ * tablero que traduce `shared/arcade/juegos/lindes-en-tres.ts`, y convierte los
+ * toques en movimientos. Ni una regla vive aquí: qué se puede poner y dónde lo dice
+ * la lista de opciones que el juego acaba de componer.
+ *
+ * ═══ ES LA HERMANA DE `escritorio/src/lindes-en-tres.tsx`, Y COMPARTEN LO QUE IMPORTA ═══
+ *
+ * Las dos pantallas son distintas —una tiene raíl y la otra una hoja, una tiene
+ * teclado y la otra el pulgar— y las dos llaman a las MISMAS funciones de
+ * `shared/`: `tableroEnTres`, `sitiosQueSeOfrecen`, `girosQueCaben`,
+ * `movimientoDePoner`. Lo que se comparte es lo que puede divergir sin que nadie se
+ * entere; lo que no se comparte es la forma, que es distinta a propósito.
+ *
+ * ═══ EL RESPALDO NO ES UNA CORTESÍA ═══
+ *
+ * Si los modelos no llegan o el aparato no da contexto de dibujo, se cae al
+ * RETABLO —el mueble genérico, el mismo SVG con el que se juega sin una línea de
+ * tres dimensiones— y la partida se puede terminar ahí. Es lo que hace que la
+ * escena sea un lujo y no una dependencia.
+ *
+ * ═══ Y EL GIRO VIVE EN LA PANTALLA ═══
+ *
+ * Con qué giro se pone la losa es una decisión de pantalla hasta que se pulsa: no
+ * es estado del juego, no viaja por el cable y no tiene que sobrevivir a nada. Si
+ * viviera en la partida, girar sería un movimiento —una revisión, un aviso a los
+ * demás aparatos y una entrada en el diario— por cada vuelta que alguien le da a
+ * una losa antes de decidirse.
+ */
+import { Component, useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Canvas } from '../tres/Lienzo';
+import { Lindes } from '../../../escenas/lindes/Lindes';
+import type { ModoDeCamaraDeLasLindes } from '../../../escenas/lindes/tipos';
+import {
+  elSiguienteGiro,
+  girosQueCaben,
+  movimientoDePoner,
+  sitiosQueSeOfrecen,
+  tableroEnTres,
+} from '../../../shared/arcade/juegos/lindes-en-tres';
+/*
+ * Del juego y NUNCA del índice: `shared/arcade/juegos/index.ts` instala los siete
+ * arcades al cargarse, y eso es cosa del servidor. Aquí sólo hace falta el
+ * identificador y el catálogo de losas.
+ */
+import { LINDES } from '../../../shared/arcade/juegos/lindes';
+import { losaPorId } from '../../../shared/arcade/juegos/lindes-losas';
+import type { Giro } from '../../../shared/arcade/juegos/lindes-losas';
+import { tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
+import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
+import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
+import { usarMesaDeArcade } from './mesa';
+import { LETRA, SALA } from './muebles';
+import { Pantalla } from './piezas';
+import { Retablo } from './retablo';
+import { traer } from './traer';
+
+/** El campo vertical de la cámara. El mismo que usa `camaraDeMesa` para encuadrar. */
+const CAMPO = 45;
+
+/** Las tres cámaras, con su rótulo corto: en un móvil no cabe una frase. */
+const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string }[] = [
+  { modo: 'mesa', rotulo: 'Mesa' },
+  { modo: 'hombro', rotulo: 'Hombro' },
+  { modo: 'ojos', rotulo: 'Ojos' },
+];
+
+/**
+ * LA RED DEL LIENZO.
+ *
+ * Un fallo dentro del contexto de dibujo —un modelo roto, un aparato sin WebGL—
+ * tiraría la pantalla entera y dejaría a alguien fuera de su partida. Con la red,
+ * se cae el lienzo y se sigue jugando sobre el retablo. Es la misma que tienen las
+ * otras dos pantallas de escena de esta app.
+ */
+class RedDelValle extends Component<
+  { alFallar: (motivo: string) => void; children: ReactNode },
+  { roto: boolean }
+> {
+  public override state = { roto: false };
+
+  public static getDerivedStateFromError(): { roto: boolean } {
+    return { roto: true };
+  }
+
+  public override componentDidCatch(fallo: unknown): void {
+    this.props.alFallar(fallo instanceof Error ? fallo.message : String(fallo));
+  }
+
+  public override render(): ReactNode {
+    return this.state.roto ? null : this.props.children;
+  }
+}
+
+export default function LasLindesPorDentro(): JSX.Element {
+  const manifiesto = manifiestoDeArcadeSiExiste(LINDES);
+  const mesa = usarMesaDeArcade(LINDES);
+  const [nombre, ponerNombre] = useState('');
+  const [codigo, ponerCodigo] = useState('');
+  const [giro, ponerGiro] = useState<Giro>(0);
+  const [senalada, ponerSenalada] = useState<{ x: number; y: number } | null>(null);
+  const [modo, ponerModo] = useState<'mesa' | 'hombro' | 'ojos'>('mesa');
+  const [rotoElValle, ponerRotoElValle] = useState(false);
+  const bordes = useSafeAreaInsets();
+
+  const vista = mesa.mesa?.vista ?? null;
+  const opciones = mesa.mesa?.opciones ?? [];
+  const datos = useMemo(() => tableroEnTres(vista), [vista]);
+  const tablero = useMemo(() => tableroDeLaVista(vista), [vista]);
+  const sitios = useMemo(() => sitiosQueSeOfrecen(vista, opciones), [vista, opciones]);
+  const girosAqui = useMemo(
+    () => (datos === null || senalada === null ? [] : girosQueCaben(datos, senalada.x, senalada.y)),
+    [datos, senalada],
+  );
+
+  /*
+   * El giro se ajusta solo al señalar una casilla: si el que llevas elegido no cabe
+   * ahí, pasa al primero que sí. Lo contrario es un fantasma que no aparece y un
+   * toque que pone la losa de otra manera, y enseñar lo que va a pasar antes de que
+   * pase es toda la gracia del fantasma.
+   */
+  useEffect(() => {
+    if (girosAqui.length === 0) return;
+    if (girosAqui.indexOf(giro) >= 0) return;
+    ponerGiro(girosAqui[0] as Giro);
+  }, [girosAqui, giro]);
+
+  const alFallar = useCallback((motivo: string) => {
+    console.warn(`El valle no se ha podido pintar (${motivo}): se juega sobre el retablo.`);
+    ponerRotoElValle(true);
+  }, []);
+
+  const alTocarHueco = useCallback(
+    (x: number, y: number, conGiro: Giro) => {
+      void mesa.mover(movimientoDePoner(x, y, conGiro));
+    },
+    [mesa],
+  );
+
+  const alSenalarHueco = useCallback((x: number, y: number) => {
+    ponerSenalada({ x, y });
+  }, []);
+
+  const alTocar = useCallback(
+    (movimiento: MovimientoDeclarado) => {
+      void mesa.mover(movimiento);
+    },
+    [mesa],
+  );
+
+  if (mesa.fase === 'yendo') {
+    return (
+      <Pantalla hueco={28} estilo={{ paddingTop: bordes.top + 28, paddingBottom: bordes.bottom + 28 }}>
+        <View style={estilos.centro}>
+          <ActivityIndicator color={SALA.acento} />
+          <Text style={estilos.texto}>Hablando con la mesa…</Text>
+        </View>
+      </Pantalla>
+    );
+  }
+
+  const sinNombre = nombre.trim().length === 0;
+  const noPuedeAbrir = mesa.quieto || sinNombre;
+  const noPuedeEntrar = noPuedeAbrir || codigo.trim().length === 0;
+
+  if (mesa.fase === 'fuera' || mesa.mesa === null) {
+    return (
+      <Pantalla hueco={28} estilo={{ paddingTop: bordes.top + 28, paddingBottom: bordes.bottom + 28 }}>
+        <View style={estilos.centro}>
+          <Text style={estilos.titulo}>{manifiesto?.nombre ?? 'Las Lindes'}</Text>
+          <Text style={estilos.texto}>{manifiesto?.gancho ?? ''}</Text>
+          <TextInput
+            style={estilos.campo}
+            placeholder="Tu nombre en la mesa"
+            placeholderTextColor={SALA.tenue}
+            value={nombre}
+            onChangeText={ponerNombre}
+            maxLength={24}
+            accessibilityLabel="Tu nombre en la mesa"
+          />
+          <Pressable
+            style={[estilos.boton, noPuedeAbrir && estilos.botonApagado]}
+            disabled={noPuedeAbrir}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: noPuedeAbrir }}
+            onPress={() => mesa.abrir(nombre.trim())}
+          >
+            <Text style={estilos.botonTexto}>Volcar la bolsa</Text>
+          </Pressable>
+          <Text style={estilos.rotulo}>O SENTARSE EN UNA MESA ABIERTA</Text>
+          <TextInput
+            style={estilos.campo}
+            placeholder="Código de la mesa"
+            placeholderTextColor={SALA.tenue}
+            value={codigo}
+            onChangeText={ponerCodigo}
+            autoCapitalize="characters"
+            maxLength={8}
+            accessibilityLabel="Código de la mesa"
+          />
+          <Pressable
+            style={[estilos.boton, noPuedeEntrar && estilos.botonApagado]}
+            disabled={noPuedeEntrar}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: noPuedeEntrar }}
+            onPress={() => mesa.entrar(codigo.trim().toUpperCase(), nombre.trim())}
+          >
+            <Text style={estilos.botonTexto}>Sentarse</Text>
+          </Pressable>
+          {mesa.aviso.length > 0 ? <Text style={estilos.aviso}>{mesa.aviso}</Text> : null}
+        </View>
+      </Pantalla>
+    );
+  }
+
+  /*
+   * ═══ EL RESPALDO: EL RETABLO, Y SE JUEGA IGUAL ═══
+   *
+   * Cuando la vista no es de este juego —un servidor con otro reparto— o el lienzo
+   * se ha caído, se pinta el tablero declarado. No es una pantalla de disculpa: es
+   * el mismo mueble genérico con el que se juega una partida entera.
+   */
+  if (datos === null || rotoElValle) {
+    return (
+      <Pantalla hueco={16} estilo={{ paddingTop: bordes.top + 12, paddingBottom: bordes.bottom + 12 }}>
+        {tablero === null ? (
+          <Text style={estilos.texto}>Esperando a la mesa…</Text>
+        ) : (
+          <Retablo tablero={tablero} alTocar={alTocar} quieto={mesa.quieto} />
+        )}
+      </Pantalla>
+    );
+  }
+
+  const laLosa = datos.enMano === '' ? null : losaPorId(datos.enMano);
+  const camara: ModoDeCamaraDeLasLindes =
+    modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: mesa.mesa.yo ?? '' };
+
+  return (
+    <View style={[estilos.pantalla, { paddingTop: bordes.top }]}>
+      <View style={estilos.lienzo}>
+        <RedDelValle alFallar={alFallar}>
+          <Canvas
+            style={estilos.canvas}
+            gl={{ antialias: true }}
+            dpr={[1, 2]}
+            /*
+             * Sin sombras en ningún cliente, y no es una decisión por plataforma: un
+             * mapa de sombras redibujado cada fotograma baja un móvil de gama media
+             * de sesenta a veinte, y el valle se lee perfectamente sin él. Es lo
+             * mismo que hacen el Muelle y el Burgo.
+             */
+            shadows={false}
+            camera={{ fov: CAMPO, near: 1, far: 6000 }}
+          >
+            <Lindes
+              tablero={datos}
+              codigo={mesa.mesa.codigo}
+              ventana={{ ancho: 0, alto: 0, franjaInferior: 0 }}
+              traer={traer}
+              calidad="plena"
+              camara={camara}
+              giroEnMano={giro}
+              quieto={mesa.quieto}
+              alTocarHueco={alTocarHueco}
+              alSenalarHueco={alSenalarHueco}
+              alFallar={alFallar}
+            />
+          </Canvas>
+        </RedDelValle>
+
+        <View style={estilos.camaras}>
+          {LAS_CAMARAS.map((c) => (
+            <Pressable
+              key={c.modo}
+              style={[estilos.camara, modo === c.modo && estilos.camaraPuesta]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: modo === c.modo }}
+              onPress={() => ponerModo(c.modo)}
+            >
+              <Text style={[estilos.camaraTexto, modo === c.modo && estilos.camaraTextoPuesto]}>
+                {c.rotulo}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/*
+        LA HOJA: lo que hay que leer y lo que se puede pulsar, debajo del valle.
+
+        Se queda SIEMPRE a la vista y no detrás de un cajón, por lo mismo que en el
+        escritorio es un raíl y no un cajón: la decisión de este juego es «dónde
+        encaja esto», y se toma mirando el tablero y la losa A LA VEZ. Un cajón
+        obligaría a abrirlo y cerrarlo en cada turno.
+      */}
+      <View style={[estilos.hoja, { paddingBottom: bordes.bottom + 10 }]}>
+        <Text style={estilos.aviso} numberOfLines={2}>
+          {tablero?.aviso ?? ''}
+        </Text>
+
+        {laLosa !== null ? (
+          <View style={estilos.fila}>
+            <View style={estilos.manoTexto}>
+              <Text style={estilos.manoNombre}>{laLosa.nombre}</Text>
+              <Text style={estilos.manoLados}>
+                N {laLosa.lados[0]} · E {laLosa.lados[1]} · S {laLosa.lados[2]} · O {laLosa.lados[3]}
+                {laLosa.ermita ? ' · ermita' : ''}
+              </Text>
+            </View>
+            <Pressable
+              style={[estilos.girar, girosAqui.length < 2 && estilos.botonApagado]}
+              disabled={girosAqui.length < 2 || mesa.quieto}
+              accessibilityRole="button"
+              onPress={() => ponerGiro((g) => elSiguienteGiro(girosAqui, g))}
+            >
+              <Text style={estilos.botonTexto}>Girar</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {sitios.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.tira}>
+            {sitios.map((s) => (
+              <Pressable
+                key={`${s.clase}:${s.indice}`}
+                style={estilos.chip}
+                disabled={mesa.quieto}
+                accessibilityRole="button"
+                accessibilityLabel={`${s.rotulo}. ${s.ayuda}`}
+                onPress={() => alTocar(s.movimiento)}
+              >
+                <Text style={estilos.chipTexto}>{s.rotulo}</Text>
+                <Text style={estilos.chipCifra}>
+                  {s.cerrada ? `cierra ${s.valdria}` : s.valdria > 0 ? `${s.valdria}` : '—'}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {/*
+          LOS BOTONES QUE NO SE TOCAN EN EL TABLERO: empezar, no plantar. Salen del
+          tablero declarado y no de una lista escrita aquí, para que un botón nuevo
+          del juego aparezca sin tocar esta pantalla.
+        */}
+        {tablero !== null && tablero.acciones.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.tira}>
+            {tablero.acciones.map((a) => (
+              <Pressable
+                key={a.id}
+                style={[estilos.chip, !a.disponible && estilos.botonApagado]}
+                disabled={!a.disponible || mesa.quieto}
+                accessibilityRole="button"
+                accessibilityLabel={`${a.rotulo}. ${a.ayuda}`}
+                onPress={() => alTocar(a.toque)}
+              >
+                <Text style={estilos.chipTexto}>{a.rotulo}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
+
+        <View style={estilos.marcador}>
+          {datos.labriegos.length === 0 && mesa.mesa.asientos.length === 0 ? null : null}
+          {(mesa.mesa.asientos ?? []).map((a) => (
+            <View key={a.id} style={estilos.enLaMesa}>
+              <Text style={estilos.enLaMesaNombre} numberOfLines={1}>
+                {a.nombre}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const estilos = StyleSheet.create({
+  pantalla: { flex: 1, backgroundColor: SALA.suelo },
+  lienzo: { flex: 1, minHeight: 200, backgroundColor: '#8cb8de' },
+  canvas: { flex: 1 },
+  centro: { width: '100%', alignItems: 'center', gap: 12 },
+  titulo: { ...LETRA.rotulo, color: SALA.blanco, fontSize: 26, lineHeight: 31, textAlign: 'center' },
+  texto: { color: SALA.palabra, fontSize: 16, lineHeight: 24, textAlign: 'center', ...LETRA.cuerpo },
+  rotulo: { color: SALA.tenue, fontSize: 13, ...LETRA.rotuloChico },
+  campo: {
+    width: '100%',
+    backgroundColor: SALA.teja,
+    borderColor: SALA.filo,
+    borderWidth: 1,
+    borderRadius: 10,
+    color: SALA.palabra,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+  },
+  boton: {
+    width: '100%',
+    backgroundColor: SALA.acento,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  botonApagado: { opacity: 0.4 },
+  botonTexto: { color: SALA.suelo, fontSize: 15, ...LETRA.rotuloChico },
+  aviso: { color: SALA.palabra, fontSize: 14, lineHeight: 19, ...LETRA.cuerpo },
+  camaras: { position: 'absolute', top: 8, right: 8, flexDirection: 'row', gap: 6 },
+  camara: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(12, 20, 8, 0.62)',
+    borderWidth: 1,
+    borderColor: 'rgba(243, 236, 216, 0.45)',
+  },
+  camaraPuesta: { backgroundColor: '#f3ecd8', borderColor: '#f3ecd8' },
+  camaraTexto: { color: '#f3ecd8', fontSize: 12, ...LETRA.rotuloChico },
+  camaraTextoPuesto: { color: '#1b2411' },
+  hoja: {
+    backgroundColor: SALA.pared,
+    borderTopColor: SALA.filo,
+    borderTopWidth: 1,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    gap: 8,
+  },
+  fila: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  manoTexto: { flex: 1, minWidth: 0 },
+  manoNombre: { color: SALA.palabra, fontSize: 15, ...LETRA.rotuloChico },
+  manoLados: { color: SALA.tenue, fontSize: 12, ...LETRA.cuerpo },
+  girar: {
+    backgroundColor: SALA.acento,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  tira: { flexDirection: 'row', gap: 8, paddingVertical: 2 },
+  chip: {
+    backgroundColor: SALA.teja,
+    borderColor: SALA.filoVivo,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    gap: 2,
+  },
+  chipTexto: { color: SALA.palabra, fontSize: 13, ...LETRA.cuerpo },
+  chipCifra: { color: SALA.tenue, fontSize: 11, ...LETRA.cuerpo },
+  marcador: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  enLaMesa: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  enLaMesaNombre: { color: SALA.tenue, fontSize: 12, ...LETRA.cuerpo },
+});

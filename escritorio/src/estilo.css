@@ -5489,3 +5489,241 @@ code {
   height: 100%;
   min-height: 0;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * LAS LINDES
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La pantalla es DOS COLUMNAS: el valle a la izquierda, ocupando todo lo que
+ * puede, y un raíl estrecho a la derecha con lo que hay que leer —la losa de la
+ * mano, dónde plantar, quién va ganando—.
+ *
+ * ═══ POR QUÉ UN RAÍL Y NO UN CAJÓN COMO EL BURGO ═══
+ *
+ * Porque lo que este juego pide leer mientras se decide es DISTINTO de lo que
+ * pide el Burgo. Allí se consultan cuarenta casillas, dos mazos y las cuentas de
+ * seis jugadores: eso es un cuaderno, y un cuaderno se guarda en un cajón. Aquí
+ * lo que hay que mirar mientras se elige dónde poner la losa son cuatro cosas, y
+ * las cuatro tienen que estar a la vista AL MISMO TIEMPO que el tablero — porque
+ * la decisión es «dónde encaja esto», y se toma mirando las dos cosas.
+ *
+ * El raíl se cuelga debajo del lienzo por debajo de 60rem de ancho, que es donde
+ * dos columnas dejan el tablero en una tira.
+ */
+
+.lindes-pantalla {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: var(--aire-2, 0.75rem);
+  padding: var(--aire-2, 0.75rem);
+  background: var(--suelo);
+}
+
+.lindes-lienzo {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--radio-ficha);
+  overflow: hidden;
+  outline: 1px solid var(--filo);
+  /*
+   * El fondo es el mismo azul de cielo que pinta la escena. No es un adorno: es
+   * lo que evita el destello NEGRO del primer fotograma, antes de que el lienzo
+   * tenga nada dentro. Un destello negro en una pantalla que va a ser azul se lee
+   * como que algo ha fallado.
+   */
+  background: #8cb8de;
+}
+
+.lindes-lienzo canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/*
+ * LA CINTA: la frase de la mesa, pegada abajo y por encima del lienzo.
+ *
+ * Con `pointer-events: none` a propósito: es un cartel, no un control, y si
+ * atrapara el puntero robaría el gesto de señalar una casilla justo en la franja
+ * donde más se señala.
+ */
+.lindes-cinta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.95rem;
+  color: #f3ecd8;
+  background: linear-gradient(to top, rgba(12, 20, 8, 0.82), rgba(12, 20, 8, 0));
+  pointer-events: none;
+}
+
+.lindes-camaras {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.lindes-camara {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radio-ficha);
+  border: 1px solid rgba(243, 236, 216, 0.45);
+  background: rgba(12, 20, 8, 0.62);
+  color: #f3ecd8;
+  cursor: pointer;
+}
+
+.lindes-camara-puesta {
+  background: #f3ecd8;
+  color: #1b2411;
+  border-color: #f3ecd8;
+}
+
+.lindes-rail {
+  flex: 0 0 21rem;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--aire-2, 0.75rem);
+}
+
+.lindes-rail h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+.lindes-mano,
+.lindes-plantar,
+.lindes-panel,
+.lindes-marcador {
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radio-ficha);
+  background: var(--ficha);
+  outline: 1px solid var(--filo);
+}
+
+.lindes-mano-nombre {
+  margin: 0;
+  font-weight: 600;
+}
+
+.lindes-mano-lados,
+.lindes-pista {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.78;
+}
+
+.lindes-girar {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.lindes-plantar ul,
+.lindes-panel ul,
+.lindes-marcador ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.lindes-plantar button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.lindes-vale {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.lindes-marcador li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/*
+ * EL COLOR DEL ASIENTO ES UN CUADRADO Y NO EL COLOR DE LA LETRA.
+ *
+ * Los cinco colores de esta mesa incluyen un hueso muy claro y un carmín muy
+ * saturado: escritos como color de letra, uno no se lee sobre la ficha y el otro
+ * vibra. Como cuadrado al lado del nombre, los cinco se distinguen y el nombre se
+ * lee siempre con el color de texto de la casa. Es la misma decisión que el raíl
+ * del Burgo ya tenía tomada para sus seis.
+ */
+.lindes-color {
+  flex: 0 0 auto;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 0.2rem;
+  outline: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.lindes-nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lindes-puntos {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.lindes-labriegos {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.lindes-le-toca {
+  font-weight: 700;
+}
+
+.lindes-bolsa {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+
+.lindes-respaldo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--aire-2, 0.75rem);
+}
+
+@media (max-width: 60rem) {
+  .lindes-pantalla {
+    flex-direction: column;
+  }
+
+  .lindes-lienzo {
+    flex: 1 1 60%;
+    min-height: 18rem;
+  }
+
+  .lindes-rail {
+    flex: 0 0 auto;
+    max-height: 40%;
+  }
+}
