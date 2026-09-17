@@ -220,6 +220,7 @@ import {
   puestaDeLaReja,
   puestasDeLasEsquinas,
   puntoEnCasilla,
+  sitioDelPrecinto,
   puntoEnEsquina,
   semillaDelCampo,
   suelosDelAnillo,
@@ -243,7 +244,7 @@ import {
   tonoDelEdificio,
 } from './ciudad';
 import type { BultoPropio, EdificioDeLaCiudad, LaCiudad, MontajeDeLaCiudad, PuestaDeSala, PuestaEnLaCiudad } from './ciudad';
-import { claveDelBulto, geometriaDeLaJoya, geometriaDeLaMonedaDeLaRecaudacion, geometriaDeLaOnda, geometriaDeUnaBocanada, geometriaDeLaRejaDeLaCelda, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
+import { claveDelBulto, geometriaDelPrecinto, geometriaDeLaJoya, geometriaDeLaMonedaDeLaRecaudacion, geometriaDeLaOnda, geometriaDeUnaBocanada, geometriaDeLaRejaDeLaCelda, geometriaDeLaRuleta, geometriaDeLaTapa, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnTren, geometriaDeUnaCinta, soltarLosBultos } from './ciudad-en-3d';
 import { BOCANADAS_DEL_HUMO, CASILLA_DE_LA_CENTRAL, CASILLA_DEL_CANAL, bisagrasDeLosCofres, bocaDeLaChimenea, centroDeLaAlberca, ejeDeLaJoya, ejesDeLasRuletas, largoDeLaVia, monedaDeLaRecaudacionEnElMundo, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda } from './obras';
 import { CASAS_DEL_CONCEJO, DISCOS_DEL_TRATO, DISCOS_DE_CONTACTO, MONEDAS_EN_VUELO, POSADAS_DEL_CONCEJO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DEL_DISCO, TITULOS } from './presupuesto';
 import {
@@ -392,6 +393,8 @@ const CAPACIDAD = {
   monedas: MONEDAS_EN_VUELO,
   marcas: CASILLAS + 1,
   trato: DISCOS_DEL_TRATO,
+  /** Un precinto por título: lo más que puede haber hipotecado a la vez. */
+  precintos: TITULOS,
 } as const;
 
 /* ───────────────────────── La ciudad de dentro del recinto ───────────────────────── */
@@ -1304,6 +1307,10 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   /* Y el tren, que va aparte porque anda: una malla, dos instancias, una llamada. */
   const trenGeometria = useMemo(geometriaDeUnTren, []);
   useEffect(() => () => trenGeometria?.dispose(), [trenGeometria]);
+  /* El precinto de la hipoteca: una geometría, instanciada una vez por casilla hipotecada. */
+  const precintoGeometria = useMemo(geometriaDelPrecinto, []);
+  useEffect(() => () => precintoGeometria?.dispose(), [precintoGeometria]);
+  const precintos = useRef<THREE.InstancedMesh>(null);
   const trenes = useRef<THREE.InstancedMesh>(null);
   const laVia = useMemo(() => ({ largo: largoDeLaVia(), paradas: paradasDelTren() }), []);
   /* Las tres piezas vivas de las casillas: las tapas de los cofres, las ruletas y la joya. */
@@ -1891,6 +1898,19 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         malla.setMatrixAt(n, auxMatriz.compose(auxPosicion.set(x, y, z), auxGiro.setFromAxisAngle(EJE_Y, giro), auxEscala.set(1, Math.max(0.001, escalaY), 1)));
         porColor.set(hex, n + 1);
       };
+      /*
+       * EL PRECINTO, tendido lo que diga la hipoteca: entero si está hipotecada, a medias mientras se
+       * hipoteca o se deshipoteca —con la misma curva que la bandera—, y nada si no. Se estira a lo
+       * largo de la cinta, que es el primer eje de su marco (`sitioDelPrecinto`).
+       */
+      const mallaDePrecintos = precintos.current;
+      let nPrecintos = 0;
+      const escribePrecinto = (casilla: number, tendido: number): void => {
+        if (mallaDePrecintos === null || tendido <= 0.001 || nPrecintos >= CAPACIDAD.precintos) return;
+        const s = sitioDelPrecinto(casilla);
+        mallaDePrecintos.setMatrixAt(nPrecintos, auxMatriz.compose(auxPosicion.set(s.x, s.y, s.z), auxGiro.setFromAxisAngle(EJE_Y, s.giro), auxEscala.set(tendido, 1, 1)));
+        nPrecintos++;
+      };
       for (const c of casillas) {
         const marco = marcoDeCasilla(c.indice);
         if (marco.esEsquina) continue;
@@ -1967,6 +1987,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
             acerasEnCurso.current.delete(c.indice);
             pintaLaAcera(suelo, c, luminancia);
           }
+          escribePrecinto(c.indice, f);
           const y = cae === undefined ? 0 : caidaConRebote(ahora - cae.desde);
           const giroDeLaBandera = cae !== undefined && cae.suceso.que === 'cambia-de-mano' ? giro + Math.PI * pinza((ahora - cae.desde) / (cae.hasta - cae.desde), 0, 1) : giro;
           escribeBandera(suyo, b.x, ALTURA_DEL_REBORDE + y, b.z, giroDeLaBandera, 1 - 0.45 * f);
@@ -1980,6 +2001,11 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         mc.instanceMatrix.needsUpdate = true;
         if (mc.instanceColor !== null) mc.instanceColor.needsUpdate = true;
         mc.computeBoundingSphere();
+      }
+      if (mallaDePrecintos !== null) {
+        mallaDePrecintos.count = nPrecintos;
+        mallaDePrecintos.instanceMatrix.needsUpdate = true;
+        mallaDePrecintos.computeBoundingSphere();
       }
       coloresDeBanderas.forEach((hex, k) => {
         const malla = banderas.current[k];
@@ -2636,6 +2662,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       {/* Los precios y los emblemas de las casillas: fundidos en una sola geometría, tinta plana. */}
       {obras === null ? null : <mesh geometry={obras} material={materiales.bulto} position={[0, 0, 0]} raycast={() => null} />}
       {trenGeometria === null ? null : <instancedMesh ref={trenes} args={[trenGeometria, materiales.bulto, TREN.cuantos]} frustumCulled={false} raycast={() => null} />}
+      {/* Los precintos de las casillas hipotecadas: tinta plana, como los rótulos, y uno por casilla. */}
+      {precintoGeometria === null ? null : <instancedMesh ref={precintos} args={[precintoGeometria, materiales.rotulo, CAPACIDAD.precintos]} frustumCulled={false} raycast={() => null} />}
       {tapaGeometria === null ? null : <instancedMesh ref={tapas} args={[tapaGeometria, materiales.bulto, sitiosVivos.cofres.length]} frustumCulled={false} raycast={() => null} />}
       {ruletaGeometria === null ? null : <instancedMesh ref={ruletas} args={[ruletaGeometria, materiales.bulto, sitiosVivos.ruletas.length]} frustumCulled={false} raycast={() => null} />}
       {joyaGeometria === null ? null : <instancedMesh ref={joya} args={[joyaGeometria, materiales.bulto, 1]} frustumCulled={false} raycast={() => null} />}

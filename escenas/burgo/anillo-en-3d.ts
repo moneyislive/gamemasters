@@ -942,6 +942,131 @@ export function vDelFinalDelNombre(casilla: number): number {
   return renglones === 0 ? V_DEL_NOMBRE : V_DEL_NOMBRE + ALTO_DEL_NOMBRE + (renglones - 1) * PASO_DEL_NOMBRE;
 }
 
+/* ──────────────────────────── El precinto de la hipoteca ──────────────────────────── */
+
+/**
+ * EL PRECINTO DE UNA CASILLA HIPOTECADA, TENDIDO SOBRE SU FRANJA.
+ *
+ * Una casilla hipotecada tenía dos señales: la franja del barrio apagada al 55 % y la bandera del
+ * dueño a media asta. Miguel, mirando el banco con dos calles hipotecadas, las tomó por un fallo de
+ * color —«tienen un color ligeramente distinto al resto de propiedades de su color»—, y dicho lo que
+ * era lo resolvió así: «me parece bien el color oscurecido pero vamos a ponerle en la celda de color
+ * como un precinto para que sea más evidente que está hipotecada, yo no lo había distinguido y
+ * entendido bien». Un apagado sin más se lee como un error; un precinto con la palabra, no.
+ *
+ * ═══ CÓMO ES ═══
+ *
+ * Una cinta amarilla de 64 × 11 con los dos cantos negros y HIPOTECADA en negro a 5,5 de alto —un
+ * poco más que el nombre de la casilla, que va a 4,7—, cruzando la franja con 6° de sesgo, que es como
+ * queda una cinta puesta a mano. El amarillo con negro es el de las cintas de precinto de verdad, y
+ * `verify:burgo-escena` mide que no se confunde con ninguna franja apagada. Sesgada, la cinta ocupa
+ * 64,8 × 17,6 de una franja de 72 × 21: no se sale ni pisa la línea de la casilla de al lado.
+ *
+ * El sesgo BAJA el lado de la H, que es el de la bandera del dueño (u = 30, v = 15): así la bandera a
+ * media asta queda por encima del final de la cinta y no encima de la palabra.
+ *
+ * ═══ SE TIENDE CON LA HIPOTECA ═══
+ *
+ * Se estira a lo largo en los 0,5 s de `empena`, con la misma curva con la que baja la bandera
+ * (`mediaAsta`), y se recoge igual al deshipotecar. Una casilla con casas no puede hipotecarse, así
+ * que la cinta nunca lleva casas encima.
+ *
+ * ═══ UNA GEOMETRÍA Y UNA LLAMADA ═══
+ *
+ * La cinta, sus cantos y sus diez letras se funden en UNA geometría (`geometriaDelPrecinto`, en
+ * `ciudad-en-3d.ts`) en el MARCO DEL PRECINTO: el de una casilla del lado sur puesto en el centro de la
+ * cinta, con `x` hacia la derecha de quien lee (−adelante), `z` hacia fuera y `y` arriba, SIN el
+ * sesgo. La escena la instancia una vez por casilla hipotecada —hasta 28, una llamada de dibujo— con
+ * el sitio y el giro de `sitioDelPrecinto`, que es donde va el sesgo: así estirarla a lo largo la
+ * estira de verdad y no la tuerce.
+ */
+export const PRECINTO = {
+  largo: 64,
+  ancho: 11,
+  /** El grosor de cada canto negro. */
+  canto: 0.9,
+  /** El sesgo, alrededor de la vertical: negativo baja el lado de la H, el de la bandera. */
+  sesgo: (-6 * Math.PI) / 180,
+  /** El centro de la cinta en la franja: el de las casas. */
+  v: V_DE_LAS_CASAS,
+  texto: 'HIPOTECADA',
+  altoDelTexto: 5.5,
+  /** Sobre la franja: la cinta, sus cantos y las letras, cada cosa a 0,08 de la de debajo. */
+  alzas: { cinta: 0.08, canto: 0.16, letras: 0.24 },
+  color: { cinta: '#f4c21b', tinta: '#1d1b19' },
+} as const;
+
+export interface CuadroDelPrecinto {
+  readonly papel: 'cinta' | 'canto';
+  readonly puntos: readonly [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]];
+  readonly color: string;
+}
+
+/**
+ * LA CINTA Y SUS DOS CANTOS, en el marco del precinto. Los cuatro puntos van en el orden que deja la
+ * cara mirando arriba con el producto vectorial de `geometriaDeCarasConColor`.
+ */
+export function cuadrosDelPrecinto(): CuadroDelPrecinto[] {
+  const l = PRECINTO.largo / 2;
+  const a = PRECINTO.ancho / 2;
+  const cuadro = (papel: CuadroDelPrecinto['papel'], z0: number, z1: number, y: number, color: string): CuadroDelPrecinto => ({
+    papel,
+    color,
+    puntos: [
+      [-l, y, z0],
+      [-l, y, z1],
+      [l, y, z1],
+      [l, y, z0],
+    ],
+  });
+  return [
+    cuadro('cinta', -a, a, PRECINTO.alzas.cinta, PRECINTO.color.cinta),
+    cuadro('canto', a - PRECINTO.canto, a, PRECINTO.alzas.canto, PRECINTO.color.tinta),
+    cuadro('canto', -a, -a + PRECINTO.canto, PRECINTO.alzas.canto, PRECINTO.color.tinta),
+  ];
+}
+
+/**
+ * LAS LETRAS DE HIPOTECADA, en el marco del precinto: centradas en la cinta y avanzando hacia `+x`, que
+ * es la derecha de quien lee. El giro es el de un nombre del lado sur (`π`), porque el marco es el de
+ * esa casilla: la escena le suma el giro de cada una, y la palabra se lee como su nombre.
+ *
+ * Y con la LÍNEA DE BASE en `z = +alto / 2`, no en el eje: la silueta de una letra nace en su base y
+ * crece hacia arriba, que tumbada en el suelo es hacia `−z`, la ciudad. Puesta en el eje, la palabra
+ * ocupaba la media cinta de dentro y las panzas de la O y de la C asomaban por el canto; lo vio la
+ * regla que mide la geometría de verdad, no la captura.
+ */
+export function letrasDelPrecinto(): LetraEnElTablero[] {
+  const alto = PRECINTO.altoDelTexto;
+  const escala = alto / ALTO_DE_LA_LETRA;
+  const salida: LetraEnElTablero[] = [];
+  let x = -anchoDeLaPalabra(PRECINTO.texto, alto) / 2;
+  for (const letra of PRECINTO.texto) {
+    const avance = avanceDelCaracter(letra) * escala;
+    if (letra !== ' ') salida.push({ letra, x: x + avance / 2, z: alto / 2, giro: Math.PI, alto, alza: PRECINTO.alzas.letras });
+    x += avance;
+  }
+  return salida;
+}
+
+/**
+ * DÓNDE VA EL PRECINTO DE UNA CASILLA LATERAL: el centro de la cinta sobre su franja y el giro, en
+ * radianes de `rotation.y`, que lleva el marco del precinto al de la casilla CON el sesgo.
+ */
+export function sitioDelPrecinto(casilla: number): { readonly x: number; readonly y: number; readonly z: number; readonly giro: number } {
+  const m = marcoDeCasilla(casilla);
+  const p = puntoEnLaCasillaPorV(m, 0, PRECINTO.v);
+  return { x: p.x, y: ALTURA_DEL_REBORDE, z: p.z, giro: Math.atan2(m.fuera.x, m.fuera.z) + PRECINTO.sesgo };
+}
+
+/** Un punto del marco del precinto llevado al mundo en una casilla, con el mismo giro que le da la escena. */
+export function puntoDelPrecintoEnElMundo(casilla: number, x: number, z: number): Punto {
+  const s = sitioDelPrecinto(casilla);
+  const c = Math.cos(s.giro);
+  const n = Math.sin(s.giro);
+  return { x: s.x + x * c + z * n, z: s.z - x * n + z * c };
+}
+
 /* ──────────────── La talla de las piezas que son de un jugador ──────────────── */
 
 /**

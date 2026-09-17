@@ -37,8 +37,8 @@
  *
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
- *     TABLERO en plena ... 235.901   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 203.153   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en plena ... 258.749   de los cuales el manto de teselas son 64.656
+ *     TABLERO en sobria .. 226.001   (sin decorado de campo, sin atrezo menudo, sin aventurero)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
@@ -51,7 +51,10 @@
  * Eran 244.475 y 209.231 hasta que la cárcel y la comisaría se quedaron sin calle, para que se
  * leyera su texto: se fueron las losas de calzada y de acera, los semáforos, las farolas y dos coches.
  * Y suben 36 con la bandeja de los dados, que llevó los dados a la pantalla: 26 de la bandeja y 12 de
- * su asa, menos los 2 del paño que había en el campo.
+ * su asa, menos los 2 del paño que había en el campo. Y 22.848 con los PRECINTOS de las hipotecas, que
+ * se cuentan como si los 28 títulos estuvieran hipotecados a la vez: 816 cada uno, casi todo letras.
+ * Con eso la sobria se queda a 4.000 de su tope: el próximo que añada algo al tablero tiene que mirar
+ * antes esta cuenta.
  * Los de arriba son los que `verify:burgo-escena` imprime hoy, y ahora también los COMPARA con esta
  * cabecera: dos veces se quedaron viejos sin que nada lo notara, y la segunda fue a la media hora de
  * corregirlos.)
@@ -107,7 +110,7 @@
 import { PIEZA } from './piezas';
 import { BOCANADAS_DEL_HUMO, CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLosCarteles, letrasDelNeon, triangulosDeLasObras, triangulosDelTren, triangulosDeLasPiezasVivas } from './obras';
 import type { NombreDePieza } from './piezas';
-import { CASILLAS, ESQUINAS, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, huecosDeLosEmblemas, mundoEstatico } from './anillo-en-3d';
+import { CASILLAS, ESQUINAS, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, cuadrosDelPrecinto, huecosDeLosEmblemas, letrasDelPrecinto, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
 import { TRIANGULOS_DEL_ASA_DE_LOS_DADOS, triangulosDeLaBandeja } from './bandeja-de-los-dados';
 
@@ -170,6 +173,15 @@ export const TRIANGULOS_POR_EMBLEMA = 120;
  * pone el anillo: 81.399 triángulos para 1.005 letras y dos emblemas.
  */
 export const TRIANGULOS_POR_LETRA = 81;
+
+/**
+ * EL PRECINTO DE UNA CASILLA HIPOTECADA: la cinta y sus dos cantos, dos triángulos cada uno, y las diez
+ * letras de HIPOTECADA a la media de las letras. Se cuenta uno por título, que es lo más que puede
+ * haber hipotecado a la vez.
+ */
+export function triangulosDelPrecinto(): number {
+  return cuadrosDelPrecinto().length * 2 + letrasDelPrecinto().length * TRIANGULOS_POR_LETRA;
+}
 export function letrasDelTablero(): number {
   let cuantas = letrasDeLosCarteles().length + letrasDelNeon().length;
   for (const palabra of [...Object.values(ROTULO_DE_LA_CASILLA), ...Object.values(SUBTITULO_DE_LA_CASILLA)]) for (const caracter of palabra) if (caracter !== ' ') cuantas++;
@@ -287,6 +299,7 @@ export function sumaDelPresupuesto(
   });
   renglones.push({ que: 'discos de contacto', cuantos: DISCOS_DE_CONTACTO, triangulos: DISCOS_DE_CONTACTO * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'dados', cuantos: DADOS, triangulos: DADOS * triangulosDelDado });
+  renglones.push({ que: 'precintos de las hipotecas', cuantos: TITULOS, triangulos: TITULOS * triangulosDelPrecinto() });
   renglones.push({ que: 'la bandeja de los dados y su asa', cuantos: 1, triangulos: triangulosDeLaBandeja() + TRIANGULOS_DEL_ASA_DE_LOS_DADOS });
   renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });
   renglones.push({ que: 'la cúpula del cielo', cuantos: 1, triangulos: triangulosDelCielo() });

@@ -75,7 +75,7 @@ import {
   ORIGEN_DE_LA_LETRA,
 } from '../iconos';
 import { geometriaDeContornos } from '../formas';
-import { ALZA_DEL_ROTULO, CASILLAS, FERIA, huecosDeLosEmblemas, letrasDelRotulo, letrasDelSubtitulo } from './anillo-en-3d';
+import { ALZA_DEL_ROTULO, CASILLAS, FERIA, PRECINTO, cuadrosDelPrecinto, huecosDeLosEmblemas, letrasDelPrecinto, letrasDelRotulo, letrasDelSubtitulo } from './anillo-en-3d';
 import { COLOR_DE_OBRA, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaOnda, carasDeUnaBocanada, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDelTren, casillasConObra, letrasDeLosCarteles, letrasDelNeon } from './obras';
 import type { CaraEnElMundo } from './obras';
 import type { BultoPropio, CintaPropia, Punto } from './ciudad';
@@ -568,39 +568,74 @@ export function geometriaDeLaOnda(): THREE.BufferGeometry | null {
   return geometriaDeCarasConColor(carasDeLaOnda());
 }
 
+/**
+ * UNA SILUETA PUESTA EN EL SUELO: tumbada, girada para leerse desde fuera, a su talla y a su cota, y
+ * con su tinta en cada vértice. La usan los rótulos del tablero y el precinto de la hipoteca, que así
+ * no pueden leerse de dos maneras distintas.
+ */
+function siluetaPuesta(silueta: THREE.BufferGeometry, x: number, z: number, giro: number, lado: number, hex: string, alza: number): THREE.BufferGeometry {
+  const copia = silueta.clone();
+  const cuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+  cuaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), giroDelRotulo(giro)));
+  copia.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, alza, z), cuaternion, new THREE.Vector3(lado, lado, lado)));
+  if (copia.getAttribute('normal') === undefined) copia.computeVertexNormals();
+  const cuenta = (copia.getAttribute('position') as THREE.BufferAttribute).count;
+  const colores = new Float32Array(cuenta * 3);
+  const tinta = new THREE.Color(hex);
+  for (let i = 0; i < cuenta; i++) {
+    colores[i * 3] = tinta.r;
+    colores[i * 3 + 1] = tinta.g;
+    colores[i * 3 + 2] = tinta.b;
+  }
+  copia.setAttribute('color', new THREE.BufferAttribute(colores, 3));
+  /* `mergeGeometries` exige los mismos atributos en todas: nada de uv sueltos. */
+  copia.deleteAttribute('uv');
+  return copia;
+}
+
+/**
+ * EL PRECINTO DE LA HIPOTECA, FUNDIDO EN SU MARCO (`PRECINTO` en `anillo-en-3d.ts`): la cinta amarilla,
+ * sus dos cantos y HIPOTECADA, en UNA geometría con color por vértice que la escena instancia una vez
+ * por casilla hipotecada. Sin índice, como las caras: las letras se desindexan para fundirse con la
+ * cinta. `null` si falta la cinta o alguna letra: un precinto que dijera «HIPOTECDA» no se monta.
+ */
+export function geometriaDelPrecinto(): THREE.BufferGeometry | null {
+  const cinta = geometriaDeCarasConColor(cuadrosDelPrecinto().map((q) => ({ puntos: q.puntos, color: q.color })));
+  if (cinta === null) return null;
+  const partes: THREE.BufferGeometry[] = [cinta];
+  const siluetas = new Map<string, THREE.BufferGeometry | null>();
+  let completa = true;
+  for (const l of letrasDelPrecinto()) {
+    if (!siluetas.has(l.letra)) siluetas.set(l.letra, geometriaDeUnaLetra(l.letra));
+    const silueta = siluetas.get(l.letra) ?? null;
+    if (silueta === null) {
+      completa = false;
+      break;
+    }
+    const puesta = siluetaPuesta(silueta, l.x, l.z, l.giro, l.alto, PRECINTO.color.tinta, l.alza);
+    partes.push(puesta.toNonIndexed());
+    puesta.dispose();
+  }
+  for (const g of siluetas.values()) g?.dispose();
+  const fundida = completa ? (mergeGeometries(partes, false) as THREE.BufferGeometry | null) : null;
+  for (const g of partes) g.dispose();
+  if (fundida === null) return null;
+  fundida.computeBoundingSphere();
+  return fundida;
+}
+
 export function geometriaDeLosRotulos(): Rotulos | null {
   const partes: THREE.BufferGeometry[] = [];
   const propias: THREE.BufferGeometry[] = [];
   let emblemas = 0;
   let letras = 0;
-  const tinta = new THREE.Color();
-  const matriz = new THREE.Matrix4();
-  const cuaternion = new THREE.Quaternion();
-  const euler = new THREE.Euler();
   /*
    * `alza` viene con valor por defecto porque casi todo se posa en la superficie, que está a
    * ras. Los RÓTULOS no: van sobre la franja, que está subida 0,6, y puestos a 0,08 quedarían
    * enterrados dentro del reborde sin que fallara nada en pantalla.
    */
   const pon = (silueta: THREE.BufferGeometry, x: number, z: number, giro: number, lado: number, hex: string, alza = ALZA_DEL_ROTULO): void => {
-    const copia = silueta.clone();
-    euler.set(-Math.PI / 2, 0, 0);
-    cuaternion.setFromEuler(euler);
-    cuaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), giroDelRotulo(giro)));
-    matriz.compose(new THREE.Vector3(x, alza, z), cuaternion, new THREE.Vector3(lado, lado, lado));
-    copia.applyMatrix4(matriz);
-    if (copia.getAttribute('normal') === undefined) copia.computeVertexNormals();
-    const cuenta = (copia.getAttribute('position') as THREE.BufferAttribute).count;
-    const colores = new Float32Array(cuenta * 3);
-    tinta.set(hex);
-    for (let i = 0; i < cuenta; i++) {
-      colores[i * 3] = tinta.r;
-      colores[i * 3 + 1] = tinta.g;
-      colores[i * 3 + 2] = tinta.b;
-    }
-    copia.setAttribute('color', new THREE.BufferAttribute(colores, 3));
-    /* `mergeGeometries` exige los mismos atributos en todas: nada de uv sueltos. */
-    copia.deleteAttribute('uv');
+    const copia = siluetaPuesta(silueta, x, z, giro, lado, hex, alza);
     partes.push(copia);
     propias.push(copia);
   };

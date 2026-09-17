@@ -380,7 +380,7 @@ minutos y nadie lo ve).
 | `almoneda-cerrada` desierta | la bandera ámbar se hunde | 0,5 s |
 | `alza` | cada casa brota desde escala 0 con back-out (sobrepaso 1,7) en su hueco, con `usar`; al pasar a posada las cuatro se hunden (0,3 s) y la casa con bandera brota | 0,45 s por casa |
 | `vende` | la casa se hunde y unas monedas vuelan al peón | 0,4 s |
-| `empena` / `desempena` | la bandera baja a media asta y la acera se apaga al 55 % de luminancia (color por vértice reescrito; nunca opacidad) / sube y recobra | 0,5 s |
+| `empena` / `desempena` | la bandera baja a media asta, la acera se apaga al 55 % de luminancia (color por vértice reescrito; nunca opacidad) y se tiende sobre la franja un PRECINTO amarillo que dice HIPOTECADA (`PRECINTO`, en `anillo-en-3d.ts`) / sube, recobra y el precinto se recoge | 0,5 s |
 | `carta` | §5.5 | 0,4 + 2,4 + 0,4 s |
 | `a-la-mazmorra` / `sale-de-la-mazmorra` / `sigue-presa` | §5.3 | ≈ 3,5 s (≈ 4,4 desde la 30) / 0,6 s + salto / 0,667 s |
 | `trato` propuesto | una línea de 12 discos en el suelo entre los dos peones; la hoja abre «El trato» | mientras dure |

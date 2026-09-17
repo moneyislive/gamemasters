@@ -173,12 +173,17 @@ import {
   marcoDeCasilla,
   mundoEstatico,
   puestaDeLaPiezaDeLaCasilla,
+  PRECINTO,
+  giroHaciaDentro,
+  letrasDelPrecinto,
   puestasDeLasEsquinas,
   puestasDelAtrezo,
+  puntoDelPrecintoEnElMundo,
   puntoEnEsquina,
   puntoEnLaCasillaPorV,
   radianesDeCuartos,
   sitioDeCasilla,
+  sitioDelPrecinto,
   suelosDeLaCasilla,
   vDeRadial,
 } from '../burgo/anillo-en-3d';
@@ -200,6 +205,7 @@ import {
   TRIANGULOS_POR_LETRA,
   letrasDelTablero,
   sumaDelPresupuesto,
+  triangulosDelPrecinto,
 } from '../burgo/presupuesto';
 import {
   A_LA_CELDA,
@@ -230,7 +236,7 @@ import {
   velocidadDelClip,
 } from '../burgo/peon';
 import type { EstadoDelPeon, FaseDelPeon } from '../burgo/peon';
-import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, HUMO, ONDA_DEL_AGUA, RECAUDACION, bocanadaDelHumo, duracionDelHumo, esRentaDe, ondaDelAgua, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelDinero, duracionDelEncierro, duracionDelSuceso, esRecaudacion, finDeLaCola, momentoDeLaRecaudacion, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
+import { CASILLAS_DEL_ARCA, CASILLAS_DEL_PREGON, JOYA_QUE_GIRA, RULETA, TAPA_DEL_COFRE, TREN, aperturaDelCofre, avanceDelTren, avanzarLaCola, colaVacia, enCurso, encolar as encolarSucesos, A_LA_MAZMORRA as DURA_A_LA_MAZMORRA, HUMO, ONDA_DEL_AGUA, RECAUDACION, bocanadaDelHumo, duracionDelHumo, esRentaDe, ondaDelAgua, alzadoDeLaReja, alzadoDeLaRejaDeLaCelda, duracionDelDinero, duracionDelEncierro, duracionDelSuceso, esRecaudacion, finDeLaCola, momentoDeLaRecaudacion, giroDeLaJoya, giroDeLaRuleta, loQueAnimaUnaCarta, LUMINANCIA_EMPENADA, saltar, terminada as colaTerminada, vueltaDelTren } from '../burgo/coreografia';
 import { dadosDelBurgoEnReposo, faseDeLosDadosConPar, parDeLaVista, saltoDelDoble } from '../burgo/dados-del-burgo';
 import {
   ARISTA_DE_LOS_DADOS,
@@ -886,6 +892,130 @@ const medioPeon = Math.max(peon.ancho, peon.fondo) / 2;
     return q.x === v.x && q.z === v.z;
   });
   comprobar('en la Mazmorra el hueco de peón es el de visita', huecoDelDiez);
+}
+
+// ---------------------------------------------------------------------------
+paso('El precinto de una casilla hipotecada: cabe en su franja, se lee como el nombre, la bandera no pisa la palabra y no se confunde con ningún barrio');
+// ---------------------------------------------------------------------------
+
+/*
+ * Miguel no reconoció una calle hipotecada —la franja apagada al 55 % y la bandera a media asta— y la
+ * tomó por un fallo de color; pidió «como un precinto» en la celda de color (`PRECINTO`, en
+ * `anillo-en-3d.ts`). Una captura enseña UNA casilla hipotecada; esto mide las treinta y seis
+ * laterales, con la cinta puesta donde la pone la escena (`sitioDelPrecinto`).
+ */
+{
+  const laterales = Array.from({ length: CASILLAS }, (_, i) => i).filter((i) => !marcoDeCasilla(i).esEsquina);
+  /* Un punto del mundo en su casilla: `u` a lo largo de `adelante` desde el eje, y `v` desde la ciudad. */
+  const enLaCasilla = (i: number, p: Punto): { readonly u: number; readonly v: number } => {
+    const m = marcoDeCasilla(i);
+    const dx = p.x - m.centro.x;
+    const dz = p.z - m.centro.z;
+    return { u: dx * m.adelante.x + dz * m.adelante.z, v: vDeRadial(LINEA_DE_LA_MARCHA + dx * m.fuera.x + dz * m.fuera.z) };
+  };
+  const medioLargo = PRECINTO.largo / 2;
+  const medioAncho = PRECINTO.ancho / 2;
+  const cintaFuera = (largo: number): string[] => {
+    const salida: string[] = [];
+    for (const i of laterales) {
+      for (const [x, z] of [
+        [-largo / 2, -medioAncho],
+        [-largo / 2, medioAncho],
+        [largo / 2, medioAncho],
+        [largo / 2, -medioAncho],
+      ] as const) {
+        const q = enLaCasilla(i, puntoDelPrecintoEnElMundo(i, x, z));
+        if (Math.abs(q.u) > ANCHO_DE_CASILLA / 2 - 1 || q.v < 1 || q.v > BANDA.franja - 1) salida.push(`${String(i)}: (${r(q.u)}, ${r(q.v)})`);
+      }
+    }
+    return salida;
+  };
+  comprobar(
+    `la cinta del precinto, de ${String(PRECINTO.largo)} × ${String(PRECINTO.ancho)} y sesgada, cabe en la franja de las ${String(laterales.length)} laterales con 1 de margen: no se sale ni pisa la línea de la casilla de al lado`,
+    laterales.length === 36 && cintaFuera(PRECINTO.largo).length === 0,
+    cintaFuera(PRECINTO.largo).slice(0, 4),
+  );
+  comprobar('se ve fallar: una cinta de lado a lado de la casilla, de 72, pisaría la línea de al lado', cintaFuera(ANCHO_DE_CASILLA).length > 0);
+
+  /* Las letras, con la caja de su avance y su alto —desde la base hacia `−z`, que es hacia donde crece la silueta tumbada—, dentro de la cinta. */
+  const letras = letrasDelPrecinto();
+  const cajaDeLetra = (le: LetraEnElTablero): { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number } => {
+    const ancho = anchoDeLaPalabra(le.letra, le.alto);
+    return { x0: le.x - ancho / 2, x1: le.x + ancho / 2, z0: le.z - le.alto, z1: le.z };
+  };
+  const letrasFuera = letras.filter((le) => {
+    const c = cajaDeLetra(le);
+    return c.x0 < -medioLargo + 2 || c.x1 > medioLargo - 2 || c.z0 < -medioAncho + PRECINTO.canto + 1 || c.z1 > medioAncho - PRECINTO.canto - 1;
+  });
+  comprobar(
+    `las ${String(letras.length)} letras de ${PRECINTO.texto} caben en la cinta: a 1 de sus cantos y a 2 de sus puntas`,
+    letras.map((le) => le.letra).join('') === PRECINTO.texto && letrasFuera.length === 0,
+    letrasFuera.map((le) => le.letra),
+  );
+
+  /* Se lee como el nombre: avanzando hacia la derecha de quien mira desde fuera, con el giro del nombre y el sesgo. */
+  const vuelta = 2 * Math.PI;
+  const malLeidas = (giroLocal: number): string[] => {
+    const salida: string[] = [];
+    for (const i of laterales) {
+      const m = marcoDeCasilla(i);
+      const enElMundo = letras.map((le) => puntoDelPrecintoEnElMundo(i, le.x, le.z));
+      for (let k = 1; k < enElMundo.length; k++) {
+        const a = enElMundo[k - 1] as Punto;
+        const b = enElMundo[k] as Punto;
+        if ((b.x - a.x) * -m.adelante.x + (b.z - a.z) * -m.adelante.z <= 0) salida.push(`${String(i)}: ${letras[k]?.letra ?? '?'} retrocede`);
+      }
+      const esperado = giroHaciaDentro(m) + PRECINTO.sesgo;
+      const diferencia = ((((giroLocal + sitioDelPrecinto(i).giro - esperado) % vuelta) + vuelta) % vuelta);
+      if (Math.min(diferencia, vuelta - diferencia) > 1e-9) salida.push(`${String(i)}: gira ${r(diferencia)}`);
+    }
+    return salida;
+  };
+  comprobar(
+    `${PRECINTO.texto} se lee en las treinta y seis laterales como su nombre: hacia la derecha de quien mira desde fuera, con el giro del nombre más el sesgo`,
+    letras.every((le) => le.giro === Math.PI) && malLeidas(Math.PI).length === 0,
+    malLeidas(Math.PI).slice(0, 4),
+  );
+  comprobar('se ve fallar: con las letras giradas como una pieza que mira fuera, sale cabeza abajo en todas', malLeidas(0).length >= laterales.length);
+
+  /* La bandera, llevada al marco de la cinta, lejos de la caja de cualquier letra. */
+  const banderaEnLaCinta = (i: number, sesgo: number): { readonly x: number; readonly z: number } => {
+    const p = huecoDeBandera(i);
+    const s = sitioDelPrecinto(i);
+    const giro = s.giro - PRECINTO.sesgo + sesgo;
+    const dx = p.x - s.x;
+    const dz = p.z - s.z;
+    return { x: dx * Math.cos(giro) - dz * Math.sin(giro), z: dx * Math.sin(giro) + dz * Math.cos(giro) };
+  };
+  const hastaLaPalabra = (q: { readonly x: number; readonly z: number }): number =>
+    Math.min(
+      ...letras.map((le) => {
+        const c = cajaDeLetra(le);
+        return Math.hypot(Math.max(c.x0 - q.x, 0, q.x - c.x1), Math.max(c.z0 - q.z, 0, q.z - c.z1));
+      }),
+    );
+  const conSuSesgo = Math.min(...laterales.map((i) => hastaLaPalabra(banderaEnLaCinta(i, PRECINTO.sesgo))));
+  const alReves = Math.max(...laterales.map((i) => hastaLaPalabra(banderaEnLaCinta(i, -PRECINTO.sesgo))));
+  comprobar(`la bandera del dueño queda a ${r(conSuSesgo)} de la palabra, más de 3: el sesgo baja el lado de la H, que es el suyo`, conSuSesgo > 3, conSuSesgo);
+  comprobar(`se ve fallar: con el sesgo al revés, la bandera se queda a ${r(alReves)} de la H`, alReves <= 3, alReves);
+
+  /* La cinta no se confunde con ninguna franja apagada, y la tinta se lee sobre la cinta. */
+  const lineal = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const deLineal = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+  const apagado = (hex: string): string =>
+    `#${[0, 1, 2]
+      .map((k) => Math.round(deLineal(lineal(Number.parseInt(hex.slice(1 + 2 * k, 3 + 2 * k), 16) / 255) * LUMINANCIA_EMPENADA) * 255))
+      .map((v) => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0'))
+      .join('')}`;
+  const sinBarrio = /const COLOR_DE_LA_FRANJA_SIN_BARRIO = '(#[0-9a-f]{6})'/.exec(fs.readFileSync(path.join(CARPETA, 'Burgo.tsx'), 'utf8'))?.[1] ?? '';
+  const franjas = [...BARRIOS.map((b) => b.color), sinBarrio];
+  const cercaDeLaCinta = (cinta: string): string[] => franjas.filter((f) => distanciaEntreColores(apagado(f), cinta) < 80).map((f) => `${f} apagado ${apagado(f)}`);
+  comprobar(
+    `la cinta amarilla no se confunde con ninguna de las ${String(franjas.length)} franjas apagadas —los ocho barrios y la de estaciones y servicios— y su tinta negra contrasta con ella`,
+    BARRIOS.length === 8 && sinBarrio.length === 7 && cercaDeLaCinta(PRECINTO.color.cinta).length === 0 && distanciaEntreColores(PRECINTO.color.tinta, PRECINTO.color.cinta) > 250,
+    cercaDeLaCinta(PRECINTO.color.cinta),
+  );
+  comprobar('se ve fallar: una cinta del ocre del barrio amarillo apagado se confunde con su franja', cercaDeLaCinta(apagado('#b8860b')).length > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -2474,6 +2604,20 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
     ponenLaBandeja(elEscritorio, 'abajo-derecha') && /estilo=\{sitioDelCartel\}/.test(elEscritorio) && /poseDeLaBandeja\(lienzo\.ancho, lienzo\.alto, FOV, SITIO_DE_LA_BANDEJA\)/.test(elEscritorio) && ponenLaBandeja(laApp, 'arriba-derecha'),
   );
   comprobar('se ve fallar: una app que no pasa el sitio de la bandeja cae', !ponenLaBandeja(laApp.replace(/bandejaDeLosDados=\{SITIO_DE_LA_BANDEJA\}/, ''), 'arriba-derecha'));
+  /*
+   * EL PRECINTO SE TIENDE CON LA HIPOTECA: uno por casilla hipotecada, en su sitio, estirado lo que diga
+   * la curva de la bandera, en una malla de un precinto por título. Sin la llamada en el bucle de las
+   * casillas no fallaría ninguna cuenta: el precinto simplemente no saldría nunca.
+   */
+  const precintoEnLaEscena = (codigo: string): boolean =>
+    /escribePrecinto\(c\.indice, f\)/.test(codigo) &&
+    /sitioDelPrecinto\(casilla\)/.test(codigo) &&
+    /auxEscala\.set\(tendido, 1, 1\)/.test(codigo) &&
+    /args=\{\[precintoGeometria, materiales\.rotulo, CAPACIDAD\.precintos\]\}/.test(codigo) &&
+    /precintos: TITULOS/.test(codigo) &&
+    /mallaDePrecintos\.count = nPrecintos/.test(codigo);
+  comprobar('la escena tiende un precinto por casilla hipotecada, en su sitio y estirado con la curva de la bandera, en una malla de uno por título', precintoEnLaEscena(codigoDelBurgo));
+  comprobar('se ve fallar: sin la llamada en el bucle de las casillas, cae', !precintoEnLaEscena(codigoDelBurgo.replace('escribePrecinto(c.indice, f);', '')));
   const elAnillo = await import('../burgo/anillo-en-3d');
   comprobar('y ya no hay paño de dados en el campo: anillo-en-3d.ts no lo exporta y Burgo.tsx no lo pinta', !('SUELO_DE_DADOS' in elAnillo) && !/SUELO_DE_DADOS/.test(codigoDelBurgo));
   comprobar('computeBoundingSphere se llama tras escribir matrices instanciadas', (codigoDelBurgo.match(/computeBoundingSphere\(\)/g) ?? []).length >= 3);
@@ -2541,7 +2685,7 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
  * `ShapePath` son aritmética), así que aquí se pueden pedir las geometrías de verdad.
  */
 {
-  const { MINIMO_DE_UN_VOLUMEN, claveDelBulto, cuentaDeBulto, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaLetra, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
+  const { MINIMO_DE_UN_VOLUMEN, claveDelBulto, cuentaDeBulto, geometriaDelPrecinto, geometriaDeLasObras, geometriaDeLosRotulos, geometriaDeUnBulto, geometriaDeUnaLetra, geometriaDeUnaCinta, repartoDeLaCaja, soltarLosBultos, triangulosDeUnaCaja } = await import('../burgo/ciudad-en-3d');
   const { ALTURA_DEL_BORDILLO, HISTERESIS_DEL_NIVEL, TONO_DEL_EDIFICIO, TONO_POR_DEFECTO, TRIANGULOS_DE_LA_CASCARA_ABIERTA, TRIANGULOS_DE_LA_CUBIERTA, TRIANGULOS_DE_LA_MEDIANERA, UMBRALES_DE_NIVEL, VETA_DE_LA_ALTURA, cascaraAbierta, ciudadDelCodigo, cocheEnElInstante, montarLaCiudad, nivelDelGrupo, pulsoDeLaParcela, tonoDeLaFachada, tonoDelEdificio, triangulosDeUnaTorre, ANCHO_DEL_CARRIL, ANCHO_DEL_BORDILLO, EJE_DEL_CARRIL } = await import('../burgo/ciudad');
   /* La retícula es de `piezas.ts` y `ciudad.ts` no la reexporta: pedírsela a `ciudad` devolvía `undefined` en silencio y el juez del carril se caía comparando con NaN. */
   const RETICULA = RETICULA_DE_LA_CIUDAD;
@@ -2729,6 +2873,29 @@ paso('El MONTAJE: lo que la escena instancia de verdad, medido sin abrir un lien
      * idioma y se olvide su alfabeto en el charset del compilador.
      */
     comprobar('se ve fallar: una letra que el tipo no trae no da geometría, y ese rótulo se montaría corto', geometriaDeUnaLetra('Ω') === null);
+    /*
+     * EL PRECINTO DE LA HIPOTECA SE MONTA ENTERO: la cinta, sus dos cantos y las diez letras en una
+     * geometría, del orden de lo que le guarda el presupuesto, sin nada fuera de la cinta y con cada
+     * capa a su cota —cinta, cantos, letras—, que es lo que hace que las letras no se hundan en la cinta.
+     */
+    {
+      const precinto = geometriaDelPrecinto();
+      const posiciones = precinto?.getAttribute('position') as THREE.BufferAttribute | undefined;
+      const triangulos = posiciones === undefined ? 0 : posiciones.count / 3;
+      let fueraDeLaCinta = 0;
+      const cotas = new Set<number>();
+      for (let k = 0; posiciones !== undefined && k < posiciones.count; k++) {
+        if (Math.abs(posiciones.getX(k)) > PRECINTO.largo / 2 + 1e-4 || Math.abs(posiciones.getZ(k)) > PRECINTO.ancho / 2 + 1e-4) fueraDeLaCinta++;
+        cotas.add(Math.round(posiciones.getY(k) * 1000));
+      }
+      const porPrecinto = triangulosDelPrecinto();
+      comprobar(
+        `el precinto se monta en una geometría de ${String(triangulos)} triángulos —la cinta, sus cantos y las diez letras—, del orden de los ${String(porPrecinto)} que le guarda el presupuesto, sin nada fuera de la cinta y en tres cotas`,
+        precinto !== null && triangulos > porPrecinto * 0.7 && triangulos <= porPrecinto * 1.3 && fueraDeLaCinta === 0 && [...cotas].sort((x, y) => x - y).join() === [PRECINTO.alzas.cinta, PRECINTO.alzas.canto, PRECINTO.alzas.letras].map((y) => Math.round(y * 1000)).join(),
+        { triangulos, porPrecinto, fueraDeLaCinta, cotas: [...cotas] },
+      );
+      precinto?.dispose();
+    }
     /* El presupuesto los cuenta a 120 y a su media por letra: la medida real no puede pasarse del doble. */
     const presupuestados = huecosDeLosEmblemas().length * TRIANGULOS_POR_EMBLEMA + letrasDelTablero() * TRIANGULOS_POR_LETRA;
     comprobar(
@@ -4444,7 +4611,8 @@ if (fallos.length === 0) {
       'precio es el del reglamento y se lee en los mismos píxeles que antes porque creció con el tablero,\n' +
       'no queda una sola pieza medieval en el anillo, las cuatro esquinas son manzanas de nueve por nueve\n' +
       'celdas que no tocan la ele de la marcha, el campo es un manto continuo con las nubes fuera y el\n' +
-      'claro del Concejo despejado, los dados van en una bandeja pegada a la pantalla que cabe en su\n' +
+      'claro del Concejo despejado, una casilla hipotecada lleva su precinto dentro de la franja y\n' +
+      'leyéndose como su nombre, los dados van en una bandeja pegada a la pantalla que cabe en su\n' +
       'esquina con los dados en el aire, las cuatro avenidas de 48 entran encaradas a las casillas 5, 15,\n' +
       '25 y 35,\n' +
       'el tablero cabe en el presupuesto dejando sitio a la ciudad, el peón cruza una casilla en 1,5 s y\n' +

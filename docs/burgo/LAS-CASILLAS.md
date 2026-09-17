@@ -310,6 +310,21 @@ del tablero, carteles incluidos, contra los sinónimos que el §0.2 prohíbe.
      sigue libre. El tablero baja a 235.865 triángulos en plena y 203.117 en sobria, y
      `verify:burgo-escena` mide que no quede un trozo de calle en esas dos esquinas y que la flecha
      esté sólo en la Salida.
+   - **Y el precinto de la hipoteca (17 de septiembre de 2026).** Miguel vio dos calles del banco con
+     la franja un poco más oscura que sus vecinas y lo tomó por un fallo de color; eran dos calles
+     hipotecadas, y la hipoteca se marcaba sólo con ese apagado y con la bandera a media asta. Dicho lo
+     que era: «me parece bien el color oscurecido pero vamos a ponerle en la celda de color como un
+     precinto para que sea más evidente que está hipotecada». Ahora una casilla hipotecada lleva sobre
+     su franja una cinta amarilla de 64 × 11 con los cantos negros y HIPOTECADA en negro, algo más
+     grande que el nombre y con 6° de sesgo, como puesta a mano. Se tiende en los 0,5 s de la hipoteca
+     con la curva de la bandera y se recoge igual; las veintiocho posibles son una geometría y una
+     llamada de dibujo. `verify:burgo-escena` mide que cabe en la franja de las treinta y seis
+     laterales, que la palabra se lee como el nombre, que la bandera queda lejos de ella —el sesgo baja
+     el lado de la H, que es el suyo: a 7,7 y no a 2,7—, que no se confunde con ninguna franja apagada y
+     que la geometría lleva sus diez letras dentro de la cinta. Esa última regla cazó al hacerlo que la
+     palabra salía corrida media altura hacia la ciudad —la silueta de una letra nace en su base—, con
+     la O y la C asomando por el canto. Cuesta 816 triángulos por precinto, 22.848 si se hipotecaran
+     los veintiocho títulos a la vez: la calidad sobria queda en 226.001, a 4.000 de su tope.
    - **Lo que no se ha hecho, y por qué:** el coche que aparca en el Descanso. No es una animación
      de 0,6 s sino un estado —un coche por jugador, que se queda mientras esté ahí y se va cuando se
      vaya—, y nadie lo pidió.
