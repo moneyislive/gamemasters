@@ -179,7 +179,6 @@ export function LindesEnTres({ mesa, puesta, tablero, opciones, elRail }: LoQueV
             <Lindes
               tablero={datos}
               codigo={puesta.codigo}
-              ventana={{ ancho: 0, alto: 0, franjaInferior: 0 }}
               traer={traer}
               calidad={calidad}
               camara={camara}

@@ -157,5 +157,17 @@ function Banco(): JSX.Element {
   );
 }
 
-const raiz = document.getElementById('raiz');
-if (raiz !== null) createRoot(raiz).render(<Banco />);
+/*
+ * LA RAÍZ SE GUARDA EN EL PROPIO NODO, igual que en `banco-hoja-burgo.tsx` y por lo que
+ * allí está explicado: con `createRoot` a pelo, cada reejecución en caliente crea OTRA raíz
+ * sobre el mismo `div` y React llena la consola de avisos. Que no es un fallo del producto
+ * da igual: lo que importa es que TAPA el que sí lo sea, y la consola de un banco existe
+ * exactamente para eso.
+ */
+type ConRaiz = HTMLElement & { __raizDeReact?: ReturnType<typeof createRoot> };
+
+const donde = document.getElementById('raiz') as ConRaiz | null;
+if (donde !== null) {
+  donde.__raizDeReact ??= createRoot(donde);
+  donde.__raizDeReact.render(<Banco />);
+}

@@ -21,7 +21,7 @@
  * dos sitios donde se decide qué es legal.
  */
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
-import type { Calidad, Traer, Ventana } from '../embarcadero/tipos';
+import type { Calidad, Traer } from '../embarcadero/tipos';
 
 /** Una losa puesta en el tablero. */
 export interface LosaEnElTablero {
@@ -100,7 +100,28 @@ export interface PropsDeLasLindes {
   readonly tablero: TableroDeLasLindesEn3D;
   /** El código de la mesa. De aquí sale la semilla del paisaje, y de ningún otro sitio. */
   readonly codigo: string;
-  readonly ventana: Ventana;
+  /*
+   * ═══ AQUÍ HABÍA UNA `ventana`, Y NADIE LA LEÍA ═══
+   *
+   * El contrato la pedía obligatoria, los dos clientes la rellenaban con
+   * `{ ancho: 0, alto: 0, franjaInferior: 0 }` —ceros, o sea nada— y `Lindes.tsx` no la
+   * mencionaba ni una vez. Un campo obligatorio que todo el mundo rellena con ceros es
+   * peor que no tenerlo: el siguiente que lo vea le pondrá números de verdad, no pasará
+   * nada, y se quedará un rato buscando por qué.
+   *
+   * Y no hace falta, por dos motivos que van juntos:
+   *
+   *   · LO QUE LA ESCENA MIDE ES EL LIENZO, no la ventana, y eso lo da `size` de
+   *     `useThree` —un `ResizeObserver` sobre el propio `<canvas>`—, que es la medida
+   *     de verdad y no una que haya que acordarse de pasar.
+   *   · Y LA FRANJA INFERIOR AQUÍ ES CERO de verdad: en la app, el raíl del turno y la
+   *     hoja de abajo son HERMANAS del lienzo y no están encima, así que no tapan nada.
+   *     Otras escenas de esta casa sí la necesitan —las que llevan un cajón por encima—
+   *     y por eso el tipo `Ventana` sigue existiendo; ésta no.
+   *
+   * Si algún día el lienzo de Las Lindes se hace de pantalla completa con algo encima,
+   * esto vuelve, y vuelve porque hará falta y no por simetría.
+   */
   readonly traer: Traer;
   readonly calidad: Calidad;
   readonly camara: ModoDeCamaraDeLasLindes;
@@ -132,4 +153,4 @@ export interface PropsDeLasLindes {
 }
 
 /** Lo que se reexporta para que quien monte la escena no importe de dos sitios. */
-export type { Calidad, Traer, Ventana };
+export type { Calidad, Traer };

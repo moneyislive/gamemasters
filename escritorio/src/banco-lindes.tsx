@@ -138,6 +138,53 @@ function unaPartida(codigo: string, cuantos: number, hastaLosas: number): Estado
   return estado;
 }
 
+/* ──────────────────────────────── Las formas del lienzo ──────────────────────────────── */
+
+/**
+ * ═══ POR QUÉ EL BANCO SABE PONERSE DEL TAMAÑO DE UN MÓVIL ═══
+ *
+ * Porque desde fuera no se puede. El panel del navegador que se usa para mirar esto
+ * informa SIEMPRE de una ventana de 1024 de ancho, por mucho que se le pida emular un
+ * teléfono: lo que hace es escalar la imagen, no estrechar la página. Así que la única
+ * forma que hay en esta máquina de ver la escena con proporción de móvil es que la caja
+ * del lienzo la tenga.
+ *
+ * Y vale igual de bien, porque **lo que la escena mide no es la ventana: es el LIENZO**.
+ * El `size` de `useThree` sale de un `ResizeObserver` sobre el elemento `<canvas>`, así
+ * que un lienzo de 390 por 844 le da a la cámara exactamente la misma proporción, el
+ * mismo encuadre y el mismo rincón para la losa de la mano que un teléfono de verdad.
+ * Lo que NO prueba es el rendimiento de una tarjeta de móvil, que es otra cosa y no se
+ * mide desde aquí.
+ */
+interface FormaDeLienzo {
+  readonly nombre: string;
+  /** `null` es «todo el hueco», que es como estaba el banco antes de esto. */
+  readonly ancho: number | null;
+  readonly alto: number | null;
+}
+
+const LIENZOS: readonly FormaDeLienzo[] = [
+  { nombre: 'pleno', ancho: null, alto: null },
+  /*
+   * ═══ «MÓVIL» ES EL TELÉFONO ENTERO; «MÓVIL CON HOJA» ES EL LIENZO DE VERDAD ═══
+   *
+   * En la app, el lienzo NO ocupa el teléfono: encima lleva el raíl del turno y debajo
+   * la hoja con la losa de la mano, el botón de girar y la tira de sitios — y las dos
+   * son HERMANAS del lienzo, no están encima, así que lo que la escena recibe es lo que
+   * sobra entre ellas. Medido sobre la pantalla de la app: unos 60 puntos arriba y unos
+   * 200 abajo en un teléfono de 844, o sea un lienzo de 390 por 584.
+   *
+   * Los dos están porque dicen cosas distintas: el de 844 es el caso peor de proporción
+   * —lo que se ve si un día el lienzo se hace de pantalla completa— y el de 584 es lo
+   * que un jugador tiene delante hoy. Mirar sólo el segundo dejaría sin probar la
+   * proporción extrema; mirar sólo el primero sería mirar una pantalla que no existe.
+   */
+  { nombre: 'móvil con hoja', ancho: 390, alto: 584 },
+  { nombre: 'móvil de pie', ancho: 390, alto: 844 },
+  { nombre: 'móvil tumbado', ancho: 844, alto: 390 },
+  { nombre: 'tableta', ancho: 768, alto: 1024 },
+];
+
 /* ─────────────────────────────── Las direcciones de Vite ─────────────────────────────── */
 
 const DIRECCIONES: Readonly<Record<string, string>> = { [rutaDelTablero()]: tableroGlb };
@@ -156,6 +203,7 @@ function Banco(): JSX.Element {
   const [losas, setLosas] = useState(CUANTAS_LOSAS);
   const [modo, setModo] = useState<'mesa' | 'hombro' | 'ojos'>('mesa');
   const [giro, setGiro] = useState<Giro>(0);
+  const [forma, setForma] = useState<FormaDeLienzo>(LIENZOS[0] as FormaDeLienzo);
   const [medida, setMedida] = useState<{ triangulos: number; llamadas: number; ms: number } | null>(null);
 
   const sentados: LosSentados = useMemo(() => {
@@ -194,24 +242,53 @@ function Banco(): JSX.Element {
    * Un banco que miente sobre la forma de la pantalla es peor que no tenerlo: es el único
    * sitio donde se puede ver si algo se sale por un canto.
    */
-  const [ventana, setVentana] = useState(() => ({
+  const [delNavegador, setDelNavegador] = useState(() => ({
     ancho: window.innerWidth,
     alto: window.innerHeight,
-    franjaInferior: 0,
   }));
   useEffect(() => {
     const alCambiar = (): void => {
-      setVentana({ ancho: window.innerWidth, alto: window.innerHeight, franjaInferior: 0 });
+      setDelNavegador({ ancho: window.innerWidth, alto: window.innerHeight });
     };
     window.addEventListener('resize', alCambiar);
     alCambiar();
     return () => window.removeEventListener('resize', alCambiar);
   }, []);
 
+  /*
+   * LO QUE MIDE EL LIENZO, para enseñarlo en el raíl. No se le pasa a la escena: la
+   * escena lo mide ella sola con su `ResizeObserver`, que es la medida de verdad. Esto
+   * está para que quien mire sepa CONTRA QUÉ está mirando, que es medio banco.
+   */
+  const elLienzo = {
+    ancho: forma.ancho ?? delNavegador.ancho,
+    alto: forma.alto ?? delNavegador.alto,
+  };
+
   if (datos === null) return <p style={{ color: 'white' }}>La vista no es de Las Lindes.</p>;
 
   return (
-    <div style={{ position: 'fixed', inset: 0 }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0d1408',
+      }}
+    >
+      <div
+        style={{
+          width: forma.ancho === null ? '100%' : `${String(forma.ancho)}px`,
+          height: forma.alto === null ? '100%' : `${String(forma.alto)}px`,
+          maxWidth: '100%',
+          maxHeight: '100%',
+          /* Un filo para que se vea dónde acaba el lienzo, que es de lo que se trata. */
+          outline: forma.ancho === null ? 'none' : '1px solid rgba(232,228,212,.45)',
+          position: 'relative',
+        }}
+      >
       <Canvas
         shadows={false}
         dpr={[1, 2]}
@@ -225,7 +302,6 @@ function Banco(): JSX.Element {
         <Lindes
           tablero={datos}
           codigo={CODIGO}
-          ventana={ventana}
           traer={traer}
           calidad="plena"
           camara={camara}
@@ -237,6 +313,7 @@ function Banco(): JSX.Element {
           alMedir={alMedir}
         />
       </Canvas>
+      </div>
 
       <div
         style={{
@@ -282,10 +359,39 @@ function Banco(): JSX.Element {
         <button type="button" onClick={() => setGiro(((giro + 1) % 4) as Giro)}>
           giro {giro}
         </button>
+        {/*
+          LAS FORMAS DE LIENZO. Ver el porqué donde se declaran: desde fuera no se puede
+          estrechar esta ventana, y lo que la escena mide es el lienzo y no la ventana.
+        */}
+        {LIENZOS.map((f) => (
+          <button
+            key={f.nombre}
+            type="button"
+            onClick={() => setForma(f)}
+            disabled={forma.nombre === f.nombre}
+          >
+            {f.nombre}
+          </button>
+        ))}
+        <span>
+          · lienzo {elLienzo.ancho}×{elLienzo.alto}
+        </span>
       </div>
     </div>
   );
 }
 
-const raiz = document.getElementById('raiz');
-if (raiz !== null) createRoot(raiz).render(<Banco />);
+/*
+ * LA RAÍZ SE GUARDA EN EL PROPIO NODO, igual que en `banco-hoja-burgo.tsx` y por lo que
+ * allí está explicado: con `createRoot` a pelo, cada reejecución en caliente crea OTRA raíz
+ * sobre el mismo `div` y React llena la consola de avisos. Que no es un fallo del producto
+ * da igual: lo que importa es que TAPA el que sí lo sea, y la consola de un banco existe
+ * exactamente para eso.
+ */
+type ConRaiz = HTMLElement & { __raizDeReact?: ReturnType<typeof createRoot> };
+
+const donde = document.getElementById('raiz') as ConRaiz | null;
+if (donde !== null) {
+  donde.__raizDeReact ??= createRoot(donde);
+  donde.__raizDeReact.render(<Banco />);
+}

@@ -284,7 +284,6 @@ export default function LasLindesPorDentro(): JSX.Element {
             <Lindes
               tablero={datos}
               codigo={mesa.mesa.codigo}
-              ventana={{ ancho: 0, alto: 0, franjaInferior: 0 }}
               traer={traer}
               calidad="plena"
               camara={camara}
