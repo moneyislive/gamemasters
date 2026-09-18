@@ -31,7 +31,8 @@ deja de servir para lo único que sirve.
 | 12 | El paseo en primera y tercera persona sobre el tablero | **hecho** — mesa, hombro y ojos |
 | 13 | El maestro de oro: `robot-de-las-lindes.ts` y `oro-arcade/lindes.json` | **hecho** |
 | 14 | La pantalla del jugador: la losa de la mano y el reloj de la bolsa | **hecho** |
-| 15 | Batería entera en verde | **hecho** — 86 de 86 |
+| 15 | `verify:mesa` juega a Las Lindes, con la bolsa vigilada | **hecho** — 94 revisiones |
+| 16 | Batería entera en verde | **hecho** — 86 de 86 |
 
 ## Siguiente paso
 
@@ -46,7 +47,8 @@ demostrarse tres veces. Lo que hay que abrir y mirar:
 - `escritorio/banco-lindes.html` — el tablero, la losa de la mano (abajo a la
   izquierda) y el reloj de la bolsa (abajo a la derecha). El botón «giro» tiene
   que dar un cuarto de vuelta a la losa de la mano, a la vista.
-- `escritorio/banco-linde.html` — el lobby.
+- `escritorio/banco-linde.html` — el lobby. Con cinco sentados se ven CUATRO
+  aventureros y está bien: el quinto asiento del corro es desde donde se mira.
 - Y lo que NO se ha podido mirar: el móvil de verdad. El panel del navegador
   informa siempre de una ventana de 1024 de ancho, así que lo que se ha medido
   del encuadre en pantalla estrecha es la ARITMÉTICA (que está en verde, en seis
@@ -136,6 +138,14 @@ por seis de pantalla, más los dos rincones.
 - `verify:lindes`: 13.295 comprobaciones en verde. Diez partidas enteras, 709
   losas puestas, 397 labriegos plantados; se cerraron 62 villas, 66 sendas y 20
   ermitas, y 35 prados cobraron al final.
+- `verify:mesa`: Las Lindes se juega ENTERA con el árbitro de la mesa —94
+  revisiones, 71 losas puestas, 14 labriegos plantados, 7 veces sin plantar— y en
+  cada revisión se comprueba que ni la bolsa ni la semilla salen por ninguna vista
+  ni por ninguna opción. Con vacuna: se exige que `loSecreto` declare más de 60
+  cosas, porque una lista vacía daría verde sin mirar nada.
+- `verify:escena`: 17 comprobaciones nuevas del montaje del reloj, con un `.glb`
+  fabricado torcido a propósito. Cazaron un fallo que llevaba dentro de Riberas
+  desde que se escribió.
 - Sin tocar el núcleo: `verify:nucleo-quieto`, `verify:pureza`, `verify:fronteras`,
   `verify:procedencia`, `verify:marcador`, `verify:mesa`, `verify:larga`,
   `verify:determinismo` y `oro:arcade` siguen en verde con el séptimo arcade dado
