@@ -25,8 +25,16 @@ import { Canvas } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
 import { Lindes } from '../../escenas/lindes/Lindes';
 import type { ModoDeCamaraDeLasLindes } from '../../escenas/lindes/tipos';
-import { rutaDelTablero } from '../../escenas/ruta-de-modelos';
+import { RUTA_DE_MODELOS, rutaDelTablero } from '../../escenas/ruta-de-modelos';
+import { FICHERO_DE_ANIMACIONES } from '../../escenas/embarcadero/figuras';
 import tableroGlb from '../../escenas/modelos/tablero.glb?url';
+import animacionesGlb from '../../escenas/modelos/aventureros/animaciones.glb?url';
+import caballeroGlb from '../../escenas/modelos/aventureros/caballero.glb?url';
+import barbaroGlb from '../../escenas/modelos/aventureros/barbaro.glb?url';
+import magaGlb from '../../escenas/modelos/aventureros/maga.glb?url';
+import exploradoraGlb from '../../escenas/modelos/aventureros/exploradora.glb?url';
+import picaroGlb from '../../escenas/modelos/aventureros/picaro.glb?url';
+import encapuchadoGlb from '../../escenas/modelos/aventureros/encapuchado.glb?url';
 import {
   EMPEZAR,
   PASAR,
@@ -187,7 +195,17 @@ const LIENZOS: readonly FormaDeLienzo[] = [
 
 /* ─────────────────────────────── Las direcciones de Vite ─────────────────────────────── */
 
-const DIRECCIONES: Readonly<Record<string, string>> = { [rutaDelTablero()]: tableroGlb };
+const DIRECCIONES: Readonly<Record<string, string>> = {
+  [rutaDelTablero()]: tableroGlb,
+  /* Y los aventureros, que es lo que anda por encima del tablero en hombro y en ojos. */
+  [`${RUTA_DE_MODELOS}/aventureros/${FICHERO_DE_ANIMACIONES}`]: animacionesGlb,
+  [`${RUTA_DE_MODELOS}/aventureros/caballero.glb`]: caballeroGlb,
+  [`${RUTA_DE_MODELOS}/aventureros/barbaro.glb`]: barbaroGlb,
+  [`${RUTA_DE_MODELOS}/aventureros/maga.glb`]: magaGlb,
+  [`${RUTA_DE_MODELOS}/aventureros/exploradora.glb`]: exploradoraGlb,
+  [`${RUTA_DE_MODELOS}/aventureros/picaro.glb`]: picaroGlb,
+  [`${RUTA_DE_MODELOS}/aventureros/encapuchado.glb`]: encapuchadoGlb,
+};
 
 async function traer(ruta: string): Promise<ArrayBuffer> {
   const donde = DIRECCIONES[ruta];

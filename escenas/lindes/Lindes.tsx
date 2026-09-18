@@ -66,6 +66,7 @@ import {
   sitioDelRelojDeLaBolsa,
 } from './rincones';
 import { ALTO_DEL_RELOJ_EN_LADOS, RelojDeArena } from '../reloj';
+import { QuienAnda } from './quien-anda';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
@@ -529,6 +530,22 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       ) : null}
 
       <LosLabriegos labriegos={tablero.labriegos} />
+
+      {/*
+        QUIEN ANDA, en tercera persona. Sólo mientras se pasea: en la mesa no hay a quién
+        seguir, y pintarlo allí sería una figura de dos unidades y media perdida en un
+        tablero de mil seiscientas. Ver `quien-anda.tsx` para por qué no existía.
+      */}
+      {camara.modo === 'mesa' ? null : (
+        <QuienAnda
+          traer={traer}
+          asiento={camara.asiento}
+          figura={props.figura}
+          paseante={paseante}
+          enPrimeraPersona={camara.modo === 'ojos'}
+          alFallar={props.alFallar}
+        />
+      )}
 
       {huecos !== null ? (
         <mesh geometry={huecos} onPointerDown={alBajar} onPointerUp={alTocar} onPointerMove={alSenalar}>

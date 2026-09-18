@@ -28,7 +28,7 @@ deja de servir para lo único que sirve.
 | 9 | `escritorio/src/lindes-en-tres.tsx` + fila en `pintores.ts` | **hecho**, con su hoja |
 | 10 | `app/src/arcade/lindes-en-tres-escena.tsx` + fila en `pintados.ts` | **hecho** |
 | 11 | El lobby propio (La Linde Alta) + fila en `escenas/embarcadero/tema.ts` | **hecho** |
-| 12 | El paseo en primera y tercera persona sobre el tablero | **hecho** — mesa, hombro y ojos |
+| 12 | El paseo en primera y tercera persona sobre el tablero | **hecho** — y ver «7 · la tercera persona iba detrás de nadie» |
 | 13 | El maestro de oro: `robot-de-las-lindes.ts` y `oro-arcade/lindes.json` | **hecho** |
 | 14 | La pantalla del jugador: la losa de la mano y el reloj de la bolsa | **hecho** |
 | 15 | `verify:mesa` juega a Las Lindes, con la bolsa vigilada | **hecho** — 94 revisiones |
@@ -37,7 +37,8 @@ deja de servir para lo único que sirve.
 | 18 | Sentarse **en la app** y jugarla tocando | **hecho** — dos fallos más |
 | 19 | Llevar una mesa hasta el DESENLACE y mirarlo | **hecho** — un fallo más |
 | 20 | El pintor de Las Lindes, montado por `verify:escritorio` | **hecho** — 7 más |
-| 21 | Batería entera en verde | **hecho** — 86 de 86 |
+| 21 | El avatar del paseo, que faltaba | **hecho** |
+| 22 | Batería entera en verde | **hecho** — 86 de 86 |
 
 ## Siguiente paso
 
@@ -74,6 +75,35 @@ demostrarse tres veces. Lo que hay que abrir y mirar:
   informa siempre de una ventana de 1024 de ancho, así que lo que se ha medido
   del encuadre en pantalla estrecha es la ARITMÉTICA (que está en verde, en seis
   formas de pantalla) y no el píxel.
+
+## 7 · La tercera persona iba detrás de NADIE
+
+Miguel lo pidió con estas palabras: «un tablero enorme que se pueda recorrer en primera
+o tercera persona **con los avatares encima del tablero**». Las tres cámaras estaban
+—mesa, hombro y ojos— y esta bitácora daba la capa 12 por hecha. Pero `Lindes.tsx` no
+tenía **ni una referencia a un avatar**: cero a marioneta, cero a aventurero. La cámara
+de hombro iba detrás de nadie, y sólo se ve pulsando «hombro».
+
+La capa estaba a dos tercios y la tabla decía «hecho». Está corregida.
+
+**Lo que se ha construido** (`escenas/lindes/quien-anda.tsx`) no modela nada nuevo: es la
+misma marioneta del Muelle y de La Linde Alta, el mismo cargador, la misma tabla de
+figuras y los mismos clips. Lo único propio es cuándo anda, cuándo corre y cuándo está
+quieta — y eso sale de la DERIVADA de `paseante.andando`, no de los mandos: contra una
+pared se pulsa adelante y no se anda, y preguntando a los mandos la figura correría en el
+sitio.
+
+**Dos cosas que hubo que mirar para acertar:**
+
+- **Miraba a cámara.** El rumbo de esta casa es cero al norte (−z); la marioneta nace
+  mirando al +z. Sin media vuelta, la cámara de hombro —que va detrás— se encontraba con
+  la cara. Es la misma media vuelta que `sitiosDeLaLinde` da a los del corro.
+- **En primera persona no se pinta**, porque la cámara está dentro de su cabeza.
+
+**Y lleva red:** con siete rumbos distintos se exige que la cámara de hombro esté detrás
+de quien anda, mirando hacia donde él mira y a distancia de persona; y que la escena monte
+el avatar, no lo monte en la mesa, y le diga cuándo va en primera persona. Quitando el
+avatar: tres rojas.
 
 ## El hueco que hacía posibles los fallos del escritorio
 

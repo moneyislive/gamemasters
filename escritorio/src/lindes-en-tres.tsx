@@ -237,6 +237,12 @@ export function LindesEnTres({
               calidad={calidad}
               camara={camara}
               giroEnMano={giro}
+              /*
+               * LA FIGURA DE QUIEN PASEA, sacada del asiento de la mesa. Si no eligió
+               * ninguna, `figuraQueSePinta` saca una del identificador: nunca se queda
+               * sin nadie a quien seguir por no haber pasado un dato.
+               */
+              figura={puesta.asientos.find((a) => a.id === puesta.yo)?.figura}
               quieto={quieto}
               sePuedePasar={laDePasar !== null && !quieto}
               alPasar={laDePasar === null ? undefined : () => alTocar(laDePasar.toque)}

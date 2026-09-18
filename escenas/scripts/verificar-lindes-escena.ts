@@ -65,7 +65,7 @@ import {
   sitiosDeLaLinde,
 } from '../linde-alta/la-linde';
 import { ALTURA_DE_UNA_PERSONA } from '../escala';
-import { camaraDeMesa, loQueAbarca } from '../lindes/paseo';
+import { camaraDeHombro, camaraDeMesa, loQueAbarca } from '../lindes/paseo';
 import { loQueHaCaido, sitioDeLaMano, sitioDelRelojDeLaBolsa } from '../lindes/rincones';
 import { ALTO_DEL_RELOJ_EN_LADOS } from '../reloj';
 
@@ -903,6 +903,80 @@ for (const [comoEs, ancho, alto] of TABLEROS) {
       { cerca: Math.round(pose.niebla.cerca), lejos: Math.round(pose.niebla.lejos), fondo: Math.round(pose.lejos) },
     );
   }
+}
+
+
+// ---------------------------------------------------------------------------
+paso('El paseo: la tercera persona va detrás de ALGUIEN, y en primera no se pinta a nadie');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * Miguel pidió «un tablero enorme que se pueda recorrer en primera o tercera persona CON
+ * LOS AVATARES ENCIMA DEL TABLERO». Las tres cámaras estaban y la bitácora daba la capa
+ * por hecha — pero `Lindes.tsx` no tenía ni una referencia a un avatar: la cámara de
+ * hombro iba DETRÁS DE NADIE. Sólo se ve pulsando «hombro», y no falla nada.
+ *
+ * Se comprueban las dos mitades que se pueden comprobar sin WebGL: que la cámara esté de
+ * verdad detrás —si no, un avatar no arregla nada—, y que la escena lo monte donde toca y
+ * no donde no.
+ */
+{
+  const RUMBOS = [0, Math.PI / 4, Math.PI / 2, 2.6, Math.PI, 4.2, 5.5];
+  for (const rumbo of RUMBOS) {
+    const quien = { x: 137, z: -412, rumbo, andando: 0 };
+    const hombro = camaraDeHombro(quien);
+
+    /* Hacia dónde mira quien pasea: cero al norte (−z) y creciendo hacia el este. */
+    const adelante = { x: Math.sin(rumbo), z: -Math.cos(rumbo) };
+    /* Y del ojo a él: si la cámara está detrás, este vector apunta HACIA delante. */
+    const delOjo = { x: quien.x - hombro.x, z: quien.z - hombro.z };
+    const conElRumbo = delOjo.x * adelante.x + delOjo.z * adelante.z;
+    comprobar(
+      `con rumbo ${rumbo.toFixed(2)}, la cámara de hombro está DETRÁS de quien anda`,
+      conElRumbo > 0,
+      { conElRumbo: conElRumbo.toFixed(2) },
+    );
+    /* Y mirando hacia donde él mira, que es lo que hace que se le vea la nuca y no la oreja. */
+    const aDondeMira = { x: hombro.miraX - hombro.x, z: hombro.miraZ - hombro.z };
+    const largo = Math.hypot(aDondeMira.x, aDondeMira.z);
+    const alineada = (aDondeMira.x * adelante.x + aDondeMira.z * adelante.z) / Math.max(1e-9, largo);
+    comprobar(
+      `y mirando hacia donde él mira, no de lado (rumbo ${rumbo.toFixed(2)})`,
+      alineada > 0.98,
+      { alineada: alineada.toFixed(3) },
+    );
+    /*
+     * Y NO ENCIMA DE ÉL: una cámara de hombro a cero de distancia es una cámara de ojos
+     * con otro nombre, y el avatar taparía la pantalla entera.
+     */
+    comprobar(
+      `y a una distancia de persona, no encima (rumbo ${rumbo.toFixed(2)})`,
+      Math.hypot(delOjo.x, delOjo.z) > ALTURA_DE_UNA_PERSONA,
+      { atras: Math.hypot(delOjo.x, delOjo.z).toFixed(2) },
+    );
+  }
+
+  /*
+   * Y LA ESCENA LO MONTA DONDE TOCA. Se mira en el fuente porque aquí no hay WebGL: lo
+   * que se compra es que el avatar EXISTA en la escena y que la primera persona lo
+   * apague, que son las dos cosas que no estaban.
+   */
+  const laEscena = fs.readFileSync(new URL('../lindes/Lindes.tsx', import.meta.url), 'utf8');
+  comprobar(
+    'la escena monta a quien anda: sin esto, «tercera persona» es una cámara detrás de nadie',
+    /<QuienAnda\b/.test(laEscena),
+    laEscena.includes('QuienAnda'),
+  );
+  comprobar(
+    'y no lo monta en la vista de mesa, donde no hay a quién seguir',
+    /camara\.modo === 'mesa' \? null : \(/.test(laEscena),
+  );
+  comprobar(
+    'y le dice cuándo está en primera persona, que es cuando la cámara va dentro de su cabeza',
+    /enPrimeraPersona=\{camara\.modo === 'ojos'\}/.test(laEscena),
+  );
 }
 
 

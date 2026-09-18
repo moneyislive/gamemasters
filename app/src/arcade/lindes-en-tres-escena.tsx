@@ -291,6 +291,8 @@ export default function LasLindesPorDentro(): JSX.Element {
               calidad="plena"
               camara={camara}
               giroEnMano={giro}
+              /* La figura de quien pasea; sin ella, `figuraQueSePinta` saca una del asiento. */
+              figura={mesa.mesa?.asientos.find((a) => a.id === mesa.mesa?.yo)?.figura}
               sePuedePasar={laDePasar !== null && !mesa.quieto}
               alPasar={laDePasar === null ? undefined : () => alTocar(laDePasar.toque)}
               quieto={mesa.quieto}

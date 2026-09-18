@@ -128,6 +128,15 @@ export interface PropsDeLasLindes {
   /** Con qué giro se enseña la losa de la mano mientras se elige dónde ponerla. */
   readonly giroEnMano: Giro;
   /**
+   * LA FIGURA DE QUIEN PASEA, si eligió una.
+   *
+   * Opcional a propósito y no obligatoria: `figuraQueSePinta` saca una del asiento cuando
+   * no hay elección, igual que en el muelle. Así la escena nunca se queda sin nadie a quien
+   * seguir por no haber pasado un dato — y la cámara de hombro iría detrás de nadie, que es
+   * exactamente lo que pasaba antes de que esto existiera.
+   */
+  readonly figura?: string;
+  /**
    * SI SE PUEDE PASAR EL TURNO AHORA, y qué hacer si se toca el reloj.
    *
    * El reloj de arena es también el botón de pasar, como en Riberas y por lo mismo: es el
@@ -154,3 +163,4 @@ export interface PropsDeLasLindes {
 
 /** Lo que se reexporta para que quien monte la escena no importe de dos sitios. */
 export type { Calidad, Traer };
+export type { Paseante } from './paseo';
