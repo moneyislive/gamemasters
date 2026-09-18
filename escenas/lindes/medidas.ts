@@ -52,7 +52,7 @@
  * lado. No es elegancia: es que el día que el lado cambie —y cambiará, porque lo
  * decide cómo se ve en un móvil— no haya catorce números que ajustar a mano.
  */
-import { ESCALA_DEL_PACK } from '../escala';
+import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
 
 /** Lo que mide el lado de una losa, en unidades del pack. */
 export const LADO_EN_PACK = 32;
@@ -289,6 +289,55 @@ export const TOPE_DE_TRIANGULOS = 3_200_000;
  * —unas siete personas— y crece con ella.
  */
 export const ALTO_DEL_LABRIEGO = LADO_DE_LOSA * 0.11;
+
+/**
+ * LO QUE SE LEVANTA LA ÚLTIMA LOSA PUESTA, para que se vea de un vistazo cuál es.
+ *
+ * Levanta sus PIEZAS y no su suelo, así que desde la mesa es un resalte del tres por
+ * ciento del lado: se lee y no molesta.
+ */
+export const ALTO_DE_LA_ULTIMA = LADO_DE_LOSA * 0.03;
+
+/**
+ * Y CUÁNTO SE LEVANTA DE VERDAD, QUE DEPENDE DE DESDE DÓNDE SE MIRE.
+ *
+ * ═══ A PIE, NADA ═══
+ *
+ * `ALTO_DE_LA_ULTIMA` son cinco unidades y cuarto: DOS PERSONAS. Desde la mesa eso es el
+ * resalte que dice «ésta acaba de ponerse». Andando por el tablero son las casas, la
+ * muralla y los árboles de esa losa **flotando a dos alturas de hombre sobre su propio
+ * terreno** — y el paseante nace precisamente en esa losa, así que es lo primero que ve.
+ *
+ * Es el mismo caso que `ALTO_DEL_LABRIEGO`: una ayuda pensada para quien mira la mesa
+ * desde arriba, que vista desde el suelo es un disparate. Y se resuelve igual: la ayuda
+ * se queda en la mesa.
+ */
+export function loQueSeLevantaLaUltima(aPie: boolean): number {
+  return aPie ? 0 : ALTO_DE_LA_ULTIMA;
+}
+
+/**
+ * LO QUE ENCOGE EL LABRIEGO AL BAJAR AL TABLERO.
+ *
+ * ═══ UNA FICHA DESDE LA MESA, UN HOMBRE DESDE EL SUELO ═══
+ *
+ * `ALTO_DEL_LABRIEGO` son siete personas, y su comentario explica por qué: desde la mesa
+ * el labriego no es un señor en un campo, es la marca de QUIÉN tiene qué, y tiene que
+ * leerse de un vistazo entre las casitas. Eso sigue siendo verdad.
+ *
+ * Lo que no estaba previsto es que este tablero se recorre A PIE. Y a pie esa misma ficha
+ * es un gigante de trece metros plantado en el prado, con la peana flotándole a la altura
+ * de la rodilla del paseante. Mirado en el móvil: al pulsar «hombro» la pantalla se
+ * llenaba de rojo — y lo primero que parecía es que el avatar salía gigante. El avatar
+ * estaba bien; lo gigante era la ficha.
+ *
+ * Así que no se cambia la decisión: se parte en dos. Ficha en la mesa, hombre a pie, con
+ * la altura EXACTA del aventurero que anda a su lado. Y no es un apaño de tamaño: un
+ * labriego es, literalmente, un hombre en un campo.
+ */
+export function loQueEncogeElLabriego(aPie: boolean): number {
+  return aPie ? ALTURA_DE_UNA_PERSONA / ALTO_DEL_LABRIEGO : 1;
+}
 
 /** Cuánto sobresale del suelo la peana de un labriego. */
 export const PEANA_DEL_LABRIEGO = LADO_DE_LOSA * 0.002;

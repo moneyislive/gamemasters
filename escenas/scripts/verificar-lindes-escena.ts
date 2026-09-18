@@ -41,11 +41,15 @@ import {
 import type { Giro, Lado, Losa } from '../../shared/arcade/juegos/lindes-losas';
 import { LOSAS_EN_TOTAL } from '../../shared/arcade/juegos/lindes-losas';
 import {
+  ALTO_DE_LA_ULTIMA,
+  ALTO_DEL_LABRIEGO,
   CELDAS_POR_LOSA,
   CELDAS_POR_MURO,
   LADO_DE_LOSA,
   PIEZAS_POR_LOSA,
   TOPE_DE_TRIANGULOS,
+  loQueEncogeElLabriego,
+  loQueSeLevantaLaUltima,
 } from '../lindes/medidas';
 import {
   CELDAS_MINIMAS_DE_MURO,
@@ -1296,6 +1300,78 @@ paso('Andando, la losa de la mano y el reloj NO se entierran bajo el tablero');
     'y con la distancia de la mesa se enterraban los dos en todas las pantallas',
     enterradosConLaDeLejos === LIENZOS.length * OJOS.length * 2,
     { enterradosConLaDeLejos },
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+paso('Las ayudas de la mesa se quedan en la mesa, que a pie son disparates');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA, Y POR QUÉ SON EL MISMO FALLO DOS VECES ═══
+ *
+ * Hay cosas del tablero que NO están a escala del paisaje a propósito, porque su trabajo
+ * es leerse desde arriba entre las casitas:
+ *
+ *   · el LABRIEGO mide siete personas, para que se vea de quién es cada cosa;
+ *   · la ÚLTIMA LOSA levanta sus piezas, para que se vea cuál acaba de ponerse.
+ *
+ * Las dos decisiones son buenas y las dos están razonadas en `medidas.ts`. Y las dos se
+ * escribieron cuando este tablero sólo se miraba desde arriba. Al recorrerlo a pie, la
+ * primera es un gigante rojo de trece metros —lo que llenaba la pantalla al pulsar
+ * «hombro», y lo que me hizo creer que el avatar salía gigante— y la segunda son las casas
+ * de una losa entera flotando a dos alturas de hombre sobre su propio terreno, justo la
+ * losa donde NACE el paseante.
+ *
+ * Por eso las dos medidas viven fuera de la escena: para que esto se pueda comprobar sin
+ * montar WebGL, y para que la próxima ayuda de mesa que alguien añada tenga dónde mirar.
+ */
+{
+  comprobar(
+    'desde la mesa el labriego sigue midiendo lo suyo, que es de lo que sirve',
+    loQueEncogeElLabriego(false) === 1,
+  );
+  comprobar(
+    'y a pie mide EXACTAMENTE lo que el aventurero que anda a su lado',
+    Math.abs(ALTO_DEL_LABRIEGO * loQueEncogeElLabriego(true) - ALTURA_DE_UNA_PERSONA) < 1e-9,
+    { aPie: (ALTO_DEL_LABRIEGO * loQueEncogeElLabriego(true)).toFixed(3) },
+  );
+  comprobar(
+    'desde la mesa la última losa sigue levantándose, que es como se ve cuál es',
+    loQueSeLevantaLaUltima(false) === ALTO_DE_LA_ULTIMA && ALTO_DE_LA_ULTIMA > 0,
+  );
+  comprobar('y a pie no se levanta nada del tablero', loQueSeLevantaLaUltima(true) === 0);
+
+  /*
+   * ═══ LA VACUNA: QUE LAS DOS AYUDAS SON DE VERDAD DISPARATES A PIE ═══
+   *
+   * Sin esto, las cuatro líneas de arriba seguirían en verde el día que alguien dejara las
+   * dos ayudas en un tamaño que no molesta —y entonces el interruptor sobraría y nadie lo
+   * sabría—. Aquí se afirma lo que hace falta que sea verdad para que el interruptor tenga
+   * sentido: que aplicadas a pie se verían, y mucho.
+   */
+  comprobar(
+    'el labriego de la mesa, a pie, mediría más de cinco personas',
+    ALTO_DEL_LABRIEGO / ALTURA_DE_UNA_PERSONA > 5,
+    { personas: (ALTO_DEL_LABRIEGO / ALTURA_DE_UNA_PERSONA).toFixed(1) },
+  );
+  comprobar(
+    'y el resalte de la última losa dejaría más de una persona de aire bajo cada casa',
+    ALTO_DE_LA_ULTIMA / ALTURA_DE_UNA_PERSONA > 1,
+    { personas: (ALTO_DE_LA_ULTIMA / ALTURA_DE_UNA_PERSONA).toFixed(1) },
+  );
+
+  /* Y que la escena pregunta por las medidas en vez de llevar su propia copia. */
+  const laEscena = fs.readFileSync(new URL('../lindes/Lindes.tsx', import.meta.url), 'utf8');
+  comprobar(
+    'la escena encoge al labriego preguntando, no con una cuenta suya',
+    /const cuanto = loQueEncogeElLabriego\(aPie\);/.test(laEscena),
+  );
+  comprobar(
+    'y levanta la última losa preguntando, no con la constante a pelo',
+    /const seLevanta = loQueSeLevantaLaUltima\(aPie\);/.test(laEscena) &&
+      /casilla === ultima \? seLevanta : 0/.test(laEscena),
   );
 }
 

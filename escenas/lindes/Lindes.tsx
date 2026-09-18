@@ -35,7 +35,7 @@ import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { abrirGlb } from '../embarcadero/cargar';
-import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
+import { ESCALA_DEL_PACK } from '../escala';
 import { rutaDelTablero } from '../ruta-de-modelos';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import { LADO_DE_LOSA } from './medidas';
@@ -44,7 +44,12 @@ import type { PuestaEnLaLosa } from './losa';
 import { COLOR_DE_LA_MESA, geometriaDeLaMesa, geometriaDeLosHuecos, geometriaDelSuelo } from './suelo';
 import type { LosaQueSePinta } from './suelo';
 import { geometriaDeLaPeana, geometriaDelLabriego } from './labriego';
-import { ALTO_DEL_LABRIEGO } from './medidas';
+import {
+  ALTO_DE_LA_ULTIMA,
+  ALTO_DEL_LABRIEGO,
+  loQueEncogeElLabriego,
+  loQueSeLevantaLaUltima,
+} from './medidas';
 import {
   QUIETO,
   camaraDeHombro,
@@ -104,8 +109,8 @@ const COLOR_DE_LA_NIEBLA = '#cfdae2';
 const LOSAS_CON_MENUDO = 1.8;
 const LOSAS_CON_RELLENO = 4;
 
-/** Lo que se levanta la última losa puesta, para que se vea cuál es. */
-const ALTO_DE_LA_ULTIMA = LADO_DE_LOSA * 0.03;
+/* `ALTO_DE_LA_ULTIMA` y `loQueSeLevantaLaUltima` viven en `medidas.ts`: son medidas, y
+ * desde allí se pueden comprobar sin montar una escena. */
 
 /*
  * ═══ LA LOSA DE LA MANO, PEGADA A LA CÁMARA ═══
@@ -530,6 +535,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
           mirandoA={mirandoA}
           calidad={calidad}
           ultima={tablero.losas.find((l) => l.ultima)?.casilla ?? ''}
+          aPie={camara.modo !== 'mesa'}
         />
       ) : null}
 
@@ -603,6 +609,8 @@ interface LoQueSePoneEncimaProps {
   readonly mirandoA: { current: { x: number; z: number } };
   readonly calidad: string;
   readonly ultima: string;
+  /** ¿Se está andando por el tablero? Entonces la última losa no se levanta. */
+  readonly aPie: boolean;
 }
 
 /**
@@ -619,7 +627,14 @@ interface LoQueSePoneEncimaProps {
  * recorrer una lista: microsegundos, una vez por losa puesta.
  */
 function LoQueSePoneEncima(props: LoQueSePoneEncimaProps): JSX.Element {
-  const { catalogo, contenidos, mirandoA, ultima } = props;
+  const { catalogo, contenidos, mirandoA, ultima, aPie } = props;
+
+  /*
+   * Desde la mesa, la última losa se levanta para que se vea cuál acaba de ponerse; a pie
+   * no, que sus casas flotarían a dos alturas de hombre sobre su propio terreno. El
+   * razonamiento entero está en `loQueSeLevantaLaUltima`, que es donde vive la medida.
+   */
+  const seLevanta = loQueSeLevantaLaUltima(aPie);
 
   /* Lo que cuenta una regla se monta siempre; el relleno, sólo cerca. */
   const porModelo = useMemo(() => {
@@ -633,14 +648,14 @@ function LoQueSePoneEncima(props: LoQueSePoneEncimaProps): JSX.Element {
           ...p,
           x: p.x + dx,
           z: p.z + dz,
-          y: p.y + (casilla === ultima ? ALTO_DE_LA_ULTIMA : 0),
+          y: p.y + (casilla === ultima ? seLevanta : 0),
         };
         if (lista === undefined) salida.set(p.pieza, [puesta]);
         else lista.push(puesta);
       }
     }
     return salida;
-  }, [contenidos, ultima]);
+  }, [contenidos, seLevanta, ultima]);
 
   return (
     <group>
@@ -1065,7 +1080,7 @@ function LosLabriegos({
    * pasea, que mide exactamente lo mismo. Las dos lecturas son verdad, cada una desde
    * donde se mira.
    */
-  const cuanto = aPie ? ALTURA_DE_UNA_PERSONA / ALTO_DEL_LABRIEGO : 1;
+  const cuanto = loQueEncogeElLabriego(aPie);
   const peon = useMemo(() => geometriaDelLabriego(), []);
   const peana = useMemo(() => geometriaDeLaPeana(ALTO_DEL_LABRIEGO * 0.42), []);
   const materialDelPeon = useMemo(

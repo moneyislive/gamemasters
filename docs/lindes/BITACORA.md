@@ -551,6 +551,34 @@ tablero con las dos alturas de ojo y las seis formas de lienzo, y —lo que hace
 arreglo sea legítimo— que las fracciones de pantalla de cerca y de lejos sean idénticas
 hasta `1e-12`. Vacuna: afirma que con la distancia de mesa se enterraban **los 24 casos**.
 
+### Y la última losa dejaba sus casas flotando
+
+El mismo fallo que el labriego, otra vez, en otro sitio — y por eso conviene leerlos
+juntos. `ALTO_DE_LA_ULTIMA` levanta las PIEZAS de la última losa puesta —y no su suelo—
+para que desde la mesa se vea de un vistazo cuál acaba de ponerse. Desde arriba es un
+resalte del tres por ciento del lado: se lee y no molesta.
+
+Andando son **cinco unidades y cuarto: dos personas**. Las casas, la muralla y los árboles
+de esa losa quedan flotando a dos alturas de hombre sobre su propio terreno — y el
+paseante **nace precisamente en esa losa**.
+
+No hizo falta buscarlo con los ojos: está en el código, `y: p.y + (casilla === ultima ?
+ALTO_DE_LA_ULTIMA : 0)`, y `suelo.ts` no sabe nada de «última». Es cierto por construcción.
+
+**Las dos medidas se han sacado de la escena a `medidas.ts`** —`loQueEncogeElLabriego` y
+`loQueSeLevantaLaUltima`— por una razón que no es de orden: desde allí se pueden comprobar
+sin montar WebGL. Y la red, además de exigir que a pie no se levante ni se agigante nada,
+**afirma que las dos ayudas SERÍAN disparates a pie** (cinco personas y más de una,
+respectivamente). Sin esa vacuna, las comprobaciones seguirían en verde el día que alguien
+dejara las ayudas en un tamaño que no molesta, y entonces el interruptor sobraría sin que
+nadie se enterase. Probada rompiéndola: devolviendo el comportamiento viejo salen dos rojos
+con nombre y apellidos.
+
+**El patrón, que es lo que hay que recordar:** este tablero se mira desde DOS distancias, y
+toda ayuda pensada para la de arriba hay que volver a juzgarla desde la de abajo. Van tres:
+el labriego, el resalte de la última losa y los dos rincones. La próxima que alguien añada
+tiene ya dónde mirar.
+
 ## Lo medido hasta aquí
 
 - `verify:lindes`: 13.295 comprobaciones en verde. Diez partidas enteras, 709
@@ -590,6 +618,16 @@ hasta `1e-12`. Vacuna: afirma que con la distancia de mesa se enterraban **los 2
   juega Las Lindes entera con el árbitro, así que el hueco que quedaría es sólo el
   PESO —y eso, hoy, está medido a mano y escrito arriba. Meterlo pide que se levante
   su propio servidor, como hace `jugar:fondo`; es barato y no está hecho.
+- **No hay colisión con las piezas, sólo con el borde del tablero.** Andando se atraviesan
+  almiares, casas y murallas; `unPaso` sólo pregunta si hay losa puesta. Se ha visto
+  metiéndose dentro de un almiar en el móvil. No se hace esta noche y no es un descuido:
+  Miguel pidió poder RECORRER el tablero, no un simulador de tropiezos, y una capa de
+  colisión de verdad —contra las piezas del pack, que son cientos por losa— es un trabajo
+  con su propio presupuesto y sus propios riesgos de rendimiento. Queda escrito con lo que
+  costaría: haría falta un volumen por pieza en `PuestaEnLaLosa` y una rejilla por losa
+  para no preguntar por todas. Efecto secundario que sí conviene saber: metido dentro de
+  una pieza, la losa de la mano y el reloj se quedan detrás de ella y no se ven.
+
 - **La arena de `reloj.glb` no se ve en la escena de Las Lindes.** Se ha decidido
   usar los conos y está explicado arriba, pero el porqué de fondo —que el horneado
   de ese modelo sea tan oscuro— igual conviene mirarlo también del lado de
