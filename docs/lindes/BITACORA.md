@@ -76,6 +76,30 @@ demostrarse tres veces. Lo que hay que abrir y mirar:
   del encuadre en pantalla estrecha es la ARITMÉTICA (que está en verde, en seis
   formas de pantalla) y no el píxel.
 
+## 8 · Y el lienzo se quedaba en el 62 % del alto — éste lo metí yo
+
+Al mirar el avatar en el cliente de verdad (no en el banco), el lienzo medía 604 × 572
+en una pantalla de 922: **trescientos cincuenta puntos de página vacía debajo**, el 38 %
+del alto, que se lee como una banda negra bajo el tablero y como que la pantalla se ha
+quedado a medias.
+
+**Y lo metí yo**, dos ciclos antes. Al arreglar la cadena del alto le puse al recuadro
+`height: 62vh` de base, para que `flex: 1 1 auto` no partiera de cero cuando la cadena no
+se aplica —un navegador sin `:has`—. Pero `.lindes-pantalla` reparte en **fila**, y en una
+fila lo que `flex: 1 1 auto` hace crecer es el ANCHO: el alto sale del estirado, y
+`align-items: stretch` sólo estira lo que tiene el alto en `auto`. Con `62vh` escrito, el
+recuadro se quedaba clavado en el 62 % de la ventana. 572 es exactamente 0,62 × 922.
+
+El del Burgo no lo sufre porque su pintor reparte en **columna**, y allí `flex: 1 1 auto`
+sí hace crecer el alto y el `62vh` es sólo la base de la que parte. La misma regla, dos
+resultados, según cómo reparta el padre.
+
+Arreglado con `height: auto` en la regla de la cadena —que no es redundante: es lo que
+suelta el `62vh`—. Medido después: 604 × 922, sin banda.
+
+**Y la comprobación de la cadena no lo veía**, porque exige `flex` y `min-height` y eso
+seguía estando. Una cadena puede estar entera y repartir mal.
+
 ## 7 · La tercera persona iba detrás de NADIE
 
 Miguel lo pidió con estas palabras: «un tablero enorme que se pueda recorrer en primera

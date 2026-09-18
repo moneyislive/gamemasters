@@ -5601,6 +5601,23 @@ code {
  */
 .sala:has(.lienzo-propio) .lindes-lienzo {
   flex: 1 1 auto;
+  /*
+   * ═══ `height: auto` NO ES REDUNDANTE: ES LO QUE SUELTA EL `62vh` ═══
+   *
+   * El recuadro lleva `height: 62vh` de base para que valga algo cuando esta cadena no se
+   * aplica —un navegador sin `:has`—. Pero `.lindes-pantalla` reparte en FILA, y en una
+   * fila lo que `flex: 1 1 auto` hace crecer es el ANCHO: el alto sale del estirado, y
+   * `align-items: stretch` sólo estira lo que tiene el alto en `auto`. Con `62vh` escrito,
+   * el lienzo se quedaba clavado en el 62 % de la ventana.
+   *
+   * Medido en una mesa de verdad: pantalla de 922 puntos, lienzo de 572, y TRESCIENTOS
+   * CINCUENTA de página vacía debajo — el 38 % del alto. Se veía como una banda negra bajo
+   * el tablero y se lee como que la pantalla se ha quedado a medias.
+   *
+   * El del Burgo no lo necesita porque su pintor reparte en COLUMNA, y allí `flex: 1 1
+   * auto` sí hace crecer el alto y el `62vh` es sólo la base de la que parte.
+   */
+  height: auto;
   min-height: 50%;
   border: 0;
   border-radius: 0;
