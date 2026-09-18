@@ -4981,6 +4981,139 @@ function elCartelDeLaCarta(): void {
  * reparto sigan estando y sigan diciendo lo que dicen; el alto se mide con los ojos, y las
  * cifras de esa medida están en la cabecera de `elCartelQueCabe` y en la de `estilo.css`.
  */
+function elPintorDeLasLindes(): void {
+  paso('El pintor de Las Lindes se monta: avisa de su lienzo, no repite el raíl y cae al retablo cuando toca');
+
+  /*
+   * ═══ POR QUÉ ESTE PASO EXISTE, Y LO QUE COSTÓ NO TENERLO ═══
+   *
+   * `LindesEnTres` sólo aparecía en este fichero para comprobar que su FILA del registro
+   * apunta a él. NADIE LO MONTABA — los de Riberas y el Burgo sí—. Y ahí vivían dos de los
+   * tres fallos que hubo que encontrar sentándose a una mesa de verdad:
+   *
+   *   · NO AVISABA DE QUE TIENE LIENZO. `sala.tsx` pinta el raíl DENTRO del lienzo cuando
+   *     lo hay y en un `<aside>` cuando no, y quién lo sabe es el pintor, que lo dice
+   *     llamando a `foco` con su recuadro. Éste ni recibía la prop.
+   *   · Y POR ESO EL RAÍL SALÍA DOS VECES: el suyo y el `<aside>` de la Sala. Dos regiones
+   *     vivas diciendo lo mismo y dos botones de «Tirar la mesa». Además, ese `<aside>` de
+   *     más caía en una fila implícita del grid y dejaba el lienzo en NUEVE PÍXELES.
+   *
+   * Nada de eso da un error. Se monta el pintor y se le pregunta.
+   */
+  const asientos = ['s1', 's2'];
+  const sentados = asientos.map((a, i) => ({ asiento: a, nombre: ['Ana', 'Bruno'][i] ?? a }));
+  const estado = avanzar(
+    LINDES,
+    undefined,
+    { tipo: 'lindes:empezar' },
+    { quien: 's1', azar: 20260918, tic: 0, asientos } as ContextoMovimiento,
+  );
+  const vista = proyectar(LINDES, estado, 's1', sentados);
+  const opciones = opcionesDeArcade(LINDES, vista, 's1');
+  const tablero = tableroDeLaVista(vista);
+  comprobar(
+    'la partida de Las Lindes que se monta aquí trae tablero y opciones de verdad',
+    tablero !== null && opciones.length > 0,
+    { caras: tablero?.caras.length, opciones: opciones.length },
+  );
+  if (tablero === null) return;
+
+  const puesta: MesaVista = {
+    codigo: 'LNDS1',
+    arcade: LINDES,
+    rev: 3,
+    tic: 0,
+    terminada: false,
+    venceEn: null,
+    turnoDesde: Date.now(),
+    asientos: sentados.map((s) => ({ id: s.asiento, nombre: s.nombre, presente: true })),
+    yo: 's1',
+    vista,
+    opciones,
+  };
+
+  /*
+   * EL RAÍL DE MENTIRA LLEVA UNA MARCA, para poder contar cuántas veces sale. Es lo único
+   * que distingue «el pintor lo pinta una vez» de «lo pinta y la Sala lo pinta otra».
+   */
+  const elRail = <p>RAIL-DE-PRUEBA</p>;
+  /* `cuantos` cuenta ETIQUETAS (`<x`); esto cuenta apariciones de un texto, que es otra cosa. */
+  const veces = (texto: string, aguja: string): number => texto.split(aguja).length - 1;
+  let recuadros = 0;
+  let sueltos = 0;
+  const foco = (r: HTMLElement | null): void => {
+    if (r === null) sueltos++;
+    else recuadros++;
+  };
+
+  const html = renderToStaticMarkup(
+    <LindesEnTres
+      manifiesto={{ id: LINDES } as never}
+      mesa={unaMesa('dentro', puesta)}
+      puesta={puesta}
+      tablero={tablero}
+      opciones={opciones}
+      elRail={elRail}
+      foco={foco}
+    />,
+  );
+
+  comprobar(
+    'monta su recuadro con las DOS clases: la suya y `lienzo-propio`, que es de la que cuelga el reparto del alto',
+    /class="lienzo-propio lindes-pantalla"/.test(html),
+    html.slice(0, 200),
+  );
+  /*
+   * `renderToStaticMarkup` no corre `ref`s —no hay DOM—, así que aquí no se puede comprobar
+   * que `foco` SE LLAME. Lo que sí se compra, y es lo que faltaba, es que el pintor ACEPTE
+   * la prop: sin ella en su firma no hay manera de que avise, y eso es lo que pasaba.
+   */
+  comprobar(
+    'y acepta la prop `foco`, que es como le dice a la Sala que hay lienzo y que no pinte su `<aside>`',
+    /\bfoco\b/.test(readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8')),
+    { recuadros, sueltos },
+  );
+  comprobar(
+    'el raíl sale UNA sola vez: dos son dos regiones vivas diciendo lo mismo y dos botones de «Tirar la mesa»',
+    veces(html, 'RAIL-DE-PRUEBA') === 1,
+    veces(html, 'RAIL-DE-PRUEBA'),
+  );
+  comprobar(
+    'y no se cae al retablo sin que haya fallado nada: con vista buena, no hay SVG de respaldo',
+    veces(html, 'lindes-respaldo') === 0,
+    html.slice(0, 200),
+  );
+
+  /*
+   * ═══ Y CON UNA VISTA QUE NO ES SUYA, AL RETABLO ═══
+   *
+   * Es el camino del respaldo: sin `.glb`, sin WebGL, o con una vista que no entiende. Ahí
+   * NO pinta «Dónde plantar», así que sus acciones tienen que salir ENTERAS o no se podría
+   * plantar — es la mitad del reparto que se rompería sin darse cuenta.
+   */
+  const deOtro = renderToStaticMarkup(
+    <LindesEnTres
+      manifiesto={{ id: LINDES } as never}
+      mesa={unaMesa('dentro', { ...puesta, vista: { desde: 'otro' } })}
+      puesta={{ ...puesta, vista: { desde: 'otro' } }}
+      tablero={tablero}
+      opciones={opciones}
+      elRail={elRail}
+    />,
+  );
+  comprobar(
+    'con una vista que no es de Las Lindes cae al retablo, y no revienta',
+    veces(deOtro, 'lindes-respaldo') === 1,
+    deOtro.slice(0, 200),
+  );
+  const plantar = opciones.filter((o) => o.tipo === 'lindes:plantar');
+  comprobar(
+    'y en el respaldo salen TODAS sus acciones, que allí no hay tira de sitios que las pinte',
+    plantar.every((o) => deOtro.includes(o.rotulo)),
+    { plantar: plantar.map((o) => o.rotulo) },
+  );
+}
+
 function laPaginaDePie(): void {
   paso('La página de pie: los seis eslabones siguen repartiendo el alto y el foco tiene dónde caer');
 
@@ -11107,6 +11240,7 @@ losDadosLleganAparte();
 losDadosEnLaPantalla();
 recogerLaMesa();
 elCartelDeLaCarta();
+elPintorDeLasLindes();
 laPaginaDePie();
 laCintaYElCajon();
 elRelojDeLaCinta();

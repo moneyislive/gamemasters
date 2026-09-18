@@ -36,7 +36,8 @@ deja de servir para lo único que sirve.
 | 17 | Sentarse a una mesa de verdad y jugarla pulsando | **hecho** — tres fallos |
 | 18 | Sentarse **en la app** y jugarla tocando | **hecho** — dos fallos más |
 | 19 | Llevar una mesa hasta el DESENLACE y mirarlo | **hecho** — un fallo más |
-| 20 | Batería entera en verde | **hecho** — 86 de 86 |
+| 20 | El pintor de Las Lindes, montado por `verify:escritorio` | **hecho** — 7 más |
+| 21 | Batería entera en verde | **hecho** — 86 de 86 |
 
 ## Siguiente paso
 
@@ -57,6 +58,28 @@ demostrarse tres veces. Lo que hay que abrir y mirar:
   informa siempre de una ventana de 1024 de ancho, así que lo que se ha medido
   del encuadre en pantalla estrecha es la ARITMÉTICA (que está en verde, en seis
   formas de pantalla) y no el píxel.
+
+## El hueco que hacía posibles los fallos del escritorio
+
+`LindesEnTres` sólo aparecía en `verificar-escritorio.tsx` para comprobar que su FILA
+del registro apunta a él. **Nadie lo montaba.** Los de Riberas y el Burgo sí — el del
+Burgo, cuatro veces.
+
+Y ahí vivían dos de los tres fallos que hubo que encontrar sentándose: el raíl pintado
+dos veces y el pintor que no avisaba de que tiene lienzo. Ahora se monta y se le
+pregunta, con la partida de verdad:
+
+- que su recuadro lleve **las dos clases** —la suya y `lienzo-propio`—, que es de la que
+  cuelga el reparto del alto;
+- que **acepte la prop `foco`**, que es como le dice a la Sala que hay lienzo y que no
+  pinte su `<aside>`;
+- que el **raíl salga una sola vez** (probado duplicándolo: roja);
+- que **no se caiga al retablo** sin que haya fallado nada;
+- y que con una vista que no es suya **sí caiga**, y allí salgan **todas** sus acciones,
+  porque en el respaldo no hay tira de sitios que las pinte.
+
+Y el respaldo se miró con ojos, tumbando la descarga del `.glb` desde la consola: sale
+el retablo SVG con las setenta y dos losas, la última marcada, y el raíl completo.
 
 ## 6 · La niebla se comía el tablero, y sólo se ve al final
 
