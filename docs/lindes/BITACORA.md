@@ -67,9 +67,22 @@ SERVIDOR MANDÓ. Una partida de tres, medida:
   y lo que se acepta no son la misma cosa.
 - **La lectura más gorda: 85,1 kB.** Media 39,0 kB. **6,86 MB** en toda la partida.
 
+### Y el peor momento NO es el final, que es lo que uno supondría
+
+Medido vuelta a vuelta: el máximo cae con **69 losas puestas y 56 colocaciones
+abiertas** —el tablero casi lleno y todavía con sitios donde cabe la losa— y son
+**73,5 kB**. Con las 72 puestas no queda ni una colocación, las caras bajan de 125 a
+72, y la vista se queda en **59,1 kB**. Medir sólo el final se habría dejado fuera el
+caso peor por catorce kilobytes.
+
+**Y lleva presupuesto**, en `verify:mesa`, como los triángulos de la escena: 96 kB
+sobre los 74,2 que mide su partida, o sea un 30 % de holgura. Ni pegado —un tope al
+8 % se pone rojo el día que alguien añada un campo legítimo, y entonces se sube sin
+mirar, que es como un presupuesto deja de serlo— ni al doble, que sería no vigilar.
+
 ### Y de dónde sale ese peso
 
-De la vista con el tablero lleno —59,0 kB sin los avisos—, repartida así:
+De la vista con el tablero lleno —59,1 kB sin los avisos—, repartida así:
 
 | Qué | Cuánto | |
 |---|---|---|

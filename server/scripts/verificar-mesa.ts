@@ -955,6 +955,9 @@ paso('En proceso: una partida ENTERA de Las Lindes, con la bolsa vigilada en cad
   let mesa: Mesa = abrirMesa({ id: 'lindes-en-la-mesa', arcade: LINDES, semilla: 20260918, asientos: DOS });
 
   let revisiones = 0;
+  /** Lo que ocuparía la vista de un asiento si bajara ahora por el cable, en bytes. */
+  let laMasGorda = 0;
+  let sumaDeVistas = 0;
   const revisar = (): void => {
     revisiones++;
     const reproches = reprochesDeSecretos(LINDES, mesa.estado, DOS, false);
@@ -963,6 +966,16 @@ paso('En proceso: una partida ENTERA de Las Lindes, con la bolsa vigilada en cad
       reproches.length === 0,
       reproches,
     );
+    /*
+     * Y DE PASO SE PESA, que es gratis aquí y no lo mide nadie más. Ver el presupuesto
+     * de abajo para por qué importa.
+     */
+    const bytes = Buffer.byteLength(
+      JSON.stringify(vistaDeAsiento(LINDES, mesa.estado, DOS[0] as AsientoId)) ?? '',
+      'utf8',
+    );
+    sumaDeVistas += bytes;
+    if (bytes > laMasGorda) laMasGorda = bytes;
   };
 
   revisar();
@@ -1062,6 +1075,49 @@ paso('En proceso: una partida ENTERA de Las Lindes, con la bolsa vigilada en cad
   console.log(
     `  ${String(revisiones)} revisiones · ${String(puestas)} losas puestas, ` +
       `${String(plantados)} labriegos plantados, ${String(pasadas)} veces sin plantar`,
+  );
+
+  /*
+   * ═══ EL PRESUPUESTO DE LO QUE BAJA POR EL CABLE ═══
+   *
+   * La proyección de Las Lindes lleva dentro un TABLERO DECLARADO entero —caras, líneas
+   * y nudos, uno por losa y por lado— que se compone en CADA lectura y baja en CADA
+   * sondeo, a un móvil, por datos. Y el 84 % de la vista es eso.
+   *
+   * ═══ Y EL PEOR MOMENTO NO ES EL FINAL, QUE ES LO QUE UNO SUPONDRÍA ═══
+   *
+   * Medido vuelta a vuelta: el máximo cae con SESENTA Y NUEVE losas puestas y CINCUENTA
+   * Y SEIS colocaciones abiertas —o sea el tablero casi lleno y todavía con sitios donde
+   * cabe la losa—, y son 73,5 kB. Con las setenta y dos puestas no queda ni una
+   * colocación, así que las caras bajan de 125 a 72 y la vista se queda en 59,1 kB.
+   * Medir sólo el final se habría dejado fuera el caso peor por catorce kilobytes.
+   *
+   * Jugada por HTTP, la lectura más gorda son 85 kB —la mesa añade asientos, opciones y
+   * avisos por encima de la vista— y una partida completa baja 6,86 MB.
+   *
+   * Eso NO es un fallo: `mueble: 'tablero'` es lo que permite que un cliente sin el
+   * pintor de Las Lindes juegue igual, y el tablero declarado es el §18 entero. Lo que
+   * sí sería un fallo es que creciera sin que nadie se entere — y crecer es fácil: un
+   * `rotulo` de veinte letras en cada línea son cinco kilobytes más por sondeo, y las
+   * líneas hoy no llevan texto ninguno.
+   *
+   * ═══ EL NÚMERO, Y POR QUÉ ÉSE ═══
+   *
+   * 96 kB sobre los 74,2 que mide la partida de aquí arriba: un 30 % de holgura. Ni
+   * pegado —un tope al 8 % se pone rojo el día que alguien añada un campo legítimo y
+   * entonces se sube sin mirar, que es como un presupuesto deja de serlo— ni al doble,
+   * que sería no vigilar nada. Es la misma cuenta que el tope de triángulos de la
+   * escena, y como allí, con la medida escrita al lado para poder discutirla.
+   */
+  const TOPE_DE_LA_VISTA = 96 * 1024;
+  comprobar(
+    'y la vista más gorda de la partida cabe en el presupuesto del cable',
+    laMasGorda < TOPE_DE_LA_VISTA,
+    { laMasGorda, tope: TOPE_DE_LA_VISTA },
+  );
+  console.log(
+    `  por el cable: la vista más gorda ${(laMasGorda / 1024).toFixed(1)} kB ` +
+      `(tope ${String(TOPE_DE_LA_VISTA / 1024)} kB) · media ${(sumaDeVistas / Math.max(1, revisiones) / 1024).toFixed(1)} kB`,
   );
 }
 
