@@ -610,6 +610,28 @@ el componente compartido **no lleve ningún sitio escrito dentro**. Probada romp
 devolviendo «en el muelle» al componente sale roja con nombre. Y con vacuna, que afirma que
 está leyendo el fichero de verdad y no una cadena vacía.
 
+## Y despues se jugo a mano, con todo esto encima
+
+Los arreglos de esta noche tocan `Lindes.tsx` de arriba abajo, asi que no basta con la
+bateria: se abrio una mesa de verdad en el escritorio y se jugo un turno entero pulsando.
+
+1. Lobby de La Linde Alta, nombre, **«Abrir mesa»** → mesa `8APYZ`, y la maga aparece
+   junto al fuego en la escena.
+2. Segunda ventana en la **silla «b»** —el mecanismo que la propia Sala ofrece para probar
+   solo—, nombre y codigo: **2 de 5 sentados**, La Maga y El Picaro.
+3. **«Volcar la bolsa»** → losa de salida en el centro, 70 en la bolsa, reloj lleno, «Maga
+   tiene el recodo en la mano».
+4. **Tocando una casilla clara** del tablero se pone la losa (revision 4) y el panel pasa a
+   «Maga decide donde planta».
+5. **«Labriego en la villa»** → la maga baja a 6 labriegos, la bolsa a 69, revision 5, y el
+   turno pasa a Bruno.
+6. Y al pulsar **«Al hombro»**: la maga de espaldas a su escala, la muralla de la villa
+   doblandola en altura como debe, la losa de la mano abajo a la izquierda y el reloj abajo
+   a la derecha.
+
+La medida del lienzo, que es donde vivio el fallo de los 566x9: **604 x 922**, recuadro
+identico, **cero railes hermanos**. La cadena del alto esta sana.
+
 ## Lo medido hasta aquí
 
 - `verify:lindes`: 13.295 comprobaciones en verde. Diez partidas enteras, 709
