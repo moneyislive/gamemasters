@@ -41,8 +41,24 @@ deja de servir para lo único que sirve.
 
 ## Siguiente paso
 
-Lo que Miguel mire por la mañana. Lo que queda apuntado de mi parte está en
-«Deudas apuntadas», y lo que hay que enseñarle, en «Lo que hay que mirar con ojos».
+Lo que Miguel mire. De mi parte no queda trabajo empezado a medias: el árbol está
+limpio, la batería en 86 de 86, y lo que falta por decidir está en «Deudas apuntadas».
+
+### Por dónde se ha pasado de verdad, y qué encontró cada camino
+
+| Camino | Qué encontró |
+|---|---|
+| La batería (86 comprobadores) | las reglas, la geometría, las fugas, el peso del cable |
+| Los dos bancos | cuatro fallos de dibujo que no dan error |
+| Medir el ENCUADRE desde Node | el tablero al 110 % del ancho, y desapareciendo en pantalla estrecha |
+| **Sentarse en el escritorio** | el lienzo en 9 píxeles, el raíl doble, «Le toca a otro» a quien le tocaba |
+| **Sentarse en la app** | no se podía poner una losa, y cada sitio salía dos veces |
+| **Llegar al DESENLACE** | la niebla se comía el tablero |
+| Tumbar el `.glb` a mano | el respaldo está sano |
+
+La lección, escrita para el siguiente: **cada camino nuevo encontró algo que ninguno de
+los anteriores veía, y la batería estaba en verde en todos**. El orden en que salieron no
+es casualidad: los fallos viven donde nadie ha pasado todavía.
 
 ## Lo que hay que mirar con ojos
 
