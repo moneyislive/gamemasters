@@ -159,6 +159,8 @@ export interface PoseDeCamara {
 export interface PoseDeMesa extends PoseDeCamara {
   /** El plano de fondo que hace falta para que la esquina de allá se vea. */
   readonly lejos: number;
+  /** Desde dónde y hasta dónde va la niebla SIN comerse el tablero. Ver abajo. */
+  readonly niebla: { readonly cerca: number; readonly lejos: number };
 }
 
 /** La cámara de ojos: donde está la cara, mirando adelante. */
@@ -255,6 +257,25 @@ export function camaraDeMesa(
    */
   const diagonal = Math.sqrt(ancho * ancho + alto * alto);
   const lejos = (distancia + diagonal / 2) * 1.35;
+
+  /*
+   * ═══ Y DÓNDE EMPIEZA LA NIEBLA, QUE ES DEL PASEO Y NO DE LA MESA ═══
+   *
+   * La niebla de esta escena se afinó para andar por encima del tablero: a ras de suelo,
+   * lo que está lejos se desvanece y eso es lo que da profundidad. Con la cámara de mesa no
+   * da profundidad: SE COME EL TABLERO. Y no se veía, porque con pocas losas la cámara está
+   * cerca y no llega a la niebla.
+   *
+   * Medido al mirar el final de una partida, con las setenta y dos puestas: la cámara se va
+   * a 2.796 y las esquinas quedan entre 2.524 y 3.469, o sea entre el 25 % y el 45 % de
+   * niebla —31 % en el centro— con la niebla fija de 1.400 a 5.950. El tablero entero salía
+   * pálido y sin color, justo en la pantalla que más se mira: la del final.
+   *
+   * Aquí la niebla empieza DONDE ACABA EL TABLERO —la esquina de allá— y llega hasta el
+   * plano de fondo. Así el tablero no se toca, y lo que se desvanece es la mesa de debajo,
+   * que es lo que tiene que desvanecerse.
+   */
+  const niebla = { cerca: distancia + diagonal / 2, lejos };
   return {
     x: centroX,
     y: distancia * Math.sin(inclinacion),
@@ -263,6 +284,7 @@ export function camaraDeMesa(
     miraY: 0,
     miraZ: centroZ,
     lejos,
+    niebla,
   };
 }
 

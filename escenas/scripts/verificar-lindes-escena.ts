@@ -859,6 +859,53 @@ for (const [pantalla, aspecto] of LIENZOS) {
 }
 
 
+/*
+ * ═══ Y LA NIEBLA NO SE COME EL TABLERO ═══
+ *
+ * La niebla de esta escena es del PASEO: a ras de suelo, lo que está lejos se desvanece y
+ * eso es lo que da idea de cuánto tablero queda por delante. Mirando la mesa no da
+ * profundidad ninguna — se come el tablero.
+ *
+ * Y no se veía, porque con pocas losas la cámara está cerca y no llega. Se vio mirando el
+ * FINAL de una partida, que es la pantalla que más se mira y la única donde el tablero
+ * está lleno: con las setenta y dos puestas, la cámara se iba a 2.796 y las esquinas
+ * quedaban entre 2.524 y 3.469, con la niebla fija de 1.400 a 5.950. O sea entre el 25 %
+ * y el 45 % de niebla encima del tablero, 31 % en el centro. Pálido y sin color.
+ *
+ * Lo que se exige es lo único que importa: que NINGUNA esquina del tablero llegue a la
+ * niebla. Y la otra mitad —que la niebla exista y no se haya ido al infinito—, porque una
+ * niebla que empieza detrás del plano de fondo no es niebla: es nada, y entonces la mesa
+ * de debajo acaba en un canto duro.
+ */
+for (const [comoEs, ancho, alto] of TABLEROS) {
+  const abarca = loQueAbarca([
+    { x: 0, y: 0 },
+    { x: ancho, y: alto },
+  ]);
+  for (const [pantalla, aspecto] of LIENZOS) {
+    const pose = camaraDeMesa(abarca, aspecto, CAMPO_DE_LA_CAMARA);
+    let laEsquinaMasLejos = 0;
+    for (const ex of [abarca.minX - 0.5, abarca.maxX + 0.5]) {
+      for (const ey of [abarca.minY - 0.5, abarca.maxY + 0.5]) {
+        const dx = ex * LADO_DE_LOSA - pose.x;
+        const dz = -ey * LADO_DE_LOSA - pose.z;
+        laEsquinaMasLejos = Math.max(laEsquinaMasLejos, Math.sqrt(dx * dx + pose.y * pose.y + dz * dz));
+      }
+    }
+    comprobar(
+      `${comoEs} en «${pantalla}»: ni una esquina llega a la niebla`,
+      pose.niebla.cerca >= laEsquinaMasLejos - 1e-6,
+      { esquina: Math.round(laEsquinaMasLejos), nieblaDesde: Math.round(pose.niebla.cerca) },
+    );
+    comprobar(
+      `${comoEs} en «${pantalla}»: y la niebla existe, que si empieza detrás del fondo no es niebla`,
+      pose.niebla.cerca < pose.lejos && pose.niebla.lejos <= pose.lejos,
+      { cerca: Math.round(pose.niebla.cerca), lejos: Math.round(pose.niebla.lejos), fondo: Math.round(pose.lejos) },
+    );
+  }
+}
+
+
 console.log('');
 if (fallos.length > 0) {
   console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);

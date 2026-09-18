@@ -269,6 +269,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   const { camera, size } = useThree();
   const abarca = useMemo(() => loQueAbarca(tablero.losas), [tablero.losas]);
   const puestas = useMemo(() => new Set(tablero.losas.map((l) => l.casilla)), [tablero.losas]);
+  const laNiebla = useRef<THREE.Fog>(null);
   const paseante = useRef<Paseante>(nacerEn(0, 0));
   const mandos = useRef<Mandos>(QUIETO);
   const mirandoA = useRef<{ x: number; z: number }>({ x: 0, z: 0 });
@@ -326,12 +327,27 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
         camaraDeVerdad.far = pose.lejos;
         camaraDeVerdad.updateProjectionMatrix();
       }
+      /* Y la niebla, detrás del tablero: mirando la mesa no da profundidad, se lo come. */
+      const n = laNiebla.current;
+      if (n !== null) {
+        n.near = pose.niebla.cerca;
+        n.far = pose.niebla.lejos;
+      }
       if (quieto === true) camera.position.set(pose.x, pose.y, pose.z);
       /* Si no, se acerca poco a poco: el tablero crece y un salto de cámara marea. */
       else camera.position.lerp(new THREE.Vector3(pose.x, pose.y, pose.z), Math.min(1, dt * 2.5));
       camera.lookAt(pose.miraX, pose.miraY, pose.miraZ);
       mirandoA.current = { x: pose.miraX, z: pose.miraZ };
       return;
+    }
+    /*
+     * Andando SÍ hace falta la niebla cerca: a ras de suelo es lo único que da idea de
+     * cuánto tablero queda por delante. Se le devuelven sus dos números de siempre.
+     */
+    const nAndando = laNiebla.current;
+    if (nAndando !== null) {
+      nAndando.near = LADO_DE_LOSA * 8;
+      nAndando.far = LADO_DE_LOSA * 34;
     }
     paseante.current = unPaso(paseante.current, mandos.current, dt, puestas);
     const pose = camara.modo === 'ojos' ? camaraDeOjos(paseante.current) : camaraDeHombro(paseante.current);
@@ -477,7 +493,12 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   return (
     <>
       <color attach="background" args={[COLOR_DEL_CIELO]} />
-      <fog attach="fog" args={[COLOR_DE_LA_NIEBLA, LADO_DE_LOSA * 8, LADO_DE_LOSA * 34]} />
+      {/*
+        LA NIEBLA LA MUEVE EL FOTOGRAMA, y no estos dos números: en la vista de mesa se
+        aparta detrás del tablero y en el paseo se queda cerca, que es donde sirve. Ver
+        `camaraDeMesa`. Los `args` son sólo con lo que nace, antes del primer fotograma.
+      */}
+      <fog ref={laNiebla} attach="fog" args={[COLOR_DE_LA_NIEBLA, LADO_DE_LOSA * 8, LADO_DE_LOSA * 34]} />
       <hemisphereLight args={['#eaf2ff', '#6b6a4a', 1.15]} />
       <directionalLight
         position={[LADO_DE_LOSA * 3, LADO_DE_LOSA * 5, LADO_DE_LOSA * 2]}

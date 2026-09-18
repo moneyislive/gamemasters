@@ -35,7 +35,8 @@ deja de servir para lo único que sirve.
 | 16 | `npm run jugar:lindes` — una mesa entera POR EL CABLE, medida | **hecho** |
 | 17 | Sentarse a una mesa de verdad y jugarla pulsando | **hecho** — tres fallos |
 | 18 | Sentarse **en la app** y jugarla tocando | **hecho** — dos fallos más |
-| 19 | Batería entera en verde | **hecho** — 86 de 86 |
+| 19 | Llevar una mesa hasta el DESENLACE y mirarlo | **hecho** — un fallo más |
+| 20 | Batería entera en verde | **hecho** — 86 de 86 |
 
 ## Siguiente paso
 
@@ -56,6 +57,36 @@ demostrarse tres veces. Lo que hay que abrir y mirar:
   informa siempre de una ventana de 1024 de ancho, así que lo que se ha medido
   del encuadre en pantalla estrecha es la ARITMÉTICA (que está en verde, en seis
   formas de pantalla) y no el píxel.
+
+## 6 · La niebla se comía el tablero, y sólo se ve al final
+
+Todo lo anterior se jugó uno o dos turnos. **El final de una partida no lo había visto
+nadie** — y es la pantalla que más se mira: es la última.
+
+Con las setenta y dos losas puestas, el tablero entero salía **pálido, lavado y sin
+color**. La niebla de esta escena es del PASEO —a ras de suelo, lo que está lejos se
+desvanece y eso es lo que da idea de cuánto tablero queda por delante—, y estaba fija de
+1.400 a 5.950. Mirando la mesa no da profundidad ninguna: se come el tablero.
+
+Medido, y por eso no se había visto nunca:
+
+| Tablero | Cámara a | Esquinas a | Niebla encima |
+|---|---|---|---|
+| la primera losa | 431 | 390–499 | **0 %** |
+| media docena | 969 | 866–1.185 | 0 % |
+| el del banco | 1.988 | 1.806–2.438 | 9–23 % |
+| **la bolsa entera** | 2.796 | 2.524–3.469 | **25–45 %** (31 % en el centro) |
+
+Con pocas losas la cámara está cerca y no llega a la niebla. Con el tablero lleno, un
+tercio. Ahora la niebla empieza **donde acaba el tablero** —la esquina de allá— y llega
+al plano de fondo: el tablero no se toca y lo que se desvanece es la mesa de debajo, que
+es lo que tiene que desvanecerse. Andando se le devuelven sus dos números de siempre,
+porque ahí sí sirve.
+
+**Y lleva red:** `verify:lindes-escena` exige que ninguna esquina del tablero llegue a la
+niebla, en las seis formas de tablero por las seis de pantalla — y también que la niebla
+EXISTA, porque una que empiece detrás del plano de fondo no es niebla y deja la mesa
+acabando en un canto duro. Con la niebla vieja: 57 rojas.
 
 ## Y dos más, que sólo se vieron sentándose EN LA APP
 
