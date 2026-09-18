@@ -32,7 +32,8 @@ deja de servir para lo único que sirve.
 | 13 | El maestro de oro: `robot-de-las-lindes.ts` y `oro-arcade/lindes.json` | **hecho** |
 | 14 | La pantalla del jugador: la losa de la mano y el reloj de la bolsa | **hecho** |
 | 15 | `verify:mesa` juega a Las Lindes, con la bolsa vigilada | **hecho** — 94 revisiones |
-| 16 | Batería entera en verde | **hecho** — 86 de 86 |
+| 16 | `npm run jugar:lindes` — una mesa entera POR EL CABLE, medida | **hecho** |
+| 17 | Batería entera en verde | **hecho** — 86 de 86 |
 
 ## Siguiente paso
 
@@ -53,6 +54,46 @@ demostrarse tres veces. Lo que hay que abrir y mirar:
   informa siempre de una ventana de 1024 de ancho, así que lo que se ha medido
   del encuadre en pantalla estrecha es la ARITMÉTICA (que está en verde, en seis
   formas de pantalla) y no el píxel.
+
+## Lo que pesa una mesa por el cable, que nadie había medido
+
+`npm run jugar:lindes -- --servidor http://localhost:5174` juega una mesa entera
+contra un servidor levantado, con los movimientos sacados del TABLERO QUE EL
+SERVIDOR MANDÓ. Una partida de tres, medida:
+
+- **105 vueltas**, terminada: 71 losas puestas, 23 labriegos plantados, 11 pasadas.
+- Ni un 500, y **ni un botón que el servidor ofrezca y luego rechace** — que es lo
+  más grave que ese guion puede encontrar, porque significaría que lo que se pinta
+  y lo que se acepta no son la misma cosa.
+- **La lectura más gorda: 85,1 kB.** Media 39,0 kB. **6,86 MB** en toda la partida.
+
+### Y de dónde sale ese peso
+
+De la vista con el tablero lleno —59,0 kB sin los avisos—, repartida así:
+
+| Qué | Cuánto | |
+|---|---|---|
+| `tablero` | 49,5 kB | **84 %** |
+| `losas` | 7,4 kB | 12 % |
+| `cobros` | 1,7 kB | 3 % |
+| todo lo demás | 0,4 kB | 1 % |
+
+Y dentro del tablero: `lineas` 32,8 kB (252 piezas), `caras` 13,7 kB (72), `nudos`
+2,0 kB (16). **Las líneas no llevan texto**: son `id`, dos puntos, un color, un
+grosor y un `toque`. Ahí no hay grasa que quitar.
+
+### Y no es un fallo: es lo que se compró
+
+Las Lindes declara `mueble: 'tablero'`, o sea el mueble GENÉRICO. Eso significa que
+un cliente que no tenga el pintor de Las Lindes puede jugar igual, pintando el
+tablero declarado — que es el §18 entero y la razón de que exista el tablero
+declarado. El pintor propio de esta casa NO usa esas 49,5 kB: pinta con `losas`,
+`plantados` y `colocaciones`, que son 7,6 kB.
+
+O sea: **cuatro quintas partes de cada sondeo son el precio de que cualquiera pueda
+jugar a esto sin saber a qué se juega.** Queda escrito para que la decisión de
+cobrarlo o no la tome alguien mirando el número, y no por sorpresa un día con datos
+móviles.
 
 ## Por qué el reloj de arena mide la BOLSA y no el turno
 
@@ -162,9 +203,16 @@ por seis de pantalla, más los dos rincones.
   reparto de la bolsa— vive en el reductor, que ya está congelado por el maestro
   de oro movimiento a movimiento. Meterlo no compraría nada que no esté comprado.
   Queda escrito para que el siguiente no tenga que volver a deducirlo.
-- **El móvil de verdad, sin mirar.** Ver arriba: el panel del navegador no deja
-  emular una ventana estrecha de verdad. La aritmética del encuadre está medida
-  en seis formas de pantalla; los píxeles de un teléfono, no.
+- ~~El móvil de verdad, sin mirar.~~ **Saldada.** El banco se pone del tamaño del
+  lienzo —`móvil con hoja` (390×584, que es el de verdad en la app), `móvil de pie`,
+  `móvil tumbado` y `tableta`— porque lo que la escena mide es el LIENZO y no la
+  ventana. Mirado en los dos móviles: el tablero entra entero, la losa de la mano
+  entra entera y el reloj entra entero.
+- **`jugar:lindes` no está en la batería.** Necesita un servidor levantado y hoy se
+  le pasa por `--servidor`. `verify:mesa` ya cubre la superficie HTTP genérica y
+  juega Las Lindes entera con el árbitro, así que el hueco que quedaría es sólo el
+  PESO —y eso, hoy, está medido a mano y escrito arriba. Meterlo pide que se levante
+  su propio servidor, como hace `jugar:fondo`; es barato y no está hecho.
 - **La arena de `reloj.glb` no se ve en la escena de Las Lindes.** Se ha decidido
   usar los conos y está explicado arriba, pero el porqué de fondo —que el horneado
   de ese modelo sea tan oscuro— igual conviene mirarlo también del lado de

@@ -370,3 +370,15 @@ miraba qué entra en el LIENZO.
 
 Y los que ya existen y lo cogen solo: `verify:juegos`, `verify:mesa`,
 `verify:procedencia`, `verify:pureza`, `verify:fronteras`, `oro:arcade`.
+
+Y una herramienta que no es comprobador y se corre a mano:
+
+    npm run jugar:lindes -- --servidor http://localhost:5174
+
+Juega una mesa entera POR EL CABLE contra un servidor levantado, con los movimientos
+sacados del tablero que el servidor mandó. Lo que busca no son las reglas —ésas ya
+están medidas tres veces— sino lo que sólo se ve ahí: que la partida entera cabe por
+las rutas, que no hay un botón ofrecido y luego rechazado, y **cuánto pesa**. Medido:
+la lectura más gorda son 85,1 kB y una partida baja 6,86 MB, de los que el 84 % es el
+tablero declarado. Ver la bitácora para el desglose y para por qué eso es el precio
+de `mueble: 'tablero'` y no un fallo.
