@@ -726,9 +726,30 @@ en `tablero.glb` y no supuesta: **las piezas del pack no miden lo mismo ni de le
 escala uno, `roca-a` mide 0,15 personas y `piedra` 0,60 — cuatro veces. Con una escala común,
 la misma cuenta daba un peñasco y una china.
 
-Así que `desierto.ts` **pide el alto en personas** —entre cuatro y nueve— y es la escena la
-que mide la caja del modelo que toque y saca la escala. Eso además sobrevive al día que
-alguien recompile el pack con otro tamaño, cosa que una tabla de escalas a mano no haría.
+**Tercer intento, y el que enseña algo:** pasé a pedir el ALTO en personas. Miguel lo miró y
+dijo lo que faltaba: «son demasiado grandes, o al menos no es proporcional la forma al
+tamaño». Y tenía razón, porque **el alto de una piedra no dice lo grande que se ve**. Medida
+la caja ENTERA de cada una, el ancho partido por el alto:
+
+| | ancho/alto |
+|---|---|
+| `roca-a` | **4,3** |
+| `roca-e` | 2,5 |
+| `roca-b` | 2,1 |
+| `roca-c` · `roca-d` | 1,8 |
+| `piedra` | 1,5 |
+
+`roca-a` es un lanchón. Pidiéndole nueve personas de alto salía con **noventa y ocho unidades
+de ancho** —más de media losa de tablero, una losa de piedra de sesenta y siete metros— y la
+cuenta decía tan tranquila «nueve personas». Lo que se mide mal no se ve mal en el número: se
+ve mal en la pantalla.
+
+Así que se mide por el **LADO MAYOR**, entre cinco y diez personas. Cada piedra conserva su
+carácter —la plana se queda plana y tendida, la rechoncha sube— y ninguna se estira para
+alcanzar una medida que su forma no pide. La cuenta salió de la escena a `loQueSeEstira`, en
+`desierto.ts`, justo para que una batería pueda darle **una caja plana a propósito** y
+preguntar qué ocupa el resultado. Probada rompiéndola: volviendo a dividir por el alto salen
+tres rojos, y la vacuna afirma que esa cuenta sacaba del lanchón más de media losa.
 
 **Y desperdigadas no es al azar.** Ocho tiradas independientes dejan parejas pegadas y lados
 vacíos: eso no se lee como paisaje sino como descuido. El contorno se parte en ocho sectores

@@ -36,7 +36,7 @@
  * pantallas y después de recargar.
  */
 import { GRUESO_DE_LOSA, LADO_DE_LOSA } from './medidas';
-import { ALTURA_DE_UNA_PERSONA } from '../escala';
+import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
 import { sorteo } from './losa';
 import { MODELO } from '../nombres';
 
@@ -72,26 +72,31 @@ export const LO_QUE_CRECE_EN_LA_ARENA: readonly string[] = [
 ];
 
 /**
- * LO ALTOS QUE SALEN, EN PERSONAS.
+ * LO GRANDES QUE SALEN, EN PERSONAS, MEDIDAS POR SU LADO MAYOR.
  *
- * ═══ POR QUÉ EN PERSONAS Y NO EN «ESCALA» ═══
+ * ═══ POR QUÉ NO SE PIDE EL ALTO, QUE ES LO QUE PARECE ═══
  *
- * Porque las piezas del pack NO miden lo mismo. Medido en `tablero.glb`, a escala uno:
- * `roca-a` 0,15 personas, `roca-b` 0,29, `roca-d` 0,35, `roca-c` y `roca-e` 0,42,
- * `piedra` 0,60. **Cuatro veces de diferencia entre la mayor y la menor.** Con una escala
- * común, la misma cuenta daba un peñasco y un guijarro, y en el tablero se veía: parecía
- * gravilla tirada en vez de un desierto.
+ * Porque **el alto de una piedra no dice lo grande que se ve**. Medida la caja entera de
+ * cada una en `tablero.glb`, el ancho partido por el alto sale así:
  *
- * Así que aquí se pide el ALTO y es la escena la que, midiendo la caja del modelo que le
- * toque, saca la escala que hace falta. Eso además sobrevive al día que alguien recompile el
- * pack con otro tamaño, que con una tabla de escalas a mano no pasaría.
+ *     roca-a  4,3     roca-e  2,5     roca-b  2,1
+ *     roca-c  1,8     roca-d  1,8     piedra  1,5
  *
- * Entre cuatro y nueve personas: peñascos de siete a veintitrés metros. Se leen desde la
- * cámara de mesa —a quinientas unidades y con un lienzo de novecientos, cincuenta píxeles— y
- * al pasar andando al lado siguen siendo rocas y no montañas.
+ * `roca-a` es CUATRO VECES Y MEDIA más ancha que alta: es un lanchón tendido. Pidiéndole
+ * nueve personas de alto salían **noventa y ocho unidades de ancho**, más de media losa de
+ * tablero — una losa de piedra de sesenta y siete metros tirada en la arena. Miguel lo vio
+ * en cuanto miró: «son demasiado grandes, o al menos no es proporcional la forma al tamaño».
+ *
+ * Midiendo por el LADO MAYOR cada piedra se queda con su carácter: la plana se queda plana y
+ * tendida —y baja—, y la rechoncha sube. Ninguna se estira para llegar a un alto que su forma
+ * no pide.
+ *
+ * Entre cinco y diez personas de lado mayor: de trece a veintiséis unidades, o sea entre un
+ * trece y un quince por ciento del lado de una losa. Se ven desde la cámara de mesa y no le
+ * comen sitio al tablero, que es de quien es la partida.
  */
-const MAS_BAJO = ALTURA_DE_UNA_PERSONA * 4;
-const MAS_ALTO = ALTURA_DE_UNA_PERSONA * 9;
+const MAS_PEQUENA = ALTURA_DE_UNA_PERSONA * 5;
+const MAS_GRANDE = ALTURA_DE_UNA_PERSONA * 10;
 
 /**
  * A QUÉ DISTANCIA DEL CANTO DEL TABLERO, en losas.
@@ -112,6 +117,41 @@ const MAS_ALTO = ALTURA_DE_UNA_PERSONA * 9;
 const MAS_CERCA = 0.2;
 const MAS_LEJOS = 0.8;
 
+/** La caja de un modelo del pack, en unidades del pack. */
+export interface CajaDelModelo {
+  readonly ancho: number;
+  readonly alto: number;
+  readonly fondo: number;
+}
+
+/**
+ * CUÁNTO HAY QUE ESTIRAR UN MODELO PARA QUE MIDA LO QUE SE LE PIDE.
+ *
+ * ═══ POR EL LADO MAYOR, Y AQUÍ ESTÁ EL PORQUÉ ═══
+ *
+ * La primera versión dividía por el ALTO, y eso rompe con cualquier pieza que no sea
+ * rechoncha. Medidas las cajas en `tablero.glb`, el ancho partido por el alto:
+ *
+ *     roca-a  4,3     roca-e  2,5     roca-b  2,1
+ *     roca-c  1,8     roca-d  1,8     piedra  1,5
+ *
+ * `roca-a` es un lanchón: cuatro veces y media más ancha que alta. Pidiéndole nueve personas
+ * de ALTO salía con **noventa y ocho unidades de ancho** —más de media losa de tablero, un
+ * pedrusco de sesenta y siete metros— mientras la cuenta decía tan tranquila «nueve personas».
+ *
+ * Por el lado mayor, lo que se pide es lo que ocupa, y cada piedra conserva su carácter: la
+ * plana se queda plana y tendida, y la rechoncha sube. Ninguna se estira para alcanzar una
+ * medida que su forma no pide.
+ *
+ * Vive aquí y no en la escena para que se pueda comprobar sin montar WebGL: dándole una caja
+ * plana a propósito, una batería puede preguntar qué ocupa el resultado.
+ */
+export function loQueSeEstira(caja: CajaDelModelo, tamano: number): number {
+  const mayor = Math.max(caja.ancho, caja.alto, caja.fondo);
+  /* Sin caja no hay cuenta posible: se pinta a su tamaño antes que no pintarlo. */
+  return mayor <= 1e-6 ? 1 : tamano / (mayor * ESCALA_DEL_PACK);
+}
+
 /** Una pieza del desierto, ya en coordenadas del mundo. */
 export interface EnElDesierto {
   readonly pieza: string;
@@ -119,8 +159,13 @@ export interface EnElDesierto {
   readonly y: number;
   readonly z: number;
   readonly giro: number;
-  /** Lo alto que tiene que salir, en unidades del mundo. La escala la saca quien la pinta. */
-  readonly alto: number;
+  /**
+   * LO QUE TIENE QUE MEDIR SU LADO MAYOR, en unidades del mundo.
+   *
+   * El lado mayor y no el alto: ver `MAS_PEQUENA`. La escala la saca quien la pinta, midiendo
+   * la caja del modelo que le toque.
+   */
+  readonly tamano: number;
 }
 
 /** El rectángulo que ocupan las losas puestas, en unidades del mundo. */
@@ -197,7 +242,7 @@ export function loQueHayEnElDesierto(
      */
     const radio = empiezaLaArena + LADO_DE_LOSA * (MAS_CERCA + tira() * (MAS_LEJOS - MAS_CERCA));
 
-    const alto = MAS_BAJO + tira() * (MAS_ALTO - MAS_BAJO);
+    const tamano = MAS_PEQUENA + tira() * (MAS_GRANDE - MAS_PEQUENA);
     const cual = LO_QUE_CRECE_EN_LA_ARENA[Math.floor(tira() * LO_QUE_CRECE_EN_LA_ARENA.length)];
     salida.push({
       pieza: cual ?? MODELO.rocaA,
@@ -206,7 +251,7 @@ export function loQueHayEnElDesierto(
       /* Apoyadas en la mesa, que está un pelo por debajo de la cara de abajo de las losas. */
       y: -GRUESO_DE_LOSA * 1.02,
       giro: tira() * Math.PI * 2,
-      alto,
+      tamano,
     });
   }
   return salida;

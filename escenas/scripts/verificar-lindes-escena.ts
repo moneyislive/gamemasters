@@ -66,6 +66,7 @@ import {
   LO_QUE_CRECE_EN_LA_ARENA,
   MARGEN_DE_LA_ARENA,
   loQueHayEnElDesierto,
+  loQueSeEstira,
 } from '../lindes/desierto';
 import {
   RADIO_DEL_ALTOZANO,
@@ -74,7 +75,7 @@ import {
   loQueHayEnLaLinde,
   sitiosDeLaLinde,
 } from '../linde-alta/la-linde';
-import { ALTURA_DE_UNA_PERSONA } from '../escala';
+import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
 import {
   ALTURA_DE_LOS_OJOS,
   SOBRE_EL_HOMBRO,
@@ -1503,9 +1504,9 @@ paso('La arena se distingue del tablero, y el desierto está donde tiene que est
       z: pieza.z.toFixed(0),
     });
 
-    /* El alto, en personas: ni guijarros que no se ven ni montañas que tapan el tablero. */
-    const personas = pieza.alto / ALTURA_DE_UNA_PERSONA;
-    comprobar(`y mide entre cuatro y nueve personas (${pieza.pieza})`, personas >= 4 && personas <= 9, {
+    /* El tamaño, en personas: ni guijarros que no se ven ni pedruscos que tapan el tablero. */
+    const personas = pieza.tamano / ALTURA_DE_UNA_PERSONA;
+    comprobar(`y su lado mayor mide entre cinco y diez personas (${pieza.pieza})`, personas >= 5 && personas <= 10, {
       personas: personas.toFixed(1),
     });
 
@@ -1519,6 +1520,65 @@ paso('La arena se distingue del tablero, y el desierto está donde tiene que est
     const centroZ = (z0 + z1) / 2;
     const angulo = Math.atan2(pieza.z - centroZ, pieza.x - centroX);
     sectores.add(Math.floor(((angulo + Math.PI * 2) % (Math.PI * 2)) / ((Math.PI * 2) / CUANTAS_EN_EL_DESIERTO)));
+  }
+
+  /*
+   * ═══ Y NINGUNA SE ESTIRA HASTA SER UN LANCHÓN ═══
+   *
+   * La primera versión pedía el ALTO y dividía por el alto del modelo. Con una pieza
+   * rechoncha sale bien; con una plana, no: medido en `tablero.glb`, `roca-a` es CUATRO VECES
+   * Y MEDIA más ancha que alta, así que pidiéndole nueve personas de alto salía con noventa y
+   * ocho unidades de ancho —más de media losa de tablero— mientras la cuenta decía tan
+   * tranquila «nueve personas». Miguel lo vio en el tablero: «son demasiado grandes, o al
+   * menos no es proporcional la forma al tamaño».
+   *
+   * Aquí se le da a `loQueSeEstira` una caja PLANA A PROPÓSITO y se le pregunta qué ocupa el
+   * resultado. Es la comprobación que no existía, y la que se pone roja el día que alguien
+   * vuelva a dividir por el alto.
+   */
+  {
+    const UN_LANCHON = { ancho: 0.30, alto: 0.07, fondo: 0.28 };
+    const UNA_RECHONCHA = { ancho: 0.42, alto: 0.28, fondo: 0.36 };
+    const TOPE = ALTURA_DE_UNA_PERSONA * 10;
+
+    for (const [comoEs, caja] of [
+      ['plana como un lanchón', UN_LANCHON],
+      ['rechoncha', UNA_RECHONCHA],
+    ] as const) {
+      const escala = loQueSeEstira(caja, TOPE);
+      const enElMundo = {
+        ancho: caja.ancho * escala * ESCALA_DEL_PACK,
+        alto: caja.alto * escala * ESCALA_DEL_PACK,
+        fondo: caja.fondo * escala * ESCALA_DEL_PACK,
+      };
+      const mayor = Math.max(enElMundo.ancho, enElMundo.alto, enElMundo.fondo);
+      comprobar(
+        `una piedra ${comoEs} pedida al máximo ocupa lo que se le pide y ni una unidad más`,
+        Math.abs(mayor - TOPE) < 1e-9,
+        { mayor: mayor.toFixed(1), pedido: TOPE.toFixed(1) },
+      );
+      /* Y en losas, que es la unidad en la que se ve si tapa la partida. */
+      comprobar(
+        `y no se come el tablero: menos de un sexto de losa (${comoEs})`,
+        mayor < LADO_DE_LOSA / 6,
+        { enLosas: (mayor / LADO_DE_LOSA).toFixed(3) },
+      );
+    }
+
+    /*
+     * ═══ LA VACUNA ═══
+     *
+     * Que la cuenta vieja —dividir por el ALTO— sí rompía esto, y por cuánto. Sin esta línea
+     * las de arriba seguirían en verde el día que alguien las cambie por algo que no
+     * discrimina, y se leerían como vigiladas.
+     */
+    const porElAlto = TOPE / (UN_LANCHON.alto * ESCALA_DEL_PACK);
+    const anchoConLaVieja = UN_LANCHON.ancho * porElAlto * ESCALA_DEL_PACK;
+    comprobar(
+      'y la cuenta de antes —por el alto— sacaba del lanchón más de media losa de ancho',
+      anchoConLaVieja > LADO_DE_LOSA / 2,
+      { ancho: anchoConLaVieja.toFixed(0), enLosas: (anchoConLaVieja / LADO_DE_LOSA).toFixed(2) },
+    );
   }
 
   /*

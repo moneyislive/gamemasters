@@ -42,8 +42,8 @@ import { LADO_DE_LOSA } from './medidas';
 import { LO_QUE_NO_SE_RECORTA, montarLaLosa, semillaDeLaLosa } from './losa';
 import type { PuestaEnLaLosa } from './losa';
 import { COLOR_DE_LA_ARENA, geometriaDeLaArena, geometriaDeLosHuecos, geometriaDelSuelo } from './suelo';
-import { loQueHayEnElDesierto } from './desierto';
-import type { EnElDesierto } from './desierto';
+import { loQueHayEnElDesierto, loQueSeEstira } from './desierto';
+import type { CajaDelModelo, EnElDesierto } from './desierto';
 import type { LosaQueSePinta } from './suelo';
 import { geometriaDeLaPeana, geometriaDelLabriego } from './labriego';
 import {
@@ -770,21 +770,32 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
 }
 
 /**
- * LO QUE MIDE DE ALTO UN MODELO DEL PACK, en unidades del pack.
+ * LA CAJA DE UN MODELO DEL PACK, en unidades del pack: su alto y su lado mayor.
  *
- * Es el único sitio donde se sabe de verdad: las piezas no miden lo mismo ni de lejos —entre
- * `roca-a` y `piedra` hay cuatro veces— y una tabla de escalas escrita a mano se queda vieja
- * en silencio el día que alguien recompile `tablero.glb`. Quien quiera una pieza de un alto
- * concreto pide el alto y divide por esto.
+ * Es el único sitio donde se sabe de verdad lo que mide una pieza, y hacen falta las dos
+ * medidas porque sirven para cosas distintas:
+ *
+ *   · el ALTO, para sentar algo encima —la caja bajo el reloj—;
+ *   · el LADO MAYOR, para decidir lo grande que se ve —las piedras del desierto—, porque el
+ *     alto de una piedra plana no dice nada de lo grande que parece: `roca-a` es cuatro veces
+ *     y media más ancha que alta, y pidiéndole un alto salía un lanchón de media losa.
+ *
+ * Una tabla de medidas escrita a mano se quedaría vieja en silencio el día que alguien
+ * recompile `tablero.glb`; esto no.
  */
-function altoDelModelo(catalogo: Catalogo, nombre: string): number {
+function cajaDelModelo(catalogo: Catalogo, nombre: string): CajaDelModelo {
+  let ancho = 0;
   let alto = 0;
+  let fondo = 0;
   for (const parte of catalogo.partes.get(nombre) ?? []) {
     parte.geometria.computeBoundingBox();
     const caja = parte.geometria.boundingBox;
-    if (caja !== null) alto = Math.max(alto, caja.max.y - caja.min.y);
+    if (caja === null) continue;
+    ancho = Math.max(ancho, caja.max.x - caja.min.x);
+    alto = Math.max(alto, caja.max.y - caja.min.y);
+    fondo = Math.max(fondo, caja.max.z - caja.min.z);
   }
-  return alto;
+  return { ancho, alto, fondo };
 }
 
 /* ──────────────────────────── El desierto de fuera ──────────────────────────── */
@@ -816,9 +827,7 @@ function ElDesierto({
   const porModelo = useMemo(() => {
     const salida = new Map<string, PuestaEnLaLosa[]>();
     for (const p of piezas) {
-      const suyo = altoDelModelo(catalogo, p.pieza);
-      /* Sin caja no hay escala posible: se pinta a su tamaño antes que no pintarlo. */
-      const escala = suyo <= 1e-6 ? 1 : p.alto / (suyo * ESCALA_DEL_PACK);
+      const escala = loQueSeEstira(cajaDelModelo(catalogo, p.pieza), p.tamano);
       const puesta: PuestaEnLaLosa = {
         pieza: p.pieza,
         x: p.x,
@@ -1005,7 +1014,7 @@ function ElRelojDeLaBolsa({
    */
   const enQueSeApoya = useMemo(() => {
     if (catalogo === null) return null;
-    const suyo = altoDelModelo(catalogo, MODELO.caja);
+    const suyo = cajaDelModelo(catalogo, MODELO.caja).alto;
     if (suyo <= 1e-6) return null;
     const alto = sitio.lado * ALTO_DE_LA_CAJA_DEL_RELOJ;
     const puestas: PuestaEnLaLosa[] = [
