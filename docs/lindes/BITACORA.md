@@ -33,7 +33,8 @@ deja de servir para lo único que sirve.
 | 14 | La pantalla del jugador: la losa de la mano y el reloj de la bolsa | **hecho** |
 | 15 | `verify:mesa` juega a Las Lindes, con la bolsa vigilada | **hecho** — 94 revisiones |
 | 16 | `npm run jugar:lindes` — una mesa entera POR EL CABLE, medida | **hecho** |
-| 17 | Batería entera en verde | **hecho** — 86 de 86 |
+| 17 | Sentarse a una mesa de verdad y jugarla pulsando | **hecho** — tres fallos |
+| 18 | Batería entera en verde | **hecho** — 86 de 86 |
 
 ## Siguiente paso
 
@@ -54,6 +55,70 @@ demostrarse tres veces. Lo que hay que abrir y mirar:
   informa siempre de una ventana de 1024 de ancho, así que lo que se ha medido
   del encuadre en pantalla estrecha es la ARITMÉTICA (que está en verde, en seis
   formas de pantalla) y no el píxel.
+
+## Los tres fallos que sólo se vieron SENTÁNDOSE
+
+Con la batería en 86 de 86, los dos bancos mirados y una mesa entera jugada por HTTP,
+quedaba un camino sin recorrer: abrir la Sala, sentarse y jugar **pulsando**. Salieron
+tres, y ninguno da un error en ninguna consola.
+
+### 1 · El tablero en NUEVE PÍXELES
+
+`.lindes-pantalla` medía 34 puntos de alto y el lienzo **566 × 9**. La cadena de seis
+eslabones que reparte el alto desde la ventana hasta el recuadro termina, por selector
+LITERAL, en `.burgo-en-tres` y `.burgo-lienzo`. El tercer pintor entró sin los suyos.
+
+El comentario del Burgo lo avisaba dos mil líneas más arriba, palabra por palabra: «con
+base cero un antepasado que no tenga alto que repartir dejaría el recuadro en cero
+puntos y la mesa en negro, sin un error en ninguna consola».
+
+**Por qué el banco no lo veía:** `banco-lindes.html` se pinta con `position: fixed;
+inset: 0`, así que allí nunca falta alto. Un banco no es la pantalla.
+
+### 2 · El raíl, DOS VECES en el árbol
+
+`sala.tsx` pinta el raíl dentro del lienzo cuando hay lienzo, y en un `<aside>` cuando
+no. Quién lo sabe es el pintor —puede caer al respaldo en mitad de su render— y lo avisa
+llamando a `foco` con su recuadro. `LindesEnTres` ni recibía ese `foco`, así que la Sala
+pintaba su `<aside>` **además** del que el propio pintor ya pintaba: dos regiones vivas
+diciendo lo mismo, el código de la mesa repetido y **dos botones de «Tirar la mesa»**.
+
+Y ese `<aside>` de más era también la causa del fallo 1: el grid de la pantalla declara
+UNA fila, y el `<aside>` caía en una fila implícita que se llevaba el alto entero.
+Medido: `grid-template-rows: 34px 888px`.
+
+Arreglado y medido en pantalla: `.lindes-pantalla` de 34 a **922**, `aside.rail` de 1 a
+**0**, «Tirar la mesa» de 2 a **1**.
+
+### 3 · «Le toca a otro», dicho a quien le tocaba
+
+Con la flecha del turno señalando mi propio asiento en el raíl y la losa en mi mano, el
+panel de acciones decía «Le toca a otro. Cuando ponga su losa, te tocará a ti».
+
+La causa: la lista de acciones se salta los `PONER` a propósito —no son botones, son
+casillas del tablero—, así que sale vacía TAMBIÉN para quien tiene el turno, y el
+respaldo de lista vacía sólo miraba si estaba vacía. Ahora dice **«Ponla en el tablero ·
+Señala una casilla clara y tócala»**, y ninguna de las 13.295 comprobaciones del
+reglamento lo veía porque todas miran QUÉ SE PUEDE HACER y ésta es una frase sobre quién
+manda.
+
+### Y lo que se deja puesto para que no vuelva
+
+- **`verify:lindes`** comprueba ahora lo que el tablero LE DICE a cada cual, y no sólo lo
+  que ofrece. Probada deshaciendo el arreglo: se pone roja con el mensaje exacto.
+- **`verify:escritorio`** barre los fuentes, saca la clase de TODO recuadro que lleve
+  `lienzo-propio` y le exige su eslabón. El cuarto pintor lo estrena en cuanto escriba su
+  `<div className="lienzo-propio …">`. Probada quitando el eslabón de Las Lindes: roja.
+- Y esa guardia **nació mal y hubo que rehacerla**: la primera versión montaba cada
+  pintor con una vista fabricada para leerle la clase, y ningún pintor se monta con una
+  vista que no es suya —caen al respaldo, que es correcto—, así que no inspeccionaba
+  nada y pasaba en verde. Lo delató quitar el eslabón a mano. Lleva vacuna desde
+  entonces: si el barrido se queda a cero, lo dice.
+
+### Y después se jugó, pulsando
+
+Losa colocada tocando el tablero, labriego plantado desde el raíl (7 → 6), revisión 4 y
+turno al siguiente. Las dos ramas del mensaje del turno, vistas en el producto.
 
 ## Lo que pesa una mesa por el cable, que nadie había medido
 

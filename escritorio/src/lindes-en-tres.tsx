@@ -72,8 +72,48 @@ const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string; 
   { modo: 'ojos', rotulo: 'Sus ojos', ayuda: 'Desde su cara, andando por encima de las losas.' },
 ];
 
-export function LindesEnTres({ mesa, puesta, tablero, opciones, elRail }: LoQueVeElPintor): JSX.Element {
+export function LindesEnTres({
+  mesa,
+  puesta,
+  tablero,
+  opciones,
+  elRail,
+  foco,
+}: LoQueVeElPintor): JSX.Element {
   const { mover, quieto } = mesa;
+
+  /*
+   * ═══ AVISAR DE QUE HAY LIENZO, QUE ES DE LO QUE CUELGA MEDIA PANTALLA ═══
+   *
+   * `sala.tsx` pinta el raíl en dos sitios distintos según haya lienzo o no: con lienzo va
+   * DENTRO, en el cajón; sin lienzo va en un `<aside>` a un lado. Y quién lo sabe es este
+   * pintor, en mitad de su render —puede caer al respaldo—, así que hay que decirlo.
+   *
+   * Sin decirlo pasaban las DOS cosas a la vez, y las dos sólo se ven sentándose a una
+   * mesa de verdad —el banco de pruebas se pinta con `position: fixed` y allí nunca falta
+   * alto, y la batería estaba en 86 de 86—:
+   *
+   *   · EL TABLERO EN NUEVE PÍXELES. El grid de la pantalla declara UNA fila; el `<aside>`
+   *     de más caía en una fila implícita y se llevaba el alto entero. Medido:
+   *     `grid-template-rows: 34px 888px`, con el mueble en los 34.
+   *   · Y EL RAÍL DOS VECES EN EL ÁRBOL: una aquí dentro y otra en ese `<aside>`. Dos
+   *     regiones vivas diciendo lo mismo, el código de la mesa repetido y DOS botones de
+   *     «Tirar la mesa» — que es exactamente lo que `sala.tsx` tiene escrito que no puede
+   *     pasar.
+   *
+   * Se avisa al montar el recuadro y con `null` al soltarlo, igual que el Burgo: si el
+   * recuadro se va con el foco dentro, el navegador lo suelta al `<body>` y quien mira con
+   * teclado se queda sin sitio.
+   *
+   * `foco` es OPCIONAL porque `verify:escritorio` monta este pintor suelto para medirlo,
+   * sin ninguna Sala alrededor.
+   */
+  const apuntarElRecuadro = useCallback(
+    (recuadro: HTMLDivElement | null): void => {
+      foco?.(recuadro);
+    },
+    [foco],
+  );
   const vista = puesta.vista;
 
   const datos = useMemo(() => tableroEnTres(vista), [vista]);
@@ -164,7 +204,7 @@ export function LindesEnTres({ mesa, puesta, tablero, opciones, elRail }: LoQueV
 
   return (
     <div className="lienzo-propio lindes-pantalla">
-      <div className="lindes-lienzo">
+      <div className="lindes-lienzo" ref={apuntarElRecuadro}>
         <LimiteDelMundo alFallar={alFallar}>
           <Canvas
             shadows={false}

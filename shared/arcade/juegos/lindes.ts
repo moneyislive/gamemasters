@@ -1504,14 +1504,38 @@ function accionesDelTablero(
       toque: { tipo: o.tipo, carga: o.carga ?? null },
     });
   }
+  /*
+   * ═══ Y CUANDO NO HAY NINGUNO, HAY DOS MOTIVOS DISTINTOS Y NO SE PARECEN ═══
+   *
+   * Aquí sólo se miraba si la lista había salido vacía, y salía vacía en LOS DOS casos:
+   * para quien está esperando su turno, y también para QUIEN LE TOCA PONER —porque sus
+   * únicas opciones son `PONER`, y el bucle de arriba se las salta a propósito: esos no
+   * son botones, son casillas del tablero—. Así que a quien le tocaba jugar se le decía
+   * «Le toca a otro. Cuando ponga su losa, te tocará a ti».
+   *
+   * Sentado a una mesa de verdad, con la flecha del turno señalando mi propio asiento en
+   * el raíl y la losa en mi mano. Ninguna de las 13.295 comprobaciones del reglamento lo
+   * vio, porque todas miran QUÉ SE PUEDE HACER y ésta es una frase sobre quién manda.
+   */
   if (salida.length === 0 && vista.momento === 'colocando') {
-    salida.push({
-      id: 'espera',
-      rotulo: 'Le toca a otro',
-      ayuda: 'Cuando ponga su losa, te tocará a ti.',
-      disponible: false,
-      toque: { tipo: PASAR, carga: null },
-    });
+    const meToca = vista.turnoDe !== null && vista.turnoDe === vista.yo;
+    salida.push(
+      meToca
+        ? {
+            id: 'a-poner',
+            rotulo: 'Ponla en el tablero',
+            ayuda: 'Señala una casilla clara y tócala. Con «Girar» se prueba de otra manera.',
+            disponible: false,
+            toque: { tipo: PASAR, carga: null },
+          }
+        : {
+            id: 'espera',
+            rotulo: 'Le toca a otro',
+            ayuda: 'Cuando ponga su losa, te tocará a ti.',
+            disponible: false,
+            toque: { tipo: PASAR, carga: null },
+          },
+    );
   }
   return salida;
 }

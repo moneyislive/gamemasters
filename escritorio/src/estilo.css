@@ -5537,6 +5537,16 @@ code {
 
 .lindes-lienzo {
   position: relative;
+  /*
+   * ═══ `62vh` DE BASE, Y NO ES UN ADORNO DEL DÍA QUE NO HAYA `:has` ═══
+   *
+   * `flex: 1 1 auto` reparte desde SU BASE, y aquí la base era `auto` sobre un contenido
+   * que no mide nada: un lienzo vacío. Sentándose a una mesa de verdad, el recuadro salía
+   * de 566 por NUEVE PÍXELES. Con `62vh` de base, aunque un antepasado no tenga alto que
+   * repartir —un navegador sin `:has`, o la cadena rota como estaba— el recuadro mide algo
+   * y la partida se ve. Es lo mismo que hace `.burgo-lienzo` y por lo mismo.
+   */
+  height: 62vh;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -5557,6 +5567,44 @@ code {
   width: 100%;
   height: 100%;
   touch-action: none;
+}
+
+/*
+ * ═══ LOS DOS ESLABONES DE LAS LINDES EN LA CADENA DEL ALTO ═══
+ *
+ * La cadena que reparte el alto desde la ventana hasta el recuadro está escrita arriba
+ * tres veces —para `.riberas-lienzo`, para `.lienzo-propio` con el pintor del Burgo, y
+ * con su porqué entero—. Sus dos últimos eslabones nombran la clase raíz DEL PINTOR y la
+ * de SU RECUADRO, por selector literal, así que un pintor nuevo entra sin ellos.
+ *
+ * Las Lindes entró sin ellos. Sentándose a una mesa de verdad —que es lo único que lo
+ * enseña: la batería estaba en 86 de 86 y el banco de pruebas se pinta con
+ * `position: fixed`, así que allí nunca faltó alto— `.lindes-pantalla` medía TREINTA Y
+ * CUATRO PÍXELES de alto y el lienzo NUEVE. El tablero estaba, la escena corría, el raíl
+ * decía «quedan 70 losas en la bolsa», y no había un solo error en la consola.
+ *
+ * Que esto haya que escribirlo una vez por pintor es lo que es; lo que NO puede volver a
+ * pasar es que se olvide en silencio, y de eso se encarga ahora `verify:escritorio`, que
+ * saca la clase de cada pintor de lo que RENDERIZA y exige sus dos eslabones.
+ */
+.sala:has(.lienzo-propio) .lindes-pantalla {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+  padding: 0;
+}
+
+/*
+ * El recuadro crece desde su `62vh` sin bajar de la mitad del mueble, y suelta el marco:
+ * pegado al canto de la ventana, un borde y un radio se leen como parte del tablero. Es
+ * palabra por palabra lo que hace el del Burgo.
+ */
+.sala:has(.lienzo-propio) .lindes-lienzo {
+  flex: 1 1 auto;
+  min-height: 50%;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
 }
 
 /*

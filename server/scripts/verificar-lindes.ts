@@ -82,6 +82,7 @@ import {
   losaDeLaFicha,
   opcionesDeLasLindes,
   partidaNueva,
+  tableroDeLasLindes,
   proyectarLasLindes,
   seAcabo,
 } from '../../shared/arcade/juegos/lindes';
@@ -843,6 +844,70 @@ function unaPartida(semilla: number, cuantos: number, sentados: LosSentados): Lo
    * una red deja de serlo. Lo que tienen que cazar es un CERO o un puñado: el
    * camino que no se recorre.
    */
+}
+
+// ---------------------------------------------------------------------------
+paso('Lo que el tablero le DICE a cada cual, que no es lo mismo según de quién sea el turno');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LA COMPROBACIÓN QUE FALTABA, Y LO QUE COSTÓ NO TENERLA ═══
+ *
+ * Las 13.295 comprobaciones de aquí arriba miran QUÉ SE PUEDE HACER: qué movimientos se
+ * ofrecen, cuáles se rechazan, cuánto cobra cada cosa. Ninguna miraba lo que el tablero
+ * DICE, y una frase no es un movimiento.
+ *
+ * Así que durante toda una fase, a quien le tocaba poner la losa el panel de acciones le
+ * decía «Le toca a otro. Cuando ponga su losa, te tocará a ti» — con la flecha del turno
+ * señalando su propio asiento en el raíl, y la losa en su mano. La causa: la lista de
+ * acciones se salta los `PONER` a propósito —esos no son botones, son casillas del
+ * tablero—, así que sale vacía TAMBIÉN para quien tiene el turno, y el respaldo de lista
+ * vacía sólo miraba si estaba vacía.
+ *
+ * Se vio sentándose a una mesa de verdad y no se habría visto de otra manera.
+ */
+{
+  const asientos: AsientoId[] = ['a-0', 'a-1'];
+  const estado = aplicar(
+    avanzarLasLindes as never,
+    partidaNueva(),
+    { tipo: EMPEZAR },
+    ctxDe('a-0', asientos, 11),
+  ) as EstadoDeLasLindes;
+
+  const deQuien = deQuienEsElTurno(estado);
+  comprobar('recién volcada la bolsa, a alguien le toca colocar', deQuien !== null, deQuien);
+
+  for (const quien of asientos) {
+    const vista = loQueSeVe(estado, quien, NADIE_SENTADO);
+    const tablero = tableroDeLasLindes(vista, opcionesDeLasLindes(vista, quien));
+    const rotulos = tablero.acciones.map((a) => a.rotulo);
+    const leToca = quien === deQuien;
+
+    comprobar(
+      `a ${quien}, que ${leToca ? 'SÍ' : 'no'} tiene el turno, el tablero no le dice «Le toca a otro»` +
+        `${leToca ? '' : ' ... salvo que sea verdad'}`,
+      leToca ? !rotulos.includes('Le toca a otro') : rotulos.includes('Le toca a otro'),
+      { quien, deQuien, rotulos },
+    );
+    /*
+     * Y AL QUE LE TOCA SE LE DICE QUÉ HACER. Que no le mientan es la mitad; la otra es que
+     * la casilla del panel no se quede en blanco, porque un panel vacío en el sitio donde
+     * antes había una frase se lee como que algo se ha roto.
+     */
+    if (leToca) {
+      comprobar(
+        'y en su sitio se le dice qué hacer con la losa que tiene en la mano',
+        rotulos.length > 0 && rotulos.some((r) => /tablero/i.test(r)),
+        rotulos,
+      );
+      comprobar(
+        'y eso NO es un botón: no se puede pulsar, porque la losa se pone en el tablero',
+        tablero.acciones.every((a) => !a.disponible),
+        tablero.acciones.map((a) => `${a.rotulo}:${String(a.disponible)}`),
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

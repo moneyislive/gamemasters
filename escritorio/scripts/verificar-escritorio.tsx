@@ -49,7 +49,7 @@
  * dice quién tiene el pincel. Lo que sí se compra es que la tabla los tenga a los
  * CUATRO, que es donde se rompe sola con el tiempo.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { arcadesInstalados, avanzar, hayOpciones, opcionesDeArcade, proyectar } from '../../shared/arcade';
 import type { ContextoMovimiento, ManifiestoDeArcade, Opcion } from '../../shared/arcade';
@@ -5127,6 +5127,60 @@ function laPaginaDePie(): void {
       /height:\s*62vh/.test(reglaDe('.burgo-lienzo')),
     { enLaCadena: reglaDe(`${RAIZ_GENERICA} .burgo-lienzo`).replace(/\s+/g, ' '), suelta: reglaDe('.burgo-lienzo').replace(/\s+/g, ' ') },
   );
+
+  /*
+   * ═══ Y AHORA LA MISMA CADENA PARA TODOS, Y NO SÓLO PARA LOS DOS ESCRITOS A MANO ═══
+   *
+   * Las dos cadenas de arriba nombran `.riberas-*` y `.burgo-*` letra a letra. Eso las hace
+   * precisas y las deja CIEGAS al pintor siguiente: Las Lindes entró sin sus dos eslabones,
+   * y el resultado fue un tablero de 566 por NUEVE PÍXELES en una mesa de verdad, con la
+   * batería en 86 de 86 y sin un error en ninguna consola. El banco de pruebas no lo veía
+   * porque se pinta con `position: fixed`, y allí nunca falta alto.
+   *
+   * ═══ SE LEE EL FUENTE, Y NO ES PEREZA ═══
+   *
+   * La primera versión de esto montaba cada pintor con una vista fabricada para leerle la
+   * clase raíz. No sirve: NINGÚN pintor se monta con una vista que no es suya —caen al
+   * respaldo, que es lo correcto—, así que el bucle no inspeccionaba nada y las dos
+   * afirmaciones pasaban vacías. Comprobado quitando el eslabón de Las Lindes: verde.
+   *
+   * La clase raíz está ESCRITA en el marcado, al lado de `lienzo-propio`, y eso sí se puede
+   * leer sin montar nada. Se barren los fuentes del escritorio, y cada clase que se
+   * encuentre junto a la genérica tiene que tener su eslabón. Un pintor nuevo lo estrena en
+   * cuanto escribe su `<div className="lienzo-propio …">`, que es justo cuando hace falta.
+   */
+  const RECUADROS = /className="lienzo-propio ([a-z0-9-]+)"/g;
+  const clasesDeRecuadro = new Set<string>();
+  for (const fichero of readdirSync(new URL('../src/', import.meta.url))) {
+    if (!fichero.endsWith('.tsx')) continue;
+    const fuente = readFileSync(new URL(`../src/${fichero}`, import.meta.url), 'utf8');
+    let hallazgo = RECUADROS.exec(fuente);
+    while (hallazgo !== null) {
+      const clase = hallazgo[1];
+      if (clase !== undefined) clasesDeRecuadro.add(clase);
+      hallazgo = RECUADROS.exec(fuente);
+    }
+  }
+  /*
+   * LA VACUNA, y no es teórica: la versión anterior de este bloque pasaba en verde SIN
+   * MIRAR NADA, y lo único que lo delató fue quitar un eslabón a mano. Si el barrido no
+   * encuentra ni un recuadro, esto no está mirando donde cree.
+   */
+  comprobar(
+    'el barrido encuentra los recuadros de los pintores propios, y no se queda a cero',
+    clasesDeRecuadro.size > 0,
+    [...clasesDeRecuadro],
+  );
+  const sinCadena = [...clasesDeRecuadro].sort().filter((clase) => {
+    const regla = reglaDe(`${RAIZ_GENERICA} .${clase}`);
+    return !/flex:/.test(regla) || !/min-height:/.test(regla);
+  });
+  comprobar(
+    'y TODO recuadro con `lienzo-propio` tiene su eslabón en la cadena del alto, no sólo los dos escritos aquí a mano',
+    sinCadena.length === 0,
+    { sinCadena, mirados: [...clasesDeRecuadro].sort() },
+  );
+
   /*
    * Y LAS TRES LÍNEAS QUE NO SE VEN FALLAR EN UN RATÓN: el recuadro se queda el gesto
    * (`touch-action: none`) y las dos cajas que ruedan por dentro lo devuelven (`auto`). Sin
