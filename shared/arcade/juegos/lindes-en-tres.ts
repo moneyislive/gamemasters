@@ -30,8 +30,8 @@ import type {
   LosaEnElTablero,
   TableroDeLasLindesEn3D,
 } from '../../../escenas/lindes/tipos';
-import type { MovimientoDeclarado } from '../../mecanicas/tablero-declarado';
-import { losaPorId } from './lindes-losas';
+import type { AccionDeTablero, MovimientoDeclarado } from '../../mecanicas/tablero-declarado';
+import { LOSAS_EN_TOTAL, losaPorId } from './lindes-losas';
 import type { ClaseDeCosa, Giro } from './lindes-losas';
 import { PLANTAR, PASAR, PONER, puntoDeLaCosa } from './lindes';
 import type { DondePlantar, VistaSinTablero } from './lindes';
@@ -104,6 +104,14 @@ export function tableroEnTres(vista: unknown): TableroDeLasLindesEn3D | null {
     huecos,
     enMano: v.claseEnMano,
     cobradas: [],
+    /*
+     * La bolsa, con su denominador. `LOSAS_EN_TOTAL` cuenta el reparto entero y la de
+     * salida ya está puesta en la mesa desde el primer movimiento, así que lo que llegó a
+     * caber en la bolsa es una menos. Se calcula aquí —una vez, en `shared/`— y no en cada
+     * cliente: es la clase de cuenta que sale bien en uno y mal en el otro.
+     */
+    quedan: v.quedan,
+    deLaBolsa: LOSAS_EN_TOTAL - 1,
   };
 }
 
@@ -128,6 +136,31 @@ export function movimientoDePlantar(clase: ClaseDeCosa, indice: number): Movimie
 /** El de no plantar y pasar. */
 export function movimientoDePasar(): MovimientoDeclarado {
   return { tipo: PASAR, carga: null };
+}
+
+/**
+ * LA ACCIÓN DE PASAR, SACADA DEL TABLERO DECLARADO — o `null` si ahora no se puede.
+ *
+ * ═══ POR QUÉ NO LA BUSCA CADA CLIENTE ═══
+ *
+ * Porque buscarla es saber una regla: hay que saber que el movimiento de pasar se llama
+ * `PASAR`, y eso es exactamente lo que los clientes de esta casa NO saben —el §18 dice que
+ * el escritorio elige por tabla y no por el nombre de un juego, y lo mismo vale aquí—. Los
+ * dos clientes preguntan; el que contesta es `shared/`.
+ *
+ * Hace falta porque el reloj de arena de la escena es también el botón de pasar, igual que
+ * en Riberas: tiene que saber si está encendido y qué mandar si lo tocan, y lo que manda
+ * tiene que ser EL MISMO movimiento que manda el botón de la tira. Dos caminos al mismo
+ * gesto que mandaran cosas distintas serían dos gestos, y uno de los dos acabaría roto.
+ */
+export function laAccionDePasar(
+  tablero: { readonly acciones: readonly AccionDeTablero[] } | null,
+): AccionDeTablero | null {
+  if (tablero === null) return null;
+  for (const a of tablero.acciones) {
+    if (a.toque.tipo === PASAR && a.disponible) return a;
+  }
+  return null;
 }
 
 /**

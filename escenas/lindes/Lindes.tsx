@@ -57,7 +57,13 @@ import {
 import type { Mandos, Paseante } from './paseo';
 import type { PropsDeLasLindes } from './tipos';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
-import { INCLINACION_DE_LA_MANO, sitioDeLaMano } from './mano';
+import {
+  INCLINACION_DE_LA_MANO,
+  loQueHaCaido,
+  sitioDeLaMano,
+  sitioDelRelojDeLaBolsa,
+} from './rincones';
+import { ALTO_DEL_RELOJ_EN_LADOS, RelojDeArena } from '../reloj';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
@@ -231,7 +237,6 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
 
   /* ── La semilla del paisaje: la misma mesa, el mismo valle ──────────────── */
   const semilla = useMemo(() => semillaDelCodigo(codigo, 0x5eed), [codigo]);
-
   /* ── El suelo ───────────────────────────────────────────────────────────── */
   const losasQueSePintan = useMemo<LosaQueSePinta[]>(
     () => tablero.losas.map((l) => ({ x: l.x, y: l.y, losa: l.losa, giro: l.giro })),
@@ -476,6 +481,13 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
         <LaLosaEnLaMano catalogo={catalogo} losa={tablero.enMano} giro={giroEnMano} semilla={semilla} />
       ) : null}
 
+      <ElRelojDeLaBolsa
+        quedan={tablero.quedan}
+        deLaBolsa={tablero.deLaBolsa}
+        sePuedePasar={props.sePuedePasar === true}
+        alPasar={props.alPasar}
+      />
+
       {sueloDelFantasma !== null && fantasma !== null ? (
         <group position={[0, ALTO_DE_LA_ULTIMA, 0]}>
           <mesh geometry={sueloDelFantasma}>
@@ -619,6 +631,134 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
           frustumCulled={false}
         />
       ))}
+    </group>
+  );
+}
+
+/* ─────────────────────── El reloj de arena de la bolsa ─────────────────────── */
+
+/**
+ * CUÁNTA PARTIDA QUEDA, EN EL RINCÓN DE LA DERECHA.
+ *
+ * ═══ POR QUÉ UN RELOJ DE ARENA EN UN JUEGO SIN PLAZOS ═══
+ *
+ * Porque lo que se acaba aquí no es el turno: es LA BOLSA. Las Lindes declara `tickHz: 0`
+ * —ni plazos ni nada que el servidor haga por ti si tardas—, así que un reloj que contara
+ * el turno sería una mentira muy bien pintada. Pero la partida SÍ se acaba, y se acaba
+ * exactamente cuando se saca la última losa: cuánto queda es lo que decide si mandar un
+ * labriego al prado, de donde no vuelve, o guardárselo. Eso está en el raíl como «Quedan
+ * 38», que es un número que hay que leer y comparar con otro que no está en ningún sitio.
+ *
+ * Es el MISMO reloj de Riberas: el mismo componente `RelojDeArena` y las mismas medidas.
+ * Lo único que cambia es qué mide la arena, y eso lo decide quien lo monta.
+ *
+ * ═══ PERO CON SUS CONOS, Y NO CON `reloj.glb`. MEDIDO, NO DE OÍDAS ═══
+ *
+ * El componente admite las dos cosas: el modelo de arte de 717 kB, o los dos conos del
+ * respaldo. Aquí van los conos, y no por ahorrar:
+ *
+ *   · El `.glb` trae su color HORNEADO A VÉRTICE, y horneado oscuro: la arena sale en
+ *     `rgb(133, 74, 29)` —marrón de tierra— y la madera en `rgb(42, 10, 2)`, casi negra.
+ *     Sobre la mesa oscura de Las Lindes y a un 17 % del alto del lienzo eso es una
+ *     silueta negra donde no se distingue cuánta arena queda, que es lo único que este
+ *     trasto tiene que decir. Contado sobre el lienzo, con la bolsa a dos tercios: 20
+ *     píxeles claros dentro de los bulbos. Con los conos, 3.539, y repartidos entre
+ *     arriba y abajo como toca.
+ *   · En Riberas se ve bien porque allí vive en la BARRA, cerca del ojo y sobre madera
+ *     clara. No es el mismo sitio ni la misma talla.
+ *   · Y de propina: 20 triángulos y trece llamadas de dibujo en vez de 25.000 y ciento
+ *     seis, y 717 kB que este juego no baja.
+ *
+ * Los conos usan la paleta de la casa —`COLOR_DE_LA_ARENA`— y se leen de un vistazo. Si
+ * un día el modelo se hornea claro, volver a él es pasarle el `modelo` y nada más.
+ *
+ * ═══ Y ES TAMBIÉN EL BOTÓN DE PASAR ═══
+ *
+ * Como allí y por lo mismo: no plantar es el gesto más corriente de la partida y no tiene
+ * que costar buscar un botón. Apagado cuando el juego no lo ofrece, y entonces ni coge el
+ * toque.
+ */
+function ElRelojDeLaBolsa({
+  quedan,
+  deLaBolsa,
+  sePuedePasar,
+  alPasar,
+}: {
+  readonly quedan: number;
+  readonly deLaBolsa: number;
+  readonly sePuedePasar: boolean;
+  readonly alPasar?: () => void;
+}): JSX.Element {
+  const grupo = useRef<THREE.Group>(null);
+  const cuerpo = useRef<THREE.Group>(null);
+  const arenaArriba = useRef<THREE.Group>(null);
+  const arenaAbajo = useRef<THREE.Group>(null);
+  const hilo = useRef<THREE.Mesh>(null);
+  const asa = useRef<THREE.Mesh>(null);
+  const { camera, size } = useThree();
+
+  /*
+   * El sitio se saca UNA vez por pintado y se usa en los dos lados: el tamaño se lo lleva
+   * el componente y la pose la pone el fotograma. Sacarlo dos veces sería tener dos
+   * cuentas que hay que acordarse de cambiar a la vez, y sólo una se vería mal.
+   */
+  const sitio = sitioDelRelojDeLaBolsa(
+    (camera as THREE.PerspectiveCamera).fov ?? 45,
+    size.width / Math.max(1, size.height),
+    ALTO_DEL_RELOJ_EN_LADOS,
+  );
+
+  /*
+   * La pose y la arena, en el mismo fotograma y sin pasar por el estado de React: la
+   * fracción sólo cambia cuando se saca una losa, pero la POSE cambia con la cámara, que
+   * se mueve sola mientras el tablero crece.
+   *
+   * Y el `cuerpo` no gira nunca, al revés que en Riberas: allí el reloj da media vuelta al
+   * empezar la ronda porque el plazo se reinicia. Aquí no hay plazo y la bolsa no se
+   * rellena, así que darle la vuelta sería decir que algo vuelve a empezar.
+   */
+  useFrame(() => {
+    const g = grupo.current;
+    if (g === null) return;
+    const camara = camera as THREE.PerspectiveCamera;
+    AUX_ADELANTE.set(0, 0, -1).applyQuaternion(camara.quaternion);
+    AUX_DERECHA.set(1, 0, 0).applyQuaternion(camara.quaternion);
+    AUX_ARRIBA.set(0, 1, 0).applyQuaternion(camara.quaternion);
+    g.position
+      .copy(camara.position)
+      .addScaledVector(AUX_ADELANTE, sitio.adelante)
+      .addScaledVector(AUX_DERECHA, sitio.derecha)
+      .addScaledVector(AUX_ARRIBA, sitio.arriba);
+    /*
+     * El reloj está de pie en su plano y mira al frente, así que con el giro de la cámara
+     * basta: no lleva la vuelta que sí necesita la losa, que está tumbada.
+     */
+    g.quaternion.copy(camara.quaternion);
+
+    const parte = loQueHaCaido(quedan, deLaBolsa);
+    const encima = arenaArriba.current;
+    if (encima !== null) encima.scale.y = 1 - parte;
+    const debajo = arenaAbajo.current;
+    if (debajo !== null) debajo.scale.y = parte;
+    const chorro = hilo.current;
+    /* El hilo sólo cae mientras queda algo arriba y aún no ha llegado todo abajo. */
+    if (chorro !== null) chorro.visible = parte > 0.001 && parte < 0.999;
+  });
+
+  return (
+    <group ref={grupo}>
+      <RelojDeArena
+        cuerpo={cuerpo}
+        arenaArriba={arenaArriba}
+        arenaAbajo={arenaAbajo}
+        hilo={hilo}
+        asa={asa}
+        lado={sitio.lado}
+        ancho={sitio.ancho}
+        encendido={sePuedePasar}
+        modelo={null}
+        onPulsar={() => alPasar?.()}
+      />
     </group>
   );
 }

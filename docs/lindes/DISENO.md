@@ -305,6 +305,60 @@ cual**, para que se vean entre ellos.
 
 ---
 
+## 9 bis. Los dos rincones de la pantalla del jugador
+
+Miguel pidió que la pantalla del jugador tuviera «dados, reloj de arena,
+fragmentos de tablero, menús». De esos, dos se hacen EN LA ESCENA y colgados de
+la cámara, uno en cada rincón de abajo. Dados no hay: este juego no tira.
+
+### La losa de la mano — abajo a la izquierda
+
+La pieza que toca poner, **en tres dimensiones y montada con el mismo generador**
+que la va a poner en el tablero: misma semilla, mismo giro, mismas casas y
+mismos árboles. Que sea la misma y no un dibujo aparte es la mitad del asunto —un
+dibujo aparte se separa del generador en la primera semana y nadie se entera
+hasta que alguien compara—. Y gira con el botón, que es lo único que hace que
+«girar» deje de ser una palabra y pase a ser algo que se ve antes de tocar el
+tablero.
+
+### El reloj de arena — abajo a la derecha
+
+**Mide la BOLSA, no el turno**, y eso no es un adorno del reglamento: este juego
+declara `tickHz: 0`, no tiene plazos y no hay nada que el servidor haga por nadie
+si tarda. Un reloj de turno sería una mentira pintada muy bien. Lo que sí se
+acaba es la bolsa —la partida termina cuando sale la última losa—, y cuánto queda
+es lo que decide si mandar un labriego al prado, de donde no vuelve, o guardarlo.
+
+Es el mismo `RelojDeArena` de Riberas y, como allí, es también el botón de pasar:
+lo que manda al tocarlo es LA MISMA acción que manda el botón de la tira, porque
+se la pregunta a `shared/` (`laAccionDePasar`). Los clientes de esta casa no
+saben reglas.
+
+### Por qué los dos cuelgan de la cámara, y no de un sitio del mundo
+
+Porque **el tablero crece**: cualquier rincón del mundo que hoy caiga en una
+esquina del encuadre, con setenta losas puestas cae en medio o fuera. Colgados de
+la cámara ocupan siempre el mismo trozo de pantalla, que es lo que una pieza en la
+mano tiene que hacer. Es la misma decisión que la bandeja de los dados del Burgo.
+
+Y **no** son un segundo `<Canvas>`: serían dos contextos de WebGL en la misma
+pantalla, y en esta casa ya está apuntado cómo acaba eso en un móvil.
+
+### Y su aritmética vive fuera de la escena, a propósito
+
+`escenas/lindes/rincones.ts` no importa `three`: es la cuenta de dónde va cada
+cosa y cuánto ocupa, y nada más. En Node no hay WebGL, así que **lo único que un
+comprobador de esta casa puede mirar de una escena es la CUENTA** — y sólo si la
+cuenta está en un sitio al que se pueda llamar. La de la cámara de mesa vive en
+`paseo.ts` por lo mismo.
+
+No es teoría: con la cuenta dentro del `useFrame`, el tablero salía al 110 % del
+ancho del lienzo y el reloj se salía por abajo, con 22.000 comprobaciones de la
+escena en verde encima. Todas miraban dónde cae cada cosa en el MUNDO; ninguna
+miraba qué entra en el LIENZO.
+
+---
+
 ## 10. La red
 
 | Comprobador | Qué mira |
@@ -312,6 +366,7 @@ cual**, para que se vean entre ellos.
 | `verify:lindes` | Las reglas: el reparto, los casamientos, las cuentas y una partida entera jugada de principio a fin |
 | `verify:lindes-en-tres` | La traducción de la vista a la escena, desde Node |
 | `verify:lindes-escena` | La geometría: que ni una cara del suelo mire hacia abajo, que las 24 losas por sus 4 giros casen celda a celda en la raya, que ningún muro parta una villa, que nada se plante en un camino, que el presupuesto se cumpla con los triángulos del `.glb`, y que el lobby se vea |
+| `verify:lindes-escena`, el §del encuadre | Y lo que ENTRA en el lienzo, proyectado a mano: seis formas de tablero por seis de pantalla, que el tablero quepa entero y no se salga por el fondo, que los dos rincones quepan, no se pisen y se vean, y que la arena diga lo que queda de bolsa y nunca vuelva a subir |
 
 Y los que ya existen y lo cogen solo: `verify:juegos`, `verify:mesa`,
 `verify:procedencia`, `verify:pureza`, `verify:fronteras`, `oro:arcade`.

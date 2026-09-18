@@ -48,6 +48,7 @@ import { Lindes } from '../../../escenas/lindes/Lindes';
 import type { ModoDeCamaraDeLasLindes } from '../../../escenas/lindes/tipos';
 import {
   elSiguienteGiro,
+  laAccionDePasar,
   girosQueCaben,
   movimientoDePoner,
   sitiosQueSeOfrecen,
@@ -155,6 +156,14 @@ export default function LasLindesPorDentro(): JSX.Element {
   const alSenalarHueco = useCallback((x: number, y: number) => {
     ponerSenalada({ x, y });
   }, []);
+
+  /*
+   * EL RELOJ DE ARENA DE LA ESCENA ES TAMBIÉN EL BOTÓN DE PASAR, y lo que manda es LA
+   * MISMA acción que manda el botón de la tira: se la pregunta a `shared/`, que es quien
+   * sabe cuál de las acciones del tablero es la de no plantar. Dos caminos al mismo gesto
+   * que mandaran cosas distintas serían dos gestos, y uno acabaría roto en silencio.
+   */
+  const laDePasar = useMemo(() => laAccionDePasar(tablero), [tablero]);
 
   const alTocar = useCallback(
     (movimiento: MovimientoDeclarado) => {
@@ -280,6 +289,8 @@ export default function LasLindesPorDentro(): JSX.Element {
               calidad="plena"
               camara={camara}
               giroEnMano={giro}
+              sePuedePasar={laDePasar !== null && !mesa.quieto}
+              alPasar={laDePasar === null ? undefined : () => alTocar(laDePasar.toque)}
               quieto={mesa.quieto}
               alTocarHueco={alTocarHueco}
               alSenalarHueco={alSenalarHueco}

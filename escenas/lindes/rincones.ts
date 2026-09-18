@@ -1,5 +1,9 @@
 /**
- * DÓNDE VA LA LOSA DE LA MANO, EN ARITMÉTICA Y SIN THREE.
+ * LOS DOS RINCONES DEL LIENZO, EN ARITMÉTICA Y SIN THREE.
+ *
+ * Dos cosas van pegadas a la cámara en Las Lindes, cada una en un rincón de abajo: LA
+ * LOSA DE LA MANO, que es la pieza que toca poner, y EL RELOJ DE ARENA, que dice cuánta
+ * bolsa queda. Las dos se colocan con la misma cuenta y por eso viven juntas.
  *
  * ═══ POR QUÉ ESTO NO VIVE DENTRO DEL `useFrame` QUE LO USA ═══
  *
@@ -135,4 +139,113 @@ export function sitioDeLaMano(fov: number, aspecto: number): SitioDeLaMano {
     medioAncho,
     medioAlto,
   };
+}
+
+/* ─────────────────────── El reloj de arena de la bolsa ─────────────────────── */
+
+/**
+ * ═══ POR QUÉ HAY UN RELOJ DE ARENA EN UN JUEGO SIN PLAZOS ═══
+ *
+ * Las Lindes declara `tickHz: 0`: no hay reloj de turno, no hay plazo que se acabe y no
+ * hay nada que el servidor vaya a hacer por ti si tardas. Un reloj que contara el turno
+ * sería una mentira pintada muy bonita.
+ *
+ * Lo que sí se acaba, y es lo que de verdad hay que ver de un vistazo, es LA BOLSA. En
+ * este juego la partida termina cuando se saca la última losa: cuánto queda decide si
+ * vale la pena mandar un labriego al prado —que no vuelve— o guardárselo. Esa cifra está
+ * en el raíl como «Quedan 38», que es un número que hay que leer y comparar con otro que
+ * no está. La arena lo enseña sin leer nada.
+ *
+ * Es el MISMO reloj de Riberas: el mismo `reloj.glb`, el mismo componente y el mismo
+ * montaje —`montarElReloj`, que salió de dentro de `delta.tsx` justo para esto—. Lo
+ * único distinto es qué mide la arena, y eso lo decide quien lo monta, no el reloj.
+ */
+
+/** Cuánto ocupa de alto, en fracciones del medio alto visible. */
+export const PARTE_DEL_ALTO_DEL_RELOJ = 0.17;
+/** Y su tope por el ancho, para el móvil de pie. */
+export const PARTE_DEL_ANCHO_DEL_RELOJ = 0.17;
+/**
+ * LO ANCHO QUE ES SU ASA, en fracciones de su alto.
+ *
+ * El mismo `ANCHO_DEL_RELOJ` que `barra.ts` le da en Riberas. No se importa de allí
+ * porque allí es una medida de LA BARRA —cuánto se le reserva en una fila de huecos— y
+ * aquí no hay barra ninguna: es la misma cifra por el mismo motivo (un reloj de arena es
+ * alto y estrecho), no la misma decisión.
+ */
+export const ANCHO_DEL_RELOJ_EN_ALTOS = 0.62;
+
+/** Dónde acaba colgado el reloj, respecto de la cámara. */
+export interface SitioDelReloj {
+  readonly adelante: number;
+  readonly derecha: number;
+  readonly arriba: number;
+  /** El `lado` que pide `RelojDeArena`: el alto de su hueco. */
+  readonly lado: number;
+  /** Y el `ancho` de su asa. */
+  readonly ancho: number;
+  /** La mitad de lo que ocupa en el lienzo, para quien quiera medir que cabe. */
+  readonly mediaEnAncho: number;
+  readonly mediaEnAlto: number;
+  readonly medioAncho: number;
+  readonly medioAlto: number;
+}
+
+/**
+ * EL RINCÓN DE ABAJO A LA DERECHA, simétrico del de la losa de la mano.
+ *
+ * Y simétrico a propósito: son las dos cosas que se miran sin dejar de mirar el tablero,
+ * una en cada esquina baja, con el mismo aire hasta el canto. Poner las dos juntas dejaría
+ * media pantalla vacía y la otra media abarrotada.
+ *
+ * El alto del reloj NO es su `lado`, y encima depende de CUÁL de los dos relojes se esté
+ * pintando: el de conos del respaldo llega a sus tapas y el del `.glb` llega a un lado
+ * entero. Por eso el alto entra por parámetro desde `reloj.tsx`, que es quien sabe los
+ * dos números y devuelve el mayor. Con el pequeño, el reloj se salía por abajo justo
+ * cuando el fichero de arte llegaba — o sea, sólo cuando todo iba bien.
+ */
+export function sitioDelRelojDeLaBolsa(
+  fov: number,
+  aspecto: number,
+  /** `ALTO_DEL_RELOJ_EN_LADOS` de `reloj.tsx`: lo alto que es el MÁS alto de los dos relojes. */
+  altoEnLados: number,
+): SitioDelReloj {
+  const medioAlto = DISTANCIA_DE_LA_MANO * Math.tan((fov * Math.PI) / 360);
+  const medioAncho = medioAlto * Math.max(1e-6, aspecto);
+
+  /* Lo que va a ocupar de alto en el mundo, y de ahí se despeja su `lado`. */
+  const alto = Math.min(
+    medioAlto * PARTE_DEL_ALTO_DEL_RELOJ * 2,
+    medioAncho * PARTE_DEL_ANCHO_DEL_RELOJ * 2,
+  );
+  const lado = alto / Math.max(1e-6, altoEnLados);
+  const aire = medioAlto * AIRE_HASTA_EL_CANTO;
+
+  const mediaEnAlto = alto / 2;
+  const mediaEnAncho = (lado * ANCHO_DEL_RELOJ_EN_ALTOS) / 2;
+
+  return {
+    adelante: DISTANCIA_DE_LA_MANO,
+    derecha: medioAncho - aire - mediaEnAncho,
+    arriba: -medioAlto + aire + mediaEnAlto,
+    lado,
+    ancho: lado * ANCHO_DEL_RELOJ_EN_ALTOS,
+    mediaEnAncho,
+    mediaEnAlto,
+    medioAncho,
+    medioAlto,
+  };
+}
+
+/**
+ * QUÉ PARTE DE LA ARENA HA CAÍDO YA, de cero a uno.
+ *
+ * Cero es la bolsa llena —toda la arena arriba, la partida por empezar— y uno es la bolsa
+ * vacía. `deLaBolsa` es lo que cabía; se pasa en vez de darlo por sabido para que el día
+ * que alguien añada losas al reparto no haya que acordarse de tocar esto.
+ */
+export function loQueHaCaido(quedan: number, deLaBolsa: number): number {
+  if (deLaBolsa <= 0) return 1;
+  const parte = 1 - quedan / deLaBolsa;
+  return parte < 0 ? 0 : parte > 1 ? 1 : parte;
 }

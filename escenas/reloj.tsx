@@ -30,6 +30,7 @@
 
 import type { Ref } from 'react';
 import * as THREE from 'three';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 /** El vidrio de los dos bulbos. Casi transparente, sin luz propia. */
 export const COLOR_DEL_VIDRIO = '#cfe4ef';
@@ -64,6 +65,22 @@ export const LADOS_DEL_CONO = 12;
  * botón es el rectángulo y no el cristal—, así que quien quiera pasar el turno en el primer
  * instante puede.
  */
+/**
+ * LO ALTO QUE ES UN RELOJ, EN LADOS DE SU HUECO — Y POR QUÉ ES UNO Y NO 0,82.
+ *
+ * Porque hay DOS relojes y no miden lo mismo. El de conos del respaldo llega hasta sus
+ * tapas, o sea `(ALTO_DEL_BULBO + GRUESO_DEL_MARCO/2) · 2 = 0,82` lados. El del `.glb`
+ * llega a UN lado exacto, porque `montarElReloj` lo normaliza a una unidad de alto y aquí
+ * se pinta con `scale={lado}`.
+ *
+ * Quien lo coloque tiene que contar con el MÁS ALTO de los dos o se le sale por abajo el
+ * día que el fichero llegue —que es justo el día en que se ve bonito—. Medido en Las
+ * Lindes: colocado con 0,82, el pie del reloj se salía del lienzo un 4 % en cuanto entró
+ * el modelo de verdad, y con los conos no se salía. Un fallo que sólo aparece cuando todo
+ * va bien es de los peores que hay.
+ */
+export const ALTO_DEL_RELOJ_EN_LADOS = Math.max(1, (ALTO_DEL_BULBO + GRUESO_DEL_MARCO / 2) * 2);
+
 export const GIRO_DEL_RELOJ = 0.5;
 /**
  * CUÁNTO TARDA EN VACIARSE DE GOLPE cuando se pulsa, en segundos.
@@ -86,6 +103,128 @@ export const VACIADO_DEL_RELOJ = 0.34;
 export interface RelojCargado {
   readonly escena: THREE.Object3D;
   readonly clips: readonly THREE.AnimationClip[];
+}
+
+/**
+ * EL RELOJ YA MONTADO: lo que hay que tener a mano para pintarlo y para moverlo.
+ *
+ * `clon` es lo que se le pasa al componente como `modelo`; `mezclador` hay que
+ * empujarlo cada fotograma para que caigan los granos; y `montones` son las dos
+ * mallas con morfologia, cada una sabiendo si es la de arriba.
+ */
+export interface RelojMontado {
+  readonly clon: THREE.Group;
+  readonly mezclador: THREE.AnimationMixer;
+  readonly montones: readonly { readonly malla: THREE.Mesh; readonly arriba: boolean }[];
+}
+
+/**
+ * MONTA EL `.glb` DEL RELOJ: lo clona, lo normaliza, arranca sus clips y ordena sus montones.
+ *
+ * ═══ POR QUÉ ESTÁ AQUÍ Y NO EN LA ESCENA QUE LO PINTA ═══
+ *
+ * Porque vivía dentro de un `useMemo` de `delta.tsx`, o sea dentro de Riberas, y nada de lo
+ * que hace es de Riberas: es del reloj. En cuanto una segunda escena quiso el mismo reloj
+ * —Las Lindes, para enseñar cuánto queda de bolsa— la única salida era copiar cincuenta
+ * renglones que hay que arreglar a la vez el día que alguien recompile el modelo. Aquí hay
+ * uno solo, y lo mide `verify:escena` con un `.glb` fabricado a mano.
+ *
+ * No usa ningún gancho, como todo lo de este fichero y por lo mismo: se puede llamar desde
+ * Node y preguntarle qué montó.
+ *
+ * ═══ SE MIDE LA CAJA, NO SE SUPONE ═══
+ *
+ * El `.glb` trae su propia escala en la raíz —los modelos de Sketchfab salen casi siempre con
+ * una— y multiplicar la nuestra encima daba 0,0001 de escala de mundo: el reloj estaba en la
+ * escena, con sus mallas y su clip corriendo, y medía tres milésimas de unidad. No se veía y
+ * no fallaba nada, que es la peor forma de no estar.
+ *
+ * Así que se envuelve en un grupo que lo normaliza a UNA UNIDAD DE ALTO centrado en el
+ * origen, con la caja medida sobre el clon ya montado. Quien lo pinta sólo tiene que
+ * multiplicar por el lado de su hueco, y el día que alguien recompile el modelo con otra
+ * escala esto sigue saliendo bien sin tocar una línea.
+ *
+ * ═══ LOS DOS MONTONES, Y CUÁL ES CUÁL ═══
+ *
+ * Son las dos mallas con morfología —el compilador las deja como «0» y «1»— y hay que saber
+ * cuál va arriba, porque se mueven AL REVÉS la una de la otra. No se distinguen por el
+ * nombre: «0» y «1» los pone el exportador y el día que alguien recompile pueden salir
+ * cambiados, y el fallo sería un reloj que cuenta al revés sin que nada falle. Se distinguen
+ * midiendo dónde está cada una: la de arriba tiene el centro de su caja más alto.
+ */
+export function montarElReloj(cargado: RelojCargado | null): RelojMontado | null {
+  if (cargado === null) return null;
+  const dentro = SkeletonUtils.clone(cargado.escena);
+
+  const caja = new THREE.Box3().setFromObject(dentro);
+  const alto = Math.max(1e-6, caja.max.y - caja.min.y);
+  const centro = caja.getCenter(new THREE.Vector3());
+  /*
+   * ═══ LA POSICIÓN QUE EL MODELO YA TRAÍA CUENTA, Y SE LE ESTABA COMIENDO ═══
+   *
+   * Esto ponía `position = −centro/alto` a secas, y eso sólo sale bien si la raíz del
+   * `.glb` venía en el origen — que es lo que pasa con `reloj.glb` y por lo que nunca se
+   * notó. Un punto del modelo iba a `escala·p + posicion`, y lo que se quiere es
+   * `(escala·p + posicion − centro)/alto`; despejando, la posición nueva es
+   * `(posicion − centro)/alto` y NO `−centro/alto`. Con un modelo que traiga traslación
+   * en la raíz —los de Sketchfab la traen tanto como la escala— el reloj se iba a
+   * cincuenta unidades de donde tenía que estar.
+   *
+   * Lo cazó `verify:escena` con un `.glb` fabricado torcido a propósito, el mismo día que
+   * esta función salió de dentro de Riberas. Es la razón de sacarla: ahí no la medía nadie.
+   *
+   * Y NO MUEVE EL RELOJ DE RIBERAS, comprobado y no supuesto: la raíz de `reloj.glb` es
+   * `Sketchfab_Scene` con `position` exactamente en el origen, así que las dos cuentas dan
+   * el mismo número hasta el último decimal. Esto arregla el modelo que venga, no el que hay.
+   */
+  dentro.position.set(
+    (dentro.position.x - centro.x) / alto,
+    (dentro.position.y - centro.y) / alto,
+    (dentro.position.z - centro.z) / alto,
+  );
+  dentro.scale.multiplyScalar(1 / alto);
+  const clon = new THREE.Group();
+  clon.add(dentro);
+
+  const mezclador = new THREE.AnimationMixer(dentro);
+  for (const clip of cargado.clips) mezclador.clipAction(clip).play();
+
+  const conAltura: { malla: THREE.Mesh; alturaDeSuCaja: number }[] = [];
+  dentro.traverse((n) => {
+    const m = n as THREE.Mesh;
+    if (!m.isMesh || (m.morphTargetInfluences?.length ?? 0) === 0) return;
+    m.geometry.computeBoundingBox();
+    const suCaja = m.geometry.boundingBox;
+    const suCentro = suCaja === null ? 0 : (suCaja.min.y + suCaja.max.y) / 2;
+    conAltura.push({ malla: m, alturaDeSuCaja: suCentro });
+  });
+  conAltura.sort((a, b) => b.alturaDeSuCaja - a.alturaDeSuCaja);
+  const montones = conAltura.map((c, i) => ({ malla: c.malla, arriba: i === 0 }));
+
+  return { clon, mezclador, montones };
+}
+
+/** Lo que hay que soltar al desmontar: el mezclador se queda con el árbol si no. */
+export function soltarElReloj(montado: RelojMontado | null): void {
+  if (montado === null) return;
+  montado.mezclador.stopAllAction();
+  montado.mezclador.uncacheRoot(montado.clon.children[0] ?? montado.clon);
+}
+
+/**
+ * PONE LOS DOS MONTONES A LA FRACCIÓN QUE TOQUE. `parte` es lo que YA cayó: 0 es lleno
+ * arriba y 1 es todo abajo.
+ *
+ * El peso cero de cada malla es su montón LLENO y el uno es vacío —así lo dejó quien
+ * modeló—, de modo que arriba va `parte` (empieza lleno y se vacía) y abajo va su
+ * complementario. Aquí iba `parte` en los dos, y eso fabricaba arena: los dos montones son
+ * inversamente proporcionales y su suma es siempre uno.
+ */
+export function ponerLaArena(montado: RelojMontado, parte: number): void {
+  for (const monton of montado.montones) {
+    const pesos = monton.malla.morphTargetInfluences;
+    if (pesos !== undefined && pesos.length > 0) pesos[0] = monton.arriba ? parte : 1 - parte;
+  }
 }
 
 export interface RelojDeLaMesa {

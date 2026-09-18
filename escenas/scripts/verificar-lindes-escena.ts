@@ -66,7 +66,8 @@ import {
 } from '../linde-alta/la-linde';
 import { ALTURA_DE_UNA_PERSONA } from '../escala';
 import { camaraDeMesa, loQueAbarca } from '../lindes/paseo';
-import { sitioDeLaMano } from '../lindes/mano';
+import { loQueHaCaido, sitioDeLaMano, sitioDelRelojDeLaBolsa } from '../lindes/rincones';
+import { ALTO_DEL_RELOJ_EN_LADOS } from '../reloj';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -769,6 +770,94 @@ for (const [pantalla, aspecto] of LIENZOS) {
 }
 
 // ---------------------------------------------------------------------------
+
+/*
+ * ═══ EL RELOJ DE ARENA DE LA BOLSA, EN EL OTRO RINCÓN ═══
+ *
+ * Las mismas dos preguntas que la losa de la mano —¿cabe? ¿se ve?— más la suya propia,
+ * que es la única que importa de verdad: QUÉ DICE LA ARENA. Un reloj que cabe, se ve y
+ * cuenta al revés es peor que no tenerlo.
+ *
+ * Y una cosa que ya falló: el alto del reloj depende de CUÁL de los dos se pinte. El de
+ * conos del respaldo mide 0,82 lados y el del `.glb` mide uno entero, así que colocarlo
+ * con 0,82 lo dejaba dentro mientras el fichero de arte no llegaba y se lo salía por abajo
+ * en cuanto llegaba. Aquí se mide con `ALTO_DEL_RELOJ_EN_LADOS`, que es el mayor de los
+ * dos y viene de `reloj.tsx`, que es quien los sabe.
+ */
+for (const [pantalla, aspecto] of LIENZOS) {
+  const r = sitioDelRelojDeLaBolsa(CAMPO_DE_LA_CAMARA, aspecto, ALTO_DEL_RELOJ_EN_LADOS);
+  const izquierda = (r.derecha - r.mediaEnAncho) / r.medioAncho;
+  const derecha = (r.derecha + r.mediaEnAncho) / r.medioAncho;
+  const abajo = (r.arriba - r.mediaEnAlto) / r.medioAlto;
+  const arriba = (r.arriba + r.mediaEnAlto) / r.medioAlto;
+  comprobar(
+    `el reloj de la bolsa cabe entero en «${pantalla}»`,
+    izquierda >= -1 && derecha <= 1 && abajo >= -1 && arriba <= 1,
+    { x: [izquierda.toFixed(3), derecha.toFixed(3)], y: [abajo.toFixed(3), arriba.toFixed(3)] },
+  );
+  comprobar(
+    `y va al rincón de abajo a la DERECHA en «${pantalla}», enfrente de la losa`,
+    izquierda > 0 && arriba < 0,
+    { izquierda: izquierda.toFixed(3), arriba: arriba.toFixed(3) },
+  );
+  /* Y no se pisan: la losa está a la izquierda y el reloj a la derecha, sin tocarse. */
+  const m = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto);
+  comprobar(
+    `y no se pisa con la losa de la mano en «${pantalla}»`,
+    (m.derecha + m.mediaEnAncho) < (r.derecha - r.mediaEnAncho),
+    {
+      laLosaAcabaEn: ((m.derecha + m.mediaEnAncho) / m.medioAncho).toFixed(3),
+      elRelojEmpiezaEn: izquierda.toFixed(3),
+    },
+  );
+  /* Y se ve: medido contra el lado corto, por lo mismo que la losa. */
+  const corto = Math.min(r.medioAncho, r.medioAlto);
+  comprobar(
+    `y se ve lo bastante en «${pantalla}» para leer la arena de un vistazo`,
+    (r.mediaEnAlto * 2) / corto > 0.2,
+    { deAlto: ((r.mediaEnAlto * 2) / corto).toFixed(3) },
+  );
+}
+
+/*
+ * ═══ Y LO QUE DICE LA ARENA, QUE ES PARA LO ÚNICO QUE ESTÁ ═══
+ *
+ * `loQueHaCaido` devuelve lo que YA cayó, que es lo que el componente llama `parte`: cero
+ * es la bolsa llena y uno es la bolsa vacía. Al revés —que es como sale si alguien escribe
+ * `quedan / deLaBolsa` sin pensarlo— el reloj empieza la partida vacío y se llena, que es
+ * exactamente lo contrario de lo que cualquiera va a leer.
+ */
+{
+  const LOSAS = 71;
+  comprobar('con la bolsa llena no ha caído nada', loQueHaCaido(LOSAS, LOSAS) === 0, loQueHaCaido(LOSAS, LOSAS));
+  comprobar('con la bolsa vacía ha caído todo', loQueHaCaido(0, LOSAS) === 1, loQueHaCaido(0, LOSAS));
+  comprobar(
+    'y a media bolsa, media arena',
+    Math.abs(loQueHaCaido(LOSAS / 2, LOSAS) - 0.5) < 1e-9,
+    loQueHaCaido(LOSAS / 2, LOSAS),
+  );
+  /* Y NO CRECE HACIA ATRÁS: sacar losas sólo puede hacer caer más arena, nunca menos. */
+  let anterior = -1;
+  for (let quedan = LOSAS; quedan >= 0; quedan--) {
+    const ahora = loQueHaCaido(quedan, LOSAS);
+    comprobar(
+      `con ${String(quedan)} en la bolsa, la arena no ha vuelto a subir`,
+      ahora >= anterior && ahora >= 0 && ahora <= 1,
+      { quedan, ahora, anterior },
+    );
+    anterior = ahora;
+  }
+  /*
+   * Y los dos casos que no pueden pasar pero pasarían: una bolsa de cero —que sería una
+   * división por cero— y una cuenta pasada de rosca por un estado a medio migrar.
+   */
+  comprobar('una bolsa de cero no divide por cero', loQueHaCaido(0, 0) === 1, loQueHaCaido(0, 0));
+  comprobar('y una cuenta imposible se queda en el tope', loQueHaCaido(-5, LOSAS) === 1 && loQueHaCaido(999, LOSAS) === 0, {
+    menos: loQueHaCaido(-5, LOSAS),
+    demasiadas: loQueHaCaido(999, LOSAS),
+  });
+}
+
 
 console.log('');
 if (fallos.length > 0) {

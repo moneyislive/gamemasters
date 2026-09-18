@@ -71,6 +71,19 @@ export interface TableroDeLasLindesEn3D {
   readonly enMano: string;
   /** Las casillas de las cosas que se acaban de cobrar, para enseñarlas. */
   readonly cobradas: readonly string[];
+  /**
+   * ═══ CUÁNTAS LOSAS QUEDAN EN LA BOLSA, Y CUÁNTAS CABÍAN ═══
+   *
+   * Las dos, y no sólo la primera: de la fracción sale la arena del reloj, y una fracción
+   * necesita denominador. Si el denominador se diera por sabido en la escena, el día que
+   * alguien añada losas al reparto el reloj empezaría la partida medio caído sin que nada
+   * fallara.
+   *
+   * El CONTENIDO de la bolsa es secreto; la cuenta no —en la mesa se ve el montón—, y por
+   * eso las dos salen de la vista sin romper nada del §5.8.
+   */
+  readonly quedan: number;
+  readonly deLaBolsa: number;
 }
 
 /** Desde dónde se mira. */
@@ -93,6 +106,16 @@ export interface PropsDeLasLindes {
   readonly camara: ModoDeCamaraDeLasLindes;
   /** Con qué giro se enseña la losa de la mano mientras se elige dónde ponerla. */
   readonly giroEnMano: Giro;
+  /**
+   * SI SE PUEDE PASAR EL TURNO AHORA, y qué hacer si se toca el reloj.
+   *
+   * El reloj de arena es también el botón de pasar, como en Riberas y por lo mismo: es el
+   * gesto más corriente de la partida y no tiene que costar abrir un cajón. Apagado
+   * cuando el juego no lo ofrece —o sea casi siempre que aún hay que poner la losa—, y
+   * entonces no coge el toque.
+   */
+  readonly sePuedePasar?: boolean;
+  readonly alPasar?: () => void;
   /** Para que no se mueva nada mientras un comprobador mide. */
   readonly quieto?: boolean;
   readonly alTocarHueco?: (x: number, y: number, giro: Giro) => void;

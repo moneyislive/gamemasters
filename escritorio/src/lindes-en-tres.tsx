@@ -36,6 +36,7 @@ import type { Calidad } from '../../escenas/embarcadero/tipos';
 import {
   elSiguienteGiro,
   girosQueCaben,
+  laAccionDePasar,
   movimientoDePoner,
   sitiosQueSeOfrecen,
   tableroEnTres,
@@ -113,6 +114,15 @@ export function LindesEnTres({ mesa, puesta, tablero, opciones, elRail }: LoQueV
     setSenalada({ x, y });
   }, []);
 
+  /*
+   * EL RELOJ DE ARENA DE LA ESCENA ES TAMBIÉN EL BOTÓN DE PASAR, y lo que manda
+   * es LA MISMA acción que manda el botón de la tira: se la pregunta a
+   * `shared/`, que es quien sabe cuál de las acciones del tablero es la de no
+   * plantar. Dos caminos al mismo gesto que mandaran cosas distintas serían dos
+   * gestos, y uno de los dos acabaría roto sin que nadie lo notara.
+   */
+  const laDePasar = useMemo(() => laAccionDePasar(tablero), [tablero]);
+
   const alTocar = useCallback(
     (movimiento: MovimientoDeclarado) => {
       void mover(movimiento);
@@ -175,6 +185,8 @@ export function LindesEnTres({ mesa, puesta, tablero, opciones, elRail }: LoQueV
               camara={camara}
               giroEnMano={giro}
               quieto={quieto}
+              sePuedePasar={laDePasar !== null && !quieto}
+              alPasar={laDePasar === null ? undefined : () => alTocar(laDePasar.toque)}
               alTocarHueco={alTocarHueco}
               alSenalarHueco={alSenalarHueco}
               alFallar={alFallar}
