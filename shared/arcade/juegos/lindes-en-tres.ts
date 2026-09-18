@@ -31,6 +31,7 @@ import type {
   TableroDeLasLindesEn3D,
 } from '../../../escenas/lindes/tipos';
 import type { AccionDeTablero, MovimientoDeclarado } from '../../mecanicas/tablero-declarado';
+import { canonico } from '../../mecanicas/canonico';
 import { LOSAS_EN_TOTAL, losaPorId } from './lindes-losas';
 import type { ClaseDeCosa, Giro } from './lindes-losas';
 import { PLANTAR, PASAR, PONER, puntoDeLaCosa } from './lindes';
@@ -136,6 +137,39 @@ export function movimientoDePlantar(clase: ClaseDeCosa, indice: number): Movimie
 /** El de no plantar y pasar. */
 export function movimientoDePasar(): MovimientoDeclarado {
   return { tipo: PASAR, carga: null };
+}
+
+/**
+ * LAS ACCIONES QUE NO ESTÁN YA EN LA TIRA DE SITIOS.
+ *
+ * ═══ POR QUÉ HACE FALTA, Y POR QUÉ LA RESPUESTA ESTÁ AQUÍ ═══
+ *
+ * Las dos pantallas de Las Lindes pintan DOS tiras: la de SITIOS —cada cosa de la losa
+ * recién puesta donde cabe un labriego, con lo que valdría y si cierra— y la de ACCIONES,
+ * que es «lo que no se toca en el tablero»: empezar, no plantar.
+ *
+ * Y salían DUPLICADAS. `acciones` trae todo lo que no sea `PONER`, o sea también los
+ * plantados, así que cada sitio aparecía dos veces: una con su valor y otra sin él. Visto
+ * en la app con seis chips donde había tres cosas.
+ *
+ * El tablero declarado tiene que seguir trayéndolos: un cliente que no tenga el pintor de
+ * Las Lindes SÓLO tiene el tablero declarado, y sin los plantados en `acciones` no podría
+ * plantar. O sea que quien filtra es quien pinta las dos tiras. Pero CUÁL filtrar es una
+ * regla —hay que saber qué movimiento hay detrás de cada sitio—, y los clientes de esta
+ * casa no saben reglas: preguntan.
+ *
+ * Se comparan por FORMA CANÓNICA y no por identidad: lo que llega al cliente son dos
+ * objetos distintos construidos por dos caminos, y comparar referencias no encontraría
+ * nada. La forma canónica ordena las llaves, así que `{tipo, carga}` casa aunque los
+ * campos vengan al revés.
+ */
+export function accionesFueraDeLosSitios(
+  tablero: { readonly acciones: readonly AccionDeTablero[] } | null,
+  sitios: readonly { readonly movimiento: MovimientoDeclarado }[],
+): AccionDeTablero[] {
+  if (tablero === null) return [];
+  const yaEstan = new Set(sitios.map((s) => canonico(s.movimiento)));
+  return tablero.acciones.filter((a) => !yaEstan.has(canonico({ tipo: a.toque.tipo, carga: a.toque.carga ?? null })));
 }
 
 /**

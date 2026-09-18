@@ -39,6 +39,7 @@ import {
   deQuienEsElTurno,
   loQueSeVe,
   opcionesDeLasLindes,
+  tableroDeLasLindes,
   partidaNueva,
   seAcabo,
 } from '../../shared/arcade/juegos/lindes';
@@ -50,6 +51,7 @@ import {
   movimientoDePlantar,
   movimientoDePoner,
   seVeEnTres,
+  accionesFueraDeLosSitios,
   sitiosQueSeOfrecen,
   tableroEnTres,
 } from '../../shared/arcade/juegos/lindes-en-tres';
@@ -193,6 +195,41 @@ for (const cuantos of [2, 3, 4, 5]) {
         { suyo: s.movimiento, montado },
       );
     }
+
+    /*
+     * ═══ LAS DOS TIRAS DE LA PANTALLA NO PINTAN LO MISMO DOS VECES ═══
+     *
+     * Las dos pantallas de Las Lindes pintan DOS tiras: la de SITIOS —cada cosa donde cabe
+     * un labriego, con lo que valdría y si cierra— y la de ACCIONES, que es «lo que no se
+     * toca en el tablero»: empezar, no plantar.
+     *
+     * Y salían duplicadas: `acciones` trae TODO lo que no sea `PONER`, o sea también los
+     * plantados. Visto en la app con SEIS chips donde había tres cosas, la mitad con su
+     * valor y la mitad sin él. `accionesFueraDeLosSitios` es lo que reparte, y aquí se le
+     * exigen las dos mitades del reparto, que es lo que lo hace un reparto y no un filtro:
+     *
+     *   · NO SOBRA NADA: ningún sitio vuelve a salir como acción.
+     *   · Y NO FALTA NADA: todo lo que estaba sigue estando en una de las dos. Sin esto, un
+     *     filtro que se comiera «No plantar» pasaría la primera mitad tan tranquilo, y
+     *     dejaría a la pantalla sin la única manera de no plantar.
+     */
+    /* El tablero declarado que baja al cliente, que es de donde salen las dos tiras. */
+    const elTablero = tableroDeLasLindes(vista, opciones);
+    const aparte = accionesFueraDeLosSitios(elTablero, sitios);
+    const formaDe = (t: { tipo: string; carga?: unknown }): string =>
+      canonico({ t: t.tipo, c: t.carga ?? null });
+    const enLosSitios = new Set(sitios.map((x) => formaDe(x.movimiento)));
+    comprobar(
+      `mesa de ${cuantos}: ningún sitio donde plantar se repite como acción`,
+      aparte.every((a) => !enLosSitios.has(formaDe(a.toque))),
+      aparte.map((a) => a.rotulo),
+    );
+    comprobar(
+      `mesa de ${cuantos}: y el reparto no pierde ninguna: sitios + aparte = las acciones del tablero`,
+      aparte.length + elTablero.acciones.filter((a) => enLosSitios.has(formaDe(a.toque))).length ===
+        elTablero.acciones.length,
+      { acciones: elTablero.acciones.length, aparte: aparte.length, sitios: sitios.length },
+    );
 
     /*
      * ═══ Y A UN MIRÓN NO SE LE OFRECE NADA, AUNQUE LA VISTA TRAIGA `sitios` ═══

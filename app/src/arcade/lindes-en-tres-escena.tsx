@@ -48,6 +48,7 @@ import { Lindes } from '../../../escenas/lindes/Lindes';
 import type { ModoDeCamaraDeLasLindes } from '../../../escenas/lindes/tipos';
 import {
   elSiguienteGiro,
+  accionesFueraDeLosSitios,
   laAccionDePasar,
   girosQueCaben,
   movimientoDePoner,
@@ -164,6 +165,8 @@ export default function LasLindesPorDentro(): JSX.Element {
    * que mandaran cosas distintas serían dos gestos, y uno acabaría roto en silencio.
    */
   const laDePasar = useMemo(() => laAccionDePasar(tablero), [tablero]);
+  /* Lo que va en la segunda tira: lo que la primera no pinta ya. Ver el comentario de abajo. */
+  const sinRepetir = useMemo(() => accionesFueraDeLosSitios(tablero, sitios), [tablero, sitios]);
 
   const alTocar = useCallback(
     (movimiento: MovimientoDeclarado) => {
@@ -374,10 +377,16 @@ export default function LasLindesPorDentro(): JSX.Element {
           LOS BOTONES QUE NO SE TOCAN EN EL TABLERO: empezar, no plantar. Salen del
           tablero declarado y no de una lista escrita aquí, para que un botón nuevo
           del juego aparezca sin tocar esta pantalla.
+
+          Y SIN LOS QUE YA ESTÁN ARRIBA. `acciones` trae TODO lo que no sea poner una
+          losa, así que traía también los plantados y cada sitio salía DOS veces: una en
+          la tira de arriba con lo que valdría, y otra aquí sin nada. Seis chips donde
+          había tres cosas. Cuáles sobran lo dice `shared/`, que es quien sabe qué
+          movimiento hay detrás de cada sitio.
         */}
-        {tablero !== null && tablero.acciones.length > 0 ? (
+        {sinRepetir.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.tira}>
-            {tablero.acciones.map((a) => (
+            {sinRepetir.map((a) => (
               <Pressable
                 key={a.id}
                 style={[estilos.chip, !a.disponible && estilos.chipQuieto]}

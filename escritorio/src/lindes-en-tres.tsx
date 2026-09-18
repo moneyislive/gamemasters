@@ -36,6 +36,7 @@ import type { Calidad } from '../../escenas/embarcadero/tipos';
 import {
   elSiguienteGiro,
   girosQueCaben,
+  accionesFueraDeLosSitios,
   laAccionDePasar,
   movimientoDePoner,
   sitiosQueSeOfrecen,
@@ -171,6 +172,19 @@ export function LindesEnTres({
   );
 
   const sitios = useMemo(() => sitiosQueSeOfrecen(vista, opciones), [vista, opciones]);
+  /*
+   * ═══ LO QUE VA EN LA SEGUNDA LISTA: LO QUE LA PRIMERA NO PINTA YA ═══
+   *
+   * `acciones` trae TODO lo que no sea poner una losa, así que traía también los
+   * plantados — y éstos ya salen arriba, en «Dónde plantar», con lo que valdría cada uno.
+   * Cada sitio aparecía DOS veces: una con su valor y otra sin nada.
+   *
+   * Sólo se filtra en el camino del LIENZO. El del respaldo —arriba, cuando no hay
+   * tablero en tres dimensiones— no pinta «Dónde plantar», así que allí `acciones` tiene
+   * que seguir trayéndolos todos o no se podría plantar.
+   */
+  const sinRepetir = useMemo(() => accionesFueraDeLosSitios(tablero, sitios), [tablero, sitios]);
+  const loQueNoEstaArriba = useMemo(() => ({ ...tablero, acciones: sinRepetir }), [tablero, sinRepetir]);
   const enMano = datos === null ? '' : datos.enMano;
   const laLosa = enMano === '' ? null : losaPorId(enMano);
   const girosAquí = useMemo(
@@ -296,7 +310,7 @@ export function LindesEnTres({
           </section>
         ) : null}
 
-        <AccionesDelTablero tablero={tablero} alTocar={alTocar} quieto={quieto} />
+        <AccionesDelTablero tablero={loQueNoEstaArriba} alTocar={alTocar} quieto={quieto} />
 
         {tablero.paneles.map((p) => (
           <section key={p.titulo} className="lindes-panel">

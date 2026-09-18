@@ -34,7 +34,8 @@ deja de servir para lo único que sirve.
 | 15 | `verify:mesa` juega a Las Lindes, con la bolsa vigilada | **hecho** — 94 revisiones |
 | 16 | `npm run jugar:lindes` — una mesa entera POR EL CABLE, medida | **hecho** |
 | 17 | Sentarse a una mesa de verdad y jugarla pulsando | **hecho** — tres fallos |
-| 18 | Batería entera en verde | **hecho** — 86 de 86 |
+| 18 | Sentarse **en la app** y jugarla tocando | **hecho** — dos fallos más |
+| 19 | Batería entera en verde | **hecho** — 86 de 86 |
 
 ## Siguiente paso
 
@@ -55,6 +56,57 @@ demostrarse tres veces. Lo que hay que abrir y mirar:
   informa siempre de una ventana de 1024 de ancho, así que lo que se ha medido
   del encuadre en pantalla estrecha es la ARITMÉTICA (que está en verde, en seis
   formas de pantalla) y no el píxel.
+
+## Y dos más, que sólo se vieron sentándose EN LA APP
+
+El escritorio ya estaba jugado y la batería en verde. La app nunca se había ejecutado — y
+esta casa tiene escrito que ningún juego es sólo para PC.
+
+### 4 · En la app NO SE PODÍA PONER UNA LOSA
+
+O sea: no se podía jugar. El tablero se tocaba con `onClick`, y React Native Web llama a
+`preventDefault` en el `pointerdown` para su propio sistema de gestos, así que el
+navegador **nunca sintetiza el `click`**. Con ratón, en el escritorio, sí lo sintetiza: el
+mismo código, el mismo servidor, dos resultados.
+
+Y engañaba, porque los `pointermove` SÍ llegaban: al pasar por encima aparecía el fantasma
+de la losa y el botón de girar se encendía. La pantalla respondía a todo menos a lo único
+que importa.
+
+`Lindes.tsx` era el **único** sitio de `escenas/` con `onClick`; las otras veintiuna asas
+de la casa usan `onPointerDown`/`onPointerUp`. Ahora también, y con la distinción entre
+toque y arrastre que el Burgo ya tenía: sin ella, girar la cámara con el dedo pondría una
+losa en cada giro.
+
+### 5 · Cada sitio donde plantar salía DOS veces
+
+Las dos pantallas pintan dos tiras: la de SITIOS —cada cosa donde cabe un labriego, con
+lo que valdría— y la de ACCIONES, que su propio comentario describe como «lo que no se
+toca en el tablero: empezar, no plantar». Pero `acciones` trae todo lo que no sea poner
+una losa, o sea también los plantados. **Seis chips donde había tres cosas**, la mitad con
+su valor y la mitad sin él. En los dos clientes.
+
+El tablero declarado tiene que seguir trayéndolos —un cliente sin el pintor de Las Lindes
+sólo tiene eso, y sin ellos no podría plantar—, así que quien filtra es quien pinta las
+dos tiras. Pero **cuál** filtrar es una regla, y los clientes de esta casa no saben
+reglas: lo dice `accionesFueraDeLosSitios`, en `shared/`.
+
+### Y la red, las dos probadas rompiendo lo que vigilan
+
+- **`verify:escena`** barre los fuentes de `escenas/` y exige que ninguna escena use
+  `onClick`. Con el `onClick` puesto: roja, y nombra el fichero.
+- **`verify:lindes-en-tres`** exige las DOS mitades del reparto: que ningún sitio se
+  repita como acción, y que el reparto no pierda ninguna. Lo segundo importa tanto como lo
+  primero: un filtro que se comiera «No plantar» pasaría la primera mitad tan tranquilo y
+  dejaría la pantalla sin la única manera de no plantar. Con el filtro roto: 252 rojas.
+
+### Lo que la app enseñó del panel, y conviene saber
+
+El panel del navegador **no entrega punteros de verdad al lienzo de la app**: el `hover` y
+el `click` reales no llegan a la escena, aunque sí funcionan sobre los botones. Lo que sí
+llega es un `PointerEvent` despachado a mano. O sea que para probar una escena 3D de la
+app hay que hacerlo con punteros sintéticos, y conviene no confundir «no responde» con
+«está roto»: el primer diagnóstico de esta noche fue equivocado por esto.
 
 ## Los tres fallos que sólo se vieron SENTÁNDOSE
 

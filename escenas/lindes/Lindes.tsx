@@ -57,6 +57,8 @@ import {
 import type { Mandos, Paseante } from './paseo';
 import type { PropsDeLasLindes } from './tipos';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
+import { llaveDeCasilla } from '../../shared/arcade/juegos/lindes-losas';
+import { MINIMO_PARA_GIRAR } from '../camara';
 import {
   INCLINACION_DE_LA_MANO,
   loQueHaCaido,
@@ -347,10 +349,53 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
     return { x: Math.round(p.x / LADO_DE_LOSA), y: Math.round(-p.z / LADO_DE_LOSA) };
   }, []);
 
-  const alTocar = useCallback(
-    (e: ThreeEvent<MouseEvent>) => {
+  /*
+   * ═══ EL TOQUE ES `pointerdown` + `pointerup`, Y NO `onClick` ═══
+   *
+   * Esto era un `onClick` y en la app NO SE PODÍA PONER UNA LOSA — o sea, no se podía
+   * jugar—. Los `pointermove` sí llegaban: el fantasma aparecía y el botón de girar se
+   * encendía. Lo que no llegaba nunca era el `click`, porque React Native Web llama a
+   * `preventDefault` en el `pointerdown` para su propio sistema de gestos y entonces el
+   * navegador no sintetiza el `click`. Con ratón, en el escritorio, sí lo sintetiza, y por
+   * eso allí funcionaba y aquí no: el mismo código, el mismo servidor, dos resultados.
+   *
+   * `Lindes.tsx` era el ÚNICO sitio de `escenas/` que usaba `onClick`; las otras veintiuna
+   * asas de esta casa usan `onPointerDown`/`onPointerUp`, y ahora se ve por qué.
+   *
+   * ═══ Y UN TOQUE NO ES UN ARRASTRE ═══
+   *
+   * Con el dedo, girar la cámara empieza igual que tocar: bajando el puntero sobre el
+   * tablero. Si `pointerup` pusiera la losa a secas, cada giro de cámara colocaría una. Se
+   * guarda dónde bajó y sólo cuenta como toque si subió cerca —`MINIMO_PARA_GIRAR`, el
+   * mismo umbral que usa el Burgo y que vive en `escenas/camara.ts`— y en la misma casilla.
+   */
+  const bajoEn = useRef<{ x: number; y: number; casilla: string } | null>(null);
+  const alBajar = useCallback(
+    (e: ThreeEvent<PointerEvent>) => {
+      if (e.nativeEvent.button !== undefined && e.nativeEvent.button !== 0) return;
       e.stopPropagation();
       const donde = casillaDelPunto(e.point);
+      bajoEn.current = { x: e.pointer.x, y: e.pointer.y, casilla: llaveDeCasilla(donde.x, donde.y) };
+    },
+    [casillaDelPunto],
+  );
+
+  const alTocar = useCallback(
+    (e: ThreeEvent<PointerEvent>) => {
+      const bajo = bajoEn.current;
+      bajoEn.current = null;
+      if (bajo === null) return;
+      if (e.nativeEvent.button !== undefined && e.nativeEvent.button !== 0) return;
+      e.stopPropagation();
+      const donde = casillaDelPunto(e.point);
+      /*
+       * El umbral se mide en PUNTOS de pantalla y no en las unidades de r3f, que van de
+       * menos uno a uno: en un lienzo ancho, cuatro puntos son una centésima de esa escala.
+       */
+      const dx = ((e.pointer.x - bajo.x) * size.width) / 2;
+      const dy = ((e.pointer.y - bajo.y) * size.height) / 2;
+      if (Math.hypot(dx, dy) > MINIMO_PARA_GIRAR) return;
+      if (bajo.casilla !== llaveDeCasilla(donde.x, donde.y)) return;
       const cabe = tablero.huecos.filter((h) => h.x === donde.x && h.y === donde.y);
       if (cabe.length === 0) return;
       /*
@@ -365,7 +410,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       if (elegido === undefined) return;
       props.alTocarHueco?.(elegido.x, elegido.y, elegido.giro);
     },
-    [casillaDelPunto, giroEnMano, props, tablero.huecos],
+    [casillaDelPunto, giroEnMano, props, tablero.huecos, size],
   );
 
   const alSenalar = useCallback(
@@ -465,7 +510,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       <LosLabriegos labriegos={tablero.labriegos} />
 
       {huecos !== null ? (
-        <mesh geometry={huecos} onClick={alTocar} onPointerMove={alSenalar}>
+        <mesh geometry={huecos} onPointerDown={alBajar} onPointerUp={alTocar} onPointerMove={alSenalar}>
           <meshStandardMaterial
             color="#f3e7b8"
             transparent

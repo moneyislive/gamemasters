@@ -10206,6 +10206,58 @@ paso('El reloj de arena se monta bien: normalizado, con sus montones en su sitio
   soltarElReloj(null);
 }
 
+// ---------------------------------------------------------------------------
+paso('Ninguna escena se toca con `onClick`, que en la app no llega nunca');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ EL FALLO QUE ESTO CIERRA, Y CUÁNTO COSTÓ VERLO ═══
+ *
+ * En la app NO SE PODÍA PONER UNA LOSA en Las Lindes. O sea: no se podía jugar. Y la
+ * batería estaba entera en verde, el escritorio funcionaba, y no había un solo error en
+ * ninguna consola.
+ *
+ * La causa: el tablero se tocaba con `onClick`. React Native Web llama a `preventDefault`
+ * en el `pointerdown` para su propio sistema de gestos, y entonces el navegador NO
+ * sintetiza el `click`. Con ratón, en el escritorio, sí lo sintetiza — el mismo código, el
+ * mismo servidor, dos resultados. Los `pointermove` sí llegaban, así que el fantasma
+ * aparecía y el botón de girar se encendía: parecía que la pantalla respondía.
+ *
+ * Las otras VEINTIUNA asas de `escenas/` ya usaban `onPointerDown`/`onPointerUp`. Ésta era
+ * la única con `onClick`, y por eso era la única que no se podía tocar en un teléfono.
+ *
+ * Se mira en el FUENTE porque es lo único que se puede mirar: en Node no hay WebGL y aquí
+ * no se monta ninguna escena.
+ */
+{
+  const conClick: string[] = [];
+  const mirados: string[] = [];
+  const barrer = (carpeta: URL): void => {
+    for (const entrada of fs.readdirSync(carpeta, { withFileTypes: true })) {
+      if (entrada.name === 'node_modules' || entrada.name === 'scripts') continue;
+      const donde = new URL(`${entrada.name}${entrada.isDirectory() ? '/' : ''}`, carpeta);
+      if (entrada.isDirectory()) {
+        barrer(donde);
+        continue;
+      }
+      if (!entrada.name.endsWith('.tsx')) continue;
+      mirados.push(entrada.name);
+      const fuente = fs.readFileSync(donde, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      if (/\bonClick=/.test(fuente)) conClick.push(entrada.name);
+    }
+  };
+  barrer(new URL('../', import.meta.url));
+
+  /* La vacuna de siempre: un barrido que no mira ficheros no encuentra fallos. */
+  comprobar('el barrido de las escenas encuentra ficheros que mirar', mirados.length > 5, mirados.length);
+  comprobar(
+    'y ninguna escena se toca con `onClick`: en la app no llega, y el juego se queda sin jugarse',
+    conClick.length === 0,
+    conClick,
+  );
+}
+
+
 console.log('');
 if (fallos.length > 0) {
   console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);
