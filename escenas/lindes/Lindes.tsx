@@ -61,7 +61,7 @@ import {
   unPaso,
 } from './paseo';
 import type { Mandos, Paseante } from './paseo';
-import type { PropsDeLasLindes } from './tipos';
+import type { PropsDeLasLindes, Traer } from './tipos';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
 import { llaveDeCasilla } from '../../shared/arcade/juegos/lindes-losas';
 import { MINIMO_PARA_GIRAR } from '../camara';
@@ -73,7 +73,15 @@ import {
   sitioDeLaMano,
   sitioDelRelojDeLaBolsa,
 } from './rincones';
-import { ALTO_DEL_RELOJ_EN_LADOS, RelojDeArena } from '../reloj';
+import {
+  ALTO_DEL_RELOJ_EN_LADOS,
+  RelojDeArena,
+  montarElReloj,
+  ponerLaArena,
+  relojDe,
+  soltarElReloj,
+} from '../reloj';
+import type { RelojCargado } from '../reloj';
 import { QuienAnda } from './quien-anda';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
@@ -582,6 +590,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
 
       <ElRelojDeLaBolsa
         aPie={camara.modo !== 'mesa'}
+        traer={traer}
         quedan={tablero.quedan}
         deLaBolsa={tablero.deLaBolsa}
         sePuedePasar={props.sePuedePasar === true}
@@ -761,25 +770,19 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
  * Es el MISMO reloj de Riberas: el mismo componente `RelojDeArena` y las mismas medidas.
  * Lo único que cambia es qué mide la arena, y eso lo decide quien lo monta.
  *
- * ═══ PERO CON SUS CONOS, Y NO CON `reloj.glb`. MEDIDO, NO DE OÍDAS ═══
+ * ═══ Y ES EL `.glb`, COMO EN RIBERAS Y EN EL BURGO ═══
  *
- * El componente admite las dos cosas: el modelo de arte de 717 kB, o los dos conos del
- * respaldo. Aquí van los conos, y no por ahorrar:
+ * Aquí se pasaba `modelo={null}`, que era pedir el reloj de conos —el respaldo anterior al
+ * modelo— y quedarse con él para siempre. Lo puse yo, y con un motivo medido: el `.glb` trae
+ * el color HORNEADO A VÉRTICE y horneado oscuro (la arena en `rgb(133, 74, 29)` y la madera
+ * en `rgb(42, 10, 2)`, casi negra), y en el rincón oscuro de este juego eso daba 20 píxeles
+ * claros dentro de los bulbos contra los 3.539 de los conos.
  *
- *   · El `.glb` trae su color HORNEADO A VÉRTICE, y horneado oscuro: la arena sale en
- *     `rgb(133, 74, 29)` —marrón de tierra— y la madera en `rgb(42, 10, 2)`, casi negra.
- *     Sobre la mesa oscura de Las Lindes y a un 17 % del alto del lienzo eso es una
- *     silueta negra donde no se distingue cuánta arena queda, que es lo único que este
- *     trasto tiene que decir. Contado sobre el lienzo, con la bolsa a dos tercios: 20
- *     píxeles claros dentro de los bulbos. Con los conos, 3.539, y repartidos entre
- *     arriba y abajo como toca.
- *   · En Riberas se ve bien porque allí vive en la BARRA, cerca del ojo y sobre madera
- *     clara. No es el mismo sitio ni la misma talla.
- *   · Y de propina: 20 triángulos y trece llamadas de dibujo en vez de 25.000 y ciento
- *     seis, y 717 kB que este juego no baja.
- *
- * Los conos usan la paleta de la casa —`COLOR_DE_LA_ARENA`— y se leen de un vistazo. Si
- * un día el modelo se hornea claro, volver a él es pasarle el `modelo` y nada más.
+ * El motivo era bueno y la decisión era mala: dejaba a este juego con un reloj distinto al de
+ * los otros dos, y el respaldo abierto para que a cualquiera le volviera a pasar. Miguel lo
+ * vio en cuanto se sentó. Así que aquí va el mismo reloj que en todas partes, y lo oscuro del
+ * horneado se arregla donde está el problema —en el modelo—, no escondiéndolo detrás de un
+ * segundo reloj.
  *
  * ═══ Y ES TAMBIÉN EL BOTÓN DE PASAR ═══
  *
@@ -789,6 +792,7 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
  */
 function ElRelojDeLaBolsa({
   aPie,
+  traer,
   quedan,
   deLaBolsa,
   sePuedePasar,
@@ -796,6 +800,8 @@ function ElRelojDeLaBolsa({
 }: {
   /** ¿Se está andando por el tablero? Entonces el rincón va cerca, o se entierra. */
   readonly aPie: boolean;
+  /** Para traer `reloj.glb`. El mismo `traer` de la escena, así que se baja una sola vez. */
+  readonly traer: Traer;
   readonly quedan: number;
   readonly deLaBolsa: number;
   readonly sePuedePasar: boolean;
@@ -803,11 +809,27 @@ function ElRelojDeLaBolsa({
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   const cuerpo = useRef<THREE.Group>(null);
-  const arenaArriba = useRef<THREE.Group>(null);
-  const arenaAbajo = useRef<THREE.Group>(null);
-  const hilo = useRef<THREE.Mesh>(null);
   const asa = useRef<THREE.Mesh>(null);
   const { camera, size } = useThree();
+
+  /*
+   * EL MODELO, CON SU PROPIA RED Y SIN TUMBAR NADA SI NO LLEGA. Es el mismo trato que las
+   * losas, los aventureros y el pack: una mesa sin reloj se sigue jugando —el asa de pasar
+   * sigue puesta— y lo que no puede es dejar la escena a medias. `relojDe` lo baja una sola
+   * vez por `traer`, así que abrir dos veces la misma mesa no lo pide dos veces.
+   */
+  const [cargado, ponerCargado] = useState<RelojCargado | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    void relojDe(traer).then((m) => {
+      if (vivo) ponerCargado(m);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [traer]);
+  const montado = useMemo(() => montarElReloj(cargado), [cargado]);
+  useEffect(() => () => soltarElReloj(montado), [montado]);
 
   /*
    * El sitio se saca UNA vez por pintado y se usa en los dos lados: el tamaño se lo lleva
@@ -830,7 +852,7 @@ function ElRelojDeLaBolsa({
    * empezar la ronda porque el plazo se reinicia. Aquí no hay plazo y la bolsa no se
    * rellena, así que darle la vuelta sería decir que algo vuelve a empezar.
    */
-  useFrame(() => {
+  useFrame((_, salto) => {
     const g = grupo.current;
     if (g === null) return;
     const camara = camera as THREE.PerspectiveCamera;
@@ -848,28 +870,31 @@ function ElRelojDeLaBolsa({
      */
     g.quaternion.copy(camara.quaternion);
 
-    const parte = loQueHaCaido(quedan, deLaBolsa);
-    const encima = arenaArriba.current;
-    if (encima !== null) encima.scale.y = 1 - parte;
-    const debajo = arenaAbajo.current;
-    if (debajo !== null) debajo.scale.y = parte;
-    const chorro = hilo.current;
-    /* El hilo sólo cae mientras queda algo arriba y aún no ha llegado todo abajo. */
-    if (chorro !== null) chorro.visible = parte > 0.001 && parte < 0.999;
+    /*
+     * ═══ LA ARENA, Y EL SALTO QUE DA `useFrame` ═══
+     *
+     * El mezclador se empuja con el `salto` de `useFrame` y NO con `clock.getDelta()`: r3f ya
+     * consume ese reloj una vez por fotograma, así que volver a llamarlo devuelve casi cero y
+     * los granos se quedan quietos sin que falle nada. Está medido en Riberas y escrito allí.
+     *
+     * Y la fracción no cuenta un plazo: cuenta LA BOLSA. `loQueHaCaido` la saca de cuántas
+     * losas quedan, que es lo único que aquí se acaba.
+     */
+    if (montado !== null) {
+      montado.mezclador.update(salto);
+      ponerLaArena(montado, loQueHaCaido(quedan, deLaBolsa));
+    }
   });
 
   return (
     <group ref={grupo}>
       <RelojDeArena
         cuerpo={cuerpo}
-        arenaArriba={arenaArriba}
-        arenaAbajo={arenaAbajo}
-        hilo={hilo}
         asa={asa}
         lado={sitio.lado}
         ancho={sitio.ancho}
         encendido={sePuedePasar}
-        modelo={null}
+        modelo={montado?.clon ?? null}
         onPulsar={() => alPasar?.()}
       />
     </group>

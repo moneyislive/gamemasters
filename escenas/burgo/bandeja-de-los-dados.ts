@@ -519,13 +519,19 @@ export function triangulosDeLasCaras(caras: readonly CaraDeLaBandeja[]): number 
 }
 
 /**
- * EL RELOJ DE ARENA DE CONOS de `escenas/reloj.tsx`, contado pieza a pieza con las cuentas de
- * `CylinderGeometry`: dos tapas de doce lados con sus dos caras (48 cada una), tres postes de seis (24),
- * dos vidrios abiertos (12: un cono no tiene la mitad de arriba de sus cuadros), dos montones de arena
- * con su base (24), el hilo de cinco lados (20) y el asa (2). `verify:burgo-escena` lo cuenta llamando
- * a `RelojDeArena` y montando sus geometrías: la primera cuenta, hecha de cabeza, decía 310.
+ * LO QUE PINTA `RelojDeArena` CUANDO NO TIENE MODELO: el asa y nada más.
+ *
+ * Aquí había `TRIANGULOS_DEL_RELOJ_DE_CONOS`, 330 triángulos de un reloj de respaldo hecho de
+ * cilindros y conos. Ese reloj está borrado —era anterior a `reloj.glb` y se colaba en cuanto
+ * alguien pasaba `modelo={null}`, que es lo que le pasó a Las Lindes durante semanas—, así que
+ * en la calidad sobria el hueco del reloj se queda con el asa: dos triángulos.
+ *
+ * En El Burgo ese reloj es DECORATIVO —va en la bandeja de los dados con `encendido={false}`—,
+ * así que la sobria pierde un adorno y no una función. Está anotado en la bitácora para que se
+ * decida con la cuenta delante: bajarle el modelo a la sobria son 717 kB y veinte mil
+ * triángulos en los aparatos que la sobria existe para proteger.
  */
-export const TRIANGULOS_DEL_RELOJ_DE_CONOS = 2 * 48 + 3 * 24 + 2 * 12 + 2 * 24 + 20 + 2;
+export const TRIANGULOS_DEL_RELOJ_SIN_MODELO = 2;
 /**
  * Y el de Riberas, `reloj.glb`, contado con `@gltf-transform` NODO A NODO —los cincuenta granos comparten
  * una malla de dos triángulos, y se dibujan cincuenta—, más su asa.

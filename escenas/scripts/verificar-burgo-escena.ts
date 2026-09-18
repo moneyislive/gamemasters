@@ -262,7 +262,7 @@ import {
   PROPORCIONES_DEL_RELOJ,
   TRIANGULOS_DEL_ASA_DE_LOS_DADOS,
   TRIANGULOS_DEL_ASA_DEL_RELOJ,
-  TRIANGULOS_DEL_RELOJ_DE_CONOS,
+  TRIANGULOS_DEL_RELOJ_SIN_MODELO,
   TRIANGULOS_DEL_RELOJ_DE_RIBERAS,
   altoDelMazo,
   alzaMaximaDeLosDados,
@@ -2019,7 +2019,7 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
     const reloj = planoDeLaBandeja('completa').reloj;
     const relojCompacto = planoDeLaBandeja('compacta').reloj;
     comprobar(
-      `las proporciones del reloj que usa la caja son las de escenas/reloj.tsx, y el de conos cabe en el cilindro que se le reserva (${String(ENVOLVENTE_DEL_RELOJ.alto)} lado de alto y ${String(ENVOLVENTE_DEL_RELOJ.radio)} de radio), de pie fuera de la caja`,
+      `las proporciones del reloj que usa la caja son las de escenas/reloj.tsx, y cabe en el cilindro que se le reserva (${String(ENVOLVENTE_DEL_RELOJ.alto)} lado de alto y ${String(ENVOLVENTE_DEL_RELOJ.radio)} de radio), de pie fuera de la caja`,
       PROPORCIONES_DEL_RELOJ.altoDelBulbo === ALTO_DEL_BULBO_DEL_RELOJ &&
         PROPORCIONES_DEL_RELOJ.radioDelBulbo === RADIO_DEL_BULBO_DEL_RELOJ &&
         PROPORCIONES_DEL_RELOJ.gruesoDelMarco === GRUESO_DEL_MARCO_DEL_RELOJ &&
@@ -2079,14 +2079,50 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
       }
       return triangulosDelArbol(e.props?.children);
     };
+    /*
+     * ═══ SIN MODELO NO SE PINTA UN SEGUNDO RELOJ: SE PINTA EL ASA Y NADA MÁS ═══
+     *
+     * Aquí se contaban los 330 triángulos de un reloj de RESPALDO —cilindros y conos— que vivía
+     * dentro de `RelojDeArena` y salía en cuanto alguien pasaba `modelo={null}`. Era anterior a
+     * `reloj.glb`, y por esa puerta Las Lindes enseñó durante semanas un reloj que ya no era el
+     * de la casa, sin que fallara nada y sin que ningún comprobador lo mirara.
+     *
+     * El respaldo está borrado. Esta comprobación es ahora su contraria: llamando al componente
+     * sin modelo tiene que salir SÓLO el asa —dos triángulos de un plano—, que es lo que deja el
+     * botón de pasar el turno puesto mientras el `.glb` viaja.
+     */
     const nadaDeReferencia = { current: null };
-    const arbolDelReloj = RelojDeArena({ cuerpo: nadaDeReferencia, arenaArriba: nadaDeReferencia, arenaAbajo: nadaDeReferencia, hilo: nadaDeReferencia, asa: nadaDeReferencia, lado: reloj.lado, ancho: reloj.lado * ASA_DEL_RELOJ_DE_ARENA.ancho, encendido: false, modelo: null, onPulsar: () => undefined });
-    const triangulosDeLosConos = triangulosDelArbol(arbolDelReloj);
+    const arbolDelReloj = RelojDeArena({ cuerpo: nadaDeReferencia, asa: nadaDeReferencia, lado: reloj.lado, ancho: reloj.lado * ASA_DEL_RELOJ_DE_ARENA.ancho, encendido: false, modelo: null, onPulsar: () => undefined });
+    const sinModelo = triangulosDelArbol(arbolDelReloj);
     comprobar(
-      `el reloj de conos, montado llamando a RelojDeArena y contando sus geometrías, son los ${String(TRIANGULOS_DEL_RELOJ_DE_CONOS)} triángulos que cuenta el presupuesto`,
-      triangulosDeLosConos === TRIANGULOS_DEL_RELOJ_DE_CONOS,
-      triangulosDeLosConos,
+      `sin modelo, RelojDeArena pinta el asa y nada más: ${String(TRIANGULOS_DEL_RELOJ_SIN_MODELO)} triángulos, los que cuenta el presupuesto de la calidad sobria`,
+      sinModelo === TRIANGULOS_DEL_RELOJ_SIN_MODELO,
+      sinModelo,
     );
+
+    /*
+     * ═══ Y LA PUERTA, CERRADA POR EL FUENTE ═══
+     *
+     * Lo de arriba cuenta triángulos, y un reloj de respaldo nuevo podría tener otros. Esto mira
+     * el fichero: en `escenas/reloj.tsx` no puede haber geometría de conos ni cilindros, porque
+     * el único reloj de esta casa es un `.glb`. Es la comprobación que faltaba la primera vez.
+     */
+    {
+      const fuenteDelReloj = fs.readFileSync(path.join(RAIZ, 'reloj.tsx'), 'utf8');
+      const soloCodigo = fuenteDelReloj.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+      for (const prohibida of ['coneGeometry', 'cylinderGeometry', 'sphereGeometry']) {
+        comprobar(
+          `\`escenas/reloj.tsx\` no vuelve a levantar un reloj a mano: sin \`${prohibida}\``,
+          !soloCodigo.includes(prohibida),
+        );
+      }
+      /* Vacuna: que se está leyendo el fichero de verdad y no una cadena vacía. */
+      comprobar(
+        'y se ha leído el fuente del reloj para juzgarlo',
+        soloCodigo.includes('RelojDeArena') && soloCodigo.includes('planeGeometry'),
+        { letras: soloCodigo.length },
+      );
+    }
     /* El de Riberas, abierto con `@gltf-transform`: sus triángulos nodo a nodo —los cincuenta granos comparten una malla— y su silueta. */
     const RELOJ_GLB = path.join(RAIZ, 'modelos', 'reloj.glb');
     const delGlb = await (async (): Promise<{ triangulos: number; radioPorAlto: number } | null> => {

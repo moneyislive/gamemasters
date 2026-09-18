@@ -38,7 +38,8 @@
  * Medido contra el `.glb` real, y `verify:burgo-escena` lo vuelve a sumar en cada pasada:
  *
  *     TABLERO en plena ... 280.774   de los cuales el manto de teselas son 64.656
- *     TABLERO en sobria .. 228.202   (sin decorado de campo, sin atrezo menudo, sin aventurero)
+ *     TABLERO en sobria .. 227.942   (sin decorado de campo, sin atrezo menudo, sin aventurero,
+ *                                y sin el reloj: en sobria no se baja su modelo y queda el asa)
  *
  * (Eran 207.949 y 145.595 antes de que los solares se quedaran SIN CUERPOS —los edificios de las
  * propiedades se confundían con las casas y las posadas del Concejo, y se quitaron a petición de
@@ -115,7 +116,7 @@ import { BOCANADAS_DEL_HUMO, CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLo
 import type { NombreDePieza } from './piezas';
 import { CASILLAS, ESQUINAS, ROTULO_DE_LA_CASILLA, SUBTITULO_DE_LA_CASILLA, cuadrosDelPrecinto, huecosDeLosEmblemas, letrasDelPrecinto, mundoEstatico } from './anillo-en-3d';
 import type { Puesta } from './anillo-en-3d';
-import { LETRAS_DE_LA_PLACA, TRIANGULOS_DEL_RELOJ_DE_CONOS, TRIANGULOS_DEL_RELOJ_DE_RIBERAS, triangulosDeLaCaja } from './bandeja-de-los-dados';
+import { LETRAS_DE_LA_PLACA, TRIANGULOS_DEL_RELOJ_DE_RIBERAS, TRIANGULOS_DEL_RELOJ_SIN_MODELO, triangulosDeLaCaja } from './bandeja-de-los-dados';
 
 /**
  * LOS TOPES. Ver la cabecera: la cuenta que los justifica está en `LA-CIUDAD.md` §8, y
@@ -308,7 +309,8 @@ export function sumaDelPresupuesto(
     cuantos: 1,
     triangulos: triangulosDeLaCaja() + 2 * TRIANGULOS_POR_EMBLEMA + LETRAS_DE_LA_PLACA * TRIANGULOS_POR_LETRA,
   });
-  renglones.push({ que: plena ? 'el reloj de arena de Riberas' : 'el reloj de arena de conos', cuantos: 1, triangulos: plena ? TRIANGULOS_DEL_RELOJ_DE_RIBERAS : TRIANGULOS_DEL_RELOJ_DE_CONOS });
+  /* En la sobria no se baja el modelo, así que del reloj sólo queda su asa. */
+  renglones.push({ que: plena ? 'el reloj de arena de Riberas' : 'el asa del reloj, sin su modelo', cuantos: 1, triangulos: plena ? TRIANGULOS_DEL_RELOJ_DE_RIBERAS : TRIANGULOS_DEL_RELOJ_SIN_MODELO });
   renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });
   renglones.push({ que: 'la cúpula del cielo', cuantos: 1, triangulos: triangulosDelCielo() });
   renglones.push({ que: 'aventurero (exploradora)', cuantos: plena ? 1 : 0, triangulos: plena ? triangulosDeUnAventurero : 0 });

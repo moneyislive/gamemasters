@@ -632,6 +632,63 @@ bateria: se abrio una mesa de verdad en el escritorio y se jugo un turno entero 
 La medida del lienzo, que es donde vivio el fallo de los 566x9: **604 x 922**, recuadro
 identico, **cero railes hermanos**. La cadena del alto esta sana.
 
+## El reloj de arena era OTRO reloj, y ya no existe
+
+Miguel lo vio al sentarse: «el reloj de arena es una versión anterior incorrecta anterior a
+que se introdujera el que está en Riberas y el Burgo». Tenía razón, y el fallo era mío.
+
+`escenas/reloj.tsx` guardaba **dos** relojes:
+
+1. El bueno, `reloj.glb`, con sus dos montones de arena con morfología y su clip.
+2. Un **respaldo de conos y cilindros**, anterior al modelo, que se pintaba cuando llegaba
+   `modelo={null}`.
+
+El Burgo y Riberas pasan `modelo={relojMontado?.clon ?? null}`. **Las Lindes pasaba
+`modelo={null}` a pelo.** Lo puse yo, con un motivo medido y escrito: el `.glb` trae el color
+horneado a vértice y horneado oscuro —arena en `rgb(133, 74, 29)`, madera en `rgb(42, 10, 2)`—
+y en el rincón oscuro de este juego conté 20 píxeles claros dentro de los bulbos contra los
+3.539 de los conos.
+
+**El motivo era bueno y la decisión era mala**, por dos razones que no había pesado: dejaba a
+este juego con un reloj distinto al de los otros dos, y dejaba abierta la puerta para que a
+cualquiera le volviera a pasar sin que nada fallara. Un respaldo que se elige a mano no es un
+respaldo: es un segundo producto.
+
+**Lo que se ha hecho.** El respaldo está borrado entero —los conos, el vidrio, el marco, el
+hilo y su paleta—, `modelo` ya no tiene valor por defecto (hay que decir de dónde sale, y la
+única respuesta posible es `relojDe` + `montarElReloj`), y Las Lindes usa el mismo reloj que
+todos. Sin modelo se pinta **el asa y nada más**: el botón de pasar el turno sigue puesto, que
+era la única razón de fondo para tener respaldo. De paso, el cargador del `.glb` sube a
+`reloj.tsx`: lo tenían El Burgo y Riberas por separado y con Las Lindes la copia iba por tres.
+
+**La red, por los dos lados.** Llamando a `RelojDeArena` sin modelo tienen que salir **dos
+triángulos** —el asa— y ni uno más; y el fuente de `reloj.tsx` no puede contener
+`coneGeometry`, `cylinderGeometry` ni `sphereGeometry`, porque el único reloj de esta casa es
+un `.glb`. Probada rompiéndola: metiendo un cono salen los dos rojos a la vez.
+
+### Lo que esto se lleva por delante, y hay que decidir
+
+**El Burgo en calidad SOBRIA se queda sin reloj.** No es un descuido mío al borrar: la sobria
+—la que protege a los aparatos flojos— no baja el modelo a propósito («pesa veinte mil
+triángulos») y pintaba el de conos en su lugar. Ahora pinta el asa.
+
+Lo que hace que esto sea aceptable y no una regresión seria: **en El Burgo ese reloj es
+DECORATIVO**. Va en la bandeja de los dados con `encendido={false}` y `onPulsar={NADA_QUE_HACER}`,
+así que la sobria pierde un adorno y no una función. El presupuesto lo dice ahora con su
+nombre —«el asa del reloj, sin su modelo», 2 triángulos— y el tablero en sobria baja de
+228.202 a 227.942.
+
+Si se quiere el reloj también en sobria, la cuenta está sobre la mesa: son **717 kB y unos
+veinte mil triángulos** en los aparatos para los que existe la sobria. Es decisión de Miguel y
+no se toma aquí.
+
+### Y la arena sigue horneada oscura
+
+Es el otro lado de la misma moneda y sigue en pie: mirado en el escritorio con la bolsa casi
+llena, el bulbo de arriba SÍ se lee. Pero el marco es casi negro y el problema de fondo está
+en el modelo, no en la escena. Arreglarlo es volver a hornear `reloj.glb` más claro, y eso
+toca también a Riberas, que está en producción.
+
 ## Lo medido hasta aquí
 
 - `verify:lindes`: 13.295 comprobaciones en verde. Diez partidas enteras, 709
@@ -681,10 +738,16 @@ identico, **cero railes hermanos**. La cadena del alto esta sana.
   para no preguntar por todas. Efecto secundario que sí conviene saber: metido dentro de
   una pieza, la losa de la mano y el reloj se quedan detrás de ella y no se ven.
 
-- **La arena de `reloj.glb` no se ve en la escena de Las Lindes.** Se ha decidido
-  usar los conos y está explicado arriba, pero el porqué de fondo —que el horneado
-  de ese modelo sea tan oscuro— igual conviene mirarlo también del lado de
-  Riberas, que usa el mismo fichero.
+- **`reloj.glb` está horneado oscuro.** ~~Se ha decidido usar los conos.~~ **Ya no:**
+  el reloj de conos está borrado y Las Lindes usa el modelo, como Riberas y El Burgo
+  (ver arriba). Lo que queda en pie es el horneado: la arena sale en `rgb(133, 74, 29)`
+  y la madera en `rgb(42, 10, 2)`, casi negra. Se lee, pero se leería mucho mejor
+  horneado claro — y eso toca también a Riberas, que usa el mismo fichero y está en
+  producción.
+- **El Burgo en calidad sobria se queda sin reloj**, porque la sobria no baja el modelo
+  a propósito y el de conos ya no existe. Allí es decorativo, así que pierde un adorno
+  y no una función; bajarle el modelo serían 717 kB y veinte mil triángulos en los
+  aparatos para los que la sobria existe. Está explicado arriba con la cuenta.
 
 ## Lo que NO se hace, y por qué
 

@@ -1826,9 +1826,6 @@ function Barra({
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   const cuerpoDelReloj = useRef<THREE.Group>(null);
-  const arenaArriba = useRef<THREE.Group>(null);
-  const arenaAbajo = useRef<THREE.Group>(null);
-  const hiloDeArena = useRef<THREE.Mesh>(null);
   const asaDelReloj = useRef<THREE.Mesh>(null);
   /* La vuelta que el reloj tiene girada, y cuándo empezó el giro. `null` es «quieto». */
   const girando = useRef<{ desde: number; vuelta: number } | null>(null);
@@ -2101,13 +2098,6 @@ function Barra({
       ponerLaArena(relojMontado, parte);
     }
 
-    const arriba = arenaArriba.current;
-    if (arriba !== null) arriba.scale.y = 1 - parte;
-    const abajo = arenaAbajo.current;
-    if (abajo !== null) abajo.scale.y = parte;
-    const hilo = hiloDeArena.current;
-    /* El hilo sólo cae mientras queda algo arriba y aún no ha llegado todo abajo. */
-    if (hilo !== null) hilo.visible = parte > 0.001 && parte < 0.999;
   });
 
   /*
@@ -2296,9 +2286,6 @@ function Barra({
         >
           <RelojDeArena
             cuerpo={cuerpoDelReloj}
-            arenaArriba={arenaArriba}
-            arenaAbajo={arenaAbajo}
-            hilo={hiloDeArena}
             asa={asaDelReloj}
             lado={sitioDelRelojDeArena.alto}
             ancho={sitioDelRelojDeArena.ancho}
