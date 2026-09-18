@@ -30,6 +30,15 @@
 import { LADO_DE_LOSA } from './medidas';
 
 /** A qué distancia de la cámara cuelga. Cualquiera vale: todo lo demás se mide contra ella. */
+/**
+ * LO ALTA QUE ES LA CAJA EN LA QUE SE APOYA EL RELOJ, en lados del reloj.
+ *
+ * El reloj iba flotando en su esquina. Un tercio de su lado es una caja de mercado que se lee
+ * como caja —no como peana ni como sombra— y que no le roba sitio: el rincón sigue ocupando lo
+ * que ocupaba, porque lo que se reparte es el alto del RELOJ y la caja cuelga por debajo.
+ */
+export const ALTO_DE_LA_CAJA_DEL_RELOJ = 0.34;
+
 export const DISTANCIA_DE_LA_MANO = 60;
 
 /**

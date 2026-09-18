@@ -24,6 +24,7 @@
  */
 import * as THREE from 'three';
 import { GRUESO_DE_LOSA, LADO_DE_CELDA, LADO_DE_LOSA, CELDAS_POR_LOSA, ALZADO_DE_LA_VILLA, HUNDIDO_DE_LA_SENDA } from './medidas';
+import { MARGEN_DE_LA_ARENA } from './desierto';
 import { sueloDeLaLosa } from './losa';
 import type { ClaseDeSuelo } from './losa';
 import { losaPorId } from '../../shared/arcade/juegos/lindes-losas';
@@ -287,23 +288,33 @@ export function geometriaDelSuelo(losas: readonly LosaQueSePinta[]): THREE.Buffe
 }
 
 /**
- * LA MESA DE DEBAJO: el tablero está encima de algo.
+ * LA ARENA DE DEBAJO: el tablero está encima de algo, y ese algo es un desierto.
  *
  * ═══ NO ES ADORNO: ES LO QUE TAPA LAS JUNTAS ═══
  *
  * Una losa es un cartón con grueso, así que entre dos vecinas hay una raya de aire.
  * Sin nada debajo, por esa raya se ve EL CIELO, y un tablero atravesado por rayas
- * de cielo no parece un tablero con juntas: parece un tablero roto. Con la mesa,
- * por la junta se ve la mesa.
+ * de cielo no parece un tablero con juntas: parece un tablero roto. Con la arena,
+ * por la junta se ve la arena.
  *
  * Y de paso da lo que a la vista aérea le faltaba: un sitio. Un tablero flotando
- * sobre el vacío azul es una maqueta; sobre una mesa es una partida.
+ * sobre el vacío azul es una maqueta; sobre un desierto es una partida.
  *
- * Sale UN PELO más grande que lo que abarcan las losas —media losa por cada lado—
- * para que no se le vea el borde justo donde acaba el tablero, y se queda POR
- * DEBAJO del faldón para que no pelee con él por el mismo píxel.
+ * ═══ POR QUÉ ARENA Y NO EL FIELTRO OSCURO DE ANTES ═══
+ *
+ * Porque el fieltro no se distinguía de las losas por abajo. La cuenta, en luminancia:
+ * el prado va a 139, la senda a 142 y la villa a 148 —las tres casi iguales—, y el
+ * FALDÓN de cada losa a 61. El fieltro estaba a 50: once puntos de diferencia con el
+ * canto de la losa, o sea ninguna. El tablero se leía como una mancha sobre un agujero.
+ * Con la arena a 200 el faldón recorta con 140 de diferencia, y el reloj de arena
+ * —cuyo marco está horneado casi negro— también. Lo pidió Miguel al sentarse a mirar.
+ *
+ * Sale MÁS grande que lo que abarcan las losas —`MARGEN_DE_LA_ARENA` por cada lado—
+ * para que no se le vea el borde justo donde acaba el tablero y para que quepa el
+ * desierto de `desierto.ts`, y se queda POR DEBAJO del faldón para que no pelee con él
+ * por el mismo píxel.
  */
-export function geometriaDeLaMesa(
+export function geometriaDeLaArena(
   losas: readonly { readonly x: number; readonly y: number }[],
 ): THREE.BufferGeometry | null {
   if (losas.length === 0) return null;
@@ -317,7 +328,7 @@ export function geometriaDeLaMesa(
     if (l.y < minY) minY = l.y;
     if (l.y > maxY) maxY = l.y;
   }
-  const margen = LADO_DE_LOSA * 0.75;
+  const margen = MARGEN_DE_LA_ARENA;
   const x0 = (minX - 0.5) * LADO_DE_LOSA - margen;
   const x1 = (maxX + 0.5) * LADO_DE_LOSA + margen;
   /* La `y` del tablero crece al norte y la `z` al sur: por eso se cruzan. */
@@ -336,8 +347,14 @@ export function geometriaDeLaMesa(
   return geometria;
 }
 
-/** El color de la mesa sobre la que se juega: un fieltro oscuro de tablero. */
-export const COLOR_DE_LA_MESA = '#2b3524';
+/**
+ * LA ARENA DEL DESIERTO QUE RODEA AL TABLERO.
+ *
+ * Luminancia 200, contra los 139-148 de los tres suelos de losa y los 61 del faldón. Ése es
+ * el número que importa: es lo que hace que cada losa recorte contra el fondo en vez de
+ * fundirse con él, que es lo que pasaba con el fieltro de antes.
+ */
+export const COLOR_DE_LA_ARENA = '#dcc79b';
 
 /**
  * LA GEOMETRÍA DE LAS CASILLAS DONDE CABE LA LOSA DE LA MANO.

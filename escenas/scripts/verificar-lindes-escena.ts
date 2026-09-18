@@ -60,7 +60,13 @@ import {
 } from '../lindes/losa';
 import type { CeldaDeSuelo, PorQueEsta } from '../lindes/losa';
 import { ANCHO_DE_LA_SENDA } from '../lindes/medidas';
-import { geometriaDelSuelo } from '../lindes/suelo';
+import { COLOR_DE_LA_ARENA, COLOR_DEL_FALDON, COLOR_DEL_PRADO, COLOR_DE_LA_SENDA, COLOR_DE_LA_VILLA, geometriaDelSuelo } from '../lindes/suelo';
+import {
+  CUANTAS_EN_EL_DESIERTO,
+  LO_QUE_CRECE_EN_LA_ARENA,
+  MARGEN_DE_LA_ARENA,
+  loQueHayEnElDesierto,
+} from '../lindes/desierto';
 import {
   RADIO_DEL_ALTOZANO,
   RADIO_DEL_CORRO,
@@ -80,6 +86,7 @@ import {
   nacerEnLaLosa,
 } from '../lindes/paseo';
 import {
+  ALTO_DE_LA_CAJA_DEL_RELOJ,
   DISTANCIA_DE_LA_MANO,
   DISTANCIA_DE_LA_MANO_A_PIE,
   loQueHaCaido,
@@ -1239,11 +1246,16 @@ paso('Andando, la losa de la mano y el reloj NO se entierran bajo el tablero');
       DISTANCIA_DE_LA_MANO_A_PIE,
     );
     for (const [comoSeMira, ojo] of OJOS) {
-      for (const [queEs, sitio] of [
-        ['la losa de la mano', m],
-        ['el reloj de la bolsa', r],
+      for (const [queEs, sitio, cuelga] of [
+        ['la losa de la mano', m, 0],
+        /*
+         * El reloj ya no acaba en su base: debajo lleva la CAJA en la que se apoya, y es la
+         * caja la que toca el suelo primero. Sin este sumando la comprobación mediría un
+         * objeto que no es el que se entierra.
+         */
+        ['el reloj de la bolsa', r, r.lado * ALTO_DE_LA_CAJA_DEL_RELOJ],
       ] as const) {
-        const bajo = loMasBajo(ojo, sitio.arriba, sitio.mediaEnAlto);
+        const bajo = loMasBajo(ojo, sitio.arriba, sitio.mediaEnAlto) - cuelga;
         if (bajo < elPeor) elPeor = bajo;
         if (bajo <= 0) {
           comprobar(`${queEs} se ve ${comoSeMira} en «${pantalla}»`, false, {
@@ -1373,6 +1385,152 @@ paso('Las ayudas de la mesa se quedan en la mesa, que a pie son disparates');
     /const seLevanta = loQueSeLevantaLaUltima\(aPie\);/.test(laEscena) &&
       /casilla === ultima \? seLevanta : 0/.test(laEscena),
   );
+}
+
+
+// ---------------------------------------------------------------------------
+paso('La arena se distingue del tablero, y el desierto está donde tiene que estar');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * El fondo era un fieltro verde casi negro. Cumplía lo suyo —tapar las juntas entre losas para
+ * que no se viera el cielo por ellas— y traía dos cosas que Miguel vio al sentarse: el tablero
+ * parecía flotar sobre un agujero, y el reloj de arena, con su marco horneado casi negro, se
+ * perdía contra él.
+ *
+ * Lo que decide si dos cosas se distinguen no es el tono: es la LUMINANCIA. Y ahí estaba el
+ * fallo, que no se ve mirando los colores en la paleta: el faldón de la losa iba a 61 y el
+ * fieltro a 50. Once puntos. Con la arena a 200 hay ciento cuarenta.
+ */
+{
+  const luz = (hex: string): number => {
+    const n = parseInt(hex.replace('#', ''), 16);
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+
+  const DEL_FIELTRO_DE_ANTES = '#2b3524';
+  const arena = luz(COLOR_DE_LA_ARENA);
+  const faldon = luz(COLOR_DEL_FALDON);
+
+  /*
+   * EL FALDÓN CONTRA EL FONDO es el número que importa: es el canto de cada losa, o sea la
+   * raya que dice dónde acaba una pieza y empieza la siguiente. Si eso no recorta, el tablero
+   * se lee como una mancha y no como piezas puestas.
+   */
+  comprobar(
+    'el canto de la losa recorta contra la arena: más de cien de luminancia',
+    arena - faldon > 100,
+    { arena: arena.toFixed(0), faldon: faldon.toFixed(0), diferencia: (arena - faldon).toFixed(0) },
+  );
+
+  /* Y los tres suelos de losa, que van casi juntos, también se separan del fondo. */
+  for (const [que, color] of [
+    ['el prado', COLOR_DEL_PRADO],
+    ['la senda', COLOR_DE_LA_SENDA],
+    ['la villa', COLOR_DE_LA_VILLA],
+  ] as const) {
+    comprobar(`y ${que} se separa de la arena`, Math.abs(arena - luz(color)) > 40, {
+      suelo: luz(color).toFixed(0),
+      arena: arena.toFixed(0),
+    });
+  }
+
+  /*
+   * ═══ LA VACUNA ═══
+   *
+   * Que el fieltro de antes NO pasaría esto. Sin esta línea, la comprobación de arriba podría
+   * estar midiendo algo que cualquier color cumple, y se leería como vigilada.
+   */
+  comprobar(
+    'y el fieltro verde de antes no lo cumplía: once puntos de luminancia contra el canto',
+    luz(DEL_FIELTRO_DE_ANTES) - faldon < 20,
+    { fieltro: luz(DEL_FIELTRO_DE_ANTES).toFixed(0), faldon: faldon.toFixed(0) },
+  );
+
+  /* ── El desierto ── */
+  const LOSAS_DE_PRUEBA = [
+    { x: 0, y: 0 },
+    { x: 0, y: 1 },
+    { x: 1, y: 1 },
+  ];
+  const piezas = loQueHayEnElDesierto(LOSAS_DE_PRUEBA, 20260918);
+
+  comprobar(`el desierto son ${String(CUANTAS_EN_EL_DESIERTO)} piezas, ni una más`, piezas.length === CUANTAS_EN_EL_DESIERTO, {
+    cuantas: piezas.length,
+  });
+
+  /* LA MISMA MESA, EL MISMO DESIERTO: si no, cada pantalla vería un sitio distinto. */
+  const otraVez = loQueHayEnElDesierto(LOSAS_DE_PRUEBA, 20260918);
+  comprobar(
+    'dos veces la misma semilla dan el mismo desierto, hasta el último decimal',
+    JSON.stringify(piezas) === JSON.stringify(otraVez),
+  );
+  /* Y vacuna de lo contrario: que la semilla sirva para algo. */
+  comprobar(
+    'y otra semilla da otro desierto, que si no la semilla no pintaría nada',
+    JSON.stringify(piezas) !== JSON.stringify(loQueHayEnElDesierto(LOSAS_DE_PRUEBA, 777)),
+  );
+
+  const x0 = -0.5 * LADO_DE_LOSA;
+  const x1 = 1.5 * LADO_DE_LOSA;
+  const z0 = -1.5 * LADO_DE_LOSA;
+  const z1 = 0.5 * LADO_DE_LOSA;
+  const sectores = new Set<number>();
+  for (const pieza of piezas) {
+    /*
+     * NINGUNA ENCIMA DEL TABLERO. Es lo primero: un peñasco sobre una losa tapa la partida, y
+     * es lo que pasaría el día que alguien toque la cuenta del radio sin mirar.
+     */
+    const dentro = pieza.x > x0 && pieza.x < x1 && pieza.z > z0 && pieza.z < z1;
+    comprobar(`ninguna pieza del desierto cae sobre el tablero (${pieza.pieza})`, !dentro, {
+      x: pieza.x.toFixed(0),
+      z: pieza.z.toFixed(0),
+    });
+
+    /* Y ninguna fuera de la arena, que sería un peñasco flotando sobre el vacío azul. */
+    const fuera =
+      pieza.x < x0 - MARGEN_DE_LA_ARENA ||
+      pieza.x > x1 + MARGEN_DE_LA_ARENA ||
+      pieza.z < z0 - MARGEN_DE_LA_ARENA ||
+      pieza.z > z1 + MARGEN_DE_LA_ARENA;
+    comprobar(`ni fuera de la arena (${pieza.pieza})`, !fuera, {
+      x: pieza.x.toFixed(0),
+      z: pieza.z.toFixed(0),
+    });
+
+    /* El alto, en personas: ni guijarros que no se ven ni montañas que tapan el tablero. */
+    const personas = pieza.alto / ALTURA_DE_UNA_PERSONA;
+    comprobar(`y mide entre cuatro y nueve personas (${pieza.pieza})`, personas >= 4 && personas <= 9, {
+      personas: personas.toFixed(1),
+    });
+
+    /* Y sale del pack que este juego ya baja: pedir un modelo de más sería pedir otro fichero. */
+    comprobar(
+      `y es una pieza de las que crecen en la arena (${pieza.pieza})`,
+      LO_QUE_CRECE_EN_LA_ARENA.includes(pieza.pieza),
+    );
+
+    const centroX = (x0 + x1) / 2;
+    const centroZ = (z0 + z1) / 2;
+    const angulo = Math.atan2(pieza.z - centroZ, pieza.x - centroX);
+    sectores.add(Math.floor(((angulo + Math.PI * 2) % (Math.PI * 2)) / ((Math.PI * 2) / CUANTAS_EN_EL_DESIERTO)));
+  }
+
+  /*
+   * ═══ Y DESPERDIGADAS, QUE NO ES LO MISMO QUE AL AZAR ═══
+   *
+   * Ocho tiradas independientes dejan parejas pegadas y lados vacíos, y eso no se lee como un
+   * paisaje sino como un descuido. Una por sector es lo que lo evita, y esto lo comprueba: si
+   * alguien cambia el reparto por un `Math.random()` suelto, los sectores se repiten y salta.
+   */
+  comprobar('y hay una en cada sector: ninguna pareja pegada y ningún lado vacío', sectores.size === CUANTAS_EN_EL_DESIERTO, {
+    sectores: sectores.size,
+  });
 }
 
 

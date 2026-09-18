@@ -41,7 +41,9 @@ import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import { LADO_DE_LOSA } from './medidas';
 import { LO_QUE_NO_SE_RECORTA, montarLaLosa, semillaDeLaLosa } from './losa';
 import type { PuestaEnLaLosa } from './losa';
-import { COLOR_DE_LA_MESA, geometriaDeLaMesa, geometriaDeLosHuecos, geometriaDelSuelo } from './suelo';
+import { COLOR_DE_LA_ARENA, geometriaDeLaArena, geometriaDeLosHuecos, geometriaDelSuelo } from './suelo';
+import { loQueHayEnElDesierto } from './desierto';
+import type { EnElDesierto } from './desierto';
 import type { LosaQueSePinta } from './suelo';
 import { geometriaDeLaPeana, geometriaDelLabriego } from './labriego';
 import {
@@ -72,6 +74,7 @@ import {
   DISTANCIA_DE_LA_MANO_A_PIE,
   sitioDeLaMano,
   sitioDelRelojDeLaBolsa,
+  ALTO_DE_LA_CAJA_DEL_RELOJ,
 } from './rincones';
 import {
   ALTO_DEL_RELOJ_EN_LADOS,
@@ -83,6 +86,7 @@ import {
 } from '../reloj';
 import type { RelojCargado } from '../reloj';
 import { QuienAnda } from './quien-anda';
+import { MODELO } from '../nombres';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
@@ -263,8 +267,17 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   );
   const suelo = useMemo(() => geometriaDelSuelo(losasQueSePintan), [losasQueSePintan]);
   useEffect(() => () => suelo?.dispose(), [suelo]);
-  const mesa = useMemo(() => geometriaDeLaMesa(losasQueSePintan), [losasQueSePintan]);
-  useEffect(() => () => mesa?.dispose(), [mesa]);
+  const arena = useMemo(() => geometriaDeLaArena(losasQueSePintan), [losasQueSePintan]);
+  /*
+   * El desierto se saca de las losas y de la semilla, así que sólo se rehace cuando el
+   * tablero crece: ocho piezas no cuestan nada, pero recalcularlas cada fotograma las movería
+   * de sitio y un peñasco que anda es peor que ningún peñasco.
+   */
+  const desierto = useMemo(
+    () => loQueHayEnElDesierto(losasQueSePintan, semilla),
+    [losasQueSePintan, semilla],
+  );
+  useEffect(() => () => arena?.dispose(), [arena]);
 
   /* ── Lo que se pone encima, agrupado por modelo ──────────────────────────── */
   const contenidos = useMemo(() => {
@@ -524,11 +537,13 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
         color="#fff3dd"
       />
 
-      {mesa !== null ? (
-        <mesh geometry={mesa} receiveShadow={false}>
-          <meshStandardMaterial color={COLOR_DE_LA_MESA} roughness={1} metalness={0} />
+      {arena !== null ? (
+        <mesh geometry={arena} receiveShadow={false}>
+          <meshStandardMaterial color={COLOR_DE_LA_ARENA} roughness={1} metalness={0} />
         </mesh>
       ) : null}
+
+      {catalogo !== null ? <ElDesierto catalogo={catalogo} piezas={desierto} /> : null}
 
       {suelo !== null ? (
         <mesh geometry={suelo} receiveShadow={false}>
@@ -590,6 +605,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
 
       <ElRelojDeLaBolsa
         aPie={camara.modo !== 'mesa'}
+        catalogo={catalogo}
         traer={traer}
         quedan={tablero.quedan}
         deLaBolsa={tablero.deLaBolsa}
@@ -753,6 +769,88 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
   );
 }
 
+/**
+ * LO QUE MIDE DE ALTO UN MODELO DEL PACK, en unidades del pack.
+ *
+ * Es el único sitio donde se sabe de verdad: las piezas no miden lo mismo ni de lejos —entre
+ * `roca-a` y `piedra` hay cuatro veces— y una tabla de escalas escrita a mano se queda vieja
+ * en silencio el día que alguien recompile `tablero.glb`. Quien quiera una pieza de un alto
+ * concreto pide el alto y divide por esto.
+ */
+function altoDelModelo(catalogo: Catalogo, nombre: string): number {
+  let alto = 0;
+  for (const parte of catalogo.partes.get(nombre) ?? []) {
+    parte.geometria.computeBoundingBox();
+    const caja = parte.geometria.boundingBox;
+    if (caja !== null) alto = Math.max(alto, caja.max.y - caja.min.y);
+  }
+  return alto;
+}
+
+/* ──────────────────────────── El desierto de fuera ──────────────────────────── */
+
+/**
+ * LAS OCHO PIEZAS DE ALREDEDOR.
+ *
+ * Dónde van y cuáles son lo decide `desierto.ts`, que es aritmética y se puede medir desde
+ * Node. Aquí sólo se instancian, con el mismo camino que la losa de la mano: agrupadas por
+ * modelo y sin recorte por distancia, porque ocho piezas grandes no son atrezo menudo — son
+ * el sitio, y el sitio no se apaga cuando la cámara se aleja.
+ */
+function ElDesierto({
+  catalogo,
+  piezas,
+}: {
+  readonly catalogo: Catalogo;
+  readonly piezas: readonly EnElDesierto[];
+}): JSX.Element | null {
+  /*
+   * ═══ LA ESCALA SE SACA MIDIENDO EL MODELO, NO DE UNA TABLA ═══
+   *
+   * `desierto.ts` pide un ALTO porque las piezas del pack no miden lo mismo —hay cuatro veces
+   * entre `roca-a` y `piedra`—, así que una escala común daba un peñasco y un guijarro. Aquí
+   * está la caja de cada modelo, que es el único sitio donde se sabe de verdad lo que mide, y
+   * de ella sale la escala. El día que alguien recompile el pack con otro tamaño, esto sigue
+   * dando peñascos sin tocar una línea.
+   */
+  const porModelo = useMemo(() => {
+    const salida = new Map<string, PuestaEnLaLosa[]>();
+    for (const p of piezas) {
+      const suyo = altoDelModelo(catalogo, p.pieza);
+      /* Sin caja no hay escala posible: se pinta a su tamaño antes que no pintarlo. */
+      const escala = suyo <= 1e-6 ? 1 : p.alto / (suyo * ESCALA_DEL_PACK);
+      const puesta: PuestaEnLaLosa = {
+        pieza: p.pieza,
+        x: p.x,
+        y: p.y,
+        z: p.z,
+        giro: p.giro,
+        escala,
+        largo: 1,
+        porque: 'prado',
+        menuda: false,
+      };
+      const lista = salida.get(p.pieza);
+      if (lista === undefined) salida.set(p.pieza, [puesta]);
+      else lista.push(puesta);
+    }
+    return salida;
+  }, [catalogo, piezas]);
+
+  if (porModelo.size === 0) return null;
+  return (
+    <group>
+      {[...porModelo.keys()].sort().map((nombre) => (
+        <UnModeloSinRecorte
+          key={nombre}
+          partes={catalogo.partes.get(nombre) ?? []}
+          puestas={porModelo.get(nombre) ?? []}
+        />
+      ))}
+    </group>
+  );
+}
+
 /* ─────────────────────── El reloj de arena de la bolsa ─────────────────────── */
 
 /**
@@ -792,6 +890,7 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
  */
 function ElRelojDeLaBolsa({
   aPie,
+  catalogo,
   traer,
   quedan,
   deLaBolsa,
@@ -800,6 +899,8 @@ function ElRelojDeLaBolsa({
 }: {
   /** ¿Se está andando por el tablero? Entonces el rincón va cerca, o se entierra. */
   readonly aPie: boolean;
+  /** El pack, para la caja en la que se apoya. `null` mientras viaja. */
+  readonly catalogo: Catalogo | null;
   /** Para traer `reloj.glb`. El mismo `traer` de la escena, así que se baja una sola vez. */
   readonly traer: Traer;
   readonly quedan: number;
@@ -886,8 +987,47 @@ function ElRelojDeLaBolsa({
     }
   });
 
+  /*
+   * ═══ EN QUÉ SE APOYA, QUE NO PUEDE SER EN NADA ═══
+   *
+   * El reloj iba flotando en su esquina. Un reloj de arena que flota no es un objeto: es un
+   * icono pegado en el cristal, y este juego no tiene iconos pegados, tiene cosas puestas
+   * encima de otras. En Riberas se apoya en la barra y en El Burgo en la bandeja de los
+   * dados; aquí no había nada debajo.
+   *
+   * Una CAJA DE MERCADO, del mismo pack que todo lo que hay en las losas: es lo que habría
+   * debajo de un reloj en una plaza, y para este juego dice además lo suyo — lo que se acaba
+   * aquí es la BOLSA de losas, y de una caja es de donde salen.
+   *
+   * Se le da el ALTO medido y no una escala a ojo, por lo mismo que al desierto, y se sienta
+   * con su cara de arriba justo en la base del reloj: el modelo llega normalizado a una
+   * unidad y centrado, así que su base está media unidad por debajo del centro de su grupo.
+   */
+  const enQueSeApoya = useMemo(() => {
+    if (catalogo === null) return null;
+    const suyo = altoDelModelo(catalogo, MODELO.caja);
+    if (suyo <= 1e-6) return null;
+    const alto = sitio.lado * ALTO_DE_LA_CAJA_DEL_RELOJ;
+    const puestas: PuestaEnLaLosa[] = [
+      {
+        pieza: MODELO.caja,
+        x: 0,
+        y: -sitio.lado / 2 - alto,
+        z: 0,
+        /* Un pelo torcida: una caja a escuadra con la pantalla parece parte del marco. */
+        giro: Math.PI * 0.12,
+        escala: alto / (suyo * ESCALA_DEL_PACK),
+        largo: 1,
+        porque: 'prado',
+        menuda: false,
+      },
+    ];
+    return <UnModeloSinRecorte partes={catalogo.partes.get(MODELO.caja) ?? []} puestas={puestas} />;
+  }, [catalogo, sitio.lado]);
+
   return (
     <group ref={grupo}>
+      {enQueSeApoya}
       <RelojDeArena
         cuerpo={cuerpo}
         asa={asa}

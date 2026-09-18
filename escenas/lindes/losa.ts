@@ -144,7 +144,7 @@ export interface Punto {
  * `three`, y esto tiene que poder correr en Node dentro de un comprobador. Son seis
  * líneas y están medidas; importarlo costaría un motor de dibujo entero.
  */
-function sorteo(semilla: number): () => number {
+export function sorteo(semilla: number): () => number {
   let x = (Math.trunc(semilla) >>> 0) + 0x6d2b79f5;
   return () => {
     x = (x + 0x6d2b79f5) | 0;

@@ -689,6 +689,81 @@ llena, el bulbo de arriba SÍ se lee. Pero el marco es casi negro y el problema 
 en el modelo, no en la escena. Arreglarlo es volver a hornear `reloj.glb` más claro, y eso
 toca también a Riberas, que está en producción.
 
+## El fondo dejó de ser un agujero negro y pasó a ser un desierto
+
+Lo pidió Miguel mirando la mesa: cambiar el fondo «de oscuro casi negro» a un bioma de
+desierto, con **muy pocos elementos 3D, unos ocho desperdigados**, y con el fondo en color
+arena — que contrastaría tanto con el reloj como con los fragmentos de tablero.
+
+**Y el porqué se puede contar con números, que es lo que hace que no sea cuestión de gusto.**
+Lo que decide si dos cosas se distinguen no es el tono sino la LUMINANCIA, y ahí estaba el
+fallo, invisible mirando la paleta:
+
+| | luminancia |
+|---|---|
+| prado `#6f9a4e` | 139 |
+| senda `#b08a55` | 142 |
+| villa `#9b9389` | 148 |
+| **faldón de la losa** `#4c3b28` | **61** |
+| **fieltro de antes** `#2b3524` | **50** |
+| **arena** `#dcc79b` | **200** |
+
+El faldón es el canto de cada losa: la raya que dice dónde acaba una pieza y empieza la
+siguiente. Contra el fieltro tenía **once puntos** de diferencia, o sea ninguna, y por eso el
+tablero se leía como una mancha sobre un agujero en vez de como piezas puestas. Contra la
+arena tiene **ciento treinta y nueve**.
+
+### Los ocho, y las dos veces que me equivoqué midiendo a ojo
+
+**Primer intento:** las puse repartidas por toda la banda de arena. Siete de las ocho caían
+FUERA DE CUADRO, porque `camaraDeMesa` ciñe el tablero con un 4 % de aire y lo de fuera sólo
+se ve por la holgura que deja el desajuste entre la forma del tablero y la del lienzo. Medido
+con una sonda en un tablero de dos losas sobre 604×922: **setenta y dos unidades a cada
+lado**, 0,41 losas. Ahora van entre 0,2 y 0,8 losas del canto.
+
+**Segundo intento:** les di una escala común de 3 a 6 y salieron guijarros. La causa, medida
+en `tablero.glb` y no supuesta: **las piezas del pack no miden lo mismo ni de lejos**. A
+escala uno, `roca-a` mide 0,15 personas y `piedra` 0,60 — cuatro veces. Con una escala común,
+la misma cuenta daba un peñasco y una china.
+
+Así que `desierto.ts` **pide el alto en personas** —entre cuatro y nueve— y es la escena la
+que mide la caja del modelo que toque y saca la escala. Eso además sobrevive al día que
+alguien recompile el pack con otro tamaño, cosa que una tabla de escalas a mano no haría.
+
+**Y desperdigadas no es al azar.** Ocho tiradas independientes dejan parejas pegadas y lados
+vacíos: eso no se lee como paisaje sino como descuido. El contorno se parte en ocho sectores
+y va una en cada uno, con su ángulo y su distancia movidos dentro del sector.
+
+### Y el reloj dejó de flotar
+
+También lo dijo Miguel: el reloj debería estar apoyado en algo de temática Carcassonne, no
+flotando. Tenía razón y es la misma regla que el resto de la casa — en Riberas se apoya en la
+barra y en El Burgo en la bandeja de los dados; aquí no había nada debajo. Un reloj que flota
+no es un objeto: es un icono pegado en el cristal.
+
+Ahora se apoya en una **caja de mercado** del mismo pack que todo lo demás. Y para este juego
+dice además lo suyo: lo que se acaba aquí es la BOLSA de losas, y de una caja es de donde
+salen. Se le da el alto medido, por lo mismo que al desierto, y se sienta con su cara de
+arriba justo en la base del reloj.
+
+**Ojo con lo que esto tocaba:** la caja cuelga POR DEBAJO del reloj, así que es ella la que
+toca el suelo primero cuando se anda. La comprobación de «los rincones no se entierran» ya
+existía y medía el reloj; ahora suma la caja. Probada rompiéndola con una caja absurda: salta
+en las seis formas de lienzo.
+
+### Y un tropiezo de la maquina, que no es del juego
+
+Al crear `desierto.ts` con Metro VIVO, Expo Router lo metio en la tabla de rutas de la app
+como si fuera una pantalla: `/../../escenas/lindes/desierto`. La bateria se puso roja en
+`rutas . movil` —y el comprobador explica el arreglo el solo: regenerar con todo Metro
+parado, `npm run web --prefix app`—.
+
+No es un fallo del juego ni del codigo: ese fichero esta en `.gitignore` porque es un
+artefacto de la maquina. Pero conviene saberlo, porque **cualquier modulo nuevo bajo
+`escenas/` creado con un empaquetador corriendo deja la misma basura**, y el sintoma
+aparece un rato despues, en un comprobador que no tiene nada que ver con lo que se estaba
+tocando.
+
 ## Lo medido hasta aquí
 
 - `verify:lindes`: 13.295 comprobaciones en verde. Diez partidas enteras, 709
