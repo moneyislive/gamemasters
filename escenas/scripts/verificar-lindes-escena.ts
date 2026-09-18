@@ -65,7 +65,14 @@ import {
   sitiosDeLaLinde,
 } from '../linde-alta/la-linde';
 import { ALTURA_DE_UNA_PERSONA } from '../escala';
-import { camaraDeHombro, camaraDeMesa, loQueAbarca } from '../lindes/paseo';
+import {
+  camaraDeHombro,
+  camaraDeMesa,
+  giroDeLaMarioneta,
+  loQueAbarca,
+  nacerEn,
+  nacerEnLaLosa,
+} from '../lindes/paseo';
 import { loQueHaCaido, sitioDeLaMano, sitioDelRelojDeLaBolsa } from '../lindes/rincones';
 import { ALTO_DEL_RELOJ_EN_LADOS } from '../reloj';
 
@@ -976,6 +983,203 @@ paso('El paseo: la tercera persona va detrás de ALGUIEN, y en primera no se pin
   comprobar(
     'y le dice cuándo está en primera persona, que es cuando la cámara va dentro de su cabeza',
     /enPrimeraPersona=\{camara\.modo === 'ojos'\}/.test(laEscena),
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+paso('Quien pasea no nace dentro de una casa');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * El paseante nacía en el CENTRO EXACTO de la última losa puesta. En un prado da igual;
+ * en una villa es nacer dentro de una casa, y la última losa es villa cuatro veces de
+ * cada diez. Mirado en el móvil: al pulsar «hombro» la pantalla entera era un tejado rojo
+ * a un palmo de la cara. Ninguna geometría falla, ningún comprobador se pone rojo, y es
+ * lo PRIMERO que ve quien pulsa el botón.
+ *
+ * Se barre el mazo entero con sus cuatro giros, que son noventa y seis paisajes, y se
+ * mide la holgura: la distancia de donde nace a la pieza levantada más cercana.
+ */
+{
+  const holguraEn = (
+    x: number,
+    z: number,
+    puestas: readonly { readonly x: number; readonly z: number }[],
+  ): number => {
+    let d = Number.POSITIVE_INFINITY;
+    for (const q of puestas) d = Math.min(d, Math.hypot(x - q.x, z - q.z));
+    return d;
+  };
+
+  /*
+   * DOS PERSONAS DE HOLGURA. No es un número redondo elegido a ojo: los doce centros
+   * malos del mazo estaban entre 0.0 y 2.6 —la ermita, exactamente encima de la ermita—,
+   * y el peor sitio que elige la cuenta nueva tiene 10.35. El umbral cae en medio, lejos
+   * de los dos, así que ni deja pasar el fallo ni se pone rojo porque alguien mueva un
+   * barril.
+   */
+  const HOLGURA_MINIMA = ALTURA_DE_UNA_PERSONA * 2;
+
+  let centrosMalos = 0;
+  let peor = Number.POSITIVE_INFINITY;
+  let peorQuien = '';
+  let mirandoAlBulto = 0;
+  for (const losa of LAS_LOSAS) {
+    for (const giro of GIROS) {
+      const quien = `${losa.id}/${giro}`;
+      const c = montarLaLosa(losa.id, giro, 12345 + giro);
+      const nace = nacerEnLaLosa(0, 0, c.celdas, c.puestas);
+
+      /* Lo de antes, para saber si esta comprobación muerde: ver la vacuna de abajo. */
+      const centro = nacerEn(0, 0);
+      if (holguraEn(centro.x, centro.z, c.puestas) < ALTURA_DE_UNA_PERSONA) centrosMalos++;
+
+      const suya = holguraEn(nace.x, nace.z, c.puestas);
+      if (suya < peor) {
+        peor = suya;
+        peorQuien = quien;
+      }
+      if (suya < HOLGURA_MINIMA) {
+        comprobar(`en ${quien} se nace con sitio alrededor`, false, { holgura: suya.toFixed(2) });
+      }
+
+      /* Y DENTRO DE SU LOSA: nacer en el prado del vecino es nacer donde no toca. */
+      if (Math.abs(nace.x) > LADO_DE_LOSA / 2 || Math.abs(nace.z) > LADO_DE_LOSA / 2) {
+        comprobar(`en ${quien} se nace dentro de la losa`, false, { x: nace.x, z: nace.z });
+      }
+
+      /*
+       * Y NO EN LA VILLA CUANDO HAY DÓNDE ELEGIR. Es la regla de verdad: la holgura
+       * sola se contentaría con la plaza más ancha del pueblo, y por una plaza no se
+       * pasea, se va a sitios.
+       */
+      const i = Math.round(((nace.x / LADO_DE_LOSA) + 0.5) * CELDAS_POR_LOSA - 0.5);
+      const j = Math.round(((nace.z / LADO_DE_LOSA) + 0.5) * CELDAS_POR_LOSA - 0.5);
+      const suCelda = c.celdas.find((celda) => celda.i === i && celda.j === j);
+      const hayDondeElegir = c.celdas.some((celda) => celda.clase !== 'villa');
+      if (hayDondeElegir && suCelda !== undefined && suCelda.clase === 'villa') {
+        comprobar(`en ${quien} no se nace en la villa habiendo prado o senda`, false, {
+          i,
+          j,
+        });
+      }
+
+      /* Y DE ESPALDAS A LO MÁS CERCANO, que si no se nace mirando un muro. */
+      let cerca = { x: 0, z: 0 };
+      let d = Number.POSITIVE_INFINITY;
+      for (const q of c.puestas) {
+        const suD = Math.hypot(nace.x - q.x, nace.z - q.z);
+        if (suD < d) {
+          d = suD;
+          cerca = { x: q.x, z: q.z };
+        }
+      }
+      const adelante = { x: Math.sin(nace.rumbo), z: -Math.cos(nace.rumbo) };
+      const alBulto = { x: cerca.x - nace.x, z: cerca.z - nace.z };
+      if (adelante.x * alBulto.x + adelante.z * alBulto.z > 0) mirandoAlBulto++;
+    }
+  }
+
+  comprobar('en las noventa y seis losas del mazo se nace con sitio alrededor', peor >= HOLGURA_MINIMA, {
+    peor: peor.toFixed(2),
+    quien: peorQuien,
+    minimo: HOLGURA_MINIMA.toFixed(2),
+  });
+  comprobar('y ninguna nace mirando a lo que tiene más cerca', mirandoAlBulto === 0, {
+    mirandoAlBulto,
+  });
+
+  /*
+   * ═══ LA VACUNA ═══
+   *
+   * Una comprobación que sólo dice «todo bien» no prueba nada: podría estar mirando una
+   * lista vacía. Esto afirma que el fallo EXISTÍA —que el centro de la losa, que es donde
+   * se nacía hasta hoy, deja al paseante dentro de algo en doce de los noventa y seis
+   * paisajes—, así que el día que alguien vuelva a `nacerEn` esta sección se pone roja.
+   */
+  comprobar(
+    'y el centro de la losa —de donde se venía— sí metía al paseante dentro de algo',
+    centrosMalos > 0,
+    { centrosMalos, deCuantos: LAS_LOSAS.length * GIROS.length },
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+paso('El avatar MIRA hacia donde anda, y no sólo cuando anda al norte');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * `quien-anda.tsx` giraba la marioneta con `rumbo + Math.PI`. Esa cuenta acierta al NORTE
+ * y al SUR, y da lo CONTRARIO al este y al oeste: el aventurero andaba de espaldas media
+ * vuelta de cada dos. Como el paseante nace mirando al norte, mirarlo una vez lo daba por
+ * bueno — y de hecho así se dio por bueno, con un comentario explicando la media vuelta.
+ *
+ * Visto en el móvil girando de cuarenta y cinco en cuarenta y cinco: dos nucas y dos caras
+ * en 180° de giro. Con la cámara pegada detrás, el ángulo aparente sólo cambia si el muñeco
+ * está espejado.
+ *
+ * Lo que se compra aquí es la cuenta, que es donde estaba el fallo: que al girar la
+ * marioneta por `giroDeLaMarioneta(r)` su cara acabe mirando EXACTAMENTE al rumbo, en las
+ * cuatro direcciones y en las de en medio.
+ */
+{
+  /* Las marionetas de KayKit nacen mirando a su +z; girar θ deja ese +z en (sin θ, cos θ). */
+  const aDondeMira = (giro: number): { x: number; z: number } => ({
+    x: Math.sin(giro),
+    z: Math.cos(giro),
+  });
+
+  let peorError = 0;
+  for (let k = 0; k < 24; k++) {
+    const rumbo = -Math.PI + (k * (Math.PI * 2)) / 24;
+    /* Hacia donde ANDA, que es lo que dice `unPaso` y de donde no se puede discrepar. */
+    const anda = { x: Math.sin(rumbo), z: -Math.cos(rumbo) };
+    const mira = aDondeMira(giroDeLaMarioneta(rumbo));
+    const error = Math.hypot(mira.x - anda.x, mira.z - anda.z);
+    if (error > peorError) peorError = error;
+    if (error > 1e-9) {
+      comprobar(`con rumbo ${rumbo.toFixed(2)} la marioneta mira a donde anda`, false, {
+        anda: `${anda.x.toFixed(3)},${anda.z.toFixed(3)}`,
+        mira: `${mira.x.toFixed(3)},${mira.z.toFixed(3)}`,
+      });
+    }
+  }
+  comprobar('en las veinticuatro direcciones la marioneta mira a donde anda', peorError <= 1e-9, {
+    peorError: peorError.toExponential(2),
+  });
+
+  /*
+   * ═══ LA VACUNA ═══
+   *
+   * Que la cuenta vieja NO pasaría esto. Sin esta línea, alguien podría escribir una
+   * comprobación que acepte las dos —por ejemplo comparando sólo el eje z, que en las dos
+   * cuentas coincide— y quedarse tan tranquilo. Aquí se afirma que discrimina, y en cuántas
+   * direcciones.
+   */
+  let malasConLaVieja = 0;
+  for (let k = 0; k < 24; k++) {
+    const rumbo = -Math.PI + (k * (Math.PI * 2)) / 24;
+    const anda = { x: Math.sin(rumbo), z: -Math.cos(rumbo) };
+    const mira = aDondeMira(rumbo + Math.PI);
+    if (Math.hypot(mira.x - anda.x, mira.z - anda.z) > 1e-9) malasConLaVieja++;
+  }
+  comprobar(
+    'y la cuenta de antes —«+ media vuelta»— fallaba en 22 de las 24, acertando sólo norte y sur',
+    malasConLaVieja === 22,
+    { malasConLaVieja },
+  );
+
+  /* Y que la escena usa la cuenta, no una copia suelta que se quede vieja aparte. */
+  const elAvatar = fs.readFileSync(new URL('../lindes/quien-anda.tsx', import.meta.url), 'utf8');
+  comprobar(
+    'la escena gira al avatar con `giroDeLaMarioneta`, no con una media vuelta a mano',
+    /g\.rotation\.y = giroDeLaMarioneta\(/.test(elAvatar) && !/rotation\.y = .*\+ Math\.PI/.test(elAvatar),
   );
 }
 

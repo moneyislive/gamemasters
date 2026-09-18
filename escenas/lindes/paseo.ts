@@ -22,6 +22,8 @@
  * `cala.ts` toma con el agua del embarcadero.
  */
 import { LADO_DE_LOSA } from './medidas';
+import { centroDeCelda } from './losa';
+import type { CeldaDeSuelo } from './losa';
 import { ALTURA_DE_UNA_PERSONA, PASO_POR_SEGUNDO } from '../escala';
 
 /** A qué velocidad anda un aventurero por el tablero. */
@@ -74,6 +76,107 @@ export const QUIETO: Mandos = {
 export function nacerEn(x: number, y: number): Paseante {
   return { x: x * LADO_DE_LOSA, z: -y * LADO_DE_LOSA, rumbo: 0, andando: 0 };
 }
+
+/**
+ * HACIA DÓNDE HAY QUE GIRAR LA MARIONETA PARA QUE MIRE A SU RUMBO.
+ *
+ * ═══ POR QUÉ NO ES `rumbo + π`, QUE ES LO QUE PARECE ═══
+ *
+ * El rumbo de esta casa tiene el cero al NORTE y crece hacia el ESTE, así que quien anda
+ * se mueve hacia `(sin r, −cos r)` — está escrito en `unPaso`. Las marionetas de KayKit,
+ * en cambio, nacen mirando a su `+z`, y un giro de `θ` alrededor del eje vertical deja ese
+ * `+z` en `(sin θ, cos θ)`. Igualando las dos cosas sale `θ = π − r`, que es exactamente
+ * `atan2(sin r, −cos r)`: el ángulo de su propio rumbo, sin más.
+ *
+ * Aquí había `r + π`, y **las dos cuentas dan lo mismo mirando al norte y al sur**. Por eso
+ * pasó: el paseante nace mirando al norte, se mira, se ve la nuca, y todo parece bien. Al
+ * este y al oeste dan lo CONTRARIO, y el aventurero andaba de espaldas.
+ *
+ * Mirado en el móvil girando de cuarenta y cinco en cuarenta y cinco: en 180° de giro se
+ * vieron dos nucas y dos caras. Con la cámara pegada detrás, el ángulo aparente sólo puede
+ * cambiar al DOBLE del giro si el muñeco está espejado; si estuviera bien, no cambiaría
+ * nunca.
+ */
+export function giroDeLaMarioneta(rumbo: number): number {
+  return Math.PI - rumbo;
+}
+
+/** Lo justo que se mira de una pieza puesta: dónde está. */
+export interface DondeHayAlgo {
+  readonly x: number;
+  readonly z: number;
+}
+
+/**
+ * DÓNDE NACE QUIEN PASEA, DENTRO DE LA LOSA EN LA QUE NACE.
+ *
+ * ═══ EL CENTRO DE UNA LOSA NO ES UN SITIO ═══
+ *
+ * `nacerEn` deja al paseante en el centro exacto de la casilla. En un prado da igual; en
+ * una villa es un desastre. LA VILLA AMURALLADA es ciudad de lado a lado, así que nacer
+ * en su centro es nacer DENTRO de una casa — y el paseante nace en la ÚLTIMA losa
+ * puesta, que en este juego es villa cuatro veces de cada diez.
+ *
+ * Medido en el móvil, en una mesa de dos losas: al pulsar «hombro» la pantalla entera era
+ * un tejado rojo a un palmo de la cara, y en «ojos» lo mismo. Andando cinco segundos se
+ * salía del pueblo y el paisaje aparecía de golpe. No falla nada, no avisa nadie, no lo
+ * ve ningún comprobador de geometría — y es lo PRIMERO que se ve al pulsar el botón.
+ *
+ * ═══ SE ELIGE CON LO QUE LA LOSA YA SABE DE SÍ MISMA ═══
+ *
+ * Ni lista de modelos que estorban ni umbral de tamaño: las dos cosas se quedan viejas el
+ * día que alguien añade una pieza, y se quedan viejas EN SILENCIO. Se usan las CELDAS del
+ * suelo, que ya dicen si son `senda`, `prado` o `villa`, y las PUESTAS, que ya dicen
+ * dónde hay algo levantado. Se prefiere la senda —un camino es, literalmente, por donde
+ * se anda—, luego el prado, y entre las celdas que valen gana la que más lejos tenga lo
+ * más cercano.
+ */
+export function nacerEnLaLosa(
+  x: number,
+  y: number,
+  celdas: readonly CeldaDeSuelo[],
+  puestas: readonly DondeHayAlgo[],
+): Paseante {
+  const sendas = celdas.filter((c) => c.clase === 'senda');
+  const prados = celdas.filter((c) => c.clase === 'prado');
+  /*
+   * Si la losa es villa entera no hay celda buena y se cogen todas: entre malas, la plaza
+   * más despejada. Quedarse sin nacer sería peor que nacer en un sitio regular.
+   */
+  const candidatas = sendas.length > 0 ? sendas : prados.length > 0 ? prados : celdas;
+
+  let mejor: DondeHayAlgo | null = null;
+  let suHolgura = -1;
+  let loMasCerca: DondeHayAlgo | null = null;
+  for (const c of candidatas) {
+    const enFracciones = centroDeCelda(c.i, c.j);
+    const punto = { x: enFracciones.x * LADO_DE_LOSA, z: enFracciones.z * LADO_DE_LOSA };
+    let holgura = Number.POSITIVE_INFINITY;
+    let cerca: DondeHayAlgo | null = null;
+    for (const q of puestas) {
+      const d = Math.hypot(punto.x - q.x, punto.z - q.z);
+      if (d < holgura) {
+        holgura = d;
+        cerca = q;
+      }
+    }
+    if (holgura > suHolgura) {
+      suHolgura = holgura;
+      mejor = punto;
+      loMasCerca = cerca;
+    }
+  }
+  if (mejor === null) return nacerEn(x, y);
+
+  /*
+   * Y MIRANDO A LO ABIERTO, de espaldas a lo más cercano. Nacer pegado a un muro mirándolo
+   * es la mitad del fallo que esto arregla: se ve lo mismo que dentro de la casa.
+   */
+  const rumbo =
+    loMasCerca === null ? 0 : Math.atan2(mejor.x - loMasCerca.x, -(mejor.z - loMasCerca.z));
+  return { x: x * LADO_DE_LOSA + mejor.x, z: -y * LADO_DE_LOSA + mejor.z, rumbo, andando: 0 };
+}
+
 
 /** ¿Hay losa puesta en la casilla que contiene este punto? */
 export function hayLosaEn(

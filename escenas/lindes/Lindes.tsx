@@ -35,11 +35,11 @@ import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { abrirGlb } from '../embarcadero/cargar';
-import { ESCALA_DEL_PACK } from '../escala';
+import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
 import { rutaDelTablero } from '../ruta-de-modelos';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import { LADO_DE_LOSA } from './medidas';
-import { LO_QUE_NO_SE_RECORTA, montarLaLosa } from './losa';
+import { LO_QUE_NO_SE_RECORTA, montarLaLosa, semillaDeLaLosa } from './losa';
 import type { PuestaEnLaLosa } from './losa';
 import { COLOR_DE_LA_MESA, geometriaDeLaMesa, geometriaDeLosHuecos, geometriaDelSuelo } from './suelo';
 import type { LosaQueSePinta } from './suelo';
@@ -52,6 +52,7 @@ import {
   camaraDeOjos,
   loQueAbarca,
   nacerEn,
+  nacerEnLaLosa,
   unPaso,
 } from './paseo';
 import type { Mandos, Paseante } from './paseo';
@@ -254,13 +255,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   const contenidos = useMemo(() => {
     const salida = new Map<string, { readonly puestas: readonly PuestaEnLaLosa[]; readonly x: number; readonly y: number }>();
     for (const l of tablero.losas) {
-      /*
-       * La semilla de cada losa mezcla la de la mesa con SUS COORDENADAS y no con
-       * su número de serie: así una losa puesta en el mismo sitio se ve igual
-       * aunque la partida se rebobine, y dos losas iguales en sitios distintos no
-       * salen clonadas — que es lo que delata un paisaje generado.
-       */
-      const suya = (semilla ^ Math.imul(l.x + 512, 73856093) ^ Math.imul(l.y + 512, 19349663)) >>> 0;
+      const suya = semillaDeLaLosa(semilla, l.x, l.y);
       salida.set(l.casilla, { puestas: montarLaLosa(l.losa, l.giro, suya).puestas, x: l.x, y: l.y });
     }
     return salida;
@@ -275,14 +270,21 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   const mandos = useRef<Mandos>(QUIETO);
   const mirandoA = useRef<{ x: number; z: number }>({ x: 0, z: 0 });
 
-  /* Quien pasea nace en la última losa puesta, que es donde está pasando algo. */
+  /*
+   * Quien pasea nace en la última losa puesta, que es donde está pasando algo — pero NO en
+   * su centro a ciegas: el centro de una villa es el interior de una casa. Ver
+   * `nacerEnLaLosa`, que es donde está el razonamiento y lo que se midió.
+   */
   useEffect(() => {
     if (camara.modo === 'mesa') return;
     const ultima = tablero.losas.find((l) => l.ultima) ?? tablero.losas[0];
-    if (ultima !== undefined && paseante.current.andando === 0 && paseante.current.x === 0 && paseante.current.z === 0) {
-      paseante.current = nacerEn(ultima.x, ultima.y);
-    }
-  }, [camara.modo, tablero.losas]);
+    if (ultima === undefined) return;
+    const virgen =
+      paseante.current.andando === 0 && paseante.current.x === 0 && paseante.current.z === 0;
+    if (!virgen) return;
+    const dentro = montarLaLosa(ultima.losa, ultima.giro, semillaDeLaLosa(semilla, ultima.x, ultima.y));
+    paseante.current = nacerEnLaLosa(ultima.x, ultima.y, dentro.celdas, dentro.puestas);
+  }, [camara.modo, semilla, tablero.losas]);
 
   /* Las teclas del paseo. Sólo mientras se pasea: en la mesa no se anda. */
   useEffect(() => {
@@ -529,7 +531,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
         />
       ) : null}
 
-      <LosLabriegos labriegos={tablero.labriegos} />
+      <LosLabriegos labriegos={tablero.labriegos} aPie={camara.modo !== 'mesa'} />
 
       {/*
         QUIEN ANDA, en tercera persona. Sólo mientras se pasea: en la mesa no hay a quién
@@ -1014,6 +1016,7 @@ function UnModeloSinRecorte({
  */
 function LosLabriegos({
   labriegos,
+  aPie,
 }: {
   readonly labriegos: readonly {
     readonly casilla: string;
@@ -1021,7 +1024,28 @@ function LosLabriegos({
     readonly enZ: number;
     readonly color: string;
   }[];
+  /** ¿Se está andando por el tablero? Entonces el labriego es un hombre, no una ficha. */
+  readonly aPie: boolean;
 }): JSX.Element | null {
+  /*
+   * ═══ UNA FICHA DESDE LA MESA, UN HOMBRE DESDE EL SUELO ═══
+   *
+   * `ALTO_DEL_LABRIEGO` son siete personas, y está bien razonado: desde la mesa el
+   * labriego no es un señor en un campo, es la marca de QUIÉN tiene qué, y tiene que
+   * leerse de un vistazo entre las casitas. Ver su comentario en `medidas.ts`.
+   *
+   * Pero este juego se recorre a pie. Y a pie esa misma ficha es un gigante rojo de
+   * TRECE METROS plantado en el prado, con una peana de once metros flotándole a la
+   * altura de la rodilla y el paseante andando por debajo. Mirado en el móvil: al
+   * pulsar «hombro» la pantalla se llenaba de rojo, y lo primero que pensé es que el
+   * avatar salía gigante — el avatar estaba bien; lo gigante era la ficha.
+   *
+   * Así que la ficha se queda ficha en la mesa y se hace hombre al bajar. No es un apaño
+   * de tamaño: un labriego ES un hombre en un campo, y a su lado va el avatar de quien
+   * pasea, que mide exactamente lo mismo. Las dos lecturas son verdad, cada una desde
+   * donde se mira.
+   */
+  const cuanto = aPie ? ALTURA_DE_UNA_PERSONA / ALTO_DEL_LABRIEGO : 1;
   const peon = useMemo(() => geometriaDelLabriego(), []);
   const peana = useMemo(() => geometriaDeLaPeana(ALTO_DEL_LABRIEGO * 0.42), []);
   const materialDelPeon = useMemo(
@@ -1065,9 +1089,9 @@ function LosLabriegos({
       const esPeana = malla === lasPeanas.current;
       for (let i = 0; i < sitios.length; i++) {
         const s = sitios[i] as { x: number; z: number; color: THREE.Color };
-        AUX_POSICION.set(s.x, esPeana ? LADO_DE_LOSA * 0.006 : 0, s.z);
+        AUX_POSICION.set(s.x, esPeana ? LADO_DE_LOSA * 0.006 * cuanto : 0, s.z);
         AUX_GIRO.identity();
-        AUX_ESCALA.set(1, 1, 1);
+        AUX_ESCALA.set(cuanto, cuanto, cuanto);
         malla.setMatrixAt(i, AUX_MATRIZ.compose(AUX_POSICION, AUX_GIRO, AUX_ESCALA));
         malla.setColorAt(i, s.color);
       }
@@ -1075,7 +1099,7 @@ function LosLabriegos({
       malla.instanceMatrix.needsUpdate = true;
       if (malla.instanceColor !== null) malla.instanceColor.needsUpdate = true;
     }
-  }, [sitios]);
+  }, [cuanto, sitios]);
 
   if (sitios.length === 0) return null;
   return (

@@ -31,6 +31,7 @@ import type { AventureroCargado } from '../embarcadero/cargar';
 import { CLIP, figuraQueSePinta } from '../embarcadero/figuras';
 import { desmontaMarioneta, giroCorto, montaMarioneta, reproduce } from '../aventureros/marioneta';
 import type { Marioneta } from '../aventureros/marioneta';
+import { giroDeLaMarioneta } from './paseo';
 import type { Paseante, Traer } from './tipos';
 
 /**
@@ -156,15 +157,13 @@ export function QuienAnda({
       rumboAhora.current = rumbo + paso;
     }
     /*
-     * ═══ Y MEDIA VUELTA, QUE NO ES UN APAÑO ═══
+     * ═══ Y MIRANDO A SU RUMBO, QUE NO ES SUMARLE MEDIA VUELTA ═══
      *
-     * El rumbo de esta casa es cero al NORTE (−z) y crece hacia el este; la marioneta, en
-     * cambio, nace mirando al +z. Sin la media vuelta, la cámara de hombro —que va detrás—
-     * se encontraba con la CARA: mirado en el banco, la exploradora nos miraba a los ojos
-     * mientras andaba de espaldas. Es la misma media vuelta que `sitiosDeLaLinde` le da a
-     * los del corro para que miren a la piedra, y por lo mismo.
+     * Aquí ponía `+ Math.PI`, y funciona mirando al norte y al sur. Al este y al oeste hace
+     * lo contrario de lo que debe, y el aventurero anda de espaldas sin que falle nada. La
+     * cuenta buena —y el porqué— están en `giroDeLaMarioneta`.
      */
-    g.rotation.y = (rumboAhora.current ?? quien.rumbo) + Math.PI;
+    g.rotation.y = giroDeLaMarioneta(rumboAhora.current ?? quien.rumbo);
 
     /*
      * ═══ QUÉ CLIP TOCA, SACADO DE LO QUE SE HA MOVIDO ═══

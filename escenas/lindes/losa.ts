@@ -350,6 +350,21 @@ export function queHayEn(losa: Losa, giro: Giro, p: Punto): ClaseDeSuelo {
   return 'prado';
 }
 
+/**
+ * LA SEMILLA DE UNA LOSA CONCRETA.
+ *
+ * Mezcla la de la mesa con SUS COORDENADAS y no con su número de serie: así una losa
+ * puesta en el mismo sitio se ve igual aunque la partida se rebobine, y dos losas
+ * iguales en sitios distintos no salen clonadas — que es lo que delata un paisaje
+ * generado. Vive aquí, y no en la escena, porque quien pregunte por el contenido de una
+ * losa fuera del bucle de pintado tiene que obtener EXACTAMENTE el mismo paisaje: con la
+ * cuenta copiada, el día que cambie una de las dos copias el paseante nacería en un
+ * pueblo que no es el que se ve.
+ */
+export function semillaDeLaLosa(semilla: number, x: number, y: number): number {
+  return (semilla ^ Math.imul(x + 512, 73856093) ^ Math.imul(y + 512, 19349663)) >>> 0;
+}
+
 /** El centro de una celda, en fracciones de losa. */
 export function centroDeCelda(i: number, j: number): Punto {
   return { x: (i + 0.5) / CELDAS_POR_LOSA - 0.5, z: (j + 0.5) / CELDAS_POR_LOSA - 0.5 };

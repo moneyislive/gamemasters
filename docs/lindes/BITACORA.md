@@ -428,6 +428,104 @@ comprobador de Node puede proyectar a mano y preguntar si lo que tiene que verse
 cae entre menos uno y uno. Son 132 comprobaciones nuevas: seis formas de tablero
 por seis de pantalla, más los dos rincones.
 
+## El paseante nacía DENTRO de una casa
+
+Con la batería en verde y el avatar ya montado, al pulsar **HOMBRO** en el móvil la
+pantalla entera era un **tejado rojo a un palmo de la cara**, y en **OJOS** lo mismo.
+Parecía un fallo de escala del aventurero —el avatar saliendo gigante—, y no lo era: la
+primera hipótesis, que los nombres de cámara del cliente y de la escena no casaran, se
+comprobó y quedó **descartada**. Andando cinco segundos se salía y el paisaje aparecía
+de golpe, que fue lo que lo delató.
+
+**La causa.** `nacerEn(ultima.x, ultima.y)` dejaba al paseante en el **centro exacto**
+de la última losa puesta. En un prado da igual. En una villa es nacer dentro de una
+casa — y la última losa es villa cuatro veces de cada diez.
+
+**Medido sobre el mazo entero**, las veinticuatro losas por sus cuatro giros: en **12
+de los 96** paisajes el centro de la losa cae a menos de una persona de una pieza
+levantada. La `ermita` da **0.0**: se nacía exactamente dentro de la ermita. `calle`,
+`calle-blason` y `villa-redonda` dan 2.6, que es un paso.
+
+**El arreglo no lleva lista de modelos ni umbral de tamaño**, porque las dos cosas se
+quedan viejas en silencio el día que alguien añade una pieza. `nacerEnLaLosa` usa lo que
+la losa ya sabe de sí misma: las **celdas** del suelo, que dicen si son `senda`, `prado`
+o `villa`, y las **puestas**, que dicen dónde hay algo levantado. Prefiere la senda —un
+camino es, literalmente, por donde se anda—, luego el prado, y entre las que valen elige
+la que más lejos tenga lo más cercano. Y mira **de espaldas a lo más cercano**, porque
+nacer pegado a un muro mirándolo se ve igual de mal que nacer dentro.
+
+El peor sitio que elige la cuenta nueva tiene **10.35** de holgura, contra los 0.0 de
+antes. El umbral del comprobador se puso en dos personas (5.09): en medio de los dos, así
+que ni deja pasar el fallo ni se pone rojo porque alguien mueva un barril.
+
+**La red**: `verify:lindes-escena` barre las 96 losas y exige holgura, que se nazca
+dentro de la propia losa, que no se nazca en la villa habiendo prado o senda, y que no
+se mire a lo más cercano. **Probada rompiéndola**: devolviéndole la cuenta vieja salen
+43 rojos y código 1. Y lleva vacuna —afirma que el centro de la losa SÍ metía al
+paseante dentro de algo en 12 de 96—, para que el día que alguien vuelva a `nacerEn` la
+sección se ponga roja en vez de quedarse mirando una lista vacía.
+
+**De paso**, la semilla de cada losa estaba copiada en dos sitios. Ahora es
+`semillaDeLaLosa` en `losa.ts`: con la cuenta duplicada, el día que cambiara una copia el
+paseante nacería en un pueblo que no es el que se ve.
+
+### Y lo que enseñó de mí, que es lo que más vale
+
+Escribí `nacerEnLaLosa`, la exporté, la usé — y **no la importé**. La app lo dijo a la
+cara: `nacerEnLaLosa is not defined`. Lo primero que pensé fue «Metro trae un bundle
+rancio», y lo comprobé antes de creérmelo: **no había ciclo, no había bundle rancio,
+faltaba la línea**. `npm run typecheck -w escritorio` lo caza —`TS2304: Cannot find name
+'nacerEnLaLosa'`, código 2—, así que **no hay agujero en la red**: hubo prisa mía por
+abrir la app antes de pasar los tipos. `escenas/` no tiene typecheck propio, pero
+`escritorio` importa la escena y la arrastra entera.
+
+## Y dos más que sólo se ven ANDANDO, no mirando
+
+Los dos salieron del mismo sitio: pulsar «hombro» en el móvil y caminar. Ninguno da
+error, ninguno rompe geometría, y los dos se ven en el primer minuto.
+
+### El labriego medía TRECE METROS
+
+Al arreglar el nacimiento apareció, a dos pasos, **un gigante rojo translúcido** con una
+peana de once metros flotándole a la altura de la rodilla, y el paseante andando por
+debajo. Era un labriego.
+
+Y **no era un descuido**: `ALTO_DEL_LABRIEGO = LADO_DE_LOSA * 0.11` —siete personas— está
+razonado en `medidas.ts`, y el razonamiento es bueno. Desde la mesa el labriego no es un
+señor en un campo: es la marca de QUIÉN tiene qué, y tiene que leerse de un vistazo entre
+las casitas, igual que la ficha de madera es enorme al lado del dibujo de la losa.
+
+Lo que no se había previsto es que este juego **se recorre a pie**, y que la misma pieza
+mirada desde el suelo es un monumento. Así que no se ha cambiado la decisión: se ha
+partido en dos. **Ficha en la mesa, hombre a pie** — `ALTURA_DE_UNA_PERSONA` exacta, la
+misma que el avatar que anda a su lado. Y no es un apaño de tamaño: un labriego ES un
+hombre en un campo. Las dos lecturas son verdad, cada una desde donde se mira.
+
+### El avatar andaba de espaldas media vuelta de cada dos
+
+`quien-anda.tsx` giraba la marioneta con `rumbo + Math.PI`, con un comentario largo
+explicando por qué hacía falta la media vuelta. El comentario describía un fallo real y
+la cuenta estaba mal:
+
+- El rumbo tiene el cero al **norte** y crece al **este**, así que se anda hacia
+  `(sin r, −cos r)` — está en `unPaso`.
+- Las marionetas nacen mirando a su `+z`, y girar `θ` deja ese `+z` en `(sin θ, cos θ)`.
+- Igualando: **`θ = π − r`**, que es `atan2` del propio rumbo. No `r + π`.
+
+**Las dos cuentas coinciden al norte y al sur, y dan lo contrario al este y al oeste.** Y
+el paseante nacía mirando al norte. Por eso pasó la revisión: se mira una vez, se ve la
+nuca, y parece bien.
+
+**Cómo se cazó, que es lo que vale.** Girando de cuarenta y cinco en cuarenta y cinco y
+mirando: en 180° de giro salieron **dos nucas y dos caras**. Con la cámara pegada detrás,
+el ángulo aparente NO puede cambiar si el muñeco está bien; si cambia al doble del giro,
+está espejado. Eso es una firma, no una impresión.
+
+**La red** (`verify:lindes-escena`) compara, en veinticuatro direcciones, hacia dónde mira
+la marioneta contra hacia dónde dice `unPaso` que anda. Y lleva vacuna: afirma que la
+cuenta vieja **fallaba en 22 de las 24**, acertando sólo norte y sur. Sin esa línea, una
+comprobación que mirase sólo el eje `z` aceptaría las dos y se leería como vigilada.
+
 ## Lo medido hasta aquí
 
 - `verify:lindes`: 13.295 comprobaciones en verde. Diez partidas enteras, 709
