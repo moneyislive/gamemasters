@@ -1341,6 +1341,58 @@ function elMuelle(): void {
     { conMuelle: arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id), instalados: arcadesInstalados().map((m) => m.id) },
   );
 
+  /*
+   * ═══ Y CADA VESTÍBULO DICE SU SITIO, NO EL DE OTRO ═══
+   *
+   * El vestíbulo —nombre, plazo, abrir, código, elegir figura— es UNO para los tres
+   * juegos, y llevaba escrito «en el muelle» a pelo en dos frases: «Es lo que ven los
+   * demás en el muelle» y «Quién eres en el muelle». El muelle es el lobby de Riberas, así
+   * que El Burgo y Las Lindes mandaban al jugador a un sitio que no existe en su partida.
+   * Visto leyendo el panel de La Linde Alta en el escritorio.
+   *
+   * No se arregla con tres frases copiadas: la frase la pone el TEMA, que es donde ya
+   * viven las palabras propias de cada lobby. Y se vigila por los dos lados —que ningún
+   * tema se quede sin ella y que el componente no vuelva a llevar un sitio dentro—, porque
+   * lo que falló no fue el texto sino que un componente compartido supiera de un juego.
+   */
+  for (const id of CON_MUELLE) {
+    const suyo = temaDelMuelle(id);
+    comprobar(`el tema de ${id} dice dónde se está, para la frase del vestíbulo`, suyo !== undefined && suyo.donde.length > 0, {
+      donde: suyo?.donde,
+    });
+    comprobar(
+      `y la frase de ${id} encaja detrás de «Quién eres»`,
+      suyo !== undefined && suyo.donde.startsWith('en '),
+      { donde: suyo?.donde },
+    );
+  }
+
+  /*
+   * Y que los tres sean DISTINTOS: si alguien copia el tema de un juego para estrenar otro
+   * y se deja este campo, las dos comprobaciones de arriba siguen en verde y el vestíbulo
+   * vuelve a mandar a la gente al sitio equivocado — que es exactamente lo que pasó.
+   */
+  const losSitios = CON_MUELLE.map((id) => temaDelMuelle(id)?.donde ?? '');
+  comprobar('y los tres vestíbulos nombran tres sitios distintos', new Set(losSitios).size === CON_MUELLE.length, {
+    losSitios,
+  });
+
+  {
+    const elVestibulo = readFileSync(new URL('../src/muelle.tsx', import.meta.url), 'utf8');
+    /* Sin los comentarios: la explicación de por qué esto está prohibido no puede tumbarlo. */
+    const soloCodigo = sinComentarios(elVestibulo);
+    for (const sitio of ['en el muelle', 'en la plaza', 'en la Linde Alta']) {
+      comprobar(
+        `el vestíbulo no lleva «${sitio}» escrito dentro: lo pone el tema`,
+        !soloCodigo.includes(sitio),
+      );
+    }
+    /* Vacuna: que de verdad se está mirando el fichero y no una cadena vacía. */
+    comprobar('y se ha leído el vestíbulo de verdad para juzgarlo', soloCodigo.includes('rotulo-de-panel'), {
+      letras: soloCodigo.length,
+    });
+  }
+
   paso('El raíl del muelle existe entero sin el mundo, y en Node no se monta el Canvas');
 
   /*

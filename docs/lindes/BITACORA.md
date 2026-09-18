@@ -579,6 +579,37 @@ toda ayuda pensada para la de arriba hay que volver a juzgarla desde la de abajo
 el labriego, el resalte de la última losa y los dos rincones. La próxima que alguien añada
 tiene ya dónde mirar.
 
+## El vestíbulo mandaba a la gente al lobby de OTRO juego
+
+Sentándose en el escritorio y leyendo el panel de La Linde Alta:
+
+> «Es lo que ven los demás **en el muelle**.»
+> «Quién eres **en el muelle**.»
+
+El muelle es el lobby de **Riberas**. El vestíbulo —nombre, plazo, abrir mesa, código,
+elegir figura— es UNO solo para los tres juegos (`escritorio/src/muelle.tsx`), y llevaba el
+sitio de Riberas escrito a pelo dentro. Así que **El Burgo y Las Lindes mandaban al jugador
+a un sitio que no existe en su partida**.
+
+No se arregla con tres frases copiadas. La frase la pone ahora el TEMA
+(`escenas/embarcadero/tema.ts`), que es donde ya viven las palabras propias de cada lobby
+—`lugar`, `espera`, `zarpar`, los colores—. Campo nuevo `donde`, y no vale reusar `lugar`
+en minúscula: `lugar` del Burgo dice «A la entrada del Burgo», que no se puede meter detrás
+de un «en».
+
+- riberas → `en el muelle` — **no cambia nada de lo que se ve hoy en producción**.
+- burgo → `en la plaza del Burgo` — **esto SÍ cambia un texto de un juego que está en
+  main**. Es una corrección de un sitio equivocado, no un retoque de estilo, y va escrito
+  aquí para que se vea en la revisión y se pueda revertir sola si se prefiere.
+- lindes → `en la Linde Alta`.
+
+**La guarda no vigila el texto, vigila la causa**: que ningún tema se quede sin su frase,
+que las tres sean distintas —si alguien copia un tema para estrenar un lobby y se deja el
+campo, las otras dos comprobaciones seguirían en verde y volvería a pasar lo mismo— y que
+el componente compartido **no lleve ningún sitio escrito dentro**. Probada rompiéndola:
+devolviendo «en el muelle» al componente sale roja con nombre. Y con vacuna, que afirma que
+está leyendo el fichero de verdad y no una cadena vacía.
+
 ## Lo medido hasta aquí
 
 - `verify:lindes`: 13.295 comprobaciones en verde. Diez partidas enteras, 709

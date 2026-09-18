@@ -355,6 +355,7 @@ export function Muelle({
           {eligiendo ? (
             <Figuras
               elegida={figura}
+              donde={tema.donde}
               alElegir={elegir}
               alVolver={() => {
                 ponerEligiendo(false);
@@ -368,6 +369,7 @@ export function Muelle({
               codigoDeLaUrl={codigoDeLaUrl}
               minimo={manifiesto.jugadores.minimo}
               figura={figura}
+              donde={tema.donde}
               alCambiar={() => {
                 ponerEligiendo(true);
               }}
@@ -440,6 +442,7 @@ function EnLaOrilla({
   codigoDeLaUrl,
   minimo,
   figura,
+  donde,
   alCambiar,
 }: {
   escondida: boolean;
@@ -447,6 +450,8 @@ function EnLaOrilla({
   codigoDeLaUrl: string;
   minimo: number;
   figura: FiguraId;
+  /** «en el muelle», «en la plaza del Burgo», «en la Linde Alta». Lo pone el tema. */
+  donde: string;
   alCambiar: () => void;
 }): JSX.Element {
   const [nombre, ponerNombre] = useState('');
@@ -461,7 +466,7 @@ function EnLaOrilla({
       <section className="panel">
         <h2 className="rotulo-de-panel">Quién eres</h2>
         <p className="letra-chica">
-          Es lo que ven los demás en el muelle. No es una cuenta: no hay correo ni contraseña, y
+          Es lo que ven los demás {donde}. No es una cuenta: no hay correo ni contraseña, y
           muere con la partida.
         </p>
         <input
@@ -773,16 +778,19 @@ function EnElMuelle({
 
 function Figuras({
   elegida,
+  donde,
   alElegir,
   alVolver,
 }: {
   elegida: FiguraId;
+  /** «en el muelle», «en la plaza del Burgo», «en la Linde Alta». Lo pone el tema. */
+  donde: string;
   alElegir: (id: FiguraId) => void;
   alVolver: () => void;
 }): JSX.Element {
   return (
     <section className="panel muelle-tramo">
-      <h2 className="rotulo-de-panel">Quién eres en el muelle</h2>
+      <h2 className="rotulo-de-panel">Quién eres {donde}</h2>
       <p className="letra-chica">Se ve en la escena al elegir. También con las teclas 1 a 6.</p>
       <ul className="opciones muelle-figuras">
         {FIGURAS.map((f, i) => (
