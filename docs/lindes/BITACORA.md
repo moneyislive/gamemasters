@@ -526,6 +526,31 @@ la marioneta contra hacia dónde dice `unPaso` que anda. Y lleva vacuna: afirma 
 cuenta vieja **fallaba en 22 de las 24**, acertando sólo norte y sur. Sin esa línea, una
 comprobación que mirase sólo el eje `z` aceptaría las dos y se leería como vigilada.
 
+### Y los dos rincones se ENTERRABAN bajo el tablero
+
+Al andar desaparecían la losa de la mano y el reloj de arena. Los dos. En «hombro» y en
+«ojos».
+
+Ninguno de los dos cuelga de la cámara: se recolocan cada fotograma delante de ella y son
+objetos del MUNDO, para que se iluminen y se ennieblen con lo que tienen alrededor — está
+razonado en `LaLosaEnLaMano` y el razonamiento es bueno. Lo que trae de regalo es que un
+objeto del mundo **puede quedar debajo del suelo**.
+
+La cuenta: a `DISTANCIA_DE_LA_MANO = 60` el canto de abajo de la pantalla cae **dieciocho
+unidades por debajo del ojo**. Mirando la mesa da igual, que la cámara va a cientos de
+unidades de alto y ahí abajo sólo hay aire. Andando, el ojo está a dos y medio — así que
+los dos rincones se quedaban **catorce unidades enterrados bajo el tablero**.
+
+**Se arregla acercándolos, no subiéndolos.** Todo lo que devuelven esas dos cuentas es
+proporcional a la distancia, así que a cuatro unidades **se ven exactamente del mismo
+tamaño y en el mismo sitio de la pantalla** y ya no llegan al suelo. Cuatro y no seis
+porque el margen tiene que valer también para la cámara de ojos, que va más baja.
+
+La red comprueba las dos cosas: que el punto más bajo de cada rincón quede por encima del
+tablero con las dos alturas de ojo y las seis formas de lienzo, y —lo que hace que el
+arreglo sea legítimo— que las fracciones de pantalla de cerca y de lejos sean idénticas
+hasta `1e-12`. Vacuna: afirma que con la distancia de mesa se enterraban **los 24 casos**.
+
 ## Lo medido hasta aquí
 
 - `verify:lindes`: 13.295 comprobaciones en verde. Diez partidas enteras, 709

@@ -33,6 +33,30 @@ import { LADO_DE_LOSA } from './medidas';
 export const DISTANCIA_DE_LA_MANO = 60;
 
 /**
+ * Y LO MISMO, PERO ANDANDO POR EL TABLERO.
+ *
+ * ═══ POR QUÉ NO VALE LA MISMA ═══
+ *
+ * Los dos rincones no cuelgan de la cámara: se recolocan cada fotograma delante de ella,
+ * y son objetos del MUNDO —así se iluminan y se enniebla con lo que tienen alrededor, que
+ * es el porqué entero de hacerlo así (ver `LaLosaEnLaMano`)—. Y un objeto del mundo puede
+ * quedar debajo del suelo.
+ *
+ * A sesenta unidades, el canto de abajo de la pantalla cae DIECIOCHO por debajo del ojo.
+ * Mirando la mesa da igual: la cámara está a cientos de unidades de alto y ahí abajo sólo
+ * hay aire. Andando, el ojo está a dos y medio — así que la losa de la mano y el reloj se
+ * quedaban **catorce unidades enterrados bajo el tablero**, y al pulsar «hombro» u «ojos»
+ * desaparecían los dos. No falla nada: el jugador, sencillamente, deja de ver qué losa
+ * tiene y cuánto queda en la bolsa.
+ *
+ * Se arregla ACERCÁNDOLOS, no subiéndolos: todo lo que devuelven estas dos cuentas es
+ * proporcional a la distancia, así que a cuatro unidades se ven EXACTAMENTE del mismo
+ * tamaño en la pantalla y ya no llegan al suelo. Cuatro y no seis porque el margen tiene
+ * que valer también para la cámara de ojos, que va más baja que la de hombro.
+ */
+export const DISTANCIA_DE_LA_MANO_A_PIE = 4;
+
+/**
  * ═══ CUÁNTO OCUPA, Y POR QUÉ SON DOS TOPES Y NO UNO ═══
  *
  * El primero es del alto y es el que manda en una pantalla apaisada. El segundo es del
@@ -109,8 +133,8 @@ export interface SitioDeLaMano {
  * alto. A `d` de una cámara de `fov` grados, el medio alto visible es `d · tan(fov/2)`:
  * de ahí sale todo lo demás y por eso no hay ni un número probado a ojo.
  */
-export function sitioDeLaMano(fov: number, aspecto: number): SitioDeLaMano {
-  const medioAlto = DISTANCIA_DE_LA_MANO * Math.tan((fov * Math.PI) / 360);
+export function sitioDeLaMano(fov: number, aspecto: number, distancia: number): SitioDeLaMano {
+  const medioAlto = distancia * Math.tan((fov * Math.PI) / 360);
   const medioAncho = medioAlto * Math.max(1e-6, aspecto);
 
   const media = Math.min(
@@ -129,7 +153,7 @@ export function sitioDeLaMano(fov: number, aspecto: number): SitioDeLaMano {
     media * Math.cos(VUELTA_DE_LA_MANO) + media * 2 * LO_QUE_SOBRESALE * Math.sin(VUELTA_DE_LA_MANO);
 
   return {
-    adelante: DISTANCIA_DE_LA_MANO,
+    adelante: distancia,
     derecha: -medioAncho + aire + mediaEnAncho,
     arriba: -medioAlto + aire + mediaEnAlto,
     escala: (media * 2) / LADO_DE_LOSA,
@@ -209,8 +233,9 @@ export function sitioDelRelojDeLaBolsa(
   aspecto: number,
   /** `ALTO_DEL_RELOJ_EN_LADOS` de `reloj.tsx`: lo alto que es el MÁS alto de los dos relojes. */
   altoEnLados: number,
+  distancia: number,
 ): SitioDelReloj {
-  const medioAlto = DISTANCIA_DE_LA_MANO * Math.tan((fov * Math.PI) / 360);
+  const medioAlto = distancia * Math.tan((fov * Math.PI) / 360);
   const medioAncho = medioAlto * Math.max(1e-6, aspecto);
 
   /* Lo que va a ocupar de alto en el mundo, y de ahí se despeja su `lado`. */
@@ -225,7 +250,7 @@ export function sitioDelRelojDeLaBolsa(
   const mediaEnAncho = (lado * ANCHO_DEL_RELOJ_EN_ALTOS) / 2;
 
   return {
-    adelante: DISTANCIA_DE_LA_MANO,
+    adelante: distancia,
     derecha: medioAncho - aire - mediaEnAncho,
     arriba: -medioAlto + aire + mediaEnAlto,
     lado,

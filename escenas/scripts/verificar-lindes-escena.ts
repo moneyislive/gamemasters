@@ -66,6 +66,8 @@ import {
 } from '../linde-alta/la-linde';
 import { ALTURA_DE_UNA_PERSONA } from '../escala';
 import {
+  ALTURA_DE_LOS_OJOS,
+  SOBRE_EL_HOMBRO,
   camaraDeHombro,
   camaraDeMesa,
   giroDeLaMarioneta,
@@ -73,7 +75,13 @@ import {
   nacerEn,
   nacerEnLaLosa,
 } from '../lindes/paseo';
-import { loQueHaCaido, sitioDeLaMano, sitioDelRelojDeLaBolsa } from '../lindes/rincones';
+import {
+  DISTANCIA_DE_LA_MANO,
+  DISTANCIA_DE_LA_MANO_A_PIE,
+  loQueHaCaido,
+  sitioDeLaMano,
+  sitioDelRelojDeLaBolsa,
+} from '../lindes/rincones';
 import { ALTO_DEL_RELOJ_EN_LADOS } from '../reloj';
 
 let hechas = 0;
@@ -735,7 +743,7 @@ for (const [comoEs, ancho, alto] of TABLEROS) {
  * justamente lo que se compra: que tocarlas no vuelva a sacarla del lienzo.
  */
 for (const [pantalla, aspecto] of LIENZOS) {
-  const m = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto);
+  const m = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto, DISTANCIA_DE_LA_MANO);
   const izquierda = (m.derecha - m.mediaEnAncho) / m.medioAncho;
   const derecha = (m.derecha + m.mediaEnAncho) / m.medioAncho;
   const abajo = (m.arriba - m.mediaEnAlto) / m.medioAlto;
@@ -792,7 +800,12 @@ for (const [pantalla, aspecto] of LIENZOS) {
  * dos y viene de `reloj.tsx`, que es quien los sabe.
  */
 for (const [pantalla, aspecto] of LIENZOS) {
-  const r = sitioDelRelojDeLaBolsa(CAMPO_DE_LA_CAMARA, aspecto, ALTO_DEL_RELOJ_EN_LADOS);
+  const r = sitioDelRelojDeLaBolsa(
+    CAMPO_DE_LA_CAMARA,
+    aspecto,
+    ALTO_DEL_RELOJ_EN_LADOS,
+    DISTANCIA_DE_LA_MANO,
+  );
   const izquierda = (r.derecha - r.mediaEnAncho) / r.medioAncho;
   const derecha = (r.derecha + r.mediaEnAncho) / r.medioAncho;
   const abajo = (r.arriba - r.mediaEnAlto) / r.medioAlto;
@@ -808,7 +821,7 @@ for (const [pantalla, aspecto] of LIENZOS) {
     { izquierda: izquierda.toFixed(3), arriba: arriba.toFixed(3) },
   );
   /* Y no se pisan: la losa está a la izquierda y el reloj a la derecha, sin tocarse. */
-  const m = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto);
+  const m = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto, DISTANCIA_DE_LA_MANO);
   comprobar(
     `y no se pisa con la losa de la mano en «${pantalla}»`,
     (m.derecha + m.mediaEnAncho) < (r.derecha - r.mediaEnAncho),
@@ -1180,6 +1193,109 @@ paso('El avatar MIRA hacia donde anda, y no sólo cuando anda al norte');
   comprobar(
     'la escena gira al avatar con `giroDeLaMarioneta`, no con una media vuelta a mano',
     /g\.rotation\.y = giroDeLaMarioneta\(/.test(elAvatar) && !/rotation\.y = .*\+ Math\.PI/.test(elAvatar),
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+paso('Andando, la losa de la mano y el reloj NO se entierran bajo el tablero');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * Los dos rincones no cuelgan de la cámara: se recolocan delante de ella y son objetos del
+ * MUNDO, para que se iluminen y se enniebla con lo que tienen alrededor. Eso está bien
+ * razonado — y tiene una consecuencia que no se había mirado: un objeto del mundo puede
+ * quedar DEBAJO DEL SUELO.
+ *
+ * A sesenta unidades, el canto de abajo cae dieciocho por debajo del ojo. Mirando la mesa
+ * da igual, que la cámara va altísima. Andando, el ojo está a dos y medio: la losa de la
+ * mano y el reloj se quedaban catorce unidades bajo el tablero y DESAPARECÍAN los dos al
+ * pulsar «hombro» u «ojos». Visto en el móvil; no falla nada, no avisa nadie, y el jugador
+ * deja de ver qué losa tiene y cuánto queda en la bolsa.
+ */
+{
+  /* Lo más bajo que llega el rincón, en unidades del mundo, con el ojo a esa altura. */
+  const loMasBajo = (ojo: number, arriba: number, mediaEnAlto: number): number =>
+    ojo + arriba - mediaEnAlto;
+
+  const OJOS: readonly (readonly [string, number])[] = [
+    ['en primera persona', ALTURA_DE_LOS_OJOS],
+    ['por encima del hombro', SOBRE_EL_HOMBRO],
+  ];
+
+  let elPeor = Number.POSITIVE_INFINITY;
+  for (const [pantalla, aspecto] of LIENZOS) {
+    const m = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto, DISTANCIA_DE_LA_MANO_A_PIE);
+    const r = sitioDelRelojDeLaBolsa(
+      CAMPO_DE_LA_CAMARA,
+      aspecto,
+      ALTO_DEL_RELOJ_EN_LADOS,
+      DISTANCIA_DE_LA_MANO_A_PIE,
+    );
+    for (const [comoSeMira, ojo] of OJOS) {
+      for (const [queEs, sitio] of [
+        ['la losa de la mano', m],
+        ['el reloj de la bolsa', r],
+      ] as const) {
+        const bajo = loMasBajo(ojo, sitio.arriba, sitio.mediaEnAlto);
+        if (bajo < elPeor) elPeor = bajo;
+        if (bajo <= 0) {
+          comprobar(`${queEs} se ve ${comoSeMira} en «${pantalla}»`, false, {
+            loMasBajo: bajo.toFixed(2),
+          });
+        }
+      }
+    }
+
+    /*
+     * ═══ Y SE VEN EXACTAMENTE IGUAL QUE EN LA MESA ═══
+     *
+     * Esto es lo que hace que el arreglo sea acercarlos y no moverlos: TODO lo que
+     * devuelven las dos cuentas es proporcional a la distancia, así que las fracciones de
+     * pantalla no cambian. Si algún día alguien mete un término que no escale, el rincón
+     * cambiaría de sitio o de tamaño al echar a andar — y saldría aquí.
+     */
+    const lejos = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto, DISTANCIA_DE_LA_MANO);
+    comprobar(
+      `la losa de la mano ocupa lo mismo en la pantalla de cerca que de lejos en «${pantalla}»`,
+      Math.abs(m.derecha / m.medioAncho - lejos.derecha / lejos.medioAncho) < 1e-12 &&
+        Math.abs(m.mediaEnAlto / m.medioAlto - lejos.mediaEnAlto / lejos.medioAlto) < 1e-12,
+      {
+        cerca: (m.derecha / m.medioAncho).toFixed(6),
+        lejos: (lejos.derecha / lejos.medioAncho).toFixed(6),
+      },
+    );
+  }
+  comprobar('el rincón más bajo sigue estando por encima del tablero', elPeor > 0, {
+    elPeor: elPeor.toFixed(2),
+  });
+
+  /*
+   * ═══ LA VACUNA ═══
+   *
+   * Que con la distancia de la mesa SÍ se entierran. Sin esto, la comprobación de arriba
+   * podría estar midiendo algo que nunca da negativo y leerse como vigilada.
+   */
+  let enterradosConLaDeLejos = 0;
+  for (const [, aspecto] of LIENZOS) {
+    const m = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto, DISTANCIA_DE_LA_MANO);
+    const r = sitioDelRelojDeLaBolsa(
+      CAMPO_DE_LA_CAMARA,
+      aspecto,
+      ALTO_DEL_RELOJ_EN_LADOS,
+      DISTANCIA_DE_LA_MANO,
+    );
+    for (const [, ojo] of OJOS) {
+      if (loMasBajo(ojo, m.arriba, m.mediaEnAlto) < 0) enterradosConLaDeLejos++;
+      if (loMasBajo(ojo, r.arriba, r.mediaEnAlto) < 0) enterradosConLaDeLejos++;
+    }
+  }
+  comprobar(
+    'y con la distancia de la mesa se enterraban los dos en todas las pantallas',
+    enterradosConLaDeLejos === LIENZOS.length * OJOS.length * 2,
+    { enterradosConLaDeLejos },
   );
 }
 

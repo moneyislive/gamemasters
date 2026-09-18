@@ -63,6 +63,8 @@ import { MINIMO_PARA_GIRAR } from '../camara';
 import {
   INCLINACION_DE_LA_MANO,
   loQueHaCaido,
+  DISTANCIA_DE_LA_MANO,
+  DISTANCIA_DE_LA_MANO_A_PIE,
   sitioDeLaMano,
   sitioDelRelojDeLaBolsa,
 } from './rincones';
@@ -563,10 +565,17 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       ) : null}
 
       {catalogo !== null && tablero.enMano !== '' ? (
-        <LaLosaEnLaMano catalogo={catalogo} losa={tablero.enMano} giro={giroEnMano} semilla={semilla} />
+        <LaLosaEnLaMano
+          aPie={camara.modo !== 'mesa'}
+          catalogo={catalogo}
+          losa={tablero.enMano}
+          giro={giroEnMano}
+          semilla={semilla}
+        />
       ) : null}
 
       <ElRelojDeLaBolsa
+        aPie={camara.modo !== 'mesa'}
         quedan={tablero.quedan}
         deLaBolsa={tablero.deLaBolsa}
         sePuedePasar={props.sePuedePasar === true}
@@ -764,11 +773,14 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
  * toque.
  */
 function ElRelojDeLaBolsa({
+  aPie,
   quedan,
   deLaBolsa,
   sePuedePasar,
   alPasar,
 }: {
+  /** ¿Se está andando por el tablero? Entonces el rincón va cerca, o se entierra. */
+  readonly aPie: boolean;
   readonly quedan: number;
   readonly deLaBolsa: number;
   readonly sePuedePasar: boolean;
@@ -791,6 +803,7 @@ function ElRelojDeLaBolsa({
     (camera as THREE.PerspectiveCamera).fov ?? 45,
     size.width / Math.max(1, size.height),
     ALTO_DEL_RELOJ_EN_LADOS,
+    aPie ? DISTANCIA_DE_LA_MANO_A_PIE : DISTANCIA_DE_LA_MANO,
   );
 
   /*
@@ -866,11 +879,14 @@ function ElRelojDeLaBolsa({
  * imaginarse el resultado; con esto se ve antes de tocar el tablero.
  */
 function LaLosaEnLaMano({
+  aPie,
   catalogo,
   losa,
   giro,
   semilla,
 }: {
+  /** ¿Se está andando por el tablero? Entonces el rincón va cerca, o se entierra. */
+  readonly aPie: boolean;
   readonly catalogo: Catalogo;
   readonly losa: string;
   readonly giro: Giro;
@@ -907,7 +923,11 @@ function LaLosaEnLaMano({
     const g = grupo.current;
     if (g === null) return;
     const camara = camera as THREE.PerspectiveCamera;
-    const sitio = sitioDeLaMano(camara.fov ?? 45, size.width / Math.max(1, size.height));
+    const sitio = sitioDeLaMano(
+      camara.fov ?? 45,
+      size.width / Math.max(1, size.height),
+      aPie ? DISTANCIA_DE_LA_MANO_A_PIE : DISTANCIA_DE_LA_MANO,
+    );
 
     AUX_ADELANTE.set(0, 0, -1).applyQuaternion(camara.quaternion);
     AUX_DERECHA.set(1, 0, 0).applyQuaternion(camara.quaternion);
