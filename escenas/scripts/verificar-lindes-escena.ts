@@ -60,7 +60,16 @@ import {
 } from '../lindes/losa';
 import type { CeldaDeSuelo, PorQueEsta } from '../lindes/losa';
 import { ANCHO_DE_LA_SENDA } from '../lindes/medidas';
-import { COLOR_DE_LA_ARENA, COLOR_DEL_FALDON, COLOR_DEL_PRADO, COLOR_DE_LA_SENDA, COLOR_DE_LA_VILLA, geometriaDelSuelo } from '../lindes/suelo';
+import {
+  COLOR_DE_LA_ARENA,
+  COLOR_DE_LA_CASILLA_CLARA,
+  COLOR_DEL_FALDON,
+  COLOR_DEL_PRADO,
+  COLOR_DE_LA_SENDA,
+  COLOR_DE_LA_VILLA,
+  VELO_DE_LA_CASILLA_CLARA,
+  geometriaDelSuelo,
+} from '../lindes/suelo';
 import {
   CUANTAS_EN_EL_DESIERTO,
   LO_QUE_CRECE_EN_LA_ARENA,
@@ -1452,6 +1461,50 @@ paso('La arena se distingue del tablero, y el desierto está donde tiene que est
     luz(DEL_FIELTRO_DE_ANTES) - faldon < 20,
     { fieltro: luz(DEL_FIELTRO_DE_ANTES).toFixed(0), faldon: faldon.toFixed(0) },
   );
+
+
+  /*
+   * ═══ Y LA CASILLA CLARA, QUE ES UN VELO Y SE JUZGA COMPUESTO ═══
+   *
+   * La marca de «aquí cabe tu losa» es un velo translúcido encima del suelo, así que su color
+   * a secas no dice nada: lo que se ve es el color COMPUESTO sobre lo que tiene debajo. Era
+   * `#f3e7b8` al 32 %, que sobre el fieltro verde oscuro de antes se leía de sobra — y sobre
+   * la arena compone 210 contra 200. **Diez puntos.** El panel seguía diciendo «señala una
+   * casilla clara y tócala» mientras las casillas claras eran del color del suelo.
+   *
+   * Lo encontré probándolo: no acertaba a poner una losa porque no veía dónde. Es el mismo
+   * fallo que el fieltro y en el sitio de al lado, y el mismo que no ve nadie mirando la
+   * paleta — porque en la paleta los dos colores son muy distintos.
+   */
+  {
+    const compuesto = (fondo: number, velo: string, cuanto: number): number =>
+      fondo * (1 - cuanto) + luz(velo) * cuanto;
+
+    const laCasilla = compuesto(arena, COLOR_DE_LA_CASILLA_CLARA, VELO_DE_LA_CASILLA_CLARA);
+    comprobar(
+      'la casilla clara se distingue de la arena que tiene debajo: más de treinta de luminancia',
+      Math.abs(laCasilla - arena) > 30,
+      { casilla: laCasilla.toFixed(0), arena: arena.toFixed(0), diferencia: Math.abs(laCasilla - arena).toFixed(0) },
+    );
+
+    /*
+     * ═══ LA VACUNA ═══
+     *
+     * Que el velo de antes NO lo cumplía sobre la arena. Sin esto, la línea de arriba podría
+     * estar midiendo algo que cualquier velo cumple —y no lo es: el de antes daba diez—.
+     */
+    const elDeAntes = compuesto(arena, '#f3e7b8', 0.32);
+    comprobar(
+      'y el velo claro de antes se perdía sobre la arena: menos de quince',
+      Math.abs(elDeAntes - arena) < 15,
+      { antes: elDeAntes.toFixed(0), arena: arena.toFixed(0) },
+    );
+    /* Y que sobre el fieltro viejo SÍ valía, que es lo que explica por qué nadie lo vio. */
+    comprobar(
+      'y sobre el fieltro de antes sí valía, que por eso estaba escrito así',
+      Math.abs(compuesto(luz(DEL_FIELTRO_DE_ANTES), '#f3e7b8', 0.32) - luz(DEL_FIELTRO_DE_ANTES)) > 30,
+    );
+  }
 
   /* ── El desierto ── */
   const LOSAS_DE_PRUEBA = [

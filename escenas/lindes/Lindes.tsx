@@ -41,7 +41,14 @@ import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import { LADO_DE_LOSA } from './medidas';
 import { LO_QUE_NO_SE_RECORTA, montarLaLosa, semillaDeLaLosa } from './losa';
 import type { PuestaEnLaLosa } from './losa';
-import { COLOR_DE_LA_ARENA, geometriaDeLaArena, geometriaDeLosHuecos, geometriaDelSuelo } from './suelo';
+import {
+  COLOR_DE_LA_ARENA,
+  COLOR_DE_LA_CASILLA_CLARA,
+  VELO_DE_LA_CASILLA_CLARA,
+  geometriaDeLaArena,
+  geometriaDeLosHuecos,
+  geometriaDelSuelo,
+} from './suelo';
 import { loQueHayEnElDesierto, loQueSeEstira } from './desierto';
 import type { CajaDelModelo, EnElDesierto } from './desierto';
 import type { LosaQueSePinta } from './suelo';
@@ -583,9 +590,9 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       {huecos !== null ? (
         <mesh geometry={huecos} onPointerDown={alBajar} onPointerUp={alTocar} onPointerMove={alSenalar}>
           <meshStandardMaterial
-            color="#f3e7b8"
+            color={COLOR_DE_LA_CASILLA_CLARA}
             transparent
-            opacity={0.32}
+            opacity={VELO_DE_LA_CASILLA_CLARA}
             roughness={1}
             metalness={0}
             depthWrite={false}

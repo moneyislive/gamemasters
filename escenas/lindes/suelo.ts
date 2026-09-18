@@ -357,6 +357,28 @@ export function geometriaDeLaArena(
 export const COLOR_DE_LA_ARENA = '#dcc79b';
 
 /**
+ * LA CASILLA CLARA: dónde cabe la losa que se tiene en la mano.
+ *
+ * ═══ EL MISMO FALLO QUE EL FIELTRO, EN EL SITIO DE AL LADO ═══
+ *
+ * Era `#f3e7b8` al 32 %, y con el fieltro verde oscuro debajo se veía perfectamente. Al
+ * cambiar el fondo a arena dejó de verse, y no por poco: compuesto sobre la arena, ese velo
+ * da luminancia **210 contra los 200 del fondo**. Diez puntos. El panel sigue diciendo
+ * «señala una casilla clara y tócala» mientras las casillas claras son del color del suelo.
+ *
+ * No es un detalle de estilo: es la única señal de DÓNDE SE PUEDE JUGAR. Sin ella hay que
+ * adivinar el sitio a base de tocar, que es lo que me pasó a mí probándolo.
+ *
+ * Ahora es un velo OSCURO —154 compuesto contra 200— que se lee como un hueco esperando su
+ * losa. Va oscuro y no más claro porque la arena ya está muy arriba en la escala: subir por
+ * encima de 200 sin llegar al blanco puro deja poco recorrido, y bajar deja cuarenta y seis
+ * puntos limpios.
+ */
+export const COLOR_DE_LA_CASILLA_CLARA = '#3f4a3a';
+/** Lo que tapa el velo de la casilla. Con el color de arriba compone 154 sobre la arena. */
+export const VELO_DE_LA_CASILLA_CLARA = 0.38;
+
+/**
  * LA GEOMETRÍA DE LAS CASILLAS DONDE CABE LA LOSA DE LA MANO.
  *
  * Una chapa plana por casilla, un pelo por encima del suelo, para que se pueda

@@ -755,6 +755,45 @@ tres rojos, y la vacuna afirma que esa cuenta sacaba del lanchón más de media 
 vacíos: eso no se lee como paisaje sino como descuido. El contorno se parte en ocho sectores
 y va una en cada uno, con su ángulo y su distancia movidos dentro del sector.
 
+### Y al reiniciar el tablero salió lo que el cambio se había llevado por delante
+
+Miguel pidió reiniciar el tablero para ver si las rocas se generan bien. Se abrió mesa nueva
+—semilla nueva— y salen bien: ocho, del tamaño que toca y repartidas. Pero **al intentar
+poner una losa no acertaba dónde**, y no era torpeza: la marca de «aquí cabe tu losa» había
+dejado de verse.
+
+Es el MISMO fallo que el fieltro, en el sitio de al lado, y otra vez invisible en la paleta.
+La casilla clara es un VELO translúcido, así que su color a secas no dice nada: lo que se ve
+es el color COMPUESTO sobre lo que tiene debajo.
+
+| | luminancia compuesta |
+|---|---|
+| velo `#f3e7b8` al 32 % sobre el fieltro viejo | 108 contra 50 — **se veía de sobra** |
+| el mismo velo sobre la arena | 210 contra 200 — **diez puntos** |
+| velo `#3f4a3a` al 38 % sobre la arena | 154 contra 200 — cuarenta y seis |
+
+El panel seguía diciendo «señala una casilla clara y tócala» mientras las casillas claras
+eran del color del suelo. Va oscuro y no más claro porque la arena ya está muy arriba en la
+escala: subir por encima de 200 sin llegar al blanco deja poco recorrido; bajar deja cuarenta
+y seis puntos limpios, y un hueco oscuro se lee además como lo que es: un sitio esperando su
+losa.
+
+**La red lo juzga COMPUESTO**, que es lo que no hacía nadie: exige más de treinta de
+diferencia contra el fondo, afirma que el velo de antes daba menos de quince sobre la arena
+—la vacuna— y afirma también que sobre el fieltro viejo SÍ valía, que es lo que explica por
+qué estaba escrito así y nadie lo había tocado.
+
+### Y las piedras se mueven al crecer el tablero, y está bien
+
+Medido sobre tableros de 1x1 a 8x8: siempre ocho piezas, siempre las mismas y siempre del
+mismo rango de tamaño, pero **la que más se mueve salta hasta 1,3 losas** cuando el tablero
+crece, porque el anillo se calcula desde el borde del tablero y el borde se mueve.
+
+Mirado poniendo una losa de verdad: no canta. Las piedras se mueven EN EL MISMO INSTANTE en
+que la cámara reencuadra, así que se lee como que la cámara se aleja y no como piedras
+andando. Queda escrito por si algún día molesta: la alternativa sería anclarlas al mundo y
+perderlas según el tablero las alcance.
+
 ### Y el reloj dejó de flotar
 
 También lo dijo Miguel: el reloj debería estar apoyado en algo de temática Carcassonne, no
