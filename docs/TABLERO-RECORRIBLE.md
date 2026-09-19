@@ -3,6 +3,23 @@
 Cómo se anda por un tablero de esta casa, con qué se choca, **dónde se ejecuta cada cosa** y
 qué hace falta para que el siguiente juego lo tenga sin volver a escribirlo.
 
+> **DECISIONES TOMADAS POR MIGUEL, 19 de septiembre de 2026.** Este documento se escribió
+> proponiendo un motor de paseo PROPIO. Miguel ha decidido otra cosa, y manda:
+>
+> 1. **IR Engine entra, y es innegociable.** Los cuatro bloqueos del §2.1 del motor de arcade
+>    quedan aceptados como coste a planificar, no como impedimento. Condiciones suyas: la capa
+>    de IR es **sólo para los dispositivos que la soporten**, se activa **sólo cuando el usuario
+>    quiere ver el avatar sobre el tablero**, y **la verdad de la partida NO vive en IR**.
+> 2. **Los avatares SÍ se ven unos a otros.**
+> 3. **Los objetos del tablero son DE CADA UNO**: cada jugador recoge su copia. No hay carrera,
+>    así que no tocan el reductor sellado.
+> 4. **En Riberas se vadea**: se anda por la arena y por el agua somera, con el avatar metido en
+>    el agua; lo hondo frena, porque no hay clip de nadar.
+>
+> **La arquitectura de todo esto vive en `docs/CAPA-ESPACIAL.md`**, que la sustituye. Lo que
+> sigue se conserva porque el análisis de coste del §2 y la partición del paseo del §4 siguen
+> siendo válidos y son la base de aquélla.
+
 > **Estado: DISEÑO, no construido.** Lo único que existe hoy es el paseo de Las Lindes, que es
 > el borrador del que sale todo esto. Las decisiones marcadas **PARA MIGUEL** no las toma
 > quien escriba el código.
