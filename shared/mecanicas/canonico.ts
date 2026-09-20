@@ -88,6 +88,16 @@ function esLlano(valor: object): boolean {
  *
  * @throws {NoCanonizable} si hay algo que no sobreviviría al viaje.
  */
+/**
+ * CUÁNTOS NIVELES DE ANIDAMIENTO SE ACEPTAN. Ver el razonamiento en `escribir`.
+ *
+ * Sesenta y cuatro, contra los SEIS del estado más hondo que esta casa ha producido nunca
+ * —medido sobre los 673 estados de los maestros de oro—. No es un número de compromiso: es
+ * diez veces el peor caso conocido, y aun así corta en seco la carga que hace trabajar al
+ * servidor por trabajar.
+ */
+export const TOPE_DE_PROFUNDIDAD = 64;
+
 export function canonico(valor: unknown): string {
   return escribir(valor, '$', []);
 }
@@ -158,6 +168,40 @@ function escribir(valor: unknown, ruta: string, enCurso: object[]): string {
   }
 
   const objeto = valor as object;
+
+  /*
+   * ═══ Y UN TOPE DE PROFUNDIDAD, QUE ES LO QUE DE VERDAD CUESTA ═══
+   *
+   * Este recorrido es recursivo, así que una carga muy anidada se lleva la pila por delante.
+   * Y eso NO salía como un dato mal formado: salía como un `RangeError`, que no es
+   * `NoCanonizable`, así que `porQueNoEsCanonico` lo relanzaba, escapaba de `leerRepeticion`,
+   * `registrarRecord` lo volvía a lanzar y la ruta de récords —que no tiene `try`— contestaba
+   * un **500**. Medido en este árbol: con el aviso de inicio delante, una `carga` anidada
+   * veinte mil veces lo provoca, y se llega ahí con dos peticiones sin credencial ninguna.
+   *
+   * Y lo caro está POR DEBAJO de ese punto: una carga anidada tres mil veces se acepta y
+   * bloquea el hilo **50,5 ms**, cuando una llana de doscientos kilobytes cuesta 0,5. Cien
+   * veces más por los mismos bytes — y como tres mil niveles son unos seis kilobytes, un tope
+   * de TAMAÑO como el de la otra puerta (ocho) la habría dejado pasar entera. Lo que hay que
+   * acotar no era el tamaño: era esto.
+   *
+   * El número sale de medir, no de elegir: se han recorrido los 673 estados que guardan los
+   * maestros de oro y **el más hondo de todos tiene profundidad 6** (El Burgo). Sesenta y
+   * cuatro es diez veces eso, así que ningún estado de esta casa lo roza.
+   *
+   * Va aquí y no en cada puerta porque por aquí pasan TODAS: el récord, el movimiento y el
+   * pesaje del estado. Y sale como `NoCanonizable`, que es lo que las puertas ya saben
+   * convertir en un 400 con su explicación.
+   */
+  if (enCurso.length >= TOPE_DE_PROFUNDIDAD) {
+    throw new NoCanonizable(
+      ruta,
+      `está anidado más de ${String(TOPE_DE_PROFUNDIDAD)} niveles. El estado más hondo que ` +
+        'produce esta casa tiene seis, así que esto no es un estado: es una carga que hace ' +
+        'trabajar al servidor por trabajar. Recorrer algo así cuesta cien veces más que lo ' +
+        'mismo en llano, y lo bastante hondo se lleva la pila por delante.',
+    );
+  }
 
   for (const antepasado of enCurso) {
     if (antepasado === objeto) {
