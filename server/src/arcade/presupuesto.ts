@@ -381,18 +381,24 @@ export function losApartados(): Array<{ arcade: ArcadeId; porque: string }> {
   return [...cuarentena.entries()].map(([arcade, porque]) => ({ arcade, porque }));
 }
 
-/**
- * Levanta la cuarentena de un arcade. SÓLO para las pruebas.
+/*
+ * ═══ AQUÍ VIVÍA `levantarLaCuarentena`, Y SE HA BORRADO ═══
  *
- * No hay ninguna ruta que llame a esto y es deliberado: una puerta para
- * desactivar el castigo desde fuera es una puerta para desactivar la
- * comprobación, y esta casa ya tiene tres casos apuntados de comprobadores que
- * alguien puso en verde por el camino corto. Se levanta reiniciando el proceso,
- * que es lo que hay que hacer de todas formas cuando el código cambia.
+ * Su comentario decía «SÓLO para las pruebas» y razonaba, con acierto, que no hubiera
+ * ninguna ruta que la llamara: «una puerta para desactivar el castigo desde fuera es una
+ * puerta para desactivar la comprobación». Lo que no decía es que TAMPOCO la llamaban las
+ * pruebas: buscada en el árbol entero, la única aparición era su propia definición. Las
+ * pruebas usan `olvidarLoMedido()`, que ya hace `cuarentena.clear()` de paso.
+ *
+ * O sea que era una función exportada, muerta, cuyo comentario le atribuía un uso que no
+ * tenía — y encima era exactamente la puerta que ese mismo comentario prohíbe: lo único que
+ * le faltaba para ser la ruta que alguien pidiera era que alguien la importara.
+ *
+ * Y alguien la pidió: `docs/BOOTS-ON-BOARD.md` §5 llevaba escrito «dar salida a la
+ * cuarentena: `levantarLaCuarentena` existe y ninguna ruta la llama». Esto contesta a eso —
+ * no se le pone la ruta: se le quita la función. La salida sigue siendo reiniciar el
+ * proceso, que es lo que hay que hacer de todas formas cuando el código cambia.
  */
-export function levantarLaCuarentena(arcade: ArcadeId): void {
-  cuarentena.delete(arcade);
-}
 
 /**
  * SE RECHAZA ANTES DE LLAMAR AL REDUCTOR. Ésta es la línea que de verdad protege.
@@ -442,11 +448,41 @@ export function conPresupuesto<T>(arcade: ArcadeId, tipo: string, hacerlo: () =>
     salida = hacerlo();
   } finally {
     const ms = Number(process.hrtime.bigint() - desde) / 1_000_000;
+    /* Antes de anotar: `anotarTiempo` mete esta muestra en la cuenta y en el peor. */
+    const hasta = deArcade(arcade);
+    const antesDeEsta = { movimientos: hasta.movimientos, msTotal: hasta.msTotal };
     anotarTiempo(arcade, tipo, ms);
     if (ms > TOPE_MS) {
+      /*
+       * ═══ EL MOTIVO LLEVA LA ESTADÍSTICA, PORQUE UNA MUESTRA NO DISTINGUE DOS COSAS ═══
+       *
+       * Esto se decide con UN cronómetro de reloj de pared, y el castigo es permanente. Se ha
+       * medido si eso es frágil y sale que no: reejecutando el registro congelado del Burgo
+       * —el juego más caro— el peor movimiento cuesta 1,21 ms contra un tope de 50, doce
+       * hilos quemando CPU no lo empeoran (0,62 ms), y ni siquiera una recolección COMPLETA
+       * forzada dentro del cronómetro, con 138 MB de montón, pasa de 13,78 ms. Cuarenta veces
+       * de margen, y por eso el disparo de una muestra se queda como está.
+       *
+       * Lo que NO se puede medir desde aquí es el contenedor de Render estrangulado por
+       * cuota, que sí puede parar el proceso cientos de milisegundos y es indistinguible de
+       * un reductor malo… mirando una sola cifra. Mirando la estadística, no: un reductor
+       * malo llega con una media alta, y un estrangulamiento con dos mil movimientos a
+       * centésimas y un solo pico.
+       *
+       * Esa estadística YA se guardaba —`anotarTiempo` la lleva desde el principio— y no
+       * salía en el motivo. Ahora sí, porque el motivo es lo único que lee quien se encuentra
+       * el juego apartado: va en el registro, en la respuesta a quien movía y en
+       * `/api/arcade/presupuesto`.
+       */
+      const media =
+        antesDeEsta.movimientos > 0 ? antesDeEsta.msTotal / antesDeEsta.movimientos : 0;
       cuarentena.set(
         arcade,
-        `el movimiento «${tipo}» tardó ${ms.toFixed(1)} ms de reloj síncrono y el tope son ${String(TOPE_MS)} ms`,
+        `el movimiento «${tipo}» tardó ${ms.toFixed(1)} ms de reloj síncrono y el tope son ` +
+          `${String(TOPE_MS)} ms. De los ${String(antesDeEsta.movimientos)} movimientos medidos ` +
+          `antes de éste, la media era ${media.toFixed(2)} ms: si esa media es diminuta, esto ` +
+          'es un pico de la máquina —una recolección, el contenedor estrangulado— y no un ' +
+          'reductor lento; si es alta, el lento es el juego.',
       );
     }
   }

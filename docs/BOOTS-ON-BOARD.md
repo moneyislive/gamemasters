@@ -168,8 +168,28 @@ Salieron de los ataques y **no dependen de que esto se construya**:
 
 1. **Subir los topes de carga al árbitro.** Hoy `TOPE_CARGA_BYTES` sólo se exige en la ruta
    HTTP; `mesas.ts` y `arbitro.ts` tienen cero referencias. Cualquier segunda puerta los salta.
-2. **Dar salida a la cuarentena.** `levantarLaCuarentena` existe y ninguna ruta la llama: hoy
-   un movimiento gordo deja un juego parado hasta reiniciar el proceso.
+2. ~~**Dar salida a la cuarentena.**~~ **ESTE PUNTO ESTABA MAL Y NO SE HACE.** Lo escribí yo
+   sin leer el razonamiento que ya estaba en `presupuesto.ts`, y el código contesta mejor que
+   el plan: «una puerta para desactivar el castigo desde fuera es una puerta para desactivar
+   la comprobación». Además la justificación —«un movimiento gordo deja un juego parado»—
+   estaba rancia: `TOPE_CARGA_BYTES` ya corta ese sobre en la ruta de movimientos, y desde el
+   20-sep también en la de récords.
+
+   Y la sospecha con la que lo escalé —«lo decide un cronómetro de reloj de pared de UNA
+   muestra»— **no la sostiene la medida**: reejecutando el registro congelado del Burgo, el
+   peor movimiento cuesta **1,21 ms** contra un tope de 50; doce hilos quemando CPU no lo
+   empeoran (0,62 ms); y ni una recolección COMPLETA forzada dentro del cronómetro, con
+   138 MB de montón, pasa de **13,78 ms**. Cuarenta veces de margen.
+
+   Lo que SÍ se ha hecho, que es lo que quedó en pie al medir:
+   - **Borrar `levantarLaCuarentena`**, porque no la llamaba nadie —ni las pruebas, que usan
+     `olvidarLoMedido()`— y era exactamente la puerta que su propio comentario prohíbe: sólo
+     le faltaba que alguien la importara.
+   - **Poner la estadística en el motivo.** Lo único que no se puede medir desde aquí es un
+     contenedor estrangulado por cuota, y eso es indistinguible de un reductor malo si sólo
+     se mira la cifra de esa muestra. Con la media de los movimientos anteriores —que ya se
+     guardaba y no salía— se distingue: un juego lento llega con la media alta; un pico, con
+     dos mil movimientos a centésimas y un solo salto.
 3. **Cerrar el CORS pelado y el minado de asientos.**
 4. **Deltas en la vista.** Hoy se manda la vista entera a cada jugador en cada revisión: 20 MB
    por partida, 20-26 TB/mes al millón. Es la línea más gorda de la factura y es del producto

@@ -56,6 +56,7 @@ import {
   ArcadeFueraDePresupuesto,
   conPresupuesto,
   enCuarentena,
+  loMedidoDe,
   losApartados,
   medirMovimiento,
   olvidarLoMedido,
@@ -736,6 +737,95 @@ try {
   /* en Windows el fichero sigue tomado un instante */
 }
 void CTX;
+
+// ---------------------------------------------------------------------------
+paso('El motivo de una cuarentena distingue un juego lento de un pico de la maquina');
+// ---------------------------------------------------------------------------
+{
+  /*
+   * ═══ POR QUE ESTO IMPORTA, MEDIDO ═══
+   *
+   * La cuarentena la decide UN cronometro de reloj de pared y el castigo es permanente. Se
+   * midio si eso es fragil y NO lo es: reejecutando el registro congelado del Burgo —el juego
+   * mas caro de la casa— el peor movimiento cuesta 1,21 ms contra un tope de 50; doce hilos
+   * quemando CPU no lo empeoran (0,62 ms); y ni una recoleccion COMPLETA forzada dentro del
+   * cronometro, con 138 MB de monton, pasa de 13,78 ms. Cuarenta veces de margen.
+   *
+   * Lo que no se puede medir desde aqui es un contenedor estrangulado por cuota, que si puede
+   * parar el proceso cientos de milisegundos — y es indistinguible de un reductor malo si lo
+   * unico que se mira es la cifra de esa muestra. Por eso el motivo lleva la estadistica que
+   * ya se guardaba: con ella, un reductor lento llega con la media alta y un pico llega con
+   * dos mil movimientos a centesimas.
+   */
+  olvidarLoMedido();
+
+  /* Primero unos cuantos movimientos baratos, que son los que hacen la media. */
+  for (let i = 0; i < 40; i++) conPresupuesto('el-tranquilo', 'barato', () => 1);
+  const antes = loMedidoDe('el-tranquilo');
+  comprobar('el arnes ha medido movimientos baratos antes de nada', (antes?.movimientos ?? 0) === 40, {
+    movimientos: antes?.movimientos,
+  });
+
+  /* Y ahora uno que se pasa, que es lo que dispara. */
+  try {
+    conPresupuesto('el-tranquilo', 'el-pico', () => {
+      const hasta = Date.now() + TOPE_MS + 20;
+      while (Date.now() < hasta) {
+        /* quemar reloj de pared a proposito: es la unica forma de pasarse del tope */
+      }
+      return 1;
+    });
+  } catch {
+    /* `conPresupuesto` lanza al salir, que es lo que tiene que hacer. */
+  }
+
+  const porque = enCuarentena('el-tranquilo');
+  comprobar('el arcade queda apartado', porque !== null, { porque });
+  if (porque !== null) {
+    comprobar('y el motivo dice cuanto tardo y cual era el tope', /tardó [0-9]/.test(porque) && porque.includes(String(TOPE_MS)), {
+      porque,
+    });
+    comprobar(
+      'y ademas cuantos movimientos se habian medido antes, que es lo que faltaba',
+      porque.includes('40 movimientos medidos'),
+      { porque },
+    );
+    comprobar('y la media de aquellos, para poder distinguir las dos cosas', /la media era 0\.[0-9]{2} ms/.test(porque), {
+      porque,
+    });
+  }
+  olvidarLoMedido();
+}
+
+// ---------------------------------------------------------------------------
+paso('Y no hay ninguna puerta para levantar el castigo desde fuera');
+// ---------------------------------------------------------------------------
+{
+  /*
+   * `levantarLaCuarentena` existia, estaba exportada, y su propio comentario decia por que no
+   * debia tener ruta: «una puerta para desactivar el castigo desde fuera es una puerta para
+   * desactivar la comprobacion». Lo que no decia es que tampoco la llamaban las pruebas — la
+   * unica aparicion en el arbol entero era su definicion—, asi que era codigo muerto al que
+   * solo le faltaba que alguien lo importara para convertirse en esa puerta. Se borro.
+   *
+   * Se mira el fuente porque lo que hay que afirmar es que NO EXISTE, y una funcion que no
+   * existe no se puede llamar desde una comprobacion.
+   */
+  const fuente = fs.readFileSync(new URL('../src/arcade/presupuesto.ts', import.meta.url), 'utf8');
+  /* Sin comentarios: la explicacion de por que esto esta prohibido no puede tumbarlo. */
+  const soloCodigo = sinComentarios(fuente);
+  comprobar(
+    'no hay ninguna funcion para levantar la cuarentena de un arcade',
+    !/levantarLaCuarentena/.test(soloCodigo),
+    { donde: /export function levantarLaCuarentena/.exec(soloCodigo)?.[0] },
+  );
+  /* Vacuna: que se ha leido el fichero de verdad y no una cadena vacia. */
+  comprobar('y se ha leido el presupuesto de verdad para juzgarlo', soloCodigo.includes('const cuarentena'), {
+    letras: soloCodigo.length,
+  });
+  /* Y que las pruebas siguen teniendo su forma de empezar de cero, que es la que si se usa. */
+  comprobar('las pruebas siguen pudiendo empezar de cero por `olvidarLoMedido`', /olvidarLoMedido/.test(soloCodigo));
+}
 
 console.log('');
 if (fallos.length === 0) {
