@@ -41,6 +41,30 @@ const BASE = opcion('servidor', 'http://localhost:5174').replace(/\/$/, '');
 const CUANTOS = Number(opcion('jugadores', '3'));
 const TOPE = Number(opcion('tope', '400'));
 
+/**
+ * EL CODIGO DE UNA MESA YA ABIERTA, PARA JUGAR CONTRA QUIEN ESTA EN PANTALLA.
+ *
+ * Sin el, el guion abre su mesa y la juega entera, que es lo que hace falta para medir el
+ * cable. Con el se sienta en la que ya hay abierta, juega SOLO sus asientos y espera cuando
+ * el turno es de alguien que no es suyo.
+ *
+ * Hace falta porque las dos veces que esta casa ha encontrado fallos que la bateria no ve
+ * ha sido jugando una mesa de verdad con un asiento en pantalla, y para eso el companero
+ * tiene que poder sentarse DONDE YA ESTA la persona. Por eso aqui el «el turno es de
+ * alguien que no esta sentado» deja de ser queja: es lo normal cuando al otro lado hay
+ * alguien. Fuera de este modo sigue siendo fallo, que es lo que vigila la bateria.
+ */
+const CODIGO = opcion('codigo', '').toUpperCase();
+const ACOMPANANDO = CODIGO.length > 0;
+
+/** Cuanto se espera antes de volver a mirar si ya le toca a un robot, en ms. */
+const OJEADA_MS = 800;
+
+const dormir = async (ms: number): Promise<void> =>
+  new Promise((listo) => {
+    setTimeout(listo, ms);
+  });
+
 interface Respuesta {
   estado: number;
   datos: Record<string, unknown>;
@@ -150,16 +174,15 @@ async function jugar(): Promise<void> {
   console.log(`\nJugando una mesa de Las Lindes contra ${BASE}\n`);
 
   /* ── Abrir y sentarse ───────────────────────────────────────────────────── */
-  const abierta = await pedir('/arcade/mesas', {
-    metodo: 'POST',
-    cuerpo: { arcade: LINDES, nombre: 'Ana' },
-  });
+  const abierta = ACOMPANANDO
+    ? await pedir(`/arcade/mesas/${CODIGO}/asientos`, { metodo: 'POST', cuerpo: { nombre: 'Ana' } })
+    : await pedir('/arcade/mesas', { metodo: 'POST', cuerpo: { arcade: LINDES, nombre: 'Ana' } });
   /* Abrir devuelve 201 —se ha creado algo—; sentarse, 200. Se aceptan los dos por su sitio. */
   if (abierta.estado !== 200 && abierta.estado !== 201) {
     quejarse(`abrir la mesa contestó ${String(abierta.estado)}: ${JSON.stringify(abierta.datos).slice(0, 200)}`);
     return;
   }
-  const codigo = String(abierta.datos['codigo']);
+  const codigo = ACOMPANANDO ? CODIGO : String(abierta.datos['codigo']);
   const gente: Asiento[] = [
     {
       asiento: String(abierta.datos['asiento']),
@@ -167,7 +190,9 @@ async function jugar(): Promise<void> {
       nombre: 'Ana',
     },
   ];
-  console.log(`  mesa ${codigo} abierta (${String(abierta.bytes)} B, ${String(abierta.ms)} ms)`);
+  console.log(
+    `  mesa ${codigo} ${ACOMPANANDO ? 'acompanada' : 'abierta'} (${String(abierta.bytes)} B, ${String(abierta.ms)} ms)`,
+  );
 
   for (let i = 1; i < CUANTOS; i++) {
     const nombre = ['Bruno', 'Carla', 'Diego', 'Eva'][i - 1] ?? `J${String(i)}`;
@@ -215,15 +240,20 @@ async function jugar(): Promise<void> {
       .map((o) => ({ tipo: String((o as { tipo: string }).tipo), carga: (o as { carga?: unknown }).carga ?? null }));
   };
   const arranque = empezar ?? deOpciones(vista).find((t) => t.tipo === 'lindes:empezar');
-  if (arranque === undefined) {
-    quejarse('la mesa recién abierta no ofrece «empezar» ni en el tablero ni en las opciones');
-    return;
-  }
-  const rev0 = Number(laMesaDe(vista).rev ?? 0);
-  const arrancada = await mover(primera, arranque, rev0);
-  if (arrancada.estado !== 200) {
-    quejarse(`empezar contestó ${String(arrancada.estado)}: ${JSON.stringify(arrancada.datos).slice(0, 200)}`);
-    return;
+  if (ACOMPANANDO) {
+    /* La bolsa la vuelca quien esta en pantalla: aqui solo se acompana. */
+    console.log('  esperando a que se vuelque la bolsa desde la pantalla...');
+  } else {
+    if (arranque === undefined) {
+      quejarse('la mesa recién abierta no ofrece «empezar» ni en el tablero ni en las opciones');
+      return;
+    }
+    const rev0 = Number(laMesaDe(vista).rev ?? 0);
+    const arrancada = await mover(primera, arranque, rev0);
+    if (arrancada.estado !== 200) {
+      quejarse(`empezar contestó ${String(arrancada.estado)}: ${JSON.stringify(arrancada.datos).slice(0, 200)}`);
+      return;
+    }
   }
 
   let vueltas = 0;
@@ -257,11 +287,23 @@ async function jugar(): Promise<void> {
     }
     const turno = deQuien(cualquiera);
     if (turno === null) {
+      if (ACOMPANANDO) {
+        /* Todavia no se ha volcado la bolsa. Se mira otra vez sin gastar vuelta. */
+        await dormir(OJEADA_MS);
+        vueltas--;
+        continue;
+      }
       quejarse('la mesa empezada no dice de quién es el turno');
       return;
     }
     const quien = gente.find((g) => g.asiento === turno);
     if (quien === undefined) {
+      if (ACOMPANANDO) {
+        /* Le toca a la persona de la pantalla: se espera, que es lo que hace un companero. */
+        await dormir(OJEADA_MS);
+        vueltas--;
+        continue;
+      }
       quejarse(`el turno es de «${turno}», que no está sentado`);
       return;
     }

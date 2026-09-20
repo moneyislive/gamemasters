@@ -128,6 +128,16 @@ const COLOR_DE_LA_NIEBLA = '#cfdae2';
 const LOSAS_CON_MENUDO = 1.8;
 const LOSAS_CON_RELLENO = 4;
 
+/**
+ * A QUÉ PARTE DEL ALCANCE EMPIEZA UNA PIEZA A IRSE, para que el recorte no se vea.
+ *
+ * Desde aquí hasta el tope la pieza encoge hasta nada. Dos tercios es bastante para que el
+ * cambio no se lea como un parpadeo y poco para que no se noten los árboles enanos: en el
+ * último tercio del alcance una pieza ya está a cuatro losas de distancia y ocupa unos pocos
+ * píxeles. No cuesta un triángulo: es la escala que ya se estaba componiendo.
+ */
+const DONDE_EMPIEZA_A_IRSE = 0.66;
+
 /* `ALTO_DE_LA_ULTIMA` y `loQueSeLevantaLaUltima` viven en `medidas.ts`: son medidas, y
  * desde allí se pueden comprobar sin montar una escena. */
 
@@ -274,7 +284,6 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   );
   const suelo = useMemo(() => geometriaDelSuelo(losasQueSePintan), [losasQueSePintan]);
   useEffect(() => () => suelo?.dispose(), [suelo]);
-  const arena = useMemo(() => geometriaDeLaArena(losasQueSePintan), [losasQueSePintan]);
   /*
    * El desierto se saca de las losas y de la semilla, así que sólo se rehace cuando el
    * tablero crece: ocho piezas no cuestan nada, pero recalcularlas cada fotograma las movería
@@ -284,7 +293,6 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
     () => loQueHayEnElDesierto(losasQueSePintan, semilla),
     [losasQueSePintan, semilla],
   );
-  useEffect(() => () => arena?.dispose(), [arena]);
 
   /* ── Lo que se pone encima, agrupado por modelo ──────────────────────────── */
   const contenidos = useMemo(() => {
@@ -300,6 +308,38 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   const { camera, size } = useThree();
   const abarca = useMemo(() => loQueAbarca(tablero.losas), [tablero.losas]);
   const puestas = useMemo(() => new Set(tablero.losas.map((l) => l.casilla)), [tablero.losas]);
+
+  /*
+   * ═══ HASTA DÓNDE LLEGA LA ARENA ═══
+   *
+   * Dos alcances, y se pintan LOS DOS A LA VEZ aunque sólo uno esté en uso: el modo de
+   * cámara cambia con un botón, y rehacer el suelo en ese momento es un parpadeo en la
+   * pantalla justo cuando el jugador está mirando.
+   *
+   *   · MIRANDO LA MESA, lo que pisan las cuatro esquinas del cuadro. Crece con el tablero
+   *     y con lo estrecha que sea la ventana, y por eso no se puede escribir como un
+   *     margen fijo: es lo que se intentó y dejó el 35 % del cuadro en cielo.
+   *   · ANDANDO, hasta donde llega la niebla del paseo —`LADO_DE_LOSA * 34`—, que es justo
+   *     donde se deja de ver: más allá no hay nada que tapar.
+   *
+   * Son dos triángulos con un color plano, así que sobrar no cuesta nada y faltar cuesta
+   * un tercio de la pantalla.
+   */
+  const alcanceDeLaArena = useMemo(() => {
+    const pose = camaraDeMesa(abarca, size.width / Math.max(1, size.height));
+    const andando = LADO_DE_LOSA * 34;
+    return {
+      x0: Math.min(pose.suelo.x0, (abarca.minX - 0.5) * LADO_DE_LOSA - andando),
+      x1: Math.max(pose.suelo.x1, (abarca.maxX + 0.5) * LADO_DE_LOSA + andando),
+      z0: Math.min(pose.suelo.z0, -(abarca.maxY + 0.5) * LADO_DE_LOSA - andando),
+      z1: Math.max(pose.suelo.z1, -(abarca.minY - 0.5) * LADO_DE_LOSA + andando),
+    };
+  }, [abarca, size.width, size.height]);
+  const arena = useMemo(
+    () => geometriaDeLaArena(losasQueSePintan, alcanceDeLaArena),
+    [losasQueSePintan, alcanceDeLaArena],
+  );
+  useEffect(() => () => arena?.dispose(), [arena]);
   const laNiebla = useRef<THREE.Fog>(null);
   const paseante = useRef<Paseante>(nacerEn(0, 0));
   const mandos = useRef<Mandos>(QUIETO);
@@ -399,6 +439,22 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   const huecos = useMemo(() => geometriaDeLosHuecos(tablero.huecos), [tablero.huecos]);
   useEffect(() => () => huecos?.dispose(), [huecos]);
 
+  /*
+   * LA CASILLA SEÑALADA SE OLVIDA CUANDO DEJA DE SER UN HUECO.
+   *
+   * Se quedaba puesta de un turno para otro, y al empezar el siguiente la pista del raíl
+   * decía «En 3, -1» —una casilla que acababa de llenarse, la que uno mismo acaba de
+   * ocupar— mientras el fantasma no se pintaba en ninguna parte. Desde que el primer toque
+   * señala y el segundo pone, además, una casilla señalada rancia haría que el primer toque
+   * en OTRA casilla colocara sin enseñar nada, que es justo lo que se acaba de arreglar.
+   */
+  useEffect(() => {
+    if (senalado === null) return;
+    if (tablero.huecos.some((h) => h.x === senalado.x && h.y === senalado.y)) return;
+    setSenalado(null);
+    props.alSenalarHueco?.(null, null);
+  }, [props, senalado, tablero.huecos]);
+
   const casillaDelPunto = useCallback((p: THREE.Vector3) => {
     return { x: Math.round(p.x / LADO_DE_LOSA), y: Math.round(-p.z / LADO_DE_LOSA) };
   }, []);
@@ -453,6 +509,28 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       const cabe = tablero.huecos.filter((h) => h.x === donde.x && h.y === donde.y);
       if (cabe.length === 0) return;
       /*
+       * ═══ EL PRIMER TOQUE SEÑALA; EL SEGUNDO PONE ═══
+       *
+       * Con ratón esto no cambia nada: el cursor ya ha pasado por encima de la casilla, así
+       * que `onPointerMove` la señaló y el clic sigue colocando a la primera.
+       *
+       * Con el dedo sí, y era lo que hacía el juego injugable en el móvil. El motor nativo
+       * de react-three-fiber saca `onPointerMove` del `onPanResponderMove`, o sea SÓLO si el
+       * dedo se arrastra: un toque limpio da `onPointerDown` y `onPointerUp` y ninguno en
+       * medio. Así que en el móvil nunca había casilla señalada, «Girar» estaba apagado
+       * —`girosQueCaben` con `senalada === null` devuelve cero— y el primer toque ponía la
+       * losa en el acto, con el giro que hubiera. Las cuatro maneras de encajar una losa,
+       * que son media regla de Carcassonne, no se podían elegir.
+       *
+       * Ahora el primer toque enciende el fantasma y el botón, y el segundo confirma. Nadie
+       * pone una losa sin haber visto antes cómo queda.
+       */
+      if (senalado === null || senalado.x !== donde.x || senalado.y !== donde.y) {
+        setSenalado(donde);
+        props.alSenalarHueco?.(donde.x, donde.y);
+        return;
+      }
+      /*
        * ═══ CON QUÉ GIRO SE PONE, QUE ES LA DECISIÓN DE INTERFAZ DEL JUEGO ═══
        *
        * La pantalla lleva un giro elegido —se cambia con un botón o con la rueda—
@@ -464,7 +542,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       if (elegido === undefined) return;
       props.alTocarHueco?.(elegido.x, elegido.y, elegido.giro);
     },
-    [casillaDelPunto, giroEnMano, props, tablero.huecos, size],
+    [casillaDelPunto, giroEnMano, props, senalado, tablero.huecos, size],
   );
 
   const alSenalar = useCallback(
@@ -489,7 +567,18 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       x: elegido.x,
       y: elegido.y,
       giro: elegido.giro,
-      contenido: montarLaLosa(tablero.enMano, elegido.giro, semilla ^ 0x9e37),
+      /*
+       * LA SEMILLA ES LA DE LA CASILLA A LA QUE VA, y no una cualquiera. El fantasma
+       * ensena como va a quedar la losa ahi: con `semilla ^ 0x9e37` ensenaba un reparto
+       * de casas, arboles y vallas y al soltarla salia otro, porque lo que se pone se
+       * monta con `semillaDeLaLosa(semilla, x, y)`. Medido: 0 de 384 coincidian. Un
+       * fantasma que no es lo que va a pasar no es un fantasma, es un dibujo.
+       */
+      contenido: montarLaLosa(
+        tablero.enMano,
+        elegido.giro,
+        semillaDeLaLosa(semilla, elegido.x, elegido.y),
+      ),
     };
   }, [giroEnMano, semilla, senalado, tablero.enMano, tablero.huecos]);
   const sueloDelFantasma = useMemo(
@@ -606,7 +695,15 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
           catalogo={catalogo}
           losa={tablero.enMano}
           giro={giroEnMano}
-          semilla={semilla}
+          /*
+           * Mientras se senala una casilla, la losa del rincon se monta con LA SEMILLA DE
+           * ESA CASILLA: asi lo que se tiene en la mano y lo que se va a soltar son la
+           * misma losa, arbol por arbol. Sin casilla senalada no hay destino todavia, y
+           * entonces vale la de la mesa.
+           */
+          semilla={
+            senalado === null ? semilla : semillaDeLaLosa(semilla, senalado.x, senalado.y)
+          }
         />
       ) : null}
 
@@ -737,19 +834,41 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
       if (malla === null || malla === undefined) continue;
       let n = 0;
       for (const p of puestas) {
+        /*
+         * ═══ EL RECORTE SE DESVANECE, NO CORTA ═══
+         *
+         * Era un `continue` a secas: la pieza estaba entera o no estaba. Y el borde SE VE,
+         * porque no hay nada que lo tape — el relleno desaparece a cuatro losas del centro y
+         * la niebla del paseo no empieza hasta ocho. Entre las dos hay cuatro losas de tierra
+         * de nadie donde los árboles se encienden y se apagan de golpe según uno anda, en un
+         * anillo perfecto alrededor de la cámara. Y en la vista de mesa ya no hay niebla
+         * ninguna, así que el anillo se ve entero.
+         *
+         * Ensanchar el anillo no cabe: está medido que cuatro losas y media son 3.241.206
+         * triángulos contra un tope de 3.200.000. Así que en el último tramo del alcance la
+         * pieza ENCOGE hasta desaparecer. No cuesta ni un triángulo —es la escala que ya se
+         * está componiendo— y lo que se ve es que las cosas se hacen pequeñas con la
+         * distancia, que es lo que hacen las cosas.
+         */
+        let desvanece = 1;
         if (LO_QUE_NO_SE_RECORTA.indexOf(p.porque) < 0) {
           const dx = p.x - centro.x;
           const dz = p.z - centro.z;
           const lejos = dx * dx + dz * dz;
           const tope = p.menuda ? conMenudo : conRelleno;
           if (lejos > tope * tope) continue;
+          const desde = tope * DONDE_EMPIEZA_A_IRSE;
+          if (lejos > desde * desde) {
+            desvanece = (tope - Math.sqrt(lejos)) / (tope - desde);
+            if (desvanece <= 0.02) continue;
+          }
         }
         AUX_POSICION.set(p.x, p.y, p.z);
         AUX_GIRO.setFromAxisAngle(AUX_EJE, p.giro);
         AUX_ESCALA.set(
-          p.escala * ESCALA_DEL_PACK * p.largo,
-          p.escala * ESCALA_DEL_PACK,
-          p.escala * ESCALA_DEL_PACK,
+          p.escala * ESCALA_DEL_PACK * p.largo * desvanece,
+          p.escala * ESCALA_DEL_PACK * desvanece,
+          p.escala * ESCALA_DEL_PACK * desvanece,
         );
         malla.setMatrixAt(n, AUX_MATRIZ.compose(AUX_POSICION, AUX_GIRO, AUX_ESCALA));
         n++;
@@ -1091,7 +1210,7 @@ function LaLosaEnLaMano({
   const grupo = useRef<THREE.Group>(null);
   const { camera, size } = useThree();
 
-  const contenido = useMemo(() => montarLaLosa(losa, giro, semilla ^ 0x9e37), [giro, losa, semilla]);
+  const contenido = useMemo(() => montarLaLosa(losa, giro, semilla), [giro, losa, semilla]);
   const suelo = useMemo(() => geometriaDelSuelo([{ x: 0, y: 0, losa, giro }]), [giro, losa]);
   useEffect(() => () => suelo?.dispose(), [suelo]);
 

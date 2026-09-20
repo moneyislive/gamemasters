@@ -70,6 +70,7 @@ import { usarMesaDeArcade } from './mesa';
 import { LETRA, SALA } from './muebles';
 import { Pantalla } from './piezas';
 import { Retablo } from './retablo';
+import { BarraDeLaMesa } from './tablero-en-linea';
 import { traer } from './traer';
 
 /** El campo vertical de la cámara. El mismo que usa `camaraDeMesa` para encuadrar. */
@@ -154,8 +155,8 @@ export default function LasLindesPorDentro(): JSX.Element {
     [mesa],
   );
 
-  const alSenalarHueco = useCallback((x: number, y: number) => {
-    ponerSenalada({ x, y });
+  const alSenalarHueco = useCallback((x: number | null, y: number | null) => {
+    ponerSenalada(x === null || y === null ? null : { x, y });
   }, []);
 
   /*
@@ -253,7 +254,15 @@ export default function LasLindesPorDentro(): JSX.Element {
    */
   if (datos === null || rotoElValle) {
     return (
-      <Pantalla hueco={16} estilo={{ paddingTop: bordes.top + 12, paddingBottom: bordes.bottom + 12 }}>
+      <Pantalla hueco={16} estilo={{ paddingBottom: bordes.bottom + 12 }}>
+        <BarraDeLaMesa
+          juego={manifiesto?.nombre ?? 'Las Lindes'}
+          codigo={mesa.mesa.codigo}
+          asientos={mesa.mesa.asientos}
+          salir={mesa.salir}
+          tirar={mesa.tirar}
+          arriba={bordes.top}
+        />
         {tablero === null ? (
           <Text style={estilos.texto}>Esperando a la mesa…</Text>
         ) : (
@@ -268,7 +277,29 @@ export default function LasLindesPorDentro(): JSX.Element {
     modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: mesa.mesa.yo ?? '' };
 
   return (
-    <View style={[estilos.pantalla, { paddingTop: bordes.top }]}>
+    <View style={estilos.pantalla}>
+      {/*
+        ═══ DE DÓNDE SE SALE Y QUÉ CÓDIGO SE DICTA ═══
+
+        Esta pantalla no montaba la barra, así que desde una mesa de Las Lindes en marcha NO
+        SE PODÍA hacer ninguna de las tres cosas que la barra existe para hacer: ver el
+        código para que se siente quien falta, levantarse para dejarle el sitio a otro, o
+        tirar la mesa cuando alguien se ha ido y la partida ya no puede seguir. En el
+        escritorio están las tres; aquí no estaba ninguna, y con una partida de tres días
+        eso es quedarse encerrado en el valle.
+
+        Va en LAS DOS ramas —la del retablo y la del valle— porque de las dos hay que poder
+        salir, y se lleva ella el hueco de arriba (`arriba={bordes.top}`), que antes se comía
+        la pantalla entera. Es el mismo montaje que El Burgo y que el tablero genérico.
+      */}
+      <BarraDeLaMesa
+        juego={manifiesto?.nombre ?? 'Las Lindes'}
+        codigo={mesa.mesa.codigo}
+        asientos={mesa.mesa.asientos}
+        salir={mesa.salir}
+        tirar={mesa.tirar}
+        arriba={bordes.top}
+      />
       <View style={estilos.lienzo}>
         <RedDelValle alFallar={alFallar}>
           <Canvas
@@ -367,8 +398,15 @@ export default function LasLindesPorDentro(): JSX.Element {
                 onPress={() => alTocar(s.movimiento)}
               >
                 <Text style={estilos.chipTexto}>{s.rotulo}</Text>
+                {/*
+                  LA CIFRA VA SIEMPRE, AUNQUE SEA EL CERO. Una losa puede ofrecer DOS prados
+                  —dos praderas que no se tocan—, y entonces los dos rótulos son la misma
+                  frase palabra por palabra: «Labriego en el prado». Con la raya en vez del
+                  número salían dos fichas idénticas, «—» las dos, y no había forma de saber
+                  cuál era cuál ni por qué había dos. Visto jugando una mesa desde la app.
+                */}
                 <Text style={estilos.chipCifra}>
-                  {s.cerrada ? `cierra ${s.valdria}` : s.valdria > 0 ? `${s.valdria}` : '—'}
+                  {s.cerrada ? `cierra ${s.valdria}` : `${s.valdria}`}
                 </Text>
               </Pressable>
             ))}
@@ -405,16 +443,33 @@ export default function LasLindesPorDentro(): JSX.Element {
           </ScrollView>
         ) : null}
 
-        <View style={estilos.marcador}>
-          {datos.labriegos.length === 0 && mesa.mesa.asientos.length === 0 ? null : null}
-          {(mesa.mesa.asientos ?? []).map((a) => (
-            <View key={a.id} style={estilos.enLaMesa}>
-              <Text style={estilos.enLaMesaNombre} numberOfLines={1}>
-                {a.nombre}
+        {/*
+          ═══ EL MARCADOR ES EL QUE DECLARA EL JUEGO, Y NO UNA LISTA DE NOMBRES ═══
+
+          Aquí había una fila con los nombres de los sentados y nada más: ni los puntos, ni
+          cuántos labriegos le quedan a cada uno, ni cuántas losas hay en la bolsa, ni qué se
+          acaba de cobrar, ni el recuento del final. Jugando una mesa entera desde el móvil no
+          se veía UN SOLO PUNTO: se podía poner losas y plantar, pero no saber quién iba
+          ganando ni por qué, ni enterarse de haber ganado.
+
+          Y encima llevaba delante una línea que no podía pintar nada —`cond ? null : null`,
+          que devuelve `null` decida lo que decida— puesta ahí para que `datos.labriegos`
+          pareciera usado. El sitio estaba reservado y el contenido nunca llegó.
+
+          Lo que se pinta ahora es `tablero.paneles`: lo mismo que el escritorio, salido del
+          mismo reductor, sin un dato nuevo ni una regla escrita en el cliente. Es la regla de
+          la casa —ningún juego sólo para PC— aplicada a lo único que aquí faltaba.
+        */}
+        {(tablero?.paneles ?? []).map((panel, i) => (
+          <View key={`panel-${String(i)}`} style={estilos.panel}>
+            <Text style={estilos.panelTitulo}>{panel.titulo}</Text>
+            {panel.lineas.map((linea, j) => (
+              <Text key={`panel-${String(i)}-${String(j)}`} style={estilos.panelLinea}>
+                {linea}
               </Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -510,7 +565,19 @@ const estilos = StyleSheet.create({
   },
   chipTexto: { color: SALA.palabra, fontSize: 13, ...LETRA.cuerpo },
   chipCifra: { color: SALA.tenue, fontSize: 13, ...LETRA.cuerpo },
-  marcador: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  enLaMesa: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  enLaMesaNombre: { color: SALA.tenue, fontSize: 13, ...LETRA.cuerpo },
+  panel: { gap: 2, paddingTop: 2 },
+  /*
+   * Los mismos dos estilos que el retablo usa para SUS paneles —son los mismos paneles,
+   * salidos del mismo reductor—: el rótulo en `rotuloChico` y las líneas en `LETRA.dato`,
+   * que trae `tabular-nums` y es lo que hace que las cifras queden alineadas de un renglón
+   * al siguiente. Y los dos a 13, que es el mínimo de la casa: a 11 lo cazó
+   * `verify:gramatica`, y con razón —esto se lee en un móvil, a un brazo de distancia—.
+   */
+  panelTitulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
+  panelLinea: {
+    ...LETRA.dato,
+    fontVariant: [...LETRA.dato.fontVariant],
+    color: SALA.palabra,
+    fontSize: 13,
+  },
 });

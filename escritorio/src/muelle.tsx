@@ -70,6 +70,18 @@ export const TOPE_DE_ZARPAR_MS = 3500;
 const COPIADO_MS = 1600;
 
 /**
+ * El sitio del tema, en pie: «en la Linde Alta» → «En la Linde Alta».
+ *
+ * El tema guarda la frase en minúscula porque su sitio natural es detrás de un «Quién eres
+ * ___». El rótulo del piloto de un asiento la quiere sola y empezando la frase, y decía «En
+ * el muelle» a pelo: el tercer sitio del vestíbulo que nombraba el lobby de Riberas mientras
+ * el jugador estaba en el Burgo o en la Linde Alta.
+ */
+function enPie(donde: string): string {
+  return donde.charAt(0).toUpperCase() + donde.slice(1);
+}
+
+/**
  * Los bytes de un modelo, por la misma ruta relativa que pide la app.
  *
  * En desarrollo pasa por el proxy de Vite y en producción es el mismo Node que
@@ -495,7 +507,7 @@ function EnLaOrilla({
         <h2 className="rotulo-de-panel">Abrir una mesa</h2>
         <p className="letra-chica">
           {minimo > 1
-            ? `Hacen falta ${String(minimo)} para zarpar: al abrir sale un código que se pasa a los demás.`
+            ? `Hacen falta ${String(minimo)} para empezar: al abrir sale un código que se pasa a los demás.`
             : 'Sale un código por si quieres que se siente alguien más.'}
         </p>
         <select
@@ -687,7 +699,7 @@ function EnElMuelle({
               <li key={a.id} className={soyYo ? 'yo' : undefined}>
                 <i
                   className={a.presente ? 'piloto piloto-vivo' : 'piloto'}
-                  title={a.presente ? 'En el muelle' : 'Fuera'}
+                  title={a.presente ? enPie(tema.donde) : 'Fuera'}
                 />
                 <span className="sentado-nombre">
                   {a.nombre.length > 0 ? a.nombre : a.id}

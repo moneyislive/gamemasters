@@ -52,6 +52,7 @@ import {
   loQueSeLevantaLaUltima,
 } from '../lindes/medidas';
 import {
+  alturaDe,
   CELDAS_MINIMAS_DE_MURO,
   LO_QUE_NO_SE_RECORTA,
   montarLaLosa,
@@ -68,6 +69,7 @@ import {
   COLOR_DE_LA_SENDA,
   COLOR_DE_LA_VILLA,
   VELO_DE_LA_CASILLA_CLARA,
+  geometriaDeLaArena,
   geometriaDelSuelo,
 } from '../lindes/suelo';
 import {
@@ -321,7 +323,34 @@ function celdasDe(losa: Losa, giro: Giro): readonly CeldaDeSuelo[] {
           Math.abs(p.x) <= media + 0.001 && Math.abs(p.z) <= media + 0.001,
           { x: p.x, z: p.z, media },
         );
-        comprobar(`${losa.id}/${giro}: ${p.pieza} se apoya en el suelo`, p.y >= 0, { y: p.y });
+        /*
+         * ═══ «SE APOYA EN EL SUELO» ERA `p.y >= 0`, Y TODAS LAS `y` VALÍAN CERO ═══
+         *
+         * O sea `0 >= 0`, 4.991 veces. Una comprobación que no puede ponerse roja no vigila
+         * nada, y ésta además tapaba un fallo de verdad: el suelo de una losa NO está a cero
+         * —la villa se alza `ALZADO_DE_LA_VILLA` y la senda se hunde `HUNDIDO_DE_LA_SENDA`—,
+         * así que medido contra el terreno había 1.707 piezas ENTERRADAS y 8 FLOTANDO.
+         *
+         * Ahora se compara contra la altura de la celda en la que la pieza acaba de verdad,
+         * que es lo que `montarLaLosa` le pone al final. Es la misma cuenta por los dos lados
+         * —sí—, pero la que se vigila es que la pieza y su celda coincidan DESPUÉS del
+         * empujón al azar y del acotado al canto, que es donde se descolocaban.
+         */
+        const iDeLaPieza = Math.min(
+          CELDAS_POR_LOSA - 1,
+          Math.max(0, Math.floor((p.x / LADO_DE_LOSA + 0.5) * CELDAS_POR_LOSA)),
+        );
+        const jDeLaPieza = Math.min(
+          CELDAS_POR_LOSA - 1,
+          Math.max(0, Math.floor((p.z / LADO_DE_LOSA + 0.5) * CELDAS_POR_LOSA)),
+        );
+        const suya = celdasDe(losa, giro)[jDeLaPieza * CELDAS_POR_LOSA + iDeLaPieza];
+        const suelo = suya === undefined ? 0 : alturaDe(suya.clase);
+        comprobar(
+          `${losa.id}/${giro}: ${p.pieza} se apoya en el suelo que tiene debajo`,
+          Math.abs(p.y - suelo) < 1e-6,
+          { y: p.y, suelo, clase: suya?.clase },
+        );
         comprobar(`${losa.id}/${giro}: ${p.pieza} tiene escala positiva`, p.escala > 0 && p.largo > 0);
 
         /*
@@ -351,9 +380,18 @@ function celdasDe(losa: Losa, giro: Giro): readonly CeldaDeSuelo[] {
         ];
         if (celda !== undefined && celda.clase === 'senda') enLaSenda++;
       }
+      /*
+       * EL TOPE ERA `PIEZAS_POR_LOSA + 200` —242— y el máximo de verdad es 66, en
+       * `calle-blason/0`. Ciento setenta y seis de holgura no es un tope: es un número que
+       * no se puede alcanzar, o sea otra comprobación que no vigila nada. El cupo del
+       * relleno son `PIEZAS_POR_LOSA`; lo demás son las OBLIGADAS —murallas, remates,
+       * casas de la villa, ermita—, que no salen de ese cupo y que en la losa más cargada
+       * son 42. Con el doble del cupo se deja sitio a una losa nueva bien poblada y se
+       * sigue cazando una fuga.
+       */
       comprobar(
         `${losa.id}/${giro}: no se pasa del cupo de relleno`,
-        contenido.puestas.length <= PIEZAS_POR_LOSA + 200,
+        contenido.puestas.length <= PIEZAS_POR_LOSA * 2,
         contenido.puestas.length,
       );
     }
@@ -1005,6 +1043,30 @@ paso('El paseo: la tercera persona va detrás de ALGUIEN, y en primera no se pin
    * apague, que son las dos cosas que no estaban.
    */
   const laEscena = fs.readFileSync(new URL('../lindes/Lindes.tsx', import.meta.url), 'utf8');
+
+  /*
+   * ═══ EL FANTASMA ES LA LOSA QUE SE VA A PONER, NO UNA PARECIDA ═══
+   *
+   * Lo que se pone se monta con `semillaDeLaLosa(semilla, x, y)` —la casilla decide dónde cae
+   * cada casa, cada árbol y cada valla— y el fantasma se montaba con `semilla ^ 0x9e37`, que
+   * es otra cosa. Medido: 0 de 384 coincidían. Se señalaba una casilla, se veía un reparto, se
+   * soltaba la losa y salía otro. Y lo mismo la losa del rincón, la que se tiene «en la mano».
+   *
+   * Se mira en el fuente porque aquí no hay WebGL, y se mira por la marca exacta que lo
+   * causaba: en esta escena no se tuerce ninguna semilla a mano.
+   */
+  const escenaSinComentarios = laEscena.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  comprobar(
+    'ni el fantasma ni la losa de la mano se montan con una semilla inventada',
+    !/semilla \^ 0x/.test(escenaSinComentarios),
+    { donde: /semilla \^ 0x[0-9a-f]+/.exec(escenaSinComentarios)?.[0] },
+  );
+  comprobar(
+    'y las dos se montan con la de la casilla, que es la que decide lo que cae en la losa',
+    /semillaDeLaLosa\(semilla, elegido\.x, elegido\.y\)/.test(escenaSinComentarios) &&
+      /semillaDeLaLosa\(semilla, senalado\.x, senalado\.y\)/.test(escenaSinComentarios),
+  );
+
   comprobar(
     'la escena monta a quien anda: sin esto, «tercera persona» es una cámara detrás de nadie',
     /<QuienAnda\b/.test(laEscena),
@@ -1644,6 +1706,359 @@ paso('La arena se distingue del tablero, y el desierto está donde tiene que est
   comprobar('y hay una en cada sector: ninguna pareja pegada y ningún lado vacío', sectores.size === CUANTAS_EN_EL_DESIERTO, {
     sectores: sectores.size,
   });
+}
+
+paso('La arena llega hasta donde pisa el cuadro, y ni la niebla ni el fondo la cortan');
+
+/*
+ * ═══ EL DESIERTO TIENE QUE SER EL FONDO, NO UN ROMBO FLOTANDO ═══
+ *
+ * Medido en el lienzo con una partida de cuatro losas en marcha: el 35 % del cuadro era
+ * CIELO —`#8cb8de` exacto, no niebla— en dos cuñas a izquierda y derecha que bajaban hasta
+ * el filo de abajo, y el 18 % de la mitad inferior. Miguel había pedido que «el fondo pasaría
+ * a ser color arena»; con eso, un tercio del fondo seguía sin serlo.
+ *
+ * Y las tres cosas que lo causaban eran la misma: la arena se dimensionaba desde EL TABLERO
+ * —su caja más dos losas— y el plano de fondo y la niebla desde LA ESQUINA DEL TABLERO,
+ * cuando lo que decide qué entra en el cuadro es a qué distancia se ha puesto la cámara. La
+ * esquina de ARRIBA del cuadro pisa el suelo a 1,5 veces esa distancia, o sea más allá de
+ * las tres. Es otra vez «medido en el centro, no en la esquina».
+ *
+ * Esto lo mira por donde se rompió: se echan los cuatro rayos de las esquinas del cuadro,
+ * se ve dónde pisan, y se exige que pisen ARENA, por delante del plano de fondo y por delante
+ * de la niebla. Los rayos se construyen aquí con la base de la cámara —no con `sueloQueSeVe`—
+ * para que la comprobación no sea la misma cuenta mirándose al espejo.
+ */
+{
+  /** Dónde pisa el suelo el rayo que sale por la esquina `(u, v)` del cuadro. */
+  const dondePisa = (
+    pose: { x: number; y: number; z: number; miraX: number; miraY: number; miraZ: number },
+    aspecto: number,
+    u: number,
+    v: number,
+  ): { x: number; z: number; hasta: number } | null => {
+    const mx = pose.miraX - pose.x;
+    const my = pose.miraY - pose.y;
+    const mz = pose.miraZ - pose.z;
+    const largo = Math.max(1e-9, Math.sqrt(mx * mx + my * my + mz * mz));
+    const fx = mx / largo;
+    const fy = my / largo;
+    const fz = mz / largo;
+    /* La derecha: `mira x arriba-del-mundo`. */
+    const cx = -fz;
+    const cz = fx;
+    const dc = Math.max(1e-9, Math.sqrt(cx * cx + cz * cz));
+    const dx = cx / dc;
+    const dz = cz / dc;
+    /* Y el arriba de la cámara: `derecha x mira`. */
+    const ax = -dz * fy;
+    const ay = dz * fx - dx * fz;
+    const az = dx * fy;
+    const t = T_DEL_CAMPO;
+    const rx = fx + u * t * aspecto * dx + v * t * ax;
+    const ry = fy + v * t * ay;
+    const rz = fz + u * t * aspecto * dz + v * t * az;
+    if (ry >= -1e-9) return null;
+    const s = -pose.y / ry;
+    const largoDelRayo = Math.sqrt(rx * rx + ry * ry + rz * rz);
+    return { x: pose.x + s * rx, z: pose.z + s * rz, hasta: s * largoDelRayo };
+  };
+
+  /** Los cantos de la arena que pinta la escena, leídos de la geometría de verdad. */
+  const cantosDeLaArena = (
+    losas: readonly { readonly x: number; readonly y: number }[],
+    alcanza?: { x0: number; x1: number; z0: number; z1: number },
+  ): { x0: number; x1: number; z0: number; z1: number } => {
+    const g = geometriaDeLaArena(losas.map((l) => ({ x: l.x, y: l.y, losa: 'X', giro: 0 as Giro })), alcanza);
+    if (g === null) return { x0: 0, x1: 0, z0: 0, z1: 0 };
+    const p = g.getAttribute('position').array as ArrayLike<number>;
+    let x0 = Number.POSITIVE_INFINITY;
+    let x1 = Number.NEGATIVE_INFINITY;
+    let z0 = Number.POSITIVE_INFINITY;
+    let z1 = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < p.length; i += 3) {
+      const x = p[i] as number;
+      const z = p[i + 2] as number;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (z < z0) z0 = z;
+      if (z > z1) z1 = z;
+    }
+    g.dispose();
+    return { x0, x1, z0, z1 };
+  };
+
+  let esquinasMiradas = 0;
+  let seSalieronConLaVieja = 0;
+
+  for (const [comoEs, ancho, alto] of TABLEROS) {
+    const casillas = [
+      { x: 0, y: 0 },
+      { x: ancho, y: alto },
+    ];
+    const abarca = loQueAbarca(casillas);
+    for (const [pantalla, aspecto] of LIENZOS) {
+      const pose = camaraDeMesa(abarca, aspecto, CAMPO_DE_LA_CAMARA);
+      /* El alcance, montado igual que en `Lindes.tsx`: lo de la mesa y lo del paseo. */
+      const andando = LADO_DE_LOSA * 34;
+      const alcanza = {
+        x0: Math.min(pose.suelo.x0, (abarca.minX - 0.5) * LADO_DE_LOSA - andando),
+        x1: Math.max(pose.suelo.x1, (abarca.maxX + 0.5) * LADO_DE_LOSA + andando),
+        z0: Math.min(pose.suelo.z0, -(abarca.maxY + 0.5) * LADO_DE_LOSA - andando),
+        z1: Math.max(pose.suelo.z1, -(abarca.minY - 0.5) * LADO_DE_LOSA + andando),
+      };
+      const arena = cantosDeLaArena(casillas, alcanza);
+      const vieja = cantosDeLaArena(casillas);
+
+      let fuera = 0;
+      let fueraConLaVieja = 0;
+      let detrasDelFondo = 0;
+      let conNiebla = 0;
+      let sinPisar = 0;
+      for (const u of [-1, 1]) {
+        for (const v of [-1, 1]) {
+          const pisa = dondePisa(pose, aspecto, u, v);
+          esquinasMiradas++;
+          if (pisa === null) {
+            sinPisar++;
+            continue;
+          }
+          const dentro = (a: { x0: number; x1: number; z0: number; z1: number }): boolean =>
+            pisa.x >= a.x0 && pisa.x <= a.x1 && pisa.z >= a.z0 && pisa.z <= a.z1;
+          if (!dentro(arena)) fuera++;
+          if (!dentro(vieja)) fueraConLaVieja++;
+          if (pisa.hasta > pose.lejos) detrasDelFondo++;
+          if (pisa.hasta > pose.niebla.cerca + 1) conNiebla++;
+        }
+      }
+      seSalieronConLaVieja += fueraConLaVieja;
+
+      comprobar(
+        `${comoEs} en «${pantalla}»: las cuatro esquinas del cuadro pisan arena`,
+        fuera === 0,
+        { fuera, arena },
+      );
+      comprobar(
+        `${comoEs} en «${pantalla}»: y ninguna queda detrás del plano de fondo`,
+        detrasDelFondo === 0,
+        { detrasDelFondo, lejos: pose.lejos.toFixed(0) },
+      );
+      comprobar(
+        `${comoEs} en «${pantalla}»: y la niebla no le quita el color a nada que se vea`,
+        conNiebla === 0,
+        { conNiebla, nieblaCerca: pose.niebla.cerca.toFixed(0) },
+      );
+      /*
+       * Con 50° de inclinación y 45 de campo el rayo de arriba baja con 0,50, así que las
+       * cuatro pisan. Si alguien tumba la cámara y alguna se va al horizonte, esto lo dice
+       * en vez de dejar que la comprobación de arriba pase sin mirar ninguna.
+       */
+      comprobar(`${comoEs} en «${pantalla}»: las cuatro esquinas miran al suelo`, sinPisar === 0, {
+        sinPisar,
+      });
+    }
+  }
+
+  /*
+   * ═══ LAS DOS VACUNAS ═══
+   *
+   * La primera, que se ha mirado algo: cero esquinas es cero fuera, y se leería como vigilado.
+   * La segunda, que la guarda MUERDE: con la arena de antes —la caja de las losas más
+   * `MARGEN_DE_LA_ARENA` y nada más— tienen que salirse esquinas. Si no se saliera ninguna,
+   * esta sección estaría comprando algo que ya pasaba y el 35 % de cielo seguiría ahí.
+   */
+  comprobar('y se han echado las cuatro esquinas de cada tablero en cada pantalla', esquinasMiradas === TABLEROS.length * LIENZOS.length * 4, {
+    esquinasMiradas,
+    esperadas: TABLEROS.length * LIENZOS.length * 4,
+  });
+  comprobar(
+    `y con la arena de antes —sólo ${(MARGEN_DE_LA_ARENA / LADO_DE_LOSA).toFixed(0)} losas de margen— se salían esquinas: por eso se veía el cielo`,
+    seSalieronConLaVieja > 0,
+    { seSalieronConLaVieja, deCuantas: esquinasMiradas },
+  );
+}
+
+paso('El relleno del prado cae donde hay prado, y no se gasta entero en la banda de arriba');
+
+/*
+ * ═══ EL CUPO SE GASTABA DE NORTE A SUR ═══
+ *
+ * El barrido que siembra el prado va por filas, de norte a sur, y cortaba en cuanto la lista
+ * llegaba al cupo de `PIEZAS_POR_LOSA`. O sea que las primeras filas se lo llevaban entero.
+ * Medido sobre `senda-recta`, que tiene el prado UNIFORME —276 celdas en cada una de las ocho
+ * bandas—: las piezas salían 8, 8, 9, 0, 0, 0, 0, 0. Los cinco octavos del sur, pelados. En
+ * `muralla`, 11, 19, 24, 0, 0, 0, 0, 0. Y multiplicado por setenta y dos losas, el tablero
+ * entero sale rayado.
+ *
+ * Esto lo mide por donde se rompió: se cuentan las CELDAS de prado por bandas y las PIEZAS de
+ * prado por bandas, y se exige que donde hay prado de sobra haya algo puesto. No se pide un
+ * reparto exacto —el azar es azar y una banda puede quedarse corta— sino que ninguna banda con
+ * prado de verdad se quede en cero mientras otra se lleva el montón.
+ */
+{
+  const BANDAS = 8;
+  const medioDeLaLosa = LADO_DE_LOSA / 2;
+  const deQueBanda = (z: number): number =>
+    Math.min(BANDAS - 1, Math.max(0, Math.floor(((z + medioDeLaLosa) / LADO_DE_LOSA) * BANDAS)));
+  /* La `z` de una fila de celdas, con la misma cuenta que usa `losa.ts` a la inversa. */
+  const zDeLaFila = (j: number): number => ((j + 0.5) / CELDAS_POR_LOSA - 0.5) * LADO_DE_LOSA;
+
+  let miradas = 0;
+  let conPradoEnLasDosMitades = 0;
+  let pelada = 0;
+  const peores: string[] = [];
+  /** Lo mismo, con el reparto viejo simulado: coger las primeras hasta el cupo. */
+  let peladaALaVieja = 0;
+  /* Y el recuento del corpus entero, que es donde la propiedad se puede afirmar sin azar. */
+  let celdasSurTotal = 0;
+  let celdasTotal = 0;
+  let piezasSurTotal = 0;
+  let piezasTotal = 0;
+
+  for (const losa of LAS_LOSAS) {
+    for (const giro of GIROS) {
+      for (const semilla of [1000, 7, 424242]) {
+        const { puestas, celdas } = montarLaLosa(losa.id, giro, semilla);
+        miradas++;
+        const celdasPorBanda = new Array<number>(BANDAS).fill(0);
+        for (let j = 0; j < CELDAS_POR_LOSA; j++) {
+          for (let i = 0; i < CELDAS_POR_LOSA; i++) {
+            const c = celdas[j * CELDAS_POR_LOSA + i];
+            if (c === undefined || c.clase !== 'prado') continue;
+            const b = deQueBanda(zDeLaFila(j));
+            celdasPorBanda[b] = (celdasPorBanda[b] ?? 0) + 1;
+          }
+        }
+        const delPrado = puestas.filter((p) => p.porque === 'prado');
+        const piezasPorBanda = new Array<number>(BANDAS).fill(0);
+        for (const p of delPrado) {
+          const b = deQueBanda(p.z);
+          piezasPorBanda[b] = (piezasPorBanda[b] ?? 0) + 1;
+        }
+        const mitad = BANDAS / 2;
+        const celdasNorte = celdasPorBanda.slice(0, mitad).reduce((a, b) => a + b, 0);
+        const celdasSur = celdasPorBanda.slice(mitad).reduce((a, b) => a + b, 0);
+        const piezasSur = piezasPorBanda.slice(mitad).reduce((a, b) => a + b, 0);
+        celdasTotal += celdasNorte + celdasSur;
+        celdasSurTotal += celdasSur;
+        piezasTotal += delPrado.length;
+        piezasSurTotal += piezasSur;
+        /*
+         * Y la mirada losa a losa se reserva al caso en el que el azar no explica nada: la
+         * mitad de abajo tiene LA MITAD del prado y hay doce piezas o más. Con menos de eso
+         * —seis piezas y un sur que es el 29 % del campo— que no caiga ninguna al sur es
+         * azar corriente, y una comprobación que se pone roja por azar es peor que ninguna.
+         */
+        if (celdasSur < celdasNorte || delPrado.length < 12) continue;
+        conPradoEnLasDosMitades++;
+        if (piezasSur === 0) {
+          pelada++;
+          if (peores.length < 5) peores.push(`${losa.id}/${giro}/${semilla}: ${piezasPorBanda.join(',')}`);
+        }
+        /*
+         * Y el reparto viejo, simulado fielmente sobre la MISMA lista: el corte del barrido
+         * se quedaba con las de más al norte, así que se ordena por `z` y se toma la mitad
+         * de arriba. Es lo que tiene que salir pelado, y es lo que hace que esta sección
+         * compre algo que no pasaba ya.
+         */
+        const aLaVieja = delPrado
+          .slice()
+          .sort((a, b) => a.z - b.z)
+          .slice(0, Math.max(1, Math.floor(delPrado.length / 2)));
+        if (aLaVieja.every((p) => deQueBanda(p.z) < mitad)) peladaALaVieja++;
+      }
+    }
+  }
+
+  /*
+   * LA PROPIEDAD, SOBRE EL CORPUS ENTERO: el reparto de las piezas sigue al reparto del
+   * campo. Aquí el azar ya no manda —son miles de piezas—, así que esto se puede exigir
+   * estrecho. Antes del arreglo la mitad de abajo tenía el 49 % de las celdas y el 12 % de
+   * las piezas; ahora las dos cifras se dan la mano.
+   */
+  const parteDelSurEnCeldas = celdasSurTotal / Math.max(1, celdasTotal);
+  const parteDelSurEnPiezas = piezasSurTotal / Math.max(1, piezasTotal);
+  comprobar(
+    'las piezas del prado se reparten como el prado: la mitad de abajo recibe lo que le toca',
+    parteDelSurEnPiezas > parteDelSurEnCeldas * 0.75,
+    {
+      celdas: `${(100 * parteDelSurEnCeldas).toFixed(1)} %`,
+      piezas: `${(100 * parteDelSurEnPiezas).toFixed(1)} %`,
+      piezasTotal,
+    },
+  );
+
+  comprobar(
+    'ninguna losa con MÁS prado abajo que arriba se queda sin una sola pieza en la de abajo',
+    pelada === 0,
+    { pelada, deCuantas: conPradoEnLasDosMitades, peores },
+  );
+  /* Vacuna 1: que hay losas que juzgar. Cero juzgadas es cero peladas, y se lee como vigilado. */
+  comprobar('y hay losas con más prado abajo que arriba que juzgar', conPradoEnLasDosMitades >= 20, {
+    conPradoEnLasDosMitades,
+    miradas,
+  });
+  /*
+   * Vacuna 2: que la guarda MUERDE. Con el reparto de antes —las primeras del barrido— tiene
+   * que haber losas que se queden enteras en el norte. Si no saliera ninguna, esta sección
+   * estaría comprando algo que ya pasaba.
+   */
+  comprobar(
+    'y quedándose con las primeras del barrido, como antes, sí salen losas enteras en el norte',
+    peladaALaVieja > 0,
+    { peladaALaVieja, deCuantas: conPradoEnLasDosMitades },
+  );
+}
+
+paso('Dos sitios con el mismo nombre se distinguen por su cifra, y la cifra va siempre');
+
+/*
+ * ═══ UNA LOSA PUEDE OFRECER DOS PRADOS, Y SE LLAMAN IGUAL ═══
+ *
+ * El rótulo de un sitio sale de su CLASE —«Labriego en el prado»— y una losa con dos
+ * praderas que no se tocan ofrece dos sitios de la misma clase: dos renglones con la misma
+ * frase palabra por palabra. Lo único que los distingue en la lista es la cifra de al lado.
+ *
+ * Los dos clientes la escondían cuando valía cero: el escritorio dejaba la cadena vacía y la
+ * app pintaba una raya. Visto jugando una mesa de verdad —en la pantalla salían «Labriego en
+ * el prado · vale 3» y «Labriego en el prado ·», y en el móvil los dos con «—»—, y en las dos
+ * el jugador tenía que elegir entre dos botones idénticos sin saber en qué se diferencian.
+ *
+ * El cero no es «nada que decir»: es lo que hay que decir. Un prado que hoy no toca ninguna
+ * villa cerrada vale cero HOY, y eso es justo lo que el jugador necesita para no plantar ahí
+ * el labriego que no vuelve.
+ */
+{
+  const CLIENTES = [
+    ['el escritorio', '../../escritorio/src/lindes-en-tres.tsx'],
+    ['la app', '../../app/src/arcade/lindes-en-tres-escena.tsx'],
+  ] as const;
+  for (const [quien, ruta] of CLIENTES) {
+    const fuente = fs.readFileSync(new URL(ruta, import.meta.url), 'utf8');
+    /* Sin comentarios: la explicación de por qué esto está prohibido no puede tumbarlo. */
+    const soloCodigo = fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    comprobar(
+      `${quien} nunca esconde la cifra de un sitio: nada de «valdria > 0 ?»`,
+      !/valdria\s*>\s*0\s*\?/.test(soloCodigo),
+      { donde: /valdria\s*>\s*0\s*\?[^\n]*/.exec(soloCodigo)?.[0] },
+    );
+    /* Vacuna: que se está mirando el fichero que pinta los sitios, y no otro cualquiera. */
+    comprobar(`y se ha leído el fichero que pinta los sitios de ${quien}`, soloCodigo.includes('s.valdria') && soloCodigo.includes('s.rotulo'), {
+      letras: soloCodigo.length,
+    });
+  }
+
+  /*
+   * Y la razón por la que esto importa, comprobada en el mazo de verdad y no supuesta: hay
+   * losas con dos prados. Si no las hubiera, la guarda de arriba estaría defendiendo un caso
+   * que no existe y sobraría entera.
+   */
+  const conDosPrados = LAS_LOSAS.filter((l) => l.prados.length >= 2);
+  comprobar(
+    'y en el mazo hay losas con más de un prado, que es cuando dos rótulos salen idénticos',
+    conDosPrados.length > 0,
+    { cuantas: conDosPrados.length, ejemplos: conDosPrados.slice(0, 3).map((l) => l.nombre) },
+  );
 }
 
 

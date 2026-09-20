@@ -42,7 +42,7 @@ import * as THREE from 'three';
 import { ALTURA_DE_UNA_PERSONA } from '../escala';
 import { cargadorPara } from '../embarcadero/cargar';
 import type { AventureroCargado } from '../embarcadero/cargar';
-import { figuraQueSePinta } from '../embarcadero/figuras';
+import { esFigura, figuraQueSePinta } from '../embarcadero/figuras';
 import type { FiguraId } from '../embarcadero/figuras';
 import { clipQueToca, nacer, siguiente } from '../embarcadero/gestos';
 import type { EstadoDeAventurero } from '../embarcadero/gestos';
@@ -283,6 +283,35 @@ export function LindeAlta(props: PropsDelEmbarcadero): JSX.Element {
   );
   useEffect(() => () => mesaDePiedra.dispose(), [mesaDePiedra]);
 
+  /*
+   * QUÉ FIGURA SE ME PINTA A MÍ: la que estoy probando en el panel si hay una, y si no la
+   * que me toque por asiento. Misma cuenta que `Embarcadero.tsx` y que la Plaza.
+   */
+  const yo = mesa.asientos.find((a) => a.id === mesa.yo) ?? null;
+  const figuraLocal: FiguraId | null = esFigura(props.figuraQuePruebo)
+    ? props.figuraQuePruebo
+    : yo !== null
+      ? figuraQueSePinta(yo.id, yo.figura)
+      : null;
+
+  /*
+   * EL SITIO DE DELANTE Y A LA IZQUIERDA, que es donde la figura se ve de verdad.
+   *
+   * La cámara se pone en `+z` mirando al centro, así que cuanta más `z` más cerca y más
+   * grande sale; y cuanta menos `x`, más a la izquierda del cuadro. Las dos cosas hacen
+   * falta: el sitio más cercano del corro cae en `x = +8,4` y en el escritorio eso queda
+   * DETRÁS de la hoja del vestíbulo, que se lleva media pantalla. Medido en la pantalla:
+   * la figura estaba montada, en su sitio y animada, y no se veía ni un píxel de ella.
+   */
+  const elSitioDeDelante = useMemo(
+    () => sitios.reduce<(typeof sitios)[number] | undefined>(
+      (mejor, s) =>
+        mejor === undefined || s.pie.z - s.pie.x > mejor.pie.z - mejor.pie.x ? s : mejor,
+      undefined,
+    ),
+    [sitios],
+  );
+
   /* ── Lo que se pone encima ──────────────────────────────────────────────── */
   const puestas = useMemo(() => loQueHayEnLaLinde(semilla), [semilla]);
   const valle = useMemo(
@@ -387,7 +416,9 @@ export function LindeAlta(props: PropsDelEmbarcadero): JSX.Element {
           <UnoEnSuSitio
             key={a.id}
             sitio={sitio}
-            figura={figuraQueSePinta(a.id, a.figura)}
+            figura={
+              a.id === mesa.yo && figuraLocal !== null ? figuraLocal : figuraQueSePinta(a.id, a.figura)
+            }
             color={colorDeAsiento(mesa.tema, i)}
             presente={a.presente}
             esLocal={a.id === mesa.yo}
@@ -397,6 +428,33 @@ export function LindeAlta(props: PropsDelEmbarcadero): JSX.Element {
           />
         );
       })}
+
+      {/*
+        ═══ Y EN LA ORILLA, LA FIGURA QUE SE ESTÁ ELIGIENDO ═══
+
+        Antes de abrir mesa no hay ningún asiento, así que el bucle de arriba no pinta a nadie
+        y La Linde Alta salía VACÍA —un altozano pelado— mientras el panel de al lado promete
+        que ahí se ve lo que los demás verán de ti y ofrece un botón de «Cambiar». La figura
+        elegida SÍ se descargaba —`figuraQuePruebo` entra en `quienes` y se trae entera— y
+        después no se pintaba en ninguna parte: los bytes traídos para nada y una promesa sin
+        cumplir, que es lo que esta casa no deja pasar.
+
+        Es lo que ya hacen las dos escenas hermanas: el Embarcadero calcula su `figuraLocal`
+        con `esFigura(figuraQuePruebo)` y la pinta en el amarre. Aquí va al primer sitio del
+        corro, que es el que ocupa quien abre la mesa.
+      */}
+      {mesa.asientos.length === 0 && figuraLocal !== null && elSitioDeDelante !== undefined ? (
+        <UnoEnSuSitio
+          sitio={elSitioDeDelante}
+          figura={figuraLocal}
+          color={colorDeAsiento(mesa.tema, 0)}
+          presente
+          esLocal
+          figuras={figuras}
+          biblioteca={biblioteca}
+          semilla={semilla}
+        />
+      ) : null}
     </>
   );
 }

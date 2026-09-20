@@ -1391,6 +1391,59 @@ function elMuelle(): void {
     comprobar('y se ha leído el vestíbulo de verdad para juzgarlo', soloCodigo.includes('rotulo-de-panel'), {
       letras: soloCodigo.length,
     });
+
+    /*
+     * ═══ NI EL SITIO NI EL VERBO: EL VESTÍBULO TAMPOCO SABE CÓMO EMPIEZA CADA JUEGO ═══
+     *
+     * La guarda de arriba prohíbe los SITIOS, y se escribió mirando las dos frases que los
+     * llevaban. Pero quedaba una tercera con el mismo defecto y otra forma: «Hacen falta 2
+     * para ZARPAR». Zarpar es de Riberas —barcos, amarres, una cala—; en El Burgo se abre
+     * una ciudad y en Las Lindes se vuelca una bolsa de losas. Visto leyendo el panel de
+     * abrir mesa de Las Lindes en el escritorio, con la guarda de los sitios en verde.
+     *
+     * Así que esto mira lo mismo por el otro lado: no el nombre del lugar, sino el VERBO de
+     * un juego dentro del cascarón compartido. Cada tema ya trae el suyo (`tema.zarpar`:
+     * «Se reparte el delta», «Se abre el Burgo», «Se vuelca la bolsa»), y donde la frase es
+     * de la plataforma —cuántos hacen falta— la palabra tiene que ser neutra.
+     *
+     * Se mira SÓLO dentro de los literales de texto y con los `className` fuera: el
+     * componente se llama `Muelle`, sus clases son `muelle-*` y su prop es `zarpando`. Lo
+     * que está prohibido es que esas palabras lleguen a los ojos de alguien.
+     */
+    const soloLoQueSeLee = soloCodigo
+      /* Las rutas de `import` no las lee nadie, y una de ellas es `escenas/linde-alta/…`. */
+      .split('\n')
+      .filter((l) => !/^\s*import\b/.test(l))
+      .join('\n')
+      /* Las clases tampoco: son `muelle-*`, `opcion-zarpar`… y van en atributo o en ternario. */
+      .replace(/className=\{[^}]*\}/g, 'className=""')
+      .replace(/className="[^"]*"/g, 'className=""');
+    const literales = soloLoQueSeLee.match(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g) ?? [];
+    /** Palabras que son de UN juego y no de la plataforma. En minúsculas; se compara igual. */
+    const DE_UN_SOLO_JUEGO = ['zarpar', 'zarpad', 'barco', 'amarre', 'muelle', 'delta', 'burgo', 'linde'];
+    const colados = literales
+      .map((l) => ({ literal: l, mote: DE_UN_SOLO_JUEGO.find((p) => l.toLowerCase().includes(p)) }))
+      .filter((c) => c.mote !== undefined);
+    comprobar(
+      'y ninguna palabra de un solo juego se cuela en los textos del vestíbulo: el verbo lo pone el tema',
+      colados.length === 0,
+      { colados, cuantosLiterales: literales.length },
+    );
+
+    /*
+     * Vacuna doble, porque esta guarda tiene DOS maneras de quedarse en verde sin vigilar:
+     * que la extracción de literales devuelva cero (y entonces no hay nada que juzgar), y
+     * que la lista de palabras no case con la frase que de verdad falló.
+     */
+    comprobar('y se han sacado literales del vestíbulo para juzgarlos', literales.length > 20, {
+      cuantosLiterales: literales.length,
+    });
+    const comoEstaba = '`Hacen falta ${String(minimo)} para zarpar: al abrir sale un código.`';
+    comprobar(
+      'y la frase tal y como estaba escrita habría caído por aquí',
+      DE_UN_SOLO_JUEGO.some((p) => comoEstaba.toLowerCase().includes(p)),
+      { comoEstaba },
+    );
   }
 
   paso('El raíl del muelle existe entero sin el mundo, y en Node no se monta el Canvas');

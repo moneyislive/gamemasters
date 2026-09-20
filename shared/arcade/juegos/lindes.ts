@@ -1096,17 +1096,39 @@ function deCasilla(llave: string): { readonly x: number; readonly y: number } {
   return { x: Number(partes[0]), y: Number(partes[1]) };
 }
 
+/**
+ * UNA LISTA DE NOMBRES COMO SE DICE EN CASTELLANO: «Ana», «Ana y Bruno», «Ana, Bruno y Carla».
+ *
+ * Estaba escrita aquí dentro, para los cobros, y NO estaba en el aviso del final, que unía con
+ * `join(' y ')` y sacaba «Empatan Ana y Bruno y Carla» — en la frase que cierra la partida, que
+ * es la que más se lee y la única que algunos leen.
+ */
+function enLista(nombres: readonly string[]): string {
+  if (nombres.length === 0) return '';
+  if (nombres.length === 1) return nombres[0] as string;
+  return `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1] as string}`;
+}
+
 /** Lo que se lee cuando algo se cobra. */
 function fraseDelCobro(c: Cobro, sentados: LosSentados): string {
-  const quienes = c.quienes.map((a) => comoSeLlama(sentados, a));
-  const gente =
-    quienes.length === 1
-      ? (quienes[0] as string)
-      : `${quienes.slice(0, -1).join(', ')} y ${quienes[quienes.length - 1] as string}`;
+  const gente = enLista(c.quienes.map((a) => comoSeLlama(sentados, a)));
   const cosa = NOMBRE_DE_LA_COSA[c.clase];
   const medida = c.clase === 'ermita' ? '' : ` de ${c.losas} ${c.losas === 1 ? 'losa' : 'losas'}`;
-  const cierre = c.alFinal ? 'se cuenta al acabar' : 'cerrada';
-  return `${gente}: ${c.puntos} por una ${cosa}${medida} ${cierre}.`;
+  /*
+   * ═══ EL ARTÍCULO LO DECIDE LA COSA, Y UNA DE LAS CUATRO ES MASCULINA ═══
+   *
+   * Aquí ponía «una» a pelo. Villa, senda y ermita son femeninas y colaba; EL PRADO no, y el
+   * prado es justo la cosa que sólo se cobra AL FINAL, así que «7 por una prado de 4 losas»
+   * salía en el recuento de cierre de casi todas las partidas.
+   *
+   * ═══ Y LA COLA SE COSE CON SU COMA ═══
+   *
+   * `${medida} ${cierre}` con una ermita —que no lleva medida— daba «5 por una ermita se
+   * cuenta al acabar.»: dos oraciones pegadas sin nada en medio.
+   */
+  const articulo = c.clase === 'prado' ? 'un' : 'una';
+  const cierre = c.alFinal ? ', que se cuenta al acabar' : ' cerrada';
+  return `${gente}: ${c.puntos} por ${articulo} ${cosa}${medida}${cierre}.`;
 }
 
 /**
@@ -1125,7 +1147,7 @@ function elAviso(estado: EstadoDeLasLindes, sentados: LosSentados): string {
     if (estado.ganadores.length === 0) return 'Se acabó la bolsa.';
     const nombres = estado.ganadores.map((a) => comoSeLlama(sentados, a));
     if (nombres.length === 1) return `Se acabó la bolsa. Gana ${nombres[0] as string}.`;
-    return `Se acabó la bolsa. Empatan ${nombres.join(' y ')}.`;
+    return `Se acabó la bolsa. Empatan ${enLista(nombres)}.`;
   }
   const quien = deQuienEsElTurno(estado);
   const nombre = quien === null ? '' : comoSeLlama(sentados, quien);
@@ -1553,12 +1575,23 @@ function ofrecido(opciones: readonly Opcion[], tipo: string, carga: unknown): bo
 function panelesDeLasLindes(vista: VistaSinTablero): TableroDeclarado['paneles'] {
   const paneles: TableroDeclarado['paneles'] = [];
 
+  /*
+   * ═══ ACABADA LA PARTIDA, LO QUE IMPORTA SON LOS PUNTOS ═══
+   *
+   * Esta línea decía siempre «N puntos · M labriegos», también en la pantalla del final. Y al
+   * final todos los labriegos han vuelto a la mano —los recoge el recuento, el propio reductor
+   * lo tiene escrito— así que el marcador de cierre ponía «· 0 labriegos» debajo de cada
+   * nombre: un cero que no significa nada, repetido, justo en la pantalla que se queda mirando
+   * quien acaba de ganar o de perder. Terminada la partida se dice el resultado y ya está.
+   */
   const mesa: string[] = [];
+  const acabada = vista.momento === 'terminada';
   for (const l of vista.labriegos) {
-    const suyo = l.asiento === vista.turnoDe ? ' ←' : '';
-    mesa.push(`${l.nombre}: ${l.puntos} · ${l.sinPlantar} labriegos${suyo}`);
+    const suyo = !acabada && l.asiento === vista.turnoDe ? ' ←' : '';
+    const cuantos = acabada ? '' : ` · ${l.sinPlantar} labriegos`;
+    mesa.push(`${l.nombre}: ${l.puntos}${cuantos}${suyo}`);
   }
-  if (mesa.length > 0) paneles.push({ titulo: 'La mesa', lineas: mesa });
+  if (mesa.length > 0) paneles.push({ titulo: acabada ? 'Cómo quedó' : 'La mesa', lineas: mesa });
 
   if (vista.claseEnMano !== '') {
     const losa = losaPorId(vista.claseEnMano);
@@ -1578,9 +1611,25 @@ function panelesDeLasLindes(vista: VistaSinTablero): TableroDeclarado['paneles']
   if (vista.momento === 'plantando' && vista.sitios.length > 0) {
     paneles.push({
       titulo: 'Dónde cabe un labriego',
-      lineas: vista.sitios.map(
-        (s) => `${NOMBRE_DE_LA_COSA[s.clase]}: ${s.valdria}${s.cerrada ? ' (se cierra ya)' : ''}`,
-      ),
+      /*
+       * ═══ Y EL AVISO DEL PRADO, DONDE SE VE ═══
+       *
+       * «Se queda ahí hasta el final» sólo estaba en la ayuda de la opción, y la ayuda es un
+       * `title` en el escritorio —hay que posar el ratón y esperar— y un `accessibilityLabel`
+       * en la app —sólo lo lee un lector de pantalla—. O sea que la única decisión IRREVERSIBLE
+       * de un turno de Carcassonne se tomaba a ciegas en los dos clientes.
+       *
+       * Va como renglón del panel porque el panel lo declara el juego y lo pintan los tres
+       * muebles —escritorio, app y retablo— sin que ninguno tenga que saber nada.
+       */
+      lineas: [
+        ...vista.sitios.map(
+          (s) => `${NOMBRE_DE_LA_COSA[s.clase]}: ${s.valdria}${s.cerrada ? ' (se cierra ya)' : ''}`,
+        ),
+        ...(vista.sitios.some((s) => s.clase === 'prado')
+          ? ['El del prado no vuelve: se queda hasta que se acabe la bolsa.']
+          : []),
+      ],
     });
   }
 

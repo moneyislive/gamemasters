@@ -44,6 +44,7 @@
  *     `PIEZAS_POR_LOSA`, y lo recorta además la distancia, en `Lindes.tsx`.
  */
 import {
+  ALZADO_DE_LA_VILLA,
   ANCHO_DEL_EJE,
   ANCHO_DE_LA_SENDA,
   CELDAS_POR_LOSA,
@@ -57,6 +58,7 @@ import {
   ESCALA_DE_LA_TORRE,
   ESCALA_DEL_QUE_MANDA,
   FONDO_DE_LA_VILLA,
+  HUNDIDO_DE_LA_SENDA,
   LADO_DE_LOSA,
   NUCLEO_DE_LA_VILLA,
   ENTRADA_RECTA_DE_LA_SENDA,
@@ -70,6 +72,20 @@ import type { Giro, Lado, Losa } from '../../shared/arcade/juegos/lindes-losas';
 
 /** Lo que hay en una celda del suelo. */
 export type ClaseDeSuelo = 'prado' | 'senda' | 'villa';
+
+/**
+ * LA ALTURA A LA QUE VA LA CARA DE ARRIBA DE CADA CLASE DE SUELO.
+ *
+ * Vivia en `suelo.ts` —que es quien la usa para tallar el terreno— y se mudo aqui el dia
+ * que las piezas tuvieron que apoyarse en el suelo de verdad: `suelo.ts` importa de este
+ * fichero, asi que la importacion de vuelta habria cerrado un circulo. Su sitio natural es
+ * este de todas formas: describe `ClaseDeSuelo`, que se declara justo arriba.
+ */
+export function alturaDe(clase: ClaseDeSuelo): number {
+  if (clase === 'senda') return -HUNDIDO_DE_LA_SENDA;
+  if (clase === 'villa') return ALZADO_DE_LA_VILLA;
+  return 0;
+}
 
 /** Una celda del suelo, en la retícula de la losa. */
 export interface CeldaDeSuelo {
@@ -1015,9 +1031,35 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
   }
 
   /* ── 5 · El prado, partido en parcelas con sus lindes ───────────────────── */
+  /*
+   * ═══ EL CUPO SE REPARTE POR LA LOSA ENTERA, Y NO SE GASTA EN LA PRIMERA BANDA ═══
+   *
+   * El barrido va de norte a sur, y hasta aqui cortaba en cuanto `relleno` llegaba a
+   * `PIEZAS_POR_LOSA`. O sea que las primeras filas se llevaban el cupo entero y el resto
+   * de la losa se quedaba pelado. Medido sobre `muralla` con la semilla 1000, por bandas
+   * de norte a sur: 11, 19, 24, 0, 0, 0, 0, 0 piezas —las cinco bandas del sur suman
+   * 1.440 celdas de prado y CERO piezas—. Las 43 piezas de esa losa caen todas entre
+   * z = −80 y z = −27, en una losa que va de −88 a +88: 115 de 175 unidades sin nada.
+   * Y no era una losa rara: pasa en 23 de las 24 clases, en las 32 combinaciones de giro
+   * y semilla que se probaron. Multiplicado por setenta y dos losas, el tablero sale
+   * rayado: un tercio decorado y dos tercios de alfombra verde.
+   *
+   * Ahora el barrido recorre la losa ENTERA y lo que sale se aparta en dos cestas:
+   *
+   *   · LOS SETOS, que son la raya entre dos campos —de donde le viene el nombre al
+   *     juego— y que no se pueden ralear: media valla es un hueco en la linde.
+   *   · LO SEMBRADO, que si se puede ralear, y se ralea COGIENDO UNO DE CADA TANTOS en
+   *     el orden del barrido. Como el barrido va por filas, uno de cada tantos cae
+   *     repartido por toda la losa; quedarse con los primeros seria el mismo fallo.
+   *
+   * El cupo no cambia: siguen siendo `PIEZAS_POR_LOSA` como maximo, y el presupuesto de
+   * triangulos tampoco se toca.
+   */
+  const setos: PuestaEnLaLosa[] = [];
+  const sembrado: PuestaEnLaLosa[] = [];
   const desplazaParcela = Math.floor(tirada() * CELDAS_POR_PARCELA);
-  for (let j = 0; j < CELDAS_POR_LOSA && relleno.length < PIEZAS_POR_LOSA; j++) {
-    for (let i = 0; i < CELDAS_POR_LOSA && relleno.length < PIEZAS_POR_LOSA; i++) {
+  for (let j = 0; j < CELDAS_POR_LOSA; j++) {
+    for (let i = 0; i < CELDAS_POR_LOSA; i++) {
       if (claseEn(i, j) !== 'prado') continue;
       const centro = centroDeCelda(i, j);
       if (alLadoDeLaSenda(losa, giro, centro)) continue;
@@ -1046,7 +1088,7 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
       if (cambiaAlEste && j % CELDAS_POR_SETO === 0) {
         const m = medioDelLado(1);
         const medio = centroDeCelda(i, j + (CELDAS_POR_SETO - 1) / 2);
-        relleno.push({
+        setos.push({
           pieza: tirada() < 0.88 ? MODELO.valla : MODELO.vallaPuerta,
           x: aMundo(centro.x + m.x * paso),
           z: aMundo(medio.z),
@@ -1062,7 +1104,7 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
       if (cambiaAlSur && i % CELDAS_POR_SETO === 0) {
         const m = medioDelLado(2);
         const medio = centroDeCelda(i + (CELDAS_POR_SETO - 1) / 2, j);
-        relleno.push({
+        setos.push({
           pieza: tirada() < 0.88 ? MODELO.valla : MODELO.vallaPuerta,
           x: aMundo(medio.x),
           z: aMundo(centro.z + m.z * paso),
@@ -1095,8 +1137,11 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
        * tocones. Ver `ANCHO_EN_PACK`, que es de donde salen los veinte.
        */
       const suyo = loQueOcupa(que.pieza, escala);
-      if (relleno.some((p) => cerca(p, donde, (suyo + loQueOcupa(p.pieza, p.escala)) * 0.45))) continue;
-      relleno.push({
+      /* Se mira contra lo ya puesto Y contra las dos cestas: si no, se montan entre ellas. */
+      const estorba = (p: PuestaEnLaLosa): boolean =>
+        cerca(p, donde, (suyo + loQueOcupa(p.pieza, p.escala)) * 0.45);
+      if (relleno.some(estorba) || setos.some(estorba) || sembrado.some(estorba)) continue;
+      sembrado.push({
         pieza: que.pieza,
         x: aMundo(donde.x),
         z: aMundo(donde.z),
@@ -1108,6 +1153,45 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
         menuda: false,
       });
     }
+  }
+
+  /*
+   * ═══ SE RALEAN LAS DOS CESTAS, Y NINGUNA SE SIRVE ENTERA ANTES QUE LA OTRA ═══
+   *
+   * El primer intento fue «primero los setos, que son estructura, y lo que sobre para lo
+   * sembrado». Medido, eso no arregla nada: sólo mueve el fallo de una cesta a la otra. En
+   * `senda-recta` el prado es uniforme —276 celdas en cada una de las ocho bandas— y los
+   * setos solos llenaban el cupo, así que salían 8, 8, 9, 0, 0, 0, 0, 0: los cinco octavos
+   * del sur, pelados. Servir una lista entera en el orden del barrido es el fallo, sea la
+   * lista que sea.
+   *
+   * Así que las dos se ralean igual: cada una se lleva su parte del hueco —a proporción de
+   * lo que haya pedido— y de cada una se coge UNO DE CADA TANTOS a lo largo del barrido.
+   * Como el barrido va por filas, uno de cada tantos cae repartido de norte a sur.
+   *
+   * El seto sale más suelto que antes, y está bien que salga: ya era discontinuo —una valla
+   * cada `CELDAS_POR_SETO`— y una raya de puntos a lo largo de toda la linde se lee como una
+   * linde. Media linde dibujada y media ausente, no.
+   */
+  const unoDeCada = (lista: readonly PuestaEnLaLosa[], cuantas: number): void => {
+    if (cuantas <= 0 || lista.length === 0) return;
+    if (lista.length <= cuantas) {
+      for (const p of lista) relleno.push(p);
+      return;
+    }
+    const salto = lista.length / cuantas;
+    for (let k = 0; k < cuantas; k++) {
+      const cual = lista[Math.floor(k * salto)];
+      if (cual !== undefined) relleno.push(cual);
+    }
+  };
+  const hueco = PIEZAS_POR_LOSA - relleno.length;
+  const pedido = setos.length + sembrado.length;
+  if (hueco > 0 && pedido > 0) {
+    const paraSetos =
+      pedido <= hueco ? setos.length : Math.round((hueco * setos.length) / pedido);
+    unoDeCada(setos, paraSetos);
+    unoDeCada(sembrado, hueco - paraSetos);
   }
 
   /*
@@ -1148,12 +1232,37 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
     );
     return claseEn(i, j) === 'senda';
   };
-  const conTalla = (p: PuestaEnLaLosa): PuestaEnLaLosa => ({
-    ...p,
-    x: acotar(p.x),
-    z: acotar(p.z),
-    menuda: esMenuda(p.pieza),
-  });
+  /*
+   * ═══ Y CADA PIEZA SE APOYA EN EL SUELO QUE TIENE DEBAJO ═══
+   *
+   * Las nueve veces que este fichero empuja una pieza ponen `y: 0`, y el suelo de la losa NO
+   * está a cero: `alturaDe` levanta el empedrado de la villa `ALZADO_DE_LA_VILLA` y hunde la
+   * senda `HUNDIDO_DE_LA_SENDA`. Así que todo lo que cae sobre una villa se entierra un
+   * cuarto de persona y lo que cae en una senda flota casi medio. Medido sobre las 24 clases
+   * por sus 4 giros: 3.276 piezas al ras, 1.707 ENTERRADAS y 8 FLOTANDO.
+   *
+   * Se corrige aquí, al final y de una vez, por lo mismo que `menuda` y el acotado: nueve
+   * copias son nueve sitios donde olvidarse. Y se hace DESPUÉS de acotar, porque el empujón
+   * al azar puede haber movido la pieza a una celda de otra clase — la altura es la del sitio
+   * donde la pieza acaba, no la del sitio donde se pensó.
+   */
+  const alturaDondeCae = (x: number, z: number): number => {
+    const i = Math.min(
+      CELDAS_POR_LOSA - 1,
+      Math.max(0, Math.floor((x / LADO_DE_LOSA + 0.5) * CELDAS_POR_LOSA)),
+    );
+    const j = Math.min(
+      CELDAS_POR_LOSA - 1,
+      Math.max(0, Math.floor((z / LADO_DE_LOSA + 0.5) * CELDAS_POR_LOSA)),
+    );
+    const clase = claseEn(i, j);
+    return clase === null ? 0 : alturaDe(clase);
+  };
+  const conTalla = (p: PuestaEnLaLosa): PuestaEnLaLosa => {
+    const x = acotar(p.x);
+    const z = acotar(p.z);
+    return { ...p, x, z, y: p.y + alturaDondeCae(x, z), menuda: esMenuda(p.pieza) };
+  };
   return {
     celdas,
     puestas: [...obligadas, ...relleno.slice(0, PIEZAS_POR_LOSA)].map(conTalla).filter((p) => !enCamino(p)),

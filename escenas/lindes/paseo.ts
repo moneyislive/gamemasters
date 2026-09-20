@@ -259,11 +259,103 @@ export interface PoseDeCamara {
  * común: un campo opcional que en la práctica siempre está es la mejor manera de que un
  * día se olvide justo donde importa.
  */
+/** Un rectángulo de suelo, en coordenadas del mundo. */
+export interface TrozoDeSuelo {
+  readonly x0: number;
+  readonly x1: number;
+  readonly z0: number;
+  readonly z1: number;
+  /** Lo que hay desde la cámara hasta la esquina del cuadro que pisa más lejos. */
+  readonly masLejos: number;
+}
+
 export interface PoseDeMesa extends PoseDeCamara {
   /** El plano de fondo que hace falta para que la esquina de allá se vea. */
   readonly lejos: number;
   /** Desde dónde y hasta dónde va la niebla SIN comerse el tablero. Ver abajo. */
   readonly niebla: { readonly cerca: number; readonly lejos: number };
+  /**
+   * EL SUELO QUE HAY QUE PINTAR PARA QUE NO SE LE VEA EL CANTO. Ver `sueloQueSeVe`.
+   */
+  readonly suelo: TrozoDeSuelo;
+}
+
+/**
+ * DÓNDE PISA EL SUELO CADA ESQUINA DEL CUADRO.
+ *
+ * ═══ POR QUÉ ESTA CUENTA EXISTE ═══
+ *
+ * La arena se dimensionaba desde EL TABLERO —su caja más `MARGEN_DE_LA_ARENA`, dos
+ * losas por lado— con el comentario «para que no se le vea el borde». Medido en la
+ * pantalla con una partida en marcha: **el 35 % del cuadro era cielo**, y el 18 % de la
+ * mitad de abajo. El desierto salía como un rombo flotando, con dos cuñas de cielo a
+ * izquierda y derecha bajando hasta el filo inferior.
+ *
+ * Y no es que faltara horizonte: con cincuenta grados de inclinación y 45 de campo, el
+ * rayo de la esquina de arriba baja con `−sen i + t·cos i = −0,50`, o sea que **las
+ * cuatro esquinas del cuadro pisan el suelo**. Lo que se veía era el CANTO de la arena,
+ * no el fin del mundo. El margen estaba atado al tamaño del tablero y lo que manda es
+ * a qué distancia se ha puesto la cámara, que crece con el tablero Y con lo estrecha
+ * que sea la ventana.
+ *
+ * Es la misma regla que ya gobierna `lejos` y la niebla tres renglones más abajo: quien
+ * sabe dónde se pone la cámara es esta cuenta, así que es esta cuenta la que dice hasta
+ * dónde hay que pintar.
+ *
+ * ═══ LA CUENTA, QUE ES EXACTA ═══
+ *
+ * Con la cámara en `(0, h, D·cos i)` mirando al centro, el rayo que sale por el punto
+ * `(u, v)` del cuadro —los dos en [−1, 1]— es, sin normalizar:
+ *
+ *     dir = (u·t·aspecto,  −sen i + v·t·cos i,  −cos i − v·t·sen i)
+ *
+ * y corta el suelo en `s = h / (sen i − v·t·cos i)`. Las cuatro esquinas dan la caja.
+ */
+export function sueloQueSeVe(
+  centroX: number,
+  centroZ: number,
+  distancia: number,
+  inclinacion: number,
+  t: number,
+  aspecto: number,
+): TrozoDeSuelo {
+  const sen = Math.sin(inclinacion);
+  const cos = Math.cos(inclinacion);
+  const alto = distancia * sen;
+  const camaraZ = centroZ + distancia * cos;
+  let x0 = Number.POSITIVE_INFINITY;
+  let x1 = Number.NEGATIVE_INFINITY;
+  let z0 = Number.POSITIVE_INFINITY;
+  let z1 = Number.NEGATIVE_INFINITY;
+  let masLejos = 0;
+  for (const u of [-1, 1]) {
+    for (const v of [-1, 1]) {
+      const baja = sen - v * t * cos;
+      /*
+       * Si el rayo no baja, esa esquina mira por encima del horizonte y ningún suelo
+       * finito la tapa. No pasa con 50° y 45 de campo —sale 0,50— pero el día que alguien
+       * tumbe la cámara esto tiene que devolver algo, no un infinito.
+       */
+      if (baja <= 1e-6) continue;
+      const s = alto / baja;
+      const x = centroX + s * (u * t * aspecto);
+      const z = camaraZ + s * (-cos - v * t * sen);
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (z < z0) z0 = z;
+      if (z > z1) z1 = z;
+      /* `s` va sobre el rayo sin normalizar; el largo de verdad lo da su módulo. */
+      const largoDelRayo = Math.sqrt(
+        (u * t * aspecto) ** 2 + baja ** 2 + (cos + v * t * sen) ** 2,
+      );
+      const hasta = s * largoDelRayo;
+      if (hasta > masLejos) masLejos = hasta;
+    }
+  }
+  if (!Number.isFinite(x0)) {
+    return { x0: centroX, x1: centroX, z0: centroZ, z1: centroZ, masLejos: distancia };
+  }
+  return { x0, x1, z0, z1, masLejos };
 }
 
 /** La cámara de ojos: donde está la cara, mirando adelante. */
@@ -357,9 +449,20 @@ export function camaraDeMesa(
    * Quien sabe a qué distancia se pone la cámara es esta cuenta, así que es esta cuenta la
    * que tiene que decir hasta dónde hay que ver. La esquina de allá está a `distancia` más
    * media diagonal del tablero, con un tercio de sobra para el cielo del fondo.
+   *
+   * ═══ Y NO BASTA CON EL TABLERO: TAMBIÉN EL SUELO QUE SE VE ═══
+   *
+   * Porque la esquina de arriba del CUADRO pisa el suelo más lejos que la esquina del
+   * tablero —su rayo baja con 0,50 en vez de 0,77, o sea 1,5 veces la distancia de la
+   * cámara— y ahí el plano de fondo la cortaba. Lo que quedaba detrás no era niebla: era
+   * el color del cielo, `#8cb8de`, medido en el lienzo. Por eso el desierto salía como un
+   * rombo con dos cuñas azules a los lados.
    */
   const diagonal = Math.sqrt(ancho * ancho + alto * alto);
-  const lejos = (distancia + diagonal / 2) * 1.35;
+  const suelo = sueloQueSeVe(centroX, centroZ, distancia, inclinacion, t, Math.max(0.35, aspecto));
+  const finDelTablero = distancia + diagonal / 2;
+  const hastaDondeSeVe = Math.max(finDelTablero, suelo.masLejos);
+  const lejos = hastaDondeSeVe * 1.35;
 
   /*
    * ═══ Y DÓNDE EMPIEZA LA NIEBLA, QUE ES DEL PASEO Y NO DE LA MESA ═══
@@ -374,11 +477,16 @@ export function camaraDeMesa(
    * niebla —31 % en el centro— con la niebla fija de 1.400 a 5.950. El tablero entero salía
    * pálido y sin color, justo en la pantalla que más se mira: la del final.
    *
-   * Aquí la niebla empieza DONDE ACABA EL TABLERO —la esquina de allá— y llega hasta el
-   * plano de fondo. Así el tablero no se toca, y lo que se desvanece es la mesa de debajo,
-   * que es lo que tiene que desvanecerse.
+   * Aquí la niebla empieza DONDE ACABA LO QUE SE VE y llega hasta el plano de fondo: en la
+   * vista de mesa no se desvanece nada.
+   *
+   * Empezaba donde acaba EL TABLERO, dejando la arena de alrededor a merced de la niebla, y
+   * eso era correcto mientras la arena fuera un ruedo estrecho alrededor de las losas. Desde
+   * que la arena llega hasta donde pisa el cuadro, dejarla ahí cambiaría las cuñas azules
+   * por cuñas grises: `#cfdae2` en vez de `#8cb8de`, y seguiría sin ser un desierto. Un
+   * tablero se mira desde arriba: la niebla no le da profundidad, sólo le quita color.
    */
-  const niebla = { cerca: distancia + diagonal / 2, lejos };
+  const niebla = { cerca: hastaDondeSeVe, lejos };
   return {
     x: centroX,
     y: distancia * Math.sin(inclinacion),
@@ -388,6 +496,7 @@ export function camaraDeMesa(
     miraZ: centroZ,
     lejos,
     niebla,
+    suelo,
   };
 }
 

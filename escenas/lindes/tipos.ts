@@ -149,7 +149,12 @@ export interface PropsDeLasLindes {
   /** Para que no se mueva nada mientras un comprobador mide. */
   readonly quieto?: boolean;
   readonly alTocarHueco?: (x: number, y: number, giro: Giro) => void;
-  readonly alSenalarHueco?: (x: number, y: number) => void;
+  /**
+   * Qué casilla clara está señalada, o `null` cuando deja de haber ninguna —porque se ha
+   * puesto la losa ahí, o porque el turno ha pasado a otro—. Antes sólo sabía decir «esta
+   * de aquí», así que la pista del rail se quedaba nombrando una casilla ya ocupada.
+   */
+  readonly alSenalarHueco?: (x: number | null, y: number | null) => void;
   readonly alTocarLosa?: (casilla: string) => void;
   readonly alEstarListo?: () => void;
   readonly alFallar?: (motivo: string) => void;

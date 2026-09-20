@@ -151,8 +151,8 @@ export function LindesEnTres({
     [mover],
   );
 
-  const alSenalarHueco = useCallback((x: number, y: number) => {
-    setSenalada({ x, y });
+  const alSenalarHueco = useCallback((x: number | null, y: number | null) => {
+    setSenalada(x === null || y === null ? null : { x, y });
   }, []);
 
   /*
@@ -271,9 +271,24 @@ export function LindesEnTres({
         </div>
       </div>
 
-      <aside className="lindes-rail">
-        {elRail}
+      {/*
+        ═══ PRIMERO LO QUE HAY QUE HACER; LA CHAPA DE LA MESA, DEBAJO ═══
 
+        El raíl es una columna que se desplaza, y este orden estaba al revés: `elRail` —el
+        marcador, el código, el enlace, la nota de las dos ventanas, los sentados, el reloj,
+        «Levantarse» y «Tirar la mesa»— ocupa 790 píxeles, así que «Dónde plantar» empezaba
+        a 911 y «No plantar» a 1.104. Medido en la pantalla con la partida en marcha: en una
+        ventana de 1.080 la acción del turno asoma por el borde de abajo, y en cualquier
+        ventana más baja hay que desplazarse casi mil píxeles —pasando por encima de «Tirar
+        la mesa», que acaba la partida de todos— para llegar a lo único que el juego está
+        esperando que hagas.
+
+        El Burgo ya lo tiene bien: su hoja va antes y `elRail` después (`burgo-en-tres.tsx`).
+        Así que aquí igual, y en el orden en que se necesita: lo que se hace ahora, luego lo
+        que hace falta para decidirlo —los paneles que declara el propio juego— y al final
+        la chapa de la mesa, que se mira una vez al empezar y casi nunca más.
+      */}
+      <aside className="lindes-rail">
         {laLosa !== null ? (
           <section className="lindes-mano">
             <h3>En la mano</h3>
@@ -306,8 +321,15 @@ export function LindesEnTres({
                 <li key={`${s.clase}:${s.indice}`}>
                   <button type="button" disabled={quieto} onClick={() => alTocar(s.movimiento)} title={s.ayuda}>
                     {s.rotulo}
+                    {/*
+                      SIEMPRE DICE UN NÚMERO, aunque sea el cero. Una losa puede ofrecer DOS
+                      prados, y entonces los dos rótulos son la misma frase palabra por
+                      palabra: si el de cero se queda sin nota, en la lista salen dos
+                      renglones idénticos y no hay manera de saber cuál es cuál. Visto
+                      jugando: «Labriego en el prado · vale 3» y «Labriego en el prado ·».
+                    */}
                     <span className="lindes-vale">
-                      {s.cerrada ? `cierra: ${s.valdria}` : s.valdria > 0 ? `vale ${s.valdria}` : ''}
+                      {s.cerrada ? `cierra: ${s.valdria}` : `vale ${s.valdria}`}
                     </span>
                   </button>
                 </li>
@@ -328,6 +350,8 @@ export function LindesEnTres({
             </ul>
           </section>
         ))}
+
+        {elRail}
       </aside>
     </div>
   );

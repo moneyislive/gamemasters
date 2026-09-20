@@ -824,6 +824,132 @@ artefacto de la maquina. Pero conviene saberlo, porque **cualquier modulo nuevo 
 aparece un rato despues, en un comprobador que no tiene nada que ver con lo que se estaba
 tocando.
 
+## El cierre: una revisión adversaria, y catorce cosas que se veían
+
+Antes de dar Las Lindes por cerrado se hicieron dos cosas a la vez: **jugar una mesa
+entera en pantalla** —con compañeros de verdad por HTTP, que es para lo que
+`jugar:lindes` ganó un `--codigo`— y **una revisión adversaria de 47 agentes** sobre
+siete dimensiones: reglas, escena, HUD, lobby, textos, paridad y guardas vacuas.
+
+**Lo primero que hay que decir, porque es bueno: LAS REGLAS ESTÁN LIMPIAS.** Medidas
+losa a losa contra el reparto oficial A–X del juego base —A2 B4 C1 D4 E5 F2 G1 H3 I2 J3
+K3 L3 M2 N3 O2 P3 Q1 R3 S2 T1 U8 V9 W4 X1 = 72—, los diez blasones en las seis clases
+que los llevan, la de salida siendo la D, los ocho recuentos dando el número exacto, el
+empate repartiendo entero y los prados bien cortados. Cuarenta partidas jugadas con el
+reductor sin perder una losa ni un labriego. Ni una discrepancia con el reglamento.
+
+Lo que falló fue todo lo demás, y en dos sitios que conviene nombrar aparte.
+
+### El móvil no era un cliente de primera
+
+Jugando una mesa desde la app: **no se veía un solo punto**. Ni el marcador, ni los
+labriegos, ni las losas de la bolsa, ni el recuento final. Donde iba el marcador había
+una fila con los nombres de los sentados y, delante, una línea que no podía pintar nada
+—`cond ? null : null`, que devuelve `null` decida lo que decida— puesta ahí para que
+`datos.labriegos` pareciera usado. Se podía poner losas y plantar, pero no saber quién
+iba ganando ni enterarse de haber ganado.
+
+Y tampoco montaba **la barra de la mesa**: desde una partida en marcha no se podía ver
+el código para que se sentara quien faltaba, ni levantarse, ni tirar la mesa. En una
+partida de tres días, eso es quedarse encerrado en el valle.
+
+Y **no se podía elegir el giro de la losa**. El motor nativo de react-three-fiber saca
+`onPointerMove` del `onPanResponderMove`, o sea sólo si el dedo se arrastra: un toque
+limpio da `onPointerDown` y `onPointerUp` y ninguno en medio. Así que en el móvil nunca
+había casilla señalada, «Girar» estaba apagado y el primer toque ponía la losa con el
+giro que hubiera. Las cuatro maneras de encajar una losa, que son media regla de
+Carcassonne, no se podían elegir. Ahora **el primer toque señala y el segundo pone**, y
+con ratón no cambia nada porque el cursor ya pasó por encima.
+
+### Y el tablero salía rayado, con dos tercios de alfombra verde
+
+El barrido que siembra el prado va de norte a sur y cortaba en cuanto llegaba al cupo de
+`PIEZAS_POR_LOSA`. Las primeras filas se lo llevaban entero. Medido sobre `senda-recta`,
+que tiene el prado UNIFORME —276 celdas en cada una de las ocho bandas—: las piezas
+salían **8, 8, 9, 0, 0, 0, 0, 0**. En `muralla`, 11, 19, 24 y cinco ceros.
+
+El primer arreglo no arregló nada: apartar los setos a su cesta y servirlos primero sólo
+movía el fallo de una cesta a la otra. **Servir una lista entera en el orden del barrido
+es el fallo, sea la lista que sea.** Ahora las dos se ralean igual —cada una su parte del
+hueco, y de cada una uno de cada tantos a lo largo del barrido—. Medido después:
+5,6 · 7,1 · 6,6 · 7,6 · 7,7 · 7,2 · 5,3 · 4,9. El gradiente pasa de 4,7× a 1,5×, el total
+por losa no se mueve (52,1) y ninguna losa con más prado abajo que arriba se queda sin
+nada abajo.
+
+### Las otras once
+
+- **«Hacen falta 2 para zarpar»** y **«En el muelle»** en el rótulo del piloto de cada
+  asiento: el vestíbulo es UNO para los tres juegos y seguía mandando a la gente al lobby
+  de Riberas. Tercera y cuarta vez del mismo fallo. La guarda que prohibía los SITIOS
+  dentro de `muelle.tsx` ahora prohíbe también los VERBOS de un juego, mirando sólo dentro
+  de los literales y con los `className` fuera.
+- **La acción del turno vivía a 911 píxeles del borde**, detrás del código de la mesa, de
+  una nota de desarrollo y de dos botones destructivos —uno de ellos «Tirar la mesa», que
+  acaba la partida de todos—. El Burgo ya lo tenía al revés y bien. Ahora el raíl va: lo
+  que se hace ahora, lo que hace falta para decidirlo, y la chapa de la mesa al final.
+- **Dos botones idénticos.** Una losa con dos prados ofrece dos sitios con el mismo
+  rótulo, y la cifra se escondía cuando valía cero: «Labriego en el prado · vale 3» y
+  «Labriego en el prado ·». En la app, «—» los dos. El cero no es «nada que decir»: es lo
+  que hay que decir.
+- **El 35 % del cuadro era CIELO**, en dos cuñas a los lados que bajaban hasta el filo de
+  abajo. Tres cosas lo causaban y eran la misma: la arena se dimensionaba desde el
+  TABLERO y el plano de fondo y la niebla desde la esquina del TABLERO, cuando lo que
+  decide qué entra en el cuadro es a qué distancia se ha puesto la cámara. La esquina de
+  arriba del cuadro pisa el suelo a 1,5 veces esa distancia. Ahora lo dice `sueloQueSeVe`,
+  que vive junto a la cámara porque es ella quien lo sabe. Medido después: **0 % de cielo,
+  0 % de niebla, las cuatro esquinas de arena**.
+- **El recorte por distancia se veía**: el relleno desaparecía de golpe a cuatro losas en
+  un anillo perfecto alrededor de la cámara. Ahora encoge en el último tercio del alcance
+  y no cuesta un triángulo.
+- **1.707 piezas enterradas y 8 flotando.** El suelo de una losa no está a cero —la villa
+  se alza, la senda se hunde— y las nueve veces que `losa.ts` empuja una pieza ponían
+  `y: 0`. Y la comprobación que lo vigilaba era `p.y >= 0` sobre 4.991 valores que valen
+  literalmente cero: **una guarda que no puede ponerse roja no vigila nada**, y ésta
+  además tapaba el fallo. Ahora cada pieza se apoya en la celda donde de verdad cae, y la
+  guarda compara contra esa altura. Probada: sin el arreglo, 1.717 comprobaciones en rojo.
+- **El tope del cupo era 242 y el máximo real 66.** Otra que no podía alcanzarse. Ahora es
+  el doble del cupo.
+- **El fantasma no era la losa que se ponía.** Se montaba con `semilla ^ 0x9e37` y lo que
+  se pone se monta con `semillaDeLaLosa(semilla, x, y)`: **0 de 384 coincidían**. Se
+  señalaba una casilla, se veía un reparto de casas y árboles, se soltaba y salía otro.
+- **La pista señalaba una casilla ya ocupada** al empezar cada turno, porque la señalada
+  no se olvidaba al dejar de ser hueco.
+- **«5 por una ermita se cuenta al acabar»** —dos oraciones pegadas sin nada en medio— y
+  **«por una prado»**, con el artículo equivocado justo en la cosa que sólo se cobra al
+  final. Y **«Empatan Ana y Bruno y Carla»** en la frase que cierra la partida. Los tres
+  en el texto que más se lee.
+- **«Se queda ahí hasta el final» no se veía en ninguno de los dos clientes**: en el
+  escritorio era un `title` y en la app un `accessibilityLabel`. La única decisión
+  irreversible de un turno de Carcassonne se tomaba a ciegas. Ahora es un renglón del
+  panel que declara el juego, así que lo pintan los tres muebles.
+- **La Linde Alta prometía enseñar tu figura y estaba vacía.** `figuraQuePruebo` se
+  descargaba entera y no se pintaba en ninguna parte. Y al pintarla en el primer sitio del
+  corro seguía sin verse: **estaba montada, en su sitio y animada, detrás de la hoja del
+  vestíbulo**, que se lleva media pantalla. Va al sitio de delante y a la izquierda.
+
+### Lo que la revisión encontró y NO se ha arreglado
+
+De 91 hallazgos en bruto, **se verificaron 40 y se confirmaron 35**. Los 51 restantes no
+se miraron: el guion cortaba en 40 y no lo decía, que es el mismo pecado que persigue este
+documento. Queda dicho aquí.
+
+De los confirmados quedan sin tocar, y por orden de lo que se vería antes:
+
+- El altozano del lobby es hierba pelada y un color de fondo liso: entre los dos se llevan
+  el 71 % de la pantalla en escritorio y el 94 % en el móvil sobrio. La Plaza usa una
+  cúpula con degradado; aquí hay un `<color attach="background">`. Y el valle del fondo son
+  34 piezas a escala 4–7 que salen de 46 a 75 unidades con el ojo a 10,9.
+- La escena del lobby vuelve a pedir y a reconstruir los 4,3 MB de `tablero.glb` cada vez
+  que cambia la mesa, y suelta las geometrías anteriores sin destruirlas. El Burgo ya tiene
+  el patrón resuelto en `catalogo-del-burgo.ts`.
+- La figura del lobby sale pequeña y puede quedar medio tapada por las piedras del alto.
+- El `fov` no lo fija nadie: el mismo lobby es 55° en el escritorio y 75° en la app, y la
+  distancia de cámara está calibrada para el segundo.
+- Las matrices de instancia del tablero entero se recalculan y se resuben a la tarjeta en
+  cada fotograma aunque no cambie nada.
+- El fantasma flota dos alturas de hombre cuando se anda, y no se borra.
+- Cinco motivos de rechazo de `poner` y `plantar` son inalcanzables.
+
 ## Lo medido hasta aquí
 
 - `verify:lindes`: 13.295 comprobaciones en verde. Diez partidas enteras, 709
@@ -859,7 +985,10 @@ tocando.
   ventana. Mirado en los dos móviles: el tablero entra entero, la losa de la mano
   entra entera y el reloj entra entero.
 - **`jugar:lindes` no está en la batería.** Necesita un servidor levantado y hoy se
-  le pasa por `--servidor`. `verify:mesa` ya cubre la superficie HTTP genérica y
+  le pasa por `--servidor`. Desde el cierre acepta además `--codigo`, que lo sienta en una
+  mesa YA ABIERTA en pantalla y le hace esperar cuando el turno es de la persona: es la
+  única forma de jugar una mesa de verdad con un asiento humano, y es lo que encontró la
+  mitad de los catorce fallos del cierre. `verify:mesa` ya cubre la superficie HTTP genérica y
   juega Las Lindes entera con el árbitro, así que el hueco que quedaría es sólo el
   PESO —y eso, hoy, está medido a mano y escrito arriba. Meterlo pide que se levante
   su propio servidor, como hace `jugar:fondo`; es barato y no está hecho.

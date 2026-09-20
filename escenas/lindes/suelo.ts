@@ -25,7 +25,7 @@
 import * as THREE from 'three';
 import { GRUESO_DE_LOSA, LADO_DE_CELDA, LADO_DE_LOSA, CELDAS_POR_LOSA, ALZADO_DE_LA_VILLA, HUNDIDO_DE_LA_SENDA } from './medidas';
 import { MARGEN_DE_LA_ARENA } from './desierto';
-import { sueloDeLaLosa } from './losa';
+import { alturaDe, sueloDeLaLosa } from './losa';
 import type { ClaseDeSuelo } from './losa';
 import { losaPorId } from '../../shared/arcade/juegos/lindes-losas';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
@@ -76,12 +76,15 @@ const FALDON = new THREE.Color(COLOR_DEL_FALDON);
  */
 export const JUNTA_ENTRE_LOSAS = LADO_DE_LOSA * 0.004;
 
-/** La altura a la que va la cara de arriba de cada clase de suelo. */
-export function alturaDe(clase: ClaseDeSuelo): number {
-  if (clase === 'senda') return -HUNDIDO_DE_LA_SENDA;
-  if (clase === 'villa') return ALZADO_DE_LA_VILLA;
-  return 0;
-}
+/*
+ * `alturaDe` VIVE EN `losa.ts`, y se reexporta aqui.
+ *
+ * Estaba en este fichero, y tuvo que mudarse el dia que `losa.ts` necesito apoyar cada
+ * pieza en el suelo que tiene debajo: `suelo.ts` ya importa de `losa.ts`, asi que la
+ * importacion de vuelta habria cerrado un circulo. Vive donde vive `ClaseDeSuelo`, que es
+ * lo que describe, y se reexporta para que quien la pedia aqui la siga encontrando.
+ */
+export { alturaDe } from './losa';
 
 /** El color de cada clase, con una pizca de variación para que no sea una plancha. */
 function colorDe(clase: ClaseDeSuelo, ruido: number, salida: THREE.Color): THREE.Color {
@@ -310,12 +313,26 @@ export function geometriaDelSuelo(losas: readonly LosaQueSePinta[]): THREE.Buffe
  * —cuyo marco está horneado casi negro— también. Lo pidió Miguel al sentarse a mirar.
  *
  * Sale MÁS grande que lo que abarcan las losas —`MARGEN_DE_LA_ARENA` por cada lado—
- * para que no se le vea el borde justo donde acaba el tablero y para que quepa el
- * desierto de `desierto.ts`, y se queda POR DEBAJO del faldón para que no pelee con él
- * por el mismo píxel.
+ * para que quepa el desierto de `desierto.ts`, y se queda POR DEBAJO del faldón para que
+ * no pelee con él por el mismo píxel.
+ *
+ * ═══ Y ADEMÁS, LO QUE LA CÁMARA ALCANCE A VER ═══
+ *
+ * El margen de dos losas se escribió «para que no se le vea el borde». No bastaba, y no
+ * podía bastar: está atado al tamaño del TABLERO y lo que decide qué entra en el cuadro es
+ * a qué distancia se ha puesto la cámara, que crece con el tablero Y con lo estrecha que
+ * sea la ventana. Medido en la pantalla con una partida de cuatro losas: **el 35 % del
+ * cuadro era cielo**, en dos cuñas a izquierda y derecha que bajaban hasta el filo de
+ * abajo. El desierto salía como un rombo flotando.
+ *
+ * Así que quien dice hasta dónde hay que pintar es `sueloQueSeVe`, que vive junto a la
+ * cámara porque es ella quien lo sabe. Aquí se unen las dos cajas: la de las losas con su
+ * margen —que manda cuando la cámara está cerca— y la que pisa el cuadro. Andando no se
+ * pasa nada: sin `alcanza` esto es exactamente lo que era.
  */
 export function geometriaDeLaArena(
   losas: readonly { readonly x: number; readonly y: number }[],
+  alcanza?: { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number },
 ): THREE.BufferGeometry | null {
   if (losas.length === 0) return null;
   let minX = Number.POSITIVE_INFINITY;
@@ -329,11 +346,19 @@ export function geometriaDeLaArena(
     if (l.y > maxY) maxY = l.y;
   }
   const margen = MARGEN_DE_LA_ARENA;
-  const x0 = (minX - 0.5) * LADO_DE_LOSA - margen;
-  const x1 = (maxX + 0.5) * LADO_DE_LOSA + margen;
+  let x0 = (minX - 0.5) * LADO_DE_LOSA - margen;
+  let x1 = (maxX + 0.5) * LADO_DE_LOSA + margen;
   /* La `y` del tablero crece al norte y la `z` al sur: por eso se cruzan. */
-  const z0 = -(maxY + 0.5) * LADO_DE_LOSA - margen;
-  const z1 = -(minY - 0.5) * LADO_DE_LOSA + margen;
+  let z0 = -(maxY + 0.5) * LADO_DE_LOSA - margen;
+  let z1 = -(minY - 0.5) * LADO_DE_LOSA + margen;
+  if (alcanza !== undefined) {
+    /* Un dedo de sobra: la esquina del cuadro no puede caer justo en el canto. */
+    const sobra = LADO_DE_LOSA * 0.5;
+    x0 = Math.min(x0, alcanza.x0 - sobra);
+    x1 = Math.max(x1, alcanza.x1 + sobra);
+    z0 = Math.min(z0, alcanza.z0 - sobra);
+    z1 = Math.max(z1, alcanza.z1 + sobra);
+  }
   const y = -GRUESO_DE_LOSA * 1.02;
 
   const posiciones = [x0, y, z0, x0, y, z1, x1, y, z1, x0, y, z0, x1, y, z1, x1, y, z0];
