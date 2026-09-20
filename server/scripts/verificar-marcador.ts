@@ -68,6 +68,7 @@ import os from 'node:os';
 import path from 'node:path';
 import '../../shared/arcade/juegos';
 import { EL_ARCADE, FRENTE, RONDA } from '../../shared/arcade/juegos';
+import { TOPE_DE_PROFUNDIDAD } from '../../shared/mecanicas/canonico';
 import {
   arcadesConCifraSinPuntuacion,
   instalarArcade,
@@ -885,6 +886,117 @@ try {
   } catch {
     /* Un temporal que no se borra no es un fallo del marcador. */
   }
+}
+
+// ---------------------------------------------------------------------------
+paso('Y la puerta acota lo que le dan ANTES de reejecutarlo');
+// ---------------------------------------------------------------------------
+{
+  /*
+   * ═══ LA OTRA PUERTA AL MISMO REDUCTOR ═══
+   *
+   * `TOPE_TIPO_CARACTERES` y `TOPE_CARGA_BYTES` se declaran en `presupuesto.ts` y sólo se
+   * exigían en `routes/arcade.ts`, la ruta de MOVIMIENTOS. Ésta es la otra puerta por la que
+   * una carga de un desconocido llega al mismo reductor, y entraba sin mirar ninguno de los
+   * dos. Medido antes del arreglo, con el aviso de inicio delante:
+   *
+   *   · un `tipo` de cien mil caracteres: ACEPTADO;
+   *   · una carga llana de doscientos kilobytes: ACEPTADA;
+   *   · una carga anidada tres mil veces: ACEPTADA, y 50,5 ms de hilo bloqueado;
+   *   · una anidada veinte mil veces: `RangeError` — que no es `RepeticionMalFormada`, así
+   *     que `registrarRecord` lo relanzaba y la ruta, que no tiene `try`, contestaba un 500.
+   *
+   * Y lo importante para quien venga: el tope que arregla lo caro NO es el de tamaño. Tres
+   * mil niveles son unos seis kilobytes, o sea que el tope de ocho los habría dejado pasar
+   * enteros. Lo que cuesta es la PROFUNDIDAD, y por eso el tope vive en `canonico.ts`, por
+   * donde pasan las dos puertas.
+   */
+  const hondo = (n: number): unknown => {
+    let x: unknown = 1;
+    for (let i = 0; i < n; i++) x = { a: x };
+    return x;
+  };
+  const conUnaEntrada = (tipo: string, carga: unknown): unknown => ({
+    arcade: EL_ARCADE,
+    partida: anunciarInicio(EL_ARCADE).partida,
+    cifra: 1,
+    tics: 60,
+    entradas: [{ tic: 1, tipo, carga }],
+  });
+  /** Qué contesta la puerta entera, que es lo que ve quien llama. */
+  const loQueContesta = (cuerpo: unknown): { motivo: string; detalle: string; ms: number } => {
+    const arranca = process.hrtime.bigint();
+    try {
+      const v = registrarRecord(cuerpo) as { acepta: boolean; motivo?: string; detalle?: string };
+      return {
+        motivo: v.acepta ? 'ACEPTA' : String(v.motivo ?? '-'),
+        detalle: String(v.detalle ?? '-'),
+        ms: Number(process.hrtime.bigint() - arranca) / 1e6,
+      };
+    } catch (error) {
+      /* Lo que no es `RepeticionMalFormada` sube hasta la ruta, que no lo atrapa: 500. */
+      return {
+        motivo: `LANZA ${(error as Error).constructor.name}`,
+        detalle: 'la ruta no lo atrapa: 500',
+        ms: Number(process.hrtime.bigint() - arranca) / 1e6,
+      };
+    }
+  };
+
+  const conTipoLargo = loQueContesta(conUnaEntrada('x'.repeat(100_000), null));
+  comprobar(
+    'un `tipo` de cien mil caracteres se rechaza, y por mal formada',
+    conTipoLargo.detalle === 'entrada-mal-formada',
+    conTipoLargo,
+  );
+
+  const conCargaGorda = loQueContesta(conUnaEntrada('mover', { a: 'y'.repeat(200_000) }));
+  comprobar(
+    'una carga llana de doscientos kilobytes se rechaza',
+    conCargaGorda.detalle === 'entrada-mal-formada',
+    conCargaGorda,
+  );
+
+  const conCargaHonda = loQueContesta(conUnaEntrada('mover', hondo(3000)));
+  comprobar(
+    'una carga anidada tres mil veces se rechaza por no ser canonizable',
+    conCargaHonda.detalle === 'carga-no-serializable',
+    conCargaHonda,
+  );
+  /*
+   * Y se rechaza BARATO, que es el objeto del arreglo: antes costaba 50,5 ms de hilo
+   * bloqueado. Cinco es holgado para no ponerse rojo en una máquina ocupada —esta casa ya se
+   * ha comido cronómetros que mentían— y sigue siendo diez veces menos que lo de antes.
+   */
+  comprobar(
+    'y se rechaza sin pagar el recorrido: menos de cinco milisegundos',
+    conCargaHonda.ms < 5,
+    conCargaHonda,
+  );
+
+  const conCargaAbisal = loQueContesta(conUnaEntrada('mover', hondo(20000)));
+  comprobar(
+    'y una anidada veinte mil veces tampoco revienta: se rechaza, no da un 500',
+    conCargaAbisal.detalle === 'carga-no-serializable',
+    conCargaAbisal,
+  );
+
+  /*
+   * VACUNA: que una carga NORMAL sigue entrando hasta el reductor. Sin esto, un tope
+   * demasiado apretado dejaría las cuatro de arriba en verde cerrando la puerta a todo el
+   * mundo, que es el otro modo de fallar y no se vería.
+   */
+  const normal = loQueContesta(conUnaEntrada('mover', { donde: 3, que: [1, 2, { z: true }] }));
+  comprobar(
+    'y una carga normal sigue pasando hasta el reductor, que es quien la juzga',
+    normal.detalle !== 'entrada-mal-formada' && normal.detalle !== 'carga-no-serializable',
+    normal,
+  );
+  comprobar(
+    'y el estado más hondo de esta casa cabe de sobra en el tope',
+    TOPE_DE_PROFUNDIDAD >= 32,
+    { tope: TOPE_DE_PROFUNDIDAD, elMasHondoMedido: 6 },
+  );
 }
 
 // ---------------------------------------------------------------------------

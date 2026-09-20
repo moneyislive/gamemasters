@@ -54,7 +54,7 @@
  * después. Es la forma en que el §10 del diseño describe `verify:presupuesto`:
  * «se rechaza antes de bloquear el bucle de eventos».
  */
-import { canonico, porQueNoEsCanonico } from '../../../shared/mecanicas/canonico';
+import { canonico, NoCanonizable } from '../../../shared/mecanicas/canonico';
 import {
   exigeReejecutabilidad,
   manifiestoDeArcadeSiExiste,
@@ -63,7 +63,7 @@ import {
   tieneReloj,
 } from '../../../shared/arcade';
 import type { ArcadeId, ManifiestoDeArcade, MovimientoRegistrado } from '../../../shared/arcade';
-import { medirMovimiento } from './presupuesto';
+import { medirMovimiento, TOPE_CARGA_BYTES, TOPE_TIPO_CARACTERES } from './presupuesto';
 
 /**
  * Cuánto puede durar como mucho una partida que se suba, en segundos de juego.
@@ -261,6 +261,30 @@ export function leerRepeticion(crudo: unknown): Repeticion {
       throw new RepeticionMalFormada('entrada-mal-formada', `La entrada ${i} no trae `+'`tipo`.');
     }
     /*
+     * ═══ Y LOS DOS TOPES DE LA OTRA PUERTA, QUE AQUÍ NO ESTABAN ═══
+     *
+     * `TOPE_TIPO_CARACTERES` y `TOPE_CARGA_BYTES` se declaran en `presupuesto.ts` y sólo se
+     * exigían en `routes/arcade.ts`, la ruta de MOVIMIENTOS. Ésta es la otra puerta por la que
+     * una carga llega al mismo reductor —`leerRepeticion` la canoniza y `reejecutar` la
+     * juega—, y entraba sin mirar ninguno de los dos: medido, un `tipo` de cien mil caracteres
+     * se aceptaba tan tranquilo. Dos topes escritos en un sitio y exigidos en otro no son un
+     * tope: son un comentario.
+     *
+     * El tamaño se mide con `canonico` y NO con `JSON.stringify`, y la diferencia importa:
+     * `JSON.stringify` lanza un `RangeError` a partir de unos mil niveles de anidamiento —o
+     * sea, revienta ANTES de poder medir justo lo que hay que medir—, mientras que `canonico`
+     * ya trae su tope de profundidad y devuelve un `NoCanonizable` que estas puertas saben
+     * convertir en un 400. Medirlo con lo que se rompe es no medirlo.
+     */
+    if (e.tipo.length > TOPE_TIPO_CARACTERES) {
+      throw new RepeticionMalFormada(
+        'entrada-mal-formada',
+        `El \`tipo\` de la entrada ${i} trae ${String(e.tipo.length)} caracteres y el tope son ` +
+          `${String(TOPE_TIPO_CARACTERES)}. Es el mismo tope que la ruta de movimientos, y por ` +
+          'la misma razón: el tipo es vocabulario del juego, no un sitio donde meter datos.',
+      );
+    }
+    /*
      * EL PREFIJO `arcade:` LO RESERVA LA PLATAFORMA, y aquí esa reserva deja de
      * ser vocabulario y pasa a ser una defensa: sin esto, cualquiera podría meter
      * `arcade:tic` a mano entre las entradas y darse pasos de más sin que el
@@ -292,11 +316,28 @@ export function leerRepeticion(crudo: unknown): Repeticion {
     anterior = e.tic;
 
     if ('carga' in e && e.carga !== undefined) {
-      const malo = porQueNoEsCanonico(e.carga);
-      if (malo !== null) {
+      /*
+       * Se canoniza UNA vez y se usa el resultado para las dos cosas —saber si sobrevive y
+       * cuánto ocupa—, en vez de recorrer la carga dos veces. Y lo que se pesa es la forma
+       * CANÓNICA, que es la que se guarda y se manda, no la que llegó.
+       */
+      let escrita: string;
+      try {
+        escrita = canonico(e.carga);
+      } catch (error) {
+        if (!(error instanceof NoCanonizable)) throw error;
         throw new RepeticionMalFormada(
           'carga-no-serializable',
-          `La carga de la entrada ${i} no sobrevive a la serialización canónica: ${malo}`,
+          `La carga de la entrada ${i} no sobrevive a la serialización canónica: ${error.message}`,
+        );
+      }
+      const pesa = Buffer.byteLength(escrita, 'utf8');
+      if (pesa > TOPE_CARGA_BYTES) {
+        throw new RepeticionMalFormada(
+          'entrada-mal-formada',
+          `La carga de la entrada ${i} ocupa ${String(pesa)} bytes y el tope son ` +
+            `${String(TOPE_CARGA_BYTES)}. Es el mismo tope que la ruta de movimientos: lo que ` +
+            'entra por aquí lo reejecuta el mismo reductor.',
         );
       }
       entradas.push({ tic: e.tic, tipo: e.tipo, carga: e.carga });
