@@ -70,6 +70,91 @@ const RETARDO_MAXIMO_MS = 3000;
  */
 const MAXIMO_DE_CLAVES = 20_000;
 
+/**
+ * ═══ QUE UN NÚMERO MAL DECLARADO GRITE, EN VEZ DE CALLARSE ═══
+ *
+ * `SALTOS_DE_CONFIANZA` dice cuántos proxies hay delante, y no hay forma de averiguarlo desde
+ * dentro: se declara. Un número declarado es una suposición, y una suposición que nadie
+ * comprueba es exactamente lo que acaba de costar que dos personas compartieran cubo durante
+ * meses sin que ningún comprobador lo viera.
+ *
+ * Así que se cuenta lo que LLEGA. Si la cadena de `X-Forwarded-For` trae un número de saltos
+ * distinto del declarado, se dice una vez y en voz alta. No arregla nada solo: convierte una
+ * configuración equivocada en algo que se ve en el registro del primer minuto, en vez de en un
+ * limitador que lleva meses metiendo a todo el mundo en el mismo sitio.
+ *
+ * ═══ NO SE GUARDA NI UNA DIRECCIÓN ═══
+ *
+ * Se cuentan SALTOS, que es un número pequeño, y no direcciones. Una cuenta no identifica a
+ * nadie; una IP sí. Por eso el aviso dice «vienen 3 y se han declarado 2» y nunca de quién.
+ *
+ * ═══ Y UNA PETICIÓN SUELTA PUEDE MENTIR ═══
+ *
+ * Quien llama puede anteponer entradas inventadas a la cabecera, así que un aviso aislado no
+ * demuestra que el número esté mal. Lo que lo demuestra es que salga SIEMPRE; por eso se
+ * guardan todas las cuentas vistas —`cadenasVistas`— para poder mirarlas, y el aviso se dice
+ * una sola vez para no llenar el registro con lo que puede ser un tanteo.
+ */
+const saltosVistos = new Map<number, number>();
+let yaSeDijoLoDeLosSaltos = false;
+
+/** Cuántos saltos se han visto llegar y cuántas veces cada cuenta. Para mirarlo, no para decidir. */
+export function cadenasVistas(): ReadonlyMap<number, number> {
+  return saltosVistos;
+}
+
+/** Sólo para los comprobadores: olvida lo visto. */
+export function olvidarLasCadenas(): void {
+  saltosVistos.clear();
+  yaSeDijoLoDeLosSaltos = false;
+}
+
+/**
+ * Apunta cuántos saltos trae esta petición, y grita SÓLO cuando lo que ve no lo puede haber
+ * fabricado quien llama.
+ *
+ * ═══ POR QUÉ SÓLO SE MIRA EL LADO CORTO ═══
+ *
+ * La cuenta de entradas de `X-Forwarded-For` NO es un invariante: quien llama puede ANTEPONER
+ * las que quiera, y la infraestructura añade las suyas detrás. O sea que la cuenta que llega
+ * es «lo que puso el visitante» + «lo que añade la casa», y el primer sumando lo elige él.
+ *
+ * Eso hace que una cadena MÁS LARGA de lo declarado no signifique nada: puede ser un proxy
+ * más, o puede ser un curioso. Avisar de eso es gritar en falso a la primera visita, y —lo
+ * que es mucho peor— sería decirle al que opera «pon este número», que es dejar que quien
+ * llama escriba la configuración del servidor. Un número declarado DE MÁS es justo el error
+ * peligroso: hace fiable una entrada que escribe el atacante.
+ *
+ * Pero el lado corto sí dice algo, y dice mucho: **nadie puede hacer que lleguen MENOS
+ * entradas de las que la infraestructura añade**. Si se han declarado tres saltos y llega una
+ * cadena de dos, no hay visitante que haya podido provocarlo: el número está de más, que es
+ * la dirección peligrosa. Eso es lo que se grita.
+ *
+ * ═══ NO SE GUARDA NI UNA DIRECCIÓN ═══
+ *
+ * Se cuentan SALTOS, que es un número pequeño, y no direcciones. Una cuenta no identifica a
+ * nadie; una IP sí. El aviso dice «llegan 2 y se han declarado 3», nunca de quién.
+ */
+export function apuntarLaCadena(req: Request): void {
+  const cabecera = req.headers['x-forwarded-for'];
+  if (cabecera === undefined) return;
+  const cuantos = String(cabecera)
+    .split(',')
+    .filter((t) => t.trim().length > 0).length;
+  saltosVistos.set(cuantos, (saltosVistos.get(cuantos) ?? 0) + 1);
+  if (cuantos >= env.saltosDeConfianza || yaSeDijoLoDeLosSaltos) return;
+  yaSeDijoLoDeLosSaltos = true;
+  console.warn(
+    `[puerta] llega una cadena de X-Forwarded-For con ${String(cuantos)} entrada(s) y ` +
+      `\`SALTOS_DE_CONFIANZA\` declara ${String(env.saltosDeConfianza)}. Nadie de fuera puede ` +
+      'hacer que lleguen MENOS de las que añade la infraestructura, así que el número ' +
+      'declarado está DE MÁS — y ése es el error peligroso: con un número largo, quien llama ' +
+      'antepone una entrada y elige la dirección con la que se le cuenta, así que puede rotarla ' +
+      'para no acumular nunca, o fijar la de otra persona para dejarla fuera. Bájalo. Se dice ' +
+      'una sola vez.',
+  );
+}
+
 /** De dónde llega una petición, y si esa respuesta se puede creer. */
 export interface Procedencia {
   /** La dirección con la que se va a contar. */
@@ -132,9 +217,33 @@ export function procedenciaDe(req: Request): Procedencia {
   if (env.proxyDeConfianza === 'plataforma') {
     const deLaPlataforma = req.ips;
     if (deLaPlataforma.length > 0) {
-      // El último de la lista es el que añadió el salto en el que sí se confía;
-      // los de más a la izquierda los puede haber escrito quien llama.
-      return { ip: deLaPlataforma[deLaPlataforma.length - 1] ?? '', fiable: true };
+      /*
+       * ═══ EL PRIMERO ES EL CLIENTE, Y AQUÍ SE COGÍA EL ÚLTIMO ═══
+       *
+       * `req.ips` de Express va EN EL ORDEN DE LA CABECERA: el primero es quien empezó la
+       * petición y el último el proxy más cercano a esta máquina. Y Express ya ha tirado los
+       * que no entran en los saltos de confianza, así que lo que queda en la lista es todo
+       * fiable: `req.ips[0]` es exactamente `req.ip`.
+       *
+       * Aquí se cogía `[length - 1]`. Con UN salto delante el primero y el último son el
+       * mismo, así que nunca se vio; **con dos, el último es el balanceador y es el mismo
+       * para todo el mundo**. Medido con este Express y esta función:
+       *
+       *     trust 2, XFF="203.0.113.7, 172.71.0.9"  -> ips=[203.0.113.7, 172.71.0.9] -> 172.71.0.9
+       *     trust 2, XFF="198.51.100.22, 172.71.0.9" -> ips=[198.51.100.22, 172.71.0.9] -> 172.71.0.9
+       *
+       * Dos personas distintas, la misma dirección y `fiable: true`. O sea, EL DESASTRE QUE LA
+       * GUARDA DE ARRANQUE DE `index.ts` DICE QUE EVITA —«todas las peticiones del mundo entran
+       * con la misma dirección»— entrando por la otra puerta, con la variable bien puesta.
+       *
+       * Y producción tiene dos saltos: `Server: cloudflare` + `x-render-origin-server: Render`.
+       *
+       * Este cambio SOLO no arregla nada, y conviene saberlo: si `trust proxy` se queda corto,
+       * Express tira al cliente de la lista y el primero YA ES el balanceador. El arreglo son
+       * las dos cosas —el primero de la lista y el número de saltos bien declarado—, y por eso
+       * van juntas y con la misma comprobación encima.
+       */
+      return { ip: deLaPlataforma[0] ?? '', fiable: true };
     }
   } else {
     /*
@@ -148,9 +257,15 @@ export function procedenciaDe(req: Request): Procedencia {
     const peer = req.socket.remoteAddress ?? '';
     if (!esBucleLocal(peer) && peer) return { ip: peer, fiable: true };
 
+    /*
+     * El mismo cambio que arriba, y por la misma razón: el primero de la lista es el cliente.
+     * Aquí llega sólo cuando el peer ES el bucle local, o sea con un proxy de esta misma
+     * máquina delante —el nginx de casa—, que hoy es un salto. Con uno da igual; el día que
+     * alguien monte dos en su portátil, no.
+     */
     const porProxy = req.ips;
     if (porProxy.length > 0) {
-      return { ip: porProxy[porProxy.length - 1] ?? '', fiable: true };
+      return { ip: porProxy[0] ?? '', fiable: true };
     }
   }
 
@@ -298,6 +413,12 @@ export function limitarIntentos(opciones: OpcionesDeLimitador): RequestHandler {
 
   return (req: Request, res: Response, next: NextFunction): void => {
     const ahora = Date.now();
+    /*
+     * Se apunta aquí y no en un middleware aparte porque es aquí donde importa: las puertas
+     * son las rutas cuya protección depende de que el número de saltos sea el bueno. Cuesta
+     * un `split` de una cabecera corta, y sólo en las rutas que ya estaban contando.
+     */
+    apuntarLaCadena(req);
     const procedencia = procedenciaDe(req);
 
     /*

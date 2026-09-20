@@ -56,6 +56,85 @@ function readPort(): number {
   return Number.isInteger(raw) && raw > 0 ? raw : 5174;
 }
 
+/**
+ * El tope es un número redondo y su única función es cazar un dedazo: nadie tiene diez
+ * balanceadores en fila, así que un `SALTOS_DE_CONFIANZA=80` es un error de tecleo y no una
+ * topología. Sin tope, ese dedazo hace fiable la cabecera entera y con ella a quien llama.
+ */
+export const TOPE_DE_SALTOS = 10;
+
+/**
+ * CUÁNTOS PROXIES HAY DELANTE, que no es lo mismo que si hay alguno.
+ *
+ * ═══ POR QUÉ ES UN NÚMERO Y NO UN BOOLEANO ═══
+ *
+ * `PROXY_DE_CONFIANZA` dice SI hay que fiarse de la cabecera; esto dice DE CUÁNTOS. Express
+ * necesita el número para saber dónde acaba la parte de `X-Forwarded-For` que escribió la
+ * infraestructura y dónde empieza la que escribió quien llama, y se equivoca en las dos
+ * direcciones con consecuencias opuestas:
+ *
+ *   · CORTO: Express tira al cliente de `req.ips` y lo que queda es el balanceador, igual
+ *     para todo el mundo. El limitador mete a la casa entera en un cubo y los jugadores se
+ *     bloquean entre ellos. **Es lo que pasa hoy**: el número estaba escrito a mano como 1 en
+ *     `index.ts` y producción tiene DOS saltos (Cloudflare por delante de Render, medido en
+ *     las cabeceras: `Server: cloudflare` + `x-render-origin-server: Render`).
+ *   · LARGO: quien llama puede ANTEPONER una entrada inventada a `X-Forwarded-For` y que sea
+ *     ésa la que se cuente. Rotándola no acumula fallos nunca; fijándola en la de otra
+ *     persona, la deja fuera. Eso es peor: convierte la defensa en un arma, que es justo lo
+ *     que `limitador.ts` cuenta que ya pasó una vez.
+ *
+ * Ninguno de los dos lados es «el seguro», así que no se adivina: se declara, y si lo que se
+ * declara no es un entero se para el arranque. Un `SALTOS_DE_CONFIANZA=dos` convertido con
+ * `Number` da `NaN`, y `app.set('trust proxy', NaN)` deja `req.ips` VACÍO y el limitador DEJA
+ * DE BLOQUEAR en toda la casa, en silencio. Medido. Por eso lanza en vez de caer a un valor.
+ *
+ * El valor por defecto es 1 —lo que había escrito a mano— para que un despliegue de casa sin
+ * la variable siga comportándose exactamente igual que antes de este cambio.
+ */
+export function leerSaltosDeConfianza(
+  crudo: string | undefined,
+  modo: 'loopback' | 'plataforma' = 'plataforma',
+): number {
+  const texto = crudo?.trim() ?? '';
+  if (texto.length === 0) return 1;
+  const n = Number(texto);
+  if (!Number.isInteger(n) || n < 1 || n > TOPE_DE_SALTOS) {
+    throw new Error(
+      `\`SALTOS_DE_CONFIANZA\` vale «${texto}» y tiene que ser un entero entre 1 y ` +
+        `${String(TOPE_DE_SALTOS)}: es cuántos proxies hay delante de este servidor. Con un ` +
+        'valor que no sea un número, Express deja `req.ips` vacío y el limitador deja de ' +
+        'bloquear sin decir nada.',
+    );
+  }
+  /*
+   * ═══ Y LAS DOS VARIABLES TIENEN QUE DECIR LO MISMO ═══
+   *
+   * `loopback` es el despliegue de casa: el portátil de una velada, con un nginx suyo delante
+   * como mucho. Ese nginx usa `$proxy_add_x_forwarded_for`, que AÑADE la dirección de quien
+   * llama a lo que quien llama haya mandado. Con un salto, Express tira lo que mandó el móvil
+   * y se queda con lo que puso el nginx: correcto. Con DOS, se cree también la entrada que
+   * escribió el móvil — y entonces cualquiera rota la cabecera para no acumular fallos nunca,
+   * o la fija en la de otra persona para dejarla fuera. El propio `limitador.ts` cuenta que
+   * eso ya pasó una vez y lo llama «convertir una defensa en un arma».
+   *
+   * Las dos variables se aceptaban por separado y nadie las cruzaba. Se cruzan aquí, que es
+   * donde se leen, y no en una guarda de arranque: así también lo ven los comprobadores y
+   * cualquiera que las lea sin levantar un servidor.
+   */
+  if (modo === 'loopback' && n > 1) {
+    throw new Error(
+      `\`SALTOS_DE_CONFIANZA\` vale ${String(n)} pero \`PROXY_DE_CONFIANZA\` no es ` +
+        '`plataforma`, o sea que éste es el despliegue de casa: delante hay un nginx propio ' +
+        'como mucho. Con más de un salto, el servidor se cree la parte de la cabecera que ' +
+        'escribió quien llama, y entonces cualquiera puede elegir con qué dirección se le ' +
+        'cuenta: rotarla para no acumular fallos nunca, o fijar la de otra persona para ' +
+        'dejarla fuera. Si de verdad hay un balanceador externo delante, lo que falta es ' +
+        '`PROXY_DE_CONFIANZA=plataforma`.',
+    );
+  }
+  return n;
+}
+
 function readDefaultModel(): ModelId {
   // ANTHROPIC_MODEL es el nombre documentado en .env.example; DEFAULT_MODEL se
   // acepta como alias por comodidad.
@@ -198,6 +277,11 @@ export const env: {
    * en direcciones opuestas, y ninguna avisa.
    */
   proxyDeConfianza: 'loopback' | 'plataforma';
+  /**
+   * CUÁNTOS hay delante, que es la otra mitad de la pregunta. Ver `leerSaltosDeConfianza`:
+   * `proxyDeConfianza` dice si la cabecera vale, y esto dice hasta dónde vale.
+   */
+  saltosDeConfianza: number;
   uploadsDir: string;
   clientDir?: string;
 } = {
@@ -233,6 +317,10 @@ export const env: {
   appPassword: process.env.APP_PASSWORD?.trim() || undefined,
   // Cualquier valor que no sea exactamente 'plataforma' cae en el seguro.
   proxyDeConfianza: process.env.PROXY_DE_CONFIANZA?.trim() === 'plataforma' ? 'plataforma' : 'loopback',
+  saltosDeConfianza: leerSaltosDeConfianza(
+    process.env.SALTOS_DE_CONFIANZA,
+    process.env.PROXY_DE_CONFIANZA?.trim() === 'plataforma' ? 'plataforma' : 'loopback',
+  ),
   uploadsDir: readUploadsDir(),
   clientDir: readClientDir(),
 };

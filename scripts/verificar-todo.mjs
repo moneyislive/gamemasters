@@ -150,6 +150,12 @@ const BATERIA = [
     guion: 'verify:limitador',
     porque: 'que enumerar codigos cueste, y que un acierto no lo lave',
   },
+  {
+    nombre: 'quien llama',
+    donde: 'server',
+    guion: 'verify:quien-llama',
+    porque: 'que detras de dos balanceadores dos personas no sean una sola',
+  },
   { nombre: 'puertas', donde: 'server', guion: 'verify:puertas', lento: true, porque: 'las rutas y el ZIP del paquete' },
 
   // ── El móvil ──────────────────────────────────────────────────────────────

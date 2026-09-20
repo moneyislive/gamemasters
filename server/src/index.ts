@@ -84,10 +84,23 @@ const app = express();
  * Detrás de un proxy (Render, Fly, un Nginx doméstico) la conexión con el
  * navegador es HTTPS pero el último salto hasta aquí es HTTP en claro. Sin
  * esto, `req.secure` es falso, la cookie de sesión sale sin `secure`, y viaja
- * expuesta a cualquiera que comparta la wifi. El 1 es «me fío de UN proxy
- * delante», no de la cabecera que traiga cualquiera.
+ * expuesta a cualquiera que comparta la wifi.
+ *
+ * ═══ Y EL NÚMERO ERA UN 1 ESCRITO A MANO, CON DOS SALTOS DELANTE ═══
+ *
+ * Decía «me fío de UN proxy delante» y eso describía un nginx. Producción no es eso:
+ * `curl -I https://harkania.onrender.com/api/salud` devuelve `Server: cloudflare` y
+ * `x-render-origin-server: Render`, o sea **dos**. Con el número corto, Express tira al
+ * cliente de `req.ips` y deja sólo el balanceador — el mismo para todo el mundo—, y el
+ * limitador mete a la casa entera en un cubo. Es exactamente el desastre que la guarda de
+ * `PROXY_DE_CONFIANZA` de más abajo dice que evita, entrando por otra puerta y con la
+ * variable bien puesta.
+ *
+ * Ahora lo dice `SALTOS_DE_CONFIANZA`, que se valida al leerla (`config.ts`) y para el
+ * arranque si no es un entero: `app.set('trust proxy', NaN)` deja `req.ips` vacío y apaga el
+ * limitador en silencio, que es la peor forma de fallar que tiene esto.
  */
-app.set('trust proxy', 1);
+app.set('trust proxy', env.saltosDeConfianza);
 
 app.use(cors());
 

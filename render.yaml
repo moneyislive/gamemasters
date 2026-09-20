@@ -109,6 +109,52 @@ services:
       # la escribe quien quiere. Ver `server/src/puerta/limitador.ts`.
       - key: PROXY_DE_CONFIANZA
         value: plataforma
+      # Y CUANTOS hay delante, que es la otra mitad y faltaba.
+      #
+      # `PROXY_DE_CONFIANZA` dice si la cabecera vale; esto dice HASTA DONDE vale.
+      # Estaba escrito a mano como un 1 en `index.ts` con el comentario «me fio
+      # de UN proxy delante», y eso describia un nginx. Aqui hay DOS saltos:
+      # `curl -I https://harkania.onrender.com/api/salud` devuelve
+      # `Server: cloudflare` Y `x-render-origin-server: Render`. Con el numero
+      # corto, Express tira al cliente de `req.ips` y deja solo el balanceador
+      # —el mismo para todo el mundo—, asi que el limitador mete a la casa
+      # entera en un cubo y los jugadores se bloquean entre ellos. Es el mismo
+      # desastre que evita la variable de arriba, entrando por otra puerta.
+      #
+      # ═══ POR QUE SE QUEDA EN 1 Y NO SE PONE 2 DE UNA VEZ ═══
+      #
+      # Porque equivocarse en las dos direcciones cuesta cosas distintas y la de
+      # arriba es la peor: con el numero LARGO, quien llama puede anteponer una
+      # entrada inventada a la cabecera y elegir su propia direccion —rotandola
+      # no acumula fallos nunca, o fijandola en la de otra persona la deja
+      # fuera—. Eso convierte la defensa en un arma. Asi que el numero no se
+      # adivina desde fuera: se mide.
+      #
+      # ═══ COMO SE AVERIGUA EL NUMERO BUENO, Y COMO NO ═══
+      #
+      # COMO NO: mirando cuantas entradas trae la cabecera de una visita
+      # cualquiera. Quien llama puede ANTEPONER las que quiera, asi que esa
+      # cuenta la elige el, y subir el numero por lo que diga una visita es
+      # dejar que un desconocido escriba la configuracion del servidor. Es la
+      # direccion peligrosa: con el numero de mas, cada cual elige con que
+      # direccion se le cuenta.
+      #
+      # COMO SI: siendo nosotros el cliente. Se hace UNA peticion desde una
+      # maquina propia SIN mandar `X-Forwarded-For`, y se mira cuantas entradas
+      # le llegaron al servidor. Lo que llega menos lo que mandamos —cero— es lo
+      # que anade la infraestructura, y ese es el numero. Mientras no se haga esa
+      # medida, el valor se queda en 1: es lo que habia, no empeora nada, y el
+      # arreglo del codigo no cambia ni un comportamiento con este valor.
+      #
+      # El servidor ayuda por el lado que NO se puede falsificar: si alguna vez
+      # llegan MENOS entradas de las declaradas —cosa que nadie de fuera puede
+      # provocar, porque anteponer solo alarga— escribe una linea `[puerta]`
+      # diciendo que el numero esta DE MAS. Un aviso de esos significa bajarlo.
+      # El silencio no significa nada: no confirma que el numero sea correcto.
+      #
+      # Ver `server/scripts/verificar-quien-llama.ts`, que es quien vigila esto.
+      - key: SALTOS_DE_CONFIANZA
+        value: "1"
       # Firma las cookies, los pasaportes y las credenciales de jugador.
       # Cambiarlo invalida TODAS las sesiones a la vez: se elige una vez.
       - key: PLAYER_TOKEN_SECRET
