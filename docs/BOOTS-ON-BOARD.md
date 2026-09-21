@@ -191,9 +191,45 @@ Salieron de los ataques y **no dependen de que esto se construya**:
      guardaba y no salía— se distingue: un juego lento llega con la media alta; un pico, con
      dos mil movimientos a centésimas y un solo salto.
 3. **Cerrar el CORS pelado y el minado de asientos.**
-4. **Deltas en la vista.** Hoy se manda la vista entera a cada jugador en cada revisión: 20 MB
-   por partida, 20-26 TB/mes al millón. Es la línea más gorda de la factura y es del producto
-   que ya existe.
+4. **Deltas en la vista.** Hoy se manda la vista entera a cada jugador en cada revisión.
+   Medido reejecutando el registro congelado del Burgo —343 revisiones × 5 observadores—:
+   **73,5 kB por revisión, 24,62 MB por partida, 23,48 TB/mes al millón en crudo**.
+
+   **PERO ESA CIFRA NO ES LA FACTURA, Y LA CORRECCIÓN ES GORDA.** El mismo contenido son
+   4,07 TB con gzip y 3,42 con brotli —el 82,7 % y el 85,4 % menos—, y el cable ya va
+   comprimido: una petición a `harkania.onrender.com` devuelve `Content-Encoding: br`.
+
+   Lo que yo di por supuesto es que eso lo hacía Cloudflare. **Lo hace Render**, y está
+   documentado: «Render's load balancers automatically compress HTTP responses from your
+   apps using Brotli and gzip compression» (`render.com/docs/render-vs-heroku-comparison`,
+   página viva, y la misma prestación listada en `docs/web-services`, `docs/native-runtimes`
+   y `docs/docker`). O sea que **el ahorro del 82-89 % YA SE ESTÁ HACIENDO, gratis**, y
+   `app.use(compression())` no lo compra: como mucho mueve de sitio lo que la plataforma ya
+   hace —y peor, porque el paquete `compression` de npm es gzip/deflate y el balanceador usa
+   brotli—.
+
+   **DÓNDE SE MIDE: NO ESTÁ DOCUMENTADO.** Barrido el corpus entero de Render
+   (`docs/llms-full.txt`, 1 MB, generado el 18-sep-2026): no existe ninguna frase que ate
+   compresión y ancho de banda facturado. Dicen qué se cuenta —«traffic sent from your
+   workspace's services to destinations outside of Render», 0,15 $/GB— y nunca en qué salto.
+
+   El indicio más fuerte de que el contador está en el borde, aguas ABAJO de la compresión:
+   **un sitio estático factura ancho de banda y no tiene proceso ninguno**. Si el contador
+   viviera en la aplicación, un sitio estático contaría cero.
+
+   **DECISIÓN: no se escribe la línea.** Solo ganaría dinero en un escenario —que el
+   contador esté en la tarjeta de red de la instancia, por delante del balanceador— que es
+   el menos probable de los tres y que nada respalda. Y antes de tocar los deltas conviene
+   recordar lo medido: un parche ingenuo ahorra 79,6 % en el Burgo pero sólo 23,0 % en Las
+   Lindes, y en las ocho revisiones más gordas **el parche es más grande que la vista**.
+
+   Si alguna vez hace falta la certeza, hay un experimento de 0,08 $ que la da sin tocar
+   producción: un servicio testigo con tráfico cero que sirve 100 MiB en crudo y 400 MiB en
+   brotli en la misma hora —la aplicación escribe 0,524 GB y el cable lleva 0,105— y mirar
+   cuál de los dos números apunta Render. Son 5× de diferencia. Dos avisos: el panel da UN
+   punto por hora y cada uno aparece ~60 min después, así que son 10 min de trabajo y hasta
+   2 h de reloj; y `starter` en `render.yaml` es TIPO DE INSTANCIA, no plan de workspace —los
+   incluidos (Hobby 5 GB / Pro 25 GB / Scale 1 TB) hay que mirarlos en el panel—.
 
 ---
 
