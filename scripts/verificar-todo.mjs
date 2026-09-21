@@ -638,6 +638,27 @@ const BATERIA = [
       'en cuatro partidas de verdad (2, 3, 4 y 5 asientos) y en cada revisión, la escena recibe exactamente las losas que hay con su giro y su número de serie, cada casilla que deja tocar es una colocación que `opcionesDeLasLindes` ofrece y su movimiento es la carga de la opción sin montar nada, lo que se ofrece plantar sale de las OPCIONES y no de la vista —así que a un mirón no se le pinta un botón—, cada labriego cae dentro de su losa con el color de su sitio, y una vista de otro juego devuelve nada en vez de un valle vacío',
   },
   /*
+   * ═══ Y LA MISMA MESA, PERO POR EL CABLE ═══
+   *
+   * Las tres de arriba juegan Las Lindes EN PROCESO. Ninguna pesa lo que de verdad baja a un
+   * móvil: la proyección compone el tablero declarado entero —caras, líneas, nudos, rótulos—
+   * en cada lectura, y con 72 losas puestas es el objeto más gordo que publica ningún arcade
+   * de la casa. `verify:mesa` tiene un tope de 96 kB sobre la vista en proceso (74,2 kB); por
+   * el cable la mesa añade asientos, opciones y avisos y se va a 90,9 kB medidos. Ese
+   * sobrecoste no lo vigilaba nadie: estaba escrito en un comentario.
+   *
+   * `lento: true` no es por lo que tarda —2,4 s— sino por el criterio de esta lista: levanta
+   * un servidor, y `--rapido` salta los que levantan servidor.
+   */
+  {
+    nombre: 'Las Lindes por el cable',
+    donde: 'server',
+    guion: 'jugar:lindes',
+    lento: true,
+    porque:
+      'una mesa de tres se juega ENTERA por las rutas de verdad —abrir, sentarse, las 71 losas de la bolsa, plantar y pasar— eligiendo siempre un movimiento del TABLERO QUE EL PROPIO SERVIDOR acaba de mandar: ni un 500, ni un botón que ofrezca y luego rechace, y la lectura más gorda de la partida cabe en los 128 kB del presupuesto del cable, que es el único sitio donde se pesa lo que baja a un móvil de verdad',
+  },
+  /*
    * Y EL VALLE MEDIDO, que es lo único que dice que el tablero SE VE.
    *
    * Va en `escenas` y no en `server` porque lo que mide es geometría, y porque lee

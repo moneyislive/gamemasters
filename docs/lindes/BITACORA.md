@@ -984,14 +984,26 @@ De los confirmados quedan sin tocar, y por orden de lo que se vería antes:
   `móvil tumbado` y `tableta`— porque lo que la escena mide es el LIENZO y no la
   ventana. Mirado en los dos móviles: el tablero entra entero, la losa de la mano
   entra entera y el reloj entra entero.
-- **`jugar:lindes` no está en la batería.** Necesita un servidor levantado y hoy se
-  le pasa por `--servidor`. Desde el cierre acepta además `--codigo`, que lo sienta en una
-  mesa YA ABIERTA en pantalla y le hace esperar cuando el turno es de la persona: es la
-  única forma de jugar una mesa de verdad con un asiento humano, y es lo que encontró la
-  mitad de los catorce fallos del cierre. `verify:mesa` ya cubre la superficie HTTP genérica y
-  juega Las Lindes entera con el árbitro, así que el hueco que quedaría es sólo el
-  PESO —y eso, hoy, está medido a mano y escrito arriba. Meterlo pide que se levante
-  su propio servidor, como hace `jugar:fondo`; es barato y no está hecho.
+- **~~`jugar:lindes` no está en la batería.~~ YA ESTÁ, y lo que costó no fue levantar el
+  servidor.** Levantarlo era lo barato. Lo que había que ver antes era que el puerto por
+  defecto —el 5174— es la entrada `sala` de `.claude/launch.json`, y esa entrada arranca
+  **`../GameMasters-arcade/server`: OTRO WORKTREE**. Metido tal cual, el comprobador habría
+  sido rojo siempre sin nada levantado, y **verde midiendo el trabajo de otra rama** cuando
+  alguien tuviera la Sala abierta —escribiéndole mesas de verdad en su almacén—. Ahora, si no
+  se le dice a dónde ir, levanta el suyo en un puerto que le **pide al sistema** (`listen(0)`),
+  no en un rango al azar como `jugar:fondo`: su 7600-7899 incluye un 7680 que en esta máquina
+  tiene cogido un `svchost.exe` para siempre.
+  Lo segundo que faltaba: el guion **medía y no afirmaba**. Imprimía vueltas, lecturas y kB
+  sin exigir nada, así que una partida cortada salía con un cero. Ahora lleva suelos (71
+  losas, 60 vueltas, 100 lecturas, plantar y pasar), **cuenta e imprime sus comprobaciones**
+  —651 en una partida— y guarda el número por el que existe: la lectura más gorda contra un
+  presupuesto de 128 kB. Ese tope no es el de `verify:mesa`: aquél son 96 kB sobre la vista
+  EN PROCESO (74,2 kB), y por el cable la mesa añade asientos, opciones y avisos y se va a
+  **90,9 kB**. Reutilizar el 96 habría dejado un kilobyte de margen.
+  `--codigo` sigue funcionando igual que antes y contra el 5174 por defecto: es la única
+  forma de jugar con un asiento humano y encontró la mitad de los catorce fallos del cierre.
+  Lo que se le ha puesto es un tope de espera, porque sus dos ramas hacían `vueltas--;
+  continue;` y al otro lado podía no jugar nadie nunca.
 - **No hay colisión con las piezas, sólo con el borde del tablero.** Andando se atraviesan
   almiares, casas y murallas; `unPaso` sólo pregunta si hay losa puesta. Se ha visto
   metiéndose dentro de un almiar en el móvil. No se hace esta noche y no es un descuido:

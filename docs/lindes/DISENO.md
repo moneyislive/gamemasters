@@ -371,9 +371,11 @@ miraba qué entra en el LIENZO.
 Y los que ya existen y lo cogen solo: `verify:juegos`, `verify:mesa`,
 `verify:procedencia`, `verify:pureza`, `verify:fronteras`, `oro:arcade`.
 
-Y una herramienta que no es comprobador y se corre a mano:
+Y uno más, `jugar:lindes`, que además se corre a mano de tres formas:
 
+    npm run jugar:lindes                                    (levanta su propio servidor)
     npm run jugar:lindes -- --servidor http://localhost:5174
+    npm run jugar:lindes -- --codigo ABCDE                  (acompañante, contra la pantalla)
 
 Juega una mesa entera POR EL CABLE contra un servidor levantado, con los movimientos
 sacados del tablero que el servidor mandó. Lo que busca no son las reglas —ésas ya

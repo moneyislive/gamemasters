@@ -1,7 +1,28 @@
 /**
- * JUGAR UNA MESA DE LAS LINDES DE VERDAD, POR HTTP, CONTRA UN SERVIDOR LEVANTADO.
+ * JUGAR UNA MESA DE LAS LINDES DE VERDAD, POR HTTP.
  *
+ *   npm run jugar:lindes                                   (levanta su propio servidor)
  *   npm run jugar:lindes -- --servidor http://localhost:5174
+ *   npm run jugar:lindes -- --codigo ABCDE                 (acompañante, contra la pantalla)
+ *
+ * ═══ POR QUÉ LEVANTA SU PROPIO SERVIDOR, Y POR QUÉ ESO ERA LA CONDICIÓN PARA ENTRAR ═══
+ *
+ * Este guion existía desde el cierre de Las Lindes y NO estaba en la batería, porque pedía un
+ * servidor levantado a mano. Meterlo tal cual habría sido peor que no meterlo, y no por lo
+ * que parece:
+ *
+ *   · Sin nada levantado era ROJO SIEMPRE, en medio segundo, con un `TypeError: fetch failed`.
+ *   · Y con algo levantado era VERDE MIDIENDO OTRO ÁRBOL. El puerto por defecto era el 5174,
+ *     que en este repositorio es la entrada `sala` de `.claude/launch.json` — y esa entrada
+ *     arranca `../GameMasters-arcade/server`, OTRO WORKTREE. O sea que la batería habría dado
+ *     verde por el trabajo de otra rama, y además le habría escrito mesas de verdad en su
+ *     almacén.
+ *
+ * Así que cuando no se le dice a dónde ir, se levanta uno propio en un puerto que PIDE AL
+ * SISTEMA (`listen(0)`), como hacen `verify:larga` y `verify:mesa`. No en un rango al azar
+ * como `jugar:fondo`, cuyo 7600-7899 incluye un 7680 que en esta máquina tiene cogido un
+ * `svchost.exe` para siempre: una de cada trescientas corridas elige un puerto que no va a
+ * poder abrir nunca, y el rojo que sale no tiene nada que ver con lo que se tocó.
  *
  * ═══ QUÉ AÑADE SOBRE LA BATERÍA, QUE YA ESTÁ VERDE ═══
  *
@@ -28,6 +49,12 @@
  * lo más grave que puede encontrar este guion, porque significa que lo que se pinta y lo
  * que se acepta no son la misma cosa.
  */
+import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { LINDES } from '../../shared/arcade/juegos/lindes';
 
 const args = process.argv.slice(2);
@@ -37,7 +64,6 @@ const opcion = (n: string, pd: string): string => {
   return i >= 0 && v !== undefined ? v : pd;
 };
 
-const BASE = opcion('servidor', 'http://localhost:5174').replace(/\/$/, '');
 const CUANTOS = Number(opcion('jugadores', '3'));
 const TOPE = Number(opcion('tope', '400'));
 
@@ -59,6 +85,118 @@ const ACOMPANANDO = CODIGO.length > 0;
 
 /** Cuanto se espera antes de volver a mirar si ya le toca a un robot, en ms. */
 const OJEADA_MS = 800;
+
+/**
+ * CUÁNTO SE ESPERA EN TOTAL A QUE JUEGUE LA PERSONA, ANTES DE RENDIRSE.
+ *
+ * Las dos ramas de acompañante hacen `vueltas--; continue;`, o sea que si al otro lado no
+ * juega nadie el bucle NO TERMINA NUNCA. La batería lanza con `spawnSync` y SIN plazo, así
+ * que un `--codigo` que se colara la dejaría colgada para siempre. Nunca va a pasar —la
+ * batería no pasa `--codigo`— pero un guion que puede colgarse acaba colgándose.
+ */
+const ESPERAS_SEGUIDAS = 240;
+
+/**
+ * LO MÁS GORDO QUE PUEDE BAJAR UNA LECTURA DE LA MESA.
+ *
+ * 128 kB, y NO los 96 kB de `verify:mesa`: aquel tope mide la vista EN PROCESO (74,2 kB
+ * medidos ahí), y por el cable la mesa añade asientos, opciones y avisos encima. Medido por
+ * el cable en diez repartos distintos, con tres a la mesa: 84,5 · 85,7 · 85,9 · 86,2 · 88,0 ·
+ * 88,1 · 88,4 · 92,3 · 92,7 · 95,0 kB. Reutilizar el 96 dejaría un kilobyte de margen sobre
+ * el peor caso, que es exactamente el comprobador que se cae uno de cada tres días. 128 son
+ * un 35 % sobre el peor medido.
+ *
+ * El número es para TRES a la mesa, que es lo que corre la batería. Cada asiento añade un
+ * renglón al panel, así que con `--jugadores 5` un rojo de aquí no es del producto.
+ */
+const TOPE_DEL_CABLE = 128 * 1024;
+
+/*
+ * ═══ EL SERVIDOR: EL SUYO, SALVO QUE SE LE DIGA OTRA COSA ═══
+ *
+ * `--servidor` y `--codigo` siguen funcionando exactamente igual que antes, porque el modo
+ * acompañante es la única forma que hay de jugar una mesa con un asiento humano —y encontró
+ * la mitad de los catorce fallos del cierre de Las Lindes—. Lo que cambia es el caso en que
+ * no se dice nada: antes caía al 5174 de otro worktree, y ahora levanta el suyo.
+ */
+const AQUI = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.resolve(AQUI, '..', '..');
+const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+const ARRANQUE = path.join(REPO, 'server', 'src', 'index.ts');
+
+const SERVIDOR_DICHO = opcion('servidor', '').replace(/\/$/, '');
+/** Si se levanta uno propio: ni se dijo servidor, ni se está acompañando a nadie. */
+const PROPIO = SERVIDOR_DICHO === '' && !ACOMPANANDO;
+
+/** Un puerto que el sistema dice que está libre, y no uno elegido al azar. */
+async function puertoLibre(): Promise<number> {
+  const { createServer } = await import('node:net');
+  return new Promise<number>((resolver, rechazar) => {
+    const sonda = createServer();
+    sonda.once('error', rechazar);
+    sonda.listen(0, '127.0.0.1', () => {
+      const donde = sonda.address();
+      const puerto = typeof donde === 'object' && donde !== null ? donde.port : 0;
+      sonda.close(() => resolver(puerto));
+    });
+  });
+}
+
+const PUERTO = PROPIO ? await puertoLibre() : 0;
+const BASE = PROPIO
+  ? `http://127.0.0.1:${String(PUERTO)}`
+  : SERVIDOR_DICHO === ''
+    ? 'http://localhost:5174'
+    : SERVIDOR_DICHO;
+
+const CARPETA = PROPIO ? fs.mkdtempSync(path.join(os.tmpdir(), 'lindes-cable-')) : '';
+let loQueDijoElServidor = '';
+let servidor: ChildProcess | undefined;
+
+function levantar(): ChildProcess {
+  const proceso = spawn(process.execPath, [TSX, ARRANQUE], {
+    cwd: CARPETA,
+    env: {
+      PATH: process.env['PATH'],
+      SystemRoot: process.env['SystemRoot'],
+      TEMP: process.env['TEMP'],
+      TMP: process.env['TMP'],
+      PORT: String(PUERTO),
+      NODE_ENV: 'test',
+      MESAS_DIR: path.join(CARPETA, 'mesas'),
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const anotar = (d: Buffer): void => {
+    loQueDijoElServidor += d.toString();
+  };
+  proceso.stdout?.on('data', anotar);
+  proceso.stderr?.on('data', anotar);
+  return proceso;
+}
+
+/**
+ * Esperar a que escuche, y si no, DECIR LO QUE DIJO.
+ *
+ * `jugar:fondo` lanza con `stdio: 'ignore'` y cuando no arranca lo único que se lee es «el
+ * servidor no llegó a arrancar», sin una palabra del servidor. Eso convierte cualquier fallo
+ * de arranque —un puerto imposible, un error de compilación— en el mismo mensaje mudo, y
+ * enseña a volver a correr la batería en vez de a leerla.
+ */
+async function esperarAlServidor(): Promise<void> {
+  for (let i = 0; i < 200; i++) {
+    try {
+      const r = await fetch(`${BASE}/api/salud`);
+      if (r.ok) return;
+    } catch {
+      /* todavía no escucha */
+    }
+    await dormir(250);
+  }
+  throw new Error(
+    `el servidor no arrancó en el puerto ${String(PUERTO)}. Dijo:\n${loQueDijoElServidor.slice(-1500)}`,
+  );
+}
 
 const dormir = async (ms: number): Promise<void> =>
   new Promise((listo) => {
@@ -89,11 +227,25 @@ async function pedir(
   const cabeceras: Record<string, string> = {};
   if (opciones?.cuerpo !== undefined) cabeceras['Content-Type'] = 'application/json';
   if (opciones?.llave !== undefined) cabeceras['x-asiento'] = opciones.llave;
-  const r = await fetch(`${BASE}/api${ruta}`, {
-    method: opciones?.metodo ?? 'GET',
-    headers: cabeceras,
-    body: opciones?.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
-  });
+  let r: Response;
+  try {
+    r = await fetch(`${BASE}/api${ruta}`, {
+      method: opciones?.metodo ?? 'GET',
+      headers: cabeceras,
+      body: opciones?.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
+    });
+  } catch (e) {
+    /*
+     * Sin esto, un servidor que no está al otro lado revienta con un `TypeError: fetch
+     * failed` y una pila de veinte líneas de `node:internal` que no dice ni a qué dirección
+     * se llamó. Es el caso más probable de todos —se corre el modo acompañante sin haber
+     * levantado nada— y merece una frase, no un volcado.
+     */
+    throw new Error(
+      `no contesta nadie en ${BASE} (${e instanceof Error ? e.message : String(e)}).` +
+        (PROPIO ? '' : '\n  Si querías que levantara el suyo, no le pases --servidor ni --codigo.'),
+    );
+  }
   const texto = await r.text();
   const ms = Date.now() - arranca;
   let datos: Record<string, unknown> = {};
@@ -168,6 +320,37 @@ const reproches: string[] = [];
 const quejarse = (q: string): void => {
   reproches.push(q);
   console.log(`  ✗ ${q}`);
+};
+
+/**
+ * CUÁNTAS AFIRMACIONES SE HAN HECHO.
+ *
+ * Sin esta cifra la entrada sale en la batería como `✓ Las Lindes por el cable  2,9s` y no
+ * hay forma de distinguirla de una que no comprobó nada: cero inspeccionados se lee como
+ * vigilado. `jugar:fondo` imprime la suya —«2138 comprobaciones jugando»— y ésta también.
+ */
+let comprobaciones = 0;
+
+/** Una afirmación: se cuenta siempre, se queja sólo si no se cumple. */
+const comprobar = (que: string, condicion: boolean, detalle?: unknown): void => {
+  comprobaciones++;
+  if (condicion) return;
+  quejarse(detalle === undefined ? que : `${que} — ${JSON.stringify(detalle)}`);
+};
+
+/** Cuántas ojeadas seguidas se llevan esperando a que juegue alguien que no es nuestro. */
+let esperasSeguidas = 0;
+
+/** ¿Se sigue esperando a la persona, o ya es rendirse? Ver `ESPERAS_SEGUIDAS`. */
+const seguirEsperando = (): boolean => {
+  esperasSeguidas++;
+  if (esperasSeguidas <= ESPERAS_SEGUIDAS) return true;
+  quejarse(
+    `se llevan ${String(ESPERAS_SEGUIDAS)} ojeadas seguidas —unos ` +
+      `${String(Math.round((ESPERAS_SEGUIDAS * OJEADA_MS) / 60000))} minutos— esperando a que juegue ` +
+      'alguien que no es nuestro. Se para en vez de esperar para siempre.',
+  );
+  return false;
 };
 
 async function jugar(): Promise<void> {
@@ -276,8 +459,17 @@ async function jugar(): Promise<void> {
     sumaLecturas += cualquiera.bytes;
     if (cualquiera.bytes > mayorLectura) mayorLectura = cualquiera.bytes;
     if (cualquiera.ms > masLento) masLento = cualquiera.ms;
+    comprobaciones++;
     if (cualquiera.estado !== 200) {
       quejarse(`leer la mesa contestó ${String(cualquiera.estado)}`);
+      return;
+    }
+    comprobaciones++;
+    if (cualquiera.bytes > TOPE_DEL_CABLE) {
+      quejarse(
+        `vuelta ${String(vueltas)}: una lectura de la mesa pesa ${(cualquiera.bytes / 1024).toFixed(1)} kB, ` +
+          `por encima de los ${String(TOPE_DEL_CABLE / 1024)} kB del presupuesto del cable`,
+      );
       return;
     }
     const mesa = laMesaDe(cualquiera);
@@ -286,9 +478,11 @@ async function jugar(): Promise<void> {
       break;
     }
     const turno = deQuien(cualquiera);
+    comprobaciones++;
     if (turno === null) {
       if (ACOMPANANDO) {
         /* Todavia no se ha volcado la bolsa. Se mira otra vez sin gastar vuelta. */
+        if (!seguirEsperando()) return;
         await dormir(OJEADA_MS);
         vueltas--;
         continue;
@@ -297,9 +491,11 @@ async function jugar(): Promise<void> {
       return;
     }
     const quien = gente.find((g) => g.asiento === turno);
+    comprobaciones++;
     if (quien === undefined) {
       if (ACOMPANANDO) {
         /* Le toca a la persona de la pantalla: se espera, que es lo que hace un companero. */
+        if (!seguirEsperando()) return;
         await dormir(OJEADA_MS);
         vueltas--;
         continue;
@@ -307,6 +503,7 @@ async function jugar(): Promise<void> {
       quejarse(`el turno es de «${turno}», que no está sentado`);
       return;
     }
+    esperasSeguidas = 0;
     const suya = quien.asiento === primera.asiento ? cualquiera : await leer(quien);
     if (quien.asiento !== primera.asiento) {
       lecturas++;
@@ -316,6 +513,7 @@ async function jugar(): Promise<void> {
     }
     const suMesa = laMesaDe(suya);
     const toques = toquesDe(suMesa.vista);
+    comprobaciones++;
     if (toques.length === 0) {
       quejarse(`vuelta ${String(vueltas)}: el tablero de quien tiene el turno no ofrece ni un toque`);
       return;
@@ -334,6 +532,7 @@ async function jugar(): Promise<void> {
     const hecho = await mover(quien, elegido, rev);
     porFamilia.set(elegido.tipo, (porFamilia.get(elegido.tipo) ?? 0) + 1);
 
+    comprobaciones++;
     if (hecho.estado === 200) continue;
     if (hecho.estado >= 500) {
       quejarse(`vuelta ${String(vueltas)}: ${elegido.tipo} reventó el servidor (${String(hecho.estado)})`);
@@ -367,15 +566,113 @@ async function jugar(): Promise<void> {
   );
   console.log(`  bajado en total: ${(sumaLecturas / 1024 / 1024).toFixed(2)} MB`);
 
-  if (!terminada) quejarse(`la partida no terminó en ${String(TOPE)} vueltas`);
+  comprobar(`la partida termina en ${String(TOPE)} vueltas`, terminada, { vueltas });
+
+  /*
+   * ═══ Y AHORA SE AFIRMA SOBRE LO QUE SE ACABA DE IMPRIMIR ═══
+   *
+   * Hasta aquí el guion medía y enseñaba, y no exigía nada: una partida que se hubiera
+   * cortado a las tres vueltas imprimía sus tres vueltas y salía con un cero. Los suelos son
+   * lo que convierte esto en un comprobador; los números son los medidos en diez corridas con
+   * tres a la mesa, y cada suelo va bien por debajo del peor caso para no caerse solo.
+   *
+   * Sin modo acompañante, porque ahí las cuentas son de dos jugadores distintos y la mitad de
+   * la partida la hace una persona.
+   */
+  if (!ACOMPANANDO) {
+    const puestas = porFamilia.get('lindes:poner') ?? 0;
+    const plantadas = porFamilia.get('lindes:plantar') ?? 0;
+    const pasadas = porFamilia.get('lindes:pasar') ?? 0;
+    /* 71 en 10 de 10: las 72 losas de la bolsa menos la de salida. */
+    comprobar('se ponen las losas de la bolsa, no cuatro', puestas >= 60, { puestas });
+    /* Medido 101-107. */
+    comprobar('la partida es larga de verdad', vueltas >= 60, { vueltas });
+    /* Medido 172-184. */
+    comprobar('y se lee la mesa en cada turno', lecturas >= 100, { lecturas });
+    /* Medidos 21-23 y 9-11. Los mismos umbrales de familia que usa `verify:mesa`. */
+    comprobar('se planta de verdad', plantadas >= 10, { plantadas });
+    comprobar('y se pasa de turno alguna vez', pasadas >= 3, { pasadas });
+    /*
+     * EL NÚMERO POR EL QUE EXISTE ESTE GUION. Estaba medido y escrito en un comentario de
+     * `verify:mesa`, y guardado por nadie.
+     */
+    comprobar(
+      `la lectura más gorda cabe en los ${String(TOPE_DEL_CABLE / 1024)} kB del presupuesto del cable`,
+      mayorLectura <= TOPE_DEL_CABLE,
+      { mayor: `${(mayorLectura / 1024).toFixed(1)} kB`, tope: `${String(TOPE_DEL_CABLE / 1024)} kB` },
+    );
+  }
 }
 
-await jugar();
+if (PROPIO) {
+  servidor = levantar();
+  try {
+    await esperarAlServidor();
+  } catch (e) {
+    console.log(`\n  ✗ ${e instanceof Error ? e.message : String(e)}`);
+    servidor.kill();
+    process.exit(1);
+  }
+}
+
+/**
+ * Esperar a que el servidor muera DE VERDAD. En Windows no es instantáneo, y mientras respira
+ * sigue agarrando su carpeta: borrarla antes da un `EBUSY` que no tiene nada que ver con el
+ * juego y que se lee como un fallo del guion.
+ */
+function esperarAQueMuera(proceso: ChildProcess): Promise<void> {
+  return new Promise((resolver) => {
+    if (proceso.exitCode !== null || proceso.signalCode !== null) {
+      resolver();
+      return;
+    }
+    proceso.once('exit', () => resolver());
+    setTimeout(resolver, 3000);
+  });
+}
+
+try {
+  await jugar();
+} catch (e) {
+  quejarse(e instanceof Error ? e.message : String(e));
+} finally {
+  if (servidor !== undefined) {
+    servidor.kill();
+    await esperarAQueMuera(servidor);
+  }
+}
 
 console.log('');
 if (reproches.length > 0) {
+  console.log(`${String(comprobaciones)} comprobaciones jugando`);
   console.log(`${String(reproches.length)} reproches. La mesa NO está limpia.`);
+  /*
+   * ═══ UN ROJO DE AQUÍ TIENE QUE PODER RELEERSE ═══
+   *
+   * La semilla la elige el servidor con `crypto.getRandomValues` y la ruta no la acepta del
+   * cliente a propósito, así que cada corrida es una partida distinta: un rojo no se
+   * reproduce volviendo a correr. Lo que sí se puede es dejar el almacén donde está y decir
+   * dónde, que es lo que `jugar:fondo` no hace —borra siempre— y por eso sus rojos se miran
+   * una vez y se pierden.
+   */
+  if (PROPIO) {
+    console.log(`\nLo que jugó se queda sin borrar, para poder releerlo:\n  ${CARPETA}`);
+    if (loQueDijoElServidor.length > 0) {
+      console.log(`\nLo último que dijo el servidor:\n${loQueDijoElServidor.slice(-800)}`);
+    }
+  }
   process.exit(1);
 }
+if (PROPIO) {
+  /* Si Windows sigue sin soltarla, se deja: es un temporal y no vale un rojo. */
+  try {
+    fs.rmSync(CARPETA, { recursive: true, force: true });
+  } catch {
+    /* que la recoja el sistema */
+  }
+}
+console.log(`${String(comprobaciones)} comprobaciones jugando`);
+console.log('');
 console.log('La mesa se juega entera por el cable: sin un 500, sin un botón que el servidor');
-console.log('ofrezca y luego rechace, y con la partida terminada.');
+console.log('ofrezca y luego rechace, con la partida terminada, y con la lectura más gorda');
+console.log('dentro del presupuesto del cable.');
