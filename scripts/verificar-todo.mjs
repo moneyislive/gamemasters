@@ -504,6 +504,26 @@ const BATERIA = [
     porque:
       'la multiplicación Q16.16 usa `×` y `÷` —que IEEE 754 fija al bit— y no un desplazamiento, que desborda y devuelve el paso NEGATIVO; y nadie en `shared/` se escribe el suyo a mano',
   },
+  /*
+   * ═══ Y LO QUE SE CONSTRUYE ENCIMA DE ESA ARITMÉTICA ═══
+   *
+   * `verify:fijo` dice que los números salen bien. Éste dice que la CAPA que los usa contesta
+   * lo mismo en los dos motores: se recorre un tablero lleno de Las Lindes —72 casillas y
+   * 3.024 cuerpos, el peor caso medido del juego— en Node y en Hermes, y se comparan la huella
+   * del recorrido y con qué se topó.
+   *
+   * El suelo es la mitad del comprobador y está partido en dos a propósito: un paseante al que
+   * no para nada da la misma huella en los dos motores —la de no tocar nada—, y con un solo
+   * contador, apagar la capa de colisiones entera seguía dando miles de paradas porque el borde
+   * del tablero para igual. Se vio: `porCuerpo` a cero y `porBorde` en 1.946, en verde.
+   */
+  {
+    nombre: 'el mundo y su arena',
+    donde: 'server',
+    guion: 'verify:mundo',
+    porque:
+      'el mundo declarado pasa por `canonico.ts` —o sea que se puede comparar y congelar, que es lo que el primer diseño no conseguía con sus listas tipadas dentro— y la arena que se deriva de él para al paseante en los MISMOS sitios en Node y en Hermes: misma huella, mismas paradas contra cuerpo y contra borde, mismos resbalones',
+  },
   {
     nombre: 'marcador',
     donde: 'server',
