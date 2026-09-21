@@ -82,6 +82,8 @@ import {
   TICS_PARA_COLOCARSE,
 } from '../../shared/arcade/juegos';
 import { asientosDelRobot, jugarConElRobot } from './robot-del-burgo';
+import { LINDES, partidaNuevaDeLasLindes } from '../../shared/arcade/juegos';
+import { asientosDeLasLindes, jugarLasLindes } from './robot-de-las-lindes';
 
 const AQUI = path.resolve(import.meta.dirname ?? __dirname, 'oro-arcade');
 
@@ -343,7 +345,57 @@ const EL_BURGO: GuionDeArcade = {
   },
 };
 
-const GUIONES: GuionDeArcade[] = [LA_FRENTE, EL_BURGO];
+/**
+ * LAS LINDES: una partida de tres, jugada por el robot hasta vaciar la bolsa.
+ *
+ * ═══ QUÉ CONGELA QUE NO CONGELE NINGUNA OTRA REFERENCIA ═══
+ *
+ * Un tablero que CRECE. La Frente no tiene tablero y el del Burgo es el mismo anillo
+ * de cuarenta casillas de la primera jugada a la última; aquí la topología nace
+ * vacía, cambia en cada movimiento y una losa puede fundir dos villas en una. Lo que
+ * queda congelado es el recuento entero —qué se cerró, cuándo, quién cobró y cuánto—
+ * de una partida de doscientos y pico movimientos.
+ *
+ * Sin tics: este juego declara `tickHz: 0` y no tiene plazos, así que el tic no
+ * entra por la puerta del reductor más que para devolver el mismo estado. Se
+ * congelan tres al final por lo mismo que en el Burgo: para que `sinTocar` cuente
+ * algo y el contador que caza un `{ ...estado }` gratuito tenga qué contar.
+ *
+ * `retratosPorHuella` porque cada vista lleva el tablero declarado dentro —caras,
+ * líneas, nudos y paneles de setenta y dos losas— y en claro serían decenas de
+ * megabytes. La comparación sigue siendo byte a byte: dos cadenas distintas dan
+ * huellas distintas.
+ */
+const CUANTOS_EN_LAS_LINDES = 3;
+const TICS_TRAS_LAS_LINDES = 3;
+
+const LAS_LINDES: GuionDeArcade = {
+  arcade: LINDES,
+  titulo: 'Las Lindes · tres a la mesa, jugada por el robot hasta vaciar la bolsa',
+  semilla: 20260918,
+  inicial: () => partidaNuevaDeLasLindes(),
+  miradas: [ESPECTADOR, ...asientosDeLasLindes(CUANTOS_EN_LAS_LINDES)],
+  retratosPorHuella: true,
+  guion: () => {
+    const partida = jugarLasLindes(20260918, CUANTOS_EN_LAS_LINDES);
+    const apuntes: Apunte[] = [];
+    let ultimoTic = 0;
+    for (const a of partida.apuntes) {
+      const apunte: Apunte = { tipo: a.tipo, tic: a.tic };
+      if (a.carga !== undefined) apunte.carga = a.carga;
+      if (a.quien !== undefined && a.quien !== null) apunte.quien = a.quien;
+      if (a.asientos !== undefined && a.asientos.length > 0) apunte.asientos = a.asientos;
+      apuntes.push(apunte);
+      if (a.tic > ultimoTic) ultimoTic = a.tic;
+    }
+    for (let t = 1; t <= TICS_TRAS_LAS_LINDES; t++) {
+      apuntes.push({ tipo: 'arcade:tic', tic: ultimoTic + t });
+    }
+    return apuntes;
+  },
+};
+
+const GUIONES: GuionDeArcade[] = [LA_FRENTE, EL_BURGO, LAS_LINDES];
 
 // ---------------------------------------------------------------------------
 // La instantánea

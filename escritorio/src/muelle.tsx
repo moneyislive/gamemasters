@@ -55,6 +55,7 @@ import type { FiguraId } from '../../escenas/embarcadero/figuras';
 import type { TemaDelMuelle } from '../../escenas/embarcadero/tema';
 import type { MesaEnElMuelle, Traer, Ventana } from '../../escenas/embarcadero/tipos';
 import { Plaza } from '../../escenas/plaza/Plaza';
+import { LindeAlta } from '../../escenas/linde-alta/LindeAlta';
 import { esLaOpcionDeEmpezar, haEmpezado } from './empezada';
 import { figuraDeEstreno, guardarFigura } from './figura';
 import type { LaMesa, MesaVista } from './mesa';
@@ -67,6 +68,18 @@ export const TOPE_DE_ZARPAR_MS = 3500;
 
 /** Cuánto dura el «copiado» junto al botón. Lo que se tarda en mirarlo. */
 const COPIADO_MS = 1600;
+
+/**
+ * El sitio del tema, en pie: «en la Linde Alta» → «En la Linde Alta».
+ *
+ * El tema guarda la frase en minúscula porque su sitio natural es detrás de un «Quién eres
+ * ___». El rótulo del piloto de un asiento la quiere sola y empezando la frase, y decía «En
+ * el muelle» a pelo: el tercer sitio del vestíbulo que nombraba el lobby de Riberas mientras
+ * el jugador estaba en el Burgo o en la Linde Alta.
+ */
+function enPie(donde: string): string {
+  return donde.charAt(0).toUpperCase() + donde.slice(1);
+}
 
 /**
  * Los bytes de un modelo, por la misma ruta relativa que pide la app.
@@ -281,7 +294,16 @@ export function Muelle({
    * bloque entero sería el mismo JSX copiado con otro nombre dentro, y el día que el contrato
    * crezca se arreglaría una de las dos copias. Lo decide el tema, no el nombre del arcade.
    */
-  const Escena = tema.escena === 'plaza' ? Plaza : Embarcadero;
+  /*
+   * ═══ TRES ESCENAS HERMANAS, Y LA TABLA LAS ELIGE POR NOMBRE ═══
+   *
+   * Las tres cumplen `PropsDelEmbarcadero` letra por letra, así que aquí no hay más
+   * que escoger. Un `escena` que esta versión no conozca cae al embarcadero, que es
+   * el que siempre estuvo: un lobby de otro sitio es raro, y una pantalla en blanco
+   * es un fallo.
+   */
+  const ESCENAS = { plaza: Plaza, linde: LindeAlta, embarcadero: Embarcadero } as const;
+  const Escena = ESCENAS[tema.escena] ?? Embarcadero;
   const conMundo = typeof window !== 'undefined' && mundoPedido;
 
   return (
@@ -345,6 +367,7 @@ export function Muelle({
           {eligiendo ? (
             <Figuras
               elegida={figura}
+              donde={tema.donde}
               alElegir={elegir}
               alVolver={() => {
                 ponerEligiendo(false);
@@ -358,6 +381,7 @@ export function Muelle({
               codigoDeLaUrl={codigoDeLaUrl}
               minimo={manifiesto.jugadores.minimo}
               figura={figura}
+              donde={tema.donde}
               alCambiar={() => {
                 ponerEligiendo(true);
               }}
@@ -430,6 +454,7 @@ function EnLaOrilla({
   codigoDeLaUrl,
   minimo,
   figura,
+  donde,
   alCambiar,
 }: {
   escondida: boolean;
@@ -437,6 +462,8 @@ function EnLaOrilla({
   codigoDeLaUrl: string;
   minimo: number;
   figura: FiguraId;
+  /** «en el muelle», «en la plaza del Burgo», «en la Linde Alta». Lo pone el tema. */
+  donde: string;
   alCambiar: () => void;
 }): JSX.Element {
   const [nombre, ponerNombre] = useState('');
@@ -451,7 +478,7 @@ function EnLaOrilla({
       <section className="panel">
         <h2 className="rotulo-de-panel">Quién eres</h2>
         <p className="letra-chica">
-          Es lo que ven los demás en el muelle. No es una cuenta: no hay correo ni contraseña, y
+          Es lo que ven los demás {donde}. No es una cuenta: no hay correo ni contraseña, y
           muere con la partida.
         </p>
         <input
@@ -480,7 +507,7 @@ function EnLaOrilla({
         <h2 className="rotulo-de-panel">Abrir una mesa</h2>
         <p className="letra-chica">
           {minimo > 1
-            ? `Hacen falta ${String(minimo)} para zarpar: al abrir sale un código que se pasa a los demás.`
+            ? `Hacen falta ${String(minimo)} para empezar: al abrir sale un código que se pasa a los demás.`
             : 'Sale un código por si quieres que se siente alguien más.'}
         </p>
         <select
@@ -672,7 +699,7 @@ function EnElMuelle({
               <li key={a.id} className={soyYo ? 'yo' : undefined}>
                 <i
                   className={a.presente ? 'piloto piloto-vivo' : 'piloto'}
-                  title={a.presente ? 'En el muelle' : 'Fuera'}
+                  title={a.presente ? enPie(tema.donde) : 'Fuera'}
                 />
                 <span className="sentado-nombre">
                   {a.nombre.length > 0 ? a.nombre : a.id}
@@ -763,16 +790,19 @@ function EnElMuelle({
 
 function Figuras({
   elegida,
+  donde,
   alElegir,
   alVolver,
 }: {
   elegida: FiguraId;
+  /** «en el muelle», «en la plaza del Burgo», «en la Linde Alta». Lo pone el tema. */
+  donde: string;
   alElegir: (id: FiguraId) => void;
   alVolver: () => void;
 }): JSX.Element {
   return (
     <section className="panel muelle-tramo">
-      <h2 className="rotulo-de-panel">Quién eres en el muelle</h2>
+      <h2 className="rotulo-de-panel">Quién eres {donde}</h2>
       <p className="letra-chica">Se ve en la escena al elegir. También con las teclas 1 a 6.</p>
       <ul className="opciones muelle-figuras">
         {FIGURAS.map((f, i) => (

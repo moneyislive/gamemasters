@@ -75,7 +75,7 @@ const { dondeSePinta, loQueLlega, queSeEnsena } = await cargarModuloTs(
  * coherente consigo misma, que no es lo que hay que comprar.
  */
 const BINARIO = {
-  juegos: ['frente', 'el-arcade', 'riberas', 'peonza', 'burgo'],
+  juegos: ['frente', 'el-arcade', 'riberas', 'peonza', 'burgo', 'lindes'],
   muebles: ['formulario', 'tablero', 'lienzo', 'escena'],
   genericosDelContrato: ['formulario', 'tablero'],
   genericos: ['tablero'],
@@ -279,7 +279,7 @@ paso('Y el binario con el que se juzga es el de verdad');
     entradas.length === BINARIO.juegos.length,
     { enLaTabla: entradas.length, conLosQueSeJuzga: BINARIO.juegos.length },
   );
-  for (const constante of ['FRENTE', 'EL_ARCADE', 'RIBERAS', 'PEONZA', 'BURGO']) {
+  for (const constante of ['FRENTE', 'EL_ARCADE', 'RIBERAS', 'PEONZA', 'BURGO', 'LINDES']) {
     comprobar(`y «${constante}» esta entre ellos`, new RegExp(`\\[${constante}\\]:`).test(pintados), constante);
   }
 }

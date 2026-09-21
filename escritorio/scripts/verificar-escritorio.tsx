@@ -49,7 +49,7 @@
  * dice quién tiene el pincel. Lo que sí se compra es que la tabla los tenga a los
  * CUATRO, que es donde se rompe sola con el tiempo.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { arcadesInstalados, avanzar, hayOpciones, opcionesDeArcade, proyectar } from '../../shared/arcade';
 import type { ContextoMovimiento, ManifiestoDeArcade, Opcion } from '../../shared/arcade';
@@ -255,6 +255,8 @@ import {
   laSeccionQueSeAbre,
   LaTarjetaDeUnaCasilla,
 } from '../src/hojas-del-burgo';
+import { LINDES } from '../../shared/arcade/juegos';
+import { LindesEnTres, MarcadorDeLasLindes } from '../src/lindes-en-tres';
 import { PINTORES_PROPIOS } from '../src/pintores';
 /*
  * LAS PIEZAS GENÉRICAS DEL LIENZO Y EL BANCO DE LA INTERFAZ, importados de verdad y no leídos
@@ -1323,18 +1325,126 @@ function elMuelle(): void {
   );
   /*
    * QUIÉN TIENE MUELLE, POR LISTA CERRADA. Decía «Riberas y ningún otro» mientras Riberas
-   * fue el único; con el Burgo son dos, y se sigue escribiendo la lista entera en vez de
-   * «al menos uno»: dar un tema del muelle a un arcade es mandarlo a un lobby con seis
-   * amarres y una coreografía de zarpar, y eso tiene que pasar por aquí a sabiendas. Se
-   * exige contra los INSTALADOS: mientras `burgo` no esté dado de alta en
-   * `shared/arcade/juegos/index.ts`, esto está en rojo y dice cuál falta.
+   * fue el único; con el Burgo fueron dos; con Las Lindes son tres, y se sigue escribiendo
+   * la lista entera en vez de «al menos uno»: dar un tema del muelle a un arcade es
+   * mandarlo a un lobby con seis amarres y una coreografía de zarpar, y eso tiene que
+   * pasar por aquí a sabiendas. Se exige contra los INSTALADOS: mientras un juego no esté
+   * dado de alta en `shared/arcade/juegos/index.ts`, esto está en rojo y dice cuál falta.
+   *
+   * Y el orden es el alfabético porque la comparación ordena los dos lados: escribir la
+   * lista en otro orden no la rompe, pero leerla ordenada evita la duda.
    */
-  const CON_MUELLE = ['burgo', 'riberas'];
+  const CON_MUELLE = ['burgo', 'lindes', 'riberas'];
   comprobar(
-    `los arcades instalados con muelle son exactamente ${CON_MUELLE.join(' y ')}, y ninguno más`,
+    `los arcades instalados con muelle son exactamente ${CON_MUELLE.join(', ')}, y ninguno más`,
     JSON.stringify(arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id).sort()) === JSON.stringify(CON_MUELLE),
     { conMuelle: arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id), instalados: arcadesInstalados().map((m) => m.id) },
   );
+
+  /*
+   * ═══ Y CADA VESTÍBULO DICE SU SITIO, NO EL DE OTRO ═══
+   *
+   * El vestíbulo —nombre, plazo, abrir, código, elegir figura— es UNO para los tres
+   * juegos, y llevaba escrito «en el muelle» a pelo en dos frases: «Es lo que ven los
+   * demás en el muelle» y «Quién eres en el muelle». El muelle es el lobby de Riberas, así
+   * que El Burgo y Las Lindes mandaban al jugador a un sitio que no existe en su partida.
+   * Visto leyendo el panel de La Linde Alta en el escritorio.
+   *
+   * No se arregla con tres frases copiadas: la frase la pone el TEMA, que es donde ya
+   * viven las palabras propias de cada lobby. Y se vigila por los dos lados —que ningún
+   * tema se quede sin ella y que el componente no vuelva a llevar un sitio dentro—, porque
+   * lo que falló no fue el texto sino que un componente compartido supiera de un juego.
+   */
+  for (const id of CON_MUELLE) {
+    const suyo = temaDelMuelle(id);
+    comprobar(`el tema de ${id} dice dónde se está, para la frase del vestíbulo`, suyo !== undefined && suyo.donde.length > 0, {
+      donde: suyo?.donde,
+    });
+    comprobar(
+      `y la frase de ${id} encaja detrás de «Quién eres»`,
+      suyo !== undefined && suyo.donde.startsWith('en '),
+      { donde: suyo?.donde },
+    );
+  }
+
+  /*
+   * Y que los tres sean DISTINTOS: si alguien copia el tema de un juego para estrenar otro
+   * y se deja este campo, las dos comprobaciones de arriba siguen en verde y el vestíbulo
+   * vuelve a mandar a la gente al sitio equivocado — que es exactamente lo que pasó.
+   */
+  const losSitios = CON_MUELLE.map((id) => temaDelMuelle(id)?.donde ?? '');
+  comprobar('y los tres vestíbulos nombran tres sitios distintos', new Set(losSitios).size === CON_MUELLE.length, {
+    losSitios,
+  });
+
+  {
+    const elVestibulo = readFileSync(new URL('../src/muelle.tsx', import.meta.url), 'utf8');
+    /* Sin los comentarios: la explicación de por qué esto está prohibido no puede tumbarlo. */
+    const soloCodigo = sinComentarios(elVestibulo);
+    for (const sitio of ['en el muelle', 'en la plaza', 'en la Linde Alta']) {
+      comprobar(
+        `el vestíbulo no lleva «${sitio}» escrito dentro: lo pone el tema`,
+        !soloCodigo.includes(sitio),
+      );
+    }
+    /* Vacuna: que de verdad se está mirando el fichero y no una cadena vacía. */
+    comprobar('y se ha leído el vestíbulo de verdad para juzgarlo', soloCodigo.includes('rotulo-de-panel'), {
+      letras: soloCodigo.length,
+    });
+
+    /*
+     * ═══ NI EL SITIO NI EL VERBO: EL VESTÍBULO TAMPOCO SABE CÓMO EMPIEZA CADA JUEGO ═══
+     *
+     * La guarda de arriba prohíbe los SITIOS, y se escribió mirando las dos frases que los
+     * llevaban. Pero quedaba una tercera con el mismo defecto y otra forma: «Hacen falta 2
+     * para ZARPAR». Zarpar es de Riberas —barcos, amarres, una cala—; en El Burgo se abre
+     * una ciudad y en Las Lindes se vuelca una bolsa de losas. Visto leyendo el panel de
+     * abrir mesa de Las Lindes en el escritorio, con la guarda de los sitios en verde.
+     *
+     * Así que esto mira lo mismo por el otro lado: no el nombre del lugar, sino el VERBO de
+     * un juego dentro del cascarón compartido. Cada tema ya trae el suyo (`tema.zarpar`:
+     * «Se reparte el delta», «Se abre el Burgo», «Se vuelca la bolsa»), y donde la frase es
+     * de la plataforma —cuántos hacen falta— la palabra tiene que ser neutra.
+     *
+     * Se mira SÓLO dentro de los literales de texto y con los `className` fuera: el
+     * componente se llama `Muelle`, sus clases son `muelle-*` y su prop es `zarpando`. Lo
+     * que está prohibido es que esas palabras lleguen a los ojos de alguien.
+     */
+    const soloLoQueSeLee = soloCodigo
+      /* Las rutas de `import` no las lee nadie, y una de ellas es `escenas/linde-alta/…`. */
+      .split('\n')
+      .filter((l) => !/^\s*import\b/.test(l))
+      .join('\n')
+      /* Las clases tampoco: son `muelle-*`, `opcion-zarpar`… y van en atributo o en ternario. */
+      .replace(/className=\{[^}]*\}/g, 'className=""')
+      .replace(/className="[^"]*"/g, 'className=""');
+    const literales = soloLoQueSeLee.match(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g) ?? [];
+    /** Palabras que son de UN juego y no de la plataforma. En minúsculas; se compara igual. */
+    const DE_UN_SOLO_JUEGO = ['zarpar', 'zarpad', 'barco', 'amarre', 'muelle', 'delta', 'burgo', 'linde'];
+    const colados = literales
+      .map((l) => ({ literal: l, mote: DE_UN_SOLO_JUEGO.find((p) => l.toLowerCase().includes(p)) }))
+      .filter((c) => c.mote !== undefined);
+    comprobar(
+      'y ninguna palabra de un solo juego se cuela en los textos del vestíbulo: el verbo lo pone el tema',
+      colados.length === 0,
+      { colados, cuantosLiterales: literales.length },
+    );
+
+    /*
+     * Vacuna doble, porque esta guarda tiene DOS maneras de quedarse en verde sin vigilar:
+     * que la extracción de literales devuelva cero (y entonces no hay nada que juzgar), y
+     * que la lista de palabras no case con la frase que de verdad falló.
+     */
+    comprobar('y se han sacado literales del vestíbulo para juzgarlos', literales.length > 20, {
+      cuantosLiterales: literales.length,
+    });
+    const comoEstaba = '`Hacen falta ${String(minimo)} para zarpar: al abrir sale un código.`';
+    comprobar(
+      'y la frase tal y como estaba escrita habría caído por aquí',
+      DE_UN_SOLO_JUEGO.some((p) => comoEstaba.toLowerCase().includes(p)),
+      { comoEstaba },
+    );
+  }
 
   paso('El raíl del muelle existe entero sin el mundo, y en Node no se monta el Canvas');
 
@@ -2432,9 +2542,28 @@ function burgoEnTres(): void {
       typeof PINTORES_PROPIOS[RIBERAS]?.pregonDe === 'function' &&
       typeof PINTORES_PROPIOS[RIBERAS]?.panelesDe === 'function',
   );
+  /*
+   * ═══ Y LA FILA QUE LA CABECERA DE `pintores.ts` PROMETIÓ QUE SERÍA GRATIS ═══
+   *
+   * Aquel fichero se escribió diciendo que «el tercer pintor no volverá a pagar esto:
+   * escribe su fila y ya está». Las Lindes es ese tercero y aquí se cobra la promesa:
+   * dos claves en la tabla, y la afirmación de abajo —la que exige que `sala.tsx` no
+   * nombre a ningún juego— sigue en verde sin tocarla.
+   *
+   * Sin `pregonDe` ni `panelesDe`, y eso también se mide: si un día alguien le añade
+   * un pregón a Las Lindes sin escribirlo en su fila, el mueble genérico se lo comería
+   * en silencio.
+   */
   comprobar(
-    'y los pintores propios son exactamente esos dos: un arcade sin fila se pinta con su mueble genérico y no se entera',
-    Object.keys(PINTORES_PROPIOS).sort().join(',') === [BURGO, RIBERAS].sort().join(','),
+    'Las Lindes tiene fila, con su pintor y su marcador, y sin pregón ni paneles propios',
+    PINTORES_PROPIOS[LINDES]?.Pintor === LindesEnTres &&
+      PINTORES_PROPIOS[LINDES]?.Marcador === MarcadorDeLasLindes &&
+      PINTORES_PROPIOS[LINDES]?.pregonDe === undefined &&
+      PINTORES_PROPIOS[LINDES]?.panelesDe === undefined,
+  );
+  comprobar(
+    'y los pintores propios son exactamente esos tres: un arcade sin fila se pinta con su mueble genérico y no se entera',
+    Object.keys(PINTORES_PROPIOS).sort().join(',') === [BURGO, LINDES, RIBERAS].sort().join(','),
     Object.keys(PINTORES_PROPIOS),
   );
   comprobar(
@@ -4957,6 +5086,139 @@ function elCartelDeLaCarta(): void {
  * reparto sigan estando y sigan diciendo lo que dicen; el alto se mide con los ojos, y las
  * cifras de esa medida están en la cabecera de `elCartelQueCabe` y en la de `estilo.css`.
  */
+function elPintorDeLasLindes(): void {
+  paso('El pintor de Las Lindes se monta: avisa de su lienzo, no repite el raíl y cae al retablo cuando toca');
+
+  /*
+   * ═══ POR QUÉ ESTE PASO EXISTE, Y LO QUE COSTÓ NO TENERLO ═══
+   *
+   * `LindesEnTres` sólo aparecía en este fichero para comprobar que su FILA del registro
+   * apunta a él. NADIE LO MONTABA — los de Riberas y el Burgo sí—. Y ahí vivían dos de los
+   * tres fallos que hubo que encontrar sentándose a una mesa de verdad:
+   *
+   *   · NO AVISABA DE QUE TIENE LIENZO. `sala.tsx` pinta el raíl DENTRO del lienzo cuando
+   *     lo hay y en un `<aside>` cuando no, y quién lo sabe es el pintor, que lo dice
+   *     llamando a `foco` con su recuadro. Éste ni recibía la prop.
+   *   · Y POR ESO EL RAÍL SALÍA DOS VECES: el suyo y el `<aside>` de la Sala. Dos regiones
+   *     vivas diciendo lo mismo y dos botones de «Tirar la mesa». Además, ese `<aside>` de
+   *     más caía en una fila implícita del grid y dejaba el lienzo en NUEVE PÍXELES.
+   *
+   * Nada de eso da un error. Se monta el pintor y se le pregunta.
+   */
+  const asientos = ['s1', 's2'];
+  const sentados = asientos.map((a, i) => ({ asiento: a, nombre: ['Ana', 'Bruno'][i] ?? a }));
+  const estado = avanzar(
+    LINDES,
+    undefined,
+    { tipo: 'lindes:empezar' },
+    { quien: 's1', azar: 20260918, tic: 0, asientos } as ContextoMovimiento,
+  );
+  const vista = proyectar(LINDES, estado, 's1', sentados);
+  const opciones = opcionesDeArcade(LINDES, vista, 's1');
+  const tablero = tableroDeLaVista(vista);
+  comprobar(
+    'la partida de Las Lindes que se monta aquí trae tablero y opciones de verdad',
+    tablero !== null && opciones.length > 0,
+    { caras: tablero?.caras.length, opciones: opciones.length },
+  );
+  if (tablero === null) return;
+
+  const puesta: MesaVista = {
+    codigo: 'LNDS1',
+    arcade: LINDES,
+    rev: 3,
+    tic: 0,
+    terminada: false,
+    venceEn: null,
+    turnoDesde: Date.now(),
+    asientos: sentados.map((s) => ({ id: s.asiento, nombre: s.nombre, presente: true })),
+    yo: 's1',
+    vista,
+    opciones,
+  };
+
+  /*
+   * EL RAÍL DE MENTIRA LLEVA UNA MARCA, para poder contar cuántas veces sale. Es lo único
+   * que distingue «el pintor lo pinta una vez» de «lo pinta y la Sala lo pinta otra».
+   */
+  const elRail = <p>RAIL-DE-PRUEBA</p>;
+  /* `cuantos` cuenta ETIQUETAS (`<x`); esto cuenta apariciones de un texto, que es otra cosa. */
+  const veces = (texto: string, aguja: string): number => texto.split(aguja).length - 1;
+  let recuadros = 0;
+  let sueltos = 0;
+  const foco = (r: HTMLElement | null): void => {
+    if (r === null) sueltos++;
+    else recuadros++;
+  };
+
+  const html = renderToStaticMarkup(
+    <LindesEnTres
+      manifiesto={{ id: LINDES } as never}
+      mesa={unaMesa('dentro', puesta)}
+      puesta={puesta}
+      tablero={tablero}
+      opciones={opciones}
+      elRail={elRail}
+      foco={foco}
+    />,
+  );
+
+  comprobar(
+    'monta su recuadro con las DOS clases: la suya y `lienzo-propio`, que es de la que cuelga el reparto del alto',
+    /class="lienzo-propio lindes-pantalla"/.test(html),
+    html.slice(0, 200),
+  );
+  /*
+   * `renderToStaticMarkup` no corre `ref`s —no hay DOM—, así que aquí no se puede comprobar
+   * que `foco` SE LLAME. Lo que sí se compra, y es lo que faltaba, es que el pintor ACEPTE
+   * la prop: sin ella en su firma no hay manera de que avise, y eso es lo que pasaba.
+   */
+  comprobar(
+    'y acepta la prop `foco`, que es como le dice a la Sala que hay lienzo y que no pinte su `<aside>`',
+    /\bfoco\b/.test(readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8')),
+    { recuadros, sueltos },
+  );
+  comprobar(
+    'el raíl sale UNA sola vez: dos son dos regiones vivas diciendo lo mismo y dos botones de «Tirar la mesa»',
+    veces(html, 'RAIL-DE-PRUEBA') === 1,
+    veces(html, 'RAIL-DE-PRUEBA'),
+  );
+  comprobar(
+    'y no se cae al retablo sin que haya fallado nada: con vista buena, no hay SVG de respaldo',
+    veces(html, 'lindes-respaldo') === 0,
+    html.slice(0, 200),
+  );
+
+  /*
+   * ═══ Y CON UNA VISTA QUE NO ES SUYA, AL RETABLO ═══
+   *
+   * Es el camino del respaldo: sin `.glb`, sin WebGL, o con una vista que no entiende. Ahí
+   * NO pinta «Dónde plantar», así que sus acciones tienen que salir ENTERAS o no se podría
+   * plantar — es la mitad del reparto que se rompería sin darse cuenta.
+   */
+  const deOtro = renderToStaticMarkup(
+    <LindesEnTres
+      manifiesto={{ id: LINDES } as never}
+      mesa={unaMesa('dentro', { ...puesta, vista: { desde: 'otro' } })}
+      puesta={{ ...puesta, vista: { desde: 'otro' } }}
+      tablero={tablero}
+      opciones={opciones}
+      elRail={elRail}
+    />,
+  );
+  comprobar(
+    'con una vista que no es de Las Lindes cae al retablo, y no revienta',
+    veces(deOtro, 'lindes-respaldo') === 1,
+    deOtro.slice(0, 200),
+  );
+  const plantar = opciones.filter((o) => o.tipo === 'lindes:plantar');
+  comprobar(
+    'y en el respaldo salen TODAS sus acciones, que allí no hay tira de sitios que las pinte',
+    plantar.every((o) => deOtro.includes(o.rotulo)),
+    { plantar: plantar.map((o) => o.rotulo) },
+  );
+}
+
 function laPaginaDePie(): void {
   paso('La página de pie: los seis eslabones siguen repartiendo el alto y el foco tiene dónde caer');
 
@@ -5103,6 +5365,60 @@ function laPaginaDePie(): void {
       /height:\s*62vh/.test(reglaDe('.burgo-lienzo')),
     { enLaCadena: reglaDe(`${RAIZ_GENERICA} .burgo-lienzo`).replace(/\s+/g, ' '), suelta: reglaDe('.burgo-lienzo').replace(/\s+/g, ' ') },
   );
+
+  /*
+   * ═══ Y AHORA LA MISMA CADENA PARA TODOS, Y NO SÓLO PARA LOS DOS ESCRITOS A MANO ═══
+   *
+   * Las dos cadenas de arriba nombran `.riberas-*` y `.burgo-*` letra a letra. Eso las hace
+   * precisas y las deja CIEGAS al pintor siguiente: Las Lindes entró sin sus dos eslabones,
+   * y el resultado fue un tablero de 566 por NUEVE PÍXELES en una mesa de verdad, con la
+   * batería en 86 de 86 y sin un error en ninguna consola. El banco de pruebas no lo veía
+   * porque se pinta con `position: fixed`, y allí nunca falta alto.
+   *
+   * ═══ SE LEE EL FUENTE, Y NO ES PEREZA ═══
+   *
+   * La primera versión de esto montaba cada pintor con una vista fabricada para leerle la
+   * clase raíz. No sirve: NINGÚN pintor se monta con una vista que no es suya —caen al
+   * respaldo, que es lo correcto—, así que el bucle no inspeccionaba nada y las dos
+   * afirmaciones pasaban vacías. Comprobado quitando el eslabón de Las Lindes: verde.
+   *
+   * La clase raíz está ESCRITA en el marcado, al lado de `lienzo-propio`, y eso sí se puede
+   * leer sin montar nada. Se barren los fuentes del escritorio, y cada clase que se
+   * encuentre junto a la genérica tiene que tener su eslabón. Un pintor nuevo lo estrena en
+   * cuanto escribe su `<div className="lienzo-propio …">`, que es justo cuando hace falta.
+   */
+  const RECUADROS = /className="lienzo-propio ([a-z0-9-]+)"/g;
+  const clasesDeRecuadro = new Set<string>();
+  for (const fichero of readdirSync(new URL('../src/', import.meta.url))) {
+    if (!fichero.endsWith('.tsx')) continue;
+    const fuente = readFileSync(new URL(`../src/${fichero}`, import.meta.url), 'utf8');
+    let hallazgo = RECUADROS.exec(fuente);
+    while (hallazgo !== null) {
+      const clase = hallazgo[1];
+      if (clase !== undefined) clasesDeRecuadro.add(clase);
+      hallazgo = RECUADROS.exec(fuente);
+    }
+  }
+  /*
+   * LA VACUNA, y no es teórica: la versión anterior de este bloque pasaba en verde SIN
+   * MIRAR NADA, y lo único que lo delató fue quitar un eslabón a mano. Si el barrido no
+   * encuentra ni un recuadro, esto no está mirando donde cree.
+   */
+  comprobar(
+    'el barrido encuentra los recuadros de los pintores propios, y no se queda a cero',
+    clasesDeRecuadro.size > 0,
+    [...clasesDeRecuadro],
+  );
+  const sinCadena = [...clasesDeRecuadro].sort().filter((clase) => {
+    const regla = reglaDe(`${RAIZ_GENERICA} .${clase}`);
+    return !/flex:/.test(regla) || !/min-height:/.test(regla);
+  });
+  comprobar(
+    'y TODO recuadro con `lienzo-propio` tiene su eslabón en la cadena del alto, no sólo los dos escritos aquí a mano',
+    sinCadena.length === 0,
+    { sinCadena, mirados: [...clasesDeRecuadro].sort() },
+  );
+
   /*
    * Y LAS TRES LÍNEAS QUE NO SE VEN FALLAR EN UN RATÓN: el recuadro se queda el gesto
    * (`touch-action: none`) y las dos cajas que ruedan por dentro lo devuelven (`auto`). Sin
@@ -5122,7 +5438,43 @@ function laPaginaDePie(): void {
    * 40 % es texto ilegible, no un botón apagado— y la lista de apoyo NUNCA con `display:
    * none`, que los lectores saltan. Las dos se rompen sin que nada falle.
    */
-  const loDelBurgo = hojaPelada.slice(hojaPelada.indexOf('.burgo-en-tres {'));
+  /*
+   * ═══ DE DÓNDE A DÓNDE SON «LAS REGLAS DEL BURGO» ═══
+   *
+   * Esto era `slice(indexOf('.burgo-en-tres {'))`: desde ahí HASTA EL FINAL DEL
+   * FICHERO. Valía mientras el Burgo fuera lo último que había escrito en la hoja, y
+   * dejó de valer en cuanto un juego nuevo escribió debajo: sus reglas entraban en el
+   * corte y se juzgaban como si fueran del Burgo. Lo estrenó Las Lindes, con un
+   * `opacity` legítimo en un texto secundario saliendo como «el Burgo apaga con
+   * opacity».
+   *
+   * Ahora no se corta un trozo de fichero: se recogen LAS REGLAS CUYO SELECTOR
+   * NOMBRA AL BURGO, estén donde estén. Eso es exactamente lo que «las reglas del
+   * Burgo» significa, no depende de dónde escriba el siguiente, y no se afloja con el
+   * tiempo. Y lleva su vacuna: si el recorrido no encuentra ni una, lo dice.
+   */
+  const reglasConSelector = (contiene: string): string => {
+    let junto = '';
+    let cuantas = 0;
+    const bloques = /(^|\n)\s*([^{}@]*?)\{([^{}]*)\}/g;
+    let hallazgo = bloques.exec(hojaPelada);
+    while (hallazgo !== null) {
+      const selector = hallazgo[2] ?? '';
+      if (selector.includes(contiene)) {
+        junto += `${selector}{${hallazgo[3] ?? ''}}\n`;
+        cuantas++;
+      }
+      hallazgo = bloques.exec(hojaPelada);
+    }
+    /*
+     * La otra mitad de la vacuna, y no es teórica: si el recorrido no encuentra
+     * ninguna regla, esto no está mirando donde cree. Cero reglas inspeccionadas es
+     * cero fallos y se lee como verde — que es el peor de los fallos posibles.
+     */
+    comprobar(`la hoja trae reglas de «${contiene}» que juzgar`, cuantas > 0, { cuantas });
+    return junto;
+  };
+  const loDelBurgo = reglasConSelector('.burgo');
   comprobar(
     'y en las reglas del Burgo no hay un solo `opacity` apagando nada: lo apagado se apaga con su clase quieta',
     loDelBurgo.length > 0 && !/opacity:/.test(loDelBurgo),
@@ -10993,6 +11345,7 @@ losDadosLleganAparte();
 losDadosEnLaPantalla();
 recogerLaMesa();
 elCartelDeLaCarta();
+elPintorDeLasLindes();
 laPaginaDePie();
 laCintaYElCajon();
 elRelojDeLaCinta();

@@ -45,10 +45,11 @@ import type { ComponentType } from 'react';
  */
 import { MUEBLES_DEL_CONTRATO } from '../../../shared/arcade/tipos';
 import type { ArcadeId, ManifiestoDeArcade, MuebleDeArcade } from '../../../shared/arcade';
-import { BURGO, EL_ARCADE, FRENTE, PEONZA, RIBERAS } from '../../../shared/arcade/juegos';
+import { BURGO, EL_ARCADE, FRENTE, LINDES, PEONZA, RIBERAS } from '../../../shared/arcade/juegos';
 import type { LoQuePintaEsteBinario } from './del-servidor';
 import { ElArcade } from './arcade';
 import { ElBurgoEnTres } from './burgo-en-tres';
+import { LasLindesEnTres } from './lindes-en-tres';
 import { LaPeonza } from './escena';
 import { LaFrente } from './frente';
 import { MUEBLES } from './muebles';
@@ -146,6 +147,7 @@ export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {
    * portada, que es por donde pasa esta tabla.
    */
   [BURGO]: ElBurgoEnTres,
+  [LINDES]: LasLindesEnTres,
   /*
    * LA PEONZA, que es la puerta del mueble `escena` de la fase 5 y no un
    * juego-prueba. Va aquí y no en `LOS_MUEBLES_GENERICOS` porque `escena` es un

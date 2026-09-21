@@ -5489,3 +5489,328 @@ code {
   height: 100%;
   min-height: 0;
 }
+
+/*
+ * ═══ AQUÍ ACABAN LAS REGLAS DEL BURGO ═══
+ *
+ * Y conviene decirlo, aunque ya no haga falta ninguna marca: `verify:escritorio`
+ * juzgaba la gramática de los `.burgo-*` cortando la hoja desde `.burgo-en-tres {`
+ * HASTA EL FINAL DEL FICHERO, porque cuando se escribió el Burgo era lo último que
+ * había. En cuanto un juego nuevo escribió debajo, sus reglas entraron en ese corte
+ * y se juzgaron como si fueran del Burgo — las de Las Lindes lo estrenaron, con un
+ * `opacity` legítimo en un texto secundario saliendo como «el Burgo apaga con
+ * opacity».
+ *
+ * Hoy el comprobador recoge las reglas por SU SELECTOR y no por dónde están, así que
+ * escribir debajo de aquí ya no le hace nada a nadie.
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * LAS LINDES
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La pantalla es DOS COLUMNAS: el valle a la izquierda, ocupando todo lo que
+ * puede, y un raíl estrecho a la derecha con lo que hay que leer —la losa de la
+ * mano, dónde plantar, quién va ganando—.
+ *
+ * ═══ POR QUÉ UN RAÍL Y NO UN CAJÓN COMO EL BURGO ═══
+ *
+ * Porque lo que este juego pide leer mientras se decide es DISTINTO de lo que
+ * pide el Burgo. Allí se consultan cuarenta casillas, dos mazos y las cuentas de
+ * seis jugadores: eso es un cuaderno, y un cuaderno se guarda en un cajón. Aquí
+ * lo que hay que mirar mientras se elige dónde poner la losa son cuatro cosas, y
+ * las cuatro tienen que estar a la vista AL MISMO TIEMPO que el tablero — porque
+ * la decisión es «dónde encaja esto», y se toma mirando las dos cosas.
+ *
+ * El raíl se cuelga debajo del lienzo por debajo de 60rem de ancho, que es donde
+ * dos columnas dejan el tablero en una tira.
+ */
+
+.lindes-pantalla {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: var(--aire-2, 0.75rem);
+  padding: var(--aire-2, 0.75rem);
+  background: var(--suelo);
+}
+
+.lindes-lienzo {
+  position: relative;
+  /*
+   * ═══ `62vh` DE BASE, Y NO ES UN ADORNO DEL DÍA QUE NO HAYA `:has` ═══
+   *
+   * `flex: 1 1 auto` reparte desde SU BASE, y aquí la base era `auto` sobre un contenido
+   * que no mide nada: un lienzo vacío. Sentándose a una mesa de verdad, el recuadro salía
+   * de 566 por NUEVE PÍXELES. Con `62vh` de base, aunque un antepasado no tenga alto que
+   * repartir —un navegador sin `:has`, o la cadena rota como estaba— el recuadro mide algo
+   * y la partida se ve. Es lo mismo que hace `.burgo-lienzo` y por lo mismo.
+   */
+  height: 62vh;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--radio-ficha);
+  overflow: hidden;
+  outline: 1px solid var(--filo);
+  /*
+   * El fondo es el mismo azul de cielo que pinta la escena. No es un adorno: es
+   * lo que evita el destello NEGRO del primer fotograma, antes de que el lienzo
+   * tenga nada dentro. Un destello negro en una pantalla que va a ser azul se lee
+   * como que algo ha fallado.
+   */
+  background: #8cb8de;
+}
+
+.lindes-lienzo canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/*
+ * ═══ LOS DOS ESLABONES DE LAS LINDES EN LA CADENA DEL ALTO ═══
+ *
+ * La cadena que reparte el alto desde la ventana hasta el recuadro está escrita arriba
+ * tres veces —para `.riberas-lienzo`, para `.lienzo-propio` con el pintor del Burgo, y
+ * con su porqué entero—. Sus dos últimos eslabones nombran la clase raíz DEL PINTOR y la
+ * de SU RECUADRO, por selector literal, así que un pintor nuevo entra sin ellos.
+ *
+ * Las Lindes entró sin ellos. Sentándose a una mesa de verdad —que es lo único que lo
+ * enseña: la batería estaba en 86 de 86 y el banco de pruebas se pinta con
+ * `position: fixed`, así que allí nunca faltó alto— `.lindes-pantalla` medía TREINTA Y
+ * CUATRO PÍXELES de alto y el lienzo NUEVE. El tablero estaba, la escena corría, el raíl
+ * decía «quedan 70 losas en la bolsa», y no había un solo error en la consola.
+ *
+ * Que esto haya que escribirlo una vez por pintor es lo que es; lo que NO puede volver a
+ * pasar es que se olvide en silencio, y de eso se encarga ahora `verify:escritorio`, que
+ * saca la clase de cada pintor de lo que RENDERIZA y exige sus dos eslabones.
+ */
+.sala:has(.lienzo-propio) .lindes-pantalla {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+  padding: 0;
+}
+
+/*
+ * El recuadro crece desde su `62vh` sin bajar de la mitad del mueble, y suelta el marco:
+ * pegado al canto de la ventana, un borde y un radio se leen como parte del tablero. Es
+ * palabra por palabra lo que hace el del Burgo.
+ */
+.sala:has(.lienzo-propio) .lindes-lienzo {
+  flex: 1 1 auto;
+  /*
+   * ═══ `height: auto` NO ES REDUNDANTE: ES LO QUE SUELTA EL `62vh` ═══
+   *
+   * El recuadro lleva `height: 62vh` de base para que valga algo cuando esta cadena no se
+   * aplica —un navegador sin `:has`—. Pero `.lindes-pantalla` reparte en FILA, y en una
+   * fila lo que `flex: 1 1 auto` hace crecer es el ANCHO: el alto sale del estirado, y
+   * `align-items: stretch` sólo estira lo que tiene el alto en `auto`. Con `62vh` escrito,
+   * el lienzo se quedaba clavado en el 62 % de la ventana.
+   *
+   * Medido en una mesa de verdad: pantalla de 922 puntos, lienzo de 572, y TRESCIENTOS
+   * CINCUENTA de página vacía debajo — el 38 % del alto. Se veía como una banda negra bajo
+   * el tablero y se lee como que la pantalla se ha quedado a medias.
+   *
+   * El del Burgo no lo necesita porque su pintor reparte en COLUMNA, y allí `flex: 1 1
+   * auto` sí hace crecer el alto y el `62vh` es sólo la base de la que parte.
+   */
+  height: auto;
+  min-height: 50%;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+}
+
+/*
+ * LA CINTA: la frase de la mesa, pegada abajo y por encima del lienzo.
+ *
+ * Con `pointer-events: none` a propósito: es un cartel, no un control, y si
+ * atrapara el puntero robaría el gesto de señalar una casilla justo en la franja
+ * donde más se señala.
+ */
+.lindes-cinta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.95rem;
+  color: #f3ecd8;
+  background: linear-gradient(to top, rgba(12, 20, 8, 0.82), rgba(12, 20, 8, 0));
+  pointer-events: none;
+}
+
+.lindes-camaras {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.lindes-camara {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radio-ficha);
+  border: 1px solid rgba(243, 236, 216, 0.45);
+  background: rgba(12, 20, 8, 0.62);
+  color: #f3ecd8;
+  cursor: pointer;
+}
+
+.lindes-camara-puesta {
+  background: #f3ecd8;
+  color: #1b2411;
+  border-color: #f3ecd8;
+}
+
+.lindes-rail {
+  flex: 0 0 21rem;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--aire-2, 0.75rem);
+}
+
+.lindes-rail h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+.lindes-mano,
+.lindes-plantar,
+.lindes-panel,
+.lindes-marcador {
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radio-ficha);
+  background: var(--ficha);
+  outline: 1px solid var(--filo);
+}
+
+.lindes-mano-nombre {
+  margin: 0;
+  font-weight: 600;
+}
+
+/*
+ * LO SECUNDARIO SE APAGA CON COLOR, NUNCA CON `opacity`.
+ *
+ * Es la gramática de la casa y está medida: un texto al 78 % sobre la ficha baja el
+ * contraste por debajo de lo que se lee, y además apaga el borde y el fondo con él.
+ * `--tenue` da 6,50 sobre el suelo y es lo que existe justo para esto.
+ */
+.lindes-mano-lados,
+.lindes-pista {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--tenue);
+}
+
+.lindes-girar {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.lindes-plantar ul,
+.lindes-panel ul,
+.lindes-marcador ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.lindes-plantar button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.lindes-vale {
+  font-size: 0.8rem;
+  color: var(--tenue);
+}
+
+.lindes-marcador li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/*
+ * EL COLOR DEL ASIENTO ES UN CUADRADO Y NO EL COLOR DE LA LETRA.
+ *
+ * Los cinco colores de esta mesa incluyen un hueso muy claro y un carmín muy
+ * saturado: escritos como color de letra, uno no se lee sobre la ficha y el otro
+ * vibra. Como cuadrado al lado del nombre, los cinco se distinguen y el nombre se
+ * lee siempre con el color de texto de la casa. Es la misma decisión que el raíl
+ * del Burgo ya tenía tomada para sus seis.
+ */
+.lindes-color {
+  flex: 0 0 auto;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 0.2rem;
+  outline: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.lindes-nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lindes-puntos {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.lindes-labriegos {
+  font-size: 0.78rem;
+  color: var(--tenue);
+}
+
+.lindes-le-toca {
+  font-weight: 700;
+}
+
+.lindes-bolsa {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--tenue);
+}
+
+.lindes-respaldo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--aire-2, 0.75rem);
+}
+
+@media (max-width: 60rem) {
+  .lindes-pantalla {
+    flex-direction: column;
+  }
+
+  .lindes-lienzo {
+    flex: 1 1 60%;
+    min-height: 18rem;
+  }
+
+  .lindes-rail {
+    flex: 0 0 auto;
+    max-height: 40%;
+  }
+}

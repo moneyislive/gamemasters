@@ -130,7 +130,14 @@ import {
 } from './escala';
 import { Mancha } from './mancha';
 import type { RelojCargado, RelojDeLaMesa } from './reloj';
-import { GIRO_DEL_RELOJ, RelojDeArena, VACIADO_DEL_RELOJ } from './reloj';
+import {
+  GIRO_DEL_RELOJ,
+  montarElReloj,
+  ponerLaArena,
+  RelojDeArena,
+  soltarElReloj,
+  VACIADO_DEL_RELOJ,
+} from './reloj';
 import type { LoQueTiene } from './territorio';
 import { ALTO_DE_LA_MANCHA, mallaDelTerritorio, territorioDe } from './territorio';
 import { asientoDelDisco } from './zocalo';
@@ -1819,9 +1826,6 @@ function Barra({
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   const cuerpoDelReloj = useRef<THREE.Group>(null);
-  const arenaArriba = useRef<THREE.Group>(null);
-  const arenaAbajo = useRef<THREE.Group>(null);
-  const hiloDeArena = useRef<THREE.Mesh>(null);
   const asaDelReloj = useRef<THREE.Mesh>(null);
   /* La vuelta que el reloj tiene girada, y cuándo empezó el giro. `null` es «quieto». */
   const girando = useRef<{ desde: number; vuelta: number } | null>(null);
@@ -1993,62 +1997,9 @@ function Barra({
    * que es la única que sabe cuánto queda de verdad. Dejándolos correr, el reloj de arena y el
    * reloj del turno dirían cosas distintas, y el que la gente se cree es el de arena.
    */
-  const relojMontado = useMemo(() => {
-    if (modeloDelReloj === null) return null;
-    const dentro = SkeletonUtils.clone(modeloDelReloj.escena);
-    /*
-     * ═══ SE MIDE LA CAJA, NO SE SUPONE ═══
-     *
-     * El `.glb` trae su propia escala en la raíz —los modelos de Sketchfab salen casi siempre con
-     * una— y multiplicar la nuestra encima daba 0,0001 de escala de mundo: el reloj estaba en la
-     * escena, con sus mallas y su clip corriendo, y medía tres milésimas de unidad. No se veía y
-     * no fallaba nada, que es la peor forma de no estar.
-     *
-     * Así que se envuelve en un grupo que lo normaliza a UNA UNIDAD DE ALTO centrado en el
-     * origen, con la caja medida sobre el clon ya montado. Quien lo pinta sólo tiene que
-     * multiplicar por el lado de su hueco, y el día que alguien recompile el modelo con otra
-     * escala esto sigue saliendo bien sin tocar una línea.
-     */
-    const caja = new THREE.Box3().setFromObject(dentro);
-    const alto = Math.max(1e-6, caja.max.y - caja.min.y);
-    const centro = caja.getCenter(new THREE.Vector3());
-    dentro.position.set(-centro.x / alto, -centro.y / alto, -centro.z / alto);
-    dentro.scale.multiplyScalar(1 / alto);
-    const clon = new THREE.Group();
-    clon.add(dentro);
-    const mezclador = new THREE.AnimationMixer(dentro);
-    for (const clip of modeloDelReloj.clips) mezclador.clipAction(clip).play();
-    /*
-     * ═══ LOS DOS MONTONES, Y CUÁL ES CUÁL ═══
-     *
-     * Son las dos mallas con morfología —el compilador las deja como «0» y «1»— y hay que saber
-     * cuál va arriba, porque se mueven AL REVÉS la una de la otra. No se distinguen por el
-     * nombre: «0» y «1» los pone el exportador y el día que alguien recompile pueden salir
-     * cambiados, y el fallo sería un reloj que cuenta al revés sin que nada falle. Se distinguen
-     * midiendo dónde está cada una: la de arriba tiene el centro de su caja más alto.
-     */
-    const conAltura: { malla: THREE.Mesh; alturaDeSuCaja: number }[] = [];
-    dentro.traverse((n) => {
-      const m = n as THREE.Mesh;
-      if (!m.isMesh || (m.morphTargetInfluences?.length ?? 0) === 0) return;
-      m.geometry.computeBoundingBox();
-      const caja = m.geometry.boundingBox;
-      const centro = caja === null ? 0 : (caja.min.y + caja.max.y) / 2;
-      conAltura.push({ malla: m, alturaDeSuCaja: centro });
-    });
-    conAltura.sort((a, b) => b.alturaDeSuCaja - a.alturaDeSuCaja);
-    const montones = conAltura.map((c, i) => ({ malla: c.malla, arriba: i === 0 }));
-    return { clon, mezclador, montones };
-  }, [modeloDelReloj]);
+  const relojMontado = useMemo(() => montarElReloj(modeloDelReloj), [modeloDelReloj]);
 
-  useEffect(
-    () => () => {
-      if (relojMontado === null) return;
-      relojMontado.mezclador.stopAllAction();
-      relojMontado.mezclador.uncacheRoot(relojMontado.clon.children[0] ?? relojMontado.clon);
-    },
-    [relojMontado],
-  );
+  useEffect(() => () => soltarElReloj(relojMontado), [relojMontado]);
 
   /*
    * ═══ LA ARENA, EL GIRO Y EL VACIADO DE GOLPE ═══
@@ -2144,19 +2095,9 @@ function Barra({
        * modeló—, de modo que arriba va `parte` (empieza lleno y se vacía) y abajo va su
        * complementario (empieza vacío y se llena).
        */
-      for (const monton of relojMontado.montones) {
-        const pesos = monton.malla.morphTargetInfluences;
-        if (pesos !== undefined && pesos.length > 0) pesos[0] = monton.arriba ? parte : 1 - parte;
-      }
+      ponerLaArena(relojMontado, parte);
     }
 
-    const arriba = arenaArriba.current;
-    if (arriba !== null) arriba.scale.y = 1 - parte;
-    const abajo = arenaAbajo.current;
-    if (abajo !== null) abajo.scale.y = parte;
-    const hilo = hiloDeArena.current;
-    /* El hilo sólo cae mientras queda algo arriba y aún no ha llegado todo abajo. */
-    if (hilo !== null) hilo.visible = parte > 0.001 && parte < 0.999;
   });
 
   /*
@@ -2345,9 +2286,6 @@ function Barra({
         >
           <RelojDeArena
             cuerpo={cuerpoDelReloj}
-            arenaArriba={arenaArriba}
-            arenaAbajo={arenaAbajo}
-            hilo={hiloDeArena}
             asa={asaDelReloj}
             lado={sitioDelRelojDeArena.alto}
             ancho={sitioDelRelojDeArena.ancho}

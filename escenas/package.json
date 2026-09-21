@@ -21,7 +21,8 @@
     "verify:burgo-modelos": "tsx scripts/verificar-burgo-modelos.ts",
     "verify:burgo-escena": "tsx scripts/verificar-burgo-escena.ts",
     "verify:plaza": "tsx scripts/verificar-plaza.ts",
-    "verify:la-ciudad": "tsx scripts/verificar-la-ciudad.ts"
+    "verify:la-ciudad": "tsx scripts/verificar-la-ciudad.ts",
+    "verify:lindes-escena": "tsx scripts/verificar-lindes-escena.ts"
   },
   "description": "Las escenas 3D que pintan los DOS clientes. Sin Canvas propio: lo monta quien la usa.",
   "peerDependencies": {

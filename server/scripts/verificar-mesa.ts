@@ -295,6 +295,8 @@ const FRENTE = 'frente';
 const RIBERAS = 'riberas';
 /** El sexto, con `secretos: true` y dos mazos que tapar. Ver su bloque más abajo. */
 const BURGO = 'burgo';
+/** Y el séptimo, con el secreto más goloso de la casa: la bolsa. Ver su bloque. */
+const LINDES = 'lindes';
 
 /**
  * ═══ POR QUÉ RIBERAS ENTRÓ AQUÍ, Y POR QUÉ NO ESTABA ═══
@@ -887,6 +889,28 @@ function seAcabo(mesa: Mesa): boolean {
   return vista.momento === 'terminada';
 }
 
+/*
+ * ═══ Y LOS MISMOS DOS PARA LAS LINDES, QUE NO SON LOS DE ARRIBA ═══
+ *
+ * Los tres ayudantes de aquí encima llevan `RONDA` DENTRO, escrito, porque se
+ * escribieron cuando La Ronda era el único juego con mesa. Reutilizarlos con otro
+ * arcade proyecta su estado con el reductor equivocado, y eso no da un rojo legible:
+ * da un `TypeError` a doscientas líneas de distancia, dentro de `ronda.ts`. Pasó.
+ *
+ * No se generalizan a `(arcade, mesa)` a propósito: las firmas de arriba están citadas
+ * en media docena de sitios de este fichero y cambiarlas por esto sería un remiendo
+ * ancho para un juego. Dos funciones de tres líneas cuestan menos y dicen a qué juegan.
+ */
+function elTurnoDeLasLindes(mesa: Mesa): AsientoId | null {
+  const vista = vistaDeAsiento(LINDES, mesa.estado, ESPECTADOR) as { turnoDe?: unknown };
+  return typeof vista.turnoDe === 'string' ? vista.turnoDe : null;
+}
+
+function seAcabaronLasLindes(mesa: Mesa): boolean {
+  const vista = vistaDeAsiento(LINDES, mesa.estado, ESPECTADOR) as { momento?: unknown };
+  return vista.momento === 'terminada';
+}
+
 // ---------------------------------------------------------------------------
 
 console.log('\nLa mesa en línea de la Sala de Arcade\n');
@@ -898,6 +922,204 @@ for (const semilla of [1, 7, 12345, 987654321, 2 ** 31]) {
   revisionesExaminadas += partidaEnProceso(semilla, semilla % 2 === 1);
 }
 console.log(`  ${revisionesExaminadas} revisiones examinadas en cinco partidas`);
+
+paso('En proceso: una partida ENTERA de Las Lindes, con la bolsa vigilada en cada revisión');
+
+/*
+ * ═══ POR QUÉ ENTRA LAS LINDES AQUÍ, Y CON EL MISMO ARGUMENTO QUE RIBERAS ═══
+ *
+ * Arriba está escrito por qué Riberas tuvo que entrar: es un arcade cuya proyección
+ * lleva un TABLERO ENTERO compuesto a partir de la vista Y de `opciones()`, o sea por
+ * dos caminos, y una fuga por el segundo no la delata el juego de campos cerrado de la
+ * vista. Las Lindes es exactamente eso mismo — y le añade el secreto que más duele de
+ * los que hay en esta casa.
+ *
+ * ═══ LA BOLSA ═══
+ *
+ * En La Ronda lo secreto son las cartas de la mano de cada cual: saberlas da ventaja.
+ * En Las Lindes lo secreto es EL ORDEN DE LA BOLSA, y saberlo no da ventaja: da la
+ * partida. Quien sepa que la siguiente losa cierra su villa juega de otra manera
+ * durante veinte turnos. Y el número de losas que quedan SÍ es público —en la mesa se
+ * ve el montón, y de ahí sale la arena del reloj—, así que la frontera entre lo que
+ * sale y lo que no pasa por el mismo objeto: exactamente donde se cuela una fuga.
+ *
+ * Se juega LEYENDO EL TABLERO DECLARADO, o sea como jugaría un cliente tonto, y se
+ * mira en cada revisión con el mismo árbitro que ya dio verde a La Ronda y a Riberas.
+ * La partida se juega ENTERA: setenta y dos losas puestas es donde el tablero está más
+ * grande, y el tablero es la superficie por la que una fuga tendría más sitios por los
+ * que salir.
+ */
+{
+  const DOS: AsientoId[] = ['a-ana', 'a-bruno'];
+  const TOPE = 600;
+  let mesa: Mesa = abrirMesa({ id: 'lindes-en-la-mesa', arcade: LINDES, semilla: 20260918, asientos: DOS });
+
+  let revisiones = 0;
+  /** Lo que ocuparía la vista de un asiento si bajara ahora por el cable, en bytes. */
+  let laMasGorda = 0;
+  let sumaDeVistas = 0;
+  const revisar = (): void => {
+    revisiones++;
+    const reproches = reprochesDeSecretos(LINDES, mesa.estado, DOS, false);
+    comprobar(
+      `rev ${mesa.rev}: ni la bolsa ni la semilla de Las Lindes se escapan`,
+      reproches.length === 0,
+      reproches,
+    );
+    /*
+     * Y DE PASO SE PESA, que es gratis aquí y no lo mide nadie más. Ver el presupuesto
+     * de abajo para por qué importa.
+     */
+    const bytes = Buffer.byteLength(
+      JSON.stringify(vistaDeAsiento(LINDES, mesa.estado, DOS[0] as AsientoId)) ?? '',
+      'utf8',
+    );
+    sumaDeVistas += bytes;
+    if (bytes > laMasGorda) laMasGorda = bytes;
+  };
+
+  revisar();
+  mesa = jugar(mesa, { quien: DOS[0] as AsientoId, movimiento: { tipo: 'lindes:empezar' }, rev: mesa.rev });
+  revisar();
+
+  /*
+   * ═══ LA VACUNA, Y VA DESPUÉS DE EMPEZAR A PROPÓSITO ═══
+   *
+   * Si `loSecreto` devolviera una lista vacía, `reprochesDeSecretos` daría verde a todo
+   * sin mirar nada — «no se escapa» y «no se vigila» se leen igual, y es la trampa que
+   * esta casa tiene apuntada como «cero inspeccionados es cero fallos».
+   *
+   * Y se mira AQUÍ y no antes: una mesa recién abierta nace SIN estado —el reductor lo
+   * construye en el primer movimiento, con la semilla y los asientos ya puestos—, así que
+   * antes de `empezar` la bolsa no existe todavía y preguntar ahí no compraría nada.
+   *
+   * Se exige una CUENTA y no un «más de cero»: lo que hay que vigilar es la bolsa entera,
+   * y una bolsa de un elemento pasaría un «> 0» sin decir nada. Recién empezada quedan 71
+   * losas dentro y el reparto ya está hecho.
+   */
+  comprobar(
+    'y hay algo que vigilar: `loSecreto` de Las Lindes declara la bolsa entera',
+    loSecretoDe(LINDES, mesa.estado).length > 60,
+    loSecretoDe(LINDES, mesa.estado).length,
+  );
+
+  const porFamilia = new Map<string, number>();
+  let vueltas = 0;
+  while (!seAcabaronLasLindes(mesa) && vueltas < TOPE) {
+    vueltas++;
+    const turno = elTurnoDeLasLindes(mesa);
+    if (turno === null) break;
+
+    /*
+     * ═══ SE JUEGA DESDE EL TABLERO, QUE ES LO QUE BAJA POR EL CABLE ═══
+     *
+     * Y no desde `opciones()` a secas: lo que un cliente de esta casa pulsa son los
+     * toques del tablero declarado —sus caras, sus nudos y sus acciones—, así que jugar
+     * por ahí es jugar por el mismo sitio por el que jugaría alguien, y de paso obliga
+     * a que el tablero se COMPONGA en cada vuelta, que es la superficie que se vigila.
+     */
+    const vista = vistaDeAsiento(LINDES, mesa.estado, turno);
+    const toques = toquesDelTablero(vista);
+    if (toques.length === 0) break;
+
+    /*
+     * Se reparte por familias en vez de coger el primero: con el primero, este bucle
+     * planta siempre en lo mismo y los recuentos de sendas, ermitas y prados no se
+     * ejercitan nunca — es el mismo fallo que ya se midió en el robot, y está escrito
+     * en su cabecera.
+     */
+    const dePoner = toques.filter((t) => t.tipo === 'lindes:poner');
+    const dePlantar = toques.filter((t) => t.tipo === 'lindes:plantar');
+    const dePasar = toques.filter((t) => t.tipo === 'lindes:pasar');
+    let elegido: Toque;
+    if (dePoner.length > 0) elegido = dePoner[vueltas % dePoner.length] as Toque;
+    /*
+     * Y una de cada tres veces que se puede, NO se planta. Sin esto, el bucle planta
+     * siempre que puede y `lindes:pasar` no se manda ni una vez en toda la partida: el
+     * tercer verbo del juego se quedaría sin recorrer, y el recuento de abajo lo diría
+     * con un cero — que es exactamente para lo que está.
+     */
+    else if (vueltas % 3 === 0 && dePasar.length > 0) elegido = dePasar[0] as Toque;
+    else if (dePlantar.length > 0) elegido = dePlantar[vueltas % dePlantar.length] as Toque;
+    else elegido = toques[0] as Toque;
+
+    porFamilia.set(elegido.tipo, (porFamilia.get(elegido.tipo) ?? 0) + 1);
+    mesa = jugar(mesa, { quien: turno, movimiento: { tipo: elegido.tipo, carga: elegido.carga }, rev: mesa.rev });
+    revisar();
+  }
+
+  comprobar('la partida de Las Lindes TERMINA', seAcabaronLasLindes(mesa), { vueltas, tope: TOPE });
+  /*
+   * ═══ Y SE JUEGA DE VERDAD, CON LOS TRES VERBOS ═══
+   *
+   * Una partida que sólo pusiera losas terminaría igual y dejaría sin recorrer la mitad
+   * del reductor: el recuento se escribe para poder desmentirlo, no para adornar. Es la
+   * misma lección que este fichero ya tiene escrita más abajo con los trueques de
+   * Riberas, donde tres partidas «enteras» se quedaban en el primer turno y las dos
+   * afirmaciones salían verdes.
+   *
+   * LOS NÚMEROS, MEDIDOS: con esta semilla salen 71 losas puestas, 14 labriegos
+   * plantados y 7 veces sin plantar. Los topes van por debajo con holgura —y no pegados,
+   * que sería un comprobador que se cae el día que alguien toque el reparto sin romper
+   * nada— pero lo bastante altos como para que un bucle atascado en el primer turno los
+   * tumbe.
+   */
+  const puestas = porFamilia.get('lindes:poner') ?? 0;
+  const plantados = porFamilia.get('lindes:plantar') ?? 0;
+  const pasadas = porFamilia.get('lindes:pasar') ?? 0;
+  comprobar(
+    'y se jugó con los tres verbos: poner, plantar y pasar',
+    puestas > 50 && plantados > 8 && pasadas > 3,
+    { puestas, plantados, pasadas, revisiones },
+  );
+  console.log(
+    `  ${String(revisiones)} revisiones · ${String(puestas)} losas puestas, ` +
+      `${String(plantados)} labriegos plantados, ${String(pasadas)} veces sin plantar`,
+  );
+
+  /*
+   * ═══ EL PRESUPUESTO DE LO QUE BAJA POR EL CABLE ═══
+   *
+   * La proyección de Las Lindes lleva dentro un TABLERO DECLARADO entero —caras, líneas
+   * y nudos, uno por losa y por lado— que se compone en CADA lectura y baja en CADA
+   * sondeo, a un móvil, por datos. Y el 84 % de la vista es eso.
+   *
+   * ═══ Y EL PEOR MOMENTO NO ES EL FINAL, QUE ES LO QUE UNO SUPONDRÍA ═══
+   *
+   * Medido vuelta a vuelta: el máximo cae con SESENTA Y NUEVE losas puestas y CINCUENTA
+   * Y SEIS colocaciones abiertas —o sea el tablero casi lleno y todavía con sitios donde
+   * cabe la losa—, y son 73,5 kB. Con las setenta y dos puestas no queda ni una
+   * colocación, así que las caras bajan de 125 a 72 y la vista se queda en 59,1 kB.
+   * Medir sólo el final se habría dejado fuera el caso peor por catorce kilobytes.
+   *
+   * Jugada por HTTP, la lectura más gorda son 85 kB —la mesa añade asientos, opciones y
+   * avisos por encima de la vista— y una partida completa baja 6,86 MB.
+   *
+   * Eso NO es un fallo: `mueble: 'tablero'` es lo que permite que un cliente sin el
+   * pintor de Las Lindes juegue igual, y el tablero declarado es el §18 entero. Lo que
+   * sí sería un fallo es que creciera sin que nadie se entere — y crecer es fácil: un
+   * `rotulo` de veinte letras en cada línea son cinco kilobytes más por sondeo, y las
+   * líneas hoy no llevan texto ninguno.
+   *
+   * ═══ EL NÚMERO, Y POR QUÉ ÉSE ═══
+   *
+   * 96 kB sobre los 74,2 que mide la partida de aquí arriba: un 30 % de holgura. Ni
+   * pegado —un tope al 8 % se pone rojo el día que alguien añada un campo legítimo y
+   * entonces se sube sin mirar, que es como un presupuesto deja de serlo— ni al doble,
+   * que sería no vigilar nada. Es la misma cuenta que el tope de triángulos de la
+   * escena, y como allí, con la medida escrita al lado para poder discutirla.
+   */
+  const TOPE_DE_LA_VISTA = 96 * 1024;
+  comprobar(
+    'y la vista más gorda de la partida cabe en el presupuesto del cable',
+    laMasGorda < TOPE_DE_LA_VISTA,
+    { laMasGorda, tope: TOPE_DE_LA_VISTA },
+  );
+  console.log(
+    `  por el cable: la vista más gorda ${(laMasGorda / 1024).toFixed(1)} kB ` +
+      `(tope ${String(TOPE_DE_LA_VISTA / 1024)} kB) · media ${(sumaDeVistas / Math.max(1, revisiones) / 1024).toFixed(1)} kB`,
+  );
+}
 
 paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la proyección');
 

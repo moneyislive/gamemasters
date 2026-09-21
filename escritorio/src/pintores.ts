@@ -50,6 +50,7 @@ import type { PanelDeTablero, TableroDeclarado } from '../../shared/mecanicas/ta
 /* De `riberas.ts` y de `burgo.ts`, nunca del índice: ver la cabecera. */
 import { RIBERAS } from '../../shared/arcade/juegos/riberas';
 import { BURGO } from '../../shared/arcade/juegos/burgo';
+import { LINDES } from '../../shared/arcade/juegos/lindes';
 import {
   elPregonEnTres,
   panelesEnTres,
@@ -57,6 +58,7 @@ import {
 } from '../../shared/arcade/juegos/riberas-en-tres';
 import type { PregonEnTres } from '../../shared/arcade/juegos/riberas-en-tres';
 import { BurgoEnTres, MarcadorDelBurgo } from './burgo-en-tres';
+import { LindesEnTres, MarcadorDeLasLindes } from './lindes-en-tres';
 import type { LaMesa, MesaVista } from './mesa';
 import type { ArcadeDelCatalogo } from './muebles';
 import { MarcadorDeRiberas, RiberasEnTres } from './riberas-en-tres';
@@ -115,6 +117,22 @@ export const PINTORES_PROPIOS: Readonly<Record<string, PintorPropio>> = {
      */
     panelesDe: (paneles, pregon) =>
       panelesFueraDelPregon(panelesEnTres(paneles), pregon as PregonEnTres<Opcion> | null),
+  },
+  /*
+   * ═══ EL TERCER PINTOR, Y NO HA PAGADO NADA ═══
+   *
+   * La cabecera de este fichero prometía que «el tercer pintor no volverá a pagar
+   * esto: escribe su fila y ya está». Ésta es esa fila, y se cumplió: dos líneas y
+   * ni un `if` en `sala.tsx`.
+   *
+   * Sin `pregonDe` ni `panelesDe` por lo mismo que El Burgo: lo que Las Lindes
+   * tiene que decir fuera del tablero —la losa de la mano, dónde plantar, quién
+   * va ganando— lo pinta su propio raíl, y sus paneles declarados se pintan tal
+   * cual porque el reglamento no tiene ninguno que sobre.
+   */
+  [LINDES]: {
+    Pintor: LindesEnTres,
+    Marcador: MarcadorDeLasLindes,
   },
   [BURGO]: {
     Pintor: BurgoEnTres,

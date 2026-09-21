@@ -47,9 +47,19 @@ export interface TemaDelMuelle {
    * nombre del arcade: un `if (arcade === 'burgo')` en los dos clientes sería la misma
    * decisión escrita dos veces y en el sitio donde no se ve.
    */
-  readonly escena: 'embarcadero' | 'plaza';
+  readonly escena: 'embarcadero' | 'plaza' | 'linde';
   /** Cómo se llama el lugar. Sale en el HUD encima del código. */
   readonly lugar: string;
+  /**
+   * EL MISMO LUGAR, PERO EN LA FRASE: «Quién eres ___», «lo que ven los demás ___».
+   *
+   * Es un campo aparte y no `lugar` en minúscula porque las tres frases no encajan en el
+   * hueco: `lugar` dice «A la entrada del Burgo», que no se puede meter detrás de un «en».
+   * Y hace falta porque el vestíbulo es UNO para los tres juegos: tenía escrito «en el
+   * muelle» a pelo, así que El Burgo y Las Lindes mandaban al jugador a un sitio que no
+   * existe en su partida. Empieza siempre por «en », y eso lo vigila `verify:escritorio`.
+   */
+  readonly donde: string;
   /** La frase que se lee mientras se espera. Voz de la casa. */
   readonly espera: string;
   /** La frase de la llamada a zarpar, cuando el juego ofrece empezar. */
@@ -62,6 +72,8 @@ const RIBERAS: TemaDelMuelle = {
   arcade: 'riberas',
   escena: 'embarcadero',
   lugar: 'El embarcadero',
+  /* Riberas es de donde salía la frase, así que aquí no cambia nada de lo que se ve hoy. */
+  donde: 'en el muelle',
   espera: 'Los barcos zarpan cuando estéis todos.',
   zarpar: 'Se reparte el delta',
   /* El mismo orden que `COLORES_DE_COLONO` en riberas.ts: rojo, azul, oro, verde, malva, naranja. */
@@ -72,15 +84,35 @@ const BURGO: TemaDelMuelle = {
   arcade: 'burgo',
   escena: 'plaza',
   lugar: 'A la entrada del Burgo',
+  donde: 'en la plaza del Burgo',
   espera: 'La ciudad abre cuando estéis todos.',
   zarpar: 'Se abre el Burgo',
   /* El mismo orden que `COLORES_DEL_BURGO` en burgo.ts: marfil, azabache, violeta, turquesa, coral, lima. */
   colonos: ['#f2e8cf', '#26262e', '#7d3fd6', '#2fe0d0', '#ff8f6b', '#c5e84a'],
 };
 
+/**
+ * LA LINDE ALTA: el altozano sobre el valle vacío desde el que se abre Las Lindes.
+ *
+ * El tercer lobby, y el primero que no es un sitio de llegada sino un MIRADOR: lo
+ * que se ve desde aquí es el valle donde va a crecer el tablero. Por eso la frase de
+ * espera habla del valle y no de la gente.
+ */
+const LINDES: TemaDelMuelle = {
+  arcade: 'lindes',
+  escena: 'linde',
+  lugar: 'La Linde Alta',
+  donde: 'en la Linde Alta',
+  espera: 'El valle está vacío. Se vuelca la bolsa cuando estéis todos.',
+  zarpar: 'Se vuelca la bolsa',
+  /* El mismo orden que `COLORES_DE_LAS_LINDES` en lindes.ts: carmín, índigo, ocre, musgo, hueso. */
+  colonos: ['#c8303a', '#2f5fd0', '#e0a32e', '#3f9a56', '#ece3cf'],
+};
+
 const TEMAS: Readonly<Record<string, TemaDelMuelle>> = {
   [RIBERAS.arcade]: RIBERAS,
   [BURGO.arcade]: BURGO,
+  [LINDES.arcade]: LINDES,
 };
 
 /** ¿Tiene este arcade un muelle en tres dimensiones antes de la partida? */

@@ -1456,9 +1456,6 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   const relojMontadoRef = useRef(relojMontado);
   relojMontadoRef.current = relojMontado;
   const cuerpoDelReloj = useRef<THREE.Group>(null);
-  const arenaArriba = useRef<THREE.Group>(null);
-  const arenaAbajo = useRef<THREE.Group>(null);
-  const hiloDeArena = useRef<THREE.Mesh>(null);
   const asaDelReloj = useRef<THREE.Mesh>(null);
   const estadoDelReloj = useRef<{ vueltaPintada: number | null; girando: { desde: number } | null; vaciando: number | null; sePulso: boolean }>({ vueltaPintada: null, girando: null, vaciando: null, sePulso: false });
 
@@ -2582,12 +2579,6 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
             chorro.instanceMatrix.needsUpdate = true;
           }
         }
-        const arriba = arenaArriba.current;
-        if (arriba !== null) arriba.scale.y = Math.max(0.001, 1 - parte);
-        const abajo = arenaAbajo.current;
-        if (abajo !== null) abajo.scale.y = Math.max(0.001, parte);
-        const hilo = hiloDeArena.current;
-        if (hilo !== null) hilo.visible = parte > 0.001 && parte < 0.999;
       }
     }
 
@@ -3128,12 +3119,14 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
             Su asa propia va APAGADA: pasar el turno es tocar el asa de la caja (`tocaElReloj`), que la
             envuelve, y no apretar ésta.
           */}
-          <group position={[plano.reloj.x, relojMontado === null ? plano.reloj.cinturaDeLosConos : plano.reloj.centroDelModelo, plano.reloj.z]}>
+          {/*
+            Va donde va el MODELO y no hay segundo sitio: el respaldo de conos se sentaba en
+            `cinturaDeLosConos`, y ese reloj ya no existe. La medida se queda en la bandeja
+            porque el nicho sigue tallado para que quepa de sobra, no para colocar nada.
+          */}
+          <group position={[plano.reloj.x, plano.reloj.centroDelModelo, plano.reloj.z]}>
             <RelojDeArena
               cuerpo={cuerpoDelReloj}
-              arenaArriba={arenaArriba}
-              arenaAbajo={arenaAbajo}
-              hilo={hiloDeArena}
               asa={asaDelReloj}
               lado={plano.reloj.lado}
               ancho={plano.reloj.lado * ASA_DEL_RELOJ_DE_ARENA.ancho}

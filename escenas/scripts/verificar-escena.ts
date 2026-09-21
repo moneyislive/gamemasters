@@ -25,6 +25,7 @@
  * VEA bien. Ni la luz, ni los materiales, ni si el móvil aguanta los triángulos.
  * Eso sigue exigiendo ojos y un aparato de verdad, y está en el banco de pruebas.
  */
+import { montarElReloj, ponerLaArena, soltarElReloj } from '../reloj';
 import {
   aristaDeHex,
   aristasDe,
@@ -10088,6 +10089,174 @@ paso('El caserío del paisaje es gris, pardo o arena y tiene tope: seis celdas d
     { cuantasParejas, bytesPorMundo: bytesPorMundo.map(enMiB), delAsentamientoPorColor },
   );
 }
+
+// ---------------------------------------------------------------------------
+paso('El reloj de arena se monta bien: normalizado, con sus montones en su sitio y sin fabricar arena');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ POR QUÉ SE COMPRUEBA CON UN MODELO FABRICADO AQUÍ ═══
+ *
+ * Porque lo que hay que comprobar no es `reloj.glb` —ese ya está y se ve— sino que
+ * `montarElReloj` aguante el `.glb` que venga: con su propia escala en la raíz, con su
+ * propio centro, y con los dos montones en el orden que le dé la gana al exportador. Un
+ * modelo de verdad sólo prueba el caso que trae.
+ *
+ * Y las tres cosas que mide han fallado de verdad, las tres sin dar un error:
+ *
+ *   · SIN NORMALIZAR, el reloj medía tres milésimas de unidad. Estaba en la escena, con
+ *     sus mallas y su clip corriendo, y no se veía.
+ *   · CON LOS MONTONES AL REVÉS, el reloj cuenta hacia atrás. «0» y «1» los pone el
+ *     exportador y pueden salir cambiados el día que alguien recompile.
+ *   · CON LOS DOS MONTONES A LA MISMA FRACCIÓN, el reloj FABRICA ARENA: al empezar una
+ *     ronda aparecía arena nueva arriba y abajo a la vez.
+ *
+ * Esto vivía dentro de `delta.tsx`, o sea dentro de Riberas, sin una sola comprobación
+ * encima. Sale de ahí porque Las Lindes usa el mismo reloj para enseñar cuánta bolsa
+ * queda, y sale CON su medida: mudarlo sin ella habría sido mudar el riesgo a dos sitios.
+ */
+{
+  /** Un `.glb` fabricado: torcido, a otra escala, y con el montón de abajo declarado primero. */
+  const unRelojDeMentira = (): { escena: THREE.Object3D; clips: THREE.AnimationClip[] } => {
+    const raiz = new THREE.Group();
+    /* La escala y el desplazamiento que traen los modelos de fuera, exagerados a propósito. */
+    raiz.scale.setScalar(0.004);
+    raiz.position.set(17, -9, 4);
+
+    const conMorfologia = (y: number, nombre: string): THREE.Mesh => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute([-1, y - 1, 0, 1, y - 1, 0, 0, y + 1, 0], 3),
+      );
+      g.morphAttributes['position'] = [
+        new THREE.Float32BufferAttribute([-1, y - 1, 0, 1, y - 1, 0, 0, y, 0], 3),
+      ];
+      const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial());
+      m.morphTargetInfluences = [0];
+      m.name = nombre;
+      return m;
+    };
+    /* EL DE ABAJO PRIMERO: si el orden del fichero decidiera, esto saldría del revés. */
+    raiz.add(conMorfologia(-40, 'uno'));
+    raiz.add(conMorfologia(40, 'cero'));
+    /* Y una malla sin morfología, que no es un montón y no tiene que colarse. */
+    const suelta = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
+    raiz.add(suelta);
+    return { escena: raiz, clips: [] };
+  };
+
+  const montado = montarElReloj(unRelojDeMentira());
+  comprobar('un `.glb` con su escala y su centro se monta', montado !== null);
+
+  if (montado !== null) {
+    const caja = new THREE.Box3().setFromObject(montado.clon);
+    const alto = caja.max.y - caja.min.y;
+    comprobar(
+      'y sale con UNA unidad de alto, venga a la escala que venga',
+      Math.abs(alto - 1) < 1e-3,
+      { alto },
+    );
+    const centro = caja.getCenter(new THREE.Vector3());
+    comprobar(
+      'y centrado en el origen, para que quien lo pinte sólo tenga que darle su lado',
+      Math.abs(centro.x) < 1e-3 && Math.abs(centro.y) < 1e-3 && Math.abs(centro.z) < 1e-3,
+      { x: centro.x, y: centro.y, z: centro.z },
+    );
+
+    comprobar(
+      'trae los DOS montones, y ninguna malla sin morfología se cuela de montón',
+      montado.montones.length === 2,
+      montado.montones.length,
+    );
+    const arriba = montado.montones.filter((m) => m.arriba);
+    comprobar('y exactamente uno de los dos es el de arriba', arriba.length === 1, arriba.length);
+    comprobar(
+      'y es el que está más alto, aunque el fichero declare primero el de abajo',
+      (arriba[0]?.malla.name ?? '') === 'cero',
+      montado.montones.map((m) => `${m.malla.name}:${m.arriba ? 'arriba' : 'abajo'}`),
+    );
+
+    /*
+     * Y LA ARENA NO SE FABRICA: los dos montones son inversamente proporcionales y su
+     * suma es UNO, esté la partida donde esté.
+     */
+    for (const parte of [0, 0.25, 0.5, 0.75, 1]) {
+      ponerLaArena(montado, parte);
+      const pesos = montado.montones.map((m) => m.malla.morphTargetInfluences?.[0] ?? -1);
+      const suma = pesos.reduce((a, b) => a + b, 0);
+      comprobar(
+        `con ${String(parte)} caído, los dos montones suman uno y no se fabrica arena`,
+        Math.abs(suma - 1) < 1e-9,
+        { pesos, suma },
+      );
+      const elDeArriba = montado.montones.find((m) => m.arriba);
+      comprobar(
+        `y el de arriba lleva ${String(parte)}, que es lo que YA cayó`,
+        Math.abs((elDeArriba?.malla.morphTargetInfluences?.[0] ?? -1) - parte) < 1e-9,
+        elDeArriba?.malla.morphTargetInfluences?.[0],
+      );
+    }
+  }
+
+  /* Y sin modelo no revienta: es el caso normal mientras `reloj.glb` viaja. */
+  /* Sin modelo devuelve nada: es el caso normal mientras `reloj.glb` viaja, y el
+     permanente si no llega. Soltar lo que no existe tampoco puede reventar. */
+  comprobar('sin modelo devuelve nada, que es el caso de siempre mientras el fichero viaja', montarElReloj(null) === null);
+  soltarElReloj(null);
+}
+
+// ---------------------------------------------------------------------------
+paso('Ninguna escena se toca con `onClick`, que en la app no llega nunca');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ EL FALLO QUE ESTO CIERRA, Y CUÁNTO COSTÓ VERLO ═══
+ *
+ * En la app NO SE PODÍA PONER UNA LOSA en Las Lindes. O sea: no se podía jugar. Y la
+ * batería estaba entera en verde, el escritorio funcionaba, y no había un solo error en
+ * ninguna consola.
+ *
+ * La causa: el tablero se tocaba con `onClick`. React Native Web llama a `preventDefault`
+ * en el `pointerdown` para su propio sistema de gestos, y entonces el navegador NO
+ * sintetiza el `click`. Con ratón, en el escritorio, sí lo sintetiza — el mismo código, el
+ * mismo servidor, dos resultados. Los `pointermove` sí llegaban, así que el fantasma
+ * aparecía y el botón de girar se encendía: parecía que la pantalla respondía.
+ *
+ * Las otras VEINTIUNA asas de `escenas/` ya usaban `onPointerDown`/`onPointerUp`. Ésta era
+ * la única con `onClick`, y por eso era la única que no se podía tocar en un teléfono.
+ *
+ * Se mira en el FUENTE porque es lo único que se puede mirar: en Node no hay WebGL y aquí
+ * no se monta ninguna escena.
+ */
+{
+  const conClick: string[] = [];
+  const mirados: string[] = [];
+  const barrer = (carpeta: URL): void => {
+    for (const entrada of fs.readdirSync(carpeta, { withFileTypes: true })) {
+      if (entrada.name === 'node_modules' || entrada.name === 'scripts') continue;
+      const donde = new URL(`${entrada.name}${entrada.isDirectory() ? '/' : ''}`, carpeta);
+      if (entrada.isDirectory()) {
+        barrer(donde);
+        continue;
+      }
+      if (!entrada.name.endsWith('.tsx')) continue;
+      mirados.push(entrada.name);
+      const fuente = fs.readFileSync(donde, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      if (/\bonClick=/.test(fuente)) conClick.push(entrada.name);
+    }
+  };
+  barrer(new URL('../', import.meta.url));
+
+  /* La vacuna de siempre: un barrido que no mira ficheros no encuentra fallos. */
+  comprobar('el barrido de las escenas encuentra ficheros que mirar', mirados.length > 5, mirados.length);
+  comprobar(
+    'y ninguna escena se toca con `onClick`: en la app no llega, y el juego se queda sin jugarse',
+    conClick.length === 0,
+    conClick,
+  );
+}
+
 
 console.log('');
 if (fallos.length > 0) {
