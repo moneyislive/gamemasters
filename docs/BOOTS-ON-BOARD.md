@@ -106,6 +106,27 @@ Medido con el propio Hermes del repositorio:
 Así que el servidor arbitra sobre la arena entera, y el aparato pinta con el BVH. Las dos
 salen de **la misma declaración**.
 
+> **CORRECCIÓN, y toca a las tres viñetas de arriba: «firma idéntica» NO demuestra lo que este
+> apartado le hace decir.**
+>
+> Los tres bancos que dan las firmas `b0040bc2`, `f46fbfdd` y `888c6f9a` reciben los
+> incrementos **ya multiplicados**. Ninguno hace la multiplicación que un paseante hace una vez
+> por tic —`velocidad × dt`—, y ésa es justo la operación que se rompe: en Q16.16 el producto
+> no cabe en 32 bits, así que `(a * b) >> 16` devuelve un número equivocado **con el signo
+> cambiado** en 17 de las 32 combinaciones de velocidad por frecuencia de esta casa; cae andar
+> a 30 fps. `Math.imul` se rompe igual, y está en la lista de lo seguro de `verify:pureza`.
+>
+> Lo grave no es el desbordamiento: es que **es determinista**. Node y Hermes devuelven la
+> MISMA firma mala, medido. O sea que una firma idéntica entre motores es compatible con estar
+> equivocado, y `verify:determinismo` —el único comprobador que había para esto— sale verde
+> encima. Un banco que no hace la operación del código de verdad certifica el determinismo de
+> la operación que no es.
+>
+> Lo que vale es `((a * b) / 65536) | 0`: coma flotante exacta hasta 2^53, margen de 218.473
+> veces sobre el mayor producto real, y un 3,7 % más caro en Hermes que la forma rota. Vive en
+> `shared/mecanicas/fijo.ts` y lo vigila `npm run verify:fijo`, que ejecuta los dos motores y
+> se ha visto rojo de seis maneras.
+
 ### La puerta al estado sellado, que ya existe
 
 `server/src/arcade/mesas.ts:2326` comprueba el prefijo reservado **`arcade:` antes incluso de
@@ -243,3 +264,37 @@ Salieron de los ataques y **no dependen de que esto se construya**:
 4. La modalidad `botas` y su compuerta.
 5. La refriega y el veredicto.
 6. El botín, un juego cada vez.
+
+### 6.1 · Lo que hay que decidir antes de escribir el paso 3
+
+El diseño del paso 3 se escribió, se atacó por tres lados y volvió **agujereado por los tres**.
+La aritmética ya está arreglada (arriba, §2). Lo que queda son decisiones, no tecleo, y cinco de
+ellas cambian la forma del contrato:
+
+- **El contrato de niveles no pasa por `canonico.ts`.** Un `Int16Array` dentro de
+  `MundoDeclarado` da `NoCanonizable: no es un objeto llano`. Pasado a listas llanas sí canoniza
+  y pesa **324 kB por revisión**, que son **4,4 veces la vista más cara de la casa** (73,5 kB,
+  medidos en §5.4). O el mundo no viaja por el cable —y entonces «el servidor arbitra sobre la
+  misma declaración» hay que reescribirlo—, o viaja de otra forma.
+- **`escenas/` está fuera de la compilación del servidor.** `server/tsconfig.json` incluye
+  `src/`, `scripts/` y `../shared/`. Con el productor del mundo en `escenas/`, la declaración es
+  del cliente y sólo del cliente. Y de los tres juegos **sólo Las Lindes tiene su mundo en el
+  estado sellado**: el Burgo y Riberas declaran *decorado*, que el servidor no sabe que existe.
+- **El mundo del Burgo depende del APARATO, no de la mesa.** `ciudadDelCodigo(código, recinto,
+  calidad)`, y `calidad` la decide en ejecución el tiempo de los primeros 120 fotogramas. Medido:
+  en calidad sobria hay **2.808 obstáculos menos**. Dos personas en la misma mesa andarían dos
+  Burgos distintos, y como cada uno es coherente consigo mismo, el comprobador pasa en los dos.
+- **El umbral de subida está mal por un 46 %.** El diseño dice que el mayor desnivel entre
+  clases de Las Lindes es 1,203 u y que el umbral de 1,27 lo admite «por poco». El real es
+  **1,8594 u** (senda contra villa, verificado con `ESCALA_DEL_PACK`): es la puerta del pueblo,
+  está en el mazo hoy, y se ve como pararse en seco delante de ella.
+- **El borde del mundo desaparece.** `hayLosaEn` no era un obstáculo más: era el límite del
+  tablero, y `paseo.ts` le dedica un apartado entero a explicar por qué. Cambiarlo por «¿choca
+  con algún cuerpo?» deja andar por el vacío, donde no hay cuerpo con el que chocar.
+
+Y una que es de orden, no de diseño: **el único paseante que existe vive en la rama `lindes`,
+sin fusionar**. Lo malo de escribir el paso 3 antes no es el conflicto: es que **no hay
+conflicto**. `shared/mecanicas/andar.ts` y `escenas/lindes/paseo.ts` son ficheros distintos y
+git los fusiona tan contento — quedan dos `unPaso`, y `Lindes.tsx` sigue llamando al viejo. Paso
+3 entregado, comprobadores en verde, y el único juego que se puede andar sigue atravesando
+murallas.
