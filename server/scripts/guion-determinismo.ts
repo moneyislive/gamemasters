@@ -51,6 +51,8 @@ import {
 } from '../../shared/arcade/juegos/arcade';
 import type { EstadoDelArcade, Rumbo } from '../../shared/arcade/juegos/arcade';
 import { jugarConElRobot } from './robot-del-burgo';
+import { jugarLasLindes } from './robot-de-las-lindes';
+import { PLANTAR } from '../../shared/arcade/juegos/lindes';
 
 /**
  * Las semillas con las que se juega. Cuatro, y ninguna redonda.
@@ -148,6 +150,70 @@ export const UN_TIC_DEL_BURGO_CADA = 7;
 /** Tope de pasos del robot por partida: un cambio de reglas que lo dejara dando vueltas no bloquea la batería. */
 export const TOPE_DE_PASOS_DEL_BURGO = 4000;
 
+/**
+ * UNA PARTIDA DE LAS LINDES, JUGADA ENTERA POR EL ROBOT.
+ *
+ * Igual que el Burgo: el robot de `robot-de-las-lindes.ts` decide sobre la vista, mueve, y
+ * vuelve a decidir, así que una divergencia de un maravedí en el turno diez separa las dos
+ * partidas del todo. La diferencia con el Burgo es que aquí no hay reloj —`tickHz: 0`—, así
+ * que no hay tics que intercalar: el tic es el número de orden del movimiento.
+ *
+ * Lo que NO se afirma: el tercer escalón (la repetición expandida) es de El Arcade. Las
+ * Lindes son de servidor, no suben repetición, y su reejecución la cubre el oro de
+ * `oro-arcade.ts` contra `oro-arcade/lindes.json`.
+ */
+export interface JugadaDeLasLindes {
+  semilla: number;
+  /** Cuántos a la mesa. */
+  cuantos: number;
+  /** Cuántos movimientos se mandaron en total. */
+  apuntes: number;
+  /** Losas en el tablero al acabar. La bolsa tiene 72, y una sale puesta. */
+  puestas: number;
+  /**
+   * Cuántas veces se PLANTÓ, contado sobre los movimientos.
+   *
+   * ═══ Y NO SOBRE EL TABLERO FINAL, QUE SIEMPRE ESTÁ VACÍO ═══
+   *
+   * `estado.plantados` al acabar la partida es CERO en las cuatro semillas, medido: el remate
+   * recoge todos los labriegos al puntuarlos. Un suelo escrito sobre ese campo exigiría
+   * «cero o más» para siempre y se leería como vigilancia. Lo que dice si se plantó es la
+   * cuenta de movimientos `lindes:plantar`, que es lo que se guarda aquí.
+   */
+  plantados: number;
+  /**
+   * Cuántas veces se plantó DE CADA CLASE, también sobre los movimientos.
+   *
+   * No es adorno y no basta con el total: el recuento de Las Lindes tiene cuatro ramas
+   * —villa, senda, ermita y prado— y la rara es la ermita. Con un solo número, que la ermita
+   * cayera a cero seguiría dando una suma cómoda y dejaría un recuento entero sin ejercitar,
+   * en verde. Por eso el comprobador exige un suelo POR CLASE.
+   */
+  porClase: Record<string, number>;
+  /** Lo que sumaron todos. */
+  puntos: number;
+  /** Si acabó de verdad, que es cuando se vacía la bolsa. */
+  terminada: boolean;
+  /** EL ESTADO FINAL, serializado con `canonico.ts`. Es lo que se compara. */
+  huella: string;
+}
+
+/**
+ * Cuántos se sientan en cada partida de Las Lindes: una por semilla, en este orden.
+ *
+ * ═══ NO ES `CUANTOS_EN_EL_BURGO`, Y COPIARLO SALE VERDE SIN JUGAR ═══
+ *
+ * El Burgo admite 6 a la mesa; Las Lindes no: `CABEN.maximo` es 5 (`lindes.ts:121`). Con 6,
+ * el EMPEZAR se RECHAZA, la partida se queda en `momento: 'reuniendo'` con UN apunte y CERO
+ * losas… y las huellas de Node y Hermes coinciden perfectamente, porque coinciden en la nada.
+ * Es el verde por conjunto vacío servido en bandeja, y es exactamente lo que va a hacer el
+ * siguiente que copie la línea de al lado. Los suelos de `verificar-determinismo.ts` están
+ * puestos para cazarlo: se han visto rojos con este mismo cambio.
+ */
+export const CUANTOS_EN_LAS_LINDES: readonly number[] = [2, 3, 4, 5];
+/** Tope de pasos del robot por partida: acota, no decide (medido: acaban solas en 94-123). */
+export const TOPE_DE_PASOS_DE_LAS_LINDES = 600;
+
 /** Y lo que sale de jugarlas todas, más quién las jugó. */
 export interface Tanda {
   /**
@@ -170,6 +236,8 @@ export interface Tanda {
   jugadas: Jugada[];
   /** Las partidas del Burgo, una por semilla. */
   burgo: JugadaDelBurgo[];
+  /** Las partidas de Las Lindes, una por semilla. */
+  lindes: JugadaDeLasLindes[];
 }
 
 /** Cómo se llama el motor que está ejecutando esto. Ver `Tanda.motor`. */
@@ -320,6 +388,33 @@ export function jugarUnaDelBurgo(semilla: number, cuantos: number): JugadaDelBur
   };
 }
 
+/** Una partida entera de Las Lindes con esa semilla y los que le tocan a la mesa. Ver `JugadaDeLasLindes`. */
+export function jugarUnaDeLasLindes(semilla: number, cuantos: number): JugadaDeLasLindes {
+  const p = jugarLasLindes(semilla, cuantos, TOPE_DE_PASOS_DE_LAS_LINDES);
+  const porClase: Record<string, number> = {};
+  let plantados = 0;
+  for (const a of p.apuntes) {
+    if (a.tipo !== PLANTAR) continue;
+    plantados++;
+    const carga = a.carga as { clase?: string } | undefined;
+    const clase = carga === undefined ? undefined : carga.clase;
+    if (clase !== undefined) porClase[clase] = (porClase[clase] ?? 0) + 1;
+  }
+  let puntos = 0;
+  for (const l of p.estado.labriegos) puntos += l.puntos;
+  return {
+    semilla,
+    cuantos,
+    apuntes: p.apuntes.length,
+    puestas: p.puestas,
+    plantados,
+    porClase,
+    puntos,
+    terminada: p.estado.momento === 'terminada',
+    huella: canonico(p.estado),
+  };
+}
+
 /** Todas las partidas, con el nombre del motor delante. */
 export function jugarLaTanda(): Tanda {
   const jugadas: Jugada[] = [];
@@ -328,7 +423,11 @@ export function jugarLaTanda(): Tanda {
   for (let i = 0; i < SEMILLAS.length; i++) {
     burgo.push(jugarUnaDelBurgo(SEMILLAS[i] as number, CUANTOS_EN_EL_BURGO[i] as number));
   }
-  return { motor: queMotorSoy(), jugadas, burgo };
+  const lindes: JugadaDeLasLindes[] = [];
+  for (let i = 0; i < SEMILLAS.length; i++) {
+    lindes.push(jugarUnaDeLasLindes(SEMILLAS[i] as number, CUANTOS_EN_LAS_LINDES[i] as number));
+  }
+  return { motor: queMotorSoy(), jugadas, burgo, lindes };
 }
 
 /**

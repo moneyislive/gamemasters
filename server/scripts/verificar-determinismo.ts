@@ -102,10 +102,54 @@
  *
  * PISTA MALA, dicha para que no cueste otra tarde: si al meter un juego nuevo esto
  * dice «Hermes ejecuta el paquete sin caerse: código 1», casi nunca es una
- * divergencia de motores. Es SINTAXIS o API que Hermes 0.12 no tiene —`class` sin
- * bajar, `Array.prototype.at`, `Object.hasOwn`, `replaceAll`, `toSorted`,
- * `structuredClone`, `padStart` en según qué versión— colada en `shared/` o en el
- * robot. Se lee la salida de Hermes, que nombra la función que falta.
+ * divergencia de motores. Es SINTAXIS o API que Hermes 0.12 no tiene —`Array.prototype.at`,
+ * `Object.hasOwn`, `replaceAll`, `toSorted`, `structuredClone`, `padStart` en según qué
+ * versión— colada en `shared/` o en el robot. Se lee la salida de Hermes, que nombra la
+ * función que falta. (Con `class` NO pasa: la pasada de Babel de más abajo la baja, y es
+ * justo por lo que existe — `canonico.ts` declara `class NoCanonizable extends Error`.)
+ *
+ * ═══ Y LAS LINDES, QUE ENTRARON LAS SÉPTIMAS ═══
+ *
+ * Cuatro partidas más, jugadas enteras por `robot-de-las-lindes.ts`: se vacía la bolsa de 72
+ * losas, se plantan labriegos de las cuatro clases y se cobra. Sin tics, porque el juego
+ * declara `tickHz: 0`.
+ *
+ * DOS TRAMPAS, las dos vistas rojas a propósito antes de escribir esto:
+ *
+ *  1. EL AFORO. Las Lindes admiten 5 a la mesa (`lindes.ts:121`) y el Burgo 6. Copiar
+ *     `CUANTOS_EN_EL_BURGO` hace que la cuarta partida NO ARRANQUE —un apunte, cero losas—
+ *     y entonces los dos motores coinciden perfectamente, porque coinciden en la nada. Por
+ *     eso los suelos van DELANTE de las huellas: con el 6 puesto, ocho comprobaciones caen.
+ *  2. EL RECUENTO POR CLASES. El total de labriegos plantados no basta: la clase rara es la
+ *     ermita (15 de 157 en estas cuatro semillas), y con un solo número su desaparición se
+ *     escondería detrás de las otras tres. Se exige cada clase EN CADA PARTIDA. Visto rojo
+ *     haciendo que el robot no plante ermitas: caen cinco y nada más.
+ *
+ * LO QUE ESTA TANDA NO MIRA, Y SE DICE PARA QUE NO SE LEA COMO VIGILADO: en las cuatro
+ * semillas salen `retiradas: 0` y CERO movimientos `lindes:pasar` (medido). O sea que
+ * recoger un labriego y pasar de turno son dos ramas del reductor que aquí NO se ejercitan.
+ * Quien quiera cubrirlas tendrá que buscar semillas que las provoquen y demostrarlo con un
+ * contador, no suponerlo.
+ *
+ * ═══ QUÉ DIVERGE DE VERDAD ENTRE ESTOS DOS MOTORES ═══
+ *
+ * Conviene tenerlo medido y no de oídas, porque decide qué caza este comprobador. En Node
+ * 20.17 contra `hermes-engine-cli` 0.12, y a través de esta misma tubería (esbuild
+ * `--target=es2015` más la pasada de Babel), NO divergen las trascendentales de `Math`, ni
+ * el `sort` por defecto, ni el orden de claves, ni `toFixed`. Divergen dos cosas:
+ *
+ *  · UN COMPARADOR INCONSISTENTE en `sort` —el barajado tramposo que `azar.ts` prohíbe en su
+ *    cabecera—. Pero ése ya lo caza el Burgo: `barajar` lo usan todos los juegos.
+ *  · LA LIGADURA POR ITERACIÓN DE `let`, que Hermes 0.12 no hace. Medido aquí mismo:
+ *    `for (let i = 0; i < 5; i++) fns.push(() => i)` da `0,1,2,3,4` en Node y `5,5,5,5,5` en
+ *    Hermes. Sobrevive al empaquetado, y `verify:pureza` NO TIENE NINGUNA REGLA contra ello.
+ *    Ése es el fallo que este escalón caza y los suelos no: metido en `porTexto`, las cuatro
+ *    partidas de Las Lindes divergen con TODOS los suelos en verde —94 apuntes y 72 losas en
+ *    los dos motores— y el Burgo ni se entera. Es el rojo que justifica el bloque.
+ *
+ * Y UN HUECO QUE NO CIERRA ESTE FICHERO: `verify:pureza` mira `shared/arcade` y
+ * `shared/mecanicas` (`verificar-pureza.ts:104`), no `server/scripts/`. Los dos robots que
+ * entran en el paquete viven fuera de su alcance.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -121,6 +165,7 @@ import { movimientosDe } from '../src/arcade/repeticiones';
 import type { Repeticion } from '../src/arcade/repeticiones';
 import {
   CUANTOS_EN_EL_BURGO,
+  CUANTOS_EN_LAS_LINDES,
   jugarGrabando,
   jugarLaTanda,
   jugarUna,
@@ -128,7 +173,12 @@ import {
   segundosDeLaTanda,
   TOPE_DE_PASOS,
 } from './guion-determinismo';
-import type { Jugada, JugadaDelBurgo, Tanda } from './guion-determinismo';
+import type { Jugada, JugadaDelBurgo, JugadaDeLasLindes, Tanda } from './guion-determinismo';
+/*
+ * Las clases del recuento salen del juego y no de una lista escrita aquí: si mañana se añade
+ * una quinta, este comprobador la exige sola en vez de seguir en verde sin mirarla.
+ */
+import { CLASES_DE_COSA as CLASES_QUE_SE_CUENTAN } from '../../shared/arcade/juegos/lindes-losas';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 
@@ -138,8 +188,24 @@ const fallos: string[] = [];
 function comprobar(que: string, condicion: boolean, detalle?: unknown): void {
   hechas++;
   if (condicion) return;
-  const cola = detalle === undefined ? '' : `\n      ${String(detalle).slice(0, 900)}`;
+  const cola = detalle === undefined ? '' : `\n      ${comoSeLee(detalle).slice(0, 900)}`;
   fallos.push(`${que}${cola}`);
+}
+
+/**
+ * El detalle de un fallo, legible.
+ *
+ * `String(objeto)` da «[object Object]», que es exactamente la cifra que hacía falta para
+ * saber por qué se cayó la comprobación. Con las cadenas se deja como están, porque
+ * `dondeDifieren` ya devuelve un texto compuesto a mano.
+ */
+function comoSeLee(detalle: unknown): string {
+  if (typeof detalle === 'string') return detalle;
+  try {
+    return JSON.stringify(detalle) ?? String(detalle);
+  } catch {
+    return String(detalle);
+  }
 }
 
 function paso(titulo: string): void {
@@ -302,6 +368,75 @@ comprobar(
   );
   comprobar('y en ellas quiebra alguien: se compara dinero que se mueve, no un sorteo', quebradosDelBurgo >= 3, {
     quebradosDelBurgo,
+  });
+}
+
+/*
+ * ═══ Y LAS PARTIDAS DE LAS LINDES, CON LOS SUELOS DELANTE ═══
+ *
+ * Los suelos no son adorno y van ANTES de mirar ninguna huella, por una razón concreta y
+ * medida: si la mesa no arranca, las cuatro partidas se quedan en un apunte y cero losas —y
+ * las huellas de los dos motores COINCIDEN PERFECTAMENTE, porque coinciden en la nada—. La
+ * forma más fácil de provocarlo es copiar `CUANTOS_EN_EL_BURGO`, que lleva un 6 cuando Las
+ * Lindes admiten 5 (`lindes.ts:121`). Se ha hecho a propósito: sin estos suelos sale verde.
+ *
+ * El suelo POR CLASE es el que impide lo mismo un piso más arriba. El recuento tiene cuatro
+ * ramas —villa, senda, ermita y prado— y la rara es la ermita: si dejara de plantarse, la
+ * suma seguiría cómoda y un recuento entero quedaría sin ejercitar, en verde.
+ */
+paso('Las partidas de Las Lindes, dos veces en Node');
+
+comprobar(
+  `la tanda trae ${CUANTOS_EN_LAS_LINDES.length} partidas de Las Lindes, una por semilla`,
+  primera.lindes.length === SEMILLAS.length && CUANTOS_EN_LAS_LINDES.length === SEMILLAS.length,
+  { lindes: primera.lindes.length, semillas: SEMILLAS.length },
+);
+{
+  let plantadosEnTotal = 0;
+  const porClaseEnTotal: Record<string, number> = {};
+  for (let i = 0; i < primera.lindes.length; i++) {
+    const a = primera.lindes[i] as JugadaDeLasLindes;
+    const b = segunda.lindes[i] as JugadaDeLasLindes;
+    plantadosEnTotal += a.plantados;
+    for (const clase of CLASES_QUE_SE_CUENTAN) {
+      porClaseEnTotal[clase] = (porClaseEnTotal[clase] ?? 0) + (a.porClase[clase] ?? 0);
+    }
+    console.log(
+      `  semilla ${String(a.semilla).padStart(10)} · ${a.cuantos} a la mesa · ${String(a.apuntes).padStart(3)} apuntes · ` +
+        `${String(a.puestas).padStart(2)} losas · ${String(a.plantados).padStart(2)} plantadas · ` +
+        `${String(a.puntos).padStart(3)} puntos · ${a.terminada ? 'termina' : 'NO TERMINA'}`,
+    );
+    comprobar(`la partida de Las Lindes de la semilla ${a.semilla} termina`, a.terminada, a);
+    comprobar(
+      `la de la semilla ${a.semilla} vacía la bolsa: pone las losas, no se corta`,
+      a.puestas >= 70,
+      { puestas: a.puestas },
+    );
+    comprobar(`y en ella se cobra algo`, a.puntos > 0, { puntos: a.puntos });
+    /*
+     * Las CUATRO clases en CADA partida, no en la suma. Con la suma, una semilla que dejara
+     * de plantar ermitas se escondería detrás de las otras tres.
+     */
+    for (const clase of CLASES_QUE_SE_CUENTAN) {
+      comprobar(
+        `la de la semilla ${a.semilla} planta al menos una vez en ${clase}`,
+        (a.porClase[clase] ?? 0) >= 1,
+        { porClase: a.porClase },
+      );
+    }
+    comprobar(
+      `la partida de Las Lindes de la semilla ${a.semilla} da el mismo estado dos veces`,
+      b !== undefined && a.huella === b.huella,
+      b === undefined ? 'falta la segunda' : a.huella === b.huella ? undefined : dondeDifieren(a.huella, b.huella),
+    );
+  }
+  comprobar(
+    'entre las cuatro se planta de verdad: más de cien labriegos',
+    plantadosEnTotal >= 120,
+    { plantadosEnTotal },
+  );
+  comprobar('y la clase rara —la ermita— sale en cantidad, no de milagro', (porClaseEnTotal['ermita'] ?? 0) >= 10, {
+    porClaseEnTotal,
   });
 }
 
@@ -558,13 +693,58 @@ if (enNode !== null && enHermes !== null) {
   }
 
   /*
+   * ═══ Y LAS LINDES EN LOS DOS MOTORES ═══
+   *
+   * Mismo razonamiento que el Burgo: una tanda sin `lindes` es ROJO, no «no aplica». Y aquí
+   * hay una razón de más para comparar también las CUENTAS y no sólo la huella: el modo de
+   * fallo que este escalón caza y los suelos no es una divergencia SILENCIOSA —dos motores
+   * que juegan partidas distintas de largo—, y verla en los apuntes dice mucho más deprisa
+   * qué pasó que un carácter distinto en la posición 3.412 de la huella.
+   */
+  const lindesEnNode = Array.isArray(enNode.lindes) ? enNode.lindes : [];
+  const lindesEnHermes = Array.isArray(enHermes.lindes) ? enHermes.lindes : [];
+  comprobar(
+    'las dos tandas traen las partidas de Las Lindes, y las mismas',
+    lindesEnNode.length === SEMILLAS.length && lindesEnHermes.length === SEMILLAS.length,
+    `Node ${lindesEnNode.length} · Hermes ${lindesEnHermes.length}`,
+  );
+  const cuantasDeLasLindes = Math.min(lindesEnNode.length, lindesEnHermes.length);
+  for (let i = 0; i < cuantasDeLasLindes; i++) {
+    const a = lindesEnNode[i] as JugadaDeLasLindes;
+    const b = lindesEnHermes[i] as JugadaDeLasLindes;
+    comprobar(
+      `Las Lindes con la semilla ${a.semilla} dan el MISMO estado final en Node y en Hermes`,
+      a.huella === b.huella,
+      a.huella === b.huella ? undefined : dondeDifieren(a.huella, b.huella),
+    );
+    comprobar(
+      `Las Lindes con la semilla ${a.semilla} duran lo mismo y plantan lo mismo en los dos motores`,
+      a.apuntes === b.apuntes && a.puestas === b.puestas && a.plantados === b.plantados && a.puntos === b.puntos,
+      `Node: ${a.apuntes} apuntes / ${a.puestas} losas / ${a.plantados} plantadas / ${a.puntos} puntos · ` +
+        `Hermes: ${b.apuntes} / ${b.puestas} / ${b.plantados} / ${b.puntos}`,
+    );
+  }
+
+  /*
    * Y lo mismo contra la tanda que se jugó EN PROCESO al principio. Node fuera y
    * Node dentro deberían coincidir siempre; que no coincidieran significaría que
    * el empaquetado cambia el comportamiento —una optimización de esbuild, un
    * `target` que reescribe la aritmética— y eso es una noticia por sí sola.
+   *
+   * LAS TRES FAMILIAS ENTRAN AQUÍ. Si Las Lindes se dejaran fuera, el empaquetado podría
+   * cambiarlas y nadie se enteraría: el escalón compararía Hermes contra Node, los dos
+   * empaquetados, y los dos igual de cambiados.
    */
-  const enProceso = canonico([...primera.jugadas.map((j) => j.huella), ...primera.burgo.map((j) => j.huella)]);
-  const deFuera = canonico([...enNode.jugadas.map((j) => j.huella), ...burgoEnNode.map((j) => j.huella)]);
+  const enProceso = canonico([
+    ...primera.jugadas.map((j) => j.huella),
+    ...primera.burgo.map((j) => j.huella),
+    ...primera.lindes.map((j) => j.huella),
+  ]);
+  const deFuera = canonico([
+    ...enNode.jugadas.map((j) => j.huella),
+    ...burgoEnNode.map((j) => j.huella),
+    ...lindesEnNode.map((j) => j.huella),
+  ]);
   comprobar(
     'el paquete de esbuild da lo mismo que el mismo código sin empaquetar',
     enProceso === deFuera,
@@ -708,8 +888,11 @@ if (fallos.length === 0) {
     `✔ ${hechas} comprobaciones. El mismo registro da el mismo estado dos veces, da el mismo\n` +
       '  estado en Node y en Hermes, y la partida expandida desde su repetición da el mismo\n' +
       '  estado que la partida jugada — comparado con `canonico.ts`, no con `JSON.stringify`.\n' +
-      '  Y el Burgo también: cuatro partidas de solares jugadas por su robot, con tics que tiran\n' +
-      '  por el ausente, dan el mismo estado final en los dos motores.',
+      '  Y los tres juegos de servidor, no uno: cuatro partidas de solares del Burgo con tics que\n' +
+      '  tiran por el ausente, y cuatro de Las Lindes que vacían la bolsa de 72 losas y plantan en\n' +
+      '  las cuatro clases, dan el mismo estado final en los dos motores.\n' +
+      '  Sin mirar, y dicho a propósito: recoger un labriego y pasar de turno no salen en estas\n' +
+      '  cuatro semillas de Las Lindes, así que esas dos ramas no las compara nadie todavía.',
   );
   process.exit(0);
 }
@@ -719,8 +902,12 @@ console.log(
   '\nNada de esto es un fallo de estilo, y el escalón que falla dice dónde mirar:\n' +
     '\n' +
     '  · Si falla el 1 o el 2, es el REDUCTOR: dos jugadores con la misma semilla ven partidas\n' +
-    '    distintas. Lo más probable es una función aproximada de `Math` —`sin`, `pow`, `exp`,\n' +
-    '    `log`, `atan2`, `hypot`— colada en su camino. `verify:pureza` las lista.\n' +
+    '    distintas. Por dónde empezar a mirar, EN ESTE ORDEN, que es el que da la medida y no\n' +
+    '    la intuición: (a) una clausura sobre el `let` de un bucle —Hermes 0.12 no hace la\n' +
+    '    ligadura por iteración y `verify:pureza` no tiene regla contra ello—; (b) un `sort`\n' +
+    '    con comparador INCONSISTENTE, que pasa la regla de pureza porque comparador hay.\n' +
+    '    Las trascendentales de `Math` están prohibidas y conviene descartarlas, pero medidas\n' +
+    '    contra estos dos binarios NO divergen: es el sitio donde menos probable es.\n' +
     '  · Si falla el 3, el reductor está bien y lo que no cuadra es EL FORMATO DE REPETICIÓN:\n' +
     '    `repeticiones.movimientosDe` expande con un criterio y los grabadores apuntan con\n' +
     '    otro. Ya pasó una vez, con un paso de desfase, y el síntoma es que el marcador\n' +
