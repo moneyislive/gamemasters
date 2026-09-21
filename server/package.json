@@ -66,6 +66,7 @@
     "verify:mesa": "tsx scripts/verificar-mesa.ts",
     "verify:larga": "tsx scripts/verificar-larga.ts",
     "verify:determinismo": "tsx scripts/verificar-determinismo.ts",
+    "verify:fijo": "tsx scripts/verificar-fijo.ts",
     "verify:marcador": "tsx scripts/verificar-marcador.ts",
     "verify:canvaskit": "tsx scripts/verificar-canvaskit.ts",
     "verify:bucle": "tsx scripts/verificar-bucle.ts",

@@ -484,6 +484,26 @@ const BATERIA = [
     porque:
       'el mismo registro da el mismo estado dos veces, da el mismo estado en Node y en Hermes, y la partida expandida desde su repetición da el mismo estado que la jugada — comparado con `canonico.ts` y no con `JSON.stringify`',
   },
+  /*
+   * ═══ POR QUÉ ESTE VA JUSTO DETRÁS DEL DE ARRIBA, Y NO ES EL MISMO ═══
+   *
+   * `determinismo` compara Node contra Hermes y da por bueno lo que coincide. Eso deja
+   * pasar una familia entera de fallos: los que son IGUALES DE MALOS en los dos motores.
+   * El caso medido es la multiplicación en coma fija — `(a * b) >> 16` desborda el entero
+   * de 32 bits y devuelve el paso con el signo cambiado en 17 de 32 combinaciones de
+   * velocidad por frecuencia, y los dos motores devuelven exactamente la misma firma mala.
+   * `determinismo` sale VERDE mientras el paseante anda hacia atrás.
+   *
+   * O sea que no es que `determinismo` esté mal: es que «las dos coinciden» y «las dos
+   * aciertan» son afirmaciones distintas, y sólo comprobaba la primera.
+   */
+  {
+    nombre: 'coma fija',
+    donde: 'server',
+    guion: 'verify:fijo',
+    porque:
+      'la multiplicación Q16.16 usa `×` y `÷` —que IEEE 754 fija al bit— y no un desplazamiento, que desborda y devuelve el paso NEGATIVO; y nadie en `shared/` se escribe el suyo a mano',
+  },
   {
     nombre: 'marcador',
     donde: 'server',
