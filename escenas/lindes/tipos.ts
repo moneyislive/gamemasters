@@ -23,6 +23,7 @@
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
 import type { Calidad, Traer } from '../embarcadero/tipos';
 import type { MandosDeFuera } from '../paseo/mandos';
+import type { CanalDeBotas } from '../paseo/mesa-de-botas';
 
 /** Una losa puesta en el tablero. */
 export interface LosaEnElTablero {
@@ -147,6 +148,16 @@ export interface PropsDeLasLindes {
    */
   readonly mandos?: { readonly current: MandosDeFuera };
   /**
+   * EL CANAL DE BOOTS ON BOARD, sólo en una mesa de la modalidad `botas`.
+   *
+   * Con él la escena abre el canal de la mesa (`paseo/usar-el-canal.ts`), le cuenta cada tic de
+   * quien pasea, deja que el servidor lo corrija y pinta a los demás asientos andando
+   * (`paseo/los-demas.tsx`). Sin él —la mesa de siempre— no se abre nada y no se paga nada: ni un
+   * socket ni una llamada por tic. Quién lo pasa y cuándo lo deciden los clientes con
+   * `esMesaDeBotas`, y en ningún otro sitio.
+   */
+  readonly canal?: CanalDeBotas;
+  /**
    * SI SE PUEDE PASAR EL TURNO AHORA, y qué hacer si se toca el reloj.
    *
    * El reloj de arena es también el botón de pasar, como en Riberas y por lo mismo: es el
@@ -179,3 +190,5 @@ export interface PropsDeLasLindes {
 /** Lo que se reexporta para que quien monte la escena no importe de dos sitios. */
 export type { Calidad, Traer };
 export type { Paseante } from './paseo';
+export type { AsientoQueAnda, CanalDeBotas } from '../paseo/mesa-de-botas';
+export type { EstadoDelCanal } from '../paseo/canal-de-botas';

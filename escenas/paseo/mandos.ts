@@ -176,6 +176,13 @@ export interface PedidoDelTic {
 export interface EntradaDelTic extends PedidoDelTic {
   /** El número del tic, consecutivo desde que se nace. El primero es el 1. */
   readonly tic: number;
+  /**
+   * HACIA DÓNDE MIRA, de 0 a 255: el rumbo visual del fotograma, cuantizado. No es `rumbo`, que es
+   * hacia dónde se da el PASO y andando hacia atrás lleva media vuelta de más. Es lo que viaja por
+   * el canal como `r`: con el rumbo del paso, los demás verían a quien retrocede darse la vuelta y
+   * andar de frente, y un golpe «hacia donde miro» no tendría de dónde salir.
+   */
+  readonly mira: number;
 }
 
 /**

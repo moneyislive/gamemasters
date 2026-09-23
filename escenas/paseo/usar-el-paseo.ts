@@ -48,15 +48,32 @@
  * ═══ LA COSTURA CON LA RED ═══
  *
  * Las dos puntas de `paseante.ts`, sacadas afuera: `alDarUnTic` se llama con lo pedido en cada
- * tic y el sitio donde acabó, y `corregir` pone a quien pasea donde diga quien sabe más. Hoy no
- * las usa nadie en la partida: son por donde entrará Boots on Board sin abrir esto otra vez.
+ * tic y el sitio donde acabó, y `corregir` pone a quien pasea donde diga quien sabe más. Las usa
+ * el canal de Boots on Board (`canal-de-botas.ts`, montado con `usar-el-canal.ts`).
+ *
+ * `corregir` hace dos cosas más que poner el sitio, y las dos las pidió el canal:
+ *
+ *  · SI TODAVÍA NO SE HA NACIDO, SE NACE AHÍ. El canal se abre en un efecto y el paseo nace en el
+ *    primer fotograma a pie con mundo, y nada ordena las dos cosas: si el `dentro` llega antes, no
+ *    había nadie a quien poner, se nacía donde dice el mundo y el primer tic salía de otro sitio,
+ *    que el servidor devolvería con un `corrige`. Ahora el sitio se guarda y se nace en él.
+ *  · SI AHÍ NO SE CABE, SE APARTA AL SITIO LIBRE MÁS CERCANO (`mudarDeMundo`). El servidor valida
+ *    contra la ESTRUCTURA del mundo y el aparato anda con estructura y ADORNO: un sitio bueno para
+ *    el servidor puede caer dentro de un barril de aquí, y desde dentro de una caja el paso no deja
+ *    salir. En Las Lindes no pasa —su reparto entero es estructura—; en el Burgo y en Riberas sí.
+ *
+ * ═══ Y LA CÁMARA DE HOMBRO NO ATRAVIESA ═══
+ *
+ * Cada fotograma se mira hasta dónde cabe detrás de quien pasea (`hastaDondeCabeElHombro`) y la
+ * cámara se acerca o se aleja hacia eso sin saltar (`acercarElHombro`). El porqué y los números
+ * están en `camaras.ts`.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { deNumero } from '../../shared/mecanicas/fijo';
+import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
 import { arenaDe } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena, MundoDeclarado, Sitio } from '../../shared/mecanicas/mundo';
-import { camaraDeHombro, camaraDeOjos } from './camaras';
+import { acercarElHombro, camaraDeHombro, camaraDeOjos, hastaDondeCabeElHombro } from './camaras';
 import { mandosDelFotograma, SIN_MANDOS_DE_FUERA, SIN_TECLAS, teclaDelPaseo } from './mandos';
 import type { EntradaDelTic, MandosDeFuera, Teclas } from './mandos';
 import { corregirElPaseo, fotogramaDelPaseo, mudarDeMundo, nacerEnElPaseo, poseDelPaseo } from './paseante';
@@ -105,7 +122,10 @@ export interface OpcionesDelPaseo {
 export interface ElPaseo {
   /** Quien pasea, como se pinta en este fotograma. La escribe el paseo antes que nadie. */
   readonly pose: { readonly current: PaseoPintado };
-  /** La costura (b) con la red: poner a quien pasea en un sitio, en Q16.16. */
+  /**
+   * La costura (b) con la red: poner a quien pasea en un sitio, en Q16.16. Antes de nacer, se
+   * nacerá ahí; donde no se quepa, en el sitio libre más cercano. Ver la cabecera.
+   */
   readonly corregir: (sitio: Andante) => void;
 }
 
@@ -125,6 +145,10 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
   const pose = useRef<PaseoPintado>(SIN_NACER);
   const alturaDeLosPies = useRef<number | null>(null);
   const alturaDeLaCamara = useRef<number | null>(null);
+  /* Cuánto se queda detrás la cámara de hombro: `null` fuera del hombro, y al volver se pone de golpe. */
+  const atrasDelHombro = useRef<number | null>(null);
+  /* Un sitio que dijo la red antes de que hubiera nacido nadie: se nace ahí. */
+  const pendiente = useRef<Andante | null>(null);
   const camera = useThree((s) => s.camera);
 
   /*
@@ -158,20 +182,28 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
   }, [aPie]);
 
   useFrame((_, dt) => {
-    if (!aPie || arena === null) return;
+    if (!aPie || arena === null) {
+      atrasDelHombro.current = null;
+      return;
+    }
 
     /* ── Nacer la primera vez, o seguir donde se estaba si el mundo ha cambiado ── */
     let actual = estado.current;
     if (actual === null) {
-      if (o.nace === null) return;
-      const nacido = nacerEnElPaseo(arena, o.nace);
-      if (nacido.ahora.x !== deNumero(o.nace.x) || nacido.ahora.z !== deNumero(o.nace.z)) {
+      /* Si la red ya dijo dónde, se nace ahí, mirando a donde declara el mundo si lo declara. */
+      const dicho = pendiente.current;
+      const nace: Sitio | null =
+        o.nace ?? (dicho === null ? null : { x: aNumero(dicho.x), z: aNumero(dicho.z), rumbo: 0 });
+      if (nace === null) return;
+      const nacido = nacerEnElPaseo(arena, nace);
+      if (dicho === null && (nacido.ahora.x !== deNumero(nace.x) || nacido.ahora.z !== deNumero(nace.z))) {
         /* Un respaldo mudo es un fallo que nadie ve: el mundo declaró un sitio donde no se cabe. */
         console.warn(
-          `El mundo declara nacer en (${o.nace.x.toFixed(1)}, ${o.nace.z.toFixed(1)}) y ahí no se cabe: se nace en el sitio libre más cercano.`,
+          `El mundo declara nacer en (${nace.x.toFixed(1)}, ${nace.z.toFixed(1)}) y ahí no se cabe: se nace en el sitio libre más cercano.`,
         );
       }
-      actual = { arena, paseo: nacido };
+      pendiente.current = null;
+      actual = { arena, paseo: dicho === null ? nacido : mudarDeMundo(arena, corregirElPaseo(nacido, dicho)) };
     } else if (actual.arena !== arena) {
       actual = { arena, paseo: mudarDeMundo(arena, actual.paseo) };
     }
@@ -188,15 +220,25 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
     pose.current = { ...p, y };
 
     const suelo = asentar(alturaDeLaCamara, (o.alturaDeLaCamaraEn ?? o.alturaEn)(p.x, p.z), cuanto);
-    const c = o.modo === 'ojos' ? camaraDeOjos(p, suelo) : camaraDeHombro(p, suelo);
+    /*
+     * La de hombro, hasta donde quepa detrás: sin meterse en la pared que se tiene a la espalda ni
+     * salirse del suelo. Se mira desde el sitio PINTADO, que es donde está la figura que se sigue.
+     */
+    let atras: number | null = null;
+    if (o.modo !== 'ojos') atras = acercarElHombro(atrasDelHombro.current, hastaDondeCabeElHombro(arena, p), dt);
+    atrasDelHombro.current = atras;
+    const c = atras === null ? camaraDeOjos(p, suelo) : camaraDeHombro(p, suelo, atras);
     camera.position.set(c.x, c.y, c.z);
     camera.lookAt(c.miraX, c.miraY, c.miraZ);
   }, -1);
 
   const corregir = useCallback((sitio: Andante): void => {
     const actual = estado.current;
-    if (actual === null) return;
-    estado.current = { arena: actual.arena, paseo: corregirElPaseo(actual.paseo, sitio) };
+    if (actual === null) {
+      pendiente.current = sitio;
+      return;
+    }
+    estado.current = { arena: actual.arena, paseo: mudarDeMundo(actual.arena, corregirElPaseo(actual.paseo, sitio)) };
   }, []);
 
   return useMemo(() => ({ pose, corregir }), [corregir]);

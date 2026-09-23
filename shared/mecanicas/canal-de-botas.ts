@@ -103,8 +103,14 @@ export interface Hola {
 }
 
 /**
- * Dónde estoy, en el tic `n` de mi cuenta (empieza en 1 y crece de uno en uno). `x` y `z` en
- * Q16.16, `r` el rumbo de 0 a 255, `m` la marcha (0 quieto, 1 andando, 2 corriendo).
+ * Dónde estoy, en el tic `n` de mi cuenta (crece siempre, aunque no de uno en uno: quieto se
+ * avisa cada varios tics, y tras reconectar se sigue contando). `x` y `z` en Q16.16, `m` la marcha
+ * (0 quieto, 1 andando, 2 corriendo).
+ *
+ * `r` es HACIA DÓNDE MIRA, de 0 a 255 —no hacia dónde da el paso—. Andando hacia atrás el paso
+ * lleva media vuelta de más que la mirada, y con el paso los demás verían a quien retrocede darse
+ * la vuelta y andar de frente. El servidor no lo usa para validar (valida sitios); lo reparte en
+ * la foto para pintar, y el día del combate es el «hacia dónde golpeo».
  */
 export interface Aqui {
   readonly t: 'aqui';
@@ -119,7 +125,10 @@ export type MensajeDelAparato = Hola | Aqui;
 
 /* ─── LO QUE DICE EL SERVIDOR ────────────────────────────────────────────── */
 
-/** Ya estás dentro: quién eres en esta mesa y dónde apareces. */
+/**
+ * Ya estás dentro: quién eres en esta mesa, dónde apareces y hacia dónde miras (`r`, 0-255), y
+ * `hz`, los tics por segundo con los que cuenta el servidor (`TICS_POR_SEGUNDO`).
+ */
 export interface Dentro {
   readonly t: 'dentro';
   readonly yo: string;
@@ -131,8 +140,9 @@ export interface Dentro {
 
 /**
  * La foto de la mesa: dónde está cada uno según el servidor, en el tic `k` de SU cuenta. Cada
- * entrada es `[asiento, x, z, rumbo, marcha]`, con `x` y `z` en Q16.16. Se serializa UNA vez por
- * mesa y tic y se manda la misma cadena a todos: por eso no lleva nada de nadie en particular.
+ * entrada es `[asiento, x, z, mira, marcha]`, con `x` y `z` en Q16.16 y `mira` hacia dónde mira
+ * (ver `Aqui.r`); un asiento sale una vez como mucho. Se serializa UNA vez por mesa y tic y se
+ * manda la misma cadena a todos: por eso no lleva nada de nadie en particular.
  */
 export interface Foto {
   readonly t: 'foto';
@@ -228,10 +238,14 @@ export function leerMensajeDelServidor(texto: string): MensajeDelServidor | null
   if (m.t === 'foto') {
     if (!esEntero(m.k) || !Array.isArray(m.p)) return null;
     const p: [string, number, number, number, number][] = [];
+    const vistos: string[] = [];
     for (const e of m.p as unknown[]) {
       if (!Array.isArray(e) || e.length !== 5) return null;
       const [a, x, z, r, mm] = e as unknown[];
       if (typeof a !== 'string' || !esCoordenada(x) || !esCoordenada(z) || !esRumbo(r) || !esMarcha(mm)) return null;
+      /* Un asiento dos veces en la misma foto es una foto que no dice dónde está. */
+      if (vistos.indexOf(a) >= 0) return null;
+      vistos.push(a);
       p.push([a, x, z, r, mm]);
     }
     return { t: 'foto', k: m.k, p };

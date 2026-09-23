@@ -5241,14 +5241,56 @@ function elPintorDeLasLindes(): void {
     rotulos.slice(1),
   );
   comprobar(
-    'y el pintor lo monta encima del lienzo con el modo que lleva puesto',
-    /<ComoSeAnda modo=\{modo\} \/>/.test(readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8')),
+    'y el pintor lo monta encima del lienzo con el modo que lleva puesto, y con el canal SÓLO en una mesa de botas',
+    /<ComoSeAnda modo=\{modo\} canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\} \/>/.test(
+      readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8'),
+    ),
   );
   comprobar(
     'y la hoja le da su sitio encima del valle sin coger el puntero: es un cartel, no un control',
     /\.lindes-como-se-anda \{[^}]*position: absolute;[^}]*pointer-events: none;/.test(
       readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8'),
     ),
+  );
+
+  /*
+   * ═══ Y EN UNA MESA DE BOTAS, SE NACE AL HOMBRO Y SE DICE CÓMO VA EL CANAL ═══
+   *
+   * Boots on Board: una mesa que se abrió en la modalidad `botas` se juega bajando al tablero con
+   * los demás. El pintor tiene que empezar a pie —es a lo que se viene— y decir en el mismo cartel
+   * cómo va el canal; una mesa normal, como siempre: en la mesa y sin cartel. Se pinta el pintor
+   * entero con las dos modalidades, porque el modo inicial sale de la mesa al montar y un pintado
+   * estático lo enseña. (Que la escena abra el canal sólo con la prop, y que el pintor se la pase
+   * sólo en botas, lo mira `verify:canal-del-paseo` en el fuente de los dos clientes.)
+   */
+  const conCanal = (['mesa', 'hombro'] as const).map((m) => renderToStaticMarkup(<ComoSeAnda modo={m} canal="Dentro" />));
+  comprobar(
+    'con canal, en la mesa el cartel dice sólo cómo va el canal, y a pie las dos cosas',
+    /class="lindes-como-se-anda"/.test(conCanal[0] ?? '') &&
+      /Dentro/.test(conCanal[0] ?? '') &&
+      !/W A S D/.test(conCanal[0] ?? '') &&
+      /W A S D/.test(conCanal[1] ?? '') &&
+      /Dentro/.test(conCanal[1] ?? ''),
+    conCanal,
+  );
+  const deBotas = renderToStaticMarkup(
+    <LindesEnTres
+      manifiesto={{ id: LINDES } as never}
+      mesa={{ ...unaMesa('dentro', { ...puesta, modalidad: 'botas' }), llave: 'llave-de-prueba' }}
+      puesta={{ ...puesta, modalidad: 'botas' }}
+      tablero={tablero}
+      opciones={opciones}
+      elRail={elRail}
+    />,
+  );
+  comprobar(
+    'una mesa de botas nace al hombro —el cartel de cómo se anda está puesto— y dice cómo va el canal',
+    /class="lindes-como-se-anda"/.test(deBotas) && /W A S D/.test(deBotas) && /Conectando…/.test(deBotas),
+    deBotas.slice(deBotas.indexOf('lindes-como-se-anda') - 20, deBotas.indexOf('lindes-como-se-anda') + 160),
+  );
+  comprobar(
+    'y una mesa normal —la del resto de este paso, sin `modalidad`— sigue naciendo en la mesa, sin cartel ni canal',
+    !/lindes-como-se-anda/.test(html) && !/Conectando…/.test(html),
   );
 }
 

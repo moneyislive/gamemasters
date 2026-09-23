@@ -14,6 +14,9 @@
  *  5. QUIEN PASEA, con el paseo común de `escenas/paseo/`: esta escena le da su
  *     mundo —`mundoDeLasLindes`—, de qué losa se nace y a qué altura está el suelo, y
  *     el paseo pone el resto: los tics, los choques, las cámaras de a pie y la figura.
+ *  6. LOS DEMÁS, sólo en una mesa `botas` (la prop `canal`): el canal de la mesa lleva
+ *     cada tic de quien pasea al servidor y trae dónde anda cada uno, y los demás
+ *     asientos se pintan andando con su figura y su nombre (`paseo/los-demas.tsx`).
  *
  * ═══ LO QUE ESTA ESCENA NO SABE ═══
  *
@@ -74,6 +77,9 @@ import {
 } from './paseo';
 import { usarElPaseo } from '../paseo/usar-el-paseo';
 import { QuienAnda } from '../paseo/quien-anda';
+import { usarElCanal } from '../paseo/usar-el-canal';
+import { LosDemas } from '../paseo/los-demas';
+import type { Andante } from '../../shared/mecanicas/mundo';
 import { mundoDeLasLindes } from '../../shared/arcade/juegos/lindes-mundo';
 import type { PropsDeLasLindes, Traer } from './tipos';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
@@ -359,6 +365,16 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
     (x: number, z: number) => alturaDeLaCamara(porCasilla, x, z),
     [porCasilla],
   );
+  /*
+   * ═══ EL CANAL, SÓLO SI LA MESA ES DE BOTAS ═══
+   *
+   * Sin la prop no se abre nada y `alDarUnTic` es `undefined`: una mesa normal no paga ni una
+   * llamada por tic. Con ella, el paseo le da cada tic al canal (la costura a) y el canal pone a
+   * quien pasea donde dice el servidor (la costura b), que llega por una referencia porque el
+   * paseo se monta después. Ver `paseo/usar-el-canal.ts`.
+   */
+  const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
+  const elCanal = usarElCanal(props.canal, corregirAQuienPasea);
   const paseo = usarElPaseo({
     mundo,
     nace,
@@ -366,7 +382,11 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
     mandos: props.mandos,
     alturaEn,
     alturaDeLaCamaraEn,
+    alDarUnTic: elCanal.alDarUnTic,
   });
+  useEffect(() => {
+    corregirAQuienPasea.current = paseo.corregir;
+  }, [paseo.corregir]);
 
   useFrame((_, dt) => {
     if (camara.modo === 'mesa') {
@@ -656,6 +676,22 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
           pose={paseo.pose}
           enPrimeraPersona={camara.modo === 'ojos'}
           alFallar={props.alFallar}
+        />
+      )}
+
+      {/*
+        LOS DEMÁS, sólo con canal y sólo a pie: en la mesa son figuras de dos unidades y media
+        en un tablero de mil seiscientas, lo mismo que quien pasea, que tampoco se pinta allí.
+        El canal sigue abierto mirando la mesa, y al bajar ya están donde están.
+      */}
+      {props.canal === undefined || camara.modo === 'mesa' ? null : (
+        <LosDemas
+          traer={traer}
+          cliente={elCanal.cliente}
+          presentes={elCanal.presentes}
+          asientos={props.canal.asientos}
+          yo={props.canal.yo}
+          alturaEn={alturaEn}
         />
       )}
 

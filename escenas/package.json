@@ -24,7 +24,8 @@
     "verify:la-ciudad": "tsx scripts/verificar-la-ciudad.ts",
     "verify:lindes-escena": "tsx scripts/verificar-lindes-escena.ts",
     "medir:huellas-de-las-lindes": "tsx scripts/medir-huellas-de-las-lindes.ts",
-    "verify:paseo": "tsx scripts/verificar-paseo.ts"
+    "verify:paseo": "tsx scripts/verificar-paseo.ts",
+    "verify:canal-del-paseo": "tsx scripts/verificar-canal-del-paseo.ts"
   },
   "description": "Las escenas 3D que pintan los DOS clientes. Sin Canvas propio: lo monta quien la usa.",
   "peerDependencies": {

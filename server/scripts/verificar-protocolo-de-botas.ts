@@ -106,6 +106,7 @@ const MALOS_DEL_SERVIDOR: readonly [string, string][] = [
   ['dentro sin hz', j({ t: 'dentro', yo: 'a1', x: 0, z: 0, r: 0 })],
   ['corrige con x con decimales', j({ t: 'corrige', n: 1, x: 0.5, z: 0 })],
   ['un tipo que no existe', j({ t: 'botin', de: 'a1' })],
+  ['una foto con el mismo asiento dos veces', j({ t: 'foto', k: 1, p: [['a1', 0, 0, 0, 0], ['a1', 65536, 0, 0, 0]] })],
 ];
 for (const [que, texto] of MALOS_DEL_SERVIDOR) {
   comprobar(`se rechaza del servidor: ${que}`, leerMensajeDelServidor(texto) === null, texto);
@@ -125,7 +126,7 @@ comprobar('y escapa lo que no es un código', rutaDelCanal('A/B?c') === '/api/ar
 }
 
 /* El suelo: que se ha mirado de verdad todo lo que se dice arriba. */
-comprobar('se han mirado todas las muestras', hechas >= 38, { hechas });
+comprobar('se han mirado todas las muestras', hechas >= 39, { hechas });
 
 console.log('');
 if (fallos.length > 0) {

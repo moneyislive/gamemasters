@@ -38,6 +38,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Opcion } from '../../shared/arcade';
+import { rutaDelCanal } from '../../shared/mecanicas/canal-de-botas';
 import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { turnoDeLaVista } from '../../shared/mecanicas/turno-declarado';
 import { elSitioGuardado, guardarElSitio, olvidarElSitio } from './bolsillo';
@@ -90,6 +91,15 @@ export interface MesaVista {
   opciones?: readonly Opcion[];
   /** Por qué el juego no hizo nada. Solo llega en la respuesta de mover. */
   motivo?: string | null;
+  /**
+   * CÓMO SE JUEGA ESTA MESA: la de siempre, o Boots on Board —bajando al tablero con los demás—.
+   * Se elige al abrirla y no cambia (`docs/BOOTS-ON-BOARD.md` §3).
+   *
+   * OPCIONAL por lo mismo que `opciones`: un servidor anterior no lo manda, y SIN ÉL ES
+   * `'normal'`. Se lee con `esMesaDeBotas` (`escenas/paseo/mesa-de-botas.ts`), la misma función
+   * que usa la app, que es quien decide qué hacer con un valor que falte o que no se conozca.
+   */
+  modalidad?: 'normal' | 'botas';
 }
 
 export interface AvisoDeMesa {
@@ -149,8 +159,12 @@ export interface LaMesa {
   cronica: AvisoDeMesa[];
   /** Hay una petición que escribe en curso: los botones se quedan quietos. */
   quieto: boolean;
-  /** `figura` viaja con el alta si se da, y es el aspecto de MI asiento desde el primer sondeo de los demás. */
-  abrir: (nombre: string, plazoSegundos?: number, figura?: string) => void;
+  /**
+   * `figura` viaja con el alta si se da, y es el aspecto de MI asiento desde el primer sondeo de los demás.
+   * `modalidad`, igual: sólo si se da, y sin ella el servidor abre la mesa de siempre. Elegirla es
+   * cosa de la pantalla de abrir; aquí sólo está la tubería.
+   */
+  abrir: (nombre: string, plazoSegundos?: number, figura?: string, modalidad?: 'normal' | 'botas') => void;
   entrar: (codigo: string, nombre: string, figura?: string) => void;
   /**
    * MOVER DEVUELVE CÓMO ACABÓ, con lo que el cuerpo ya calculaba: `'rechazado'` si la
@@ -176,6 +190,30 @@ export interface LaMesa {
    * qué se diferencian.
    */
   tirar: () => void;
+  /**
+   * LA LLAVE DE MI ASIENTO, mientras estoy sentado; `null` fuera.
+   *
+   * Hasta Boots on Board no salía de este fichero: iba en la cabecera de cada petición y nadie más
+   * la necesitaba. El canal de una mesa `botas` es otra conexión —un WebSocket, que en el navegador
+   * no admite cabeceras— y la llave va en su primer mensaje, así que el pintor tiene que poder
+   * dársela. Opcional en el tipo para que las mesas de mentira de los bancos y de
+   * `verify:escritorio` no tengan que inventarse una; el gancho la da siempre.
+   */
+  llave?: string | null;
+}
+
+/**
+ * LA DIRECCIÓN DEL CANAL DE BOOTS ON BOARD DE UNA MESA: la misma casa que sirvió esta página, con
+ * `ws` en vez de `http` —`wss` en vez de `https`— y la ruta del contrato. Sin la llave: la llave va
+ * en el `hola`.
+ *
+ * La misma casa por lo mismo que `ruta()`: en producción es el mismo Node, y en desarrollo el Vite
+ * de al lado pasa `/api` al servidor —también la subida de protocolo, si su proxy lleva
+ * `ws: true`—. `null` sin `location`, que es como se pinta en `verify:escritorio`.
+ */
+export function direccionDelCanal(codigo: string): string | null {
+  if (typeof location === 'undefined') return null;
+  return `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${rutaDelCanal(codigo)}`;
 }
 
 const CABECERA_DE_ASIENTO = 'x-asiento';
@@ -267,6 +305,16 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
   const codigo = useRef<string | null>(null);
   const llave = useRef<string | null>(null);
   const vivo = useRef(true);
+  /*
+   * LA LLAVE, TAMBIÉN EN ESTADO, para dársela al pintor (`LaMesa.llave`). La del bucle sigue siendo
+   * la referencia, por lo de arriba; ésta es su copia para pintar, y se cambian las dos a la vez y
+   * en un solo sitio para que no puedan decir cosas distintas.
+   */
+  const [llaveDelAsiento, ponerLlaveDelAsiento] = useState<string | null>(null);
+  const apuntarLaLlave = useCallback((nueva: string | null): void => {
+    llave.current = nueva;
+    ponerLlaveDelAsiento(nueva);
+  }, []);
 
   useEffect(() => {
     vivo.current = true;
@@ -341,7 +389,7 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
 
         if (datos.mesa !== undefined && datos.mesa.yo !== null) {
           codigo.current = datos.mesa.codigo;
-          llave.current = sitio.llave;
+          apuntarLaLlave(sitio.llave);
           ponerMesa(datos.mesa);
           ponerFase('dentro');
           return;
@@ -513,7 +561,7 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
           const datos = (await r.json()) as { error?: string; llave?: string; mesa?: MesaVista };
           if (!r.ok || datos.mesa === undefined) throw new Error(datos.error ?? queSalioMal);
           codigo.current = datos.mesa.codigo;
-          llave.current = datos.llave ?? null;
+          apuntarLaLlave(datos.llave ?? null);
           if (datos.llave !== undefined) {
             guardarElSitio(arcade, silla, { codigo: datos.mesa.codigo, llave: datos.llave });
           }
@@ -530,16 +578,17 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
         }
       })();
     },
-    [arcade, silla, cabeceras],
+    [apuntarLaLlave, arcade, silla, cabeceras],
   );
 
   /*
    * `figura` se manda SÓLO si viene, igual que `plazoSegundos`: el servidor trata
    * la clave ausente como «no dijo», y mandar `undefined` en un JSON es no
    * mandar nada, pero mandar `null` o `''` sería una figura mal escrita y un 400.
+   * Y `modalidad`, lo mismo: sin ella el servidor abre la mesa de siempre.
    */
   const abrir = useCallback(
-    (nombre: string, plazoSegundos?: number, figura?: string) => {
+    (nombre: string, plazoSegundos?: number, figura?: string, modalidad?: 'normal' | 'botas') => {
       sentarse(
         '/mesas',
         {
@@ -547,6 +596,7 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
           nombre,
           ...(plazoSegundos === undefined ? {} : { plazoSegundos }),
           ...(figura === undefined ? {} : { figura }),
+          ...(modalidad === undefined ? {} : { modalidad }),
         },
         'No se ha podido abrir la mesa',
       );
@@ -609,7 +659,7 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
               if (loSuyo.mesa !== undefined && loSuyo.mesa.yo !== null) {
                 salidasDeEstaPestana.delete(`${arcade}:${silla}:${limpio}`);
                 codigo.current = loSuyo.mesa.codigo;
-                llave.current = guardado.llave;
+                apuntarLaLlave(guardado.llave);
                 ponerMesa(loSuyo.mesa);
                 ponerCronica([]);
                 ponerFase('dentro');
@@ -630,7 +680,7 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
       }
       sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'No se ha podido entrar');
     },
-    [arcade, silla, sentarse],
+    [apuntarLaLlave, arcade, silla, sentarse],
   );
 
   // -------------------------------------------------------------------------
@@ -775,12 +825,12 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
       salidasDeEstaPestana.add(`${arcade}:${silla}:${codigo.current}`);
     }
     codigo.current = null;
-    llave.current = null;
+    apuntarLaLlave(null);
     ponerMesa(null);
     ponerCronica([]);
     ponerAviso(SIN_AVISO);
     ponerFase('fuera');
-  }, [arcade, silla]);
+  }, [apuntarLaLlave, arcade, silla]);
 
   /**
    * TIRAR LA MESA, que es lo que faltaba y deja a la gente sin salida.
@@ -836,7 +886,20 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
    * origen la invitaría a pintar dos avisos distintos, que es cómo se acaba
    * teniendo dos sitios donde mirar cuando algo va mal.
    */
-  return { fase, mesa, aviso: aviso.texto, cronica, quieto, abrir, entrar, mover, vestir, salir, tirar };
+  return {
+    fase,
+    mesa,
+    aviso: aviso.texto,
+    cronica,
+    quieto,
+    abrir,
+    entrar,
+    mover,
+    vestir,
+    salir,
+    tirar,
+    llave: llaveDelAsiento,
+  };
 }
 
 function textoDelFallo(error: unknown): string {

@@ -755,6 +755,13 @@ const BATERIA = [
     porque:
       'los fotogramas dan exactamente ⌊total/tic⌋ tics y nunca más de cinco por fotograma, lo pintado va siempre entre el tic anterior y el último, las teclas y la palanca piden su rumbo y su marcha con el atrás en +128, contra un cuerpo del mundo se para sin meterse y de lado resbala, la marioneta se queda quieta contra la pared aunque se pulse y corre al correr con el clip a la velocidad del suelo, lo pedido tic a tic basta para rehacer el camino, nadie nace encerrado, y la escena de Las Lindes y la app montan justo esto',
   },
+  {
+    nombre: 'el canal del paseo',
+    donde: 'escenas',
+    guion: 'verify:canal-del-paseo',
+    porque:
+      'el hola va primero y con la llave, que no va en la URL; nada sale antes de dentro y con él se está donde dijo el servidor; un aqui por tic con los números de la costura —y con la MIRADA, no el paso: andando hacia atrás los demás no te ven darte la vuelta— y quieto dos por segundo; corrige corrige sin ping-pong; a los demás se les pinta 150 ms atrás y nunca por delante; sin vuelta con llave mala, mesa que no u otro aparato, con lo demás la espera se dobla hasta su tope y con quieto se vuelve al andar; la cámara de hombro no atraviesa; el rótulo se lee desde el hombro; y sólo una mesa botas monta el canal',
+  },
   /*
    * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.
    *
