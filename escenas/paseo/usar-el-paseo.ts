@@ -74,8 +74,8 @@ import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
 import { arenaDe } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena, MundoDeclarado, Sitio } from '../../shared/mecanicas/mundo';
 import { acercarElHombro, camaraDeHombro, camaraDeOjos, hastaDondeCabeElHombro } from './camaras';
-import { mandosDelFotograma, SIN_MANDOS_DE_FUERA, SIN_TECLAS, teclaDelPaseo } from './mandos';
-import type { EntradaDelTic, MandosDeFuera, Teclas } from './mandos';
+import { esTeclaDeOtro, mandosDelFotograma, SIN_MANDOS_DE_FUERA, SIN_TECLAS, teclaDelPaseo } from './mandos';
+import type { DestinoDeLaTecla, EntradaDelTic, MandosDeFuera, Teclas } from './mandos';
 import { corregirElPaseo, fotogramaDelPaseo, mudarDeMundo, nacerEnElPaseo, poseDelPaseo } from './paseante';
 import type { EstadoDelPaseo, Paseante } from './paseante';
 
@@ -161,7 +161,12 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
     const cambia = (e: KeyboardEvent, pulsada: boolean): void => {
       const mando = teclaDelPaseo(e.key);
       if (mando === null) return;
-      e.preventDefault();
+      /*
+       * Soltar se atiende SIEMPRE —una tecla que se soltó escribiendo en un campo no puede
+       * quedarse pisada en el paseo—; pulsar, sólo si la tecla no es de otro (ver `esTeclaDeOtro`).
+       */
+      if (pulsada && esTeclaDeOtro(e.target as DestinoDeLaTecla | null, e.ctrlKey || e.altKey || e.metaKey)) return;
+      if (pulsada) e.preventDefault();
       teclas.current = { ...teclas.current, [mando]: pulsada };
     };
     const abajo = (e: KeyboardEvent): void => cambia(e, true);
