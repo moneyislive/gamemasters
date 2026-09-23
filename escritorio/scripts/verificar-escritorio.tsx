@@ -99,7 +99,7 @@ import { sePuedeRecorrer } from '../../shared/arcade/juegos/mundos';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
 import { haEmpezado } from '../src/empezada';
 import { Muelle } from '../src/muelle';
-import { temaDelMuelle, tieneMuelle } from '../../escenas/embarcadero/tema';
+import { arcadesConMuelle, temaDelMuelle, tieneMuelle } from '../../escenas/embarcadero/tema';
 import { FIGURAS } from '../../escenas/embarcadero/figuras';
 import { semillaDeCodigo } from '../../escenas/embarcadero/cala';
 /* El sitio del mando de recoger lo dice la escena, no esta hoja: ver `escenas/mesa.ts`. */
@@ -1335,21 +1335,34 @@ function elMuelle(): void {
     !tocaElMuelle(true, 'dentro', true, orilla),
   );
   /*
-   * QUIÉN TIENE MUELLE, POR LISTA CERRADA. Decía «Riberas y ningún otro» mientras Riberas
-   * fue el único; con el Burgo fueron dos; con Las Lindes son tres, y se sigue escribiendo
-   * la lista entera en vez de «al menos uno»: dar un tema del muelle a un arcade es
-   * mandarlo a un lobby con seis amarres y una coreografía de zarpar, y eso tiene que
-   * pasar por aquí a sabiendas. Se exige contra los INSTALADOS: mientras un juego no esté
-   * dado de alta en `shared/arcade/juegos/index.ts`, esto está en rojo y dice cuál falta.
+   * QUIÉN TIENE MUELLE: LOS QUE TIENEN TEMA, Y TODOS INSTALADOS.
    *
-   * Y el orden es el alfabético porque la comparación ordena los dos lados: escribir la
-   * lista en otro orden no la rompe, pero leerla ordenada evita la duda.
+   * Esto era una lista cerrada escrita aquí —«Riberas y ningún otro», luego dos, luego tres—
+   * con el argumento de que dar un tema a un arcade es mandarlo a un lobby con seis amarres
+   * y una coreografía de zarpar, y eso tenía que pasar por aquí a sabiendas. Pero ese acto
+   * a sabiendas ya existe y es otro: escribir el tema entero —lugar, sitio de la frase,
+   * espera, verbo de zarpar, paleta y escena— en `escenas/embarcadero/tema.ts`. La línea de
+   * aquí sólo lo repetía, y un lobby nuevo pagaba las dos. Así que la lista se lee del tema
+   * (`arcadesConMuelle`) y lo que se sigue exigiendo es lo que la lista escrita compraba:
+   *
+   *   · que NINGÚN TEMA sea de un arcade que no está instalado: mientras un juego no esté
+   *     dado de alta en `shared/arcade/juegos/index.ts`, esto está en rojo y dice cuál falta
+   *     (o cuál está mal escrito);
+   *   · y SUELO: que la lista no salga vacía y traiga los tres de hoy. Una lista derivada
+   *     que sale vacía no comprueba nada —todo lo que se recorre abajo quedaría en verde—,
+   *     y un tema que desaparece sin querer es un lobby que se pierde sin un error.
    */
-  const CON_MUELLE = ['burgo', 'lindes', 'riberas'];
+  const LOS_TRES_DE_HOY = ['burgo', 'lindes', 'riberas'];
+  const CON_MUELLE = [...arcadesConMuelle()].sort();
   comprobar(
-    `los arcades instalados con muelle son exactamente ${CON_MUELLE.join(', ')}, y ninguno más`,
+    `la lista de arcades con muelle sale del tema, no está vacía y trae los de hoy (${LOS_TRES_DE_HOY.join(', ')})`,
+    CON_MUELLE.length >= LOS_TRES_DE_HOY.length && LOS_TRES_DE_HOY.every((id) => CON_MUELLE.includes(id)),
+    CON_MUELLE,
+  );
+  comprobar(
+    `los arcades instalados con muelle son exactamente los que tienen tema (${CON_MUELLE.join(', ')}): ningún tema es de un arcade sin instalar`,
     JSON.stringify(arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id).sort()) === JSON.stringify(CON_MUELLE),
-    { conMuelle: arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id), instalados: arcadesInstalados().map((m) => m.id) },
+    { conMuelle: arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id), temas: CON_MUELLE, instalados: arcadesInstalados().map((m) => m.id) },
   );
 
   /*
@@ -1379,12 +1392,12 @@ function elMuelle(): void {
   }
 
   /*
-   * Y que los tres sean DISTINTOS: si alguien copia el tema de un juego para estrenar otro
+   * Y que todos sean DISTINTOS: si alguien copia el tema de un juego para estrenar otro
    * y se deja este campo, las dos comprobaciones de arriba siguen en verde y el vestíbulo
    * vuelve a mandar a la gente al sitio equivocado — que es exactamente lo que pasó.
    */
   const losSitios = CON_MUELLE.map((id) => temaDelMuelle(id)?.donde ?? '');
-  comprobar('y los tres vestíbulos nombran tres sitios distintos', new Set(losSitios).size === CON_MUELLE.length, {
+  comprobar(`y los ${String(CON_MUELLE.length)} vestíbulos nombran sitios distintos`, new Set(losSitios).size === CON_MUELLE.length, {
     losSitios,
   });
 
@@ -1392,7 +1405,13 @@ function elMuelle(): void {
     const elVestibulo = readFileSync(new URL('../src/muelle.tsx', import.meta.url), 'utf8');
     /* Sin los comentarios: la explicación de por qué esto está prohibido no puede tumbarlo. */
     const soloCodigo = sinComentarios(elVestibulo);
-    for (const sitio of ['en el muelle', 'en la plaza', 'en la Linde Alta']) {
+    /*
+     * Los sitios que no pueden ir escritos en el vestíbulo: los tres que se escribieron aquí
+     * cuando se cazó el fallo —«en la plaza» a secas, más ancho que el del tema— y el `donde`
+     * de CADA tema, leído de la tabla: un lobby nuevo queda vigilado sin tocar esta línea.
+     */
+    const SITIOS_DE_UN_JUEGO = [...new Set(['en el muelle', 'en la plaza', 'en la Linde Alta', ...losSitios.filter((s) => s.length > 0)])];
+    for (const sitio of SITIOS_DE_UN_JUEGO) {
       comprobar(
         `el vestíbulo no lleva «${sitio}» escrito dentro: lo pone el tema`,
         !soloCodigo.includes(sitio),
@@ -2980,10 +2999,30 @@ function burgoEnTres(): void {
       PINTORES_PROPIOS[LINDES]?.pregonDe === undefined &&
       PINTORES_PROPIOS[LINDES]?.panelesDe === undefined,
   );
+  /*
+   * ═══ Y QUIÉN MÁS TIENE FILA, SIN ESCRIBIRLO AQUÍ ═══
+   *
+   * Decía «exactamente esos tres», con la lista escrita en esta línea: el cuarto pintor
+   * pagaba su fila en `pintores.ts` y otra vez aquí, que es justo el peaje que la cabecera
+   * de aquel fichero prometió quitar. Lo que la lista cerrada compraba de verdad es que no
+   * haya una fila que no pinte nada —de un juego que no existe, o de uno que no se pinta
+   * sobre el retablo: un pintor propio OCUPA EL SITIO DEL RETABLO, así que sólo tiene
+   * sentido para un arcade instalado de mueble `tablero`—, y eso se exige fila a fila. Con
+   * SUELO: los tres de hoy tienen que seguir teniendo la suya, que es lo que un borrado sin
+   * querer se llevaría por delante sin un error.
+   */
+  const conPintorPropio = Object.keys(PINTORES_PROPIOS);
   comprobar(
-    'y los pintores propios son exactamente esos tres: un arcade sin fila se pinta con su mueble genérico y no se entera',
-    Object.keys(PINTORES_PROPIOS).sort().join(',') === [BURGO, LINDES, RIBERAS].sort().join(','),
-    Object.keys(PINTORES_PROPIOS),
+    'Riberas, El Burgo y Las Lindes siguen teniendo fila en `PINTORES_PROPIOS`',
+    [BURGO, LINDES, RIBERAS].every((id) => conPintorPropio.includes(id)),
+    conPintorPropio,
+  );
+  comprobar(
+    'y cada fila es de un arcade instalado de mueble `tablero`, con su pintor: un arcade sin fila se pinta con su mueble genérico y no se entera',
+    conPintorPropio.every(
+      (id) => arcadesInstalados().some((m) => m.id === id && m.mueble === 'tablero') && PINTORES_PROPIOS[id]?.Pintor !== undefined,
+    ),
+    conPintorPropio.map((id) => ({ id, mueble: arcadesInstalados().find((m) => m.id === id)?.mueble ?? 'sin instalar' })),
   );
   comprobar(
     '`sala.tsx` monta el pintor por la tabla y ya no nombra a ningún juego: ni `RIBERAS`, ni `<RiberasEnTres`, ni `esRiberas`',

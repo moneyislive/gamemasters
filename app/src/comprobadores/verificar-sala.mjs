@@ -68,14 +68,50 @@ const { dondeSePinta, loQueLlega, queSeEnsena } = await cargarModuloTs(
 );
 
 /**
+ * LOS JUEGOS QUE TRAE EL BINARIO, LEÍDOS DE `pintados.ts` Y NO COPIADOS AQUÍ.
+ *
+ * Eran una lista escrita en este fichero —la del binario de abajo— que había que tocar
+ * cada vez que un juego entraba en `LOS_QUE_PINTA`, además de su fila allí: la misma alta
+ * dos veces, y la de aquí sólo servía para ponerse roja si no se hacía. La tabla no se
+ * puede importar desde Node —trae componentes de React Native y de Skia—, así que sus
+ * claves se leen del fuente (`[FRENTE]: LaFrente,` → `FRENTE`) y cada constante se resuelve
+ * a su identificador en el fichero del juego (`export const FRENTE = 'frente';`). Una que
+ * no se resuelva, o que dos juegos declaren con valores distintos, sale como `null`, y
+ * eso se ve rojo más abajo; y como una lectura rota daría una lista vacía —que no juzga
+ * nada—, allí mismo se le exige suelo.
+ *
+ * Recibe los textos para poder darle también uno FABRICADO: la vacuna de más abajo.
+ */
+function juegosDeLaTabla(textoDePintados, ficherosDeJuegos) {
+  const cuerpo = (textoDePintados.split('LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {')[1] ?? '').split('};')[0] ?? '';
+  const constantes = [...cuerpo.matchAll(/^\s*\[([A-Z_]+)\]:/gm)].map((m) => m[1]);
+  const valores = new Map();
+  for (const texto of ficherosDeJuegos) {
+    for (const m of texto.matchAll(/^export const ([A-Z_]+)(?:: ArcadeId)? = '([a-z0-9-]+)';$/gm)) {
+      valores.set(m[1], valores.has(m[1]) && valores.get(m[1]) !== m[2] ? null : m[2]);
+    }
+  }
+  return constantes.map((constante) => ({ constante, id: valores.get(constante) ?? null }));
+}
+
+const CARPETA_DE_LOS_JUEGOS = path.resolve(SRC, '..', '..', 'shared', 'arcade', 'juegos');
+const LOS_DE_LA_TABLA = juegosDeLaTabla(
+  leer(path.join(SRC, 'arcade', 'pintados.ts')),
+  fs
+    .readdirSync(CARPETA_DE_LOS_JUEGOS)
+    .filter((f) => f.endsWith('.ts'))
+    .map((f) => leer(path.join(CARPETA_DE_LOS_JUEGOS, f))),
+);
+
+/**
  * El binario con el que se ejercita el juicio.
  *
- * Es el de VERDAD —se comprueba más abajo contra las tablas— y no uno inventado:
- * probar la regla contra un binario imaginario compraría que la regla es
+ * Es el de VERDAD —sus juegos salen de la tabla de arriba y se comprueban más abajo— y no
+ * uno inventado: probar la regla contra un binario imaginario compraría que la regla es
  * coherente consigo misma, que no es lo que hay que comprar.
  */
 const BINARIO = {
-  juegos: ['frente', 'el-arcade', 'riberas', 'peonza', 'burgo', 'lindes'],
+  juegos: LOS_DE_LA_TABLA.map((j) => j.id).filter((id) => id !== null),
   muebles: ['formulario', 'tablero', 'lienzo', 'escena'],
   genericosDelContrato: ['formulario', 'tablero'],
   genericos: ['tablero'],
@@ -269,19 +305,57 @@ paso('Y el binario con el que se juzga es el de verdad');
   /*
    * Las claves de `LOS_QUE_PINTA` son CONSTANTES (`[FRENTE]`, `[RIBERAS]`…) y no
    * literales, asi que buscar la cadena 'riberas' en el fichero no encuentra nada.
-   * Se cuentan las entradas y se contrastan con la lista de arriba: un juego nuevo
-   * con pintor propio obliga a tocar esta prueba, que es justo lo que se quiere.
+   *
+   * Aquí se contaban las entradas contra una lista escrita arriba, y un juego nuevo con
+   * pintor propio obligaba a tocar esta prueba «que es justo lo que se quiere». Lo que se
+   * quería era que el juicio se ejercite con el binario de verdad, y eso ya no necesita
+   * una copia: los juegos del binario SALEN de la tabla (`juegosDeLaTabla`). Lo que queda
+   * por comprar es que esa lectura no se rompa en silencio, y se compra por tres lados:
+   *
+   *   · cada clave de la tabla se resuelve a un identificador —una constante renombrada o
+   *     escrita de otra forma saldría `null` y se perdería del juicio sin un error—;
+   *   · SUELO: la lista no sale vacía y trae los seis de hoy —una lectura rota da cero
+   *     juegos, y con cero juegos el juicio de arriba se juzga contra un binario vacío—;
+   *   · y la lectura se ve CAER y LEER con una tabla fabricada, más abajo.
    */
-  const cuerpoDeLosQuePinta = pintados.split('LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {')[1] ?? '';
-  const entradas = (cuerpoDeLosQuePinta.split('};')[0] ?? '').match(/^\s*\[[A-Z_]+\]:/gm) ?? [];
   comprobar(
-    'el binario trae exactamente los juegos con los que se juzga arriba',
-    entradas.length === BINARIO.juegos.length,
-    { enLaTabla: entradas.length, conLosQueSeJuzga: BINARIO.juegos.length },
+    'cada clave de `LOS_QUE_PINTA` se resuelve al identificador de su juego',
+    LOS_DE_LA_TABLA.length > 0 && LOS_DE_LA_TABLA.every((j) => j.id !== null),
+    LOS_DE_LA_TABLA,
   );
-  for (const constante of ['FRENTE', 'EL_ARCADE', 'RIBERAS', 'PEONZA', 'BURGO', 'LINDES']) {
-    comprobar(`y «${constante}» esta entre ellos`, new RegExp(`\\[${constante}\\]:`).test(pintados), constante);
-  }
+  const LOS_SEIS_DE_HOY = ['frente', 'el-arcade', 'riberas', 'peonza', 'burgo', 'lindes'];
+  comprobar(
+    `y los juegos con los que se juzga salen de ahí, sin repetir, y traen al menos los seis de hoy (${LOS_SEIS_DE_HOY.join(', ')})`,
+    new Set(BINARIO.juegos).size === BINARIO.juegos.length && LOS_SEIS_DE_HOY.every((id) => BINARIO.juegos.includes(id)),
+    BINARIO.juegos,
+  );
+  /*
+   * LA VACUNA DE LA LECTURA. Una tabla fabricada con un juego que el binario no tiene
+   * (`[NUEVO]`), una constante que no declara nadie (`[FANTASMA]`), y un renglón de
+   * comentario con cara de fila que no tiene que contar; y una tabla sin la cabecera que
+   * se busca, que tiene que dar cero y no la lista de siempre.
+   */
+  const fabricada = [
+    'export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {',
+    '  [FRENTE]: LaFrente,',
+    '  /*',
+    '   * [RIBERAS]: esto es un comentario, no una fila',
+    '   */',
+    '  [NUEVO]: ElNuevoEnTres,',
+    '  [FANTASMA]: ElFantasma,',
+    '};',
+  ].join('\n');
+  const declaraciones = ["export const FRENTE = 'frente';", "export const NUEVO: ArcadeId = 'el-nuevo';"];
+  comprobar(
+    'y la lectura lee lo que está escrito: en una tabla fabricada ve `frente` y `el-nuevo`, deja `[FANTASMA]` sin resolver y no cuenta el comentario',
+    JSON.stringify(juegosDeLaTabla(fabricada, declaraciones)) ===
+      JSON.stringify([
+        { constante: 'FRENTE', id: 'frente' },
+        { constante: 'NUEVO', id: 'el-nuevo' },
+        { constante: 'FANTASMA', id: null },
+      ]) && juegosDeLaTabla(fabricada.replace('LOS_QUE_PINTA:', 'OTRA_TABLA:'), declaraciones).length === 0,
+    juegosDeLaTabla(fabricada, declaraciones),
+  );
 }
 
 paso('Lo que llega por el cable se mira antes de pintarlo');

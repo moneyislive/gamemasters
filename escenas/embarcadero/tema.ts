@@ -136,6 +136,18 @@ export function temaDelMuelle(arcade: string): TemaDelMuelle | undefined {
   return TEMAS[arcade];
 }
 
+/**
+ * QUÉ ARCADES TIENEN MUELLE: los de esta tabla, y ninguno más.
+ *
+ * Existe para los comprobadores. `verify:escritorio` llevaba la lista ESCRITA A MANO
+ * (`CON_MUELLE`), así que un lobby nuevo era su tema aquí y además una línea allí; ahora
+ * la lee de aquí, con suelo —no puede salir vacía y tiene que traer los de hoy— para que
+ * una lista rota no deje en verde todo lo que se comprueba recorriéndola.
+ */
+export function arcadesConMuelle(): readonly string[] {
+  return Object.keys(TEMAS);
+}
+
 /** El color del asiento que ocupa la posición `i` en la lista de sentados. */
 export function colorDeAsiento(tema: TemaDelMuelle, i: number): string {
   const n = tema.colonos.length;
