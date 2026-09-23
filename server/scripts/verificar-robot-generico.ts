@@ -39,12 +39,13 @@
  *
  * ═══ Y EL VERDE POR SUELO QUE NO MUERDE, CERRADO CON UNA VACUNA ═══
  *
- * Los suelos de avance —termina o sigue viva, cada tipo ofrecido se hizo— sólo valen si el bucle
- * que no juega los incumple. Así que se juega también con la política `'primera'`, que es el bucle
- * viejo de `verify:mesa` que la memoria apunta —26 de 40 vueltas ofreciendo trueques—, y se exige
- * que en algún juego NO pase esos suelos. Si un día los pasa, los suelos dejaron de medir.
- * Hoy caen tres: en Riberas se atasca ofreciendo y rechazando trueques, en el Burgo el primero que
- * se mueve se rinde y la partida «termina» en dos pasos, y en Las Lindes no pasa nunca.
+ * Los tres suelos de avance —termina o sigue viva, mueven todos los sentados, cada tipo ofrecido a
+ * menudo se hizo— sólo valen si el bucle que no juega los incumple. Así que se juega también con la
+ * política `'primera'`, que es el bucle viejo de `verify:mesa` que la memoria apunta —26 de 40
+ * vueltas ofreciendo trueques—, y se exige que en algún juego NO pase esos suelos. Si un día los
+ * pasa, los suelos dejaron de medir. Hoy caen tres: en Riberas se atasca ofreciendo y rechazando
+ * trueques; en el Burgo el primero que se mueve se rinde y la partida «termina» en dos pasos sin
+ * que el otro mueva; y en Las Lindes no pasa nunca.
  *
  * ═══ CÓMO SE HA VISTO ROJA CADA COMPROBACIÓN, Y POR LO QUE ES ═══
  *
@@ -428,8 +429,8 @@ for (const m of aJugar) {
 comprobar(
   'el bucle viejo no pasa los suelos de avance en algún juego: los suelos miden algo',
   caidos.length > 0,
-  'con la política «primera» todos los juegos terminan o siguen vivos y hacen todo lo que se les ofrece: ' +
-    'los suelos de este comprobador ya no distinguen un robot que juega de uno que no',
+  'con la política «primera» todos los juegos terminan o siguen vivos, mueven todos los sentados y hacen todo ' +
+    'lo que se les ofrece: los suelos de este comprobador ya no distinguen un robot que juega de uno que no',
 );
 nota(`caen con él: ${caidos.length === 0 ? 'ninguno' : caidos.join(', ')}`);
 nota(`todo junto: ${((performance.now() - inicio) / 1000).toFixed(1)} s (las dos vueltas y la vacuna)`);
