@@ -14,7 +14,9 @@
  * `aventurero.tsx`, y lo que será del anillo irá en `burgo/`.
  *
  * Sin React y sin `useFrame` a propósito: es aritmética sobre objetos de `three`,
- * y quien la llama decide desde qué reloj. Sí importa `three`, así que no entra
+ * y quien la llama decide desde qué reloj. El envoltorio de React que la trae, la
+ * monta, la suelta y la pinta es uno para todas las escenas: `comun/marioneta.tsx`.
+ * Sí importa `three`, así que no entra
  * en los comprobadores que se quedan sin motor de dibujo (ver
  * `verificar-embarcadero.ts`); lo que se le puede medir en Node es lo que hace
  * el `GLTFLoader` con los nombres de los huesos, y eso ya lo mide
