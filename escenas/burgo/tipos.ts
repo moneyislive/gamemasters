@@ -27,15 +27,19 @@
  * de `Burgo.tsx` sería un trozo de decisión que ningún comprobador puede ejecutar, y un
  * filtro de repetición roto no da error: sigue avisando, sólo que de más.
  *
- * ═══ EL SEGUNDO MODO DE CÁMARA ESTÁ RESERVADO ═══
+ * ═══ LAS TRES CÁMARAS SON LAS DE LAS LINDES, Y A PIE SE ANDA CON EL PASEO COMÚN ═══
  *
- * `ModoDeCamara` admite `tercera-persona`, pero HOY la escena lo ignora y lo dice en su
- * cabecera: `peon.ts` ya da posición y rumbo por fotograma, así que el día que se quiera
- * el hueco está hecho sin cambiar el contrato.
+ * `ModoDeCamara` era la aérea y una `tercera-persona` RESERVADA que la escena ignoraba. Ahora
+ * son las tres de Las Lindes con sus mismos nombres: `mesa` —la de siempre, que pone el
+ * cliente—, y `hombro` y `ojos`, que bajan a andar por la ciudad con el paseo común
+ * (`escenas/paseo/`) sobre el mundo que declara `mundoDelBurgo`. Los dos modos de a pie llevan
+ * el ASIENTO de quien anda: de él salen su sitio de nacer y su figura. La palanca de la app
+ * llega por `mandos`, igual que en Las Lindes. Lo que es sólo de esta ciudad está en `a-pie.ts`.
  */
 import type { FiguraId } from '../embarcadero/figuras';
 import type { Traer, Ventana, Calidad } from '../embarcadero/tipos';
 import type { ParDeDados } from '../dados';
+import type { MandosDeFuera } from '../paseo/mandos';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 import type { SitioDeLaBandeja } from './bandeja-de-los-dados';
 
@@ -128,8 +132,22 @@ export interface TableroDelBurgoEn3D {
   readonly banca: { readonly casas: number; readonly posadas: number; readonly cartas: { readonly pregon: number; readonly arca: number } };
 }
 
-/** El segundo modo está RESERVADO: hoy la escena ignora el valor y lo dice en cabecera. `peon.ts` ya da {x, z, rumbo} por fotograma. */
-export type ModoDeCamara = { readonly modo: 'aerea' } | { readonly modo: 'tercera-persona'; readonly asiento: string };
+/**
+ * DESDE DÓNDE SE MIRA: las tres cámaras de Las Lindes, con sus nombres.
+ *
+ *  · `mesa`: la de siempre. La pone el cliente (`CamaraAerea` en el escritorio, el ojo del
+ *    mirador táctil en la app) y la escena sólo la empuja para seguir al que mueve.
+ *  · `hombro` y `ojos`: A PIE por la ciudad, detrás de la figura de `asiento` o desde su cara.
+ *    Ahí la cámara es del paseo común, la escriba quien la escriba (ver `Burgo.tsx`).
+ *  · `aerea` es el nombre VIEJO de `mesa` y la escena lo trata igual. Queda porque
+ *    `escritorio/src/banco-burgo.tsx`, que no es de esta tanda, todavía lo pasa; el día que
+ *    pase `mesa`, esta línea se borra.
+ */
+export type ModoDeCamara =
+  | { readonly modo: 'mesa' }
+  | { readonly modo: 'hombro'; readonly asiento: string }
+  | { readonly modo: 'ojos'; readonly asiento: string }
+  | { readonly modo: 'aerea' };
 
 export interface PropsDelBurgo {
   readonly tablero: TableroDelBurgoEn3D;
@@ -143,6 +161,15 @@ export interface PropsDelBurgo {
   readonly traer: Traer;
   readonly calidad: Calidad;
   readonly camara: ModoDeCamara;
+  /**
+   * LA PALANCA Y EL BOTÓN DE CORRER, cuando el aparato no tiene teclado: lo mismo que Las Lindes.
+   *
+   * La escena lee el teclado ella sola —donde hay `document`, lo hace el paseo común—, pero en iOS
+   * y en Android no lo hay. La app monta los mandos táctiles (`app/src/arcade/mandos-del-paseo.tsx`)
+   * y los escribe en esta referencia; la escena los lee en su bucle, sin pasar por React. Opcional
+   * porque el escritorio anda con el teclado.
+   */
+  readonly mandos?: { readonly current: MandosDeFuera };
   /**
    * EN QUÉ ESQUINA DEL LIENZO VA LA BANDEJA DE LOS DADOS, y a cuántos puntos de sus bordes. La
    * escena no sabe qué tiene el cliente encima del lienzo, así que lo dice él: el escritorio abajo a

@@ -120,7 +120,30 @@
  * peso amortiguado que sube al empezar un `mueve` y baja `REPOSO_TRAS_SEGUIR` después
  * del salto. El cliente cancela el seguimiento con `seguirAlQueMueve: false` (lo hace
  * ante cualquier gesto). En `fin`, la misma mezcla lleva la cámara a plomo sobre la plaza.
- * El modo `tercera-persona` de `camara` está RESERVADO: hoy se ignora, a sabiendas.
+ * Todo esto es la cámara de MESA, y sigue siendo la de siempre.
+ *
+ * ═══ A PIE: EL PASEO COMÚN, CON EL MUNDO QUE DECLARA LA MESA ═══
+ *
+ * Con `camara.modo` en `hombro` u `ojos` se baja a andar por la ciudad, y se anda con el paseo
+ * de `escenas/paseo/` y NINGUNO propio, igual que en Las Lindes: `usarElPaseo` recibe el mundo
+ * de `mundoDelBurgo(código)` —la estructura de la mesa, la misma en todas las calidades y la
+ * que derivará el servidor para validar—, el sitio de nacer del asiento de quien anda, la
+ * palanca de la app (`mandos`) y la altura del suelo que se pinta; el paso, los choques, las
+ * cámaras de a pie y la marioneta son suyos. Lo que sólo sabe esta ciudad —de qué sitio se
+ * nace, a qué cota va cada suelo y hasta dónde se ve— está en `a-pie.ts`, sin `three`.
+ *
+ * Tres cosas cambian a pie y ninguna en la mesa: la cámara es del paseo aunque el cliente la
+ * siga escribiendo (ver «a pie, la cámara es del paseo» más abajo), la niebla se acerca y con
+ * ella el nivel de detalle de la ciudad (`UMBRALES_A_PIE`, medido contra el presupuesto de
+ * esta misma escena), y no se abre ningún edificio. El peón del raíl, los dados, la caja y
+ * todo lo del tablero siguen como están: se puede tirar y comprar andando.
+ *
+ * ═══ Y LA COSTURA CON EL CANAL DE BOOTS ON BOARD ES LA DE LAS LINDES ═══
+ *
+ * El paseo se monta aquí con la misma llamada que en `Lindes.tsx`, así que el día que llegue la
+ * prop opcional del canal se enchufa por los mismos dos sitios: lo pedido en cada tic
+ * (`alDarUnTic` de las opciones del paseo) y la corrección (`paseo.corregir`). Los demás, cuando
+ * se vean, son la misma `QuienAnda` con la pose que llegue.
  *
  * ═══ LOS AVISOS DEL CONTRATO, Y CÓMO SE CUMPLEN AQUÍ ═══
  *
@@ -318,6 +341,11 @@ import { AMBAR_DEL_CONCEJO, coloresDeLasBanderas, geometriaParaInstanciar, geome
 import { Aventurero } from './Aventurero';
 import { gestoAlSalir, senaladoTrasElGesto } from './tipos';
 import type { CasillaEn3D, FiguraEn3D, GestoDeSenalado, PropsDelBurgo } from './tipos';
+import { NIEBLA_A_PIE, UMBRALES_A_PIE, asientoQueAnda, modoDelPaseoDe, sitioDeNacerEnElBurgo, sueloDelBurgo } from './a-pie';
+import { usarElPaseo } from '../paseo/usar-el-paseo';
+import { QuienAnda } from '../paseo/quien-anda';
+import { mundoDelBurgo } from '../../shared/arcade/juegos/burgo-mundo';
+import type { MundoDeclarado } from '../../shared/mecanicas/mundo';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
@@ -1161,6 +1189,20 @@ function centroDeLaMarca(casilla: number): Punto {
   return m.centro;
 }
 
+/** El suelo mientras se mira la mesa: nadie pregunta, y derivar el de verdad no se paga ahí. */
+const SIN_SUELO = (): number => 0;
+
+/**
+ * SI LA FIGURA DE QUIEN ANDA NO LLEGA, SE DICE Y SE SIGUE ANDANDO. No por `alFallar`: el escritorio
+ * manda la partida entera al tablero dibujado con cualquier aviso de ésos, y una figura que no
+ * baja no puede tirar el anillo —es el mismo trato que el reloj de arena, `relojDelBurgoDe`—. Se
+ * anda sin verla, que es lo que ya pasa en primera persona. A nivel de módulo para ser la misma
+ * función siempre: `QuienAnda` vuelve a pedir la figura si cambia.
+ */
+function avisaQueNoLlegaQuienAnda(motivo: string): void {
+  console.warn(`La figura de quien anda por el burgo no ha llegado (${motivo}): se anda sin verla.`);
+}
+
 /* ─────────────────────────────── La escena entera ─────────────────────────────── */
 
 export function Burgo(props: PropsDelBurgo): JSX.Element {
@@ -1474,6 +1516,79 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   useEffect(() => () => laCiudad?.soltar(), [laCiudad]);
   useEffect(() => soltarLosBultos, []);
 
+  /*
+   * ═══ A PIE: EL PASEO COMÚN, CON EL MUNDO DE LA MESA Y LO QUE SÓLO SABE ESTA CIUDAD ═══
+   *
+   * La misma llamada que `Lindes.tsx`, y a propósito: el paseo, los choques, las cámaras de a pie,
+   * las teclas y la marioneta son de `escenas/paseo/`, y el día que llegue el canal de Boots on
+   * Board se enchufa aquí igual que allí. Esta escena sólo le da lo suyo:
+   *
+   *   · EL MUNDO, que es `mundoDelBurgo(código)`: la traza y lo sólido de los distritos, igual en
+   *     todas las calidades y el mismo que derivará el servidor. Es ESTÁTICO —las casas que se
+   *     compran son fichas, no mundo—, así que se deriva UNA vez por código, y la primera vez que se
+   *     baja a andar: medido en Node, de 2 a 15 ms, y en el Hermes del móvil, sin JIT, bastante
+   *     más. Mirando la mesa, que es casi toda la partida, no se paga.
+   *   · DE QUÉ SITIO SE NACE: el del asiento de quien anda (`sitioDeNacerEnElBurgo`).
+   *   · A QUÉ ALTURA ESTÁ EL SUELO QUE SE PINTA (`sueloDelBurgo`), que no decide nada.
+   */
+  const modoDelPaseo = modoDelPaseoDe(props.camara);
+  const aPie = modoDelPaseo !== 'mesa';
+  const quienAnda = asientoQueAnda(props.camara);
+  const mundoRecordado = useRef<{ readonly codigo: string; readonly mundo: MundoDeclarado } | null>(null);
+  const mundoAPie = useMemo(() => {
+    if (!aPie) return null;
+    const hecho = mundoRecordado.current;
+    if (hecho !== null && hecho.codigo === codigo) return hecho.mundo;
+    const deLaMesa = mundoDelBurgo(codigo);
+    mundoRecordado.current = { codigo, mundo: deLaMesa };
+    return deLaMesa;
+  }, [aPie, codigo]);
+  const naceQuienAnda = useMemo(() => (mundoAPie === null ? null : sitioDeNacerEnElBurgo(mundoAPie.nace, tablero.figuras, quienAnda)), [mundoAPie, tablero.figuras, quienAnda]);
+  const alturaDelSuelo = useMemo(() => (aPie ? sueloDelBurgo(ciudad) : SIN_SUELO), [aPie, ciudad]);
+  const paseo = usarElPaseo({
+    mundo: mundoAPie,
+    nace: naceQuienAnda,
+    modo: modoDelPaseo,
+    mandos: props.mandos,
+    alturaEn: alturaDelSuelo,
+  });
+  const figuraQueAnda = tablero.figuras.find((f) => f.asiento === quienAnda)?.figura;
+
+  /*
+   * ═══ A PIE, LA CÁMARA ES DEL PASEO, LA ESCRIBA QUIEN LA ESCRIBA DESPUÉS ═══
+   *
+   * El paseo común pone la cámara de hombro o de ojos con prioridad −1, antes que nadie. Pero en
+   * el Burgo la cámara de MESA la pone el cliente, en cada fotograma y con prioridad 0 —el ojo del
+   * mirador táctil en la app, `CamaraAerea` en el escritorio—, y montada ANTES que esta escena, así
+   * que corre después del paseo y lo pisaría. Apagarla no está en manos de la escena, y
+   * desmontarla a pie y volverla a montar en la mesa la dejaría suscrita DETRÁS de la escena, que
+   * es justo lo que rompe «seguir al que mueve» (la cabecera lo cuenta: el cliente va delante).
+   *
+   * Así que se guarda la cámara que el paseo acaba de poner —con −1 y detrás de él, porque se
+   * apunta después— y se vuelve a poner en el primer `useFrame` de prioridad 0 de la escena, que
+   * corre DESPUÉS del del cliente y ANTES que todo lo que aquí se lee de la cámara: el reparto de
+   * la ciudad por cercanía, el naipe y la caja pegada a la pantalla. Prioridad NEGATIVA, que no le
+   * quita a r3f el pintar solo: eso sólo lo hace una positiva (`usar-el-paseo.ts` lo cuenta).
+   */
+  const camaraDelPaseo = useRef({ posicion: new THREE.Vector3(), giro: new THREE.Quaternion() });
+  useFrame((s) => {
+    if (!aPie) return;
+    camaraDelPaseo.current.posicion.copy(s.camera.position);
+    camaraDelPaseo.current.giro.copy(s.camera.quaternion);
+  }, -1);
+  const laNiebla = useRef<THREE.Fog>(null);
+  useFrame((s) => {
+    /* La niebla de la mesa se aparta detrás del tablero; la de a pie se acerca y manda en el detalle. */
+    const n = laNiebla.current;
+    if (n !== null) {
+      n.near = aPie ? NIEBLA_A_PIE.cerca : NIEBLA.cerca;
+      n.far = aPie ? NIEBLA_A_PIE.lejos : NIEBLA.lejos;
+    }
+    if (!aPie) return;
+    s.camera.position.copy(camaraDelPaseo.current.posicion);
+    s.camera.quaternion.copy(camaraDelPaseo.current.giro);
+  });
+
   /* Los precios y los emblemas: no cambian con la partida, así que van fundidos y son UNA llamada. */
   const rotulos = useMemo(geometriaDeLosRotulos, []);
   useEffect(() => () => rotulos?.geometria.dispose(), [rotulos]);
@@ -1737,6 +1852,10 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     reparto.current.salas = [];
     salasPorEdificio.current.clear();
   }, [laCiudad]);
+  /* Y al bajar a andar o al subir a la mesa, los umbrales son otros: se reparte en el fotograma siguiente. */
+  useEffect(() => {
+    reparto.current.desde = null;
+  }, [aPie]);
 
   /**
    * QUÉ EDIFICIOS SE ABREN: los TRES más cercanos AL PUNTO QUE SE MIRA, y sólo de cerca.
@@ -1747,7 +1866,12 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
    * `PARA_ABRIR` para por qué el segundo no es la altura del ojo.
    */
   const edificiosQueSeAbren = (c: CiudadEn3D, x: number, z: number, alcance: number): number[] => {
-    if (!plena || !INTERRUPTORES_DEL_BANCO.interiores || alcance > PARA_ABRIR.alcance) return [];
+    /*
+     * A PIE NO SE ABRE NINGUNO. La casa de muñecas se hizo para mirarla desde arriba: le quita la
+     * fachada que da a la calle, y a ras de calle eso es un edificio sin frente, con los muebles a la
+     * vista y una caja en el mundo que no deja entrar. Es un decorado roto, no un interior.
+     */
+    if (aPie || !plena || !INTERRUPTORES_DEL_BANCO.interiores || alcance > PARA_ABRIR.alcance) return [];
     const cerca: { indice: number; d: number }[] = [];
     for (const e of c.ciudad.edificios) {
       if (e.cascara === null) continue;
@@ -1871,7 +1995,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       r.salas = salas;
       r.caparazones = caparazones;
     }
-    const montaje = montarLaCiudad(c.ciudad, x, z, r.niveles.length === c.ciudad.grupos.length ? r.niveles : undefined);
+    /* A pie, con los umbrales de a pie: el detalle hasta donde manda la calidad y el L2 hasta la niebla (`a-pie.ts`). */
+    const montaje = montarLaCiudad(c.ciudad, x, z, r.niveles.length === c.ciudad.grupos.length ? r.niveles : undefined, aPie ? UMBRALES_A_PIE[c.ciudad.calidad] : undefined);
     r.montaje = montaje;
     r.niveles = [...montaje.nivelDelGrupo];
     r.repartos++;
@@ -2671,6 +2796,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
    * fotograma ve la pose que el cliente acaba de dejar y la mezcla desde ahí.
    */
   useFrame((s, dtCrudo) => {
+    /* A pie la cámara es del paseo: ni se sigue al que mueve ni se sube a la plaza. Al volver a la mesa, sigue donde iba. */
+    if (aPie) return;
     const dt = Math.min(0.1, Math.max(0, dtCrudo));
     const ahora = s.clock.elapsedTime;
     const cam = s.camera as THREE.PerspectiveCamera;
@@ -2902,7 +3029,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
   return (
     <>
-      <fog attach="fog" args={[COLOR_DE_LA_NIEBLA, NIEBLA.cerca, NIEBLA.lejos]} />
+      {/* La niebla la mueve el fotograma: la de la mesa o la de a pie. Los `args` son sólo con los que nace. */}
+      <fog ref={laNiebla} attach="fog" args={[COLOR_DE_LA_NIEBLA, NIEBLA.cerca, NIEBLA.lejos]} />
 
       {/* El fondo: la cúpula de mediodía pegada a la cámara. Se dibuja la primera y no escribe profundidad. */}
       <mesh ref={cupula} geometry={geometrias.cielo} material={materiales.cielo} frustumCulled={false} renderOrder={-10} raycast={() => null} />
@@ -3173,6 +3301,23 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       {/* Y el ganador en la plaza, en `fin`. */}
       {plena && ganadorEnPlaza && cargadoDelGanador !== undefined && biblioteca.length > 0 ? (
         <Aventurero key="ganador" estado={estadoDelGanador} cargado={cargadoDelGanador} biblioteca={biblioteca} anillo={anilloDeLaPlaza} />
+      ) : null}
+
+      {/*
+        QUIEN ANDA, sólo a pie: la marioneta del paseo común con la figura de su asiento, la que se
+        eligió en el Muelle. No es el aventurero del raíl —ése sigue andando las casillas con su
+        peón—: es quien mira, bajado a la calle. En «ojos» no se pinta, que la cámara está dentro de
+        su cabeza. En las dos calidades: sin ella la cámara de hombro iría detrás de nadie.
+      */}
+      {aPie ? (
+        <QuienAnda
+          traer={traer}
+          asiento={quienAnda}
+          figura={figuraQueAnda}
+          pose={paseo.pose}
+          enPrimeraPersona={modoDelPaseo === 'ojos'}
+          alFallar={avisaQueNoLlegaQuienAnda}
+        />
       ) : null}
     </>
   );

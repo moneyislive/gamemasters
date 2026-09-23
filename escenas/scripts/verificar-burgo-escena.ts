@@ -361,7 +361,7 @@ const FICHEROS = fs
   .readdirSync(CARPETA)
   .filter((f) => /\.tsx?$/.test(f))
   .map((f) => path.join(CARPETA, f));
-const PUROS = ['tipos.ts', 'anillo-en-3d.ts', 'presupuesto.ts', 'coreografia.ts', 'peon.ts', 'dados-del-burgo.ts', 'bandeja-de-los-dados.ts', 'camara-del-burgo.ts', 'piezas.ts'];
+const PUROS = ['tipos.ts', 'anillo-en-3d.ts', 'presupuesto.ts', 'coreografia.ts', 'peon.ts', 'dados-del-burgo.ts', 'bandeja-de-los-dados.ts', 'camara-del-burgo.ts', 'piezas.ts', 'a-pie.ts'];
 
 {
   const conAlgo = FICHEROS.flatMap((f) => loProhibidoEn(fs.readFileSync(f, 'utf8')).map((q) => `${path.basename(f)}: ${q}`));
@@ -3059,10 +3059,17 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   );
   /* Una posición, rotación o escala de JSX empieza por `[`: es una terna, no un Vector3 ni un objeto de otra copia de three. */
   const CON_VECTOR = /(position|rotation|scale)=\{\s*(?!\[)[^}]*\}/;
-  const CON_PRIORIDAD = /useFrame\([\s\S]*?\},\s*-?\d+\s*\)/;
+  /*
+   * LA PRIORIDAD QUE LE QUITA A R3F EL PINTAR SOLO ES LA POSITIVA, y sólo ésa (`internal.priority`
+   * sube con `priority > 0`, en `events-*.js`; `usar-el-paseo.ts` lo cuenta). Esto pedía que no hubiera
+   * NINGUNA, y a pie la escena necesita una NEGATIVA: guardar la cámara que el paseo común acaba de
+   * poner, detrás de él y antes que nadie. Se prohíbe lo que rompe, que es la positiva.
+   */
+  const CON_PRIORIDAD = /useFrame\([\s\S]*?\},\s*[1-9]\d*\s*\)/;
   comprobar('ninguna posición, rotación ni escala de JSX recibe algo que no sea una terna', !CON_VECTOR.test(codigoDelBurgo) && !CON_VECTOR.test(codigoDelAventurero));
   comprobar('el asa de los dados se desmonta con porTirar, no se esconde', /porTirar === true \? \(/.test(codigoDelBurgo) && !/visible=\{[^}]*porTirar/.test(codigoDelBurgo));
-  comprobar('ningún useFrame pide prioridad: r3f dejaría de pintar solo', !CON_PRIORIDAD.test(codigoDelBurgo) && !CON_PRIORIDAD.test(codigoDelAventurero));
+  comprobar('ningún useFrame pide prioridad POSITIVA: r3f dejaría de pintar solo', !CON_PRIORIDAD.test(codigoDelBurgo) && !CON_PRIORIDAD.test(codigoDelAventurero));
+  comprobar('y la única que pide la escena es la −1 de guardar la cámara del paseo: una negativa no le quita el pintado a r3f', (codigoDelBurgo.match(/\},\s*-1\s*\);/g) ?? []).length === 1 && !CON_PRIORIDAD.test('useFrame((s) => { s.x; }, -1);'));
   /*
    * LA BANDEJA DE LOS DADOS SE PEGA A LA CÁMARA EN EL ÚLTIMO `useFrame`, Y LOS DADOS Y SU ASA VAN
    * DENTRO DE ELLA.
@@ -3289,7 +3296,12 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   comprobar('y ya no hay paño de dados en el campo: anillo-en-3d.ts no lo exporta y Burgo.tsx no lo pinta', !('SUELO_DE_DADOS' in elAnillo) && !/SUELO_DE_DADOS/.test(codigoDelBurgo));
   comprobar('computeBoundingSphere se llama tras escribir matrices instanciadas', (codigoDelBurgo.match(/computeBoundingSphere\(\)/g) ?? []).length >= 3);
   comprobar('alEstarListo se avisa desde el hilo de dibujo con tope de quince segundos', /TOPE_DE_ARRANQUE_MS = 15_000/.test(codigoDelBurgo) && /alEstarListo\?\.\(\)/.test(codigoDelBurgo));
-  comprobar('el modo tercera-persona se ignora a sabiendas y la cabecera lo dice', /tercera-persona/.test(burgo) && !/tercera-persona/.test(codigoDelBurgo));
+  comprobar(
+    'la `tercera-persona` reservada ya no existe: las cámaras son las tres de Las Lindes —`mesa`, `hombro` y `ojos`— en el contrato y en la escena',
+    !/tercera-persona/.test(codigoDelBurgo) &&
+      !/tercera-persona/.test(sinComentarios(fs.readFileSync(path.join(CARPETA, 'tipos.ts'), 'utf8'))) &&
+      /\| \{ readonly modo: 'mesa' \}\s*\| \{ readonly modo: 'hombro'; readonly asiento: string \}\s*\| \{ readonly modo: 'ojos'; readonly asiento: string \}/.test(fs.readFileSync(path.join(CARPETA, 'tipos.ts'), 'utf8')),
+  );
   comprobar('Aventurero.tsx nunca pide t-pose ni reproduce sin marioneta', !/tPose|t-pose/.test(codigoDelAventurero) && /marioneta === null\) return/.test(codigoDelAventurero));
   /* Vacunas del barrido: un fuente sin React, con Vector3 en props o con prioridad en useFrame. */
   comprobar('se ve fallar: un fuente con `position={new THREE.Vector3()}` cae, y una terna pasa', CON_VECTOR.test('<mesh position={new THREE.Vector3(1, 2, 3)} />') && !CON_VECTOR.test('<mesh position={[1, 2, 3]} />'));
@@ -5307,6 +5319,389 @@ paso('El señalado: la escena dice qué casilla mira el puntero, y no dos veces 
 }
 
 // ---------------------------------------------------------------------------
+paso('A pie por el Burgo: el paseo común con el mundo de la mesa, de qué sitio se nace, a qué altura, cuánta ciudad, la mesa de siempre y los muros del estadio');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ QUÉ SE COMPRA AQUÍ ═══
+ *
+ * El Burgo se anda con el paseo COMÚN de `escenas/paseo/` —el mismo de Las Lindes— sobre el mundo
+ * que declara `mundoDelBurgo(código)`. Nada de eso falla solo si se hace mal: un paseo propio con su
+ * paso anda igual de bien en la pantalla mientras el servidor valida con otro; un sitio de nacer
+ * repetido pone a dos en el mismo punto; una altura mal sacada deja la figura flotando sobre el
+ * asfalto; y la ciudad entera en detalle a ras de calle hunde el móvil sin un error. Y lo que no puede
+ * cambiar es la cámara de MESA, que es la de siempre y con la que se juega.
+ *
+ * Los jueces de fuente miran el CÓDIGO (sin comentarios) de la escena y de los dos clientes; los de
+ * aritmética corren las funciones puras de `a-pie.ts` contra el `.glb` real, el anillo que se pinta,
+ * la ciudad de varias mesas y el presupuesto de la escena. Cada uno se ve caer.
+ */
+{
+  const aPie = await import('../burgo/a-pie');
+  const laCiudadDelBurgo = await import('../burgo/ciudad');
+  const elMundo = await import('../../shared/arcade/juegos/burgo-mundo');
+  const laArena = await import('../../shared/mecanicas/mundo');
+  const { RADIO_DEL_PASEANTE } = await import('../../shared/mecanicas/andar');
+  const anillo = await import('../burgo/anillo-en-3d');
+  const { cajaDelDistrito } = await import('../../shared/arcade/juegos/burgo-distritos');
+  const escena = sinComentarios(fs.readFileSync(path.join(CARPETA, 'Burgo.tsx'), 'utf8'));
+  const laApp = sinComentarios(fs.readFileSync(path.join(RAIZ, '../app/src/arcade/burgo-en-tres-escena.tsx'), 'utf8'));
+  const elEscritorio = sinComentarios(fs.readFileSync(path.join(RAIZ, '../escritorio/src/burgo-en-tres.tsx'), 'utf8'));
+
+  /* ── 1. EL PASEO ES EL COMÚN, CON EL MUNDO DE LA MESA, Y NINGUNO PROPIO ── */
+  /*
+   * Las cinco claves se miran SUELTAS dentro de la llamada y no como una lista cerrada: el canal de
+   * Boots on Board entrará aquí igual que entró en Las Lindes —con un `alDarUnTic` más en esta misma
+   * llamada—, y un juez que lo tumbe por eso enseñaría a no conectar el canal.
+   */
+  const laLlamadaDelPaseo = (c: string): string => /const paseo = usarElPaseo\(\{([\s\S]*?)\}\);/.exec(c)?.[1] ?? '';
+  const usaElComun = (c: string): boolean =>
+    /import \{ usarElPaseo \} from '\.\.\/paseo\/usar-el-paseo';/.test(c) &&
+    (c.match(/\busarElPaseo\(/g) ?? []).length === 1 &&
+    ['mundo: mundoAPie,', 'nace: naceQuienAnda,', 'modo: modoDelPaseo,', 'mandos: props.mandos,', 'alturaEn: alturaDelSuelo,'].every((clave) => laLlamadaDelPaseo(c).includes(clave)) &&
+    /import \{ mundoDelBurgo \} from '\.\.\/\.\.\/shared\/arcade\/juegos\/burgo-mundo';/.test(c) &&
+    /const deLaMesa = mundoDelBurgo\(codigo\);/.test(c) &&
+    /if \(!aPie\) return null;/.test(c);
+  comprobar('la escena anda con `usarElPaseo` —una sola vez— y le da el mundo de `mundoDelBurgo(codigo)`, sólo a pie, con la palanca de `props.mandos` y la altura del suelo', usaElComun(escena));
+  comprobar(
+    'se ve fallar: con el mundo sacado de otra parte, o con un segundo paseo montado, cae',
+    !usaElComun(escena.replace('const deLaMesa = mundoDelBurgo(codigo);', 'const deLaMesa = mundoDeLaSemilla(1);')) &&
+      !usaElComun(`${escena}\nconst otro = usarElPaseo({ mundo: null, nace: null, modo: 'mesa', alturaEn: () => 0 });`) &&
+      !usaElComun(escena.replace('mundo: mundoAPie,', 'mundo: null,')),
+  );
+  comprobar(
+    'y con el canal conectado como en Las Lindes —un `alDarUnTic` más en la misma llamada— el juez sigue en verde: no enseña a no conectarlo',
+    usaElComun(escena.replace('alturaEn: alturaDelSuelo,', 'alturaEn: alturaDelSuelo,\n    alDarUnTic: elCanal.alDarUnTic,')),
+  );
+  /* Lo que sería un paseo propio: el paso, el reloj, las teclas o la arena escritos o llamados en `escenas/burgo/`. */
+  const PASEO_PROPIO = /\b(pasoDelTic|unPaso|fotogramaDelPaseo|ticsDelFotograma|nacerEnElPaseo|teclaDelPaseo|mandosDelFotograma|arenaDe|sePuedeEstar)\s*\(/;
+  const conPaseoPropio = FICHEROS.filter((f) => PASEO_PROPIO.test(sinComentarios(fs.readFileSync(f, 'utf8')))).map((f) => path.basename(f));
+  comprobar('ningún fichero de escenas/burgo da un paso, cuenta tics, lee teclas ni deriva una arena por su cuenta: el paseo es el común', conPaseoPropio.length === 0, conPaseoPropio);
+  comprobar('se ve fallar: una escena que diera su propio `pasoDelTic` lo enciende', PASEO_PROPIO.test(`${escena}\nconst p = pasoDelTic(arena, quien, 0, 1);`));
+  comprobar(
+    'y quien anda es la marioneta común, sólo a pie, con la pose del paseo, sin pintarse desde sus ojos y con la figura de su asiento',
+    /\{aPie \? \(\s*<QuienAnda\b[\s\S]*?pose=\{paseo\.pose\}[\s\S]*?enPrimeraPersona=\{modoDelPaseo === 'ojos'\}[\s\S]*?\/>\s*\) : null\}/.test(escena) &&
+      /const figuraQueAnda = tablero\.figuras\.find\(\(f\) => f\.asiento === quienAnda\)\?\.figura;/.test(escena) &&
+      /import \{ QuienAnda \} from '\.\.\/paseo\/quien-anda';/.test(escena),
+  );
+  comprobar(
+    'y la figura que no llega se dice por consola y NO por `alFallar`: el escritorio mandaría la partida entera al tablero dibujado',
+    /alFallar=\{avisaQueNoLlegaQuienAnda\}/.test(escena) && /function avisaQueNoLlegaQuienAnda\(motivo: string\): void \{\s*console\.warn\(/.test(escena),
+  );
+
+  /* ── 2. LA MESA ES LA DE SIEMPRE, Y A PIE LA CÁMARA ES DEL PASEO LA ESCRIBA QUIEN LA ESCRIBA ── */
+  const modosBien =
+    aPie.modoDelPaseoDe({ modo: 'mesa' }) === 'mesa' &&
+    aPie.modoDelPaseoDe({ modo: 'aerea' }) === 'mesa' &&
+    aPie.modoDelPaseoDe({ modo: 'hombro', asiento: 's1' }) === 'hombro' &&
+    aPie.modoDelPaseoDe({ modo: 'ojos', asiento: 's1' }) === 'ojos' &&
+    aPie.asientoQueAnda({ modo: 'ojos', asiento: 's3' }) === 's3' &&
+    aPie.asientoQueAnda({ modo: 'mesa' }) === '';
+  comprobar('la mesa —y `aerea`, su nombre viejo— no anda; hombro y ojos andan con el asiento que traen', modosBien);
+  const laMesaDeSiempre = (c: string): boolean => {
+    const guarda = c.search(/useFrame\(\(s\) => \{\s*if \(!aPie\) return;\s*camaraDelPaseo\.current\.posicion\.copy\(s\.camera\.position\);\s*camaraDelPaseo\.current\.giro\.copy\(s\.camera\.quaternion\);\s*\}, -1\);/);
+    const reponeEn = c.search(/if \(!aPie\) return;\s*s\.camera\.position\.copy\(camaraDelPaseo\.current\.posicion\);\s*s\.camera\.quaternion\.copy\(camaraDelPaseo\.current\.giro\);/);
+    const elPaseo = c.indexOf('const paseo = usarElPaseo(');
+    const elFotograma = c.indexOf('const losAsientos = asientosRef.current;');
+    return (
+      elPaseo > 0 &&
+      guarda > elPaseo &&
+      reponeEn > guarda &&
+      elFotograma > reponeEn &&
+      /const sg = seguimiento\.current;/.test(c) &&
+      /useFrame\(\(s, dtCrudo\) => \{\s*if \(aPie\) return;\s*const dt = Math\.min\(0\.1, Math\.max\(0, dtCrudo\)\);\s*const ahora = s\.clock\.elapsedTime;\s*const cam = s\.camera as THREE\.PerspectiveCamera;\s*const sg = seguimiento\.current;/.test(c) &&
+      /n\.near = aPie \? NIEBLA_A_PIE\.cerca : NIEBLA\.cerca;\s*n\.far = aPie \? NIEBLA_A_PIE\.lejos : NIEBLA\.lejos;/.test(c) &&
+      /aPie \? UMBRALES_A_PIE\[c\.ciudad\.calidad\] : undefined\)/.test(c) &&
+      /if \(aPie \|\| !plena \|\| !INTERRUPTORES_DEL_BANCO\.interiores/.test(c)
+    );
+  };
+  comprobar(
+    'en la mesa todo es lo de siempre —el seguimiento, la niebla, los umbrales y los interiores—; a pie, la cámara que el paseo pone se guarda con −1 DETRÁS de él y se repone en un `useFrame` que corre ANTES del fotograma que la lee',
+    laMesaDeSiempre(escena),
+  );
+  comprobar(
+    'se ve fallar: con el fotograma que lee la cámara ANTES de reponerla —el reparto de la ciudad la leería del cliente—, o con el seguimiento corriendo a pie, cae',
+    !laMesaDeSiempre(escena.replace('const losAsientos = asientosRef.current;', '').replace('const paseo = usarElPaseo(', 'const losAsientos = asientosRef.current;\n  const paseo = usarElPaseo(')) &&
+      !laMesaDeSiempre(escena.replace(/useFrame\(\(s, dtCrudo\) => \{\s*if \(aPie\) return;/, 'useFrame((s, dtCrudo) => {')),
+  );
+  comprobar(
+    'los dos clientes siguen montando su cámara de mesa ANTES que `<Burgo>` —la app su ojo y el escritorio `CamaraAerea`—, y le pasan la cámara con su modo y el asiento de quien mira',
+    laApp.indexOf('<ElOjoDelBurgo mirador={mirador} cercania={cercania} />') > 0 &&
+      laApp.indexOf('<ElOjoDelBurgo') < laApp.indexOf('<Burgo\n') &&
+      /const CAMARA_DE_MESA: ModoDeCamara = \{ modo: 'mesa' \};/.test(laApp) &&
+      /modo === 'mesa' \? CAMARA_DE_MESA : \{ modo, asiento: yo \?\? '' \}/.test(laApp) &&
+      /camara=\{camara\}\s*mandos=\{mandos\}/.test(laApp) &&
+      elEscritorio.indexOf('<CamaraAerea') > 0 &&
+      elEscritorio.indexOf('<CamaraAerea') < elEscritorio.indexOf('<Burgo\n') &&
+      /modo === 'mesa' \? \{ modo: 'mesa' \} : \{ modo, asiento: yo \?\? '' \}/.test(elEscritorio) &&
+      /camara=\{camara\}/.test(elEscritorio) &&
+      !/modo: 'aerea'/.test(laApp) &&
+      !/modo: 'aerea'/.test(elEscritorio),
+  );
+
+  /* ── 3. DE QUÉ SITIO SE NACE ── */
+  const CODIGOS_A_PIE = ['QWXYZ', '', '39KG2', 'B4RGK', 'M7NPT'];
+  const sentados = (n: number): { asiento: string }[] => Array.from({ length: n }, (_, k) => ({ asiento: `s${String(k + 1)}` }));
+  type Elige = typeof aPie.sitioDeNacerEnElBurgo;
+  /** Lo que tiene de malo un reparto de sitios de nacer, con la función que se le dé. */
+  const malNacidos = (elige: Elige): unknown[] => {
+    const malos: unknown[] = [];
+    for (const codigo of CODIGOS_A_PIE) {
+      const mundo = elMundo.mundoDelBurgo(codigo);
+      const arena = laArena.arenaDe(mundo);
+      const seis = sentados(6);
+      const sitios = seis.map((s) => elige(mundo.nace, seis, s.asiento));
+      if (sitios.some((s, k) => s !== mundo.nace[k])) malos.push({ codigo, que: 'el asiento k no nace en el sitio k del mundo' });
+      if (new Set(sitios).size !== 6) malos.push({ codigo, que: 'dos asientos en el mismo sitio' });
+      for (const s of sitios) {
+        if (s === null) continue;
+        if (!laArena.sePuedeEstar(arena, Math.round(s.x * 65536) | 0, Math.round(s.z * 65536) | 0, RADIO_DEL_PASEANTE)) malos.push({ codigo, que: 'no se cabe donde se nace', s });
+      }
+      if (elige(mundo.nace, seis, 'miron') !== mundo.nace[6]) malos.push({ codigo, que: 'quien mira sin asiento no nace en el siguiente libre' });
+      const ocho = sentados(8);
+      if (new Set(ocho.map((s) => elige(mundo.nace, ocho, s.asiento))).size !== 8) malos.push({ codigo, que: 'ocho asientos no nacen en ocho sitios' });
+    }
+    return malos;
+  };
+  const puertas = sentados(4).map((s) => aPie.sitioDeNacerEnElBurgo(elMundo.NACE_EN_EL_BURGO, sentados(4), s.asiento));
+  comprobar(
+    `en ${String(CODIGOS_A_PIE.length)} mesas, cada asiento nace en el sitio de su orden —los cuatro primeros, las cuatro Puertas—, en un sitio donde se cabe, ninguno repetido, y quien mira sin asiento en el siguiente libre`,
+    malNacidos(aPie.sitioDeNacerEnElBurgo).length === 0 && puertas.every((p, k) => p === elMundo.NACE_EN_EL_BURGO[k]) && aPie.sitioDeNacerEnElBurgo([], sentados(2), 's1') === null,
+    malNacidos(aPie.sitioDeNacerEnElBurgo).slice(0, 4),
+  );
+  comprobar('se ve fallar: naciendo todos en el primer sitio, seis se pisan en el mismo punto y el juez lo dice en todas las mesas', malNacidos((nace) => nace[0] ?? null).length >= CODIGOS_A_PIE.length);
+  comprobar('y la escena nace con ESA función, con las figuras de la vista y el asiento de quien anda', /sitioDeNacerEnElBurgo\(mundoAPie\.nace, tablero\.figuras, quienAnda\)/.test(escena));
+
+  /* ── 4. A QUÉ ALTURA ESTÁ EL SUELO QUE SE PINTA ── */
+  /* 4a. El anillo: el centro y cuatro puntos de dentro de cada cuadro de suelo, contra la cota a la que se pinta. */
+  const PAPELES_QUE_SE_PISAN = new Set(['franja', 'filete', 'superficie', 'borde', 'esquina']);
+  const cuadrosMal = (alturaEn: (x: number, z: number) => number): number => {
+    let mal = 0;
+    for (let i = 0; i < CASILLAS; i++) {
+      for (const q of suelosDeLaCasilla(i)) {
+        if (!PAPELES_QUE_SE_PISAN.has(q.papel)) continue;
+        const cx = q.puntos.reduce((a, p) => a + p[0], 0) / 4;
+        const cz = q.puntos.reduce((a, p) => a + p[2], 0) / 4;
+        const y = (q.puntos[0] as readonly [number, number, number])[1];
+        for (const p of [[cx, cz], ...q.puntos.map((v) => [cx + (v[0] - cx) * 0.9, cz + (v[2] - cz) * 0.9])] as [number, number][]) {
+          /* Encima de la raya que separa dos casillas, que va más alta y mide 0,9, no se mira: es una raya. */
+          const m = marcoDeCasilla(i);
+          const u = (p[0] - m.centro.x) * m.adelante.x + (p[1] - m.centro.z) * m.adelante.z;
+          if (!m.esEsquina && Math.abs(Math.abs(u) - ANCHO_DE_CASILLA / 2) < 0.5) continue;
+          if (Math.abs(alturaEn(p[0], p[1]) - y) > 1e-9) mal++;
+        }
+      }
+    }
+    return mal;
+  };
+  comprobar('en las cuarenta casillas, la altura a pie es la del cuadro de suelo que se pinta: la franja a 0,60, el filete a 0,20, la superficie a 0 y el marco a 0,30', cuadrosMal(aPie.alturaEnElAnillo) === 0, cuadrosMal(aPie.alturaEnElAnillo));
+  comprobar('se ve fallar: con la franja del barrio a ras de suelo, las cuarenta casillas lo dicen', cuadrosMal((x, z) => (Math.max(Math.abs(x), Math.abs(z)) < anillo.FRANJA.hasta && Math.min(Math.abs(x), Math.abs(z)) < anillo.BORDE_INTERIOR ? 0 : aPie.alturaEnElAnillo(x, z))) >= 40);
+
+  /* 4b. Las seis losas de calle: el modelo de bordillo contra la superficie de arriba del `.glb`, rasterizada. */
+  const trianglesDeLaLosa = (nombre: string): (readonly [number, number, number])[][] => {
+    const raiz = raices.find((r) => r.getName() === nombre);
+    const caras: (readonly [number, number, number])[][] = [];
+    const anda = (n: Node): void => {
+      const malla = n.getMesh();
+      if (malla !== null) {
+        for (const prim of malla.listPrimitives()) {
+          const pos = prim.getAttribute('POSITION');
+          if (pos === null) continue;
+          const idx = prim.getIndices();
+          const m = n.getWorldMatrix();
+          const v = [0, 0, 0];
+          const punto = (i: number): [number, number, number] => porLaMatriz(m, pos.getElement(i, v));
+          const cuenta = idx?.getCount() ?? pos.getCount();
+          for (let k = 0; k < cuenta; k += 3) caras.push([punto(idx === null ? k : idx.getScalar(k)), punto(idx === null ? k + 1 : idx.getScalar(k + 1)), punto(idx === null ? k + 2 : idx.getScalar(k + 2))]);
+        }
+      }
+      for (const h of n.listChildren()) anda(h);
+    };
+    if (raiz !== undefined) anda(raiz);
+    return caras;
+  };
+  const alturaRasterizada = (caras: readonly (readonly [number, number, number])[][], px: number, pz: number): number => {
+    let alto = -1;
+    for (const t of caras) {
+      const [p0, p1, p2] = t as [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]];
+      const d = (p1[0] - p0[0]) * (p2[2] - p0[2]) - (p2[0] - p0[0]) * (p1[2] - p0[2]);
+      if (Math.abs(d) < 1e-9) continue;
+      const u = ((px - p0[0]) * (p2[2] - p0[2]) - (p2[0] - p0[0]) * (pz - p0[2])) / d;
+      const w = ((p1[0] - p0[0]) * (pz - p0[2]) - (px - p0[0]) * (p1[2] - p0[2])) / d;
+      if (u < -1e-6 || w < -1e-6 || u + w > 1 + 1e-6) continue;
+      const y = p0[1] + u * (p1[1] - p0[1]) + w * (p2[1] - p0[1]);
+      if (y > alto) alto = y;
+    }
+    return alto;
+  };
+  const MEDIO_ESCALON = (laCiudadDelBurgo.ALTURA_DEL_ASFALTO + laCiudadDelBurgo.ALTURA_DEL_BORDILLO) / 2;
+  const PUNTOS_POR_LADO = 48;
+  const acierto = (modelo: (abiertas: number, u: number, v: number) => number): { peor: number; porLosa: string[] } => {
+    let peor = 1;
+    const porLosa: string[] = [];
+    for (const nombre of Object.keys(laCiudadDelBurgo.CARAS_ABIERTAS)) {
+      /* Sin girar: las caras de la tabla y, si es la curva suave, su marca. Es lo que la escena guarda por celda. */
+      const abiertas = aPie.carasQueSePintan(nombre, 0);
+      const caras = trianglesDeLaLosa(nombre);
+      let bien = 0;
+      let total = 0;
+      for (let a = 0; a < PUNTOS_POR_LADO; a++) {
+        for (let b = 0; b < PUNTOS_POR_LADO; b++) {
+          const x = -RETICULA_DE_LA_CIUDAD / 2 + ((a + 0.5) * RETICULA_DE_LA_CIUDAD) / PUNTOS_POR_LADO;
+          const z = -RETICULA_DE_LA_CIUDAD / 2 + ((b + 0.5) * RETICULA_DE_LA_CIUDAD) / PUNTOS_POR_LADO;
+          const real = alturaRasterizada(caras, x, z);
+          if (real < 0) continue;
+          total++;
+          if (real > MEDIO_ESCALON === modelo(abiertas, x, z) > MEDIO_ESCALON) bien++;
+        }
+      }
+      const parte = total === 0 ? 0 : bien / total;
+      peor = Math.min(peor, parte);
+      porLosa.push(`${nombre} ${(100 * parte).toFixed(1)} %`);
+    }
+    return { peor, porLosa };
+  };
+  const conBordillo = acierto(aPie.alturaEnLaLosa);
+  console.log(`  el bordillo de a pie contra el .glb rasterizado (${String(PUNTOS_POR_LADO)} × ${String(PUNTOS_POR_LADO)} por losa): ${conBordillo.porLosa.join(' · ')}`);
+  comprobar('en las seis losas de calle, el asfalto y el bordillo de a pie caen donde los pone el `.glb`, en el 97 % de los puntos de la peor', conBordillo.peor >= 0.97, conBordillo.porLosa);
+  const sinBordillo = acierto(() => laCiudadDelBurgo.ALTURA_DEL_ASFALTO);
+  comprobar('se ve fallar: con la losa entera de asfalto, sin bordillo, la peor baja del 97 %', sinBordillo.peor < 0.97, sinBordillo.porLosa);
+  const sinArco = acierto((abiertas, u, v) => aPie.alturaEnLaLosa(abiertas & ~aPie.CURVA_SUAVE, u, v));
+  comprobar('y con la curva suave doblando en ángulo recto, como las demás, también', sinArco.peor < 0.97, sinArco.porLosa);
+
+  /* 4c. La ciudad: los sitios de nacer, las calles, las aceras, el puente y el andén, en varias mesas. */
+  const alturasMal: unknown[] = [];
+  let puentesMirados = 0;
+  let andenesMirados = 0;
+  for (const codigo of CODIGOS_A_PIE) {
+    const ciudad = laCiudadDelBurgo.ciudadDelCodigo(codigo, laCiudadDelBurgo.RECINTO_DEL_BURGO, 'plena');
+    const suelo = aPie.sueloDelBurgo(ciudad);
+    const nace = elMundo.NACE_EN_EL_BURGO;
+    for (let k = 0; k < 4; k++) {
+      const s = nace[k] as { x: number; z: number };
+      if (suelo(s.x, s.z) !== anillo.ALTURA_DEL_FILETE) alturasMal.push({ codigo, sitio: k, que: 'la Puerta no está en el filete', y: suelo(s.x, s.z) });
+    }
+    for (let k = 4; k < 8; k++) {
+      const s = nace[k] as { x: number; z: number };
+      if (suelo(s.x, s.z) !== laCiudadDelBurgo.ALTURA_DEL_ASFALTO) alturasMal.push({ codigo, sitio: k, que: 'el brazo de la glorieta no está en el asfalto', y: suelo(s.x, s.z) });
+    }
+    for (const celda of ciudad.celdas) {
+      const esperada = laCiudadDelBurgo.esClaseDeCalle(celda.clase) ? laCiudadDelBurgo.ALTURA_DEL_ASFALTO : laCiudadDelBurgo.ALTURA_DEL_BORDILLO;
+      const dada = suelo(celda.x, celda.z);
+      /* Lo que se levanta encima (el andén, un puente, un forjado) sólo puede SUBIR la cota de su celda. */
+      if (dada < esperada || (laCiudadDelBurgo.esClaseDeCalle(celda.clase) && dada !== esperada)) alturasMal.push({ codigo, celda: [celda.i, celda.j], clase: celda.clase, dada, esperada });
+    }
+    for (const b of ciudad.fachadas) {
+      if (b.clase !== 'puente' && b.clase !== 'anden') continue;
+      const cota = b.y + b.alto;
+      if (suelo(b.x, b.z) !== cota) alturasMal.push({ codigo, que: `el ${b.clase} no se pisa a su cota`, dada: suelo(b.x, b.z), cota });
+      if (b.clase === 'puente') puentesMirados++;
+      else andenesMirados++;
+    }
+  }
+  comprobar(
+    `en ${String(CODIGOS_A_PIE.length)} mesas: se nace en las Puertas a la cota del filete y en la glorieta a la del asfalto, cada calle a la del asfalto en su centro, cada acera, parcela y distrito a la del bordillo o más, y ${String(puentesMirados)} puentes y ${String(andenesMirados)} andenes se pisan por encima`,
+    alturasMal.length === 0 && puentesMirados > 0 && andenesMirados > 0,
+    alturasMal.slice(0, 4),
+  );
+  {
+    const ciudad = laCiudadDelBurgo.ciudadDelCodigo('QWXYZ', laCiudadDelBurgo.RECINTO_DEL_BURGO, 'plena');
+    const puente = ciudad.fachadas.find((b) => b.clase === 'puente');
+    const sinPuentes = aPie.sueloDelBurgo({ ...ciudad, fachadas: ciudad.fachadas.filter((b) => b.clase !== 'puente') });
+    comprobar('se ve fallar: sin mirar lo que se levanta del suelo, un puente se pisa a la cota de la calle y la figura se hunde en su tablero', puente !== undefined && sinPuentes(puente.x, puente.z) < puente.y + puente.alto);
+    const forjadoDeArriba = ciudad.fachadas.find((b) => b.clase === 'forjado' && b.y > aPie.TECHO_DE_UN_SUELO);
+    comprobar('y un forjado de las plantas de arriba de la obra no es suelo: se pasa por debajo', forjadoDeArriba !== undefined && aPie.sueloDelBurgo(ciudad)(forjadoDeArriba.x, forjadoDeArriba.z) < forjadoDeArriba.y);
+  }
+  comprobar('y la escena le da al paseo ESA altura, derivada sólo a pie', /const alturaDelSuelo = useMemo\(\(\) => \(aPie \? sueloDelBurgo\(ciudad\) : SIN_SUELO\), \[aPie, ciudad\]\);/.test(escena));
+
+  /* ── 5. CUÁNTA CIUDAD SE MONTA A PIE, CONTRA EL PRESUPUESTO QUE YA TENÍA LA ESCENA ── */
+  comprobar('a pie, el L2 llega hasta donde llega la niebla y no más: más allá no se ve nada', aPie.UMBRALES_A_PIE.plena.medio === aPie.NIEBLA_A_PIE.lejos && aPie.UMBRALES_A_PIE.sobria.medio === aPie.NIEBLA_A_PIE.lejos && aPie.NIEBLA_A_PIE.cerca < aPie.NIEBLA_A_PIE.lejos);
+  const peorAPie = (calidad: 'plena' | 'sobria', umbrales: { readonly alto: number; readonly medio: number } | undefined): { peor: number; donde: string } => {
+    let peor = 0;
+    let donde = '';
+    for (const codigo of CODIGOS_A_PIE.slice(0, 4)) {
+      const ciudad = laCiudadDelBurgo.ciudadDelCodigo(codigo, laCiudadDelBurgo.RECINTO_DEL_BURGO, calidad);
+      const arena = laArena.arenaDe(elMundo.mundoDelBurgo(codigo));
+      const rutas = ciudad.coches.rutas.reduce((a, r) => a + laCiudadDelBurgo.triangulosDe(r.pieza), 0);
+      for (let x = -426; x <= 426; x += 12) {
+        for (let z = -426; z <= 426; z += 12) {
+          if (!laArena.sePuedeEstar(arena, Math.round(x * 65536) | 0, Math.round(z * 65536) | 0, RADIO_DEL_PASEANTE)) continue;
+          const t = laCiudadDelBurgo.montarLaCiudad(ciudad, x, z, undefined, umbrales).triangulos + rutas;
+          if (t > peor) {
+            peor = t;
+            donde = `${codigo === '' ? 'portada' : codigo} (${String(x)}, ${String(z)})`;
+          }
+        }
+      }
+    }
+    return { peor, donde };
+  };
+  const plenaAPie = peorAPie('plena', aPie.UMBRALES_A_PIE.plena);
+  const sobriaAPie = peorAPie('sobria', aPie.UMBRALES_A_PIE.sobria);
+  console.log(
+    `  a pie, lo más que se monta de ciudad donde se puede estar: plena ${String(plenaAPie.peor)} de ${String(laCiudadDelBurgo.TOPE_DE_LA_CIUDAD.plena)} en ${plenaAPie.donde} · sobria ${String(sobriaAPie.peor)} de ${String(laCiudadDelBurgo.TOPE_DE_LA_CIUDAD.sobria)} en ${sobriaAPie.donde}`,
+  );
+  comprobar(
+    `a pie, en ${String(CODIGOS_A_PIE.slice(0, 4).length)} mesas y en cada punto andable de doce en doce, la ciudad montada cabe en el presupuesto de la escena en las dos calidades`,
+    plenaAPie.peor <= laCiudadDelBurgo.TOPE_DE_LA_CIUDAD.plena && sobriaAPie.peor <= laCiudadDelBurgo.TOPE_DE_LA_CIUDAD.sobria && plenaAPie.peor > 0 && sobriaAPie.peor > 0,
+    { plena: plenaAPie, sobria: sobriaAPie },
+  );
+  const sobriaConLosDeLaMesa = peorAPie('sobria', undefined);
+  comprobar(
+    `se ve fallar: a pie con los umbrales de la mesa, la sobria monta ${String(sobriaConLosDeLaMesa.peor)} y NO cabe en ${String(laCiudadDelBurgo.TOPE_DE_LA_CIUDAD.sobria)} —por eso a pie hay otros—`,
+    sobriaConLosDeLaMesa.peor > laCiudadDelBurgo.TOPE_DE_LA_CIUDAD.sobria,
+    sobriaConLosDeLaMesa,
+  );
+
+  /* ── 6. NINGÚN MURO DEL ESTADIO CRUZA UNA CALLE: lo que se PINTA, en las dos calidades ── */
+  const murosQueCruzan = (ciudad: ReturnType<typeof laCiudadDelBurgo.ciudadDelCodigo>, muros: readonly ReturnType<typeof laCiudadDelBurgo.ciudadDelCodigo>['fachadas'][number][]): unknown[] => {
+    const d = ciudad.distritos.find((x) => x.nombre === 'estadio');
+    if (d === undefined) return [{ que: 'sin estadio' }];
+    const caja = cajaDelDistrito(ciudad.recinto, d);
+    const malos: unknown[] = [];
+    for (const b of muros) {
+      const c = Math.cos(b.giro);
+      const s = Math.sin(b.giro);
+      const xs = [-1, 1].flatMap((i) => [-1, 1].map((j) => b.x + ((i * b.ancho) / 2) * c + ((j * b.fondo) / 2) * s));
+      const zs = [-1, 1].flatMap((i) => [-1, 1].map((j) => b.z - ((i * b.ancho) / 2) * s + ((j * b.fondo) / 2) * c));
+      const x0 = Math.min(...xs);
+      const x1 = Math.max(...xs);
+      const z0 = Math.min(...zs);
+      const z1 = Math.max(...zs);
+      if (x0 < caja.x0 - 1e-6 || x1 > caja.x1 + 1e-6 || z0 < caja.z0 - 1e-6 || z1 > caja.z1 + 1e-6) malos.push({ que: 'se sale del distrito', caja: [r(x0), r(z0), r(x1), r(z1)] });
+      for (const celda of ciudad.celdas) {
+        if (!laCiudadDelBurgo.esClaseDeCalle(celda.clase)) continue;
+        /* Con una millonésima de holgura: la caja sale de un seno y un coseno, y el muro va justo en el canto de su distrito. */
+        const m = RETICULA_DE_LA_CIUDAD / 2 - 1e-6;
+        if (x0 < celda.x + m && x1 > celda.x - m && z0 < celda.z + m && z1 > celda.z - m) {
+          malos.push({ que: 'pisa una calle', celda: [celda.i, celda.j] });
+          break;
+        }
+      }
+    }
+    return malos;
+  };
+  const murosDe = (ciudad: ReturnType<typeof laCiudadDelBurgo.ciudadDelCodigo>): ReturnType<typeof laCiudadDelBurgo.ciudadDelCodigo>['fachadas'][number][] => ciudad.fachadas.filter((b) => b.clase === 'cantil' && b.y === laCiudadDelBurgo.ALTURA_DEL_BORDILLO);
+  const estadiosMal: unknown[] = [];
+  let murosMirados = 0;
+  let cruzabanAntes = 0;
+  for (const codigo of CODIGOS_A_PIE) {
+    for (const calidad of ['plena', 'sobria'] as const) {
+      const ciudad = laCiudadDelBurgo.ciudadDelCodigo(codigo, laCiudadDelBurgo.RECINTO_DEL_BURGO, calidad);
+      const muros = murosDe(ciudad);
+      murosMirados += muros.length;
+      if (muros.length !== 4) estadiosMal.push({ codigo, calidad, que: `${String(muros.length)} muros y no cuatro` });
+      estadiosMal.push(...murosQueCruzan(ciudad, muros).map((m) => ({ codigo, calidad, ...(m as object) })));
+      /* La cuenta de antes: a los que giran un número impar de cuartos se les cambiaban el ancho y el fondo. */
+      const comoAntes = muros.map((b) => (Math.round(b.giro / (Math.PI / 2)) % 2 !== 0 ? { ...b, ancho: b.fondo, fondo: b.ancho } : b));
+      cruzabanAntes += murosQueCruzan(ciudad, comoAntes).length;
+    }
+  }
+  comprobar(`en ${String(CODIGOS_A_PIE.length)} mesas y en las dos calidades, los ${String(murosMirados)} muros del estadio que se PINTAN van dentro de su distrito y ninguno pisa una calle`, estadiosMal.length === 0 && murosMirados === CODIGOS_A_PIE.length * 2 * 4, estadiosMal.slice(0, 4));
+  comprobar(`se ve fallar: con la cuenta de antes, girados dos veces, salen ${String(cruzabanAntes)} faltas —muros fuera del distrito y sobre la calle—`, cruzabanAntes >= CODIGOS_A_PIE.length * 2 * 2, cruzabanAntes);
+}
+
+// ---------------------------------------------------------------------------
 
 console.log('');
 if (fallos.length > 0) {
@@ -5320,7 +5715,7 @@ if (fallos.length > 0) {
  * a la mitad termina con código cero y una lista corta de aciertos. El número va a mano,
  * con margen, y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 256;
+const COMPROBACIONES_ESCRITAS = 285;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(`Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: se ha caído por el camino sin decirlo. Si has añadido comprobaciones nuevas, sube el número.`);
   process.exit(2);

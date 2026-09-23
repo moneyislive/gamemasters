@@ -35,13 +35,22 @@
  *     la cripta, sale igual en las dos, pero eso se decide por capas y no pieza a pieza: la que
  *     tenga que parar a alguien se sube aquí, con su caja medida.
  *
- * ═══ UN FALLO DE DIBUJO QUE ESTO DEJA A LA VISTA ═══
+ * ═══ EL FALLO DE DIBUJO QUE ESTO DEJABA A LA VISTA, Y CÓMO SE ARREGLÓ ═══
  *
- * Los muros del este y del oeste del estadio llevan el ancho y el fondo YA cambiados y además el
- * cuarto de vuelta de `giroMirandoA`: giran dos veces. Se pintan a lo ancho, no a lo largo, y
- * sobresalen 53 del distrito por los dos lados, cruzando la calle. Aquí se declaran tal como se
- * pintan —el mundo sigue a lo que se ve, y el día que se arregle el dibujo se arregla el choque
- * con él—, y el arreglo cambia el aspecto de la ciudad, que es decisión aparte.
+ * Los muros del este y del oeste del estadio llevaban el ancho y el fondo YA cambiados —un metro
+ * de ancho y el largo del lado de fondo— y además el cuarto de vuelta de `giroMirandoA`: giraban
+ * DOS veces. Se pintaban a lo ancho y no a lo largo, o sea como una pared de 107 × 1 cruzada al
+ * lado que tenían que cerrar, y se salían 53 del distrito por fuera, atravesando la calle entera.
+ * Desde el aire era una raya gris sobre el asfalto; a pie era una pared en mitad de la calle, y
+ * como aquí se declaraban tal como se pintaban, el paseo chocaba con ella de verdad.
+ *
+ * Se arregló el 23-sep-2026 en el ÚNICO sitio que lo decide: los cuatro muros van ahora en sus
+ * ejes —lo largo en su `ancho`, el grueso en su `fondo`— y el giro los lleva a su lado. Como la
+ * escena los pinta con estos números (`montarElEstadio` en `escenas/burgo/ciudad.ts`), lo que se
+ * ve y lo que para cambiaron a la vez. Medido: el muro del este y el del oeste miden ahora 1 × 107
+ * en planta, dentro de su distrito; el del norte y el del sur salen idénticos a los de antes, bit
+ * a bit. `verify:burgo-mundo` comprueba en todas sus mesas que ningún muro del estadio pisa una
+ * celda de calle ni se sale del distrito, y lo ve fallar con la cuenta vieja.
  */
 import { ALTURA_DE_PLANTA_DEL_BURGO, ALTURA_DEL_BORDILLO, RETICULA_DEL_BURGO, RUMBOS, centroDeCelda, cuartosMirandoA, giroMirandoA, rumboALaDerecha, rumboContrario, vectorDelRumbo } from './burgo-traza';
 import type { CascaraDelBurgo, DistritoPuesto, Punto, RecintoDeLaCiudad, Rumbo } from './burgo-traza';
@@ -153,7 +162,10 @@ export const GRADA_DEL_ESTADIO = { fondo: 9, alto: 3.6 } as const;
 /**
  * EL ESTADIO: la grada en anillo, las cuatro torres de luz sobre su pilar y el muro perimetral.
  *
- * El muro va tal como se pinta, con los del este y del oeste girados dos veces: ver la cabecera.
+ * Cada muro se escribe EN SUS EJES y el giro lo lleva a su lado: lo largo en `ancho`, el grueso
+ * en `fondo`. Es la misma regla que la grada de dos líneas más arriba. Los del este y del oeste
+ * llevaban las dos medidas ya cambiadas y además el giro, y se pintaban cruzando la calle: ver la
+ * cabecera.
  */
 export function estructuraDelEstadio(caja: CajaEnPlanta): { readonly gradas: readonly VolumenDeEstructura[]; readonly pilares: readonly VolumenDeEstructura[]; readonly muros: readonly VolumenDeEstructura[] } {
   const GRADA = GRADA_DEL_ESTADIO;
@@ -190,9 +202,10 @@ export function estructuraDelEstadio(caja: CajaEnPlanta): { readonly gradas: rea
       y: ALTURA_DEL_BORDILLO,
       z: caja.cz + v.z * (caja.fondo / 2 - 0.5),
       cuartos: cuartosMirandoA(r),
-      ancho: r % 2 === 0 ? 1 : largo,
+      /* En los ejes del muro, para los cuatro: el giro de `cuartosMirandoA` ya lo pone a lo largo de su lado. */
+      ancho: largo,
       alto: 2.2,
-      fondo: r % 2 === 0 ? largo : 1,
+      fondo: 1,
     });
   }
   return { gradas, pilares, muros };

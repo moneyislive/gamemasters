@@ -17,14 +17,17 @@
  *
  * ═══ LO QUE AFIRMA, EN OCHO PASOS ═══
  *
- *  1. La ciudad de la escena es, bit a bit, la de ANTES de mudar la traza: la huella de diez
- *     ciudades (cinco mesas, dos calidades) está congelada aquí.
+ *  1. La ciudad de la escena es, bit a bit, la de ANTES de mudar la traza con los muros del
+ *     estadio enderezados: la huella de diez ciudades (cinco mesas, dos calidades) está congelada
+ *     aquí, y la de antes del arreglo sale de ésta volviendo a girar esos dos muros y nada más.
  *  2. El mundo es contrato: canoniza, y se dice cuánto pesa.
  *  3. El mundo que se deduce de lo que la escena pinta es el MISMO en plena y en sobria, y es el
  *     declarado, caja a caja. Toda clase de bulto que la escena pinte tiene que estar clasificada
  *     (suelo, aire, sólido, adorno): una nueva sin clasificar pone esto en rojo, porque es una
  *     decisión —¿se choca con ella?— que alguien tiene que tomar.
  *  4. Hay cuerpos, tantos como edificios y lo sólido de los distritos, y ninguno fuera del tablero.
+ *     Y los cuatro muros del estadio van a lo largo de su lado: dentro de su distrito y sin pisar
+ *     una celda de calle.
  *  5. Donde se nace hay suelo y no hay cuerpo, los sitios están repartidos y ninguno mira a una
  *     pared.
  *  6. Un paseante que se echa encima de un edificio se queda en la fachada, y eso se cuenta.
@@ -45,7 +48,9 @@
  *  1. Un color de la nave del centro comercial cambiado en `ciudad.ts` → las diez huellas rojas.
  *  2. Un cuerpo con `NaN` en `mundoDeLaSemilla` → «el mundo canoniza» rojo.
  *  3. El polígono sin su segunda nave en sobria (`ciudad.ts`) → plena y sobria difieren.
- *  4. El pedestal corrido 1.000 → «ninguno fuera del tablero» rojo.
+ *  4. El pedestal corrido 1.000 → «ninguno fuera del tablero» rojo. Y el muro del estadio con la
+ *     cuenta de antes en `burgo-distritos.ts` —el ancho y el fondo cambiados Y el giro— → «los
+ *     muros del estadio» rojo en las doce mesas, y las huellas del paso 1 también.
  *  5. Un sitio de nacer en el centro de la glorieta, dentro del pedestal → rojo.
  *  6. El mundo sin cuerpos → las embestidas atraviesan las fachadas y los suelos caen.
  *  7. El filete del anillo a 8 en `shared/` → la línea de la marcha no es la de la escena.
@@ -74,11 +79,14 @@ import {
   MEDIO_LADO_DEL_BURGO,
   NACE_EN_EL_BURGO,
   cajaDelEdificio,
+  cajaDelVolumen,
   mundoDelBurgo,
   mundoDeLaSemilla,
 } from '../../shared/arcade/juegos/burgo-mundo';
-import { ALTURA_DE_PLANTA_DEL_BURGO, CUERPO_DEL_MODELO, RETICULA_DEL_BURGO, trazaDelBurgo, vectorDelRumbo } from '../../shared/arcade/juegos/burgo-traza';
-import type { EdificioDelBurgo } from '../../shared/arcade/juegos/burgo-traza';
+import { cajaDelDistrito, estructuraDelEstadio } from '../../shared/arcade/juegos/burgo-distritos';
+import type { VolumenDeEstructura } from '../../shared/arcade/juegos/burgo-distritos';
+import { ALTURA_DE_PLANTA_DEL_BURGO, CUERPO_DEL_MODELO, RETICULA_DEL_BURGO, esClaseDeCalle, trazaDelBurgo, vectorDelRumbo } from '../../shared/arcade/juegos/burgo-traza';
+import type { ClaseDeCelda, DistritoPuesto, EdificioDelBurgo } from '../../shared/arcade/juegos/burgo-traza';
 import { embestir, enFijo, paseoDelBurgo, CODIGOS_DEL_PASEO } from './paseo-del-burgo';
 import type { MundoResumido } from './paseo-del-burgo';
 import { ALTURA_DEL_BORDILLO, LADO_DEL_RECINTO, RECINTO_DEL_BURGO, ciudadDelCodigo, giraElPunto } from '../../escenas/burgo/ciudad';
@@ -116,6 +124,15 @@ paso('1 · La ciudad que pinta la escena es, bit a bit, la de antes de mudar la 
  * primeras cifras). Se sacaron 94 ciudades —27 mesas y las 20 semillas de `verify:la-ciudad`, en
  * las dos calidades— y las 94 salieron idénticas después; aquí se guardan diez.
  *
+ * ═══ Y SE RENOVÓ UNA VEZ, EL MISMO DÍA, POR LOS MUROS DEL ESTADIO ═══
+ *
+ * Los del este y del oeste se pintaban girados dos veces y cruzaban la calle (la cabecera de
+ * `burgo-distritos.ts` lo cuenta con sus cifras); al enderezarlos cambió el `todo` de las diez
+ * ciudades y NADA MÁS: `celdas`, `edificios` y `volumenes` son los de siempre. Que no se colara otra
+ * cosa con el arreglo no se da por dicho: `HUELLAS_DE_ANTES_DEL_ESTADIO` guarda los `todo` de antes,
+ * y el paso vuelve a girar esos dos muros en la ciudad de hoy —y sólo ésos— y exige que salga,
+ * bit a bit, la de antes.
+ *
  * SI HAS CAMBIADO LA CIUDAD A PROPÓSITO, esto se pone rojo y tiene que ponerse: lo que dice es que
  * la ciudad de hoy ya no es aquélla. Mira qué parte ha cambiado —si es `celdas`, `edificios` o
  * `volumenes`, has movido la TRAZA, y con ella el mundo con el que se choca; si no, mira el paso
@@ -124,22 +141,66 @@ paso('1 · La ciudad que pinta la escena es, bit a bit, la de antes de mudar la 
  * diciéndolo en el mensaje del cambio.
  */
 const HUELLAS_DE_ANTES: Readonly<Record<string, { todo: string; celdas: string; edificios: string; volumenes: string }>> = {
-  'QWXYZ|plena': { todo: '237f9f646b6dc4b9', celdas: '0b2153f60476c3d1', edificios: '8ec66b8f3bdd0039', volumenes: 'dd6b97a7ba21e036' },
-  'QWXYZ|sobria': { todo: 'f732922d7900ea4a', celdas: '0b2153f60476c3d1', edificios: '8ec66b8f3bdd0039', volumenes: 'dd6b97a7ba21e036' },
-  '|plena': { todo: '4884deb1e9521f1c', celdas: '7bb3f8c7694a5032', edificios: '486fccb63b9be9e2', volumenes: 'a546a295e9f27923' },
-  '|sobria': { todo: '4b1edfa62618bf38', celdas: '7bb3f8c7694a5032', edificios: '486fccb63b9be9e2', volumenes: 'a546a295e9f27923' },
-  '39KG2|plena': { todo: '05cf33e5782f70b3', celdas: 'e6282ba9f4695c6c', edificios: 'f634678dd6efcea3', volumenes: '0c9ba32cba686b34' },
-  '39KG2|sobria': { todo: 'b1caf689ef6c0e06', celdas: 'e6282ba9f4695c6c', edificios: 'f634678dd6efcea3', volumenes: '0c9ba32cba686b34' },
-  '97L5F|plena': { todo: 'd02365b48fc3ce50', celdas: '96412c72a374a90f', edificios: '9187e4cdabf0dd34', volumenes: 'b796c5f53cbe9bf0' },
-  '97L5F|sobria': { todo: 'a4d53fb7c0d5af12', celdas: '96412c72a374a90f', edificios: '9187e4cdabf0dd34', volumenes: 'b796c5f53cbe9bf0' },
-  'GLM4N|plena': { todo: 'a91412cc280e3b4b', celdas: '3185683a9cb35e81', edificios: 'f6f949460de52abb', volumenes: '8e2e95c910ecfffc' },
-  'GLM4N|sobria': { todo: '869c1d4e131133fa', celdas: '3185683a9cb35e81', edificios: 'f6f949460de52abb', volumenes: '8e2e95c910ecfffc' },
+  'QWXYZ|plena': { todo: '5849033ae9f98ad2', celdas: '0b2153f60476c3d1', edificios: '8ec66b8f3bdd0039', volumenes: 'dd6b97a7ba21e036' },
+  'QWXYZ|sobria': { todo: 'a8c793c393faa4bb', celdas: '0b2153f60476c3d1', edificios: '8ec66b8f3bdd0039', volumenes: 'dd6b97a7ba21e036' },
+  '|plena': { todo: '58125bc9a5d55aff', celdas: '7bb3f8c7694a5032', edificios: '486fccb63b9be9e2', volumenes: 'a546a295e9f27923' },
+  '|sobria': { todo: '6d48ff4b7c5a682d', celdas: '7bb3f8c7694a5032', edificios: '486fccb63b9be9e2', volumenes: 'a546a295e9f27923' },
+  '39KG2|plena': { todo: 'eb3561f6c5e35dde', celdas: 'e6282ba9f4695c6c', edificios: 'f634678dd6efcea3', volumenes: '0c9ba32cba686b34' },
+  '39KG2|sobria': { todo: '9fcd34649251f140', celdas: 'e6282ba9f4695c6c', edificios: 'f634678dd6efcea3', volumenes: '0c9ba32cba686b34' },
+  '97L5F|plena': { todo: 'e67fd43902555159', celdas: '96412c72a374a90f', edificios: '9187e4cdabf0dd34', volumenes: 'b796c5f53cbe9bf0' },
+  '97L5F|sobria': { todo: '3ebc3b26cb6a3ad4', celdas: '96412c72a374a90f', edificios: '9187e4cdabf0dd34', volumenes: 'b796c5f53cbe9bf0' },
+  'GLM4N|plena': { todo: 'a7d36f630ec29e1c', celdas: '3185683a9cb35e81', edificios: 'f6f949460de52abb', volumenes: '8e2e95c910ecfffc' },
+  'GLM4N|sobria': { todo: '3459c860505f76a1', celdas: '3185683a9cb35e81', edificios: 'f6f949460de52abb', volumenes: '8e2e95c910ecfffc' },
 };
+
+/** El `todo` de las mismas diez ciudades ANTES de enderezar los muros del estadio: los que hubo congelados hasta el arreglo. */
+const HUELLAS_DE_ANTES_DEL_ESTADIO: Readonly<Record<string, string>> = {
+  'QWXYZ|plena': '237f9f646b6dc4b9',
+  'QWXYZ|sobria': 'f732922d7900ea4a',
+  '|plena': '4884deb1e9521f1c',
+  '|sobria': '4b1edfa62618bf38',
+  '39KG2|plena': '05cf33e5782f70b3',
+  '39KG2|sobria': 'b1caf689ef6c0e06',
+  '97L5F|plena': 'd02365b48fc3ce50',
+  '97L5F|sobria': 'a4d53fb7c0d5af12',
+  'GLM4N|plena': 'a91412cc280e3b4b',
+  'GLM4N|sobria': '869c1d4e131133fa',
+};
+
+/**
+ * LA CIUDAD COMO ESTABA ANTES DEL ARREGLO, sacada de la de hoy: a cada muro del estadio que gira un
+ * número IMPAR de cuartos —el del este y el del oeste— se le vuelven a cambiar el ancho y el fondo,
+ * que es exactamente lo que los hacía girar dos veces. Se reconoce por lo que sólo él tiene: un
+ * `cantil` sobre la acera (los del canal van por debajo, junto al agua). Devuelve la copia y
+ * cuántas veces tocó un muro: cada uno sale en la lista entera de bultos y en sus niveles de detalle.
+ */
+function comoAntesDelEstadio(ciudad: LaCiudad): { readonly copia: unknown; readonly muros: number } {
+  const copia: unknown = JSON.parse(JSON.stringify(ciudad));
+  let muros = 0;
+  const anda = (x: unknown): void => {
+    if (Array.isArray(x)) {
+      for (const y of x) anda(y);
+      return;
+    }
+    if (x === null || typeof x !== 'object') return;
+    const o = x as Record<string, unknown>;
+    if (o.clase === 'cantil' && o.y === ALTURA_DEL_BORDILLO && typeof o.giro === 'number' && Math.round(o.giro / (Math.PI / 2)) % 2 !== 0) {
+      const ancho = o.ancho;
+      o.ancho = o.fondo;
+      o.fondo = ancho;
+      muros++;
+    }
+    for (const k of Object.keys(o)) anda(o[k]);
+  };
+  anda(copia);
+  return { copia, muros };
+}
 
 const pedirHuellas = process.argv.includes('--huellas');
 {
   const nuevas: string[] = [];
   const distintas: string[] = [];
+  const noEsSoloElEstadio: string[] = [];
   for (const clave of Object.keys(HUELLAS_DE_ANTES)) {
     const [codigo, calidad] = clave.split('|') as [string, 'plena' | 'sobria'];
     const c = ciudadDelCodigo(codigo === '' ? null : codigo, RECINTO_DEL_BURGO, calidad);
@@ -150,10 +211,17 @@ const pedirHuellas = process.argv.includes('--huellas');
       const partes = (['celdas', 'edificios', 'volumenes'] as const).filter((p) => hoy[p] !== antes[p]);
       distintas.push(`${clave}: ${partes.length === 0 ? 'la traza y los edificios son los de antes; ha cambiado otra cosa —los distritos, el mobiliario, los coches—, y si es sólida lo dice el paso 3' : `ha cambiado la TRAZA: ${partes.join(', ')}`}`);
     }
+    const vieja = comoAntesDelEstadio(c);
+    if (vieja.muros === 0 || sha(JSON.stringify(vieja.copia)) !== HUELLAS_DE_ANTES_DEL_ESTADIO[clave]) noEsSoloElEstadio.push(`${clave}: ${String(vieja.muros)} muros vueltos a girar, y sale ${sha(JSON.stringify(vieja.copia))}`);
   }
   if (pedirHuellas) console.log(`\n  Las huellas de hoy, para pegar en HUELLAS_DE_ANTES:\n${nuevas.join('\n')}\n`);
-  comprobar(`las ${Object.keys(HUELLAS_DE_ANTES).length} ciudades congeladas (cinco mesas, plena y sobria) son las de antes de mudar la traza`, distintas.length === 0, distintas);
+  comprobar(`las ${Object.keys(HUELLAS_DE_ANTES).length} ciudades congeladas (cinco mesas, plena y sobria) son las de antes de mudar la traza, con los muros del estadio enderezados`, distintas.length === 0, distintas);
   console.log(`  ${Object.keys(HUELLAS_DE_ANTES).length - distintas.length} de ${Object.keys(HUELLAS_DE_ANTES).length} ciudades idénticas a las de antes`);
+  comprobar(
+    'y lo ÚNICO que cambió al enderezarlos son esos dos muros: vueltos a girar dos veces en la ciudad de hoy, sale bit a bit la huella de antes del arreglo en las diez',
+    noEsSoloElEstadio.length === 0,
+    noEsSoloElEstadio,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -413,6 +481,66 @@ paso('4 · Los cuerpos: hay los que tiene que haber, y ninguno fuera del tablero
   comprobar(
     'se ve fallar: una caja corrida mil unidades cae fuera del tablero',
     [{ x0: 1000, z0: 0, x1: 1006, z1: 6 }].some((c) => c.x1 > MEDIO_LADO_DEL_BURGO),
+  );
+}
+
+/*
+ * ═══ LOS MUROS DEL ESTADIO, A LO LARGO DE SU LADO ═══
+ *
+ * El del este y el del oeste se pintaban —y se declaraban— girados dos veces: una pared de 107 × 1
+ * CRUZADA a su lado, que se salía 53 del distrito y en seis de estas siete primeras mesas pisaba
+ * de una a cinco celdas de calle. A pie era una pared en mitad del asfalto. Lo que se afirma es lo
+ * que un muro perimetral tiene que ser: su caja dentro de la del distrito, ni una celda de calle
+ * debajo, lo largo a lo largo de su lado, y la misma caja en el mundo declarado. La vacuna es la
+ * cuenta de antes —el ancho y el fondo cambiados encima del giro— sobre los mismos muros.
+ */
+{
+  const CALLE = RETICULA_DEL_BURGO;
+  /** Lo que tiene de malo un muro: fuera del distrito, sobre una calle, cruzado o sin su caja en el mundo. */
+  const malDelMuro = (codigo: string, cambia: (m: VolumenDeEstructura, r: number) => VolumenDeEstructura): unknown[] => {
+    const traza = trazaDelBurgo(semillaDelCodigo(codigo, 1));
+    const d = traza.trazado.distritos.find((x) => x.nombre === 'estadio');
+    if (d === undefined) return [{ codigo, que: 'la mesa no tiene estadio' }];
+    const caja = cajaDelDistrito(RECINTO_DEL_BURGO, d);
+    const mundo = mundos.get(codigo) ?? mundoDelBurgo(codigo);
+    const n = traza.trazado.n;
+    const malos: unknown[] = [];
+    estructuraDelEstadio(caja).muros.forEach((original, r) => {
+      const m = cambia(original, r);
+      const c = cajaDelVolumen(m);
+      const fuera = Math.max(caja.x0 - c.x0, c.x1 - caja.x1, caja.z0 - c.z0, c.z1 - caja.z1, 0);
+      if (fuera > 1e-9) malos.push({ codigo, muro: r, que: 'se sale del distrito', fuera });
+      let calles = 0;
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          if (!esClaseDeCalle(traza.trazado.clase[j * n + i] as ClaseDeCelda)) continue;
+          const x0 = -LADO_DEL_RECINTO / 2 + CALLE * i;
+          const z0 = -LADO_DEL_RECINTO / 2 + CALLE * j;
+          if (c.x0 < x0 + CALLE && c.x1 > x0 && c.z0 < z0 + CALLE && c.z1 > z0) calles++;
+        }
+      }
+      if (calles > 0) malos.push({ codigo, muro: r, que: 'pisa celdas de calle', calles });
+      /* Los rumbos pares son el este y el oeste: su lado corre en z. */
+      const aLoLargo = r % 2 === 0 ? c.z1 - c.z0 > c.x1 - c.x0 : c.x1 - c.x0 > c.z1 - c.z0;
+      if (!aLoLargo) malos.push({ codigo, muro: r, que: 'va cruzado a su lado', caja: c });
+      if (!mundo.cuerpos.some((k) => Math.abs(k.x0 - c.x0) < 1e-9 && Math.abs(k.z0 - c.z0) < 1e-9 && Math.abs(k.x1 - c.x1) < 1e-9 && Math.abs(k.z1 - c.z1) < 1e-9)) malos.push({ codigo, muro: r, que: 'su caja no está en el mundo declarado' });
+    });
+    return malos;
+  };
+  const tal = (m: VolumenDeEstructura): VolumenDeEstructura => m;
+  /* La cuenta de antes: a los de rumbo par (este y oeste) se les volvían a cambiar el ancho y el fondo. */
+  const comoAntes = (m: VolumenDeEstructura, r: number): VolumenDeEstructura => (r % 2 === 0 ? { ...m, ancho: m.fondo, fondo: m.ancho } : m);
+  const malos = CODIGOS.flatMap((codigo) => malDelMuro(codigo, tal));
+  const portada = estructuraDelEstadio(cajaDelDistrito(RECINTO_DEL_BURGO, trazaDelBurgo(1).trazado.distritos.find((x) => x.nombre === 'estadio') as DistritoPuesto)).muros.map((m) => cajaDelVolumen(m));
+  console.log(`  los cuatro muros del estadio de la portada, en planta: ${portada.map((c) => `${(c.x1 - c.x0).toFixed(0)} × ${(c.z1 - c.z0).toFixed(0)}`).join(' · ')}`);
+  comprobar(`en las ${String(CODIGOS.length)} mesas los cuatro muros del estadio van a lo largo de su lado, dentro de su distrito, sin pisar una celda de calle, y con su caja en el mundo`, malos.length === 0, malos.slice(0, 4));
+  const vacunados = CODIGOS.flatMap((codigo) => malDelMuro(codigo, comoAntes));
+  const seSalian = vacunados.filter((x) => (x as { que: string }).que === 'se sale del distrito').length;
+  const pisaban = vacunados.filter((x) => (x as { que: string }).que === 'pisa celdas de calle').length;
+  comprobar(
+    `se ve fallar: con la cuenta de antes —girados dos veces— los muros del este y del oeste se salen del distrito en las ${String(CODIGOS.length)} mesas y pisan calle en ${String(pisaban)} muros`,
+    seSalian === 2 * CODIGOS.length && pisaban > 0,
+    { seSalian, pisaban },
   );
 }
 
