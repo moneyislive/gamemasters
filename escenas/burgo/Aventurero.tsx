@@ -15,9 +15,9 @@
  *
  * ═══ NUNCA T-POSE, Y CÓMO SE CUMPLE AQUÍ ═══
  *
- * La pose de enlace del rig ES la T. `montaMarioneta` devuelve `null` si la biblioteca de
+ * La pose de enlace del rig ES la T. `usarMarioneta` devuelve `null` si la biblioteca de
  * clips (`animaciones.glb`) no ha llegado, y entonces la figura NO se enseña: el grupo
- * se queda invisible, y el peón instanciado de `Burgo.tsx` es lo que se ve deslizarse por
+ * no llega a montarse, y el peón instanciado de `Burgo.tsx` es lo que se ve deslizarse por
  * la polilínea. `clipQueToca` nunca pide `t-pose` por construcción (`peon.ts`), y
  * `reproduce` cae a `reposo-a` si le piden un clip que no exista.
  *
@@ -34,19 +34,21 @@
  * parcial encima de la marcha, sin detenerla, y se apaga al terminar. Es el único sitio
  * donde suenan dos clips a la vez.
  *
- * ═══ LO QUE SE SUELTA AL DESMONTAR ═══
+ * ═══ MONTARLA, SOLTARLA Y PINTARLA ES LO COMÚN ═══
  *
- * El mezclador se para y se desengancha, el esqueleto del clon suelta su textura de
- * huesos (`desmontaMarioneta`).
+ * `usarMarioneta` y `<Marioneta>` (`escenas/comun/marioneta.tsx`), los mismos del Muelle, la
+ * Plaza, La Linde Alta y el paseo: al desmontar, el mezclador se para y se desengancha y el
+ * esqueleto del clon suelta su textura de huesos, y sin marioneta no se pinta nada.
  */
 import * as React from 'react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useRef } from 'react';
 import type { JSX } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { CLIP } from '../embarcadero/figuras';
 import type { AventureroCargado } from '../embarcadero/cargar';
-import { desmontaMarioneta, montaMarioneta, reproduce } from '../aventureros/marioneta';
+import { reproduce } from '../aventureros/marioneta';
+import { Marioneta, usarMarioneta } from '../comun/marioneta';
 import { ANILLO_DEL_BURGO } from './anillo-en-3d';
 import type { AnilloEn3D } from './anillo-en-3d';
 import { clipQueToca, posicionYRumbo, saludoSuperpuesto } from './peon';
@@ -69,13 +71,7 @@ const PESO_DEL_SALUDO = 0.6;
 export function Aventurero(props: PropsDelAventureroDelBurgo): JSX.Element {
   const { estado, cargado, biblioteca, anillo = ANILLO_DEL_BURGO } = props;
 
-  const marioneta = useMemo(() => montaMarioneta(cargado, biblioteca), [cargado, biblioteca]);
-  useEffect(
-    () => () => {
-      if (marioneta !== null) desmontaMarioneta(marioneta);
-    },
-    [marioneta],
-  );
+  const marioneta = usarMarioneta(cargado, biblioteca);
 
   const grupo = useRef<THREE.Group>(null);
   const saludando = useRef(false);
@@ -118,9 +114,5 @@ export function Aventurero(props: PropsDelAventureroDelBurgo): JSX.Element {
     marioneta.mezclador.update(Math.min(0.1, Math.max(0, dt)));
   });
 
-  return (
-    <group ref={grupo} visible={false}>
-      {marioneta === null ? null : <primitive object={marioneta.raiz} />}
-    </group>
-  );
+  return <Marioneta de={marioneta} grupo={grupo} visible={false} />;
 }

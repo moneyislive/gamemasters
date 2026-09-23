@@ -3338,7 +3338,28 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
       !/tercera-persona/.test(sinComentarios(fs.readFileSync(path.join(CARPETA, 'tipos.ts'), 'utf8'))) &&
       /\| \{ readonly modo: 'mesa' \}\s*\| \{ readonly modo: 'hombro'; readonly asiento: string \}\s*\| \{ readonly modo: 'ojos'; readonly asiento: string \}/.test(fs.readFileSync(path.join(CARPETA, 'tipos.ts'), 'utf8')),
   );
-  comprobar('Aventurero.tsx nunca pide t-pose ni reproduce sin marioneta', !/tPose|t-pose/.test(codigoDelAventurero) && /marioneta === null\) return/.test(codigoDelAventurero));
+  /*
+   * NUNCA EN T: el aventurero no pide `t-pose` ni reproduce sin marioneta, y la marioneta la monta y la
+   * pinta lo común (`comun/marioneta.tsx`), que es donde vive ahora la otra mitad de la promesa —la que
+   * estaba aquí—: sin biblioteca no se monta ni se clona nada, y sin marioneta no se pinta nada.
+   */
+  const codigoDeLaMarionetaComun = sinComentarios(fs.readFileSync(path.join(RAIZ, 'comun', 'marioneta.tsx'), 'utf8'));
+  const nuncaEnT = (aventurero: string, comun: string): boolean =>
+    !/tPose|t-pose/.test(aventurero) &&
+    /marioneta === null\) return/.test(aventurero) &&
+    /const marioneta = usarMarioneta\(cargado, biblioteca\);/.test(aventurero) &&
+    /<Marioneta de=\{marioneta\}/.test(aventurero) &&
+    /biblioteca\.length === 0 \? null : montaMarioneta\(cargado, biblioteca\)/.test(comun) &&
+    /if \(de === null\) return null;/.test(comun);
+  comprobar(
+    'Aventurero.tsx nunca pide t-pose ni reproduce sin marioneta, y la monta y la pinta lo común, que sin clips no monta nada ni pinta nada',
+    nuncaEnT(codigoDelAventurero, codigoDeLaMarionetaComun),
+  );
+  comprobar(
+    'se ve fallar: un <Marioneta> que pinta sin marioneta, o un montaje que no mira si hay biblioteca, cae',
+    !nuncaEnT(codigoDelAventurero, codigoDeLaMarionetaComun.replace('if (de === null) return null;', '')) &&
+      !nuncaEnT(codigoDelAventurero, codigoDeLaMarionetaComun.replace('biblioteca.length === 0 ? null : ', '')),
+  );
   /* Vacunas del barrido: un fuente sin React, con Vector3 en props o con prioridad en useFrame. */
   comprobar('se ve fallar: un fuente con `position={new THREE.Vector3()}` cae, y una terna pasa', CON_VECTOR.test('<mesh position={new THREE.Vector3(1, 2, 3)} />') && !CON_VECTOR.test('<mesh position={[1, 2, 3]} />'));
   comprobar('se ve fallar: un `useFrame(() => {}, 1)` cae', CON_PRIORIDAD.test('useFrame((s) => { s.x; }, 1);'));

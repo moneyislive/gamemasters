@@ -11,10 +11,11 @@
  *
  * ═══ QUÉ SE REUTILIZA, QUE ES TODO ═══
  *
- * La misma marioneta del Muelle y de La Linde Alta (`aventureros/marioneta.ts`), el mismo
- * cargador (`embarcadero/cargar.ts`), la misma tabla de figuras y los mismos clips. Aquí no se
- * modela nada nuevo: lo único propio es CUÁNDO anda, cuándo corre, cuándo está quieta y a qué
- * ritmo.
+ * La misma marioneta del Muelle y de La Linde Alta (`aventureros/marioneta.ts`), traída, montada
+ * y pintada con lo común (`usarLaFigura`, `usarMarioneta` y `<Marioneta>`, de
+ * `comun/marioneta.tsx`), la misma tabla de figuras y los mismos clips. Aquí no se modela nada
+ * nuevo: lo único propio es CUÁNDO anda, cuándo corre, cuándo está quieta y a qué ritmo, y eso
+ * está en `mueveAQuienAnda`, que es también lo que mueve a los demás (`los-demas.tsx`).
  *
  * ═══ NO SABE QUIÉN LA MUEVE ═══
  *
@@ -45,18 +46,18 @@
  * cabeza lleva sus corazones, sin nombre, en una placa como la de los demás; en primera persona no
  * se ven, y por eso los dice también el cartel del canal de cada cliente.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
-import { cargadorPara } from '../embarcadero/cargar';
-import type { AventureroCargado } from '../embarcadero/cargar';
 import { figuraQueSePinta } from '../embarcadero/figuras';
 import type { Traer } from '../embarcadero/tipos';
-import { desmontaMarioneta, giroCorto, montaMarioneta, reproduce } from '../aventureros/marioneta';
-import type { Marioneta } from '../aventureros/marioneta';
+import { giroCorto, reproduce } from '../aventureros/marioneta';
+import type { Marioneta as MarionetaMontada } from '../aventureros/marioneta';
+import { Marioneta, usarLaFigura, usarMarioneta } from '../comun/marioneta';
 import { giroDeLaMarioneta } from './camaras';
 import type { ClienteDelCanal } from './canal-de-botas';
+import type { ComoVaEnLaRefriega } from './refriega';
 import { ALTURA_DEL_ROTULO, altoDelRotulo, geometriaDeLosCorazones, ponerLosCorazones } from './rotulo';
 import { clipDelPaso, ritmoDelClip } from './zancada';
 
@@ -101,6 +102,96 @@ export interface QuienAndaProps {
   readonly cliente?: { readonly current: ClienteDelCanal | null };
 }
 
+/**
+ * LO QUE UNA MARIONETA QUE ANDA RECUERDA ENTRE FOTOGRAMAS: hacia dónde mira de verdad, y de qué
+ * montaje. Una marioneta nueva —otra figura, o la misma vuelta a montar— mira a su rumbo de golpe.
+ */
+export interface RumboPintado {
+  de: MarionetaMontada | null;
+  ahora: number | null;
+}
+
+/** Dónde anda y a qué paso, que es lo que dice la pose de quien pasea y la foto de cualquiera de los demás. */
+export interface PasoQueSePinta {
+  readonly x: number;
+  readonly z: number;
+  readonly rumbo: number;
+  readonly velocidad: number;
+}
+
+/**
+ * LA MARIONETA DE QUIEN ANDA, EN UN FOTOGRAMA: se enseña —o parpadea—, se pone en su sitio, se
+ * vuelve hacia su rumbo y toca el clip que manda.
+ *
+ * Es la misma para quien pasea y para los demás (`los-demas.tsx`): estuvo escrita dos veces, línea a
+ * línea, y lo único distinto era de dónde sale la pose y a qué altura se pinta, que es lo que llega
+ * por parámetro. Así un arreglo del paso llega a todas las figuras que andan y no sólo a la propia.
+ */
+export function mueveAQuienAnda(
+  m: MarionetaMontada,
+  g: THREE.Group,
+  quien: PasoQueSePinta,
+  y: number,
+  como: ComoVaEnLaRefriega | null,
+  rumbo: RumboPintado,
+  dt: number,
+): void {
+  /* Intocable, parpadea: ver `refriega.ts`. */
+  g.visible = como === null || como.seVe;
+  g.position.set(quien.x, y, quien.z);
+
+  /*
+   * ═══ EL RUMBO SE ALCANZA, NO SE COPIA ═══
+   *
+   * Se gira hacia él por el camino CORTO —`giroCorto`, el mismo del Muelle—, que es lo que
+   * evita la vuelta larga al cruzar el norte.
+   */
+  if (rumbo.de !== m) {
+    rumbo.de = m;
+    rumbo.ahora = null;
+  }
+  const antes = rumbo.ahora;
+  let ahora: number;
+  if (antes === null) {
+    ahora = quien.rumbo;
+  } else {
+    const falta = giroCorto(antes, quien.rumbo);
+    const paso = Math.min(Math.abs(falta), LO_QUE_SE_VUELVE * dt) * Math.sign(falta);
+    ahora = antes + paso;
+  }
+  rumbo.ahora = ahora;
+  /*
+   * ═══ Y MIRANDO A SU RUMBO, QUE NO ES SUMARLE MEDIA VUELTA ═══
+   *
+   * Aquí ponía `+ Math.PI`, y funciona mirando al norte y al sur. Al este y al oeste hace lo
+   * contrario de lo que debe, y el aventurero anda de espaldas sin que falle nada. La cuenta
+   * buena —y el porqué— están en `giroDeLaMarioneta`.
+   */
+  g.rotation.y = giroDeLaMarioneta(ahora);
+
+  /*
+   * ═══ QUÉ CLIP TOCA, Y A QUÉ RITMO ═══
+   *
+   * De la velocidad MEDIDA entre los dos últimos tics: contra una pared es cero aunque se
+   * pulse, y la figura se queda quieta. El ritmo se le pone a la acción de ese clip y sólo a
+   * ella: si el clip faltara, `reproduce` cae en el reposo, y el reposo a ritmo de carrera
+   * sería un muñeco temblando. Se asigna `timeScale` a pelo, y no con
+   * `setEffectiveTimeScale`, porque ésta quita el acompasado del fundido —el `warp` que
+   * `crossFadeFrom` pone al cambiar de clip— y el paso de andar a correr daría un tirón.
+   */
+  const gesto = como?.gesto ?? null;
+  if (como !== null && gesto !== null) {
+    /* Un gesto de la refriega manda sobre el paso mientras dura; el mezclador cuenta en segundos. */
+    reproduce(m, gesto.clip, gesto.bucle, gesto.desde / 1000, como.a / 1000);
+  } else {
+    const clip = clipDelPaso(quien.velocidad);
+    reproduce(m, clip, true, 0, 0);
+    const accion = m.acciones.get(clip);
+    if (accion !== undefined && accion === m.actual) accion.timeScale = ritmoDelClip(clip, quien.velocidad);
+  }
+  m.mezclador.update(dt);
+}
+
 export function QuienAnda({
   traer,
   asiento,
@@ -110,12 +201,8 @@ export function QuienAnda({
   alFallar,
   cliente,
 }: QuienAndaProps): JSX.Element | null {
-  const [cargada, setCargada] = useState<AventureroCargado | null>(null);
-  const [biblioteca, setBiblioteca] = useState<readonly THREE.AnimationClip[]>([]);
-  const [montada, setMontada] = useState<THREE.Object3D | null>(null);
-  const marioneta = useRef<Marioneta | null>(null);
   const grupo = useRef<THREE.Group>(null);
-  const rumboAhora = useRef<number | null>(null);
+  const rumbo = useRef<RumboPintado>({ de: null, ahora: null });
   const placa = useRef<THREE.Group>(null);
   const corazonesPintados = useRef<string | null>(null);
   const camera = useThree((s) => s.camera);
@@ -135,53 +222,13 @@ export function QuienAnda({
   /*
    * LA FIGURA Y LOS CLIPS, con su propia red y sin tumbar nada si no llegan. Un tablero sin
    * aventurero se sigue jugando; lo que no puede es dejar la escena a medias. Es el mismo trato
-   * que tienen los dados, el reloj y el pack.
+   * que tienen los dados, el reloj y el pack. Lo que no llega se le dice a la escena, que sabe si
+   * eso tumba algo (Las Lindes) o sólo se dice por consola (el Burgo). Y si llega sin `reposo-a`,
+   * no hay marioneta —llegaría en T— y lo dice `usarMarioneta`.
    */
   const laFigura = figuraQueSePinta(asiento, figura);
-  useEffect(() => {
-    let vivo = true;
-    const cargador = cargadorPara(traer);
-    void cargador
-      .aventurero(laFigura)
-      .then((a) => {
-        if (vivo) setCargada(a);
-      })
-      .catch((e: unknown) => {
-        alFallar?.(e instanceof Error ? e.message : String(e));
-      });
-    void cargador
-      .animaciones()
-      .then((clips) => {
-        if (vivo) setBiblioteca(clips);
-      })
-      .catch((e: unknown) => {
-        alFallar?.(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      vivo = false;
-    };
-  }, [alFallar, laFigura, traer]);
-
-  useEffect(() => {
-    if (cargada === null || biblioteca.length === 0) return;
-    const m = montaMarioneta(cargada, biblioteca);
-    if (m === null) {
-      /*
-       * Sin `reposo-a` no hay marioneta: la figura llegaría en T. Se dice, porque un respaldo
-       * mudo es un fallo que nadie ve — la misma regla que en La Linde Alta.
-       */
-      console.warn(`La figura ${laFigura} ha llegado sin el clip de reposo: no se pinta a quien anda.`);
-      return;
-    }
-    marioneta.current = m;
-    setMontada(m.raiz);
-    rumboAhora.current = null;
-    return () => {
-      desmontaMarioneta(m);
-      marioneta.current = null;
-      setMontada(null);
-    };
-  }, [biblioteca, cargada, laFigura]);
+  const { cargado, biblioteca } = usarLaFigura(traer, laFigura, (_, motivo) => alFallar?.(motivo));
+  const marioneta = usarMarioneta(cargado, biblioteca, 'no se pinta a quien anda');
 
   useFrame((_, dt) => {
     const quien = pose.current;
@@ -205,68 +252,15 @@ export function QuienAnda({
       r.scale.setScalar(altoDelRotulo(camera.position.distanceTo(r.position), campo));
     }
 
-    const m = marioneta.current;
     const g = grupo.current;
-    if (m === null || g === null) return;
-
-    /* Intocable, parpadea: ver `refriega.ts`. */
-    g.visible = como === null || como.seVe;
-    g.position.set(quien.x, quien.y, quien.z);
-
-    /*
-     * ═══ EL RUMBO SE ALCANZA, NO SE COPIA ═══
-     *
-     * Se gira hacia él por el camino CORTO —`giroCorto`, el mismo del Muelle—, que es lo que
-     * evita la vuelta larga al cruzar el norte.
-     */
-    const rumbo = rumboAhora.current;
-    if (rumbo === null) {
-      rumboAhora.current = quien.rumbo;
-    } else {
-      const falta = giroCorto(rumbo, quien.rumbo);
-      const paso = Math.min(Math.abs(falta), LO_QUE_SE_VUELVE * dt) * Math.sign(falta);
-      rumboAhora.current = rumbo + paso;
-    }
-    /*
-     * ═══ Y MIRANDO A SU RUMBO, QUE NO ES SUMARLE MEDIA VUELTA ═══
-     *
-     * Aquí ponía `+ Math.PI`, y funciona mirando al norte y al sur. Al este y al oeste hace lo
-     * contrario de lo que debe, y el aventurero anda de espaldas sin que falle nada. La cuenta
-     * buena —y el porqué— están en `giroDeLaMarioneta`.
-     */
-    g.rotation.y = giroDeLaMarioneta(rumboAhora.current ?? quien.rumbo);
-
-    /*
-     * ═══ QUÉ CLIP TOCA, Y A QUÉ RITMO ═══
-     *
-     * De la velocidad MEDIDA entre los dos últimos tics: contra una pared es cero aunque se
-     * pulse, y la figura se queda quieta. El ritmo se le pone a la acción de ese clip y sólo a
-     * ella: si el clip faltara, `reproduce` cae en el reposo, y el reposo a ritmo de carrera
-     * sería un muñeco temblando. Se asigna `timeScale` a pelo, y no con
-     * `setEffectiveTimeScale`, porque ésta quita el acompasado del fundido —el `warp` que
-     * `crossFadeFrom` pone al cambiar de clip— y el paso de andar a correr daría un tirón.
-     */
-    const gesto = como?.gesto ?? null;
-    if (como !== null && gesto !== null) {
-      /* Un gesto de la refriega manda sobre el paso mientras dura; el mezclador cuenta en segundos. */
-      reproduce(m, gesto.clip, gesto.bucle, gesto.desde / 1000, como.a / 1000);
-    } else {
-      const clip = clipDelPaso(quien.velocidad);
-      reproduce(m, clip, true, 0, 0);
-      const accion = m.acciones.get(clip);
-      if (accion !== undefined && accion === m.actual) accion.timeScale = ritmoDelClip(clip, quien.velocidad);
-    }
-    m.mezclador.update(dt);
+    if (marioneta === null || g === null) return;
+    mueveAQuienAnda(marioneta, g, quien, quien.y, como, rumbo.current, dt);
   });
 
   if (enPrimeraPersona) return null;
   return (
     <>
-      {montada === null ? null : (
-        <group ref={grupo}>
-          <primitive object={montada} />
-        </group>
-      )}
+      <Marioneta de={marioneta} grupo={grupo} />
       {corazones === null ? null : (
         <group ref={placa} visible={false}>
           <mesh geometry={corazones} material={tinta} />

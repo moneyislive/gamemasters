@@ -37,7 +37,7 @@
  * reloj de `useFrame`. El primero y el último los lleva el gancho común de
  * `comun/arranque.ts`, el mismo de las demás escenas.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -50,8 +50,8 @@ import { clipQueToca, nacer, siguiente } from '../embarcadero/gestos';
 import type { EstadoDeAventurero } from '../embarcadero/gestos';
 import { colorDeAsiento } from '../embarcadero/tema';
 import type { PropsDelEmbarcadero } from '../embarcadero/tipos';
-import { desmontaMarioneta, giroCorto, montaMarioneta, reproduce } from '../aventureros/marioneta';
-import type { Marioneta } from '../aventureros/marioneta';
+import { giroCorto, reproduce } from '../aventureros/marioneta';
+import { Marioneta, usarMarioneta } from '../comun/marioneta';
 import { rutaDelTablero } from '../ruta-de-modelos';
 import { abrirGlb } from '../embarcadero/cargar';
 import { usarArranqueYMedida } from '../comun/arranque';
@@ -527,34 +527,25 @@ function UnoEnSuSitio({
   readonly figuras: ReadonlyMap<FiguraId, AventureroCargado>;
   readonly biblioteca: readonly THREE.AnimationClip[];
   readonly semilla: number;
-}): JSX.Element | null {
-  const cargada = figuras.get(figura) ?? null;
-  const marioneta = useRef<Marioneta | null>(null);
+}): JSX.Element {
+  /*
+   * La marioneta, con lo común (`comun/marioneta.tsx`). Sin `reposo-a` no hay marioneta que valga,
+   * y callarlo deja un lobby con la mesa puesta y NADIE de pie —se lee como que no se ha sentado
+   * nadie—: lo dice `usarMarioneta`, como decía esto.
+   */
+  const marioneta = usarMarioneta(figuras.get(figura), biblioteca);
   const grupo = useRef<THREE.Group>(null);
   const estado = useRef<EstadoDeAventurero | null>(null);
-  const [montada, setMontada] = useState<THREE.Object3D | null>(null);
 
-  useEffect(() => {
-    if (cargada === null || biblioteca.length === 0) return;
-    const m = montaMarioneta(cargada, biblioteca);
-    if (m === null) {
-      /*
-       * Sin `reposo-a` no hay marioneta que valga, y callarlo deja un lobby con la
-       * mesa puesta y NADIE de pie: se lee como que no se ha sentado nadie. Un
-       * respaldo mudo es un fallo que no se ve.
-       */
-      console.warn(`La figura ${figura} ha llegado sin el clip de reposo: no se pinta.`);
-      return;
-    }
-    marioneta.current = m;
-    setMontada(m.raiz);
-    estado.current = nacer(semilla, 0, 'quieto', 0, presente);
-    return () => {
-      desmontaMarioneta(m);
-      marioneta.current = null;
-      setMontada(null);
-    };
-  }, [biblioteca, cargada, figura, presente, semilla]);
+  /*
+   * Cada marioneta nace con su estado: quieta, en su sitio, y presente o no; y vuelve a nacer si
+   * cambia la presencia o la semilla, como hacía cuando esto montaba la figura entera otra vez por
+   * eso —ahora ya no se clona para nacer—. En un efecto de maquetación, que corre antes de cualquier
+   * fotograma: el primero que pinte una marioneta nueva ya tiene su estado, y no el de la anterior.
+   */
+  useLayoutEffect(() => {
+    if (marioneta !== null) estado.current = nacer(semilla, 0, 'quieto', 0, presente);
+  }, [marioneta, presente, semilla]);
 
   /* La ausencia y la vuelta entran por la misma puerta que todo lo demás. */
   const estabaPresente = useRef(presente);
@@ -567,7 +558,7 @@ function UnoEnSuSitio({
   }, [presente]);
 
   useFrame((reloj, dt) => {
-    const m = marioneta.current;
+    const m = marioneta;
     const e = estado.current;
     if (m === null || e === null) return;
     const ahora = reloj.clock.elapsedTime;
@@ -584,14 +575,12 @@ function UnoEnSuSitio({
     g.rotation.y += giroCorto(g.rotation.y, sitio.giro) * Math.min(1, dt * 6);
   });
 
-  if (montada === null) return null;
   return (
-    <group ref={grupo}>
-      <primitive object={montada} />
+    <Marioneta de={marioneta} grupo={grupo}>
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[ALTURA_DE_UNA_PERSONA * 0.34, 20]} />
         <meshBasicMaterial color={color} transparent opacity={esLocal ? 0.55 : 0.32} />
       </mesh>
-    </group>
+    </Marioneta>
   );
 }
