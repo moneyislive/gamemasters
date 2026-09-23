@@ -17,14 +17,21 @@
  * 'tablero'`, su vista y sus opciones no cambian, y `ElTableroEnLinea` sigue
  * pintando cualquier arcade de fuera con tablero.
  *
- * ═══ LO QUE SE REUTILIZA DEL MUEBLE GENÉRICO, Y POR QUÉ ═══
+ * ═══ LO QUE SE REUTILIZA DEL MUEBLE GENÉRICO Y DE LA PLATAFORMA, Y POR QUÉ ═══
  *
- * La barra de la mesa, la línea del turno, el aviso, los botones de opción y la
- * crónica son los de `tablero-en-linea.tsx`, importados y no copiados: la barra ya
- * se separó sola una vez cuando estuvo escrita dos veces, y una tercera copia con
- * la identidad nueva —diez estilos— sería una promesa que se rompe sola. Lo único
- * que esta pantalla pinta con sus manos es el lienzo, el telón mientras el modelo
- * llega, la nota del respaldo y la hoja de «¿a quién?».
+ * La línea del turno, el aviso, los botones de opción y la crónica son los de
+ * `tablero-en-linea.tsx`, importados y no copiados: la barra ya se separó sola una
+ * vez cuando estuvo escrita dos veces, y una tercera copia con la identidad nueva
+ * —diez estilos— sería una promesa que se rompe sola.
+ *
+ * Y lo que es de cualquier mesa en tres dimensiones viene del contrato de pintor de
+ * la app (`pintor-propio.tsx`, el espejo de `LoQueVeElPintor` del escritorio): el
+ * vestíbulo de abrir o entrar con su plazo, el latido de la cuenta atrás, los nombres,
+ * la barra de la mesa ya montada, la red bajo el lienzo, el telón y la letra de la nota
+ * del respaldo. Estaban escritos aquí, en el Burgo y en Las Lindes, y la tercera copia
+ * ya se había quedado sin plazo y sin parte de fallos. Lo que esta pantalla pinta con
+ * sus manos es el delta: el lienzo, la mano, el mazo, las hojas de «¿a quién?», el
+ * pregón, el componedor y el marcador, y su propio respaldo, que los lleva encima.
  *
  * ═══ EL TABLERO SE MIRA DE CERCA, Y ESO SON TRES COSAS Y NO UNA ═══
  *
@@ -123,21 +130,9 @@
  * mesa normal no se pasa nada y no se abre ningún socket.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
 /*
  * `three` entra aquí por lo mismo que en `muelle-escena.tsx` y `escena-peonza.tsx`:
  * el `Canvas` sigue saliendo de `tres/Lienzo`, que es lo que la regla del §7
@@ -148,9 +143,7 @@ import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
-/* Instala los arcades del binario, por si se llega aquí por enlace directo. Ver `pintar.tsx`. */
-import '../../../shared/arcade/juegos';
+import { RIBERAS } from '../../../shared/arcade/juegos';
 import { opcionesSueltas, tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
 import {
   barraEnTres,
@@ -251,14 +244,11 @@ import { rutaDeLosDados, rutaDelTablero } from '../../../escenas/ruta-de-modelos
 import type { Sitio } from '../../../escenas/sitios';
 import { Canvas } from '../tres/Lienzo';
 import { decodificaImagenes, texturasDelTablero } from '../tres/texturas-nativas';
-import { apuntarFallo } from '../parte-de-fallos';
-import { Component } from 'react';
-import type { ErrorInfo, ReactNode } from 'react';
 import { conAlfa } from '../tema';
 import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import type { CanalDeBotas } from '../../../escenas/paseo/mesa-de-botas';
-import { direccionDelCanal, usarMesaDeArcade } from './mesa';
-import type { MesaVista, OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
+import { direccionDelCanal } from './mesa';
+import type { OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
 
 /**
  * EL CAMPO VERTICAL DE LA CÁMARA, en radianes: los 45° del `fov` del `Canvas` de la mesa.
@@ -268,13 +258,11 @@ import type { MesaVista, OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
 const CAMPO_DE_LA_CAMARA = (45 * Math.PI) / 180;
 import { usarMiradorTactil } from './mirador-tactil';
 import { BOTON, LETRA, RADIO, SALA } from './muebles';
-import { Pantalla } from './piezas';
-import { PLAZOS } from './plazos';
+import { ElTelon, ESTILOS_DEL_PINTOR, LaMesaDeUnPintor, RedDelLienzo } from './pintor-propio';
+import type { LoQueVeElPintor } from './pintor-propio';
 import { Retablo } from './retablo';
 import {
-  BarraDeLaMesa,
   ElAviso,
-  ESTILOS_DE_LA_MESA,
   LaCronica,
   hayAlgoQuePintar,
   LasOpciones,
@@ -446,234 +434,34 @@ function textoDelFallo(fallo: unknown): string {
 // La pantalla
 // ---------------------------------------------------------------------------
 
-/** Pinta la mesa de Riberas que pida la ruta, con el delta en tres dimensiones. */
+/**
+ * Pinta la mesa de Riberas, con el delta en tres dimensiones.
+ *
+ * La pantalla entera hasta que hay mesa —el vestíbulo con su plazo, la rueda de «Hablando con la
+ * mesa…»— y lo que es de cualquier mesa —el latido, los nombres, la barra— es de la plataforma
+ * (`LaMesaDeUnPintor`). Con la constante y no con el parámetro de la ruta, que es lo que esta
+ * pantalla leía antes: `quienPinta` ya casó el id contra `LOS_QUE_PINTA` antes de montarla, así que
+ * la mesa es la de Riberas, y el parámetro sólo presta el nombre si falta el manifiesto.
+ */
 export default function ElTableroEnTresPorDentro(): JSX.Element {
-  const { arcade } = useLocalSearchParams<{ arcade?: string }>();
-  const id = typeof arcade === 'string' ? arcade : '';
-  const manifiesto = manifiestoDeArcadeSiExiste(id);
-  const mesa = usarMesaDeArcade(id);
-  const [nombre, ponerNombre] = useState('');
-  const [codigo, ponerCodigo] = useState('');
-  const [plazo, ponerPlazo] = useState(0);
-  /* El área segura, leída UNA vez y aquí arriba: es un hook y los hooks no se saltan. */
-  const bordes = useSafeAreaInsets();
-  const relleno = { paddingTop: bordes.top + 28, paddingBottom: bordes.bottom + 28 };
-
-  /*
-   * EL LATIDO DE LA CUENTA ATRÁS, el mismo que en `tablero-en-linea.tsx` y por lo
-   * mismo: el vencimiento viaja como instante absoluto y quien resta es la pantalla.
-   * Cada segundo en el último minuto; cada minuto el resto del tiempo, también sin
-   * plazo, que es cuando se enseña «lleva N min».
-   */
-  const [latido, latir] = useState(0);
-  const venceEn = mesa.mesa?.venceEn ?? null;
-  useEffect(() => {
-    const quedan = venceEn === null ? Infinity : venceEn - Date.now();
-    const cada = quedan > 0 && quedan < 60_000 ? 1000 : 60_000;
-    const reloj = setTimeout(() => latir((n) => n + 1), cada);
-    return () => clearTimeout(reloj);
-  }, [venceEn, latido]);
-
-  const nombres = useMemo(() => {
-    const tabla = new Map<string, string>();
-    for (const a of mesa.mesa?.asientos ?? []) tabla.set(a.id, a.nombre);
-    return tabla;
-  }, [mesa.mesa?.asientos]);
-
-  if (mesa.fase === 'yendo') {
-    return (
-      <Pantalla hueco={28} estilo={relleno}>
-        <View style={ESTILOS_DE_LA_MESA.centro}>
-          {/* El acento aquí sí: la rueda es el piloto de «está pasando algo». */}
-          <ActivityIndicator color={SALA.acento} />
-          <Text style={ESTILOS_DE_LA_MESA.texto}>Hablando con la mesa…</Text>
-        </View>
-      </Pantalla>
-    );
-  }
-
-  const sinNombre = nombre.trim().length === 0;
-  const noPuedeAbrir = mesa.quieto || sinNombre;
-  const noPuedeEntrar = noPuedeAbrir || codigo.trim().length === 0;
-
-  if (mesa.fase === 'fuera' || mesa.mesa === null) {
-    /*
-     * EL VESTÍBULO, con las piezas y los estilos del mueble genérico. Por el Muelle
-     * casi nadie llega aquí sin mesa —la tarjeta de la Sala lleva al embarcadero y
-     * el embarcadero zarpa con la mesa ya sentada—, pero un enlace directo, un
-     * asiento caducado o «Salir» acaban en esta rama, y una rama que no se puede
-     * usar es una pantalla en blanco con otro nombre.
-     */
-    return (
-      <Pantalla hueco={28} estilo={relleno}>
-        <View style={ESTILOS_DE_LA_MESA.centro}>
-          <Text style={ESTILOS_DE_LA_MESA.titulo}>{manifiesto?.nombre ?? id}</Text>
-          <Text style={ESTILOS_DE_LA_MESA.texto}>{manifiesto?.gancho ?? ''}</Text>
-          <TextInput
-            style={ESTILOS_DE_LA_MESA.campo}
-            placeholder="Tu nombre en la mesa"
-            placeholderTextColor={SALA.tenue}
-            value={nombre}
-            onChangeText={ponerNombre}
-            maxLength={24}
-            accessibilityLabel="Tu nombre en la mesa"
-          />
-          <Text style={ESTILOS_DE_LA_MESA.rotuloDeGrupo}>cuánto se espera por turno</Text>
-          <View
-            style={ESTILOS_DE_LA_MESA.plazos}
-            accessibilityRole="radiogroup"
-            accessibilityLabel="Cuánto se espera por turno"
-          >
-            {PLAZOS.map((p, i) => (
-              <Pressable
-                key={p.rotulo}
-                style={[ESTILOS_DE_LA_MESA.plazo, i === plazo ? ESTILOS_DE_LA_MESA.plazoElegido : null]}
-                onPress={() => ponerPlazo(i)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: i === plazo }}
-                accessibilityLabel={`Plazo por turno: ${p.rotulo}`}
-                accessibilityHint={p.ayuda}
-              >
-                <Text
-                  style={
-                    i === plazo ? ESTILOS_DE_LA_MESA.plazoRotuloElegido : ESTILOS_DE_LA_MESA.plazoRotulo
-                  }
-                >
-                  {p.rotulo}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={ESTILOS_DE_LA_MESA.ayuda}>{PLAZOS[plazo]?.ayuda ?? ''}</Text>
-          <Pressable
-            style={[
-              ESTILOS_DE_LA_MESA.boton,
-              noPuedeAbrir ? ESTILOS_DE_LA_MESA.botonQuieto : ESTILOS_DE_LA_MESA.botonVivo,
-            ]}
-            disabled={noPuedeAbrir}
-            onPress={() => mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos)}
-            accessibilityRole="button"
-            accessibilityLabel="Abrir una mesa"
-            accessibilityState={{ disabled: noPuedeAbrir }}
-          >
-            <Text
-              style={[
-                ESTILOS_DE_LA_MESA.botonRotulo,
-                noPuedeAbrir ? ESTILOS_DE_LA_MESA.botonRotuloQuieto : ESTILOS_DE_LA_MESA.botonRotuloVivo,
-              ]}
-            >
-              Abrir una mesa
-            </Text>
-          </Pressable>
-          <Text style={ESTILOS_DE_LA_MESA.alternativa}>o entra con el código que te hayan dicho</Text>
-          <TextInput
-            style={ESTILOS_DE_LA_MESA.campo}
-            placeholder="CÓDIGO"
-            placeholderTextColor={SALA.tenue}
-            value={codigo}
-            onChangeText={ponerCodigo}
-            autoCapitalize="characters"
-            maxLength={8}
-            accessibilityLabel="Código de la mesa"
-          />
-          <Pressable
-            style={[ESTILOS_DE_LA_MESA.boton, noPuedeEntrar ? ESTILOS_DE_LA_MESA.botonQuieto : null]}
-            disabled={noPuedeEntrar}
-            onPress={() => mesa.entrar(codigo, nombre.trim())}
-            accessibilityRole="button"
-            accessibilityLabel="Sentarse en la mesa de ese código"
-            accessibilityState={{ disabled: noPuedeEntrar }}
-          >
-            <Text
-              style={[
-                ESTILOS_DE_LA_MESA.botonRotulo,
-                noPuedeEntrar ? ESTILOS_DE_LA_MESA.botonRotuloQuieto : null,
-              ]}
-            >
-              Sentarse
-            </Text>
-          </Pressable>
-          <ElAviso texto={mesa.aviso} />
-        </View>
-      </Pantalla>
-    );
-  }
-
-  return (
-    <LaMesaEnTres
-      mesa={mesa}
-      vista={mesa.mesa}
-      juego={manifiesto?.nombre ?? id}
-      nombres={nombres}
-      arriba={bordes.top}
-      abajo={bordes.bottom}
-    />
-  );
+  return <LaMesaDeUnPintor arcade={RIBERAS} Pintor={LaMesaEnTres} />;
 }
 
 // ---------------------------------------------------------------------------
 // La mesa, sentados
 // ---------------------------------------------------------------------------
 
-type LaMesa = ReturnType<typeof usarMesaDeArcade>;
-
 /**
- * Lo que la pantalla pinta con una mesa delante. Componente aparte para que sus
- * hooks —el catálogo, el gesto, lo cogido— no queden detrás de los `return` de
- * arriba, que es la regla que `verify:app` lee con el árbol de TypeScript.
- */
-/**
- * LA RED BAJO EL LIENZO: si el delta revienta al PINTAR, se juega sobre el retablo.
+ * EL PINTOR DE RIBERAS: lo que la pantalla pinta con una mesa delante, con lo que le da el
+ * contrato (`LoQueVeElPintor`). Componente aparte para que sus hooks —el catálogo, el gesto, lo
+ * cogido— no queden detrás de los `return` del vestíbulo, que es la regla que `verify:app` lee con
+ * el árbol de TypeScript.
  *
- * Los tres respaldos de la pantalla —modelo que no llega, más de cuatro colonos, vista
- * sin islas— se deciden ANTES de montar el `Canvas`. Lo que ninguno recoge es un fallo
- * dentro del propio lienzo: una textura que expo-gl no quiere, un sombreador que no
- * compila en esa GPU, un modelo que se queda sin memoria. La primera vez que el tablero
- * 3D se monta en un teléfono real es la víspera de una partida, y ahí un `throw` en el
- * render no puede costar la partida: se apunta —el parte de fallos lo enseñará al
- * volver a abrir, con su motivo— y la mesa sigue sobre el tablero de siempre.
- *
- * Es una clase porque React no da otra forma de recoger un `throw` de render, y avisa
- * hacia arriba en vez de pintar ella el respaldo porque el respaldo necesita la vista, las
- * opciones y la crónica, que viven en la pantalla.
+ * La red bajo el lienzo —si el delta revienta AL PINTAR, se apunta y se juega sobre el retablo—
+ * es la del contrato (`RedDelLienzo`); los tres respaldos de esta pantalla —modelo que no llega,
+ * más de cuatro colonos, vista sin islas— se siguen decidiendo aquí, ANTES de montar el `Canvas`.
  */
-class RedDelLienzo extends Component<
-  { readonly alCaer: (motivo: string) => void; readonly children: ReactNode },
-  { readonly cayo: boolean }
-> {
-  override state: { readonly cayo: boolean } = { cayo: false };
-
-  static getDerivedStateFromError(): { cayo: boolean } {
-    return { cayo: true };
-  }
-
-  override componentDidCatch(error: unknown, info: ErrorInfo): void {
-    const e = error instanceof Error ? error : new Error(String(error));
-    e.stack = `${e.stack ?? ''}\n— en el lienzo —${info.componentStack ?? ''}`;
-    apuntarFallo(e, 'render', false);
-    this.props.alCaer(e.message);
-  }
-
-  override render(): ReactNode {
-    return this.state.cayo ? null : this.props.children;
-  }
-}
-
-function LaMesaEnTres({
-  mesa,
-  vista,
-  juego,
-  nombres,
-  arriba,
-  abajo,
-}: {
-  mesa: LaMesa;
-  vista: MesaVista;
-  juego: string;
-  nombres: Map<string, string>;
-  arriba: number;
-  abajo: number;
-}): JSX.Element {
+function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeElPintor): JSX.Element {
   const catalogo = usarCatalogoDelTablero();
   /* Si el lienzo cayó una vez en este aparato, esta pantalla no vuelve a montarlo. */
   const [elLienzoCayo, ponerElLienzoCayo] = useState<string | null>(null);
@@ -1404,15 +1192,7 @@ function LaMesaEnTres({
     );
     return (
       <View style={estilos.todo}>
-        <BarraDeLaMesa
-          juego={juego}
-          codigo={vista.codigo}
-          asientos={vista.asientos}
-          salir={mesa.salir}
-          tirar={mesa.tirar}
-          arriba={arriba}
-          deBotas={esMesaDeBotas(vista)}
-        />
+        {laBarra}
         <LineaDelTurno mesa={vista} nombres={nombres} />
         <ElAviso texto={mesa.aviso} />
         {/*
@@ -1428,7 +1208,7 @@ function LaMesaEnTres({
           cambio de pincel. Dice el motivo porque «no se ha podido» sin motivo
           manda a adivinar, y el motivo de verdad casi siempre es la cobertura.
         */}
-        <Text style={estilos.nota} accessibilityRole="alert" accessibilityLiveRegion="polite">
+        <Text style={ESTILOS_DEL_PINTOR.nota} accessibilityRole="alert" accessibilityLiveRegion="polite">
           {nota}
         </Text>
         {/*
@@ -1524,15 +1304,7 @@ function LaMesaEnTres({
      */
     return (
       <View style={estilos.todo}>
-        <BarraDeLaMesa
-          juego={juego}
-          codigo={vista.codigo}
-          asientos={vista.asientos}
-          salir={mesa.salir}
-          tirar={mesa.tirar}
-          arriba={arriba}
-          deBotas={esMesaDeBotas(vista)}
-        />
+        {laBarra}
         <ScrollView
           style={estilos.rio}
           contentContainerStyle={{ paddingBottom: abajo }}
@@ -1566,15 +1338,7 @@ function LaMesaEnTres({
 
   return (
     <View style={estilos.todo}>
-      <BarraDeLaMesa
-        juego={juego}
-        codigo={vista.codigo}
-        asientos={vista.asientos}
-        salir={mesa.salir}
-        tirar={mesa.tirar}
-        arriba={arriba}
-        deBotas={esMesaDeBotas(vista)}
-      />
+      {laBarra}
       <LineaDelTurno mesa={vista} nombres={nombres} />
       <ElAviso texto={mesa.aviso} />
       {/*
@@ -1588,7 +1352,7 @@ function LaMesaEnTres({
 
       <View style={[estilos.cajaDelLienzo, { height: altoDelLienzo }]}>
         {catalogo.que === 'listo' ? (
-          <RedDelLienzo alCaer={ponerElLienzoCayo}>
+          <RedDelLienzo juego={juego} alCaer={ponerElLienzoCayo}>
           {/* A pie, el gemelo apagado: ver `gestoApagado`. */}
           <GestureDetector gesture={aPie ? gestoApagado : gesto}>
             {/*
@@ -1712,12 +1476,7 @@ function LaMesaEnTres({
           línea. Nunca coge toques, y no depende del `Canvas`: si el modelo falla,
           esta rama entera se sustituye por el respaldo de arriba.
         */}
-        {catalogo.que === 'llegando' ? (
-          <View style={estilos.telon} pointerEvents="none">
-            <Text style={estilos.lugar}>RIBERAS</Text>
-            <Text style={estilos.espera}>Trayendo el delta…</Text>
-          </View>
-        ) : null}
+        {catalogo.que === 'llegando' ? <ElTelon rotulo="RIBERAS" texto="Trayendo el delta…" /> : null}
 
         {/*
           LA SALIDA DEL ACERCAMIENTO, Y POR QUÉ ES UN BOTÓN Y NO UN GESTO.
@@ -2656,8 +2415,9 @@ function FichaDelColono({
 // ---------------------------------------------------------------------------
 
 /*
- * Sólo lo que esta pantalla pinta con sus manos: el lienzo, el telón, la nota del
- * respaldo y la hoja. Todo lo demás son los estilos del mueble genérico, importados.
+ * Sólo lo que esta pantalla pinta con sus manos: el lienzo, las hojas, el pregón, el
+ * componedor y el marcador. El telón y la nota del respaldo son del contrato de pintor
+ * (`pintor-propio.tsx`), y todo lo demás son los estilos del mueble genérico, importados.
  * Ni un color inventado: los de `SALA` y los alfas que `conAlfa` saca de ellos.
  */
 const estilos = StyleSheet.create({
@@ -2675,30 +2435,6 @@ const estilos = StyleSheet.create({
    */
   cajaDelLienzo: { width: '100%', overflow: 'hidden' },
   lienzo: { flex: 1 },
-  telon: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 28,
-    backgroundColor: SALA.suelo,
-  },
-  lugar: { ...LETRA.rotulo, color: SALA.palabra, fontSize: 18 },
-  espera: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-  /* La nota del respaldo: texto que se lee y no grita, como el aviso de la mesa. */
-  nota: {
-    ...LETRA.cuerpo,
-    color: SALA.tenue,
-    fontSize: 13,
-    lineHeight: 18,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    textAlign: 'center',
-  },
   /*
    * EL BOTÓN DE VOLVER AL TABLERO ENTERO: cromo sobre el lienzo, arriba y a la
    * IZQUIERDA. Que es la única esquina de las cuatro que la propia interfaz no usa.

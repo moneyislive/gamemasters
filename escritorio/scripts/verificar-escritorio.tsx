@@ -3146,8 +3146,12 @@ function elBurgoAPie(): void {
   comprobar('y en «Al hombro» y en «Sus ojos» sí: las cuatro letras, las flechas, Mayúsculas para correr y la tecla para volver', carteles.slice(1).every(diceComoSeAnda), carteles.slice(1));
   comprobar('se ve fallar: un cartel sin la tecla de volver no lo pasa', !diceComoSeAnda((carteles[1] ?? '').replace('1 para volver a la mesa', '')));
 
-  /* ── 2. LAS TRES CÁMARAS: las de Las Lindes, con sus palabras y sus teclas ── */
-  const deLasLindes = sinComentarios(readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8'));
+  /*
+   * ── 2. LAS TRES CÁMARAS: las de Las Lindes, con sus palabras y sus teclas ──
+   * Se leen del controlador de Las Lindes, que es donde viven desde que la app y el escritorio
+   * dejaron de escribirlas cada uno (`escenas/lindes/el-valle-en-la-mesa.ts`).
+   */
+  const deLasLindes = sinComentarios(readFileSync(new URL('../../escenas/lindes/el-valle-en-la-mesa.ts', import.meta.url), 'utf8'));
   const rotulosDeLasLindes = [...deLasLindes.matchAll(/\{ modo: '(mesa|hombro|ojos)', rotulo: '([^']+)'/g)].map((m) => `${m[1] ?? ''}:${m[2] ?? ''}`).join(',');
   const rotulosDelBurgo = LAS_CAMARAS_DEL_BURGO.map((c) => `${c.modo}:${c.rotulo}`).join(',');
   comprobar(

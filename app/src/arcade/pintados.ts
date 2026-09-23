@@ -147,6 +147,16 @@ export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {
    * portada, que es por donde pasa esta tabla.
    */
   [BURGO]: ElBurgoEnTres,
+  /*
+   * LAS LINDES, Y LO QUE UNA FILA DE PINTOR PROPIO TRAE DETRÁS DESDE EL CONTRATO DE PINTOR.
+   *
+   * Las tres filas en tres dimensiones apuntan a su envoltura perezosa (`pantalla-perezosa.tsx`), y
+   * lo que ésa trae es un PINTOR del contrato de la app (`pintor-propio.tsx`): el juego pinta su
+   * escena con `LoQueVeElPintor`, y el vestíbulo con su plazo, el latido, la barra, la red bajo el
+   * lienzo y el respaldo son de la plataforma. Es la promesa que `PINTORES_PROPIOS` le hace al
+   * escritorio, cumplida también aquí: el juego siguiente escribe su fila y su escena, no una
+   * pantalla entera.
+   */
   [LINDES]: LasLindesEnTres,
   /*
    * LA PEONZA, que es la puerta del mueble `escena` de la fase 5 y no un

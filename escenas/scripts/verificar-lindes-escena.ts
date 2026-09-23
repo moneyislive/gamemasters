@@ -2540,6 +2540,8 @@ const elementoDeLaEscena = (texto: string): string => /<Lindes\b[\s\S]*?\/>/.exe
 const fuenteDeLaEscena = leerCodigo('../lindes/Lindes.tsx');
 const fuenteDeLaApp = leerCodigo('../../app/src/arcade/lindes-en-tres-escena.tsx');
 const fuenteDelEscritorio = leerCodigo('../../escritorio/src/lindes-en-tres.tsx');
+/* El controlador que usan las dos: lo que hacían igual, escrito una vez. */
+const fuenteDelControlador = leerCodigo('../lindes/el-valle-en-la-mesa.ts');
 
 paso('La calidad la decide lo que cuesta pintar: el juez de la casa, con el tablero creciendo');
 
@@ -2645,24 +2647,56 @@ paso('La calidad la decide lo que cuesta pintar: el juez de la casa, con el tabl
     fuenteDeLaEscena,
     [fuenteDeLaEscena.replace(' || catalogo === null', ''), fuenteDeLaEscena.replace('m.fotogramas = 0;', '')],
   );
+  /*
+   * ═══ EL JUEZ ES UNO, EN EL CONTROLADOR, Y LOS DOS CLIENTES SE LO PASAN A LA ESCENA ═══
+   *
+   * Esta regla miraba cada cliente por separado —«juzga con `conLaMuestra` y `calidadDelValle`, y
+   * se lo pasa a `<Lindes>`»— porque cada uno llevaba su copia del juez. Desde el controlador de Las
+   * Lindes (`lindes/el-valle-en-la-mesa.ts`, el que usan las dos pantallas) el juez está escrito UNA
+   * vez, y lo que hay que seguir comprando es lo de antes, por los dos extremos: que el controlador
+   * juzgue con la ventana y ponga la calidad y su `alMedir` en lo que va a la escena, y que cada
+   * cliente le pase eso a `<Lindes>` sin pisar la calidad con una escrita a mano ni juzgar por su
+   * cuenta con otra cuenta.
+   */
+  reglaDelFuente(
+    'el controlador de Las Lindes juzga la calidad con lo que mide la escena —la ventana y el juez de la casa— y la pone, con su `alMedir`, en lo que va a la escena',
+    (t) => {
+      const escena = /const escena: LaEscenaDelValle \| null =([\s\S]*?)\};/.exec(t)?.[1] ?? '';
+      return (
+        /conLaMuestra\(muestras\.current, \{ ms: m\.ms, fotogramas: m\.fotogramas \}\)/.test(t) &&
+        /\(antes\) => calidadDelValle\(antes, muestras\.current\)/.test(t) &&
+        /\n\s*calidad,\n/.test(escena) &&
+        /\n\s*alMedir,\n/.test(escena) &&
+        /return \{[^}]*\bescena\b[^}]*\};/.test(t) &&
+        !/\bcalidad:\s*['"](plena|sobria)/.test(t)
+      );
+    },
+    fuenteDelControlador,
+    [
+      fuenteDelControlador.replace(/(\n\s*)calidad,\n/, "$1calidad: 'plena',\n"),
+      fuenteDelControlador.replace(/\n\s*alMedir,\n/, '\n'),
+      fuenteDelControlador.replace('(antes) => calidadDelValle(antes, muestras.current)', '(antes) => antes'),
+    ],
+  );
   for (const [quien, fuente] of [
     ['la app', fuenteDeLaApp],
     ['el escritorio', fuenteDelEscritorio],
   ] as const) {
     reglaDelFuente(
-      `${quien} juzga la calidad con lo que mide la escena y se la pasa: ni «plena» escrita a mano, ni una calidad sin quien la cambie`,
+      `${quien} le pasa a la escena lo que compone el controlador —con la calidad juzgada y su \`alMedir\`— y no la pisa: ni «plena» escrita a mano, ni un juez propio`,
       (t) => {
         const elemento = elementoDeLaEscena(t);
         return (
-          /\bcalidad=\{calidad\}/.test(elemento) &&
-          /\balMedir=\{alMedir\}/.test(elemento) &&
-          /conLaMuestra\(muestras\.current, \{ ms: m\.ms, fotogramas: m\.fotogramas \}\)/.test(t) &&
-          /\(antes\) => calidadDelValle\(antes, muestras\.current\)/.test(t) &&
+          /^<Lindes\s+\{\.\.\.valle\.escena\}/.test(elemento) &&
+          !/\b(calidad|alMedir)=/.test(elemento) &&
+          /\bconst valle = usarElValleEnLaMesa\(\{/.test(t) &&
+          /import \{[^}]*\busarElValleEnLaMesa\b[^}]*\} from '(?:\.\.\/)+escenas\/lindes\/el-valle-en-la-mesa';/.test(t) &&
+          !/\b(calidadDelValle|conLaMuestra|juzgarCalidad)\b/.test(t) &&
           !/\bcalidad=["'{]\s*['"]?(plena|sobria)/.test(t)
         );
       },
       fuente,
-      [fuente.replace('calidad={calidad}', 'calidad="plena"'), fuente.replace('alMedir={alMedir}', '')],
+      [fuente.replace('{...valle.escena}', '{...valle.escena}\n calidad="plena"'), fuente.replace('{...valle.escena}', '')],
     );
   }
 }

@@ -125,9 +125,10 @@
  * llegaba a nadie.
  *
  * Así que en la web se escucha además la RUEDA y el arrastre con el botón secundario o
- * con Mayúsculas, que es exactamente lo que ya hacía el escritorio en
- * `escritorio/src/riberas-en-tres.tsx`. No hay aritmética nueva: la rueda entra por
- * `acercando` y el arrastre por `arrastrandoLaMirada`, las dos de `acercar.ts`.
+ * con Mayúsculas, que es exactamente lo que hace el escritorio en la pieza común de sus
+ * lienzos, `escritorio/src/lienzo-propio.tsx` (antes vivía en su pantalla de Riberas). No
+ * hay aritmética nueva: la rueda entra por `acercando` y el arrastre por
+ * `arrastrandoLaMirada`, las dos de `acercar.ts`.
  *
  * Va en un efecto sobre el NODO del lienzo y no en un `onWheel` del `View`: en React
  * Native Web esa propiedad no llega de forma fiable al elemento, y además el oyente
@@ -201,30 +202,37 @@ const EL_RATON_CUENTA_AQUI = Platform.OS === 'web';
  * cruza el tablero entero en otro, y eso no se lee como una conversión mal hecha sino
  * como un zoom roto.
  *
+ * El modo línea se cuenta EN LÍNEAS y no pasando por píxeles: tres líneas son una muesca.
+ * Aquí se convertían a dieciséis píxeles cada una, o sea media muesca, y en Firefox el zoom
+ * iba a la mitad de velocidad sin que nada lo midiera: se nota como que «en Firefox cuesta
+ * más acercarse». El escritorio lo corrigió primero; esto es la misma corrección.
+ *
  * El tope de golpe es por el panel táctil con inercia: un empujón de dos dedos manda
  * una ráfaga larguísima y sin tope salta del aire al suelo de una vez.
  *
  * ═══ Y LOS CUATRO NÚMEROS SON LOS DEL ESCRITORIO, A PROPÓSITO ═══
  *
- * Están escritos igual en `escritorio/src/riberas-en-tres.tsx`. Es una copia y se dice:
- * el sitio donde no estarían copiados es `escenas/acercar.ts`, que está congelado, y la
- * alternativa —ponerlos distintos aquí— es peor de lo que parece, porque son los dos
- * clientes de LA MISMA partida en LA MISMA máquina: la rueda acercaría a dos velocidades
- * según la ventana que se mirase. Si un día se tocan, se tocan en los dos sitios.
+ * Están escritos igual en `escritorio/src/lienzo-propio.tsx`, la pieza común de los lienzos
+ * del escritorio. Es una copia y se dice: el sitio donde no estarían copiados es
+ * `escenas/acercar.ts`, que está congelado, y la alternativa —ponerlos distintos aquí— es
+ * peor de lo que parece, porque son los dos clientes de LA MISMA partida en LA MISMA
+ * máquina: la rueda acercaría a dos velocidades según la ventana que se mirase. Y ya pasó:
+ * el escritorio contó el modo línea en líneas y esta copia se quedó con los dieciséis
+ * píxeles. Por eso `verify:sala` lee los cuatro números de los dos ficheros y los compara:
+ * si un día se tocan, se tocan en los dos sitios o se pone rojo.
  */
 const PIXELES_POR_MUESCA = 100;
-const PIXELES_POR_LINEA = 16;
-const PIXELES_POR_PAGINA = 400;
+const LINEAS_POR_MUESCA = 3;
+const MUESCAS_POR_PAGINA = 4;
 const MUESCAS_DE_GOLPE = 4;
 
 function pasosDeLaRueda(e: WheelEvent): number {
-  const enPixeles =
+  const muescas =
     e.deltaMode === 1
-      ? e.deltaY * PIXELES_POR_LINEA
+      ? e.deltaY / LINEAS_POR_MUESCA
       : e.deltaMode === 2
-        ? e.deltaY * PIXELES_POR_PAGINA
-        : e.deltaY;
-  const muescas = enPixeles / PIXELES_POR_MUESCA;
+        ? e.deltaY * MUESCAS_POR_PAGINA
+        : e.deltaY / PIXELES_POR_MUESCA;
   /* Rueda hacia arriba, más cerca: es lo que hace cualquier mapa, y de ahí el signo. */
   return -Math.min(MUESCAS_DE_GOLPE, Math.max(-MUESCAS_DE_GOLPE, muescas));
 }
