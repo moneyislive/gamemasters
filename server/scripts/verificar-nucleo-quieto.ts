@@ -333,6 +333,51 @@
  * que lo pida, lo que hay que escribir es un timbre más rápido detrás de una
  * interfaz que ya tiene dos implementaciones probadas —la de sondeo y la que
  * revienta— y no un protocolo distinto.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * Y OTRO SELLADO, EL DE LOS ARREGLOS PREVIOS A BOOTS ON BOARD (23-SEP-2026)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * (Entre éste y el quinto hubo uno más, `6924643`, que le puso cota de hondura a
+ * `canonico.ts`; su porqué está en su commit.)
+ *
+ * Se movió UN fichero del núcleo, `server/src/arcade/mesas.ts`, y ninguno del
+ * contrato. Lo que lo motivó son los arreglos que `docs/BOOTS-ON-BOARD.md` §5 y §6
+ * pide antes de bajar al tablero, y ninguno le enseña al núcleo nada de ningún
+ * juego:
+ *
+ *  M · LA MODALIDAD DE LA MESA. `Modalidad = 'normal' | 'botas'`, elegida en
+ *      `abrir` y sin ningún verbo que la cambie (decisión de Miguel del 20-sep), en
+ *      `MesaEnCurso` y en `VistaDeMesa`, persistida sin subir la versión del fichero.
+ *      Es un dato de la MESA y no una regla: no entra en el contexto del movimiento
+ *      ni en el estado, y la misma partida reejecutada da lo mismo en las dos. QUÉ
+ *      JUEGOS LA ADMITEN no lo sabe el núcleo: lo pregunta a `admiteBotas`, que vive
+ *      en `server/src/arcade/modalidades.ts`, fuera del sello y con el registro vacío.
+ *      Y `quienEsLaLlave`, el acceso de sólo lectura para el canal que vendrá: una
+ *      llave y su silla, sin proyectar, sin tic, sin presencia y sin escribir.
+ *  N · LOS TOPES DEL SOBRE, EXIGIDOS EN `mover()`: antes del candado y fuera del
+ *      cronómetro, con `exigirLosTopesDelSobre` de `presupuesto.ts` (que pesa con
+ *      `canonico` y su cota). Sólo se exigían en dos rutas, y cualquier otra puerta
+ *      se los saltaba.
+ *  O · LA LECTURA BARATA. `revisionDe`: todo lo que hace `mirar` —el 404, el tic si
+ *      venció, la presencia— menos proyectar, para que la lectura con `?desde=N`
+ *      compare sin componer vistas que tira. `mirar` y ella comparten
+ *      `ponerAlDiaParaLeer`.
+ *  P · LA MEMORIA. El almacén aprende a leer POR CÓDIGO (`leerUna`, `existe`,
+ *      `viejas`, todos opcionales en la interfaz): la mesa fría se trae del disco
+ *      dentro de su candado, lo frío se desaloja de la memoria —sólo si lo de
+ *      memoria es lo último escrito, sin candado, sin nadie esperando
+ *      (`mientrasSeEspera`) y sin nadie presente—, el barrido de treinta días borra
+ *      del disco sin cargar nada, `codigoLibre` mira el disco, y `barrerAhora` y
+ *      `memoriaDeLasMesas` dejan mirarlo desde fuera. EL FORMATO DEL FICHERO NO
+ *      CAMBIA —versión 2, los mismos campos más `modalidad`—, así que revertir el
+ *      despliegue lee exactamente lo que ésta escribe.
+ *
+ * LO QUE NO SE HA MOVIDO, y es lo que este sello sigue comprando: `shared/arcade/`
+ * byte a byte, `arbitro.ts` también, `server/src/canal/` también, y `azar.ts` y
+ * `canonico.ts` también. El núcleo sigue sin nombrar ningún juego —`botas` es una
+ * modalidad y no un arcade, y la búsqueda de identificadores de abajo lo confirma
+ * contra el registro— y sigue sin importar nada de `juegos/`.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
