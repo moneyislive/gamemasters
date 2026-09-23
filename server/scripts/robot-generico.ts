@@ -182,11 +182,22 @@ export interface PartidaGenerica {
   tics: { metidos: number; aceptados: number };
   /** Cuántas veces cambió de quién es el turno, según las vistas que se miraron. */
   cambiosDeTurno: number;
+  /**
+   * De ésos, cuántos los trajo el RELOJ —un tic que pasó el turno por el ausente— y no un
+   * movimiento de asiento. Se separan porque el reloj hace avanzar una mesa en la que nadie
+   * puede terminar su turno: un «pasar» que no pasa sigue viendo cambiar el turno cada vez que
+   * vence el plazo, y eso no es avance de la partida.
+   */
+  cambiosDeTurnoPorElReloj: number;
   /** ¿Declara el juego de quién es el turno en su vista? */
   declaraTurno: boolean;
   /** Cuántas veces se miró al espectador. */
   miradasDelEspectador: number;
-  /** La cola de la partida: en los últimos `VENTANA_DE_VIDA` aceptados, cuántos cambios de turno, tipos y asientos. */
+  /**
+   * La cola de la partida: en los últimos `VENTANA_DE_VIDA` movimientos de asiento aceptados,
+   * cuántos cambios de turno trajeron ELLOS (los del reloj no cuentan: ver
+   * `cambiosDeTurnoPorElReloj`), cuántos tipos distintos y cuántos asientos movieron.
+   */
   vida: { aceptados: number; cambiosDeTurno: number; tipos: number; asientos: number };
   /** La racha más larga del mismo asiento haciendo el mismo tipo sin que cambie el turno. */
   rachaMasLarga: { quien: AsientoId; tipo: string; largo: number };
@@ -313,8 +324,16 @@ export function jugarConElRobotGenerico(
   let declaraTurno = false;
   let turnoAnterior = '\u0000sin mirar';
   let cambiosDeTurno = 0;
+  let cambiosDeTurnoPorElReloj = 0;
+  /** Cuántos cambios de turno trajo un movimiento de asiento: los que cuentan para la vida. */
+  let cambiosPorJugada = 0;
+  /**
+   * ¿Lo último que cambió la mesa fue un tic? Cada paso acepta como mucho una cosa, y el cambio de
+   * turno se ve en la primera mirada del paso siguiente: así que se le atribuye a eso.
+   */
+  let loUltimoFueElReloj = false;
   let miradasDelEspectador = 0;
-  /** La cola de aceptados: tipo, asiento y cuántos cambios de turno llevaba. Anillo de `VENTANA_DE_VIDA`. */
+  /** La cola de aceptados: tipo, asiento y cuántos cambios de turno por jugada llevaba. Anillo de `VENTANA_DE_VIDA`. */
   const cola: { tipo: string; quien: string; turnos: number }[] = [];
   let enLaCola = 0;
   let racha = { quien: '', tipo: '', largo: 0, turnos: -1 };
@@ -350,6 +369,8 @@ export function jugarConElRobotGenerico(
     const de = turno.de === null ? '\u0000nadie' : turno.de;
     if (de !== turnoAnterior) {
       cambiosDeTurno++;
+      if (loUltimoFueElReloj) cambiosDeTurnoPorElReloj++;
+      else cambiosPorJugada++;
       turnoAnterior = de;
     }
   };
@@ -500,7 +521,8 @@ export function jugarConElRobotGenerico(
   const contarAceptado = (quien: AsientoId, tipo: string): void => {
     sumar(aceptadas, tipo, 1);
     sumar(movieron, quien, 1);
-    const entrada = { tipo, quien, turnos: cambiosDeTurno };
+    loUltimoFueElReloj = false;
+    const entrada = { tipo, quien, turnos: cambiosPorJugada };
     if (cola.length < VENTANA_DE_VIDA) cola.push(entrada);
     else cola[enLaCola % VENTANA_DE_VIDA] = entrada;
     enLaCola++;
@@ -577,6 +599,7 @@ export function jugarConElRobotGenerico(
     diario.push({ movimiento, ctx });
     vetadas = {};
     tics.aceptados++;
+    loUltimoFueElReloj = true;
   };
 
   /** EL BUCLE VIEJO, para la vacuna: el primer asiento con algo, y lo primero de su lista. */
@@ -744,6 +767,7 @@ export function jugarConElRobotGenerico(
     excepcion,
     tics,
     cambiosDeTurno,
+    cambiosDeTurnoPorElReloj,
     declaraTurno,
     miradasDelEspectador,
     vida: {
