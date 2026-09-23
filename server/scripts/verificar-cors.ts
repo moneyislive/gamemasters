@@ -18,8 +18,12 @@
  *  4. El preflight con `x-asiento` desde un origen permitido pasa, con la lista cerrada de
  *     cabeceras y no la que se le pida; desde uno ajeno no pasa.
  *  5. En modo producción el bucle local NO pasa, y lo que se añada en `ORIGENES_PERMITIDOS` sí.
- *  6. `ORIGENES_PERMITIDOS` es OPCIONAL: vacía no cambia nada; con una entrada ilegible, `*` o
- *     `null`, el arranque se niega a seguir diciendo por qué.
+ *  6. `ORIGENES_PERMITIDOS` es OPCIONAL: vacía no cambia nada; con una entrada ilegible, `*`,
+ *     `null` o un comodín en cualquier parte (`https://*.example`), el arranque se niega a seguir
+ *     diciendo por qué — el del comodín, además, con el servidor de verdad levantado.
+ *  7. `https://harkania.com` NO va fijo en la lista: el dominio está suspendido por el registrador
+ *     y podría cambiar de manos. Se vuelve a poner, si hace falta, con `ORIGENES_PERMITIDOS` o con
+ *     `PUBLIC_ORIGIN`.
  *
  * ═══ POR QUÉ LAS DOS PUERTAS ═══
  *
@@ -240,6 +244,12 @@ paso('En proceso, en producción: el bucle local ya no, y lo añadido a mano sí
     }
     const ajeno = await preguntar(base, '/api/salud', { origen: 'https://malo.example' });
     comprobar('y lo ajeno sigue sin pasar', ajeno.permite === null, ajeno.permite);
+    const dominioSuspendido = await preguntar(base, '/api/salud', { origen: 'https://harkania.com' });
+    comprobar(
+      'ni el dominio propio suspendido, `https://harkania.com`, que ya no va fijo en la lista',
+      dominioSuspendido.estado === 200 && dominioSuspendido.permite === null,
+      dominioSuspendido,
+    );
     const sinOrigen = await preguntar(base, '/api/salud');
     comprobar('y sin `Origin` se sirve igual', sinOrigen.estado === 200 && sinOrigen.permite === null, sinOrigen);
   } finally {
@@ -278,6 +288,60 @@ paso('`ORIGENES_PERMITIDOS`: opcional, y lo que no se entiende para el arranque'
       error instanceof Error ? error.message : error,
     );
   }
+  /*
+   * UN COMODÍN EN CUALQUIER PARTE PARA EL ARRANQUE. `new URL('https://*.example')` se lee sin error
+   * —el asterisco vale en un nombre para ese analizador—, así que se guardaba como un origen literal
+   * que ningún navegador manda nunca: quien lo puso creía haber abierto un dominio entero y no había
+   * abierto nada, sin una línea en ningún sitio.
+   */
+  for (const conComodin of ['https://*.example', 'https://a.example, https://*.b.example', 'http://*', 'https://a.*.example']) {
+    let error: unknown;
+    try {
+      leerOrigenesPermitidos(conComodin);
+    } catch (e) {
+      error = e;
+    }
+    comprobar(
+      `«${conComodin}», con un comodín, PARA el arranque en vez de aceptarse como un nombre literal`,
+      error instanceof Error && error.message.includes('ORIGENES_PERMITIDOS') && error.message.includes('comodín'),
+      error instanceof Error ? error.message : leerOrigenesPermitidos(conComodin),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+paso('`harkania.com` no va fijo en la lista: el dominio está suspendido y podría cambiar de manos');
+// ---------------------------------------------------------------------------
+
+{
+  /*
+   * Un origen escrito a fuego es un permiso que no caduca. Con el dominio propio suspendido por el
+   * registrador, si cambiara de manos su nuevo dueño leería la API desde el navegador de quien
+   * visitara su página. Sale de la lista fija; el día que vuelva, se pone desde el panel.
+   */
+  comprobar(
+    'la lista fija de orígenes propios ya no lleva `https://harkania.com`',
+    !ORIGENES_PROPIOS.includes('https://harkania.com'),
+    ORIGENES_PROPIOS,
+  );
+  comprobar(
+    'y sigue llevando la producción viva, `https://harkania.onrender.com`',
+    ORIGENES_PROPIOS.includes('https://harkania.onrender.com'),
+    ORIGENES_PROPIOS,
+  );
+  const enProduccion: ContextoDelCors = { produccion: true, publico: 'https://harkania.onrender.com', extra: [] };
+  comprobar(
+    'en producción, `https://harkania.com` no lee la API si nadie lo ha puesto',
+    !origenPermitido('https://harkania.com', enProduccion),
+  );
+  comprobar(
+    'y el día que vuelva, se pone con `ORIGENES_PERMITIDOS` y entra',
+    origenPermitido('https://harkania.com', { ...enProduccion, extra: leerOrigenesPermitidos('https://harkania.com') }),
+  );
+  comprobar(
+    'o, si pasa a ser EL origen del despliegue, con `PUBLIC_ORIGIN`',
+    origenPermitido('https://harkania.com', { ...enProduccion, publico: 'https://harkania.com' }),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -395,6 +459,65 @@ function esperarAQueMuera(proceso: ChildProcess): Promise<void> {
 
 {
   /*
+   * Y EL COMODÍN, POR EL CABLE: que `leerOrigenesPermitidos` lance no dice que el servidor no
+   * arranque —podría estar envuelto en algún sitio—. Se levanta el de verdad con un comodín en la
+   * variable y se mira que se PARA, diciendo por qué, y que no llega a contestar.
+   */
+  const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'cors-comodin-'));
+  const puerto = await puertoLibre();
+  let dijo = '';
+  /* En un objeto, y no en dos `let`: los rellena un oyente, y el análisis de flujo no lo ve. */
+  const final: { murio: boolean; codigo: number | null } = { murio: false, codigo: null };
+  const servidor = spawn(process.execPath, [TSX, SERVIDOR], {
+    cwd: carpeta,
+    env: {
+      PATH: process.env.PATH,
+      SystemRoot: process.env.SystemRoot,
+      TEMP: process.env.TEMP,
+      TMP: process.env.TMP,
+      PORT: String(puerto),
+      NODE_ENV: 'test',
+      MESAS_DIR: path.join(carpeta, 'mesas'),
+      ORIGENES_PERMITIDOS: 'https://*.example',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  servidor.stdout?.on('data', (d: Buffer) => (dijo += d.toString()));
+  servidor.stderr?.on('data', (d: Buffer) => (dijo += d.toString()));
+  servidor.once('exit', (codigo) => {
+    final.murio = true;
+    final.codigo = codigo;
+  });
+  try {
+    let contesto = false;
+    for (let i = 0; i < 240 && !contesto && !final.murio; i++) {
+      try {
+        contesto = (await fetch(`http://127.0.0.1:${String(puerto)}/api/salud`)).ok;
+      } catch {
+        await dormir(250);
+      }
+    }
+    /* «comod» y no la palabra entera: un trozo de la salida puede partir la tilde en dos. */
+    comprobar(
+      'con un comodín en `ORIGENES_PERMITIDOS`, el servidor de verdad NO arranca: se para, y dice por qué',
+      final.murio && final.codigo !== 0 && !contesto && dijo.includes('ORIGENES_PERMITIDOS') && dijo.includes('comod'),
+      { ...final, contesto, dijo: dijo.slice(-600) },
+    );
+  } finally {
+    if (!final.murio) {
+      servidor.kill();
+      await esperarAQueMuera(servidor);
+    }
+    try {
+      fs.rmSync(carpeta, { recursive: true, force: true });
+    } catch {
+      /* en Windows un fichero recién cerrado a veces sigue tomado un instante */
+    }
+  }
+}
+
+{
+  /*
    * Y EN EL FUENTE, sin comentarios: el servidor de producción no se puede levantar aquí —exige
    * una base de datos—, así que lo que se afirma de él es que `index.ts` monta ESTE middleware y
    * no el pelado. La prosa que explica por qué se quitó `cors()` no cuenta.
@@ -428,7 +551,7 @@ if (fallos.length > 0) {
 }
 
 /* EL GUARDIA: un comprobador que se cae a mitad sin decirlo se parece mucho a uno verde. */
-const COMPROBACIONES_ESCRITAS = 78;
+const COMPROBACIONES_ESCRITAS = 86;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones escritas.`);
   process.exit(2);
