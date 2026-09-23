@@ -295,6 +295,8 @@ export function cuentasVacias(): DiagnosticoDeBotas {
       quieto: 0,
       atropello: 0,
       mesaCerrada: 0,
+      versionVieja: 0,
+      atascado: 0,
       apagado: 0,
       fallo: 0,
       seFue: 0,
@@ -517,9 +519,13 @@ export class CanalDeBotas {
         return;
       }
       if (m.v !== VERSION_DEL_CANAL) {
+        /*
+         * Con su código y no con `sinHola`: al aparato viejo le dice que actualice, en vez de
+         * dejarle reintentando para siempre un saludo que sí se oyó.
+         */
         this.echar(
           c,
-          'sinHola',
+          'versionVieja',
           `Este aparato habla la versión ${String(m.v)} del canal y el servidor la ${String(VERSION_DEL_CANAL)}: hay que actualizar.`,
         );
         return;

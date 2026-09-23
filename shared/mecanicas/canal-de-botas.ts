@@ -64,7 +64,11 @@ export const RETRASO_DE_LOS_DEMAS_MS = 150;
  */
 export const QUIETO_HASTA_CERRAR_MS = 60_000;
 
-/** Cuánto se guarda el sitio de quien se desconecta, por si vuelve (una red que parpadea). */
+/**
+ * Cuánto sigue abierta la sala de una mesa cuando se va el ÚLTIMO que tenía canal: por si vuelve
+ * (una red que parpadea). El asiento de quien se va no se borra nunca de una sala abierta: se queda
+ * de pie donde estaba, en la foto, y se le puede golpear —nadie es inmune por irse—.
+ */
 export const GRACIA_AL_IRSE_MS = 5000;
 
 /** El tope de un mensaje del aparato, en bytes: el más largo (`hola`) cabe de sobra. */
@@ -90,6 +94,20 @@ export const CIERRE = {
   atropello: 4005,
   /** La mesa se cerró o se olvidó. */
   mesaCerrada: 4006,
+  /**
+   * Dijo `hola` en otra versión del canal. Volver a llamar con el mismo aparato da lo mismo: lo que
+   * hay que hacer es actualizarlo. Hasta que tuvo código propio salía como `sinHola`, y un aparato
+   * viejo no distinguía «no me oyeron» —que se arregla reintentando— de «ya no me entienden».
+   */
+  versionVieja: 4007,
+  /**
+   * Su conexión no daba abasto: había que mandarle algo que NO SE PUEDE PERDER —`dentro`, `vidas`,
+   * `da`, `cae`, `renace`— y ya esperaban a salir más bytes de los que caben. Saltárselo le dejaría
+   * contando mal las vidas de todos, así que se cierra: al volver a entrar, `dentro` y `vidas` le
+   * ponen al día. Reintentar SÍ lo arregla. Lo que se puede perder —una foto, un `corrige`, un
+   * `lanza`— se salta y no cierra nada.
+   */
+  atascado: 4008,
 } as const;
 export type CodigoDeCierre = (typeof CIERRE)[keyof typeof CIERRE];
 
@@ -110,7 +128,7 @@ export interface Hola {
  * `r` es HACIA DÓNDE MIRA, de 0 a 255 —no hacia dónde da el paso—. Andando hacia atrás el paso
  * lleva media vuelta de más que la mirada, y con el paso los demás verían a quien retrocede darse
  * la vuelta y andar de frente. El servidor no lo usa para validar (valida sitios); lo reparte en
- * la foto para pintar, y el día del combate es el «hacia dónde golpeo».
+ * la foto para pintar. El golpe no lo toma de aquí: lleva su propio `r` (ver `Golpe`).
  */
 export interface Aqui {
   readonly t: 'aqui';
@@ -143,6 +161,10 @@ export interface Dentro {
  * entrada es `[asiento, x, z, mira, marcha]`, con `x` y `z` en Q16.16 y `mira` hacia dónde mira
  * (ver `Aqui.r`); un asiento sale una vez como mucho. Se serializa UNA vez por mesa y tic y se
  * manda la misma cadena a todos: por eso no lleva nada de nadie en particular.
+ *
+ * Salen TODOS los sentados a la mesa, hayan bajado o no: quien no tiene canal —porque nunca lo
+ * abrió, o porque lo cerró— sale quieto (marcha 0) donde nació o donde se quedó, y se le puede
+ * golpear como a cualquiera. En una mesa `botas` nadie es inmune por no bajar al tablero.
  */
 export interface Foto {
   readonly t: 'foto';
@@ -175,13 +197,20 @@ export type MensajeDelServidor = Dentro | Foto | Corrige | Fuera | Lanza | Da | 
  * 150-250 ms): cada uno tiene `VIDA_ENTERA` golpes; se golpea LANZANDO algo a corta distancia
  * —el clip `lanzar` de los aventureros; el paquete gratuito no trae otro ataque—, hacia donde se
  * mira, con `RECARGA_DEL_GOLPE_MS` entre golpe y golpe; quien se queda sin vida CAE
- * `CAIDO_MS`, y renace en su sitio de nacer con la vida entera e intocable `INTOCABLE_MS`.
+ * `CAIDO_MS`, y renace en un sitio de nacer —el suyo si queda lejos de quien lo tumbó; la regla
+ * entera está en el servidor— con la vida entera e intocable `INTOCABLE_MS`.
  *
  * EL APARATO SÓLO DICE «GOLPEO» (`golpe`), con su tic y hacia dónde mira. Si alcanza a alguien
  * lo decide el servidor, sobre los sitios que ACEPTÓ, rebobinando al otro como mucho
  * `REBOBINADO_MAXIMO_MS` para verlo donde lo veía quien golpeó. Y quien cae le da BOTÍN a quien
  * lo tumbó: eso tampoco viaja por aquí, lo mete el servidor en la mesa como `arcade:botin`, y lo
  * que se roba no sale de la mesa (decisión de Miguel del 20-sep; ver docs/COMBATE-Y-BOTIN.md §0).
+ * Una misma pareja cobra una vez cada `BOTIN_CADA_PAREJA_MS`, y la mesa tiene además un tope por
+ * minuto: los dos son del servidor, y al aparato no le hace falta saberlos.
+ *
+ * Lo que el aparato sí tiene que saber para pintar: `caído` dura `CAIDO_MS` y acaba con un
+ * `renace`; `intocable` dura `INTOCABLE_MS` desde ese `renace` y acaba SIN mensaje —se cuenta con
+ * el reloj—. El servidor no hace ninguna otra transición de estado, y por eso ésta basta.
  */
 
 /** Cuántos golpes aguanta cada uno. */
@@ -256,9 +285,10 @@ export interface Renace {
 }
 
 /**
- * Cómo está cada uno al entrar: `[asiento, vida, estado]`. Llega una vez, justo después de
- * `dentro`; a partir de ahí se sigue por `da`, `cae` y `renace`, que por un WebSocket llegan
- * todos y en orden. Quien reconecta recibe otro.
+ * Cómo está cada uno al entrar: `[asiento, vida, estado]`, de TODOS los sentados, bajen o no.
+ * Llega una vez, justo después de `dentro`; a partir de ahí se sigue por `da`, `cae` y `renace`,
+ * que por un WebSocket llegan todos y en orden —y si al servidor no le caben en el canal, lo
+ * cierra con `atascado` en vez de saltárselos—. Quien reconecta recibe otro.
  */
 export interface Vidas {
   readonly t: 'vidas';

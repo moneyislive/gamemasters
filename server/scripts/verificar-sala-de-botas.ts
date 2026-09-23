@@ -427,9 +427,14 @@ paso('El saludo: `hola` en cinco segundos, lo primero, y en esta versión');
   const otraVersion = new EnchufeDeMentira();
   canal.abrir(codigo, otraVersion).recibir(hola('lo-que-sea', VERSION_DEL_CANAL + 1));
   comprobar(
-    'un `hola` de otra versión del canal: `sinHola`, y el motivo lo dice',
-    otraVersion.cierre?.codigo === CIERRE.sinHola && (otraVersion.ultimo('fuera')?.motivo ?? '').includes('versión'),
+    'un `hola` de otra versión del canal: `versionVieja` (4007) y no `sinHola`, y el motivo lo dice',
+    otraVersion.cierre?.codigo === CIERRE.versionVieja && (otraVersion.ultimo('fuera')?.motivo ?? '').includes('versión'),
     otraVersion.textos,
+  );
+  comprobar(
+    'y el diagnóstico lo cuenta aparte',
+    canal.diagnostico().cierres.versionVieja === 1,
+    canal.diagnostico().cierres,
   );
 
   const basura = new EnchufeDeMentira();
@@ -1662,7 +1667,7 @@ if (fallos.length > 0) {
  * EL GUARDIA DE «NO SE HAN HECHO TODAS»: un comprobador que se cae a mitad sin decirlo se parece
  * mucho a uno verde. El número es el que se hace hoy, contado, y se sube al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 154;
+const COMPROBACIONES_ESCRITAS = 155;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones escritas.`);
   process.exit(2);

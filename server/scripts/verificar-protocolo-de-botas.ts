@@ -76,6 +76,10 @@ const MALOS_DEL_APARATO: readonly [string, string][] = [
   ['un golpe con el rumbo 256', j({ t: 'golpe', n: 3, r: 256 })],
   ['un golpe sin rumbo', j({ t: 'golpe', n: 3 })],
   ['un golpe que dice a quién le da', j({ t: 'golpe', n: 3, r: 0, a: 'a2' })],
+  ['un golpe que dice cuánto quita', j({ t: 'golpe', n: 3, r: 0, vida: 3 })],
+  ['un golpe con el tic con decimales', j({ t: 'golpe', n: 3.5, r: 0 })],
+  ['un golpe con el rumbo en texto', j({ t: 'golpe', n: 3, r: '0' })],
+  ['un golpe con el rumbo con decimales', j({ t: 'golpe', n: 3, r: 12.5 })],
   ['más largo que el tope', j({ ...hola, llave: 'k'.repeat(40) }) + ' '.repeat(TOPE_DE_MENSAJE_BYTES)],
 ];
 for (const [que, texto] of MALOS_DEL_APARATO) {
@@ -114,6 +118,17 @@ comprobar('`renace` se lee', leerMensajeDelServidor(j({ t: 'renace', a: 'a2', x:
   const vidas = leerMensajeDelServidor(j({ t: 'vidas', v: [['a1', 3, 0], ['a2', 0, 1], ['a3', 3, 2]] }));
   comprobar('`vidas` se lee con sus tres entradas', vidas !== null && vidas.t === 'vidas' && vidas.v.length === 3, vidas);
 }
+{
+  /* Una sala en la que sólo está quien entra manda `vidas` con él solo; y quien renace puede hacerlo al oeste y al norte. */
+  const sola = leerMensajeDelServidor(j({ t: 'vidas', v: [['a1', 3, 0]] }));
+  comprobar('`vidas` de una sala con uno solo se lee', sola !== null && sola.t === 'vidas' && sola.v.length === 1, sola);
+  const alNoroeste = leerMensajeDelServidor(j({ t: 'renace', a: 'a2', x: -655360, z: -131072, r: 255 }));
+  comprobar(
+    '`renace` con coordenadas negativas y el último rumbo se lee tal cual',
+    alNoroeste !== null && alNoroeste.t === 'renace' && alNoroeste.x === -655360 && alNoroeste.z === -131072 && alNoroeste.r === 255,
+    alNoroeste,
+  );
+}
 
 const MALOS_DEL_SERVIDOR: readonly [string, string][] = [
   ['una foto con una entrada de cuatro', j({ t: 'foto', k: 1, p: [['a1', 0, 0, 0]] })],
@@ -130,6 +145,15 @@ const MALOS_DEL_SERVIDOR: readonly [string, string][] = [
   ['unas vidas con el mismo asiento dos veces', j({ t: 'vidas', v: [['a1', 3, 0], ['a1', 2, 0]] })],
   ['unas vidas con un estado que no existe', j({ t: 'vidas', v: [['a1', 3, 3]] })],
   ['unas vidas con una entrada de dos', j({ t: 'vidas', v: [['a1', 3]] })],
+  ['unas vidas con más vida de la que hay', j({ t: 'vidas', v: [['a1', 4, 0]] })],
+  ['unas vidas que no son una lista', j({ t: 'vidas', v: { a1: [3, 0] } })],
+  ['un lanza sin quién', j({ t: 'lanza' })],
+  ['un lanza con quién en número', j({ t: 'lanza', de: 1 })],
+  ['un da con la vida con decimales', j({ t: 'da', de: 'a1', a: 'a2', vida: 1.5 })],
+  ['un da sin a quién', j({ t: 'da', de: 'a1', vida: 2 })],
+  ['un cae con quién lo tumbó en número', j({ t: 'cae', a: 'a2', por: 7 })],
+  ['un renace con el rumbo 256', j({ t: 'renace', a: 'a2', x: 0, z: 0, r: 256 })],
+  ['un renace sin rumbo', j({ t: 'renace', a: 'a2', x: 0, z: 0 })],
 ];
 for (const [que, texto] of MALOS_DEL_SERVIDOR) {
   comprobar(`se rechaza del servidor: ${que}`, leerMensajeDelServidor(texto) === null, texto);
@@ -146,10 +170,27 @@ comprobar('y escapa lo que no es un código', rutaDelCanal('A/B?c') === '/api/ar
     codigos.every((c) => c >= 4000 && c <= 4999) && new Set(codigos).size === codigos.length,
     codigos,
   );
+  /*
+   * LOS DOS QUE LLEGARON CON LA REFRIEGA, con su número: el aparato los distingue por él —con uno se
+   * actualiza y con el otro se reintenta—, así que cambiarlo es romper a los aparatos que ya hay.
+   */
+  comprobar('la versión que no cuadra tiene su cierre: 4007, y ya no es un `sinHola`', CIERRE.versionVieja === 4007, CIERRE);
+  comprobar('y el canal que no da abasto, el suyo: 4008', CIERRE.atascado === 4008, CIERRE);
+  comprobar(
+    'y los siete de antes siguen con el número que tenían',
+    CIERRE.sinHola === 4000 &&
+      CIERRE.llaveMala === 4001 &&
+      CIERRE.mesaQueNo === 4002 &&
+      CIERRE.reemplazado === 4003 &&
+      CIERRE.quieto === 4004 &&
+      CIERRE.atropello === 4005 &&
+      CIERRE.mesaCerrada === 4006,
+    CIERRE,
+  );
 }
 
 /* El suelo: que se ha mirado de verdad todo lo que se dice arriba. */
-comprobar('se han mirado todas las muestras', hechas >= 57, { hechas });
+comprobar('se han mirado todas las muestras', hechas >= 75, { hechas });
 
 console.log('');
 if (fallos.length > 0) {
