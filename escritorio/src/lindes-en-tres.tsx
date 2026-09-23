@@ -50,6 +50,7 @@ import type { Calidad } from '../../escenas/embarcadero/tipos';
 import type { MuestraDelHilo } from '../../escenas/embarcadero/calidad';
 import { calidadDelValle, conLaMuestra } from '../../escenas/lindes/detalle';
 import { asientosQueAndan, esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
+import { COMO_SE_GOLPEA } from '../../escenas/paseo/mandos';
 import {
   elSiguienteGiro,
   girosQueCaben,
@@ -108,7 +109,9 @@ const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string; 
  * En el mismo cartel y debajo, `canal`: «Conectando…», «Dentro», «Sin conexión: …». Es el sitio
  * donde se mira mientras se anda, y no hace falta otro. Desde la mesa también se enseña —allí no se
  * anda, pero el canal sigue abierto y conviene saber si al bajar se verá a los demás—; sin canal,
- * en la mesa no sale nada, como siempre.
+ * en la mesa no sale nada, como siempre. Y con canal se golpea: la tecla va con las de andar
+ * (`COMO_SE_GOLPEA`, que sale de la misma tecla que lee el paseo), y los corazones propios los
+ * trae el texto del canal.
  */
 export function ComoSeAnda({
   modo,
@@ -121,6 +124,7 @@ export function ComoSeAnda({
   return (
     <p className="lindes-como-se-anda">
       W A S D o las flechas para andar · Mayúsculas para correr
+      {canal === undefined ? null : ` · ${COMO_SE_GOLPEA}`}
       {canal === undefined ? null : (
         <>
           <br />

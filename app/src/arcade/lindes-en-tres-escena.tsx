@@ -105,6 +105,7 @@ import { tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
 import { MandosDelPaseo } from './mandos-del-paseo';
+import { BotonDeGolpear } from './mandos-del-paseo';
 import { direccionDelCanal, usarMesaDeArcade } from './mesa';
 import { LETRA, SALA } from './muebles';
 import { Pantalla } from './piezas';
@@ -453,9 +454,11 @@ export default function LasLindesPorDentro(): JSX.Element {
 
         {/*
           LOS MANDOS DEL PASEO, encima del lienzo y sólo a pie. Sin ellos, en el teléfono se
-          bajaba a «Hombro» y no se podía dar un paso. Ver `mandos-del-paseo.tsx`.
+          bajaba a «Hombro» y no se podía dar un paso. Ver `mandos-del-paseo.tsx`. Y «Golpear»,
+          a pie y sólo con canal: la refriega de una mesa de botas, lo que en el escritorio es la G.
         */}
         <MandosDelPaseo mandos={mandos} visibles={modo !== 'mesa'} />
+        <BotonDeGolpear mandos={mandos} visible={modo !== 'mesa' && canal !== undefined} />
 
         {/*
           CÓMO VA EL CANAL, arriba a la izquierda —la derecha es de las cámaras y abajo están

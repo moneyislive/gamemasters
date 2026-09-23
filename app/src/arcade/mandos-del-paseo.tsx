@@ -47,10 +47,31 @@
  * juego es: el día que El Burgo y Riberas se anden, se monta igual. Y ahí hay una cosa que Las
  * Lindes no tiene: su MIRADOR TÁCTIL (`mirador-tactil.ts`), que gira la cámara de mesa al
  * arrastrar. Mientras se anda hay que apagarlo, o el pulgar que anda giraría a la vez la mesa.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS, «GOLPEAR», QUE SÍ SE PULSA ANDANDO ═══
+ *
+ * La refriega de Boots on Board se golpea: en el escritorio con la G, y aquí con un botón que
+ * sale SÓLO a pie y SÓLO con canal (`BotonDeGolpear`). Cuenta pulsaciones en `MandosDeFuera.golpes`
+ * y el paseo pone el golpe en el primer tic que dé (`escenas/paseo/mandos.ts`).
+ *
+ * No es un `Pressable`, y es a propósito: correr se enciende y se apaga porque con el pulgar en la
+ * palanca no hay otro respondedor, y golpear tiene que poder hacerse ANDANDO —acercarse y golpear
+ * sin soltar la palanca es la refriega entera—. Con un respondedor dentro de la palanca, un dedo
+ * nuevo ni siquiera le pregunta al botón: la negociación empieza en el antepasado común de los dos
+ * (`ResponderEventPlugin`). Lo que sí le llega es el toque en crudo, `onTouchStart`, que React Native
+ * reparte a la vista que toca cada dedo nuevo esté quien esté respondiendo; y con `onClick`, que en
+ * la app no llega, no hay nada que hacer. Para el lector de pantalla, la acción `activate`.
+ *
+ * Grande para el pulgar —76 puntos, que es un botón que se busca a ciegas— y en la fila del correr,
+ * a su izquierda: nunca encima de la palanca ni del correr, y dentro de la franja del paseo del
+ * Burgo, que mide 152 y fuera de ella el dedo no llega en Android. Si no cabe, encoge hasta 48
+ * (`ladoDelGolpe`, con el ancho medido y el de la ventana, el menor de los dos). Y cuando no toca
+ * NO SE PINTA, que un botón invisible que siguiera cogiendo el dedo taparía el tablero sin decirlo.
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { JSX, MutableRefObject } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import type { AccessibilityActionInfo, LayoutChangeEvent } from 'react-native';
 import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
 import { LETRA } from './muebles';
@@ -66,6 +87,35 @@ const RECORRIDO = 44;
 /** Lo que mide la base de la palanca y lo que mide su pomo, en puntos. */
 const BASE = 128;
 const POMO = 56;
+
+/** A qué altura del pie va la fila del correr y del golpe: la del centro de la palanca, los dos pulgares a la par. */
+const ABAJO_DEL_CORRER = 16 + BASE / 2 - 24;
+
+/** Lo que mide el correr a lo ancho: fijo, para que el golpe sepa dónde acaba sin medirlo. */
+const ANCHO_DEL_CORRER = 112;
+
+/** El golpe: el lado que se quiere, el menor que se acepta y el hueco con sus vecinos, en puntos. */
+const LADO_DEL_GOLPE = 76;
+const LADO_MINIMO_DEL_GOLPE = 48;
+const HUECO_DEL_GOLPE = 12;
+
+/** Lo que es de la palanca por la izquierda —su margen, su base y el hueco— y lo que es del correr por la derecha. */
+const LO_DE_LA_PALANCA = 16 + BASE + HUECO_DEL_GOLPE;
+const LO_DEL_CORRER = 16 + ANCHO_DEL_CORRER + HUECO_DEL_GOLPE;
+
+/**
+ * EL LADO DEL GOLPE en un lienzo de `ancho` puntos: lo que quede entre la palanca y el correr, hasta
+ * 76, y nunca menos de 48. Con 375 de ancho salen los 76; con 360, 64; con 320 no cabe ni el
+ * mínimo y se queda en 48, comiéndose doce puntos del canto derecho de la base —por donde el pomo
+ * sólo pasa a tope—, que es menos malo que un botón que no se acierta.
+ */
+export function ladoDelGolpe(ancho: number): number {
+  const cabe = Math.floor(ancho - LO_DE_LA_PALANCA - LO_DEL_CORRER);
+  return Math.max(LADO_MINIMO_DEL_GOLPE, Math.min(LADO_DEL_GOLPE, Number.isFinite(cabe) ? cabe : LADO_MINIMO_DEL_GOLPE));
+}
+
+/** Para el lector de pantalla: pulsar dos veces es golpear. */
+const ACCIONES_DEL_GOLPE: readonly AccessibilityActionInfo[] = [{ name: 'activate', label: 'Golpear' }];
 
 export interface MandosDelPaseoProps {
   /** Donde se escriben. La escena los lee en su bucle, sin pasar por React. */
@@ -87,11 +137,12 @@ export function MandosDelPaseo({ mandos, visibles }: MandosDelPaseoProps): JSX.E
       const x = dx * k;
       const y = dy * k;
       pomo.setValue({ x, y });
-      mandos.current = { palanca: { x: x / RECORRIDO, y: -y / RECORRIDO }, deprisa: mandos.current.deprisa };
+      /* Los golpes se copian tal cual: el otro pulgar puede haber golpeado entre dos movimientos de éste. */
+      mandos.current = { palanca: { x: x / RECORRIDO, y: -y / RECORRIDO }, deprisa: mandos.current.deprisa, golpes: mandos.current.golpes };
     };
     const soltar = (): void => {
       pomo.setValue({ x: 0, y: 0 });
-      mandos.current = { palanca: { x: 0, y: 0 }, deprisa: mandos.current.deprisa };
+      mandos.current = { palanca: { x: 0, y: 0 }, deprisa: mandos.current.deprisa, golpes: mandos.current.golpes };
     };
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -133,12 +184,72 @@ export function MandosDelPaseo({ mandos, visibles }: MandosDelPaseoProps): JSX.E
         onPress={() => {
           const ahora = !corriendo;
           ponerCorriendo(ahora);
-          mandos.current = { palanca: mandos.current.palanca, deprisa: ahora };
+          mandos.current = { palanca: mandos.current.palanca, deprisa: ahora, golpes: mandos.current.golpes };
         }}
       >
-        <Text style={[estilos.correrTexto, corriendo && estilos.correrTextoPuesto]}>Correr</Text>
+        <Text style={[estilos.correrTexto, corriendo && estilos.correrTextoPuesto]} numberOfLines={1} adjustsFontSizeToFit>
+          Correr
+        </Text>
       </Pressable>
     </>
+  );
+}
+
+export interface BotonDeGolpearProps {
+  /** Donde se cuentan los golpes: la misma referencia que la palanca. */
+  readonly mandos: MutableRefObject<MandosDeFuera>;
+  /** Sólo a pie y con canal: en una mesa normal, o mirando la mesa, no hay a quién golpear. */
+  readonly visible: boolean;
+}
+
+/**
+ * «GOLPEAR»: un toque, un golpe. Ver la cabecera: por qué `onTouchStart` y no un `Pressable`, dónde
+ * va y por qué no se pinta cuando no toca.
+ */
+export function BotonDeGolpear({ mandos, visible }: BotonDeGolpearProps): JSX.Element | null {
+  const ventana = useWindowDimensions();
+  const [medido, ponerMedido] = useState(0);
+  const [apretado, ponerApretado] = useState(false);
+  /* Al esconderse, suelto: un botón que vuelve a salir no puede salir apretado. */
+  useEffect(() => {
+    if (!visible) ponerApretado(false);
+  }, [visible]);
+
+  if (!visible) return null;
+  /* El ancho medido y el de la ventana, el menor: el medido puede quedarse viejo, y la ventana no sabe de columnas. */
+  const ancho = medido > 0 ? Math.min(medido, ventana.width) : ventana.width;
+  const lado = ladoDelGolpe(ancho);
+  const golpear = (): void => {
+    mandos.current = { ...mandos.current, golpes: mandos.current.golpes + 1 };
+  };
+  const medir = (e: LayoutChangeEvent): void => {
+    const nuevo = Math.round(e.nativeEvent.layout.width);
+    if (nuevo > 0 && nuevo !== medido) ponerMedido(nuevo);
+  };
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none" onLayout={medir}>
+      <View
+        style={[estilos.golpear, { width: lado, height: lado, borderRadius: lado / 2 }, apretado && estilos.golpearApretado]}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="Golpear"
+        accessibilityHint="Lanza un golpe hacia donde miras."
+        accessibilityActions={ACCIONES_DEL_GOLPE}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'activate') golpear();
+        }}
+        onTouchStart={() => {
+          golpear();
+          ponerApretado(true);
+        }}
+        onTouchEnd={() => ponerApretado(false)}
+        onTouchCancel={() => ponerApretado(false)}
+      >
+        <Text style={[estilos.golpearTexto, apretado && estilos.golpearTextoApretado]} numberOfLines={1} adjustsFontSizeToFit>
+          Golpear
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -169,12 +280,14 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#f3ecd8',
   },
-  /* A la altura del centro de la palanca: los dos pulgares en la misma línea. */
+  /* A la altura del centro de la palanca: los dos pulgares en la misma línea. Con su ancho fijo: ver `ANCHO_DEL_CORRER`. */
   correr: {
     position: 'absolute',
     right: 16,
-    bottom: 16 + BASE / 2 - 24,
-    paddingHorizontal: 18,
+    bottom: ABAJO_DEL_CORRER,
+    width: ANCHO_DEL_CORRER,
+    alignItems: 'center',
+    paddingHorizontal: 8,
     paddingVertical: 14,
     borderRadius: 12,
     backgroundColor: 'rgba(12, 20, 8, 0.62)',
@@ -184,4 +297,22 @@ const estilos = StyleSheet.create({
   correrPuesto: { backgroundColor: '#f3ecd8', borderColor: '#f3ecd8' },
   correrTexto: { color: '#f3ecd8', fontSize: 15, ...LETRA.rotuloChico },
   correrTextoPuesto: { color: '#1b2411' },
+  /*
+   * EL GOLPE, en la fila del correr y a su izquierda. Redondo y en teja: es el único mando que no
+   * mueve a nadie, y se tiene que distinguir de los dos que sí sin leerlo. Apretado, en crema con la
+   * tinta oscura, como el correr encendido.
+   */
+  golpear: {
+    position: 'absolute',
+    right: LO_DEL_CORRER,
+    bottom: ABAJO_DEL_CORRER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(122, 34, 24, 0.78)',
+    borderWidth: 2,
+    borderColor: 'rgba(243, 236, 216, 0.7)',
+  },
+  golpearApretado: { backgroundColor: '#f3ecd8', borderColor: '#f3ecd8' },
+  golpearTexto: { color: '#f3ecd8', fontSize: 13, ...LETRA.rotuloChico, letterSpacing: 0.6 },
+  golpearTextoApretado: { color: '#1b2411' },
 });

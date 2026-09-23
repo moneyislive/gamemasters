@@ -35,11 +35,20 @@
  * Porque la cámara está dentro de su cabeza: se vería el interior del cráneo, que es peor que
  * no ver nada. Es la misma razón por la que ningún juego de esta casa pinta al jugador desde sus
  * propios ojos.
+ *
+ * ═══ EN LA REFRIEGA, LO SUYO LO DICE EL CANAL ═══
+ *
+ * En una mesa de botas (`cliente`, el canal de la escena) quien pasea también lanza, recibe, cae y
+ * renace, y se le pinta igual que a los demás (`los-demas.tsx`): el gesto manda sobre el paso
+ * mientras dura, en el suelo se queda tumbado, intocable parpadea. Su `lanzar` sale en cuanto se
+ * pulsa —el canal lo apunta al mandar el golpe—, sin esperar a que vuelva nada. Y encima de la
+ * cabeza lleva sus corazones, sin nombre, en una placa como la de los demás; en primera persona no
+ * se ven, y por eso los dice también el cartel del canal de cada cliente.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { cargadorPara } from '../embarcadero/cargar';
 import type { AventureroCargado } from '../embarcadero/cargar';
 import { figuraQueSePinta } from '../embarcadero/figuras';
@@ -47,6 +56,8 @@ import type { Traer } from '../embarcadero/tipos';
 import { desmontaMarioneta, giroCorto, montaMarioneta, reproduce } from '../aventureros/marioneta';
 import type { Marioneta } from '../aventureros/marioneta';
 import { giroDeLaMarioneta } from './camaras';
+import type { ClienteDelCanal } from './canal-de-botas';
+import { ALTURA_DEL_ROTULO, altoDelRotulo, geometriaDeLosCorazones, ponerLosCorazones } from './rotulo';
 import { clipDelPaso, ritmoDelClip } from './zancada';
 
 /**
@@ -83,6 +94,11 @@ export interface QuienAndaProps {
   /** En primera persona no se pinta: la cámara está dentro de su cabeza. */
   readonly enPrimeraPersona: boolean;
   readonly alFallar?: (motivo: string) => void;
+  /**
+   * El canal de la escena, en una mesa de botas: de él sale cómo va quien pasea en la refriega. Sin
+   * canal abierto su `current` es `null` y quien pasea sólo anda.
+   */
+  readonly cliente?: { readonly current: ClienteDelCanal | null };
 }
 
 export function QuienAnda({
@@ -92,6 +108,7 @@ export function QuienAnda({
   pose,
   enPrimeraPersona,
   alFallar,
+  cliente,
 }: QuienAndaProps): JSX.Element | null {
   const [cargada, setCargada] = useState<AventureroCargado | null>(null);
   const [biblioteca, setBiblioteca] = useState<readonly THREE.AnimationClip[]>([]);
@@ -99,6 +116,21 @@ export function QuienAnda({
   const marioneta = useRef<Marioneta | null>(null);
   const grupo = useRef<THREE.Group>(null);
   const rumboAhora = useRef<number | null>(null);
+  const placa = useRef<THREE.Group>(null);
+  const corazonesPintados = useRef<string | null>(null);
+  const camera = useThree((s) => s.camera);
+
+  /*
+   * SUS CORAZONES, sólo con canal: una placa sin nombre, escondida hasta que el canal sepa cómo va
+   * la refriega. Sin niebla y sin el tono de la escena, como el rótulo de los demás.
+   */
+  const corazones = useMemo(() => (cliente === undefined ? null : geometriaDeLosCorazones()), [cliente]);
+  useEffect(() => {
+    corazonesPintados.current = null;
+    return () => corazones?.dispose();
+  }, [corazones]);
+  const tinta = useMemo(() => new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, toneMapped: false }), []);
+  useEffect(() => () => tinta.dispose(), [tinta]);
 
   /*
    * LA FIGURA Y LOS CLIPS, con su propia red y sin tumbar nada si no llegan. Un tablero sin
@@ -152,11 +184,33 @@ export function QuienAnda({
   }, [biblioteca, cargada, laFigura]);
 
   useFrame((_, dt) => {
+    const quien = pose.current;
+    /* La refriega, a la hora de ahora: a uno mismo se le pinta en el presente. `null` sin `vidas`. */
+    const como = cliente?.current?.refriegaDe(asiento) ?? null;
+
+    /* Sus corazones, encima de la cabeza y mirando a la cámara; se repintan sólo si han cambiado. */
+    const r = placa.current;
+    if (corazones !== null) {
+      const pintar = como === null ? 'sin' : `${String(como.corazones.llenos)}:${String(como.corazones.apagados)}`;
+      if (pintar !== corazonesPintados.current) {
+        ponerLosCorazones(corazones, como === null ? null : como.corazones);
+        corazonesPintados.current = pintar;
+      }
+    }
+    if (r !== null) {
+      r.visible = como !== null;
+      r.position.set(quien.x, quien.y + ALTURA_DEL_ROTULO, quien.z);
+      r.quaternion.copy(camera.quaternion);
+      const campo = (((camera as THREE.PerspectiveCamera).fov ?? 45) * Math.PI) / 180;
+      r.scale.setScalar(altoDelRotulo(camera.position.distanceTo(r.position), campo));
+    }
+
     const m = marioneta.current;
     const g = grupo.current;
     if (m === null || g === null) return;
-    const quien = pose.current;
 
+    /* Intocable, parpadea: ver `refriega.ts`. */
+    g.visible = como === null || como.seVe;
     g.position.set(quien.x, quien.y, quien.z);
 
     /*
@@ -192,17 +246,32 @@ export function QuienAnda({
      * `setEffectiveTimeScale`, porque ésta quita el acompasado del fundido —el `warp` que
      * `crossFadeFrom` pone al cambiar de clip— y el paso de andar a correr daría un tirón.
      */
-    const clip = clipDelPaso(quien.velocidad);
-    reproduce(m, clip, true, 0, 0);
-    const accion = m.acciones.get(clip);
-    if (accion !== undefined && accion === m.actual) accion.timeScale = ritmoDelClip(clip, quien.velocidad);
+    const gesto = como?.gesto ?? null;
+    if (como !== null && gesto !== null) {
+      /* Un gesto de la refriega manda sobre el paso mientras dura; el mezclador cuenta en segundos. */
+      reproduce(m, gesto.clip, gesto.bucle, gesto.desde / 1000, como.a / 1000);
+    } else {
+      const clip = clipDelPaso(quien.velocidad);
+      reproduce(m, clip, true, 0, 0);
+      const accion = m.acciones.get(clip);
+      if (accion !== undefined && accion === m.actual) accion.timeScale = ritmoDelClip(clip, quien.velocidad);
+    }
     m.mezclador.update(dt);
   });
 
-  if (montada === null || enPrimeraPersona) return null;
+  if (enPrimeraPersona) return null;
   return (
-    <group ref={grupo}>
-      <primitive object={montada} />
-    </group>
+    <>
+      {montada === null ? null : (
+        <group ref={grupo}>
+          <primitive object={montada} />
+        </group>
+      )}
+      {corazones === null ? null : (
+        <group ref={placa} visible={false}>
+          <mesh geometry={corazones} material={tinta} />
+        </group>
+      )}
+    </>
   );
 }

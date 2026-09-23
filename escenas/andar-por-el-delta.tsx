@@ -125,11 +125,13 @@ export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos,
    * ella, el paseo le da cada tic al canal (la costura a) y el canal pone a quien pasea donde dice el
    * servidor (la costura b), que llega por una referencia porque el paseo se monta después. Si ahí
    * no se cabe —el servidor valida contra la estructura y aquí se anda también con el adorno—, el
-   * paseo lo aparta al sitio libre más cercano (`usar-el-paseo.ts`).
+   * paseo lo aparta al sitio libre más cercano (`usar-el-paseo.ts`). La refriega, por los mismos
+   * hilos que en Las Lindes: el paseo pregunta si quien pasea está en el suelo (`caido`) y
+   * `QuienAnda` cómo va (`cliente`).
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
   const elCanal = usarElCanal(canal, corregirAQuienPasea);
-  const paseo = usarElPaseo({ mundo, nace, modo: camara.modo, mandos, alturaEn, alDarUnTic: elCanal.alDarUnTic });
+  const paseo = usarElPaseo({ mundo, nace, modo: camara.modo, mandos, alturaEn, alDarUnTic: elCanal.alDarUnTic, caido: elCanal.caido });
   useEffect(() => {
     corregirAQuienPasea.current = paseo.corregir;
   }, [paseo.corregir]);
@@ -175,6 +177,7 @@ export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos,
         pose={paseo.pose}
         enPrimeraPersona={camara.modo === 'ojos'}
         alFallar={alFallarLaFigura}
+        cliente={elCanal.cliente}
       />
       {/*
         LOS DEMÁS, sólo con canal —y sólo a pie, que en la mesa se sale arriba—, con LA MISMA

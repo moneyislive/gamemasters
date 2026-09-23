@@ -16,7 +16,8 @@
  *     el índice de cajones de tres mil cuerpos para no cambiar nada.
  *  2. Se suman las dos manos: el teclado, que se lee aquí si hay `document`, y los mandos de
  *     fuera, que la app escribe en una referencia.
- *  3. Se dan los tics que caben (`paseante.ts`), con el paso de `shared/`.
+ *  3. Se dan los tics que caben (`fotogramaDeQuienPasea`, en `paseante.ts`), con el paso de
+ *     `shared/` y el golpe que haya pendiente; en el suelo, ninguno.
  *  4. Se pinta: la pose entre los dos últimos tics, a la altura del suelo que da la escena, y la
  *     cámara de hombro o de ojos detrás.
  *
@@ -67,6 +68,21 @@
  * Cada fotograma se mira hasta dónde cabe detrás de quien pasea (`hastaDondeCabeElHombro`) y la
  * cámara se acerca o se aleja hacia eso sin saltar (`acercarElHombro`). El porqué y los números
  * están en `camaras.ts`.
+ *
+ * ═══ LA REFRIEGA: LA G, EL BOTÓN, Y EL SUELO ═══
+ *
+ * En una mesa de botas se golpea (`mandos.ts`, «Y EL GOLPE SE DA»). El gancho cuenta las G que se
+ * pulsan —pulsadas, no repetidas, y no las que van a un campo— y las suma a las del botón de la
+ * app; lo que no haya salido todavía va en el primer tic que se dé, y con la cuenta
+ * (`golpesVistosTras`) un fotograma sin tics no se lo come. La G sólo se atiende con canal: sin
+ * nadie a quien contárselo no hay golpe, y la tecla se deja pasar.
+ *
+ * Y si la red dice que quien pasea está en el suelo (`caido`), el paseo NO DA NI UN TIC: ni anda,
+ * ni gira, ni le cuenta nada al canal —el servidor no atiende los pasos de un caído, y lo que se
+ * anduviera tumbado en la pantalla propia volvería de golpe al levantarse—. Se sigue pintando donde
+ * cayó, con la cámara detrás, y lo que se pulse en el suelo no se guarda para después: al renacer
+ * no sale un golpe que se pidió tumbado. Se levanta con el `renace`, que llega por la costura de
+ * corregir con su rumbo.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -74,9 +90,9 @@ import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
 import { arenaDe } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena, MundoDeclarado, Sitio } from '../../shared/mecanicas/mundo';
 import { acercarElHombro, camaraDeHombro, camaraDeOjos, hastaDondeCabeElHombro } from './camaras';
-import { esTeclaDeOtro, mandosDelFotograma, SIN_MANDOS_DE_FUERA, SIN_TECLAS, teclaDelPaseo } from './mandos';
+import { esTeclaDeOtro, esUnGolpe, SIN_MANDOS_DE_FUERA, SIN_TECLAS, teclaDelPaseo } from './mandos';
 import type { DestinoDeLaTecla, EntradaDelTic, MandosDeFuera, Teclas } from './mandos';
-import { corregirElPaseo, fotogramaDelPaseo, mudarDeMundo, nacerEnElPaseo, poseDelPaseo } from './paseante';
+import { corregirElPaseo, fotogramaDeQuienPasea, mudarDeMundo, nacerEnElPaseo, poseDelPaseo } from './paseante';
 import type { EstadoDelPaseo, Paseante } from './paseante';
 
 /** Desde dónde se mira. En la mesa no se anda. */
@@ -117,16 +133,22 @@ export interface OpcionesDelPaseo {
   readonly alturaDeLaCamaraEn?: (x: number, z: number) => number;
   /** La costura (a) con la red: lo pedido en cada tic y dónde se acabó. */
   readonly alDarUnTic?: (entrada: EntradaDelTic, sitio: Andante) => void;
+  /**
+   * Si quien pasea está en el suelo en la refriega (el `caido` del canal). Mientras diga que sí no
+   * se da ni un tic: ver la cabecera. Sin canal no se da, y no se cae nunca.
+   */
+  readonly caido?: () => boolean;
 }
 
 export interface ElPaseo {
   /** Quien pasea, como se pinta en este fotograma. La escribe el paseo antes que nadie. */
   readonly pose: { readonly current: PaseoPintado };
   /**
-   * La costura (b) con la red: poner a quien pasea en un sitio, en Q16.16. Antes de nacer, se
-   * nacerá ahí; donde no se quepa, en el sitio libre más cercano. Ver la cabecera.
+   * La costura (b) con la red: poner a quien pasea en un sitio, en Q16.16, y con `rumbo`
+   * (radianes) mirando hacia ahí. Antes de nacer, se nacerá ahí; donde no se quepa, en el sitio
+   * libre más cercano. Ver la cabecera.
    */
-  readonly corregir: (sitio: Andante) => void;
+  readonly corregir: (sitio: Andante, rumbo?: number) => void;
 }
 
 /** Una altura pintada que alcanza la de verdad poco a poco: la primera vez, de golpe. */
@@ -147,8 +169,19 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
   const alturaDeLaCamara = useRef<number | null>(null);
   /* Cuánto se queda detrás la cámara de hombro: `null` fuera del hombro, y al volver se pone de golpe. */
   const atrasDelHombro = useRef<number | null>(null);
-  /* Un sitio que dijo la red antes de que hubiera nacido nadie: se nace ahí. */
-  const pendiente = useRef<Andante | null>(null);
+  /* Un sitio que dijo la red antes de que hubiera nacido nadie: se nace ahí, y mirando a donde dijo si lo dijo. */
+  const pendiente = useRef<{ readonly sitio: Andante; readonly rumbo: number | undefined } | null>(null);
+  /*
+   * LOS GOLPES: los de la G, que cuenta este gancho, y los que ya salieron en un tic. Los del botón
+   * de la app llegan en los mandos de fuera. `null` hasta el primer fotograma a pie. Ver la cabecera.
+   */
+  const golpesDelTeclado = useRef(0);
+  const golpesVistos = useRef<number | null>(null);
+  /* Con canal se golpea; sin él, la G no es del paseo. Se lee en el oyente, que no se vuelve a apuntar por esto. */
+  const conCanal = useRef(o.alDarUnTic !== undefined);
+  useEffect(() => {
+    conCanal.current = o.alDarUnTic !== undefined;
+  });
   const camera = useThree((s) => s.camera);
 
   /*
@@ -161,6 +194,14 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
     const cambia = (e: KeyboardEvent, pulsada: boolean): void => {
       const mando = teclaDelPaseo(e.key);
       if (mando === null) return;
+      if (mando === 'golpe') {
+        /* Un golpe es PULSAR la G, con canal y sin que sea de otro (ver `esUnGolpe`); soltarla no hace nada. */
+        const conModificador = e.ctrlKey || e.altKey || e.metaKey;
+        if (!pulsada || !conCanal.current || !esUnGolpe(e.key, e.target as DestinoDeLaTecla | null, conModificador, e.repeat)) return;
+        e.preventDefault();
+        golpesDelTeclado.current += 1;
+        return;
+      }
       /*
        * Soltar se atiende SIEMPRE —una tecla que se soltó escribiendo en un campo no puede
        * quedarse pisada en el paseo—; pulsar, sólo si la tecla no es de otro (ver `esTeclaDeOtro`).
@@ -187,7 +228,11 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
   }, [aPie]);
 
   useFrame((_, dt) => {
+    const fuera = o.mandos?.current ?? SIN_MANDOS_DE_FUERA;
+    const golpesPedidos = golpesDelTeclado.current + fuera.golpes;
     if (!aPie || arena === null) {
+      /* Lo pulsado sin andar no se guarda para cuando se ande. */
+      golpesVistos.current = golpesPedidos;
       atrasDelHombro.current = null;
       return;
     }
@@ -198,7 +243,7 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
       /* Si la red ya dijo dónde, se nace ahí, mirando a donde declara el mundo si lo declara. */
       const dicho = pendiente.current;
       const nace: Sitio | null =
-        o.nace ?? (dicho === null ? null : { x: aNumero(dicho.x), z: aNumero(dicho.z), rumbo: 0 });
+        o.nace ?? (dicho === null ? null : { x: aNumero(dicho.sitio.x), z: aNumero(dicho.sitio.z), rumbo: dicho.rumbo ?? 0 });
       if (nace === null) return;
       const nacido = nacerEnElPaseo(arena, nace);
       if (dicho === null && (nacido.ahora.x !== deNumero(nace.x) || nacido.ahora.z !== deNumero(nace.z))) {
@@ -208,14 +253,28 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
         );
       }
       pendiente.current = null;
-      actual = { arena, paseo: dicho === null ? nacido : mudarDeMundo(arena, corregirElPaseo(nacido, dicho)) };
+      actual = {
+        arena,
+        paseo: dicho === null ? nacido : mudarDeMundo(arena, corregirElPaseo(nacido, dicho.sitio, dicho.rumbo)),
+      };
     } else if (actual.arena !== arena) {
       actual = { arena, paseo: mudarDeMundo(arena, actual.paseo) };
     }
 
-    /* ── Los tics ─────────────────────────────────────────────────────────── */
-    const mandos = mandosDelFotograma(teclas.current, o.mandos?.current ?? SIN_MANDOS_DE_FUERA);
-    const paseo = fotogramaDelPaseo(arena, actual.paseo, dt, mandos, o.alDarUnTic);
+    /* ── Los tics, con el golpe pendiente; y en el suelo, ninguno (`fotogramaDeQuienPasea`) ── */
+    const hecho = fotogramaDeQuienPasea(
+      arena,
+      actual.paseo,
+      dt,
+      teclas.current,
+      fuera,
+      golpesPedidos,
+      golpesVistos.current,
+      o.caido?.() === true,
+      o.alDarUnTic,
+    );
+    const paseo = hecho.paseo;
+    golpesVistos.current = hecho.golpesVistos;
     estado.current = { arena, paseo };
 
     /* ── Lo que se pinta ──────────────────────────────────────────────────── */
@@ -237,13 +296,13 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
     camera.lookAt(c.miraX, c.miraY, c.miraZ);
   }, -1);
 
-  const corregir = useCallback((sitio: Andante): void => {
+  const corregir = useCallback((sitio: Andante, rumbo?: number): void => {
     const actual = estado.current;
     if (actual === null) {
-      pendiente.current = sitio;
+      pendiente.current = { sitio, rumbo };
       return;
     }
-    estado.current = { arena: actual.arena, paseo: mudarDeMundo(actual.arena, corregirElPaseo(actual.paseo, sitio)) };
+    estado.current = { arena: actual.arena, paseo: mudarDeMundo(actual.arena, corregirElPaseo(actual.paseo, sitio, rumbo)) };
   }, []);
 
   return useMemo(() => ({ pose, corregir }), [corregir]);

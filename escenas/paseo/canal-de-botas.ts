@@ -67,20 +67,72 @@
  * (BOOTS-ON-BOARD §7.3 A). Lo que se interpola de los demás es presentación. Por eso las cuentas de
  * esta mitad pueden ir en coma flotante: lo único entero es lo que viaja, y viaja tal cual sale de
  * `pasoDelTic`.
+ *
+ * ═══ LA REFRIEGA: UN `golpe` QUE SALE, Y CINCO MENSAJES QUE LLEGAN ═══
+ *
+ * Lo único que dice el aparato es «golpeo»: cuando el paseo trae un tic con `golpe`, sale un
+ * `golpe` con ESE tic y ESA mirada, detrás del `aqui` del mismo tic. Tres cosas lo paran aquí, y
+ * las tres son para no mandar lo que el servidor tiraría: fuera del canal no sale —ni se guarda
+ * para luego: un golpe es un gesto de ahora—; caído no sale; y entre golpe y golpe tiene que pasar
+ * `RECARGA_DEL_GOLPE_MS`, que un dedo nervioso no manda ráfagas. El gesto propio se anota en el
+ * acto, para que `lanzar` salga al pulsar; su eco (`lanza` de uno mismo) no lo vuelve a empezar.
+ *
+ * Lo que llega —`lanza`, `da`, `cae`, `renace`, `vidas`— se apunta por asiento en `refriega.ts`,
+ * que es quien sabe qué quiere decir cada uno. Aquí se hace lo que toca a la conexión:
+ *
+ *  · `vidas` lo pone TODO, al entrar y al reconectar, y hasta que llega no se enseña nada: sin él no
+ *    se sabe cómo está nadie, y un servidor sin refriega no lo manda nunca.
+ *  · El `cae` propio para el paseo: `caido()` dice que sí, y el paseo no da ni un tic hasta renacer.
+ *  · El `renace` propio pone a quien pasea en su sitio de nacer, mirando a donde dice, por la misma
+ *    costura que `corrige` —y un `corrige` de antes de renacer ya está contestado—. El de otro pone
+ *    ese sitio en sus fotos a la hora a la que llegó, para que su salto coincida con su brote.
+ *  · Lo intocable propio caduca con un temporizador, porque el cartel lo dice y tiene que dejar de
+ *    decirlo; lo de los demás se pregunta a la hora de pintarlo.
+ *  · Al cortarse, la refriega se olvida: sin canal no hay refriega, y quien estuviera en el suelo
+ *    con una llave que ya no vale no puede quedarse tumbado para siempre.
  */
 import {
   AVISOS_QUIETO_POR_SEGUNDO,
+  CAIDO,
   CIERRE,
+  DE_PIE,
+  INTOCABLE,
+  INTOCABLE_MS,
   PLAZO_DEL_HOLA_MS,
+  RECARGA_DEL_GOLPE_MS,
   RETRASO_DE_LOS_DEMAS_MS,
   VERSION_DEL_CANAL,
   leerMensajeDelServidor,
 } from '../../shared/mecanicas/canal-de-botas';
-import type { Aqui, Corrige, Dentro, Foto, Hola } from '../../shared/mecanicas/canal-de-botas';
+import type {
+  Cae,
+  Corrige,
+  Da,
+  Dentro,
+  EstadoEnLaRefriega,
+  Foto,
+  Lanza,
+  MensajeDelAparato,
+  Renace,
+  Vidas,
+} from '../../shared/mecanicas/canal-de-botas';
 import { QUIETO, TICS_POR_SEGUNDO, VELOCIDAD_CORRIENDO, radianesDelRumbo } from '../../shared/mecanicas/andar';
 import { aNumero } from '../../shared/mecanicas/fijo';
 import type { Andante } from '../../shared/mecanicas/mundo';
 import type { EntradaDelTic } from './mandos';
+import {
+  REFRIEGA_DE_SERIE,
+  alCaer,
+  alLanzar,
+  alRecibir,
+  alRenacer,
+  comoVaA,
+  estadoA,
+  porLasVidas,
+  textoDeLaRefriega,
+  vidaA,
+} from './refriega';
+import type { ComoVaEnLaRefriega, EnLaRefriega } from './refriega';
 
 /* ─── Los números ────────────────────────────────────────────────────────── */
 
@@ -194,7 +246,11 @@ export type FaseDelCanal = 'conectando' | 'dentro' | 'reintentando' | 'dormido' 
 
 export interface EstadoDelCanal {
   readonly fase: FaseDelCanal;
-  /** Lo que se enseña, en una línea: «Conectando…», «Dentro», «Sin conexión: …». */
+  /**
+   * Lo que se enseña, en una línea: «Conectando…», «Dentro», «Sin conexión: …». Dentro y con la
+   * refriega en marcha lleva también los corazones propios —«Dentro · ♥♥♡ · 2 más andando»—: es lo
+   * que cada cliente ya enseña, y en primera persona no hay otro sitio donde verlos.
+   */
   readonly texto: string;
   /** Quién soy en la mesa, según el servidor. `null` hasta el primer `dentro`. */
   readonly yo: string | null;
@@ -202,6 +258,8 @@ export interface EstadoDelCanal {
   readonly motivo: string | null;
   /** Cuántos intentos seguidos van sin una conexión que aguante. */
   readonly intentos: number;
+  /** Cómo voy en la refriega a la hora del aviso. `null` mientras no haya llegado `vidas`. */
+  readonly refriega: { readonly vida: number; readonly estado: EstadoEnLaRefriega } | null;
 }
 
 /** El tope de lo que se enseña de un motivo que manda el servidor: una línea, no un párrafo. */
@@ -225,10 +283,39 @@ export function motivoDelCierre(codigo: number, razon: string): string {
     case CIERRE.mesaCerrada:
       return 'la mesa se ha cerrado';
     default: {
-      const dicho = razon.trim();
-      return dicho.length > 0 ? `se ha perdido la conexión (${dicho.slice(0, TOPE_DEL_MOTIVO)})` : 'se ha perdido la conexión';
+      /* Entre paréntesis y en mitad de una frase, lo que dijo sin su punto: «(Reinicio)», no «(Reinicio.).». */
+      const dicho = sinPuntoFinal(razon.trim().slice(0, TOPE_DEL_MOTIVO));
+      return dicho.length > 0 ? `se ha perdido la conexión (${dicho})` : 'se ha perdido la conexión';
     }
   }
+}
+
+/** ¿Trae esta frase su propio cierre —punto, admiración, interrogación, puntos suspensivos—? */
+function yaCierra(frase: string): boolean {
+  return /[.!?…]$/.test(frase);
+}
+
+/** Una frase sin su punto final, para meterla en otra. Los puntos suspensivos no son un punto final. */
+function sinPuntoFinal(frase: string): string {
+  return /(^|[^.])\.$/.test(frase) ? frase.slice(0, -1) : frase;
+}
+
+/**
+ * «SIN CONEXIÓN» Y POR QUÉ, en una frase bien cerrada.
+ *
+ * Los motivos de esta casa son un trozo de frase —«un minuto sin moverte»— y van detrás de dos
+ * puntos. Los que manda el servidor en su `fuera` son una frase ENTERA, con su mayúscula y su punto,
+ * y detrás de dos puntos salía «Sin conexión: Un minuto sin moverte: el canal se cierra hasta que
+ * vuelvas a andar.. Echa a andar para volver.»: mayúscula tras los dos puntos y punto doble, en el
+ * cartel que se lee en la prueba de punta a punta. Así que la frase que empieza por mayúscula va
+ * aparte, tras un punto; y a ninguna se le pone el suyo si ya trae cierre. Lo que venga detrás
+ * —«Echa a andar para volver.»— empieza frase nueva.
+ */
+export function sinConexion(motivo: string): string {
+  const m = motivo.trim();
+  if (m.length === 0) return 'Sin conexión.';
+  const frase = yaCierra(m) ? m : `${m}.`;
+  return /^\p{Lu}/u.test(m) ? `Sin conexión. ${frase}` : `Sin conexión: ${frase}`;
 }
 
 /** Los cierres después de los cuales no se vuelve a llamar. Ver la cabecera. */
@@ -313,8 +400,11 @@ export interface OpcionesDelCanal {
   readonly url: string;
   /** La llave del asiento. Viaja en el `hola` y en ningún otro sitio. */
   readonly llave: string;
-  /** La costura (b) del paseo: poner a quien pasea en un sitio, en Q16.16. */
-  readonly corregir: (sitio: Andante) => void;
+  /**
+   * La costura (b) del paseo: poner a quien pasea en un sitio, en Q16.16. Con `rumbo` (radianes),
+   * mirando además hacia ahí: sólo lo da el `renace`.
+   */
+  readonly corregir: (sitio: Andante, rumbo?: number) => void;
   /** Mi asiento, si ya se sabe: a uno mismo no se le pinta aunque salga en la foto. */
   readonly yo?: string | null;
   /** Cada vez que cambia lo que hay que enseñar. */
@@ -332,6 +422,14 @@ export interface ClienteDelCanal {
   alDarUnTic(entrada: EntradaDelTic, sitio: Andante): void;
   /** Dónde se pinta ahora a un asiento, o `null` si no sale en las fotos. */
   poseDe(asiento: string, ahora?: number): OtroQueAnda | null;
+  /**
+   * Cómo va un asiento en la refriega —corazones, gesto, parpadeo—, a la hora a la que se le pinta:
+   * la de ahora para uno mismo, `RETRASO_DE_LOS_DEMAS_MS` atrás para los demás. `null` mientras no
+   * haya llegado `vidas`. Ver `refriega.ts`.
+   */
+  refriegaDe(asiento: string, ahora?: number): ComoVaEnLaRefriega | null;
+  /** Si quien pasea está en el suelo: mientras lo esté, el paseo no da ni un tic. */
+  caido(ahora?: number): boolean;
   /** Dónde se pinta ahora a todos los que salen en las fotos. */
   losDemas(ahora?: number): readonly OtroQueAnda[];
   /** Quién sale en las fotos, en orden. */
@@ -376,20 +474,44 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
   let empezarDeNuevo = false;
   let tirados = 0;
 
-  const estado = (): EstadoDelCanal => ({ fase, texto: textoDe(), yo, motivo, intentos });
+  /* La refriega: lo que ha llegado de cada asiento, si ya llegó `vidas`, y el último golpe que salió. */
+  const refriega = new Map<string, EnLaRefriega>();
+  let refriegaConocida = false;
+  let ultimoGolpe: number | null = null;
+  let cancelarLoIntocable: (() => void) | null = null;
+
+  /** Mi asiento: el que dijo el servidor, o el que dio el cliente mientras no lo haya dicho. */
+  const miAsiento = (): string | null => yo ?? o.yo ?? null;
+
+  const laDe = (asiento: string): EnLaRefriega => refriega.get(asiento) ?? REFRIEGA_DE_SERIE;
+
+  function miRefriega(): EstadoDelCanal['refriega'] {
+    const mio = miAsiento();
+    if (!refriegaConocida || mio === null) return null;
+    const t = reloj.ahora();
+    return { vida: vidaA(laDe(mio), t), estado: estadoA(laDe(mio), t) };
+  }
+
+  const estado = (): EstadoDelCanal => ({ fase, texto: textoDe(), yo, motivo, intentos, refriega: miRefriega() });
 
   function textoDe(): string {
     switch (fase) {
       case 'conectando':
         return 'Conectando…';
-      case 'dentro':
-        return presentes.length === 0 ? 'Dentro' : `Dentro · ${String(presentes.length)} más andando`;
+      case 'dentro': {
+        const partes = ['Dentro'];
+        const mio = miAsiento();
+        if (refriegaConocida && mio !== null) partes.push(textoDeLaRefriega(laDe(mio), reloj.ahora()));
+        if (presentes.length > 0) partes.push(`${String(presentes.length)} más andando`);
+        return partes.join(' · ');
+      }
+      /* El motivo, cerrado una vez y por `sinConexion`: el del servidor ya trae su punto. */
       case 'reintentando':
-        return `Sin conexión: ${motivo ?? 'se ha perdido la conexión'}. Se vuelve a intentar en ${String(Math.ceil(esperaProgramada / 1000))} s.`;
+        return `${sinConexion(motivo ?? 'se ha perdido la conexión')} Se vuelve a intentar en ${String(Math.ceil(esperaProgramada / 1000))} s.`;
       case 'dormido':
-        return `Sin conexión: ${motivo ?? 'un minuto sin moverte'}. Echa a andar para volver.`;
+        return `${sinConexion(motivo ?? 'un minuto sin moverte')} Echa a andar para volver.`;
       case 'parado':
-        return `Sin conexión: ${motivo ?? 'se ha perdido la conexión'}.`;
+        return sinConexion(motivo ?? 'se ha perdido la conexión');
       case 'cerrado':
         return '';
     }
@@ -414,7 +536,39 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
     ponerPresentes([]);
   }
 
-  function mandar(mensaje: Hola | Aqui): void {
+  /** Sin canal no hay refriega: se olvida al entrar de nuevo (llegará otro `vidas`), al cortarse y al cerrar. */
+  function olvidarLaRefriega(): void {
+    refriega.clear();
+    refriegaConocida = false;
+    cancelarLoIntocable?.();
+    cancelarLoIntocable = null;
+  }
+
+  /**
+   * LO INTOCABLE PROPIO SE APAGA SOLO, y el cartel tiene que enterarse: se avisa cuando caduca. Lo
+   * de los demás no hace falta, que se pregunta cada fotograma a la hora de pintarlo.
+   */
+  function vigilarLoIntocable(): void {
+    cancelarLoIntocable?.();
+    cancelarLoIntocable = null;
+    const mio = miAsiento();
+    const mia = mio === null ? undefined : refriega.get(mio);
+    if (mia === undefined || mia.estado !== INTOCABLE) return;
+    const falta = mia.estadoDesde + INTOCABLE_MS - reloj.ahora();
+    if (!(falta > 0)) return;
+    cancelarLoIntocable = reloj.tras(falta, () => {
+      cancelarLoIntocable = null;
+      avisar();
+    });
+  }
+
+  /** ¿Estoy en el suelo? Lo diga `vidas` o un `cae`: el servidor no atiende los pasos de un caído. */
+  function estoyCaido(t: number): boolean {
+    const mio = miAsiento();
+    return mio !== null && estadoA(laDe(mio), t) === CAIDO;
+  }
+
+  function mandar(mensaje: MensajeDelAparato): void {
     const s = socket;
     if (s === null || s.readyState !== ABIERTO) return;
     try {
@@ -500,8 +654,26 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
       case 'corrige':
         if (fase === 'dentro') corrige(m);
         return;
-      case 'fuera':
-        motivoDelFuera = m.motivo.trim().slice(0, TOPE_DEL_MOTIVO);
+      case 'fuera': {
+        /* Un `fuera` sin nada que decir no tapa la frase del código de cierre. */
+        const dicho = m.motivo.trim().slice(0, TOPE_DEL_MOTIVO);
+        motivoDelFuera = dicho.length > 0 ? dicho : null;
+        return;
+      }
+      case 'lanza':
+        if (fase === 'dentro') lanza(m);
+        return;
+      case 'da':
+        if (fase === 'dentro') da(m);
+        return;
+      case 'cae':
+        if (fase === 'dentro') cae(m);
+        return;
+      case 'renace':
+        if (fase === 'dentro') renace(m);
+        return;
+      case 'vidas':
+        if (fase === 'dentro') vidas(m);
         return;
     }
   }
@@ -521,8 +693,78 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
     /* Las fotos de la conexión anterior se sustituyen por las de ésta en cuanto llegue la primera. */
     ultimaFoto = null;
     empezarDeNuevo = true;
+    /* Y la refriega, por la de ésta: detrás del `dentro` llega su `vidas`. */
+    olvidarLaRefriega();
     o.corregir({ x: m.x, z: m.z });
     avisar();
+  }
+
+  /* ─── La refriega ─── */
+
+  /** `lanza`: el gesto de otro. El propio ya se anotó al mandar el golpe, y su eco no lo vuelve a empezar. */
+  function lanza(m: Lanza): void {
+    if (m.de === miAsiento()) return;
+    refriega.set(m.de, alLanzar(laDe(m.de), reloj.ahora()));
+  }
+
+  function da(m: Da): void {
+    refriega.set(m.a, alRecibir(laDe(m.a), m.vida, reloj.ahora()));
+    if (m.a === miAsiento()) avisar();
+  }
+
+  function cae(m: Cae): void {
+    refriega.set(m.a, alCaer(laDe(m.a), reloj.ahora()));
+    if (m.a === miAsiento()) {
+      vigilarLoIntocable();
+      avisar();
+    }
+  }
+
+  function renace(m: Renace): void {
+    const t = reloj.ahora();
+    refriega.set(m.a, alRenacer(laDe(m.a), t));
+    const rumbo = radianesDelRumbo(m.r);
+    if (m.a === miAsiento()) {
+      /* Lo que se corrigiera de antes de renacer ya lo contesta el `renace`: su sitio es el bueno. */
+      corregidoHasta = Math.max(corregidoHasta, ultimoTicMandado);
+      o.corregir({ x: m.x, z: m.z }, rumbo);
+      vigilarLoIntocable();
+      avisar();
+      return;
+    }
+    /* Su sitio de nacer, en sus fotos a la hora del `renace`: el salto se pinta cuando empieza a brotar. */
+    const suyas = fotos.get(m.a);
+    if (suyas !== undefined && !empezarDeNuevo) suyas.push({ t, x: aNumero(m.x), z: aNumero(m.z), rumbo });
+  }
+
+  function vidas(m: Vidas): void {
+    const t = reloj.ahora();
+    const mio = miAsiento();
+    refriega.clear();
+    /* Lo de los demás, ya en su pasado: se les pinta `RETRASO_DE_LOS_DEMAS_MS` atrás (`refriega.ts`). */
+    for (const [asiento, vida, dicho] of m.v) {
+      /* El lector estricto ya sólo deja pasar los tres estados; aquí se le pone su nombre. */
+      const suEstado: EstadoEnLaRefriega = dicho === CAIDO ? CAIDO : dicho === INTOCABLE ? INTOCABLE : DE_PIE;
+      refriega.set(asiento, porLasVidas(vida, suEstado, asiento === mio ? t : t - RETRASO_DE_LOS_DEMAS_MS));
+    }
+    refriegaConocida = true;
+    vigilarLoIntocable();
+    avisar();
+  }
+
+  /**
+   * EL GOLPE DE UN TIC. Sólo dentro —quien lo llama ya lo ha mirado—, nunca caído, y no antes de
+   * `RECARGA_DEL_GOLPE_MS` desde el anterior: lo que no sale se tira, no se guarda. El gesto propio,
+   * al instante.
+   */
+  function golpear(entrada: EntradaDelTic): void {
+    const t = reloj.ahora();
+    const mio = miAsiento();
+    if (mio === null || estoyCaido(t)) return;
+    if (ultimoGolpe !== null && t - ultimoGolpe < RECARGA_DEL_GOLPE_MS) return;
+    mandar({ t: 'golpe', n: entrada.tic, r: entrada.mira });
+    ultimoGolpe = t;
+    refriega.set(mio, alLanzar(laDe(mio), t));
   }
 
   function foto(m: Foto): void {
@@ -561,6 +803,8 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
     cancelarTemporizadores();
     if (cerrado) return;
     const estuvoDentro = fase === 'dentro';
+    /* Sin canal no hay refriega: ni corazones que enseñar, ni un suelo del que no se pueda levantar. */
+    olvidarLaRefriega();
     motivo = motivoDelFuera ?? motivoDelCierre(codigo, razon);
     motivoDelFuera = null;
     if (cierreSinVuelta(codigo)) {
@@ -595,18 +839,33 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
         return;
       }
       if (fase !== 'dentro') return;
+      /*
+       * En el suelo no se cuenta nada: el paseo no da tics a un caído, y si alguien se los diera, el
+       * servidor los tiraría igual. Ni el sitio, ni un golpe.
+       */
+      if (estoyCaido(reloj.ahora())) return;
       const quieto = entrada.marcha === QUIETO;
-      if (quieto && ultimaMarchaMandada === QUIETO && entrada.tic - ultimoTicMandado < TICS_ENTRE_AVISOS_QUIETO) return;
-      /* `r` es hacia dónde MIRA, no hacia dónde se da el paso: ver `EntradaDelTic.mira`. */
-      mandar({ t: 'aqui', n: entrada.tic, x: sitio.x, z: sitio.z, r: entrada.mira, m: entrada.marcha });
-      ultimoTicMandado = entrada.tic;
-      ultimaMarchaMandada = entrada.marcha;
+      /* Quieto y avisado hace menos de `TICS_ENTRE_AVISOS_QUIETO` tics: este `aqui` sobra. */
+      const sobraElAqui = quieto && ultimaMarchaMandada === QUIETO && entrada.tic - ultimoTicMandado < TICS_ENTRE_AVISOS_QUIETO;
+      if (!sobraElAqui) {
+        /* `r` es hacia dónde MIRA, no hacia dónde se da el paso: ver `EntradaDelTic.mira`. */
+        mandar({ t: 'aqui', n: entrada.tic, x: sitio.x, z: sitio.z, r: entrada.mira, m: entrada.marcha });
+        ultimoTicMandado = entrada.tic;
+        ultimaMarchaMandada = entrada.marcha;
+      }
+      /* El golpe, detrás del sitio del mismo tic: el servidor lo mide desde donde aceptó que estaba. */
+      if (entrada.golpe) golpear(entrada);
     },
     poseDe(asiento, ahora = reloj.ahora()) {
       const suyas = fotos.get(asiento);
       if (suyas === undefined) return null;
       return poseEntreFotos(asiento, suyas, ahora - RETRASO_DE_LOS_DEMAS_MS);
     },
+    refriegaDe(asiento, ahora = reloj.ahora()) {
+      if (!refriegaConocida) return null;
+      return comoVaA(laDe(asiento), asiento === miAsiento() ? ahora : ahora - RETRASO_DE_LOS_DEMAS_MS);
+    },
+    caido: (ahora = reloj.ahora()) => estoyCaido(ahora),
     losDemas(ahora = reloj.ahora()) {
       const salida: OtroQueAnda[] = [];
       for (const asiento of presentes) {
@@ -625,6 +884,7 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
       socket = null;
       fase = 'cerrado';
       olvidarALosDemas();
+      olvidarLaRefriega();
       cerrado = true;
       if (s !== null) soltar(s);
     },

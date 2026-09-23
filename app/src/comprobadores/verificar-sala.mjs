@@ -3445,6 +3445,163 @@ paso('Boots on Board en la app: la elección sólo en el lobby común, apagada c
   );
 }
 
+/*
+ * ═══ BOOTS ON BOARD EN LA APP: «GOLPEAR» ═══
+ *
+ * La refriega se golpea con la G en el escritorio, y aquí con un botón (`BotonDeGolpear`, en
+ * `mandos-del-paseo.tsx`). Todo lo que puede ir mal con él va mal en silencio, y en el escritorio
+ * nada de eso se ve:
+ *
+ *   · Que sea un `Pressable`: con el pulgar en la palanca, el dedo nuevo ni le pregunta —la
+ *     negociación empieza en el antepasado común de los dos—, y no se puede golpear andando. Tiene
+ *     que ser el toque en crudo, `onTouchStart`; y nada de `onClick`, que en la app no llega.
+ *   · Que quien reescribe la referencia —la palanca, sesenta veces por segundo; el correr— se deje
+ *     los golpes por el camino: el golpe del otro pulgar desaparece antes de que lo lea el paseo.
+ *   · Que tape la palanca o el correr, o que en el Burgo se salga de la franja del paseo, que mide
+ *     152 y fuera de la cual el dedo no llega en Android. La cuenta del sitio se EJECUTA: sus
+ *     medidas y `ladoDelGolpe` se sacan del fuente y se corren para los anchos de teléfono.
+ *   · Y que salga donde no toca —en una mesa normal, mirando la mesa— o que, escondido, siga
+ *     cogiendo el dedo: tiene que no pintarse.
+ *
+ * Lo que esto no compra es que en un teléfono se vea bien y se acierte con el pulgar: eso pide
+ * un teléfono. Cada regla se afirma sobre el fichero de verdad y se ve CAER envenenada.
+ */
+paso('Boots on Board en la app: «Golpear» sólo a pie y con canal, con el toque en crudo, sin tapar la palanca ni el correr, y sin perder un golpe');
+{
+  const mandos = leer(path.join(SRC, 'arcade', 'mandos-del-paseo.tsx'));
+  const laDelBurgo = leer(path.join(SRC, 'arcade', 'burgo-en-tres-escena.tsx'));
+  const PANTALLAS = [
+    ['Las Lindes', leer(path.join(SRC, 'arcade', 'lindes-en-tres-escena.tsx')), "modo !== 'mesa'"],
+    ['el Burgo', laDelBurgo, 'aPie'],
+    ['Riberas', leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx')), 'aPie'],
+  ];
+  const soloCodigo = (texto) =>
+    texto
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const aLaLetra = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  /** Afirma la regla sobre el fichero de verdad, y la ve CAER con cada caso envenenado. */
+  const regla = (que, prueba, bueno, envenenados, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    envenenados.forEach((envenenado, i) => {
+      comprobar(
+        `y «${que}» se ve CAER con el caso envenenado ${String(i + 1)}`,
+        envenenado !== bueno && !prueba(envenenado),
+        envenenado === bueno ? 'el envenenado no ha cambiado el fichero: la regla no se está poniendo a prueba' : porque,
+      );
+    });
+  };
+
+  /* ── El botón ── */
+  const elBoton = (t) =>
+    /export function BotonDeGolpear\(\{ mandos, visible \}: BotonDeGolpearProps\): JSX\.Element \| null \{([\s\S]*?)\n\}/.exec(soloCodigo(t))?.[1] ?? '';
+  regla(
+    '«Golpear» se pulsa con el toque EN CRUDO —`onTouchStart`, que llega aunque la palanca sea el respondedor—, sin `Pressable` ni `onClick`, cuenta un golpe más sin tocar lo demás, y el lector de pantalla lo activa',
+    (t) => {
+      const b = elBoton(t);
+      return (
+        b.length > 0 &&
+        /onTouchStart=\{\(\) => \{\s*golpear\(\);/.test(b) &&
+        !/Pressable|onPress|onClick/.test(b) &&
+        /mandos\.current = \{ \.\.\.mandos\.current, golpes: mandos\.current\.golpes \+ 1 \};/.test(b) &&
+        /accessibilityRole="button"/.test(b) &&
+        /accessibilityActions=\{ACCIONES_DEL_GOLPE\}/.test(b) &&
+        /if \(e\.nativeEvent\.actionName === 'activate'\) golpear\(\);/.test(b) &&
+        /const ACCIONES_DEL_GOLPE[^=]*= \[\{ name: 'activate', label: 'Golpear' \}\];/.test(t) &&
+        !/onClick/.test(soloCodigo(t))
+      );
+    },
+    mandos,
+    [mandos.replace('onTouchStart={() => {', 'onPress={() => {'), mandos.replace('golpes: mandos.current.golpes + 1', 'golpes: 1')],
+    'con un `Pressable`, andando con la palanca el botón no se entera, y sin sumar se pisan dos toques seguidos',
+  );
+  regla(
+    'y cuando no toca NO SE PINTA: su `return null` va antes de pintar nada y detrás de todos sus ganchos',
+    (t) => {
+      const b = elBoton(t);
+      const salida = b.indexOf('if (!visible) return null;');
+      return salida > 0 && b.indexOf('<View') > salida && !/\buse[A-Z]\w*\(/.test(b.slice(salida));
+    },
+    mandos,
+    [mandos.replace('if (!visible) return null;', '')],
+    'un botón escondido con opacidad seguiría cogiendo el dedo encima del tablero, y un gancho detrás del `return` rompe la pantalla al cambiar de rama',
+  );
+
+  /* ── Quien reescribe la referencia copia los golpes ── */
+  regla(
+    'la palanca y el correr, que reescriben la referencia, copian los golpes tal cual: el otro pulgar puede haber golpeado entre dos movimientos',
+    (t) => {
+      const escrituras = [...soloCodigo(t).matchAll(/mandos\.current = ([^;]*);/g)].map((m) => m[1] ?? '');
+      return escrituras.length >= 5 && escrituras.every((e) => e === 'SIN_MANDOS_DE_FUERA' || /\bgolpes: mandos\.current\.golpes\b/.test(e) || /\.\.\.mandos\.current\b/.test(e));
+    },
+    mandos,
+    [mandos.replace('y: -y / RECORRIDO }, deprisa: mandos.current.deprisa, golpes: mandos.current.golpes }', 'y: -y / RECORRIDO }, deprisa: mandos.current.deprisa }')],
+    'una palanca que reescribe `{ palanca, deprisa }` borra el golpe que el otro pulgar acaba de dar, y el golpe no sale nunca',
+  );
+
+  /* ── Dónde va, con la cuenta de verdad ── */
+  const MEDIDAS = ['BASE', 'ABAJO_DEL_CORRER', 'ANCHO_DEL_CORRER', 'LADO_DEL_GOLPE', 'LADO_MINIMO_DEL_GOLPE', 'HUECO_DEL_GOLPE', 'LO_DE_LA_PALANCA', 'LO_DEL_CORRER'];
+  const lasMedidas = MEDIDAS.map((n) => new RegExp(`^const ${n} = [^;\\n]+;`, 'm').exec(mandos)?.[0] ?? `const ${n} = Number.NaN;`);
+  const laCuenta = /export function ladoDelGolpe\(ancho: number\): number \{[\s\S]*?\n\}/.exec(mandos)?.[0] ?? 'export function ladoDelGolpe() { return Number.NaN; }';
+  const laFranja = /^const ALTO_DE_LA_FRANJA_ANDANDO = [^;\n]+;/m.exec(laDelBurgo)?.[0] ?? 'const ALTO_DE_LA_FRANJA_ANDANDO = Number.NaN;';
+  const js = ts.transpileModule(
+    `${lasMedidas.join('\n')}\n${laFranja}\n${laCuenta}\nexport const MEDIDAS = { BASE, ABAJO_DEL_CORRER, ANCHO_DEL_CORRER, LO_DEL_CORRER, ALTO_DE_LA_FRANJA_ANDANDO };`,
+    { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } },
+  ).outputText;
+  const { ladoDelGolpe, MEDIDAS: m } = await import(`data:text/javascript;base64,${Buffer.from(js, 'utf8').toString('base64')}`);
+  /** Dónde queda el golpe en un lienzo de `ancho` puntos, con su derecha a `derechaDelGolpe` del canto. */
+  const dibujo = (ancho, derechaDelGolpe = m.LO_DEL_CORRER) => {
+    const lado = ladoDelGolpe(ancho);
+    const derecha = ancho - derechaDelGolpe;
+    return { lado, izquierda: derecha - lado, derecha, arriba: m.ABAJO_DEL_CORRER + lado };
+  };
+  const tapa = (ancho, derechaDelGolpe) => {
+    const d = dibujo(ancho, derechaDelGolpe);
+    return d.izquierda < 16 + m.BASE || d.derecha > ancho - 16 - m.ANCHO_DEL_CORRER;
+  };
+  const ANCHOS = [360, 375, 390, 393, 412, 414, 428, 430];
+  comprobar(
+    'de 360 a 430 puntos de ancho, «Golpear» no tapa ni la palanca ni el correr',
+    ANCHOS.every((w) => !tapa(w)),
+    ANCHOS.map((w) => [w, dibujo(w)]),
+  );
+  comprobar('se ve fallar: con el golpe donde está el correr, lo tapa', ANCHOS.every((w) => tapa(w, 16)));
+  comprobar(
+    'y es grande para el pulgar: 76 puntos desde 375, 64 o más en todos, y nunca menos de 48, ni en 320 ni con un ancho roto',
+    ladoDelGolpe(375) === 76 && ANCHOS.every((w) => ladoDelGolpe(w) >= 64) && ladoDelGolpe(320) === 48 && ladoDelGolpe(Number.NaN) === 48,
+    ANCHOS.map((w) => ladoDelGolpe(w)),
+  );
+  comprobar(
+    `y cabe en la franja del paseo del Burgo (${String(m.ALTO_DE_LA_FRANJA_ANDANDO)} de alto), que es donde el dedo llega en Android`,
+    [320, ...ANCHOS].every((w) => dibujo(w).arriba <= m.ALTO_DE_LA_FRANJA_ANDANDO),
+    [320, ...ANCHOS].map((w) => dibujo(w).arriba),
+  );
+  comprobar(
+    'y el estilo lo pone donde dice la cuenta: a la izquierda del correr, a su altura, y el correr con su ancho fijo',
+    /golpear: \{\s*position: 'absolute',\s*right: LO_DEL_CORRER,\s*bottom: ABAJO_DEL_CORRER,/.test(mandos) &&
+      /correr: \{\s*position: 'absolute',\s*right: 16,\s*bottom: ABAJO_DEL_CORRER,\s*width: ANCHO_DEL_CORRER,/.test(mandos) &&
+      /\{ width: lado, height: lado, borderRadius: lado \/ 2 \}/.test(mandos),
+  );
+
+  /* ── Las tres pantallas lo montan: a pie, SÓLO con canal, junto a la palanca ── */
+  for (const [juego, fuente, aPie] of PANTALLAS) {
+    const esperado = new RegExp(
+      `<MandosDelPaseo mandos=\\{mandos\\} visibles=\\{${aLaLetra(aPie)}\\} \\/>\\s*<BotonDeGolpear mandos=\\{mandos\\} visible=\\{${aLaLetra(aPie)} && canal !== undefined\\} \\/>`,
+    );
+    regla(
+      `${juego}: la pantalla monta «Golpear» UNA vez, junto a la palanca y en su misma caja, a pie y SÓLO con canal`,
+      (t) => {
+        const c = soloCodigo(t);
+        return esperado.test(c) && (c.match(/<BotonDeGolpear\b/g) ?? []).length === 1 && /import \{ BotonDeGolpear \} from '\.\/mandos-del-paseo';/.test(c);
+      },
+      fuente,
+      [fuente.replace(`visible={${aPie} && canal !== undefined}`, `visible={${aPie}}`), `${fuente}\n<BotonDeGolpear mandos={mandos} visible />`],
+      'sin la pregunta por el canal, una mesa normal enseñaría un botón que no golpea a nadie; y fuera de la caja de la palanca, en el Burgo el dedo no llegaría en Android',
+    );
+  }
+}
+
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», el mismo que llevan el servidor y la escena.
  *
@@ -3472,7 +3629,8 @@ paso('Boots on Board en la app: la elección sólo en el lobby común, apagada c
  * después, con su propio código de salida (2) para que se distinga de una roja de verdad.
  */
 /* Y dieciocho más de Boots on Board en la app —la mitad, vacunas—: el guardia sube con ellas. */
-const COMPROBACIONES_ESCRITAS = 271;
+/* Y veintiuna de «Golpear», la refriega en la app —once de ellas, vacunas—: el guardia sube con ellas. */
+const COMPROBACIONES_ESCRITAS = 292;
 
 if (fallos.length > 0) {
   console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);

@@ -21,6 +21,13 @@
  *
  * Sin canal —una mesa `normal`— no se abre nada y `alDarUnTic` es `undefined`: el paseo no paga ni
  * una llamada por tic.
+ *
+ * ═══ Y LA REFRIEGA LLEGA POR LOS MISMOS SITIOS ═══
+ *
+ * `QuienAnda` y `LosDemas` le preguntan al canal en cada fotograma cómo va cada uno
+ * (`refriegaDe`, por `cliente`), y el paseo pregunta si quien pasea está en el suelo por `caido`,
+ * estable como `alDarUnTic`. El `renace` propio pasa por la costura de corregir con un rumbo, así
+ * que ésta reenvía los dos. Sin canal, `caido` dice siempre que no.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Andante } from '../../shared/mecanicas/mundo';
@@ -38,11 +45,13 @@ export interface ElCanal {
   readonly presentes: readonly string[];
   /** Lo último que dijo el canal de sí mismo. `null` sin canal. */
   readonly estado: EstadoDelCanal | null;
+  /** Para `usarElPaseo`: si quien pasea está en el suelo en la refriega. Estable; sin canal, nunca. */
+  readonly caido: () => boolean;
 }
 
 export function usarElCanal(
   canal: CanalDeBotas | undefined,
-  corregir: { readonly current: (sitio: Andante) => void },
+  corregir: { readonly current: (sitio: Andante, rumbo?: number) => void },
   inyectado?: { readonly WebSocket?: FabricaDeSockets; readonly reloj?: RelojDelCanal },
 ): ElCanal {
   const cliente = useRef<ClienteDelCanal | null>(null);
@@ -66,7 +75,7 @@ export function usarElCanal(
       url,
       llave,
       yo,
-      corregir: (sitio) => corregir.current(sitio),
+      corregir: (sitio, rumbo) => corregir.current(sitio, rumbo),
       alCambiar: (e) => {
         ponerEstado(e);
         alCambiar.current?.(e);
@@ -88,9 +97,11 @@ export function usarElCanal(
     cliente.current?.alDarUnTic(entrada, sitio);
   }, []);
 
+  const caido = useCallback((): boolean => cliente.current?.caido() === true, []);
+
   const conCanal = url !== null && llave !== null;
   return useMemo(
-    () => ({ alDarUnTic: conCanal ? alDarUnTic : undefined, cliente, presentes, estado: conCanal ? estado : null }),
-    [alDarUnTic, conCanal, estado, presentes],
+    () => ({ alDarUnTic: conCanal ? alDarUnTic : undefined, cliente, presentes, estado: conCanal ? estado : null, caido }),
+    [alDarUnTic, caido, conCanal, estado, presentes],
   );
 }

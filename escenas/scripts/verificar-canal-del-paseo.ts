@@ -20,14 +20,21 @@
  *     fotos se pintan `RETRASO_DE_LOS_DEMAS_MS` atrás y nunca por delante de la última; quien deja
  *     de salir desaparece; lo mal formado se tira y se cuenta.
  *  4. CUANDO SE CORTA. Con `llaveMala`, `mesaQueNo` y `reemplazado` no se vuelve; con lo demás sí,
- *     con la espera doblándose hasta su tope; con `quieto`, sólo al volver a moverse.
- *  5. LA CÁMARA DE HOMBRO. Se acerca delante de un muro sin saltar, no se queda nunca al otro
+ *     con la espera doblándose hasta su tope; con `quieto`, sólo al volver a moverse. Y la frase del
+ *     corte sale bien cerrada diga lo que diga el servidor: ni punto doble, ni mayúscula tras dos puntos.
+ *  5. LA REFRIEGA. `vidas` inicia y reinicia; `lanza`, `da`, `cae` y `renace` cambian lo que deben y
+ *     a la hora a la que se pinta a cada uno; lo intocable caduca solo; lo mal formado no cambia
+ *     nada. El golpe sale sólo dentro, con su tic y su mirada, con la recarga y nunca caído; caído no
+ *     se anda; `renace` recoloca y mira; y al cortarse se olvida todo.
+ *  6. LA CÁMARA DE HOMBRO. Se acerca delante de un muro sin saltar, no se queda nunca al otro
  *     lado, no baja del mínimo, y vuelve a su sitio al apartarse.
- *  6. EL RÓTULO. Se escribe lo que tiene dibujo, mira a la cámara y se lee desde el hombro.
- *  7. EL MONTAJE. La escena abre el canal SÓLO con la prop, y los dos clientes se la pasan SÓLO en
+ *  7. EL RÓTULO. Se escribe lo que tiene dibujo, mira a la cámara y se lee desde el hombro; la
+ *     tesela lleva un canto claro que se lee con cualquier color; y los corazones van encima.
+ *  8. EL MONTAJE. La escena abre el canal SÓLO con la prop, y los dos clientes se la pasan SÓLO en
  *     una mesa `botas`, con la misma pregunta.
- *  8. LOS TRES JUEGOS QUE SE ANDAN. Las Lindes, el Burgo y Riberas cosen el canal igual —la prop, su
- *     `alDarUnTic` en el paseo y la corrección por una referencia—, pintan a los demás UNA vez, sólo
+ *  9. LOS TRES JUEGOS QUE SE ANDAN. Las Lindes, el Burgo y Riberas cosen el canal igual —la prop, su
+ *     `alDarUnTic` en el paseo, la corrección por una referencia, y la refriega: `caido` en el paseo y
+ *     el cliente en `QuienAnda`—, pintan a los demás UNA vez, sólo
  *     con canal y a pie, y con LA MISMA altura del suelo que el paseo le da a quien anda; los dos
  *     clientes del Burgo y los dos de Riberas construyen el canal SÓLO en una mesa `botas`, se lo
  *     pasan a la escena una vez, empiezan a pie, dicen cómo va el canal sólo en botas, y dan a cada
@@ -41,14 +48,23 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import {
   AVISOS_QUIETO_POR_SEGUNDO,
+  CAIDO,
   CIERRE,
+  DE_PIE,
+  INTOCABLE,
+  INTOCABLE_MS,
+  RECARGA_DEL_GOLPE_MS,
   RETRASO_DE_LOS_DEMAS_MS,
   TOPE_DE_MENSAJE_BYTES,
   VERSION_DEL_CANAL,
+  VIDA_ENTERA,
   leerMensajeDelAparato,
   rutaDelCanal,
 } from '../../shared/mecanicas/canal-de-botas';
 import { ANDANDO, QUIETO, RADIO_DEL_PASEANTE, RUMBOS, TICS_POR_SEGUNDO, radianesDelRumbo } from '../../shared/mecanicas/andar';
+import { COLORES_DEL_BURGO } from '../../shared/arcade/juegos/burgo';
+import { CLIP } from '../embarcadero/figuras';
+import { DURACION } from '../embarcadero/gestos';
 import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
 import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena, Casilla, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
@@ -73,9 +89,25 @@ import {
 import { mandosDelFotograma, SIN_MANDOS_DE_FUERA, SIN_TECLAS } from '../paseo/mandos';
 import type { EntradaDelTic, Mandos } from '../paseo/mandos';
 import { asientosQueAndan, COLOR_SIN_DECLARAR, esMesaDeBotas } from '../paseo/mesa-de-botas';
-import { corregirElPaseo, fotogramaDelPaseo, nacerEnElPaseo, poseDelPaseo } from '../paseo/paseante';
+import { corregirElPaseo, fotogramaDelPaseo, fotogramaDeQuienPasea, nacerEnElPaseo, poseDelPaseo } from '../paseo/paseante';
 import type { EstadoDelPaseo } from '../paseo/paseante';
-import { ALTO_MAXIMO_DEL_ROTULO, altoDelRotulo, geometriaDelRotulo, letrasDelRotulo } from '../paseo/rotulo';
+import { PARPADEO_MS } from '../paseo/refriega';
+import {
+  ALTO_MAXIMO_DEL_ROTULO,
+  CANTO_DE_LA_TESELA,
+  COLOR_DE_LA_PLACA,
+  COLOR_DE_LA_TINTA,
+  COLOR_DEL_CORAZON,
+  COLOR_DEL_CORAZON_APAGADO,
+  COLOR_DEL_CORAZON_PERDIDO,
+  altoDeLaPlaca,
+  altoDelRotulo,
+  corazonesDelRotulo,
+  geometriaDeLosCorazones,
+  geometriaDelRotulo,
+  letrasDelRotulo,
+  ponerLosCorazones,
+} from '../paseo/rotulo';
 import { asientosQueAndanPorElBurgo } from '../burgo/a-pie';
 import { asientosQueAndanPorElDelta } from '../delta-a-pie';
 import { direccionDelCanal as direccionDelEscritorio } from '../../escritorio/src/mesa';
@@ -168,6 +200,8 @@ interface Banco {
   readonly creados: SocketDePrueba[];
   readonly reloj: RelojDePrueba;
   readonly correcciones: Andante[];
+  /** El rumbo de cada corrección, en radianes: sólo lo lleva la del `renace`. */
+  readonly rumbos: (number | undefined)[];
   readonly estados: EstadoDelCanal[];
   readonly presentes: (readonly string[])[];
   /** El último socket que abrió el canal. */
@@ -177,7 +211,7 @@ interface Banco {
 }
 
 /** Un canal contra el servidor de mentira. `corregir` es la costura (b); por defecto sólo apunta. */
-function unBanco(corregir?: (sitio: Andante) => void): Banco {
+function unBanco(corregir?: (sitio: Andante, rumbo?: number) => void): Banco {
   const creados: SocketDePrueba[] = [];
   class Fabrica extends SocketDePrueba {
     constructor(url: string) {
@@ -187,15 +221,17 @@ function unBanco(corregir?: (sitio: Andante) => void): Banco {
   }
   const reloj = new RelojDePrueba();
   const correcciones: Andante[] = [];
+  const rumbos: (number | undefined)[] = [];
   const estados: EstadoDelCanal[] = [];
   const presentes: (readonly string[])[] = [];
   const cliente = abrirElCanal({
     url: DIRECCION,
     llave: LLAVE,
     yo: 's1',
-    corregir: (sitio) => {
+    corregir: (sitio, rumbo) => {
       correcciones.push(sitio);
-      corregir?.(sitio);
+      rumbos.push(rumbo);
+      corregir?.(sitio, rumbo);
     },
     alCambiar: (e) => estados.push(e),
     alCambiarLosPresentes: (p) => presentes.push(p),
@@ -212,6 +248,7 @@ function unBanco(corregir?: (sitio: Andante) => void): Banco {
     creados,
     reloj,
     correcciones,
+    rumbos,
     estados,
     presentes,
     socket,
@@ -636,7 +673,7 @@ paso('Cuando se corta: sin vuelta con la llave mala, la mesa que no y el asiento
     comprobar(`y se deja el motivo escrito para la pantalla: «${e.texto}»`, e.texto.startsWith('Sin conexión: ') && dice.test(e.texto), e.texto);
     comprobar('y ya no se pinta a nadie: esas fotos eran de una conexión que no vuelve', b.cliente.presentes().length === 0);
     /* Ni moviéndose. */
-    b.cliente.alDarUnTic({ tic: 9999, rumbo: 0, marcha: ANDANDO, mira: 0 }, { x: 0, z: 0 });
+    b.cliente.alDarUnTic({ tic: 9999, rumbo: 0, marcha: ANDANDO, mira: 0, golpe: false }, { x: 0, z: 0 });
     comprobar('y ni echando a andar se vuelve', b.creados.length === 1);
   }
   /* El `fuera` que manda el servidor antes de cerrar es lo que se lee. */
@@ -646,9 +683,85 @@ paso('Cuando se corta: sin vuelta con la llave mala, la mesa que no y el asiento
   b.socket().llega(JSON.stringify({ t: 'fuera', motivo: 'Esta mesa se juega en la modalidad de siempre.' }));
   b.socket().cae(CIERRE.mesaQueNo);
   comprobar(
-    'y si el servidor dijo por qué con un `fuera`, se lee lo que dijo',
-    b.cliente.estado().texto === 'Sin conexión: Esta mesa se juega en la modalidad de siempre..',
+    'y si el servidor dijo por qué con un `fuera`, se lee lo que dijo, como frase suya: tras un punto y con su punto, no con dos',
+    b.cliente.estado().texto === 'Sin conexión. Esta mesa se juega en la modalidad de siempre.',
     b.cliente.estado().texto,
+  );
+}
+
+/*
+ * ═══ LA FRASE DEL CORTE, BIEN CERRADA, DIGA LO QUE DIGA EL SERVIDOR ═══
+ *
+ * El `fuera` del servidor es una frase entera, con su mayúscula y su punto, y el cartel la ponía
+ * detrás de dos puntos y le añadía otro: en la prueba de punta a punta salió «Sin conexión: Un
+ * minuto sin moverte: el canal se cierra hasta que vuelvas a andar.. Echa a andar para volver.».
+ * Aquí se recorren motivos con punto y sin él, con admiración, interrogación y puntos suspensivos,
+ * en mayúscula y en minúscula, por las tres fases que enseñan un motivo —parado, dormido y
+ * reintentando— y por la razón de un cierre de la red; y ninguna frase puede llevar un punto doble,
+ * un punto detrás de otro cierre, mayúscula detrás de dos puntos, ni quedarse sin cerrar.
+ */
+{
+  const MOTIVOS: readonly string[] = [
+    'Un minuto sin moverte: el canal se cierra hasta que vuelvas a andar.',
+    'La mesa se ha cerrado.',
+    'la mesa se ha cerrado.',
+    'Reinicio del servidor',
+    '¿Sigues ahí?',
+    '¡Hasta luego!',
+    'Mantenimiento…',
+    'Espera...',
+  ];
+  const CORTES: readonly (readonly [string, number])[] = [
+    ['parado', CIERRE.mesaQueNo],
+    ['dormido', CIERRE.quieto],
+    ['reintentando', CIERRE.mesaCerrada],
+  ];
+  const malCerrada = (texto: string): boolean =>
+    /(^|[^.])\.\.(?!\.)/.test(texto) || /[!?…]\./.test(texto) || /: \p{Lu}/u.test(texto) || /\.\)/.test(texto) || !/[.!?…]$/.test(texto);
+  const malas: string[] = [];
+  let casos = 0;
+  for (const motivo of MOTIVOS) {
+    for (const [fase, codigo] of CORTES) {
+      const c = unBanco();
+      c.socket().abrir();
+      c.socket().llega(dentro(0, 0));
+      c.socket().llega(JSON.stringify({ t: 'fuera', motivo }));
+      c.socket().cae(codigo);
+      const e = c.cliente.estado();
+      casos++;
+      const suyo = motivo.replace(/(^|[^.])\.$/, '$1');
+      if (e.fase !== fase || malCerrada(e.texto) || !e.texto.includes(suyo)) malas.push(`${fase}: ${e.texto}`);
+      c.cliente.cerrar();
+    }
+  }
+  comprobar(
+    `${String(casos)} frases de corte con los motivos del servidor, en las tres fases, sin punto doble, sin mayúscula tras dos puntos y cerradas una vez`,
+    malas.length === 0 && casos === MOTIVOS.length * CORTES.length,
+    malas,
+  );
+  const dormido = unBanco();
+  dormido.socket().abrir();
+  dormido.socket().llega(dentro(0, 0));
+  dormido.socket().llega(JSON.stringify({ t: 'fuera', motivo: 'Un minuto sin moverte: el canal se cierra hasta que vuelvas a andar.' }));
+  dormido.socket().cae(CIERRE.quieto);
+  comprobar(
+    'y la de la prueba de punta a punta dice lo que tiene que decir, letra a letra',
+    dormido.cliente.estado().texto === 'Sin conexión. Un minuto sin moverte: el canal se cierra hasta que vuelvas a andar. Echa a andar para volver.',
+    dormido.cliente.estado().texto,
+  );
+  const deLaRed = unBanco();
+  deLaRed.socket().abrir();
+  deLaRed.socket().llega(dentro(0, 0));
+  deLaRed.socket().cae(1011, 'Reinicio del servidor.');
+  comprobar(
+    'y la razón de un cierre de la red va entre paréntesis sin su punto, y la frase se cierra una vez',
+    deLaRed.cliente.estado().texto === 'Sin conexión: se ha perdido la conexión (Reinicio del servidor). Se vuelve a intentar en 1 s.',
+    deLaRed.cliente.estado().texto,
+  );
+  /* LA VACUNA: la composición de antes, con el motivo tal cual y un punto detrás, sí sale mal cerrada. */
+  comprobar(
+    'y la composición de antes —dos puntos, el motivo tal cual y otro punto— sí la pilla: la guarda distingue',
+    malCerrada(`Sin conexión: ${MOTIVOS[0] ?? ''}. Echa a andar para volver.`) && malCerrada(`Sin conexión: ${MOTIVOS[4] ?? ''}.`),
   );
 }
 
@@ -761,9 +874,9 @@ paso('Con `quieto`, se vuelve SÓLO al volver a moverse');
   b.reloj.avanzar(10 * 60_000);
   comprobar('desalojado por quieto, no se vuelve en diez minutos', b.creados.length === 1 && b.cliente.estado().fase === 'dormido', b.cliente.estado());
   comprobar('y la pantalla dice por qué y cómo volver', /Echa a andar para volver/.test(b.cliente.estado().texto), b.cliente.estado().texto);
-  for (let tic = 1; tic <= 100; tic++) b.cliente.alDarUnTic({ tic, rumbo: 0, marcha: QUIETO, mira: 0 }, { x: 0, z: 0 });
+  for (let tic = 1; tic <= 100; tic++) b.cliente.alDarUnTic({ tic, rumbo: 0, marcha: QUIETO, mira: 0, golpe: false }, { x: 0, z: 0 });
   comprobar('ni con cien tics quieto', b.creados.length === 1);
-  b.cliente.alDarUnTic({ tic: 101, rumbo: 0, marcha: ANDANDO, mira: 0 }, { x: 0, z: 0 });
+  b.cliente.alDarUnTic({ tic: 101, rumbo: 0, marcha: ANDANDO, mira: 0, golpe: false }, { x: 0, z: 0 });
   comprobar('y en el primer tic que se anda, se vuelve a llamar en el acto', b.creados.length === 2 && b.cliente.estado().fase === 'conectando', {
     sockets: b.creados.length,
   });
@@ -784,13 +897,372 @@ paso('Cerrar es para siempre: sin sockets, sin temporizadores y sin avisos');
   const avisos = b.estados.length;
   b.cliente.cerrar();
   b.reloj.avanzar(10 * 60_000);
-  b.cliente.alDarUnTic({ tic: 1, rumbo: 0, marcha: ANDANDO, mira: 0 }, { x: 0, z: 0 });
+  b.cliente.alDarUnTic({ tic: 1, rumbo: 0, marcha: ANDANDO, mira: 0, golpe: false }, { x: 0, z: 0 });
   comprobar('cerrado el canal, no se vuelve a llamar aunque hubiera un intento programado', b.creados.length === 1 && b.cliente.estado().fase === 'cerrado');
   comprobar('y no se avisa a una pantalla que ya no está', b.estados.length === avisos, { antes: avisos, despues: b.estados.length });
   const abierto = unBanco();
   abierto.socket().abrir();
   abierto.cliente.cerrar();
   comprobar('y cerrarlo con el socket abierto lo cierra con un cierre normal', abierto.socket().cerradoPorElCliente?.codigo === 1000);
+}
+
+// ---------------------------------------------------------------------------
+paso('La refriega: cada mensaje cambia lo que debe, lo mal formado no cambia nada, y el golpe sale cuando toca');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * El contrato de la refriega (`shared/mecanicas/canal-de-botas.ts`) deja al aparato UNA palabra y
+ * cinco que escuchar, y todo lo que puede ir mal aquí va mal en silencio: un golpe que sale fuera
+ * del canal o en ráfaga, uno que sale en el suelo, un caído que sigue andando, un `renace` que no
+ * recoloca, uno de otro que se pinta brotando donde cayó, lo intocable que no se apaga nunca, un
+ * `vidas` que no pisa lo de la conexión anterior, o un mensaje roto que cambia algo. Se mide con el
+ * servidor de mentira y, donde se anda, con el fotograma del gancho de verdad (`fotogramaDeQuienPasea`).
+ */
+{
+  const llega = (b: Banco, m: unknown): void => b.socket().llega(JSON.stringify(m));
+  const golpesDe = (b: Banco): { readonly n: number; readonly r: number }[] =>
+    b.leidos().flatMap((m) => (m !== null && m !== undefined && m.t === 'golpe' ? [{ n: m.n, r: m.r }] : []));
+  const aquisDe = (b: Banco): number => b.leidos().filter((m) => m !== null && m !== undefined && m.t === 'aqui').length;
+  const tic = (n: number, golpe: boolean, marcha: 0 | 1 | 2 = ANDANDO, mira = 200): EntradaDelTic => ({ tic: n, rumbo: 0, marcha, mira, golpe });
+  const SITIO: Andante = { x: deNumero(2), z: deNumero(3) };
+  const ANTES = RETRASO_DE_LOS_DEMAS_MS;
+
+  /* ── `vidas` inicia ── */
+  const b = unBanco();
+  b.socket().abrir();
+  b.socket().llega(dentro(0, 0));
+  b.socket().llega(unaFoto(1, [['s2', 1, 1, 0], ['s3', 5, 5, 0]]));
+  comprobar(
+    'antes de `vidas` no se enseña la refriega: ni corazones en el cartel, ni la de nadie',
+    b.cliente.refriegaDe('s1') === null &&
+      b.cliente.refriegaDe('s2') === null &&
+      b.cliente.estado().refriega === null &&
+      b.cliente.estado().texto === 'Dentro · 2 más andando',
+    b.cliente.estado(),
+  );
+  llega(b, { t: 'vidas', v: [['s1', 2, DE_PIE], ['s2', 1, DE_PIE], ['s3', 0, CAIDO]] });
+  const s3 = b.cliente.refriegaDe('s3');
+  comprobar(
+    '`vidas` lo pone todo: mis corazones en el cartel, y la vida y el estado de cada uno',
+    b.cliente.estado().texto === 'Dentro · ♥♥♡ · 2 más andando' &&
+      b.cliente.estado().refriega?.vida === 2 &&
+      b.cliente.estado().refriega?.estado === DE_PIE &&
+      b.cliente.refriegaDe('s2')?.vida === 1 &&
+      b.cliente.refriegaDe('s2')?.estado === DE_PIE &&
+      s3?.estado === CAIDO &&
+      s3.corazones.apagados &&
+      s3.corazones.llenos === 0,
+    { texto: b.cliente.estado().texto, s2: b.cliente.refriegaDe('s2'), s3 },
+  );
+  const caidoDeAntes = s3?.gesto ?? null;
+  comprobar(
+    'y quien estaba en el suelo sale ya tumbado —su `caer`, terminado—, y nadie hace un gesto que nadie ha visto pasar',
+    s3 !== null && caidoDeAntes !== null && caidoDeAntes.clip === CLIP.caer && s3.a - caidoDeAntes.desde >= DURACION.caer * 1000 && b.cliente.refriegaDe('s2')?.gesto === null,
+    s3,
+  );
+
+  /* ── `lanza` ── */
+  b.reloj.avanzar(10);
+  const t0 = b.reloj.ahora();
+  llega(b, { t: 'lanza', de: 's2' });
+  const alLlegar = b.cliente.refriegaDe('s2', t0);
+  const alPintarse = b.cliente.refriegaDe('s2', t0 + ANTES);
+  const alAcabar = b.cliente.refriegaDe('s2', t0 + ANTES + DURACION.lanzar * 1000);
+  comprobar(
+    `\`lanza\` de otro: su \`lanzar\` a la hora a la que se le pinta, ${String(ANTES)} ms después de llegar —antes se pintaría donde ya no está—, y hasta que acaba`,
+    alLlegar?.gesto === null && alPintarse?.gesto?.clip === CLIP.lanzar && alPintarse.gesto.desde === t0 && alAcabar?.gesto === null,
+    { alLlegar: alLlegar?.gesto, alPintarse: alPintarse?.gesto, alAcabar: alAcabar?.gesto },
+  );
+  llega(b, { t: 'lanza', de: 's1' });
+  comprobar(
+    'y el eco de mi propio `lanza` no me hace lanzar: el gesto propio sale al mandar el golpe, no al volver',
+    b.cliente.refriegaDe('s1')?.gesto === null,
+    b.cliente.refriegaDe('s1'),
+  );
+
+  /* ── `da` ── */
+  b.reloj.avanzar(10);
+  const t1 = b.reloj.ahora();
+  const avisosAntesDeDa = b.estados.length;
+  llega(b, { t: 'da', de: 's2', a: 's1', vida: 1 });
+  const yoTrasDa = b.cliente.refriegaDe('s1');
+  comprobar(
+    '`da` a mí: me quedo con la vida que dice, se me ve recibir en el acto, y el cartel lo dice',
+    yoTrasDa?.vida === 1 &&
+      yoTrasDa.gesto?.clip === CLIP.golpe &&
+      yoTrasDa.gesto.desde === t1 &&
+      b.estados.length > avisosAntesDeDa &&
+      b.estados[b.estados.length - 1]?.texto === 'Dentro · ♥♡♡ · 2 más andando',
+    { yoTrasDa, texto: b.estados[b.estados.length - 1]?.texto },
+  );
+  b.reloj.avanzar(10);
+  const t2 = b.reloj.ahora();
+  llega(b, { t: 'da', de: 's1', a: 's2', vida: 0 });
+  const s2AntesDelDa = b.cliente.refriegaDe('s2', t2 + ANTES - 1);
+  const s2TrasElDa = b.cliente.refriegaDe('s2', t2 + ANTES);
+  comprobar(
+    '`da` a otro: su vida nueva y su `golpe` a la hora de pintarle, y antes de esa hora la de antes',
+    s2AntesDelDa?.vida === 1 && s2TrasElDa?.vida === 0 && s2TrasElDa.gesto?.clip === CLIP.golpe && s2TrasElDa.gesto.desde === t2,
+    { s2AntesDelDa, s2TrasElDa },
+  );
+
+  /* ── `cae` de otro ── */
+  b.reloj.avanzar(10);
+  const t3 = b.reloj.ahora();
+  llega(b, { t: 'cae', a: 's2', por: 's1' });
+  const s2DePie = b.cliente.refriegaDe('s2', t3 + ANTES - 1);
+  const s2EnElSuelo = b.cliente.refriegaDe('s2', t3 + ANTES);
+  const s2Luego = b.cliente.refriegaDe('s2', t3 + ANTES + 4000);
+  comprobar(
+    '`cae` de otro: al suelo con su `caer` y los corazones apagados, a la hora de pintarle; un fotograma antes, de pie',
+    s2DePie?.estado === DE_PIE &&
+      s2EnElSuelo?.estado === CAIDO &&
+      s2EnElSuelo.gesto?.clip === CLIP.caer &&
+      s2EnElSuelo.gesto.desde === t3 &&
+      s2EnElSuelo.corazones.apagados,
+    { s2DePie, s2EnElSuelo },
+  );
+  comprobar(
+    'y se queda en el suelo, con el mismo `caer` clavado, hasta que el servidor diga `renace`',
+    s2Luego?.estado === CAIDO && s2Luego.gesto?.clip === CLIP.caer && s2Luego.gesto.desde === t3,
+    s2Luego,
+  );
+
+  /* ── `renace` de otro: su sitio, en sus fotos, cuando empieza a brotar ── */
+  b.reloj.avanzar(80);
+  b.socket().llega(unaFoto(2, [['s2', 1, 1, 0], ['s3', 5, 5, 0]]));
+  b.reloj.avanzar(100);
+  const t4 = b.reloj.ahora();
+  llega(b, { t: 'renace', a: 's2', x: deNumero(20), z: deNumero(-20), r: 64 });
+  const unoAntes = b.cliente.poseDe('s2', t4 + ANTES - 1);
+  const alBrotar = b.cliente.poseDe('s2', t4 + ANTES);
+  const comoAlBrotar = b.cliente.refriegaDe('s2', t4 + ANTES);
+  comprobar(
+    '`renace` de otro: se le pinta en su sitio de nacer justo cuando empieza su `aparecer`, y un fotograma antes sigue en el suelo donde cayó',
+    unoAntes?.x === 1 &&
+      unoAntes.z === 1 &&
+      b.cliente.refriegaDe('s2', t4 + ANTES - 1)?.estado === CAIDO &&
+      alBrotar?.x === 20 &&
+      alBrotar.z === -20 &&
+      Math.abs(alBrotar.rumbo - radianesDelRumbo(64)) < 1e-12 &&
+      comoAlBrotar?.gesto?.clip === CLIP.aparecer &&
+      comoAlBrotar.estado === INTOCABLE &&
+      comoAlBrotar.vida === VIDA_ENTERA,
+    { unoAntes, alBrotar, comoAlBrotar },
+  );
+
+  /* ── Lo intocable parpadea, y se apaga solo ── */
+  const parpadeos = [0, 1, 2, 3].map((k) => b.cliente.refriegaDe('s2', t4 + ANTES + k * PARPADEO_MS + 1)?.seVe);
+  comprobar(`intocable, parpadea: se ve y no se ve cada ${String(PARPADEO_MS)} ms`, parpadeos.join() === 'true,false,true,false', parpadeos);
+  const casi = b.cliente.refriegaDe('s2', t4 + ANTES + INTOCABLE_MS - 1);
+  const pasado = b.cliente.refriegaDe('s2', t4 + ANTES + INTOCABLE_MS);
+  comprobar(
+    `y lo intocable se apaga solo a los ${String(INTOCABLE_MS)} ms de su \`renace\`: de pie, con la vida entera y sin parpadear`,
+    casi?.estado === INTOCABLE && pasado?.estado === DE_PIE && pasado.vida === VIDA_ENTERA && pasado.seVe && pasado.corazones.llenos === VIDA_ENTERA,
+    { casi: casi?.estado, pasado },
+  );
+
+  /* ── El golpe ── */
+  let paseante = nacerEnElPaseo(ABIERTO, { x: 0, z: 25, rumbo: 0 });
+  const g = unBanco((sitio, rumbo) => {
+    paseante = corregirElPaseo(paseante, sitio, rumbo);
+  });
+  g.cliente.alDarUnTic(tic(1, true), SITIO);
+  g.socket().abrir();
+  g.cliente.alDarUnTic(tic(2, true), SITIO);
+  comprobar(
+    'fuera del canal no sale ningún golpe: ni conectando, ni abierto antes de `dentro` —sólo el `hola`—, ni se guarda para luego',
+    g.socket().enviados.length === 1 && golpesDe(g).length === 0,
+    g.socket().enviados,
+  );
+  g.socket().llega(dentro(0, 25));
+  llega(g, { t: 'vidas', v: [['s1', VIDA_ENTERA, DE_PIE], ['s2', VIDA_ENTERA, DE_PIE]] });
+  const tg = g.reloj.ahora();
+  const antesDelGolpe = g.socket().enviados.length;
+  g.cliente.alDarUnTic(tic(3, true, ANDANDO, 200), SITIO);
+  const trasElGolpe = g.leidos().slice(antesDelGolpe);
+  const elAqui = trasElGolpe[0];
+  const elGolpe = trasElGolpe[1];
+  comprobar(
+    'dentro, un tic con golpe manda su `aqui` y DETRÁS un `golpe` con ese tic y esa mirada, que el lector estricto del servidor acepta',
+    trasElGolpe.length === 2 &&
+      elAqui !== null &&
+      elAqui !== undefined &&
+      elAqui.t === 'aqui' &&
+      elAqui.n === 3 &&
+      elGolpe !== null &&
+      elGolpe !== undefined &&
+      elGolpe.t === 'golpe' &&
+      elGolpe.n === 3 &&
+      elGolpe.r === 200,
+    trasElGolpe,
+  );
+  const gestoPropio = g.cliente.refriegaDe('s1');
+  comprobar(
+    'y el gesto propio, `lanzar`, sale en el acto: no espera a que vuelva nada, y el impacto no se predice',
+    gestoPropio?.gesto?.clip === CLIP.lanzar && gestoPropio.gesto.desde === tg && g.cliente.refriegaDe('s2')?.vida === VIDA_ENTERA,
+    gestoPropio,
+  );
+  g.reloj.avanzar(100);
+  g.cliente.alDarUnTic(tic(5, true), SITIO);
+  g.reloj.avanzar(RECARGA_DEL_GOLPE_MS - 101);
+  g.cliente.alDarUnTic(tic(20, true), SITIO);
+  comprobar(`y hasta ${String(RECARGA_DEL_GOLPE_MS)} ms después no sale otro: un dedo nervioso no manda ráfagas`, golpesDe(g).length === 1, golpesDe(g));
+  g.reloj.avanzar(1);
+  g.cliente.alDarUnTic(tic(21, true), SITIO);
+  comprobar('y pasada la recarga, sí: la guarda distingue', golpesDe(g).length === 2 && golpesDe(g)[1]?.n === 21, golpesDe(g));
+  g.reloj.avanzar(RECARGA_DEL_GOLPE_MS);
+  g.cliente.alDarUnTic(tic(22, false, QUIETO), SITIO);
+  const antesDeQuieto = g.socket().enviados.length;
+  g.cliente.alDarUnTic(tic(23, true, QUIETO), SITIO);
+  const trasQuieto = g.leidos().slice(antesDeQuieto);
+  comprobar(
+    'y quieto, el golpe sale aunque al `aqui` de su tic no le toque salir',
+    trasQuieto.length === 1 && trasQuieto[0]?.t === 'golpe',
+    trasQuieto,
+  );
+
+  /* ── Mi `cae`: ni se anda, ni se golpea ── */
+  llega(g, { t: 'cae', a: 's1', por: 's2' });
+  comprobar(
+    'mi `cae`: el canal dice que estoy en el suelo, el cartel lo dice y se me ve caer',
+    g.cliente.caido() &&
+      g.cliente.estado().refriega?.estado === CAIDO &&
+      /♡♡♡ caído/.test(g.cliente.estado().texto) &&
+      g.cliente.refriegaDe('s1')?.gesto?.clip === CLIP.caer,
+    g.cliente.estado(),
+  );
+  g.reloj.avanzar(RECARGA_DEL_GOLPE_MS * 2);
+  const golpesAntesDelSuelo = golpesDe(g).length;
+  const aquisAntesDelSuelo = aquisDe(g);
+  g.cliente.alDarUnTic(tic(40, true), SITIO);
+  comprobar('y en el suelo no sale ningún golpe, ni pasada la recarga, ni un `aqui` aunque alguien le dé un tic', golpesDe(g).length === golpesAntesDelSuelo && aquisDe(g) === aquisAntesDelSuelo);
+  let tumbado = paseante;
+  let vistos: number | null = null;
+  for (let i = 0; i < 120; i++) {
+    const hecho = fotogramaDeQuienPasea(ABIERTO, tumbado, 1 / 60, { ...SIN_TECLAS, adelante: true }, SIN_MANDOS_DE_FUERA, 0, vistos, g.cliente.caido(), (en, s) =>
+      g.cliente.alDarUnTic(en, s),
+    );
+    tumbado = hecho.paseo;
+    vistos = hecho.golpesVistos;
+  }
+  comprobar(
+    'caído, con el paseo de verdad y la W pulsada, en dos segundos no se anda ni sale un `aqui`',
+    tumbado === paseante && aquisDe(g) === aquisAntesDelSuelo,
+    { tic: tumbado.tic, aquis: aquisDe(g) - aquisAntesDelSuelo },
+  );
+
+  /* ── Mi `renace` ── */
+  const ultimoAqui = g.leidos().filter((m) => m !== null && m !== undefined && m.t === 'aqui').pop();
+  const nDelUltimo = ultimoAqui !== null && ultimoAqui !== undefined && ultimoAqui.t === 'aqui' ? ultimoAqui.n : -1;
+  g.reloj.avanzar(10);
+  llega(g, { t: 'renace', a: 's1', x: deNumero(-12), z: deNumero(8), r: 64 });
+  comprobar(
+    'mi `renace`: me pone en mi sitio de nacer mirando a donde dice, por la costura de corregir, y me levanta',
+    paseante.ahora.x === deNumero(-12) &&
+      paseante.ahora.z === deNumero(8) &&
+      g.rumbos[g.rumbos.length - 1] === radianesDelRumbo(64) &&
+      Math.abs(paseante.rumbo - radianesDelRumbo(64)) < 1e-12 &&
+      !g.cliente.caido() &&
+      g.cliente.estado().refriega?.estado === INTOCABLE &&
+      /♥♥♥ intocable/.test(g.cliente.estado().texto) &&
+      g.cliente.refriegaDe('s1')?.gesto?.clip === CLIP.aparecer,
+    { ahora: paseante.ahora, rumbo: paseante.rumbo, texto: g.cliente.estado().texto },
+  );
+  const correccionesAntes = g.correcciones.length;
+  llega(g, { t: 'corrige', n: nDelUltimo, x: deNumero(0), z: deNumero(0) });
+  comprobar(
+    'y un `corrige` de un tic de antes de renacer ya está contestado: no me devuelve a donde caí',
+    nDelUltimo > 0 && g.correcciones.length === correccionesAntes && paseante.ahora.x === deNumero(-12),
+    { nDelUltimo, correcciones: g.correcciones.length - correccionesAntes },
+  );
+  let levantado = paseante;
+  const aquisAlLevantarse = aquisDe(g);
+  for (let i = 0; i < 30; i++) {
+    const hecho = fotogramaDeQuienPasea(ABIERTO, levantado, 1 / 60, { ...SIN_TECLAS, adelante: true }, SIN_MANDOS_DE_FUERA, 0, vistos, g.cliente.caido(), (en, s) =>
+      g.cliente.alDarUnTic(en, s),
+    );
+    levantado = hecho.paseo;
+    vistos = hecho.golpesVistos;
+  }
+  comprobar(
+    'y en pie se anda en el acto, desde el sitio de nacer, contándoselo al canal',
+    levantado.tic > paseante.tic && aquisDe(g) > aquisAlLevantarse && Math.abs(aNumero(levantado.ahora.x) + 12) > 1,
+    { tics: levantado.tic - paseante.tic, aquis: aquisDe(g) - aquisAlLevantarse, x: aNumero(levantado.ahora.x) },
+  );
+  const avisosAlRenacer = g.estados.length;
+  g.reloj.avanzar(INTOCABLE_MS - 1);
+  const todaviaIntocable = g.cliente.estado().refriega?.estado === INTOCABLE && g.estados.length === avisosAlRenacer;
+  g.reloj.avanzar(1);
+  const elAviso = g.estados[g.estados.length - 1];
+  comprobar(
+    `y lo mío intocable se apaga solo a los ${String(INTOCABLE_MS)} ms, y el cartel se entera sin que llegue nada`,
+    todaviaIntocable &&
+      g.estados.length === avisosAlRenacer + 1 &&
+      elAviso?.refriega?.estado === DE_PIE &&
+      elAviso.texto.startsWith('Dentro · ♥♥♥') &&
+      !/intocable/.test(elAviso.texto),
+    { todaviaIntocable, aviso: elAviso },
+  );
+
+  /* ── Al cortarse se olvida; al volver, `vidas` reinicia ── */
+  llega(g, { t: 'cae', a: 's1', por: 's2' });
+  const enElSueloAlCortarse = g.cliente.caido();
+  g.socket().cae(1006);
+  comprobar(
+    'al cortarse la refriega se olvida: ni corazones, ni un suelo del que no se pueda levantar mientras no haya canal',
+    enElSueloAlCortarse && !g.cliente.caido() && g.cliente.refriegaDe('s1') === null && g.cliente.estado().refriega === null,
+    g.cliente.estado(),
+  );
+  g.reloj.avanzar(PRIMERA_ESPERA_MS);
+  g.socket().abrir();
+  g.socket().llega(dentro(0, 25));
+  const alVolver = g.cliente.estado().texto;
+  llega(g, { t: 'vidas', v: [['s1', 1, INTOCABLE], ['s2', 2, DE_PIE]] });
+  const yoAlVolver = g.cliente.refriegaDe('s1');
+  comprobar(
+    'y al volver no se enseña nada hasta su `vidas`, que lo pone todo otra vez: de lo de antes de cortarse no queda nada',
+    alVolver === 'Dentro' &&
+      yoAlVolver?.vida === 1 &&
+      yoAlVolver.estado === INTOCABLE &&
+      yoAlVolver.gesto === null &&
+      g.cliente.refriegaDe('s2')?.vida === 2 &&
+      g.cliente.estado().texto === 'Dentro · ♥♡♡ intocable',
+    { alVolver, yoAlVolver, texto: g.cliente.estado().texto },
+  );
+  g.reloj.avanzar(INTOCABLE_MS);
+  comprobar('y lo intocable de `vidas` también se apaga solo, contado desde que llegó', g.cliente.refriegaDe('s1')?.estado === DE_PIE && g.cliente.estado().texto === 'Dentro · ♥♡♡');
+
+  /* ── Lo mal formado no cambia nada ── */
+  const hora = g.reloj.ahora();
+  const foto = (): string => JSON.stringify([g.cliente.refriegaDe('s1', hora), g.cliente.refriegaDe('s2', hora), g.cliente.estado().texto, g.correcciones.length, g.cliente.caido(hora)]);
+  const antesDeLoMalo = foto();
+  const ignoradosAntes = g.cliente.ignorados();
+  const MALOS: readonly unknown[] = [
+    { t: 'vidas', v: [['s1', VIDA_ENTERA + 1, DE_PIE]] },
+    { t: 'vidas', v: [['s1', 2, 7]] },
+    { t: 'vidas', v: [['s1', 2, DE_PIE], ['s1', 1, DE_PIE]] },
+    { t: 'vidas', v: 's1' },
+    { t: 'lanza' },
+    { t: 'lanza', de: 3 },
+    { t: 'da', de: 's2', a: 's1' },
+    { t: 'da', de: 's2', a: 's1', vida: -1 },
+    { t: 'da', de: 's2', a: 's1', vida: 1.5 },
+    { t: 'cae', a: 's1' },
+    { t: 'cae', a: 7, por: 's2' },
+    { t: 'renace', a: 's1', x: 0, z: 0 },
+    { t: 'renace', a: 's1', x: 0.5, z: 0, r: 0 },
+    { t: 'renace', a: 's1', x: 0, z: 0, r: 256 },
+  ];
+  for (const m of MALOS) llega(g, m);
+  comprobar(
+    `${String(MALOS.length)} mensajes de la refriega mal formados se tiran y se cuentan, uno a uno`,
+    g.cliente.ignorados() - ignoradosAntes === MALOS.length,
+    { contados: g.cliente.ignorados() - ignoradosAntes },
+  );
+  comprobar('y no cambian nada: ni vidas, ni estados, ni el cartel, ni el sitio, ni el suelo', foto() === antesDeLoMalo, { antes: antesDeLoMalo, despues: foto() });
 }
 
 // ---------------------------------------------------------------------------
@@ -968,6 +1440,173 @@ paso('El rótulo: se escribe lo que tiene dibujo, mira a la cámara y se lee des
     caja === null ? null : { min: caja.min, max: caja.max },
   );
   g?.dispose();
+
+  /*
+   * ═══ EL COLOR DEL ASIENTO SE LEE AUNQUE SEA OSCURO ═══
+   *
+   * El segundo asiento del Burgo es `#26262e` y la placa `#1b2411`: contraste de 1,07 a 1. La
+   * tesela lleva ahora un canto claro, de la tinta. Se mide que el problema es de verdad —si no, el
+   * canto no estaría arreglando nada—, que el canto contra la placa se lee, y que en los seis colores
+   * del Burgo el canto está donde tiene que estar: rodeando la tesela, entre la placa y ella.
+   */
+  const luminancia = (hex: string): number => {
+    const canal = (i: number): number => {
+      const v = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+      return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * canal(1) + 0.7152 * canal(3) + 0.0722 * canal(5);
+  };
+  const contraste = (a: string, b: string): number => {
+    const [x, y] = [luminancia(a), luminancia(b)].sort((p, q) => q - p) as [number, number];
+    return (x + 0.05) / (y + 0.05);
+  };
+  const casiIguales = COLORES_DEL_BURGO.filter((c) => contraste(c, COLOR_DE_LA_PLACA) < 1.5);
+  comprobar(
+    'el problema es de verdad: el segundo asiento del Burgo, #26262e, contra la placa no llega a 1,5 a 1',
+    casiIguales.includes('#26262e'),
+    COLORES_DEL_BURGO.map((c) => `${c}: ${contraste(c, COLOR_DE_LA_PLACA).toFixed(2)}`),
+  );
+  comprobar('y el canto, de la tinta, contra la placa pasa de siete a uno', contraste(COLOR_DE_LA_TINTA, COLOR_DE_LA_PLACA) >= 7, contraste(COLOR_DE_LA_TINTA, COLOR_DE_LA_PLACA));
+  const sinCanto: string[] = [];
+  for (const color of COLORES_DEL_BURGO) {
+    const geo = geometriaDelRotulo('Bruno', color);
+    const p = geo?.getAttribute('position');
+    const k = geo?.getAttribute('color');
+    if (geo === null || geo === undefined || p === undefined || k === undefined) {
+      sinCanto.push(`${color}: sin geometría`);
+      continue;
+    }
+    const suyo = new THREE.Color(color);
+    const tinta = new THREE.Color(COLOR_DE_LA_TINTA);
+    const es = (i: number, c: THREE.Color): boolean => Math.abs(k.getX(i) - c.r) < 1e-6 && Math.abs(k.getY(i) - c.g) < 1e-6 && Math.abs(k.getZ(i) - c.b) < 1e-6;
+    const caja = (lista: number[]): { x0: number; x1: number; y0: number; y1: number; z: number } => ({
+      x0: Math.min(...lista.map((i) => p.getX(i))),
+      x1: Math.max(...lista.map((i) => p.getX(i))),
+      y0: Math.min(...lista.map((i) => p.getY(i))),
+      y1: Math.max(...lista.map((i) => p.getY(i))),
+      z: p.getZ(lista[0] ?? 0),
+    });
+    const tesela: number[] = [];
+    for (let i = 0; i < p.count; i++) if (es(i, suyo)) tesela.push(i);
+    const t = tesela.length === 4 ? caja(tesela) : null;
+    /* La tinta de las letras va delante, en el plano de la tesela; la del canto, entre la placa y ella. */
+    const canto: number[] = [];
+    for (let i = 0; i < p.count; i++) if (t !== null && es(i, tinta) && p.getZ(i) > 0 && p.getZ(i) < t.z) canto.push(i);
+    const c = canto.length === 4 ? caja(canto) : null;
+    const rodea =
+      t !== null &&
+      c !== null &&
+      Math.abs(t.x0 - c.x0 - CANTO_DE_LA_TESELA) < 1e-5 &&
+      Math.abs(c.x1 - t.x1 - CANTO_DE_LA_TESELA) < 1e-5 &&
+      Math.abs(t.y0 - c.y0 - CANTO_DE_LA_TESELA) < 1e-5 &&
+      Math.abs(c.y1 - t.y1 - CANTO_DE_LA_TESELA) < 1e-5 &&
+      c.z > 0 &&
+      c.z < t.z;
+    if (!rodea) sinCanto.push(`${color}: tesela ${String(tesela.length)}, canto ${String(canto.length)}`);
+    geo.dispose();
+  }
+  comprobar('en los seis colores del Burgo la tesela lleva su canto claro alrededor, entre la placa y ella', sinCanto.length === 0, sinCanto);
+
+  /*
+   * ═══ Y LOS CORAZONES ═══
+   *
+   * `VIDA_ENTERA` en su placa, encima del nombre, en la misma geometría y al final del índice:
+   * escondidos hasta que se pongan, llenos según la vida, apagados en el suelo, y todos mirando a la
+   * cámara —una cara al revés no la pinta nadie, y no falla nada—.
+   */
+  const conCorazones = geometriaDelRotulo('Ana', '#c0392b', true);
+  const suyos = conCorazones === null ? null : corazonesDelRotulo(conCorazones);
+  const indices = conCorazones?.getIndex() ?? null;
+  const posiciones = conCorazones?.getAttribute('position');
+  const colores = conCorazones?.getAttribute('color');
+  const alReves = (geo: THREE.BufferGeometry | null): { triangulos: number; alReves: number } => {
+    const idx = geo?.getIndex() ?? null;
+    const pos = geo?.getAttribute('position');
+    if (idx === null || pos === undefined) return { triangulos: 0, alReves: -1 };
+    let triangulos = 0;
+    let malos = 0;
+    const a = new THREE.Vector3();
+    const b2 = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    for (let i = 0; i + 2 < idx.count; i += 3) {
+      a.fromBufferAttribute(pos as THREE.BufferAttribute, idx.getX(i));
+      b2.fromBufferAttribute(pos as THREE.BufferAttribute, idx.getX(i + 1));
+      c.fromBufferAttribute(pos as THREE.BufferAttribute, idx.getX(i + 2));
+      const normal = new THREE.Vector3().subVectors(b2, a).cross(new THREE.Vector3().subVectors(c, a));
+      if (normal.lengthSq() < 1e-18) continue;
+      triangulos++;
+      if (normal.z <= 0) malos++;
+    }
+    return { triangulos, alReves: malos };
+  };
+  comprobar(
+    `con corazones, el rótulo lleva ${String(VIDA_ENTERA)} al final del índice, y sin ponerlos no se dibujan`,
+    conCorazones !== null && suyos !== null && indices !== null && suyos.vertices.length === VIDA_ENTERA && suyos.desdeIndice < indices.count && conCorazones.drawRange.count === suyos.desdeIndice,
+    { suyos, indices: indices?.count, dibujados: conCorazones?.drawRange.count },
+  );
+  const caras = alReves(conCorazones);
+  comprobar('y TODOS sus triángulos, corazones incluidos, miran a `+z`', caras.triangulos > 100 && caras.alReves === 0, caras);
+  let encima = false;
+  if (suyos !== null && posiciones !== undefined) {
+    let y0 = Number.POSITIVE_INFINITY;
+    let x0 = Number.POSITIVE_INFINITY;
+    let x1 = Number.NEGATIVE_INFINITY;
+    for (const [desde, hasta] of suyos.vertices) {
+      for (let i = desde; i < hasta; i++) {
+        y0 = Math.min(y0, posiciones.getY(i));
+        x0 = Math.min(x0, posiciones.getX(i));
+        x1 = Math.max(x1, posiciones.getX(i));
+      }
+    }
+    encima = y0 > altoDeLaPlaca() && Math.abs(x0 + x1) < 1e-4;
+  }
+  comprobar('y van encima de la placa del nombre, centrados', encima);
+  const tintes = (): string[] =>
+    suyos === null || colores === undefined
+      ? []
+      : suyos.vertices.map(([desde, hasta]) => {
+          const que = [COLOR_DEL_CORAZON, COLOR_DEL_CORAZON_PERDIDO, COLOR_DEL_CORAZON_APAGADO].find((hex) => {
+            const c = new THREE.Color(hex);
+            for (let i = desde; i < hasta; i++) {
+              if (Math.abs(colores.getX(i) - c.r) > 1e-6 || Math.abs(colores.getY(i) - c.g) > 1e-6 || Math.abs(colores.getZ(i) - c.b) > 1e-6) return false;
+            }
+            return true;
+          });
+          return que === COLOR_DEL_CORAZON ? 'lleno' : que === COLOR_DEL_CORAZON_PERDIDO ? 'perdido' : que === COLOR_DEL_CORAZON_APAGADO ? 'apagado' : '?';
+        });
+  let puestos = '';
+  let enElSuelo = '';
+  let escondidos = false;
+  if (conCorazones !== null) {
+    ponerLosCorazones(conCorazones, { llenos: 2, apagados: false });
+    puestos = `${tintes().join()}|${String(conCorazones.drawRange.count >= (indices?.count ?? Number.POSITIVE_INFINITY))}`;
+    ponerLosCorazones(conCorazones, { llenos: 0, apagados: true });
+    enElSuelo = tintes().join();
+    ponerLosCorazones(conCorazones, null);
+    escondidos = suyos !== null && conCorazones.drawRange.count === suyos.desdeIndice;
+  }
+  comprobar(
+    'y se ponen como va: con dos vidas, dos llenos y uno perdido, y todo se dibuja; en el suelo, los tres apagados; y sin refriega, escondidos otra vez',
+    puestos === 'lleno,lleno,perdido|true' && enElSuelo === 'apagado,apagado,apagado' && escondidos,
+    { puestos, enElSuelo, escondidos },
+  );
+  conCorazones?.dispose();
+  const propios = geometriaDeLosCorazones();
+  propios.computeBoundingBox();
+  const cajaPropia = propios.boundingBox;
+  const carasPropias = alReves(propios);
+  comprobar(
+    'y los de quien pasea van en su placa sola, centrada y con el canto de abajo en el cero, mirando a `+z` y escondidos hasta que se pongan',
+    cajaPropia !== null &&
+      Math.abs(cajaPropia.min.x + cajaPropia.max.x) < 1e-4 &&
+      Math.abs(cajaPropia.min.y) < 1e-6 &&
+      carasPropias.alReves === 0 &&
+      carasPropias.triangulos > 100 &&
+      propios.drawRange.count === 0 &&
+      corazonesDelRotulo(propios)?.vertices.length === VIDA_ENTERA,
+    { caja: cajaPropia, carasPropias, dibujados: propios.drawRange.count },
+  );
+  propios.dispose();
 
   /*
    * SE LEE DESDE EL HOMBRO: de la cámara de hombro a alguien que anda por ahí hay de unas pocas
@@ -1324,6 +1963,21 @@ paso('Los tres juegos que se andan: el canal cosido igual, los demás a la altur
         e.fuente.replace(e.sinAPie[0], e.sinAPie[1]),
       ],
     );
+    /*
+     * LA REFRIEGA, POR LOS MISMOS HILOS: el paseo le pregunta al canal si quien anda está en el suelo
+     * —sin eso, un caído sigue andando en su pantalla—, y `QuienAnda` cómo va —sin eso, quien pasea no
+     * lanza, no cae y no lleva corazones—. `LosDemas` ya tiene el cliente, y la regla de arriba lo mira.
+     */
+    const quienAndaEn = (c: string): string => /<QuienAnda\b[\s\S]*?\/>/.exec(c)?.[0] ?? '';
+    reglaDelFuente(
+      `${e.juego}: la refriega llega por los mismos hilos: el paseo pregunta al canal si quien anda está en el suelo, y \`QuienAnda\` cómo va`,
+      (c) =>
+        /\bcaido: elCanal\.caido\b/.test(llamadaAlPaseo(c) ?? '') &&
+        /\bcliente=\{elCanal\.cliente\}/.test(quienAndaEn(c)) &&
+        (c.match(/<QuienAnda\b/g) ?? []).length === 1,
+      e.fuente,
+      [e.fuente.replace(/,\s*caido: elCanal\.caido/, ''), e.fuente.replace(/(<QuienAnda\b[\s\S]*?)\s*cliente=\{elCanal\.cliente\}/, '$1')],
+    );
   }
 
   /* El Burgo lo declara en su contrato, y Riberas lo pasa de la escena del delta al paseo. */
@@ -1493,8 +2147,11 @@ console.log('\nEl `hola` va primero y con la llave, nada sale antes de `dentro` 
 console.log('servidor; un `aqui` por tic con los números de la costura y quieto sólo dos por segundo; `corrige`');
 console.log('corrige sin ping-pong; a los demás se les pinta 150 ms atrás y nunca por delante, quien se va');
 console.log('desaparece y lo mal formado se cuenta; sin vuelta con llave mala, mesa que no u otro aparato, y');
-console.log('con lo demás se vuelve doblando la espera hasta su tope, y con quieto al volver a andar; la cámara');
-console.log('de hombro se acerca a un muro sin saltar y vuelve; el rótulo se lee desde el hombro; y sólo una');
+console.log('con lo demás se vuelve doblando la espera hasta su tope, y con quieto al volver a andar; en la');
+console.log('refriega el golpe sale sólo dentro, con su tic y su recarga y nunca en el suelo, caído no se anda,');
+console.log('renacer recoloca, cada mensaje cambia lo suyo a la hora de pintarlo y lo roto no cambia nada; la');
+console.log('cámara de hombro se acerca a un muro sin saltar y vuelve; el rótulo se lee desde el hombro, con');
+console.log('un canto que deja leer cualquier color y los corazones encima; y sólo una');
 console.log('mesa `botas` monta el canal: en Las Lindes, en el Burgo y en Riberas, cosido igual y con los demás');
 console.log('a la altura del suelo de cada juego, y en sus seis clientes, que empiezan a pie, dicen cómo va el');
 console.log('canal y dan a cada asiento el color de su juego.');

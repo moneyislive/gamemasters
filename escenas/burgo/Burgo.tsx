@@ -1559,7 +1559,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
    * costura a) y el canal pone a quien anda donde dice el servidor (la costura b), que llega por una
    * referencia porque el paseo se monta después. El canal se queda abierto también mirando la mesa:
    * al bajar, los demás ya están donde están, y un `dentro` que llegue antes de nacer se guarda y se
-   * nace ahí (ver `paseo/usar-el-paseo.ts`).
+   * nace ahí (ver `paseo/usar-el-paseo.ts`). La refriega, por los mismos hilos que en Las Lindes: el
+   * paseo pregunta si quien anda está en el suelo (`caido`) y `QuienAnda` cómo va (`cliente`).
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
   const elCanal = usarElCanal(props.canal, corregirAQuienPasea);
@@ -1570,6 +1571,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     mandos: props.mandos,
     alturaEn: alturaDelSuelo,
     alDarUnTic: elCanal.alDarUnTic,
+    caido: elCanal.caido,
   });
   useEffect(() => {
     corregirAQuienPasea.current = paseo.corregir;
@@ -3339,6 +3341,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           pose={paseo.pose}
           enPrimeraPersona={modoDelPaseo === 'ojos'}
           alFallar={avisaQueNoLlegaQuienAnda}
+          cliente={elCanal.cliente}
         />
       ) : null}
 

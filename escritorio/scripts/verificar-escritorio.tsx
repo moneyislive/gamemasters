@@ -95,6 +95,8 @@ import type { LaMesa, MesaVista, ResultadoDelMovimiento } from '../src/mesa';
 /* Boots on Board: el veredicto guardado de este navegador, y las palabras y la compuerta que pintan los vestíbulos. */
 import { elVeredictoDelAparato, guardarElVeredicto } from '../src/mesa';
 import { MARCA_DE_BOTAS, MOTIVO_NO_LLEGA, MOTIVO_SIN_MEDIR } from '../../escenas/compuerta-de-botas';
+/* Boots on Board, la refriega: la tecla de golpear y cómo se dice, de donde las lee el paseo. */
+import { COMO_SE_GOLPEA, TECLA_DE_GOLPEAR, teclaDelPaseo } from '../../escenas/paseo/mandos';
 import { sePuedeRecorrer } from '../../shared/arcade/juegos/mundos';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
 import { haEmpezado } from '../src/empezada';
@@ -2015,6 +2017,78 @@ function laCompuertaDeBotas(): void {
   comprobar(
     'se ve fallar: leyéndola con la cabecera del asiento, cae',
     !leeSinLlave(laMesa.replace('await fetch(ruta(`/mesas/${codigo}?desde=-1`));', 'await fetch(ruta(`/mesas/${codigo}?desde=-1`), { headers: cabeceras(false) });')),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 5 ter · Boots on Board: la refriega en el escritorio
+// ---------------------------------------------------------------------------
+
+/**
+ * LA REFRIEGA EN EL ESCRITORIO: la tecla, y que los tres carteles la digan.
+ *
+ * En el escritorio se golpea con la G (`TECLA_DE_GOLPEAR`, que lee el paseo común de la escena).
+ * Lo que de aquí puede fallar sin que falle nada: que un cartel de «cómo se anda» no lo diga —se
+ * baja a la refriega y no hay forma de saber con qué se pega—, que lo diga en una mesa normal donde
+ * no hay refriega, o que la G ya sea de otra cosa en alguno de los tres escritorios y un golpe haga
+ * a la vez lo que esa otra cosa hace. Se pintan los tres carteles sueltos, con canal y sin él, en
+ * los dos modos de a pie; y se preguntan las teclas de verdad de cada pintor: las cámaras del Burgo
+ * y de Riberas se ejecutan, y el oyente de Las Lindes, que vive dentro de su efecto, se lee del
+ * fuente. (Que la G no se coma la de un campo de texto lo ejecuta `verify:paseo`.)
+ */
+function laRefriegaEnElEscritorio(): void {
+  paso('Boots on Board en el escritorio: la G golpea en los tres, y los tres carteles lo dicen sólo en una mesa de botas');
+
+  const carteles = (canal: string | undefined): string[] =>
+    (['hombro', 'ojos'] as const).flatMap((modo) => [
+      renderToStaticMarkup(<ComoSeAnda modo={modo} canal={canal} />),
+      renderToStaticMarkup(<ComoSeAndaPorElBurgo modo={modo} canal={canal} />),
+      renderToStaticMarkup(<ComoSeAndaPorElDelta modo={modo} canal={canal} />),
+    ]);
+  const conCanal = carteles('Dentro · ♥♥♡');
+  const sinCanal = carteles(undefined);
+  const loDicenBien = (con: readonly string[], sin: readonly string[]): boolean =>
+    con.length === 6 && sin.length === 6 && con.every((h) => h.includes(COMO_SE_GOLPEA)) && sin.every((h) => !h.includes(COMO_SE_GOLPEA));
+  comprobar(
+    'los tres carteles de cómo se anda dicen con qué se golpea en una mesa de botas, a pie, y en una mesa normal no',
+    loDicenBien(conCanal, sinCanal),
+    { conCanal, sinCanal },
+  );
+  comprobar(
+    'se ve fallar: un cartel que no lo dijera con canal, o que lo dijera sin él, cae',
+    !loDicenBien(conCanal.map((h, i) => (i === 5 ? h.replace(COMO_SE_GOLPEA, '') : h)), sinCanal) &&
+      !loDicenBien(conCanal, sinCanal.map((h, i) => (i === 1 ? (conCanal[1] ?? h) : h))),
+  );
+  comprobar(
+    'y lo que dicen es la tecla que lee el paseo: la G, que el paseo tiene por golpe también con Mayúsculas',
+    COMO_SE_GOLPEA === `${TECLA_DE_GOLPEAR.toUpperCase()} para golpear` &&
+      teclaDelPaseo(TECLA_DE_GOLPEAR) === 'golpe' &&
+      teclaDelPaseo(TECLA_DE_GOLPEAR.toUpperCase()) === 'golpe',
+  );
+
+  /* ── La G no es de nadie más ── */
+  const g = { key: TECLA_DE_GOLPEAR, metaKey: false, ctrlKey: false, altKey: false, repeat: false };
+  const deLasLindes = sinComentarios(readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8'));
+  const oyenteDeLasLindes = (c: string): string => /const oye = \(e: KeyboardEvent\): void => \{([\s\S]*?)\n {4}\};/.exec(c)?.[1] ?? '';
+  const laGEsLibre = (lindes: string): boolean => {
+    const oyente = oyenteDeLasLindes(lindes);
+    return (
+      /e\.key === '1'/.test(oyente) &&
+      /=== 'r'/.test(oyente) &&
+      !new RegExp(`'${TECLA_DE_GOLPEAR}'|'${TECLA_DE_GOLPEAR.toUpperCase()}'`).test(oyente) &&
+      camaraDeLaTecla(g, null) === null &&
+      camaraDeLaTecla({ ...g, key: TECLA_DE_GOLPEAR.toUpperCase() }, null) === null &&
+      CAMARA_DE_LA_TECLA.get(TECLA_DE_GOLPEAR) === undefined
+    );
+  };
+  comprobar(
+    'y la G no es de nadie más en los tres escritorios: ni de las cámaras del Burgo, ni de las de Riberas, ni del oyente de Las Lindes (1, 2, 3 y R)',
+    laGEsLibre(deLasLindes),
+    oyenteDeLasLindes(deLasLindes).slice(0, 300),
+  );
+  comprobar(
+    'se ve fallar: un oyente de Las Lindes que cogiera la G, cae',
+    !laGEsLibre(deLasLindes.replace("if (e.key === '1') setModo('mesa');", `if (e.key === '${TECLA_DE_GOLPEAR}') setModo('mesa');\n      else if (e.key === '1') setModo('mesa');`)),
   );
 }
 
@@ -9991,6 +10065,7 @@ loQueLaPantallaDecideSola();
 lasDirecciones();
 elMuelle();
 laCompuertaDeBotas();
+laRefriegaEnElEscritorio();
 riberasEnTres();
 burgoEnTres();
 elAcercamientoDelDelta();
@@ -12379,8 +12454,12 @@ console.log('');
  * los dos vestíbulos, la marca de la mesa y la silla que no se da), así que el guardia sube
  * veintitrés. Ninguna sale de un bucle que dependa del azar: los arcades son los instalados y los
  * almacenes de mentira los pone y los quita el propio bloque.
+ *
+ * Y LA REFRIEGA TRAE CINCO (`laRefriegaEnElEscritorio`: los tres carteles dicen la G sólo con
+ * canal, la tecla es la del paseo, y no es de nadie más en los tres escritorios, cada juez con su
+ * vacuna), así que el guardia sube cinco. Ninguna sale de un bucle.
  */
-const COMPROBACIONES_ESCRITAS = 1013;
+const COMPROBACIONES_ESCRITAS = 1018;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(

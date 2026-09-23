@@ -22,7 +22,9 @@
  *  6. LA COSTURA CON LA RED. Un aviso por tic con lo pedido, que basta para rehacer el camino;
  *     y una corrección que no se pinta como un salto a la carrera.
  *  7. NACER. Nadie se queda encerrado dentro de una caja.
- *  8. EL MONTAJE. Que la escena y la app usan esto y no otra cosa: se mira en el fuente, que es
+ *  8. EL GOLPE Y EL SUELO. La G golpea y no se come la de un campo de texto; un toque es un golpe,
+ *     en el primer tic que se dé y en uno solo; y en el suelo no se da ni un tic.
+ *  9. EL MONTAJE. Que la escena y la app usan esto y no otra cosa: se mira en el fuente, que es
  *     lo único que hay sin WebGL.
  *
  * Cada comprobación lleva su vacuna: una cuenta hecha a propósito del revés tiene que salir
@@ -45,22 +47,27 @@ import { arenaDe, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena, Casilla, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
 import { CLIP } from '../embarcadero/figuras';
 import {
+  COMO_SE_GOLPEA,
   GIRO_POR_SEGUNDO,
   girar,
+  golpesVistosTras,
   mandosDelFotograma,
   pedidoDelTic,
   SIN_MANDOS,
   SIN_MANDOS_DE_FUERA,
   SIN_TECLAS,
   esTeclaDeOtro,
+  esUnGolpe,
+  TECLA_DE_GOLPEAR,
   teclaDelPaseo,
   TOPE_DEL_GIRO,
   ZONA_MUERTA,
 } from '../paseo/mandos';
-import type { DestinoDeLaTecla, EntradaDelTic, Mandos, Teclas } from '../paseo/mandos';
+import type { DestinoDeLaTecla, EntradaDelTic, MandoDeLaTecla, Mandos, MandosDeFuera, Teclas } from '../paseo/mandos';
 import {
   corregirElPaseo,
   fotogramaDelPaseo,
+  fotogramaDeQuienPasea,
   MICROS_POR_TIC,
   mudarDeMundo,
   nacerEnElPaseo,
@@ -308,7 +315,7 @@ paso('Las teclas y la palanca dan el rumbo y la marcha que tienen que dar');
 // ---------------------------------------------------------------------------
 
 {
-  const TECLAS: readonly (readonly [string, keyof Teclas | null])[] = [
+  const TECLAS: readonly (readonly [string, MandoDeLaTecla | null])[] = [
     ['w', 'adelante'],
     ['W', 'adelante'],
     ['ArrowUp', 'adelante'],
@@ -321,11 +328,14 @@ paso('Las teclas y la palanca dan el rumbo y la marcha que tienen que dar');
     ['D', 'derecha'],
     ['ArrowRight', 'derecha'],
     ['Shift', 'deprisa'],
+    ['g', 'golpe'],
+    ['G', 'golpe'],
     ['x', null],
     ['Enter', null],
+    [' ', null],
   ];
   const malas = TECLAS.filter(([tecla, mando]) => teclaDelPaseo(tecla) !== mando).map(([tecla]) => tecla);
-  comprobar('W A S D, las flechas y Mayúsculas van a su mando, también con Mayúsculas pulsada', malas.length === 0, malas);
+  comprobar('W A S D, las flechas y Mayúsculas van a su mando, y la G a golpear, también con Mayúsculas pulsada', malas.length === 0, malas);
 
   /*
    * Y NO SE QUEDA CON LO QUE VA A OTRO: escribiendo en un campo mientras se anda, W A S D y las
@@ -396,7 +406,7 @@ paso('Las teclas y la palanca dan el rumbo y la marcha que tienen que dar');
   comprobar('y mirando al norte, W anda hacia la z negativa, que es el norte de la casa', alNorteConW.ahora.z < 0, alNorteConW.ahora);
 
   /* LA PALANCA: hacia delante anda, hacia atrás retrocede, y lo que cae en la zona muerta no hace nada. */
-  const palanca = (x: number, y: number): Mandos => mandosDelFotograma(SIN_TECLAS, { palanca: { x, y }, deprisa: false });
+  const palanca = (x: number, y: number): Mandos => mandosDelFotograma(SIN_TECLAS, { palanca: { x, y }, deprisa: false, golpes: 0 });
   comprobar('la palanca hacia delante anda hacia delante', pedidoDelTic(palanca(0, 1), 0.3).marcha === ANDANDO && pedidoDelTic(palanca(0, 1), 0.3).rumbo === rumboDeRadianes(0.3));
   comprobar(
     'y hacia atrás retrocede, con la misma media vuelta que la S',
@@ -408,7 +418,7 @@ paso('Las teclas y la palanca dan el rumbo y la marcha que tienen que dar');
   );
   comprobar(
     'y el botón de correr de la app corre',
-    pedidoDelTic(mandosDelFotograma(SIN_TECLAS, { palanca: { x: 0, y: 1 }, deprisa: true }), 0).marcha === CORRIENDO,
+    pedidoDelTic(mandosDelFotograma(SIN_TECLAS, { palanca: { x: 0, y: 1 }, deprisa: true, golpes: 0 }), 0).marcha === CORRIENDO,
   );
   comprobar('y una palanca rota —sin número— no anda ni gira', pedidoDelTic(palanca(Number.NaN, Number.NaN), 0).marcha === QUIETO && palanca(Number.NaN, 0).giro === 0);
 
@@ -711,6 +721,183 @@ paso('Nadie se queda encerrado: si donde se nace no se cabe, se nace en el sitio
 }
 
 // ---------------------------------------------------------------------------
+paso('El golpe y el suelo: la G golpea sin comerse la de un campo, un toque es un golpe en un tic, y caído no se anda');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * La refriega de Boots on Board se golpea con la G en el escritorio y con «Golpear» en la app, y
+ * las dos cosas pueden fallar sin que falle nada: una G que se come la letra de un campo de texto
+ * —escribiendo un trato, el nombre—, un toque que se pierde porque cayó en un fotograma sin tics
+ * —a 144 por segundo son casi todos—, un toque que sale cinco veces porque el fotograma dio cinco,
+ * o un golpe pedido tumbado que sale al levantarse. Y quien está en el suelo no puede andar: el
+ * servidor no atiende sus pasos, y lo que anduviera en su pantalla volvería de golpe al renacer.
+ * Todo se mide aquí con el fotograma del gancho de verdad (`fotogramaDeQuienPasea`), sin React.
+ */
+{
+  /* ── La tecla ── */
+  const CASOS: readonly (readonly [string, string, DestinoDeLaTecla | null, boolean, boolean, boolean])[] = [
+    ['la G sobre el lienzo', 'g', { tagName: 'CANVAS' }, false, false, true],
+    ['la G con Mayúsculas, corriendo', 'G', { tagName: 'CANVAS' }, false, false, true],
+    ['la G sobre el cuerpo del documento', 'g', { tagName: 'BODY' }, false, false, true],
+    ['la G sin destino', 'g', null, false, false, true],
+    ['la G escrita en un campo de texto', 'g', { tagName: 'INPUT' }, false, false, false],
+    ['la G escrita en un área de texto', 'g', { tagName: 'TEXTAREA' }, false, false, false],
+    ['la G en un desplegable', 'g', { tagName: 'SELECT' }, false, false, false],
+    ['la G en algo editable', 'g', { tagName: 'DIV', isContentEditable: true }, false, false, false],
+    ['Ctrl+G, que es del navegador', 'g', { tagName: 'CANVAS' }, true, false, false],
+    ['la G mantenida, que el teclado repite', 'g', { tagName: 'CANVAS' }, false, true, false],
+    ['la W, que anda', 'w', { tagName: 'CANVAS' }, false, false, false],
+  ];
+  const mal = CASOS.filter(([, tecla, destino, mod, repetida, esperado]) => esUnGolpe(tecla, destino, mod, repetida) !== esperado).map(([que]) => que);
+  comprobar(
+    'la G golpea sobre el lienzo, y no se come la de un campo de texto, ni Ctrl+G, ni la repetición del teclado',
+    mal.length === 0 && TECLA_DE_GOLPEAR === 'g' && COMO_SE_GOLPEA === 'G para golpear',
+    mal,
+  );
+
+  /* ── La cuenta ── */
+  comprobar(
+    'la cuenta de golpes: pendiente mientras no salga un tic, vista cuando sale, y una cuenta que BAJA no es un golpe',
+    golpesVistosTras(5, 3, false) === 3 &&
+      golpesVistosTras(5, 3, true) === 5 &&
+      golpesVistosTras(3, 3, false) === 3 &&
+      golpesVistosTras(0, 4, false) === 0 &&
+      golpesVistosTras(0, 4, true) === 0,
+  );
+
+  /* ── Un toque es un golpe, en el primer tic del fotograma ── */
+  const entradasDe = (mandos: Mandos, dt: number): EntradaDelTic[] => {
+    const salen: EntradaDelTic[] = [];
+    fotogramaDelPaseo(ABIERTO, nacerEnElPaseo(ABIERTO, { x: 0, z: 0, rumbo: 0 }), dt, mandos, (en) => {
+      salen.push(en);
+    });
+    return salen;
+  };
+  const deTres = entradasDe(mandosDelFotograma(ADELANTE, SIN_MANDOS_DE_FUERA, true), 0.15);
+  const sinGolpe = entradasDe(mandosDelFotograma(ADELANTE, SIN_MANDOS_DE_FUERA, false), 0.15);
+  comprobar(
+    'un fotograma de tres tics con un golpe lo lleva en el primero y en ninguno más; sin golpe, en ninguno',
+    deTres.length === 3 && deTres.map((en) => en.golpe).join() === 'true,false,false' && sinGolpe.length === 3 && sinGolpe.every((en) => !en.golpe),
+    { deTres: deTres.map((en) => en.golpe), sinGolpe: sinGolpe.map((en) => en.golpe) },
+  );
+
+  /*
+   * A 144 FOTOGRAMAS POR SEGUNDO, CON EL FOTOGRAMA DEL GANCHO: tres toques en fotogramas distintos,
+   * y dos más en el MISMO fotograma. Tienen que salir cuatro golpes —los dos del mismo fotograma son
+   * uno—, cada uno en el primer tic que se da desde que se pulsó.
+   */
+  const TOQUES: ReadonlyMap<number, number> = new Map([
+    [3, 1],
+    [101, 1],
+    [250, 1],
+    [400, 2],
+  ]);
+  const conLaCuenta = (perderLosDeSinTic: boolean): { golpes: number[]; pulsados: number[] } => {
+    let e = nacerEnElPaseo(ABIERTO, { x: 0, z: 20, rumbo: 0 });
+    let pedidos = 0;
+    let vistos: number | null = null;
+    const golpes: number[] = [];
+    const pulsados: number[] = [];
+    const fuera = (): MandosDeFuera => ({ ...SIN_MANDOS_DE_FUERA, golpes: pedidos });
+    for (let i = 0; i < 520; i++) {
+      const toques = TOQUES.get(i) ?? 0;
+      if (toques > 0) {
+        pedidos += toques;
+        pulsados.push(e.tic);
+      }
+      const hecho = fotogramaDeQuienPasea(ABIERTO, e, 1 / 144, SIN_TECLAS, fuera(), pedidos, vistos, false, (en) => {
+        if (en.golpe) golpes.push(en.tic);
+      });
+      e = hecho.paseo;
+      /* LA VACUNA: dar por visto lo pedido en cada fotograma, salga tic o no, como haría un sí/no. */
+      vistos = perderLosDeSinTic ? pedidos : hecho.golpesVistos;
+    }
+    return { golpes, pulsados };
+  };
+  const bien = conLaCuenta(false);
+  const primerTicTras = bien.pulsados.every((t, k) => bien.golpes[k] === t + 1);
+  comprobar(
+    `a 144 por segundo, ${String(TOQUES.size)} fotogramas con toques —el último con dos— dan ${String(TOQUES.size)} golpes, cada uno en el primer tic tras el toque`,
+    bien.golpes.length === TOQUES.size && primerTicTras,
+    bien,
+  );
+  const perdidos = conLaCuenta(true);
+  comprobar(
+    'y dándolos por vistos en cada fotograma, salga tic o no, se pierden: la cuenta es lo que los guarda',
+    perdidos.golpes.length < TOQUES.size,
+    perdidos,
+  );
+
+  /* ── Caído ── */
+  let e = nacerEnElPaseo(ABIERTO, { x: 0, z: 20, rumbo: 0 });
+  const tics: EntradaDelTic[] = [];
+  let pedidos = 0;
+  let vistos: number | null = null;
+  let movidoCaido = 0;
+  for (let i = 0; i < 120; i++) {
+    if (i === 30) pedidos += 1;
+    const antes = e;
+    const hecho = fotogramaDeQuienPasea(
+      ABIERTO,
+      e,
+      1 / 60,
+      { ...ADELANTE, derecha: true },
+      { ...SIN_MANDOS_DE_FUERA, golpes: pedidos },
+      pedidos,
+      vistos,
+      true,
+      (en) => {
+        tics.push(en);
+      },
+    );
+    if (hecho.paseo !== antes) movidoCaido++;
+    e = hecho.paseo;
+    vistos = hecho.golpesVistos;
+  }
+  comprobar(
+    'caído, con la W y la D pulsadas y un golpe pedido, en dos segundos no se da ni un tic, ni se anda, ni se gira, ni se le cuenta nada a la red',
+    tics.length === 0 && movidoCaido === 0 && e.tic === 0 && e.rumbo === 0 && e.ahora.z === deNumero(20),
+    { tics: tics.length, movidoCaido, tic: e.tic },
+  );
+  const levantado: EntradaDelTic[] = [];
+  for (let i = 0; i < 30; i++) {
+    const hecho = fotogramaDeQuienPasea(ABIERTO, e, 1 / 60, ADELANTE, { ...SIN_MANDOS_DE_FUERA, golpes: pedidos }, pedidos, vistos, false, (en) => {
+      levantado.push(en);
+    });
+    e = hecho.paseo;
+    vistos = hecho.golpesVistos;
+  }
+  comprobar(
+    'y al levantarse se anda en el acto, y el golpe que se pidió tumbado no sale',
+    levantado.length === 10 && levantado.every((en) => !en.golpe) && e.ahora.z < deNumero(20),
+    { tics: levantado.length, golpes: levantado.filter((en) => en.golpe).length },
+  );
+  /* LA VACUNA: sin estar caído, los mismos fotogramas andan. Lo que para es el suelo, no otra cosa. */
+  const deOtro = fotogramaDeQuienPasea(ABIERTO, nacerEnElPaseo(ABIERTO, { x: 0, z: 20, rumbo: 0 }), 1 / 60, ADELANTE, SIN_MANDOS_DE_FUERA, 0, 0, false);
+  const deOtroMas = [0, 1, 2, 3, 4].reduce((f) => fotogramaDeQuienPasea(ABIERTO, f.paseo, 1 / 60, ADELANTE, SIN_MANDOS_DE_FUERA, 0, 0, false), deOtro);
+  comprobar('y de pie, los mismos fotogramas sí dan tics y andan: la guarda distingue', deOtroMas.paseo.tic > 0 && deOtroMas.paseo.ahora.z < deNumero(20));
+
+  /* ── Renacer mirando a donde dice ── */
+  const corriendo = nacerEnElPaseo(ABIERTO, { x: 0, z: 0, rumbo: 0.4 });
+  const sitio: Andante = { x: deNumero(-12), z: deNumero(7) };
+  const renacido = corregirElPaseo(corriendo, sitio, 2 * Math.PI + 1);
+  const alOtroLado = corregirElPaseo(corriendo, sitio, -2 * Math.PI - 0.5);
+  const soloCorregido = corregirElPaseo(corriendo, sitio);
+  comprobar(
+    'renacer pone en el sitio Y mirando a donde dice —en una vuelta—; corregir sin rumbo no toca hacia dónde se mira',
+    renacido.ahora === sitio &&
+      renacido.antes === sitio &&
+      Math.abs(renacido.rumbo - 1) < 1e-9 &&
+      Math.abs(alOtroLado.rumbo + 0.5) < 1e-9 &&
+      soloCorregido.rumbo === 0.4 &&
+      soloCorregido.ahora === sitio,
+    { renacido: renacido.rumbo, alOtroLado: alOtroLado.rumbo, soloCorregido: soloCorregido.rumbo },
+  );
+}
+
+// ---------------------------------------------------------------------------
 paso('El montaje: la escena y la app usan esto, y no otra cosa');
 // ---------------------------------------------------------------------------
 
@@ -743,13 +930,44 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
     'y corre antes que nadie: su `useFrame` lleva prioridad −1',
     /useFrame\(\(_, dt\) => \{[\s\S]*\}, -1\);/.test(gancho),
   );
+  /*
+   * EL FOTOGRAMA DEL GANCHO ES EL MEDIDO ARRIBA: `fotogramaDeQuienPasea`, con las teclas, los mandos
+   * de fuera, las dos cuentas de golpes, si está caído según el canal y la costura con la red. Se ve
+   * caer quitándole el suelo —el gancho andaría tumbado— y quitándole la cuenta del teclado.
+   */
+  const LA_LLAMADA =
+    /fotogramaDeQuienPasea\(\s*arena,\s*actual\.paseo,\s*dt,\s*teclas\.current,\s*fuera,\s*golpesPedidos,\s*golpesVistos\.current,\s*o\.caido\?\.\(\) === true,\s*o\.alDarUnTic,?\s*\)/;
+  const daLosTicsMedidos = (c: string): boolean =>
+    LA_LLAMADA.test(c) &&
+    /golpesVistos\.current = hecho\.golpesVistos;/.test(c) &&
+    /const golpesPedidos = golpesDelTeclado\.current \+ fuera\.golpes;/.test(c) &&
+    /poseDelPaseo\(paseo\)/.test(c) &&
+    !/\bfotogramaDelPaseo\(/.test(c);
+  comprobar('y da los tics con `fotogramaDeQuienPasea` —el golpe pendiente y el suelo— y pinta con `poseDelPaseo`, medidos aquí', daLosTicsMedidos(gancho));
   comprobar(
-    'y da los tics con `fotogramaDelPaseo` y pinta con `poseDelPaseo`, las dos medidas aquí',
-    /fotogramaDelPaseo\(arena, actual\.paseo, dt, mandos, o\.alDarUnTic\)/.test(gancho) && /poseDelPaseo\(paseo\)/.test(gancho),
+    'y se ve caer: sin preguntar si está caído, o sin la G en la cuenta, o dando tics por su cuenta',
+    !daLosTicsMedidos(gancho.replace('o.caido?.() === true', 'false')) &&
+      !daLosTicsMedidos(gancho.replace('golpesDelTeclado.current + fuera.golpes', 'fuera.golpes')) &&
+      !daLosTicsMedidos(`${gancho}\nfotogramaDelPaseo(arena, e, dt, mandos);`),
   );
   comprobar(
     'y lee el teclado sólo donde hay `document`, y los mandos de fuera siempre',
-    /typeof document === 'undefined'/.test(gancho) && /mandosDelFotograma\(teclas\.current, o\.mandos\?\.current \?\? SIN_MANDOS_DE_FUERA\)/.test(gancho),
+    /typeof document === 'undefined'/.test(gancho) && /const fuera = o\.mandos\?\.current \?\? SIN_MANDOS_DE_FUERA;/.test(gancho),
+  );
+  /*
+   * LA G, EN EL OYENTE: pulsada —no al soltar—, sólo con canal, y preguntando antes `esUnGolpe`, que
+   * es lo que no se come la G de un campo de texto (medido arriba). Y sólo entonces `preventDefault`
+   * y la cuenta: un oyente que contara antes de preguntar se llevaría la letra de cualquier campo.
+   */
+  const laG = (c: string): boolean =>
+    /if \(mando === 'golpe'\) \{\s*const conModificador = e\.ctrlKey \|\| e\.altKey \|\| e\.metaKey;\s*if \(!pulsada \|\| !conCanal\.current \|\| !esUnGolpe\(e\.key, e\.target as DestinoDeLaTecla \| null, conModificador, e\.repeat\)\) return;\s*e\.preventDefault\(\);\s*golpesDelTeclado\.current \+= 1;\s*return;\s*\}/.test(
+      c,
+    ) && /conCanal\.current = o\.alDarUnTic !== undefined;/.test(c);
+  comprobar('y la G cuenta un golpe sólo pulsada, con canal y si no es de otro; y sólo entonces se la queda', laG(gancho));
+  comprobar(
+    'y se ve caer: contando sin preguntar si es de otro, o también sin canal',
+    !laG(gancho.replace('|| !esUnGolpe(e.key, e.target as DestinoDeLaTecla | null, conModificador, e.repeat)', '')) &&
+      !laG(gancho.replace('if (!pulsada || !conCanal.current ||', 'if (!pulsada ||')),
   );
   comprobar(
     'la marioneta elige el clip por la velocidad medida y le pone su ritmo',
@@ -802,4 +1020,5 @@ console.log(`${hechas} comprobaciones`);
 console.log('\nEl reloj cuenta tics enteros y no se desboca, se pinta entre los dos últimos, las teclas y la');
 console.log('palanca piden lo que tienen que pedir, la muralla para y deja resbalar, la marioneta se queda');
 console.log('quieta contra ella y corre al correr sin patinar, lo pedido basta para rehacer el camino, nadie');
-console.log('se queda encerrado, y la escena y la app montan justo esto.');
+console.log('se queda encerrado, la G golpea sin comerse la de un campo y un toque es un golpe en un solo');
+console.log('tic, en el suelo no se anda, y la escena y la app montan justo esto.');

@@ -230,6 +230,7 @@ import { asientosQueAndanPorElDelta } from '../../escenas/delta-a-pie';
 import type { EstadoDelCanal } from '../../escenas/paseo/canal-de-botas';
 import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import type { CanalDeBotas } from '../../escenas/paseo/mesa-de-botas';
+import { COMO_SE_GOLPEA } from '../../escenas/paseo/mandos';
 /*
  * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
  * `verify:riberas` mide contra los seis colores de colono: el carril la usa para la barra de
@@ -413,7 +414,8 @@ export const CAMARA_DE_LA_TECLA: ReadonlyMap<string, ModoDeCamaraDelDelta['modo'
  * volver, recoger y la cámara, y abajo la barra, que en el lienzo más estrecho deja 41 puntos a cada
  * lado; el porqué entero está en `MANDOS_DE_LA_CAMARA`, en `escenas/delta-a-pie.ts`—, y un cartel
  * ahí taparía la pieza de la barra que se va a coger. Una mesa de botas se empieza a pie, y es a pie
- * donde se ve a los demás: ahí sí.
+ * donde se ve a los demás: ahí sí. Y ahí se golpea: la tecla va con las demás (`COMO_SE_GOLPEA`,
+ * como en Las Lindes), y los corazones propios los trae el texto del canal.
  */
 export function ComoSeAndaPorElDelta({
   modo,
@@ -426,6 +428,7 @@ export function ComoSeAndaPorElDelta({
   return (
     <p className="riberas-como-se-anda">
       W A S D o las flechas para andar · Mayúsculas para correr · M vuelve a la mesa
+      {canal === undefined ? null : ` · ${COMO_SE_GOLPEA}`}
       {canal === undefined ? null : (
         <>
           <br />

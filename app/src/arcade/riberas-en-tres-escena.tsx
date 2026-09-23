@@ -231,6 +231,7 @@ import type { EstadoDelCanal } from '../../../escenas/paseo/canal-de-botas';
 import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
 import { MandosDelPaseo } from './mandos-del-paseo';
+import { BotonDeGolpear } from './mandos-del-paseo';
 /*
  * LAS DOS MITADES DE LA CÁMARA, Y NINGUNA SE ESCRIBE AQUÍ. `camara.ts` dice desde
  * qué rumbo y qué altura se mira; `acercar.ts`, cuánto se acerca y adónde. Esta
@@ -1700,9 +1701,11 @@ function LaMesaEnTres({
           mover. Es la misma de Las Lindes, sin tocarla (`mandos-del-paseo.tsx`), y escribe en la
           referencia que la escena lee. Hermana del `GestureDetector` y no hija, como los otros
           mandos de esta caja: se lleva su toque sin pelearlo con el lienzo. Abajo a los lados,
-          que andando es sitio libre: la mesa se ha recogido al bajar.
+          que andando es sitio libre: la mesa se ha recogido al bajar. Y «Golpear», a pie y sólo
+          con canal: la refriega de una mesa de botas, lo que en el escritorio es la G.
         */}
         <MandosDelPaseo mandos={mandos} visibles={aPie} />
+        <BotonDeGolpear mandos={mandos} visible={aPie && canal !== undefined} />
 
         {/*
           EL TELÓN, mientras el modelo llega: suelo con el nombre del juego y una

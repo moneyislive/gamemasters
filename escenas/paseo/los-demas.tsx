@@ -30,6 +30,14 @@
  * Con la misma `alturaEn` que quien pasea, y alcanzándola en un par de fotogramas en vez de
  * copiarla (`LO_QUE_SE_ASIENTA`, el mismo número que el paseo): bajar de la senda al prado son 1,2
  * unidades, y los demás tampoco tienen que dar respingos.
+ *
+ * ═══ Y LA REFRIEGA, POR EL MISMO CLIENTE ═══
+ *
+ * Cómo va cada uno en la refriega se le pregunta al canal en el fotograma, igual que su sitio
+ * (`refriegaDe`, y ya a su hora: la de su pose). Lo que contesta manda sobre el paso: el clip de un
+ * gesto —lanzar, recibir, caer y quedarse en el suelo, aparecer— pisa al de andar mientras dura,
+ * mientras es intocable la figura parpadea, y sus corazones van en su rótulo, encima del nombre.
+ * Los corazones se repintan sólo el fotograma en que cambian; el resto, se leen números.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
@@ -44,7 +52,7 @@ import type { Marioneta } from '../aventureros/marioneta';
 import { giroDeLaMarioneta } from './camaras';
 import type { ClienteDelCanal } from './canal-de-botas';
 import type { AsientoQueAnda } from './mesa-de-botas';
-import { ALTURA_DEL_ROTULO, altoDelRotulo, geometriaDelRotulo } from './rotulo';
+import { ALTURA_DEL_ROTULO, altoDelRotulo, geometriaDelRotulo, ponerLosCorazones } from './rotulo';
 import { clipDelPaso, ritmoDelClip } from './zancada';
 
 /** Lo deprisa que se vuelve una figura hacia su rumbo, por segundo: el mismo de `quien-anda.tsx`. */
@@ -110,6 +118,8 @@ function UnoDeLosDemas({ traer, cliente, asiento, nombre, figura, color, alturaE
   const placa = useRef<THREE.Group>(null);
   const rumboAhora = useRef<number | null>(null);
   const alturaAhora = useRef<number | null>(null);
+  /* Cómo están pintados sus corazones: sólo se repintan cuando esto cambia. */
+  const corazonesPintados = useRef<string | null>(null);
   const camera = useThree((s) => s.camera);
 
   /*
@@ -159,9 +169,15 @@ function UnoDeLosDemas({ traer, cliente, asiento, nombre, figura, color, alturaE
     };
   }, [biblioteca, cargada, laFigura, nombre]);
 
-  /* La placa se compone una vez por nombre y color, y se suelta al cambiar o al irse. */
-  const geometria = useMemo(() => geometriaDelRotulo(nombre, color), [nombre, color]);
-  useEffect(() => () => geometria?.dispose(), [geometria]);
+  /*
+   * La placa se compone una vez por nombre y color —con sus corazones, escondidos hasta que el canal
+   * sepa cómo va la refriega—, y se suelta al cambiar o al irse.
+   */
+  const geometria = useMemo(() => geometriaDelRotulo(nombre, color, true), [nombre, color]);
+  useEffect(() => {
+    corazonesPintados.current = null;
+    return () => geometria?.dispose();
+  }, [geometria]);
   const material = useMemo(
     /*
      * Sin niebla —de lejos es cuando más falta encontrar a alguien— y sin el tono de la escena, que
@@ -176,12 +192,15 @@ function UnoDeLosDemas({ traer, cliente, asiento, nombre, figura, color, alturaE
   useFrame((_, dt) => {
     const g = cuerpo.current;
     const r = placa.current;
-    const pose = cliente.current?.poseDe(asiento) ?? null;
+    const canal = cliente.current;
+    const pose = canal?.poseDe(asiento) ?? null;
     if (pose === null) {
       if (g !== null) g.visible = false;
       if (r !== null) r.visible = false;
       return;
     }
+    /* La refriega, a la misma hora que su pose. `null` sin `vidas`: entonces sólo anda. */
+    const como = canal?.refriegaDe(asiento) ?? null;
 
     const suelo = alturaEn(pose.x, pose.z);
     const antes = alturaAhora.current;
@@ -191,7 +210,8 @@ function UnoDeLosDemas({ traer, cliente, asiento, nombre, figura, color, alturaE
 
     const m = marioneta.current;
     if (g !== null && m !== null) {
-      g.visible = true;
+      /* Intocable, parpadea: ver `refriega.ts`. */
+      g.visible = como === null || como.seVe;
       g.position.set(pose.x, y, pose.z);
       /* El rumbo se alcanza por el camino corto, como el de quien pasea. */
       const rumbo = rumboAhora.current;
@@ -202,12 +222,25 @@ function UnoDeLosDemas({ traer, cliente, asiento, nombre, figura, color, alturaE
         rumboAhora.current = rumbo + Math.min(Math.abs(falta), LO_QUE_SE_VUELVE * dt) * Math.sign(falta);
       }
       g.rotation.y = giroDeLaMarioneta(rumboAhora.current ?? pose.rumbo);
-      /* El clip y su ritmo, de la velocidad MEDIDA entre dos fotos: ver `zancada.ts`. */
-      const clip = clipDelPaso(pose.velocidad);
-      reproduce(m, clip, true, 0, 0);
-      const accion = m.acciones.get(clip);
-      if (accion !== undefined && accion === m.actual) accion.timeScale = ritmoDelClip(clip, pose.velocidad);
+      const gesto = como?.gesto ?? null;
+      if (como !== null && gesto !== null) {
+        /* Un gesto de la refriega manda sobre el paso mientras dura; el mezclador cuenta en segundos. */
+        reproduce(m, gesto.clip, gesto.bucle, gesto.desde / 1000, como.a / 1000);
+      } else {
+        /* El clip y su ritmo, de la velocidad MEDIDA entre dos fotos: ver `zancada.ts`. */
+        const clip = clipDelPaso(pose.velocidad);
+        reproduce(m, clip, true, 0, 0);
+        const accion = m.acciones.get(clip);
+        if (accion !== undefined && accion === m.actual) accion.timeScale = ritmoDelClip(clip, pose.velocidad);
+      }
       m.mezclador.update(dt);
+    }
+
+    /* Sus corazones: se repintan sólo si han cambiado. */
+    const pintar = como === null ? 'sin' : `${String(como.corazones.llenos)}:${String(como.corazones.apagados)}`;
+    if (geometria !== null && pintar !== corazonesPintados.current) {
+      ponerLosCorazones(geometria, como === null ? null : como.corazones);
+      corazonesPintados.current = pintar;
     }
 
     if (r !== null) {

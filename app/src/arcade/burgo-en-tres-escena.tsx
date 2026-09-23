@@ -249,6 +249,7 @@ import {
   usarLaSeccionAbierta,
 } from './hojas-del-burgo';
 import { MandosDelPaseo } from './mandos-del-paseo';
+import { BotonDeGolpear } from './mandos-del-paseo';
 import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import type { CanalDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import { direccionDelCanal, usarMesaDeArcade } from './mesa';
@@ -1610,7 +1611,9 @@ function LaMesaEnTres({
                 accessible
                 accessibilityLabel={
                   aPie
-                    ? 'El burgo a pie. Anda con la palanca de abajo a la izquierda; «Mesa» vuelve a mirarlo desde arriba.'
+                    ? canal !== undefined
+                      ? 'El burgo a pie. Anda con la palanca de abajo a la izquierda y golpea con «Golpear», a su derecha; «Mesa» vuelve a mirarlo desde arriba.'
+                      : 'El burgo a pie. Anda con la palanca de abajo a la izquierda; «Mesa» vuelve a mirarlo desde arriba.'
                     : 'El burgo en tres dimensiones. Arrastra con un dedo para girarlo, pellizca para acercarlo y mueve dos dedos para recorrerlo.'
                 }
                 /*
@@ -1812,6 +1815,8 @@ function LaMesaEnTres({
               </View>
               {/* LA PALANCA Y EL CORRER, sólo a pie: en la mesa no hay a quién mover. Ver `mandos-del-paseo.tsx`. */}
               <MandosDelPaseo mandos={mandos} visibles={aPie} />
+              {/* Y «GOLPEAR», a pie y sólo con canal, en la misma franja: fuera de ella el dedo no llega en Android. */}
+              <BotonDeGolpear mandos={mandos} visible={aPie && canal !== undefined} />
             </View>
             {elPie(fuera)}
           </View>

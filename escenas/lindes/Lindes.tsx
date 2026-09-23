@@ -340,7 +340,9 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
    * Sin la prop no se abre nada y `alDarUnTic` es `undefined`: una mesa normal no paga ni una
    * llamada por tic. Con ella, el paseo le da cada tic al canal (la costura a) y el canal pone a
    * quien pasea donde dice el servidor (la costura b), que llega por una referencia porque el
-   * paseo se monta después. Ver `paseo/usar-el-canal.ts`.
+   * paseo se monta después. Ver `paseo/usar-el-canal.ts`. La refriega va por los mismos hilos: el
+   * paseo le pregunta al canal si quien pasea está en el suelo (`caido`), y `QuienAnda` y `LosDemas`
+   * le preguntan cómo va cada uno (`cliente`).
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
   const elCanal = usarElCanal(props.canal, corregirAQuienPasea);
@@ -352,6 +354,7 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
     alturaEn,
     alturaDeLaCamaraEn,
     alDarUnTic: elCanal.alDarUnTic,
+    caido: elCanal.caido,
   });
   useEffect(() => {
     corregirAQuienPasea.current = paseo.corregir;
@@ -661,6 +664,7 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
           pose={paseo.pose}
           enPrimeraPersona={camara.modo === 'ojos'}
           alFallar={props.alFallar}
+          cliente={elCanal.cliente}
         />
       )}
 

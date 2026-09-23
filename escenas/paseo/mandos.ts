@@ -25,6 +25,25 @@
  * Girar mueve la cámara, y una cámara que girase a saltos, veinte veces por segundo, marearía.
  * El rumbo visual es continuo, gira en cada fotograma y no decide nada; lo que decide es su
  * redondeo en el instante del tic.
+ *
+ * ═══ Y EL GOLPE SE DA, NO SE TIENE PULSADO ═══
+ *
+ * La refriega de Boots on Board (`shared/mecanicas/canal-de-botas.ts`, «LA REFRIEGA») pide una
+ * cosa más: golpear. Andar es un ESTADO —se lleva la W pulsada, se lleva la palanca torcida— y un
+ * golpe es un SUCESO: se pulsa una vez y sale uno. Por eso no es una tecla más de `Teclas`, que
+ * dice qué se lleva pulsado, sino una CUENTA de pulsaciones: la G en el teclado, que lleva el
+ * gancho del paseo, y el botón «Golpear» de la app, que escribe `MandosDeFuera.golpes`. El paseo
+ * compara lo pedido con lo que ya salió (`golpesVistosTras`) y pone el golpe en el primer tic que
+ * dé; un fotograma sin tics —a 144 por segundo son casi todos— no lo pierde, lo deja para el
+ * siguiente.
+ *
+ * Una cuenta y no un «golpea sí o no» porque en la app escriben DOS manos en la misma referencia:
+ * el pulgar de la palanca la reescribe sesenta veces por segundo, y un sí que el otro pulgar dejara
+ * entre dos fotogramas lo pisaría el primero. Un número que sólo crece no se pisa: quien escribe la
+ * palanca copia los golpes tal cual, y el tipo le obliga, porque el campo no es opcional.
+ *
+ * Lo que sale de aquí es la INTENCIÓN (`EntradaDelTic.golpe`). Si sale un `golpe` por el canal lo
+ * decide el canal —la recarga, estar dentro, no estar caído— y si da a alguien, el servidor.
  */
 import { ANDANDO, CORRIENDO, QUIETO, RUMBOS, rumboDeRadianes, rumboValido } from '../../shared/mecanicas/andar';
 import type { Marcha } from '../../shared/mecanicas/andar';
@@ -50,19 +69,40 @@ export const SIN_TECLAS: Teclas = {
 };
 
 /**
+ * LA TECLA DE GOLPEAR: la G, de «golpear».
+ *
+ * Elegida por descarte, mirando lo que ya es de alguien en los tres escritorios que se andan: W A
+ * S D y las flechas andan, Mayúsculas corre, 1, 2 y 3 son las cámaras de Las Lindes y del Burgo,
+ * la R gira la losa de Las Lindes, M, H y O son las cámaras de Riberas y las cifras son el carril
+ * de sus opciones. La G no la usa nadie, y se encuentra a ciegas: está en la fila de reposo, a
+ * dos teclas de la D, sin soltar la mano de andar. No es el espacio, que es lo primero que se
+ * busca: el espacio PULSA el botón que tenga el foco —el de una cámara recién elegida, uno del
+ * carril—, y un golpe haría a la vez lo que ese botón hace.
+ */
+export const TECLA_DE_GOLPEAR = 'g';
+
+/** Cómo se dice, para los carteles de «cómo se anda» de los escritorios: sale de la tecla, así no se separan. */
+export const COMO_SE_GOLPEA = `${TECLA_DE_GOLPEAR.toUpperCase()} para golpear`;
+
+/** A qué va una tecla del paseo: a un mando que se lleva pulsado, o a un golpe, que se da al pulsar. */
+export type MandoDeLaTecla = keyof Teclas | 'golpe';
+
+/**
  * A QUÉ MANDO VA UNA TECLA, o `null` si no es del paseo.
  *
  * W A S D y las flechas, y Mayúsculas para correr: lo que busca a ciegas quien ya ha jugado a
  * algo. Se compara en minúsculas porque con Mayúsculas pulsada la W llega como `W`, y correr
- * hacia delante —la combinación más corriente del paseo— dejaba de andar.
+ * hacia delante —la combinación más corriente del paseo— dejaba de andar. Y la G golpea (ver
+ * `TECLA_DE_GOLPEAR`), también corriendo.
  */
-export function teclaDelPaseo(tecla: string): keyof Teclas | null {
+export function teclaDelPaseo(tecla: string): MandoDeLaTecla | null {
   const k = tecla.toLowerCase();
   if (k === 'w' || k === 'arrowup') return 'adelante';
   if (k === 's' || k === 'arrowdown') return 'atras';
   if (k === 'a' || k === 'arrowleft') return 'izquierda';
   if (k === 'd' || k === 'arrowright') return 'derecha';
   if (k === 'shift') return 'deprisa';
+  if (k === TECLA_DE_GOLPEAR) return 'golpe';
   return null;
 }
 
@@ -92,6 +132,20 @@ export function esTeclaDeOtro(
   return etiqueta === 'INPUT' || etiqueta === 'TEXTAREA' || etiqueta === 'SELECT';
 }
 
+/**
+ * ¿ES ESTE `keydown` UN GOLPE? La G, pulsada ahora —no la repetición que manda el teclado mientras
+ * se mantiene, que golpearía en ráfaga con un dedo apoyado—, y que no sea de otro: una G que se
+ * escribe en un campo es una letra, y Ctrl+G es un atajo del navegador.
+ */
+export function esUnGolpe(
+  tecla: string,
+  destino: DestinoDeLaTecla | null | undefined,
+  conModificador: boolean,
+  repetida: boolean,
+): boolean {
+  return teclaDelPaseo(tecla) === 'golpe' && !repetida && !esTeclaDeOtro(destino, conModificador);
+}
+
 /* ─── Lo que llega de fuera: la palanca de la app ────────────────────────── */
 
 /**
@@ -105,10 +159,16 @@ export interface MandosDeFuera {
   /** De −1 a 1 en los dos ejes: `x` hacia la derecha y `y` hacia DELANTE. */
   readonly palanca: { readonly x: number; readonly y: number };
   readonly deprisa: boolean;
+  /**
+   * CUÁNTAS VECES SE HA PULSADO «GOLPEAR» desde que se montaron los mandos: sólo crece, y vuelve a
+   * cero al dejar de andar. No es opcional a propósito: quien reescribe la referencia —la palanca,
+   * el correr— tiene que copiarla, y sin copiarla el tipo no compila. Ver la cabecera.
+   */
+  readonly golpes: number;
 }
 
-/** La palanca suelta y sin correr. */
-export const SIN_MANDOS_DE_FUERA: MandosDeFuera = { palanca: { x: 0, y: 0 }, deprisa: false };
+/** La palanca suelta, sin correr y sin golpes. */
+export const SIN_MANDOS_DE_FUERA: MandosDeFuera = { palanca: { x: 0, y: 0 }, deprisa: false, golpes: 0 };
 
 /**
  * LO QUE LA PALANCA NO CUENTA, en fracción de su recorrido.
@@ -135,10 +195,12 @@ export interface Mandos {
   /** Cuánto se gira, de −1 (a la izquierda) a 1 (a la derecha). */
   readonly giro: number;
   readonly deprisa: boolean;
+  /** Si hay un golpe pedido que todavía no ha salido en ningún tic: sale en el primero que se dé. */
+  readonly golpe: boolean;
 }
 
 /** Nada pedido. */
-export const SIN_MANDOS: Mandos = { avance: 0, giro: 0, deprisa: false };
+export const SIN_MANDOS: Mandos = { avance: 0, giro: 0, deprisa: false, golpe: false };
 
 /**
  * LAS DOS MANOS, SUMADAS.
@@ -150,8 +212,11 @@ export const SIN_MANDOS: Mandos = { avance: 0, giro: 0, deprisa: false };
  * torciera un poco.
  *
  * Adelante y atrás a la vez se anulan, venga de donde venga cada uno.
+ *
+ * `golpe` no sale de las teclas ni de la palanca, que dicen lo que se lleva pulsado: lo pone
+ * quien lleva la cuenta de las pulsaciones (`golpesVistosTras`, en el gancho del paseo).
  */
-export function mandosDelFotograma(teclas: Teclas, fuera: MandosDeFuera): Mandos {
+export function mandosDelFotograma(teclas: Teclas, fuera: MandosDeFuera, golpe = false): Mandos {
   const palancaY = fueraDeLaZonaMuerta(fuera.palanca.y);
   const hacia = (teclas.adelante ? 1 : 0) - (teclas.atras ? 1 : 0) + Math.sign(palancaY);
   const avance: -1 | 0 | 1 = hacia > 0 ? 1 : hacia < 0 ? -1 : 0;
@@ -159,7 +224,23 @@ export function mandosDelFotograma(teclas: Teclas, fuera: MandosDeFuera): Mandos
     -1,
     Math.min(1, (teclas.derecha ? 1 : 0) - (teclas.izquierda ? 1 : 0) + fueraDeLaZonaMuerta(fuera.palanca.x)),
   );
-  return { avance, giro, deprisa: teclas.deprisa || fuera.deprisa };
+  return { avance, giro, deprisa: teclas.deprisa || fuera.deprisa, golpe };
+}
+
+/* ─── Los golpes: pedidos y vistos ───────────────────────────────────────── */
+
+/**
+ * LOS GOLPES QUE QUEDAN VISTOS TRAS UN FOTOGRAMA.
+ *
+ * `pedidos` es la suma de las dos cuentas —la G y el botón— y `vistos`, lo que ya se había dado
+ * por visto. Hay un golpe pendiente mientras `pedidos > vistos`; sale en el primer tic de un
+ * fotograma (`fotogramaDelPaseo`), y entonces se dan por vistos todos los pedidos —diez toques en
+ * un fotograma son UN golpe: la recarga del canal no dejaría salir más—. Si el fotograma no dio
+ * ningún tic, el golpe espera al siguiente. Y si la cuenta BAJA —la app suelta los mandos al dejar
+ * de andar y vuelve a cero—, se da por visto lo que haya: un número que baja no es un golpe.
+ */
+export function golpesVistosTras(pedidos: number, vistos: number, dioTics: boolean): number {
+  return pedidos <= vistos || dioTics ? pedidos : vistos;
 }
 
 /* ─── El giro, por fotograma ─────────────────────────────────────────────── */
@@ -209,6 +290,11 @@ export interface EntradaDelTic extends PedidoDelTic {
    * andar de frente, y un golpe «hacia donde miro» no tendría de dónde salir.
    */
   readonly mira: number;
+  /**
+   * SI EN ESTE TIC SE GOLPEA. Lo pedido y nada más: si sale un `golpe` por el canal —con este tic y
+   * esta `mira`— lo decide el canal, y si da a alguien, el servidor. Ver la cabecera.
+   */
+  readonly golpe: boolean;
 }
 
 /**
