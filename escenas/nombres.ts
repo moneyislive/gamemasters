@@ -33,7 +33,18 @@
  * De ahí `NOMBRE_QUE_SOBREVIVE`, que usan el compilador —para negarse a escribir un
  * nombre que el cargador vaya a cambiar— y `verify:escena` —para comprobar que lo
  * que hay dentro del `.glb` es exactamente lo que esta tabla dice—.
+ *
+ * ═══ CUARENTA DE ESTOS NOMBRES VIENEN DE `shared/`, Y NO ES UNA COPIA ═══
+ *
+ * Los que pone el reparto de Las Lindes —murallas, casas, árboles, trastos— los pide
+ * también `shared/arcade/juegos/lindes-reparto.ts`, que vive en `shared/` porque de él
+ * sale con qué se choca y lo deriva también el servidor. Su verdad es `PIEZA`, en
+ * `lindes-piezas.ts`, y aquí se meten en `MODELO` por referencia, con la misma clave y en
+ * el mismo sitio de la tabla. Copiarlos habría sido el fallo que esta cabecera ya contó:
+ * un renombrado que `verify:escena` ve verde aquí y el reparto pidiendo una pieza que no
+ * existe. Así, lo que comprueba `verify:escena` es lo que pide el reparto.
  */
+import { PIEZA } from '../shared/arcade/juegos/lindes-piezas';
 import type { ColorDeJugador } from './tipos';
 
 /**
@@ -102,16 +113,16 @@ export const MODELO = {
   rioPuenteB: 'rio-puente-b',
 
   /* Árboles sueltos y arboledas de tesela entera. Hacen falta los dos: ver `poblar.ts`. */
-  arbolA: 'arbol-a',
-  arbolB: 'arbol-b',
-  tocon: 'tocon',
-  arboledaGrande: 'arboleda-grande',
-  arboledaMedia: 'arboleda-media',
-  arboledaPequena: 'arboleda-pequena',
+  arbolA: PIEZA.arbolA,
+  arbolB: PIEZA.arbolB,
+  tocon: PIEZA.tocon,
+  arboledaGrande: PIEZA.arboledaGrande,
+  arboledaMedia: PIEZA.arboledaMedia,
+  arboledaPequena: PIEZA.arboledaPequena,
   arboledaB: 'arboleda-b',
 
   /* Relieve. Las `colina-*` son montículos sueltos; las `colinas-*` llenan la tesela. */
-  colinaA: 'colina-a',
+  colinaA: PIEZA.colinaA,
   colinaB: 'colina-b',
   colinaC: 'colina-c',
   colinasA: 'colinas-a',
@@ -122,35 +133,35 @@ export const MODELO = {
   montanaC: 'montana-c',
   montanaVerde: 'montana-verde',
   montanaArbolada: 'montana-arbolada',
-  rocaA: 'roca-a',
-  rocaB: 'roca-b',
-  rocaC: 'roca-c',
-  rocaD: 'roca-d',
-  rocaE: 'roca-e',
+  rocaA: PIEZA.rocaA,
+  rocaB: PIEZA.rocaB,
+  rocaC: PIEZA.rocaC,
+  rocaD: PIEZA.rocaD,
+  rocaE: PIEZA.rocaE,
 
   /* Campo. */
-  trigal: 'trigal',
-  barbecho: 'barbecho',
+  trigal: PIEZA.trigal,
+  barbecho: PIEZA.barbecho,
   ruina: 'ruina',
-  valla: 'valla',
-  vallaPuerta: 'valla-puerta',
-  muro: 'muro',
-  muroPuerta: 'muro-puerta',
+  valla: PIEZA.valla,
+  vallaPuerta: PIEZA.vallaPuerta,
+  muro: PIEZA.muro,
+  muroPuerta: PIEZA.muroPuerta,
   muroEsquina: 'muro-esquina',
   muroEsquinaDentro: 'muro-esquina-dentro',
   muroEsquinaPuerta: 'muro-esquina-puerta',
   puente: 'puente',
 
   /* Trastos. */
-  tienda: 'tienda',
-  saco: 'saco',
-  carro: 'carro',
-  barril: 'barril',
-  caja: 'caja',
-  lena: 'lena',
-  piedra: 'piedra',
-  almiar: 'almiar',
-  abrevadero: 'abrevadero',
+  tienda: PIEZA.tienda,
+  saco: PIEZA.saco,
+  carro: PIEZA.carro,
+  barril: PIEZA.barril,
+  caja: PIEZA.caja,
+  lena: PIEZA.lena,
+  piedra: PIEZA.piedra,
+  almiar: PIEZA.almiar,
+  abrevadero: PIEZA.abrevadero,
   bote: 'bote',
   ancla: 'ancla',
   varadero: 'varadero',
@@ -172,22 +183,22 @@ export const MODELO = {
   nubePequena: 'nube-pequena',
 
   /* Los edificios del paisaje. No son de nadie: ver `compilar-modelos.ts`. */
-  casa: 'casa',
-  iglesia: 'iglesia',
-  taberna: 'taberna',
-  mercado: 'mercado',
-  molino: 'molino',
+  casa: PIEZA.casa,
+  iglesia: PIEZA.iglesia,
+  taberna: PIEZA.taberna,
+  mercado: PIEZA.mercado,
+  molino: PIEZA.molino,
   acena: 'acena',
   aserradero: 'aserradero',
-  herreria: 'herreria',
+  herreria: PIEZA.herreria,
   mina: 'mina',
-  pozo: 'pozo',
-  atalaya: 'atalaya',
-  concejo: 'concejo',
-  taller: 'taller',
-  cuadras: 'cuadras',
-  ermita: 'ermita',
-  vigia: 'vigia',
+  pozo: PIEZA.pozo,
+  atalaya: PIEZA.atalaya,
+  concejo: PIEZA.concejo,
+  taller: PIEZA.taller,
+  cuadras: PIEZA.cuadras,
+  ermita: PIEZA.ermita,
+  vigia: PIEZA.vigia,
 
   /* El barco de nadie, para el mar. */
   barco: 'barco',

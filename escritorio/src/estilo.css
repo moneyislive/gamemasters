@@ -5669,6 +5669,24 @@ code {
   border-color: #f3ecd8;
 }
 
+/*
+ * CÓMO SE ANDA, mientras se anda: arriba a la izquierda, con la misma placa que las cámaras de
+ * la derecha, y sin coger el puntero, que es un cartel y no un control. Ver `ComoSeAnda`.
+ */
+.lindes-como-se-anda {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  margin: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  border-radius: var(--radio-ficha);
+  border: 1px solid rgba(243, 236, 216, 0.45);
+  background: rgba(12, 20, 8, 0.62);
+  color: #f3ecd8;
+  pointer-events: none;
+}
+
 .lindes-rail {
   flex: 0 0 21rem;
   min-width: 0;

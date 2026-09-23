@@ -525,6 +525,27 @@ const BATERIA = [
       'el mundo declarado pasa por `canonico.ts` —o sea que se puede comparar y congelar, que es lo que el primer diseño no conseguía con sus listas tipadas dentro— y la arena que se deriva de él para al paseante en los MISMOS sitios en Node y en Hermes: misma huella, mismas paradas contra cuerpo y contra borde, mismos resbalones',
   },
   {
+    nombre: 'el mundo del Burgo',
+    donde: 'server',
+    guion: 'verify:burgo-mundo',
+    porque:
+      'el Burgo con el que se choca es uno solo aunque cada aparato elija su calidad: lo sólido que la escena PINTA en plena y en sobria se deduce caja a caja y es el mundo que declara `shared/` (la traza, los edificios y lo sólido de los distritos); la ciudad es bit a bit la de antes de mudar la traza, el mundo canoniza, ningún cuerpo se sale del tablero, se nace con suelo y sin cuerpo mirando a una calle, quien embiste setecientos edificios se queda en la fachada, y el mundo levantado y andado en Node y en Hermes deja la misma huella — con suelos de choques contra cuerpo y contra borde',
+  },
+  {
+    nombre: 'el protocolo de Boots on Board',
+    donde: 'server',
+    guion: 'verify:protocolo-de-botas',
+    porque:
+      'lo que manda un aparato llega de un entorno hostil, y el lector del servidor devuelve null ante cualquier cosa que no sea exactamente un mensaje bien formado —una clave de más, un número con decimales, una coordenada fuera de la coma fija, un rumbo o una marcha fuera de rango, un texto más largo que el tope—; el del aparato, igual con lo que manda el servidor; la ruta cuelga de la mesa bajo /api y la llave NO va en ella',
+  },
+  {
+    nombre: 'el mundo de Las Lindes',
+    donde: 'server',
+    guion: 'verify:lindes-mundo',
+    porque:
+      'el mundo de Las Lindes sale del reparto de verdad, bajado a `shared/`: canoniza; estorban la muralla, las torres, la villa, la ermita y lo que se levanta en el campo, con la huella MEDIDA de cada modelo en `tablero.glb` —se vuelve a medir y se exigen los mismos números— y ni una caja de trigal, barbecho o nada menudo; se nace en senda o prado donde se puede estar; quien va derecho contra un lienzo se queda en su lado —y sin él cruzaría— y por el hueco de una puerta se pasa —y cerrada no—; y el mismo tablero da el mismo mundo y el mismo paseo en Node y en Hermes, con suelos de choques contra cuerpo y contra borde',
+  },
+  {
     nombre: 'marcador',
     donde: 'server',
     guion: 'verify:marcador',
@@ -719,6 +740,13 @@ const BATERIA = [
     guion: 'verify:lindes-escena',
     porque:
       'ni un triángulo del suelo mira hacia abajo, las 24 losas por sus 4 giros casan celda a celda en la raya con todas las que las reglas dejan pegar, ningún muro parte una villa que continúa en la losa de al lado, nada se sale de su losa ni flota ni se planta en mitad de un camino, los muros cubren su tramo sin aplastarse, un tablero de nueve por nueve con el recorte por distancia puesto cabe en el presupuesto —contado con los triángulos reales del `.glb`— y en el lobby los cinco sitios están en corro, mirando a la piedra y sin nada sembrado encima',
+  },
+  {
+    nombre: 'el paseo común',
+    donde: 'escenas',
+    guion: 'verify:paseo',
+    porque:
+      'los fotogramas dan exactamente ⌊total/tic⌋ tics y nunca más de cinco por fotograma, lo pintado va siempre entre el tic anterior y el último, las teclas y la palanca piden su rumbo y su marcha con el atrás en +128, contra un cuerpo del mundo se para sin meterse y de lado resbala, la marioneta se queda quieta contra la pared aunque se pulse y corre al correr con el clip a la velocidad del suelo, lo pedido tic a tic basta para rehacer el camino, nadie nace encerrado, y la escena de Las Lindes y la app montan justo esto',
   },
   /*
    * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.

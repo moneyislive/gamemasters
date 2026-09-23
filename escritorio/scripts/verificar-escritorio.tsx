@@ -256,7 +256,7 @@ import {
   LaTarjetaDeUnaCasilla,
 } from '../src/hojas-del-burgo';
 import { LINDES } from '../../shared/arcade/juegos';
-import { LindesEnTres, MarcadorDeLasLindes } from '../src/lindes-en-tres';
+import { ComoSeAnda, LindesEnTres, MarcadorDeLasLindes } from '../src/lindes-en-tres';
 import { PINTORES_PROPIOS } from '../src/pintores';
 /*
  * LAS PIEZAS GENÉRICAS DEL LIENZO Y EL BANCO DE LA INTERFAZ, importados de verdad y no leídos
@@ -5087,7 +5087,7 @@ function elCartelDeLaCarta(): void {
  * cifras de esa medida están en la cabecera de `elCartelQueCabe` y en la de `estilo.css`.
  */
 function elPintorDeLasLindes(): void {
-  paso('El pintor de Las Lindes se monta: avisa de su lienzo, no repite el raíl y cae al retablo cuando toca');
+  paso('El pintor de Las Lindes se monta: avisa de su lienzo, no repite el raíl, cae al retablo cuando toca y a pie dice cómo se anda');
 
   /*
    * ═══ POR QUÉ ESTE PASO EXISTE, Y LO QUE COSTÓ NO TENERLO ═══
@@ -5216,6 +5216,39 @@ function elPintorDeLasLindes(): void {
     'y en el respaldo salen TODAS sus acciones, que allí no hay tira de sitios que las pinte',
     plantar.every((o) => deOtro.includes(o.rotulo)),
     { plantar: plantar.map((o) => o.rotulo) },
+  );
+
+  /*
+   * ═══ Y A PIE, DICE CÓMO SE ANDA ═══
+   *
+   * El paseo se anda con W, A, S, D o las flechas, y Mayúsculas para correr, y eso sólo estaba en
+   * el `title` del botón «Al hombro»: sale si el ratón se para encima, y no sale nunca con el
+   * teclado ni en «Sus ojos». Se bajaba al valle, la figura no se movía, y no había ni una pista.
+   *
+   * Se pinta el rótulo suelto en los tres modos, porque el pintor nace en la mesa y en un pintado
+   * estático no se puede bajar a andar; y se mira en el fuente que el pintor lo monte con su modo.
+   */
+  const rotulos = (['mesa', 'hombro', 'ojos'] as const).map((m) => renderToStaticMarkup(<ComoSeAnda modo={m} />));
+  comprobar('en la mesa no se dice cómo se anda: allí no se anda', rotulos[0] === '', rotulos[0]);
+  comprobar(
+    'y en «Al hombro» y en «Sus ojos» sí: las cuatro letras, las flechas y Mayúsculas para correr',
+    rotulos
+      .slice(1)
+      .every(
+        (h) =>
+          /class="lindes-como-se-anda"/.test(h) && /W A S D/.test(h) && /flechas/.test(h) && /Mayúsculas para correr/.test(h),
+      ),
+    rotulos.slice(1),
+  );
+  comprobar(
+    'y el pintor lo monta encima del lienzo con el modo que lleva puesto',
+    /<ComoSeAnda modo=\{modo\} \/>/.test(readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8')),
+  );
+  comprobar(
+    'y la hoja le da su sitio encima del valle sin coger el puntero: es un cartel, no un control',
+    /\.lindes-como-se-anda \{[^}]*position: absolute;[^}]*pointer-events: none;/.test(
+      readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8'),
+    ),
   );
 }
 

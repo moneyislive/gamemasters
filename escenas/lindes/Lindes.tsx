@@ -11,6 +11,9 @@
  *     con el color del asiento (ver `labriego.ts`).
  *  4. LAS CASILLAS DONDE CABE LA LOSA DE LA MANO, que son lo único que se toca, y
  *     el FANTASMA de la losa sobre la que se está señalando.
+ *  5. QUIEN PASEA, con el paseo común de `escenas/paseo/`: esta escena le da su
+ *     mundo —`mundoDeLasLindes`—, de qué losa se nace y a qué altura está el suelo, y
+ *     el paseo pone el resto: los tics, los choques, las cámaras de a pie y la figura.
  *
  * ═══ LO QUE ESTA ESCENA NO SABE ═══
  *
@@ -60,16 +63,18 @@ import {
   loQueSeLevantaLaUltima,
 } from './medidas';
 import {
-  QUIETO,
-  camaraDeHombro,
+  NIEBLA_DEL_PASEO,
+  alcanceDeLaArena,
+  alturaDeLaCamara,
+  alturaDelSuelo,
   camaraDeMesa,
-  camaraDeOjos,
+  dondeNaceQuienPasea,
   loQueAbarca,
-  nacerEn,
-  nacerEnLaLosa,
-  unPaso,
+  losasPorCasilla,
 } from './paseo';
-import type { Mandos, Paseante } from './paseo';
+import { usarElPaseo } from '../paseo/usar-el-paseo';
+import { QuienAnda } from '../paseo/quien-anda';
+import { mundoDeLasLindes } from '../../shared/arcade/juegos/lindes-mundo';
 import type { PropsDeLasLindes, Traer } from './tipos';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
 import { llaveDeCasilla } from '../../shared/arcade/juegos/lindes-losas';
@@ -92,7 +97,6 @@ import {
   soltarElReloj,
 } from '../reloj';
 import type { RelojCargado } from '../reloj';
-import { QuienAnda } from './quien-anda';
 import { MODELO } from '../nombres';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
@@ -307,85 +311,62 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   /* ── La cámara ──────────────────────────────────────────────────────────── */
   const { camera, size } = useThree();
   const abarca = useMemo(() => loQueAbarca(tablero.losas), [tablero.losas]);
-  const puestas = useMemo(() => new Set(tablero.losas.map((l) => l.casilla)), [tablero.losas]);
 
-  /*
-   * ═══ HASTA DÓNDE LLEGA LA ARENA ═══
-   *
-   * Dos alcances, y se pintan LOS DOS A LA VEZ aunque sólo uno esté en uso: el modo de
-   * cámara cambia con un botón, y rehacer el suelo en ese momento es un parpadeo en la
-   * pantalla justo cuando el jugador está mirando.
-   *
-   *   · MIRANDO LA MESA, lo que pisan las cuatro esquinas del cuadro. Crece con el tablero
-   *     y con lo estrecha que sea la ventana, y por eso no se puede escribir como un
-   *     margen fijo: es lo que se intentó y dejó el 35 % del cuadro en cielo.
-   *   · ANDANDO, hasta donde llega la niebla del paseo —`LADO_DE_LOSA * 34`—, que es justo
-   *     donde se deja de ver: más allá no hay nada que tapar.
-   *
-   * Son dos triángulos con un color plano, así que sobrar no cuesta nada y faltar cuesta
-   * un tercio de la pantalla.
-   */
-  const alcanceDeLaArena = useMemo(() => {
-    const pose = camaraDeMesa(abarca, size.width / Math.max(1, size.height));
-    const andando = LADO_DE_LOSA * 34;
-    return {
-      x0: Math.min(pose.suelo.x0, (abarca.minX - 0.5) * LADO_DE_LOSA - andando),
-      x1: Math.max(pose.suelo.x1, (abarca.maxX + 0.5) * LADO_DE_LOSA + andando),
-      z0: Math.min(pose.suelo.z0, -(abarca.maxY + 0.5) * LADO_DE_LOSA - andando),
-      z1: Math.max(pose.suelo.z1, -(abarca.minY - 0.5) * LADO_DE_LOSA + andando),
-    };
-  }, [abarca, size.width, size.height]);
+  /* Hasta dónde llega la arena: lo de la mesa y lo del paseo, a la vez. Ver `alcanceDeLaArena`. */
+  const alcance = useMemo(
+    () => alcanceDeLaArena(abarca, camaraDeMesa(abarca, size.width / Math.max(1, size.height)).suelo),
+    [abarca, size.width, size.height],
+  );
   const arena = useMemo(
-    () => geometriaDeLaArena(losasQueSePintan, alcanceDeLaArena),
-    [losasQueSePintan, alcanceDeLaArena],
+    () => geometriaDeLaArena(losasQueSePintan, alcance),
+    [losasQueSePintan, alcance],
   );
   useEffect(() => () => arena?.dispose(), [arena]);
   const laNiebla = useRef<THREE.Fog>(null);
-  const paseante = useRef<Paseante>(nacerEn(0, 0));
-  const mandos = useRef<Mandos>(QUIETO);
   const mirandoA = useRef<{ x: number; z: number }>({ x: 0, z: 0 });
 
   /*
-   * Quien pasea nace en la última losa puesta, que es donde está pasando algo — pero NO en
-   * su centro a ciegas: el centro de una villa es el interior de una casa. Ver
-   * `nacerEnLaLosa`, que es donde está el razonamiento y lo que se midió.
+   * ═══ EL PASEO ES EL COMÚN: ESTA ESCENA SÓLO DECLARA SU MUNDO ═══
+   *
+   * Aquí se daba un paso propio por fotograma, en coma flotante, preguntando a un `Set` de
+   * casillas si había losa: el borde paraba y las casas y las murallas se atravesaban. Y las
+   * teclas se leían de `document`, que en el móvil no existe. Ahora el paseo es el de
+   * `escenas/paseo/`, por tics, con el paso de `shared/` y la arena de un MUNDO que esta escena
+   * no escribe: lo deriva `mundoDeLasLindes` de las mismas losas y la misma semilla que el
+   * paisaje, que es también lo que derivará el servidor. Lo único que se le cuenta desde aquí es
+   * lo que sólo sabe este valle: de qué losa se nace, a qué altura está su suelo, y que la
+   * cámara no baja a la senda con los pies (ver `alturaDeLaCamara`).
+   *
+   * ═══ Y EL MUNDO SÓLO SE DERIVA A PIE ═══
+   *
+   * Derivarlo es montar otra vez el reparto de todas las losas y sacar sus cajas: medido en
+   * Node con un tablero lleno —72 losas, 1.831 cuerpos— son entre 210 y 345 ms, tanto como el
+   * paisaje que esta escena ya monta, y en el Hermes del móvil, sin JIT, bastante más. Mirando
+   * la mesa no lo usa nadie, y es donde se pasa casi toda la partida: ahí no se paga.
    */
-  useEffect(() => {
-    if (camara.modo === 'mesa') return;
-    const ultima = tablero.losas.find((l) => l.ultima) ?? tablero.losas[0];
-    if (ultima === undefined) return;
-    const virgen =
-      paseante.current.andando === 0 && paseante.current.x === 0 && paseante.current.z === 0;
-    if (!virgen) return;
-    const dentro = montarLaLosa(ultima.losa, ultima.giro, semillaDeLaLosa(semilla, ultima.x, ultima.y));
-    paseante.current = nacerEnLaLosa(ultima.x, ultima.y, dentro.celdas, dentro.puestas);
-  }, [camara.modo, semilla, tablero.losas]);
-
-  /* Las teclas del paseo. Sólo mientras se pasea: en la mesa no se anda. */
-  useEffect(() => {
-    if (camara.modo === 'mesa' || typeof document === 'undefined') return;
-    const cambia = (e: KeyboardEvent, pulsada: boolean): void => {
-      const m = { ...mandos.current };
-      const k = e.key.toLowerCase();
-      if (k === 'w' || k === 'arrowup') m.adelante = pulsada;
-      else if (k === 's' || k === 'arrowdown') m.atras = pulsada;
-      else if (k === 'a' || k === 'arrowleft') m.izquierda = pulsada;
-      else if (k === 'd' || k === 'arrowright') m.derecha = pulsada;
-      else if (k === 'shift') m.deprisa = pulsada;
-      else return;
-      e.preventDefault();
-      mandos.current = m;
-    };
-    const abajo = (e: KeyboardEvent): void => cambia(e, true);
-    const arriba = (e: KeyboardEvent): void => cambia(e, false);
-    document.addEventListener('keydown', abajo);
-    document.addEventListener('keyup', arriba);
-    return () => {
-      document.removeEventListener('keydown', abajo);
-      document.removeEventListener('keyup', arriba);
-      mandos.current = QUIETO;
-    };
-  }, [camara.modo]);
+  const aPie = camara.modo !== 'mesa';
+  const mundo = useMemo(
+    () => (aPie ? mundoDeLasLindes(tablero.losas, semilla) : null),
+    [aPie, tablero.losas, semilla],
+  );
+  const nace = useMemo(
+    () => (mundo === null ? null : dondeNaceQuienPasea(tablero.losas, mundo)),
+    [tablero.losas, mundo],
+  );
+  const porCasilla = useMemo(() => losasPorCasilla(tablero.losas), [tablero.losas]);
+  const alturaEn = useCallback((x: number, z: number) => alturaDelSuelo(porCasilla, x, z), [porCasilla]);
+  const alturaDeLaCamaraEn = useCallback(
+    (x: number, z: number) => alturaDeLaCamara(porCasilla, x, z),
+    [porCasilla],
+  );
+  const paseo = usarElPaseo({
+    mundo,
+    nace,
+    modo: camara.modo,
+    mandos: props.mandos,
+    alturaEn,
+    alturaDeLaCamaraEn,
+  });
 
   useFrame((_, dt) => {
     if (camara.modo === 'mesa') {
@@ -424,14 +405,15 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
      */
     const nAndando = laNiebla.current;
     if (nAndando !== null) {
-      nAndando.near = LADO_DE_LOSA * 8;
-      nAndando.far = LADO_DE_LOSA * 34;
+      nAndando.near = NIEBLA_DEL_PASEO.cerca;
+      nAndando.far = NIEBLA_DEL_PASEO.lejos;
     }
-    paseante.current = unPaso(paseante.current, mandos.current, dt, puestas);
-    const pose = camara.modo === 'ojos' ? camaraDeOjos(paseante.current) : camaraDeHombro(paseante.current);
-    camera.position.set(pose.x, pose.y, pose.z);
-    camera.lookAt(pose.miraX, pose.miraY, pose.miraZ);
-    mirandoA.current = { x: paseante.current.x, z: paseante.current.z };
+    /*
+     * El paso y la cámara ya los ha dado el paseo, que corre antes que esto (`usarElPaseo`,
+     * con prioridad −1). Aquí sólo se lee dónde está quien pasea, que es el centro del
+     * recorte por distancia.
+     */
+    mirandoA.current = { x: paseo.pose.current.x, z: paseo.pose.current.z };
   });
 
   /* ── Los toques ─────────────────────────────────────────────────────────── */
@@ -625,7 +607,7 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
         aparta detrás del tablero y en el paseo se queda cerca, que es donde sirve. Ver
         `camaraDeMesa`. Los `args` son sólo con lo que nace, antes del primer fotograma.
       */}
-      <fog ref={laNiebla} attach="fog" args={[COLOR_DE_LA_NIEBLA, LADO_DE_LOSA * 8, LADO_DE_LOSA * 34]} />
+      <fog ref={laNiebla} attach="fog" args={[COLOR_DE_LA_NIEBLA, NIEBLA_DEL_PASEO.cerca, NIEBLA_DEL_PASEO.lejos]} />
       <hemisphereLight args={['#eaf2ff', '#6b6a4a', 1.15]} />
       <directionalLight
         position={[LADO_DE_LOSA * 3, LADO_DE_LOSA * 5, LADO_DE_LOSA * 2]}
@@ -663,14 +645,15 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       {/*
         QUIEN ANDA, en tercera persona. Sólo mientras se pasea: en la mesa no hay a quién
         seguir, y pintarlo allí sería una figura de dos unidades y media perdida en un
-        tablero de mil seiscientas. Ver `quien-anda.tsx` para por qué no existía.
+        tablero de mil seiscientas. Ver `paseo/quien-anda.tsx` para por qué no existía. Lee
+        la pose que escribe el paseo: dónde, a qué altura y a qué paso de verdad.
       */}
       {camara.modo === 'mesa' ? null : (
         <QuienAnda
           traer={traer}
           asiento={camara.asiento}
           figura={props.figura}
-          paseante={paseante}
+          pose={paseo.pose}
           enPrimeraPersona={camara.modo === 'ojos'}
           alFallar={props.alFallar}
         />

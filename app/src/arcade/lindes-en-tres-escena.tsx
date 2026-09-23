@@ -30,8 +30,17 @@
  * viviera en la partida, girar sería un movimiento —una revisión, un aviso a los
  * demás aparatos y una entrada en el diario— por cada vuelta que alguien le da a
  * una losa antes de decidirse.
+ *
+ * ═══ Y A PIE SE ANDA CON EL PULGAR ═══
+ *
+ * La escena leía las teclas de `document`, y aquí no hay ni una cosa ni la otra: en
+ * «Hombro» y en «Ojos» la cámara bajaba detrás de la figura y la figura no se movía.
+ * Ahora esta pantalla monta `MandosDelPaseo` —una palanca y un botón de correr— y le
+ * pasa a la escena la referencia donde los escribe. Esta pantalla no tiene mirador
+ * táctil que apagar mientras se anda: la cámara de mesa de Las Lindes se encuadra sola
+ * y no se arrastra, así que el pulgar que anda no mueve nada más.
  */
-import { Component, useCallback, useEffect, useMemo, useState } from 'react';
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -46,6 +55,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Canvas } from '../tres/Lienzo';
 import { Lindes } from '../../../escenas/lindes/Lindes';
 import type { ModoDeCamaraDeLasLindes } from '../../../escenas/lindes/tipos';
+import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
+import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
 import {
   elSiguienteGiro,
   accionesFueraDeLosSitios,
@@ -66,6 +77,7 @@ import type { Giro } from '../../../shared/arcade/juegos/lindes-losas';
 import { tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
+import { MandosDelPaseo } from './mandos-del-paseo';
 import { usarMesaDeArcade } from './mesa';
 import { LETRA, SALA } from './muebles';
 import { Pantalla } from './piezas';
@@ -120,6 +132,12 @@ export default function LasLindesPorDentro(): JSX.Element {
   const [modo, ponerModo] = useState<'mesa' | 'hombro' | 'ojos'>('mesa');
   const [rotoElValle, ponerRotoElValle] = useState(false);
   const bordes = useSafeAreaInsets();
+  /*
+   * La palanca y el correr, en una referencia que escribe `MandosDelPaseo` y lee la escena en
+   * su bucle. Aquí arriba, con los demás ganchos: debajo de una salida temprana, React se
+   * rompería la primera vez que la pantalla cambiara de rama.
+   */
+  const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
 
   const vista = mesa.mesa?.vista ?? null;
   const opciones = mesa.mesa?.opciones ?? [];
@@ -330,9 +348,16 @@ export default function LasLindesPorDentro(): JSX.Element {
               alTocarHueco={alTocarHueco}
               alSenalarHueco={alSenalarHueco}
               alFallar={alFallar}
+              mandos={mandos}
             />
           </Canvas>
         </RedDelValle>
+
+        {/*
+          LOS MANDOS DEL PASEO, encima del lienzo y sólo a pie. Sin ellos, en el teléfono se
+          bajaba a «Hombro» y no se podía dar un paso. Ver `mandos-del-paseo.tsx`.
+        */}
+        <MandosDelPaseo mandos={mandos} visibles={modo !== 'mesa'} />
 
         <View style={estilos.camaras}>
           {LAS_CAMARAS.map((c) => (

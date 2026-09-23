@@ -73,6 +73,23 @@ const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string; 
   { modo: 'ojos', rotulo: 'Sus ojos', ayuda: 'Desde su cara, andando por encima de las losas.' },
 ];
 
+/**
+ * CÓMO SE ANDA, ESCRITO ENCIMA DEL VALLE MIENTRAS SE ANDA.
+ *
+ * Estaba sólo en el `title` del botón «Al hombro», que sale si el ratón se para encima y no sale
+ * nunca con el teclado ni en «Sus ojos». Quien bajaba al valle veía la figura quieta y ninguna
+ * pista de que las teclas eran W, A, S, D y Mayúsculas para correr: el paseo existía y no se
+ * sabía usar. Va arriba a la izquierda —la derecha es de las cámaras y abajo está la cinta— y no
+ * coge el puntero: es un cartel, no un control. En la mesa no sale, porque allí no se anda.
+ *
+ * Suelto y exportado para que `verify:escritorio` lo pinte en los tres modos: el pintor entero
+ * nace en la mesa y en un pintado estático no se puede bajar a andar.
+ */
+export function ComoSeAnda({ modo }: { readonly modo: 'mesa' | 'hombro' | 'ojos' }): JSX.Element | null {
+  if (modo === 'mesa') return null;
+  return <p className="lindes-como-se-anda">W A S D o las flechas para andar · Mayúsculas para correr</p>;
+}
+
 export function LindesEnTres({
   mesa,
   puesta,
@@ -254,6 +271,8 @@ export function LindesEnTres({
         </LimiteDelMundo>
 
         <p className="lindes-cinta">{tablero.aviso}</p>
+
+        <ComoSeAnda modo={modo} />
 
         <div className="lindes-camaras" role="group" aria-label="Desde dónde se mira">
           {LAS_CAMARAS.map((c) => (

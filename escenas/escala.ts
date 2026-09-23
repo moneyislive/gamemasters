@@ -60,40 +60,35 @@
  * eso la unidad del mundo es la del PERSONAJE, que es la única con un referente
  * real fuera de la pantalla.
  *
- * ═══ ESTE FICHERO NO IMPORTA NADA, A PROPÓSITO ═══
+ * ═══ ESTE FICHERO NO IMPORTA NADA DE DIBUJO, A PROPÓSITO ═══
  *
  * Ni `three` ni la malla. Es la aritmética del mundo, y tiene que poder leerla un
  * comprobador de Node sin abrir un contexto de dibujo — que es justo lo que hace
  * `verify:escena`.
+ *
+ * Lo único que importa son los CUATRO PRIMEROS ESLABONES de la cadena —la persona, la
+ * casa que queremos, la casa del pack y la escala que sale de dividirlas—, y los
+ * importa de `shared/arcade/juegos/lindes-medidas.ts`, que también es aritmética y
+ * nada más. Se mudaron allí con el reparto de Las Lindes, que desde el paso 3 de
+ * `docs/BOOTS-ON-BOARD.md` decide con qué se choca y lo tiene que derivar también el
+ * servidor. Mudar este fichero entero no se podía —lleva trigonometría de cámara que
+ * `verify:pureza` no admite en `shared/`— y copiar la escala allí habría dejado dos
+ * verdades sobre el tamaño del mundo. Se siguen exportando desde aquí con el mismo
+ * nombre, y su explicación está donde viven.
  */
+import {
+  ALTURA_DE_LA_CASA_EN_EL_PACK,
+  ALTURA_DE_UNA_CASA,
+  ALTURA_DE_UNA_PERSONA,
+  ESCALA_DEL_PACK,
+} from '../shared/arcade/juegos/lindes-medidas';
 
 /**
- * CUÁNTO MIDE UNA PERSONA. Es la unidad de referencia de todo.
- *
- * Medido sobre `Knight.glb` del Character Pack. No se redondea a 2 ni se
- * «normaliza» a 1,8 como en un motor realista: los personajes de KayKit son
- * achaparrados a propósito, y reescalarlos para que midan lo que mide una persona
- * de verdad los haría parecer larguiruchos junto a sus propias armas.
+ * CUÁNTO MIDE UNA PERSONA (medido en `Knight.glb`), CUÁNTO QUEREMOS QUE MIDA UNA CASA
+ * (dos personas: una de las dos decisiones), CUÁNTO MIDE LA DEL PACK (medido, y
+ * `verify:escena` lo vuelve a medir) y A CUÁNTO HAY QUE SUBIR EL PACK: los pasos 1 a 4.
  */
-export const ALTURA_DE_UNA_PERSONA = 2.543;
-
-/**
- * CUÁNTO QUEREMOS QUE MIDA UNA CASA. Ésta es una de las dos decisiones.
- *
- * Dos personas de alto. Es lo que hace que una puerta parezca una puerta y que
- * caminar entre dos casas se sienta como una calle. Con menos, el avatar mira por
- * encima de los tejados; con mucho más, un pueblo deja de leerse desde el aire.
- */
-export const ALTURA_DE_UNA_CASA = ALTURA_DE_UNA_PERSONA * 2;
-
-/**
- * CUÁNTO MIDE LA CASA DENTRO DEL PACK, medido y no supuesto.
- *
- * `building_home_A_*` da 0,930 de alto en `escenas/modelos/tablero.glb`.
- * `verify:escena` lo vuelve a medir sobre el fichero de verdad y protesta si se ha
- * movido, porque de este número cuelga el tamaño del mundo entero.
- */
-export const ALTURA_DE_LA_CASA_EN_EL_PACK = 0.93;
+export { ALTURA_DE_LA_CASA_EN_EL_PACK, ALTURA_DE_UNA_CASA, ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK };
 
 /**
  * EL RADIO DEL HEXÁGONO DEL PACK, medido y no supuesto.
@@ -108,9 +103,6 @@ export const ALTURA_DE_LA_CASA_EN_EL_PACK = 0.93;
  * comprobarlo, y `verify:escena` lo contrasta contra el `.glb` de verdad.
  */
 export const RADIO_DEL_PACK = 2 / Math.sqrt(3);
-
-/** A cuánto hay que subir el pack para que su casa mida dos personas. Sale 5,469. */
-export const ESCALA_DEL_PACK = ALTURA_DE_UNA_CASA / ALTURA_DE_LA_CASA_EN_EL_PACK;
 
 /**
  * LO QUE MIDE UNA TESELA DEL SUELO EN EL MUNDO. Consecuencia, no elección.
