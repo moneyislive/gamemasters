@@ -26,7 +26,13 @@
  *  6. QUE EL MISMO PASEO DA LA MISMA HUELLA EN NODE Y EN HERMES, y el mismo mundo.
  *  7. QUE LA TABLA DE HUELLAS ES LA DE LOS MODELOS: se vuelven a medir en `tablero.glb` y se
  *     exigen los mismos números, y lo mismo el alto y el radio de las piedras.
- *  8. Y QUE LAS DOS TABLAS LITERALES DEL REPARTO DICEN LO QUE DICE SU CABECERA.
+ *  8. QUE LAS DOS TABLAS LITERALES DEL REPARTO DICEN LO QUE DICE SU CABECERA.
+ *  9. Y QUE MUCHAS MESAS CUESTAN LO QUE UNA CALIENTE: con dieciséis en rueda —más losas de las
+ *     que cabían en las memorias viejas del proceso—, poner una losa monta UNA y saca las cajas de
+ *     UNA, y una jugada sin losa no hace nada; lo que sale de memoria es, bit a bit, lo que sale en
+ *     frío; el tope se respeta y lo que sale es la mesa que más tiempo lleva quieta, entera; y en el
+ *     aparato el mundo no vuelve a montar lo que la escena ya montó. CONTANDO, no cronometrando: en
+ *     una máquina ocupada el reloj miente, y una losa montada es una losa montada.
  *
  * ═══ CON SUELOS DELANTE ═══
  *
@@ -37,6 +43,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,7 +53,7 @@ import { deNumero, UNO } from '../../shared/mecanicas/fijo';
 import { arenaDe, hayPiso, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Arena, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
-import { casillaDeLlave, LAS_LOSAS, ladoGirado, losaPorId } from '../../shared/arcade/juegos/lindes-losas';
+import { casillaDeLlave, LAS_LOSAS, ladoGirado, losaPorId, LOSAS_EN_TOTAL } from '../../shared/arcade/juegos/lindes-losas';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
 import {
   ALTO_Y_RADIO_DEL_MODELO,
@@ -71,12 +78,17 @@ import {
   montarLaLosa,
   rumboDelTramo,
   semillaDeLaLosa,
+  sueloDeLaLosa,
 } from '../../shared/arcade/juegos/lindes-reparto';
 import {
   cajasDeLaPuesta,
   cuartosDeVuelta,
+  cuentasDelMundo,
   cuerposDeLasLindes,
   LADO_DE_LOSA_DEL_MUNDO,
+  LOSAS_QUE_SE_RECUERDAN,
+  loQueSeRecuerda,
+  memoriaDeLasLindes,
   mundoDeLasLindes,
 } from '../../shared/arcade/juegos/lindes-mundo';
 import type { CuerpoDeLasLindes, LosaParaElMundo } from '../../shared/arcade/juegos/lindes-mundo';
@@ -84,6 +96,7 @@ import { ESCALA_DEL_PACK as ESCALA_DE_ESCENAS } from '../../escenas/escala';
 import { LADO_DE_LOSA as LADO_DE_ESCENAS } from '../../escenas/lindes/medidas';
 import { medirLasHuellas } from '../../escenas/scripts/medir-huellas-de-las-lindes';
 import { jugarLasLindes } from './robot-de-las-lindes';
+import type { PartidaDelRobot } from './robot-de-las-lindes';
 import { pasearLasLindes } from './paseo-de-las-lindes';
 import type { PaseoDeLasLindes } from './paseo-de-las-lindes';
 
@@ -116,6 +129,17 @@ interface Tablero {
   readonly semilla: number;
 }
 
+/** Cada partida del robot se juega una vez: la usan varios escalones. */
+const PARTIDAS = new Map<number, PartidaDelRobot>();
+function partidaDelRobot(semilla: number): PartidaDelRobot {
+  let partida = PARTIDAS.get(semilla);
+  if (partida === undefined) {
+    partida = jugarLasLindes(semilla, 3);
+    PARTIDAS.set(semilla, partida);
+  }
+  return partida;
+}
+
 /**
  * Un tablero de verdad: el que deja una partida del robot, con las losas en el orden de sus
  * llaves. `hasta` corta por el orden en que se pusieron, que es un tablero que existió a mitad
@@ -124,7 +148,7 @@ interface Tablero {
  * si no se dice otro.
  */
 function tableroDelRobot(semilla: number, hasta: number | null, codigo = `LINDES-${String(semilla)}`): Tablero {
-  const partida = jugarLasLindes(semilla, 3);
+  const partida = partidaDelRobot(semilla);
   const losas: LosaParaElMundo[] = [];
   for (const llave of Object.keys(partida.estado.tablero).sort(porOrden)) {
     const puesta = partida.estado.tablero[llave];
@@ -1488,6 +1512,339 @@ paso('Las tablas literales del reparto dicen lo que dice su cabecera');
 }
 
 // ---------------------------------------------------------------------------
+// ESCALÓN 9 · MUCHAS MESAS CUESTAN LO QUE UNA CALIENTE
+// ---------------------------------------------------------------------------
+
+paso('Muchas mesas en rueda cuestan lo que una caliente, y la memoria no pasa de su tope');
+
+/*
+ * ═══ POR QUÉ SE CUENTA Y NO SE CRONOMETRA ═══
+ *
+ * El servidor deriva el mundo de cada mesa de botas cada vez que cambia. Con las memorias viejas,
+ * que eran del proceso —512 losas del reparto, 1.024 de cajas y de sitios de nacer—, a partir de
+ * ocho mesas llenas en rueda cada jugada volvía a montar el tablero en frío: con veinte, 66 losas
+ * montadas, 66 cajas y 66 sitios de nacer POR JUGADA. Aquí se exigen cuentas —losas montadas,
+ * losas cuyas cajas se sacan, sitios de nacer buscados, arenas levantadas—, que salen iguales en
+ * una máquina ocupada y en una parada. Un cronómetro, no.
+ *
+ * ═══ Y LAS DEL REPARTO, DEL REPARTO QUE USA EL MUNDO ═══
+ *
+ * `tsx` carga DOS VECES los módulos de `shared/` cuando los pide un guion ESM como éste: una copia
+ * para los `import` de este guion y otra para los que se hacen entre ellos, que van por `require`
+ * porque `shared/` no es un paquete ESM. Cada copia tiene su memoria y sus cuentas, así que un
+ * `cuentasDelReparto` importado arriba NO ve lo que monta `mundoDeLasLindes`: se escribió así
+ * primero y dio cero losas montadas al abrir dieciséis mesas en frío. El reparto del mundo es el de
+ * `require`, y de él se leen las cuentas y se monta lo que «pinta la escena». En el servidor, que se
+ * empaqueta con esbuild, y en el aparato, hay una sola copia. Si un día `tsx` las junta o las separa
+ * de otra manera, el suelo de abajo —abrir dieciséis mesas en frío SÍ monta losas— se pone rojo.
+ */
+const repartoDelMundo = createRequire(import.meta.url)(
+  '../../shared/arcade/juegos/lindes-reparto',
+) as typeof import('../../shared/arcade/juegos/lindes-reparto');
+
+interface Trabajo {
+  readonly montadas: number;
+  readonly cajas: number;
+  readonly nacimientos: number;
+  readonly arenas: number;
+}
+
+function trabajoHastaAhora(): Trabajo {
+  const r = repartoDelMundo.cuentasDelReparto();
+  const m = cuentasDelMundo();
+  return { montadas: r.montadas, cajas: m.cajasCalculadas, nacimientos: m.nacimientosCalculados, arenas: m.arenasParaNacer };
+}
+
+/** Hace algo y dice lo que ha costado, contado. */
+function contado<T>(hacer: () => T): { readonly valor: T; readonly trabajo: Trabajo } {
+  const a = trabajoHastaAhora();
+  const valor = hacer();
+  const b = trabajoHastaAhora();
+  return {
+    valor,
+    trabajo: {
+      montadas: b.montadas - a.montadas,
+      cajas: b.cajas - a.cajas,
+      nacimientos: b.nacimientos - a.nacimientos,
+      arenas: b.arenas - a.arenas,
+    },
+  };
+}
+
+/** Una mesa de la rueda: su código, su semilla, y sus losas en el orden de la vista con cuándo se puso cada una. */
+interface MesaEnRueda {
+  readonly codigo: string;
+  readonly semilla: number;
+  readonly conOrden: readonly { readonly losa: LosaParaElMundo; readonly orden: number }[];
+  /** Los `orden` de todas, de menor a mayor. */
+  readonly ordenes: readonly number[];
+  /** Cuántas hay puestas ahora. */
+  puestas: number;
+}
+
+/** Una mesa con el tablero de una partida del robot y un código propio: otro paisaje, otras losas que montar. */
+function mesaEnRueda(partida: number, codigo: string): MesaEnRueda {
+  const p = partidaDelRobot(partida);
+  const conOrden: { losa: LosaParaElMundo; orden: number }[] = [];
+  for (const llave of Object.keys(p.estado.tablero).sort(porOrden)) {
+    const puesta = p.estado.tablero[llave];
+    const c = casillaDeLlave(llave);
+    if (puesta === undefined || c === null) continue;
+    conOrden.push({ losa: { x: c.x, y: c.y, losa: puesta.losa, giro: puesta.giro }, orden: puesta.orden });
+  }
+  const ordenes = conOrden.map((e) => e.orden).sort((a, b) => a - b);
+  return { codigo, semilla: semillaDelCodigo(codigo, 0x5eed), conOrden, ordenes, puestas: conOrden.length };
+}
+
+/** El tablero de una mesa con sus `puestas` primeras losas, en el orden de la vista: por casilla. */
+function tableroEnRueda(m: MesaEnRueda): LosaParaElMundo[] {
+  if (m.puestas <= 0) return [];
+  const hasta = m.ordenes[Math.min(m.puestas, m.ordenes.length) - 1] as number;
+  return m.conOrden.filter((e) => e.orden <= hasta).map((e) => e.losa);
+}
+
+const sumaDe = (l: readonly Trabajo[], k: keyof Trabajo): number => l.reduce((s, t) => s + t[k], 0);
+const porJugada = (l: readonly Trabajo[], k: keyof Trabajo): string => (l.length === 0 ? '—' : (sumaDe(l, k) / l.length).toFixed(2));
+
+/*
+ * LA RUEDA: cuatro partidas del robot, cada una en cuatro mesas con su código —dieciséis paisajes,
+ * más de mil cien losas distintas—. Se abren con todas sus losas menos las seis últimas, y luego,
+ * de una en una y cada vez en la mesa siguiente, se ponen esas seis: seis vueltas.
+ */
+const RUEDA: MesaEnRueda[] = [];
+for (const partida of [1, 2, 3, 10]) {
+  for (let k = 0; k < 4; k++) RUEDA.push(mesaEnRueda(partida, `RUEDA-${String(partida)}-${String(k)}`));
+}
+const LOSAS_EN_LA_RUEDA = RUEDA.reduce((s, m) => s + m.conOrden.length, 0);
+const QUEDAN = 6;
+comprobar(
+  'la rueda tiene más losas distintas de las que cabían en las memorias viejas del proceso (1.024)',
+  RUEDA.length >= 16 && LOSAS_EN_LA_RUEDA > 1024 && new Set(RUEDA.map((m) => m.semilla)).size === RUEDA.length,
+  { mesas: RUEDA.length, losas: LOSAS_EN_LA_RUEDA },
+);
+
+for (const m of RUEDA) m.puestas = m.conOrden.length - QUEDAN;
+const alAbrir = contado(() => {
+  for (const m of RUEDA) mundoDeLasLindes(tableroEnRueda(m), m.semilla);
+}).trabajo;
+
+/*
+ * Poner losa, en rueda. Y en la ÚLTIMA mesa de la rueda, cada mundo se compara con el que sale en
+ * frío —con una memoria nueva—: poner losa obliga a volver a buscar dónde se nace en la nueva y en
+ * sus vecinas, y un vecindario que no se volviera a mirar dejaría un sitio viejo. La última porque
+ * sus losas son las que el reparto aún recuerda: compararla no vuelve a montar nada.
+ */
+const conLosa: Trabajo[] = [];
+const vigilada = RUEDA[RUEDA.length - 1] as MesaEnRueda;
+let comparadasPasoAPaso = 0;
+const distintasPasoAPaso: string[] = [];
+for (let vuelta = 0; vuelta < QUEDAN; vuelta++) {
+  for (const m of RUEDA) {
+    m.puestas++;
+    const tablero = tableroEnRueda(m);
+    const hecho = contado(() => mundoDeLasLindes(tablero, m.semilla));
+    conLosa.push(hecho.trabajo);
+    if (m !== vigilada) continue;
+    comparadasPasoAPaso++;
+    const enFrio = mundoDeLasLindes(tablero, m.semilla, memoriaDeLasLindes(LOSAS_QUE_SE_RECUERDAN));
+    if (canonico(hecho.valor) !== canonico(enFrio)) distintasPasoAPaso.push(`${m.codigo} con ${String(tablero.length)} losas`);
+  }
+}
+
+/* Y dos vueltas de jugadas que no ponen losa: plantar, pasar o un botín cambian la revisión, no el tablero. */
+const sinLosa: Trabajo[] = [];
+for (let vuelta = 0; vuelta < 2; vuelta++) {
+  for (const m of RUEDA) sinLosa.push(contado(() => mundoDeLasLindes(tableroEnRueda(m), m.semilla)).trabajo);
+}
+
+console.log(
+  `  ${String(RUEDA.length)} mesas en rueda, ${String(LOSAS_EN_LA_RUEDA)} losas: al abrirlas, ` +
+    `${(alAbrir.montadas / RUEDA.length).toFixed(1)} losas montadas por mesa`,
+);
+console.log(
+  `  poniendo losa (${String(conLosa.length)} jugadas), por jugada: ${porJugada(conLosa, 'montadas')} montadas · ` +
+    `${porJugada(conLosa, 'cajas')} cajas · ${porJugada(conLosa, 'nacimientos')} sitios de nacer · ${porJugada(conLosa, 'arenas')} arenas`,
+);
+console.log(
+  `  sin poner losa (${String(sinLosa.length)} jugadas), por jugada: ${porJugada(sinLosa, 'montadas')} montadas · ` +
+    `${porJugada(sinLosa, 'cajas')} cajas · ${porJugada(sinLosa, 'nacimientos')} sitios de nacer · ${porJugada(sinLosa, 'arenas')} arenas`,
+);
+/* EL SUELO: abrir las mesas SÍ las monta. Si no, las cuentas no estarían contando nada. */
+comprobar(
+  'abrir las mesas en frío las monta enteras: las cuentas son las del reparto que usa el mundo',
+  alAbrir.montadas >= RUEDA.length * 50 && alAbrir.cajas >= RUEDA.length * 50,
+  alAbrir,
+);
+{
+  const malas = conLosa.filter((t) => t.montadas !== 1 || t.cajas !== 1 || t.arenas !== 1 || t.nacimientos < 1 || t.nacimientos > 9);
+  comprobar(
+    `con ${String(RUEDA.length)} mesas en rueda, poner una losa monta UNA, saca las cajas de UNA y busca dónde nacer en ella y en sus vecinas: lo de una mesa caliente`,
+    conLosa.length === RUEDA.length * QUEDAN && malas.length === 0,
+    { jugadas: conLosa.length, malas: malas.length, laPrimera: malas[0] },
+  );
+}
+{
+  const malas = sinLosa.filter((t) => t.montadas !== 0 || t.cajas !== 0 || t.nacimientos !== 0 || t.arenas !== 0);
+  comprobar(
+    'y una jugada que no pone losa —plantar, pasar, un botín— no monta, no saca cajas ni busca dónde nacer',
+    sinLosa.length === RUEDA.length * 2 && malas.length === 0,
+    { jugadas: sinLosa.length, malas: malas.length, laPrimera: malas[0] },
+  );
+}
+comprobar(
+  'y en cada losa puesta, el mundo que sale de memoria es, bit a bit, el que sale en frío',
+  comparadasPasoAPaso === QUEDAN && distintasPasoAPaso.length === 0,
+  { comparadas: comparadasPasoAPaso, distintas: distintasPasoAPaso },
+);
+{
+  const distintas: string[] = [];
+  for (const m of RUEDA) {
+    const tablero = tableroEnRueda(m);
+    const deMemoria = canonico(mundoDeLasLindes(tablero, m.semilla));
+    const enFrio = canonico(mundoDeLasLindes(tablero, m.semilla, memoriaDeLasLindes(LOSAS_QUE_SE_RECUERDAN)));
+    if (deMemoria !== enFrio) distintas.push(m.codigo);
+  }
+  comprobar(`y tras la rueda, el de las ${String(RUEDA.length)} mesas también`, distintas.length === 0, distintas);
+}
+{
+  const lo = loQueSeRecuerda();
+  console.log(`  la memoria del proceso: ${String(lo.mesas)} mesas · ${String(lo.losas)} losas de ${String(lo.tope)} · ${String(lo.olvidadas)} olvidadas`);
+  comprobar(
+    'la memoria del proceso guarda las mesas de la rueda enteras y no pasa de su tope',
+    lo.tope === LOSAS_QUE_SE_RECUERDAN && lo.mesas >= RUEDA.length && lo.losas >= LOSAS_EN_LA_RUEDA && lo.losas <= lo.tope,
+    lo,
+  );
+}
+
+/*
+ * EL TOPE, con una memoria aparte en la que caben TRES mesas llenas: con el de verdad harían falta
+ * más de cien mesas en frío para verlo actuar. Cinco mesas en rueda, y luego a ver cuál sale.
+ */
+{
+  const chica = memoriaDeLasLindes(3 * LOSAS_EN_TOTAL);
+  const lleno = (m: MesaEnRueda): LosaParaElMundo[] => m.conOrden.map((e) => e.losa);
+  const loQueHay = (): number => {
+    let s = 0;
+    for (const suyas of chica.mesas.values()) s += suyas.size;
+    return s;
+  };
+  const cinco = RUEDA.slice(0, 5);
+  let pasadas = 0;
+  let descuadres = 0;
+  for (const m of cinco) {
+    mundoDeLasLindes(lleno(m), m.semilla, chica);
+    if (chica.losas > chica.tope) pasadas++;
+    if (chica.losas !== loQueHay()) descuadres++;
+  }
+  const trasLaVuelta = loQueSeRecuerda(chica);
+  comprobar(
+    'con sitio para tres mesas llenas y cinco en rueda, nunca se pasa del tope, y lo que cuenta es lo que hay',
+    pasadas === 0 && descuadres === 0 && trasLaVuelta.mesas === 3 && trasLaVuelta.olvidadas === 2,
+    { pasadas, descuadres, ...trasLaVuelta },
+  );
+  const [a, , c, d] = cinco as [MesaEnRueda, MesaEnRueda, MesaEnRueda, MesaEnRueda, MesaEnRueda];
+  /* Quedan la tercera, la cuarta y la quinta. Se vuelve a jugar la tercera: pasa a ser la más reciente. */
+  const vuelveLaTercera = contado(() => mundoDeLasLindes(lleno(c), c.semilla, chica)).trabajo;
+  /* Vuelve la primera, que no cabe: sale entera la cuarta, que es la que más tiempo lleva sin jugarse. */
+  const vuelveLaPrimera = contado(() => mundoDeLasLindes(lleno(a), a.semilla, chica)).trabajo;
+  const otraVezLaTercera = contado(() => mundoDeLasLindes(lleno(c), c.semilla, chica)).trabajo;
+  const vuelveLaCuarta = contado(() => mundoDeLasLindes(lleno(d), d.semilla, chica)).trabajo;
+  comprobar(
+    'y sale entera la mesa que más tiempo lleva sin jugarse: la que se acaba de jugar sigue caliente',
+    vuelveLaTercera.cajas === 0 &&
+      otraVezLaTercera.cajas === 0 &&
+      vuelveLaPrimera.cajas === lleno(a).length &&
+      vuelveLaCuarta.cajas === lleno(d).length,
+    { vuelveLaTercera, vuelveLaPrimera, otraVezLaTercera, vuelveLaCuarta },
+  );
+  /* Una partida rebobinada: la tercera vuelve a diez losas, y su mesa suelta las demás. */
+  const antesDeRebobinar = chica.losas;
+  mundoDeLasLindes(lleno(c).slice(0, 10), c.semilla, chica);
+  comprobar(
+    'y si un tablero pierde losas —una partida rebobinada—, su mesa deja de recordarlas',
+    chica.losas === antesDeRebobinar - (lleno(c).length - 10) && chica.losas === loQueHay(),
+    { antes: antesDeRebobinar, ahora: chica.losas, deVerdad: loQueHay() },
+  );
+}
+
+/*
+ * EL APARATO: una mesa sola, como en el móvil. La escena monta cada losa para pintarla —con
+ * `montarLaLosa`, cada vez que cambia el tablero— y el mundo, al echar a andar y en cada losa
+ * puesta, se sirve de lo que ella montó: no vuelve a montar nada. Es lo que hacía antes.
+ */
+{
+  const delAparato = memoriaDeLasLindes(LOSAS_QUE_SE_RECUERDAN);
+  const m = mesaEnRueda(2, 'APARATO');
+  m.puestas = m.conOrden.length - QUEDAN;
+  const pintar = (): void => {
+    for (const l of tableroEnRueda(m)) repartoDelMundo.montarLaLosa(l.losa, l.giro, semillaDeLaLosa(m.semilla, l.x, l.y));
+  };
+  const alPintar = contado(pintar).trabajo;
+  const alEcharAAndar = contado(() => mundoDeLasLindes(tableroEnRueda(m), m.semilla, delAparato)).trabajo;
+  const jugadas: Trabajo[] = [];
+  for (let k = 0; k < QUEDAN; k++) {
+    m.puestas++;
+    pintar();
+    jugadas.push(contado(() => mundoDeLasLindes(tableroEnRueda(m), m.semilla, delAparato)).trabajo);
+  }
+  const pintadas = m.conOrden.length - QUEDAN;
+  comprobar(
+    'en el aparato, el mundo no monta nada que la escena no haya montado ya: ni al echar a andar ni al poner losa',
+    alPintar.montadas === pintadas && alEcharAAndar.montadas === 0 && jugadas.length === QUEDAN && jugadas.every((t) => t.montadas === 0),
+    { alPintar, alEcharAAndar, jugadas },
+  );
+  comprobar(
+    'y echar a andar saca las cajas y los sitios de todas, y poner losa, los de UNA y sus vecinas, como antes',
+    alEcharAAndar.cajas === pintadas &&
+      alEcharAAndar.nacimientos === pintadas &&
+      alEcharAAndar.arenas === 1 &&
+      jugadas.every((t) => t.cajas === 1 && t.arenas === 1 && t.nacimientos >= 1 && t.nacimientos <= 9),
+    { alEcharAAndar, jugadas },
+  );
+}
+
+/*
+ * EL SUELO COMPARTIDO del reparto: uno por clase y giro, el mismo objeto para dos semillas, igual
+ * celda a celda al de `sueloDeLaLosa`; y la losa recordada, bit a bit la recién montada. Y la
+ * memoria del reparto, que a estas alturas ha visto pasar más de mil losas, en su tope.
+ */
+{
+  const combinaciones = LAS_LOSAS.length * 4;
+  let compartidos = 0;
+  let igualesAlSuelo = 0;
+  let igualesAlMontaje = 0;
+  for (const losa of LAS_LOSAS) {
+    for (const giro of [0, 1, 2, 3] as Giro[]) {
+      const una = repartoDelMundo.montarLaLosa(losa.id, giro, 1001);
+      const otra = repartoDelMundo.montarLaLosa(losa.id, giro, 2002);
+      if (una.celdas === otra.celdas) compartidos++;
+      if (canonico(una.celdas) === canonico(sueloDeLaLosa(losa, giro))) igualesAlSuelo++;
+      if (canonico(otra) === canonico(repartoDelMundo.montarLaLosaDeNuevo(losa.id, giro, 2002))) igualesAlMontaje++;
+    }
+  }
+  comprobar(
+    'el suelo que recuerda el reparto es uno por clase y giro: con dos semillas, el mismo objeto',
+    compartidos === combinaciones,
+    { compartidos, combinaciones },
+  );
+  comprobar(
+    'y es, celda a celda, el de `sueloDeLaLosa`; y la losa recordada es, bit a bit, la recién montada',
+    igualesAlSuelo === combinaciones && igualesAlMontaje === combinaciones,
+    { igualesAlSuelo, igualesAlMontaje, combinaciones },
+  );
+  const r = repartoDelMundo.cuentasDelReparto();
+  console.log(
+    `  el reparto del mundo: ${String(r.montadas)} losas montadas en todo el guion · ${String(r.enLaMemoria)} en su memoria · ` +
+      `${String(r.suelos)} suelos compartidos`,
+  );
+  comprobar(
+    'y la memoria del reparto, que ha visto pasar más de 512 losas, se queda en 512, con un suelo por clase y giro',
+    r.montadas > 512 && r.enLaMemoria === 512 && r.suelos === combinaciones,
+    r,
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 console.log('');
 if (fallos.length > 0) {
@@ -1500,4 +1857,5 @@ console.log(`${String(hechas)} comprobaciones`);
 console.log('\nEl mundo de Las Lindes sale del reparto de verdad: las murallas paran, las puertas dejan');
 console.log('pasar, las piedras que pasan de la cintura paran sin cerrar ni una senda ni una puerta, se');
 console.log('nace donde se puede estar, y el mismo tablero da el mismo mundo y el mismo paseo en Node y en');
-console.log('Hermes. Las huellas son las de los modelos, medidas otra vez.');
+console.log('Hermes. Las huellas son las de los modelos, medidas otra vez. Y muchas mesas en rueda');
+console.log('cuestan lo que una caliente —una losa montada por losa puesta—, con la memoria en su tope.');
