@@ -3,33 +3,45 @@
  *
  * ═══ QUÉ HACE ESTA PANTALLA ═══
  *
- * Abre o entra en una mesa, monta la escena (`escenas/lindes/Lindes.tsx`) con el
- * tablero que traduce `shared/arcade/juegos/lindes-en-tres.ts`, y convierte los
- * toques en movimientos. Ni una regla vive aquí: qué se puede poner y dónde lo dice
- * la lista de opciones que el juego acaba de componer.
+ * Monta la escena (`escenas/lindes/Lindes.tsx`) con el tablero que traduce
+ * `shared/arcade/juegos/lindes-en-tres.ts`, y pinta debajo la hoja con la que se juega:
+ * la losa de la mano, dónde plantar, las acciones del turno y los paneles del juego. Ni
+ * una regla vive aquí: qué se puede poner y dónde lo dice la lista de opciones que el
+ * juego acaba de componer.
  *
- * ═══ ES LA HERMANA DE `escritorio/src/lindes-en-tres.tsx`, Y COMPARTEN LO QUE IMPORTA ═══
+ * ═══ ES LA HERMANA DE `escritorio/src/lindes-en-tres.tsx`, Y COMPARTEN EL CONTROLADOR ═══
  *
- * Las dos pantallas son distintas —una tiene raíl y la otra una hoja, una tiene
- * teclado y la otra el pulgar— y las dos llaman a las MISMAS funciones de
- * `shared/`: `tableroEnTres`, `sitiosQueSeOfrecen`, `girosQueCaben`,
- * `movimientoDePoner`. Lo que se comparte es lo que puede divergir sin que nadie se
- * entere; lo que no se comparte es la forma, que es distinta a propósito.
+ * Las dos pantallas son distintas —una tiene raíl y la otra una hoja, una tiene teclado y
+ * la otra el pulgar— y lo que hacían igual ya no está escrito dos veces: las tres cámaras,
+ * el giro que se ajusta solo al señalar una casilla, la calidad medida, el `alFallar` que
+ * manda al retablo, lo que manda cada toque y el lienzo con la escena dentro son del
+ * controlador de Las Lindes (`escenas/lindes/el-valle-en-la-mesa.ts`). Lo que se comparte es
+ * lo que puede divergir sin que nadie se entere; lo que no se comparte es la forma, que es
+ * distinta a propósito.
+ *
+ * ═══ Y LO QUE ES DE CUALQUIER MESA, ES DE LA PLATAFORMA ═══
+ *
+ * El vestíbulo de abrir o entrar, el latido de la cuenta atrás, los nombres, la barra de la
+ * mesa, la red bajo el lienzo y el respaldo al retablo vienen del contrato de pintor de la
+ * app (`pintor-propio.tsx`). Esta pantalla tenía su propia copia de todo eso, y era la que se
+ * había quedado atrás: sin selector de plazo, con un botón de abrir que decía «Volcar la
+ * bolsa» —que es empezar la partida, no abrir la mesa—, con una red que no apuntaba el fallo
+ * en el parte, y con un respaldo que no decía de quién era el turno ni por qué se estaba
+ * jugando sobre el retablo. Con el contrato tiene las cuatro cosas sin escribir ninguna.
  *
  * ═══ EL RESPALDO NO ES UNA CORTESÍA ═══
  *
- * Si los modelos no llegan o el aparato no da contexto de dibujo, se cae al
- * RETABLO —el mueble genérico, el mismo SVG con el que se juega sin una línea de
- * tres dimensiones— y la partida se puede terminar ahí. Es lo que hace que la
- * escena sea un lujo y no una dependencia.
+ * Si los modelos no llegan, el lienzo revienta o la vista no es de este juego, se cae al
+ * RETABLO —el mueble genérico, el mismo SVG con el que se juega sin una línea de tres
+ * dimensiones— y la partida se puede terminar ahí. Es lo que hace que la escena sea un lujo y
+ * no una dependencia.
  *
- * ═══ Y EL GIRO VIVE EN LA PANTALLA ═══
+ * ═══ Y SIN TELÓN, A PROPÓSITO ═══
  *
- * Con qué giro se pone la losa es una decisión de pantalla hasta que se pulsa: no
- * es estado del juego, no viaja por el cable y no tiene que sobrevivir a nada. Si
- * viviera en la partida, girar sería un movimiento —una revisión, un aviso a los
- * demás aparatos y una entrada en el diario— por cada vuelta que alguien le da a
- * una losa antes de decidirse.
+ * El Burgo y Riberas tapan el lienzo hasta que llega su mundo; éste no. El suelo, los huecos
+ * donde cabe la losa y los labriegos se pintan sin esperar a los modelos, así que el valle se
+ * puede jugar antes de que lleguen, y un telón encima quitaría una partida que ya se puede
+ * jugar para enseñar una frase.
  *
  * ═══ Y A PIE SE ANDA CON EL PULGAR ═══
  *
@@ -48,79 +60,44 @@
  * soy y los asientos con su nombre, su figura y su color. Se empieza a pie, al hombro, que
  * es a lo que se viene a una mesa así, y arriba a la izquierda se enseña cómo va el canal:
  * «Conectando…», «Dentro», «Sin conexión: …». En una mesa normal no se pasa nada y la escena
- * no abre ningún socket.
+ * no abre ningún socket. Todo eso sigue aquí y no en el controlador: cada cliente llama a su
+ * casa, y `verify:canal-del-paseo` lo mira en el fuente de cada uno.
  *
  * ═══ Y EN EL TELÉFONO EL VALLE TIENE COLOR, Y CALIDAD MEDIDA ═══
  *
- * Dos cosas que esta pantalla le pasa a la escena y que antes no le pasaba. El ATLAS del
- * tablero, compilado a bytes (`COMPLEMENTOS_DEL_TABLERO`): sin él, en iOS y en Android cada
- * casa y cada muralla salían blancas. Y la CALIDAD, que iba escrita a mano como `"plena"`: ahora
- * la juzga `calidadDelValle` con lo que la escena mide por `alMedir`.
+ * El ATLAS del tablero, compilado a bytes (`COMPLEMENTOS_DEL_TABLERO`): sin él, en iOS y en
+ * Android cada casa y cada muralla salían blancas. Y la CALIDAD, que la juzga el controlador con
+ * lo que la escena mide por `alMedir`, igual que en el escritorio.
  */
-import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Canvas } from '../tres/Lienzo';
 import { decodificaImagenes, texturasDelTablero } from '../tres/texturas-nativas';
 import { Lindes } from '../../../escenas/lindes/Lindes';
 import type { ComplementoDelCargador } from '../../../escenas/lindes/catalogo';
-import { calidadDelValle, conLaMuestra } from '../../../escenas/lindes/detalle';
-import type { MuestraDelHilo } from '../../../escenas/embarcadero/calidad';
-import type {
-  Calidad,
-  CanalDeBotas,
-  EstadoDelCanal,
-  ModoDeCamaraDeLasLindes,
-} from '../../../escenas/lindes/tipos';
+import {
+  alCrearElLienzoDelValle,
+  EL_LIENZO_DEL_VALLE,
+  LAS_CAMARAS_DEL_VALLE,
+  usarElValleEnLaMesa,
+} from '../../../escenas/lindes/el-valle-en-la-mesa';
+import type { CanalDeBotas, EstadoDelCanal } from '../../../escenas/lindes/tipos';
 import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
 import { asientosQueAndan, esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
-import {
-  elSiguienteGiro,
-  accionesFueraDeLosSitios,
-  laAccionDePasar,
-  girosQueCaben,
-  movimientoDePoner,
-  sitiosQueSeOfrecen,
-  tableroEnTres,
-} from '../../../shared/arcade/juegos/lindes-en-tres';
 /*
- * Del juego y NUNCA del índice: `shared/arcade/juegos/index.ts` instala los siete
- * arcades al cargarse, y eso es cosa del servidor. Aquí sólo hace falta el
- * identificador y el catálogo de losas.
+ * Del fichero del juego, que aquí sólo hace falta el identificador. Quien instala los arcades
+ * del binario —por si se llega por enlace directo— es el contrato de pintor.
  */
 import { LINDES } from '../../../shared/arcade/juegos/lindes';
-import { losaPorId } from '../../../shared/arcade/juegos/lindes-losas';
-import type { Giro } from '../../../shared/arcade/juegos/lindes-losas';
 import { tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
-import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
-import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
 import { MandosDelPaseo } from './mandos-del-paseo';
-import { direccionDelCanal, usarMesaDeArcade } from './mesa';
+import { BotonDeGolpear } from './mandos-del-paseo';
+import { direccionDelCanal } from './mesa';
 import { LETRA, SALA } from './muebles';
-import { Pantalla } from './piezas';
-import { Retablo } from './retablo';
-import { BarraDeLaMesa } from './tablero-en-linea';
+import { ElRespaldo, LaMesaDeUnPintor, RedDelLienzo } from './pintor-propio';
+import type { LoQueVeElPintor } from './pintor-propio';
 import { traer } from './traer';
-
-/** El campo vertical de la cámara. El mismo que usa `camaraDeMesa` para encuadrar. */
-const CAMPO = 45;
-
-/** Las tres cámaras, con su rótulo corto: en un móvil no cabe una frase. */
-const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string }[] = [
-  { modo: 'mesa', rotulo: 'Mesa' },
-  { modo: 'hombro', rotulo: 'Hombro' },
-  { modo: 'ojos', rotulo: 'Ojos' },
-];
 
 /**
  * ═══ CON QUÉ SE ABRE EL TABLERO: EN UN TELÉFONO, CON SU ATLAS COMPILADO ═══
@@ -140,65 +117,27 @@ const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string }
 const COMPLEMENTOS_DEL_TABLERO: readonly ComplementoDelCargador[] = decodificaImagenes() ? [] : [texturasDelTablero];
 
 /**
- * LA RED DEL LIENZO.
- *
- * Un fallo dentro del contexto de dibujo —un modelo roto, un aparato sin WebGL—
- * tiraría la pantalla entera y dejaría a alguien fuera de su partida. Con la red,
- * se cae el lienzo y se sigue jugando sobre el retablo. Es la misma que tienen las
- * otras dos pantallas de escena de esta app.
+ * Pinta la mesa de Las Lindes. La pantalla entera hasta que hay mesa —el vestíbulo con su plazo—
+ * y lo que es de cualquier mesa —el latido, los nombres, la barra— es de la plataforma.
  */
-class RedDelValle extends Component<
-  { alFallar: (motivo: string) => void; children: ReactNode },
-  { roto: boolean }
-> {
-  public override state = { roto: false };
-
-  public static getDerivedStateFromError(): { roto: boolean } {
-    return { roto: true };
-  }
-
-  public override componentDidCatch(fallo: unknown): void {
-    this.props.alFallar(fallo instanceof Error ? fallo.message : String(fallo));
-  }
-
-  public override render(): ReactNode {
-    return this.state.roto ? null : this.props.children;
-  }
+export default function LasLindesPorDentro(): JSX.Element {
+  return <LaMesaDeUnPintor arcade={LINDES} Pintor={ElValleEnLaMesa} />;
 }
 
-export default function LasLindesPorDentro(): JSX.Element {
-  const manifiesto = manifiestoDeArcadeSiExiste(LINDES);
-  const mesa = usarMesaDeArcade(LINDES);
-  const [nombre, ponerNombre] = useState('');
-  const [codigo, ponerCodigo] = useState('');
-  const [giro, ponerGiro] = useState<Giro>(0);
-  const [senalada, ponerSenalada] = useState<{ x: number; y: number } | null>(null);
+/**
+ * EL PINTOR DE LAS LINDES: el valle y su hoja, con lo que le da el contrato (`LoQueVeElPintor`).
+ * Componente aparte para que sus ganchos —el modo, la palanca, el canal, el controlador— no queden
+ * detrás de los `return` del vestíbulo.
+ */
+function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
+  const { mesa, vista, juego, abajo, laBarra } = pintor;
   const [modo, ponerModo] = useState<'mesa' | 'hombro' | 'ojos'>('mesa');
-  const [rotoElValle, ponerRotoElValle] = useState(false);
-  const bordes = useSafeAreaInsets();
   /*
    * La palanca y el correr, en una referencia que escribe `MandosDelPaseo` y lee la escena en
    * su bucle. Aquí arriba, con los demás ganchos: debajo de una salida temprana, React se
    * rompería la primera vez que la pantalla cambiara de rama.
    */
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
-
-  /*
-   * ═══ LA CALIDAD SE MIDE, NO SE ESCRIBE ═══
-   *
-   * Aquí ponía `calidad="plena"`, a mano, para cualquier teléfono. Ahora la escena manda por
-   * `alMedir` lo que le cuesta cada segundo y `calidadDelValle` (`escenas/lindes/detalle.ts`)
-   * decide con el juez de la casa —22 ms de media en 120 fotogramas—, sobre las últimas doce
-   * muestras y sin volver a subir: el tablero crece de una losa a setenta y dos, y juzgar sólo al
-   * montar sería juzgar siempre el de una. Es la misma cuenta que hace el escritorio, y en todas
-   * las plataformas: ninguna decisión mira `Platform.OS`. También aquí arriba, con los ganchos.
-   */
-  const [calidad, ponerCalidad] = useState<Calidad>('plena');
-  const muestras = useRef<MuestraDelHilo[]>([]);
-  const alMedir = useCallback((m: { triangulos: number; llamadas: number; ms: number; fotogramas: number }) => {
-    muestras.current = conLaMuestra(muestras.current, { ms: m.ms, fotogramas: m.fotogramas });
-    ponerCalidad((antes) => calidadDelValle(antes, muestras.current));
-  }, []);
 
   /*
    * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
@@ -232,161 +171,43 @@ export default function LasLindesPorDentro(): JSX.Element {
     if (esBotas) ponerModo('hombro');
   }, [esBotas, codigoDeLaMesa]);
 
-  const vista = mesa.mesa?.vista ?? null;
-  const opciones = mesa.mesa?.opciones ?? [];
-  const datos = useMemo(() => tableroEnTres(vista), [vista]);
-  const tablero = useMemo(() => tableroDeLaVista(vista), [vista]);
-  const sitios = useMemo(() => sitiosQueSeOfrecen(vista, opciones), [vista, opciones]);
-  const girosAqui = useMemo(
-    () => (datos === null || senalada === null ? [] : girosQueCaben(datos, senalada.x, senalada.y)),
-    [datos, senalada],
-  );
-
   /*
-   * El giro se ajusta solo al señalar una casilla: si el que llevas elegido no cabe
-   * ahí, pasa al primero que sí. Lo contrario es un fantasma que no aparece y un
-   * toque que pone la losa de otra manera, y enseñar lo que va a pasar antes de que
-   * pase es toda la gracia del fantasma.
+   * EL CONTROLADOR DE LAS LINDES: la escena, el giro, la calidad, los sitios y lo que manda cada
+   * toque, lo mismo que el escritorio. Ver la cabecera de `escenas/lindes/el-valle-en-la-mesa.ts`.
    */
-  useEffect(() => {
-    if (girosAqui.length === 0) return;
-    if (girosAqui.indexOf(giro) >= 0) return;
-    ponerGiro(girosAqui[0] as Giro);
-  }, [girosAqui, giro]);
-
-  const alFallar = useCallback((motivo: string) => {
-    console.warn(`El valle no se ha podido pintar (${motivo}): se juega sobre el retablo.`);
-    ponerRotoElValle(true);
-  }, []);
-
-  const alTocarHueco = useCallback(
-    (x: number, y: number, conGiro: Giro) => {
-      void mesa.mover(movimientoDePoner(x, y, conGiro));
-    },
-    [mesa],
-  );
-
-  const alSenalarHueco = useCallback((x: number | null, y: number | null) => {
-    ponerSenalada(x === null || y === null ? null : { x, y });
-  }, []);
-
-  /*
-   * EL RELOJ DE ARENA DE LA ESCENA ES TAMBIÉN EL BOTÓN DE PASAR, y lo que manda es LA
-   * MISMA acción que manda el botón de la tira: se la pregunta a `shared/`, que es quien
-   * sabe cuál de las acciones del tablero es la de no plantar. Dos caminos al mismo gesto
-   * que mandaran cosas distintas serían dos gestos, y uno acabaría roto en silencio.
-   */
-  const laDePasar = useMemo(() => laAccionDePasar(tablero), [tablero]);
-  /* Lo que va en la segunda tira: lo que la primera no pinta ya. Ver el comentario de abajo. */
-  const sinRepetir = useMemo(() => accionesFueraDeLosSitios(tablero, sitios), [tablero, sitios]);
-
-  const alTocar = useCallback(
-    (movimiento: MovimientoDeclarado) => {
-      void mesa.mover(movimiento);
-    },
-    [mesa],
-  );
-
-  if (mesa.fase === 'yendo') {
-    return (
-      <Pantalla hueco={28} estilo={{ paddingTop: bordes.top + 28, paddingBottom: bordes.bottom + 28 }}>
-        <View style={estilos.centro}>
-          <ActivityIndicator color={SALA.acento} />
-          <Text style={estilos.texto}>Hablando con la mesa…</Text>
-        </View>
-      </Pantalla>
-    );
-  }
-
-  const sinNombre = nombre.trim().length === 0;
-  const noPuedeAbrir = mesa.quieto || sinNombre;
-  const noPuedeEntrar = noPuedeAbrir || codigo.trim().length === 0;
-
-  if (mesa.fase === 'fuera' || mesa.mesa === null) {
-    return (
-      <Pantalla hueco={28} estilo={{ paddingTop: bordes.top + 28, paddingBottom: bordes.bottom + 28 }}>
-        <View style={estilos.centro}>
-          <Text style={estilos.titulo}>{manifiesto?.nombre ?? 'Las Lindes'}</Text>
-          <Text style={estilos.texto}>{manifiesto?.gancho ?? ''}</Text>
-          <TextInput
-            style={estilos.campo}
-            placeholder="Tu nombre en la mesa"
-            placeholderTextColor={SALA.tenue}
-            value={nombre}
-            onChangeText={ponerNombre}
-            maxLength={24}
-            accessibilityLabel="Tu nombre en la mesa"
-          />
-          <Pressable
-            style={[estilos.boton, noPuedeAbrir && estilos.botonQuieto]}
-            disabled={noPuedeAbrir}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: noPuedeAbrir }}
-            onPress={() => mesa.abrir(nombre.trim())}
-          >
-            <Text style={[estilos.botonTexto, noPuedeAbrir && estilos.botonTextoQuieto]}>
-              Volcar la bolsa
-            </Text>
-          </Pressable>
-          <Text style={estilos.rotulo}>O SENTARSE EN UNA MESA ABIERTA</Text>
-          <TextInput
-            style={estilos.campo}
-            placeholder="Código de la mesa"
-            placeholderTextColor={SALA.tenue}
-            value={codigo}
-            onChangeText={ponerCodigo}
-            autoCapitalize="characters"
-            maxLength={8}
-            accessibilityLabel="Código de la mesa"
-          />
-          <Pressable
-            style={[estilos.boton, noPuedeEntrar && estilos.botonQuieto]}
-            disabled={noPuedeEntrar}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: noPuedeEntrar }}
-            onPress={() => mesa.entrar(codigo.trim().toUpperCase(), nombre.trim())}
-          >
-            <Text style={[estilos.botonTexto, noPuedeEntrar && estilos.botonTextoQuieto]}>
-              Sentarse
-            </Text>
-          </Pressable>
-          {mesa.aviso.length > 0 ? <Text style={estilos.aviso}>{mesa.aviso}</Text> : null}
-        </View>
-      </Pantalla>
-    );
-  }
+  const tablero = useMemo(() => tableroDeLaVista(vista.vista), [vista.vista]);
+  const valle = usarElValleEnLaMesa({
+    puesta: vista,
+    tablero,
+    opciones: vista.opciones ?? [],
+    mover: mesa.mover,
+    quieto: mesa.quieto,
+    modo,
+    traer,
+  });
+  const { laLosa, girosAqui, girar, sitios, sinRepetir, alTocar } = valle;
 
   /*
    * ═══ EL RESPALDO: EL RETABLO, Y SE JUEGA IGUAL ═══
    *
-   * Cuando la vista no es de este juego —un servidor con otro reparto— o el lienzo
-   * se ha caído, se pinta el tablero declarado. No es una pantalla de disculpa: es
-   * el mismo mueble genérico con el que se juega una partida entera.
+   * Cuando la vista no es de este juego —un servidor con otro reparto— o el valle se ha caído,
+   * se pinta el tablero declarado con la mesa de siempre alrededor: la barra, de quién es el
+   * turno, el aviso, los botones que el retablo no pinta y la crónica. No es una pantalla de
+   * disculpa: es el mismo mueble genérico con el que se juega una partida entera, y con una nota
+   * que dice por qué.
    */
-  if (datos === null || rotoElValle) {
+  if (valle.escena === null || valle.roto !== null) {
     return (
-      <Pantalla hueco={16} estilo={{ paddingBottom: bordes.bottom + 12 }}>
-        <BarraDeLaMesa
-          juego={manifiesto?.nombre ?? 'Las Lindes'}
-          codigo={mesa.mesa.codigo}
-          asientos={mesa.mesa.asientos}
-          salir={mesa.salir}
-          tirar={mesa.tirar}
-          arriba={bordes.top}
-          deBotas={esBotas}
-        />
-        {tablero === null ? (
-          <Text style={estilos.texto}>Esperando a la mesa…</Text>
-        ) : (
-          <Retablo tablero={tablero} alTocar={alTocar} quieto={mesa.quieto} />
-        )}
-      </Pantalla>
+      <ElRespaldo
+        pintor={pintor}
+        nota={
+          valle.roto !== null
+            ? `El valle en tres dimensiones no se ha podido pintar (${valle.roto}). Se juega sobre el tablero de siempre.`
+            : 'El valle en tres dimensiones no ha podido leer esta mesa. Se juega sobre el tablero de siempre.'
+        }
+      />
     );
   }
-
-  const laLosa = datos.enMano === '' ? null : losaPorId(datos.enMano);
-  const camara: ModoDeCamaraDeLasLindes =
-    modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: mesa.mesa.yo ?? '' };
 
   return (
     <View style={estilos.pantalla}>
@@ -394,68 +215,31 @@ export default function LasLindesPorDentro(): JSX.Element {
         ═══ DE DÓNDE SE SALE Y QUÉ CÓDIGO SE DICTA ═══
 
         Esta pantalla no montaba la barra, así que desde una mesa de Las Lindes en marcha NO
-        SE PODÍA hacer ninguna de las tres cosas que la barra existe para hacer: ver el
-        código para que se siente quien falta, levantarse para dejarle el sitio a otro, o
-        tirar la mesa cuando alguien se ha ido y la partida ya no puede seguir. En el
-        escritorio están las tres; aquí no estaba ninguna, y con una partida de tres días
-        eso es quedarse encerrado en el valle.
-
-        Va en LAS DOS ramas —la del retablo y la del valle— porque de las dos hay que poder
-        salir, y se lleva ella el hueco de arriba (`arriba={bordes.top}`), que antes se comía
-        la pantalla entera. Es el mismo montaje que El Burgo y que el tablero genérico.
+        SE PODÍA hacer ninguna de las tres cosas que la barra existe para hacer: ver el código
+        para que se siente quien falta, levantarse para dejarle el sitio a otro, o tirar la mesa
+        cuando alguien se ha ido y la partida ya no puede seguir. Ahora llega hecha del contrato
+        de pintor —con el hueco de arriba y la marca de Boots on Board—, en las dos ramas.
       */}
-      <BarraDeLaMesa
-        juego={manifiesto?.nombre ?? 'Las Lindes'}
-        codigo={mesa.mesa.codigo}
-        asientos={mesa.mesa.asientos}
-        salir={mesa.salir}
-        tirar={mesa.tirar}
-        arriba={bordes.top}
-        deBotas={esBotas}
-      />
+      {laBarra}
       <View style={estilos.lienzo}>
-        <RedDelValle alFallar={alFallar}>
-          <Canvas
-            style={estilos.canvas}
-            gl={{ antialias: true }}
-            dpr={[1, 2]}
-            /*
-             * Sin sombras en ningún cliente, y no es una decisión por plataforma: un
-             * mapa de sombras redibujado cada fotograma baja un móvil de gama media
-             * de sesenta a veinte, y el valle se lee perfectamente sin él. Es lo
-             * mismo que hacen el Muelle y el Burgo.
-             */
-            shadows={false}
-            camera={{ fov: CAMPO, near: 1, far: 6000 }}
-          >
+        <RedDelLienzo juego={juego} alCaer={valle.alFallar}>
+          <Canvas style={estilos.canvas} {...EL_LIENZO_DEL_VALLE} onCreated={alCrearElLienzoDelValle}>
             <Lindes
-              tablero={datos}
-              codigo={mesa.mesa.codigo}
-              traer={traer}
+              {...valle.escena}
               complementosDelTablero={COMPLEMENTOS_DEL_TABLERO}
-              calidad={calidad}
-              alMedir={alMedir}
-              camara={camara}
-              giroEnMano={giro}
-              /* La figura de quien pasea; sin ella, `figuraQueSePinta` saca una del asiento. */
-              figura={mesa.mesa?.asientos.find((a) => a.id === mesa.mesa?.yo)?.figura}
-              sePuedePasar={laDePasar !== null && !mesa.quieto}
-              alPasar={laDePasar === null ? undefined : () => alTocar(laDePasar.toque)}
-              quieto={mesa.quieto}
-              alTocarHueco={alTocarHueco}
-              alSenalarHueco={alSenalarHueco}
-              alFallar={alFallar}
               canal={canal}
               mandos={mandos}
             />
           </Canvas>
-        </RedDelValle>
+        </RedDelLienzo>
 
         {/*
           LOS MANDOS DEL PASEO, encima del lienzo y sólo a pie. Sin ellos, en el teléfono se
-          bajaba a «Hombro» y no se podía dar un paso. Ver `mandos-del-paseo.tsx`.
+          bajaba a «Hombro» y no se podía dar un paso. Ver `mandos-del-paseo.tsx`. Y «Golpear»,
+          a pie y sólo con canal: la refriega de una mesa de botas, lo que en el escritorio es la G.
         */}
         <MandosDelPaseo mandos={mandos} visibles={modo !== 'mesa'} />
+        <BotonDeGolpear mandos={mandos} visible={modo !== 'mesa' && canal !== undefined} />
 
         {/*
           CÓMO VA EL CANAL, arriba a la izquierda —la derecha es de las cámaras y abajo están
@@ -469,8 +253,9 @@ export default function LasLindesPorDentro(): JSX.Element {
           </View>
         ) : null}
 
+        {/* Las tres cámaras, con su nombre corto: en un móvil no cabe una frase. */}
         <View style={estilos.camaras}>
-          {LAS_CAMARAS.map((c) => (
+          {LAS_CAMARAS_DEL_VALLE.map((c) => (
             <Pressable
               key={c.modo}
               style={[estilos.camara, modo === c.modo && estilos.camaraPuesta]}
@@ -479,7 +264,7 @@ export default function LasLindesPorDentro(): JSX.Element {
               onPress={() => ponerModo(c.modo)}
             >
               <Text style={[estilos.camaraTexto, modo === c.modo && estilos.camaraTextoPuesto]}>
-                {c.rotulo}
+                {c.corto}
               </Text>
             </Pressable>
           ))}
@@ -494,9 +279,15 @@ export default function LasLindesPorDentro(): JSX.Element {
         encaja esto», y se toma mirando el tablero y la losa A LA VEZ. Un cajón
         obligaría a abrirlo y cerrarlo en cada turno.
       */}
-      <View style={[estilos.hoja, { paddingBottom: bordes.bottom + 10 }]}>
+      <View style={[estilos.hoja, { paddingBottom: abajo + 10 }]}>
+        {/*
+          EL AVISO DE LA MESA MANDA SOBRE EL DEL JUEGO. «No ha salido el movimiento» no se veía en
+          ninguna parte de esta pantalla mientras se jugaba: sólo en el vestíbulo. Es lo que el Burgo
+          hace con su cinta, y por lo mismo: lo que se acaba de pulsar manda sobre lo que hay que
+          esperar.
+        */}
         <Text style={estilos.aviso} numberOfLines={2}>
-          {tablero?.aviso ?? ''}
+          {mesa.aviso.length > 0 ? mesa.aviso : (tablero?.aviso ?? '')}
         </Text>
 
         {laLosa !== null ? (
@@ -512,7 +303,7 @@ export default function LasLindesPorDentro(): JSX.Element {
               style={[estilos.girar, girosAqui.length < 2 && estilos.botonQuieto]}
               disabled={girosAqui.length < 2 || mesa.quieto}
               accessibilityRole="button"
-              onPress={() => ponerGiro((g) => elSiguienteGiro(girosAqui, g))}
+              onPress={girar}
             >
               <Text style={[estilos.botonTexto, girosAqui.length < 2 && estilos.botonTextoQuieto]}>
                 Girar
@@ -587,10 +378,6 @@ export default function LasLindesPorDentro(): JSX.Element {
           se veía UN SOLO PUNTO: se podía poner losas y plantar, pero no saber quién iba
           ganando ni por qué, ni enterarse de haber ganado.
 
-          Y encima llevaba delante una línea que no podía pintar nada —`cond ? null : null`,
-          que devuelve `null` decida lo que decida— puesta ahí para que `datos.labriegos`
-          pareciera usado. El sitio estaba reservado y el contenido nunca llegó.
-
           Lo que se pinta ahora es `tablero.paneles`: lo mismo que el escritorio, salido del
           mismo reductor, sin un dato nuevo ni una regla escrita en el cliente. Es la regla de
           la casa —ningún juego sólo para PC— aplicada a lo único que aquí faltaba.
@@ -614,28 +401,6 @@ const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: SALA.suelo },
   lienzo: { flex: 1, minHeight: 200, backgroundColor: '#8cb8de' },
   canvas: { flex: 1 },
-  centro: { width: '100%', alignItems: 'center', gap: 12 },
-  titulo: { ...LETRA.rotulo, color: SALA.blanco, fontSize: 26, lineHeight: 31, textAlign: 'center' },
-  texto: { color: SALA.palabra, fontSize: 16, lineHeight: 24, textAlign: 'center', ...LETRA.cuerpo },
-  rotulo: { color: SALA.tenue, fontSize: 13, ...LETRA.rotuloChico },
-  campo: {
-    width: '100%',
-    backgroundColor: SALA.teja,
-    borderColor: SALA.filo,
-    borderWidth: 1,
-    borderRadius: 10,
-    color: SALA.palabra,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-  },
-  boton: {
-    width: '100%',
-    backgroundColor: SALA.acento,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
   /*
    * ═══ LO APAGADO SE APAGA CON COLOR, Y POR ESO SON TRES Y NO UNO ═══
    *

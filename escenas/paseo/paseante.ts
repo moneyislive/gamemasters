@@ -56,14 +56,16 @@
  *
  *   (a) LO PEDIDO EN CADA TIC. `fotogramaDelPaseo` llama a `alDarUnTic` UNA vez por tic, justo
  *       después de darlo, con `{ tic, rumbo, marcha }` —los dos enteros de `pasoDelTic` y el
- *       número del tic, consecutivo desde el nacimiento— y con el sitio en Q16.16 donde acabó.
- *       Todo entero: nada de lo que viajaría depende del fotograma ni de la coma flotante.
+ *       número del tic, consecutivo desde el nacimiento—, hacia dónde se mira y si en ese tic se
+ *       golpea, y con el sitio en Q16.16 donde acabó. Todo entero: nada de lo que viajaría
+ *       depende del fotograma ni de la coma flotante.
  *   (b) LA CORRECCIÓN. `corregirElPaseo(estado, sitio)` pone al paseante donde diga quien sabe
  *       más, y pone ahí también el tic anterior: así no se pinta un deslizamiento a través de la
  *       pared de la que se le saca, y la velocidad de ese tic es cero —la marioneta no echa a
  *       correr por un salto que no ha dado—. No reproduce lo pedido después, a propósito: el
  *       servidor valida y no resimula, y rehacer el camino con el mismo mundo que metió al
- *       paseante en el sitio malo le volvería a meter.
+ *       paseante en el sitio malo le volvería a meter. Con un rumbo, además le hace mirar ahí:
+ *       es como se renace en la refriega.
  *
  * ═══ Y NADIE SE QUEDA ENCERRADO ═══
  *
@@ -86,8 +88,8 @@ import {
 import { aNumero, deNumero, por } from '../../shared/mecanicas/fijo';
 import { sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena, Sitio } from '../../shared/mecanicas/mundo';
-import { girar, pedidoDelTic } from './mandos';
-import type { EntradaDelTic, Mandos, PedidoDelTic } from './mandos';
+import { girar, golpesVistosTras, mandosDelFotograma, pedidoDelTic } from './mandos';
+import type { EntradaDelTic, Mandos, MandosDeFuera, PedidoDelTic, Teclas } from './mandos';
 
 /* ─── El reloj ───────────────────────────────────────────────────────────── */
 
@@ -257,6 +259,10 @@ export function ticDelPaseo(
  * Todos los tics de un fotograma llevan el mismo pedido —el de los mandos y el rumbo de este
  * fotograma—, porque es lo único que se sabe: nadie ha pulsado nada entre medias. `alDarUnTic`
  * es la costura (a) de la cabecera.
+ *
+ * El golpe, si lo hay (`Mandos.golpe`), va SÓLO en el primero: un toque es un golpe, y un
+ * fotograma de cinco tics no puede convertirlo en cinco. Si el fotograma no da ningún tic, el
+ * golpe no sale aquí y quien lleva la cuenta lo deja para el siguiente (`golpesVistosTras`).
  */
 export function fotogramaDelPaseo(
   arena: Arena,
@@ -273,15 +279,70 @@ export function fotogramaDelPaseo(
     const pedido = pedidoDelTic(mandos, rumbo);
     s = ticDelPaseo(arena, s, pedido, radio);
     if (alDarUnTic !== undefined) {
-      alDarUnTic({ tic: s.tic, rumbo: pedido.rumbo, marcha: pedido.marcha, mira: rumboDeRadianes(rumbo) }, s.ahora);
+      alDarUnTic(
+        { tic: s.tic, rumbo: pedido.rumbo, marcha: pedido.marcha, mira: rumboDeRadianes(rumbo), golpe: mandos.golpe && i === 0 },
+        s.ahora,
+      );
     }
   }
   return s;
 }
 
-/** LA COSTURA (b): poner a quien pasea en un sitio, sin pintar cómo llegó. Ver la cabecera. */
-export function corregirElPaseo(e: EstadoDelPaseo, sitio: Andante): EstadoDelPaseo {
-  return { ...e, antes: sitio, ahora: sitio };
+/** Lo que el gancho del paseo se lleva de un fotograma al siguiente: el paseo y los golpes ya vistos. */
+export interface FotogramaDeQuienPasea {
+  readonly paseo: EstadoDelPaseo;
+  readonly golpesVistos: number;
+}
+
+/**
+ * UN FOTOGRAMA DEL GANCHO, SIN REACT: lo que `usarElPaseo` hace entre leer los mandos y pintar,
+ * suelto para que `verify:paseo` lo recorra en Node.
+ *
+ *  · EN EL SUELO NO SE DA NI UN TIC. Con `caido` el paseo sale tal cual entró —ni anda, ni gira, ni
+ *    se le cuenta nada a la red— y lo pulsado se da por visto: al levantarse no sale un golpe que se
+ *    pidió tumbado.
+ *  · EL GOLPE PENDIENTE va en el primer tic del fotograma (`fotogramaDelPaseo`), y si el fotograma
+ *    no da ninguno espera al siguiente (`golpesVistosTras`).
+ *
+ * `golpesPedidos` es la suma de las dos cuentas —la G y el botón— y `golpesVistos`, lo que ya salió;
+ * `null` en el primer fotograma, que no tiene nada pendiente.
+ */
+export function fotogramaDeQuienPasea(
+  arena: Arena,
+  e: EstadoDelPaseo,
+  dt: number,
+  teclas: Teclas,
+  fuera: MandosDeFuera,
+  golpesPedidos: number,
+  golpesVistos: number | null,
+  caido: boolean,
+  alDarUnTic?: (entrada: EntradaDelTic, sitio: Andante) => void,
+): FotogramaDeQuienPasea {
+  if (caido) return { paseo: e, golpesVistos: golpesPedidos };
+  const vistos = golpesVistos ?? golpesPedidos;
+  const mandos = mandosDelFotograma(teclas, fuera, golpesPedidos > vistos);
+  const paseo = fotogramaDelPaseo(arena, e, dt, mandos, alDarUnTic);
+  return { paseo, golpesVistos: golpesVistosTras(golpesPedidos, vistos, paseo.tic !== e.tic) };
+}
+
+/** Un rumbo en radianes, llevado a (−π, π] como los guarda `girar`. */
+function enUnaVuelta(r: number): number {
+  let v = r % (Math.PI * 2);
+  if (v > Math.PI) v -= Math.PI * 2;
+  if (v <= -Math.PI) v += Math.PI * 2;
+  return v;
+}
+
+/**
+ * LA COSTURA (b): poner a quien pasea en un sitio, sin pintar cómo llegó. Ver la cabecera.
+ *
+ * Con `rumbo` (en radianes), mirando además hacia ahí: es lo que pide el `renace` de la refriega,
+ * que pone a quien cayó en su sitio de nacer Y hacia dónde tiene que mirar. Un `corrige` no lo da:
+ * corrige dónde se está, y hacia dónde se mira sigue siendo cosa de quien pasea.
+ */
+export function corregirElPaseo(e: EstadoDelPaseo, sitio: Andante, rumbo?: number): EstadoDelPaseo {
+  if (rumbo === undefined || !Number.isFinite(rumbo)) return { ...e, antes: sitio, ahora: sitio };
+  return { ...e, antes: sitio, ahora: sitio, rumbo: enUnaVuelta(rumbo) };
 }
 
 /* ─── Lo que se pinta ────────────────────────────────────────────────────── */

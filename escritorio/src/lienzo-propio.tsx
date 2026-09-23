@@ -7,20 +7,33 @@
  * ═══ QUÉ ES ESTO Y DE DÓNDE SALE ═══
  *
  * Todo lo de aquí vivía PRIVADO dentro de `riberas-en-tres.tsx`, que fue el primer
- * pintor propio del escritorio. Cuando llegó el segundo —el Burgo— había dos
- * caminos: mover aquellas piezas aquí y dejar a Riberas importándolas, o COPIARLAS.
- * Se copian, y la razón no es pereza: `verificar-escritorio.tsx` ata a Riberas por
- * REGEX LITERALES sobre su fuente —dónde avisa del recuadro, en qué orden mira el
- * foco, cómo compone sus seis cribas—, y mover una función de fichero pone rojas
- * comprobaciones que no hablan de este trabajo. Riberas no se toca en esta fase:
- * lo dice el §6.2 del diseño del Burgo con todas sus letras.
+ * pintor propio del escritorio. Cuando llegó el segundo —el Burgo— se COPIÓ aquí en vez
+ * de mudarse, y la razón no fue pereza: `verificar-escritorio.tsx` ataba a Riberas por
+ * REGEX LITERALES sobre su fuente, y mover una función de fichero ponía rojas
+ * comprobaciones que no hablaban de aquel trabajo. Durante dos pintores hubo DOS
+ * copias de cada pieza, y ya se habían separado: la cámara de Riberas sabía callarse
+ * a pie y la de aquí no; el menú de aquí admitía una tarjeta dentro y el de allí no.
  *
- * Lo que sí se comparte, y es lo único que NO se puede duplicar, es LA PILA DE
- * TRAMPAS DE FOCO: `armarUnaTrampa` / `mandaEstaTrampa` viven en un array de módulo
- * de `riberas-en-tres.tsx` y son quienes deciden qué caja modal se queda el
- * `Escape`. Dos pilas serían dos cajas creyéndose las de encima, y `Escape`
- * cerraría las dos de un golpe. Por eso se importan de allí y no se copian, aunque
- * el resto del fichero sí.
+ * YA NO HAY COPIAS. Riberas monta estas piezas como el Burgo: lo que su copia tenía de
+ * mejor pasó aquí para todos (`callada`, en la cámara), y lo que era suyo es un
+ * parámetro (el recuadro, las cajas que ruedan y el velo, en la cámara; la clase de la
+ * nota, en el menú). Las reglas de `verificar-escritorio.tsx` que leían la cámara, la
+ * trampa y el menú DENTRO de Riberas leen ahora la pieza de aquí Y que Riberas la
+ * monta: una copia que vuelva a nacer allí las pone rojas a todas a la vez.
+ *
+ * ═══ Y LA DEPENDENCIA VA DE LOS PINTORES A ESTO, NUNCA AL REVÉS ═══
+ *
+ * Este fichero no importa de ningún pintor. Lo que el Burgo y esto sacaban de Riberas
+ * —la pila de trampas de foco, la raíz de la letra, el ancho de la cinta— vive aquí, y
+ * de `riberas-en-tres.tsx` sólo importa quien monta su pantalla (`pintores.ts`). Al
+ * revés, cualquier pintor que tocara esta pieza cargaba Riberas entero —Las Lindes, que
+ * sólo quiere `LimiteDelMundo`, lo cargaba ya—, y un pintor nuevo empezaba dependiendo
+ * de otro juego para abrir una caja modal.
+ *
+ * LA PILA DE TRAMPAS DE FOCO es la única pieza que además NO se puede duplicar: es
+ * quien decide qué caja modal se queda el `Escape`. Dos pilas serían dos cajas
+ * creyéndose las de encima, y `Escape` cerraría las dos de un golpe. Vive aquí, en un
+ * array de módulo, y `verify:escritorio` compra que no hay otra en `escritorio/src/`.
  *
  * ═══ AQUÍ NO HAY NINGUNA REGLA DE NINGÚN JUEGO ═══
  *
@@ -63,17 +76,27 @@ import { catalogoDeModelos } from '../../escenas/modelos';
 import type { CatalogoDeModelos } from '../../escenas/modelos';
 import type { Opcion } from '../../shared/arcade';
 import { loQueSeDiceDeUnFallo } from './red-de-seguridad';
-/*
- * LA PILA DE TRAMPAS ES UNA, Y POR ESO ESTAS TRES SE IMPORTAN EN VEZ DE COPIARSE.
- * Ver la cabecera: dos pilas dejarían que `Escape` cerrara de un golpe el menú y el
- * cajón de debajo.
- */
-import { armarUnaTrampa, loQueHaceLaTrampa, mandaEstaTrampa, RAIZ_DE_LA_CASA } from './riberas-en-tres';
-import type { ElFocoDeLaTrampa } from './riberas-en-tres';
 
 // ---------------------------------------------------------------------------
 // La raíz de la letra, medida y no supuesta
 // ---------------------------------------------------------------------------
+
+/**
+ * ═══ LA RAÍZ DE ESTA CASA VALE 17 PUNTOS, Y ESE DATO YA SE ESCRIBIÓ MAL UNA VEZ ═══
+ *
+ * `estilo.css` abre con `html { font-size: 106.25%; }` y su propia cabecera dice por qué:
+ * «los 17 px de siempre cuando el navegador viene con sus 16», y va en porcentaje para no
+ * anular la preferencia de tamaño de letra del navegador. El diseño del cartel de los naipes
+ * (`docs/LAS-CARTAS-SE-EXPLICAN.md`) escribió «0,82 rem sobre 16, o sea 13 puntos» y sobre
+ * esos 13 levantó sus dos tablas de letra: con el rem malo salían 27 letras por renglón donde
+ * hay 25 y renglones de 18 donde son de 19, o sea que el sitio quedaba SOBRESTIMADO por los
+ * dos lados y una frase de tres renglones pasaba por una de dos.
+ *
+ * Se escribe aquí, una vez, y de aquí sale en los dos pintores todo lo que se mide en letras.
+ * Si alguien toca la raíz de la hoja sin tocar esto, `verify:escritorio` lo dice: afirma que
+ * las dos cifras coinciden.
+ */
+export const RAIZ_DE_LA_CASA = 17;
 
 /**
  * LOS 17 PUNTOS DE LA CASA SON EL SUELO, NO LA MEDIDA: la de verdad se le pide al
@@ -304,6 +327,22 @@ export interface LoQueVeLaCamara {
   alturaMinima?: number;
   /** La niebla que sigue al ojo, o `null` para no tocar la de la escena. */
   niebla?: { empiezaA: number; terminaA: number } | null;
+  /**
+   * CALLADA: ni escucha el ratón ni pone la cámara ni la niebla, porque la vista es de
+   * otro —a pie, del paseo de la escena—. Se queda MONTADA y no se desmonta, y las dos
+   * cosas importan: su mirador vive aquí dentro, así que al volver a la mesa se sigue
+   * mirando desde donde se dejó; y desmontada y vuelta a montar se suscribiría a
+   * `useFrame` DETRÁS de la escena y le pisaría la cámara en cada fotograma (por qué ese
+   * orden importa lo cuenta la cabecera de `burgo-en-tres.tsx`). Sin callarla, cada
+   * fotograma subiría la cámara al aire por encima de la que acaba de poner el paseo, y
+   * arrastrar a pie giraría una mesa que no se ve.
+   *
+   * Nació en la copia que Riberas llevaba de este componente, con el nombre de `aPie`, y
+   * es justo lo que pasa con las copias: la mejora se quedó en una. El Burgo, que usaba
+   * ésta, calla la suya a pie por otro camino —un `alAcercarse` que no hace nada y los
+   * punteros marcados como de la interfaz—. Aquí vale para todos; `false` si no se dice.
+   */
+  callada?: boolean;
 }
 
 /**
@@ -331,6 +370,13 @@ export interface LoQueVeLaCamara {
  * media carrera y el tablero pegaba un bandazo sin que nadie hubiera soltado nada. Y la
  * cuenta es también lo que distingue dos dedos de dos botones: el ratón manda siempre EL
  * MISMO `pointerId` apriete lo que apriete, así que no llega a dos.
+ *
+ * Sólo cuentan los gestos que empiezan SOBRE ESTE lienzo —`e.target === lienzo`—, así que
+ * arrastrar por el raíl o por un formulario no mueve nada. Y la proporción del lienzo entra
+ * en CADA FOTOGRAMA y no una vez: el raíl baja o sube al cruzar los 900 px, la ventana se
+ * estira, la tableta se gira, y el `<canvas>` cambia de forma sin que se remonte nada. Leer
+ * `clientWidth` por fotograma cuesta menos que un observador de tamaño y no se queda nunca
+ * atrás.
  */
 export function CamaraAerea({
   alcance,
@@ -343,11 +389,13 @@ export function CamaraAerea({
   limites = LIMITES_DE_SALIDA,
   alturaMinima,
   niebla = NIEBLA_DE_SIEMPRE,
+  callada = false,
 }: LoQueVeLaCamara): null {
   const { camera, gl, scene } = useThree();
   const mirador = useRef<Mirador>(miradorDeSalida);
 
   useEffect(() => {
+    if (callada) return undefined;
     const lienzo = gl.domElement;
     /* Si un día el recuadro no estuviera, se cae al lienzo: peor, pero no roto. */
     const caja: HTMLElement = lienzo.closest<HTMLElement>(`.${recuadro}`) ?? lienzo;
@@ -502,9 +550,10 @@ export function CamaraAerea({
       caja.removeEventListener('wheel', rueda);
       lienzo.removeEventListener('contextmenu', menuDelSistema);
     };
-  }, [gl, alcance, cercania, alAcercarse, recuadro, seDesplazanSolas, velo, limites]);
+  }, [gl, alcance, cercania, alAcercarse, recuadro, seDesplazanSolas, velo, limites, callada]);
 
   useFrame(() => {
+    if (callada) return;
     const lienzo = gl.domElement;
     const proporcion = lienzo.clientHeight > 0 ? lienzo.clientWidth / lienzo.clientHeight : undefined;
     /*
@@ -535,25 +584,139 @@ export function CamaraAerea({
 }
 
 // ---------------------------------------------------------------------------
-// La trampa de foco de una caja modal
+// La trampa de foco de una caja modal, y la pila que decide cuál manda
 // ---------------------------------------------------------------------------
+
+/**
+ * LAS TRAMPAS ARMADAS, en el orden en que se abrieron: LA PILA, y es una para toda la pestaña.
+ *
+ * ═══ POR QUÉ HACE FALTA UNA PILA ═══
+ *
+ * Con el oyente de teclas en la caja, la burbuja repartía sola: con el cajón abierto y el menú
+ * de elegir encima, un `Escape` sólo llegaba a la caja que tenía el foco dentro. Desde que el
+ * oyente vive en `document` (ver `usarLaTrampaDeFoco`) llegan LAS DOS, y `Escape` cerraría el
+ * menú Y el cajón de un golpe. Así que `armarUnaTrampa` apunta cada caja en el orden en que se
+ * abre y sólo actúa la de arriba.
+ *
+ * Es un array de módulo y no un estado de React a propósito: no decide qué se pinta, y las
+ * cajas que lo comparten no tienen un antepasado común al que colgárselo sin inventar un
+ * contexto para cuatro líneas. Y por lo mismo es UNO: una segunda pila en otro fichero serían
+ * dos cajas creyéndose las de encima. No se exporta: se apunta con `armarUnaTrampa`, que
+ * devuelve cómo desarmarse, y se pregunta con `mandaEstaTrampa` y `hayUnaTrampaArmada`.
+ */
+const LAS_TRAMPAS_ARMADAS: unknown[] = [];
+
+/**
+ * APUNTA UNA TRAMPA Y DEVUELVE CÓMO BORRARLA. Desarmar dos veces no hace nada, que es lo que
+ * pide un efecto de React en modo estricto (monta, desmonta y vuelve a montar).
+ */
+export function armarUnaTrampa(quien: unknown): () => void {
+  LAS_TRAMPAS_ARMADAS.push(quien);
+  let desarmada = false;
+  return () => {
+    if (desarmada) return;
+    desarmada = true;
+    const suPuesto = LAS_TRAMPAS_ARMADAS.lastIndexOf(quien);
+    if (suPuesto >= 0) LAS_TRAMPAS_ARMADAS.splice(suPuesto, 1);
+  };
+}
+
+/** ¿Manda ésta? Sólo la última que se armó, que es la que está encima. */
+export function mandaEstaTrampa(quien: unknown): boolean {
+  return LAS_TRAMPAS_ARMADAS.length > 0 && LAS_TRAMPAS_ARMADAS[LAS_TRAMPAS_ARMADAS.length - 1] === quien;
+}
+
+/**
+ * ¿HAY ALGUNA CAJA MODAL ABIERTA, SEA CUAL SEA? Para las teclas que no son de ninguna caja
+ * —las de la cámara de Riberas— y que con una abierta tienen que callarse: cambiar de cámara
+ * por debajo de un menú es mover lo que no se ve. Se pregunta a la pila en vez de exportarla,
+ * para que nadie apunte ni borre una trampa sin pasar por `armarUnaTrampa`.
+ */
+export function hayUnaTrampaArmada(): boolean {
+  return LAS_TRAMPAS_ARMADAS.length > 0;
+}
+
+/**
+ * DÓNDE ESTÁ EL FOCO CUANDO LLEGA LA TECLA, visto desde la caja modal.
+ *
+ * `fuera` es el caso que costó tres turnos de partida: el navegador lo ha soltado al
+ * `<body>` porque el botón que lo tenía se desmontó. No es un caso raro ni un caso de
+ * teclado: pasa con el ratón, en la primera jugada, y dejaba la caja sin `Escape`.
+ */
+export type ElFocoDeLaTrampa = 'fuera' | 'la-caja' | 'el-unico' | 'el-primero' | 'el-ultimo' | 'dentro';
+
+/** Lo que la trampa hace con una tecla. `nada` quiere decir «déjasela al navegador». */
+export type LoQueHaceLaTrampa = 'nada' | 'cerrar' | 'al-primero' | 'al-ultimo' | 'a-la-caja';
+
+/**
+ * LA DECISIÓN DE LA TRAMPA, SIN NAVEGADOR, para que se pueda comprar llamándola.
+ *
+ * La comprobación de antes leía el CUERPO del oyente y buscaba dentro las palabras `Tab`,
+ * `shiftKey` y `Escape`. Pasaba en verde con la trampa rota delante, porque las palabras
+ * estaban escritas y el fallo era DÓNDE se enganchaba el oyente y qué pasaba con el foco
+ * caído: dos cosas que aquel texto no miraba. Partido así, el reparto se llama con una tabla
+ * —incluida la fila `fuera`, que es la del fallo— y el enganche se lee aparte.
+ *
+ * `Escape` cierra MIRE DONDE MIRE EL FOCO, y eso es la mitad del arreglo: es justo la tecla
+ * que se pulsa cuando uno ya no sabe dónde está.
+ */
+export function loQueHaceLaTrampa(
+  tecla: { key: string; shiftKey: boolean },
+  foco: ElFocoDeLaTrampa,
+  cuantosEnfocables: number,
+): LoQueHaceLaTrampa {
+  if (tecla.key === 'Escape') return 'cerrar';
+  if (tecla.key !== 'Tab') return 'nada';
+  /* Una caja sin nada que enfocar dentro se queda el tabulador ella misma. */
+  if (cuantosEnfocables === 0) return 'a-la-caja';
+  /* El foco caído al `body`: el tabulador entra en la caja en vez de irse a la Sala. */
+  if (foco === 'fuera') return tecla.shiftKey ? 'al-ultimo' : 'al-primero';
+  if (!tecla.shiftKey && (foco === 'el-ultimo' || foco === 'el-unico')) return 'al-primero';
+  if (tecla.shiftKey && (foco === 'el-primero' || foco === 'el-unico' || foco === 'la-caja')) return 'al-ultimo';
+  return 'nada';
+}
 
 /**
  * ENCERRAR EL FOCO DENTRO DE UNA CAJA MODAL, con `Escape` y con rescate.
  *
- * El oyente va en `document` y NO en la caja, y eso es lo que costó tres turnos de
- * partida: un oyente en la caja sólo oye lo que pasa con el foco DENTRO, y el foco se
- * sale solo en cuanto una jugada cambia la lista de opciones —el botón que lo tenía se
- * desmonta y el navegador lo suelta al `<body>` sin avisar a nadie—. Con la pila de
- * trampas, seguir en `document` no le quita el `Escape` a la caja que haya encima.
+ * Es un gancho y no el cuerpo de una caja porque cajas modales hay muchas —el cajón del
+ * marcador, el menú de elegir, el componedor del trueque, las cajas del Burgo— y todas se
+ * pintan encima de un tablero donde un toque funda una choza o compra un solar. Escrita dos
+ * veces, son dos trampas que se separan el día que alguien arregle una, y la que se queda
+ * rota es la que nadie estaba mirando.
  *
- * El RESCATE es la otra mitad: se vigila la caja por dentro con un `MutationObserver`, y
- * cada vez que cambia, si el foco se ha caído fuera, vuelve a la caja. Desde ahí el
- * tabulador entra otra vez, que es lo que se perdía.
+ * LO QUE HACE, y las tres son cosas que un navegador NO hace solo con un `<div>`:
  *
- * El reparto de teclas lo decide `loQueHaceLaTrampa`, que es una función pura de
- * `riberas-en-tres.tsx` y se puede llamar desde Node con una tabla —incluida la fila
- * `fuera`, que es la del fallo—. Aquí sólo se lee dónde está el foco y se obedece.
+ *   · al abrirse, el foco se va DENTRO de la caja. Sin esto, quien abre con teclado se queda
+ *     tabulando por detrás de un modal opaco;
+ *   · `Tab` sobre el último enfocable vuelve al primero y `Mayúsculas+Tab` sobre el primero
+ *     va al último. `aria-modal` se lo cuenta al lector de pantalla y no le quita el
+ *     tabulador a nadie: sin la vuelta, el foco se va a la cabecera de la Sala;
+ *   · `Escape` cierra, que es la salida que quien abrió con teclado espera encontrar.
+ *
+ * DEVOLVER EL FOCO AL CERRAR NO ES COSA DE AQUÍ, y no por descuido: la caja se DESMONTA al
+ * cerrarse y adónde vuelve el foco depende de quién la abrió —la ficha de mis puntos en un
+ * caso, el recuadro del lienzo en otro, porque a un menú lo abre un naipe del `<canvas>` y un
+ * `<canvas>` no recibe foco—. Lo hace cada `cerrar`, que es el que lo sabe.
+ *
+ * ═══ EL OYENTE VA EN `document`, Y ESO ES LO QUE COSTÓ TRES TURNOS DE PARTIDA ═══
+ *
+ * Vivía EN LA CAJA, y un `keydown` sólo llega ahí si el foco está DENTRO. Basta pulsar una
+ * opción para que deje de estarlo: la lista cambia con la jugada, el botón pulsado se desmonta
+ * y el navegador suelta el foco al `<body>` sin avisar a nadie. Desde ahí ni el tabulador daba
+ * la vuelta ni `Escape` cerraba: la trampa existía hasta el primer toque. Por eso `tecla` mira
+ * `caja.current` EN EL MOMENTO de la tecla y no el nodo que se capturó al armarla; y con la
+ * pila, seguir en `document` no le quita el `Escape` a la caja que haya encima.
+ *
+ * El RESCATE es la otra mitad. Que el botón que tenía el foco se desmonte no avisa a nadie
+ * —el navegador no dispara `blur` al quitar de la página al que lo tenía—, así que se vigila
+ * la caja por dentro con un `MutationObserver`, y cada vez que cambia, si el foco se ha caído
+ * fuera, vuelve a la caja. Desde ahí el tabulador entra otra vez, que es lo que se perdía. Es
+ * el mismo patrón que el rescate del recuadro de `sala.tsx`, aquí en pequeño.
+ *
+ * El reparto de teclas lo decide `loQueHaceLaTrampa`, la función pura de aquí arriba, que se
+ * puede llamar desde Node con una tabla —incluida la fila `fuera`, que es la del fallo—. Aquí
+ * sólo se lee dónde está el foco y se obedece.
  */
 export function usarLaTrampaDeFoco(
   abierto: boolean,
@@ -618,11 +781,19 @@ export function usarLaTrampaDeFoco(
  * inventa ni una palabra sobre la jugada: sólo el título, que llega de fuera, y la
  * salida.
  *
+ * Es UN componente para todas las preguntas y no uno por pregunta. La primera versión, en
+ * Riberas, sólo sabía de trueques y llevaba el título escrito dentro; con las cartas habría
+ * hecho falta copiarlo tres veces, y tres copias de un menú son tres sitios donde el día que
+ * el botón de «Dejarlo» cambie sólo cambiará uno. Luego hubo dos —la de Riberas y ésta—, y ya
+ * no se parecían: ésta admitía una tarjeta dentro y aquélla no.
+ *
  * Es MODAL con las cuatro mitades, y ninguna sobra: el VELO, sin el cual un clic fuera
  * cierra el menú Y toca el tablero de debajo; `role="dialog"` con `aria-modal` y NOMBRE
  * —que es el título de la pregunta—, sin el cual un lector sigue leyendo lo de abajo; la
  * TRAMPA DE FOCO; y el foco DE VUELTA al cerrar, que lo hace quien lo abrió porque adonde
- * vuelve depende de quién fue.
+ * vuelve depende de quién fue. `alDejarlo` hace de cerrar en los tres caminos —el botón, el
+ * velo y `Escape`— y es a propósito: son la misma decisión dicha de tres maneras, y con tres
+ * funciones distintas la que se olvidaría de devolver el foco sería la que menos se prueba.
  *
  * `fijo` coloca la caja sobre la VENTANA en vez de sobre el recuadro, y hace falta porque
  * hay dos pantallas: en el lienzo el recuadro vale la ventana entera y debajo no hay nada;
@@ -653,12 +824,21 @@ export function ElijeUna({
   fijo = false,
   velo,
   menu,
+  claseDeLaNota = 'letra-chica',
   alElegir,
   alDejarlo,
   children,
 }: {
   titulo: string;
-  /** Un renglón en tenue bajo el título, para las preguntas que tienen estado que contar. */
+  /**
+   * UN RENGLÓN EN TENUE BAJO EL TÍTULO, para las preguntas que tienen estado que contar: la
+   * hoja de un trato dice en qué anda —«la aceptó Ana», «no tienes 1 limo»—.
+   *
+   * Va aquí y no en el título porque el título es además el NOMBRE del diálogo, y meterle el
+   * estado dentro haría que un lector anunciara «Ana te da 1 junco por 1 limo, la aceptó Ana,
+   * diálogo» al abrirlo. Y es opcional porque la mayoría de las preguntas no tienen estado
+   * ninguno: un renglón vacío ahí sería una caja de más en un modal que ya va justo de alto.
+   */
   nota?: string;
   opciones: readonly Opcion[];
   quieto: boolean;
@@ -666,6 +846,15 @@ export function ElijeUna({
   /** Las clases del velo y de la caja: cada pintor tiene las suyas y la cámara las busca. */
   velo: string;
   menu: string;
+  /**
+   * LA CLASE DEL RENGLÓN DE LA NOTA, que es del pintor por lo mismo que `velo` y `menu`: la
+   * pone su hoja. `letra-chica` si no se dice otra, que es la de la casa. Riberas pasa la suya
+   * (`riberas-elige-nota`: pegada al título con margen negativo y en el cuerpo de la ayuda de
+   * una opción) porque así la pintaba su menú antes de que el menú fuera de todos, y el
+   * componedor del trueque la reutiliza; heredar aquí `letra-chica` le habría cambiado la
+   * letra y el aire sin que nada se pusiera rojo.
+   */
+  claseDeLaNota?: string;
   alElegir: (o: Opcion) => void;
   alDejarlo: () => void;
   /** La tarjeta que se está mirando, si la pregunta tiene una. Va entre la nota y la lista. */
@@ -685,7 +874,7 @@ export function ElijeUna({
         tabIndex={-1}
       >
         <h2 className="rotulo-de-panel">{titulo}</h2>
-        {nota === undefined ? null : <p className="letra-chica">{nota}</p>}
+        {nota === undefined ? null : <p className={claseDeLaNota}>{nota}</p>}
         {children}
         <ul className="opciones">
           {opciones.map((o) => (
@@ -728,6 +917,32 @@ export function ElijeUna({
 }
 
 // ---------------------------------------------------------------------------
+// El ancho de la cinta, del número medido al estilo
+// ---------------------------------------------------------------------------
+
+/**
+ * EL ANCHO DE LA CINTA, TRADUCIDO A LO QUE EL NAVEGADOR ENTIENDE.
+ *
+ * Es una función y no una línea dentro del JSX por el fallo del que nació en Riberas su
+ * hermana `elEstiloDelCartel`: `loQueLlevaLaCinta` mide con muchísimo cuidado y
+ * `verify:escena` lo contrasta contra las dos manos, y lo que NADA ataba era que ese número
+ * acabara de verdad en el `width` de la caja que se pinta. Así es una función pura que se
+ * puede llamar desde Node y mirar qué sale, y `verify:escritorio` la llama.
+ *
+ * Vive aquí y no en Riberas porque la usan los dos pintores —Riberas para su cinta y su
+ * carril, el Burgo para su cajón y la caja de los tratos, que cuelgan del pie de la suya—, y
+ * con ella en Riberas el Burgo importaba de otro pintor para medir una caja.
+ *
+ * Con el recuadro sin medir todavía (cero por cero, el primer render y también Node, donde no
+ * hay `ResizeObserver`) devuelve `undefined` y manda la hoja: un ancho de cero puntos no se ve
+ * como un error, se ve como que no hay cinta.
+ */
+export function elEstiloDeLaCinta(cinta: { ancho: number }): CSSProperties | undefined {
+  if (cinta.ancho <= 0) return undefined;
+  return { width: `${String(Math.round(cinta.ancho))}px` };
+}
+
+// ---------------------------------------------------------------------------
 // La gramática de las cajas sobre el lienzo: los nombres, escritos una vez
 // ---------------------------------------------------------------------------
 
@@ -737,7 +952,7 @@ export function ElijeUna({
  * `ElijeUna` recibe `velo` y `menu` por props —cada pintor traía las suyas— y eso obliga a
  * quien monta el menú a acordarse de DOS cosas: ponerle la clase y, además, nombrarla en el
  * `seDesplazanSolas` de la cámara. Riberas lo hace bien porque su lista está escrita al lado
- * de las cinco constantes (`SE_DESPLAZAN_SOLAS`, `riberas-en-tres.tsx:407`), pero el segundo
+ * de las cinco constantes (`SE_DESPLAZAN_SOLAS`, en `riberas-en-tres.tsx`), pero el segundo
  * pintor llegó con DOS de las suyas —`burgo-cajon` y `burgo-elige`— y la lista no es un sitio
  * al que se vuelva: un carril que se añada mañana, o una caja colgada, entra sin que nada
  * avise. El fallo que sale de ahí no es un error en ninguna consola: es que girar la rueda
@@ -824,8 +1039,8 @@ export const QUIETA_EN_EL_LIENZO = 'lienzo-quieta';
  *      leyendo lo de debajo como si nada; sin nombre, un `dialog` se anuncia «diálogo» a
  *      secas y no dice de qué. El nombre lo escribe quien la monta, que es quien sabe de qué
  *      va; aquí no se inventa ni una palabra.
- *   3. LA TRAMPA DE FOCO, que es LA PILA COMPARTIDA de `riberas-en-tres.tsx` y no una segunda:
- *      con dos pilas, `Escape` cerraría de un golpe la caja de encima y la de debajo.
+ *   3. LA TRAMPA DE FOCO, que es LA PILA COMPARTIDA de este fichero y no una segunda: con
+ *      dos pilas, `Escape` cerraría de un golpe la caja de encima y la de debajo.
  *   4. EL FOCO DE VUELTA AL CERRAR, y ADÓNDE VUELVE LO SABE `alCerrar`, no la trampa. No es
  *      una comodidad: el destino depende de quién abrió. El cajón vuelve a la ficha de la
  *      cinta que lo abre; un menú que abre una casilla del `<canvas>` no tiene botón al que

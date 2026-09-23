@@ -96,6 +96,8 @@ import type { LaMesa, MesaVista, ResultadoDelMovimiento } from '../src/mesa';
 /* Boots on Board: el veredicto guardado de este navegador, y las palabras y la compuerta que pintan los vestíbulos. */
 import { elVeredictoDelAparato, guardarElVeredicto } from '../src/mesa';
 import { MARCA_DE_BOTAS, MOTIVO_NO_LLEGA, MOTIVO_SIN_MEDIR } from '../../escenas/compuerta-de-botas';
+/* Boots on Board, la refriega: la tecla de golpear y cómo se dice, de donde las lee el paseo. */
+import { COMO_SE_GOLPEA, TECLA_DE_GOLPEAR, teclaDelPaseo } from '../../escenas/paseo/mandos';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
 import { haEmpezado } from '../src/empezada';
 import { Muelle } from '../src/muelle';
@@ -114,7 +116,6 @@ import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
 import { ASA_DEL_HUECO, huecosDeLaMesa, loQueSeVe } from '../../escenas/barra';
 import {
   altoDelPregonPlegado,
-  armarUnaTrampa,
   cifrasDeLosPuntos,
   cuantasTirasSeVen,
   ElComponedorDelRetablo,
@@ -124,7 +125,6 @@ import {
   elEstadoQueCabe,
   elEstiloDelCajon,
   elEstiloDelCartel,
-  elEstiloDeLaCinta,
   elEstiloDelPregon,
   huecoDeLaTira,
   huecoDelRelojDeLaCinta,
@@ -132,17 +132,20 @@ import {
   elRenglonDelColonoQueCabe,
   huecoDelRenglonDelColono,
   ladoDelBotonDeLaCinta,
-  loQueHaceLaTrampa,
-  mandaEstaTrampa,
   MarcadorDeRiberas,
-  RAIZ_DE_LA_CASA,
   RiberasEnTres,
   techoDelAsaEnPuntos,
 } from '../src/riberas-en-tres';
 /* A pie por el delta: el cartel, las teclas y los mandos de la cámara, leídos como datos. */
 import { CAMARA_DE_LA_TECLA, ComoSeAndaPorElDelta, LOS_MANDOS_DE_LA_CAMARA } from '../src/riberas-en-tres';
 import { MANDOS_DE_LA_CAMARA } from '../../escenas/delta-a-pie';
-import type { ElFocoDeLaTrampa, LoQueHaceLaTrampa } from '../src/riberas-en-tres';
+/*
+ * LA PILA DE TRAMPAS, LA RAÍZ DE LA LETRA Y EL ANCHO DE LA CINTA SON DE TODOS LOS PINTORES y se
+ * importan de donde viven, `lienzo-propio.tsx`. Hasta que Riberas dejó de llevar copias vivían
+ * en Riberas, y el Burgo y la pieza común importaban de otro pintor.
+ */
+import { armarUnaTrampa, elEstiloDeLaCinta, hayUnaTrampaArmada, loQueHaceLaTrampa, mandaEstaTrampa, RAIZ_DE_LA_CASA } from '../src/lienzo-propio';
+import type { ElFocoDeLaTrampa, LoQueHaceLaTrampa } from '../src/lienzo-propio';
 /* La cinta la reparte `escenas/`, y de ahí salen los dos 44 que la hoja escribe en `rem`. */
 import { altoDeLaCinta, ALTO_DE_LA_CINTA, anchoDeLaCinta, BOTON_DE_LA_CINTA, cuantosSeVenEnElCarril, loQueLlevaLaCinta } from '../../escenas/cinta';
 /*
@@ -2049,6 +2052,78 @@ function laCompuertaDeBotas(): void {
 }
 
 // ---------------------------------------------------------------------------
+// 5 ter · Boots on Board: la refriega en el escritorio
+// ---------------------------------------------------------------------------
+
+/**
+ * LA REFRIEGA EN EL ESCRITORIO: la tecla, y que los tres carteles la digan.
+ *
+ * En el escritorio se golpea con la G (`TECLA_DE_GOLPEAR`, que lee el paseo común de la escena).
+ * Lo que de aquí puede fallar sin que falle nada: que un cartel de «cómo se anda» no lo diga —se
+ * baja a la refriega y no hay forma de saber con qué se pega—, que lo diga en una mesa normal donde
+ * no hay refriega, o que la G ya sea de otra cosa en alguno de los tres escritorios y un golpe haga
+ * a la vez lo que esa otra cosa hace. Se pintan los tres carteles sueltos, con canal y sin él, en
+ * los dos modos de a pie; y se preguntan las teclas de verdad de cada pintor: las cámaras del Burgo
+ * y de Riberas se ejecutan, y el oyente de Las Lindes, que vive dentro de su efecto, se lee del
+ * fuente. (Que la G no se coma la de un campo de texto lo ejecuta `verify:paseo`.)
+ */
+function laRefriegaEnElEscritorio(): void {
+  paso('Boots on Board en el escritorio: la G golpea en los tres, y los tres carteles lo dicen sólo en una mesa de botas');
+
+  const carteles = (canal: string | undefined): string[] =>
+    (['hombro', 'ojos'] as const).flatMap((modo) => [
+      renderToStaticMarkup(<ComoSeAnda modo={modo} canal={canal} />),
+      renderToStaticMarkup(<ComoSeAndaPorElBurgo modo={modo} canal={canal} />),
+      renderToStaticMarkup(<ComoSeAndaPorElDelta modo={modo} canal={canal} />),
+    ]);
+  const conCanal = carteles('Dentro · ♥♥♡');
+  const sinCanal = carteles(undefined);
+  const loDicenBien = (con: readonly string[], sin: readonly string[]): boolean =>
+    con.length === 6 && sin.length === 6 && con.every((h) => h.includes(COMO_SE_GOLPEA)) && sin.every((h) => !h.includes(COMO_SE_GOLPEA));
+  comprobar(
+    'los tres carteles de cómo se anda dicen con qué se golpea en una mesa de botas, a pie, y en una mesa normal no',
+    loDicenBien(conCanal, sinCanal),
+    { conCanal, sinCanal },
+  );
+  comprobar(
+    'se ve fallar: un cartel que no lo dijera con canal, o que lo dijera sin él, cae',
+    !loDicenBien(conCanal.map((h, i) => (i === 5 ? h.replace(COMO_SE_GOLPEA, '') : h)), sinCanal) &&
+      !loDicenBien(conCanal, sinCanal.map((h, i) => (i === 1 ? (conCanal[1] ?? h) : h))),
+  );
+  comprobar(
+    'y lo que dicen es la tecla que lee el paseo: la G, que el paseo tiene por golpe también con Mayúsculas',
+    COMO_SE_GOLPEA === `${TECLA_DE_GOLPEAR.toUpperCase()} para golpear` &&
+      teclaDelPaseo(TECLA_DE_GOLPEAR) === 'golpe' &&
+      teclaDelPaseo(TECLA_DE_GOLPEAR.toUpperCase()) === 'golpe',
+  );
+
+  /* ── La G no es de nadie más ── */
+  const g = { key: TECLA_DE_GOLPEAR, metaKey: false, ctrlKey: false, altKey: false, repeat: false };
+  const deLasLindes = sinComentarios(readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8'));
+  const oyenteDeLasLindes = (c: string): string => /const oye = \(e: KeyboardEvent\): void => \{([\s\S]*?)\n {4}\};/.exec(c)?.[1] ?? '';
+  const laGEsLibre = (lindes: string): boolean => {
+    const oyente = oyenteDeLasLindes(lindes);
+    return (
+      /e\.key === '1'/.test(oyente) &&
+      /=== 'r'/.test(oyente) &&
+      !new RegExp(`'${TECLA_DE_GOLPEAR}'|'${TECLA_DE_GOLPEAR.toUpperCase()}'`).test(oyente) &&
+      camaraDeLaTecla(g, null) === null &&
+      camaraDeLaTecla({ ...g, key: TECLA_DE_GOLPEAR.toUpperCase() }, null) === null &&
+      CAMARA_DE_LA_TECLA.get(TECLA_DE_GOLPEAR) === undefined
+    );
+  };
+  comprobar(
+    'y la G no es de nadie más en los tres escritorios: ni de las cámaras del Burgo, ni de las de Riberas, ni del oyente de Las Lindes (1, 2, 3 y R)',
+    laGEsLibre(deLasLindes),
+    oyenteDeLasLindes(deLasLindes).slice(0, 300),
+  );
+  comprobar(
+    'se ve fallar: un oyente de Las Lindes que cogiera la G, cae',
+    !laGEsLibre(deLasLindes.replace("if (e.key === '1') setModo('mesa');", `if (e.key === '${TECLA_DE_GOLPEAR}') setModo('mesa');\n      else if (e.key === '1') setModo('mesa');`)),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 6 · Riberas en tres dimensiones: sin Canvas en Node, y cada movimiento una vez
 // ---------------------------------------------------------------------------
 
@@ -3071,8 +3146,12 @@ function elBurgoAPie(): void {
   comprobar('y en «Al hombro» y en «Sus ojos» sí: las cuatro letras, las flechas, Mayúsculas para correr y la tecla para volver', carteles.slice(1).every(diceComoSeAnda), carteles.slice(1));
   comprobar('se ve fallar: un cartel sin la tecla de volver no lo pasa', !diceComoSeAnda((carteles[1] ?? '').replace('1 para volver a la mesa', '')));
 
-  /* ── 2. LAS TRES CÁMARAS: las de Las Lindes, con sus palabras y sus teclas ── */
-  const deLasLindes = sinComentarios(readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8'));
+  /*
+   * ── 2. LAS TRES CÁMARAS: las de Las Lindes, con sus palabras y sus teclas ──
+   * Se leen del controlador de Las Lindes, que es donde viven desde que la app y el escritorio
+   * dejaron de escribirlas cada uno (`escenas/lindes/el-valle-en-la-mesa.ts`).
+   */
+  const deLasLindes = sinComentarios(readFileSync(new URL('../../escenas/lindes/el-valle-en-la-mesa.ts', import.meta.url), 'utf8'));
   const rotulosDeLasLindes = [...deLasLindes.matchAll(/\{ modo: '(mesa|hombro|ojos)', rotulo: '([^']+)'/g)].map((m) => `${m[1] ?? ''}:${m[2] ?? ''}`).join(',');
   const rotulosDelBurgo = LAS_CAMARAS_DEL_BURGO.map((c) => `${c.modo}:${c.rotulo}`).join(',');
   comprobar(
@@ -3234,6 +3313,35 @@ function elBurgoAPie(): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * ═══ ¿MONTA RIBERAS LA PIEZA COMÚN, O UNA COPIA SUYA? ═══
+ *
+ * La cámara, la trampa de foco con su pila, el menú de una pregunta, la raíz de la letra y los
+ * modelos vivieron COPIADOS dentro de `riberas-en-tres.tsx` —el Burgo copió las piezas en vez
+ * de mudarlas, precisamente por las reglas de este guion— y las copias ya se habían separado:
+ * la cámara de Riberas sabía callarse a pie y la común no. Hoy son de `lienzo-propio.tsx` y
+ * Riberas las importa. Las reglas que leían esas piezas DENTRO de Riberas las leen ahora en la
+ * pieza común, y cada una exige ADEMÁS que Riberas la use: que la importe de `./lienzo-propio`
+ * y que no la vuelva a escribir en su fichero. Sin esa segunda mitad, una copia que volviera a
+ * nacer allí dejaría todas estas reglas en verde mirando una pieza que Riberas ya no monta.
+ *
+ * Se pregunta sobre el código SIN comentarios: la cabecera de Riberas NOMBRA las piezas que
+ * ya no lleva, y nombrarlas no es declararlas.
+ */
+function loQueRiberasImportaDelLienzo(codigo: string): readonly string[] {
+  const lista = /import \{([^}]*)\} from '\.\/lienzo-propio';/.exec(codigo)?.[1] ?? '';
+  return lista
+    .split(',')
+    .map((nombre) => nombre.trim())
+    .filter((nombre) => nombre !== '');
+}
+function usaLaPiezaComun(codigo: string, pieza: string): boolean {
+  return (
+    loQueRiberasImportaDelLienzo(codigo).includes(pieza) &&
+    !new RegExp(`\\b(?:function|class|const|let|var|type|interface)\\s+${pieza}\\b`).test(codigo)
+  );
+}
+
+/**
  * QUE EL ZOOM DEL TABLERO SIGA SIENDO EL DE `escenas/acercar.ts`.
  *
  * ═══ POR QUÉ ESTO SE MIRA EN EL TEXTO Y NO RENDERIZANDO ═══
@@ -3279,33 +3387,54 @@ function elAcercamientoDelDelta(): void {
 
   const fuente = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
   const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
-
-  comprobar(
-    'el ojo y el punto de mira salen de `ojoYMira`, y la cámara mira ADONDE dice, no al centro del mundo',
-    fuente.includes('ojoYMira(') &&
-      /camera\.lookAt\(\s*\.\.\.mira\s*\)/.test(fuente) &&
-      !/camera\.lookAt\(\s*0\s*,/.test(fuente),
-  );
-  comprobar(
-    'y la dirección la sigue poniendo `ojoDelMirador`, que es lo que ata el giro al acercamiento',
-    /ojoYMira\([\s\S]{0,300}?ojoDelMirador\(/.test(fuente),
-  );
-  comprobar(
-    'se entra viendo el tablero entero: el acercamiento arranca en CERCANIA_DE_SALIDA',
-    /useRef<Cercania>\(CERCANIA_DE_SALIDA\)/.test(fuente),
-  );
   /*
+   * ═══ Y LA CÁMARA YA NO ESTÁ EN `riberas-en-tres.tsx`: ES `CamaraAerea`, LA COMÚN ═══
+   *
+   * Todo lo de abajo que habla del GESTO —el ojo, la rueda, los dedos, los botones— leía una
+   * copia de la cámara escrita dentro de Riberas. Ahora lee la pieza de `lienzo-propio.tsx`
+   * (`laCamara`) y exige, en cada regla, que Riberas la monte (`montaLaComun`): importada de
+   * allí, sin otra escrita en su fichero y montada dentro de su `Canvas`. Lo que es de Riberas
+   * y no de la cámara —el acercamiento de partida, la lista de sus cajas, qué recuadro y qué
+   * velo le pasa, la salida— se sigue leyendo en su fuente.
+   *
    * EL OYENTE SE MIRA SIN SUS COMENTARIOS, y no por gusto: desde que la rueda tiene que
    * decidir de quién es el suceso —cajón, velo o cámara— su cuerpo lleva dentro un párrafo
    * que cuenta el porqué, y una ventana de trescientas letras sobre el fuente CON
    * comentarios se agotaba antes de llegar al `preventDefault`. La comprobación se ponía
    * roja por documentar, que es la manera de enseñar a no documentar.
    */
-  const laRueda = sinComentarios(/const rueda = \(e: WheelEvent\)[\s\S]*?\n {4}\};/.exec(fuente)?.[0] ?? '');
+  const piezaComun = readFileSync(new URL('../src/lienzo-propio.tsx', import.meta.url), 'utf8');
+  const codigoDeRiberas = sinComentarios(fuente);
+  const laCamara = /export function CamaraAerea\(\{[\s\S]*?\n\}\n/.exec(sinComentarios(piezaComun))?.[0] ?? '';
+  const elMontaje = /<CamaraAerea\b[^>]*\/>/.exec(codigoDeRiberas)?.[0] ?? '';
+  const montaLaComun = laCamara.length > 0 && elMontaje.length > 0 && usaLaPiezaComun(codigoDeRiberas, 'CamaraAerea');
+  comprobar(
+    'Riberas monta la `CamaraAerea` COMÚN y no una copia suya: la importa de `lienzo-propio.tsx`, no escribe otra, y le pasa lo que ella busca desde sus constantes',
+    montaLaComun,
+    { montaje: elMontaje.replace(/\s+/g, ' '), importa: loQueRiberasImportaDelLienzo(codigoDeRiberas) },
+  );
+
+  comprobar(
+    'el ojo y el punto de mira salen de `ojoYMira`, y la cámara mira ADONDE dice, no al centro del mundo',
+    montaLaComun &&
+      laCamara.includes('ojoYMira(') &&
+      /camera\.lookAt\(\s*\.\.\.mira\s*\)/.test(laCamara) &&
+      ![fuente, piezaComun].some((f) => /camera\.lookAt\(\s*0\s*,/.test(f)),
+  );
+  comprobar(
+    'y la dirección la sigue poniendo `ojoDelMirador`, que es lo que ata el giro al acercamiento',
+    montaLaComun && /ojoYMira\([\s\S]{0,300}?ojoDelMirador\(/.test(laCamara),
+  );
+  comprobar(
+    'se entra viendo el tablero entero: el acercamiento arranca en CERCANIA_DE_SALIDA',
+    /useRef<Cercania>\(CERCANIA_DE_SALIDA\)/.test(fuente),
+  );
+  const laRueda = /const rueda = \(e: WheelEvent\)[\s\S]*?\n {4}\};/.exec(laCamara)?.[0] ?? '';
   comprobar(
     'la rueda acerca con `acercando` y le quita el gesto a la página: `preventDefault` sobre un oyente no pasivo',
-    /preventDefault\(\)[\s\S]{0,200}?acercando\(/.test(laRueda) &&
-      /addEventListener\('wheel',[^;]*\{\s*passive:\s*false\s*\}\)/.test(fuente),
+    montaLaComun &&
+      /preventDefault\(\)[\s\S]{0,200}?acercando\(/.test(laRueda) &&
+      /addEventListener\('wheel',[^;]*\{\s*passive:\s*false\s*\}\)/.test(laCamara),
     laRueda.replace(/\s+/g, ' ').slice(0, 300),
   );
   /*
@@ -3336,20 +3465,32 @@ function elAcercamientoDelDelta(): void {
    * acerca el delta y la caja no se mueve. Por eso se compra que la guarda las mire a las
    * TRES por una lista con nombre y no con tres `closest` escritos a mano, que es la forma de
    * que la cuarta caja que llegue se olvide en el sitio donde no lo va a notar nadie.
+   *
+   * Y DESDE QUE LA CÁMARA ES LA COMÚN, LA LISTA Y EL VELO VIAJAN: la rueda de la pieza mira
+   * `seDesplazanSolas` y `velo`, y lo que hay que comprar además es que Riberas le pase SU
+   * lista y SU velo. Sin eso la pieza haría lo correcto con las cajas de otro.
    */
-  const salidaDeLasCajas = laRueda.indexOf('SE_DESPLAZAN_SOLAS');
+  const salidaDeLasCajas = laRueda.indexOf('seDesplazanSolas');
   const evitaElGesto = laRueda.indexOf('preventDefault()');
-  const salidaDelVelo = laRueda.indexOf('EL_VELO');
-  const laLista = /const SE_DESPLAZAN_SOLAS = \[([^\]]*)\];/.exec(sinComentarios(fuente))?.[1] ?? '';
+  const salidaDelVelo = laRueda.indexOf('closest(`.${velo}`)');
+  const laLista = /const SE_DESPLAZAN_SOLAS = \[([^\]]*)\];/.exec(codigoDeRiberas)?.[1] ?? '';
   comprobar(
     'y con algo abierto encima la rueda no es siempre de la cámara: dentro de una caja que se desplaza sola se sale ANTES del `preventDefault` para que el navegador la desplace, sobre el velo se corta DESPUÉS —modal incluye la cámara— y en el resto se acerca',
-    salidaDeLasCajas > 0 &&
+    montaLaComun &&
+      salidaDeLasCajas > 0 &&
       evitaElGesto > salidaDeLasCajas &&
       salidaDelVelo > evitaElGesto &&
       laRueda.indexOf('acercando(') > salidaDelVelo &&
-      /SE_DESPLAZAN_SOLAS\.some\(\(clase\) => donde\?\.closest\(`\.\$\{clase\}`\) != null\)/.test(laRueda) &&
-      /closest\(`\.\$\{EL_VELO\}`\)/.test(laRueda),
-    { cajas: salidaDeLasCajas, preventDefault: evitaElGesto, velo: salidaDelVelo, acercando: laRueda.indexOf('acercando(') },
+      /seDesplazanSolas\.some\(\(clase\) => donde\?\.closest\(`\.\$\{clase\}`\) != null\)/.test(laRueda) &&
+      /\bseDesplazanSolas=\{SE_DESPLAZAN_SOLAS\}/.test(elMontaje) &&
+      /\bvelo=\{EL_VELO\}/.test(elMontaje),
+    {
+      cajas: salidaDeLasCajas,
+      preventDefault: evitaElGesto,
+      velo: salidaDelVelo,
+      acercando: laRueda.indexOf('acercando('),
+      montaje: elMontaje.replace(/\s+/g, ' '),
+    },
   );
   comprobar(
     'y esa lista son las TRES cajas que se desplazan por dentro —el cajón, el carril de la cinta y el menú de elegir—, nombradas juntas: una caja nueva que se olvide ahí no da error, sólo deja de poder leerse',
@@ -3365,17 +3506,25 @@ function elAcercamientoDelDelta(): void {
    * ratón para salir del acercamiento, y con el mismo síntoma que no señala nunca al
    * zoom. En la ventana tampoco puede ir: girar la rueda leyendo el formulario de abajo
    * acercaría el delta.
+   *
+   * La pieza común busca el recuadro por la clase que le pasan (`recuadro`) y cuelga de él
+   * la rueda; Riberas le pasa `RECUADRO_DEL_LIENZO`, que es la misma constante que pinta su
+   * JSX. Las tres cosas se compran: dónde cuelga, por qué clase lo busca y qué clase recibe.
    */
   comprobar(
     'y ese oyente va sobre el RECUADRO —lienzo y botón dentro— y no en el `<canvas>` ni en la ventana',
-    /recuadro\.addEventListener\('wheel'/.test(fuente) &&
-      !/lienzo\.addEventListener\('wheel'/.test(fuente) &&
-      !/window\.addEventListener\('wheel'/.test(fuente),
+    montaLaComun &&
+      /const caja: HTMLElement = lienzo\.closest<HTMLElement>\(`\.\$\{recuadro\}`\) \?\? lienzo;/.test(laCamara) &&
+      /caja\.addEventListener\('wheel'/.test(laCamara) &&
+      ![laCamara, codigoDeRiberas].some((c) => /(?:lienzo|window)\.addEventListener\('wheel'/.test(c)),
   );
   comprobar(
     'y el recuadro se busca por la MISMA clase que pinta el JSX, no por una copia suelta',
-    (fuente.match(/RECUADRO_DEL_LIENZO/g) ?? []).length >= 3 && /\.closest<HTMLElement>\(/.test(fuente),
-    (fuente.match(/RECUADRO_DEL_LIENZO/g) ?? []).length,
+    montaLaComun &&
+      /\brecuadro=\{RECUADRO_DEL_LIENZO\}/.test(elMontaje) &&
+      (codigoDeRiberas.match(/RECUADRO_DEL_LIENZO/g) ?? []).length >= 3 &&
+      /\.closest<HTMLElement>\(`\.\$\{recuadro\}`\)/.test(laCamara),
+    (codigoDeRiberas.match(/RECUADRO_DEL_LIENZO/g) ?? []).length,
   );
   /*
    * ═══ LOS TRES MODOS DE LA RUEDA VALEN LO MISMO ═══
@@ -3387,13 +3536,16 @@ function elAcercamientoDelDelta(): void {
    */
   comprobar(
     'la rueda en modo línea cuenta las líneas de Firefox: tres son una muesca, no media',
-    /LINEAS_POR_MUESCA = 3/.test(fuente) &&
-      /deltaMode === 1[\s\S]{0,120}?deltaY \/ LINEAS_POR_MUESCA/.test(fuente) &&
-      !fuente.includes('PIXELES_POR_LINEA'),
+    montaLaComun &&
+      /pasosDeLaRueda\(e\)/.test(laRueda) &&
+      /LINEAS_POR_MUESCA = 3/.test(piezaComun) &&
+      /deltaMode === 1[\s\S]{0,120}?deltaY \/ LINEAS_POR_MUESCA/.test(piezaComun) &&
+      !/\bpasosDeLaRueda\b/.test(codigoDeRiberas) &&
+      ![fuente, piezaComun].some((f) => f.includes('PIXELES_POR_LINEA')),
   );
   comprobar(
     'el arrastre secundario mueve la mirada con `arrastrandoLaMirada`, y el primario sigue girando con `tirandoDelMirador`',
-    fuente.includes('arrastrandoLaMirada(') && fuente.includes('tirandoDelMirador('),
+    montaLaComun && laCamara.includes('arrastrandoLaMirada(') && laCamara.includes('tirandoDelMirador('),
   );
 
   /*
@@ -3410,26 +3562,33 @@ function elAcercamientoDelDelta(): void {
    * —medidas en `verify:escena`— y no por una cuenta escrita en el cliente.
    */
   /* `[^}]*` y no `[\s\S]*?`: con lo segundo el bloque empezaba en el primer `import {` del fichero. */
-  const importaDeAcercar = /import \{([^}]*)\} from '\.\.\/\.\.\/escenas\/acercar';/.exec(fuente)?.[1] ?? '';
+  const importaDeAcercar = /import \{([^}]*)\} from '\.\.\/\.\.\/escenas\/acercar';/.exec(piezaComun)?.[1] ?? '';
   comprobar(
     'con dos dedos se acerca, y la escala del pellizco la convierte `pellizcando`',
-    importaDeAcercar.includes('pellizcando') && /pellizcando\(/.test(fuente),
+    montaLaComun && importaDeAcercar.includes('pellizcando') && /pellizcando\(/.test(laCamara),
     importaDeAcercar,
   );
   comprobar(
     'se lleva la cuenta de los punteros apoyados, que es lo que distingue dos dedos de dos botones del ratón',
-    /new Map<number, \{ x: number; y: number \}>\(\)/.test(fuente) &&
-      /apoyados\.set\(e\.pointerId/.test(fuente) &&
-      /apoyados\.delete\(e\.pointerId\)/.test(fuente),
+    montaLaComun &&
+      /new Map<number, \{ x: number; y: number \}>\(\)/.test(laCamara) &&
+      /apoyados\.set\(e\.pointerId/.test(laCamara) &&
+      /apoyados\.delete\(e\.pointerId\)/.test(laCamara),
   );
   comprobar(
     'y el paseo del punto medio de los dos dedos sale del mismo `arrastrandoLaMirada` que el botón derecho',
-    /pellizco !== null[\s\S]{0,800}?arrastrandoLaMirada\(/.test(fuente),
+    montaLaComun && /pellizco !== null[\s\S]{0,800}?arrastrandoLaMirada\(/.test(laCamara),
   );
+  /*
+   * El cuarto argumento son los topes de la cámara (`limites`), que la común recibe y Riberas
+   * no le pasa: salen los de siempre, `LIMITES_DE_SALIDA`, que es lo que `pellizcando` ponía
+   * solo cuando la copia de Riberas lo llamaba con tres.
+   */
   comprobar(
     'el pellizco guarda el acercamiento y la separación DE PARTIDA: separar y volver a juntar deja el tablero donde estaba',
-    /alEmpezar: cercania\.current\.factor/.test(fuente) &&
-      /pellizcando\(paseada, pellizco\.alEmpezar, dos\.separacion \/ pellizco\.separacion\)/.test(fuente),
+    montaLaComun &&
+      /alEmpezar: cercania\.current\.factor/.test(laCamara) &&
+      /pellizcando\(paseada, pellizco\.alEmpezar, dos\.separacion \/ pellizco\.separacion, limites\)/.test(laCamara),
   );
 
   /*
@@ -3440,25 +3599,25 @@ function elAcercamientoDelDelta(): void {
    * y `suelta` limpiaba con el otro botón todavía apretado. Ninguna de las dos da error:
    * las dos se ven como que el tablero pega un bandazo solo.
    */
-  const bajaEntera = /const baja = \(e: PointerEvent\)[\s\S]*?\n {4}\};/.exec(fuente)?.[0] ?? '';
+  const bajaEntera = /const baja = \(e: PointerEvent\)[\s\S]*?\n {4}\};/.exec(laCamara)?.[0] ?? '';
   comprobar(
     'quien empezó un arrastre se lo queda: un segundo botón no le cambia el gesto a media carrera',
-    /if \(desde !== null\) return;/.test(bajaEntera),
+    montaLaComun && /if \(desde !== null\) return;/.test(bajaEntera),
     bajaEntera.slice(0, 200),
   );
-  const sueltaEntera = /const suelta = \(e: PointerEvent\)[\s\S]*?\n {4}\};/.exec(fuente)?.[0] ?? '';
+  const sueltaEntera = /const suelta = \(e: PointerEvent\)[\s\S]*?\n {4}\};/.exec(laCamara)?.[0] ?? '';
   comprobar(
     'y no se termina mientras quede un botón apretado',
-    /e\.buttons !== 0/.test(sueltaEntera),
+    montaLaComun && /e\.buttons !== 0/.test(sueltaEntera),
     sueltaEntera.slice(0, 300),
   );
   comprobar(
     'y ese arrastre no abre el menú del navegador encima del delta',
-    /addEventListener\('contextmenu'/.test(fuente),
+    montaLaComun && /addEventListener\('contextmenu'/.test(laCamara),
   );
   comprobar(
     'coger de la barra y coger una carta siguen siendo suyos: se pregunta a `esDeLaInterfaz` antes de quedarse el gesto',
-    /esDeLaInterfaz\(e\)/.test(fuente),
+    montaLaComun && /esDeLaInterfaz\(e\)/.test(laCamara),
   );
   comprobar(
     'hay salida, y es un botón de la Sala con su rótulo, que devuelve `comoAlPrincipio()`',
@@ -3544,17 +3703,23 @@ function elAcercamientoDelDelta(): void {
    * que aquí se calcula son píxeles de pantalla —la zona muerta del arrastre— y la
    * traducción de las unidades de la rueda a pasos, que no es una cuenta de cámara
    * sino de un suceso del navegador.
+   *
+   * Se mira en los DOS ficheros que la pantalla de Riberas pone a hacer cámara: el suyo y
+   * la pieza común, que es donde está la cámara. Mirar sólo el de Riberas dejaría la
+   * cuenta escrita a mano en el único sitio donde ahora podría escribirse.
    */
-  const trigonometria = /Math\.(sin|cos|tan|atan2?|pow)\s*\(/.exec(fuente);
+  const conCuentas = [fuente, piezaComun].map((f) => /Math\.(sin|cos|tan|atan2?|pow)\s*\(/.exec(f));
+  const trigonometria = conCuentas.find((m) => m !== null) ?? null;
   comprobar(
     'ninguna cuenta de cámara escrita a mano: ni un seno, ni un coseno, ni una potencia en el cliente',
     trigonometria === null,
     trigonometria?.[0],
   );
-  const distanciaAMano = /Math\.hypot\([^()]*,[^(),]*,[^()]*\)/.exec(fuente);
+  const aMano = [fuente, piezaComun].map((f) => /Math\.hypot\([^()]*,[^(),]*,[^()]*\)/.exec(f));
+  const distanciaAMano = aMano.find((m) => m !== null) ?? null;
   comprobar(
     'ni la distancia del ojo medida a mano: la niebla se mide entre el ojo y el punto de mira, con `three`',
-    distanciaAMano === null && fuente.includes('camera.position.distanceTo('),
+    montaLaComun && distanciaAMano === null && laCamara.includes('camera.position.distanceTo('),
     distanciaAMano?.[0],
   );
 }
@@ -5036,21 +5201,31 @@ function riberasAPie(): void {
 
   /* ── 1. La cámara de la mesa, callada a pie y montada siempre ── */
 
+  /*
+   * LA CÁMARA ES LA COMÚN (`lienzo-propio.tsx`) y callarse a pie es suyo: se llama `callada`,
+   * y nació en la copia que Riberas llevaba de ella, donde se llamaba `aPie`. La regla mira las
+   * dos mitades —que la común se calle entera, oyentes y fotograma, sin desmontarse, y que
+   * Riberas la monte con `callada={aPie}`— y la vacuna quita el silencio del fotograma de la
+   * COMÚN, que es donde ahora se rompería.
+   */
+  const piezaComun = readFileSync(new URL('../src/lienzo-propio.tsx', import.meta.url), 'utf8');
   regla(
-    '`CamaraAerea` se queda montada y recibe `aPie`: a pie ni apunta sus oyentes ni pone la cámara ni la niebla',
-    (t: string) => {
-      const c = soloCodigo(t);
-      const camara = trozo(c, 'function CamaraAerea(', '\nclass LimiteDelMundo');
+    '`CamaraAerea` —la común— se queda montada y recibe `callada={aPie}`: a pie ni apunta sus oyentes ni pone la cámara ni la niebla',
+    (t: { riberas: string; pieza: string }) => {
+      const c = soloCodigo(t.riberas);
+      const camara = /export function CamaraAerea\(\{[\s\S]*?\n\}\n/.exec(soloCodigo(t.pieza))?.[0] ?? '';
       return (
-        /<CamaraAerea alcance=\{alcance\} cercania=\{cercania\} alAcercarse=\{alAcercarse\} aPie=\{aPie\} \/>/.test(c) &&
-        !/aPie \? null : <CamaraAerea/.test(c) &&
-        /useEffect\(\(\) => \{\s*if \(aPie\) return undefined;\s*const lienzo = gl\.domElement;/.test(camara) &&
-        /\}, \[gl, alcance, cercania, alAcercarse, aPie\]\);/.test(camara) &&
-        /useFrame\(\(\) => \{\s*if \(aPie\) return;\s*const lienzo = gl\.domElement;/.test(camara)
+        usaLaPiezaComun(sinComentarios(t.riberas), 'CamaraAerea') &&
+        /<CamaraAerea\b[^>]*\bcallada=\{aPie\}[^>]*\/>/.test(c) &&
+        !/aPie \? null : \(?\s*<CamaraAerea/.test(c) &&
+        /\bcallada = false,/.test(camara) &&
+        /useEffect\(\(\) => \{\s*if \(callada\) return undefined;\s*const lienzo = gl\.domElement;/.test(camara) &&
+        /\}, \[gl, [^\]]*\bcallada\]\);/.test(camara) &&
+        /useFrame\(\(\) => \{\s*if \(callada\) return;\s*const lienzo = gl\.domElement;/.test(camara)
       );
     },
-    fuente,
-    fuente.replace(/useFrame\(\(\) => \{\n(\s*)if \(aPie\) return;\n/, 'useFrame(() => {\n'),
+    { riberas: fuente, pieza: piezaComun },
+    { riberas: fuente, pieza: piezaComun.replace(/useFrame\(\(\) => \{\n(\s*)if \(callada\) return;\n/, 'useFrame(() => {\n') },
   );
   regla(
     'y a la escena se le dan la cámara, la VISTA —de ella sale `mundoDeRiberas`— y el `traer` del muelle, que es la caché de aventureros: el paseo es el común',
@@ -5090,14 +5265,20 @@ function riberasAPie(): void {
         /if \(e\.metaKey \|\| e\.ctrlKey \|\| e\.altKey \|\| e\.repeat\) return;/.test(efecto) &&
         /activo instanceof HTMLInputElement/.test(efecto) &&
         /activo instanceof HTMLElement && activo\.isContentEditable/.test(efecto) &&
-        /if \(LAS_TRAMPAS_ARMADAS\.length > 0\) return;/.test(efecto) &&
+        /*
+         * «Hay una caja modal abierta» se le pregunta a LA pila, la de todas las cajas, que vive
+         * en `lienzo-propio.tsx`: antes era el array de Riberas leído a pelo, y desde que la pila
+         * no es de Riberas, la pregunta es `hayUnaTrampaArmada`, importada de allí.
+         */
+        /if \(hayUnaTrampaArmada\(\)\) return;/.test(efecto) &&
+        usaLaPiezaComun(sinComentarios(t), 'hayUnaTrampaArmada') &&
         /const nuevo = CAMARA_DE_LA_TECLA\.get\(e\.key\.toLowerCase\(\)\);/.test(efecto) &&
         /cambiarDeCamara\(nuevo\);/.test(efecto) &&
         /document\.addEventListener\('keydown', alPulsar\);/.test(efecto)
       );
     },
     fuente,
-    fuente.replace('if (LAS_TRAMPAS_ARMADAS.length > 0) return;\n', ''),
+    fuente.replace('if (hayUnaTrampaArmada()) return;\n', ''),
   );
 
   /* ── 3. Bajar recoge la mesa, subir la saca; y los mandos de la mesa no están a pie ── */
@@ -5397,9 +5578,20 @@ function elCartelDeLaCarta(): void {
   const cuerpoDelCartel = Number(/font-size:\s*([\d.]+)rem/.exec(reglaDelCartel)?.[1] ?? '0');
   const rellenoDelCartel = Number(/padding:\s*(\d+)px/.exec(reglaDelCartel)?.[1] ?? '0');
   const interlineadoDelCartel = Number(/line-height:\s*([\d.]+)/.exec(reglaDelCartel)?.[1] ?? '0');
+  /*
+   * LA RAÍZ YA NO SE ESCRIBE EN RIBERAS: los 17 puntos y la medida del navegador son de todos
+   * los pintores y viven en `lienzo-propio.tsx`, de donde Riberas —y el Burgo— los importan.
+   * Así que la cifra se busca en la pieza común, y se exige que Riberas la use y no escriba la
+   * suya: un 17 escrito dos veces es el sitio donde el día que la hoja cambie se queda uno.
+   */
+  const codigoDeLaPieza = soloCodigo(readFileSync(new URL('../src/lienzo-propio.tsx', import.meta.url), 'utf8'));
   comprobar(
     'la raíz de esta casa vale 17 puntos y sale de la hoja (`106.25 %` sobre los 16 del navegador), no de un 16 dado por hecho',
-    porcentajeDeLaRaiz > 0 && Math.abs((porcentajeDeLaRaiz / 100) * 16 - 17) < 1e-9 && /const RAIZ_DE_LA_CASA = 17;/.test(codigo),
+    porcentajeDeLaRaiz > 0 &&
+      Math.abs((porcentajeDeLaRaiz / 100) * 16 - 17) < 1e-9 &&
+      /export const RAIZ_DE_LA_CASA = 17;/.test(codigoDeLaPieza) &&
+      RAIZ_DE_LA_CASA === 17 &&
+      usaLaPiezaComun(codigo, 'RAIZ_DE_LA_CASA'),
     { porcentajeDeLaRaiz, da: (porcentajeDeLaRaiz / 100) * 16 },
   );
   comprobar(
@@ -5433,9 +5625,10 @@ function elCartelDeLaCarta(): void {
    */
   comprobar(
     'la raíz se le pide al navegador (`getComputedStyle` sobre la raíz del documento) y el 17 se queda de suelo para Node, donde no hay `document`',
-    /function raizDelNavegador\(\): number \{/.test(codigo) &&
-      /getComputedStyle\(document\.documentElement\)\.fontSize/.test(codigo) &&
-      /typeof document === 'undefined'[\s\S]{0,80}return RAIZ_DE_LA_CASA;/.test(codigo) &&
+    /export function raizDelNavegador\(\): number \{/.test(codigoDeLaPieza) &&
+      /getComputedStyle\(document\.documentElement\)\.fontSize/.test(codigoDeLaPieza) &&
+      /typeof document === 'undefined'[\s\S]{0,80}return RAIZ_DE_LA_CASA;/.test(codigoDeLaPieza) &&
+      usaLaPiezaComun(codigo, 'raizDelNavegador') &&
       /const \[raizDeLaLetra, ponerRaizDeLaLetra\] = useState\(RAIZ_DE_LA_CASA\);/.test(codigo) &&
       /ponerRaizDeLaLetra\(\(antes\) => \{\s*const ahora = raizDelNavegador\(\);/.test(codigo) &&
       /observador\.observe\(document\.documentElement\);/.test(codigo),
@@ -7208,7 +7401,15 @@ function laCintaYElCajon(): void {
    */
   const cajaDeAbajo = {};
   const cajaDeArriba = {};
+  /*
+   * Y QUIEN SÓLO QUIERE SABER SI HAY ALGUNA ABIERTA —las teclas de la cámara de Riberas, que
+   * con una caja modal encima tienen que callarse— se lo pregunta a LA MISMA pila con
+   * `hayUnaTrampaArmada`. Se apunta lo que contesta en cada paso de este mismo guion y se
+   * compra al final: vacía no, con una sí, y vacía otra vez al desarmarlas.
+   */
+  const hayAntes = hayUnaTrampaArmada();
   const bajarLaDeAbajo = armarUnaTrampa(cajaDeAbajo);
+  const hayConUna = hayUnaTrampaArmada();
   comprobar(
     'con una sola caja abierta, manda ella',
     mandaEstaTrampa(cajaDeAbajo) && !mandaEstaTrampa(cajaDeArriba),
@@ -7233,15 +7434,27 @@ function laCintaYElCajon(): void {
     !mandaEstaTrampa(cajaDeAbajo) && !mandaEstaTrampa(cajaDeArriba),
     { abajo: mandaEstaTrampa(cajaDeAbajo), arriba: mandaEstaTrampa(cajaDeArriba) },
   );
+  comprobar(
+    'y `hayUnaTrampaArmada` lee esa misma pila: vacía dice que no, con una caja dice que sí, y al desarmarlas vuelve a decir que no —si no, las teclas de la cámara se quedarían mudas para siempre—',
+    !hayAntes && hayConUna && !hayUnaTrampaArmada(),
+    { antes: hayAntes, conUna: hayConUna, despues: hayUnaTrampaArmada() },
+  );
   /*
    * Y EL ENGANCHE, QUE ES LO QUE NO SE PUEDE LLAMAR SIN NAVEGADOR Y ES DONDE ESTABA EL FALLO.
    * Se lee el gancho entero y se mira DÓNDE se engancha el oyente, no qué palabras lleva
    * dentro.
+   *
+   * EL GANCHO ES EL COMÚN (`lienzo-propio.tsx`). Aquí se leía una copia escrita dentro de
+   * Riberas, igual al original salvo por el `export`; ahora se lee el original, y cada regla
+   * exige además que Riberas lo importe de allí y no escriba el suyo (`laTrampaEsLaComun`):
+   * sin eso, una copia que volviera a nacer en Riberas pasaría sin que nadie la leyera.
    */
-  const elGanchoDeLaTrampa = /function usarLaTrampaDeFoco\([\s\S]*?\n\}\n/.exec(codigo)?.[0] ?? '';
+  const piezaComun = sinComentarios(readFileSync(new URL('../src/lienzo-propio.tsx', import.meta.url), 'utf8'));
+  const elGanchoDeLaTrampa = /export function usarLaTrampaDeFoco\([\s\S]*?\n\}\n/.exec(piezaComun)?.[0] ?? '';
+  const laTrampaEsLaComun = elGanchoDeLaTrampa.length > 0 && usaLaPiezaComun(codigo, 'usarLaTrampaDeFoco');
   comprobar(
     'el oyente de teclas vive en `document` mientras la caja está abierta y NO en la caja: enganchado en la caja sólo oye lo que pasa con el foco dentro, y el foco se sale solo en cuanto una jugada cambia la lista de opciones',
-    elGanchoDeLaTrampa.length > 0 &&
+    laTrampaEsLaComun &&
       /document\.addEventListener\('keydown', tecla\)/.test(elGanchoDeLaTrampa) &&
       /document\.removeEventListener\('keydown', tecla\)/.test(elGanchoDeLaTrampa) &&
       !/(?:suya|alArmar|dentro|caja\.current)\.addEventListener\(/.test(elGanchoDeLaTrampa),
@@ -7249,14 +7462,16 @@ function laCintaYElCajon(): void {
   );
   comprobar(
     'y `tecla` decide por `caja.current` EN EL MOMENTO de la tecla, y no por el nodo que se capturó al armarla: si no, la trampa sigue mirando una caja que ya no está pintada',
-    /const tecla = \(e: KeyboardEvent\): void => \{\s*const dentro = caja\.current;/.test(elGanchoDeLaTrampa) &&
+    laTrampaEsLaComun &&
+      /const tecla = \(e: KeyboardEvent\): void => \{\s*const dentro = caja\.current;/.test(elGanchoDeLaTrampa) &&
       /if \(dentro === null \|\| !mandaEstaTrampa\(caja\)\) return;/.test(elGanchoDeLaTrampa) &&
       /loQueHaceLaTrampa\(e, dondeEstaElFoco\(dentro, lista\), lista\.length\)/.test(elGanchoDeLaTrampa),
     elGanchoDeLaTrampa.replace(/\s+/g, ' ').slice(0, 900),
   );
   comprobar(
     'y hay RESCATE del foco caído: un vigía mira la caja por dentro y, cuando el que tenía el foco se desmonta —que no dispara `blur` en ningún navegador—, se lo devuelve a la caja',
-    /const vigia = new MutationObserver\(rescatar\);/.test(elGanchoDeLaTrampa) &&
+    laTrampaEsLaComun &&
+      /const vigia = new MutationObserver\(rescatar\);/.test(elGanchoDeLaTrampa) &&
       /vigia\.observe\(alArmar, \{ childList: true, subtree: true \}\);/.test(elGanchoDeLaTrampa) &&
       /vigia\.disconnect\(\);/.test(elGanchoDeLaTrampa) &&
       /if \(dondeEstaElFoco\(dentro, enfocables\(dentro\)\) === 'fuera'\) dentro\.focus\(\);/.test(elGanchoDeLaTrampa),
@@ -7264,7 +7479,7 @@ function laCintaYElCajon(): void {
   );
   comprobar(
     'y `dondeEstaElFoco` sabe decir `fuera`, que es el sitio donde el foco acaba cuando lo sueltan al `body` y el único que las dos mitades del arreglo —la tecla y el rescate— tienen que reconocer',
-    /if \(activo === null \|\| !dentro\.contains\(activo\)\) return 'fuera';/.test(elGanchoDeLaTrampa),
+    laTrampaEsLaComun && /if \(activo === null \|\| !dentro\.contains\(activo\)\) return 'fuera';/.test(elGanchoDeLaTrampa),
     elGanchoDeLaTrampa.replace(/\s+/g, ' ').slice(0, 900),
   );
   /*
@@ -7278,19 +7493,25 @@ function laCintaYElCajon(): void {
    * tabulador se va a la cabecera de la Sala con un modal opaco puesto encima, sin un error en
    * ninguna consola—. Se compra que el gancho exista y que lo llamen LAS TRES.
    *
-   * Y el número es CUATRO y no tres porque una de las cuatro apariciones es la declaración de
-   * la función. Las dos llamadas `(true, caja, alDejarlo)` son idénticas a propósito: la del
-   * menú y la del componedor abren y cierran igual, y escribirlas distintas sería el primer
-   * paso hacia dos trampas.
+   * Y DESDE QUE LA TRAMPA ES LA COMÚN, LAS CUENTAS SON OTRAS Y DICEN LO MISMO. Riberas ya no
+   * la declara: la importa de `lienzo-propio.tsx` y la LLAMA dos veces, el cajón y el
+   * componedor. El menú de elegir es el `ElijeUna` común, que la arma dentro con la misma
+   * llamada `(true, caja, alDejarlo)` que el componedor —idénticas a propósito: abren y
+   * cierran igual, y escribirlas distintas sería el primer paso hacia dos trampas—. Antes eran
+   * cuatro apariciones en Riberas porque una era la declaración de la copia.
    */
   const quienLlamaALaTrampa = codigo.match(/usarLaTrampaDeFoco\(/g) ?? [];
+  const elMenuComun = /export function ElijeUna\(\{[\s\S]*?\n\}\n/.exec(piezaComun)?.[0] ?? '';
   comprobar(
     'y la trampa de foco está escrita UNA vez y la usan las TRES cajas modales del recuadro —el cajón, el menú de elegir y el componedor—: dos copias se separan, y la que se rompe es la que nadie mira',
-    /function usarLaTrampaDeFoco\(/.test(codigo) &&
-      quienLlamaALaTrampa.length === 4 &&
+    laTrampaEsLaComun &&
+      usaLaPiezaComun(codigo, 'ElijeUna') &&
+      quienLlamaALaTrampa.length === 2 &&
       /usarLaTrampaDeFoco\(cajonAbierto, elCajon, cerrarElCajon\);/.test(codigo) &&
-      (codigo.match(/usarLaTrampaDeFoco\(true, caja, alDejarlo\);/g) ?? []).length === 2,
-    quienLlamaALaTrampa.length,
+      (codigo.match(/usarLaTrampaDeFoco\(true, caja, alDejarlo\);/g) ?? []).length === 1 &&
+      /usarLaTrampaDeFoco\(true, caja, alDejarlo\);/.test(elMenuComun) &&
+      (codigo.match(/<ElijeUna\b/g) ?? []).length >= 2,
+    { enRiberas: quienLlamaALaTrampa.length, menus: (codigo.match(/<ElijeUna\b/g) ?? []).length },
   );
   /*
    * Y AL CERRARLO EL FOCO VUELVE A LA FICHA QUE LO ABRIÓ. El cajón se DESMONTA al cerrarse, y
@@ -7892,21 +8113,38 @@ function laCintaYElCajon(): void {
    * una llave: lleva un retorno de carro delante. La ventana salía VACÍA y esto se ponía rojo
    * con la función entera escrita como toca, que es la peor manera de ponerse rojo. Es el
    * mismo tropiezo que ya costó la regla de los dos botones de la cinta.
+   *
+   * ═══ Y EL MENÚ ES EL COMÚN: SE LEE EN LA PIEZA, Y SE COMPRA QUE RIBERAS LO MONTA ═══
+   *
+   * Aquí había una copia de `ElijeUna` escrita dentro de Riberas, con dieciséis líneas
+   * distintas del original: las clases del velo y de la caja escritas a mano (`EL_VELO`,
+   * `EL_MENU`), la nota con su clase, y sin sitio para una tarjeta. Ahora se lee el de
+   * `lienzo-propio.tsx`, y las clases viajan: cada `<ElijeUna>` de Riberas tiene que pasarle
+   * `velo={EL_VELO}` y `menu={EL_MENU}`, que son las que su hoja coloca, tapa y deja rodar.
+   * Un menú montado sin ellas se pinta sin velo que se coma el clic y fuera del recuadro, y
+   * eso no falla en ninguna consola.
    */
-  const fuentePelada = fuente.replace(/\r\n/g, '\n');
-  const elMenu = sinComentarios(/function ElijeUna\(\{[\s\S]*?\n\}\n/.exec(fuentePelada)?.[0] ?? '');
+  const piezaPelada = readFileSync(new URL('../src/lienzo-propio.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const elMenu = sinComentarios(/export function ElijeUna\(\{[\s\S]*?\n\}\n/.exec(piezaPelada)?.[0] ?? '');
+  const losMenusDeRiberas = codigo.match(/<ElijeUna\b[\s\S]*?\/>/g) ?? [];
+  const montaElMenuComun =
+    elMenu.length > 0 &&
+    usaLaPiezaComun(codigo, 'ElijeUna') &&
+    losMenusDeRiberas.length >= 3 &&
+    losMenusDeRiberas.every((m) => /\bvelo=\{EL_VELO\}/.test(m) && /\bmenu=\{EL_MENU\}/.test(m));
   comprobar(
     'el menú de elegir es MODAL y vive dentro del recuadro: en flujo por debajo del lienzo se pintaba donde no se ve, y «a quién le robas» es una jugada obligatoria',
-    /role="dialog"/.test(elMenu) &&
+    montaElMenuComun &&
+      /role="dialog"/.test(elMenu) &&
       /aria-modal="true"/.test(elMenu) &&
       /aria-label=\{titulo\}/.test(elMenu) &&
       /tabIndex=\{-1\}/.test(elMenu) &&
       /position:\s*absolute/.test(reglaDe('.riberas-elige')),
-    elMenu.replace(/\s+/g, ' ').slice(0, 300),
+    { menu: elMenu.replace(/\s+/g, ' ').slice(0, 300), montajes: losMenusDeRiberas.map((m) => m.replace(/\s+/g, ' ').slice(0, 160)) },
   );
   comprobar(
     'y lleva su velo, que es la mitad que se olvida: sin él un clic fuera del menú cierra la pregunta Y funda una choza donde estaba el dedo',
-    /<div className=\{[^\n]*EL_VELO[^\n]*\} onClick=\{alDejarlo\} aria-hidden="true" \/>/.test(elMenu),
+    montaElMenuComun && /<div className=\{[^\n]*velo[^\n]*\} onClick=\{alDejarlo\} aria-hidden="true" \/>/.test(elMenu),
     elMenu.replace(/\s+/g, ' ').slice(0, 300),
   );
   /*
@@ -7923,9 +8161,11 @@ function laCintaYElCajon(): void {
    */
   comprobar(
     'y con `fijo` se coloca sobre la VENTANA: la caja y su velo, las dos, y con el tope de alto de la ventana',
-    /fijo = false/.test(elMenu) &&
-      /fijo \? `\$\{EL_VELO\} \$\{EL_VELO\}-fijo`/.test(elMenu) &&
-      /fijo \? `formulario \$\{EL_MENU\} \$\{EL_MENU\}-fijo`/.test(elMenu) &&
+    montaElMenuComun &&
+      /fijo = false/.test(elMenu) &&
+      /fijo \? `\$\{velo\} \$\{velo\}-fijo`/.test(elMenu) &&
+      /fijo \? `formulario \$\{menu\} \$\{menu\}-fijo`/.test(elMenu) &&
+      losMenusDeRiberas.some((m) => /^<ElijeUna\s+fijo\b/.test(m)) &&
       /position:\s*fixed/.test(reglaDe('.riberas-elige-fijo')) &&
       /position:\s*fixed/.test(reglaDe('.riberas-velo-fijo')) &&
       /max-height:\s*calc\(100vh/.test(reglaDe('.riberas-elige-fijo')),
@@ -7943,12 +8183,33 @@ function laCintaYElCajon(): void {
    */
   comprobar(
     'y sus opciones se apagan con `aria-disabled` y no con `disabled`: un botón deshabilitado teniendo el foco lo suelta al `body`, y dentro de un modal eso es escaparse de su propia trampa',
-    /aria-disabled=\{quieto\}/.test(elMenu) &&
+    montaElMenuComun &&
+      /aria-disabled=\{quieto\}/.test(elMenu) &&
       /* `\b` no vale aquí: el guión de «aria-disabled» es frontera de palabra y casaba con él. */
       !/(?<!aria-)disabled=\{quieto\}/.test(elMenu) &&
       /className=\{quieto \? 'opcion opcion-quieta' : 'opcion'\}/.test(elMenu) &&
       /if \(quieto\) return;/.test(elMenu),
     elMenu.replace(/\s+/g, ' ').slice(0, 400),
+  );
+  /*
+   * ═══ Y LA NOTA DE SUS HOJAS SIGUE SIENDO LA SUYA ═══
+   *
+   * La copia de Riberas pintaba la nota —«la aceptó Ana», la regla del componedor— con
+   * `riberas-elige-nota`, pegada al título y en el cuerpo de la ayuda de una opción; el menú
+   * común la pinta con la `letra-chica` de la casa si no le dicen otra. Montar el común sin
+   * pasarle la suya cambiaba la letra y el aire de la hoja donde se aceptan los trueques, y
+   * eso no se pone rojo en ninguna parte: sale bien, sólo que distinto. Así que cada menú de
+   * Riberas CON nota le pasa su clase, escrita una vez en `LA_NOTA_DEL_MENU`.
+   */
+  const conNota = losMenusDeRiberas.filter((m) => /\bnota=/.test(m));
+  comprobar(
+    'y las hojas con nota la pintan con la clase de ESTA hoja (`riberas-elige-nota`, por `claseDeLaNota`), no con la `letra-chica` de la casa: sin eso la hoja de un trato cambia de letra sin que nada falle',
+    montaElMenuComun &&
+      /const LA_NOTA_DEL_MENU = 'riberas-elige-nota';/.test(codigo) &&
+      conNota.length >= 2 &&
+      conNota.every((m) => /\bclaseDeLaNota=\{LA_NOTA_DEL_MENU\}/.test(m)) &&
+      /<p className=\{claseDeLaNota\}>\{nota\}<\/p>/.test(elMenu),
+    conNota.map((m) => m.replace(/\s+/g, ' ').slice(0, 200)),
   );
   /*
    * Y AL CERRARLO EL FOCO VUELVE AL RECUADRO. El menú se DESMONTA al cerrarse, y desmontarse
@@ -10041,6 +10302,7 @@ loQueLaPantallaDecideSola();
 lasDirecciones();
 elMuelle();
 laCompuertaDeBotas();
+laRefriegaEnElEscritorio();
 riberasEnTres();
 burgoEnTres();
 elAcercamientoDelDelta();
@@ -10111,13 +10373,128 @@ function lasPiezasDelLienzoYSuBanco(): void {
    * vuelve depende de quién abrió. Lo que sí se puede comprar es que la pieza NO se lo invente
    * —no hay ningún `.focus()` sobre un destino elegido aquí dentro— y que la trampa que arma
    * sea LA COMPARTIDA y no una segunda pila.
+   *
+   * «La compartida» se compraba viendo que esta pieza importaba la pila de `riberas-en-tres.tsx`.
+   * La pila ya no es de Riberas: vive AQUÍ, y lo que hay que comprar es que sea la ÚNICA. Se
+   * barren los fuentes del cliente: una sola declaración de `LAS_TRAMPAS_ARMADAS`, la de
+   * `lienzo-propio.tsx`, y nadie que se traiga `armarUnaTrampa`, `mandaEstaTrampa` o
+   * `hayUnaTrampaArmada` de otro sitio. Dos pilas son dos cajas creyéndose las de encima, y
+   * `Escape` cerrando las dos de un golpe.
    */
+  const losFuentesDelCliente: [string, string][] = readdirSync(new URL('../src/', import.meta.url))
+    .filter((f) => /\.tsx?$/.test(f))
+    .map((f): [string, string] => [f, sinComentarios(readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8'))]);
+  const laPilaEsUna = (fuentes: readonly [string, string][]): { conPila: string[]; deOtroSitio: string[] } => ({
+    conPila: fuentes.filter(([, c]) => /\bLAS_TRAMPAS_ARMADAS\s*(?::[^=;]*)?=\s*\[/.test(c)).map(([f]) => f),
+    deOtroSitio: fuentes
+      .filter(([, c]) =>
+        [...c.matchAll(/import \{([^}]*)\} from '([^']+)';/g)].some(
+          (m) => m[2] !== './lienzo-propio' && /\b(?:armarUnaTrampa|mandaEstaTrampa|hayUnaTrampaArmada)\b/.test(m[1] ?? ''),
+        ),
+      )
+      .map(([f]) => f),
+  });
+  const lasPilas = laPilaEsUna(losFuentesDelCliente);
   comprobar(
     'la caja no se inventa adónde vuelve el foco: arma la trampa COMPARTIDA y el destino lo pone quien la cierra',
     /export function CajaEnElLienzo\(\{[\s\S]*?usarLaTrampaDeFoco\(true, caja, alCerrar\);/.test(fuenteSinComentarios) &&
-      /import \{ armarUnaTrampa, loQueHaceLaTrampa, mandaEstaTrampa, RAIZ_DE_LA_CASA \} from '\.\/riberas-en-tres';/.test(
-        fuente,
-      ),
+      lasPilas.conPila.length === 1 &&
+      lasPilas.conPila[0] === 'lienzo-propio.tsx' &&
+      lasPilas.deOtroSitio.length === 0,
+    lasPilas,
+  );
+  comprobar(
+    'VACUNA: una segunda pila escrita en un pintor, o la de siempre traída de Riberas, se ven',
+    /* Relativa a lo que hay hoy y no a un número escrito: la vacuna compra que el juez VE el veneno. */
+    (() => {
+      const conOtra = laPilaEsUna([...losFuentesDelCliente, ['otro-pintor.tsx', 'const LAS_TRAMPAS_ARMADAS: unknown[] = [];']]);
+      const traida = laPilaEsUna([...losFuentesDelCliente, ['otro-pintor.tsx', "import { armarUnaTrampa } from './riberas-en-tres';"]]);
+      return (
+        conOtra.conPila.includes('otro-pintor.tsx') &&
+        conOtra.conPila.length === lasPilas.conPila.length + 1 &&
+        traida.deOtroSitio.includes('otro-pintor.tsx')
+      );
+    })(),
+  );
+
+  /*
+   * ═══ Y LA DEPENDENCIA APUNTA BIEN: DE LOS PINTORES A LAS PIEZAS, NUNCA AL REVÉS ═══
+   *
+   * Esta pieza importaba de `riberas-en-tres.tsx` la pila y la raíz de la letra, y el Burgo
+   * importaba de allí la raíz y el ancho de la cinta: el segundo pintor dependía del primero, y
+   * Las Lindes, que de aquí sólo quiere `LimiteDelMundo`, cargaba Riberas entero por debajo.
+   * Ahora de Riberas sólo importa quien monta su pantalla (`pintores.ts`), y las piezas no
+   * importan de ningún pintor. Si mañana otro pintor necesita algo de Riberas, eso es una
+   * pieza que hay que mudar aquí, no una flecha más hacia Riberas.
+   */
+  const quienImportaDeRiberas = (fuentes: readonly [string, string][]): string[] =>
+    fuentes.filter(([, c]) => /from '\.\/riberas-en-tres'/.test(c)).map(([f]) => f);
+  const deRiberasImportan = quienImportaDeRiberas(losFuentesDelCliente);
+  comprobar(
+    'y la dependencia va de los pintores a las piezas: de `riberas-en-tres.tsx` sólo importa quien monta su pantalla (`pintores.ts`), y esta pieza no importa de ningún pintor',
+    deRiberasImportan.length === 1 &&
+      deRiberasImportan[0] === 'pintores.ts' &&
+      !/from '\.\/[a-z-]+-en-tres'/.test(fuenteSinComentarios),
+    deRiberasImportan,
+  );
+  comprobar(
+    'VACUNA: el Burgo con su importación de antes —la raíz y el ancho de la cinta traídos de Riberas— pone rojo ese juez',
+    (() => {
+      const conLaDeAntes = losFuentesDelCliente.map(([f, c]): [string, string] =>
+        f === 'burgo-en-tres.tsx' ? [f, `${c}\nimport { elEstiloDeLaCinta, RAIZ_DE_LA_CASA } from './riberas-en-tres';`] : [f, c],
+      );
+      const conElla = quienImportaDeRiberas(conLaDeAntes);
+      return conElla.includes('burgo-en-tres.tsx') && conElla.length === deRiberasImportan.length + 1;
+    })(),
+  );
+
+  /*
+   * ═══ Y RIBERAS YA NO LLEVA COPIAS ═══
+   *
+   * Todo lo de este fichero vivía PRIVADO en Riberas, y cuando llegó el Burgo se copió aquí.
+   * Dos copias de cada pieza se separan solas: la cámara de Riberas sabía callarse a pie y la de
+   * aquí no; el menú de aquí admitía una tarjeta y el de Riberas no. Ahora Riberas las importa,
+   * y lo que se compra es que ninguna vuelva a escribirse allí —ni con su nombre ni con el que
+   * tuvo: `usarElCatalogo` era la copia de `usarLosModelos`—, y que cada una que usa la traiga
+   * de aquí.
+   */
+  const codigoDeRiberas = sinComentarios(readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8'));
+  const LAS_QUE_RIBERAS_IMPORTA = [
+    'armarUnaTrampa',
+    'CamaraAerea',
+    'ElijeUna',
+    'elEstiloDeLaCinta',
+    'hayUnaTrampaArmada',
+    'LimiteDelMundo',
+    'mandaEstaTrampa',
+    'RAIZ_DE_LA_CASA',
+    'raizDelNavegador',
+    'recordada',
+    'traerUnGlb',
+    'usarLaTrampaDeFoco',
+    'usarLosModelos',
+  ];
+  const LAS_QUE_NO_PUEDE_ESCRIBIR = [
+    ...LAS_QUE_RIBERAS_IMPORTA,
+    'LAS_TRAMPAS_ARMADAS',
+    'loQueHaceLaTrampa',
+    'pasosDeLaRueda',
+    'PUNTO_DE_MIRA',
+    'usarElCatalogo',
+  ];
+  const copiasEn = (codigo: string): string[] =>
+    LAS_QUE_NO_PUEDE_ESCRIBIR.filter((p) =>
+      new RegExp(`\\b(?:function|class|const|let|var|type|interface)\\s+${p}\\b`).test(codigo),
+    );
+  comprobar(
+    'Riberas no lleva COPIAS PRIVADAS de las piezas: ninguna —ni la cámara, ni la rueda, ni la pila, ni el menú, ni los modelos— se escribe en su fichero, y cada una que usa la importa de aquí',
+    copiasEn(codigoDeRiberas).length === 0 && LAS_QUE_RIBERAS_IMPORTA.every((p) => usaLaPiezaComun(codigoDeRiberas, p)),
+    { copias: copiasEn(codigoDeRiberas), sinImportar: LAS_QUE_RIBERAS_IMPORTA.filter((p) => !usaLaPiezaComun(codigoDeRiberas, p)) },
+  );
+  comprobar(
+    'VACUNA: una `recordada` o un `usarElCatalogo` escritos otra vez en Riberas se ven',
+    copiasEn(`${codigoDeRiberas}\nfunction recordada<T>(traer: () => Promise<T>) { return traer; }`).includes('recordada') &&
+      copiasEn(`${codigoDeRiberas}\nfunction usarElCatalogo(hazFalta: boolean) { return hazFalta; }`).includes('usarElCatalogo'),
   );
   /* Y LA VACUNA DE LAS CUATRO MITADES: una caja sin velo tiene que hacer caer al juez. */
   const cajaEnvenenada = '<div role="dialog" aria-modal="true" aria-label="La hoja" tabindex="-1"><p>dentro</p></div>';
@@ -10391,6 +10768,32 @@ function lasPiezasDelLienzoYSuBanco(): void {
     alReves !== conFicha &&
       !(fichaAlReves > 0 && notaAlReves < fichaAlReves && fichaAlReves < listaAlReves),
     { nota: notaAlReves, ficha: fichaAlReves, lista: listaAlReves },
+  );
+  /*
+   * LA CLASE DE LA NOTA ES DEL PINTOR, como `velo` y `menu`. El menú de Riberas la pintaba con la
+   * suya (`riberas-elige-nota`) antes de que el menú fuera de todos, y el Burgo con la de la casa.
+   * Se renderiza con y sin `claseDeLaNota` y se mira qué `<p>` sale: si el parámetro no llegara
+   * al marcado, Riberas cambiaría de letra con todo en verde.
+   */
+  const conSuNota = renderToStaticMarkup(
+    <ElijeUna
+      titulo="La hoja de un trato"
+      nota="la aceptó Ana"
+      opciones={unaOpcion}
+      quieto={false}
+      velo="riberas-velo"
+      menu="riberas-elige"
+      claseDeLaNota="riberas-elige-nota"
+      alElegir={() => undefined}
+      alDejarlo={() => undefined}
+    />,
+  );
+  comprobar(
+    'y la nota se pinta con la clase del pintor cuando la da (`claseDeLaNota`) y con la `letra-chica` de la casa cuando no',
+    conSuNota.includes('<p class="riberas-elige-nota">la aceptó Ana</p>') &&
+      !conSuNota.includes('letra-chica') &&
+      conFicha.includes('<p class="letra-chica">Te quedan 120 €</p>'),
+    { conSuNota: conSuNota.slice(0, 300), conLaDeLaCasa: /<p class="[^"]*">Te quedan[^<]*<\/p>/.exec(conFicha)?.[0] ?? null },
   );
 
   // ── 6. LO QUE RUEDA POR DENTRO ESTÁ DECLARADO, Y CON EL DEDO TAMBIÉN ──
@@ -12429,8 +12832,12 @@ console.log('');
  * los dos vestíbulos, la marca de la mesa y la silla que no se da), así que el guardia sube
  * veintitrés. Ninguna sale de un bucle que dependa del azar: los arcades son los instalados y los
  * almacenes de mentira los pone y los quita el propio bloque.
+ *
+ * Y LA REFRIEGA TRAE CINCO (`laRefriegaEnElEscritorio`: los tres carteles dicen la G sólo con
+ * canal, la tecla es la del paseo, y no es de nadie más en los tres escritorios, cada juez con su
+ * vacuna), así que el guardia sube cinco. Ninguna sale de un bucle.
  */
-const COMPROBACIONES_ESCRITAS = 1013;
+const COMPROBACIONES_ESCRITAS = 1018;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(

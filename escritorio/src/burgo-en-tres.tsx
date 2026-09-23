@@ -194,6 +194,7 @@ import type { ModoDelBurgo } from '../../escenas/burgo/a-pie';
 import type { EstadoDelCanal } from '../../escenas/paseo/canal-de-botas';
 import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import type { CanalDeBotas } from '../../escenas/paseo/mesa-de-botas';
+import { COMO_SE_GOLPEA } from '../../escenas/paseo/mandos';
 import { poseDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { RelojDeLaMesa } from '../../escenas/reloj';
@@ -281,7 +282,9 @@ import {
   CartelAlPie,
   COLGADA_BAJO_EL_CARRIL,
   ElijeUna,
+  elEstiloDeLaCinta,
   LimiteDelMundo,
+  RAIZ_DE_LA_CASA,
   raizDelNavegador,
   recordada,
   RUEDAN_SOLAS,
@@ -305,7 +308,6 @@ import { loQueSeDiceDeUnFallo } from './red-de-seguridad';
  * `laSillaDeEstaVentana`, aquí abajo.
  */
 import { loQuePide } from './sala';
-import { elEstiloDeLaCinta, RAIZ_DE_LA_CASA } from './riberas-en-tres';
 import { cuantoQuedaEnLaCinta, elPlazoAprieta, msHastaQueCambieElRotulo, cuantoQueda } from './relojes';
 import { AccionesDelTablero, Retablo } from './retablo';
 
@@ -485,13 +487,15 @@ export function camaraDeLaTecla(e: { readonly key: string; readonly metaKey: boo
  * En el mismo cartel y debajo, `canal`: «Conectando…», «Dentro», «Sin conexión: …», igual que en Las
  * Lindes (`ComoSeAnda`). Desde la mesa también se enseña —allí no se anda, pero el canal sigue abierto
  * y conviene saber si al bajar se verá a los demás—, y va en la columna de las cámaras, que está en
- * los dos modos; sin canal, en la mesa no sale nada, como siempre.
+ * los dos modos; sin canal, en la mesa no sale nada, como siempre. Con canal se golpea, y la tecla
+ * va con las demás (`COMO_SE_GOLPEA`, como en Las Lindes).
  */
 export function ComoSeAndaPorElBurgo({ modo, canal }: { readonly modo: ModoDelBurgo; readonly canal?: string }): JSX.Element | null {
   if (modo === 'mesa') return canal === undefined ? null : <p className="burgo-como-se-anda">{canal}</p>;
   return (
     <p className="burgo-como-se-anda">
       W A S D o las flechas para andar · Mayúsculas para correr · 1 para volver a la mesa
+      {canal === undefined ? null : ` · ${COMO_SE_GOLPEA}`}
       {canal === undefined ? null : (
         <>
           <br />

@@ -120,16 +120,14 @@ import {
   RelojDeArena,
   montarElReloj,
   ponerLaArena,
-  relojDe,
   soltarElReloj,
 } from '../reloj';
-import type { RelojCargado } from '../reloj';
+import { relojDe } from '../comun/reloj';
+import type { RelojCargado } from '../comun/reloj';
+import { usarArranqueYMedida } from '../comun/arranque';
 import { MODELO } from '../nombres';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
-
-/** Cuánto se espera a que lleguen los modelos antes de enseñar lo que haya. */
-const TOPE_DE_ARRANQUE_MS = 15_000;
 
 /** El cielo de una mañana de siega: azul arriba, paja en el horizonte. */
 const COLOR_DEL_CIELO = '#8cb8de';
@@ -211,18 +209,23 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
   const { tablero, codigo, traer, calidad, camara, giroEnMano, quieto } = props;
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
   const [fallo, setFallo] = useState<string | null>(null);
-  const avisado = useRef(false);
+
+  /*
+   * ═══ EL ARRANQUE Y LA MEDIDA, CON EL GANCHO COMÚN ═══
+   *
+   * `comun/arranque.ts`, el mismo de las demás escenas. Aquí se avisaba de que el tablero estaba
+   * listo en cuanto llegaba el `.glb`, con el valle aún sin pintar; ahora se deja pintar y se avisa,
+   * como promete el contrato, y el tope de quince segundos es el suyo. Y la medida —una vez por
+   * segundo, con la media de ESE segundo— sólo corre con el tablero cargado: mientras el `.glb`
+   * viaja la escena es un suelo y un cielo, y un juez que mirara eso diría `plena` de un valle que
+   * aún no está.
+   */
+  const arrancar = usarArranqueYMedida(props, { llave: traer, midiendo: catalogo !== null });
 
   /* ── Los modelos ────────────────────────────────────────────────────────── */
   useEffect(() => {
     let vivo = true;
     let cargado: Catalogo | null = null;
-    const reloj = setTimeout(() => {
-      if (vivo && !avisado.current) {
-        avisado.current = true;
-        props.alEstarListo?.();
-      }
-    }, TOPE_DE_ARRANQUE_MS);
 
     /* Sin complementos es el `GLTFLoader` de siempre; en el teléfono, con el atlas compilado. */
     const complementos = props.complementosDelTablero ?? [];
@@ -240,14 +243,11 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
         props.alFallar?.(motivo);
       })
       .finally(() => {
-        if (!vivo || avisado.current) return;
-        avisado.current = true;
-        props.alEstarListo?.();
+        if (vivo) arrancar();
       });
 
     return () => {
       vivo = false;
-      clearTimeout(reloj);
       cargado?.soltar();
     };
     /* `traer` y los avisos son estables por contrato; el catálogo se pide una vez. */
@@ -340,7 +340,9 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
    * Sin la prop no se abre nada y `alDarUnTic` es `undefined`: una mesa normal no paga ni una
    * llamada por tic. Con ella, el paseo le da cada tic al canal (la costura a) y el canal pone a
    * quien pasea donde dice el servidor (la costura b), que llega por una referencia porque el
-   * paseo se monta después. Ver `paseo/usar-el-canal.ts`.
+   * paseo se monta después. Ver `paseo/usar-el-canal.ts`. La refriega va por los mismos hilos: el
+   * paseo le pregunta al canal si quien pasea está en el suelo (`caido`), y `QuienAnda` y `LosDemas`
+   * le preguntan cómo va cada uno (`cliente`).
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
   const elCanal = usarElCanal(props.canal, corregirAQuienPasea);
@@ -352,6 +354,7 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
     alturaEn,
     alturaDeLaCamaraEn,
     alDarUnTic: elCanal.alDarUnTic,
+    caido: elCanal.caido,
   });
   useEffect(() => {
     corregirAQuienPasea.current = paseo.corregir;
@@ -564,34 +567,14 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
   /*
    * ═══ LA MEDIDA: UNA VEZ POR SEGUNDO, CON LA MEDIA DE ESE SEGUNDO ═══
    *
-   * Es el contrato de `alMedir` en esta casa (`embarcadero/tipos.ts`), y es lo que lee el juez
-   * de la calidad: la media de milisegundos del ÚLTIMO segundo y cuántos fotogramas cubre. Aquí
-   * se mandaba cada treinta fotogramas la media DESDE EL PRINCIPIO con el total de fotogramas
-   * desde el principio; con eso `juzgarCalidad`, que suma los fotogramas de las muestras, contaba
-   * los treinta primeros tres veces y juzgaba con noventa fotogramas vistos y no con ciento veinte.
-   *
-   * Y se empieza a medir cuando HAY TABLERO QUE PINTAR: mientras el `.glb` viaja la escena es un
-   * suelo y un cielo, y un juez que mirara eso diría `plena` de un valle que aún no está. Cada
-   * fotograma se acota a cien milisegundos, como en el Burgo y en el Muelle: el primero con las
-   * piezas compila sombreadores, y un tirón de un segundo no es lo que va a durar la partida.
+   * Es el contrato de `alMedir` en esta casa, y es lo que lee el juez de la calidad: la media de
+   * milisegundos del ÚLTIMO segundo y cuántos fotogramas cubre. La lleva el gancho de arriba
+   * (`usarArranqueYMedida`, que sólo mide con el tablero cargado). Aquí se mandaba cada treinta
+   * fotogramas la media DESDE EL PRINCIPIO con el total de fotogramas desde el principio; con eso
+   * `juzgarCalidad`, que suma los fotogramas de las muestras, contaba los treinta primeros tres veces
+   * y juzgaba con noventa fotogramas vistos y no con ciento veinte. El lobby de Las Lindes tenía el
+   * mismo fallo cada sesenta y nadie lo vio: por eso ahora la medida es una, y de todas.
    */
-  const medido = useRef({ segundos: 0, fotogramas: 0 });
-  const { gl } = useThree();
-  useFrame((_, dtCrudo) => {
-    if (props.alMedir === undefined || catalogo === null) return;
-    const m = medido.current;
-    m.segundos += Math.min(0.1, Math.max(0, dtCrudo));
-    m.fotogramas++;
-    if (m.segundos < 1) return;
-    props.alMedir({
-      triangulos: gl.info.render.triangles,
-      llamadas: gl.info.render.calls,
-      ms: (m.segundos * 1000) / m.fotogramas,
-      fotogramas: m.fotogramas,
-    });
-    m.segundos = 0;
-    m.fotogramas = 0;
-  });
 
   /*
    * ═══ SE DEVUELVE UN FRAGMENTO Y NO UN `<group>`, Y NO ES ESTILO ═══
@@ -661,6 +644,7 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
           pose={paseo.pose}
           enPrimeraPersona={camara.modo === 'ojos'}
           alFallar={props.alFallar}
+          cliente={elCanal.cliente}
         />
       )}
 

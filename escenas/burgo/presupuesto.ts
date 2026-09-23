@@ -111,6 +111,8 @@
  * instancias más de otra pieza, otra llamada, y habría que sumarlo aquí. `verify:burgo-escena`
  * afirma que la cuenta de `casa` sigue siendo 44 justamente para que ese día se note.
  */
+import { renglonesDeLasPiezas, sumaDeLosRenglones, triangulosDeUnaEsfera } from '../comun/presupuesto';
+import type { RenglonDelPresupuesto } from '../comun/presupuesto';
 import { PIEZA } from './piezas';
 import { BOCANADAS_DEL_HUMO, CASILLAS_CON_CASINO, CASILLAS_CON_COFRE, letrasDeLosCarteles, letrasDelNeon, triangulosDeLasObras, triangulosDelTren, triangulosDeLasPiezasVivas } from './obras';
 import type { NombreDePieza } from './piezas';
@@ -195,7 +197,7 @@ export function letrasDelTablero(): number {
 export const SEGMENTOS_DEL_DISCO = 18;
 export const SEGMENTOS_DEL_CIELO = { ancho: 24, alto: 12 } as const;
 export function triangulosDelCielo(ancho = SEGMENTOS_DEL_CIELO.ancho, alto = SEGMENTOS_DEL_CIELO.alto): number {
-  return ancho * 2 + (alto - 2) * ancho * 2;
+  return triangulosDeUnaEsfera(ancho, alto);
 }
 export const TRIANGULOS_DEL_NAIPE = 2;
 /** La marca de casilla tocable: un anillo plano de 18 sectores. */
@@ -247,12 +249,6 @@ export const MULTIPLICIDADES_SOBRIA: Multiplicidades = multiplicidades('sobria')
 
 /* ─────────────────────────────── La suma ─────────────────────────────── */
 
-export interface RenglonDelPresupuesto {
-  readonly que: string;
-  readonly cuantos: number;
-  readonly triangulos: number;
-}
-
 export interface SumaDelPresupuesto {
   readonly total: number;
   readonly renglones: readonly RenglonDelPresupuesto[];
@@ -271,14 +267,7 @@ export function sumaDelPresupuesto(
   triangulosDeUnAventurero = TRIANGULOS_DE_LA_EXPLORADORA,
   triangulosDelDado = TRIANGULOS_DEL_DADO,
 ): SumaDelPresupuesto {
-  const renglones: RenglonDelPresupuesto[] = [];
-  const desconocidas: string[] = [];
-  for (const pieza of Object.keys(tabla).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
-    const cuantos = tabla[pieza] ?? 0;
-    const t = triangulosDe(pieza);
-    if (t === undefined) desconocidas.push(pieza);
-    renglones.push({ que: pieza, cuantos, triangulos: cuantos * (t ?? 0) });
-  }
+  const { renglones, desconocidas } = renglonesDeLasPiezas(Object.entries(tabla), triangulosDe);
   const plena = calidad === 'plena';
   const emblemas = huecosDeLosEmblemas().length;
   const letras = letrasDelTablero();
@@ -314,8 +303,7 @@ export function sumaDelPresupuesto(
   renglones.push({ que: 'naipe, marca y discos del trato', cuantos: 1, triangulos: TRIANGULOS_DEL_NAIPE + TRIANGULOS_DE_LA_MARCA + DISCOS_DEL_TRATO * 2 });
   renglones.push({ que: 'la cúpula del cielo', cuantos: 1, triangulos: triangulosDelCielo() });
   renglones.push({ que: 'aventurero (exploradora)', cuantos: plena ? 1 : 0, triangulos: plena ? triangulosDeUnAventurero : 0 });
-  const total = renglones.reduce((a, r) => a + r.triangulos, 0);
-  return { total, renglones, desconocidas };
+  return { total: sumaDeLosRenglones(renglones), renglones, desconocidas };
 }
 
 /** Los nombres de pieza que hay que encontrar en el fichero para que la suma valga. */

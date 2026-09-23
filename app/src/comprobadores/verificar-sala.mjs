@@ -56,6 +56,38 @@ function leer(fichero) {
   return fs.readFileSync(fichero, 'utf8');
 }
 
+/**
+ * LA RED DEL CONTRATO DE PINTOR APUNTA ANTES DE CAER.
+ *
+ * Riberas, el Burgo y Las Lindes tenían cada una su red bajo el lienzo, y la tercera no apuntaba
+ * nada: un valle que se caía en un teléfono no dejaba rastro en el parte. Desde el contrato de
+ * pintor (`arcade/pintor-propio.tsx`) montan LA MISMA, así que lo que antes se leía en cada pantalla
+ * —«la red apunta el fallo»— se lee aquí una vez: en `componentDidCatch`, `apuntarFallo` con
+ * `'render'` y DESPUÉS el aviso hacia arriba. Recibe el texto para poder verla caer con uno
+ * envenenado; y mira el código sin comentarios, que cuentan el fallo con los mismos nombres.
+ */
+function laRedDelContratoApunta(texto) {
+  const codigo = texto
+    .split('\n')
+    .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+    .join('\n');
+  return /export class RedDelLienzo extends Component<[\s\S]*?override componentDidCatch\(error: unknown, info: ErrorInfo\): void \{[\s\S]*?apuntarFallo\(e, 'render', false\);\s*this\.props\.alCaer\(e\.message\);/.test(
+    codigo,
+  );
+}
+
+/**
+ * Y LA PANTALLA MONTA ESA RED Y NO UNA SUYA: la importa del contrato y no recoge fallos por su
+ * cuenta. Una red propia al lado —con su `componentDidCatch`— es exactamente cómo la de Las Lindes
+ * se quedó sin apuntar, y por eso se prohíbe la pieza y no sólo se pide la otra.
+ */
+function montaLaRedDelContrato(codigo) {
+  return (
+    /import \{[^}]*\bRedDelLienzo\b[^}]*\} from '\.\/pintor-propio';/.test(codigo) &&
+    !/componentDidCatch|getDerivedStateFromError/.test(codigo)
+  );
+}
+
 async function cargarModuloTs(fichero) {
   const js = ts.transpileModule(leer(fichero), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
@@ -717,9 +749,14 @@ paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
    * volver a abrir) y se sigue jugando sobre el retablo. Se exige que el Canvas vaya
    * dentro de la red, que la red apunte, y que la pantalla tenga la rama que cae al
    * retablo: quitar cualquiera de las tres deja al teléfono sin partida.
+   *
+   * La red es la del CONTRATO DE PINTOR (`pintor-propio.tsx`) desde que las tres pantallas
+   * dejaron de tener cada una la suya: se exige que ésta monte ESA y ninguna propia
+   * (`montaLaRedDelContrato`) y que ésa apunte (`laRedDelContratoApunta`, arriba del todo).
    */
+  const contratoDePintor = leer(path.join(SRC, 'arcade', 'pintor-propio.tsx'));
   const dondeLaRed = codigoDeLaPantalla.join('\n');
-  const abreLaRed = dondeLaRed.indexOf('<RedDelLienzo alCaer={ponerElLienzoCayo}>');
+  const abreLaRed = dondeLaRed.indexOf('<RedDelLienzo juego={juego} alCaer={ponerElLienzoCayo}>');
   const elCanvas = dondeLaRed.indexOf('<Canvas');
   const cierraLaRed = dondeLaRed.indexOf('</RedDelLienzo>');
   comprobar(
@@ -728,8 +765,9 @@ paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
     { abreLaRed, elCanvas, cierraLaRed },
   );
   comprobar(
-    'y la red apunta el fallo antes de caer, para que el parte lo cuente al volver a abrir',
-    /class RedDelLienzo[\s\S]*?apuntarFallo\([^)]*'render'/.test(dondeLaRed) &&
+    'y la red es la del contrato de pintor, que apunta el fallo antes de caer para que el parte lo cuente al volver a abrir',
+    montaLaRedDelContrato(dondeLaRed) &&
+      laRedDelContratoApunta(contratoDePintor) &&
       /if \(elLienzoCayo !== null\)[\s\S]*?respaldoSobreElRetablo\(/.test(dondeLaRed),
   );
   comprobar(
@@ -908,6 +946,27 @@ paso('El delta se puede mirar de cerca, recorrer, y siempre se puede volver');
     'y los tres modos de la rueda se traducen a lo mismo (Firefox la manda en LÍNEAS)',
     /deltaMode === 1/.test(gestoSinComentarios) && /deltaMode === 2/.test(gestoSinComentarios),
     'tres líneas leídas como tres píxeles son un zoom que no se mueve',
+  );
+  /*
+   * ═══ Y CON LOS MISMOS CUATRO NÚMEROS QUE EL ESCRITORIO, QUE SE HABÍAN SEPARADO ═══
+   *
+   * `mirador-tactil.ts` decía que sus números eran una copia de los del escritorio, y ya no lo
+   * eran: el escritorio pasó a contar el modo línea EN LÍNEAS —tres por muesca— y esta copia se
+   * quedó pasándolas por dieciséis píxeles, o sea media muesca: en Firefox la rueda acercaba a la
+   * mitad de velocidad en la app y a la entera en el PC, en la misma máquina. Se leen los cuatro de
+   * los dos ficheros y se comparan; un número que falte en cualquiera de los dos es rojo, no igual.
+   */
+  const NUMEROS_DE_LA_RUEDA = ['PIXELES_POR_MUESCA', 'LINEAS_POR_MUESCA', 'MUESCAS_POR_PAGINA', 'MUESCAS_DE_GOLPE'];
+  const numerosDeLaRueda = (texto) => NUMEROS_DE_LA_RUEDA.map((n) => new RegExp(`const ${n} = (\\d+);`).exec(texto)?.[1] ?? null);
+  const losDelEscritorio = numerosDeLaRueda(leer(path.resolve(SRC, '..', '..', 'escritorio', 'src', 'lienzo-propio.tsx')));
+  const losDeAqui = numerosDeLaRueda(gestoSinComentarios);
+  comprobar(
+    'y la rueda cuenta con LOS MISMOS cuatro números que el escritorio —el modo línea en líneas, tres por muesca—: son los dos clientes de la misma partida en la misma máquina',
+    losDeAqui.every((n) => n !== null) &&
+      JSON.stringify(losDeAqui) === JSON.stringify(losDelEscritorio) &&
+      /e\.deltaMode === 1\s*\?\s*e\.deltaY \/ LINEAS_POR_MUESCA/.test(gestoSinComentarios) &&
+      !/PIXELES_POR_LINEA/.test(gestoSinComentarios),
+    { losDeAqui, losDelEscritorio },
   );
   comprobar(
     'el paseo de la mirada también existe con ratón: botón secundario o Mayúsculas',
@@ -2290,24 +2349,37 @@ paso(
 
   /* ─── La red bajo el lienzo ─── */
 
+  /*
+   * La red es la del CONTRATO DE PINTOR desde que las tres pantallas dejaron de tener cada una la
+   * suya: se exige que el Burgo monte ESA —importada, y sin recoger fallos por su cuenta— y que ésa
+   * apunte. Las dos mitades se ven caer: la pantalla sin la red, y el contrato sin el apunte.
+   */
+  const elContrato = leer(path.join(SRC, 'arcade', 'pintor-propio.tsx'));
   reglaDelFuente(
-    'el `Canvas` del Burgo va DENTRO de la red que cae al retablo si el lienzo revienta al pintar, y la red apunta el fallo',
+    'el `Canvas` del Burgo va DENTRO de la red que cae al retablo si el lienzo revienta al pintar, y la red es la del contrato de pintor',
     (t) => {
       const c = soloCodigo(t);
-      const abre = c.indexOf('<RedDelLienzo alCaer={ponerElLienzoCayo}>');
+      const abre = c.indexOf('<RedDelLienzo juego={juego} alCaer={ponerElLienzoCayo}>');
       const lienzo = c.indexOf('<Canvas');
       const cierra = c.indexOf('</RedDelLienzo>');
       return (
         abre >= 0 &&
         lienzo > abre &&
         cierra > lienzo &&
-        /class RedDelLienzo[\s\S]*?apuntarFallo\([^)]*'render'/.test(c) &&
+        montaLaRedDelContrato(c) &&
         /if \(elLienzoCayo !== null\) \{[\s\S]*?respaldoSobreElRetablo\(/.test(c)
       );
     },
     escena,
-    escena.replace('<RedDelLienzo alCaer={ponerElLienzoCayo}>', '<View>').replace('</RedDelLienzo>', '</View>'),
+    escena.replace('<RedDelLienzo juego={juego} alCaer={ponerElLienzoCayo}>', '<View>').replace('</RedDelLienzo>', '</View>'),
     'sin la red, un `throw` al pintar cierra la app en mitad de una partida de tres días',
+  );
+  reglaDelFuente(
+    'y la red del contrato apunta el fallo en el parte ANTES de avisar hacia arriba',
+    laRedDelContratoApunta,
+    elContrato,
+    elContrato.replace("apuntarFallo(e, 'render', false);", ''),
+    'sin el apunte, un lienzo que revienta en un teléfono no deja rastro: al volver a abrir, el parte no dice nada',
   );
 
   /* ─── Ninguna decisión por plataforma ─── */
@@ -3253,15 +3325,18 @@ paso(
    *     defecto) para que una pantalla que ya tiene su región pida el texto pelado. Sin
    *     él, el respaldo del Burgo se queda con dos regiones corteses a la vez.
    */
+  /*
+   * Y EL VESTÍBULO, QUE ES DONDE SÍ VA, YA NO ES DE ESTE FICHERO: desde el contrato de pintor es el
+   * de la plataforma (`LaMesaDeUnPintor`), y allí es la única región viva de su rama —lo compra la
+   * regla del contrato, más abajo—. Así que en la pantalla del Burgo no puede quedar NINGUNA: la
+   * que antes se contaba «una y sólo una, en el vestíbulo» ahora se cuenta cero, y la cinta sigue
+   * llevándose el aviso de la mesa en las dos ramas.
+   */
   reglaDelFuente(
-    'la pantalla del Burgo no monta `ElAviso` sobre la mesa: el aviso se lo lleva la cinta, que está siempre en el árbol',
+    'la pantalla del Burgo no monta `ElAviso` en ninguna parte: el del vestíbulo es del contrato de pintor, y sobre la mesa el aviso se lo lleva la cinta, que está siempre en el árbol',
     (t) => {
       const c = soloCodigo(t);
-      /* En el vestíbulo sí, y ahí es la única de esa pantalla: una y sólo una en todo el fichero. */
-      const cuantos = (c.match(/<ElAviso texto=\{mesa\.aviso\} \/>/g) ?? []).length;
-      const vestibulo = c.indexOf('<ElAviso texto={mesa.aviso} />');
-      const laMesa = c.indexOf('function LaMesaEnTres(');
-      return cuantos === 1 && vestibulo > 0 && laMesa > vestibulo && /avisoDeLaMesa=\{mesa\.aviso\}/.test(c);
+      return !/<ElAviso\b/.test(c) && /avisoDeLaMesa=\{mesa\.aviso\}/.test(c);
     },
     escena,
     escena.replace(
@@ -3330,6 +3405,245 @@ paso(
     hojas,
     hojas.replace("behavior={Platform.OS === 'ios' ? 'padding' : undefined}", ''),
     'en iOS el teclado se pone encima y se come los 336 de abajo: con la subasta abierta, el campo de la puja y su botón quedan detrás del teclado y se escribe a ciegas la cifra que decide un solar',
+  );
+}
+
+/*
+ * ═══ EL CONTRATO DE PINTOR DE LA APP: LO QUE ES DE CUALQUIER MESA, ESCRITO UNA VEZ ═══
+ *
+ * Riberas, el Burgo y Las Lindes escribían cada una la mesa, el vestíbulo con su plazo, el latido,
+ * los nombres, la barra, la red bajo el lienzo, el respaldo, el telón y la calidad; y la tercera
+ * copia ya se había quedado sin plazo, sin parte de fallos y con «Volcar la bolsa» —que es empezar
+ * la partida— en el botón de abrir la mesa. Desde `arcade/pintor-propio.tsx` todo eso es de la
+ * plataforma y cada pantalla pinta su escena con `LoQueVeElPintor`, como en el escritorio.
+ *
+ * Lo que puede volver en silencio es la COPIA: una pantalla que se escriba otra vez su vestíbulo,
+ * su barra o su red —y la copia es la que pierde la marca de Boots on Board, el plazo o el parte—,
+ * o un contrato que pierda una de sus piezas sin que ninguna pantalla se queje. Se lee el fuente,
+ * sabiendo lo que eso compra —que la forma está escrita— y lo que no: que se VEA bien en un
+ * teléfono, que es mirarlo. Cada regla se afirma sobre el fichero de verdad y se ve CAER con cada
+ * copia envenenada; un envenenado que no cambia el fichero cuenta como fallo.
+ */
+paso('El contrato de pintor de la app: las tres pantallas pintan su escena y la plataforma pone lo demás');
+{
+  const soloCodigo = (texto) =>
+    texto
+      .split('\n')
+      .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+      .join('\n');
+  /** Afirma la regla sobre el fichero de verdad, y la ve CAER con cada caso envenenado. */
+  const regla = (que, prueba, bueno, envenenados, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    envenenados.forEach((envenenado, i) => {
+      comprobar(
+        `y «${que}» se ve CAER con el caso envenenado ${String(i + 1)}`,
+        envenenado !== bueno && !prueba(envenenado),
+        envenenado === bueno ? 'el envenenado no ha cambiado el fichero: la regla no se está poniendo a prueba' : porque,
+      );
+    });
+  };
+  const contrato = leer(path.join(SRC, 'arcade', 'pintor-propio.tsx'));
+  /*
+   * LAS PANTALLAS DE PINTOR SE LEEN DE LA CARPETA, no de una lista escrita aquí: la de un juego nuevo
+   * —`<juego>-en-tres-escena.tsx`— queda vigilada sin tocar este guion, que es lo que el contrato
+   * promete. Su constante es la del juego en mayúsculas (`burgo` → `BURGO`), como las tres de hoy; y
+   * con SUELO, porque una lectura rota da cero pantallas y cero pantallas no juzgan nada.
+   */
+  const esPantallaDePintor = (f) => /^[a-z-]+-en-tres-escena\.tsx$/.test(f);
+  const LAS_TRES_DE_HOY = ['burgo', 'lindes', 'riberas'];
+  const PANTALLAS = fs
+    .readdirSync(path.join(SRC, 'arcade'))
+    .filter(esPantallaDePintor)
+    .map((f) => {
+      const juego = f.replace(/-en-tres-escena\.tsx$/, '');
+      return { juego, constante: juego.toUpperCase().replace(/-/g, '_'), fuente: leer(path.join(SRC, 'arcade', f)) };
+    });
+  comprobar(
+    `las pantallas de pintor se leen de la carpeta (${PANTALLAS.map((p) => p.juego).join(', ')}): las tres de hoy están, y la de un juego nuevo entra sola`,
+    LAS_TRES_DE_HOY.every((j) => PANTALLAS.some((p) => p.juego === j)) &&
+      esPantallaDePintor('nuevo-en-tres-escena.tsx') &&
+      !esPantallaDePintor('nuevo-en-tres.tsx') &&
+      !esPantallaDePintor('muelle-escena.tsx'),
+    PANTALLAS.map((p) => p.juego),
+  );
+
+  /* ── Cada pantalla: su `export default` es la plataforma, con SU juego y un pintor del módulo ── */
+  const delegaEnLaPlataforma = (constante) => (t) => {
+    const c = soloCodigo(t);
+    const m = /export default function \w+\(\): JSX\.Element \{\s*return <LaMesaDeUnPintor arcade=\{([A-Z_]+)\} Pintor=\{(\w+)\} \/>;\s*\}/.exec(
+      c,
+    );
+    return (
+      m !== null &&
+      m[1] === constante &&
+      new RegExp(`\\nfunction ${m[2]}\\(`).test(c) &&
+      /import \{[^}]*\bLaMesaDeUnPintor\b[^}]*\} from '\.\/pintor-propio';/.test(c) &&
+      /import type \{ LoQueVeElPintor \} from '\.\/pintor-propio';/.test(c)
+    );
+  };
+  /* ── Y ninguna se escribe otra vez lo que es de la plataforma; la barra la monta como le llega ── */
+  const sinLoDeLaPlataforma = (t) => {
+    const c = soloCodigo(t);
+    return (
+      !/\bmesa\.(abrir|entrar)\(/.test(c) &&
+      !/\bPLAZOS\b/.test(c) &&
+      !/<BarraDeLaMesa\b/.test(c) &&
+      !/\buseSafeAreaInsets\(/.test(c) &&
+      !/\busarMesaDeArcade\(/.test(c) &&
+      !/\blatir\(/.test(c) &&
+      !/componentDidCatch|getDerivedStateFromError/.test(c) &&
+      /\{laBarra\}/.test(c)
+    );
+  };
+  for (const p of PANTALLAS) {
+    regla(
+      `${p.juego}: su pantalla es la de la plataforma —\`LaMesaDeUnPintor\` con ${p.constante}— y su pintor es un componente del módulo`,
+      delegaEnLaPlataforma(p.constante),
+      p.fuente,
+      [
+        p.fuente.replace(/Pintor=\{(\w+)\} \/>/, 'Pintor={(q: LoQueVeElPintor) => <$1 {...q} />} />'),
+        p.fuente.replace(`arcade={${p.constante}}`, 'arcade={deLaRuta}'),
+      ],
+      'un pintor creado al pintar es un componente nuevo en cada latido, y React desmonta la escena entera con su contexto de dibujo; y con el parámetro de la ruta, la mesa sería la que diga el enlace',
+    );
+    regla(
+      `${p.juego}: y no se escribe otra vez nada de lo que es de la plataforma —ni vestíbulo, ni plazo, ni barra, ni área segura, ni mesa, ni latido, ni red propia—, y monta la barra que le llega`,
+      sinLoDeLaPlataforma,
+      p.fuente,
+      [
+        `${p.fuente}\nconst otra = <BarraDeLaMesa juego="" codigo="" asientos={[]} salir={() => {}} tirar={() => {}} arriba={0} />;`,
+        `${p.fuente}\nconst abre = () => mesa.abrir(nombre.trim());`,
+        `${p.fuente}\nclass OtraRed extends Component { componentDidCatch() {} }`,
+      ],
+      'una copia de la barra se queda sin la marca de Boots on Board, una de vestíbulo sin plazo y una de red sin parte: las tres cosas que la copia de Las Lindes ya había perdido',
+    );
+  }
+
+  /* ── Las Lindes, que es la que más gana: la red que apunta y el respaldo con la mesa entera ── */
+  const lasLindes = PANTALLAS.find((p) => p.juego === 'lindes')?.fuente ?? '';
+  regla(
+    'Las Lindes monta su lienzo DENTRO de la red del contrato, la que apunta el fallo, y la red la manda al respaldo',
+    (t) => {
+      const c = soloCodigo(t);
+      const abre = c.indexOf('<RedDelLienzo juego={juego} alCaer={valle.alFallar}>');
+      const lienzo = c.indexOf('<Canvas');
+      const cierra = c.indexOf('</RedDelLienzo>');
+      return abre >= 0 && lienzo > abre && cierra > lienzo && montaLaRedDelContrato(c);
+    },
+    lasLindes,
+    [lasLindes.replace('<RedDelLienzo juego={juego} alCaer={valle.alFallar}>', '<View>').replace('</RedDelLienzo>', '</View>')],
+    'su red de antes no apuntaba nada: un valle que se caía en un teléfono no dejaba rastro en el parte',
+  );
+  regla(
+    'y cae al respaldo del contrato —la mesa de siempre sobre el retablo, con la nota de por qué— cuando la vista no se lee y cuando el valle se cae',
+    (t) =>
+      /if \(valle\.escena === null \|\| valle\.roto !== null\) \{\s*return \(\s*<ElRespaldo\s+pintor=\{pintor\}\s+nota=\{/.test(soloCodigo(t)),
+    lasLindes,
+    [lasLindes.replace('if (valle.escena === null || valle.roto !== null) {', 'if (valle.escena === null) {')],
+    'sin la rama del valle que se cae, un tablero que no llega deja la mesa con el lienzo vacío y nada que tocar',
+  );
+
+  /* ── El contrato: el vestíbulo con su plazo, la barra con su marca, el latido, y lo que no sabe ── */
+  regla(
+    'el vestíbulo del contrato abre la mesa con el PLAZO elegido —en un grupo de radio—, entra con el código, y su única región viva es el aviso de la mesa',
+    (t) => {
+      const c = soloCodigo(t);
+      const desde = c.indexOf("if (mesa.fase === 'fuera' || mesa.mesa === null) {");
+      const hasta = c.indexOf('const vista = mesa.mesa;');
+      const vestibulo = desde >= 0 && hasta > desde ? c.slice(desde, hasta) : '';
+      return (
+        /PLAZOS\.map\(\(p, i\) => \(/.test(vestibulo) &&
+        /accessibilityRole="radiogroup"/.test(vestibulo) &&
+        /onPress=\{\(\) => mesa\.abrir\(nombre\.trim\(\), PLAZOS\[plazo\]\?\.segundos\)\}/.test(vestibulo) &&
+        /onPress=\{\(\) => mesa\.entrar\(codigo, nombre\.trim\(\)\)\}/.test(vestibulo) &&
+        (vestibulo.match(/<ElAviso texto=\{mesa\.aviso\} \/>/g) ?? []).length === 1 &&
+        !/accessibilityLiveRegion/.test(vestibulo)
+      );
+    },
+    contrato,
+    [contrato.replace('mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos)', 'mesa.abrir(nombre.trim())')],
+    'sin el plazo, desde el móvil sólo se abren mesas del plazo por defecto: una partida de días existe en el servidor y no hay forma de empezarla',
+  );
+  regla(
+    'y el pintor recibe la barra YA MONTADA —el juego, el código, salir, tirar, el área segura y la marca de Boots on Board de `esMesaDeBotas`—, y es la única barra del contrato',
+    (t) => {
+      const c = soloCodigo(t);
+      const barra = /laBarra=\{\s*<BarraDeLaMesa([\s\S]*?)\/>\s*\}/.exec(c)?.[1] ?? '';
+      return (
+        /juego=\{juego\}/.test(barra) &&
+        /codigo=\{vista\.codigo\}/.test(barra) &&
+        /asientos=\{vista\.asientos\}/.test(barra) &&
+        /salir=\{mesa\.salir\}/.test(barra) &&
+        /tirar=\{mesa\.tirar\}/.test(barra) &&
+        /arriba=\{bordes\.top\}/.test(barra) &&
+        /deBotas=\{esMesaDeBotas\(vista\)\}/.test(barra) &&
+        (c.match(/<BarraDeLaMesa\b/g) ?? []).length === 1
+      );
+    },
+    contrato,
+    [
+      contrato.replace('deBotas={esMesaDeBotas(vista)}', ''),
+      contrato.replace('arriba={bordes.top}\n          deBotas', 'arriba={0}\n          deBotas'),
+    ],
+    'sin la marca, una mesa de Boots on Board se pinta como una cualquiera; sin el área segura, en un iPhone con muesca los mandos de la barra caen debajo del reloj',
+  );
+  regla(
+    'y el latido de la cuenta atrás es del contrato: cada segundo en el último minuto, cada minuto el resto, y el ritmo se reelige en cada vuelta',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /const cada = quedan > 0 && quedan < 60_000 \? 1000 : 60_000;/.test(c) &&
+        /const reloj = setTimeout\(\(\) => latir\(\(n\) => n \+ 1\), cada\);/.test(c) &&
+        /\}, \[venceEn, latido\]\);/.test(c)
+      );
+    },
+    contrato,
+    [contrato.replace('}, [venceEn, latido]);', '}, [venceEn]);')],
+    'sin el latido en las dependencias, una mesa que entra en su último minuto sigue latiendo cada minuto y la cuenta atrás salta de sesenta en sesenta justo cuando se mira',
+  );
+  regla(
+    'y el contrato no sabe de ningún juego: ni una constante de arcade, ni la escena de ninguno, ni `three`',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        !/\b(BURGO|LINDES|RIBERAS|PEONZA|FRENTE|EL_ARCADE)\b/.test(c) &&
+        !/from '[^']*escenas\/(burgo|lindes)\//.test(c) &&
+        !/from '[^']*escenas\/(delta|andar-por-el-delta)'/.test(c) &&
+        !/from 'three'|@react-three\/fiber/.test(c) &&
+        !/-en-tres-escena/.test(c)
+      );
+    },
+    contrato,
+    [`${contrato}\nimport { BURGO } from '../../../shared/arcade/juegos';`],
+    'un contrato que sabe de un juego sale a medida de ese juego, y el siguiente vuelve a copiarse la pantalla entera',
+  );
+  regla(
+    'y su telón no coge el dedo: es un cartel encima del lienzo, no una tapa',
+    (t) => /export function ElTelon\([\s\S]*?<View style=\{estilos\.telon\} pointerEvents="none">/.test(soloCodigo(t)),
+    contrato,
+    [contrato.replace('<View style={estilos.telon} pointerEvents="none">', '<View style={estilos.telon}>')],
+    'un telón que coge el dedo deja el tablero de debajo sin poder tocarse mientras llega el mundo',
+  );
+  regla(
+    'y su respaldo es la mesa de siempre sobre el retablo: la barra, el turno, el aviso, la nota, el retablo, lo que el retablo no pinta y la crónica',
+    (t) => {
+      const c = soloCodigo(t);
+      const desde = c.indexOf('export function ElRespaldo(');
+      const r = desde >= 0 ? c.slice(desde) : '';
+      return (
+        /\{laBarra\}/.test(r) &&
+        /<LineaDelTurno mesa=\{vista\} nombres=\{nombres\} \/>/.test(r) &&
+        /<ElAviso texto=\{mesa\.aviso\} \/>/.test(r) &&
+        /<Text style=\{estilos\.nota\}>\{nota\}<\/Text>/.test(r) &&
+        /<Retablo tablero=\{tablero\} alTocar=\{mesa\.mover\} quieto=\{mesa\.quieto\} \/>/.test(r) &&
+        /const sueltas = tablero === null \? opciones : opcionesSueltas\(tablero, opciones\);/.test(r) &&
+        /\{hayAlgoQuePintar\(sueltas\) \? \(/.test(r) &&
+        /<LaCronica cronica=\{mesa\.cronica\} \/>/.test(r)
+      );
+    },
+    contrato,
+    [contrato.replace('const sueltas = tablero === null ? opciones : opcionesSueltas(tablero, opciones);', 'const sueltas = opciones;')],
+    'sin la criba, lo que el retablo ya pinta sale otra vez como botón; y sin las sueltas, lo que no pinta no sale en ninguna parte',
   );
 }
 
@@ -3556,8 +3870,14 @@ paso('Boots on Board en la app: la elección sólo en el lobby común, apagada c
     }
     return salen;
   };
-  /* Los vestíbulos PROPIOS: los que pinta cada juego cuando no hay mesa. No tienen elección y no la tendrán. */
-  const PROPIOS = ['burgo-en-tres-escena.tsx', 'lindes-en-tres-escena.tsx', 'riberas-en-tres-escena.tsx', 'tablero-en-linea.tsx'];
+  /*
+   * Los vestíbulos PROPIOS: los que se pintan cuando no hay mesa. No tienen elección y no la tendrán.
+   *
+   * Eran cuatro —uno por cada pantalla en tres dimensiones y el del mueble genérico— y ahora son
+   * DOS: el de las tres pantallas es uno solo, el del contrato de pintor (`pintor-propio.tsx`). Que
+   * ninguna de las tres vuelva a escribirse el suyo lo compra la regla del contrato, más arriba.
+   */
+  const PROPIOS = ['pintor-propio.tsx', 'tablero-en-linea.tsx'];
   const losDeLaApp = fs
     .readdirSync(path.join(SRC, 'arcade'))
     .filter((f) => /\.tsx?$/.test(f))
@@ -3587,6 +3907,163 @@ paso('Boots on Board en la app: la elección sólo en el lobby común, apagada c
   );
 }
 
+/*
+ * ═══ BOOTS ON BOARD EN LA APP: «GOLPEAR» ═══
+ *
+ * La refriega se golpea con la G en el escritorio, y aquí con un botón (`BotonDeGolpear`, en
+ * `mandos-del-paseo.tsx`). Todo lo que puede ir mal con él va mal en silencio, y en el escritorio
+ * nada de eso se ve:
+ *
+ *   · Que sea un `Pressable`: con el pulgar en la palanca, el dedo nuevo ni le pregunta —la
+ *     negociación empieza en el antepasado común de los dos—, y no se puede golpear andando. Tiene
+ *     que ser el toque en crudo, `onTouchStart`; y nada de `onClick`, que en la app no llega.
+ *   · Que quien reescribe la referencia —la palanca, sesenta veces por segundo; el correr— se deje
+ *     los golpes por el camino: el golpe del otro pulgar desaparece antes de que lo lea el paseo.
+ *   · Que tape la palanca o el correr, o que en el Burgo se salga de la franja del paseo, que mide
+ *     152 y fuera de la cual el dedo no llega en Android. La cuenta del sitio se EJECUTA: sus
+ *     medidas y `ladoDelGolpe` se sacan del fuente y se corren para los anchos de teléfono.
+ *   · Y que salga donde no toca —en una mesa normal, mirando la mesa— o que, escondido, siga
+ *     cogiendo el dedo: tiene que no pintarse.
+ *
+ * Lo que esto no compra es que en un teléfono se vea bien y se acierte con el pulgar: eso pide
+ * un teléfono. Cada regla se afirma sobre el fichero de verdad y se ve CAER envenenada.
+ */
+paso('Boots on Board en la app: «Golpear» sólo a pie y con canal, con el toque en crudo, sin tapar la palanca ni el correr, y sin perder un golpe');
+{
+  const mandos = leer(path.join(SRC, 'arcade', 'mandos-del-paseo.tsx'));
+  const laDelBurgo = leer(path.join(SRC, 'arcade', 'burgo-en-tres-escena.tsx'));
+  const PANTALLAS = [
+    ['Las Lindes', leer(path.join(SRC, 'arcade', 'lindes-en-tres-escena.tsx')), "modo !== 'mesa'"],
+    ['el Burgo', laDelBurgo, 'aPie'],
+    ['Riberas', leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx')), 'aPie'],
+  ];
+  const soloCodigo = (texto) =>
+    texto
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const aLaLetra = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  /** Afirma la regla sobre el fichero de verdad, y la ve CAER con cada caso envenenado. */
+  const regla = (que, prueba, bueno, envenenados, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    envenenados.forEach((envenenado, i) => {
+      comprobar(
+        `y «${que}» se ve CAER con el caso envenenado ${String(i + 1)}`,
+        envenenado !== bueno && !prueba(envenenado),
+        envenenado === bueno ? 'el envenenado no ha cambiado el fichero: la regla no se está poniendo a prueba' : porque,
+      );
+    });
+  };
+
+  /* ── El botón ── */
+  const elBoton = (t) =>
+    /export function BotonDeGolpear\(\{ mandos, visible \}: BotonDeGolpearProps\): JSX\.Element \| null \{([\s\S]*?)\n\}/.exec(soloCodigo(t))?.[1] ?? '';
+  regla(
+    '«Golpear» se pulsa con el toque EN CRUDO —`onTouchStart`, que llega aunque la palanca sea el respondedor—, sin `Pressable` ni `onClick`, cuenta un golpe más sin tocar lo demás, y el lector de pantalla lo activa',
+    (t) => {
+      const b = elBoton(t);
+      return (
+        b.length > 0 &&
+        /onTouchStart=\{\(\) => \{\s*golpear\(\);/.test(b) &&
+        !/Pressable|onPress|onClick/.test(b) &&
+        /mandos\.current = \{ \.\.\.mandos\.current, golpes: mandos\.current\.golpes \+ 1 \};/.test(b) &&
+        /accessibilityRole="button"/.test(b) &&
+        /accessibilityActions=\{ACCIONES_DEL_GOLPE\}/.test(b) &&
+        /if \(e\.nativeEvent\.actionName === 'activate'\) golpear\(\);/.test(b) &&
+        /const ACCIONES_DEL_GOLPE[^=]*= \[\{ name: 'activate', label: 'Golpear' \}\];/.test(t) &&
+        !/onClick/.test(soloCodigo(t))
+      );
+    },
+    mandos,
+    [mandos.replace('onTouchStart={() => {', 'onPress={() => {'), mandos.replace('golpes: mandos.current.golpes + 1', 'golpes: 1')],
+    'con un `Pressable`, andando con la palanca el botón no se entera, y sin sumar se pisan dos toques seguidos',
+  );
+  regla(
+    'y cuando no toca NO SE PINTA: su `return null` va antes de pintar nada y detrás de todos sus ganchos',
+    (t) => {
+      const b = elBoton(t);
+      const salida = b.indexOf('if (!visible) return null;');
+      return salida > 0 && b.indexOf('<View') > salida && !/\buse[A-Z]\w*\(/.test(b.slice(salida));
+    },
+    mandos,
+    [mandos.replace('if (!visible) return null;', '')],
+    'un botón escondido con opacidad seguiría cogiendo el dedo encima del tablero, y un gancho detrás del `return` rompe la pantalla al cambiar de rama',
+  );
+
+  /* ── Quien reescribe la referencia copia los golpes ── */
+  regla(
+    'la palanca y el correr, que reescriben la referencia, copian los golpes tal cual: el otro pulgar puede haber golpeado entre dos movimientos',
+    (t) => {
+      const escrituras = [...soloCodigo(t).matchAll(/mandos\.current = ([^;]*);/g)].map((m) => m[1] ?? '');
+      return escrituras.length >= 5 && escrituras.every((e) => e === 'SIN_MANDOS_DE_FUERA' || /\bgolpes: mandos\.current\.golpes\b/.test(e) || /\.\.\.mandos\.current\b/.test(e));
+    },
+    mandos,
+    [mandos.replace('y: -y / RECORRIDO }, deprisa: mandos.current.deprisa, golpes: mandos.current.golpes }', 'y: -y / RECORRIDO }, deprisa: mandos.current.deprisa }')],
+    'una palanca que reescribe `{ palanca, deprisa }` borra el golpe que el otro pulgar acaba de dar, y el golpe no sale nunca',
+  );
+
+  /* ── Dónde va, con la cuenta de verdad ── */
+  const MEDIDAS = ['BASE', 'ABAJO_DEL_CORRER', 'ANCHO_DEL_CORRER', 'LADO_DEL_GOLPE', 'LADO_MINIMO_DEL_GOLPE', 'HUECO_DEL_GOLPE', 'LO_DE_LA_PALANCA', 'LO_DEL_CORRER'];
+  const lasMedidas = MEDIDAS.map((n) => new RegExp(`^const ${n} = [^;\\n]+;`, 'm').exec(mandos)?.[0] ?? `const ${n} = Number.NaN;`);
+  const laCuenta = /export function ladoDelGolpe\(ancho: number\): number \{[\s\S]*?\n\}/.exec(mandos)?.[0] ?? 'export function ladoDelGolpe() { return Number.NaN; }';
+  const laFranja = /^const ALTO_DE_LA_FRANJA_ANDANDO = [^;\n]+;/m.exec(laDelBurgo)?.[0] ?? 'const ALTO_DE_LA_FRANJA_ANDANDO = Number.NaN;';
+  const js = ts.transpileModule(
+    `${lasMedidas.join('\n')}\n${laFranja}\n${laCuenta}\nexport const MEDIDAS = { BASE, ABAJO_DEL_CORRER, ANCHO_DEL_CORRER, LO_DEL_CORRER, ALTO_DE_LA_FRANJA_ANDANDO };`,
+    { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } },
+  ).outputText;
+  const { ladoDelGolpe, MEDIDAS: m } = await import(`data:text/javascript;base64,${Buffer.from(js, 'utf8').toString('base64')}`);
+  /** Dónde queda el golpe en un lienzo de `ancho` puntos, con su derecha a `derechaDelGolpe` del canto. */
+  const dibujo = (ancho, derechaDelGolpe = m.LO_DEL_CORRER) => {
+    const lado = ladoDelGolpe(ancho);
+    const derecha = ancho - derechaDelGolpe;
+    return { lado, izquierda: derecha - lado, derecha, arriba: m.ABAJO_DEL_CORRER + lado };
+  };
+  const tapa = (ancho, derechaDelGolpe) => {
+    const d = dibujo(ancho, derechaDelGolpe);
+    return d.izquierda < 16 + m.BASE || d.derecha > ancho - 16 - m.ANCHO_DEL_CORRER;
+  };
+  const ANCHOS = [360, 375, 390, 393, 412, 414, 428, 430];
+  comprobar(
+    'de 360 a 430 puntos de ancho, «Golpear» no tapa ni la palanca ni el correr',
+    ANCHOS.every((w) => !tapa(w)),
+    ANCHOS.map((w) => [w, dibujo(w)]),
+  );
+  comprobar('se ve fallar: con el golpe donde está el correr, lo tapa', ANCHOS.every((w) => tapa(w, 16)));
+  comprobar(
+    'y es grande para el pulgar: 76 puntos desde 375, 64 o más en todos, y nunca menos de 48, ni en 320 ni con un ancho roto',
+    ladoDelGolpe(375) === 76 && ANCHOS.every((w) => ladoDelGolpe(w) >= 64) && ladoDelGolpe(320) === 48 && ladoDelGolpe(Number.NaN) === 48,
+    ANCHOS.map((w) => ladoDelGolpe(w)),
+  );
+  comprobar(
+    `y cabe en la franja del paseo del Burgo (${String(m.ALTO_DE_LA_FRANJA_ANDANDO)} de alto), que es donde el dedo llega en Android`,
+    [320, ...ANCHOS].every((w) => dibujo(w).arriba <= m.ALTO_DE_LA_FRANJA_ANDANDO),
+    [320, ...ANCHOS].map((w) => dibujo(w).arriba),
+  );
+  comprobar(
+    'y el estilo lo pone donde dice la cuenta: a la izquierda del correr, a su altura, y el correr con su ancho fijo',
+    /golpear: \{\s*position: 'absolute',\s*right: LO_DEL_CORRER,\s*bottom: ABAJO_DEL_CORRER,/.test(mandos) &&
+      /correr: \{\s*position: 'absolute',\s*right: 16,\s*bottom: ABAJO_DEL_CORRER,\s*width: ANCHO_DEL_CORRER,/.test(mandos) &&
+      /\{ width: lado, height: lado, borderRadius: lado \/ 2 \}/.test(mandos),
+  );
+
+  /* ── Las tres pantallas lo montan: a pie, SÓLO con canal, junto a la palanca ── */
+  for (const [juego, fuente, aPie] of PANTALLAS) {
+    const esperado = new RegExp(
+      `<MandosDelPaseo mandos=\\{mandos\\} visibles=\\{${aLaLetra(aPie)}\\} \\/>\\s*<BotonDeGolpear mandos=\\{mandos\\} visible=\\{${aLaLetra(aPie)} && canal !== undefined\\} \\/>`,
+    );
+    regla(
+      `${juego}: la pantalla monta «Golpear» UNA vez, junto a la palanca y en su misma caja, a pie y SÓLO con canal`,
+      (t) => {
+        const c = soloCodigo(t);
+        return esperado.test(c) && (c.match(/<BotonDeGolpear\b/g) ?? []).length === 1 && /import \{ BotonDeGolpear \} from '\.\/mandos-del-paseo';/.test(c);
+      },
+      fuente,
+      [fuente.replace(`visible={${aPie} && canal !== undefined}`, `visible={${aPie}}`), `${fuente}\n<BotonDeGolpear mandos={mandos} visible />`],
+      'sin la pregunta por el canal, una mesa normal enseñaría un botón que no golpea a nadie; y fuera de la caja de la palanca, en el Burgo el dedo no llegaría en Android',
+    );
+  }
+}
+
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», el mismo que llevan el servidor y la escena.
  *
@@ -3614,7 +4091,14 @@ paso('Boots on Board en la app: la elección sólo en el lobby común, apagada c
  * después, con su propio código de salida (2) para que se distinga de una roja de verdad.
  */
 /* Y dieciocho más de Boots on Board en la app —la mitad, vacunas—: el guardia sube con ellas. */
-const COMPROBACIONES_ESCRITAS = 271;
+/* Y veintiuna de «Golpear», la refriega en la app —once de ellas, vacunas—: el guardia sube con ellas. */
+/*
+ * Y cuarenta y una del contrato de pintor de la app —veinticinco de ellas, vacunas—: las dos que se
+ * reescriben en la red de Riberas y del Burgo no cambian la cuenta, y la del Burgo gana su segunda
+ * mitad, la red del contrato vista caer sin el apunte. Y una más: la rueda de la app con los números
+ * del escritorio. El guardia sube con ellas.
+ */
+const COMPROBACIONES_ESCRITAS = 334;
 
 if (fallos.length > 0) {
   console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);

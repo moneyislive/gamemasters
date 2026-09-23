@@ -9,6 +9,16 @@
  * lo dice la lista de opciones que el juego acaba de componer, y qué significa un
  * toque lo dice la traducción de `shared/`.
  *
+ * ═══ Y LO QUE HACE IGUAL QUE LA APP, LO HACE CON LA APP ═══
+ *
+ * Las tres cámaras, el giro que se ajusta solo al señalar una casilla, la calidad medida,
+ * el `alFallar` que manda al retablo, lo que cada toque manda y el lienzo con la escena
+ * dentro estaban escritos aquí y otra vez en `app/src/arcade/lindes-en-tres-escena.tsx`,
+ * casi palabra por palabra. Ahora son del controlador de Las Lindes
+ * (`escenas/lindes/el-valle-en-la-mesa.ts`), que usan las dos pantallas. Lo que se queda
+ * aquí es lo que hace de esto el ESCRITORIO: el raíl, las teclas 1, 2, 3 y R, el cartel de
+ * cómo se anda, y el canal de Boots on Board, que cada cliente construye con su dirección.
+ *
  * ═══ EL RESPALDO NO ES UNA CORTESÍA ═══
  *
  * Si los modelos no llegan, si el navegador no da contexto de dibujo o si la vista
@@ -16,15 +26,6 @@
  * que se juega sin una línea de tres dimensiones—. Se puede jugar la partida
  * entera ahí. Esa es la decisión que hace que la escena sea un lujo y no una
  * dependencia, y está tomada desde el §6 del diseño.
- *
- * ═══ EL GIRO VIVE AQUÍ Y NO EN LA PARTIDA ═══
- *
- * Con qué giro se pone la losa es una decisión de PANTALLA hasta que se pulsa: no
- * es estado del juego, no viaja por el cable y no tiene que sobrevivir a nada. Va
- * en un `useState` y se manda dentro del movimiento. Si viviera en la partida,
- * girar sería un movimiento —una revisión más, un aviso a los demás aparatos y una
- * entrada en el diario— por cada vez que alguien le da vueltas a una losa antes de
- * decidirse.
  *
  * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
  *
@@ -35,61 +36,24 @@
  * dice también cómo va el canal. En una mesa normal no se pasa nada y la escena no abre
  * ningún socket.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { ACESFilmicToneMapping } from 'three';
 import { Lindes } from '../../escenas/lindes/Lindes';
-import type {
-  CanalDeBotas,
-  EstadoDelCanal,
-  ModoDeCamaraDeLasLindes,
-  TableroDeLasLindesEn3D,
-} from '../../escenas/lindes/tipos';
-import type { Calidad } from '../../escenas/embarcadero/tipos';
-import type { MuestraDelHilo } from '../../escenas/embarcadero/calidad';
-import { calidadDelValle, conLaMuestra } from '../../escenas/lindes/detalle';
-import { asientosQueAndan, esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
+import type { CanalDeBotas, EstadoDelCanal } from '../../escenas/lindes/tipos';
 import {
-  elSiguienteGiro,
-  girosQueCaben,
-  accionesFueraDeLosSitios,
-  laAccionDePasar,
-  movimientoDePoner,
-  sitiosQueSeOfrecen,
-  tableroEnTres,
-} from '../../shared/arcade/juegos/lindes-en-tres';
-/*
- * DEL JUEGO, NUNCA DEL ÍNDICE: `shared/arcade/juegos/index.ts` INSTALA los siete
- * arcades al cargarse, y eso es cosa del servidor. Este cliente sólo necesita el
- * catálogo de losas. Es la misma razón que `pintores.ts` ya tenía escrita para su
- * importación de `RIBERAS`.
- */
-import { losaPorId } from '../../shared/arcade/juegos/lindes-losas';
-import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
-import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declarado';
+  alCrearElLienzoDelValle,
+  EL_LIENZO_DEL_VALLE,
+  LAS_CAMARAS_DEL_VALLE,
+  usarElValleEnLaMesa,
+} from '../../escenas/lindes/el-valle-en-la-mesa';
+import { asientosQueAndan, esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
+import { COMO_SE_GOLPEA } from '../../escenas/paseo/mandos';
 import { LimiteDelMundo } from './lienzo-propio';
 import { direccionDelCanal } from './mesa';
 import { traer } from './muelle';
 import type { LoQueVeElPintor } from './pintores';
 import { AccionesDelTablero, Retablo } from './retablo';
-
-/** El campo vertical de la cámara. El mismo que usa `camaraDeMesa` para encuadrar. */
-const CAMPO = 45;
-
-/**
- * LO QUE SE VE DESDE DÓNDE, con su rótulo.
- *
- * Tres, y las tres hacen falta: la de mesa es con la que se juega, la de hombro es
- * con la que se recorre, y la de ojos es la que hace que el tablero deje de ser
- * una maqueta y pase a ser un sitio. Se cambia con un botón y con las teclas 1, 2
- * y 3, que es lo que se busca a ciegas mientras se anda.
- */
-const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string; ayuda: string }[] = [
-  { modo: 'mesa', rotulo: 'La mesa', ayuda: 'Desde arriba, con el tablero entero a la vista.' },
-  { modo: 'hombro', rotulo: 'Al hombro', ayuda: 'Detrás de tu figura. Se anda con W, A, S, D.' },
-  { modo: 'ojos', rotulo: 'Sus ojos', ayuda: 'Desde su cara, andando por encima de las losas.' },
-];
 
 /**
  * CÓMO SE ANDA, ESCRITO ENCIMA DEL VALLE MIENTRAS SE ANDA.
@@ -108,7 +72,9 @@ const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string; 
  * En el mismo cartel y debajo, `canal`: «Conectando…», «Dentro», «Sin conexión: …». Es el sitio
  * donde se mira mientras se anda, y no hace falta otro. Desde la mesa también se enseña —allí no se
  * anda, pero el canal sigue abierto y conviene saber si al bajar se verá a los demás—; sin canal,
- * en la mesa no sale nada, como siempre.
+ * en la mesa no sale nada, como siempre. Y con canal se golpea: la tecla va con las de andar
+ * (`COMO_SE_GOLPEA`, que sale de la misma tecla que lee el paseo), y los corazones propios los
+ * trae el texto del canal.
  */
 export function ComoSeAnda({
   modo,
@@ -121,6 +87,7 @@ export function ComoSeAnda({
   return (
     <p className="lindes-como-se-anda">
       W A S D o las flechas para andar · Mayúsculas para correr
+      {canal === undefined ? null : ` · ${COMO_SE_GOLPEA}`}
       {canal === undefined ? null : (
         <>
           <br />
@@ -173,27 +140,6 @@ export function LindesEnTres({
     },
     [foco],
   );
-  const vista = puesta.vista;
-
-  const datos = useMemo(() => tableroEnTres(vista), [vista]);
-  const [rotoElLienzo, setRotoElLienzo] = useState(false);
-  /*
-   * ═══ LA CALIDAD SE MIDE, NO SE ESCRIBE ═══
-   *
-   * Era `useState('plena')` sin quien la cambiara: una constante con forma de estado. Ahora la
-   * escena manda por `alMedir` lo que le cuesta cada segundo y `calidadDelValle`
-   * (`escenas/lindes/detalle.ts`) decide con el juez de la casa, sobre las últimas doce muestras
-   * y sin volver a subir: el tablero crece de una losa a setenta y dos, y juzgar sólo al montar
-   * sería juzgar siempre el de una. La misma cuenta que hace la app.
-   */
-  const [calidad, setCalidad] = useState<Calidad>('plena');
-  const muestras = useRef<MuestraDelHilo[]>([]);
-  const alMedir = useCallback((m: { triangulos: number; llamadas: number; ms: number; fotogramas: number }) => {
-    muestras.current = conLaMuestra(muestras.current, { ms: m.ms, fotogramas: m.fotogramas });
-    setCalidad((antes) => calidadDelValle(antes, muestras.current));
-  }, []);
-  const [giro, setGiro] = useState<Giro>(0);
-  const [senalada, setSenalada] = useState<{ x: number; y: number } | null>(null);
 
   /*
    * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
@@ -225,10 +171,12 @@ export function LindesEnTres({
     if (esBotas) setModo('hombro');
   }, [esBotas, puesta.codigo]);
 
-  const alFallar = useCallback((motivo: string) => {
-    console.warn(`El valle no se ha podido pintar (${motivo}): se juega sobre el retablo.`);
-    setRotoElLienzo(true);
-  }, []);
+  /*
+   * EL CONTROLADOR DE LAS LINDES: la escena, el giro, la calidad, los sitios y lo que manda cada
+   * toque, lo mismo que la app. Ver la cabecera de `escenas/lindes/el-valle-en-la-mesa.ts`.
+   */
+  const valle = usarElValleEnLaMesa({ puesta, tablero, opciones, mover, quieto, modo, traer });
+  const { datos, senalada, girar, girosAqui, laLosa, sitios, sinRepetir, alTocar } = valle;
 
   /* Las teclas: 1, 2 y 3 cambian de cámara; R gira la losa. */
   useEffect(() => {
@@ -236,79 +184,22 @@ export function LindesEnTres({
       if (e.key === '1') setModo('mesa');
       else if (e.key === '2') setModo('hombro');
       else if (e.key === '3') setModo('ojos');
-      else if (e.key.toLowerCase() === 'r' && datos !== null && senalada !== null) {
-        setGiro((g) => elSiguienteGiro(girosQueCaben(datos, senalada.x, senalada.y), g));
-      } else return;
+      else if (e.key.toLowerCase() === 'r' && datos !== null && senalada !== null) girar();
+      else return;
       e.preventDefault();
     };
     document.addEventListener('keydown', oye);
     return () => document.removeEventListener('keydown', oye);
-  }, [datos, senalada]);
-
-  const alTocarHueco = useCallback(
-    (x: number, y: number, conGiro: Giro) => {
-      void mover(movimientoDePoner(x, y, conGiro));
-    },
-    [mover],
-  );
-
-  const alSenalarHueco = useCallback((x: number | null, y: number | null) => {
-    setSenalada(x === null || y === null ? null : { x, y });
-  }, []);
+  }, [datos, senalada, girar]);
 
   /*
-   * EL RELOJ DE ARENA DE LA ESCENA ES TAMBIÉN EL BOTÓN DE PASAR, y lo que manda
-   * es LA MISMA acción que manda el botón de la tira: se la pregunta a
-   * `shared/`, que es quien sabe cuál de las acciones del tablero es la de no
-   * plantar. Dos caminos al mismo gesto que mandaran cosas distintas serían dos
-   * gestos, y uno de los dos acabaría roto sin que nadie lo notara.
+   * LA TIRA DE LAS ACCIONES, SIN LO QUE YA ESTÁ EN «DÓNDE PLANTAR». Sólo en el camino del LIENZO:
+   * el del respaldo —abajo, cuando no hay tablero en tres dimensiones— no pinta «Dónde plantar»,
+   * así que allí `acciones` tiene que seguir trayéndolos todos o no se podría plantar.
    */
-  const laDePasar = useMemo(() => laAccionDePasar(tablero), [tablero]);
-
-  const alTocar = useCallback(
-    (movimiento: MovimientoDeclarado) => {
-      void mover(movimiento);
-    },
-    [mover],
-  );
-
-  const sitios = useMemo(() => sitiosQueSeOfrecen(vista, opciones), [vista, opciones]);
-  /*
-   * ═══ LO QUE VA EN LA SEGUNDA LISTA: LO QUE LA PRIMERA NO PINTA YA ═══
-   *
-   * `acciones` trae TODO lo que no sea poner una losa, así que traía también los
-   * plantados — y éstos ya salen arriba, en «Dónde plantar», con lo que valdría cada uno.
-   * Cada sitio aparecía DOS veces: una con su valor y otra sin nada.
-   *
-   * Sólo se filtra en el camino del LIENZO. El del respaldo —arriba, cuando no hay
-   * tablero en tres dimensiones— no pinta «Dónde plantar», así que allí `acciones` tiene
-   * que seguir trayéndolos todos o no se podría plantar.
-   */
-  const sinRepetir = useMemo(() => accionesFueraDeLosSitios(tablero, sitios), [tablero, sitios]);
   const loQueNoEstaArriba = useMemo(() => ({ ...tablero, acciones: sinRepetir }), [tablero, sinRepetir]);
-  const enMano = datos === null ? '' : datos.enMano;
-  const laLosa = enMano === '' ? null : losaPorId(enMano);
-  const girosAquí = useMemo(
-    () => (datos === null || senalada === null ? [] : girosQueCaben(datos, senalada.x, senalada.y)),
-    [datos, senalada],
-  );
 
-  /*
-   * EL GIRO SE AJUSTA SOLO AL SEÑALAR UNA CASILLA. Si el que llevas elegido no
-   * cabe ahí, pasa al primero que sí: lo contrario es un fantasma que no aparece y
-   * un toque que pone la losa de otra manera. Enseñar lo que va a pasar antes de
-   * que pase es toda la gracia del fantasma.
-   */
-  useEffect(() => {
-    if (girosAquí.length === 0) return;
-    if (girosAquí.indexOf(giro) >= 0) return;
-    setGiro(girosAquí[0] as Giro);
-  }, [girosAquí, giro]);
-
-  const camara: ModoDeCamaraDeLasLindes =
-    modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: puesta.yo ?? '' };
-
-  if (datos === null || rotoElLienzo) {
+  if (valle.escena === null || valle.roto !== null) {
     return (
       <div className="lindes-respaldo">
         <Retablo tablero={tablero} alTocar={alTocar} quieto={quieto} />
@@ -320,39 +211,9 @@ export function LindesEnTres({
   return (
     <div className="lienzo-propio lindes-pantalla">
       <div className="lindes-lienzo" ref={apuntarElRecuadro}>
-        <LimiteDelMundo alFallar={alFallar}>
-          <Canvas
-            shadows={false}
-            dpr={[1, 2]}
-            gl={{ antialias: true }}
-            camera={{ fov: CAMPO, near: 1, far: 6000 }}
-            onCreated={({ gl }) => {
-              gl.toneMapping = ACESFilmicToneMapping;
-              gl.toneMappingExposure = 1.02;
-            }}
-          >
-            <Lindes
-              tablero={datos}
-              codigo={puesta.codigo}
-              traer={traer}
-              calidad={calidad}
-              camara={camara}
-              giroEnMano={giro}
-              /*
-               * LA FIGURA DE QUIEN PASEA, sacada del asiento de la mesa. Si no eligió
-               * ninguna, `figuraQueSePinta` saca una del identificador: nunca se queda
-               * sin nadie a quien seguir por no haber pasado un dato.
-               */
-              figura={puesta.asientos.find((a) => a.id === puesta.yo)?.figura}
-              quieto={quieto}
-              sePuedePasar={laDePasar !== null && !quieto}
-              alPasar={laDePasar === null ? undefined : () => alTocar(laDePasar.toque)}
-              alTocarHueco={alTocarHueco}
-              alSenalarHueco={alSenalarHueco}
-              alFallar={alFallar}
-              alMedir={alMedir}
-              canal={canal}
-            />
+        <LimiteDelMundo alFallar={valle.alFallar}>
+          <Canvas {...EL_LIENZO_DEL_VALLE} onCreated={alCrearElLienzoDelValle}>
+            <Lindes {...valle.escena} canal={canal} />
           </Canvas>
         </LimiteDelMundo>
 
@@ -361,7 +222,7 @@ export function LindesEnTres({
         <ComoSeAnda modo={modo} canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined} />
 
         <div className="lindes-camaras" role="group" aria-label="Desde dónde se mira">
-          {LAS_CAMARAS.map((c) => (
+          {LAS_CAMARAS_DEL_VALLE.map((c) => (
             <button
               key={c.modo}
               type="button"
@@ -405,10 +266,10 @@ export function LindesEnTres({
             <button
               type="button"
               className="lindes-girar"
-              disabled={girosAquí.length < 2 || quieto}
-              onClick={() => setGiro((g) => elSiguienteGiro(girosAquí, g))}
+              disabled={girosAqui.length < 2 || quieto}
+              onClick={girar}
             >
-              Girar {girosAquí.length < 2 ? '' : `(${girosAquí.length} maneras)`}
+              Girar {girosAqui.length < 2 ? '' : `(${girosAqui.length} maneras)`}
             </button>
             <p className="lindes-pista">
               {senalada === null

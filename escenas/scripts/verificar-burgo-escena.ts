@@ -373,6 +373,24 @@ const PUROS = ['tipos.ts', 'anillo-en-3d.ts', 'presupuesto.ts', 'coreografia.ts'
   comprobar(`los ${String(PUROS.length - 1)} ficheros de aritmética (y piezas.ts) no importan three`, conThree.length === 0, conThree);
   const faltan = PUROS.filter((f) => !fs.existsSync(path.join(CARPETA, f)));
   comprobar(`y los ${String(PUROS.length)} existen`, faltan.length === 0, faltan);
+
+  /*
+   * ═══ Y LO QUE SE MUDÓ A `escenas/comun/`, CON LAS MISMAS PROHIBICIONES ═══
+   *
+   * El cargador del reloj, el arranque y la medida, la marioneta, las props de tablero y el renglón del
+   * presupuesto vivían, entre otros sitios, en esta carpeta, y este barrido los miraba. Se han mudado a
+   * `comun/`, y el barrido va con ellos: sin esto, un `window` escrito allí llegaría al Burgo sin que
+   * nadie lo viera. Y los dos de allí que leen `tipos.ts` y `presupuesto.ts` de aquí —puros, que este
+   * guion importa en Node— tampoco pueden traer `three`: el regex de arriba mira el `import` de este
+   * fichero, no el del que importa. CERO INSPECCIONADOS ES UN FALLO: se cuentan.
+   */
+  const COMUN = path.join(RAIZ, 'comun');
+  const deComun = fs.existsSync(COMUN) ? fs.readdirSync(COMUN).filter((f) => /\.tsx?$/.test(f)) : [];
+  const enComun = deComun.flatMap((f) => loProhibidoEn(fs.readFileSync(path.join(COMUN, f), 'utf8')).map((q) => `comun/${f}: ${q}`));
+  comprobar(`ni ninguno de los ${String(deComun.length)} de escenas/comun, adonde se mudó parte de lo de aquí`, deComun.length >= 6 && enComun.length === 0, { deComun, enComun });
+  const PUROS_DE_COMUN = ['presupuesto.ts', 'tablero.ts'];
+  const comunConThree = PUROS_DE_COMUN.filter((f) => !fs.existsSync(path.join(COMUN, f)) || /from\s+['"]three['"]|from\s+['"]three\/|from\s+['"]react|@react-three\/fiber/.test(sinComentarios(fs.readFileSync(path.join(COMUN, f), 'utf8'))));
+  comprobar('y los dos puros de comun que leen tipos.ts y presupuesto.ts existen y no traen three ni React', comunConThree.length === 0, comunConThree);
 }
 
 // ---------------------------------------------------------------------------
@@ -2357,7 +2375,7 @@ if (fs.existsSync(ANIMACIONES)) {
   const d = await io.read(ANIMACIONES);
   for (const anim of d.getRoot().listAnimations()) clipsDelFichero.add(anim.getName());
 }
-comprobar('animaciones.glb está y trae los doce clips de CLIP', Object.values(CLIP).every((c) => clipsDelFichero.has(c)), [...clipsDelFichero]);
+comprobar('animaciones.glb está y trae los trece clips de CLIP', Object.values(CLIP).every((c) => clipsDelFichero.has(c)), [...clipsDelFichero]);
 
 /** La distancia de un punto a la polilínea como conjunto de segmentos (cerrada). */
 function distanciaALaPolilinea(p: Punto): number {
@@ -3178,23 +3196,40 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
    * en UNA llamada —medido en el banco, sueltos subían la escena de 117 a 207 llamadas con un tope de
    * 150— y, si no llega, no se avisa por `alFallar`: el escritorio mandaría la partida al tablero dibujado
    * por un fichero de arte.
+   *
+   * La carga es la COMÚN, `relojDe` de `comun/reloj.ts`: el Burgo tuvo su copia, `relojDelBurgoDe`, con
+   * su caché y su aviso, y se fue. Así que lo que se mira es que la escena la use —y no traiga otra— y que
+   * el cargador común, que es donde vive el trato del 404, lo diga por consola y no llame a ningún aviso.
    */
-  const relojBienMontado = (codigo: string): boolean => {
-    const carga = /function relojDelBurgoDe\(traer: Traer\): Promise<RelojCargado \| null> \{([\s\S]*?)\n\}/.exec(codigo)?.[1] ?? null;
+  const codigoDelCargadorDelReloj = sinComentarios(fs.readFileSync(path.join(RAIZ, 'comun', 'reloj.ts'), 'utf8'));
+  const relojBienMontado = (codigo: string, cargador: string): boolean => {
+    const carga = /export function relojDe\(traer: Traer\): Promise<RelojCargado \| null> \{([\s\S]*?)\n\}/.exec(cargador)?.[1] ?? null;
     return (
       carga !== null &&
+      /console\.warn\(/.test(carga) &&
       !/alFallar|falla\(/.test(carga) &&
-      /relojDelBurgoDe\(traer\)\.then/.test(codigo) &&
+      /import \{ relojDe \} from '\.\.\/comun\/reloj';/.test(codigo) &&
+      /\brelojDe\(traer\)\.then/.test(codigo) &&
+      !/WeakMap<Traer, Promise<RelojCargado/.test(codigo) &&
+      !/\brutaDelReloj\(/.test(codigo) &&
       /tamano\.y \/ ENVOLVENTE_DEL_RELOJ\.alto, Math\.max\(tamano\.x, tamano\.z\) \/ \(2 \* ENVOLVENTE_DEL_RELOJ\.radio\)/.test(codigo) &&
       /new THREE\.InstancedMesh\(primero\.geometry, primero\.material, granos\.length\)/.test(codigo) &&
       /for \(const g of granos\) g\.visible = false;/.test(codigo) &&
       /chorro\.setMatrixAt\(k, auxMatriz\.multiplyMatrices\(nodo\.matrix, g\.matrix\)\)/.test(codigo)
     );
   };
-  comprobar('el reloj de Riberas se normaliza al cilindro de la caja, pinta sus cincuenta granos en una llamada y, si no llega, no tumba el anillo', relojBienMontado(codigoDelBurgo));
   comprobar(
-    'se ve fallar: con el reloj que no llega avisado por alFallar, o con los granos sueltos, cae',
-    !relojBienMontado(codigoDelBurgo.replace(/(function relojDelBurgoDe\(traer: Traer\): Promise<RelojCargado \| null> \{[\s\S]*?)console\.warn\(/, '$1alFallar(')) && !relojBienMontado(codigoDelBurgo.replace('for (const g of granos) g.visible = false;', '')),
+    'el reloj de Riberas se trae con el cargador común, se normaliza al cilindro de la caja, pinta sus cincuenta granos en una llamada y, si no llega, no tumba el anillo',
+    relojBienMontado(codigoDelBurgo, codigoDelCargadorDelReloj),
+  );
+  comprobar(
+    'se ve fallar: con el reloj que no llega avisado por alFallar, con los granos sueltos o con un cargador propio otra vez en la escena, cae',
+    !relojBienMontado(codigoDelBurgo, codigoDelCargadorDelReloj.replace('console.warn(', 'alFallar(')) &&
+      !relojBienMontado(codigoDelBurgo.replace('for (const g of granos) g.visible = false;', ''), codigoDelCargadorDelReloj) &&
+      !relojBienMontado(
+        `${codigoDelBurgo.replace('relojDe(traer).then', 'relojDelBurgoDe(traer).then')}\nconst relojesDelBurgo = new WeakMap<Traer, Promise<RelojCargado | null>>();\nfunction relojDelBurgoDe(traer: Traer): Promise<RelojCargado | null> { return traer(rutaDelReloj()).then(() => null); }`,
+        codigoDelCargadorDelReloj,
+      ),
   );
   /*
    * `RelojDelBurgo` (`tipos.ts`) ES `RelojDeLaMesa` (`reloj.tsx`) CAMPO A CAMPO. Está escrito dos veces
@@ -3295,14 +3330,54 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   const elAnillo = await import('../burgo/anillo-en-3d');
   comprobar('y ya no hay paño de dados en el campo: anillo-en-3d.ts no lo exporta y Burgo.tsx no lo pinta', !('SUELO_DE_DADOS' in elAnillo) && !/SUELO_DE_DADOS/.test(codigoDelBurgo));
   comprobar('computeBoundingSphere se llama tras escribir matrices instanciadas', (codigoDelBurgo.match(/computeBoundingSphere\(\)/g) ?? []).length >= 3);
-  comprobar('alEstarListo se avisa desde el hilo de dibujo con tope de quince segundos', /TOPE_DE_ARRANQUE_MS = 15_000/.test(codigoDelBurgo) && /alEstarListo\?\.\(\)/.test(codigoDelBurgo));
+  /*
+   * `alEstarListo` desde el hilo de dibujo y con tope de quince segundos: lo lleva el gancho común
+   * (`comun/arranque.ts`), que la escena arranca cuando `burgo.glb` y `dados.glb` han llegado o fallado,
+   * y la escena no avisa por su cuenta. Se juzgan los dos fuentes, y cada caso envenenado rompe uno.
+   */
+  const codigoDelArranque = sinComentarios(fs.readFileSync(path.join(RAIZ, 'comun', 'arranque.ts'), 'utf8'));
+  const avisaListo = (escena: string, gancho: string): boolean =>
+    /export const TOPE_DE_ARRANQUE_MS = 15_000;/.test(gancho) &&
+    /\}, TOPE_DE_ARRANQUE_MS\);/.test(gancho) &&
+    /useFrame\(\(s, dtCrudo\) => \{[\s\S]*?losAvisos\.current\.alEstarListo\?\.\(\);/.test(gancho) &&
+    /const arrancar = usarArranqueYMedida\(props, \{ llave: traer, alVencerElTope: \(\) => falla\('el burgo no ha contestado en quince segundos'\) \}\);/.test(escena) &&
+    /void Promise\.all\(\[burgo, losDados\]\)\.then\(\(\) => \{\s*if \(vivo\.current\) arrancar\(\);\s*\}\);/.test(escena) &&
+    !/\balEstarListo\?\.\(\)/.test(escena);
+  comprobar('alEstarListo se avisa desde el hilo de dibujo con tope de quince segundos: con el gancho común, arrancado cuando llegan los dos .glb', avisaListo(codigoDelBurgo, codigoDelArranque));
+  comprobar(
+    'se ve fallar: sin arrancar al llegar los .glb, con otro tope, o avisando la escena por su cuenta, cae',
+    !avisaListo(codigoDelBurgo.replace('if (vivo.current) arrancar();', ''), codigoDelArranque) &&
+      !avisaListo(codigoDelBurgo, codigoDelArranque.replace('TOPE_DE_ARRANQUE_MS = 15_000', 'TOPE_DE_ARRANQUE_MS = 60_000')) &&
+      !avisaListo(`${codigoDelBurgo}\navisos.current.alEstarListo?.();`, codigoDelArranque),
+  );
   comprobar(
     'la `tercera-persona` reservada ya no existe: las cámaras son las tres de Las Lindes —`mesa`, `hombro` y `ojos`— en el contrato y en la escena',
     !/tercera-persona/.test(codigoDelBurgo) &&
       !/tercera-persona/.test(sinComentarios(fs.readFileSync(path.join(CARPETA, 'tipos.ts'), 'utf8'))) &&
       /\| \{ readonly modo: 'mesa' \}\s*\| \{ readonly modo: 'hombro'; readonly asiento: string \}\s*\| \{ readonly modo: 'ojos'; readonly asiento: string \}/.test(fs.readFileSync(path.join(CARPETA, 'tipos.ts'), 'utf8')),
   );
-  comprobar('Aventurero.tsx nunca pide t-pose ni reproduce sin marioneta', !/tPose|t-pose/.test(codigoDelAventurero) && /marioneta === null\) return/.test(codigoDelAventurero));
+  /*
+   * NUNCA EN T: el aventurero no pide `t-pose` ni reproduce sin marioneta, y la marioneta la monta y la
+   * pinta lo común (`comun/marioneta.tsx`), que es donde vive ahora la otra mitad de la promesa —la que
+   * estaba aquí—: sin biblioteca no se monta ni se clona nada, y sin marioneta no se pinta nada.
+   */
+  const codigoDeLaMarionetaComun = sinComentarios(fs.readFileSync(path.join(RAIZ, 'comun', 'marioneta.tsx'), 'utf8'));
+  const nuncaEnT = (aventurero: string, comun: string): boolean =>
+    !/tPose|t-pose/.test(aventurero) &&
+    /marioneta === null\) return/.test(aventurero) &&
+    /const marioneta = usarMarioneta\(cargado, biblioteca\);/.test(aventurero) &&
+    /<Marioneta de=\{marioneta\}/.test(aventurero) &&
+    /biblioteca\.length === 0 \? null : montaMarioneta\(cargado, biblioteca\)/.test(comun) &&
+    /if \(de === null\) return null;/.test(comun);
+  comprobar(
+    'Aventurero.tsx nunca pide t-pose ni reproduce sin marioneta, y la monta y la pinta lo común, que sin clips no monta nada ni pinta nada',
+    nuncaEnT(codigoDelAventurero, codigoDeLaMarionetaComun),
+  );
+  comprobar(
+    'se ve fallar: un <Marioneta> que pinta sin marioneta, o un montaje que no mira si hay biblioteca, cae',
+    !nuncaEnT(codigoDelAventurero, codigoDeLaMarionetaComun.replace('if (de === null) return null;', '')) &&
+      !nuncaEnT(codigoDelAventurero, codigoDeLaMarionetaComun.replace('biblioteca.length === 0 ? null : ', '')),
+  );
   /* Vacunas del barrido: un fuente sin React, con Vector3 en props o con prioridad en useFrame. */
   comprobar('se ve fallar: un fuente con `position={new THREE.Vector3()}` cae, y una terna pasa', CON_VECTOR.test('<mesh position={new THREE.Vector3(1, 2, 3)} />') && !CON_VECTOR.test('<mesh position={[1, 2, 3]} />'));
   comprobar('se ve fallar: un `useFrame(() => {}, 1)` cae', CON_PRIORIDAD.test('useFrame((s) => { s.x; }, 1);'));

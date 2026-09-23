@@ -155,7 +155,8 @@
  * llegado O HAN FALLADO se deja pintar un fotograma y en el siguiente se avisa; si
  * `traer` no contesta nunca, un tope de quince segundos avisa igual con cielo y luz.
  * `alFallar` va una vez por fichero. `alMedir` una vez por segundo con la media real de
- * milisegundos (cada fotograma acotado a 100 ms). `alTerminarLaCola` cuando la cola y
+ * milisegundos (cada fotograma acotado a 100 ms). `alEstarListo` y `alMedir` los lleva el gancho
+ * común de `comun/arranque.ts`, el mismo de las demás escenas. `alTerminarLaCola` cuando la cola y
  * todas las máquinas de peón han quedado en reposo tras una jugada con sucesos.
  *
  * `alSenalarCasilla` sale de las MISMAS asas que el toque, y sólo cuando la casilla señalada
@@ -185,10 +186,12 @@ import { LEJANIA, loCogeLaInterfaz, MINIMO_PARA_GIRAR } from '../camara';
 import { ORDEN_DE_LAS_CARTAS, ORDEN_DE_LAS_CASILLAS } from '../capas';
 import { catalogoDeModelos, MODELO } from '../modelos';
 import type { CatalogoDeModelos } from '../modelos';
-import { rutaDeLosDados, rutaDelBurgo, rutaDelReloj } from '../ruta-de-modelos';
+import { rutaDeLosDados, rutaDelBurgo } from '../ruta-de-modelos';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { GIRO_DEL_RELOJ, RelojDeArena, VACIADO_DEL_RELOJ } from '../reloj';
-import type { RelojCargado } from '../reloj';
+import { relojDe } from '../comun/reloj';
+import type { RelojCargado } from '../comun/reloj';
+import { usarArranqueYMedida } from '../comun/arranque';
 import {
   ARISTA_DEL_D6_EN_EL_PACK,
   COLOR_DEL_NUMERO,
@@ -356,8 +359,6 @@ import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
-/** Cuánto se espera a `traer` antes de levantar el telón con lo que haya. */
-const TOPE_DE_ARRANQUE_MS = 15_000;
 /** El mediodía: azul en el cénit, crema en el horizonte, y la niebla del color del horizonte. */
 const COLOR_DEL_CENIT = '#6fa9dc';
 const COLOR_DEL_HORIZONTE = '#e9e0c8';
@@ -1102,30 +1103,16 @@ function pintaElFieltro(caja: THREE.BufferGeometry, hex: string): void {
 }
 
 /*
- * EL RELOJ DE ARENA DE RIBERAS, cargado para la calidad plena. En la sobria no se pide: pesa veinte mil
- * triángulos y un móvil no los tiene; allí se pinta el reloj de conos de `escenas/reloj.tsx`, que cuenta
- * lo mismo.
+ * EL RELOJ DE ARENA DE RIBERAS se trae con `relojDe`, el cargador común (`comun/reloj.ts`), y sólo en la
+ * calidad plena: pesa veinte mil triángulos y un móvil no los tiene, así que en la sobria no se pide y la
+ * caja se queda con el asa, que es lo que cuenta su presupuesto.
  *
- * SI NO LLEGA NO SE AVISA POR `alFallar`, y es a propósito: el escritorio del Burgo manda la partida
- * entera al tablero dibujado con cualquier aviso de ésos, y un fichero de arte que no llega no puede
- * tirar el anillo. Se pinta el de conos y se dice por consola, que es el trato que le da Riberas
- * (`traerElRelojConSuClip`, en `riberas-en-tres.tsx`): un respaldo mudo es un fallo que nadie ve.
+ * Aquí hubo una copia suya, `relojDelBurgoDe`, con su propia caché contra el mismo `traer` —el mismo
+ * fichero bajado dos veces si el cliente pasaba de Las Lindes al Burgo— y un aviso que decía «se pinta
+ * el de conos» cuando el reloj de conos ya no existía. El trato es el de siempre y está escrito allí: si
+ * no llega NO se avisa por `alFallar` —el escritorio del Burgo mandaría la partida entera al tablero
+ * dibujado por un fichero de arte—, se dice por consola.
  */
-const relojesDelBurgo = new WeakMap<Traer, Promise<RelojCargado | null>>();
-function relojDelBurgoDe(traer: Traer): Promise<RelojCargado | null> {
-  const hecho = relojesDelBurgo.get(traer);
-  if (hecho !== undefined) return hecho;
-  const promesa = traer(rutaDelReloj())
-    .then((bytes) => abrirGlb(bytes))
-    .then((gltf): RelojCargado => ({ escena: gltf.scene, clips: gltf.animations }))
-    .catch((fallo: unknown): null => {
-      relojesDelBurgo.delete(traer);
-      console.warn(`El reloj de arena no ha llegado (${rutaDelReloj()}: ${fallo instanceof Error ? fallo.message : String(fallo)}): se pinta el de conos.`);
-      return null;
-    });
-  relojesDelBurgo.set(traer, promesa);
-  return promesa;
-}
 
 /** Pinta la acera de una casilla con su color, apagado al tanto que se diga (1 = entera). */
 function pintaLaAcera(suelo: Suelo, casilla: CasillaEn3D, luminancia: number): void {
@@ -1201,7 +1188,7 @@ const SIN_SUELO = (): number => 0;
 /**
  * SI LA FIGURA DE QUIEN ANDA NO LLEGA, SE DICE Y SE SIGUE ANDANDO. No por `alFallar`: el escritorio
  * manda la partida entera al tablero dibujado con cualquier aviso de ésos, y una figura que no
- * baja no puede tirar el anillo —es el mismo trato que el reloj de arena, `relojDelBurgoDe`—. Se
+ * baja no puede tirar el anillo —es el mismo trato que el reloj de arena, `relojDe`—. Se
  * anda sin verla, que es lo que ya pasa en primera persona. A nivel de módulo para ser la misma
  * función siempre: `QuienAnda` vuelve a pedir la figura si cambia.
  */
@@ -1236,10 +1223,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
   const [catalogo, ponerCatalogo] = useState<CatalogoDeModelos | null>(null);
   const [catalogoDeDados, ponerCatalogoDeDados] = useState<CatalogoDeModelos | null>(null);
-  const [arranque, ponerArranque] = useState(false);
-  const arranqueRef = useRef(false);
-  arranqueRef.current = arranque;
 
+  /* Cuando los dos `.glb` han llegado o fallado, arranca: `arrancar` es el del gancho de arranque, más abajo. */
   useEffect(() => {
     const burgo = catalogoDelBurgoDe(traer).then(
       (c) => {
@@ -1253,16 +1238,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       if (vivo.current && c !== null) ponerCatalogoDeDados(c);
     });
     void Promise.all([burgo, losDados]).then(() => {
-      if (vivo.current) ponerArranque(true);
+      if (vivo.current) arrancar();
     });
-    const tope = setTimeout(() => {
-      if (!vivo.current || arranqueRef.current) return;
-      falla('el burgo no ha contestado en quince segundos');
-      ponerArranque(true);
-    }, TOPE_DE_ARRANQUE_MS);
-    return () => {
-      clearTimeout(tope);
-    };
   }, [traer]);
 
   const cargador = useMemo(() => cargadorPara(traer), [traer]);
@@ -1431,13 +1408,13 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   /*
    * ─ EL RELOJ DE ARENA. ─ El de Riberas en la calidad plena, clonado, normalizado a una unidad de alto
    * y con sus dos montones medidos por dónde están —el de arriba tiene el centro más alto—; en la
-   * sobria, los conos de `escenas/reloj.tsx`. Lo mueve el `useFrame` de la escena: la arena con la
+   * sobria, el asa y nada más. Lo mueve el `useFrame` de la escena: la arena con la
    * fracción de turno, el giro al cambiar de turno y el vaciado de golpe al pasarlo.
    */
   const [modeloDelReloj, ponerModeloDelReloj] = useState<RelojCargado | null>(null);
   useEffect(() => {
     if (!plena) return;
-    void relojDelBurgoDe(traer).then((m) => {
+    void relojDe(traer).then((m) => {
       if (vivo.current) ponerModeloDelReloj(m);
     });
   }, [plena, traer]);
@@ -1559,7 +1536,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
    * costura a) y el canal pone a quien anda donde dice el servidor (la costura b), que llega por una
    * referencia porque el paseo se monta después. El canal se queda abierto también mirando la mesa:
    * al bajar, los demás ya están donde están, y un `dentro` que llegue antes de nacer se guarda y se
-   * nace ahí (ver `paseo/usar-el-paseo.ts`).
+   * nace ahí (ver `paseo/usar-el-paseo.ts`). La refriega, por los mismos hilos que en Las Lindes: el
+   * paseo pregunta si quien anda está en el suelo (`caido`) y `QuienAnda` cómo va (`cliente`).
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
   const elCanal = usarElCanal(props.canal, corregirAQuienPasea);
@@ -1570,6 +1548,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     mandos: props.mandos,
     alturaEn: alturaDelSuelo,
     alDarUnTic: elCanal.alDarUnTic,
+    caido: elCanal.caido,
   });
   useEffect(() => {
     corregirAQuienPasea.current = paseo.corregir;
@@ -1773,9 +1752,14 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
   const seguimiento = useRef({ peso: 0, objetivo: { x: 0, z: 0 }, hastaCuando: -1 });
   const marcaDestacada = useRef<{ x: number; z: number } | null>(null);
-  const medida = useRef({ segundos: 0, fotogramas: 0 });
-  const fotogramasDesdeElArranque = useRef(0);
-  const listoAvisado = useRef(false);
+
+  /*
+   * ─ EL ARRANQUE Y LA MEDIDA, con el gancho común (`comun/arranque.ts`). ─ `alEstarListo` dos fotogramas
+   * después de que `burgo.glb` y `dados.glb` hayan llegado o fallado —o a los quince segundos, diciendo
+   * que el burgo no contestó—, y `alMedir` una vez por segundo. Se llama aquí, detrás de la cámara del
+   * paseo, para que ésa siga siendo el primer `useFrame` de prioridad 0 de la escena.
+   */
+  const arrancar = usarArranqueYMedida(props, { llave: traer, alVencerElTope: () => falla('el burgo no ha contestado en quince segundos') });
 
   /* ─ La ciudad viva: el reparto por niveles, los interiores abiertos y las mallas. ─ */
   const laCiudadRef = useRef<CiudadEn3D | null>(laCiudad);
@@ -2034,15 +2018,6 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     const dt = Math.min(0.1, Math.max(0, dtCrudo));
     const losAsientos = asientosRef.current;
     const casillas = casillasRef.current;
-
-    /* ─ El arranque: dos fotogramas después de que el mundo esté (o haya fallado), se avisa. ─ */
-    if (arranqueRef.current && !listoAvisado.current) {
-      fotogramasDesdeElArranque.current++;
-      if (fotogramasDesdeElArranque.current >= 2) {
-        listoAvisado.current = true;
-        avisos.current.alEstarListo?.();
-      }
-    }
 
     /* ─ Los peones nacen con la vista, y se resincronizan cuando no animan nada. ─ */
     for (const a of losAsientos) {
@@ -2792,17 +2767,6 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       }
     }
 
-    /* ─ La medida: una vez por segundo, con la media real. ─ */
-    const m = medida.current;
-    m.segundos += dt;
-    m.fotogramas++;
-    if (m.segundos >= 1) {
-      const info = s.gl.info.render;
-      avisos.current.alMedir?.({ triangulos: info.triangles, llamadas: info.calls, ms: (m.segundos * 1000) / m.fotogramas, fotogramas: m.fotogramas });
-      m.segundos = 0;
-      m.fotogramas = 0;
-    }
-
     /* ─ El fin: el ganador aparece en la plaza. ─ */
     const fin = enCursoDe('fin') !== undefined || (tablero.ganador !== null && colaTerminada(cola.current));
     if (fin !== ganadorEnPlaza) ponerGanadorEnPlaza(fin);
@@ -3339,6 +3303,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           pose={paseo.pose}
           enPrimeraPersona={modoDelPaseo === 'ojos'}
           alFallar={avisaQueNoLlegaQuienAnda}
+          cliente={elCanal.cliente}
         />
       ) : null}
 

@@ -84,6 +84,10 @@ export function figuraQueSePinta(asientoId: string, elegida: string | undefined)
  *
  * Constantes y no cadenas sueltas: un clip mal escrito no lo ve el compilador de
  * TypeScript, y el síntoma es un aventurero clavado en T-pose.
+ *
+ * `caer` es de la refriega de Boots on Board (`escenas/paseo/refriega.ts`): quien se queda
+ * sin vida cae y se queda tumbado hasta renacer. El Muelle no lo usa; está aquí porque la
+ * biblioteca es una para todos.
  */
 export const CLIP = {
   reposoA: 'reposo-a',
@@ -96,6 +100,7 @@ export const CLIP = {
   usar: 'usar',
   lanzar: 'lanzar',
   golpe: 'golpe',
+  caer: 'caer',
   salto: 'salto',
   tPose: 't-pose',
 } as const;

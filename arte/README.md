@@ -132,7 +132,7 @@ npm run verify:aventureros -w escenas
 | sale | entra |
 | --- | --- |
 | `caballero.glb`, `barbaro.glb`, `maga.glb`, `exploradora.glb`, `picaro.glb`, `encapuchado.glb` | `Characters/gltf/{Knight,Barbarian,Mage,Ranger,Rogue,Rogue_Hooded}.glb` |
-| `animaciones.glb` (doce clips: `reposo-a`, `reposo-b`, `andar`, `correr`, `saludar`, `recoger`, `aparecer`, `usar`, `lanzar`, `golpe`, `salto`, `t-pose`) | `Animations/gltf/Rig_Medium/Rig_Medium_General.glb` y `Rig_Medium_MovementBasic.glb` |
+| `animaciones.glb` (trece clips: `reposo-a`, `reposo-b`, `andar`, `correr`, `saludar`, `recoger`, `aparecer`, `usar`, `lanzar`, `golpe`, `caer`, `salto`, `t-pose`) | `Animations/gltf/Rig_Medium/Rig_Medium_General.glb` y `Rig_Medium_MovementBasic.glb` |
 
 Los seis personajes llevan el mismo esqueleto —`Rig_Medium`, 23 huesos— y por eso una
 sola biblioteca de clips vale para todos: se carga una vez y cualquier clip se aplica a
@@ -246,7 +246,7 @@ pasarlo —subió de 3 cuando el centro del tablero pasó de ser una muralla vac
 ciudad; el precedente medido es `tablero.glb`, que pesa 4.209 kB y viaja en cada despliegue—.
 Hoy pesa 3.073 kB con 163 piezas y 68.789 triángulos; lo que se quedó fuera por peso está apuntado en `PIEZAS_EN_ESPERA` con su coste.
 Lo sirve `server/src/routes/modelos.ts` en `/api/arcade/modelos/burgo.glb`, con ruta fija
-como los demás, y está versionado: sin eso daría 200 en el portátil y 404 en el despliegue.
+como los demás —una fila de `MODELOS_DE_NOMBRE_FIJO` en `escenas/ruta-de-modelos.ts`—, y está versionado: sin eso daría 200 en el portátil y 404 en el despliegue.
 
 ## Lo que queda por hacer
 

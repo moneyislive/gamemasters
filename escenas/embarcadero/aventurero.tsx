@@ -57,9 +57,10 @@
  * Clonar la figura, montarle el mezclador, fundir de un clip al siguiente y
  * soltar el esqueleto vivían aquí, privados, mientras el muelle fue el único sitio
  * donde un aventurero se movía. Desde que el Burgo pone uno a andar por su anillo,
- * eso es de `escenas/aventureros/marioneta.ts`: lo que este fichero sabe es DEL
- * AMARRE —dónde está, hacia dónde mira, su barco y su bandera—, y la marioneta la
- * importa como la importa el anillo.
+ * eso es de `escenas/aventureros/marioneta.ts`; y montarla, soltarla y pintarla, de
+ * `escenas/comun/marioneta.tsx` (`usarMarioneta` y `<Marioneta>`), igual que en la
+ * Plaza, el Burgo, La Linde Alta y el paseo. Lo que este fichero sabe es DEL AMARRE
+ * —dónde está, hacia dónde mira, su barco y su bandera—.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
@@ -69,7 +70,8 @@ import { ESCALA_DEL_PACK, LAMINA } from '../escala';
 import { PIEZA } from './piezas';
 import type { FiguraId } from './figuras';
 import type { AventureroCargado, CatalogoDelEmbarcadero } from './cargar';
-import { desmontaMarioneta, giroCorto, montaMarioneta, reproduce } from '../aventureros/marioneta';
+import { giroCorto, reproduce } from '../aventureros/marioneta';
+import { Marioneta, usarMarioneta } from '../comun/marioneta';
 import { tenir } from './tinte';
 import { amortiguado } from './camara';
 import {
@@ -172,17 +174,7 @@ export function Aventurero(props: PropsDelAventurero): JSX.Element {
   }, [llegadas]);
 
   /* La marioneta: el clon con su mezclador. Se rehace al cambiar la figura visible o al llegar la biblioteca. */
-  const cargado = figuras.get(figuraVisible);
-  const marioneta = useMemo(
-    () => (cargado === undefined ? null : montaMarioneta(cargado, biblioteca)),
-    [cargado, biblioteca],
-  );
-  useEffect(
-    () => () => {
-      if (marioneta !== null) desmontaMarioneta(marioneta);
-    },
-    [marioneta],
-  );
+  const marioneta = usarMarioneta(figuras.get(figuraVisible), biblioteca);
 
   /* Las piezas teñidas del asiento. La caché de `tinte.ts` hace que dos asientos del mismo color compartan geometría. */
   const barco = useMemo(() => {
@@ -386,18 +378,19 @@ export function Aventurero(props: PropsDelAventurero): JSX.Element {
         </group>
       )}
 
-      <group ref={grupoDeLaFigura} visible={false}>
-        {marioneta === null ? null : <primitive object={marioneta.raiz} />}
+      <Marioneta de={marioneta} grupo={grupoDeLaFigura} visible={false}>
         {/*
           El disco de contacto va en las dos calidades: la escena no proyecta
           sombras en ningún cliente (el `Canvas` del escritorio no las activa y
           en el móvil no caben), y sin algo oscuro bajo los pies la figura flota.
+          Sin marioneta no se monta, como ella: estaba en el mismo grupo
+          escondido, y un disco sin nadie encima no se enseñó nunca.
         */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
           <circleGeometry args={[0.75, SEGMENTOS_DEL_DISCO]} />
           <meshBasicMaterial color="#000000" transparent opacity={calidad === 'sobria' ? 0.38 : 0.3} depthWrite={false} />
         </mesh>
-      </group>
+      </Marioneta>
 
       <points ref={grupoDelHumo} geometry={humo.geometria} material={humo.material} visible={false} frustumCulled={false} />
     </group>

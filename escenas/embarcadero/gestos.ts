@@ -28,7 +28,11 @@
 import { CLIP } from './figuras';
 import type { NombreDeClip } from './figuras';
 
-/** Segundos por clip, medidos por el compilador. `t-pose` no se usa nunca; está para que la tabla sea total. */
+/**
+ * Segundos por clip, medidos por el compilador. `t-pose` no se usa nunca; está para que la tabla sea total.
+ * `caer` no lo usa el amarre —es de la refriega de Boots on Board—, pero la tabla es la de la biblioteca
+ * entera y `verify:embarcadero` coteja cada fila con el fichero.
+ */
 export const DURACION: Readonly<Record<NombreDeClip, number>> = {
   'reposo-a': 1.067,
   'reposo-b': 2.133,
@@ -40,6 +44,7 @@ export const DURACION: Readonly<Record<NombreDeClip, number>> = {
   usar: 1.6,
   lanzar: 1.367,
   golpe: 0.667,
+  caer: 0.8,
   salto: 1.167,
   't-pose': 1,
 };
