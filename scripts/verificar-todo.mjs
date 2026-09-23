@@ -536,7 +536,7 @@ const BATERIA = [
     donde: 'server',
     guion: 'verify:protocolo-de-botas',
     porque:
-      'lo que manda un aparato llega de un entorno hostil, y el lector del servidor devuelve null ante cualquier cosa que no sea exactamente un mensaje bien formado —una clave de más, un número con decimales, una coordenada fuera de la coma fija, un rumbo o una marcha fuera de rango, un texto más largo que el tope—; el del aparato, igual con lo que manda el servidor; la ruta cuelga de la mesa bajo /api y la llave NO va en ella',
+      'lo que manda un aparato llega de un entorno hostil, y el lector del servidor devuelve null ante cualquier cosa que no sea exactamente un mensaje bien formado —una clave de más, un número con decimales, una coordenada fuera de la coma fija, un rumbo o una marcha fuera de rango, un texto más largo que el tope—; el del aparato, igual con lo que manda el servidor, la refriega incluida en los dos sentidos; la ruta cuelga de la mesa bajo /api y la llave NO va en ella; y los cierres tienen su número fijo —4007 la versión que no cuadra y 4008 el canal atascado, y los siete de antes sin moverse—, que es lo que distingue el aparato',
   },
   {
     nombre: 'la sala de Boots on Board',
@@ -544,7 +544,7 @@ const BATERIA = [
     guion: 'verify:sala-de-botas',
     lento: true,
     porque:
-      'la sala del canal con el reloj en la mano: el `hola` en su plazo, la llave, la mesa en `botas` y recorrible, un canal por asiento, el presupuesto de distancia con su tope de un segundo, la estructura con la escuadra de un tic, lo que viene de camino tras corregir, el cubo, el quieto, la gracia, una foto por sala sin asiento repetido y un solo temporizador que se para sin salas, el mundo que cambia debajo de alguien, derivar mundos por turno con abrir delante, una subida que revienta sin tirar el servidor, y SIGTERM con el montaje de verdad cerrando con 1001 dentro de la despedida',
+      'la sala del canal con el reloj en la mano: el `hola` en su plazo y la versión (4007), la llave, la mesa en `botas` y recorrible, un canal por asiento, el presupuesto de distancia con su tope de un segundo, la estructura con la escuadra de un tic, lo que viene de camino tras corregir, el cubo, el quieto, la gracia, una foto por sala con TODOS los sentados y un solo temporizador que se para sin salas, el mundo que cambia debajo de alguien, derivar mundos por turno con abrir delante; la refriega entera —el golpe a su manejador sin envenenar la foto, la recarga desde el último aceptado, el alcance, el cono, la espalda, el muro, el más cercano, 250 ms de rebobinado y ni uno más, caer, renacer lejos, intocable y `vidas`—; nadie inmune por no bajar; los topes del botín por pareja y por mesa; el canal atascado (4008); la vía interna con mesas de verdad de los tres juegos; una subida que revienta sin tirar el servidor, y SIGTERM con el montaje de verdad cerrando con 1001 dentro de la despedida',
   },
   {
     nombre: 'Boots on Board de punta a punta',
@@ -552,7 +552,15 @@ const BATERIA = [
     guion: 'verify:botas',
     lento: true,
     porque:
-      'un servidor de verdad con una mesa de Las Lindes en `botas`: dos aparatos `ws` entran donde se puede estar, un paseo legal se acepta entero y lo ve el otro, el teletransporte, la muralla de verdad y correr de más se corrigen, los cierres llevan su código del contrato, otras rutas 404 y un origen ajeno 403, y la llave no sale nunca en lo que escribe el servidor',
+      'un servidor de verdad con mesas en `botas`: dos aparatos `ws` entran donde se puede estar, un paseo legal se acepta entero y lo ve el otro, el teletransporte, la muralla de verdad y correr de más se corrigen, los cierres llevan su código del contrato, otras rutas 404 y un origen ajeno 403, y la llave no sale nunca en lo que escribe el servidor; y la refriega en mesas de verdad del Burgo, Riberas y Las Lindes: se tumban por el cable, el botín llega a la mesa y `mirar` lo enseña una vez y no dos, y `arcade:botin` por HTTP sigue siendo un 400',
+  },
+  {
+    nombre: 'las cuotas de Boots on Board',
+    donde: 'server',
+    guion: 'verify:cuotas-de-botas',
+    lento: true,
+    porque:
+      'el canal no se puede saturar por conexiones: cuatro topes en el upgrade —global, sin saludar, concurrentes por procedencia y ritmo—, con la misma confianza en los saltos de proxy que el limitador HTTP y su modo degradado (con procedencia desconocida sólo mandan los topes globales); la inundación sin saludar se queda acotada con la salud plana, los jugadores de varias mesas desde una misma procedencia entran, y el diagnóstico dice cuántas se negaron y por qué',
   },
   {
     nombre: 'el botín de la refriega',

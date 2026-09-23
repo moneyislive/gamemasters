@@ -198,6 +198,12 @@ export const REVISAR_LA_MESA_CADA_MS = 1000;
  * revisión, y cada vuelta del bucle deriva más que la anterior. Es una espiral: el servidor entero
  * —la API incluida— deja de contestar.
  *
+ * Eso ya no pasa por las cachés: desde el 23-sep la memoria de Las Lindes es POR MESA
+ * (`lindes-mundo.ts`, con tope de 128 mesas llenas), y volver a derivar cuesta una losa montada por
+ * cada losa puesta, y ninguna si la jugada no pone losa —con 100 mesas en rueda, 4,6 ms en vez de
+ * 243—. Lo que sigue en frío es ABRIR una sala, y un juego nuevo cuyo mundo sea caro de derivar:
+ * para eso sigue haciendo falta el turno.
+ *
  * Así que se pregunta la revisión como siempre —es barato: no proyecta nada— pero DERIVAR un mundo
  * pide TURNO: uno para todo el proceso, de uno en uno, y después de cada derivación la siguiente
  * espera cuatro veces lo que costó esa, con un temporizador de verdad en medio —así el bucle lee los

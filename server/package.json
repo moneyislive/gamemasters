@@ -94,6 +94,7 @@
     "verify:mesas-frias": "tsx scripts/verificar-mesas-frias.ts",
     "verify:sala-de-botas": "tsx scripts/verificar-sala-de-botas.ts",
     "verify:botas": "tsx scripts/verificar-botas.ts",
+    "verify:cuotas-de-botas": "tsx scripts/verificar-cuotas-de-botas.ts",
     "medir:botas": "node --expose-gc --import tsx scripts/medir-botas.ts"
   },
   "dependencies": {
