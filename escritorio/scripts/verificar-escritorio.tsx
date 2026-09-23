@@ -92,6 +92,10 @@ import { Retablo } from '../src/retablo';
 import { LaMesaPuesta, loQuePide, PLAZOS, tocaElMuelle } from '../src/sala';
 import { loQueQuedaTrasElSondeo, seVuelveSoloAlSitio, SIN_AVISO } from '../src/mesa';
 import type { LaMesa, MesaVista, ResultadoDelMovimiento } from '../src/mesa';
+/* Boots on Board: el veredicto guardado de este navegador, y las palabras y la compuerta que pintan los vestíbulos. */
+import { elVeredictoDelAparato, guardarElVeredicto } from '../src/mesa';
+import { MARCA_DE_BOTAS, MOTIVO_NO_LLEGA, MOTIVO_SIN_MEDIR } from '../../escenas/compuerta-de-botas';
+import { sePuedeRecorrer } from '../../shared/arcade/juegos/mundos';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
 import { haEmpezado } from '../src/empezada';
 import { Muelle } from '../src/muelle';
@@ -135,6 +139,9 @@ import {
   RiberasEnTres,
   techoDelAsaEnPuntos,
 } from '../src/riberas-en-tres';
+/* A pie por el delta: el cartel, las teclas y los mandos de la cámara, leídos como datos. */
+import { CAMARA_DE_LA_TECLA, ComoSeAndaPorElDelta, LOS_MANDOS_DE_LA_CAMARA } from '../src/riberas-en-tres';
+import { MANDOS_DE_LA_CAMARA } from '../../escenas/delta-a-pie';
 import type { ElFocoDeLaTrampa, LoQueHaceLaTrampa } from '../src/riberas-en-tres';
 /* La cinta la reparte `escenas/`, y de ahí salen los dos 44 que la hoja escribe en `rem`. */
 import { altoDeLaCinta, ALTO_DE_LA_CINTA, anchoDeLaCinta, BOTON_DE_LA_CINTA, cuantosSeVenEnElCarril, loQueLlevaLaCinta } from '../../escenas/cinta';
@@ -236,7 +243,11 @@ import { guardarLaSeccion, laSeccionGuardada } from '../src/bolsillo';
  */
 import {
   BurgoEnTres,
+  camaraDeLaTecla,
+  ComoSeAndaPorElBurgo,
   EL_CARTEL_EN_BLANCO,
+  LAS_CAMARAS_DEL_BURGO,
+  LasCamarasDelBurgo,
   loQueDiceLaCinta,
   sinLaFraseDelTurno,
   loQueHaceElToque,
@@ -1600,6 +1611,414 @@ function elMuelle(): void {
 }
 
 // ---------------------------------------------------------------------------
+// 5 bis · Boots on Board: la elección al abrir, la marca de la mesa y la silla que no se da
+// ---------------------------------------------------------------------------
+
+/**
+ * LA COMPUERTA DE BOOTS ON BOARD EN EL ESCRITORIO, pintada y leída.
+ *
+ * `verify:compuerta-de-botas` mide la compuerta en sí: qué decide con cada veredicto y cada juego,
+ * y cómo no sienta en una mesa `botas` a quien no llega. Lo que allí no se puede ver es si ESTE
+ * cliente la llama, y dónde: una función pura correcta y una pantalla que no la usa es el verde
+ * falso de siempre. Así que aquí se pintan los dos vestíbulos de verdad —la orilla del lobby y el
+ * de la Sala— con el veredicto guardado que haga falta en un almacén de mentira, y se cuenta lo
+ * que sale:
+ *
+ *  1. El veredicto se guarda en este navegador con UNA llave, el último sustituye al anterior, lo
+ *     que no sea `plena` o `sobria` escrito así no cuenta, y un almacén que lanza no tumba nada.
+ *  2. La elección sale en el vestíbulo de la Sala si y sólo si el juego se recorre —con los arcades
+ *     INSTALADOS, no con una lista de aquí—, y en la orilla de los lobbies igual.
+ *  3. Sin veredicto, Boots on Board sale APAGADA diciendo que el aparato aún no se ha medido —en
+ *     Node no hay mundo que mida, y «midiendo» sería mentira—; con `sobria`, apagada diciendo que no
+ *     llega; con `plena`, encendida y sin porqué. La normal, puesta de salida en los tres casos.
+ *  4. La mesa `botas` lleva la marca en el título y en la ficha, y ninguna otra la lleva.
+ *  5. Del fuente, lo que el HTML no enseña: que `abrir` recibe lo que se ve encendido, que el lobby
+ *     mide y guarda, que sólo los dos vestíbulos le pasan una modalidad a `abrir`, y que `entrar`
+ *     pide silla por UNA puerta que antes pregunta a la compuerta, leyendo la mesa sin llave.
+ *
+ * Cada juez se pasa además por un caso envenenado que tiene que tumbarlo.
+ */
+function laCompuertaDeBotas(): void {
+  paso('Boots on Board en el escritorio: el veredicto guardado, la elección al abrir, la marca de la mesa y la silla que no se da');
+
+  /* ── 1 · EL VEREDICTO GUARDADO, con un almacén de mentira que se pone y se quita aquí ── */
+  const conAlmacen = globalThis as { localStorage?: unknown };
+  const habiaAlmacen = 'localStorage' in conAlmacen ? conAlmacen.localStorage : undefined;
+  const cajon = new Map<string, string>();
+  const almacenDeMentira = {
+    getItem: (llave: string): string | null => cajon.get(llave) ?? null,
+    setItem: (llave: string, valor: string): void => {
+      cajon.set(llave, String(valor));
+    },
+    removeItem: (llave: string): void => {
+      cajon.delete(llave);
+    },
+  };
+  function conElAlmacen<T>(almacen: unknown, hacer: () => T): T {
+    conAlmacen.localStorage = almacen;
+    try {
+      return hacer();
+    } finally {
+      if (habiaAlmacen === undefined) delete conAlmacen.localStorage;
+      else conAlmacen.localStorage = habiaAlmacen;
+    }
+  }
+  const leido = conElAlmacen(almacenDeMentira, () => {
+    const vacio = elVeredictoDelAparato();
+    guardarElVeredicto('sobria');
+    const trasSobria = elVeredictoDelAparato();
+    guardarElVeredicto('plena');
+    const trasPlena = elVeredictoDelAparato();
+    const llaves = [...cajon.keys()];
+    cajon.set(llaves[0] ?? '', 'PLENA');
+    const malEscrito = elVeredictoDelAparato();
+    return { vacio, trasSobria, trasPlena, llaves, malEscrito };
+  });
+  cajon.clear();
+  comprobar(
+    'sin nada guardado no hay veredicto; lo guardado se lee; el último sustituye al anterior; y lo mal escrito es no saber',
+    leido.vacio === null && leido.trasSobria === 'sobria' && leido.trasPlena === 'plena' && leido.malEscrito === null,
+    leido,
+  );
+  comprobar(
+    'y se guarda con UNA llave por aparato, del escritorio: ni por silla ni por juego',
+    leido.llaves.length === 1 && /^escritorio\./.test(leido.llaves[0] ?? '') && !/#|riberas|burgo|lindes/.test(leido.llaves[0] ?? ''),
+    leido.llaves,
+  );
+  const conUnAlmacenQueLanza = conElAlmacen(
+    {
+      getItem: (): string => {
+        throw new Error('SecurityError');
+      },
+      setItem: (): void => {
+        throw new Error('QuotaExceededError');
+      },
+    },
+    (): string | null => {
+      try {
+        guardarElVeredicto('plena');
+        return elVeredictoDelAparato();
+      } catch {
+        return 'lanzó';
+      }
+    },
+  );
+  comprobar(
+    'un almacén que lanza —una ventana privada— no tumba nada: guardar no revienta y no hay veredicto; y sin almacén, que es Node, tampoco',
+    conUnAlmacenQueLanza === null && elVeredictoDelAparato() === null,
+    conUnAlmacenQueLanza,
+  );
+
+  /* ── 2 y 3 · LA ELECCIÓN, PINTADA ── */
+
+  /** La elección tal como sale pintada: si está, sus botones, y el porqué de la apagada con su `id`. */
+  function laEleccionEn(html: string): {
+    readonly esta: boolean;
+    readonly botones: readonly { readonly rotulo: string; readonly apagado: boolean; readonly puesto: boolean; readonly atadoA: string | null }[];
+    readonly motivo: string | null;
+    readonly idDelMotivo: string | null;
+  } {
+    const grupo = /<div class="modalidades" role="group" aria-label="Cómo se juega">([\s\S]*?)<\/div>/.exec(html);
+    if (grupo === null) return { esta: false, botones: [], motivo: null, idDelMotivo: null };
+    const dentro = grupo[1] ?? '';
+    const botones = [...dentro.matchAll(/<button([^>]*)>([\s\S]*?)<\/button>/g)].map((b) => ({
+      rotulo: /<span class="opcion-rotulo">([^<]*)<\/span>/.exec(b[2] ?? '')?.[1] ?? '',
+      apagado: /\sdisabled=""/.test(b[1] ?? ''),
+      puesto: /aria-pressed="true"/.test(b[1] ?? ''),
+      atadoA: /aria-describedby="([^"]+)"/.exec(b[1] ?? '')?.[1] ?? null,
+    }));
+    const motivo = /<p class="letra-chica modalidad-motivo" id="([^"]+)">([^<]*)<\/p>/.exec(dentro);
+    return { esta: true, botones, motivo: motivo === null ? null : palabrasDe(motivo[2] ?? ''), idDelMotivo: motivo?.[1] ?? null };
+  }
+  /** Sale, con la normal puesta y encendida, y Boots on Board apagada, atada a SU porqué. */
+  const apagadaConSuPorque = (html: string, porque: string): boolean => {
+    const e = laEleccionEn(html);
+    const [normal, botas] = e.botones;
+    return (
+      e.esta &&
+      e.botones.length === 2 &&
+      normal?.rotulo === 'Normal' &&
+      normal.puesto &&
+      !normal.apagado &&
+      botas?.rotulo === MARCA_DE_BOTAS &&
+      botas.apagado &&
+      !botas.puesto &&
+      e.motivo === porque &&
+      botas.atadoA !== null &&
+      botas.atadoA === e.idDelMotivo
+    );
+  };
+  /** Sale, con las dos encendidas, la normal puesta y ningún porqué. */
+  const encendida = (html: string): boolean => {
+    const e = laEleccionEn(html);
+    return e.esta && e.botones.length === 2 && e.botones.every((b) => !b.apagado) && e.botones[0]?.puesto === true && e.botones[1]?.puesto === false && e.motivo === null;
+  };
+
+  const instalados = elCatalogoQuePublicaElServidor();
+  const vestibuloDe = (m: ArcadeDelCatalogo): string =>
+    renderToStaticMarkup(<LaMesaPuesta manifiesto={m} mesa={unaMesa('fuera', null)} silla="" codigoDeLaUrl="" />);
+  const orillaDe = (m: ArcadeDelCatalogo): string => {
+    const tema = temaDelMuelle(m.id);
+    return tema === undefined
+      ? ''
+      : renderToStaticMarkup(
+          <Muelle manifiesto={m} tema={tema} mesa={unaMesa('fuera', null)} silla="" codigoDeLaUrl="" zarpando={false} alDesembarcar={() => undefined} />,
+        );
+  };
+  const guardadoComo = (veredicto: string | null): unknown => {
+    const unCajon = new Map<string, string>();
+    if (veredicto !== null) unCajon.set('escritorio.aparato.veredicto', veredicto);
+    return { getItem: (llave: string): string | null => unCajon.get(llave) ?? null, setItem: (): void => undefined };
+  };
+
+  const conEleccionEnLaSala = instalados.filter((m) => laEleccionEn(conElAlmacen(guardadoComo('plena'), () => vestibuloDe(m))).esta).map((m) => m.id);
+  const queSeRecorren = instalados.filter((m) => sePuedeRecorrer(m.id)).map((m) => m.id);
+  comprobar(
+    `en el vestíbulo de la Sala, de los ${String(instalados.length)} arcades instalados, la elección sale EXACTAMENTE en los que se recorren`,
+    queSeRecorren.length > 0 && queSeRecorren.length < instalados.length && conEleccionEnLaSala.join() === queSeRecorren.join(),
+    { conEleccionEnLaSala, queSeRecorren },
+  );
+  const lobbies = instalados.filter((m) => tieneMuelle(m.id));
+  const lasOrillas = lobbies.map((m) => ({
+    id: m.id,
+    seRecorre: sePuedeRecorrer(m.id),
+    sinMedir: conElAlmacen(guardadoComo(null), () => orillaDe(m)),
+    noLlega: conElAlmacen(guardadoComo('sobria'), () => orillaDe(m)),
+    llega: conElAlmacen(guardadoComo('plena'), () => orillaDe(m)),
+    malGuardado: conElAlmacen(guardadoComo('Plena'), () => orillaDe(m)),
+  }));
+  comprobar(
+    'y en la orilla de cada lobby sale igual: sólo si el juego se recorre',
+    lasOrillas.length > 0 && lasOrillas.every((o) => laEleccionEn(o.llega).esta === o.seRecorre && laEleccionEn(o.sinMedir).esta === o.seRecorre),
+    lasOrillas.map((o) => o.id),
+  );
+  const conEleccion = lasOrillas.filter((o) => o.seRecorre);
+  comprobar(
+    'sin veredicto, Boots on Board sale APAGADA y atada a su porqué, que dice que el aparato aún no se ha medido —aquí nada mide, y «midiendo» sería mentira—',
+    conEleccion.length > 0 && conEleccion.every((o) => apagadaConSuPorque(o.sinMedir, MOTIVO_SIN_MEDIR) && apagadaConSuPorque(o.malGuardado, MOTIVO_SIN_MEDIR)),
+    conEleccion.map((o) => laEleccionEn(o.sinMedir)),
+  );
+  comprobar(
+    'con `sobria`, apagada diciendo que no llega; con `plena`, encendida y sin porqué; la normal, puesta de salida en todos',
+    conEleccion.every((o) => apagadaConSuPorque(o.noLlega, MOTIVO_NO_LLEGA) && encendida(o.llega)),
+    conEleccion.map((o) => [laEleccionEn(o.noLlega), laEleccionEn(o.llega)]),
+  );
+  {
+    const [una] = conEleccion;
+    const html = una?.noLlega ?? '';
+    comprobar(
+      'se ve fallar: con la apagada sin `disabled`, o sin su porqué, o encendida sin estar puesta la normal, los jueces caen',
+      !apagadaConSuPorque(html.replace(' disabled=""', ''), MOTIVO_NO_LLEGA) &&
+        !apagadaConSuPorque(html.replace(/<p class="letra-chica modalidad-motivo"[^>]*>[^<]*<\/p>/, ''), MOTIVO_NO_LLEGA) &&
+        !encendida((una?.llega ?? '').replace('aria-pressed="true"', 'aria-pressed="false"')),
+    );
+  }
+  {
+    const vestibuloSinMedir = instalados.filter((m) => sePuedeRecorrer(m.id)).map((m) => conElAlmacen(guardadoComo(null), () => vestibuloDe(m)));
+    comprobar(
+      'y el vestíbulo de la Sala, que no tiene mundo, tampoco dice «midiendo»: sin veredicto guardado, apagada y sin medir',
+      vestibuloSinMedir.length > 0 && vestibuloSinMedir.every((h) => apagadaConSuPorque(h, MOTIVO_SIN_MEDIR)),
+    );
+  }
+
+  /* ── 4 · LA MARCA DE LA MESA ── */
+  const riberas = instalados.find((m) => m.id === 'riberas');
+  comprobar('Riberas está instalado para pintar su mesa', riberas !== undefined);
+  if (riberas !== undefined) {
+    const vistaCon = (modalidad: unknown): MesaVista =>
+      ({
+        codigo: 'BOTAS',
+        arcade: 'riberas',
+        rev: 1,
+        tic: 0,
+        terminada: false,
+        venceEn: null,
+        turnoDesde: 0,
+        asientos: [{ id: 's1', nombre: 'Ana', presente: true }],
+        yo: 's1',
+        vista: {},
+        opciones: [],
+        ...(modalidad === undefined ? {} : { modalidad }),
+      }) as unknown as MesaVista;
+    const marcas = (html: string): number => (html.match(/class="marca-de-botas"/g) ?? []).length;
+    /* `LaFicha` arma el enlace con `window.location.origin`: se le da uno con lo justo, y se quita. */
+    const conVentana = globalThis as { window?: unknown };
+    const habiaVentana = 'window' in conVentana ? conVentana.window : undefined;
+    conVentana.window = { location: { origin: 'https://ejemplo.invalid' } };
+    const mesaPuesta = (modalidad: unknown): string =>
+      renderToStaticMarkup(<LaMesaPuesta manifiesto={riberas} mesa={unaMesa('dentro', vistaCon(modalidad))} silla="" codigoDeLaUrl="" />);
+    const deBotas = mesaPuesta('botas');
+    const sinMarca = [mesaPuesta('normal'), mesaPuesta(undefined), mesaPuesta('BOTAS'), mesaPuesta(true)];
+    if (habiaVentana === undefined) delete conVentana.window;
+    else conVentana.window = habiaVentana;
+    comprobar(
+      'la mesa `botas` lleva la marca DENTRO del título —se oye con el nombre— y en la ficha de la mesa, que es lo que se ve con el lienzo a pantalla completa',
+      marcas(deBotas) === 2 &&
+        new RegExp(`<h1 class="titulo"[^>]*>${riberas.nombre}<span class="marca-de-botas">${MARCA_DE_BOTAS}</span></h1>`).test(deBotas) &&
+        /<h2 class="rotulo-de-panel">La mesa<\/h2><p class="marca-de-botas">/.test(deBotas),
+      palabrasDe(deBotas).slice(0, 200),
+    );
+    comprobar(
+      'y ninguna otra la lleva: ni la normal, ni la de un servidor anterior sin el campo, ni una modalidad que esta versión no conoce',
+      sinMarca.every((h) => marcas(h) === 0 && h.length > 0),
+      sinMarca.map(marcas),
+    );
+    const tema = temaDelMuelle('riberas');
+    const enElLobby = (modalidad: unknown): string =>
+      tema === undefined
+        ? ''
+        : renderToStaticMarkup(
+            <Muelle manifiesto={riberas} tema={tema} mesa={unaMesa('dentro', vistaCon(modalidad))} silla="" codigoDeLaUrl="" zarpando={false} alDesembarcar={() => undefined} />,
+          );
+    comprobar(
+      'y en el lobby, sentados esperando, la marca va en el título: quien llega con el código sabe a qué mesa ha entrado',
+      marcas(enElLobby('botas')) === 1 && /<h1 class="titulo">[^<]*<span class="marca-de-botas">/.test(enElLobby('botas')) && marcas(enElLobby('normal')) === 0,
+    );
+  }
+
+  /* ── 5 · EL FUENTE: lo que el HTML no enseña ── */
+  const elLobby = sinComentarios(readFileSync(new URL('../src/muelle.tsx', import.meta.url), 'utf8'));
+  const laSala = sinComentarios(readFileSync(new URL('../src/sala.tsx', import.meta.url), 'utf8'));
+  const laMesa = sinComentarios(readFileSync(new URL('../src/mesa.ts', import.meta.url), 'utf8'));
+
+  const abrenConLoQueSeVe = (lobby: string, sala: string): boolean =>
+    /const \[elegida, ponerElegida\] = useState<Modalidad>\('normal'\);/.test(lobby) &&
+    /<EleccionDeModalidad elegida=\{elegida\} compuerta=\{compuerta\} alElegir=\{ponerElegida\} \/>/.test(lobby) &&
+    /mesa\.abrir\(nombre\.trim\(\), plazo\?\.segundos, figura, modalidadQueViaja\(elegida, compuerta\)\);/.test(lobby) &&
+    /const \[elegida, ponerElegida\] = useState<Modalidad>\('normal'\);/.test(sala) &&
+    /const compuerta = compuertaDeBotas\(veredicto, arcade, false\);/.test(sala) &&
+    /<EleccionDeModalidad elegida=\{elegida\} compuerta=\{compuerta\} alElegir=\{ponerElegida\} \/>/.test(sala) &&
+    /mesa\.abrir\(nombre\.trim\(\), plazo\?\.segundos, undefined, modalidadQueViaja\(elegida, compuerta\)\);/.test(sala);
+  comprobar(
+    'los dos vestíbulos empiezan en la normal y le pasan a `abrir` lo que se ve encendido, con `modalidadQueViaja`',
+    abrenConLoQueSeVe(elLobby, laSala),
+  );
+  comprobar(
+    'se ve fallar: con el lobby mandando la marcada a pelo, o la Sala sin la compuerta, cae',
+    !abrenConLoQueSeVe(elLobby.replace('modalidadQueViaja(elegida, compuerta));', 'elegida);'), laSala) &&
+      !abrenConLoQueSeVe(elLobby, laSala.replace('compuertaDeBotas(veredicto, arcade, false)', "{ que: 'se-ofrece' }")),
+  );
+
+  const elLobbyMideYGuarda = (lobby: string): boolean =>
+    /alMedir=\{alMedir\}/.test(lobby) &&
+    /useState<Calidad \| null>\(\(\) => elVeredictoDelAparato\(\)\)/.test(lobby) &&
+    /if \(typeof document !== 'undefined' && document\.visibilityState === 'hidden'\) return;/.test(lobby) &&
+    /const juicio = juzgarCalidad\(muestras\.current\);[\s\S]{0,120}guardarElVeredicto\(juicio\);\s*ponerVeredicto\(juicio\);/.test(lobby) &&
+    /const midiendo = conMundo && \(listo \|\| fallo === null\);/.test(lobby) &&
+    /const compuerta = compuertaDeBotas\(veredicto, manifiesto\.id, midiendo\);/.test(lobby);
+  comprobar(
+    'el lobby le pide muestras a la escena, parte del veredicto guardado, no muestrea con la pestaña escondida, guarda el que dé el juez, y sólo dice «midiendo» con un mundo en pantalla',
+    elLobbyMideYGuarda(elLobby),
+  );
+  comprobar(
+    'se ve fallar: sin pedirle muestras a la escena —el lobby no mediría nunca— o sin guardar el veredicto, cae',
+    !elLobbyMideYGuarda(elLobby.replace('alMedir={alMedir}', '')) && !elLobbyMideYGuarda(elLobby.replace('guardarElVeredicto(juicio);', '')),
+  );
+
+  /** Cuántos argumentos lleva cada `mesa.abrir(…)` de un fuente, contando comas de primer nivel. */
+  const llamadasAAbrir = (fuente: string): { readonly args: number; readonly texto: string }[] => {
+    const salen: { args: number; texto: string }[] = [];
+    const puerta = 'mesa.abrir(';
+    let desde = 0;
+    for (;;) {
+      const i = fuente.indexOf(puerta, desde);
+      if (i < 0) break;
+      let hondo = 0;
+      let args = 1;
+      let vacia = true;
+      let cadena: string | null = null;
+      let j = i + puerta.length;
+      for (; j < fuente.length; j++) {
+        const c = fuente[j] ?? '';
+        if (cadena !== null) {
+          if (c === '\\') j++;
+          else if (c === cadena) cadena = null;
+          continue;
+        }
+        if (c === "'" || c === '"' || c === '`') {
+          cadena = c;
+          vacia = false;
+        } else if (c === '(' || c === '[' || c === '{') {
+          hondo++;
+          vacia = false;
+        } else if (c === ')' || c === ']' || c === '}') {
+          if (hondo === 0) break;
+          hondo--;
+        } else if (c === ',' && hondo === 0) {
+          args++;
+        } else if (!/\s/.test(c)) {
+          vacia = false;
+        }
+      }
+      salen.push({ args: vacia ? 0 : args, texto: fuente.slice(i, j + 1) });
+      desde = j + 1;
+    }
+    return salen;
+  };
+  const DE_LOS_VESTIBULOS = new Set(['muelle.tsx', 'sala.tsx']);
+  const conModalidad = (ficheros: readonly [string, string][]): { readonly fichero: string; readonly texto: string }[] =>
+    ficheros.flatMap(([f, fuente]) => llamadasAAbrir(fuente).filter((l) => l.args > 3).map((l) => ({ fichero: f, texto: l.texto })));
+  const losFuentes: [string, string][] = readdirSync(new URL('../src/', import.meta.url))
+    .filter((f) => /\.tsx?$/.test(f))
+    .map((f): [string, string] => [f, sinComentarios(readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8'))]);
+  const soloLosVestibulos = (ficheros: readonly [string, string][]): boolean => {
+    const cuales = conModalidad(ficheros);
+    return (
+      cuales.length === 2 &&
+      cuales.every((c) => DE_LOS_VESTIBULOS.has(c.fichero) && c.texto.endsWith(', modalidadQueViaja(elegida, compuerta))')) &&
+      new Set(cuales.map((c) => c.fichero)).size === 2
+    );
+  };
+  comprobar(
+    `de los ${String(losFuentes.length)} ficheros del escritorio, sólo los dos vestíbulos le pasan una modalidad a \`abrir\`, y los dos la de \`modalidadQueViaja\``,
+    losFuentes.length > 20 && soloLosVestibulos(losFuentes),
+    conModalidad(losFuentes),
+  );
+  comprobar(
+    'se ve fallar: un pintor que abriera su propia mesa de botas, o un vestíbulo que mandara `botas` a pelo, cae; y el contador no confunde las comas de dentro',
+    !soloLosVestibulos([...losFuentes, ['pintor.tsx', "mesa.abrir(nombre, 60, undefined, 'botas');"]]) &&
+      !soloLosVestibulos(losFuentes.map(([f, t]): [string, string] => [f, t.replace('modalidadQueViaja(elegida, compuerta))', "'botas')")])) &&
+      llamadasAAbrir("mesa.abrir(a(b, c), [d, e], { f, g }, 'h, i')")[0]?.args === 4 &&
+      llamadasAAbrir('mesa.abrir()')[0]?.args === 0,
+  );
+
+  const unaSolaPuerta = (mesa: string): boolean => {
+    const pedir = /const pedirSilla = useCallback\(([\s\S]*?)\n {4}\[arcade, sentarse\],/.exec(mesa)?.[1] ?? '';
+    const entrar = /const entrar = useCallback\(([\s\S]*?)\n {4}\[apuntarLaLlave, arcade, silla, pedirSilla\],/.exec(mesa)?.[1] ?? '';
+    const pregunta = pedir.indexOf('await porQueNoTeSientas(limpio, arcade, elVeredictoDelAparato(), leerSinLlave)');
+    const silla = pedir.indexOf('sentarse(`/mesas/${limpio}/asientos`');
+    return (
+      pedir.length > 0 &&
+      entrar.length > 0 &&
+      pregunta > 0 &&
+      silla > pregunta &&
+      /if \(motivo !== null\) \{\s*ponerFase\('fuera'\);\s*ponerAviso\(\{ texto: motivo, de: 'la-red' \}\);\s*ponerQuieto\(false\);\s*return;\s*\}/.test(pedir) &&
+      (mesa.match(/\/asientos`/g) ?? []).length === 1 &&
+      (entrar.match(/pedirSilla\(limpio, cuerpoDeAsiento\)/g) ?? []).length === 2 &&
+      !/sentarse\(/.test(entrar)
+    );
+  };
+  comprobar(
+    '`entrar` pide silla por UNA puerta, y esa puerta pregunta antes a la compuerta: en una mesa de botas, quien no llega se queda fuera con su frase',
+    unaSolaPuerta(laMesa),
+  );
+  comprobar(
+    'se ve fallar: sin la pregunta, o con un segundo camino a `/asientos` que se la salte, cae',
+    !unaSolaPuerta(laMesa.replace('await porQueNoTeSientas(limpio, arcade, elVeredictoDelAparato(), leerSinLlave)', 'null')) &&
+      !unaSolaPuerta(laMesa.replace('pedirSilla(limpio, cuerpoDeAsiento);\n    },', "sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'x');\n    },")),
+  );
+  const leeSinLlave = (mesa: string): boolean => {
+    const cuerpo = /async function leerSinLlave\(codigo: string\): Promise<LecturaSinLlave> \{([\s\S]*?)\n\}/.exec(mesa)?.[1] ?? '';
+    return /const r = await fetch\(ruta\(`\/mesas\/\$\{codigo\}\?desde=-1`\)\);/.test(cuerpo) && !/x-asiento|headers|cabeceras|CABECERA/.test(cuerpo);
+  };
+  comprobar('y la mesa se lee SIN llave —como la ve quien aún no se ha sentado— y en el acto, con `?desde=-1`', leeSinLlave(laMesa));
+  comprobar(
+    'se ve fallar: leyéndola con la cabecera del asiento, cae',
+    !leeSinLlave(laMesa.replace('await fetch(ruta(`/mesas/${codigo}?desde=-1`));', 'await fetch(ruta(`/mesas/${codigo}?desde=-1`), { headers: cabeceras(false) });')),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 6 · Riberas en tres dimensiones: sin Canvas en Node, y cada movimiento una vez
 // ---------------------------------------------------------------------------
 
@@ -2574,6 +2993,156 @@ function burgoEnTres(): void {
       !/<RiberasEnTres\b/.test(laSala) &&
       !/\bRIBERAS\b/.test(laSala),
     /PINTORES_PROPIOS\[[^\]]*\]/.exec(laSala)?.[0] ?? null,
+  );
+
+  elBurgoAPie();
+}
+
+/**
+ * ═══ A PIE POR EL BURGO, EN EL ESCRITORIO ═══
+ *
+ * Tres botones y las teclas 1, 2 y 3 —los de Las Lindes, con sus palabras— bajan a andar, un
+ * cartel dice cómo se anda mientras se anda, y `CamaraAerea` —que sigue montada delante de la
+ * escena por el seguimiento al que mueve— no puede mover por detrás la cámara de mesa: su
+ * acercamiento se queda sin efecto y los punteros del recuadro se marcan como de la interfaz.
+ *
+ * Nada de eso se ve en un pintado estático: el pintor nace en la mesa y en Node no hay `Canvas`.
+ * Así que se pintan sueltos los dos muebles en los tres modos, se corre la tecla con los sucesos
+ * que la hacen fallar, y lo que vive en el pintor y en la hoja se lee del fuente. Cada juez se ve
+ * caer con su caso envenenado.
+ */
+function elBurgoAPie(): void {
+  paso('El Burgo a pie en el escritorio: tres cámaras con sus teclas, cómo se anda, y la cámara de mesa quieta mientras tanto');
+
+  /* ── 1. EL CARTEL DE CÓMO SE ANDA, en los tres modos ── */
+  const carteles = (['mesa', 'hombro', 'ojos'] as const).map((m) => renderToStaticMarkup(<ComoSeAndaPorElBurgo modo={m} />));
+  comprobar('en la mesa no se dice cómo se anda: allí no se anda', carteles[0] === '', carteles[0]);
+  const diceComoSeAnda = (h: string): boolean => /class="burgo-como-se-anda"/.test(h) && /W A S D/.test(h) && /flechas/.test(h) && /Mayúsculas para correr/.test(h) && /1 para volver a la mesa/.test(h);
+  comprobar('y en «Al hombro» y en «Sus ojos» sí: las cuatro letras, las flechas, Mayúsculas para correr y la tecla para volver', carteles.slice(1).every(diceComoSeAnda), carteles.slice(1));
+  comprobar('se ve fallar: un cartel sin la tecla de volver no lo pasa', !diceComoSeAnda((carteles[1] ?? '').replace('1 para volver a la mesa', '')));
+
+  /* ── 2. LAS TRES CÁMARAS: las de Las Lindes, con sus palabras y sus teclas ── */
+  const deLasLindes = sinComentarios(readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8'));
+  const rotulosDeLasLindes = [...deLasLindes.matchAll(/\{ modo: '(mesa|hombro|ojos)', rotulo: '([^']+)'/g)].map((m) => `${m[1] ?? ''}:${m[2] ?? ''}`).join(',');
+  const rotulosDelBurgo = LAS_CAMARAS_DEL_BURGO.map((c) => `${c.modo}:${c.rotulo}`).join(',');
+  comprobar(
+    'las tres cámaras del Burgo son las de Las Lindes, en su orden y con sus mismas palabras, y las teclas 1, 2 y 3',
+    rotulosDelBurgo === 'mesa:La mesa,hombro:Al hombro,ojos:Sus ojos' && rotulosDelBurgo === rotulosDeLasLindes && LAS_CAMARAS_DEL_BURGO.map((c) => c.tecla).join('') === '123',
+    { burgo: rotulosDelBurgo, lindes: rotulosDeLasLindes },
+  );
+  const pintadas = (['mesa', 'hombro', 'ojos'] as const).map((m) => renderToStaticMarkup(<LasCamarasDelBurgo modo={m} alElegir={() => undefined} conCarril={false} />));
+  const cadaUnaPuesta = pintadas.every(
+    (h, k) =>
+      cuantos(h, 'button') === 3 &&
+      (h.match(/aria-pressed="true"/g) ?? []).length === 1 &&
+      new RegExp(`aria-pressed="true"[^>]*>${LAS_CAMARAS_DEL_BURGO[k]?.rotulo ?? '\u0000'}<`).test(h) &&
+      /role="group" aria-label="Desde dónde se mira el burgo"/.test(h) &&
+      /class="burgo-a-pie"/.test(h),
+  );
+  comprobar('se pintan tres botones, con UNO puesto —el del modo— y su grupo con nombre', cadaUnaPuesta, pintadas.map((h) => h.slice(0, 160)));
+  comprobar(
+    'y el cartel de cómo se anda va con ellos sólo a pie; con carril, la columna baja una tira',
+    !/burgo-como-se-anda/.test(pintadas[0] ?? '') &&
+      /burgo-como-se-anda/.test(pintadas[1] ?? '') &&
+      /class="burgo-a-pie burgo-a-pie-con-carril"/.test(renderToStaticMarkup(<LasCamarasDelBurgo modo="mesa" alElegir={() => undefined} conCarril />)),
+  );
+
+  /* ── 3. LAS TECLAS, Y CUÁNDO NO CUENTAN ── */
+  const tecla = (key: string, mas: { metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; repeat?: boolean } = {}): { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; repeat: boolean } => ({
+    key,
+    metaKey: mas.metaKey ?? false,
+    ctrlKey: mas.ctrlKey ?? false,
+    altKey: mas.altKey ?? false,
+    repeat: mas.repeat ?? false,
+  });
+  comprobar(
+    'el 1, el 2 y el 3 cambian de cámara, y ninguna otra tecla; ni con Control, ni con Alt, ni con la tecla mantenida',
+    camaraDeLaTecla(tecla('1'), null) === 'mesa' &&
+      camaraDeLaTecla(tecla('2'), null) === 'hombro' &&
+      camaraDeLaTecla(tecla('3'), null) === 'ojos' &&
+      camaraDeLaTecla(tecla('4'), null) === null &&
+      camaraDeLaTecla(tecla('w'), null) === null &&
+      camaraDeLaTecla(tecla('2', { ctrlKey: true }), null) === null &&
+      camaraDeLaTecla(tecla('2', { altKey: true }), null) === null &&
+      camaraDeLaTecla(tecla('2', { repeat: true }), null) === null,
+  );
+  {
+    /*
+     * ESCRIBIENDO EN UN CAMPO, NO. En Node no hay DOM, así que se le pone uno de mentira a la vuelta
+     * de la pregunta —la clase que la función mira— y se quita después: lo que se compra es que
+     * pregunte por lo que tiene el foco, que es lo que un «1» tecleado en la puja libre necesita.
+     */
+    const elGlobal = globalThis as { HTMLInputElement?: unknown };
+    const antes = elGlobal.HTMLInputElement;
+    class CampoDeMentira {}
+    elGlobal.HTMLInputElement = CampoDeMentira;
+    const escribiendo = camaraDeLaTecla(tecla('1'), new CampoDeMentira());
+    const fuera = camaraDeLaTecla(tecla('1'), {});
+    elGlobal.HTMLInputElement = antes;
+    comprobar('y con el foco en un campo de texto —la puja libre lleva cifras— el 1 no sube a nadie a la mesa', escribiendo === null && fuera === 'mesa', { escribiendo, fuera });
+  }
+
+  /* ── 4. EL PINTOR: LOS MONTA, Y LA CÁMARA DE MESA SE QUEDA QUIETA A PIE ── */
+  const pintor = sinComentarios(readFileSync(new URL('../src/burgo-en-tres.tsx', import.meta.url), 'utf8'));
+  const quietaAPie = (c: string): boolean =>
+    /alAcercarse=\{aPie \? NO_SE_ACERCA : alAcercarse\}/.test(c) &&
+    /const esDelPaseo = \(e: PointerEvent\): void => \{\s*loCogeLaInterfaz\(e\);\s*\};\s*recuadro\.addEventListener\('pointerdown', esDelPaseo, \{ capture: true \}\);/.test(c) &&
+    /if \(!aPie \|\| recuadro === null\) return undefined;/.test(c) &&
+    !/aPie \? null : \(?\s*<CamaraAerea/.test(c) &&
+    c.indexOf('<CamaraAerea') > 0 &&
+    c.indexOf('<CamaraAerea') < c.indexOf('<Burgo\n');
+  comprobar(
+    'a pie `CamaraAerea` sigue montada y delante de la escena, pero no mueve la cámara de mesa: su acercamiento no hace nada y los punteros del recuadro se marcan, en la captura, como de la interfaz',
+    quietaAPie(pintor),
+  );
+  comprobar(
+    'se ve fallar: con el acercamiento de siempre a pie, o sin marcar los punteros, cae',
+    !quietaAPie(pintor.replace('alAcercarse={aPie ? NO_SE_ACERCA : alAcercarse}', 'alAcercarse={alAcercarse}')) && !quietaAPie(pintor.replace(/loCogeLaInterfaz\(e\);/, '')),
+  );
+  const montaLoDeAPie = (c: string): boolean =>
+    /const \[modo, ponerModo\] = useState<ModoDelBurgo>\('mesa'\);/.test(c) &&
+    /const camara = useMemo\(\(\): ModoDeCamara => \(modo === 'mesa' \? \{ modo: 'mesa' \} : \{ modo, asiento: yo \?\? '' \}\), \[modo, yo\]\);/.test(c) &&
+    /<Burgo\n(?:(?!\/>)[\s\S])*camara=\{camara\}/.test(c) &&
+    /<LasCamarasDelBurgo modo=\{modo\} alElegir=\{ponerModo\} conCarril=\{cuadrados\.length > 0\} \/>/.test(c) &&
+    c.indexOf('<LasCamarasDelBurgo') > c.indexOf('</LimiteDelMundo>') &&
+    /const cual = camaraDeLaTecla\(e, document\.activeElement\);/.test(c) &&
+    /\{alPrincipio \|\| aPie \? null : \(/.test(c);
+  comprobar('el pintor baja a andar con su `modo`, le pasa la cámara con el asiento a la escena, monta las cámaras sobre el lienzo, escucha las teclas y a pie esconde «Ver el burgo entero»', montaLoDeAPie(pintor));
+  comprobar(
+    'se ve fallar: sin la cámara del modo, o con «Ver el burgo entero» también a pie, cae',
+    !montaLoDeAPie(pintor.replace(/camara=\{camara\}/, "camara={{ modo: 'mesa' }}")) && !montaLoDeAPie(pintor.replace('{alPrincipio || aPie ? null : (', '{alPrincipio ? null : (')),
+  );
+
+  /* ── 5. LA HOJA: SU SITIO, Y QUE NO SE COMA EL PUNTERO ── */
+  const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
+  const regla = (selector: string, css: string = hoja): string => new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+  const dondeEmpieza = (selector: string, css: string = hoja): number => new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{`).exec(css)?.index ?? -1;
+  const laHojaDeAPie = (css: string): boolean => {
+    const arriba = Number(/top:\s*([\d.]+)rem/.exec(regla('.burgo-a-pie', css))?.[1] ?? '0');
+    const tira = Number(/height:\s*([\d.]+)rem/.exec(regla('.lienzo-carril', css))?.[1] ?? '0');
+    const conCarril = /top:\s*calc\(([\d.]+)rem \+ ([\d.]+)rem\)/.exec(regla('.burgo-a-pie-con-carril', css));
+    return (
+      /position:\s*absolute;/.test(regla('.burgo-a-pie', css)) &&
+      /pointer-events:\s*none;/.test(regla('.burgo-a-pie', css)) &&
+      /pointer-events:\s*auto;/.test(regla('.burgo-camaras', css)) &&
+      /min-height:\s*2\.75rem;/.test(regla('.burgo-camara', css)) &&
+      /pointer-events:\s*none;/.test(regla('.burgo-como-se-anda', css)) &&
+      arriba > 0 &&
+      conCarril !== null &&
+      Number(conCarril[1]) === arriba &&
+      Number(conCarril[2]) === tira &&
+      dondeEmpieza('.burgo-a-pie-con-carril', css) > dondeEmpieza('.burgo-a-pie', css)
+    );
+  };
+  comprobar(
+    'la hoja pone la columna encima del lienzo sin coger el puntero —y los botones sí, con su dedo de 2,75rem—, el cartel tampoco lo coge, y con carril baja exactamente una tira, escrita DESPUÉS',
+    laHojaDeAPie(hoja),
+    { aPie: regla('.burgo-a-pie').replace(/\s+/g, ' '), conCarril: regla('.burgo-a-pie-con-carril').replace(/\s+/g, ' ') },
+  );
+  comprobar(
+    'se ve fallar: con la columna cogiendo el puntero —se come el tablero entre los botones—, o con la tira del carril escrita a mano, cae',
+    !laHojaDeAPie(hoja.replace(/(\n\.burgo-a-pie \{[^}]*?)pointer-events:\s*none;/, '$1pointer-events: auto;')) &&
+      !laHojaDeAPie(hoja.replace(/(\n\.burgo-a-pie-con-carril \{\s*top:\s*)calc\([^)]*\)/, (_: string, antes: string) => `${antes}6.5rem`)),
   );
 }
 
@@ -4275,7 +4844,8 @@ function recogerLaMesa(): void {
    * turno la sacaría en el render siguiente y no habría manera de mirar el tablero mientras
    * me toca; o sea, la mitad de para lo que sirve recogerla.
    */
-  const laVuelta = /const meTocaAhora = meToca\(vista\);[\s\S]*?\}, \[meTocaAhora, cogida, cartaDelMazo\]\);/.exec(codigo)?.[0] ?? '';
+  /* `aPie` entra en las dependencias desde que se anda: la salida también espera a volver a la mesa. */
+  const laVuelta = /const meTocaAhora = meToca\(vista\);[\s\S]*?\}, \[meTocaAhora, cogida, cartaDelMazo(?:, aPie)?\]\);/.exec(codigo)?.[0] ?? '';
   comprobar(
     'la mesa sale sola cuando `meToca` pasa de falso a verdadero (el FLANCO, con `meToca` de shared) y no cada vez que me toca',
     laVuelta.length > 0 &&
@@ -4308,7 +4878,7 @@ function recogerLaMesa(): void {
   const enRem = (puntos: number): string => `${String(puntos / 16)}rem`;
   comprobar(
     'el botón de recoger existe sólo donde hay mesa que recoger (la misma condición con la que `<Delta>` monta la barra) y dice qué hace con todas sus letras',
-    /\{barra\.length > 0 \|\| mazo !== null \? \(\s*<button[\s\S]*?className="riberas-recoger"[\s\S]*?onClick=\{alRecogerLaMesa\}[\s\S]*?aria-label=\{mesaRecogida \? SACAR_LA_MESA : RECOGER_LA_MESA\}/.test(codigo) &&
+    /\{(?:!aPie && \()?barra\.length > 0 \|\| mazo !== null\)? \? \(\s*<button[\s\S]*?className="riberas-recoger"[\s\S]*?onClick=\{alRecogerLaMesa\}[\s\S]*?aria-label=\{mesaRecogida \? SACAR_LA_MESA : RECOGER_LA_MESA\}/.test(codigo) &&
       /const RECOGER_LA_MESA = 'Recoger la mesa';/.test(fuente) &&
       /const SACAR_LA_MESA = 'Sacar la mesa';/.test(fuente),
   );
@@ -4338,6 +4908,228 @@ function recogerLaMesa(): void {
       /right: 0\.75rem;/.test(reglaDelVolverEnTres) &&
       MANDO_DE_RECOGER.margen + MANDO_DE_RECOGER.bajoElOtroMando >= 12 + 44,
     { volver: reglaDelVolverEnTres.replace(/\s+/g, ' ').slice(0, 120) },
+  );
+}
+
+/**
+ * ═══ RIBERAS A PIE EN EL ESCRITORIO ═══
+ *
+ * El delta se anda con el paseo común de la escena (`escenas/andar-por-el-delta.tsx`), y lo que
+ * es de esta pantalla son cuatro cosas que fallan sin decir nada:
+ *
+ *   1. QUE LA CÁMARA DE LA MESA SE CALLE A PIE. `CamaraAerea` pone la cámara en cada fotograma:
+ *      montada y hablando, subiría al aire la que acaba de poner el paseo, y arrastrar a pie
+ *      giraría una mesa que no se ve. Y se calla sin desmontarse, porque su mirador vive dentro.
+ *   2. QUE LAS TECLAS DE LA CÁMARA NO PISEN LAS DEL CARRIL. En Las Lindes son 1, 2 y 3; aquí el
+ *      carril reparte del 1 al 9 (`usarLosAtajos`) y pulsar «2» para bajar mandaría además la
+ *      segunda opción. Por eso son M, H y O, y aquí se exige que NINGÚN dígito mueva la cámara.
+ *   3. QUE A PIE SE DIGA CÓMO SE ANDA, y cómo se vuelve.
+ *   4. QUE LOS MANDOS ESTÉN DONDE SE MIDIERON: en la columna de arriba a la derecha, con los
+ *      números de `MANDOS_DE_LA_CAMARA`, que `verify:escena` mide contra las asas.
+ *
+ * Todo se lee del fuente, de la hoja y de las dos tablas exportadas, porque el pintor nace en la
+ * mesa y en Node no hay `Canvas`; y cada regla se ve CAER con su caso envenenado.
+ */
+function riberasAPie(): void {
+  paso('Riberas a pie en el escritorio: la cámara de la mesa se calla, M, H y O no pisan el carril, se dice cómo se anda y los mandos están donde se midieron');
+
+  const fuente = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+  const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
+  const soloCodigo = (texto: string): string =>
+    texto
+      .split('\n')
+      .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+      .join('\n');
+  /** Afirma la regla sobre lo de verdad, y la ve CAER con el caso envenenado. */
+  const regla = <T,>(que: string, prueba: (t: T) => boolean, bueno: T, envenenado: T, detalle?: unknown): void => {
+    comprobar(que, prueba(bueno), detalle);
+    comprobar(`y «${que}» se ve CAER con el caso envenenado`, !prueba(envenenado));
+  };
+  const trozo = (texto: string, desde: string, hasta: string): string => {
+    const a = texto.indexOf(desde);
+    const b = a < 0 ? -1 : texto.indexOf(hasta, a + desde.length);
+    return a < 0 || b < 0 ? '' : texto.slice(a, b);
+  };
+
+  /* ── 1. La cámara de la mesa, callada a pie y montada siempre ── */
+
+  regla(
+    '`CamaraAerea` se queda montada y recibe `aPie`: a pie ni apunta sus oyentes ni pone la cámara ni la niebla',
+    (t: string) => {
+      const c = soloCodigo(t);
+      const camara = trozo(c, 'function CamaraAerea(', '\nclass LimiteDelMundo');
+      return (
+        /<CamaraAerea alcance=\{alcance\} cercania=\{cercania\} alAcercarse=\{alAcercarse\} aPie=\{aPie\} \/>/.test(c) &&
+        !/aPie \? null : <CamaraAerea/.test(c) &&
+        /useEffect\(\(\) => \{\s*if \(aPie\) return undefined;\s*const lienzo = gl\.domElement;/.test(camara) &&
+        /\}, \[gl, alcance, cercania, alAcercarse, aPie\]\);/.test(camara) &&
+        /useFrame\(\(\) => \{\s*if \(aPie\) return;\s*const lienzo = gl\.domElement;/.test(camara)
+      );
+    },
+    fuente,
+    fuente.replace(/useFrame\(\(\) => \{\n(\s*)if \(aPie\) return;\n/, 'useFrame(() => {\n'),
+  );
+  regla(
+    'y a la escena se le dan la cámara, la VISTA —de ella sale `mundoDeRiberas`— y el `traer` del muelle, que es la caché de aventureros: el paseo es el común',
+    (t: string) => {
+      const c = soloCodigo(t);
+      return (
+        /<Delta[\s\S]*?camara=\{camara\}\s+vista=\{vista\}\s+traer=\{traer\}[\s\S]*?\/>/.test(c) &&
+        /import \{ traer \} from '\.\/muelle';/.test(c) &&
+        /const camara: ModoDeCamaraDelDelta = modo === 'mesa' \? \{ modo: 'mesa' \} : \{ modo, asiento: yo \?\? '' \};/.test(c) &&
+        !/\b(pasoDelTic|unPaso|fotogramaDelPaseo|usarElPaseo|teclaDelPaseo)\b/.test(c)
+      );
+    },
+    fuente,
+    fuente.replace("import { traer } from './muelle';", "const traer = async (r: string): Promise<ArrayBuffer> => (await fetch(r)).arrayBuffer();"),
+  );
+
+  /* ── 2. Las teclas: M, H y O, y ningún dígito ── */
+
+  const lasTeclas = (tabla: ReadonlyMap<string, string>): boolean =>
+    tabla.get('m') === 'mesa' &&
+    tabla.get('h') === 'hombro' &&
+    tabla.get('o') === 'ojos' &&
+    [...tabla.keys()].every((k) => !/\d/.test(k)) &&
+    [...tabla.keys()].every((k) => !['w', 'a', 's', 'd', 'shift'].includes(k));
+  regla(
+    'la cámara va con M, H y O, y NINGÚN dígito la mueve: del 1 al 9 son del carril, y W, A, S, D y Mayúsculas del paseo',
+    lasTeclas,
+    CAMARA_DE_LA_TECLA as ReadonlyMap<string, string>,
+    new Map<string, string>([...CAMARA_DE_LA_TECLA, ['2', 'hombro']]),
+    [...CAMARA_DE_LA_TECLA],
+  );
+  regla(
+    'y las escucha con las guardas del carril —ni con un campo enfocado, ni con modificadores, ni repetidas— y ninguna con una caja modal abierta',
+    (t: string) => {
+      const efecto = trozo(soloCodigo(t), 'const alPulsar = (e: KeyboardEvent): void => {\n      if (e.metaKey', "document.removeEventListener('keydown', alPulsar);");
+      return (
+        /if \(e\.metaKey \|\| e\.ctrlKey \|\| e\.altKey \|\| e\.repeat\) return;/.test(efecto) &&
+        /activo instanceof HTMLInputElement/.test(efecto) &&
+        /activo instanceof HTMLElement && activo\.isContentEditable/.test(efecto) &&
+        /if \(LAS_TRAMPAS_ARMADAS\.length > 0\) return;/.test(efecto) &&
+        /const nuevo = CAMARA_DE_LA_TECLA\.get\(e\.key\.toLowerCase\(\)\);/.test(efecto) &&
+        /cambiarDeCamara\(nuevo\);/.test(efecto) &&
+        /document\.addEventListener\('keydown', alPulsar\);/.test(efecto)
+      );
+    },
+    fuente,
+    fuente.replace('if (LAS_TRAMPAS_ARMADAS.length > 0) return;\n', ''),
+  );
+
+  /* ── 3. Bajar recoge la mesa, subir la saca; y los mandos de la mesa no están a pie ── */
+
+  regla(
+    'bajar a andar suelta lo cogido y RECOGE la mesa con su mismo estado, y volver la saca',
+    (t: string) =>
+      /if \(modo === 'mesa'\) \{\s*soltarTodo\(\);\s*ponerMesaRecogida\(true\);\s*\} else if \(nuevo === 'mesa'\) \{\s*ponerMesaRecogida\(false\);\s*\}\s*ponerModo\(nuevo\);/.test(
+        trozo(soloCodigo(t), 'const cambiarDeCamara = useCallback(', '[modo, soltarTodo],'),
+      ),
+    fuente,
+    fuente.replace(/soltarTodo\(\);\n(\s*)ponerMesaRecogida\(true\);/, 'ponerMesaRecogida(true);'),
+  );
+  regla(
+    'y a pie la mesa NO sale sola al pasar a tocarme: la salida espera a volver, y `aPie` la despierta',
+    (t: string) => {
+      const vuelta =
+        /const meTocaAhora = meToca\(vista\);[\s\S]*?\}, \[meTocaAhora, cogida, cartaDelMazo, aPie\]\);/.exec(soloCodigo(t))?.[0] ?? '';
+      return /if \(!laSalidaEspera\.current\) return;\s*if \(aPie\) return;\s*if \(cogida !== null \|\| cartaDelMazo !== null\) return;/.test(vuelta);
+    },
+    fuente,
+    fuente.replace(/\n\s*if \(aPie\) return;\n\s*if \(cogida !== null \|\| cartaDelMazo/, '\n    if (cogida !== null || cartaDelMazo'),
+  );
+  regla(
+    'y a pie no están ni «Ver el tablero entero» ni «Recoger la mesa»: los dos son de la mesa, y andando no hay aire ni barra',
+    (t: string) => {
+      const c = soloCodigo(t);
+      return /\{aPie \|\| alPrincipio \? null : \(/.test(c) && /\{!aPie && \(barra\.length > 0 \|\| mazo !== null\) \? \(/.test(c);
+    },
+    fuente,
+    fuente.replace('{!aPie && (barra.length > 0 || mazo !== null) ? (', '{barra.length > 0 || mazo !== null ? ('),
+  );
+
+  /* ── 4. Cómo se anda, dicho a pie ── */
+
+  const rotulos = (['mesa', 'hombro', 'ojos'] as const).map((m) => renderToStaticMarkup(<ComoSeAndaPorElDelta modo={m} />));
+  const diceComoSeAnda = (h: string): boolean =>
+    /class="riberas-como-se-anda"/.test(h) && /W A S D/.test(h) && /flechas/.test(h) && /Mayúsculas para correr/.test(h) && /M vuelve a la mesa/.test(h);
+  comprobar('en la mesa no se dice cómo se anda: allí no se anda', rotulos[0] === '', rotulos[0]);
+  regla(
+    'y en «Hombro» y en «Ojos» sí: las cuatro letras, las flechas, Mayúsculas para correr y la tecla de volver',
+    (hs: readonly string[]) => hs.length === 2 && hs.every(diceComoSeAnda),
+    rotulos.slice(1),
+    [rotulos[1] ?? '', (rotulos[2] ?? '').replace('M vuelve a la mesa', '')],
+    rotulos.slice(1),
+  );
+  regla(
+    'y el pintor lo monta encima del lienzo con el modo puesto, y la hoja le da su sitio sin coger el puntero: es un cartel, no un control',
+    (par: readonly [string, string]) =>
+      /<ComoSeAndaPorElDelta modo=\{modo\} \/>/.test(par[0]) &&
+      /\.riberas-como-se-anda \{[^}]*position: absolute;[^}]*pointer-events: none;/.test(par[1]),
+    [fuente, hoja] as const,
+    [fuente, hoja.replace(/(\.riberas-como-se-anda \{[^}]*)pointer-events: none;/, '$1')] as const,
+  );
+
+  /* ── 5. Los mandos: dónde, y qué dicen ── */
+
+  const enRem = (puntos: number): string => `${String(puntos / 16)}rem`;
+  const losMandosDicenSuTecla = (m: typeof LOS_MANDOS_DE_LA_CAMARA): boolean =>
+    Object.values(m).every((x) => x.nombre.startsWith(x.rotulo)) &&
+    CAMARA_DE_LA_TECLA.get(m.bajar.tecla.toLowerCase()) === 'hombro' &&
+    CAMARA_DE_LA_TECLA.get(m.subir.tecla.toLowerCase()) === 'mesa' &&
+    CAMARA_DE_LA_TECLA.get(m.aLosOjos.tecla.toLowerCase()) === 'ojos' &&
+    CAMARA_DE_LA_TECLA.get(m.alHombro.tecla.toLowerCase()) === 'hombro';
+  regla(
+    'cada mando dice adónde lleva, su nombre entero EMPIEZA por lo que se lee —para poder decirlo en voz alta— y lleva la tecla que de verdad lleva allí',
+    losMandosDicenSuTecla,
+    LOS_MANDOS_DE_LA_CAMARA,
+    { ...LOS_MANDOS_DE_LA_CAMARA, subir: { ...LOS_MANDOS_DE_LA_CAMARA.subir, tecla: 'O' } } as unknown as typeof LOS_MANDOS_DE_LA_CAMARA,
+    LOS_MANDOS_DE_LA_CAMARA,
+  );
+  regla(
+    'el primero está SIEMPRE —baja a andar o vuelve a la mesa— y el segundo sólo a pie, y los dos anuncian su tecla',
+    (t: string) => {
+      const c = soloCodigo(t);
+      return (
+        /<MandoDeLaCamara\s+mando=\{aPie \? LOS_MANDOS_DE_LA_CAMARA\.subir : LOS_MANDOS_DE_LA_CAMARA\.bajar\}\s+alPulsar=\{\(\) => cambiarDeCamara\(aPie \? 'mesa' : 'hombro'\)\}\s*\/>/.test(c) &&
+        /\{aPie \? \(\s*<MandoDeLaCamara\s+segundo/.test(c) &&
+        /aria-keyshortcuts=\{mando\.tecla\}/.test(c)
+      );
+    },
+    fuente,
+    fuente.replace('{aPie ? (\n              <MandoDeLaCamara\n                segundo', '{true ? (\n              <MandoDeLaCamara\n                segundo'),
+  );
+  const reglaDe = (css: string, selector: string): string =>
+    new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+  const losMandosEnSuSitio = (css: string): boolean => {
+    const primero = reglaDe(css, '.riberas-camara');
+    const segundo = reglaDe(css, '.riberas-camara-segunda');
+    return (
+      primero.includes(`top: ${enRem(MANDOS_DE_LA_CAMARA.arriba)};`) &&
+      primero.includes(`right: ${enRem(MANDOS_DE_LA_CAMARA.margen)};`) &&
+      primero.includes(`min-width: ${enRem(MANDOS_DE_LA_CAMARA.lado)};`) &&
+      primero.includes(`height: ${enRem(MANDOS_DE_LA_CAMARA.lado)};`) &&
+      !/bottom:|left:/.test(primero) &&
+      /background: var\(--teja-alta\);/.test(primero) &&
+      /border: 1px solid var\(--filo\);/.test(primero) &&
+      /\.riberas-camara:hover \{[\s\S]*?border-color: var\(--acento\);[\s\S]*?\}/.test(css) &&
+      segundo.includes(`top: ${enRem(MANDOS_DE_LA_CAMARA.arriba + MANDOS_DE_LA_CAMARA.bajoElPrimero)};`)
+    );
+  };
+  regla(
+    'y la hoja los pone donde `MANDOS_DE_LA_CAMARA` dice —debajo de volver y de recoger, en su columna y con su paso— y con el cromo de los otros dos',
+    losMandosEnSuSitio,
+    hoja,
+    hoja.replace(`top: ${enRem(MANDOS_DE_LA_CAMARA.arriba)};`, 'top: 4rem;'),
+    { primero: reglaDe(hoja, '.riberas-camara').replace(/\s+/g, ' ').slice(0, 160) },
+  );
+  comprobar(
+    'y esos números son los de la columna: el primero baja lo que bajan volver y recoger juntos, y el segundo un paso más',
+    MANDOS_DE_LA_CAMARA.arriba === MANDO_DE_RECOGER.margen + 2 * MANDO_DE_RECOGER.bajoElOtroMando &&
+      MANDOS_DE_LA_CAMARA.bajoElPrimero === MANDO_DE_RECOGER.bajoElOtroMando &&
+      MANDOS_DE_LA_CAMARA.lado === MANDO_DE_RECOGER.lado &&
+      MANDOS_DE_LA_CAMARA.margen === MANDO_DE_RECOGER.margen,
+    { MANDOS_DE_LA_CAMARA, MANDO_DE_RECOGER },
   );
 }
 
@@ -9142,6 +9934,7 @@ laPausaCabe();
 loQueLaPantallaDecideSola();
 lasDirecciones();
 elMuelle();
+laCompuertaDeBotas();
 riberasEnTres();
 burgoEnTres();
 elAcercamientoDelDelta();
@@ -11419,6 +12212,7 @@ elResultadoDeMover();
 losDadosLleganAparte();
 losDadosEnLaPantalla();
 recogerLaMesa();
+riberasAPie();
 elCartelDeLaCarta();
 elPintorDeLasLindes();
 laPaginaDePie();
@@ -11524,8 +12318,13 @@ console.log('');
  *
  * Y LAS ROJAS SE IMPRIMEN ANTES DE IRSE: el orden estaba al revés, así que el día que el
  * guardia saltara se llevaría por delante los nombres de todo lo que ya se había encontrado.
+ *
+ * Y BOOTS ON BOARD TRAE VEINTITRÉS (`laCompuertaDeBotas`: el veredicto guardado, la elección en
+ * los dos vestíbulos, la marca de la mesa y la silla que no se da), así que el guardia sube
+ * veintitrés. Ninguna sale de un bucle que dependa del azar: los arcades son los instalados y los
+ * almacenes de mentira los pone y los quita el propio bloque.
  */
-const COMPROBACIONES_ESCRITAS = 990;
+const COMPROBACIONES_ESCRITAS = 1013;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(

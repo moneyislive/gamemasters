@@ -756,6 +756,13 @@ const BATERIA = [
       'los fotogramas dan exactamente ⌊total/tic⌋ tics y nunca más de cinco por fotograma, lo pintado va siempre entre el tic anterior y el último, las teclas y la palanca piden su rumbo y su marcha con el atrás en +128, contra un cuerpo del mundo se para sin meterse y de lado resbala, la marioneta se queda quieta contra la pared aunque se pulse y corre al correr con el clip a la velocidad del suelo, lo pedido tic a tic basta para rehacer el camino, nadie nace encerrado, y la escena de Las Lindes y la app montan justo esto',
   },
   {
+    nombre: 'la compuerta de Boots on Board',
+    donde: 'escenas',
+    guion: 'verify:compuerta-de-botas',
+    porque:
+      'la elección de Boots on Board sale al abrir mesa sólo en los juegos que se recorren, encendida sólo si este aparato midió `plena` y apagada siempre con su porqué; lo que viaja en `abrir` es lo que se ve encendido; y un aparato que no llega no se sienta en una mesa `botas` —sentado sin bajar sería inmune a que le roben—, sin que a quien sí llega le cueste una petición',
+  },
+  {
     nombre: 'el canal del paseo',
     donde: 'escenas',
     guion: 'verify:canal-del-paseo',
