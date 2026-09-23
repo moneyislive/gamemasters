@@ -42,7 +42,8 @@
  * `alZarpar`, exactamente una vez por coreografía: a los 3,2 s de empezarla o, si
  * `zarpando` llega sin mundo, en el fotograma siguiente. `alMedir`, una vez por segundo
  * con la media real del reloj de `useFrame` (cada fotograma acotado a 100 ms: un
- * navegador en segundo plano deja pasar segundos entre dos).
+ * navegador en segundo plano deja pasar segundos entre dos). `alEstarListo` y `alMedir`
+ * los lleva el gancho común de `comun/arranque.ts`, el mismo de las demás escenas.
  *
  * ═══ LO QUE NO HAY, A PROPÓSITO ═══
  *
@@ -86,11 +87,10 @@ import type { PuestoDeLaPlaza } from './la-plaza';
 import { construirElMundoDeLaPlaza } from './mundo-de-la-plaza';
 import { MOTAS, RADIO_DEL_CIELO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DE_LA_BOMBILLA } from './presupuesto-de-la-plaza';
 import { MEDIODIA_DEL_TABLERO, TARDE, mezclaDeNumeros } from './tarde';
+import { usarArranqueYMedida } from '../comun/arranque';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
-/** Cuánto se espera a `traer` antes de levantar el telón con lo que haya. */
-const TOPE_DE_ARRANQUE_MS = 15_000;
 /** Los que ya estaban al montar nacen escalonados así, y en ese mismo orden zarpan. */
 const ESCALON = 0.15;
 /** La farola de un puesto: encendida, a media luz si se ha ido, y apagada si no hay nadie. */
@@ -452,9 +452,17 @@ export function Plaza(props: PropsDelEmbarcadero): JSX.Element {
   const figurasListas = useRef(new Set<FiguraId>());
   const figurasFallidas = useRef(new Set<FiguraId>());
   const plazaResuelta = useRef(false);
-  const [arranque, ponerArranque] = useState(false);
-  const arranqueRef = useRef(false);
-  arranqueRef.current = arranque;
+  /*
+   * EL ARRANQUE Y LA MEDIDA, con el gancho común (`comun/arranque.ts`), como en el Muelle: dos fotogramas
+   * después de `arrancar`, o a los quince segundos con cielo y luz —diciendo que la plaza no contestó, si
+   * no lo hizo—, y `alMedir` una vez por segundo.
+   */
+  const arrancar = usarArranqueYMedida(props, {
+    llave: traer,
+    alVencerElTope: () => {
+      if (!plazaResuelta.current) falla('la plaza no ha contestado en quince segundos');
+    },
+  });
   const figuraLocalRef = useRef(figuraLocal);
   figuraLocalRef.current = figuraLocal;
 
@@ -465,12 +473,12 @@ export function Plaza(props: PropsDelEmbarcadero): JSX.Element {
 
   /* El arranque está cuando la plaza ha contestado y la figura local de AHORA está o ha fallado. */
   const compruebaArranque = (): void => {
-    if (!vivo.current || arranqueRef.current || !plazaResuelta.current) return;
+    if (!vivo.current || !plazaResuelta.current) return;
     const local = figuraLocalRef.current;
-    if (local === null || figurasListas.current.has(local) || figurasFallidas.current.has(local)) ponerArranque(true);
+    if (local === null || figurasListas.current.has(local) || figurasFallidas.current.has(local)) arrancar();
   };
 
-  /* 1. El catálogo del Burgo: la caché la comparte el tablero, así que al zarpar ya está hecha. */
+  /* 1. El catálogo del Burgo: la caché la comparte el tablero, así que al zarpar ya está hecha. El tope, del gancho. */
   useEffect(() => {
     catalogoDelBurgoDe(traer).then(
       (c) => {
@@ -485,14 +493,6 @@ export function Plaza(props: PropsDelEmbarcadero): JSX.Element {
         compruebaArranque();
       },
     );
-    const tope = setTimeout(() => {
-      if (!vivo.current || arranqueRef.current) return;
-      if (!plazaResuelta.current) falla('la plaza no ha contestado en quince segundos');
-      ponerArranque(true);
-    }, TOPE_DE_ARRANQUE_MS);
-    return () => {
-      clearTimeout(tope);
-    };
   }, [traer]);
 
   /* 2. Las figuras que hacen falta, la local la primera; 3. la biblioteca, tras la primera figura. */
@@ -589,9 +589,6 @@ export function Plaza(props: PropsDelEmbarcadero): JSX.Element {
   const zarpe = useRef<{ pedido: boolean; desde: number | null; avisado: boolean }>({ pedido: false, desde: null, avisado: false });
   const mediodia = useRef(0);
   const arrastre = useRef({ activo: false, x0: 0, objetivo: 0, actual: 0 });
-  const fotogramasDesdeElArranque = useRef(0);
-  const listoAvisado = useRef(false);
-  const medida = useRef({ segundos: 0, fotogramas: 0 });
   const colorDeNiebla = useMemo(() => new THREE.Color(TARDE.niebla), []);
   const colorDelSol = useMemo(() => new THREE.Color(TARDE.sol.color), []);
   const colorDelCielo = useMemo(() => new THREE.Color(TARDE.hemisferio.cielo), []);
@@ -636,15 +633,6 @@ export function Plaza(props: PropsDelEmbarcadero): JSX.Element {
     const t = s.clock.elapsedTime;
     const dt = Math.min(0.1, Math.max(0, dtCrudo));
     const cam = s.camera as THREE.PerspectiveCamera;
-
-    /* ─ El arranque: dos fotogramas después de que el mundo esté (o haya fallado), se avisa. ─ */
-    if (arranqueRef.current && !listoAvisado.current) {
-      fotogramasDesdeElArranque.current++;
-      if (fotogramasDesdeElArranque.current >= 2) {
-        listoAvisado.current = true;
-        avisos.current.alEstarListo?.();
-      }
-    }
 
     /* ─ El zarpe. ─ */
     const z = zarpe.current;
@@ -724,22 +712,6 @@ export function Plaza(props: PropsDelEmbarcadero): JSX.Element {
     if (Math.abs(cam.fov - fovActual.current) > 0.01) {
       cam.fov = fovActual.current;
       cam.updateProjectionMatrix();
-    }
-
-    /* ─ La medida: una vez por segundo, con la media real y cada fotograma acotado a 100 ms. ─ */
-    const med = medida.current;
-    med.segundos += dt;
-    med.fotogramas++;
-    if (med.segundos >= 1) {
-      const info = s.gl.info.render;
-      avisos.current.alMedir?.({
-        triangulos: info.triangles,
-        llamadas: info.calls,
-        ms: (med.segundos * 1000) / med.fotogramas,
-        fotogramas: med.fotogramas,
-      });
-      med.segundos = 0;
-      med.fotogramas = 0;
     }
   });
 

@@ -30,10 +30,12 @@
  * ═══ LOS CUATRO AVISOS, Y CÓMO SE CUMPLEN ═══
  *
  * `alEstarListo` se llama SIEMPRE y una sola vez: cuando el catálogo y las figuras
- * han llegado O HAN FALLADO; y si `traer` no contesta nunca, un tope de quince
- * segundos avisa igual con el cielo y la luz puestos. `alFallar`, una vez por
- * fichero que no llegó. `alZarpar`, una vez cuando `zarpando` llega. `alMedir`, una
- * vez por segundo con la media real del reloj de `useFrame`.
+ * han llegado O HAN FALLADO, dejando pintar un fotograma con ellos; y si `traer` no
+ * contesta nunca, un tope de quince segundos avisa igual con el cielo y la luz
+ * puestos. `alFallar`, una vez por fichero que no llegó. `alZarpar`, una vez cuando
+ * `zarpando` llega. `alMedir`, una vez por segundo con la media de ese segundo del
+ * reloj de `useFrame`. El primero y el último los lleva el gancho común de
+ * `comun/arranque.ts`, el mismo de las demás escenas.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
@@ -52,6 +54,7 @@ import { desmontaMarioneta, giroCorto, montaMarioneta, reproduce } from '../aven
 import type { Marioneta } from '../aventureros/marioneta';
 import { rutaDelTablero } from '../ruta-de-modelos';
 import { abrirGlb } from '../embarcadero/cargar';
+import { usarArranqueYMedida } from '../comun/arranque';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import {
   ALTO_DE_LA_MESA,
@@ -66,9 +69,6 @@ import {
 import type { PuestaEnLaLinde } from './la-linde';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
-
-/** Cuánto se espera a `traer` antes de levantar el telón con lo que haya. */
-const TOPE_DE_ARRANQUE_MS = 15_000;
 
 /** La hora: media tarde de verano, con el sol bajo por el oeste. */
 const COLOR_DEL_CIELO = '#9cc3e4';
@@ -190,22 +190,27 @@ export function LindeAlta(props: PropsDelEmbarcadero): JSX.Element {
   const [catalogo, setCatalogo] = useState<ReadonlyMap<string, readonly ParteDelModelo[]> | null>(null);
   const [figuras, setFiguras] = useState<ReadonlyMap<FiguraId, AventureroCargado>>(new Map());
   const [biblioteca, setBiblioteca] = useState<readonly THREE.AnimationClip[]>([]);
-  const avisado = useRef(false);
   const zarpado = useRef(false);
 
   const sitios = useMemo(sitiosDeLaLinde, []);
   const semilla = useMemo(() => semillaDelCodigo(mesa.codigo ?? '', 0x11de), [mesa.codigo]);
 
+  /*
+   * ═══ EL ARRANQUE Y LA MEDIDA, CON EL GANCHO COMÚN ═══
+   *
+   * `comun/arranque.ts`, el de las demás escenas, y con él se van tres derivas de este fichero: el
+   * aviso salía en cuanto llegaban los modelos, con el mundo aún sin pintar; el tope de quince
+   * segundos volvía a empezar cada vez que se sentaba alguien, porque vivía en el efecto de la carga;
+   * y la medida iba cada sesenta fotogramas con la media DESDE EL PRINCIPIO y el total desde el
+   * principio —el fallo que Las Lindes ya había arreglado en la suya—, mientras esta cabecera decía
+   * «una vez por segundo». Ahora es una vez por segundo de verdad.
+   */
+  const arrancar = usarArranqueYMedida(props, { llave: traer });
+
   /* ── Los modelos ────────────────────────────────────────────────────────── */
   useEffect(() => {
     let vivo = true;
     const cargador = cargadorPara(traer);
-    const reloj = setTimeout(() => {
-      if (vivo && !avisado.current) {
-        avisado.current = true;
-        props.alEstarListo?.();
-      }
-    }, TOPE_DE_ARRANQUE_MS);
 
     const quienes: FiguraId[] = [];
     for (const a of mesa.asientos) quienes.push(figuraQueSePinta(a.id, a.figura));
@@ -254,14 +259,11 @@ export function LindeAlta(props: PropsDelEmbarcadero): JSX.Element {
     });
 
     void Promise.all([elPack, losClips, lasFiguras]).then(() => {
-      if (!vivo || avisado.current) return;
-      avisado.current = true;
-      props.alEstarListo?.();
+      if (vivo) arrancar();
     });
 
     return () => {
       vivo = false;
-      clearTimeout(reloj);
     };
     /* `traer` y los avisos son estables por contrato; los asientos cambian de verdad. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -360,22 +362,6 @@ export function LindeAlta(props: PropsDelEmbarcadero): JSX.Element {
     camera.position.set(0, alto, atras);
     camera.lookAt(0, ALTURA_DE_UNA_PERSONA * 1.15, 0);
   }, [camera, size.height, size.width, ventana.franjaInferior]);
-
-  /* ── La medida ──────────────────────────────────────────────────────────── */
-  const { gl } = useThree();
-  const medido = useRef({ fotogramas: 0, ms: 0 });
-  useFrame((_, dt) => {
-    if (props.alMedir === undefined) return;
-    medido.current.fotogramas++;
-    medido.current.ms += Math.min(dt, 0.1) * 1000;
-    if (medido.current.fotogramas % 60 !== 0) return;
-    props.alMedir({
-      triangulos: gl.info.render.triangles,
-      llamadas: gl.info.render.calls,
-      ms: medido.current.ms / medido.current.fotogramas,
-      fotogramas: medido.current.fotogramas,
-    });
-  });
 
   return (
     <>

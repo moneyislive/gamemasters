@@ -2634,16 +2634,57 @@ paso('La calidad la decide lo que cuesta pintar: el juez de la casa, con el tabl
       fuenteDeLaEscena.replace('if (LO_QUE_NO_SE_RECORTA.indexOf(p.porque) < 0) {', '{'),
     ],
   );
+  /*
+   * LA MEDIDA ES LA DEL GANCHO COMÚN (`comun/arranque.ts`): la escena se lo pide diciendo que sólo mida
+   * con el tablero cargado, y no mide por su cuenta; el gancho acota cada fotograma a cien milisegundos,
+   * manda una vez por segundo la media de ESE segundo y vuelve a contar desde cero. Se juzgan los dos
+   * fuentes juntos para que cada caso envenenado rompa una sola cosa, en uno o en otro.
+   */
+  const SEPARADOR_DEL_GANCHO = '\n/* ── el gancho de arranque ── */\n';
+  const laEscenaYSuGancho = `${fuenteDeLaEscena}${SEPARADOR_DEL_GANCHO}${leerCodigo('../comun/arranque.ts')}`;
   reglaDelFuente(
-    'y mide una vez por segundo con la media de ESE segundo, y sólo con el tablero cargado',
+    'y mide una vez por segundo con la media de ESE segundo, y sólo con el tablero cargado: con el gancho común',
+    (t) => {
+      const [escena = '', gancho = ''] = t.split(SEPARADOR_DEL_GANCHO);
+      return (
+        /usarArranqueYMedida\(props, \{ llave: traer, midiendo: catalogo !== null \}\)/.test(escena) &&
+        !/\balMedir(\?\.)?\(/.test(escena) &&
+        /const midiendo = opciones\.midiendo !== false;/.test(gancho) &&
+        /if \(!midiendo\) return;/.test(gancho) &&
+        /export const LO_MAS_QUE_CUENTA_UN_FOTOGRAMA = 0\.1;/.test(gancho) &&
+        /m\.segundos \+= Math\.min\(LO_MAS_QUE_CUENTA_UN_FOTOGRAMA, Math\.max\(0, dtCrudo\)\);/.test(gancho) &&
+        /if \(m\.segundos < 1\) return;/.test(gancho) &&
+        /ms: \(m\.segundos \* 1000\) \/ m\.fotogramas,\s*fotogramas: m\.fotogramas,/.test(gancho) &&
+        /m\.segundos = 0;\s*m\.fotogramas = 0;/.test(gancho)
+      );
+    },
+    laEscenaYSuGancho,
+    [
+      laEscenaYSuGancho.replace(', midiendo: catalogo !== null', ''),
+      laEscenaYSuGancho.replace('m.fotogramas = 0;', ''),
+      laEscenaYSuGancho.replace('if (!midiendo) return;', ''),
+      laEscenaYSuGancho.replace(SEPARADOR_DEL_GANCHO, `\nprops.alMedir?.({ triangulos: 0, llamadas: 0, ms: 0, fotogramas: 0 });${SEPARADOR_DEL_GANCHO}`),
+    ],
+  );
+  /*
+   * Y SU LOBBY, LA LINDE ALTA, CON EL MISMO GANCHO. Mandaba cada sesenta fotogramas la media DESDE EL
+   * PRINCIPIO con el total desde el principio —el fallo de arriba, que aquí ya se había arreglado— y
+   * avisaba de listo con el mundo sin pintar. Se mira que arranque con el gancho y que no vuelva a
+   * avisar ni a medir por su cuenta.
+   */
+  const fuenteDelLobby = leerCodigo('../linde-alta/LindeAlta.tsx');
+  reglaDelFuente(
+    'y el lobby de Las Lindes avisa y mide con el mismo gancho: ni un aviso de listo suyo ni una medida desde el principio',
     (t) =>
-      /if \(props\.alMedir === undefined \|\| catalogo === null\) return;/.test(t) &&
-      /m\.segundos \+= Math\.min\(0\.1, Math\.max\(0, dtCrudo\)\);/.test(t) &&
-      /if \(m\.segundos < 1\) return;/.test(t) &&
-      /ms: \(m\.segundos \* 1000\) \/ m\.fotogramas,\s*fotogramas: m\.fotogramas,/.test(t) &&
-      /m\.segundos = 0;\s*m\.fotogramas = 0;/.test(t),
-    fuenteDeLaEscena,
-    [fuenteDeLaEscena.replace(' || catalogo === null', ''), fuenteDeLaEscena.replace('m.fotogramas = 0;', '')],
+      /const arrancar = usarArranqueYMedida\(props, \{ llave: traer \}\);/.test(t) &&
+      /if \(vivo\) arrancar\(\);/.test(t) &&
+      !/\balEstarListo\?\.\(\)/.test(t) &&
+      !/\balMedir(\?\.)?\(/.test(t),
+    fuenteDelLobby,
+    [
+      fuenteDelLobby.replace('if (vivo) arrancar();', 'if (vivo) props.alEstarListo?.();'),
+      `${fuenteDelLobby}\nprops.alMedir({ triangulos: 0, llamadas: 0, ms: 0, fotogramas: 60 });`,
+    ],
   );
   for (const [quien, fuente] of [
     ['la app', fuenteDeLaApp],

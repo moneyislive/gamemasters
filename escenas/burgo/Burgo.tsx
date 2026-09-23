@@ -155,7 +155,8 @@
  * llegado O HAN FALLADO se deja pintar un fotograma y en el siguiente se avisa; si
  * `traer` no contesta nunca, un tope de quince segundos avisa igual con cielo y luz.
  * `alFallar` va una vez por fichero. `alMedir` una vez por segundo con la media real de
- * milisegundos (cada fotograma acotado a 100 ms). `alTerminarLaCola` cuando la cola y
+ * milisegundos (cada fotograma acotado a 100 ms). `alEstarListo` y `alMedir` los lleva el gancho
+ * común de `comun/arranque.ts`, el mismo de las demás escenas. `alTerminarLaCola` cuando la cola y
  * todas las máquinas de peón han quedado en reposo tras una jugada con sucesos.
  *
  * `alSenalarCasilla` sale de las MISMAS asas que el toque, y sólo cuando la casilla señalada
@@ -190,6 +191,7 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { GIRO_DEL_RELOJ, RelojDeArena, VACIADO_DEL_RELOJ } from '../reloj';
 import { relojDe } from '../comun/reloj';
 import type { RelojCargado } from '../comun/reloj';
+import { usarArranqueYMedida } from '../comun/arranque';
 import {
   ARISTA_DEL_D6_EN_EL_PACK,
   COLOR_DEL_NUMERO,
@@ -357,8 +359,6 @@ import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
-/** Cuánto se espera a `traer` antes de levantar el telón con lo que haya. */
-const TOPE_DE_ARRANQUE_MS = 15_000;
 /** El mediodía: azul en el cénit, crema en el horizonte, y la niebla del color del horizonte. */
 const COLOR_DEL_CENIT = '#6fa9dc';
 const COLOR_DEL_HORIZONTE = '#e9e0c8';
@@ -1223,10 +1223,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
   const [catalogo, ponerCatalogo] = useState<CatalogoDeModelos | null>(null);
   const [catalogoDeDados, ponerCatalogoDeDados] = useState<CatalogoDeModelos | null>(null);
-  const [arranque, ponerArranque] = useState(false);
-  const arranqueRef = useRef(false);
-  arranqueRef.current = arranque;
 
+  /* Cuando los dos `.glb` han llegado o fallado, arranca: `arrancar` es el del gancho de arranque, más abajo. */
   useEffect(() => {
     const burgo = catalogoDelBurgoDe(traer).then(
       (c) => {
@@ -1240,16 +1238,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       if (vivo.current && c !== null) ponerCatalogoDeDados(c);
     });
     void Promise.all([burgo, losDados]).then(() => {
-      if (vivo.current) ponerArranque(true);
+      if (vivo.current) arrancar();
     });
-    const tope = setTimeout(() => {
-      if (!vivo.current || arranqueRef.current) return;
-      falla('el burgo no ha contestado en quince segundos');
-      ponerArranque(true);
-    }, TOPE_DE_ARRANQUE_MS);
-    return () => {
-      clearTimeout(tope);
-    };
   }, [traer]);
 
   const cargador = useMemo(() => cargadorPara(traer), [traer]);
@@ -1762,9 +1752,14 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
   const seguimiento = useRef({ peso: 0, objetivo: { x: 0, z: 0 }, hastaCuando: -1 });
   const marcaDestacada = useRef<{ x: number; z: number } | null>(null);
-  const medida = useRef({ segundos: 0, fotogramas: 0 });
-  const fotogramasDesdeElArranque = useRef(0);
-  const listoAvisado = useRef(false);
+
+  /*
+   * ─ EL ARRANQUE Y LA MEDIDA, con el gancho común (`comun/arranque.ts`). ─ `alEstarListo` dos fotogramas
+   * después de que `burgo.glb` y `dados.glb` hayan llegado o fallado —o a los quince segundos, diciendo
+   * que el burgo no contestó—, y `alMedir` una vez por segundo. Se llama aquí, detrás de la cámara del
+   * paseo, para que ésa siga siendo el primer `useFrame` de prioridad 0 de la escena.
+   */
+  const arrancar = usarArranqueYMedida(props, { llave: traer, alVencerElTope: () => falla('el burgo no ha contestado en quince segundos') });
 
   /* ─ La ciudad viva: el reparto por niveles, los interiores abiertos y las mallas. ─ */
   const laCiudadRef = useRef<CiudadEn3D | null>(laCiudad);
@@ -2023,15 +2018,6 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     const dt = Math.min(0.1, Math.max(0, dtCrudo));
     const losAsientos = asientosRef.current;
     const casillas = casillasRef.current;
-
-    /* ─ El arranque: dos fotogramas después de que el mundo esté (o haya fallado), se avisa. ─ */
-    if (arranqueRef.current && !listoAvisado.current) {
-      fotogramasDesdeElArranque.current++;
-      if (fotogramasDesdeElArranque.current >= 2) {
-        listoAvisado.current = true;
-        avisos.current.alEstarListo?.();
-      }
-    }
 
     /* ─ Los peones nacen con la vista, y se resincronizan cuando no animan nada. ─ */
     for (const a of losAsientos) {
@@ -2779,17 +2765,6 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           malla.computeBoundingSphere();
         }
       }
-    }
-
-    /* ─ La medida: una vez por segundo, con la media real. ─ */
-    const m = medida.current;
-    m.segundos += dt;
-    m.fotogramas++;
-    if (m.segundos >= 1) {
-      const info = s.gl.info.render;
-      avisos.current.alMedir?.({ triangulos: info.triangles, llamadas: info.calls, ms: (m.segundos * 1000) / m.fotogramas, fotogramas: m.fotogramas });
-      m.segundos = 0;
-      m.fotogramas = 0;
     }
 
     /* ─ El fin: el ganador aparece en la plaza. ─ */

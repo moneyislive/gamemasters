@@ -42,7 +42,8 @@
  * esperar a nada. `alMedir` va una vez por segundo con la media real de
  * milisegundos del reloj de `useFrame` (cada fotograma acotado a 100 ms: un
  * navegador en segundo plano deja pasar segundos entre dos, y la media salía en
- * miles) y cuántos fotogramas cubre.
+ * miles) y cuántos fotogramas cubre. `alEstarListo` y `alMedir` los lleva el
+ * gancho común de `comun/arranque.ts`, el mismo de las demás escenas.
  *
  * ═══ `zarpando` ES DE IDA ═══
  *
@@ -120,6 +121,7 @@ import {
 import { colorDeAsiento } from './tema';
 import { soltarTintes, tenirGeometria } from './tinte';
 import type { AsientoEnElMuelle, PropsDelEmbarcadero } from './tipos';
+import { usarArranqueYMedida } from '../comun/arranque';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
@@ -130,8 +132,6 @@ const COLOR_DEL_FAROL = new THREE.Color('#ffb765');
 const COLOR_DE_LA_LLAMA = '#ffa040';
 /** La niebla: empieza detrás del caserío y se cierra antes del canto del mar. */
 const NIEBLA = { cerca: 70, lejos: 560 } as const;
-/** Cuánto se espera a `traer` antes de levantar el telón con lo que haya. */
-const TOPE_DE_ARRANQUE_MS = 15_000;
 /** Los que ya estaban al montar nacen escalonados así, sin coreografía. */
 const ESCALON_DE_NACIMIENTO = 0.25;
 /** El farol a cada intensidad: ocupado y presente, ausente, y amarre vacío (el noray a oscuras). */
@@ -943,9 +943,18 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   const figurasListas = useRef(new Set<FiguraId>());
   const figurasFallidas = useRef(new Set<FiguraId>());
   const embarcaderoResuelto = useRef(false);
-  const [arranque, ponerArranque] = useState(false);
-  const arranqueRef = useRef(false);
-  arranqueRef.current = arranque;
+
+  /*
+   * EL ARRANQUE Y LA MEDIDA, con el gancho común (`comun/arranque.ts`): `alEstarListo` dos fotogramas
+   * después de `arrancar`, o a los quince segundos con cielo, agua y luz —diciendo que el embarcadero
+   * no contestó, si no lo hizo—, y `alMedir` una vez por segundo.
+   */
+  const arrancar = usarArranqueYMedida(props, {
+    llave: cargador,
+    alVencerElTope: () => {
+      if (!embarcaderoResuelto.current) falla('el embarcadero no ha contestado en quince segundos');
+    },
+  });
 
   const figuraLocalRef = useRef(figuraLocal);
   figuraLocalRef.current = figuraLocal;
@@ -961,15 +970,17 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
    * llama desde cada promesa que termina y desde el cambio de figura local.
    */
   const compruebaArranque = (): void => {
-    if (!vivo.current || arranqueRef.current || !embarcaderoResuelto.current) return;
+    if (!vivo.current || !embarcaderoResuelto.current) return;
     const local = figuraLocalRef.current;
-    if (local === null || figurasListas.current.has(local) || figurasFallidas.current.has(local)) ponerArranque(true);
+    if (local === null || figurasListas.current.has(local) || figurasFallidas.current.has(local)) arrancar();
   };
 
   /*
    * 1. El embarcadero: lo primero, con o sin él se avisa. Depende sólo del
    * cargador: `falla` y `compruebaArranque` leen referencias, no cierres, y volver
    * a pedir el embarcadero al cambiar cualquier otra cosa sería pedirlo dos veces.
+   * El tope —si `traer` no contesta, se levanta el telón con cielo, agua y luz— lo
+   * lleva el gancho de arranque, con el cargador de llave.
    */
   useEffect(() => {
     cargador.embarcadero().then(
@@ -985,15 +996,6 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
         compruebaArranque();
       },
     );
-    /* El tope: si `traer` no contesta, se levanta el telón con cielo, agua y luz. */
-    const tope = setTimeout(() => {
-      if (!vivo.current || arranqueRef.current) return;
-      if (!embarcaderoResuelto.current) falla('el embarcadero no ha contestado en quince segundos');
-      ponerArranque(true);
-    }, TOPE_DE_ARRANQUE_MS);
-    return () => {
-      clearTimeout(tope);
-    };
   }, [cargador]);
 
   /* 2. Las figuras que hacen falta, la local la primera; 3. la biblioteca, después de la primera figura. */
@@ -1108,9 +1110,6 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   const zarpe = useRef<{ pedido: boolean; desde: number | null; avisado: boolean }>({ pedido: false, desde: null, avisado: false });
   const amanecer = useRef(0);
   const arrastre = useRef({ activo: false, x0: 0, objetivo: 0, actual: 0 });
-  const fotogramasDesdeElArranque = useRef(0);
-  const listoAvisado = useRef(false);
-  const medida = useRef({ segundos: 0, fotogramas: 0 });
   const colorDeNiebla = useMemo(() => new THREE.Color(COLOR_DEL_HORIZONTE), []);
 
   useEffect(() => {
@@ -1137,15 +1136,6 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
     const t = s.clock.elapsedTime;
     const dt = Math.min(0.1, Math.max(0, dtCrudo));
     const cam = s.camera as THREE.PerspectiveCamera;
-
-    /* ─ El arranque: dos fotogramas después de que el mundo esté (o haya fallado), se avisa. ─ */
-    if (arranqueRef.current && !listoAvisado.current) {
-      fotogramasDesdeElArranque.current++;
-      if (fotogramasDesdeElArranque.current >= 2) {
-        listoAvisado.current = true;
-        avisos.current.alEstarListo?.();
-      }
-    }
 
     /* ─ El zarpe. ─ */
     const z = zarpe.current;
@@ -1209,22 +1199,6 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
     if (Math.abs(cam.fov - fovActual.current) > 0.01) {
       cam.fov = fovActual.current;
       cam.updateProjectionMatrix();
-    }
-
-    /* ─ La medida: una vez por segundo, con la media real y cada fotograma acotado a 100 ms. ─ */
-    const m = medida.current;
-    m.segundos += dt;
-    m.fotogramas++;
-    if (m.segundos >= 1) {
-      const info = s.gl.info.render;
-      avisos.current.alMedir?.({
-        triangulos: info.triangles,
-        llamadas: info.calls,
-        ms: (m.segundos * 1000) / m.fotogramas,
-        fotogramas: m.fotogramas,
-      });
-      m.segundos = 0;
-      m.fotogramas = 0;
     }
   });
 

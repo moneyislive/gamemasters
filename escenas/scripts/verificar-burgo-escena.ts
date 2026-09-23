@@ -3312,7 +3312,26 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   const elAnillo = await import('../burgo/anillo-en-3d');
   comprobar('y ya no hay paño de dados en el campo: anillo-en-3d.ts no lo exporta y Burgo.tsx no lo pinta', !('SUELO_DE_DADOS' in elAnillo) && !/SUELO_DE_DADOS/.test(codigoDelBurgo));
   comprobar('computeBoundingSphere se llama tras escribir matrices instanciadas', (codigoDelBurgo.match(/computeBoundingSphere\(\)/g) ?? []).length >= 3);
-  comprobar('alEstarListo se avisa desde el hilo de dibujo con tope de quince segundos', /TOPE_DE_ARRANQUE_MS = 15_000/.test(codigoDelBurgo) && /alEstarListo\?\.\(\)/.test(codigoDelBurgo));
+  /*
+   * `alEstarListo` desde el hilo de dibujo y con tope de quince segundos: lo lleva el gancho común
+   * (`comun/arranque.ts`), que la escena arranca cuando `burgo.glb` y `dados.glb` han llegado o fallado,
+   * y la escena no avisa por su cuenta. Se juzgan los dos fuentes, y cada caso envenenado rompe uno.
+   */
+  const codigoDelArranque = sinComentarios(fs.readFileSync(path.join(RAIZ, 'comun', 'arranque.ts'), 'utf8'));
+  const avisaListo = (escena: string, gancho: string): boolean =>
+    /export const TOPE_DE_ARRANQUE_MS = 15_000;/.test(gancho) &&
+    /\}, TOPE_DE_ARRANQUE_MS\);/.test(gancho) &&
+    /useFrame\(\(s, dtCrudo\) => \{[\s\S]*?losAvisos\.current\.alEstarListo\?\.\(\);/.test(gancho) &&
+    /const arrancar = usarArranqueYMedida\(props, \{ llave: traer, alVencerElTope: \(\) => falla\('el burgo no ha contestado en quince segundos'\) \}\);/.test(escena) &&
+    /void Promise\.all\(\[burgo, losDados\]\)\.then\(\(\) => \{\s*if \(vivo\.current\) arrancar\(\);\s*\}\);/.test(escena) &&
+    !/\balEstarListo\?\.\(\)/.test(escena);
+  comprobar('alEstarListo se avisa desde el hilo de dibujo con tope de quince segundos: con el gancho común, arrancado cuando llegan los dos .glb', avisaListo(codigoDelBurgo, codigoDelArranque));
+  comprobar(
+    'se ve fallar: sin arrancar al llegar los .glb, con otro tope, o avisando la escena por su cuenta, cae',
+    !avisaListo(codigoDelBurgo.replace('if (vivo.current) arrancar();', ''), codigoDelArranque) &&
+      !avisaListo(codigoDelBurgo, codigoDelArranque.replace('TOPE_DE_ARRANQUE_MS = 15_000', 'TOPE_DE_ARRANQUE_MS = 60_000')) &&
+      !avisaListo(`${codigoDelBurgo}\navisos.current.alEstarListo?.();`, codigoDelArranque),
+  );
   comprobar(
     'la `tercera-persona` reservada ya no existe: las cámaras son las tres de Las Lindes —`mesa`, `hombro` y `ojos`— en el contrato y en la escena',
     !/tercera-persona/.test(codigoDelBurgo) &&
