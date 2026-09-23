@@ -159,8 +159,45 @@
  * primer movimiento mirando `deLaInterfaz`. Se mira AL MOVER y no al bajar porque el
  * aviso de la escena llega dentro del mismo suceso, y el orden de los dos oyentes no
  * se puede dar por supuesto; para cuando llega el primer movimiento, ya está puesto.
+ *
+ * ═══ Y SE APAGA ENTERO, DESDE AQUÍ: `apagado` ═══
+ *
+ * El Burgo y Riberas bajan a andar por su tablero, y a pie la cámara de mesa no se ve: si
+ * el mirador siguiera vivo, el pulgar que anda la giraría por detrás y al volver el
+ * tablero estaría torcido sin que nadie lo hubiera pedido. Y en Android el gesto puede ver
+ * el mismo dedo que la palanca, que va encima del lienzo. Así que quien monta el gancho
+ * le pasa `{ apagado }` y el gancho se calla ENTERO —sus tres gestos y el ratón de la
+ * web—; el mirador y la cercanía se quedan donde estaban, y al volver se mira desde donde
+ * se dejó.
+ *
+ * LOS GESTOS SE APAGAN EN SÍ MISMOS, con `.enabled(!apagado)` en un efecto de maquetación,
+ * y NO dándole al detector otro gesto. Con otro número de gestos o en otro hilo, el
+ * detector los desengancha y los vuelve a enganchar, y si cambian de hilo pinta OTRO
+ * envoltorio (`AnimatedWrap` o `Wrap`), o sea que React desmonta el lienzo entero con su
+ * contexto de dibujo. Las dos pantallas lo hacían distinto: el Burgo ya así, y Riberas
+ * cambiándole el gesto por un GEMELO APAGADO de la misma forma, que se salva de eso. Pero
+ * el gemelo tampoco servía: `react-native-gesture-handler` (2.32, `updateHandlers`) se
+ * queda para siempre con los gestos del PRIMER enganche y, cuando le llegan otros de la
+ * misma forma, les copia encima la configuración y los manejadores de los nuevos. Desde el
+ * primer cambio, los gestos del mirador llevaban dentro los del gemelo: en una mesa normal,
+ * tras bajar a andar y volver, el tablero ya no giraba ni se acercaba con el dedo; en una de
+ * botas —que empieza a pie—, tras subir y volver a bajar, el mirador seguía vivo andando.
+ * Sin un error en ninguna parte. Se midió corriendo `attachHandlers` y `updateHandlers` de
+ * la propia librería contra un módulo nativo de mentira, en las dos secuencias, y con los
+ * mismos objetos de siempre sale bien en todas.
+ *
+ * Con los mismos objetos, lo único que cambia es su configuración, y el detector la manda
+ * desde su propio efecto, que es normal: los de maquetación de toda la pantalla corren
+ * antes que cualquier normal, así que cuando la lee ya está puesta. Si el detector todavía
+ * no está —Riberas monta el lienzo cuando llega el modelo— nace con ella. Y se recorre
+ * `toGestureArray()`: da igual cuántos gestos tenga el mirador mañana.
+ *
+ * EL RATÓN SE CALLA PORQUE SU EFECTO NO SE APUNTA con el mirador apagado: la rueda y el
+ * arrastre con el botón secundario se descuelgan solos. El nodo del lienzo se le sigue
+ * dando SIEMPRE; antes cada pantalla se lo quitaba a pie, que era la otra mitad del mismo
+ * interruptor escrita dos veces.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { Platform } from 'react-native';
 import type { View } from 'react-native';
@@ -246,7 +283,8 @@ export interface MiradorTactil {
    * Es un `ref` de función y no un `RefObject` porque lo que hay detrás es estado: el
    * lienzo aparece cuando el modelo llega, o sea después del primer montaje, y el
    * efecto que apunta los oyentes tiene que volver a correr entonces. En nativo se
-   * guarda el nodo y no se hace nada más con él.
+   * guarda el nodo y no se hace nada más con él. Se le da SIEMPRE, también a pie: con
+   * el mirador apagado es el gancho quien no apunta nada.
    */
   readonly apuntarElLienzo: (nodo: View | null) => void;
   /** Dónde está puesto el ojo. Lo lee la escena cada fotograma; nunca pasa por React. */
@@ -274,6 +312,15 @@ export interface MiradorTactil {
   readonly laInterfazSeLoQueda: () => void;
 }
 
+/** Cómo se monta el gancho. Hoy sólo hay una cosa que decirle: si está apagado. */
+export interface ComoSeMontaElMirador {
+  /**
+   * APAGADO: ni el dedo ni el ratón mueven la cámara de mesa, porque la vista es de otro
+   * —a pie, del paseo de la escena—. Ver la cabecera. `false` si no se dice.
+   */
+  readonly apagado?: boolean;
+}
+
 /**
  * El gesto del tablero: un dedo gira, dos dedos acercan y pasean la mirada.
  *
@@ -281,11 +328,13 @@ export interface MiradorTactil {
  * unidades de mundo. Los dos van por referencia y NO en las dependencias del
  * `useMemo`: el gesto se crea UNA vez, y si se recreara con cada medida —o con cada
  * partida que reparte un delta de otro tamaño— un giro de pantalla a mitad de
- * arrastre soltaría el gesto en marcha.
+ * arrastre soltaría el gesto en marcha. `apagado` tampoco lo recrea: apaga y enciende
+ * ese mismo gesto (ver la cabecera).
  */
 export function usarMiradorTactil(
   medida: { ancho: number; alto: number },
   alcance: number,
+  { apagado = false }: ComoSeMontaElMirador = {},
 ): MiradorTactil {
   const mirador = useRef<Mirador>(MIRADOR_DE_SALIDA);
   const cercania = useRef<Cercania>(CERCANIA_DE_SALIDA);
@@ -461,6 +510,17 @@ export function usarMiradorTactil(
   }, [desde, deLaInterfaz, elRatonPasea, previo, mover, avisarSiCambia]);
 
   /*
+   * ═══ APAGADO: SUS MISMOS GESTOS, ANTES DE QUE EL DETECTOR LOS LEA ═══
+   *
+   * El detector lleva siempre ESTE gesto; lo que cambia es su configuración, y la manda él
+   * desde su efecto normal. Por eso aquí es de maquetación. Por qué no un gemelo apagado,
+   * y qué se midió, está en la cabecera.
+   */
+  useLayoutEffect(() => {
+    for (const g of gesto.toGestureArray()) g.enabled(!apagado);
+  }, [gesto, apagado]);
+
+  /*
    * ═══ LA RUEDA Y EL ARRASTRE DEL RATÓN, EN LA WEB ═══
    *
    * Los mismos dos movimientos que el pellizco y el paseo, con el aparato que de verdad
@@ -470,11 +530,12 @@ export function usarMiradorTactil(
    * La rueda se apunta EN EL LIENZO y con `{ passive: false }`, que es lo que deja
    * pararla; el arrastre se sigue en la ventana para que salirse del lienzo a mitad de
    * gesto no lo deje colgado, y empieza sólo si el puntero bajó sobre el lienzo. Todo
-   * se descuelga al desmontar y también cuando el lienzo cambia de nodo —el respaldo
-   * SVG entra y sale—, que es lo que hace el retorno del efecto.
+   * se descuelga al desmontar, cuando el lienzo cambia de nodo —el respaldo SVG entra y
+   * sale— y cuando el mirador se APAGA, que es lo que hace el retorno del efecto: con
+   * `apagado` no se apunta nada, y así el ratón se calla a la vez que los gestos.
    */
   useEffect(() => {
-    if (!EL_RATON_CUENTA_AQUI || elLienzo === null) return undefined;
+    if (!EL_RATON_CUENTA_AQUI || elLienzo === null || apagado) return undefined;
     /*
      * En React Native Web el `ref` de un `View` ES el elemento del documento. El paso
      * por `unknown` es el precio de que los tipos de React Native no lo digan; no hay
@@ -540,7 +601,7 @@ export function usarMiradorTactil(
       window.removeEventListener('pointercancel', suelta);
       suelta();
     };
-  }, [elLienzo, deLaInterfaz, elRatonPasea, avisarSiCambia]);
+  }, [elLienzo, apagado, deLaInterfaz, elRatonPasea, avisarSiCambia]);
 
   const verElTableroEntero = useCallback(() => {
     cercania.current = comoAlPrincipio();

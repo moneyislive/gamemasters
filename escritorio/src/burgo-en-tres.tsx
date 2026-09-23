@@ -151,13 +151,34 @@
  * Tres botones —«La mesa», «Al hombro» y «Sus ojos»— y las teclas 1, 2 y 3, los mismos de Las
  * Lindes, bajan la cámara a la calle; a pie se anda con W, A, S, D o las flechas y Mayúsculas
  * para correr, que lee el paseo común de la escena, y un cartel lo dice mientras se anda. La
- * escena hace el resto (`escenas/burgo/Burgo.tsx`). Lo que es de aquí es que `CamaraAerea`, que
- * no sabe de paseos y no se puede apagar sin desmontarla —y desmontada y vuelta a montar se
- * suscribiría DETRÁS de la escena, que es lo que rompe el seguimiento al que mueve—, no mueva
- * por detrás la cámara de mesa mientras se anda: su acercamiento se queda sin efecto
- * (`NO_SE_ACERCA`) y los punteros que bajan en el recuadro se marcan como de la interfaz, que
- * es lo que su arrastre ya respeta. La cámara la sigue escribiendo; la escena pone encima la
- * del paseo. Las teclas no cuentan escribiendo en un campo: la puja libre lleva cifras.
+ * escena hace el resto (`escenas/burgo/Burgo.tsx`). Lo que es de aquí es que `CamaraAerea` no
+ * mueva por detrás la cámara de mesa mientras se anda, y sin desmontarla: desmontada y vuelta a
+ * montar se suscribiría DETRÁS de la escena, que es lo que rompe el seguimiento al que mueve. Su
+ * acercamiento se queda sin efecto (`NO_SE_ACERCA`) y los punteros que bajan en el recuadro se
+ * marcan como de la interfaz, que es lo que su arrastre ya respeta. La cámara la sigue
+ * escribiendo; la escena pone encima la del paseo. Las teclas no cuentan escribiendo en un
+ * campo: la puja libre lleva cifras.
+ *
+ * ═══ Y NO SE CALLA CON `callada`, AUNQUE EXISTA: CALLARÍA TAMBIÉN LO QUE DEFIENDE LA PÁGINA ═══
+ *
+ * Aquí ponía que `CamaraAerea` «no se puede apagar sin desmontarla», y ya no es verdad: la pieza
+ * común sabe callarse (`callada`, en `lienzo-propio.tsx`) y Riberas la monta con `callada={aPie}`.
+ * Si el Burgo no, es porque `callada` apaga el efecto ENTERO de la cámara, y en ese efecto no
+ * están sólo el giro, el pellizco y la rueda que acercan: están también las dos defensas que la
+ * cámara le pone a la página, que a pie siguen haciendo falta encima de un lienzo que no las usa:
+ *
+ *   · la RUEDA con `preventDefault` sobre el recuadro —salvo en las cajas que ruedan solas
+ *     (`SE_DESPLAZAN_SOLAS`) y en el velo—. Callada, la rueda o dos dedos en un panel táctil
+ *     encima del burgo, andando, se los lleva el navegador: desplaza lo que haya detrás si algo
+ *     desborda, y hay navegadores en los que un barrido de lado es «atrás», que saca de la mesa;
+ *   · el MENÚ DEL SISTEMA del botón secundario sobre el `<canvas>`. Callada, un clic derecho
+ *     andando abre el menú del navegador encima del burgo.
+ *
+ * Las dos cosas pasan hoy en Riberas a pie. Con `NO_SE_ACERCA` y la marca de la interfaz, aquí
+ * se calla lo que MUEVE la cámara y siguen puestas las defensas. El día que `callada` separe las
+ * dos mitades —que calle lo que mueve y deje lo que defiende—, esta pantalla pasa a
+ * `callada={aPie}` sin que cambie nada de lo que se ve, y `NO_SE_ACERCA` y el efecto de la marca
+ * sobran.
  *
  * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
  *
@@ -1194,7 +1215,8 @@ export function BurgoEnTres({
    * puede mover la cámara de mesa por detrás: su acercamiento se queda en `NO_SE_ACERCA`, y los
    * punteros que bajan en el recuadro se marcan como de la interfaz ANTES de que le lleguen (en la
    * captura, y ella escucha en la ventana), que es lo que su arrastre y su pellizco ya respetan. Al
-   * subir a la mesa está exactamente donde se dejó.
+   * subir a la mesa está exactamente donde se dejó. Y no con `callada`, que a pie le quitaría
+   * además a la página sus dos defensas —la rueda y el menú del botón secundario—: ver la cabecera.
    */
   const [modo, ponerModo] = useState<ModoDelBurgo>('mesa');
   const aPie = modo !== 'mesa';

@@ -980,13 +980,14 @@ paso('El delta se puede mirar de cerca, recorrer, y siempre se puede volver');
     'el mismo arrastre girando el tablero y moviendo la mirada a la vez es un bandazo',
   );
   /*
-   * Mirando la mesa se le da el nodo; a pie se le quita, y eso lo compra el bloque de andar
-   * («Riberas a pie en la app»). Aquí se acepta la forma con la guarda porque lo que se compra
-   * es lo de siempre: que en la mesa el nodo llegue.
+   * El nodo se le da SIEMPRE: a pie quien se calla es el gancho (`apagado`), y eso lo compra el
+   * bloque de andar («Riberas a pie en la app»). Aquí antes se aceptaba también la forma con la
+   * guarda —`aPie ? undefined :`—, que era la otra mitad del interruptor escrita en la pantalla;
+   * desde que el gancho se apaga entero, esa guarda sería un segundo interruptor y no se acepta.
    */
   comprobar(
-    'y la pantalla le da el nodo del lienzo, que es donde se escucha',
-    /ref=\{(?:aPie \? undefined : )?apuntarElLienzo\}/.test(escenaSinComentarios),
+    'y la pantalla le da el nodo del lienzo, que es donde se escucha, siempre y sin guarda',
+    /ref=\{apuntarElLienzo\}/.test(escenaSinComentarios),
     'sin el nodo no hay dónde apuntarse: en React Native Web el `onWheel` del `View` no basta',
   );
 
@@ -1887,49 +1888,119 @@ paso('Riberas a pie en la app: la palanca sólo a pie, el mirador táctil apagad
   /* ─── El mirador táctil, apagado a pie ─── */
 
   /*
-   * EL GEMELO APAGADO TIENE LA FORMA DEL GESTO DEL MIRADOR: los mismos tres gestos, del mismo
-   * tipo, en el mismo orden y en el mismo hilo. Con otra forma, `GestureDetector` volvería a
-   * enganchar los gestos y podría cambiar de envoltorio —`Wrap` por `AnimatedWrap`—, que es
-   * desmontar el lienzo y perder el contexto de dibujo cada vez que se baja a andar. Se mira la
-   * forma del de verdad en `mirador-tactil.ts` y la del gemelo aquí, y se exige la misma.
+   * A PIE EL MIRADOR SE APAGA, Y LO APAGA ÉL: `usarMiradorTactil(…, { apagado: aPie })`.
+   *
+   * Aquí se vigilaba un GEMELO APAGADO —los mismos tres gestos, deshabilitados— que la pantalla le
+   * cambiaba al `GestureDetector` al bajar a andar, con la forma exigida igual a la del mirador para
+   * que el detector no se volviera a enganchar. La forma no bastaba: `react-native-gesture-handler`
+   * (2.32, `updateHandlers`) se queda con los gestos del PRIMER enganche y a los que llegan después
+   * con la misma forma les copia encima la configuración y los manejadores. Corriendo el código de
+   * la librería contra un módulo nativo de mentira: en una mesa normal, tras bajar a andar y volver,
+   * los tres gestos se quedaban apagados y con los manejadores vacíos del gemelo; en una de botas,
+   * que empieza a pie, tras subir y volver a bajar, se quedaban encendidos. Con `.enabled()` sobre
+   * los MISMOS gestos, bien en las dos secuencias y antes de montar el detector.
+   *
+   * Así que se compran dos mitades, cada una en su fichero: que la pantalla le pase `aPie` al
+   * gancho, lleve SIEMPRE el mismo gesto en el detector —ninguno construido aquí— y le dé siempre
+   * el nodo; y que el gancho apague SUS gestos, en un efecto de maquetación —el detector manda la
+   * configuración desde su efecto normal, que corre después—, y no apunte el ratón apagado.
    */
-  const gestoDelMirador = soloCodigo(tactil);
   const trozo = (texto, desde, hasta) => {
     const a = texto.indexOf(desde);
     const b = a < 0 ? -1 : texto.indexOf(hasta, a + desde.length);
     return a < 0 || b < 0 ? '' : texto.slice(a, b);
   };
-  const giro = trozo(gestoDelMirador, 'const giro = Gesture.Pan()', 'const pellizco = ');
-  const pellizco = trozo(gestoDelMirador, 'const pellizco = Gesture.Pinch()', 'const paseo = ');
-  const paseoDeDos = trozo(gestoDelMirador, 'const paseo = Gesture.Pan()', 'return Gesture.Simultaneous(');
-  comprobar(
-    'el gesto del mirador sigue siendo el que el gemelo copia: un `Pan` de trabajo, un `Pinch` y un `Pan` en JavaScript, simultáneos',
-    giro.length > 0 &&
+  /*
+   * EL GIRO SIGUE SIENDO DE TRABAJO, CON GEMELO O SIN ÉL. Aquí se exigía la forma del mirador para
+   * que el gemelo la copiara, y la mitad de lo que se exigía no era del gemelo: que el giro —el
+   * `Pan` con activación a mano— sea worklets de arriba abajo. Un manejador suyo sin `'worklet'`
+   * deja el gesto entero en JavaScript, y ahí `estado.activate()` no hace nada: es el fallo que dejó
+   * la cámara sin girar en iOS y en Android (cabecera de `mirador-tactil.ts`). La regla del
+   * `runOnJS(true)`, más arriba, no lo ve: sin esa línea el gesto también acaba en JavaScript. Se
+   * cuenta ahora MANEJADOR A MANEJADOR, que es más de lo que se miraba.
+   */
+  const elGiroEsDeTrabajo = (t) => {
+    const c = soloCodigo(t);
+    const giro = trozo(c, 'const giro = Gesture.Pan()', 'const pellizco = ');
+    const pellizco = trozo(c, 'const pellizco = Gesture.Pinch()', 'const paseo = ');
+    const paseoDeDos = trozo(c, 'const paseo = Gesture.Pan()', 'return Gesture.Simultaneous(');
+    const manejadores = (giro.match(/\.on[A-Z]\w*\(/g) ?? []).length;
+    return (
+      manejadores >= 5 &&
+      (giro.match(/'worklet';/g) ?? []).length === manejadores &&
       !/\.runOnJS\(true\)/.test(giro) &&
-      /'worklet';/.test(giro) &&
       /\.runOnJS\(true\)/.test(pellizco) &&
       /\.runOnJS\(true\)/.test(paseoDeDos) &&
-      /return Gesture\.Simultaneous\(giro, pellizco, paseo\);/.test(gestoDelMirador),
-    'si el mirador cambia de forma, el gemelo de la pantalla tiene que cambiar con él',
-  );
-  const FORMA_DEL_GEMELO =
-    /const gestoApagado = useMemo\(\s*\(\) =>\s*Gesture\.Simultaneous\(\s*Gesture\.Pan\(\)\s*\.onTouchesDown\(\(\) => \{\s*'worklet';\s*\}\)\s*\.enabled\(false\),\s*Gesture\.Pinch\(\)\.runOnJS\(true\)\.enabled\(false\),\s*Gesture\.Pan\(\)\.runOnJS\(true\)\.minPointers\(2\)\.enabled\(false\),\s*\),\s*\[\],\s*\);/;
+      /return Gesture\.Simultaneous\(giro, pellizco, paseo\);/.test(c)
+    );
+  };
   reglaDelFuente(
-    'a pie el `GestureDetector` lleva el gemelo APAGADO del mirador, con su misma forma, y en la mesa el de siempre',
-    (t) => {
-      const c = soloCodigo(t);
-      return /<GestureDetector gesture=\{aPie \? gestoApagado : gesto\}>/.test(c) && FORMA_DEL_GEMELO.test(c);
-    },
-    escena,
-    escena.replace('Gesture.Pinch().runOnJS(true).enabled(false)', 'Gesture.Pinch().enabled(false)'),
-    'un gemelo con otro hilo cambia el envoltorio del detector: se desmonta el lienzo al bajar a andar',
+    "el giro del mirador es de trabajo de arriba abajo —cada manejador suyo lleva `'worklet'` y ninguno `runOnJS(true)`—, y el pellizco y el paseo de dos van en JavaScript, simultáneos",
+    elGiroEsDeTrabajo,
+    tactil,
+    tactil.replace(".onStart((e) => {\n        'worklet';\n", '.onStart((e) => {\n'),
+    'un manejador del giro fuera del hilo de trabajo lo deja en JavaScript, donde `estado.activate()` no hace nada: la cámara no gira en el teléfono',
   );
+  /*
+   * Lo que se prohíbe es EXACTAMENTE la forma del gemelo —un detector con un gesto u otro según algo,
+   * y gestos apagados a mano en la pantalla—, no que la pantalla tenga otros gestos o detectores: el
+   * día que la mano de cartas quiera el suyo, esta regla no tiene por qué ponerse en medio.
+   */
+  const pideElApagado = (t) => {
+    const c = soloCodigo(t);
+    return (
+      /\} = usarMiradorTactil\(medida, encuadre\?\.alcance \?\? 0, \{ apagado: aPie \}\);/.test(c) &&
+      /<GestureDetector gesture=\{gesto\}>/.test(c) &&
+      !/<GestureDetector gesture=\{[^}]*\?[^}]*\}>/.test(c) &&
+      !/\.enabled\(/.test(c) &&
+      /ref=\{apuntarElLienzo\}/.test(c)
+    );
+  };
   reglaDelFuente(
-    'y a pie se le quita el nodo del lienzo, que es por donde entran la rueda y el arrastre del ratón',
-    (t) => /ref=\{aPie \? undefined : apuntarElLienzo\}/.test(soloCodigo(t)),
+    'a pie el mirador se APAGA desde su gancho —`usarMiradorTactil(…, { apagado: aPie })`—: el detector lleva siempre el mismo gesto, sin gemelo, y el lienzo le da siempre su nodo',
+    pideElApagado,
     escena,
-    escena.replace('ref={aPie ? undefined : apuntarElLienzo}', 'ref={apuntarElLienzo}'),
-    'con el nodo puesto, la rueda sigue acercando la mesa que no se ve mientras se anda',
+    escena.replace(
+      'usarMiradorTactil(medida, encuadre?.alcance ?? 0, { apagado: aPie });',
+      'usarMiradorTactil(medida, encuadre?.alcance ?? 0);',
+    ),
+    'con el gancho encendido a pie, el pulgar que anda gira por detrás una mesa que no se ve, y al volver está torcida',
+  );
+  comprobar(
+    'y se ve CAER con un gemelo apagado de vuelta en el detector',
+    !pideElApagado(
+      escena.replace(
+        '<GestureDetector gesture={gesto}>',
+        '<GestureDetector gesture={aPie ? gestoApagado : gesto}>',
+      ),
+    ) &&
+      !pideElApagado(`${escena}\nconst gestoApagado = Gesture.Simultaneous(Gesture.Pan().enabled(false));`),
+    'el gemelo se desincroniza: la librería le copia su configuración a los gestos del mirador y ya no se la devuelve',
+  );
+  const apagaLoSuyo = (t) => {
+    const c = soloCodigo(t);
+    return (
+      /\{ apagado = false \}: ComoSeMontaElMirador = \{\},/.test(c) &&
+      /useLayoutEffect\(\(\) => \{\s*for \(const g of gesto\.toGestureArray\(\)\) g\.enabled\(!apagado\);\s*\}, \[gesto, apagado\]\);/.test(c) &&
+      /if \(!EL_RATON_CUENTA_AQUI \|\| elLienzo === null \|\| apagado\) return undefined;/.test(c) &&
+      /\}, \[elLienzo, apagado, deLaInterfaz, elRatonPasea, avisarSiCambia\]\);/.test(c)
+    );
+  };
+  reglaDelFuente(
+    'y el gancho apaga SUS MISMOS gestos —`.enabled(!apagado)` sobre `toGestureArray()`, en un efecto de maquetación— y con el mirador apagado no apunta la rueda ni el arrastre del ratón',
+    apagaLoSuyo,
+    tactil,
+    tactil.replace(
+      /useLayoutEffect\(\(\) => \{\s*for \(const g of gesto\.toGestureArray\(\)\) g\.enabled\(!apagado\);\s*\}, \[gesto, apagado\]\);/,
+      '',
+    ),
+    'sin apagarlos, `{ apagado }` no apaga nada: el gesto sigue girando la mesa por debajo de quien anda',
+  );
+  comprobar(
+    'y se ve CAER con el ratón apuntado aunque el mirador esté apagado, y con un efecto normal en vez del de maquetación',
+    !apagaLoSuyo(tactil.replace(' || apagado) return undefined;', ') return undefined;')) &&
+      !apagaLoSuyo(tactil.replace('useLayoutEffect(() => {\n    for (const g', 'useEffect(() => {\n    for (const g')),
+    'con el ratón apuntado, la rueda sigue acercando a pie la mesa que no se ve',
   );
   reglaDelFuente(
     'la cámara de la MESA es la de siempre —el `Ojo` con `ojoYMira`— y sólo en la mesa: a pie la pone el paseo',
@@ -2519,9 +2590,10 @@ paso(
    * El ojo del cliente NO se desmonta a pie, al revés que en Riberas: aquí va montado ANTES que
    * `<Burgo>` por el seguimiento al que mueve (la regla de arriba), y desmontado y vuelto a montar se
    * suscribiría detrás. A pie lo sigue escribiendo y la escena pone encima la cámara del paseo. Lo
-   * que se apaga es lo que MUEVE la cámara de mesa por detrás: el gesto del tablero —con
-   * `enabled(false)` en sus mismos gestos, sin cambiarle la forma al detector— y el nodo que la web
-   * le da al ratón.
+   * que se apaga es lo que MUEVE la cámara de mesa por detrás: el mirador táctil, y lo apaga su
+   * gancho —`{ apagado: aPie }`: sus mismos gestos con `enabled(false)` y el ratón de la web sin
+   * apuntar—. Esta pantalla lo hacía con su propio `apagarElMiradorAPie` y quitándole el nodo al
+   * lienzo; que el gancho lo haga bien lo compra el bloque de Riberas a pie, que lee el gancho.
    */
   reglaDelFuente(
     'el Burgo baja a andar con un `useState` de la pantalla —mesa, hombro u ojos—, y la escena recibe la cámara con el asiento de quien mira y la palanca',
@@ -2560,20 +2632,28 @@ paso(
     escena.replace('<MandosDelPaseo mandos={mandos} visibles={aPie} />', '<MandosDelPaseo mandos={mandos} visibles />'),
     'una palanca también en la mesa es un pulgar que no mueve a nadie tapando el tablero; y en el borde, se sienta encima de la cinta y del carril',
   );
+  const pideElApagadoDelBurgo = (t) => {
+    const c = soloCodigo(t);
+    return (
+      /usarMiradorTactil\(medida, ALCANCE_DEL_BURGO, \{ apagado: aPie \}\);/.test(c) &&
+      /<GestureDetector gesture=\{gesto\}>/.test(c) &&
+      !/<GestureDetector gesture=\{[^}]*\?[^}]*\}>/.test(c) &&
+      /ref=\{apuntarElLienzo\}/.test(c) &&
+      !/\.enabled\(|toGestureArray\(/.test(c)
+    );
+  };
   reglaDelFuente(
-    'a pie el gesto del tablero se APAGA en sus mismos gestos, antes de que el detector lea su configuración, y se le quita al ratón el nodo del lienzo',
-    (t) => {
-      const c = soloCodigo(t);
-      return (
-        /function apagarElMiradorAPie\([^)]*\): void \{\s*for \(const g of gesto\.toGestureArray\(\)\) g\.enabled\(!aPie\);\s*\}/.test(c) &&
-        /useLayoutEffect\(\(\) => \{\s*apagarElMiradorAPie\(gesto, aPie\);\s*\}, \[gesto, aPie\]\);/.test(c) &&
-        /<GestureDetector gesture=\{gesto\}>/.test(c) &&
-        /ref=\{aPie \? undefined : apuntarElLienzo\}/.test(c)
-      );
-    },
+    'a pie el mirador del Burgo se APAGA desde su gancho —`usarMiradorTactil(…, { apagado: aPie })`—: el detector lleva siempre el mismo gesto, el lienzo le da siempre su nodo y la pantalla no apaga nada por su cuenta',
+    pideElApagadoDelBurgo,
     escena,
-    escena.replace(/useLayoutEffect\(\(\) => \{\s*apagarElMiradorAPie\(gesto, aPie\);\s*\}, \[gesto, aPie\]\);/, ''),
+    escena.replace('usarMiradorTactil(medida, ALCANCE_DEL_BURGO, { apagado: aPie });', 'usarMiradorTactil(medida, ALCANCE_DEL_BURGO);'),
     'con el gesto vivo a pie, el dedo que arrastra por el lienzo gira por detrás la cámara de mesa, y al volver el tablero está torcido sin que nadie lo pidiera',
+  );
+  comprobar(
+    'y se ve CAER con un segundo interruptor en la pantalla: los gestos apagados aquí a mano, o el nodo quitado a pie',
+    !pideElApagadoDelBurgo(`${escena}\nfor (const g of gesto.toGestureArray()) g.enabled(!aPie);`) &&
+      !pideElApagadoDelBurgo(escena.replace('ref={apuntarElLienzo}', 'ref={aPie ? undefined : apuntarElLienzo}')),
+    'dos interruptores para lo mismo son dos sitios donde se desincroniza, que es lo que pasó con el gemelo de Riberas',
   );
   reglaDelFuente(
     'y a pie no sale «Ver el burgo entero»: andando no hay acercamiento del que volver',
@@ -3423,8 +3503,17 @@ paso(
  * sabiendo lo que eso compra —que la forma está escrita— y lo que no: que se VEA bien en un
  * teléfono, que es mirarlo. Cada regla se afirma sobre el fichero de verdad y se ve CAER con cada
  * copia envenenada; un envenenado que no cambia el fichero cuenta como fallo.
+ *
+ * ═══ Y LA MESA —VESTÍBULO, BARRA Y LATIDO— SE LEE DONDE VIVE: EN EL MUEBLE GENÉRICO ═══
+ *
+ * La cuarta copia del vestíbulo era la del mueble genérico (`tablero-en-linea.tsx`), igual a la
+ * del contrato palabra por palabra. No podía usar la del contrato sin un ciclo de `import` —el
+ * contrato ya carga el mueble—, así que `LaMesaDeUnPintor` se mudó al mueble y el contrato la
+ * presta. Las reglas del vestíbulo, la barra y el latido leen ahora `tablero-en-linea.tsx`, que es
+ * donde están; y dos más compran lo que la mudanza pide: que el contrato la preste sin escribirse
+ * otra, y que el mueble genérico sea un pintor como los demás y no vuelva a pintar su vestíbulo.
  */
-paso('El contrato de pintor de la app: las tres pantallas pintan su escena y la plataforma pone lo demás');
+paso('El contrato de pintor de la app: las tres pantallas —y el mueble genérico— pintan lo suyo y la plataforma pone lo demás');
 {
   const soloCodigo = (texto) =>
     texto
@@ -3443,6 +3532,8 @@ paso('El contrato de pintor de la app: las tres pantallas pintan su escena y la 
     });
   };
   const contrato = leer(path.join(SRC, 'arcade', 'pintor-propio.tsx'));
+  /* La mesa con su vestíbulo, su barra y su latido: vive en el mueble genérico y el contrato la presta. */
+  const laMesa = leer(path.join(SRC, 'arcade', 'tablero-en-linea.tsx'));
   /*
    * LAS PANTALLAS DE PINTOR SE LEEN DE LA CARPETA, no de una lista escrita aquí: la de un juego nuevo
    * —`<juego>-en-tres-escena.tsx`— queda vigilada sin tocar este guion, que es lo que el contrato
@@ -3543,13 +3634,19 @@ paso('El contrato de pintor de la app: las tres pantallas pintan su escena y la 
     'sin la rama del valle que se cae, un tablero que no llega deja la mesa con el lienzo vacío y nada que tocar',
   );
 
-  /* ── El contrato: el vestíbulo con su plazo, la barra con su marca, el latido, y lo que no sabe ── */
+  /* ── La mesa de la plataforma: el vestíbulo con su plazo, la barra con su marca, el latido ── */
+  /*
+   * Estas tres leían el contrato; desde que la mesa se mudó al mueble genérico leen `laMesa`, que es
+   * donde está, con las mismas expresiones. El vestíbulo se busca DESPUÉS de su `if`, y no en el
+   * fichero entero: en el mueble viven más cosas que en el contrato, y un `const vista` anterior
+   * dejaría el trozo vacío sin decir por qué.
+   */
   regla(
-    'el vestíbulo del contrato abre la mesa con el PLAZO elegido —en un grupo de radio—, entra con el código, y su única región viva es el aviso de la mesa',
+    'el vestíbulo de la plataforma —el de las pantallas de pintor Y el del mueble genérico, que es uno— abre la mesa con el PLAZO elegido —en un grupo de radio—, entra con el código, y su única región viva es el aviso de la mesa',
     (t) => {
       const c = soloCodigo(t);
       const desde = c.indexOf("if (mesa.fase === 'fuera' || mesa.mesa === null) {");
-      const hasta = c.indexOf('const vista = mesa.mesa;');
+      const hasta = desde < 0 ? -1 : c.indexOf('const vista = mesa.mesa;', desde);
       const vestibulo = desde >= 0 && hasta > desde ? c.slice(desde, hasta) : '';
       return (
         /PLAZOS\.map\(\(p, i\) => \(/.test(vestibulo) &&
@@ -3560,12 +3657,12 @@ paso('El contrato de pintor de la app: las tres pantallas pintan su escena y la 
         !/accessibilityLiveRegion/.test(vestibulo)
       );
     },
-    contrato,
-    [contrato.replace('mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos)', 'mesa.abrir(nombre.trim())')],
+    laMesa,
+    [laMesa.replace('mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos)', 'mesa.abrir(nombre.trim())')],
     'sin el plazo, desde el móvil sólo se abren mesas del plazo por defecto: una partida de días existe en el servidor y no hay forma de empezarla',
   );
   regla(
-    'y el pintor recibe la barra YA MONTADA —el juego, el código, salir, tirar, el área segura y la marca de Boots on Board de `esMesaDeBotas`—, y es la única barra del contrato',
+    'y el pintor recibe la barra YA MONTADA —el juego, el código, salir, tirar, el área segura y la marca de Boots on Board de `esMesaDeBotas`—, y es la única barra de la mesa',
     (t) => {
       const c = soloCodigo(t);
       const barra = /laBarra=\{\s*<BarraDeLaMesa([\s\S]*?)\/>\s*\}/.exec(c)?.[1] ?? '';
@@ -3580,15 +3677,15 @@ paso('El contrato de pintor de la app: las tres pantallas pintan su escena y la 
         (c.match(/<BarraDeLaMesa\b/g) ?? []).length === 1
       );
     },
-    contrato,
+    laMesa,
     [
-      contrato.replace('deBotas={esMesaDeBotas(vista)}', ''),
-      contrato.replace('arriba={bordes.top}\n          deBotas', 'arriba={0}\n          deBotas'),
+      laMesa.replace('deBotas={esMesaDeBotas(vista)}', ''),
+      laMesa.replace('arriba={bordes.top}\n          deBotas', 'arriba={0}\n          deBotas'),
     ],
     'sin la marca, una mesa de Boots on Board se pinta como una cualquiera; sin el área segura, en un iPhone con muesca los mandos de la barra caen debajo del reloj',
   );
   regla(
-    'y el latido de la cuenta atrás es del contrato: cada segundo en el último minuto, cada minuto el resto, y el ritmo se reelige en cada vuelta',
+    'y el latido de la cuenta atrás es de la mesa: cada segundo en el último minuto, cada minuto el resto, y el ritmo se reelige en cada vuelta',
     (t) => {
       const c = soloCodigo(t);
       return (
@@ -3597,12 +3694,61 @@ paso('El contrato de pintor de la app: las tres pantallas pintan su escena y la 
         /\}, \[venceEn, latido\]\);/.test(c)
       );
     },
-    contrato,
-    [contrato.replace('}, [venceEn, latido]);', '}, [venceEn]);')],
+    laMesa,
+    [laMesa.replace('}, [venceEn, latido]);', '}, [venceEn]);')],
     'sin el latido en las dependencias, una mesa que entra en su último minuto sigue latiendo cada minuto y la cuenta atrás salta de sesenta en sesenta justo cuando se mira',
   );
+  /*
+   * ── Y LA MUDANZA: el contrato presta la mesa y no se escribe otra; el mueble es un pintor más ──
+   *
+   * Contadas y no sólo buscadas: el vestíbulo, el área segura, la mesa y el latido UNA vez en el
+   * mueble, y NINGUNA en el contrato. Una segunda copia en cualquiera de los dos —la cuarta que se
+   * acaba de quitar, o una quinta que naciera en el contrato— sale en la cuenta.
+   */
+  const cuantasVeces = (c, re) => (c.match(re) ?? []).length;
+  const LO_QUE_ES_DE_LA_MESA = [/\bmesa\.abrir\(/g, /\bmesa\.entrar\(/g, /\buseSafeAreaInsets\(/g, /\busarMesaDeArcade\(/g, /\blatir\(/g, /<BarraDeLaMesa\b/g, /\bPLAZOS\.map\(/g];
   regla(
-    'y el contrato no sabe de ningún juego: ni una constante de arcade, ni la escena de ninguno, ni `three`',
+    'el contrato PRESTA la mesa del mueble genérico —`LaMesaDeUnPintor` y `LoQueVeElPintor`, importados y vueltos a exportar— y no se escribe otra: ni vestíbulo, ni plazo, ni barra, ni área segura, ni latido',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /import \{[^}]*\bLaMesaDeUnPintor\b[^}]*\} from '\.\/tablero-en-linea';/.test(c) &&
+        /import type \{ LoQueVeElPintor \} from '\.\/tablero-en-linea';/.test(c) &&
+        /\nexport \{ LaMesaDeUnPintor \};/.test(c) &&
+        /\nexport type \{ LoQueVeElPintor \};/.test(c) &&
+        !/function LaMesaDeUnPintor\b|interface LoQueVeElPintor\b/.test(c) &&
+        LO_QUE_ES_DE_LA_MESA.every((re) => cuantasVeces(c, re) === 0)
+      );
+    },
+    contrato,
+    [
+      `${contrato}\nconst abre = () => mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos);`,
+      contrato.replace('export { LaMesaDeUnPintor };', ''),
+    ],
+    'un contrato que se escribe su vestíbulo al lado del prestado es la quinta copia, y la primera que se separa se queda sin plazo o sin marca',
+  );
+  regla(
+    'y el mueble genérico es un pintor más: `ElTableroEnLinea` monta `LaMesaDeUnPintor` con el arcade de la ruta y un pintor del módulo, y la mesa está en el mueble UNA sola vez',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /export function ElTableroEnLinea\(\): JSX\.Element \{\s*const \{ arcade \} = useLocalSearchParams<\{ arcade\?: string \}>\(\);\s*return <LaMesaDeUnPintor arcade=\{typeof arcade === 'string' \? arcade : ''\} Pintor=\{ElPintorDelMueble\} \/>;\s*\}/.test(c) &&
+        /\nfunction ElPintorDelMueble\(\{[^}]*\blaBarra\b[^}]*\}: LoQueVeElPintor\): JSX\.Element \{/.test(c) &&
+        cuantasVeces(c, /\{laBarra\}/g) === 2 &&
+        cuantasVeces(c, /\bexport function LaMesaDeUnPintor\(/g) === 1 &&
+        LO_QUE_ES_DE_LA_MESA.every((re) => cuantasVeces(c, re) === 1)
+      );
+    },
+    laMesa,
+    [
+      laMesa.replace('Pintor={ElPintorDelMueble} />', 'Pintor={(q: LoQueVeElPintor) => <ElPintorDelMueble {...q} />} />'),
+      `${laMesa}\nconst otraVez = () => mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos);`,
+      laMesa.replace('      {laBarra}\n      {/*\n        ═══ DE QUIÉN ES EL TURNO', '      <BarraDeLaMesa juego={juego} codigo={vista.codigo} asientos={vista.asientos} salir={mesa.salir} tirar={mesa.tirar} arriba={arriba} />\n      {/*\n        ═══ DE QUIÉN ES EL TURNO'),
+    ],
+    'con el pintor creado al pintar, el retablo se desmonta en cada latido; con una segunda mesa en el mueble vuelve la cuarta copia; y con una barra suya, la rama pierde la marca de Boots on Board',
+  );
+  regla(
+    'y ni el contrato ni la mesa saben de ningún juego: ni una constante de arcade, ni la escena de ninguno, ni `three`',
     (t) => {
       const c = soloCodigo(t);
       return (
@@ -3613,9 +3759,12 @@ paso('El contrato de pintor de la app: las tres pantallas pintan su escena y la 
         !/-en-tres-escena/.test(c)
       );
     },
-    contrato,
-    [`${contrato}\nimport { BURGO } from '../../../shared/arcade/juegos';`],
-    'un contrato que sabe de un juego sale a medida de ese juego, y el siguiente vuelve a copiarse la pantalla entera',
+    `${contrato}\n${laMesa}`,
+    [
+      `${contrato}\n${laMesa}\nimport { BURGO } from '../../../shared/arcade/juegos';`,
+      `${contrato}\n${laMesa.replace("import { Retablo } from './retablo';", "import { Retablo } from './retablo';\nimport { Burgo } from '../../../escenas/burgo/Burgo';")}`,
+    ],
+    'una mesa que sabe de un juego sale a medida de ese juego, y el siguiente vuelve a copiarse la pantalla entera',
   );
   regla(
     'y su telón no coge el dedo: es un cartel encima del lienzo, no una tapa',
@@ -3799,20 +3948,28 @@ paso('Boots on Board en la app: la elección sólo en el lobby común, apagada c
   );
 
   /* ── La marca ── */
+  /*
+   * La barra se montaba en las DOS ramas del mueble genérico, y se contaban dos preguntas. Desde que
+   * la mesa —`LaMesaDeUnPintor`, en el mismo fichero— la monta UNA vez y se la da a cada pintor como
+   * `laBarra`, lo que se compra es lo mismo dicho de la forma nueva: que CADA barra que se monta lleve
+   * la pregunta, y que haya una sola. Que las ramas pinten esa y no otra lo compra el contrato.
+   */
   regla(
-    'la barra de la mesa dice Boots on Board cuando `esMesaDeBotas` lo dice, en sus dos ramas, y sin la prop no dice nada',
+    'la barra de la mesa dice Boots on Board cuando `esMesaDeBotas` lo dice —se monta UNA vez, en la mesa, para todas las ramas de todos los pintores—, y sin la prop no dice nada',
     (c) => {
       const codigo = soloCodigo(c);
+      const barras = (codigo.match(/<BarraDeLaMesa\b/g) ?? []).length;
       return (
         /deBotas = false,/.test(codigo) &&
         /deBotas\?: boolean;/.test(codigo) &&
         /\{deBotas \? \(\s*<Text style=\{estilos\.marcaDeBotas\}[^>]*>\s*\{MARCA_DE_BOTAS\}\s*<\/Text>\s*\) : null\}/.test(codigo) &&
-        (codigo.match(/deBotas=\{esMesaDeBotas\(mesa\.mesa\)\}/g) ?? []).length === 2
+        barras === 1 &&
+        (codigo.match(/deBotas=\{esMesaDeBotas\(vista\)\}/g) ?? []).length === barras
       );
     },
     enLinea,
-    enLinea.replace('deBotas={esMesaDeBotas(mesa.mesa)}', ''),
-    'una rama sin la prop pinta la mesa de botas como una cualquiera',
+    enLinea.replace('deBotas={esMesaDeBotas(vista)}', ''),
+    'una barra sin la prop pinta la mesa de botas como una cualquiera, en todas las ramas de todos los pintores a la vez',
   );
   regla(
     'y la barra del lobby también, debajo del nombre del juego, sólo sentados en una mesa que lo sea',
@@ -3873,11 +4030,13 @@ paso('Boots on Board en la app: la elección sólo en el lobby común, apagada c
   /*
    * Los vestíbulos PROPIOS: los que se pintan cuando no hay mesa. No tienen elección y no la tendrán.
    *
-   * Eran cuatro —uno por cada pantalla en tres dimensiones y el del mueble genérico— y ahora son
-   * DOS: el de las tres pantallas es uno solo, el del contrato de pintor (`pintor-propio.tsx`). Que
-   * ninguna de las tres vuelva a escribirse el suyo lo compra la regla del contrato, más arriba.
+   * Eran cuatro —uno por cada pantalla en tres dimensiones y el del mueble genérico—, luego DOS
+   * —el del contrato de pintor y el del mueble, iguales palabra por palabra— y ahora es UNO: el de
+   * `LaMesaDeUnPintor`, que vive en el mueble (`tablero-en-linea.tsx`) y el contrato presta. Que
+   * nadie vuelva a escribirse el suyo —las tres pantallas, el contrato, el mueble— lo compran las
+   * reglas del contrato, más arriba; aquí se mira que el que queda abra la mesa de siempre.
    */
-  const PROPIOS = ['pintor-propio.tsx', 'tablero-en-linea.tsx'];
+  const PROPIOS = ['tablero-en-linea.tsx'];
   const losDeLaApp = fs
     .readdirSync(path.join(SRC, 'arcade'))
     .filter((f) => /\.tsx?$/.test(f))

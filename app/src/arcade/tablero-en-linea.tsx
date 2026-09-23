@@ -76,8 +76,31 @@
  *   · Y NADA DE LO QUE CAMBIA SOLO SE ANUNCIABA: ni el aviso de la mesa, ni la
  *     crónica, ni el turno. Con lector de pantalla se pulsaba «Abrir una mesa» y no
  *     pasaba nada audible.
+ *
+ * ═══ Y LA MESA —VESTÍBULO, LATIDO, NOMBRES Y BARRA— ES UNA SOLA: LA DE AQUÍ ═══
+ *
+ * Había CUATRO vestíbulos: éste y uno por cada pantalla en tres dimensiones. El
+ * contrato de pintor (`pintor-propio.tsx`) juntó los tres de las pantallas en
+ * `LaMesaDeUnPintor`, y éste se quedó con el suyo, igual palabra por palabra: la
+ * cuarta copia, que es la que un día se separa sola. Ahora `LaMesaDeUnPintor` vive
+ * AQUÍ, y esta pantalla es un pintor más —`ElPintorDelMueble`, el del retablo—,
+ * montado exactamente igual que el Burgo, Riberas y Las Lindes. El contrato la presta:
+ * la importa de aquí y la vuelve a exportar, y las tres pantallas la siguen pidiendo
+ * allí.
+ *
+ * VIVE AQUÍ Y NO ALLÍ POR EL SENTIDO DE LOS `import`. El contrato ya importa de este
+ * fichero la barra, la línea del turno, las opciones y la crónica; si este fichero
+ * importara del contrato, los dos se cargarían el uno al otro, y Metro avisa en
+ * desarrollo de cada ciclo —«Require cycle»— porque un módulo a medio cargar puede
+ * entregar valores sin definir. Con la mesa aquí, la flecha sigue yendo en un solo
+ * sentido: del contrato al mueble, como ya iba.
+ *
+ * Y lo que ve quien abre un arcade de fuera no cambia en nada: los dos vestíbulos eran
+ * el mismo, con los mismos estilos —los de este fichero—, y el título sale igual: el
+ * nombre del manifiesto, o el de la ruta si el manifiesto no está.
  */
 import { useEffect, useMemo, useState } from 'react';
+import type { ComponentType } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -91,6 +114,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
+import type { ArcadeId } from '../../../shared/arcade';
 import {
   opcionesSueltas,
   tableroDeLaVista,
@@ -101,7 +125,7 @@ import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 import { MARCA_DE_BOTAS } from '../../../escenas/compuerta-de-botas';
 import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import { usarMesaDeArcade } from './mesa';
-import type { OpcionDeMesa, AvisoDeMesa} from './mesa';
+import type { AvisoDeMesa, LaMesa, MesaVista, OpcionDeMesa } from './mesa';
 import { cuantoLleva, cuantoQueda } from './relojes';
 import { conAlfa } from '../tema';
 import { BOTON, LETRA, RADIO, SALA } from './muebles';
@@ -151,12 +175,63 @@ import { PLAZOS } from './plazos';
  * `import` ninguno para que `verificar-relojes.mjs` los llame de verdad.
  */
 
-/** Pinta el arcade de tablero que pida la ruta. */
-export function ElTableroEnLinea(): JSX.Element {
-  const { arcade } = useLocalSearchParams<{ arcade?: string }>();
-  const id = typeof arcade === 'string' ? arcade : '';
-  const manifiesto = manifiestoDeArcadeSiExiste(id);
-  const mesa = usarMesaDeArcade(id);
+/**
+ * LO QUE LA PLATAFORMA LE DA A UN PINTOR. El espejo de `LoQueVeElPintor` del escritorio, con
+ * lo que en la app hace falta: el área segura —aquí no hay una página que la ponga— y la barra.
+ *
+ * Vive aquí, con `LaMesaDeUnPintor`, que es quien lo compone; el contrato de pintor
+ * (`pintor-propio.tsx`) lo vuelve a exportar y las pantallas en tres dimensiones lo piden allí.
+ */
+export interface LoQueVeElPintor {
+  /** La mesa: `mover`, `quieto`, `aviso`, `cronica`, `llave`, `salir` y `tirar`. */
+  readonly mesa: LaMesa;
+  /** La mesa ya sentada, con la vista del juego dentro. Aquí no es `null` nunca. */
+  readonly vista: MesaVista;
+  /** El nombre del juego, del manifiesto: lo que dice la barra. */
+  readonly juego: string;
+  /** Quién es quién, por asiento: lo que necesita `LineaDelTurno` para decir «le toca a Ana». */
+  readonly nombres: Map<string, string>;
+  /** Lo que el sistema se queda arriba —la muesca— y abajo —el indicador de inicio—. */
+  readonly arriba: number;
+  readonly abajo: number;
+  /**
+   * LA BARRA DE LA MESA, YA MONTADA: el juego, el código, «Salir», «Tirar» y la marca de Boots on
+   * Board. Se pinta con `{laBarra}` en cada rama, y una rama nueva no tiene nada que recordar.
+   */
+  readonly laBarra: JSX.Element;
+}
+
+/**
+ * LA PANTALLA DE UN PINTOR: la mesa del juego, y el vestíbulo mientras no hay mesa.
+ *
+ * La montan las pantallas en tres dimensiones desde su `export default`, con SU constante
+ * —`BURGO`, `LINDES`, `RIBERAS`— y pidiéndola al contrato de pintor, y la monta este mueble con
+ * el arcade de la ruta (`ElTableroEnLinea`, aquí abajo). La ruta sólo presta el nombre cuando el
+ * manifiesto no está: la de un pintor es `/tablero?arcade=…` y `quienPinta` ya casó el
+ * identificador contra `LOS_QUE_PINTA` antes de montar la pantalla, así que la mesa es la de ese
+ * juego y punto; lo que el parámetro sigue sirviendo es para el rótulo de un enlace directo con el
+ * registro a medio instalar.
+ *
+ * `Pintor` tiene que ser un componente del ámbito del módulo, nunca uno creado al pintar: React
+ * trataría cada función nueva como un componente nuevo y desmontaría la escena en cada latido.
+ *
+ * ═══ EL ESTADO DEL VESTÍBULO VIVE AQUÍ ARRIBA, Y NO ES UN DESCUIDO ═══
+ *
+ * El nombre, el código y el plazo se guardan en la pantalla y no en un componente del
+ * vestíbulo: al pulsar «Abrir una mesa» la fase pasa por `yendo` —otra rama— y, si el servidor
+ * dice que no, vuelve a `fuera`. Con el estado dentro del vestíbulo, ese viaje lo desmontaría y
+ * quien acaba de fallar tendría que volver a escribir su nombre.
+ */
+export function LaMesaDeUnPintor({
+  arcade,
+  Pintor,
+}: {
+  readonly arcade: ArcadeId;
+  readonly Pintor: ComponentType<LoQueVeElPintor>;
+}): JSX.Element {
+  const { arcade: deLaRuta } = useLocalSearchParams<{ arcade?: string }>();
+  const manifiesto = manifiestoDeArcadeSiExiste(arcade);
+  const mesa = usarMesaDeArcade(arcade);
   const [nombre, ponerNombre] = useState('');
   const [codigo, ponerCodigo] = useState('');
   const [plazo, ponerPlazo] = useState(0);
@@ -178,8 +253,8 @@ export function ElTableroEnLinea(): JSX.Element {
    * `app/app/_layout.tsx`, así que esto no añade dependencia ninguna: sólo lee lo
    * que ya había.
    *
-   * Se lee UNA VEZ y aquí arriba, antes de los tres `return` tempranos, porque es
-   * un hook y los hooks no se saltan.
+   * Se lee UNA VEZ y aquí arriba, antes de los `return` tempranos, porque es un
+   * hook y los hooks no se saltan; y le llega al pintor como `arriba` y `abajo`.
    */
   const bordes = useSafeAreaInsets();
   /* Los 28 de relleno de la casa, más lo que el sistema se queda arriba y abajo. */
@@ -191,7 +266,8 @@ export function ElTableroEnLinea(): JSX.Element {
    * El vencimiento viaja como INSTANTE ABSOLUTO y no como «quedan 40 s», porque una
    * cuenta atrás obliga al servidor a decrementarla, o sea a escribir el estado sin
    * que pase nada. La consecuencia es que quien resta es la pantalla, y para restar
-   * hay que repintar.
+   * hay que repintar. Repinta la pantalla entera, y con ella al pintor y a su línea
+   * del turno.
    *
    * Cada cuánto: en el último minuto, una vez por segundo, que es cuando el número
    * cambia de verdad y hay alguien mirándolo. Antes, una vez por minuto — porque en
@@ -242,15 +318,18 @@ export function ElTableroEnLinea(): JSX.Element {
    * nombres puestos. `tableroConLosNombres` se ha borrado con el rodeo entero.
    *
    * La tabla se queda porque sigue haciendo falta para lo que es de la PANTALLA y
-   * no del juego: la línea que dice «le toca a Ana», que este mueble compone él
-   * solo a partir del turno declarado en la vista. Eso no viaja escrito porque el
-   * juego no tiene por qué saber que existe esa línea.
+   * no del juego: la línea que dice «le toca a Ana», que la mesa compone ella sola
+   * a partir del turno declarado en la vista. Eso no viaja escrito porque el juego
+   * no tiene por qué saber que existe esa línea.
    */
   const nombres = useMemo(() => {
     const tabla = new Map<string, string>();
     for (const a of mesa.mesa?.asientos ?? []) tabla.set(a.id, a.nombre);
     return tabla;
   }, [mesa.mesa?.asientos]);
+
+  const juego =
+    manifiesto?.nombre ?? (typeof deLaRuta === 'string' && deLaRuta.length > 0 ? deLaRuta : arcade);
 
   if (mesa.fase === 'yendo') {
     return (
@@ -282,6 +361,18 @@ export function ElTableroEnLinea(): JSX.Element {
   if (mesa.fase === 'fuera' || mesa.mesa === null) {
     return (
       /*
+       * ═══ EL VESTÍBULO, Y POR QUÉ HAY QUE PODER USARLO AUNQUE CASI NADIE LLEGUE ═══
+       *
+       * Por el Muelle casi nadie llega aquí sin mesa —la tarjeta de la Sala lleva al
+       * embarcadero y el embarcadero abre el juego con la mesa ya sentada—, pero un
+       * enlace directo, un asiento caducado o «Salir» acaban en esta rama, y un arcade
+       * de fuera entra SIEMPRE por aquí. Una rama que no se puede usar es una pantalla
+       * en blanco con otro nombre.
+       *
+       * Abre la mesa DE SIEMPRE: la modalidad —Boots on Board— sólo se elige en la
+       * orilla del lobby común, que es la que mide si el aparato llega (`verify:sala`
+       * lo vigila en toda la app).
+       *
        * ═══ EL VESTÍBULO SE DESPLAZA, Y ES LO MÁS GRAVE QUE TENÍA ESTA PANTALLA ═══
        *
        * Era un `View` de `flex: 1` con `justifyContent: 'center'` y DOS campos de
@@ -307,7 +398,7 @@ export function ElTableroEnLinea(): JSX.Element {
        */
       <Pantalla hueco={28} estilo={relleno}>
         <View style={estilos.centro}>
-          <Text style={estilos.titulo}>{manifiesto?.nombre ?? id}</Text>
+          <Text style={estilos.titulo}>{juego}</Text>
           <Text style={estilos.texto}>{manifiesto?.gancho ?? ''}</Text>
           {/*
             LA ETIQUETA NO PUEDE SER EL `placeholder`, y aquí lo era en los dos
@@ -413,13 +504,56 @@ export function ElTableroEnLinea(): JSX.Element {
               Sentarse
             </Text>
           </Pressable>
+          {/* La ÚNICA región viva de esta rama: el vestíbulo no tiene línea del turno ni retablo. */}
           <ElAviso texto={mesa.aviso} />
         </View>
       </Pantalla>
     );
   }
 
-  const tablero = tableroDeLaVista(mesa.mesa.vista);
+  const vista = mesa.mesa;
+  return (
+    <Pintor
+      mesa={mesa}
+      vista={vista}
+      juego={juego}
+      nombres={nombres}
+      arriba={bordes.top}
+      abajo={bordes.bottom}
+      laBarra={
+        <BarraDeLaMesa
+          juego={juego}
+          codigo={vista.codigo}
+          asientos={vista.asientos}
+          salir={mesa.salir}
+          tirar={mesa.tirar}
+          arriba={bordes.top}
+          deBotas={esMesaDeBotas(vista)}
+        />
+      }
+    />
+  );
+}
+
+/**
+ * Pinta el arcade de tablero que pida la ruta: la mesa de la plataforma —la misma que montan las
+ * pantallas en tres dimensiones, con su vestíbulo y su barra— y el retablo por pintor.
+ */
+export function ElTableroEnLinea(): JSX.Element {
+  const { arcade } = useLocalSearchParams<{ arcade?: string }>();
+  return <LaMesaDeUnPintor arcade={typeof arcade === 'string' ? arcade : ''} Pintor={ElPintorDelMueble} />;
+}
+
+/**
+ * EL PINTOR DEL MUEBLE: la mesa sentada, sin saber a qué se juega.
+ *
+ * Tres ramas, según lo que traiga la vista: el tablero declarado sobre el `Retablo`, un botón
+ * por opción cuando el juego no se dibuja, y la frase de por qué no hay nada que pintar. La barra
+ * le llega hecha (`laBarra`) y el área segura medida (`arriba`, `abajo`), como a cualquier pintor
+ * del contrato; lo único que pone esta función es el mueble.
+ */
+function ElPintorDelMueble({ mesa, vista, juego, nombres, arriba, abajo, laBarra }: LoQueVeElPintor): JSX.Element {
+  const tablero = tableroDeLaVista(vista.vista);
   /*
    * ═══ LAS OPCIONES QUE MANDA EL JUEGO, QUE ES EL HUECO DE LA FASE 5 ═══
    *
@@ -444,20 +578,12 @@ export function ElTableroEnLinea(): JSX.Element {
    * la ayuda que escribió el juego, y se manda `tipo` y `carga` tal cual vienen:
    * este fichero no traduce ni una cadena, que es lo que lo mantiene genérico.
    */
-  const opciones = mesa.mesa.opciones ?? [];
+  const opciones = vista.opciones ?? [];
   if (tablero === null) {
     if (opciones.length > 0) {
       return (
         <View style={estilos.todo}>
-          <BarraDeLaMesa
-            juego={manifiesto?.nombre ?? id}
-            codigo={mesa.mesa.codigo}
-            asientos={mesa.mesa.asientos}
-            salir={mesa.salir}
-            tirar={mesa.tirar}
-            arriba={bordes.top}
-            deBotas={esMesaDeBotas(mesa.mesa)}
-          />
+          {laBarra}
           {/*
             ═══ AQUÍ TAMPOCO SE DESPLAZABA NADA, Y ES LA RAMA QUE MÁS CRECE ═══
 
@@ -474,10 +600,10 @@ export function ElTableroEnLinea(): JSX.Element {
           */}
           <ScrollView
             style={estilos.rio}
-            contentContainerStyle={{ paddingBottom: bordes.bottom }}
+            contentContainerStyle={{ paddingBottom: abajo }}
             keyboardShouldPersistTaps="handled"
           >
-            <LineaDelTurno mesa={mesa.mesa} nombres={nombres} />
+            <LineaDelTurno mesa={vista} nombres={nombres} />
             <ElAviso texto={mesa.aviso} />
             <LasOpciones opciones={opciones} alTocar={mesa.mover} quieto={mesa.quieto} />
             <LaCronica cronica={mesa.cronica} />
@@ -486,9 +612,9 @@ export function ElTableroEnLinea(): JSX.Element {
       );
     }
     return (
-      <Pantalla hueco={28} estilo={relleno}>
+      <Pantalla hueco={28} estilo={{ paddingTop: arriba + 28, paddingBottom: abajo + 28 }}>
         <View style={estilos.centro}>
-          <Text style={estilos.titulo}>{manifiesto?.nombre ?? id}</Text>
+          <Text style={estilos.titulo}>{juego}</Text>
           <Text style={estilos.texto}>
             Esta mesa está abierta y lo que manda no trae tablero ni dice qué se puede hacer, así
             que no hay nada que pintar aquí. Suele significar que esta versión de la app es más
@@ -511,15 +637,7 @@ export function ElTableroEnLinea(): JSX.Element {
 
   return (
     <View style={estilos.todo}>
-      <BarraDeLaMesa
-        juego={manifiesto?.nombre ?? id}
-        codigo={mesa.mesa.codigo}
-        asientos={mesa.mesa.asientos}
-        salir={mesa.salir}
-        tirar={mesa.tirar}
-        arriba={bordes.top}
-        deBotas={esMesaDeBotas(mesa.mesa)}
-      />
+      {laBarra}
       {/*
         ═══ DE QUIÉN ES EL TURNO Y CUÁNTO QUEDA ═══
 
@@ -543,7 +661,7 @@ export function ElTableroEnLinea(): JSX.Element {
         cosas distintas separadas por el filo de un píxel, que es lo único con lo
         que esta identidad separa nada.
       */}
-      <LineaDelTurno mesa={mesa.mesa} nombres={nombres} />
+      <LineaDelTurno mesa={vista} nombres={nombres} />
       <ElAviso texto={mesa.aviso} />
       {/*
         EL TABLERO SE PINTA TAL Y COMO LLEGA. Ya no se le sustituye nada.
@@ -588,7 +706,7 @@ export function ElTableroEnLinea(): JSX.Element {
       */}
       <ScrollView
         style={estilos.pieDeLaMesa}
-        contentContainerStyle={{ paddingBottom: bordes.bottom }}
+        contentContainerStyle={{ paddingBottom: abajo }}
       >
         {/* Lo que decide es lo PINTABLE y no lo que llega: ver `hayAlgoQuePintar`. */}
         {hayAlgoQuePintar(sueltas) ? (
@@ -660,8 +778,8 @@ function ElAviso({ texto }: { texto: string }): JSX.Element | null {
  * distinto —bajando al tablero con los demás— y quien vuelve a la mesa tiene que
  * saberlo sin buscarlo. Llega como `deBotas` y no como la mesa entera, porque la
  * pregunta es `esMesaDeBotas` y la hace quien monta la barra, que es quien tiene la
- * mesa: los pintores en tres dimensiones la reutilizan con su propia vista. Sin la
- * prop no hay marca, que es lo que decía la barra antes de que existiera.
+ * mesa: `LaMesaDeUnPintor`, una vez para todos sus pintores. Sin la prop no hay
+ * marca, que es lo que decía la barra antes de que existiera.
  */
 function BarraDeLaMesa({
   juego,
@@ -684,7 +802,7 @@ function BarraDeLaMesa({
    *
    * `useSafeAreaInsets` es un hook, así que llamarlo aquí lo llamaría también en
    * la rama que no monta barra y ataría este componente al proveedor. Llega como
-   * número desde la pantalla, que es quien ya lo lee una vez para las cuatro
+   * número desde `LaMesaDeUnPintor`, que es quien ya lo lee una vez para todas las
    * ramas. Se SUMA a los 14 de la casa en vez de sustituirlos: sin muesca el
    * inset vale 0 y la barra queda exactamente como estaba.
    */
@@ -1523,20 +1641,24 @@ const estilos = StyleSheet.create({
 });
 
 /*
- * ═══ LO QUE EL PINTOR PROPIO DE RIBERAS REUTILIZA DE AQUÍ, Y POR QUÉ SE EXPORTA ═══
+ * ═══ LO QUE LOS PINTORES PROPIOS REUTILIZAN DE AQUÍ, Y POR QUÉ SE EXPORTA ═══
  *
- * `riberas-en-tres-escena.tsx` pinta la misma mesa que esta pantalla —barra, línea
- * del turno, aviso, opciones sueltas y crónica— y en vez del `Retablo` pone un
- * lienzo de tres dimensiones. Todo lo que no es el lienzo es ESTA pantalla, y
- * copiarlo allí sería estrenar la segunda copia de la barra de la mesa: la primera
- * ya se separó sola una vez, y está contado en la cabecera de `BarraDeLaMesa`.
+ * Las pantallas en tres dimensiones pintan la misma mesa que esta pantalla —línea
+ * del turno, aviso, opciones sueltas y crónica— y en vez del `Retablo` ponen un
+ * lienzo. Todo lo que no es el lienzo es ESTA pantalla, y copiarlo allí sería
+ * estrenar otra copia de algo que ya se separó solo una vez: la barra de la mesa,
+ * contado en la cabecera de `BarraDeLaMesa`.
  *
- * Los estilos van con las piezas por lo mismo: el vestíbulo de abrir o entrar que
- * aquel fichero pinta cuando no hay mesa usa estos campos, estos chips y este
- * botón, y un vestíbulo con OTRO contorno de campo a un toque de distancia se lee
- * como un descuido antes que como otra pantalla. Se exporta la tabla entera y no
- * seis entradas sueltas para que la siguiente que haga falta no obligue a volver
- * aquí.
+ * `LaMesaDeUnPintor` y `LoQueVeElPintor` se exportan donde se declaran, arriba, y
+ * los recoge el contrato de pintor para prestarlos. La BARRA ya no se exporta: le
+ * llega hecha a cada pintor (`laBarra`), que es lo que el contrato promete —una rama
+ * nueva no puede olvidarse de la marca de Boots on Board ni del área segura—, y la
+ * pieza suelta a mano era la puerta de la copia siguiente.
+ *
+ * Los estilos van con las piezas por lo mismo de siempre: un respaldo con OTRO
+ * contorno de campo a un toque de distancia se lee como un descuido antes que como
+ * otra pantalla. Se exporta la tabla entera y no seis entradas sueltas para que la
+ * siguiente que haga falta no obligue a volver aquí.
  *
  * Nada de lo de arriba cambia: esta pantalla sigue siendo el mueble genérico, y
  * sigue sin saber a qué se juega.
@@ -1563,7 +1685,6 @@ function hayAlgoQuePintar(opciones: readonly OpcionDeMesa[]): boolean {
 }
 
 export {
-  BarraDeLaMesa,
   LineaDelTurno,
   LasOpciones,
   hayAlgoQuePintar,
