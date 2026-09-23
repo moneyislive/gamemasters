@@ -261,18 +261,8 @@ export function poseDeGrua(base: Pose, u: number): Pose {
   return mezclaDePoses(base, POSE_AEREA, easeInOutQuart(u));
 }
 
-/** Gira la posición de una pose alrededor de su objetivo, en horizontal. Para el arrastre. */
-export function giraAlrededorDelObjetivo(pose: Pose, angulo: number): Pose {
-  const rx = pose.posicion.x - pose.objetivo.x;
-  const rz = pose.posicion.z - pose.objetivo.z;
-  const cos = Math.cos(angulo);
-  const sin = Math.sin(angulo);
-  return {
-    ...pose,
-    posicion: {
-      x: pose.objetivo.x + rx * cos + rz * sin,
-      y: pose.posicion.y,
-      z: pose.objetivo.z - rx * sin + rz * cos,
-    },
-  };
-}
+/*
+ * El giro del arrastre alrededor del objetivo estuvo aquí, copiado del Muelle. Es
+ * `giraAlrededorDelObjetivo` de `comun/bucle-del-lobby.ts`: lo usa el bucle común de los lobbies, que
+ * es quien arrastra, y esta escena ya no lo llama.
+ */

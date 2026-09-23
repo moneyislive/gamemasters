@@ -12,7 +12,8 @@
  * que entra andando, espera, se viste y se va corriendo (`aventurero-de-la-plaza.tsx`).
  * La cámara es una sola y viva: toda pose es un objetivo de `camara-de-la-plaza.ts` al
  * que se llega por amortiguado exponencial, y sólo en el primer fotograma se asigna en
- * seco.
+ * seco; el bucle que la lleva es el común de los lobbies (`comun/bucle-del-lobby.ts`),
+ * el mismo del Muelle.
  *
  * ═══ POR QUÉ ES UNA ESCENA HERMANA Y NO UN PARÁMETRO DEL MUELLE ═══
  *
@@ -56,10 +57,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import { amortiguado, conRespiracion, easeInOutQuart } from '../embarcadero/camara';
-import type { Pose } from '../embarcadero/camara';
+import { amortiguado } from '../embarcadero/camara';
 import { cargadorPara } from '../embarcadero/cargar';
 import type { AventureroCargado } from '../embarcadero/cargar';
 import { sorteo } from '../embarcadero/cala';
@@ -72,15 +71,7 @@ import type { AsientoEnElMuelle, PropsDelEmbarcadero } from '../embarcadero/tipo
 import { catalogoDelBurgoDe } from '../burgo/catalogo-del-burgo';
 import { rutaDelBurgo } from '../ruta-de-modelos';
 import { AventureroDeLaPlaza } from './aventurero-de-la-plaza';
-import {
-  DURACION_DEL_ZARPE,
-  DURACION_DE_LA_MIRADA,
-  ARRASTRE,
-  giraAlrededorDelObjetivo,
-  poseDeGrua,
-  poseDeMirada,
-  poseDeReposo,
-} from './camara-de-la-plaza';
+import { DURACION_DE_LA_MIRADA, ARRASTRE, poseDeGrua, poseDeMirada, poseDeReposo } from './camara-de-la-plaza';
 import { colorDeLaNieblaDeLaPlaza, distanciasDeLaNiebla, materialDelCieloDeLaPlaza, rumboDelSol } from './cielo-de-la-plaza';
 import { componerLaPlaza, semillaDeLaPlaza, SUELO_DE_LA_PLAZA, TALLA_DE_LA_BANDERA } from './la-plaza';
 import type { PuestoDeLaPlaza } from './la-plaza';
@@ -88,6 +79,7 @@ import { construirElMundoDeLaPlaza } from './mundo-de-la-plaza';
 import { MOTAS, RADIO_DEL_CIELO, SEGMENTOS_DEL_CIELO, SEGMENTOS_DE_LA_BOMBILLA } from './presupuesto-de-la-plaza';
 import { MEDIODIA_DEL_TABLERO, TARDE, mezclaDeNumeros } from './tarde';
 import { usarArranqueYMedida } from '../comun/arranque';
+import { usarElBucleDelLobby } from '../comun/bucle-del-lobby';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
@@ -568,27 +560,10 @@ export function Plaza(props: PropsDelEmbarcadero): JSX.Element {
   const intensidadDeLaCara = useRef(TARDE.cara.intensidad);
 
   // -------------------------------------------------------------------------
-  // La cámara, el zarpe, la mirada, el arrastre y las medidas
+  // La cámara, el zarpe, la mirada y el arrastre: el bucle común de un lobby
   // -------------------------------------------------------------------------
 
-  const camara = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const tamanoDelLienzo = useThree((s) => s.size);
-  useEffect(() => {
-    /* El plano lejano tiene que dejar dentro la cúpula; la cámara de serie de r3f se queda corta. */
-    camara.near = 0.5;
-    camara.far = Math.max(camara.far, RADIO_DEL_CIELO * 1.3);
-    camara.updateProjectionMatrix();
-  }, [camara]);
-
-  const primerFotograma = useRef(true);
-  const posicionActual = useMemo(() => new THREE.Vector3(), []);
-  const objetivoActual = useMemo(() => new THREE.Vector3(), []);
-  const auxPosicion = useMemo(() => new THREE.Vector3(), []);
-  const fovActual = useRef(55);
-  const mirada = useRef<{ desde: number; punto: { x: number; z: number } } | null>(null);
-  const zarpe = useRef<{ pedido: boolean; desde: number | null; avisado: boolean }>({ pedido: false, desde: null, avisado: false });
-  const mediodia = useRef(0);
-  const arrastre = useRef({ activo: false, x0: 0, objetivo: 0, actual: 0 });
   const colorDeNiebla = useMemo(() => new THREE.Color(TARDE.niebla), []);
   const colorDelSol = useMemo(() => new THREE.Color(TARDE.sol.color), []);
   const colorDelCielo = useMemo(() => new THREE.Color(TARDE.hemisferio.cielo), []);
@@ -605,18 +580,63 @@ export function Plaza(props: PropsDelEmbarcadero): JSX.Element {
     [],
   );
 
-  useEffect(() => {
-    /* De ida: un `false` después del `true` no deshace nada, como en el Muelle. */
-    if (zarpando === true) zarpe.current = { pedido: true, desde: null, avisado: false };
-  }, [zarpando]);
+  const franja = pinza(ventana.franjaInferior, 0, 0.8);
+  const aspectoDeLaVentana =
+    ventana.ancho > 0 && ventana.alto > 0 ? ventana.ancho / ventana.alto : tamanoDelLienzo.width / Math.max(1, tamanoDelLienzo.height);
 
-  /* Cuántos han llegado a su puesto desde que se montó: los que esperan les saludan. */
+  /*
+   * El bucle entero —el zarpe de ida y su aviso, el mediodía que corre con él, la mirada a quien entra,
+   * el arrastre de la cúpula (±22° con el dedo, ±2° con el ratón), la respiración y el amortiguado— es
+   * `usarElBucleDelLobby` (`comun/bucle-del-lobby.ts`), el mismo del Muelle. Aquí va lo que es de la
+   * Plaza: su pose de reposo por el puesto ocupado más alto, la mirada de 1,6 s hacia el puesto de quien
+   * entra, la grúa a la pose con la que abre el tablero, los planos de su cúpula, y el cielo, la niebla
+   * y las luces que corren hacia el mediodía del tablero.
+   */
+  const { mirarA, alPulsar, alMover, alSoltar } = usarElBucleDelLobby({
+    ventana,
+    hayMundo: mundo !== null,
+    zarpando,
+    alZarpar: props.alZarpar,
+    arrastre: ARRASTRE,
+    /* El plano lejano tiene que dejar dentro la cúpula; la cámara de serie de r3f se queda corta. */
+    planos: { cerca: 0.5, lejos: RADIO_DEL_CIELO * 1.3 },
+    reposo: (aspecto) => poseDeReposo(puestoMasAlto, aspecto, franja),
+    mirada: { duracion: DURACION_DE_LA_MIRADA, pose: poseDeMirada },
+    zarpe: poseDeGrua,
+    alAvanzar: ({ luz: m, camara: cam }) => {
+      /* ─ El cielo, la niebla y las luces corren hacia el mediodía del tablero. ─ */
+      cielo.uniforms.mediodia.value = m;
+      colorDeLaNieblaDeLaPlaza(m, colorDeNiebla);
+      const distancias = distanciasDeLaNiebla(m);
+      if (niebla.current !== null) {
+        niebla.current.color.copy(colorDeNiebla);
+        niebla.current.near = distancias.cerca;
+        niebla.current.far = distancias.lejos;
+      }
+      if (cupula.current !== null) cupula.current.position.copy(cam.position);
+      if (sol.current !== null) {
+        rumboDelSol(m, rumbo).multiplyScalar(300);
+        sol.current.position.copy(rumbo);
+        sol.current.color.copy(colorDelSol.set(TARDE.sol.color).lerp(finDeLaTarde.sol, m));
+        sol.current.intensity = mezclaDeNumeros(TARDE.sol.intensidad, MEDIODIA_DEL_TABLERO.sol.intensidad, m);
+      }
+      if (hemisferio.current !== null) {
+        hemisferio.current.color.copy(colorDelCielo.set(TARDE.hemisferio.cielo).lerp(finDeLaTarde.cielo, m));
+        hemisferio.current.groundColor.copy(colorDelSuelo.set(TARDE.hemisferio.suelo).lerp(finDeLaTarde.suelo, m));
+        hemisferio.current.intensity = mezclaDeNumeros(TARDE.hemisferio.intensidad, MEDIODIA_DEL_TABLERO.hemisferio.intensidad, m);
+      }
+      colorDeLaCara.current.set(TARDE.cara.color).lerp(finDeLaTarde.cara, m);
+      intensidadDeLaCara.current = mezclaDeNumeros(TARDE.cara.intensidad, MEDIODIA_DEL_TABLERO.cara.intensidad, m);
+    },
+  });
+
+  /* Cuántos han llegado a su puesto desde que se montó: los que esperan les saludan. Y al entrar, la cámara le mira. */
   const [llegadas, ponerLlegadas] = useState(0);
   const alEntrar = useMemo(
     () => (puesto: PuestoDeLaPlaza) => {
-      mirada.current = { desde: -1, punto: { x: puesto.pie.x, z: puesto.pie.z } };
+      mirarA(puesto.pie);
     },
-    [],
+    [mirarA],
   );
   const alLlegar = useMemo(
     () => () => {
@@ -624,118 +644,6 @@ export function Plaza(props: PropsDelEmbarcadero): JSX.Element {
     },
     [],
   );
-
-  const franja = pinza(ventana.franjaInferior, 0, 0.8);
-  const aspectoDeLaVentana =
-    ventana.ancho > 0 && ventana.alto > 0 ? ventana.ancho / ventana.alto : tamanoDelLienzo.width / Math.max(1, tamanoDelLienzo.height);
-
-  useFrame((s, dtCrudo) => {
-    const t = s.clock.elapsedTime;
-    const dt = Math.min(0.1, Math.max(0, dtCrudo));
-    const cam = s.camera as THREE.PerspectiveCamera;
-
-    /* ─ El zarpe. ─ */
-    const z = zarpe.current;
-    if (z.pedido && z.desde === null && !z.avisado) {
-      if (mundo === null) {
-        /* Sin mundo no hay coreografía: se avisa en cuanto se puede. */
-        z.avisado = true;
-        avisos.current.alZarpar?.();
-      } else {
-        z.desde = t;
-      }
-    }
-    let u = 0;
-    if (z.desde !== null) {
-      u = pinza((t - z.desde) / DURACION_DEL_ZARPE, 0, 1);
-      if (u >= 1 && !z.avisado) {
-        z.avisado = true;
-        avisos.current.alZarpar?.();
-      }
-    }
-    const objetivoDelMediodia = z.desde === null ? 0 : easeInOutQuart(u);
-    mediodia.current += (objetivoDelMediodia - mediodia.current) * (z.desde === null ? amortiguado(dt, 2) : 1);
-    const m = mediodia.current;
-
-    /* ─ El cielo, la niebla y las luces corren hacia el mediodía del tablero. ─ */
-    cielo.uniforms.mediodia.value = m;
-    colorDeLaNieblaDeLaPlaza(m, colorDeNiebla);
-    const distancias = distanciasDeLaNiebla(m);
-    if (niebla.current !== null) {
-      niebla.current.color.copy(colorDeNiebla);
-      niebla.current.near = distancias.cerca;
-      niebla.current.far = distancias.lejos;
-    }
-    if (cupula.current !== null) cupula.current.position.copy(cam.position);
-    if (sol.current !== null) {
-      rumboDelSol(m, rumbo).multiplyScalar(300);
-      sol.current.position.copy(rumbo);
-      sol.current.color.copy(colorDelSol.set(TARDE.sol.color).lerp(finDeLaTarde.sol, m));
-      sol.current.intensity = mezclaDeNumeros(TARDE.sol.intensidad, MEDIODIA_DEL_TABLERO.sol.intensidad, m);
-    }
-    if (hemisferio.current !== null) {
-      hemisferio.current.color.copy(colorDelCielo.set(TARDE.hemisferio.cielo).lerp(finDeLaTarde.cielo, m));
-      hemisferio.current.groundColor.copy(colorDelSuelo.set(TARDE.hemisferio.suelo).lerp(finDeLaTarde.suelo, m));
-      hemisferio.current.intensity = mezclaDeNumeros(TARDE.hemisferio.intensidad, MEDIODIA_DEL_TABLERO.hemisferio.intensidad, m);
-    }
-    colorDeLaCara.current.set(TARDE.cara.color).lerp(finDeLaTarde.cara, m);
-    intensidadDeLaCara.current = mezclaDeNumeros(TARDE.cara.intensidad, MEDIODIA_DEL_TABLERO.cara.intensidad, m);
-
-    /* ─ La cámara: el objetivo de este fotograma. ─ */
-    const aspecto = ventana.ancho > 0 && ventana.alto > 0 ? ventana.ancho / ventana.alto : s.size.width / Math.max(1, s.size.height);
-    let pose: Pose = conRespiracion(poseDeReposo(puestoMasAlto, aspecto, franja), t);
-    const ar = arrastre.current;
-    ar.actual += (ar.objetivo - ar.actual) * amortiguado(dt, ar.activo ? 10 : 4);
-    if (Math.abs(ar.actual) > 1e-4) pose = giraAlrededorDelObjetivo(pose, ar.actual);
-    const mir = mirada.current;
-    if (mir !== null) {
-      if (mir.desde < 0) mir.desde = t;
-      const v = (t - mir.desde) / DURACION_DE_LA_MIRADA;
-      if (v >= 1) mirada.current = null;
-      else pose = poseDeMirada(pose, mir.punto, v);
-    }
-    if (z.desde !== null) pose = poseDeGrua(pose, u);
-
-    /* ─ Y el amortiguado hacia él: la posición más viva que el objetivo, que sigue con 0,25 s. ─ */
-    if (primerFotograma.current) {
-      primerFotograma.current = false;
-      posicionActual.set(pose.posicion.x, pose.posicion.y, pose.posicion.z);
-      objetivoActual.set(pose.objetivo.x, pose.objetivo.y, pose.objetivo.z);
-      fovActual.current = pose.fov;
-    } else {
-      posicionActual.lerp(auxPosicion.set(pose.posicion.x, pose.posicion.y, pose.posicion.z), amortiguado(dt, 6));
-      objetivoActual.lerp(auxPosicion.set(pose.objetivo.x, pose.objetivo.y, pose.objetivo.z), amortiguado(dt, 4));
-      fovActual.current += (pose.fov - fovActual.current) * amortiguado(dt, 4);
-    }
-    cam.position.copy(posicionActual);
-    cam.lookAt(objetivoActual);
-    if (Math.abs(cam.fov - fovActual.current) > 0.01) {
-      cam.fov = fovActual.current;
-      cam.updateProjectionMatrix();
-    }
-  });
-
-  /*
-   * EL ARRASTRE: ±22° con el dedo, ±2° con el ratón, y vuelta con muelle al soltar. Lo
-   * recibe UN solo objeto, la cúpula, que rodea a la cámara y por tanto está bajo el
-   * puntero siempre: si lo recibieran también el suelo y las piezas, pasar de uno a otro
-   * dispararía un `leave` en mitad del arrastre y lo cortaría. Es la lección del Muelle.
-   */
-  const alPulsar = (e: ThreeEvent<PointerEvent>): void => {
-    arrastre.current.activo = true;
-    arrastre.current.x0 = e.pointer.x;
-  };
-  const alMover = (e: ThreeEvent<PointerEvent>): void => {
-    const ar = arrastre.current;
-    const tipo = (e as { pointerType?: string }).pointerType ?? 'touch';
-    const tope = tipo === 'mouse' ? ARRASTRE.raton : ARRASTRE.dedo;
-    if (ar.activo) ar.objetivo = pinza((e.pointer.x - ar.x0) * tope, -tope, tope);
-    else if (tipo === 'mouse') ar.objetivo = e.pointer.x * ARRASTRE.raton;
-  };
-  const alSoltar = (): void => {
-    arrastre.current.activo = false;
-    arrastre.current.objetivo = 0;
-  };
 
   // -------------------------------------------------------------------------
 
