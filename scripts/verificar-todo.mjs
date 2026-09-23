@@ -525,6 +525,13 @@ const BATERIA = [
       'el mundo declarado pasa por `canonico.ts` —o sea que se puede comparar y congelar, que es lo que el primer diseño no conseguía con sus listas tipadas dentro— y la arena que se deriva de él para al paseante en los MISMOS sitios en Node y en Hermes: misma huella, mismas paradas contra cuerpo y contra borde, mismos resbalones',
   },
   {
+    nombre: 'el mundo del Burgo',
+    donde: 'server',
+    guion: 'verify:burgo-mundo',
+    porque:
+      'el Burgo con el que se choca es uno solo aunque cada aparato elija su calidad: lo sólido que la escena PINTA en plena y en sobria se deduce caja a caja y es el mundo que declara `shared/` (la traza, los edificios y lo sólido de los distritos); la ciudad es bit a bit la de antes de mudar la traza, el mundo canoniza, ningún cuerpo se sale del tablero, se nace con suelo y sin cuerpo mirando a una calle, quien embiste setecientos edificios se queda en la fachada, y el mundo levantado y andado en Node y en Hermes deja la misma huella — con suelos de choques contra cuerpo y contra borde',
+  },
+  {
     nombre: 'marcador',
     donde: 'server',
     guion: 'verify:marcador',
