@@ -378,7 +378,12 @@ haya piso, que no esté dentro de un cuerpo— y si no cuadra lo devuelve al úl
 que ya decía el §2 —«disparé desde P» lleva la P del cliente—, dicho entero.
 
 Las Lindes sí baja su reparto a `shared/`, porque allí las casas y las murallas SON estructura y
-salen del sorteo del paisaje. El Burgo declara sus edificios (que no dependen de la calidad) y
+salen del sorteo del paisaje. De lo menudo, sólo son estructura las piedras, las rocas y los
+tocones que, puestos, pasan de la cintura de quien anda (media persona, 1,27 u), con el cuadrado
+de su radio medido (`comoEstorbaLaPuesta`); `verify:lindes-mundo` vigila que ninguna tape una
+senda, el hueco de una puerta o un sitio de nacer, ni parta el valle. Y como el servidor tiene
+muchas mesas a la vez y el aparato una, el mundo de Las Lindes se recuerda POR MESA con un tope
+medido: con 100 mesas en rueda, una jugada cuesta lo que en una mesa caliente. El Burgo declara sus edificios (que no dependen de la calidad) y
 Riberas su tierra, su vado y sus poblados desde la vista pública; su paisaje fino se queda donde
 está.
 
@@ -390,6 +395,25 @@ CONTENIDO: sesenta segundos sin moverse cierran el socket. Coste estimado: 5 a 9
 diez minutos. Es la sala de la mesa y vive con ella: el día que las mesas se repartan por código
 entre procesos, su canal viaja con ellas.
 
+Medido (23-sep): una foto de cinco personas pesa 180 B, 1,75 kB/s por aparato; 100 salas con 500
+aparatos son el 1,7 % de un núcleo, y el 4,3 % peleando. Y con CUOTAS en el `upgrade`
+(`server/src/botas/cuotas.ts`): global 2.000 canales, 200 sin saludar, 64 por procedencia y 8 por
+segundo, con la misma confianza en los saltos de proxy que el limitador HTTP. Sin ellas, un
+revisor adversario abrió 3.000 canales sin saludar en 0,7 s desde un solo cliente.
+
+**C · La refriega, arbitrada por el servidor.** El aparato sólo dice «golpeo» (`golpe`, con su
+tic y su mirada). El servidor busca a quién da entre los que están de pie, vistos donde los veía
+quien golpeó —rebobinando hasta 250 ms: los 150 con que el aparato pinta a los demás y 100 de
+ida y vuelta—, a 2,5 u o menos, dentro de un cono de 45° a cada lado de la mirada y sin muro en
+medio, y le da al más cercano. Tres golpes y se cae: cinco segundos en el suelo sin andar ni
+golpear, y se renace en el sitio libre MÁS CERCANO a donde se cayó de entre los que están a 52,8 u
+o más de quien te tumbó (lo que éste corre en los dos segundos de intocable). Nadie es inmune por
+no bajar: todo sentado está en la sala —de pie en su sitio de nacer si nunca abrió su canal, o
+donde se quedó si lo cerró—, y se le puede golpear y robar. Quien cae le da BOTÍN a quien lo
+tumbó: el movimiento `arcade:botin` entra en la mesa por una vía interna del núcleo (sin ruta
+HTTP) y cada juego decide qué se lleva; una vez por minuto y pareja, y como mucho 6 por mesa y
+minuto. Las reglas enteras están en `docs/COMBATE-Y-BOTIN.md` §7.
+
 ### 7.4 · La decisión que la sesión anterior dejó abierta (el reparto de Las Lindes)
 
 **Camino 1: se baja el reparto entero y se acepta el repaisaje.** Las Lindes no se ha desplegado
@@ -399,20 +423,29 @@ un almiar decide si se pasa, moverlo deja de ser gratis.
 
 ### 7.5 · El plan que manda, por frentes en paralelo
 
+Estado al cierre del 23-sep-2026. Todo está en la rama `botas-servidor` (worktree
+`GameMasters-botas-servidor`), con la batería entera; nada se ha empujado.
+
 | ronda | frente | estado |
 |---|---|---|
 | 0 | contrato común: el agujero del cajón, vados, rumbo al nacer, `andar.ts` (tics y 256 rumbos literales) | hecho (`f1ec033`) |
-| 1 | Las Lindes: el reparto a `shared/` y su mundo de verdad (murallas, remates, villa, ermita), recordado por losa | hecho (`263c97a`, `a92d091`) |
-| 1 | el paseo común en `escenas/paseo/`, por tics e interpolado; mandos táctiles en la app; los dos fallos de la animación | hecho (`3a77490`) |
-| 1 | el mundo del Burgo, igual en todas las calidades | hecho (`a4e4046`) |
-| 1 | el mundo de Riberas: tierra, vado y poblados desde la vista pública | hecho (`4204cac`) |
-| 1 | el núcleo del servidor: modalidad de la mesa, topes en la mesa, lectura barata, CORS con lista blanca, memoria perezosa | hecho en `botas-servidor`; un revisor adversario encontró dos fallos medios y se están arreglando |
-| 2 | el contrato del canal (`dbfd726`) y el registro de mundos (`9848404`) | hecho |
-| 2 | el canal en el aparato: entrar, mandar el sitio, corregir, ver a los demás; la cámara que no atraviesa | hecho (`5857bbc`) |
-| 2 | el canal en el servidor: sala por mesa, validación, fotos, desalojo por contenido | en curso |
-| 2 | la modalidad y su compuerta en los lobbies; el Burgo y Riberas a pie; Las Lindes en la app con su atlas y su juez de calidad | en curso |
-| 3 | la refriega y el botín: un golpe, la vida, el veredicto `arcade:botin` en los tres reductores | después de la 2 |
+| 1 | Las Lindes: el reparto a `shared/` y su mundo de verdad (murallas, remates, villa, ermita) | hecho (`263c97a`, `a92d091`) |
+| 1 | el paseo común en `escenas/paseo/`, por tics e interpolado; mandos táctiles en la app | hecho (`3a77490`) |
+| 1 | el mundo del Burgo, igual en todas las calidades; el de Riberas desde la vista pública | hecho (`a4e4046`, `4204cac`) |
+| 1 | el núcleo del servidor: modalidad, topes en la mesa, lectura barata, CORS con lista blanca, memoria perezosa; y los hallazgos del revisor adversario | hecho (`botas-nucleo`, fusionado) |
+| 2 | el contrato del canal y el registro de mundos | hecho (`dbfd726`, `9848404`) |
+| 2 | el canal en el aparato, en los tres juegos y los dos clientes | hecho (`5857bbc`, `f81d9d1`) |
+| 2 | el canal en el servidor: sala por mesa, validación, fotos, desalojo, derivar por turno | hecho (`fbb80a3`…`0e34866`) |
+| 2 | cuotas de conexión en el `upgrade` (tras un revisor adversario) | hecho (`cuotas`, fusionado) |
+| 2 | la modalidad y su compuerta; el Burgo y Riberas a pie; Las Lindes en la app con su atlas y su juez | hecho (`c49bc24`, `13b5f78`, `d5eea02`, `6b6ba15`) |
+| 2 | las piedras grandes de Las Lindes estorban; su mundo se recuerda por mesa | hecho (`botas-rocas`, `cache-lindes`, fusionados) |
+| 3 | los contratos de la refriega y del botín | hecho (`b9f7674`, `db88dff`) |
+| 3 | el botín en los tres reductores | hecho (`botas-botin`, fusionado) |
+| 3 | la refriega y el botín en el servidor: golpe con rebobinado, caer y renacer cerca y a salvo, nadie inmune por no bajar, la vía interna de la mesa, topes, 4007/4008 | hecho (`c63d15f`…`36987c5`) |
+| 3 | la refriega en el aparato: la G y el botón «Golpear», los clips (`caer` nuevo), los corazones | hecho (`5043dec`, `ebc3d1b`, `37cd0e2`) |
+| 4 | la plataforma para escribir juegos deprisa (`docs/ESCRIBIR-UN-ARCADE.md` §9) | hecho: altas derivadas, robot genérico y arnés, contrato de pintor en la app, lienzo propio en el escritorio, `escenas/comun/` |
 
 **Lo que sigue siendo de Miguel:** el inventario global y las cuentas (`docs/TABLERO-RECORRIBLE.md`
-§6), las armas y el crafteo, medir `SALTOS_DE_CONFIANZA` en producción antes de desplegar, y el
-empuje a `main` y el APK.
+§6), las armas y el crafteo, medir `SALTOS_DE_CONFIANZA` en producción antes de desplegar —y
+ahora no sólo lo pide el limitador HTTP: las cuotas por procedencia del canal también dependen de
+él—, el disco de Render (`docs/COSTE-Y-ESCALA.md` §3), y el empuje a `main` y el APK.

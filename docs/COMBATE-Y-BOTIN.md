@@ -229,3 +229,51 @@ A un millón de partidas al mes son **20-26 TB/mes** — *antes de que se mueva 
 - subir los topes de carga al árbitro (§4.1);
 - dar salida a la cuarentena (§4.1);
 - cerrar el CORS pelado y el minado de asientos (ver `docs/CAPA-ESPACIAL.md` §4).
+
+## 7 · Lo que hay en el servidor (23-sep-2026)
+
+Escrito cuando la refriega entró en `botas-servidor` (`server/src/botas/canal.ts`, con el contrato en
+`shared/mecanicas/canal-de-botas.ts`). Si algo de aquí no cuadra con `verify:sala-de-botas`, gana
+el comprobador.
+
+- **El aparato sólo dice «golpeo»**: `golpe {n, r}`, su tic y hacia dónde mira. El tic del golpe
+  tiene que crecer (un contador distinto del de los pasos) y entre dos golpes ACEPTADOS pasan
+  `RECARGA_DEL_GOLPE_MS` (800). Quien está en el suelo no golpea.
+- **A quién da**: a quien esté DE PIE —ni caído ni intocable—, visto donde lo veía quien golpeó:
+  se le rebobina sobre su rastro de sitios aceptados hasta 250 ms, que son los 150 con que el
+  aparato pinta a los demás más 100 de ida y vuelta que se suponen (el protocolo no tiene latido
+  para medirlos). Justo después de renacer, durante esos 250 ms, al renacido se le sigue viendo
+  donde cayó, que es lo que los demás tenían pintado; lo guarda ser intocable. Tiene que estar a
+  `ALCANCE_DEL_GOLPE` (2,5 u) o menos, dentro del cono de 45° a cada lado de la mirada (en enteros
+  exactos, sin raíces) y sin muro en medio (`seAndaEnRecta` con 0,1 u de radio; también corta si
+  en medio no hay suelo). Le da al MÁS CERCANO; si empatan, al que se sentó antes. El gesto
+  (`lanza`) se reparte siempre, dé o no.
+- **Caer**: con la vida a cero, `cae {a, por}` a toda la sala; `CAIDO_MS` (5 s) en el suelo sin
+  andar —sus pasos se ignoran sin corregirle— ni golpear, y sin que le golpeen.
+- **Renacer**: de los sitios de nacer LIBRES que estén a 52,8 u o más de quien lo tumbó (lo que éste
+  corre mientras dura lo intocable), el más CERCANO a donde cayó; si ninguno está tan lejos, el
+  libre más lejano de quien lo tumbó; y si no hay ninguno libre, como al entrar. Con la vida entera
+  e intocable `INTOCABLE_MS` (2 s), que se cuenta sólo con el reloj (el intocable sí puede golpear).
+  La primera regla —«el suyo, si está libre y lejos»— mandaba a veces al otro lado del tablero de
+  Las Lindes, a 450 u.
+- **`vidas`**: justo detrás de `dentro`, al entrar y al volver; después se sigue por `da`, `cae` y
+  `renace`, que por un WebSocket llegan todos y en orden.
+- **Nadie es inmune por no bajar**: todo sentado de una mesa `botas` está en la sala y en la foto —de
+  pie en su sitio de nacer si nunca abrió su canal, o donde se quedó si lo cerró—, y se le golpea, se
+  le tumba, renace y se le pide botín. Si no, bastaría con no abrir la escena, o cerrarla al ver
+  venir a alguien, para no perder nada. La sala vive mientras alguien tenga canal, más 5 s; al
+  borrarse se pierden vidas y caídas, pero no el libro de botines.
+- **El botín**: con cada `cae` de B por A, el servidor mete `arcade:botin {de: B, para: A}` en la
+  mesa por su vía interna (`meterDeLaPlataforma`: bajo el candado, con el presupuesto y la báscula
+  del tic, `quien: null`, al diario como cualquier otro movimiento; sin ruta HTTP, y `mover` sigue
+  rechazando el prefijo `arcade:` a los aparatos con un 400). Cada juego decide qué se lleva (§6.3).
+  **Topes**: una misma pareja —quién pierde y quién gana, en ese sentido— cobra UNA vez por minuto,
+  y cada mesa como mucho SEIS por minuto (un botín por cabeza de la mesa más grande: 360 entradas de
+  diario por hora de pelea); sólo cuentan los que ENTRAN —no los que el juego rechaza ni los que no
+  mueven nada—, y los que van de camino se reservan.
+- **El canal atascado**: a quien tiene más de 16 kB sin leer se le saltan la foto, `corrige`,
+  `lanza` y el `fuera`; lo que no se puede perder —`dentro`, `vidas`, `da`, `cae`, `renace`— cierra
+  el canal con `atascado` (4008), y el aparato vuelve y recibe `vidas` con todo al día. La versión
+  que no cuadra se cierra con `versionVieja` (4007), y el aparato no reintenta: hay que actualizar.
+- **Lo que cuesta** (`medir:botas`): un golpe en el peor sitio, 5,9 µs de mediana; el rastro, unos
+  220 bytes por asiento; 100 salas peleando, el 4,3 % de un núcleo. Ver `docs/COSTE-Y-ESCALA.md`.
