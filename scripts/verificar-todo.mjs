@@ -539,6 +539,13 @@ const BATERIA = [
       'lo que manda un aparato llega de un entorno hostil, y el lector del servidor devuelve null ante cualquier cosa que no sea exactamente un mensaje bien formado —una clave de más, un número con decimales, una coordenada fuera de la coma fija, un rumbo o una marcha fuera de rango, un texto más largo que el tope—; el del aparato, igual con lo que manda el servidor; la ruta cuelga de la mesa bajo /api y la llave NO va en ella',
   },
   {
+    nombre: 'el botín de la refriega',
+    donde: 'server',
+    guion: 'verify:botin',
+    porque:
+      'el botín es el único movimiento, además del tic, que entra en una mesa en nombre de nadie, y mueve cosas de valor de un asiento a otro: su lector dice que no a todo lo que llegue con un asiento detrás, a un botín de uno a sí mismo, a un asiento que no está sentado y a una clave de más',
+  },
+  {
     nombre: 'el mundo de Riberas',
     donde: 'server',
     guion: 'verify:riberas-mundo',
