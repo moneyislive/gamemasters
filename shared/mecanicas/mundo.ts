@@ -413,6 +413,42 @@ export interface Andante {
 }
 
 /**
+ * Cuántos trozos como mucho se miran en un tramo. Con el radio de una persona son 1.600 unidades
+ * del mundo: más que cualquier tramo que un servidor tenga que mirar, porque antes de preguntar
+ * esto ya ha descartado lo que no se puede andar en el tiempo que ha pasado.
+ */
+export const TROZOS_DE_UN_TRAMO = 4096;
+
+/**
+ * ¿SE PUEDE IR DE AQUÍ A ALLÍ EN LÍNEA RECTA? Todo en Q16.16.
+ *
+ * Es la pregunta del que valida. Comprobar sólo el sitio de llegada deja que quien diga «estoy al
+ * otro lado del muro» lo esté: la llegada es buena, lo malo es el camino. Así que se recorre el
+ * tramo a trozos no más largos que el radio —ninguna pared más gruesa que un paseante se cuela
+ * entre dos— y en cada trozo se exige poder estar. El trozo se saca con una multiplicación y una
+ * división exactas y un truncado, sin un producto Q16.16 (ver `fijo.ts`).
+ *
+ * Un tramo de más de `TROZOS_DE_UN_TRAMO` trozos se da por imposible: nadie anda tanto en un tic,
+ * y mirarlo sería dejar que cualquiera ponga a trabajar al servidor diciendo que se ha
+ * teletransportado.
+ */
+export function seAndaEnRecta(arena: Arena, desde: Andante, hasta: Andante, radio: number): boolean {
+  const dx = hasta.x - desde.x;
+  const dz = hasta.z - desde.z;
+  const largo = Math.max(Math.abs(dx), Math.abs(dz));
+  if (largo === 0) return sePuedeEstar(arena, hasta.x, hasta.z, radio);
+  const paso = radio > 0 ? radio : UNO / 4;
+  const trozos = Math.ceil(largo / paso);
+  if (trozos > TROZOS_DE_UN_TRAMO) return false;
+  for (let i = 1; i <= trozos; i++) {
+    const x = desde.x + (((dx * i) / trozos) | 0);
+    const z = desde.z + (((dz * i) / trozos) | 0);
+    if (!sePuedeEstar(arena, x, z, radio)) return false;
+  }
+  return true;
+}
+
+/**
  * UN PASO, Y SI NO CABE ENTERO, LO QUE QUEPA DE CADA EJE.
  *
  * Probar el paso entero y, si no, cada eje por separado, es lo que hace que andar pegado a un

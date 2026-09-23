@@ -34,7 +34,7 @@ import { COSENO, pasoDelTic, RUMBOS, rumboDeRadianes, rumboValido, SENO } from '
 import { ANDANDO, QUIETO } from '../../shared/mecanicas/andar';
 import { canonico, porQueNoEsCanonico } from '../../shared/mecanicas/canonico';
 import { UNO } from '../../shared/mecanicas/fijo';
-import { arenaDe, FIRME, hayPiso, NADA, sePuedeEstar, sueloEn, VADO } from '../../shared/mecanicas/mundo';
+import { arenaDe, FIRME, hayPiso, NADA, sePuedeEstar, seAndaEnRecta, sueloEn, VADO } from '../../shared/mecanicas/mundo';
 import type { Cuerpo } from '../../shared/mecanicas/mundo';
 import { LADO, LOSAS_ANCHO, mundoDePrueba, pasear, PASOS } from './paseo-del-banco';
 import type { Paseo } from './paseo-del-banco';
@@ -195,6 +195,43 @@ comprobar(
   'y lejos de la caja se puede estar: la prueba de arriba no es un «nunca se puede»',
   sePuedeEstar(raya, medio(30), 0, medio(0.4)),
 );
+
+/*
+ * ═══ EN LÍNEA RECTA: LO QUE PREGUNTA QUIEN VALIDA ═══
+ *
+ * Mirar sólo la llegada deja que quien dice «estoy al otro lado del muro» lo esté. Estas pruebas
+ * piden el camino: cruzar la caja de la raya no se puede, pasarla por encima sí, salirse del
+ * tablero no, y una pared de medio paso de grosor no se cuela entre dos trozos.
+ */
+{
+  const p = (x: number, z: number): { x: number; z: number } => ({ x: medio(x), z: medio(z) });
+  const r = medio(0.4);
+  comprobar('en recta: cruzar una caja no se puede', !seAndaEnRecta(raya, p(20, 0), p(45, 0), r));
+  comprobar('en recta: hasta antes de la caja sí', seAndaEnRecta(raya, p(20, 0), p(30, 0), r));
+  comprobar('en recta: por encima de la caja, sin tocarla, sí', seAndaEnRecta(raya, p(20, 15), p(45, 15), r));
+  comprobar('en recta: salirse del tablero no', !seAndaEnRecta(raya, p(0, 0), p(100, 0), r));
+  comprobar('en recta: quedarse donde se está, si se puede estar, sí', seAndaEnRecta(raya, p(10, 10), p(10, 10), r));
+  const fina = arenaDe({
+    lado: LADO,
+    pisables: [{ x: 0, y: 0 }],
+    vados: [],
+    cuerpos: [{ x0: 50, z0: -20, x1: 50.3, z1: 20 }],
+    nace: [],
+  });
+  comprobar(
+    'en recta: una pared más fina que un paso no se cuela entre dos trozos',
+    !seAndaEnRecta(fina, p(49, 0), p(51.4, 0), r),
+  );
+  comprobar(
+    'en recta: un salto de más trozos de los que se miran es imposible, aunque la llegada sea buena',
+    !seAndaEnRecta(
+      arenaDe({ lado: 4000, pisables: [{ x: 0, y: 0 }], vados: [], cuerpos: [], nace: [] }),
+      p(-1900, 0),
+      p(1900, 0),
+      r,
+    ),
+  );
+}
 
 /*
  * ═══ EL VADO: SE PISA, FRENA A LA MITAD, Y LO HONDO NO SE PISA ═══

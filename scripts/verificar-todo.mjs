@@ -532,6 +532,13 @@ const BATERIA = [
       'el Burgo con el que se choca es uno solo aunque cada aparato elija su calidad: lo sólido que la escena PINTA en plena y en sobria se deduce caja a caja y es el mundo que declara `shared/` (la traza, los edificios y lo sólido de los distritos); la ciudad es bit a bit la de antes de mudar la traza, el mundo canoniza, ningún cuerpo se sale del tablero, se nace con suelo y sin cuerpo mirando a una calle, quien embiste setecientos edificios se queda en la fachada, y el mundo levantado y andado en Node y en Hermes deja la misma huella — con suelos de choques contra cuerpo y contra borde',
   },
   {
+    nombre: 'el protocolo de Boots on Board',
+    donde: 'server',
+    guion: 'verify:protocolo-de-botas',
+    porque:
+      'lo que manda un aparato llega de un entorno hostil, y el lector del servidor devuelve null ante cualquier cosa que no sea exactamente un mensaje bien formado —una clave de más, un número con decimales, una coordenada fuera de la coma fija, un rumbo o una marcha fuera de rango, un texto más largo que el tope—; el del aparato, igual con lo que manda el servidor; la ruta cuelga de la mesa bajo /api y la llave NO va en ella',
+  },
+  {
     nombre: 'el mundo de Las Lindes',
     donde: 'server',
     guion: 'verify:lindes-mundo',
