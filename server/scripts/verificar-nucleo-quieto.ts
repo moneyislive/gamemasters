@@ -426,6 +426,46 @@
  * campos—, así que revertir el despliegue sigue leyendo exactamente lo que éste escribe. Y el núcleo
  * sigue sin nombrar ningún juego ni importar nada de `juegos/`: lo confirman las dos comprobaciones
  * de abajo que no se pueden sellar.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * Y OTRO, EL DE LA REFRIEGA DE BOOTS ON BOARD (23-SEP-2026)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Se movieron DOS ficheros del núcleo, `server/src/arcade/arbitro.ts` (491 → 531 líneas) y
+ * `server/src/arcade/mesas.ts` (3.915 → 4.033), y ninguno del contrato. Lo que lo motivó es el
+ * botín de la refriega: quien cae en Boots on Board le da botín a quien lo tumbó, y ese botín es un
+ * movimiento del JUEGO —`shared/arcade/juegos/botin.ts`; lo que se roba no sale de la mesa, decisión
+ * de Miguel del 20-sep— que no manda ningún asiento.
+ *
+ *  V · LA TERCERA PUERTA DEL ÁRBITRO: `meterDeLaPlataforma(mesa, movimiento)`. El botín entra como el
+ *      tic —`quien: null`, lo mete quien hospeda, al diario como cualquier otro— pero no es el tic, y
+ *      las dos puertas que había no le servían: `jugarConMotivo` no deja pasar un `null` a una mesa
+ *      con asientos, y `avanzarElReloj` sólo mete el tic. Deja pasar SÓLO los tipos `arcade:` que no
+ *      son el tic, y lo exige ella misma; `mover` les sigue negando ese prefijo a los aparatos, así
+ *      que las dos no se tocan.
+ *  W · LA VÍA INTERNA DE LA MESA: `meterDeLaPlataforma(codigo, movimiento)` y `SalidaDeLaPlataforma`,
+ *      sin ruta HTTP. Lo mismo que `mover` y el tic, en el mismo orden: los topes del sobre antes del
+ *      candado, el plazo PRIMERO, el presupuesto y la báscula del tic, el rechazo descartado entero,
+ *      los relojes del turno con `empiezaTurnoNuevo` —un botín no pasa el turno, así que no regala
+ *      plazo—, `empezada` sin tocar, y `cerrarSiSeAcabo`, que ya son tres puertas. Devuelve cuál de
+ *      las salidas fue —entró, sin efecto, rechazado, terminada, apartado o sin mesa— y si subió la
+ *      revisión; avisar a los que sondean lo hace quien llama, como la ruta después de `mover`.
+ *  X · Y dos comentarios de `mesas.ts` que decían que `admiteBotas` no admitía a ningún juego.
+ *
+ * POR QUÉ ESTO TOCA EL NÚCLEO Y NO SE QUEDA EN UN JUEGO: el botín tiene que entrar por el diario —si
+ * el servidor tocara el estado por su cuenta, la partida reejecutada daría otra cosa y los
+ * marcadores dejarían de comprobarse—, y el diario sólo lo escribe el árbitro. Cada juego ya lo
+ * atendía por su cuenta (`verify:botin`); lo que faltaba era la puerta por la que la plataforma lo
+ * mete. Y no le enseña a la mesa nada de ningún juego: la vía es de «lo que mete la plataforma», el
+ * núcleo no escribe `arcade:botin` en ningún sitio —el movimiento lo construye el canal de Boots on
+ * Board con `movimientoDelBotin`—, y la búsqueda de identificadores contra el registro sigue limpia.
+ * Lo fija `verify:sala-de-botas`, con mesas de verdad de los tres juegos que se recorren.
+ *
+ * LO QUE NO SE HA MOVIDO: `shared/arcade/` byte a byte —y con él `movimiento.ts`, cuya cabecera sigue
+ * diciendo que el prefijo reservado tiene «exactamente uno: el tic»; ya son dos, pero esa frase va
+ * sellada byte a byte y se deja para cuando haya que tocar el contrato por otra cosa—,
+ * `server/src/canal/`, `azar.ts` y `canonico.ts`. El formato del fichero de mesa tampoco: un botín
+ * es una entrada más del diario, versión 2 y los mismos campos.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';

@@ -1,11 +1,11 @@
 {
   "server/src/arcade/arbitro.ts": {
-    "huella": "3f252d2e687dcc0b",
-    "lineas": 491
+    "huella": "c37c78a6c93176f7",
+    "lineas": 531
   },
   "server/src/arcade/mesas.ts": {
-    "huella": "dcbe0cd9655d0bd3",
-    "lineas": 3915
+    "huella": "3fcc037e6f10e182",
+    "lineas": 4033
   },
   "server/src/canal/index.ts": {
     "huella": "72b651d609fac007",
