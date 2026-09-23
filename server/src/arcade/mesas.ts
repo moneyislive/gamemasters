@@ -1133,6 +1133,22 @@ function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string, fechaDelFic
     );
     m.modalidad = 'normal';
   }
+  /*
+   * ═══ Y UNA `botas` DE UN JUEGO QUE YA NO SE RECORRE SE SIRVE COMO `botas`, A PROPÓSITO ═══
+   *
+   * Puede pasar: una mesa se abrió en `botas` y después su juego dejó de admitirla —se le quitó el
+   * alta, o un despliegue con otro reparto no la trae—. Aquí NO se le pregunta a `admiteBotas`: se
+   * lee tal cual, porque es lo coherente con la decisión que gobierna la modalidad, que se elige al
+   * abrir y NO CAMBIA a mitad, ni para subir ni para bajar. Rebajarla a `normal` al leerla sería
+   * justo ese cambio, hecho por el servidor sin que nadie lo pidiera, y además mentiría sobre lo
+   * que se eligió al abrirla.
+   *
+   * Y no deja a nadie sin jugar: el canal de Boots on Board rechaza con `mesaQueNo` una mesa cuyo
+   * juego no se recorre (`shared/mecanicas/canal-de-botas.ts`), y la partida —el reductor, el estado
+   * y el diario, que son los mismos en las dos modalidades— se sigue jugando desde arriba. Lo que
+   * decide `admiteBotas` es si se puede ABRIR una mesa `botas`, y eso lo pregunta `abrir`; no si una
+   * que ya existe lo sigue siendo. Lo fija `verify:modalidad`.
+   */
   return m;
 }
 

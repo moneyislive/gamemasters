@@ -21,6 +21,9 @@
  *     silla es, o nulo. Sin proyectar, sin meter el tic, sin marcar presencia y sin escribir. Y
  *     también sobre una mesa FRÍA —sólo en el disco, y que el juego da por acabada aunque su
  *     fichero no—: la mira allí, no la trae a la memoria, no la cierra y no toca el fichero.
+ *  6. Una mesa guardada en `botas` de un juego que YA NO la admite se sigue sirviendo en `botas`
+ *     —la modalidad no cambia a mitad, tampoco al leerla—, y abrir una nueva de ese juego en
+ *     `botas`, en cambio, se niega. Es una decisión, escrita en `alDiaDesdeElDisco`.
  *
  * ═══ POR QUÉ LAS DOS PUERTAS Y NO UNA ═══
  *
@@ -427,6 +430,51 @@ paso('En proceso: y sobre una mesa FRÍA, reconocer una llave no la trae, no la 
 dejarDeAdmitirBotas(MIRADOR);
 comprobar('y al terminar se devuelve el registro a vacío', arcadesQueAdmitenBotas().length === 0, arcadesQueAdmitenBotas());
 
+paso('En proceso: una mesa `botas` de un juego que YA NO la admite se sigue sirviendo en `botas`');
+
+{
+  /*
+   * La decisión escrita en `alDiaDesdeElDisco`: la modalidad se elige al abrir y no cambia a mitad,
+   * tampoco al leerla de un disco en el que su juego ya no se recorre. Quien no la deja bajar al
+   * tablero es el canal (`mesaQueNo`), y la partida se juega desde arriba. Lo que el registro decide
+   * es si se puede ABRIR una: eso sí se niega.
+   */
+  const codigo = 'BOTA1';
+  const llave = 'LLAVEDELABOTA00000000000';
+  const ahora = Date.now();
+  fs.writeFileSync(
+    path.join(MESAS_EN_PROCESO, `${codigo}.json`),
+    JSON.stringify({
+      version: 2,
+      mesa: {
+        codigo,
+        mesa: { id: codigo, arcade: MIRADOR, asientos: ['aBOTA0000'], rev: 2, tic: 0, semilla: 7, terminada: false, diario: [] },
+        sillas: [{ id: 'aBOTA0000', nombre: 'Iris', llave }],
+        plazoMs: 0,
+        venceEn: null,
+        turnoDesde: ahora,
+        abiertaEn: ahora,
+        ultimoToqueEn: ahora,
+        modalidad: 'botas',
+      },
+    }),
+    'utf8',
+  );
+  const vista = await mesas.mirar(codigo, null);
+  const quien = await mesas.quienEsLaLlave(codigo, llave);
+  comprobar(
+    'guardada en `botas` y con su juego ya sin alta, se lee y se sirve en `botas`: no se rebaja al leerla',
+    !admiteBotas(MIRADOR) && vista.modalidad === 'botas' && quien?.modalidad === 'botas',
+    { admite: admiteBotas(MIRADOR), vista: vista.modalidad, llave: quien?.modalidad },
+  );
+  const otraNueva = await loQueLanza(() => mesas.abrir({ arcade: MIRADOR, nombre: 'Jon', modalidad: 'botas' }));
+  comprobar(
+    'y abrir una NUEVA en `botas` de ese juego, en cambio, ya no se puede: el registro decide abrir, no leer',
+    otraNueva instanceof mesas.ModalidadNoAdmitida,
+    nombreDe(otraNueva),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // SEGUNDA MITAD · POR EL CABLE, CON EL SERVIDOR DE VERDAD
 // ---------------------------------------------------------------------------
@@ -712,7 +760,7 @@ if (fallos.length > 0) {
  * EL GUARDIA DE «NO SE HAN HECHO TODAS»: un comprobador que se cae a mitad sin decirlo se parece
  * mucho a uno verde. El número es el que se hace hoy, contado, y se sube al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 64;
+const COMPROBACIONES_ESCRITAS = 66;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(
     `Sólo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones escritas: algo se ha ` +
