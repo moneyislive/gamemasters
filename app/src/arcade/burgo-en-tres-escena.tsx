@@ -73,10 +73,10 @@
  * anda con `MandosDelPaseo`: la misma palanca y el mismo correr que Las Lindes, sin tocarlos. La
  * escena anda con el paseo común sobre el mundo de la mesa (`escenas/burgo/Burgo.tsx`); aquí
  * sólo hay los botones, la palanca y dos cosas que Las Lindes no tiene porque no tiene mirador
- * táctil: a pie el gesto del tablero se APAGA (`apagarElMiradorAPie`) y el lienzo deja de darle
- * su nodo al ratón de la web, para que arrastrar no gire por detrás la cámara de mesa; y
- * «Ver el burgo entero» no sale, que andando no hay acercamiento del que volver. La palanca va
- * encima del pie y no en el borde, que aquí es de la cinta y del carril.
+ * táctil: a pie el mirador se APAGA entero —su gancho, con `{ apagado: aPie }`, calla sus gestos
+ * y el ratón de la web—, para que arrastrar no gire por detrás la cámara de mesa; y «Ver el
+ * burgo entero» no sale, que andando no hay acercamiento del que volver. La palanca va encima
+ * del pie y no en el borde, que aquí es de la cinta y del carril.
  *
  * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
  *
@@ -169,7 +169,7 @@
  * carga, por lienzo caído y por vista que no se ve en tres, y son los mismos en las
  * dos plataformas. `verify:sala` lo vigila.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
@@ -327,26 +327,6 @@ const LAS_CAMARAS: readonly { readonly modo: ModoDelBurgo; readonly rotulo: stri
 const ALTO_DE_LA_FRANJA_ANDANDO = 16 + 128 + 8;
 /** Y lo que ocupa la fila de las cámaras mirando la mesa: un mando de 44 y su margen. */
 const ALTO_DE_LA_FRANJA_EN_LA_MESA = 44 + 8;
-
-/**
- * A PIE, EL MIRADOR TÁCTIL SE APAGA, Y SE APAGA DE VERDAD.
- *
- * El gesto del tablero gira la cámara de MESA con un dedo y la acerca con dos. Andando no hay
- * cámara de mesa que mover, y si el gesto siguiera vivo, el pulgar que arrastra por el lienzo la
- * iría girando por detrás: al volver a «Mesa», el tablero estaría torcido sin que nadie lo hubiera
- * pedido. Y en Android el gesto puede ver el mismo dedo que la palanca, que va encima del lienzo.
- *
- * Se apaga con `enabled(false)` en cada uno de los gestos que ya están puestos, y NO cambiando el
- * gesto del `GestureDetector` por otro: si el nuevo tuviera otro número de gestos o otro hilo, el
- * detector se desengancha y se vuelve a enganchar, y si cambiara de hilo pintaría OTRO envoltorio
- * (`AnimatedWrap` o `Wrap`) y React desmontaría el lienzo entero con su contexto de dibujo.
- * Con los mismos objetos, el detector sólo manda la configuración nueva en su efecto, que corre
- * después de éste. `mirador-tactil.ts` no es de esta pantalla y no se toca: lo que se apaga es lo
- * que devuelve.
- */
-function apagarElMiradorAPie(gesto: ReturnType<typeof usarMiradorTactil>['gesto'], aPie: boolean): void {
-  for (const g of gesto.toGestureArray()) g.enabled(!aPie);
-}
 
 /**
  * LA BANDEJA DE LOS DADOS, ARRIBA A LA DERECHA DEL LIENZO. Miguel quería los dados en la pantalla y
@@ -664,32 +644,35 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
   );
 
   /*
-   * EL GESTO Y LA CÁMARA. El alcance es el del Burgo y no el del delta: 66 unidades
-   * de mundo, `MEDIO_LADO × 1,32`, que es lo que hace que un pellizco mueva lo
-   * mismo aquí que allí en pantallas de mundo.
-   */
-  const { gesto, apuntarElLienzo, mirador, cercania, seHaMovido, verElTableroEntero, laInterfazSeLoQueda } =
-    usarMiradorTactil(medida, ALCANCE_DEL_BURGO);
-
-  /*
    * ═══ A PIE: DESDE DÓNDE SE MIRA, LA PALANCA Y EL MIRADOR APAGADO ═══
    *
    * `modo` es de la pantalla y no viaja: bajar a andar no es una jugada. La palanca y el correr van
    * en una referencia que escribe `MandosDelPaseo` y la escena lee en su bucle, igual que en Las
-   * Lindes, y aquí arriba con los demás ganchos. A pie, el gesto del tablero se apaga
-   * (`apagarElMiradorAPie`) y el lienzo deja de darle su nodo al ratón de la web —sin nodo, los
-   * oyentes de la rueda y del botón secundario se descuelgan solos—: ni el dedo ni el ratón pueden
-   * girar por detrás la cámara de mesa mientras se anda. La cámara del cliente, `ElOjoDelBurgo`,
-   * sigue montada y en su sitio —antes que `<Burgo>`, que es lo que hace que seguir al que mueve
-   * vaya al día—: a pie la escena vuelve a poner encima la del paseo.
+   * Lindes, y aquí arriba con los demás ganchos. Va ANTES que el gesto porque el gesto lo necesita:
+   * a pie el mirador se apaga entero —`{ apagado: aPie }`, aquí abajo—, y ni el dedo ni el ratón
+   * pueden girar por detrás la cámara de mesa mientras se anda. La cámara del cliente,
+   * `ElOjoDelBurgo`, sigue montada y en su sitio —antes que `<Burgo>`, que es lo que hace que seguir
+   * al que mueve vaya al día—: a pie la escena vuelve a poner encima la del paseo.
    */
   const [modo, ponerModo] = useState<ModoDelBurgo>('mesa');
   const aPie = modo !== 'mesa';
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
-  useLayoutEffect(() => {
-    apagarElMiradorAPie(gesto, aPie);
-  }, [gesto, aPie]);
   const camara = useMemo((): ModoDeCamara => (modo === 'mesa' ? CAMARA_DE_MESA : { modo, asiento: yo ?? '' }), [modo, yo]);
+
+  /*
+   * EL GESTO Y LA CÁMARA. El alcance es el del Burgo y no el del delta: 570,24 unidades de
+   * mundo, `MEDIO_LADO` (432) × 1,32, que es lo que hace que un pellizco mueva lo mismo aquí
+   * que allí en pantallas de mundo.
+   *
+   * Y A PIE SE APAGA, Y LO APAGA ÉL: con `{ apagado: aPie }` el gancho apaga SUS MISMOS gestos
+   * —`.enabled(false)` en un efecto de maquetación, sin cambiarle el gesto al detector— y no
+   * apunta la rueda ni el arrastre del ratón de la web. Es lo que esta pantalla hacía con su
+   * propio `apagarElMiradorAPie` y quitándole el nodo al lienzo; Riberas lo hacía con un gemelo
+   * apagado que se desincronizaba. Ahora es una sola cosa, en `mirador-tactil.ts`, y su
+   * cabecera cuenta por qué así y no de otra manera.
+   */
+  const { gesto, apuntarElLienzo, mirador, cercania, seHaMovido, verElTableroEntero, laInterfazSeLoQueda } =
+    usarMiradorTactil(medida, ALCANCE_DEL_BURGO, { apagado: aPie });
 
   /*
    * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
@@ -1359,9 +1342,10 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
                 /*
                   EL NODO DEL LIENZO, para la rueda del ratón. En la web es el elemento
                   del documento donde se apuntan `wheel` y el arrastre con el botón
-                  secundario; en nativo se guarda y no se usa.
+                  secundario; en nativo se guarda y no se usa. Se le da SIEMPRE: a pie
+                  quien no apunta nada es el gancho, que está apagado.
                 */
-                ref={aPie ? undefined : apuntarElLienzo}
+                ref={apuntarElLienzo}
                 onLayout={medir}
                 accessible
                 accessibilityLabel={

@@ -118,9 +118,10 @@
  * (`escenas/andar-por-el-delta.tsx`): el mundo con el que se choca lo deriva de la vista,
  * se nace junto a lo propio y en el agua se anda con ella por la cintura. Lo que pone esta
  * pantalla es lo que sólo sabe un teléfono: la palanca y el correr (`MandosDelPaseo`, la
- * misma de Las Lindes), y APAGAR el mirador táctil mientras se anda —su gesto, su rueda y
- * su `Ojo`—, que si no el pulgar que anda giraría a la vez una mesa que no se ve. Bajar
- * recoge la mesa y subir la saca; ver `cambiarDeCamara`.
+ * misma de Las Lindes), y APAGAR el mirador táctil mientras se anda —su gesto y su rueda
+ * los calla su gancho con `{ apagado: aPie }`, y el `Ojo` se desmonta—, que si no el pulgar
+ * que anda giraría a la vez una mesa que no se ve. Bajar recoge la mesa y subir la saca;
+ * ver `cambiarDeCamara`.
  *
  * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
  *
@@ -132,7 +133,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector } from 'react-native-gesture-handler';
 /*
  * `three` entra aquí por lo mismo que en `muelle-escena.tsx` y `escena-peonza.tsx`:
  * el `Canvas` sigue saliendo de `tres/Lienzo`, que es lo que la regla del §7
@@ -558,31 +559,6 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
     },
     [modo, soltarTodo],
   );
-  /*
-   * ═══ Y A PIE EL MIRADOR TÁCTIL SE APAGA ═══
-   *
-   * Un dedo sobre el lienzo gira la mesa y dos la acercan: andando, el pulgar que no está en la
-   * palanca giraría a la vez una mesa que no se ve, y al volver estaría girada. Se le da al
-   * `GestureDetector` un gemelo APAGADO del gesto del mirador —los mismos tres gestos, del mismo
-   * tipo y en el mismo hilo— en vez de quitarle el detector: con la misma forma el detector sólo
-   * cambia su configuración; con otra forma los volvería a enganchar y podría cambiar de
-   * envoltorio, que es desmontar el lienzo y perder el contexto de dibujo. El giro lleva un
-   * `onTouchesDown` de trabajo vacío porque los del mirador lo son, y así se reparten igual entre
-   * hilos en la web y en el móvil.
-   */
-  const gestoApagado = useMemo(
-    () =>
-      Gesture.Simultaneous(
-        Gesture.Pan()
-          .onTouchesDown(() => {
-            'worklet';
-          })
-          .enabled(false),
-        Gesture.Pinch().runOnJS(true).enabled(false),
-        Gesture.Pan().runOnJS(true).minPointers(2).enabled(false),
-      ),
-    [],
-  );
 
   const [medida, ponerMedida] = useState({ ancho: 0, alto: 0 });
   const medir = useCallback((e: LayoutChangeEvent) => {
@@ -898,6 +874,19 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    * pide el radio del delta. Mientras no hay islas repartidas todavía no hay radio:
    * va un cero, que `acercar.ts` acota solo. Sigue siendo un gancho sin condiciones
    * y por delante de todos los `return`, que es la regla que lee `verify:app`.
+   *
+   * ═══ Y A PIE EL MIRADOR TÁCTIL SE APAGA, Y LO APAGA ÉL ═══
+   *
+   * Un dedo sobre el lienzo gira la mesa y dos la acercan: andando, el pulgar que no está en la
+   * palanca giraría a la vez una mesa que no se ve, y al volver estaría girada. Con
+   * `{ apagado: aPie }` el gancho apaga SUS MISMOS gestos y descuelga la rueda y el ratón de la
+   * web; el detector lleva siempre el mismo gesto y el lienzo le da siempre su nodo.
+   *
+   * Aquí hubo un GEMELO APAGADO —los mismos tres gestos, deshabilitados— que se le cambiaba al
+   * detector al bajar a andar. Con la misma forma, sí, pero la librería se queda con los gestos
+   * del primer enganche y les copia encima lo del gemelo: tras bajar y volver, el mirador se
+   * quedaba apagado en la mesa; en una mesa de botas, al revés, vivo a pie. La cuenta entera,
+   * en la cabecera de `mirador-tactil.ts`.
    */
   const {
     gesto,
@@ -907,7 +896,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
     seHaMovido,
     verElTableroEntero,
     laInterfazSeLoQueda,
-  } = usarMiradorTactil(medida, encuadre?.alcance ?? 0);
+  } = usarMiradorTactil(medida, encuadre?.alcance ?? 0, { apagado: aPie });
 
   /* ─── Lo que se toca, traducido al movimiento que se manda ─── */
 
@@ -1353,8 +1342,8 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
       <View style={[estilos.cajaDelLienzo, { height: altoDelLienzo }]}>
         {catalogo.que === 'listo' ? (
           <RedDelLienzo juego={juego} alCaer={ponerElLienzoCayo}>
-          {/* A pie, el gemelo apagado: ver `gestoApagado`. */}
-          <GestureDetector gesture={aPie ? gestoApagado : gesto}>
+          {/* El mismo gesto siempre: a pie lo apaga su gancho (`apagado`). */}
+          <GestureDetector gesture={gesto}>
             {/*
               LA ETIQUETA VA EN LA VISTA QUE SÓLO ENVUELVE EL `Canvas`, y no en la
               caja de fuera: `accessible` agrupa a sus hijos, y la caja tiene también
@@ -1370,11 +1359,11 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
                 fuera porque la rueda tiene que pararse encima DEL TABLERO y no encima
                 de la hoja de «¿a quién?», que sí se desplaza si algún día crece.
 
-                A PIE SE LE QUITA: soltar el nodo descuelga la rueda y el arrastre del ratón
-                (el efecto de `mirador-tactil.ts` se va con él), que es la otra mitad del
-                mirador que se apaga mientras se anda. Al volver a la mesa se le devuelve.
+                SE LE DA SIEMPRE, también a pie: con `apagado` es el gancho quien no apunta
+                la rueda ni el arrastre del ratón. Aquí se le quitaba el nodo al bajar a andar,
+                y era la otra mitad del mismo interruptor escrita en la pantalla.
               */
-              ref={aPie ? undefined : apuntarElLienzo}
+              ref={apuntarElLienzo}
               onLayout={medir}
               accessible
               accessibilityLabel="El delta de Riberas en tres dimensiones. Arrastra con un dedo para girarlo, pellizca para acercarlo y mueve dos dedos para recorrerlo."

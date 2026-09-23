@@ -3213,20 +3213,27 @@ function elBurgoAPie(): void {
 
   /* ── 4. EL PINTOR: LOS MONTA, Y LA CÁMARA DE MESA SE QUEDA QUIETA A PIE ── */
   const pintor = sinComentarios(readFileSync(new URL('../src/burgo-en-tres.tsx', import.meta.url), 'utf8'));
+  /*
+   * CALLADA, COMO RIBERAS: desde que `callada` sólo calla lo que mueve la cámara y deja las dos
+   * defensas de la página (la rueda y el menú del botón secundario), el Burgo se calla con ella y el
+   * rodeo de antes —un acercamiento que no hacía nada y los punteros marcados como de la interfaz—
+   * sobra. Lo que la regla sigue exigiendo es lo que no puede cambiar: montada siempre y DELANTE de
+   * la escena, o el seguimiento al que mueve deja de ir al día.
+   */
   const quietaAPie = (c: string): boolean =>
-    /alAcercarse=\{aPie \? NO_SE_ACERCA : alAcercarse\}/.test(c) &&
-    /const esDelPaseo = \(e: PointerEvent\): void => \{\s*loCogeLaInterfaz\(e\);\s*\};\s*recuadro\.addEventListener\('pointerdown', esDelPaseo, \{ capture: true \}\);/.test(c) &&
-    /if \(!aPie \|\| recuadro === null\) return undefined;/.test(c) &&
+    /<CamaraAerea\b[^>]*\bcallada=\{aPie\}[^>]*\/>/.test(c) &&
+    /<CamaraAerea\b[^>]*\balAcercarse=\{alAcercarse\}[^>]*\/>/.test(c) &&
+    !/NO_SE_ACERCA|esDelPaseo/.test(c) &&
     !/aPie \? null : \(?\s*<CamaraAerea/.test(c) &&
     c.indexOf('<CamaraAerea') > 0 &&
     c.indexOf('<CamaraAerea') < c.indexOf('<Burgo\n');
   comprobar(
-    'a pie `CamaraAerea` sigue montada y delante de la escena, pero no mueve la cámara de mesa: su acercamiento no hace nada y los punteros del recuadro se marcan, en la captura, como de la interfaz',
+    'a pie `CamaraAerea` sigue montada y delante de la escena, pero callada (`callada={aPie}`): no mueve la cámara de mesa, y sin el rodeo de antes',
     quietaAPie(pintor),
   );
   comprobar(
-    'se ve fallar: con el acercamiento de siempre a pie, o sin marcar los punteros, cae',
-    !quietaAPie(pintor.replace('alAcercarse={aPie ? NO_SE_ACERCA : alAcercarse}', 'alAcercarse={alAcercarse}')) && !quietaAPie(pintor.replace(/loCogeLaInterfaz\(e\);/, '')),
+    'se ve fallar: sin `callada`, o desmontándola a pie, cae',
+    !quietaAPie(pintor.replace('callada={aPie}', '')) && !quietaAPie(pintor.replace('<CamaraAerea', 'aPie ? null : <CamaraAerea')),
   );
   /*
    * Las cámaras se montan con el modo, el que las cambia y si hay carril; y, en una mesa de botas,
@@ -5209,23 +5216,48 @@ function riberasAPie(): void {
    * COMÚN, que es donde ahora se rompería.
    */
   const piezaComun = readFileSync(new URL('../src/lienzo-propio.tsx', import.meta.url), 'utf8');
+  /*
+   * Y CALLADA SIGUE DEFENDIENDO LA PÁGINA: la rueda sobre el recuadro no la desplaza y el clic
+   * derecho no abre el menú del navegador. Hasta el 23-sep `callada` salía del efecto antes de
+   * ponerlas, y en Riberas a pie pasaban las dos cosas; las vacunas nuevas son justo eso —salir
+   * antes de las defensas— y una rueda que acerca callada.
+   */
+  const camaraCallada = (t: { riberas: string; pieza: string }): boolean => {
+    const c = soloCodigo(t.riberas);
+    const camara = /export function CamaraAerea\(\{[\s\S]*?\n\}\n/.exec(soloCodigo(t.pieza))?.[0] ?? '';
+    const defensas = camara.search(/caja\.addEventListener\('wheel', rueda, \{ passive: false \}\);\s*lienzo\.addEventListener\('contextmenu', menuDelSistema\);/);
+    const seCalla = camara.indexOf('if (callada) return quitarLasDefensas;');
+    const gestos = camara.indexOf("window.addEventListener('pointerdown', baja);");
+    return (
+      usaLaPiezaComun(sinComentarios(t.riberas), 'CamaraAerea') &&
+      /<CamaraAerea\b[^>]*\bcallada=\{aPie\}[^>]*\/>/.test(c) &&
+      !/aPie \? null : \(?\s*<CamaraAerea/.test(c) &&
+      /\bcallada = false,/.test(camara) &&
+      !/useEffect\(\(\) => \{\s*if \(callada\) return undefined;/.test(camara) &&
+      defensas > 0 &&
+      seCalla > defensas &&
+      gestos > seCalla &&
+      /if \(callada\) return;\s*alAcercarse\(acercando\(/.test(camara) &&
+      /\}, \[gl, [^\]]*\bcallada\]\);/.test(camara) &&
+      /useFrame\(\(\) => \{\s*if \(callada\) return;\s*const lienzo = gl\.domElement;/.test(camara)
+    );
+  };
   regla(
-    '`CamaraAerea` —la común— se queda montada y recibe `callada={aPie}`: a pie ni apunta sus oyentes ni pone la cámara ni la niebla',
-    (t: { riberas: string; pieza: string }) => {
-      const c = soloCodigo(t.riberas);
-      const camara = /export function CamaraAerea\(\{[\s\S]*?\n\}\n/.exec(soloCodigo(t.pieza))?.[0] ?? '';
-      return (
-        usaLaPiezaComun(sinComentarios(t.riberas), 'CamaraAerea') &&
-        /<CamaraAerea\b[^>]*\bcallada=\{aPie\}[^>]*\/>/.test(c) &&
-        !/aPie \? null : \(?\s*<CamaraAerea/.test(c) &&
-        /\bcallada = false,/.test(camara) &&
-        /useEffect\(\(\) => \{\s*if \(callada\) return undefined;\s*const lienzo = gl\.domElement;/.test(camara) &&
-        /\}, \[gl, [^\]]*\bcallada\]\);/.test(camara) &&
-        /useFrame\(\(\) => \{\s*if \(callada\) return;\s*const lienzo = gl\.domElement;/.test(camara)
-      );
-    },
+    '`CamaraAerea` —la común— se queda montada y recibe `callada={aPie}`: a pie ni gira, ni acerca, ni pone la cámara ni la niebla, y sigue defendiendo la página',
+    camaraCallada,
     { riberas: fuente, pieza: piezaComun },
     { riberas: fuente, pieza: piezaComun.replace(/useFrame\(\(\) => \{\n(\s*)if \(callada\) return;\n/, 'useFrame(() => {\n') },
+  );
+  comprobar(
+    'y cae si `callada` sale del efecto ANTES de poner las defensas, como antes del 23-sep',
+    !camaraCallada({
+      riberas: fuente,
+      pieza: piezaComun.replace('useEffect(() => {\n    const lienzo = gl.domElement;', 'useEffect(() => {\n    if (callada) return undefined;\n    const lienzo = gl.domElement;'),
+    }),
+  );
+  comprobar(
+    'y cae si la rueda acerca estando callada',
+    !camaraCallada({ riberas: fuente, pieza: piezaComun.replace(/if \(callada\) return;\n(\s*)alAcercarse\(acercando\(/, 'alAcercarse(acercando(') }),
   );
   regla(
     'y a la escena se le dan la cámara, la VISTA —de ella sale `mundoDeRiberas`— y el `traer` del muelle, que es la caché de aventureros: el paseo es el común',

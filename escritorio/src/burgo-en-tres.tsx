@@ -151,13 +151,17 @@
  * Tres botones —«La mesa», «Al hombro» y «Sus ojos»— y las teclas 1, 2 y 3, los mismos de Las
  * Lindes, bajan la cámara a la calle; a pie se anda con W, A, S, D o las flechas y Mayúsculas
  * para correr, que lee el paseo común de la escena, y un cartel lo dice mientras se anda. La
- * escena hace el resto (`escenas/burgo/Burgo.tsx`). Lo que es de aquí es que `CamaraAerea`, que
- * no sabe de paseos y no se puede apagar sin desmontarla —y desmontada y vuelta a montar se
- * suscribiría DETRÁS de la escena, que es lo que rompe el seguimiento al que mueve—, no mueva
- * por detrás la cámara de mesa mientras se anda: su acercamiento se queda sin efecto
- * (`NO_SE_ACERCA`) y los punteros que bajan en el recuadro se marcan como de la interfaz, que
- * es lo que su arrastre ya respeta. La cámara la sigue escribiendo; la escena pone encima la
- * del paseo. Las teclas no cuentan escribiendo en un campo: la puja libre lleva cifras.
+ * escena hace el resto (`escenas/burgo/Burgo.tsx`). Lo que es de aquí es que `CamaraAerea` no
+ * mueva por detrás la cámara de mesa mientras se anda, y sin desmontarla: desmontada y vuelta a
+ * montar se suscribiría DETRÁS de la escena, que es lo que rompe el seguimiento al que mueve. Se
+ * monta con `callada={aPie}`, como en Riberas: a pie no gira, ni pasea, ni acerca, ni pone la
+ * cámara —la pone la escena, la del paseo—, y al volver a la mesa se mira desde donde se dejó. Lo
+ * que sigue haciendo callada es defender la página: la rueda sobre el recuadro no la desplaza (ni
+ * un barrido de lado vuelve «atrás» y saca de la mesa) y el clic derecho no abre el menú del
+ * navegador encima del burgo. Hasta el 23-sep `callada` apagaba también esas dos defensas, y el
+ * Burgo se callaba por otro camino —un acercamiento que no hacía nada y los punteros marcados como
+ * de la interfaz—; `lienzo-propio.tsx` separó las dos mitades y el rodeo sobró. Las teclas no
+ * cuentan escribiendo en un campo: la puja libre lleva cifras.
  *
  * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
  *
@@ -187,7 +191,6 @@ import { Canvas } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
 import type { Cercania } from '../../escenas/acercar';
 import { CERCANIA_DE_SALIDA } from '../../escenas/acercar';
-import { loCogeLaInterfaz } from '../../escenas/camara';
 import { Burgo } from '../../escenas/burgo/Burgo';
 import { asientosQueAndanPorElBurgo } from '../../escenas/burgo/a-pie';
 import type { ModoDelBurgo } from '../../escenas/burgo/a-pie';
@@ -454,9 +457,6 @@ export const LAS_CAMARAS_DEL_BURGO: readonly { readonly modo: ModoDelBurgo; read
   { modo: 'hombro', rotulo: 'Al hombro', ayuda: 'Detrás de tu figura, andando por las calles. Tecla 2.', tecla: '2' },
   { modo: 'ojos', rotulo: 'Sus ojos', ayuda: 'Desde su cara, andando por las calles. Tecla 3.', tecla: '3' },
 ];
-
-/** Lo que se le pasa a `CamaraAerea` como acercamiento mientras se anda: nada. Ver la cabecera. */
-const NO_SE_ACERCA = (): void => undefined;
 
 /**
  * ¿ESTA TECLA ES PARA LA CÁMARA? Sólo si nadie está escribiendo: la puja libre lleva cifras, y un
@@ -1190,26 +1190,13 @@ export function BurgoEnTres({
    * ═══ A PIE: DESDE DÓNDE SE MIRA, Y LA CÁMARA DE MESA QUIETA MIENTRAS TANTO ═══
    *
    * `modo` es de la pantalla y no viaja: bajar a andar no es una jugada. A pie, `CamaraAerea` sigue
-   * montada —y delante de la escena, que es lo que hace que el seguimiento vaya al día— pero no
-   * puede mover la cámara de mesa por detrás: su acercamiento se queda en `NO_SE_ACERCA`, y los
-   * punteros que bajan en el recuadro se marcan como de la interfaz ANTES de que le lleguen (en la
-   * captura, y ella escucha en la ventana), que es lo que su arrastre y su pellizco ya respetan. Al
-   * subir a la mesa está exactamente donde se dejó.
+   * montada —y delante de la escena, que es lo que hace que el seguimiento vaya al día— pero
+   * CALLADA (`callada={aPie}`): no mueve la cámara de mesa por detrás, y al subir a la mesa está
+   * exactamente donde se dejó. Callada sigue defendiendo la página: ver la cabecera.
    */
   const [modo, ponerModo] = useState<ModoDelBurgo>('mesa');
   const aPie = modo !== 'mesa';
   const camara = useMemo((): ModoDeCamara => (modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: yo ?? '' }), [modo, yo]);
-  useEffect(() => {
-    const recuadro = elRecuadro.current;
-    if (!aPie || recuadro === null) return undefined;
-    const esDelPaseo = (e: PointerEvent): void => {
-      loCogeLaInterfaz(e);
-    };
-    recuadro.addEventListener('pointerdown', esDelPaseo, { capture: true });
-    return () => {
-      recuadro.removeEventListener('pointerdown', esDelPaseo, { capture: true });
-    };
-  }, [aPie]);
 
   /*
    * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
@@ -1918,7 +1905,7 @@ export function BurgoEnTres({
                 <CamaraAerea
                   alcance={ALCANCE_DEL_BURGO}
                   cercania={cercania}
-                  alAcercarse={aPie ? NO_SE_ACERCA : alAcercarse}
+                  alAcercarse={alAcercarse}
                   recuadro={RECUADRO_DEL_LIENZO}
                   seDesplazanSolas={SE_DESPLAZAN_SOLAS}
                   velo={EL_VELO}
@@ -1927,6 +1914,8 @@ export function BurgoEnTres({
                   alturaMinima={ALTURA_MINIMA_DEL_OJO_DEL_BURGO}
                   /* La escena trae su propia niebla de mediodía, fija: moverla con el ojo sería pisársela. */
                   niebla={null}
+                  /* A pie, la cámara es la del paseo de la escena: ésta se calla sin desmontarse. */
+                  callada={aPie}
                 />
                 <Burgo
                   tablero={datos}

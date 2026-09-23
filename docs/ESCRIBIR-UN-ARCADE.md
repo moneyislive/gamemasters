@@ -158,7 +158,7 @@ Ver `docs/BOOTS-ON-BOARD.md` §7. El juego sólo DECLARA; todo lo demás es de l
    (`usarElCanal` + `LosDemas`, `caido` al paseo y el cliente a `QuienAnda`) igual que la montan
    `escenas/lindes/Lindes.tsx`, `escenas/burgo/Burgo.tsx` y `escenas/andar-por-el-delta.tsx`.
 4. **En los clientes**: en la app, `app/src/arcade/mandos-del-paseo.tsx` (la palanca, correr y el
-   botón «Golpear») y el mirador táctil apagado a pie; en el escritorio, sus teclas de cámara, la G
+   botón «Golpear») y el mirador táctil apagado a pie con `usarMiradorTactil(…, { apagado: aPie })` —ni gemelos ni quitarle el nodo al lienzo—; en el escritorio, sus teclas de cámara, la G
    para golpear y el rótulo de cómo se anda y se golpea.
 5. **La refriega no se escribe**: el golpe, las vidas, caer y renacer los arbitra el servidor y los
    pinta el paseo común (clips `lanzar`, `golpe`, `caer`, `aparecer`, y los corazones sobre el
@@ -219,8 +219,9 @@ atacado el mismo día:
 | altas derivadas: la tabla de escenas del muelle una vez, los modelos por lista, las listas de los comprobadores | HECHO: de 8 toques a 2 (a 1 si el lobby reutiliza una escena) |
 | un arnés de comprobación y un robot genérico | HECHO: `arnes.ts` (lo usan tres comprobadores) y `robot-generico.ts` con `verify:robot-generico`; los 73 guiones viejos se quedan como están, a propósito |
 | `escenas/comun/`: la marioneta, el arranque y la medida, `relojDe`, el presupuesto, las props de tablero y el bucle del lobby | HECHO: −550 líneas de código en las escenas, +369 en `comun/`; las copias que ya divergían se unificaron una a una |
-| `tablero-en-linea.tsx` con su propio vestíbulo | PENDIENTE: es una cuarta copia que podría usar el del contrato |
-| el mirador táctil de la app, que se apaga distinto en Riberas (un gemelo) que en el Burgo (`.enabled`) | PENDIENTE: `usarMiradorTactil(…, { apagado })` en `app/src/arcade/mirador-tactil.ts` |
+| `tablero-en-linea.tsx` con su propio vestíbulo | HECHO: `LaMesaDeUnPintor` vive en el mueble genérico y el contrato la presta (al revés habría un ciclo de imports); el mueble es un pintor más |
+| el mirador táctil de la app, que se apaga distinto en Riberas (un gemelo) que en el Burgo (`.enabled`) | HECHO: `usarMiradorTactil(…, { apagado })` apaga sus mismos gestos y el ratón; el gemelo de Riberas se desincronizaba de verdad (tras bajar a andar y volver, no se podía girar) |
+| `callada` de `CamaraAerea` apagaba también las defensas de la página | HECHO: calla lo que mueve la cámara y deja la rueda y el menú del botón derecho defendidos; el Burgo del escritorio se calla con ella |
 | la biblioteca de `escenas/embarcadero/` (`cargar`, `figuras`, `gestos`, `tipos`, `calidad`, `piezas`, `tinte`, `tema`), que usan todos | PENDIENTE: moverla a `escenas/comun/` son cientos de imports y reglas; no se hizo a propósito |
 
 Ninguna tocó código sellado.

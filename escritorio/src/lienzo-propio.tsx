@@ -328,8 +328,10 @@ export interface LoQueVeLaCamara {
   /** La niebla que sigue al ojo, o `null` para no tocar la de la escena. */
   niebla?: { empiezaA: number; terminaA: number } | null;
   /**
-   * CALLADA: ni escucha el ratón ni pone la cámara ni la niebla, porque la vista es de
-   * otro —a pie, del paseo de la escena—. Se queda MONTADA y no se desmonta, y las dos
+   * CALLADA: ni gira, ni pasea la mirada, ni acerca, ni pone la cámara ni la niebla, porque
+   * la vista es de otro —a pie, del paseo de la escena—; lo que SÍ sigue haciendo es
+   * defender la página (la rueda sobre el recuadro no la desplaza, y el clic derecho no abre
+   * el menú del navegador): eso no es de la cámara. Se queda MONTADA y no se desmonta, y las dos
    * cosas importan: su mirador vive aquí dentro, así que al volver a la mesa se sigue
    * mirando desde donde se dejó; y desmontada y vuelta a montar se suscribiría a
    * `useFrame` DETRÁS de la escena y le pisaría la cámara en cada fotograma (por qué ese
@@ -338,9 +340,8 @@ export interface LoQueVeLaCamara {
    * arrastrar a pie giraría una mesa que no se ve.
    *
    * Nació en la copia que Riberas llevaba de este componente, con el nombre de `aPie`, y
-   * es justo lo que pasa con las copias: la mejora se quedó en una. El Burgo, que usaba
-   * ésta, calla la suya a pie por otro camino —un `alAcercarse` que no hace nada y los
-   * punteros marcados como de la interfaz—. Aquí vale para todos; `false` si no se dice.
+   * es justo lo que pasa con las copias: la mejora se quedó en una. Aquí vale para todos
+   * —Riberas y el Burgo la montan con `callada={aPie}`—; `false` si no se dice.
    */
   callada?: boolean;
 }
@@ -395,10 +396,53 @@ export function CamaraAerea({
   const mirador = useRef<Mirador>(miradorDeSalida);
 
   useEffect(() => {
-    if (callada) return undefined;
     const lienzo = gl.domElement;
     /* Si un día el recuadro no estuviera, se cae al lienzo: peor, pero no roto. */
     const caja: HTMLElement = lienzo.closest<HTMLElement>(`.${recuadro}`) ?? lienzo;
+
+    /*
+     * ═══ LAS DOS DEFENSAS DE LA PÁGINA, CALLADA O NO ═══
+     *
+     * La rueda sobre el recuadro y el menú del botón secundario sobre el lienzo no son de la
+     * cámara: son de la PÁGINA. A pie, sin ellas, la rueda o el panel táctil desplazarían la Sala
+     * —o, según el navegador, el barrido lateral volvería «atrás»— y un clic derecho abriría el
+     * menú del navegador encima del mundo. Así que se ponen siempre, y `callada` sólo apaga lo que
+     * MUEVE la cámara: callada, la rueda se sigue parando y no acerca nada. Antes `callada` lo
+     * apagaba todo, y en Riberas a pie pasaban las dos cosas.
+     */
+    const rueda = (e: WheelEvent): void => {
+      const donde = e.target instanceof Element ? e.target : null;
+      if (seDesplazanSolas.some((clase) => donde?.closest(`.${clase}`) != null)) return;
+      e.preventDefault();
+      /*
+       * EL VELO GENÉRICO SE PARA SIEMPRE, SIN QUE EL PINTOR TENGA QUE DECIRLO, y eso arregla
+       * el único cabo que quedaba suelto de la decisión de publicar `RUEDAN_SOLAS`.
+       *
+       * Las cajas que ruedan por dentro viajan en una LISTA y por eso el pintor puede pasar
+       * las suyas y las de las piezas juntas; el velo viaja en `velo`, que es UNA sola cadena.
+       * Un pintor que ya tenga velo propio —el Burgo pasa `burgo-velo`, por su `ElijeUna`— y
+       * monte además una `CajaEnElLienzo`, que trae el suyo puesto, no tiene dónde nombrar el
+       * segundo: la rueda sobre el velo genérico caería en `preventDefault` y acercaría el
+       * mundo DE DETRÁS de una caja modal abierta, que es el mismo fallo silencioso de la
+       * crónica y el carril por el otro lado. Como la clase es de la pieza, la pieza la
+       * defiende: se mira siempre, además de la que diga el pintor.
+       */
+      if (donde?.closest(`.${velo}`) != null || donde?.closest(`.${VELO_DEL_LIENZO}`) != null) return;
+      if (callada) return;
+      alAcercarse(acercando(cercania.current, pasosDeLaRueda(e), limites));
+    };
+    /* Sin esto, el primer arrastre con el botón derecho abre el menú del navegador encima del mundo. */
+    const menuDelSistema = (e: MouseEvent): void => {
+      e.preventDefault();
+    };
+    caja.addEventListener('wheel', rueda, { passive: false });
+    lienzo.addEventListener('contextmenu', menuDelSistema);
+    const quitarLasDefensas = (): void => {
+      caja.removeEventListener('wheel', rueda);
+      lienzo.removeEventListener('contextmenu', menuDelSistema);
+    };
+    /* Callada, nada más: ni gira, ni pasea la mirada, ni pellizca. */
+    if (callada) return quitarLasDefensas;
 
     let desde: { x: number; y: number } | null = null;
     let gira = false;
@@ -511,44 +555,17 @@ export function CamaraAerea({
       gira = false;
       mueveLaMirada = false;
     };
-    const rueda = (e: WheelEvent): void => {
-      const donde = e.target instanceof Element ? e.target : null;
-      if (seDesplazanSolas.some((clase) => donde?.closest(`.${clase}`) != null)) return;
-      e.preventDefault();
-      /*
-       * EL VELO GENÉRICO SE PARA SIEMPRE, SIN QUE EL PINTOR TENGA QUE DECIRLO, y eso arregla
-       * el único cabo que quedaba suelto de la decisión de publicar `RUEDAN_SOLAS`.
-       *
-       * Las cajas que ruedan por dentro viajan en una LISTA y por eso el pintor puede pasar
-       * las suyas y las de las piezas juntas; el velo viaja en `velo`, que es UNA sola cadena.
-       * Un pintor que ya tenga velo propio —el Burgo pasa `burgo-velo`, por su `ElijeUna`— y
-       * monte además una `CajaEnElLienzo`, que trae el suyo puesto, no tiene dónde nombrar el
-       * segundo: la rueda sobre el velo genérico caería en `preventDefault` y acercaría el
-       * mundo DE DETRÁS de una caja modal abierta, que es el mismo fallo silencioso de la
-       * crónica y el carril por el otro lado. Como la clase es de la pieza, la pieza la
-       * defiende: se mira siempre, además de la que diga el pintor.
-       */
-      if (donde?.closest(`.${velo}`) != null || donde?.closest(`.${VELO_DEL_LIENZO}`) != null) return;
-      alAcercarse(acercando(cercania.current, pasosDeLaRueda(e), limites));
-    };
-    /* Sin esto, el primer arrastre con el botón derecho abre el menú del navegador encima del mundo. */
-    const menuDelSistema = (e: MouseEvent): void => {
-      e.preventDefault();
-    };
 
     window.addEventListener('pointerdown', baja);
     window.addEventListener('pointermove', mueve);
     window.addEventListener('pointerup', suelta);
     window.addEventListener('pointercancel', suelta);
-    caja.addEventListener('wheel', rueda, { passive: false });
-    lienzo.addEventListener('contextmenu', menuDelSistema);
     return () => {
       window.removeEventListener('pointerdown', baja);
       window.removeEventListener('pointermove', mueve);
       window.removeEventListener('pointerup', suelta);
       window.removeEventListener('pointercancel', suelta);
-      caja.removeEventListener('wheel', rueda);
-      lienzo.removeEventListener('contextmenu', menuDelSistema);
+      quitarLasDefensas();
     };
   }, [gl, alcance, cercania, alAcercarse, recuadro, seDesplazanSolas, velo, limites, callada]);
 

@@ -23,7 +23,9 @@
  *
  *   · `LaMesaDeUnPintor`: la pantalla entera hasta que hay mesa —la rueda de «Hablando con la
  *     mesa…» y el vestíbulo con su plazo— y, sentados, el latido y los nombres. Monta al pintor
- *     con `LoQueVeElPintor`, que le lleva la barra de la mesa ya hecha.
+ *     con `LoQueVeElPintor`, que le lleva la barra de la mesa ya hecha. SE PRESTA: vive en el
+ *     mueble genérico (`tablero-en-linea.tsx`), que la monta también para los arcades de fuera,
+ *     y aquí se vuelve a exportar. Ver «LA MESA SE PRESTA», más abajo.
  *   · `RedDelLienzo`: si el lienzo revienta AL PINTAR, apunta el fallo en el parte y avisa.
  *   · `ElTelon`: lo que tapa el lienzo mientras el mundo no ha llegado.
  *   · `usarLaCalidadDelAparato`: `plena` o `sobria`, medida con el juez de la casa.
@@ -45,15 +47,20 @@
  *
  * Por lo mismo que `elRail` en el escritorio: la barra es la identidad de la mesa —qué juego,
  * qué código, cómo se sale y si es de Boots on Board— y se escribía hasta TRES veces por
- * pantalla, una por rama. Hecha aquí, una rama nueva no puede olvidarse de `deBotas` ni del área
- * segura: pone `{laBarra}` y ya está.
+ * pantalla, una por rama. Hecha en la mesa, una rama nueva no puede olvidarse de `deBotas` ni del
+ * área segura: pone `{laBarra}` y ya está. Y la pieza suelta ya ni se exporta.
  *
- * ═══ EL ESTADO DEL VESTÍBULO VIVE ARRIBA, Y NO ES UN DESCUIDO ═══
+ * ═══ LA MESA SE PRESTA, NO SE ESCRIBE AQUÍ ═══
  *
- * El nombre, el código y el plazo se guardan en la pantalla y no en un componente del
- * vestíbulo: al pulsar «Abrir una mesa» la fase pasa por `yendo` —otra rama— y, si el servidor
- * dice que no, vuelve a `fuera`. Con el estado dentro del vestíbulo, ese viaje lo desmontaría y
- * quien acaba de fallar tendría que volver a escribir su nombre.
+ * Cuando este contrato juntó los vestíbulos de las tres pantallas, el del mueble genérico se
+ * quedó fuera con el suyo, palabra por palabra el mismo: la cuarta copia. No podía usar el de
+ * aquí sin cargar este fichero, y este fichero ya carga aquél —la barra, la línea del turno, las
+ * opciones, la crónica—: se habrían importado el uno al otro, y Metro avisa en desarrollo de cada
+ * ciclo, «Require cycle», porque un módulo a medio cargar entrega valores sin definir. Así que la
+ * mesa se mudó al mueble, que es donde nacieron el vestíbulo y sus estilos, y aquí se presta:
+ * `LaMesaDeUnPintor` y `LoQueVeElPintor` se importan de allí y se vuelven a exportar, y las
+ * pantallas los siguen pidiendo aquí. Por qué el estado del vestíbulo vive arriba, y lo demás que
+ * la mesa decide, está escrito junto a ella.
  *
  * ═══ Y AQUÍ NO HAY NI `three` NI UN JUEGO ═══
  *
@@ -62,253 +69,36 @@
  * lo que la portada ya carga —la mesa, el mueble genérico, el retablo— y el juez de la calidad,
  * que son veinte líneas de números: nada de eso arrastra `three` a ninguna parte.
  */
-import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ComponentType, ErrorInfo, ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
-import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
-import type { ArcadeId } from '../../../shared/arcade';
+import { Component, useCallback, useRef, useState } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 /* Instala los arcades del binario, por si se llega aquí por enlace directo. Ver `pintar.tsx`. */
 import '../../../shared/arcade/juegos';
 import { opcionesSueltas, tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
 import { juzgarCalidad } from '../../../escenas/embarcadero/calidad';
 import type { MuestraDelHilo } from '../../../escenas/embarcadero/calidad';
 import type { Calidad } from '../../../escenas/embarcadero/tipos';
-import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import { apuntarFallo } from '../parte-de-fallos';
-import { usarMesaDeArcade } from './mesa';
-import type { LaMesa, MesaVista } from './mesa';
 import { LETRA, SALA } from './muebles';
-import { Pantalla } from './piezas';
-import { PLAZOS } from './plazos';
 import { Retablo } from './retablo';
 import {
-  BarraDeLaMesa,
   ElAviso,
   ESTILOS_DE_LA_MESA,
   hayAlgoQuePintar,
   LaCronica,
+  LaMesaDeUnPintor,
   LasOpciones,
   LineaDelTurno,
 } from './tablero-en-linea';
+import type { LoQueVeElPintor } from './tablero-en-linea';
 
-/**
- * LO QUE LA PLATAFORMA LE DA A UN PINTOR. El espejo de `LoQueVeElPintor` del escritorio, con
- * lo que en la app hace falta: el área segura —aquí no hay una página que la ponga— y la barra.
+/*
+ * LA MESA Y LO QUE LE DA A SU PINTOR, PRESTADOS DEL MUEBLE GENÉRICO: ver «LA MESA SE PRESTA» en la
+ * cabecera. Las pantallas los piden aquí —`verify:sala` lo exige— y este fichero no se escribe otro
+ * vestíbulo, ni otra barra, ni otro latido.
  */
-export interface LoQueVeElPintor {
-  /** La mesa: `mover`, `quieto`, `aviso`, `cronica`, `llave`, `salir` y `tirar`. */
-  readonly mesa: LaMesa;
-  /** La mesa ya sentada, con la vista del juego dentro. Aquí no es `null` nunca. */
-  readonly vista: MesaVista;
-  /** El nombre del juego, del manifiesto: lo que dice la barra. */
-  readonly juego: string;
-  /** Quién es quién, por asiento: lo que necesita `LineaDelTurno` para decir «le toca a Ana». */
-  readonly nombres: Map<string, string>;
-  /** Lo que el sistema se queda arriba —la muesca— y abajo —el indicador de inicio—. */
-  readonly arriba: number;
-  readonly abajo: number;
-  /**
-   * LA BARRA DE LA MESA, YA MONTADA: el juego, el código, «Salir», «Tirar» y la marca de Boots on
-   * Board. Se pinta con `{laBarra}` en cada rama, y una rama nueva no tiene nada que recordar.
-   */
-  readonly laBarra: JSX.Element;
-}
-
-/**
- * LA PANTALLA DE UN PINTOR: la mesa del juego, y el vestíbulo mientras no hay mesa.
- *
- * Cada pantalla de juego la monta desde su `export default` con SU constante —`BURGO`,
- * `LINDES`, `RIBERAS`—, y la ruta sólo presta el nombre cuando el manifiesto no está. La ruta es
- * `/tablero?arcade=…` y `quienPinta` ya casó el identificador contra `LOS_QUE_PINTA` antes de
- * montar la pantalla, así que la mesa es la de ese juego y punto; lo que el parámetro sigue
- * sirviendo es para el rótulo de un enlace directo con el registro a medio instalar.
- *
- * `Pintor` tiene que ser un componente del ámbito del módulo, nunca uno creado al pintar: React
- * trataría cada función nueva como un componente nuevo y desmontaría la escena en cada latido.
- */
-export function LaMesaDeUnPintor({
-  arcade,
-  Pintor,
-}: {
-  readonly arcade: ArcadeId;
-  readonly Pintor: ComponentType<LoQueVeElPintor>;
-}): JSX.Element {
-  const { arcade: deLaRuta } = useLocalSearchParams<{ arcade?: string }>();
-  const manifiesto = manifiestoDeArcadeSiExiste(arcade);
-  const mesa = usarMesaDeArcade(arcade);
-  const [nombre, ponerNombre] = useState('');
-  const [codigo, ponerCodigo] = useState('');
-  const [plazo, ponerPlazo] = useState(0);
-  /* El área segura, leída UNA vez y aquí arriba: es un gancho y los ganchos no se saltan. */
-  const bordes = useSafeAreaInsets();
-  const relleno = { paddingTop: bordes.top + 28, paddingBottom: bordes.bottom + 28 };
-
-  /*
-   * EL LATIDO DE LA CUENTA ATRÁS, el mismo que en `tablero-en-linea.tsx` y por lo mismo: el
-   * vencimiento viaja como instante absoluto y quien resta es la pantalla. Cada segundo en el
-   * último minuto; cada minuto el resto del tiempo, también sin plazo, que es cuando se enseña
-   * «lleva N min». Repinta la pantalla entera, y con ella al pintor y a su línea del turno.
-   */
-  const [latido, latir] = useState(0);
-  const venceEn = mesa.mesa?.venceEn ?? null;
-  useEffect(() => {
-    const quedan = venceEn === null ? Infinity : venceEn - Date.now();
-    const cada = quedan > 0 && quedan < 60_000 ? 1000 : 60_000;
-    const reloj = setTimeout(() => latir((n) => n + 1), cada);
-    return () => clearTimeout(reloj);
-  }, [venceEn, latido]);
-
-  const nombres = useMemo(() => {
-    const tabla = new Map<string, string>();
-    for (const a of mesa.mesa?.asientos ?? []) tabla.set(a.id, a.nombre);
-    return tabla;
-  }, [mesa.mesa?.asientos]);
-
-  const juego =
-    manifiesto?.nombre ?? (typeof deLaRuta === 'string' && deLaRuta.length > 0 ? deLaRuta : arcade);
-
-  if (mesa.fase === 'yendo') {
-    return (
-      <Pantalla hueco={28} estilo={relleno}>
-        <View style={ESTILOS_DE_LA_MESA.centro}>
-          {/* El acento aquí sí: la rueda es el piloto de «está pasando algo». */}
-          <ActivityIndicator color={SALA.acento} />
-          <Text style={ESTILOS_DE_LA_MESA.texto}>Hablando con la mesa…</Text>
-        </View>
-      </Pantalla>
-    );
-  }
-
-  const sinNombre = nombre.trim().length === 0;
-  const noPuedeAbrir = mesa.quieto || sinNombre;
-  const noPuedeEntrar = noPuedeAbrir || codigo.trim().length === 0;
-
-  if (mesa.fase === 'fuera' || mesa.mesa === null) {
-    /*
-     * EL VESTÍBULO, con las piezas y los estilos del mueble genérico. Por el Muelle casi nadie
-     * llega aquí sin mesa —la tarjeta de la Sala lleva al embarcadero y el embarcadero abre el
-     * juego con la mesa ya sentada—, pero un enlace directo, un asiento caducado o «Salir» acaban
-     * en esta rama, y una rama que no se puede usar es una pantalla en blanco con otro nombre.
-     *
-     * Abre la mesa DE SIEMPRE: la modalidad —Boots on Board— sólo se elige en la orilla del lobby
-     * común, que es la que mide si el aparato llega (`verify:sala` lo vigila en toda la app).
-     */
-    return (
-      <Pantalla hueco={28} estilo={relleno}>
-        <View style={ESTILOS_DE_LA_MESA.centro}>
-          <Text style={ESTILOS_DE_LA_MESA.titulo}>{juego}</Text>
-          <Text style={ESTILOS_DE_LA_MESA.texto}>{manifiesto?.gancho ?? ''}</Text>
-          <TextInput
-            style={ESTILOS_DE_LA_MESA.campo}
-            placeholder="Tu nombre en la mesa"
-            placeholderTextColor={SALA.tenue}
-            value={nombre}
-            onChangeText={ponerNombre}
-            maxLength={24}
-            accessibilityLabel="Tu nombre en la mesa"
-          />
-          <Text style={ESTILOS_DE_LA_MESA.rotuloDeGrupo}>cuánto se espera por turno</Text>
-          <View
-            style={ESTILOS_DE_LA_MESA.plazos}
-            accessibilityRole="radiogroup"
-            accessibilityLabel="Cuánto se espera por turno"
-          >
-            {PLAZOS.map((p, i) => (
-              <Pressable
-                key={p.rotulo}
-                style={[ESTILOS_DE_LA_MESA.plazo, i === plazo ? ESTILOS_DE_LA_MESA.plazoElegido : null]}
-                onPress={() => ponerPlazo(i)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: i === plazo }}
-                accessibilityLabel={`Plazo por turno: ${p.rotulo}`}
-                accessibilityHint={p.ayuda}
-              >
-                <Text
-                  style={i === plazo ? ESTILOS_DE_LA_MESA.plazoRotuloElegido : ESTILOS_DE_LA_MESA.plazoRotulo}
-                >
-                  {p.rotulo}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={ESTILOS_DE_LA_MESA.ayuda}>{PLAZOS[plazo]?.ayuda ?? ''}</Text>
-          <Pressable
-            style={[
-              ESTILOS_DE_LA_MESA.boton,
-              noPuedeAbrir ? ESTILOS_DE_LA_MESA.botonQuieto : ESTILOS_DE_LA_MESA.botonVivo,
-            ]}
-            disabled={noPuedeAbrir}
-            onPress={() => mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos)}
-            accessibilityRole="button"
-            accessibilityLabel="Abrir una mesa"
-            accessibilityState={{ disabled: noPuedeAbrir }}
-          >
-            <Text
-              style={[
-                ESTILOS_DE_LA_MESA.botonRotulo,
-                noPuedeAbrir ? ESTILOS_DE_LA_MESA.botonRotuloQuieto : ESTILOS_DE_LA_MESA.botonRotuloVivo,
-              ]}
-            >
-              Abrir una mesa
-            </Text>
-          </Pressable>
-          <Text style={ESTILOS_DE_LA_MESA.alternativa}>o entra con el código que te hayan dicho</Text>
-          <TextInput
-            style={ESTILOS_DE_LA_MESA.campo}
-            placeholder="CÓDIGO"
-            placeholderTextColor={SALA.tenue}
-            value={codigo}
-            onChangeText={ponerCodigo}
-            autoCapitalize="characters"
-            maxLength={8}
-            accessibilityLabel="Código de la mesa"
-          />
-          <Pressable
-            style={[ESTILOS_DE_LA_MESA.boton, noPuedeEntrar ? ESTILOS_DE_LA_MESA.botonQuieto : null]}
-            disabled={noPuedeEntrar}
-            onPress={() => mesa.entrar(codigo, nombre.trim())}
-            accessibilityRole="button"
-            accessibilityLabel="Sentarse en la mesa de ese código"
-            accessibilityState={{ disabled: noPuedeEntrar }}
-          >
-            <Text
-              style={[ESTILOS_DE_LA_MESA.botonRotulo, noPuedeEntrar ? ESTILOS_DE_LA_MESA.botonRotuloQuieto : null]}
-            >
-              Sentarse
-            </Text>
-          </Pressable>
-          {/* La ÚNICA región viva de esta rama: el vestíbulo no tiene línea del turno ni retablo. */}
-          <ElAviso texto={mesa.aviso} />
-        </View>
-      </Pantalla>
-    );
-  }
-
-  const vista = mesa.mesa;
-  return (
-    <Pintor
-      mesa={mesa}
-      vista={vista}
-      juego={juego}
-      nombres={nombres}
-      arriba={bordes.top}
-      abajo={bordes.bottom}
-      laBarra={
-        <BarraDeLaMesa
-          juego={juego}
-          codigo={vista.codigo}
-          asientos={vista.asientos}
-          salir={mesa.salir}
-          tirar={mesa.tirar}
-          arriba={bordes.top}
-          deBotas={esMesaDeBotas(vista)}
-        />
-      }
-    />
-  );
-}
+export { LaMesaDeUnPintor };
+export type { LoQueVeElPintor };
 
 /**
  * LA RED BAJO EL LIENZO: si la escena revienta AL PINTAR, se apunta y se juega sobre el retablo.
