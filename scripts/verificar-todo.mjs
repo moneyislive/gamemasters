@@ -532,6 +532,13 @@ const BATERIA = [
       'el Burgo con el que se choca es uno solo aunque cada aparato elija su calidad: lo sólido que la escena PINTA en plena y en sobria se deduce caja a caja y es el mundo que declara `shared/` (la traza, los edificios y lo sólido de los distritos); la ciudad es bit a bit la de antes de mudar la traza, el mundo canoniza, ningún cuerpo se sale del tablero, se nace con suelo y sin cuerpo mirando a una calle, quien embiste setecientos edificios se queda en la fachada, y el mundo levantado y andado en Node y en Hermes deja la misma huella — con suelos de choques contra cuerpo y contra borde',
   },
   {
+    nombre: 'el mundo de Las Lindes',
+    donde: 'server',
+    guion: 'verify:lindes-mundo',
+    porque:
+      'el mundo de Las Lindes sale del reparto de verdad, bajado a `shared/`: canoniza; estorban la muralla, las torres, la villa, la ermita y lo que se levanta en el campo, con la huella MEDIDA de cada modelo en `tablero.glb` —se vuelve a medir y se exigen los mismos números— y ni una caja de trigal, barbecho o nada menudo; se nace en senda o prado donde se puede estar; quien va derecho contra un lienzo se queda en su lado —y sin él cruzaría— y por el hueco de una puerta se pasa —y cerrada no—; y el mismo tablero da el mismo mundo y el mismo paseo en Node y en Hermes, con suelos de choques contra cuerpo y contra borde',
+  },
+  {
     nombre: 'marcador',
     donde: 'server',
     guion: 'verify:marcador',
