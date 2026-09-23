@@ -40,32 +40,52 @@
  *     la caja es exacta: girar un cuarto es cambiar el ancho por el fondo y los signos, sin una
  *     sola multiplicación por un seno. Se reconoce el cuarto con una división y un redondeo.
  *   · A UN ÁNGULO CUALQUIERA van sólo las cosas del campo —árboles, arboledas, almiares,
- *     colinas, y las piedras, rocas y tocones que estorban—, que en planta son REDONDAS u
- *     ovaladas: una copa, un bosquecillo, un montón de heno, un canto. Una planta redonda tiene
- *     la misma caja la gire uno como la gire, así que se toma el cuadrado de su mayor semieje,
- *     medido desde el sitio donde se pone. Para lo redondo es la caja justa; para un óvalo como
- *     el almiar sobra por las esquinas, que es donde no hay nada.
+ *     colinas, y las piedras, rocas y tocones que estorban—: una copa, un bosquecillo, un montón
+ *     de heno, un canto. A ésas no se les gira la caja: se toma el cuadrado de su RADIO medido
+ *     desde el sitio donde se pone, que las cubre enteras las gire uno como las gire. Sobra por las
+ *     esquinas, que es donde no hay nada: ver la sección siguiente.
  *
  * `verify:lindes-mundo` exige que nada con esquinas llegue nunca con un giro que no sea un cuarto.
  *
- * ═══ LAS PIEDRAS, CON SU RADIO Y NO CON SU SEMIEJE ═══
+ * ═══ TODO LO QUE VA GIRADO, CON SU RADIO Y NO CON SU SEMIEJE ═══
  *
- * El mayor semieje sólo cubre lo que es redondo DE VERDAD: si algo del modelo queda más lejos del
- * centro que él, girado hacia un eje asoma por fuera de la caja. Y la piedra no es redonda:
- * medida, su punto más lejano está a 0,266 del pack y su mayor semieje a 0,211, así que según
- * cómo cayera asomaba por fuera de su caja hasta 0,45 unidades junto a la senda y 0,66 en el
- * erial —más que el radio de quien anda—. La regla de la cintura se habría estrenado con eso:
- * una piedra que se atraviesa por una esquina es la queja de Miguel en pequeño.
+ * La caja de lo que va girado era el cuadrado de su MAYOR SEMIEJE, y eso sólo cubre lo que es redondo
+ * DE VERDAD: si algo del modelo queda más lejos del centro que él, girado hacia un eje asoma por fuera
+ * de la caja. Medido en `tablero.glb`, casi nada lo es. La piedra, la que más: su punto más lejano está
+ * a 0,266 del pack y su semieje a 0,211, así que asomaba hasta 0,45 unidades junto a la senda y 0,66 en
+ * el erial —más que el radio de quien anda—, y la regla de la cintura se habría estrenado con una
+ * piedra que se atraviesa por una esquina, que es la queja de Miguel en pequeño. Y detrás, el campo: la
+ * arboleda grande asoma un 11 % de su semieje —hasta 1,36 unidades a escala 2,2—, el almiar un 8 %, la
+ * arboleda pequeña un 4 %, la media un 3 % y la colina un 0,4 %. Sólo los dos árboles sueltos son
+ * redondos al diezmilésimo.
  *
- * Así que lo que estorba sólo si pasa de la cintura trae medido su RADIO
- * (`ALTO_Y_RADIO_DEL_MODELO`): lo más lejos del sitio donde se pone que llega su planta. Su
- * cuadrado la cubre entera se gire como se gire, y sobra por las esquinas como sobra en el almiar.
+ * Así que lo que va girado se cubre con el cuadrado de su RADIO (`ALTO_Y_RADIO_DEL_MODELO`, que el
+ * medidor escribe de todo lo que estorba): lo más lejos del sitio donde se pone que llega su planta.
+ * Las piedras lo estrenaron con la regla de la cintura, y el resto del campo lo siguió el mismo 23 de
+ * septiembre. Ya no hay caja por el semieje.
  *
- * Los árboles y las arboledas se quedan con el semieje, que es lo que ya había y no es de esta
- * decisión: medido igual, el `arbol-a` y el `arbol-b` son redondos al diezmilésimo, pero la
- * arboleda grande asoma un 11 % de su semieje —hasta 1,4 unidades a escala 2,2—, la media y la
- * pequeña un 3 y un 4 %, y el almiar un 8 %. Queda escrito aquí para quien lo quiera cerrar: es
- * medir su radio también y ensanchar esas cajas, mirando antes qué pasos estrechan.
+ * ═══ Y COMO LAS CAJAS CRECEN, SE MIDIÓ ANTES QUÉ PASOS ESTRECHABAN ═══
+ *
+ * En 47 tableros jugados enteros por el robot —3.313 losas, 91.085 cuerpos—, con el semieje y con el
+ * radio. No hay ni un cuerpo más: crecen 689 arboledas grandes (hasta 1,36), 1.343 pequeñas (0,37),
+ * 994 medias (0,34), 6.293 almiares (0,19), 971 colinas (0,03) y 7.700 `arbol-a` (una milésima); el
+ * `arbol-b`, nada. La arena apunta un 0,29 % más de cajas en sus cajones, y nada más cuesta distinto.
+ *
+ * Estrechan los 7.333 huecos que hay a menos de 3 unidades de una caja que crece, y 208 bajan de lo
+ * que pasa una persona. Pero de lo que se anda:
+ *
+ *   · NINGUNA SENDA SE CORTA. De través, donde antes cabía el centro de quien anda, lo más estrecho
+ *     que queda son 2,38. Las arboledas grandes y medias ya pisaban el EJE de alguna senda con el
+ *     semieje —en 430 puntos de 1,78 millones—, y con el radio lo pisan en 143 más: se rodean por la
+ *     senda misma. Las piedras, que no pisan ninguno, siguen sin pisarlo.
+ *   · NINGUNA PUERTA SE CIERRA: de 138, una estrecha su pasillo y sigue cabiendo quien anda.
+ *   · 108 de los 3.313 SITIOS DE NACER se mueven, y el más pegado a un cuerpo queda a 3,87.
+ *   · EL VALLE, en 635 millones de celdas de medio paso: tres rincones quedan aparte —de 1,5, 8 y
+ *     8 u²— y dos bolsillos se tapan —de 2,75 y 0,75—, ninguno con un sitio de nacer. Y a los cinco
+ *     los cierra la ESQUINA de un cuadrado, no un árbol: de las celdas que se tapan a menos de 8 de
+ *     ellos, ninguna queda a un radio de nada pintado —la más cerca, a 0,53—. Es lo que cuesta cubrir
+ *     con una caja lo que va girado, y queda por debajo de una celda de losa (13,3 u²), que es lo que
+ *     `verify:lindes-mundo` le consiente: un rincón, no un trozo del valle.
  *
  * ═══ LA PUERTA: DOS JAMBAS Y UN HUECO ═══
  *
@@ -166,7 +186,8 @@ export function cuartosDeVuelta(giro: number): number | null {
  * LAS CAJAS DE UNA PIEZA PUESTA, en coordenadas del tablero. `(cx, cz)` es el centro de su losa.
  *
  * Vacío si la pieza no estorba —puesta así: una piedra que no pasa de la cintura no estorba—, o si
- * no tiene huella medida —eso segundo no debería pasar nunca y lo vigila `verify:lindes-mundo`—.
+ * no tiene su huella y su radio medidos —eso segundo no debería pasar nunca: las dos tablas salen
+ * juntas del mismo guion, con los mismos nombres, y lo vigila `verify:lindes-mundo`—.
  */
 export function cajasDeLaPuesta(
   p: PuestaEnLaLosa,
@@ -176,12 +197,11 @@ export function cajasDeLaPuesta(
   const como = comoEstorbaLaPuesta(p.pieza, p.escala);
   if (como === 'nada') return [];
   const huella = HUELLA_DEL_MODELO[p.pieza];
-  if (huella === undefined) return [];
+  const medido = ALTO_Y_RADIO_DEL_MODELO[p.pieza];
+  if (huella === undefined || medido === undefined) return [];
   /* La misma escala que `UnModelo`: `largo` estira la `x` del modelo, y sólo la `x`. */
   const sx = p.escala * ESCALA_DEL_PACK * p.largo;
   const sz = p.escala * ESCALA_DEL_PACK;
-  /* Lo que trae medido su radio —las piedras— se cubre con él si va girado de cualquier manera. */
-  const radio = ALTO_Y_RADIO_DEL_MODELO[p.pieza]?.radio;
   const trozos: HuellaDelModelo[] =
     como === 'puerta'
       ? [
@@ -201,14 +221,11 @@ export function cajasDeLaPuesta(
     const d = t.z1 * sz;
     if (k === null) {
       /*
-       * Redonda: el cuadrado de su mayor semieje, que es su caja la gire uno como la gire. O el de
-       * su radio medido, si lo tiene, que la cubre aunque no sea redonda: ver la cabecera. Si un
-       * día se estirara, el radio crece con el lado que más se estira.
+       * A un ángulo cualquiera: el cuadrado de su RADIO medido, que la cubre entera se gire como se
+       * gire, sea redonda o no: ver la cabecera. Si un día se estirara, el radio crece con el lado
+       * que más se estira.
        */
-      const r =
-        radio !== undefined
-          ? radio * (sx > sz ? sx : sz)
-          : Math.max(Math.abs(a), Math.abs(b), Math.abs(c), Math.abs(d));
+      const r = medido.radio * (sx > sz ? sx : sz);
       salida.push({ cuerpo: { x0: x - r, z0: z - r, x1: x + r, z1: z + r }, forma: 'redonda' });
       continue;
     }

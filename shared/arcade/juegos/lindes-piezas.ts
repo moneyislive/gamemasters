@@ -200,8 +200,8 @@ export type ComoEstorba = 'nada' | 'puerta' | 'caja' | 'si-pasa-de-la-cintura';
  * pequeño que una torre— se sigue cumpliendo: el reparto las pone a 1,5 junto a la senda y de
  * 1,7 a 2,2 en las parcelas, y la torre va a 1,4. Lo vigila `verify:lindes-mundo`, que además
  * mira que ninguna tape una senda, el hueco de una puerta o un sitio de nacer, ni parta el valle
- * en trozos. Y como van giradas de cualquier manera, su caja es la de su RADIO medido: ver
- * `cajasDeLaPuesta`.
+ * en trozos. Y como van giradas de cualquier manera, su caja es la de su RADIO medido, como la de
+ * todo lo del campo: ver `cajasDeLaPuesta`.
  *
  * Lo demás menudo sigue sin estorbar aunque haya barriles o carros que pasen de la cintura: la
  * queja era de las rocas, y para todo lo demás la regla de producto —lo menudo no choca— se
@@ -223,7 +223,9 @@ export function comoEstorba(pieza: string): ComoEstorba {
 
 /**
  * LO QUE MIDE DE ALTO UNA PIEZA PUESTA, en unidades del mundo, desde el suelo donde se apoya.
- * `null` si su alto no está medido: sólo se mide el de lo que estorba si pasa de la cintura.
+ * `null` si su alto no está medido: se mide el de todo lo que puede estorbar, con su huella
+ * (`lindes-huellas.ts`), y el de lo que nunca estorba, no. Sólo lo pregunta `comoEstorbaLaPuesta`,
+ * y sólo de las piedras.
  */
 export function altoDeLaPuesta(pieza: string, escala: number): number | null {
   const medido = ALTO_Y_RADIO_DEL_MODELO[pieza];
