@@ -832,6 +832,37 @@ const BATERIA = [
     porque:
       'un arcade escrito en un fichero temporal fuera del repositorio se instala por `ARCADES_EXTERNOS` —con la ruta de Windows, que es donde falla el cargador—, sale en el catálogo, abre mesa, esconde la mano de cada cual, pinta con el mueble genérico desde sus propias `opciones()` y dice POR QUÉ rechaza un movimiento',
   },
+  {
+    nombre: 'modalidad de la mesa',
+    donde: 'server',
+    guion: 'verify:modalidad',
+    lento: true,
+    porque:
+      'una mesa se abre en `normal` o en `botas` y no cambia: sin decir nada es normal, `botas` sólo para un juego que se recorre, lo mal escrito es un 400 que no deja mesa, la modalidad sobrevive a que el proceso muera y un fichero de antes se lee normal; y reconocer una llave no proyecta, no mete el tic, no marca presencia y no escribe',
+  },
+  {
+    nombre: 'lectura barata',
+    donde: 'server',
+    guion: 'verify:lectura-barata',
+    porque:
+      'la lectura con `desde` que espera y no encuentra nada no proyecta nada —contado: antes eran dos vistas y dos listas de opciones por vuelta—, la que encuentra algo proyecta una vez y no dos, y lo demás es lo de siempre: 200, 204 y 404, avisos, presencia, el tic metido por la lectura y el despertador',
+  },
+  {
+    nombre: 'CORS con lista blanca',
+    donde: 'server',
+    guion: 'verify:cors',
+    lento: true,
+    porque:
+      'la API sólo se deja leer desde los orígenes propios, lo añadido en `ORIGENES_PERMITIDOS` y —fuera de producción— el bucle local en cualquier puerto; sin `Origin` se sirve como siempre; el preflight con `x-asiento` pasa sólo desde donde toca y con la lista cerrada de cabeceras; y el servidor de verdad lo monta en lugar del `cors()` pelado',
+  },
+  {
+    nombre: 'mesas frías',
+    donde: 'server',
+    guion: 'verify:mesas-frias',
+    lento: true,
+    porque:
+      'un proceso nuevo lee lo que se le pide y no la carpeta entera; lo frío sale de la memoria con su fichero intacto y lo que no se puede soltar —alguien esperando, un asiento visto, el candado cogido, una escritura pendiente o una que falló— se queda; al pedirlas vuelven idénticas y con su tic; `abrir` no reparte el código de una mesa dormida; y el barrido de treinta días borra del disco sin cargar nada ni tocar lo que no entiende',
+  },
 
   /*
    * ═══ EL CLIENTE DE ESCRITORIO, Y VA DESPUÉS DEL ARCADE DE FUERA ═══
