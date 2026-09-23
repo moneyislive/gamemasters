@@ -62,6 +62,7 @@ import {
   MovimientoReservado,
   olvidarMesa,
   PLAZO_MAXIMO_S,
+  revisionDe,
   saludDelAlmacen,
   sentarse,
   vestir,
@@ -741,9 +742,30 @@ router.get('/arcade/mesas/:codigo', contadorDeCodigos, async (req, res) => {
   const desde = Number(req.query.desde);
 
   try {
-    const primera = await mirar(codigo, llave);
-    if (!Number.isFinite(desde) || primera.rev !== desde) {
-      responderConLaMesa(res, primera, desde);
+    if (!Number.isFinite(desde)) {
+      responderConLaMesa(res, await mirar(codigo, llave), desde);
+      return;
+    }
+
+    /*
+     * ═══ LAS DOS COMPARACIONES VAN CON LA LECTURA BARATA ═══
+     *
+     * Aquí había dos `mirar`: uno para comparar antes de aparcarse y otro para comparar al
+     * despertar, y los dos PROYECTABAN —componían la vista de este asiento con el código del
+     * juego y le pedían sus opciones— para que, si nada había cambiado, se tiraran las dos y se
+     * contestara 204. Era la mitad del coste de una mesa quieta, por cada móvil y cada vuelta.
+     *
+     * `revisionDe` hace todo lo que hacía `mirar` —el 404, el tic si venció el plazo, la
+     * presencia— menos la vista, y `mirar` se llama sólo cuando hay algo que mandar. Contado en
+     * `verify:lectura-barata`: la lectura que espera y no encuentra nada pasa de dos proyecciones y
+     * dos listas de opciones a CERO, y la que encuentra algo, de dos a una.
+     *
+     * Si entre comparar y componer entra otro movimiento, lo que se manda es la mesa de DESPUÉS de
+     * ese movimiento, que es más fresca y nunca más vieja: la revisión sólo sube.
+     */
+    const primera = await revisionDe(codigo, llave);
+    if (primera.rev !== desde) {
+      responderConLaMesa(res, await mirar(codigo, llave), desde);
       return;
     }
 
@@ -758,9 +780,9 @@ router.get('/arcade/mesas/:codigo', contadorDeCodigos, async (req, res) => {
     }
     await elCanal().esperarCambio(codigo);
 
-    const segunda = await mirar(codigo, llave);
+    const segunda = await revisionDe(codigo, llave);
     if (segunda.rev !== desde) {
-      responderConLaMesa(res, segunda, desde);
+      responderConLaMesa(res, await mirar(codigo, llave), desde);
       return;
     }
     res.status(204).end();

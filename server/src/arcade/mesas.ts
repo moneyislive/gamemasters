@@ -2407,23 +2407,78 @@ export async function mirar(codigo: string, llave: string | null): Promise<Vista
    */
   cargar();
   barrerSiTocaPorReloj(Date.now());
+  return conLaMesa(codigo, async (m) => vistaDe(m, await ponerAlDiaParaLeer(m, llave)));
+}
+
+/**
+ * LO QUE HACE UNA LECTURA ANTES DE CONTESTAR, sea cara o barata. Devuelve quién lee.
+ *
+ * Es el cuerpo de `mirar` menos la vista, sacado aquí para que `mirar` y `revisionDe` hagan
+ * EXACTAMENTE lo mismo y en el mismo orden: el manifiesto primero —un arcade que no está instalado
+ * falla igual en las dos—, el plazo después —el tic que venció entra por aquí y se guarda—, y la
+ * presencia al final, sólo si todo lo anterior ha ido bien. Dos copias de estas cuatro líneas
+ * serían dos lecturas que un día dejarían de hacer lo mismo sin que nadie lo viera.
+ */
+async function ponerAlDiaParaLeer(m: MesaEnCurso, llave: string | null): Promise<AsientoId | null> {
+  const manifiesto = manifiestoDeArcade(m.mesa.arcade);
+  const yo = asientoDe(m, llave);
+
+  if (ponerAlDiaElPlazo(m)) await guardar(manifiesto, m);
+
+  /*
+   * La presencia se marca AQUÍ, en la lectura, porque es lo que significa: «se
+   * le ha visto». No se escribe en ningún sitio ni pide el candado de nada —es
+   * un número en un mapa— y por eso puede ocurrir en cada vuelta de sondeo sin
+   * costar nada. La lección viene de las veladas, donde marcar «sigo aquí»
+   * pasaba por el candado de la partida y estrechaba la velada entera por el
+   * cuello del dato más insignificante que hay en ella.
+   */
+  if (yo !== null) marcarPresencia(clavePresencia(m.codigo), yo);
+  return yo;
+}
+
+/**
+ * LO QUE SE SABE DE UNA MESA SIN PROYECTARLA. Lo que devuelve `revisionDe`.
+ *
+ * Justo lo que la lectura con `?desde=N` necesita para decidir si contesta, si se aparca y si pide
+ * el despertador, y nada que salga de la partida: la revisión, cuándo vence el plazo y si terminó.
+ */
+export interface RevisionDeMesa {
+  rev: number;
+  venceEn: number | null;
+  terminada: boolean;
+}
+
+/**
+ * LA LECTURA BARATA: todo lo que hace `mirar`, MENOS PROYECTAR.
+ *
+ * ═══ LO QUE COSTABA UNA MESA QUIETA ═══
+ *
+ * `GET /arcade/mesas/:codigo?desde=N` —lo que hacen todos los móviles, todo el rato— llamaba a
+ * `mirar` sólo para comparar la revisión, se aparcaba, y volvía a llamar a `mirar` para comparar
+ * otra vez; si nada había cambiado tiraba las dos vistas y contestaba 204. Y `mirar` PROYECTA:
+ * ejecuta el código del juego en el hilo para componer la vista de ese asiento y le pregunta sus
+ * `opciones()`, que es lo más caro que hace este servidor. Contado con un arcade de prueba
+ * (`verify:lectura-barata`): una lectura quieta costaba dos proyecciones y dos listas de opciones
+ * por móvil y por vuelta de sondeo, para una respuesta sin cuerpo.
+ *
+ * ═══ LO QUE HACE, QUE ES TODO LO DEMÁS ═══
+ *
+ * Lo mismo que `mirar` y en el mismo orden, porque la comparación que la ruta hace con esto tiene
+ * que significar lo mismo que la que hacía con `mirar`: carga y barre si toca, contesta el mismo
+ * `MesaDesconocida` —el mismo 404 y el mismo contador de códigos en la ruta—, mete el tic si
+ * venció el plazo exactamente igual —es la lectura la que lo mete, bajo el candado, y se guarda—
+ * y marca la presencia de quien pregunta. Lo único que no hace es la vista.
+ *
+ * Y por eso una lectura aparcada que se suelta porque venció el plazo sigue trayendo el tic
+ * metido: lo mete esto, en la segunda comparación, y `mirar` sólo compone lo que se va a mandar.
+ */
+export async function revisionDe(codigo: string, llave: string | null): Promise<RevisionDeMesa> {
+  cargar();
+  barrerSiTocaPorReloj(Date.now());
   return conLaMesa(codigo, async (m) => {
-    const manifiesto = manifiestoDeArcade(m.mesa.arcade);
-    const yo = asientoDe(m, llave);
-
-    if (ponerAlDiaElPlazo(m)) await guardar(manifiesto, m);
-
-    /*
-     * La presencia se marca AQUÍ, en la lectura, porque es lo que significa: «se
-     * le ha visto». No se escribe en ningún sitio ni pide el candado de nada —es
-     * un número en un mapa— y por eso puede ocurrir en cada vuelta de sondeo sin
-     * costar nada. La lección viene de las veladas, donde marcar «sigo aquí»
-     * pasaba por el candado de la partida y estrechaba la velada entera por el
-     * cuello del dato más insignificante que hay en ella.
-     */
-    if (yo !== null) marcarPresencia(clavePresencia(codigo), yo);
-
-    return vistaDe(m, yo);
+    await ponerAlDiaParaLeer(m, llave);
+    return { rev: m.mesa.rev, venceEn: m.venceEn, terminada: m.mesa.terminada };
   });
 }
 

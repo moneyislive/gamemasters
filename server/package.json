@@ -82,7 +82,8 @@
     "oro:arcade": "tsx scripts/oro-arcade.ts",
     "verify:presupuesto": "tsx scripts/verificar-presupuesto.ts",
     "verify:arcade-de-fuera": "tsx scripts/verificar-arcade-de-fuera.ts",
-    "verify:modalidad": "tsx scripts/verificar-modalidad.ts"
+    "verify:modalidad": "tsx scripts/verificar-modalidad.ts",
+    "verify:lectura-barata": "tsx scripts/verificar-lectura-barata.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
