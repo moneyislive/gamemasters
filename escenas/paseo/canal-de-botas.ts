@@ -44,15 +44,21 @@
  * Llegan fotos —diez por segundo— y entre foto y foto no se sabe nada. Se pinta a cada uno
  * `RETRASO_DE_LOS_DEMAS_MS` atrás en el tiempo, que casi siempre cae entre dos fotos que ya han
  * llegado, y se interpola entre ellas. Si la última no ha llegado todavía se le deja en la última
- * que hay, quieto: extrapolar lo pintaría atravesando la pared contra la que se paró. Quien deja de
- * salir en las fotos se quita en el acto —el servidor ya le dio su gracia (`GRACIA_AL_IRSE_MS`)
- * antes de dejar de ponerlo—.
+ * que hay, quieto: extrapolar lo pintaría atravesando la pared contra la que se paró. Desde la
+ * refriega la foto lleva a TODOS los sentados mientras la sala viva —quien no abrió su canal, de pie
+ * en su sitio de nacer; quien lo cerró, donde se quedó—, porque nadie es inmune por no bajar; así
+ * que quien deja de salir en las fotos es que la sala se acabó, y se quita en el acto.
  *
  * ═══ QUÉ SE HACE CUANDO SE CORTA ═══
  *
- *  · `llaveMala`, `mesaQueNo`, `reemplazado`: NO se reconecta. Volver a llamar con la misma llave a
- *    la misma mesa daría lo mismo, y con `reemplazado` sería peor: dos aparatos con el mismo asiento
- *    echándose el uno al otro para siempre. Se deja el motivo escrito para la pantalla.
+ *  · `llaveMala`, `mesaQueNo`, `reemplazado`, `versionVieja`: NO se reconecta. Volver a llamar con la
+ *    misma llave a la misma mesa daría lo mismo, con `reemplazado` sería peor —dos aparatos con el
+ *    mismo asiento echándose el uno al otro para siempre— y con `versionVieja` el servidor habla
+ *    otra versión del canal: lo único que lo arregla es actualizar la app. Se deja el motivo escrito
+ *    para la pantalla.
+ *  · `atascado`: el servidor cerró porque este canal no daba abasto y no podía perder lo que no se
+ *    salta (una caída, un renacer): se reconecta como tras cualquier corte, y al volver llega
+ *    `vidas` con todo al día.
  *  · `quieto`: el servidor desaloja a quien lleva un minuto sin moverse. Reconectar en el acto sería
  *    burlar su regla con una conexión nueva cada minuto; se reconecta cuando se vuelve a MOVER, que
  *    es justo lo que la regla pide.
@@ -282,6 +288,10 @@ export function motivoDelCierre(codigo: number, razon: string): string {
       return 'el servidor ha cortado por demasiados mensajes';
     case CIERRE.mesaCerrada:
       return 'la mesa se ha cerrado';
+    case CIERRE.versionVieja:
+      return 'esta versión de la app ya no habla con el servidor: hay que actualizarla';
+    case CIERRE.atascado:
+      return 'la conexión no daba abasto';
     default: {
       /* Entre paréntesis y en mitad de una frase, lo que dijo sin su punto: «(Reinicio)», no «(Reinicio.).». */
       const dicho = sinPuntoFinal(razon.trim().slice(0, TOPE_DEL_MOTIVO));
@@ -320,7 +330,12 @@ export function sinConexion(motivo: string): string {
 
 /** Los cierres después de los cuales no se vuelve a llamar. Ver la cabecera. */
 export function cierreSinVuelta(codigo: number): boolean {
-  return codigo === CIERRE.llaveMala || codigo === CIERRE.mesaQueNo || codigo === CIERRE.reemplazado;
+  return (
+    codigo === CIERRE.llaveMala ||
+    codigo === CIERRE.mesaQueNo ||
+    codigo === CIERRE.reemplazado ||
+    codigo === CIERRE.versionVieja
+  );
 }
 
 /* ─── Los demás, como se pintan ──────────────────────────────────────────── */

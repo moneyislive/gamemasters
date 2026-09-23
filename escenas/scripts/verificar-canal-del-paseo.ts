@@ -70,7 +70,9 @@ import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mun
 import type { Andante, Arena, Casilla, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
 import {
   abrirElCanal,
+  cierreSinVuelta,
   esperaTras,
+  motivoDelCierre,
   PLAZO_PARA_ENTRAR_MS,
   poseEntreFotos,
   PRIMERA_ESPERA_MS,
@@ -660,6 +662,7 @@ paso('Cuando se corta: sin vuelta con la llave mala, la mesa que no y el asiento
     ['llaveMala', CIERRE.llaveMala, /llave/],
     ['mesaQueNo', CIERRE.mesaQueNo, /no se recorre/],
     ['reemplazado', CIERRE.reemplazado, /otro aparato/],
+    ['versionVieja', CIERRE.versionVieja, /hay que actualizarla/],
   ];
   for (const [nombre, codigo, dice] of SIN_VUELTA) {
     const b = unBanco();
@@ -686,6 +689,40 @@ paso('Cuando se corta: sin vuelta con la llave mala, la mesa que no y el asiento
     'y si el servidor dijo por qué con un `fuera`, se lee lo que dijo, como frase suya: tras un punto y con su punto, no con dos',
     b.cliente.estado().texto === 'Sin conexión. Esta mesa se juega en la modalidad de siempre.',
     b.cliente.estado().texto,
+  );
+}
+{
+  /*
+   * `atascado` SÍ VUELVE: el servidor cerró porque este canal no daba abasto y no podía perder una
+   * caída o un renacer; al volver le llega `vidas` con todo al día. Quedarse parado sería dejar a
+   * alguien sin canal por una cola que ya no existe.
+   */
+  const b = unBanco();
+  b.socket().abrir();
+  b.socket().llega(dentro(0, 0));
+  b.socket().cae(CIERRE.atascado);
+  const e = b.cliente.estado();
+  b.reloj.avanzar(PRIMERA_ESPERA_MS);
+  comprobar(
+    'con `atascado` se vuelve a llamar, como tras un corte cualquiera, y se dice por qué',
+    e.fase === 'reintentando' && /no daba abasto/.test(e.texto) && b.creados.length === 2,
+    { fase: e.fase, texto: e.texto, sockets: b.creados.length },
+  );
+  /*
+   * Y CADA CIERRE DEL CONTRATO TIENE SU FRASE: el día que el contrato gane un código nuevo y aquí no
+   * se escriba, el cartel diría «se ha perdido la conexión», que es mentira y no dice qué hacer.
+   */
+  const sinFrase = Object.entries(CIERRE)
+    .filter(([, codigo]) => /^se ha perdido la conexión/.test(motivoDelCierre(codigo, '')))
+    .map(([nombre]) => nombre);
+  comprobar('cada código de cierre del contrato tiene su propia frase', sinFrase.length === 0 && Object.keys(CIERRE).length >= 9, sinFrase);
+  comprobar(
+    'y sólo no vuelven los que no pueden volver: la llave, la mesa, el otro aparato y la versión',
+    Object.entries(CIERRE)
+      .filter(([, codigo]) => cierreSinVuelta(codigo))
+      .map(([nombre]) => nombre)
+      .sort()
+      .join(',') === 'llaveMala,mesaQueNo,reemplazado,versionVieja',
   );
 }
 
