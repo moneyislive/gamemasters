@@ -539,6 +539,13 @@ const BATERIA = [
       'lo que manda un aparato llega de un entorno hostil, y el lector del servidor devuelve null ante cualquier cosa que no sea exactamente un mensaje bien formado —una clave de más, un número con decimales, una coordenada fuera de la coma fija, un rumbo o una marcha fuera de rango, un texto más largo que el tope—; el del aparato, igual con lo que manda el servidor; la ruta cuelga de la mesa bajo /api y la llave NO va en ella',
   },
   {
+    nombre: 'el mundo de Riberas',
+    donde: 'server',
+    guion: 'verify:riberas-mundo',
+    porque:
+      'el mundo del delta cae bajo lo que pinta la escena —centros y vértices de sitios.ts a milésimas, las 2.736 teselas propias dentro de su comarca y ninguna esquina pintada en lo hondo—, el vado frena a la mitad y lo hondo para, cada choza, torre y estiaje corta el paso con su caja medida en tablero.glb, se nace en tierra mirando al centro, y el mismo mundo y el mismo paseo salen en Node y en Hermes',
+  },
+  {
     nombre: 'el mundo de Las Lindes',
     donde: 'server',
     guion: 'verify:lindes-mundo',
