@@ -49,6 +49,19 @@
  * nadie produce ni lee es el fallo firmado de esta casa; cuando haga falta, se añade con su
  * productor y su comprobador el mismo día.
  *
+ * La altura a la que se PINTA a alguien es cosa de cada escena: sale del relieve que esa
+ * escena ya dibuja, y no decide nada. Lo que decide —si se puede estar, si se choca— es
+ * plano, y es lo único que está aquí.
+ *
+ * ═══ EL VADO: SE ANDA, PERO DESPACIO ═══
+ *
+ * Miguel lo decidió para Riberas el 18 de septiembre: «se anda por la arena y por el agua
+ * somera, con el avatar metido en el agua; lo hondo frena». Una casilla puede ser, pues, de
+ * TRES maneras y no de dos: no se pisa, se pisa, o se VADEA. Lo hondo es simplemente lo que
+ * no está en ninguna de las dos listas. En un vado el paso es la mitad —con una división
+ * entera, sin coma flotante—, y un juego sin agua declara `vados: []`, que es una palabra que
+ * alguien tuvo que escribir y no un campo que faltaba.
+ *
  * ═══ POR QUÉ UNA CAJA ALINEADA Y NO UNA MALLA ═══
  *
  * Porque el camino que decide un choque NO MULTIPLICA: cuatro comparaciones y ni un producto.
@@ -93,10 +106,17 @@ export interface Cuerpo {
   readonly z1: number;
 }
 
-/** Un sitio donde se puede nacer, en unidades del mundo. */
+/**
+ * Un sitio donde se puede nacer, en unidades del mundo, y hacia dónde se mira al nacer.
+ *
+ * `rumbo` en radianes con el convenio del paseante: 0 es el norte —la `z` negativa— y crece
+ * hacia el este. Va aquí y no en cada escena porque nacer mirando a una pared es un fallo del
+ * MUNDO —quien lo declara sabe dónde está el centro del tablero— y no de quien lo pinta.
+ */
 export interface Sitio {
   readonly x: number;
   readonly z: number;
+  readonly rumbo: number;
 }
 
 /**
@@ -114,6 +134,11 @@ export interface MundoDeclarado {
   readonly lado: number;
   /** Dónde se puede estar. Vacío significa vacío: un mundo sin suelo no se recorre. */
   readonly pisables: readonly Casilla[];
+  /**
+   * Dónde se puede estar, pero con el agua por las rodillas: se anda a la mitad. Una casilla
+   * que esté en las dos listas es firme —gana la tierra—. Sin agua, `[]`.
+   */
+  readonly vados: readonly Casilla[];
   /** Lo que hay en medio. */
   readonly cuerpos: readonly Cuerpo[];
   /** Dónde se puede nacer. */
@@ -126,6 +151,20 @@ export interface MundoDeclarado {
 const UNIDADES_POR_CAJON = 32;
 
 /**
+ * El lado de un cajón en coma fija: 32 × 65.536 = 2^21. Que sea potencia de dos no es
+ * casualidad: dividir un entero entre ella es exacto en coma flotante, así que `Math.floor`
+ * de esa división da el mismo cajón en todos los motores sin pasar por un desplazamiento
+ * (ver `fijo.ts` para por qué los desplazamientos no).
+ */
+const CAJON_EN_FIJO = UNIDADES_POR_CAJON * UNO;
+
+/** Lo que hay debajo de un punto. */
+export const NADA = 0;
+export const FIRME = 1;
+export const VADO = 2;
+export type Suelo = typeof NADA | typeof FIRME | typeof VADO;
+
+/**
  * La forma rápida del mundo. Se deriva con `arenaDe()` y se tira al salir.
  *
  * Todo lo que lleva dentro está en Q16.16 salvo los índices de casilla y de cajón, que son
@@ -134,12 +173,12 @@ const UNIDADES_POR_CAJON = 32;
 export interface Arena {
   /** El lado de una casilla, en Q16.16. */
   readonly lado: number;
-  /** El rectángulo de casillas que envuelve lo pisable. */
+  /** El rectángulo de casillas que envuelve lo pisable y lo vadeable. */
   readonly desdeX: number;
   readonly desdeY: number;
   readonly anchura: number;
   readonly fondo: number;
-  /** Un byte por casilla del rectángulo: 1 si se puede estar. */
+  /** Un byte por casilla del rectángulo: `NADA`, `FIRME` o `VADO`. */
   readonly pisable: Uint8Array;
   /** Las cajas, planas: `x0, z0, x1, z1` por cuerpo, en Q16.16. */
   readonly cuerpos: Int32Array;
@@ -152,6 +191,8 @@ export interface Arena {
   readonly cajones: readonly (readonly number[])[];
   /** Los sitios donde se nace, en Q16.16: `x, z` por sitio. */
   readonly nace: Int32Array;
+  /** Y hacia dónde se mira en cada uno, en radianes: no decide nada, así que no es entero. */
+  readonly rumbos: readonly number[];
 }
 
 /**
@@ -166,9 +207,15 @@ function casillaDe(v: number, lado: number): number {
   return Math.floor(v / lado + 0.5);
 }
 
-/** En qué cajón del índice cae una coordenada. */
-function cajonDe(v: number, porCajon: number): number {
-  return Math.floor(v / porCajon);
+/**
+ * En qué cajón del índice cae una coordenada EN COMA FIJA.
+ *
+ * El índice se monta y se consulta con la MISMA cuenta sobre los MISMOS enteros. Antes se
+ * montaba con los números del mundo en coma flotante y se consultaba con los de coma fija
+ * divididos otra vez: dos caminos hasta el mismo cajón, que en una raya pueden no coincidir.
+ */
+function cajonDe(v: number): number {
+  return Math.floor(v / CAJON_EN_FIJO);
 }
 
 /** Un número del mundo a coma fija. Sólo aquí, al derivar. */
@@ -182,18 +229,22 @@ function aFijo(x: number): number {
 export function arenaDe(mundo: MundoDeclarado): Arena {
   const lado = aFijo(mundo.lado);
 
-  /* ── El rectángulo de lo pisable ─────────────────────────────────────── */
+  /* ── El rectángulo de lo que se pisa o se vadea ──────────────────────── */
   let desdeX = 0;
   let desdeY = 0;
   let hastaX = -1;
   let hastaY = -1;
-  if (mundo.pisables.length > 0) {
-    const primera = mundo.pisables[0] as Casilla;
-    desdeX = primera.x;
-    desdeY = primera.y;
-    hastaX = primera.x;
-    hastaY = primera.y;
-    for (const c of mundo.pisables) {
+  let hayAlguna = false;
+  for (const lista of [mundo.pisables, mundo.vados]) {
+    for (const c of lista) {
+      if (!hayAlguna) {
+        desdeX = c.x;
+        desdeY = c.y;
+        hastaX = c.x;
+        hastaY = c.y;
+        hayAlguna = true;
+        continue;
+      }
       if (c.x < desdeX) desdeX = c.x;
       if (c.y < desdeY) desdeY = c.y;
       if (c.x > hastaX) hastaX = c.x;
@@ -203,11 +254,11 @@ export function arenaDe(mundo: MundoDeclarado): Arena {
   const anchura = hastaX >= desdeX ? hastaX - desdeX + 1 : 0;
   const fondo = hastaY >= desdeY ? hastaY - desdeY + 1 : 0;
   const pisable = new Uint8Array(anchura * fondo);
-  for (const c of mundo.pisables) {
-    pisable[(c.y - desdeY) * anchura + (c.x - desdeX)] = 1;
-  }
+  /* Primero el agua y después la tierra: una casilla en las dos listas acaba FIRME. */
+  for (const c of mundo.vados) pisable[(c.y - desdeY) * anchura + (c.x - desdeX)] = VADO;
+  for (const c of mundo.pisables) pisable[(c.y - desdeY) * anchura + (c.x - desdeX)] = FIRME;
 
-  /* ── Las cajas, y su índice por cajones ──────────────────────────────── */
+  /* ── Las cajas, en coma fija, y su índice por cajones ────────────────── */
   const cuerpos = new Int32Array(mundo.cuerpos.length * 4);
   for (let i = 0; i < mundo.cuerpos.length; i++) {
     const c = mundo.cuerpos[i] as Cuerpo;
@@ -221,22 +272,22 @@ export function arenaDe(mundo: MundoDeclarado): Arena {
   let cajonDesdeZ = 0;
   let cajonHastaX = -1;
   let cajonHastaZ = -1;
-  if (mundo.cuerpos.length > 0) {
-    const primero = mundo.cuerpos[0] as Cuerpo;
-    cajonDesdeX = cajonDe(primero.x0, UNIDADES_POR_CAJON);
-    cajonDesdeZ = cajonDe(primero.z0, UNIDADES_POR_CAJON);
-    cajonHastaX = cajonDe(primero.x1, UNIDADES_POR_CAJON);
-    cajonHastaZ = cajonDe(primero.z1, UNIDADES_POR_CAJON);
-    for (const c of mundo.cuerpos) {
-      const a = cajonDe(c.x0, UNIDADES_POR_CAJON);
-      const b = cajonDe(c.z0, UNIDADES_POR_CAJON);
-      const d = cajonDe(c.x1, UNIDADES_POR_CAJON);
-      const e = cajonDe(c.z1, UNIDADES_POR_CAJON);
-      if (a < cajonDesdeX) cajonDesdeX = a;
-      if (b < cajonDesdeZ) cajonDesdeZ = b;
-      if (d > cajonHastaX) cajonHastaX = d;
-      if (e > cajonHastaZ) cajonHastaZ = e;
+  for (let i = 0; i < mundo.cuerpos.length; i++) {
+    const a = cajonDe(cuerpos[i * 4] as number);
+    const b = cajonDe(cuerpos[i * 4 + 1] as number);
+    const d = cajonDe(cuerpos[i * 4 + 2] as number);
+    const e = cajonDe(cuerpos[i * 4 + 3] as number);
+    if (i === 0) {
+      cajonDesdeX = a;
+      cajonDesdeZ = b;
+      cajonHastaX = d;
+      cajonHastaZ = e;
+      continue;
     }
+    if (a < cajonDesdeX) cajonDesdeX = a;
+    if (b < cajonDesdeZ) cajonDesdeZ = b;
+    if (d > cajonHastaX) cajonHastaX = d;
+    if (e > cajonHastaZ) cajonHastaZ = e;
   }
   const cajonesAncho = cajonHastaX >= cajonDesdeX ? cajonHastaX - cajonDesdeX + 1 : 0;
   const cajonesFondo = cajonHastaZ >= cajonDesdeZ ? cajonHastaZ - cajonDesdeZ + 1 : 0;
@@ -248,11 +299,10 @@ export function arenaDe(mundo: MundoDeclarado): Arena {
    * sólo en uno lo haría invisible desde el resto de su propia longitud.
    */
   for (let i = 0; i < mundo.cuerpos.length; i++) {
-    const c = mundo.cuerpos[i] as Cuerpo;
-    const a = cajonDe(c.x0, UNIDADES_POR_CAJON) - cajonDesdeX;
-    const b = cajonDe(c.z0, UNIDADES_POR_CAJON) - cajonDesdeZ;
-    const d = cajonDe(c.x1, UNIDADES_POR_CAJON) - cajonDesdeX;
-    const e = cajonDe(c.z1, UNIDADES_POR_CAJON) - cajonDesdeZ;
+    const a = cajonDe(cuerpos[i * 4] as number) - cajonDesdeX;
+    const b = cajonDe(cuerpos[i * 4 + 1] as number) - cajonDesdeZ;
+    const d = cajonDe(cuerpos[i * 4 + 2] as number) - cajonDesdeX;
+    const e = cajonDe(cuerpos[i * 4 + 3] as number) - cajonDesdeZ;
     for (let cz = b; cz <= e; cz++) {
       for (let cx = a; cx <= d; cx++) {
         (cajones[cz * cajonesAncho + cx] as number[]).push(i);
@@ -261,10 +311,12 @@ export function arenaDe(mundo: MundoDeclarado): Arena {
   }
 
   const nace = new Int32Array(mundo.nace.length * 2);
+  const rumbos: number[] = [];
   for (let i = 0; i < mundo.nace.length; i++) {
     const s = mundo.nace[i] as Sitio;
     nace[i * 2] = aFijo(s.x);
     nace[i * 2 + 1] = aFijo(s.z);
+    rumbos.push(s.rumbo);
   }
 
   return {
@@ -281,17 +333,24 @@ export function arenaDe(mundo: MundoDeclarado): Arena {
     cajonesFondo,
     cajones,
     nace,
+    rumbos,
   };
 }
 
-/* ─── LAS DOS PREGUNTAS ──────────────────────────────────────────────────── */
+/* ─── LAS PREGUNTAS ──────────────────────────────────────────────────────── */
 
-/** ¿Cae este punto en una casilla donde se puede estar? Todo en Q16.16. */
-export function hayPiso(arena: Arena, x: number, z: number): boolean {
+/** ¿Qué hay debajo de este punto? Todo en Q16.16. */
+export function sueloEn(arena: Arena, x: number, z: number): Suelo {
   const i = casillaDe(x, arena.lado) - arena.desdeX;
   const j = casillaDe(-z, arena.lado) - arena.desdeY;
-  if (i < 0 || j < 0 || i >= arena.anchura || j >= arena.fondo) return false;
-  return arena.pisable[j * arena.anchura + i] === 1;
+  if (i < 0 || j < 0 || i >= arena.anchura || j >= arena.fondo) return NADA;
+  const v = arena.pisable[j * arena.anchura + i];
+  return v === FIRME ? FIRME : v === VADO ? VADO : NADA;
+}
+
+/** ¿Cae este punto en una casilla donde se puede estar, firme o vadeando? Todo en Q16.16. */
+export function hayPiso(arena: Arena, x: number, z: number): boolean {
+  return sueloEn(arena, x, z) !== NADA;
 }
 
 /**
@@ -300,29 +359,48 @@ export function hayPiso(arena: Arena, x: number, z: number): boolean {
  * Cuatro comparaciones por caja y ni un producto. Se prueba el CUADRADO que envuelve al
  * paseante y no el círculo: para decidir si se pasa entre un almiar y un muro, la diferencia
  * entre una esquina y un arco es menos que el ancho de una bota, y el arco costaría una raíz.
+ *
+ * ═══ SE MIRAN TODOS LOS CAJONES QUE PISA EL CUADRADO, NO SÓLO EL DEL CENTRO ═══
+ *
+ * Mirar sólo el cajón del centro era el agujero: con el centro a una bota de la raya, la mitad
+ * del paseante está en el cajón de al lado, y lo que vive sólo ahí no se consultaba. Se veía
+ * como meterse medio cuerpo en una casa que cae justo en una raya. Son a lo sumo cuatro cajones
+ * —el radio es mucho menor que el cajón—, y una caja apuntada en dos se mira dos veces, que
+ * para contestar «¿choca con algo?» da igual.
  */
 export function chocaConCuerpo(arena: Arena, x: number, z: number, radio: number): boolean {
-  const cx = cajonDe(x / UNO, UNIDADES_POR_CAJON) - arena.cajonDesdeX;
-  const cz = cajonDe(z / UNO, UNIDADES_POR_CAJON) - arena.cajonDesdeZ;
-  if (cx < 0 || cz < 0 || cx >= arena.cajonesAncho || cz >= arena.cajonesFondo) return false;
-  const cajon = arena.cajones[cz * arena.cajonesAncho + cx];
-  if (cajon === undefined) return false;
+  if (arena.cajonesAncho === 0 || arena.cajonesFondo === 0) return false;
+  let desdeCx = cajonDe(x - radio) - arena.cajonDesdeX;
+  let hastaCx = cajonDe(x + radio) - arena.cajonDesdeX;
+  let desdeCz = cajonDe(z - radio) - arena.cajonDesdeZ;
+  let hastaCz = cajonDe(z + radio) - arena.cajonDesdeZ;
+  if (hastaCx < 0 || hastaCz < 0 || desdeCx >= arena.cajonesAncho || desdeCz >= arena.cajonesFondo) return false;
+  if (desdeCx < 0) desdeCx = 0;
+  if (desdeCz < 0) desdeCz = 0;
+  if (hastaCx >= arena.cajonesAncho) hastaCx = arena.cajonesAncho - 1;
+  if (hastaCz >= arena.cajonesFondo) hastaCz = arena.cajonesFondo - 1;
   const c = arena.cuerpos;
-  for (const k of cajon) {
-    const i = k * 4;
-    if (
-      x + radio > (c[i] as number) &&
-      x - radio < (c[i + 2] as number) &&
-      z + radio > (c[i + 1] as number) &&
-      z - radio < (c[i + 3] as number)
-    ) {
-      return true;
+  for (let cz = desdeCz; cz <= hastaCz; cz++) {
+    for (let cx = desdeCx; cx <= hastaCx; cx++) {
+      const cajon = arena.cajones[cz * arena.cajonesAncho + cx];
+      if (cajon === undefined) continue;
+      for (const k of cajon) {
+        const i = k * 4;
+        if (
+          x + radio > (c[i] as number) &&
+          x - radio < (c[i + 2] as number) &&
+          z + radio > (c[i + 1] as number) &&
+          z - radio < (c[i + 3] as number)
+        ) {
+          return true;
+        }
+      }
     }
   }
   return false;
 }
 
-/** ¿Se puede estar aquí? Hay piso y no hay cuerpo. */
+/** ¿Se puede estar aquí? Hay piso —firme o vado— y no hay cuerpo. */
 export function sePuedeEstar(arena: Arena, x: number, z: number, radio: number): boolean {
   if (!hayPiso(arena, x, z)) return false;
   return !chocaConCuerpo(arena, x, z, radio);
@@ -347,6 +425,10 @@ export interface Andante {
  * va por `fijo.por` y NO por un desplazamiento de 16: `(v * dt) >> 16` desborda el entero de
  * 32 bits y devuelve el paso con el signo cambiado —el peón anda hacia atrás— igual en los dos
  * motores, que es lo que lo hacía invisible. Ver la cabecera de `fijo.ts`.
+ *
+ * En un VADO el paso es la mitad, y la mitad es `(d / 2) | 0`: división y truncado, las dos
+ * fijadas al bit. Lo decide el suelo que se pisa AL SALIR, no al llegar: entrar en el agua no
+ * frena el paso que te mete, frena el siguiente, que es como se nota andando.
  */
 export function unPaso(
   arena: Arena,
@@ -356,8 +438,12 @@ export function unPaso(
   dt: number,
   radio: number,
 ): Andante {
-  const dx = por(vx, dt);
-  const dz = por(vz, dt);
+  let dx = por(vx, dt);
+  let dz = por(vz, dt);
+  if (sueloEn(arena, quien.x, quien.z) === VADO) {
+    dx = (dx / 2) | 0;
+    dz = (dz / 2) | 0;
+  }
   if (dx === 0 && dz === 0) return quien;
 
   if (sePuedeEstar(arena, quien.x + dx, quien.z + dz, radio)) {

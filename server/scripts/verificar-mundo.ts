@@ -30,11 +30,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { COSENO, pasoDelTic, RUMBOS, rumboDeRadianes, rumboValido, SENO } from '../../shared/mecanicas/andar';
+import { ANDANDO, QUIETO } from '../../shared/mecanicas/andar';
 import { canonico, porQueNoEsCanonico } from '../../shared/mecanicas/canonico';
 import { UNO } from '../../shared/mecanicas/fijo';
-import { arenaDe, hayPiso, sePuedeEstar } from '../../shared/mecanicas/mundo';
+import { arenaDe, FIRME, hayPiso, NADA, sePuedeEstar, sueloEn, VADO } from '../../shared/mecanicas/mundo';
 import type { Cuerpo } from '../../shared/mecanicas/mundo';
-import { LADO, mundoDePrueba, pasear, PASOS } from './paseo-del-banco';
+import { LADO, LOSAS_ANCHO, mundoDePrueba, pasear, PASOS } from './paseo-del-banco';
 import type { Paseo } from './paseo-del-banco';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -70,6 +72,9 @@ comprobar('el mundo de prueba tiene las 72 casillas de un tablero lleno', mundo.
   pisables: mundo.pisables.length,
 });
 comprobar('y las 3.024 piezas del peor caso', mundo.cuerpos.length === 3024, { cuerpos: mundo.cuerpos.length });
+comprobar('y una fila de vado al sur, para que el agua también se pise', mundo.vados.length === LOSAS_ANCHO, {
+  vados: mundo.vados.length,
+});
 
 const porQue = porQueNoEsCanonico(mundo);
 comprobar('el mundo declarado canoniza', porQue === null, porQue);
@@ -119,10 +124,22 @@ console.log(
  * un mundo sin obstáculos, que se atraviesa tan tranquilo y en el que todas las huellas
  * coinciden entre motores.
  */
-comprobar('el índice apunta todos los cuerpos, y alguno en más de un cajón', enCajones >= mundo.cuerpos.length, {
+/*
+ * `>` y no `>=`: con `>=` esta línea pasaba también con cada cuerpo apuntado UNA sola vez, que
+ * es justo el índice roto que la frase dice descartar. Con 3.024 cajas repartidas al azar,
+ * alguna cae en una raya seguro.
+ */
+comprobar('el índice apunta todos los cuerpos, y alguno en más de un cajón', enCajones > mundo.cuerpos.length, {
   enCajones,
   cuerpos: mundo.cuerpos.length,
 });
+let sinApuntar = 0;
+{
+  const apuntados = new Set<number>();
+  for (const c of arena.cajones) for (const k of c) apuntados.add(k);
+  sinApuntar = mundo.cuerpos.length - apuntados.size;
+}
+comprobar('y no queda ni un cuerpo sin apuntar en ningún cajón', sinApuntar === 0, { sinApuntar });
 comprobar('y ningún cajón se queda con la mitad del tablero dentro', peorCajon < 100, { peorCajon });
 
 const medio = (v: number): number => Math.round(v * UNO);
@@ -136,6 +153,124 @@ comprobar(
   !sePuedeEstar(arena, medio((primero.x0 + primero.x1) / 2), medio((primero.z0 + primero.z1) / 2), medio(0.4)),
 );
 
+/*
+ * ═══ LA RAYA DEL CAJÓN, QUE ES DONDE SE ESCONDÍA UN AGUJERO ═══
+ *
+ * El índice parte el mundo en cajones de 32 unidades y cada caja se apunta en los que TOCA. La
+ * pregunta «¿choca este paseante?» miraba sólo el cajón donde cae su CENTRO. Con el centro a
+ * 31,9 y un radio de 0,4, el paseante ocupa hasta 32,3 —ya dentro del cajón de al lado—, y una
+ * caja que empieza en 32,1 y vive sólo en ese cajón no se consultaba nunca: se podía meter
+ * hasta un radio entero dentro de ella. No da error y no se ve desde arriba; se ve andando
+ * pegado a una casa que cae justo en una raya.
+ */
+const raya = arenaDe({
+  lado: LADO,
+  pisables: [{ x: 0, y: 0 }],
+  vados: [],
+  cuerpos: [{ x0: 32.1, z0: -10, x1: 40, z1: 10 }],
+  nace: [{ x: 0, z: 0, rumbo: 0 }],
+});
+comprobar(
+  'un paseante con el centro en un cajón y el cuerpo en el de al lado SÍ choca con lo que hay ahí',
+  !sePuedeEstar(raya, medio(31.9), 0, medio(0.4)),
+  'el paseante ocupa [31,5 · 32,3] y la caja empieza en 32,1: se estaría metiendo 0,2 dentro',
+);
+comprobar(
+  'y por el otro lado de la raya igual: centro en el cajón de la caja y el paseante asomando',
+  !sePuedeEstar(
+    arenaDe({
+      lado: LADO,
+      pisables: [{ x: 0, y: 0 }],
+      vados: [],
+      cuerpos: [{ x0: 20, z0: -10, x1: 31.9, z1: 10 }],
+      nace: [{ x: 0, z: 0, rumbo: 0 }],
+    }),
+    medio(32.2),
+    0,
+    medio(0.4),
+  ),
+  'la caja acaba en 31,9, el paseante empieza en 31,8',
+);
+comprobar(
+  'y lejos de la caja se puede estar: la prueba de arriba no es un «nunca se puede»',
+  sePuedeEstar(raya, medio(30), 0, medio(0.4)),
+);
+
+/*
+ * ═══ EL VADO: SE PISA, FRENA A LA MITAD, Y LO HONDO NO SE PISA ═══
+ */
+comprobar('en la fila del sur el suelo es VADO', sueloEn(arena, medio(0), medio(LADO)) === VADO, {
+  suelo: sueloEn(arena, medio(0), medio(LADO)),
+});
+comprobar('en el tablero es FIRME', sueloEn(arena, 0, 0) === FIRME, { suelo: sueloEn(arena, 0, 0) });
+comprobar('y más allá del vado no hay NADA: lo hondo no se pisa', sueloEn(arena, 0, medio(LADO * 2)) === NADA);
+comprobar(
+  'y una casilla que está en las dos listas es FIRME: gana la tierra',
+  sueloEn(
+    arenaDe({ lado: LADO, pisables: [{ x: 0, y: 0 }], vados: [{ x: 0, y: 0 }], cuerpos: [], nace: [] }),
+    0,
+    0,
+  ) === FIRME,
+);
+{
+  /* El mismo tic, sin nada delante, en tierra y en el agua: el del agua es la mitad. */
+  const llano = arenaDe({
+    lado: LADO,
+    pisables: [{ x: 0, y: 0 }],
+    vados: [{ x: 0, y: -1 }],
+    cuerpos: [],
+    nace: [],
+  });
+  const enTierra = pasoDelTic(llano, { x: 0, z: 0 }, 64, ANDANDO);
+  const enAgua = pasoDelTic(llano, { x: 0, z: medio(LADO) }, 64, ANDANDO);
+  const avanceTierra = enTierra.x;
+  const avanceAgua = enAgua.x;
+  comprobar('andando al este en tierra se avanza algo', avanceTierra > 0, { avanceTierra });
+  comprobar(
+    'y en el vado, el MISMO tic avanza la mitad —entera, truncada—',
+    avanceAgua === ((avanceTierra / 2) | 0),
+    { avanceTierra, avanceAgua },
+  );
+  comprobar('y quieto no se mueve nadie', pasoDelTic(llano, { x: 5, z: 7 }, 64, QUIETO).x === 5);
+}
+
+/*
+ * ═══ LA TABLA DE RUMBOS DICE LO QUE DICE SU CABECERA ═══
+ *
+ * La tabla es literal a propósito: nadie la calcula al cargar. Aquí SÍ se calcula —esto es un
+ * comprobador, corre en un solo motor y no decide nada— para saber que lo pegado sigue siendo
+ * el seno y el coseno de cada rumbo. Se admite una unidad de diferencia porque un motor con
+ * otro `Math.sin` podría redondear distinto el último bit, y eso ya no importa: lo que viaja es
+ * la tabla.
+ */
+{
+  let malos = 0;
+  let peor = 0;
+  for (let r = 0; r < RUMBOS; r++) {
+    const a = (Math.PI * 2 * r) / RUMBOS;
+    const ds = Math.abs((SENO[r] as number) - Math.round(Math.sin(a) * UNO));
+    const dc = Math.abs((COSENO[r] as number) - Math.round(Math.cos(a) * UNO));
+    peor = Math.max(peor, ds, dc);
+    if (ds > 1 || dc > 1) malos++;
+  }
+  comprobar('las dos tablas tienen los 256 rumbos', SENO.length === RUMBOS && COSENO.length === RUMBOS, {
+    seno: SENO.length,
+    coseno: COSENO.length,
+  });
+  comprobar('y cada entrada es el seno o el coseno de su rumbo, a una unidad como mucho', malos === 0, {
+    malos,
+    peor,
+  });
+  comprobar('el rumbo 0 mira al norte: dirección (0, −1)', SENO[0] === 0 && COSENO[0] === UNO);
+  comprobar('el 64 mira al este: dirección (1, 0)', SENO[64] === UNO && COSENO[64] === 0);
+  comprobar('los rumbos dan la vuelta: −1 es 255 y 256 es 0', rumboValido(-1) === 255 && rumboValido(256) === 0);
+  comprobar(
+    'y de radianes a rumbo: π/2 es el este',
+    rumboDeRadianes(Math.PI / 2) === 64,
+    { rumbo: rumboDeRadianes(Math.PI / 2) },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // ESCALÓN 3 · EL PASEO, CON EL SUELO DELANTE
 // ---------------------------------------------------------------------------
@@ -144,8 +279,8 @@ paso('Un paseo largo, y que se haya chocado de verdad');
 
 const paseo = pasear();
 console.log(
-  `  ${String(PASOS)} pasos · parado por un cuerpo ${String(paseo.porCuerpo)} · por el borde ${String(paseo.porBorde)} · ` +
-    `resbalando ${String(paseo.resbalados)} · ` +
+  `  ${String(PASOS)} tics · parado por un cuerpo ${String(paseo.porCuerpo)} · por el borde ${String(paseo.porBorde)} · ` +
+    `resbalando ${String(paseo.resbalados)} · en el vado ${String(paseo.enElVado)} · ${String(paseo.rumbosAndados)} rumbos · ` +
     `acaba en x=${(paseo.x / UNO).toFixed(2)} z=${(paseo.z / UNO).toFixed(2)}`,
 );
 
@@ -159,7 +294,17 @@ comprobar('y ha resbalado pegado a algo, que es la otra mitad', paseo.resbalados
   resbalados: paseo.resbalados,
 });
 comprobar('y no se ha salido del tablero ni una vez', paseo.fuera === 0, { fuera: paseo.fuera });
-comprobar('y se ha movido: no está donde nació', paseo.x !== Math.round((LADO / 2) * UNO), { x: paseo.x });
+/*
+ * Nace en (0, 0). Esta línea comparaba con `LADO/2`, que no es donde nace, así que pasaba
+ * también con un paseante que no se hubiera movido nunca.
+ */
+comprobar('y se ha movido: no está donde nació', paseo.x !== 0 || paseo.z !== 0, { x: paseo.x, z: paseo.z });
+comprobar('y ha pisado el vado, que es la tercera clase de suelo', paseo.enElVado >= 20, {
+  enElVado: paseo.enElVado,
+});
+comprobar('y ha andado rumbos de toda la tabla, no ocho', paseo.rumbosAndados >= 40, {
+  rumbosAndados: paseo.rumbosAndados,
+});
 
 // ---------------------------------------------------------------------------
 // ESCALÓN 4 · EL MISMO PASEO, EN NODE Y EN HERMES
@@ -282,10 +427,13 @@ if (paqueteListo && hermes !== null) {
     });
     comprobar(
       'y se chocaron las mismas veces contra lo mismo',
-      a.porCuerpo === b.porCuerpo && a.porBorde === b.porBorde && a.resbalados === b.resbalados,
+      a.porCuerpo === b.porCuerpo &&
+        a.porBorde === b.porBorde &&
+        a.resbalados === b.resbalados &&
+        a.enElVado === b.enElVado,
       {
-        node: `${String(a.porCuerpo)}/${String(a.porBorde)}/${String(a.resbalados)}`,
-        hermes: `${String(b.porCuerpo)}/${String(b.porBorde)}/${String(b.resbalados)}`,
+        node: `${String(a.porCuerpo)}/${String(a.porBorde)}/${String(a.resbalados)}/${String(a.enElVado)}`,
+        hermes: `${String(b.porCuerpo)}/${String(b.porBorde)}/${String(b.resbalados)}/${String(b.enElVado)}`,
       },
     );
     comprobar('y el paquete da lo mismo que el código sin empaquetar', a.huella === paseo.huella, {
