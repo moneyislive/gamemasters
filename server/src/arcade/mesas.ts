@@ -223,9 +223,10 @@ import {
   avanzarElReloj,
   cerrarMesa,
   jugarConMotivo,
+  meterDeLaPlataforma as meterPorLaPuertaDeLaPlataforma,
   MovimientoRechazado,
 } from './arbitro';
-import type { Mesa } from './arbitro';
+import type { Jugado, Mesa } from './arbitro';
 import {
   ArcadeFueraDePresupuesto,
   conPresupuesto,
@@ -236,6 +237,7 @@ import {
 import { admiteBotas } from './modalidades';
 import { marcarPresencia, olvidarPresencia, senalEnMemoria } from '../mecanicas/presencia';
 import {
+  esTic,
   hayFinal,
   hayOpciones,
   manifiestoDeArcade,
@@ -426,7 +428,7 @@ export class ModalidadDesconocida extends Error {
 /**
  * ESTE JUEGO NO SE PUEDE JUGAR BAJANDO AL TABLERO. 400 y no 409: no es la mesa la que está en un
  * estado que no deja, es la petición la que pide algo que este juego no tiene. Ver
- * `modalidades.ts`: hoy no lo admite ninguno, porque ninguno ha declarado todavía su mundo.
+ * `modalidades.ts`: lo admiten los que declaran su mundo, que el arranque da de alta.
  */
 export class ModalidadNoAdmitida extends Error {
   constructor(
@@ -537,8 +539,9 @@ export interface MesaEnCurso {
    * La regla escrita en `Guardado` es que el número sube cuando un lector viejo interpretaría MAL
    * el fichero, no cuando hay un campo nuevo. Un lector de antes de este campo lee una mesa
    * `botas` como una mesa normal: el mismo reductor, el mismo estado y el mismo diario, sin bajar
-   * al tablero. Eso es una partida jugada desde arriba, no una partida mal leída. Y además hoy no
-   * puede existir ninguna: `admiteBotas` no admite todavía a ningún juego.
+   * al tablero. Eso es una partida jugada desde arriba, no una partida mal leída. (Aquí ponía que
+   * además no podía existir ninguna, porque `admiteBotas` no admitía a ningún juego; desde que el
+   * arranque da de alta a los que declaran su mundo, existen.)
    *
    * En el otro sentido tampoco hace falta el número: un fichero de antes llega sin el campo, y
    * `alDiaDesdeElDisco` lo lee como `normal`, que es exactamente lo que era.
@@ -3651,6 +3654,121 @@ export async function mover(
     await guardar(manifiesto, m);
     return vistaDe(m, yo);
   });
+}
+
+/**
+ * LO QUE FUE DE UN MOVIMIENTO DE LA PLATAFORMA. Lo devuelve `meterDeLaPlataforma`.
+ *
+ * Las tres salidas del reductor —ENTRÓ (el estado es otro), SIN EFECTO (el mismo objeto, sin
+ * motivo: legítimo, pero no había nada que hacer) y RECHAZADO (con el motivo del juego)— más las
+ * tres de la mesa: ya TERMINADA, el arcade APARTADO por el presupuesto, y SIN MESA. Son valores y
+ * no excepciones porque quien llama —el canal de Boots on Board— no tiene a nadie esperando una
+ * respuesta HTTP: tiene que decidir qué contar, y para eso le hace falta saber cuál fue.
+ *
+ * `subio` dice si la revisión de la mesa ha cambiado, por el movimiento o por un tic que venció
+ * antes: es lo que decide si hay que despertar a los que sondean. `guardada` es falso cuando el
+ * movimiento entró y el almacén no pudo escribirlo —ya está en el registro y en el diagnóstico,
+ * como en el volcado diferido: aquí tampoco hay nadie a quien contestarle un 503—.
+ */
+export type SalidaDeLaPlataforma =
+  | { readonly salida: 'entro'; readonly rev: number; readonly subio: true; readonly guardada: boolean }
+  | { readonly salida: 'sinEfecto' | 'terminada' | 'apartado'; readonly rev: number; readonly subio: boolean }
+  | { readonly salida: 'rechazado'; readonly rev: number; readonly subio: boolean; readonly motivo: string }
+  | { readonly salida: 'sinMesa' };
+
+/**
+ * METE UN MOVIMIENTO DE LA PLATAFORMA EN UNA MESA: la vía interna, sin ruta HTTP.
+ *
+ * La usa el canal de Boots on Board para el botín de la refriega (`shared/arcade/juegos/botin.ts`):
+ * lo mete el servidor en nombre de nadie, por la puerta de la plataforma del árbitro
+ * (`meterDeLaPlataforma` de `arbitro.ts`), que sólo deja pasar los tipos `arcade:` que no son el
+ * tic. `mover` sigue rechazando ese prefijo a cualquier aparato: esto no es una puerta más para
+ * ellos, es la de quien hospeda.
+ *
+ * Lo mismo que `mover` y el tic, en el mismo orden y con lo mismo:
+ *
+ *   · LOS TOPES DEL SOBRE, antes del candado. El movimiento lo construye el servidor, pero la
+ *     puerta no se fía de quién la llama.
+ *   · BAJO EL CANDADO DE LA MESA, y el PLAZO PRIMERO: si venció, el tic entra antes, como en
+ *     `mover`, y se guarda aunque lo de después no pase.
+ *   · EL PRESUPUESTO Y LA BÁSCULA del tic —`conPresupuesto` y `pesarElEstado`, antes de quedarse
+ *     el estado—. Un arcade que se pasa queda apartado y la mesa, como estaba.
+ *   · EL RECHAZO SE DESCARTA ENTERO y lo que no cambia nada no deja rastro: ni revisión, ni diario,
+ *     ni disco. Sólo lo que ENTRA sube la revisión, se guarda y se avisa.
+ *   · LOS RELOJES DEL TURNO, con la regla de siempre (`empiezaTurnoNuevo`): un botín no pasa el
+ *     turno, así que no le regala plazo a nadie. Y `empezada` NO se toca: la pone un asiento que
+ *     mueve, y esto no lo manda ningún asiento.
+ *   · Y SI CON ÉL SE ACABA LA PARTIDA, se cierra (`cerrarSiSeAcabo`), que ya es la tercera puerta
+ *     por la que cambia el estado.
+ *
+ * AVISAR a los que sondean es transporte y no se hace aquí —este fichero no importa el canal a
+ * propósito—: lo hace quien llama cuando `subio`, igual que la ruta después de `mover`.
+ */
+export async function meterDeLaPlataforma(codigo: string, movimiento: Movimiento): Promise<SalidaDeLaPlataforma> {
+  exigirLosTopesDelSobre(movimiento);
+  if (!movimiento.tipo.startsWith(PREFIJO_RESERVADO) || esTic(movimiento)) {
+    throw new Error(
+      `«${movimiento.tipo.slice(0, 64)}» no es un movimiento de la plataforma que se pueda meter así: ` +
+        'sólo los `arcade:` que no son el tic, que entra por el plazo.',
+    );
+  }
+  try {
+    return await conLaMesa(codigo, async (m): Promise<SalidaDeLaPlataforma> => {
+      const manifiesto = manifiestoDeArcade(m.mesa.arcade);
+      const revAntes = m.mesa.rev;
+      const vencio = ponerAlDiaElPlazo(m);
+      /* Lo que metió el plazo se guarda salga lo que salga; si el almacén falla, ya está dicho. */
+      const guardarElTic = async (): Promise<void> => {
+        if (!vencio) return;
+        try {
+          await guardar(manifiesto, m);
+        } catch (error) {
+          if (!(error instanceof AlmacenNoGuarda)) throw error;
+        }
+      };
+      if (m.mesa.terminada) {
+        await guardarElTic();
+        return { salida: 'terminada', rev: m.mesa.rev, subio: m.mesa.rev !== revAntes };
+      }
+      const antes = m.mesa;
+      let jugado: Jugado;
+      try {
+        jugado = conPresupuesto(antes.arcade, movimiento.tipo, () => meterPorLaPuertaDeLaPlataforma(antes, movimiento));
+        if (jugado.motivo === null && jugado.mesa.estado !== antes.estado) pesarElEstado(antes.arcade, jugado.mesa.estado);
+      } catch (error) {
+        await guardarElTic();
+        if (error instanceof ArcadeFueraDePresupuesto) return { salida: 'apartado', rev: m.mesa.rev, subio: m.mesa.rev !== revAntes };
+        throw error;
+      }
+      if (jugado.motivo !== null) {
+        await guardarElTic();
+        return { salida: 'rechazado', rev: m.mesa.rev, subio: m.mesa.rev !== revAntes, motivo: jugado.motivo };
+      }
+      if (jugado.mesa.estado === antes.estado) {
+        await guardarElTic();
+        return { salida: 'sinEfecto', rev: m.mesa.rev, subio: m.mesa.rev !== revAntes };
+      }
+      const otroTurno = empiezaTurnoNuevo(antes.arcade, antes.estado, jugado.mesa.estado);
+      m.mesa = jugado.mesa;
+      m.ultimoToqueEn = Date.now();
+      if (otroTurno) {
+        if (m.plazoMs > 0) m.venceEn = Date.now() + m.plazoMs;
+        m.turnoDesde = m.ultimoToqueEn;
+      }
+      cerrarSiSeAcabo(m);
+      let guardada = true;
+      try {
+        await guardar(manifiesto, m);
+      } catch (error) {
+        if (!(error instanceof AlmacenNoGuarda)) throw error;
+        guardada = false;
+      }
+      return { salida: 'entro', rev: m.mesa.rev, subio: true, guardada };
+    });
+  } catch (error) {
+    if (error instanceof MesaDesconocida) return { salida: 'sinMesa' };
+    throw error;
+  }
 }
 
 /**

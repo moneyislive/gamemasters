@@ -63,9 +63,18 @@ import { pasoDelTic, RADIO_DEL_PASEANTE, TICS_POR_SEGUNDO } from '../../shared/m
 import { deNumero, UNO } from '../../shared/mecanicas/fijo';
 import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Arena, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
+/* Sólo el tipo: `mesas.ts` se carga a mano más abajo, cuando ya está puesta su carpeta. */
+import type { SalidaDeLaPlataforma } from '../src/arcade/mesas';
+import { movimientoDelBotin } from '../../shared/arcade/juegos/botin';
 import { loQueSeVe } from '../../shared/arcade/juegos/lindes';
 import { mundoDeLaMesa } from '../../shared/arcade/juegos/mundos';
 import { ESPECTADOR, NADIE_SENTADO } from '../../shared/arcade/tipos';
+import {
+  abrirMesa as abrirMesaDelArbitro,
+  cerrarMesa as cerrarMesaDelArbitro,
+  meterDeLaPlataforma as meterEnElArbitro,
+  MovimientoRechazado,
+} from '../src/arcade/arbitro';
 import {
   ATASCO_BYTES,
   CanalDeBotas,
@@ -1541,6 +1550,228 @@ paso('La ruta del canal, el origen, que ninguna llave llega al registro, y que u
 }
 
 // ---------------------------------------------------------------------------
+// 14 BIS · LA VÍA INTERNA DE LA MESA, CON LAS MESAS DE VERDAD DE LOS TRES JUEGOS
+// ---------------------------------------------------------------------------
+
+paso('La vía interna de la mesa: el botín por la puerta de la plataforma, con mesas de verdad de los tres juegos');
+
+/*
+ * A MANO Y AQUÍ, NO ARRIBA: `mesas.ts` lee su carpeta al cargarse, y la de esta prueba se puso al
+ * principio del fichero (`CARPETA_DE_MESAS`). Esto y la parte siguiente usan la MISMA carga.
+ */
+await import('../../shared/arcade/juegos');
+const mesas = await import('../src/arcade/mesas');
+const botas = await import('../src/botas/index');
+const presupuesto = await import('../src/arcade/presupuesto');
+{
+  const dadas = botas.darDeAltaLosQueSeRecorren();
+  comprobar('el alta del arranque da de alta Las Lindes, que se recorre', dadas.includes('lindes'), dadas);
+}
+
+/** Lo que de verdad se guardó de una mesa: su fichero en la carpeta de esta prueba. `null` si no hay. */
+interface Guardada {
+  readonly texto: string;
+  readonly rev: number;
+  readonly diario: readonly { movimiento: { tipo: string; carga?: unknown }; ctx: { quien: string | null; asientos: string[] } }[];
+}
+function guardada(codigo: string): Guardada | null {
+  try {
+    const texto = fs.readFileSync(path.join(CARPETA_DE_MESAS, `${codigo}.json`), 'utf8');
+    const leido = JSON.parse(texto) as { mesa: { mesa: { rev: number; diario: Guardada['diario'] } } };
+    return { texto, rev: leido.mesa.mesa.rev, diario: leido.mesa.mesa.diario };
+  } catch {
+    return null;
+  }
+}
+
+/** Una mesa `botas` de verdad con Ana y Bea sentadas, empezada con la opción que ofrece el juego si se pide. */
+async function mesaDeVerdad(
+  arcade: string,
+  empezar: string | null,
+  plazoSegundos = 0,
+): Promise<{ codigo: string; ana: { id: string; llave: string }; bea: { id: string; llave: string } }> {
+  const abierta = await mesas.abrir({ arcade, nombre: 'Ana', modalidad: 'botas', plazoSegundos });
+  const codigo = abierta.mesa.codigo;
+  const bea = await mesas.sentarse(codigo, 'Bea');
+  if (empezar !== null) {
+    const vista = await mesas.mirar(codigo, abierta.silla.llave);
+    const opcion = vista.opciones.find((o) => o.tipo === empezar);
+    await mesas.mover(codigo, abierta.silla.llave, vista.rev, { tipo: empezar, carga: opcion?.carga ?? null });
+  }
+  return { codigo, ana: abierta.silla, bea };
+}
+
+/**
+ * LA VÍA INTERNA, SIN QUE UNA EXCEPCIÓN SE LLEVE POR DELANTE LA PRUEBA: lo que lanza sale como una
+ * salida más (`lanzó`), para que la comprobación que lo mira se ponga roja con su nombre en vez de
+ * tumbar el comprobador entero a mitad.
+ */
+async function meter(
+  codigo: string,
+  movimiento: { tipo: string; carga?: unknown },
+): Promise<SalidaDeLaPlataforma | { readonly salida: 'lanzó'; readonly error: string }> {
+  try {
+    return await mesas.meterDeLaPlataforma(codigo, movimiento);
+  } catch (error) {
+    return { salida: 'lanzó', error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Lo que lanza, o `null`. Para las puertas que tienen que negarse con una excepción. */
+async function loQueLanza(hacer: () => Promise<unknown> | unknown): Promise<unknown> {
+  try {
+    await hacer();
+    return null;
+  } catch (error) {
+    return error;
+  }
+}
+
+const dineroDe = (vista: unknown, asiento: string): number =>
+  (vista as { jugadores: { asiento: string; mrs: number }[] }).jugadores.find((j) => j.asiento === asiento)?.mrs ?? NaN;
+
+{
+  /* ENTRA: El Burgo empezado, donde todos llevan dinero. */
+  const burgo = await mesaDeVerdad('burgo', 'burgo:empezar');
+  const antes = await mesas.mirar(burgo.codigo, null);
+  const r = await meter(burgo.codigo, movimientoDelBotin(burgo.bea.id, burgo.ana.id));
+  const despues = await mesas.mirar(burgo.codigo, null);
+  comprobar(
+    'El Burgo empezado: el botín ENTRA, sube la revisión en uno y se guarda',
+    r.salida === 'entro' && r.subio && r.guardada && r.rev === antes.rev + 1 && despues.rev === antes.rev + 1,
+    { r, antes: antes.rev, despues: despues.rev },
+  );
+  const bea0 = dineroDe(antes.vista, burgo.bea.id);
+  const bea1 = dineroDe(despues.vista, burgo.bea.id);
+  const ana0 = dineroDe(antes.vista, burgo.ana.id);
+  const ana1 = dineroDe(despues.vista, burgo.ana.id);
+  comprobar(
+    'y `mirar` enseña lo que cambió de manos: lo que pierde Bea lo gana Ana',
+    bea1 < bea0 && bea0 - bea1 === ana1 - ana0,
+    { bea: [bea0, bea1], ana: [ana0, ana1] },
+  );
+  const g = guardada(burgo.codigo);
+  const ultimo = g?.diario[g.diario.length - 1];
+  comprobar(
+    'y en el diario del disco, como un movimiento más: en nombre de NADIE y con los sentados en el contexto',
+    g !== null &&
+      r.salida === 'entro' &&
+      g.rev === r.rev &&
+      ultimo?.movimiento.tipo === 'arcade:botin' &&
+      ultimo.ctx.quien === null &&
+      JSON.stringify(ultimo.ctx.asientos) === JSON.stringify([burgo.ana.id, burgo.bea.id]),
+    ultimo,
+  );
+  comprobar(
+    'un botín no pasa el turno, así que no le toca los relojes a nadie: `turnoDesde` igual',
+    despues.turnoDesde === antes.turnoDesde,
+    { antes: antes.turnoDesde, despues: despues.turnoDesde },
+  );
+
+  /* APARTADO: el arcade en cuarentena no acepta nada, y la mesa se queda como estaba. */
+  try {
+    presupuesto.pesarElEstado('burgo', 'x'.repeat(presupuesto.TOPE_BYTES + 16));
+  } catch {
+    /* se aparta, que es lo que se quería */
+  }
+  const enCuarentena = await meter(burgo.codigo, movimientoDelBotin(burgo.bea.id, burgo.ana.id));
+  const tras = await mesas.mirar(burgo.codigo, null);
+  comprobar(
+    'con el arcade apartado por el presupuesto: `apartado`, y ni la revisión ni el dinero se mueven',
+    enCuarentena.salida === 'apartado' && tras.rev === despues.rev && dineroDe(tras.vista, burgo.bea.id) === bea1,
+    enCuarentena,
+  );
+  presupuesto.olvidarLoMedido();
+
+  /* Y LA PUERTA NO SE ABRE A NADA MÁS. */
+  const deUnJuego = await meter(burgo.codigo, { tipo: 'burgo:tirar' });
+  const elTic = await meter(burgo.codigo, { tipo: 'arcade:tic' });
+  comprobar(
+    'por la vía interna no entra un movimiento de un juego, ni el tic —que tiene su puerta y adelanta el reloj—',
+    deUnJuego.salida === 'lanzó' && elTic.salida === 'lanzó' && (await mesas.mirar(burgo.codigo, null)).rev === tras.rev,
+    [deUnJuego, elTic],
+  );
+  const porLaPublica = await loQueLanza(async () => {
+    const v = await mesas.mirar(burgo.codigo, burgo.ana.llave);
+    return mesas.mover(burgo.codigo, burgo.ana.llave, v.rev, movimientoDelBotin(burgo.bea.id, burgo.ana.id));
+  });
+  comprobar(
+    'y `mover`, la puerta de los aparatos, sigue negando el prefijo `arcade:` aunque sea el botín',
+    porLaPublica instanceof mesas.MovimientoReservado,
+    String(porLaPublica),
+  );
+  {
+    const sinNadie = abrirMesaDelArbitro({ id: 'ARB01', arcade: 'burgo', semilla: 1, asientos: ['a', 'b'] });
+    const deJuego = await loQueLanza(() => meterEnElArbitro(sinNadie, { tipo: 'burgo:tirar' }));
+    const tic = await loQueLanza(() => meterEnElArbitro(sinNadie, { tipo: 'arcade:tic' }));
+    const acabada = await loQueLanza(() => meterEnElArbitro(cerrarMesaDelArbitro(sinNadie), movimientoDelBotin('a', 'b')));
+    comprobar(
+      'y la puerta del árbitro se niega ella misma, la llame quien la llame: ni un tipo de juego, ni el tic, ni una mesa terminada',
+      deJuego instanceof Error &&
+        !(deJuego instanceof MovimientoRechazado) &&
+        tic instanceof Error &&
+        !(tic instanceof MovimientoRechazado) &&
+        acabada instanceof MovimientoRechazado &&
+        acabada.motivo === 'mesa-terminada',
+      [String(deJuego), String(tic), String(acabada)],
+    );
+  }
+}
+
+{
+  /* SIN EFECTO: Riberas recién empezada, colocando, sin una ficha en ningún almacén. */
+  const riberas = await mesaDeVerdad('riberas', 'riberas:empezar');
+  const antes = guardada(riberas.codigo);
+  const r = await meter(riberas.codigo, movimientoDelBotin(riberas.bea.id, riberas.ana.id));
+  const despues = guardada(riberas.codigo);
+  comprobar(
+    'Riberas colocando, sin nada que llevarse: `sinEfecto`, sin subir la revisión y sin tocar el disco',
+    r.salida === 'sinEfecto' && !r.subio && antes !== null && despues !== null && despues.texto === antes.texto,
+    { r, antes: antes?.rev, despues: despues?.rev },
+  );
+}
+
+{
+  /* RECHAZADO: Las Lindes sin empezar. Y TERMINADA, y SIN MESA. */
+  const lindes = await mesaDeVerdad('lindes', null);
+  const antes = guardada(lindes.codigo);
+  const r = await meter(lindes.codigo, movimientoDelBotin(lindes.bea.id, lindes.ana.id));
+  comprobar(
+    'Las Lindes sin empezar: `rechazado` con el motivo del juego, sin subir la revisión ni tocar el disco',
+    r.salida === 'rechazado' && r.motivo.includes('no ha empezado') && !r.subio && guardada(lindes.codigo)?.texto === antes?.texto,
+    r,
+  );
+  await mesas.cerrar(lindes.codigo, lindes.ana.llave);
+  const acabada = await meter(lindes.codigo, movimientoDelBotin(lindes.bea.id, lindes.ana.id));
+  comprobar('con la mesa terminada: `terminada`', acabada.salida === 'terminada' && !acabada.subio, acabada);
+  const noHay = await meter('QQQQQ', movimientoDelBotin(lindes.bea.id, lindes.ana.id));
+  comprobar('y en una mesa que no existe: `sinMesa`, sin lanzar', noHay.salida === 'sinMesa', noHay);
+}
+
+{
+  /*
+   * EL PLAZO PRIMERO, como en `mover`: una mesa del Burgo con un segundo por turno, y el botín llega
+   * cuando ya ha vencido. El tic de El Burgo juega por el ausente, así que entra; y tiene que quedar
+   * en el diario DELANTE del botín —si el botín entra, que con los dados de esa mesa puede que no:
+   * una subasta abierta lo deja sin efecto—.
+   */
+  const conPrisa = await mesaDeVerdad('burgo', 'burgo:empezar', 1);
+  const antes = guardada(conPrisa.codigo);
+  await new Promise<void>((r) => setTimeout(r, 1150));
+  const r = await meter(conPrisa.codigo, movimientoDelBotin(conPrisa.bea.id, conPrisa.ana.id));
+  const despues = guardada(conPrisa.codigo);
+  const nuevos = (despues?.diario ?? []).slice(antes?.diario.length ?? 0).map((d) => d.movimiento.tipo);
+  comprobar(
+    'con el plazo vencido, el tic entra ANTES que el botín, y la revisión sube aunque el botín no entre',
+    r.salida !== 'sinMesa' && r.salida !== 'lanzó' &&
+      r.subio &&
+      nuevos[0] === 'arcade:tic' &&
+      (r.salida === 'entro' ? nuevos[nuevos.length - 1] === 'arcade:botin' : !nuevos.includes('arcade:botin')),
+    { salida: r.salida, nuevos },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 15 · SIGTERM, CON EL MONTAJE DE VERDAD
 // ---------------------------------------------------------------------------
 
@@ -1580,12 +1811,6 @@ async function hasta(que: () => boolean, ms = 3000): Promise<boolean> {
 }
 
 {
-  await import('../../shared/arcade/juegos');
-  const mesas = await import('../src/arcade/mesas');
-  const botas = await import('../src/botas/index');
-  const dadas = botas.darDeAltaLosQueSeRecorren();
-  comprobar('el alta del arranque da de alta Las Lindes, que se recorre', dadas.includes('lindes'), dadas);
-
   const servidor = http.createServer((_peticion, respuesta) => {
     respuesta.statusCode = 404;
     respuesta.end();
@@ -1667,7 +1892,7 @@ if (fallos.length > 0) {
  * EL GUARDIA DE «NO SE HAN HECHO TODAS»: un comprobador que se cae a mitad sin decirlo se parece
  * mucho a uno verde. El número es el que se hace hoy, contado, y se sube al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 155;
+const COMPROBACIONES_ESCRITAS = 168;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones escritas.`);
   process.exit(2);

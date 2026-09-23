@@ -454,7 +454,47 @@ export function avanzarElReloj(mesa: Mesa): Mesa {
 }
 
 /**
- * Lo común a los dos caminos: montar el contexto, llamar a las reglas y anotar.
+ * EL PREFIJO DE LA PLATAFORMA: los tipos que empiezan así no los manda ningún asiento. Es la regla
+ * de `shared/arcade/movimiento.ts`, escrita aquí otra vez —como en `mesas.ts`— porque aquel fichero
+ * la declara en un comentario y no en una constante.
+ */
+const PREFIJO_DE_LA_PLATAFORMA = 'arcade:';
+
+/**
+ * UN MOVIMIENTO DE LA PLATAFORMA QUE NO ES EL TIC: la tercera puerta.
+ *
+ * ═══ POR QUÉ HACE FALTA, SI YA ESTÁ EL RELOJ ═══
+ *
+ * El botín de la refriega de Boots on Board entra como entra el tic: en nombre de nadie —`quien:
+ * null`—, lo mete quien hospeda, y queda en el diario como cualquier otro. Pero no es el tic: no
+ * adelanta el reloj ni lleva su tipo. Ninguna de las dos puertas que había le servía: `jugarConMotivo`
+ * no deja pasar un `null` a una mesa con asientos —y está bien que no—, y `avanzarElReloj` sólo
+ * sabe meter el tic.
+ *
+ * ═══ Y POR QUÉ NO ABRE LA LLAVE MAESTRA ═══
+ *
+ * Por lo que deja pasar: SÓLO los tipos que reserva la plataforma y que no son el tic, y lo exige
+ * AQUÍ y no quien llama. `mover` le rechaza ese prefijo a cualquier aparato, así que las puertas no
+ * se tocan: lo de un asiento no entra por aquí como si no fuera de nadie, y lo de la plataforma no
+ * entra por allí. Qué significa cada tipo lo sigue sabiendo el juego —su reductor lo lee con
+ * desconfianza y exige `quien === null`—: el árbitro no sabe qué es un botín, como no sabe qué es un
+ * turno. Y como en las otras dos, la mesa terminada no admite nada.
+ */
+export function meterDeLaPlataforma(mesa: Mesa, movimiento: Movimiento): Jugado {
+  if (!movimiento.tipo.startsWith(PREFIJO_DE_LA_PLATAFORMA) || movimiento.tipo === movimientoDeTic().tipo) {
+    throw new Error(
+      `«${movimiento.tipo.slice(0, 64)}» no entra por la puerta de la plataforma: sólo pasan los tipos ` +
+        `\`${PREFIJO_DE_LA_PLATAFORMA}\` que no son el tic, que tiene la suya y adelanta el reloj.`,
+    );
+  }
+  if (mesa.terminada) {
+    throw new MovimientoRechazado('mesa-terminada', 'Esta partida ya ha terminado.');
+  }
+  return aplicarMovimiento(mesa, movimiento, null);
+}
+
+/**
+ * Lo común a las tres puertas: montar el contexto, llamar a las reglas y anotar.
  *
  * El contexto se guarda ENTERO en el diario junto al movimiento. Es lo que
  * permite reejecutar exactamente lo que pasó incluso cuando los asientos
