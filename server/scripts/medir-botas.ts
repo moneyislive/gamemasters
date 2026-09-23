@@ -27,8 +27,15 @@
  *
  *   · El TIC: tiempo de pared y de CPU de cada llamada del temporizador, en todas las salas.
  *   · LO QUE LLEGA: CPU de atender los `aqui` (leer, validar), por mensaje.
+ *   · LA REFRIEGA: cada aparato golpea además una vez cada `GOLPE_CADA_MS` —lo más que deja la
+ *     recarga—, hacia donde caiga; se cronometra aparte lo que cuesta atender cada golpe (buscar a
+ *     quién le da: rebobinar, alcance, cono y muro), y cuántos golpes por segundo y sala son.
+ *   · EL RASTRO: cuántos sitios guarda el rastro de cada asiento para rebobinarle, y cuántos bytes.
  *   · LO QUE BAJA: bytes por sala y segundo, y por aparato.
  *   · LA MEMORIA: montón tras recoger basura, antes y después de levantar las salas, por sala.
+ *
+ * Y aparte, EL GOLPE EN EL PEOR SITIO: una sala de mentira con seis en corro, todos al alcance y
+ * dentro del cono de quien golpea, y con muros alrededor —lo más caro que puede buscar un golpe—.
  */
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -36,8 +43,8 @@ import { performance } from 'node:perf_hooks';
 import { WebSocket } from 'ws';
 import { pasoDelTic } from '../../shared/mecanicas/andar';
 import { arenaDe } from '../../shared/mecanicas/mundo';
-import type { Andante, Arena } from '../../shared/mecanicas/mundo';
-import { leerMensajeDelServidor, rutaDelCanal, VERSION_DEL_CANAL } from '../../shared/mecanicas/canal-de-botas';
+import type { Andante, Arena, MundoDeclarado } from '../../shared/mecanicas/mundo';
+import { leerMensajeDelServidor, RECARGA_DEL_GOLPE_MS, rutaDelCanal, VERSION_DEL_CANAL } from '../../shared/mecanicas/canal-de-botas';
 import { loQueSeVe } from '../../shared/arcade/juegos/lindes';
 import { mundoDeLaMesa, sePuedeRecorrer } from '../../shared/arcade/juegos/mundos';
 import { ESPECTADOR, NADIE_SENTADO } from '../../shared/arcade/tipos';
@@ -57,6 +64,32 @@ const SALAS = opcion('salas', '').length > 0 ? [Number(opcion('salas', '1'))] : 
 const SEGUNDOS = Number(opcion('segundos', '8'));
 const POR_SALA = 5;
 const gc = (globalThis as { gc?: () => void }).gc;
+
+/** Cada cuántos tics golpea cada aparato: 17, o sea 850 ms, lo más seguido que deja la recarga (800). */
+const GOLPE_CADA_TICS = Math.ceil((RECARGA_DEL_GOLPE_MS + 50) / 50);
+
+/**
+ * LOS BYTES DE UN RASTRO DE `sitios` SITIOS, medidos: veinte mil listas hechas como las hace el canal
+ * —tres números por sitio, con la hora de pared delante— y el montón antes y después.
+ */
+const bytesMedidos = new Map<number, number>();
+function bytesDelRastro(sitios: number): number {
+  const k = Math.max(1, Math.round(sitios));
+  const hay = bytesMedidos.get(k);
+  if (hay !== undefined) return hay;
+  gc?.();
+  const antes = process.memoryUsage().heapUsed;
+  const listas: number[][] = [];
+  for (let i = 0; i < 20_000; i++) {
+    const r: number[] = [];
+    for (let s = 0; s < k; s++) r.push(1_758_650_000_000 + s * 50, 1_234_567 + s, -7_654_321 - s);
+    listas.push(r);
+  }
+  gc?.();
+  const bytes = (process.memoryUsage().heapUsed - antes) / listas.length;
+  bytesMedidos.set(k, bytes);
+  return bytes;
+}
 
 function dormir(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -110,6 +143,8 @@ function revisionDe(codigo: string): number {
 }
 
 const LA_MESA: LaMesa = {
+  /* El botín no se mide aquí —es de la mesa, y su coste es el de un movimiento—: entra, y ya. */
+  botin: async () => ({ salida: 'entro' }),
   quienEsLaLlave: async (codigo, llave) => {
     const a = LLAVES.get(llave);
     return a !== undefined && a.codigo === codigo ? { id: a.id, modalidad: 'botas' } : null;
@@ -363,8 +398,14 @@ async function vuelta(salas: number): Promise<void> {
   }
   arenas.clear();
 
-  /* A andar: un `aqui` por aparato y tic, veinte veces por segundo, cronometrando lo que llega. */
+  /*
+   * A andar: un `aqui` por aparato y tic, veinte veces por segundo, cronometrando lo que llega. Y a
+   * golpear: cada `GOLPE_CADA_TICS` tics, un golpe de cada aparato hacia donde caiga, con los textos
+   * hechos antes de poner el cronómetro, que sólo mide lo que hace el canal con ellos.
+   */
   const llegada: number[] = [];
+  const golpeando: number[] = [];
+  const azarDeLosGolpes = sorteo(20260923);
   let tic = 0;
   const bytes0 = aparatos.map((x) => x.a.bytes());
   const d0 = canal.diagnostico();
@@ -381,6 +422,12 @@ async function vuelta(salas: number): Promise<void> {
       const p0 = performance.now();
       for (let k = 0; k < aparatos.length; k++) (aparatos[k] as { a: Aparato }).a.mandar((textos[k] as string[])[tic] as string);
       llegada.push(performance.now() - p0);
+      if (tic % GOLPE_CADA_TICS === 0) {
+        const golpes = aparatos.map(() => JSON.stringify({ t: 'golpe', n: 2_000_000 + tic, r: Math.floor(azarDeLosGolpes() * 256) }));
+        const g0 = performance.now();
+        for (let k = 0; k < aparatos.length; k++) (aparatos[k] as { a: Aparato }).a.mandar(golpes[k] as string);
+        golpeando.push((performance.now() - g0) / aparatos.length);
+      }
       tic++;
     }, 50);
   });
@@ -404,6 +451,19 @@ async function vuelta(salas: number): Promise<void> {
     console.log(
       `   lo que llega: ${media(llegada).toFixed(3)} ms por tanda de ${String(aparatos.length)} \`aqui\` → ` +
         `${((media(llegada) * 1000) / aparatos.length).toFixed(2)} µs por mensaje (leer y validar)`,
+    );
+    console.log(
+      `   la refriega: ${((d.golpes - d0.golpes) / pared / salas).toFixed(1)} golpes aceptados/s por sala —uno por aparato cada ` +
+        `${String(GOLPE_CADA_TICS * 50)} ms, lo más que deja la recarga—, ${(media(golpeando) * 1000).toFixed(2)} µs por golpe ` +
+        `(p95 ${(percentil(golpeando, 0.95) * 1000).toFixed(2)}); ${String(d.aciertos - d0.aciertos)} aciertos, ` +
+        `${String(d.caidas - d0.caidas)} caídas: por un mundo tan grande casi todos golpean al aire`,
+    );
+  }
+  {
+    const porAsiento = d.sitiosEnLosRastros / Math.max(1, salas * POR_SALA);
+    console.log(
+      `   el rastro para rebobinar: ${porAsiento.toFixed(1)} sitios por asiento de media, ` +
+        `${bytesDelRastro(porAsiento).toFixed(0)} bytes por asiento (${((bytesDelRastro(porAsiento) * salas * POR_SALA) / 1024).toFixed(1)} kB entre todas)`,
     );
   }
   if (derivaciones.length > 0) {
@@ -479,6 +539,78 @@ console.log(`Banco del canal de Boots on Board — Las Lindes llenas, ${String(P
   console.log(
     `\nderivar el mundo en frío: Las Lindes llenas ${mediana(frio).toFixed(1)} ms (p95 ${percentil(frio, 0.95).toFixed(1)}), ` +
       `El Burgo ${mediana(burgo).toFixed(1)} ms (p95 ${percentil(burgo, 0.95).toFixed(1)})`,
+  );
+}
+
+/*
+ * EL GOLPE EN EL PEOR SITIO: lo más caro que puede buscar un golpe. Quien golpea tiene a tres delante,
+ * los tres al alcance y dentro del cono —así que para los tres se rebobina, se mira el alcance y el
+ * cono, y el muro se mira hasta el primero que pasa—, en un prado sembrado de cajas que caen en los
+ * mismos cajones del índice. Con un reloj quieto —el del canal no corre—: se golpea nueve veces por
+ * sala, las que hacen falta para tumbar a los tres, y se cambia de sala; trescientas salas.
+ */
+{
+  const casillas: { x: number; y: number }[] = [];
+  for (let x = -2; x <= 2; x++) for (let y = -2; y <= 2; y++) casillas.push({ x, y });
+  const cajas: { x0: number; z0: number; x1: number; z1: number }[] = [];
+  for (let i = 0; i < 200; i++) {
+    const angulo = (i * 2.399963) % (Math.PI * 2);
+    const radio = 4 + (i % 25);
+    const x = Math.sin(angulo) * radio;
+    const z = Math.cos(angulo) * radio;
+    cajas.push({ x0: x - 0.3, z0: z - 0.3, x1: x + 0.3, z1: z + 0.3 });
+  }
+  const MUNDO: MundoDeclarado = {
+    lado: 16,
+    pisables: casillas,
+    vados: [],
+    cuerpos: cajas,
+    nace: [
+      { x: 0, z: 0, rumbo: 0 },
+      { x: 0, z: -2.4, rumbo: Math.PI },
+      { x: -1.65, z: -1.7, rumbo: Math.PI },
+      { x: 1.65, z: -1.7, rumbo: Math.PI },
+    ],
+  };
+  const relojQuieto = { t: 1_000_000 };
+  const quieto: Reloj = {
+    ahora: () => relojQuieto.t,
+    cada: () => ({ parar: () => {} }),
+    dentroDe: () => ({ parar: () => {} }),
+  };
+  const mesaDelCorro: LaMesa = {
+    botin: async () => ({ salida: 'entro' }),
+    quienEsLaLlave: async () => ({ id: 'c0', modalidad: 'botas' }),
+    revision: async () => ({ rev: 1, terminada: false }),
+    vista: async () => ({ arcade: 'corro', rev: 1, terminada: false, asientos: ['c0', 'c1', 'c2', 'c3'], vista: null }),
+  };
+  const medidas: number[] = [];
+  let aciertos = 0;
+  for (let s = 0; s < 300; s++) {
+    const canal = new CanalDeBotas({
+      reloj: quieto,
+      mesa: mesaDelCorro,
+      mundos: { sePuedeRecorrer: () => true, mundoDeLaMesa: () => MUNDO },
+      registrar: () => {},
+    });
+    const enchufe: Enchufe = { enviar: () => {}, cerrar: () => {}, pendientes: () => 0 };
+    const c = canal.abrir(`C${String(s).padStart(4, '0')}`, enchufe);
+    c.recibir(JSON.stringify({ t: 'hola', v: VERSION_DEL_CANAL, llave: 'la-llave-del-corro' }));
+    for (let i = 0; i < 5; i++) await new Promise<void>((r) => setImmediate(r));
+    for (let g = 1; g <= 9; g++) {
+      relojQuieto.t += RECARGA_DEL_GOLPE_MS + 100;
+      const texto = JSON.stringify({ t: 'golpe', n: g, r: 0 });
+      const p0 = performance.now();
+      c.recibir(texto);
+      medidas.push(performance.now() - p0);
+    }
+    aciertos += canal.diagnostico().aciertos;
+    canal.apagar();
+  }
+  console.log(
+    `el golpe en el peor sitio —tres delante, al alcance y en el cono, entre doscientas cajas—: mediana ` +
+      `${(mediana(medidas) * 1000).toFixed(1)} µs, p95 ${(percentil(medidas, 0.95) * 1000).toFixed(1)} µs ` +
+      `(${String(medidas.length)} golpes, ${String(aciertos)} aciertos)`,
   );
 }
 
