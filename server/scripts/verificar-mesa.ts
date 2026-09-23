@@ -163,6 +163,27 @@ import {
   TICS_PARA_COLOCARSE,
 } from '../../shared/arcade/juegos';
 import { asientosDelRobot, jugarConElRobot } from './robot-del-burgo';
+/*
+ * LAS RUTAS DE LOS MODELOS, LAS DE LOS CLIENTES: la lista de nombre fijo que recorre el
+ * servidor y las funciones con que la app y el escritorio componen sus direcciones. Sin
+ * `three`: son cadenas. Ver el bloque «LOS MODELOS 3D».
+ */
+import {
+  MODELOS_DE_NOMBRE_FIJO,
+  RUTA_DE_MODELOS,
+  rutaDelBurgo,
+  rutaDeLosDados,
+  rutaDelModelo,
+  rutaDelReloj,
+  rutaDelTablero,
+} from '../../escenas/ruta-de-modelos';
+import {
+  FICHERO_DE_ANIMACIONES,
+  FIGURAS,
+  rutaDeLasAnimaciones,
+  rutaDelAventurero,
+  rutaDelEmbarcadero,
+} from '../../escenas/embarcadero/figuras';
 import type { MesaEnCurso } from '../src/arcade/mesas';
 import { abrirMesa, avanzarElReloj, jugar, jugarConMotivo } from '../src/arcade/arbitro';
 import type { Mesa } from '../src/arcade/arbitro';
@@ -2649,11 +2670,31 @@ try {
      *   · Y LO QUE NO ES. No es `terminada`: una mesa puede estar empezada y no
      *     terminada, y una recién abierta no está ni lo uno ni lo otro.
      */
+    /*
+     * ═══ Y `modalidad` ENTRÓ CON BOOTS ON BOARD, QUINTA VEZ QUE ESTA LÍNEA SE PONE ROJA ═══
+     *
+     * Lo que se vino a pensar, escrito para no volver a pensarlo:
+     *
+     *   · QUÉ ES. Cómo se juega la mesa: `normal` —el tablero desde arriba— o `botas`
+     *     —bajar al tablero—. Lo elige quien abre y no cambia nunca (decisión de Miguel
+     *     del 20-sep-2026, `docs/BOOTS-ON-BOARD.md`).
+     *   · POR QUÉ PUEDE SALIR. Es una palabra de la MESA, igual para todos los que
+     *     miran, espectador incluido: no lleva nada de ningún asiento ni del estado del
+     *     juego, que es el mismo en las dos modalidades. Y el cliente la necesita para
+     *     saber QUÉ pintar sin abrir la vista del juego.
+     *   · Y LO QUE NO ES. No es una preferencia de quien mira: no hay verbo que la
+     *     cambie, y por eso no depende de la llave con la que se lea.
+     */
     comprobar(
       'la mesa manda exactamente estos campos',
       campos ===
-        'arcade,asientos,codigo,empezada,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
+        'arcade,asientos,codigo,empezada,modalidad,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
       campos,
+    );
+    comprobar(
+      'y una mesa abierta sin decir modalidad es normal',
+      r.datos.mesa.modalidad === 'normal',
+      r.datos.mesa.modalidad,
     );
     comprobar(
       'y al MIRAR la mesa el motivo viene vacío: es de un intento, no de la partida',
@@ -3117,7 +3158,7 @@ try {
     const camposB = Object.keys(antesDeEmpezar.datos.mesa).sort().join(',');
     comprobar(
       'y la mesa del Burgo manda exactamente los mismos campos que las demás: la lista es de la MESA, no del juego',
-      camposB === 'arcade,asientos,codigo,empezada,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
+      camposB === 'arcade,asientos,codigo,empezada,modalidad,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
       camposB,
     );
 
@@ -3934,103 +3975,160 @@ try {
      * sistema de ficheros. El servidor en esta prueba arranca en una carpeta
      * temporal con `MODELOS_DIR` puesta; la búsqueda relativa se comprueba en
      * proceso más abajo.
-     */
-    const fichero = path.join(REPO, 'escenas', 'modelos', 'tablero.glb');
-    comprobar('el tablero existe en el repositorio: `escenas/modelos/tablero.glb`', fs.existsSync(fichero), fichero);
-    const tamano = fs.existsSync(fichero) ? fs.statSync(fichero).size : -1;
-    const url = `${BASE}/arcade/modelos/tablero.glb`;
-
-    const r = await fetch(url);
-    const bytes = new Uint8Array(await r.arrayBuffer());
-    comprobar('GET /api/arcade/modelos/tablero.glb contesta 200', r.status === 200, r.status);
-    const tipo = r.headers.get('content-type') ?? '';
-    comprobar('con `Content-Type: model/gltf-binary`', tipo.startsWith('model/gltf-binary'), tipo);
-    comprobar(
-      'y anuncia y manda el tamaño del fichero real',
-      Number(r.headers.get('content-length')) === tamano && bytes.length === tamano,
-      { anunciado: r.headers.get('content-length'), recibido: bytes.length, real: tamano },
-    );
-    comprobar(
-      'y lo que llega empieza por la firma «glTF»: son los bytes del fichero, no un HTML',
-      bytes[0] === 0x67 && bytes[1] === 0x6c && bytes[2] === 0x54 && bytes[3] === 0x46,
-      Array.from(bytes.slice(0, 4)),
-    );
-    const cache = r.headers.get('cache-control') ?? '';
-    comprobar(
-      'con `Cache-Control: public, max-age=3600`',
-      /public/.test(cache) && /max-age=3600/.test(cache),
-      cache,
-    );
-    const etag = r.headers.get('etag');
-    comprobar('y un ETag', etag !== null && etag.length > 0, etag);
-
-    const head = await fetch(url, { method: 'HEAD' });
-    const cuerpoDelHead = await head.text();
-    comprobar(
-      'HEAD contesta 200 con el mismo tamaño anunciado y sin cuerpo',
-      head.status === 200 &&
-        Number(head.headers.get('content-length')) === tamano &&
-        cuerpoDelHead.length === 0,
-      { estado: head.status, anunciado: head.headers.get('content-length'), cuerpo: cuerpoDelHead.length },
-    );
-    /*
-     * ═══ CON `node:http` Y NO CON `fetch`, Y HAY QUE DECIR POR QUÉ ═══
      *
-     * El `fetch` de Node (undici) sigue la especificación al pie de la letra, y
-     * ésta manda que una petición a la que se le pone `If-None-Match` a mano viaje
-     * además con `Cache-Control: no-cache` y `Pragma: no-cache`. `fresh` —lo que
-     * `send` usa para decidir el 304— ve ese `no-cache` y contesta 200 SIEMPRE,
-     * que es lo correcto: el cliente ha dicho que no quiere una respuesta de
-     * caché. O sea que con `fetch` esta comprobación era roja con el servidor
-     * perfectamente bien (medido: las cabeceras que llegaban al servidor llevaban
-     * el `no-cache` que nadie había escrito). Un navegador no añade esa cabecera
-     * a sus revalidaciones, y `node:http` manda exactamente lo que se le da.
+     * ═══ CADA FILA DE LA LISTA, PEDIDA POR LA RUTA QUE COMPONE EL CLIENTE ═══
+     *
+     * Los ficheros de nombre fijo son UNA lista, `MODELOS_DE_NOMBRE_FIJO` en
+     * `escenas/ruta-de-modelos.ts`: el servidor la recorre para registrar una ruta por
+     * fila y los clientes componen sus direcciones con `rutaDelModelo`. Aquí se recorre
+     * la misma lista y cada fila se pide por `rutaDelModelo(fila)` —la dirección que
+     * pediría un cliente, no una cadena escrita aquí—, así que lo que se compra es la
+     * puerta de punta a punta: la que abre el servidor es la que llama el cliente, y
+     * la que llama el cliente sirve los bytes de verdad. Antes esto miraba el tablero y
+     * los dados y nada más: el embarcadero, el burgo y el reloj se servían sin que nada
+     * lo comprobara aquí.
+     *
+     * Y COMO LA LISTA ES DERIVADA, TIENE SUELO. Una lista que saliera vacía —un `import`
+     * roto, un filtro que no casa— haría que este bucle no pidiera nada y todo quedara
+     * en verde, que es el verde por filtro roto de esta casa. Así que se exige que no
+     * esté vacía y que traiga, al menos, los cinco de hoy: añadir un fichero no obliga a
+     * tocar esto, y quitar uno sí, a sabiendas.
      */
-    const condicional = await new Promise<number>((resolver, rechazar) => {
-      const peticion = http.request(
-        url,
-        { method: 'GET', headers: { 'If-None-Match': etag ?? '' } },
-        (respuesta) => {
-          respuesta.resume();
-          respuesta.on('end', () => resolver(respuesta.statusCode ?? 0));
-        },
-      );
-      peticion.on('error', rechazar);
-      peticion.end();
-    });
+    const LOS_CINCO_DE_HOY = ['tablero.glb', 'embarcadero.glb', 'dados.glb', 'burgo.glb', 'reloj.glb'];
+    const filas: readonly string[] = MODELOS_DE_NOMBRE_FIJO;
     comprobar(
-      'y con `If-None-Match` contesta 304: el cliente no vuelve a bajar cuatro megas',
-      condicional === 304,
-      condicional,
+      `la lista de nombre fijo no está vacía y trae al menos los cinco de hoy (${LOS_CINCO_DE_HOY.join(', ')})`,
+      filas.length >= LOS_CINCO_DE_HOY.length && LOS_CINCO_DE_HOY.every((f) => filas.includes(f)),
+      filas,
+    );
+    comprobar(
+      'y cada fila tiene forma de nombre de modelo —minúsculas, dígitos y guiones, acabado en `.glb`—, que es lo que el servidor exige para registrarla',
+      filas.every((f) => /^[a-z0-9-]+\.glb$/.test(f)) && new Set(filas).size === filas.length,
+      filas,
+    );
+    /*
+     * Las rutas que los clientes piden a mano. Las cuatro de `ruta-de-modelos.ts` salen
+     * de la lista por tipo; la del embarcadero la compone `embarcadero/figuras.ts` con su
+     * propia cadena, y ésa es la que puede quedarse pidiendo a una puerta que no existe.
+     */
+    const lasDeLaLista = MODELOS_DE_NOMBRE_FIJO.map((f) => rutaDelModelo(f));
+    const lasQuePidenLosClientes = [rutaDelTablero(), rutaDeLosDados(), rutaDelReloj(), rutaDelBurgo(), rutaDelEmbarcadero()];
+    comprobar(
+      'y cada ruta de modelo que piden los clientes —el tablero, los dados, el reloj, el burgo y el embarcadero— es la de una fila de la lista',
+      lasQuePidenLosClientes.every((r) => lasDeLaLista.includes(r)),
+      { fuera: lasQuePidenLosClientes.filter((r) => !lasDeLaLista.includes(r)), lista: lasDeLaLista },
     );
 
+    const ORIGEN = `http://127.0.0.1:${PUERTO}`;
+    for (const fila of MODELOS_DE_NOMBRE_FIJO) {
+      const ruta = rutaDelModelo(fila);
+      const fichero = path.join(REPO, 'escenas', 'modelos', fila);
+      comprobar(`${fila} existe en el repositorio: \`escenas/modelos/${fila}\``, fs.existsSync(fichero), fichero);
+      const real = fs.existsSync(fichero) ? fs.readFileSync(fichero) : Buffer.alloc(0);
+      const url = `${ORIGEN}${ruta}`;
+
+      const r = await fetch(url);
+      const bytes = Buffer.from(await r.arrayBuffer());
+      const tipo = r.headers.get('content-type') ?? '';
+      const cache = r.headers.get('cache-control') ?? '';
+      const etag = r.headers.get('etag');
+      comprobar(
+        `GET ${ruta} contesta 200 con \`Content-Type: model/gltf-binary\`, \`Cache-Control: public, max-age=3600\`, un ETag y \`Accept-Ranges\``,
+        r.status === 200 &&
+          tipo.startsWith('model/gltf-binary') &&
+          /public/.test(cache) &&
+          /max-age=3600/.test(cache) &&
+          etag !== null &&
+          etag.length > 0 &&
+          r.headers.get('accept-ranges') === 'bytes',
+        { estado: r.status, tipo, cache, etag, rangos: r.headers.get('accept-ranges') },
+      );
+      comprobar(
+        `y anuncia y manda EXACTAMENTE los bytes de \`${fila}\`, que empiezan por la firma «glTF» y no son un HTML`,
+        real.length > 0 &&
+          Number(r.headers.get('content-length')) === real.length &&
+          bytes.equals(real) &&
+          bytes[0] === 0x67 && bytes[1] === 0x6c && bytes[2] === 0x54 && bytes[3] === 0x46,
+        { anunciado: r.headers.get('content-length'), recibido: bytes.length, real: real.length },
+      );
+
+      const head = await fetch(url, { method: 'HEAD' });
+      const cuerpoDelHead = await head.text();
+      comprobar(
+        `HEAD ${ruta} contesta 200 con el mismo tamaño anunciado y sin cuerpo`,
+        head.status === 200 && Number(head.headers.get('content-length')) === real.length && cuerpoDelHead.length === 0,
+        { estado: head.status, anunciado: head.headers.get('content-length'), cuerpo: cuerpoDelHead.length },
+      );
+      /*
+       * ═══ CON `node:http` Y NO CON `fetch`, Y HAY QUE DECIR POR QUÉ ═══
+       *
+       * El `fetch` de Node (undici) sigue la especificación al pie de la letra, y
+       * ésta manda que una petición a la que se le pone `If-None-Match` a mano viaje
+       * además con `Cache-Control: no-cache` y `Pragma: no-cache`. `fresh` —lo que
+       * `send` usa para decidir el 304— ve ese `no-cache` y contesta 200 SIEMPRE,
+       * que es lo correcto: el cliente ha dicho que no quiere una respuesta de
+       * caché. O sea que con `fetch` esta comprobación era roja con el servidor
+       * perfectamente bien (medido: las cabeceras que llegaban al servidor llevaban
+       * el `no-cache` que nadie había escrito). Un navegador no añade esa cabecera
+       * a sus revalidaciones, y `node:http` manda exactamente lo que se le da.
+       */
+      const condicional = await new Promise<number>((resolver, rechazar) => {
+        const peticion = http.request(
+          url,
+          { method: 'GET', headers: { 'If-None-Match': etag ?? '' } },
+          (respuesta) => {
+            respuesta.resume();
+            respuesta.on('end', () => resolver(respuesta.statusCode ?? 0));
+          },
+        );
+        peticion.on('error', rechazar);
+        peticion.end();
+      });
+      comprobar(
+        `y con \`If-None-Match\` ${ruta} contesta 304: el cliente no vuelve a bajarlo`,
+        condicional === 304,
+        condicional,
+      );
+    }
+
     /*
-     * LOS DADOS, POR SU RUTA FIJA. `dados.glb` es el D6 de KayKit horneado, unos kB,
-     * en un fichero aparte del tablero (ver `escenas/nombres.ts`, `MODELO.dado`). Se
-     * afirma lo mismo que del tablero y además que pesa lo que un dado y no lo que un
-     * tablero: si un día alguien lo compilara con la textura dentro, la ruta seguiría
-     * contestando 200 y el teléfono no lo abriría.
+     * LOS DADOS PESAN LO QUE UN DADO. `dados.glb` es el D6 de KayKit horneado, unos kB, en
+     * un fichero aparte del tablero (ver `escenas/nombres.ts`, `MODELO.dado`): si un día
+     * alguien lo compilara con la textura dentro, la ruta seguiría contestando 200 con los
+     * bytes de verdad —el bucle de arriba en verde— y el teléfono no lo abriría.
      */
     const ficheroDeLosDados = path.join(REPO, 'escenas', 'modelos', 'dados.glb');
-    comprobar('los dados existen en el repositorio: `escenas/modelos/dados.glb`', fs.existsSync(ficheroDeLosDados), ficheroDeLosDados);
     const tamanoDeLosDados = fs.existsSync(ficheroDeLosDados) ? fs.statSync(ficheroDeLosDados).size : -1;
-    const dados = await fetch(`${BASE}/arcade/modelos/dados.glb`);
-    const bytesDeLosDados = new Uint8Array(await dados.arrayBuffer());
-    comprobar(
-      'GET /api/arcade/modelos/dados.glb contesta 200 con `model/gltf-binary` y la misma caché que el tablero',
-      dados.status === 200 &&
-        (dados.headers.get('content-type') ?? '').startsWith('model/gltf-binary') &&
-        /max-age=3600/.test(dados.headers.get('cache-control') ?? ''),
-      { estado: dados.status, tipo: dados.headers.get('content-type'), cache: dados.headers.get('cache-control') },
-    );
-    comprobar(
-      'y manda los bytes del fichero real, que empiezan por «glTF» y pesan menos de 100 kB',
-      bytesDeLosDados.length === tamanoDeLosDados &&
-        tamanoDeLosDados > 0 &&
-        tamanoDeLosDados < 100 * 1024 &&
-        bytesDeLosDados[0] === 0x67 && bytesDeLosDados[1] === 0x6c && bytesDeLosDados[2] === 0x54 && bytesDeLosDados[3] === 0x46,
-      { recibido: bytesDeLosDados.length, real: tamanoDeLosDados },
-    );
+    comprobar('y los dados pesan menos de 100 kB', tamanoDeLosDados > 0 && tamanoDeLosDados < 100 * 1024, tamanoDeLosDados);
+
+    /*
+     * ═══ LOS AVENTUREROS, TAMBIÉN POR LA RUTA QUE COMPONE EL CLIENTE ═══
+     *
+     * No están en la lista —se sirven por forma, ver `routes/modelos.ts`—, pero los
+     * clientes los piden con `rutaDelAventurero` y `rutaDeLasAnimaciones`, así que cada
+     * figura de `FIGURAS` y la biblioteca de clips se piden por ahí y tienen que llegar
+     * enteras. Sin esto, lo único que se comprobaba de esta puerta eran nombres que NO
+     * tenía que servir.
+     */
+    const lasFiguras: { readonly ruta: string; readonly fichero: string }[] = [
+      ...FIGURAS.map((f) => ({ ruta: rutaDelAventurero(f.id), fichero: f.fichero })),
+      { ruta: rutaDeLasAnimaciones(), fichero: FICHERO_DE_ANIMACIONES },
+    ];
+    comprobar('las figuras que se piden son al menos las seis de hoy y la biblioteca de clips', lasFiguras.length >= 7, lasFiguras.length);
+    for (const { ruta, fichero } of lasFiguras) {
+      const real = path.join(REPO, 'escenas', 'modelos', 'aventureros', fichero);
+      const bytesReales = fs.existsSync(real) ? fs.readFileSync(real) : Buffer.alloc(0);
+      const r = await fetch(`${ORIGEN}${ruta}`);
+      const bytes = Buffer.from(await r.arrayBuffer());
+      comprobar(
+        `GET ${ruta} contesta 200 con \`model/gltf-binary\` y los bytes exactos de \`aventureros/${fichero}\``,
+        r.status === 200 &&
+          (r.headers.get('content-type') ?? '').startsWith('model/gltf-binary') &&
+          bytesReales.length > 0 &&
+          bytes.equals(bytesReales),
+        { estado: r.status, tipo: r.headers.get('content-type'), recibido: bytes.length, real: bytesReales.length },
+      );
+    }
 
     for (const malo of [
       '..%2Ftablero.glb',
@@ -4056,8 +4154,63 @@ try {
       bienFormadoPeroAusente.estado === 404 && typeof bienFormadoPeroAusente.datos?.error === 'string',
       bienFormadoPeroAusente.datos,
     );
-    const otro = await pedir('/arcade/modelos/otro.glb');
-    comprobar('y fuera de las dos rutas no se sirve nada', otro.estado === 404, otro.estado);
+    /*
+     * ═══ Y LO QUE NO ESTÁ EN LA LISTA SIGUE SU CAMINO, COMO SI ESTA PUERTA NO EXISTIERA ═══
+     *
+     * Decía «fuera de las dos rutas no se sirve nada» y miraba un solo nombre y un 404 a
+     * secas. Con las rutas de nombre fijo sacadas de una lista, lo que hay que comprar es
+     * más fino: que un nombre que no está en ella conteste EXACTAMENTE lo que una ruta que
+     * no existe —el 404 de la API; o el 401 del guardián en un despliegue con contraseña,
+     * y por eso se compara y no se escribe—. Un manejador `/arcade/modelos/:fichero` con la
+     * lista dentro fallaría aquí por dos sitios: contestaría su propio 404 («no hay ningún
+     * modelo…») en vez de dejar pasar, y descodificaría `tablero%2Eglb` a `tablero.glb` y lo
+     * serviría. Y `animaciones.glb` existe, pero dentro de `aventureros/`: pedirlo en la raíz
+     * no puede encontrarlo.
+     *
+     * Las peticiones van CRUDAS, por `node:http`: `fetch` normaliza la dirección antes de
+     * mandarla, y lo que se quiere es que llegue lo que está escrito.
+     */
+    const crudo = (ruta: string): Promise<{ estado: number; cuerpo: string }> =>
+      new Promise((resolver, rechazar) => {
+        const peticion = http.request({ host: '127.0.0.1', port: PUERTO, path: ruta, method: 'GET' }, (respuesta) => {
+          let cuerpo = '';
+          respuesta.setEncoding('utf8');
+          respuesta.on('data', (trozo: string) => {
+            cuerpo += trozo;
+          });
+          respuesta.on('end', () => resolver({ estado: respuesta.statusCode ?? 0, cuerpo }));
+        });
+        peticion.on('error', rechazar);
+        peticion.end();
+      });
+    const nadie = await crudo('/api/ninguna-ruta-de-esta-casa');
+    comprobar(
+      'una ruta de la API que no existe contesta 404 con cuerpo, que es con lo que se compara todo lo de fuera',
+      nadie.estado === 404 && nadie.cuerpo.length > 0,
+      nadie,
+    );
+    for (const fuera of [
+      'otro.glb',
+      'animaciones.glb',
+      'caballero.glb',
+      'tablero.gltf',
+      'tablero',
+      'tablero.glb.bak',
+      'tablero%2Eglb',
+      '..%2Ftablero.glb',
+      '%2e%2e%2ftablero.glb',
+      'aventureros',
+      '',
+      'tablero.glb%00',
+      ':fichero',
+    ]) {
+      const r = await crudo(`${RUTA_DE_MODELOS}/${fuera}`);
+      comprobar(
+        `«${fuera}» no es una fila de la lista y no se sirve: contesta lo mismo que una ruta que no existe`,
+        r.estado === nadie.estado && r.cuerpo === nadie.cuerpo,
+        { estado: r.estado, cuerpo: r.cuerpo.slice(0, 120) },
+      );
+    }
     const salud = await pedir('/salud');
     comprobar('y el servidor sigue en pie después de todo eso', salud.estado === 200, salud.estado);
   }

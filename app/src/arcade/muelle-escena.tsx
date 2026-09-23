@@ -53,10 +53,11 @@ import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
 import type { ManifiestoDeArcade } from '../../../shared/arcade';
 /* Instala los arcades del binario, por si se llega aquí por enlace directo. Ver `pintar.tsx`. */
 import '../../../shared/arcade/juegos';
-import { Embarcadero } from '../../../escenas/embarcadero/Embarcadero';
-/* La escena hermana del Burgo: mismo contrato, y el tema dice cuál de las dos se monta. */
-import { Plaza } from '../../../escenas/plaza/Plaza';
-import { LindeAlta } from '../../../escenas/linde-alta/LindeAlta';
+/*
+ * Las escenas hermanas —embarcadero, plaza, linde— y cuál monta cada tema, en UNA tabla que
+ * lee también el escritorio. Ver su cabecera: estuvo escrita aquí y allí.
+ */
+import { escenaDelMuelle } from '../../../escenas/embarcadero/escenas-del-muelle';
 /*
  * El juez de la calidad vivía aquí y se fue a `escenas/` el día que el Burgo lo quiso
  * también en el escritorio, que no puede importar de `app/`. Ver su cabecera.
@@ -341,21 +342,13 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
     figura === null ? undefined : miAsiento === undefined || miAsiento.figura !== figura ? figura : undefined;
 
   /*
-   * LA ESCENA QUE PIDE EL TEMA, igual que en el escritorio (ver `muelle.tsx`): las dos hermanas
-   * cumplen `PropsDelEmbarcadero`, así que se elige el componente y las props se escriben una
-   * sola vez. `escena` vive en el tema porque el manifiesto de arcade está sellado y un lobby
-   * no es una regla del juego.
+   * LA ESCENA QUE PIDE EL TEMA, la misma que elige el escritorio: las hermanas cumplen
+   * `PropsDelEmbarcadero`, así que se elige el componente y las props se escriben una sola
+   * vez. `escena` vive en el tema porque el manifiesto de arcade está sellado y un lobby no
+   * es una regla del juego; y la tabla que convierte ese nombre en componente —con su
+   * respaldo al embarcadero— vive en `escenas/`, una vez para los dos clientes.
    */
-  /*
-   * ═══ TRES ESCENAS HERMANAS, Y LA TABLA LAS ELIGE POR NOMBRE ═══
-   *
-   * Las tres cumplen `PropsDelEmbarcadero` letra por letra, así que aquí no hay más
-   * que escoger. Un `escena` que esta versión no conozca cae al embarcadero, que es
-   * el que siempre estuvo: un lobby de otro sitio es raro, y una pantalla en blanco
-   * es un fallo.
-   */
-  const ESCENAS = { plaza: Plaza, linde: LindeAlta, embarcadero: Embarcadero } as const;
-  const Escena = ESCENAS[tema.escena] ?? Embarcadero;
+  const Escena = escenaDelMuelle(tema);
 
   /*
    * «MIDIENDO» SÓLO SI HAY UN MUNDO DANDO MUESTRAS, o a punto de darlas: mientras se mira el

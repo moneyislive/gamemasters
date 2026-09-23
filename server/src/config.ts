@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ModelId, ModelOption } from '../../shared/types';
+import { leerOrigenesPermitidos } from './puerta/origenes';
 
 const rootEnvPath = path.resolve(process.cwd(), '../.env');
 if (fs.existsSync(rootEnvPath)) {
@@ -252,6 +253,13 @@ export const env: {
   port: number;
   /** Dónde vive este servidor de cara al mundo, p. ej. `https://harkania.com`. */
   publicOrigin?: string;
+  /**
+   * `ORIGENES_PERMITIDOS`: páginas de OTRO origen a las que se deja leer la API, además de las
+   * propias. OPCIONAL: vacía es lo normal, porque todo lo de la casa se sirve desde el mismo
+   * origen que la API. Ver `puerta/origenes.ts`, que la lee y dice por qué para el arranque con
+   * una entrada que no se entiende.
+   */
+  origenesPermitidos: string[];
   /** Interfaz de escucha. Ver `readHost`. */
   host: string;
   mongoUri?: string;
@@ -311,6 +319,7 @@ export const env: {
   defaultModel: readDefaultModel(),
   port: readPort(),
   publicOrigin: readPublicOrigin(),
+  origenesPermitidos: leerOrigenesPermitidos(process.env.ORIGENES_PERMITIDOS),
   host: readHost(),
   mongoUri: process.env.MONGODB_URI?.trim() || undefined,
   mongoDbName: process.env.MONGODB_DB?.trim() || undefined,

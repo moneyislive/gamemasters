@@ -15,8 +15,9 @@
  * ═══ LOS CUERPOS SALEN DEL REPARTO, Y SUS CAJAS DE LOS MODELOS ═══
  *
  * Cada losa se monta con `montarLaLosa` —el mismo reparto que pinta la escena, con la misma
- * semilla por losa—, y cada pieza que estorba (`comoEstorba`, en `lindes-piezas.ts`) deja una
- * caja alineada con los ejes. La caja es la HUELLA MEDIDA del modelo en `tablero.glb`
+ * semilla por losa—, y cada pieza que estorba tal como está puesta (`comoEstorbaLaPuesta`, en
+ * `lindes-piezas.ts`: una piedra estorba si pasa de la cintura) deja una caja alineada con los
+ * ejes. La caja es la HUELLA MEDIDA del modelo en `tablero.glb`
  * (`lindes-huellas.ts`) por lo que la escena le hace al pintarlo:
  *
  *     ancho  = huella en x × ESCALA_DEL_PACK × escala × largo
@@ -39,12 +40,32 @@
  *     la caja es exacta: girar un cuarto es cambiar el ancho por el fondo y los signos, sin una
  *     sola multiplicación por un seno. Se reconoce el cuarto con una división y un redondeo.
  *   · A UN ÁNGULO CUALQUIERA van sólo las cosas del campo —árboles, arboledas, almiares,
- *     colinas—, que en planta son REDONDAS u ovaladas: una copa, un bosquecillo, un montón de
- *     heno. Una planta redonda tiene la misma caja la gire uno como la gire, así que se toma el
- *     cuadrado de su mayor semieje, medido desde el sitio donde se pone. Para lo redondo es la
- *     caja justa; para un óvalo como el almiar sobra por las esquinas, que es donde no hay nada.
+ *     colinas, y las piedras, rocas y tocones que estorban—, que en planta son REDONDAS u
+ *     ovaladas: una copa, un bosquecillo, un montón de heno, un canto. Una planta redonda tiene
+ *     la misma caja la gire uno como la gire, así que se toma el cuadrado de su mayor semieje,
+ *     medido desde el sitio donde se pone. Para lo redondo es la caja justa; para un óvalo como
+ *     el almiar sobra por las esquinas, que es donde no hay nada.
  *
  * `verify:lindes-mundo` exige que nada con esquinas llegue nunca con un giro que no sea un cuarto.
+ *
+ * ═══ LAS PIEDRAS, CON SU RADIO Y NO CON SU SEMIEJE ═══
+ *
+ * El mayor semieje sólo cubre lo que es redondo DE VERDAD: si algo del modelo queda más lejos del
+ * centro que él, girado hacia un eje asoma por fuera de la caja. Y la piedra no es redonda:
+ * medida, su punto más lejano está a 0,266 del pack y su mayor semieje a 0,211, así que según
+ * cómo cayera asomaba por fuera de su caja hasta 0,45 unidades junto a la senda y 0,66 en el
+ * erial —más que el radio de quien anda—. La regla de la cintura se habría estrenado con eso:
+ * una piedra que se atraviesa por una esquina es la queja de Miguel en pequeño.
+ *
+ * Así que lo que estorba sólo si pasa de la cintura trae medido su RADIO
+ * (`ALTO_Y_RADIO_DEL_MODELO`): lo más lejos del sitio donde se pone que llega su planta. Su
+ * cuadrado la cubre entera se gire como se gire, y sobra por las esquinas como sobra en el almiar.
+ *
+ * Los árboles y las arboledas se quedan con el semieje, que es lo que ya había y no es de esta
+ * decisión: medido igual, el `arbol-a` y el `arbol-b` son redondos al diezmilésimo, pero la
+ * arboleda grande asoma un 11 % de su semieje —hasta 1,4 unidades a escala 2,2—, la media y la
+ * pequeña un 3 y un 4 %, y el almiar un 8 %. Queda escrito aquí para quien lo quiera cerrar: es
+ * medir su radio también y ensanchar esas cajas, mirando antes qué pasos estrechan.
  *
  * ═══ LA PUERTA: DOS JAMBAS Y UN HUECO ═══
  *
@@ -76,11 +97,11 @@ import { COSENO, radianesDelRumbo, RADIO_DEL_PASEANTE, RUMBOS, SENO } from '../.
 import { deNumero } from '../../mecanicas/fijo';
 import { arenaDe, sePuedeEstar } from '../../mecanicas/mundo';
 import type { Arena, Cuerpo, MundoDeclarado, Sitio } from '../../mecanicas/mundo';
-import { HUECO_DE_LA_PUERTA, HUELLA_DEL_MODELO } from './lindes-huellas';
+import { ALTO_Y_RADIO_DEL_MODELO, HUECO_DE_LA_PUERTA, HUELLA_DEL_MODELO } from './lindes-huellas';
 import type { HuellaDelModelo } from './lindes-huellas';
 import type { Giro } from './lindes-losas';
 import { ESCALA_DEL_PACK, LADO_DE_LOSA } from './lindes-medidas';
-import { comoEstorba } from './lindes-piezas';
+import { comoEstorbaLaPuesta } from './lindes-piezas';
 import { centroDeCelda, montarLaLosa, semillaDeLaLosa } from './lindes-reparto';
 import type { CeldaDeSuelo, ContenidoDeLosa, PorQueEsta, PuestaEnLaLosa } from './lindes-reparto';
 
@@ -143,21 +164,23 @@ export function cuartosDeVuelta(giro: number): number | null {
 /**
  * LAS CAJAS DE UNA PIEZA PUESTA, en coordenadas del tablero. `(cx, cz)` es el centro de su losa.
  *
- * Vacío si la pieza no estorba o si no tiene huella medida —eso segundo no debería pasar nunca y
- * lo vigila `verify:lindes-mundo`—.
+ * Vacío si la pieza no estorba —puesta así: una piedra que no pasa de la cintura no estorba—, o si
+ * no tiene huella medida —eso segundo no debería pasar nunca y lo vigila `verify:lindes-mundo`—.
  */
 export function cajasDeLaPuesta(
   p: PuestaEnLaLosa,
   cx: number,
   cz: number,
 ): { readonly cuerpo: Cuerpo; readonly forma: FormaDelCuerpo }[] {
-  const como = comoEstorba(p.pieza);
+  const como = comoEstorbaLaPuesta(p.pieza, p.escala);
   if (como === 'nada') return [];
   const huella = HUELLA_DEL_MODELO[p.pieza];
   if (huella === undefined) return [];
   /* La misma escala que `UnModelo`: `largo` estira la `x` del modelo, y sólo la `x`. */
   const sx = p.escala * ESCALA_DEL_PACK * p.largo;
   const sz = p.escala * ESCALA_DEL_PACK;
+  /* Lo que trae medido su radio —las piedras— se cubre con él si va girado de cualquier manera. */
+  const radio = ALTO_Y_RADIO_DEL_MODELO[p.pieza]?.radio;
   const trozos: HuellaDelModelo[] =
     como === 'puerta'
       ? [
@@ -176,8 +199,15 @@ export function cajasDeLaPuesta(
     const c = t.z0 * sz;
     const d = t.z1 * sz;
     if (k === null) {
-      /* Redonda: el cuadrado de su mayor semieje, que es su caja la gire uno como la gire. */
-      const r = Math.max(Math.abs(a), Math.abs(b), Math.abs(c), Math.abs(d));
+      /*
+       * Redonda: el cuadrado de su mayor semieje, que es su caja la gire uno como la gire. O el de
+       * su radio medido, si lo tiene, que la cubre aunque no sea redonda: ver la cabecera. Si un
+       * día se estirara, el radio crece con el lado que más se estira.
+       */
+      const r =
+        radio !== undefined
+          ? radio * (sx > sz ? sx : sz)
+          : Math.max(Math.abs(a), Math.abs(b), Math.abs(c), Math.abs(d));
       salida.push({ cuerpo: { x0: x - r, z0: z - r, x1: x + r, z1: z + r }, forma: 'redonda' });
       continue;
     }
@@ -207,7 +237,9 @@ export function cajasDeLaPuesta(
  * 150 en Hermes: un tirón visible en el móvil cada vez que alguien pone una losa mientras uno
  * anda. Así que se recuerdan también, y con la llave que les toca:
  *
- *   · LAS CAJAS DE UNA LOSA dependen de ella sola: su clase, su giro, su semilla y su sitio.
+ *   · LAS CAJAS DE UNA LOSA dependen de ella sola: su clase, su giro, su semilla y su sitio. Las
+ *     de las piedras también: si una estorba lo decide su escala, y su escala sale del reparto
+ *     de su losa.
  *   · EL SITIO DE NACER EN UNA LOSA depende de ella y de sus OCHO VECINAS —los cuerpos de al lado
  *     asoman hasta un octavo de losa (`MARGEN_DE_LO_CERCANO`)—, así que su llave es la de las
  *     nueve. Poner una losa sólo obliga a rehacer el de ella y el de sus vecinas.

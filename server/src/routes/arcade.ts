@@ -50,21 +50,29 @@ import {
   AlmacenNoGuarda,
   ArcadeSinMesa,
   cerrar,
+  esModalidad,
   FiguraMalEscrita,
   MesaDesconocida,
   MesaLlena,
+  memoriaDeLasMesas,
   mesasVivas,
+  mientrasSeEspera,
   mirar,
+  ModalidadDesconocida,
+  ModalidadNoAdmitida,
   mover,
   MovimientoReservado,
   olvidarMesa,
   PLAZO_MAXIMO_S,
+  revisionDe,
   saludDelAlmacen,
   sentarse,
   vestir,
   candadosDeMesaVivos,
 } from '../arcade/mesas';
-import type { VistaDeMesa } from '../arcade/mesas';
+import type { Modalidad, VistaDeMesa } from '../arcade/mesas';
+import { admiteBotas } from '../arcade/modalidades';
+import { diagnosticoDeBotas, seRecorreAqui } from '../botas';
 import {
   anunciarInicio,
   ArcadeSinRecords,
@@ -76,6 +84,7 @@ import {
   ArcadeFueraDePresupuesto,
   loMedido,
   losApartados,
+  MovimientoDesmedido,
   TOPE_BYTES,
   TOPE_CARGA_BYTES,
   TOPE_MS,
@@ -171,6 +180,15 @@ function contestarElFallo(error: unknown, res: Response, vista?: VistaDeMesa): b
     res.status(400).json({ error: error.message, motivo: 'movimiento-reservado', tipo: error.tipo });
     return true;
   }
+  if (error instanceof MovimientoDesmedido) {
+    /*
+     * 400, y con el motivo de la mesa. Llega aquí cuando el sobre pasa el tope de esta ruta y no el
+     * de la mesa —la ruta cuenta caracteres de `JSON.stringify` y la mesa bytes de la forma
+     * canónica, con su cota de hondura—, o cuando alguien llama a `mover()` por otra puerta.
+     */
+    res.status(400).json({ error: error.message, motivo: error.motivo });
+    return true;
+  }
   if (error instanceof FiguraMalEscrita) {
     /*
      * 400, y por lo mismo que el de arriba: lo mandado está mal escrito y
@@ -179,6 +197,25 @@ function contestarElFallo(error: unknown, res: Response, vista?: VistaDeMesa): b
      * «Caballero» no vale por la mayúscula es que se le diga aquí.
      */
     res.status(400).json({ error: error.message, motivo: 'figura-mal-escrita' });
+    return true;
+  }
+  if (error instanceof ModalidadDesconocida) {
+    /* 400 por lo mismo que la figura: mal escrita, y no se arregla sola. */
+    res.status(400).json({ error: error.message, motivo: 'modalidad-desconocida' });
+    return true;
+  }
+  if (error instanceof ModalidadNoAdmitida) {
+    /*
+     * 400 y no 409: no es la mesa la que está en un estado que no deja —no hay mesa todavía—, es
+     * la petición la que pide algo que este juego no tiene. Normalmente lo contesta antes la
+     * propia ruta de abrir; esto es por si llega por `abrir` desde otro sitio.
+     */
+    res.status(400).json({
+      error: error.message,
+      motivo: 'modalidad-no-admitida',
+      arcade: error.arcade,
+      modalidad: error.modalidad,
+    });
     return true;
   }
   if (error instanceof AlmacenNoGuarda) {
@@ -344,10 +381,23 @@ const contadorDeAperturas = limitarIntentos({
  * nada que hacer»—; hasta hoy no la llamaba nadie desde una respuesta. Es un
  * campo NUEVO y por tanto opcional en el otro extremo: un cliente empaquetado
  * contra un servidor más viejo no lo recibirá, y eso no puede ser un fallo.
+ *
+ * ═══ Y `sePuedeRecorrer`, QUE TAMPOCO ESTÁ EN EL MANIFIESTO ═══
+ *
+ * Si se puede bajar al tablero de este arcade EN ESTE SERVIDOR: que la mesa admita la modalidad
+ * `botas` y que haya mundo que recorrer (`seRecorreAqui` en `botas/index.ts`). Los clientes lo usan
+ * para OFRECER la modalidad al abrir mesa, y por la misma razón que `publicaOpciones` no puede
+ * vivir en el manifiesto: «este juego se recorre» es que exista el productor de su mundo, que es
+ * código de este proceso, y no una bandera que alguien pueda poner a `true`. Opcional en el otro
+ * extremo, igual: un servidor viejo no lo manda, y un cliente que no lo recibe no ofrece `botas`.
  */
 router.get('/arcade', (_req, res) => {
   res.json({
-    arcades: arcadesInstalados().map((m) => ({ ...m, publicaOpciones: hayOpciones(m.id) })),
+    arcades: arcadesInstalados().map((m) => ({
+      ...m,
+      publicaOpciones: hayOpciones(m.id),
+      sePuedeRecorrer: seRecorreAqui(m.id),
+    })),
   });
 });
 
@@ -379,6 +429,46 @@ function figuraDelCuerpo(
 }
 
 /**
+ * La `modalidad` del cuerpo, comprobada ENTERA: forma y si este juego la admite.
+ *
+ * ═══ POR QUÉ LA RUTA LO PREGUNTA, SI `abrir` TAMBIÉN LO PREGUNTA ═══
+ *
+ * Porque son dos cosas distintas y hacen falta las dos. `abrir` lo exige para que ninguna otra
+ * puerta se lo salte —la mesa es la autoridad—, y esto lo contesta ANTES, en la petición, con el
+ * motivo dicho en el idioma de la petición: qué mandaste, qué vale, y qué juego no la tiene. Es
+ * la misma defensa en dos capas que el tope de la carga: la ruta corta pronto y la mesa no se fía.
+ *
+ * Sin `modalidad` la mesa es `normal`, que es lo que eran todas antes de que existiera el campo:
+ * un cliente empaquetado antes que este servidor no lo manda, y eso no puede ser un error.
+ */
+function modalidadDelCuerpo(
+  cuerpo: { modalidad?: unknown },
+  arcade: string,
+  res: Response,
+): { modalidad: Modalidad } | null {
+  if (cuerpo.modalidad === undefined) return { modalidad: 'normal' };
+  if (!esModalidad(cuerpo.modalidad)) {
+    res.status(400).json({
+      error: new ModalidadDesconocida(cuerpo.modalidad).message,
+      motivo: 'modalidad-desconocida',
+    });
+    return null;
+  }
+  if (cuerpo.modalidad === 'botas' && !admiteBotas(arcade)) {
+    res.status(400).json({
+      error:
+        `«${arcade}» no se puede jugar bajando al tablero en este servidor: el juego no ha ` +
+        'declarado su mundo. La mesa se puede abrir en modalidad «normal».',
+      motivo: 'modalidad-no-admitida',
+      arcade,
+      modalidad: cuerpo.modalidad,
+    });
+    return null;
+  }
+  return { modalidad: cuerpo.modalidad };
+}
+
+/**
  * ABRE UNA MESA. La abre el primer jugador y se sienta de paso.
  *
  * Devuelve el código —para dictarlo— y la llave —para guardarla—. La llave no
@@ -392,6 +482,7 @@ router.post('/arcade/mesas', contadorDeAperturas, async (req, res) => {
     nombre?: unknown;
     plazoSegundos?: unknown;
     figura?: unknown;
+    modalidad?: unknown;
   };
   const arcade = typeof cuerpo.arcade === 'string' ? cuerpo.arcade : '';
   if (!arcadeInstalado(arcade)) {
@@ -414,12 +505,16 @@ router.post('/arcade/mesas', contadorDeAperturas, async (req, res) => {
   const conFigura = figuraDelCuerpo(cuerpo, res);
   if (conFigura === null) return;
 
+  const conModalidad = modalidadDelCuerpo(cuerpo, arcade, res);
+  if (conModalidad === null) return;
+
   try {
     const abierta = await abrir({
       arcade,
       nombre: typeof cuerpo.nombre === 'string' ? cuerpo.nombre : '',
       plazoSegundos,
       figura: conFigura.figura,
+      modalidad: conModalidad.modalidad,
     });
     /*
      * La respuesta se compone con la MISMA `mirar` que usan las demás rutas, y no
@@ -663,9 +758,30 @@ router.get('/arcade/mesas/:codigo', contadorDeCodigos, async (req, res) => {
   const desde = Number(req.query.desde);
 
   try {
-    const primera = await mirar(codigo, llave);
-    if (!Number.isFinite(desde) || primera.rev !== desde) {
-      responderConLaMesa(res, primera, desde);
+    if (!Number.isFinite(desde)) {
+      responderConLaMesa(res, await mirar(codigo, llave), desde);
+      return;
+    }
+
+    /*
+     * ═══ LAS DOS COMPARACIONES VAN CON LA LECTURA BARATA ═══
+     *
+     * Aquí había dos `mirar`: uno para comparar antes de aparcarse y otro para comparar al
+     * despertar, y los dos PROYECTABAN —componían la vista de este asiento con el código del
+     * juego y le pedían sus opciones— para que, si nada había cambiado, se tiraran las dos y se
+     * contestara 204. Era la mitad del coste de una mesa quieta, por cada móvil y cada vuelta.
+     *
+     * `revisionDe` hace todo lo que hacía `mirar` —el 404, el tic si venció el plazo, la
+     * presencia— menos la vista, y `mirar` se llama sólo cuando hay algo que mandar. Contado en
+     * `verify:lectura-barata`: la lectura que espera y no encuentra nada pasa de dos proyecciones y
+     * dos listas de opciones a CERO, y la que encuentra algo, de dos a una.
+     *
+     * Si entre comparar y componer entra otro movimiento, lo que se manda es la mesa de DESPUÉS de
+     * ese movimiento, que es más fresca y nunca más vieja: la revisión sólo sube.
+     */
+    const primera = await revisionDe(codigo, llave);
+    if (primera.rev !== desde) {
+      responderConLaMesa(res, await mirar(codigo, llave), desde);
       return;
     }
 
@@ -678,11 +794,16 @@ router.get('/arcade/mesas/:codigo', contadorDeCodigos, async (req, res) => {
     if (primera.venceEn !== null && !primera.terminada) {
       elCanal().despertarAlVencer(codigo, primera.venceEn - Date.now());
     }
-    await elCanal().esperarCambio(codigo);
+    /*
+     * Y MIENTRAS ESTÁ APARCADA, LA MESA NO SE SUELTA DE LA MEMORIA. `mesas.ts` desaloja lo frío, y
+     * una mesa con alguien esperándola no lo está: soltarla sería volver a leerla del disco en
+     * cuanto esta espera despierte. La capa de mesa no conoce el canal, así que se le pasa la espera.
+     */
+    await mientrasSeEspera(codigo, () => elCanal().esperarCambio(codigo));
 
-    const segunda = await mirar(codigo, llave);
+    const segunda = await revisionDe(codigo, llave);
     if (segunda.rev !== desde) {
-      responderConLaMesa(res, segunda, desde);
+      responderConLaMesa(res, await mirar(codigo, llave), desde);
       return;
     }
     res.status(204).end();
@@ -900,6 +1021,15 @@ router.post('/arcade/mesas/:codigo/movimientos', contadorDeCodigos, async (req, 
    * lo que luego sería caro. Sobre un cuerpo ya acotado a 256 kB por express su
    * coste es del orden del milisegundo, y si le dan algo que no se puede
    * serializar falla CERRANDO la puerta, que es el lado bueno del que fallar.
+   *
+   * ═══ Y NO ES EL ÚNICO: LA MESA EXIGE LOS MISMOS DOS TOPES ═══
+   *
+   * Estos dos eran los únicos del servidor para esta puerta, y por eso cualquier otra que llamara
+   * a `mover()` se los saltaba. Desde §5.1 de `docs/BOOTS-ON-BOARD.md` la mesa los exige también,
+   * antes del candado y con `canonico` —bytes de la forma canónica y cota de hondura—, así que lo
+   * que se escapa de aquí —cinco mil «ñ» son 5.002 caracteres y 10.002 bytes; cien niveles de
+   * anidamiento no son nada para `stringify`— lo para ella con un `MovimientoDesmedido`, que
+   * `contestarElFallo` convierte en el mismo 400. Éste se queda: corta antes y sin tocar la mesa.
    */
   if (cuerpo.tipo.length > TOPE_TIPO_CARACTERES) {
     res.status(400).json({
@@ -1155,6 +1285,22 @@ router.get('/arcade/presupuesto', (_req, res) => {
  * Así que sale la CARPETA que se está usando —para poder compararla con la del
  * despliegue de un vistazo— y la cuenta de fallos con el último. Sin la carpeta,
  * el número de fallos no dice dónde mirar.
+ *
+ * ═══ Y `mesas` CUENTA LAS QUE HAY EN MEMORIA, QUE YA NO SON TODAS ═══
+ *
+ * Desde que las mesas se leen del disco a demanda y lo frío sale de la memoria,
+ * `mesas` son las calientes: lo que vigila fugas. `memoria` dice además cuántas se
+ * han traído del disco y cuántas se han soltado desde que arrancó el proceso, que
+ * es lo que dice desde fuera que un proceso nuevo NO ha leído la carpeta entera.
+ * Contar las del disco aquí costaría recorrer la carpeta en cada petición, y esta
+ * ruta no pide credencial.
+ *
+ * ═══ Y `botas`: EL CANAL DE BOOTS ON BOARD ═══
+ *
+ * Salas, canales, si el temporizador está en marcha —parado sin salas, que es lo que dice desde
+ * fuera que un servidor sin nadie andando no hace nada—, fotos mandadas y saltadas, pasos
+ * aceptados, correcciones por motivo y cierres por motivo. Sólo cuentas: ni un código de mesa, ni
+ * un asiento, ni una llave, porque esto se sirve sin credencial.
  */
 router.get('/arcade/diagnostico', (_req, res) => {
   res.json({
@@ -1163,6 +1309,8 @@ router.get('/arcade/diagnostico', (_req, res) => {
     despertadores: despertadoresVivos(),
     almacen: saludDelAlmacen(),
     avisosDeArcade: avisosAbiertos(),
+    memoria: memoriaDeLasMesas(),
+    botas: diagnosticoDeBotas(),
   });
 });
 

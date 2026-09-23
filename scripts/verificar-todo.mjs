@@ -539,11 +539,27 @@ const BATERIA = [
       'lo que manda un aparato llega de un entorno hostil, y el lector del servidor devuelve null ante cualquier cosa que no sea exactamente un mensaje bien formado —una clave de más, un número con decimales, una coordenada fuera de la coma fija, un rumbo o una marcha fuera de rango, un texto más largo que el tope—; el del aparato, igual con lo que manda el servidor; la ruta cuelga de la mesa bajo /api y la llave NO va en ella',
   },
   {
+    nombre: 'la sala de Boots on Board',
+    donde: 'server',
+    guion: 'verify:sala-de-botas',
+    lento: true,
+    porque:
+      'la sala del canal con el reloj en la mano: el `hola` en su plazo, la llave, la mesa en `botas` y recorrible, un canal por asiento, el presupuesto de distancia con su tope de un segundo, la estructura con la escuadra de un tic, lo que viene de camino tras corregir, el cubo, el quieto, la gracia, una foto por sala sin asiento repetido y un solo temporizador que se para sin salas, el mundo que cambia debajo de alguien, derivar mundos por turno con abrir delante, una subida que revienta sin tirar el servidor, y SIGTERM con el montaje de verdad cerrando con 1001 dentro de la despedida',
+  },
+  {
+    nombre: 'Boots on Board de punta a punta',
+    donde: 'server',
+    guion: 'verify:botas',
+    lento: true,
+    porque:
+      'un servidor de verdad con una mesa de Las Lindes en `botas`: dos aparatos `ws` entran donde se puede estar, un paseo legal se acepta entero y lo ve el otro, el teletransporte, la muralla de verdad y correr de más se corrigen, los cierres llevan su código del contrato, otras rutas 404 y un origen ajeno 403, y la llave no sale nunca en lo que escribe el servidor',
+  },
+  {
     nombre: 'el botín de la refriega',
     donde: 'server',
     guion: 'verify:botin',
     porque:
-      'el botín es el único movimiento, además del tic, que entra en una mesa en nombre de nadie, y mueve cosas de valor de un asiento a otro: su lector dice que no a todo lo que llegue con un asiento detrás, a un botín de uno a sí mismo, a un asiento que no está sentado y a una clave de más',
+      'el botín es el único movimiento, además del tic, que entra en una mesa en nombre de nadie, y mueve cosas de valor de un asiento a otro: su lector dice que no a todo lo que llegue con un asiento detrás, a un botín de uno a sí mismo, a un asiento que no está sentado y a una clave de más; y cada juego del registro de mundos tiene su prueba jugada de verdad —se lleva lo que dice su regla y a quien la dice, sin mover el turno, el momento ni los plazos, sin nada que llevarse devuelve el mismo estado, y en sus momentos delicados (el descarte de Riberas, la subasta y el apuro del Burgo) no deja la partida atascada—',
   },
   {
     nombre: 'el mundo de Riberas',
@@ -557,7 +573,7 @@ const BATERIA = [
     donde: 'server',
     guion: 'verify:lindes-mundo',
     porque:
-      'el mundo de Las Lindes sale del reparto de verdad, bajado a `shared/`: canoniza; estorban la muralla, las torres, la villa, la ermita y lo que se levanta en el campo, con la huella MEDIDA de cada modelo en `tablero.glb` —se vuelve a medir y se exigen los mismos números— y ni una caja de trigal, barbecho o nada menudo; se nace en senda o prado donde se puede estar; quien va derecho contra un lienzo se queda en su lado —y sin él cruzaría— y por el hueco de una puerta se pasa —y cerrada no—; y el mismo tablero da el mismo mundo y el mismo paseo en Node y en Hermes, con suelos de choques contra cuerpo y contra borde',
+      'el mundo de Las Lindes sale del reparto de verdad, bajado a `shared/`: canoniza; estorban la muralla, las torres, la villa, la ermita y lo que se levanta en el campo, con la huella MEDIDA de cada modelo en `tablero.glb` —se vuelve a medir y se exigen los mismos números— y ni una caja de trigal, barbecho o nada menudo, salvo las piedras, rocas y tocones que pasan de la cintura, que estorban con su radio medido sin tapar una senda, el hueco de una puerta ni un sitio de nacer, ni partir el valle; se nace en senda o prado donde se puede estar; quien va derecho contra un lienzo se queda en su lado —y sin él cruzaría— y por el hueco de una puerta se pasa —y cerrada no—; y el mismo tablero da el mismo mundo y el mismo paseo en Node y en Hermes, con suelos de choques contra cuerpo y contra borde',
   },
   {
     nombre: 'marcador',
@@ -859,6 +875,37 @@ const BATERIA = [
     lento: true,
     porque:
       'un arcade escrito en un fichero temporal fuera del repositorio se instala por `ARCADES_EXTERNOS` —con la ruta de Windows, que es donde falla el cargador—, sale en el catálogo, abre mesa, esconde la mano de cada cual, pinta con el mueble genérico desde sus propias `opciones()` y dice POR QUÉ rechaza un movimiento',
+  },
+  {
+    nombre: 'modalidad de la mesa',
+    donde: 'server',
+    guion: 'verify:modalidad',
+    lento: true,
+    porque:
+      'una mesa se abre en `normal` o en `botas` y no cambia: sin decir nada es normal, `botas` sólo para un juego que se recorre, lo mal escrito es un 400 que no deja mesa, la modalidad sobrevive a que el proceso muera y un fichero de antes se lee normal; y reconocer una llave no proyecta, no mete el tic, no marca presencia y no escribe',
+  },
+  {
+    nombre: 'lectura barata',
+    donde: 'server',
+    guion: 'verify:lectura-barata',
+    porque:
+      'la lectura con `desde` que espera y no encuentra nada no proyecta nada —contado: antes eran dos vistas y dos listas de opciones por vuelta—, la que encuentra algo proyecta una vez y no dos, y lo demás es lo de siempre: 200, 204 y 404, avisos, presencia, el tic metido por la lectura y el despertador',
+  },
+  {
+    nombre: 'CORS con lista blanca',
+    donde: 'server',
+    guion: 'verify:cors',
+    lento: true,
+    porque:
+      'la API sólo se deja leer desde los orígenes propios, lo añadido en `ORIGENES_PERMITIDOS` y —fuera de producción— el bucle local en cualquier puerto; sin `Origin` se sirve como siempre; el preflight con `x-asiento` pasa sólo desde donde toca y con la lista cerrada de cabeceras; y el servidor de verdad lo monta en lugar del `cors()` pelado',
+  },
+  {
+    nombre: 'mesas frías',
+    donde: 'server',
+    guion: 'verify:mesas-frias',
+    lento: true,
+    porque:
+      'un proceso nuevo lee lo que se le pide y no la carpeta entera; lo frío sale de la memoria con su fichero intacto y lo que no se puede soltar —alguien esperando, un asiento visto, el candado cogido, una escritura pendiente o una que falló— se queda; al pedirlas vuelven idénticas y con su tic; `abrir` no reparte el código de una mesa dormida; y el barrido de treinta días borra del disco sin cargar nada ni tocar lo que no entiende',
   },
 
   /*

@@ -48,6 +48,7 @@
 import { rechazar } from '../motor';
 import type { Rechazo } from '../motor';
 import { esTic } from '../reloj';
+import { esBotin, leerElBotin } from './botin';
 import { NADIE_SENTADO, comoSeLlama } from '../tipos';
 import type { ArcadeId, AsientoId, LosSentados, ManifiestoDeArcade, QuienMira } from '../tipos';
 import type { ContextoMovimiento, Movimiento } from '../movimiento';
@@ -119,6 +120,28 @@ export const NOMBRES_DE_LOS_COLORES: readonly string[] = [
 
 /** El aforo. Cinco colores, cinco sitios. */
 export const CABEN = { minimo: 2, maximo: 5 } as const;
+
+/**
+ * LO QUE SE LLEVA EL BOTÍN DE LA REFRIEGA: hasta tres puntos de quien cae, para quien lo tumbó.
+ *
+ * Puntos y no labriegos, y no es por comodidad. Un labriego es la única pieza con la que se
+ * juega —siete por cabeza, y hasta que lo que ocupa no se cierra no vuelve—, así que quitar uno
+ * dejaría a quien cae con menos turnos de verdad por delante, y quitar uno PLANTADO desharía una
+ * mayoría sobre una villa ajena a la que nadie ha tocado. Los puntos, en cambio, no gobiernan
+ * nada hasta el recuento final: pasarlos de una columna a otra cambia quién va ganando y no
+ * cambia qué se puede hacer. Tres es lo que vale una senda cerrada de tres losas: se nota en el
+ * marcador, y no decide una partida en un solo golpe.
+ */
+export const PUNTOS_DEL_BOTIN = 3;
+
+/**
+ * Cuántas refriegas recuerda la mesa para contarlas. Las más viejas se caen por delante.
+ *
+ * Es una crónica y no un registro: el registro es el diario de la mesa, que las guarda todas.
+ * Aquí sólo hace falta que quien mira sepa qué acaba de pasar, y tres dan para dos peleas
+ * seguidas en sitios distintos sin que la tercera tape a la primera.
+ */
+export const REFRIEGAS_QUE_SE_RECUERDAN = 3;
 
 // ---------------------------------------------------------------------------
 // Los momentos
@@ -206,6 +229,13 @@ export interface Cobro {
   readonly alFinal: boolean;
 }
 
+/** Una refriega que dio botín: quién cayó y perdió, quién lo tumbó y se lo llevó, y cuántos puntos. */
+export interface RefriegaDeLasLindes {
+  readonly de: AsientoId;
+  readonly para: AsientoId;
+  readonly puntos: number;
+}
+
 export interface EstadoDeLasLindes {
   momento: MomentoDeLasLindes;
   /** Vacío mientras se reúne la mesa. */
@@ -239,6 +269,20 @@ export interface EstadoDeLasLindes {
   azar: Azar;
   /** Quién ganó. Vacío hasta que termina. */
   ganadores: AsientoId[];
+  /**
+   * LAS ÚLTIMAS REFRIEGAS QUE DIERON BOTÍN, de la más vieja a la más nueva. Públicas enteras:
+   * en Boots on Board la pelea se ve, y los puntos de cada cual ya salen en la mesa.
+   *
+   * ═══ OPCIONAL, Y NO UNA LISTA VACÍA DESDE EL PRINCIPIO, A PROPÓSITO ═══
+   *
+   * Una partida en la que nadie ha caído tiene que seguir siendo, byte a byte, la de antes de
+   * que existiera el botín: `oro:arcade` congela el estado final y las vistas de cada revisión
+   * de una partida entera de este juego (`oro-arcade/lindes.json`), y ese oro no se recaptura
+   * porque sí. Con el campo puesto siempre —aunque fuera `[]`— cambiarían todas sus huellas sin
+   * que cambiara ninguna regla, y un oro que hay que recapturar por un campo vacío enseña a
+   * recapturarlo sin mirar. Así que aparece con la primera refriega y ya no se va.
+   */
+  refriegas?: RefriegaDeLasLindes[];
 }
 
 /** Una mesa recién puesta, sin bolsa y sin tablero. */
@@ -325,6 +369,14 @@ export function avanzarLasLindes(
    * tiene que devolver un estado igualmente.
    */
   if (esTic(movimiento)) return actual;
+
+  /*
+   * EL BOTÍN TAMPOCO PASA POR EL PORTILLO, y por lo mismo que el tic: no lo manda ningún
+   * asiento —lo mete el servidor cuando alguien cae en Boots on Board—, así que `opciones()` no
+   * se lo ofrece a nadie y el portillo lo tiraría siempre. Lo que el portillo no mira, lo mira
+   * `elBotin` con su propio lector, que es más estricto que él. Ver `botin.ts`.
+   */
+  if (esBotin(movimiento)) return elBotin(actual, movimiento.carga, ctx);
 
   const vista = loQueSeVe(actual, ctx.quien, NADIE_SENTADO);
   if (!estaOfrecido(opcionesDeLasLindes(vista, ctx.quien), movimiento)) {
@@ -904,6 +956,84 @@ export function deQuienEsElTurno(estado: EstadoDeLasLindes): AsientoId | null {
 }
 
 // ---------------------------------------------------------------------------
+// El botín de la refriega
+// ---------------------------------------------------------------------------
+
+/**
+ * EL BOTÍN: `de` cayó en Boots on Board y `para` lo tumbó. Pasan hasta `PUNTOS_DEL_BOTIN`
+ * puntos de uno a otro, y nada más.
+ *
+ * ═══ QUIÉN PUEDE MANDARLO, Y POR QUÉ SE RECHAZA CON MOTIVO ═══
+ *
+ * Nadie de fuera: `leerElBotin` exige `quien: null`, dos sentados distintos y una carga que sea
+ * exactamente `{ de, para }`. Lo que el lector no puede saber lo mira esto, que es quien lo sabe:
+ * que la partida esté en juego —colocando o plantando— y que los dos JUEGUEN ESTA PARTIDA, que no
+ * es lo mismo que estar sentado: quien se sentó después de volcar la bolsa mira y no tiene
+ * columna de puntos. Todo eso es un botín que no debió llegar, y se rechaza con su motivo para que
+ * el servidor, que es el único que lo manda, sepa por qué no entró.
+ *
+ * ═══ SIN NADA QUE LLEVARSE, EL MISMO OBJETO ═══
+ *
+ * Quien cae con cero puntos no pierde nada, y entonces la refriega no pasó para el juego: sale
+ * EL MISMO estado, que la mesa cuenta como movimiento que no cambió nada, y la crónica no apunta
+ * un robo de cero. No es un rechazo: el botín era bueno y sencillamente no había qué llevarse.
+ *
+ * ═══ EN QUÉ MOMENTOS SE APLICA: EN TODOS LOS DE JUEGO, Y ESTÁ MIRADO ═══
+ *
+ * Aquí los puntos no gobiernan nada mientras se juega. Poner exige una losa en la mano y un sitio
+ * donde case; plantar, un labriego libre y una cosa sin gente; el remate cobra lo que se cierra.
+ * Ninguna de las tres cosas lee los puntos: sólo los SUMA. El único que los lee es
+ * `rematarLaPartida`, al vaciarse la bolsa, para decir quién gana — y a esas alturas el botín ya
+ * se rechaza, porque la partida está terminada. Así que no hay ningún momento delicado que
+ * proteger: ni la losa de la mano, ni `plantando`, ni el remate a medias cambian por esto. Y los
+ * puntos no bajan de cero porque se lleva `min(los suyos, PUNTOS_DEL_BOTIN)`.
+ *
+ * ═══ LO QUE NO TOCA, Y HAY QUE PODER AFIRMARLO ═══
+ *
+ * Ni el turno, ni el momento, ni la losa de la mano, ni los labriegos plantados, ni lo cobrado en
+ * el último remate. Sobre todo el turno: la mesa reprograma su plazo cuando cambia `turnoDe`, y
+ * un botín que lo moviera le regalaría —o le quitaría— tiempo a quien juega sin que jugara nadie.
+ *
+ * ═══ Y SE CUENTA COMO SE CUENTA UN COBRO ═══
+ *
+ * Con una frase en su panel, igual que «Se ha cobrado», y con los nombres dentro: la refriega va a
+ * `refriegas` y la proyección la escribe. Ver `fraseDeLaRefriega`.
+ */
+function elBotin(
+  estado: EstadoDeLasLindes,
+  carga: unknown,
+  ctx: ContextoMovimiento,
+): EstadoDeLasLindes | Rechazo<EstadoDeLasLindes> {
+  const botin = leerElBotin(carga, ctx.quien, ctx.asientos);
+  if (botin === null) {
+    return rechazar(estado, 'Ese botín no vale: lo mete la mesa, entre dos sentados que no sean el mismo.');
+  }
+  if (estado.momento === 'reuniendo') return rechazar(estado, 'La partida no ha empezado: todavía no hay botín.');
+  if (estado.momento === 'terminada') return rechazar(estado, 'La partida ya ha terminado: ya no hay botín.');
+
+  let de = -1;
+  let para = -1;
+  for (let i = 0; i < estado.labriegos.length; i++) {
+    const asiento = (estado.labriegos[i] as Labriego).asiento;
+    if (asiento === botin.de) de = i;
+    if (asiento === botin.para) para = i;
+  }
+  if (de < 0 || para < 0) return rechazar(estado, 'Ese botín es de alguien que no juega esta partida.');
+
+  const suyos = (estado.labriegos[de] as Labriego).puntos;
+  const puntos = suyos < PUNTOS_DEL_BOTIN ? suyos : PUNTOS_DEL_BOTIN;
+  if (puntos <= 0) return estado;
+
+  const labriegos = estado.labriegos.map((l, i) => {
+    if (i === de) return { ...l, puntos: l.puntos - puntos };
+    if (i === para) return { ...l, puntos: l.puntos + puntos };
+    return l;
+  });
+  const refriegas = [...(estado.refriegas ?? []), { de: botin.de, para: botin.para, puntos }];
+  return { ...estado, labriegos, refriegas: refriegas.slice(-REFRIEGAS_QUE_SE_RECUERDAN) };
+}
+
+// ---------------------------------------------------------------------------
 // LA PROYECCIÓN: qué ve cada cual
 // ---------------------------------------------------------------------------
 
@@ -947,6 +1077,14 @@ export interface CobroVisto {
   readonly frase: string;
 }
 
+/** Una refriega que dio botín, ya escrita para leerse. Como `CobroVisto`, con su frase. */
+export interface RefriegaVista {
+  readonly de: AsientoId;
+  readonly para: AsientoId;
+  readonly puntos: number;
+  readonly frase: string;
+}
+
 /**
  * LA VISTA SIN EL TABLERO DIBUJADO.
  *
@@ -977,6 +1115,11 @@ export interface VistaSinTablero {
   /** La llave de la última losa puesta. */
   readonly ultima: string;
   readonly cobros: readonly CobroVisto[];
+  /**
+   * LAS ÚLTIMAS REFRIEGAS, y SÓLO SI HUBO ALGUNA: el campo no viaja en una partida en la que
+   * nadie ha caído, por lo mismo que no existe en su estado (ver `EstadoDeLasLindes.refriegas`).
+   */
+  readonly refriegas?: readonly RefriegaVista[];
   readonly ganadores: readonly string[];
   /** Dónde cabe la losa de la mano. Público: se ve mirando el tablero. */
   readonly colocaciones: readonly Colocacion[];
@@ -1083,6 +1226,17 @@ export function loQueSeVe(
     retiradas: estado.retiradas,
     ultima: estado.ultima,
     cobros,
+    /* Sólo si hubo alguna: una partida sin refriega manda la misma vista que antes del botín. */
+    ...(estado.refriegas === undefined
+      ? {}
+      : {
+          refriegas: estado.refriegas.map((r) => ({
+            de: r.de,
+            para: r.para,
+            puntos: r.puntos,
+            frase: fraseDeLaRefriega(r, sentados),
+          })),
+        }),
     ganadores: estado.ganadores.map((a) => comoSeLlama(sentados, a)),
     colocaciones,
     sitios,
@@ -1129,6 +1283,18 @@ function fraseDelCobro(c: Cobro, sentados: LosSentados): string {
   const articulo = c.clase === 'prado' ? 'un' : 'una';
   const cierre = c.alFinal ? ', que se cuenta al acabar' : ' cerrada';
   return `${gente}: ${c.puntos} por ${articulo} ${cosa}${medida}${cierre}.`;
+}
+
+/**
+ * Lo que se lee cuando alguien se lleva botín: «Ana le quita 3 puntos a Bruno en la refriega.»
+ *
+ * Contado desde quien se lo lleva, que es quien hizo algo; y con el número siempre, porque con
+ * menos de `PUNTOS_DEL_BOTIN` en la columna se lleva lo que hubiera y «le quita puntos» a secas
+ * no diría cuántos.
+ */
+function fraseDeLaRefriega(r: RefriegaDeLasLindes, sentados: LosSentados): string {
+  const cuantos = r.puntos === 1 ? '1 punto' : `${r.puntos} puntos`;
+  return `${comoSeLlama(sentados, r.para)} le quita ${cuantos} a ${comoSeLlama(sentados, r.de)} en la refriega.`;
 }
 
 /**
@@ -1635,6 +1801,16 @@ function panelesDeLasLindes(vista: VistaSinTablero): TableroDeclarado['paneles']
 
   if (vista.cobros.length > 0) {
     paneles.push({ titulo: 'Se ha cobrado', lineas: vista.cobros.map((c) => c.frase) });
+  }
+
+  /*
+   * LA REFRIEGA, al lado de lo cobrado y con el mismo trato: una frase por botín, ya escrita. El
+   * `Array.isArray` no es desconfianza gratuita: esto recibe la vista que llegó por la red, y una
+   * vista de antes del botín no trae el campo.
+   */
+  const refriegas = Array.isArray(vista.refriegas) ? vista.refriegas : [];
+  if (refriegas.length > 0) {
+    paneles.push({ titulo: 'La refriega', lineas: refriegas.map((r) => r.frase) });
   }
 
   paneles.push({

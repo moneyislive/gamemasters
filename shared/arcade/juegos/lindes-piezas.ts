@@ -25,6 +25,9 @@
  *
  * `rocaB` y `rocaD` no los pone el reparto: están porque la lista de piezas menudas los nombra.
  */
+import { ALTO_Y_RADIO_DEL_MODELO } from './lindes-huellas';
+import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from './lindes-medidas';
+
 export const PIEZA = {
   /* Árboles sueltos y arboledas. */
   arbolA: 'arbol-a',
@@ -91,7 +94,9 @@ export type NombreDePieza = (typeof PIEZA)[keyof typeof PIEZA];
  * Vivía en el reparto; está aquí para que se lea al lado de `comoEstorba`, que es la otra
  * pregunta que se le hace a esta lista y se contesta distinto. «Menuda» es una decisión de
  * DIBUJO —cuándo deja de pintarse—, no de física. Que lo menudo no estorbe al andar es
- * además una decisión de producto, no una consecuencia de esta lista.
+ * además una decisión de producto, no una consecuencia de esta lista; y tiene una excepción,
+ * las piedras, las rocas y los tocones que pasan de la cintura, que se pintan como menudos y
+ * se rodean como lo que son.
  */
 const PIEZAS_MENUDAS: ReadonlySet<string> = new Set<string>([
   PIEZA.valla,
@@ -127,11 +132,34 @@ export function esMenuda(pieza: string): boolean {
 const CUBIERTA_DE_SUELO: ReadonlySet<string> = new Set<string>([PIEZA.trigal, PIEZA.barbecho]);
 
 /**
- * CÓMO ESTORBA UNA PIEZA A QUIEN ANDA.
+ * LAS PIEDRAS, LAS ROCAS Y LOS TOCONES: lo menudo que se rodea si es alto. Ver `comoEstorba`.
+ */
+const PIEDRAS_ROCAS_Y_TOCONES: ReadonlySet<string> = new Set<string>([
+  PIEZA.piedra,
+  PIEZA.rocaA,
+  PIEZA.rocaB,
+  PIEZA.rocaC,
+  PIEZA.rocaD,
+  PIEZA.rocaE,
+  PIEZA.tocon,
+]);
+
+/** La cintura de quien anda: media persona, 1,27 unidades del mundo. Ver `comoEstorba`. */
+export const CINTURA_DE_QUIEN_ANDA = ALTURA_DE_UNA_PERSONA / 2;
+
+/** Las cuatro respuestas de `comoEstorba`: la última se resuelve por pieza puesta. */
+export type ComoEstorba = 'nada' | 'puerta' | 'caja' | 'si-pasa-de-la-cintura';
+
+/**
+ * CÓMO ESTORBA UNA PIEZA A QUIEN ANDA, por su nombre.
  *
  *   · `'nada'` — se atraviesa. Lo MENUDO, por decisión de producto: vallas, setos, barriles,
- *     carros, sacos, leña, cajas, puestos, pozos, abrevaderos, piedras, rocas y tocones. Y la
- *     CUBIERTA DE SUELO, que es el campo mismo.
+ *     carros, sacos, leña, cajas, puestos, pozos y abrevaderos. Y la CUBIERTA DE SUELO, que
+ *     es el campo mismo.
+ *   · `'si-pasa-de-la-cintura'` — las piedras, las rocas y los tocones: los que, PUESTOS, pasan
+ *     de la cintura de quien anda estorban con su planta medida, y los demás se pisan. Como eso
+ *     depende de la escala a la que los pone el reparto, no se contesta aquí sino en
+ *     `comoEstorbaLaPuesta`, que es la que usa el mundo.
  *   · `'puerta'` — `muro-puerta`: estorba por sus dos lados y se cruza por el hueco. La
  *     muralla tiene que parar y la puerta tiene que dejar pasar, y las dos cosas son la
  *     misma pieza.
@@ -140,7 +168,7 @@ const CUBIERTA_DE_SUELO: ReadonlySet<string> = new Set<string>([PIEZA.trigal, PI
  *     iglesia, taberna, mercado, concejo, herrería, taller, molino, cuadras—; y del campo, lo
  *     que se levanta: los árboles sueltos y las tres arboledas, el almiar y la colina.
  *
- * ═══ LOS ÁRBOLES, SÍ; Y LAS ROCAS, NO ═══
+ * ═══ LOS ÁRBOLES, SÍ ═══
  *
  * Un árbol del pack tiene la copa baja: medida en el `.glb`, empieza a 0,14 del pack en
  * `arbol-b` y a 0,19 en `arbol-a` —una sexta parte de su alto—, que a la escala a la que
@@ -150,11 +178,34 @@ const CUBIERTA_DE_SUELO: ReadonlySet<string> = new Set<string>([PIEZA.trigal, PI
  * El almiar ya estaba nombrado como obstáculo en la cabecera de `mundo.ts`, y la colina es
  * un bulto de doce por nueve.
  *
- * Las rocas, las piedras y los tocones son MENUDOS y no estorban, aunque los mayores pasen
- * de la altura de una persona: una `piedra` mide 2,3 junto a la senda y hasta 3,4 en el
- * erial, una `roca-e` hasta 2,3 y un tocón hasta 2,7. Es la regla de producto —lo menudo no
- * choca— aplicada sin excepciones, que es lo que la hace comprobable. Si un día se quiere
- * que las piedras grandes paren, es una línea aquí y `verify:lindes-mundo` pedirá su huella.
+ * ═══ Y LAS ROCAS, SI PASAN DE LA CINTURA ═══
+ *
+ * Hasta el 23 de septiembre las piedras, las rocas y los tocones eran menudos y ninguno
+ * estorbaba, aunque los mayores pasaran de la altura de una persona: una `piedra` mide 2,3 junto
+ * a la senda y hasta 3,4 en el erial. Y se veía: Miguel se quejó de que las rocas grandes se
+ * atravesaban. La regla nueva es la de un cuerpo: lo que no llega a la cintura se pisa o se
+ * salta, y lo que pasa de ella se rodea.
+ *
+ * Es una pregunta por pieza PUESTA y no por nombre, porque «grande» lo decide la escala a la
+ * que la pone el reparto y no el modelo: una `roca-b` a escala 1,7 no llega a la cintura y a
+ * 1,75 pasa. Con el reparto de hoy sale así, medido: la `roca-a` no pasa nunca —mide de 0,64 a
+ * 0,83 en el erial— y se sigue pisando; la `piedra`, la `roca-c`, la `roca-e` y el tocón pasan
+ * siempre y con holgura —lo más bajo que se pone de ellos, una `roca-c` o una `roca-e` a 1,7,
+ * mide 1,81—. La `roca-b` y la `roca-d` no las pone el reparto.
+ *
+ * La planta con la que estorban se mide como la de todo lo que estorba (`lindes-huellas.ts`):
+ * hasta la cabeza de quien anda a la escala de una torre, que para ellas es la planta ENTERA
+ * —la más alta, la piedra, mide 0,28 del pack, y la huella se mide hasta 0,33—. No hace falta
+ * otra altura, porque el invariante que la de ahora pide —que nada que estorba se ponga más
+ * pequeño que una torre— se sigue cumpliendo: el reparto las pone a 1,5 junto a la senda y de
+ * 1,7 a 2,2 en las parcelas, y la torre va a 1,4. Lo vigila `verify:lindes-mundo`, que además
+ * mira que ninguna tape una senda, el hueco de una puerta o un sitio de nacer, ni parta el valle
+ * en trozos. Y como van giradas de cualquier manera, su caja es la de su RADIO medido: ver
+ * `cajasDeLaPuesta`.
+ *
+ * Lo demás menudo sigue sin estorbar aunque haya barriles o carros que pasen de la cintura: la
+ * queja era de las rocas, y para todo lo demás la regla de producto —lo menudo no choca— se
+ * aplica sin excepciones, que es lo que la hace comprobable.
  *
  * ═══ POR QUÉ «TODO LO DEMÁS» Y NO UNA LISTA DE LO QUE CHOCA ═══
  *
@@ -163,8 +214,37 @@ const CUBIERTA_DE_SUELO: ReadonlySet<string> = new Set<string>([PIEZA.trigal, PI
  * primer día, y como no tiene huella medida `verify:lindes-mundo` se pone rojo hasta que
  * alguien lo mida o lo declare menudo.
  */
-export function comoEstorba(pieza: string): 'nada' | 'puerta' | 'caja' {
+export function comoEstorba(pieza: string): ComoEstorba {
   if (pieza === PIEZA.muroPuerta) return 'puerta';
+  if (PIEDRAS_ROCAS_Y_TOCONES.has(pieza)) return 'si-pasa-de-la-cintura';
   if (esMenuda(pieza) || CUBIERTA_DE_SUELO.has(pieza)) return 'nada';
   return 'caja';
+}
+
+/**
+ * LO QUE MIDE DE ALTO UNA PIEZA PUESTA, en unidades del mundo, desde el suelo donde se apoya.
+ * `null` si su alto no está medido: sólo se mide el de lo que estorba si pasa de la cintura.
+ */
+export function altoDeLaPuesta(pieza: string, escala: number): number | null {
+  const medido = ALTO_Y_RADIO_DEL_MODELO[pieza];
+  return medido === undefined ? null : medido.alto * ESCALA_DEL_PACK * escala;
+}
+
+/**
+ * CÓMO ESTORBA UNA PIEZA PUESTA: lo que dice `comoEstorba`, con las piedras resueltas por lo que
+ * miden a la escala a la que se pusieron. Es la pregunta que hace el mundo (`cajasDeLaPuesta`).
+ *
+ * «Pasa de la cintura» es estrictamente más: una piedra que midiera la cintura justa se pisaría.
+ * Y la cuenta son dos productos en coma flotante, que IEEE 754 fija al bit: da lo mismo en el
+ * servidor que en Hermes.
+ *
+ * Una piedra sin alto medido estorba, que es el trato que recibe un edificio nuevo: como tampoco
+ * tiene huella, `verify:lindes-mundo` se pone rojo hasta que alguien vuelva a medir el pack.
+ */
+export function comoEstorbaLaPuesta(pieza: string, escala: number): 'nada' | 'puerta' | 'caja' {
+  const como = comoEstorba(pieza);
+  if (como !== 'si-pasa-de-la-cintura') return como;
+  const alto = altoDeLaPuesta(pieza, escala);
+  if (alto === null) return 'caja';
+  return alto > CINTURA_DE_QUIEN_ANDA ? 'caja' : 'nada';
 }

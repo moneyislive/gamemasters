@@ -36,16 +36,28 @@
  * (`COLORES_DEL_BURGO`) es propia y distinta de la de Riberas a propósito: los
  * barrios del Burgo se llaman por su color, y tres de los seis colonos de Riberas
  * se confundirían con su acera. `verify:embarcadero` contrasta también ésta.
+ *
+ * ═══ AQUÍ SE DICE EL NOMBRE DE LA ESCENA, NO SE IMPORTA LA ESCENA ═══
+ *
+ * Este fichero es una tabla de cadenas sin un solo `import`, y tiene que seguir
+ * siéndolo: la portada de la app le pregunta `tieneMuelle` (`app/src/arcade/muebles.ts`)
+ * antes de que nadie toque nada, y con un componente aquí dentro esa pregunta
+ * arrastraría `three` y las tres escenas a la primera pantalla. Además la plaza y la
+ * linde importan `colorDeAsiento` de aquí: con las escenas dentro, el tema se
+ * importaría a sí mismo a través de ellas. Qué componente monta cada `escena` lo dice
+ * `escenas-del-muelle.ts`, una vez para los dos clientes.
  */
 
 export interface TemaDelMuelle {
   /** El identificador del arcade al que sirve. */
   readonly arcade: string;
   /**
-   * CUÁL DE LAS DOS ESCENAS HERMANAS SE MONTA. Las dos cumplen el mismo contrato
+   * CUÁL DE LAS ESCENAS HERMANAS SE MONTA. Todas cumplen el mismo contrato
    * (`PropsDelEmbarcadero`), así que quien pinta el muelle elige por este campo y no por el
    * nombre del arcade: un `if (arcade === 'burgo')` en los dos clientes sería la misma
-   * decisión escrita dos veces y en el sitio donde no se ve.
+   * decisión escrita dos veces y en el sitio donde no se ve. El nombre se convierte en
+   * componente en `escenas-del-muelle.ts`, y una escena nueva es una fila allí y un nombre
+   * más en esta unión: sin la fila no compila.
    */
   readonly escena: 'embarcadero' | 'plaza' | 'linde';
   /** Cómo se llama el lugar. Sale en el HUD encima del código. */
@@ -122,6 +134,18 @@ export function tieneMuelle(arcade: string): boolean {
 
 export function temaDelMuelle(arcade: string): TemaDelMuelle | undefined {
   return TEMAS[arcade];
+}
+
+/**
+ * QUÉ ARCADES TIENEN MUELLE: los de esta tabla, y ninguno más.
+ *
+ * Existe para los comprobadores. `verify:escritorio` llevaba la lista ESCRITA A MANO
+ * (`CON_MUELLE`), así que un lobby nuevo era su tema aquí y además una línea allí; ahora
+ * la lee de aquí, con suelo —no puede salir vacía y tiene que traer los de hoy— para que
+ * una lista rota no deje en verde todo lo que se comprueba recorriéndola.
+ */
+export function arcadesConMuelle(): readonly string[] {
+  return Object.keys(TEMAS);
 }
 
 /** El color del asiento que ocupa la posición `i` en la lista de sentados. */

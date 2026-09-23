@@ -17,13 +17,16 @@
       mentira, con botones para sentar, levantar, ausentar, vestir y zarpar.
       Se abre en /sala/plaza3d.html del Vite del escritorio, y acepta
       ?jugadores=1..6&codigo=ABCDE&aspecto=retrato para abrirlo en un estado concreto.
+
+      El código es el del banco de los lobbies (`src/banco-lobby.tsx`), el mismo que abre
+      `lobby3d.html`: `data-lobby` en la raíz le dice cuál de sus filas pintar.
     -->
     <meta name="viewport" content="width=1024, initial-scale=1.0" />
     <title>Banco de pruebas · la plaza del Burgo en 3D</title>
     <meta name="theme-color" content="#080a0e" />
   </head>
   <body>
-    <div id="raiz"></div>
-    <script type="module" src="/src/banco-plaza.tsx"></script>
+    <div id="raiz" data-lobby="burgo"></div>
+    <script type="module" src="/src/banco-lobby.tsx"></script>
   </body>
 </html>

@@ -61,7 +61,9 @@ import {
   medirMovimiento,
   olvidarLoMedido,
   TOPE_BYTES,
+  TOPE_CARGA_BYTES,
   TOPE_MS,
+  TOPE_TIPO_CARACTERES,
 } from '../src/arcade/presupuesto';
 import { sinComentarios } from './sin-comentarios';
 
@@ -722,6 +724,231 @@ paso('La mesa usa las dos puertas, y eso se lee en el árbol');
     'y las búsquedas encontrarían la llamada si estuviera',
     /conPresupuesto\(\s*antes\.arcade/.test('const x = conPresupuesto( antes.arcade, t, f);'),
   );
+}
+
+// ---------------------------------------------------------------------------
+paso('Los topes del SOBRE se exigen en la mesa, no sólo en la ruta');
+// ---------------------------------------------------------------------------
+
+/** Un valor anidado `niveles` veces: `[[[…[0]…]]]`. Dos bytes por nivel. */
+function hondo(niveles: number): unknown {
+  let valor: unknown = 0;
+  for (let i = 0; i < niveles; i++) valor = [valor];
+  return valor;
+}
+
+{
+  /*
+   * ═══ EL AGUJERO QUE ESTO CIERRA, Y QUE SE DABA POR CERRADO ═══
+   *
+   * `TOPE_TIPO_CARACTERES` y `TOPE_CARGA_BYTES` se exigían en la ruta de movimientos y en la de
+   * récords, y `mesas.ts` y `arbitro.ts` tenían CERO referencias. Un tope que sólo existe en dos
+   * puertas es un tope de esas dos puertas: cualquier otra que llame a `mover()` —el canal de Boots
+   * on Board que viene— se lo salta. `docs/BOOTS-ON-BOARD.md` §5.1 lo daba por arreglado y no lo
+   * estaba.
+   *
+   * Lo que se afirma aquí, llamando a `mover()` A PELO y sin ruta ninguna: que el sobre que no cabe
+   * se rechaza, que la mesa no se mueve ni un byte —ni revisión, ni diario, ni estado, ni fichero—,
+   * que el reductor NO entra, y que NI SIQUIERA LA BÁSCULA se entera: si el rechazo pasara por
+   * `conPresupuesto`, el trabajo de medir el sobre de quien llama se le cobraría al juego, que es
+   * exactamente lo que estos dos topes existen para impedir.
+   */
+  const { mesa, silla } = await mesas.abrir({ arcade: 'el-bueno', nombre: 'Hugo', plazoSegundos: 0 });
+  const cod = mesa.codigo;
+  const primera = await mesas.mover(cod, silla.llave, 0, { tipo: 'seguir' });
+  comprobar('la mesa de prueba juega', primera.rev === 1, primera.rev);
+
+  const fichero = path.join(CARPETA, `${cod}.json`);
+  const foto = (): Record<string, unknown> => ({
+    rev: mesa.mesa.rev,
+    diario: mesa.mesa.diario.length,
+    estado: mesa.mesa.estado,
+    entradas: entradas.bueno,
+    medidos: loMedidoDe('el-bueno')?.movimientos ?? 0,
+    apartado: enCuarentena('el-bueno'),
+    enDisco: fs.readFileSync(fichero, 'utf8'),
+  });
+  const antes = foto();
+
+  const ciclo: Record<string, unknown> = {};
+  ciclo.yoMismo = ciclo;
+
+  const casos: Array<{ que: string; movimiento: Movimiento; motivo: string }> = [
+    {
+      que: 'una carga plana de más de ocho kilobytes',
+      movimiento: { tipo: 'seguir', carga: 'x'.repeat(TOPE_CARGA_BYTES + 1) },
+      motivo: 'carga-grande',
+    },
+    {
+      que: 'cinco mil «ñ», que la RUTA deja pasar —son 5.002 caracteres de JSON— y pesan 10.002 bytes',
+      movimiento: { tipo: 'seguir', carga: 'ñ'.repeat(5000) },
+      motivo: 'carga-grande',
+    },
+    {
+      que: 'una carga anidada 1.500 veces —unos tres mil bytes—, que es donde `JSON.stringify` revienta',
+      movimiento: { tipo: 'seguir', carga: hondo(1500) },
+      motivo: 'carga-no-serializable',
+    },
+    {
+      que: 'una carga anidada cien veces, que `JSON.stringify` mide sin quejarse',
+      movimiento: { tipo: 'seguir', carga: hondo(100) },
+      motivo: 'carga-no-serializable',
+    },
+    {
+      que: 'una carga con un ciclo',
+      movimiento: { tipo: 'seguir', carga: ciclo },
+      motivo: 'carga-no-serializable',
+    },
+    {
+      que: 'una carga con una función dentro',
+      movimiento: { tipo: 'seguir', carga: { hazlo: () => 1 } },
+      motivo: 'carga-no-serializable',
+    },
+    {
+      que: `un \`tipo\` de ${String(TOPE_TIPO_CARACTERES + 1)} caracteres`,
+      movimiento: { tipo: 's'.repeat(TOPE_TIPO_CARACTERES + 1) },
+      motivo: 'tipo-largo',
+    },
+    {
+      que: 'un `tipo` que no es una cadena',
+      movimiento: { tipo: 42 as unknown as string },
+      motivo: 'tipo-sin-texto',
+    },
+  ];
+  for (const caso of casos) {
+    const error = await salta(
+      `${caso.que}: una llamada DIRECTA a mover() se rechaza`,
+      () => mesas.mover(cod, silla.llave, primera.rev, caso.movimiento),
+      'MovimientoDesmedido',
+    );
+    comprobar(
+      `  y por su motivo, «${caso.motivo}»`,
+      (error as { motivo?: unknown } | undefined)?.motivo === caso.motivo,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+
+  const despues = foto();
+  comprobar(
+    'la mesa NO se ha movido: ni revisión, ni diario, ni estado',
+    despues.rev === antes.rev && despues.diario === antes.diario && despues.estado === antes.estado,
+    { antes: [antes.rev, antes.diario], despues: [despues.rev, despues.diario] },
+  );
+  comprobar('el reductor NO ha entrado ni una vez', despues.entradas === antes.entradas, {
+    antes: antes.entradas,
+    despues: despues.entradas,
+  });
+  comprobar(
+    'NI LA BÁSCULA se ha enterado: ningún rechazo pasó por `conPresupuesto`, así que ninguno se le cobra al juego',
+    despues.medidos === antes.medidos,
+    { antes: antes.medidos, despues: despues.medidos },
+  );
+  comprobar('y el juego sigue sin estar apartado', despues.apartado === null, despues.apartado);
+  comprobar('y en el disco no se ha escrito nada', despues.enDisco === antes.enDisco);
+  comprobar('ni queda ningún candado', mesas.candadosDeMesaVivos() === 0, mesas.candadosDeMesaVivos());
+
+  /*
+   * ═══ ANTES DEL CANDADO, Y SE VE ═══
+   *
+   * Con la mesa cogida por otra operación que no suelta, el sobre gordo tiene que rechazarse igual
+   * y SIN ESPERAR SU TURNO. Si la comprobación estuviera dentro del candado —o en el árbitro, que va
+   * dentro—, este `mover` se quedaría en la cola hasta que se soltara la mesa.
+   */
+  let soltar: (() => void) | undefined;
+  const retenida = mesas.conLaMesa(cod, () => new Promise<void>((suelta) => {
+    soltar = suelta;
+  }));
+  let enCuantoLlega = 'todavía en la cola';
+  const gordo = mesas
+    .mover(cod, silla.llave, primera.rev, { tipo: 'seguir', carga: 'x'.repeat(TOPE_CARGA_BYTES + 1) })
+    .then(
+      () => 'entró',
+      (error: unknown) => (error instanceof Error ? error.name : String(error)),
+    )
+    .then((que) => {
+      enCuantoLlega = que;
+    });
+  await new Promise((suelta) => setTimeout(suelta, 50));
+  comprobar(
+    'con la mesa cogida por otra operación, el sobre gordo se rechaza YA, sin hacer cola: va antes del candado',
+    enCuantoLlega === 'MovimientoDesmedido',
+    enCuantoLlega,
+  );
+  soltar?.();
+  await retenida;
+  await gordo;
+
+  /*
+   * La vacuna: el tope no rechaza lo que sí cabe. Se lee la revisión de AHORA en vez de dar por
+   * hecha la de antes: si los topes no estuvieran, los sobres gordos habrían entrado, y este
+   * movimiento saldría rancio en vez de decir lo que tiene que decir.
+   */
+  const ahora = await mesas.mirar(cod, silla.llave);
+  const sigue = await mesas.mover(cod, silla.llave, ahora.rev, {
+    tipo: 'seguir',
+    carga: { vertice: 'v:-1,-1|0,-2|0,-1' },
+  });
+  comprobar('y un movimiento de verdad, con una carga de verdad, sigue entrando', sigue.rev === ahora.rev + 1, {
+    antes: ahora.rev,
+    despues: sigue.rev,
+  });
+}
+
+// ---------------------------------------------------------------------------
+paso('Y la ruta lo traduce a un 400 con su motivo, también cuando su propio tope no lo ve');
+// ---------------------------------------------------------------------------
+
+{
+  /*
+   * La ruta tiene su propio tope —`JSON.stringify(...).length`, que cuenta CARACTERES y no mide
+   * la hondura— y se queda, porque corta antes y sin tocar la mesa. Lo que hay que ver es que lo
+   * que se le escapa lo para la mesa, y que sale como un 400 y no como un 500 ni como un 200.
+   *
+   * Un Express de verdad con el router de verdad, escuchando en el puerto que diga el sistema.
+   */
+  const express = (await import('express')).default;
+  const { default: arcadeRouter } = await import('../src/routes/arcade');
+  const { ponerCanal } = await import('../src/canal');
+  const { canalDeSondeo } = await import('../src/canal/sondeo');
+  ponerCanal(canalDeSondeo);
+  const app = express();
+  app.use(express.json({ limit: '256kb' }));
+  app.use('/api', arcadeRouter);
+  const escucha = app.listen(0, '127.0.0.1');
+  await new Promise<void>((lista) => escucha.once('listening', () => lista()));
+  const donde = escucha.address();
+  const puerto = typeof donde === 'object' && donde !== null ? donde.port : 0;
+
+  const { mesa, silla } = await mesas.abrir({ arcade: 'el-bueno', nombre: 'Iria', plazoSegundos: 0 });
+  const mandar = async (cuerpo: unknown): Promise<{ estado: number; datos: any }> => {
+    const r = await fetch(`http://127.0.0.1:${String(puerto)}/api/arcade/mesas/${mesa.codigo}/movimientos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-asiento': silla.llave },
+      body: JSON.stringify(cuerpo),
+    });
+    return { estado: r.status, datos: await r.json().catch(() => null) };
+  };
+
+  try {
+    const enBytes = await mandar({ rev: 0, tipo: 'seguir', carga: 'ñ'.repeat(5000) });
+    comprobar(
+      'cinco mil «ñ» pasan el tope de la ruta, y la MESA los para con un 400 y su motivo',
+      enBytes.estado === 400 && enBytes.datos?.motivo === 'carga-grande',
+      enBytes,
+    );
+    const cienNiveles = await mandar({ rev: 0, tipo: 'seguir', carga: hondo(100) });
+    comprobar(
+      'y una carga anidada cien veces, que la ruta mide sin quejarse, también: 400',
+      cienNiveles.estado === 400 && cienNiveles.datos?.motivo === 'carga-no-serializable',
+      cienNiveles,
+    );
+    const vista = await mesas.mirar(mesa.codigo, silla.llave);
+    comprobar('y la mesa sigue en su revisión 0: nada de eso entró', vista.rev === 0, vista.rev);
+    const bueno = await mandar({ rev: 0, tipo: 'seguir', carga: { carta: 'oros-7' } });
+    comprobar('mientras que uno de verdad entra por la misma puerta', bueno.estado === 200 && bueno.datos?.mesa?.rev === 1, bueno);
+  } finally {
+    await new Promise<void>((cerrado) => escucha.close(() => cerrado()));
+  }
 }
 
 // ---------------------------------------------------------------------------

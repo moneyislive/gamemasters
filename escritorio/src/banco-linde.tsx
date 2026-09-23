@@ -11,7 +11,8 @@
  * Los asientos se sientan y se levantan con botones, y los bytes de los `.glb` se
  * piden a las direcciones que da Vite con `?url`. La escena no se entera: recibe la
  * misma `MesaEnElMuelle` y la misma `traer` que en la Sala. Es la misma frontera que
- * `banco-lobby.tsx` y `banco-plaza.tsx`.
+ * `banco-lobby.tsx`, el banco con marco y hoja del muelle y de la plaza; éste va aparte
+ * porque es otra cosa: a pantalla completa, sin hoja, con su cámara y su exposición.
  */
 import { useMemo, useState } from 'react';
 import type { JSX } from 'react';

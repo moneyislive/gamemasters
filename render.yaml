@@ -65,6 +65,27 @@ services:
       - key: PUBLIC_ORIGIN
         value: https://harkania.onrender.com
 
+      # ORIGENES_PERMITIDOS — OPCIONAL, y por eso va aquí como comentario y no
+      # como clave: no se le exige a este despliegue y no tiene que existir.
+      #
+      # Es la lista de páginas de OTRO origen a las que se deja leer la API desde
+      # el navegador (el CORS), separadas por comas y con su esquema. Las propias
+      # ya están dentro sin ponerlas —harkania.onrender.com y lo que diga
+      # PUBLIC_ORIGIN— y todo lo de la casa (taller, /jugar, /sala) se sirve
+      # desde el mismo origen que la API, así que hoy NO HACE FALTA NINGUNA. La
+      # app nativa no manda `Origin` y tampoco la necesita.
+      #
+      # harkania.com YA NO va fijo entre las propias: el dominio está suspendido
+      # por el registrador, y si cambiara de manos su dueño leería la API desde
+      # el navegador de quien visitara su página. Cuando vuelva a ser nuestro,
+      # se pone aquí (o en PUBLIC_ORIGIN, si pasa a ser el origen del despliegue).
+      #
+      # Si algún día hiciera falta, se pone en el panel (Environment), y cambiarla
+      # allí redespliega solo. Ojo: una entrada ilegible, «*», «null» o una con
+      # un comodín («https://*.ejemplo.com») PARAN el arranque, a propósito;
+      # Render mantiene la versión anterior si la nueva no pasa /api/salud. Ver
+      # server/src/puerta/origenes.ts.
+
       # Render enruta al puerto que le digas y el proceso vive en su propia red:
       # aquí NO se ata al bucle local como en una máquina con nginx delante, o
       # el enrutador no llegaría.

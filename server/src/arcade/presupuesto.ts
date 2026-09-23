@@ -91,7 +91,7 @@
  * sea así es lo que permitirá que en la fase 3 lo llame también el bucle de
  * fotogramas del arcade de un jugador, que no tiene mesa ninguna.
  */
-import { canonico } from '../../../shared/mecanicas/canonico';
+import { canonico, NoCanonizable } from '../../../shared/mecanicas/canonico';
 import type { ArcadeId } from '../../../shared/arcade';
 
 /**
@@ -330,6 +330,111 @@ export const TOPE_BYTES = 512 * 1024;
  */
 export const TOPE_TIPO_CARACTERES = 64;
 export const TOPE_CARGA_BYTES = 8 * 1024;
+
+/**
+ * POR QUÉ NO CABE UN SOBRE. Unión cerrada, como los demás motivos de la casa: quien lo traduce a
+ * HTTP no compara cadenas, y un cambio de redacción no se lleva por delante la traducción.
+ */
+export type PorQueNoCabe = 'tipo-sin-texto' | 'tipo-largo' | 'carga-no-serializable' | 'carga-grande';
+
+/**
+ * UN MOVIMIENTO QUE NO CABE EN LOS TOPES DEL SOBRE. 400: está mal hecho y reintentarlo igual no lo
+ * arregla. No es una cuarentena ni un rechazo del juego: el juego ni se ha enterado.
+ */
+export class MovimientoDesmedido extends Error {
+  constructor(
+    public readonly motivo: PorQueNoCabe,
+    detalle: string,
+  ) {
+    super(detalle);
+    this.name = 'MovimientoDesmedido';
+  }
+}
+
+/**
+ * LOS DOS TOPES DEL SOBRE, EXIGIDOS DONDE ENTRA EL MOVIMIENTO Y NO SÓLO EN LA RUTA.
+ *
+ * ═══ EL AGUJERO: DOS TOPES ESCRITOS AQUÍ Y EXIGIDOS EN OTRO SITIO ═══
+ *
+ * `TOPE_TIPO_CARACTERES` y `TOPE_CARGA_BYTES` se exigían en `routes/arcade.ts` —la ruta de
+ * movimientos— y en `repeticiones.ts` —la de récords—, y NO en `mesas.ts` ni en `arbitro.ts`, que
+ * tenían cero referencias. O sea que eran topes de dos puertas y no de la mesa: cualquier puerta
+ * nueva que llame a `mover()` —el canal de Boots on Board que viene, un guion, un arcade de fuera
+ * que abra otra ruta— los salta enteros, y lo que salta es exactamente lo que este fichero dice
+ * que la cuarentena NO puede pagar: un sobre que elige quien llama, cronometrado a cuenta del
+ * juego. `docs/BOOTS-ON-BOARD.md` §5.1.
+ *
+ * Así que se exigen AQUÍ, llamados desde `mover()` ANTES de coger el candado y antes de ejecutar
+ * nada del juego, y la ruta se queda con los suyos: defensa en dos capas, y el 400 temprano.
+ *
+ * ═══ CON `canonico` Y NO CON `JSON.stringify`, MEDIDO ═══
+ *
+ * `JSON.stringify` revienta con un `RangeError` a partir de unos mil quinientos niveles de
+ * anidamiento, que son unos tres mil bytes: por DEBAJO del tope. Pesar con lo que se rompe es no
+ * pesar —el error no es un 400, es lo que haya encima—, y además lo caro no es el tamaño sino la
+ * hondura. `canonico` trae su cota de sesenta y cuatro niveles desde el sello de `6924643` y
+ * contesta `NoCanonizable`, que aquí se convierte en un motivo. Es la misma forma que ya usa
+ * `repeticiones.ts` para la otra puerta, y pesa lo que de verdad se guarda: la forma canónica, en
+ * bytes UTF-8 y no en caracteres —cinco mil «ñ» son 5.002 caracteres de JSON y 10.002 bytes, y la
+ * ruta, que cuenta caracteres, los deja pasar—.
+ *
+ * ═══ Y FUERA DEL CRONÓMETRO, QUE ES LA MITAD DE LA GARANTÍA ═══
+ *
+ * Esto no pasa por `conPresupuesto`. Si pasara, el trabajo de medir el sobre de quien llama se le
+ * cobraría al juego —que es el fallo entero que estos dos topes existen para cerrar— y un sobre
+ * gordo podría apartar a un arcade inocente. Un rechazo de aquí no toca la báscula, ni la
+ * cuarentena, ni la mesa: lo comprueba `verify:presupuesto`.
+ */
+export function exigirLosTopesDelSobre(movimiento: { readonly tipo: unknown; readonly carga?: unknown }): void {
+  const { tipo, carga } = movimiento;
+  if (typeof tipo !== 'string' || tipo.length === 0) {
+    throw new MovimientoDesmedido(
+      'tipo-sin-texto',
+      'Un movimiento tiene que traer `tipo`: una cadena con texto que diga qué clase de movimiento es.',
+    );
+  }
+  if (tipo.length > TOPE_TIPO_CARACTERES) {
+    throw new MovimientoDesmedido(
+      'tipo-largo',
+      `El \`tipo\` de un movimiento no puede pasar de ${String(TOPE_TIPO_CARACTERES)} caracteres, y éste ` +
+        `trae ${String(tipo.length)}. El tipo es vocabulario del juego, no un sitio donde meter datos.`,
+    );
+  }
+  if (carga === undefined) return;
+  /*
+   * Dos atajos que no cuestan nada y ahorran serializar lo que ya se sabe que no cabe: la forma
+   * canónica de una cadena mide al menos sus caracteres más las dos comillas, y la de una lista al
+   * menos un carácter por elemento. Sólo sirven a quien llame a `mover()` sin pasar por un
+   * analizador con límite de cuerpo; por la ruta, express ya cortó en 256 kB.
+   */
+  const alMenos =
+    typeof carga === 'string' ? carga.length + 2 : Array.isArray(carga) ? carga.length * 2 + 1 : 0;
+  if (alMenos > TOPE_CARGA_BYTES) {
+    throw new MovimientoDesmedido(
+      'carga-grande',
+      `La \`carga\` de un movimiento no puede pasar de ${String(TOPE_CARGA_BYTES)} bytes en su forma ` +
+        `canónica, y ésta ocupa al menos ${String(alMenos)}.`,
+    );
+  }
+  let escrita: string;
+  try {
+    escrita = canonico(carga);
+  } catch (error) {
+    if (!(error instanceof NoCanonizable)) throw error;
+    throw new MovimientoDesmedido(
+      'carga-no-serializable',
+      `La \`carga\` de ese movimiento no sobrevive a la serialización canónica: ${error.message}`,
+    );
+  }
+  const pesa = Buffer.byteLength(escrita, 'utf8');
+  if (pesa > TOPE_CARGA_BYTES) {
+    throw new MovimientoDesmedido(
+      'carga-grande',
+      `La \`carga\` de un movimiento no puede pasar de ${String(TOPE_CARGA_BYTES)} bytes en su forma ` +
+        `canónica, y ésta ocupa ${String(pesa)}.`,
+    );
+  }
+}
 
 /**
  * LOS ARCADES CASTIGADOS, con el porqué escrito.

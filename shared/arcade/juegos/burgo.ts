@@ -96,6 +96,10 @@
  *   · `encuadre` se importa de `malla-hexagonal.ts` (donde vive) y no de `anillo.ts`.
  *   · Dentro de un trato, los Salvoconductos que se dan son los PRIMEROS de la lista del que
  *     los da; como hay uno por mazo, nadie puede recibir dos del mismo mazo.
+ *   · El botín de la refriega (`arcade:botin`, lo mete el servidor) se lleva como mucho
+ *     `MRS_DEL_BOTIN` de la bolsa de quien cae, nunca abre un apuro, y NO se aplica —mismo
+ *     estado— con una subasta o un apuro en la mesa, abiertos o en cola. Un quebrado ni lo da ni
+ *     lo recibe. Ver `elBotin`.
  *
  * ═══ LAS CUATRO REGLAS OFICIALES QUE FALTABAN, Y CÓMO SE CIERRAN ═══
  *
@@ -188,6 +192,7 @@ import type { Opcion } from '../opciones';
 import { esTic } from '../reloj';
 import { comoSeLlama, ESPECTADOR, NADIE_SENTADO } from '../tipos';
 import type { ArcadeId, AsientoId, LosSentados, ManifiestoDeArcade, QuienMira } from '../tipos';
+import { esBotin, leerElBotin } from './botin';
 import {
   BARRIOS,
   CASAS_DEL_CONCEJO,
@@ -305,6 +310,18 @@ export const TOPE_DE_MRS_EN_UN_TRATO = 100000;
 export const INDULTOS_QUE_EXISTEN = 2;
 /** A partir de cuántas casillas un `mueve` por carta se anima como viaje y no como paseo. */
 export const PASOS_DE_UN_PASEO = 12;
+/**
+ * LO QUE SE LLEVA EL BOTÍN DE LA REFRIEGA: hasta cien euros de quien cae, para quien lo tumbó.
+ *
+ * DINERO Y NO UN TÍTULO, aunque `docs/COMBATE-Y-BOTIN.md` §6 hablara de «propiedades del
+ * Burgo» cuando todavía era una pregunta. Un título arrastra casas, hipotecas y el barrio entero
+ * de quien lo tenía: pasarlo de un golpe desharía un barrio que alguien tardó la partida en
+ * juntar, y lo dejaría con edificios en un barrio que ya no es entero. El dinero, en cambio, pasa
+ * por una sola puerta que ya sabe moverlo sin romper nada (`transferirEntre`). Cien es lo que
+ * cobra el Impuesto de Lujo: duele, y no deja a nadie en la calle, porque se lleva como mucho lo
+ * que quien cae tenga en la bolsa y nunca abre una deuda. Ver `elBotin`.
+ */
+export const MRS_DEL_BOTIN = 100;
 
 /** `presa` de un jugador libre. */
 export const LIBRE = -1;
@@ -400,7 +417,9 @@ export type PorqueDelDinero =
   | 'trato'
   | 'quiebra'
   | 'reparaciones'
-  | 'sorteo';
+  | 'sorteo'
+  /** El botín de Boots on Board: lo que se lleva quien tumba a otro. Nunca es una deuda. */
+  | 'refriega';
 
 export interface DeudaDelBurgo {
   readonly a: AsientoId | null;
@@ -2552,6 +2571,12 @@ export function avanzarElBurgo(
 ): EstadoDelBurgo | Rechazo<EstadoDelBurgo> {
   const actual = comoSiSiempreHubieraHabidoBurgo(estado ?? partidaNueva());
   if (esTic(movimiento)) return venceElPlazo(actual);
+  /*
+   * EL BOTÍN, TAMBIÉN ANTES DEL PORTILLO y por lo mismo que el tic: lo mete el servidor con
+   * `quien: null` cuando alguien cae en Boots on Board, nadie lo ofrece, y el portillo lo tiraría
+   * siempre. Su lector es más estricto que el portillo. Ver `elBotin`.
+   */
+  if (esBotin(movimiento)) return elBotin(actual, movimiento.carga, ctx);
 
   const vista = loQueSeVe(actual, ctx.quien, NADIE_SENTADO);
   if (!estaOfrecido(opcionesDelBurgo(vista, ctx.quien), movimiento)) {
@@ -2755,6 +2780,87 @@ function pagarElImpuesto(e: EstadoDelBurgo, i: number, porLaDecima: boolean, cro
   const cuanto = porLaDecima ? decimaDelPatrimonio(patrimonioDe(e, j)) : fila.precio;
   const s = transferirEntre({ ...e, impuestoSinPagar: false }, i, null, cuanto, 'diezmo', j.casilla, cronica);
   return s.impuestoSinPagar ? { ...s, impuestoSinPagar: false } : s;
+}
+
+// ---------------------------------------------------------------------------
+// EL BOTÍN DE LA REFRIEGA: lo único que entra en la mesa porque alguien cayó
+// ---------------------------------------------------------------------------
+
+/**
+ * EL BOTÍN: `de` cayó en Boots on Board y `para` lo tumbó. Pasan hasta `MRS_DEL_BOTIN` euros de
+ * uno a otro, por `transferirEntre` y con el motivo `'refriega'`, y nada más.
+ *
+ * ═══ SE RECHAZA CON MOTIVO LO QUE NO DEBIÓ LLEGAR ═══
+ *
+ * Lo mal formado, lo que manda un asiento, el de uno a sí mismo y quien no está sentado ya lo dice
+ * `leerElBotin`. Lo que sólo sabe el juego lo dice esto: que la partida esté `jugando`, que los dos
+ * jueguen ESTA partida —estar sentado no basta: quien se sentó después de empezar mira— y que
+ * ninguno de los dos haya quebrado. Quien quiebra está fuera con cero euros; si fuera él quien
+ * cobra, `transferirEntre` le pasaría el dinero al Ayuntamiento, que es lo que hace con un
+ * acreedor quebrado, y el botín acabaría destruido en vez de robado.
+ *
+ * ═══ NUNCA ABRE UN APURO, Y NO POR SUERTE ═══
+ *
+ * Se lleva `min(lo que tenga, MRS_DEL_BOTIN)`, así que el pago siempre alcanza y la hacienda no
+ * devuelve deuda. Un botín que endeudara a quien cae lo metería en un apuro que no ha pedido, con
+ * su plazo y su `turnoDe`: le cambiaría el turno a la mesa entera por una pelea. Con cero euros no
+ * hay nada que llevarse, y sale EL MISMO estado, sin nada en la crónica: la mesa lo cuenta como
+ * movimiento que no cambió nada.
+ *
+ * ═══ Y NO SE APLICA CON UNA SUBASTA O UN APURO EN LA MESA (mismo estado) ═══
+ *
+ * Son los dos momentos de la regla 1 de la cabecera en los que la mesa espera UNA respuesta y el
+ * dinero decide cuál: quién gana la puja y si el endeudado sale o quiebra. Por eso ahí no obra
+ * nadie más que el implicado, y un botín es exactamente «un pago de un tercero en medio». Mirado
+ * caso a caso, no rompería la máquina de pasos —el cierre de la subasta ya aguanta a un postor que
+ * se quedó sin dinero— pero sí la dejaría INCOHERENTE en el apuro: el endeudado que cobra un botín
+ * puede quedar con dinero de sobra para pagar y seguir en apuro, porque `saldar` sólo corre cuando
+ * vende o hipoteca; y llamarlo desde aquí cerraría el apuro y cambiaría el paso, que es lo que un
+ * botín no puede hacer. Lo más simple y correcto es no tocar el dinero mientras dure cualquiera de
+ * las dos cosas, abierta o en cola (`elDineroEstaEnVilo`). En la compra sin resolver, en la
+ * Comisaría y con el Impuesto por elegir SÍ se aplica: ninguno de los tres ha comprometido dinero
+ * todavía. Si después no alcanza, el botón de comprar o de la fianza deja de ofrecerse —se saca a
+ * subasta, se prueba con los dados— o el pago abre su apuro, como cualquier pago de siempre.
+ *
+ * ═══ LO QUE NO TOCA ═══
+ *
+ * Ni el turno, ni el paso, ni `luego`, ni los dobles, ni la tirada, ni el tope de vueltas, ni los
+ * tratos: la mesa reprograma su plazo cuando cambia `turnoDe`, y un botín que lo moviera le daría o
+ * le quitaría tiempo a quien juega sin que jugara nadie. Sube `jugada` y sustituye `sucesos`, que
+ * es como cierra cualquier cambio: así la escena anima las monedas de uno a otro y el pregón lo
+ * cuenta —«Ana le quita 100 € a Bruno en la refriega.»—. Un trato que prometía dinero que ya no
+ * está se contesta con el motivo de siempre al aceptarlo, y caduca en el relevo.
+ */
+function elBotin(e: EstadoDelBurgo, carga: unknown, ctx: ContextoMovimiento): EstadoDelBurgo | Rechazo<EstadoDelBurgo> {
+  const botin = leerElBotin(carga, ctx.quien, ctx.asientos);
+  if (botin === null) return rechazar(e, 'Ese botín no vale: lo mete la mesa, entre dos sentados que no sean el mismo.');
+  if (e.momento === 'reuniendo') return rechazar(e, 'La partida no ha empezado: todavía no hay botín.');
+  if (e.momento !== 'jugando') return rechazar(e, 'La partida ya ha terminado: ya no hay botín.');
+  const de = indiceDelJugador(e, botin.de);
+  const para = indiceDelJugador(e, botin.para);
+  if (de === NADIE || para === NADIE) return rechazar(e, 'Ese botín es de alguien que no juega esta partida.');
+  if (!estaVivo(e, de) || !estaVivo(e, para)) return rechazar(e, 'Quien ha quebrado ya no juega: ni da ni se lleva botín.');
+  if (elDineroEstaEnVilo(e)) return e;
+
+  const j = jugadorEn(e, de) as JugadorDelBurgo;
+  const cuanto = j.mrs < MRS_DEL_BOTIN ? j.mrs : MRS_DEL_BOTIN;
+  if (cuanto <= 0) return e;
+  const cronica: Cronica = [];
+  const s = transferirEntre(e, de, para, cuanto, 'refriega', j.casilla, cronica);
+  /* No puede fallar —`cuanto` cabe en la bolsa—, y si fallara no se escribe ni un suceso de algo que no pasó. */
+  if (!pagoHecho(e, s, de, cuanto)) return e;
+  return conSucesos(s, cronica);
+}
+
+/**
+ * ¿ESTÁ LA MESA DECIDIENDO ALGO CON EL DINERO DE ALGUIEN? Una subasta o un apuro, abiertos o en
+ * cola. Se mira el paso Y los campos, y las dos colas, porque entre un cierre y el `reanudar` que lo
+ * sigue pueden no coincidir, y aquí basta con que cualquiera de los seis diga que sí.
+ */
+function elDineroEstaEnVilo(e: EstadoDelBurgo): boolean {
+  if (e.paso === 'almoneda' || e.paso === 'apuro') return true;
+  if (e.almoneda !== null || e.apuro !== null) return true;
+  return e.colaDeAlmonedas.length > 0 || e.colaDeApuros.length > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -3073,6 +3179,8 @@ export function porqueEnPalabras(porque: PorqueDelDinero): string {
       return 'de reparaciones';
     case 'sorteo':
       return 'del sorteo';
+    case 'refriega':
+      return 'en la refriega';
     default:
       return '';
   }
@@ -3125,6 +3233,15 @@ function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string, deO
     case 'cobra':
       return s.de === null ? `${nombre(s.quien)} cobra ${maravedies(s.cuanto)} ${porqueEnPalabras(s.porque)}.` : '';
     case 'paga':
+      /*
+       * EL BOTÍN NO ES UN PAGO: nadie paga una refriega, se la quitan. Con la frase de siempre
+       * saldría «Bruno paga 100 € en la refriega a Ana», que se lee como si Bruno hubiera
+       * elegido algo. Se cuenta desde quien se lo lleva, y el `cobra` de al lado calla como
+       * calla todo cobro entre dos jugadores: la frase es una por pago, no dos.
+       */
+      if (s.porque === 'refriega') {
+        return `${nombre(s.a)} le quita ${maravedies(s.cuanto)} a ${nombre(s.quien)} en la refriega.`;
+      }
       return `${nombre(s.quien)} paga ${maravedies(s.cuanto)} ${porqueEnPalabras(s.porque)} ${aQuienRecibe(s.a, nombre)}.`;
     case 'compra':
       return `${nombre(s.quien)} compra ${nombreDeCasilla(s.casilla)} por ${maravedies(s.cuanto)}.`;

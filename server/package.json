@@ -86,7 +86,14 @@
     "verify:nucleo-quieto": "tsx scripts/verificar-nucleo-quieto.ts",
     "oro:arcade": "tsx scripts/oro-arcade.ts",
     "verify:presupuesto": "tsx scripts/verificar-presupuesto.ts",
-    "verify:arcade-de-fuera": "tsx scripts/verificar-arcade-de-fuera.ts"
+    "verify:arcade-de-fuera": "tsx scripts/verificar-arcade-de-fuera.ts",
+    "verify:modalidad": "tsx scripts/verificar-modalidad.ts",
+    "verify:lectura-barata": "tsx scripts/verificar-lectura-barata.ts",
+    "verify:cors": "tsx scripts/verificar-cors.ts",
+    "verify:mesas-frias": "tsx scripts/verificar-mesas-frias.ts",
+    "verify:sala-de-botas": "tsx scripts/verificar-sala-de-botas.ts",
+    "verify:botas": "tsx scripts/verificar-botas.ts",
+    "medir:botas": "node --expose-gc --import tsx scripts/medir-botas.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -95,7 +102,8 @@
     "express": "^4.21.2",
     "mongoose": "^8.9.5",
     "multer": "^1.4.5-lts.1",
-    "nanoid": "^5.0.9"
+    "nanoid": "^5.0.9",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
@@ -105,6 +113,7 @@
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.12",
     "@types/node": "^20.17.10",
+    "@types/ws": "^8.18.1",
     "esbuild": "^0.28.1",
     "hermes-engine-cli": "0.12.0",
     "mongodb-memory-server": "^10.4.3",
