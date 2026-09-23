@@ -118,8 +118,20 @@ export function seRecorreAqui(arcade: string): boolean {
  * confunda con una red que se ha caído. Va aquí y no en `index.ts` para que montar el canal y su
  * despedida sean una sola cosa: un canal montado sin despedida es la red que alguien se olvida de
  * encender.
+ *
+ * `terminar` es lo que se hace DESPUÉS de cerrar los canales, y por defecto es lo mismo que hacía
+ * la despedida de `mesas.ts`: volver a mandarse la señal. Es una costura de prueba con la misma
+ * razón que `ponerLaDespedida` —la de verdad mata el proceso, y Windows no entrega `SIGTERM`, así
+ * que la única forma de ejercitarla aquí es en proceso (`verify:sala-de-botas`)—; `index.ts` no la
+ * pasa, y no hay variable de entorno que la toque.
  */
-export function montarElCanalDeBotas(servidor: Server, contexto: ContextoDelCors): CanalDeBotas {
+export function montarElCanalDeBotas(
+  servidor: Server,
+  contexto: ContextoDelCors,
+  terminar: (senal: NodeJS.Signals) => void = (senal) => {
+    process.kill(process.pid, senal);
+  },
+): CanalDeBotas {
   const canal = new CanalDeBotas({ reloj: RELOJ_DE_PARED, mesa: LA_MESA_DE_VERDAD, mundos: LOS_MUNDOS_DE_VERDAD });
   enchufarElCanal(servidor, canal, contexto);
   global_[LLAVE] = canal;
@@ -127,7 +139,7 @@ export function montarElCanalDeBotas(servidor: Server, contexto: ContextoDelCors
     try {
       canal.apagar();
     } finally {
-      process.kill(process.pid, senal);
+      terminar(senal);
     }
   });
   return canal;

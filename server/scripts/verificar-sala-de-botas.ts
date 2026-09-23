@@ -37,7 +37,17 @@
  *   · Mesa cerrada, mesa olvidada, `SIGTERM`: fuera todos, con su código.
  *   · Y paseos LEGALES de verdad —`pasoDelTic` sobre Las Lindes llenas y sobre el Burgo— no se
  *     corrigen, mientras que la recta sola sí los habría corregido.
+ *   · Y AL FINAL, CON EL MONTAJE DE VERDAD: `montarElCanalDeBotas` sobre un servidor HTTP de este
+ *     proceso, la mesa de verdad (`mesas.ts`, con su carpeta temporal) y dos aparatos por `ws`; y
+ *     la señal `SIGTERM` emitida aquí dentro, porque Windows no la entrega a un hijo —la técnica de
+ *     `verify:mesa` para el volcado—: los canales se cierran con 1001 DENTRO de la despedida.
  */
+import fs from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import { WebSocket } from 'ws';
 import {
   CIERRE,
   GRACIA_AL_IRSE_MS,
@@ -45,6 +55,7 @@ import {
   MENSAJES_DE_GOLPE,
   PLAZO_DEL_HOLA_MS,
   QUIETO_HASTA_CERRAR_MS,
+  rutaDelCanal,
   VERSION_DEL_CANAL,
 } from '../../shared/mecanicas/canal-de-botas';
 import type { MensajeDelServidor } from '../../shared/mecanicas/canal-de-botas';
@@ -63,8 +74,16 @@ import {
   UN_TIC_CON_HOLGURA,
 } from '../src/botas/canal';
 import type { Conexion, Enchufe, LaMesa, LosMundos, Reloj, Temporizador } from '../src/botas/canal';
-import { codigoDeLaRuta, origenAdmitido } from '../src/botas/enchufe';
+import { codigoDeLaRuta, enchufarElCanal, origenAdmitido } from '../src/botas/enchufe';
 import { jugarLasLindes } from './robot-de-las-lindes';
+
+/*
+ * La carpeta de las mesas de la última parte, ANTES de que nada cargue `mesas.ts` —que la lee al
+ * cargarse—: sin esto las mesas de prueba acabarían en la carpeta de datos del portátil. Nada de lo
+ * importado arriba lo carga; la última parte lo importa a mano.
+ */
+const CARPETA_DE_MESAS = fs.mkdtempSync(path.join(os.tmpdir(), 'sala-de-botas-'));
+process.env.MESAS_DIR = CARPETA_DE_MESAS;
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -1207,6 +1226,129 @@ paso('Mesa cerrada u olvidada: `mesaCerrada` a todos. SIGTERM: 1001 a todos, y n
 }
 
 // ---------------------------------------------------------------------------
+// 12 BIS · DERIVAR MUNDOS POR TURNO
+// ---------------------------------------------------------------------------
+
+paso('Derivar mundos por turno: de uno en uno, abrir delante de volver a derivar, y nunca más de la quinta parte del hilo');
+
+{
+  /*
+   * Un productor que CUESTA 200 ms en un cronómetro de mentira —lo que cuesta Las Lindes llena en
+   * frío—. Sin turno, tres salas que se abren a la vez o que mueven a la vez se derivarían seguidas
+   * y el hilo se iría 600 ms sin leer un enchufe; con turno van de una en una, y cada una espera
+   * cuatro veces lo que costó la anterior. Y abrir va DELANTE: hay alguien esperando su `dentro`.
+   */
+  let cronometro = 0;
+  let coste = 200;
+  const llamadas: { codigo: string; t: number }[] = [];
+  const reloj = new RelojDeMentira();
+  const canal = new CanalDeBotas({
+    reloj,
+    mesa: LA_MESA,
+    mundos: {
+      sePuedeRecorrer: (arcade) => RECORRIBLES.has(arcade),
+      mundoDeLaMesa: (_arcade, vista, codigo) => {
+        llamadas.push({ codigo, t: reloj.ahora() });
+        cronometro += coste;
+        return (vista as { mundo: MundoDeclarado | null }).mundo;
+      },
+    },
+    registrar: (linea) => LO_QUE_SE_REGISTRA.push(linea),
+    cronometro: () => cronometro,
+  });
+  const cuatro = [mesaNueva(), mesaNueva(), mesaNueva(), mesaNueva()];
+  const moverLasMesas = (cuantas: number): void => {
+    for (const m of cuatro.slice(0, cuantas)) {
+      const mesa = MESAS.get(m.codigo);
+      if (mesa !== undefined) mesa.rev++;
+    }
+  };
+
+  /* 1 · Tres salas caras que se abren a la vez. */
+  const enchufes = cuatro.slice(0, 3).map((m) => {
+    const e = new EnchufeDeMentira();
+    canal.abrir(m.codigo, e).recibir(hola(m.llave('a-uno')));
+    return e;
+  });
+  await vaciar();
+  const dentros = (): number => enchufes.filter((e) => e.de('dentro').length === 1).length;
+  comprobar('tres salas caras que se abren a la vez: la primera entra en el acto, las otras esperan turno', dentros() === 1, dentros());
+  await reloj.avanzar(800);
+  comprobar('la segunda entra cuatro veces lo que costó la primera después (800 ms)', dentros() === 2, dentros());
+  await reloj.avanzar(800);
+  comprobar('y la tercera, 800 ms más tarde: ninguna se queda sin entrar', dentros() === 3, dentros());
+
+  /* 2 · Las tres mesas mueven a la vez. */
+  await reloj.avanzar(1000);
+  llamadas.length = 0;
+  moverLasMesas(3);
+  const fotosAntes = (enchufes[0] as EnchufeDeMentira).de('foto').length;
+  await reloj.avanzar(6000);
+  const ts = llamadas.map((l) => l.t);
+  comprobar(
+    'las tres vuelven a derivar su mundo, una vez cada una',
+    llamadas.length === 3 && new Set(llamadas.map((l) => l.codigo)).size === 3,
+    llamadas,
+  );
+  comprobar(
+    'de una en una y con turno: cada una, al menos cuatro veces lo que costó la anterior (800 ms) después',
+    ts.length === 3 && ts.every((t, i) => i === 0 || t - (ts[i - 1] as number) >= 800),
+    ts.map((t) => t - (ts[0] ?? 0)),
+  );
+  comprobar(
+    'mientras esperan, las salas siguen: las fotos no se paran',
+    (enchufes[0] as EnchufeDeMentira).de('foto').length - fotosAntes >= 50,
+    (enchufes[0] as EnchufeDeMentira).de('foto').length - fotosAntes,
+  );
+
+  /*
+   * 3 · Vuelven a mover, ahora con derivaciones de 500 ms —así la siguiente espera dos segundos—, y
+   * se deja que las TRES se pongan a la cola antes de que llegue alguien a abrir la cuarta: la
+   * primera deriva y las otras dos esperan turno cuando llega. Sin prioridad, la cuarta iría la
+   * última; con ella, la siguiente.
+   */
+  coste = 500;
+  llamadas.length = 0;
+  moverLasMesas(3);
+  for (let i = 0; i < 40 && llamadas.length === 0; i++) await reloj.avanzar(50);
+  await reloj.avanzar(1100);
+  comprobar(
+    'con la primera derivando, las otras dos esperan turno en la cola',
+    llamadas.length === 1 && canal.diagnostico().colaParaDerivar === 2,
+    { llamadas: llamadas.length, cola: canal.diagnostico().colaParaDerivar },
+  );
+  const cuarta = new EnchufeDeMentira();
+  canal.abrir((cuatro[3] as { codigo: string }).codigo, cuarta).recibir(hola((cuatro[3] as { llave: (a: string) => string }).llave('a-uno')));
+  await vaciar();
+  await reloj.avanzar(8000);
+  const orden = llamadas.map((l) => l.codigo);
+  comprobar(
+    'abrir va DELANTE de volver a derivar: la sala nueva se deriva antes que las dos que ya esperaban',
+    orden.length === 4 && orden[1] === (cuatro[3] as { codigo: string }).codigo,
+    orden,
+  );
+  comprobar('y quien la abrió entra', cuarta.de('dentro').length === 1, cuarta.textos.slice(0, 2));
+  comprobar(
+    'la cola se vacía, y el diagnóstico cuenta el trabajo: seis derivaciones de 200 ms y cuatro de 500',
+    canal.diagnostico().colaParaDerivar === 0 && canal.diagnostico().msDerivando === 3200 && canal.diagnostico().rederivaciones === 6,
+    { cola: canal.diagnostico().colaParaDerivar, ms: canal.diagnostico().msDerivando, rederivaciones: canal.diagnostico().rederivaciones },
+  );
+
+  /* 4 · Y si derivar es barato, no se espera nada más que lo que tarda en preguntarse la revisión. */
+  coste = 0;
+  llamadas.length = 0;
+  const movidas = reloj.ahora();
+  moverLasMesas(4);
+  await reloj.avanzar(1300);
+  comprobar(
+    'y si derivar es barato no se espera nada: las cuatro dentro del segundo en que se pregunta la revisión',
+    llamadas.length === 4 && llamadas.every((l) => l.t - movidas <= 1050),
+    llamadas.map((l) => l.t - movidas),
+  );
+  canal.apagar();
+}
+
+// ---------------------------------------------------------------------------
 // 13 · PASEOS LEGALES DE VERDAD, SOBRE LOS MUNDOS DE VERDAD
 // ---------------------------------------------------------------------------
 
@@ -1293,7 +1435,7 @@ async function pasearPorElCanal(nombre: string, arcade: string, mundo: MundoDecl
 // 14 · LA RUTA Y EL ORIGEN, Y QUE LA LLAVE NO SE ESCRIBE
 // ---------------------------------------------------------------------------
 
-paso('La ruta del canal, el origen, y que ninguna llave llega al registro');
+paso('La ruta del canal, el origen, que ninguna llave llega al registro, y que una subida que revienta no tira el servidor');
 
 {
   comprobar('la ruta del contrato da su código', codigoDeLaRuta('/api/arcade/mesas/AB2CD/botas') === 'AB2CD');
@@ -1326,6 +1468,187 @@ paso('La ruta del canal, el origen, y que ninguna llave llega al registro');
   );
 }
 
+{
+  /*
+   * UNA SUBIDA QUE REVIENTA DENTRO DEL CANAL se lleva su enchufe y nada más. El `upgrade` corre en
+   * un evento del servidor HTTP: lo que se escapara de él llegaría a `uncaughtException`, que en
+   * `index.ts` termina el proceso —con las mesas de todos—. Aquí el canal revienta al abrir, a
+   * propósito, y se mira que el aparato ve su enchufe caído, que no se escapa nada y que el servidor
+   * sigue atendiendo.
+   */
+  const escapadas: string[] = [];
+  const alEscaparse = (e: unknown): void => {
+    escapadas.push(e instanceof Error ? e.message : String(e));
+  };
+  process.on('uncaughtException', alEscaparse);
+  const quePetardea = {
+    abrir: () => {
+      throw new Error('el canal revienta al abrir');
+    },
+    contarOrigenNegado: () => {},
+  } as unknown as CanalDeBotas;
+  const servidor = http.createServer((_peticion, respuesta) => {
+    respuesta.statusCode = 404;
+    respuesta.end();
+  });
+  enchufarElCanal(servidor, quePetardea, { produccion: false, extra: [] });
+  await new Promise<void>((r) => servidor.listen(0, '127.0.0.1', () => r()));
+  const puerto = (servidor.address() as AddressInfo).port;
+  const abiertos: WebSocket[] = [];
+  const intento = (): Promise<string> =>
+    new Promise<string>((r) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${String(puerto)}${rutaDelCanal('AB2CD')}`, { handshakeTimeout: 3000 });
+      abiertos.push(ws);
+      const plazo = setTimeout(() => r('sigue abierto'), 2000);
+      ws.on('close', (c) => {
+        clearTimeout(plazo);
+        r(`cerrado ${String(c)}`);
+      });
+      ws.on('error', (e) => {
+        clearTimeout(plazo);
+        r(`error: ${e.message}`);
+      });
+    });
+  const primero = await intento();
+  comprobar('una subida que revienta dentro del canal se cierra: el aparato ve su enchufe caído', primero !== 'sigue abierto', primero);
+  comprobar('y no se escapa nada a `uncaughtException`, que en `index.ts` termina el proceso', escapadas.length === 0, escapadas);
+  const segundo = await intento();
+  const normal = await new Promise<number>((r) => {
+    http
+      .get(`http://127.0.0.1:${String(puerto)}/`, (respuesta) => {
+        respuesta.resume();
+        r(respuesta.statusCode ?? 0);
+      })
+      .on('error', () => r(0));
+  });
+  comprobar(
+    'y el servidor sigue atendiendo: otra subida igual se cierra igual, y una petición normal se contesta',
+    segundo !== 'sigue abierto' && normal === 404 && escapadas.length === 0,
+    { segundo, normal, escapadas },
+  );
+  for (const ws of abiertos) ws.terminate();
+  servidor.closeAllConnections();
+  await Promise.race([
+    new Promise<void>((r) => servidor.close(() => r())),
+    new Promise<void>((r) => setTimeout(r, 2000)),
+  ]);
+  process.off('uncaughtException', alEscaparse);
+}
+
+// ---------------------------------------------------------------------------
+// 15 · SIGTERM, CON EL MONTAJE DE VERDAD
+// ---------------------------------------------------------------------------
+
+paso('SIGTERM con el montaje de verdad: la mesa de `mesas.ts`, el enchufe, dos aparatos por `ws`, y la despedida');
+
+/** Un aparato de verdad por el bucle local: abre, saluda, y apunta lo que le dicen y cómo se cierra. */
+const DE_VERDAD: WebSocket[] = [];
+
+function aparatoDeVerdad(puerto: number, codigo: string, llave: string | null): {
+  mensajes: (MensajeDelServidor | null)[];
+  cierre: () => number | null;
+  abierto: Promise<boolean>;
+} {
+  const mensajes: (MensajeDelServidor | null)[] = [];
+  let cierre: number | null = null;
+  const ws = new WebSocket(`ws://127.0.0.1:${String(puerto)}${rutaDelCanal(codigo)}`, { handshakeTimeout: 5000 });
+  DE_VERDAD.push(ws);
+  const abierto = new Promise<boolean>((r) => {
+    ws.once('open', () => {
+      if (llave !== null) ws.send(hola(llave));
+      r(true);
+    });
+    ws.once('error', () => r(false));
+  });
+  ws.on('message', (d) => mensajes.push(leerMensajeDelServidor(d.toString())));
+  ws.on('close', (c) => {
+    cierre = c;
+  });
+  ws.on('error', () => {});
+  return { mensajes, cierre: () => cierre, abierto };
+}
+
+async function hasta(que: () => boolean, ms = 3000): Promise<boolean> {
+  const fin = Date.now() + ms;
+  while (Date.now() < fin && !que()) await new Promise<void>((r) => setTimeout(r, 15));
+  return que();
+}
+
+{
+  await import('../../shared/arcade/juegos');
+  const mesas = await import('../src/arcade/mesas');
+  const botas = await import('../src/botas/index');
+  const dadas = botas.darDeAltaLosQueSeRecorren();
+  comprobar('el alta del arranque da de alta Las Lindes, que se recorre', dadas.includes('lindes'), dadas);
+
+  const servidor = http.createServer((_peticion, respuesta) => {
+    respuesta.statusCode = 404;
+    respuesta.end();
+  });
+  const despedidas: string[] = [];
+  botas.montarElCanalDeBotas(servidor, { produccion: false, extra: [] }, (senal) => despedidas.push(senal));
+  await new Promise<void>((r) => servidor.listen(0, '127.0.0.1', () => r()));
+  const puerto = (servidor.address() as AddressInfo).port;
+
+  const abierta = await mesas.abrir({ arcade: 'lindes', nombre: 'Ana', modalidad: 'botas', plazoSegundos: 0 });
+  const codigo = abierta.mesa.codigo;
+  const bea = await mesas.sentarse(codigo, 'Bea');
+  const vista = await mesas.mirar(codigo, abierta.silla.llave);
+  const empezar = vista.opciones.find((o) => o.tipo === 'lindes:empezar');
+  await mesas.mover(codigo, abierta.silla.llave, vista.rev, { tipo: 'lindes:empezar', carga: empezar?.carga ?? null });
+
+  const ana = aparatoDeVerdad(puerto, codigo, abierta.silla.llave);
+  const otra = aparatoDeVerdad(puerto, codigo, bea.llave);
+  const dentro = (a: { mensajes: (MensajeDelServidor | null)[] }): boolean => a.mensajes.some((m) => m?.t === 'dentro');
+  await hasta(() => dentro(ana) && dentro(otra));
+  comprobar(
+    'con la mesa de VERDAD y el montaje de verdad, las dos entran: `dentro`',
+    dentro(ana) && dentro(otra),
+    { ana: ana.mensajes.slice(0, 2), otra: otra.mensajes.slice(0, 2) },
+  );
+  const callada = aparatoDeVerdad(puerto, codigo, null);
+  await callada.abierto;
+
+  process.emit('SIGTERM', 'SIGTERM');
+  await hasta(() => ana.cierre() !== null && otra.cierre() !== null && callada.cierre() !== null);
+  comprobar(
+    'SIGTERM: la despedida de `mesas.ts` cierra los canales con 1001 —«el servidor se va»—, también al que aún no saludó',
+    ana.cierre() === 1001 && otra.cierre() === 1001 && callada.cierre() === 1001,
+    [ana.cierre(), otra.cierre(), callada.cierre()],
+  );
+  comprobar(
+    'diciéndoles antes por qué, con un `fuera` que el aparato sabe leer',
+    ana.mensajes.some((m) => m?.t === 'fuera') && otra.mensajes.some((m) => m?.t === 'fuera'),
+    ana.mensajes.slice(-2),
+  );
+  comprobar(
+    'y DESPUÉS termina como terminaba: la señal sigue su camino, una vez',
+    despedidas.length === 1 && despedidas[0] === 'SIGTERM',
+    despedidas,
+  );
+  const tarde = aparatoDeVerdad(puerto, codigo, abierta.silla.llave);
+  await hasta(() => tarde.cierre() !== null);
+  comprobar('y quien llega después no entra: 1001 en el acto', tarde.cierre() === 1001, tarde.cierre());
+  comprobar('el diagnóstico lo cuenta', (botas.diagnosticoDeBotas().cierres.apagado ?? 0) >= 3, botas.diagnosticoDeBotas().cierres);
+
+  /*
+   * Y se recoge TODO, pase lo que pase arriba: un enchufe que quedara abierto —por ejemplo, si
+   * alguien rompe el cierre de SIGTERM— retendría el servidor y `close` no volvería nunca. Un
+   * comprobador que se cuelga en vez de ponerse rojo es el peor de los dos.
+   */
+  for (const ws of DE_VERDAD) ws.terminate();
+  servidor.closeAllConnections();
+  await Promise.race([
+    new Promise<void>((r) => servidor.close(() => r())),
+    new Promise<void>((r) => setTimeout(r, 2000)),
+  ]);
+  try {
+    fs.rmSync(CARPETA_DE_MESAS, { recursive: true, force: true });
+  } catch {
+    /* en Windows un fichero recién cerrado a veces sigue tomado un instante */
+  }
+}
+
 console.log('');
 console.log(`  (la mesa de mentira contestó ${String(revisiones)} revisiones y ${String(vistas)} vistas)`);
 console.log('');
@@ -1339,7 +1662,7 @@ if (fallos.length > 0) {
  * EL GUARDIA DE «NO SE HAN HECHO TODAS»: un comprobador que se cae a mitad sin decirlo se parece
  * mucho a uno verde. El número es el que se hace hoy, contado, y se sube al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 133;
+const COMPROBACIONES_ESCRITAS = 154;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones escritas.`);
   process.exit(2);
@@ -1349,7 +1672,8 @@ console.log(
   `✔ ${String(hechas)} comprobaciones. La sala de Boots on Board, con el reloj en la mano: el saludo y su\n` +
     '  plazo, la entrada, un canal por asiento, el presupuesto de distancia, la estructura (con la escuadra\n' +
     '  de un tic), lo que viene de camino tras corregir, el cubo, el quieto, la gracia, una foto por sala y\n' +
-    '  un solo temporizador parado sin salas, el mundo que cambia debajo de alguien, los cierres, y paseos\n' +
-    '  legales de verdad sin una corrección.',
+    '  un solo temporizador parado sin salas, el mundo que cambia debajo de alguien, los cierres, paseos\n' +
+    '  legales de verdad sin una corrección; y con el montaje de verdad, SIGTERM cierra los canales con\n' +
+    '  1001 dentro de la despedida de la mesa.',
 );
 process.exit(0);

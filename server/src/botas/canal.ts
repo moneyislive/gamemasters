@@ -99,6 +99,44 @@ export const MAL_FORMADOS_TOLERADOS = 3;
 export const REVISAR_LA_MESA_CADA_MS = 1000;
 
 /**
+ * QUÉ PARTE DEL HILO SE DEJA, COMO MUCHO, PARA VOLVER A DERIVAR MUNDOS: la quinta parte.
+ *
+ * ═══ LA ESPIRAL QUE ESTO CORTA, MEDIDA ═══
+ *
+ * Derivar el mundo de Las Lindes con el tablero lleno cuesta 0,3 ms si el reparto de sus losas está
+ * en las cachés del proceso, y 210-230 ms si no lo está. Esas cachés son de 512 y 1.024 losas —las
+ * dimensionó quien pensaba en UN aparato— y una mesa llena son 72: con más de siete salas llenas a
+ * la vez, cada jugada vuelve a montarlo todo en frío. Medido con `medir:botas --jugada 5`: con cinco
+ * salas, 0,3 ms por derivación; con diez, 209 ms, el 39 % de un núcleo, y las fotos bajan de 8 a 5,4
+ * por segundo porque el hilo no llega. Con cincuenta NO TERMINA: cada derivación bloquea el hilo,
+ * así que cuando vuelve el tic TODAS las salas están ya para revisar y casi todas han cambiado de
+ * revisión, y cada vuelta del bucle deriva más que la anterior. Es una espiral: el servidor entero
+ * —la API incluida— deja de contestar.
+ *
+ * Así que se pregunta la revisión como siempre —es barato: no proyecta nada— pero DERIVAR un mundo
+ * pide TURNO: uno para todo el proceso, de uno en uno, y después de cada derivación la siguiente
+ * espera cuatro veces lo que costó esa, con un temporizador de verdad en medio —así el bucle lee los
+ * enchufes entre una y otra—. Con derivaciones de 0,3 ms no se nota nada; con las de 210 ms las salas
+ * esperan su turno para ver su mundo nuevo —y mientras tanto se valida contra el que tenían, que es
+ * lo que pasaba en el segundo de antes—, pero el hilo sigue sirviendo a todos.
+ *
+ * ═══ Y ABRIR UNA SALA TAMBIÉN PIDE TURNO, PERO VA DELANTE ═══
+ *
+ * Abrir una sala deriva su mundo, y al principio no pedía turno —«hay alguien esperando»—. El banco
+ * con WebSocket de verdad enseñó por qué tiene que pedirlo: tras un despliegue vuelven todos a la vez,
+ * cincuenta salas son cincuenta derivaciones en frío seguidas, y el hilo se queda once segundos sin
+ * leer ningún enchufe; los `hola` que ya estaban en el cable se leen cuando el plazo de cinco
+ * segundos ya ha saltado, se cierra con `sinHola` a gente que sí saludó a tiempo, la sala se vacía, y
+ * al volver a entrar se abre otra vez, en frío. Otra espiral. Así que abrir pide turno como todos,
+ * pero con PRIORIDAD sobre volver a derivar: delante hay alguien esperando su `dentro`.
+ */
+export const PARTE_PARA_DERIVAR = 0.2;
+
+/** Quién va antes al pedir turno para derivar: abrir una sala, antes que volver a derivar. */
+const PARA_ABRIR = 0;
+const PARA_VOLVER_A_DERIVAR = 1;
+
+/**
  * Cuántos bytes pueden esperar a salir por un canal antes de saltarle las fotos: dieciséis kilos,
  * unas setenta fotos de cinco personas. Un canal sano está a cero: lo que se manda va derecho al
  * sistema.
@@ -178,6 +216,12 @@ export interface OpcionesDelCanal {
   readonly mundos: LosMundos;
   /** Dónde se escribe lo que pasa. NUNCA recibe una llave. */
   readonly registrar?: (linea: string) => void;
+  /**
+   * Con qué se cronometra lo que CUESTA derivar un mundo, en milisegundos. Es otro reloj que el de
+   * pared a propósito: lo que se mide es trabajo del hilo, y en las pruebas el reloj de pared es de
+   * mentira. Por defecto, `performance.now()`.
+   */
+  readonly cronometro?: () => number;
 }
 
 /* ─── LO QUE SE CUENTA ───────────────────────────────────────────────────── */
@@ -211,6 +255,10 @@ export interface DiagnosticoDeBotas {
   correcciones: Record<PorQueSeCorrige, number>;
   rederivaciones: number;
   fallosAlRederivar: number;
+  /** Cuántas salas esperan su turno para volver a derivar el mundo. */
+  colaParaDerivar: number;
+  /** Cuánto trabajo del hilo se ha ido en derivar mundos (al abrir salas y al volver a derivar), en ms. */
+  msDerivando: number;
   entradas: number;
   origenesNegados: number;
   cierres: Record<PorQueSeCierra, number>;
@@ -235,6 +283,8 @@ export function cuentasVacias(): DiagnosticoDeBotas {
     correcciones: { presupuesto: 0, estructura: 0, rescate: 0, repetida: 0 },
     rederivaciones: 0,
     fallosAlRederivar: 0,
+    colaParaDerivar: 0,
+    msDerivando: 0,
     entradas: 0,
     origenesNegados: 0,
     cierres: {
@@ -325,6 +375,8 @@ interface Sala {
   k: number;
   revisando: boolean;
   revisadaEn: number;
+  /** Si está en la cola para volver a derivar su mundo. Una vez como mucho. */
+  enCola: boolean;
   cerrada: boolean;
 }
 
@@ -409,12 +461,22 @@ export class CanalDeBotas {
   private temporizador: Temporizador | null = null;
   private apagado = false;
   private readonly cuentas = cuentasVacias();
+  private readonly cronometro: () => number;
+  /** Quienes esperan turno para derivar, por prioridad y luego por llegada. Ver `PARTE_PARA_DERIVAR`. */
+  private readonly esperandoTurno: { readonly prioridad: number; readonly seguir: () => void }[] = [];
+  /** Si alguien tiene el turno: de uno en uno. */
+  private enTurno = false;
+  /** El temporizador que espera a que se pueda dar el siguiente turno. */
+  private esperaDelTurno: Temporizador | null = null;
+  /** Antes de esta hora de pared no empieza la siguiente derivación. */
+  private derivarDesde = 0;
 
   constructor(opciones: OpcionesDelCanal) {
     this.reloj = opciones.reloj;
     this.mesa = opciones.mesa;
     this.mundos = opciones.mundos;
     this.registrar = opciones.registrar ?? ((linea) => console.log(`[botas] ${linea}`));
+    this.cronometro = opciones.cronometro ?? (() => performance.now());
   }
 
   /* ── Entrar ──────────────────────────────────────────────────────────── */
@@ -538,20 +600,28 @@ export class CanalDeBotas {
     if (!this.mundos.sePuedeRecorrer(v.arcade)) {
       return { clave: 'mesaQueNo', motivo: 'Este juego no se puede recorrer en este servidor.' };
     }
-    const mundo = this.mundos.mundoDeLaMesa(v.arcade, v.vista, codigo);
-    if (mundo === null) {
+    /* Abrir también pide turno para derivar, pero va delante de volver a derivar: ver `PARTE_PARA_DERIVAR`. */
+    await this.pedirTurno(PARA_ABRIR);
+    let arena: Arena | null;
+    try {
+      arena = this.derivarElMundo(v.arcade, v.vista, codigo);
+    } finally {
+      this.soltarTurno();
+    }
+    if (arena === null) {
       return { clave: 'mesaQueNo', motivo: 'Todavía no hay tablero que recorrer: la partida no ha empezado.' };
     }
     const sala: Sala = {
       codigo,
       arcade: v.arcade,
-      arena: arenaDe(mundo),
+      arena,
       rev: v.rev,
       asientos: v.asientos,
       ocupantes: new Map(),
       k: 0,
       revisando: false,
       revisadaEn: this.reloj.ahora(),
+      enCola: false,
       cerrada: false,
     };
     this.salas.set(codigo, sala);
@@ -784,9 +854,9 @@ export class CanalDeBotas {
   }
 
   /**
-   * ¿HA CAMBIADO LA MESA? Como mucho una vez por segundo y por sala. Si ha cambiado la revisión,
-   * se vuelve a derivar el mundo, y a quien haya quedado dentro de un cuerpo o sin suelo se le
-   * saca al sitio libre más cercano y se le dice con un `corrige`.
+   * ¿HA CAMBIADO LA MESA? Como mucho una vez por segundo y por sala, y es barato: la lectura que no
+   * proyecta. Si la mesa se ha acabado o ya no existe, fuera todos. Si ha cambiado la revisión, la
+   * sala se pone a la COLA para volver a derivar su mundo (ver `PARTE_PARA_DERIVAR`).
    */
   private async revisar(sala: Sala): Promise<void> {
     sala.revisando = true;
@@ -802,7 +872,80 @@ export class CanalDeBotas {
         this.cerrarLaSala(sala, 'La partida se ha acabado.');
         return;
       }
-      if (r.rev === sala.rev) return;
+      if (r.rev !== sala.rev && !sala.enCola) {
+        sala.enCola = true;
+        void this.derivar(sala);
+      }
+    } catch (error) {
+      this.cuentas.fallosAlRederivar++;
+      this.registrar(
+        `no se ha podido preguntar por la mesa ${sala.codigo}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      sala.revisando = false;
+    }
+  }
+
+  /* ── El turno para derivar ───────────────────────────────────────────── */
+
+  /** Pide turno para derivar un mundo. Se sigue cuando toca; hay que soltarlo con `soltarTurno`. */
+  private pedirTurno(prioridad: number): Promise<void> {
+    return new Promise<void>((seguir) => {
+      let i = this.esperandoTurno.length;
+      while (i > 0 && (this.esperandoTurno[i - 1] as { prioridad: number }).prioridad > prioridad) i--;
+      this.esperandoTurno.splice(i, 0, { prioridad, seguir });
+      this.repartirTurno();
+    });
+  }
+
+  private soltarTurno(): void {
+    this.enTurno = false;
+    this.repartirTurno();
+  }
+
+  /**
+   * DA EL TURNO AL PRIMERO, si nadie lo tiene y ya ha pasado lo que apartó la última derivación. Si
+   * aún no, un temporizador lo dará cuando toque: entre medias el bucle atiende a los demás.
+   */
+  private repartirTurno(): void {
+    if (this.enTurno || this.esperaDelTurno !== null) return;
+    const primero = this.esperandoTurno[0];
+    if (primero === undefined) return;
+    const espera = this.derivarDesde - this.reloj.ahora();
+    if (espera >= 1) {
+      this.esperaDelTurno = this.reloj.dentroDe(espera, () => {
+        this.esperaDelTurno = null;
+        this.repartirTurno();
+      });
+      return;
+    }
+    this.esperandoTurno.shift();
+    this.enTurno = true;
+    primero.seguir();
+  }
+
+  /** Deriva el mundo con el turno cogido y apunta lo que ha costado: aparta al siguiente cuatro veces eso. */
+  private derivarElMundo(arcade: string, vista: unknown, codigo: string): Arena | null {
+    const t0 = this.cronometro();
+    try {
+      const mundo = this.mundos.mundoDeLaMesa(arcade, vista, codigo);
+      return mundo === null ? null : arenaDe(mundo);
+    } finally {
+      const coste = Math.max(0, this.cronometro() - t0);
+      this.cuentas.msDerivando += coste;
+      this.derivarDesde = Math.max(this.derivarDesde, this.reloj.ahora() + coste * (1 / PARTE_PARA_DERIVAR - 1));
+    }
+  }
+
+  /**
+   * VUELVE A DERIVAR EL MUNDO DE UNA SALA, con turno y con la vista de ese momento, y a quien haya
+   * quedado dentro de un cuerpo o sin suelo se le saca al sitio libre más cercano con un `corrige`.
+   */
+  private async derivar(sala: Sala): Promise<void> {
+    await this.pedirTurno(PARA_VOLVER_A_DERIVAR);
+    sala.enCola = false;
+    try {
+      if (sala.cerrada || this.salas.get(sala.codigo) !== sala) return;
       const v = await this.mesa.vista(sala.codigo);
       if (sala.cerrada || this.salas.get(sala.codigo) !== sala) return;
       if (v === null) {
@@ -813,12 +956,12 @@ export class CanalDeBotas {
         this.cerrarLaSala(sala, 'La partida se ha acabado.');
         return;
       }
-      const mundo = this.mundos.mundoDeLaMesa(sala.arcade, v.vista, sala.codigo);
+      const arena = this.derivarElMundo(sala.arcade, v.vista, sala.codigo);
       sala.rev = v.rev;
       sala.asientos = v.asientos;
       /* Un mundo que desaparece no deja a nadie en el vacío: se sigue con el que había. */
-      if (mundo === null) return;
-      sala.arena = arenaDe(mundo);
+      if (arena === null) return;
+      sala.arena = arena;
       this.cuentas.rederivaciones++;
       this.rescatar(sala);
     } catch (error) {
@@ -828,7 +971,7 @@ export class CanalDeBotas {
           (error instanceof Error ? error.message : String(error)),
       );
     } finally {
-      sala.revisando = false;
+      this.soltarTurno();
     }
   }
 
@@ -928,6 +1071,10 @@ export class CanalDeBotas {
       this.echar(c, 'apagado', 'El servidor se está reiniciando: vuelve a entrar en unos segundos.');
     }
     this.salas.clear();
+    /* Quien esperaba turno para derivar se queda esperando: el proceso se va, y nadie lo va a leer. */
+    this.esperandoTurno.length = 0;
+    this.esperaDelTurno?.parar();
+    this.esperaDelTurno = null;
   }
 
   /* ── Mirar desde fuera ───────────────────────────────────────────────── */
@@ -946,6 +1093,7 @@ export class CanalDeBotas {
       canales: this.conexiones.size,
       enSala,
       temporizador: this.temporizador !== null,
+      colaParaDerivar: this.esperandoTurno.length,
       correcciones: { ...this.cuentas.correcciones },
       cierres: { ...this.cuentas.cierres },
     };

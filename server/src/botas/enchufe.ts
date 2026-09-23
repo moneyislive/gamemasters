@@ -107,6 +107,20 @@ export function enchufarElCanal(servidor: Server, canal: CanalDeBotas, contexto:
   });
 
   servidor.on('upgrade', (req: IncomingMessage, socket: Duplex, cabeza: Buffer) => {
+    /*
+     * Todo en un `try`: esto corre dentro de un evento del servidor HTTP, y lo que se escapara de
+     * aquí llegaría a `uncaughtException`, que en `index.ts` termina el proceso. Una subida rara se
+     * lleva por delante su enchufe, y nada más.
+     */
+    try {
+      atender(req, socket, cabeza);
+    } catch (error) {
+      console.error('[botas] una subida ha fallado y se cierra:', error instanceof Error ? error.message : String(error));
+      socket.destroy();
+    }
+  });
+
+  function atender(req: IncomingMessage, socket: Duplex, cabeza: Buffer): void {
     const codigo = codigoDeLaRuta(req.url);
     if (codigo === null) {
       if (servidor.listenerCount('upgrade') > 1) return;
@@ -139,7 +153,7 @@ export function enchufarElCanal(servidor: Server, canal: CanalDeBotas, contexto:
        */
       ws.on('error', () => {});
     });
-  });
+  }
 
   return wss;
 }
