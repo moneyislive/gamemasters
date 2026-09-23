@@ -142,6 +142,11 @@
  * en memoria y el almacén es el respaldo». El precio es una carpeta con muchos
  * ficheros pequeños, que es exactamente lo que un sistema de ficheros hace bien.
  *
+ * Y un fichero por código es también lo que permitió, después, LEER de una en
+ * una: las mesas que se juegan viven en memoria, y las frías sólo en el disco,
+ * que para ellas es la fuente. Ver «La memoria: calientes aquí, todas en el
+ * disco», más abajo.
+ *
  * NO SE MIGRA DEL FORMATO VIEJO, y queda dicho: esta fase no está desplegada en
  * ningún sitio, así que lo único que existiría es el `data/mesas.json` de un
  * portátil. Una migración que nadie ejecuta es código que se descubre roto el
@@ -206,8 +211,9 @@
  *     del diseño lo apunta como límite conocido: «las mesas de arcade no heredan
  *     el patrón de `mutar` —candado + lectura y escritura completa por acción—:
  *     correcto a ritmo de velada, seis lecturas y seis escrituras por segundo en
- *     una mesa de seis». Las mesas viven en memoria y el almacén es el respaldo,
- *     no la fuente.
+ *     una mesa de seis». Las mesas que se juegan viven en memoria y el almacén es
+ *     su respaldo; el disco sólo se lee para traer una mesa fría, UNA vez y dentro
+ *     de su candado, y no en cada vuelta. Ver «La memoria».
  */
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -727,11 +733,22 @@ function letrasAlAzar(cuantas: number): string {
   return salida;
 }
 
-/** Un código que no esté ya en uso. */
+/**
+ * Un código que no esté ya en uso: ni en memoria NI EN EL DISCO.
+ *
+ * Mirar sólo la memoria valía mientras en la memoria estaba todo. Desde que lo frío sale de ella,
+ * un código puede estar libre en memoria y ocupado en disco, y darlo sería abrir la mesa nueva
+ * ENCIMA del fichero de una partida que sólo estaba dormida: la primera escritura de la nueva se
+ * la lleva por delante. Es el fallo que la cabecera de `Guardado` ya temía con los ficheros que
+ * una versión no entiende —«el código liberado se puede reasignar y sobreescribir el fichero
+ * original»—, y esto lo cierra también para ellos: `existe` mira el fichero, se entienda o no.
+ */
 function codigoLibre(): string {
   for (let intento = 0; intento < 50; intento++) {
     const codigo = letrasAlAzar(LARGO_DEL_CODIGO);
-    if (!mesas.has(codigo)) return codigo;
+    if (mesas.has(codigo)) continue;
+    if (almacen.existe?.(codigo) === true) continue;
+    return codigo;
   }
   /*
    * Cincuenta colisiones seguidas con veintiocho millones de códigos no pasa: si
@@ -765,10 +782,43 @@ function codigoLibre(): string {
  *
  * `guardarYa` sí recibe el conjunto, porque el volcado de la despedida es
  * justamente lo contrario: una sola vez, todo, y antes de morir.
+ *
+ * ═══ Y SE LEE DE UNA EN UNA, QUE ES LO QUE ESTE ALMACÉN NO SABÍA HACER ═══
+ *
+ * Tenía un solo verbo de lectura, `leer()`: TODO, de golpe, en la primera petición
+ * del proceso y bloqueando el hilo mientras tanto. Y como lo leído se quedaba en la
+ * tabla de memoria los treinta días del olvido —terminado o no, con su diario
+ * entero—, la RAM del servidor era proporcional a las mesas de un mes y no a las que
+ * se están jugando. Era el techo real del servidor. Ver «La memoria», más abajo.
+ *
+ * Ahora son dos clases de almacén, y la mesa distingue cuál tiene delante:
+ *
+ *   · EL QUE LEE POR CÓDIGO —`leerUna`, `existe` y `viejas`; el de ficheros—. La
+ *     mesa lo trata como LA FUENTE: pide cada mesa cuando le hace falta, la suelta
+ *     de la memoria cuando se enfría, y barre el disco sin leerlo.
+ *   · EL QUE SÓLO SABE LEERLO TODO —`leer`; los de mentira de `verify:mesa`, o uno
+ *     pequeño en memoria—. Se carga entero una vez, como siempre, y de él NO SE
+ *     DESALOJA NADA: lo que saliera de la memoria no se podría volver a leer.
  */
 export interface AlmacenDeMesas {
-  /** Lo que hubiera guardado. Se llama una vez, al arrancar. */
-  leer(): MesaEnCurso[];
+  /** TODO lo guardado, de golpe. Sólo para almacenes pequeños: ver arriba. */
+  leer?(): MesaEnCurso[];
+  /**
+   * UNA mesa, por su código, ya puesta al día (`alDiaDesdeElDisco`), o `null` si no
+   * hay ninguna con ese código o no se puede leer —y en ese caso lo DICE en el
+   * registro: el silencio aquí es una partida que desaparece sin explicación—.
+   * Recibe sólo códigos con forma de código: ver `FORMA_DE_CODIGO`.
+   */
+  leerUna?(codigo: string): Promise<MesaEnCurso | null>;
+  /** ¿Hay algo guardado con este código, aunque no se entienda? Para `codigoLibre`. */
+  existe?(codigo: string): boolean;
+  /**
+   * Los códigos cuya ÚLTIMA ESCRITURA es anterior a `antesDe`, SIN LEERLOS. Es la
+   * criba barata del barrido de treinta días: cada toque de una mesa la escribe, así
+   * que lo que no se ha escrito en un mes no se ha tocado en un mes. Quien barre
+   * confirma leyendo sólo lo que sale de aquí.
+   */
+  viejas?(antesDe: number): Promise<string[]>;
   /** Guarda UNA mesa. Devuelve cuando está en disco; LANZA si no ha podido. */
   guardar(mesa: MesaEnCurso): Promise<void>;
   /** Se acabó esta mesa: que no vuelva a aparecer al arrancar. */
@@ -783,8 +833,25 @@ export interface AlmacenDeMesas {
  */
 const CARPETA = path.resolve(process.env.MESAS_DIR?.trim() || path.join(process.cwd(), 'data', 'mesas'));
 
-/** El fichero de una mesa. El código ya es de un alfabeto sin barras ni puntos. */
+/**
+ * LA FORMA DE UN CÓDIGO, que desde que se lee por código es también un NOMBRE DE FICHERO.
+ *
+ * Mientras todo se leía de golpe, un código sólo se buscaba en la tabla de memoria y
+ * cualquier cadena valía: no existía y ya está. Ahora un código que no está en memoria se
+ * busca EN EL DISCO, y la ruta lo saca de la URL. Sin esto, `/arcade/mesas/..%2F..%2Fx` sería
+ * `ficheroDe('../../X')`: leer lo que quien llama elija fuera de la carpeta.
+ *
+ * Mayúsculas y dígitos, del largo de un código. No es el alfabeto de `codigoLibre` —sin I, O,
+ * S, 0, 1, 5— a propósito: hay mesas escritas a mano en las pruebas (`VIEJA`) y lo que importa
+ * aquí no es que se pueda dictar, sino que no pueda salirse de la carpeta.
+ */
+const FORMA_DE_CODIGO = new RegExp(`^[A-Z0-9]{${String(LARGO_DEL_CODIGO)}}$`);
+
+/** El fichero de una mesa. Se niega a construir uno con algo que no sea un código. */
 function ficheroDe(codigo: string): string {
+  if (!FORMA_DE_CODIGO.test(codigo)) {
+    throw new Error(`«${codigo.slice(0, 16)}» no tiene forma de código de mesa, y un código es un nombre de fichero.`);
+  }
   return path.join(CARPETA, `${codigo}.json`);
 }
 
@@ -865,7 +932,7 @@ function esInstante(x: unknown): x is number {
  * Rellena lo que una versión vieja no traía. Devuelve `null` si no se reconoce.
  *
  * `nombre` es sólo para el registro, y está porque un descarte mudo aquí es una
- * partida que desaparece sin que nadie pueda averiguar por qué. Ver `leer()`.
+ * partida que desaparece sin que nadie pueda averiguar por qué. Ver `leerUna`.
  */
 function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string): MesaEnCurso | null {
   if (typeof leido.version !== 'number' || !VERSIONES_QUE_SE_LEEN.includes(leido.version)) {
@@ -908,7 +975,15 @@ function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string): MesaEnCurs
    * escala de días de La Larga no cambia ninguna decisión.
    */
   const ahora = Date.now();
-  if (!esInstante(m.abiertaEn)) m.abiertaEn = ahora;
+  if (!esInstante(m.abiertaEn)) {
+    m.abiertaEn = ahora;
+    /*
+     * La única reposición que depende de CUÁNDO se lee: volver a leer el fichero daría otra hora.
+     * Así que esta mesa no es igual a su fichero hasta que se vuelva a escribir, y no se desaloja
+     * antes. Ver «La memoria».
+     */
+    if (typeof m === 'object' && m !== null) repuestasConLaHora.add(m);
+  }
   if (!esInstante(m.ultimoToqueEn)) m.ultimoToqueEn = m.abiertaEn;
   /*
    * Se mira el VALOR y no la versión, y no es lo mismo: un fichero escrito por una
@@ -989,62 +1064,84 @@ async function escribirAtomico(destino: string, texto: string): Promise<void> {
   }
 }
 
+/**
+ * ¿«No existe» o «no puedo»? Sólo lo primero es normal y callado.
+ *
+ * ═══ «NO EXISTE» Y «NO PUEDO» NO SON LO MISMO, Y AQUÍ LO FUERON ═══
+ *
+ * Cuando esto se leía todo de golpe, un `catch` mudo con «no existe todavía» encima se tragaba
+ * también el caso que de verdad muerde: una VPS con `ProtectSystem=strict` y `MESAS_DIR` fuera de
+ * `ReadWritePaths` da `EACCES`, y TODAS las partidas en curso desaparecían sin una línea en el
+ * registro, con el diagnóstico diciendo `mesas: 0` junto a `almacen.fallos: 0` —la combinación que
+ * no le deja a nadie ni empezar a mirar—. Leyendo de una en una la regla es la misma: `ENOENT` es
+ * «esa mesa no está» y se calla; cualquier otra cosa SE DICE, en voz alta y nombrando la variable,
+ * y cuenta en el diagnóstico. Y no se lanza: la mesa que no se puede leer contesta lo mismo que la
+ * que no existe, que es lo único honrado que se puede contestar sin ella.
+ */
+function noExiste(error: unknown): boolean {
+  return (error as { code?: string } | null)?.code === 'ENOENT';
+}
+
 const almacenEnFichero: AlmacenDeMesas = {
-  leer() {
-    let nombres: string[];
+  async leerUna(codigo) {
+    let texto: string;
     try {
-      nombres = fs.readdirSync(CARPETA).filter((n) => n.endsWith('.json'));
+      texto = await fsp.readFile(ficheroDe(codigo), 'utf8');
+    } catch (error) {
+      if (noExiste(error)) return null;
+      anotarElFalloAlLeer(codigo, error);
+      console.error(
+        `[arcade] NO SE PUEDE LEER la mesa ${codigo} de la carpeta «${CARPETA}». Se contesta como si no ` +
+          'existiera, y el fichero sigue en disco. Revisa `MESAS_DIR` y los permisos de esa ruta:',
+        error,
+      );
+      return null;
+    }
+    try {
+      return alDiaDesdeElDisco(JSON.parse(texto) as Partial<Guardado>, `${codigo}.json`);
     } catch (error) {
       /*
-       * ═══ «NO EXISTE» Y «NO PUEDO» NO SON LO MISMO, Y AQUÍ LO ERAN ═══
-       *
-       * Un `catch` mudo con el comentario «no existe todavía» encima. Y el caso que
-       * de verdad muerde es el otro, el que la cabecera de este fichero ya
-       * describe: una VPS con `ProtectSystem=strict` y `MESAS_DIR` fuera de
-       * `ReadWritePaths` da `EACCES` aquí. Con esto se devolvía `[]` en silencio,
-       * TODAS las partidas en curso desaparecían sin una línea en el registro, y
-       * el diagnóstico publicaba `mesas: 0` junto a `almacen.fallos: 0` —que es,
-       * con las palabras de este mismo fichero, la combinación que no le deja a
-       * nadie ni empezar a mirar—.
-       *
-       * `ENOENT` sigue siendo el caso normal y sigue sin decir nada: la carpeta se
-       * crea al guardar la primera mesa. Cualquier otra cosa SE DICE, y en voz
-       * alta, nombrando la variable —porque el arreglo siempre está ahí—.
-       *
-       * Y NO SE LANZA, que era y sigue siendo lo correcto: un servidor que no
-       * arranca por la carpeta de las mesas deja fuera también a las veladas, que
-       * no tienen nada que ver.
+       * Una mesa ilegible se salta y se DICE, en vez de tumbar la petición o desaparecer en
+       * silencio. Es la ventaja concreta de un fichero por mesa: un JSON a medias se lleva por
+       * delante SU partida y ninguna más. Y el fichero no se borra: puede entenderlo otra versión.
        */
-      const codigo = (error as { code?: string } | null)?.code;
-      if (codigo !== 'ENOENT') {
-        console.error(
-          `[arcade] NO SE PUEDE LEER LA CARPETA DE LAS MESAS «${CARPETA}» (${codigo ?? 'sin código'}). ` +
-            'El servidor arranca SIN NINGUNA partida recuperada, y las que hubiera guardadas siguen ' +
-            'en disco. Revisa `MESAS_DIR` y los permisos de esa ruta:',
-          error,
-        );
+      anotarElFalloAlLeer(codigo, error);
+      console.error(`[arcade] La mesa guardada en «${codigo}.json» no se puede leer y se ignora:`, error);
+      return null;
+    }
+  },
+
+  existe(codigo) {
+    return FORMA_DE_CODIGO.test(codigo) && fs.existsSync(ficheroDe(codigo));
+  },
+
+  async viejas(antesDe) {
+    /*
+     * Asíncrono y de uno en uno, para no bloquear el hilo con una carpeta de un mes: es justo lo
+     * que la lectura de golpe hacía mal. Y sólo MIRA LA FECHA de cada fichero, sin abrirlo.
+     */
+    let carpeta: fs.Dir;
+    try {
+      carpeta = await fsp.opendir(CARPETA);
+    } catch (error) {
+      if (!noExiste(error)) {
+        console.error(`[arcade] No se puede recorrer la carpeta de las mesas «${CARPETA}» para barrerla:`, error);
       }
       return [];
     }
-
-    const recuperadas: MesaEnCurso[] = [];
-    for (const nombre of nombres) {
+    const salida: string[] = [];
+    for await (const entrada of carpeta) {
+      if (!entrada.isFile() || !entrada.name.endsWith('.json')) continue;
+      const codigo = entrada.name.slice(0, -'.json'.length);
+      if (!FORMA_DE_CODIGO.test(codigo)) continue;
       try {
-        const leido = JSON.parse(fs.readFileSync(path.join(CARPETA, nombre), 'utf8')) as Partial<Guardado>;
-        const mesa = alDiaDesdeElDisco(leido, nombre);
-        if (mesa === null) continue;
-        recuperadas.push(mesa);
-      } catch (error) {
-        /*
-         * Una mesa ilegible se salta y se DICE, en vez de tumbar el arranque o
-         * desaparecer en silencio. Ésta es la ventaja concreta de un fichero por
-         * mesa sobre uno con todas: antes, un JSON a medias se llevaba por
-         * delante TODAS las partidas del servidor; ahora se lleva la suya.
-         */
-        console.error(`[arcade] La mesa guardada en «${nombre}» no se puede leer y se ignora:`, error);
+        const datos = await fsp.stat(path.join(CARPETA, entrada.name));
+        if (datos.mtimeMs < antesDe) salida.push(codigo);
+      } catch {
+        /* se ha ido mientras se miraba: nada que barrer */
       }
     }
-    return recuperadas;
+    return salida;
   },
 
   async guardar(mesa) {
@@ -1072,9 +1169,11 @@ const almacenEnFichero: AlmacenDeMesas = {
       return;
     }
     for (const mesa of mesas) {
-      const destino = ficheroDe(mesa.codigo);
-      const temporal = `${destino}.${letrasAlAzar(6)}.tmp`;
+      let temporal = '';
       try {
+        /* Dentro del `try`: un código sin forma de código no puede cortar el volcado de las demás. */
+        const destino = ficheroDe(mesa.codigo);
+        temporal = `${destino}.${letrasAlAzar(6)}.tmp`;
         fs.writeFileSync(temporal, JSON.stringify({ version: 2, mesa } satisfies Guardado), 'utf8');
         fs.renameSync(temporal, destino);
       } catch (error) {
@@ -1084,7 +1183,7 @@ const almacenEnFichero: AlmacenDeMesas = {
          * trescientas.
          */
         try {
-          fs.rmSync(temporal, { force: true });
+          if (temporal.length > 0) fs.rmSync(temporal, { force: true });
         } catch {
           /* si no se puede ni borrar el temporal, no hay nada más que hacer */
         }
@@ -1143,6 +1242,7 @@ export function ponerAlmacenDeMesas(otro: AlmacenDeMesas): void {
    * hace un rato» del anterior. Ver `barrerSiTocaPorReloj`.
    */
   ultimoBarridoEn = 0;
+  ultimoBarridoDelDiscoEn = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -1150,12 +1250,19 @@ export function ponerAlmacenDeMesas(otro: AlmacenDeMesas): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Las mesas vivas, por código.
+ * Las mesas CALIENTES, por código.
  *
- * Vive en memoria y el almacén es el RESPALDO, no la fuente. Es la diferencia
- * con `mutar`, que relee la sesión entera de la base en cada vuelta: correcto a
- * ritmo de velada y ruinoso a ritmo de mesa, donde en una partida de cuatro hay
- * un movimiento cada pocos segundos y una lectura por móvil cada veinticinco.
+ * Decía «las mesas vivas», y lo eran todas: lo que se leía del almacén al arrancar
+ * se quedaba aquí los treinta días del olvido, terminado o no, con su diario entero.
+ * Desde que el almacén se lee por código, aquí está lo que se está jugando o se acaba
+ * de mirar, y el disco tiene todo lo demás. Ver «La memoria: calientes aquí, todas en
+ * el disco», un poco más abajo, que cuenta lo que eso toca y cómo se respeta.
+ *
+ * Lo que no cambia es por qué la mesa caliente vive en memoria y no se relee en cada
+ * vuelta: es la diferencia con `mutar`, que relee la sesión entera de la base cada
+ * vez —correcto a ritmo de velada y ruinoso a ritmo de mesa, donde en una partida de
+ * cuatro hay un movimiento cada pocos segundos y una lectura por móvil cada
+ * veinticinco—.
  *
  * La consecuencia, que es un límite conocido y preexistente y conviene no
  * echársela al motor nuevo: esto NO escala a dos instancias. Con dos procesos en
@@ -1168,9 +1275,18 @@ const mesas = new Map<string, MesaEnCurso>();
 
 let cargadas = false;
 
+/**
+ * LA CARGA DE GOLPE, que ya sólo hacen los almacenes que no saben leer por código.
+ *
+ * El de ficheros no la hace: se lee cada mesa cuando alguien la pide, dentro de su
+ * candado (`conLaMesa`). Esto queda para los almacenes pequeños que sólo tienen
+ * `leer()` —los de mentira de `verify:mesa`—, que se siguen cargando enteros una vez
+ * como antes, y de los que no se desaloja nada.
+ */
 function cargar(): void {
   if (cargadas) return;
   cargadas = true;
+  if (almacen.leer === undefined) return;
   /*
    * Se cuenta lo que se ha LEÍDO y no lo que hay en la tabla. Parece lo mismo
    * —al arrancar la tabla está vacía— y no lo es en cuanto alguien cambia el
@@ -1180,37 +1296,14 @@ function cargar(): void {
    */
   let recuperadas = 0;
   for (const m of almacen.leer()) {
-    /*
-     * ═══ Y LO QUE SE RECUPERA YA ACABADO SE CIERRA AQUÍ ═══
-     *
-     * Las otras dos puertas —`mover` y el tic— sólo se cruzan cuando el estado
-     * CAMBIA, así que una partida que terminó y no quedó marcada no se cierra por
-     * ninguna de las dos: el reductor rechaza todo movimiento sobre una partida
-     * acabada —luego no hay cambio— y el tic devuelve el mismo estado. Se quedaba
-     * abierta PARA SIEMPRE y rearmando la cuenta atrás en cada mirada, que es
-     * exactamente el síntoma que todo esto vino a matar.
-     *
-     * Y no es hipotético: son todas las mesas guardadas por un servidor anterior
-     * a este cambio, y las que se cerraron en memoria con el almacén caído.
-     *
-     * Va en `cargar` y no en el `leer` del almacén de ficheros a propósito: por
-     * aquí pasan LOS DOS almacenes, así que también se puede ejercitar con uno
-     * de mentira. Y es el sitio barato: una vez por mesa al recuperarla, no una
-     * por lectura.
-     */
-    if (cerrarSiSeAcabo(m, false)) {
+    anotarLoGuardado(m);
+    if (cerrarAlRecuperar(m)) {
       /*
-       * Y SE GUARDA, que si no se repite en cada arranque. Al recuperar no pasa
-       * por `mover` ni por el tic, y `ponerAlDiaElPlazo` sale antes de tiempo en
-       * una mesa ya terminada, así que nadie escribiría nunca: en memoria queda
-       * cerrada y en disco sigue diciendo que no. Sanaba sólo si el proceso
-       * terminaba de forma limpia; tras una caída, otra vez.
-       *
        * Sin esperar, porque `cargar()` es síncrona a propósito —la llaman rutas que
        * ya tienen su mesa en la mano— y esto es un apaño del respaldo, no algo de
-       * lo que dependa la respuesta.
+       * lo que dependa la respuesta. Ver `cerrarAlRecuperar`.
        */
-      void almacen.guardar(m).catch((error: unknown) => {
+      void escribir(m).catch((error: unknown) => {
         console.error(`[arcade] No se ha podido guardar el cierre de la mesa ${m.codigo}:`, error);
       });
     }
@@ -1218,6 +1311,33 @@ function cargar(): void {
     recuperadas++;
   }
   if (recuperadas > 0) console.log(`[arcade] ${recuperadas} mesa(s) recuperadas del almacén.`);
+}
+
+/**
+ * ═══ Y LO QUE SE RECUPERA YA ACABADO SE CIERRA AL RECUPERARLO ═══
+ *
+ * Las otras dos puertas —`mover` y el tic— sólo se cruzan cuando el estado
+ * CAMBIA, así que una partida que terminó y no quedó marcada no se cierra por
+ * ninguna de las dos: el reductor rechaza todo movimiento sobre una partida
+ * acabada —luego no hay cambio— y el tic devuelve el mismo estado. Se quedaba
+ * abierta PARA SIEMPRE y rearmando la cuenta atrás en cada mirada, que es
+ * exactamente el síntoma que todo esto vino a matar.
+ *
+ * Y no es hipotético: son todas las mesas guardadas por un servidor anterior
+ * a este cambio, y las que se cerraron en memoria con el almacén caído.
+ *
+ * Va aquí, en lo que recupera, y no dentro del almacén de ficheros a propósito: por
+ * aquí pasan LOS DOS almacenes —el de golpe y el de por código—, así que también se
+ * puede ejercitar con uno de mentira. Y es el sitio barato: una vez por mesa al
+ * recuperarla, no una por lectura.
+ *
+ * Devuelve si ha cerrado, y QUIEN LLAMA LA GUARDA, que si no se repite en cada
+ * arranque. Al recuperar no pasa por `mover` ni por el tic, y `ponerAlDiaElPlazo` sale
+ * antes de tiempo en una mesa ya terminada, así que nadie escribiría nunca: en memoria
+ * queda cerrada y en disco sigue diciendo que no.
+ */
+function cerrarAlRecuperar(m: MesaEnCurso): boolean {
+  return cerrarSiSeAcabo(m, false);
 }
 
 /**
@@ -1272,10 +1392,16 @@ const CADA_CUANTO_SE_BARRE_MS = 60 * 60_000;
 
 let ultimoBarridoEn = 0;
 
-/** Barre si toca por reloj. Lo llaman las lecturas; `abrir` barre siempre. */
+/**
+ * Barre si toca por reloj. Lo llaman las lecturas; `abrir` barre la memoria siempre.
+ *
+ * Son DOS barridos con dos relojes, y tienen que serlo: el de la memoria lo dispara también cada
+ * `abrir`, y si el del disco colgara del mismo reloj, en un servidor donde se abren mesas más de
+ * una vez por hora el disco no se barrería nunca.
+ */
 function barrerSiTocaPorReloj(ahora: number): void {
-  if (ahora - ultimoBarridoEn < CADA_CUANTO_SE_BARRE_MS) return;
-  barrerLasViejas(ahora);
+  if (ahora - ultimoBarridoEn >= CADA_CUANTO_SE_BARRE_MS) barrerLasViejas(ahora);
+  barrerElDiscoSiToca(ahora);
 }
 
 function barrerLasViejas(ahora: number): void {
@@ -1304,15 +1430,385 @@ function barrerLasViejas(ahora: number): void {
     void almacen.borrar(codigo).catch((error: unknown) => {
       console.error(`[arcade] No se ha podido borrar la mesa vieja ${codigo}:`, error);
     });
-    /* Y que el canal se olvide también de ella. Ver `cuandoSeOlvideUnaMesa`. */
-    if (alOlvidarseUnaMesa !== null) {
-      try {
-        alOlvidarseUnaMesa(codigo);
-      } catch (error) {
-        console.error(`[arcade] No se ha podido olvidar en el canal la mesa ${codigo}:`, error);
-      }
+    avisarAlCanalDeQueSeOlvida(codigo);
+  }
+  /*
+   * Y DESPUÉS, lo que se enfrió: sale de la memoria y se queda en el disco. Después y no antes,
+   * para que una mesa que lleva un mes sin tocarse se BORRE aquí —con su línea en el registro—
+   * en vez de desalojarse y esperar al barrido del disco.
+   */
+  desalojarLasFrias(ahora);
+}
+
+/** Que el canal se olvide también de una mesa que desaparece. Ver `cuandoSeOlvideUnaMesa`. */
+function avisarAlCanalDeQueSeOlvida(codigo: string): void {
+  if (alOlvidarseUnaMesa === null) return;
+  try {
+    alOlvidarseUnaMesa(codigo);
+  } catch (error) {
+    console.error(`[arcade] No se ha podido olvidar en el canal la mesa ${codigo}:`, error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LA MEMORIA: CALIENTES AQUÍ, TODAS EN EL DISCO
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ EL TECHO REAL DEL SERVIDOR, QUE ERA ÉSTE ═══
+ *
+ * Toda mesa, terminada o no, vivía treinta días en la tabla de memoria con su diario entero: una
+ * mesa cerrada no se borraba —para que los demás vieran el final— y el barrido sólo se la llevaba
+ * al mes. Y el primer arranque leía y analizaba TODOS los ficheros de `MESAS_DIR` en la primera
+ * petición, con el hilo bloqueado. La RAM crecía con las mesas de un mes y no con las que se
+ * están jugando, y el arranque tardaba lo que tardara leer un mes.
+ *
+ * Ahora, con un almacén que sabe leer por código (el de ficheros):
+ *
+ *   · EL DISCO ES LA FUENTE. Una mesa que no está en memoria se lee de su fichero cuando alguien
+ *     la pide, DENTRO de su candado. Un proceso nuevo no lee nada hasta que le piden algo.
+ *   · LO FRÍO SE DESALOJA DE LA MEMORIA —no del disco—: una mesa terminada que nadie ha tocado ni
+ *     mirado en una hora, o una sin terminar en doce. Sólo si se puede soltar sin perder nada.
+ *   · EL BARRIDO DE TREINTA DÍAS sigue borrando del disco, y ya no necesita cargar lo que no está
+ *     en memoria para saber qué es viejo.
+ *
+ * ═══ LO QUE ESTO TOCA DE ESTE FICHERO, Y CÓMO SE RESPETA CADA COSA ═══
+ *
+ * Se listó antes de escribir una línea, porque cada una es un sitio donde soltar una mesa de la
+ * memoria podía perder algo sin que nada fallara:
+ *
+ *  1. EL CANDADO. La carga ocurre DENTRO del candado de la mesa (`conLaMesa`, tras esperar su
+ *     turno), así que dos peticiones a una mesa fría la leen una sola vez. El desalojo no toca una
+ *     mesa con el candado cogido o con alguien en la cola (`candados`), así que ninguna operación
+ *     en vuelo pierde su mesa a mitad. El barrido del disco y `olvidarMesa` borran bajo el mismo
+ *     candado, para que nadie esté leyendo un fichero que se borra.
+ *  2. LA ESCRITURA —síncrona con `tickHz: 0`, diferida con `tickHz > 0`—. Sólo se desaloja una
+ *     mesa si lo que hay en memoria es EXACTAMENTE lo último que el almacén confirmó haber escrito:
+ *     una foto por referencia —`mesa` y `sillas` se sustituyen enteros en cada cambio, nunca se
+ *     retocan— y los campos sueltos, tomada al llamar a `guardar` y anotada cuando RESUELVE. Una
+ *     escritura pendiente (`pendientesDeGuardar`), en vuelo o que falló —el 503 de
+ *     `AlmacenNoGuarda`— deja la mesa SUCIA y no se desaloja: el movimiento que entró en memoria y
+ *     no llegó al disco no se pierde por esto.
+ *  3. LOS PLAZOS vencen entrando por el reductor AL LEER. Una mesa desalojada con plazo vuelve del
+ *     disco en su siguiente lectura y ahí se le mete el tic, como si nunca hubiera salido. Lo único
+ *     que se toca en memoria sin escribirlo es `venceEn` cuando un tic no cambia nada; por eso esa
+ *     diferencia sólo se perdona si los dos plazos —el de memoria y el del disco— ya han vencido,
+ *     que es cuando la siguiente lectura mete el tic igual en los dos mundos.
+ *  4. LOS DESPERTADORES viven en el canal y sólo guardan el código: al saltar sueltan una lectura
+ *     que entra por `conLaMesa`, que carga lo que haga falta. Y una mesa con alguien APARCADO no se
+ *     desaloja: lo cuenta `mientrasSeEspera`, que la ruta pone alrededor de `esperarCambio`.
+ *     Lo que el desalojo NO suelta, y se dice: los AVISOS que el canal guarda de la mesa —una lista
+ *     de como mucho cuarenta, casi siempre uno: «se acabó la partida»—. Se van con el barrido de
+ *     treinta días, como antes; soltarlos al enfriarse dejaría sin ese aviso a quien vuelve con
+ *     una revisión vieja, que es exactamente para quien se guardan.
+ *  5. LA PRESENCIA vive en `mecanicas/presencia.ts`, con su propia caducidad, y el desalojo no la
+ *     toca. Una mesa con un asiento visto en el último minuto no se desaloja.
+ *  6. EL VOLCADO DE `SIGTERM` vuelca lo que hay en memoria; lo desalojado está en disco por
+ *     construcción (punto 2). Y ahora vuelca lo caliente y no un mes de mesas.
+ *  7. `mesasVivas()` Y `/arcade/diagnostico`: `mesas` cuenta lo que hay EN MEMORIA, que es lo que
+ *     vigila fugas, y `memoriaDeLasMesas()` añade cuántas se han leído del disco y cuántas se han
+ *     desalojado. `verify:mesa` y `verify:larga` afirman `mesas > 0` y `candados === 0` después
+ *     de usar mesas, y las que acaban de usar están en memoria.
+ *  8. EL BARRIDO DE TREINTA DÍAS: en memoria, por `ultimoToqueEn`, igual que antes. En el disco,
+ *     sin cargar: la fecha de escritura del fichero escoge las candidatas —todo toque escribe, así
+ *     que lo que no se ha escrito en un mes no se ha tocado en un mes— y sólo de ésas se lee el
+ *     fichero para confirmar su `ultimoToqueEn` antes de borrar, bajo su candado. Lo que no se
+ *     entiende no se borra, como siempre: puede entenderlo la instancia de al lado.
+ *  9. `codigoLibre` no da un código que exista en disco aunque no esté en memoria (`existe`).
+ *     Sin esto, una mesa desalojada podía perder su código —y su fichero— con el `abrir` de un
+ *     desconocido.
+ * 10. `olvidarMesa` borra también el fichero de una mesa que no está en memoria.
+ * 11. UN CÓDIGO ES UN NOMBRE DE FICHERO: sólo se lee del disco lo que tiene forma de código
+ *     (`FORMA_DE_CODIGO`), porque la ruta lo saca de la URL.
+ * 12. Y los almacenes que sólo saben leerlo todo siguen exactamente como estaban: se cargan una vez
+ *     y de ellos no se desaloja nada, porque lo que saliera de la memoria no se podría releer.
+ *
+ * Lo comprueba `verify:mesas-frias`, con el reloj adelantado en proceso y con un proceso nuevo de
+ * verdad sobre una carpeta llena.
+ */
+
+/** Una mesa terminada que nadie ha tocado ni mirado en una hora sale de la memoria. */
+const DESALOJO_TERMINADA_MS = 60 * 60_000;
+
+/** Una sin terminar, en doce: La Larga se juega a un movimiento por mañana. */
+const DESALOJO_EN_CURSO_MS = 12 * 60 * 60_000;
+
+/**
+ * LO ÚLTIMO QUE EL ALMACÉN CONFIRMÓ HABER ESCRITO de cada mesa en memoria.
+ *
+ * Por REFERENCIA y no copiado: `mesa` y `sillas` se sustituyen enteros en cada cambio —el árbitro
+ * devuelve mesas nuevas y este fichero reconstruye la lista de sillas—, así que comparar la
+ * referencia es comparar el contenido, y cuesta nada. Un `WeakMap` para que la foto se vaya con la
+ * mesa cuando la mesa se va.
+ */
+interface LoEscrito {
+  mesa: Mesa;
+  sillas: Silla[];
+  plazoMs: number;
+  venceEn: number | null;
+  turnoDesde: number;
+  abiertaEn: number;
+  ultimoToqueEn: number;
+  modalidad: Modalidad;
+}
+
+const loEscrito = new WeakMap<MesaEnCurso, LoEscrito>();
+
+/** Cuándo se usó por última vez cada mesa en memoria, lectura incluida. No se guarda: es de memoria. */
+const usadaEn = new WeakMap<MesaEnCurso, number>();
+
+/**
+ * Las mesas que se repusieron con la hora de AHORA al leerlas —un fichero sin `abiertaEn`—: volver a
+ * leerlas daría otra hora, así que no son iguales a su fichero hasta que se vuelvan a escribir.
+ */
+const repuestasConLaHora = new WeakSet<MesaEnCurso>();
+
+/** Cuántas lecturas hay aparcadas en cada mesa. Lo lleva `mientrasSeEspera`. */
+const esperando = new Map<string, number>();
+
+let leidasDelDisco = 0;
+let desalojadas = 0;
+
+function fotoDe(m: MesaEnCurso): LoEscrito {
+  return {
+    mesa: m.mesa,
+    sillas: m.sillas,
+    plazoMs: m.plazoMs,
+    venceEn: m.venceEn,
+    turnoDesde: m.turnoDesde,
+    abiertaEn: m.abiertaEn,
+    ultimoToqueEn: m.ultimoToqueEn,
+    modalidad: m.modalidad,
+  };
+}
+
+/** Lo que hay en memoria ES lo que hay en el disco: acaba de leerse, o de escribirse. */
+function anotarLoGuardado(m: MesaEnCurso, foto: LoEscrito = fotoDe(m)): void {
+  loEscrito.set(m, foto);
+}
+
+/**
+ * ESCRIBE UNA MESA Y APUNTA QUÉ SE ESCRIBIÓ. Toda escritura de una mesa pasa por aquí, salvo el
+ * volcado de la despedida.
+ *
+ * La foto se toma AL LLAMAR —el almacén de ficheros serializa en el acto— y se apunta sólo si el
+ * almacén contesta que está escrito. Si falla, la foto vieja se queda, la mesa queda SUCIA, y el
+ * desalojo no la toca: lo que sólo está en memoria no se suelta.
+ */
+async function escribir(m: MesaEnCurso): Promise<void> {
+  const foto = fotoDe(m);
+  await almacen.guardar(m);
+  anotarLoGuardado(m, foto);
+  /* Ya está en el disco con la hora que se le repuso: releerla da lo mismo. */
+  repuestasConLaHora.delete(m);
+}
+
+/**
+ * ¿SE PUEDE SOLTAR ESTA MESA SIN PERDER NADA? O sea: ¿es lo de memoria lo último escrito?
+ *
+ * Con una excepción exacta, y es la única: `venceEn` lo reprograma en memoria un tic que no cambió
+ * nada, y eso no se escribe. Soltarla entonces cambiaría el plazo... salvo que los dos —el de
+ * memoria y el del disco— ya hayan vencido: ahí la siguiente lectura mete el tic en los dos mundos
+ * y los deja iguales. Ver el punto 3 de arriba.
+ */
+function igualQueEnElDisco(m: MesaEnCurso, ahora: number): boolean {
+  const g = loEscrito.get(m);
+  if (g === undefined || repuestasConLaHora.has(m)) return false;
+  const igual =
+    g.mesa === m.mesa &&
+    g.sillas === m.sillas &&
+    g.plazoMs === m.plazoMs &&
+    g.turnoDesde === m.turnoDesde &&
+    g.abiertaEn === m.abiertaEn &&
+    g.ultimoToqueEn === m.ultimoToqueEn &&
+    g.modalidad === m.modalidad;
+  if (!igual) return false;
+  if (g.venceEn === m.venceEn) return true;
+  return g.venceEn !== null && m.venceEn !== null && g.venceEn <= ahora && m.venceEn <= ahora;
+}
+
+/** ¿Se ha visto a alguien de esta mesa en el último minuto? */
+function alguienPresente(m: MesaEnCurso, ahora: number): boolean {
+  const clave = clavePresencia(m.codigo);
+  return m.sillas.some((s) => ahora - senalEnMemoria(clave, s.id) < CONECTADO_MS);
+}
+
+/** ¿Este almacén sabe leer una mesa suelta? Sólo de ése se desaloja. */
+function seLeePorCodigo(): boolean {
+  return almacen.leerUna !== undefined;
+}
+
+/**
+ * SUELTA DE LA MEMORIA LO QUE SE HA ENFRIADO. Del disco no se borra nada.
+ *
+ * Fría es: terminada y sin tocar ni mirar en una hora, o sin terminar en doce —por la última vez
+ * que se ESCRIBIÓ (`ultimoToqueEn`) o que se USÓ, lectura incluida (`usadaEn`), la más reciente—.
+ * Y aun fría, se queda si tiene el candado cogido, una escritura pendiente, alguien aparcado
+ * esperándola, un asiento visto en el último minuto, o algo en memoria que no está en el disco.
+ */
+function desalojarLasFrias(ahora: number): void {
+  if (!seLeePorCodigo()) return;
+  let ahoraSalen = 0;
+  for (const [codigo, m] of mesas) {
+    const umbral = m.mesa.terminada ? DESALOJO_TERMINADA_MS : DESALOJO_EN_CURSO_MS;
+    const tocada = Math.max(m.ultimoToqueEn, usadaEn.get(m) ?? 0);
+    if (ahora - tocada < umbral) continue;
+    if (candados.has(codigo)) continue;
+    /*
+     * Esta línea es un ATAJO y no la garantía, y se dice para que nadie la lea como tal: una
+     * escritura pendiente deja la mesa distinta de su última foto escrita, así que
+     * `igualQueEnElDisco` la retiene igual. Se comprobó quitándola sola: `verify:mesas-frias` sigue
+     * verde. Se queda porque no cuesta nada y dice en una línea lo que si no hay que deducir.
+     */
+    if (pendientesDeGuardar.has(codigo)) continue;
+    if ((esperando.get(codigo) ?? 0) > 0) continue;
+    if (alguienPresente(m, ahora)) continue;
+    if (!igualQueEnElDisco(m, ahora)) continue;
+    mesas.delete(codigo);
+    ahoraSalen++;
+  }
+  if (ahoraSalen > 0) {
+    desalojadas += ahoraSalen;
+    console.log(
+      `[arcade] ${String(ahoraSalen)} mesa(s) fría(s) salen de la memoria; siguen en disco y vuelven ` +
+        'en cuanto alguien las pida.',
+    );
+  }
+}
+
+/**
+ * TRAE UNA MESA DEL DISCO a la memoria. Se llama DENTRO del candado de esa mesa: ver `conLaMesa`.
+ *
+ * Devuelve `undefined` si no hay ninguna con ese código —o no tiene forma de código, o no se puede
+ * leer, que el almacén ya ha dicho en voz alta—, y quien llama contesta `MesaDesconocida`, que es
+ * lo mismo que contestaba cuando todo estaba en memoria.
+ */
+async function traerDelDisco(codigo: string): Promise<MesaEnCurso | undefined> {
+  if (almacen.leerUna === undefined || !FORMA_DE_CODIGO.test(codigo)) return undefined;
+  const m = await almacen.leerUna(codigo);
+  if (m === null) return undefined;
+  if (m.codigo !== codigo) {
+    console.error(
+      `[arcade] El fichero de la mesa ${codigo} guarda dentro la mesa ${String(m.codigo)}. Se ignora: ` +
+        'una mesa que no es la que dice su nombre no se sabe de quién es.',
+    );
+    return undefined;
+  }
+  leidasDelDisco++;
+  mesas.set(codigo, m);
+  anotarLoGuardado(m);
+  if (cerrarAlRecuperar(m)) {
+    try {
+      await escribir(m);
+    } catch (error) {
+      console.error(`[arcade] No se ha podido guardar el cierre de la mesa ${codigo}:`, error);
     }
   }
+  return m;
+}
+
+/**
+ * MIENTRAS ALGUIEN ESPERA UNA MESA, ESA MESA NO SE DESALOJA.
+ *
+ * Lo pone la ruta alrededor de `esperarCambio`. Esta capa no conoce el canal —la cabecera dice por
+ * qué— y no hace falta: quien espera le pasa su espera, y aquí sólo se cuenta que hay alguien
+ * aparcado. La cuenta se deshace pase lo que pase, con un `finally`: una entrada que no se borra
+ * es una fuga y además una mesa que ya no se desalojaría nunca.
+ */
+export async function mientrasSeEspera<T>(codigo: string, esperar: () => Promise<T>): Promise<T> {
+  esperando.set(codigo, (esperando.get(codigo) ?? 0) + 1);
+  try {
+    return await esperar();
+  } finally {
+    const quedan = (esperando.get(codigo) ?? 1) - 1;
+    if (quedan <= 0) esperando.delete(codigo);
+    else esperando.set(codigo, quedan);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// EL BARRIDO DEL DISCO, SIN CARGAR NADA
+// ---------------------------------------------------------------------------
+
+let ultimoBarridoDelDiscoEn = 0;
+let barriendoElDisco: Promise<void> | null = null;
+
+/** Arranca el barrido del disco si toca, SIN esperarlo: la petición que lo dispara no paga nada. */
+function barrerElDiscoSiToca(ahora: number): void {
+  if (almacen.viejas === undefined || barriendoElDisco !== null) return;
+  if (ahora - ultimoBarridoDelDiscoEn < CADA_CUANTO_SE_BARRE_MS) return;
+  ultimoBarridoDelDiscoEn = ahora;
+  barriendoElDisco = barrerElDisco(ahora)
+    .catch((error: unknown) => {
+      console.error('[arcade] El barrido del disco de las mesas ha fallado; se reintenta en una hora:', error);
+    })
+    .finally(() => {
+      barriendoElDisco = null;
+    });
+}
+
+/**
+ * BORRA DEL DISCO LO QUE LLEVA UN MES SIN TOCARSE Y NO ESTÁ EN MEMORIA.
+ *
+ * Lo que está en memoria lo juzga `barrerLasViejas` por su `ultimoToqueEn`; aquí sólo se mira lo
+ * que no está. La fecha del fichero escoge, sin abrirlo, y de lo escogido se lee el fichero para
+ * confirmar la fecha que de verdad manda —`ultimoToqueEn`— antes de borrar: una copia restaurada
+ * con fechas raras no se lleva por delante una partida viva. Todo bajo el candado de cada mesa, y
+ * volviendo a mirar dentro que siga sin estar en memoria.
+ */
+async function barrerElDisco(ahora: number): Promise<void> {
+  const viejas = almacen.viejas;
+  const leerUna = almacen.leerUna;
+  if (viejas === undefined || leerUna === undefined) return;
+  for (const codigo of await viejas(ahora - OLVIDO_MS)) {
+    if (mesas.has(codigo)) continue;
+    await conElCandado(codigo, async () => {
+      if (mesas.has(codigo)) return;
+      const m = await leerUna(codigo);
+      /* Lo que no se entiende no se borra: puede entenderlo la instancia de al lado. */
+      if (m === null || !(ahora - m.ultimoToqueEn > OLVIDO_MS)) return;
+      try {
+        await almacen.borrar(codigo);
+      } catch (error) {
+        anotarElFallo(codigo, error);
+        return;
+      }
+      /* SE DICE, como lo que se borra de la memoria: es borrar una partida entera. */
+      console.log(
+        `[arcade] Se olvida la mesa ${codigo} desde el disco: llevaba ${String(
+          Math.round((ahora - m.ultimoToqueEn) / 86_400_000),
+        )} día(s) sin que nadie la tocara (el límite son ${String(OLVIDO_MS / 86_400_000)}).`,
+      );
+      olvidarPresencia(clavePresencia(codigo));
+      avisarAlCanalDeQueSeOlvida(codigo);
+    });
+  }
+}
+
+/**
+ * BARRE YA, las dos cosas, y espera a que acabe el disco.
+ *
+ * El servidor no la llama: barre solo, colgado de la actividad (`barrerSiTocaPorReloj`). Existe
+ * para quien necesita barrer en un momento conocido —los comprobadores— sin esperar una hora, y no
+ * hace nada distinto de lo que haría el barrido que salta solo.
+ */
+export async function barrerAhora(): Promise<void> {
+  cargar();
+  const ahora = Date.now();
+  if (barriendoElDisco !== null) await barriendoElDisco;
+  barrerLasViejas(ahora);
+  ultimoBarridoDelDiscoEn = 0;
+  barrerElDiscoSiToca(ahora);
+  if (barriendoElDisco !== null) await barriendoElDisco;
+}
+
+/**
+ * CÓMO VA LA MEMORIA, para el diagnóstico: cuántas hay en ella, cuántas se han leído del disco y
+ * cuántas se han soltado desde que arrancó el proceso. Es lo que dice, desde fuera, que un proceso
+ * nuevo no ha leído la carpeta entera y que lo frío sale.
+ */
+export function memoriaDeLasMesas(): { enMemoria: number; leidasDelDisco: number; desalojadas: number } {
+  return { enMemoria: mesas.size, leidasDelDisco, desalojadas };
 }
 
 // ---------------------------------------------------------------------------
@@ -1415,11 +1911,15 @@ export function saludDelAlmacen(): {
   carpetaDeclarada: boolean;
   fallos: number;
   ultimoFallo?: { cuando: number; codigo: string; que: string };
+  fallosAlLeer: number;
+  ultimoFalloAlLeer?: { cuando: number; codigo: string; que: string };
 } {
   return {
     carpetaDeclarada: (process.env.MESAS_DIR?.trim() ?? '') !== '',
     fallos: fallosAlGuardar,
     ultimoFallo: ultimoFalloAlGuardar,
+    fallosAlLeer,
+    ultimoFalloAlLeer,
   };
 }
 
@@ -1442,6 +1942,21 @@ function anotarElFallo(codigo: string, error: unknown): void {
 }
 
 /**
+ * Y LO QUE FALLÓ AL LEER, que desde que se lee por código también tiene que verse desde fuera.
+ *
+ * Una mesa que no se puede leer contesta lo mismo que una que no existe —un 404—, así que sin esta
+ * cuenta el diagnóstico diría `fallos: 0` con la carpeta ilegible: la combinación que no le deja a
+ * nadie ni empezar a mirar. Quien llama ya ha escrito en el registro el porqué, con la ruta.
+ */
+let fallosAlLeer = 0;
+let ultimoFalloAlLeer: { cuando: number; codigo: string; que: string } | undefined;
+
+function anotarElFalloAlLeer(codigo: string, error: unknown): void {
+  fallosAlLeer++;
+  ultimoFalloAlLeer = { cuando: Date.now(), codigo, que: claseDelFallo(error) };
+}
+
+/**
  * Guarda ESTA mesa, por frecuencia. Lanza `AlmacenNoGuarda` si no ha podido.
  *
  * Antes recibía solo el manifiesto y guardaba TODAS las mesas del proceso. Ver
@@ -1455,7 +1970,7 @@ async function guardar(manifiesto: ManifiestoDeArcade, m: MesaEnCurso): Promise<
     return;
   }
   try {
-    await almacen.guardar(m);
+    await escribir(m);
   } catch (error) {
     anotarElFallo(m.codigo, error);
     throw new AlmacenNoGuarda(m.codigo, error);
@@ -1487,7 +2002,7 @@ async function volcarLoPendiente(): Promise<void> {
     const m = mesas.get(codigo);
     if (!m) continue;
     try {
-      await almacen.guardar(m);
+      await escribir(m);
     } catch (error) {
       anotarElFallo(codigo, error);
     }
@@ -1606,6 +2121,27 @@ export async function conLaMesa<T>(
   hacer: (m: MesaEnCurso) => T | Promise<T>,
 ): Promise<T> {
   cargar();
+  return conElCandado(codigo, async () => {
+    /*
+     * ═══ Y SI NO ESTÁ EN MEMORIA, SE TRAE DEL DISCO: AQUÍ, CON EL CANDADO COGIDO ═══
+     *
+     * Con el almacén de ficheros, lo que no está en memoria puede estar en el disco: una mesa
+     * fría que se desalojó, o cualquier mesa en un proceso recién arrancado. Se lee DENTRO del
+     * candado, así que dos peticiones a la misma mesa fría la leen una vez: la segunda espera su
+     * turno y ya la encuentra en memoria. Ver «La memoria», arriba.
+     */
+    const m = mesas.get(codigo) ?? (await traerDelDisco(codigo));
+    if (!m) throw new MesaDesconocida(codigo);
+    usadaEn.set(m, Date.now());
+    return hacer(m);
+  });
+}
+
+/**
+ * EL CANDADO A SECAS, sin mesa: lo usan `conLaMesa` y quien borra —el barrido del disco y
+ * `olvidarMesa`—, que tienen que hacer cola con los demás aunque la mesa no esté en memoria.
+ */
+async function conElCandado<T>(codigo: string, hacer: () => T | Promise<T>): Promise<T> {
   const anterior = candados.get(codigo) ?? Promise.resolve();
   let liberar!: () => void;
   const turno = new Promise<void>((r) => {
@@ -1616,9 +2152,7 @@ export async function conLaMesa<T>(
   await anterior;
 
   try {
-    const m = mesas.get(codigo);
-    if (!m) throw new MesaDesconocida(codigo);
-    return await hacer(m);
+    return await hacer();
   } finally {
     liberar();
     if (candados.get(codigo) === miVez) candados.delete(codigo);
@@ -2118,6 +2652,7 @@ export async function abrir(datos: {
   const modalidad = modalidadValida(datos.modalidad);
   const ahora = Date.now();
   barrerLasViejas(ahora);
+  barrerElDiscoSiToca(ahora);
 
   /*
    * El manifiesto se pide ANTES de nada. Abrir una mesa de un arcade que no está
@@ -2859,22 +3394,34 @@ export async function cerrar(codigo: string, llave: string | null): Promise<Vist
  */
 export async function olvidarMesa(codigo: string): Promise<void> {
   cargar();
-  const m = mesas.get(codigo);
-  if (!m) return;
-  mesas.delete(codigo);
-  pendientesDeGuardar.delete(codigo);
-  olvidarPresencia(clavePresencia(codigo));
   /*
-   * El fallo al borrar se anota y no sube: la mesa ya está fuera de la memoria y
-   * de la partida, y quien pidió olvidarla no puede hacer nada con «el fichero
-   * sigue ahí». Lo que sí importa es que salga en el diagnóstico, porque una
-   * mesa que vuelve al arrancar es exactamente lo que se creía haber borrado.
+   * BAJO SU CANDADO, desde que las mesas se leen del disco a demanda: sin él, una lectura que
+   * estuviera trayendo esta mesa del disco la volvería a meter en memoria justo después de
+   * olvidarla, y cualquier escritura suya resucitaría el fichero.
    */
-  try {
-    await almacen.borrar(codigo);
-  } catch (error) {
-    anotarElFallo(codigo, error);
-  }
+  await conElCandado(codigo, async () => {
+    const m = mesas.get(codigo);
+    /*
+     * Y si no está en memoria puede estar en el disco, desalojada por fría: olvidarla es borrar
+     * también ese fichero, o volvería en cuanto alguien la pidiera.
+     */
+    const soloEnDisco = m === undefined && FORMA_DE_CODIGO.test(codigo) && almacen.existe?.(codigo) === true;
+    if (m === undefined && !soloEnDisco) return;
+    mesas.delete(codigo);
+    pendientesDeGuardar.delete(codigo);
+    olvidarPresencia(clavePresencia(codigo));
+    /*
+     * El fallo al borrar se anota y no sube: la mesa ya está fuera de la memoria y
+     * de la partida, y quien pidió olvidarla no puede hacer nada con «el fichero
+     * sigue ahí». Lo que sí importa es que salga en el diagnóstico, porque una
+     * mesa que vuelve al arrancar es exactamente lo que se creía haber borrado.
+     */
+    try {
+      await almacen.borrar(codigo);
+    } catch (error) {
+      anotarElFallo(codigo, error);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

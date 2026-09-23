@@ -84,7 +84,8 @@
     "verify:arcade-de-fuera": "tsx scripts/verificar-arcade-de-fuera.ts",
     "verify:modalidad": "tsx scripts/verificar-modalidad.ts",
     "verify:lectura-barata": "tsx scripts/verificar-lectura-barata.ts",
-    "verify:cors": "tsx scripts/verificar-cors.ts"
+    "verify:cors": "tsx scripts/verificar-cors.ts",
+    "verify:mesas-frias": "tsx scripts/verificar-mesas-frias.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

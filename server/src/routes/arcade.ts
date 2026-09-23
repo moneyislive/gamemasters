@@ -54,7 +54,9 @@ import {
   FiguraMalEscrita,
   MesaDesconocida,
   MesaLlena,
+  memoriaDeLasMesas,
   mesasVivas,
+  mientrasSeEspera,
   mirar,
   ModalidadDesconocida,
   ModalidadNoAdmitida,
@@ -778,7 +780,12 @@ router.get('/arcade/mesas/:codigo', contadorDeCodigos, async (req, res) => {
     if (primera.venceEn !== null && !primera.terminada) {
       elCanal().despertarAlVencer(codigo, primera.venceEn - Date.now());
     }
-    await elCanal().esperarCambio(codigo);
+    /*
+     * Y MIENTRAS ESTÁ APARCADA, LA MESA NO SE SUELTA DE LA MEMORIA. `mesas.ts` desaloja lo frío, y
+     * una mesa con alguien esperándola no lo está: soltarla sería volver a leerla del disco en
+     * cuanto esta espera despierte. La capa de mesa no conoce el canal, así que se le pasa la espera.
+     */
+    await mientrasSeEspera(codigo, () => elCanal().esperarCambio(codigo));
 
     const segunda = await revisionDe(codigo, llave);
     if (segunda.rev !== desde) {
@@ -1264,6 +1271,15 @@ router.get('/arcade/presupuesto', (_req, res) => {
  * Así que sale la CARPETA que se está usando —para poder compararla con la del
  * despliegue de un vistazo— y la cuenta de fallos con el último. Sin la carpeta,
  * el número de fallos no dice dónde mirar.
+ *
+ * ═══ Y `mesas` CUENTA LAS QUE HAY EN MEMORIA, QUE YA NO SON TODAS ═══
+ *
+ * Desde que las mesas se leen del disco a demanda y lo frío sale de la memoria,
+ * `mesas` son las calientes: lo que vigila fugas. `memoria` dice además cuántas se
+ * han traído del disco y cuántas se han soltado desde que arrancó el proceso, que
+ * es lo que dice desde fuera que un proceso nuevo NO ha leído la carpeta entera.
+ * Contar las del disco aquí costaría recorrer la carpeta en cada petición, y esta
+ * ruta no pide credencial.
  */
 router.get('/arcade/diagnostico', (_req, res) => {
   res.json({
@@ -1272,6 +1288,7 @@ router.get('/arcade/diagnostico', (_req, res) => {
     despertadores: despertadoresVivos(),
     almacen: saludDelAlmacen(),
     avisosDeArcade: avisosAbiertos(),
+    memoria: memoriaDeLasMesas(),
   });
 });
 
