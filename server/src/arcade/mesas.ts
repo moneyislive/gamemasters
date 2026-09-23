@@ -226,6 +226,7 @@ import {
   enCuarentena,
   pesarElEstado,
 } from './presupuesto';
+import { admiteBotas } from './modalidades';
 import { marcarPresencia, olvidarPresencia, senalEnMemoria } from '../mecanicas/presencia';
 import {
   hayFinal,
@@ -363,6 +364,91 @@ function figuraValida(figura: string | undefined): string | undefined {
   return figura;
 }
 
+/**
+ * CÓMO SE JUEGA UNA MESA: desde arriba, o bajando al tablero. Se elige al abrirla y NO CAMBIA.
+ *
+ * ═══ ES UNA DECISIÓN DE MIGUEL Y ES LA QUE MÁS SIMPLIFICA ═══
+ *
+ * `docs/BOOTS-ON-BOARD.md`, decisión 3 del 20-sep-2026: al abrir mesa se elige `normal` —lo de
+ * hoy: el tablero desde arriba, con zoom en las animaciones— o `botas` —Boots on Board: bajar al
+ * tablero con avatares—. Y no se cambia a mitad, ni para subir ni para bajar: a nadie se le echa
+ * de una partida empezada porque le empeore la conexión. Por eso aquí no hay ningún verbo que la
+ * toque: `abrir` la pone y nada más la escribe.
+ *
+ * ═══ NO ES UNA REGLA DEL JUEGO, Y POR ESO NO ENTRA EN NADA DE LO QUE SE REEJECUTA ═══
+ *
+ * El reductor es el mismo en las dos modalidades, el estado es el mismo y el diario es el mismo:
+ * la modalidad no va en el contexto del movimiento ni dentro del estado, así que la misma partida
+ * reejecutada da exactamente lo mismo en una mesa `normal` que en una `botas`. Es un dato de la
+ * MESA, como el plazo: lo decide quien la abre y lo guarda la autoridad.
+ *
+ * ═══ Y ESTA CAPA NO SABE QUÉ JUEGOS LA ADMITEN ═══
+ *
+ * Lo pregunta a `admiteBotas`, que vive fuera del núcleo (`modalidades.ts`) porque saberlo es
+ * saber de juegos. Aquí sólo se exige la FORMA —una de las dos palabras, tal cual— y se rechaza
+ * en vez de arreglarse, por lo mismo que la figura: un «Botas» que se normalizara en silencio
+ * sería una mesa abierta en una modalidad que nadie pidió con esas letras.
+ */
+export type Modalidad = 'normal' | 'botas';
+
+/** Las dos, en el orden en que se ofrecen. La que no se dice es la primera. */
+export const MODALIDADES: readonly Modalidad[] = ['normal', 'botas'];
+
+/** ¿Es una modalidad, tal cual y sin arreglar? La misma pregunta para lo que llega y lo que se lee. */
+export function esModalidad(valor: unknown): valor is Modalidad {
+  return valor === 'normal' || valor === 'botas';
+}
+
+/**
+ * LA MODALIDAD PEDIDA NO EXISTE. 400: lo mandado está mal escrito y reintentarlo igual no lo
+ * arregla. Lleva el valor recortado, por lo mismo que `FiguraMalEscrita`: es texto que elige quien
+ * llama y se le devuelve.
+ */
+export class ModalidadDesconocida extends Error {
+  constructor(public readonly pedida: unknown) {
+    super(
+      `«${String(typeof pedida === 'string' ? pedida : JSON.stringify(pedida)).slice(0, 40)}» no es ` +
+        'una modalidad de mesa. Son dos, escritas tal cual: «normal» (el tablero desde arriba) o ' +
+        '«botas» (bajar al tablero). No se corrige sola: se manda bien escrita, o no se manda y la ' +
+        'mesa se abre normal.',
+    );
+    this.name = 'ModalidadDesconocida';
+  }
+}
+
+/**
+ * ESTE JUEGO NO SE PUEDE JUGAR BAJANDO AL TABLERO. 400 y no 409: no es la mesa la que está en un
+ * estado que no deja, es la petición la que pide algo que este juego no tiene. Ver
+ * `modalidades.ts`: hoy no lo admite ninguno, porque ninguno ha declarado todavía su mundo.
+ */
+export class ModalidadNoAdmitida extends Error {
+  constructor(
+    public readonly arcade: ArcadeId,
+    public readonly nombre: string,
+    public readonly modalidad: Modalidad,
+  ) {
+    super(
+      `«${nombre}» no se puede jugar en modalidad «${modalidad}» en este servidor: para bajar al ` +
+        'tablero el juego tiene que declarar su mundo, y éste no lo ha declarado. La mesa se ' +
+        'puede abrir en modalidad «normal».',
+    );
+    this.name = 'ModalidadNoAdmitida';
+  }
+}
+
+/**
+ * La modalidad que llega de fuera, comprobada. `undefined` es «no dijo», y eso es `normal`.
+ *
+ * Aquí, al revés que con el plazo, lo mal escrito NO cae al defecto: un plazo raro por defecto es
+ * un producto razonable, pero una mesa pedida en `"Botas"` y abierta en `normal` es alguien que
+ * cree haber pedido una cosa y tiene otra, sin forma de saberlo. Es el razonamiento de la figura.
+ */
+function modalidadValida(pedida: unknown): Modalidad {
+  if (pedida === undefined) return 'normal';
+  if (!esModalidad(pedida)) throw new ModalidadDesconocida(pedida);
+  return pedida;
+}
+
 /** Una mesa viva, con todo lo que la autoridad guarda de ella. */
 export interface MesaEnCurso {
   /** El código con el que se entra. Es también el identificador de la mesa. */
@@ -436,12 +522,35 @@ export interface MesaEnCurso {
   abiertaEn: number;
   /** Cuándo se tocó por última vez. Para lo mismo. */
   ultimoToqueEn: number;
+  /**
+   * CÓMO SE JUEGA: `normal` o `botas`. Lo pone `abrir` y no lo toca nadie más. Ver `Modalidad`.
+   *
+   * ═══ SE GUARDA SIN SUBIR LA VERSIÓN DEL FICHERO, Y SE DICE POR QUÉ ═══
+   *
+   * La regla escrita en `Guardado` es que el número sube cuando un lector viejo interpretaría MAL
+   * el fichero, no cuando hay un campo nuevo. Un lector de antes de este campo lee una mesa
+   * `botas` como una mesa normal: el mismo reductor, el mismo estado y el mismo diario, sin bajar
+   * al tablero. Eso es una partida jugada desde arriba, no una partida mal leída. Y además hoy no
+   * puede existir ninguna: `admiteBotas` no admite todavía a ningún juego.
+   *
+   * En el otro sentido tampoco hace falta el número: un fichero de antes llega sin el campo, y
+   * `alDiaDesdeElDisco` lo lee como `normal`, que es exactamente lo que era.
+   */
+  modalidad: Modalidad;
 }
 
 /** Lo que se le enseña a quien mira una mesa. */
 export interface VistaDeMesa {
   codigo: string;
   arcade: ArcadeId;
+  /**
+   * CÓMO SE JUEGA ESTA MESA. Ver `Modalidad`.
+   *
+   * Sale en la vista porque el cliente la necesita para decidir QUÉ pinta —el tablero desde
+   * arriba o el mundo para bajar a él— y porque es de la mesa y no de nadie: no lleva nada de
+   * ningún asiento, y es la misma para todos los que miran, espectador incluido.
+   */
+  modalidad: Modalidad;
   /** La revisión de AHORA. Es la que hay que devolver al mover. */
   rev: number;
   /** En qué tic va. Con `tickHz: 0` es cuántos plazos se han pasado. */
@@ -835,6 +944,27 @@ function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string): MesaEnCurs
     for (const silla of m.sillas) {
       if (silla.figura !== undefined && !tieneFormaDeFigura(silla.figura)) delete silla.figura;
     }
+  }
+  /*
+   * ═══ Y LA MODALIDAD, QUE TAMPOCO LA TRAEN LAS MESAS DE ANTES ═══
+   *
+   * Sin el campo, la mesa es `normal`, porque es lo que era: antes de que existiera no había otra
+   * forma de jugar. Y se mira el VALOR, como con la figura: uno que no sea ninguna de las dos
+   * palabras —un fichero escrito a mano, o por una versión con una tercera modalidad— se lee
+   * también como `normal`, que es la única que admite cualquier juego. Pero ESO SE DICE: a
+   * diferencia de la figura, que es presentación, la modalidad decide cómo se juega, y cambiarla
+   * en silencio al leer sería el cambio de modalidad a mitad de partida que la decisión prohíbe.
+   */
+  if (m.modalidad === undefined) {
+    m.modalidad = 'normal';
+  } else if (!esModalidad(m.modalidad)) {
+    console.error(
+      `[arcade] La mesa guardada en «${nombre}» trae una modalidad que este servidor no conoce ` +
+        `(${JSON.stringify(m.modalidad)}; se conocen ${MODALIDADES.join(', ')}). Se lee como ` +
+        '«normal», que es la que admite cualquier juego, y el fichero no se toca hasta que la ' +
+        'mesa se vuelva a guardar.',
+    );
+    m.modalidad = 'normal';
   }
   return m;
 }
@@ -1967,15 +2097,24 @@ export const PLAZO_MAXIMO_S = 7 * 24 * 60 * 60;
  * `figura` es la del asiento de quien abre, si ya la eligió. Se comprueba ANTES
  * de nada, con el manifiesto: una figura mal escrita tiene que fallar en la
  * petición que abre y sin dejar mesa detrás, no después de repartir un código.
+ *
+ * `modalidad` es la de la mesa, y la única vez que se escribe es aquí: ver
+ * `Modalidad`. Su FORMA se comprueba antes de nada, con la figura; si el juego
+ * la ADMITE se pregunta después del manifiesto, a `admiteBotas` —que vive
+ * fuera del núcleo— y AQUÍ Y NO SÓLO EN LA RUTA: la ruta lo pregunta antes
+ * para contestar pronto y con su motivo, y esto es lo que impide que cualquier
+ * otra puerta que llame a `abrir` se lo salte.
  */
 export async function abrir(datos: {
   arcade: ArcadeId;
   nombre: string;
   plazoSegundos?: number;
   figura?: string;
+  modalidad?: Modalidad;
 }): Promise<{ mesa: MesaEnCurso; silla: Silla }> {
   cargar();
   const figura = figuraValida(datos.figura);
+  const modalidad = modalidadValida(datos.modalidad);
   const ahora = Date.now();
   barrerLasViejas(ahora);
 
@@ -1993,6 +2132,14 @@ export async function abrir(datos: {
    * responde desde la fase 0 y que no le hacía nadie: ver `ArcadeSinMesa`.
    */
   if (!necesitaMesa(manifiesto)) throw new ArcadeSinMesa(datos.arcade, manifiesto.nombre);
+
+  /*
+   * Y SI SE PIDE BAJAR AL TABLERO, QUE ESTE JUEGO SE PUEDA PISAR. Antes de repartir código: una
+   * mesa `botas` de un juego sin mundo no se abre, igual que no se abre la de un juego de aparato.
+   */
+  if (modalidad === 'botas' && !admiteBotas(datos.arcade)) {
+    throw new ModalidadNoAdmitida(datos.arcade, manifiesto.nombre, modalidad);
+  }
 
   const codigo = codigoLibre();
   const silla = sillaNueva(datos.nombre, figura);
@@ -2023,6 +2170,7 @@ export async function abrir(datos: {
     turnoDesde: ahora,
     abiertaEn: ahora,
     ultimoToqueEn: ahora,
+    modalidad,
   };
   if (enCurso.plazoMs > 0) enCurso.venceEn = ahora + enCurso.plazoMs;
 
@@ -2276,6 +2424,65 @@ export async function mirar(codigo: string, llave: string | null): Promise<Vista
 
     return vistaDe(m, yo);
   });
+}
+
+/**
+ * QUIÉN SE SIENTA CON ESTA LLAVE, sin mirar la partida. Lo que devuelve `quienEsLaLlave`.
+ *
+ * La silla SIN la llave —que es el secreto y no sale de aquí por ningún camino— y la modalidad
+ * de la mesa, que es lo otro que necesita saber quien vaya a dejar pasar a alguien al tablero.
+ * Es una copia: tocarla no toca la mesa.
+ */
+export interface AsientoReconocido {
+  id: AsientoId;
+  nombre: string;
+  /** Sólo si la eligió, y como clave ausente si no: igual que en `VistaDeMesa.asientos`. */
+  figura?: string;
+  modalidad: Modalidad;
+}
+
+/**
+ * ¿DE QUIÉN ES ESTA LLAVE EN ESTA MESA? De sólo lectura, y para el canal de Boots on Board.
+ *
+ * ═══ POR QUÉ HACE FALTA UN ACCESO QUE NO SEA `mirar` ═══
+ *
+ * El canal que llegará con la modalidad `botas` —posiciones a 10-30 Hz, `docs/BOOTS-ON-BOARD.md`
+ * §2— tiene que saber, al abrirse, si quien llama está sentado a esta mesa y con qué asiento. Con
+ * `mirar` lo sabría, pero `mirar` es una LECTURA DE LA PARTIDA: mete el tic si venció el plazo,
+ * marca la presencia y, sobre todo, PROYECTA, que es lo caro del servidor y código del juego
+ * corriendo en el hilo. Nada de eso tiene que ver con reconocer una llave.
+ *
+ * Así que esto hace lo mínimo: coge la mesa por la puerta de siempre —el candado, y el mismo
+ * «esta mesa no existe» que las demás— y compara la llave. No mete ningún tic, no marca
+ * presencia, no proyecta y no escribe nada: la mesa queda exactamente como estaba, revisión
+ * incluida. Lo comprueba `verify:modalidad`.
+ *
+ * ═══ `null` SI LA MESA NO EXISTE Y `null` SI LA LLAVE NO ES DE ELLA ═══
+ *
+ * Las dos respuestas son la misma a propósito. Un acceso que distinguiera «esa mesa no existe» de
+ * «esa llave no es de esa mesa» sería otro oráculo de códigos, como el que `contadorDeCodigos`
+ * cierra en las seis rutas con código. A quien llama le basta con saber que no le reconoce nadie.
+ */
+export async function quienEsLaLlave(
+  codigo: string,
+  llave: string | null,
+): Promise<AsientoReconocido | null> {
+  if (llave === null || llave.length === 0) return null;
+  try {
+    return await conLaMesa(codigo, (m) => {
+      const silla = m.sillas.find((s) => s.llave === llave);
+      if (silla === undefined) return null;
+      return {
+        id: silla.id,
+        nombre: silla.nombre,
+        ...(silla.figura === undefined ? {} : { figura: silla.figura }),
+        modalidad: m.modalidad,
+      };
+    });
+  } catch (error) {
+    if (error instanceof MesaDesconocida) return null;
+    throw error;
+  }
 }
 
 /**
@@ -2646,6 +2853,7 @@ function vistaDe(m: MesaEnCurso, yo: AsientoId | null, motivo: string | null = n
     opciones: loQueSePuedeHacer(m.mesa.arcade, vista, yo),
     codigo: m.codigo,
     arcade: m.mesa.arcade,
+    modalidad: m.modalidad,
     rev: m.mesa.rev,
     tic: m.mesa.tic,
     terminada: m.mesa.terminada,

@@ -81,7 +81,8 @@
     "verify:nucleo-quieto": "tsx scripts/verificar-nucleo-quieto.ts",
     "oro:arcade": "tsx scripts/oro-arcade.ts",
     "verify:presupuesto": "tsx scripts/verificar-presupuesto.ts",
-    "verify:arcade-de-fuera": "tsx scripts/verificar-arcade-de-fuera.ts"
+    "verify:arcade-de-fuera": "tsx scripts/verificar-arcade-de-fuera.ts",
+    "verify:modalidad": "tsx scripts/verificar-modalidad.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

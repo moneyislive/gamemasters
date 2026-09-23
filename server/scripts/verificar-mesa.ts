@@ -2649,11 +2649,31 @@ try {
      *   · Y LO QUE NO ES. No es `terminada`: una mesa puede estar empezada y no
      *     terminada, y una recién abierta no está ni lo uno ni lo otro.
      */
+    /*
+     * ═══ Y `modalidad` ENTRÓ CON BOOTS ON BOARD, QUINTA VEZ QUE ESTA LÍNEA SE PONE ROJA ═══
+     *
+     * Lo que se vino a pensar, escrito para no volver a pensarlo:
+     *
+     *   · QUÉ ES. Cómo se juega la mesa: `normal` —el tablero desde arriba— o `botas`
+     *     —bajar al tablero—. Lo elige quien abre y no cambia nunca (decisión de Miguel
+     *     del 20-sep-2026, `docs/BOOTS-ON-BOARD.md`).
+     *   · POR QUÉ PUEDE SALIR. Es una palabra de la MESA, igual para todos los que
+     *     miran, espectador incluido: no lleva nada de ningún asiento ni del estado del
+     *     juego, que es el mismo en las dos modalidades. Y el cliente la necesita para
+     *     saber QUÉ pintar sin abrir la vista del juego.
+     *   · Y LO QUE NO ES. No es una preferencia de quien mira: no hay verbo que la
+     *     cambie, y por eso no depende de la llave con la que se lea.
+     */
     comprobar(
       'la mesa manda exactamente estos campos',
       campos ===
-        'arcade,asientos,codigo,empezada,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
+        'arcade,asientos,codigo,empezada,modalidad,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
       campos,
+    );
+    comprobar(
+      'y una mesa abierta sin decir modalidad es normal',
+      r.datos.mesa.modalidad === 'normal',
+      r.datos.mesa.modalidad,
     );
     comprobar(
       'y al MIRAR la mesa el motivo viene vacío: es de un intento, no de la partida',
@@ -3117,7 +3137,7 @@ try {
     const camposB = Object.keys(antesDeEmpezar.datos.mesa).sort().join(',');
     comprobar(
       'y la mesa del Burgo manda exactamente los mismos campos que las demás: la lista es de la MESA, no del juego',
-      camposB === 'arcade,asientos,codigo,empezada,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
+      camposB === 'arcade,asientos,codigo,empezada,modalidad,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
       camposB,
     );
 

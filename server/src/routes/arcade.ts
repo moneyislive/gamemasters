@@ -50,11 +50,14 @@ import {
   AlmacenNoGuarda,
   ArcadeSinMesa,
   cerrar,
+  esModalidad,
   FiguraMalEscrita,
   MesaDesconocida,
   MesaLlena,
   mesasVivas,
   mirar,
+  ModalidadDesconocida,
+  ModalidadNoAdmitida,
   mover,
   MovimientoReservado,
   olvidarMesa,
@@ -64,7 +67,8 @@ import {
   vestir,
   candadosDeMesaVivos,
 } from '../arcade/mesas';
-import type { VistaDeMesa } from '../arcade/mesas';
+import type { Modalidad, VistaDeMesa } from '../arcade/mesas';
+import { admiteBotas } from '../arcade/modalidades';
 import {
   anunciarInicio,
   ArcadeSinRecords,
@@ -179,6 +183,25 @@ function contestarElFallo(error: unknown, res: Response, vista?: VistaDeMesa): b
      * «Caballero» no vale por la mayúscula es que se le diga aquí.
      */
     res.status(400).json({ error: error.message, motivo: 'figura-mal-escrita' });
+    return true;
+  }
+  if (error instanceof ModalidadDesconocida) {
+    /* 400 por lo mismo que la figura: mal escrita, y no se arregla sola. */
+    res.status(400).json({ error: error.message, motivo: 'modalidad-desconocida' });
+    return true;
+  }
+  if (error instanceof ModalidadNoAdmitida) {
+    /*
+     * 400 y no 409: no es la mesa la que está en un estado que no deja —no hay mesa todavía—, es
+     * la petición la que pide algo que este juego no tiene. Normalmente lo contesta antes la
+     * propia ruta de abrir; esto es por si llega por `abrir` desde otro sitio.
+     */
+    res.status(400).json({
+      error: error.message,
+      motivo: 'modalidad-no-admitida',
+      arcade: error.arcade,
+      modalidad: error.modalidad,
+    });
     return true;
   }
   if (error instanceof AlmacenNoGuarda) {
@@ -379,6 +402,46 @@ function figuraDelCuerpo(
 }
 
 /**
+ * La `modalidad` del cuerpo, comprobada ENTERA: forma y si este juego la admite.
+ *
+ * ═══ POR QUÉ LA RUTA LO PREGUNTA, SI `abrir` TAMBIÉN LO PREGUNTA ═══
+ *
+ * Porque son dos cosas distintas y hacen falta las dos. `abrir` lo exige para que ninguna otra
+ * puerta se lo salte —la mesa es la autoridad—, y esto lo contesta ANTES, en la petición, con el
+ * motivo dicho en el idioma de la petición: qué mandaste, qué vale, y qué juego no la tiene. Es
+ * la misma defensa en dos capas que el tope de la carga: la ruta corta pronto y la mesa no se fía.
+ *
+ * Sin `modalidad` la mesa es `normal`, que es lo que eran todas antes de que existiera el campo:
+ * un cliente empaquetado antes que este servidor no lo manda, y eso no puede ser un error.
+ */
+function modalidadDelCuerpo(
+  cuerpo: { modalidad?: unknown },
+  arcade: string,
+  res: Response,
+): { modalidad: Modalidad } | null {
+  if (cuerpo.modalidad === undefined) return { modalidad: 'normal' };
+  if (!esModalidad(cuerpo.modalidad)) {
+    res.status(400).json({
+      error: new ModalidadDesconocida(cuerpo.modalidad).message,
+      motivo: 'modalidad-desconocida',
+    });
+    return null;
+  }
+  if (cuerpo.modalidad === 'botas' && !admiteBotas(arcade)) {
+    res.status(400).json({
+      error:
+        `«${arcade}» no se puede jugar bajando al tablero en este servidor: el juego no ha ` +
+        'declarado su mundo. La mesa se puede abrir en modalidad «normal».',
+      motivo: 'modalidad-no-admitida',
+      arcade,
+      modalidad: cuerpo.modalidad,
+    });
+    return null;
+  }
+  return { modalidad: cuerpo.modalidad };
+}
+
+/**
  * ABRE UNA MESA. La abre el primer jugador y se sienta de paso.
  *
  * Devuelve el código —para dictarlo— y la llave —para guardarla—. La llave no
@@ -392,6 +455,7 @@ router.post('/arcade/mesas', contadorDeAperturas, async (req, res) => {
     nombre?: unknown;
     plazoSegundos?: unknown;
     figura?: unknown;
+    modalidad?: unknown;
   };
   const arcade = typeof cuerpo.arcade === 'string' ? cuerpo.arcade : '';
   if (!arcadeInstalado(arcade)) {
@@ -414,12 +478,16 @@ router.post('/arcade/mesas', contadorDeAperturas, async (req, res) => {
   const conFigura = figuraDelCuerpo(cuerpo, res);
   if (conFigura === null) return;
 
+  const conModalidad = modalidadDelCuerpo(cuerpo, arcade, res);
+  if (conModalidad === null) return;
+
   try {
     const abierta = await abrir({
       arcade,
       nombre: typeof cuerpo.nombre === 'string' ? cuerpo.nombre : '',
       plazoSegundos,
       figura: conFigura.figura,
+      modalidad: conModalidad.modalidad,
     });
     /*
      * La respuesta se compone con la MISMA `mirar` que usan las demás rutas, y no
