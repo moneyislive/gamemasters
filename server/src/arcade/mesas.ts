@@ -3215,10 +3215,11 @@ export async function mirar(codigo: string, llave: string | null): Promise<Vista
  * LO QUE HACE UNA LECTURA ANTES DE CONTESTAR, sea cara o barata. Devuelve quién lee.
  *
  * Es el cuerpo de `mirar` menos la vista, sacado aquí para que `mirar` y `revisionDe` hagan
- * EXACTAMENTE lo mismo y en el mismo orden: el manifiesto primero —un arcade que no está instalado
- * falla igual en las dos—, el plazo después —el tic que venció entra por aquí y se guarda—, y la
- * presencia al final, sólo si todo lo anterior ha ido bien. Dos copias de estas cuatro líneas
- * serían dos lecturas que un día dejarían de hacer lo mismo sin que nadie lo viera.
+ * EXACTAMENTE lo mismo y en el mismo orden HASTA LA VISTA: el manifiesto primero —un arcade que no
+ * está instalado falla igual en las dos—, el plazo después —el tic que venció entra por aquí y se
+ * guarda—, y la presencia al final, sólo si todo lo anterior ha ido bien. Dos copias de estas cuatro
+ * líneas serían dos lecturas que un día dejarían de hacer lo mismo sin que nadie lo viera. Lo que
+ * cambia no componer la vista, que se nota, está en `revisionDe`.
  */
 async function ponerAlDiaParaLeer(m: MesaEnCurso, llave: string | null): Promise<AsientoId | null> {
   const manifiesto = manifiestoDeArcade(m.mesa.arcade);
@@ -3251,7 +3252,7 @@ export interface RevisionDeMesa {
 }
 
 /**
- * LA LECTURA BARATA: todo lo que hace `mirar`, MENOS PROYECTAR.
+ * LA LECTURA BARATA: lo que hace `mirar` ANTES de componer la vista, y la vista no.
  *
  * ═══ LO QUE COSTABA UNA MESA QUIETA ═══
  *
@@ -3263,16 +3264,34 @@ export interface RevisionDeMesa {
  * (`verify:lectura-barata`): una lectura quieta costaba dos proyecciones y dos listas de opciones
  * por móvil y por vuelta de sondeo, para una respuesta sin cuerpo.
  *
- * ═══ LO QUE HACE, QUE ES TODO LO DEMÁS ═══
+ * ═══ LO QUE HACE: LO DE `mirar` HASTA LA VISTA, EN EL MISMO ORDEN ═══
  *
- * Lo mismo que `mirar` y en el mismo orden, porque la comparación que la ruta hace con esto tiene
- * que significar lo mismo que la que hacía con `mirar`: carga y barre si toca, contesta el mismo
- * `MesaDesconocida` —el mismo 404 y el mismo contador de códigos en la ruta—, mete el tic si
- * venció el plazo exactamente igual —es la lectura la que lo mete, bajo el candado, y se guarda—
- * y marca la presencia de quien pregunta. Lo único que no hace es la vista.
+ * Carga y barre si toca, contesta el mismo `MesaDesconocida` —el mismo 404 y el mismo contador de
+ * códigos en la ruta—, mete el tic si venció el plazo exactamente igual —es la lectura la que lo
+ * mete, bajo el candado, y se guarda— y marca la presencia de quien pregunta. Todo eso lo comparten
+ * las dos (`ponerAlDiaParaLeer`), así que la revisión que compara la ruta es la misma que habría
+ * visto `mirar`. Y por eso una lectura aparcada que se suelta porque venció el plazo sigue trayendo
+ * el tic metido: lo mete esto, en la segunda comparación, y `mirar` sólo compone lo que se manda.
  *
- * Y por eso una lectura aparcada que se suelta porque venció el plazo sigue trayendo el tic
- * metido: lo mete esto, en la segunda comparación, y `mirar` sólo compone lo que se va a mandar.
+ * ═══ Y LO QUE NO HACE SE NOTA DESDE FUERA EN DOS COSAS, LAS DOS A PROPÓSITO ═══
+ *
+ * Aquí ponía «lo mismo que `mirar` y en el mismo orden, porque la comparación tiene que significar
+ * lo mismo… lo único que no hace es la vista», y un revisor encontró que NO componer la vista no es
+ * invisible: la vista es código del juego, y lo que ese código hacía mal en cada sondeo deja de
+ * pasar en el sondeo quieto. Son dos, y las dos son mejoras que se quedan:
+ *
+ *   · UNA PROYECCIÓN QUE REVIENTA ya no tumba la espera de una mesa quieta. Antes, sondear con
+ *     `desde` igual a la revisión daba 500 aunque no hubiera nada que mandar; ahora da 204. En
+ *     cuanto SÍ hay que mandar la mesa —sin `desde`, o con uno rancio— `mirar` proyecta y el 500
+ *     sale igual: la rotura se sigue viendo, pero sólo quien pide la mesa la paga.
+ *   · UNAS `opciones()` LENTAS ya no apartan al arcade por sondear. Antes cada vuelta de sondeo de
+ *     una mesa quieta las ejecutaba bajo el presupuesto, y una sola vuelta lenta dejaba al arcade
+ *     en cuarentena; y como un arcade apartado no tica, el plazo dejaba de meter su tic. Ahora el
+ *     sondeo quieto no las ejecuta: el arcade sólo se aparta si son lentas cuando alguien PIDE la
+ *     mesa, y hasta entonces el plazo vence como tiene que vencer.
+ *
+ * Las dos las fija `verify:lectura-barata`, con un arcade de proyección rota y otro de opciones
+ * lentas: si alguien volviera a comparar con `mirar`, se pondrían rojas.
  */
 export async function revisionDe(codigo: string, llave: string | null): Promise<RevisionDeMesa> {
   cargar();

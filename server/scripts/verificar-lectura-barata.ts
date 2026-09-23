@@ -13,9 +13,9 @@
  * tiraba las dos vistas y contestaba 204. O sea que la mitad del coste de una mesa quieta era
  * componer dos pantallas que nadie iba a ver, por cada móvil y cada veinticinco segundos.
  *
- * Ahora las dos comparaciones se hacen con `revisionDe`, que hace todo lo que `mirar` hace —el
- * 404, el tic si venció el plazo, la presencia, el barrido— menos proyectar, y `mirar` se llama
- * sólo cuando hay que contestar con la mesa.
+ * Ahora las dos comparaciones se hacen con `revisionDe`, que hace lo que `mirar` hace ANTES de
+ * componer la vista —el 404, el tic si venció el plazo, la presencia, el barrido— y la vista no, y
+ * `mirar` se llama sólo cuando hay que contestar con la mesa.
  *
  * ═══ SE CUENTA, NO SE CRONOMETRA ═══
  *
@@ -25,12 +25,24 @@
  * se las llama, apuntado por asiento: así se separan las proyecciones de la lectura que se mide de
  * las que hace de paso un movimiento de otro asiento.
  *
- * ═══ Y EL RESTO TIENE QUE SER IDÉNTICO ═══
+ * ═══ EL RESTO ES LO DE SIEMPRE, MENOS DOS COSAS QUE CAMBIAN A MEJOR ═══
  *
  * Mismos 200, 204 y 404, mismos avisos, el mismo tic metido por la lectura, la misma presencia, y
  * el despertador por vencimiento soltando la espera igual. Esto lo comprueba aquí contra la ruta
  * de verdad montada en un Express de verdad, y `verify:mesa`, `verify:larga` y `verify:marcador`
  * contra el servidor levantado.
+ *
+ * Aquí ponía «el resto tiene que ser IDÉNTICO», y un revisor encontró dos cosas que no lo son,
+ * porque no componer la vista es no ejecutar el código del juego que la compone:
+ *
+ *  · una proyección que REVIENTA ya no da 500 a quien sondea una mesa quieta: da 204. Sin `desde`
+ *    o con uno rancio —cuando sí hay que mandar la mesa— el 500 sigue saliendo;
+ *  · unas `opciones()` LENTAS ya no apartan al arcade porque alguien sondee una mesa quieta, y por
+ *    eso el plazo sigue metiendo su tic —un arcade apartado no tica—. Pedir la mesa sí las paga.
+ *
+ * Las dos son mejoras y se quedan; las dos se comprueban abajo, con un arcade de proyección rota y
+ * otro de opciones lentas, y se vieron ROJAS devolviéndole `mirar` a la ruta: si alguien lo hiciera,
+ * esto se lo diría.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -38,6 +50,7 @@ import path from 'node:path';
 import express from 'express';
 import { instalarArcade, olvidarArcade, rechazar } from '../../shared/arcade';
 import type { ManifiestoDeArcade, Movimiento, Opcion } from '../../shared/arcade';
+import { enCuarentena, TOPE_MS } from '../src/arcade/presupuesto';
 
 /* La carpeta de las mesas, ANTES de cargar `mesas.ts`, que la lee al cargarse. */
 const CARPETA = fs.mkdtempSync(path.join(os.tmpdir(), 'lectura-barata-'));
@@ -123,6 +136,53 @@ instalarArcade<EstadoDelContado | undefined, unknown>({
   opciones: (_vista, quien): readonly Opcion[] => {
     sumar(opcionesPedidas, quien);
     return quien === null ? [] : [{ id: 'jugar', tipo: 'jugar', carga: {}, rotulo: 'Jugar', ayuda: '' }];
+  },
+  seAcabo: () => false,
+});
+
+/*
+ * LOS DOS QUE ENSEÑAN LO QUE LA LECTURA BARATA CAMBIA A LA VISTA: uno cuya proyección revienta con
+ * un estado concreto, y otro cuyas `opciones()` tardan más que el tope del presupuesto. Los dos
+ * cambios son a mejor y se quedan; esto los deja escritos para que nadie los deshaga sin verlo.
+ */
+const ROTO = 'el-roto';
+const LENTO = 'el-lento';
+
+interface EstadoDelRoto {
+  tics: number;
+  roto: boolean;
+}
+
+instalarArcade<EstadoDelRoto | undefined, unknown>({
+  manifiesto: { ...manifiesto, id: ROTO, nombre: 'El Roto' },
+  avanzar: (estado: EstadoDelRoto | undefined, movimiento: Movimiento) => {
+    const actual = estado ?? { tics: 0, roto: false };
+    if (movimiento.tipo === 'arcade:tic') return { ...actual, tics: actual.tics + 1 };
+    if (movimiento.tipo === 'romper') return { ...actual, roto: true };
+    return rechazar(actual, 'Eso no es una jugada del Roto.');
+  },
+  proyeccion: (estado: EstadoDelRoto | undefined) => {
+    if (estado?.roto === true) throw new Error('una proyección que revienta, a propósito');
+    return estado ?? null;
+  },
+  seAcabo: () => false,
+});
+
+instalarArcade<EstadoDelRoto | undefined, unknown>({
+  manifiesto: { ...manifiesto, id: LENTO, nombre: 'El Lento' },
+  avanzar: (estado: EstadoDelRoto | undefined, movimiento: Movimiento) => {
+    const actual = estado ?? { tics: 0, roto: false };
+    if (movimiento.tipo === 'arcade:tic') return { ...actual, tics: actual.tics + 1 };
+    return rechazar(actual, 'Eso no es una jugada del Lento.');
+  },
+  proyeccion: (estado: EstadoDelRoto | undefined) => estado ?? null,
+  opciones: (): readonly Opcion[] => {
+    /* Más que el tope del presupuesto, de reloj de verdad: una sola llamada aparta al arcade. */
+    const hasta = Date.now() + TOPE_MS + 25;
+    while (Date.now() < hasta) {
+      /* esperar sin soltar el hilo, que es lo que hace un `opciones()` lento */
+    }
+    return [{ id: 'nada', tipo: 'nada', carga: {}, rotulo: 'Nada', ayuda: '' }];
   },
   seAcabo: () => false,
 });
@@ -395,6 +455,87 @@ try {
     comprobar('y no proyecta nada', contadoEntero() === deTodos, { antes: deTodos, despues: contadoEntero() });
   }
 
+  // ---------------------------------------------------------------------------
+  paso('Lo que cambia a la vista, y a mejor: una proyección rota ya no tumba la espera de una mesa quieta');
+  // ---------------------------------------------------------------------------
+
+  {
+    /*
+     * La lectura quieta proyectaba, así que una proyección que revienta daba 500 también a quien
+     * sólo preguntaba «¿hay algo nuevo?» sobre una mesa en la que no había pasado nada. Ahora
+     * contesta 204: no había nada que mandar, y lo que falla es componer lo que se manda. En cuanto
+     * SÍ hay que mandar la mesa —sin `desde`, o con uno rancio— `mirar` proyecta y el 500 sale, que
+     * es lo honrado: la proyección está rota y quien pide la mesa se entera.
+     *
+     * La mesa se abre y se rompe en proceso: abrir por la ruta ya compone la primera vista.
+     */
+    const rota = await mesas.abrir({ arcade: ROTO, nombre: 'Rita', plazoSegundos: 0 });
+    const codigoR = rota.mesa.codigo;
+    const alRomper = await mesas.mover(codigoR, rota.silla.llave, 0, { tipo: 'romper', carga: {} }).then(
+      () => 'nada',
+      (error: unknown) => (error instanceof Error ? error.message : String(error)),
+    );
+    comprobar(
+      'la jugada que la rompe entra y se guarda, y lo que revienta es componer la respuesta',
+      alRomper.includes('revienta') && rota.mesa.mesa.rev === 1,
+      { alRomper, rev: rota.mesa.mesa.rev },
+    );
+    const quieta = await soltandoLaEspera(codigoR, pedir(`/arcade/mesas/${codigoR}?desde=1`, { llave: rota.silla.llave }));
+    comprobar(
+      'con la proyección rota y la mesa QUIETA, la espera contesta 204 (antes, 500): no había nada que componer',
+      quieta.estado === 204,
+      { estado: quieta.estado },
+    );
+    const sinDesde = await pedir(`/arcade/mesas/${codigoR}`, { llave: rota.silla.llave });
+    const rancia = await pedir(`/arcade/mesas/${codigoR}?desde=0`, { llave: rota.silla.llave });
+    comprobar(
+      'y en cuanto hay que MANDAR la mesa —sin `desde`, o con uno rancio—, 500: la rotura se sigue viendo',
+      sinDesde.estado === 500 && rancia.estado === 500,
+      { sinDesde: sinDesde.estado, rancia: rancia.estado },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  paso('Y unas `opciones()` lentas ya no apartan al arcade porque alguien espera mirando una mesa quieta');
+  // ---------------------------------------------------------------------------
+
+  {
+    /*
+     * La lectura quieta componía la vista, y la vista le pide al juego sus `opciones()`, que pasan
+     * por el presupuesto. Unas opciones lentas apartaban al arcade SÓLO porque alguien sondeaba una
+     * mesa en la que no pasaba nada, y un arcade apartado deja de ticar: el plazo ya no metía su tic.
+     * Ahora el sondeo quieto no las llama, el arcade no se aparta por eso, y el plazo vence como
+     * tiene que vencer. Quien PIDE la mesa sí las paga —`mirar` las llama—, y la vacuna lo enseña.
+     *
+     * En proceso para abrir, por lo mismo que la rota: abrir por la ruta ya llama a `opciones()`.
+     */
+    const lenta = await mesas.abrir({ arcade: LENTO, nombre: 'Luis', plazoSegundos: 2 });
+    const codigoL = lenta.mesa.codigo;
+    const sondeos: number[] = [];
+    for (let vuelta = 0; vuelta < 3; vuelta++) {
+      sondeos.push(
+        (await soltandoLaEspera(codigoL, pedir(`/arcade/mesas/${codigoL}?desde=0`, { llave: lenta.silla.llave }))).estado,
+      );
+    }
+    comprobar(
+      'tres sondeos de la mesa quieta: 204, y el arcade de las opciones lentas SIGUE sin apartar (antes, apartado)',
+      sondeos.every((e) => e === 204) && enCuarentena(LENTO) === null,
+      { sondeos, apartado: enCuarentena(LENTO) },
+    );
+    await dormir(2_300);
+    const vencida = await pedir(`/arcade/mesas/${codigoL}`, { llave: lenta.silla.llave });
+    comprobar(
+      'y vencido el plazo, la lectura mete el tic (antes no: un arcade apartado no tica)',
+      vencida.estado === 200 && vencida.datos.mesa?.tic === 1 && vencida.datos.mesa?.rev === 1,
+      { estado: vencida.estado, tic: vencida.datos?.mesa?.tic, rev: vencida.datos?.mesa?.rev },
+    );
+    comprobar(
+      'y la vacuna: pedir la mesa SÍ llama a sus opciones, y ahí el arcade se aparta, así que lo de arriba mide algo',
+      enCuarentena(LENTO) !== null,
+      enCuarentena(LENTO),
+    );
+  }
+
   {
     const d = await pedir('/arcade/diagnostico');
     comprobar('y no queda ningún candado suelto', d.estado === 200 && d.datos.candados === 0, d.datos);
@@ -404,6 +545,8 @@ try {
 } finally {
   await new Promise<void>((cerrado) => escucha.close(() => cerrado()));
   olvidarArcade(CONTADO);
+  olvidarArcade(ROTO);
+  olvidarArcade(LENTO);
   try {
     fs.rmSync(CARPETA, { recursive: true, force: true });
   } catch {
@@ -419,7 +562,7 @@ if (fallos.length > 0) {
 }
 
 /* EL GUARDIA: un comprobador que se cae a mitad sin decirlo se parece mucho a uno verde. */
-const COMPROBACIONES_ESCRITAS = 22;
+const COMPROBACIONES_ESCRITAS = 28;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones escritas.`);
   process.exit(2);
@@ -429,6 +572,8 @@ console.log(
   `✔ ${hechas} comprobaciones. Una lectura con \`desde\` que espera y no encuentra nada ya no\n` +
     '  proyecta nada —ni para quien pregunta ni para nadie—, y la que encuentra algo proyecta una vez\n' +
     '  y no dos. El resto es lo de siempre: 200, 204 y 404 donde tocan, los avisos con la mesa, la\n' +
-    '  presencia marcada, el tic metido por la lectura y la espera soltada por el despertador.',
+    '  presencia marcada, el tic metido por la lectura y la espera soltada por el despertador. Y lo\n' +
+    '  que cambia es a mejor: una proyección rota ya no tumba la espera de una mesa quieta, y unas\n' +
+    '  opciones lentas ya no apartan al arcade ni le quitan el tic por sondear.',
 );
 process.exit(0);
