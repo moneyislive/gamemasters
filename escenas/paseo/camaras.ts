@@ -16,7 +16,25 @@
  * Las Lindes la senda está hundida 1,20 unidades y la villa alzada 0,66, y la senda es
  * justamente por donde se anda. La altura la da la escena, que es quien dibuja el suelo; aquí
  * sólo se le suma. Es presentación: dónde se puede estar lo decide la arena, que es plana.
+ *
+ * ═══ Y LA DE HOMBRO YA NO SE METE EN LAS PAREDES ═══
+ *
+ * Con las murallas de verdad en el mundo, andar de espaldas contra una dejaba la cámara de hombro
+ * DENTRO de ella, o al otro lado: la pantalla entera era la cara de atrás de un muro, con quien
+ * pasea detrás. Quedó abierto al estrenar los choques. Ahora, en cada fotograma, se recorre el
+ * tramo que va de quien pasea a donde querría ir la cámara con las mismas preguntas con las que se
+ * anda (`sePuedeEstar` de `mundo.ts`: que haya suelo y que no haya cuerpo), y la cámara se queda
+ * en el último trozo libre (`hastaDondeCabeElHombro`). No salta hasta allí: se acerca deprisa y se
+ * aleja despacio (`acercarElHombro`), y nunca más cerca que `ATRAS_MINIMO_DEL_HOMBRO`.
+ *
+ * La arena es plana y un cuerpo no tiene altura (ver `mundo.ts`), así que la cámara también se
+ * acerca detrás de algo bajo que, a su altura, pasaría por encima: un almiar, un seto. Es el precio
+ * de preguntarle al mismo mundo con el que se choca en vez de inventar otro; no se atraviesa nada.
  */
+import { RADIO_DEL_PASEANTE } from '../../shared/mecanicas/andar';
+import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
+import { sePuedeEstar } from '../../shared/mecanicas/mundo';
+import type { Arena } from '../../shared/mecanicas/mundo';
 import { ALTURA_DE_UNA_PERSONA } from '../escala';
 
 /** A qué altura van los ojos sobre el suelo que se pisa. */
@@ -81,14 +99,96 @@ export function camaraDeOjos(quien: QuienSeMira, suelo = 0): PoseDeCamara {
   };
 }
 
-/** La cámara de hombro: por detrás y por encima, mirando a la nuca. `suelo` es la altura que pisa. */
-export function camaraDeHombro(quien: QuienSeMira, suelo = 0): PoseDeCamara {
+/**
+ * La cámara de hombro: por detrás y por encima, mirando a la nuca. `suelo` es la altura que pisa y
+ * `atras` cuánto se queda detrás —lo que dé `acercarElHombro`, o la distancia de siempre—.
+ */
+export function camaraDeHombro(quien: QuienSeMira, suelo = 0, atras = ATRAS_DEL_HOMBRO): PoseDeCamara {
   return {
-    x: quien.x - Math.sin(quien.rumbo) * ATRAS_DEL_HOMBRO,
+    x: quien.x - Math.sin(quien.rumbo) * atras,
     y: suelo + SOBRE_EL_HOMBRO,
-    z: quien.z + Math.cos(quien.rumbo) * ATRAS_DEL_HOMBRO,
+    z: quien.z + Math.cos(quien.rumbo) * atras,
     miraX: quien.x + Math.sin(quien.rumbo) * 6,
     miraY: suelo + ALTURA_DE_UNA_PERSONA * 0.6,
     miraZ: quien.z - Math.cos(quien.rumbo) * 6,
   };
+}
+
+/* ─── La cámara de hombro que no atraviesa ───────────────────────────────── */
+
+/**
+ * LO MÁS CERCA QUE SE PONE LA CÁMARA DE HOMBRO: media persona.
+ *
+ * Pegado de espaldas a una pared, el centro de quien pasea queda a un radio de ella (0,4) y ahí no
+ * cabe ninguna cámara de hombro. Por debajo de esto la cámara estaría encima de la cabeza y se
+ * vería la coronilla y nada más; a esta distancia sigue viéndose el hombro. Si el tramo libre es
+ * más corto, la cámara se queda aquí y lo que tiene detrás cae dentro del plano cercano (a una
+ * unidad en los dos clientes), así que no tapa: es la única concesión, y es de un palmo.
+ */
+export const ATRAS_MINIMO_DEL_HOMBRO = ALTURA_DE_UNA_PERSONA * 0.5;
+
+/**
+ * EL RADIO DE LA CÁMARA, en Q16.16: el del paseante. Es lo que tiene que caber el ojo, con su plano
+ * cercano, sin rozar una pared; con el mismo radio con el que se anda, la cámara se queda donde
+ * podría estar alguien, y ése es un sitio que el mundo ya sabe contestar.
+ */
+export const RADIO_DE_LA_CAMARA = RADIO_DEL_PASEANTE;
+
+/**
+ * CUÁNTO SE ACERCA POR SEGUNDO CUANDO ALGO SE METE DETRÁS, Y CUÁNTO SE ALEJA CUANDO SE VA.
+ *
+ * Acercarse es deprisa —en un décimo de segundo se ha hecho el 92 %— porque lo que hay detrás ya
+ * está tapando: andando de espaldas contra una pared a doce unidades por segundo, la cámara va
+ * 12/25 ≈ media unidad por detrás de lo que cabe, y lo que cabe ya deja entre el radio de la cámara
+ * y un trozo más hasta la pared. Medido en `verify:canal-del-paseo`, de espaldas contra una muralla
+ * con el paseo de verdad: mientras quien pasea está lejos de ella, la cámara no pasa de 0,29
+ * unidades de su cara, y el mayor cambio en un fotograma es de 0,24. Alejarse es despacio, tres por
+ * segundo —3,2 s para volver del mínimo—, porque no corre prisa y porque volver de golpe a su sitio
+ * cada vez que se pasa junto a una esquina marearía más que la esquina.
+ */
+export const LO_QUE_SE_ACERCA = 25;
+export const LO_QUE_SE_ALEJA = 3;
+
+/**
+ * HASTA DÓNDE CABE LA CÁMARA DE HOMBRO DETRÁS DE QUIEN PASEA, en unidades del mundo.
+ *
+ * Se recorre el tramo de quien pasea hacia atrás, a trozos no más largos que el radio de la cámara
+ * —ninguna pared más gruesa que ella se cuela entre dos—, preguntando en cada trozo lo mismo que
+ * pregunta el paso: ¿hay suelo y no hay cuerpo? (`sePuedeEstar`). Se devuelve la distancia del
+ * último trozo bueno antes del primero malo; si no hay ninguno malo, `lejos`. Cero si ya el
+ * primero es malo.
+ */
+export function hastaDondeCabeElHombro(arena: Arena, quien: QuienSeMira, lejos = ATRAS_DEL_HOMBRO): number {
+  if (!(lejos > 0)) return 0;
+  const haciaAtrasX = -Math.sin(quien.rumbo);
+  const haciaAtrasZ = Math.cos(quien.rumbo);
+  const radio = RADIO_DE_LA_CAMARA;
+  const paso = aNumero(radio);
+  const trozos = Math.ceil(lejos / paso);
+  let libre = 0;
+  for (let i = 1; i <= trozos; i++) {
+    const d = Math.min(lejos, i * paso);
+    const x = deNumero(quien.x + haciaAtrasX * d);
+    const z = deNumero(quien.z + haciaAtrasZ * d);
+    if (!sePuedeEstar(arena, x, z, radio)) return libre;
+    libre = d;
+  }
+  return libre;
+}
+
+/**
+ * CUÁNTO SE QUEDA DETRÁS LA CÁMARA ESTE FOTOGRAMA, alcanzando lo que cabe sin saltar.
+ *
+ * `antes` es lo de el fotograma anterior —`null` al bajar a andar, y entonces se pone en su sitio
+ * de golpe, que no hay nada de lo que venir—; `cabe` lo que da `hastaDondeCabeElHombro`. Lo que sale
+ * está siempre entre `ATRAS_MINIMO_DEL_HOMBRO` y `ATRAS_DEL_HOMBRO`, y se mueve hacia `cabe` con
+ * `1 − e^(−k·dt)`, que da lo mismo a treinta fotogramas que a ciento cuarenta y cuatro.
+ */
+export function acercarElHombro(antes: number | null, cabe: number, dt: number): number {
+  const quiere = Math.min(ATRAS_DEL_HOMBRO, Math.max(ATRAS_MINIMO_DEL_HOMBRO, Number.isFinite(cabe) ? cabe : ATRAS_DEL_HOMBRO));
+  if (antes === null || !Number.isFinite(antes)) return quiere;
+  if (!(dt > 0) || !Number.isFinite(dt)) return Math.min(ATRAS_DEL_HOMBRO, Math.max(ATRAS_MINIMO_DEL_HOMBRO, antes));
+  const k = quiere < antes ? LO_QUE_SE_ACERCA : LO_QUE_SE_ALEJA;
+  const ahora = antes + (quiere - antes) * (1 - Math.exp(-k * dt));
+  return Math.min(ATRAS_DEL_HOMBRO, Math.max(ATRAS_MINIMO_DEL_HOMBRO, ahora));
 }

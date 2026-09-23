@@ -13,7 +13,12 @@
  *   2. LA CALIDAD. `plena` en la web y en iOS; en Android empieza en `plena` y
  *      baja a `sobria` si el hilo de dibujo MIDE más de 22 ms por fotograma en
  *      los primeros 120. Medida y no adivinada: ver `juzgarCalidad` en
- *      `escenas/embarcadero/calidad.ts`.
+ *      `escenas/embarcadero/calidad.ts`. Y LA MISMA MEDIDA, EN LAS TRES
+ *      PLATAFORMAS, es el veredicto de la compuerta de Boots on Board
+ *      (`escenas/compuerta-de-botas.ts`): si al abrir mesa sale la elección, y
+ *      si sale encendida. Se guarda en el aparato (`guardarElVeredicto`) para no
+ *      esperar 120 fotogramas la próxima vez, y hasta que llega uno nuevo manda
+ *      el guardado. Bajar la calidad sigue siendo cosa de Android; medir, no.
  *   3. CUÁNDO SE CAMBIA DE PANTALLA. Cuando `haEmpezado` pasa a `true` EN LA
  *      VISTA —nunca al pulsar— se arranca la coreografía de zarpar, y se navega
  *      cuando la escena dice que terminó, cuando alguien toca la pantalla, o a
@@ -41,7 +46,7 @@
  * entero está en su cabecera.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
@@ -59,6 +64,8 @@ import { LindeAlta } from '../../../escenas/linde-alta/LindeAlta';
 import { juzgarCalidad } from '../../../escenas/embarcadero/calidad';
 import type { MuestraDelHilo } from '../../../escenas/embarcadero/calidad';
 import type { Calidad, MesaEnElMuelle, Ventana } from '../../../escenas/embarcadero/tipos';
+/* Lo que la medida decide además de la calidad: si se ofrece Boots on Board. Ver su cabecera. */
+import { compuertaDeBotas } from '../../../escenas/compuerta-de-botas';
 /*
  * Sólo la constante del mapeo tonal: el `Canvas` sigue entrando por `tres/Lienzo`,
  * que es lo que la regla del §7 protege. Ver `escena-peonza.tsx`, que hace lo mismo
@@ -73,7 +80,7 @@ import { Canvas } from '../tres/Lienzo';
 import { haEmpezado } from './empezada';
 import { figuraConCuenta, figuraDeEstreno, guardarFigura } from './figura';
 import { HojaDelMuelle } from './hoja-del-muelle';
-import { usarMesaDeArcade } from './mesa';
+import { elVeredictoDelAparato, guardarElVeredicto, usarMesaDeArcade } from './mesa';
 import { LETRA, rutaDelMueble, SALA } from './muebles';
 /* La misma cara que pone la Sala cuando algo no se puede jugar. Una, no dos. */
 import { NoHayNada } from './pintar';
@@ -96,8 +103,21 @@ const FUNDIDO_MS = 600;
  * `alMedir` llega una vez por segundo con el tiempo medio de fotograma de ese
  * segundo y el juez es `juzgarCalidad`, de `escenas/embarcadero/calidad.ts`: 22 ms
  * sobre los primeros 120 fotogramas, medido en ESTE aparato con ESTA escena. Lo que
- * este fichero decide es CUÁNDO se le pregunta —sólo en Android, y sólo hasta que
- * haya veredicto—; la cuenta es de la escena y la comparten los dos clientes.
+ * este fichero decide es CUÁNDO se le pregunta —hasta que haya veredicto, y nunca
+ * con la app en segundo plano— y qué se hace con la respuesta: en Android baja la
+ * calidad, y en las tres plataformas es el veredicto de la compuerta de Boots on
+ * Board. La cuenta es de la escena y la comparten los dos clientes.
+ *
+ * ═══ POR QUÉ SE MIDE TAMBIÉN DONDE LA CALIDAD NO BAJA ═══
+ *
+ * Antes sólo se preguntaba en Android porque sólo allí había algo que decidir. Con
+ * la compuerta hay algo en las tres: un iPhone o un navegador que no se hubiera
+ * medido nunca no tendría veredicto, y sin veredicto Boots on Board no se ofrece.
+ * Medir no cuesta nada que no se pagara ya —las muestras llegan igual—, y lo que no
+ * cambia es la calidad fuera de Android, que es lo que decidió `docs/EL-MUELLE.md`.
+ *
+ * Con la app en segundo plano no se muestrea: el sistema para o espacia el dibujo,
+ * y una muestra de entonces mide al sistema ahorrando, no a este aparato pintando.
  */
 
 /** Pinta el Muelle del arcade que pida la ruta, o dice por qué no. */
@@ -148,8 +168,27 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
   const adoptadaDe = useRef<string | null>(null);
   const muestras = useRef<MuestraDelHilo[]>([]);
   const calidadJuzgada = useRef(false);
+  /*
+   * EL VEREDICTO DE LA COMPUERTA: el guardado mientras no llegue el de esta visita, y el de esta
+   * visita en cuanto llegue. `null` es no saber, y no saber no ofrece Boots on Board.
+   */
+  const [veredicto, ponerVeredicto] = useState<Calidad | null>(null);
 
   const empezada = mesa.mesa !== null && haEmpezado(mesa.mesa);
+
+  /*
+   * EL GUARDADO, UNA VEZ AL MONTAR. Si mientras se lee el almacén el juez ya ha hablado —no pasa en
+   * la práctica: son 120 fotogramas contra una lectura del disco—, manda el juez, que es más nuevo.
+   */
+  useEffect(() => {
+    let vivo = true;
+    void elVeredictoDelAparato().then((guardado) => {
+      if (vivo) ponerVeredicto((antes) => antes ?? guardado);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   /*
    * ═══ LA FIGURA, EN DOS TIEMPOS ═══
@@ -234,12 +273,17 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
   }, [listo, telon]);
 
   const alMedir = useCallback((medidaDelHilo: MuestraDelHilo & { triangulos: number; llamadas: number }) => {
-    if (Platform.OS !== 'android' || calidadJuzgada.current) return;
+    if (calidadJuzgada.current) return;
+    /* En segundo plano se mediría al sistema ahorrando, no a este aparato: ver arriba. */
+    if (AppState.currentState === 'background' || AppState.currentState === 'inactive') return;
     muestras.current.push({ ms: medidaDelHilo.ms, fotogramas: medidaDelHilo.fotogramas });
-    const veredicto = juzgarCalidad(muestras.current);
-    if (veredicto === null) return;
+    const juicio = juzgarCalidad(muestras.current);
+    if (juicio === null) return;
     calidadJuzgada.current = true;
-    ponerCalidad(veredicto);
+    /* La calidad sólo baja en Android, como siempre; el veredicto vale en las tres. */
+    if (Platform.OS === 'android') ponerCalidad(juicio);
+    ponerVeredicto(juicio);
+    void guardarElVeredicto(juicio);
   }, []);
 
   const alEstarListo = useCallback(() => ponerListo(true), []);
@@ -313,6 +357,15 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
   const ESCENAS = { plaza: Plaza, linde: LindeAlta, embarcadero: Embarcadero } as const;
   const Escena = ESCENAS[tema.escena] ?? Embarcadero;
 
+  /*
+   * «MIDIENDO» SÓLO SI HAY UN MUNDO DANDO MUESTRAS, o a punto de darlas: mientras se mira el
+   * bolsillo el lienzo aún no se ha montado, pero se va a montar. Si el mundo se cae antes de su
+   * primer fotograma no mide nada, y decir «midiendo» sería una espera sin final: la compuerta
+   * dice entonces que este aparato aún no se ha medido.
+   */
+  const midiendo = listo || fallo === null;
+  const compuerta = compuertaDeBotas(veredicto, manifiesto.id, midiendo);
+
   return (
     <View style={estilos.todo} onLayout={medirTodo}>
       {lienzoMontado && figura !== null ? (
@@ -366,6 +419,7 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
         alMedirLaHoja={ponerAltoHoja}
         fallo={fallo}
         zarpando={zarpando}
+        compuerta={compuerta}
       />
 
       {zarpando ? (

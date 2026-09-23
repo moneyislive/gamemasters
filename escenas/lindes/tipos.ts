@@ -23,6 +23,7 @@
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
 import type { Calidad, Traer } from '../embarcadero/tipos';
 import type { MandosDeFuera } from '../paseo/mandos';
+import type { CanalDeBotas } from '../paseo/mesa-de-botas';
 
 /** Una losa puesta en el tablero. */
 export interface LosaEnElTablero {
@@ -96,7 +97,13 @@ export type ModoDeCamaraDeLasLindes =
   /** Desde su cara. */
   | { readonly modo: 'ojos'; readonly asiento: string };
 
-/** Lo que la escena recibe. */
+/**
+ * Lo que la escena recibe.
+ *
+ * Y una prop más que no está aquí: `complementosDelTablero`, con qué se abre `tablero.glb` en un
+ * teléfono. Es un tipo de `three`, y este fichero no nombra `three` porque lo lee el servidor;
+ * vive en `Lindes.tsx`, en `PropsDeLaEscenaDeLasLindes`.
+ */
 export interface PropsDeLasLindes {
   readonly tablero: TableroDeLasLindesEn3D;
   /** El código de la mesa. De aquí sale la semilla del paisaje, y de ningún otro sitio. */
@@ -124,6 +131,11 @@ export interface PropsDeLasLindes {
    * esto vuelve, y vuelve porque hará falta y no por simetría.
    */
   readonly traer: Traer;
+  /**
+   * `plena` o `sobria`: hasta dónde se pinta el relleno y si se pinta lo menudo (`detalle.ts`).
+   * La decide quien monta la escena con lo que ésta mide por `alMedir` (`calidadDelValle`); lo
+   * que cuenta una regla se pinta igual en las dos.
+   */
   readonly calidad: Calidad;
   readonly camara: ModoDeCamaraDeLasLindes;
   /** Con qué giro se enseña la losa de la mano mientras se elige dónde ponerla. */
@@ -147,6 +159,16 @@ export interface PropsDeLasLindes {
    */
   readonly mandos?: { readonly current: MandosDeFuera };
   /**
+   * EL CANAL DE BOOTS ON BOARD, sólo en una mesa de la modalidad `botas`.
+   *
+   * Con él la escena abre el canal de la mesa (`paseo/usar-el-canal.ts`), le cuenta cada tic de
+   * quien pasea, deja que el servidor lo corrija y pinta a los demás asientos andando
+   * (`paseo/los-demas.tsx`). Sin él —la mesa de siempre— no se abre nada y no se paga nada: ni un
+   * socket ni una llamada por tic. Quién lo pasa y cuándo lo deciden los clientes con
+   * `esMesaDeBotas`, y en ningún otro sitio.
+   */
+  readonly canal?: CanalDeBotas;
+  /**
    * SI SE PUEDE PASAR EL TURNO AHORA, y qué hacer si se toca el reloj.
    *
    * El reloj de arena es también el botón de pasar, como en Riberas y por lo mismo: es el
@@ -168,6 +190,11 @@ export interface PropsDeLasLindes {
   readonly alTocarLosa?: (casilla: string) => void;
   readonly alEstarListo?: () => void;
   readonly alFallar?: (motivo: string) => void;
+  /**
+   * LO QUE CUESTA PINTAR, una vez por segundo: la media de milisegundos de ESE segundo y cuántos
+   * fotogramas cubre —el contrato de `embarcadero/tipos.ts`, que es lo que lee `juzgarCalidad`—,
+   * y sólo desde que el tablero está cargado: antes no hay valle que medir.
+   */
   readonly alMedir?: (m: {
     triangulos: number;
     llamadas: number;
@@ -179,3 +206,5 @@ export interface PropsDeLasLindes {
 /** Lo que se reexporta para que quien monte la escena no importe de dos sitios. */
 export type { Calidad, Traer };
 export type { Paseante } from './paseo';
+export type { AsientoQueAnda, CanalDeBotas } from '../paseo/mesa-de-botas';
+export type { EstadoDelCanal } from '../paseo/canal-de-botas';

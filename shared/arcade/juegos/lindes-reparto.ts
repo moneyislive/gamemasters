@@ -1025,7 +1025,14 @@ export function montarLaLosaDeNuevo(idDeLosa: string, giro: Giro, semilla: numbe
           y: 0,
           giro: giroDelLado(lado) + Math.PI / 2,
           escala: 1.6,
-          largo: 1.7,
+          /*
+           * 1,083: lo justo para que cinco vallas cada tres celdas (10,94 u) cierren el lado sin
+           * montarse. Una valla del pack mide 1,155 de largo por la escala del pack y la suya:
+           * 1,155 × 5,4688 × 1,6 = 10,11, y 10,94 / 10,11 = 1,083. Aquí ponía 1,7, escrito cuando
+           * `largo` engordaba la valla en vez de alargarla; con el largo en su eje, 1,7 las
+           * montaba 6,24 unas sobre otras y los travesaños parpadeaban.
+           */
+          largo: 1.083,
           porque: 'ermita',
           menuda: false,
         });
@@ -1198,7 +1205,12 @@ export function montarLaLosaDeNuevo(idDeLosa: string, giro: Giro, semilla: numbe
         y: 0,
         giro: suyo,
         escala: esValla ? 1.6 : 1.5,
-        largo: esValla ? 1.8 : 1,
+        /*
+         * La valla de la senda va suelta, a su largo del pack (10,11 u). Llevaba 1,8, escrito
+         * cuando `largo` engordaba en vez de alargar; con el largo en su eje salían de 18 u y se
+         * montaban unas sobre otras en la misma raya (585 parejas en el tablero peor).
+         */
+        largo: 1,
         porque: 'senda',
         menuda: false,
       });

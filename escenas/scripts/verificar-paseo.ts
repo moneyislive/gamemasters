@@ -52,11 +52,12 @@ import {
   SIN_MANDOS,
   SIN_MANDOS_DE_FUERA,
   SIN_TECLAS,
+  esTeclaDeOtro,
   teclaDelPaseo,
   TOPE_DEL_GIRO,
   ZONA_MUERTA,
 } from '../paseo/mandos';
-import type { EntradaDelTic, Mandos, Teclas } from '../paseo/mandos';
+import type { DestinoDeLaTecla, EntradaDelTic, Mandos, Teclas } from '../paseo/mandos';
 import {
   corregirElPaseo,
   fotogramaDelPaseo,
@@ -325,6 +326,29 @@ paso('Las teclas y la palanca dan el rumbo y la marcha que tienen que dar');
   ];
   const malas = TECLAS.filter(([tecla, mando]) => teclaDelPaseo(tecla) !== mando).map(([tecla]) => tecla);
   comprobar('W A S D, las flechas y Mayúsculas van a su mando, también con Mayúsculas pulsada', malas.length === 0, malas);
+
+  /*
+   * Y NO SE QUEDA CON LO QUE VA A OTRO: escribiendo en un campo mientras se anda, W A S D y las
+   * flechas son letras y cursor, no pasos; y con Ctrl, Alt o Meta son atajos.
+   */
+  const DE_OTRO: readonly [string, DestinoDeLaTecla | null, boolean, boolean][] = [
+    ['un campo de texto', { tagName: 'INPUT' }, false, true],
+    ['un área de texto', { tagName: 'textarea' }, false, true],
+    ['un desplegable', { tagName: 'SELECT' }, false, true],
+    ['algo editable', { tagName: 'DIV', isContentEditable: true }, false, true],
+    ['Ctrl sobre el lienzo', { tagName: 'CANVAS' }, true, true],
+    ['el lienzo', { tagName: 'CANVAS' }, false, false],
+    ['el cuerpo del documento', { tagName: 'BODY' }, false, false],
+    ['sin destino', null, false, false],
+  ];
+  const confundidas = DE_OTRO.filter(([, destino, mod, esperado]) => esTeclaDeOtro(destino, mod) !== esperado).map(
+    ([que]) => que,
+  );
+  comprobar(
+    'las teclas que van a un campo, a algo editable o con Ctrl/Alt/Meta son de otro; las del lienzo, del paseo',
+    confundidas.length === 0,
+    confundidas,
+  );
 
   let pedidosMalos = 0;
   const ejemplos: unknown[] = [];
@@ -707,6 +731,10 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
   const mandos = leer('../../app/src/arcade/mandos-del-paseo.tsx');
   const pantalla = leer('../../app/src/arcade/lindes-en-tres-escena.tsx');
 
+  comprobar(
+    'el gancho pregunta si la tecla es de otro antes de quedársela, y al soltar suelta siempre',
+    /if \(pulsada && esTeclaDeOtro\(/.test(gancho) && /if \(pulsada\) e\.preventDefault\(\);/.test(gancho),
+  );
   comprobar(
     'el gancho deriva la arena UNA vez por mundo, con `useMemo`, y sin mundo no la deriva',
     /useMemo\(\(\) => \(o\.mundo === null \? null : arenaDe\(o\.mundo\)\), \[o\.mundo\]\)/.test(gancho),

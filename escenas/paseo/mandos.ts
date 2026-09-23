@@ -66,6 +66,32 @@ export function teclaDelPaseo(tecla: string): keyof Teclas | null {
   return null;
 }
 
+/** Lo que el paseo necesita saber de a quién iba una tecla: sin DOM, para poder probarlo en Node. */
+export interface DestinoDeLaTecla {
+  readonly tagName?: string;
+  readonly isContentEditable?: boolean;
+}
+
+/**
+ * ¿ES ESTA TECLA DE OTRO? Sí si va a algo donde se ESCRIBE —un campo, un área de texto, un
+ * desplegable, algo editable— o si lleva Ctrl, Alt o Meta.
+ *
+ * El paseo escucha en todo el documento y se quedaba con W, A, S, D y las flechas con
+ * `preventDefault`: mientras alguien andaba, esas letras no se podían escribir en ningún campo
+ * de la pantalla —un trato, un nombre—, y las flechas no movían el cursor. Y Ctrl+A, Ctrl+D o
+ * Alt+flecha son atajos del navegador o del sistema, no pasos.
+ */
+export function esTeclaDeOtro(
+  destino: DestinoDeLaTecla | null | undefined,
+  conModificador: boolean,
+): boolean {
+  if (conModificador) return true;
+  if (destino === null || destino === undefined) return false;
+  if (destino.isContentEditable === true) return true;
+  const etiqueta = (destino.tagName ?? '').toUpperCase();
+  return etiqueta === 'INPUT' || etiqueta === 'TEXTAREA' || etiqueta === 'SELECT';
+}
+
 /* ─── Lo que llega de fuera: la palanca de la app ────────────────────────── */
 
 /**
@@ -176,6 +202,13 @@ export interface PedidoDelTic {
 export interface EntradaDelTic extends PedidoDelTic {
   /** El número del tic, consecutivo desde que se nace. El primero es el 1. */
   readonly tic: number;
+  /**
+   * HACIA DÓNDE MIRA, de 0 a 255: el rumbo visual del fotograma, cuantizado. No es `rumbo`, que es
+   * hacia dónde se da el PASO y andando hacia atrás lleva media vuelta de más. Es lo que viaja por
+   * el canal como `r`: con el rumbo del paso, los demás verían a quien retrocede darse la vuelta y
+   * andar de frente, y un golpe «hacia donde miro» no tendría de dónde salir.
+   */
+  readonly mira: number;
 }
 
 /**

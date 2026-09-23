@@ -30,6 +30,14 @@
  *     uno suyo, que nace donde declara su mundo y con sitio alrededor, y que la figura se
  *     pinta a la altura del suelo que se dibuja. El paseo en sí —tics, choques, mandos,
  *     marioneta— lo mide `verify:paseo`.
+ *  9. LA SOBRIA PINTA MENOS, Y LO DICE LA MEDIDA. Los triángulos de las dos calidades con la
+ *     misma cuenta del punto 6, lo que cuenta una regla igual en las dos, y el juez que baja a
+ *     sobria —con el tablero creciendo, que es lo que le pasa a esta partida—.
+ * 10. EN EL TELÉFONO EL VALLE TIENE COLOR. Se abre `tablero.glb` en Node como lo abre la escena:
+ *     sin complemento no llega el atlas —el fallo de la app, reproducido—, y con el que pasa la
+ *     app, todas las piezas del valle lo llevan.
+ * 11. LA VALLA ESTIRADA SE ALARGA, NO ENGORDA. Medido en la caja de cada modelo, y sin tocar
+ *     cómo se estira lo que choca.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -118,6 +126,29 @@ import {
   sitioDelRelojDeLaBolsa,
 } from '../lindes/rincones';
 import { ALTO_DEL_RELOJ_EN_LADOS } from '../reloj';
+import { ANILLOS_DE_DETALLE, calidadDelValle, conLaMuestra, MUESTRAS_DE_LA_VENTANA } from '../lindes/detalle';
+import type { AnillosDeDetalle } from '../lindes/detalle';
+import {
+  abrirElTablero,
+  cajaDelModelo,
+  catalogoDe,
+  ejeDelLargo,
+  escalaDeLaPuesta,
+  VECES_QUE_HACEN_UN_LARGO,
+} from '../lindes/catalogo';
+import type { Catalogo, ComplementoDelCargador } from '../lindes/catalogo';
+import { LARGO_DE_LA_VALLA_EN_PACK } from '../lindes/medidas';
+import { juzgarCalidad } from '../embarcadero/calidad';
+import type { MuestraDelHilo } from '../embarcadero/calidad';
+import type { Calidad } from '../embarcadero/tipos';
+import { IMAGEN_DEL_ATLAS } from '../atlas-del-tablero';
+import { MODELO } from '../nombres';
+import { comoEstorba } from '../../shared/arcade/juegos/lindes-piezas';
+/*
+ * El complemento del teléfono se importa DE LA APP, que es de donde lo coge su pantalla: lo que
+ * se compra es que ÉSE —y no una copia— pinta el valle. `verify:atlas-del-tablero` hace lo mismo.
+ */
+import { texturasDelTablero } from '../../app/src/tres/texturas-nativas';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -512,22 +543,40 @@ function triangulosPorModelo(): ReadonlyMap<string, number> {
    * con el tablero fuera de cuota, según de qué lado caiga.
    */
   const LADO_DEL_CUADRADO = 9;
-  let conRecorte = 0;
   const centro = (LADO_DEL_CUADRADO - 1) / 2;
-  for (let fila = 0; fila < LADO_DEL_CUADRADO; fila++) {
-    for (let col = 0; col < LADO_DEL_CUADRADO; col++) {
-      conRecorte += sueloPorLosa;
-      const dx = col - centro;
-      const dy = fila - centro;
-      const lejos = Math.sqrt(dx * dx + dy * dy);
-      for (const p of laPeorPuesta) {
-        const obligada = LO_QUE_NO_SE_RECORTA.indexOf(p.porque) >= 0;
-        const tope = p.menuda ? 1.8 : 4;
-        if (!obligada && lejos > tope) continue;
-        conRecorte += porModelo.get(p.pieza) ?? 0;
+  /*
+   * LA CUENTA, PARA UNOS ANILLOS. Los de la escena, que viven en `detalle.ts`: aquí había un
+   * «1.8» y un «4» copiados a mano, y una copia es un presupuesto que sigue midiendo lo de antes
+   * el día que alguien cambia la escena. Se lleva aparte lo que cuenta una regla, lo menudo y el
+   * relleno, porque la sobria se juzga por partes.
+   */
+  const conRecorteDe = (
+    anillos: AnillosDeDetalle,
+  ): { total: number; obligado: number; menudo: number; relleno: number } => {
+    const cuenta = { total: 0, obligado: 0, menudo: 0, relleno: 0 };
+    for (let fila = 0; fila < LADO_DEL_CUADRADO; fila++) {
+      for (let col = 0; col < LADO_DEL_CUADRADO; col++) {
+        cuenta.total += sueloPorLosa;
+        const dx = col - centro;
+        const dy = fila - centro;
+        const lejos = Math.sqrt(dx * dx + dy * dy);
+        for (const p of laPeorPuesta) {
+          const obligada = LO_QUE_NO_SE_RECORTA.indexOf(p.porque) >= 0;
+          const tope = p.menuda ? anillos.menudo : anillos.relleno;
+          /* Como en la escena: un anillo de cero es NUNCA, y no «lo que caiga justo en el centro». */
+          if (!obligada && (tope <= 0 || lejos > tope)) continue;
+          const suyos = porModelo.get(p.pieza) ?? 0;
+          cuenta.total += suyos;
+          if (obligada) cuenta.obligado += suyos;
+          else if (p.menuda) cuenta.menudo += suyos;
+          else cuenta.relleno += suyos;
+        }
       }
     }
-  }
+    return cuenta;
+  };
+  const enPlena = conRecorteDe(ANILLOS_DE_DETALLE.plena);
+  const conRecorte = enPlena.total;
   console.log(
     `  con el recorte por distancia puesto, un tablero de nueve por nueve de la losa más cara`,
   );
@@ -561,6 +610,59 @@ function triangulosPorModelo(): ReadonlyMap<string, number> {
     { delTablero, tope: TOPE_DE_TRIANGULOS },
   );
   comprobar('y el suelo de una losa cabe en mil triángulos gracias a la fusión', sueloPorLosa < 1000, sueloPorLosa);
+
+  /*
+   * ═══ Y LA SOBRIA, CON LA MISMA CUENTA ═══
+   *
+   * La escena recibía `calidad` y no la leía: `sobria` pintaba lo mismo que `plena`, y los dos
+   * clientes la forzaban a `plena` de todos modos. Se compran tres cosas, las tres con los
+   * triángulos del `.glb`: que la sobria PINTA MENOS —y no un poco—; que lo que quita es lo que
+   * esta casa quita —lo menudo entero, el relleno de lejos—; y que lo que cuenta una regla se
+   * pinta igual en las dos, porque un tablero sin la muralla de una villa cerrada es el tablero
+   * mintiendo, y eso no es una cuestión de rendimiento.
+   *
+   * UNA QUINTA PARTE COMO MÍNIMO, y no «menos que la plena»: con quitar un barril ya sería menos,
+   * y una sobria que se deja todo lo que pesa es la plena con otro nombre. Lo medido son un 27 %;
+   * el techo lo pone lo que cuenta una regla, que es más de la mitad del tablero peor y no se
+   * toca en ninguna calidad.
+   */
+  paso('En la calidad sobria se pinta menos, medido, y lo que cuenta una regla sigue entero');
+  const AHORRO_MINIMO_DE_LA_SOBRIA = 0.2;
+  const enSobria = conRecorteDe(ANILLOS_DE_DETALLE.sobria);
+  const ahorro = enPlena.total - enSobria.total;
+  console.log(
+    `  plena ${enPlena.total.toLocaleString('es')} · sobria ${enSobria.total.toLocaleString('es')} ` +
+      `(−${ahorro.toLocaleString('es')}, un ${((100 * ahorro) / Math.max(1, enPlena.total)).toFixed(1)} % menos)`,
+  );
+  console.log(
+    `  lo que cuenta una regla, ${enSobria.obligado.toLocaleString('es')} en las dos; lo menudo, ` +
+      `${enPlena.menudo.toLocaleString('es')} → ${enSobria.menudo.toLocaleString('es')}; el relleno, ` +
+      `${enPlena.relleno.toLocaleString('es')} → ${enSobria.relleno.toLocaleString('es')}`,
+  );
+  comprobar('la sobria cabe en el presupuesto', enSobria.total <= TOPE_DE_TRIANGULOS, {
+    sobria: enSobria.total,
+    tope: TOPE_DE_TRIANGULOS,
+  });
+  comprobar(
+    'y pinta al menos una quinta parte menos que la plena en el tablero peor: si no, es la plena con otro nombre',
+    enSobria.total <= enPlena.total * (1 - AHORRO_MINIMO_DE_LA_SOBRIA),
+    { plena: enPlena.total, sobria: enSobria.total, anillos: ANILLOS_DE_DETALLE },
+  );
+  comprobar(
+    'en sobria no se pinta nada menudo, y en plena sí había',
+    enSobria.menudo === 0 && enPlena.menudo > 0,
+    { plena: enPlena.menudo, sobria: enSobria.menudo },
+  );
+  comprobar(
+    'y el relleno llega menos lejos',
+    enSobria.relleno < enPlena.relleno,
+    { plena: enPlena.relleno, sobria: enSobria.relleno },
+  );
+  comprobar(
+    'lo que cuenta una regla —murallas, torres, ermitas— se pinta ENTERO en las dos calidades',
+    enSobria.obligado === enPlena.obligado && enPlena.obligado > 0,
+    { plena: enPlena.obligado, sobria: enSobria.obligado },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2396,6 +2498,490 @@ paso('Dos sitios con el mismo nombre se distinguen por su cifra, y la cifra va s
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * DE AQUÍ ABAJO SE LEE TAMBIÉN EL FUENTE de la escena y de los dos clientes: en Node no hay
+ * lienzo, y que la escena use lo que aquí se mide sólo se ve en lo que está escrito. Sin
+ * comentarios —las cabeceras cuentan lo que estuvo mal con sus nombres, y una regla que
+ * castigara nombrarlo enseñaría a no documentarlo— y cada regla VISTA CAER sobre una copia
+ * envenenada del propio fichero: una regla que no se ve caer puede estar mirando otra cosa.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+const leerCodigo = (ruta: string): string =>
+  fs
+    .readFileSync(new URL(ruta, import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+/** Afirma la regla sobre el fichero de verdad, y la ve caer con cada caso envenenado. */
+function reglaDelFuente(
+  que: string,
+  prueba: (texto: string) => boolean,
+  bueno: string,
+  envenenados: readonly string[],
+): void {
+  comprobar(que, prueba(bueno));
+  envenenados.forEach((envenenado, i) => {
+    comprobar(
+      `y «${que}» se ve CAER con el caso envenenado ${String(i + 1)}`,
+      envenenado !== bueno && !prueba(envenenado),
+      'una regla que no se ve caer puede estar mirando otra cosa, y entonces es verde para siempre',
+    );
+  });
+}
+
+/** El elemento `<Lindes … />` de un cliente, entero: lo que se le pasa a la escena. */
+const elementoDeLaEscena = (texto: string): string => /<Lindes\b[\s\S]*?\/>/.exec(texto)?.[0] ?? '';
+
+const fuenteDeLaEscena = leerCodigo('../lindes/Lindes.tsx');
+const fuenteDeLaApp = leerCodigo('../../app/src/arcade/lindes-en-tres-escena.tsx');
+const fuenteDelEscritorio = leerCodigo('../../escritorio/src/lindes-en-tres.tsx');
+
+paso('La calidad la decide lo que cuesta pintar: el juez de la casa, con el tablero creciendo');
+
+{
+  /* Muestras como las que manda la escena: la media de un segundo y cuántos fotogramas cubre. */
+  const RAPIDA: MuestraDelHilo = { ms: 16, fotogramas: 60 };
+  const LENTA: MuestraDelHilo = { ms: 30, fotogramas: 33 };
+  const repetida = (m: MuestraDelHilo, veces: number): MuestraDelHilo[] => Array.from({ length: veces }, () => m);
+  /** Lo que hace un cliente: cada muestra entra en la ventana y se vuelve a juzgar. */
+  const siguiendo = (antes: Calidad, muestras: readonly MuestraDelHilo[]): Calidad => {
+    let ventana: MuestraDelHilo[] = [];
+    let calidad = antes;
+    for (const m of muestras) {
+      ventana = conLaMuestra(ventana, m);
+      calidad = calidadDelValle(calidad, ventana);
+    }
+    return calidad;
+  };
+
+  comprobar('un aparato que pinta a 16 ms por fotograma se queda en plena', siguiendo('plena', repetida(RAPIDA, 6)) === 'plena');
+  comprobar('uno que pinta a 30 ms baja a sobria', siguiendo('plena', repetida(LENTA, 6)) === 'sobria');
+  comprobar(
+    'y mientras no hay 120 fotogramas no se juzga: se sigue en plena',
+    calidadDelValle('plena', [{ ms: 40, fotogramas: 60 }]) === 'plena',
+  );
+  comprobar(
+    'un tirón suelto —un segundo de diez fotogramas— no baja a nadie',
+    siguiendo('plena', [...repetida(RAPIDA, 5), { ms: 100, fotogramas: 10 }, ...repetida(RAPIDA, 5)]) === 'plena',
+  );
+  comprobar(
+    'y la sobria no sube: un relleno que entrara y saliera sería peor que cualquiera de las dos',
+    siguiendo('sobria', repetida(RAPIDA, 30)) === 'sobria',
+  );
+  let ventana: MuestraDelHilo[] = [];
+  for (const m of repetida(RAPIDA, 100)) ventana = conLaMuestra(ventana, m);
+  comprobar(
+    `la ventana son las últimas ${String(MUESTRAS_DE_LA_VENTANA)} muestras: una partida de tres días no arrastra su historial`,
+    ventana.length === MUESTRAS_DE_LA_VENTANA,
+    ventana.length,
+  );
+
+  /*
+   * ═══ EL TABLERO CRECE, Y POR ESO NO SE JUZGA UNA SOLA VEZ ═══
+   *
+   * Una partida empieza con UNA losa. Se simula lo que ve el cliente: medio minuto pintando un
+   * tablero pequeño y luego uno grande con el que el aparato ya no puede. Preguntando al juez con
+   * cada muestra, baja; preguntándole una vez al montar —lo que hace el Burgo en la app, cuya
+   * ciudad está entera desde el primer fotograma— se habría quedado en plena para siempre. La
+   * segunda comprobación es la vacuna de la primera: sin ella, podría estar comprando algo que ya
+   * pasaba solo.
+   */
+  const partida = [...repetida(RAPIDA, 30), ...repetida(LENTA, 20)];
+  comprobar(
+    'con el tablero creciendo y el aparato quedándose justo, se baja a sobria',
+    siguiendo('plena', partida) === 'sobria',
+  );
+  let unaVez: Calidad | null = null;
+  const vistas: MuestraDelHilo[] = [];
+  for (const m of partida) {
+    vistas.push(m);
+    unaVez = juzgarCalidad(vistas);
+    if (unaVez !== null) break;
+  }
+  comprobar(
+    'y juzgando una sola vez, al montar, se habría quedado en plena: por eso se juzga con cada muestra',
+    unaVez === 'plena',
+    { unaVez },
+  );
+
+  /* ─── Y la escena y los dos clientes usan esto, y no otra cosa ─── */
+
+  /*
+   * La cuenta de arriba da lo que cuenta una regla ENTERO en las dos calidades porque lo cuenta
+   * así; que la escena también lo haga depende de que el recorte —el anillo, el cero que es
+   * nunca, el desvanecerse— viva DENTRO de la guarda de `LO_QUE_NO_SE_RECORTA`. Se exige aquí.
+   */
+  reglaDelFuente(
+    'la escena recorta con los anillos de la calidad que le llega, y no con números suyos; un anillo de cero es nunca; y lo que cuenta una regla no pasa por el recorte',
+    (t) =>
+      /const anillos = ANILLOS_DE_DETALLE\[calidad\];/.test(t) &&
+      /<UnModelo\b[\s\S]*?\banillos=\{anillos\}[\s\S]*?\/>/.test(t) &&
+      /const conRelleno = anillos\.relleno \* LADO_DE_LOSA;/.test(t) &&
+      /const conMenudo = anillos\.menudo \* LADO_DE_LOSA;/.test(t) &&
+      /<LoQueSePoneEncima\b[\s\S]*?\bcalidad=\{calidad\}[\s\S]*?\/>/.test(t) &&
+      /if \(LO_QUE_NO_SE_RECORTA\.indexOf\(p\.porque\) < 0\) \{\s*const tope = p\.menuda \? conMenudo : conRelleno;\s*if \(tope <= 0\) continue;/.test(
+        t,
+      ),
+    fuenteDeLaEscena,
+    [
+      fuenteDeLaEscena.replace('ANILLOS_DE_DETALLE[calidad]', 'ANILLOS_DE_DETALLE.plena'),
+      fuenteDeLaEscena.replace('if (tope <= 0) continue;', ''),
+      fuenteDeLaEscena.replace('if (LO_QUE_NO_SE_RECORTA.indexOf(p.porque) < 0) {', '{'),
+    ],
+  );
+  reglaDelFuente(
+    'y mide una vez por segundo con la media de ESE segundo, y sólo con el tablero cargado',
+    (t) =>
+      /if \(props\.alMedir === undefined \|\| catalogo === null\) return;/.test(t) &&
+      /m\.segundos \+= Math\.min\(0\.1, Math\.max\(0, dtCrudo\)\);/.test(t) &&
+      /if \(m\.segundos < 1\) return;/.test(t) &&
+      /ms: \(m\.segundos \* 1000\) \/ m\.fotogramas,\s*fotogramas: m\.fotogramas,/.test(t) &&
+      /m\.segundos = 0;\s*m\.fotogramas = 0;/.test(t),
+    fuenteDeLaEscena,
+    [fuenteDeLaEscena.replace(' || catalogo === null', ''), fuenteDeLaEscena.replace('m.fotogramas = 0;', '')],
+  );
+  for (const [quien, fuente] of [
+    ['la app', fuenteDeLaApp],
+    ['el escritorio', fuenteDelEscritorio],
+  ] as const) {
+    reglaDelFuente(
+      `${quien} juzga la calidad con lo que mide la escena y se la pasa: ni «plena» escrita a mano, ni una calidad sin quien la cambie`,
+      (t) => {
+        const elemento = elementoDeLaEscena(t);
+        return (
+          /\bcalidad=\{calidad\}/.test(elemento) &&
+          /\balMedir=\{alMedir\}/.test(elemento) &&
+          /conLaMuestra\(muestras\.current, \{ ms: m\.ms, fotogramas: m\.fotogramas \}\)/.test(t) &&
+          /\(antes\) => calidadDelValle\(antes, muestras\.current\)/.test(t) &&
+          !/\bcalidad=["'{]\s*['"]?(plena|sobria)/.test(t)
+        );
+      },
+      fuente,
+      [fuente.replace('calidad={calidad}', 'calidad="plena"'), fuente.replace('alMedir={alMedir}', '')],
+    );
+  }
+}
+
+paso('En el teléfono el valle se abre con su atlas: la app pasa el complemento y la escena lo monta');
+
+const bytesDelTablero = ((): ArrayBuffer => {
+  const crudo = fs.readFileSync(path.resolve(import.meta.dirname ?? __dirname, '..', 'modelos', 'tablero.glb'));
+  return crudo.buffer.slice(crudo.byteOffset, crudo.byteOffset + crudo.byteLength) as ArrayBuffer;
+})();
+
+/** Abre el tablero con el cargador de la escena, callando lo que `three` y el complemento dicen por consola. */
+async function abrirComoLaEscena(
+  complementos: readonly ComplementoDelCargador[],
+): Promise<{ catalogo: Catalogo | null; fallo: string | null; dichos: number }> {
+  let dichos = 0;
+  const error = console.error;
+  const aviso = console.warn;
+  console.error = (): void => {
+    dichos++;
+  };
+  console.warn = (): void => {
+    dichos++;
+  };
+  try {
+    const gltf = await abrirElTablero(bytesDelTablero, complementos);
+    return { catalogo: catalogoDe(gltf.scene), fallo: null, dichos };
+  } catch (f) {
+    return { catalogo: null, fallo: f instanceof Error ? f.message : String(f), dichos };
+  } finally {
+    console.error = error;
+    console.warn = aviso;
+  }
+}
+
+/** Las piezas que pinta Las Lindes: todo lo que reparte una losa, lo del desierto y la caja del reloj. */
+const piezasDelValle = new Set<string>([...LO_QUE_CRECE_EN_LA_ARENA, MODELO.caja]);
+for (const losa of LAS_LOSAS) {
+  for (const giro of GIROS) {
+    for (const semilla of [7, 99, 1000]) {
+      for (const p of montarLaLosa(losa.id, giro, semilla).puestas) piezasDelValle.add(p.pieza);
+    }
+  }
+}
+
+/** Cómo llegan las partes de las piezas del valle: con el atlas compilado, con otro mapa o sin mapa. */
+function comoLlegan(catalogo: Catalogo | null): {
+  partes: number;
+  conAtlas: number;
+  sinMapa: number;
+  otras: string[];
+  sinModelo: string[];
+} {
+  const cuenta = { partes: 0, conAtlas: 0, sinMapa: 0, otras: [] as string[], sinModelo: [] as string[] };
+  if (catalogo === null) return cuenta;
+  for (const pieza of piezasDelValle) {
+    const partes = catalogo.partes.get(pieza) ?? [];
+    if (partes.length === 0) cuenta.sinModelo.push(pieza);
+    for (const parte of partes) {
+      cuenta.partes++;
+      const mapa =
+        (parte.material as unknown as { map?: { isDataTexture?: boolean; name?: string } | null }).map ?? null;
+      if (mapa === null) cuenta.sinMapa++;
+      else if (mapa.isDataTexture === true && mapa.name === IMAGEN_DEL_ATLAS) cuenta.conAtlas++;
+      else cuenta.otras.push(pieza);
+    }
+  }
+  return cuenta;
+}
+
+/*
+ * ═══ PRIMERO EL FALLO: SIN COMPLEMENTO NO LLEGA EL ATLAS ═══
+ *
+ * Node, como Hermes, no tiene con qué decodificar el PNG empotrado. Se le pone `self` —que React
+ * Native sí define y Node no— para que el cargador recorra el camino del teléfono: llega hasta la
+ * imagen, no puede con ella, y `three` 0.185 deja el mapa en `null`. Es lo que se veía en la app:
+ * el valle montado, y blanco. Sin `self` la carga revienta antes, que es la otra cara del mismo
+ * fallo y también vale: en ningún caso llega el atlas.
+ */
+const conSelf = globalThis as { self?: unknown };
+const habiaSelf = conSelf.self !== undefined;
+if (!habiaSelf) conSelf.self = globalThis;
+const sinComplemento = await abrirComoLaEscena([]);
+if (!habiaSelf) delete conSelf.self;
+const comoLleganSin = comoLlegan(sinComplemento.catalogo);
+console.log(
+  sinComplemento.fallo === null
+    ? `  sin complemento: ${String(comoLleganSin.partes)} partes de las piezas del valle, ${String(comoLleganSin.sinMapa)} sin mapa y ${String(comoLleganSin.conAtlas)} con el atlas`
+    : `  sin complemento la carga revienta: ${sinComplemento.fallo}`,
+);
+comprobar(
+  'sin complemento, en un motor que no decodifica imágenes, ninguna pieza del valle llega con su atlas: es el valle blanco de la app',
+  sinComplemento.fallo !== null || (comoLleganSin.partes > 0 && comoLleganSin.conAtlas === 0),
+  { fallo: sinComplemento.fallo, ...comoLleganSin, otras: comoLleganSin.otras.length },
+);
+
+/* ═══ Y CON EL QUE PASA LA APP, TODAS ═══ */
+const conComplemento = await abrirComoLaEscena([texturasDelTablero]);
+const comoLleganCon = comoLlegan(conComplemento.catalogo);
+console.log(
+  `  con \`texturasDelTablero\`: ${String(comoLleganCon.conAtlas)} de ${String(comoLleganCon.partes)} partes, de ${String(piezasDelValle.size)} piezas, con el atlas compilado`,
+);
+comprobar(
+  'con el complemento de la app, TODAS las partes de TODAS las piezas del valle llevan el atlas compilado',
+  conComplemento.fallo === null &&
+    comoLleganCon.partes > 0 &&
+    comoLleganCon.conAtlas === comoLleganCon.partes &&
+    comoLleganCon.sinModelo.length === 0,
+  {
+    fallo: conComplemento.fallo,
+    partes: comoLleganCon.partes,
+    conAtlas: comoLleganCon.conAtlas,
+    sinMapa: comoLleganCon.sinMapa,
+    otras: comoLleganCon.otras.slice(0, 5),
+    sinModelo: comoLleganCon.sinModelo.slice(0, 5),
+  },
+);
+comprobar(
+  'y se han mirado piezas de verdad: lo que reparte una losa, el desierto y la caja del reloj',
+  piezasDelValle.size > 30,
+  piezasDelValle.size,
+);
+
+reglaDelFuente(
+  'la app le pasa ese complemento a la escena donde el motor no decodifica imágenes —el del tablero, no la blanca de los avatares—',
+  (t) =>
+    /const COMPLEMENTOS_DEL_TABLERO: readonly ComplementoDelCargador\[\] = decodificaImagenes\(\) \? \[\] : \[texturasDelTablero\];/.test(
+      t,
+    ) &&
+    /\bcomplementosDelTablero=\{COMPLEMENTOS_DEL_TABLERO\}/.test(elementoDeLaEscena(t)) &&
+    /import \{ decodificaImagenes, texturasDelTablero \} from '\.\.\/tres\/texturas-nativas';/.test(t) &&
+    !/texturasLisas/.test(t),
+  fuenteDeLaApp,
+  [
+    fuenteDeLaApp.replace('complementosDelTablero={COMPLEMENTOS_DEL_TABLERO}', ''),
+    fuenteDeLaApp.replace('[texturasDelTablero];', '[texturasLisas];'),
+  ],
+);
+reglaDelFuente(
+  'y la escena abre `tablero.glb` con los complementos que le llegan, con su cargador y con ningún otro',
+  (t) =>
+    /const complementos = props\.complementosDelTablero \?\? \[\];/.test(t) &&
+    /traer\(rutaDelTablero\(\)\)\s*\.then\(\(bytes\) => abrirElTablero\(bytes, complementos\)\)/.test(t) &&
+    !/\babrirGlb\(/.test(t) &&
+    !/new GLTFLoader\(/.test(t),
+  fuenteDeLaEscena,
+  [fuenteDeLaEscena.replace('abrirElTablero(bytes, complementos)', 'abrirElTablero(bytes, [])')],
+);
+comprobar(
+  'el escritorio no pasa ninguno: su navegador decodifica el PNG, y el valle se ve como se veía',
+  !/complementosDelTablero/.test(fuenteDelEscritorio) && elementoDeLaEscena(fuenteDelEscritorio).length > 0,
+);
+
+paso('Una valla estirada se alarga, no engorda; y lo que choca se sigue estirando como choca');
+
+{
+  const catalogo = conComplemento.catalogo;
+  comprobar('el catálogo del tablero se ha abierto para medir las cajas', catalogo !== null);
+  if (catalogo !== null) {
+    const valla = cajaDelModelo(catalogo, MODELO.valla);
+    const vallaPuerta = cajaDelModelo(catalogo, MODELO.vallaPuerta);
+    const muro = cajaDelModelo(catalogo, MODELO.muro);
+    const muroPuerta = cajaDelModelo(catalogo, MODELO.muroPuerta);
+    const enPlanta = (c: { ancho: number; fondo: number }): string => `${c.ancho.toFixed(3)} × ${c.fondo.toFixed(3)}`;
+    console.log(
+      `  en planta, x × z del pack: valla ${enPlanta(valla)}, valla con puerta ${enPlanta(vallaPuerta)}, ` +
+        `muro ${enPlanta(muro)}, muro con puerta ${enPlanta(muroPuerta)}`,
+    );
+    comprobar(
+      'la valla del pack es larga en su z, medido en su caja: su `largo` va por ahí',
+      ejeDelLargo(valla) === 'z' && ejeDelLargo(vallaPuerta) === 'z',
+      { valla, vallaPuerta },
+    );
+    comprobar(
+      'y lo que mide a lo largo es lo que el reparto cree que mide una valla (`LARGO_DE_LA_VALLA_EN_PACK`)',
+      Math.abs(valla.fondo - LARGO_DE_LA_VALLA_EN_PACK) < 0.01,
+      { fondo: valla.fondo, delReparto: LARGO_DE_LA_VALLA_EN_PACK },
+    );
+    comprobar(
+      'el muro es largo en su x, y se sigue estirando por ahí',
+      ejeDelLargo(muro) === 'x' && ejeDelLargo(muroPuerta) === 'x',
+      { muro, muroPuerta },
+    );
+
+    /*
+     * ═══ LO QUE SE PINTA, PIEZA A PIEZA ═══
+     *
+     * Cada puesta estirada del reparto, con la escala que le compone la escena: lo que mide a lo
+     * largo —el lado MAYOR de su caja— tiene que crecer por su `largo`, y lo que mide de grueso
+     * —el menor— y de alto, quedarse como el pack. Se decide cuál es el lado mayor aquí, con la
+     * caja, y no preguntándole a `ejeDelLargo`: si se le preguntara, una regla equivocada se daría
+     * la razón a sí misma.
+     */
+    const auxiliar = { x: 0, y: 0, z: 0 };
+    let estiradas = 0;
+    let malas = 0;
+    const ejemplos: unknown[] = [];
+    let sinLargoClaro = 0;
+    const casiCuadradas = new Set<string>();
+    let vallasEstiradas = 0;
+    let gruesasALaVieja = 0;
+    let chocanEstiradas = 0;
+    let chocanPorLaZ = 0;
+    const cercaDeLaErmita = { largo: 0, cada: Number.POSITIVE_INFINITY };
+    for (const losa of LAS_LOSAS) {
+      for (const giro of GIROS) {
+        for (const semilla of [7, 99, 1000]) {
+          const puestas = montarLaLosa(losa.id, giro, semilla).puestas;
+          for (const p of puestas) {
+            if (p.largo === 1) continue;
+            estiradas++;
+            const caja = cajaDelModelo(catalogo, p.pieza);
+            const mayor = Math.max(caja.ancho, caja.fondo);
+            const menor = Math.min(caja.ancho, caja.fondo);
+            if (mayor < menor * VECES_QUE_HACEN_UN_LARGO) {
+              sinLargoClaro++;
+              casiCuadradas.add(p.pieza);
+              continue;
+            }
+            const largaEnZ = caja.fondo > caja.ancho;
+            const e = escalaDeLaPuesta(p.escala, p.largo, ejeDelLargo(caja), auxiliar);
+            const s = p.escala * ESCALA_DEL_PACK;
+            const largoPintado = largaEnZ ? caja.fondo * e.z : caja.ancho * e.x;
+            const gruesoPintado = largaEnZ ? caja.ancho * e.x : caja.fondo * e.z;
+            const bien =
+              Math.abs(largoPintado - mayor * s * p.largo) < 1e-9 &&
+              Math.abs(gruesoPintado - menor * s) < 1e-9 &&
+              Math.abs(e.y - s) < 1e-9;
+            if (!bien) {
+              malas++;
+              if (ejemplos.length < 5) ejemplos.push({ pieza: p.pieza, largo: p.largo, largoPintado, gruesoPintado });
+            }
+            if (p.pieza === MODELO.valla || p.pieza === MODELO.vallaPuerta) {
+              vallasEstiradas++;
+              /* La cuenta de antes: el `largo` siempre a la `x` del modelo. */
+              const aLaVieja = escalaDeLaPuesta(p.escala, p.largo, 'x', { x: 0, y: 0, z: 0 });
+              /*
+               * Más gruesa en su `largo`: con la cuenta de antes el grueso crecía lo que debía crecer
+               * el largo. El umbral era vez y media cuando los largos eran 1,7 y 1,8; la cerca de la
+               * ermita va ahora a 1,083 —lo justo para cerrar sin montarse—, así que se mira que
+               * engorde, no cuánto.
+               */
+              if (caja.ancho * aLaVieja.x > gruesoPintado * 1.01) gruesasALaVieja++;
+              if (p.porque === 'ermita') cercaDeLaErmita.largo = Math.max(cercaDeLaErmita.largo, largoPintado);
+            }
+            if (comoEstorba(p.pieza) !== 'nada') {
+              chocanEstiradas++;
+              if (ejeDelLargo(caja) !== 'x') chocanPorLaZ++;
+            }
+          }
+          /* Cada cuánto va una valla de la cerca de la ermita: la menor distancia entre dos de la misma raya. */
+          const deLaErmita = puestas.filter((p) => p.porque === 'ermita' && p.pieza === MODELO.valla);
+          for (let i = 0; i < deLaErmita.length; i++) {
+            for (let j = i + 1; j < deLaErmita.length; j++) {
+              const a = deLaErmita[i];
+              const b = deLaErmita[j];
+              if (a === undefined || b === undefined || a.giro !== b.giro) continue;
+              const d = Math.hypot(a.x - b.x, a.z - b.z);
+              if (Math.abs(a.x - b.x) < 1e-6 || Math.abs(a.z - b.z) < 1e-6) cercaDeLaErmita.cada = Math.min(cercaDeLaErmita.cada, d);
+            }
+          }
+        }
+      }
+    }
+    console.log(
+      `  ${String(estiradas)} puestas estiradas en el reparto, ${String(vallasEstiradas)} de ellas vallas; ` +
+        `${String(gruesasALaVieja)} salían más gruesas con la cuenta de antes`,
+    );
+    if (cercaDeLaErmita.largo > 0 && Number.isFinite(cercaDeLaErmita.cada)) {
+      console.log(
+        `  la cerca de la ermita: cada valla mide ${cercaDeLaErmita.largo.toFixed(2)} y van cada ` +
+          `${cercaDeLaErmita.cada.toFixed(2)}: ${(cercaDeLaErmita.largo - cercaDeLaErmita.cada).toFixed(2)} de solape`,
+      );
+    }
+    comprobar(
+      'la cerca de la ermita cierra su lado sin montarse: cada valla mide lo que va de una a la siguiente, a una décima',
+      cercaDeLaErmita.largo > 0 &&
+        Number.isFinite(cercaDeLaErmita.cada) &&
+        Math.abs(cercaDeLaErmita.largo - cercaDeLaErmita.cada) < 0.1,
+      cercaDeLaErmita,
+    );
+    comprobar(
+      'toda pieza estirada crece por su lado largo y conserva su grueso y su alto',
+      estiradas > 0 && malas === 0,
+      { estiradas, malas, ejemplos },
+    );
+    comprobar(
+      'y todo lo que se estira tiene un largo claro —un lado que dobla al otro—: estirar algo casi cuadrado no dice hacia dónde',
+      sinLargoClaro === 0,
+      { sinLargoClaro, piezas: [...casiCuadradas] },
+    );
+    comprobar(
+      'y en el reparto hay vallas estiradas que mirar —la cerca de la ermita y las de la senda—',
+      vallasEstiradas > 0,
+      vallasEstiradas,
+    );
+    comprobar(
+      'con la cuenta de antes —el `largo` siempre a la x— TODAS esas vallas salían más gruesas en vez de más largas: el fallo, medido',
+      gruesasALaVieja === vallasEstiradas,
+      { gruesasALaVieja, vallasEstiradas },
+    );
+    comprobar(
+      'nada que choque se estira por su z: el mundo (`cajasDeLaPuesta`) estira la x de su caja, y lo que se pinta es lo que para',
+      chocanEstiradas > 0 && chocanPorLaZ === 0,
+      { chocanEstiradas, chocanPorLaZ },
+    );
+  }
+
+  reglaDelFuente(
+    'las piezas del tablero y las de la mano se escalan con `escalaDeLaPuesta` y el eje de su caja, y no estirando la x a mano',
+    (t) =>
+      (t.match(/const eje = useMemo\(\(\) => ejeDelLargo\(cajaDeLasPartes\(partes\)\), \[partes\]\);/g) ?? []).length === 2 &&
+      /escalaDeLaPuesta\(p\.escala \* desvanece, p\.largo, eje, AUX_ESCALA\);/.test(t) &&
+      /escalaDeLaPuesta\(p\.escala, p\.largo, eje, AUX_ESCALA\);/.test(t) &&
+      !/\bp\.largo\s*\*|\*\s*p\.largo\b/.test(t),
+    fuenteDeLaEscena,
+    [
+      fuenteDeLaEscena.replace(
+        'escalaDeLaPuesta(p.escala, p.largo, eje, AUX_ESCALA);',
+        'AUX_ESCALA.set(p.escala * ESCALA_DEL_PACK * p.largo, p.escala * ESCALA_DEL_PACK, p.escala * ESCALA_DEL_PACK);',
+      ),
+    ],
+  );
+}
 
 console.log('');
 if (fallos.length > 0) {

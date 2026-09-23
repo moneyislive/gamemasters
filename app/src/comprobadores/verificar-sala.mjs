@@ -846,9 +846,14 @@ paso('El delta se puede mirar de cerca, recorrer, y siempre se puede volver');
       /if \(deLaInterfaz\.value \|\| elRatonPasea\.value\)/.test(gestoSinComentarios),
     'el mismo arrastre girando el tablero y moviendo la mirada a la vez es un bandazo',
   );
+  /*
+   * Mirando la mesa se le da el nodo; a pie se le quita, y eso lo compra el bloque de andar
+   * («Riberas a pie en la app»). Aquí se acepta la forma con la guarda porque lo que se compra
+   * es lo de siempre: que en la mesa el nodo llegue.
+   */
   comprobar(
     'y la pantalla le da el nodo del lienzo, que es donde se escucha',
-    /ref=\{apuntarElLienzo\}/.test(escenaSinComentarios),
+    /ref=\{(?:aPie \? undefined : )?apuntarElLienzo\}/.test(escenaSinComentarios),
     'sin el nodo no hay dónde apuntarse: en React Native Web el `onWheel` del `View` no basta',
   );
 
@@ -1594,7 +1599,8 @@ paso('Recoger la mesa en la app: suelta lo cogido, devuelve tirar y comprar al p
     /<Delta[\s\S]*?mazo=\{mazo\}[\s\S]*?dados=\{dados\}[\s\S]*?\/>/.test(escena) &&
       !/<Delta[\s\S]*?(dados|mazo)=\{mesaRecogida/.test(escena),
   );
-  const laVuelta = /const meTocaAhora = meToca\(laVista\);[\s\S]*?\}, \[meTocaAhora, cogida, cogidaDelMazo\]\);/.exec(codigo)?.[0] ?? '';
+  /* `aPie` entra en las dependencias desde que se anda: la salida también espera a volver a la mesa. */
+  const laVuelta = /const meTocaAhora = meToca\(laVista\);[\s\S]*?\}, \[meTocaAhora, cogida, cogidaDelMazo(?:, aPie)?\]\);/.exec(codigo)?.[0] ?? '';
   comprobar(
     'la mesa sale sola cuando `meToca` pasa de falso a verdadero (el FLANCO, con `meToca` de shared) y no cada vez que me toca',
     laVuelta.length > 0 &&
@@ -1642,7 +1648,7 @@ paso('Recoger la mesa en la app: suelta lo cogido, devuelve tirar y comprar al p
   const arribaDelMando = margenDelMando + Number(mando?.[3] ?? NaN);
   comprobar(
     'el botón de recoger existe sólo donde hay mesa que recoger (la misma condición con la que `<Delta>` monta la barra) y dice qué hace con todas sus letras',
-    /\{catalogo\.que === 'listo' && \(barra\.length > 0 \|\| mazo !== null\) \? \(\s*<Pressable[\s\S]*?style=\{estilos\.recogerLaMesa\}[\s\S]*?onPress=\{alRecogerLaMesa\}[\s\S]*?accessibilityRole="button"\s+accessibilityLabel=\{mesaRecogida \? 'Sacar la mesa' : 'Recoger la mesa'\}/.test(codigo),
+    /\{catalogo\.que === 'listo' && (?:!aPie && )?\(barra\.length > 0 \|\| mazo !== null\) \? \(\s*<Pressable[\s\S]*?style=\{estilos\.recogerLaMesa\}[\s\S]*?onPress=\{alRecogerLaMesa\}[\s\S]*?accessibilityRole="button"\s+accessibilityLabel=\{mesaRecogida \? 'Sacar la mesa' : 'Recoger la mesa'\}/.test(codigo),
   );
   const estiloDelRecoger = /recogerLaMesa: \{([^}]*)\},/.exec(codigo)?.[1] ?? '';
   comprobar(
@@ -1668,6 +1674,232 @@ paso('Recoger la mesa en la app: suelta lo cogido, devuelve tirar y comprar al p
       /minHeight: 44,/.test(estiloDelVolver) &&
       arribaDelMando >= 12 + 44,
     { volver: estiloDelVolver.replace(/\s+/g, ' ').slice(0, 120), recoge: arribaDelMando },
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ RIBERAS A PIE EN LA APP ═══
+ *
+ * El delta se anda con el paseo común de la escena (`escenas/andar-por-el-delta.tsx`), y lo
+ * que es de esta pantalla es lo que sólo sabe un teléfono: la palanca, y que el mirador
+ * táctil se APAGUE mientras se anda. Las dos cosas fallan sin decir nada: una palanca que no
+ * sale deja al móvil sin poder andar —el escritorio anda con el teclado y la batería en
+ * verde—, y un mirador encendido gira la mesa por debajo con el mismo pulgar que anda. Y la
+ * tercera, que no se puede perder: la cámara de la MESA tiene que seguir siendo la de siempre,
+ * el `Ojo` con su `ojoYMira`, y sólo en la mesa.
+ *
+ * Se lee el fuente porque todo esto vive dentro del `Canvas` o encima de él y aquí no hay
+ * `Canvas`, y cada regla se ve CAER con su caso envenenado, como las del Burgo.
+ */
+paso('Riberas a pie en la app: la palanca sólo a pie, el mirador táctil apagado mientras se anda, y la cámara de la mesa la de siempre');
+{
+  const escena = leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx'));
+  const tactil = leer(path.join(SRC, 'arcade', 'mirador-tactil.ts'));
+  const soloCodigo = (texto) =>
+    texto
+      .split('\n')
+      .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+      .join('\n');
+  /** Afirma la regla sobre el fichero de verdad, y la ve CAER con el caso envenenado. */
+  const reglaDelFuente = (que, prueba, bueno, envenenado, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    comprobar(
+      `y «${que}» se ve CAER con el caso envenenado`,
+      !prueba(envenenado),
+      'una regla que no se ve caer puede estar mirando otra cosa, y entonces es verde para siempre',
+    );
+  };
+
+  reglaDelFuente(
+    'desde dónde se mira es un `useState` de la pantalla —mesa, hombro u ojos— y «a pie» es no estar en la mesa',
+    (t) =>
+      /const \[modo, ponerModo\] = useState<ModoDeCamaraDelDelta\['modo'\]>\('mesa'\);/.test(soloCodigo(t)) &&
+      /const aPie = modo !== 'mesa';/.test(soloCodigo(t)),
+    escena,
+    escena.replace("const aPie = modo !== 'mesa';", "const aPie = modo === 'ojos';"),
+    'si «a pie» no es todo lo que no es la mesa, al hombro se anda con la mesa encendida por debajo',
+  );
+  reglaDelFuente(
+    'la palanca de Las Lindes sale SÓLO a pie, y escribe en la misma referencia que lee la escena',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /<MandosDelPaseo mandos=\{mandos\} visibles=\{aPie\} \/>/.test(c) &&
+        /const mandos = useRef<MandosDeFuera>\(SIN_MANDOS_DE_FUERA\);/.test(c) &&
+        /<Delta[\s\S]*?\bmandos=\{mandos\}[\s\S]*?\/>/.test(c) &&
+        /import \{ MandosDelPaseo \} from '\.\/mandos-del-paseo';/.test(c)
+      );
+    },
+    escena,
+    escena.replace('<MandosDelPaseo mandos={mandos} visibles={aPie} />', '<MandosDelPaseo mandos={mandos} visibles />'),
+    'sin la palanca en el teléfono no se anda: la escena lee el teclado, y en iOS y en Android no hay',
+  );
+  reglaDelFuente(
+    'y la escena recibe la cámara, la VISTA —de ella sale `mundoDeRiberas`— y `traer`: el paseo es el común, y esta pantalla no da un paso',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /<Delta[\s\S]*?camara=\{camara\}\s+vista=\{laVista\}\s+traer=\{traer\}[\s\S]*?\/>/.test(c) &&
+        /const camara: ModoDeCamaraDelDelta = modo === 'mesa' \? \{ modo: 'mesa' \} : \{ modo, asiento: yo \?\? '' \};/.test(c) &&
+        !/\b(pasoDelTic|unPaso|fotogramaDelPaseo|usarElPaseo|teclaDelPaseo)\b/.test(c)
+      );
+    },
+    escena,
+    escena.replace('vista={laVista}', 'vista={datos}'),
+    'con otra cosa que la vista la escena no sabe derivar el mundo, y a pie no se choca con nada',
+  );
+
+  /* ─── El mirador táctil, apagado a pie ─── */
+
+  /*
+   * EL GEMELO APAGADO TIENE LA FORMA DEL GESTO DEL MIRADOR: los mismos tres gestos, del mismo
+   * tipo, en el mismo orden y en el mismo hilo. Con otra forma, `GestureDetector` volvería a
+   * enganchar los gestos y podría cambiar de envoltorio —`Wrap` por `AnimatedWrap`—, que es
+   * desmontar el lienzo y perder el contexto de dibujo cada vez que se baja a andar. Se mira la
+   * forma del de verdad en `mirador-tactil.ts` y la del gemelo aquí, y se exige la misma.
+   */
+  const gestoDelMirador = soloCodigo(tactil);
+  const trozo = (texto, desde, hasta) => {
+    const a = texto.indexOf(desde);
+    const b = a < 0 ? -1 : texto.indexOf(hasta, a + desde.length);
+    return a < 0 || b < 0 ? '' : texto.slice(a, b);
+  };
+  const giro = trozo(gestoDelMirador, 'const giro = Gesture.Pan()', 'const pellizco = ');
+  const pellizco = trozo(gestoDelMirador, 'const pellizco = Gesture.Pinch()', 'const paseo = ');
+  const paseoDeDos = trozo(gestoDelMirador, 'const paseo = Gesture.Pan()', 'return Gesture.Simultaneous(');
+  comprobar(
+    'el gesto del mirador sigue siendo el que el gemelo copia: un `Pan` de trabajo, un `Pinch` y un `Pan` en JavaScript, simultáneos',
+    giro.length > 0 &&
+      !/\.runOnJS\(true\)/.test(giro) &&
+      /'worklet';/.test(giro) &&
+      /\.runOnJS\(true\)/.test(pellizco) &&
+      /\.runOnJS\(true\)/.test(paseoDeDos) &&
+      /return Gesture\.Simultaneous\(giro, pellizco, paseo\);/.test(gestoDelMirador),
+    'si el mirador cambia de forma, el gemelo de la pantalla tiene que cambiar con él',
+  );
+  const FORMA_DEL_GEMELO =
+    /const gestoApagado = useMemo\(\s*\(\) =>\s*Gesture\.Simultaneous\(\s*Gesture\.Pan\(\)\s*\.onTouchesDown\(\(\) => \{\s*'worklet';\s*\}\)\s*\.enabled\(false\),\s*Gesture\.Pinch\(\)\.runOnJS\(true\)\.enabled\(false\),\s*Gesture\.Pan\(\)\.runOnJS\(true\)\.minPointers\(2\)\.enabled\(false\),\s*\),\s*\[\],\s*\);/;
+  reglaDelFuente(
+    'a pie el `GestureDetector` lleva el gemelo APAGADO del mirador, con su misma forma, y en la mesa el de siempre',
+    (t) => {
+      const c = soloCodigo(t);
+      return /<GestureDetector gesture=\{aPie \? gestoApagado : gesto\}>/.test(c) && FORMA_DEL_GEMELO.test(c);
+    },
+    escena,
+    escena.replace('Gesture.Pinch().runOnJS(true).enabled(false)', 'Gesture.Pinch().enabled(false)'),
+    'un gemelo con otro hilo cambia el envoltorio del detector: se desmonta el lienzo al bajar a andar',
+  );
+  reglaDelFuente(
+    'y a pie se le quita el nodo del lienzo, que es por donde entran la rueda y el arrastre del ratón',
+    (t) => /ref=\{aPie \? undefined : apuntarElLienzo\}/.test(soloCodigo(t)),
+    escena,
+    escena.replace('ref={aPie ? undefined : apuntarElLienzo}', 'ref={apuntarElLienzo}'),
+    'con el nodo puesto, la rueda sigue acercando la mesa que no se ve mientras se anda',
+  );
+  reglaDelFuente(
+    'la cámara de la MESA es la de siempre —el `Ojo` con `ojoYMira`— y sólo en la mesa: a pie la pone el paseo',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /\{aPie \? null : <Ojo mirador=\{mirador\} cercania=\{cercania\} alcance=\{alcance\} \/>\}/.test(c) &&
+        /const \{ ojo, mira \} = ojoYMira\(cercania\.current, alcance, \(d\) =>\s*ojoDelMirador\(m, d, proporcion\),?\s*\);/.test(c) &&
+        (c.match(/<Ojo\b/g) ?? []).length === 1
+      );
+    },
+    escena,
+    escena.replace(
+      '{aPie ? null : <Ojo mirador={mirador} cercania={cercania} alcance={alcance} />}',
+      '<Ojo mirador={mirador} cercania={cercania} alcance={alcance} />',
+    ),
+    'con el `Ojo` montado a pie, cada fotograma devuelve la cámara al aire: el paseo pone la suya y el `Ojo` la pisa',
+  );
+
+  /* ─── Bajar recoge la mesa, y subir la saca ─── */
+
+  reglaDelFuente(
+    'bajar a andar suelta lo cogido y RECOGE la mesa con su mismo estado, y volver a la mesa la saca',
+    (t) => {
+      const cuerpo = trozo(soloCodigo(t), 'const cambiarDeCamara = useCallback(', '[modo, soltarTodo],');
+      return (
+        /if \(modo === 'mesa'\) \{\s*soltarTodo\(\);\s*ponerMesaRecogida\(true\);\s*\} else if \(nuevo === 'mesa'\) \{\s*ponerMesaRecogida\(false\);\s*\}\s*ponerModo\(nuevo\);/.test(
+          cuerpo,
+        )
+      );
+    },
+    escena,
+    escena.replace(/soltarTodo\(\);\n(\s*)ponerMesaRecogida\(true\);/, 'ponerMesaRecogida(true);'),
+    'sin recogerla, la barra y los dados cuelgan delante de la cámara de hombro y encima de la palanca',
+  );
+  reglaDelFuente(
+    'y a pie la mesa NO sale sola al pasar a tocarme: la salida espera a volver a la mesa, y `aPie` la despierta',
+    (t) => {
+      const vuelta =
+        /const meTocaAhora = meToca\(laVista\);[\s\S]*?\}, \[meTocaAhora, cogida, cogidaDelMazo, aPie\]\);/.exec(soloCodigo(t))?.[0] ?? '';
+      return /if \(!laSalidaEspera\.current\) return;\s*if \(aPie\) return;\s*if \(cogida !== null \|\| cogidaDelMazo !== null\) return;/.test(vuelta);
+    },
+    escena,
+    escena.replace(/\n\s*if \(aPie\) return;\n/, '\n'),
+    'una mesa que sube mientras se anda cuelga la barra delante de la cámara y encima de la palanca',
+  );
+  reglaDelFuente(
+    'y a pie no hay ni mando de recoger ni «Tablero entero»: la mesa ya está recogida, «sacarla» colgaría la barra delante de quien anda, y andando no hay aire al que volver',
+    (t) =>
+      /\{catalogo\.que === 'listo' && !aPie && \(barra\.length > 0 \|\| mazo !== null\) \? \(/.test(soloCodigo(t)) &&
+      /\{catalogo\.que === 'listo' && !aPie && seHaMovido \? \(/.test(soloCodigo(t)),
+    escena,
+    escena.replace("catalogo.que === 'listo' && !aPie && (barra", "catalogo.que === 'listo' && (barra"),
+    'un «Sacar la mesa» andando saca la barra encima de la palanca',
+  );
+
+  /* ─── Los tres botones de cámara, debajo del lienzo ─── */
+
+  reglaDelFuente(
+    'las tres cámaras son botones DEBAJO del lienzo —fuera del gesto y de la red— que cambian por `cambiarDeCamara`, y lo que se oye empieza por lo que se lee',
+    (t) => {
+      const c = soloCodigo(t);
+      const lista = /const LAS_CAMARAS[^=]*= \[([\s\S]*?)\];/.exec(c)?.[1] ?? '';
+      const filas = [...lista.matchAll(/\{ modo: '(\w+)', rotulo: '([^']+)', dicho: '([^']+)' \}/g)];
+      const botones = c.indexOf('style={estilos.camaras}');
+      return (
+        filas.length === 3 &&
+        filas.map((f) => f[1]).join(',') === 'mesa,hombro,ojos' &&
+        filas.every((f) => (f[3] ?? '').startsWith(f[2] ?? '\u0000')) &&
+        /LAS_CAMARAS\.map\(\(c\) => \([\s\S]*?onPress=\{\(\) => cambiarDeCamara\(c\.modo\)\}[\s\S]*?accessibilityState=\{\{ selected: modo === c\.modo \}\}/.test(c) &&
+        botones > c.indexOf('</RedDelLienzo>') &&
+        botones > c.indexOf('</GestureDetector>') &&
+        botones < c.indexOf('style={estilos.pieDeLaMesa}', botones)
+      );
+    },
+    escena,
+    escena.replace("dicho: 'Hombro: bajar", "dicho: 'Bajar"),
+    'un nombre que no empieza por lo que se lee no se puede decir en voz alta para pulsarlo',
+  );
+
+  /*
+   * EN UNA MESA DE BOTAS, CÓMO VA EL CANAL: en la tira de las cámaras, DEBAJO del lienzo, por lo
+   * mismo que ellas —encima no queda esquina—, y sólo detrás de la pregunta de botas. (Que el canal
+   * se construya sólo en botas y que se empiece a pie lo mira `verify:canal-del-paseo`.)
+   */
+  reglaDelFuente(
+    'en una mesa de botas se dice cómo va el canal en la tira de las cámaras, debajo del lienzo; en una normal, nada',
+    (t) => {
+      const c = soloCodigo(t);
+      const tira = c.indexOf('style={estilos.camaras}');
+      const cartel = c.indexOf('<Text style={estilos.canal} numberOfLines={2}>');
+      return (
+        /const esBotas = esMesaDeBotas\(vista\);/.test(c) &&
+        /\{esBotas \? \(\s*<Text style=\{estilos\.canal\} numberOfLines=\{2\}>\s*\{estadoDelCanal\?\.texto \?\? 'Conectando…'\}/.test(c) &&
+        (c.match(/style=\{estilos\.canal\}/g) ?? []).length === 1 &&
+        tira > c.indexOf('</RedDelLienzo>') &&
+        cartel > tira &&
+        cartel < c.indexOf('style={estilos.pieDeLaMesa}', tira)
+      );
+    },
+    escena,
+    escena.replace(/\{esBotas \? \(\s*<Text style=\{estilos\.canal\}/, '{true ? (\n            <Text style={estilos.canal}'),
+    'sin la pregunta, una mesa normal diría «Conectando…» debajo del delta sin abrir ningún socket',
   );
 }
 
@@ -2065,6 +2297,122 @@ paso(
     escena,
     escena.replace('<ElOjoDelBurgo mirador={mirador} cercania={cercania} />', ''),
     'r3f corre los suscriptores de igual prioridad en orden de montaje: montado después, el seguimiento de la escena iría siempre un fotograma por detrás',
+  );
+
+  /*
+   * ─── A pie por el Burgo: la palanca sólo a pie, el mirador táctil apagado y la mesa la de siempre ───
+   *
+   * El ojo del cliente NO se desmonta a pie, al revés que en Riberas: aquí va montado ANTES que
+   * `<Burgo>` por el seguimiento al que mueve (la regla de arriba), y desmontado y vuelto a montar se
+   * suscribiría detrás. A pie lo sigue escribiendo y la escena pone encima la cámara del paseo. Lo
+   * que se apaga es lo que MUEVE la cámara de mesa por detrás: el gesto del tablero —con
+   * `enabled(false)` en sus mismos gestos, sin cambiarle la forma al detector— y el nodo que la web
+   * le da al ratón.
+   */
+  reglaDelFuente(
+    'el Burgo baja a andar con un `useState` de la pantalla —mesa, hombro u ojos—, y la escena recibe la cámara con el asiento de quien mira y la palanca',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /const \[modo, ponerModo\] = useState<ModoDelBurgo>\('mesa'\);/.test(c) &&
+        /const aPie = modo !== 'mesa';/.test(c) &&
+        /const camara = useMemo\(\(\): ModoDeCamara => \(modo === 'mesa' \? CAMARA_DE_MESA : \{ modo, asiento: yo \?\? '' \}\), \[modo, yo\]\);/.test(c) &&
+        /<Burgo\n[\s\S]*?camara=\{camara\}\s+mandos=\{mandos\}[\s\S]*?\/>/.test(c) &&
+        /const mandos = useRef<MandosDeFuera>\(SIN_MANDOS_DE_FUERA\);/.test(c)
+      );
+    },
+    escena,
+    escena.replace('camara={camara}\n                    mandos={mandos}', 'camara={CAMARA_DE_MESA}'),
+    'sin la cámara con su modo la escena no baja nunca a andar, y sin la palanca en la referencia, en el teléfono no se da un paso',
+  );
+  reglaDelFuente(
+    'la palanca de Las Lindes sale SÓLO a pie, en la franja justo encima del pie y no en el borde, que es de la cinta y del carril',
+    (t) => {
+      const c = soloCodigo(t);
+      const franja = c.indexOf('<View style={[estilos.franjaDelPaseo, aPie ? estilos.franjaAndando : null]} pointerEvents="box-none">');
+      const palanca = c.indexOf('<MandosDelPaseo mandos={mandos} visibles={aPie} />');
+      const pie = c.indexOf('{elPie(fuera)}');
+      return (
+        /import \{ MandosDelPaseo \} from '\.\/mandos-del-paseo';/.test(c) &&
+        (c.match(/<MandosDelPaseo\b/g) ?? []).length === 1 &&
+        franja > c.indexOf('<View style={estilos.pieFlotante} pointerEvents="box-none">') &&
+        palanca > franja &&
+        pie > palanca &&
+        /franjaDelPaseo: \{ height: ALTO_DE_LA_FRANJA_EN_LA_MESA, flexShrink: 0 \}/.test(c) &&
+        /franjaAndando: \{ height: ALTO_DE_LA_FRANJA_ANDANDO \}/.test(c)
+      );
+    },
+    escena,
+    escena.replace('<MandosDelPaseo mandos={mandos} visibles={aPie} />', '<MandosDelPaseo mandos={mandos} visibles />'),
+    'una palanca también en la mesa es un pulgar que no mueve a nadie tapando el tablero; y en el borde, se sienta encima de la cinta y del carril',
+  );
+  reglaDelFuente(
+    'a pie el gesto del tablero se APAGA en sus mismos gestos, antes de que el detector lea su configuración, y se le quita al ratón el nodo del lienzo',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /function apagarElMiradorAPie\([^)]*\): void \{\s*for \(const g of gesto\.toGestureArray\(\)\) g\.enabled\(!aPie\);\s*\}/.test(c) &&
+        /useLayoutEffect\(\(\) => \{\s*apagarElMiradorAPie\(gesto, aPie\);\s*\}, \[gesto, aPie\]\);/.test(c) &&
+        /<GestureDetector gesture=\{gesto\}>/.test(c) &&
+        /ref=\{aPie \? undefined : apuntarElLienzo\}/.test(c)
+      );
+    },
+    escena,
+    escena.replace(/useLayoutEffect\(\(\) => \{\s*apagarElMiradorAPie\(gesto, aPie\);\s*\}, \[gesto, aPie\]\);/, ''),
+    'con el gesto vivo a pie, el dedo que arrastra por el lienzo gira por detrás la cámara de mesa, y al volver el tablero está torcido sin que nadie lo pidiera',
+  );
+  reglaDelFuente(
+    'y a pie no sale «Ver el burgo entero»: andando no hay acercamiento del que volver',
+    (t) => /\{!llegando && seHaMovido && !aPie \? \(/.test(soloCodigo(t)),
+    escena,
+    escena.replace('{!llegando && seHaMovido && !aPie ? (', '{!llegando && seHaMovido ? ('),
+    'un botón de volver al aire que sale andando devuelve la cámara de mesa por debajo de quien anda',
+  );
+  reglaDelFuente(
+    'las tres cámaras son botones del pie —Mesa, Hombro y Ojos, como en Las Lindes—, FUERA del gesto, que le quitan el dedo al giro antes de cambiar de cámara',
+    (t) => {
+      const c = soloCodigo(t);
+      const lista = /const LAS_CAMARAS[^=]*= \[([\s\S]*?)\];/.exec(c)?.[1] ?? '';
+      const filas = [...lista.matchAll(/\{ modo: '(\w+)', rotulo: '([^']+)', ayuda: '([^']+)' \}/g)];
+      const botones = c.indexOf('style={estilos.camaras}');
+      return (
+        filas.length === 3 &&
+        filas.map((f) => f[1]).join(',') === 'mesa,hombro,ojos' &&
+        /LAS_CAMARAS\.map\(\(c\) => \([\s\S]*?onPress=\{\(\) => \{\s*laInterfazSeLoQueda\(\);\s*ponerModo\(c\.modo\);\s*\}\}[\s\S]*?accessibilityState=\{\{ selected: modo === c\.modo \}\}/.test(c) &&
+        botones > c.indexOf('</GestureDetector>') &&
+        /camara: \{\s*minHeight: 44,/.test(c)
+      );
+    },
+    escena,
+    escena.replace(/onPress=\{\(\) => \{\s*laInterfazSeLoQueda\(\);\s*ponerModo\(c\.modo\);\s*\}\}/, 'onPress={() => ponerModo(c.modo)}'),
+    'sin quitarle el dedo al giro, pulsar «Hombro» con el gesto aún vivo arranca además un giro de la mesa',
+  );
+  /*
+   * EN UNA MESA DE BOTAS, CÓMO VA EL CANAL. Encima de la franja del paseo y en la pila del pie, y no
+   * arriba a la izquierda como en Las Lindes: arriba está la caja del Burgo, que en un teléfono en pie
+   * ocupa casi todo el ancho. Sólo detrás de la pregunta de botas y sin coger el dedo, que lo que tapa
+   * sigue siendo tablero. (Que el canal se construya sólo en botas y que se empiece a pie lo mira
+   * `verify:canal-del-paseo`, en los dos clientes de los tres juegos.)
+   */
+  reglaDelFuente(
+    'en una mesa de botas se dice cómo va el canal encima de la franja del paseo, en la pila del pie y sin coger el dedo; en una normal, nada',
+    (t) => {
+      const c = soloCodigo(t);
+      const pila = c.indexOf('<View style={estilos.pieFlotante} pointerEvents="box-none">');
+      const cartel = c.indexOf('<Text style={estilos.canal} numberOfLines={2}>');
+      const franja = c.indexOf('<View style={[estilos.franjaDelPaseo, aPie ? estilos.franjaAndando : null]} pointerEvents="box-none">');
+      return (
+        /const esBotas = esMesaDeBotas\(vista\);/.test(c) &&
+        /\{esBotas \? \(\s*<View pointerEvents="none">\s*<Text style=\{estilos\.canal\} numberOfLines=\{2\}>\s*\{estadoDelCanal\?\.texto \?\? 'Conectando…'\}/.test(c) &&
+        (c.match(/style=\{estilos\.canal\}/g) ?? []).length === 1 &&
+        pila >= 0 &&
+        cartel > pila &&
+        franja > cartel
+      );
+    },
+    escena,
+    escena.replace(/\{esBotas \? \(\s*<View pointerEvents="none">/, '{true ? (\n              <View pointerEvents="none">'),
+    'sin la pregunta, una mesa normal diría «Conectando…» encima del tablero sin abrir ningún socket',
   );
 
   /* ─── El orden de composición, que es el fallo que no se ve ─── */
@@ -2843,6 +3191,260 @@ paso(
   );
 }
 
+/*
+ * ═══ BOOTS ON BOARD EN LA APP: LA ELECCIÓN AL ABRIR, LA MARCA Y LA SILLA QUE NO SE DA ═══
+ *
+ * `verify:compuerta-de-botas` mide la compuerta en sí, en Node y caso por caso. Lo que allí no se
+ * puede ver es si la APP la llama, y dónde: una función pura correcta y una pantalla que no la usa
+ * es el verde falso de siempre. Y aquí no se puede pintar nada —React Native entero detrás, y este
+ * guion corre con `node` pelado—, así que se lee el fuente, sabiendo lo que eso compra: que cada
+ * llamada está escrita donde tiene que estar y con lo que tiene que llevar. Lo que cada llamada
+ * DECIDE lo compra aquel comprobador, ejecutándola.
+ *
+ *   · La orilla del lobby común pinta la elección, empieza en la normal y manda en `abrir` lo que
+ *     se ve encendido; sin elección si el juego no se recorre, y apagada —`disabled`— con su porqué.
+ *   · El lobby mide en las TRES plataformas (la calidad sólo baja en Android), parte del veredicto
+ *     guardado, guarda el nuevo y le da la compuerta a la hoja.
+ *   · `entrar` pregunta a la compuerta ANTES de la única petición que pide silla, leyendo la mesa
+ *     sin llave; y el veredicto se guarda por aparato, y el último manda también en memoria.
+ *   · La barra de la mesa y la del lobby dicen Boots on Board cuando `esMesaDeBotas` lo dice.
+ *   · Y los vestíbulos PROPIOS de cada juego siguen abriendo la mesa de siempre: en toda la app,
+ *     sólo la orilla del lobby común le pasa una modalidad a `abrir`.
+ *
+ * Cada regla se afirma sobre el fichero de verdad y se ve CAER con una copia envenenada.
+ */
+paso('Boots on Board en la app: la elección sólo en el lobby común, apagada con su porqué, la marca en la barra, y nadie sin figura en una mesa de botas');
+{
+  const hoja = leer(path.join(SRC, 'arcade', 'hoja-del-muelle.tsx'));
+  const escena = leer(path.join(SRC, 'arcade', 'muelle-escena.tsx'));
+  const laMesa = leer(path.join(SRC, 'arcade', 'mesa.ts'));
+  const enLinea = leer(path.join(SRC, 'arcade', 'tablero-en-linea.tsx'));
+
+  /* Sin comentarios: las cabeceras cuentan el porqué con los mismos nombres que aquí se buscan. */
+  const soloCodigo = (texto) =>
+    texto
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+
+  /** Afirma la regla sobre el fichero de verdad, y la ve CAER con el caso envenenado. */
+  const regla = (que, prueba, bueno, envenenado, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    comprobar(
+      `y «${que}» se ve CAER con el caso envenenado`,
+      !prueba(envenenado),
+      'una regla que no se ve caer puede estar mirando otra cosa, y entonces es verde para siempre',
+    );
+  };
+
+  /* ── La orilla del lobby común ── */
+  regla(
+    'la orilla del lobby común pinta la elección, empieza en la normal, y en `abrir` viaja lo que se ve encendido',
+    (c) => {
+      const codigo = soloCodigo(c);
+      return (
+        /const \[elegida, ponerElegida\] = useState<Modalidad>\('normal'\);/.test(codigo) &&
+        /<EleccionDeModalidad elegida=\{elegida\} compuerta=\{compuerta\} alElegir=\{ponerElegida\} \/>/.test(codigo) &&
+        /mesa\.abrir\(nombre\.trim\(\), PLAZOS\[plazo\]\?\.segundos, figura \?\? undefined, modalidadQueViaja\(elegida, compuerta\)\)/.test(codigo)
+      );
+    },
+    hoja,
+    hoja.replace('modalidadQueViaja(elegida, compuerta))', 'elegida)'),
+    'mandar la marcada a pelo abriría una mesa de botas con la opción apagada en pantalla',
+  );
+  regla(
+    'sin elección si el juego no se recorre; con Boots on Board apagada —`disabled`— y su porqué en el renglón de debajo mientras el aparato no llegue',
+    (c) => {
+      const codigo = soloCodigo(c);
+      return (
+        /if \(compuerta\.que === 'no-se-recorre'\) return null;/.test(codigo) &&
+        /const motivo = compuerta\.que === 'se-ofrece' \? null : compuerta\.motivo;/.test(codigo) &&
+        /const apagada = m\.modalidad === 'botas' && motivo !== null;/.test(codigo) &&
+        /disabled=\{apagada\}/.test(codigo) &&
+        /accessibilityState=\{\{ selected: es, disabled: apagada \}\}/.test(codigo) &&
+        /const renglon = motivo \?\? /.test(codigo) &&
+        /<Text style=\{estilos\.ayuda\}>\{renglon\}<\/Text>/.test(codigo)
+      );
+    },
+    hoja,
+    hoja.replace('disabled={apagada}', ''),
+    'sin `disabled` la apagada se pulsaría igual, y el porqué de debajo diría una cosa mientras el dedo hace otra',
+  );
+
+  /* ── El lobby mide ── */
+  regla(
+    'el lobby mide en las tres plataformas —la calidad sólo baja en Android—, parte del veredicto guardado, guarda el nuevo y le da la compuerta a la hoja',
+    (c) => {
+      const codigo = soloCodigo(c);
+      return (
+        /if \(calidadJuzgada\.current\) return;/.test(codigo) &&
+        !/Platform\.OS !== 'android' \|\| calidadJuzgada\.current/.test(codigo) &&
+        /AppState\.currentState === 'background'/.test(codigo) &&
+        /if \(Platform\.OS === 'android'\) ponerCalidad\(juicio\);\s*ponerVeredicto\(juicio\);\s*void guardarElVeredicto\(juicio\);/.test(codigo) &&
+        /void elVeredictoDelAparato\(\)\.then\(\(guardado\) => \{\s*if \(vivo\) ponerVeredicto\(\(antes\) => antes \?\? guardado\);/.test(codigo) &&
+        /const compuerta = compuertaDeBotas\(veredicto, manifiesto\.id, midiendo\);/.test(codigo) &&
+        /compuerta=\{compuerta\}/.test(codigo)
+      );
+    },
+    escena,
+    escena.replace('if (calidadJuzgada.current) return;', "if (Platform.OS !== 'android' || calidadJuzgada.current) return;"),
+    'con el filtro de antes, un iPhone o la web no se medirían nunca, y a ninguno se le ofrecería Boots on Board',
+  );
+
+  /* ── La silla que no se da ── */
+  regla(
+    '`entrar` pregunta a la compuerta ANTES de la única petición que pide silla, y en una mesa de botas deja fuera con su frase a quien no llega',
+    (c) => {
+      const codigo = soloCodigo(c);
+      const cuerpo = /const entrar = useCallback\(([\s\S]*?)\n {4}\[apuntarLaLlave, arcade, cabeceras\],/.exec(codigo)?.[1] ?? '';
+      const pregunta = cuerpo.indexOf('await porQueNoTeSientas(limpio, arcade, await elVeredictoDelAparato(), leerSinLlave)');
+      const silla = cuerpo.indexOf('/asientos`');
+      return (
+        cuerpo.length > 0 &&
+        pregunta > 0 &&
+        silla > pregunta &&
+        /if \(motivo !== null\) \{\s*ponerFase\('fuera'\);\s*avisoDeLaRed\(motivo\);\s*return;\s*\}/.test(cuerpo) &&
+        (codigo.match(/\/asientos`/g) ?? []).length === 1
+      );
+    },
+    laMesa,
+    laMesa.replace('await porQueNoTeSientas(limpio, arcade, await elVeredictoDelAparato(), leerSinLlave)', 'null'),
+    'sin la pregunta, un aparato que no llega se sienta en una mesa de botas y juega desde arriba sin que nadie pueda alcanzarle',
+  );
+  regla(
+    'la mesa se lee SIN llave —como la ve quien aún no se ha sentado— y en el acto, con `?desde=-1`',
+    (c) => {
+      const cuerpo = /async function leerSinLlave\(codigo: string\): Promise<LecturaSinLlave> \{([\s\S]*?)\n\}/.exec(soloCodigo(c))?.[1] ?? '';
+      return (
+        /await fetch\(`\$\{servidorActual\(\)\}\/api\/arcade\/mesas\/\$\{codigo\}\?desde=-1`\);/.test(cuerpo) &&
+        !/x-asiento|headers|cabeceras|CABECERA/.test(cuerpo)
+      );
+    },
+    laMesa,
+    laMesa.replace('?desde=-1`);', "?desde=-1`, { headers: { 'x-asiento': 'la-mia' } });"),
+    'con la llave puesta la mesa contestaría como a un sentado, que no es lo que se pregunta',
+  );
+  regla(
+    'el veredicto se guarda por aparato en el almacén del bolsillo, se lee con `leerElVeredicto`, y el último sustituye al anterior también en memoria',
+    (c) => {
+      const codigo = soloCodigo(c);
+      return (
+        /const LLAVE_DEL_VEREDICTO = 'arcade\.aparato\.veredicto';/.test(codigo) &&
+        /await SecureStore\.getItemAsync\(LLAVE_DEL_VEREDICTO\)/.test(codigo) &&
+        /await SecureStore\.setItemAsync\(LLAVE_DEL_VEREDICTO, veredicto\)/.test(codigo) &&
+        /globalThis\.localStorage\?\.setItem\(LLAVE_DEL_VEREDICTO, veredicto\)/.test(codigo) &&
+        /veredictoEnMemoria = leerElVeredicto\(crudo\)/.test(codigo) &&
+        /export async function guardarElVeredicto\(veredicto: Calidad\): Promise<void> \{\s*veredictoEnMemoria = veredicto;/.test(codigo)
+      );
+    },
+    laMesa,
+    laMesa.replace(/(export async function guardarElVeredicto\(veredicto: Calidad\): Promise<void> \{\s*)veredictoEnMemoria = veredicto;/, '$1'),
+    'sin la copia en memoria, el veredicto recién medido no valdría para el `entrar` de un segundo después',
+  );
+
+  /* ── La marca ── */
+  regla(
+    'la barra de la mesa dice Boots on Board cuando `esMesaDeBotas` lo dice, en sus dos ramas, y sin la prop no dice nada',
+    (c) => {
+      const codigo = soloCodigo(c);
+      return (
+        /deBotas = false,/.test(codigo) &&
+        /deBotas\?: boolean;/.test(codigo) &&
+        /\{deBotas \? \(\s*<Text style=\{estilos\.marcaDeBotas\}[^>]*>\s*\{MARCA_DE_BOTAS\}\s*<\/Text>\s*\) : null\}/.test(codigo) &&
+        (codigo.match(/deBotas=\{esMesaDeBotas\(mesa\.mesa\)\}/g) ?? []).length === 2
+      );
+    },
+    enLinea,
+    enLinea.replace('deBotas={esMesaDeBotas(mesa.mesa)}', ''),
+    'una rama sin la prop pinta la mesa de botas como una cualquiera',
+  );
+  regla(
+    'y la barra del lobby también, debajo del nombre del juego, sólo sentados en una mesa que lo sea',
+    (c) => {
+      const codigo = soloCodigo(c);
+      return (
+        /const deBotas = mesa\.fase === 'dentro' && esMesaDeBotas\(mesa\.mesa\);/.test(codigo) &&
+        /\{deBotas \? \(\s*<Text style=\{estilos\.marcaDeBotas\}/.test(codigo)
+      );
+    },
+    hoja,
+    hoja.replace("const deBotas = mesa.fase === 'dentro' && esMesaDeBotas(mesa.mesa);", 'const deBotas = false;'),
+    'quien llega con el código tiene que saber a qué mesa ha entrado antes de que empiece',
+  );
+
+  /* ── Los vestíbulos propios siguen abriendo la mesa de siempre ── */
+
+  /** Cuántos argumentos lleva cada `mesa.abrir(…)` de un fuente, contando comas de primer nivel. */
+  const llamadasAAbrir = (fuente) => {
+    const salen = [];
+    const puerta = 'mesa.abrir(';
+    let desde = 0;
+    for (;;) {
+      const i = fuente.indexOf(puerta, desde);
+      if (i < 0) break;
+      let hondo = 0;
+      let args = 1;
+      let vacia = true;
+      let cadena = null;
+      let j = i + puerta.length;
+      for (; j < fuente.length; j++) {
+        const c = fuente[j];
+        if (cadena !== null) {
+          if (c === '\\') j++;
+          else if (c === cadena) cadena = null;
+          continue;
+        }
+        if (c === "'" || c === '"' || c === '`') {
+          cadena = c;
+          vacia = false;
+        } else if (c === '(' || c === '[' || c === '{') {
+          hondo++;
+          vacia = false;
+        } else if (c === ')' || c === ']' || c === '}') {
+          if (hondo === 0) break;
+          hondo--;
+        } else if (c === ',' && hondo === 0) {
+          args++;
+        } else if (!/\s/.test(c)) {
+          vacia = false;
+        }
+      }
+      salen.push({ args: vacia ? 0 : args, texto: fuente.slice(i, j + 1) });
+      desde = j + 1;
+    }
+    return salen;
+  };
+  /* Los vestíbulos PROPIOS: los que pinta cada juego cuando no hay mesa. No tienen elección y no la tendrán. */
+  const PROPIOS = ['burgo-en-tres-escena.tsx', 'lindes-en-tres-escena.tsx', 'riberas-en-tres-escena.tsx', 'tablero-en-linea.tsx'];
+  const losDeLaApp = fs
+    .readdirSync(path.join(SRC, 'arcade'))
+    .filter((f) => /\.tsx?$/.test(f))
+    .map((f) => [f, soloCodigo(leer(path.join(SRC, 'arcade', f)))]);
+  const soloElLobbyComun = (lista) => {
+    const conModalidad = lista.flatMap(([f, t]) => llamadasAAbrir(t).filter((l) => l.args > 3).map((l) => ({ f, texto: l.texto })));
+    const propios = lista.filter(([f]) => PROPIOS.includes(f));
+    return (
+      conModalidad.length === 1 &&
+      conModalidad[0].f === 'hoja-del-muelle.tsx' &&
+      conModalidad[0].texto.endsWith(', modalidadQueViaja(elegida, compuerta))') &&
+      propios.length === PROPIOS.length &&
+      propios.every(([, t]) => llamadasAAbrir(t).length > 0 && llamadasAAbrir(t).every((l) => l.args <= 3 && !/modalidad|botas/i.test(l.texto)))
+    );
+  };
+  comprobar(
+    `los vestíbulos propios de los juegos siguen abriendo la mesa de siempre, y de los ${losDeLaApp.length} ficheros de la Sala sólo la orilla del lobby común le pasa una modalidad a \`abrir\``,
+    losDeLaApp.length > 20 && soloElLobbyComun(losDeLaApp),
+    losDeLaApp.flatMap(([f, t]) => llamadasAAbrir(t).map((l) => `${f}: ${l.args} · ${l.texto.slice(0, 90)}`)),
+  );
+  comprobar(
+    'se ve fallar: un vestíbulo propio que abriera de botas, o la orilla mandándola a pelo, cae; y el contador no confunde las comas de dentro',
+    !soloElLobbyComun([...losDeLaApp, ['vestibulo-propio.tsx', "mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos, undefined, 'botas');"]]) &&
+      !soloElLobbyComun(losDeLaApp.map(([f, t]) => [f, f === 'hoja-del-muelle.tsx' ? t.replace('modalidadQueViaja(elegida, compuerta))', "'botas')") : t])) &&
+      llamadasAAbrir("mesa.abrir(a(b, c), [d, e], { f, g }, 'h, i')")[0]?.args === 4 &&
+      llamadasAAbrir('mesa.abrir()')[0]?.args === 0,
+  );
+}
+
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», el mismo que llevan el servidor y la escena.
  *
@@ -2869,7 +3471,8 @@ paso(
  * que hace falta para arreglarlo. Ahora las rojas se cuentan primero y el guardia habla
  * después, con su propio código de salida (2) para que se distinga de una roja de verdad.
  */
-const COMPROBACIONES_ESCRITAS = 253;
+/* Y dieciocho más de Boots on Board en la app —la mitad, vacunas—: el guardia sube con ellas. */
+const COMPROBACIONES_ESCRITAS = 271;
 
 if (fallos.length > 0) {
   console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);

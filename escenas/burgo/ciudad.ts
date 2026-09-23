@@ -2275,10 +2275,12 @@ function montarElEstadio(caja: CajaEnPlanta, calidad: Calidad): ObraDeDistrito {
    * del pack se queda donde es la SEÑA de identidad del distrito —el cementerio y el
    * colegio—, que es donde se mira de cerca y donde se reconoce.
    *
-   * OJO: el del este y el del oeste giran DOS veces —el ancho y el fondo ya van cambiados y
-   * además llevan el cuarto de vuelta—, así que se pintan a lo ancho y cruzan la calle. Está
-   * contado en la cabecera de `shared/arcade/juegos/burgo-distritos.ts`; arreglarlo cambia el
-   * aspecto de la ciudad y no se hace de tapadillo.
+   * Y LOS CUATRO SE PINTAN A LO LARGO DE SU LADO. El del este y el del oeste giraban DOS veces
+   * —el ancho y el fondo ya iban cambiados y además llevaban el cuarto de vuelta—, así que se
+   * pintaban como una pared de 107 × 1 cruzada a su lado y se salían 53 del distrito, atravesando
+   * la calle: a pie era una pared en mitad del asfalto, y el mundo declarado chocaba con ella. Se
+   * arregló donde se decide, en `estructuraDelEstadio` (`shared/arcade/juegos/burgo-distritos.ts`,
+   * con las cifras en su cabecera), y aquí no cambia nada: se pinta lo que allí se declara.
    */
   for (const r of RUMBOS) {
     const v = vectorDelRumbo(r);
@@ -2885,6 +2887,16 @@ export const UMBRALES_DE_NIVEL = { plena: { alto: 156, medio: 1_500 }, sobria: {
 export const HISTERESIS_DEL_NIVEL = 40;
 
 /**
+ * UNOS UMBRALES QUE NO SON LOS DE LA MESA: hasta dónde llega el disco de detalle (L1) y hasta
+ * dónde el L2. Sólo los pide quien anda por la ciudad (`UMBRALES_A_PIE`, en `a-pie.ts`, con sus
+ * cifras medidas): sin ellos, se juzga con los de la calidad, que son los de siempre.
+ */
+export interface UmbralesDeNivel {
+  readonly alto: number;
+  readonly medio: number;
+}
+
+/**
  * EL NIVEL QUE LE TOCA A UN GRUPO: 0 = L1, 1 = L2, 2 = L3.
  *
  * `anterior` es el nivel que el grupo tenía; con él se aplica la histéresis, y sin él se
@@ -2899,8 +2911,8 @@ export const HISTERESIS_DEL_NIVEL = 40;
  * es lo que dice el plano: quien está DENTRO de una manzana la tiene a menos de su radio, y
  * un radio de manzana nunca llega al umbral.
  */
-export function nivelDelGrupo(g: GrupoDeLaCiudad, x: number, z: number, calidad: Calidad, anterior?: number): number {
-  const u = calidad === 'plena' ? UMBRALES_DE_NIVEL.plena : UMBRALES_DE_NIVEL.sobria;
+export function nivelDelGrupo(g: GrupoDeLaCiudad, x: number, z: number, calidad: Calidad, anterior?: number, umbrales?: UmbralesDeNivel): number {
+  const u = umbrales ?? (calidad === 'plena' ? UMBRALES_DE_NIVEL.plena : UMBRALES_DE_NIVEL.sobria);
   const dx = g.centro.x - x;
   const dz = g.centro.z - z;
   const d = Math.sqrt(dx * dx + dz * dz);
@@ -2917,13 +2929,13 @@ export function nivelDelGrupo(g: GrupoDeLaCiudad, x: number, z: number, calidad:
  * de celda—, y lo que el comprobador llama para juzgar el presupuesto. Devuelve el nivel de
  * cada grupo y la suma, repartida por nivel para saber quién se come el presupuesto.
  */
-export function montarLaCiudad(ciudad: LaCiudad, x: number, z: number, anteriores?: readonly number[]): MontajeDeLaCiudad {
+export function montarLaCiudad(ciudad: LaCiudad, x: number, z: number, anteriores?: readonly number[], umbrales?: UmbralesDeNivel): MontajeDeLaCiudad {
   const nivelDelGrupoDeLaCiudad: number[] = [];
   const porNivel = [0, 0, 0];
   const gruposPorNivel = [0, 0, 0];
   let triangulos = 0;
   for (const g of ciudad.grupos) {
-    const nivel = nivelDelGrupo(g, x, z, ciudad.calidad, anteriores?.[g.indice]);
+    const nivel = nivelDelGrupo(g, x, z, ciudad.calidad, anteriores?.[g.indice], umbrales);
     nivelDelGrupoDeLaCiudad.push(nivel);
     const cuanto = (g.niveles[nivel] as NivelDeDetalle).triangulos;
     triangulos += cuanto;

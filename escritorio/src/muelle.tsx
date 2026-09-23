@@ -40,28 +40,48 @@
  * mira pulsa la escena, se desembarca igual. Una animación que puede dejar a
  * alguien sin tablero no es una animación: es un cerrojo.
  *
+ * ═══ Y MIENTRAS SE ESPERA, MIDE ESTE APARATO: LA COMPUERTA DE BOOTS ON BOARD ═══
+ *
+ * La escena manda una muestra por segundo (`alMedir`) y el juez de siempre
+ * (`escenas/embarcadero/calidad.ts`) decide con los primeros 120 fotogramas. Aquí
+ * NO baja la calidad —el lobby del escritorio se pinta en `plena`, como siempre—:
+ * el veredicto va a la compuerta (`escenas/compuerta-de-botas.ts`), que decide si
+ * al abrir mesa sale la elección entre la normal y Boots on Board, y si sale
+ * encendida. Se guarda en este navegador con `guardarElVeredicto` para no esperar
+ * 120 fotogramas la próxima vez, y hasta que llega uno nuevo manda el guardado.
+ * Con la pestaña escondida no se muestrea: el navegador baja entonces el ritmo de
+ * dibujo, y lo medido sería el ahorro del navegador y no este aparato.
+ *
  * ═══ LO QUE ESTO NO IMPORTA ═══
  *
  * Nada de `app/` (lo vigila `verify:fronteras`) y nada de `drei`. De `escenas/`
- * sólo lo que el contrato exporta: la escena, la lista de figuras y el tema.
+ * sólo lo que el contrato exporta —la escena, la lista de figuras y el tema—, más
+ * el juez de la calidad, la compuerta y la pregunta de si una mesa es de botas,
+ * que son funciones sin `three` que comparte con la app.
  */
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
+import { compuertaDeBotas, MARCA_DE_BOTAS, modalidadQueViaja } from '../../escenas/compuerta-de-botas';
+import type { LoQueDiceLaCompuerta, Modalidad } from '../../escenas/compuerta-de-botas';
+import { juzgarCalidad } from '../../escenas/embarcadero/calidad';
+import type { MuestraDelHilo } from '../../escenas/embarcadero/calidad';
 import { Embarcadero } from '../../escenas/embarcadero/Embarcadero';
 import { esFigura, FIGURAS, figura as datosDeFigura, figuraQueSePinta } from '../../escenas/embarcadero/figuras';
 import type { FiguraId } from '../../escenas/embarcadero/figuras';
 import type { TemaDelMuelle } from '../../escenas/embarcadero/tema';
-import type { MesaEnElMuelle, Traer, Ventana } from '../../escenas/embarcadero/tipos';
+import type { Calidad, MesaEnElMuelle, Traer, Ventana } from '../../escenas/embarcadero/tipos';
+import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import { Plaza } from '../../escenas/plaza/Plaza';
 import { LindeAlta } from '../../escenas/linde-alta/LindeAlta';
 import { esLaOpcionDeEmpezar, haEmpezado } from './empezada';
 import { figuraDeEstreno, guardarFigura } from './figura';
+import { elVeredictoDelAparato, guardarElVeredicto } from './mesa';
 import type { LaMesa, MesaVista } from './mesa';
 import type { ArcadeDelCatalogo } from './muebles';
 import { loQueSeDiceDeUnFallo } from './red-de-seguridad';
-import { BASE, PLAZOS } from './sala';
+import { BASE, EleccionDeModalidad, PLAZOS } from './sala';
 
 /** Lo que se le da a la coreografía de zarpar antes de cambiar de pantalla sin ella. */
 export const TOPE_DE_ZARPAR_MS = 3500;
@@ -213,6 +233,31 @@ export function Muelle({
     ponerFallo(motivo);
   }, []);
 
+  // -------------------------------------------------------------------------
+  // El aparato, medido: lo que necesita la compuerta de Boots on Board
+  // -------------------------------------------------------------------------
+
+  /*
+   * EL GUARDADO MANDA DESDE EL PRIMER RENDER —se lee síncrono, como el bolsillo— y el que dé el
+   * juez en esta visita lo sustituye, en pantalla y en el almacén. Las muestras van en una `ref`
+   * porque llegan una por segundo y no pintan nada, y se deja de mirar en cuanto hay veredicto: la
+   * ventana del juez son los PRIMEROS 120 fotogramas, no la tarde entera.
+   */
+  const [veredicto, ponerVeredicto] = useState<Calidad | null>(() => elVeredictoDelAparato());
+  const muestras = useRef<MuestraDelHilo[]>([]);
+  const juzgado = useRef(false);
+  const alMedir = useCallback((m: { ms: number; fotogramas: number }) => {
+    if (juzgado.current) return;
+    /* Con la pestaña escondida se mide el ahorro del navegador, no el aparato: ver la cabecera. */
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    muestras.current.push({ ms: m.ms, fotogramas: m.fotogramas });
+    const juicio = juzgarCalidad(muestras.current);
+    if (juicio === null) return;
+    juzgado.current = true;
+    guardarElVeredicto(juicio);
+    ponerVeredicto(juicio);
+  }, []);
+
   /*
    * La ventana que ve la cámara es el CONTENEDOR, no `window`: en una ventana
    * estrecha la escena ocupa 46vh arriba y el raíl va debajo, y la cámara tiene
@@ -306,6 +351,13 @@ export function Muelle({
   const Escena = ESCENAS[tema.escena] ?? Embarcadero;
   const conMundo = typeof window !== 'undefined' && mundoPedido;
 
+  /*
+   * «MIDIENDO» SÓLO SI HAY UN MUNDO DANDO MUESTRAS. Sin ventana —en Node— o con el mundo caído antes
+   * de su primer fotograma, aquí no mide nada, y decir «midiendo» sería una espera sin final.
+   */
+  const midiendo = conMundo && (listo || fallo === null);
+  const compuerta = compuertaDeBotas(veredicto, manifiesto.id, midiendo);
+
   return (
     <main className="muelle">
       <div
@@ -340,6 +392,7 @@ export function Muelle({
                 alEstarListo={alEstarListo}
                 alZarpar={desembarcar}
                 alFallar={alFallar}
+                alMedir={alMedir}
               />
             </Canvas>
           </LimiteDelMundo>
@@ -358,7 +411,14 @@ export function Muelle({
 
       <div className="muelle-hoja">
         <div className="muelle-hueco">
-          <h1 className="titulo">{manifiesto.nombre}</h1>
+          {/*
+            La marca va DENTRO del título y no al lado: es parte de a qué se juega en esta mesa, y
+            así se oye con el nombre. La pregunta es la de siempre, `esMesaDeBotas`.
+          */}
+          <h1 className="titulo">
+            {manifiesto.nombre}
+            {puesta !== null && esMesaDeBotas(puesta) ? <span className="marca-de-botas">{MARCA_DE_BOTAS}</span> : null}
+          </h1>
           {zarpando ? <p className="muelle-zarpando">{tema.zarpar}</p> : null}
         </div>
 
@@ -382,6 +442,7 @@ export function Muelle({
               minimo={manifiesto.jugadores.minimo}
               figura={figura}
               donde={tema.donde}
+              compuerta={compuerta}
               alCambiar={() => {
                 ponerEligiendo(true);
               }}
@@ -447,6 +508,10 @@ class LimiteDelMundo extends Component<
  * Se esconde con `hidden` en vez de desmontarse mientras se elige figura, para
  * que el nombre y el código tecleados sigan ahí al volver: elegir aventurero es
  * un paréntesis, no otra pantalla.
+ *
+ * Y la elección de cómo se juega, la misma que en el `Vestibulo`: sale si el juego
+ * se recorre, con Boots on Board apagada y su porqué mientras este aparato no
+ * llegue, y lo que viaja en `abrir` es lo que se ve encendido (`modalidadQueViaja`).
  */
 function EnLaOrilla({
   escondida,
@@ -455,6 +520,7 @@ function EnLaOrilla({
   minimo,
   figura,
   donde,
+  compuerta,
   alCambiar,
 }: {
   escondida: boolean;
@@ -464,6 +530,8 @@ function EnLaOrilla({
   figura: FiguraId;
   /** «en el muelle», «en la plaza del Burgo», «en la Linde Alta». Lo pone el tema. */
   donde: string;
+  /** Lo que dice la compuerta de Boots on Board para este aparato y este juego. */
+  compuerta: LoQueDiceLaCompuerta;
   alCambiar: () => void;
 }): JSX.Element {
   const [nombre, ponerNombre] = useState('');
@@ -472,6 +540,8 @@ function EnLaOrilla({
   const [cualPlazo, ponerCualPlazo] = useState(0);
   const plazo = PLAZOS[cualPlazo];
   const laFigura = datosDeFigura(figura);
+  /* La de siempre viene puesta: Boots on Board se elige, nunca se hereda. */
+  const [elegida, ponerElegida] = useState<Modalidad>('normal');
 
   return (
     <div className="muelle-tramo" hidden={escondida}>
@@ -525,12 +595,13 @@ function EnLaOrilla({
           ))}
         </select>
         {plazo === undefined ? null : <p className="letra-chica">{plazo.ayuda}</p>}
+        <EleccionDeModalidad elegida={elegida} compuerta={compuerta} alElegir={ponerElegida} />
         <button
           type="button"
           className="opcion"
           disabled={mesa.quieto}
           onClick={() => {
-            mesa.abrir(nombre.trim(), plazo?.segundos, figura);
+            mesa.abrir(nombre.trim(), plazo?.segundos, figura, modalidadQueViaja(elegida, compuerta));
           }}
         >
           <span className="opcion-texto">

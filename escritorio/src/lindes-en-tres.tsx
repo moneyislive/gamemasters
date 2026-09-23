@@ -25,14 +25,31 @@
  * girar sería un movimiento —una revisión más, un aviso a los demás aparatos y una
  * entrada en el diario— por cada vez que alguien le da vueltas a una losa antes de
  * decidirse.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
+ *
+ * Si la mesa es de la modalidad `botas` —lo dice `esMesaDeBotas`, la misma pregunta que
+ * hace la app—, la escena recibe el canal: la dirección del WebSocket en la misma casa que
+ * sirvió la página (`direccionDelCanal`), la llave del asiento, quién soy y los asientos
+ * con su nombre, su figura y su color. Se empieza al hombro, y el cartel de cómo se anda
+ * dice también cómo va el canal. En una mesa normal no se pasa nada y la escena no abre
+ * ningún socket.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
 import { Lindes } from '../../escenas/lindes/Lindes';
-import type { ModoDeCamaraDeLasLindes, TableroDeLasLindesEn3D } from '../../escenas/lindes/tipos';
+import type {
+  CanalDeBotas,
+  EstadoDelCanal,
+  ModoDeCamaraDeLasLindes,
+  TableroDeLasLindesEn3D,
+} from '../../escenas/lindes/tipos';
 import type { Calidad } from '../../escenas/embarcadero/tipos';
+import type { MuestraDelHilo } from '../../escenas/embarcadero/calidad';
+import { calidadDelValle, conLaMuestra } from '../../escenas/lindes/detalle';
+import { asientosQueAndan, esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import {
   elSiguienteGiro,
   girosQueCaben,
@@ -52,6 +69,7 @@ import { losaPorId } from '../../shared/arcade/juegos/lindes-losas';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
 import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { LimiteDelMundo } from './lienzo-propio';
+import { direccionDelCanal } from './mesa';
 import { traer } from './muelle';
 import type { LoQueVeElPintor } from './pintores';
 import { AccionesDelTablero, Retablo } from './retablo';
@@ -84,10 +102,33 @@ const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string; 
  *
  * Suelto y exportado para que `verify:escritorio` lo pinte en los tres modos: el pintor entero
  * nace en la mesa y en un pintado estático no se puede bajar a andar.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS, CÓMO VA EL CANAL ═══
+ *
+ * En el mismo cartel y debajo, `canal`: «Conectando…», «Dentro», «Sin conexión: …». Es el sitio
+ * donde se mira mientras se anda, y no hace falta otro. Desde la mesa también se enseña —allí no se
+ * anda, pero el canal sigue abierto y conviene saber si al bajar se verá a los demás—; sin canal,
+ * en la mesa no sale nada, como siempre.
  */
-export function ComoSeAnda({ modo }: { readonly modo: 'mesa' | 'hombro' | 'ojos' }): JSX.Element | null {
-  if (modo === 'mesa') return null;
-  return <p className="lindes-como-se-anda">W A S D o las flechas para andar · Mayúsculas para correr</p>;
+export function ComoSeAnda({
+  modo,
+  canal,
+}: {
+  readonly modo: 'mesa' | 'hombro' | 'ojos';
+  readonly canal?: string;
+}): JSX.Element | null {
+  if (modo === 'mesa') return canal === undefined ? null : <p className="lindes-como-se-anda">{canal}</p>;
+  return (
+    <p className="lindes-como-se-anda">
+      W A S D o las flechas para andar · Mayúsculas para correr
+      {canal === undefined ? null : (
+        <>
+          <br />
+          {canal}
+        </>
+      )}
+    </p>
+  );
 }
 
 export function LindesEnTres({
@@ -136,10 +177,53 @@ export function LindesEnTres({
 
   const datos = useMemo(() => tableroEnTres(vista), [vista]);
   const [rotoElLienzo, setRotoElLienzo] = useState(false);
-  const [calidad] = useState<Calidad>('plena');
+  /*
+   * ═══ LA CALIDAD SE MIDE, NO SE ESCRIBE ═══
+   *
+   * Era `useState('plena')` sin quien la cambiara: una constante con forma de estado. Ahora la
+   * escena manda por `alMedir` lo que le cuesta cada segundo y `calidadDelValle`
+   * (`escenas/lindes/detalle.ts`) decide con el juez de la casa, sobre las últimas doce muestras
+   * y sin volver a subir: el tablero crece de una losa a setenta y dos, y juzgar sólo al montar
+   * sería juzgar siempre el de una. La misma cuenta que hace la app.
+   */
+  const [calidad, setCalidad] = useState<Calidad>('plena');
+  const muestras = useRef<MuestraDelHilo[]>([]);
+  const alMedir = useCallback((m: { triangulos: number; llamadas: number; ms: number; fotogramas: number }) => {
+    muestras.current = conLaMuestra(muestras.current, { ms: m.ms, fotogramas: m.fotogramas });
+    setCalidad((antes) => calidadDelValle(antes, muestras.current));
+  }, []);
   const [giro, setGiro] = useState<Giro>(0);
   const [senalada, setSenalada] = useState<{ x: number; y: number } | null>(null);
-  const [modo, setModo] = useState<'mesa' | 'hombro' | 'ojos'>('mesa');
+
+  /*
+   * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
+   *
+   * Se nace al hombro en una mesa de botas —es a lo que se viene—, y el modo inicial se saca de la
+   * mesa al montar para que un pintado estático también lo diga. Sin llave, sin asiento o sin
+   * dirección (sin `location`) no hay canal: no hay con qué decir `hola`. Los asientos llegan en
+   * cada vuelta del sondeo, pero la escena sólo reabre el socket si cambian la dirección, la llave o
+   * el asiento.
+   */
+  const esBotas = esMesaDeBotas(puesta);
+  const [modo, setModo] = useState<'mesa' | 'hombro' | 'ojos'>(() => (esBotas ? 'hombro' : 'mesa'));
+  const [estadoDelCanal, setEstadoDelCanal] = useState<EstadoDelCanal | null>(null);
+  const llaveDelAsiento = mesa.llave ?? null;
+  const yoEnLaMesa = puesta.yo;
+  const canal = useMemo<CanalDeBotas | undefined>(() => {
+    const url = esBotas ? direccionDelCanal(puesta.codigo) : null;
+    if (url === null || llaveDelAsiento === null || yoEnLaMesa === null) return undefined;
+    return {
+      url,
+      llave: llaveDelAsiento,
+      yo: yoEnLaMesa,
+      asientos: asientosQueAndan(puesta.asientos, puesta.vista),
+      alCambiar: setEstadoDelCanal,
+    };
+  }, [esBotas, llaveDelAsiento, puesta.asientos, puesta.codigo, puesta.vista, yoEnLaMesa]);
+  /* Si la mesa resulta ser de botas después de montar, también se baja; luego manda el botón. */
+  useEffect(() => {
+    if (esBotas) setModo('hombro');
+  }, [esBotas, puesta.codigo]);
 
   const alFallar = useCallback((motivo: string) => {
     console.warn(`El valle no se ha podido pintar (${motivo}): se juega sobre el retablo.`);
@@ -266,13 +350,15 @@ export function LindesEnTres({
               alTocarHueco={alTocarHueco}
               alSenalarHueco={alSenalarHueco}
               alFallar={alFallar}
+              alMedir={alMedir}
+              canal={canal}
             />
           </Canvas>
         </LimiteDelMundo>
 
         <p className="lindes-cinta">{tablero.aviso}</p>
 
-        <ComoSeAnda modo={modo} />
+        <ComoSeAnda modo={modo} canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined} />
 
         <div className="lindes-camaras" role="group" aria-label="Desde dónde se mira">
           {LAS_CAMARAS.map((c) => (

@@ -2027,6 +2027,71 @@ code {
   font-style: italic;
 }
 
+/* --- Boots on Board: la elección al abrir, y la marca de la mesa ---------------- */
+
+/*
+ * LA ELECCIÓN DE CÓMO SE JUEGA, en los dos vestíbulos (la orilla del lobby y el de la Sala). Dos
+ * botones en columna: caben en las 22 rem del raíl sin partir la ayuda en tres renglones, y así los
+ * dos miden lo mismo.
+ *
+ * Los que se pueden pulsar van sin relleno (`.opcion-sobria`), y el apagado —Boots on Board cuando
+ * el aparato no llega— lo pinta `.opcion:disabled`, sobre la teja y en `--tenue`: con los dos en el
+ * mismo gris neutro no se distinguiría «no la has elegido» de «no se puede». Lo elegido se marca con
+ * el FILO en el acento, como la figura elegida: un apagado nunca está elegido —lo que se ve puesto
+ * es lo que viaja—, así que las dos reglas no se pisan.
+ */
+.modalidades {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.modalidades .opcion {
+  width: 100%;
+  min-width: 0;
+}
+
+.modalidad-elegida {
+  border-color: var(--acento);
+  box-shadow: 0 0 20px -8px var(--halo);
+}
+
+.modalidad-elegida .opcion-rotulo {
+  color: var(--acento);
+}
+
+/* El porqué de la apagada, pegado a los dos botones: es de ellos y no del botón de abrir. */
+.modalidad-motivo {
+  margin: 0;
+}
+
+/*
+ * LA MARCA DE UNA MESA DE BOOTS ON BOARD: discreta, en la tinta de lo que acompaña y con el filo
+ * vivo, como un rótulo y no como un botón —no se pulsa, así que no lleva acento—. Va dentro del
+ * título, donde se dice a qué se juega, y encima del código en la ficha de la mesa, que es lo que se
+ * ve cuando el lienzo ocupa la pantalla.
+ */
+.marca-de-botas {
+  display: inline-block;
+  margin: 0 0 0.6rem;
+  padding: 0.1rem 0.55rem;
+  font-family: var(--letra-dato);
+  font-size: var(--letra-minima);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--tenue);
+  border: 1px solid var(--filo-vivo);
+  border-radius: var(--radio-mando);
+}
+
+.titulo .marca-de-botas {
+  margin: 0 0 0 0.75rem;
+  vertical-align: middle;
+}
+
 @media (max-width: 900px) {
   .muelle {
     display: flex;
@@ -2527,6 +2592,73 @@ code {
 .riberas-recoger:hover {
   border-color: var(--acento);
   box-shadow: 0 0 20px -8px var(--halo);
+}
+
+/*
+ * ═══ LOS MANDOS DE LA CÁMARA: BAJAR A ANDAR, Y A PIE EL HOMBRO O LOS OJOS ═══
+ *
+ * El mismo botón que `.riberas-volver` y `.riberas-recoger` —teja alta, filo en reposo, acento
+ * al pasar el ratón, `2.75rem` de mínimo de dedo— en la misma columna de arriba a la derecha y
+ * con el mismo paso: el primero baja lo que bajan los dos de encima (`4rem` + `3.25rem`, o sea
+ * `7.25rem`) y el segundo otro paso más (`10.5rem`). En este lienzo no queda otra esquina: los
+ * números y el porqué están en `MANDOS_DE_LA_CAMARA` (`escenas/delta-a-pie.ts`), `verify:escena`
+ * mide el primero contra la silueta de todas las asas y `verify:escritorio` afirma esta regla.
+ *
+ * El rótulo es una palabra corta —«A pie», «Mesa», «Ojos», «Hombro»— y no un glifo, así que el
+ * ancho no es cuadrado: es un MÍNIMO de dedo y crece hacia la izquierda desde el canto, que es
+ * hacia donde queda tablero y no la mano.
+ */
+.riberas-camara {
+  position: absolute;
+  top: 7.25rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  padding: 0 0.6rem;
+  font: inherit;
+  font-size: var(--letra-minima);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+
+.riberas-camara:hover {
+  border-color: var(--acento);
+  box-shadow: 0 0 20px -8px var(--halo);
+}
+
+.riberas-camara-segunda {
+  top: 10.5rem;
+}
+
+/*
+ * CÓMO SE ANDA, mientras se anda: abajo a la izquierda, que a pie es sitio libre —la barra se ha
+ * recogido al bajar y la mano del mazo no baja del 30 % del alto—, con la placa de los mandos y
+ * SIN COGER EL PUNTERO: es un cartel, no un control. Ver `ComoSeAndaPorElDelta`.
+ */
+.riberas-como-se-anda {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  max-width: calc(50% - 1.5rem);
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  font-size: var(--letra-minima);
+  line-height: 1.35;
+  pointer-events: none;
 }
 
 /*
@@ -4127,6 +4259,76 @@ code {
  */
 .burgo-volver-con-carril {
   top: calc(3.75rem + 2.75rem);
+}
+
+/*
+ * A PIE POR EL BURGO: las tres cámaras y el cartel de cómo se anda, en una columna ARRIBA A LA
+ * IZQUIERDA del lienzo, a un rem del pie de la cinta —la derecha es de «Ver el burgo entero» y
+ * abajo están el cartel del pie y la caja del Burgo—. Con carril baja una tira, con la misma cuenta
+ * y el mismo orden de hoja que `.burgo-volver-con-carril`: la segunda va DESPUÉS porque las dos
+ * pesan (0,1,0). `z-index: 1` y no 2: la caja de los tratos, que cuelga del carril en el centro,
+ * tiene que quedar por encima si un lienzo estrecho las junta.
+ *
+ * La columna no coge el puntero —lo que queda entre los botones es tablero— y los botones sí. Los
+ * botones son el cromo de la Sala sobre el lienzo, el de «Ver el burgo entero», con sus 2,75rem de
+ * dedo; el puesto, en claro con la tinta del suelo, y sin acento: no es lo que hay que tocar ahora.
+ */
+.burgo-a-pie {
+  position: absolute;
+  top: 3.75rem;
+  left: 0.75rem;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.burgo-a-pie-con-carril {
+  top: calc(3.75rem + 2.75rem);
+}
+
+.burgo-camaras {
+  display: flex;
+  gap: 0.35rem;
+  pointer-events: auto;
+}
+
+.burgo-camara {
+  min-height: 2.75rem;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: var(--letra-minima);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+
+.burgo-camara:hover {
+  border-color: var(--acento);
+}
+
+.burgo-camara-puesta {
+  background: var(--palabra);
+  color: var(--suelo);
+  border-color: var(--palabra);
+}
+
+/* Es un cartel y no un control: no coge el puntero, igual que el de Las Lindes. */
+.burgo-como-se-anda {
+  margin: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: var(--letra-minima);
+  border-radius: var(--radio-ficha);
+  border: 1px solid var(--filo);
+  background: var(--teja-alta);
+  color: var(--palabra);
+  pointer-events: none;
 }
 
 /*

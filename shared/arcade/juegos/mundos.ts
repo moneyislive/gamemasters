@@ -36,6 +36,8 @@ import { mundoDelBurgo } from './burgo-mundo';
 import { LINDES } from './lindes';
 import { tableroEnTres as tableroDeLasLindes } from './lindes-en-tres';
 import { mundoDeLasLindes } from './lindes-mundo';
+import { RIBERAS } from './riberas';
+import { mundoDeRiberas } from './riberas-mundo';
 
 /**
  * Cómo se saca el mundo de una mesa: de su vista pública y su código. `null` si la vista todavía
@@ -57,6 +59,17 @@ const PRODUCTORES: ReadonlyMap<ArcadeId, ProductorDeMundo> = new Map<ArcadeId, P
   ],
   /* El Burgo no depende de la vista: su ciudad es la del código, y las casas que se compran son fichas. */
   [BURGO, (_vista, codigo) => mundoDelBurgo(codigo)],
+  /*
+   * Riberas, al revés: su delta ES la vista —qué comarca es de qué, dónde hay chozas y torres, el
+   * estiaje—, y no depende del código. Una mesa que aún se reúne no tiene delta: mundo vacío, null.
+   */
+  [
+    RIBERAS,
+    (vista) => {
+      const mundo = mundoDeRiberas(vista);
+      return mundo.pisables.length === 0 ? null : mundo;
+    },
+  ],
 ]);
 
 /** ¿Se puede recorrer este arcade? Si y sólo si tiene productor de mundo. */

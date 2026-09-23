@@ -70,7 +70,12 @@ const MALOS_DEL_APARATO: readonly [string, string][] = [
   ['aqui con la marcha 3', j({ ...aqui, m: 3 })],
   ['aqui con el tic 0', j({ ...aqui, n: 0 })],
   ['aqui con el tic negativo', j({ ...aqui, n: -5 })],
-  ['un tipo que no existe', j({ t: 'golpe', n: 1, x: 0, z: 0, r: 0, m: 1 })],
+  ['un tipo que no existe, con la forma de un aqui', j({ t: 'botin', n: 1, x: 0, z: 0, r: 0, m: 1 })],
+  ['un golpe con la forma de un aqui', j({ t: 'golpe', n: 1, x: 0, z: 0, r: 0, m: 1 })],
+  ['un golpe con el tic 0', j({ t: 'golpe', n: 0, r: 0 })],
+  ['un golpe con el rumbo 256', j({ t: 'golpe', n: 3, r: 256 })],
+  ['un golpe sin rumbo', j({ t: 'golpe', n: 3 })],
+  ['un golpe que dice a quién le da', j({ t: 'golpe', n: 3, r: 0, a: 'a2' })],
   ['más largo que el tope', j({ ...hola, llave: 'k'.repeat(40) }) + ' '.repeat(TOPE_DE_MENSAJE_BYTES)],
 ];
 for (const [que, texto] of MALOS_DEL_APARATO) {
@@ -99,6 +104,17 @@ comprobar(
 comprobar('`corrige` se lee', leerMensajeDelServidor(j({ t: 'corrige', n: 3, x: 0, z: 0 }))?.t === 'corrige');
 comprobar('`fuera` se lee', leerMensajeDelServidor(j({ t: 'fuera', motivo: 'quieto' }))?.t === 'fuera');
 
+/* La refriega: el golpe del aparato, y lo que cuenta el servidor. */
+comprobar('un `golpe` bien formado se lee', leerMensajeDelAparato(j({ t: 'golpe', n: 12, r: 200 }))?.t === 'golpe');
+comprobar('`lanza` se lee', leerMensajeDelServidor(j({ t: 'lanza', de: 'a1' }))?.t === 'lanza');
+comprobar('`da` se lee', leerMensajeDelServidor(j({ t: 'da', de: 'a1', a: 'a2', vida: 2 }))?.t === 'da');
+comprobar('`cae` se lee', leerMensajeDelServidor(j({ t: 'cae', a: 'a2', por: 'a1' }))?.t === 'cae');
+comprobar('`renace` se lee', leerMensajeDelServidor(j({ t: 'renace', a: 'a2', x: 0, z: 65536, r: 128 }))?.t === 'renace');
+{
+  const vidas = leerMensajeDelServidor(j({ t: 'vidas', v: [['a1', 3, 0], ['a2', 0, 1], ['a3', 3, 2]] }));
+  comprobar('`vidas` se lee con sus tres entradas', vidas !== null && vidas.t === 'vidas' && vidas.v.length === 3, vidas);
+}
+
 const MALOS_DEL_SERVIDOR: readonly [string, string][] = [
   ['una foto con una entrada de cuatro', j({ t: 'foto', k: 1, p: [['a1', 0, 0, 0]] })],
   ['una foto con el rumbo 300', j({ t: 'foto', k: 1, p: [['a1', 0, 0, 300, 0]] })],
@@ -106,6 +122,14 @@ const MALOS_DEL_SERVIDOR: readonly [string, string][] = [
   ['dentro sin hz', j({ t: 'dentro', yo: 'a1', x: 0, z: 0, r: 0 })],
   ['corrige con x con decimales', j({ t: 'corrige', n: 1, x: 0.5, z: 0 })],
   ['un tipo que no existe', j({ t: 'botin', de: 'a1' })],
+  ['una foto con el mismo asiento dos veces', j({ t: 'foto', k: 1, p: [['a1', 0, 0, 0, 0], ['a1', 65536, 0, 0, 0]] })],
+  ['un da con más vida de la que hay', j({ t: 'da', de: 'a1', a: 'a2', vida: 4 })],
+  ['un da con la vida negativa', j({ t: 'da', de: 'a1', a: 'a2', vida: -1 })],
+  ['un cae sin quién lo tumbó', j({ t: 'cae', a: 'a2' })],
+  ['un renace con x con decimales', j({ t: 'renace', a: 'a2', x: 0.5, z: 0, r: 0 })],
+  ['unas vidas con el mismo asiento dos veces', j({ t: 'vidas', v: [['a1', 3, 0], ['a1', 2, 0]] })],
+  ['unas vidas con un estado que no existe', j({ t: 'vidas', v: [['a1', 3, 3]] })],
+  ['unas vidas con una entrada de dos', j({ t: 'vidas', v: [['a1', 3]] })],
 ];
 for (const [que, texto] of MALOS_DEL_SERVIDOR) {
   comprobar(`se rechaza del servidor: ${que}`, leerMensajeDelServidor(texto) === null, texto);
@@ -125,7 +149,7 @@ comprobar('y escapa lo que no es un código', rutaDelCanal('A/B?c') === '/api/ar
 }
 
 /* El suelo: que se ha mirado de verdad todo lo que se dice arriba. */
-comprobar('se han mirado todas las muestras', hechas >= 38, { hechas });
+comprobar('se han mirado todas las muestras', hechas >= 57, { hechas });
 
 console.log('');
 if (fallos.length > 0) {

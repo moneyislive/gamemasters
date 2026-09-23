@@ -146,6 +146,28 @@
  * pose de salida. Sólo se enseña cuando hace falta: un botón que siempre está no informa
  * de nada.
  *
+ * ═══ Y SE PUEDE BAJAR A ANDAR, COMO EN LAS LINDES ═══
+ *
+ * Tres botones —«La mesa», «Al hombro» y «Sus ojos»— y las teclas 1, 2 y 3, los mismos de Las
+ * Lindes, bajan la cámara a la calle; a pie se anda con W, A, S, D o las flechas y Mayúsculas
+ * para correr, que lee el paseo común de la escena, y un cartel lo dice mientras se anda. La
+ * escena hace el resto (`escenas/burgo/Burgo.tsx`). Lo que es de aquí es que `CamaraAerea`, que
+ * no sabe de paseos y no se puede apagar sin desmontarla —y desmontada y vuelta a montar se
+ * suscribiría DETRÁS de la escena, que es lo que rompe el seguimiento al que mueve—, no mueva
+ * por detrás la cámara de mesa mientras se anda: su acercamiento se queda sin efecto
+ * (`NO_SE_ACERCA`) y los punteros que bajan en el recuadro se marcan como de la interfaz, que
+ * es lo que su arrastre ya respeta. La cámara la sigue escribiendo; la escena pone encima la
+ * del paseo. Las teclas no cuentan escribiendo en un campo: la puja libre lleva cifras.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
+ *
+ * Si la mesa es de la modalidad `botas` —lo dice `esMesaDeBotas`, la misma pregunta que hacen la app
+ * y Las Lindes—, la escena recibe el canal: la dirección del WebSocket en la misma casa que sirvió la
+ * página (`direccionDelCanal`), la llave del asiento, quién soy y los asientos con su nombre, su
+ * figura y el color de su peón (`asientosQueAndanPorElBurgo`). Se empieza al hombro, y el cartel de
+ * la columna de las cámaras dice también cómo va el canal. En una mesa normal no se pasa nada y la
+ * escena no abre ningún socket.
+ *
  * ═══ LO QUE LA REVISIÓN DE LA MESA NO TOCA ═══
  *
  * La cámara. Al cambiar `rev` se suelta lo que se tenía abierto —la tarjeta de una casilla,
@@ -165,7 +187,13 @@ import { Canvas } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
 import type { Cercania } from '../../escenas/acercar';
 import { CERCANIA_DE_SALIDA } from '../../escenas/acercar';
+import { loCogeLaInterfaz } from '../../escenas/camara';
 import { Burgo } from '../../escenas/burgo/Burgo';
+import { asientosQueAndanPorElBurgo } from '../../escenas/burgo/a-pie';
+import type { ModoDelBurgo } from '../../escenas/burgo/a-pie';
+import type { EstadoDelCanal } from '../../escenas/paseo/canal-de-botas';
+import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
+import type { CanalDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import { poseDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { RelojDeLaMesa } from '../../escenas/reloj';
@@ -177,7 +205,7 @@ import {
   MIRADOR_DEL_BURGO,
   poseDeSalidaAlLadoDeLaCaja,
 } from '../../escenas/burgo/camara-del-burgo';
-import type { TableroDelBurgoEn3D } from '../../escenas/burgo/tipos';
+import type { ModoDeCamara, TableroDelBurgoEn3D } from '../../escenas/burgo/tipos';
 import { juzgarCalidad } from '../../escenas/embarcadero/calidad';
 import type { MuestraDelHilo } from '../../escenas/embarcadero/calidad';
 import type { Calidad } from '../../escenas/embarcadero/tipos';
@@ -262,6 +290,7 @@ import {
   usarLosModelos,
 } from './lienzo-propio';
 import type { CuadradoDelCarril } from './lienzo-propio';
+import { direccionDelCanal } from './mesa';
 import type { LaMesa, MesaVista } from './mesa';
 import { traer } from './muelle';
 import type { ArcadeDelCatalogo } from './muebles';
@@ -408,6 +437,111 @@ const MUESTRAS_QUE_SE_GUARDAN = 12;
  * miente en una de las dos pantallas.
  */
 const FOV = CAMPO_DE_LA_CAMARA;
+
+// ---------------------------------------------------------------------------
+// A pie: las tres cámaras, sus teclas y el cartel de cómo se anda
+// ---------------------------------------------------------------------------
+
+/**
+ * LO QUE SE VE DESDE DÓNDE, con su rótulo y su tecla: los tres de Las Lindes, con sus mismas
+ * palabras y sus mismas teclas, para que quien baja a andar en un juego no tenga que aprender el
+ * otro. La mesa es con la que se juega; «Al hombro» y «Sus ojos» bajan a la calle.
+ */
+export const LAS_CAMARAS_DEL_BURGO: readonly { readonly modo: ModoDelBurgo; readonly rotulo: string; readonly ayuda: string; readonly tecla: string }[] = [
+  { modo: 'mesa', rotulo: 'La mesa', ayuda: 'Desde arriba, con el burgo entero a la vista. Tecla 1.', tecla: '1' },
+  { modo: 'hombro', rotulo: 'Al hombro', ayuda: 'Detrás de tu figura, andando por las calles. Tecla 2.', tecla: '2' },
+  { modo: 'ojos', rotulo: 'Sus ojos', ayuda: 'Desde su cara, andando por las calles. Tecla 3.', tecla: '3' },
+];
+
+/** Lo que se le pasa a `CamaraAerea` como acercamiento mientras se anda: nada. Ver la cabecera. */
+const NO_SE_ACERCA = (): void => undefined;
+
+/**
+ * ¿ESTA TECLA ES PARA LA CÁMARA? Sólo si nadie está escribiendo: la puja libre lleva cifras, y un
+ * «1» tecleado en ella no puede subir a nadie a la mesa. Es la misma lista de lo editable que
+ * `formulario.tsx` mira para sus atajos, y por lo mismo: un oyente en el documento se lo lleva TODO.
+ */
+export function camaraDeLaTecla(e: { readonly key: string; readonly metaKey: boolean; readonly ctrlKey: boolean; readonly altKey: boolean; readonly repeat: boolean }, activo: unknown): ModoDelBurgo | null {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return null;
+  const escribe =
+    (typeof HTMLInputElement !== 'undefined' && activo instanceof HTMLInputElement) ||
+    (typeof HTMLTextAreaElement !== 'undefined' && activo instanceof HTMLTextAreaElement) ||
+    (typeof HTMLSelectElement !== 'undefined' && activo instanceof HTMLSelectElement) ||
+    (typeof HTMLElement !== 'undefined' && activo instanceof HTMLElement && activo.isContentEditable);
+  if (escribe) return null;
+  return LAS_CAMARAS_DEL_BURGO.find((c) => c.tecla === e.key)?.modo ?? null;
+}
+
+/**
+ * CÓMO SE ANDA, escrito encima del burgo mientras se anda. En la mesa no sale, porque allí no se
+ * anda. Es el mismo cartel de Las Lindes (`ComoSeAnda`) con la tecla de volver, y con su clase
+ * y su sitio: arriba a la izquierda del lienzo de Las Lindes aquí está la cinta.
+ *
+ * Suelto y exportado para que `verify:escritorio` lo pinte en los tres modos: el pintor nace en la
+ * mesa, y en un pintado estático no se puede bajar a andar.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS, CÓMO VA EL CANAL ═══
+ *
+ * En el mismo cartel y debajo, `canal`: «Conectando…», «Dentro», «Sin conexión: …», igual que en Las
+ * Lindes (`ComoSeAnda`). Desde la mesa también se enseña —allí no se anda, pero el canal sigue abierto
+ * y conviene saber si al bajar se verá a los demás—, y va en la columna de las cámaras, que está en
+ * los dos modos; sin canal, en la mesa no sale nada, como siempre.
+ */
+export function ComoSeAndaPorElBurgo({ modo, canal }: { readonly modo: ModoDelBurgo; readonly canal?: string }): JSX.Element | null {
+  if (modo === 'mesa') return canal === undefined ? null : <p className="burgo-como-se-anda">{canal}</p>;
+  return (
+    <p className="burgo-como-se-anda">
+      W A S D o las flechas para andar · Mayúsculas para correr · 1 para volver a la mesa
+      {canal === undefined ? null : (
+        <>
+          <br />
+          {canal}
+        </>
+      )}
+    </p>
+  );
+}
+
+/**
+ * LAS TRES CÁMARAS Y EL CARTEL, en una columna arriba a la izquierda del lienzo: debajo de la
+ * cinta, y una tira más abajo si hay carril, con la misma cuenta que «Ver el burgo entero» usa al
+ * otro lado (`.burgo-a-pie-con-carril`). La columna no coge el puntero —lo que queda entre los
+ * botones sigue siendo tablero— y los botones sí.
+ */
+export function LasCamarasDelBurgo({
+  modo,
+  alElegir,
+  conCarril,
+  canal,
+}: {
+  readonly modo: ModoDelBurgo;
+  readonly alElegir: (modo: ModoDelBurgo) => void;
+  readonly conCarril: boolean;
+  /** Cómo va el canal, sólo en una mesa de botas: va en el cartel de debajo. Ver `ComoSeAndaPorElBurgo`. */
+  readonly canal?: string;
+}): JSX.Element {
+  return (
+    <div className={conCarril ? 'burgo-a-pie burgo-a-pie-con-carril' : 'burgo-a-pie'}>
+      <div className="burgo-camaras" role="group" aria-label="Desde dónde se mira el burgo">
+        {LAS_CAMARAS_DEL_BURGO.map((c) => (
+          <button
+            key={c.modo}
+            type="button"
+            className={modo === c.modo ? 'burgo-camara burgo-camara-puesta' : 'burgo-camara'}
+            aria-pressed={modo === c.modo}
+            title={c.ayuda}
+            onClick={() => {
+              alElegir(c.modo);
+            }}
+          >
+            {c.rotulo}
+          </button>
+        ))}
+      </div>
+      <ComoSeAndaPorElBurgo modo={modo} canal={canal} />
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Los modelos: el anillo y los dados, cada uno con su red
@@ -1048,6 +1182,59 @@ export function BurgoEnTres({
     ponerSiguiendo(false);
   }, [alAcercarse]);
 
+  /*
+   * ═══ A PIE: DESDE DÓNDE SE MIRA, Y LA CÁMARA DE MESA QUIETA MIENTRAS TANTO ═══
+   *
+   * `modo` es de la pantalla y no viaja: bajar a andar no es una jugada. A pie, `CamaraAerea` sigue
+   * montada —y delante de la escena, que es lo que hace que el seguimiento vaya al día— pero no
+   * puede mover la cámara de mesa por detrás: su acercamiento se queda en `NO_SE_ACERCA`, y los
+   * punteros que bajan en el recuadro se marcan como de la interfaz ANTES de que le lleguen (en la
+   * captura, y ella escucha en la ventana), que es lo que su arrastre y su pellizco ya respetan. Al
+   * subir a la mesa está exactamente donde se dejó.
+   */
+  const [modo, ponerModo] = useState<ModoDelBurgo>('mesa');
+  const aPie = modo !== 'mesa';
+  const camara = useMemo((): ModoDeCamara => (modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: yo ?? '' }), [modo, yo]);
+  useEffect(() => {
+    const recuadro = elRecuadro.current;
+    if (!aPie || recuadro === null) return undefined;
+    const esDelPaseo = (e: PointerEvent): void => {
+      loCogeLaInterfaz(e);
+    };
+    recuadro.addEventListener('pointerdown', esDelPaseo, { capture: true });
+    return () => {
+      recuadro.removeEventListener('pointerdown', esDelPaseo, { capture: true });
+    };
+  }, [aPie]);
+
+  /*
+   * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
+   *
+   * Lo mismo que en Las Lindes. Sin llave, sin asiento o sin dirección (sin `location`, que es como
+   * se pinta en `verify:escritorio`) no hay canal: no hay con qué decir `hola`. Los asientos llegan en
+   * cada vuelta del sondeo, pero la escena sólo reabre el socket si cambian la dirección, la llave o
+   * el asiento. Y el color de cada uno es el de su peón, el que la traducción ya puso en las figuras.
+   */
+  const esBotas = esMesaDeBotas(puesta);
+  const [estadoDelCanal, ponerEstadoDelCanal] = useState<EstadoDelCanal | null>(null);
+  const llaveDelAsiento = mesa.llave ?? null;
+  const figurasDeLaMesa = datos?.figuras;
+  const canal = useMemo<CanalDeBotas | undefined>(() => {
+    const url = esBotas ? direccionDelCanal(puesta.codigo) : null;
+    if (url === null || llaveDelAsiento === null || yo === null) return undefined;
+    return {
+      url,
+      llave: llaveDelAsiento,
+      yo,
+      asientos: asientosQueAndanPorElBurgo(puesta.asientos, figurasDeLaMesa ?? []),
+      alCambiar: ponerEstadoDelCanal,
+    };
+  }, [esBotas, figurasDeLaMesa, llaveDelAsiento, puesta.asientos, puesta.codigo, yo]);
+  /* Una mesa de botas se empieza al hombro: es a lo que se viene. Una vez por mesa; luego mandan los botones y las teclas. */
+  useEffect(() => {
+    if (esBotas) ponerModo('hombro');
+  }, [esBotas, puesta.codigo]);
+
   // -------------------------------------------------------------------------
   // Las cribas: qué enseña la escena, qué la caja, qué el carril, qué la hoja
   // -------------------------------------------------------------------------
@@ -1069,6 +1256,20 @@ export function BurgoEnTres({
    *     sin él: son marcado, no `<canvas>`, así que están ahí también bajo el telón.
    */
   const conMundo = typeof window !== 'undefined' && modelos !== null;
+  /* Las teclas 1, 2 y 3 cambian de cámara, como en Las Lindes; sólo con mundo, que sin él no hay adónde bajar. */
+  useEffect(() => {
+    if (!conMundo) return undefined;
+    const oye = (e: KeyboardEvent): void => {
+      const cual = camaraDeLaTecla(e, document.activeElement);
+      if (cual === null) return;
+      e.preventDefault();
+      ponerModo(cual);
+    };
+    document.addEventListener('keydown', oye);
+    return () => {
+      document.removeEventListener('keydown', oye);
+    };
+  }, [conMundo]);
   const dados = useMemo((): DadosEnTres<Opcion> | null => dadosEnTres(vista, yo, opciones), [vista, yo, opciones]);
   /* 1. La caja de los tratos. No depende de nadie. */
   const pregon = useMemo(() => pregonDelBurgo(vista, yo, opciones), [vista, yo, opciones]);
@@ -1713,7 +1914,7 @@ export function BurgoEnTres({
                 <CamaraAerea
                   alcance={ALCANCE_DEL_BURGO}
                   cercania={cercania}
-                  alAcercarse={alAcercarse}
+                  alAcercarse={aPie ? NO_SE_ACERCA : alAcercarse}
                   recuadro={RECUADRO_DEL_LIENZO}
                   seDesplazanSolas={SE_DESPLAZAN_SOLAS}
                   velo={EL_VELO}
@@ -1731,7 +1932,7 @@ export function BurgoEnTres({
                   ventana={{ ancho: lienzo.ancho, alto: lienzo.alto, franjaInferior: 0 }}
                   traer={traer}
                   calidad={calidad}
-                  camara={{ modo: 'aerea' }}
+                  camara={camara}
                   bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
                   reloj={relojDeArena}
                   alPasarElTurno={alPasarElTurno}
@@ -1750,16 +1951,28 @@ export function BurgoEnTres({
                   alTocarFigura={alTocarFigura}
                   alFallar={alFallarElLienzo}
                   alMedir={alMedir}
+                  canal={canal}
                 />
               </Canvas>
             </LimiteDelMundo>
             {/*
+              A PIE: las tres cámaras y, mientras se anda, cómo se anda; y en una mesa de botas, en los
+              dos modos, cómo va el canal. Ver `LasCamarasDelBurgo`.
+            */}
+            <LasCamarasDelBurgo
+              modo={modo}
+              alElegir={ponerModo}
+              conCarril={cuadrados.length > 0}
+              canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined}
+            />
+            {/*
               LA SALIDA, y sólo cuando hace falta. Está FUERA del `Canvas`: es un botón de la
               Sala con su foco y su filo, no un objeto del mundo. Y no le roba el gesto a la
               cámara sin tener que pedirlo: la cámara sólo atiende lo que empieza sobre el
-              propio `<canvas>`.
+              propio `<canvas>`. A pie no sale: andando no hay acercamiento del que volver, y a
+              la mesa se sube con «La mesa» o con el 1.
             */}
-            {alPrincipio ? null : (
+            {alPrincipio || aPie ? null : (
               <button
                 type="button"
                 /*

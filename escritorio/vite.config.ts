@@ -70,7 +70,12 @@ export default defineConfig({
      */
     port: Number(process.env.GM_ESCRITORIO_PORT ?? 5175),
     proxy: {
-      '/api': { target: SERVIDOR, changeOrigin: true },
+      /*
+       * `ws: true` porque el canal de Boots on Board es un WebSocket bajo `/api`
+       * (`/api/arcade/mesas/:codigo/botas`): sin ello Vite contesta la subida de
+       * protocolo él mismo y el canal no llega nunca al servidor, sólo en desarrollo.
+       */
+      '/api': { target: SERVIDOR, changeOrigin: true, ws: true },
     },
   },
 });

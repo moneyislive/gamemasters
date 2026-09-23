@@ -539,6 +539,20 @@ const BATERIA = [
       'lo que manda un aparato llega de un entorno hostil, y el lector del servidor devuelve null ante cualquier cosa que no sea exactamente un mensaje bien formado —una clave de más, un número con decimales, una coordenada fuera de la coma fija, un rumbo o una marcha fuera de rango, un texto más largo que el tope—; el del aparato, igual con lo que manda el servidor; la ruta cuelga de la mesa bajo /api y la llave NO va en ella',
   },
   {
+    nombre: 'el botín de la refriega',
+    donde: 'server',
+    guion: 'verify:botin',
+    porque:
+      'el botín es el único movimiento, además del tic, que entra en una mesa en nombre de nadie, y mueve cosas de valor de un asiento a otro: su lector dice que no a todo lo que llegue con un asiento detrás, a un botín de uno a sí mismo, a un asiento que no está sentado y a una clave de más',
+  },
+  {
+    nombre: 'el mundo de Riberas',
+    donde: 'server',
+    guion: 'verify:riberas-mundo',
+    porque:
+      'el mundo del delta cae bajo lo que pinta la escena —centros y vértices de sitios.ts a milésimas, las 2.736 teselas propias dentro de su comarca y ninguna esquina pintada en lo hondo—, el vado frena a la mitad y lo hondo para, cada choza, torre y estiaje corta el paso con su caja medida en tablero.glb, se nace en tierra mirando al centro, y el mismo mundo y el mismo paseo salen en Node y en Hermes',
+  },
+  {
     nombre: 'el mundo de Las Lindes',
     donde: 'server',
     guion: 'verify:lindes-mundo',
@@ -747,6 +761,20 @@ const BATERIA = [
     guion: 'verify:paseo',
     porque:
       'los fotogramas dan exactamente ⌊total/tic⌋ tics y nunca más de cinco por fotograma, lo pintado va siempre entre el tic anterior y el último, las teclas y la palanca piden su rumbo y su marcha con el atrás en +128, contra un cuerpo del mundo se para sin meterse y de lado resbala, la marioneta se queda quieta contra la pared aunque se pulse y corre al correr con el clip a la velocidad del suelo, lo pedido tic a tic basta para rehacer el camino, nadie nace encerrado, y la escena de Las Lindes y la app montan justo esto',
+  },
+  {
+    nombre: 'la compuerta de Boots on Board',
+    donde: 'escenas',
+    guion: 'verify:compuerta-de-botas',
+    porque:
+      'la elección de Boots on Board sale al abrir mesa sólo en los juegos que se recorren, encendida sólo si este aparato midió `plena` y apagada siempre con su porqué; lo que viaja en `abrir` es lo que se ve encendido; y un aparato que no llega no se sienta en una mesa `botas` —sentado sin bajar sería inmune a que le roben—, sin que a quien sí llega le cueste una petición',
+  },
+  {
+    nombre: 'el canal del paseo',
+    donde: 'escenas',
+    guion: 'verify:canal-del-paseo',
+    porque:
+      'el hola va primero y con la llave, que no va en la URL; nada sale antes de dentro y con él se está donde dijo el servidor; un aqui por tic con los números de la costura —y con la MIRADA, no el paso: andando hacia atrás los demás no te ven darte la vuelta— y quieto dos por segundo; corrige corrige sin ping-pong; a los demás se les pinta 150 ms atrás y nunca por delante; sin vuelta con llave mala, mesa que no u otro aparato, con lo demás la espera se dobla hasta su tope y con quieto se vuelve al andar; la cámara de hombro no atraviesa; el rótulo se lee desde el hombro; y sólo una mesa botas monta el canal',
   },
   /*
    * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.

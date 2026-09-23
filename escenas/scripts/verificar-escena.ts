@@ -355,6 +355,34 @@ import {
   PLUMA_DE_LA_ORILLA,
   materialDeLaMarea,
 } from '../marea';
+/*
+ * RIBERAS A PIE: la aritmética de andar por el delta (`delta-a-pie.ts`), el mundo con el que se
+ * choca, y las piezas del paseo común que se usan para medirla —las de verdad, no copias—.
+ */
+import {
+  alturaAPie,
+  CINTURA_DEL_AVENTURERO,
+  colonoDeQuienMira,
+  esRampaPintada,
+  firmaDelMundo,
+  MANDOS_DE_LA_CAMARA,
+  NIEBLA_A_PIE,
+  sitioDeNacer,
+  subidaDeLaRampa,
+  sueloPintadoDe,
+  vaHundido,
+} from '../delta-a-pie';
+import type { SueloPintado } from '../delta-a-pie';
+import type { Relieve, Subtesela } from '../relieve';
+import { LAMINA } from '../escala';
+import { mundoDeRiberas } from '../../shared/arcade/juegos/riberas-mundo';
+import { arenaDe, FIRME, sePuedeEstar, sueloEn, VADO } from '../../shared/mecanicas/mundo';
+import type { MundoDeclarado, Sitio } from '../../shared/mecanicas/mundo';
+import { RADIO_DEL_PASEANTE } from '../../shared/mecanicas/andar';
+import { deNumero } from '../../shared/mecanicas/fijo';
+import { nacerEnElPaseo } from '../paseo/paseante';
+import { camaraDeHombro } from '../paseo/camaras';
+import { RADIO_DEL_DISCO } from '../presupuesto-del-delta';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -6073,6 +6101,44 @@ paso('Recoger la mesa: la bajada tapa el asa PROYECTADA en los quince lienzos, e
     holguras,
   );
   /*
+   * ═══ Y EL MANDO DE LA CÁMARA DEL ESCRITORIO, DEBAJO DE LOS DOS ═══
+   *
+   * `MANDOS_DE_LA_CAMARA` (`delta-a-pie.ts`) apila el primero debajo de volver y de recoger, con
+   * el mismo paso, y es el único que convive con la barra: el segundo sólo sale a pie, con la
+   * mesa recogida. Se mide como el de recoger, contra la silueta proyectada de todas las asas de
+   * los quince lienzos, pegado a la derecha y con TRES lados de ancho —su rótulo es una palabra,
+   * no un glifo, y crece hacia la izquierda—. Y se ve caer: el mismo mando pegado ABAJO a la
+   * derecha pisa asas, que es lo que dice que la medida mira donde tiene que mirar.
+   */
+  const mandoDeLaCamaraPisa = (bajadaEn: (altoPt: number) => number): string[] => {
+    const pisa: string[] = [];
+    for (const [nombre, anchoPt, altoPt] of LIENZOS) {
+      const arribaDesdeAbajo = altoPt - bajadaEn(altoPt) - MANDOS_DE_LA_CAMARA.lado;
+      const ancho = MANDOS_DE_LA_CAMARA.lado * 3;
+      const x = anchoPt - MANDOS_DE_LA_CAMARA.margen - ancho;
+      const mando: Array<[number, number]> = [
+        [x, arribaDesdeAbajo],
+        [x + ancho, arribaDesdeAbajo],
+        [x + ancho, arribaDesdeAbajo + MANDOS_DE_LA_CAMARA.lado],
+        [x, arribaDesdeAbajo + MANDOS_DE_LA_CAMARA.lado],
+      ];
+      for (const [que, silueta] of siluetasDeLasAsas(anchoPt, altoPt)) {
+        if (seCortan(silueta, mando)) pisa.push(`${nombre}: el mando de la cámara pisa ${que}`);
+      }
+    }
+    return pisa;
+  };
+  const pisaLaCamara = mandoDeLaCamaraPisa(() => MANDOS_DE_LA_CAMARA.arriba);
+  comprobar(
+    'el mando de la cámara del escritorio —debajo de volver y de recoger, con tres lados de ancho— no roba ni un punto de ninguna asa en ninguno de los quince lienzos',
+    pisaLaCamara.length === 0,
+    pisaLaCamara.slice(0, 4),
+  );
+  comprobar(
+    'y esa medida muerde: el mismo mando pegado abajo a la derecha pisa las asas',
+    mandoDeLaCamaraPisa((altoPt) => altoPt - MANDOS_DE_LA_CAMARA.margen - MANDOS_DE_LA_CAMARA.lado).length > 0,
+  );
+  /*
    * QUE LOS DOS MANDOS NO SE SOLAPEN NO SE MIDE EN PÍXELES DE RÓTULO: se apilan. El de
    * volver mide 44 de alto como mínimo (el suelo de toque) y arranca en `margen`; éste
    * arranca en `margen + bajoElOtroMando`. Con `bajoElOtroMando` = 52 quedan ocho puntos de
@@ -9390,7 +9456,18 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
    * `useFrame`, esta línea se pone roja. Y `mallaDelTerritorio` no recibe ninguna cámara: eso lo
    * garantiza su firma, que el typecheck ya vigila.
    */
-  const memoDeLasManchas = cuerpoDe('  const manchas = useMemo(');
+  /*
+   * EL MEMO, Y SÓLO EL MEMO: de su `useMemo(` a su lista de dependencias. `cuerpoDe` corta en la
+   * siguiente declaración de primer nivel, y detrás de este memo viene el resto de `Delta` —su
+   * JSX entero—, que desde que el delta se anda SÍ habla de la cámara con todo derecho: la
+   * `camara` de a pie que se le da al paseo. Lo que se compra aquí es que la MANCHA no dependa de
+   * ella, y eso se mira en el memo que la compone.
+   */
+  const DEPENDENCIAS_DE_LAS_MANCHAS = '}, [datos.piezas, datos.caminos, relieve]);';
+  const memoDeLasManchas = ((todo: string): string => {
+    const fin = todo.indexOf(DEPENDENCIAS_DE_LAS_MANCHAS);
+    return fin < 0 ? todo : todo.slice(0, fin + DEPENDENCIAS_DE_LAS_MANCHAS.length);
+  })(cuerpoDe('  const manchas = useMemo('));
   comprobar(
     'la mancha se compone SIN la cámara: su tamaño es del mundo y no de la pantalla',
     memoDeLasManchas.length > 200 &&
@@ -10257,6 +10334,516 @@ paso('Ninguna escena se toca con `onClick`, que en la app no llega nunca');
   );
 }
 
+// ---------------------------------------------------------------------------
+paso(
+  'Riberas a pie: el paseo común con `mundoDeRiberas`, se nace en su sitio, en el agua pintada se va hundido hasta la cintura y en tierra no, y la cámara de la mesa es la de siempre',
+);
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE SE COMPRA AQUÍ, Y POR QUÉ NINGÚN OTRO COMPROBADOR LO COMPRA ═══
+ *
+ * `verify:riberas-mundo` compra el MUNDO —que cae bajo lo que se pinta, que el vado es el que
+ * es, que los sitios de nacer están en tierra— y `verify:paseo` compra el PASEO. Lo que ninguno
+ * de los dos ve es si la escena de Riberas los USA, y cómo:
+ *
+ *   1. Que a pie se ande con el paseo COMÚN y con `mundoDeRiberas`, y no con un paseo propio
+ *      escrito aquí: dos `unPaso` en el árbol, los comprobadores en verde y el delta
+ *      atravesando chozas es exactamente lo que el §6.1 de BOOTS-ON-BOARD avisaba.
+ *   2. Que se nazca en el sitio del colono de quien mira, y que ese sitio sea tierra en la que se
+ *      cabe y que se PINTA como tierra: nadie aparece hundido ni dentro de una choza.
+ *   3. Que la marioneta vaya hundida hasta la cintura donde la escena pinta agua —el mar del
+ *      vado, los ríos, los lagos— y derecha donde pinta tierra, también en la arena del vado.
+ *      Medido con relieves de verdad, y con la cintura leída del esqueleto y la rampa leída del
+ *      `.glb`: dos números escritos a mano que se quedarían viejos en silencio.
+ *   4. Que la cámara de la mesa siga siendo la de siempre: la escena no la toca en la mesa, y lo
+ *      que cambia a pie —el fondo, la niebla— se pone al bajar y se devuelve al subir.
+ *
+ * Y cada regla se ve CAER con su caso envenenado, que en esta casa es lo que separa un
+ * comprobador de un adorno.
+ */
+{
+  const aqui = import.meta.dirname ?? __dirname;
+  const soloCodigo = (texto: string): string =>
+    texto
+      .split('\n')
+      .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+      .join('\n');
+  /** Afirma la regla sobre lo de verdad, y la ve CAER con el caso envenenado. */
+  const regla = <T,>(que: string, prueba: (t: T) => boolean, bueno: T, envenenado: T, detalle?: unknown): void => {
+    comprobar(que, prueba(bueno), detalle);
+    comprobar(`y «${que}» se ve CAER con el caso envenenado`, !prueba(envenenado));
+  };
+  const fuenteDelPaseo = fs.readFileSync(path.join(aqui, '..', 'andar-por-el-delta.tsx'), 'utf8');
+  const fuenteDeLaCuenta = fs.readFileSync(path.join(aqui, '..', 'delta-a-pie.ts'), 'utf8');
+  const fuenteDeLaEscena = fs.readFileSync(path.join(aqui, '..', 'delta.tsx'), 'utf8');
+
+  /* ── 1. EL PASEO ES EL COMÚN, Y EL MUNDO EL DE `mundoDeRiberas` ── */
+
+  /*
+   * La llamada al paseo se mira por su PRINCIPIO —el mundo, dónde se nace, el modo, la palanca y la
+   * altura— y no como una lista cerrada: en una mesa de botas lleva detrás el `alDarUnTic` del canal,
+   * como en Las Lindes y en el Burgo, y un juez que lo tumbara por eso enseñaría a no conectarlo.
+   * Que el canal esté cosido de verdad lo mira `verify:canal-del-paseo`, en los tres juegos.
+   */
+  regla(
+    'a pie se anda con el paseo COMÚN —`usarElPaseo` y `QuienAnda` de `escenas/paseo/`— y con el mundo de `mundoDeRiberas`',
+    (t: string) => {
+      const c = soloCodigo(t);
+      return (
+        /import \{ usarElPaseo \} from '\.\/paseo\/usar-el-paseo';/.test(c) &&
+        /import \{ QuienAnda \} from '\.\/paseo\/quien-anda';/.test(c) &&
+        /import \{ mundoDeRiberas \} from '\.\.\/shared\/arcade\/juegos\/riberas-mundo';/.test(c) &&
+        /const paseo = usarElPaseo\(\{ mundo, nace, modo: camara\.modo, mandos, alturaEn(?:, [^}]*)? \}\);/.test(c) &&
+        /const nuevo = mundoDeRiberas\(vista\);/.test(c)
+      );
+    },
+    fuenteDelPaseo,
+    fuenteDelPaseo.replace('const nuevo = mundoDeRiberas(vista);', 'const nuevo: MundoDeclarado = { lado: 1, pisables: [], vados: [], cuerpos: [], nace: [] };'),
+  );
+  const PASEO_PROPIO = /\b(pasoDelTic|unPaso|fotogramaDelPaseo|ticDelPaseo|teclaDelPaseo|mandosDelFotograma)\b|addEventListener\(\s*'key/;
+  regla(
+    'y en Riberas no hay paseo propio: ni un paso, ni un tic, ni un teclado escritos en la escena ni en su cuenta, y la cuenta no toca la cámara',
+    (fuentes: readonly string[]) =>
+      fuentes.every((f) => !PASEO_PROPIO.test(soloCodigo(f))) &&
+      !/camera\.position\.set|\.lookAt\(/.test(soloCodigo(fuentes[0] ?? '')) &&
+      !/camera\.position\.set|\.lookAt\(/.test(soloCodigo(fuentes[1] ?? '')),
+    [fuenteDelPaseo, fuenteDeLaCuenta, fuenteDeLaEscena],
+    [
+      fuenteDelPaseo.replace('const paseo = usarElPaseo(', "document.addEventListener('keydown', () => undefined);\n  const paseo = usarElPaseo("),
+      fuenteDeLaCuenta,
+      fuenteDeLaEscena,
+    ],
+  );
+  regla(
+    'la escena monta el paseo sólo con cámara, vista y `traer`, sobre EL MISMO relieve que pinta, y montado también en la mesa para no olvidar dónde se estaba',
+    (t: string) =>
+      /\{camara !== undefined && vista !== undefined && traer !== undefined \? \(\s*<AndarPorElDelta\s+relieve=\{relieve\}\s+vista=\{vista\}\s+camara=\{camara\}\s+traer=\{traer\}/.test(
+        soloCodigo(t),
+      ),
+    fuenteDeLaEscena,
+    fuenteDeLaEscena.replace('relieve={relieve}\n          vista={vista}', 'relieve={crearRelieve([], 0)}\n          vista={vista}'),
+  );
+  regla(
+    'el mundo se deriva SÓLO A PIE y, si sale el mismo, se entrega el mismo objeto: el paseo no rehace su arena por una tirada de dados',
+    (t: string) =>
+      /if \(!aPie\) return null;\s*const nuevo = mundoDeRiberas\(vista\);\s*const firma = firmaDelMundo\(nuevo\);\s*const antes = mundoVisto\.current;\s*if \(antes !== null && antes\.firma === firma\) return antes\.mundo;\s*mundoVisto\.current = \{ firma, mundo: nuevo \};\s*return nuevo;\s*\}, \[aPie, vista\]\);/.test(
+        soloCodigo(t),
+      ),
+    fuenteDelPaseo,
+    fuenteDelPaseo.replace('if (antes !== null && antes.firma === firma) return antes.mundo;', ''),
+  );
+
+  /* ── Un delta de verdad para andarlo: diecinueve comarcas, tres colonos, el estiaje ── */
+
+  const TERRENOS_A_PIE = ['carrizal', 'marisma', 'salina', 'vega', 'cantil'];
+  const hexesAPie = mallaDeRadio(2);
+  const islasAPie = hexesAPie.map((hex, i) => ({
+    hex,
+    terreno: i === 0 ? 'duna' : (TERRENOS_A_PIE[i % TERRENOS_A_PIE.length] ?? 'vega'),
+    cifra: i === 0 ? null : 2 + (i % 11),
+  }));
+  const verticesAPie = verticesDe(hexesAPie);
+  const vertice = (i: number): string => verticesAPie[i % verticesAPie.length] as string;
+  const vistaDeRiberas = (colonos: ReadonlyArray<{ asiento: string; chozas: string[]; torres: string[] }>): unknown => ({
+    desde: 'riberas',
+    momento: 'jugando',
+    islas: islasAPie,
+    colonos,
+    estiaje: '1,-1',
+  });
+  const vistaAPie = vistaDeRiberas([
+    { asiento: 'A', chozas: [vertice(0), vertice(20)], torres: [vertice(33)] },
+    { asiento: 'B', chozas: [vertice(7)], torres: [] },
+    { asiento: 'C', chozas: [], torres: [] },
+  ]);
+  const mundoAPie = mundoDeRiberas(vistaAPie);
+  const arenaAPie = arenaDe(mundoAPie);
+  const LADO = mundoAPie.lado;
+  comprobar(
+    'el delta de prueba es un delta de verdad: siete mil casillas firmes, mil trescientas de vado, sus cajas y seis sitios de nacer',
+    mundoAPie.pisables.length === 7107 && mundoAPie.vados.length === 1304 && mundoAPie.cuerpos.length === 5 && mundoAPie.nace.length === 6,
+    { firmes: mundoAPie.pisables.length, vados: mundoAPie.vados.length, cuerpos: mundoAPie.cuerpos.length, nace: mundoAPie.nace.length },
+  );
+
+  /* La firma: el mismo mundo derivado dos veces firma igual, y una choza en otro sitio no. */
+  const otraVista = vistaDeRiberas([
+    { asiento: 'A', chozas: [vertice(1), vertice(20)], torres: [vertice(33)] },
+    { asiento: 'B', chozas: [vertice(7)], torres: [] },
+    { asiento: 'C', chozas: [], torres: [] },
+  ]);
+  const firmaQueDistingue = (firma: (m: MundoDeclarado) => number): boolean =>
+    firma(mundoDeRiberas(vistaAPie)) === firma(mundoAPie) && firma(mundoDeRiberas(otraVista)) !== firma(mundoAPie);
+  regla(
+    'y la firma del mundo es la misma para el mismo mundo y otra en cuanto una choza cambia de vértice, aunque se cuenten las mismas',
+    firmaQueDistingue,
+    firmaDelMundo,
+    (m: MundoDeclarado) => m.pisables.length * 1_000_000 + m.vados.length * 100 + m.cuerpos.length,
+  );
+
+  /* ── 2. SE NACE EN EL SITIO DEL COLONO DE QUIEN MIRA ── */
+
+  const naceBien = (f: (m: MundoDeclarado, colono: number) => Sitio | null): boolean =>
+    [0, 1, 2, 3, 4, 5].every((k) => f(mundoAPie, k) === mundoAPie.nace[k]) &&
+    f(mundoAPie, -1) === mundoAPie.nace[0] &&
+    f({ ...mundoAPie, nace: [] }, 0) === null;
+  regla(
+    'se nace en el sitio de `mundo.nace` del colono de quien mira, quien mira sin sentarse en el primero, y sin sitios en ninguno',
+    naceBien,
+    sitioDeNacer,
+    (m: MundoDeclarado) => m.nace[0] ?? null,
+  );
+  comprobar(
+    'y el colono es el de la vista, en su orden de asiento: A el primero, C el tercero, y un mirón o una vista que no es de Riberas no son ninguno',
+    colonoDeQuienMira(vistaAPie, 'A') === 0 &&
+      colonoDeQuienMira(vistaAPie, 'C') === 2 &&
+      colonoDeQuienMira(vistaAPie, '') === -1 &&
+      colonoDeQuienMira(vistaAPie, 'Z') === -1 &&
+      colonoDeQuienMira({ desde: 'otro', momento: 'jugando', islas: [], colonos: [] }, 'A') === -1,
+  );
+  const sitiosSanos: string[] = [];
+  for (let k = 0; k < mundoAPie.nace.length; k++) {
+    const s = mundoAPie.nace[k] as Sitio;
+    const x = deNumero(s.x);
+    const z = deNumero(s.z);
+    const nacido = nacerEnElPaseo(arenaAPie, s);
+    if (sueloEn(arenaAPie, x, z) !== FIRME) sitiosSanos.push(`${String(k)}: no es firme`);
+    if (!sePuedeEstar(arenaAPie, x, z, RADIO_DEL_PASEANTE)) sitiosSanos.push(`${String(k)}: no se cabe`);
+    if (nacido.ahora.x !== x || nacido.ahora.z !== z) sitiosSanos.push(`${String(k)}: el paseo lo rescata a otro sitio`);
+  }
+  comprobar(
+    'y cada sitio es tierra firme en la que se cabe: el paseo nace ahí mismo, sin tener que rescatar a nadie de dentro de una choza',
+    sitiosSanos.length === 0,
+    sitiosSanos,
+  );
+
+  /* ── 3. HUNDIDO EN EL AGUA PINTADA, DERECHO EN LA TIERRA ── */
+
+  /*
+   * LO QUE LA ESCENA PINTA COMO AGUA, dicho aquí y comparado con la escena: la tesela que
+   * `delta.tsx` dibuja de agua es la de `CAUCE` o `CUERPO`, puesta a su nivel del agua, y lo que
+   * no tiene tesela es el mar, cuyo disco va a `LAMINA`. Si la escena cambia de criterio, esto
+   * se cae antes de comparar nada.
+   */
+  comprobar(
+    'la escena pinta el agua como se supone aquí: río o lago a su nivel del agua con la lámina `LAMINA` más abajo, y el mar a `LAMINA`',
+    /const enAgua = t\.agua === CAUCE \|\| t\.agua === CUERPO;/.test(fuenteDeLaEscena) &&
+      /const cota = enAgua \? t\.nivelDelAgua \* ESCALON : t\.altura;/.test(fuenteDeLaEscena) &&
+      /<mesh position=\{\[0, LAMINA, 0\]\} geometry=\{geometria\} material=\{material\} \/>/.test(fuenteDeLaEscena),
+  );
+  const SEMILLAS_A_PIE = [0, 1, 2, 3, 7, 11];
+  const casos = SEMILLAS_A_PIE.map((semilla) => {
+    const relieve = crearRelieve(
+      islasAPie.map((i) => ({ hex: i.hex, terreno: i.terreno })),
+      semilla,
+    );
+    return { semilla, relieve, suelo: sueloPintadoDe(relieve) };
+  });
+  const teselaEn = (suelo: SueloPintado, x: number, z: number): Subtesela | undefined => {
+    const h = hexDePunto({ x, y: z }, RADIO_DE_TESELA);
+    return suelo.get(`${String(h.q)},${String(h.r)}`);
+  };
+  const laminaPintadaEn = (suelo: SueloPintado, x: number, z: number): number | null => {
+    const t = teselaEn(suelo, x, z);
+    if (t === undefined) return LAMINA;
+    if (t.agua === CAUCE || t.agua === CUERPO) return t.nivelDelAgua * ESCALON + LAMINA;
+    return null;
+  };
+  type AlturaAPie = (suelo: SueloPintado, relieve: Relieve, x: number, z: number) => number;
+  const hundidoEnElAguaYDerechoEnTierra = (altura: AlturaAPie): boolean => {
+    for (const caso of casos) {
+      for (const c of [...mundoAPie.vados, ...mundoAPie.pisables]) {
+        const x = c.x * LADO;
+        const z = -c.y * LADO;
+        const h = altura(caso.suelo, caso.relieve, x, z);
+        const lamina = laminaPintadaEn(caso.suelo, x, z);
+        if (lamina !== null) {
+          if (Math.abs(h - (lamina - CINTURA_DEL_AVENTURERO)) > 1e-9) return false;
+          continue;
+        }
+        const t = teselaEn(caso.suelo, x, z) as Subtesela;
+        const suelo = caso.relieve.alturaEn({ x, y: z });
+        if (esRampaPintada(t)) {
+          if (h < suelo - 1e-9 || h > suelo + ESCALON + 1e-9) return false;
+        } else if (Math.abs(h - suelo) > 1e-9) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+  regla(
+    'en el agua que se pinta los pies van la cintura por debajo de la lámina, y en la tierra que se pinta van sobre ella —también en la arena del vado, donde hundir por ser «vado» sería andar enterrado—',
+    hundidoEnElAguaYDerechoEnTierra,
+    (suelo: SueloPintado, _relieve: Relieve, x: number, z: number) => alturaAPie(suelo, x, z),
+    (_suelo: SueloPintado, relieve: Relieve, x: number, z: number) =>
+      sueloEn(arenaAPie, deNumero(x), deNumero(z)) === VADO ? LAMINA - CINTURA_DEL_AVENTURERO : relieve.alturaEn({ x, y: z }),
+  );
+  comprobar(
+    'y la otra vacuna: una altura que NO se hunde nunca se cae en el mar del vado',
+    !hundidoEnElAguaYDerechoEnTierra((_suelo, relieve, x, z) => relieve.alturaEn({ x, y: z })),
+  );
+  /* Lo que queda de cada clase, para que se vea en qué se hunde y en qué no. */
+  const cuentas = { vadoEnAgua: 0, vadoEnTierra: 0, firmeEnTierra: 0, firmeEnAgua: 0, rampas: 0 };
+  const primero = casos[0];
+  if (primero !== undefined) {
+    for (const c of mundoAPie.vados) {
+      if (vaHundido(primero.suelo, c.x * LADO, -c.y * LADO)) cuentas.vadoEnAgua++;
+      else cuentas.vadoEnTierra++;
+    }
+    for (const c of mundoAPie.pisables) {
+      const x = c.x * LADO;
+      const z = -c.y * LADO;
+      if (vaHundido(primero.suelo, x, z)) cuentas.firmeEnAgua++;
+      else {
+        cuentas.firmeEnTierra++;
+        /* Sin tesela no hay rampa: si `vaHundido` mintiera, esto no revienta, cuenta. */
+        const t = teselaEn(primero.suelo, x, z);
+        if (t !== undefined && esRampaPintada(t)) cuentas.rampas++;
+      }
+    }
+  }
+  console.log(
+    `  a pie, con el relieve de semilla ${String(primero?.semilla)}: del vado, ${String(cuentas.vadoEnAgua)} casillas hundidas en agua y ${String(cuentas.vadoEnTierra)} derechas en la arena; ` +
+      `de lo firme, ${String(cuentas.firmeEnTierra)} en tierra (${String(cuentas.rampas)} en rampa) y ${String(cuentas.firmeEnAgua)} en agua (ríos, lagos y los dientes de la costa)`,
+  );
+  /*
+   * Lo firme en agua no es un error: dentro de una comarca TODO es firme para el mundo, también
+   * el río que la escena pinta por medio (`riberas-mundo.ts`), y ahí se vadea a paso de tierra con
+   * el agua por la cintura. Lo que se exige es que sea poco y que las dos clases existan: sin
+   * arena en el vado o sin agua en él, la regla de arriba no habría mordido en uno de los lados.
+   */
+  comprobar(
+    'y en el vado se va hundido casi siempre —la mayor parte del vado es agua pintada— y en lo firme casi nunca: la regla muerde en los dos lados',
+    cuentas.vadoEnAgua > cuentas.vadoEnTierra &&
+      cuentas.vadoEnTierra > 0 &&
+      cuentas.firmeEnAgua > 0 &&
+      cuentas.firmeEnAgua * 10 < cuentas.firmeEnTierra,
+    cuentas,
+  );
+  const naceEnTierraPintada = casos.every((caso) => mundoAPie.nace.every((s) => !vaHundido(caso.suelo, s.x, s.z)));
+  comprobar('y nadie nace hundido: los seis sitios de nacer caen en tierra pintada con todos los relieves', naceEnTierraPintada);
+
+  /*
+   * LA CINTURA, LEÍDA DEL ESQUELETO. Las matrices de ligadura de la piel dicen dónde está cada
+   * hueso en la pose de reposo; la cintura tiene que caer entre donde nacen las piernas y donde
+   * empieza la espalda, y con ella hundida la cabeza entera —del cuello arriba— tiene que quedar
+   * fuera del agua.
+   */
+  const caballero = await new NodeIO().read(path.join(aqui, '..', 'modelos', 'aventureros', 'caballero.glb'));
+  const piel = caballero.getRoot().listSkins()[0];
+  const alturaDelHueso = (nombre: string): number => {
+    if (piel === undefined) return Number.NaN;
+    const juntas = piel.listJoints();
+    const inversas = piel.getInverseBindMatrices();
+    const i = juntas.findIndex((j) => j.getName() === nombre);
+    if (i < 0 || inversas === null) return Number.NaN;
+    const m = new Array<number>(16).fill(0);
+    inversas.getElement(i, m);
+    return new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(m).invert()).y;
+  };
+  const dondeNacenLasPiernas = alturaDelHueso('upperleg.l');
+  const dondeEmpiezaLaEspalda = alturaDelHueso('spine');
+  const elCuello = alturaDelHueso('head');
+  regla(
+    `la cintura (${String(CINTURA_DEL_AVENTURERO)}) cae en el esqueleto entre donde nacen las piernas (${dondeNacenLasPiernas.toFixed(3)}) y donde empieza la espalda (${dondeEmpiezaLaEspalda.toFixed(3)}), y hundida hasta ahí el cuello (${elCuello.toFixed(3)}) queda fuera del agua`,
+    (cintura: number) =>
+      Number.isFinite(dondeNacenLasPiernas) &&
+      cintura >= dondeNacenLasPiernas &&
+      cintura <= dondeEmpiezaLaEspalda &&
+      elCuello - cintura > 0.5,
+    CINTURA_DEL_AVENTURERO,
+    ALTURA_DE_UNA_PERSONA / 2,
+  );
+
+  /*
+   * LA RAMPA, LEÍDA DEL `.glb` CON RAYOS. La cara de arriba de `rampa-alta` sube en línea recta
+   * de su canto bajo al centro y sigue llana un escalón más arriba; `subidaDeLaRampa` tiene que
+   * decir lo mismo en cada punto, y lo contrario —una cuesta de canto a canto— se tiene que caer.
+   */
+  const trianglesDe = async (nombre: string): Promise<number[][]> => {
+    const doc = await new NodeIO().read(path.join(aqui, '..', 'modelos', 'tablero.glb'));
+    const nodo = doc.getRoot().listNodes().find((n) => n.getName() === nombre);
+    const salida: number[][] = [];
+    const bajar = (n: Node): void => {
+      const m = n.getWorldMatrix();
+      for (const p of n.getMesh()?.listPrimitives() ?? []) {
+        const pos = p.getAttribute('POSITION');
+        const ind = p.getIndices();
+        if (pos === null) continue;
+        const cuantos = ind === null ? pos.getCount() : ind.getCount();
+        for (let i = 0; i < cuantos; i += 3) {
+          const tri: number[] = [];
+          for (let k = 0; k < 3; k++) {
+            const idx = ind === null ? i + k : (ind.getScalar(i + k) as number);
+            const v = [0, 0, 0];
+            pos.getElement(idx, v);
+            const [vx, vy, vz] = v as [number, number, number];
+            tri.push(
+              (m[0] as number) * vx + (m[4] as number) * vy + (m[8] as number) * vz + (m[12] as number),
+              (m[1] as number) * vx + (m[5] as number) * vy + (m[9] as number) * vz + (m[13] as number),
+              (m[2] as number) * vx + (m[6] as number) * vy + (m[10] as number) * vz + (m[14] as number),
+            );
+          }
+          salida.push(tri);
+        }
+      }
+      for (const h of n.listChildren()) bajar(h);
+    };
+    if (nodo !== undefined) bajar(nodo);
+    return salida;
+  };
+  const trisDeLaRampa = await trianglesDe(MODELO.rampaAlta);
+  const caraDeArribaEn = (tris: readonly number[][], x: number, z: number): number => {
+    let alto = -Infinity;
+    for (const t of tris) {
+      const [ax, ay, az, bx, by, bz, cx, cy, cz] = t as [number, number, number, number, number, number, number, number, number];
+      const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+      if (Math.abs(d) < 1e-12) continue;
+      const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+      const l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+      const l3 = 1 - l1 - l2;
+      if (l1 < -1e-9 || l2 < -1e-9 || l3 < -1e-9) continue;
+      alto = Math.max(alto, l1 * ay + l2 * by + l3 * cy);
+    }
+    return alto;
+  };
+  const teselaDePrueba = { centro: { x: 0, y: 0 }, rampa: 0 } as unknown as Subtesela;
+  const MUESTRAS_DE_LA_RAMPA = [-0.95, -0.75, -0.5, -0.25, 0.1, 0.5, 0.9];
+  const laRampaEsLaDelPack = (subida: (t: Subtesela, x: number, z: number) => number): boolean =>
+    trisDeLaRampa.length > 0 &&
+    MUESTRAS_DE_LA_RAMPA.every((u) => Math.abs(caraDeArribaEn(trisDeLaRampa, u, 0) - subida(teselaDePrueba, u * ESCALA_DEL_PACK, 0)) < 0.02);
+  regla(
+    'en una rampa se pinta lo que sube la rampa del pack, medida con rayos en `tablero.glb`: cuesta del canto bajo al centro y llano un escalón más arriba',
+    laRampaEsLaDelPack,
+    subidaDeLaRampa,
+    (t: Subtesela, x: number, z: number) =>
+      Math.min(1, Math.max(0, (1 + ((x - t.centro.x) * Math.cos(t.rampa ?? 0) - (z - t.centro.y) * Math.sin(t.rampa ?? 0)) / ESCALA_DEL_PACK) / 2)),
+  );
+  /*
+   * Y MIRA AL VECINO DE ARRIBA: desde el centro de cada rampa pintada, un paso de tesela en su
+   * dirección cae en la tesela que está un escalón más alta, así que la rampa acaba justo en la
+   * cara de la terraza de arriba y no se ve el salto.
+   */
+  const hacia = (t: Subtesela): readonly [number, number] => [Math.cos(t.rampa ?? 0), -Math.sin(t.rampa ?? 0)];
+  const rampasQueMiranArriba = (direccion: (t: Subtesela) => readonly [number, number]): boolean => {
+    let vistas = 0;
+    for (const caso of casos) {
+      for (const t of caso.relieve.todas()) {
+        if (!esRampaPintada(t)) continue;
+        const [dx, dz] = direccion(t);
+        const paso = Math.sqrt(3) * RADIO_DE_TESELA;
+        /* Una vecina que no se pinta es mar: ahí no se anda, y no dice nada de la rampa. */
+        const vecina = teselaEn(caso.suelo, t.centro.x + dx * paso, t.centro.y + dz * paso);
+        if (vecina === undefined) continue;
+        if (vecina.nivel !== t.nivel + 1) return false;
+        vistas++;
+      }
+    }
+    return vistas > 50;
+  };
+  regla(
+    'y cada rampa pintada sube hacia la tesela de un escalón más arriba, con el giro que le pone la escena',
+    rampasQueMiranArriba,
+    hacia,
+    (t: Subtesela) => [Math.cos(t.rampa ?? 0), Math.sin(t.rampa ?? 0)] as const,
+  );
+  /*
+   * Y `subidaDeLaRampa` SUBE EN ESA MISMA DIRECCIÓN en cada rampa pintada, que es lo que la
+   * muestra del `.glb` no puede ver: allí la rampa está sin girar y el eje `z` no cuenta. Cerca
+   * del canto alto va un escalón arriba y cerca del bajo casi a ras, con el giro de cada una.
+   */
+  const subeHaciaArriba = (subida: (t: Subtesela, x: number, z: number) => number): boolean => {
+    let vistas = 0;
+    for (const caso of casos) {
+      for (const t of caso.relieve.todas()) {
+        if (!esRampaPintada(t)) continue;
+        const [dx, dz] = hacia(t);
+        const a = ESCALA_DEL_PACK * 0.9;
+        const arriba = subida(t, t.centro.x + dx * a, t.centro.y + dz * a);
+        const abajo = subida(t, t.centro.x - dx * a, t.centro.y - dz * a);
+        if (Math.abs(arriba - 1) > 1e-9 || Math.abs(abajo - 0.1) > 1e-9) return false;
+        vistas++;
+      }
+    }
+    return vistas > 50;
+  };
+  regla(
+    'y `subidaDeLaRampa` sube hacia ese vecino en cada rampa pintada, con su giro: un escalón junto al canto alto, casi nada junto al bajo',
+    subeHaciaArriba,
+    subidaDeLaRampa,
+    (t: Subtesela, x: number, z: number) =>
+      Math.min(1, Math.max(0, 1 + ((x - t.centro.x) * Math.cos(t.rampa ?? 0) + (z - t.centro.y) * Math.sin(t.rampa ?? 0)) / ESCALA_DEL_PACK)),
+  );
+
+  /* ── 4. LA CÁMARA DE LA MESA ES LA DE SIEMPRE; A PIE, EL FONDO Y LA NIEBLA SE PONEN Y SE DEVUELVEN ── */
+
+  regla(
+    'en la mesa la escena no toca la cámara ni pinta a nadie ni deriva el mundo; a pie pone el fondo en el canto de la niebla y al subir DEVUELVE el de antes',
+    (t: string) => {
+      const c = soloCodigo(t);
+      return (
+        /if \(!aPie \|\| c\.isPerspectiveCamera !== true\) return undefined;\s*const fondoDeLaMesa = c\.far;\s*c\.far = NIEBLA_A_PIE\.lejos;\s*c\.updateProjectionMatrix\(\);\s*return \(\) => \{\s*c\.far = fondoDeLaMesa;\s*c\.updateProjectionMatrix\(\);\s*\};/.test(c) &&
+        /useFrame\(\(\) => \{\s*if \(!aPie\) return;\s*const niebla = laEscena\.fog;/.test(c) &&
+        /if \(!aPie\) return null;\s*return \(\s*(?:<>\s*)?<QuienAnda/.test(c) &&
+        !/camera\.position\.set|\.lookAt\(/.test(c)
+      );
+    },
+    fuenteDelPaseo,
+    fuenteDelPaseo.replace(/return \(\) => \{\s*c\.far = fondoDeLaMesa;\s*c\.updateProjectionMatrix\(\);\s*\};/, 'return undefined;'),
+  );
+  let loMasLejosQueSeAnda = 0;
+  for (const c of [...mundoAPie.pisables, ...mundoAPie.vados]) {
+    loMasLejosQueSeAnda = Math.max(loMasLejosQueSeAnda, Math.hypot(c.x * LADO, c.y * LADO) + LADO);
+  }
+  const laNieblaTapaElCantoDelMar = (niebla: { readonly cerca: number; readonly lejos: number }): boolean =>
+    niebla.cerca > 0 &&
+    niebla.lejos > niebla.cerca &&
+    niebla.lejos >= 2 * loMasLejosQueSeAnda &&
+    niebla.lejos + loMasLejosQueSeAnda <= RADIO_DEL_DISCO * ALCANCE_DEL_DELTA;
+  regla(
+    `la niebla a pie deja ver el delta entero de canto a canto (${(2 * loMasLejosQueSeAnda).toFixed(0)}) y cierra antes del canto del disco de mar, que desde lo más lejos que se anda queda a ${(RADIO_DEL_DISCO * ALCANCE_DEL_DELTA - loMasLejosQueSeAnda).toFixed(0)}`,
+    laNieblaTapaElCantoDelMar,
+    NIEBLA_A_PIE,
+    { cerca: NIEBLA_A_PIE.cerca, lejos: ALCANCE_DEL_DELTA * 5 },
+  );
+
+  /*
+   * Y CUÁNTO SE PINTA A PIE, contado y no cronometrado: con la cámara de hombro de verdad en cada
+   * sitio de nacer, mirando a donde mira quien nace, cuántas comarcas caen en el tronco con el
+   * fondo a pie. La escena agrupa sus copias por comarca y `three` descarta por grupo, así que esto
+   * es lo que se manda a dibujar. Desde la mesa caen las diecinueve: andar no puede pintar más.
+   */
+  const enElTronco: number[] = [];
+  for (let k = 0; k < mundoAPie.nace.length; k++) {
+    /* El sitio que elige la escena para el colono `k`, y no la lista a pelo. */
+    const s = sitioDeNacer(mundoAPie, k);
+    if (s === null) continue;
+    const pose = camaraDeHombro({ x: s.x, z: s.z, rumbo: s.rumbo }, 0);
+    const ojo = new THREE.PerspectiveCamera(45, 16 / 9, 0.5, NIEBLA_A_PIE.lejos);
+    ojo.position.set(pose.x, pose.y, pose.z);
+    ojo.lookAt(pose.miraX, pose.miraY, pose.miraZ);
+    ojo.updateMatrixWorld(true);
+    ojo.updateProjectionMatrix();
+    const tronco = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(ojo.projectionMatrix, ojo.matrixWorldInverse),
+    );
+    let cuantas = 0;
+    for (const h of hexesAPie) {
+      const c = centroDeHex(h, RADIO_DE_COMARCA);
+      if (tronco.intersectsSphere(new THREE.Sphere(new THREE.Vector3(c.x, ESCALON, c.y), RADIO_DE_COMARCA * 1.2))) cuantas++;
+    }
+    enElTronco.push(cuantas);
+  }
+  const deMedia = enElTronco.reduce((a, b) => a + b, 0) / Math.max(1, enElTronco.length);
+  console.log(`  a pie caen en el tronco ${enElTronco.join(', ')} de las ${String(hexesAPie.length)} comarcas (media ${deMedia.toFixed(1)}); desde la mesa, las ${String(hexesAPie.length)}`);
+  comprobar(
+    'a pie se pinta menos mundo que desde la mesa: desde cada sitio de nacer caen en el tronco menos comarcas de las diecinueve, y alguna',
+    enElTronco.length === mundoAPie.nace.length && enElTronco.every((n) => n > 0 && n < hexesAPie.length),
+    enElTronco,
+  );
+}
+
 
 console.log('');
 if (fallos.length > 0) {
@@ -10297,8 +10884,13 @@ if (fallos.length > 0) {
  * si alguna comprobación viviera dentro de un `if` que depende del aparato, un guardia al ras
  * sería un rojo aleatorio. Medido: no hay ninguna: las treinta que no son llamadas sueltas
  * están en bucles sobre listas escritas en el propio guion.
+ *
+ * Y CON RIBERAS A PIE SE HACEN 576, y el guardia estaba en 521 con 540 hechas: se sube al ras.
+ * Las treinta y seis nuevas son llamadas sueltas —cada regla con su caso envenenado cuenta
+ * dos— y ninguna vive en un bucle ni detrás de un `if`, así que el número no baila. Corrido dos
+ * veces seguidas, 576 las dos.
  */
-const COMPROBACIONES_ESCRITAS = 521;
+const COMPROBACIONES_ESCRITAS = 576;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

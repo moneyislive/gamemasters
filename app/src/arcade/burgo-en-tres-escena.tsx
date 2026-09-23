@@ -56,6 +56,26 @@
  * que la mueve sin pedirlo es SEGUIR AL QUE MUEVE, y eso se apaga en cuanto la
  * persona toca el tablero y se vuelve a encender en el turno siguiente.
  *
+ * ═══ Y SE PUEDE BAJAR A ANDAR POR EL BURGO, CON EL PULGAR ═══
+ *
+ * Tres botones —Mesa, Hombro y Ojos, los de Las Lindes— bajan la cámara a la calle, y a pie se
+ * anda con `MandosDelPaseo`: la misma palanca y el mismo correr que Las Lindes, sin tocarlos. La
+ * escena anda con el paseo común sobre el mundo de la mesa (`escenas/burgo/Burgo.tsx`); aquí
+ * sólo hay los botones, la palanca y dos cosas que Las Lindes no tiene porque no tiene mirador
+ * táctil: a pie el gesto del tablero se APAGA (`apagarElMiradorAPie`) y el lienzo deja de darle
+ * su nodo al ratón de la web, para que arrastrar no gire por detrás la cámara de mesa; y
+ * «Ver el burgo entero» no sale, que andando no hay acercamiento del que volver. La palanca va
+ * encima del pie y no en el borde, que aquí es de la cinta y del carril.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
+ *
+ * Como en Las Lindes y con la misma pregunta (`esMesaDeBotas`): si la mesa es de la modalidad
+ * `botas`, la escena recibe el canal (`canal`) —la dirección del WebSocket del servidor que la app
+ * tiene elegido (`direccionDelCanal`), la llave del asiento, quién soy y los asientos con su nombre,
+ * su figura y el color de su peón (`asientosQueAndanPorElBurgo`)—, se empieza a pie, al hombro, que
+ * es a lo que se viene, y encima de la franja del paseo se dice cómo va el canal: «Conectando…»,
+ * «Dentro», «Sin conexión: …». En una mesa normal no se pasa nada y la escena no abre ningún socket.
+ *
  * ═══ EL RESPALDO NO ES OPCIONAL ═══
  *
  * Si el modelo no llega —sin cobertura, un servidor viejo que no sirve `.glb`, un
@@ -136,7 +156,7 @@
  * carga, por lienzo caído y por vista que no se ve en tres, y son los mismos en las
  * dos plataformas. `verify:sala` lo vigila.
  */
-import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
@@ -182,6 +202,11 @@ import type {
 } from '../../../shared/arcade/juegos/burgo-en-tres';
 import { Burgo } from '../../../escenas/burgo/Burgo';
 import type { ModoDeCamara, TableroDelBurgoEn3D } from '../../../escenas/burgo/tipos';
+import { asientosQueAndanPorElBurgo } from '../../../escenas/burgo/a-pie';
+import type { ModoDelBurgo } from '../../../escenas/burgo/a-pie';
+import type { EstadoDelCanal } from '../../../escenas/paseo/canal-de-botas';
+import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
+import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
 import { poseDeLaBandeja } from '../../../escenas/burgo/bandeja-de-los-dados';
 import type { SitioDeLaBandeja } from '../../../escenas/burgo/bandeja-de-los-dados';
 import type { RelojDeLaMesa } from '../../../escenas/reloj';
@@ -223,7 +248,10 @@ import {
   LaHojaSobreElLienzo,
   usarLaSeccionAbierta,
 } from './hojas-del-burgo';
-import { usarMesaDeArcade } from './mesa';
+import { MandosDelPaseo } from './mandos-del-paseo';
+import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
+import type { CanalDeBotas } from '../../../escenas/paseo/mesa-de-botas';
+import { direccionDelCanal, usarMesaDeArcade } from './mesa';
 import type { AvisoDeMesa, MesaVista, OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
 import { usarMiradorTactil } from './mirador-tactil';
 import { LETRA, RADIO, SALA } from './muebles';
@@ -274,8 +302,48 @@ import { traer } from './traer';
  */
 const FRANJA_QUE_TAPA_LA_HOJA = 0;
 
-/** Hoy la escena sólo sabe la aérea; el otro modo está reservado en `tipos.ts`. Objeto de módulo: no se refabrica por fotograma. */
-const CAMARA_AEREA: ModoDeCamara = { modo: 'aerea' };
+/** La cámara de mesa, la de siempre: la pone `ElOjoDelBurgo`. Objeto de módulo: no se refabrica por pintado. */
+const CAMARA_DE_MESA: ModoDeCamara = { modo: 'mesa' };
+
+/**
+ * LAS TRES CÁMARAS, las de Las Lindes con sus mismos nombres: la mesa, detrás de tu figura y desde
+ * su cara. Rótulo corto porque va encima del tablero y cada punto de ancho es tablero que deja de
+ * tocarse; lo que se OYE es la frase entera.
+ */
+const LAS_CAMARAS: readonly { readonly modo: ModoDelBurgo; readonly rotulo: string; readonly ayuda: string }[] = [
+  { modo: 'mesa', rotulo: 'Mesa', ayuda: 'Mirar el burgo desde arriba, como la mesa' },
+  { modo: 'hombro', rotulo: 'Hombro', ayuda: 'Bajar a andar por el burgo, detrás de tu figura' },
+  { modo: 'ojos', rotulo: 'Ojos', ayuda: 'Bajar a andar por el burgo, mirando con sus ojos' },
+];
+
+/*
+ * LO QUE LA PALANCA NECESITA POR ENCIMA DEL PIE: 16 de aire, los 128 de su base y 8 de margen.
+ * Los dos primeros son de `mandos-del-paseo.tsx`, que no los exporta y no es de esta pantalla:
+ * si allí cambian, aquí hay que cambiarlos a mano.
+ */
+const ALTO_DE_LA_FRANJA_ANDANDO = 16 + 128 + 8;
+/** Y lo que ocupa la fila de las cámaras mirando la mesa: un mando de 44 y su margen. */
+const ALTO_DE_LA_FRANJA_EN_LA_MESA = 44 + 8;
+
+/**
+ * A PIE, EL MIRADOR TÁCTIL SE APAGA, Y SE APAGA DE VERDAD.
+ *
+ * El gesto del tablero gira la cámara de MESA con un dedo y la acerca con dos. Andando no hay
+ * cámara de mesa que mover, y si el gesto siguiera vivo, el pulgar que arrastra por el lienzo la
+ * iría girando por detrás: al volver a «Mesa», el tablero estaría torcido sin que nadie lo hubiera
+ * pedido. Y en Android el gesto puede ver el mismo dedo que la palanca, que va encima del lienzo.
+ *
+ * Se apaga con `enabled(false)` en cada uno de los gestos que ya están puestos, y NO cambiando el
+ * gesto del `GestureDetector` por otro: si el nuevo tuviera otro número de gestos o otro hilo, el
+ * detector se desengancha y se vuelve a enganchar, y si cambiara de hilo pintaría OTRO envoltorio
+ * (`AnimatedWrap` o `Wrap`) y React desmontaría el lienzo entero con su contexto de dibujo.
+ * Con los mismos objetos, el detector sólo manda la configuración nueva en su efecto, que corre
+ * después de éste. `mirador-tactil.ts` no es de esta pantalla y no se toca: lo que se apaga es lo
+ * que devuelve.
+ */
+function apagarElMiradorAPie(gesto: ReturnType<typeof usarMiradorTactil>['gesto'], aPie: boolean): void {
+  for (const g of gesto.toGestureArray()) g.enabled(!aPie);
+}
 
 /**
  * LA BANDEJA DE LOS DADOS, ARRIBA A LA DERECHA DEL LIENZO. Miguel quería los dados en la pantalla y
@@ -814,6 +882,56 @@ function LaMesaEnTres({
    */
   const { gesto, apuntarElLienzo, mirador, cercania, seHaMovido, verElTableroEntero, laInterfazSeLoQueda } =
     usarMiradorTactil(medida, ALCANCE_DEL_BURGO);
+
+  /*
+   * ═══ A PIE: DESDE DÓNDE SE MIRA, LA PALANCA Y EL MIRADOR APAGADO ═══
+   *
+   * `modo` es de la pantalla y no viaja: bajar a andar no es una jugada. La palanca y el correr van
+   * en una referencia que escribe `MandosDelPaseo` y la escena lee en su bucle, igual que en Las
+   * Lindes, y aquí arriba con los demás ganchos. A pie, el gesto del tablero se apaga
+   * (`apagarElMiradorAPie`) y el lienzo deja de darle su nodo al ratón de la web —sin nodo, los
+   * oyentes de la rueda y del botón secundario se descuelgan solos—: ni el dedo ni el ratón pueden
+   * girar por detrás la cámara de mesa mientras se anda. La cámara del cliente, `ElOjoDelBurgo`,
+   * sigue montada y en su sitio —antes que `<Burgo>`, que es lo que hace que seguir al que mueve
+   * vaya al día—: a pie la escena vuelve a poner encima la del paseo.
+   */
+  const [modo, ponerModo] = useState<ModoDelBurgo>('mesa');
+  const aPie = modo !== 'mesa';
+  const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
+  useLayoutEffect(() => {
+    apagarElMiradorAPie(gesto, aPie);
+  }, [gesto, aPie]);
+  const camara = useMemo((): ModoDeCamara => (modo === 'mesa' ? CAMARA_DE_MESA : { modo, asiento: yo ?? '' }), [modo, yo]);
+
+  /*
+   * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
+   *
+   * También aquí arriba, con los demás ganchos. Sin asiento o sin llave no hay canal: no hay con qué
+   * decir `hola`. Los asientos llegan en cada vuelta del sondeo, pero la escena sólo reabre el socket
+   * si cambian la dirección, la llave o el asiento. Y el color de cada uno es el de su peón, el que
+   * la traducción ya puso en las figuras del tablero: el rótulo de Ana, del color de la ficha de Ana.
+   */
+  const esBotas = esMesaDeBotas(vista);
+  const [estadoDelCanal, ponerEstadoDelCanal] = useState<EstadoDelCanal | null>(null);
+  const llaveDelAsiento = mesa.llave ?? null;
+  const figurasDeLaMesa = datos?.figuras;
+  const canal = useMemo<CanalDeBotas | undefined>(
+    () =>
+      esBotas && yo !== null && llaveDelAsiento !== null
+        ? {
+            url: direccionDelCanal(vista.codigo),
+            llave: llaveDelAsiento,
+            yo,
+            asientos: asientosQueAndanPorElBurgo(vista.asientos, figurasDeLaMesa ?? []),
+            alCambiar: ponerEstadoDelCanal,
+          }
+        : undefined,
+    [esBotas, figurasDeLaMesa, llaveDelAsiento, vista.asientos, vista.codigo, yo],
+  );
+  /* Una mesa de botas se empieza a pie: es a lo que se viene. Una vez por mesa; luego mandan los botones. */
+  useEffect(() => {
+    if (esBotas) ponerModo('hombro');
+  }, [esBotas, vista.codigo]);
 
   /*
    * ═══ LA POSE DE SALIDA ES LA DEL BURGO, Y HAY QUE PONERLA ═══
@@ -1374,6 +1492,7 @@ function LaMesaEnTres({
             salir={mesa.salir}
             tirar={mesa.tirar}
             arriba={arriba}
+            deBotas={esMesaDeBotas(vista)}
           />
           <LineaDelTurno mesa={vista} nombres={nombres} />
           {/*
@@ -1461,6 +1580,7 @@ function LaMesaEnTres({
           salir={mesa.salir}
           tirar={mesa.tirar}
           arriba={arriba}
+          deBotas={esMesaDeBotas(vista)}
         />
         <LineaDelTurno mesa={vista} nombres={nombres} />
         {/*
@@ -1485,10 +1605,14 @@ function LaMesaEnTres({
                   del documento donde se apuntan `wheel` y el arrastre con el botón
                   secundario; en nativo se guarda y no se usa.
                 */
-                ref={apuntarElLienzo}
+                ref={aPie ? undefined : apuntarElLienzo}
                 onLayout={medir}
                 accessible
-                accessibilityLabel="El burgo en tres dimensiones. Arrastra con un dedo para girarlo, pellizca para acercarlo y mueve dos dedos para recorrerlo."
+                accessibilityLabel={
+                  aPie
+                    ? 'El burgo a pie. Anda con la palanca de abajo a la izquierda; «Mesa» vuelve a mirarlo desde arriba.'
+                    : 'El burgo en tres dimensiones. Arrastra con un dedo para girarlo, pellizca para acercarlo y mueve dos dedos para recorrerlo.'
+                }
                 /*
                   TIRAR —Y COMPRAR— PARA QUIEN NO VE EL LIENZO. El botón de tirar se ha
                   ido del pie mientras el asa existe, y un dado que sólo se pueda tocar
@@ -1550,7 +1674,9 @@ function LaMesaEnTres({
                     ventana={ventana}
                     traer={traer}
                     calidad={calidad}
-                    camara={CAMARA_AEREA}
+                    camara={camara}
+                    mandos={mandos}
+                    canal={canal}
                     bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
                     reloj={relojDeArena}
                     alPasarElTurno={alPasarElTurno}
@@ -1590,7 +1716,8 @@ function LaMesaEnTres({
 
             Sólo cuando hace falta: `seHaMovido` es falso mientras se esté como al
             llegar, y entonces un botón para volver a donde ya estás sería ruido encima
-            del tablero. Va aquí FUERA del `GestureDetector`, hermano del lienzo y no
+            del tablero. Y a pie tampoco: lo que se mueve andando no es la cámara de mesa, y
+            de la calle a la mesa se sube con «Mesa». Va aquí FUERA del `GestureDetector`, hermano del lienzo y no
             hijo: así se lleva su propio toque sin quitárselo a la escena y queda fuera
             del `accessible` que agrupa el lienzo.
 
@@ -1602,7 +1729,7 @@ function LaMesaEnTres({
             va arriba a la derecha y en vertical ocupa casi todo el ancho
             (`alturaDelBotonDeVolver`).
           */}
-          {!llegando && seHaMovido ? (
+          {!llegando && seHaMovido && !aPie ? (
             <Pressable
               style={[estilos.volver, { top: alturaDelBotonDeVolver }]}
               onPress={verElBurgoEntero}
@@ -1637,6 +1764,55 @@ function LaMesaEnTres({
               durante ocho segundos y no hay manera de saber cuál va bien.
             */}
             {laEscenaVaDetras ? <Text style={estilos.alDia}>El burgo se está poniendo al día…</Text> : null}
+            {/*
+              CÓMO VA EL CANAL, sólo en una mesa de botas: «Conectando…», «Dentro», «Sin conexión: …».
+              Aquí, encima de la franja del paseo, y no arriba a la izquierda como en Las Lindes: arriba
+              está la caja del Burgo, que en un teléfono en pie ocupa casi todo el ancho, y debajo de ella
+              «Ver el burgo entero». Se ve en la mesa y a pie —en la mesa conviene saber si al bajar se
+              verá a los demás— y no coge el dedo: es un cartel, y lo que tapa sigue siendo tablero.
+            */}
+            {esBotas ? (
+              <View pointerEvents="none">
+                <Text style={estilos.canal} numberOfLines={2}>
+                  {estadoDelCanal?.texto ?? 'Conectando…'}
+                </Text>
+              </View>
+            ) : null}
+            {/*
+              ═══ LA FRANJA DEL PASEO: LAS TRES CÁMARAS, Y A PIE LA PALANCA, JUSTO ENCIMA DEL PIE ═══
+
+              Encima del pie y no en el borde del lienzo, que es donde Las Lindes pone su palanca:
+              aquí el borde es de la cinta —el asa del cajón, lo que se busca a ciegas con el
+              pulgar— y del carril, y una palanca encima de los dos los dejaría sin tocar. Así que
+              la franja va en la misma pila que el pie, justo por encima, y crece a pie lo que la
+              palanca pide (`mandos-del-paseo.tsx` se pinta pegada a su pie izquierdo y el correr
+              al derecho, a 56 del pie). Las cámaras van ABAJO a la derecha de la franja, por
+              debajo del correr: pegadas al pie en los dos modos, así que el botón que se busca
+              para volver a la mesa está donde estaba el que bajó a andar.
+
+              Con `box-none`, como el pie: lo que la franja no ocupa sigue siendo tablero.
+            */}
+            <View style={[estilos.franjaDelPaseo, aPie ? estilos.franjaAndando : null]} pointerEvents="box-none">
+              <View style={estilos.camaras} accessibilityRole="radiogroup" accessibilityLabel="Desde dónde se mira el burgo">
+                {LAS_CAMARAS.map((c) => (
+                  <Pressable
+                    key={c.modo}
+                    style={[estilos.camara, modo === c.modo ? estilos.camaraPuesta : null]}
+                    onPress={() => {
+                      laInterfazSeLoQueda();
+                      ponerModo(c.modo);
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: modo === c.modo }}
+                    accessibilityLabel={c.ayuda}
+                  >
+                    <Text style={modo === c.modo ? estilos.camaraRotuloPuesto : estilos.camaraRotulo}>{c.rotulo}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {/* LA PALANCA Y EL CORRER, sólo a pie: en la mesa no hay a quién mover. Ver `mandos-del-paseo.tsx`. */}
+              <MandosDelPaseo mandos={mandos} visibles={aPie} />
+            </View>
             {elPie(fuera)}
           </View>
         </View>
@@ -1851,6 +2027,26 @@ const estilos = StyleSheet.create({
     backgroundColor: SALA.teja,
   },
   /*
+   * CÓMO VA EL CANAL, en una mesa de botas: la misma caja que «se está poniendo al día» y por lo
+   * mismo —flota sobre el campo del burgo, y sin caja no hay contraste que se pueda medir—, pero con
+   * la tinta de lo que se lee y no en tenue: «Sin conexión» es justo lo que no se puede perder.
+   */
+  canal: {
+    ...LETRA.cuerpo,
+    color: SALA.palabra,
+    fontSize: 13,
+    lineHeight: 18,
+    alignSelf: 'flex-start',
+    marginHorizontal: 12,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.teja,
+  },
+  /*
    * EL BOTÓN DE VOLVER AL BURGO ENTERO: cromo sobre el lienzo, arriba y a la
    * IZQUIERDA, que es la esquina que ni las hojas —de abajo— ni la marca del turno
    * usan. Lleva fondo opaco a propósito: debajo hay cielo, tejados y campo, o sea un
@@ -1881,4 +2077,30 @@ const estilos = StyleSheet.create({
     backgroundColor: SALA.teja,
   },
   volverRotulo: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13 },
+  /*
+   * LA FRANJA DEL PASEO, en la pila del pie y justo encima de él. No cede nunca —`flexShrink: 0`—
+   * porque lo que lleva dentro va colocado a ojo de pulgar: si encogiera, la palanca se saldría
+   * por arriba. Mirando la mesa mide lo que la fila de las cámaras; a pie, lo que la palanca.
+   */
+  franjaDelPaseo: { height: ALTO_DE_LA_FRANJA_EN_LA_MESA, flexShrink: 0 },
+  franjaAndando: { height: ALTO_DE_LA_FRANJA_ANDANDO },
+  /* Abajo a la derecha de la franja, por debajo del correr, que empieza a 56 del pie. */
+  camaras: { position: 'absolute', right: 12, bottom: 8, flexDirection: 'row', gap: 6 },
+  /*
+   * LAS TRES CÁMARAS: el cromo de «Ver el burgo entero» —teja, contorno blanco al 40 %, radio de
+   * mando y los 44 de dedo—, y la puesta en blanco con la tinta del suelo. Sin acento: no es lo que
+   * hay que tocar ahora, es desde dónde se mira.
+   */
+  camara: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.teja,
+  },
+  camaraPuesta: { backgroundColor: SALA.blanco, borderColor: SALA.blanco },
+  camaraRotulo: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13 },
+  camaraRotuloPuesto: { ...LETRA.rotuloChico, color: SALA.suelo, fontSize: 13 },
 });

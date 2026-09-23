@@ -272,7 +272,9 @@ export function fotogramaDelPaseo(
   for (let i = 0; i < reloj.tics; i++) {
     const pedido = pedidoDelTic(mandos, rumbo);
     s = ticDelPaseo(arena, s, pedido, radio);
-    if (alDarUnTic !== undefined) alDarUnTic({ tic: s.tic, rumbo: pedido.rumbo, marcha: pedido.marcha }, s.ahora);
+    if (alDarUnTic !== undefined) {
+      alDarUnTic({ tic: s.tic, rumbo: pedido.rumbo, marcha: pedido.marcha, mira: rumboDeRadianes(rumbo) }, s.ahora);
+    }
   }
   return s;
 }

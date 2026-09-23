@@ -15,17 +15,20 @@
  * pantallas y una consulta, y una dependencia con su propio modelo mental sale
  * más cara que las veinte líneas.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { MouseEvent as ClicDeReact } from 'react';
 import { Catalogo, usarElCatalogo } from './catalogo';
 import type { ElCatalogo } from './catalogo';
 import { Formulario, hayAlgoQuePintar } from './formulario';
 import { haEmpezado } from './empezada';
-import { usarMesaDeArcade } from './mesa';
+import { elVeredictoDelAparato, usarMesaDeArcade } from './mesa';
 import type { FaseDeLaMesa, LaMesa } from './mesa';
 import { Muelle } from './muelle';
 import { dondeSeJuega } from './muebles';
 import { temaDelMuelle, tieneMuelle } from '../../escenas/embarcadero/tema';
+import { compuertaDeBotas, LAS_DOS_MODALIDADES, MARCA_DE_BOTAS, modalidadQueViaja } from '../../escenas/compuerta-de-botas';
+import type { LoQueDiceLaCompuerta, Modalidad } from '../../escenas/compuerta-de-botas';
+import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import type { ArcadeDelCatalogo } from './muebles';
 import { opcionesSueltas, queSePinta } from './plan';
 import type { Opcion } from '../../shared/arcade';
@@ -570,7 +573,7 @@ export function LaMesaPuesta({
             {mesa.aviso}
           </p>
         ) : null}
-        <Vestibulo mesa={mesa} codigoDeLaUrl={codigoDeLaUrl} aforo={leerAforo(manifiesto)} />
+        <Vestibulo mesa={mesa} codigoDeLaUrl={codigoDeLaUrl} aforo={leerAforo(manifiesto)} arcade={manifiesto.id} />
       </main>
     );
   }
@@ -799,8 +802,15 @@ export function LaMesaPuesta({
             sentarse. El aviso de foco lo pone `:focus-visible`, que la hoja ya
             tiene medido en los cuatro temas.
           */}
+          {/*
+            LA MARCA DE BOOTS ON BOARD, DENTRO DEL TÍTULO: es parte de a qué se juega en ESTA mesa, y
+            así se oye con el nombre cuando el foco llega aquí al sentarse. Con el lienzo a
+            pantalla completa el título sale del flujo, y por eso la marca va también en la ficha
+            de la mesa (`LaFicha`), que es lo que se ve en el cajón.
+          */}
           <h1 className="titulo" tabIndex={-1} ref={tituloDeLaMesa}>
             {manifiesto.nombre}
+            {esMesaDeBotas(puesta) ? <span className="marca-de-botas">{MARCA_DE_BOTAS}</span> : null}
           </h1>
           {mesa.aviso.length > 0 ? (
             <p className="aviso" role="alert">
@@ -932,18 +942,100 @@ function FormularioSiHayAlgo({
   );
 }
 
+/**
+ * CÓMO SE JUEGA LA MESA QUE SE ABRE: la de siempre, o Boots on Board.
+ *
+ * ═══ UNA PARA LOS DOS VESTÍBULOS ═══
+ *
+ * La pintan este vestíbulo y la orilla del lobby (`muelle.tsx`), igual que los plazos: dos copias
+ * de una elección son dos elecciones que acaban diciendo cosas distintas. Las palabras son las de
+ * `escenas/compuerta-de-botas.ts`, las mismas que pinta la app.
+ *
+ * ═══ SI EL JUEGO NO SE RECORRE NO SALE; SI EL APARATO NO LLEGA, SALE APAGADA ═══
+ *
+ * Lo que decide es la compuerta, y aquí sólo se obedece. Un juego sin mundo no tiene tablero al
+ * que bajar, así que la mesa se abre como siempre y no hay nada que elegir. Un aparato que no
+ * llega VE la opción, apagada con color (`.opcion:disabled`) y con el motivo escrito debajo y atado
+ * a ella con `aria-describedby`: es como esta casa enseña lo que no se puede, y esconderla sería que
+ * quien no llega no supiera nunca que existe. Y lo que se ve puesto es lo que viaja: apagada, la
+ * normal, aunque se hubiera marcado la otra antes de que llegara el veredicto.
+ *
+ * Botones con `aria-pressed` en un grupo con nombre, como las cámaras y las figuras de esta casa.
+ * Sin relleno los que se pueden pulsar (`.opcion-sobria`), para que el apagado —que va sobre la teja—
+ * no se confunda con uno que simplemente no está elegido.
+ */
+export function EleccionDeModalidad({
+  elegida,
+  compuerta,
+  alElegir,
+}: {
+  elegida: Modalidad;
+  compuerta: LoQueDiceLaCompuerta;
+  alElegir: (modalidad: Modalidad) => void;
+}): JSX.Element | null {
+  const idDelMotivo = useId();
+  if (compuerta.que === 'no-se-recorre') return null;
+  const motivo = compuerta.que === 'se-ofrece' ? null : compuerta.motivo;
+  const puesta: Modalidad = motivo === null ? elegida : 'normal';
+  return (
+    <div className="modalidades" role="group" aria-label="Cómo se juega">
+      {LAS_DOS_MODALIDADES.map((m) => {
+        const apagada = m.modalidad === 'botas' && motivo !== null;
+        const es = m.modalidad === puesta;
+        return (
+          <button
+            key={m.modalidad}
+            type="button"
+            className={es ? 'opcion opcion-sobria modalidad-elegida' : 'opcion opcion-sobria'}
+            aria-pressed={es}
+            disabled={apagada}
+            aria-describedby={apagada ? idDelMotivo : undefined}
+            onClick={() => {
+              alElegir(m.modalidad);
+            }}
+          >
+            <span className="opcion-texto">
+              <span className="opcion-rotulo">{m.rotulo}</span>
+              <span className="opcion-ayuda">{m.ayuda}</span>
+            </span>
+          </button>
+        );
+      })}
+      {motivo === null ? null : (
+        <p className="letra-chica modalidad-motivo" id={idDelMotivo}>
+          {motivo}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Antes de sentarse: abrir una mesa nueva o entrar con un código. */
 function Vestibulo({
   mesa,
   codigoDeLaUrl,
   aforo,
+  arcade,
 }: {
   mesa: LaMesa;
   codigoDeLaUrl: string;
   aforo: Aforo | null;
+  /** El juego de la mesa que se abre: la compuerta de Boots on Board pregunta si se recorre. */
+  arcade: string;
 }): JSX.Element {
   const [nombre, ponerNombre] = useState('');
   const [codigo, ponerCodigo] = useState(codigoDeLaUrl);
+  /*
+   * ═══ LA COMPUERTA, AQUÍ SIN NADA QUE MIDA ═══
+   *
+   * Este vestíbulo no tiene mundo en tres dimensiones, así que no da muestras al juez: vale el
+   * veredicto que este navegador guardó la última vez que pintó un lobby, y sin él la compuerta
+   * dice que aún no se ha medido —no «midiendo», que aquí sería una espera sin final—. La de
+   * siempre viene puesta: Boots on Board se elige, nunca se hereda.
+   */
+  const [veredicto] = useState(() => elVeredictoDelAparato());
+  const compuerta = compuertaDeBotas(veredicto, arcade, false);
+  const [elegida, ponerElegida] = useState<Modalidad>('normal');
   /*
    * EL CÓDIGO DE LA BARRA SE VUELVE A LEER SI CAMBIA. `useState(codigoDeLaUrl)`
    * toma la semilla y después ignora el prop, mientras que `codigoDeLaUrl` sí se
@@ -1033,6 +1125,7 @@ function Vestibulo({
             ha llegado. «Un día» y «Sin prisa» no se distinguen por el rótulo.
           */}
           {plazo === undefined ? null : <p className="letra-chica">{plazo.ayuda}</p>}
+          <EleccionDeModalidad elegida={elegida} compuerta={compuerta} alElegir={ponerElegida} />
           {/*
             ═══ ESTE ES EL BOTÓN QUE SE ESPERA QUE PULSES, Y AHORA LO PARECE ═══
 
@@ -1057,7 +1150,7 @@ function Vestibulo({
             className="opcion opcion-primaria"
             disabled={mesa.quieto}
             onClick={() => {
-              mesa.abrir(nombre.trim(), plazo?.segundos);
+              mesa.abrir(nombre.trim(), plazo?.segundos, undefined, modalidadQueViaja(elegida, compuerta));
             }}
           >
             <span className="opcion-texto">
@@ -1270,6 +1363,11 @@ function LaFicha({
   return (
     <section className="panel">
       <h2 className="rotulo-de-panel">La mesa</h2>
+      {/*
+        La marca de Boots on Board, encima del código: con el lienzo a pantalla completa el título
+        no se ve, y esta ficha es lo que sí se ve —en el cajón—. La pregunta es `esMesaDeBotas`.
+      */}
+      {esMesaDeBotas(mesa) ? <p className="marca-de-botas">{MARCA_DE_BOTAS}</p> : null}
       {codigo === null ? (
         <p className="letra-chica">
           Este servidor no ha dicho el código de esta mesa, así que no hay nada que pasarle a

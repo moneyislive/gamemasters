@@ -6,8 +6,9 @@
  * Cada hexágono del juego es una COMARCA de setenta y seis unidades de radio, hecha
  * de CIENTO CUARENTA Y CUATRO teselas de suelo. Una persona tarda casi cuarenta
  * segundos en cruzarla. La vista de tablero es ese mismo mundo mirado desde muy
- * arriba, y la vista en tercera persona que llegará con los avatares es la de
- * alguien andando por él. El razonamiento entero está en `escala.ts`.
+ * arriba, y la vista a pie —al hombro o desde sus ojos, con el paseo común de
+ * `escenas/paseo/` (`andar-por-el-delta.tsx`)— es la de alguien andando por él. El
+ * razonamiento entero está en `escala.ts`.
  *
  * ═══ EL SUELO SON TESELAS DEL PACK, EN TERRAZAS ═══
  *
@@ -273,8 +274,19 @@ import { cuaternionDelValor, geometriaDeLosPuntosDelDado, geometriaDelCuerpoDelD
 import type { ValorDelDado } from './caras-del-dado';
 import type { Colocando, Sitio } from './sitios';
 import type { CaminoEn3D, ColorDeJugador, DeltaEn3D, IslaEn3D, PiezaEn3D } from './tipos';
+/*
+ * A PIE POR EL DELTA: el paseo común montado sobre este mundo. La aritmética —dónde se nace, a
+ * qué altura se pinta, el agua por la cintura— vive en `delta-a-pie.ts`, sin `three`, para que
+ * `verify:escena` la mida; el componente, en `andar-por-el-delta.tsx`.
+ */
+import { AndarPorElDelta } from './andar-por-el-delta';
+import type { ModoDeCamaraDelDelta } from './delta-a-pie';
+import type { Traer } from './embarcadero/tipos';
+import type { MandosDeFuera } from './paseo/mandos';
+import type { CanalDeBotas } from './paseo/mesa-de-botas';
 
 export { RADIO_DE_COMARCA, RADIO_DE_TESELA, ESCALON };
+export type { ModoDeCamaraDelDelta };
 
 /*
  * EL CREMA DE LAS FICHAS Y EL COLOR DE SUS CIFRAS VIVEN EN `dados.ts`, sin `three`: son
@@ -3708,6 +3720,12 @@ export function Delta({
   onJugarCarta,
   onRevelarCarta,
   onSenalarCartaDelMazo,
+  camara,
+  vista,
+  traer,
+  figura,
+  mandos,
+  canal,
 }: {
   datos: DeltaEn3D;
   modelos: CatalogoDeModelos;
@@ -3908,6 +3926,39 @@ export function Delta({
    * falta: allí el cartel cuelga de `cartaDelMazoCogida`, que es un estado que ya existe.
    */
   onSenalarCartaDelMazo?: (carta: CartaDelMazo | null) => void;
+  /**
+   * ═══ DESDE DÓNDE SE MIRA, Y A PIE QUIÉN PASEA ═══
+   *
+   * `mesa` es lo de siempre: la cámara la pone quien monta la escena (su `Ojo`, su
+   * `CamaraAerea`) y la escena no la toca. `hombro` y `ojos` bajan al delta con el paseo común
+   * (`andar-por-el-delta.tsx`): la cámara, los tics, los choques y la marioneta son de allí.
+   *
+   * Sin poner no hay paseo ninguno —ni gancho, ni mundo, ni figura—, que es lo que quiere el
+   * banco de pruebas y cualquier pantalla que sólo mire. Con `camara` hacen falta también la
+   * `vista` (de ella sale el mundo con el que se choca) y `traer` (de él, la figura): sin alguna
+   * de las dos tampoco se monta, porque un paseo sin mundo no da un paso y uno sin figura sigue a
+   * nadie.
+   *
+   * El paseo se queda montado aunque se mire la mesa: al volver a bajar se sigue donde se estaba.
+   */
+  camara?: ModoDeCamaraDelDelta;
+  /** La vista pública de la mesa, tal cual llega: `mundoDeRiberas` la lee a pie. */
+  vista?: unknown;
+  /** Cómo se traen los `.glb` de los aventureros: el mismo `traer` de cada cliente. */
+  traer?: Traer;
+  /** La figura que eligió quien pasea. Sin ella, `figuraQueSePinta` saca una de su asiento. */
+  figura?: string;
+  /**
+   * LA PALANCA Y EL CORRER, cuando el aparato no tiene teclado: la app los escribe en esta
+   * referencia (`app/src/arcade/mandos-del-paseo.tsx`) y el paseo los lee en su bucle. El
+   * escritorio anda con W, A, S, D, que el paseo lee solo.
+   */
+  mandos?: { readonly current: MandosDeFuera };
+  /**
+   * EL CANAL DE BOOTS ON BOARD, sólo en una mesa `botas`: se le pasa tal cual al paseo
+   * (`andar-por-el-delta.tsx`), que es quien lo abre y pinta a los demás. Sin él no se abre nada.
+   */
+  canal?: CanalDeBotas;
 }): JSX.Element {
   /**
    * Cada modelo, aplanado una vez a geometría + material para poder instanciarlo.
@@ -4775,6 +4826,24 @@ export function Delta({
           aplanados={aplanados}
         />
       ))}
+
+      {/*
+        A PIE, EL PASEO COMÚN. Montado siempre que haya cámara, vista y `traer`, también
+        mirando la mesa: así se sube a mirar el tablero y al bajar se sigue donde se estaba. En
+        la mesa no toca la cámara ni pinta a nadie. Lee el MISMO relieve que pinta esto, que es de
+        donde sale la altura a la que se pinta a quien pasea.
+      */}
+      {camara !== undefined && vista !== undefined && traer !== undefined ? (
+        <AndarPorElDelta
+          relieve={relieve}
+          vista={vista}
+          camara={camara}
+          traer={traer}
+          figura={figura}
+          mandos={mandos}
+          canal={canal}
+        />
+      ) : null}
     </group>
   );
 }

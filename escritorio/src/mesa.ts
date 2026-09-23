@@ -38,8 +38,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Opcion } from '../../shared/arcade';
+import { rutaDelCanal } from '../../shared/mecanicas/canal-de-botas';
 import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { turnoDeLaVista } from '../../shared/mecanicas/turno-declarado';
+import { leerElVeredicto, porQueNoTeSientas } from '../../escenas/compuerta-de-botas';
+import type { LecturaSinLlave } from '../../escenas/compuerta-de-botas';
+import type { Calidad } from '../../escenas/embarcadero/tipos';
 import { elSitioGuardado, guardarElSitio, olvidarElSitio } from './bolsillo';
 import { pausaAntesDeVolverAPreguntar } from './relojes';
 
@@ -90,6 +94,15 @@ export interface MesaVista {
   opciones?: readonly Opcion[];
   /** Por qué el juego no hizo nada. Solo llega en la respuesta de mover. */
   motivo?: string | null;
+  /**
+   * CÓMO SE JUEGA ESTA MESA: la de siempre, o Boots on Board —bajando al tablero con los demás—.
+   * Se elige al abrirla y no cambia (`docs/BOOTS-ON-BOARD.md` §3).
+   *
+   * OPCIONAL por lo mismo que `opciones`: un servidor anterior no lo manda, y SIN ÉL ES
+   * `'normal'`. Se lee con `esMesaDeBotas` (`escenas/paseo/mesa-de-botas.ts`), la misma función
+   * que usa la app, que es quien decide qué hacer con un valor que falte o que no se conozca.
+   */
+  modalidad?: 'normal' | 'botas';
 }
 
 export interface AvisoDeMesa {
@@ -149,8 +162,12 @@ export interface LaMesa {
   cronica: AvisoDeMesa[];
   /** Hay una petición que escribe en curso: los botones se quedan quietos. */
   quieto: boolean;
-  /** `figura` viaja con el alta si se da, y es el aspecto de MI asiento desde el primer sondeo de los demás. */
-  abrir: (nombre: string, plazoSegundos?: number, figura?: string) => void;
+  /**
+   * `figura` viaja con el alta si se da, y es el aspecto de MI asiento desde el primer sondeo de los demás.
+   * `modalidad`, igual: sólo si se da, y sin ella el servidor abre la mesa de siempre. Elegirla es
+   * cosa de la pantalla de abrir; aquí sólo está la tubería.
+   */
+  abrir: (nombre: string, plazoSegundos?: number, figura?: string, modalidad?: 'normal' | 'botas') => void;
   entrar: (codigo: string, nombre: string, figura?: string) => void;
   /**
    * MOVER DEVUELVE CÓMO ACABÓ, con lo que el cuerpo ya calculaba: `'rechazado'` si la
@@ -176,6 +193,30 @@ export interface LaMesa {
    * qué se diferencian.
    */
   tirar: () => void;
+  /**
+   * LA LLAVE DE MI ASIENTO, mientras estoy sentado; `null` fuera.
+   *
+   * Hasta Boots on Board no salía de este fichero: iba en la cabecera de cada petición y nadie más
+   * la necesitaba. El canal de una mesa `botas` es otra conexión —un WebSocket, que en el navegador
+   * no admite cabeceras— y la llave va en su primer mensaje, así que el pintor tiene que poder
+   * dársela. Opcional en el tipo para que las mesas de mentira de los bancos y de
+   * `verify:escritorio` no tengan que inventarse una; el gancho la da siempre.
+   */
+  llave?: string | null;
+}
+
+/**
+ * LA DIRECCIÓN DEL CANAL DE BOOTS ON BOARD DE UNA MESA: la misma casa que sirvió esta página, con
+ * `ws` en vez de `http` —`wss` en vez de `https`— y la ruta del contrato. Sin la llave: la llave va
+ * en el `hola`.
+ *
+ * La misma casa por lo mismo que `ruta()`: en producción es el mismo Node, y en desarrollo el Vite
+ * de al lado pasa `/api` al servidor —también la subida de protocolo, si su proxy lleva
+ * `ws: true`—. `null` sin `location`, que es como se pinta en `verify:escritorio`.
+ */
+export function direccionDelCanal(codigo: string): string | null {
+  if (typeof location === 'undefined') return null;
+  return `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${rutaDelCanal(codigo)}`;
 }
 
 const CABECERA_DE_ASIENTO = 'x-asiento';
@@ -194,6 +235,56 @@ const TOPE_DE_CRONICA = 40;
  */
 function ruta(cola: string): string {
   return `/api/arcade${cola}`;
+}
+
+/*
+ * ═══ EL VEREDICTO DE ESTE APARATO: LO QUE LA COMPUERTA DE BOOTS ON BOARD NECESITA A MANO ═══
+ *
+ * Lo que dijo el juez de calidad la última vez que este navegador pintó un lobby (ver
+ * `escenas/compuerta-de-botas.ts`). Vive AQUÍ, al lado de `entrar`, y no en el lobby que lo mide,
+ * porque quien no puede sentar en una mesa `botas` a un aparato que no llega es `entrar` —venga el
+ * código del lobby, del vestíbulo de la Sala o de un enlace pegado—, y la pregunta tiene que tener
+ * la respuesta sin esperar a que nadie mida. El lobby la escribe con `guardarElVeredicto` cada vez
+ * que el juez habla, y el último sustituye al anterior.
+ *
+ * `localStorage` envuelto en `try`, por lo que cuenta `bolsillo.ts`, y POR APARATO: sin silla,
+ * porque dos ventanas del mismo navegador pintan con la misma tarjeta. En Node —donde se pinta en
+ * `verify:escritorio`— no hay almacén, y eso es no saber: `null`.
+ */
+const LLAVE_DEL_VEREDICTO = 'escritorio.aparato.veredicto';
+
+/** El último veredicto de este aparato, o `null` si no lo hay o no se puede leer. */
+export function elVeredictoDelAparato(): Calidad | null {
+  try {
+    return leerElVeredicto(globalThis.localStorage?.getItem(LLAVE_DEL_VEREDICTO) ?? null);
+  } catch {
+    return null;
+  }
+}
+
+/** Apunta el veredicto que acaba de dar el juez, encima del que hubiera. */
+export function guardarElVeredicto(veredicto: Calidad): void {
+  try {
+    globalThis.localStorage?.setItem(LLAVE_DEL_VEREDICTO, veredicto);
+  } catch {
+    /* Sin almacén se juega igual: lo que cuesta es volver a medir la próxima vez, 120 fotogramas. */
+  }
+}
+
+/**
+ * LA MESA DE ESE CÓDIGO LEÍDA SIN LLAVE, que es como la ve quien aún no se ha sentado: la misma
+ * lectura que el sondeo, sin la cabecera de asiento y con `?desde=-1` para que conteste en el acto.
+ * Se la da hecha a `porQueNoTeSientas`, que no sabe de rutas ni de `fetch`.
+ */
+async function leerSinLlave(codigo: string): Promise<LecturaSinLlave> {
+  const r = await fetch(ruta(`/mesas/${codigo}?desde=-1`));
+  let cuerpo: unknown;
+  try {
+    cuerpo = await r.json();
+  } catch {
+    cuerpo = undefined;
+  }
+  return { ok: r.ok, status: r.status, cuerpo };
 }
 
 /*
@@ -267,6 +358,16 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
   const codigo = useRef<string | null>(null);
   const llave = useRef<string | null>(null);
   const vivo = useRef(true);
+  /*
+   * LA LLAVE, TAMBIÉN EN ESTADO, para dársela al pintor (`LaMesa.llave`). La del bucle sigue siendo
+   * la referencia, por lo de arriba; ésta es su copia para pintar, y se cambian las dos a la vez y
+   * en un solo sitio para que no puedan decir cosas distintas.
+   */
+  const [llaveDelAsiento, ponerLlaveDelAsiento] = useState<string | null>(null);
+  const apuntarLaLlave = useCallback((nueva: string | null): void => {
+    llave.current = nueva;
+    ponerLlaveDelAsiento(nueva);
+  }, []);
 
   useEffect(() => {
     vivo.current = true;
@@ -341,7 +442,7 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
 
         if (datos.mesa !== undefined && datos.mesa.yo !== null) {
           codigo.current = datos.mesa.codigo;
-          llave.current = sitio.llave;
+          apuntarLaLlave(sitio.llave);
           ponerMesa(datos.mesa);
           ponerFase('dentro');
           return;
@@ -513,7 +614,7 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
           const datos = (await r.json()) as { error?: string; llave?: string; mesa?: MesaVista };
           if (!r.ok || datos.mesa === undefined) throw new Error(datos.error ?? queSalioMal);
           codigo.current = datos.mesa.codigo;
-          llave.current = datos.llave ?? null;
+          apuntarLaLlave(datos.llave ?? null);
           if (datos.llave !== undefined) {
             guardarElSitio(arcade, silla, { codigo: datos.mesa.codigo, llave: datos.llave });
           }
@@ -530,16 +631,17 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
         }
       })();
     },
-    [arcade, silla, cabeceras],
+    [apuntarLaLlave, arcade, silla, cabeceras],
   );
 
   /*
    * `figura` se manda SÓLO si viene, igual que `plazoSegundos`: el servidor trata
    * la clave ausente como «no dijo», y mandar `undefined` en un JSON es no
    * mandar nada, pero mandar `null` o `''` sería una figura mal escrita y un 400.
+   * Y `modalidad`, lo mismo: sin ella el servidor abre la mesa de siempre.
    */
   const abrir = useCallback(
-    (nombre: string, plazoSegundos?: number, figura?: string) => {
+    (nombre: string, plazoSegundos?: number, figura?: string, modalidad?: 'normal' | 'botas') => {
       sentarse(
         '/mesas',
         {
@@ -547,9 +649,49 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
           nombre,
           ...(plazoSegundos === undefined ? {} : { plazoSegundos }),
           ...(figura === undefined ? {} : { figura }),
+          ...(modalidad === undefined ? {} : { modalidad }),
         },
         'No se ha podido abrir la mesa',
       );
+    },
+    [arcade, sentarse],
+  );
+
+  /*
+   * ═══ PEDIR SILLA, Y UNA MESA DE BOTAS NO SE LA DA A QUIEN NO PUEDE BAJAR ═══
+   *
+   * La ÚNICA puerta por la que este cliente pide un asiento nuevo en una mesa ajena, y por eso la
+   * compuerta de Boots on Board va aquí y no en la pantalla: el código puede llegar del lobby, del
+   * vestíbulo de la Sala o de un enlace, y las tres entran por `entrar`. Un aparato que no llega,
+   * sentado en una mesa `botas`, jugaría desde arriba sin que nadie pudiera alcanzarle —una ventaja,
+   * no una forma humilde de jugar— y después ya no se le puede echar. Así que se mira ANTES:
+   * `porQueNoTeSientas` lee la mesa sin llave SÓLO si este aparato no baja a este tablero —quien baja
+   * entra como siempre, sin una petición de más— y contesta la frase que se enseña, o nada.
+   *
+   * `quieto` se pone al entrar y no se suelta hasta el final, por lo que cuenta `pideSilla` más abajo:
+   * si pasa, lo sigue teniendo `sentarse`, que lo vuelve a poner en el mismo tic; si no, se suelta
+   * aquí, con la mesa fuera y la frase puesta. Un fallo de la lectura se dice como el de pedir silla,
+   * con lo que dijo el servidor: un código equivocado sigue sonando igual que antes.
+   */
+  const pedirSilla = useCallback(
+    (limpio: string, cuerpoDeAsiento: unknown) => {
+      void (async () => {
+        ponerQuieto(true);
+        ponerFase('yendo');
+        let motivo: string | null;
+        try {
+          motivo = await porQueNoTeSientas(limpio, arcade, elVeredictoDelAparato(), leerSinLlave);
+        } catch (error) {
+          motivo = `No se ha podido entrar: ${textoDelFallo(error)}`;
+        }
+        if (motivo !== null) {
+          ponerFase('fuera');
+          ponerAviso({ texto: motivo, de: 'la-red' });
+          ponerQuieto(false);
+          return;
+        }
+        sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'No se ha podido entrar');
+      })();
     },
     [arcade, sentarse],
   );
@@ -609,7 +751,7 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
               if (loSuyo.mesa !== undefined && loSuyo.mesa.yo !== null) {
                 salidasDeEstaPestana.delete(`${arcade}:${silla}:${limpio}`);
                 codigo.current = loSuyo.mesa.codigo;
-                llave.current = guardado.llave;
+                apuntarLaLlave(guardado.llave);
                 ponerMesa(loSuyo.mesa);
                 ponerCronica([]);
                 ponerFase('dentro');
@@ -622,15 +764,13 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
           } finally {
             ponerQuieto(false);
           }
-          if (pideSilla) {
-            sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'No se ha podido entrar');
-          }
+          if (pideSilla) pedirSilla(limpio, cuerpoDeAsiento);
         })();
         return;
       }
-      sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'No se ha podido entrar');
+      pedirSilla(limpio, cuerpoDeAsiento);
     },
-    [arcade, silla, sentarse],
+    [apuntarLaLlave, arcade, silla, pedirSilla],
   );
 
   // -------------------------------------------------------------------------
@@ -775,12 +915,12 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
       salidasDeEstaPestana.add(`${arcade}:${silla}:${codigo.current}`);
     }
     codigo.current = null;
-    llave.current = null;
+    apuntarLaLlave(null);
     ponerMesa(null);
     ponerCronica([]);
     ponerAviso(SIN_AVISO);
     ponerFase('fuera');
-  }, [arcade, silla]);
+  }, [apuntarLaLlave, arcade, silla]);
 
   /**
    * TIRAR LA MESA, que es lo que faltaba y deja a la gente sin salida.
@@ -836,7 +976,20 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
    * origen la invitaría a pintar dos avisos distintos, que es cómo se acaba
    * teniendo dos sitios donde mirar cuando algo va mal.
    */
-  return { fase, mesa, aviso: aviso.texto, cronica, quieto, abrir, entrar, mover, vestir, salir, tirar };
+  return {
+    fase,
+    mesa,
+    aviso: aviso.texto,
+    cronica,
+    quieto,
+    abrir,
+    entrar,
+    mover,
+    vestir,
+    salir,
+    tirar,
+    llave: llaveDelAsiento,
+  };
 }
 
 function textoDelFallo(error: unknown): string {

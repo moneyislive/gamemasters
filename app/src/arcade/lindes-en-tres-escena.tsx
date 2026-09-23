@@ -39,6 +39,23 @@
  * pasa a la escena la referencia donde los escribe. Esta pantalla no tiene mirador
  * táctil que apagar mientras se anda: la cámara de mesa de Las Lindes se encuadra sola
  * y no se arrastra, así que el pulgar que anda no mueve nada más.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
+ *
+ * Si la mesa es de la modalidad `botas` —y eso lo dice `esMesaDeBotas`, la misma pregunta
+ * que hace el escritorio—, la escena recibe el canal (`canal`): la dirección del WebSocket
+ * del servidor que la app tiene elegido (`direccionDelCanal`), la llave del asiento, quién
+ * soy y los asientos con su nombre, su figura y su color. Se empieza a pie, al hombro, que
+ * es a lo que se viene a una mesa así, y arriba a la izquierda se enseña cómo va el canal:
+ * «Conectando…», «Dentro», «Sin conexión: …». En una mesa normal no se pasa nada y la escena
+ * no abre ningún socket.
+ *
+ * ═══ Y EN EL TELÉFONO EL VALLE TIENE COLOR, Y CALIDAD MEDIDA ═══
+ *
+ * Dos cosas que esta pantalla le pasa a la escena y que antes no le pasaba. El ATLAS del
+ * tablero, compilado a bytes (`COMPLEMENTOS_DEL_TABLERO`): sin él, en iOS y en Android cada
+ * casa y cada muralla salían blancas. Y la CALIDAD, que iba escrita a mano como `"plena"`: ahora
+ * la juzga `calidadDelValle` con lo que la escena mide por `alMedir`.
  */
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -53,10 +70,20 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Canvas } from '../tres/Lienzo';
+import { decodificaImagenes, texturasDelTablero } from '../tres/texturas-nativas';
 import { Lindes } from '../../../escenas/lindes/Lindes';
-import type { ModoDeCamaraDeLasLindes } from '../../../escenas/lindes/tipos';
+import type { ComplementoDelCargador } from '../../../escenas/lindes/catalogo';
+import { calidadDelValle, conLaMuestra } from '../../../escenas/lindes/detalle';
+import type { MuestraDelHilo } from '../../../escenas/embarcadero/calidad';
+import type {
+  Calidad,
+  CanalDeBotas,
+  EstadoDelCanal,
+  ModoDeCamaraDeLasLindes,
+} from '../../../escenas/lindes/tipos';
 import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
+import { asientosQueAndan, esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import {
   elSiguienteGiro,
   accionesFueraDeLosSitios,
@@ -78,7 +105,7 @@ import { tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
 import { MandosDelPaseo } from './mandos-del-paseo';
-import { usarMesaDeArcade } from './mesa';
+import { direccionDelCanal, usarMesaDeArcade } from './mesa';
 import { LETRA, SALA } from './muebles';
 import { Pantalla } from './piezas';
 import { Retablo } from './retablo';
@@ -94,6 +121,23 @@ const LAS_CAMARAS: readonly { modo: 'mesa' | 'hombro' | 'ojos'; rotulo: string }
   { modo: 'hombro', rotulo: 'Hombro' },
   { modo: 'ojos', rotulo: 'Ojos' },
 ];
+
+/**
+ * ═══ CON QUÉ SE ABRE EL TABLERO: EN UN TELÉFONO, CON SU ATLAS COMPILADO ═══
+ *
+ * `tablero.glb` trae su atlas empotrado como PNG y Hermes no decodifica PNG: sin esto el valle
+ * se montaba entero y SIN UN SOLO COLOR —ni el verde de un prado ni la piedra de una muralla—,
+ * porque todo el color del pack vive en ese atlas. Es lo que le pasaba a Riberas y se arregla
+ * con lo mismo: `texturasDelTablero` (`tres/texturas-nativas.ts`) contesta con el atlas
+ * compilado a bytes. Lo único distinto es quién abre el `.glb`: allí la pantalla, aquí la
+ * escena, así que aquí se le PASA.
+ *
+ * Sólo donde el motor no decodifica imágenes: en la web de la app el PNG se abre de verdad, y
+ * el complemento cambiaría el atlas por su copia, que es lo mismo pero por nada. Y es el del
+ * TABLERO, no `texturasLisas`: la blanca de los avatares dejaría el valle igual de blanco.
+ * Es del módulo y no del render porque la escena lo lee una vez, al pedir el catálogo.
+ */
+const COMPLEMENTOS_DEL_TABLERO: readonly ComplementoDelCargador[] = decodificaImagenes() ? [] : [texturasDelTablero];
 
 /**
  * LA RED DEL LIENZO.
@@ -138,6 +182,55 @@ export default function LasLindesPorDentro(): JSX.Element {
    * rompería la primera vez que la pantalla cambiara de rama.
    */
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
+
+  /*
+   * ═══ LA CALIDAD SE MIDE, NO SE ESCRIBE ═══
+   *
+   * Aquí ponía `calidad="plena"`, a mano, para cualquier teléfono. Ahora la escena manda por
+   * `alMedir` lo que le cuesta cada segundo y `calidadDelValle` (`escenas/lindes/detalle.ts`)
+   * decide con el juez de la casa —22 ms de media en 120 fotogramas—, sobre las últimas doce
+   * muestras y sin volver a subir: el tablero crece de una losa a setenta y dos, y juzgar sólo al
+   * montar sería juzgar siempre el de una. Es la misma cuenta que hace el escritorio, y en todas
+   * las plataformas: ninguna decisión mira `Platform.OS`. También aquí arriba, con los ganchos.
+   */
+  const [calidad, ponerCalidad] = useState<Calidad>('plena');
+  const muestras = useRef<MuestraDelHilo[]>([]);
+  const alMedir = useCallback((m: { triangulos: number; llamadas: number; ms: number; fotogramas: number }) => {
+    muestras.current = conLaMuestra(muestras.current, { ms: m.ms, fotogramas: m.fotogramas });
+    ponerCalidad((antes) => calidadDelValle(antes, muestras.current));
+  }, []);
+
+  /*
+   * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
+   *
+   * También aquí arriba, por lo mismo que los mandos. Sin mesa, sin llave o sin asiento no hay
+   * canal: no hay con qué decir `hola`. Los asientos llegan en cada vuelta del sondeo, pero la
+   * escena sólo reabre el socket si cambian la dirección, la llave o el asiento.
+   */
+  const esBotas = esMesaDeBotas(mesa.mesa);
+  const [estadoDelCanal, ponerEstadoDelCanal] = useState<EstadoDelCanal | null>(null);
+  const codigoDeLaMesa = mesa.mesa?.codigo ?? null;
+  const yoEnLaMesa = mesa.mesa?.yo ?? null;
+  const llaveDelAsiento = mesa.llave ?? null;
+  const asientosDeLaMesa = mesa.mesa?.asientos;
+  const vistaDeLaMesa = mesa.mesa?.vista;
+  const canal = useMemo<CanalDeBotas | undefined>(
+    () =>
+      esBotas && codigoDeLaMesa !== null && yoEnLaMesa !== null && llaveDelAsiento !== null
+        ? {
+            url: direccionDelCanal(codigoDeLaMesa),
+            llave: llaveDelAsiento,
+            yo: yoEnLaMesa,
+            asientos: asientosQueAndan(asientosDeLaMesa ?? [], vistaDeLaMesa),
+            alCambiar: ponerEstadoDelCanal,
+          }
+        : undefined,
+    [asientosDeLaMesa, codigoDeLaMesa, esBotas, llaveDelAsiento, vistaDeLaMesa, yoEnLaMesa],
+  );
+  /* Una mesa de botas se empieza a pie: es a lo que se viene. Una vez por mesa; luego manda el botón. */
+  useEffect(() => {
+    if (esBotas) ponerModo('hombro');
+  }, [esBotas, codigoDeLaMesa]);
 
   const vista = mesa.mesa?.vista ?? null;
   const opciones = mesa.mesa?.opciones ?? [];
@@ -280,6 +373,7 @@ export default function LasLindesPorDentro(): JSX.Element {
           salir={mesa.salir}
           tirar={mesa.tirar}
           arriba={bordes.top}
+          deBotas={esBotas}
         />
         {tablero === null ? (
           <Text style={estilos.texto}>Esperando a la mesa…</Text>
@@ -317,6 +411,7 @@ export default function LasLindesPorDentro(): JSX.Element {
         salir={mesa.salir}
         tirar={mesa.tirar}
         arriba={bordes.top}
+        deBotas={esBotas}
       />
       <View style={estilos.lienzo}>
         <RedDelValle alFallar={alFallar}>
@@ -337,7 +432,9 @@ export default function LasLindesPorDentro(): JSX.Element {
               tablero={datos}
               codigo={mesa.mesa.codigo}
               traer={traer}
-              calidad="plena"
+              complementosDelTablero={COMPLEMENTOS_DEL_TABLERO}
+              calidad={calidad}
+              alMedir={alMedir}
               camara={camara}
               giroEnMano={giro}
               /* La figura de quien pasea; sin ella, `figuraQueSePinta` saca una del asiento. */
@@ -348,6 +445,7 @@ export default function LasLindesPorDentro(): JSX.Element {
               alTocarHueco={alTocarHueco}
               alSenalarHueco={alSenalarHueco}
               alFallar={alFallar}
+              canal={canal}
               mandos={mandos}
             />
           </Canvas>
@@ -358,6 +456,18 @@ export default function LasLindesPorDentro(): JSX.Element {
           bajaba a «Hombro» y no se podía dar un paso. Ver `mandos-del-paseo.tsx`.
         */}
         <MandosDelPaseo mandos={mandos} visibles={modo !== 'mesa'} />
+
+        {/*
+          CÓMO VA EL CANAL, arriba a la izquierda —la derecha es de las cámaras y abajo están
+          la palanca y el correr— y sin coger el dedo: es un cartel. Sólo en una mesa de botas.
+        */}
+        {esBotas ? (
+          <View style={estilos.canal} pointerEvents="none">
+            <Text style={estilos.canalTexto} numberOfLines={2}>
+              {estadoDelCanal?.texto ?? 'Conectando…'}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={estilos.camaras}>
           {LAS_CAMARAS.map((c) => (
@@ -559,6 +669,20 @@ const estilos = StyleSheet.create({
   camaraPuesta: { backgroundColor: '#f3ecd8', borderColor: '#f3ecd8' },
   camaraTexto: { color: '#f3ecd8', fontSize: 13, ...LETRA.rotuloChico },
   camaraTextoPuesto: { color: '#1b2411' },
+  /* La misma placa que las cámaras, para que se lea como de la misma familia. */
+  canal: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    maxWidth: '52%',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(12, 20, 8, 0.62)',
+    borderWidth: 1,
+    borderColor: 'rgba(243, 236, 216, 0.45)',
+  },
+  canalTexto: { color: '#f3ecd8', fontSize: 13, ...LETRA.cuerpo },
   hoja: {
     backgroundColor: SALA.pared,
     borderTopColor: SALA.filo,

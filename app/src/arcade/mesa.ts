@@ -51,6 +51,8 @@
  * `bolsillo.ts`, incluido por qué no se usa el almacén de `api.ts`.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { cargarSesionGuardada, servidorActual } from '../api';
 import {
   loQueQuedaTrasElSondeo,
@@ -58,7 +60,11 @@ import {
 } from '../../../shared/mecanicas/aviso-puesto';
 import type { AvisoPuesto } from '../../../shared/mecanicas/aviso-puesto';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
+import { rutaDelCanal } from '../../../shared/mecanicas/canal-de-botas';
 import type { ArcadeId } from '../../../shared/arcade';
+import { leerElVeredicto, porQueNoTeSientas } from '../../../escenas/compuerta-de-botas';
+import type { LecturaSinLlave } from '../../../escenas/compuerta-de-botas';
+import type { Calidad } from '../../../escenas/embarcadero/tipos';
 import { elSitioGuardado, guardarElSitio, olvidarElSitio } from './bolsillo';
 import { pausaAntesDeVolverAPreguntar } from './relojes';
 import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
@@ -115,6 +121,16 @@ export interface MesaVista {
    * un servidor más viejo que ella, y un campo que falta no puede ser un fallo.
    */
   opciones?: OpcionDeMesa[];
+  /**
+   * CÓMO SE JUEGA ESTA MESA: la de siempre, o Boots on Board —bajando al tablero con los demás—.
+   * Se elige al abrirla y no cambia (`docs/BOOTS-ON-BOARD.md` §3).
+   *
+   * Opcional por lo de todo este tipo: un servidor anterior no lo manda, y SIN ÉL ES `'normal'`.
+   * No se lee a pelo: se lee con `esMesaDeBotas` (`escenas/paseo/mesa-de-botas.ts`), que es quien
+   * decide qué hacer con un valor que falte o que este binario no conozca, y que es el mismo en
+   * los dos clientes.
+   */
+  modalidad?: 'normal' | 'botas';
 }
 
 /**
@@ -177,8 +193,11 @@ export interface LaMesa {
    * `mesas.ts` y es el eje entero de la fase 4 bis. Sin este parámetro, la app
    * sólo sabría abrir mesas del plazo por defecto, o sea que una partida de días
    * existiría en el servidor y no habría forma de empezarla desde el móvil.
+   *
+   * `modalidad` es la de la mesa que se abre, y viaja sólo si se da: sin ella el servidor abre la
+   * de siempre. Elegirla es cosa de la pantalla de abrir; aquí sólo está la tubería.
    */
-  abrir: (nombre: string, plazoSegundos?: number, figura?: string) => void;
+  abrir: (nombre: string, plazoSegundos?: number, figura?: string, modalidad?: 'normal' | 'botas') => void;
   /**
    * `figura` en los dos: es el aventurero con el que se llega al Muelle, y viaja
    * en el mismo cuerpo que el nombre para que el asiento nazca vestido y los demás
@@ -237,6 +256,98 @@ export interface LaMesa {
    * escena por un fotograma que nadie ve.
    */
   recuperando: boolean;
+  /**
+   * LA LLAVE DE MI ASIENTO, mientras estoy sentado; `null` fuera.
+   *
+   * Hasta Boots on Board no salía de este fichero: la ponía él en la cabecera de cada petición y
+   * nadie más la necesitaba. El canal de una mesa `botas` es otra conexión —un WebSocket, no una
+   * petición— y la llave va en su primer mensaje, así que la pantalla tiene que poder dársela.
+   *
+   * Opcional en el tipo para que una mesa de mentira —la de un banco o un comprobador— no tenga que
+   * inventarse una; el gancho la da siempre.
+   */
+  llave?: string | null;
+}
+
+/**
+ * LA DIRECCIÓN DEL CANAL DE BOOTS ON BOARD DE UNA MESA: el servidor de la app con `ws` en vez de
+ * `http` —`wss` en vez de `https`— y la ruta del contrato. Sin la llave: la llave va en el `hola`.
+ *
+ * Se pregunta al servidor que la app tiene elegido (`servidorActual`), el mismo de las peticiones:
+ * un canal que hablara con otro servidor que la mesa sería una mesa distinta.
+ */
+export function direccionDelCanal(codigo: string): string {
+  return `${servidorActual().replace(/^http/i, 'ws')}${rutaDelCanal(codigo)}`;
+}
+
+/*
+ * ═══ EL VEREDICTO DE ESTE APARATO: LO QUE LA COMPUERTA DE BOOTS ON BOARD NECESITA A MANO ═══
+ *
+ * Lo que dijo el juez de calidad la última vez que este aparato pintó un lobby (ver
+ * `escenas/compuerta-de-botas.ts`). Vive AQUÍ, al lado de `entrar`, y no en el lobby que lo mide,
+ * porque quien no puede sentar en una mesa `botas` a un aparato que no llega es `entrar` —venga el
+ * código del lobby o del vestíbulo propio de un juego, que no mide nada—, y la pregunta tiene que
+ * tener la respuesta sin esperar a que nadie mida. El lobby la escribe con `guardarElVeredicto` cada
+ * vez que el juez habla, y el último sustituye al anterior.
+ *
+ * En el almacén del bolsillo —`SecureStore` en el aparato, `localStorage` en la web, todo envuelto en
+ * `try`—, que es el que ya tiene esta app y por las razones que cuenta `bolsillo.ts`: son las mismas
+ * diez líneas de fontanería, y un almacén seguro de sobra para cinco letras no cuesta nada. POR
+ * APARATO: una llave, sin arcade, porque la tarjeta que pinta es la misma para los tres juegos.
+ *
+ * Y una copia en memoria, porque el almacén es asíncrono: el veredicto que el lobby acaba de dar
+ * tiene que valer en el `entrar` de un segundo después, haya terminado de escribirse o no.
+ */
+const LLAVE_DEL_VEREDICTO = 'arcade.aparato.veredicto';
+
+/** Lo último que se sabe en esta ejecución; `undefined` mientras no se haya mirado el almacén. */
+let veredictoEnMemoria: Calidad | null | undefined;
+
+/** El último veredicto de este aparato, o `null` si no lo hay o no se puede leer. */
+export async function elVeredictoDelAparato(): Promise<Calidad | null> {
+  if (veredictoEnMemoria !== undefined) return veredictoEnMemoria;
+  let crudo: string | null = null;
+  try {
+    crudo =
+      Platform.OS === 'web'
+        ? (globalThis.localStorage?.getItem(LLAVE_DEL_VEREDICTO) ?? null)
+        : await SecureStore.getItemAsync(LLAVE_DEL_VEREDICTO);
+  } catch {
+    crudo = null;
+  }
+  /* Si mientras se leía llegó uno recién medido, manda el medido: es más nuevo que el guardado. */
+  if (veredictoEnMemoria === undefined) veredictoEnMemoria = leerElVeredicto(crudo);
+  return veredictoEnMemoria;
+}
+
+/** Apunta el veredicto que acaba de dar el juez, encima del que hubiera. */
+export async function guardarElVeredicto(veredicto: Calidad): Promise<void> {
+  veredictoEnMemoria = veredicto;
+  try {
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(LLAVE_DEL_VEREDICTO, veredicto);
+      return;
+    }
+    await SecureStore.setItemAsync(LLAVE_DEL_VEREDICTO, veredicto);
+  } catch {
+    /* Sin almacén se juega igual: lo que cuesta es volver a medir la próxima vez, 120 fotogramas. */
+  }
+}
+
+/**
+ * LA MESA DE ESE CÓDIGO LEÍDA SIN LLAVE, que es como la ve quien aún no se ha sentado: la misma
+ * lectura que el sondeo, sin la cabecera de asiento y con `?desde=-1` para que conteste en el acto.
+ * Se la da hecha a `porQueNoTeSientas`, que no sabe de servidores ni de `fetch`.
+ */
+async function leerSinLlave(codigo: string): Promise<LecturaSinLlave> {
+  const r = await fetch(`${servidorActual()}/api/arcade/mesas/${codigo}?desde=-1`);
+  let cuerpo: unknown;
+  try {
+    cuerpo = await r.json();
+  } catch {
+    cuerpo = undefined;
+  }
+  return { ok: r.ok, status: r.status, cuerpo };
 }
 
 /** La cabecera con la que un asiento demuestra que es él. Ver `routes/arcade.ts`. */
@@ -337,6 +448,16 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
   const codigo = useRef<string | null>(null);
   const llave = useRef<string | null>(null);
   const vivo = useRef(true);
+  /*
+   * LA LLAVE, TAMBIÉN EN ESTADO, para dársela a la pantalla (`LaMesa.llave`). La del bucle sigue
+   * siendo la referencia, por lo de arriba; ésta es su copia para pintar, y se cambian las dos a la
+   * vez y en un solo sitio para que no puedan decir cosas distintas.
+   */
+  const [llaveDelAsiento, ponerLlaveDelAsiento] = useState<string | null>(null);
+  const apuntarLaLlave = useCallback((nueva: string | null): void => {
+    llave.current = nueva;
+    ponerLlaveDelAsiento(nueva);
+  }, []);
 
   useEffect(() => {
     vivo.current = true;
@@ -417,7 +538,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
 
         if (datos.mesa !== undefined && datos.mesa.yo !== null) {
           codigo.current = datos.mesa.codigo;
-          llave.current = sitio.llave;
+          apuntarLaLlave(sitio.llave);
           ponerMesa(datos.mesa);
           ponerFase('dentro');
           return;
@@ -542,7 +663,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
           if (r.status === 404) {
             parado = true;
             codigo.current = null;
-            llave.current = null;
+            apuntarLaLlave(null);
             ponerMesa(null);
             ponerFase('fuera');
             void olvidarElSitio(arcade);
@@ -596,7 +717,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
   }, [fase, mesa?.rev, mesa?.venceEn, mesa?.terminada, cabeceras]);
 
   const abrir = useCallback(
-    (nombre: string, plazoSegundos?: number, figura?: string) => {
+    (nombre: string, plazoSegundos?: number, figura?: string, modalidad?: 'normal' | 'botas') => {
       void (async () => {
         ponerQuieto(true);
         ponerFase('yendo');
@@ -616,6 +737,8 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
               ...(plazoSegundos === undefined ? {} : { plazoSegundos }),
               /* Igual que el plazo: sólo viaja si quien abre llegó con una. */
               ...(figura === undefined ? {} : { figura }),
+              /* Y la modalidad, igual: sin ella el servidor abre la mesa de siempre. */
+              ...(modalidad === undefined ? {} : { modalidad }),
             }),
           });
           const datos = (await r.json()) as {
@@ -627,7 +750,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
           };
           if (!r.ok || datos.mesa === undefined) throw new Error(datos.error ?? 'no se pudo abrir');
           codigo.current = datos.mesa.codigo;
-          llave.current = datos.llave ?? null;
+          apuntarLaLlave(datos.llave ?? null);
           /* Al bolsillo, para que recargar o que el sistema mate la app no cueste el asiento. */
           if (datos.llave !== undefined) {
             await guardarElSitio(arcade, { codigo: datos.mesa.codigo, llave: datos.llave });
@@ -645,7 +768,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
         }
       })();
     },
-    [arcade, cabeceras],
+    [apuntarLaLlave, arcade, cabeceras],
   );
 
   const entrar = useCallback(
@@ -680,7 +803,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
               if (loSuyo.mesa !== undefined && loSuyo.mesa.yo !== null) {
                 salidasDeEstaEjecucion.delete(`${arcade}:${limpio}`);
                 codigo.current = loSuyo.mesa.codigo;
-                llave.current = guardado.llave;
+                apuntarLaLlave(guardado.llave);
                 ponerMesa(loSuyo.mesa);
                 ponerCronica([]);
                 ponerFase('dentro');
@@ -688,6 +811,25 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
                 return;
               }
             }
+          }
+          /*
+           * ═══ UNA MESA DE BOTAS NO LE DA SILLA A QUIEN NO PUEDE BAJAR ═══
+           *
+           * Aquí y no en la pantalla, porque ésta es la ÚNICA puerta por la que la app pide un
+           * asiento nuevo en una mesa ajena: el código puede llegar del lobby o del vestíbulo
+           * propio de un juego, y los dos entran por `entrar`. Un aparato que no llega, sentado en
+           * una mesa `botas`, jugaría desde arriba sin que nadie pudiera alcanzarle —una ventaja,
+           * no una forma humilde de jugar— y después ya no se le puede echar. Así que se mira
+           * ANTES: `porQueNoTeSientas` lee la mesa sin llave SÓLO si este aparato no baja a este
+           * tablero —quien baja entra como siempre, sin una petición de más— y contesta la frase
+           * que se enseña, o nada. Si la lectura falla, lanza con lo que dijo el servidor y cae al
+           * `catch` de abajo, que lo cuenta como cualquier fallo al entrar.
+           */
+          const motivo = await porQueNoTeSientas(limpio, arcade, await elVeredictoDelAparato(), leerSinLlave);
+          if (motivo !== null) {
+            ponerFase('fuera');
+            avisoDeLaRed(motivo);
+            return;
           }
           const r = await fetch(`${servidorActual()}/api/arcade/mesas/${limpio}/asientos`, {
             method: 'POST',
@@ -708,7 +850,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
           const datos = (await r.json()) as { error?: string; llave?: string; mesa?: MesaVista };
           if (!r.ok || datos.mesa === undefined) throw new Error(datos.error ?? 'no se pudo entrar');
           codigo.current = datos.mesa.codigo;
-          llave.current = datos.llave ?? null;
+          apuntarLaLlave(datos.llave ?? null);
           if (datos.llave !== undefined) {
             await guardarElSitio(arcade, { codigo: datos.mesa.codigo, llave: datos.llave });
           }
@@ -725,7 +867,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
         }
       })();
     },
-    [arcade, cabeceras],
+    [apuntarLaLlave, arcade, cabeceras],
   );
 
   const mover = useCallback(
@@ -882,12 +1024,12 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
   const salir = useCallback(() => {
     if (codigo.current !== null) salidasDeEstaEjecucion.add(`${arcade}:${codigo.current}`);
     codigo.current = null;
-    llave.current = null;
+    apuntarLaLlave(null);
     ponerMesa(null);
     ponerCronica([]);
     ponerAviso(SIN_AVISO);
     ponerFase('fuera');
-  }, [arcade]);
+  }, [apuntarLaLlave, arcade]);
 
   /*
    * TIRAR ES OTRA COSA QUE SALIR, y por eso sí olvida el sitio: al salir la mesa
@@ -934,14 +1076,14 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
         return;
       }
       codigo.current = null;
-      llave.current = null;
+      apuntarLaLlave(null);
       ponerMesa(null);
       ponerCronica([]);
       ponerAviso(SIN_AVISO);
       ponerFase('fuera');
       await olvidarElSitio(arcade);
     })();
-  }, [arcade, avisoDeTuJugada]);
+  }, [apuntarLaLlave, arcade, avisoDeTuJugada]);
 
   /*
    * Hacia fuera sigue siendo UNA CADENA. De dónde salió el renglón es cosa de
@@ -960,6 +1102,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
     mover,
     salir,
     tirar,
+    llave: llaveDelAsiento,
   };
 }
 

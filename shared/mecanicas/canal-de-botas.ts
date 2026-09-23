@@ -103,8 +103,14 @@ export interface Hola {
 }
 
 /**
- * Dónde estoy, en el tic `n` de mi cuenta (empieza en 1 y crece de uno en uno). `x` y `z` en
- * Q16.16, `r` el rumbo de 0 a 255, `m` la marcha (0 quieto, 1 andando, 2 corriendo).
+ * Dónde estoy, en el tic `n` de mi cuenta (crece siempre, aunque no de uno en uno: quieto se
+ * avisa cada varios tics, y tras reconectar se sigue contando). `x` y `z` en Q16.16, `m` la marcha
+ * (0 quieto, 1 andando, 2 corriendo).
+ *
+ * `r` es HACIA DÓNDE MIRA, de 0 a 255 —no hacia dónde da el paso—. Andando hacia atrás el paso
+ * lleva media vuelta de más que la mirada, y con el paso los demás verían a quien retrocede darse
+ * la vuelta y andar de frente. El servidor no lo usa para validar (valida sitios); lo reparte en
+ * la foto para pintar, y el día del combate es el «hacia dónde golpeo».
  */
 export interface Aqui {
   readonly t: 'aqui';
@@ -115,11 +121,14 @@ export interface Aqui {
   readonly m: 0 | 1 | 2;
 }
 
-export type MensajeDelAparato = Hola | Aqui;
+export type MensajeDelAparato = Hola | Aqui | Golpe;
 
 /* ─── LO QUE DICE EL SERVIDOR ────────────────────────────────────────────── */
 
-/** Ya estás dentro: quién eres en esta mesa y dónde apareces. */
+/**
+ * Ya estás dentro: quién eres en esta mesa, dónde apareces y hacia dónde miras (`r`, 0-255), y
+ * `hz`, los tics por segundo con los que cuenta el servidor (`TICS_POR_SEGUNDO`).
+ */
 export interface Dentro {
   readonly t: 'dentro';
   readonly yo: string;
@@ -131,8 +140,9 @@ export interface Dentro {
 
 /**
  * La foto de la mesa: dónde está cada uno según el servidor, en el tic `k` de SU cuenta. Cada
- * entrada es `[asiento, x, z, rumbo, marcha]`, con `x` y `z` en Q16.16. Se serializa UNA vez por
- * mesa y tic y se manda la misma cadena a todos: por eso no lleva nada de nadie en particular.
+ * entrada es `[asiento, x, z, mira, marcha]`, con `x` y `z` en Q16.16 y `mira` hacia dónde mira
+ * (ver `Aqui.r`); un asiento sale una vez como mucho. Se serializa UNA vez por mesa y tic y se
+ * manda la misma cadena a todos: por eso no lleva nada de nadie en particular.
  */
 export interface Foto {
   readonly t: 'foto';
@@ -154,7 +164,106 @@ export interface Fuera {
   readonly motivo: string;
 }
 
-export type MensajeDelServidor = Dentro | Foto | Corrige | Fuera;
+export type MensajeDelServidor = Dentro | Foto | Corrige | Fuera | Lanza | Da | Cae | Renace | Vidas;
+
+/* ─── LA REFRIEGA ────────────────────────────────────────────────────────── */
+
+/*
+ * ═══ EL COMBATE, EN UNA PANTALLA ═══
+ *
+ * Una arena LENTA, como decidió Miguel el 20-sep (se acepta una ventaja del que asoma de
+ * 150-250 ms): cada uno tiene `VIDA_ENTERA` golpes; se golpea LANZANDO algo a corta distancia
+ * —el clip `lanzar` de los aventureros; el paquete gratuito no trae otro ataque—, hacia donde se
+ * mira, con `RECARGA_DEL_GOLPE_MS` entre golpe y golpe; quien se queda sin vida CAE
+ * `CAIDO_MS`, y renace en su sitio de nacer con la vida entera e intocable `INTOCABLE_MS`.
+ *
+ * EL APARATO SÓLO DICE «GOLPEO» (`golpe`), con su tic y hacia dónde mira. Si alcanza a alguien
+ * lo decide el servidor, sobre los sitios que ACEPTÓ, rebobinando al otro como mucho
+ * `REBOBINADO_MAXIMO_MS` para verlo donde lo veía quien golpeó. Y quien cae le da BOTÍN a quien
+ * lo tumbó: eso tampoco viaja por aquí, lo mete el servidor en la mesa como `arcade:botin`, y lo
+ * que se roba no sale de la mesa (decisión de Miguel del 20-sep; ver docs/COMBATE-Y-BOTIN.md §0).
+ */
+
+/** Cuántos golpes aguanta cada uno. */
+export const VIDA_ENTERA = 3;
+
+/** Hasta dónde llega un golpe, en unidades del mundo: poco más que un brazo y lo que se lanza. */
+export const ALCANCE_DEL_GOLPE = 2.5;
+
+/**
+ * El ancho del golpe: medio cono de 45 grados a cada lado de la mirada. Se da como el CUADRADO
+ * de su coseno —0,5— porque así el servidor lo compara sin raíces: `(d·m)² ≥ 0,5·|d|²·|m|²` con
+ * `d·m ≥ 0`.
+ */
+export const COSENO_CUADRADO_DEL_CONO = 0.5;
+
+/** Entre golpe y golpe de la misma persona, como poco. */
+export const RECARGA_DEL_GOLPE_MS = 800;
+
+/** Lo que se está en el suelo tras caer: ni se anda ni se golpea. */
+export const CAIDO_MS = 5000;
+
+/** Lo que se es intocable al renacer: nadie te recibe con un golpe en el sitio de nacer. */
+export const INTOCABLE_MS = 2000;
+
+/** Lo más que el servidor rebobina a los demás para ver lo que veía quien golpeó. */
+export const REBOBINADO_MAXIMO_MS = 250;
+
+/** Una misma pareja no da botín más de una vez en este tiempo: tumbar al mismo en bucle no renta. */
+export const BOTIN_CADA_PAREJA_MS = 60_000;
+
+/** Cómo está alguien. */
+export const DE_PIE = 0;
+export const CAIDO = 1;
+export const INTOCABLE = 2;
+export type EstadoEnLaRefriega = typeof DE_PIE | typeof CAIDO | typeof INTOCABLE;
+
+/** «Golpeo», en mi tic `n`, hacia `r` (hacia dónde miro, 0-255). Nada más: si da, lo dice el servidor. */
+export interface Golpe {
+  readonly t: 'golpe';
+  readonly n: number;
+  readonly r: number;
+}
+
+/** `de` lanzó un golpe (le haya dado a alguien o no): para que todos vean el gesto. */
+export interface Lanza {
+  readonly t: 'lanza';
+  readonly de: string;
+}
+
+/** El golpe de `de` le dio a `a`, que se queda con `vida`. Con 0, detrás llega su `cae`. */
+export interface Da {
+  readonly t: 'da';
+  readonly de: string;
+  readonly a: string;
+  readonly vida: number;
+}
+
+/** `a` cae, tumbado por `por`. Se queda en el suelo `CAIDO_MS`. */
+export interface Cae {
+  readonly t: 'cae';
+  readonly a: string;
+  readonly por: string;
+}
+
+/** `a` renace en `(x, z)` mirando a `r`, con la vida entera e intocable `INTOCABLE_MS`. */
+export interface Renace {
+  readonly t: 'renace';
+  readonly a: string;
+  readonly x: number;
+  readonly z: number;
+  readonly r: number;
+}
+
+/**
+ * Cómo está cada uno al entrar: `[asiento, vida, estado]`. Llega una vez, justo después de
+ * `dentro`; a partir de ahí se sigue por `da`, `cae` y `renace`, que por un WebSocket llegan
+ * todos y en orden. Quien reconecta recibe otro.
+ */
+export interface Vidas {
+  readonly t: 'vidas';
+  readonly v: readonly (readonly [string, number, number])[];
+}
 
 /* ─── LOS LECTORES ESTRICTOS ─────────────────────────────────────────────── */
 
@@ -213,7 +322,19 @@ export function leerMensajeDelAparato(texto: string): MensajeDelAparato | null {
     if (!esCoordenada(v.x) || !esCoordenada(v.z) || !esRumbo(v.r) || !esMarcha(v.m)) return null;
     return { t: 'aqui', n: v.n, x: v.x, z: v.z, r: v.r, m: v.m };
   }
+  if (conClaves(v, ['t', 'n', 'r'])) {
+    if (v.t !== 'golpe' || !esEntero(v.n) || v.n < 1 || !esRumbo(v.r)) return null;
+    return { t: 'golpe', n: v.n, r: v.r };
+  }
   return null;
+}
+
+function esVida(v: unknown): v is number {
+  return esEntero(v) && v >= 0 && v <= VIDA_ENTERA;
+}
+
+function esEstado(v: unknown): v is EstadoEnLaRefriega {
+  return v === DE_PIE || v === CAIDO || v === INTOCABLE;
 }
 
 /** Lo que manda el servidor, leído por el aparato. `null` si no es un mensaje conocido. */
@@ -228,10 +349,14 @@ export function leerMensajeDelServidor(texto: string): MensajeDelServidor | null
   if (m.t === 'foto') {
     if (!esEntero(m.k) || !Array.isArray(m.p)) return null;
     const p: [string, number, number, number, number][] = [];
+    const vistos: string[] = [];
     for (const e of m.p as unknown[]) {
       if (!Array.isArray(e) || e.length !== 5) return null;
       const [a, x, z, r, mm] = e as unknown[];
       if (typeof a !== 'string' || !esCoordenada(x) || !esCoordenada(z) || !esRumbo(r) || !esMarcha(mm)) return null;
+      /* Un asiento dos veces en la misma foto es una foto que no dice dónde está. */
+      if (vistos.indexOf(a) >= 0) return null;
+      vistos.push(a);
       p.push([a, x, z, r, mm]);
     }
     return { t: 'foto', k: m.k, p };
@@ -243,6 +368,37 @@ export function leerMensajeDelServidor(texto: string): MensajeDelServidor | null
   if (m.t === 'fuera') {
     if (typeof m.motivo !== 'string') return null;
     return { t: 'fuera', motivo: m.motivo };
+  }
+  if (m.t === 'lanza') {
+    if (typeof m.de !== 'string') return null;
+    return { t: 'lanza', de: m.de };
+  }
+  if (m.t === 'da') {
+    if (typeof m.de !== 'string' || typeof m.a !== 'string' || !esVida(m.vida)) return null;
+    return { t: 'da', de: m.de, a: m.a, vida: m.vida };
+  }
+  if (m.t === 'cae') {
+    if (typeof m.a !== 'string' || typeof m.por !== 'string') return null;
+    return { t: 'cae', a: m.a, por: m.por };
+  }
+  if (m.t === 'renace') {
+    if (typeof m.a !== 'string' || !esCoordenada(m.x) || !esCoordenada(m.z) || !esRumbo(m.r)) return null;
+    return { t: 'renace', a: m.a, x: m.x, z: m.z, r: m.r };
+  }
+  if (m.t === 'vidas') {
+    if (!Array.isArray(m.v)) return null;
+    const lista: [string, number, EstadoEnLaRefriega][] = [];
+    const vistos: string[] = [];
+    for (const e of m.v as unknown[]) {
+      if (!Array.isArray(e) || e.length !== 3) return null;
+      const [a, vida, estado] = e as unknown[];
+      if (typeof a !== 'string' || !esVida(vida) || !esEstado(estado)) return null;
+      /* Como en la foto: un asiento dos veces no dice cómo está. */
+      if (vistos.indexOf(a) >= 0) return null;
+      vistos.push(a);
+      lista.push([a, vida, estado]);
+    }
+    return { t: 'vidas', v: lista };
   }
   return null;
 }
