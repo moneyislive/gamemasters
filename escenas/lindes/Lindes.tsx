@@ -34,13 +34,23 @@
  * regla —murallas, ermitas, labriegos— se monta SIEMPRE. Un tablero sin árboles
  * lejos sigue siendo el tablero; un tablero sin la muralla de una villa cerrada es
  * el tablero mintiendo.
+ *
+ * Y el radio lo pone LA CALIDAD (`detalle.ts`), que hasta ahora llegaba y nadie leía: en
+ * `sobria` no se pinta nada menudo y el relleno llega a dos losas y media en vez de a
+ * cuatro. Lo que cuenta una regla es igual en las dos.
+ *
+ * ═══ EN EL TELÉFONO, EL ATLAS DEL TABLERO LLEGA DE FUERA ═══
+ *
+ * `tablero.glb` trae su atlas como PNG y Hermes no lo decodifica: el valle entero salía en
+ * la app sin un solo color. Quien monta la escena en un teléfono le pasa
+ * `complementosDelTablero` —el atlas compilado de `app/src/tres/texturas-nativas.ts`— y aquí
+ * se registran en el cargador del `.glb`. Por qué así y no importándolo: `catalogo.ts`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
-import { abrirGlb } from '../embarcadero/cargar';
 import { ESCALA_DEL_PACK } from '../escala';
 import { rutaDelTablero } from '../ruta-de-modelos';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
@@ -56,8 +66,19 @@ import {
   geometriaDelSuelo,
 } from './suelo';
 import { loQueHayEnElDesierto, loQueSeEstira } from './desierto';
-import type { CajaDelModelo, EnElDesierto } from './desierto';
+import type { EnElDesierto } from './desierto';
 import type { LosaQueSePinta } from './suelo';
+import {
+  abrirElTablero,
+  cajaDeLasPartes,
+  cajaDelModelo,
+  catalogoDe,
+  ejeDelLargo,
+  escalaDeLaPuesta,
+} from './catalogo';
+import type { Catalogo, ComplementoDelCargador, ParteDelModelo } from './catalogo';
+import { ANILLOS_DE_DETALLE, DONDE_EMPIEZA_A_IRSE } from './detalle';
+import type { AnillosDeDetalle } from './detalle';
 import { geometriaDeLaPeana, geometriaDelLabriego } from './labriego';
 import {
   ALTO_DE_LA_ULTIMA,
@@ -81,7 +102,7 @@ import { usarElCanal } from '../paseo/usar-el-canal';
 import { LosDemas } from '../paseo/los-demas';
 import type { Andante } from '../../shared/mecanicas/mundo';
 import { mundoDeLasLindes } from '../../shared/arcade/juegos/lindes-mundo';
-import type { PropsDeLasLindes, Traer } from './tipos';
+import type { Calidad, PropsDeLasLindes, Traer } from './tipos';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
 import { llaveDeCasilla } from '../../shared/arcade/juegos/lindes-losas';
 import { MINIMO_PARA_GIRAR } from '../camara';
@@ -114,42 +135,15 @@ const TOPE_DE_ARRANQUE_MS = 15_000;
 const COLOR_DEL_CIELO = '#8cb8de';
 const COLOR_DE_LA_NIEBLA = '#cfdae2';
 
-/**
- * LOS DOS ANILLOS DE DETALLE, en losas alrededor de donde mira la cámara.
+/*
+ * LOS DOS ANILLOS DE DETALLE —hasta dónde se pinta lo menudo y hasta dónde el relleno— y
+ * cuándo empieza una pieza a irse viven en `detalle.ts`, uno por calidad: son números, y
+ * `verify:lindes-escena` cuenta con ellos los triángulos de las dos calidades. Aquí sólo se
+ * leen, con la calidad que llega por `props`.
  *
- * ═══ POR QUÉ DOS Y NO UNO ═══
- *
- * Con uno solo hay que elegir entre un tablero pelado de cerca o uno que no cabe de
- * lejos. Con dos, lo que desaparece primero es lo que primero deja de verse:
- *
- *     hasta 1,8 losas .... todo, hasta el último barril
- *     hasta 4 losas ...... lo que tiene bulto: casas, edificios, árboles, mieses
- *     más allá ........... sólo lo que cuenta una regla: murallas, torres, ermitas
- *
- * Los dos números salieron de MEDIR, no de elegir: con siete y dos con seis, un
- * tablero de nueve por nueve pintaba cuatro millones y medio de triángulos contra un
- * techo de tres. `verify:lindes-escena` hace esa cuenta con los triángulos reales del
- * `.glb` y es la que manda.
- *
- * La tercera línea es la que no se puede tocar. Un tablero sin árboles al fondo
- * sigue siendo el tablero; uno sin la muralla de una villa cerrada es el tablero
- * mintiendo sobre la partida, y eso se paga en una jugada mal hecha.
+ * `ALTO_DE_LA_ULTIMA` y `loQueSeLevantaLaUltima` viven en `medidas.ts`: son medidas, y
+ * desde allí se pueden comprobar sin montar una escena.
  */
-const LOSAS_CON_MENUDO = 1.8;
-const LOSAS_CON_RELLENO = 4;
-
-/**
- * A QUÉ PARTE DEL ALCANCE EMPIEZA UNA PIEZA A IRSE, para que el recorte no se vea.
- *
- * Desde aquí hasta el tope la pieza encoge hasta nada. Dos tercios es bastante para que el
- * cambio no se lea como un parpadeo y poco para que no se noten los árboles enanos: en el
- * último tercio del alcance una pieza ya está a cuatro losas de distancia y ocupa unos pocos
- * píxeles. No cuesta un triángulo: es la escala que ya se estaba componiendo.
- */
-const DONDE_EMPIEZA_A_IRSE = 0.66;
-
-/* `ALTO_DE_LA_ULTIMA` y `loQueSeLevantaLaUltima` viven en `medidas.ts`: son medidas, y
- * desde allí se pueden comprobar sin montar una escena. */
 
 /*
  * ═══ LA LOSA DE LA MANO, PEGADA A LA CÁMARA ═══
@@ -179,35 +173,11 @@ const DONDE_EMPIEZA_A_IRSE = 0.66;
 
 /* ───────────────────────────────── Ayudas ───────────────────────────────── */
 
-/** Una parte de un modelo, ya lista para instanciar. */
-interface ParteDelModelo {
-  readonly geometria: THREE.BufferGeometry;
-  readonly material: THREE.Material;
-}
-
-/**
- * LAS PARTES DE UN MODELO DEL PACK, en coordenadas del modelo.
- *
- * Un nodo del `.glb` puede traer varias mallas dentro con materiales distintos
- * —una casa con su tejado y su pared—, así que se aplanan todas y se guarda cada
- * una con SU material y SU matriz ya aplicada. Instanciar un grupo entero no se
- * puede; instanciar cada malla suelta sí.
+/*
+ * LAS PARTES DE CADA MODELO, EL CATÁLOGO Y LA CAJA DE UNA PIEZA viven en `catalogo.ts`, con el
+ * cargador del `.glb`: son `three` sin React, y así `verify:lindes-escena` abre el tablero y
+ * mide las cajas en Node con el mismo código que pinta.
  */
-function partesDe(nodo: THREE.Object3D): ParteDelModelo[] {
-  const partes: ParteDelModelo[] = [];
-  nodo.updateWorldMatrix(true, true);
-  const inversa = new THREE.Matrix4().copy(nodo.matrixWorld).invert();
-  nodo.traverse((hijo) => {
-    const malla = hijo as THREE.Mesh;
-    if (!malla.isMesh || malla.geometry === undefined) return;
-    const g = malla.geometry.clone();
-    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inversa, malla.matrixWorld));
-    const material = Array.isArray(malla.material) ? malla.material[0] : malla.material;
-    if (material === undefined) return;
-    partes.push({ geometria: g, material });
-  });
-  return partes;
-}
 
 /** Cuántos triángulos tiene una geometría. */
 function triangulosDe(g: THREE.BufferGeometry): number {
@@ -217,30 +187,27 @@ function triangulosDe(g: THREE.BufferGeometry): number {
   return pos === undefined ? 0 : pos.count / 3;
 }
 
-/* ──────────────────────────── El catálogo cargado ──────────────────────────── */
-
-interface Catalogo {
-  readonly partes: ReadonlyMap<string, readonly ParteDelModelo[]>;
-  readonly soltar: () => void;
-}
-
-function catalogoDe(raiz: THREE.Object3D): Catalogo {
-  const partes = new Map<string, readonly ParteDelModelo[]>();
-  for (const hijo of raiz.children) {
-    if (hijo.name.length === 0) continue;
-    partes.set(hijo.name, partesDe(hijo));
-  }
-  return {
-    partes,
-    soltar: () => {
-      for (const lista of partes.values()) for (const p of lista) p.geometria.dispose();
-    },
-  };
-}
-
 /* ─────────────────────────────── La escena ─────────────────────────────── */
 
-export function Lindes(props: PropsDeLasLindes): JSX.Element {
+/**
+ * LO QUE RECIBE LA ESCENA: lo de `tipos.ts`, y una cosa más que no puede vivir allí.
+ *
+ * `tipos.ts` no nombra `three` a propósito —lo lee el servidor, a través de la traducción de
+ * `shared/`, y el servidor no compila `three`—, y un complemento de `GLTFLoader` es un tipo de
+ * `three`. Así que la prop que lo lleva se declara aquí, junto a quien la usa.
+ */
+export interface PropsDeLaEscenaDeLasLindes extends PropsDeLasLindes {
+  /**
+   * LOS COMPLEMENTOS CON LOS QUE SE ABRE `tablero.glb`, si el motor no sabe abrir su atlas.
+   *
+   * En la app, en un teléfono, es `[texturasDelTablero]`: el atlas compilado a bytes. En un
+   * navegador no se pasa nada, porque el PNG se decodifica de verdad. Se lee UNA vez, al pedir
+   * el catálogo —como `traer`—: cambiarlo después no vuelve a abrir el tablero.
+   */
+  readonly complementosDelTablero?: readonly ComplementoDelCargador[];
+}
+
+export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
   const { tablero, codigo, traer, calidad, camara, giroEnMano, quieto } = props;
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
   const [fallo, setFallo] = useState<string | null>(null);
@@ -257,8 +224,10 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
       }
     }, TOPE_DE_ARRANQUE_MS);
 
+    /* Sin complementos es el `GLTFLoader` de siempre; en el teléfono, con el atlas compilado. */
+    const complementos = props.complementosDelTablero ?? [];
     traer(rutaDelTablero())
-      .then((bytes) => abrirGlb(bytes))
+      .then((bytes) => abrirElTablero(bytes, complementos))
       .then((gltf) => {
         if (!vivo) return;
         cargado = catalogoDe(gltf.scene);
@@ -592,20 +561,36 @@ export function Lindes(props: PropsDeLasLindes): JSX.Element {
   );
   useEffect(() => () => sueloDelFantasma?.dispose(), [sueloDelFantasma]);
 
-  /* ── La medida, para el comprobador y para el presupuesto ────────────────── */
-  const medido = useRef({ fotogramas: 0, ms: 0 });
+  /*
+   * ═══ LA MEDIDA: UNA VEZ POR SEGUNDO, CON LA MEDIA DE ESE SEGUNDO ═══
+   *
+   * Es el contrato de `alMedir` en esta casa (`embarcadero/tipos.ts`), y es lo que lee el juez
+   * de la calidad: la media de milisegundos del ÚLTIMO segundo y cuántos fotogramas cubre. Aquí
+   * se mandaba cada treinta fotogramas la media DESDE EL PRINCIPIO con el total de fotogramas
+   * desde el principio; con eso `juzgarCalidad`, que suma los fotogramas de las muestras, contaba
+   * los treinta primeros tres veces y juzgaba con noventa fotogramas vistos y no con ciento veinte.
+   *
+   * Y se empieza a medir cuando HAY TABLERO QUE PINTAR: mientras el `.glb` viaja la escena es un
+   * suelo y un cielo, y un juez que mirara eso diría `plena` de un valle que aún no está. Cada
+   * fotograma se acota a cien milisegundos, como en el Burgo y en el Muelle: el primero con las
+   * piezas compila sombreadores, y un tirón de un segundo no es lo que va a durar la partida.
+   */
+  const medido = useRef({ segundos: 0, fotogramas: 0 });
   const { gl } = useThree();
-  useFrame((_, dt) => {
-    if (props.alMedir === undefined) return;
-    medido.current.fotogramas++;
-    medido.current.ms += dt * 1000;
-    if (medido.current.fotogramas % 30 !== 0) return;
+  useFrame((_, dtCrudo) => {
+    if (props.alMedir === undefined || catalogo === null) return;
+    const m = medido.current;
+    m.segundos += Math.min(0.1, Math.max(0, dtCrudo));
+    m.fotogramas++;
+    if (m.segundos < 1) return;
     props.alMedir({
       triangulos: gl.info.render.triangles,
       llamadas: gl.info.render.calls,
-      ms: medido.current.ms / medido.current.fotogramas,
-      fotogramas: medido.current.fotogramas,
+      ms: (m.segundos * 1000) / m.fotogramas,
+      fotogramas: m.fotogramas,
     });
+    m.segundos = 0;
+    m.fotogramas = 0;
   });
 
   /*
@@ -755,7 +740,7 @@ interface LoQueSePoneEncimaProps {
   readonly catalogo: Catalogo;
   readonly contenidos: ReadonlyMap<string, { readonly puestas: readonly PuestaEnLaLosa[]; readonly x: number; readonly y: number }>;
   readonly mirandoA: { current: { x: number; z: number } };
-  readonly calidad: string;
+  readonly calidad: Calidad;
   readonly ultima: string;
   /** ¿Se está andando por el tablero? Entonces la última losa no se levanta. */
   readonly aPie: boolean;
@@ -775,7 +760,14 @@ interface LoQueSePoneEncimaProps {
  * recorrer una lista: microsegundos, una vez por losa puesta.
  */
 function LoQueSePoneEncima(props: LoQueSePoneEncimaProps): JSX.Element {
-  const { catalogo, contenidos, mirandoA, ultima, aPie } = props;
+  const { catalogo, contenidos, mirandoA, calidad, ultima, aPie } = props;
+
+  /*
+   * HASTA DÓNDE SE PINTA EL RELLENO LO DICE LA CALIDAD, y los números están en `detalle.ts`.
+   * Esta prop llegaba desde el principio y no la leía nadie: `sobria` pintaba lo mismo que
+   * `plena`. Lo que cuenta una regla no mira esto: se pinta siempre, en las dos.
+   */
+  const anillos = ANILLOS_DE_DETALLE[calidad];
 
   /*
    * Desde la mesa, la última losa se levanta para que se vea cuál acaba de ponerse; a pie
@@ -813,6 +805,7 @@ function LoQueSePoneEncima(props: LoQueSePoneEncimaProps): JSX.Element {
           partes={catalogo.partes.get(nombre) ?? []}
           puestas={porModelo.get(nombre) ?? []}
           mirandoA={mirandoA}
+          anillos={anillos}
         />
       ))}
     </group>
@@ -823,6 +816,8 @@ interface UnModeloProps {
   readonly partes: readonly ParteDelModelo[];
   readonly puestas: readonly PuestaEnLaLosa[];
   readonly mirandoA: { current: { x: number; z: number } };
+  /** Hasta dónde se pinta lo que se recorta, en losas: el de la calidad que toque. */
+  readonly anillos: AnillosDeDetalle;
 }
 
 const AUX_MATRIZ = new THREE.Matrix4();
@@ -841,10 +836,12 @@ const AUX_DERECHA = new THREE.Vector3();
 const AUX_ARRIBA = new THREE.Vector3();
 
 /** Un modelo del pack, con todas sus copias del tablero en una sola malla por parte. */
-function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | null {
+function UnModelo({ partes, puestas, mirandoA, anillos }: UnModeloProps): JSX.Element | null {
   const mallas = useRef<(THREE.InstancedMesh | null)[]>([]);
-  const conRelleno = LOSAS_CON_RELLENO * LADO_DE_LOSA;
-  const conMenudo = LOSAS_CON_MENUDO * LADO_DE_LOSA;
+  const conRelleno = anillos.relleno * LADO_DE_LOSA;
+  const conMenudo = anillos.menudo * LADO_DE_LOSA;
+  /* Hacia dónde estira el `largo`, leído en la caja del modelo una vez: ver `ejeDelLargo`. */
+  const eje = useMemo(() => ejeDelLargo(cajaDeLasPartes(partes)), [partes]);
 
   useFrame(() => {
     const centro = mirandoA.current;
@@ -863,18 +860,21 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
          * anillo perfecto alrededor de la cámara. Y en la vista de mesa ya no hay niebla
          * ninguna, así que el anillo se ve entero.
          *
-         * Ensanchar el anillo no cabe: está medido que cuatro losas y media son 3.241.206
-         * triángulos contra un tope de 3.200.000. Así que en el último tramo del alcance la
+         * Ensanchar el anillo no cabe: medido con el reparto de hoy, cuatro losas y media son
+         * 3.167.310 triángulos contra un tope de 3.200.000 —un uno por ciento de holgura, que no
+         * es caber; con el de entonces eran 3.241.206—. Así que en el último tramo del alcance la
          * pieza ENCOGE hasta desaparecer. No cuesta ni un triángulo —es la escala que ya se
          * está componiendo— y lo que se ve es que las cosas se hacen pequeñas con la
          * distancia, que es lo que hacen las cosas.
          */
         let desvanece = 1;
         if (LO_QUE_NO_SE_RECORTA.indexOf(p.porque) < 0) {
+          const tope = p.menuda ? conMenudo : conRelleno;
+          /* Un anillo de cero es NUNCA —lo menudo en `sobria`—, no «lo que caiga justo en el centro». */
+          if (tope <= 0) continue;
           const dx = p.x - centro.x;
           const dz = p.z - centro.z;
           const lejos = dx * dx + dz * dz;
-          const tope = p.menuda ? conMenudo : conRelleno;
           if (lejos > tope * tope) continue;
           const desde = tope * DONDE_EMPIEZA_A_IRSE;
           if (lejos > desde * desde) {
@@ -884,11 +884,8 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
         }
         AUX_POSICION.set(p.x, p.y, p.z);
         AUX_GIRO.setFromAxisAngle(AUX_EJE, p.giro);
-        AUX_ESCALA.set(
-          p.escala * ESCALA_DEL_PACK * p.largo * desvanece,
-          p.escala * ESCALA_DEL_PACK * desvanece,
-          p.escala * ESCALA_DEL_PACK * desvanece,
-        );
+        /* El `largo`, por el eje que es largo: el muro por su `x`, la valla por su `z`. */
+        escalaDeLaPuesta(p.escala * desvanece, p.largo, eje, AUX_ESCALA);
         malla.setMatrixAt(n, AUX_MATRIZ.compose(AUX_POSICION, AUX_GIRO, AUX_ESCALA));
         n++;
       }
@@ -914,34 +911,7 @@ function UnModelo({ partes, puestas, mirandoA }: UnModeloProps): JSX.Element | n
   );
 }
 
-/**
- * LA CAJA DE UN MODELO DEL PACK, en unidades del pack: su alto y su lado mayor.
- *
- * Es el único sitio donde se sabe de verdad lo que mide una pieza, y hacen falta las dos
- * medidas porque sirven para cosas distintas:
- *
- *   · el ALTO, para sentar algo encima —la caja bajo el reloj—;
- *   · el LADO MAYOR, para decidir lo grande que se ve —las piedras del desierto—, porque el
- *     alto de una piedra plana no dice nada de lo grande que parece: `roca-a` es cuatro veces
- *     y media más ancha que alta, y pidiéndole un alto salía un lanchón de media losa.
- *
- * Una tabla de medidas escrita a mano se quedaría vieja en silencio el día que alguien
- * recompile `tablero.glb`; esto no.
- */
-function cajaDelModelo(catalogo: Catalogo, nombre: string): CajaDelModelo {
-  let ancho = 0;
-  let alto = 0;
-  let fondo = 0;
-  for (const parte of catalogo.partes.get(nombre) ?? []) {
-    parte.geometria.computeBoundingBox();
-    const caja = parte.geometria.boundingBox;
-    if (caja === null) continue;
-    ancho = Math.max(ancho, caja.max.x - caja.min.x);
-    alto = Math.max(alto, caja.max.y - caja.min.y);
-    fondo = Math.max(fondo, caja.max.z - caja.min.z);
-  }
-  return { ancho, alto, fondo };
-}
+/* La caja de un modelo del pack —alto, ancho y fondo medidos— es `cajaDelModelo`, en `catalogo.ts`. */
 
 /* ──────────────────────────── El desierto de fuera ──────────────────────────── */
 
@@ -1313,6 +1283,8 @@ function UnModeloSinRecorte({
   readonly puestas: readonly PuestaEnLaLosa[];
 }): JSX.Element | null {
   const mallas = useRef<(THREE.InstancedMesh | null)[]>([]);
+  /* La misma cuenta que `UnModelo`: la losa de la mano es la que se va a poner, valla a valla. */
+  const eje = useMemo(() => ejeDelLargo(cajaDeLasPartes(partes)), [partes]);
 
   useEffect(() => {
     for (let k = 0; k < partes.length; k++) {
@@ -1322,17 +1294,13 @@ function UnModeloSinRecorte({
         const p = puestas[i] as PuestaEnLaLosa;
         AUX_POSICION.set(p.x, p.y, p.z);
         AUX_GIRO.setFromAxisAngle(AUX_EJE, p.giro);
-        AUX_ESCALA.set(
-          p.escala * ESCALA_DEL_PACK * p.largo,
-          p.escala * ESCALA_DEL_PACK,
-          p.escala * ESCALA_DEL_PACK,
-        );
+        escalaDeLaPuesta(p.escala, p.largo, eje, AUX_ESCALA);
         malla.setMatrixAt(i, AUX_MATRIZ.compose(AUX_POSICION, AUX_GIRO, AUX_ESCALA));
       }
       malla.count = puestas.length;
       malla.instanceMatrix.needsUpdate = true;
     }
-  }, [partes, puestas]);
+  }, [eje, partes, puestas]);
 
   if (partes.length === 0 || puestas.length === 0) return null;
   return (

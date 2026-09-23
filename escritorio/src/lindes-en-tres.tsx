@@ -35,7 +35,7 @@
  * dice también cómo va el canal. En una mesa normal no se pasa nada y la escena no abre
  * ningún socket.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
@@ -47,6 +47,8 @@ import type {
   TableroDeLasLindesEn3D,
 } from '../../escenas/lindes/tipos';
 import type { Calidad } from '../../escenas/embarcadero/tipos';
+import type { MuestraDelHilo } from '../../escenas/embarcadero/calidad';
+import { calidadDelValle, conLaMuestra } from '../../escenas/lindes/detalle';
 import { asientosQueAndan, esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import {
   elSiguienteGiro,
@@ -175,7 +177,21 @@ export function LindesEnTres({
 
   const datos = useMemo(() => tableroEnTres(vista), [vista]);
   const [rotoElLienzo, setRotoElLienzo] = useState(false);
-  const [calidad] = useState<Calidad>('plena');
+  /*
+   * ═══ LA CALIDAD SE MIDE, NO SE ESCRIBE ═══
+   *
+   * Era `useState('plena')` sin quien la cambiara: una constante con forma de estado. Ahora la
+   * escena manda por `alMedir` lo que le cuesta cada segundo y `calidadDelValle`
+   * (`escenas/lindes/detalle.ts`) decide con el juez de la casa, sobre las últimas doce muestras
+   * y sin volver a subir: el tablero crece de una losa a setenta y dos, y juzgar sólo al montar
+   * sería juzgar siempre el de una. La misma cuenta que hace la app.
+   */
+  const [calidad, setCalidad] = useState<Calidad>('plena');
+  const muestras = useRef<MuestraDelHilo[]>([]);
+  const alMedir = useCallback((m: { triangulos: number; llamadas: number; ms: number; fotogramas: number }) => {
+    muestras.current = conLaMuestra(muestras.current, { ms: m.ms, fotogramas: m.fotogramas });
+    setCalidad((antes) => calidadDelValle(antes, muestras.current));
+  }, []);
   const [giro, setGiro] = useState<Giro>(0);
   const [senalada, setSenalada] = useState<{ x: number; y: number } | null>(null);
 
@@ -334,6 +350,7 @@ export function LindesEnTres({
               alTocarHueco={alTocarHueco}
               alSenalarHueco={alSenalarHueco}
               alFallar={alFallar}
+              alMedir={alMedir}
               canal={canal}
             />
           </Canvas>
