@@ -25,6 +25,7 @@ import { mundoDeLaMesa, sePuedeRecorrer } from '../../../shared/arcade/juegos/mu
 import { MesaDesconocida, mirar, ponerLaDespedida, quienEsLaLlave, revisionDe } from '../arcade/mesas';
 import { admiteBotas, admitirBotas } from '../arcade/modalidades';
 import type { ContextoDelCors } from '../puerta/origenes';
+import { meterElBotinDeVerdad } from './botin';
 import { CanalDeBotas, cuentasVacias } from './canal';
 import type { DiagnosticoDeBotas, LaMesa, LosMundos, Reloj } from './canal';
 import { enchufarElCanal } from './enchufe';
@@ -75,6 +76,8 @@ export const LA_MESA_DE_VERDAD: LaMesa = {
         vista: v.vista,
       };
     }),
+  /* La única que escribe: el botín de la refriega, por la vía interna de la mesa (`botin.ts`). */
+  botin: meterElBotinDeVerdad,
 };
 
 /** Los mundos de verdad: los del registro de `shared/arcade/juegos/mundos.ts`. */

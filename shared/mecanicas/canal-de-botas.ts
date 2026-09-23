@@ -41,8 +41,17 @@ export function rutaDelCanal(codigo: string): string {
   return `/api/arcade/mesas/${encodeURIComponent(codigo)}/botas`;
 }
 
-/** Cuánto tiene el aparato para decir `hola` tras abrir, en milisegundos. */
-export const PLAZO_DEL_HOLA_MS = 5000;
+/**
+ * Cuánto tiene el aparato para decir `hola` tras abrir, en milisegundos.
+ *
+ * Bajó de 5000 a 3000 con las cuotas de conexión (`server/src/botas/cuotas.ts`): cuando la subida
+ * ya está hecha, el `hola` es UN solo marco que el aparato manda en su `onopen`, así que 3 s siguen
+ * sobrando de largo. A cambio, un canal que abre y no saluda —lo que hace una inundación— ocupa su
+ * hueco la mitad de tiempo, y así el tope de «canales sin saludar» se libera antes para las
+ * reconexiones de verdad. El aparato lo lee para su propio plazo de entrada
+ * (`PLAZO_PARA_ENTRAR_MS = PLAZO_DEL_HOLA_MS * 2`, en `escenas/paseo/canal-de-botas.ts`).
+ */
+export const PLAZO_DEL_HOLA_MS = 3000;
 
 /** Cuántas fotos manda el servidor por segundo. La mitad de los tics: se interpola entre ellas. */
 export const FOTOS_POR_SEGUNDO = 10;

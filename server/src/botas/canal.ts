@@ -153,7 +153,6 @@ import type { Marcha } from '../../../shared/mecanicas/andar';
 import { deNumero, por, UNO } from '../../../shared/mecanicas/fijo';
 import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../../shared/mecanicas/mundo';
 import type { Andante, Arena, MundoDeclarado } from '../../../shared/mecanicas/mundo';
-import { meterElBotinDeVerdad } from './botin';
 import { dondeSeNace, SEPARACION_AL_NACER, sitioDondeCabe } from './sitios';
 import type { Aparicion } from './sitios';
 
@@ -339,6 +338,13 @@ export interface Enchufe {
   cerrar(codigo: number, razon: string): void;
   /** Cuántos bytes esperan a salir. */
   pendientes(): number;
+  /**
+   * OPCIONAL: se llama UNA vez cuando este canal dice `hola` (pasa de `saludo` a `entrando`). Lo usa
+   * la capa de cuotas (`cuotas.ts`) para soltar el hueco del tope de «canales sin saludar»: hasta
+   * este aviso, el canal cuenta contra ese tope; después, no. Quien no lo pone —una mesa de
+   * mentira— no cambia en nada el comportamiento del canal.
+   */
+  saludo?(): void;
 }
 
 export interface Temporizador {
@@ -387,9 +393,11 @@ export interface LoQueFueDelBotin {
  * «esa mesa no existe». Lo real está en `index.ts` (`quienEsLaLlave`, `revisionDe` y `mirar` de
  * `arcade/mesas.ts`, las tres sin llave, como un espectador).
  *
- * La cuarta, `botin`, es la única que escribe, y la única opcional: la mesa de verdad de `index.ts`
- * no la trae —se escribió antes de la refriega—, y sin ella el canal usa la de `botin.ts`, que va a
- * la vía interna de la mesa de verdad y avisa a quien sondea. Las pruebas la inyectan.
+ * La cuarta, `botin`, es la única que escribe: la de verdad (`meterElBotinDeVerdad`, de `botin.ts`)
+ * la pone `index.ts` en `LA_MESA_DE_VERDAD`, y va a la vía interna de la mesa y avisa a quien sondea.
+ * Es opcional para que una prueba que no mira el botín no tenga que escribirla, y sin ella el botín
+ * no entra en ninguna mesa (`sinMesa`): este fichero no conoce la mesa de verdad, y así las pruebas
+ * en proceso no escriben en ella por la puerta de atrás.
  */
 export interface LaMesa {
   quienEsLaLlave(codigo: string, llave: string): Promise<AsientoDeLaLlave | null>;
@@ -428,6 +436,14 @@ export type PorQueSeCorrige = 'presupuesto' | 'estructura' | 'rescate' | 'repeti
 
 /** Qué fue de cada botín que pidió una caída, y por qué no se pidió el que no se pidió. */
 export type CuentaDelBotin = SalidaDelBotin | 'porPareja' | 'porTope' | 'fallos';
+
+/**
+ * Por qué una subida se negó en la capa de cuotas (`cuotas.ts`), antes de llegar a ser un canal:
+ * los dos topes globales —el total y el más estricto de los que no han saludado— y los dos por
+ * procedencia —cuántos a la vez y a qué ritmo—. Se cuenta aquí, con `origenesNegados`, porque el
+ * diagnóstico se sirve de `canal.diagnostico()` y así se ve «cuántas se negaron y por qué».
+ */
+export type MotivoDeCuota = 'global' | 'sinSaludar' | 'concurrencia' | 'ritmo';
 
 /**
  * LO QUE DICE EL DIAGNÓSTICO. Sólo cuentas: ni un código de mesa, ni un asiento, ni una llave.
@@ -471,6 +487,8 @@ export interface DiagnosticoDeBotas {
   msDerivando: number;
   entradas: number;
   origenesNegados: number;
+  /** Subidas negadas en la capa de cuotas, por motivo (ver `MotivoDeCuota` y `cuotas.ts`). */
+  cuotasNegadas: Record<MotivoDeCuota, number>;
   cierres: Record<PorQueSeCierra, number>;
 }
 
@@ -515,6 +533,7 @@ export function cuentasVacias(): DiagnosticoDeBotas {
     msDerivando: 0,
     entradas: 0,
     origenesNegados: 0,
+    cuotasNegadas: { global: 0, sinSaludar: 0, concurrencia: 0, ritmo: 0 },
     cierres: {
       sinHola: 0,
       llaveMala: 0,
@@ -796,7 +815,7 @@ export class CanalDeBotas {
     this.registrar = opciones.registrar ?? ((linea) => console.log(`[botas] ${linea}`));
     this.cronometro = opciones.cronometro ?? (() => performance.now());
     const botin = opciones.mesa.botin;
-    this.meterElBotin = botin === undefined ? meterElBotinDeVerdad : botin.bind(opciones.mesa);
+    this.meterElBotin = botin === undefined ? async () => ({ salida: 'sinMesa' }) : botin.bind(opciones.mesa);
   }
 
   /* ── Entrar ──────────────────────────────────────────────────────────── */
@@ -851,6 +870,8 @@ export class CanalDeBotas {
       c.plazo?.parar();
       c.plazo = null;
       c.estado = 'entrando';
+      /* Ya ha saludado: la capa de cuotas suelta su hueco del tope de «canales sin saludar». */
+      c.enchufe.saludo?.();
       void this.entrar(c, m.llave);
       return;
     }
@@ -1725,6 +1746,11 @@ export class CanalDeBotas {
     this.cuentas.origenesNegados++;
   }
 
+  /** Una subida negada por cuota: la cuenta la capa de cuotas (`cuotas.ts`) a través del enchufe. */
+  contarCuotaNegada(motivo: MotivoDeCuota): void {
+    this.cuentas.cuotasNegadas[motivo]++;
+  }
+
   diagnostico(): DiagnosticoDeBotas {
     let enSala = 0;
     for (const c of this.conexiones) if (c.estado === 'dentro') enSala++;
@@ -1740,6 +1766,7 @@ export class CanalDeBotas {
       sitiosEnLosRastros: sitios,
       correcciones: { ...this.cuentas.correcciones },
       botines: { ...this.cuentas.botines },
+      cuotasNegadas: { ...this.cuentas.cuotasNegadas },
       cierres: { ...this.cuentas.cierres },
     };
   }

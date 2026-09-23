@@ -57,6 +57,7 @@ import { elCanal, ponerCanal } from './canal';
 import { cuandoSeCierreUnaMesa, cuandoSeOlvideUnaMesa } from './arcade/mesas';
 import { canalDeSondeo } from './canal/sondeo';
 import { cerrarLaMesaDeBotas, darDeAltaLosQueSeRecorren, montarElCanalDeBotas } from './botas';
+import { configurarProcedencia, delegandoEnExpress } from './botas/cuotas';
 import type { ContextoDelCors } from './puerta/origenes';
 import arcadeRouter from './routes/arcade';
 import modelosRouter from './routes/modelos';
@@ -103,6 +104,18 @@ const app = express();
  * limitador en silencio, que es la peor forma de fallar que tiene esto.
  */
 app.set('trust proxy', env.saltosDeConfianza);
+
+/*
+ * ═══ LA PROCEDENCIA DE LAS SUBIDAS DEL CANAL DE BOOTS ON BOARD, ATADA A ESTE EXPRESS ═══
+ *
+ * Las cuotas del canal (`botas/cuotas.ts`) deciden por procedencia con `procedenciaDe` y la misma
+ * confianza en los saltos de proxy que el limitador HTTP. Pero un `upgrade` llega como
+ * `IncomingMessage` crudo, sin el `req.ips`/`req.ip` que Express deriva de `X-Forwarded-For`. Aquí
+ * —el único sitio con el Express y su `trust proxy` ya montados— se le inyecta cómo calcularla,
+ * delegando en el prototipo de petición de este `app`. Va justo detrás de `trust proxy` para que
+ * las dos cosas —de quién es la cabecera y hasta dónde vale— viajen juntas.
+ */
+configurarProcedencia(delegandoEnExpress(app));
 
 /*
  * ═══ EL CORS, CON LISTA BLANCA: AQUÍ HABÍA UN `cors()` PELADO ═══
