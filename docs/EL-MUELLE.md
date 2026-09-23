@@ -227,7 +227,7 @@ fotograma.
 
 Seis figuras compiladas en `escenas/modelos/aventureros/` (caballero, bárbaro,
 maga, exploradora, pícaro, encapuchado; rig de 23 huesos; `COLOR_0`; sin
-textura) y `animaciones.glb` con doce clips en castellano
+textura) y `animaciones.glb` con trece clips en castellano
 (`escenas/embarcadero/figuras.ts`: `CLIP`). Se cargan con `GLTFLoader.parse`
 sobre los bytes que trae el cliente, se clonan con `SkeletonUtils` y cada uno
 lleva su `AnimationMixer`.

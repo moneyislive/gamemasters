@@ -983,7 +983,7 @@ const BATERIA = [
     donde: 'escenas',
     guion: 'verify:aventureros',
     porque:
-      'los seis aventureros compilados llevan el mismo rig de veintitrés huesos, el color horneado en cada vértice y ninguna textura que Hermes no sepa abrir; miden lo que mide una persona en `escala.ts`; y cada pista de los doce clips de `animaciones.glb` encuentra su hueso en cada personaje con el nombre que GLTFLoader deja al cargar',
+      'los seis aventureros compilados llevan el mismo rig de veintitrés huesos, el color horneado en cada vértice y ninguna textura que Hermes no sepa abrir; miden lo que mide una persona en `escala.ts`; y cada pista de los trece clips de `animaciones.glb` encuentra su hueso en cada personaje con el nombre que GLTFLoader deja al cargar',
   },
   /*
    * ═══ LOS DADOS, Y POR QUÉ NO BASTA CON `aventureros` ═══

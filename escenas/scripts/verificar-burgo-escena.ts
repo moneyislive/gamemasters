@@ -2357,7 +2357,7 @@ if (fs.existsSync(ANIMACIONES)) {
   const d = await io.read(ANIMACIONES);
   for (const anim of d.getRoot().listAnimations()) clipsDelFichero.add(anim.getName());
 }
-comprobar('animaciones.glb está y trae los doce clips de CLIP', Object.values(CLIP).every((c) => clipsDelFichero.has(c)), [...clipsDelFichero]);
+comprobar('animaciones.glb está y trae los trece clips de CLIP', Object.values(CLIP).every((c) => clipsDelFichero.has(c)), [...clipsDelFichero]);
 
 /** La distancia de un punto a la polilínea como conjunto de segmentos (cerrada). */
 function distanciaALaPolilinea(p: Punto): number {

@@ -132,7 +132,7 @@ npm run verify:aventureros -w escenas
 | sale | entra |
 | --- | --- |
 | `caballero.glb`, `barbaro.glb`, `maga.glb`, `exploradora.glb`, `picaro.glb`, `encapuchado.glb` | `Characters/gltf/{Knight,Barbarian,Mage,Ranger,Rogue,Rogue_Hooded}.glb` |
-| `animaciones.glb` (doce clips: `reposo-a`, `reposo-b`, `andar`, `correr`, `saludar`, `recoger`, `aparecer`, `usar`, `lanzar`, `golpe`, `salto`, `t-pose`) | `Animations/gltf/Rig_Medium/Rig_Medium_General.glb` y `Rig_Medium_MovementBasic.glb` |
+| `animaciones.glb` (trece clips: `reposo-a`, `reposo-b`, `andar`, `correr`, `saludar`, `recoger`, `aparecer`, `usar`, `lanzar`, `golpe`, `caer`, `salto`, `t-pose`) | `Animations/gltf/Rig_Medium/Rig_Medium_General.glb` y `Rig_Medium_MovementBasic.glb` |
 
 Los seis personajes llevan el mismo esqueleto —`Rig_Medium`, 23 huesos— y por eso una
 sola biblioteca de clips vale para todos: se carga una vez y cualquier clip se aplica a
