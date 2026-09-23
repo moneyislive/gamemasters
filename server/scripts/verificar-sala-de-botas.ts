@@ -29,17 +29,35 @@
  *   · Tras una corrección, lo que venía de camino se calla un segundo y luego se repite.
  *   · El tic viejo o repetido se ignora; el cubo de mensajes; los mal formados.
  *   · Quieto sesenta segundos: fuera. Moverse reinicia la cuenta.
- *   · La gracia al irse: dentro de cinco segundos se vuelve donde se estaba; después, a nacer.
- *   · La foto: cada dos tics, LA MISMA cadena a todos, y al atascado se le salta.
+ *   · Quien se va no sale de la sala: sigue en la foto donde se quedó, y vuelve ahí aunque tarde.
+ *   · La foto: cada dos tics, LA MISMA cadena a todos —con TODOS los sentados, bajen o no—, y al
+ *     atascado se le salta.
  *   · El temporizador: UNO para todas las salas, y parado sin salas.
  *   · EL MUNDO QUE CAMBIA DEBAJO DE ALGUIEN: una caja nueva encima, o el suelo que se va, y se le
  *     saca al sitio libre más cercano con un `corrige`. Sin eso, el servidor le dejaría clavado.
  *   · Mesa cerrada, mesa olvidada, `SIGTERM`: fuera todos, con su código.
+ *   · LA REFRIEGA, con su caso que no debe pasar al lado de cada regla: el golpe va a su manejador y
+ *     ya no envenena la foto; `lanza` y `da` a toda la sala; la recarga desde el último ACEPTADO y el
+ *     tic que crece; fuera de alcance, fuera del cono, a la espalda y con muro en medio, no da; al más
+ *     cercano, uno solo, y si ése tiene un muro, al siguiente; el rebobinado de 250 ms, y no uno más;
+ *     tres golpes y `cae`, el caído que ni anda ni golpea ni recibe, `renace` a los cinco segundos
+ *     lejos de quien lo tumbó (el suyo, el siguiente libre y lejano, o el más lejano), el intocable,
+ *     y `vidas` al entrar y al volver.
+ *   · NADIE ES INMUNE POR NO BAJAR: a quien nunca abrió su canal y a quien lo cerró se le golpea, se
+ *     le tumba, renace y se le pide botín; y la sala que se vacía se borra, pero su libro de botines no.
+ *   · LOS TOPES DEL BOTÍN, con la mesa de mentira contestando lo que se le pide: una vez por pareja y
+ *     minuto —en su sentido—, seis por mesa y minuto, y sólo cuenta lo que ENTRA; cada salida contada.
+ *   · El canal atascado: `corrige` y `lanza` se saltan; `da` y `dentro` cierran con `atascado`.
  *   · Y paseos LEGALES de verdad —`pasoDelTic` sobre Las Lindes llenas y sobre el Burgo— no se
  *     corrigen, mientras que la recta sola sí los habría corregido.
+ *   · LA VÍA INTERNA DE LA MESA (`meterDeLaPlataforma`), con mesas de verdad de los tres juegos: el
+ *     botín entra, sale sin efecto o se rechaza, y la mesa terminada, el arcade apartado y la mesa que
+ *     no existe se dicen; el diario lo guarda en nombre de nadie, el plazo entra antes, y ni un tipo de
+ *     juego ni el tic pasan por ella, ni el botín por `mover`.
  *   · Y AL FINAL, CON EL MONTAJE DE VERDAD: `montarElCanalDeBotas` sobre un servidor HTTP de este
- *     proceso, la mesa de verdad (`mesas.ts`, con su carpeta temporal) y dos aparatos por `ws`; y
- *     la señal `SIGTERM` emitida aquí dentro, porque Windows no la entrega a un hijo —la técnica de
+ *     proceso, la mesa de verdad (`mesas.ts`, con su carpeta temporal) y dos aparatos por `ws`, que se
+ *     tumban por el cable y cuyo botín llega a la mesa de verdad por el respaldo de `botin.ts`; y la
+ *     señal `SIGTERM` emitida aquí dentro, porque Windows no la entrega a un hijo —la técnica de
  *     `verify:mesa` para el volcado—: los canales se cierran con 1001 DENTRO de la despedida.
  */
 import fs from 'node:fs';
@@ -49,17 +67,26 @@ import os from 'node:os';
 import path from 'node:path';
 import { WebSocket } from 'ws';
 import {
+  BOTIN_CADA_PAREJA_MS,
+  CAIDO,
+  CAIDO_MS,
   CIERRE,
+  DE_PIE,
   GRACIA_AL_IRSE_MS,
+  INTOCABLE,
+  INTOCABLE_MS,
   leerMensajeDelServidor,
   MENSAJES_DE_GOLPE,
   PLAZO_DEL_HOLA_MS,
   QUIETO_HASTA_CERRAR_MS,
+  REBOBINADO_MAXIMO_MS,
+  RECARGA_DEL_GOLPE_MS,
   rutaDelCanal,
   VERSION_DEL_CANAL,
+  VIDA_ENTERA,
 } from '../../shared/mecanicas/canal-de-botas';
 import type { MensajeDelServidor } from '../../shared/mecanicas/canal-de-botas';
-import { pasoDelTic, RADIO_DEL_PASEANTE, TICS_POR_SEGUNDO } from '../../shared/mecanicas/andar';
+import { pasoDelTic, RADIO_DEL_PASEANTE, rumboDeRadianes, TICS_POR_SEGUNDO } from '../../shared/mecanicas/andar';
 import { deNumero, UNO } from '../../shared/mecanicas/fijo';
 import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Arena, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
@@ -78,11 +105,15 @@ import {
 import {
   ATASCO_BYTES,
   CanalDeBotas,
+  LEJOS_AL_RENACER,
+  REBOBINADO_MS,
+  RECORDAR_LA_CORRECCION_MS,
   seAndaElTramo,
+  TOPE_DE_BOTINES_POR_MINUTO,
   TOPE_DEL_PRESUPUESTO,
   UN_TIC_CON_HOLGURA,
 } from '../src/botas/canal';
-import type { Conexion, Enchufe, LaMesa, LosMundos, Reloj, Temporizador } from '../src/botas/canal';
+import type { Conexion, Enchufe, LaMesa, LosMundos, Reloj, SalidaDelBotin, Temporizador } from '../src/botas/canal';
 import { codigoDeLaRuta, enchufarElCanal, origenAdmitido } from '../src/botas/enchufe';
 import { jugarLasLindes } from './robot-de-las-lindes';
 
@@ -226,13 +257,27 @@ interface MesaDeMentira {
   asientos: string[];
   llaves: Map<string, string>;
   mundo: MundoDeclarado | null;
+  /**
+   * Lo que contesta la mesa a cada botín que se le pide, en orden; cuando se acaba, `entro`. `lanza`
+   * es una mesa que revienta al meterlo.
+   */
+  botines?: (SalidaDelBotin | 'lanza')[];
 }
 
 const MESAS = new Map<string, MesaDeMentira>();
 let revisiones = 0;
 let vistas = 0;
 
+/** Los botines que el canal le ha pedido a la mesa de mentira, en orden. */
+const BOTINES_PEDIDOS: { codigo: string; pierde: string; gana: string }[] = [];
+
 const LA_MESA: LaMesa = {
+  botin: async (codigo, pierde, gana) => {
+    BOTINES_PEDIDOS.push({ codigo, pierde, gana });
+    const salida = MESAS.get(codigo)?.botines?.shift() ?? 'entro';
+    if (salida === 'lanza') throw new Error('la mesa de mentira revienta al meter el botín');
+    return salida === 'rechazado' ? { salida, motivo: 'no juega esta partida' } : { salida };
+  },
   quienEsLaLlave: async (codigo, llave) => {
     const m = MESAS.get(codigo);
     if (m === undefined || !m.existe) return null;
@@ -397,7 +442,69 @@ function enLaFoto(enchufe: EnchufeDeMentira, asiento: string): readonly [string,
   return enchufe.ultimo('foto')?.p.find((e) => e[0] === asiento);
 }
 
+/** Un golpe de `d`, en su siguiente tic, mirando a `r`. */
+function golpear(d: Dentro, r: number): void {
+  d.n++;
+  d.conexion.recibir(j({ t: 'golpe', n: d.n, r }));
+}
+
+/** El rumbo (0-255) que mira de `desde` hacia `hacia`. En coma flotante: esto es la prueba, no arbitra nada. */
+function rumboHacia(desde: { x: number; z: number }, hacia: { x: number; z: number }): number {
+  return rumboDeRadianes(Math.atan2(hacia.x - desde.x, -(hacia.z - desde.z)));
+}
+
+/** Cuántos mensajes de tipo `t` ha leído `enchufe`. */
+function cuantos(enchufe: EnchufeDeMentira, t: MensajeDelServidor['t']): number {
+  return enchufe.de(t).length;
+}
+
+/** El `vidas` más reciente que ha recibido `enchufe`, como mapa de asiento a `[vida, estado]`. */
+function vidasEn(enchufe: EnchufeDeMentira): Map<string, readonly [number, number]> {
+  return new Map((enchufe.ultimo('vidas')?.v ?? []).map((e) => [e[0], [e[1], e[2]] as const]));
+}
+
 const U = UNO;
+
+/*
+ * EL RUEDO, para la refriega: nueve por nueve casillas de 16 unidades —de −72 a 72—, sin nada en
+ * medio salvo lo que ponga cada prueba, y cinco sitios de nacer. El primero en el centro, mirando al
+ * norte; el segundo DOS unidades al norte del primero, mirando al sur —dentro del alcance y del cono
+ * de quien nace en el primero—; y tres lejos, a sesenta.
+ */
+const CASILLAS_DEL_RUEDO: { x: number; y: number }[] = [];
+for (let x = -4; x <= 4; x++) for (let y = -4; y <= 4; y++) CASILLAS_DEL_RUEDO.push({ x, y });
+const NACE_EN_EL_RUEDO = [
+  { x: 0, z: 0, rumbo: 0 },
+  { x: 0, z: -2, rumbo: Math.PI },
+  { x: 60, z: 0, rumbo: 0 },
+  { x: -60, z: 0, rumbo: 0 },
+  { x: 0, z: 60, rumbo: 0 },
+];
+const ASIENTOS_DEL_RUEDO = ['r-uno', 'r-dos', 'r-tres', 'r-cuatro', 'r-cinco'];
+function ruedo(cuerpos: readonly Cuerpo[] = []): MundoDeclarado {
+  return { lado: 16, pisables: CASILLAS_DEL_RUEDO, vados: [], cuerpos: [...cuerpos], nace: NACE_EN_EL_RUEDO };
+}
+
+/*
+ * EL CORRO, para los topes del botín: dos que golpean —en (0, 0) y en (20, 0)— y, alrededor de cada
+ * uno, cuatro que no bajan nunca, a 2,4 unidades al norte, al este, al sur y al oeste. Mirando a uno,
+ * los de al lado quedan a noventa grados: fuera del cono. Cada asiento nace en su sitio.
+ */
+const EN_EL_CORRO: readonly (readonly [string, number, number])[] = [
+  ['c-a', 0, 0],
+  ['c-z', 20, 0],
+  ['a-n', 0, -2.4],
+  ['a-e', 2.4, 0],
+  ['a-s', 0, 2.4],
+  ['a-o', -2.4, 0],
+  ['z-n', 20, -2.4],
+  ['z-e', 22.4, 0],
+  ['z-s', 20, 2.4],
+  ['z-o', 17.6, 0],
+];
+function corro(): MundoDeclarado {
+  return { lado: 16, pisables: CASILLAS_DEL_RUEDO, vados: [], cuerpos: [], nace: EN_EL_CORRO.map(([, x, z]) => ({ x, z, rumbo: 0 })) };
+}
 
 // ---------------------------------------------------------------------------
 // 1 · EL SALUDO
@@ -969,7 +1076,7 @@ paso('Quieto: sesenta segundos sin cambiar de sitio aceptado cierran el canal');
 // 9 · LA GRACIA AL IRSE
 // ---------------------------------------------------------------------------
 
-paso('La gracia: quien vuelve en cinco segundos, donde estaba; después, a nacer');
+paso('Quien se va no sale de la sala: sigue en la foto donde se quedó, y vuelve ahí, dure lo que dure');
 
 {
   const { canal, reloj } = canalNuevo();
@@ -985,7 +1092,7 @@ paso('La gracia: quien vuelve en cinco segundos, donde estaba; después, a nacer
   await reloj.avanzar(200);
   const enGracia = enLaFoto(mira.enchufe, 'a-uno');
   comprobar(
-    'mientras dura la gracia, los demás le siguen viendo donde estaba, parado (marcha 0)',
+    'al irse, los demás le siguen viendo donde estaba, parado (marcha 0)',
     enGracia !== undefined && enGracia[1] === donde.x && enGracia[4] === 0,
     enGracia,
   );
@@ -996,11 +1103,15 @@ paso('La gracia: quien vuelve en cinco segundos, donde estaba; después, a nacer
   vuelve.conexion.seCerro();
   await reloj.avanzar(GRACIA_AL_IRSE_MS + 100);
   const sinGracia = enLaFoto(mira.enchufe, 'a-uno');
-  comprobar('pasada la gracia, desaparece de la foto', sinGracia === undefined, mira.enchufe.ultimo('foto'));
+  comprobar(
+    'y pasados los cinco segundos, con otro dentro, SIGUE en la foto donde se quedó, quieto: nadie es inmune por irse',
+    sinGracia !== undefined && sinGracia[1] === donde.x && sinGracia[2] === donde.z && sinGracia[4] === 0,
+    mira.enchufe.ultimo('foto'),
+  );
   const tarde = await entrar(canal, m.codigo, m.llave('a-uno'));
   comprobar(
-    'y quien vuelve tarde nace otra vez en su sitio de nacer',
-    tarde.x === 0 && tarde.z === 0,
+    'y quien vuelve tarde aparece donde se quedó, no en su sitio de nacer',
+    tarde.x === donde.x && tarde.z === donde.z,
     [tarde.x / U, tarde.z / U],
   );
   await reloj.avanzar(200);
@@ -1025,8 +1136,8 @@ paso('La foto: cada dos tics, la misma cadena a todos; el atascado se salta. Y U
   const a = await entrar(canal, m.codigo, m.llave('a-uno'));
   const b = await entrar(canal, m.codigo, m.llave('a-dos'));
   comprobar('con una sala, un temporizador', canal.diagnostico().temporizador && reloj.periodicos() === 1);
-  const otra = mesaNueva();
-  const c = await entrar(canal, otra.codigo, otra.llave('a-uno'));
+  const otra = mesaNueva({ asientos: ['o-uno', 'o-dos'] });
+  const c = await entrar(canal, otra.codigo, otra.llave('o-uno'));
   comprobar(
     'con dos salas, SIGUE habiendo un solo temporizador',
     reloj.periodicos() === 1 && canal.diagnostico().salas === 2,
@@ -1058,11 +1169,20 @@ paso('La foto: cada dos tics, la misma cadena a todos; el atascado se salta. Y U
   comprobar('con la `k` de la sala subiendo de dos en dos', ks.slice(-5).every((k, i, t) => i === 0 || k === (t[i - 1] as number) + 2), ks.slice(-5));
   const f = a.enchufe.ultimo('foto');
   comprobar(
-    'la foto lleva a los dos de la sala, y no al de la otra mesa',
-    f !== undefined && f.p.length === 2 && f.p.some((e) => e[0] === 'a-uno') && f.p.some((e) => e[0] === 'a-dos'),
+    'la foto lleva a los TRES sentados de la sala —también al que no ha bajado— y a nadie de la otra mesa',
+    f !== undefined && f.p.map((e) => e[0]).sort().join(',') === 'a-dos,a-tres,a-uno',
     f,
   );
-  comprobar('la otra sala tiene sus propias fotos', c.enchufe.de('foto').length > 0 && (c.enchufe.ultimo('foto')?.p.length ?? 0) === 1);
+  comprobar(
+    'y el que no ha bajado sale de pie en su sitio de nacer, quieto',
+    f !== undefined && f.p.some((e) => e[0] === 'a-tres' && e[1] === deNumero(-6) && e[2] === 0 && e[4] === 0),
+    f,
+  );
+  comprobar(
+    'la otra sala tiene sus propias fotos, con sus dos sentados',
+    c.enchufe.de('foto').length > 0 && (c.enchufe.ultimo('foto')?.p.map((e) => e[0]).sort().join(',') ?? '') === 'o-dos,o-uno',
+    c.enchufe.ultimo('foto'),
+  );
 
   b.enchufe.atasco = ATASCO_BYTES + 1;
   const antesB = b.enchufe.de('foto').length;
@@ -1358,6 +1478,735 @@ paso('Derivar mundos por turno: de uno en uno, abrir delante de volver a derivar
     'y si derivar es barato no se espera nada: las cuatro dentro del segundo en que se pregunta la revisión',
     llamadas.length === 4 && llamadas.every((l) => l.t - movidas <= 1050),
     llamadas.map((l) => l.t - movidas),
+  );
+  canal.apagar();
+}
+
+// ---------------------------------------------------------------------------
+// 16 · LA REFRIEGA: EL GOLPE, A SU MANEJADOR
+// ---------------------------------------------------------------------------
+
+paso('El golpe va a su manejador y no a la validación: no mueve a nadie, y la foto de la sala sigue legible');
+
+{
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo(), asientos: ASIENTOS_DEL_RUEDO });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  const b = await entrar(canal, m.codigo, m.llave('r-dos'));
+  await reloj.avanzar(50);
+  andar(a, a.x, a.z + deNumero(0.5), 1);
+  await reloj.avanzar(300);
+  const aceptados = canal.diagnostico().aceptados;
+  const antes = enLaFoto(b.enchufe, 'r-uno');
+  golpear(a, 128);
+  await reloj.avanzar(200);
+  const despues = enLaFoto(b.enchufe, 'r-uno');
+  comprobar(
+    'un golpe al aire —al sur, donde no hay nadie—: `lanza` a los dos de la sala, y ningún `da`',
+    cuantos(a.enchufe, 'lanza') === 1 && cuantos(b.enchufe, 'lanza') === 1 && cuantos(a.enchufe, 'da') === 0 && cuantos(b.enchufe, 'da') === 0,
+    b.enchufe.textos.slice(-3),
+  );
+  comprobar(
+    'y no pasa por la validación: ni un paso aceptado más, ni se mueve nadie',
+    canal.diagnostico().aceptados === aceptados && despues !== undefined && antes !== undefined && despues[1] === antes[1] && despues[2] === antes[2],
+    { antes, despues },
+  );
+  comprobar(
+    'y la foto de toda la sala sigue legible, con la marcha de quien golpeó bien dicha: el golpe ya no la envenena',
+    a.enchufe.ilegibles() === 0 && b.enchufe.ilegibles() === 0 && despues !== undefined && despues[4] === 1,
+    b.enchufe.textos.slice(-1),
+  );
+  comprobar('y se cuenta como golpe', canal.diagnostico().golpes === 1, canal.diagnostico().golpes);
+  canal.apagar();
+}
+
+// ---------------------------------------------------------------------------
+// 17 · LANZA, DA, Y LA RECARGA
+// ---------------------------------------------------------------------------
+
+paso('`lanza` y `da` a toda la sala; la recarga cuenta desde el último golpe ACEPTADO; y el tic del golpe crece');
+
+{
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo(), asientos: ASIENTOS_DEL_RUEDO });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  const b = await entrar(canal, m.codigo, m.llave('r-dos'));
+  const lejos = await entrar(canal, m.codigo, m.llave('r-tres'));
+  await reloj.avanzar(300);
+  golpear(a, 0);
+  const primero = b.enchufe.ultimo('da');
+  comprobar(
+    'A golpea al norte y le da a B, que nace a dos unidades delante: `da` con la vida que le queda',
+    primero?.de === 'r-uno' && primero.a === 'r-dos' && primero.vida === VIDA_ENTERA - 1,
+    b.enchufe.textos.slice(-3),
+  );
+  comprobar(
+    'y `lanza` y `da` le llegan a TODA la sala, también a quien está a sesenta unidades, y a quien golpea',
+    cuantos(lejos.enchufe, 'lanza') === 1 && cuantos(lejos.enchufe, 'da') === 1 && cuantos(a.enchufe, 'lanza') === 1 && cuantos(a.enchufe, 'da') === 1,
+    lejos.enchufe.textos.slice(-3),
+  );
+  await reloj.avanzar(400);
+  golpear(a, 0);
+  comprobar(
+    'a los 400 ms, en recarga: ni `lanza` ni `da`, y se cuenta como ignorado',
+    cuantos(b.enchufe, 'lanza') === 1 && cuantos(b.enchufe, 'da') === 1 && canal.diagnostico().golpesIgnorados === 1,
+    canal.diagnostico().golpesIgnorados,
+  );
+  await reloj.avanzar(450);
+  golpear(a, 0);
+  comprobar(
+    'a los 850 ms del primero —y 450 del ignorado— entra: la recarga cuenta desde el último ACEPTADO',
+    cuantos(b.enchufe, 'da') === 2 && b.enchufe.ultimo('da')?.vida === VIDA_ENTERA - 2,
+    b.enchufe.textos.slice(-2),
+  );
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 100);
+  a.conexion.recibir(j({ t: 'golpe', n: a.n, r: 0 }));
+  comprobar(
+    'un golpe con el mismo tic que el anterior se ignora, aunque ya haya pasado la recarga',
+    cuantos(b.enchufe, 'da') === 2 && canal.diagnostico().golpesIgnorados === 2,
+    canal.diagnostico().golpesIgnorados,
+  );
+  canal.apagar();
+}
+
+// ---------------------------------------------------------------------------
+// 18 · A QUIÉN LE DA: ALCANCE, CONO, DETRÁS, MURO, EL MÁS CERCANO
+// ---------------------------------------------------------------------------
+
+paso('A quién le da: a dos unidades y media como mucho, dentro del cono, no por detrás, sin muro en medio, y al más cercano');
+
+{
+  const MURO: Cuerpo = { x0: 20, z0: -1.1, x1: 30, z1: -0.9 };
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo([MURO]), asientos: ASIENTOS_DEL_RUEDO });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  const b = await entrar(canal, m.codigo, m.llave('r-dos'));
+  /* Pone a B en `(x, z)`, deja pasar más que el rebobinado y la recarga, y dice si el golpe de A le dio. */
+  const leDa = async (x: number, z: number, r: number): Promise<boolean> => {
+    await llevar(reloj, b, deNumero(x), deNumero(z));
+    await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
+    const antes = cuantos(b.enchufe, 'da');
+    golpear(a, r);
+    return cuantos(b.enchufe, 'da') > antes;
+  };
+  comprobar('a 2,6 unidades, delante: no le da', !(await leDa(0, -2.6, 0)));
+  comprobar('a 2,4, delante: le da', await leDa(0, -2.4, 0));
+  const a50 = [2 * Math.sin((50 * Math.PI) / 180), -2 * Math.cos((50 * Math.PI) / 180)] as const;
+  const a40 = [2 * Math.sin((40 * Math.PI) / 180), -2 * Math.cos((40 * Math.PI) / 180)] as const;
+  comprobar('a dos unidades pero a 50 grados de la mirada, fuera del cono: no le da', !(await leDa(a50[0], a50[1], 0)));
+  comprobar('a 40 grados, dentro: le da', await leDa(a40[0], a40[1], 0));
+  comprobar('a dos unidades, a la espalda: no le da', !(await leDa(0, 2, 0)));
+  await llevar(reloj, a, deNumero(25), 0);
+  comprobar(
+    'con un muro fino en medio, a dos unidades, delante y en el cono: no le da',
+    sePuedeEstar(arenaDe(ruedo([MURO])), deNumero(25), deNumero(-2), RADIO_DEL_PASEANTE) && !(await leDa(25, -2, 0)),
+  );
+  await llevar(reloj, a, deNumero(35), 0);
+  comprobar('y lo mismo diez unidades más allá, donde el muro ya no está: le da', await leDa(35, -2, 0));
+  canal.apagar();
+}
+
+{
+  /*
+   * EL MÁS CERCANO, UNO SOLO; y si el más cercano tiene un muro delante, el siguiente. En el ruedo con
+   * un muro corto al oeste, a cuarenta unidades del centro.
+   */
+  const MURITO: Cuerpo = { x0: -39.8, z0: -1.1, x1: -39, z1: -1 };
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo([MURITO]), asientos: ASIENTOS_DEL_RUEDO });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  const b = await entrar(canal, m.codigo, m.llave('r-dos'));
+  const c = await entrar(canal, m.codigo, m.llave('r-tres'));
+  await llevar(reloj, c, deNumero(0.3), deNumero(-1.5));
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
+  golpear(a, 0);
+  const das = a.enchufe.de('da');
+  comprobar(
+    'con B a dos unidades y C a 1,5, los dos delante: un solo `da`, y para C, el más cercano',
+    das.length === 1 && das[0]?.a === 'r-tres',
+    das,
+  );
+  await llevar(reloj, a, deNumero(-40), 0);
+  await llevar(reloj, c, deNumero(-39.4), deNumero(-1.8));
+  await llevar(reloj, b, deNumero(-40.6), deNumero(-2.2));
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
+  golpear(a, 0);
+  const otro = a.enchufe.ultimo('da');
+  comprobar(
+    'con C más cerca pero detrás de un muro, y B más lejos y a la vista: le da a B, uno solo',
+    a.enchufe.de('da').length === 2 && otro?.a === 'r-dos',
+    a.enchufe.de('da'),
+  );
+  canal.apagar();
+}
+
+// ---------------------------------------------------------------------------
+// 19 · EL REBOBINADO
+// ---------------------------------------------------------------------------
+
+paso(`El rebobinado: se le ve donde lo veía quien golpeó, hasta ${String(REBOBINADO_MS)} ms atrás; y ni uno más`);
+
+{
+  comprobar(
+    'se rebobinan 250 ms: los 150 con que se pinta a los demás más 100 de ida y vuelta, y nunca más que el tope del contrato',
+    REBOBINADO_MS === 250 && REBOBINADO_MS <= REBOBINADO_MAXIMO_MS,
+    REBOBINADO_MS,
+  );
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo(), asientos: ASIENTOS_DEL_RUEDO });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  const b = await entrar(canal, m.codigo, m.llave('r-dos'));
+  await reloj.avanzar(1000);
+  /* B se va del alcance en dos pasos de 1,5 unidades, y A golpea 230 ms después del primero. */
+  andar(b, 0, deNumero(-3.5));
+  await reloj.avanzar(50);
+  andar(b, 0, deNumero(-5));
+  await reloj.avanzar(180);
+  golpear(a, 0);
+  comprobar(
+    'B se fue hace 230 ms y ya está a cinco unidades, pero A lo veía delante: le da',
+    cuantos(b.enchufe, 'da') === 1 && b.x === 0 && b.z === deNumero(-5),
+    b.enchufe.textos.slice(-2),
+  );
+  await llevar(reloj, b, 0, deNumero(-2));
+  await reloj.avanzar(1000);
+  andar(b, 0, deNumero(-3.5));
+  await reloj.avanzar(50);
+  andar(b, 0, deNumero(-5));
+  await reloj.avanzar(260);
+  golpear(a, 0);
+  comprobar(
+    'pero si se fue hace 310 ms, más de lo que se rebobina, no le da',
+    cuantos(b.enchufe, 'da') === 1,
+    b.enchufe.textos.slice(-2),
+  );
+  canal.apagar();
+}
+
+// ---------------------------------------------------------------------------
+// 20 · CAER, EL CAÍDO, RENACER, EL INTOCABLE, Y `vidas`
+// ---------------------------------------------------------------------------
+
+paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni recibe; `renace` lejos; el intocable; y `vidas`');
+
+{
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo(), asientos: ['r-uno', 'r-dos', 'r-tres', 'r-cuatro', 'r-cinco'] });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  comprobar(
+    'al entrar, lo primero es `dentro` y justo después `vidas`, con TODOS los sentados, de pie y con la vida entera',
+    a.enchufe.mensajes()[0]?.t === 'dentro' &&
+      a.enchufe.mensajes()[1]?.t === 'vidas' &&
+      vidasEn(a.enchufe).size === 5 &&
+      [...vidasEn(a.enchufe).values()].every(([vida, estado]) => vida === VIDA_ENTERA && estado === DE_PIE),
+    a.enchufe.textos.slice(0, 2),
+  );
+  const b = await entrar(canal, m.codigo, m.llave('r-dos'));
+  const d = await entrar(canal, m.codigo, m.llave('r-cuatro'));
+  /* D se aparta dos unidades al norte de su sitio de nacer (−60, 0), y mira al sur, hacia él. */
+  await llevar(reloj, d, deNumero(-60), deNumero(-2));
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS);
+  const pedidos = BOTINES_PEDIDOS.length;
+  golpear(a, 0);
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+  golpear(a, 0);
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+  golpear(a, 0);
+  const cayoEn = reloj.ahora();
+  const cae = d.enchufe.ultimo('cae');
+  comprobar(
+    'tres golpes: `da` con 2, 1 y 0, y detrás `cae`, a toda la sala',
+    b.enchufe.de('da').map((x) => x.vida).join(',') === '2,1,0' &&
+      cae?.a === 'r-dos' &&
+      cae.por === 'r-uno' &&
+      cuantos(a.enchufe, 'cae') === 1 &&
+      cuantos(b.enchufe, 'cae') === 1,
+    d.enchufe.textos.slice(-4),
+  );
+  comprobar(
+    'y se pide el botín a la mesa: lo pierde quien cae y se lo lleva quien lo tumbó',
+    BOTINES_PEDIDOS.length === pedidos + 1 &&
+      BOTINES_PEDIDOS[pedidos]?.codigo === m.codigo &&
+      BOTINES_PEDIDOS[pedidos]?.pierde === 'r-dos' &&
+      BOTINES_PEDIDOS[pedidos]?.gana === 'r-uno',
+    BOTINES_PEDIDOS.slice(pedidos),
+  );
+  await reloj.avanzar(200);
+  const ignorados = canal.diagnostico().ignorados;
+  andar(b, b.x, b.z - deNumero(1));
+  await reloj.avanzar(200);
+  const tumbado = enLaFoto(a.enchufe, 'r-dos');
+  comprobar(
+    'el caído no anda: su paso se ignora sin corregirle, y la foto le sigue enseñando donde cayó, quieto',
+    canal.diagnostico().ignorados === ignorados + 1 &&
+      cuantos(b.enchufe, 'corrige') === 0 &&
+      tumbado !== undefined &&
+      tumbado[1] === 0 &&
+      tumbado[2] === deNumero(-2) &&
+      tumbado[4] === 0,
+    tumbado,
+  );
+  const lanzas = cuantos(a.enchufe, 'lanza');
+  golpear(b, 128);
+  comprobar('ni golpea: su golpe no da ni `lanza`', cuantos(a.enchufe, 'lanza') === lanzas, a.enchufe.textos.slice(-1));
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS);
+  golpear(a, 0);
+  comprobar(
+    'ni se le golpea en el suelo: el golpe de A sale (`lanza`) y no le da',
+    cuantos(a.enchufe, 'lanza') === lanzas + 1 && cuantos(b.enchufe, 'da') === 3,
+    b.enchufe.textos.slice(-2),
+  );
+  const e = await entrar(canal, m.codigo, m.llave('r-cinco'));
+  comprobar(
+    'quien entra con alguien en el suelo lo sabe por `vidas`: sin vida y caído',
+    JSON.stringify(vidasEn(e.enchufe).get('r-dos')) === JSON.stringify([0, CAIDO]),
+    e.enchufe.ultimo('vidas'),
+  );
+
+  await reloj.avanzar(cayoEn + CAIDO_MS - 100 - reloj.ahora());
+  comprobar('a CAIDO_MS menos 100 ms, sigue en el suelo', cuantos(b.enchufe, 'renace') === 0);
+  await reloj.avanzar(200);
+  const renace = d.enchufe.ultimo('renace');
+  comprobar(
+    'a los CAIDO_MS, `renace` a toda la sala',
+    renace?.a === 'r-dos' && cuantos(a.enchufe, 'renace') === 1 && cuantos(b.enchufe, 'renace') === 1 && cuantos(e.enchufe, 'renace') === 1,
+    d.enchufe.textos.slice(-2),
+  );
+  comprobar(
+    'y lejos de quien lo tumbó: su sitio está a dos unidades de A, el siguiente lo ocupa quien no ha bajado, y el de después, libre desde que D se apartó, está a sesenta',
+    renace?.x === deNumero(-60) && renace.z === 0,
+    renace,
+  );
+  await reloj.avanzar(100);
+  const nacido = enLaFoto(a.enchufe, 'r-dos');
+  comprobar('y la foto le enseña ahí', nacido !== undefined && nacido[1] === deNumero(-60) && nacido[2] === 0, nacido);
+
+  /* Lo que ya venía de camino desde donde cayó se calla; desde donde renació, se acepta. */
+  const correcciones = cuantos(b.enchufe, 'corrige');
+  andar(b, 0, deNumero(-3));
+  comprobar('un paso que venía de camino desde donde cayó se ignora en silencio', cuantos(b.enchufe, 'corrige') === correcciones);
+
+  /*
+   * PASADO EL REBOBINADO Y DENTRO DE LO INTOCABLE. Justo al renacer, el rebobinado aún le ve donde
+   * cayó —es lo que los demás tenían pintado—, así que un golpe entonces no le daría ni sin la
+   * protección, y esta comprobación no probaría nada: se vio en verde con lo intocable quitado. A
+   * los 250 ms ya se le ve donde renació, y lo único que le guarda es ser intocable.
+   */
+  await reloj.avanzar(REBOBINADO_MS);
+  golpear(d, 128);
+  comprobar(
+    'recién nacido es intocable: pasado el rebobinado —que ya le ve donde renació— D, a dos unidades y mirándole, no le da',
+    cuantos(b.enchufe, 'da') === 3 && cuantos(d.enchufe, 'lanza') > 0,
+    b.enchufe.textos.slice(-2),
+  );
+  const vuelta = await entrar(canal, m.codigo, m.llave('r-cinco'));
+  comprobar(
+    'y quien vuelve a entrar lo sabe por su `vidas` nuevo: la vida entera, intocable',
+    JSON.stringify(vidasEn(vuelta.enchufe).get('r-dos')) === JSON.stringify([VIDA_ENTERA, INTOCABLE]),
+    vuelta.enchufe.ultimo('vidas'),
+  );
+  b.x = deNumero(-60);
+  b.z = 0;
+  await reloj.avanzar(50);
+  comprobar('desde el sitio de renacer se anda: la validación sigue desde ahí', paso3(b, b.x + deNumero(0.3), b.z) === 'aceptado');
+  await reloj.avanzar(INTOCABLE_MS);
+  andar(b, deNumero(-60), 0);
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
+  golpear(d, 128);
+  comprobar(
+    'pasado INTOCABLE_MS, D sí le da',
+    cuantos(b.enchufe, 'da') === 4 && b.enchufe.ultimo('da')?.de === 'r-cuatro' && b.enchufe.ultimo('da')?.vida === VIDA_ENTERA - 1,
+    b.enchufe.textos.slice(-2),
+  );
+
+  /* Y LA PAREJA AL REVÉS es otra: B va hasta A y lo tumba, y hay botín. */
+  const deVuelta = BOTINES_PEDIDOS.length;
+  await llevar(reloj, b, 0, deNumero(-2));
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
+  for (let i = 0; i < 3; i++) {
+    golpear(b, 128);
+    await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+  }
+  comprobar(
+    'y la pareja al revés es otra pareja: cuando B tumba a A, también se pide botín',
+    a.enchufe.ultimo('cae')?.a === 'r-uno' &&
+      BOTINES_PEDIDOS.length === deVuelta + 1 &&
+      BOTINES_PEDIDOS[deVuelta]?.pierde === 'r-uno' &&
+      BOTINES_PEDIDOS[deVuelta]?.gana === 'r-dos',
+    BOTINES_PEDIDOS.slice(deVuelta),
+  );
+  comprobar(
+    'y el diagnóstico lo cuenta: golpes, aciertos, caídas y renacidas',
+    canal.diagnostico().caidas === 2 && canal.diagnostico().renacidas === 1 && canal.diagnostico().aciertos === 7,
+    { caidas: canal.diagnostico().caidas, renacidas: canal.diagnostico().renacidas, aciertos: canal.diagnostico().aciertos },
+  );
+  comprobar('todo lo mandado en la refriega lo lee el lector del aparato', [a, b, d, e, vuelta].every((x) => x.enchufe.ilegibles() === 0));
+  canal.apagar();
+}
+
+{
+  /*
+   * EL SUYO: si su sitio de nacer está libre y lejos de quien lo tumbó, renace en el suyo, aunque
+   * haya otro más lejos. A tumba a V en (5, −2): el de V, (60, 0), queda a 55 —más que los 52,8—, y
+   * (−60, 0), libre, a 65.
+   */
+  const { canal, reloj } = canalNuevo();
+  const mundo: MundoDeclarado = {
+    ...ruedo(),
+    nace: [
+      { x: 0, z: 0, rumbo: 0 },
+      { x: 60, z: 0, rumbo: 0 },
+      { x: 0, z: -60, rumbo: 0 },
+      { x: -60, z: 0, rumbo: 0 },
+    ],
+  };
+  const m = mesaNueva({ mundo, asientos: ['r-uno', 'r-tres'] });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  const v = await entrar(canal, m.codigo, m.llave('r-tres'));
+  await llevar(reloj, a, deNumero(5), 0);
+  await llevar(reloj, v, deNumero(5), deNumero(-2));
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
+  for (let i = 0; i < 3; i++) {
+    golpear(a, 0);
+    await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+  }
+  await reloj.avanzar(CAIDO_MS);
+  const renace = a.enchufe.ultimo('renace');
+  comprobar(
+    'con su sitio de nacer libre y a 55 unidades de quien lo tumbó —más que los 52,8 que éste corre mientras dura lo intocable—, renace en EL SUYO y no en el más lejano',
+    renace?.a === 'r-tres' && renace.x === deNumero(60) && renace.z === 0 && Math.round((LEJOS_AL_RENACER / U) * 10) === 528,
+    renace,
+  );
+  canal.apagar();
+}
+
+{
+  /*
+   * EL MÁS LEJANO: si ningún sitio libre está lejos, el libre más lejano de quien lo tumbó. En el
+   * prado —tres sitios a seis unidades— con A en (0, 3) y B cayendo en (0, 1): el suyo, (0, 6), está a
+   * 3 de A; el de A, (0, 0), a 3; y (−6, 0) a 6,7. Ni el suyo ni el primero de la lista.
+   */
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ asientos: ['a-uno', 'a-dos'] });
+  const a = await entrar(canal, m.codigo, m.llave('a-uno'));
+  const b = await entrar(canal, m.codigo, m.llave('a-dos'));
+  await llevar(reloj, a, 0, deNumero(3));
+  await llevar(reloj, b, 0, deNumero(1));
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
+  for (let i = 0; i < 3; i++) {
+    golpear(a, 0);
+    await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+  }
+  await reloj.avanzar(CAIDO_MS);
+  const renace = a.enchufe.ultimo('renace');
+  comprobar(
+    'sin ningún sitio libre lejos, renace en el libre MÁS LEJANO de quien lo tumbó, mirando hacia donde mira ese sitio',
+    renace?.a === 'a-dos' && renace.x === deNumero(-6) && renace.z === 0 && renace.r === 64,
+    renace,
+  );
+  canal.apagar();
+}
+
+// ---------------------------------------------------------------------------
+// 21 · NADIE ES INMUNE POR NO BAJAR
+// ---------------------------------------------------------------------------
+
+paso('Nadie es inmune por no bajar: a quien nunca abrió su canal, y a quien lo cerró, se le golpea, se le tumba y se le pide botín');
+
+{
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo(), asientos: ['r-uno', 'r-dos'] });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  await reloj.avanzar(200);
+  const quieto = enLaFoto(a.enchufe, 'r-dos');
+  comprobar(
+    'quien no ha bajado nunca está en la sala: en la foto, de pie en su sitio de nacer, y en `vidas`',
+    quieto !== undefined && quieto[1] === 0 && quieto[2] === deNumero(-2) && quieto[4] === 0 && vidasEn(a.enchufe).has('r-dos'),
+    quieto,
+  );
+  const pedidos = BOTINES_PEDIDOS.length;
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS);
+  for (let i = 0; i < 3; i++) {
+    golpear(a, 0);
+    await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+  }
+  comprobar(
+    'y se le golpea y se le tumba: `da` tres veces y `cae`',
+    a.enchufe.de('da').filter((x) => x.a === 'r-dos').length === 3 && a.enchufe.ultimo('cae')?.a === 'r-dos',
+    a.enchufe.textos.slice(-4),
+  );
+  comprobar(
+    'y se le pide su botín, como a cualquiera',
+    BOTINES_PEDIDOS.length === pedidos + 1 && BOTINES_PEDIDOS[pedidos]?.pierde === 'r-dos',
+    BOTINES_PEDIDOS.slice(pedidos),
+  );
+  await reloj.avanzar(CAIDO_MS);
+  comprobar('y renace sin canal, y se le dice a la sala', a.enchufe.ultimo('renace')?.a === 'r-dos', a.enchufe.textos.slice(-2));
+  const baja = await entrar(canal, m.codigo, m.llave('r-dos'));
+  const renace = a.enchufe.ultimo('renace');
+  comprobar(
+    'y cuando por fin baja, aparece donde renació y no en su sitio de nacer',
+    renace !== undefined && baja.x === renace.x && baja.z === renace.z && baja.z !== deNumero(-2),
+    [baja.x / U, baja.z / U],
+  );
+  canal.apagar();
+}
+
+{
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo(), asientos: ['r-uno', 'r-dos'] });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  const b = await entrar(canal, m.codigo, m.llave('r-dos'));
+  await reloj.avanzar(100);
+  b.conexion.seCerro();
+  await reloj.avanzar(GRACIA_AL_IRSE_MS + RECARGA_DEL_GOLPE_MS);
+  golpear(a, 0);
+  comprobar(
+    'a quien CERRÓ su canal también: sigue donde estaba y el golpe le da',
+    a.enchufe.ultimo('da')?.a === 'r-dos' && a.enchufe.ultimo('da')?.vida === VIDA_ENTERA - 1,
+    a.enchufe.textos.slice(-2),
+  );
+  const vuelve = await entrar(canal, m.codigo, m.llave('r-dos'));
+  comprobar(
+    'y al volver, vuelve con la vida que tenga, y lo sabe por su `vidas`',
+    JSON.stringify(vidasEn(vuelve.enchufe).get('r-dos')) === JSON.stringify([VIDA_ENTERA - 1, DE_PIE]),
+    vuelve.enchufe.ultimo('vidas'),
+  );
+  canal.apagar();
+}
+
+{
+  /*
+   * LA SALA SE VA, EL LIBRO SE QUEDA: A tumba a B —que no baja—, se va, la sala se borra a los cinco
+   * segundos y con ella las vidas; A vuelve, vuelve a tumbar a B antes del minuto, y NO hay botín.
+   */
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo(), asientos: ['r-uno', 'r-dos'] });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS);
+  const pedidos = BOTINES_PEDIDOS.length;
+  for (let i = 0; i < 3; i++) {
+    golpear(a, 0);
+    await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+  }
+  a.conexion.seCerro();
+  await reloj.avanzar(GRACIA_AL_IRSE_MS + 100);
+  comprobar('sin nadie con canal, la sala se borra a los cinco segundos', canal.diagnostico().salas === 0, canal.diagnostico().salas);
+  const otraVez = await entrar(canal, m.codigo, m.llave('r-uno'));
+  comprobar(
+    'y la sala nueva empieza de cero: B de pie en su sitio y con la vida entera',
+    JSON.stringify(vidasEn(otraVez.enchufe).get('r-dos')) === JSON.stringify([VIDA_ENTERA, DE_PIE]),
+    otraVez.enchufe.ultimo('vidas'),
+  );
+  const porPareja = canal.diagnostico().botines.porPareja;
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS);
+  for (let i = 0; i < 3; i++) {
+    golpear(otraVez, 0);
+    await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+  }
+  comprobar(
+    'pero el libro de botines no se fue con ella: la misma pareja, antes del minuto, no cobra otra vez',
+    otraVez.enchufe.ultimo('cae')?.a === 'r-dos' &&
+      BOTINES_PEDIDOS.length === pedidos + 1 &&
+      canal.diagnostico().botines.porPareja === porPareja + 1,
+    { pedidos: BOTINES_PEDIDOS.length - pedidos, porPareja: canal.diagnostico().botines.porPareja - porPareja },
+  );
+  canal.apagar();
+}
+
+// ---------------------------------------------------------------------------
+// 22 · LOS TOPES DEL BOTÍN
+// ---------------------------------------------------------------------------
+
+paso(`Los topes del botín: una vez por pareja cada ${String(BOTIN_CADA_PAREJA_MS / 1000)} s, ${String(TOPE_DE_BOTINES_POR_MINUTO)} por mesa y minuto, y sólo cuenta lo que ENTRA`);
+
+/**
+ * UNA REFRIEGA EN EL CORRO: A y Z tumban, a la vez, a los cuatro que tienen alrededor —norte, este,
+ * sur y oeste— sin que ninguno de ellos haya bajado. Devuelve el canal, el reloj y los dos que
+ * golpean, para seguir.
+ */
+async function refriegaEnElCorro(botines: (SalidaDelBotin | 'lanza')[]): Promise<{
+  canal: CanalDeBotas;
+  reloj: RelojDeMentira;
+  codigo: string;
+  a: Dentro;
+  z: Dentro;
+}> {
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: corro(), asientos: EN_EL_CORRO.map(([id]) => id), botines });
+  const a = await entrar(canal, m.codigo, m.llave('c-a'));
+  const z = await entrar(canal, m.codigo, m.llave('c-z'));
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS);
+  for (const r of [0, 64, 128, 192]) {
+    for (let i = 0; i < 3; i++) {
+      golpear(a, r);
+      golpear(z, r);
+      await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+    }
+  }
+  return { canal, reloj, codigo: m.codigo, a, z };
+}
+
+/** Tumba otra vez al que está al norte de `d`: tres golpes. */
+async function tumbarAlDelNorte(reloj: RelojDeMentira, d: Dentro): Promise<void> {
+  for (let i = 0; i < 3; i++) {
+    golpear(d, 0);
+    await reloj.avanzar(RECARGA_DEL_GOLPE_MS + 50);
+  }
+}
+
+/** Un paso de nada y vuelta, para que el «quieto» no cierre a quien lleva un rato golpeando sin moverse. */
+async function menearse(reloj: RelojDeMentira, d: Dentro): Promise<void> {
+  const x = d.x;
+  await reloj.avanzar(50);
+  andar(d, x + deNumero(0.1), d.z, 1);
+  await reloj.avanzar(50);
+  andar(d, x, d.z, 0);
+}
+
+{
+  const pedidos = BOTINES_PEDIDOS.length;
+  const { canal, reloj, codigo, a, z } = await refriegaEnElCorro([]);
+  const deEsta = (): typeof BOTINES_PEDIDOS => BOTINES_PEDIDOS.slice(pedidos).filter((p) => p.codigo === codigo);
+  comprobar(
+    'ocho caídas de ocho parejas distintas en diez segundos: seis botines ENTRAN y el séptimo y el octavo no se piden, por el tope de la mesa',
+    a.enchufe.de('cae').length === 8 &&
+      deEsta().length === TOPE_DE_BOTINES_POR_MINUTO &&
+      canal.diagnostico().botines.entro === 6 &&
+      canal.diagnostico().botines.porTope === 2,
+    { caidas: a.enchufe.de('cae').length, pedidos: deEsta().length, botines: canal.diagnostico().botines },
+  );
+  /* El del norte de A cayó el primero y ya ha renacido —en su sitio, el único libre— y dejado de ser intocable. */
+  await reloj.avanzar(INTOCABLE_MS);
+  await tumbarAlDelNorte(reloj, a);
+  comprobar(
+    'la misma pareja otra vez antes del minuto: no se pide, por la pareja (se mira antes que el tope)',
+    a.enchufe.ultimo('cae')?.a === 'a-n' && deEsta().length === TOPE_DE_BOTINES_POR_MINUTO && canal.diagnostico().botines.porPareja === 1,
+    canal.diagnostico().botines,
+  );
+  for (let s = 0; s < 5; s++) {
+    await reloj.avanzar(10_000);
+    await menearse(reloj, a);
+    await menearse(reloj, z);
+  }
+  await tumbarAlDelNorte(reloj, a);
+  comprobar(
+    'y pasado el minuto, la pareja y la mesa vuelven a cobrar',
+    a.enchufe.ultimo('cae')?.a === 'a-n' && deEsta().length === TOPE_DE_BOTINES_POR_MINUTO + 1,
+    { pedidos: deEsta().length, botines: canal.diagnostico().botines },
+  );
+  comprobar('y ninguno de los dos que golpean se ha cerrado por quieto', a.enchufe.cierre === null && z.enchufe.cierre === null, [a.enchufe.cierre, z.enchufe.cierre]);
+  canal.apagar();
+}
+
+{
+  const pedidos = BOTINES_PEDIDOS.length;
+  const { canal, reloj, codigo, a } = await refriegaEnElCorro(['sinEfecto', 'sinEfecto', 'sinEfecto', 'sinEfecto', 'sinEfecto', 'sinEfecto']);
+  const deEsta = (): typeof BOTINES_PEDIDOS => BOTINES_PEDIDOS.slice(pedidos).filter((p) => p.codigo === codigo);
+  comprobar(
+    'si los seis primeros no entran —sin efecto—, no gastan el tope: el séptimo y el octavo sí se piden',
+    deEsta().length === 8 && canal.diagnostico().botines.sinEfecto === 6 && canal.diagnostico().botines.porTope === 0,
+    canal.diagnostico().botines,
+  );
+  await reloj.avanzar(INTOCABLE_MS);
+  await tumbarAlDelNorte(reloj, a);
+  comprobar(
+    'ni la pareja: la que no cobró, vuelve a pedirlo aunque no haya pasado el minuto',
+    deEsta().length === 9 && canal.diagnostico().botines.porPareja === 0,
+    canal.diagnostico().botines,
+  );
+  canal.apagar();
+}
+
+{
+  const lineas = LO_QUE_SE_REGISTRA.length;
+  const { canal, reloj, a } = await refriegaEnElCorro(['lanza', 'rechazado', 'terminada', 'apartado', 'sinMesa']);
+  await reloj.avanzar(100);
+  const b = canal.diagnostico().botines;
+  comprobar(
+    'y cada salida de la mesa se cuenta aparte —cinco raras y, de las ocho caídas, tres que entran—; la que revienta, como fallo y dicho en el registro, sin tumbar la sala',
+    b.fallos === 1 &&
+      b.rechazado === 1 &&
+      b.terminada === 1 &&
+      b.apartado === 1 &&
+      b.sinMesa === 1 &&
+      b.entro === 3 &&
+      LO_QUE_SE_REGISTRA.slice(lineas).some((l) => l.includes('botín') && l.includes('no ha podido entrar')) &&
+      a.enchufe.cierre === null,
+    { botines: b, registro: LO_QUE_SE_REGISTRA.slice(lineas) },
+  );
+  canal.apagar();
+}
+
+// ---------------------------------------------------------------------------
+// 23 · LO QUE SE PUEDE PERDER Y LO QUE NO, CON EL CANAL ATASCADO
+// ---------------------------------------------------------------------------
+
+paso('Con el canal atascado: `corrige` y `lanza` se saltan; `da` y `dentro` cierran con `atascado`; el `fuera` de quien se cierra, también se salta');
+
+{
+  const { canal, reloj } = canalNuevo();
+  const m = mesaNueva({ mundo: ruedo(), asientos: ASIENTOS_DEL_RUEDO });
+  const a = await entrar(canal, m.codigo, m.llave('r-uno'));
+  const b = await entrar(canal, m.codigo, m.llave('r-dos'));
+  await reloj.avanzar(300);
+  /* Un paso sin moverse acaba la corrección pendiente del `dentro`: lo que venga lejos ya se corrige. */
+  andar(a, a.x, a.z, 0);
+
+  a.enchufe.atasco = ATASCO_BYTES + 1;
+  const corriges = cuantos(a.enchufe, 'corrige');
+  const saltados = canal.diagnostico().saltados;
+  const presupuesto = canal.diagnostico().correcciones.presupuesto;
+  a.n++;
+  a.conexion.recibir(aqui(a.n, a.x + deNumero(50), a.z));
+  comprobar(
+    'un `corrige` a un canal atascado se salta —y se cuenta—, pero la corrección queda hecha',
+    cuantos(a.enchufe, 'corrige') === corriges &&
+      canal.diagnostico().saltados === saltados + 1 &&
+      canal.diagnostico().correcciones.presupuesto === presupuesto + 1 &&
+      a.enchufe.cierre === null,
+    canal.diagnostico(),
+  );
+  a.enchufe.atasco = 0;
+  await reloj.avanzar(RECORDAR_LA_CORRECCION_MS + 50);
+  a.n++;
+  a.conexion.recibir(aqui(a.n, a.x + deNumero(50), a.z));
+  comprobar(
+    'y como seguía pendiente, al insistir desde el sitio malo con el canal ya libre se le repite',
+    cuantos(a.enchufe, 'corrige') === corriges + 1 && a.enchufe.ultimo('corrige')?.x === a.x && canal.diagnostico().correcciones.repetida === 1,
+    { textos: a.enchufe.textos.slice(-1), correcciones: canal.diagnostico().correcciones },
+  );
+
+  b.enchufe.atasco = ATASCO_BYTES + 1;
+  const lanzasDeB = cuantos(b.enchufe, 'lanza');
+  golpear(a, 128);
+  comprobar(
+    'un `lanza` a un canal atascado se salta, y el canal sigue abierto',
+    cuantos(b.enchufe, 'lanza') === lanzasDeB && cuantos(a.enchufe, 'lanza') === 1 && b.enchufe.cierre === null,
+    b.enchufe.textos.slice(-1),
+  );
+  await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
+  golpear(a, 0);
+  comprobar(
+    'pero un `da` no se salta: al atascado se le cierra con `atascado` (4008), sin un `fuera` que no le cabe',
+    b.enchufe.cierre?.codigo === CIERRE.atascado && cuantos(b.enchufe, 'da') === 0 && cuantos(b.enchufe, 'fuera') === 0 && canal.diagnostico().cierres.atascado === 1,
+    { cierre: b.enchufe.cierre, textos: b.enchufe.textos.slice(-2) },
+  );
+  await reloj.avanzar(200);
+  comprobar(
+    'y a los demás el `da` les llega, y su asiento sigue en la sala',
+    a.enchufe.ultimo('da')?.a === 'r-dos' && enLaFoto(a.enchufe, 'r-dos') !== undefined,
+    a.enchufe.textos.slice(-2),
+  );
+
+  const nacido = new EnchufeDeMentira();
+  nacido.atasco = ATASCO_BYTES + 1;
+  canal.abrir(m.codigo, nacido).recibir(hola(m.llave('r-tres')));
+  await vaciar();
+  comprobar(
+    'y un canal que no da abasto ni para su `dentro` no se queda a medias: se cierra con `atascado`, sin nada dentro',
+    nacido.cierre?.codigo === CIERRE.atascado && nacido.textos.length === 0,
+    { cierre: nacido.cierre, textos: nacido.textos },
   );
   canal.apagar();
 }
@@ -1784,6 +2633,7 @@ function aparatoDeVerdad(puerto: number, codigo: string, llave: string | null): 
   mensajes: (MensajeDelServidor | null)[];
   cierre: () => number | null;
   abierto: Promise<boolean>;
+  enviar: (texto: string) => void;
 } {
   const mensajes: (MensajeDelServidor | null)[] = [];
   let cierre: number | null = null;
@@ -1801,7 +2651,10 @@ function aparatoDeVerdad(puerto: number, codigo: string, llave: string | null): 
     cierre = c;
   });
   ws.on('error', () => {});
-  return { mensajes, cierre: () => cierre, abierto };
+  const enviar = (texto: string): void => {
+    if (ws.readyState === WebSocket.OPEN) ws.send(texto);
+  };
+  return { mensajes, cierre: () => cierre, abierto, enviar };
 }
 
 async function hasta(que: () => boolean, ms = 3000): Promise<boolean> {
@@ -1836,6 +2689,49 @@ async function hasta(que: () => boolean, ms = 3000): Promise<boolean> {
     dentro(ana) && dentro(otra),
     { ana: ana.mensajes.slice(0, 2), otra: otra.mensajes.slice(0, 2) },
   );
+
+  {
+    /*
+     * Y LA REFRIEGA CON EL MONTAJE DE VERDAD. La mesa de `index.ts` no trae `botin`, así que el canal
+     * usa el de `botin.ts`, que llega a la vía interna de `mesas.ts` con un `import()`. Con Las Lindes
+     * recién empezada hay una sola losa, así que Bea nace a un paso de Ana; y nadie tiene puntos, así
+     * que el botín sale SIN EFECTO: que vuelva contado así es lo que prueba que llegó a la mesa de
+     * verdad y volvió.
+     */
+    const sitioDe = (a: { mensajes: (MensajeDelServidor | null)[] }): { x: number; z: number } => {
+      const d = a.mensajes.find((m) => m?.t === 'dentro');
+      return d?.t === 'dentro' ? { x: d.x, z: d.z } : { x: NaN, z: NaN };
+    };
+    const pa = sitioDe(ana);
+    let pb = sitioDe(otra);
+    let n = 0;
+    for (let i = 0; i < 40 && Math.hypot(pb.x - pa.x, pb.z - pa.z) > deNumero(2); i++) {
+      const d = Math.hypot(pa.x - pb.x, pa.z - pb.z);
+      const tramo = Math.min(deNumero(0.5), d - deNumero(1.8));
+      pb = { x: pb.x + Math.round(((pa.x - pb.x) / d) * tramo), z: pb.z + Math.round(((pa.z - pb.z) / d) * tramo) };
+      n++;
+      otra.enviar(JSON.stringify({ t: 'aqui', n, x: pb.x, z: pb.z, r: 0, m: 1 }));
+      await new Promise<void>((r) => setTimeout(r, 60));
+    }
+    await new Promise<void>((r) => setTimeout(r, REBOBINADO_MS + 50));
+    const r = rumboHacia(pa, pb);
+    for (let i = 1; i <= 3; i++) {
+      ana.enviar(JSON.stringify({ t: 'golpe', n: i, r }));
+      await new Promise<void>((res) => setTimeout(res, RECARGA_DEL_GOLPE_MS + 60));
+    }
+    await hasta(() => botas.diagnosticoDeBotas().botines.sinEfecto > 0, 3000);
+    comprobar(
+      'con el montaje de verdad, tres golpes por el cable tumban: `cae`, leído por el lector del aparato',
+      ana.mensajes.some((m) => m?.t === 'cae' && m.a === bea.id) && otra.mensajes.some((m) => m?.t === 'cae' && m.a === bea.id),
+      { distancia: Math.hypot(pb.x - pa.x, pb.z - pa.z) / U, ultimos: ana.mensajes.slice(-4) },
+    );
+    comprobar(
+      'y el botín va a la mesa de VERDAD por el respaldo de `botin.ts` —sin efecto: nadie tiene puntos todavía— y vuelve contado',
+      botas.diagnosticoDeBotas().botines.sinEfecto === 1 && botas.diagnosticoDeBotas().botines.fallos === 0,
+      botas.diagnosticoDeBotas().botines,
+    );
+  }
+
   const callada = aparatoDeVerdad(puerto, codigo, null);
   await callada.abierto;
 
@@ -1892,7 +2788,7 @@ if (fallos.length > 0) {
  * EL GUARDIA DE «NO SE HAN HECHO TODAS»: un comprobador que se cae a mitad sin decirlo se parece
  * mucho a uno verde. El número es el que se hace hoy, contado, y se sube al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 168;
+const COMPROBACIONES_ESCRITAS = 236;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones escritas.`);
   process.exit(2);
@@ -1901,9 +2797,12 @@ if (hechas < COMPROBACIONES_ESCRITAS) {
 console.log(
   `✔ ${String(hechas)} comprobaciones. La sala de Boots on Board, con el reloj en la mano: el saludo y su\n` +
     '  plazo, la entrada, un canal por asiento, el presupuesto de distancia, la estructura (con la escuadra\n' +
-    '  de un tic), lo que viene de camino tras corregir, el cubo, el quieto, la gracia, una foto por sala y\n' +
-    '  un solo temporizador parado sin salas, el mundo que cambia debajo de alguien, los cierres, paseos\n' +
-    '  legales de verdad sin una corrección; y con el montaje de verdad, SIGTERM cierra los canales con\n' +
-    '  1001 dentro de la despedida de la mesa.',
+    '  de un tic), lo que viene de camino tras corregir, el cubo, el quieto, quien se va sin salir de la\n' +
+    '  sala, una foto por sala con todos los sentados y un solo temporizador parado sin salas, el mundo que\n' +
+    '  cambia debajo de alguien, los cierres; la refriega entera —alcance, cono, muro, el más cercano, el\n' +
+    '  rebobinado, caer, renacer, el intocable, `vidas`—, nadie inmune por no bajar, los topes del botín y el\n' +
+    '  canal atascado; paseos legales de verdad sin una corrección; la vía interna de la mesa con los tres\n' +
+    '  juegos; y con el montaje de verdad, una caída por el cable con su botín en la mesa de verdad, y\n' +
+    '  SIGTERM cerrando los canales con 1001 dentro de la despedida de la mesa.',
 );
 process.exit(0);

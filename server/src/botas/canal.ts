@@ -1,6 +1,6 @@
 /**
  * EL CANAL DE BOOTS ON BOARD, DEL LADO DEL SERVIDOR: la sala de cada mesa, la validación de cada
- * paso y la foto que ven todos.
+ * paso, la refriega, y la foto que ven todos.
  *
  * ═══ EL APARATO ANDA; EL SERVIDOR VALIDA Y CORRIGE ═══
  *
@@ -17,14 +17,23 @@
  * y una `LaMesa` inyectados. Así las reglas de tiempo se prueban en proceso con un reloj de mentira
  * —sesenta segundos de «quieto» en un milisegundo— y la red de verdad la pone `enchufe.ts`.
  *
+ * ═══ LO QUE LLEGA, POR TIPO ═══
+ *
+ * `recibir` despacha por el tipo que dio el lector: `aqui` va a `validar` y `golpe` a `golpear`, y
+ * nada más. Cualquier otro tipo que el lector acepte mañana se cuenta y se ignora hasta que alguien
+ * le escriba su manejador. Antes el golpe caía en `validar` como si fuera un paso: sin `m` ni sitio,
+ * dejaba la marcha de su asiento sin definir y la foto de TODA la sala salía ilegible.
+ *
  * ═══ LA VALIDACIÓN DE UN `aqui`, EN SU ORDEN ═══
  *
+ *   0. EL CAÍDO NO ANDA. Mientras está en el suelo lo que diga se ignora, sin corregirle: se queda
+ *      donde cayó hasta que renace, y renacer es su corrección.
  *   1. EL TIC CRECE. Un `n` que no pasa del último que llegó por este canal se ignora: viejo o
  *      repetido. No se corrige: no dice nada nuevo.
- *   2. SI HAY UNA CORRECCIÓN PENDIENTE —se le mandó `corrige` o `dentro` y todavía no ha dado un
- *      paso desde ahí—, lo que no esté a un tic del sitio corregido se ignora EN SILENCIO durante
- *      un segundo. Es lo que ya venía de camino cuando salió la corrección: contestar a cada uno
- *      con otro `corrige` haría que el aparato, que ya estaba corregido, volviera a saltar atrás
+ *   2. SI HAY UNA CORRECCIÓN PENDIENTE —se le mandó `corrige`, `dentro` o `renace` y todavía no ha
+ *      dado un paso desde ahí—, lo que no esté a un tic del sitio corregido se ignora EN SILENCIO
+ *      durante un segundo. Es lo que ya venía de camino cuando salió la corrección: contestar a cada
+ *      uno con otro `corrige` haría que el aparato, que ya estaba corregido, volviera a saltar atrás
  *      por cada paso que tenía en vuelo. Pasado el segundo, se vuelve a corregir.
  *   3. EL PRESUPUESTO DE DISTANCIA, por asiento: se rellena a `VELOCIDAD_CORRIENDO` por el tiempo
  *      DE PARED que ha pasado, con un 25 % de holgura y un tope de un segundo acumulado. Un tramo
@@ -35,41 +44,118 @@
  *      un tramo de UN TIC que no pasa en recta pero sí en ESCUADRA —primero un eje y luego el
  *      otro— se admite. Ver `seAndaElTramo`.
  *
+ * ═══ LA REFRIEGA, EN UNA PANTALLA ═══
+ *
+ * El aparato dice «golpeo» (`golpe`) y nada más; lo que pasa lo decide esto, sobre los sitios que
+ * ACEPTÓ. Un golpe se ignora si quien golpea está caído, si su tic no crece, o si no ha pasado
+ * `RECARGA_DEL_GOLPE_MS` desde su último golpe ACEPTADO —los ignorados no alargan la recarga—. Si se
+ * acepta, `lanza` a toda la sala, y se busca a quién le da (`aQuienDa`): a los demás que están DE PIE
+ * —ni caídos ni intocables—, vistos donde los veía quien golpeó (rebobinados `REBOBINADO_MS` sobre su
+ * rastro de sitios aceptados), a `ALCANCE_DEL_GOLPE` o menos, dentro del cono de la mirada del golpe
+ * y sin muro en medio; y de ésos, al MÁS CERCANO, uno solo. `da` a toda la sala; con la vida a cero,
+ * `cae`: `CAIDO_MS` en el suelo, sin andar ni golpear, y luego `renace` donde dice `sitioDeRenacer`
+ * con la vida entera e intocable `INTOCABLE_MS`. Quien entra —o vuelve a entrar— recibe `vidas`
+ * justo después de `dentro`, y a partir de ahí lo sigue por `da`, `cae` y `renace`.
+ *
+ * ═══ NADIE ES INMUNE POR NO BAJAR ═══
+ *
+ * En una sala están TODOS los sentados a la mesa, y no sólo los que tienen canal: al abrirse, cada
+ * asiento se pone de pie en su sitio de nacer, y ahí se queda, quieto, hasta que baje. Quien cierra
+ * su canal —se va, o se le cierra por quieto— tampoco sale de la sala: se queda de pie donde estaba.
+ * Los dos salen en la foto, se les puede golpear, tumbar y quitar botín, y renacen como cualquiera.
+ * Si no fuera así, en una mesa donde se roba bastaría con no abrir la escena —o cerrarla al ver venir
+ * a alguien— para que no te pudieran quitar nada, y la refriega sería de quien quisiera jugarla. La
+ * mesa es `botas` porque todos la eligieron así al abrirla o sentarse. Quien vuelve, vuelve donde se
+ * quedó, con la vida que tenga.
+ *
+ * Por eso la sala ya no vive «mientras haya alguien dentro» —siempre hay alguien—, sino mientras haya
+ * alguien CON CANAL, y `GRACIA_AL_IRSE_MS` después de que se vaya el último. Al borrarse se va todo
+ * lo suyo: sitios, vidas y caídas. Lo único que sobrevive a la sala es lo que protege la mesa: el
+ * libro de botines (ver `pedirElBotin`).
+ *
  * ═══ UNA FOTO POR SALA, LA MISMA CADENA PARA TODOS, Y UN SOLO RELOJ ═══
  *
  * Un solo temporizador para todo el proceso, a `TICS_POR_SEGUNDO`, que recorre las salas con gente
  * y cada `TICS_POR_SEGUNDO / FOTOS_POR_SEGUNDO` tics serializa UNA foto por sala y manda la MISMA
- * cadena a todos sus canales. Por eso la foto no lleva nada de nadie en particular. Quien tiene el
- * búfer de salida atascado se salta esa foto —y se cuenta—: una foto es una instantánea, y
- * amontonarlas en un canal que no da abasto sólo retrasa la siguiente.
+ * cadena a todos sus canales. Por eso la foto no lleva nada de nadie en particular.
  *
  * Sin salas, el temporizador está PARADO: un servidor sin nadie andando no hace ni un tic.
+ *
+ * ═══ LO QUE SE PUEDE PERDER Y LO QUE NO, CON UN CANAL ATASCADO ═══
+ *
+ * Todo lo que se manda mira antes cuánto espera a salir por ese canal (`pendientes()`), y con más
+ * de `ATASCO_BYTES` no se le sigue llenando la cola. Qué se hace depende de lo que es:
+ *
+ *   · SE SALTA —y se cuenta— lo que otro mensaje sustituye: la FOTO (llega otra en 100 ms), el
+ *     `corrige` (si el aparato insiste desde el sitio malo, pasado un segundo se le repite), el
+ *     `lanza` (es un gesto), y el `fuera` de un canal que se cierra igual (el código de cierre dice
+ *     por qué).
+ *   · CIERRA EL CANAL, con `atascado`, lo que no se puede perder: `dentro`, `vidas`, `da`, `cae` y
+ *     `renace`. Quien se salta un `da` cuenta mal las vidas para siempre —el contrato promete que
+ *     llegan todos y en orden—, así que no se le salta: se le cierra, y al volver a entrar `dentro` y
+ *     `vidas` le ponen al día.
  *
  * ═══ DESALOJO POR CONTENIDO ═══
  *
  * Quien no cambia de sitio aceptado en `QUIETO_HASTA_CERRAR_MS` se cierra con `quieto`. Por
  * contenido y no por tráfico: una pestaña en segundo plano sigue mandando mensajes y parece viva;
- * lo que no hace es moverse. Cerrar el canal no le echa de la mesa —la partida sigue siendo suya—:
- * el aparato vuelve a abrirlo cuando se vuelva a andar.
+ * lo que no hace es moverse. Cerrar el canal no le echa de la mesa —la partida sigue siendo suya—
+ * ni de la sala: su asiento se queda donde estaba. El aparato vuelve a abrirlo cuando se vuelva a
+ * andar.
  */
 import {
+  BOTIN_CADA_PAREJA_MS,
+  CAIDO,
+  CAIDO_MS,
   CIERRE,
+  COSENO_CUADRADO_DEL_CONO,
+  DE_PIE,
   FOTOS_POR_SEGUNDO,
   GRACIA_AL_IRSE_MS,
+  INTOCABLE,
+  INTOCABLE_MS,
   leerMensajeDelAparato,
   MENSAJES_DE_GOLPE,
   MENSAJES_POR_SEGUNDO,
   PLAZO_DEL_HOLA_MS,
   QUIETO_HASTA_CERRAR_MS,
+  REBOBINADO_MAXIMO_MS,
+  RECARGA_DEL_GOLPE_MS,
+  RETRASO_DE_LOS_DEMAS_MS,
   VERSION_DEL_CANAL,
+  VIDA_ENTERA,
+  ALCANCE_DEL_GOLPE,
 } from '../../../shared/mecanicas/canal-de-botas';
-import type { Aqui, Corrige, Dentro, Foto, Fuera } from '../../../shared/mecanicas/canal-de-botas';
-import { DT_DEL_TIC, RADIO_DEL_PASEANTE, TICS_POR_SEGUNDO, VELOCIDAD_CORRIENDO } from '../../../shared/mecanicas/andar';
+import type {
+  Aqui,
+  Cae,
+  Corrige,
+  Da,
+  Dentro,
+  EstadoEnLaRefriega,
+  Foto,
+  Fuera,
+  Golpe,
+  Lanza,
+  Renace,
+  Vidas,
+} from '../../../shared/mecanicas/canal-de-botas';
+import {
+  COSENO,
+  DT_DEL_TIC,
+  RADIO_DEL_PASEANTE,
+  rumboDeRadianes,
+  SENO,
+  TICS_POR_SEGUNDO,
+  VELOCIDAD_CORRIENDO,
+} from '../../../shared/mecanicas/andar';
 import type { Marcha } from '../../../shared/mecanicas/andar';
-import { por } from '../../../shared/mecanicas/fijo';
+import { deNumero, por, UNO } from '../../../shared/mecanicas/fijo';
 import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../../shared/mecanicas/mundo';
 import type { Andante, Arena, MundoDeclarado } from '../../../shared/mecanicas/mundo';
+import { meterElBotinDeVerdad } from './botin';
 import { dondeSeNace, SEPARACION_AL_NACER, sitioDondeCabe } from './sitios';
+import type { Aparicion } from './sitios';
 
 /* ─── LOS NÚMEROS DE LA VALIDACIÓN ───────────────────────────────────────── */
 
@@ -137,9 +223,9 @@ const PARA_ABRIR = 0;
 const PARA_VOLVER_A_DERIVAR = 1;
 
 /**
- * Cuántos bytes pueden esperar a salir por un canal antes de saltarle las fotos: dieciséis kilos,
- * unas setenta fotos de cinco personas. Un canal sano está a cero: lo que se manda va derecho al
- * sistema.
+ * Cuántos bytes pueden esperar a salir por un canal antes de dejar de llenarle la cola: dieciséis
+ * kilos, unas setenta fotos de cinco personas. Un canal sano está a cero: lo que se manda va derecho
+ * al sistema. Qué se hace entonces con cada mensaje, en la cabecera.
  */
 export const ATASCO_BYTES = 16 * 1024;
 
@@ -154,6 +240,96 @@ if (!Number.isInteger(TICS_POR_FOTO) || TICS_POR_FOTO < 1) {
 
 /** Lo que dura un tic del temporizador, en milisegundos: 50. */
 export const MS_POR_TIC = 1000 / TICS_POR_SEGUNDO;
+
+/* ─── LOS NÚMEROS DE LA REFRIEGA ─────────────────────────────────────────── */
+
+/**
+ * LA IDA Y VUELTA DE LA RED QUE SE SUPONE, porque no se mide: 100 ms, un móvil con cobertura normal.
+ * El canal no tiene latido en el protocolo, y el `ping` de `ws` es del enchufe, que no es de aquí.
+ */
+export const IDA_Y_VUELTA_SUPUESTA_MS = 100;
+
+/**
+ * CUÁNTO SE REBOBINA A LOS DEMÁS PARA VERLOS DONDE LOS VEÍA QUIEN GOLPEA: 250 ms.
+ *
+ * ═══ LA CUENTA, CON LO QUE SE SABE Y LO QUE SE SUPONE ═══
+ *
+ * El aparato pinta a los demás `RETRASO_DE_LOS_DEMAS_MS` (150 ms) por detrás de las fotos que le han
+ * llegado —lo dice el contrato, y así lo hace `escenas/paseo/canal-de-botas.ts`—. Eso se SABE. Lo que
+ * falta es la red: la foto tarda en bajar y el golpe en subir, así que cuando el golpe llega aquí lo
+ * que el otro vio tiene 150 ms más una ida y vuelta. Esa ida y vuelta se SUPONE
+ * (`IDA_Y_VUELTA_SUPUESTA_MS`): 150 + 100 = 250, que es justo lo más que el contrato deja rebobinar
+ * (`REBOBINADO_MAXIMO_MS`, la «ventaja del que asoma» de 150-250 ms que aceptó Miguel). El `Math.min`
+ * queda para quien suba la suposición: nunca se rebobina más que el tope.
+ *
+ * Lo que cuesta equivocarse, en el tablero: corriendo se hacen 26,4 u/s, 2,6 u cada 100 ms, que es el
+ * alcance entero del golpe. Con 250 fijos, desde la wifi de casa —20 ms— se acierta a veces a quien
+ * ya se había ido un paso; desde un tren —300 ms— se falla lo que se creía acertar. Es la ventaja
+ * aceptada, y está del lado de quien juega desde el móvil.
+ *
+ * Lo que se rebobina son SITIOS y no estados: si alguien está caído o intocable se mira al llegar
+ * el golpe, que es cuando se puede recibir.
+ */
+export const REBOBINADO_MS = Math.min(REBOBINADO_MAXIMO_MS, RETRASO_DE_LOS_DEMAS_MS + IDA_Y_VUELTA_SUPUESTA_MS);
+
+/** El alcance del golpe en Q16.16, y su cuadrado: 163.840² cabe en un doble sin perder nada. */
+const ALCANCE = deNumero(ALCANCE_DEL_GOLPE);
+const ALCANCE_AL_CUADRADO = ALCANCE * ALCANCE;
+
+/** El coseno al cuadrado del cono en Q16.16 (0,5 → 32.768), para compararlo con enteros exactos. */
+const CONO_EN_FIJO = BigInt(deNumero(COSENO_CUADRADO_DEL_CONO));
+const UNO_GRANDE = BigInt(UNO);
+
+/**
+ * EL RADIO CON QUE SE MIRA SI HAY MURO EN MEDIO: una décima de unidad, un cuarto del de quien anda.
+ *
+ * Con el de quien anda, un golpe que pasa rozando una esquina chocaría con ella —lo mismo que obligó
+ * a la escuadra de los pasos—, y lo que vuela no tiene hombros. Y no cero: `seAndaEnRecta` mira el
+ * tramo a trozos de un radio, y con un radio de nada los trozos serían de un cuarto de unidad y un
+ * muro más fino se colaría entre dos. Con éste, los cuadrados de los trozos se solapan y ningún muro
+ * que corte el tramo se escapa. `seAndaEnRecta` pide además suelo en cada trozo: un golpe no cruza
+ * un hueco sin suelo, que dentro del alcance es el borde del tablero o el agua que no se vadea.
+ */
+export const RADIO_DEL_LANZAMIENTO = Math.floor(RADIO_DEL_PASEANTE / 4);
+
+/**
+ * LEJOS, AL RENACER: lo que corre quien te tumbó mientras dura lo intocable. 26,4 u/s × 2 s = 52,8 u.
+ * Un sitio de nacer a esa distancia de él es uno al que no llega antes de que acabe la protección.
+ * Ver `sitioDeRenacer`.
+ */
+export const LEJOS_AL_RENACER = por(VELOCIDAD_CORRIENDO, deNumero(INTOCABLE_MS / 1000));
+
+/**
+ * EL TOPE DE BOTINES POR MESA Y MINUTO: seis. Sólo cuentan los que ENTRAN.
+ *
+ * ═══ QUÉ PROTEGE ═══
+ *
+ * Cada botín que entra es una entrada más del diario —para siempre, mientras viva la mesa—, una
+ * escritura del fichero entero de la mesa y un despertar de todos los que sondean, que vuelven a
+ * pedir la mesa y la proyectan. La regla de la pareja (`BOTIN_CADA_PAREJA_MS`) ya hace que tumbar al
+ * mismo en bucle no renta; pero con seis sentados hay treinta parejas, y sin tope una refriega
+ * general serían treinta botines por minuto: treinta reescrituras, treinta vueltas de todos los
+ * sondeos, y un diario que crece 1.800 entradas por hora de pelea.
+ *
+ * ═══ POR QUÉ SEIS ═══
+ *
+ * Es el número de asientos de la mesa más grande que se recorre (Riberas y El Burgo, de 2 a 6): con
+ * él, en un minuto cada uno puede perder de media un botín, que es lo mismo que la regla de la pareja
+ * deja entre dos. Con dos jugadores no muerde nunca —dos parejas, dos por minuto—; con seis, deja un
+ * botín cada diez segundos, que en el tablero ya es mucho: el Burgo son cien de dinero y Riberas una
+ * ficha. El diario de una hora de pelea sin parar crece, como mucho, 360 entradas.
+ */
+export const TOPE_DE_BOTINES_POR_MINUTO = 6;
+
+/** La ventana del tope. */
+export const VENTANA_DEL_TOPE_MS = 60_000;
+
+/**
+ * Cuántos sitios guarda el rastro de un asiento, como mucho. Lo normal son los de la ventana de
+ * rebobinado —cinco o seis andando a veinte por segundo—; el tope está por el cubo de mensajes, que
+ * deja pasar cuarenta de golpe, y porque un rastro sin techo es memoria sin techo.
+ */
+export const TOPE_DEL_RASTRO = 64;
 
 /* ─── LO QUE SE INYECTA ──────────────────────────────────────────────────── */
 
@@ -194,14 +370,32 @@ export interface VistaDeLaMesa {
 }
 
 /**
- * LO QUE EL CANAL LE PREGUNTA A LA MESA. Las tres son de LECTURA, y `null` quiere decir «esa
- * mesa no existe». Lo real está en `index.ts` (`quienEsLaLlave`, `revisionDe` y `mirar` de
+ * LO QUE FUE DEL BOTÍN, dicho por la mesa: las tres salidas del reductor —entró, sin efecto,
+ * rechazado— y las tres de la mesa —terminada, arcade apartado, sin mesa—. Ver `meterDeLaPlataforma`
+ * en `arcade/mesas.ts`.
+ */
+export type SalidaDelBotin = 'entro' | 'sinEfecto' | 'rechazado' | 'terminada' | 'apartado' | 'sinMesa';
+
+export interface LoQueFueDelBotin {
+  readonly salida: SalidaDelBotin;
+  /** El motivo del juego, si lo rechazó. */
+  readonly motivo?: string;
+}
+
+/**
+ * LO QUE EL CANAL LE PREGUNTA A LA MESA. Las tres primeras son de LECTURA, y `null` quiere decir
+ * «esa mesa no existe». Lo real está en `index.ts` (`quienEsLaLlave`, `revisionDe` y `mirar` de
  * `arcade/mesas.ts`, las tres sin llave, como un espectador).
+ *
+ * La cuarta, `botin`, es la única que escribe, y la única opcional: la mesa de verdad de `index.ts`
+ * no la trae —se escribió antes de la refriega—, y sin ella el canal usa la de `botin.ts`, que va a
+ * la vía interna de la mesa de verdad y avisa a quien sondea. Las pruebas la inyectan.
  */
 export interface LaMesa {
   quienEsLaLlave(codigo: string, llave: string): Promise<AsientoDeLaLlave | null>;
   revision(codigo: string): Promise<{ readonly rev: number; readonly terminada: boolean } | null>;
   vista(codigo: string): Promise<VistaDeLaMesa | null>;
+  botin?(codigo: string, pierde: string, gana: string): Promise<LoQueFueDelBotin>;
 }
 
 /** De dónde sale el mundo: `sePuedeRecorrer` y `mundoDeLaMesa` de `shared/arcade/juegos/mundos.ts`. */
@@ -232,6 +426,9 @@ export type PorQueSeCierra = keyof typeof CIERRE | 'apagado' | 'fallo' | 'seFue'
 /** Por qué se corrigió a alguien. */
 export type PorQueSeCorrige = 'presupuesto' | 'estructura' | 'rescate' | 'repetida';
 
+/** Qué fue de cada botín que pidió una caída, y por qué no se pidió el que no se pidió. */
+export type CuentaDelBotin = SalidaDelBotin | 'porPareja' | 'porTope' | 'fallos';
+
 /**
  * LO QUE DICE EL DIAGNÓSTICO. Sólo cuentas: ni un código de mesa, ni un asiento, ni una llave.
  * `/api/arcade/diagnostico` se sirve sin credencial.
@@ -248,11 +445,24 @@ export interface DiagnosticoDeBotas {
   fotos: number;
   fotosSaltadas: number;
   bytesDeFotos: number;
+  /** Lo demás que se le saltó a un canal atascado: `corrige`, `lanza` y el `fuera` de quien se cierra. */
+  saltados: number;
   aceptados: number;
   porEscuadra: number;
   ignorados: number;
   ignoradosTrasCorregir: number;
   correcciones: Record<PorQueSeCorrige, number>;
+  /** Golpes aceptados: cada uno, un `lanza`. */
+  golpes: number;
+  /** Golpes ignorados: de un caído, en recarga, o con un tic que no crece. */
+  golpesIgnorados: number;
+  /** Golpes que dieron a alguien: cada uno, un `da`. */
+  aciertos: number;
+  caidas: number;
+  renacidas: number;
+  botines: Record<CuentaDelBotin, number>;
+  /** Cuántos sitios guardan ahora los rastros de todas las salas: la memoria del rebobinado. */
+  sitiosEnLosRastros: number;
   rederivaciones: number;
   fallosAlRederivar: number;
   /** Cuántas salas esperan su turno para volver a derivar el mundo. */
@@ -276,11 +486,29 @@ export function cuentasVacias(): DiagnosticoDeBotas {
     fotos: 0,
     fotosSaltadas: 0,
     bytesDeFotos: 0,
+    saltados: 0,
     aceptados: 0,
     porEscuadra: 0,
     ignorados: 0,
     ignoradosTrasCorregir: 0,
     correcciones: { presupuesto: 0, estructura: 0, rescate: 0, repetida: 0 },
+    golpes: 0,
+    golpesIgnorados: 0,
+    aciertos: 0,
+    caidas: 0,
+    renacidas: 0,
+    botines: {
+      entro: 0,
+      sinEfecto: 0,
+      rechazado: 0,
+      terminada: 0,
+      apartado: 0,
+      sinMesa: 0,
+      porPareja: 0,
+      porTope: 0,
+      fallos: 0,
+    },
+    sitiosEnLosRastros: 0,
     rederivaciones: 0,
     fallosAlRederivar: 0,
     colaParaDerivar: 0,
@@ -345,27 +573,90 @@ export function seAndaElTramo(arena: Arena, desde: Andante, hasta: Andante, radi
   return null;
 }
 
+/* ─── EL CONO Y EL RASTRO ────────────────────────────────────────────────── */
+
+/**
+ * ¿CAE `(dx, dz)` DENTRO DEL CONO DE LA MIRADA `(mx, mz)`? Todo en Q16.16.
+ *
+ * `(d·m)² ≥ c²·|d|²·|m|²` con `d·m ≥ 0`, que es lo que el contrato da hecho para no sacar raíces
+ * (`COSENO_CUADRADO_DEL_CONO`). La mirada sale de las tablas literales de `andar.ts` —`SENO[r]` y
+ * `−COSENO[r]`, el convenio de los rumbos—, así que `|m|²` no es exactamente 2³²: se usa el que es.
+ * Y en ENTEROS GRANDES: con el alcance de 2,5 u los productos llegan a 2⁶⁹, y un doble los
+ * redondearía justo en el borde del cono, que es donde importa.
+ *
+ * En el mismo sitio (`d` nulo) da: los paseantes no chocan entre sí, y quien está encima de otro
+ * está a su alcance lo mire como lo mire.
+ */
+export function enElCono(dx: number, dz: number, mx: number, mz: number): boolean {
+  const gx = BigInt(dx);
+  const gz = BigInt(dz);
+  const hx = BigInt(mx);
+  const hz = BigInt(mz);
+  const dm = gx * hx + gz * hz;
+  if (dm < 0n) return false;
+  return dm * dm * UNO_GRANDE >= CONO_EN_FIJO * (gx * gx + gz * gz) * (hx * hx + hz * hz);
+}
+
+/**
+ * APUNTA UN SITIO EN EL RASTRO de un asiento: `[t, x, z, t, x, z, …]`, del más viejo al más nuevo.
+ *
+ * Se queda lo de la ventana de rebobinado y el ÚLTIMO de antes de ella —con eso se sabe dónde estaba
+ * en cualquier instante de la ventana—, y nunca más de `TOPE_DEL_RASTRO`. Números sueltos en una
+ * lista y no objetos: es lo que más se escribe del canal, veinte veces por segundo por asiento.
+ */
+function apuntarEnElRastro(rastro: number[], t: number, x: number, z: number): void {
+  rastro.push(t, x, z);
+  const desde = t - REBOBINADO_MS;
+  let quitar = 0;
+  while (quitar + 3 < rastro.length && (rastro[quitar + 3] as number) <= desde) quitar += 3;
+  if (rastro.length - quitar > TOPE_DEL_RASTRO * 3) quitar = rastro.length - TOPE_DEL_RASTRO * 3;
+  if (quitar > 0) rastro.splice(0, quitar);
+}
+
+/**
+ * DÓNDE ESTABA, SEGÚN SU RASTRO, EN EL INSTANTE `t`: el último sitio aceptado que no es posterior.
+ * Es lo que el servidor creía en ese momento, y lo que salía en sus fotos. Si todo el rastro es
+ * posterior —apareció después—, el primero que hay.
+ */
+function sitioEnElRastro(rastro: readonly number[], t: number, ahora: Andante): Andante {
+  for (let i = rastro.length - 3; i >= 0; i -= 3) {
+    if ((rastro[i] as number) <= t) return { x: rastro[i + 1] as number, z: rastro[i + 2] as number };
+  }
+  if (rastro.length >= 3) return { x: rastro[1] as number, z: rastro[2] as number };
+  return ahora;
+}
+
 /* ─── LO QUE VIVE EN MEMORIA ─────────────────────────────────────────────── */
 
 type Estado = 'saludo' | 'entrando' | 'dentro' | 'cerrada';
 
-/** Un asiento dentro de la sala. Vive mientras tenga canal, y la gracia después. */
+/** Un asiento de la mesa, dentro de la sala. Vive lo que viva la sala, tenga canal o no. */
 interface Ocupante {
   readonly id: string;
-  /** El último sitio BUENO, en Q16.16: el aceptado, el de nacer o el del rescate. */
+  /** El último sitio BUENO, en Q16.16: el aceptado, el de nacer, el del rescate o el de renacer. */
   x: number;
   z: number;
-  /** Hacia dónde MIRA (0 a 255), tal cual lo dijo su último `aqui` aceptado. No se valida. */
+  /** Hacia dónde MIRA (0 a 255), tal cual lo dijo su último `aqui` o su último golpe. No se valida. */
   r: number;
   m: Marcha;
   conexion: Conexion | null;
-  /** Cuándo se quedó sin canal. `null` mientras lo tiene. */
-  idoEn: number | null;
   presupuesto: number;
   recargadoEn: number;
+  /** Lo que le queda de vida, de `VIDA_ENTERA` a cero. */
+  vida: number;
+  /** Cuándo cayó; `null` si no está en el suelo. */
+  caidoEn: number | null;
+  /** Quién lo tumbó la última vez: para renacer lejos de él. */
+  tumbadoPor: string | null;
+  /** Cuándo renació por última vez: intocable `INTOCABLE_MS` desde aquí. */
+  renacidoEn: number | null;
+  /** Su último golpe ACEPTADO: la recarga cuenta desde aquí, y sólo desde aquí. */
+  golpeadoEn: number | null;
+  /** Dónde ha estado, para rebobinarle. Ver `apuntarEnElRastro`. */
+  readonly rastro: number[];
 }
 
-/** La sala de una mesa: su mundo y quién anda por él. Vive mientras haya alguien. */
+/** La sala de una mesa: su mundo y sus asientos. Vive mientras alguien tenga canal, y la gracia después. */
 interface Sala {
   readonly codigo: string;
   readonly arcade: string;
@@ -380,6 +671,8 @@ interface Sala {
   /** Si está en la cola para volver a derivar su mundo. Una vez como mucho. */
   enCola: boolean;
   cerrada: boolean;
+  /** Desde cuándo no tiene a nadie con canal; `null` mientras alguien lo tiene. */
+  vaciaDesde: number | null;
 }
 
 /** Una mesa que no se puede recorrer ahora, y cómo se le dice a quien llama. */
@@ -400,6 +693,24 @@ interface Pendiente {
 }
 
 /**
+ * EL LIBRO DE BOTINES DE UNA MESA: lo que la protege del bucle y de la pelea general. Vive en el
+ * canal y no en la sala, a propósito: si viviera en la sala, bastaría con que se vaciara —cinco
+ * segundos sin nadie con canal— para que la misma pareja volviera a cobrar al minuto de haber cobrado,
+ * y a quien no ha bajado se le podría vaciar el bolsillo saliendo y entrando.
+ */
+interface LibroDeBotines {
+  /** Cuándo ENTRÓ el último botín de cada pareja, por `pierde` y `gana`. */
+  readonly parejas: Map<string, number>;
+  /** Cuándo entró cada botín de esta mesa en la ventana del tope, del más viejo al más nuevo. */
+  readonly entrados: number[];
+  /** Las parejas cuyo botín está de camino a la mesa: cuentan para el tope y no se repiten. */
+  readonly enCamino: Set<string>;
+}
+
+/** Qué se hace con un mensaje si el canal de quien lo recibe está atascado. Ver la cabecera. */
+type SiSeAtasca = 'saltar' | 'cerrar';
+
+/**
  * UN CANAL ABIERTO. Lo crea `CanalDeBotas.abrir` y le llegan los mensajes por `recibir`; cuando
  * el otro lado cierra, `seCerro`.
  */
@@ -409,6 +720,8 @@ export class Conexion {
   ocupante: Ocupante | null = null;
   plazo: Temporizador | null = null;
   ultimoN = 0;
+  /** El tic del último golpe: crece como el de los pasos, y por separado —un golpe va en el tic de un paso—. */
+  ultimoGolpe = 0;
   movidoEn = 0;
   pendiente: Pendiente | null = null;
   malos = 0;
@@ -457,9 +770,12 @@ export class CanalDeBotas {
   private readonly mesa: LaMesa;
   private readonly mundos: LosMundos;
   private readonly registrar: (linea: string) => void;
+  private readonly meterElBotin: (codigo: string, pierde: string, gana: string) => Promise<LoQueFueDelBotin>;
   private readonly salas = new Map<string, Sala>();
   private readonly creando = new Map<string, Promise<Sala | Negativa>>();
   private readonly conexiones = new Set<Conexion>();
+  /** Los libros de botines, por mesa. Ver `LibroDeBotines`. */
+  private readonly libros = new Map<string, LibroDeBotines>();
   private temporizador: Temporizador | null = null;
   private apagado = false;
   private readonly cuentas = cuentasVacias();
@@ -479,6 +795,8 @@ export class CanalDeBotas {
     this.mundos = opciones.mundos;
     this.registrar = opciones.registrar ?? ((linea) => console.log(`[botas] ${linea}`));
     this.cronometro = opciones.cronometro ?? (() => performance.now());
+    const botin = opciones.mesa.botin;
+    this.meterElBotin = botin === undefined ? meterElBotinDeVerdad : botin.bind(opciones.mesa);
   }
 
   /* ── Entrar ──────────────────────────────────────────────────────────── */
@@ -549,17 +867,18 @@ export class CanalDeBotas {
       return;
     }
 
-    if (m.t === 'golpe') {
-      /*
-       * EL GOLPE, TODAVÍA SIN REFRIEGA. El contrato ya lo lee (la ronda 3 de Boots on Board), pero
-       * la sala aún no lo arbitra: se cuenta y se ignora, como el paso de quien aún está entrando.
-       * Un aparato nuevo contra este servidor golpea al aire, y no se le echa por ello.
-       */
-      this.cuentas.ignorados++;
-      return;
+    /* POR TIPO, y sólo el paso va a validarse: ver la cabecera. */
+    switch (m.t) {
+      case 'aqui':
+        this.validar(c, m, ahora);
+        return;
+      case 'golpe':
+        this.golpear(c, m, ahora);
+        return;
+      default:
+        this.cuentas.ignorados++;
+        return;
     }
-
-    this.validar(c, m, ahora);
   }
 
   /** El otro lado cerró. Si ya lo había cerrado el servidor, no hay nada más que hacer. */
@@ -627,6 +946,7 @@ export class CanalDeBotas {
     if (arena === null) {
       return { clave: 'mesaQueNo', motivo: 'Todavía no hay tablero que recorrer: la partida no ha empezado.' };
     }
+    const ahora = this.reloj.ahora();
     const sala: Sala = {
       codigo,
       arcade: v.arcade,
@@ -636,17 +956,47 @@ export class CanalDeBotas {
       ocupantes: new Map(),
       k: 0,
       revisando: false,
-      revisadaEn: this.reloj.ahora(),
+      revisadaEn: ahora,
       enCola: false,
       cerrada: false,
+      vaciaDesde: ahora,
     };
+    /* TODOS los sentados, de pie en su sitio de nacer, y en el orden de la mesa: ver la cabecera. */
+    for (const id of v.asientos) this.ponerEnLaSala(sala, id, ahora);
     this.salas.set(codigo, sala);
     this.encenderElReloj();
     this.registrar(`se abre la sala de la mesa ${codigo} (${v.arcade})`);
     return sala;
   }
 
-  /** Pone a este canal en su asiento de la sala y le dice dónde está. */
+  /**
+   * PONE UN ASIENTO EN LA SALA, de pie en su sitio de nacer y sin canal: como están todos al
+   * abrirse, y como está quien se sentó después de la última vez que se miró la mesa.
+   */
+  private ponerEnLaSala(sala: Sala, id: string, ahora: number): Ocupante {
+    const turno = sala.asientos.indexOf(id);
+    const nace = dondeSeNace(sala.arena, turno >= 0 ? turno : sala.ocupantes.size, (x, z) => this.hayOtro(sala, null, x, z));
+    const o: Ocupante = {
+      id,
+      x: nace.x,
+      z: nace.z,
+      r: nace.r,
+      m: 0,
+      conexion: null,
+      presupuesto: TOPE_DEL_PRESUPUESTO,
+      recargadoEn: ahora,
+      vida: VIDA_ENTERA,
+      caidoEn: null,
+      tumbadoPor: null,
+      renacidoEn: null,
+      golpeadoEn: null,
+      rastro: [ahora, nace.x, nace.z],
+    };
+    sala.ocupantes.set(id, o);
+    return o;
+  }
+
+  /** Pone a este canal en su asiento de la sala y le dice dónde está y cómo están todos. */
   private sentar(c: Conexion, sala: Sala, id: string): void {
     const ahora = this.reloj.ahora();
     if (sala.cerrada) {
@@ -663,39 +1013,27 @@ export class CanalDeBotas {
     if (o?.conexion) {
       this.echar(o.conexion, 'reemplazado', 'Se ha abierto otro canal con este asiento: sigue en el nuevo.');
     }
-    if (o === undefined) {
-      const turno = sala.asientos.indexOf(id);
-      const nace = dondeSeNace(sala.arena, turno >= 0 ? turno : sala.ocupantes.size, (x, z) => this.hayAlguien(sala, x, z));
-      o = {
-        id,
-        x: nace.x,
-        z: nace.z,
-        r: nace.r,
-        m: 0,
-        conexion: null,
-        idoEn: null,
-        presupuesto: TOPE_DEL_PRESUPUESTO,
-        recargadoEn: ahora,
-      };
-      sala.ocupantes.set(id, o);
-    }
+    if (o === undefined) o = this.ponerEnLaSala(sala, id, ahora);
     /*
-     * Quien vuelve dentro de la gracia vuelve donde estaba, y ese sitio es bueno en el mundo de
-     * AHORA: si el mundo cambió mientras no estaba, `rescatar` ya le sacó, porque recorre a todos
-     * los de la sala —con canal o sin él— cada vez que se vuelve a derivar.
+     * Quien vuelve, vuelve DONDE ESTABA —su asiento no ha salido de la sala— y con la vida que
+     * tenga, y ese sitio es bueno en el mundo de AHORA: si el mundo cambió mientras no estaba,
+     * `rescatar` ya le sacó, porque recorre a todos los de la sala —con canal o sin él— cada vez que
+     * se vuelve a derivar.
      */
 
     o.conexion = c;
-    o.idoEn = null;
+    sala.vaciaDesde = null;
     c.estado = 'dentro';
     c.sala = sala;
     c.ocupante = o;
     c.ultimoN = 0;
+    c.ultimoGolpe = 0;
     c.movidoEn = ahora;
     c.pendiente = { x: o.x, z: o.z, desde: ahora };
     this.cuentas.entradas++;
     const dentro: Dentro = { t: 'dentro', yo: id, x: o.x, z: o.z, r: o.r, hz: TICS_POR_SEGUNDO };
-    c.enchufe.enviar(JSON.stringify(dentro));
+    this.mandar(c, JSON.stringify(dentro), 'cerrar');
+    this.mandar(c, JSON.stringify(this.vidasDe(sala, ahora)), 'cerrar');
   }
 
   /* ── Andar ───────────────────────────────────────────────────────────── */
@@ -704,6 +1042,11 @@ export class CanalDeBotas {
     const o = c.ocupante;
     const sala = c.sala;
     if (o === null || sala === null) return;
+
+    if (o.caidoEn !== null) {
+      this.cuentas.ignorados++;
+      return;
+    }
 
     if (m.n <= c.ultimoN) {
       this.cuentas.ignorados++;
@@ -739,8 +1082,7 @@ export class CanalDeBotas {
       }
       if (como === 'escuadra') this.cuentas.porEscuadra++;
       o.presupuesto -= d;
-      o.x = m.x;
-      o.z = m.z;
+      this.moverA(o, m.x, m.z, ahora);
       c.movidoEn = ahora;
     }
     o.r = m.r;
@@ -753,14 +1095,23 @@ export class CanalDeBotas {
     const o = c.ocupante;
     if (o === null) return;
     const corrige: Corrige = { t: 'corrige', n, x: o.x, z: o.z };
-    c.enchufe.enviar(JSON.stringify(corrige));
+    /* Se puede saltar: la corrección queda PENDIENTE igual, y si insiste desde el sitio malo, se repite. */
+    this.mandar(c, JSON.stringify(corrige), 'saltar');
     c.pendiente = { x: o.x, z: o.z, desde: ahora };
     this.cuentas.correcciones[porque]++;
   }
 
-  /** ¿Hay alguien de esta sala a menos de `SEPARACION_AL_NACER` de este punto? */
-  private hayAlguien(sala: Sala, x: number, z: number): boolean {
+  /** El sitio bueno de alguien pasa a ser éste, y queda en su rastro. */
+  private moverA(o: Ocupante, x: number, z: number, ahora: number): void {
+    o.x = x;
+    o.z = z;
+    apuntarEnElRastro(o.rastro, ahora, x, z);
+  }
+
+  /** ¿Hay alguien de esta sala —que no sea `excepto`— a menos de `SEPARACION_AL_NACER` de este punto? */
+  private hayOtro(sala: Sala, excepto: Ocupante | null, x: number, z: number): boolean {
     for (const o of sala.ocupantes.values()) {
+      if (o === excepto) continue;
       if (Math.abs(o.x - x) < SEPARACION_AL_NACER && Math.abs(o.z - z) < SEPARACION_AL_NACER) return true;
     }
     return false;
@@ -772,14 +1123,258 @@ export class CanalDeBotas {
     if (libre !== null) return libre;
     /* Nada a 38 unidades: a un sitio de nacer, como si entrara. */
     const turno = sala.asientos.indexOf(o.id);
-    const otros = (x: number, z: number): boolean => {
-      for (const p of sala.ocupantes.values()) {
-        if (p === o) continue;
-        if (Math.abs(p.x - x) < SEPARACION_AL_NACER && Math.abs(p.z - z) < SEPARACION_AL_NACER) return true;
+    return dondeSeNace(sala.arena, turno >= 0 ? turno : 0, (x, z) => this.hayOtro(sala, o, x, z));
+  }
+
+  /* ── La refriega ─────────────────────────────────────────────────────── */
+
+  /** Cómo está alguien ahora: caído hasta que renace, e intocable `INTOCABLE_MS` después. */
+  private estadoDe(o: Ocupante, ahora: number): EstadoEnLaRefriega {
+    if (o.caidoEn !== null) return CAIDO;
+    if (o.renacidoEn !== null && ahora - o.renacidoEn < INTOCABLE_MS) return INTOCABLE;
+    return DE_PIE;
+  }
+
+  /** Cómo está cada uno de la sala: lo que recibe quien entra. */
+  private vidasDe(sala: Sala, ahora: number): Vidas {
+    const v: [string, number, EstadoEnLaRefriega][] = [];
+    for (const o of sala.ocupantes.values()) v.push([o.id, o.vida, this.estadoDe(o, ahora)]);
+    return { t: 'vidas', v };
+  }
+
+  /** UN GOLPE. Ver «La refriega, en una pantalla», en la cabecera. */
+  private golpear(c: Conexion, m: Golpe, ahora: number): void {
+    const o = c.ocupante;
+    const sala = c.sala;
+    if (o === null || sala === null) return;
+    if (m.n <= c.ultimoGolpe) {
+      this.cuentas.golpesIgnorados++;
+      return;
+    }
+    c.ultimoGolpe = m.n;
+    if (o.caidoEn !== null || (o.golpeadoEn !== null && ahora - o.golpeadoEn < RECARGA_DEL_GOLPE_MS)) {
+      this.cuentas.golpesIgnorados++;
+      return;
+    }
+    o.golpeadoEn = ahora;
+    o.r = m.r;
+    this.cuentas.golpes++;
+    const lanza: Lanza = { t: 'lanza', de: o.id };
+    this.repartir(sala, JSON.stringify(lanza), 'saltar');
+
+    const blanco = this.aQuienDa(sala, o, m.r, ahora);
+    if (blanco === null) return;
+    blanco.vida = Math.max(0, blanco.vida - 1);
+    this.cuentas.aciertos++;
+    const da: Da = { t: 'da', de: o.id, a: blanco.id, vida: blanco.vida };
+    this.repartir(sala, JSON.stringify(da), 'cerrar');
+    if (blanco.vida === 0) this.tumbar(sala, blanco, o, ahora);
+  }
+
+  /**
+   * A QUIÉN LE DA UN GOLPE de `quien` hacia `r`, o `null`. Los demás DE PIE ahora, cada uno donde
+   * estaba `REBOBINADO_MS` antes según su rastro; a `ALCANCE_DEL_GOLPE` o menos de quien golpea —en
+   * su sitio aceptado—, dentro del cono y sin muro en medio. El más cercano, uno solo; a igual
+   * distancia, el que se sentó antes. El muro se mira el último y sólo hasta el primero que pasa:
+   * es lo único caro.
+   */
+  private aQuienDa(sala: Sala, quien: Ocupante, r: number, ahora: number): Ocupante | null {
+    const cuando = ahora - REBOBINADO_MS;
+    const mx = SENO[r] as number;
+    const mz = -(COSENO[r] as number);
+    const candidatos: { o: Ocupante; sitio: Andante; d2: number; orden: number }[] = [];
+    let orden = 0;
+    for (const otro of sala.ocupantes.values()) {
+      orden++;
+      if (otro === quien || this.estadoDe(otro, ahora) !== DE_PIE) continue;
+      const sitio = sitioEnElRastro(otro.rastro, cuando, otro);
+      const dx = sitio.x - quien.x;
+      const dz = sitio.z - quien.z;
+      if (dx > ALCANCE || dx < -ALCANCE || dz > ALCANCE || dz < -ALCANCE) continue;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > ALCANCE_AL_CUADRADO || !enElCono(dx, dz, mx, mz)) continue;
+      candidatos.push({ o: otro, sitio, d2, orden });
+    }
+    candidatos.sort((a, b) => a.d2 - b.d2 || a.orden - b.orden);
+    for (const k of candidatos) {
+      if (seAndaEnRecta(sala.arena, quien, k.sitio, RADIO_DEL_LANZAMIENTO)) return k.o;
+    }
+    return null;
+  }
+
+  /** SE CAE: al suelo donde está, `cae` a la sala, y se pide el botín. */
+  private tumbar(sala: Sala, victima: Ocupante, verdugo: Ocupante, ahora: number): void {
+    victima.caidoEn = ahora;
+    victima.tumbadoPor = verdugo.id;
+    victima.m = 0;
+    this.cuentas.caidas++;
+    const cae: Cae = { t: 'cae', a: victima.id, por: verdugo.id };
+    this.repartir(sala, JSON.stringify(cae), 'cerrar');
+    this.pedirElBotin(sala.codigo, victima.id, verdugo.id, ahora);
+  }
+
+  /**
+   * RENACE: en `sitioDeRenacer`, con la vida entera, intocable, y su sitio bueno pasa a ser ése —la
+   * validación sigue desde ahí—. Lo que ya venía de camino desde donde cayó se calla un segundo, como
+   * tras un `corrige`.
+   */
+  private renacer(sala: Sala, o: Ocupante, ahora: number): void {
+    const sitio = this.sitioDeRenacer(sala, o);
+    this.moverA(o, sitio.x, sitio.z, ahora);
+    o.r = sitio.r;
+    o.m = 0;
+    o.vida = VIDA_ENTERA;
+    o.caidoEn = null;
+    o.renacidoEn = ahora;
+    o.presupuesto = TOPE_DEL_PRESUPUESTO;
+    o.recargadoEn = ahora;
+    const c = o.conexion;
+    if (c !== null) {
+      c.pendiente = { x: sitio.x, z: sitio.z, desde: ahora };
+      c.movidoEn = ahora;
+    }
+    this.cuentas.renacidas++;
+    const renace: Renace = { t: 'renace', a: o.id, x: sitio.x, z: sitio.z, r: sitio.r };
+    this.repartir(sala, JSON.stringify(renace), 'cerrar');
+  }
+
+  /**
+   * DÓNDE RENACE QUIEN CAYÓ. Una regla determinista, en tres escalones, sobre los sitios de nacer que
+   * declara el mundo, recorridos desde EL SUYO —el de su asiento, el mismo al que se entra— y
+   * siguiendo la lista:
+   *
+   *   1. El primero LIBRE —se puede estar y no hay nadie encima— que esté a `LEJOS_AL_RENACER` o más
+   *      de quien lo tumbó (donde esté ahora): lo que éste corre mientras dura lo intocable. Así nadie
+   *      recibe a nadie con un golpe al acabar la protección, y casi siempre es el suyo.
+   *   2. Si ninguno libre está tan lejos, el libre MÁS LEJANO de quien lo tumbó; a igual distancia,
+   *      el primero de la lista contando desde el suyo.
+   *   3. Si no hay ninguno libre, como al entrar (`dondeSeNace`), que busca en anillos.
+   *
+   * Si quien lo tumbó ya no está en la sala, cualquiera está lejos: el suyo, si está libre.
+   */
+  private sitioDeRenacer(sala: Sala, o: Ocupante): Aparicion {
+    const arena = sala.arena;
+    const verdugo = o.tumbadoPor === null ? undefined : sala.ocupantes.get(o.tumbadoPor);
+    const cuantos = arena.nace.length / 2;
+    const turno = sala.asientos.indexOf(o.id);
+    const suyo = cuantos === 0 ? 0 : (((turno >= 0 ? turno : 0) % cuantos) + cuantos) % cuantos;
+    let masLejano = -1;
+    let distanciaMayor = -1;
+    for (let j = 0; j < cuantos; j++) {
+      const i = (suyo + j) % cuantos;
+      const x = arena.nace[i * 2] as number;
+      const z = arena.nace[i * 2 + 1] as number;
+      if (!sePuedeEstar(arena, x, z, RADIO_DEL_PASEANTE) || this.hayOtro(sala, o, x, z)) continue;
+      const lejos = verdugo === undefined ? Infinity : Math.hypot(x - verdugo.x, z - verdugo.z);
+      if (lejos >= LEJOS_AL_RENACER) return { x, z, r: rumboDeRadianes(arena.rumbos[i] as number) };
+      if (lejos > distanciaMayor) {
+        distanciaMayor = lejos;
+        masLejano = i;
       }
-      return false;
-    };
-    return dondeSeNace(sala.arena, turno >= 0 ? turno : 0, otros);
+    }
+    if (masLejano >= 0) {
+      return {
+        x: arena.nace[masLejano * 2] as number,
+        z: arena.nace[masLejano * 2 + 1] as number,
+        r: rumboDeRadianes(arena.rumbos[masLejano] as number),
+      };
+    }
+    return dondeSeNace(arena, turno >= 0 ? turno : 0, (x, z) => this.hayOtro(sala, o, x, z));
+  }
+
+  /* ── El botín ────────────────────────────────────────────────────────── */
+
+  private libroDe(codigo: string): LibroDeBotines {
+    let libro = this.libros.get(codigo);
+    if (libro === undefined) {
+      libro = { parejas: new Map(), entrados: [], enCamino: new Set() };
+      this.libros.set(codigo, libro);
+    }
+    return libro;
+  }
+
+  /** Quita del libro lo que ya no cuenta. `true` si se ha quedado vacío. */
+  private podar(libro: LibroDeBotines, ahora: number): boolean {
+    for (const [pareja, t] of libro.parejas) if (ahora - t >= BOTIN_CADA_PAREJA_MS) libro.parejas.delete(pareja);
+    let viejos = 0;
+    while (viejos < libro.entrados.length && ahora - (libro.entrados[viejos] as number) >= VENTANA_DEL_TOPE_MS) viejos++;
+    if (viejos > 0) libro.entrados.splice(0, viejos);
+    return libro.parejas.size === 0 && libro.entrados.length === 0 && libro.enCamino.size === 0;
+  }
+
+  /**
+   * EL BOTÍN DE UNA CAÍDA: `pierde` cayó y `gana` lo tumbó. Se mete en la mesa —por la vía interna,
+   * con `movimientoDelBotin(pierde, gana)`— salvo que:
+   *
+   *   · ESA PAREJA —en ese sentido— ya cobró un botín QUE ENTRÓ hace menos de `BOTIN_CADA_PAREJA_MS`,
+   *     o tiene uno de camino. La inversa es otra pareja.
+   *   · LA MESA ya ha metido `TOPE_DE_BOTINES_POR_MINUTO` en el último minuto, contando los que van
+   *     de camino: con seis en vuelo no sale un séptimo aunque ninguno haya contestado todavía.
+   *
+   * Sólo cuenta lo que ENTRA. Un botín sin efecto —nada que llevarse, una subasta abierta— o
+   * rechazado —alguien que no juega— no gasta la pareja ni el tope: la próxima vez puede que sí haya
+   * algo. Lo que conteste la mesa se cuenta en el diagnóstico; si revienta, también, y se dice.
+   */
+  private pedirElBotin(codigo: string, pierde: string, gana: string, ahora: number): void {
+    const libro = this.libroDe(codigo);
+    this.podar(libro, ahora);
+    const pareja = `${pierde}\u0000${gana}`;
+    const cobrada = libro.parejas.get(pareja);
+    if (libro.enCamino.has(pareja) || (cobrada !== undefined && ahora - cobrada < BOTIN_CADA_PAREJA_MS)) {
+      this.cuentas.botines.porPareja++;
+      return;
+    }
+    if (libro.entrados.length + libro.enCamino.size >= TOPE_DE_BOTINES_POR_MINUTO) {
+      this.cuentas.botines.porTope++;
+      return;
+    }
+    libro.enCamino.add(pareja);
+    let promesa: Promise<LoQueFueDelBotin>;
+    try {
+      promesa = this.meterElBotin(codigo, pierde, gana);
+    } catch (error) {
+      promesa = Promise.reject(error);
+    }
+    promesa.then(
+      (fue) => {
+        libro.enCamino.delete(pareja);
+        this.cuentas.botines[fue.salida]++;
+        if (fue.salida !== 'entro') return;
+        const t = this.reloj.ahora();
+        libro.parejas.set(pareja, t);
+        libro.entrados.push(t);
+      },
+      (error: unknown) => {
+        libro.enCamino.delete(pareja);
+        this.cuentas.botines.fallos++;
+        this.registrar(
+          `el botín de una caída en la mesa ${codigo} no ha podido entrar: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      },
+    );
+  }
+
+  /* ── Mandar ──────────────────────────────────────────────────────────── */
+
+  /** Manda a un canal, mirando antes si da abasto. Ver «Lo que se puede perder y lo que no». */
+  private mandar(c: Conexion, texto: string, siSeAtasca: SiSeAtasca): void {
+    if (c.estado === 'cerrada') return;
+    if (c.enchufe.pendientes() > ATASCO_BYTES) {
+      if (siSeAtasca === 'saltar') {
+        this.cuentas.saltados++;
+        return;
+      }
+      this.echar(c, 'atascado', 'Tu conexión no daba abasto: vuelve a entrar para ponerte al día.');
+      return;
+    }
+    c.enchufe.enviar(texto);
+  }
+
+  /** La misma cadena a todos los de la sala que tienen canal. */
+  private repartir(sala: Sala, texto: string, siSeAtasca: SiSeAtasca): void {
+    for (const o of sala.ocupantes.values()) {
+      if (o.conexion !== null) this.mandar(o.conexion, texto, siSeAtasca);
+    }
   }
 
   /* ── El tic ──────────────────────────────────────────────────────────── */
@@ -800,7 +1395,8 @@ export class CanalDeBotas {
    * Se recorren los `Map` en vivo y no copias: borrar la entrada que se está visitando es seguro
    * en un `Map`, y copiar las salas y sus asientos veinte veces por segundo es basura para nada.
    * Cada sala va en su `try`: lo que reviente en una no se lleva el tic de las demás, ni —por el
-   * `uncaughtException` de `index.ts`— el proceso.
+   * `uncaughtException` de `index.ts`— el proceso. Una vez por segundo se podan además los libros de
+   * botines, y se tiran los que se han quedado vacíos.
    */
   tic(): void {
     const ahora = this.reloj.ahora();
@@ -812,21 +1408,28 @@ export class CanalDeBotas {
         this.registrar(`el tic de la mesa ${sala.codigo} ha fallado: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+    if (this.cuentas.tics % TICS_POR_SEGUNDO === 0) {
+      for (const [codigo, libro] of this.libros) if (this.podar(libro, ahora)) this.libros.delete(codigo);
+    }
     if (this.salas.size === 0) this.apagarElReloj();
   }
 
   private ticDeLaSala(sala: Sala, ahora: number): void {
     sala.k++;
+    let conCanal = 0;
     for (const o of sala.ocupantes.values()) {
-      if (o.conexion === null) {
-        if (o.idoEn !== null && ahora - o.idoEn >= GRACIA_AL_IRSE_MS) sala.ocupantes.delete(o.id);
+      if (o.caidoEn !== null && ahora - o.caidoEn >= CAIDO_MS) this.renacer(sala, o, ahora);
+      const c = o.conexion;
+      if (c === null) continue;
+      if (ahora - c.movidoEn >= QUIETO_HASTA_CERRAR_MS) {
+        this.echar(c, 'quieto', 'Un minuto sin moverte: el canal se cierra hasta que vuelvas a andar.');
         continue;
       }
-      if (ahora - o.conexion.movidoEn >= QUIETO_HASTA_CERRAR_MS) {
-        this.echar(o.conexion, 'quieto', 'Un minuto sin moverte: el canal se cierra hasta que vuelvas a andar.');
-      }
+      conCanal++;
     }
-    if (sala.ocupantes.size === 0) {
+    if (conCanal > 0) sala.vaciaDesde = null;
+    else if (sala.vaciaDesde === null) sala.vaciaDesde = ahora;
+    if (sala.vaciaDesde !== null && ahora - sala.vaciaDesde >= GRACIA_AL_IRSE_MS) {
       this.borrarSala(sala);
       return;
     }
@@ -839,8 +1442,12 @@ export class CanalDeBotas {
    *
    * Una entrada por ASIENTO y nunca dos: sale de `sala.ocupantes`, que va por asiento, y quien
    * vuelve con otro canal —dentro de la gracia, o desbancando al suyo— retoma la MISMA entrada.
-   * El lector del aparato rechaza una foto con un asiento repetido. El cuarto número es hacia
-   * dónde MIRA, tal cual lo dijo su `aqui`: aquí no se valida, se reparte.
+   * El lector del aparato rechaza una foto con un asiento repetido. Salen TODOS los asientos, bajen o
+   * no: quien no tiene canal, quieto (marcha 0) donde está. El cuarto número es hacia dónde MIRA, tal
+   * cual lo dijo su `aqui`: aquí no se valida, se reparte.
+   *
+   * Quien tiene el búfer de salida atascado se salta esa foto —y se cuenta—: una foto es una
+   * instantánea, y amontonarlas en un canal que no da abasto sólo retrasa la siguiente.
    */
   private mandarLaFoto(sala: Sala): void {
     let alguien = false;
@@ -956,6 +1563,7 @@ export class CanalDeBotas {
   /**
    * VUELVE A DERIVAR EL MUNDO DE UNA SALA, con turno y con la vista de ese momento, y a quien haya
    * quedado dentro de un cuerpo o sin suelo se le saca al sitio libre más cercano con un `corrige`.
+   * Quien se haya sentado a la mesa desde la última vez entra en la sala, de pie en su sitio de nacer.
    */
   private async derivar(sala: Sala): Promise<void> {
     await this.pedirTurno(PARA_VOLVER_A_DERIVAR);
@@ -976,10 +1584,13 @@ export class CanalDeBotas {
       sala.rev = v.rev;
       sala.asientos = v.asientos;
       /* Un mundo que desaparece no deja a nadie en el vacío: se sigue con el que había. */
-      if (arena === null) return;
-      sala.arena = arena;
-      this.cuentas.rederivaciones++;
-      this.rescatar(sala);
+      if (arena !== null) {
+        sala.arena = arena;
+        this.cuentas.rederivaciones++;
+        this.rescatar(sala);
+      }
+      const ahora = this.reloj.ahora();
+      for (const id of v.asientos) if (!sala.ocupantes.has(id)) this.ponerEnLaSala(sala, id, ahora);
     } catch (error) {
       this.cuentas.fallosAlRederivar++;
       this.registrar(
@@ -997,8 +1608,7 @@ export class CanalDeBotas {
     for (const o of sala.ocupantes.values()) {
       if (sePuedeEstar(sala.arena, o.x, o.z, RADIO_DEL_PASEANTE)) continue;
       const libre = this.sitioDeRescate(sala, o);
-      o.x = libre.x;
-      o.z = libre.z;
+      this.moverA(o, libre.x, libre.z, ahora);
       const c = o.conexion;
       if (c === null || c.estado !== 'dentro') {
         this.cuentas.correcciones.rescate++;
@@ -1012,7 +1622,8 @@ export class CanalDeBotas {
 
   /**
    * CIERRA UN CANAL: dice `fuera` con el motivo, que se lee en pantalla, y cierra con su código.
-   * Lo que quede de su asiento se queda la gracia, salvo si le reemplaza otro canal.
+   * Su asiento se queda en la sala, sin canal. El `fuera` se salta si el canal está atascado: se va
+   * a cerrar igual, y el código dice por qué.
    */
   private echar(c: Conexion, clave: PorQueSeCierra, motivo: string): void {
     if (c.estado === 'cerrada') return;
@@ -1025,7 +1636,8 @@ export class CanalDeBotas {
     const codigo = clave === 'apagado' ? CIERRE_APAGADO : clave === 'fallo' || clave === 'seFue' ? CIERRE_FALLO : CIERRE[clave];
     const fuera: Fuera = { t: 'fuera', motivo };
     try {
-      c.enchufe.enviar(JSON.stringify(fuera));
+      if (c.enchufe.pendientes() > ATASCO_BYTES) this.cuentas.saltados++;
+      else c.enchufe.enviar(JSON.stringify(fuera));
       c.enchufe.cerrar(codigo, clave);
     } catch (error) {
       this.registrar(`no se ha podido cerrar limpio un canal de la mesa ${c.codigo}: ${String(error)}`);
@@ -1044,18 +1656,27 @@ export class CanalDeBotas {
     }
   }
 
-  /** El asiento se queda sin este canal. Si nadie lo retoma, se va cuando pase la gracia. */
+  /**
+   * El asiento se queda sin este canal, y se queda en la sala donde está, quieto. Si era el último
+   * con canal, empieza la gracia de la sala.
+   */
   private soltar(c: Conexion, reemplazado: boolean): void {
     const o = c.ocupante;
+    const sala = c.sala;
     if (o !== null && o.conexion === c) {
       o.conexion = null;
       if (!reemplazado) {
-        o.idoEn = this.reloj.ahora();
         o.m = 0;
+        if (sala !== null && sala.vaciaDesde === null && !this.alguienConCanal(sala)) sala.vaciaDesde = this.reloj.ahora();
       }
     }
     c.ocupante = null;
     c.sala = null;
+  }
+
+  private alguienConCanal(sala: Sala): boolean {
+    for (const o of sala.ocupantes.values()) if (o.conexion !== null) return true;
+    return false;
   }
 
   private borrarSala(sala: Sala): void {
@@ -1069,6 +1690,8 @@ export class CanalDeBotas {
       if (o.conexion !== null) this.echar(o.conexion, 'mesaCerrada', motivo);
     }
     sala.ocupantes.clear();
+    /* Una mesa acabada u olvidada ya no admite botines: su libro se va con ella. */
+    this.libros.delete(sala.codigo);
     this.registrar(`se cierra la sala de la mesa ${sala.codigo}: ${motivo}`);
     if (this.salas.size === 0) this.apagarElReloj();
   }
@@ -1077,6 +1700,7 @@ export class CanalDeBotas {
   cerrarLaMesa(codigo: string, motivo: string): void {
     const sala = this.salas.get(codigo);
     if (sala !== undefined) this.cerrarLaSala(sala, motivo);
+    else this.libros.delete(codigo);
   }
 
   /** SIGTERM: todos los canales se cierran con 1001 y no se abre ninguno más. */
@@ -1087,6 +1711,7 @@ export class CanalDeBotas {
       this.echar(c, 'apagado', 'El servidor se está reiniciando: vuelve a entrar en unos segundos.');
     }
     this.salas.clear();
+    this.libros.clear();
     /* Quien esperaba turno para derivar se queda esperando: el proceso se va, y nadie lo va a leer. */
     this.esperandoTurno.length = 0;
     this.esperaDelTurno?.parar();
@@ -1103,6 +1728,8 @@ export class CanalDeBotas {
   diagnostico(): DiagnosticoDeBotas {
     let enSala = 0;
     for (const c of this.conexiones) if (c.estado === 'dentro') enSala++;
+    let sitios = 0;
+    for (const sala of this.salas.values()) for (const o of sala.ocupantes.values()) sitios += o.rastro.length / 3;
     return {
       ...this.cuentas,
       salas: this.salas.size,
@@ -1110,7 +1737,9 @@ export class CanalDeBotas {
       enSala,
       temporizador: this.temporizador !== null,
       colaParaDerivar: this.esperandoTurno.length,
+      sitiosEnLosRastros: sitios,
       correcciones: { ...this.cuentas.correcciones },
+      botines: { ...this.cuentas.botines },
       cierres: { ...this.cuentas.cierres },
     };
   }
