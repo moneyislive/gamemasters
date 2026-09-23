@@ -29,7 +29,6 @@ import './juegos/instalados';
  */
 import '../../shared/arcade/juegos';
 import path from 'node:path';
-import cors from 'cors';
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { JuegoNoInstalado, instalarSoloEstos, juegosInstalados } from '../../shared/juegos';
@@ -45,6 +44,7 @@ import correoRouter from './correo/router';
 import { modoDeCorreo } from './correo';
 import legalRouter from './legal/documentos';
 import limitadorDeIntentos from './puerta/montaje';
+import { corsDeLaCasa } from './puerta/origenes';
 import wellKnownRouter from './enlaces/well-known';
 import { getStorageKind, getStore, initStore } from './db/store';
 import {
@@ -102,7 +102,29 @@ const app = express();
  */
 app.set('trust proxy', env.saltosDeConfianza);
 
-app.use(cors());
+/*
+ * ═══ EL CORS, CON LISTA BLANCA: AQUÍ HABÍA UN `cors()` PELADO ═══
+ *
+ * Que es `Access-Control-Allow-Origin: *` en todas las respuestas, en producción, y un preflight
+ * que daba por buenas las cabeceras que se le pidieran —`x-asiento` incluida—. O sea que cualquier
+ * página podía usar el navegador de quien la visitara para sentarse en una mesa con su código y
+ * jugar con la llave que le devolvían: la cadena de `docs/CAPA-ESPACIAL.md` §4, que había que
+ * cerrar ANTES de embeber nada de terceros, y Boots on Board embeberá.
+ *
+ * Ahora sólo leen la API los orígenes propios, los que se añadan en `ORIGENES_PERMITIDOS`
+ * —OPCIONAL: sin ella el servidor arranca igual— y, fuera de producción, el bucle local en
+ * cualquier puerto, que es desde donde hablan la app web de Expo y los Vite de la casa. Lo que llega
+ * SIN `Origin` —la app nativa, `curl`, los comprobadores— se sirve como siempre. El detalle, y lo
+ * que el CORS no es, en `puerta/origenes.ts`; lo comprueba `verify:cors`, con este servidor
+ * levantado de verdad.
+ */
+app.use(
+  corsDeLaCasa({
+    produccion: process.env.NODE_ENV === 'production',
+    publico: env.publicOrigin,
+    extra: env.origenesPermitidos,
+  }),
+);
 
 /*
  * EL LIMITE DE CUERPO, y por qué son dos y no uno.
