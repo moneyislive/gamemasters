@@ -2145,7 +2145,6 @@ paso(
     'y los cuatro reparos: la trampa de foco de las tres hojas, el techo del pie, las hojas en las dos ramas y una sola región viva',
 );
 {
-  const envoltura = leer(path.join(SRC, 'arcade', 'burgo-en-tres.tsx'));
   const escena = leer(path.join(SRC, 'arcade', 'burgo-en-tres-escena.tsx'));
   const hojas = leer(path.join(SRC, 'arcade', 'hojas-del-burgo.tsx'));
   const laTabla = leer(path.join(SRC, 'arcade', 'pintados.ts'));
@@ -2193,24 +2192,93 @@ paso(
   const LOS_MANEJADORES = ['alElegirOpcion', 'alMandar', 'alTocarCasilla', 'alTocarLosDados', 'alTocarFigura'];
   const LOS_QUE_MUEVEN = ['alElegirOpcion', 'alMandar', 'alTocarCasilla', 'alTocarLosDados'];
 
-  /* ─── La envoltura perezosa, que es lo que protege la portada ─── */
+  /* ─── Las envolturas perezosas, que es lo que protege la portada ─── */
+
+  /*
+   * ═══ UNA FÁBRICA, Y CADA JUEGO LA LLAMA EN EL ÁMBITO DE SU MÓDULO ═══
+   *
+   * Esta regla miraba la envoltura del Burgo y buscaba en ella `const LaPantalla = lazy(…)`
+   * pegado al margen. Las tres envolturas eran la misma copiada, y ahora son una llamada a
+   * `pantallaPerezosa` (`pantalla-perezosa.tsx`), así que el filo —un `lazy` creado dentro
+   * del componente, que desmonta la escena y la vuelve a bajar en cada sondeo sin un error—
+   * puede caer en dos sitios, y se mira en los dos:
+   *
+   *   · en la FÁBRICA: `lazy` una sola vez, en su cuerpo y ANTES del componente que
+   *     devuelve, nunca dentro de él; y sin importar ninguna escena;
+   *   · en CADA ENVOLTURA de la carpeta —las que hay, no una lista: la de un juego nuevo
+   *     queda vigilada sin tocar esto, y con suelo en las tres de hoy—: la llamada a la
+   *     fábrica pegada al margen, o sea en el ámbito del módulo, con el `import()` de SU
+   *     escena escrito ahí; y sin un `lazy` propio.
+   *
+   * Y ninguna de las dos arrastra `three` a la portada. Las prohibiciones miran el CÓDIGO y
+   * no el fichero: las cabeceras EXPLICAN que con un `import` normal entrarían `three` y
+   * `@react-three/fiber` en la portada, que es documentación correcta y la primera versión
+   * de esta regla se ponía roja por ella. Es el mismo filo que ya se pagó con
+   * `lookAt(0, 0, 0)` unas secciones más arriba.
+   */
+  const laFabrica = leer(path.join(SRC, 'arcade', 'pantalla-perezosa.tsx'));
+  const esEnvoltura = (f) => /^[a-z-]+-en-tres\.tsx$/.test(f);
+  const lasEnvolturas = fs
+    .readdirSync(path.join(SRC, 'arcade'))
+    .filter(esEnvoltura)
+    .map((f) => [f, leer(path.join(SRC, 'arcade', f))]);
+  const sinTres = (c) => !/from 'three'/.test(c) && !/@react-three\/fiber/.test(c);
+  const fabricaSana = (t) => {
+    const c = soloCodigo(t);
+    const devuelve = c.indexOf('return function ');
+    const crea = c.indexOf('lazy(traer)');
+    return (
+      (c.match(/\blazy\(/g) ?? []).length === 1 &&
+      crea > 0 &&
+      devuelve > crea &&
+      !/\blazy\(/.test(c.slice(devuelve)) &&
+      !/-en-tres-escena/.test(c) &&
+      sinTres(c)
+    );
+  };
+  const envolturaSana = (fichero, t) => {
+    const c = soloCodigo(t);
+    const suEscena = fichero.replace(/\.tsx$/, '-escena');
+    return (
+      new RegExp(`^export const [A-Za-z]+ = pantallaPerezosa\\(\\(\\) => import\\('\\./${suEscena}'\\),`, 'm').test(c) &&
+      !/\blazy\(/.test(c) &&
+      !new RegExp(`from '\\./${suEscena}'`).test(c) &&
+      sinTres(c)
+    );
+  };
+  const LAS_TRES_DE_HOY = ['burgo-en-tres.tsx', 'lindes-en-tres.tsx', 'riberas-en-tres.tsx'];
+  const todasSanas = (lista) =>
+    LAS_TRES_DE_HOY.every((f) => lista.some(([g]) => g === f)) && lista.every(([f, t]) => envolturaSana(f, t));
 
   reglaDelFuente(
-    'la envoltura del Burgo crea el `lazy` en ÁMBITO DE MÓDULO y no arrastra `three` a la portada',
-    /*
-     * Las dos prohibiciones miran el CÓDIGO y no el fichero: la cabecera de esta
-     * envoltura EXPLICA que con un `import` normal entrarían `three` y
-     * `@react-three/fiber` en la portada, que es documentación correcta y la primera
-     * versión de esta regla se ponía roja por ella. Es el mismo filo que ya se pagó
-     * con `lookAt(0, 0, 0)` unas secciones más arriba.
-     */
-    (t) =>
-      /^const LaPantalla = lazy\(\(\) => import\('\.\/burgo-en-tres-escena'\)\);$/m.test(soloCodigo(t)) &&
-      !/from 'three'/.test(soloCodigo(t)) &&
-      !/@react-three\/fiber/.test(soloCodigo(t)),
-    envoltura,
-    envoltura.replace(/^const LaPantalla = lazy/m, '  const LaPantalla = lazy'),
+    'la fábrica de las envolturas crea el `lazy` UNA vez, en su cuerpo y fuera del componente que devuelve, y no arrastra `three` ni ninguna escena',
+    fabricaSana,
+    laFabrica,
+    laFabrica
+      .replace('  const LaPantalla = lazy(traer);\n', '')
+      .replace('  return function LaPantallaEnTres(): JSX.Element {\n', '  return function LaPantallaEnTres(): JSX.Element {\n    const LaPantalla = lazy(traer);\n'),
     'creado dentro del componente, cada sondeo desmonta la escena y la vuelve a bajar entera, y sin un error en ninguna parte',
+  );
+  reglaDelFuente(
+    `y cada envoltura de la carpeta (${lasEnvolturas.map(([f]) => f).join(', ')}) llama a la fábrica en el ÁMBITO DE MÓDULO con el \`import()\` de su escena, sin \`lazy\` propio ni \`three\``,
+    todasSanas,
+    lasEnvolturas,
+    lasEnvolturas.map(([f, t]) => [
+      f,
+      f === 'burgo-en-tres.tsx'
+        ? t.replace(/^export const ElBurgoEnTres = pantallaPerezosa/m, 'export function ElBurgoEnTres(): JSX.Element {\n  const LaEnvoltura = pantallaPerezosa')
+        : t,
+    ]),
+    'la llamada dentro de un componente crea la fábrica —y su `lazy`— en cada repintado',
+  );
+  comprobar(
+    'y la carpeta se lee de verdad: la envoltura de un juego nuevo entra en la regla y una escena no, y una envoltura nueva a mano cae',
+    esEnvoltura('nuevo-en-tres.tsx') &&
+      !esEnvoltura('nuevo-en-tres-escena.tsx') &&
+      !esEnvoltura('muelle-escena.tsx') &&
+      !todasSanas([...lasEnvolturas, ['nuevo-en-tres.tsx', "const LaPantalla = lazy(() => import('./nuevo-en-tres-escena'));"]]) &&
+      !todasSanas(lasEnvolturas.filter(([f]) => f !== 'lindes-en-tres.tsx')),
+    lasEnvolturas.map(([f]) => f),
   );
   reglaDelFuente(
     'y la tabla de pintores monta la ENVOLTURA y no la escena',
