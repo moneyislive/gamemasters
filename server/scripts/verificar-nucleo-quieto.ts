@@ -378,6 +378,54 @@
  * `canonico.ts` también. El núcleo sigue sin nombrar ningún juego —`botas` es una
  * modalidad y no un arcade, y la búsqueda de identificadores de abajo lo confirma
  * contra el registro— y sigue sin importar nada de `juegos/`.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * Y OTRO MÁS, EL DE LO QUE UN REVISOR ADVERSARIO LE ENCONTRÓ A ESE (23-SEP-2026)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Un revisor adversario atacó M, N, O y P con sondas propias y encontró huecos en tres de ellos. Se
+ * movió otra vez UN fichero del núcleo, `server/src/arcade/mesas.ts`, y ninguno del contrato; y
+ * ninguno de los arreglos le enseña a la mesa nada de ningún juego: son la mesa leyendo, guardando y
+ * barriendo mejor lo que ya leía, guardaba y barría. Cada uno fue en su commit, con su comprobación
+ * vista ROJA contra el código de antes:
+ *
+ *  Q · LA FORMA MÍNIMA AL LEER DEL DISCO, Y LA LIMPIEZA MESA A MESA (de P). Un fichero con JSON
+ *      bueno y forma rota —sin la mesa del árbitro dentro, con `sillas: null`— entraba en la tabla
+ *      antes de que `cerrarAlRecuperar` reventara con él, y desde ahí el desalojo que corre en cada
+ *      `abrir` reventaba también: 500 para todo el servidor hasta reiniciar. Ahora
+ *      `loQueLeFaltaParaSerMesa` lo trata como un ilegible (404, contado en `fallosAlLeer`),
+ *      `traerDelDisco` cierra ANTES de meter en la tabla, y los tres barridos van mesa a mesa con su
+ *      red (`laLimpiezaNoPudoCon`): la limpieza no puede tumbar `abrir`, `mirar` ni `revisionDe`.
+ *  R · LA ESCRITURA DIFERIDA, BAJO EL CANDADO (de P). `volcarLoPendiente` escribía sin él, y un
+ *      `DELETE` con el volcado a medias dejaba el fichero escrito DESPUÉS del borrado: la mesa
+ *      olvidada volvía con sus llaves (27 de 36 por la ruta). Ahora cada mesa se vuelca bajo su
+ *      candado y se vuelve a buscar dentro, así que olvidarla cancela su volcado pendiente.
+ *  S · `quienEsLaLlave` NO TRAE LA MESA FRÍA (de M). Traerla la cerraba y la escribía si el juego la
+ *      daba por acabada, y su cabecera decía que no escribía. Ahora la mira en el disco
+ *      (`leerDelDisco`) sin traerla: no entra en memoria, no se cierra, no se escribe.
+ *  T · TRES DEL BARRIDO Y LA LECTURA (de P). El `venceEn` de una terminada se apaga al leerla —si
+ *      no, se quedaba fijada en memoria hasta el mes—; el barrido del disco no relee ni recuenta cada
+ *      hora lo que no entiende (`noSeEntendieronAlBarrer`), que hacía que `fallosAlLeer` midiera el
+ *      tiempo; y una mesa sin fechas se juzga por la del fichero y no por la hora de leerla, que la
+ *      hacía eterna.
+ *  U · Y DOS COSAS ESCRITAS QUE DECÍAN DE MÁS O DE MENOS. La letra de O, aquí arriba —«todo lo que
+ *      hace `mirar` menos proyectar»—, se deja como se escribió y se corrige aquí: no componer la
+ *      vista se nota desde fuera en dos cosas, las dos a mejor y las dos se quedan —una proyección
+ *      rota ya no tumba la espera de una mesa quieta, y unas `opciones()` lentas ya no apartan al
+ *      arcade por sondear—; lo dicen ya la cabecera de `revisionDe` y `verify:lectura-barata`. Y en
+ *      `alDiaDesdeElDisco` queda decidido en voz alta que una mesa `botas` de un juego que ya no se
+ *      recorre se sirve como `botas`: la modalidad no cambia a mitad, tampoco al leerla.
+ *
+ * FUERA DEL NÚCLEO, y por eso sin sello: `server/src/puerta/origenes.ts` —`harkania.com` sale de la
+ * lista fija de orígenes y un comodín en `ORIGENES_PERMITIDOS` para el arranque— y los comprobadores
+ * que fijan todo lo de arriba (`verify:mesas-frias`, `verify:modalidad`, `verify:lectura-barata` y
+ * `verify:cors`).
+ *
+ * LO QUE NO SE HA MOVIDO: `shared/arcade/` byte a byte, y `arbitro.ts`, `server/src/canal/`,
+ * `azar.ts` y `canonico.ts` también. El formato del fichero de mesa tampoco —versión 2 y los mismos
+ * campos—, así que revertir el despliegue sigue leyendo exactamente lo que éste escribe. Y el núcleo
+ * sigue sin nombrar ningún juego ni importar nada de `juegos/`: lo confirman las dos comprobaciones
+ * de abajo que no se pueden sellar.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';

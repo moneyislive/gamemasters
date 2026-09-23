@@ -14,9 +14,10 @@
  *
  * ═══ LO QUE HAY AHORA ═══
  *
- *  · EN PRODUCCIÓN, SÓLO LOS ORÍGENES PROPIOS: `harkania.onrender.com`, `harkania.com` y el que
- *    diga `PUBLIC_ORIGIN`, que es obligatorio allí. Más los que se añadan a mano en
+ *  · EN PRODUCCIÓN, SÓLO LOS ORÍGENES PROPIOS: `harkania.onrender.com` y el que diga
+ *    `PUBLIC_ORIGIN`, que es obligatorio allí. Más los que se añadan a mano en
  *    `ORIGENES_PERMITIDOS`, que es OPCIONAL: sin ella no cambia nada y el servidor arranca igual.
+ *    (`harkania.com` iba fijo aquí y ya no: ver `ORIGENES_PROPIOS`.)
  *    Hoy no hace falta ninguno, porque el taller, la app web (`/jugar`) y la Sala (`/sala`) se
  *    sirven desde el MISMO origen que la API y ahí no hay CORS que valga.
  *  · FUERA DE PRODUCCIÓN, ADEMÁS, CUALQUIER `localhost`, `127.0.0.1` O `[::1]` EN CUALQUIER
@@ -48,11 +49,23 @@ import type { RequestHandler } from 'express';
 /**
  * LOS ORÍGENES PÚBLICOS DE ESTA CASA, escritos aquí y no sólo en `PUBLIC_ORIGIN`.
  *
- * `harkania.onrender.com` es la producción viva; `harkania.com` es el dominio propio, que el
- * perfil de producción del APK lleva grabado (`app/eas.json`). `PUBLIC_ORIGIN` dice cuál de los dos
- * es EL origen del despliegue, y se suma aparte: si mañana apunta a otro dominio, entra solo.
+ * `harkania.onrender.com` es la producción viva. `PUBLIC_ORIGIN` dice cuál es EL origen del
+ * despliegue, y se suma aparte: si mañana apunta a otro dominio, entra solo.
+ *
+ * ═══ `harkania.com` YA NO VA AQUÍ, Y NO ES UN OLVIDO ═══
+ *
+ * Iba, con el argumento de que es el dominio propio y el perfil de producción del APK lo lleva
+ * grabado (`app/eas.json`). Pero el dominio está SUSPENDIDO por el registrador —sirve su página de
+ * verificación del WHOIS, no esta aplicación—, y un origen escrito a fuego en la lista blanca es un
+ * permiso que no caduca: si el dominio cambiara de manos, su nuevo dueño podría leer la API desde el
+ * navegador de quien visitara su página, que es exactamente la cadena que esta lista existe para
+ * cerrar. Y el APK no lo necesita: la app nativa no manda `Origin`, y el CORS no le toca.
+ *
+ * El día que vuelva, se pone donde se pone todo lo que no es fijo: en `ORIGENES_PERMITIDOS`, o en
+ * `PUBLIC_ORIGIN` si pasa a ser EL origen del despliegue. Las dos se deciden en el panel, que es donde
+ * se sabe si el dominio vuelve a ser nuestro, y no en el código.
  */
-export const ORIGENES_PROPIOS: readonly string[] = ['https://harkania.onrender.com', 'https://harkania.com'];
+export const ORIGENES_PROPIOS: readonly string[] = ['https://harkania.onrender.com'];
 
 /**
  * LAS CABECERAS QUE UN CLIENTE DE ESTA CASA MANDA DE VERDAD, y ninguna más.
@@ -92,6 +105,12 @@ const DE_ESTA_MAQUINA = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,
  * atrás, y `null` es el origen de cualquier página en un marco aislado, que es justo lo que no
  * hay que dejar leer.
  *
+ * Y UN COMODÍN EN CUALQUIER PARTE —`https://*.ejemplo.com`— TAMBIÉN PARA EL ARRANQUE. Se aceptaba
+ * en silencio: `new URL` lo lee sin error, porque el asterisco vale en un nombre para ese analizador,
+ * y se guardaba como un origen literal que ningún navegador manda nunca. Quien lo ponía creía haber
+ * abierto un dominio entero y no había abierto nada, sin una línea en ningún sitio. Aquí se compara
+ * el origen entero, así que los orígenes se ponen enteros, uno a uno.
+ *
  * Cada entrada se reduce a su origen —esquema, anfitrión y puerto—, como `PUBLIC_ORIGIN`: un
  * `https://a.example/` con barra no coincidiría nunca con la cabecera, que no la lleva.
  */
@@ -107,6 +126,13 @@ export function leerOrigenesPermitidos(crudo: string | undefined): string[] {
         `\`ORIGENES_PERMITIDOS\` trae «${entrada}», y esa entrada no se admite: «*» es dejar leer la API ` +
           'a cualquier página, que es lo que esta lista existe para cerrar, y «null» es el origen de ' +
           'cualquier página metida en un marco aislado. Pon los orígenes uno a uno, con su esquema.',
+      );
+    }
+    if (entrada.includes('*')) {
+      throw new Error(
+        `\`ORIGENES_PERMITIDOS\` trae «${entrada}», con un comodín, y los comodines no se admiten: aquí se ` +
+          'compara el origen entero, así que se tomaría como un nombre literal que ningún navegador manda, ' +
+          'y no dejaría pasar a nadie. Pon cada origen entero, uno a uno y con su esquema.',
       );
     }
     let url: URL;

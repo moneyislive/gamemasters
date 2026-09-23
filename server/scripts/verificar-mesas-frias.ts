@@ -24,7 +24,21 @@
  *  4. `abrir` NO REPARTE EL CÓDIGO DE UNA MESA DORMIDA: con el azar forzado a dar ese código, sale
  *     otro, y el fichero de la dormida queda intacto.
  *  5. EL BARRIDO DE TREINTA DÍAS sigue borrando del disco lo viejo que no está en memoria, se lo
- *     dice al canal, y no borra lo que no entiende ni lo que su fichero dice que se tocó ayer.
+ *     dice al canal, y no borra lo que no entiende ni lo que su fichero dice que se tocó ayer. Lo
+ *     que no entiende tampoco lo RELEE cada hora —`fallosAlLeer` no puede medir el tiempo—, y un
+ *     fichero sin fechas se juzga por la del fichero y se acaba barriendo.
+ *  6. UN FICHERO CON JSON BUENO Y FORMA ROTA —sin la mesa del árbitro, con `sillas: null`, con una
+ *     silla sin llave…— es un ilegible más: 404, contado en `fallosAlLeer`, fuera de la memoria y
+ *     con su fichero intacto. Antes entraba en la tabla y tumbaba el `abrir` de todo el servidor
+ *     hasta reiniciar; se mira por el cable, con el servidor de verdad, y en proceso con siete
+ *     variantes y trece horas de reloj.
+ *  7. Y LA LIMPIEZA NO TUMBA A NADIE: con dos mesas envenenadas a mano en la memoria, `mirar`,
+ *     `revisionDe`, `abrir` y el barrido siguen contestando.
+ *  8. LA ESCRITURA DIFERIDA (`tickHz > 0`) NO RESUCITA LO OLVIDADO: con el volcado retenido a
+ *     mitad —justo antes de renombrar— se pide olvidar la mesa, se suelta, y ni el fichero ni la
+ *     mesa vuelven. Y con el volcado sólo pendiente, olvidarla lo cancela.
+ *  9. UNA TERMINADA GUARDADA CON EL PLAZO PUESTO sale de la memoria como cualquier terminada, sin
+ *     que se escriba su fichero: el plazo se le apaga al leerla, no en su primera lectura.
  *
  * ═══ EL RELOJ SE ADELANTA EN PROCESO, CAMBIANDO `Date.now` ═══
  *
@@ -37,6 +51,7 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
@@ -162,6 +177,16 @@ paso('Un proceso nuevo NO lee la carpeta entera: lee lo que se le pide');
     JSON.stringify({ version: 99, mesa: (mesaGuardada('YYYYY', RIBERAS) as { mesa: unknown }).mesa }),
     'utf8',
   );
+  /*
+   * Y UNA ENVENENADA: JSON bueno, versión buena, y sin la mesa del árbitro dentro. Es la que se
+   * colaba en la tabla y desde entonces tumbaba cada `abrir` del servidor entero. Ver la tercera
+   * parte, que la estudia en proceso con todas sus variantes.
+   */
+  fs.writeFileSync(
+    ficheroDe(MESAS_DEL_PROCESO_NUEVO, 'PODR1'),
+    JSON.stringify({ version: 2, mesa: { codigo: 'PODR1' } }),
+    'utf8',
+  );
   const enLaCarpeta = fs.readdirSync(MESAS_DEL_PROCESO_NUEVO).length;
 
   const puerto = await puertoLibre();
@@ -208,8 +233,8 @@ paso('Un proceso nuevo NO lee la carpeta entera: lee lo que se le pide');
       diag,
     );
     comprobar(
-      'y de la ilegible y la de otra versión no ha dicho ni una palabra: no las ha abierto',
-      !dijo.includes('ZZZZZ') && !dijo.includes('YYYYY'),
+      'y de la ilegible, la de otra versión y la envenenada no ha dicho ni una palabra: no las ha abierto',
+      !dijo.includes('ZZZZZ') && !dijo.includes('YYYYY') && !dijo.includes('PODR1'),
       dijo.slice(-800),
     );
     comprobar('ni ha «recuperado» nada del almacén de golpe', !dijo.includes('recuperadas del almacén'), dijo.slice(-400));
@@ -245,6 +270,45 @@ paso('Un proceso nuevo NO lee la carpeta entera: lee lo que se le pide');
       'y un «código» que no es un código no toca el disco: 404 como cualquier código que no existe',
       conBarras.status === 404,
       conBarras.status,
+    );
+
+    /*
+     * LA ENVENENADA, POR EL CABLE. Antes: 500 al pedirla, la mesa metida en la tabla a medias, y
+     * desde ese momento `POST /arcade/mesas` contestaba 500 a TODO el mundo —el barrido de lo frío
+     * que corre en cada `abrir` leía `m.mesa.terminada` de una mesa sin `mesa`— hasta reiniciar.
+     */
+    const fallosAntesDeLaEnvenenada = trasLeer.almacen?.fallosAlLeer ?? 0;
+    const envenenada = await fetch(`${base}/arcade/mesas/PODR1`);
+    await dormir(100);
+    comprobar(
+      'pedida una con JSON bueno y FORMA ROTA —sin la mesa del árbitro dentro—: 404, como una ilegible, y se dice',
+      envenenada.status === 404 && dijo.includes('PODR1.json'),
+      { estado: envenenada.status, dijo: dijo.slice(-600) },
+    );
+    const abiertaTrasElVeneno = await fetch(`${base}/arcade/mesas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ arcade: RIBERAS, nombre: 'Tras el veneno' }),
+    });
+    comprobar(
+      'y DESPUÉS se sigue pudiendo abrir mesa: 201, y no el 500 para todo el servidor de antes',
+      abiertaTrasElVeneno.status === 201,
+      { estado: abiertaTrasElVeneno.status, cuerpo: (await abiertaTrasElVeneno.text()).slice(0, 200) },
+    );
+    const laBuenaOtraVez = await fetch(`${base}/arcade/mesas/BUEN4`);
+    comprobar('y las buenas se siguen leyendo', laBuenaOtraVez.status === 200, laBuenaOtraVez.status);
+    const trasElVeneno = (await (await fetch(`${base}/arcade/diagnostico`)).json()) as {
+      almacen?: { fallosAlLeer?: number; ultimoFalloAlLeer?: { codigo?: string } };
+    };
+    comprobar(
+      'y el diagnóstico la cuenta como lo que es, una mesa que no se pudo leer',
+      (trasElVeneno.almacen?.fallosAlLeer ?? 0) === fallosAntesDeLaEnvenenada + 1 &&
+        trasElVeneno.almacen?.ultimoFalloAlLeer?.codigo === 'PODR1',
+      { antes: fallosAntesDeLaEnvenenada, ahora: trasElVeneno.almacen },
+    );
+    comprobar(
+      'y su fichero sigue ahí: lo que no se entiende no se borra',
+      fs.existsSync(ficheroDe(MESAS_DEL_PROCESO_NUEVO, 'PODR1')),
     );
   } finally {
     servidor.kill();
@@ -353,6 +417,16 @@ async function estabaEnMemoria(codigo: string): Promise<boolean> {
   const antes = mesas.memoriaDeLasMesas().leidasDelDisco;
   await mesas.conLaMesa(codigo, () => undefined);
   return mesas.memoriaDeLasMesas().leidasDelDisco === antes;
+}
+
+/** El nombre de lo que lanza, o `'nada'`. Para mirar un fallo sin que tumbe la prueba entera. */
+async function loQueLanza(hacer: () => Promise<unknown>): Promise<string> {
+  try {
+    await hacer();
+    return 'nada';
+  } catch (error) {
+    return error instanceof Error ? `${error.name}: ${error.message.slice(0, 80)}` : String(error);
+  }
 }
 
 if (tieneLaMemoriaNueva) {
@@ -665,6 +739,17 @@ if (tieneLaMemoriaNueva) {
         JSON.stringify({ version: 99, mesa: (mesaGuardada('YYYYY', FRIO) as { mesa: unknown }).mesa }),
         'utf8',
       );
+      /*
+       * Y una SIN FECHAS —sin `abiertaEn`, `ultimoToqueEn` ni `turnoDesde`—, escrita con la fecha de
+       * verdad del disco, que para este reloj es de hace un mes. Se reponía con la hora de LEERLA, así
+       * que el barrido, que confirma con `ultimoToqueEn`, la encontraba siempre recién tocada y no la
+       * borraba nunca.
+       */
+      const sinFechas = { ...(mesaGuardada('SINFE', FRIO) as { mesa: Record<string, unknown> }).mesa };
+      delete sinFechas.abiertaEn;
+      delete sinFechas.ultimoToqueEn;
+      delete sinFechas.turnoDesde;
+      fs.writeFileSync(ficheroDe(MESAS, 'SINFE'), JSON.stringify({ version: 2, mesa: sinFechas }), 'utf8');
       /* Desde aquí se apunta todo lo que se le dice al canal, y lo que se trae a la memoria. */
       olvidadasEnElCanal.length = 0;
       const leidasAntes = mesas.memoriaDeLasMesas().leidasDelDisco;
@@ -707,7 +792,295 @@ if (tieneLaMemoriaNueva) {
         'la ilegible y la de otra versión siguen ahí: lo que no se entiende no se borra',
         fs.existsSync(ficheroDe(MESAS, 'ZZZZZ')) && fs.existsSync(ficheroDe(MESAS, 'YYYYY')),
       );
+      comprobar(
+        'la que no traía fechas se barre también, por la fecha de su fichero, y se le dice al canal',
+        !fs.existsSync(ficheroDe(MESAS, 'SINFE')) && olvidadasEnElCanal.includes('SINFE'),
+        { sigue: fs.existsSync(ficheroDe(MESAS, 'SINFE')), canal: olvidadasEnElCanal },
+      );
       comprobar('y no queda ningún candado suelto', mesas.candadosDeMesaVivos() === 0, mesas.candadosDeMesaVivos());
+
+      /*
+       * Y LO QUE NO ENTIENDE NO SE RELEE CADA HORA. Con la ilegible y la de otra versión en la
+       * carpeta, cada barrido las volvía a leer, a decir y a contar, y `fallosAlLeer` acababa
+       * midiendo cuánto llevaba el proceso en pie. Tres barridos más, dos horas entre cada uno.
+       */
+      const fallosAntes = mesas.saludDelAlmacen().fallosAlLeer;
+      for (let vuelta = 0; vuelta < 3; vuelta++) {
+        adelantar(2 * HORA);
+        await mesas.barrerAhora();
+      }
+      comprobar(
+        'y el barrido no relee cada hora lo que no entiende: tres barridos más, ni un fallo al leer más',
+        mesas.saludDelAlmacen().fallosAlLeer === fallosAntes,
+        { antes: fallosAntes, ahora: mesas.saludDelAlmacen().fallosAlLeer },
+      );
+      comprobar(
+        'y no releerlas no es borrarlas: siguen ahí',
+        fs.existsSync(ficheroDe(MESAS, 'ZZZZZ')) && fs.existsSync(ficheroDe(MESAS, 'YYYYY')),
+      );
+      const pedida = await loQueLanza(() => mesas.mirar('ZZZZZ', null));
+      comprobar(
+        'pero PEDIRLA sí la relee y la cuenta: eso es una petición que falla, y cada una cuenta',
+        pedida.startsWith('MesaDesconocida') && mesas.saludDelAlmacen().fallosAlLeer === fallosAntes + 1,
+        { pedida, antes: fallosAntes, ahora: mesas.saludDelAlmacen().fallosAlLeer },
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    paso('Un fichero con JSON bueno y FORMA ROTA: se cuenta como ilegible, no entra, y no tumba a nadie');
+    // -------------------------------------------------------------------------
+
+    {
+      /*
+       * EL AGUJERO: al leer del disco sólo se exigía una versión conocida y una `mesa` que no fuera
+       * falsa. Un fichero con JSON bueno y sin la mesa del árbitro dentro —o con `sillas: null`—
+       * pasaba, ENTRABA EN LA TABLA antes de que `cerrarAlRecuperar` reventara con él, y desde ese
+       * momento el barrido de lo frío, que corre en CADA `abrir`, reventaba también: `POST
+       * /arcade/mesas` daba 500 para todo el servidor hasta reiniciar. Con `sillas: null` la bomba
+       * tardaba doce horas en estallar, que es cuando la mesa se enfría y el barrido la mira entera.
+       *
+       * Se barre primero para que el último barrido sea AHORA: así ninguna de las lecturas de abajo
+       * dispara otro, y lo que se cuenta es lo que cuentan ellas y nada más.
+       */
+      await mesas.barrerAhora();
+      const ahora = Date.now();
+      const sana = (codigo: string) => ({
+        codigo,
+        mesa: { id: codigo, arcade: FRIO, asientos: ['aROTA0000'], rev: 0, tic: 0, semilla: 1, terminada: false, diario: [] },
+        sillas: [{ id: 'aROTA0000', nombre: 'Quien fuera', llave: `LLAVE${codigo}${'0'.repeat(14)}` }],
+        plazoMs: 0,
+        venceEn: null,
+        turnoDesde: ahora,
+        abiertaEn: ahora,
+        ultimoToqueEn: ahora,
+        modalidad: 'normal',
+      });
+      const rotas: Record<string, unknown> = {
+        /* Sin la mesa del árbitro: la del hallazgo. */
+        ROTA1: { version: 2, mesa: { codigo: 'ROTA1' } },
+        /* La del árbitro, nula. */
+        ROTA2: { version: 2, mesa: { ...sana('ROTA2'), mesa: null } },
+        /* Sin lista de sillas: la bomba de las doce horas. */
+        ROTA3: { version: 2, mesa: { ...sana('ROTA3'), sillas: null } },
+        /* Una silla nula, y en la versión 3, que también se lee. */
+        ROTA4: { version: 3, mesa: { ...sana('ROTA4'), sillas: [null] } },
+        /* Una silla sin llave: un asiento que nadie puede demostrar que es suyo. */
+        ROTA5: { version: 2, mesa: { ...sana('ROTA5'), sillas: [{ id: 'aROTA0000', nombre: 'Sin llave' }] } },
+        /* Un diario que no es una lista: el árbitro lo esparce en cada movimiento. */
+        ROTA6: { version: 2, mesa: { ...sana('ROTA6'), mesa: { ...sana('ROTA6').mesa, diario: 'no es una lista' } } },
+        /* Y sin mesa ninguna. */
+        ROTA7: { version: 2 },
+      };
+      for (const [codigo, contenido] of Object.entries(rotas)) {
+        fs.writeFileSync(ficheroDe(MESAS, codigo), JSON.stringify(contenido), 'utf8');
+      }
+      const fallosAntes = mesas.saludDelAlmacen().fallosAlLeer;
+      const enMemoriaAntes = mesas.memoriaDeLasMesas().enMemoria;
+
+      const contestan: Record<string, string> = {};
+      for (const codigo of Object.keys(rotas)) contestan[codigo] = await loQueLanza(() => mesas.mirar(codigo, null));
+      comprobar(
+        'las siete contestan «esa mesa no existe» —el 404 de la ruta—, y ninguna un TypeError ni una partida',
+        Object.values(contestan).every((c) => c.startsWith('MesaDesconocida')),
+        contestan,
+      );
+      comprobar(
+        'y cada una se cuenta en el diagnóstico como lo que es: una mesa que no se pudo leer',
+        mesas.saludDelAlmacen().fallosAlLeer === fallosAntes + Object.keys(rotas).length,
+        { antes: fallosAntes, ahora: mesas.saludDelAlmacen().fallosAlLeer },
+      );
+      comprobar(
+        'ninguna ha entrado en la memoria',
+        mesas.memoriaDeLasMesas().enMemoria === enMemoriaAntes,
+        { antes: enMemoriaAntes, ahora: mesas.memoriaDeLasMesas() },
+      );
+      comprobar(
+        'y sus ficheros siguen ahí: lo que no se entiende no se borra',
+        Object.keys(rotas).every((c) => fs.existsSync(ficheroDe(MESAS, c))),
+      );
+      const alAbrir = await loQueLanza(() => mesas.abrir({ arcade: FRIO, nombre: 'Tras las rotas', plazoSegundos: 0 }));
+      comprobar('y abrir otra mesa sigue funcionando', alAbrir === 'nada', alAbrir);
+      /* La bomba de las doce horas: se enfría todo, se barre, y se vuelve a abrir. */
+      adelantar(13 * HORA);
+      const alBarrer = await loQueLanza(() => mesas.barrerAhora());
+      const alAbrirLuego = await loQueLanza(() =>
+        mesas.abrir({ arcade: FRIO, nombre: 'Trece horas después', plazoSegundos: 0 }),
+      );
+      comprobar(
+        'y trece horas después, con todo frío, ni el barrido ni `abrir` revientan',
+        alBarrer === 'nada' && alAbrirLuego === 'nada',
+        { alBarrer, alAbrirLuego },
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    paso('Y si una mesa llegara envenenada a la memoria, la limpieza no tumba ni `abrir` ni las lecturas');
+    // -------------------------------------------------------------------------
+
+    {
+      /*
+       * Del disco ya no puede llegar ninguna —lo de arriba lo cierra en la puerta—, así que se
+       * envenenan A MANO, en memoria, dos mesas vivas: una sin la mesa del árbitro y otra con un
+       * toque que no se puede restar. Es la red de debajo: los barridos miran mesa a mesa, y la que
+       * revienta se queda como estaba y se dice, en vez de llevarse la petición de quien pasaba.
+       */
+      const sana = await mesas.abrir({ arcade: FRIO, nombre: 'Sana', plazoSegundos: 0 });
+      const sinMesa = await mesas.abrir({ arcade: FRIO, nombre: 'Sin mesa', plazoSegundos: 0 });
+      const sinToque = await mesas.abrir({ arcade: FRIO, nombre: 'Sin toque', plazoSegundos: 0 });
+      await mesas.conLaMesa(sinMesa.mesa.codigo, (m) => {
+        (m as unknown as { mesa: unknown }).mesa = null;
+      });
+      await mesas.conLaMesa(sinToque.mesa.codigo, (m) => {
+        (m as unknown as { ultimoToqueEn: unknown }).ultimoToqueEn = 1n;
+      });
+      /* Dos horas, para que la próxima lectura vuelva a barrer: barre como mucho una vez por hora. */
+      adelantar(2 * HORA);
+      const alMirar = await loQueLanza(() => mesas.mirar(sana.mesa.codigo, sana.silla.llave));
+      const alRevisar = await loQueLanza(() => mesas.revisionDe(sana.mesa.codigo, sana.silla.llave));
+      const alAbrir = await loQueLanza(() =>
+        mesas.abrir({ arcade: FRIO, nombre: 'Con veneno en la tabla', plazoSegundos: 0 }),
+      );
+      const alBarrer = await loQueLanza(() => mesas.barrerAhora());
+      comprobar(
+        'con dos mesas envenenadas EN MEMORIA, `mirar`, `revisionDe`, `abrir` y el barrido siguen funcionando',
+        alMirar === 'nada' && alRevisar === 'nada' && alAbrir === 'nada' && alBarrer === 'nada',
+        { alMirar, alRevisar, alAbrir, alBarrer },
+      );
+      await mesas.olvidarMesa(sinMesa.mesa.codigo);
+      await mesas.olvidarMesa(sinToque.mesa.codigo);
+      comprobar('y no queda ningún candado suelto', mesas.candadosDeMesaVivos() === 0, mesas.candadosDeMesaVivos());
+    }
+
+    // -------------------------------------------------------------------------
+    paso('La escritura diferida se vuelca bajo el candado: olvidar a mitad de volcado no resucita la mesa');
+    // -------------------------------------------------------------------------
+
+    {
+      /*
+       * EL AGUJERO: con `tickHz > 0` la escritura se difiere un segundo, y se volcaba SIN el candado
+       * de la mesa. Un `DELETE` que llegaba con el volcado a medias borraba el fichero, y el
+       * renombrado del volcado aterrizaba DESPUÉS: la mesa olvidada volvía a estar en el disco con
+       * sus llaves, y desde que las mesas se leen a demanda se servía en la siguiente petición. El
+       * revisor lo midió sin retardos inventados: 27 de 36 `DELETE` por la ruta.
+       *
+       * Aquí no se juega a acertar el milisegundo: se RETIENE el renombrado del volcado de esa mesa
+       * —el último paso de la escritura atómica— hasta que se ha pedido olvidarla, y entonces se
+       * suelta. Es exactamente el orden que la carrera producía, sin depender de la suerte.
+       */
+      const conRename = fsp as unknown as { rename: typeof fsp.rename };
+      const renombrarDeVerdad = conRename.rename;
+      let laQueSeRetiene = '';
+      const renombrado = retenida();
+      const llego = retenida();
+      conRename.rename = async (desde, hasta) => {
+        if (laQueSeRetiene !== '' && path.basename(String(hasta)) === `${laQueSeRetiene}.json`) {
+          llego.soltar();
+          await renombrado.promesa;
+        }
+        return renombrarDeVerdad(desde, hasta);
+      };
+      try {
+        const enVuelo = await mesas.abrir({ arcade: DIFERIDO, nombre: 'Olga', plazoSegundos: 0 });
+        laQueSeRetiene = enVuelo.mesa.codigo;
+        await mesas.mover(enVuelo.mesa.codigo, enVuelo.silla.llave, 0, { tipo: 'jugar', carga: 'en vuelo' });
+        const aTiempo = await Promise.race([llego.promesa.then(() => true), dormir(5_000).then(() => false)]);
+        comprobar('el volcado diferido llega a escribir la mesa, y se le retiene justo antes de renombrar', aTiempo);
+        const olvido = mesas.olvidarMesa(enVuelo.mesa.codigo);
+        await dormir(150);
+        renombrado.soltar();
+        await olvido;
+        await dormir(150);
+        comprobar(
+          'olvidada con el volcado A MEDIAS, su fichero no vuelve a aparecer',
+          !fs.existsSync(ficheroDe(MESAS, enVuelo.mesa.codigo)),
+        );
+        const vuelve = await loQueLanza(() => mesas.mirar(enVuelo.mesa.codigo, enVuelo.silla.llave));
+        comprobar(
+          'ni la mesa: pedirla es «no existe», y no una partida resucitada con sus llaves',
+          vuelve.startsWith('MesaDesconocida'),
+          vuelve,
+        );
+      } finally {
+        renombrado.soltar();
+        conRename.rename = renombrarDeVerdad;
+      }
+
+      /* Y con el volcado sólo PENDIENTE —todavía no ha empezado—, olvidarla lo cancela. */
+      const pendiente = await mesas.abrir({ arcade: DIFERIDO, nombre: 'Pau', plazoSegundos: 0 });
+      await mesas.mover(pendiente.mesa.codigo, pendiente.silla.llave, 0, { tipo: 'jugar', carga: 'pendiente' });
+      await mesas.olvidarMesa(pendiente.mesa.codigo);
+      await dormir(1_300);
+      const vuelvePendiente = await loQueLanza(() => mesas.mirar(pendiente.mesa.codigo, pendiente.silla.llave));
+      comprobar(
+        'y olvidada con el volcado sólo PENDIENTE, el volcado se cancela: ni fichero ni mesa',
+        !fs.existsSync(ficheroDe(MESAS, pendiente.mesa.codigo)) && vuelvePendiente.startsWith('MesaDesconocida'),
+        vuelvePendiente,
+      );
+      comprobar('y no queda ningún candado suelto', mesas.candadosDeMesaVivos() === 0, mesas.candadosDeMesaVivos());
+    }
+
+    // -------------------------------------------------------------------------
+    paso('Una terminada guardada con el plazo puesto sale de la memoria como cualquier terminada');
+    // -------------------------------------------------------------------------
+
+    {
+      /*
+       * La versión que rearmaba el plazo después de cerrar dejó en disco mesas TERMINADAS con
+       * `venceEn` puesto. Leídas, la primera lectura les apagaba el plazo EN MEMORIA
+       * (`ponerAlDiaElPlazo`) sin escribirlo —una terminada no escribe—, y desde ahí la de memoria
+       * ya no era la de su fichero: el desalojo no la soltaba nunca. La de control es igual pero sin
+       * el plazo puesto, y ésa ya salía.
+       */
+      const ahora = Date.now();
+      const terminadaConPlazo = (codigo: string, venceEn: number | null) => ({
+        version: 2,
+        mesa: {
+          codigo,
+          mesa: {
+            id: codigo,
+            arcade: FRIO,
+            asientos: ['aTERM0000'],
+            estado: { tics: 0, jugadas: 1, notas: [''], fin: true },
+            rev: 3,
+            tic: 0,
+            semilla: 1,
+            terminada: true,
+            diario: [],
+            empezada: true,
+          },
+          sillas: [{ id: 'aTERM0000', nombre: 'Quien acabó', llave: `LLAVE${codigo}${'0'.repeat(14)}` }],
+          plazoMs: 60_000,
+          venceEn,
+          turnoDesde: ahora,
+          abiertaEn: ahora,
+          ultimoToqueEn: ahora,
+          modalidad: 'normal',
+        },
+      });
+      fs.writeFileSync(ficheroDe(MESAS, 'TERMV'), JSON.stringify(terminadaConPlazo('TERMV', ahora - 1_000)), 'utf8');
+      fs.writeFileSync(ficheroDe(MESAS, 'TERMN'), JSON.stringify(terminadaConPlazo('TERMN', null)), 'utf8');
+      const ficheroConPlazo = fs.readFileSync(ficheroDe(MESAS, 'TERMV'), 'utf8');
+
+      const vista = await mesas.mirar('TERMV', null);
+      await mesas.mirar('TERMN', null);
+      comprobar(
+        'leída, dice que está terminada y que no vence',
+        vista.terminada && vista.venceEn === null,
+        { terminada: vista.terminada, venceEn: vista.venceEn },
+      );
+      adelantar(2 * HORA);
+      await mesas.barrerAhora();
+      const sigueLaDelPlazo = await estabaEnMemoria('TERMV');
+      const sigueLaDeControl = await estabaEnMemoria('TERMN');
+      comprobar(
+        'y dos horas sin mirarla, SALE de la memoria como la de control: no se queda fijada',
+        !sigueLaDelPlazo && !sigueLaDeControl,
+        { sigueLaDelPlazo, sigueLaDeControl },
+      );
+      comprobar(
+        'sin que se haya escrito su fichero: leerla y soltarla no cambian nada en el disco',
+        fs.readFileSync(ficheroDe(MESAS, 'TERMV'), 'utf8') === ficheroConPlazo,
+      );
     }
   } catch (error) {
     fallos.push(`la prueba se cayó: ${error instanceof Error ? error.stack : String(error)}`);
@@ -731,7 +1104,7 @@ if (fallos.length > 0) {
 }
 
 /* EL GUARDIA: un comprobador que se cae a mitad sin decirlo se parece mucho a uno verde. */
-const COMPROBACIONES_ESCRITAS = 50;
+const COMPROBACIONES_ESCRITAS = 75;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones escritas.`);
   process.exit(2);
@@ -742,7 +1115,8 @@ console.log(
     '  frío sale de la memoria con su fichero intacto, y lo que no se puede soltar —alguien esperando,\n' +
     '  un asiento visto, el candado cogido, una escritura pendiente o una que falló— se queda; al\n' +
     '  pedirlas vuelven idénticas, con su tic si les tocaba; `abrir` no reparte el código de una mesa\n' +
-    '  dormida; y el barrido de treinta días borra del disco sin cargar nada y sin tocar lo que no\n' +
-    '  entiende.',
+    '  dormida; el barrido de treinta días borra del disco sin cargar nada y sin tocar lo que no\n' +
+    '  entiende; un fichero de forma rota es un ilegible más, y no entra; y la limpieza no tumba a\n' +
+    '  nadie aunque haya una mesa envenenada en la memoria.',
 );
 process.exit(0);
