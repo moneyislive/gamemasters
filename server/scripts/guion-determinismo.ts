@@ -50,7 +50,7 @@ import {
   TICK_HZ,
 } from '../../shared/arcade/juegos/arcade';
 import type { EstadoDelArcade, Rumbo } from '../../shared/arcade/juegos/arcade';
-import { jugarConElRobot } from './robot-del-burgo';
+import { jugarConElRobot, loQueHaceElRobot } from './robot-del-burgo';
 import { jugarLasLindes } from './robot-de-las-lindes';
 import { PLANTAR } from '../../shared/arcade/juegos/lindes';
 
@@ -137,9 +137,23 @@ export interface JugadaDelBurgo {
   quebrados: number;
   /** Si terminó con ganador. */
   terminada: boolean;
+  /** Cuántos botines de la refriega entraron y movieron dinero. Ver `UN_BOTIN_DEL_BURGO_CADA`. */
+  botines: number;
   /** EL ESTADO FINAL, serializado con `canonico.ts`. Es lo que se compara. */
   huella: string;
 }
+
+/**
+ * UN BOTÍN DE LA REFRIEGA CADA TANTOS PASOS DEL ROBOT, en el Burgo y en Las Lindes.
+ *
+ * Desde Boots on Board el dinero y los puntos también cambian de manos porque alguien cae, y eso
+ * entra por el reductor como cualquier movimiento: con esto, los dos motores firman además partidas
+ * con refriega. Once en el Burgo, que no es múltiplo de su tic (`UN_TIC_DEL_BURGO_CADA`, siete): el
+ * tic va antes, y con el mismo número se llevaría todos los huecos y el botín no entraría nunca.
+ * Siete en Las Lindes, que no tiene tics.
+ */
+export const UN_BOTIN_DEL_BURGO_CADA = 11;
+export const UN_BOTIN_DE_LAS_LINDES_CADA = 7;
 
 /** Cuántos se sientan en cada partida del Burgo: una por semilla, en este orden. */
 export const CUANTOS_EN_EL_BURGO: readonly number[] = [2, 3, 4, 6];
@@ -194,6 +208,8 @@ export interface JugadaDeLasLindes {
   puntos: number;
   /** Si acabó de verdad, que es cuando se vacía la bolsa. */
   terminada: boolean;
+  /** Cuántos botines de la refriega entraron y movieron puntos. Ver `UN_BOTIN_DE_LAS_LINDES_CADA`. */
+  botines: number;
   /** EL ESTADO FINAL, serializado con `canonico.ts`. Es lo que se compara. */
   huella: string;
 }
@@ -373,7 +389,16 @@ export function jugarGrabando(
 
 /** Una partida entera del Burgo con esa semilla y los que le tocan a la mesa. Ver `JugadaDelBurgo`. */
 export function jugarUnaDelBurgo(semilla: number, cuantos: number): JugadaDelBurgo {
-  const p = jugarConElRobot(semilla, cuantos, TOPE_DE_VUELTAS_DEL_BURGO, UN_TIC_DEL_BURGO_CADA, TOPE_DE_PASOS_DEL_BURGO);
+  const p = jugarConElRobot(
+    semilla,
+    cuantos,
+    TOPE_DE_VUELTAS_DEL_BURGO,
+    UN_TIC_DEL_BURGO_CADA,
+    TOPE_DE_PASOS_DEL_BURGO,
+    loQueHaceElRobot,
+    () => {},
+    UN_BOTIN_DEL_BURGO_CADA,
+  );
   let quebrados = 0;
   for (const j of p.estado.jugadores) if (j.quebrado) quebrados++;
   return {
@@ -384,13 +409,14 @@ export function jugarUnaDelBurgo(semilla: number, cuantos: number): JugadaDelBur
     jugada: p.estado.jugada,
     quebrados,
     terminada: p.estado.momento === 'terminada' && p.estado.ganadores.length > 0,
+    botines: p.botines,
     huella: canonico(p.estado),
   };
 }
 
 /** Una partida entera de Las Lindes con esa semilla y los que le tocan a la mesa. Ver `JugadaDeLasLindes`. */
 export function jugarUnaDeLasLindes(semilla: number, cuantos: number): JugadaDeLasLindes {
-  const p = jugarLasLindes(semilla, cuantos, TOPE_DE_PASOS_DE_LAS_LINDES);
+  const p = jugarLasLindes(semilla, cuantos, TOPE_DE_PASOS_DE_LAS_LINDES, UN_BOTIN_DE_LAS_LINDES_CADA);
   const porClase: Record<string, number> = {};
   let plantados = 0;
   for (const a of p.apuntes) {
@@ -411,6 +437,7 @@ export function jugarUnaDeLasLindes(semilla: number, cuantos: number): JugadaDeL
     porClase,
     puntos,
     terminada: p.estado.momento === 'terminada',
+    botines: p.botines,
     huella: canonico(p.estado),
   };
 }

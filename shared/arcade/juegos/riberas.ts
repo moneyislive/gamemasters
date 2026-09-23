@@ -181,6 +181,7 @@ import { esTic } from '../reloj';
 import type { ContextoMovimiento, Movimiento } from '../movimiento';
 import { comoSeLlama, ESPECTADOR, NADIE_SENTADO } from '../tipos';
 import type { ArcadeId, AsientoId, LosSentados, ManifiestoDeArcade, QuienMira } from '../tipos';
+import { esBotin, leerElBotin } from './botin';
 
 /**
  * `Opcion` SE REEXPORTA Y YA NO SE DEFINE AQUÍ.
@@ -695,6 +696,24 @@ export const TOPE_POR_LADO_DEL_TRUEQUE = 3;
  * nadie puede contar mirando la mesa.
  */
 export const PROPUESTAS_VIVAS_A_LA_VEZ = 4;
+
+/**
+ * LO QUE SE LLEVA EL BOTÍN DE LA REFRIEGA: una ficha al azar del almacén de quien cae.
+ *
+ * Una, como el estiaje, y robada por la MISMA función (`elRobo`): la regla de «al azar del estado,
+ * y la ficha entera con su número de serie» ya está escrita una vez y probada, y el botín la usa
+ * en vez de escribir la segunda. Una y no más porque es lo que ya roba el siete, y tumbar a alguien
+ * no debería valer más que la regla de robar que el juego ya tenía. Ver `elBotin`.
+ */
+export const FICHAS_DEL_BOTIN = 1;
+
+/**
+ * Cuántas refriegas recuerda la mesa para contarlas. Las más viejas se caen por delante.
+ *
+ * Es una crónica, como los trueques recordados, y no un registro: el registro es el diario de la
+ * mesa. Tres dan para dos peleas seguidas en sitios distintos sin que la tercera tape la primera.
+ */
+export const REFRIEGAS_QUE_SE_RECUERDAN = 3;
 
 // ---------------------------------------------------------------------------
 // EL MAZO: la segunda economía
@@ -1226,6 +1245,20 @@ export interface Descarte {
   faltan: number;
 }
 
+/**
+ * UNA REFRIEGA QUE DIO BOTÍN: quién cayó y perdió, quién lo tumbó y se lo llevó, y CUÁNTAS fichas.
+ *
+ * Cuántas y nunca cuáles: el almacén es secreto, y una ficha dicha aquí —`'b17:junco'`— saldría en
+ * la vista de todos. Lo que cada uno sabe de la ficha concreta lo sabe por su propio almacén, que
+ * es lo que ya pasa con el robo del estiaje: al que se la quitan le desaparece de `misFichas`, y
+ * al que se la lleva le aparece en la suya.
+ */
+export interface RefriegaDeRiberas {
+  de: AsientoId;
+  para: AsientoId;
+  fichas: number;
+}
+
 /** Quién tiene el Vado Largo y con qué longitud. `de: null` si está vacante. */
 export interface Vado {
   de: AsientoId | null;
@@ -1436,6 +1469,21 @@ export interface EstadoDeRiberas {
 
   /** Quién ganó. Vacío hasta que termina. */
   ganadores: AsientoId[];
+
+  /**
+   * LAS ÚLTIMAS REFRIEGAS QUE DIERON BOTÍN, de la más vieja a la más nueva. Públicas enteras, porque
+   * sólo dicen quién, a quién y cuántas. Ver `RefriegaDeRiberas` y `elBotin`.
+   *
+   * ═══ OPCIONAL, Y SIN RELLENO EN `comoSiSiempreHubieraHabidoMazo`, A PROPÓSITO ═══
+   *
+   * Todo lo demás de este estado se rellena al abrir una mesa vieja, y esto no, por dos razones
+   * que no son de comodidad. La primera: la vista de este juego es un TIPO CERRADO y `verify:mesa`
+   * contrasta sus campos uno a uno contra lo que de verdad sale por el cable; un campo que viajara
+   * siempre obligaría a abrir esa lista para una partida en la que nadie ha peleado. La segunda:
+   * que falte ES lo cierto, igual que `descartes` vacío en una mesa de ayer —nadie cayó nunca—, así
+   * que no hay nada que rellenar. El campo aparece con la primera refriega y ya no se va.
+   */
+  refriegas?: RefriegaDeRiberas[];
 }
 
 /**
@@ -1655,6 +1703,14 @@ export function avanzarRiberas(
   const actual = comoSiSiempreHubieraHabidoMazo(estado ?? partidaNueva());
 
   if (esTic(movimiento)) return venceElPlazo(actual);
+
+  /*
+   * EL BOTÍN TAMPOCO PASA POR EL PORTILLO, y por la misma razón que el tic: no lo manda ningún
+   * asiento —lo mete el servidor cuando alguien cae en Boots on Board—, así que `opciones()` no se
+   * lo ofrece a nadie y el portillo lo rechazaría siempre. Lo que el portillo no mira lo mira
+   * `leerElBotin`, que es más estricto que él y dice que no a todo lo que llegue con `quien`.
+   */
+  if (esBotin(movimiento)) return elBotin(actual, movimiento.carga, ctx);
 
   /*
    * EL PORTILLO. Se proyecta para quien manda —o sea, se le tapa lo que no puede
@@ -2934,6 +2990,127 @@ function elRobo(
     return c;
   });
   return { colonos, azar: tirada.azar };
+}
+
+// ---------------------------------------------------------------------------
+// EL BOTÍN DE LA REFRIEGA: el robo que llega de fuera del tablero
+// ---------------------------------------------------------------------------
+
+/**
+ * EL BOTÍN: `de` cayó en Boots on Board y `para` lo tumbó. `para` le roba a `de`
+ * `FICHAS_DEL_BOTIN` fichas al azar, con `elRobo`, y nada más.
+ *
+ * ═══ ES EL ROBO DEL ESTIAJE, SIN LA PIEZA ═══
+ *
+ * El robo está escrito UNA vez (`elRobo`): al azar del estado, que avanza y viaja con él, y con la
+ * ficha entera, número de serie incluido. Así el secreto que cambia de manos deja de salir en la
+ * vista de quien la tenía y empieza a salir en la del nuevo dueño, que es exactamente lo que
+ * `verify:mesa` vigila. Esto es la tercera puerta de ese robo y no la segunda copia.
+ *
+ * ═══ SE RECHAZA CON MOTIVO LO QUE NO DEBIÓ LLEGAR ═══
+ *
+ * La carga mala, lo que manda un asiento, el de uno a sí mismo y el que no está sentado lo dice
+ * `leerElBotin`. Lo que sólo sabe el juego lo dice esto: que haya partida —ni `'reuniendo'`, que no
+ * tiene delta ni colonos, ni `'terminada'`— y que los dos sean COLONOS de esta partida: la lista se
+ * cierra al repartir el delta, y quien se sentó después mira sin almacén.
+ *
+ * Se aplica también mientras se COLOCA: la segunda choza ya cobra su cosecha, el delta está ahí y
+ * en Boots on Board ya se anda, y nada de la colocación depende del almacén.
+ *
+ * ═══ SIN NADA QUE LLEVARSE, EL MISMO OBJETO ═══
+ *
+ * Con el almacén vacío no se roba, igual que el estiaje no ofrece robarle a quien no tiene nada: sale
+ * EL MISMO estado, que la mesa cuenta como movimiento que no cambió nada, y la crónica no apunta un
+ * robo de cero fichas.
+ *
+ * ═══ EL MOMENTO DELICADO: EL DESCARTE DE UN SIETE ═══
+ *
+ * `descartes[].faltan` es la mitad de lo que cada uno tenía EN EL INSTANTE DEL SIETE, congelada, y
+ * no se recalcula (ver `EstadoDeRiberas.descartes`). Si el botín dejara a quien debe con MENOS
+ * fichas de las que le faltan por tirar, el descarte sería imposible: `opcionesDeDescarte` no le
+ * ofrecería nada con el almacén vacío, y la mesa esperaría a alguien que no puede moverse hasta que
+ * venciera el plazo, que en La Larga son días. Hay dos salidas y se elige la que no toca nada más:
+ *
+ *   · AJUSTAR `faltan` a lo que le queda cambiaría quién es el primero que debe —o sacaría a la
+ *     mesa del descarte si era el último—, o sea `turnoDe` o el momento, y con ellos el plazo, que
+ *     es justo lo que un botín no puede mover.
+ *   · NO LLEVARSE LAS QUE DEBE. Las fichas que ya están comprometidas con el siete no se tocan: se
+ *     roba de lo que sobra, y si no sobra nada, no se roba (mismo objeto). Es una comparación, y
+ *     el descarte sigue siendo posible siempre. Es lo que se hace.
+ *
+ * En la práctica casi nunca muerde: al sacar el siete a quien debe le sobran al menos cuatro (la
+ * mitad redondeando hacia arriba de más de siete), y tirar no cambia lo que sobra —baja a la vez el
+ * almacén y lo que falta—, así que tiene que caer más veces de las que le sobran dentro del mismo
+ * descarte. Quien se lleva la ficha puede estar también en la lista: le entra una más y debe las
+ * mismas, que es lo que dice la regla —se tira la mitad de lo que había cuando salió el siete—.
+ *
+ * ═══ CON TRUEQUES EN PIE NO HAY NADA QUE PROTEGER, Y ESTÁ MIRADO ═══
+ *
+ * Un trueque promete fichas que el oferente tenía al proponerlo, y el botín se las puede llevar.
+ * Eso ya pasaba sin botín —el oferente puede gastarlas alzando— y está resuelto donde se resuelve:
+ * `contestar` vuelve a mirar el almacén del oferente al aceptar, y si ya no llega CIERRA el trato
+ * como caducado en vez de dejarlo en pie. Y a quien lo iba a aceptar, `opciones()` le deja de
+ * ofrecer ACEPTAR en cuanto le falta su mitad. Ningún trato se queda colgado por esto.
+ *
+ * ═══ LO QUE NO TOCA ═══
+ *
+ * Ni el turno, ni el momento, ni el paso, ni la tirada, ni `estiajePorMover`, ni `descartes`, ni
+ * los trueques, ni los premios —una ficha no da puntos, así que no hay que mirar si alguien ganó—.
+ * La mesa reprograma su plazo cuando cambia `turnoDe`, y un botín que lo moviera le daría o le
+ * quitaría tiempo a quien juega sin que jugara nadie.
+ *
+ * ═══ Y SE CUENTA SIN DECIR QUÉ ═══
+ *
+ * La refriega va a `refriegas` con quién, a quién y cuántas —nunca cuáles— y sale en el panel «La
+ * refriega»: «Ana le quita una ficha a Bruno en la refriega.» Lo que era la ficha lo sabe cada uno
+ * por su almacén, que es lo que ya pasa con el estiaje.
+ */
+function elBotin(
+  estado: EstadoDeRiberas,
+  carga: unknown,
+  ctx: ContextoMovimiento,
+): EstadoDeRiberas | Rechazo<EstadoDeRiberas> {
+  const botin = leerElBotin(carga, ctx.quien, ctx.asientos);
+  if (botin === null) {
+    return rechazar(estado, 'Ese botín no vale: lo mete la mesa, entre dos sentados que no sean el mismo.');
+  }
+  if (estado.momento === 'reuniendo') return rechazar(estado, 'La partida no ha empezado: todavía no hay botín.');
+  if (estado.momento === 'terminada') return rechazar(estado, 'La partida ya ha terminado: ya no hay botín.');
+  const de = indiceDelAsiento(estado, botin.de);
+  const para = indiceDelAsiento(estado, botin.para);
+  if (de < 0 || para < 0) return rechazar(estado, 'Ese botín es de alguien que no juega esta partida.');
+
+  const suyo = estado.colonos[de] as Colono;
+  const debe = estado.momento === 'descartando' ? loQueDebeTirar(estado, suyo.asiento) : 0;
+  const sobran = suyo.almacen.length - debe;
+  const cuantas = sobran < FICHAS_DEL_BOTIN ? sobran : FICHAS_DEL_BOTIN;
+  if (cuantas <= 0) return estado;
+
+  /*
+   * De una en una, y cada una con `elRobo`: la segunda —si un día `FICHAS_DEL_BOTIN` pasa de una—
+   * se sortea sobre el almacén que dejó la primera y con el azar que dejó la primera, que es lo que
+   * pasaría si cayera dos veces.
+   */
+  let colonos = estado.colonos;
+  let azar = estado.azar;
+  let llevadas = 0;
+  for (let vez = 0; vez < cuantas; vez++) {
+    const robo = elRobo({ ...estado, colonos, azar }, para, de);
+    if (robo === null) break;
+    colonos = robo.colonos;
+    azar = robo.azar;
+    llevadas++;
+  }
+  if (llevadas === 0) return estado;
+
+  const refriegas = [...(estado.refriegas ?? []), { de: botin.de, para: botin.para, fichas: llevadas }];
+  return { ...estado, colonos, azar, refriegas: refriegas.slice(-REFRIEGAS_QUE_SE_RECUERDAN) };
+}
+
+/** Cuántas fichas le faltan todavía por tirar a este asiento en el descarte de ahora. Cero si nada. */
+function loQueDebeTirar(estado: EstadoDeRiberas, asiento: AsientoId): number {
+  const debe = estado.descartes.find((d) => d.de === asiento);
+  return debe === undefined || debe.faltan < 0 ? 0 : debe.faltan;
 }
 
 // ---------------------------------------------------------------------------
@@ -4578,6 +4755,14 @@ export interface VistaDeRiberas {
    */
   misPuntos: number;
   ganadores: AsientoId[];
+  /**
+   * LAS ÚLTIMAS REFRIEGAS, y SÓLO SI HUBO ALGUNA. Públicas: quién, a quién y cuántas, nunca cuáles.
+   *
+   * No viaja en una partida en la que nadie ha caído, por lo mismo que no existe en su estado
+   * (ver `EstadoDeRiberas.refriegas`): la vista de siempre sigue siendo exactamente la de siempre,
+   * y la lista cerrada de campos de `verify:mesa` sigue diciendo la verdad sobre ella.
+   */
+  refriegas?: RefriegaDeRiberas[];
   /** El tablero YA RESUELTO, para el mueble genérico. Ver `tableroDeRiberas`. */
   tablero: TableroDeclarado;
 }
@@ -4643,6 +4828,10 @@ function loQueSeVe(
     misCartas: mio === undefined ? [] : mio.mano.map((m) => ({ ...m })),
     misPuntos: mio === undefined ? 0 : puntosDe(estado, mio) + puntosOcultosDe(mio),
     ganadores: [...estado.ganadores],
+    /* Sólo si hubo alguna: una partida sin refriega manda la vista de siempre, campo a campo. */
+    ...(estado.refriegas === undefined
+      ? {}
+      : { refriegas: estado.refriegas.map((r) => ({ de: r.de, para: r.para, fichas: r.fichas })) }),
   };
 }
 
@@ -6206,7 +6395,24 @@ function panelesDe(v: VistaSinTablero): PanelDeTablero[] {
     },
   ];
   if (tratos.length > 0) paneles.push({ titulo: 'Trueques', lineas: tratos });
+
+  /*
+   * LAS ÚLTIMAS REFRIEGAS, con el mismo trato que los trueques: un renglón por botín, con los
+   * nombres de la vista. «Una ficha» y nunca cuál —el almacén es secreto—; quien la perdió y quien
+   * se la llevó lo ven en «Lo mío», que sale de su propio almacén. El `Array.isArray` es porque
+   * esto lee la vista que llegó por la red, y una de antes del botín no trae el campo.
+   */
+  const refriegas = Array.isArray(v.refriegas) ? v.refriegas : [];
+  if (refriegas.length > 0) {
+    paneles.push({ titulo: 'La refriega', lineas: refriegas.map((r) => fraseDeLaRefriega(v, r)) });
+  }
   return paneles;
+}
+
+/** «Ana le quita una ficha a Bruno en la refriega.» Contada desde quien se la lleva. */
+function fraseDeLaRefriega(v: VistaSinTablero, r: RefriegaDeRiberas): string {
+  const cuantas = r.fichas === 1 ? 'una ficha' : `${r.fichas} fichas`;
+  return `${nombreEnLaVista(v, r.para)} le quita ${cuantas} a ${nombreEnLaVista(v, r.de)} en la refriega.`;
 }
 
 /** La línea grande de arriba: qué se espera y de quién. */

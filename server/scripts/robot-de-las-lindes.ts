@@ -42,6 +42,7 @@ import {
 } from '../../shared/arcade/juegos/lindes';
 import type { EstadoDeLasLindes } from '../../shared/arcade/juegos/lindes';
 import { CLASES_DE_COSA, llaveDeCasilla } from '../../shared/arcade/juegos/lindes-losas';
+import { movimientoDelBotin } from '../../shared/arcade/juegos/botin';
 import { esRechazo } from '../../shared/arcade/motor';
 import { NADIE_SENTADO } from '../../shared/arcade/tipos';
 import type { AsientoId } from '../../shared/arcade/tipos';
@@ -63,6 +64,8 @@ export interface PartidaDelRobot {
   /** Cuántas losas quedaron puestas, para que quien llame pueda exigir que jugó. */
   readonly puestas: number;
   readonly plantados: number;
+  /** Cuántos botines de la refriega entraron y cambiaron la mesa. Cero si no se pidieron. */
+  readonly botines: number;
 }
 
 /** Los asientos del robot, con el mismo nombre siempre. */
@@ -87,12 +90,24 @@ function sorteo(semilla: number): () => number {
  * El `tic` de cada apunte sube de uno en uno: este juego declara `tickHz: 0` y no
  * tiene plazos, así que el tic no es tiempo — es el número de orden que la mesa le
  * pone a cada movimiento, y lo que hace falta es que sea estable.
+ *
+ * `cadaCuantosUnBotin`: cada tantos pasos, antes de jugar, el botín de una refriega
+ * entre dos sentados sacados del sorteo del robot, como lo metería el servidor
+ * —`quien: null`—. Es para `verify:determinismo`, que así compara en los dos motores
+ * partidas con puntos que cambian de manos. Con `0`, ninguno, y la partida es BYTE A
+ * BYTE la de siempre: el oro de Las Lindes y sus comprobadores no lo piden.
  */
-export function jugarLasLindes(semilla: number, cuantos: number, topeDePasos = 600): PartidaDelRobot {
+export function jugarLasLindes(
+  semilla: number,
+  cuantos: number,
+  topeDePasos = 600,
+  cadaCuantosUnBotin = 0,
+): PartidaDelRobot {
   const asientos = asientosDeLasLindes(cuantos);
   const tirada = sorteo(semilla);
   const apuntes: ApunteDeLasLindes[] = [];
   let tic = 0;
+  let botines = 0;
 
   const mandar = (tipo: string, carga: unknown, quien: AsientoId | null, estado: EstadoDeLasLindes): EstadoDeLasLindes => {
     tic++;
@@ -120,6 +135,22 @@ export function jugarLasLindes(semilla: number, cuantos: number, topeDePasos = 6
   let pasos = 0;
   while (!seAcabo(estado) && pasos < topeDePasos) {
     pasos++;
+    /*
+     * EL BOTÍN, y el robot sigue jugando en el mismo paso: sus demás decisiones —qué clase planta,
+     * que va por `pasos`— no se mueven de sitio. El segundo sale de los que no son el primero, por
+     * índice y sin cierres: en Hermes 0.12 un cierre sobre una variable del bucle no ve su vuelta.
+     */
+    if (cadaCuantosUnBotin > 0 && pasos % cadaCuantosUnBotin === 0) {
+      const uno = Math.floor(tirada() * asientos.length);
+      const otro = Math.floor(tirada() * (asientos.length - 1));
+      const de = asientos[uno] as AsientoId;
+      const para = asientos[otro >= uno ? otro + 1 : otro] as AsientoId;
+      const botin = movimientoDelBotin(de, para);
+      const antes = estado;
+      estado = mandar(botin.tipo, botin.carga, null, estado);
+      if (estado !== antes) botines++;
+      if (seAcabo(estado)) break;
+    }
     const quien = deQuienEsElTurno(estado);
     if (quien === null) break;
     const vista = loQueSeVe(estado, quien, NADIE_SENTADO);
@@ -172,5 +203,6 @@ export function jugarLasLindes(semilla: number, cuantos: number, topeDePasos = 6
     asientos,
     puestas: Object.keys(estado.tablero).length,
     plantados: estado.plantados.length,
+    botines,
   };
 }
