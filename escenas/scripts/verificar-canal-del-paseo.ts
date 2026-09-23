@@ -26,6 +26,12 @@
  *  6. EL RÓTULO. Se escribe lo que tiene dibujo, mira a la cámara y se lee desde el hombro.
  *  7. EL MONTAJE. La escena abre el canal SÓLO con la prop, y los dos clientes se la pasan SÓLO en
  *     una mesa `botas`, con la misma pregunta.
+ *  8. LOS TRES JUEGOS QUE SE ANDAN. Las Lindes, el Burgo y Riberas cosen el canal igual —la prop, su
+ *     `alDarUnTic` en el paseo y la corrección por una referencia—, pintan a los demás UNA vez, sólo
+ *     con canal y a pie, y con LA MISMA altura del suelo que el paseo le da a quien anda; los dos
+ *     clientes del Burgo y los dos de Riberas construyen el canal SÓLO en una mesa `botas`, se lo
+ *     pasan a la escena una vez, empiezan a pie, dicen cómo va el canal sólo en botas, y dan a cada
+ *     asiento el color de su juego: el de su peón en el Burgo, el de sus chozas en Riberas.
  *
  * Cada comprobación se ha visto roja rompiendo a propósito lo que vigila (ver el informe de la
  * sesión que la escribió); las que pueden llevan además su vacuna aquí dentro: la cuenta del revés
@@ -70,6 +76,8 @@ import { asientosQueAndan, COLOR_SIN_DECLARAR, esMesaDeBotas } from '../paseo/me
 import { corregirElPaseo, fotogramaDelPaseo, nacerEnElPaseo, poseDelPaseo } from '../paseo/paseante';
 import type { EstadoDelPaseo } from '../paseo/paseante';
 import { ALTO_MAXIMO_DEL_ROTULO, altoDelRotulo, geometriaDelRotulo, letrasDelRotulo } from '../paseo/rotulo';
+import { asientosQueAndanPorElBurgo } from '../burgo/a-pie';
+import { asientosQueAndanPorElDelta } from '../delta-a-pie';
 import { direccionDelCanal as direccionDelEscritorio } from '../../escritorio/src/mesa';
 
 let hechas = 0;
@@ -1115,6 +1123,363 @@ paso('El montaje: la escena abre el canal sólo con la prop, y los dos clientes 
   comprobar('y sin `location` —un pintado estático— no hay dirección, ni canal', direccionDelEscritorio('AB12C') === null);
 }
 
+// ---------------------------------------------------------------------------
+paso('Los tres juegos que se andan: el canal cosido igual, los demás a la altura del suelo de cada juego, y sólo en una mesa `botas`');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ POR QUÉ UNA SOLA REGLA PARA TRES ESCENAS ═══
+ *
+ * Las Lindes, el Burgo y Riberas se andan con el MISMO paseo y el MISMO canal, y se cosen por los
+ * mismos tres sitios: `usarElCanal` con la prop, ANTES del paseo; su `alDarUnTic` en las opciones del
+ * paseo (la costura a); y la corrección por una referencia (la costura b). Lo que cambia de un juego a
+ * otro es a qué altura está su suelo, y eso es justo lo que no se puede separar: los demás se pintan
+ * con LA MISMA `alturaEn` que el paseo le da a quien anda —en el Burgo pisan el andén y el puente, en
+ * Riberas vadean con el agua por la cintura—. Con otra, alguien anda a un metro de lo que pisa en su
+ * propio aparato y nada se pone rojo: `LosDemas` recibe una función, la que se le dé. Así que la regla
+ * se escribe una vez y se aplica a las tres, cada una con sus casos envenenados. (Que la altura del
+ * paseo sea la del suelo que se pinta lo mide cada juego en el suyo: `verify:lindes-escena`,
+ * `verify:burgo-escena` y `verify:escena`. Aquí se ata la de los demás a ésa.)
+ *
+ * ═══ Y EN LOS CLIENTES, QUE UNA MESA NORMAL NO ABRA NADA ═══
+ *
+ * El canal se construye SÓLO detrás de `esMesaDeBotas`, se le pasa a la escena una vez, se empieza a
+ * pie, el cartel del canal sale sólo en botas y nadie compara la modalidad a pelo. Los dos clientes de
+ * Las Lindes los mira el paso de arriba; aquí, los dos del Burgo y los dos de Riberas. Y el color de
+ * cada asiento, que es del juego, se saca con UN ayudante por juego, que aquí se ejecuta.
+ *
+ * Todo se lee del CÓDIGO sin comentarios —las cabeceras cuentan el porqué con los mismos nombres— y
+ * cada regla se ve CAER con sus casos envenenados sobre el propio fichero. Un envenenado que no
+ * cambia el fichero cuenta como fallo: sería un filtro roto, y un filtro roto da verdes para siempre.
+ */
+{
+  const leer = (ruta: string): string =>
+    fs
+      .readFileSync(new URL(ruta, import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  /** Afirma la regla sobre el fichero de verdad, y la ve CAER con cada caso envenenado. */
+  const reglaDelFuente = (que: string, prueba: (t: string) => boolean, bueno: string, envenenados: readonly string[]): void => {
+    comprobar(que, prueba(bueno));
+    envenenados.forEach((envenenado, i) => {
+      comprobar(
+        `y «${que}» se ve CAER con el caso envenenado ${String(i + 1)}`,
+        envenenado !== bueno && !prueba(envenenado),
+        envenenado === bueno ? 'el envenenado no ha cambiado el fichero: la regla no se está poniendo a prueba' : undefined,
+      );
+    });
+  };
+
+  /* ─── Los colores de cada juego, ejecutados ─── */
+
+  const SENTADOS = [
+    { id: 's1', nombre: 'Ana', figura: 'maga' },
+    { id: 's2', nombre: 'Bruno' },
+    { id: 's3', nombre: 'Celia' },
+  ] as const;
+  const delBurgo = asientosQueAndanPorElBurgo(SENTADOS, [
+    { asiento: 's1', color: '#7d3fd6' },
+    { asiento: 's2', color: 'violeta' },
+  ]);
+  comprobar(
+    'en el Burgo cada uno anda con el color de su PEÓN, con su figura; sin peón, o con un color que no es `#rrggbb`, en gris',
+    delBurgo.length === 3 &&
+      delBurgo[0]?.color === '#7d3fd6' &&
+      delBurgo[0].figura === 'maga' &&
+      delBurgo[0].nombre === 'Ana' &&
+      delBurgo[1]?.color === COLOR_SIN_DECLARAR &&
+      delBurgo[2]?.color === COLOR_SIN_DECLARAR,
+    delBurgo,
+  );
+  /* LA VACUNA: las figuras a pelo no las lee nadie; el color lo da el ayudante, y sin él no sale. */
+  const aPelo = asientosQueAndan(SENTADOS, { figuras: [{ asiento: 's1', color: '#7d3fd6' }] });
+  comprobar('y sin el ayudante —las figuras del Burgo a pelo— no sale ni un color: la guarda distingue', aPelo.every((a) => a.color === COLOR_SIN_DECLARAR), aPelo);
+  const vistaDeRiberas = {
+    desde: 'riberas',
+    momento: 'jugando',
+    islas: [],
+    colonos: [
+      { asiento: 's1', nombre: 'Ana', color: '#e0533d' },
+      { asiento: 's3', nombre: 'Celia', color: '#3d8be0' },
+    ],
+  };
+  const delDelta = asientosQueAndanPorElDelta(SENTADOS, vistaDeRiberas);
+  comprobar(
+    'en Riberas cada uno anda con el color de sus CHOZAS, el de su colono en la vista; quien no es colono, en gris',
+    delDelta.length === 3 && delDelta[0]?.color === '#e0533d' && delDelta[0].figura === 'maga' && delDelta[1]?.color === COLOR_SIN_DECLARAR && delDelta[2]?.color === '#3d8be0',
+    delDelta,
+  );
+  const deOtroJuego = asientosQueAndanPorElDelta(SENTADOS, { ...vistaDeRiberas, desde: 'burgo' });
+  comprobar('y con una vista que no es de Riberas no lo declara nadie: todos en gris, y se siguen leyendo', deOtroJuego.every((a) => a.color === COLOR_SIN_DECLARAR), deOtroJuego);
+
+  /* ─── Las tres escenas ─── */
+
+  interface EscenaQueAnda {
+    readonly juego: string;
+    readonly fuente: string;
+    /** Con qué se pide el canal: la prop de la escena. */
+    readonly prop: 'props.canal' | 'canal';
+    /** La guarda que deja pintar a los demás sólo con canal y a pie, justo delante de `<LosDemas`. */
+    readonly guarda: RegExp;
+    /** Lo que le quita a esa guarda la pregunta por el canal, y lo que le quita el «a pie». */
+    readonly sinCanal: readonly [string, string];
+    readonly sinAPie: readonly [string, string];
+  }
+  const ESCENAS: readonly EscenaQueAnda[] = [
+    {
+      juego: 'Las Lindes',
+      fuente: leer('../lindes/Lindes.tsx'),
+      prop: 'props.canal',
+      guarda: /\{props\.canal === undefined \|\| camara\.modo === 'mesa' \? null : \(\s*<LosDemas\b/,
+      sinCanal: ["{props.canal === undefined || camara.modo === 'mesa' ? null : (", "{camara.modo === 'mesa' ? null : ("],
+      sinAPie: ["{props.canal === undefined || camara.modo === 'mesa' ? null : (", '{props.canal === undefined ? null : ('],
+    },
+    {
+      juego: 'el Burgo',
+      fuente: leer('../burgo/Burgo.tsx'),
+      prop: 'props.canal',
+      guarda: /\{props\.canal === undefined \|\| !aPie \? null : \(\s*<LosDemas\b/,
+      sinCanal: ['{props.canal === undefined || !aPie ? null : (', '{!aPie ? null : ('],
+      sinAPie: ['{props.canal === undefined || !aPie ? null : (', '{props.canal === undefined ? null : ('],
+    },
+    {
+      juego: 'Riberas',
+      fuente: leer('../andar-por-el-delta.tsx'),
+      prop: 'canal',
+      guarda: /if \(!aPie\) return null;\s*return \(\s*<>(?:(?!return)[\s\S])*?\{canal === undefined \? null : \(\s*<LosDemas\b/,
+      sinCanal: ['{canal === undefined ? null : (', '{false ? null : ('],
+      sinAPie: ['if (!aPie) return null;\n  return (', 'return ('],
+    },
+  ];
+
+  /** Lo que la escena le da al paseo, entre las llaves de la llamada. */
+  const llamadaAlPaseo = (c: string): string | null => /const paseo = usarElPaseo\(\{([^}]*)\}\);/.exec(c)?.[1] ?? null;
+  /**
+   * CON QUÉ ALTURA ANDA QUIEN ANDA: lo que la llamada al paseo da como `alturaEn` —`alturaEn: algo`,
+   * o `alturaEn` a secas—. Una función escrita ahí mismo no es un nombre, y no casa con nada: se
+   * quiere el MISMO objeto en los dos sitios, no dos funciones que hoy den lo mismo.
+   */
+  const alturaDelPaseo = (c: string): string | null => {
+    const llamada = llamadaAlPaseo(c);
+    if (llamada === null) return null;
+    const m = /(?:^|[\s,{])alturaEn(?:\s*:\s*([A-Za-z_$][\w$]*))?\s*(?:,|$)/.exec(llamada);
+    return m === null ? null : (m[1] ?? 'alturaEn');
+  };
+  const losDemasEn = (c: string): readonly string[] => c.match(/<LosDemas\b[\s\S]*?\/>/g) ?? [];
+  const aLaLetra = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const coseElCanal =
+    (e: EscenaQueAnda) =>
+    (c: string): boolean => {
+      const llamada = llamadaAlPaseo(c) ?? '';
+      return (
+        new RegExp(`const elCanal = usarElCanal\\(${aLaLetra(e.prop)}, corregirAQuienPasea\\);`).test(c) &&
+        (c.match(/\busarElCanal\(/g) ?? []).length === 1 &&
+        c.indexOf('const elCanal = usarElCanal(') < c.indexOf('const paseo = usarElPaseo(') &&
+        /\balDarUnTic: elCanal\.alDarUnTic\b/.test(llamada) &&
+        /corregirAQuienPasea\.current = paseo\.corregir;/.test(c) &&
+        !/abrirElCanal\(/.test(c) &&
+        !/WebSocket/.test(c)
+      );
+    };
+  const pintaALosDemas =
+    (e: EscenaQueAnda) =>
+    (c: string): boolean => {
+      const todos = losDemasEn(c);
+      const el = todos[0] ?? '';
+      const altura = alturaDelPaseo(c);
+      const p = aLaLetra(e.prop);
+      return (
+        todos.length === 1 &&
+        e.guarda.test(c) &&
+        altura !== null &&
+        new RegExp(`\\balturaEn=\\{${aLaLetra(altura)}\\}`).test(el) &&
+        /\bcliente=\{elCanal\.cliente\}/.test(el) &&
+        /\bpresentes=\{elCanal\.presentes\}/.test(el) &&
+        new RegExp(`\\basientos=\\{${p}\\.asientos\\}`).test(el) &&
+        new RegExp(`\\byo=\\{${p}\\.yo\\}`).test(el) &&
+        /\btraer=\{traer\}/.test(el)
+      );
+    };
+
+  for (const e of ESCENAS) {
+    reglaDelFuente(
+      `${e.juego}: la escena abre el canal con la prop y con nada más, ANTES del paseo; le da cada tic, le deja corregir a quien anda, y no abre sockets por su cuenta`,
+      coseElCanal(e),
+      e.fuente,
+      [
+        e.fuente.replace('alDarUnTic: elCanal.alDarUnTic', 'alDarUnTic: undefined'),
+        e.fuente.replace('corregirAQuienPasea.current = paseo.corregir;', ''),
+        `${e.fuente}\nconst otro = new WebSocket('ws://localhost:5174');`,
+      ],
+    );
+    reglaDelFuente(
+      `${e.juego}: pinta a los demás UNA vez, sólo con canal y a pie, con los asientos y el asiento del canal, y con LA MISMA altura del suelo que el paseo le da a quien anda`,
+      pintaALosDemas(e),
+      e.fuente,
+      [
+        e.fuente.replace(/(<LosDemas\b[\s\S]*?)alturaEn=\{[A-Za-z_$][\w$]*\}/, '$1alturaEn={() => 0}'),
+        e.fuente.replace(e.sinCanal[0], e.sinCanal[1]),
+        e.fuente.replace(e.sinAPie[0], e.sinAPie[1]),
+      ],
+    );
+  }
+
+  /* El Burgo lo declara en su contrato, y Riberas lo pasa de la escena del delta al paseo. */
+  const losTiposDelBurgo = leer('../burgo/tipos.ts');
+  reglaDelFuente(
+    'el Burgo: el contrato de la escena lleva la prop `canal`, del mismo tipo que la de Las Lindes',
+    (c) =>
+      /export interface PropsDelBurgo \{(?:(?!\n\})[\s\S])*\breadonly canal\?: CanalDeBotas;/.test(c) &&
+      /import type \{ CanalDeBotas \} from '\.\.\/paseo\/mesa-de-botas';/.test(c),
+    losTiposDelBurgo,
+    [losTiposDelBurgo.replace('readonly canal?: CanalDeBotas;', '')],
+  );
+  const laDelDelta = leer('../delta.tsx');
+  reglaDelFuente(
+    'Riberas: la escena del delta declara el canal y se lo pasa al paseo tal cual, UNA vez; ni lo abre ella ni pinta a nadie',
+    (c) =>
+      /\bcanal\?: CanalDeBotas;/.test(c) &&
+      /import type \{ CanalDeBotas \} from '\.\/paseo\/mesa-de-botas';/.test(c) &&
+      (c.match(/\bcanal=\{canal\}/g) ?? []).length === 1 &&
+      /<AndarPorElDelta\b[^>]*\bcanal=\{canal\}[^>]*\/>/.test(c) &&
+      !/\busarElCanal\(/.test(c) &&
+      !/<LosDemas\b/.test(c) &&
+      !/WebSocket/.test(c),
+    laDelDelta,
+    [laDelDelta.replace(/\n\s*canal=\{canal\}/, '')],
+  );
+
+  /* ─── Los cuatro clientes del Burgo y de Riberas ─── */
+
+  interface ClienteQueAnda {
+    readonly quien: string;
+    readonly fuente: string;
+    /** A qué se le pregunta si es de botas: la vista de la mesa en la app, la mesa puesta en el escritorio. */
+    readonly pregunta: 'vista' | 'puesta';
+    /** Los elementos de la escena, enteros (con `g`: tiene que haber UNO). */
+    readonly escena: RegExp;
+    /** El ayudante que da a cada asiento el color de su juego. */
+    readonly ayudante: 'asientosQueAndanPorElBurgo' | 'asientosQueAndanPorElDelta';
+    /** Cómo se empieza a pie, y lo que lo estropea. */
+    readonly aPie: RegExp;
+    readonly sinAPie: readonly [string, string];
+    /** Cómo se dice cómo va el canal, y lo que le quita la pregunta de botas. */
+    readonly cartel: RegExp;
+    readonly sinPregunta: readonly [string | RegExp, string];
+  }
+  const EL_CARTEL_DEL_ESCRITORIO = "canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined}";
+  const CLIENTES: readonly ClienteQueAnda[] = [
+    {
+      quien: 'la app del Burgo',
+      fuente: leer('../../app/src/arcade/burgo-en-tres-escena.tsx'),
+      pregunta: 'vista',
+      escena: /<Burgo\n[\s\S]*?\/>/g,
+      ayudante: 'asientosQueAndanPorElBurgo',
+      aPie: /useEffect\(\(\) => \{\s*if \(esBotas\) ponerModo\('hombro'\);\s*\}, \[esBotas, vista\.codigo\]\);/,
+      sinAPie: ["if (esBotas) ponerModo('hombro');", ''],
+      cartel: /\{esBotas \? \(\s*<View pointerEvents="none">\s*<Text style=\{estilos\.canal\} numberOfLines=\{2\}>\s*\{estadoDelCanal\?\.texto \?\? 'Conectando…'\}/,
+      sinPregunta: [/\{esBotas \? \(\s*<View pointerEvents="none">/, '{true ? (<View pointerEvents="none">'],
+    },
+    {
+      quien: 'el escritorio del Burgo',
+      fuente: leer('../../escritorio/src/burgo-en-tres.tsx'),
+      pregunta: 'puesta',
+      escena: /<Burgo\n[\s\S]*?\/>/g,
+      ayudante: 'asientosQueAndanPorElBurgo',
+      aPie: /useEffect\(\(\) => \{\s*if \(esBotas\) ponerModo\('hombro'\);\s*\}, \[esBotas, puesta\.codigo\]\);/,
+      sinAPie: ["if (esBotas) ponerModo('hombro');", ''],
+      cartel: new RegExp(`<LasCamarasDelBurgo\\b(?:(?!\\/>)[\\s\\S])*\\b${aLaLetra(EL_CARTEL_DEL_ESCRITORIO)}`),
+      sinPregunta: [EL_CARTEL_DEL_ESCRITORIO, "canal={estadoDelCanal?.texto ?? 'Conectando…'}"],
+    },
+    {
+      quien: 'la app de Riberas',
+      fuente: leer('../../app/src/arcade/riberas-en-tres-escena.tsx'),
+      pregunta: 'vista',
+      escena: /<Delta\b[\s\S]*?\/>/g,
+      ayudante: 'asientosQueAndanPorElDelta',
+      aPie: /const bajadoEnLaMesa = useRef<string \| null>\(null\);\s*useEffect\(\(\) => \{\s*if \(!esBotas \|\| bajadoEnLaMesa\.current === vista\.codigo\) return;\s*bajadoEnLaMesa\.current = vista\.codigo;\s*cambiarDeCamara\('hombro'\);\s*\}, \[esBotas, vista\.codigo, cambiarDeCamara\]\);/,
+      sinAPie: ["bajadoEnLaMesa.current = vista.codigo;\n    cambiarDeCamara('hombro');", "bajadoEnLaMesa.current = vista.codigo;\n    ponerModo('hombro');"],
+      cartel: /\{esBotas \? \(\s*<Text style=\{estilos\.canal\} numberOfLines=\{2\}>\s*\{estadoDelCanal\?\.texto \?\? 'Conectando…'\}/,
+      sinPregunta: [/\{esBotas \? \(\s*<Text style=\{estilos\.canal\}/, '{true ? (<Text style={estilos.canal}'],
+    },
+    {
+      quien: 'el escritorio de Riberas',
+      fuente: leer('../../escritorio/src/riberas-en-tres.tsx'),
+      pregunta: 'puesta',
+      escena: /<Delta\b[\s\S]*?\/>/g,
+      ayudante: 'asientosQueAndanPorElDelta',
+      aPie: /const bajadoEnLaMesa = useRef<string \| null>\(null\);\s*useEffect\(\(\) => \{\s*if \(!esBotas \|\| bajadoEnLaMesa\.current === puesta\.codigo\) return;\s*bajadoEnLaMesa\.current = puesta\.codigo;\s*cambiarDeCamara\('hombro'\);\s*\}, \[esBotas, puesta\.codigo, cambiarDeCamara\]\);/,
+      sinAPie: ["bajadoEnLaMesa.current = puesta.codigo;\n    cambiarDeCamara('hombro');", "bajadoEnLaMesa.current = puesta.codigo;\n    ponerModo('hombro');"],
+      cartel: new RegExp(`<ComoSeAndaPorElDelta modo=\\{modo\\} ${aLaLetra(EL_CARTEL_DEL_ESCRITORIO)} \\/>`),
+      sinPregunta: [EL_CARTEL_DEL_ESCRITORIO, "canal={estadoDelCanal?.texto ?? 'Conectando…'}"],
+    },
+  ];
+
+  const construyeSoloEnBotas =
+    (k: ClienteQueAnda) =>
+    (c: string): boolean => {
+      const conSuColor = `asientos: ${k.ayudante}\\(${k.pregunta}\\.asientos, [^)]*\\),`;
+      const soloEnBotas =
+        k.pregunta === 'vista'
+          ? new RegExp(
+              `esBotas && yo !== null && llaveDelAsiento !== null\\s*\\?\\s*\\{\\s*url: direccionDelCanal\\(vista\\.codigo\\),\\s*llave: llaveDelAsiento,\\s*yo,\\s*${conSuColor}\\s*alCambiar: ponerEstadoDelCanal,\\s*\\}\\s*:\\s*undefined,`,
+            )
+          : new RegExp(
+              `const url = esBotas \\? direccionDelCanal\\(puesta\\.codigo\\) : null;\\s*if \\(url === null \\|\\| llaveDelAsiento === null \\|\\| yo === null\\) return undefined;\\s*return \\{\\s*url,\\s*llave: llaveDelAsiento,\\s*yo,\\s*${conSuColor}\\s*alCambiar: ponerEstadoDelCanal,\\s*\\};`,
+            );
+      return (
+        new RegExp(`const esBotas = esMesaDeBotas\\(${k.pregunta}\\);`).test(c) &&
+        (c.match(/\bconst esBotas = /g) ?? []).length === 1 &&
+        /const llaveDelAsiento = mesa\.llave \?\? null;/.test(c) &&
+        soloEnBotas.test(c) &&
+        (c.match(/\bdireccionDelCanal\(/g) ?? []).length === 1
+      );
+    };
+  /*
+   * UNA ESCENA, Y EL CANAL EN ELLA. Se cuentan los elementos de la escena y no las veces que sale
+   * `canal={canal}` en el fichero: en el escritorio del Burgo la columna de las cámaras le pasa al
+   * cartel SU `canal` —otro componente, otra variable: el texto de cómo va—, y eso no es pasarle el
+   * canal a nadie. Lo que no puede haber es una segunda escena montada con él.
+   */
+  const seLaPasaUnaVez =
+    (k: ClienteQueAnda) =>
+    (c: string): boolean => {
+      const escenas = c.match(k.escena) ?? [];
+      return escenas.length === 1 && /\bcanal=\{canal\}/.test(escenas[0] ?? '');
+    };
+  const empiezaAPie = (k: ClienteQueAnda) => (c: string): boolean => k.aPie.test(c);
+  const diceComoVaElCanal =
+    (k: ClienteQueAnda) =>
+    (c: string): boolean =>
+      k.cartel.test(c) && (c.match(/estadoDelCanal\?\.texto/g) ?? []).length === 1;
+  const noDecideLaModalidad = (c: string): boolean => !/modalidad\s*[!=]==/.test(c) && !/\.modalidad\b/.test(c);
+
+  for (const k of CLIENTES) {
+    const c = k.fuente;
+    reglaDelFuente(
+      `${k.quien} pregunta con \`esMesaDeBotas\` y construye el canal SÓLO si es de botas, con la llave, quién soy y los asientos con el color de su juego`,
+      construyeSoloEnBotas(k),
+      c,
+      [
+        k.pregunta === 'vista'
+          ? c.replace('esBotas && yo !== null', 'yo !== null')
+          : c.replace('const url = esBotas ? direccionDelCanal(puesta.codigo) : null;', 'const url = direccionDelCanal(puesta.codigo);'),
+        c.replace(`asientos: ${k.ayudante}(`, 'asientos: asientosQueAndan('),
+        `${c}\nconst otraDireccion = direccionDelCanal('AB12C');`,
+      ],
+    );
+    reglaDelFuente(`${k.quien} se lo pasa a la escena, y a UNA escena`, seLaPasaUnaVez(k), c, [
+      c.replace(k.escena, (el) => el.replace(/\n\s*canal=\{canal\}/, '')),
+      `${c}\n${(c.match(k.escena) ?? [''])[0] ?? ''}`,
+    ]);
+    reglaDelFuente(`${k.quien} empieza a pie en una mesa de botas, una vez por mesa, por la misma puerta que sus botones`, empiezaAPie(k), c, [c.replace(k.sinAPie[0], k.sinAPie[1])]);
+    reglaDelFuente(`${k.quien} dice cómo va el canal, en un solo sitio y SÓLO en una mesa de botas`, diceComoVaElCanal(k), c, [c.replace(k.sinPregunta[0], k.sinPregunta[1])]);
+    reglaDelFuente(`${k.quien} no decide la modalidad por su cuenta: ni una comparación con \`modalidad\` a pelo`, noDecideLaModalidad, c, [`${c}\nconst deBotas = ${k.pregunta}.modalidad === 'botas';`]);
+  }
+}
+
 console.log('');
 if (fallos.length > 0) {
   console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);
@@ -1130,4 +1495,6 @@ console.log('corrige sin ping-pong; a los demás se les pinta 150 ms atrás y nu
 console.log('desaparece y lo mal formado se cuenta; sin vuelta con llave mala, mesa que no u otro aparato, y');
 console.log('con lo demás se vuelve doblando la espera hasta su tope, y con quieto al volver a andar; la cámara');
 console.log('de hombro se acerca a un muro sin saltar y vuelve; el rótulo se lee desde el hombro; y sólo una');
-console.log('mesa `botas` monta el canal, en la escena y en los dos clientes.');
+console.log('mesa `botas` monta el canal: en Las Lindes, en el Burgo y en Riberas, cosido igual y con los demás');
+console.log('a la altura del suelo de cada juego, y en sus seis clientes, que empiezan a pie, dicen cómo va el');
+console.log('canal y dan a cada asiento el color de su juego.');

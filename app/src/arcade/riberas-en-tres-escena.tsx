@@ -114,6 +114,13 @@
  * misma de Las Lindes), y APAGAR el mirador táctil mientras se anda —su gesto, su rueda y
  * su `Ojo`—, que si no el pulgar que anda giraría a la vez una mesa que no se ve. Bajar
  * recoge la mesa y subir la saca; ver `cambiarDeCamara`.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
+ *
+ * Con la misma pregunta que el escritorio y Las Lindes (`esMesaDeBotas`), la escena recibe el canal
+ * de la mesa y pinta a los demás vadeando como quien pasea. Se empieza a pie —bajando por
+ * `cambiarDeCamara`, como los botones— y en la tira de las cámaras se dice cómo va el canal. En una
+ * mesa normal no se pasa nada y no se abre ningún socket.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -215,6 +222,8 @@ import type {
 import { semillaDelCodigo } from '../../../shared/mecanicas/semilla';
 import { Delta, encuadreDelDelta } from '../../../escenas/delta';
 import type { ModoDeCamaraDelDelta } from '../../../escenas/delta';
+import { asientosQueAndanPorElDelta } from '../../../escenas/delta-a-pie';
+import type { EstadoDelCanal } from '../../../escenas/paseo/canal-de-botas';
 /*
  * A PIE: la palanca y el correr escriben en una referencia que la escena lee en su bucle, la
  * misma pareja que monta Las Lindes. Ver `mandos-del-paseo.tsx`.
@@ -246,7 +255,8 @@ import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { conAlfa } from '../tema';
 import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
-import { usarMesaDeArcade } from './mesa';
+import type { CanalDeBotas } from '../../../escenas/paseo/mesa-de-botas';
+import { direccionDelCanal, usarMesaDeArcade } from './mesa';
 import type { MesaVista, OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
 
 /**
@@ -796,6 +806,45 @@ function LaMesaEnTres({
   const laVista = vista.vista;
   const yo = vista.yo;
   const opciones = vista.opciones ?? [];
+
+  /*
+   * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
+   *
+   * Como en Las Lindes y con la misma pregunta (`esMesaDeBotas`): en una mesa `botas` la escena
+   * recibe el canal —la dirección del WebSocket del servidor que la app tiene elegido
+   * (`direccionDelCanal`), la llave del asiento, quién soy y los asientos con su nombre, su figura y
+   * el color de sus chozas (`asientosQueAndanPorElDelta`)— y pinta a los demás vadeando como quien
+   * pasea. Sin asiento o sin llave no hay canal: no hay con qué decir `hola`. Los asientos llegan en
+   * cada vuelta del sondeo, pero la escena sólo reabre el socket si cambian la dirección, la llave o
+   * el asiento. En una mesa normal no se pasa nada y no se abre ningún socket.
+   */
+  const esBotas = esMesaDeBotas(vista);
+  const [estadoDelCanal, ponerEstadoDelCanal] = useState<EstadoDelCanal | null>(null);
+  const llaveDelAsiento = mesa.llave ?? null;
+  const canal = useMemo<CanalDeBotas | undefined>(
+    () =>
+      esBotas && yo !== null && llaveDelAsiento !== null
+        ? {
+            url: direccionDelCanal(vista.codigo),
+            llave: llaveDelAsiento,
+            yo,
+            asientos: asientosQueAndanPorElDelta(vista.asientos, laVista),
+            alCambiar: ponerEstadoDelCanal,
+          }
+        : undefined,
+    [esBotas, laVista, llaveDelAsiento, vista.asientos, vista.codigo, yo],
+  );
+  /*
+   * UNA MESA DE BOTAS SE EMPIEZA A PIE, y por la MISMA puerta que los botones de cámara:
+   * `cambiarDeCamara` suelta lo cogido y recoge la mesa, que es lo que bajar tiene que hacer se baje
+   * como se baje. Una vez por mesa —se apunta su código—, y luego mandan los botones.
+   */
+  const bajadoEnLaMesa = useRef<string | null>(null);
+  useEffect(() => {
+    if (!esBotas || bajadoEnLaMesa.current === vista.codigo) return;
+    bajadoEnLaMesa.current = vista.codigo;
+    cambiarDeCamara('hombro');
+  }, [esBotas, vista.codigo, cambiarDeCamara]);
 
   /*
    * ═══ LAS ISLAS CONSERVAN SU IDENTIDAD ENTRE SONDEOS, Y ESO ES LO QUE NO TIEMBLA ═══
@@ -1638,6 +1687,7 @@ function LaMesaEnTres({
                   traer={traer}
                   figura={vista.asientos.find((a) => a.id === yo)?.figura}
                   mandos={mandos}
+                  canal={canal}
                 />
               </Canvas>
             </View>
@@ -1804,6 +1854,16 @@ function LaMesaEnTres({
               <Text style={estilos.camaraRotulo}>{c.rotulo}</Text>
             </Pressable>
           ))}
+          {/*
+            CÓMO VA EL CANAL, sólo en una mesa de botas: «Conectando…», «Dentro», «Sin conexión: …».
+            En la misma tira, al lado de las cámaras y DEBAJO del lienzo, por lo mismo que ellas:
+            encima no queda esquina, y aquí se lee en la mesa y a pie sin tapar nada que se toque.
+          */}
+          {esBotas ? (
+            <Text style={estilos.canal} numberOfLines={2}>
+              {estadoDelCanal?.texto ?? 'Conectando…'}
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -2772,6 +2832,12 @@ const estilos = StyleSheet.create({
   },
   camaraPuesta: { borderColor: SALA.acento, backgroundColor: SALA.tejaAlta },
   camaraRotulo: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13 },
+  /*
+   * CÓMO VA EL CANAL, en la tira de las cámaras: lo que sobra de ancho, centrado en alto con los
+   * botones, y con la tinta de lo que se lee —«Sin conexión» es justo lo que no se puede perder—.
+   * Va sobre el suelo de la Sala, no sobre el delta, así que no le hace falta caja.
+   */
+  canal: { ...LETRA.cuerpo, flex: 1, alignSelf: 'center', color: SALA.palabra, fontSize: 13, lineHeight: 18 },
   /*
    * LA HOJA: una ficha sobre el lienzo, pegada abajo. Teja con el contorno que se
    * ve —blanco al 40 %, 3,63 sobre la teja—, porque aquí sí se dibuja una caja.

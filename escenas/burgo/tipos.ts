@@ -35,11 +35,20 @@
  * (`escenas/paseo/`) sobre el mundo que declara `mundoDelBurgo`. Los dos modos de a pie llevan
  * el ASIENTO de quien anda: de él salen su sitio de nacer y su figura. La palanca de la app
  * llega por `mandos`, igual que en Las Lindes. Lo que es sólo de esta ciudad está en `a-pie.ts`.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS, POR LA MISMA PROP QUE EN LAS LINDES ═══
+ *
+ * `canal`, junto a `mandos` y con el mismo tipo que la de Las Lindes (`CanalDeBotas`, de
+ * `paseo/mesa-de-botas.ts`): con ella la escena abre el canal de la mesa, le cuenta cada tic de
+ * quien anda y pinta a los demás asientos andando por las calles. Es un `import type` de un `.ts`
+ * sin JSX, así que el `tsc` del servidor, que lee este fichero a través de la traducción, lo
+ * compila igual que el de Las Lindes.
  */
 import type { FiguraId } from '../embarcadero/figuras';
 import type { Traer, Ventana, Calidad } from '../embarcadero/tipos';
 import type { ParDeDados } from '../dados';
 import type { MandosDeFuera } from '../paseo/mandos';
+import type { CanalDeBotas } from '../paseo/mesa-de-botas';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 import type { SitioDeLaBandeja } from './bandeja-de-los-dados';
 
@@ -170,6 +179,16 @@ export interface PropsDelBurgo {
    * porque el escritorio anda con el teclado.
    */
   readonly mandos?: { readonly current: MandosDeFuera };
+  /**
+   * EL CANAL DE BOOTS ON BOARD, sólo en una mesa de la modalidad `botas`: lo mismo que Las Lindes.
+   *
+   * Con él la escena abre el canal de la mesa (`paseo/usar-el-canal.ts`), le cuenta cada tic de
+   * quien anda, deja que el servidor lo corrija y pinta a los demás asientos andando por la ciudad
+   * (`paseo/los-demas.tsx`), con la misma altura del suelo que quien anda. Sin él —la mesa de
+   * siempre— no se abre nada y no se paga nada: ni un socket ni una llamada por tic. Quién lo pasa y
+   * cuándo lo deciden los clientes con `esMesaDeBotas`, y en ningún otro sitio.
+   */
+  readonly canal?: CanalDeBotas;
   /**
    * EN QUÉ ESQUINA DEL LIENZO VA LA BANDEJA DE LOS DADOS, y a cuántos puntos de sus bordes. La
    * escena no sabe qué tiene el cliente encima del lienzo, así que lo dice él: el escritorio abajo a

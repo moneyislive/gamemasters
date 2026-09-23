@@ -3099,18 +3099,25 @@ function elBurgoAPie(): void {
     'se ve fallar: con el acercamiento de siempre a pie, o sin marcar los punteros, cae',
     !quietaAPie(pintor.replace('alAcercarse={aPie ? NO_SE_ACERCA : alAcercarse}', 'alAcercarse={alAcercarse}')) && !quietaAPie(pintor.replace(/loCogeLaInterfaz\(e\);/, '')),
   );
+  /*
+   * Las cámaras se montan con el modo, el que las cambia y si hay carril; y, en una mesa de botas,
+   * con cómo va el canal (ver el punto 6): con cualquier otra cosa en `canal`, o sin la pregunta
+   * delante, el cartel diría «Conectando…» en una mesa normal que no abre ningún socket.
+   */
   const montaLoDeAPie = (c: string): boolean =>
     /const \[modo, ponerModo\] = useState<ModoDelBurgo>\('mesa'\);/.test(c) &&
     /const camara = useMemo\(\(\): ModoDeCamara => \(modo === 'mesa' \? \{ modo: 'mesa' \} : \{ modo, asiento: yo \?\? '' \}\), \[modo, yo\]\);/.test(c) &&
     /<Burgo\n(?:(?!\/>)[\s\S])*camara=\{camara\}/.test(c) &&
-    /<LasCamarasDelBurgo modo=\{modo\} alElegir=\{ponerModo\} conCarril=\{cuadrados\.length > 0\} \/>/.test(c) &&
+    /<LasCamarasDelBurgo\s+modo=\{modo\}\s+alElegir=\{ponerModo\}\s+conCarril=\{cuadrados\.length > 0\}\s+canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\}\s*\/>/.test(c) &&
     c.indexOf('<LasCamarasDelBurgo') > c.indexOf('</LimiteDelMundo>') &&
     /const cual = camaraDeLaTecla\(e, document\.activeElement\);/.test(c) &&
     /\{alPrincipio \|\| aPie \? null : \(/.test(c);
   comprobar('el pintor baja a andar con su `modo`, le pasa la cámara con el asiento a la escena, monta las cámaras sobre el lienzo, escucha las teclas y a pie esconde «Ver el burgo entero»', montaLoDeAPie(pintor));
   comprobar(
-    'se ve fallar: sin la cámara del modo, o con «Ver el burgo entero» también a pie, cae',
-    !montaLoDeAPie(pintor.replace(/camara=\{camara\}/, "camara={{ modo: 'mesa' }}")) && !montaLoDeAPie(pintor.replace('{alPrincipio || aPie ? null : (', '{alPrincipio ? null : (')),
+    'se ve fallar: sin la cámara del modo, con «Ver el burgo entero» también a pie, o con el cartel del canal sin la pregunta de botas delante, cae',
+    !montaLoDeAPie(pintor.replace(/camara=\{camara\}/, "camara={{ modo: 'mesa' }}")) &&
+      !montaLoDeAPie(pintor.replace('{alPrincipio || aPie ? null : (', '{alPrincipio ? null : (')) &&
+      !montaLoDeAPie(pintor.replace("canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined}", "canal={estadoDelCanal?.texto ?? 'Conectando…'}")),
   );
 
   /* ── 5. LA HOJA: SU SITIO, Y QUE NO SE COMA EL PUNTERO ── */
@@ -3143,6 +3150,32 @@ function elBurgoAPie(): void {
     'se ve fallar: con la columna cogiendo el puntero —se come el tablero entre los botones—, o con la tira del carril escrita a mano, cae',
     !laHojaDeAPie(hoja.replace(/(\n\.burgo-a-pie \{[^}]*?)pointer-events:\s*none;/, '$1pointer-events: auto;')) &&
       !laHojaDeAPie(hoja.replace(/(\n\.burgo-a-pie-con-carril \{\s*top:\s*)calc\([^)]*\)/, (_: string, antes: string) => `${antes}6.5rem`)),
+  );
+
+  /*
+   * ── 6. EN UNA MESA DE BOTAS, EL CARTEL DICE CÓMO VA EL CANAL ──
+   *
+   * Como en Las Lindes: debajo de cómo se anda, «Conectando…», «Dentro», «Sin conexión: …»; y desde
+   * la mesa también, que allí no se anda pero el canal sigue abierto y conviene saber si al bajar se
+   * verá a los demás. Sin canal —una mesa normal—, el cartel es el de siempre y en la mesa no sale.
+   * Se pintan los dos muebles sueltos, porque en Node no hay lienzo y el pintor no llega a montarlos;
+   * que el pintor les pase el canal SÓLO en botas lo mira `montaLoDeAPie`, arriba. (Que la escena
+   * abra el canal sólo con la prop, que el pintor se la pase sólo en botas y que empiece al hombro,
+   * lo mira `verify:canal-del-paseo` en el fuente.)
+   */
+  const conCanal = (['mesa', 'hombro', 'ojos'] as const).map((m) => renderToStaticMarkup(<ComoSeAndaPorElBurgo modo={m} canal="Dentro · 2 más andando" />));
+  const diceElCanal = (h: string): boolean => /class="burgo-como-se-anda"/.test(h) && /Dentro · 2 más andando/.test(h);
+  comprobar(
+    'con canal, en la mesa el cartel dice sólo cómo va el canal, y a pie las dos cosas, en el mismo cartel',
+    diceElCanal(conCanal[0] ?? '') &&
+      !/W A S D/.test(conCanal[0] ?? '') &&
+      conCanal.slice(1).every((h) => diceElCanal(h) && diceComoSeAnda(h) && (h.match(/class="burgo-como-se-anda"/g) ?? []).length === 1),
+    conCanal,
+  );
+  comprobar(
+    'y la columna de las cámaras lo lleva en la mesa con su canal, y sin canal no pinta ningún cartel en la mesa',
+    diceElCanal(renderToStaticMarkup(<LasCamarasDelBurgo modo="mesa" alElegir={() => undefined} conCarril={false} canal="Dentro · 2 más andando" />)) &&
+      !/burgo-como-se-anda/.test(renderToStaticMarkup(<LasCamarasDelBurgo modo="mesa" alElegir={() => undefined} conCarril={false} />)),
   );
 }
 
@@ -5062,12 +5095,35 @@ function riberasAPie(): void {
     rotulos.slice(1),
   );
   regla(
-    'y el pintor lo monta encima del lienzo con el modo puesto, y la hoja le da su sitio sin coger el puntero: es un cartel, no un control',
+    'y el pintor lo monta encima del lienzo con el modo puesto —y con cómo va el canal SÓLO en una mesa de botas—, y la hoja le da su sitio sin coger el puntero: es un cartel, no un control',
     (par: readonly [string, string]) =>
-      /<ComoSeAndaPorElDelta modo=\{modo\} \/>/.test(par[0]) &&
+      /<ComoSeAndaPorElDelta modo=\{modo\} canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\} \/>/.test(par[0]) &&
       /\.riberas-como-se-anda \{[^}]*position: absolute;[^}]*pointer-events: none;/.test(par[1]),
     [fuente, hoja] as const,
     [fuente, hoja.replace(/(\.riberas-como-se-anda \{[^}]*)pointer-events: none;/, '$1')] as const,
+  );
+  regla(
+    'y el canal se le pasa sólo detrás de la pregunta de botas: sin ella, una mesa normal diría «Conectando…» sin abrir ningún socket',
+    (t: string) =>
+      /<ComoSeAndaPorElDelta modo=\{modo\} canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\} \/>/.test(t),
+    fuente,
+    fuente.replace("canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined}", "canal={estadoDelCanal?.texto ?? 'Conectando…'}"),
+  );
+  /*
+   * EN UNA MESA DE BOTAS, EL CARTEL DICE CÓMO VA EL CANAL: A PIE, Y SÓLO A PIE. En la mesa este
+   * lienzo no tiene esquina libre y el cartel taparía la barra, así que ahí no sale ni con canal
+   * (el porqué, en `ComoSeAndaPorElDelta`); a pie, debajo de cómo se anda y en el mismo cartel.
+   */
+  const conCanal = (['mesa', 'hombro', 'ojos'] as const).map((m) => renderToStaticMarkup(<ComoSeAndaPorElDelta modo={m} canal="Dentro · 2 más andando" />));
+  regla(
+    'con canal, a pie el cartel dice cómo se anda y cómo va el canal, en el mismo cartel; y en la mesa sigue sin salir, que taparía la barra',
+    (hs: readonly string[]) =>
+      hs.length === 3 &&
+      hs[0] === '' &&
+      hs.slice(1).every((h) => diceComoSeAnda(h) && /Dentro · 2 más andando/.test(h) && (h.match(/class="riberas-como-se-anda"/g) ?? []).length === 1),
+    conCanal,
+    [conCanal[0] ?? '', (conCanal[1] ?? '').replace('Dentro · 2 más andando', ''), conCanal[2] ?? ''],
+    conCanal,
   );
 
   /* ── 5. Los mandos: dónde, y qué dicen ── */

@@ -138,12 +138,16 @@
  * esta misma escena), y no se abre ningún edificio. El peón del raíl, los dados, la caja y
  * todo lo del tablero siguen como están: se puede tirar y comprar andando.
  *
- * ═══ Y LA COSTURA CON EL CANAL DE BOOTS ON BOARD ES LA DE LAS LINDES ═══
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS, COSIDO COMO EN LAS LINDES ═══
  *
- * El paseo se monta aquí con la misma llamada que en `Lindes.tsx`, así que el día que llegue la
- * prop opcional del canal se enchufa por los mismos dos sitios: lo pedido en cada tic
- * (`alDarUnTic` de las opciones del paseo) y la corrección (`paseo.corregir`). Los demás, cuando
- * se vean, son la misma `QuienAnda` con la pose que llegue.
+ * Con la prop `canal` —sólo en una mesa `botas`, y quién la pasa lo deciden los clientes con
+ * `esMesaDeBotas`— la escena abre el canal de la mesa con `usarElCanal` y lo cose al paseo por los
+ * mismos dos sitios que `Lindes.tsx`: lo pedido en cada tic (`alDarUnTic` de las opciones del paseo)
+ * y la corrección (`paseo.corregir`, que llega al canal por una referencia porque el paseo se monta
+ * después). Los demás asientos se pintan a pie con `LosDemas`, la misma marioneta que quien anda con
+ * la pose que llega por el canal, y con LA MISMA altura del suelo (`sueloDelBurgo`): quien sube al
+ * andén o cruza un puente lo pisa por encima, visto desde aquí o desde su aparato. Sin la prop no se
+ * abre nada y el paseo no paga ni una llamada por tic.
  *
  * ═══ LOS AVISOS DEL CONTRATO, Y CÓMO SE CUMPLEN AQUÍ ═══
  *
@@ -344,8 +348,10 @@ import type { CasillaEn3D, FiguraEn3D, GestoDeSenalado, PropsDelBurgo } from './
 import { NIEBLA_A_PIE, UMBRALES_A_PIE, asientoQueAnda, modoDelPaseoDe, sitioDeNacerEnElBurgo, sueloDelBurgo } from './a-pie';
 import { usarElPaseo } from '../paseo/usar-el-paseo';
 import { QuienAnda } from '../paseo/quien-anda';
+import { usarElCanal } from '../paseo/usar-el-canal';
+import { LosDemas } from '../paseo/los-demas';
 import { mundoDelBurgo } from '../../shared/arcade/juegos/burgo-mundo';
-import type { MundoDeclarado } from '../../shared/mecanicas/mundo';
+import type { Andante, MundoDeclarado } from '../../shared/mecanicas/mundo';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
@@ -1520,8 +1526,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
    * ═══ A PIE: EL PASEO COMÚN, CON EL MUNDO DE LA MESA Y LO QUE SÓLO SABE ESTA CIUDAD ═══
    *
    * La misma llamada que `Lindes.tsx`, y a propósito: el paseo, los choques, las cámaras de a pie,
-   * las teclas y la marioneta son de `escenas/paseo/`, y el día que llegue el canal de Boots on
-   * Board se enchufa aquí igual que allí. Esta escena sólo le da lo suyo:
+   * las teclas y la marioneta son de `escenas/paseo/`, y el canal de Boots on Board se enchufa aquí
+   * igual que allí (justo debajo). Esta escena sólo le da lo suyo:
    *
    *   · EL MUNDO, que es `mundoDelBurgo(código)`: la traza y lo sólido de los distritos, igual en
    *     todas las calidades y el mismo que derivará el servidor. Es ESTÁTICO —las casas que se
@@ -1545,13 +1551,29 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   }, [aPie, codigo]);
   const naceQuienAnda = useMemo(() => (mundoAPie === null ? null : sitioDeNacerEnElBurgo(mundoAPie.nace, tablero.figuras, quienAnda)), [mundoAPie, tablero.figuras, quienAnda]);
   const alturaDelSuelo = useMemo(() => (aPie ? sueloDelBurgo(ciudad) : SIN_SUELO), [aPie, ciudad]);
+  /*
+   * ═══ EL CANAL, SÓLO SI LA MESA ES DE BOTAS ═══
+   *
+   * Lo mismo que en `Lindes.tsx`. Sin la prop no se abre nada y `alDarUnTic` es `undefined`: una
+   * mesa normal no paga ni una llamada por tic. Con ella, el paseo le da cada tic al canal (la
+   * costura a) y el canal pone a quien anda donde dice el servidor (la costura b), que llega por una
+   * referencia porque el paseo se monta después. El canal se queda abierto también mirando la mesa:
+   * al bajar, los demás ya están donde están, y un `dentro` que llegue antes de nacer se guarda y se
+   * nace ahí (ver `paseo/usar-el-paseo.ts`).
+   */
+  const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
+  const elCanal = usarElCanal(props.canal, corregirAQuienPasea);
   const paseo = usarElPaseo({
     mundo: mundoAPie,
     nace: naceQuienAnda,
     modo: modoDelPaseo,
     mandos: props.mandos,
     alturaEn: alturaDelSuelo,
+    alDarUnTic: elCanal.alDarUnTic,
   });
+  useEffect(() => {
+    corregirAQuienPasea.current = paseo.corregir;
+  }, [paseo.corregir]);
   const figuraQueAnda = tablero.figuras.find((f) => f.asiento === quienAnda)?.figura;
 
   /*
@@ -3319,6 +3341,24 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           alFallar={avisaQueNoLlegaQuienAnda}
         />
       ) : null}
+
+      {/*
+        LOS DEMÁS, sólo con canal y sólo a pie: mirando la mesa son figuras de dos unidades y media
+        en un anillo de 864 de lado, lo mismo que quien anda, que tampoco se pinta allí. Con la MISMA
+        altura del suelo que el paseo le da a quien anda, `alturaDelSuelo`: el andén, el puente y el
+        bordillo se pisan igual, se mire a quien se mire. Sus figuras son las que cada uno eligió en
+        el Muelle, y su rótulo lleva el color de su peón (`asientosQueAndanPorElBurgo`).
+      */}
+      {props.canal === undefined || !aPie ? null : (
+        <LosDemas
+          traer={traer}
+          cliente={elCanal.cliente}
+          presentes={elCanal.presentes}
+          asientos={props.canal.asientos}
+          yo={props.canal.yo}
+          alturaEn={alturaDelSuelo}
+        />
+      )}
     </>
   );
 }

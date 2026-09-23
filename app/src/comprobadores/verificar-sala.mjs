@@ -1876,6 +1876,31 @@ paso('Riberas a pie en la app: la palanca sólo a pie, el mirador táctil apagad
     escena.replace("dicho: 'Hombro: bajar", "dicho: 'Bajar"),
     'un nombre que no empieza por lo que se lee no se puede decir en voz alta para pulsarlo',
   );
+
+  /*
+   * EN UNA MESA DE BOTAS, CÓMO VA EL CANAL: en la tira de las cámaras, DEBAJO del lienzo, por lo
+   * mismo que ellas —encima no queda esquina—, y sólo detrás de la pregunta de botas. (Que el canal
+   * se construya sólo en botas y que se empiece a pie lo mira `verify:canal-del-paseo`.)
+   */
+  reglaDelFuente(
+    'en una mesa de botas se dice cómo va el canal en la tira de las cámaras, debajo del lienzo; en una normal, nada',
+    (t) => {
+      const c = soloCodigo(t);
+      const tira = c.indexOf('style={estilos.camaras}');
+      const cartel = c.indexOf('<Text style={estilos.canal} numberOfLines={2}>');
+      return (
+        /const esBotas = esMesaDeBotas\(vista\);/.test(c) &&
+        /\{esBotas \? \(\s*<Text style=\{estilos\.canal\} numberOfLines=\{2\}>\s*\{estadoDelCanal\?\.texto \?\? 'Conectando…'\}/.test(c) &&
+        (c.match(/style=\{estilos\.canal\}/g) ?? []).length === 1 &&
+        tira > c.indexOf('</RedDelLienzo>') &&
+        cartel > tira &&
+        cartel < c.indexOf('style={estilos.pieDeLaMesa}', tira)
+      );
+    },
+    escena,
+    escena.replace(/\{esBotas \? \(\s*<Text style=\{estilos\.canal\}/, '{true ? (\n            <Text style={estilos.canal}'),
+    'sin la pregunta, una mesa normal diría «Conectando…» debajo del delta sin abrir ningún socket',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2361,6 +2386,33 @@ paso(
     escena,
     escena.replace(/onPress=\{\(\) => \{\s*laInterfazSeLoQueda\(\);\s*ponerModo\(c\.modo\);\s*\}\}/, 'onPress={() => ponerModo(c.modo)}'),
     'sin quitarle el dedo al giro, pulsar «Hombro» con el gesto aún vivo arranca además un giro de la mesa',
+  );
+  /*
+   * EN UNA MESA DE BOTAS, CÓMO VA EL CANAL. Encima de la franja del paseo y en la pila del pie, y no
+   * arriba a la izquierda como en Las Lindes: arriba está la caja del Burgo, que en un teléfono en pie
+   * ocupa casi todo el ancho. Sólo detrás de la pregunta de botas y sin coger el dedo, que lo que tapa
+   * sigue siendo tablero. (Que el canal se construya sólo en botas y que se empiece a pie lo mira
+   * `verify:canal-del-paseo`, en los dos clientes de los tres juegos.)
+   */
+  reglaDelFuente(
+    'en una mesa de botas se dice cómo va el canal encima de la franja del paseo, en la pila del pie y sin coger el dedo; en una normal, nada',
+    (t) => {
+      const c = soloCodigo(t);
+      const pila = c.indexOf('<View style={estilos.pieFlotante} pointerEvents="box-none">');
+      const cartel = c.indexOf('<Text style={estilos.canal} numberOfLines={2}>');
+      const franja = c.indexOf('<View style={[estilos.franjaDelPaseo, aPie ? estilos.franjaAndando : null]} pointerEvents="box-none">');
+      return (
+        /const esBotas = esMesaDeBotas\(vista\);/.test(c) &&
+        /\{esBotas \? \(\s*<View pointerEvents="none">\s*<Text style=\{estilos\.canal\} numberOfLines=\{2\}>\s*\{estadoDelCanal\?\.texto \?\? 'Conectando…'\}/.test(c) &&
+        (c.match(/style=\{estilos\.canal\}/g) ?? []).length === 1 &&
+        pila >= 0 &&
+        cartel > pila &&
+        franja > cartel
+      );
+    },
+    escena,
+    escena.replace(/\{esBotas \? \(\s*<View pointerEvents="none">/, '{true ? (\n              <View pointerEvents="none">'),
+    'sin la pregunta, una mesa normal diría «Conectando…» encima del tablero sin abrir ningún socket',
   );
 
   /* ─── El orden de composición, que es el fallo que no se ve ─── */

@@ -283,6 +283,7 @@ import { AndarPorElDelta } from './andar-por-el-delta';
 import type { ModoDeCamaraDelDelta } from './delta-a-pie';
 import type { Traer } from './embarcadero/tipos';
 import type { MandosDeFuera } from './paseo/mandos';
+import type { CanalDeBotas } from './paseo/mesa-de-botas';
 
 export { RADIO_DE_COMARCA, RADIO_DE_TESELA, ESCALON };
 export type { ModoDeCamaraDelDelta };
@@ -3724,6 +3725,7 @@ export function Delta({
   traer,
   figura,
   mandos,
+  canal,
 }: {
   datos: DeltaEn3D;
   modelos: CatalogoDeModelos;
@@ -3952,6 +3954,11 @@ export function Delta({
    * escritorio anda con W, A, S, D, que el paseo lee solo.
    */
   mandos?: { readonly current: MandosDeFuera };
+  /**
+   * EL CANAL DE BOOTS ON BOARD, sólo en una mesa `botas`: se le pasa tal cual al paseo
+   * (`andar-por-el-delta.tsx`), que es quien lo abre y pinta a los demás. Sin él no se abre nada.
+   */
+  canal?: CanalDeBotas;
 }): JSX.Element {
   /**
    * Cada modelo, aplanado una vez a geometría + material para poder instanciarlo.
@@ -4834,6 +4841,7 @@ export function Delta({
           traer={traer}
           figura={figura}
           mandos={mandos}
+          canal={canal}
         />
       ) : null}
     </group>

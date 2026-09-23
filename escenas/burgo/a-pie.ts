@@ -15,7 +15,8 @@
  *
  *   · DE QUÉ SITIO SE NACE, que es el del asiento de quien mira;
  *   · A QUÉ ALTURA ESTÁ EL SUELO QUE SE PINTA, para poner los pies encima;
- *   · Y HASTA DÓNDE SE VE, que decide cuánta ciudad se monta mientras se anda.
+ *   · HASTA DÓNDE SE VE, que decide cuánta ciudad se monta mientras se anda;
+ *   · Y, EN UNA MESA DE BOTAS, DE QUÉ COLOR SE VE A LOS DEMÁS: el de su peón.
  *
  * ═══ LA ALTURA ES LA DE LO QUE SE PINTA, Y NO DECIDE NADA ═══
  *
@@ -60,6 +61,8 @@ import { ALTURA_DEL_ASFALTO, ALTURA_DEL_BORDILLO, ANCHO_DEL_BORDILLO, CARA, CARA
 import type { BultoPropio, ClaseDeBulto, LaCiudad } from './ciudad';
 import { PIEZA, RETICULA_DE_LA_CIUDAD } from './piezas';
 import type { Calidad } from '../embarcadero/tipos';
+import { asientosQueAndan } from '../paseo/mesa-de-botas';
+import type { AsientoQueAnda } from '../paseo/mesa-de-botas';
 import type { ModoDeCamara } from './tipos';
 
 /* ─── Desde dónde se mira ────────────────────────────────────────────────── */
@@ -100,6 +103,31 @@ export function sitioDeNacerEnElBurgo(nace: readonly Sitio[], figuras: readonly 
   const suyo = figuras.findIndex((f) => f.asiento === asiento);
   const k = suyo >= 0 ? suyo : figuras.length;
   return nace[k % nace.length] ?? null;
+}
+
+/* ─── Con qué color se ve a los demás ────────────────────────────────────── */
+
+/**
+ * LOS ASIENTOS QUE ANDAN POR EL BURGO, con el color con el que se les ve: el de su PEÓN.
+ *
+ * En una mesa de botas los demás se pintan andando con un rótulo que lleva el color de su asiento
+ * (`paseo/los-demas.tsx`), y ese color es del juego. En el Burgo es el del peón y el disco de cada
+ * uno, que la traducción de la vista ya reparte en `tablero.figuras` —`#rrggbb`, el mismo con el que
+ * la escena tiñe el peón—, así que el rótulo de Ana es del color de la ficha de Ana.
+ *
+ * `asientosQueAndan` lo busca en una lista `labriegos` con `asiento` y `color`, que es como lo declara
+ * Las Lindes; aquí se le da la del Burgo con esa forma, y nada más. Quien no tenga figura —un mirón,
+ * una vista que no se lee— sale en el gris de quien no lo declara, que se sigue leyendo.
+ *
+ * Aquí y no en cada cliente por lo mismo que `sitioDeNacerEnElBurgo`: son dos clientes, y lo que
+ * puede divergir sin que nadie se entere se escribe una vez y se mide en Node
+ * (`verify:canal-del-paseo`).
+ */
+export function asientosQueAndanPorElBurgo(
+  asientos: readonly { readonly id: string; readonly nombre: string; readonly figura?: string }[],
+  figuras: readonly { readonly asiento: string; readonly color: string }[],
+): AsientoQueAnda[] {
+  return asientosQueAndan(asientos, { labriegos: figuras.map((f) => ({ asiento: f.asiento, color: f.color })) });
 }
 
 /* ─── Hasta dónde se ve ──────────────────────────────────────────────────── */

@@ -5,8 +5,9 @@
  *
  * El paseo es el común (`escenas/paseo/`): los tics, los choques con `mundoDeRiberas`, las
  * cámaras de a pie y la marioneta. Lo único que Riberas le tiene que contar es lo que sólo sabe
- * este delta: de qué sitio nace cada uno, A QUÉ ALTURA SE PINTA a quien pasea y cómo se ve el
- * mundo a ras de suelo. Son cuentas, y viven aquí para que `verify:escena` las mida en Node con
+ * este delta: de qué sitio nace cada uno, A QUÉ ALTURA SE PINTA a quien pasea —y a los demás, en
+ * una mesa de botas: la misma cuenta—, de qué color se les ve, y cómo se ve el mundo a ras de
+ * suelo. Son cuentas, y viven aquí para que `verify:escena` las mida en Node con
  * un relieve de verdad; dentro de un `useFrame` no se podrían medir de ninguna manera. Es la
  * misma frontera que `acercar.ts` y `camara.ts` con los clientes.
  *
@@ -78,6 +79,8 @@ import type { MundoDeclarado, Sitio } from '../shared/mecanicas/mundo';
 import { CAUCE, CUERPO, piezaDeOrilla } from './aguas';
 import { ESCALA_DEL_PACK, ESCALON, LAMINA, RADIO_DE_TESELA } from './escala';
 import { MANDO_DE_RECOGER } from './mesa';
+import { asientosQueAndan } from './paseo/mesa-de-botas';
+import type { AsientoQueAnda } from './paseo/mesa-de-botas';
 import { ALCANCE_DEL_DELTA } from './presupuesto-del-delta';
 import { hexDePunto } from './relieve';
 import type { Relieve, Subtesela } from './relieve';
@@ -228,6 +231,31 @@ export function colonoDeQuienMira(vista: unknown, asiento: string): number {
 export function sitioDeNacer(mundo: MundoDeclarado, colono: number): Sitio | null {
   const suyo = colono >= 0 ? mundo.nace[colono] : undefined;
   return suyo ?? mundo.nace[0] ?? null;
+}
+
+/* ─── Con qué color se ve a los demás ────────────────────────────────────── */
+
+/**
+ * LOS ASIENTOS QUE ANDAN POR EL DELTA, con el color de sus piezas.
+ *
+ * En una mesa de botas los demás se pintan andando con un rótulo que lleva el color de su asiento
+ * (`paseo/los-demas.tsx`), y ese color es del juego. En Riberas es el de cada colono en la vista
+ * (`colonos`, `#rrggbb`), repartido por orden de asiento igual que los colores del atlas con los que
+ * el delta pinta sus chozas y sus torres: el rótulo de Ana es del color de las chozas de Ana.
+ *
+ * `asientosQueAndan` lo busca en una lista `labriegos` con `asiento` y `color`, que es como lo declara
+ * Las Lindes; aquí se le da la de Riberas con esa forma, y nada más. Con una vista que no es de
+ * Riberas nadie lo declara, y todos salen en el gris de quien no lo tiene, que se sigue leyendo.
+ *
+ * Aquí y no en cada cliente por lo mismo que `sitioDeNacer`: son dos clientes, y lo que puede
+ * divergir sin que nadie se entere se escribe una vez y se mide en Node (`verify:canal-del-paseo`).
+ */
+export function asientosQueAndanPorElDelta(
+  asientos: readonly { readonly id: string; readonly nombre: string; readonly figura?: string }[],
+  vista: unknown,
+): AsientoQueAnda[] {
+  const colonos = esVistaQueSePinta(vista) ? vista.colonos : [];
+  return asientosQueAndan(asientos, { labriegos: colonos.map((c) => ({ asiento: c.asiento, color: c.color })) });
 }
 
 /* ─── El mundo, derivado sólo cuando cambia ──────────────────────────────── */

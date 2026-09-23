@@ -10380,6 +10380,12 @@ paso(
 
   /* ── 1. EL PASEO ES EL COMÚN, Y EL MUNDO EL DE `mundoDeRiberas` ── */
 
+  /*
+   * La llamada al paseo se mira por su PRINCIPIO —el mundo, dónde se nace, el modo, la palanca y la
+   * altura— y no como una lista cerrada: en una mesa de botas lleva detrás el `alDarUnTic` del canal,
+   * como en Las Lindes y en el Burgo, y un juez que lo tumbara por eso enseñaría a no conectarlo.
+   * Que el canal esté cosido de verdad lo mira `verify:canal-del-paseo`, en los tres juegos.
+   */
   regla(
     'a pie se anda con el paseo COMÚN —`usarElPaseo` y `QuienAnda` de `escenas/paseo/`— y con el mundo de `mundoDeRiberas`',
     (t: string) => {
@@ -10388,7 +10394,7 @@ paso(
         /import \{ usarElPaseo \} from '\.\/paseo\/usar-el-paseo';/.test(c) &&
         /import \{ QuienAnda \} from '\.\/paseo\/quien-anda';/.test(c) &&
         /import \{ mundoDeRiberas \} from '\.\.\/shared\/arcade\/juegos\/riberas-mundo';/.test(c) &&
-        /const paseo = usarElPaseo\(\{ mundo, nace, modo: camara\.modo, mandos, alturaEn \}\);/.test(c) &&
+        /const paseo = usarElPaseo\(\{ mundo, nace, modo: camara\.modo, mandos, alturaEn(?:, [^}]*)? \}\);/.test(c) &&
         /const nuevo = mundoDeRiberas\(vista\);/.test(c)
       );
     },
@@ -10779,7 +10785,7 @@ paso(
       return (
         /if \(!aPie \|\| c\.isPerspectiveCamera !== true\) return undefined;\s*const fondoDeLaMesa = c\.far;\s*c\.far = NIEBLA_A_PIE\.lejos;\s*c\.updateProjectionMatrix\(\);\s*return \(\) => \{\s*c\.far = fondoDeLaMesa;\s*c\.updateProjectionMatrix\(\);\s*\};/.test(c) &&
         /useFrame\(\(\) => \{\s*if \(!aPie\) return;\s*const niebla = laEscena\.fog;/.test(c) &&
-        /if \(!aPie\) return null;\s*return \(\s*<QuienAnda/.test(c) &&
+        /if \(!aPie\) return null;\s*return \(\s*(?:<>\s*)?<QuienAnda/.test(c) &&
         !/camera\.position\.set|\.lookAt\(/.test(c)
       );
     },

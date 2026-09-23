@@ -40,23 +40,29 @@
  * del cielo; y al subir se devuelve el fondo que había. La niebla no se devuelve: la vuelve a
  * poner en su primer fotograma quien mira la mesa.
  *
- * ═══ Y EL CANAL DE BOOTS ON BOARD, CUANDO LLEGUE, ENTRA POR DONDE EN LAS LINDES ═══
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS, POR DONDE EN LAS LINDES ═══
  *
  * La estructura es la de `Lindes.tsx` a propósito: un `usarElPaseo` con sus dos costuras y la
- * marioneta a pie. Enchufar el canal son las tres piezas que allí ya están: `usarElCanal` antes
- * del paseo con una referencia para corregir, su `alDarUnTic` en las opciones del paseo, y
- * `LosDemas` junto a `QuienAnda` con ESTA MISMA `alturaEn`, para que los demás también vadeen con
- * el agua por la cintura. No se escribe hoy: la prop es del frente del canal.
+ * marioneta a pie. Con la prop `canal` —sólo en una mesa `botas`; quién la pasa lo deciden los
+ * clientes con `esMesaDeBotas`— entran las tres piezas que allí ya están: `usarElCanal` antes del
+ * paseo con una referencia para corregir, su `alDarUnTic` en las opciones del paseo, y `LosDemas`
+ * junto a `QuienAnda` con ESTA MISMA `alturaEn`, para que los demás también vadeen con el agua por
+ * la cintura y pisen la arena derechos. El canal se abre aquí, con el paseo, y como el paseo se
+ * queda montado mirando la mesa: al bajar, los demás ya están donde están. Sin la prop no se abre
+ * nada y el paseo no paga ni una llamada por tic.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { mundoDeRiberas } from '../shared/arcade/juegos/riberas-mundo';
-import type { MundoDeclarado } from '../shared/mecanicas/mundo';
+import type { Andante, MundoDeclarado } from '../shared/mecanicas/mundo';
 import type { Traer } from './embarcadero/tipos';
+import { LosDemas } from './paseo/los-demas';
 import type { MandosDeFuera } from './paseo/mandos';
+import type { CanalDeBotas } from './paseo/mesa-de-botas';
 import { QuienAnda } from './paseo/quien-anda';
+import { usarElCanal } from './paseo/usar-el-canal';
 import { usarElPaseo } from './paseo/usar-el-paseo';
 import type { Relieve } from './relieve';
 import {
@@ -80,9 +86,15 @@ export interface AndarPorElDeltaProps {
   readonly figura?: string;
   /** La palanca y el correr de la app. El escritorio anda con el teclado, que lee el paseo. */
   readonly mandos?: { readonly current: MandosDeFuera };
+  /**
+   * EL CANAL DE BOOTS ON BOARD, sólo en una mesa de la modalidad `botas`: lo mismo que Las Lindes.
+   * Con él se abre el canal de la mesa, se le cuenta cada tic de quien pasea, el servidor lo corrige
+   * y se pinta a los demás asientos andando por el delta. Sin él no se abre nada.
+   */
+  readonly canal?: CanalDeBotas;
 }
 
-export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos }: AndarPorElDeltaProps): JSX.Element | null {
+export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos, canal }: AndarPorElDeltaProps): JSX.Element | null {
   const aPie = camara.modo !== 'mesa';
   const asiento = camara.modo === 'mesa' ? '' : camara.asiento;
 
@@ -106,7 +118,21 @@ export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos 
   const suelo = useMemo(() => sueloPintadoDe(relieve), [relieve]);
   const alturaEn = useCallback((x: number, z: number) => alturaAPie(suelo, x, z), [suelo]);
 
-  const paseo = usarElPaseo({ mundo, nace, modo: camara.modo, mandos, alturaEn });
+  /*
+   * ═══ EL CANAL, SÓLO SI LA MESA ES DE BOTAS ═══
+   *
+   * Lo mismo que en `Lindes.tsx`. Sin la prop no se abre nada y `alDarUnTic` es `undefined`. Con
+   * ella, el paseo le da cada tic al canal (la costura a) y el canal pone a quien pasea donde dice el
+   * servidor (la costura b), que llega por una referencia porque el paseo se monta después. Si ahí
+   * no se cabe —el servidor valida contra la estructura y aquí se anda también con el adorno—, el
+   * paseo lo aparta al sitio libre más cercano (`usar-el-paseo.ts`).
+   */
+  const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
+  const elCanal = usarElCanal(canal, corregirAQuienPasea);
+  const paseo = usarElPaseo({ mundo, nace, modo: camara.modo, mandos, alturaEn, alDarUnTic: elCanal.alDarUnTic });
+  useEffect(() => {
+    corregirAQuienPasea.current = paseo.corregir;
+  }, [paseo.corregir]);
 
   /* ── A pie, el fondo de la cámara en el canto de la niebla; al subir, el de antes ── */
   const laCamara = useThree((s) => s.camera);
@@ -141,13 +167,30 @@ export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos 
 
   if (!aPie) return null;
   return (
-    <QuienAnda
-      traer={traer}
-      asiento={asiento}
-      figura={figura}
-      pose={paseo.pose}
-      enPrimeraPersona={camara.modo === 'ojos'}
-      alFallar={alFallarLaFigura}
-    />
+    <>
+      <QuienAnda
+        traer={traer}
+        asiento={asiento}
+        figura={figura}
+        pose={paseo.pose}
+        enPrimeraPersona={camara.modo === 'ojos'}
+        alFallar={alFallarLaFigura}
+      />
+      {/*
+        LOS DEMÁS, sólo con canal —y sólo a pie, que en la mesa se sale arriba—, con LA MISMA
+        `alturaEn` que quien pasea: en el agua pintada van hundidos hasta la cintura y en la arena
+        derechos, se les mire desde donde se les mire.
+      */}
+      {canal === undefined ? null : (
+        <LosDemas
+          traer={traer}
+          cliente={elCanal.cliente}
+          presentes={elCanal.presentes}
+          asientos={canal.asientos}
+          yo={canal.yo}
+          alturaEn={alturaEn}
+        />
+      )}
+    </>
   );
 }

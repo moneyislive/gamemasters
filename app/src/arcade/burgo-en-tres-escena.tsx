@@ -67,6 +67,15 @@
  * «Ver el burgo entero» no sale, que andando no hay acercamiento del que volver. La palanca va
  * encima del pie y no en el borde, que aquí es de la cinta y del carril.
  *
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
+ *
+ * Como en Las Lindes y con la misma pregunta (`esMesaDeBotas`): si la mesa es de la modalidad
+ * `botas`, la escena recibe el canal (`canal`) —la dirección del WebSocket del servidor que la app
+ * tiene elegido (`direccionDelCanal`), la llave del asiento, quién soy y los asientos con su nombre,
+ * su figura y el color de su peón (`asientosQueAndanPorElBurgo`)—, se empieza a pie, al hombro, que
+ * es a lo que se viene, y encima de la franja del paseo se dice cómo va el canal: «Conectando…»,
+ * «Dentro», «Sin conexión: …». En una mesa normal no se pasa nada y la escena no abre ningún socket.
+ *
  * ═══ EL RESPALDO NO ES OPCIONAL ═══
  *
  * Si el modelo no llega —sin cobertura, un servidor viejo que no sirve `.glb`, un
@@ -193,7 +202,9 @@ import type {
 } from '../../../shared/arcade/juegos/burgo-en-tres';
 import { Burgo } from '../../../escenas/burgo/Burgo';
 import type { ModoDeCamara, TableroDelBurgoEn3D } from '../../../escenas/burgo/tipos';
+import { asientosQueAndanPorElBurgo } from '../../../escenas/burgo/a-pie';
 import type { ModoDelBurgo } from '../../../escenas/burgo/a-pie';
+import type { EstadoDelCanal } from '../../../escenas/paseo/canal-de-botas';
 import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
 import { poseDeLaBandeja } from '../../../escenas/burgo/bandeja-de-los-dados';
@@ -239,7 +250,8 @@ import {
 } from './hojas-del-burgo';
 import { MandosDelPaseo } from './mandos-del-paseo';
 import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
-import { usarMesaDeArcade } from './mesa';
+import type { CanalDeBotas } from '../../../escenas/paseo/mesa-de-botas';
+import { direccionDelCanal, usarMesaDeArcade } from './mesa';
 import type { AvisoDeMesa, MesaVista, OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
 import { usarMiradorTactil } from './mirador-tactil';
 import { LETRA, RADIO, SALA } from './muebles';
@@ -890,6 +902,36 @@ function LaMesaEnTres({
     apagarElMiradorAPie(gesto, aPie);
   }, [gesto, aPie]);
   const camara = useMemo((): ModoDeCamara => (modo === 'mesa' ? CAMARA_DE_MESA : { modo, asiento: yo ?? '' }), [modo, yo]);
+
+  /*
+   * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
+   *
+   * También aquí arriba, con los demás ganchos. Sin asiento o sin llave no hay canal: no hay con qué
+   * decir `hola`. Los asientos llegan en cada vuelta del sondeo, pero la escena sólo reabre el socket
+   * si cambian la dirección, la llave o el asiento. Y el color de cada uno es el de su peón, el que
+   * la traducción ya puso en las figuras del tablero: el rótulo de Ana, del color de la ficha de Ana.
+   */
+  const esBotas = esMesaDeBotas(vista);
+  const [estadoDelCanal, ponerEstadoDelCanal] = useState<EstadoDelCanal | null>(null);
+  const llaveDelAsiento = mesa.llave ?? null;
+  const figurasDeLaMesa = datos?.figuras;
+  const canal = useMemo<CanalDeBotas | undefined>(
+    () =>
+      esBotas && yo !== null && llaveDelAsiento !== null
+        ? {
+            url: direccionDelCanal(vista.codigo),
+            llave: llaveDelAsiento,
+            yo,
+            asientos: asientosQueAndanPorElBurgo(vista.asientos, figurasDeLaMesa ?? []),
+            alCambiar: ponerEstadoDelCanal,
+          }
+        : undefined,
+    [esBotas, figurasDeLaMesa, llaveDelAsiento, vista.asientos, vista.codigo, yo],
+  );
+  /* Una mesa de botas se empieza a pie: es a lo que se viene. Una vez por mesa; luego mandan los botones. */
+  useEffect(() => {
+    if (esBotas) ponerModo('hombro');
+  }, [esBotas, vista.codigo]);
 
   /*
    * ═══ LA POSE DE SALIDA ES LA DEL BURGO, Y HAY QUE PONERLA ═══
@@ -1634,6 +1676,7 @@ function LaMesaEnTres({
                     calidad={calidad}
                     camara={camara}
                     mandos={mandos}
+                    canal={canal}
                     bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
                     reloj={relojDeArena}
                     alPasarElTurno={alPasarElTurno}
@@ -1721,6 +1764,20 @@ function LaMesaEnTres({
               durante ocho segundos y no hay manera de saber cuál va bien.
             */}
             {laEscenaVaDetras ? <Text style={estilos.alDia}>El burgo se está poniendo al día…</Text> : null}
+            {/*
+              CÓMO VA EL CANAL, sólo en una mesa de botas: «Conectando…», «Dentro», «Sin conexión: …».
+              Aquí, encima de la franja del paseo, y no arriba a la izquierda como en Las Lindes: arriba
+              está la caja del Burgo, que en un teléfono en pie ocupa casi todo el ancho, y debajo de ella
+              «Ver el burgo entero». Se ve en la mesa y a pie —en la mesa conviene saber si al bajar se
+              verá a los demás— y no coge el dedo: es un cartel, y lo que tapa sigue siendo tablero.
+            */}
+            {esBotas ? (
+              <View pointerEvents="none">
+                <Text style={estilos.canal} numberOfLines={2}>
+                  {estadoDelCanal?.texto ?? 'Conectando…'}
+                </Text>
+              </View>
+            ) : null}
             {/*
               ═══ LA FRANJA DEL PASEO: LAS TRES CÁMARAS, Y A PIE LA PALANCA, JUSTO ENCIMA DEL PIE ═══
 
@@ -1957,6 +2014,26 @@ const estilos = StyleSheet.create({
   alDia: {
     ...LETRA.cuerpo,
     color: SALA.tenue,
+    fontSize: 13,
+    lineHeight: 18,
+    alignSelf: 'flex-start',
+    marginHorizontal: 12,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.teja,
+  },
+  /*
+   * CÓMO VA EL CANAL, en una mesa de botas: la misma caja que «se está poniendo al día» y por lo
+   * mismo —flota sobre el campo del burgo, y sin caja no hay contraste que se pueda medir—, pero con
+   * la tinta de lo que se lee y no en tenue: «Sin conexión» es justo lo que no se puede perder.
+   */
+  canal: {
+    ...LETRA.cuerpo,
+    color: SALA.palabra,
     fontSize: 13,
     lineHeight: 18,
     alignSelf: 'flex-start',

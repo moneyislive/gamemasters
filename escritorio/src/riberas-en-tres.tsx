@@ -190,6 +190,13 @@
  * de la vista y vadea la orilla con el agua por la cintura. Lo que pone esta pantalla es
  * callar la `CamaraAerea` mientras se anda —ni ratón ni cámara—, decir cómo se anda
  * (`ComoSeAndaPorElDelta`) y recoger la mesa al bajar, que es lo que era de ella.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS ═══
+ *
+ * Con la misma pregunta que la app y Las Lindes (`esMesaDeBotas`), la escena recibe el canal de la
+ * mesa y pinta a los demás vadeando como quien pasea. Se empieza a pie —bajando por `cambiarDeCamara`,
+ * como el mando— y el cartel de cómo se anda dice también cómo va el canal; en la mesa no, que aquí
+ * no queda esquina (ver `ComoSeAndaPorElDelta`). En una mesa normal no se abre ningún socket.
  */
 import { Component, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
@@ -219,6 +226,10 @@ import { altoDeLaCinta, BOTON_DE_LA_CINTA, loQueLlevaLaCinta } from '../../escen
 import type { RelojCargado, RelojDeLaMesa } from '../../escenas/reloj';
 import { Delta, encuadreDelDelta } from '../../escenas/delta';
 import type { ModoDeCamaraDelDelta } from '../../escenas/delta';
+import { asientosQueAndanPorElDelta } from '../../escenas/delta-a-pie';
+import type { EstadoDelCanal } from '../../escenas/paseo/canal-de-botas';
+import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
+import type { CanalDeBotas } from '../../escenas/paseo/mesa-de-botas';
 /*
  * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
  * `verify:riberas` mide contra los seis colores de colono: el carril la usa para la barra de
@@ -306,6 +317,7 @@ import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import type { MovimientoDeclarado, TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { CON_ATAJO, Formulario, hayAlgoQuePintar, loQueSePuedePintar, usarLosAtajos } from './formulario';
+import { direccionDelCanal } from './mesa';
 import type { LaMesa, MesaVista, ResultadoDelMovimiento } from './mesa';
 /* El mismo `traer` que el muelle y Las Lindes: la figura de quien pasea viaja por él. */
 import { traer } from './muelle';
@@ -392,10 +404,36 @@ export const CAMARA_DE_LA_TECLA: ReadonlyMap<string, ModoDeCamaraDelDelta['modo'
  * ABAJO A LA IZQUIERDA, que a pie es sitio libre —la barra se ha recogido al bajar y la mano del
  * mazo no baja del 30 % del alto—, y SIN COGER EL PUNTERO: es un cartel, no un control. Suelto y
  * exportado para que `verify:escritorio` lo pinte en los tres modos: el pintor nace en la mesa.
+ *
+ * ═══ Y EN UNA MESA DE BOTAS, CÓMO VA EL CANAL: A PIE, Y SÓLO A PIE ═══
+ *
+ * En el mismo cartel y debajo, `canal`: «Conectando…», «Dentro», «Sin conexión: …», como en Las
+ * Lindes. Pero aquí NO se enseña mirando la mesa, y es a propósito: en la mesa este lienzo no tiene
+ * esquina libre —arriba a la izquierda la mano del mazo, en medio la cinta, arriba a la derecha
+ * volver, recoger y la cámara, y abajo la barra, que en el lienzo más estrecho deja 41 puntos a cada
+ * lado; el porqué entero está en `MANDOS_DE_LA_CAMARA`, en `escenas/delta-a-pie.ts`—, y un cartel
+ * ahí taparía la pieza de la barra que se va a coger. Una mesa de botas se empieza a pie, y es a pie
+ * donde se ve a los demás: ahí sí.
  */
-export function ComoSeAndaPorElDelta({ modo }: { readonly modo: ModoDeCamaraDelDelta['modo'] }): JSX.Element | null {
+export function ComoSeAndaPorElDelta({
+  modo,
+  canal,
+}: {
+  readonly modo: ModoDeCamaraDelDelta['modo'];
+  readonly canal?: string;
+}): JSX.Element | null {
   if (modo === 'mesa') return null;
-  return <p className="riberas-como-se-anda">W A S D o las flechas para andar · Mayúsculas para correr · M vuelve a la mesa</p>;
+  return (
+    <p className="riberas-como-se-anda">
+      W A S D o las flechas para andar · Mayúsculas para correr · M vuelve a la mesa
+      {canal === undefined ? null : (
+        <>
+          <br />
+          {canal}
+        </>
+      )}
+    </p>
+  );
 }
 
 /** Un mando de la cámara: su rótulo, su nombre entero con la tecla, y la tecla anunciada. */
@@ -2404,6 +2442,43 @@ export function RiberasEnTres({
   }, [cambiarDeCamara]);
 
   /*
+   * ═══ EL CANAL, SÓLO EN UNA MESA DE BOTAS ═══
+   *
+   * Si la mesa es de la modalidad `botas` —lo dice `esMesaDeBotas`, la misma pregunta que hacen la
+   * app y Las Lindes—, la escena recibe el canal: la dirección del WebSocket en la misma casa que
+   * sirvió la página (`direccionDelCanal`), la llave del asiento, quién soy y los asientos con su
+   * nombre, su figura y el color de sus chozas (`asientosQueAndanPorElDelta`). Sin llave, sin asiento
+   * o sin dirección (sin `location`, que es como se pinta en `verify:escritorio`) no hay canal. Los
+   * asientos llegan en cada vuelta del sondeo, pero la escena sólo reabre el socket si cambian la
+   * dirección, la llave o el asiento. En una mesa normal no se pasa nada y no se abre ningún socket.
+   */
+  const esBotas = esMesaDeBotas(puesta);
+  const [estadoDelCanal, ponerEstadoDelCanal] = useState<EstadoDelCanal | null>(null);
+  const llaveDelAsiento = mesa.llave ?? null;
+  const canal = useMemo<CanalDeBotas | undefined>(() => {
+    const url = esBotas ? direccionDelCanal(puesta.codigo) : null;
+    if (url === null || llaveDelAsiento === null || yo === null) return undefined;
+    return {
+      url,
+      llave: llaveDelAsiento,
+      yo,
+      asientos: asientosQueAndanPorElDelta(puesta.asientos, vista),
+      alCambiar: ponerEstadoDelCanal,
+    };
+  }, [esBotas, llaveDelAsiento, puesta.asientos, puesta.codigo, vista, yo]);
+  /*
+   * UNA MESA DE BOTAS SE EMPIEZA A PIE, y por la MISMA puerta que el mando y las teclas:
+   * `cambiarDeCamara` suelta lo cogido y recoge la mesa, que es lo que bajar tiene que hacer se baje
+   * como se baje. Una vez por mesa —se apunta su código—, y luego mandan el mando y las teclas.
+   */
+  const bajadoEnLaMesa = useRef<string | null>(null);
+  useEffect(() => {
+    if (!esBotas || bajadoEnLaMesa.current === puesta.codigo) return;
+    bajadoEnLaMesa.current = puesta.codigo;
+    cambiarDeCamara('hombro');
+  }, [esBotas, puesta.codigo, cambiarDeCamara]);
+
+  /*
    * ═══ LA MESA SALE SOLA AL PASAR A TOCARME, Y ESPERA SI HAY ALGO EN LA MANO ═══
    *
    * Decisión 16 del §1, cerrada por Miguel: recoger es para MIRAR, y cuando hay que actuar
@@ -3969,6 +4044,7 @@ export function RiberasEnTres({
                   vista={vista}
                   traer={traer}
                   figura={puesta.asientos.find((a) => a.id === yo)?.figura}
+                  canal={canal}
                 />
               </Canvas>
             </LimiteDelMundo>
@@ -4046,7 +4122,7 @@ export function RiberasEnTres({
                 alPulsar={() => cambiarDeCamara(modo === 'ojos' ? 'hombro' : 'ojos')}
               />
             ) : null}
-            <ComoSeAndaPorElDelta modo={modo} />
+            <ComoSeAndaPorElDelta modo={modo} canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined} />
             {/*
               EL CARTEL QUE EXPLICA EL NAIPE (`docs/LAS-CARTAS-SE-EXPLICAN.md`, fase 3).
 

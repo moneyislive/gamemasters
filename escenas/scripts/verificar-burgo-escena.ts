@@ -5351,8 +5351,10 @@ paso('A pie por el Burgo: el paseo común con el mundo de la mesa, de qué sitio
   /* ── 1. EL PASEO ES EL COMÚN, CON EL MUNDO DE LA MESA, Y NINGUNO PROPIO ── */
   /*
    * Las cinco claves se miran SUELTAS dentro de la llamada y no como una lista cerrada: el canal de
-   * Boots on Board entrará aquí igual que entró en Las Lindes —con un `alDarUnTic` más en esta misma
-   * llamada—, y un juez que lo tumbe por eso enseñaría a no conectar el canal.
+   * Boots on Board entró aquí igual que en Las Lindes —con un `alDarUnTic` más en esta misma llamada—,
+   * y un juez que lo tumbara por eso habría enseñado a no conectarlo. Que esté cosido de verdad, y que
+   * los demás se pinten con esta misma altura, lo mira `verify:canal-del-paseo` en los tres juegos;
+   * aquí, que el paseo sea el común con el canal y sin él.
    */
   const laLlamadaDelPaseo = (c: string): string => /const paseo = usarElPaseo\(\{([\s\S]*?)\}\);/.exec(c)?.[1] ?? '';
   const usaElComun = (c: string): boolean =>
@@ -5369,9 +5371,10 @@ paso('A pie por el Burgo: el paseo común con el mundo de la mesa, de qué sitio
       !usaElComun(`${escena}\nconst otro = usarElPaseo({ mundo: null, nace: null, modo: 'mesa', alturaEn: () => 0 });`) &&
       !usaElComun(escena.replace('mundo: mundoAPie,', 'mundo: null,')),
   );
+  const sinElCanal = escena.replace(/\n\s*alDarUnTic: elCanal\.alDarUnTic,/, '');
   comprobar(
-    'y con el canal conectado como en Las Lindes —un `alDarUnTic` más en la misma llamada— el juez sigue en verde: no enseña a no conectarlo',
-    usaElComun(escena.replace('alturaEn: alturaDelSuelo,', 'alturaEn: alturaDelSuelo,\n    alDarUnTic: elCanal.alDarUnTic,')),
+    'y el juez mira el paseo y no el canal: con el canal cosido —como está— y sin él —la mesa de siempre— sigue en verde, y quitárselo cambia la llamada de verdad',
+    usaElComun(escena) && sinElCanal !== escena && usaElComun(sinElCanal),
   );
   /* Lo que sería un paseo propio: el paso, el reloj, las teclas o la arena escritos o llamados en `escenas/burgo/`. */
   const PASEO_PROPIO = /\b(pasoDelTic|unPaso|fotogramaDelPaseo|ticsDelFotograma|nacerEnElPaseo|teclaDelPaseo|mandosDelFotograma|arenaDe|sePuedeEstar)\s*\(/;
