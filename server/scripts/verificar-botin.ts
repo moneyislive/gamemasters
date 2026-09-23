@@ -69,20 +69,13 @@ import { canonico } from '../../shared/mecanicas/canonico';
 import { turnoDeLaVista } from '../../shared/mecanicas/turno-declarado';
 import { asientosDelRobot, jugarConElRobot, loQueHaceElRobot } from './robot-del-burgo';
 import { asientosDeLasLindes, jugarLasLindes } from './robot-de-las-lindes';
+import { arnes } from './arnes';
 
-const fallos: string[] = [];
-let hechas = 0;
-
-function comprobar(que: string, bien: boolean, detalle?: unknown): void {
-  hechas++;
-  if (bien) return;
-  const cola = detalle === undefined ? '' : ` — ${typeof detalle === 'string' ? detalle : JSON.stringify(detalle)}`;
-  fallos.push(`${que}${cola}`);
-}
-
-function paso(titulo: string): void {
-  console.log(`\n· ${titulo}`);
-}
+/*
+ * EL ARNÉS COMÚN (`arnes.ts`): `comprobar`, `paso`, el informe y el suelo. Las llamadas son las de
+ * siempre; lo que cambia es que un bloque que no llega a correr sale con 2 y no con el 1 de un rojo.
+ */
+const { comprobar, paso, terminar } = arnes();
 
 /* ─── El lector ──────────────────────────────────────────────────────────── */
 
@@ -949,12 +942,13 @@ comprobar('se han probado al menos los tres juegos que se recorren hoy: un bucle
  * EL SUELO ES EL NÚMERO EXACTO DE HOY: las del lector, las del registro y, de cada juego, las suyas
  * y las comunes. Una prueba que se corta a medias —porque su partida no llegó a lo que buscaba— se
  * salta comprobaciones y baja de aquí, además de ponerse roja por su cuenta.
+ *
+ * Lo pone el arnés, y cuenta como la última comprobación igual que cuando se escribía aquí a mano
+ * (118 y ésta, 119): el número que se imprime es el mismo, y un bloque saltado sale con 2.
  */
-comprobar('se han mirado todas las muestras', hechas >= 118, { hechas });
-
-if (fallos.length > 0) {
-  console.log(`${String(fallos.length)} de ${String(hechas)} comprobaciones han fallado:\n`);
-  for (const f of fallos) console.log(`  ✗ ${f}`);
-  process.exit(1);
-}
-console.log(`\n${String(hechas)} comprobaciones`);
+terminar({
+  escritas: 119,
+  enVerde:
+    'El botín sólo lo mete el servidor, entre dos sentados distintos que juegan la partida, y\n' +
+    '  cada juego que se recorre se lleva lo que dice su regla sin atascarse.',
+});
