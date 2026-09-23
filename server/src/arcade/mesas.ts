@@ -1793,13 +1793,13 @@ function desalojarLasFrias(ahora: number): void {
 }
 
 /**
- * TRAE UNA MESA DEL DISCO a la memoria. Se llama DENTRO del candado de esa mesa: ver `conLaMesa`.
+ * LEE UNA MESA DEL DISCO SIN TRAERLA: no entra en la memoria, no se cierra y no se escribe nada.
  *
- * Devuelve `undefined` si no hay ninguna con ese código —o no tiene forma de código, o no se puede
- * leer, que el almacén ya ha dicho en voz alta—, y quien llama contesta `MesaDesconocida`, que es
- * lo mismo que contestaba cuando todo estaba en memoria.
+ * Es la mitad de `traerDelDisco` que sólo lee —el almacén, la forma de código, y que la mesa de
+ * dentro sea la que dice su nombre—, y la usa tal cual `quienEsLaLlave`, que tiene que poder mirar
+ * una mesa fría sin cambiar nada de ella. Se llama también DENTRO del candado de esa mesa.
  */
-async function traerDelDisco(codigo: string): Promise<MesaEnCurso | undefined> {
+async function leerDelDisco(codigo: string): Promise<MesaEnCurso | undefined> {
   if (almacen.leerUna === undefined || !FORMA_DE_CODIGO.test(codigo)) return undefined;
   const m = await almacen.leerUna(codigo);
   if (m === null) return undefined;
@@ -1810,6 +1810,19 @@ async function traerDelDisco(codigo: string): Promise<MesaEnCurso | undefined> {
     );
     return undefined;
   }
+  return m;
+}
+
+/**
+ * TRAE UNA MESA DEL DISCO a la memoria. Se llama DENTRO del candado de esa mesa: ver `conLaMesa`.
+ *
+ * Devuelve `undefined` si no hay ninguna con ese código —o no tiene forma de código, o no se puede
+ * leer, que el almacén ya ha dicho en voz alta—, y quien llama contesta `MesaDesconocida`, que es
+ * lo mismo que contestaba cuando todo estaba en memoria.
+ */
+async function traerDelDisco(codigo: string): Promise<MesaEnCurso | undefined> {
+  const m = await leerDelDisco(codigo);
+  if (m === undefined) return undefined;
   leidasDelDisco++;
   anotarLoGuardado(m);
   /*
@@ -1943,6 +1956,9 @@ export async function barrerAhora(): Promise<void> {
  * CÓMO VA LA MEMORIA, para el diagnóstico: cuántas hay en ella, cuántas se han leído del disco y
  * cuántas se han soltado desde que arrancó el proceso. Es lo que dice, desde fuera, que un proceso
  * nuevo no ha leído la carpeta entera y que lo frío sale.
+ *
+ * `leidasDelDisco` son las TRAÍDAS a la memoria (`traerDelDisco`). El vistazo de `quienEsLaLlave`
+ * a una mesa fría no cuenta, porque no trae nada; ni las lecturas del barrido, que tampoco.
  */
 export function memoriaDeLasMesas(): { enMemoria: number; leidasDelDisco: number; desalojadas: number } {
   return { enMemoria: mesas.size, leidasDelDisco, desalojadas };
@@ -3205,10 +3221,26 @@ export interface AsientoReconocido {
  * marca la presencia y, sobre todo, PROYECTA, que es lo caro del servidor y código del juego
  * corriendo en el hilo. Nada de eso tiene que ver con reconocer una llave.
  *
- * Así que esto hace lo mínimo: coge la mesa por la puerta de siempre —el candado, y el mismo
- * «esta mesa no existe» que las demás— y compara la llave. No mete ningún tic, no marca
- * presencia, no proyecta y no escribe nada: la mesa queda exactamente como estaba, revisión
- * incluida. Lo comprueba `verify:modalidad`.
+ * Así que esto hace lo mínimo: coge la mesa bajo su candado y compara la llave. No mete ningún tic,
+ * no marca presencia, no proyecta y no escribe nada: la mesa queda exactamente como estaba, revisión
+ * incluida. Tampoco la da por USADA —reconocer una llave no es mirar la partida—, así que no le
+ * retrasa a una mesa fría la salida de la memoria. Lo comprueba `verify:modalidad`.
+ *
+ * ═══ Y SOBRE UNA MESA FRÍA, TAMPOCO: SE MIRA EN EL DISCO Y SE DEJA ALLÍ ═══
+ *
+ * Cogía la mesa con `conLaMesa`, que trae del disco lo que no está en memoria, y TRAER NO ES LEER:
+ * una mesa que el juego da por acabada y su fichero no —la guardó un servidor de antes de que las
+ * mesas se cerraran solas— se cierra al traerla y se escribe (`cerrarAlRecuperar`). Medido por el
+ * revisor: la revisión del fichero pasaba de 5 a 6 por reconocer una llave, y esta misma cabecera y
+ * `verify:modalidad` decían que no escribía, porque sólo lo miraban con la mesa en memoria.
+ *
+ * Lo correcto es que reconocer una llave no cambie nada, y no documentar un cierre de paso: esto es
+ * lo que llamará el canal de Boots on Board en cada `hola`, y un acceso «de sólo lectura» que a
+ * veces escribe es uno del que nadie se puede fiar. Así que lo que no está en memoria se LEE del
+ * disco sin traerlo (`leerDelDisco`): no entra en la tabla, no se cierra, no cuenta como leída para
+ * la memoria y no se escribe. Y la respuesta es la misma que si se hubiera traído, porque sólo
+ * necesita las sillas y la modalidad, y cerrar una mesa no toca ninguna de las dos. El cierre llega
+ * igual —y se guarda— con la primera lectura de la partida, que es `mirar`.
  *
  * ═══ `null` SI LA MESA NO EXISTE Y `null` SI LA LLAVE NO ES DE ELLA ═══
  *
@@ -3221,21 +3253,19 @@ export async function quienEsLaLlave(
   llave: string | null,
 ): Promise<AsientoReconocido | null> {
   if (llave === null || llave.length === 0) return null;
-  try {
-    return await conLaMesa(codigo, (m) => {
-      const silla = m.sillas.find((s) => s.llave === llave);
-      if (silla === undefined) return null;
-      return {
-        id: silla.id,
-        nombre: silla.nombre,
-        ...(silla.figura === undefined ? {} : { figura: silla.figura }),
-        modalidad: m.modalidad,
-      };
-    });
-  } catch (error) {
-    if (error instanceof MesaDesconocida) return null;
-    throw error;
-  }
+  cargar();
+  return conElCandado(codigo, async () => {
+    const m = mesas.get(codigo) ?? (await leerDelDisco(codigo));
+    if (m === undefined) return null;
+    const silla = m.sillas.find((s) => s.llave === llave);
+    if (silla === undefined) return null;
+    return {
+      id: silla.id,
+      nombre: silla.nombre,
+      ...(silla.figura === undefined ? {} : { figura: silla.figura }),
+      modalidad: m.modalidad,
+    };
+  });
 }
 
 /**

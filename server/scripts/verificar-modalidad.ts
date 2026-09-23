@@ -18,7 +18,9 @@
  *  4. La modalidad SOBREVIVE a que el proceso muera, y un fichero de antes del campo —o con una
  *     palabra que este servidor no conoce— se lee como `normal`.
  *  5. Y el acceso de SOLO LECTURA que usará el canal de Boots on Board: dada una llave, qué
- *     silla es, o nulo. Sin proyectar, sin meter el tic, sin marcar presencia y sin escribir.
+ *     silla es, o nulo. Sin proyectar, sin meter el tic, sin marcar presencia y sin escribir. Y
+ *     también sobre una mesa FRÍA —sólo en el disco, y que el juego da por acabada aunque su
+ *     fichero no—: la mira allí, no la trae a la memoria, no la cierra y no toca el fichero.
  *
  * ═══ POR QUÉ LAS DOS PUERTAS Y NO UNA ═══
  *
@@ -110,6 +112,8 @@ let proyecciones = 0;
 interface EstadoDelMirador {
   tics: number;
   jugadas: number;
+  /** Sólo lo traen las mesas escritas a mano: jugando, el Mirador no llega nunca a acabarse. */
+  fin?: boolean;
 }
 
 const manifiestoDelMirador: ManifiestoDeArcade = {
@@ -138,7 +142,8 @@ instalarArcade<EstadoDelMirador | undefined>({
     proyecciones++;
     return estado ?? null;
   },
-  seAcabo: () => false,
+  /* Acaba sólo si su estado lo dice, y eso sólo lo escribe a mano la prueba de la mesa fría. */
+  seAcabo: (estado: EstadoDelMirador | undefined) => estado?.fin === true,
 });
 
 const mesas = await import('../src/arcade/mesas');
@@ -337,6 +342,85 @@ paso('En proceso: quién es esta llave, SIN mirar la partida');
     'y la vacuna: `mirar` sobre la misma mesa sí proyecta y sí mete el tic, así que lo de arriba mide algo',
     proyecciones > antes.proyecciones && mirada.tic === antes.tic + 1 && mirada.rev > antes.rev,
     { proyecciones, tic: mirada.tic, rev: mirada.rev },
+  );
+}
+
+paso('En proceso: y sobre una mesa FRÍA, reconocer una llave no la trae, no la cierra y no escribe');
+
+{
+  /*
+   * Lo de arriba mide una mesa que está en memoria. Faltaba la FRÍA: una que sólo está en el disco
+   * y que el juego da por acabada aunque su fichero no lo diga —la guardó un servidor de antes de
+   * que las mesas se cerraran solas—. Traerla a la memoria la cierra y la escribe (revisión 5 → 6),
+   * que es justo lo que este acceso promete no hacer. Se escribe a mano y no se pide nunca antes.
+   */
+  const codigo = 'FRIA1';
+  const llave = 'LLAVEDELAFRIA00000000000';
+  const fichero = path.join(MESAS_EN_PROCESO, `${codigo}.json`);
+  const ahora = Date.now();
+  fs.writeFileSync(
+    fichero,
+    JSON.stringify({
+      version: 2,
+      mesa: {
+        codigo,
+        mesa: {
+          id: codigo,
+          arcade: MIRADOR,
+          asientos: ['aFRIA0000'],
+          estado: { tics: 0, jugadas: 3, fin: true },
+          rev: 5,
+          tic: 0,
+          semilla: 7,
+          terminada: false,
+          diario: [],
+          empezada: true,
+        },
+        sillas: [{ id: 'aFRIA0000', nombre: 'Hugo', llave, figura: 'centinela' }],
+        plazoMs: 0,
+        venceEn: null,
+        turnoDesde: ahora,
+        abiertaEn: ahora,
+        ultimoToqueEn: ahora,
+        modalidad: 'botas',
+      },
+    }),
+    'utf8',
+  );
+  const antes = { fichero: fs.readFileSync(fichero, 'utf8'), memoria: mesas.memoriaDeLasMesas(), proyecciones };
+
+  const quien = await mesas.quienEsLaLlave(codigo, llave);
+  comprobar(
+    'con la mesa FRÍA reconoce la llave: su asiento, su nombre, su figura y la modalidad de la mesa',
+    quien !== null && quien.id === 'aFRIA0000' && quien.nombre === 'Hugo' && quien.figura === 'centinela' && quien.modalidad === 'botas',
+    quien,
+  );
+  const enDisco = leerElFichero(MESAS_EN_PROCESO, codigo);
+  comprobar(
+    'y NO ESCRIBE: el fichero sigue byte a byte, aunque el juego dé la partida por acabada',
+    fs.readFileSync(fichero, 'utf8') === antes.fichero,
+    { rev: enDisco.mesa?.mesa?.rev, terminada: enDisco.mesa?.mesa?.terminada },
+  );
+  comprobar(
+    'ni la trae a la memoria: la mira en el disco y la deja donde estaba',
+    mesas.memoriaDeLasMesas().enMemoria === antes.memoria.enMemoria &&
+      mesas.memoriaDeLasMesas().leidasDelDisco === antes.memoria.leidasDelDisco,
+    { antes: antes.memoria, ahora: mesas.memoriaDeLasMesas() },
+  );
+  comprobar('ni proyecta', proyecciones === antes.proyecciones, { antes: antes.proyecciones, ahora: proyecciones });
+  comprobar(
+    'y una llave que no es de ella, nulo también en frío',
+    (await mesas.quienEsLaLlave(codigo, 'X'.repeat(24))) === null,
+  );
+  comprobar('y no deja ningún candado suelto', mesas.candadosDeMesaVivos() === 0, mesas.candadosDeMesaVivos());
+
+  /* La vacuna: `mirar` sí la trae, la cierra y la escribe. */
+  const mirada = await mesas.mirar(codigo, llave);
+  const trasMirar = leerElFichero(MESAS_EN_PROCESO, codigo);
+  comprobar(
+    'y la vacuna: `mirar` sí la trae, la cierra y la escribe (revisión 5 → 6), así que lo de arriba mide algo',
+    mirada.terminada && mirada.rev === 6 && trasMirar.mesa?.mesa?.terminada === true && trasMirar.mesa?.mesa?.rev === 6,
+    { terminada: mirada.terminada, rev: mirada.rev, enDisco: trasMirar.mesa?.mesa?.rev },
   );
 }
 
@@ -628,7 +712,7 @@ if (fallos.length > 0) {
  * EL GUARDIA DE «NO SE HAN HECHO TODAS»: un comprobador que se cae a mitad sin decirlo se parece
  * mucho a uno verde. El número es el que se hace hoy, contado, y se sube al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 57;
+const COMPROBACIONES_ESCRITAS = 64;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(
     `Sólo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones escritas: algo se ha ` +
@@ -642,6 +726,6 @@ console.log(
     '  es normal, `botas` sólo para un juego dado de alta —y hoy no lo está ninguno—, lo mal escrito es\n' +
     '  un 400 que no deja mesa, la modalidad sobrevive a que el proceso muera, y un fichero de antes se\n' +
     '  lee como normal. Y reconocer una llave no proyecta, no mete el tic, no marca presencia y no\n' +
-    '  escribe.',
+    '  escribe, tampoco sobre una mesa fría: no la trae a la memoria ni la cierra.',
 );
 process.exit(0);
