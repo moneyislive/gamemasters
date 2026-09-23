@@ -282,7 +282,9 @@ import {
   CartelAlPie,
   COLGADA_BAJO_EL_CARRIL,
   ElijeUna,
+  elEstiloDeLaCinta,
   LimiteDelMundo,
+  RAIZ_DE_LA_CASA,
   raizDelNavegador,
   recordada,
   RUEDAN_SOLAS,
@@ -306,7 +308,6 @@ import { loQueSeDiceDeUnFallo } from './red-de-seguridad';
  * `laSillaDeEstaVentana`, aquí abajo.
  */
 import { loQuePide } from './sala';
-import { elEstiloDeLaCinta, RAIZ_DE_LA_CASA } from './riberas-en-tres';
 import { cuantoQuedaEnLaCinta, elPlazoAprieta, msHastaQueCambieElRotulo, cuantoQueda } from './relojes';
 import { AccionesDelTablero, Retablo } from './retablo';
 

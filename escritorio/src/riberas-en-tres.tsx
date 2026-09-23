@@ -49,79 +49,25 @@
  * el módulo: la primera mesa lo trae, las siguientes lo encuentran. Si falló, se
  * suelta la promesa para que la siguiente mesa lo vuelva a intentar.
  *
- * ═══ LA CÁMARA ES LA DEL BANCO, Y ESCUCHA EN LA VENTANA ═══
+ * ═══ LA CÁMARA ES `CamaraAerea`, LA DEL LIENZO PROPIO, Y NO UNA COPIA ═══
  *
- * El mirador (`escenas/camara.ts`) va por `ref` y no por estado: son sesenta
- * cambios por segundo mientras se arrastra. Se escucha en la ventana y no en el
- * lienzo por lo que cuenta la cabecera de `camara.ts`: así la cámara llega SIEMPRE
- * después de la escena y puede mirar si la barra o la mano ya se quedaron el gesto
- * (`esDeLaInterfaz`). Y soltar fuera del lienzo también termina el arrastre.
+ * Ver el delta entero desde el aire está bien para decidir la jugada y no sirve para
+ * MIRARLA: las casas miden cinco unidades sobre un tablero de doscientas. Así que se
+ * acerca y se lleva la mirada: la rueda y el pellizco acercan, el arrastre izquierdo
+ * gira —es el gesto que la escena necesita libre para coger de la barra y de las manos,
+ * y `esDeLaInterfaz` decide de quién es—, el derecho o con Mayúsculas pasea la mirada, y
+ * dos dedos pasean con su punto medio. El reparto entero y su porqué están en la cabecera
+ * de `CamaraAerea` (`lienzo-propio.tsx`), y NINGUNA de sus cuentas se escribe en un
+ * pintor: son de `escenas/acercar.ts`, medidas desde Node.
  *
- * Y el ojo se pone SEGÚN LA PROPORCIÓN DEL LIENZO, igual que en el banco: en un
- * monitor no cambia nada, pero en una tableta en retrato o en la rejilla de menos
- * de 900 px —donde el raíl baja y el lienzo se estrecha— sin ella el delta se
- * salía por los lados. Como al alejarse el ojo la niebla fija del banco quedaría
- * DELANTE del mundo y lo blanquearía, la niebla se mide desde el ojo y no desde
- * el centro: se mueve con la cámara en cada fotograma.
- *
- * ═══ Y AHORA SE ACERCA, QUE SON DOS GESTOS Y NO UNO ═══
- *
- * Ver el delta entero desde el aire está bien para decidir la jugada y no sirve
- * para MIRARLA: las casas miden cinco unidades sobre un tablero de doscientas.
- * Así que la rueda acerca hasta media comarca llenando el lienzo. Pero acercarse
- * siempre al centro deja el borde del delta sin poder verse nunca —el tablero se
- * escapa por los lados en cuanto se entra—, así que hace falta también MOVER LA
- * MIRADA. Las dos cosas van juntas: sin la segunda, la primera se queda a medias.
- *
- * El reparto de los botones, que es lo que hay que saber para usarlo:
- *
- *   · LA RUEDA acerca y aleja. El oyente va sobre EL RECUADRO —el `.riberas-lienzo`
- *     que lleva dentro el `<canvas>` y el botón de volver— y con `passive: false`,
- *     porque hay que llamar a `preventDefault`: sin eso el navegador se lleva el
- *     gesto para desplazar la página y la Sala entera baja mientras uno cree estar
- *     haciendo zoom. Es el fallo clásico, y no se ve como un fallo del zoom sino
- *     como una página que se mueve sola. Y va en el recuadro y NO en el `<canvas>`
- *     porque el botón de volver es hermano suyo y no hijo: con el oyente en el
- *     lienzo, girar la rueda encima de ese botón —que es justo donde está el ratón
- *     en cuanto el botón aparece— no pasaba por ningún `preventDefault` y la Sala
- *     se desplazaba precisamente al intentar salir del acercamiento.
- *   · EL ARRASTRE IZQUIERDO sigue girando, exactamente como antes. Es el gesto que
- *     ya conoce quien viene del banco, y sobre todo es el que la escena necesita
- *     libre: coger una pieza de la barra, soltarla en un anillo y coger una carta
- *     de la mano son todos clic izquierdo, y `esDeLaInterfaz` es lo que decide.
- *   · EL ARRASTRE CON EL BOTÓN DERECHO —o con MAYÚSCULAS apretada, para quien no
- *     tenga botón derecho a mano— mueve la mirada por el tablero. Se elige el
- *     derecho justamente porque la escena no lo usa para nada: cualquier reparto
- *     del izquierdo le robaría un gesto a la mano o a la barra. Y lleva su
- *     `contextmenu` con `preventDefault`, o al primer arrastre se abre el menú del
- *     navegador encima del delta.
- *   · DOS DEDOS pellizcan para acercar y pasean la mirada con su punto medio. En
- *     esta casa ningún juego es sólo para PC, y con el dedo no hay `wheel`, no hay
- *     botón derecho y no hay Mayúsculas: sin esto, en una tableta el delta se
- *     giraba y nada más, el botón de volver no aparecía NUNCA —porque nada llamaba
- *     a `alAcercarse`—, y el navegador tampoco podía suplirlo, que
- *     `touch-action: none` ya le había quitado su propio pellizco. El pellizco
- *     entra por `pellizcando`, que recibe una escala y no unos pasos, y el paseo
- *     por el mismo `arrastrandoLaMirada` del botón derecho. Un dedo solo sigue
- *     girando, que es lo que ya hacía y lo que la escena necesita libre.
- *
- * ═══ UN GESTO CADA VEZ, Y QUIEN LO EMPIEZA SE LO QUEDA ═══
- *
- * Los punteros apoyados se cuentan. Apretar el izquierdo en mitad de un
- * desplazamiento con el derecho cambiaba el gesto a girar a media carrera, y el
- * tablero pegaba un bandazo sin que nadie hubiera soltado nada; ahora un arrastre
- * en marcha no se lo lleva nadie hasta que se sueltan TODOS los botones.
- *
- * Y la cuenta de punteros es también lo que distingue dos dedos de dos botones: el
- * ratón manda siempre EL MISMO `pointerId` apriete lo que apriete, así que la
- * cuenta no sube y el segundo botón no abre ningún pellizco; dos dedos son dos
- * punteros, y ésos sí.
- *
- * NINGUNA DE ESAS CUENTAS SE ESCRIBE AQUÍ. `escenas/acercar.ts` da `acercando`,
- * `arrastrandoLaMirada` y `ojoYMira`, y sus topes están medidos desde Node; una
- * cuenta de cámara escrita en este fichero sólo se podría comprobar abriendo la
- * pantalla y mirando. Lo único que se traduce aquí son las unidades del suceso de
- * rueda, que no son pasos y que cada navegador cuenta a su manera.
+ * Aquí hubo una COPIA de esa cámara, de cuando el Burgo copió las piezas en vez de
+ * mudarlas, y ya se había separado: sólo ésta sabía callarse a pie. Eso pasó a la común
+ * (`callada`) y la copia se fue. Lo que sí es de esta pantalla son las tres cosas que la
+ * cámara BUSCA y que por eso se le pasan: el recuadro del que cuelga la rueda
+ * (`RECUADRO_DEL_LIENZO`, que lleva dentro el `<canvas>` Y el botón de volver, o la rueda
+ * encima del botón desplazaría la Sala), las cajas que ruedan por dentro
+ * (`SE_DESPLAZAN_SOLAS`) y el velo de lo modal (`EL_VELO`). La niebla es la de siempre,
+ * medida desde el ojo: la del banco, que se aleja con el ojo en los lienzos estrechos.
  *
  * ═══ Y SIEMPRE HAY SALIDA ═══
  *
@@ -198,29 +144,13 @@
  * como el mando— y el cartel de cómo se anda dice también cómo va el canal; en la mesa no, que aquí
  * no queda esquina (ver `ComoSeAndaPorElDelta`). En una mesa normal no se abre ningún socket.
  */
-import { Component, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { ACESFilmicToneMapping, Fog, Vector3 } from 'three';
+import { Canvas } from '@react-three/fiber';
+import { ACESFilmicToneMapping } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Cercania } from '../../escenas/acercar';
-import {
-  acercando,
-  arrastrandoLaMirada,
-  CERCANIA_DE_SALIDA,
-  comoAlPrincipio,
-  estaComoAlPrincipio,
-  ojoYMira,
-  pellizcando,
-} from '../../escenas/acercar';
-import type { Mirador } from '../../escenas/camara';
-import {
-  esDeLaInterfaz,
-  MINIMO_PARA_GIRAR,
-  MIRADOR_DE_SALIDA,
-  ojoDelMirador,
-  tirandoDelMirador,
-} from '../../escenas/camara';
+import { CERCANIA_DE_SALIDA, comoAlPrincipio, estaComoAlPrincipio } from '../../escenas/acercar';
 /* La cinta se mide con la MISMA función que la app y que `verify:escena`: ver `escenas/cinta.ts`. */
 import { altoDeLaCinta, BOTON_DE_LA_CINTA, loQueLlevaLaCinta } from '../../escenas/cinta';
 import type { RelojCargado, RelojDeLaMesa } from '../../escenas/reloj';
@@ -237,7 +167,7 @@ import { COMO_SE_GOLPEA } from '../../escenas/paseo/mandos';
  * terreno de sus cuadrados, y una segunda tabla escrita aquí sería la que se quedara atrás.
  */
 import { colorDeTerreno } from '../../escenas/paleta';
-import { catalogoDeModelos, unirCatalogos } from '../../escenas/modelos';
+import { unirCatalogos } from '../../escenas/modelos';
 import type { CatalogoDeModelos } from '../../escenas/modelos';
 import { rutaDeLosDados, rutaDelReloj, rutaDelTablero } from '../../escenas/ruta-de-modelos';
 import type { Opcion } from '../../shared/arcade';
@@ -318,6 +248,27 @@ import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import type { MovimientoDeclarado, TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { CON_ATAJO, Formulario, hayAlgoQuePintar, loQueSePuedePintar, usarLosAtajos } from './formulario';
+/*
+ * LAS PIEZAS DE TODOS LOS PINTORES, montadas y no copiadas: la cámara, el menú de una pregunta,
+ * la trampa de foco con su pila, los modelos, el límite del mundo y la raíz de la letra. Aquí
+ * hubo copias privadas de casi todas, y ya se habían separado; ver la cabecera de
+ * `lienzo-propio.tsx`.
+ */
+import {
+  armarUnaTrampa,
+  CamaraAerea,
+  ElijeUna,
+  elEstiloDeLaCinta,
+  hayUnaTrampaArmada,
+  LimiteDelMundo,
+  mandaEstaTrampa,
+  RAIZ_DE_LA_CASA,
+  raizDelNavegador,
+  recordada,
+  traerUnGlb,
+  usarLaTrampaDeFoco,
+  usarLosModelos,
+} from './lienzo-propio';
 import { direccionDelCanal } from './mesa';
 import type { LaMesa, MesaVista, ResultadoDelMovimiento } from './mesa';
 /* El mismo `traer` que el muelle y Las Lindes: la figura de quien pasea viaja por él. */
@@ -524,6 +475,14 @@ const EL_PREGON = 'riberas-pregon';
 const EL_COMPONEDOR_EN_EL_LIENZO = 'riberas-componedor-hoja';
 /** Las que se desplazan por dentro: la rueda es suya y no de la cámara. */
 const SE_DESPLAZAN_SOLAS = [EL_CAJON, EL_CARRIL, EL_MENU, EL_PREGON, EL_COMPONEDOR_EN_EL_LIENZO];
+/**
+ * EL RENGLÓN EN TENUE BAJO EL TÍTULO DE UNA HOJA —el estado de un trato, la regla del
+ * componedor—. Es la clase de ESTA hoja (pegada al título, en el cuerpo de la ayuda de una
+ * opción) y no la `letra-chica` de la casa, y por eso el menú común la recibe por
+ * `claseDeLaNota`: sin pasársela, el menú de Riberas cambiaría de letra y de aire sin que
+ * nada se pusiera rojo.
+ */
+const LA_NOTA_DEL_MENU = 'riberas-elige-nota';
 
 /**
  * EL CAMPO VERTICAL DE LA CÁMARA, en radianes: los 45° del `fov` del `Canvas` de abajo. La
@@ -536,41 +495,15 @@ const CAMPO_DE_LA_CAMARA = (45 * Math.PI) / 180;
 // El cartel que explica el naipe: dónde cabe y cuánto cabe
 // ---------------------------------------------------------------------------
 
-/**
- * ═══ LA RAÍZ DE ESTA CASA VALE 17 PUNTOS, Y ESE DATO YA SE ESCRIBIÓ MAL UNA VEZ ═══
- *
- * `estilo.css` abre con `html { font-size: 106.25%; }` y su propia cabecera dice por qué:
- * «los 17 px de siempre cuando el navegador viene con sus 16», y va en porcentaje para no
- * anular la preferencia de tamaño de letra del navegador. El diseño de este cartel
- * (`docs/LAS-CARTAS-SE-EXPLICAN.md`) escribió «0,82 rem sobre 16, o sea 13 puntos» y sobre
- * esos 13 levantó sus dos tablas de letra: con el rem malo salían 27 letras por renglón
- * donde hay 25 y renglones de 18 donde son de 19, o sea que el sitio quedaba SOBRESTIMADO
- * por los dos lados y una frase de tres renglones pasaba por una de dos.
- *
- * Se escribe aquí, una vez, y de aquí sale todo lo demás. Si alguien toca la raíz de la
- * hoja sin tocar esto, `verify:escritorio` lo dice: afirma que las dos cifras coinciden.
+/*
+ * LA RAÍZ DE LA LETRA NO SE ESCRIBE AQUÍ: los 17 puntos de la casa (`RAIZ_DE_LA_CASA`) y la
+ * de verdad, que se le pide al navegador para que la preferencia de letra siga mandando
+ * (`raizDelNavegador`), son de todos los pintores y viven en `lienzo-propio.tsx`, con su
+ * historia. Con un 17 clavado en vez de la medida, y `overflow: hidden`, el último renglón
+ * de este cartel se cortaría SIN NINGUNA SEÑAL, que es lo único que la cabecera de
+ * `elCartelQueCabe` promete no hacer nunca. Lo que sí es de este cartel es con qué parte de
+ * la raíz se pinta, aquí debajo.
  */
-export const RAIZ_DE_LA_CASA = 17;
-/**
- * ═══ Y ESOS 17 SON EL SUELO, NO LA MEDIDA: LA DE VERDAD SE LE PIDE AL NAVEGADOR ═══
- *
- * `106.25 %` va en porcentaje justamente para que la preferencia de tamaño de letra del
- * navegador siga mandando (lo dice el punto 2 de la cabecera de `estilo.css`). O sea que
- * quien la tenga en «muy grande» pinta el cartel con una letra bastante mayor que 13,94
- * puntos, mientras el alto máximo que esta pantalla calcula seguía saliendo de un 17
- * clavado, y con `overflow: hidden` el último renglón se corta SIN NINGUNA SEÑAL, que es
- * lo único que la cabecera de `elCartelQueCabe` promete no hacer nunca.
- *
- * Así que la raíz se mide donde se mide el lienzo, y el 17 se queda como lo que es: el
- * valor con el que se compone la hoja y el que vale en Node, donde no hay `document` y
- * donde los dos comprobadores miden. `verify:escritorio` sigue afirmando que ese número y
- * el `106.25 %` de la hoja dicen lo mismo.
- */
-function raizDelNavegador(): number {
-  if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return RAIZ_DE_LA_CASA;
-  const medida = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-  return Number.isFinite(medida) && medida > 0 ? medida : RAIZ_DE_LA_CASA;
-}
 /** El cuerpo de `.opcion-ayuda`, que es la letra con la que se pinta el cartel: `0.82rem`. */
 const CUERPO_SOBRE_LA_RAIZ = 0.82;
 /**
@@ -1064,18 +997,20 @@ export function elEstiloDelCartel(cartel: CartelAlPie | null): CSSProperties | u
 }
 
 /**
- * EL ANCHO DE LA CINTA Y EL DEL CAJÓN, TRADUCIDOS A LO QUE EL NAVEGADOR ENTIENDE.
+ * EL ANCHO DEL CAJÓN, TRADUCIDO A LO QUE EL NAVEGADOR ENTIENDE.
  *
- * ═══ POR QUÉ SON DOS FUNCIONES Y NO DOS LÍNEAS DENTRO DEL JSX ═══
+ * ═══ POR QUÉ ES UNA FUNCIÓN Y NO UNA LÍNEA DENTRO DEL JSX ═══
  *
  * Por lo mismo que `elEstiloDelCartel`, que nació del mismo fallo: `loQueLlevaLaCinta` mide
  * con muchísimo cuidado y `verify:escena` lo contrasta contra las dos manos, y lo que NADA
- * ataba era que ese número acabara de verdad en el `width` de la caja que se pinta. Sacadas
- * aquí son dos funciones puras que se pueden llamar desde Node y mirar qué sale.
+ * ataba era que ese número acabara de verdad en el `width` de la caja que se pinta. Sacada
+ * aquí es una función pura que se puede llamar desde Node y mirar qué sale.
  *
- * Y SON DOS Y NO UNA aunque hoy digan lo mismo: son dos cajas distintas, y el día que una
- * deje de medir lo que la otra —el pregón del trueque cuelga de esta misma cinta— quien lo
- * escriba tiene dónde hacerlo sin tocar la del vecino.
+ * Y NO ES `elEstiloDeLaCinta` aunque hoy diga lo mismo. Aquélla es de todos los pintores y
+ * vive en `lienzo-propio.tsx` —el Burgo la usa para su propio cajón—; ésta es la del cajón de
+ * ESTE pintor, y son dos cajas distintas: el día que una deje de medir lo que la otra —el
+ * pregón del trueque cuelga de esta misma cinta— quien lo escriba tiene dónde hacerlo sin
+ * tocar la del vecino.
  *
  * ═══ LO QUE AQUÍ YA NO ESTÁ: DÓNDE EMPIEZA EL CAJÓN ═══
  *
@@ -1090,14 +1025,9 @@ export function elEstiloDelCartel(cartel: CartelAlPie | null): CSSProperties | u
  * en la misma unidad: así los dos crecen juntos y no hay dos números que cuadrar.
  *
  * Con el recuadro sin medir todavía (cero por cero, el primer render y también Node, donde
- * no hay `ResizeObserver`) devuelven `undefined` y manda la hoja: un ancho de cero puntos no
- * se ve como un error, se ve como que no hay cinta.
+ * no hay `ResizeObserver`) devuelve `undefined` y manda la hoja: un ancho de cero puntos no
+ * se ve como un error, se ve como que no hay cajón.
  */
-export function elEstiloDeLaCinta(cinta: { ancho: number }): CSSProperties | undefined {
-  if (cinta.ancho <= 0) return undefined;
-  return { width: `${String(Math.round(cinta.ancho))}px` };
-}
-
 export function elEstiloDelCajon(cinta: { ancho: number }): CSSProperties | undefined {
   if (cinta.ancho <= 0) return undefined;
   return { width: `${String(Math.round(cinta.ancho))}px` };
@@ -1286,184 +1216,6 @@ export function elEstadoQueCabe(
 }
 
 /**
- * LA TRAMPA DE FOCO DE UN MODAL DEL LIENZO: `Escape` cierra y el tabulador da la vuelta.
- *
- * ═══ POR QUÉ ESTO ES UN GANCHO Y NO EL CUERPO DEL CAJÓN ═══
- *
- * Porque dentro del recuadro hay DOS cajas modales y no una: el cajón del marcador y el menú
- * de elegir —«a quién se lo propones», «a quién le robas», «qué dos bienes coges»—. Las dos se
- * pintan encima de un tablero donde un toque funda una choza, así que las dos necesitan lo
- * mismo, y escribirlo dos veces es tener dos trampas que se separan el día que alguien
- * arregle una: la que se queda rota es la que nadie estaba mirando. Escrito una vez, `Escape`
- * y el tabulador valen igual en las dos, y `verify:escritorio` compra que las dos lo usan.
- *
- * LO QUE HACE, y las tres son cosas que un navegador NO hace solo con un `<div>`:
- *
- *   · al abrirse, el foco se va DENTRO de la caja. Sin esto, quien abre con teclado se queda
- *     tabulando por detrás de un modal opaco;
- *   · `Tab` sobre el último enfocable vuelve al primero y `Mayúsculas+Tab` sobre el primero
- *     va al último. `aria-modal` se lo cuenta al lector de pantalla y no le quita el
- *     tabulador a nadie: sin la vuelta, el foco se va a la cabecera de la Sala;
- *   · `Escape` cierra, que es la salida que quien abrió con teclado espera encontrar.
- *
- * DEVOLVER EL FOCO AL CERRAR NO ES COSA DE AQUÍ, y no por descuido: la caja se DESMONTA al
- * cerrarse y adónde vuelve el foco depende de quién la abrió —la ficha de mis puntos en un
- * caso, el recuadro del lienzo en el otro, porque al menú lo abre un naipe del `<canvas>` y
- * un `<canvas>` no recibe foco—. Lo hace cada `cerrar`, que es el que lo sabe.
- *
- * ═══ Y SE ROMPÍA SOLA EN CUANTO SE USABA. EL FALLO, JUGANDO Y NO LEYENDO ═══
- *
- * El oyente vivía EN LA CAJA (`suya.addEventListener('keydown', …)`), y un `keydown` sólo
- * llega ahí si el foco está DENTRO. Basta pulsar una opción de «Lo que puedes hacer» para que
- * deje de estarlo: la lista de opciones cambia con la jugada, el botón pulsado desaparece, y
- * un elemento que se desmonta con el foco puesto lo suelta al `<body>`. Desde el `<body>` ni
- * el tabulador da la vuelta ni `Escape` cierra: la trampa existía hasta el primer toque.
- *
- * Por eso ahora el oyente vive en `document` mientras la caja está abierta y `tecla` mira
- * `caja.current` EN EL MOMENTO de la tecla, no el nodo que se capturó al armarla. Y hay
- * RESCATE: un vigía mira los cambios de dentro de la caja y, si el foco se ha caído fuera,
- * lo devuelve a la caja. Es el mismo patrón que el rescate del recuadro de `sala.tsx` —mirar
- * quién tiene el foco justo cuando se lo llevan por delante—, aquí en pequeño.
- *
- * ═══ Y MANDA LA DE ARRIBA, QUE ES LO QUE UN OYENTE EN `document` SE LLEVA POR DELANTE ═══
- *
- * Con el oyente en la caja, la burbuja repartía sola: con el cajón abierto y el menú de
- * elegir encima, un `Escape` sólo llegaba a la caja que tenía el foco dentro. En `document`
- * llegan LAS DOS, y `Escape` cerraría el menú Y el cajón de un golpe. De ahí la pila:
- * `armarUnaTrampa` apunta cada caja en el orden en que se abre y sólo actúa la de arriba.
- */
-/**
- * LAS TRAMPAS ARMADAS, en el orden en que se abrieron. Ver el porqué arriba.
- *
- * Es un array de módulo y no un estado de React a propósito: no decide qué se pinta, y las
- * dos cajas que lo comparten no tienen un antepasado común al que colgárselo sin inventar un
- * contexto para cuatro líneas. Se apunta con `armarUnaTrampa`, que devuelve cómo desarmarse.
- */
-const LAS_TRAMPAS_ARMADAS: unknown[] = [];
-
-/**
- * APUNTA UNA TRAMPA Y DEVUELVE CÓMO BORRARLA. Desarmar dos veces no hace nada, que es lo que
- * pide un efecto de React en modo estricto (monta, desmonta y vuelve a montar).
- */
-export function armarUnaTrampa(quien: unknown): () => void {
-  LAS_TRAMPAS_ARMADAS.push(quien);
-  let desarmada = false;
-  return () => {
-    if (desarmada) return;
-    desarmada = true;
-    const suPuesto = LAS_TRAMPAS_ARMADAS.lastIndexOf(quien);
-    if (suPuesto >= 0) LAS_TRAMPAS_ARMADAS.splice(suPuesto, 1);
-  };
-}
-
-/** ¿Manda ésta? Sólo la última que se armó, que es la que está encima. */
-export function mandaEstaTrampa(quien: unknown): boolean {
-  return LAS_TRAMPAS_ARMADAS.length > 0 && LAS_TRAMPAS_ARMADAS[LAS_TRAMPAS_ARMADAS.length - 1] === quien;
-}
-
-/**
- * DÓNDE ESTÁ EL FOCO CUANDO LLEGA LA TECLA, visto desde la caja modal.
- *
- * `fuera` es el caso que costó tres turnos de partida: el navegador lo ha soltado al
- * `<body>` porque el botón que lo tenía se desmontó. No es un caso raro ni un caso de
- * teclado: pasa con el ratón, en la primera jugada, y hasta hoy dejaba la caja sin `Escape`.
- */
-export type ElFocoDeLaTrampa = 'fuera' | 'la-caja' | 'el-unico' | 'el-primero' | 'el-ultimo' | 'dentro';
-
-/** Lo que la trampa hace con una tecla. `nada` quiere decir «déjasela al navegador». */
-export type LoQueHaceLaTrampa = 'nada' | 'cerrar' | 'al-primero' | 'al-ultimo' | 'a-la-caja';
-
-/**
- * LA DECISIÓN DE LA TRAMPA, SIN NAVEGADOR, para que se pueda comprar llamándola.
- *
- * La comprobación de antes leía el CUERPO del oyente y buscaba dentro las palabras `Tab`,
- * `shiftKey` y `Escape`. Pasaba en verde con la trampa rota delante, porque las palabras
- * estaban escritas y el fallo era DÓNDE se enganchaba el oyente y qué pasaba con el foco
- * caído: dos cosas que aquel texto no miraba. Partido así, el reparto se llama con una tabla
- * —incluida la fila `fuera`, que es la del fallo— y el enganche se lee aparte.
- *
- * `Escape` cierra MIRE DONDE MIRE EL FOCO, y eso es la mitad del arreglo: es justo la tecla
- * que se pulsa cuando uno ya no sabe dónde está.
- */
-export function loQueHaceLaTrampa(
-  tecla: { key: string; shiftKey: boolean },
-  foco: ElFocoDeLaTrampa,
-  cuantosEnfocables: number,
-): LoQueHaceLaTrampa {
-  if (tecla.key === 'Escape') return 'cerrar';
-  if (tecla.key !== 'Tab') return 'nada';
-  /* Una caja sin nada que enfocar dentro se queda el tabulador ella misma. */
-  if (cuantosEnfocables === 0) return 'a-la-caja';
-  /* El foco caído al `body`: el tabulador entra en la caja en vez de irse a la Sala. */
-  if (foco === 'fuera') return tecla.shiftKey ? 'al-ultimo' : 'al-primero';
-  if (!tecla.shiftKey && (foco === 'el-ultimo' || foco === 'el-unico')) return 'al-primero';
-  if (tecla.shiftKey && (foco === 'el-primero' || foco === 'el-unico' || foco === 'la-caja')) return 'al-ultimo';
-  return 'nada';
-}
-
-function usarLaTrampaDeFoco(
-  abierto: boolean,
-  caja: RefObject<HTMLElement | null>,
-  cerrar: () => void,
-): void {
-  useEffect(() => {
-    if (!abierto) return;
-    const alArmar = caja.current;
-    if (alArmar === null) return;
-    alArmar.focus();
-    const desarmar = armarUnaTrampa(caja);
-    const enfocables = (dentro: HTMLElement): HTMLElement[] =>
-      [...dentro.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')].filter(
-        (e) => !e.hasAttribute('disabled') && e.tabIndex >= 0,
-      );
-    const dondeEstaElFoco = (dentro: HTMLElement, lista: HTMLElement[]): ElFocoDeLaTrampa => {
-      const activo = document.activeElement;
-      if (activo === dentro) return 'la-caja';
-      if (activo === null || !dentro.contains(activo)) return 'fuera';
-      if (lista.length === 1 && activo === lista[0]) return 'el-unico';
-      if (activo === lista[0]) return 'el-primero';
-      if (activo === lista[lista.length - 1]) return 'el-ultimo';
-      return 'dentro';
-    };
-    const tecla = (e: KeyboardEvent): void => {
-      const dentro = caja.current;
-      if (dentro === null || !mandaEstaTrampa(caja)) return;
-      const lista = enfocables(dentro);
-      const hace = loQueHaceLaTrampa(e, dondeEstaElFoco(dentro, lista), lista.length);
-      if (hace === 'nada') return;
-      e.preventDefault();
-      if (hace === 'cerrar') cerrar();
-      else if (hace === 'a-la-caja') dentro.focus();
-      else (hace === 'al-primero' ? lista[0] : lista[lista.length - 1])?.focus();
-    };
-    /*
-     * EN `document` Y NO EN LA CAJA: ver la cabecera. Un oyente en la caja sólo oye lo que
-     * pasa con el foco dentro, y el foco se sale solo en cuanto una jugada cambia la lista de
-     * opciones. Con la pila, seguir aquí no le quita el `Escape` al menú que hay encima.
-     */
-    document.addEventListener('keydown', tecla);
-    /*
-     * EL RESCATE. Que el botón que tenía el foco se desmonte no avisa a nadie —el navegador
-     * no dispara `blur` al quitar de la página al que lo tenía—, así que se mira la caja por
-     * dentro: cada vez que cambia, si el foco se ha caído fuera, vuelve a la caja. Desde ahí
-     * el tabulador entra otra vez en el cajón, que es lo que se perdía.
-     */
-    const rescatar = (): void => {
-      const dentro = caja.current;
-      if (dentro === null || !mandaEstaTrampa(caja)) return;
-      if (dondeEstaElFoco(dentro, enfocables(dentro)) === 'fuera') dentro.focus();
-    };
-    const vigia = new MutationObserver(rescatar);
-    vigia.observe(alArmar, { childList: true, subtree: true });
-    return () => {
-      document.removeEventListener('keydown', tecla);
-      vigia.disconnect();
-      desarmar();
-    };
-  }, [abierto, caja, cerrar]);
-}
-
-/**
  * LOS TÍTULOS DEL MENÚ, uno por pregunta, y ni una palabra más de cosecha propia.
  *
  * Lo que va DENTRO de cada botón lo escribió el juego —`opcion.rotulo` y `opcion.ayuda`,
@@ -1530,40 +1282,15 @@ const QUE_LADO_SE_TOCA = 'Qué lado estás montando';
 // El catálogo de modelos, una vez por pestaña
 // ---------------------------------------------------------------------------
 
-/**
- * UNA PROMESA POR FICHERO Y POR PESTAÑA, que se suelta si falla para que el siguiente
- * montaje lo intente otra vez. Ver la cabecera. Es una por fichero y no una para los
- * dos porque el tablero y los dados fallan por separado: un tablero que llegó no se
- * vuelve a bajar porque los dados no llegaran, y unos dados que fallaron se pueden
- * reintentar solos en el siguiente montaje.
+/*
+ * UNA PROMESA POR FICHERO Y POR PESTAÑA (`recordada`), que se suelta si falla para que el
+ * siguiente montaje lo intente otra vez, y el `.glb` traído por `fetch` para que un 404 se lea
+ * como un 404 (`traerUnGlb`): las dos son de todos los pintores y viven en `lienzo-propio.tsx`.
+ * Ver la cabecera. Lo que es de aquí es el reparto: una promesa por fichero y no una para los
+ * dos, porque el tablero y los dados fallan por separado —un tablero que llegó no se vuelve a
+ * bajar porque los dados no llegaran, y unos dados que fallaron se pueden reintentar solos en
+ * el siguiente montaje—.
  */
-function recordada<T>(traer: () => Promise<T>): () => Promise<T> {
-  let enCamino: Promise<T> | null = null;
-  return () => {
-    if (enCamino !== null) return enCamino;
-    const promesa = traer();
-    enCamino = promesa;
-    promesa.catch(() => {
-      if (enCamino === promesa) enCamino = null;
-    });
-    return promesa;
-  };
-}
-
-/**
- * Trae y parsea un `.glb` y devuelve su catálogo.
- *
- * `GLTFLoader.parseAsync` sobre los bytes de un `fetch` relativo, y no `.load(url)`:
- * así el error de red se lee como lo que es —«contestó 404»— y no como un `ProgressEvent`
- * sin texto, que es lo que devuelve el cargador cuando la petición falla.
- */
-async function traerUnGlb(ruta: string): Promise<CatalogoDeModelos> {
-  const r = await fetch(ruta);
-  if (!r.ok) throw new Error(`${ruta} contestó ${String(r.status)}`);
-  const bytes = await r.arrayBuffer();
-  const gltf = await new GLTFLoader().parseAsync(bytes, '');
-  return catalogoDeModelos(gltf.scene);
-}
 
 /**
  * EL RELOJ DE ARENA, aparte de los otros dos y CON SUS CLIPS.
@@ -1602,397 +1329,6 @@ function traerElCatalogo(): Promise<CatalogoDeModelos> {
     return null;
   });
   return Promise.all([tablero, dados]).then(([delTablero, deLosDados]) => unirCatalogos(delTablero, deLosDados));
-}
-
-/**
- * El catálogo desde un componente: `null` mientras llega, y el motivo si no llegó.
- *
- * `cancelado` por lo mismo que en el banco: si la mesa se desmonta mientras el
- * fichero viaja, escribir el estado después es un aviso de React y una referencia
- * viva a una escena que ya no se dibuja. Y sólo se pide cuando HACE FALTA: en Node
- * no corren los efectos, y con una mesa que va a caer al retablo —más colonos que
- * colores— descargar dos megas para no montar el lienzo sería tirarlos. El gancho
- * se llama siempre (reglas de los ganchos); lo que se condiciona es la petición.
- */
-function usarElCatalogo(hazFalta: boolean): { modelos: CatalogoDeModelos | null; fallo: string | null } {
-  const [modelos, ponerModelos] = useState<CatalogoDeModelos | null>(null);
-  const [fallo, ponerFallo] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!hazFalta) return undefined;
-    let cancelado = false;
-    traerElCatalogo().then(
-      (catalogo) => {
-        if (!cancelado) ponerModelos(catalogo);
-      },
-      (error: unknown) => {
-        if (!cancelado) ponerFallo(loQueSeDiceDeUnFallo(error));
-      },
-    );
-    return () => {
-      cancelado = true;
-    };
-  }, [hazFalta]);
-
-  return { modelos, fallo };
-}
-
-// ---------------------------------------------------------------------------
-// La cámara aérea
-// ---------------------------------------------------------------------------
-
-/**
- * LA NIEBLA, MEDIDA DESDE EL OJO. El banco la pone a 2,6 y 7,5 alcances del centro
- * con la cámara quieta a `LEJANIA` (1,77) alcances; medidos desde esa cámara son
- * 0,85 y 5,7 alcances por delante del ojo. Aquí el ojo se aleja cuando el lienzo
- * es estrecho, y una niebla clavada al centro se quedaría delante del delta y lo
- * dejaría blanqueado. Así que se lleva con la cámara: mismo aspecto en el
- * monitor, y el mismo aspecto desde más lejos.
- */
-const NIEBLA_EMPIEZA_A = 0.85;
-const NIEBLA_TERMINA_A = 5.7;
-
-/**
- * DE LAS UNIDADES DE LA RUEDA A LOS PASOS DE `acercar.ts`.
- *
- * Es lo ÚNICO que este fichero calcula, y no es una cuenta de cámara: es traducir un
- * suceso del navegador. `acercando` cuenta en PASOS —un paso es «un poco más cerca»,
- * y lo que vale un paso lo decide `PASO_DE_ACERCAMIENTO`, no esto—, mientras que el
- * navegador manda un `deltaY` que no es ninguna unidad: un ratón de muesca suelta cien
- * píxeles de golpe, un panel táctil suelta cuatro sesenta veces por segundo, y un
- * Firefox con la rueda en modo línea manda TRES LÍNEAS. Sin traducir los tres modos a
- * lo mismo, el mismo gesto acerca un dedo en un aparato y cruza el tablero entero en
- * otro, y eso no se ve como un fallo de conversión sino como un zoom roto.
- *
- * ═══ Y EL MODO LÍNEA SE CUENTA EN LÍNEAS, NO EN PÍXELES ═══
- *
- * Esto pasaba por el modo línea convirtiendo cada línea a dieciséis píxeles: las tres
- * líneas de una muesca de Firefox daban cuarenta y ocho, o sea MEDIA muesca. El zoom
- * iba exactamente a la mitad de velocidad que en cualquier otro navegador, y eso nadie
- * lo mide: se nota como que «en Firefox cuesta más acercarse», que es de las cosas que
- * se achacan al ordenador. Un modo cuyas unidades son líneas no necesita pasar por
- * píxeles: tres líneas son una muesca, y de ahí sale el paso directamente.
- *
- * El tope de golpe es por el panel táctil con inercia: un gesto de dos dedos manda una
- * ráfaga larguísima, y sin tope un solo empujón salta del aire al suelo.
- */
-const PIXELES_POR_MUESCA = 100;
-const LINEAS_POR_MUESCA = 3;
-const MUESCAS_POR_PAGINA = 4;
-const MUESCAS_DE_GOLPE = 4;
-
-function pasosDeLaRueda(e: WheelEvent): number {
-  const muescas =
-    e.deltaMode === 1
-      ? e.deltaY / LINEAS_POR_MUESCA
-      : e.deltaMode === 2
-        ? e.deltaY * MUESCAS_POR_PAGINA
-        : e.deltaY / PIXELES_POR_MUESCA;
-  /* Rueda hacia arriba, más cerca: es lo que hace cualquier mapa, y de ahí el signo. */
-  return -Math.min(MUESCAS_DE_GOLPE, Math.max(-MUESCAS_DE_GOLPE, muescas));
-}
-
-/**
- * UN SOLO `Vector3` PARA TODA LA PESTAÑA. La niebla se mide sesenta veces por segundo
- * y pedir memoria sesenta veces por segundo para tres números es lo que llena el
- * recolector de basura de fantasmas y deja un tirón cada pocos segundos.
- */
-const PUNTO_DE_MIRA = new Vector3();
-
-/**
- * El mirador del banco, sin la vista de suelo: aquí se juega desde el aire — y ahora
- * también de cerca.
- *
- * La aritmética está en `escenas/camara.ts` y en `escenas/acercar.ts`, donde se puede
- * medir desde Node; esto sólo escucha el ratón y coloca la cámara en cada fotograma.
- * Sólo cuentan los gestos que empiezan SOBRE ESTE lienzo —`e.target === lienzo`—, así
- * que arrastrar por el raíl o por el formulario no mueve nada.
- *
- * Quién manda en cada botón está en la cabecera del fichero. Lo que importa aquí es
- * que `esDeLaInterfaz` se pregunta ANTES de quedarse con el gesto, igual que antes: si
- * la barra o la mano ya se quedaron el `pointerdown`, la cámara no lo toca.
- *
- * La proporción del lienzo entra en cada fotograma y no una vez: el raíl baja o
- * sube al cruzar los 900 px, la ventana se estira, la tableta se gira, y el
- * `<canvas>` cambia de forma sin que se remonte nada. Leer `clientWidth` por
- * fotograma cuesta menos que un observador de tamaño y no se queda nunca atrás.
- *
- * El acercamiento NO se guarda aquí sino en quien monta este componente, y por una
- * razón de pantalla: el botón de volver vive fuera del `Canvas` y tiene que saber si
- * hay algo a lo que volver. La `ref` entra por la puerta y se LEE aquí; escribirla es
- * cosa de `alAcercarse`, que es quien de paso enciende y apaga el botón.
- */
-function CamaraAerea({
-  alcance,
-  cercania,
-  alAcercarse,
-  aPie,
-}: {
-  alcance: number;
-  cercania: RefObject<Cercania>;
-  alAcercarse: (nueva: Cercania) => void;
-  /**
-   * A PIE, CALLADA: ni escucha el ratón ni pone la cámara ni la niebla, que son del paseo.
-   * Se queda MONTADA y no se desmonta: su mirador vive aquí dentro, y al volver a la mesa se
-   * sigue mirando desde donde se dejó. Sin esto, cada fotograma subiría la cámara al aire por
-   * encima de la que acaba de poner el paseo, y arrastrar a pie giraría la mesa que no se ve.
-   */
-  aPie: boolean;
-}): null {
-  const { camera, gl, scene } = useThree();
-  const mirador = useRef<Mirador>(MIRADOR_DE_SALIDA);
-
-  useEffect(() => {
-    if (aPie) return undefined;
-    const lienzo = gl.domElement;
-    /*
-     * EL RECUADRO NO ES EL LIENZO. Es el `.riberas-lienzo` que lleva dentro el `<canvas>`
-     * Y el botón de volver, y es de él —no del lienzo— de quien cuelga la rueda: ver la
-     * cabecera. Se busca por la misma clase que pinta el JSX, y si un día no estuviera se
-     * cae al lienzo, que es lo que había antes: peor, pero no roto.
-     */
-    const recuadro: HTMLElement = lienzo.closest<HTMLElement>(`.${RECUADRO_DEL_LIENZO}`) ?? lienzo;
-
-    let desde: { x: number; y: number } | null = null;
-    let gira = false;
-    /* De quién es ESTE arrastre: del rumbo (izquierdo) o de la mirada (derecho o Mayúsculas). */
-    let mueveLaMirada = false;
-    /*
-     * QUIÉN ESTÁ APOYADO AHORA MISMO, por `pointerId`. Con el ratón esto vale siempre uno
-     * —los botones comparten puntero—, así que sólo llega a dos con dos dedos. Ver la
-     * cabecera: es la misma cuenta la que abre el pellizco y la que impide que un segundo
-     * botón le robe el gesto a un arrastre en marcha.
-     */
-    const apoyados = new Map<number, { x: number; y: number }>();
-    /* El pellizco en curso: con qué acercamiento y con qué separación empezó, y dónde va su centro. */
-    let pellizco: { alEmpezar: number; separacion: number; centro: { x: number; y: number } } | null = null;
-
-    const pantalla = (): { ancho: number; alto: number } => ({
-      ancho: lienzo.clientWidth,
-      alto: lienzo.clientHeight,
-    });
-
-    /*
-     * La separación y el punto medio de los dos dedos, en píxeles de pantalla. No es una
-     * cuenta de cámara —de eso no hay ninguna aquí—: son las mismas coordenadas del suceso
-     * que ya se restan para el arrastre, y lo que sale de aquí entra crudo en
-     * `pellizcando` y en `arrastrandoLaMirada`, que son quienes hacen la aritmética.
-     */
-    const dosDedos = (): { separacion: number; centro: { x: number; y: number } } | null => {
-      const [a, b] = [...apoyados.values()];
-      if (a === undefined || b === undefined) return null;
-      return {
-        separacion: Math.hypot(a.x - b.x, a.y - b.y),
-        centro: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
-      };
-    };
-
-    const baja = (e: PointerEvent): void => {
-      if (e.target !== lienzo) return;
-      if (esDeLaInterfaz(e)) return;
-      apoyados.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      const dos = dosDedos();
-      if (apoyados.size >= 2 && dos !== null) {
-        /*
-         * DOS DEDOS. Se guardan el acercamiento y la separación DE PARTIDA, y a partir de
-         * ahí `pellizcando` trabaja con la razón entre la separación de ahora y aquélla.
-         * Guardar el punto de partida en vez de ir acumulando es lo que hace que separar
-         * los dedos y volver a juntarlos deje el tablero exactamente donde estaba.
-         *
-         * El suelo de un píxel es para el caso degenerado de dos dedos en el mismo punto:
-         * sin él la razón sería infinita y el pellizco no haría nada en todo el gesto.
-         */
-        pellizco = {
-          alEmpezar: cercania.current.factor,
-          separacion: Math.max(1, dos.separacion),
-          centro: dos.centro,
-        };
-        /* Y el arrastre de un dedo se cancela: lo que había empezado a girar ya no gira. */
-        desde = null;
-        gira = false;
-        mueveLaMirada = false;
-        return;
-      }
-
-      /*
-       * QUIEN EMPEZÓ EL ARRASTRE SE LO QUEDA. Apretar el izquierdo en mitad de un
-       * desplazamiento con el botón derecho cambiaba el gesto a girar a media carrera.
-       */
-      if (desde !== null) return;
-
-      desde = { x: e.clientX, y: e.clientY };
-      gira = false;
-      /*
-       * Se decide AL EMPEZAR y no en cada movimiento: soltar la tecla a mitad de
-       * gesto cambiaría de girar a desplazar sin que nadie lo haya pedido, y el
-       * tablero pegaría un bandazo en medio del arrastre.
-       */
-      mueveLaMirada = e.button === 2 || e.shiftKey;
-    };
-    const mueve = (e: PointerEvent): void => {
-      if (apoyados.has(e.pointerId)) apoyados.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pellizco !== null) {
-        const dos = dosDedos();
-        if (dos === null) return;
-        /*
-         * Las dos mitades del gesto, en este orden: primero el paseo del punto medio —por
-         * el mismo camino que el botón derecho, para que mover con dos dedos y mover con
-         * el derecho sean el mismo movimiento— y encima el acercamiento, que conserva ese
-         * centro porque `pellizcando` sólo toca el factor.
-         */
-        const paseada = arrastrandoLaMirada(
-          cercania.current,
-          dos.centro.x - pellizco.centro.x,
-          dos.centro.y - pellizco.centro.y,
-          mirador.current.rumbo,
-          alcance,
-          pantalla(),
-        );
-        pellizco.centro = dos.centro;
-        alAcercarse(pellizcando(paseada, pellizco.alEmpezar, dos.separacion / pellizco.separacion));
-        return;
-      }
-      if (desde === null) return;
-      if (!gira) {
-        if (Math.hypot(e.clientX - desde.x, e.clientY - desde.y) < MINIMO_PARA_GIRAR) return;
-        gira = true;
-      }
-      const dx = e.clientX - desde.x;
-      const dy = e.clientY - desde.y;
-      if (mueveLaMirada) {
-        /*
-         * El rumbo entra porque la mirada se mueve en los ejes de QUIEN MIRA y no en
-         * los del mundo: con el tablero girado, arrastrar a un lado movería el mapa
-         * en diagonal. Lo cuenta `arrastrandoLaMirada`, que es quien hace la cuenta.
-         */
-        alAcercarse(
-          arrastrandoLaMirada(cercania.current, dx, dy, mirador.current.rumbo, alcance, pantalla()),
-        );
-      } else {
-        mirador.current = tirandoDelMirador(mirador.current, dx, dy, pantalla());
-      }
-      desde = { x: e.clientX, y: e.clientY };
-    };
-    const suelta = (e: PointerEvent): void => {
-      apoyados.delete(e.pointerId);
-      /*
-       * Con un dedo menos ya no hay pellizco. El que queda apoyado NO sigue arrastrando:
-       * levantar un dedo de un pellizco y que el mundo se pusiera a girar de golpe con el
-       * otro es un bandazo, y para volver a girar basta con volver a apoyar.
-       */
-      if (apoyados.size < 2) pellizco = null;
-      /*
-       * Y NO SE SUELTA MIENTRAS QUEDE UN BOTÓN APRETADO. Soltar el izquierdo en mitad de
-       * un desplazamiento con el derecho terminaba un gesto que seguía en marcha, y el
-       * tablero se quedaba clavado con el botón todavía apretado.
-       */
-      if (e.buttons !== 0) return;
-      desde = null;
-      gira = false;
-      mueveLaMirada = false;
-    };
-    /*
-     * `passive: false` y `preventDefault`, o la Sala entera se desplaza mientras uno
-     * cree estar acercándose. El navegador supone que una rueda sobre un elemento es
-     * para desplazar la página y sólo deja quitárselo a un oyente que lo diga al
-     * apuntarse: `addEventListener('wheel', …)` es pasivo por omisión.
-     */
-    const rueda = (e: WheelEvent): void => {
-      /*
-       * DE QUIÉN ES ESTA RUEDA, que dentro del recuadro ya no es siempre de la cámara. Ver la
-       * cabecera de `EL_CAJON`: dentro de una caja que se desplaza sola —el cajón, el carril
-       * de la cinta o el menú de elegir— no se toca nada, ni siquiera se llama a
-       * `preventDefault`, para que el navegador la desplace como desplaza cualquier caja; y
-       * sobre el velo se llama a `preventDefault` y se para ahí, porque lo que hay abierto es
-       * modal y modal incluye la cámara. Sin la primera mitad, girar la rueda sobre la
-       * crónica acercaba el delta detrás del cajón y la crónica no se movía un renglón.
-       */
-      const donde = e.target instanceof Element ? e.target : null;
-      if (SE_DESPLAZAN_SOLAS.some((clase) => donde?.closest(`.${clase}`) != null)) return;
-      e.preventDefault();
-      if (donde?.closest(`.${EL_VELO}`) != null) return;
-      alAcercarse(acercando(cercania.current, pasosDeLaRueda(e)));
-    };
-    /* Sin esto, el primer arrastre con el botón derecho abre el menú del navegador encima del delta. */
-    const menuDelSistema = (e: MouseEvent): void => {
-      e.preventDefault();
-    };
-
-    window.addEventListener('pointerdown', baja);
-    window.addEventListener('pointermove', mueve);
-    window.addEventListener('pointerup', suelta);
-    window.addEventListener('pointercancel', suelta);
-    recuadro.addEventListener('wheel', rueda, { passive: false });
-    lienzo.addEventListener('contextmenu', menuDelSistema);
-    return () => {
-      window.removeEventListener('pointerdown', baja);
-      window.removeEventListener('pointermove', mueve);
-      window.removeEventListener('pointerup', suelta);
-      window.removeEventListener('pointercancel', suelta);
-      recuadro.removeEventListener('wheel', rueda);
-      lienzo.removeEventListener('contextmenu', menuDelSistema);
-    };
-  }, [gl, alcance, cercania, alAcercarse, aPie]);
-
-  useFrame(() => {
-    if (aPie) return;
-    const lienzo = gl.domElement;
-    const proporcion = lienzo.clientHeight > 0 ? lienzo.clientWidth / lienzo.clientHeight : undefined;
-    /*
-     * Así se junta todo, y es la única forma que hay de juntarlo: el mirador dice la
-     * DIRECCIÓN, el acercamiento dice a qué distancia y adónde se mira, y `ojoYMira`
-     * los suma —incluida la altura mínima sobre el agua, sin la cual el ojo se mete
-     * dentro de una colina al acercarse—.
-     */
-    const { ojo, mira } = ojoYMira(cercania.current, alcance, (distancia) =>
-      ojoDelMirador(mirador.current, distancia, proporcion),
-    );
-    camera.position.set(...ojo);
-    camera.lookAt(...mira);
-    if (scene.fog instanceof Fog) {
-      /*
-       * LA NIEBLA SE MIDE DEL OJO AL PUNTO DE MIRA, no de la altura del ojo al suelo.
-       * Antes bastaba con lo lejos que estaba el ojo del origen porque siempre se
-       * miraba al origen; desde que la mirada se puede llevar a un borde del delta,
-       * esa cuenta se queda corta —el ojo está lejos del centro pero cerca de lo que
-       * mira— y el mundo saldría con niebla encima justo al acercarse a mirarlo.
-       */
-      const distancia = camera.position.distanceTo(PUNTO_DE_MIRA.set(...mira));
-      scene.fog.near = distancia + alcance * NIEBLA_EMPIEZA_A;
-      scene.fog.far = distancia + alcance * NIEBLA_TERMINA_A;
-    }
-  });
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// El límite del mundo
-// ---------------------------------------------------------------------------
-
-/**
- * Si el `Canvas` revienta al nacer, aquí se para y se avisa. Es la misma clase que
- * el `LimiteDelMundo` del muelle —no se exporta de allí a propósito: cada pantalla
- * decide qué hace con el fallo, y ésta cae al SVG—. No pinta nada porque lo que
- * hay que pintar en su lugar lo decide quien la monta.
- */
-class LimiteDelMundo extends Component<
-  { alFallar: (motivo: string) => void; children: ReactNode },
-  { roto: boolean }
-> {
-  public override state = { roto: false };
-
-  public static getDerivedStateFromError(): { roto: boolean } {
-    return { roto: true };
-  }
-
-  public override componentDidCatch(error: unknown): void {
-    this.props.alFallar(loQueSeDiceDeUnFallo(error));
-  }
-
-  public override render(): ReactNode {
-    return this.state.roto ? null : this.props.children;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2419,8 +1755,9 @@ export function RiberasEnTres({
    * usa nadie más en esta pantalla, y W, A, S, D y las flechas son del paseo.
    *
    * Con las guardas de `usarLosAtajos` —ni con un campo de texto enfocado, ni con modificadores,
-   * ni repetida— y una más: con una caja modal abierta (`LAS_TRAMPAS_ARMADAS`) sus teclas son
-   * suyas, y cambiar de cámara por debajo de un menú es mover lo que no se ve.
+   * ni repetida— y una más: con una caja modal abierta (`hayUnaTrampaArmada`, que pregunta a la
+   * pila de trampas de todas las cajas) sus teclas son suyas, y cambiar de cámara por debajo de
+   * un menú es mover lo que no se ve.
    */
   useEffect(() => {
     const alPulsar = (e: KeyboardEvent): void => {
@@ -2434,7 +1771,7 @@ export function RiberasEnTres({
       ) {
         return;
       }
-      if (LAS_TRAMPAS_ARMADAS.length > 0) return;
+      if (hayUnaTrampaArmada()) return;
       const nuevo = CAMARA_DE_LA_TECLA.get(e.key.toLowerCase());
       if (nuevo === undefined) return;
       e.preventDefault();
@@ -3401,8 +2738,15 @@ export function RiberasEnTres({
   // El mundo
   // -------------------------------------------------------------------------
 
-  /* El modelo sólo se pide si el lienzo se va a montar: con delta y con colores. */
-  const { modelos, fallo: falloDelModelo } = usarElCatalogo(tablero.caras.length > 0 && seVeEnTres(vista));
+  /*
+   * El modelo sólo se pide si el lienzo se va a montar: con delta y con colores. El gancho es el
+   * de todos (`usarLosModelos`); lo que es de Riberas es QUÉ se trae, `traerElCatalogo`, que es
+   * de módulo y por eso no rearma el efecto en cada render.
+   */
+  const { modelos, fallo: falloDelModelo } = usarLosModelos(
+    tablero.caras.length > 0 && seVeEnTres(vista),
+    traerElCatalogo,
+  );
   const [falloDelLienzo, ponerFalloDelLienzo] = useState<string | null>(null);
   const alFallarElLienzo = useCallback((motivo: string) => {
     ponerFalloDelLienzo(motivo);
@@ -3549,6 +2893,9 @@ export function RiberasEnTres({
             nota={laTiraAbierta.comoAnda}
             opciones={[laTiraAbierta.aceptar, laTiraAbierta.rechazar].filter((o): o is Opcion => o !== null)}
             quieto={quieto}
+            velo={EL_VELO}
+            menu={EL_MENU}
+            claseDeLaNota={LA_NOTA_DEL_MENU}
             alElegir={(o) => {
               cerrarLaHoja();
               void mover({ tipo: o.tipo, carga: o.carga });
@@ -4002,7 +3349,20 @@ export function RiberasEnTres({
                 {/* La niebla empieza detrás del mundo, y del color del cielo: ver `banco3d.tsx`. */}
                 <color attach="background" args={[COLOR_DEL_CIELO]} />
                 <fog attach="fog" args={[COLOR_DEL_CIELO, alcance * 2.6, alcance * 7.5]} />
-                <CamaraAerea alcance={alcance} cercania={cercania} alAcercarse={alAcercarse} aPie={aPie} />
+                {/*
+                  LA CÁMARA ES LA COMÚN, y lo que se le pasa es lo que ella BUSCA: el recuadro del
+                  que cuelga la rueda, las cajas que ruedan por dentro y el velo de lo modal. A pie
+                  se queda montada y CALLADA: ver `callada` en `lienzo-propio.tsx`.
+                */}
+                <CamaraAerea
+                  alcance={alcance}
+                  cercania={cercania}
+                  alAcercarse={alAcercarse}
+                  recuadro={RECUADRO_DEL_LIENZO}
+                  seDesplazanSolas={SE_DESPLAZAN_SOLAS}
+                  velo={EL_VELO}
+                  callada={aPie}
+                />
                 <Delta
                   datos={datos}
                   modelos={modelos}
@@ -4231,6 +3591,8 @@ export function RiberasEnTres({
             titulo={preguntando.titulo}
             opciones={preguntando.opciones}
             quieto={quieto}
+            velo={EL_VELO}
+            menu={EL_MENU}
             alElegir={(o) => {
               cerrarElMenu();
               mover({ tipo: o.tipo, carga: o.carga });
@@ -4267,6 +3629,9 @@ export function RiberasEnTres({
             nota={laTiraAbierta.comoAnda}
             opciones={[laTiraAbierta.aceptar, laTiraAbierta.rechazar].filter((o): o is Opcion => o !== null)}
             quieto={quieto}
+            velo={EL_VELO}
+            menu={EL_MENU}
+            claseDeLaNota={LA_NOTA_DEL_MENU}
             alElegir={(o) => {
               cerrarLaHoja();
               mover({ tipo: o.tipo, carga: o.carga });
@@ -5084,7 +4449,7 @@ export function ElComponedorEnElLienzo({
           —«Hasta 3 fichas por lado, y pueden repetirse de la misma clase»— no cabe dentro y
           se escribe aquí. Sigue siendo la que redacta el juego, palabra por palabra.
         */}
-        <p className="riberas-elige-nota">{componedor.ayuda}</p>
+        <p className={LA_NOTA_DEL_MENU}>{componedor.ayuda}</p>
         <LasTripasDelComponedor
           componedor={componedor}
           ponerPuesto={ponerPuesto}
@@ -5214,157 +4579,6 @@ function ElPregon({
             ),
           )}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// El menú de elegir: a quién, o cuál
-// ---------------------------------------------------------------------------
-
-/**
- * EL MENÚ PEQUEÑO DE UNA PREGUNTA. Rótulo y ayuda son los que escribió el juego en cada
- * opción —ya nombran a quién se le propone el trato, a quién le roba la guardia o qué
- * dos bienes coge el año bueno—, así que aquí no se inventa ni una palabra sobre la
- * jugada: sólo el título, que llega de fuera, y la salida.
- *
- * Es UN componente para las cuatro preguntas y no cuatro casi iguales. La primera
- * versión sólo sabía de trueques y llevaba el título escrito dentro; con las cartas
- * habría hecho falta copiarlo tres veces, y tres copias de un menú son tres sitios donde
- * el día que el botón de «Dejarlo» cambie sólo cambiará uno.
- *
- * `Dejarlo` NO va deshabilitado con `quieto`: cerrar el menú no manda nada, y dejar sin
- * salida a quien lo abrió mientras una petición viaja es encerrarlo delante de una lista
- * de botones apagados.
- *
- * ═══ Y DESDE LA PANTALLA COMPLETA ES MODAL, PORQUE «DEBAJO» DEJÓ DE SER UN SITIO ═══
- *
- * Esto vivía EN FLUJO por debajo del lienzo, y funcionaba mientras el lienzo medía `62vh` y
- * la página rodaba. Con la página de pie el recuadro vale la VENTANA ENTERA menos la
- * cabecera: debajo no hay nada, porque debajo está fuera de la pantalla. O sea que el menú
- * de «a quién le robas» —y el de los quince pares del año bueno, y el de comprar— se pintaba
- * donde no se ve. Y como el estiaje es obligatorio, eso no es una molestia: es la partida
- * parada, sin un error en ninguna consola. En la app su hermano `HojaDeAQuien` ya era modal.
- *
- * Ahora se pinta DENTRO del recuadro con las mismas cuatro mitades que el cajón, y ninguna
- * sobra: el VELO, sin el cual un clic fuera cierra el menú Y funda una choza donde estaba el
- * dedo; `role="dialog"` con `aria-modal` y NOMBRE —que es el título de la pregunta—, sin el
- * cual un lector sigue leyendo el tablero de debajo; la TRAMPA DE FOCO, que es
- * `usarLaTrampaDeFoco`, la misma del cajón y no una copia; y el foco DE VUELTA al cerrar,
- * que lo hace `cerrarElMenu` porque adonde vuelve depende de quién abrió.
- *
- * ═══ Y EN EL RETABLO NO HAY RECUADRO, ASÍ QUE HAY UNA SEGUNDA COLOCACIÓN ═══
- *
- * Todo lo de arriba vale para el lienzo, donde el recuadro es la ventana entera. En la mesa
- * de cinco o de seis no hay lienzo y LA PÁGINA RUEDA: colocada sobre el flujo, la hoja de una
- * propuesta se quedaría centrada en un documento de mil puntos, o sea fuera de la pantalla en
- * cuanto alguien haya bajado a mirar el tablero. Eso es lo que hace `fijo`, que está contado
- * entero en su propio comentario unas líneas más abajo; lo que NO cambia con él es nada de lo
- * de arriba: el mismo velo, el mismo diálogo con nombre, la misma trampa y el mismo `Escape`.
- *
- * `alDejarlo` hace de cerrar en los tres caminos —el botón, el velo y `Escape`—, y eso es a
- * propósito: son la misma decisión dicha de tres maneras, y con tres funciones distintas la
- * que se olvidaría de devolver el foco sería la que menos se prueba.
- */
-function ElijeUna({
-  titulo,
-  nota,
-  opciones,
-  quieto,
-  fijo = false,
-  alElegir,
-  alDejarlo,
-}: {
-  titulo: string;
-  /**
-   * UN RENGLÓN EN TENUE BAJO EL TÍTULO, y hoy lo usa una sola pregunta: la hoja de una
-   * propuesta de trueque, donde dice en qué anda —«la aceptó Ana», «no tienes 1 limo»—.
-   *
-   * Va aquí y no en el título porque el título es además el NOMBRE del diálogo, y meterle
-   * el estado dentro haría que un lector anunciara «Ana te da 1 junco por 1 limo, la aceptó
-   * Ana, diálogo» al abrirlo. Y va opcional porque las otras tres preguntas —a quién le
-   * robas, qué dos bienes, comprar— no tienen estado ninguno que contar: un renglón vacío
-   * ahí sería una caja de más en un modal que ya va justo de alto.
-   */
-  nota?: string;
-  opciones: readonly Opcion[];
-  quieto: boolean;
-  /**
-   * SOBRE LA VENTANA Y NO SOBRE EL RECUADRO, y hace falta porque hay DOS pantallas.
-   *
-   * En el lienzo, este menú se coloca dentro del recuadro (`position: absolute`) porque el
-   * recuadro vale la ventana entera y debajo de él no hay nada. En el RETABLO no hay
-   * recuadro y la página RUEDA: colocado sobre el flujo, la hoja de una propuesta se
-   * quedaría centrada en un documento de mil puntos, o sea fuera de la pantalla en cuanto
-   * alguien haya bajado a mirar el tablero. Con esto se coloca sobre la VENTANA, que es
-   * donde está mirando quien acaba de tocar la tira.
-   *
-   * Y es un parámetro y no un componente aparte por lo mismo que la nota: lo que cambia es
-   * DÓNDE se pinta, no qué es. Un quinto modal casi igual sería el sitio donde la trampa de
-   * foco y el `Escape` se quedan a medias.
-   */
-  fijo?: boolean;
-  alElegir: (o: Opcion) => void;
-  alDejarlo: () => void;
-}): JSX.Element {
-  const caja = useRef<HTMLDivElement | null>(null);
-  usarLaTrampaDeFoco(true, caja, alDejarlo);
-  return (
-    <>
-      <div className={fijo ? `${EL_VELO} ${EL_VELO}-fijo` : EL_VELO} onClick={alDejarlo} aria-hidden="true" />
-      <div
-        ref={caja}
-        className={fijo ? `formulario ${EL_MENU} ${EL_MENU}-fijo` : `formulario ${EL_MENU}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={titulo}
-        tabIndex={-1}
-      >
-        <h2 className="rotulo-de-panel">{titulo}</h2>
-        {nota === undefined ? null : <p className="riberas-elige-nota">{nota}</p>}
-        <ul className="opciones">
-          {opciones.map((o) => (
-            <li key={o.id}>
-              {/*
-                ═══ `aria-disabled` Y NO `disabled`, Y DESDE QUE ESTO ES MODAL IMPORTA MÁS ═══
-
-                Un `<button>` al que se le pone `disabled` TENIENDO EL FOCO lo pierde, y el foco
-                cae al `<body>`. En una lista en flujo eso era molesto; dentro de un modal es
-                escaparse de la trampa: el foco sale de la caja, tabular desde ahí lleva a la
-                cabecera de la Sala y encima hay un diálogo opaco que ya no se puede cerrar con
-                el teclado. Es el mismo razonamiento que `formulario.tsx` escribió para su lista,
-                y aquí vale doble.
-
-                `aria-disabled` lo cuenta igual de bien a un lector de pantalla, conserva el foco
-                donde estaba, y quien ignora el clic es este `onClick`. La pinta de apagado la
-                pone `.opcion-quieta`, que existe para apagar SIN `disabled`.
-              */}
-              <button
-                type="button"
-                className={quieto ? 'opcion opcion-quieta' : 'opcion'}
-                aria-disabled={quieto}
-                title={o.ayuda}
-                onClick={() => {
-                  if (quieto) return;
-                  alElegir(o);
-                }}
-              >
-                <span className="opcion-texto">
-                  <span className="opcion-rotulo">{o.rotulo}</span>
-                  {o.ayuda.length > 0 ? <span className="opcion-ayuda">{o.ayuda}</span> : null}
-                </span>
-              </button>
-            </li>
-          ))}
-          <li>
-            <button type="button" className="opcion opcion-sobria" onClick={alDejarlo}>
-              <span className="opcion-texto">
-                <span className="opcion-rotulo">Dejarlo</span>
-              </span>
-            </button>
-          </li>
-        </ul>
-      </div>
-    </>
   );
 }
 
