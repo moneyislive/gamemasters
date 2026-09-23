@@ -273,16 +273,55 @@ comprobar(
   { ficheros: mirados.length },
 );
 
-const culpables: string[] = [];
-for (const f of mirados) {
-  if (f === RUTA_FIJO) continue;
-  const codigo = soloCodigo(fs.readFileSync(f, 'utf8'));
+/*
+ * ═══ LA ÚNICA FORMA DE DESPLAZAR 16 QUE NO ES COMA FIJA, Y POR QUÉ SE NOMBRA ═══
+ *
+ * `h ^ (h >>> 16)` es el paso final de un revoltillo de 32 bits (el de MurmurHash3): mezcla los
+ * bits altos de UN número con sus bajos, y no multiplica nada. Vivía en `escenas/burgo/ciudad.ts`,
+ * donde este comprobador no miraba, y el día que la traza del Burgo bajó a `shared/` apareció
+ * aquí como culpable. Cambiarle la forma —escribir `0x10`, o partirlo en dos desplazamientos—
+ * habría puesto esto en verde engañándolo, y cambiarle el número habría movido la ciudad que ya
+ * está en producción. Así que la regla aprende EXACTAMENTE ese idioma —el mismo identificador a
+ * los dos lados del `^`, desplazado sin signo— y nada más: un producto desplazado, aunque vaya
+ * dentro de un `^`, sigue siendo culpable. La vacuna de abajo lo exige con muestras.
+ */
+const REVOLTILLO = /\b([A-Za-z_$][\w$]*)\s*\^\s*\(\s*\1\s*>>>\s*16\s*\)/g;
+
+/** ¿Desplaza este código 16 bits por su cuenta, fuera del revoltillo? */
+function desplazaDieciseis(codigo: string): boolean {
   /*
    * Los DOS desplazamientos, no sólo el de la derecha. `(a << 16) / b` es el mismo fallo por
    * el otro lado —pierde los 16 bits altos de `a` antes de dividir— y salió de que romper
    * `entre` a propósito con `<<` dejó esta comprobación en verde.
    */
-  if (/(>>|<<)\s*16/.test(codigo)) culpables.push(path.relative(REPO, f));
+  return /(>>|<<)\s*16/.test(codigo.replace(REVOLTILLO, ''));
+}
+
+const DEBEN_SER_CULPABLES = [
+  'const p = (a * b) >> 16;',
+  'const p = Math.imul(a, b) >> 16;',
+  'const q = (a << 16) / b;',
+  'const p = (v * dt) >>> 16;',
+  'h = h ^ ((a * b) >>> 16);',
+  'x = y ^ (z >>> 16);',
+];
+const NO_SON_CULPABLES = ['return ((h ^ (h >>> 16)) >>> 0) / 4294967296;', 'x = x ^ (x >>> 16);'];
+comprobar(
+  'la regla caza los productos desplazados, también dentro de un `^`',
+  DEBEN_SER_CULPABLES.every(desplazaDieciseis),
+  { seEscapan: DEBEN_SER_CULPABLES.filter((m) => !desplazaDieciseis(m)) },
+);
+comprobar(
+  'y deja pasar sólo el revoltillo de un número consigo mismo',
+  NO_SON_CULPABLES.every((m) => !desplazaDieciseis(m)),
+  { cazados: NO_SON_CULPABLES.filter(desplazaDieciseis) },
+);
+
+const culpables: string[] = [];
+for (const f of mirados) {
+  if (f === RUTA_FIJO) continue;
+  const codigo = soloCodigo(fs.readFileSync(f, 'utf8'));
+  if (desplazaDieciseis(codigo)) culpables.push(path.relative(REPO, f));
 }
 comprobar(
   'y nadie se multiplica su propia coma fija con un desplazamiento',
