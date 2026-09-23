@@ -55,9 +55,9 @@
  * ═══ LO QUE ESTO NO IMPORTA ═══
  *
  * Nada de `app/` (lo vigila `verify:fronteras`) y nada de `drei`. De `escenas/`
- * sólo lo que el contrato exporta —la escena, la lista de figuras y el tema—, más
- * el juez de la calidad, la compuerta y la pregunta de si una mesa es de botas,
- * que son funciones sin `three` que comparte con la app.
+ * sólo lo que el contrato exporta —la tabla de escenas hermanas, la lista de
+ * figuras y el tema—, más el juez de la calidad, la compuerta y la pregunta de si
+ * una mesa es de botas, que son funciones sin `three` que comparte con la app.
  */
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -67,14 +67,13 @@ import { compuertaDeBotas, MARCA_DE_BOTAS, modalidadQueViaja } from '../../escen
 import type { LoQueDiceLaCompuerta, Modalidad } from '../../escenas/compuerta-de-botas';
 import { juzgarCalidad } from '../../escenas/embarcadero/calidad';
 import type { MuestraDelHilo } from '../../escenas/embarcadero/calidad';
-import { Embarcadero } from '../../escenas/embarcadero/Embarcadero';
+/* Cuál de las escenas hermanas monta cada tema: una tabla, la misma que lee la app. */
+import { escenaDelMuelle } from '../../escenas/embarcadero/escenas-del-muelle';
 import { esFigura, FIGURAS, figura as datosDeFigura, figuraQueSePinta } from '../../escenas/embarcadero/figuras';
 import type { FiguraId } from '../../escenas/embarcadero/figuras';
 import type { TemaDelMuelle } from '../../escenas/embarcadero/tema';
 import type { Calidad, MesaEnElMuelle, Traer, Ventana } from '../../escenas/embarcadero/tipos';
 import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
-import { Plaza } from '../../escenas/plaza/Plaza';
-import { LindeAlta } from '../../escenas/linde-alta/LindeAlta';
 import { esLaOpcionDeEmpezar, haEmpezado } from './empezada';
 import { figuraDeEstreno, guardarFigura } from './figura';
 import { elVeredictoDelAparato, guardarElVeredicto } from './mesa';
@@ -334,21 +333,14 @@ export function Muelle({
   // -------------------------------------------------------------------------
 
   /*
-   * CUÁL DE LAS DOS ESCENAS HERMANAS SE MONTA. Las dos cumplen `PropsDelEmbarcadero`, así que
-   * aquí se elige el COMPONENTE y las props se escriben una sola vez: un `if` alrededor del
-   * bloque entero sería el mismo JSX copiado con otro nombre dentro, y el día que el contrato
-   * crezca se arreglaría una de las dos copias. Lo decide el tema, no el nombre del arcade.
+   * CUÁL DE LAS ESCENAS HERMANAS SE MONTA. Todas cumplen `PropsDelEmbarcadero`, así que aquí
+   * se elige el COMPONENTE y las props se escriben una sola vez: un `if` alrededor del bloque
+   * entero sería el mismo JSX copiado con otro nombre dentro, y el día que el contrato crezca
+   * se arreglaría una de las dos copias. Lo decide el tema, no el nombre del arcade, y la tabla
+   * que traduce el nombre a componente —con su respaldo al embarcadero— vive en `escenas/`,
+   * una vez para los dos clientes: estuvo copiada aquí y en la app.
    */
-  /*
-   * ═══ TRES ESCENAS HERMANAS, Y LA TABLA LAS ELIGE POR NOMBRE ═══
-   *
-   * Las tres cumplen `PropsDelEmbarcadero` letra por letra, así que aquí no hay más
-   * que escoger. Un `escena` que esta versión no conozca cae al embarcadero, que es
-   * el que siempre estuvo: un lobby de otro sitio es raro, y una pantalla en blanco
-   * es un fallo.
-   */
-  const ESCENAS = { plaza: Plaza, linde: LindeAlta, embarcadero: Embarcadero } as const;
-  const Escena = ESCENAS[tema.escena] ?? Embarcadero;
+  const Escena = escenaDelMuelle(tema);
   const conMundo = typeof window !== 'undefined' && mundoPedido;
 
   /*

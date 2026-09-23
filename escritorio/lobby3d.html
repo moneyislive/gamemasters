@@ -17,13 +17,16 @@
       es de mentira, con botones para sentar, levantar, vestir, ausentar y zarpar.
       Se abre con `npm run dev -w escritorio` en /sala/lobby3d.html, y acepta
       ?codigo=ABCDE&sentados=3&aspecto=retrato para abrirlo en un estado concreto.
+
+      `src/banco-lobby.tsx` es el banco de TODOS los lobbies con marco y hoja (la plaza del
+      Burgo lo abre desde `plaza3d.html`): `data-lobby` en la raíz dice cuál se pinta.
     -->
     <meta name="viewport" content="width=1024, initial-scale=1.0" />
     <title>Banco de pruebas · el muelle en 3D</title>
     <meta name="theme-color" content="#080a0e" />
   </head>
   <body>
-    <div id="raiz"></div>
+    <div id="raiz" data-lobby="riberas"></div>
     <script type="module" src="/src/banco-lobby.tsx"></script>
   </body>
 </html>

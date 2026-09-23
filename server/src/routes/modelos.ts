@@ -3,17 +3,30 @@
  *
  * ═══ QUÉ ES ESTO Y QUÉ NO ES ═══
  *
- * Seis rutas que entregan ficheros `.glb` (el tablero, los dados y el
- * embarcadero de Riberas, el reloj de la barra, las piezas del Burgo y los
- * aventureros del lobby) y nada más. El servidor NO
- * SABE QUÉ HAY DENTRO: no importa `three`
- * (`server/` no lo tiene), no importa nada de `escenas/`, no abre el fichero para
- * mirarlo. Sirve bytes con el tipo correcto y una caché razonable, como sirve el
- * empaquetado del escritorio en `/sala`, y por la misma razón: el arte vive en el
- * repositorio y viaja con el despliegue. Que la figura de un asiento sea una
- * cadena opaca para la mesa (ver `Silla.figura`) y que aquí no haya una lista de
- * aventureros son la misma decisión vista desde dos sitios: el núcleo del arcade
- * no nombra ningún aspecto, y este fichero tampoco.
+ * Una ruta por cada fichero de nombre fijo (hoy el tablero, el embarcadero y los
+ * dados de Riberas, las piezas del Burgo y el reloj de la barra) más la de los
+ * aventureros del lobby, y nada más. El servidor NO SABE QUÉ HAY DENTRO: no importa
+ * `three` (`server/` no lo tiene), no abre el fichero para mirarlo, y de `escenas/`
+ * sólo lee la LISTA DE NOMBRES que sirve —`MODELOS_DE_NOMBRE_FIJO`, en
+ * `escenas/ruta-de-modelos.ts`, un fichero de cadenas sin un solo `import`—. Sirve
+ * bytes con el tipo correcto y una caché razonable, como sirve el empaquetado del
+ * escritorio en `/sala`, y por la misma razón: el arte vive en el repositorio y viaja
+ * con el despliegue. Que la figura de un asiento sea una cadena opaca para la mesa
+ * (ver `Silla.figura`) y que aquí no haya una lista de aventureros son la misma
+ * decisión vista desde dos sitios: el núcleo del arcade no nombra ningún aspecto, y
+ * este fichero tampoco.
+ *
+ * ═══ POR QUÉ LA LISTA DE NOMBRE FIJO SE LEE DE `escenas/` ═══
+ *
+ * Aquí había cinco manejadores idénticos de siete líneas, uno por fichero, y en el
+ * cliente una función de ruta por fichero: un `.glb` nuevo eran dos altas en dos
+ * paquetes, y con una sola el cliente pedía a una puerta que no existía y este
+ * servidor contestaba 404 sin que nada lo relacionara con el alta a medias. La lista
+ * es UNA, la escriben los que la usan —las escenas—, el cliente compone sus rutas con
+ * ella y este fichero la recorre. Una fila nueva es el alta entera. Lo que NO se ha
+ * movido es quién decide la forma: cada fila se registra como ruta LITERAL y sólo si
+ * tiene forma de nombre de modelo, así que lo que se puede pedir por HTTP sigue siendo
+ * exactamente lo que se ha decidido servir, fichero a fichero.
  *
  * ═══ VA DELANTE DE `requireAuth`, JUNTO A `arcadeRouter` ═══
  *
@@ -55,7 +68,7 @@
  * comprobadores lo levantan en una carpeta temporal— y para que el fallo, si lo
  * hay, no sea «ese fichero no existe» sin decir dónde se buscaba.
  *
- * ═══ LA LISTA BLANCA ES POR FORMA, NO POR NOMBRE ═══
+ * ═══ LA LISTA BLANCA DE LOS AVENTUREROS ES POR FORMA, NO POR NOMBRE ═══
  *
  * `/aventureros/:fichero` acepta sólo `^[a-z0-9-]+\.glb$`: sin más puntos, sin
  * barras, sin mayúsculas, sin `..`. Es la misma gramática que exige la mesa para
@@ -76,6 +89,13 @@
  * una dependencia: un modelo servido como `application/octet-stream` se descarga
  * en vez de cargarse, y no hay error en ningún sitio.
  *
+ * Y el router de Express encamina SIN distinguir mayúsculas ni la barra final:
+ * `TABLERO.GLB` y `tablero.glb/` contestan el tablero, y lo hacían ya cuando cada
+ * fichero tenía su manejador escrito a mano (medido antes de juntarlos: las mismas
+ * 162 peticiones, la misma respuesta). No abre nada, porque el nombre que llega al
+ * disco es el de la fila, nunca el de la dirección; lo que se ha mantenido es no
+ * cambiar ni una dirección que hoy contesta.
+ *
  * ═══ Y SI NO HAY CARPETA, SE CONTESTA 404 Y SE DICE; NO SE REVIENTA ═══
  *
  * `escenas/modelos/aventureros/` puede no existir todavía, y un despliegue sin
@@ -88,6 +108,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'express';
+/* La lista de nombre fijo, una para el cliente y para esto. Ver la cabecera. */
+import { MODELOS_DE_NOMBRE_FIJO } from '../../../escenas/ruta-de-modelos';
 import { crearRouter } from '../rutas';
 
 const router = crearRouter();
@@ -118,8 +140,12 @@ export function carpetaDeLosModelos(): string | undefined {
 
 const carpeta = carpetaDeLosModelos();
 
-/** La forma de un nombre de aventurero. Ver la cabecera: por forma, no por lista. */
-const NOMBRE_DE_AVENTURERO = /^[a-z0-9-]+\.glb$/;
+/**
+ * La forma de un nombre de modelo: minúsculas, dígitos y guiones, acabado en `.glb`. La
+ * tiene que tener un aventurero para que se le busque (por forma, no por lista) y la
+ * tiene que tener cada fila de nombre fijo para registrarse como ruta literal.
+ */
+const FORMA_DE_UN_MODELO = /^[a-z0-9-]+\.glb$/;
 
 /** Más largo que esto no es un nombre: es alguien probando el sistema de ficheros. */
 const LARGO_MAXIMO_DE_NOMBRE = 64;
@@ -176,73 +202,38 @@ function servir(res: Response, raiz: string, fichero: string): void {
   );
 }
 
-/** El tablero. Uno solo, con nombre fijo. */
-router.get('/arcade/modelos/tablero.glb', (_req, res) => {
-  if (carpeta === undefined) {
-    faltaLaCarpeta(res);
-    return;
-  }
-  servir(res, carpeta, 'tablero.glb');
-});
-
 /**
- * El embarcadero: las piezas del lobby, con el color horneado. Nombre fijo
- * también, y ruta propia y no un comodín sobre la carpeta: lo que se puede pedir
- * por HTTP es exactamente lo que se ha decidido servir, fichero a fichero. Ver
- * `escenas/embarcadero/piezas.ts` para qué hay dentro y por qué no es el tablero.
+ * LOS FICHEROS DE NOMBRE FIJO: una ruta LITERAL por fila de `MODELOS_DE_NOMBRE_FIJO`, y un
+ * solo manejador para todas.
+ *
+ * Literal y no `/arcade/modelos/:fichero` con la lista dentro, y no por gusto: con un
+ * parámetro, Express DESCODIFICA el nombre antes de dárselo al manejador, así que
+ * `tablero%2Eglb` pasaría a ser `tablero.glb` y contestaría 200 donde hoy no contesta
+ * nadie; y lo que no está en la lista tendría que decidir aquí qué contestar, en vez de
+ * seguir su camino de siempre hasta el 404 de la API (o el 401 del guardián, en un
+ * despliegue con contraseña). Con una ruta literal por fila, las direcciones que
+ * contestan son las mismas que cuando cada fichero tenía su manejador escrito a mano, y
+ * todo lo demás pasa de largo exactamente igual.
+ *
+ * El manejador recibe el nombre de la FILA, nunca el de la dirección. Una fila sin forma
+ * de nombre de modelo no se registra —un `:` o un `*` dejarían de ser letras en una ruta
+ * de Express— y se dice al arrancar; el arranque sigue, porque un `.glb` mal escrito no
+ * puede dejar fuera a las veladas. `verify:mesa` pide cada fila por el cable y se pone rojo
+ * con la que no contesta.
  */
-router.get('/arcade/modelos/embarcadero.glb', (_req, res) => {
-  if (carpeta === undefined) {
-    faltaLaCarpeta(res);
-    return;
+for (const fichero of MODELOS_DE_NOMBRE_FIJO) {
+  if (!FORMA_DE_UN_MODELO.test(fichero)) {
+    console.error(`[arcade] «${fichero}» no tiene forma de nombre de modelo (${String(FORMA_DE_UN_MODELO)}): no se sirve.`);
+    continue;
   }
-  servir(res, carpeta, 'embarcadero.glb');
-});
-
-/**
- * Los dados de la mesa de Riberas: el D6 de KayKit horneado, unos kB. Fichero
- * APARTE del tablero para que un dado no obligue a recargar cuatro megas y para que
- * su fallo no tumbe el tablero (las pantallas lo piden con su propia red); ruta fija
- * como las otras dos, por lo mismo. Ver `escenas/scripts/compilar-dados.ts`.
- */
-router.get('/arcade/modelos/dados.glb', (_req, res) => {
-  if (carpeta === undefined) {
-    faltaLaCarpeta(res);
-    return;
-  }
-  servir(res, carpeta, 'dados.glb');
-});
-
-/**
- * Las piezas del Burgo: setenta y tantas de siete packs de KayKit, horneadas a color
- * por vértice y ya a escala del mundo, en unos 2,8 MB. Fichero APARTE del embarcadero
- * por lo mismo que los dados —que un arcade no obligue a bajar el arte de otro y que
- * su fallo no lo tumbe— y ruta fija como las otras cuatro: lo que se puede pedir por
- * HTTP es exactamente lo que se ha decidido servir. Ver `escenas/burgo/piezas.ts` para
- * qué hay dentro y `escenas/scripts/compilar-burgo.ts` para cómo se rehace.
- */
-router.get('/arcade/modelos/burgo.glb', (_req, res) => {
-  if (carpeta === undefined) {
-    faltaLaCarpeta(res);
-    return;
-  }
-  servir(res, carpeta, 'burgo.glb');
-});
-
-/**
- * El reloj de arena de la barra: 717 kB con su clip dentro. Fichero APARTE por lo
- * mismo que los dados —que no obligue a recargar el tablero y que su fallo no lo
- * tumbe— y con una razon mas suya: es el unico modelo de este servidor que NO es de
- * dominio publico. Lleva CC-BY-4.0 y obliga a acreditar a su autor, cosa que hace
- * `/creditos`. Ver `escenas/scripts/compilar-reloj.ts`.
- */
-router.get('/arcade/modelos/reloj.glb', (_req, res) => {
-  if (carpeta === undefined) {
-    faltaLaCarpeta(res);
-    return;
-  }
-  servir(res, carpeta, 'reloj.glb');
-});
+  router.get(`/arcade/modelos/${fichero}`, (_req, res) => {
+    if (carpeta === undefined) {
+      faltaLaCarpeta(res);
+      return;
+    }
+    servir(res, carpeta, fichero);
+  });
+}
 
 /**
  * Un aventurero, por nombre de fichero. La lista blanca va ANTES de mirar si
@@ -251,7 +242,7 @@ router.get('/arcade/modelos/reloj.glb', (_req, res) => {
  */
 router.get('/arcade/modelos/aventureros/:fichero', (req, res) => {
   const fichero = String(req.params.fichero ?? '');
-  if (fichero.length > LARGO_MAXIMO_DE_NOMBRE || !NOMBRE_DE_AVENTURERO.test(fichero)) {
+  if (fichero.length > LARGO_MAXIMO_DE_NOMBRE || !FORMA_DE_UN_MODELO.test(fichero)) {
     res.status(404).json({
       error:
         'Un aventurero se pide por un nombre de fichero en minúsculas, dígitos y guiones, ' +
