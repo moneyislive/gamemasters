@@ -224,6 +224,7 @@ import {
   ArcadeFueraDePresupuesto,
   conPresupuesto,
   enCuarentena,
+  exigirLosTopesDelSobre,
   pesarElEstado,
 } from './presupuesto';
 import { admiteBotas } from './modalidades';
@@ -2526,7 +2527,20 @@ export async function mover(
   movimiento: Movimiento,
 ): Promise<VistaDeMesa> {
   /*
-   * EL PREFIJO RESERVADO SE COMPRUEBA ANTES QUE NADA, y antes incluso de coger
+   * ═══ LO PRIMERO, LOS DOS TOPES DEL SOBRE: AQUÍ Y NO SÓLO EN LA RUTA ═══
+   *
+   * `TOPE_TIPO_CARACTERES` y `TOPE_CARGA_BYTES` sólo se exigían en la ruta HTTP y en la de
+   * récords; esta puerta, que es LA puerta, no los miraba, así que cualquier otra que llamara aquí
+   * —el canal de Boots on Board que viene, sin ir más lejos— se los saltaba enteros
+   * (`docs/BOOTS-ON-BOARD.md` §5.1). Se exigen ANTES DEL CANDADO y antes de ejecutar nada del
+   * juego, y fuera del cronómetro: un sobre gordo no hace cola, no toca la mesa y no se le cobra al
+   * arcade. El porqué entero —y por qué con `canonico` y no con `JSON.stringify`— está en
+   * `exigirLosTopesDelSobre`.
+   */
+  exigirLosTopesDelSobre(movimiento);
+
+  /*
+   * EL PREFIJO RESERVADO SE COMPRUEBA JUSTO DESPUÉS, y también antes de coger
    * el candado: un dispositivo no manda movimientos de la plataforma. Ver
    * `MovimientoReservado`, que cuenta lo que costaba no comprobarlo.
    */

@@ -80,6 +80,7 @@ import {
   ArcadeFueraDePresupuesto,
   loMedido,
   losApartados,
+  MovimientoDesmedido,
   TOPE_BYTES,
   TOPE_CARGA_BYTES,
   TOPE_MS,
@@ -173,6 +174,15 @@ function contestarElFallo(error: unknown, res: Response, vista?: VistaDeMesa): b
      * la plataforma.
      */
     res.status(400).json({ error: error.message, motivo: 'movimiento-reservado', tipo: error.tipo });
+    return true;
+  }
+  if (error instanceof MovimientoDesmedido) {
+    /*
+     * 400, y con el motivo de la mesa. Llega aquí cuando el sobre pasa el tope de esta ruta y no el
+     * de la mesa —la ruta cuenta caracteres de `JSON.stringify` y la mesa bytes de la forma
+     * canónica, con su cota de hondura—, o cuando alguien llama a `mover()` por otra puerta.
+     */
+    res.status(400).json({ error: error.message, motivo: error.motivo });
     return true;
   }
   if (error instanceof FiguraMalEscrita) {
@@ -968,6 +978,15 @@ router.post('/arcade/mesas/:codigo/movimientos', contadorDeCodigos, async (req, 
    * lo que luego sería caro. Sobre un cuerpo ya acotado a 256 kB por express su
    * coste es del orden del milisegundo, y si le dan algo que no se puede
    * serializar falla CERRANDO la puerta, que es el lado bueno del que fallar.
+   *
+   * ═══ Y NO ES EL ÚNICO: LA MESA EXIGE LOS MISMOS DOS TOPES ═══
+   *
+   * Estos dos eran los únicos del servidor para esta puerta, y por eso cualquier otra que llamara
+   * a `mover()` se los saltaba. Desde §5.1 de `docs/BOOTS-ON-BOARD.md` la mesa los exige también,
+   * antes del candado y con `canonico` —bytes de la forma canónica y cota de hondura—, así que lo
+   * que se escapa de aquí —cinco mil «ñ» son 5.002 caracteres y 10.002 bytes; cien niveles de
+   * anidamiento no son nada para `stringify`— lo para ella con un `MovimientoDesmedido`, que
+   * `contestarElFallo` convierte en el mismo 400. Éste se queda: corta antes y sin tocar la mesa.
    */
   if (cuerpo.tipo.length > TOPE_TIPO_CARACTERES) {
     res.status(400).json({
