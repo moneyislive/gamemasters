@@ -185,10 +185,11 @@ import { LEJANIA, loCogeLaInterfaz, MINIMO_PARA_GIRAR } from '../camara';
 import { ORDEN_DE_LAS_CARTAS, ORDEN_DE_LAS_CASILLAS } from '../capas';
 import { catalogoDeModelos, MODELO } from '../modelos';
 import type { CatalogoDeModelos } from '../modelos';
-import { rutaDeLosDados, rutaDelBurgo, rutaDelReloj } from '../ruta-de-modelos';
+import { rutaDeLosDados, rutaDelBurgo } from '../ruta-de-modelos';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { GIRO_DEL_RELOJ, RelojDeArena, VACIADO_DEL_RELOJ } from '../reloj';
-import type { RelojCargado } from '../reloj';
+import { relojDe } from '../comun/reloj';
+import type { RelojCargado } from '../comun/reloj';
 import {
   ARISTA_DEL_D6_EN_EL_PACK,
   COLOR_DEL_NUMERO,
@@ -1102,30 +1103,16 @@ function pintaElFieltro(caja: THREE.BufferGeometry, hex: string): void {
 }
 
 /*
- * EL RELOJ DE ARENA DE RIBERAS, cargado para la calidad plena. En la sobria no se pide: pesa veinte mil
- * triángulos y un móvil no los tiene; allí se pinta el reloj de conos de `escenas/reloj.tsx`, que cuenta
- * lo mismo.
+ * EL RELOJ DE ARENA DE RIBERAS se trae con `relojDe`, el cargador común (`comun/reloj.ts`), y sólo en la
+ * calidad plena: pesa veinte mil triángulos y un móvil no los tiene, así que en la sobria no se pide y la
+ * caja se queda con el asa, que es lo que cuenta su presupuesto.
  *
- * SI NO LLEGA NO SE AVISA POR `alFallar`, y es a propósito: el escritorio del Burgo manda la partida
- * entera al tablero dibujado con cualquier aviso de ésos, y un fichero de arte que no llega no puede
- * tirar el anillo. Se pinta el de conos y se dice por consola, que es el trato que le da Riberas
- * (`traerElRelojConSuClip`, en `riberas-en-tres.tsx`): un respaldo mudo es un fallo que nadie ve.
+ * Aquí hubo una copia suya, `relojDelBurgoDe`, con su propia caché contra el mismo `traer` —el mismo
+ * fichero bajado dos veces si el cliente pasaba de Las Lindes al Burgo— y un aviso que decía «se pinta
+ * el de conos» cuando el reloj de conos ya no existía. El trato es el de siempre y está escrito allí: si
+ * no llega NO se avisa por `alFallar` —el escritorio del Burgo mandaría la partida entera al tablero
+ * dibujado por un fichero de arte—, se dice por consola.
  */
-const relojesDelBurgo = new WeakMap<Traer, Promise<RelojCargado | null>>();
-function relojDelBurgoDe(traer: Traer): Promise<RelojCargado | null> {
-  const hecho = relojesDelBurgo.get(traer);
-  if (hecho !== undefined) return hecho;
-  const promesa = traer(rutaDelReloj())
-    .then((bytes) => abrirGlb(bytes))
-    .then((gltf): RelojCargado => ({ escena: gltf.scene, clips: gltf.animations }))
-    .catch((fallo: unknown): null => {
-      relojesDelBurgo.delete(traer);
-      console.warn(`El reloj de arena no ha llegado (${rutaDelReloj()}: ${fallo instanceof Error ? fallo.message : String(fallo)}): se pinta el de conos.`);
-      return null;
-    });
-  relojesDelBurgo.set(traer, promesa);
-  return promesa;
-}
 
 /** Pinta la acera de una casilla con su color, apagado al tanto que se diga (1 = entera). */
 function pintaLaAcera(suelo: Suelo, casilla: CasillaEn3D, luminancia: number): void {
@@ -1201,7 +1188,7 @@ const SIN_SUELO = (): number => 0;
 /**
  * SI LA FIGURA DE QUIEN ANDA NO LLEGA, SE DICE Y SE SIGUE ANDANDO. No por `alFallar`: el escritorio
  * manda la partida entera al tablero dibujado con cualquier aviso de ésos, y una figura que no
- * baja no puede tirar el anillo —es el mismo trato que el reloj de arena, `relojDelBurgoDe`—. Se
+ * baja no puede tirar el anillo —es el mismo trato que el reloj de arena, `relojDe`—. Se
  * anda sin verla, que es lo que ya pasa en primera persona. A nivel de módulo para ser la misma
  * función siempre: `QuienAnda` vuelve a pedir la figura si cambia.
  */
@@ -1431,13 +1418,13 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   /*
    * ─ EL RELOJ DE ARENA. ─ El de Riberas en la calidad plena, clonado, normalizado a una unidad de alto
    * y con sus dos montones medidos por dónde están —el de arriba tiene el centro más alto—; en la
-   * sobria, los conos de `escenas/reloj.tsx`. Lo mueve el `useFrame` de la escena: la arena con la
+   * sobria, el asa y nada más. Lo mueve el `useFrame` de la escena: la arena con la
    * fracción de turno, el giro al cambiar de turno y el vaciado de golpe al pasarlo.
    */
   const [modeloDelReloj, ponerModeloDelReloj] = useState<RelojCargado | null>(null);
   useEffect(() => {
     if (!plena) return;
-    void relojDelBurgoDe(traer).then((m) => {
+    void relojDe(traer).then((m) => {
       if (vivo.current) ponerModeloDelReloj(m);
     });
   }, [plena, traer]);

@@ -3178,23 +3178,40 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
    * en UNA llamada —medido en el banco, sueltos subían la escena de 117 a 207 llamadas con un tope de
    * 150— y, si no llega, no se avisa por `alFallar`: el escritorio mandaría la partida al tablero dibujado
    * por un fichero de arte.
+   *
+   * La carga es la COMÚN, `relojDe` de `comun/reloj.ts`: el Burgo tuvo su copia, `relojDelBurgoDe`, con
+   * su caché y su aviso, y se fue. Así que lo que se mira es que la escena la use —y no traiga otra— y que
+   * el cargador común, que es donde vive el trato del 404, lo diga por consola y no llame a ningún aviso.
    */
-  const relojBienMontado = (codigo: string): boolean => {
-    const carga = /function relojDelBurgoDe\(traer: Traer\): Promise<RelojCargado \| null> \{([\s\S]*?)\n\}/.exec(codigo)?.[1] ?? null;
+  const codigoDelCargadorDelReloj = sinComentarios(fs.readFileSync(path.join(RAIZ, 'comun', 'reloj.ts'), 'utf8'));
+  const relojBienMontado = (codigo: string, cargador: string): boolean => {
+    const carga = /export function relojDe\(traer: Traer\): Promise<RelojCargado \| null> \{([\s\S]*?)\n\}/.exec(cargador)?.[1] ?? null;
     return (
       carga !== null &&
+      /console\.warn\(/.test(carga) &&
       !/alFallar|falla\(/.test(carga) &&
-      /relojDelBurgoDe\(traer\)\.then/.test(codigo) &&
+      /import \{ relojDe \} from '\.\.\/comun\/reloj';/.test(codigo) &&
+      /\brelojDe\(traer\)\.then/.test(codigo) &&
+      !/WeakMap<Traer, Promise<RelojCargado/.test(codigo) &&
+      !/\brutaDelReloj\(/.test(codigo) &&
       /tamano\.y \/ ENVOLVENTE_DEL_RELOJ\.alto, Math\.max\(tamano\.x, tamano\.z\) \/ \(2 \* ENVOLVENTE_DEL_RELOJ\.radio\)/.test(codigo) &&
       /new THREE\.InstancedMesh\(primero\.geometry, primero\.material, granos\.length\)/.test(codigo) &&
       /for \(const g of granos\) g\.visible = false;/.test(codigo) &&
       /chorro\.setMatrixAt\(k, auxMatriz\.multiplyMatrices\(nodo\.matrix, g\.matrix\)\)/.test(codigo)
     );
   };
-  comprobar('el reloj de Riberas se normaliza al cilindro de la caja, pinta sus cincuenta granos en una llamada y, si no llega, no tumba el anillo', relojBienMontado(codigoDelBurgo));
   comprobar(
-    'se ve fallar: con el reloj que no llega avisado por alFallar, o con los granos sueltos, cae',
-    !relojBienMontado(codigoDelBurgo.replace(/(function relojDelBurgoDe\(traer: Traer\): Promise<RelojCargado \| null> \{[\s\S]*?)console\.warn\(/, '$1alFallar(')) && !relojBienMontado(codigoDelBurgo.replace('for (const g of granos) g.visible = false;', '')),
+    'el reloj de Riberas se trae con el cargador común, se normaliza al cilindro de la caja, pinta sus cincuenta granos en una llamada y, si no llega, no tumba el anillo',
+    relojBienMontado(codigoDelBurgo, codigoDelCargadorDelReloj),
+  );
+  comprobar(
+    'se ve fallar: con el reloj que no llega avisado por alFallar, con los granos sueltos o con un cargador propio otra vez en la escena, cae',
+    !relojBienMontado(codigoDelBurgo, codigoDelCargadorDelReloj.replace('console.warn(', 'alFallar(')) &&
+      !relojBienMontado(codigoDelBurgo.replace('for (const g of granos) g.visible = false;', ''), codigoDelCargadorDelReloj) &&
+      !relojBienMontado(
+        `${codigoDelBurgo.replace('relojDe(traer).then', 'relojDelBurgoDe(traer).then')}\nconst relojesDelBurgo = new WeakMap<Traer, Promise<RelojCargado | null>>();\nfunction relojDelBurgoDe(traer: Traer): Promise<RelojCargado | null> { return traer(rutaDelReloj()).then(() => null); }`,
+        codigoDelCargadorDelReloj,
+      ),
   );
   /*
    * `RelojDelBurgo` (`tipos.ts`) ES `RelojDeLaMesa` (`reloj.tsx`) CAMPO A CAMPO. Está escrito dos veces

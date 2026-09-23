@@ -120,10 +120,10 @@ import {
   RelojDeArena,
   montarElReloj,
   ponerLaArena,
-  relojDe,
   soltarElReloj,
 } from '../reloj';
-import type { RelojCargado } from '../reloj';
+import { relojDe } from '../comun/reloj';
+import type { RelojCargado } from '../comun/reloj';
 import { MODELO } from '../nombres';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
