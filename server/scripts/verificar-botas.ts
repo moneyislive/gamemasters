@@ -488,10 +488,11 @@ class Monton {
 /**
  * UN CAMINO LARGO: A* sobre la misma rejilla de una unidad que `camino`, con sus ocho vecinos y cada
  * tramo con su recta libre. La búsqueda en anchura se queda corta para lo que separa dos sitios de
- * nacer —de 36 unidades en la glorieta del Burgo a más de 130 en Riberas—. Devuelve los puntos
- * DESPUÉS de `desde`, acabando exactamente en `hasta`; `null` si no lo encuentra.
+ * nacer —de 36 unidades en la glorieta del Burgo a más de 130 en Riberas, y en Las Lindes quien
+ * renace en su losa puede quedar a 450—. Devuelve los puntos DESPUÉS de `desde`, acabando
+ * exactamente en `hasta`; `null` si no lo encuentra en ±`limite` unidades.
  */
-function caminoLargo(arena: Arena, desde: Andante, hasta: Andante, limite = 320, presupuesto = 600_000): Andante[] | null {
+function caminoLargo(arena: Arena, desde: Andante, hasta: Andante, limite = 900, presupuesto = 3_000_000): Andante[] | null {
   const PASO = U;
   const R = RADIO_DEL_PASEANTE;
   const ancho = 2 * limite + 1;
