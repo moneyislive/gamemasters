@@ -539,11 +539,27 @@ const BATERIA = [
       'lo que manda un aparato llega de un entorno hostil, y el lector del servidor devuelve null ante cualquier cosa que no sea exactamente un mensaje bien formado —una clave de más, un número con decimales, una coordenada fuera de la coma fija, un rumbo o una marcha fuera de rango, un texto más largo que el tope—; el del aparato, igual con lo que manda el servidor; la ruta cuelga de la mesa bajo /api y la llave NO va en ella',
   },
   {
+    nombre: 'la sala de Boots on Board',
+    donde: 'server',
+    guion: 'verify:sala-de-botas',
+    lento: true,
+    porque:
+      'la sala del canal con el reloj en la mano: el `hola` en su plazo, la llave, la mesa en `botas` y recorrible, un canal por asiento, el presupuesto de distancia con su tope de un segundo, la estructura con la escuadra de un tic, lo que viene de camino tras corregir, el cubo, el quieto, la gracia, una foto por sala sin asiento repetido y un solo temporizador que se para sin salas, el mundo que cambia debajo de alguien, derivar mundos por turno con abrir delante, una subida que revienta sin tirar el servidor, y SIGTERM con el montaje de verdad cerrando con 1001 dentro de la despedida',
+  },
+  {
+    nombre: 'Boots on Board de punta a punta',
+    donde: 'server',
+    guion: 'verify:botas',
+    lento: true,
+    porque:
+      'un servidor de verdad con una mesa de Las Lindes en `botas`: dos aparatos `ws` entran donde se puede estar, un paseo legal se acepta entero y lo ve el otro, el teletransporte, la muralla de verdad y correr de más se corrigen, los cierres llevan su código del contrato, otras rutas 404 y un origen ajeno 403, y la llave no sale nunca en lo que escribe el servidor',
+  },
+  {
     nombre: 'el botín de la refriega',
     donde: 'server',
     guion: 'verify:botin',
     porque:
-      'el botín es el único movimiento, además del tic, que entra en una mesa en nombre de nadie, y mueve cosas de valor de un asiento a otro: su lector dice que no a todo lo que llegue con un asiento detrás, a un botín de uno a sí mismo, a un asiento que no está sentado y a una clave de más',
+      'el botín es el único movimiento, además del tic, que entra en una mesa en nombre de nadie, y mueve cosas de valor de un asiento a otro: su lector dice que no a todo lo que llegue con un asiento detrás, a un botín de uno a sí mismo, a un asiento que no está sentado y a una clave de más; y cada juego del registro de mundos tiene su prueba jugada de verdad —se lleva lo que dice su regla y a quien la dice, sin mover el turno, el momento ni los plazos, sin nada que llevarse devuelve el mismo estado, y en sus momentos delicados (el descarte de Riberas, la subasta y el apuro del Burgo) no deja la partida atascada—',
   },
   {
     nombre: 'el mundo de Riberas',
@@ -557,7 +573,7 @@ const BATERIA = [
     donde: 'server',
     guion: 'verify:lindes-mundo',
     porque:
-      'el mundo de Las Lindes sale del reparto de verdad, bajado a `shared/`: canoniza; estorban la muralla, las torres, la villa, la ermita y lo que se levanta en el campo, con la huella MEDIDA de cada modelo en `tablero.glb` —se vuelve a medir y se exigen los mismos números— y ni una caja de trigal, barbecho o nada menudo; se nace en senda o prado donde se puede estar; quien va derecho contra un lienzo se queda en su lado —y sin él cruzaría— y por el hueco de una puerta se pasa —y cerrada no—; y el mismo tablero da el mismo mundo y el mismo paseo en Node y en Hermes, con suelos de choques contra cuerpo y contra borde',
+      'el mundo de Las Lindes sale del reparto de verdad, bajado a `shared/`: canoniza; estorban la muralla, las torres, la villa, la ermita y lo que se levanta en el campo, con la huella MEDIDA de cada modelo en `tablero.glb` —se vuelve a medir y se exigen los mismos números— y ni una caja de trigal, barbecho o nada menudo, salvo las piedras, rocas y tocones que pasan de la cintura, que estorban con su radio medido sin tapar una senda, el hueco de una puerta ni un sitio de nacer, ni partir el valle; se nace en senda o prado donde se puede estar; quien va derecho contra un lienzo se queda en su lado —y sin él cruzaría— y por el hueco de una puerta se pasa —y cerrada no—; y el mismo tablero da el mismo mundo y el mismo paseo en Node y en Hermes, con suelos de choques contra cuerpo y contra borde',
   },
   {
     nombre: 'marcador',
