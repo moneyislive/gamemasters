@@ -18,11 +18,19 @@
  * ═══ SIN `three`, A PROPÓSITO ═══
  *
  * Aritmética y constantes. Lo lee `verify:embarcadero` en Node.
+ *
+ * ═══ LO QUE NO ES SÓLO DEL MUELLE ESTÁ EN `comun/presupuesto.ts` ═══
+ *
+ * El renglón, la cuenta de una esfera y el tope, que es el de cualquier LOBBY y no sólo el de este:
+ * la Plaza lo llevaba copiado con el mismo número y por el mismo motivo. Aquí se queda lo que pone
+ * el muelle.
  */
+import { TOPE_DE_UN_LOBBY, triangulosDeUnaEsfera } from '../comun/presupuesto';
+import type { RenglonDelPresupuesto } from '../comun/presupuesto';
 
-/** El tope del §2, con seis sentados y en calidad plena. */
-export const TOPE_DE_TRIANGULOS = 110_000;
-export const TOPE_DE_LLAMADAS = 70;
+/** El tope del §2, con seis sentados y en calidad plena: el de un lobby. */
+export const TOPE_DE_TRIANGULOS = TOPE_DE_UN_LOBBY.triangulos;
+export const TOPE_DE_LLAMADAS = TOPE_DE_UN_LOBBY.llamadas;
 
 /* ────────────────────────────────── El mar ────────────────────────────────── */
 
@@ -62,9 +70,9 @@ export function triangulosDelMar(
 export const RADIO_DEL_CIELO = 700;
 export const SEGMENTOS_DEL_CIELO = { ancho: 24, alto: 12 } as const;
 
-/** Los triángulos de una `SphereGeometry(ancho, alto)`: los casquetes son abanicos. */
+/** Los triángulos de la cúpula, que es una `SphereGeometry(ancho, alto)`. */
 export function triangulosDelCielo(ancho = SEGMENTOS_DEL_CIELO.ancho, alto = SEGMENTOS_DEL_CIELO.alto): number {
-  return ancho * 2 + (alto - 2) * ancho * 2;
+  return triangulosDeUnaEsfera(ancho, alto);
 }
 
 /* ────────────────────────── Faroles, norays y discos ────────────────────────── */
@@ -84,7 +92,7 @@ export function triangulosDeLaEsfera(
   ancho = SEGMENTOS_DE_LA_ESFERA.ancho,
   alto = SEGMENTOS_DE_LA_ESFERA.alto,
 ): number {
-  return ancho * 2 + (alto - 2) * ancho * 2;
+  return triangulosDeUnaEsfera(ancho, alto);
 }
 
 /* ─────────────────────────────── Lo que flota ─────────────────────────────── */
@@ -97,12 +105,6 @@ export const MOTAS_DE_HUMO = 28;
 export const BRUMAS = 6;
 
 /* ─────────────────────────── La suma, en un solo sitio ─────────────────────────── */
-
-export interface RenglonDelPresupuesto {
-  readonly que: string;
-  readonly cuantos: number;
-  readonly triangulos: number;
-}
 
 /**
  * LO QUE LA ESCENA PONE ADEMÁS DE LA CALA, con seis sentados y calidad plena.

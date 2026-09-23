@@ -12,15 +12,16 @@
  * arrastrar el motor de dibujo, y acabaría con una copia que el día menos pensado ya no
  * es la misma. Se declaran aquí, sin `three`, y los dos lados los importan.
  *
- * ═══ EL TOPE ES EL DEL MUELLE, Y ESO ES UNA DECISIÓN ═══
+ * ═══ EL TOPE ES EL DE UN LOBBY, Y ESO ES UNA DECISIÓN ═══
  *
- * 110.000 triángulos y 70 llamadas con seis sentados, los mismos que
- * `embarcadero/presupuesto.ts`. NO son los del tablero del Burgo (900.000 y 150): el
- * tablero es una ciudad de 2.916 celdas que se mira desde 570 unidades y se monta por
- * niveles de detalle; esto es un lobby que tiene que abrir en un móvil ANTES de la
- * partida, con la misma exigencia que el lobby de Riberas. Se declara aquí y no se
- * importa del Muelle porque son dos escenas distintas y `escenas/embarcadero/*` no se
- * toca; que sean el mismo número es una coincidencia con motivo, no una dependencia.
+ * 110.000 triángulos y 70 llamadas con seis sentados, los mismos que el Muelle. NO son los
+ * del tablero del Burgo (900.000 y 150): el tablero es una ciudad de 2.916 celdas que se
+ * mira desde 570 unidades y se monta por niveles de detalle; esto es un lobby que tiene que
+ * abrir en un móvil ANTES de la partida, con la misma exigencia que el lobby de Riberas.
+ * Estuvo escrito aquí a mano, «una coincidencia con motivo, no una dependencia»; el motivo es
+ * ser un lobby, y ahora tiene nombre y un solo sitio: `TOPE_DE_UN_LOBBY` en
+ * `comun/presupuesto.ts`, junto con el renglón y la cuenta de las piezas, que también eran
+ * copias.
  *
  * ═══ DÓNDE SE VA EL PRESUPUESTO, MEDIDO ═══
  *
@@ -32,12 +33,14 @@
  * suma las dos cosas con los triángulos del `.glb` de verdad y con la peor semilla de
  * las que prueba, no con la media.
  */
+import { TOPE_DE_UN_LOBBY, renglonesDeLasPiezas, sumaDeLosRenglones, triangulosDeUnaEsfera } from '../comun/presupuesto';
+import type { RenglonDelPresupuesto } from '../comun/presupuesto';
 import type { Calidad } from '../embarcadero/tipos';
 import type { LaPlaza } from './la-plaza';
 
-/** El tope, con seis sentados y en calidad plena. */
-export const TOPE_DE_TRIANGULOS = 110_000;
-export const TOPE_DE_LLAMADAS = 70;
+/** El tope, con seis sentados y en calidad plena: el de un lobby. */
+export const TOPE_DE_TRIANGULOS = TOPE_DE_UN_LOBBY.triangulos;
+export const TOPE_DE_LLAMADAS = TOPE_DE_UN_LOBBY.llamadas;
 
 /** Cuántos puestos hay, que es cuántos aventureros caben. */
 export const ASIENTOS = 6;
@@ -67,24 +70,14 @@ export const MOTAS = 240;
 /** El humo del cambio de figura, por aventurero. Puntos, como en el Muelle. */
 export const MOTAS_DE_HUMO = 14;
 
-/** Los triángulos de una `SphereGeometry(ancho, alto)`: los casquetes son abanicos. */
-export function triangulosDeLaEsfera(ancho: number, alto: number): number {
-  return ancho * 2 + (alto - 2) * ancho * 2;
-}
 export function triangulosDelCielo(ancho = SEGMENTOS_DEL_CIELO.ancho, alto = SEGMENTOS_DEL_CIELO.alto): number {
-  return triangulosDeLaEsfera(ancho, alto);
+  return triangulosDeUnaEsfera(ancho, alto);
 }
 export function triangulosDeLaBombilla(): number {
-  return triangulosDeLaEsfera(SEGMENTOS_DE_LA_BOMBILLA.ancho, SEGMENTOS_DE_LA_BOMBILLA.alto);
+  return triangulosDeUnaEsfera(SEGMENTOS_DE_LA_BOMBILLA.ancho, SEGMENTOS_DE_LA_BOMBILLA.alto);
 }
 
 /* ───────────────────────────── La suma de triángulos ───────────────────────────── */
-
-export interface RenglonDelPresupuesto {
-  readonly que: string;
-  readonly cuantos: number;
-  readonly triangulos: number;
-}
 
 /**
  * LO QUE PESA UNA PLAZA CON `sentados` AVENTUREROS, renglón a renglón.
@@ -104,14 +97,7 @@ export function renglonesDeLaPlaza(
 ): { readonly renglones: readonly RenglonDelPresupuesto[]; readonly total: number; readonly desconocidas: readonly string[] } {
   const cuenta = new Map<string, number>();
   for (const p of piezasPintadas) cuenta.set(p.pieza, (cuenta.get(p.pieza) ?? 0) + 1);
-  const renglones: RenglonDelPresupuesto[] = [];
-  const desconocidas: string[] = [];
-  for (const pieza of [...cuenta.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
-    const cuantos = cuenta.get(pieza) ?? 0;
-    const t = triangulosDe(pieza);
-    if (t === undefined) desconocidas.push(pieza);
-    renglones.push({ que: pieza, cuantos, triangulos: cuantos * (t ?? 0) });
-  }
+  const { renglones, desconocidas } = renglonesDeLasPiezas(cuenta, triangulosDe);
   const bultos = plaza.bultos.reduce((s, b) => s + b.triangulos, 0);
   const bandera = triangulosDe('bandera') ?? 0;
   const plena = plaza.calidad === 'plena';
@@ -122,7 +108,7 @@ export function renglonesDeLaPlaza(
   renglones.push({ que: 'discos de contacto', cuantos: sentados, triangulos: sentados * SEGMENTOS_DEL_DISCO });
   renglones.push({ que: 'la cúpula del cielo', cuantos: 1, triangulos: triangulosDelCielo() });
   renglones.push({ que: `aventureros (${plena ? 'plena' : 'sobria'})`, cuantos: sentados, triangulos: sentados * triangulosDeUnAventurero });
-  return { renglones, total: renglones.reduce((s, r) => s + r.triangulos, 0), desconocidas };
+  return { renglones, total: sumaDeLosRenglones(renglones), desconocidas };
 }
 
 /* ───────────────────────────── Las llamadas de dibujo ───────────────────────────── */
