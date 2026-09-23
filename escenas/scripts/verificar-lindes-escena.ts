@@ -26,6 +26,10 @@
  *     REALES de cada modelo —leídos del `.glb`, no estimados—, el tablero cabe.
  *  7. Y EL LOBBY: cinco sitios en corro, nadie dentro de una piedra, y nada sembrado
  *     en el pasillo por el que mira la cámara.
+ *  8. Y LO QUE DEL PASEO ES DE ESTE VALLE: que la escena anda con el paseo común y no con
+ *     uno suyo, que nace donde declara su mundo y con sitio alrededor, y que la figura se
+ *     pinta a la altura del suelo que se dibuja. El paseo en sí —tics, choques, mandos,
+ *     marioneta— lo mide `verify:paseo`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,9 +58,12 @@ import {
 import {
   alturaDe,
   CELDAS_MINIMAS_DE_MURO,
+  centroDeCelda,
   LO_QUE_NO_SE_RECORTA,
   montarLaLosa,
   murallasDeLaLosa,
+  queHayEn,
+  semillaDeLaLosa,
   sueloDeLaLosa,
 } from '../lindes/losa';
 import type { CeldaDeSuelo, PorQueEsta } from '../lindes/losa';
@@ -87,16 +94,21 @@ import {
   sitiosDeLaLinde,
 } from '../linde-alta/la-linde';
 import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
+/*
+ * Las cámaras de a pie y el giro de la marioneta se miden en su casa de ahora, el paseo común:
+ * `lindes/paseo.ts` las reexporta, pero lo que se vigila es lo que se usa, no el cartel.
+ */
+import { ALTURA_DE_LOS_OJOS, SOBRE_EL_HOMBRO, camaraDeHombro, giroDeLaMarioneta } from '../paseo/camaras';
 import {
-  ALTURA_DE_LOS_OJOS,
-  SOBRE_EL_HOMBRO,
-  camaraDeHombro,
+  alcanceDeLaArena,
+  alturaDeLaCamara,
+  alturaDelSuelo,
   camaraDeMesa,
-  giroDeLaMarioneta,
+  dondeNaceQuienPasea,
   loQueAbarca,
-  nacerEn,
-  nacerEnLaLosa,
+  losasPorCasilla,
 } from '../lindes/paseo';
+import { mundoDeLasLindes } from '../../shared/arcade/juegos/lindes-mundo';
 import {
   ALTO_DE_LA_CAJA_DEL_RELOJ,
   DISTANCIA_DE_LA_MANO,
@@ -1080,6 +1092,65 @@ paso('El paseo: la tercera persona va detrás de ALGUIEN, y en primera no se pin
     'y le dice cuándo está en primera persona, que es cuando la cámara va dentro de su cabeza',
     /enPrimeraPersona=\{camara\.modo === 'ojos'\}/.test(laEscena),
   );
+  comprobar(
+    'y la figura lee la pose que escribe el paseo, no un paseante propio de la escena',
+    /pose=\{paseo\.pose\}/.test(escenaSinComentarios),
+  );
+
+  /*
+   * ═══ Y SE ANDA CON EL PASEO COMÚN, NO CON UNO PROPIO ═══
+   *
+   * BOOTS-ON-BOARD §6.1 lo dejó escrito antes de que pasara: el paso con choques se escribe en
+   * `shared/mecanicas/andar.ts`, git lo fusiona tan contento con el `unPaso` de siempre, los
+   * comprobadores siguen en verde, y `Lindes.tsx` sigue llamando al viejo —uno por fotograma,
+   * en coma flotante, sin radio, parando sólo en el borde—: el único juego que se puede andar
+   * atravesando murallas. Se mira en el FUENTE sin comentarios, porque es lo único que hay sin
+   * WebGL, y se mira por las tres marcas del camino viejo y las dos del nuevo.
+   */
+  const elPaseoDeLasLindes = fs.readFileSync(new URL('../lindes/paseo.ts', import.meta.url), 'utf8');
+  comprobar(
+    'la escena anda con el paseo común (`usarElPaseo`), que da el paso de `shared/` por tics',
+    /\busarElPaseo\(\{/.test(escenaSinComentarios),
+  );
+  comprobar(
+    'y le da el mundo de Las Lindes, derivado de las mismas losas y la misma semilla que el paisaje',
+    /mundoDeLasLindes\(tablero\.losas, semilla\)/.test(escenaSinComentarios) &&
+      /const semilla = useMemo\(\(\) => semillaDelCodigo\(codigo, 0x5eed\), \[codigo\]\)/.test(escenaSinComentarios),
+  );
+  /*
+   * Y SÓLO A PIE: derivar el mundo de un tablero lleno cuesta lo que montar su paisaje otra vez
+   * —entre 210 y 345 ms en Node, medido—, y mirando la mesa, que es casi toda la partida, no lo
+   * usa nadie. Sin la condición, cada losa puesta lo pagaría en todos los aparatos de la mesa.
+   */
+  comprobar(
+    'y lo deriva sólo mientras se anda: en la mesa no se paga',
+    /aPie \? mundoDeLasLindes\(tablero\.losas, semilla\) : null/.test(escenaSinComentarios) &&
+      /const aPie = camara\.modo !== 'mesa';/.test(escenaSinComentarios),
+  );
+  comprobar(
+    'y ya no da el paso viejo: ni `unPaso(`, ni `hayLosaEn(`, ni un `Set` de casillas puestas',
+    !/\bunPaso\(/.test(escenaSinComentarios) &&
+      !/\bhayLosaEn\(/.test(escenaSinComentarios) &&
+      !/new Set\(tablero\.losas/.test(escenaSinComentarios),
+    {
+      unPaso: /\bunPaso\(/.test(escenaSinComentarios),
+      hayLosaEn: /\bhayLosaEn\(/.test(escenaSinComentarios),
+    },
+  );
+  comprobar(
+    'y `lindes/paseo.ts` no guarda un segundo paso que alguien pueda volver a llamar',
+    !/export function unPaso\b/.test(elPaseoDeLasLindes) && !/export function hayLosaEn\b/.test(elPaseoDeLasLindes),
+  );
+  comprobar(
+    'y nace donde declara el mundo, en la última losa puesta (`dondeNaceQuienPasea`)',
+    /dondeNaceQuienPasea\(tablero\.losas, mundo\)/.test(escenaSinComentarios),
+  );
+  comprobar(
+    'y le dice al paseo a qué altura pisa y en cuál se apoya la cámara, con las cuentas medidas abajo',
+    /alturaDelSuelo\(porCasilla, x, z\)/.test(escenaSinComentarios) &&
+      /alturaDeLaCamara\(porCasilla, x, z\)/.test(escenaSinComentarios) &&
+      /\balturaDeLaCamaraEn,/.test(escenaSinComentarios),
+  );
 }
 
 
@@ -1098,6 +1169,15 @@ paso('Quien pasea no nace dentro de una casa');
  *
  * Se barre el mazo entero con sus cuatro giros, que son noventa y seis paisajes, y se
  * mide la holgura: la distancia de donde nace a la pieza levantada más cercana.
+ *
+ * ═══ SE MIDE EL SITIO QUE USA LA ESCENA, NO UNA CUENTA DE AL LADO ═══
+ *
+ * Hasta el paseo común esto medía `nacerEnLaLosa`, porque era lo que la escena llamaba.
+ * Ahora la escena nace donde DECLARA EL MUNDO —`mundoDeLasLindes(losas, semilla).nace[i]`,
+ * con `dondeNaceQuienPasea` eligiendo la `i`—, y seguir midiendo la cuenta vieja habría sido
+ * vigilar un camino que ya no se recorre: verde encima de un paseante naciendo en una casa.
+ * Así que se mide el sitio declarado, con la misma vara y la misma vacuna, y con la losa
+ * montada con la semilla que le toca en la mesa, que es la que decide qué casas se ven.
  */
 {
   const holguraEn = (
@@ -1111,11 +1191,42 @@ paso('Quien pasea no nace dentro de una casa');
   };
 
   /*
+   * ═══ «LO MÁS CERCANO» ES EL PUNTO MÁS CERCANO DE CUALQUIER COSA ═══
+   *
+   * El centro de cada pieza, como siempre, y desde que el mundo tiene cuerpos, el punto más
+   * cercano de cada caja. Con sólo los centros, un lienzo de muralla contaba por su centro, a
+   * veinte unidades de su propia cara: medido al estrenar los cuerpos, en cuatro losas del mazo
+   * —la ermita, la calle, la calle con blasón y las dos murallas enfrentadas— la cara del muro
+   * quedaba a la espalda de quien nace y un árbol más lejano delante, y la cuenta de centros lo
+   * leía como «mirando al bulto». Con las cajas no sale ninguna, y del revés salen las 96: la
+   * vacuna de abajo lo exige.
+   */
+  const loMasCerca = (
+    x: number,
+    z: number,
+    puestas: readonly { readonly x: number; readonly z: number }[],
+    cajas: readonly { readonly x0: number; readonly z0: number; readonly x1: number; readonly z1: number }[],
+  ): { x: number; z: number; d: number } | null => {
+    let mejor: { x: number; z: number; d: number } | null = null;
+    for (const q of puestas) {
+      const d = Math.hypot(x - q.x, z - q.z);
+      if (mejor === null || d < mejor.d) mejor = { x: q.x, z: q.z, d };
+    }
+    for (const b of cajas) {
+      const qx = Math.min(Math.max(x, b.x0), b.x1);
+      const qz = Math.min(Math.max(z, b.z0), b.z1);
+      const d = Math.hypot(x - qx, z - qz);
+      if (mejor === null || d < mejor.d) mejor = { x: qx, z: qz, d };
+    }
+    return mejor;
+  };
+
+  /*
    * DOS PERSONAS DE HOLGURA. No es un número redondo elegido a ojo: los doce centros
    * malos del mazo estaban entre 0.0 y 2.6 —la ermita, exactamente encima de la ermita—,
-   * y el peor sitio que elige la cuenta nueva tiene 10.35. El umbral cae en medio, lejos
-   * de los dos, así que ni deja pasar el fallo ni se pone rojo porque alguien mueva un
-   * barril.
+   * y el peor sitio que elegía la cuenta de la escena tenía 10.35. El umbral cae en medio,
+   * lejos de los dos, así que ni deja pasar el fallo ni se pone rojo porque alguien mueva un
+   * barril. El peor sitio que declara el mundo, contando ya las cajas, tiene 7,08 al estrenarlo.
    */
   const HOLGURA_MINIMA = ALTURA_DE_UNA_PERSONA * 2;
 
@@ -1123,17 +1234,25 @@ paso('Quien pasea no nace dentro de una casa');
   let peor = Number.POSITIVE_INFINITY;
   let peorQuien = '';
   let mirandoAlBulto = 0;
+  let deEspaldasAlBulto = 0;
+  let sinSitio = 0;
   for (const losa of LAS_LOSAS) {
     for (const giro of GIROS) {
       const quien = `${losa.id}/${giro}`;
-      const c = montarLaLosa(losa.id, giro, 12345 + giro);
-      const nace = nacerEnLaLosa(0, 0, c.celdas, c.puestas);
+      const semillaDeLaMesa = 12345 + giro;
+      const puestasEnLaMesa = [{ x: 0, y: 0, losa: losa.id, giro, ultima: true }];
+      const c = montarLaLosa(losa.id, giro, semillaDeLaLosa(semillaDeLaMesa, 0, 0));
+      const suMundo = mundoDeLasLindes(puestasEnLaMesa, semillaDeLaMesa);
+      const nace = dondeNaceQuienPasea(puestasEnLaMesa, suMundo);
+      if (nace === null) {
+        sinSitio++;
+        continue;
+      }
 
       /* Lo de antes, para saber si esta comprobación muerde: ver la vacuna de abajo. */
-      const centro = nacerEn(0, 0);
-      if (holguraEn(centro.x, centro.z, c.puestas) < ALTURA_DE_UNA_PERSONA) centrosMalos++;
+      if (holguraEn(0, 0, c.puestas) < ALTURA_DE_UNA_PERSONA) centrosMalos++;
 
-      const suya = holguraEn(nace.x, nace.z, c.puestas);
+      const suya = loMasCerca(nace.x, nace.z, c.puestas, suMundo.cuerpos)?.d ?? Number.POSITIVE_INFINITY;
       if (suya < peor) {
         peor = suya;
         peorQuien = quien;
@@ -1164,21 +1283,18 @@ paso('Quien pasea no nace dentro de una casa');
       }
 
       /* Y DE ESPALDAS A LO MÁS CERCANO, que si no se nace mirando un muro. */
-      let cerca = { x: 0, z: 0 };
-      let d = Number.POSITIVE_INFINITY;
-      for (const q of c.puestas) {
-        const suD = Math.hypot(nace.x - q.x, nace.z - q.z);
-        if (suD < d) {
-          d = suD;
-          cerca = { x: q.x, z: q.z };
-        }
+      const cerca = loMasCerca(nace.x, nace.z, c.puestas, suMundo.cuerpos);
+      if (cerca !== null) {
+        const adelante = { x: Math.sin(nace.rumbo), z: -Math.cos(nace.rumbo) };
+        const alBulto = { x: cerca.x - nace.x, z: cerca.z - nace.z };
+        const hacia = adelante.x * alBulto.x + adelante.z * alBulto.z;
+        if (hacia > 0) mirandoAlBulto++;
+        if (hacia < 0) deEspaldasAlBulto++;
       }
-      const adelante = { x: Math.sin(nace.rumbo), z: -Math.cos(nace.rumbo) };
-      const alBulto = { x: cerca.x - nace.x, z: cerca.z - nace.z };
-      if (adelante.x * alBulto.x + adelante.z * alBulto.z > 0) mirandoAlBulto++;
     }
   }
 
+  comprobar('el mundo declara dónde se nace en las noventa y seis losas del mazo', sinSitio === 0, { sinSitio });
   comprobar('en las noventa y seis losas del mazo se nace con sitio alrededor', peor >= HOLGURA_MINIMA, {
     peor: peor.toFixed(2),
     quien: peorQuien,
@@ -1187,19 +1303,56 @@ paso('Quien pasea no nace dentro de una casa');
   comprobar('y ninguna nace mirando a lo que tiene más cerca', mirandoAlBulto === 0, {
     mirandoAlBulto,
   });
+  /*
+   * Y que esa cuenta DISTINGUE: todas las que tienen algo cerca lo tienen a la ESPALDA. Si la
+   * dirección se hubiera escrito del revés, o «lo más cercano» no encontrara nada, las dos de
+   * arriba seguirían en verde con cero.
+   */
+  comprobar(
+    'y las noventa y seis lo tienen a la espalda, que es lo que la de arriba afirma sin decirlo',
+    deEspaldasAlBulto === LAS_LOSAS.length * GIROS.length,
+    { deEspaldasAlBulto, deCuantas: LAS_LOSAS.length * GIROS.length },
+  );
 
   /*
    * ═══ LA VACUNA ═══
    *
    * Una comprobación que sólo dice «todo bien» no prueba nada: podría estar mirando una
    * lista vacía. Esto afirma que el fallo EXISTÍA —que el centro de la losa, que es donde
-   * se nacía hasta hoy, deja al paseante dentro de algo en doce de los noventa y seis
-   * paisajes—, así que el día que alguien vuelva a `nacerEn` esta sección se pone roja.
+   * se nacía antes de que nadie lo mirase, deja al paseante dentro de algo en doce de los
+   * noventa y seis paisajes—, así que el día que el mundo vuelva a declarar el centro esta
+   * sección se pone roja.
    */
   comprobar(
     'y el centro de la losa —de donde se venía— sí metía al paseante dentro de algo',
     centrosMalos > 0,
     { centrosMalos, deCuantos: LAS_LOSAS.length * GIROS.length },
+  );
+
+  /*
+   * ═══ Y DE LA ÚLTIMA LOSA, QUE ES DONDE ESTÁ PASANDO ALGO ═══
+   *
+   * `nace[i]` es el sitio de `losas[i]`: si la `i` se eligiera mal, se nacería en la primera
+   * losa de la partida, a veinte losas de la jugada. Se prueba con la última en medio de la
+   * lista —ni la primera ni la del final, que son las dos que un índice mal puesto acierta por
+   * casualidad— y sin ninguna marcada, que es cuando vale la primera.
+   */
+  const tres = [
+    { x: 0, y: 0, losa: LAS_LOSAS[0]?.id ?? '', giro: 0 as Giro, ultima: false },
+    { x: 1, y: 0, losa: LAS_LOSAS[1]?.id ?? '', giro: 1 as Giro, ultima: true },
+    { x: 1, y: 1, losa: LAS_LOSAS[2]?.id ?? '', giro: 2 as Giro, ultima: false },
+  ];
+  const suMundo = mundoDeLasLindes(tres, 777);
+  comprobar(
+    'se nace en el sitio que el mundo declara para la ÚLTIMA losa puesta, esté donde esté en la lista',
+    dondeNaceQuienPasea(tres, suMundo) === suMundo.nace[1] && suMundo.nace[1] !== undefined,
+  );
+  comprobar(
+    'y si ninguna está marcada como la última, en la primera',
+    dondeNaceQuienPasea(
+      tres.map((l) => ({ ...l, ultima: false })),
+      suMundo,
+    ) === suMundo.nace[0],
   );
 }
 
@@ -1271,11 +1424,21 @@ paso('El avatar MIRA hacia donde anda, y no sólo cuando anda al norte');
     { malasConLaVieja },
   );
 
-  /* Y que la escena usa la cuenta, no una copia suelta que se quede vieja aparte. */
-  const elAvatar = fs.readFileSync(new URL('../lindes/quien-anda.tsx', import.meta.url), 'utf8');
+  /*
+   * Y que la escena usa la cuenta, no una copia suelta que se quede vieja aparte. Se lee la
+   * marioneta en su casa de ahora, el paseo común, que es la que monta `Lindes.tsx`: la de
+   * `lindes/quien-anda.tsx` sólo la reexporta, y mirar ahí sería leer el cartel de la mudanza.
+   */
+  const elAvatar = fs.readFileSync(new URL('../paseo/quien-anda.tsx', import.meta.url), 'utf8');
   comprobar(
     'la escena gira al avatar con `giroDeLaMarioneta`, no con una media vuelta a mano',
     /g\.rotation\.y = giroDeLaMarioneta\(/.test(elAvatar) && !/rotation\.y = .*\+ Math\.PI/.test(elAvatar),
+  );
+  comprobar(
+    'y la escena monta ESA marioneta, la del paseo común',
+    /import \{ QuienAnda \} from '\.\.\/paseo\/quien-anda';/.test(
+      fs.readFileSync(new URL('../lindes/Lindes.tsx', import.meta.url), 'utf8'),
+    ),
   );
 }
 
@@ -1384,6 +1547,162 @@ paso('Andando, la losa de la mano y el reloj NO se entierran bajo el tablero');
     'y con la distancia de la mesa se enterraban los dos en todas las pantallas',
     enterradosConLaDeLejos === LIENZOS.length * OJOS.length * 2,
     { enterradosConLaDeLejos },
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+paso('Quien pasea se pinta SOBRE el suelo que pisa, y la cámara no baja a la senda');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * El aventurero se pintaba a la altura cero, y el suelo del valle no está en el cero: la senda
+ * va hundida y la villa alzada. En la senda —que es por donde se anda— se le veía flotando
+ * media persona sobre el camino. Ahora el paseo le pregunta a la escena la altura del suelo en
+ * cada punto (`alturaDelSuelo`), y aquí se compara con el suelo QUE SE DIBUJA: los rectángulos
+ * de arriba de la geometría de verdad, leídos triángulo a triángulo. Si la cuenta se equivocara
+ * de celda, de eje o de signo, pintaría la figura a la altura de la celda de al lado.
+ *
+ * Las losas van repartidas lejos del origen y con sus cuatro giros: en la casilla (0, 0) un
+ * signo cambiado en la `z` no se ve, porque menos cero es cero.
+ */
+{
+  const losasDeLaPrueba = LAS_LOSAS.map((l, k) => ({
+    x: (k % 6) - 2,
+    y: Math.floor(k / 6) - 1,
+    losa: l.id,
+    giro: (k % 4) as Giro,
+  }));
+  const porCasilla = losasPorCasilla(losasDeLaPrueba);
+  const geometria = geometriaDelSuelo(losasDeLaPrueba);
+  /* Los rectángulos de arriba: cada seis vértices son una cara, y las de arriba miran al cielo. */
+  const tapas: { x0: number; x1: number; z0: number; z1: number; y: number }[] = [];
+  if (geometria !== null) {
+    const p = geometria.getAttribute('position').array as ArrayLike<number>;
+    const n = geometria.getAttribute('normal').array as ArrayLike<number>;
+    for (let v = 0; v + 5 < p.length / 3; v += 6) {
+      if ((n[v * 3 + 1] as number) < 0.99) continue;
+      let x0 = Number.POSITIVE_INFINITY;
+      let x1 = Number.NEGATIVE_INFINITY;
+      let z0 = Number.POSITIVE_INFINITY;
+      let z1 = Number.NEGATIVE_INFINITY;
+      for (let k = 0; k < 6; k++) {
+        const x = p[(v + k) * 3] as number;
+        const z = p[(v + k) * 3 + 2] as number;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (z < z0) z0 = z;
+        if (z > z1) z1 = z;
+      }
+      tapas.push({ x0, x1, z0, z1, y: p[v * 3 + 1] as number });
+    }
+    geometria.dispose();
+  }
+  comprobar('la geometría del suelo tiene tapas que mirar', tapas.length > losasDeLaPrueba.length, {
+    tapas: tapas.length,
+  });
+
+  let muestras = 0;
+  let distintas = 0;
+  let conCeldasCambiadas = 0;
+  const alturasVistas = new Set<number>();
+  let primeraMala: unknown = null;
+  for (const l of losasDeLaPrueba) {
+    const suLosa = losaPorId(l.losa);
+    if (suLosa === null) continue;
+    for (let ci = 1; ci < CELDAS_POR_LOSA; ci += 3) {
+      for (let cj = 2; cj < CELDAS_POR_LOSA; cj += 3) {
+        /* Dentro de la celda y fuera de su centro, que es donde una cuenta a medias acierta. */
+        const fx = (ci + 0.3) / CELDAS_POR_LOSA - 0.5;
+        const fz = (cj + 0.7) / CELDAS_POR_LOSA - 0.5;
+        const x = (l.x + fx) * LADO_DE_LOSA;
+        const z = (-l.y + fz) * LADO_DE_LOSA;
+        const tapa = tapas.find((t) => x > t.x0 && x < t.x1 && z > t.z0 && z < t.z1);
+        if (tapa === undefined) continue;
+        muestras++;
+        alturasVistas.add(Math.round(tapa.y * 1000));
+        const cuenta = alturaDelSuelo(porCasilla, x, z);
+        if (Math.abs(cuenta - tapa.y) > 1e-6) {
+          distintas++;
+          if (primeraMala === null) primeraMala = { losa: l.losa, giro: l.giro, ci, cj, cuenta, dibujada: tapa.y };
+        }
+        /* La vacuna: la misma pregunta con las dos celdas cruzadas, que es el error de siempre. */
+        const cruzada = alturaDe(queHayEn(suLosa, l.giro, centroDeCelda(cj, ci)));
+        if (Math.abs(cruzada - tapa.y) > 1e-6) conCeldasCambiadas++;
+      }
+    }
+  }
+  comprobar(
+    'la altura a la que se pinta a quien pasea es la del suelo que se dibuja, en cada muestra',
+    distintas === 0 && muestras > 1000,
+    { muestras, distintas, primeraMala },
+  );
+  comprobar(
+    'y las muestras pisan las tres alturas: senda, prado y villa',
+    alturasVistas.has(Math.round(alturaDe('senda') * 1000)) &&
+      alturasVistas.has(0) &&
+      alturasVistas.has(Math.round(alturaDe('villa') * 1000)),
+    [...alturasVistas],
+  );
+  comprobar(
+    'y la comprobación distingue: con las celdas cruzadas, la cuenta se equivoca',
+    conCeldasCambiadas > muestras / 20,
+    { conCeldasCambiadas, muestras },
+  );
+  comprobar(
+    'y fuera de las losas puestas no hay suelo que pisar: cero',
+    alturaDelSuelo(porCasilla, 40 * LADO_DE_LOSA, 40 * LADO_DE_LOSA) === 0,
+  );
+  comprobar(
+    'la senda de verdad está por debajo del cero: una figura a la altura cero flotaba sobre el camino',
+    alturaDe('senda') < -ALTURA_DE_UNA_PERSONA / 4,
+    { senda: alturaDe('senda').toFixed(3) },
+  );
+
+  /*
+   * ═══ Y LA CÁMARA NO BAJA A LA SENDA CON LOS PIES ═══
+   *
+   * Los rincones de a pie —la losa de la mano y el reloj— cuelgan delante de la cámara con sus
+   * cuentas hechas para un suelo en el cero, y el paso de arriba mide que su canto de abajo queda
+   * por encima del suelo DESDE DONDE MIRA la cámara. Si la cámara bajara con los pies a la senda,
+   * ese canto quedaría por debajo del prado de al lado, y andando pegado al borde del camino los
+   * dos se meterían en el suelo. Por eso `alturaDeLaCamara` no baja del prado.
+   */
+  let camaraEnLaSenda = 0;
+  for (const l of losasDeLaPrueba) {
+    for (let ci = 1; ci < CELDAS_POR_LOSA; ci += 3) {
+      for (let cj = 2; cj < CELDAS_POR_LOSA; cj += 3) {
+        const x = (l.x + (ci + 0.5) / CELDAS_POR_LOSA - 0.5) * LADO_DE_LOSA;
+        const z = (-l.y + (cj + 0.5) / CELDAS_POR_LOSA - 0.5) * LADO_DE_LOSA;
+        const pies = alturaDelSuelo(porCasilla, x, z);
+        const camara = alturaDeLaCamara(porCasilla, x, z);
+        if (camara < 0 || camara !== Math.max(0, pies)) camaraEnLaSenda++;
+      }
+    }
+  }
+  comprobar('la cámara de a pie se apoya en el suelo, y nunca por debajo del prado', camaraEnLaSenda === 0, {
+    camaraEnLaSenda,
+  });
+
+  /*
+   * La vacuna: con la cámara en la senda, el canto de abajo de la mano y del reloj en «ojos»
+   * quedaría por debajo del prado en TODAS las pantallas. Si algún día los rincones se acercan o
+   * se suben lo bastante, esto se pone rojo, y entonces la cámara ya puede bajar con los pies.
+   */
+  let bajoElPrado = 0;
+  for (const [, aspecto] of LIENZOS) {
+    const m = sitioDeLaMano(CAMPO_DE_LA_CAMARA, aspecto, DISTANCIA_DE_LA_MANO_A_PIE);
+    const r = sitioDelRelojDeLaBolsa(CAMPO_DE_LA_CAMARA, aspecto, ALTO_DEL_RELOJ_EN_LADOS, DISTANCIA_DE_LA_MANO_A_PIE);
+    const ojoEnLaSenda = alturaDe('senda') + ALTURA_DE_LOS_OJOS;
+    if (ojoEnLaSenda + m.arriba - m.mediaEnAlto < 0) bajoElPrado++;
+    if (ojoEnLaSenda + r.arriba - r.mediaEnAlto - r.lado * ALTO_DE_LA_CAJA_DEL_RELOJ < 0) bajoElPrado++;
+  }
+  comprobar(
+    'y con la cámara en la senda, la mano y el reloj se meterían en el prado en todas las pantallas',
+    bajoElPrado === LIENZOS.length * 2,
+    { bajoElPrado, deCuantos: LIENZOS.length * 2 },
   );
 }
 
@@ -1799,14 +2118,13 @@ paso('La arena llega hasta donde pisa el cuadro, y ni la niebla ni el fondo la c
     const abarca = loQueAbarca(casillas);
     for (const [pantalla, aspecto] of LIENZOS) {
       const pose = camaraDeMesa(abarca, aspecto, CAMPO_DE_LA_CAMARA);
-      /* El alcance, montado igual que en `Lindes.tsx`: lo de la mesa y lo del paseo. */
-      const andando = LADO_DE_LOSA * 34;
-      const alcanza = {
-        x0: Math.min(pose.suelo.x0, (abarca.minX - 0.5) * LADO_DE_LOSA - andando),
-        x1: Math.max(pose.suelo.x1, (abarca.maxX + 0.5) * LADO_DE_LOSA + andando),
-        z0: Math.min(pose.suelo.z0, -(abarca.maxY + 0.5) * LADO_DE_LOSA - andando),
-        z1: Math.max(pose.suelo.z1, -(abarca.minY - 0.5) * LADO_DE_LOSA + andando),
-      };
+      /*
+       * El alcance, con LA MISMA cuenta que usa `Lindes.tsx` —lo de la mesa y lo del paseo—, y
+       * no con una copia: aquí había la cuenta entera escrita a mano, con el `LADO_DE_LOSA * 34`
+       * de la niebla copiado de la escena, y el día que la niebla cambiase la copia seguiría en
+       * verde midiendo la arena de antes. Que la escena usa esta cuenta se mira abajo.
+       */
+      const alcanza = alcanceDeLaArena(abarca, pose.suelo);
       const arena = cantosDeLaArena(casillas, alcanza);
       const vieja = cantosDeLaArena(casillas);
 
@@ -1875,6 +2193,23 @@ paso('La arena llega hasta donde pisa el cuadro, y ni la niebla ni el fondo la c
     `y con la arena de antes —sólo ${(MARGEN_DE_LA_ARENA / LADO_DE_LOSA).toFixed(0)} losas de margen— se salían esquinas: por eso se veía el cielo`,
     seSalieronConLaVieja > 0,
     { seSalieronConLaVieja, deCuantas: esquinasMiradas },
+  );
+
+  /*
+   * Y QUE LA ESCENA USA ESTA CUENTA Y ESTA NIEBLA. Si `Lindes.tsx` volviera a escribirse la
+   * suya, todo lo de arriba mediría una arena que no se pinta: por eso la cuenta salió de la
+   * escena a `lindes/paseo.ts`, y por eso se mira que la escena no lleve números propios.
+   */
+  const laEscenaDeLaArena = fs
+    .readFileSync(new URL('../lindes/Lindes.tsx', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+  comprobar(
+    'la escena monta la arena con `alcanceDeLaArena` y la niebla del paseo con `NIEBLA_DEL_PASEO`, sin números suyos',
+    /alcanceDeLaArena\(abarca, camaraDeMesa\(/.test(laEscenaDeLaArena) &&
+      /nAndando\.near = NIEBLA_DEL_PASEO\.cerca;/.test(laEscenaDeLaArena) &&
+      /nAndando\.far = NIEBLA_DEL_PASEO\.lejos;/.test(laEscenaDeLaArena) &&
+      !/LADO_DE_LOSA \* (8|34)\b/.test(laEscenaDeLaArena),
   );
 }
 

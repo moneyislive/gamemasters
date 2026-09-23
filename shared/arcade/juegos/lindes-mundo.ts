@@ -7,7 +7,7 @@
  *     semilla del paisaje, `semillaDelCodigo(codigo, 0x5eed)`, que es la misma que usa la
  *     escena. Nada del estado opaco: el servidor y el aparato tienen los dos la vista.
  *   · `lado` es el de una LOSA: una casilla del mundo es una losa puesta, y la losa `(x, y)` está
- *     centrada en `(x · LADO, −y · LADO)`, que es el convenio de `hayLosaEn` y de `casillaDe`.
+ *     centrada en `(x · LADO, −y · LADO)`, que es el convenio de `casillaDe` en `mundo.ts` (y era el del `hayLosaEn` del paseante viejo).
  *   · `pisables` son las losas puestas, y nada más: fuera de ellas no hay valle.
  *   · `nace[i]` es el sitio donde se nace en `losas[i]`, en el mismo orden. Quien pasea a solas
  *     nace en la última puesta; el servidor reparte a los de una mesa entre todas.
@@ -54,7 +54,7 @@
  *
  * ═══ DÓNDE SE NACE ═══
  *
- * La misma lógica que `nacerEnLaLosa` de `escenas/lindes/paseo.ts` —se prefiere la senda, luego
+ * La misma lógica que tenía `nacerEnLaLosa` en `escenas/lindes/paseo.ts`, que ésta sustituye —se prefiere la senda, luego
  * el prado, y entre las celdas que valen gana la que más lejos tiene lo más cercano, y se nace
  * de espaldas a eso—, con tres cambios:
  *
@@ -250,7 +250,7 @@ function rumboMasParecido(vx: number, vz: number): number {
 }
 
 /**
- * EL SITIO DONDE SE NACE EN UNA LOSA. Ver la cabecera: la lógica de `nacerEnLaLosa`, con la
+ * EL SITIO DONDE SE NACE EN UNA LOSA. Ver la cabecera: la lógica que tenía `nacerEnLaLosa`, con la
  * arena de este mundo como juez de si se puede estar.
  */
 function sitioParaNacer(
@@ -333,7 +333,7 @@ function sitioParaNacer(
     const rumbo = !hayCerca || (vx === 0 && vz === 0) ? 0 : radianesDelRumbo(rumboMasParecido(vx, vz));
     return { x: mejorX, z: mejorZ, rumbo };
   }
-  /* Ninguna celda vale —una losa desconocida no tiene celdas—: el centro, como `nacerEn`. */
+  /* Ninguna celda vale —una losa desconocida no tiene celdas—: el centro, como hacía el `nacerEn` del paseante viejo. */
   return { x: cx, z: cz, rumbo: 0 };
 }
 

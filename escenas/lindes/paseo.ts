@@ -1,264 +1,165 @@
 /**
- * EL PASEO: andar por encima del tablero, en primera o en tercera persona.
+ * EL PASEO POR LAS LINDES: lo que del paseo es sólo de este valle.
  *
- * ═══ QUÉ ES ESTO Y QUÉ NO ═══
+ * ═══ LO QUE SE FUE AL PASEO COMÚN, Y POR QUÉ ═══
  *
- * Es una máquina PURA —recibe dónde estabas, qué tecla llevas pulsada y cuánto
- * tiempo ha pasado, y dice dónde estás ahora— y NO toca el estado del juego. Andar
- * no es un movimiento: no entra por el reductor, no viaja por el cable y no cambia
- * la partida. Es una cámara y un avatar, y por eso cabe entero en la escena.
+ * Aquí vivía el paseo entero —el paso, el rumbo, las teclas, las dos cámaras de a pie y el giro
+ * de la marioneta—, porque era el único sitio de la casa donde se andaba. Y se andaba mal de tres
+ * maneras que no daban ningún error:
  *
- * Pura por lo mismo que `escenas/burgo/peon.ts`: un aventurero que atraviesa una
- * muralla, o que se sale del tablero y se queda andando sobre el vacío, no da
- * ningún error — se ve. La única forma de prometer que no pasa es que la función
- * que lo decide se pueda recorrer diez mil pasos en Node.
+ *   · con un `unPaso` propio —uno por fotograma, en coma flotante, con un punto sin radio— que
+ *     sólo paraba en el borde: casas y murallas se atravesaban. El paso de verdad, con choques,
+ *     estaba escrito en `shared/mecanicas/andar.ts` y no lo llamaba nadie;
+ *   · leyendo las teclas de `document`, que en el móvil no existe: en la app no se andaba;
+ *   · y contando lo andado en SEGUNDOS, que la marioneta leía como distancia.
  *
- * ═══ LOS LÍMITES SON LAS LOSAS PUESTAS, Y ESO ES UNA DECISIÓN ═══
+ * Todo lo que no sabe de losas se ha ido a `escenas/paseo/` —el motor de tics, los mandos, las
+ * cámaras de hombro y de ojos, la marioneta— y lo genérico se reexporta desde aquí para que quien
+ * lo pedía a este fichero lo siga encontrando. El `unPaso` viejo NO se reexporta: se ha borrado,
+ * y a propósito. Dejar dos es exactamente la trampa que avisaba BOOTS-ON-BOARD §6.1: git los
+ * fusiona tan contento, los comprobadores siguen en verde y la escena sigue llamando al malo.
  *
- * Se anda por donde hay tablero, y el tablero crece durante la partida. Podría
- * dejarse andar por el vacío —es más fácil— y sería peor: el valle de alrededor no
- * existe, así que quien saliera vería el mundo por debajo y no sabría volver. Al
- * llegar al borde de la última losa, se para. Es la misma clase de decisión que
- * `cala.ts` toma con el agua del embarcadero.
+ * ═══ LO QUE SE QUEDA, QUE ES LO QUE SABE DE ESTE VALLE ═══
+ *
+ *   · de qué losa se nace —de la última puesta—, con el sitio que declara su mundo;
+ *   · a qué altura está el suelo que se pisa, que depende de la celda: prado, senda o villa;
+ *   · la niebla del paseo, y hasta dónde tiene que llegar la arena;
+ *   · y la cámara de mesa, que encuadra un tablero que crece.
+ *
+ * ═══ LOS LÍMITES SON LAS LOSAS PUESTAS, Y ESO SIGUE SIENDO UNA DECISIÓN ═══
+ *
+ * Se anda por donde hay tablero, y el tablero crece durante la partida. Podría dejarse andar por
+ * el vacío —es más fácil— y sería peor: el valle de alrededor no existe, así que quien saliera
+ * vería el mundo por debajo y no sabría volver. Lo decía `hayLosaEn` en cada paso; ahora lo dice
+ * el mundo declarado —sus casillas pisables son las losas puestas, `lindes-mundo.ts`— y lo hace
+ * cumplir la arena, que es la misma para todos los juegos.
  */
-import { LADO_DE_LOSA } from './medidas';
-import { centroDeCelda } from './losa';
-import type { CeldaDeSuelo } from './losa';
-import { ALTURA_DE_UNA_PERSONA, PASO_POR_SEGUNDO } from '../escala';
+import { CELDAS_POR_LOSA, LADO_DE_LOSA } from './medidas';
+import { alturaDe, centroDeCelda, queHayEn } from './losa';
+import { llaveDeCasilla, losaPorId } from '../../shared/arcade/juegos/lindes-losas';
+import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
+import type { MundoDeclarado, Sitio } from '../../shared/mecanicas/mundo';
+import type { PoseDeCamara } from '../paseo/camaras';
 
-/** A qué velocidad anda un aventurero por el tablero. */
-export const VELOCIDAD_DEL_PASEO = PASO_POR_SEGUNDO * 3;
+/* Lo genérico, que vive en `escenas/paseo/`: reexportado, no copiado. */
+export {
+  ALTURA_DE_LOS_OJOS,
+  ATRAS_DEL_HOMBRO,
+  SOBRE_EL_HOMBRO,
+  camaraDeHombro,
+  camaraDeOjos,
+  giroDeLaMarioneta,
+} from '../paseo/camaras';
+export type { PoseDeCamara, QuienSeMira } from '../paseo/camaras';
+export type { Paseante } from '../paseo/paseante';
 
-/** Y corriendo. */
-export const VELOCIDAD_CORRIENDO = VELOCIDAD_DEL_PASEO * 2.2;
+/* ─── De dónde se nace ───────────────────────────────────────────────────── */
 
-/** Lo deprisa que gira, en radianes por segundo. */
-export const GIRO_POR_SEGUNDO = 2.6;
+/**
+ * DE QUÉ LOSA SE NACE, Y EN QUÉ SITIO DE ELLA.
+ *
+ * De la ÚLTIMA puesta —la que la vista marca con `ultima`—, que es donde está pasando algo; si
+ * ninguna lo está, de la primera. Y el sitio dentro de ella no se elige aquí: lo declara el
+ * mundo, `nace[i]` para `losas[i]`, porque nacer dentro de una casa o mirando a una pared es un
+ * fallo del MUNDO —quien lo declara sabe qué hay en cada losa— y no de quien lo pinta (ver `Sitio`
+ * en `shared/mecanicas/mundo.ts`). `verify:lindes-escena` mide ese sitio en las noventa y seis
+ * losas del mazo, que es lo que antes medía sobre la cuenta de esta escena.
+ *
+ * `null` si el mundo no declara dónde: una mesa que todavía se está reuniendo no tiene losas.
+ */
+export function dondeNaceQuienPasea(
+  losas: readonly { readonly ultima: boolean }[],
+  mundo: MundoDeclarado,
+): Sitio | null {
+  const i = losas.findIndex((l) => l.ultima);
+  return mundo.nace[i >= 0 ? i : 0] ?? null;
+}
 
-/** A qué altura van los ojos. */
-export const ALTURA_DE_LOS_OJOS = ALTURA_DE_UNA_PERSONA * 0.92;
+/* ─── A qué altura está el suelo ─────────────────────────────────────────── */
 
-/** Cuánto se queda la cámara de hombro por detrás y por encima. */
-export const ATRAS_DEL_HOMBRO = ALTURA_DE_UNA_PERSONA * 2.6;
-export const SOBRE_EL_HOMBRO = ALTURA_DE_UNA_PERSONA * 1.5;
-
-/** Dónde está y hacia dónde mira quien pasea. */
-export interface Paseante {
-  /** Hacia el este, en unidades del mundo. */
+/** Lo justo de una losa puesta para saber qué suelo tiene. */
+export interface LosaConSuelo {
+  /** Hacia el este. */
   readonly x: number;
-  /** Hacia el sur, en unidades del mundo. */
-  readonly z: number;
-  /** Hacia dónde mira, en radianes: 0 es el norte y crece hacia el este. */
-  readonly rumbo: number;
-  /** Cuánto lleva andando seguido, para el clip de la animación. */
-  readonly andando: number;
+  /** Hacia el norte. */
+  readonly y: number;
+  /** La clase de losa, del catálogo. */
+  readonly losa: string;
+  readonly giro: Giro;
 }
 
-/** Lo que se lleva pulsado. */
-export interface Mandos {
-  readonly adelante: boolean;
-  readonly atras: boolean;
-  readonly izquierda: boolean;
-  readonly derecha: boolean;
-  readonly deprisa: boolean;
-}
-
-/** Nadie tocando nada. */
-export const QUIETO: Mandos = {
-  adelante: false,
-  atras: false,
-  izquierda: false,
-  derecha: false,
-  deprisa: false,
-};
-
-/** Dónde empieza el paseo: en el centro de una casilla, mirando al norte. */
-export function nacerEn(x: number, y: number): Paseante {
-  return { x: x * LADO_DE_LOSA, z: -y * LADO_DE_LOSA, rumbo: 0, andando: 0 };
+/** Las losas puestas por su casilla, para preguntar por el suelo sin recorrer la lista. */
+export function losasPorCasilla(losas: readonly LosaConSuelo[]): Map<string, LosaConSuelo> {
+  const salida = new Map<string, LosaConSuelo>();
+  for (const l of losas) salida.set(llaveDeCasilla(l.x, l.y), l);
+  return salida;
 }
 
 /**
- * HACIA DÓNDE HAY QUE GIRAR LA MARIONETA PARA QUE MIRE A SU RUMBO.
+ * A QUÉ ALTURA ESTÁ EL SUELO EN UN PUNTO DEL VALLE, para pintar encima a quien pasea.
  *
- * ═══ POR QUÉ NO ES `rumbo + π`, QUE ES LO QUE PARECE ═══
+ * ═══ POR QUÉ HACE FALTA ═══
  *
- * El rumbo de esta casa tiene el cero al NORTE y crece hacia el ESTE, así que quien anda
- * se mueve hacia `(sin r, −cos r)` — está escrito en `unPaso`. Las marionetas de KayKit,
- * en cambio, nacen mirando a su `+z`, y un giro de `θ` alrededor del eje vertical deja ese
- * `+z` en `(sin θ, cos θ)`. Igualando las dos cosas sale `θ = π − r`, que es exactamente
- * `atan2(sin r, −cos r)`: el ángulo de su propio rumbo, sin más.
+ * El aventurero se pintaba siempre a la altura cero, y el suelo del valle no está en el cero: la
+ * senda está hundida 1,20 unidades —media persona— y la villa alzada 0,66. En la senda se le
+ * veía flotando sobre el camino y en la villa enterrado hasta los tobillos. No falla nada: se ve.
  *
- * Aquí había `r + π`, y **las dos cuentas dan lo mismo mirando al norte y al sur**. Por eso
- * pasó: el paseante nace mirando al norte, se mira, se ve la nuca, y todo parece bien. Al
- * este y al oeste dan lo CONTRARIO, y el aventurero andaba de espaldas.
+ * ═══ SE PREGUNTA A LA MISMA CELDA QUE DIBUJA EL SUELO ═══
  *
- * Mirado en el móvil girando de cuarenta y cinco en cuarenta y cinco: en 180° de giro se
- * vieron dos nucas y dos caras. Con la cámara pegada detrás, el ángulo aparente sólo puede
- * cambiar al DOBLE del giro si el muñeco está espejado; si estuviera bien, no cambiaría
- * nunca.
+ * `geometriaDelSuelo` pinta cada celda de la retícula plana, a la altura de su clase, y la clase
+ * sale de `queHayEn` en el centro de la celda. Aquí se hace esa misma pregunta en esa misma
+ * celda, así que se contesta lo que se ve y no una media. `verify:lindes-escena` lo compara con
+ * los triángulos de la geometría de verdad, que es la que no se puede equivocar de celda.
+ *
+ * Fuera de las losas puestas, cero: ahí no se puede estar, y lo de debajo es la arena.
  */
-export function giroDeLaMarioneta(rumbo: number): number {
-  return Math.PI - rumbo;
-}
-
-/** Lo justo que se mira de una pieza puesta: dónde está. */
-export interface DondeHayAlgo {
-  readonly x: number;
-  readonly z: number;
-}
-
-/**
- * DÓNDE NACE QUIEN PASEA, DENTRO DE LA LOSA EN LA QUE NACE.
- *
- * ═══ EL CENTRO DE UNA LOSA NO ES UN SITIO ═══
- *
- * `nacerEn` deja al paseante en el centro exacto de la casilla. En un prado da igual; en
- * una villa es un desastre. LA VILLA AMURALLADA es ciudad de lado a lado, así que nacer
- * en su centro es nacer DENTRO de una casa — y el paseante nace en la ÚLTIMA losa
- * puesta, que en este juego es villa cuatro veces de cada diez.
- *
- * Medido en el móvil, en una mesa de dos losas: al pulsar «hombro» la pantalla entera era
- * un tejado rojo a un palmo de la cara, y en «ojos» lo mismo. Andando cinco segundos se
- * salía del pueblo y el paisaje aparecía de golpe. No falla nada, no avisa nadie, no lo
- * ve ningún comprobador de geometría — y es lo PRIMERO que se ve al pulsar el botón.
- *
- * ═══ SE ELIGE CON LO QUE LA LOSA YA SABE DE SÍ MISMA ═══
- *
- * Ni lista de modelos que estorban ni umbral de tamaño: las dos cosas se quedan viejas el
- * día que alguien añade una pieza, y se quedan viejas EN SILENCIO. Se usan las CELDAS del
- * suelo, que ya dicen si son `senda`, `prado` o `villa`, y las PUESTAS, que ya dicen
- * dónde hay algo levantado. Se prefiere la senda —un camino es, literalmente, por donde
- * se anda—, luego el prado, y entre las celdas que valen gana la que más lejos tenga lo
- * más cercano.
- */
-export function nacerEnLaLosa(
-  x: number,
-  y: number,
-  celdas: readonly CeldaDeSuelo[],
-  puestas: readonly DondeHayAlgo[],
-): Paseante {
-  const sendas = celdas.filter((c) => c.clase === 'senda');
-  const prados = celdas.filter((c) => c.clase === 'prado');
-  /*
-   * Si la losa es villa entera no hay celda buena y se cogen todas: entre malas, la plaza
-   * más despejada. Quedarse sin nacer sería peor que nacer en un sitio regular.
-   */
-  const candidatas = sendas.length > 0 ? sendas : prados.length > 0 ? prados : celdas;
-
-  let mejor: DondeHayAlgo | null = null;
-  let suHolgura = -1;
-  let loMasCerca: DondeHayAlgo | null = null;
-  for (const c of candidatas) {
-    const enFracciones = centroDeCelda(c.i, c.j);
-    const punto = { x: enFracciones.x * LADO_DE_LOSA, z: enFracciones.z * LADO_DE_LOSA };
-    let holgura = Number.POSITIVE_INFINITY;
-    let cerca: DondeHayAlgo | null = null;
-    for (const q of puestas) {
-      const d = Math.hypot(punto.x - q.x, punto.z - q.z);
-      if (d < holgura) {
-        holgura = d;
-        cerca = q;
-      }
-    }
-    if (holgura > suHolgura) {
-      suHolgura = holgura;
-      mejor = punto;
-      loMasCerca = cerca;
-    }
-  }
-  if (mejor === null) return nacerEn(x, y);
-
-  /*
-   * Y MIRANDO A LO ABIERTO, de espaldas a lo más cercano. Nacer pegado a un muro mirándolo
-   * es la mitad del fallo que esto arregla: se ve lo mismo que dentro de la casa.
-   */
-  const rumbo =
-    loMasCerca === null ? 0 : Math.atan2(mejor.x - loMasCerca.x, -(mejor.z - loMasCerca.z));
-  return { x: x * LADO_DE_LOSA + mejor.x, z: -y * LADO_DE_LOSA + mejor.z, rumbo, andando: 0 };
-}
-
-
-/** ¿Hay losa puesta en la casilla que contiene este punto? */
-export function hayLosaEn(
-  puestas: ReadonlySet<string>,
-  x: number,
-  z: number,
-): boolean {
+export function alturaDelSuelo(losas: ReadonlyMap<string, LosaConSuelo>, x: number, z: number): number {
   const i = Math.round(x / LADO_DE_LOSA);
   const j = Math.round(-z / LADO_DE_LOSA);
-  return puestas.has(`${i},${j}`);
+  const puesta = losas.get(llaveDeCasilla(i, j));
+  if (puesta === undefined) return 0;
+  const losa = losaPorId(puesta.losa);
+  if (losa === null) return 0;
+  /* En fracciones de losa desde su centro: `x` hacia el este y `z` hacia el sur, entre −½ y ½. */
+  const fx = x / LADO_DE_LOSA - i;
+  const fz = z / LADO_DE_LOSA + j;
+  const ci = Math.min(CELDAS_POR_LOSA - 1, Math.max(0, Math.floor((fx + 0.5) * CELDAS_POR_LOSA)));
+  const cj = Math.min(CELDAS_POR_LOSA - 1, Math.max(0, Math.floor((fz + 0.5) * CELDAS_POR_LOSA)));
+  return alturaDe(queHayEn(losa, puesta.giro, centroDeCelda(ci, cj)));
 }
 
 /**
- * UN PASO.
+ * EN QUÉ ALTURA SE APOYA LA CÁMARA DE A PIE: la del suelo, pero nunca por debajo del prado.
  *
- * ═══ EL SENO Y EL COSENO ESTÁN AQUÍ Y NO PASA NADA ═══
+ * ═══ POR QUÉ NO ES LA MISMA QUE LA DE LOS PIES ═══
  *
- * `verify:pureza` prohíbe la trigonometría en `shared/arcade/` y en
- * `shared/mecanicas/`, porque de ahí sale el ESTADO y un último bit distinto entre
- * dos motores desincroniza una partida. Esto no es estado: es dónde está mirando
- * una cámara en un aparato, no viaja a ningún sitio y nadie lo compara con nada.
- * Prohibirlo aquí sería aplicar la regla sin su razón.
+ * Porque delante de la cámara cuelgan la losa de la mano y el reloj (`rincones.ts`), y sus cuentas
+ * se hicieron con el suelo en el cero: en «ojos» el canto de abajo del reloj —con su caja— queda
+ * 0,66 unidades por encima de donde se apoya la cámara, y el de la mano 0,85. Si la cámara bajara
+ * con los pies a la senda, hundida 1,20, esos cantos quedarían medio metro POR DEBAJO del prado de
+ * al lado: andando pegado al borde del camino, o entrando por la puerta de una villa, la mano y el
+ * reloj se meterían en el suelo. `verify:lindes-escena` lo mide.
  *
- * ═══ Y SE PARA EN EL BORDE EN VEZ DE RESBALAR ═══
- *
- * Si el paso siguiente cae fuera del tablero se prueba SÓLO en `x` y SÓLO en `z`,
- * y se queda con lo que sí quepa. Eso es lo que hace que andar pegado al borde no
- * se enganche: sin ello, quien camina en diagonal contra el borde se queda clavado
- * aunque uno de los dos ejes esté libre, y se lee como que el juego se ha colgado.
+ * Así que los pies van a su suelo y la cámara no baja del prado. En la senda se mira desde 1,20
+ * más alto de lo que tocaría, que es lo que se hizo siempre; en la villa la cámara sube lo que
+ * sube el empedrado, y eso es nuevo y es lo correcto.
  */
-export function unPaso(
-  quien: Paseante,
-  mandos: Mandos,
-  dt: number,
-  puestas: ReadonlySet<string>,
-): Paseante {
-  const paso = Math.min(dt, 0.1);
-  let rumbo = quien.rumbo;
-  if (mandos.izquierda) rumbo -= GIRO_POR_SEGUNDO * paso;
-  if (mandos.derecha) rumbo += GIRO_POR_SEGUNDO * paso;
-  /* El rumbo se guarda siempre en [−π, π] para que no crezca sin fin en una sesión larga. */
-  while (rumbo > Math.PI) rumbo -= Math.PI * 2;
-  while (rumbo < -Math.PI) rumbo += Math.PI * 2;
-
-  const adelante = (mandos.adelante ? 1 : 0) - (mandos.atras ? 1 : 0);
-  if (adelante === 0) return { x: quien.x, z: quien.z, rumbo, andando: 0 };
-
-  const velocidad = (mandos.deprisa ? VELOCIDAD_CORRIENDO : VELOCIDAD_DEL_PASEO) * adelante * paso;
-  /* El norte es la `z` negativa: mirando al rumbo 0 se va hacia −z. */
-  const dx = Math.sin(rumbo) * velocidad;
-  const dz = -Math.cos(rumbo) * velocidad;
-
-  let x = quien.x;
-  let z = quien.z;
-  if (hayLosaEn(puestas, x + dx, z + dz)) {
-    x += dx;
-    z += dz;
-  } else {
-    if (hayLosaEn(puestas, x + dx, z)) x += dx;
-    if (hayLosaEn(puestas, x, z + dz)) z += dz;
-  }
-  return { x, z, rumbo, andando: quien.andando + paso };
+export function alturaDeLaCamara(losas: ReadonlyMap<string, LosaConSuelo>, x: number, z: number): number {
+  return Math.max(0, alturaDelSuelo(losas, x, z));
 }
 
-/** Dónde va la cámara y hacia dónde mira, según el modo. */
-export interface PoseDeCamara {
-  readonly x: number;
-  readonly y: number;
-  readonly z: number;
-  readonly miraX: number;
-  readonly miraY: number;
-  readonly miraZ: number;
-}
+/* ─── La niebla del paseo y la arena ─────────────────────────────────────── */
 
 /**
- * LA POSE DE LA CÁMARA DE MESA, que ademas dice HASTA DONDE hay que ver.
+ * LA NIEBLA DEL PASEO: desde dónde empieza a comerse las cosas y dónde ya no se ve nada.
  *
- * Las cámaras de paseo no lo dicen porque no encuadran nada: van pegadas al suelo y lo
- * que se ve de lejos es niebla. La de mesa sí, y por eso el campo va aquí y no en el
- * común: un campo opcional que en la práctica siempre está es la mejor manera de que un
- * día se olvide justo donde importa.
+ * A ras de suelo es lo único que da idea de cuánto tablero queda por delante. Estaba escrita dos
+ * veces en `Lindes.tsx` —en la niebla y en el alcance de la arena— y una tercera, copiada a mano,
+ * en `verify:lindes-escena`: tres sitios que había que acordarse de cambiar a la vez, y sólo uno
+ * se habría visto mal.
  */
+export const NIEBLA_DEL_PASEO = { cerca: LADO_DE_LOSA * 8, lejos: LADO_DE_LOSA * 34 } as const;
+
 /** Un rectángulo de suelo, en coordenadas del mundo. */
 export interface TrozoDeSuelo {
   readonly x0: number;
@@ -269,6 +170,14 @@ export interface TrozoDeSuelo {
   readonly masLejos: number;
 }
 
+/**
+ * LA POSE DE LA CÁMARA DE MESA, que además dice HASTA DÓNDE hay que ver.
+ *
+ * Las cámaras de paseo no lo dicen porque no encuadran nada: van pegadas al suelo y lo
+ * que se ve de lejos es niebla. La de mesa sí, y por eso el campo va aquí y no en el
+ * común: un campo opcional que en la práctica siempre está es la mejor manera de que un
+ * día se olvide justo donde importa.
+ */
 export interface PoseDeMesa extends PoseDeCamara {
   /** El plano de fondo que hace falta para que la esquina de allá se vea. */
   readonly lejos: number;
@@ -356,30 +265,6 @@ export function sueloQueSeVe(
     return { x0: centroX, x1: centroX, z0: centroZ, z1: centroZ, masLejos: distancia };
   }
   return { x0, x1, z0, z1, masLejos };
-}
-
-/** La cámara de ojos: donde está la cara, mirando adelante. */
-export function camaraDeOjos(quien: Paseante): PoseDeCamara {
-  return {
-    x: quien.x,
-    y: ALTURA_DE_LOS_OJOS,
-    z: quien.z,
-    miraX: quien.x + Math.sin(quien.rumbo) * 10,
-    miraY: ALTURA_DE_LOS_OJOS * 0.85,
-    miraZ: quien.z - Math.cos(quien.rumbo) * 10,
-  };
-}
-
-/** La cámara de hombro: por detrás y por encima, mirando a la nuca. */
-export function camaraDeHombro(quien: Paseante): PoseDeCamara {
-  return {
-    x: quien.x - Math.sin(quien.rumbo) * ATRAS_DEL_HOMBRO,
-    y: SOBRE_EL_HOMBRO,
-    z: quien.z + Math.cos(quien.rumbo) * ATRAS_DEL_HOMBRO,
-    miraX: quien.x + Math.sin(quien.rumbo) * 6,
-    miraY: ALTURA_DE_UNA_PERSONA * 0.6,
-    miraZ: quien.z - Math.cos(quien.rumbo) * 6,
-  };
 }
 
 /**
@@ -516,4 +401,34 @@ export function loQueAbarca(
     if (c.y > maxY) maxY = c.y;
   }
   return { minX, maxX, minY, maxY };
+}
+
+/**
+ * ═══ HASTA DÓNDE LLEGA LA ARENA ═══
+ *
+ * Dos alcances, y se pintan LOS DOS A LA VEZ aunque sólo uno esté en uso: el modo de cámara
+ * cambia con un botón, y rehacer el suelo en ese momento es un parpadeo en la pantalla justo
+ * cuando el jugador está mirando.
+ *
+ *   · MIRANDO LA MESA, lo que pisan las cuatro esquinas del cuadro (`sueloQueSeVe`). Crece con
+ *     el tablero y con lo estrecha que sea la ventana, y por eso no se puede escribir como un
+ *     margen fijo: es lo que se intentó y dejó el 35 % del cuadro en cielo.
+ *   · ANDANDO, hasta donde llega la niebla del paseo —`NIEBLA_DEL_PASEO.lejos`—, que es justo
+ *     donde se deja de ver: más allá no hay nada que tapar.
+ *
+ * Son dos triángulos con un color plano, así que sobrar no cuesta nada y faltar cuesta un tercio
+ * de la pantalla. Vive aquí y no en la escena para que `verify:lindes-escena` mida esta misma
+ * cuenta y no una copia suya.
+ */
+export function alcanceDeLaArena(
+  abarca: { readonly minX: number; readonly maxX: number; readonly minY: number; readonly maxY: number },
+  suelo: TrozoDeSuelo,
+): { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number } {
+  const andando = NIEBLA_DEL_PASEO.lejos;
+  return {
+    x0: Math.min(suelo.x0, (abarca.minX - 0.5) * LADO_DE_LOSA - andando),
+    x1: Math.max(suelo.x1, (abarca.maxX + 0.5) * LADO_DE_LOSA + andando),
+    z0: Math.min(suelo.z0, -(abarca.maxY + 0.5) * LADO_DE_LOSA - andando),
+    z1: Math.max(suelo.z1, -(abarca.minY - 0.5) * LADO_DE_LOSA + andando),
+  };
 }

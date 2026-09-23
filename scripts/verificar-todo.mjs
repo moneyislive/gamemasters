@@ -734,6 +734,13 @@ const BATERIA = [
     porque:
       'ni un triángulo del suelo mira hacia abajo, las 24 losas por sus 4 giros casan celda a celda en la raya con todas las que las reglas dejan pegar, ningún muro parte una villa que continúa en la losa de al lado, nada se sale de su losa ni flota ni se planta en mitad de un camino, los muros cubren su tramo sin aplastarse, un tablero de nueve por nueve con el recorte por distancia puesto cabe en el presupuesto —contado con los triángulos reales del `.glb`— y en el lobby los cinco sitios están en corro, mirando a la piedra y sin nada sembrado encima',
   },
+  {
+    nombre: 'el paseo común',
+    donde: 'escenas',
+    guion: 'verify:paseo',
+    porque:
+      'los fotogramas dan exactamente ⌊total/tic⌋ tics y nunca más de cinco por fotograma, lo pintado va siempre entre el tic anterior y el último, las teclas y la palanca piden su rumbo y su marcha con el atrás en +128, contra un cuerpo del mundo se para sin meterse y de lado resbala, la marioneta se queda quieta contra la pared aunque se pulse y corre al correr con el clip a la velocidad del suelo, lo pedido tic a tic basta para rehacer el camino, nadie nace encerrado, y la escena de Las Lindes y la app montan justo esto',
+  },
   /*
    * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.
    *

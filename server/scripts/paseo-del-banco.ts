@@ -60,7 +60,7 @@ export function mundoDePrueba(): MundoDeclarado {
       /*
        * Las piezas van DENTRO de su losa, y por eso el `- 0.5`: una casilla `i` ocupa
        * `[i·LADO − LADO/2, i·LADO + LADO/2]`, porque el índice se saca redondeando —es el
-       * convenio que ya usa `hayLosaEn` en `paseo.ts` y se hereda a propósito—. Sin restar
+       * convenio de `casillaDe` en `mundo.ts`, heredado del `hayLosaEn` del paseante viejo—. Sin restar
        * medio lado, las piezas caen a caballo entre dos casillas y la mitad quedan fuera de
        * lo pisable, donde el paseante nunca las va a tocar.
        */

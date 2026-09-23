@@ -22,6 +22,7 @@
  */
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
 import type { Calidad, Traer } from '../embarcadero/tipos';
+import type { MandosDeFuera } from '../paseo/mandos';
 
 /** Una losa puesta en el tablero. */
 export interface LosaEnElTablero {
@@ -136,6 +137,15 @@ export interface PropsDeLasLindes {
    * exactamente lo que pasaba antes de que esto existiera.
    */
   readonly figura?: string;
+  /**
+   * LA PALANCA Y EL BOTÓN DE CORRER, cuando el aparato no tiene teclado.
+   *
+   * La escena lee el teclado ella sola —donde hay `document`—, pero en iOS y en Android no lo
+   * hay, y sin esto en la app NO SE PODÍA ANDAR. La app monta los mandos táctiles
+   * (`app/src/arcade/mandos-del-paseo.tsx`) y los escribe en esta referencia; la escena los lee
+   * en su bucle, sin pasar por React. Opcional porque el escritorio anda con el teclado.
+   */
+  readonly mandos?: { readonly current: MandosDeFuera };
   /**
    * SI SE PUEDE PASAR EL TURNO AHORA, y qué hacer si se toca el reloj.
    *
