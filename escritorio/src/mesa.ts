@@ -41,6 +41,9 @@ import type { Opcion } from '../../shared/arcade';
 import { rutaDelCanal } from '../../shared/mecanicas/canal-de-botas';
 import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { turnoDeLaVista } from '../../shared/mecanicas/turno-declarado';
+import { leerElVeredicto, porQueNoTeSientas } from '../../escenas/compuerta-de-botas';
+import type { LecturaSinLlave } from '../../escenas/compuerta-de-botas';
+import type { Calidad } from '../../escenas/embarcadero/tipos';
 import { elSitioGuardado, guardarElSitio, olvidarElSitio } from './bolsillo';
 import { pausaAntesDeVolverAPreguntar } from './relojes';
 
@@ -232,6 +235,56 @@ const TOPE_DE_CRONICA = 40;
  */
 function ruta(cola: string): string {
   return `/api/arcade${cola}`;
+}
+
+/*
+ * ═══ EL VEREDICTO DE ESTE APARATO: LO QUE LA COMPUERTA DE BOOTS ON BOARD NECESITA A MANO ═══
+ *
+ * Lo que dijo el juez de calidad la última vez que este navegador pintó un lobby (ver
+ * `escenas/compuerta-de-botas.ts`). Vive AQUÍ, al lado de `entrar`, y no en el lobby que lo mide,
+ * porque quien no puede sentar en una mesa `botas` a un aparato que no llega es `entrar` —venga el
+ * código del lobby, del vestíbulo de la Sala o de un enlace pegado—, y la pregunta tiene que tener
+ * la respuesta sin esperar a que nadie mida. El lobby la escribe con `guardarElVeredicto` cada vez
+ * que el juez habla, y el último sustituye al anterior.
+ *
+ * `localStorage` envuelto en `try`, por lo que cuenta `bolsillo.ts`, y POR APARATO: sin silla,
+ * porque dos ventanas del mismo navegador pintan con la misma tarjeta. En Node —donde se pinta en
+ * `verify:escritorio`— no hay almacén, y eso es no saber: `null`.
+ */
+const LLAVE_DEL_VEREDICTO = 'escritorio.aparato.veredicto';
+
+/** El último veredicto de este aparato, o `null` si no lo hay o no se puede leer. */
+export function elVeredictoDelAparato(): Calidad | null {
+  try {
+    return leerElVeredicto(globalThis.localStorage?.getItem(LLAVE_DEL_VEREDICTO) ?? null);
+  } catch {
+    return null;
+  }
+}
+
+/** Apunta el veredicto que acaba de dar el juez, encima del que hubiera. */
+export function guardarElVeredicto(veredicto: Calidad): void {
+  try {
+    globalThis.localStorage?.setItem(LLAVE_DEL_VEREDICTO, veredicto);
+  } catch {
+    /* Sin almacén se juega igual: lo que cuesta es volver a medir la próxima vez, 120 fotogramas. */
+  }
+}
+
+/**
+ * LA MESA DE ESE CÓDIGO LEÍDA SIN LLAVE, que es como la ve quien aún no se ha sentado: la misma
+ * lectura que el sondeo, sin la cabecera de asiento y con `?desde=-1` para que conteste en el acto.
+ * Se la da hecha a `porQueNoTeSientas`, que no sabe de rutas ni de `fetch`.
+ */
+async function leerSinLlave(codigo: string): Promise<LecturaSinLlave> {
+  const r = await fetch(ruta(`/mesas/${codigo}?desde=-1`));
+  let cuerpo: unknown;
+  try {
+    cuerpo = await r.json();
+  } catch {
+    cuerpo = undefined;
+  }
+  return { ok: r.ok, status: r.status, cuerpo };
 }
 
 /*
@@ -604,6 +657,45 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
     [arcade, sentarse],
   );
 
+  /*
+   * ═══ PEDIR SILLA, Y UNA MESA DE BOTAS NO SE LA DA A QUIEN NO PUEDE BAJAR ═══
+   *
+   * La ÚNICA puerta por la que este cliente pide un asiento nuevo en una mesa ajena, y por eso la
+   * compuerta de Boots on Board va aquí y no en la pantalla: el código puede llegar del lobby, del
+   * vestíbulo de la Sala o de un enlace, y las tres entran por `entrar`. Un aparato que no llega,
+   * sentado en una mesa `botas`, jugaría desde arriba sin que nadie pudiera alcanzarle —una ventaja,
+   * no una forma humilde de jugar— y después ya no se le puede echar. Así que se mira ANTES:
+   * `porQueNoTeSientas` lee la mesa sin llave SÓLO si este aparato no baja a este tablero —quien baja
+   * entra como siempre, sin una petición de más— y contesta la frase que se enseña, o nada.
+   *
+   * `quieto` se pone al entrar y no se suelta hasta el final, por lo que cuenta `pideSilla` más abajo:
+   * si pasa, lo sigue teniendo `sentarse`, que lo vuelve a poner en el mismo tic; si no, se suelta
+   * aquí, con la mesa fuera y la frase puesta. Un fallo de la lectura se dice como el de pedir silla,
+   * con lo que dijo el servidor: un código equivocado sigue sonando igual que antes.
+   */
+  const pedirSilla = useCallback(
+    (limpio: string, cuerpoDeAsiento: unknown) => {
+      void (async () => {
+        ponerQuieto(true);
+        ponerFase('yendo');
+        let motivo: string | null;
+        try {
+          motivo = await porQueNoTeSientas(limpio, arcade, elVeredictoDelAparato(), leerSinLlave);
+        } catch (error) {
+          motivo = `No se ha podido entrar: ${textoDelFallo(error)}`;
+        }
+        if (motivo !== null) {
+          ponerFase('fuera');
+          ponerAviso({ texto: motivo, de: 'la-red' });
+          ponerQuieto(false);
+          return;
+        }
+        sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'No se ha podido entrar');
+      })();
+    },
+    [arcade, sentarse],
+  );
+
   const entrar = useCallback(
     (elCodigo: string, nombre: string, figura?: string) => {
       const limpio = elCodigo.trim().toUpperCase();
@@ -672,15 +764,13 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
           } finally {
             ponerQuieto(false);
           }
-          if (pideSilla) {
-            sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'No se ha podido entrar');
-          }
+          if (pideSilla) pedirSilla(limpio, cuerpoDeAsiento);
         })();
         return;
       }
-      sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'No se ha podido entrar');
+      pedirSilla(limpio, cuerpoDeAsiento);
     },
-    [apuntarLaLlave, arcade, silla, sentarse],
+    [apuntarLaLlave, arcade, silla, pedirSilla],
   );
 
   // -------------------------------------------------------------------------

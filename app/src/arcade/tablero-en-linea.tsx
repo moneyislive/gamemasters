@@ -97,6 +97,9 @@ import {
 } from '../../../shared/mecanicas/tablero-declarado';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
+/* La marca de Boots on Board en la barra: su palabra y la pregunta de si la mesa lo es. */
+import { MARCA_DE_BOTAS } from '../../../escenas/compuerta-de-botas';
+import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import { usarMesaDeArcade } from './mesa';
 import type { OpcionDeMesa, AvisoDeMesa} from './mesa';
 import { cuantoLleva, cuantoQueda } from './relojes';
@@ -453,6 +456,7 @@ export function ElTableroEnLinea(): JSX.Element {
             salir={mesa.salir}
             tirar={mesa.tirar}
             arriba={bordes.top}
+            deBotas={esMesaDeBotas(mesa.mesa)}
           />
           {/*
             ═══ AQUÍ TAMPOCO SE DESPLAZABA NADA, Y ES LA RAMA QUE MÁS CRECE ═══
@@ -514,6 +518,7 @@ export function ElTableroEnLinea(): JSX.Element {
         salir={mesa.salir}
         tirar={mesa.tirar}
         arriba={bordes.top}
+        deBotas={esMesaDeBotas(mesa.mesa)}
       />
       {/*
         ═══ DE QUIÉN ES EL TURNO Y CUÁNTO QUEDA ═══
@@ -648,6 +653,15 @@ function ElAviso({ texto }: { texto: string }): JSX.Element | null {
  * peligroso lo dice la pregunta que sale al pulsar, no el color. El único rojo de
  * la tabla —`SALA.alarma`— es de «se acaba el tiempo» y gastarlo en un botón que
  * ya está protegido lo dejaría sin significar eso.
+ *
+ * ═══ Y SI LA MESA ES DE BOOTS ON BOARD, LO DICE ═══
+ *
+ * Detrás del código, con el filo vivo y en la tinta de lo que acompaña: se juega
+ * distinto —bajando al tablero con los demás— y quien vuelve a la mesa tiene que
+ * saberlo sin buscarlo. Llega como `deBotas` y no como la mesa entera, porque la
+ * pregunta es `esMesaDeBotas` y la hace quien monta la barra, que es quien tiene la
+ * mesa: los pintores en tres dimensiones la reutilizan con su propia vista. Sin la
+ * prop no hay marca, que es lo que decía la barra antes de que existiera.
  */
 function BarraDeLaMesa({
   juego,
@@ -656,12 +670,15 @@ function BarraDeLaMesa({
   salir,
   tirar,
   arriba,
+  deBotas = false,
 }: {
   juego: string;
   codigo: string;
   asientos: ReadonlyArray<{ nombre: string; presente: boolean }>;
   salir: () => void;
   tirar: () => void;
+  /** La mesa es de la modalidad `botas`, preguntado con `esMesaDeBotas`. Sin ella, no. */
+  deBotas?: boolean;
   /**
    * LO QUE EL SISTEMA SE QUEDA ARRIBA, y por qué lo recibe y no lo pregunta.
    *
@@ -680,6 +697,11 @@ function BarraDeLaMesa({
         <View style={estilos.mesaId}>
           <Text style={estilos.mesaJuego}>{juego}</Text>
           <Text style={estilos.codigo}>Mesa {codigo}</Text>
+          {deBotas ? (
+            <Text style={estilos.marcaDeBotas} accessibilityLabel={`Mesa de ${MARCA_DE_BOTAS}`}>
+              {MARCA_DE_BOTAS}
+            </Text>
+          ) : null}
         </View>
         <View style={estilos.mandos}>
           {/*
@@ -1243,6 +1265,20 @@ const estilos = StyleSheet.create({
   mesaJuego: { ...LETRA.rotulo, color: SALA.palabra, fontSize: 15 },
   /* El acento: es lo que se dicta por teléfono para que venga alguien. */
   codigo: { ...LETRA.rotuloChico, color: SALA.acento, fontSize: 13 },
+  /*
+   * La marca de Boots on Board: un rótulo con el filo vivo, SIN acento —no se toca, y el acento de
+   * esta barra es del código—. Envuelve con los otros dos si el nombre es largo.
+   */
+  marcaDeBotas: {
+    ...LETRA.rotuloChico,
+    color: SALA.tenue,
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: SALA.filoVivo,
+    borderRadius: RADIO.mando,
+    paddingHorizontal: 6,
+    overflow: 'hidden',
+  },
   mandos: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   /* 44 de alto: el mismo mínimo de dedo que el retablo aplica a sus figuras. */
   salir: {

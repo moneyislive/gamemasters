@@ -51,6 +51,8 @@
  * `bolsillo.ts`, incluido por qué no se usa el almacén de `api.ts`.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { cargarSesionGuardada, servidorActual } from '../api';
 import {
   loQueQuedaTrasElSondeo,
@@ -60,6 +62,9 @@ import type { AvisoPuesto } from '../../../shared/mecanicas/aviso-puesto';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import { rutaDelCanal } from '../../../shared/mecanicas/canal-de-botas';
 import type { ArcadeId } from '../../../shared/arcade';
+import { leerElVeredicto, porQueNoTeSientas } from '../../../escenas/compuerta-de-botas';
+import type { LecturaSinLlave } from '../../../escenas/compuerta-de-botas';
+import type { Calidad } from '../../../escenas/embarcadero/tipos';
 import { elSitioGuardado, guardarElSitio, olvidarElSitio } from './bolsillo';
 import { pausaAntesDeVolverAPreguntar } from './relojes';
 import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
@@ -273,6 +278,76 @@ export interface LaMesa {
  */
 export function direccionDelCanal(codigo: string): string {
   return `${servidorActual().replace(/^http/i, 'ws')}${rutaDelCanal(codigo)}`;
+}
+
+/*
+ * ═══ EL VEREDICTO DE ESTE APARATO: LO QUE LA COMPUERTA DE BOOTS ON BOARD NECESITA A MANO ═══
+ *
+ * Lo que dijo el juez de calidad la última vez que este aparato pintó un lobby (ver
+ * `escenas/compuerta-de-botas.ts`). Vive AQUÍ, al lado de `entrar`, y no en el lobby que lo mide,
+ * porque quien no puede sentar en una mesa `botas` a un aparato que no llega es `entrar` —venga el
+ * código del lobby o del vestíbulo propio de un juego, que no mide nada—, y la pregunta tiene que
+ * tener la respuesta sin esperar a que nadie mida. El lobby la escribe con `guardarElVeredicto` cada
+ * vez que el juez habla, y el último sustituye al anterior.
+ *
+ * En el almacén del bolsillo —`SecureStore` en el aparato, `localStorage` en la web, todo envuelto en
+ * `try`—, que es el que ya tiene esta app y por las razones que cuenta `bolsillo.ts`: son las mismas
+ * diez líneas de fontanería, y un almacén seguro de sobra para cinco letras no cuesta nada. POR
+ * APARATO: una llave, sin arcade, porque la tarjeta que pinta es la misma para los tres juegos.
+ *
+ * Y una copia en memoria, porque el almacén es asíncrono: el veredicto que el lobby acaba de dar
+ * tiene que valer en el `entrar` de un segundo después, haya terminado de escribirse o no.
+ */
+const LLAVE_DEL_VEREDICTO = 'arcade.aparato.veredicto';
+
+/** Lo último que se sabe en esta ejecución; `undefined` mientras no se haya mirado el almacén. */
+let veredictoEnMemoria: Calidad | null | undefined;
+
+/** El último veredicto de este aparato, o `null` si no lo hay o no se puede leer. */
+export async function elVeredictoDelAparato(): Promise<Calidad | null> {
+  if (veredictoEnMemoria !== undefined) return veredictoEnMemoria;
+  let crudo: string | null = null;
+  try {
+    crudo =
+      Platform.OS === 'web'
+        ? (globalThis.localStorage?.getItem(LLAVE_DEL_VEREDICTO) ?? null)
+        : await SecureStore.getItemAsync(LLAVE_DEL_VEREDICTO);
+  } catch {
+    crudo = null;
+  }
+  /* Si mientras se leía llegó uno recién medido, manda el medido: es más nuevo que el guardado. */
+  if (veredictoEnMemoria === undefined) veredictoEnMemoria = leerElVeredicto(crudo);
+  return veredictoEnMemoria;
+}
+
+/** Apunta el veredicto que acaba de dar el juez, encima del que hubiera. */
+export async function guardarElVeredicto(veredicto: Calidad): Promise<void> {
+  veredictoEnMemoria = veredicto;
+  try {
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(LLAVE_DEL_VEREDICTO, veredicto);
+      return;
+    }
+    await SecureStore.setItemAsync(LLAVE_DEL_VEREDICTO, veredicto);
+  } catch {
+    /* Sin almacén se juega igual: lo que cuesta es volver a medir la próxima vez, 120 fotogramas. */
+  }
+}
+
+/**
+ * LA MESA DE ESE CÓDIGO LEÍDA SIN LLAVE, que es como la ve quien aún no se ha sentado: la misma
+ * lectura que el sondeo, sin la cabecera de asiento y con `?desde=-1` para que conteste en el acto.
+ * Se la da hecha a `porQueNoTeSientas`, que no sabe de servidores ni de `fetch`.
+ */
+async function leerSinLlave(codigo: string): Promise<LecturaSinLlave> {
+  const r = await fetch(`${servidorActual()}/api/arcade/mesas/${codigo}?desde=-1`);
+  let cuerpo: unknown;
+  try {
+    cuerpo = await r.json();
+  } catch {
+    cuerpo = undefined;
+  }
+  return { ok: r.ok, status: r.status, cuerpo };
 }
 
 /** La cabecera con la que un asiento demuestra que es él. Ver `routes/arcade.ts`. */
@@ -736,6 +811,25 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
                 return;
               }
             }
+          }
+          /*
+           * ═══ UNA MESA DE BOTAS NO LE DA SILLA A QUIEN NO PUEDE BAJAR ═══
+           *
+           * Aquí y no en la pantalla, porque ésta es la ÚNICA puerta por la que la app pide un
+           * asiento nuevo en una mesa ajena: el código puede llegar del lobby o del vestíbulo
+           * propio de un juego, y los dos entran por `entrar`. Un aparato que no llega, sentado en
+           * una mesa `botas`, jugaría desde arriba sin que nadie pudiera alcanzarle —una ventaja,
+           * no una forma humilde de jugar— y después ya no se le puede echar. Así que se mira
+           * ANTES: `porQueNoTeSientas` lee la mesa sin llave SÓLO si este aparato no baja a este
+           * tablero —quien baja entra como siempre, sin una petición de más— y contesta la frase
+           * que se enseña, o nada. Si la lectura falla, lanza con lo que dijo el servidor y cae al
+           * `catch` de abajo, que lo cuenta como cualquier fallo al entrar.
+           */
+          const motivo = await porQueNoTeSientas(limpio, arcade, await elVeredictoDelAparato(), leerSinLlave);
+          if (motivo !== null) {
+            ponerFase('fuera');
+            avisoDeLaRed(motivo);
+            return;
           }
           const r = await fetch(`${servidorActual()}/api/arcade/mesas/${limpio}/asientos`, {
             method: 'POST',

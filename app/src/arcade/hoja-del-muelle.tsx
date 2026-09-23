@@ -36,6 +36,17 @@
  * local quede ENTERO por encima de la hoja (`Ventana.franjaInferior`), y para eso
  * tiene que saber cuánto tapa. Un 36 % escrito a mano en los dos sitios se
  * separaría el día que alguien cambiara uno.
+ *
+ * ═══ Y AL ABRIR, CÓMO SE JUEGA: LA NORMAL O BOOTS ON BOARD ═══
+ *
+ * La elección sale en la orilla si el juego se recorre, y lo decide la compuerta
+ * (`escenas/compuerta-de-botas.ts`), que llega hecha de `muelle-escena.tsx` porque
+ * es allí donde se mide el aparato. Esta hoja sólo obedece: sin elección si el
+ * juego no se recorre; con Boots on Board apagada —con color, no con opacidad— y
+ * su porqué debajo mientras el aparato no llegue; y en `abrir` viaja lo que se ve
+ * encendido (`modalidadQueViaja`). Los vestíbulos propios de cada juego no la
+ * tienen y siguen abriendo la mesa de siempre: la elección es del lobby común.
+ * Y una mesa `botas` lo dice en la barra, debajo del nombre del juego.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -57,6 +68,9 @@ import { conAlfa } from '../tema';
 import { FIGURAS, figura as figuraPorId, figuraQueSePinta } from '../../../escenas/embarcadero/figuras';
 import type { FiguraId } from '../../../escenas/embarcadero/figuras';
 import type { TemaDelMuelle } from '../../../escenas/embarcadero/tema';
+import { LAS_DOS_MODALIDADES, MARCA_DE_BOTAS, modalidadQueViaja } from '../../../escenas/compuerta-de-botas';
+import type { LoQueDiceLaCompuerta, Modalidad } from '../../../escenas/compuerta-de-botas';
+import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import { opcionDeEmpezar } from './empezada';
 import type { LaMesa } from './mesa';
 import { LETRA, RADIO, SALA } from './muebles';
@@ -89,6 +103,8 @@ export interface PropsDeLaHoja {
   readonly fallo: string | null;
   /** La coreografía de zarpar está en marcha: la hoja lo dice y se aparta. */
   readonly zarpando: boolean;
+  /** Lo que dice la compuerta de Boots on Board para este aparato y este juego. */
+  readonly compuerta: LoQueDiceLaCompuerta;
 }
 
 /** Los dos planos del HUD: la barra de arriba y la hoja de abajo. */
@@ -137,9 +153,16 @@ export function HojaDelMuelle(props: PropsDeLaHoja): JSX.Element {
     );
   } else {
     cuerpo = (
-      <EnLaOrilla mesa={mesa} figura={props.figura} alCambiarFigura={() => ponerEligiendo(true)} />
+      <EnLaOrilla
+        mesa={mesa}
+        figura={props.figura}
+        compuerta={props.compuerta}
+        alCambiarFigura={() => ponerEligiendo(true)}
+      />
     );
   }
+  /* Una mesa de botas lo dice debajo del nombre del juego. La pregunta es `esMesaDeBotas`. */
+  const deBotas = mesa.fase === 'dentro' && esMesaDeBotas(mesa.mesa);
 
   return (
     <>
@@ -155,9 +178,16 @@ export function HojaDelMuelle(props: PropsDeLaHoja): JSX.Element {
         >
           <Text style={estilos.volverRotulo}>‹ Sala</Text>
         </Pressable>
-        <Text style={estilos.nombreDelArcade} numberOfLines={1}>
-          {props.nombreDelArcade}
-        </Text>
+        <View style={estilos.nombreCaja}>
+          <Text style={estilos.nombreDelArcade} numberOfLines={1}>
+            {props.nombreDelArcade}
+          </Text>
+          {deBotas ? (
+            <Text style={estilos.marcaDeBotas} accessibilityLabel={`Mesa de ${MARCA_DE_BOTAS}`}>
+              {MARCA_DE_BOTAS}
+            </Text>
+          ) : null}
+        </View>
         <RailDeAforo aforo={props.aforo} sentados={sentados} />
       </View>
 
@@ -245,15 +275,19 @@ function Zarpando({ tema }: { tema: TemaDelMuelle }): JSX.Element {
 function EnLaOrilla({
   mesa,
   figura,
+  compuerta,
   alCambiarFigura,
 }: {
   mesa: LaMesa;
   figura: FiguraId | null;
+  compuerta: LoQueDiceLaCompuerta;
   alCambiarFigura: () => void;
 }): JSX.Element {
   const [nombre, ponerNombre] = useState('');
   const [codigo, ponerCodigo] = useState('');
   const [plazo, ponerPlazo] = useState(0);
+  /* La de siempre viene puesta: Boots on Board se elige, nunca se hereda. */
+  const [elegida, ponerElegida] = useState<Modalidad>('normal');
   /*
    * Qué código se envió ya, para que el efecto de abajo no lo mande dos veces:
    * cada respuesta de la mesa repinta, y el código sigue teniendo cinco letras.
@@ -341,10 +375,14 @@ function EnLaOrilla({
       </View>
       <Text style={estilos.ayuda}>{PLAZOS[plazo]?.ayuda ?? ''}</Text>
 
+      <EleccionDeModalidad elegida={elegida} compuerta={compuerta} alElegir={ponerElegida} />
+
       <Pressable
         style={[estilos.boton, noPuedeAbrir ? estilos.botonQuieto : estilos.botonVivo]}
         disabled={noPuedeAbrir}
-        onPress={() => mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos, figura ?? undefined)}
+        onPress={() =>
+          mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos, figura ?? undefined, modalidadQueViaja(elegida, compuerta))
+        }
         accessibilityRole="button"
         accessibilityLabel="Abrir una mesa"
         accessibilityState={{ disabled: noPuedeAbrir }}
@@ -361,6 +399,61 @@ function EnLaOrilla({
       ) : null}
       {mesa.aviso.length > 0 ? <Text style={estilos.fallo}>{mesa.aviso}</Text> : null}
     </View>
+  );
+}
+
+/**
+ * CÓMO SE JUEGA LA MESA QUE SE ABRE: dos fichas, como las del plazo, porque es la misma clase de
+ * pregunta —qué mesa se abre— y se contesta con el mismo gesto.
+ *
+ * Lo decide la compuerta y aquí sólo se obedece. Si el juego no se recorre no sale nada: no hay
+ * tablero al que bajar, y la mesa se abre como se abrió siempre. Si el aparato no llega, Boots on
+ * Board SALE, apagada y con su porqué en el renglón de debajo —es como esta casa enseña lo que no se
+ * puede: escondida, quien no llega no sabría nunca que existe—. Apagada con el FILO DISCONTINUO y no
+ * con opacidad, por la regla de siempre: la letra se sigue leyendo. Y lo que se ve puesto es lo que
+ * viaja: apagada, la normal, aunque se hubiera marcado la otra antes de que llegara el veredicto.
+ *
+ * El renglón de debajo dice la ayuda de la puesta, o el porqué de la apagada: cuando una opción no se
+ * puede tocar, lo que hace falta saber es por qué, y la hoja no tiene sitio para las dos cosas.
+ */
+function EleccionDeModalidad({
+  elegida,
+  compuerta,
+  alElegir,
+}: {
+  elegida: Modalidad;
+  compuerta: LoQueDiceLaCompuerta;
+  alElegir: (modalidad: Modalidad) => void;
+}): JSX.Element | null {
+  if (compuerta.que === 'no-se-recorre') return null;
+  const motivo = compuerta.que === 'se-ofrece' ? null : compuerta.motivo;
+  const puesta: Modalidad = motivo === null ? elegida : 'normal';
+  const renglon = motivo ?? LAS_DOS_MODALIDADES.find((m) => m.modalidad === puesta)?.ayuda ?? '';
+  return (
+    <>
+      <Text style={estilos.o}>cómo se juega</Text>
+      <View style={estilos.plazos} accessibilityRole="radiogroup" accessibilityLabel="Cómo se juega">
+        {LAS_DOS_MODALIDADES.map((m) => {
+          const apagada = m.modalidad === 'botas' && motivo !== null;
+          const es = m.modalidad === puesta;
+          return (
+            <Pressable
+              key={m.modalidad}
+              style={[estilos.plazo, es ? estilos.plazoElegido : null, apagada ? estilos.modalidadApagada : null]}
+              disabled={apagada}
+              onPress={() => alElegir(m.modalidad)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: es, disabled: apagada }}
+              accessibilityLabel={m.rotulo}
+              accessibilityHint={apagada && motivo !== null ? motivo : m.ayuda}
+            >
+              <Text style={es ? estilos.plazoRotuloElegido : estilos.plazoRotulo}>{m.rotulo}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={estilos.ayuda}>{renglon}</Text>
+    </>
   );
 }
 
@@ -667,7 +760,23 @@ const estilos = StyleSheet.create({
   },
   volver: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
   volverRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
-  nombreDelArcade: { ...LETRA.rotulo, color: SALA.palabra, fontSize: 15, flex: 1, textAlign: 'center' },
+  /* El nombre y, si la mesa es de botas, su marca debajo: los dos centrados en el hueco del medio. */
+  nombreCaja: { flex: 1, alignItems: 'center', gap: 2 },
+  nombreDelArcade: { ...LETRA.rotulo, color: SALA.palabra, fontSize: 15, textAlign: 'center' },
+  /*
+   * LA MARCA DE UNA MESA DE BOOTS ON BOARD: un rótulo con el filo vivo, en la tinta de lo que
+   * acompaña. Sin acento: no se toca, y el acento de esta hoja dice «esto está vivo o zarpa».
+   */
+  marcaDeBotas: {
+    ...LETRA.rotuloChico,
+    color: SALA.tenue,
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: SALA.filoVivo,
+    borderRadius: RADIO.mando,
+    paddingHorizontal: 6,
+    overflow: 'hidden',
+  },
   rail: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -796,6 +905,11 @@ const estilos = StyleSheet.create({
   plazoElegido: { borderColor: SALA.filoVivo, backgroundColor: SALA.tejaAlta },
   plazoRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
   plazoRotuloElegido: { ...LETRA.rotuloChico, color: SALA.palabra, fontSize: 13, fontWeight: '800' },
+  /*
+   * Boots on Board cuando el aparato no llega: el filo DISCONTINUO dice «no se puede» sin apagar la
+   * letra, que sigue en `tenue` y se lee igual que la de al lado. Lo que dice por qué va debajo.
+   */
+  modalidadApagada: { borderStyle: 'dashed', borderColor: SALA.filoVivo },
   casillas: { flexDirection: 'row', justifyContent: 'center', gap: 8, position: 'relative' },
   casilla: {
     width: 44,
