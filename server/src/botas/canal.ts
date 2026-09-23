@@ -163,6 +163,13 @@ export interface Enchufe {
   cerrar(codigo: number, razon: string): void;
   /** Cuántos bytes esperan a salir. */
   pendientes(): number;
+  /**
+   * OPCIONAL: se llama UNA vez cuando este canal dice `hola` (pasa de `saludo` a `entrando`). Lo usa
+   * la capa de cuotas (`cuotas.ts`) para soltar el hueco del tope de «canales sin saludar»: hasta
+   * este aviso, el canal cuenta contra ese tope; después, no. Quien no lo pone —una mesa de
+   * mentira— no cambia en nada el comportamiento del canal.
+   */
+  saludo?(): void;
 }
 
 export interface Temporizador {
@@ -233,6 +240,14 @@ export type PorQueSeCierra = keyof typeof CIERRE | 'apagado' | 'fallo' | 'seFue'
 export type PorQueSeCorrige = 'presupuesto' | 'estructura' | 'rescate' | 'repetida';
 
 /**
+ * Por qué una subida se negó en la capa de cuotas (`cuotas.ts`), antes de llegar a ser un canal:
+ * los dos topes globales —el total y el más estricto de los que no han saludado— y los dos por
+ * procedencia —cuántos a la vez y a qué ritmo—. Se cuenta aquí, con `origenesNegados`, porque el
+ * diagnóstico se sirve de `canal.diagnostico()` y así se ve «cuántas se negaron y por qué».
+ */
+export type MotivoDeCuota = 'global' | 'sinSaludar' | 'concurrencia' | 'ritmo';
+
+/**
  * LO QUE DICE EL DIAGNÓSTICO. Sólo cuentas: ni un código de mesa, ni un asiento, ni una llave.
  * `/api/arcade/diagnostico` se sirve sin credencial.
  */
@@ -261,6 +276,8 @@ export interface DiagnosticoDeBotas {
   msDerivando: number;
   entradas: number;
   origenesNegados: number;
+  /** Subidas negadas en la capa de cuotas, por motivo (ver `MotivoDeCuota` y `cuotas.ts`). */
+  cuotasNegadas: Record<MotivoDeCuota, number>;
   cierres: Record<PorQueSeCierra, number>;
 }
 
@@ -287,6 +304,7 @@ export function cuentasVacias(): DiagnosticoDeBotas {
     msDerivando: 0,
     entradas: 0,
     origenesNegados: 0,
+    cuotasNegadas: { global: 0, sinSaludar: 0, concurrencia: 0, ritmo: 0 },
     cierres: {
       sinHola: 0,
       llaveMala: 0,
@@ -527,6 +545,8 @@ export class CanalDeBotas {
       c.plazo?.parar();
       c.plazo = null;
       c.estado = 'entrando';
+      /* Ya ha saludado: la capa de cuotas suelta su hueco del tope de «canales sin saludar». */
+      c.enchufe.saludo?.();
       void this.entrar(c, m.llave);
       return;
     }
@@ -1094,6 +1114,11 @@ export class CanalDeBotas {
     this.cuentas.origenesNegados++;
   }
 
+  /** Una subida negada por cuota: la cuenta la capa de cuotas (`cuotas.ts`) a través del enchufe. */
+  contarCuotaNegada(motivo: MotivoDeCuota): void {
+    this.cuentas.cuotasNegadas[motivo]++;
+  }
+
   diagnostico(): DiagnosticoDeBotas {
     let enSala = 0;
     for (const c of this.conexiones) if (c.estado === 'dentro') enSala++;
@@ -1105,6 +1130,7 @@ export class CanalDeBotas {
       temporizador: this.temporizador !== null,
       colaParaDerivar: this.esperandoTurno.length,
       correcciones: { ...this.cuentas.correcciones },
+      cuotasNegadas: { ...this.cuentas.cuotasNegadas },
       cierres: { ...this.cuentas.cierres },
     };
   }
