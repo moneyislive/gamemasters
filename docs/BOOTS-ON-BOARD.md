@@ -13,6 +13,11 @@ botín. Qué se usa de IR Engine, qué se coge de terceros, qué escribimos noso
 >    que la soportan — y **a nadie se le echa de una partida empezada** porque le empeore la
 >    conexión.
 
+> **REVISADO EL 23 DE SEPTIEMBRE DE 2026.** El plan se revisó entero, con cuatro mapas medidos
+> del árbol. Las tres decisiones de arriba se sostienen; **dos piezas del plan cambian** —el
+> servidor VALIDA las posiciones en vez de resimularlas, y el canal es propio sobre WebSocket
+> en vez de Colyseus— y el orden del §6 se sustituye por el del **§7**, que es el que manda.
+
 ---
 
 ## 0 · Por qué la tercera decisión es la que más simplifica
@@ -298,3 +303,116 @@ conflicto**. `shared/mecanicas/andar.ts` y `escenas/lindes/paseo.ts` son fichero
 git los fusiona tan contento — quedan dos `unPaso`, y `Lindes.tsx` sigue llamando al viejo. Paso
 3 entregado, comprobadores en verde, y el único juego que se puede andar sigue atravesando
 murallas.
+
+---
+
+## 7 · REVISIÓN DEL 23 DE SEPTIEMBRE: lo que se sostiene, lo que no, y el plan que manda
+
+Miguel pidió revisar el plan entero, criticarlo y retomarlo con criterio propio, pensando en
+escalar el número de arcades deprisa y en lo que cuestan los servidores con muchos usuarios. Lo
+que sigue sale de cuatro mapas del árbol hechos en paralelo —coste de un juego nuevo, techo del
+servidor, paseo y 3D en los dos clientes, y la batería— y de leer la sesión anterior entera.
+
+### 7.1 · Lo que se sostiene, y no se toca
+
+- **Las tres decisiones de Miguel.** La modalidad aparte es, además, la que abarata todo lo demás.
+- **No adoptar el código de IR Engine.** El análisis del §1 es correcto y está medido: IR está
+  parado desde julio de 2025, su pegamento suelda React 18.2 y su física es Rapier en WASM, que
+  el Hermes de la app no ejecuta. Lo que se coge de IR es su patrón —el mundo se declara, el
+  transporte es un contrato, simulación separada de presentación—, y la casa ya lo hacía.
+- **El cliente declara intención, nunca resultado**, y la puerta `arcade:` del núcleo ya está
+  cerrada para los aparatos.
+- **Enteros para lo que decide.** `fijo.ts` y la arena Q16.16 se quedan.
+
+### 7.2 · Lo que no se sostiene
+
+1. **El ritmo.** Cinco días y varias decenas de agentes después, la modalidad no existía: ningún
+   tablero se andaba con choques, nadie veía a nadie y no había mesa `botas`. Se midió a fondo lo
+   que no cambiaba ninguna decisión —dónde factura Render el ancho de banda, para acabar
+   decidiendo no escribir una línea— y no se miró lo que sí la cambiaba: **en el móvil no se
+   puede andar en ningún juego**, porque no hay mandos táctiles y las teclas se leen de
+   `document`. Con el plan tal cual, Boots on Board no se habría podido ofrecer en la app, y por
+   la regla de que ningún juego es sólo para PC, tampoco en el escritorio.
+2. **Dos arreglos del §5 que se dieron por cerrados no lo estaban.** Los topes de carga seguían
+   exigiéndose sólo en la ruta HTTP (`mesas.ts` y `arbitro.ts`: cero referencias), y el CORS
+   pelado seguía en `index.ts:105`. Lo que se cerró fue otra cosa: la cadena de proxy, la puerta
+   de récords, la cuarentena y la decisión sobre los deltas.
+3. **El plan no miraba el techo del servidor, y es lo que más pesa en la factura.** Medido: toda
+   mesa —terminada o no— vive 30 días en un `Map` en RAM con su diario entero, `cargar()` lee
+   todos los ficheros de golpe al arrancar, y cada lectura de espera larga hace DOS proyecciones
+   completas sólo para comparar un número de revisión. El techo real hoy son unos pocos miles de
+   mesas al mes, en una sola instancia. Eso decide el «millón de usuarios» más que todo Boots on
+   Board junto.
+4. **Resimular cada paso en el servidor, al bit, era más caro de lo que compra.** Obligaba a
+   bajar a `shared/` —puro y sin trigonometría— el paisaje fino de los tres juegos: las 1.300
+   líneas del reparto de Las Lindes, la ciudad del Burgo (que además cambia con la calidad del
+   aparato) y el relieve y el agua de Riberas, llenos de senos. Para una arena lenta con un botín
+   que no sale de la mesa, lo que hay que impedir es atravesar muros y edificios, correr de más y
+   teletransportarse; atravesar un barril no le da ventaja a nadie.
+5. **Colyseus sobraba.** Su SDK compila en Hermes, pero pide un polirrelleno de
+   `FinalizationRegistry`, un alias de `ws` en Metro y unos 635 kB de bytecode entre SDK y
+   `schema`; trae su propio modelo de estado, que duplica la mesa; y lo que venía a dar
+   —predicción y reconciliación— sale gratis de un paso entero compartido.
+6. **`mundo.ts` tenía un agujero y le faltaban dos cosas.** Sólo miraba el cajón del centro del
+   paseante: junto a una raya se entraba hasta un radio dentro de una caja (visto rojo, 2 de 30).
+   Le faltaban los vados que Miguel decidió para Riberas y el rumbo al nacer. Y su banco medía el
+   determinismo de ocho rumbos escritos a mano, que no es el paso que se da.
+7. **Hecho juego a juego, Boots on Board no escala.** Un cuarto arcade 3D cuesta hoy unas 21.000
+   líneas en 58 ficheros; la duplicación evitable es sólo un 9 %, concentrada en los envoltorios
+   de la app. Lo que sí escala es que el paseo, los mandos, las cámaras, la marioneta, la
+   presencia y la validación sean de la plataforma, y que un juego nuevo sólo DECLARE su mundo.
+
+### 7.3 · Las dos decisiones nuevas
+
+**A · Estructura y adorno, y el servidor VALIDA.** El mundo con el que se choca tiene dos capas:
+
+| capa | qué es | dónde vive | quién la usa |
+|---|---|---|---|
+| **estructura** | lo que saben las reglas o no depende del aparato: el suelo, el agua, murallas, edificios, poblados | `shared/`, pura | el aparato para andar y el servidor para validar |
+| **adorno** | lo que depende de la calidad o sólo se ve: árboles, barriles, coches, la forma fina de la orilla | `escenas/` | sólo el aparato |
+
+En Boots on Board cada aparato anda con su mundo entero y manda por cada tic dónde está; el
+servidor lo VALIDA contra la estructura —un presupuesto de distancia por tiempo de pared, que
+haya piso, que no esté dentro de un cuerpo— y si no cuadra lo devuelve al último sitio bueno.
+**El combate y el botín los decide siempre el servidor**, sobre las posiciones que aceptó. Es lo
+que ya decía el §2 —«disparé desde P» lleva la P del cliente—, dicho entero.
+
+Las Lindes sí baja su reparto a `shared/`, porque allí las casas y las murallas SON estructura y
+salen del sorteo del paisaje. El Burgo declara sus edificios (que no dependen de la calidad) y
+Riberas su tierra, su vado y sus poblados desde la vista pública; su paisaje fino se queda donde
+está.
+
+**B · El canal es propio.** Un WebSocket por asiento en `/api/arcade/mesas/:codigo/botas`, sólo
+para mesas `botas`: `ws` en el servidor, el nativo en navegador y React Native. La llave de
+asiento viaja en el primer mensaje, nunca en la URL. El aparato manda cada tic su sitio y su
+rumbo; el servidor manda a todos una foto por tic, serializada UNA vez por mesa. Desalojo por
+CONTENIDO: sesenta segundos sin moverse cierran el socket. Coste estimado: 5 a 9 MB por mesa de
+diez minutos. Es la sala de la mesa y vive con ella: el día que las mesas se repartan por código
+entre procesos, su canal viaja con ellas.
+
+### 7.4 · La decisión que la sesión anterior dejó abierta (el reparto de Las Lindes)
+
+**Camino 1: se baja el reparto entero y se acepta el repaisaje.** Las Lindes no se ha desplegado
+nunca, así que nadie ha visto el paisaje que cambia; el seno de la plaza se sustituye por una
+tabla literal de direcciones que consume UNA tirada, como hoy; y la ventana se cierra: en cuanto
+un almiar decide si se pasa, moverlo deja de ser gratis.
+
+### 7.5 · El plan que manda, por frentes en paralelo
+
+| ronda | frente | estado |
+|---|---|---|
+| 0 | contrato común: el agujero del cajón, vados, rumbo al nacer, `andar.ts` (tics y 256 rumbos literales) | hecho (`f1ec033`) |
+| 1 | Las Lindes: el reparto a `shared/` y su mundo de verdad (murallas, remates, villa, ermita), recordado por losa | hecho (`263c97a`, `a92d091`) |
+| 1 | el paseo común en `escenas/paseo/`, por tics e interpolado; mandos táctiles en la app; los dos fallos de la animación | hecho (`3a77490`) |
+| 1 | el mundo del Burgo, igual en todas las calidades | hecho (`a4e4046`) |
+| 1 | el mundo de Riberas: tierra, vado y poblados desde la vista pública | hecho (`4204cac`) |
+| 1 | el núcleo del servidor: modalidad de la mesa, topes en la mesa, lectura barata, CORS con lista blanca, memoria perezosa | hecho en `botas-servidor`; un revisor adversario encontró dos fallos medios y se están arreglando |
+| 2 | el contrato del canal (`dbfd726`) y el registro de mundos (`9848404`) | hecho |
+| 2 | el canal en el aparato: entrar, mandar el sitio, corregir, ver a los demás; la cámara que no atraviesa | hecho (`5857bbc`) |
+| 2 | el canal en el servidor: sala por mesa, validación, fotos, desalojo por contenido | en curso |
+| 2 | la modalidad y su compuerta en los lobbies; el Burgo y Riberas a pie; Las Lindes en la app con su atlas y su juez de calidad | en curso |
+| 3 | la refriega y el botín: un golpe, la vida, el veredicto `arcade:botin` en los tres reductores | después de la 2 |
+
+**Lo que sigue siendo de Miguel:** el inventario global y las cuentas (`docs/TABLERO-RECORRIBLE.md`
+§6), las armas y el crafteo, medir `SALTOS_DE_CONFIANZA` en producción antes de desplegar, y el
+empuje a `main` y el APK.
