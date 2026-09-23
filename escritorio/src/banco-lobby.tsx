@@ -1,32 +1,54 @@
 /**
- * EL BANCO DE PRUEBAS DEL MUELLE: la escena del lobby con una mesa de mentira.
+ * EL BANCO DE PRUEBAS DE LOS LOBBIES: la escena del muelle de un arcade con una mesa de mentira.
  *
  * ═══ QUÉ DEMUESTRA, QUE ES LO ÚNICO QUE PRETENDE ═══
  *
- * Lo que `verify:embarcadero` no puede: que el embarcadero SE VE. El tinte del
- * barco con su volumen, la brasa en el agua, las motas, la llegada en barco de
- * quien se sienta, el zarpe con el amanecer, y —lo que más importa— que en un
- * móvil de 9:19,5 con la hoja del HUD al 36 % el aventurero local queda entero
- * encima de la hoja. Para eso el marco se elige con botones y la hoja se pinta
- * como una lámina gris encima, con la misma `franjaInferior` que mandaría la app.
+ * Lo que `verify:embarcadero` y `verify:plaza` no pueden: que el lobby SE VE. En el
+ * embarcadero, el tinte del barco con su volumen, la brasa en el agua, las motas y la llegada
+ * en barco de quien se sienta; en la plaza, el bronce del monumento con la luz rasante de la
+ * tarde, las farolas encendiéndose puesto a puesto, la entrada andando desde la boca de calle
+ * y el estandarte a media asta de quien se va; en los dos, el zarpe. Y —lo que más importa—
+ * que en un móvil de 9:19,5 con la hoja del HUD al 36 % el aventurero local queda entero
+ * encima de la hoja. Para eso el marco se elige con botones y la hoja se pinta como una
+ * lámina gris encima, con la misma `franjaInferior` que mandaría la app.
+ *
+ * Y lo otro que sólo se mide aquí: las LLAMADAS DE DIBUJO de verdad, que `gl.info.render`
+ * cuenta y, en el lobby que tiene presupuesto escrito (`presupuesto-de-la-plaza.ts`), se
+ * enseñan al lado de lo prometido.
+ *
+ * ═══ UN BANCO, UNA FILA POR LOBBY ═══
+ *
+ * Eran dos ficheros —éste para el embarcadero y `banco-plaza.tsx` para la plaza— iguales
+ * salvo unas cincuenta líneas de trescientas: el modelo propio, las palabras de los botones,
+ * cómo se llama en la dirección cuántos hay sentados, un botón más y el presupuesto. Lo que
+ * cambia está en `LOS_LOBBIES`, una fila por arcade; la escena la elige el tema con la misma
+ * tabla que usan los dos clientes (`escenaDelMuelle`), y la página dice qué lobby quiere con
+ * `data-lobby` en su `<div id="raiz">`. Un lobby nuevo es una fila aquí y una página de diez
+ * renglones. `lobby3d.html` y `plaza3d.html` siguen en su sitio y con sus parámetros de
+ * siempre: `?codigo=ABCDE&sentados=3&aspecto=retrato` el muelle y `?jugadores=` la plaza.
+ *
+ * La Linde Alta tiene su banco aparte (`banco-linde.tsx`) y no es un olvido: es otra cosa, a
+ * pantalla completa, sin marcos ni hoja, con su cámara y su exposición.
  *
  * ═══ LA MESA ES SIMULADA Y `traer` VIENE DE VITE ═══
  *
- * No hay servidor: los asientos se sientan y se levantan con botones, y los bytes
- * de los `.glb` se piden a las direcciones que Vite da con `?url`, traduciendo
- * las rutas de `figuras.ts` con un mapa. La escena no sabe nada de esto: recibe
- * la misma `MesaEnElMuelle`, la misma `Ventana` y la misma `traer` que en la Sala.
+ * No hay servidor: los asientos se sientan y se levantan con botones, y los bytes de los
+ * `.glb` se piden a las direcciones que Vite da con `?url`, traduciendo las rutas del servidor
+ * de juego con un mapa. La escena no sabe nada de esto: recibe la misma `MesaEnElMuelle`, la
+ * misma `Ventana` y la misma `traer` que en la Sala. Es la misma frontera que en
+ * `banco-burgo.tsx`.
  *
  * ═══ EL MISMO `Canvas` QUE EL ESCRITORIO ═══
  *
- * ACES a 0,95, `dpr` de 1 a 2, antialias: lo que monta `muelle.tsx`, para que lo
- * que se mire aquí sea lo que se va a ver allí.
+ * ACES a 0,95, `dpr` de 1 a 2, antialias: lo que monta `muelle.tsx`, para que lo que se mire
+ * aquí sea lo que se va a ver allí.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
-import { Embarcadero } from '../../escenas/embarcadero/Embarcadero';
+import { escenaDelMuelle } from '../../escenas/embarcadero/escenas-del-muelle';
 import {
   FICHERO_DE_ANIMACIONES,
   FIGURAS,
@@ -38,7 +60,10 @@ import type { FiguraId } from '../../escenas/embarcadero/figuras';
 import { temaDelMuelle } from '../../escenas/embarcadero/tema';
 import type { TemaDelMuelle } from '../../escenas/embarcadero/tema';
 import type { AsientoEnElMuelle, Calidad, MesaEnElMuelle, Traer, Ventana } from '../../escenas/embarcadero/tipos';
+import { rutaDelBurgo } from '../../escenas/ruta-de-modelos';
+import { TOPE_DE_LLAMADAS, TOPE_DE_TRIANGULOS, llamadasDeLaPlaza } from '../../escenas/plaza/presupuesto-de-la-plaza';
 import embarcaderoGlb from '../../escenas/modelos/embarcadero.glb?url';
+import burgoGlb from '../../escenas/modelos/burgo.glb?url';
 import animacionesGlb from '../../escenas/modelos/aventureros/animaciones.glb?url';
 import caballeroGlb from '../../escenas/modelos/aventureros/caballero.glb?url';
 import barbaroGlb from '../../escenas/modelos/aventureros/barbaro.glb?url';
@@ -48,14 +73,91 @@ import picaroGlb from '../../escenas/modelos/aventureros/picaro.glb?url';
 import encapuchadoGlb from '../../escenas/modelos/aventureros/encapuchado.glb?url';
 import './banco-lobby.css';
 
+/* ─────────────────────────────── Los lobbies ─────────────────────────────── */
+
+/** Lo que cambia de un lobby a otro en el banco. Todo lo demás es el mismo banco. */
+interface LobbyDelBanco {
+  /** El arcade: la llave de su tema, y del tema salen la escena, el lugar y la paleta. */
+  readonly arcade: string;
+  /** El rótulo del panel, detrás de «BANCO DE PRUEBAS · ». */
+  readonly rotulo: string;
+  /** La página que lo abre: para decirlo si le falta la raíz. */
+  readonly pagina: string;
+  /**
+   * Cómo se llama en la dirección cuántos hay sentados. Distinto en cada lobby porque así
+   * nacieron sus enlaces, y un enlace apuntado en una nota tiene que seguir abriendo lo mismo.
+   */
+  readonly parametro: 'sentados' | 'jugadores';
+  /** El modelo propio del lobby: la ruta que pide la escena y la dirección que da Vite. */
+  readonly modelo: readonly [ruta: string, direccion: string];
+  /** Las palabras de los tres botones de la mesa simulada que no son iguales en los dos. */
+  readonly sentar: string;
+  readonly levantar: string;
+  readonly ausentar: string;
+  /** Si hay botón para que OTRO se vista: la coreografía del humo vista desde fuera. */
+  readonly vestirAOtro: boolean;
+  /** Los topes que promete el presupuesto del lobby, si lo tiene escrito aparte. */
+  readonly presupuesto?: {
+    readonly triangulos: number;
+    readonly llamadas: number;
+    readonly prometidas: (calidad: Calidad, sentados: number) => number;
+  };
+}
+
+const LOS_LOBBIES: Readonly<Record<string, LobbyDelBanco>> = {
+  riberas: {
+    arcade: 'riberas',
+    rotulo: 'EL MUELLE',
+    pagina: 'lobby3d.html',
+    parametro: 'sentados',
+    modelo: [rutaDelEmbarcadero(), embarcaderoGlb],
+    sentar: 'Sentar a uno',
+    levantar: 'Levantar al último',
+    ausentar: 'Presencia de uno',
+    vestirAOtro: false,
+  },
+  burgo: {
+    arcade: 'burgo',
+    rotulo: 'LA PLAZA',
+    pagina: 'plaza3d.html',
+    parametro: 'jugadores',
+    modelo: [rutaDelBurgo(), burgoGlb],
+    sentar: 'Llega uno',
+    levantar: 'Se levanta el último',
+    ausentar: 'Ausencia de uno',
+    vestirAOtro: true,
+    presupuesto: {
+      triangulos: TOPE_DE_TRIANGULOS,
+      llamadas: TOPE_DE_LLAMADAS,
+      prometidas: (calidad, sentados) => llamadasDeLaPlaza(calidad, sentados).total,
+    },
+  },
+};
+
+/**
+ * El lobby que pide la página, por `data-lobby` en su raíz. Sin él, el del muelle, que es el que
+ * siempre abrió este fichero; con uno que no está en la tabla, se dice cuáles hay y no se pinta otro.
+ */
+function elLobbyDeLaPagina(raiz: HTMLElement | null): LobbyDelBanco {
+  const pedido = raiz?.dataset.lobby ?? 'riberas';
+  const lobby = LOS_LOBBIES[pedido];
+  if (lobby === undefined) {
+    throw new Error(`El banco no conoce el lobby «${pedido}»: los que hay son ${Object.keys(LOS_LOBBIES).join(', ')}`);
+  }
+  return lobby;
+}
+
+const raiz = document.getElementById('raiz');
+const LOBBY = elLobbyDeLaPagina(raiz);
+
 /* ─────────────────────────── Las direcciones de Vite ─────────────────────────── */
 
 /**
- * De la ruta que pide la escena a la dirección que da Vite. Las rutas salen de
- * `figuras.ts`; si allí cambia una, aquí falta y `traer` lo dice con la ruta.
+ * De la ruta que pide la escena a la dirección que da Vite. Las rutas salen de `figuras.ts` y
+ * de `ruta-de-modelos.ts`; si allí cambia una, aquí falta y `traer` lo dice con la ruta.
  */
 const DIRECCIONES: Readonly<Record<string, string>> = {
-  [rutaDelEmbarcadero()]: embarcaderoGlb,
+  [LOBBY.modelo[0]]: LOBBY.modelo[1],
   [`${RUTA_DE_MODELOS}/aventureros/${FICHERO_DE_ANIMACIONES}`]: animacionesGlb,
   [`${RUTA_DE_MODELOS}/aventureros/caballero.glb`]: caballeroGlb,
   [`${RUTA_DE_MODELOS}/aventureros/barbaro.glb`]: barbaroGlb,
@@ -65,6 +167,7 @@ const DIRECCIONES: Readonly<Record<string, string>> = {
   [`${RUTA_DE_MODELOS}/aventureros/encapuchado.glb`]: encapuchadoGlb,
 };
 
+/** UNA `traer` de módulo: la caché de los catálogos va por identidad de la función. */
 const traer: Traer = async (ruta) => {
   const direccion = DIRECCIONES[ruta];
   if (direccion === undefined) throw new Error(`el banco no tiene dirección para ${ruta}`);
@@ -101,7 +204,7 @@ interface Medida {
 function estadoDeLaDireccion(): { codigo: string; sentados: number; aspecto: Aspecto } {
   const p = new URLSearchParams(window.location.search);
   const codigo = (p.get('codigo') ?? CODIGO_DE_SERIE).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
-  const sentados = Math.max(0, Math.min(6, Number(p.get('sentados') ?? '1') || 0));
+  const sentados = Math.max(0, Math.min(6, Number(p.get(LOBBY.parametro) ?? '1') || 0));
   const aspecto = p.get('aspecto');
   return {
     codigo: codigo.length === 5 ? codigo : CODIGO_DE_SERIE,
@@ -118,9 +221,10 @@ function asientoNuevo(): AsientoEnElMuelle {
 
 /* ─────────────────────────────── El banco ─────────────────────────────── */
 
-function Banco(): JSX.Element {
+function Banco({ lobby }: { lobby: LobbyDelBanco }): JSX.Element {
   const inicial = useMemo(estadoDeLaDireccion, []);
-  const tema = temaDelMuelle('riberas') as TemaDelMuelle;
+  const tema = temaDelMuelle(lobby.arcade) as TemaDelMuelle;
+  const Escena = escenaDelMuelle(tema);
 
   const [aspecto, ponerAspecto] = useState<Aspecto>(inicial.aspecto);
   const [codigo, ponerCodigo] = useState(inicial.codigo);
@@ -189,6 +293,16 @@ function Banco(): JSX.Element {
     const i = FIGURAS.findIndex((f) => f.id === miFigura);
     ponerMiFigura((FIGURAS[(i + 1) % FIGURAS.length] as (typeof FIGURAS)[number]).id);
   };
+  /* Vestir a OTRO: es la coreografía del humo vista desde fuera, que es la que no se prueba sola. */
+  const vestirAOtro = (): void => {
+    ponerAsientos((antes) => {
+      if (antes.length < 2) return antes;
+      const cual = 1 + Math.floor(Math.random() * (antes.length - 1));
+      const suya = antes[cual] as AsientoEnElMuelle;
+      const i = FIGURAS.findIndex((f) => f.id === suya.figura);
+      return antes.map((a, k) => (k === cual ? { ...a, figura: (FIGURAS[(i + 1) % FIGURAS.length] as (typeof FIGURAS)[number]).id } : a));
+    });
+  };
   const presencia = (): void => {
     ponerAsientos((antes) => {
       if (antes.length < 2) return antes;
@@ -204,12 +318,14 @@ function Banco(): JSX.Element {
     ponerZarpando(true);
   };
 
-  const direccion = `?codigo=${codigo}&sentados=${String(asientos.length)}&aspecto=${aspecto}`;
+  const direccion = `?codigo=${codigo}&${lobby.parametro}=${String(asientos.length)}&aspecto=${aspecto}`;
+  const presupuesto = lobby.presupuesto;
+  const prometidas = presupuesto === undefined ? 0 : presupuesto.prometidas(calidad, Math.max(1, asientos.length));
 
   return (
     <div className="banco-lobby">
       <aside className="banco-panel">
-        <div className="banco-rotulo">BANCO DE PRUEBAS · EL MUELLE</div>
+        <div className="banco-rotulo">BANCO DE PRUEBAS · {lobby.rotulo}</div>
 
         <section>
           <h2>Marco</h2>
@@ -234,16 +350,21 @@ function Banco(): JSX.Element {
           </label>
           <div className="banco-botones">
             <button type="button" onClick={sentar} disabled={asientos.length >= 6}>
-              Sentar a uno ({String(asientos.length)}/6)
+              {lobby.sentar} ({String(asientos.length)}/6)
             </button>
             <button type="button" onClick={levantar} disabled={asientos.length === 0}>
-              Levantar al último
+              {lobby.levantar}
             </button>
             <button type="button" onClick={cambiarMiFigura}>
               Mi figura: {datosDeFigura(miFigura).nombre}
             </button>
+            {lobby.vestirAOtro ? (
+              <button type="button" onClick={vestirAOtro} disabled={asientos.length < 2}>
+                Otro se viste
+              </button>
+            ) : null}
             <button type="button" onClick={presencia} disabled={asientos.length < 2}>
-              Presencia de uno
+              {lobby.ausentar}
             </button>
             <button type="button" onClick={zarpar} className={zarpando ? 'vivo' : undefined} disabled={zarpando} title="Zarpar es de ida: para volver a verlo, recarga la página">
               {zarpando ? 'Zarpado (recarga para volver)' : 'Zarpar'}
@@ -268,9 +389,17 @@ function Banco(): JSX.Element {
           <h2>El hilo de dibujo</h2>
           {medida === null ? (
             <p className="tenue">Sin medida todavía.</p>
-          ) : (
+          ) : presupuesto === undefined ? (
             <p className="banco-medida">
               {medida.triangulos.toLocaleString('es-ES')} triángulos · {String(medida.llamadas)} llamadas
+              <br />
+              {medida.ms.toFixed(1)} ms/fotograma · {String(medida.fotogramas)} fotogramas en el último segundo
+            </p>
+          ) : (
+            <p className="banco-medida">
+              {medida.triangulos.toLocaleString('es-ES')} triángulos de {presupuesto.triangulos.toLocaleString('es-ES')}
+              <br />
+              {String(medida.llamadas)} llamadas de {String(presupuesto.llamadas)} (prometidas {String(prometidas)})
               <br />
               {medida.ms.toFixed(1)} ms/fotograma · {String(medida.fotogramas)} fotogramas en el último segundo
             </p>
@@ -306,7 +435,7 @@ function Banco(): JSX.Element {
               gl.toneMappingExposure = 0.95;
             }}
           >
-            <Embarcadero
+            <Escena
               mesa={mesa}
               ventana={ventana}
               traer={traer}
@@ -332,10 +461,9 @@ function Banco(): JSX.Element {
 }
 
 /* La raíz se crea una vez y se guarda en el propio div: ver la cabecera de `banco3d.tsx`. */
-const raiz = document.getElementById('raiz');
-if (raiz === null) throw new Error('Falta el <div id="raiz"> de lobby3d.html');
+if (raiz === null) throw new Error(`Falta el <div id="raiz"> de ${LOBBY.pagina}`);
 
 type ConRaiz = HTMLElement & { __raizDeReact?: ReturnType<typeof createRoot> };
 const donde = raiz as ConRaiz;
 donde.__raizDeReact ??= createRoot(donde);
-donde.__raizDeReact.render(<Banco />);
+donde.__raizDeReact.render(<Banco lobby={LOBBY} />);
