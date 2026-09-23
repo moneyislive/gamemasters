@@ -1980,15 +1980,40 @@ paso('Los tres juegos que se andan: el canal cosido igual, los demás a la altur
     );
   }
 
-  /* El Burgo lo declara en su contrato, y Riberas lo pasa de la escena del delta al paseo. */
-  const losTiposDelBurgo = leer('../burgo/tipos.ts');
+  /*
+   * El Burgo y Las Lindes lo declaran por EL MISMO contrato —`PropsDeEscenaDeTablero`, en
+   * `comun/tablero.ts`, que lleva la prop una vez— y no cada uno el suyo: así es del mismo tipo por
+   * construcción, y no porque dos copias coincidan hoy. Riberas lo pasa de la escena del delta al paseo.
+   *
+   * Los tres fuentes se juzgan juntos, separados, para que cada caso envenenado sea una copia del
+   * conjunto con una sola cosa rota: la prop fuera del común, el Burgo sin el común, o Las Lindes
+   * declarándose otra vez un `canal` suyo.
+   */
+  const SEPARADOR_DE_CONTRATOS = '\n/* ── otro fichero ── */\n';
+  const losContratos = [leer('../comun/tablero.ts'), leer('../burgo/tipos.ts'), leer('../lindes/tipos.ts')].join(SEPARADOR_DE_CONTRATOS);
   reglaDelFuente(
-    'el Burgo: el contrato de la escena lleva la prop `canal`, del mismo tipo que la de Las Lindes',
-    (c) =>
-      /export interface PropsDelBurgo \{(?:(?!\n\})[\s\S])*\breadonly canal\?: CanalDeBotas;/.test(c) &&
-      /import type \{ CanalDeBotas \} from '\.\.\/paseo\/mesa-de-botas';/.test(c),
-    losTiposDelBurgo,
-    [losTiposDelBurgo.replace('readonly canal?: CanalDeBotas;', '')],
+    'el Burgo y Las Lindes: sus contratos extienden el común de tablero, que lleva UNA vez la prop `canal` del tipo de `mesa-de-botas`, y ninguno la vuelve a declarar',
+    (c) => {
+      const [comun = '', burgo = '', lindes = ''] = c.split(SEPARADOR_DE_CONTRATOS);
+      return (
+        /export interface PropsDeEscenaDeTablero<[^>]*> \{(?:(?!\n\})[\s\S])*\breadonly canal\?: CanalDeBotas;/.test(comun) &&
+        /import type \{ CanalDeBotas \} from '\.\.\/paseo\/mesa-de-botas';/.test(comun) &&
+        /from '\.\.\/comun\/tablero';/.test(burgo) &&
+        /export interface PropsDelBurgo extends PropsDeEscenaDeTablero<ModoDeCamara> \{/.test(burgo) &&
+        /from '\.\.\/comun\/tablero';/.test(lindes) &&
+        /export interface PropsDeLasLindes extends PropsDeEscenaDeTablero<ModoDeCamaraDeLasLindes> \{/.test(lindes) &&
+        ![burgo, lindes].some((t) => /\breadonly canal\?:/.test(t))
+      );
+    },
+    losContratos,
+    [
+      losContratos.replace('readonly canal?: CanalDeBotas;', ''),
+      losContratos.replace('export interface PropsDelBurgo extends PropsDeEscenaDeTablero<ModoDeCamara> {', 'export interface PropsDelBurgo {'),
+      losContratos.replace(
+        'export interface PropsDeLasLindes extends PropsDeEscenaDeTablero<ModoDeCamaraDeLasLindes> {',
+        'export interface PropsDeLasLindes extends PropsDeEscenaDeTablero<ModoDeCamaraDeLasLindes> {\n  readonly canal?: CanalDeBotas | null;',
+      ),
+    ],
   );
   const laDelDelta = leer('../delta.tsx');
   reglaDelFuente(

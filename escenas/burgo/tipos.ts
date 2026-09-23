@@ -38,17 +38,17 @@
  *
  * ═══ Y EN UNA MESA DE BOTAS SE ANDA CON LOS DEMÁS, POR LA MISMA PROP QUE EN LAS LINDES ═══
  *
- * `canal`, junto a `mandos` y con el mismo tipo que la de Las Lindes (`CanalDeBotas`, de
- * `paseo/mesa-de-botas.ts`): con ella la escena abre el canal de la mesa, le cuenta cada tic de
- * quien anda y pinta a los demás asientos andando por las calles. Es un `import type` de un `.ts`
- * sin JSX, así que el `tsc` del servidor, que lee este fichero a través de la traducción, lo
- * compila igual que el de Las Lindes.
+ * `canal`, junto a `mandos`: con ella la escena abre el canal de la mesa, le cuenta cada tic de
+ * quien anda y pinta a los demás asientos andando por las calles. Es LA MISMA prop que la de Las
+ * Lindes y no una copia: las dos escenas extienden `PropsDeEscenaDeTablero` (`comun/tablero.ts`),
+ * que declara una vez el código, `traer`, la calidad, la cámara, la palanca, el canal y los tres
+ * avisos. Aquí queda lo que es del Burgo. Aquél es un `.ts` sin JSX, así que el `tsc` del servidor,
+ * que lee este fichero a través de la traducción, lo compila igual que antes.
  */
+import type { PropsDeEscenaDeTablero } from '../comun/tablero';
 import type { FiguraId } from '../embarcadero/figuras';
-import type { Traer, Ventana, Calidad } from '../embarcadero/tipos';
+import type { Ventana } from '../embarcadero/tipos';
 import type { ParDeDados } from '../dados';
-import type { MandosDeFuera } from '../paseo/mandos';
-import type { CanalDeBotas } from '../paseo/mesa-de-botas';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
 import type { SitioDeLaBandeja } from './bandeja-de-los-dados';
 
@@ -158,37 +158,18 @@ export type ModoDeCamara =
   | { readonly modo: 'ojos'; readonly asiento: string }
   | { readonly modo: 'aerea' };
 
-export interface PropsDelBurgo {
+/**
+ * LO QUE RECIBE EL BURGO: lo de cualquier escena de tablero (`comun/tablero.ts`: el código, `traer`,
+ * la calidad, la cámara —aquí `ModoDeCamara`, con `aerea`—, la palanca, el canal de Boots on Board y
+ * los tres avisos) y lo suyo, que es esto.
+ */
+export interface PropsDelBurgo extends PropsDeEscenaDeTablero<ModoDeCamara> {
   readonly tablero: TableroDelBurgoEn3D;
   readonly dados: DadosDelBurgoEn3D | null;
   /** Lo que acaba de pasar: `jugada` sube con cada vista nueva; la escena reproduce lo que no ha visto (sucesosEnTres). */
   readonly sucesos: { readonly jugada: number; readonly lista: readonly SucesoDelBurgo[] };
-  /** Semilla del DECORADO (semillaDelCodigo); nunca la del azar. */
-  readonly codigo: string;
   /** `franjaInferior` 0: la hoja no tapa el lienzo. */
   readonly ventana: Ventana;
-  readonly traer: Traer;
-  readonly calidad: Calidad;
-  readonly camara: ModoDeCamara;
-  /**
-   * LA PALANCA Y EL BOTÓN DE CORRER, cuando el aparato no tiene teclado: lo mismo que Las Lindes.
-   *
-   * La escena lee el teclado ella sola —donde hay `document`, lo hace el paseo común—, pero en iOS
-   * y en Android no lo hay. La app monta los mandos táctiles (`app/src/arcade/mandos-del-paseo.tsx`)
-   * y los escribe en esta referencia; la escena los lee en su bucle, sin pasar por React. Opcional
-   * porque el escritorio anda con el teclado.
-   */
-  readonly mandos?: { readonly current: MandosDeFuera };
-  /**
-   * EL CANAL DE BOOTS ON BOARD, sólo en una mesa de la modalidad `botas`: lo mismo que Las Lindes.
-   *
-   * Con él la escena abre el canal de la mesa (`paseo/usar-el-canal.ts`), le cuenta cada tic de
-   * quien anda, deja que el servidor lo corrija y pinta a los demás asientos andando por la ciudad
-   * (`paseo/los-demas.tsx`), con la misma altura del suelo que quien anda. Sin él —la mesa de
-   * siempre— no se abre nada y no se paga nada: ni un socket ni una llamada por tic. Quién lo pasa y
-   * cuándo lo deciden los clientes con `esMesaDeBotas`, y en ningún otro sitio.
-   */
-  readonly canal?: CanalDeBotas;
   /**
    * EN QUÉ ESQUINA DEL LIENZO VA LA BANDEJA DE LOS DADOS, y a cuántos puntos de sus bordes. La
    * escena no sabe qué tiene el cliente encima del lienzo, así que lo dice él: el escritorio abajo a
@@ -224,11 +205,6 @@ export interface PropsDelBurgo {
   readonly alTocarLosDados?: () => Promise<'hecho' | 'rechazado' | 'sin-red'>;
   /** Abre la ficha del jugador (tratos). */
   readonly alTocarFigura?: (asiento: string) => void;
-  /** SIEMPRE una vez, con o sin modelos, tope 15 s (contrato del Muelle). */
-  readonly alEstarListo?: () => void;
-  readonly alFallar?: (motivo: string) => void;
-  /** Una vez por segundo. */
-  readonly alMedir?: (m: { triangulos: number; llamadas: number; ms: number; fotogramas: number }) => void;
   /** La escena ya está en el estado final de la vista. */
   readonly alTerminarLaCola?: () => void;
 }
