@@ -52,6 +52,7 @@ import type { Opcion } from '../../shared/arcade/opciones';
 import { esRechazo } from '../../shared/arcade/motor';
 import { ESPECTADOR } from '../../shared/arcade/tipos';
 import type { AsientoId } from '../../shared/arcade/tipos';
+import { movimientoDelBotin } from '../../shared/arcade/juegos/botin';
 import {
   A_ALMONEDA,
   avanzarElBurgo,
@@ -371,6 +372,8 @@ export interface PartidaDelRobot {
   familias: Record<string, number>;
   /** Cuántas decisiones del robot devolvieron el mismo estado sin motivo (botón mudo). */
   mudas: string[];
+  /** Cuántos botines de la refriega entraron y cambiaron la mesa. Cero si no se pidieron. */
+  botines: number;
   /** Por qué se cortó antes de terminar, o `null`. */
   corte: string | null;
 }
@@ -390,6 +393,12 @@ export function asientosDelRobot(cuantos: number): AsientoId[] {
  * tics de verdad mezclados con los gestos (así lo congela el maestro de oro). Con
  * `0`, ningún tic. `topeDeVueltas` acota la partida: el robot juega a ganar, pero
  * seis robots comprándolo todo pueden tardar mucho en quebrar.
+ *
+ * `cadaCuantosUnBotin`: cada tantos apuntes, el botín de una refriega entre dos vivos
+ * sacados del azar del robot, como lo metería el servidor —`quien: null`—. Es para
+ * `verify:determinismo`, que así compara en los dos motores partidas con dinero que
+ * cambia de manos por una pelea. Con `0`, ninguno, y la partida es BYTE A BYTE la de
+ * siempre: el oro del Burgo, `verify:burgo` y `verify:mesa` no lo piden y no se enteran.
  */
 export function jugarConElRobot(
   semilla: number,
@@ -399,6 +408,7 @@ export function jugarConElRobot(
   topeDeMovimientos: number,
   robot: (vista: unknown, quien: AsientoId, azar: Azar, conTrato: boolean) => { azar: Azar; decision: DecisionDelRobot | null } = loQueHaceElRobot,
   trasCadaCambio: (estado: EstadoDelBurgo, quien: AsientoId | null) => void = () => {},
+  cadaCuantosUnBotin = 0,
 ): PartidaDelRobot {
   const asientos = asientosDelRobot(cuantos);
   const ctx = (quien: AsientoId | null, tic: number): ContextoMovimiento => ({ quien, azar: semilla, tic, asientos });
@@ -417,6 +427,7 @@ export function jugarConElRobot(
   let tics = 0;
   let corte: string | null = null;
   let turnoConTrato = -1;
+  let botines = 0;
   const propusieron: AsientoId[] = [];
 
   const aplicar = (movimiento: Movimiento, quien: AsientoId | null): { cambio: boolean; motivo: string | null } => {
@@ -441,6 +452,27 @@ export function jugarConElRobot(
       apuntes.push({ tipo: movimientoDeTic().tipo, tic });
       aplicar(movimientoDeTic(), null);
       tics++;
+      continue;
+    }
+    /*
+     * EL BOTÍN, entre dos vivos al azar DEL ROBOT —el mismo `azar` sembrado con el que decide la puja
+     * libre—, así que las dos ejecuciones con la misma semilla meten los mismos botines en los mismos
+     * sitios. El segundo se sortea entre los que no son el primero, contando índices y sin cierres:
+     * en Hermes 0.12 un cierre sobre una variable del bucle no ve la vuelta que cree.
+     */
+    if (cadaCuantosUnBotin > 0 && (paso + 1) % cadaCuantosUnBotin === 0) {
+      const vivos: AsientoId[] = [];
+      for (const j of e.jugadores) if (!j.quebrado) vivos.push(j.asiento);
+      if (vivos.length >= 2) {
+        const uno = enteroEntre(azar, 0, vivos.length - 1);
+        const otro = enteroEntre(uno.azar, 0, vivos.length - 2);
+        azar = otro.azar;
+        const de = vivos[uno.valor] as AsientoId;
+        const para = vivos[otro.valor >= uno.valor ? otro.valor + 1 : otro.valor] as AsientoId;
+        const botin = movimientoDelBotin(de, para);
+        apuntes.push({ tipo: botin.tipo, tic, carga: botin.carga, quien: null, asientos: [...asientos] });
+        if (aplicar(botin, null).cambio) botines++;
+      }
       continue;
     }
     if (e.turnosAbiertos !== turnoConTrato) {
@@ -491,5 +523,5 @@ export function jugarConElRobot(
 
   const fin = estado as EstadoDelBurgo;
   if (corte === null && fin.momento !== 'terminada') corte = `se agotó el tope de ${topeDeMovimientos} pasos`;
-  return { estado: fin, apuntes, movimientos, tics, familias, mudas, corte };
+  return { estado: fin, apuntes, movimientos, tics, familias, mudas, botines, corte };
 }

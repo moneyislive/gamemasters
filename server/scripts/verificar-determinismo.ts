@@ -121,15 +121,26 @@
  *     y entonces los dos motores coinciden perfectamente, porque coinciden en la nada. Por
  *     eso los suelos van DELANTE de las huellas: con el 6 puesto, ocho comprobaciones caen.
  *  2. EL RECUENTO POR CLASES. El total de labriegos plantados no basta: la clase rara es la
- *     ermita (15 de 157 en estas cuatro semillas), y con un solo número su desaparición se
- *     escondería detrás de las otras tres. Se exige cada clase EN CADA PARTIDA. Visto rojo
- *     haciendo que el robot no plante ermitas: caen cinco y nada más.
+ *     ermita (16 de 151 en estas cuatro semillas con la refriega dentro; 15 de 157 sin ella,
+ *     porque el botín gasta sorteos del robot y mueve dónde pone), y con un solo número su
+ *     desaparición se escondería detrás de las otras tres. Se exige cada clase EN CADA
+ *     PARTIDA. Visto rojo haciendo que el robot no plante ermitas: caen cinco y nada más.
  *
  * LO QUE ESTA TANDA NO MIRA, Y SE DICE PARA QUE NO SE LEA COMO VIGILADO: en las cuatro
  * semillas salen `retiradas: 0` y CERO movimientos `lindes:pasar` (medido). O sea que
  * recoger un labriego y pasar de turno son dos ramas del reductor que aquí NO se ejercitan.
  * Quien quiera cubrirlas tendrá que buscar semillas que las provoquen y demostrarlo con un
  * contador, no suponerlo.
+ *
+ * ═══ Y LA REFRIEGA, QUE ENTRÓ CON BOOTS ON BOARD ═══
+ *
+ * Los dos robots meten, cada tantos pasos, el botín de una refriega entre dos jugadores sacados
+ * de su propio azar (`UN_BOTIN_DEL_BURGO_CADA`, `UN_BOTIN_DE_LAS_LINDES_CADA`), por la misma
+ * puerta que el servidor: `arcade:botin` con `quien: null`. Así las dos huellas llevan también
+ * dinero y puntos que cambian de manos por una pelea, y la rama del botín de los dos reductores
+ * corre en Hermes. Con suelo POR PARTIDA —un botín que movió algo en cada una—, porque un
+ * robot que dejara de meterlos seguiría firmando huellas iguales en los dos motores, y ése es
+ * justo el verde que no mira nada.
  *
  * ═══ QUÉ DIVERGE DE VERDAD ENTRE ESTOS DOS MOTORES ═══
  *
@@ -352,9 +363,11 @@ comprobar(
     quebradosDelBurgo += a.quebrados;
     console.log(
       `  semilla ${String(a.semilla).padStart(10)} · ${a.cuantos} a la mesa · ${String(a.movimientos).padStart(5)} movimientos · ` +
-        `${String(a.tics).padStart(4)} tics · ${a.quebrados} quiebras · ${a.terminada ? 'termina' : 'NO TERMINA'}`,
+        `${String(a.tics).padStart(4)} tics · ${String(a.botines).padStart(3)} botines · ${a.quebrados} quiebras · ` +
+        `${a.terminada ? 'termina' : 'NO TERMINA'}`,
     );
     comprobar(`la partida del Burgo de la semilla ${a.semilla} termina con ganador`, a.terminada, a);
+    comprobar(`y en ella la refriega mueve dinero: entra algún botín`, a.botines >= 1, { botines: a.botines });
     comprobar(
       `la partida del Burgo de la semilla ${a.semilla} da el mismo estado dos veces`,
       b !== undefined && a.huella === b.huella,
@@ -404,9 +417,10 @@ comprobar(
     console.log(
       `  semilla ${String(a.semilla).padStart(10)} · ${a.cuantos} a la mesa · ${String(a.apuntes).padStart(3)} apuntes · ` +
         `${String(a.puestas).padStart(2)} losas · ${String(a.plantados).padStart(2)} plantadas · ` +
-        `${String(a.puntos).padStart(3)} puntos · ${a.terminada ? 'termina' : 'NO TERMINA'}`,
+        `${String(a.puntos).padStart(3)} puntos · ${String(a.botines).padStart(2)} botines · ${a.terminada ? 'termina' : 'NO TERMINA'}`,
     );
     comprobar(`la partida de Las Lindes de la semilla ${a.semilla} termina`, a.terminada, a);
+    comprobar(`y en ella la refriega mueve puntos: entra algún botín`, a.botines >= 1, { botines: a.botines });
     comprobar(
       `la de la semilla ${a.semilla} vacía la bolsa: pone las losas, no se corta`,
       a.puestas >= 70,
@@ -890,7 +904,8 @@ if (fallos.length === 0) {
       '  estado que la partida jugada — comparado con `canonico.ts`, no con `JSON.stringify`.\n' +
       '  Y los tres juegos de servidor, no uno: cuatro partidas de solares del Burgo con tics que\n' +
       '  tiran por el ausente, y cuatro de Las Lindes que vacían la bolsa de 72 losas y plantan en\n' +
-      '  las cuatro clases, dan el mismo estado final en los dos motores.\n' +
+      '  las cuatro clases, dan el mismo estado final en los dos motores — con botines de la\n' +
+      '  refriega metidos entre medias en las ocho.\n' +
       '  Sin mirar, y dicho a propósito: recoger un labriego y pasar de turno no salen en estas\n' +
       '  cuatro semillas de Las Lindes, así que esas dos ramas no las compara nadie todavía.',
   );
