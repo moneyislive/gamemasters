@@ -1268,16 +1268,23 @@ export class CanalDeBotas {
   /**
    * DÓNDE RENACE QUIEN CAYÓ. Una regla determinista, en tres escalones, sobre los sitios de nacer que
    * declara el mundo, recorridos desde EL SUYO —el de su asiento, el mismo al que se entra— y
-   * siguiendo la lista:
+   * siguiendo la lista, que es lo que desempata:
    *
-   *   1. El primero LIBRE —se puede estar y no hay nadie encima— que esté a `LEJOS_AL_RENACER` o más
-   *      de quien lo tumbó (donde esté ahora): lo que éste corre mientras dura lo intocable. Así nadie
-   *      recibe a nadie con un golpe al acabar la protección, y casi siempre es el suyo.
-   *   2. Si ninguno libre está tan lejos, el libre MÁS LEJANO de quien lo tumbó; a igual distancia,
-   *      el primero de la lista contando desde el suyo.
+   *   1. De los LIBRES —se puede estar y no hay nadie encima— que estén a `LEJOS_AL_RENACER` o más de
+   *      quien lo tumbó (donde esté ahora): lo que éste corre mientras dura lo intocable, así que nadie
+   *      recibe a nadie con un golpe al acabar la protección. Y de ésos, el MÁS CERCANO A DONDE CAYÓ.
+   *   2. Si ninguno libre está tan lejos, el libre MÁS LEJANO de quien lo tumbó.
    *   3. Si no hay ninguno libre, como al entrar (`dondeSeNace`), que busca en anillos.
    *
-   * Si quien lo tumbó ya no está en la sala, cualquiera está lejos: el suyo, si está libre.
+   * ═══ CERCA DE DONDE CAYÓ, Y NO EN SU SITIO, QUE ERA LA REGLA PRIMERA ═══
+   *
+   * Se escribió «el suyo, si está libre y lejos», y en Las Lindes el sitio de un asiento puede estar
+   * al otro lado del tablero: se medía renacer a 450 unidades, medio minuto andando. Caer ya cuesta el
+   * botín y cinco segundos en el suelo; un destierro encima no protege a nadie —la distancia que
+   * protege es la del escalón 1, de quien lo tumbó— y deja fuera de la partida al que cayó. Así que
+   * se renace lo más cerca posible de donde se estaba, y a salvo.
+   *
+   * Si quien lo tumbó ya no está en la sala, cualquiera está lejos: el más cercano a donde cayó.
    */
   private sitioDeRenacer(sala: Sala, o: Ocupante): Aparicion {
     const arena = sala.arena;
@@ -1285,6 +1292,8 @@ export class CanalDeBotas {
     const cuantos = arena.nace.length / 2;
     const turno = sala.asientos.indexOf(o.id);
     const suyo = cuantos === 0 ? 0 : (((turno >= 0 ? turno : 0) % cuantos) + cuantos) % cuantos;
+    let masCercano = -1;
+    let distanciaMenor = Infinity;
     let masLejano = -1;
     let distanciaMayor = -1;
     for (let j = 0; j < cuantos; j++) {
@@ -1293,17 +1302,23 @@ export class CanalDeBotas {
       const z = arena.nace[i * 2 + 1] as number;
       if (!sePuedeEstar(arena, x, z, RADIO_DEL_PASEANTE) || this.hayOtro(sala, o, x, z)) continue;
       const lejos = verdugo === undefined ? Infinity : Math.hypot(x - verdugo.x, z - verdugo.z);
-      if (lejos >= LEJOS_AL_RENACER) return { x, z, r: rumboDeRadianes(arena.rumbos[i] as number) };
-      if (lejos > distanciaMayor) {
+      if (lejos >= LEJOS_AL_RENACER) {
+        const cerca = Math.hypot(x - o.x, z - o.z);
+        if (cerca < distanciaMenor) {
+          distanciaMenor = cerca;
+          masCercano = i;
+        }
+      } else if (lejos > distanciaMayor) {
         distanciaMayor = lejos;
         masLejano = i;
       }
     }
-    if (masLejano >= 0) {
+    const elegido = masCercano >= 0 ? masCercano : masLejano;
+    if (elegido >= 0) {
       return {
-        x: arena.nace[masLejano * 2] as number,
-        z: arena.nace[masLejano * 2 + 1] as number,
-        r: rumboDeRadianes(arena.rumbos[masLejano] as number),
+        x: arena.nace[elegido * 2] as number,
+        z: arena.nace[elegido * 2 + 1] as number,
+        r: rumboDeRadianes(arena.rumbos[elegido] as number),
       };
     }
     return dondeSeNace(arena, turno >= 0 ? turno : 0, (x, z) => this.hayOtro(sala, o, x, z));

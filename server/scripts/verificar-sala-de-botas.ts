@@ -1846,18 +1846,20 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
 
 {
   /*
-   * EL SUYO: si su sitio de nacer está libre y lejos de quien lo tumbó, renace en el suyo, aunque
-   * haya otro más lejos. A tumba a V en (5, −2): el de V, (60, 0), queda a 55 —más que los 52,8—, y
-   * (−60, 0), libre, a 65.
+   * EL MÁS CERCANO A DONDE CAYÓ, de los que están lejos de quien lo tumbó, aunque el suyo sea otro. A
+   * tumba a V en (5, −2). Lejos de A —más de los 52,8 que éste corre mientras dura lo intocable—
+   * están (−60, 0), que es EL SUYO (el segundo de la lista, como su asiento), a 65 de donde cayó;
+   * (0, −60), a 58; y (60, 0), a 55. Renace en (60, 0): con la regla primera («el suyo, si está libre
+   * y lejos») habría renacido en (−60, 0), y en Las Lindes eso llegaba a ser el otro lado del tablero.
    */
   const { canal, reloj } = canalNuevo();
   const mundo: MundoDeclarado = {
     ...ruedo(),
     nace: [
       { x: 0, z: 0, rumbo: 0 },
-      { x: 60, z: 0, rumbo: 0 },
-      { x: 0, z: -60, rumbo: 0 },
       { x: -60, z: 0, rumbo: 0 },
+      { x: 0, z: -60, rumbo: 0 },
+      { x: 60, z: 0, rumbo: 0 },
     ],
   };
   const m = mesaNueva({ mundo, asientos: ['r-uno', 'r-tres'] });
@@ -1873,7 +1875,7 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
   await reloj.avanzar(CAIDO_MS);
   const renace = a.enchufe.ultimo('renace');
   comprobar(
-    'con su sitio de nacer libre y a 55 unidades de quien lo tumbó —más que los 52,8 que éste corre mientras dura lo intocable—, renace en EL SUYO y no en el más lejano',
+    'de los sitios libres lejos de quien lo tumbó —a más de los 52,8 que éste corre mientras dura lo intocable—, renace en el MÁS CERCANO a donde cayó, y no en el suyo',
     renace?.a === 'r-tres' && renace.x === deNumero(60) && renace.z === 0 && Math.round((LEJOS_AL_RENACER / U) * 10) === 528,
     renace,
   );
