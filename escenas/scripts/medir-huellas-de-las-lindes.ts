@@ -49,10 +49,27 @@
  * del modelo en el que ninguna rodaja de muro pasa de `MEDIO_GRUESO_DE_LA_HOJA`, a todas las
  * alturas hasta la cabeza. La hoja no para: una muralla con puerta se cruza por la puerta.
  *
+ * ═══ Y DE LAS PIEDRAS, ADEMÁS, EL ALTO Y EL RADIO ═══
+ *
+ * Las piedras, las rocas y los tocones estorban sólo si, puestos, pasan de la cintura de quien
+ * anda (`comoEstorba`, en `lindes-piezas.ts`). Para contestarlo en `shared/` hace falta lo que
+ * mide cada modelo de alto —lo más alto de su geometría, desde el origen, que es el suelo donde
+ * se apoya—, y se mide aquí con lo demás.
+ *
+ * Y su RADIO: lo más lejos del origen que llega su planta, medido en el mismo trozo de abajo que
+ * la huella. El reparto las pone giradas de cualquier manera, y a un ángulo que no es un cuarto el
+ * mundo no puede girar la caja: tiene que cubrirlas con algo que no cambie al girar. El mayor
+ * semieje de la caja sólo vale para lo que es redondo de verdad, y la piedra no lo es —su punto
+ * más lejano está un cuarto más allá—; el radio vale para todo, se gire como se gire.
+ *
+ * Su huella no pide otra altura de corte: son más bajas que la de la huella, así que lo que se
+ * mide de ellas es su planta ENTERA. Por qué eso basta está en la cabecera de `comoEstorba`.
+ *
  * ═══ EL REDONDEO VA HACIA FUERA, Y EL DEL HUECO HACIA DENTRO ═══
  *
  * La tabla lleva cuatro decimales —0,0001 del pack son dos milésimas del mundo a la escala
- * mayor—, y se redondea hacia el lado que no deja pasar: la caja crece y el hueco encoge. Una
+ * mayor—, y se redondea hacia el lado que no deja pasar: la caja crece y el hueco encoge; el
+ * radio crece, y el alto también, que hace que una piedra pase antes de la cintura. Una
  * tabla redondeada al más cercano podría dejar asomar una décima de milímetro de muro y, lo
  * que es peor, un comprobador que compara con tolerancia es un comprobador que alguien ensancha.
  * Éste compara EXACTO: vuelve a medir, redondea igual, y exige los mismos números.
@@ -105,18 +122,31 @@ export interface CajaEnPlanta {
   readonly z1: number;
 }
 
+/** El alto de un modelo y el radio de su planta, en unidades del pack. */
+export interface AltoYRadio {
+  readonly alto: number;
+  readonly radio: number;
+}
+
 /** Lo que devuelve medir: redondeado como va a la tabla, y en crudo para quien lo quiera ver. */
 export interface HuellasMedidas {
   readonly altura: number;
   readonly huellas: Readonly<Record<string, CajaEnPlanta>>;
   readonly crudas: Readonly<Record<string, CajaEnPlanta>>;
+  /** De lo que estorba sólo si pasa de la cintura: su alto y su radio, redondeados hacia fuera. */
+  readonly altosYRadios: Readonly<Record<string, AltoYRadio>>;
+  readonly altosYRadiosCrudos: Readonly<Record<string, AltoYRadio>>;
   readonly hueco: { readonly x0: number; readonly x1: number };
   readonly huecoCrudo: { readonly x0: number; readonly x1: number };
   /** Cuántos triángulos se miraron, por pieza: el suelo de «no se midió nada». */
   readonly triangulos: Readonly<Record<string, number>>;
 }
 
-/** Las piezas que hay que medir: todas las que estorban, por la regla de `comoEstorba`. */
+/**
+ * Las piezas que hay que medir: todas las que PUEDEN estorbar, por la regla de `comoEstorba`. Las
+ * piedras entran todas, pasen o no de la cintura donde las ponga hoy el reparto: la pregunta es por
+ * pieza puesta, y la tabla tiene que poder contestarla a cualquier escala.
+ */
 export function piezasQueSeMiden(): string[] {
   return (Object.values(PIEZA) as string[])
     .filter((p) => comoEstorba(p) !== 'nada')
@@ -212,6 +242,39 @@ function plantaBajo(tris: readonly (readonly [number, number, number][])[], h: n
   return x0 <= x1 && z0 <= z1 ? { x0, x1, z0, z1 } : null;
 }
 
+/** Lo más alto de un modelo: hasta dónde llega por encima del suelo donde se apoya. */
+function altoDe(tris: readonly (readonly [number, number, number][])[]): number {
+  let alto = Number.NEGATIVE_INFINITY;
+  for (const t of tris) for (const p of t) if (p[1] > alto) alto = p[1];
+  return alto;
+}
+
+/**
+ * EL RADIO DE LA PLANTA de lo que un modelo tiene por debajo de `h`: lo más lejos del origen que
+ * llega en `x` y `z`. Se miran los mismos puntos que en `plantaBajo` —los vértices de abajo y los
+ * cortes de los lados con la altura—, y basta: lo recortado de un triángulo es un polígono convexo,
+ * y lo más lejano de un polígono convexo a un punto es siempre uno de sus vértices.
+ */
+function radioBajo(tris: readonly (readonly [number, number, number][])[], h: number): number {
+  let radio = Number.NEGATIVE_INFINITY;
+  const meter = (x: number, z: number): void => {
+    const r = Math.hypot(x, z);
+    if (r > radio) radio = r;
+  };
+  for (const t of tris) {
+    for (let a = 0; a < 3; a++) {
+      const p = t[a] as [number, number, number];
+      const q = t[(a + 1) % 3] as [number, number, number];
+      if (p[1] <= h) meter(p[0], p[2]);
+      if ((p[1] <= h) !== (q[1] <= h)) {
+        const s = (h - p[1]) / (q[1] - p[1]);
+        meter(p[0] + s * (q[0] - p[0]), p[2] + s * (q[2] - p[2]));
+      }
+    }
+  }
+  return radio;
+}
+
 /**
  * EL HUECO DE LA PUERTA: el tramo alrededor de `x = 0` en el que, a todas las alturas de andar,
  * no hay más que la hoja. Ver la cabecera.
@@ -269,6 +332,8 @@ export async function medirLasHuellas(glb: string = TABLERO_GLB): Promise<Huella
   const h = ALTURA_DE_LA_HUELLA_EN_PACK;
   const huellas: Record<string, CajaEnPlanta> = {};
   const crudas: Record<string, CajaEnPlanta> = {};
+  const altosYRadios: Record<string, AltoYRadio> = {};
+  const altosYRadiosCrudos: Record<string, AltoYRadio> = {};
   const triangulos: Record<string, number> = {};
   let hueco: { x0: number; x1: number } | null = null;
   let huecoCrudo: { x0: number; x1: number } | null = null;
@@ -281,6 +346,12 @@ export async function medirLasHuellas(glb: string = TABLERO_GLB): Promise<Huella
     if (planta === null) throw new Error(`«${pieza}» no tiene nada por debajo de ${h.toFixed(3)} del pack`);
     crudas[pieza] = planta;
     huellas[pieza] = redondearCaja(planta);
+    if (comoEstorba(pieza) === 'si-pasa-de-la-cintura') {
+      const crudo = { alto: altoDe(tris), radio: radioBajo(tris, h) };
+      altosYRadiosCrudos[pieza] = crudo;
+      /* Hacia fuera los dos: la piedra pasa antes de la cintura, y su caja girada crece. */
+      altosYRadios[pieza] = { alto: hacia(crudo.alto, true), radio: hacia(crudo.radio, true) };
+    }
     if (comoEstorba(pieza) === 'puerta') {
       huecoCrudo = huecoDeLaPuerta(tris, h);
       /* Hacia dentro: el hueco encoge. */
@@ -288,16 +359,23 @@ export async function medirLasHuellas(glb: string = TABLERO_GLB): Promise<Huella
     }
   }
   if (hueco === null || huecoCrudo === null) throw new Error('ninguna pieza es una puerta, y la muralla tiene que tenerla');
-  return { altura: h, huellas, crudas, hueco, huecoCrudo, triangulos };
+  return { altura: h, huellas, crudas, altosYRadios, altosYRadiosCrudos, hueco, huecoCrudo, triangulos };
 }
 
 /** El fichero de la tabla, tal cual se escribe. */
 export function textoDeLaTabla(m: HuellasMedidas): string {
+  const porOrden = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
   const filas = Object.keys(m.huellas)
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    .sort(porOrden)
     .map((pieza) => {
       const c = m.huellas[pieza] as CajaEnPlanta;
       return `  '${pieza}': { x0: ${String(c.x0)}, x1: ${String(c.x1)}, z0: ${String(c.z0)}, z1: ${String(c.z1)} },`;
+    });
+  const filasDeAltoYRadio = Object.keys(m.altosYRadios)
+    .sort(porOrden)
+    .map((pieza) => {
+      const a = m.altosYRadios[pieza] as AltoYRadio;
+      return `  '${pieza}': { alto: ${String(a.alto)}, radio: ${String(a.radio)} },`;
     });
   return `/**
  * LAS HUELLAS DE LO QUE ESTORBA EN LAS LINDES — TABLA GENERADA: NO SE EDITA A MANO.
@@ -306,9 +384,10 @@ export function textoDeLaTabla(m: HuellasMedidas): string {
  *
  * Es la caja en planta de cada modelo de \`tablero.glb\` que estorba al andar, medida por debajo
  * de la cabeza de una persona, con el origen donde el reparto pone la pieza y en unidades del
- * pack. Cómo se mide y por qué así está en la cabecera del guion que la escribe; quién estorba y
- * quién no, en \`comoEstorba\` (\`lindes-piezas.ts\`); y cómo se convierte en una caja del mundo
- * —escala, largo, giro—, en \`lindes-mundo.ts\`.
+ * pack; y, de las piedras, las rocas y los tocones, que estorban sólo si pasan de la cintura, su
+ * alto y el radio de su planta. Cómo se mide y por qué así está en la cabecera del guion que la
+ * escribe; quién estorba y quién no, en \`comoEstorba\` (\`lindes-piezas.ts\`); y cómo se convierte
+ * en una caja del mundo —escala, largo, giro—, en \`lindes-mundo.ts\`.
  *
  * Es literal porque la usa \`shared/\`, que corre en el servidor y en Hermes y no abre un \`.glb\`.
  * \`verify:lindes-mundo\` la vuelve a medir y exige los mismos números: si se recompila el pack,
@@ -329,6 +408,19 @@ export const ALTURA_DE_LA_HUELLA_EN_PACK = ${String(m.altura)};
 /** La huella de cada pieza que estorba. */
 export const HUELLA_DEL_MODELO: Readonly<Record<string, HuellaDelModelo>> = {
 ${filas.join('\n')}
+};
+
+/** El alto de un modelo y el radio de su planta, en unidades del pack. */
+export interface AltoYRadioDelModelo {
+  /** Lo más alto de su geometría, desde el suelo donde se apoya. */
+  readonly alto: number;
+  /** Lo más lejos del sitio donde se pone que llega su planta: lo que ocupa girado de cualquier manera. */
+  readonly radio: number;
+}
+
+/** De lo que estorba sólo si pasa de la cintura: las piedras, las rocas y los tocones. */
+export const ALTO_Y_RADIO_DEL_MODELO: Readonly<Record<string, AltoYRadioDelModelo>> = {
+${filasDeAltoYRadio.join('\n')}
 };
 
 /**
@@ -353,6 +445,15 @@ if (esElGuion) {
     const c = m.huellas[pieza] as CajaEnPlanta;
     console.log(
       `  ${pieza.padEnd(18)} x ${c.x0.toFixed(4)} … ${c.x1.toFixed(4)}   z ${c.z0.toFixed(4)} … ${c.z1.toFixed(4)}   (${String(m.triangulos[pieza])} triángulos)`,
+    );
+  }
+  console.log('\n  de lo que estorba sólo si pasa de la cintura:');
+  for (const pieza of Object.keys(m.altosYRadios).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
+    const a = m.altosYRadios[pieza] as AltoYRadio;
+    const c = m.huellas[pieza] as CajaEnPlanta;
+    const semieje = Math.max(-c.x0, c.x1, -c.z0, c.z1);
+    console.log(
+      `  ${pieza.padEnd(18)} alto ${a.alto.toFixed(4)}   radio ${a.radio.toFixed(4)} (mayor semieje de su caja ${semieje.toFixed(4)})`,
     );
   }
   console.log(`\n  hueco de la puerta: x ${m.hueco.x0.toFixed(4)} … ${m.hueco.x1.toFixed(4)}`);
