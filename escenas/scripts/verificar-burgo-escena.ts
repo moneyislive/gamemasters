@@ -373,6 +373,24 @@ const PUROS = ['tipos.ts', 'anillo-en-3d.ts', 'presupuesto.ts', 'coreografia.ts'
   comprobar(`los ${String(PUROS.length - 1)} ficheros de aritmética (y piezas.ts) no importan three`, conThree.length === 0, conThree);
   const faltan = PUROS.filter((f) => !fs.existsSync(path.join(CARPETA, f)));
   comprobar(`y los ${String(PUROS.length)} existen`, faltan.length === 0, faltan);
+
+  /*
+   * ═══ Y LO QUE SE MUDÓ A `escenas/comun/`, CON LAS MISMAS PROHIBICIONES ═══
+   *
+   * El cargador del reloj, el arranque y la medida, la marioneta, las props de tablero y el renglón del
+   * presupuesto vivían, entre otros sitios, en esta carpeta, y este barrido los miraba. Se han mudado a
+   * `comun/`, y el barrido va con ellos: sin esto, un `window` escrito allí llegaría al Burgo sin que
+   * nadie lo viera. Y los dos de allí que leen `tipos.ts` y `presupuesto.ts` de aquí —puros, que este
+   * guion importa en Node— tampoco pueden traer `three`: el regex de arriba mira el `import` de este
+   * fichero, no el del que importa. CERO INSPECCIONADOS ES UN FALLO: se cuentan.
+   */
+  const COMUN = path.join(RAIZ, 'comun');
+  const deComun = fs.existsSync(COMUN) ? fs.readdirSync(COMUN).filter((f) => /\.tsx?$/.test(f)) : [];
+  const enComun = deComun.flatMap((f) => loProhibidoEn(fs.readFileSync(path.join(COMUN, f), 'utf8')).map((q) => `comun/${f}: ${q}`));
+  comprobar(`ni ninguno de los ${String(deComun.length)} de escenas/comun, adonde se mudó parte de lo de aquí`, deComun.length >= 6 && enComun.length === 0, { deComun, enComun });
+  const PUROS_DE_COMUN = ['presupuesto.ts', 'tablero.ts'];
+  const comunConThree = PUROS_DE_COMUN.filter((f) => !fs.existsSync(path.join(COMUN, f)) || /from\s+['"]three['"]|from\s+['"]three\/|from\s+['"]react|@react-three\/fiber/.test(sinComentarios(fs.readFileSync(path.join(COMUN, f), 'utf8'))));
+  comprobar('y los dos puros de comun que leen tipos.ts y presupuesto.ts existen y no traen three ni React', comunConThree.length === 0, comunConThree);
 }
 
 // ---------------------------------------------------------------------------
