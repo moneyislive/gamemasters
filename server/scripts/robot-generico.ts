@@ -51,9 +51,9 @@
  *     su turno; esas las hace cuando no le queda otra (el apuro del Burgo) o, una vez por tipo y
  *     partida, cuando la partida ya ha dado unas vueltas (`MADUREZ`): así se ejercitan sin que la
  *     partida se acabe por abandono.
- *  4. QUIEN NO TIENE EL TURNO CONTESTA LO QUE LE LLEGA. Cada paso se mira a un asiento sorteado y,
- *     si no es el suyo, también al del turno; el sorteado actúa la mitad de las veces si tiene algo
- *     que no sea de lo del punto 3 (un trueque que contestar). Es la lección de
+ *  4. QUIEN NO TIENE EL TURNO CONTESTA LO QUE LE LLEGA. Cada paso se mira al del turno y a otro
+ *     asiento sorteado; ése actúa la mitad de las veces si tiene algo que no sea de lo del punto 3
+ *     (un trueque que contestar). Es la lección de
  *     `robot-del-burgo.ts`: si el del turno pasa antes de que el otro conteste, el trato caduca en
  *     el relevo. Si ninguno de los dos tiene nada, se mira a los demás y actúa el primero que tenga.
  *  5. LO QUE SE RECHAZÓ O NO CAMBIÓ NADA NO SE VUELVE A ELEGIR hasta que la mesa cambie. Es un
@@ -71,11 +71,12 @@
  * ═══ LO QUE CUESTA, QUE DECIDIÓ CUÁNTO SE MIRA ═══
  *
  * Proyectar es lo caro, y no por el robot: la vista de Riberas recalcula el Vado Largo de cada
- * colono por búsqueda exhaustiva, y con doce veredas por cabeza una sola vista pasa de medio
- * milisegundo a varios. Mirar a los seis asientos y al espectador en cada paso eran treinta
- * milisegundos por movimiento en una partida larga. Por eso cada paso mira a DOS —el sorteado y
- * el del turno, que se lee de la vista del sorteado, porque `turnoDe` es público— y al espectador
- * sólo uno de cada `UNA_MIRADA_DEL_ESPECTADOR_CADA` pasos y al final.
+ * colono por búsqueda exhaustiva, y una sola vista pasa de 0,6 ms con dos y tres veredas a 2,4 ms
+ * con doce y once (medido). Mirar a los seis asientos y al espectador en cada paso eran treinta
+ * milisegundos por movimiento en una partida larga. Por eso cada paso mira a DOS —el del turno y
+ * otro; el turno se lee de la vista del primero que se mira, porque `turnoDe` es público— y al
+ * espectador sólo uno de cada `UNA_MIRADA_DEL_ESPECTADOR_CADA` pasos y al final. Así el verificador
+ * entero, con Riberas tres veces y dos vueltas, tarda entre 34 y 39 s (medido cinco veces).
  *
  * ═══ CORRE EN CUALQUIER MOTOR ═══
  *
