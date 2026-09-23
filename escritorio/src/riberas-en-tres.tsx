@@ -181,6 +181,15 @@
  * lee la Sala). La ruta del modelo y la semilla vienen de `escenas/ruta-de-modelos.ts`
  * y `shared/mecanicas/semilla.ts`, que no arrastran ninguna tabla: aquí hubo una copia
  * de cada una, y la de la semilla ya no pasaba a mayúsculas.
+ *
+ * ═══ Y SE BAJA A ANDAR POR EL DELTA, COMO EN LAS LINDES ═══
+ *
+ * Con el mando de la cámara o con M, H y O —no 1, 2 y 3: ésas son del carril, y el porqué
+ * está en `RiberasEnTres`—. A pie el paseo es el común y vive en la escena
+ * (`escenas/andar-por-el-delta.tsx`): lee W, A, S, D él solo, choca con el mundo que deriva
+ * de la vista y vadea la orilla con el agua por la cintura. Lo que pone esta pantalla es
+ * callar la `CamaraAerea` mientras se anda —ni ratón ni cámara—, decir cómo se anda
+ * (`ComoSeAndaPorElDelta`) y recoger la mesa al bajar, que es lo que era de ella.
  */
 import { Component, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
@@ -209,6 +218,7 @@ import {
 import { altoDeLaCinta, BOTON_DE_LA_CINTA, loQueLlevaLaCinta } from '../../escenas/cinta';
 import type { RelojCargado, RelojDeLaMesa } from '../../escenas/reloj';
 import { Delta, encuadreDelDelta } from '../../escenas/delta';
+import type { ModoDeCamaraDelDelta } from '../../escenas/delta';
 /*
  * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
  * `verify:riberas` mide contra los seis colores de colono: el carril la usa para la barra de
@@ -297,6 +307,8 @@ import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import type { MovimientoDeclarado, TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { CON_ATAJO, Formulario, hayAlgoQuePintar, loQueSePuedePintar, usarLosAtajos } from './formulario';
 import type { LaMesa, MesaVista, ResultadoDelMovimiento } from './mesa';
+/* El mismo `traer` que el muelle y Las Lindes: la figura de quien pasea viaja por él. */
+import { traer } from './muelle';
 import type { ArcadeDelCatalogo } from './muebles';
 import { opcionesSueltas } from './plan';
 import { loQueSeDiceDeUnFallo } from './red-de-seguridad';
@@ -345,6 +357,72 @@ const VOLVER_AL_TABLERO_ENTERO = 'Ver el tablero entero';
  */
 const RECOGER_LA_MESA = 'Recoger la mesa';
 const SACAR_LA_MESA = 'Sacar la mesa';
+
+/**
+ * ═══ LOS MANDOS DE LA CÁMARA: LO QUE PONEN Y LO QUE SE OYE ═══
+ *
+ * Chrome de la Sala como los de arriba. El rótulo dice ADÓNDE LLEVA el mando —como la flecha de
+ * recoger dice hacia dónde va la mesa— y el nombre entero empieza por el rótulo, para que se
+ * pueda decir en voz alta para pulsarlo; lleva además su tecla. Son dos mandos y no tres: el de
+ * ir y volver de la mesa, que está siempre, y a pie el de cambiar entre el hombro y los ojos. Así
+ * la columna de la derecha (`MANDOS_DE_LA_CAMARA` en `escenas/delta-a-pie.ts`) sólo crece un
+ * mando mirando la mesa —el que `verify:escena` mide contra las asas— y el otro sale cuando la
+ * mesa está recogida.
+ */
+export const LOS_MANDOS_DE_LA_CAMARA = {
+  bajar: { rotulo: 'A pie', nombre: 'A pie: bajar a andar detrás de tu figura', tecla: 'H' },
+  subir: { rotulo: 'Mesa', nombre: 'Mesa: volver a mirar el delta desde el aire', tecla: 'M' },
+  aLosOjos: { rotulo: 'Ojos', nombre: 'Ojos: mirar desde los ojos de tu figura', tecla: 'O' },
+  alHombro: { rotulo: 'Hombro', nombre: 'Hombro: volver detrás de tu figura', tecla: 'H' },
+} as const;
+
+/** La tecla de cada cámara: la inicial de su nombre. Por qué no 1, 2 y 3, en `RiberasEnTres`. */
+export const CAMARA_DE_LA_TECLA: ReadonlyMap<string, ModoDeCamaraDelDelta['modo']> = new Map([
+  ['m', 'mesa'],
+  ['h', 'hombro'],
+  ['o', 'ojos'],
+]);
+
+/**
+ * CÓMO SE ANDA, ESCRITO ENCIMA DEL DELTA MIENTRAS SE ANDA. Es el mismo cartel que Las Lindes
+ * (`ComoSeAnda`) y por lo mismo: sin él se baja al delta, la figura se queda quieta y no hay ni
+ * una pista de que las teclas son W, A, S, D. Aquí dice además cómo se vuelve, porque la tecla
+ * de volver no es la de Las Lindes.
+ *
+ * ABAJO A LA IZQUIERDA, que a pie es sitio libre —la barra se ha recogido al bajar y la mano del
+ * mazo no baja del 30 % del alto—, y SIN COGER EL PUNTERO: es un cartel, no un control. Suelto y
+ * exportado para que `verify:escritorio` lo pinte en los tres modos: el pintor nace en la mesa.
+ */
+export function ComoSeAndaPorElDelta({ modo }: { readonly modo: ModoDeCamaraDelDelta['modo'] }): JSX.Element | null {
+  if (modo === 'mesa') return null;
+  return <p className="riberas-como-se-anda">W A S D o las flechas para andar · Mayúsculas para correr · M vuelve a la mesa</p>;
+}
+
+/** Un mando de la cámara: su rótulo, su nombre entero con la tecla, y la tecla anunciada. */
+function MandoDeLaCamara({
+  mando,
+  segundo = false,
+  alPulsar,
+}: {
+  readonly mando: (typeof LOS_MANDOS_DE_LA_CAMARA)[keyof typeof LOS_MANDOS_DE_LA_CAMARA];
+  /** El de abajo de los dos, que sólo sale a pie. */
+  readonly segundo?: boolean;
+  readonly alPulsar: () => void;
+}): JSX.Element {
+  const dicho = `${mando.nombre} (tecla ${mando.tecla})`;
+  return (
+    <button
+      type="button"
+      className={segundo ? 'riberas-camara riberas-camara-segunda' : 'riberas-camara'}
+      onClick={alPulsar}
+      aria-label={dicho}
+      aria-keyshortcuts={mando.tecla}
+      title={dicho}
+    >
+      {mando.rotulo}
+    </button>
+  );
+}
 
 /**
  * EL RECUADRO DEL MUNDO, con su nombre escrito UNA vez.
@@ -1607,15 +1685,24 @@ function CamaraAerea({
   alcance,
   cercania,
   alAcercarse,
+  aPie,
 }: {
   alcance: number;
   cercania: RefObject<Cercania>;
   alAcercarse: (nueva: Cercania) => void;
+  /**
+   * A PIE, CALLADA: ni escucha el ratón ni pone la cámara ni la niebla, que son del paseo.
+   * Se queda MONTADA y no se desmonta: su mirador vive aquí dentro, y al volver a la mesa se
+   * sigue mirando desde donde se dejó. Sin esto, cada fotograma subiría la cámara al aire por
+   * encima de la que acaba de poner el paseo, y arrastrar a pie giraría la mesa que no se ve.
+   */
+  aPie: boolean;
 }): null {
   const { camera, gl, scene } = useThree();
   const mirador = useRef<Mirador>(MIRADOR_DE_SALIDA);
 
   useEffect(() => {
+    if (aPie) return undefined;
     const lienzo = gl.domElement;
     /*
      * EL RECUADRO NO ES EL LIENZO. Es el `.riberas-lienzo` que lleva dentro el `<canvas>`
@@ -1805,9 +1892,10 @@ function CamaraAerea({
       recuadro.removeEventListener('wheel', rueda);
       lienzo.removeEventListener('contextmenu', menuDelSistema);
     };
-  }, [gl, alcance, cercania, alAcercarse]);
+  }, [gl, alcance, cercania, alAcercarse, aPie]);
 
   useFrame(() => {
+    if (aPie) return;
     const lienzo = gl.domElement;
     const proporcion = lienzo.clientHeight > 0 ? lienzo.clientWidth / lienzo.clientHeight : undefined;
     /*
@@ -2252,6 +2340,70 @@ export function RiberasEnTres({
   }, [mesaRecogida, soltarTodo]);
 
   /*
+   * ═══ A PIE POR EL DELTA ═══
+   *
+   * Desde dónde se mira: la mesa, al hombro o desde sus ojos. Es dónde está la persona y no
+   * estado del juego, así que es un `useState` a secas, como la mesa recogida. En la mesa la
+   * cámara es la `CamaraAerea` de siempre; a pie es el paseo común de la escena
+   * (`escenas/andar-por-el-delta.tsx`), que lee W, A, S, D y Mayúsculas él solo.
+   *
+   * BAJAR A ANDAR RECOGE LA MESA, y subir la saca, con EL MISMO estado del botón de recoger:
+   * la barra, los dados y el reloj cuelgan de la cámara, y a ras de suelo taparían el delta por
+   * abajo. Todo lo que ya sabía hacer la mesa recogida lo hace andando sin una línea más —tirar,
+   * comprar y pasar vuelven al carril, lo cogido se suelta—, y fundar y alzar esperan a volver,
+   * que es una tecla o un clic. Las dos manos se quedan: son lo que se lleva encima.
+   */
+  const [modo, ponerModo] = useState<ModoDeCamaraDelDelta['modo']>('mesa');
+  const aPie = modo !== 'mesa';
+  const cambiarDeCamara = useCallback(
+    (nuevo: ModoDeCamaraDelDelta['modo']) => {
+      if (nuevo === modo) return;
+      if (modo === 'mesa') {
+        soltarTodo();
+        ponerMesaRecogida(true);
+      } else if (nuevo === 'mesa') {
+        ponerMesaRecogida(false);
+      }
+      ponerModo(nuevo);
+    },
+    [modo, soltarTodo],
+  );
+  /*
+   * ═══ LAS TECLAS DE LA CÁMARA: M, H Y O, Y NO 1, 2 Y 3 ═══
+   *
+   * En Las Lindes la cámara va con 1, 2 y 3. Aquí esas teclas YA SON DEL CARRIL: `usarLosAtajos`
+   * reparte del 1 al 9 entre sus cuadrados, y con la cámara en las mismas, pulsar «2» para bajar
+   * a andar mandaría además la segunda opción del carril —un destino del estiaje, una ficha del
+   * descarte—. Así que la cámara va con la inicial de cada una: Mesa, Hombro, Ojos. Ninguna la
+   * usa nadie más en esta pantalla, y W, A, S, D y las flechas son del paseo.
+   *
+   * Con las guardas de `usarLosAtajos` —ni con un campo de texto enfocado, ni con modificadores,
+   * ni repetida— y una más: con una caja modal abierta (`LAS_TRAMPAS_ARMADAS`) sus teclas son
+   * suyas, y cambiar de cámara por debajo de un menú es mover lo que no se ve.
+   */
+  useEffect(() => {
+    const alPulsar = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const activo = document.activeElement;
+      if (
+        activo instanceof HTMLInputElement ||
+        activo instanceof HTMLTextAreaElement ||
+        activo instanceof HTMLSelectElement ||
+        (activo instanceof HTMLElement && activo.isContentEditable)
+      ) {
+        return;
+      }
+      if (LAS_TRAMPAS_ARMADAS.length > 0) return;
+      const nuevo = CAMARA_DE_LA_TECLA.get(e.key.toLowerCase());
+      if (nuevo === undefined) return;
+      e.preventDefault();
+      cambiarDeCamara(nuevo);
+    };
+    document.addEventListener('keydown', alPulsar);
+    return () => document.removeEventListener('keydown', alPulsar);
+  }, [cambiarDeCamara]);
+
+  /*
    * ═══ LA MESA SALE SOLA AL PASAR A TOCARME, Y ESPERA SI HAY ALGO EN LA MANO ═══
    *
    * Decisión 16 del §1, cerrada por Miguel: recoger es para MIRAR, y cuando hay que actuar
@@ -2277,10 +2429,16 @@ export function RiberasEnTres({
     if (meTocaAhora && !meTocabaAntes.current) laSalidaEspera.current = true;
     meTocabaAntes.current = meTocaAhora;
     if (!laSalidaEspera.current) return;
+    /*
+     * A PIE LA SALIDA TAMBIÉN ESPERA: una mesa que sube mientras se anda cuelga la barra delante
+     * de la cámara de hombro. Sale al volver a la mesa, que es cuando se va a jugar; `aPie` está
+     * en las dependencias para que ese momento despierte esto.
+     */
+    if (aPie) return;
     if (cogida !== null || cartaDelMazo !== null) return;
     laSalidaEspera.current = false;
     ponerMesaRecogida(false);
-  }, [meTocaAhora, cogida, cartaDelMazo]);
+  }, [meTocaAhora, cogida, cartaDelMazo, aPie]);
 
   /*
    * La barra y lo que se está colocando se DERIVAN de la vista en cada render, no se
@@ -3326,6 +3484,8 @@ export function RiberasEnTres({
 
   const conMundo = typeof window !== 'undefined' && modelos !== null;
   const alcance = encuadre.alcance;
+  /* Quien pasea es quien está sentado en esta ventana; un mirón pasea sin asiento. */
+  const camara: ModoDeCamaraDelDelta = modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: yo ?? '' };
 
   return (
     <div className="riberas-en-tres">
@@ -3764,7 +3924,7 @@ export function RiberasEnTres({
                 {/* La niebla empieza detrás del mundo, y del color del cielo: ver `banco3d.tsx`. */}
                 <color attach="background" args={[COLOR_DEL_CIELO]} />
                 <fog attach="fog" args={[COLOR_DEL_CIELO, alcance * 2.6, alcance * 7.5]} />
-                <CamaraAerea alcance={alcance} cercania={cercania} alAcercarse={alAcercarse} />
+                <CamaraAerea alcance={alcance} cercania={cercania} alAcercarse={alAcercarse} aPie={aPie} />
                 <Delta
                   datos={datos}
                   modelos={modelos}
@@ -3800,6 +3960,15 @@ export function RiberasEnTres({
                   onJugarCarta={alJugarCarta}
                   onRevelarCarta={alRevelarCarta}
                   onSenalarCartaDelMazo={alSenalarCartaDelMazo}
+                  /*
+                   * A PIE: desde dónde se mira y quién pasea, la vista de la que sale el mundo
+                   * con el que se choca y la figura del asiento. El paseo es el común y vive en
+                   * la escena; el teclado lo lee él, y aquí no se da ni un paso.
+                   */
+                  camara={camara}
+                  vista={vista}
+                  traer={traer}
+                  figura={puesta.asientos.find((a) => a.id === yo)?.figura}
                 />
               </Canvas>
             </LimiteDelMundo>
@@ -3813,8 +3982,10 @@ export function RiberasEnTres({
 
               Y no le roba el gesto a la cámara sin tener que pedirlo: la cámara sólo
               atiende lo que empieza sobre el propio `<canvas>` (`e.target === lienzo`).
+
+              A PIE NO ESTÁ: vuelve a la mesa entera desde el aire, y andando no hay aire.
             */}
-            {alPrincipio ? null : (
+            {aPie || alPrincipio ? null : (
               <button type="button" className="riberas-volver" onClick={volverAlTableroEntero}>
                 {VOLVER_AL_TABLERO_ENTERO}
               </button>
@@ -3839,8 +4010,11 @@ export function RiberasEnTres({
               EL RÓTULO ES UNA FLECHA Y EL NOMBRE VA EN `aria-label`: en 44 píxeles no cabe
               «Recoger la mesa», y esos 44 son cuadrado de tablero que deja de pulsarse. La
               flecha dice hacia dónde va la mesa; la etiqueta, qué se hace.
+
+              A PIE NO ESTÁ: bajar a andar ya recogió la mesa y volver a la mesa la saca. Un
+              «Sacar la mesa» andando colgaría la barra delante de la cámara de hombro.
             */}
-            {barra.length > 0 || mazo !== null ? (
+            {!aPie && (barra.length > 0 || mazo !== null) ? (
               <button
                 type="button"
                 className="riberas-recoger"
@@ -3851,6 +4025,28 @@ export function RiberasEnTres({
                 {mesaRecogida ? '▲' : '▼'}
               </button>
             ) : null}
+            {/*
+              ═══ LA CÁMARA: BAJAR A ANDAR, Y A PIE EL HOMBRO O LOS OJOS ═══
+
+              Debajo de los dos de arriba, en la misma columna y con el mismo paso
+              (`MANDOS_DE_LA_CAMARA`, `escenas/delta-a-pie.ts`): en este lienzo no queda otra
+              esquina, y el porqué está allí. El primero está SIEMPRE y no se mueve —en la mesa
+              baja a andar al hombro, a pie vuelve a la mesa—; el segundo sólo a pie, que es
+              cuando la mesa está recogida y abajo no queda asa que pisar. Y los dos con su
+              tecla en `aria-keyshortcuts` y en el nombre, que es la otra puerta.
+            */}
+            <MandoDeLaCamara
+              mando={aPie ? LOS_MANDOS_DE_LA_CAMARA.subir : LOS_MANDOS_DE_LA_CAMARA.bajar}
+              alPulsar={() => cambiarDeCamara(aPie ? 'mesa' : 'hombro')}
+            />
+            {aPie ? (
+              <MandoDeLaCamara
+                segundo
+                mando={modo === 'ojos' ? LOS_MANDOS_DE_LA_CAMARA.alHombro : LOS_MANDOS_DE_LA_CAMARA.aLosOjos}
+                alPulsar={() => cambiarDeCamara(modo === 'ojos' ? 'hombro' : 'ojos')}
+              />
+            ) : null}
+            <ComoSeAndaPorElDelta modo={modo} />
             {/*
               EL CARTEL QUE EXPLICA EL NAIPE (`docs/LAS-CARTAS-SE-EXPLICAN.md`, fase 3).
 

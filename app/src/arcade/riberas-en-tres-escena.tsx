@@ -104,6 +104,16 @@
  * retablo: los respaldos que quedan son por fallo de carga, por más de cuatro colonos
  * y por vista sin islas, y son los mismos en los dos clientes. La única diferencia que
  * sigue es la de las sombras, y está en su línea.
+ *
+ * ═══ Y SE BAJA A ANDAR POR EL DELTA, COMO EN LAS LINDES ═══
+ *
+ * Mesa, hombro u ojos, debajo del lienzo. A pie el paseo es el común y vive en la escena
+ * (`escenas/andar-por-el-delta.tsx`): el mundo con el que se choca lo deriva de la vista,
+ * se nace junto a lo propio y en el agua se anda con ella por la cintura. Lo que pone esta
+ * pantalla es lo que sólo sabe un teléfono: la palanca y el correr (`MandosDelPaseo`, la
+ * misma de Las Lindes), y APAGAR el mirador táctil mientras se anda —su gesto, su rueda y
+ * su `Ojo`—, que si no el pulgar que anda giraría a la vez una mesa que no se ve. Bajar
+ * recoge la mesa y subir la saca; ver `cambiarDeCamara`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -118,7 +128,7 @@ import {
   View,
 } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 /*
@@ -204,6 +214,14 @@ import type {
  */
 import { semillaDelCodigo } from '../../../shared/mecanicas/semilla';
 import { Delta, encuadreDelDelta } from '../../../escenas/delta';
+import type { ModoDeCamaraDelDelta } from '../../../escenas/delta';
+/*
+ * A PIE: la palanca y el correr escriben en una referencia que la escena lee en su bucle, la
+ * misma pareja que monta Las Lindes. Ver `mandos-del-paseo.tsx`.
+ */
+import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
+import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
+import { MandosDelPaseo } from './mandos-del-paseo';
 /*
  * LAS DOS MITADES DE LA CÁMARA, Y NINGUNA SE ESCRIBE AQUÍ. `camara.ts` dice desde
  * qué rumbo y qué altura se mira; `acercar.ts`, cuánto se acerca y adónde. Esta
@@ -227,6 +245,7 @@ import { apuntarFallo } from '../parte-de-fallos';
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { conAlfa } from '../tema';
+import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import { usarMesaDeArcade } from './mesa';
 import type { MesaVista, OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
 
@@ -274,6 +293,17 @@ const ALTO_MINIMO_DEL_LIENZO = 360;
  */
 const NOTA_DE_MAS_DE_CUATRO =
   'Sois más de cuatro: el delta en tres dimensiones sólo sabe pintar cuatro colores todavía. Se juega sobre el tablero de siempre.';
+
+/**
+ * DESDE DÓNDE SE MIRA EL DELTA, con el rótulo corto de Las Lindes —en un móvil no cabe una
+ * frase— y lo que se oye entero. La mesa es con la que se juega; al hombro y desde sus ojos se
+ * baja a andar por el delta con el paseo común.
+ */
+const LAS_CAMARAS: readonly { modo: ModoDeCamaraDelDelta['modo']; rotulo: string; dicho: string }[] = [
+  { modo: 'mesa', rotulo: 'Mesa', dicho: 'Mesa: mirar el delta desde el aire' },
+  { modo: 'hombro', rotulo: 'Hombro', dicho: 'Hombro: bajar a andar detrás de tu figura' },
+  { modo: 'ojos', rotulo: 'Ojos', dicho: 'Ojos: bajar a andar desde sus ojos' },
+];
 
 // ---------------------------------------------------------------------------
 // El catálogo de modelos: una vez por app
@@ -695,6 +725,66 @@ function LaMesaEnTres({
     ponerMesaRecogida(!mesaRecogida);
   }, [mesaRecogida, soltarTodo]);
 
+  /*
+   * ═══ A PIE POR EL DELTA ═══
+   *
+   * Desde dónde se mira, que es dónde está la persona y no estado del juego: un `useState` a
+   * secas, como la mesa recogida. En la mesa manda el `Ojo` de siempre; al hombro y desde sus
+   * ojos manda el paseo común de la escena, y esta pantalla pone la palanca.
+   *
+   * BAJAR A ANDAR RECOGE LA MESA, y subir la saca. La barra, los dados y el naipe del mazo son
+   * de la mesa y cuelgan de la cámara: a ras de suelo taparían el delta por abajo, y es el sitio
+   * exacto de la palanca. Se recoge con EL MISMO estado de «Recoger la mesa», así que todo lo que
+   * ya sabía hacer una mesa recogida lo hace andando sin una línea más —tirar y comprar vuelven
+   * al pie, lo cogido se suelta—, y fundar y alzar esperan a volver a la mesa, que es un toque.
+   * Las dos manos se quedan: son el inventario, y nadie tiene que subir para ver qué lleva.
+   *
+   * La palanca escribe en `mandos`, una referencia que la escena lee en su bucle sin pasar por
+   * React. Aquí arriba, con los demás ganchos: debajo de un `return` React se rompería la
+   * primera vez que la pantalla cambiara de rama.
+   */
+  const [modo, ponerModo] = useState<ModoDeCamaraDelDelta['modo']>('mesa');
+  const aPie = modo !== 'mesa';
+  const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
+  const cambiarDeCamara = useCallback(
+    (nuevo: ModoDeCamaraDelDelta['modo']) => {
+      if (nuevo === modo) return;
+      if (modo === 'mesa') {
+        soltarTodo();
+        ponerMesaRecogida(true);
+      } else if (nuevo === 'mesa') {
+        ponerMesaRecogida(false);
+      }
+      ponerModo(nuevo);
+    },
+    [modo, soltarTodo],
+  );
+  /*
+   * ═══ Y A PIE EL MIRADOR TÁCTIL SE APAGA ═══
+   *
+   * Un dedo sobre el lienzo gira la mesa y dos la acercan: andando, el pulgar que no está en la
+   * palanca giraría a la vez una mesa que no se ve, y al volver estaría girada. Se le da al
+   * `GestureDetector` un gemelo APAGADO del gesto del mirador —los mismos tres gestos, del mismo
+   * tipo y en el mismo hilo— en vez de quitarle el detector: con la misma forma el detector sólo
+   * cambia su configuración; con otra forma los volvería a enganchar y podría cambiar de
+   * envoltorio, que es desmontar el lienzo y perder el contexto de dibujo. El giro lleva un
+   * `onTouchesDown` de trabajo vacío porque los del mirador lo son, y así se reparten igual entre
+   * hilos en la web y en el móvil.
+   */
+  const gestoApagado = useMemo(
+    () =>
+      Gesture.Simultaneous(
+        Gesture.Pan()
+          .onTouchesDown(() => {
+            'worklet';
+          })
+          .enabled(false),
+        Gesture.Pinch().runOnJS(true).enabled(false),
+        Gesture.Pan().runOnJS(true).minPointers(2).enabled(false),
+      ),
+    [],
+  );
+
   const [medida, ponerMedida] = useState({ ancho: 0, alto: 0 });
   const medir = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -941,10 +1031,16 @@ function LaMesaEnTres({
     if (meTocaAhora && !meTocabaAntes.current) laSalidaEspera.current = true;
     meTocabaAntes.current = meTocaAhora;
     if (!laSalidaEspera.current) return;
+    /*
+     * A PIE LA SALIDA TAMBIÉN ESPERA: una mesa que sube mientras se anda cuelga la barra delante
+     * de la cámara de hombro y encima de la palanca. Sale al volver a la mesa, que es cuando se va
+     * a jugar; `aPie` está en las dependencias para que ese momento despierte esto.
+     */
+    if (aPie) return;
     if (cogida !== null || cogidaDelMazo !== null) return;
     laSalidaEspera.current = false;
     ponerMesaRecogida(false);
-  }, [meTocaAhora, cogida, cogidaDelMazo]);
+  }, [meTocaAhora, cogida, cogidaDelMazo, aPie]);
 
   /*
    * EL ENCUADRE mide el MUNDO —lo grande que es el delta— y sólo se recalcula cuando
@@ -1265,6 +1361,7 @@ function LaMesaEnTres({
           salir={mesa.salir}
           tirar={mesa.tirar}
           arriba={arriba}
+          deBotas={esMesaDeBotas(vista)}
         />
         <LineaDelTurno mesa={vista} nombres={nombres} />
         <ElAviso texto={mesa.aviso} />
@@ -1384,6 +1481,7 @@ function LaMesaEnTres({
           salir={mesa.salir}
           tirar={mesa.tirar}
           arriba={arriba}
+          deBotas={esMesaDeBotas(vista)}
         />
         <ScrollView
           style={estilos.rio}
@@ -1413,6 +1511,8 @@ function LaMesaEnTres({
   /* ─── La mesa con el delta ─── */
 
   const alcance = encuadre.alcance;
+  /* Quien pasea es quien está sentado en esta pantalla; un mirón pasea sin asiento. */
+  const camara: ModoDeCamaraDelDelta = modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: yo ?? '' };
 
   return (
     <View style={estilos.todo}>
@@ -1423,6 +1523,7 @@ function LaMesaEnTres({
         salir={mesa.salir}
         tirar={mesa.tirar}
         arriba={arriba}
+        deBotas={esMesaDeBotas(vista)}
       />
       <LineaDelTurno mesa={vista} nombres={nombres} />
       <ElAviso texto={mesa.aviso} />
@@ -1438,7 +1539,8 @@ function LaMesaEnTres({
       <View style={[estilos.cajaDelLienzo, { height: altoDelLienzo }]}>
         {catalogo.que === 'listo' ? (
           <RedDelLienzo alCaer={ponerElLienzoCayo}>
-          <GestureDetector gesture={gesto}>
+          {/* A pie, el gemelo apagado: ver `gestoApagado`. */}
+          <GestureDetector gesture={aPie ? gestoApagado : gesto}>
             {/*
               LA ETIQUETA VA EN LA VISTA QUE SÓLO ENVUELVE EL `Canvas`, y no en la
               caja de fuera: `accessible` agrupa a sus hijos, y la caja tiene también
@@ -1453,8 +1555,12 @@ function LaMesaEnTres({
                 secundario; en nativo se guarda y no se usa. Va aquí y no en la caja de
                 fuera porque la rueda tiene que pararse encima DEL TABLERO y no encima
                 de la hoja de «¿a quién?», que sí se desplaza si algún día crece.
+
+                A PIE SE LE QUITA: soltar el nodo descuelga la rueda y el arrastre del ratón
+                (el efecto de `mirador-tactil.ts` se va con él), que es la otra mitad del
+                mirador que se apaga mientras se anda. Al volver a la mesa se le devuelve.
               */
-              ref={apuntarElLienzo}
+              ref={aPie ? undefined : apuntarElLienzo}
               onLayout={medir}
               accessible
               accessibilityLabel="El delta de Riberas en tres dimensiones. Arrastra con un dedo para girarlo, pellizca para acercarlo y mueve dos dedos para recorrerlo."
@@ -1491,7 +1597,12 @@ function LaMesaEnTres({
               >
                 <color attach="background" args={[COLOR_DEL_CIELO]} />
                 <fog attach="fog" args={[COLOR_DEL_CIELO, alcance * 2.6, alcance * 7.5]} />
-                <Ojo mirador={mirador} cercania={cercania} alcance={alcance} />
+                {/*
+                  EL OJO DE LA MESA, SÓLO EN LA MESA. A pie la cámara es del paseo, y un `Ojo`
+                  montado la pondría otra vez en el aire en cada fotograma. Su mirador y su
+                  cercanía viven en el gancho, así que al volver sigue donde se dejó.
+                */}
+                {aPie ? null : <Ojo mirador={mirador} cercania={cercania} alcance={alcance} />}
                 <Delta
                   datos={datos}
                   modelos={catalogo.modelos}
@@ -1517,12 +1628,31 @@ function LaMesaEnTres({
                   onCogerCartaDelMazo={alCogerCartaDelMazo}
                   onJugarCarta={alJugarCarta}
                   onRevelarCarta={alRevelarCarta}
+                  /*
+                   * A PIE: desde dónde se mira y quién pasea, la vista de la que sale el mundo
+                   * con el que se choca, la figura del asiento y la palanca. El paseo es el
+                   * común y vive en la escena; aquí no se da ni un paso.
+                   */
+                  camara={camara}
+                  vista={laVista}
+                  traer={traer}
+                  figura={vista.asientos.find((a) => a.id === yo)?.figura}
+                  mandos={mandos}
                 />
               </Canvas>
             </View>
           </GestureDetector>
           </RedDelLienzo>
         ) : null}
+
+        {/*
+          LA PALANCA Y EL CORRER, encima del lienzo y SÓLO A PIE: en la mesa no hay a quién
+          mover. Es la misma de Las Lindes, sin tocarla (`mandos-del-paseo.tsx`), y escribe en la
+          referencia que la escena lee. Hermana del `GestureDetector` y no hija, como los otros
+          mandos de esta caja: se lleva su toque sin pelearlo con el lienzo. Abajo a los lados,
+          que andando es sitio libre: la mesa se ha recogido al bajar.
+        */}
+        <MandosDelPaseo mandos={mandos} visibles={aPie} />
 
         {/*
           EL TELÓN, mientras el modelo llega: suelo con el nombre del juego y una
@@ -1557,8 +1687,10 @@ function LaMesaEnTres({
           que es lo que pide poder decirlo en voz alta para pulsarlo. Lo que se gana
           son unos sesenta puntos de ancho, y ese ancho es cuadrado de tablero que
           deja de poder tocarse: ver la cabecera del estilo.
+
+          A PIE NO ESTÁ: vuelve a la mesa entera desde el aire, y andando no hay aire.
         */}
-        {catalogo.que === 'listo' && seHaMovido ? (
+        {catalogo.que === 'listo' && !aPie && seHaMovido ? (
           <Pressable
             style={estilos.volver}
             onPress={verElTableroEntero}
@@ -1595,7 +1727,12 @@ function LaMesaEnTres({
           «Recoger la mesa», y esos 44 son cuadrado de tablero que deja de tocarse. La
           flecha dice hacia dónde va la mesa; la etiqueta, qué se hace.
         */}
-        {catalogo.que === 'listo' && (barra.length > 0 || mazo !== null) ? (
+        {/*
+          A pie no hay mesa que recoger ni que sacar —bajar a andar ya la recogió, y subir la
+          saca—, así que el mando no está: un «Sacar la mesa» andando colgaría la barra delante
+          de la cámara de hombro.
+        */}
+        {catalogo.que === 'listo' && !aPie && (barra.length > 0 || mazo !== null) ? (
           <Pressable
             style={estilos.recogerLaMesa}
             onPress={alRecogerLaMesa}
@@ -1642,6 +1779,33 @@ function LaMesaEnTres({
           />
         ) : null}
       </View>
+
+      {/*
+        ═══ DESDE DÓNDE SE MIRA: LA MESA, AL HOMBRO O DESDE SUS OJOS ═══
+
+        Los tres de Las Lindes, y aquí van DEBAJO del lienzo y no encima. Encima no queda
+        esquina: arriba a la izquierda están «Tablero entero» y «Recoger la mesa», arriba a la
+        derecha llega la carta de arriba de la mano de bienes (a 14 puntos del canto con la
+        mano llena, ver `estilos.volver`), y abajo es de la barra en la mesa y de la palanca a
+        pie. Debajo no tapan nada que se toque, y quedan a mano del pulgar que anda. Sólo con
+        el delta montado: sin lienzo no hay adónde bajar.
+      */}
+      {catalogo.que === 'listo' ? (
+        <View style={estilos.camaras} accessibilityRole="toolbar" accessibilityLabel="Desde dónde se mira">
+          {LAS_CAMARAS.map((c) => (
+            <Pressable
+              key={c.modo}
+              style={[estilos.camara, modo === c.modo ? estilos.camaraPuesta : null]}
+              onPress={() => cambiarDeCamara(c.modo)}
+              accessibilityRole="button"
+              accessibilityLabel={c.dicho}
+              accessibilityState={{ selected: modo === c.modo }}
+            >
+              <Text style={estilos.camaraRotulo}>{c.rotulo}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       {/*
         DEBAJO DEL LIENZO, LO QUE EL TABLERO NO ENSEÑA: tirar, pasar, aceptar,
@@ -2586,6 +2750,28 @@ const estilos = StyleSheet.create({
     backgroundColor: SALA.teja,
   },
   recogerLaMesaRotulo: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13 },
+  /*
+   * ═══ LAS TRES CÁMARAS, DEBAJO DEL LIENZO ═══
+   *
+   * Una tira que mide lo que miden sus botones —`flexGrow: 0` escrito, como el marcador— y se
+   * lleva su alto del pie, que es el que cede: el lienzo mide lo mismo que antes. Los botones
+   * son el cromo de `volver`: teja, contorno blanco al 40 % y 44 de alto, el mínimo de dedo de
+   * la casa. La puesta se ve por el CONTORNO de acento y no por un fondo de acento, que es la
+   * regla de lo elegido en esta Sala (`componedorElegido`): el acento lleno significa «esto es
+   * lo que hay que tocar», y una cámara puesta no lo es.
+   */
+  camaras: { flexGrow: 0, flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 6 },
+  camara: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.teja,
+  },
+  camaraPuesta: { borderColor: SALA.acento, backgroundColor: SALA.tejaAlta },
+  camaraRotulo: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13 },
   /*
    * LA HOJA: una ficha sobre el lienzo, pegada abajo. Teja con el contorno que se
    * ve —blanco al 40 %, 3,63 sobre la teja—, porque aquí sí se dibuja una caja.
