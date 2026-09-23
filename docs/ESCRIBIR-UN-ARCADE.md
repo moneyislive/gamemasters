@@ -81,6 +81,15 @@ dos clientes, el comprobador, y el registro de mundos (§6).
   —`caer` incluido—), la cámara de mesa (`escenas/camara.ts`, `acercar.ts`), el juez de calidad
   (`juzgarCalidad` de `escenas/embarcadero/calidad.ts`: 120 fotogramas y `'plena'` o `'sobria'`),
   y el paseo (§6).
+- **Lo común de toda escena, en `escenas/comun/`**: tus props extienden `PropsDeEscenaDeTablero`
+  (`tablero.ts`: código, `traer`, calidad, cámara, `mandos`, `canal` y los tres avisos; sin
+  `three`, lo lee el servidor) y declaras sólo lo tuyo. El aviso de listo y la medida son
+  `usarArranqueYMedida(props, { llave: traer, alVencerElTope, midiendo })` (`arranque.ts`): llamas
+  a `arrancar()` cuando lo tuyo ha llegado o ha fallado. Un aventurero KayKit es `usarLaFigura` +
+  `usarMarioneta` + `<Marioneta de grupo>` (`marioneta.tsx`), y el clip lo pones tú en tu
+  `useFrame` con `reproduce`. El reloj de arena se trae con `relojDe(traer)` (`reloj.ts`). Tu
+  presupuesto se cuenta con `renglonesDeLasPiezas` y `sumaDeLosRenglones` (`presupuesto.ts`). No
+  copies ninguna de estas: cada copia que había tenía ya su deriva.
 - **El presupuesto**: triángulos contados con los del `.glb` real, y lo que se recorta en
   `'sobria'`. Un techo de PC en la app es un juego que no se puede jugar en un teléfono barato.
 
@@ -91,7 +100,10 @@ es una escena nueva, su nombre en `TemaDelMuelle.escena` y su fila en `ESCENAS_D
 (`escenas/embarcadero/escenas-del-muelle.ts`), que leen los dos clientes: sin la fila no compila;
 si reutiliza una escena, no hay fila. Su banco: una fila en `LOS_LOBBIES` de
 `escritorio/src/banco-lobby.tsx` y una página con `data-lobby` (copia de `plaza3d.html`). El lobby
-es donde se abre la mesa y donde se elige la modalidad.
+es donde se abre la mesa y donde se elige la modalidad. Si es una escena propia con coreografía, su
+cámara es `usarElBucleDelLobby` (`escenas/comun/bucle-del-lobby.ts`): le das tu pose de reposo, la
+mirada a quien llega, la grúa del zarpe y lo que pintas con la luz del zarpe; el tope de un lobby
+es `TOPE_DE_UN_LOBBY`.
 
 ## 5. Los dos clientes
 
@@ -206,7 +218,9 @@ atacado el mismo día:
 | Riberas del escritorio sobre `lienzo-propio.tsx` en vez de sus copias | HECHO: −786 líneas, y ningún pintor importa ya de otro |
 | altas derivadas: la tabla de escenas del muelle una vez, los modelos por lista, las listas de los comprobadores | HECHO: de 8 toques a 2 (a 1 si el lobby reutiliza una escena) |
 | un arnés de comprobación y un robot genérico | HECHO: `arnes.ts` (lo usan tres comprobadores) y `robot-generico.ts` con `verify:robot-generico`; los 73 guiones viejos se quedan como están, a propósito |
-| `escenas/comun/`: la marioneta envuelta, el gancho de arranque y medida, un único `relojDe` | en curso |
+| `escenas/comun/`: la marioneta, el arranque y la medida, `relojDe`, el presupuesto, las props de tablero y el bucle del lobby | HECHO: −550 líneas de código en las escenas, +369 en `comun/`; las copias que ya divergían se unificaron una a una |
 | `tablero-en-linea.tsx` con su propio vestíbulo | PENDIENTE: es una cuarta copia que podría usar el del contrato |
+| el mirador táctil de la app, que se apaga distinto en Riberas (un gemelo) que en el Burgo (`.enabled`) | PENDIENTE: `usarMiradorTactil(…, { apagado })` en `app/src/arcade/mirador-tactil.ts` |
+| la biblioteca de `escenas/embarcadero/` (`cargar`, `figuras`, `gestos`, `tipos`, `calidad`, `piezas`, `tinte`, `tema`), que usan todos | PENDIENTE: moverla a `escenas/comun/` son cientos de imports y reglas; no se hizo a propósito |
 
 Ninguna tocó código sellado.
