@@ -1328,7 +1328,12 @@ paso('Quien pasea no nace dentro de una casa');
    * malos del mazo estaban entre 0.0 y 2.6 —la ermita, exactamente encima de la ermita—,
    * y el peor sitio que elegía la cuenta de la escena tenía 10.35. El umbral cae en medio,
    * lejos de los dos, así que ni deja pasar el fallo ni se pone rojo porque alguien mueva un
-   * barril. El peor sitio que declara el mundo, contando ya las cajas, tiene 7,08 al estrenarlo.
+   * barril. El peor sitio que declara el mundo, contando ya las cajas, tenía 7,08 al estrenarlo,
+   * y 5,64 desde que las piedras que pasan de la cintura estorban (`comoEstorba`): en
+   * `villa-tres-senda`, con y sin blasón, giro 1, la caja de una piedra de la cuneta echó al
+   * paseante del sitio de antes, y el mejor que queda en esa senda corta tiene una arboleda a
+   * 5,64. Sigue por encima del umbral —5,09—, pero ya no lejos: si un día baja de él, es la
+   * senda de esa losa la que se ha quedado sin sitio, y hay que mirarla antes que el número.
    */
   const HOLGURA_MINIMA = ALTURA_DE_UNA_PERSONA * 2;
 

@@ -12,16 +12,21 @@
  *     cuenta, en el mismo orden: lo que se cuenta aquí es lo que hay en el mundo.
  *  2. QUE ESTORBA LO QUE TIENE QUE ESTORBAR. Hay cajas de murallas, de torres, de la villa, de
  *     la ermita y del campo, y jambas de puerta; y NI UNA de trigal, de barbecho o de nada
- *     menudo. Toda pieza que estorba tiene su huella medida, nada con esquinas llega girado a un
- *     ángulo que no sea un cuarto, y nada que estorba se pone más pequeño que la altura a la
- *     que se midió su huella.
+ *     menudo, salvo las piedras, rocas y tocones que pasan de la cintura: ésas estorban TODAS, una
+ *     a una, y ninguna de las que no pasan, y su caja las cubre giradas como caigan. Toda pieza
+ *     que estorba tiene su huella medida, nada con esquinas llega girado a un ángulo que no sea
+ *     un cuarto, y nada que estorba se pone más pequeño que la altura a la que se midió su huella.
  *  3. QUE SE NACE DONDE SE PUEDE ESTAR: en su losa, en senda o en prado, sin cuerpo encima.
  *  4. QUE LA MURALLA PARA Y LA PUERTA DEJA PASAR, mirado desde el REPARTO y no desde las cajas.
  *     Ver ese escalón: una caja mal girada se «para a sí misma» si el cruce se calcula con ella.
- *  5. QUE EL MISMO PASEO DA LA MISMA HUELLA EN NODE Y EN HERMES, y el mismo mundo.
- *  6. QUE LA TABLA DE HUELLAS ES LA DE LOS MODELOS: se vuelven a medir en `tablero.glb` y se
- *     exigen los mismos números.
- *  7. Y QUE LAS DOS TABLAS LITERALES DEL REPARTO DICEN LO QUE DICE SU CABECERA.
+ *  5. QUE LAS PIEDRAS NO CIERRAN LO QUE SE ANDABA: quien va por el eje de una senda no toca
+ *     ninguna, ninguna estrecha el hueco de una puerta por debajo de lo que pasa una persona,
+ *     ningún sitio de nacer queda al lado de una, y no parten el valle: cada trozo por el que se
+ *     andaba sigue entero, y todos los sitios de nacer están en el grande.
+ *  6. QUE EL MISMO PASEO DA LA MISMA HUELLA EN NODE Y EN HERMES, y el mismo mundo.
+ *  7. QUE LA TABLA DE HUELLAS ES LA DE LOS MODELOS: se vuelven a medir en `tablero.glb` y se
+ *     exigen los mismos números, y lo mismo el alto y el radio de las piedras.
+ *  8. Y QUE LAS DOS TABLAS LITERALES DEL REPARTO DICEN LO QUE DICE SU CABECERA.
  *
  * ═══ CON SUELOS DELANTE ═══
  *
@@ -41,10 +46,17 @@ import { deNumero, UNO } from '../../shared/mecanicas/fijo';
 import { arenaDe, hayPiso, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Arena, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
-import { casillaDeLlave, LAS_LOSAS, ladoGirado } from '../../shared/arcade/juegos/lindes-losas';
+import { casillaDeLlave, LAS_LOSAS, ladoGirado, losaPorId } from '../../shared/arcade/juegos/lindes-losas';
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
-import { ALTURA_DE_LA_HUELLA_EN_PACK, HUECO_DE_LA_PUERTA, HUELLA_DEL_MODELO } from '../../shared/arcade/juegos/lindes-huellas';
 import {
+  ALTO_Y_RADIO_DEL_MODELO,
+  ALTURA_DE_LA_HUELLA_EN_PACK,
+  HUECO_DE_LA_PUERTA,
+  HUELLA_DEL_MODELO,
+} from '../../shared/arcade/juegos/lindes-huellas';
+import {
+  ALTURA_DE_UNA_PERSONA,
+  ANCHO_DE_LA_SENDA,
   CELDAS_POR_LOSA,
   CELDAS_POR_MURO,
   ESCALA_DEL_PACK,
@@ -52,7 +64,7 @@ import {
   LADO_DE_CELDA,
   LADO_DE_LOSA,
 } from '../../shared/arcade/juegos/lindes-medidas';
-import { comoEstorba, esMenuda, PIEZA } from '../../shared/arcade/juegos/lindes-piezas';
+import { comoEstorba, comoEstorbaLaPuesta, esMenuda, PIEZA } from '../../shared/arcade/juegos/lindes-piezas';
 import {
   caminoDeLaSenda,
   DIRECCIONES_DE_LA_PLAZA,
@@ -108,9 +120,10 @@ interface Tablero {
  * Un tablero de verdad: el que deja una partida del robot, con las losas en el orden de sus
  * llaves. `hasta` corta por el orden en que se pusieron, que es un tablero que existió a mitad
  * de partida y por eso también es legal. La semilla del paisaje sale como la saca la escena:
- * `semillaDelCodigo` de un código de mesa, con `0x5eed`.
+ * `semillaDelCodigo` de un código de mesa, con `0x5eed`; el código es `LINDES-` y la partida
+ * si no se dice otro.
  */
-function tableroDelRobot(semilla: number, hasta: number | null): Tablero {
+function tableroDelRobot(semilla: number, hasta: number | null, codigo = `LINDES-${String(semilla)}`): Tablero {
   const partida = jugarLasLindes(semilla, 3);
   const losas: LosaParaElMundo[] = [];
   for (const llave of Object.keys(partida.estado.tablero).sort(porOrden)) {
@@ -120,8 +133,9 @@ function tableroDelRobot(semilla: number, hasta: number | null): Tablero {
     if (hasta !== null && puesta.orden > hasta) continue;
     losas.push({ x: c.x, y: c.y, losa: puesta.losa, giro: puesta.giro });
   }
-  const nombre = hasta === null ? `partida ${String(semilla)}` : `partida ${String(semilla)} hasta la losa ${String(hasta)}`;
-  return { nombre, losas, semilla: semillaDelCodigo(`LINDES-${String(semilla)}`, 0x5eed) };
+  const partidaYHasta = hasta === null ? `partida ${String(semilla)}` : `partida ${String(semilla)} hasta la losa ${String(hasta)}`;
+  const nombre = codigo === `LINDES-${String(semilla)}` ? partidaYHasta : `${partidaYHasta} en la mesa ${codigo}`;
+  return { nombre, losas, semilla: semillaDelCodigo(codigo, 0x5eed) };
 }
 
 const TABLEROS: Tablero[] = [
@@ -131,7 +145,24 @@ const TABLEROS: Tablero[] = [
   tableroDelRobot(4, 5),
 ];
 
-/** Lo que se pone girado a un ángulo cualquiera: plantas redondas u ovaladas. Ver `lindes-mundo.ts`. */
+/**
+ * TABLEROS CON UNA PIEDRA EN LA PUERTA, sólo para el escalón 5. En los cuatro de arriba ninguna
+ * piedra cae en el pasillo del hueco de una puerta —es raro: cuatro puertas de setenta y cinco en
+ * veintiséis tableros, medido al estrenar la regla de la cintura—, y sin una allí ese escalón no
+ * probaría las puertas contra nada. Éstos son tres de los que la tienen, buscados una vez. Si el
+ * reparto cambia y dejan de tenerla, el suelo de ese escalón se pone rojo y hay que buscar otros:
+ * es lo que tiene que pasar, no un fallo del comprobador.
+ */
+const CON_PIEDRA_EN_LA_PUERTA: Tablero[] = [
+  tableroDelRobot(10, null, 'MESA10'),
+  tableroDelRobot(12, null, 'MESA12'),
+  tableroDelRobot(15, null, 'MESA15'),
+];
+
+/**
+ * Lo que se pone girado a un ángulo cualquiera: plantas redondas u ovaladas. Ver `lindes-mundo.ts`.
+ * Las piedras, las rocas y los tocones también, y ésas además con la caja de su radio medido.
+ */
 const CAMPO_REDONDO: ReadonlySet<string> = new Set([
   PIEZA.arbolA,
   PIEZA.arbolB,
@@ -140,7 +171,17 @@ const CAMPO_REDONDO: ReadonlySet<string> = new Set([
   PIEZA.arboledaPequena,
   PIEZA.almiar,
   PIEZA.colinaA,
+  PIEZA.piedra,
+  PIEZA.rocaA,
+  PIEZA.rocaB,
+  PIEZA.rocaC,
+  PIEZA.rocaD,
+  PIEZA.rocaE,
+  PIEZA.tocon,
 ]);
+
+/** ¿Es de las que estorban sólo si pasan de la cintura? Las piedras, las rocas y los tocones. */
+const esPiedra = (pieza: string): boolean => comoEstorba(pieza) === 'si-pasa-de-la-cintura';
 
 interface Derivado {
   readonly tablero: Tablero;
@@ -149,10 +190,12 @@ interface Derivado {
   readonly arena: Arena;
 }
 
-const DERIVADOS: Derivado[] = TABLEROS.map((t) => {
+function derivar(t: Tablero): Derivado {
   const mundo = mundoDeLasLindes(t.losas, t.semilla);
   return { tablero: t, mundo, conOrigen: cuerposDeLasLindes(t.losas, t.semilla), arena: arenaDe(mundo) };
-});
+}
+
+const DERIVADOS: Derivado[] = TABLEROS.map(derivar);
 
 // ---------------------------------------------------------------------------
 // ESCALÓN 1 · EL MUNDO ES CONTRATO
@@ -235,13 +278,19 @@ paso('Estorba lo que tiene que estorbar, y nada más');
   comprobar('y las casas', (porPieza.get(PIEZA.casa) ?? 0) > 100, { casa: porPieza.get(PIEZA.casa) });
   comprobar('y los árboles', (porPieza.get(PIEZA.arbolA) ?? 0) + (porPieza.get(PIEZA.arbolB) ?? 0) > 50);
   comprobar('y las puertas dejan DOS jambas cada una', jambas > 0 && jambas % 2 === 0, { jambas });
+  /*
+   * Lo menudo que estorba son las piedras que pasan de la cintura, y sólo ellas: una valla, un
+   * barril o un pozo con caja sería la regla de producto rota en silencio. Cuáles de las piedras,
+   * pieza a pieza, lo mira el bloque de abajo.
+   */
+  const menudasConCaja = [...porPieza.keys()].filter((p) => esMenuda(p) && !esPiedra(p));
   comprobar(
-    'y ni una caja de trigal, de barbecho o de nada menudo',
+    'y ni una caja de trigal, de barbecho o de nada menudo que no sea una piedra, una roca o un tocón',
     deLasQueNo.length === 0 &&
       (porPieza.get(PIEZA.trigal) ?? 0) === 0 &&
       (porPieza.get(PIEZA.barbecho) ?? 0) === 0 &&
-      [...porPieza.keys()].every((p) => !esMenuda(p)),
-    deLasQueNo.slice(0, 10),
+      menudasConCaja.length === 0,
+    { deLasQueNo: deLasQueNo.slice(0, 10), menudasConCaja },
   );
   comprobar('nada con esquinas llega girado a un ángulo que no sea un cuarto de vuelta', redondasConEsquinas.length === 0, redondasConEsquinas.slice(0, 10));
   comprobar('y lo del campo sí llega girado de cualquier manera: las redondas existen', redondas > 100, { redondas });
@@ -251,11 +300,14 @@ paso('Estorba lo que tiene que estorbar, y nada más');
 /*
  * EL REPARTO, PIEZA A PIEZA: que no se quede nada que estorbe sin huella —se atravesaría en
  * silencio— y que nada que estorbe se ponga más pequeño que una torre, que es la escala a la que
- * se midió hasta dónde llega la cabeza de quien anda.
+ * se midió hasta dónde llega la cabeza de quien anda. «Que estorbe» es tal como está PUESTA: una
+ * piedra que pasa de la cintura cuenta, y tiene que cumplirlo como una casa.
  */
 {
   let piezasMiradas = 0;
   let queEstorban = 0;
+  let piedrasQueEstorban = 0;
+  let piedraMasPequena = Number.POSITIVE_INFINITY;
   const sinHuella = new Set<string>();
   const pequenas: string[] = [];
   const cabeza = ALTURA_DE_LA_HUELLA_EN_PACK * ESCALA_DEL_PACK * ESCALA_DE_LA_TORRE;
@@ -263,14 +315,21 @@ paso('Estorba lo que tiene que estorbar, y nada más');
     for (const l of d.tablero.losas) {
       for (const p of montarLaLosa(l.losa, l.giro, semillaDeLaLosa(d.tablero.semilla, l.x, l.y)).puestas) {
         piezasMiradas++;
-        if (comoEstorba(p.pieza) === 'nada') continue;
+        if (comoEstorbaLaPuesta(p.pieza, p.escala) === 'nada') continue;
         queEstorban++;
+        if (esPiedra(p.pieza)) {
+          piedrasQueEstorban++;
+          if (p.escala < piedraMasPequena) piedraMasPequena = p.escala;
+        }
         if (HUELLA_DEL_MODELO[p.pieza] === undefined) sinHuella.add(p.pieza);
         if (p.escala < ESCALA_DE_LA_TORRE - 1e-12) pequenas.push(`${p.pieza} a escala ${p.escala.toFixed(3)}`);
       }
     }
   }
-  console.log(`  ${String(piezasMiradas)} piezas del reparto miradas, ${String(queEstorban)} estorban`);
+  console.log(
+    `  ${String(piezasMiradas)} piezas del reparto miradas, ${String(queEstorban)} estorban · ` +
+      `${String(piedrasQueEstorban)} de ellas piedras, la más pequeña a escala ${piedraMasPequena.toFixed(3)} (la torre, ${String(ESCALA_DE_LA_TORRE)})`,
+  );
   comprobar('se han mirado las piezas del reparto de verdad', piezasMiradas > 5000, { piezasMiradas });
   comprobar('toda pieza que estorba tiene su huella medida', sinHuella.size === 0, [...sinHuella]);
   comprobar(
@@ -278,6 +337,100 @@ paso('Estorba lo que tiene que estorbar, y nada más');
     pequenas.length === 0,
     pequenas.slice(0, 5),
   );
+  /* Y las piedras entran en esa cuenta: si no hubiera ninguna, el invariante no las estaría mirando. */
+  comprobar('y en esa cuenta entran piedras que estorban, que también la cumplen', piedrasQueEstorban > 300, { piedrasQueEstorban });
+}
+
+/*
+ * ═══ LAS PIEDRAS, PIEZA A PIEZA ═══
+ *
+ * La regla es por pieza PUESTA: estorba la piedra, la roca o el tocón que pasa de la cintura de
+ * quien anda (`comoEstorbaLaPuesta`). Aquí se vuelve a contestar con la cuenta a la vista —su alto
+ * medido, por la escala del pack y la suya, contra media persona—, sin preguntarle a la regla, y
+ * se exige que el mundo haya sacado caja de las que pasan y de NINGUNA otra.
+ *
+ * Y que esa caja cubra la piedra se gire como se gire: centrada donde se puso y con su radio
+ * medido —lo más lejos que llega su planta— por medio lado. Con el mayor semieje, que es lo que
+ * tienen los árboles, la piedra asomaba por las esquinas: ver `lindes-mundo.ts`. Que el radio de
+ * la tabla sea el del modelo lo mira el escalón 7, midiéndolo otra vez.
+ */
+{
+  const cintura = ALTURA_DE_UNA_PERSONA / 2;
+  let miradas = 0;
+  let estorban = 0;
+  let sePisan = 0;
+  let masBajaQueEstorba = Number.POSITIVE_INFINITY;
+  let masAltaQueSePisa = 0;
+  let aCuartos = 0;
+  let conRadio = 0;
+  const porPieza = new Map<string, { estorban: number; sePisan: number }>();
+  const malas: string[] = [];
+  for (const d of DERIVADOS) {
+    for (const l of d.tablero.losas) {
+      const cx = l.x * LADO_DE_LOSA;
+      const cz = -l.y * LADO_DE_LOSA;
+      for (const p of montarLaLosa(l.losa, l.giro, semillaDeLaLosa(d.tablero.semilla, l.x, l.y)).puestas) {
+        if (!esPiedra(p.pieza)) continue;
+        miradas++;
+        const medido = ALTO_Y_RADIO_DEL_MODELO[p.pieza];
+        if (medido === undefined) {
+          malas.push(`${p.pieza}: no tiene alto ni radio medidos`);
+          continue;
+        }
+        const alto = medido.alto * ESCALA_DEL_PACK * p.escala;
+        const pasa = alto > cintura;
+        const cuenta = porPieza.get(p.pieza) ?? { estorban: 0, sePisan: 0 };
+        if (pasa) {
+          estorban++;
+          cuenta.estorban++;
+          if (alto < masBajaQueEstorba) masBajaQueEstorba = alto;
+        } else {
+          sePisan++;
+          cuenta.sePisan++;
+          if (alto > masAltaQueSePisa) masAltaQueSePisa = alto;
+        }
+        porPieza.set(p.pieza, cuenta);
+        const cajas = cajasDeLaPuesta(p, cx, cz);
+        const donde = `${d.tablero.nombre}, ${p.pieza} a escala ${p.escala.toFixed(3)} (${alto.toFixed(2)} de alto)`;
+        if (cajas.length !== (pasa ? 1 : 0)) {
+          malas.push(`${donde}: ${String(cajas.length)} cajas y ${pasa ? 'pasa' : 'no pasa'} de la cintura`);
+          continue;
+        }
+        const caja = cajas[0];
+        if (caja === undefined) continue;
+        /* A cuartos de vuelta la caja es la huella girada, exacta; el reparto no las pone así. */
+        if (cuartosDeVuelta(p.giro) !== null) {
+          aCuartos++;
+          continue;
+        }
+        conRadio++;
+        const r = medido.radio * ESCALA_DEL_PACK * p.escala * Math.max(1, p.largo);
+        const x = cx + p.x;
+        const z = cz + p.z;
+        const b = caja.cuerpo;
+        const cubre = b.x0 <= x - r + 1e-9 && b.x1 >= x + r - 1e-9 && b.z0 <= z - r + 1e-9 && b.z1 >= z + r - 1e-9;
+        if (!cubre) malas.push(`${donde}: su caja ${JSON.stringify(b)} no cubre su radio ${r.toFixed(3)} alrededor de (${x.toFixed(2)}, ${z.toFixed(2)})`);
+      }
+    }
+  }
+  console.log(
+    `  piedras, rocas y tocones: ${String(miradas)} puestos · ${String(estorban)} pasan de la cintura (${cintura.toFixed(3)}) y estorban, ` +
+      `el más bajo de ${masBajaQueEstorba.toFixed(2)} · ${String(sePisan)} se pisan, el más alto de ${masAltaQueSePisa.toFixed(2)}`,
+  );
+  console.log(`  por pieza: ${JSON.stringify([...porPieza].sort((a, b) => porOrden(a[0], b[0])))}`);
+  comprobar('se han mirado las piedras, las rocas y los tocones del reparto', miradas > 500, { miradas });
+  comprobar(
+    'las que pasan de la cintura estorban, cada una con una caja que la cubre girada como caiga, y las que no pasan no tienen ninguna',
+    malas.length === 0,
+    malas.slice(0, 5),
+  );
+  /*
+   * Y la regla muerde por los dos lados. Sin piedras que se pisan, «estorban todas» pasaría esto
+   * en verde; sin piedras que estorban, «no estorba ninguna», que es lo que había.
+   */
+  comprobar('y hay de las dos: piedras que estorban y piedras que se pisan', estorban > 300 && sePisan > 20, { estorban, sePisan });
+  /* Y la cobertura por el radio se ha mirado de verdad, en cientos de piedras giradas de cualquier manera. */
+  comprobar('y se ha mirado que su caja las cubre en cientos de piedras giradas de cualquier manera', conRadio > 300, { conRadio, aCuartos });
 }
 
 // ---------------------------------------------------------------------------
@@ -608,7 +761,417 @@ function paraAlCruzar(d: Derivado, m: PiezaDeMuralla, a: number, sinElla: Arena)
 }
 
 // ---------------------------------------------------------------------------
-// ESCALÓN 5 · EL MISMO PASEO, EN NODE Y EN HERMES
+// ESCALÓN 5 · LAS PIEDRAS NO CIERRAN LO QUE SE ANDABA
+// ---------------------------------------------------------------------------
+
+paso('Las piedras no cierran lo que se andaba: ni una senda, ni el hueco de una puerta, ni un sitio de nacer');
+
+/*
+ * ═══ LO QUE NO PODÍA ROMPERSE ═══
+ *
+ * Que las piedras grandes paren arregla lo que se veía mal. Que una tape el paso rompería lo que
+ * se andaba bien, y sería peor: una piedra en medio de una senda, en el hueco de una puerta de la
+ * muralla o encima de un sitio de nacer deja a alguien sin poder ir por donde iba, o naciendo
+ * dentro de un canto. Y no es un miedo de papel: la piedra y el tocón son dos de las cinco cosas
+ * que el reparto pone en la cuneta de las sendas, y más de la mitad de las cajas nuevas son ésas.
+ *
+ * Se mira en lo que dicen el REPARTO y el SUELO —por dónde va el eje de cada senda y qué celdas
+ * son senda, dónde puso cada puerta y cuánto mide su hueco—, y no preguntándole a las cajas:
+ *
+ *   · LA SENDA: por su eje, en cada tramo que pisa suelo de senda, quien anda no toca ninguna
+ *     piedra. Se prueba cada dos décimas y se exige una décima de más sobre el radio, que es lo
+ *     que se puede mover el cuadrado de quien anda entre dos pruebas: así vale para el eje entero
+ *     y no sólo para los puntos probados. Una senda que se recorre por el medio no la tapa nada,
+ *     por mucho que la cuneta se estreche.
+ *   · LA PUERTA: en el pasillo de su hueco —lo que mide el hueco de ancho, y nueve unidades a
+ *     cada lado del eje del muro, como en el escalón 4—, a cada cuarto de unidad de hondo, el paso
+ *     libre de través. Donde sin las piedras cabía una persona, con ellas tiene que seguir cabiendo.
+ *   · EL SITIO DE NACER: ninguno queda a menos de un radio de una piedra. Es lo que el escalón 3
+ *     pide de todo cuerpo; aquí se cuenta aparte, para que no se diluya entre las casas.
+ *
+ * Y cada uno cuenta lo que ha mirado y exige que haya habido piedras que morder: metidas en el
+ * ancho de una senda, en el pasillo de una puerta y cerca de los sitios de nacer. Sin ellas los
+ * tres saldrían verdes con la regla apagada. Por las puertas se miran, además de los cuatro
+ * tableros de siempre, los tres de `CON_PIEDRA_EN_LA_PUERTA`.
+ */
+{
+  const radio = RADIO_DEL_PASEANTE / UNO;
+  const medioAnchoDeLaSenda = (ANCHO_DE_LA_SENDA / 2) * LADO_DE_LOSA;
+  /* Chebyshev: quien anda es un cuadrado, y toca una caja si su centro queda a menos de su radio. */
+  const aLaCaja = (px: number, pz: number, b: Cuerpo): number => Math.max(b.x0 - px, px - b.x1, b.z0 - pz, pz - b.z1, 0);
+  const cortan = (a: Cuerpo, b: Cuerpo): boolean => a.x0 < b.x1 && b.x0 < a.x1 && a.z0 < b.z1 && b.z0 < a.z1;
+  const PASO_POR_EL_EJE = 0.2;
+
+  let muestrasDelEje = 0;
+  let masCercaDelEje = Number.POSITIVE_INFINITY;
+  let dondeMasCerca = '';
+  let piedrasDeLaCuneta = 0;
+  const metidasEnLaSenda = new Set<Cuerpo>();
+  const tocanElEje: string[] = [];
+
+  let puertas = 0;
+  let honduras = 0;
+  let puertasConPiedra = 0;
+  let menorPasoConPiedra = Number.POSITIVE_INFINITY;
+  let menorPasoSinPiedra = Number.POSITIVE_INFINITY;
+  const cierranPuertas: string[] = [];
+
+  let nacesMirados = 0;
+  let naceMasCercaDeUnaPiedra = Number.POSITIVE_INFINITY;
+  let nacesConPiedraCerca = 0;
+  const nacenEnUnaPiedra: string[] = [];
+
+  for (const d of [...DERIVADOS, ...CON_PIEDRA_EN_LA_PUERTA.map(derivar)]) {
+    const piedras: Cuerpo[] = [];
+    const loDemas: Cuerpo[] = [];
+    for (const c of d.conOrigen) {
+      if (esPiedra(c.pieza)) {
+        piedras.push(c.cuerpo);
+        if (c.porque === 'senda') piedrasDeLaCuneta++;
+      } else loDemas.push(c.cuerpo);
+    }
+    for (let n = 0; n < d.tablero.losas.length; n++) {
+      const l = d.tablero.losas[n] as LosaParaElMundo;
+      const cx = l.x * LADO_DE_LOSA;
+      const cz = -l.y * LADO_DE_LOSA;
+      const montada = montarLaLosa(l.losa, l.giro, semillaDeLaLosa(d.tablero.semilla, l.x, l.y));
+      /* Las piedras que pueden asomar a esta losa, suyas o de una vecina. */
+      const suCuadro: Cuerpo = { x0: cx - LADO_DE_LOSA / 2 - 1, x1: cx + LADO_DE_LOSA / 2 + 1, z0: cz - LADO_DE_LOSA / 2 - 1, z1: cz + LADO_DE_LOSA / 2 + 1 };
+      const cerca = piedras.filter((b) => cortan(b, suCuadro));
+
+      /* ── La senda, por su eje ── */
+      const losa = losaPorId(l.losa);
+      for (const senda of losa?.sendas ?? []) {
+        const camino = caminoDeLaSenda(senda.lados.map((s) => ladoGirado(s, l.giro)));
+        for (let k = 0; k + 1 < camino.length; k++) {
+          const a = camino[k] as { x: number; z: number };
+          const b = camino[k + 1] as { x: number; z: number };
+          const ax = cx + a.x * LADO_DE_LOSA;
+          const az = cz + a.z * LADO_DE_LOSA;
+          const bx = cx + b.x * LADO_DE_LOSA;
+          const bz = cz + b.z * LADO_DE_LOSA;
+          const trozos = Math.ceil(Math.hypot(bx - ax, bz - az) / PASO_POR_EL_EJE);
+          for (let t = 0; t <= trozos; t++) {
+            const px = ax + ((bx - ax) * t) / trozos;
+            const pz = az + ((bz - az) * t) / trozos;
+            const i = Math.floor(((px - cx) / LADO_DE_LOSA + 0.5) * CELDAS_POR_LOSA);
+            const j = Math.floor(((pz - cz) / LADO_DE_LOSA + 0.5) * CELDAS_POR_LOSA);
+            if (i < 0 || j < 0 || i >= CELDAS_POR_LOSA || j >= CELDAS_POR_LOSA) continue;
+            if (montada.celdas[j * CELDAS_POR_LOSA + i]?.clase !== 'senda') continue;
+            muestrasDelEje++;
+            for (const piedra of cerca) {
+              const dd = aLaCaja(px, pz, piedra);
+              if (dd < medioAnchoDeLaSenda) metidasEnLaSenda.add(piedra);
+              if (dd < masCercaDelEje) {
+                masCercaDelEje = dd;
+                dondeMasCerca = `${d.tablero.nombre}, losa ${String(n)} (${l.losa}), en (${px.toFixed(1)}, ${pz.toFixed(1)})`;
+              }
+              if (dd < radio + PASO_POR_EL_EJE / 2 && tocanElEje.length < 10) {
+                tocanElEje.push(`${d.tablero.nombre}, losa ${String(n)} (${l.losa}): una piedra a ${dd.toFixed(3)} del eje en (${px.toFixed(1)}, ${pz.toFixed(1)})`);
+              }
+            }
+          }
+        }
+      }
+
+      /* ── La puerta, por su hueco ── */
+      for (const p of montada.puestas) {
+        if (p.pieza !== PIEZA.muroPuerta) continue;
+        const k = cuartosDeVuelta(p.giro);
+        /* Una puerta torcida no tiene pasillo derecho; que no las hay lo exige el escalón 4. */
+        if (k === null) continue;
+        puertas++;
+        const s = ESCALA_DEL_PACK * p.escala * p.largo;
+        const h0 = HUECO_DE_LA_PUERTA.x0 * s;
+        const h1 = HUECO_DE_LA_PUERTA.x1 * s;
+        const x = cx + p.x;
+        const z = cz + p.z;
+        /* El hueco en el tablero, con el mismo giro que `cajasDeLaPuesta`; y de qué lado se cruza. */
+        const deEsteAOeste = k === 0 || k === 2;
+        const g0 = k === 0 ? x + h0 : k === 2 ? x - h1 : k === 1 ? z - h1 : z + h0;
+        const g1 = k === 0 ? x + h1 : k === 2 ? x - h0 : k === 1 ? z - h0 : z + h1;
+        const eje = deEsteAOeste ? z : x;
+        const pasillo: Cuerpo = deEsteAOeste
+          ? { x0: g0, x1: g1, z0: z - DESDE_EL_EJE - radio, z1: z + DESDE_EL_EJE + radio }
+          : { x0: x - DESDE_EL_EJE - radio, x1: x + DESDE_EL_EJE + radio, z0: g0, z1: g1 };
+        const susPiedras = piedras.filter((b) => cortan(b, pasillo));
+        const loSuyo = loDemas.filter((b) => cortan(b, pasillo));
+        if (susPiedras.length > 0) puertasConPiedra++;
+        /*
+         * El paso libre de través a una hondura: lo más ancho del hueco que no tapa ninguna caja a la
+         * que quien anda llegaría con su cuadrado. Cabe una persona si mide dos radios.
+         */
+        const pasoLibre = (cajas: readonly Cuerpo[], hondo: number): number => {
+          const tapado: [number, number][] = [];
+          for (const b of cajas) {
+            const lo = deEsteAOeste ? b.z0 : b.x0;
+            const hi = deEsteAOeste ? b.z1 : b.x1;
+            if (!(lo - radio < hondo && hondo < hi + radio)) continue;
+            const u0 = Math.max(deEsteAOeste ? b.x0 : b.z0, g0);
+            const u1 = Math.min(deEsteAOeste ? b.x1 : b.z1, g1);
+            if (u0 < u1) tapado.push([u0, u1]);
+          }
+          tapado.sort((p0, p1) => p0[0] - p1[0]);
+          let mejor = 0;
+          let desde = g0;
+          for (const [u0, u1] of tapado) {
+            if (u0 > desde) mejor = Math.max(mejor, u0 - desde);
+            if (u1 > desde) desde = u1;
+          }
+          return Math.max(mejor, g1 - desde);
+        };
+        for (let paso4 = -4 * DESDE_EL_EJE; paso4 <= 4 * DESDE_EL_EJE; paso4++) {
+          const hondo = eje + paso4 / 4;
+          honduras++;
+          const sin = pasoLibre(loSuyo, hondo);
+          if (sin < 2 * radio) continue;
+          if (susPiedras.length === 0) continue;
+          const con = pasoLibre([...loSuyo, ...susPiedras], hondo);
+          if (con < menorPasoConPiedra) {
+            menorPasoConPiedra = con;
+            menorPasoSinPiedra = sin;
+          }
+          if (con < 2 * radio && cierranPuertas.length < 10) {
+            cierranPuertas.push(`${d.tablero.nombre}, losa ${String(n)} (${l.losa}), a ${(paso4 / 4).toFixed(2)} del eje: ${con.toFixed(2)} libres de ${sin.toFixed(2)}`);
+          }
+        }
+      }
+    }
+
+    /* ── Los sitios de nacer ── */
+    for (const s of d.mundo.nace) {
+      nacesMirados++;
+      let suPiedra = Number.POSITIVE_INFINITY;
+      for (const b of piedras) suPiedra = Math.min(suPiedra, aLaCaja(s.x, s.z, b));
+      if (suPiedra < naceMasCercaDeUnaPiedra) naceMasCercaDeUnaPiedra = suPiedra;
+      if (suPiedra < 4 * LADO_DE_CELDA) nacesConPiedraCerca++;
+      if (suPiedra < radio && nacenEnUnaPiedra.length < 10) {
+        nacenEnUnaPiedra.push(`${d.tablero.nombre}: en (${s.x.toFixed(1)}, ${s.z.toFixed(1)}), a ${suPiedra.toFixed(3)} de una piedra`);
+      }
+    }
+  }
+
+  console.log(
+    `  sendas: ${String(muestrasDelEje)} puntos del eje sobre suelo de senda · ${String(piedrasDeLaCuneta)} piedras de cuneta, ` +
+      `${String(metidasEnLaSenda.size)} metidas en el ancho de una senda · la más cerca del eje, a ${masCercaDelEje.toFixed(2)} u ` +
+      `(${dondeMasCerca}): de los ${medioAnchoDeLaSenda.toFixed(2)} de medio ancho se come ${(medioAnchoDeLaSenda - masCercaDelEje).toFixed(2)}`,
+  );
+  console.log(
+    `  puertas: ${String(puertas)}, ${String(honduras)} honduras de pasillo · ${String(puertasConPiedra)} con una piedra en el pasillo · ` +
+      (Number.isFinite(menorPasoConPiedra)
+        ? `el paso más estrecho que dejan, ${menorPasoConPiedra.toFixed(2)} u de ${menorPasoSinPiedra.toFixed(2)}`
+        : 'ninguna estrecha el paso'),
+  );
+  console.log(
+    `  nacer: ${String(nacesMirados)} sitios · ${String(nacesConPiedraCerca)} con una piedra a menos de cuatro celdas · ` +
+      `el más pegado a una, a ${naceMasCercaDeUnaPiedra.toFixed(2)} u`,
+  );
+  comprobar('se ha recorrido el eje de las sendas de los siete tableros', muestrasDelEje > 20000, { muestrasDelEje });
+  comprobar(
+    'y hay piedras en la cuneta, metidas en el ancho de una senda: si no, esto no mira nada',
+    piedrasDeLaCuneta > 200 && metidasEnLaSenda.size > 20,
+    { piedrasDeLaCuneta, metidas: metidasEnLaSenda.size },
+  );
+  comprobar(
+    `quien va por el eje de una senda no toca ninguna piedra: todas a más de un radio (${radio.toFixed(1)}) y una décima`,
+    tocanElEje.length === 0 && masCercaDelEje >= radio + PASO_POR_EL_EJE / 2,
+    { masCercaDelEje, tocanElEje: tocanElEje.slice(0, 5) },
+  );
+  comprobar('se han mirado los pasillos de las puertas', puertas >= 6 && honduras >= puertas * 70, { puertas, honduras });
+  comprobar(
+    'y en algunas hay una piedra en el pasillo: si no, lo de abajo no mira nada (ver `CON_PIEDRA_EN_LA_PUERTA`)',
+    puertasConPiedra >= 2,
+    { puertasConPiedra },
+  );
+  comprobar(
+    'y ninguna piedra estrecha el hueco de una puerta por debajo de lo que pasa una persona, donde sin ella pasaba',
+    cierranPuertas.length === 0,
+    cierranPuertas.slice(0, 5),
+  );
+  comprobar('hay sitios de nacer con una piedra cerca: si no, lo de abajo no mira nada', nacesConPiedraCerca >= 5, {
+    nacesConPiedraCerca,
+    nacesMirados,
+  });
+  comprobar(
+    'y ningún sitio de nacer queda a menos de un radio de una piedra',
+    nacenEnUnaPiedra.length === 0 && naceMasCercaDeUnaPiedra >= radio,
+    { naceMasCercaDeUnaPiedra, nacenEnUnaPiedra: nacenEnUnaPiedra.slice(0, 5) },
+  );
+}
+
+/*
+ * ═══ Y NO PARTEN EL VALLE ═══
+ *
+ * Lo de arriba mira los tres sitios donde una piedra haría más daño. Esto mira todo lo demás. En
+ * una rejilla de medio paso sobre el tablero entero se apunta dónde cabe el centro de quien anda
+ * —hay piso y ningún cuerpo a menos de su radio, la cuenta de `chocaConCuerpo`—, sin las piedras
+ * y con ellas, y se cuenta en cuántos trozos queda cada trozo por el que se andaba. Una piedra que
+ * cerrara el paso entre un árbol y una tapia partiría un trozo en dos; una que llenara un rincón
+ * lo borraría. Ni una cosa ni la otra. Y cada sitio de nacer cae en el trozo grande del suyo:
+ * nacer en un bolsillo sería nacer preso.
+ *
+ * La rejilla ve un paso si por él cabe algún centro de celda: los de más de 1,3 —dos radios y
+ * media celda— los ve siempre, y un paso que se estrecha desde ahí por debajo de 0,8 lo cuenta
+ * como cerrado. Lo que ya medía menos de 1,3 antes de las piedras puede escapársele: es la
+ * frontera de medir con celdas, y está escrita para que nadie lea en su verde más de lo que dice.
+ * Cuesta un segundo por tablero lleno; se miran los tres.
+ */
+{
+  const radio = RADIO_DEL_PASEANTE / UNO;
+  const CELDA = 0.5;
+  let celdasMiradas = 0;
+  let trozosNuevos = 0;
+  let areaCortada = 0;
+  let bolsillosBorrados = 0;
+  let menorTrozoGrande = Number.POSITIVE_INFINITY;
+  let nacesPresos = 0;
+  let nacesMirados = 0;
+  for (const d of DERIVADOS.slice(0, 3)) {
+    const losas = d.tablero.losas;
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (const l of losas) {
+      minX = Math.min(minX, l.x);
+      maxX = Math.max(maxX, l.x);
+      minY = Math.min(minY, l.y);
+      maxY = Math.max(maxY, l.y);
+    }
+    const x0 = (minX - 0.5) * LADO_DE_LOSA;
+    const z0 = (-maxY - 0.5) * LADO_DE_LOSA;
+    const ancho = Math.ceil(((maxX - minX + 1) * LADO_DE_LOSA) / CELDA);
+    const fondo = Math.ceil(((maxY - minY + 1) * LADO_DE_LOSA) / CELDA);
+    const puestas = new Set(losas.map((l) => `${String(l.x)},${String(l.y)}`));
+    const sinPiedras = new Uint8Array(ancho * fondo);
+    for (let j = 0; j < fondo; j++) {
+      const y = Math.floor(-(z0 + (j + 0.5) * CELDA) / LADO_DE_LOSA + 0.5);
+      for (let i = 0; i < ancho; i++) {
+        const x = Math.floor((x0 + (i + 0.5) * CELDA) / LADO_DE_LOSA + 0.5);
+        if (puestas.has(`${String(x)},${String(y)}`)) sinPiedras[j * ancho + i] = 1;
+      }
+    }
+    const tapar = (libre: Uint8Array, b: Cuerpo): void => {
+      const i0 = Math.max(0, Math.floor((b.x0 - radio - x0) / CELDA - 0.5));
+      const i1 = Math.min(ancho - 1, Math.ceil((b.x1 + radio - x0) / CELDA - 0.5));
+      const j0 = Math.max(0, Math.floor((b.z0 - radio - z0) / CELDA - 0.5));
+      const j1 = Math.min(fondo - 1, Math.ceil((b.z1 + radio - z0) / CELDA - 0.5));
+      for (let j = j0; j <= j1; j++) {
+        const z = z0 + (j + 0.5) * CELDA;
+        if (!(z + radio > b.z0 && z - radio < b.z1)) continue;
+        for (let i = i0; i <= i1; i++) {
+          const x = x0 + (i + 0.5) * CELDA;
+          if (x + radio > b.x0 && x - radio < b.x1) libre[j * ancho + i] = 0;
+        }
+      }
+    };
+    const piedras: Cuerpo[] = [];
+    for (const c of d.conOrigen) {
+      if (esPiedra(c.pieza)) piedras.push(c.cuerpo);
+      else tapar(sinPiedras, c.cuerpo);
+    }
+    const conPiedras = sinPiedras.slice();
+    for (const b of piedras) tapar(conPiedras, b);
+    const cola = new Int32Array(ancho * fondo);
+    /* Los trozos, a cuatro vecinas: una etiqueta por celda libre, y lo que mide cada trozo. */
+    const trozos = (libre: Uint8Array): { etiqueta: Int32Array; mide: number[] } => {
+      const etiqueta = new Int32Array(ancho * fondo).fill(-1);
+      const mide: number[] = [];
+      for (let k = 0; k < ancho * fondo; k++) {
+        if (libre[k] !== 1 || etiqueta[k] !== -1) continue;
+        const e = mide.length;
+        let leida = 0;
+        let puesta = 0;
+        cola[puesta++] = k;
+        etiqueta[k] = e;
+        while (leida < puesta) {
+          const q = cola[leida++] as number;
+          const i = q % ancho;
+          if (i > 0 && libre[q - 1] === 1 && etiqueta[q - 1] === -1) {
+            etiqueta[q - 1] = e;
+            cola[puesta++] = q - 1;
+          }
+          if (i < ancho - 1 && libre[q + 1] === 1 && etiqueta[q + 1] === -1) {
+            etiqueta[q + 1] = e;
+            cola[puesta++] = q + 1;
+          }
+          if (q >= ancho && libre[q - ancho] === 1 && etiqueta[q - ancho] === -1) {
+            etiqueta[q - ancho] = e;
+            cola[puesta++] = q - ancho;
+          }
+          if (q < ancho * (fondo - 1) && libre[q + ancho] === 1 && etiqueta[q + ancho] === -1) {
+            etiqueta[q + ancho] = e;
+            cola[puesta++] = q + ancho;
+          }
+        }
+        mide.push(puesta);
+      }
+      return { etiqueta, mide };
+    };
+    const antes = trozos(sinPiedras);
+    const despues = trozos(conPiedras);
+    celdasMiradas += ancho * fondo;
+    /* Cada trozo de después cae dentro de uno de antes: lo que no es el mayor de los suyos, se cortó. */
+    const deCadaUno = new Map<number, Map<number, number>>();
+    for (let k = 0; k < ancho * fondo; k++) {
+      const b = despues.etiqueta[k] as number;
+      if (b < 0) continue;
+      const a = antes.etiqueta[k] as number;
+      let suyos = deCadaUno.get(a);
+      if (suyos === undefined) {
+        suyos = new Map<number, number>();
+        deCadaUno.set(a, suyos);
+      }
+      suyos.set(b, (suyos.get(b) ?? 0) + 1);
+    }
+    const elGrande = new Map<number, number>();
+    for (const [a, suyos] of deCadaUno) {
+      let mejor = -1;
+      let cuanto = -1;
+      for (const [b, c] of suyos) {
+        if (c > cuanto) {
+          cuanto = c;
+          mejor = b;
+        }
+      }
+      elGrande.set(a, mejor);
+      for (const [b, c] of suyos) {
+        if (b === mejor) continue;
+        trozosNuevos++;
+        areaCortada += c * CELDA * CELDA;
+      }
+    }
+    for (let a = 0; a < antes.mide.length; a++) if (!deCadaUno.has(a)) bolsillosBorrados++;
+    menorTrozoGrande = Math.min(menorTrozoGrande, Math.max(...antes.mide) * CELDA * CELDA);
+    for (const s of d.mundo.nace) {
+      nacesMirados++;
+      const k = Math.floor((s.z - z0) / CELDA) * ancho + Math.floor((s.x - x0) / CELDA);
+      const b = despues.etiqueta[k] as number;
+      if (b < 0 || elGrande.get(antes.etiqueta[k] as number) !== b) nacesPresos++;
+    }
+  }
+  console.log(
+    `  el valle en celdas de ${String(CELDA)}: ${(celdasMiradas / 1e6).toFixed(1)} millones mirados, el trozo grande de cada tablero de ` +
+      `${(menorTrozoGrande / 1e6).toFixed(2)} millones de u² o más · trozos nuevos con las piedras ${String(trozosNuevos)} ` +
+      `(${areaCortada.toFixed(1)} u²) · bolsillos borrados ${String(bolsillosBorrados)} · sitios de nacer presos ${String(nacesPresos)} de ${String(nacesMirados)}`,
+  );
+  comprobar('se ha mirado el valle entero de los tres tableros llenos', celdasMiradas > 3e7 && menorTrozoGrande > 1e6, {
+    celdasMiradas,
+    menorTrozoGrande,
+  });
+  comprobar(
+    'y las piedras no parten ningún trozo por el que se andaba, ni borran ninguno',
+    trozosNuevos === 0 && bolsillosBorrados === 0,
+    { trozosNuevos, areaCortada, bolsillosBorrados },
+  );
+  comprobar('y todos los sitios de nacer caen en el trozo grande del suyo', nacesPresos === 0 && nacesMirados > 200, {
+    nacesPresos,
+    nacesMirados,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ESCALÓN 6 · EL MISMO PASEO, EN NODE Y EN HERMES
 // ---------------------------------------------------------------------------
 
 paso('El mismo mundo y el mismo paseo, en Node y en Hermes');
@@ -779,7 +1342,7 @@ if (paqueteListo && hermes !== null && enProceso.length === PARA_LOS_MOTORES.len
 fs.rmSync(dir, { recursive: true, force: true });
 
 // ---------------------------------------------------------------------------
-// ESCALÓN 6 · LA TABLA DE HUELLAS ES LA DE LOS MODELOS
+// ESCALÓN 7 · LA TABLA DE HUELLAS ES LA DE LOS MODELOS
 // ---------------------------------------------------------------------------
 
 paso('La tabla de huellas dice lo que miden los modelos de tablero.glb');
@@ -826,10 +1389,51 @@ paso('La tabla de huellas dice lo que miden los modelos de tablero.glb');
   });
   const sinMedir = (Object.values(PIEZA) as string[]).filter((p) => comoEstorba(p) !== 'nada' && HUELLA_DEL_MODELO[p] === undefined);
   comprobar('toda pieza del vocabulario que estorba tiene huella', sinMedir.length === 0, sinMedir);
+
+  /*
+   * Y DE LAS PIEDRAS, EL ALTO Y EL RADIO: de exactamente las piezas que estorban sólo si pasan de
+   * la cintura, y los mismos números que dan los modelos. Y lo que la cabecera de `comoEstorba` da
+   * por hecho: que de ellas se mide la planta ENTERA, porque son más bajas que la altura de la huella.
+   */
+  const piedrasDelVocabulario = (Object.values(PIEZA) as string[]).filter(esPiedra).sort(porOrden);
+  const piedrasEnLaTabla = Object.keys(ALTO_Y_RADIO_DEL_MODELO).sort(porOrden);
+  const piedrasMedidas = Object.keys(medidas.altosYRadios).sort(porOrden);
+  console.log(
+    `  alto y radio de ${String(piedrasMedidas.length)} piedras: ` +
+      piedrasMedidas
+        .map((p) => {
+          const m = medidas.altosYRadios[p];
+          return m === undefined ? p : `${p} ${m.alto.toFixed(4)}/${m.radio.toFixed(4)}`;
+        })
+        .join(' · '),
+  );
+  comprobar(
+    'la tabla del alto y el radio tiene exactamente las piedras, las rocas y los tocones, ni una más ni una menos',
+    piedrasDelVocabulario.length >= 7 &&
+      JSON.stringify(piedrasEnLaTabla) === JSON.stringify(piedrasMedidas) &&
+      JSON.stringify(piedrasMedidas) === JSON.stringify(piedrasDelVocabulario),
+    { tabla: piedrasEnLaTabla, medidas: piedrasMedidas, vocabulario: piedrasDelVocabulario },
+  );
+  const altosDistintos: string[] = [];
+  const masAltasQueLaHuella: string[] = [];
+  for (const pieza of piedrasMedidas) {
+    const t = ALTO_Y_RADIO_DEL_MODELO[pieza];
+    const m = medidas.altosYRadios[pieza];
+    const crudo = medidas.altosYRadiosCrudos[pieza];
+    if (t === undefined || m === undefined || crudo === undefined) continue;
+    if (t.alto !== m.alto || t.radio !== m.radio) altosDistintos.push(`${pieza}: tabla ${JSON.stringify(t)} · modelo ${JSON.stringify(m)}`);
+    if (!(crudo.alto < medidas.altura)) masAltasQueLaHuella.push(`${pieza}: ${crudo.alto.toFixed(4)} del pack`);
+  }
+  comprobar('y cada alto y cada radio es, al diezmilésimo, el que da el modelo', altosDistintos.length === 0, altosDistintos.slice(0, 5));
+  comprobar(
+    `y todas son más bajas que la altura de la huella (${medidas.altura.toFixed(4)}): lo que se mide de ellas es su planta entera`,
+    masAltasQueLaHuella.length === 0,
+    masAltasQueLaHuella,
+  );
 }
 
 // ---------------------------------------------------------------------------
-// ESCALÓN 7 · LAS DOS TABLAS LITERALES DEL REPARTO
+// ESCALÓN 8 · LAS DOS TABLAS LITERALES DEL REPARTO
 // ---------------------------------------------------------------------------
 
 paso('Las tablas literales del reparto dicen lo que dice su cabecera');
@@ -894,5 +1498,6 @@ if (fallos.length > 0) {
 
 console.log(`${String(hechas)} comprobaciones`);
 console.log('\nEl mundo de Las Lindes sale del reparto de verdad: las murallas paran, las puertas dejan');
-console.log('pasar, se nace donde se puede estar, y el mismo tablero da el mismo mundo y el mismo paseo');
-console.log('en Node y en Hermes. Las huellas son las de los modelos, medidas otra vez.');
+console.log('pasar, las piedras que pasan de la cintura paran sin cerrar ni una senda ni una puerta, se');
+console.log('nace donde se puede estar, y el mismo tablero da el mismo mundo y el mismo paseo en Node y en');
+console.log('Hermes. Las huellas son las de los modelos, medidas otra vez.');
