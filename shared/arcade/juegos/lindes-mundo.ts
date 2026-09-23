@@ -197,6 +197,44 @@ export function cajasDeLaPuesta(
 
 /* ─── EL TABLERO ENTERO ──────────────────────────────────────────────────── */
 
+/**
+ * ═══ LO QUE NO CAMBIA NO SE VUELVE A CALCULAR ═══
+ *
+ * Una losa puesta no cambia nunca, y el mundo se pide entero en cada jugada —el aparato al
+ * pasear, el servidor al validar—. Medido con 72 losas: el reparto costaba 1,1 s en Hermes y
+ * ya se recuerda en `montarLaLosa`; lo que quedaba —las cajas de 1.900 piezas y el sitio de
+ * nacer de 72 losas, que prueba 2.304 celdas por losa— eran otros 16 ms en Node por jugada, unos
+ * 150 en Hermes: un tirón visible en el móvil cada vez que alguien pone una losa mientras uno
+ * anda. Así que se recuerdan también, y con la llave que les toca:
+ *
+ *   · LAS CAJAS DE UNA LOSA dependen de ella sola: su clase, su giro, su semilla y su sitio.
+ *   · EL SITIO DE NACER EN UNA LOSA depende de ella y de sus OCHO VECINAS —los cuerpos de al lado
+ *     asoman hasta un octavo de losa (`MARGEN_DE_LO_CERCANO`)—, así que su llave es la de las
+ *     nueve. Poner una losa sólo obliga a rehacer el de ella y el de sus vecinas.
+ *
+ * Y para que recordar no cambie NADA de lo que sale, lo cercano se junta siempre en el mismo
+ * orden —de la vecina del noroeste a la del sureste— y no en el orden en que llegaron las losas:
+ * si dependiera de ese orden, un empate entre dos distancias podría resolverse distinto en frío
+ * que de memoria, y el mismo tablero daría dos mundos.
+ */
+const LOSAS_QUE_SE_RECUERDAN = 1024;
+const RECUERDO_DE_CAJAS = new Map<string, readonly CuerpoDeLasLindes[]>();
+const RECUERDO_DE_NACER = new Map<string, Sitio>();
+
+function recordar<T>(recuerdo: Map<string, T>, llave: string, valor: T): T {
+  if (recuerdo.size >= LOSAS_QUE_SE_RECUERDAN) {
+    const masAntigua = recuerdo.keys().next();
+    if (masAntigua.done !== true) recuerdo.delete(masAntigua.value);
+  }
+  recuerdo.set(llave, valor);
+  return valor;
+}
+
+/** La llave de una losa puesta: todo aquello de lo que dependen sus piezas y su sitio. */
+function llaveDeLaLosa(l: LosaParaElMundo, semilla: number): string {
+  return `${l.losa}|${String(l.giro)}|${String(l.x)}|${String(l.y)}|${String(semilla)}`;
+}
+
 /** Cada losa, montada con el reparto y con su semilla, como la monta la escena. */
 function montarTodas(losas: readonly LosaParaElMundo[], semilla: number): ContenidoDeLosa[] {
   const salida: ContenidoDeLosa[] = [];
@@ -204,16 +242,39 @@ function montarTodas(losas: readonly LosaParaElMundo[], semilla: number): Conten
   return salida;
 }
 
-function cuerposDe(losas: readonly LosaParaElMundo[], contenidos: readonly ContenidoDeLosa[]): CuerpoDeLasLindes[] {
-  const salida: CuerpoDeLasLindes[] = [];
-  for (let i = 0; i < losas.length; i++) {
-    const l = losas[i] as LosaParaElMundo;
+/** Los cuerpos de UNA losa, con de dónde sale cada uno. `indice` es el de la losa en la lista. */
+function cuerposDeUnaLosa(
+  l: LosaParaElMundo,
+  contenido: ContenidoDeLosa,
+  semilla: number,
+  indice: number,
+): CuerpoDeLasLindes[] {
+  const llave = llaveDeLaLosa(l, semilla);
+  let suyos = RECUERDO_DE_CAJAS.get(llave);
+  if (suyos === undefined) {
     const cx = l.x * LADO_DE_LOSA;
     const cz = -l.y * LADO_DE_LOSA;
-    for (const p of (contenidos[i] as ContenidoDeLosa).puestas) {
+    const nuevos: CuerpoDeLasLindes[] = [];
+    for (const p of contenido.puestas) {
       for (const c of cajasDeLaPuesta(p, cx, cz)) {
-        salida.push({ cuerpo: c.cuerpo, pieza: p.pieza, porque: p.porque, losa: i, forma: c.forma });
+        nuevos.push({ cuerpo: c.cuerpo, pieza: p.pieza, porque: p.porque, losa: 0, forma: c.forma });
       }
+    }
+    suyos = recordar(RECUERDO_DE_CAJAS, llave, nuevos);
+  }
+  /* Lo recordado lleva `losa: 0`: el índice es de la lista de esta llamada, no de la losa. */
+  return suyos.map((c) => ({ cuerpo: c.cuerpo, pieza: c.pieza, porque: c.porque, losa: indice, forma: c.forma }));
+}
+
+function cuerposDe(
+  losas: readonly LosaParaElMundo[],
+  contenidos: readonly ContenidoDeLosa[],
+  semilla: number,
+): CuerpoDeLasLindes[] {
+  const salida: CuerpoDeLasLindes[] = [];
+  for (let i = 0; i < losas.length; i++) {
+    for (const c of cuerposDeUnaLosa(losas[i] as LosaParaElMundo, contenidos[i] as ContenidoDeLosa, semilla, i)) {
+      salida.push(c);
     }
   }
   return salida;
@@ -226,7 +287,7 @@ function cuerposDe(losas: readonly LosaParaElMundo[], contenidos: readonly Conte
  * lista, quitándole el origen—, así que contarlos aquí es contar lo que hay en el mundo.
  */
 export function cuerposDeLasLindes(losas: readonly LosaParaElMundo[], semilla: number): CuerpoDeLasLindes[] {
-  return cuerposDe(losas, montarTodas(losas, semilla));
+  return cuerposDe(losas, montarTodas(losas, semilla), semilla);
 }
 
 /* ─── DÓNDE SE NACE ──────────────────────────────────────────────────────── */
@@ -337,38 +398,90 @@ function sitioParaNacer(
   return { x: cx, z: cz, rumbo: 0 };
 }
 
-/** Los cuerpos que pueden importar para nacer en la losa `(x, y)`: los que tocan su cuadrado, con margen. */
-function cuerposCercaDe(l: LosaParaElMundo, cuerpos: readonly Cuerpo[]): Cuerpo[] {
-  const margen = LADO_DE_LOSA / 8;
+/** Cuánto asoma lo de la losa de al lado: un octavo de losa. */
+const MARGEN_DE_LO_CERCANO = LADO_DE_LOSA / 8;
+
+/** Una losa del tablero, por su casilla: su llave y sus cajas. */
+interface LoDeUnaCasilla {
+  readonly llave: string;
+  readonly cuerpos: readonly Cuerpo[];
+}
+
+/** La llave de una casilla en el mapa del tablero. */
+function casillaDeLaLosa(x: number, y: number): string {
+  return `${String(x)},${String(y)}`;
+}
+
+/**
+ * Los cuerpos que pueden importar para nacer en la losa `(x, y)`: los de ella y sus ocho vecinas
+ * que tocan su cuadrado con margen. SIEMPRE en el mismo orden —de la vecina del noroeste a la del
+ * sureste—, y no en el de la lista de losas: ver la cabecera de `LOSAS_QUE_SE_RECUERDAN`.
+ */
+function cuerposCercaDe(l: LosaParaElMundo, porCasilla: ReadonlyMap<string, LoDeUnaCasilla>): Cuerpo[] {
   const cx = l.x * LADO_DE_LOSA;
   const cz = -l.y * LADO_DE_LOSA;
-  const x0 = cx - LADO_DE_LOSA / 2 - margen;
-  const x1 = cx + LADO_DE_LOSA / 2 + margen;
-  const z0 = cz - LADO_DE_LOSA / 2 - margen;
-  const z1 = cz + LADO_DE_LOSA / 2 + margen;
+  const x0 = cx - LADO_DE_LOSA / 2 - MARGEN_DE_LO_CERCANO;
+  const x1 = cx + LADO_DE_LOSA / 2 + MARGEN_DE_LO_CERCANO;
+  const z0 = cz - LADO_DE_LOSA / 2 - MARGEN_DE_LO_CERCANO;
+  const z1 = cz + LADO_DE_LOSA / 2 + MARGEN_DE_LO_CERCANO;
   const salida: Cuerpo[] = [];
-  for (const b of cuerpos) {
-    if (b.x1 < x0 || b.x0 > x1 || b.z1 < z0 || b.z0 > z1) continue;
-    salida.push(b);
+  for (let dy = 1; dy >= -1; dy--) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const vecina = porCasilla.get(casillaDeLaLosa(l.x + dx, l.y + dy));
+      if (vecina === undefined) continue;
+      for (const b of vecina.cuerpos) {
+        if (b.x1 < x0 || b.x0 > x1 || b.z1 < z0 || b.z0 > z1) continue;
+        salida.push(b);
+      }
+    }
   }
   return salida;
+}
+
+/** La llave del sitio de nacer en una losa: la suya y la de sus ocho vecinas, en el mismo orden. */
+function llaveDelVecindario(l: LosaParaElMundo, porCasilla: ReadonlyMap<string, LoDeUnaCasilla>): string {
+  const partes: string[] = [];
+  for (let dy = 1; dy >= -1; dy--) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const vecina = porCasilla.get(casillaDeLaLosa(l.x + dx, l.y + dy));
+      partes.push(vecina === undefined ? '-' : vecina.llave);
+    }
+  }
+  return partes.join(';');
 }
 
 /** EL MUNDO DE UN TABLERO DE LAS LINDES. Función pura: la misma vista da el mismo mundo en los dos lados. */
 export function mundoDeLasLindes(losas: readonly LosaParaElMundo[], semilla: number): MundoDeclarado {
   const contenidos = montarTodas(losas, semilla);
-  const cuerpos = cuerposDe(losas, contenidos).map((c) => c.cuerpo);
   const pisables = losas.map((l) => ({ x: l.x, y: l.y }));
+  const cuerpos: Cuerpo[] = [];
+  const porCasilla = new Map<string, LoDeUnaCasilla>();
+  for (let i = 0; i < losas.length; i++) {
+    const l = losas[i] as LosaParaElMundo;
+    const suyos = cuerposDeUnaLosa(l, contenidos[i] as ContenidoDeLosa, semilla, i).map((c) => c.cuerpo);
+    for (const c of suyos) cuerpos.push(c);
+    porCasilla.set(casillaDeLaLosa(l.x, l.y), { llave: llaveDeLaLosa(l, semilla), cuerpos: suyos });
+  }
   /*
    * La arena con la que se decide dónde se nace es la de este mismo mundo, sin los sitios de
    * nacer: `nace` no cambia ni el suelo ni los cuerpos, así que la del mundo terminado contesta
-   * lo mismo en cada uno.
+   * lo mismo en cada uno. Y sólo se levanta si alguna losa no tiene su sitio recordado.
    */
-  const arena = arenaDe({ lado: LADO_DE_LOSA, pisables, vados: [], cuerpos, nace: [] });
+  let arena: Arena | null = null;
   const nace: Sitio[] = [];
   for (let i = 0; i < losas.length; i++) {
     const l = losas[i] as LosaParaElMundo;
-    nace.push(sitioParaNacer(l, contenidos[i] as ContenidoDeLosa, arena, cuerposCercaDe(l, cuerpos)));
+    const llave = llaveDelVecindario(l, porCasilla);
+    let sitio = RECUERDO_DE_NACER.get(llave);
+    if (sitio === undefined) {
+      if (arena === null) arena = arenaDe({ lado: LADO_DE_LOSA, pisables, vados: [], cuerpos, nace: [] });
+      sitio = recordar(
+        RECUERDO_DE_NACER,
+        llave,
+        sitioParaNacer(l, contenidos[i] as ContenidoDeLosa, arena, cuerposCercaDe(l, porCasilla)),
+      );
+    }
+    nace.push(sitio);
   }
   return {
     lado: LADO_DE_LOSA,
