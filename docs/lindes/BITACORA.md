@@ -76,6 +76,25 @@ demostrarse tres veces. Lo que hay que abrir y mirar:
   del encuadre en pantalla estrecha es la ARITMÉTICA (que está en verde, en seis
   formas de pantalla) y no el píxel.
 
+## 9 · Las piedras grandes se atravesaban andando (23-sep-2026)
+
+Miguel lo vio en Boots on Board: una piedra del erial más alta que el paseante, y se pasaba a
+través. La regla era «lo menudo no estorba», aplicada sin excepciones. Ahora las piedras, las
+rocas y los tocones que, PUESTOS, pasan de la cintura de quien anda (media persona, 1,27 u)
+estorban (`comoEstorbaLaPuesta` en `lindes-piezas.ts`), con el cuadrado de su RADIO medido: con
+el mayor semieje la piedra, que no es redonda, asomaba hasta 0,45 u junto a la senda. Lo demás
+menudo (vallas, barriles, carros, pozos) sigue siendo adorno.
+
+- +350 cuerpos en un tablero lleno (1.629 → 1.979), sin coste medible al derivar.
+- Ninguna cierra una senda (la más cercana, a 1,05 u del eje), el hueco de una puerta (el paso
+  más estrecho que queda, 6,37 de 7,29), ni un sitio de nacer, ni parte el valle (rejilla de
+  0,5 en 25 tableros): lo vigila `verify:lindes-mundo`.
+- El peor sitio de nacer de `verify:lindes-escena` pasa de 7,08 a 5,64 (umbral 5,09): el margen
+  es ahora estrecho.
+- Queda apuntado y sin tocar: las arboledas y el almiar tienen el mismo defecto del semieje
+  (asoman entre un 3 y un 11 %); arreglarlo cambia sus cajas y hay que medir antes qué pasos
+  estrechan.
+
 ## 8 · Y el lienzo se quedaba en el 62 % del alto — éste lo metí yo
 
 Al mirar el avatar en el cliente de verdad (no en el banco), el lienzo medía 604 × 572

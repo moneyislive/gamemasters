@@ -246,7 +246,7 @@ pasarlo —subió de 3 cuando el centro del tablero pasó de ser una muralla vac
 ciudad; el precedente medido es `tablero.glb`, que pesa 4.209 kB y viaja en cada despliegue—.
 Hoy pesa 3.073 kB con 163 piezas y 68.789 triángulos; lo que se quedó fuera por peso está apuntado en `PIEZAS_EN_ESPERA` con su coste.
 Lo sirve `server/src/routes/modelos.ts` en `/api/arcade/modelos/burgo.glb`, con ruta fija
-como los demás, y está versionado: sin eso daría 200 en el portátil y 404 en el despliegue.
+como los demás —una fila de `MODELOS_DE_NOMBRE_FIJO` en `escenas/ruta-de-modelos.ts`—, y está versionado: sin eso daría 200 en el portátil y 404 en el despliegue.
 
 ## Lo que queda por hacer
 

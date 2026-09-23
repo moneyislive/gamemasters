@@ -312,7 +312,7 @@ presencia, la figura elegida y «copiado». Todo lo demás, grises fríos.
 | `shared/mecanicas/` | `semilla.ts` | LA semilla de una mesa (FNV-1a en mayúsculas): la cala del Muelle y el delta de Riberas la comparten para que un código dé un solo mundo en todos los aparatos |
 | `shared/arcade/juegos/` | `riberas-en-tres.ts` | La ÚNICA traducción de la vista de Riberas a la escena: barra, anillos con su movimiento, opciones fuera del tablero, trueques por carta, `seVeEnTres`. Se apoya en `riberas-en-3d.ts` (`deltaDeLaVista`, `obraPosible`) |
 | `server/scripts/` | `verificar-riberas-en-tres.ts` | Su comprobador, con una mesa real del árbitro (`verify:riberas-en-tres`, en la batería tras Riberas) |
-| `escritorio/` | `lobby3d.html`, `src/banco-lobby.tsx`, `src/banco-lobby.css` | El banco de pruebas con asientos simulados |
+| `escritorio/` | `lobby3d.html`, `plaza3d.html`, `src/banco-lobby.tsx` (uno para todos los lobbies, con `data-lobby`), `src/banco-lobby.css` | El banco de pruebas con asientos simulados |
 | | `src/muelle.tsx`, `src/sala.tsx`, `src/mesa.ts`, `src/estilo.css` | El lobby en la Sala web |
 | | `src/riberas-en-tres.tsx` | La partida de Riberas en tres dimensiones en la Sala web (pintor propio; respaldo SVG) |
 | `app/` | `app/(arcade)/muelle.tsx`, `app/(arcade)/_layout.tsx`, `src/arcade/muelle.tsx`, `src/arcade/muelle-escena.tsx`, `src/arcade/hoja-del-muelle.tsx`, `src/arcade/figura.ts`, `src/arcade/empezada.ts`, `src/arcade/plazos.ts`, `src/arcade/piezas.tsx`, `src/arcade/mesa.ts`, `src/arcade/muebles.ts` | El lobby en la app |

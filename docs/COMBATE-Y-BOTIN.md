@@ -213,6 +213,13 @@ A un millón de partidas al mes son **20-26 TB/mes** — *antes de que se mueva 
    hacer y hay que decirlo con esa frase.
 3. **Qué se puede robar en cada juego sin romperlo**: recursos de Riberas, propiedades del
    Burgo, ventajas de Las Lindes — y qué NO.
+   **Decidido el 23-sep-2026** (`docs/BOOTS-ON-BOARD.md` §7): el botín entra en la mesa como el
+   movimiento `arcade:botin` (`shared/arcade/juegos/botin.ts`), que sólo mete el servidor, y cada
+   reductor decide qué se lleva. Riberas, una ficha al azar con `elRobo`, sin tocar las que se
+   deben en un descarte; El Burgo, hasta 100 € por `transferirEntre`, sin abrir apuro y nunca con
+   una subasta o un apuro en la mesa, y un quebrado ni da ni recibe; Las Lindes, hasta 3 puntos.
+   Sin nada que llevarse, el mismo estado; nunca mueve el turno ni el momento. Las propiedades
+   del Burgo NO se roban.
 4. **Si esto es una capa sobre tres juegos o un CUARTO JUEGO** con su propio reductor y una
    aduana con los otros tres. La tercera arquitectura defendía esto, y es más simple y más
    vendible.

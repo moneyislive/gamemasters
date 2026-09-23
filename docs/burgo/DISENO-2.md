@@ -553,7 +553,8 @@ export const PINTORES_PROPIOS: Readonly<Record<string, PintorPropio>> = {
   6610), y sube `COMPROBACIONES_ESCRITAS` (719) al número real.
 - `escritorio/src/lienzo-propio.tsx` (NUEVO): lo genérico que hoy es PRIVADO de
   `riberas-en-tres.tsx`, COPIADO y no movido (sus regex lo atan; Riberas no se toca en esta
-  fase): `recordada`, `traerUnGlb`, `usarLosModelos(hazFalta, traer)` (renombrado:
+  fase; el 23-sep-2026 se retiraron las copias: Riberas importa las piezas y la pila de trampas
+  vive en `lienzo-propio.tsx`): `recordada`, `traerUnGlb`, `usarLosModelos(hazFalta, traer)` (renombrado:
   `usarElCatalogo` choca con `catalogo.tsx`), `LimiteDelMundo`, `CamaraAerea` parametrizada
   `{ recuadro, seDesplazanSolas, velo }`, `usarLaTrampaDeFoco` (importando
   `armarUnaTrampa`/`mandaEstaTrampa` de riberas-en-tres.tsx: la pila de trampas es UNA),
