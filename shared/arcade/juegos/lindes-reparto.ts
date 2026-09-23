@@ -867,14 +867,47 @@ export const TOPE_DE_CASAS = 12;
  * casi todo era esto (1,1 s). En el móvil, cada losa puesta habría congelado la pantalla un
  * segundo.
  *
- * Así que se recuerda. La llave son las tres cosas de las que depende, el tope es de sobra para
- * varias mesas a la vez (72 losas por tablero), y cuando se llena se olvida la más antigua —un
- * `Map` recuerda el orden en que se metió cada llave—. Lo que sale es de SÓLO LECTURA para todos
- * sus consumidores (`ContenidoDeLosa` es `readonly` hasta abajo), así que compartir el mismo
- * objeto no deja que nadie le cambie el paisaje a otro.
+ * Así que se recuerda. La llave son las tres cosas de las que depende, y cuando se llena se olvida
+ * la más antigua —un `Map` recuerda el orden en que se metió cada llave—. Lo que sale es de SÓLO
+ * LECTURA para todos sus consumidores (`ContenidoDeLosa` es `readonly` hasta abajo), así que
+ * compartir el mismo objeto no deja que nadie le cambie el paisaje a otro.
+ *
+ * El tope, 512 losas, es la memoria DEL APARATO: la escena y el mundo de la única mesa que mira
+ * comparten lo que se monta aquí, y así el mundo no vuelve a montar lo que la escena ya pintó. Se
+ * escribió «de sobra para varias mesas a la vez», y en el servidor no lo era: con más de siete
+ * mesas llenas en rueda se olvidaba justo la que iba a jugar. El servidor ya no depende de esta
+ * memoria: la suya es por mesa, en `lindes-mundo.ts` (ver `LOSAS_QUE_SE_RECUERDAN` allí).
+ *
+ * ═══ Y EL SUELO, UNO POR CLASE Y GIRO, COMPARTIDO ═══
+ *
+ * De lo que se recordaba por losa, casi todo era su suelo: 2.304 celdas, 131 kB de los 142 que
+ * ocupa una losa montada —las piezas son 8,5—. Y el suelo NO depende de la semilla:
+ * `sueloDeLaLosa` sólo mira la clase y el giro. O sea que las 512 losas guardaban como mucho 96
+ * suelos distintos —24 clases por 4 giros—, copiados: 73 MB en cuanto la memoria se llenaba, que
+ * en el servidor pasaba con la octava mesa. Ahora lo que se recuerda lleva el suelo de su clase y
+ * su giro, el mismo objeto para todas las losas iguales: las 512 caben en unos 4 MB, y los suelos,
+ * en 12,6 como mucho. Es de sólo lectura como el resto, y es igual celda a celda al de
+ * `sueloDeLaLosa` —lo exige `verify:lindes-mundo`—, así que ni cambia ni se puede cambiar.
+ *
+ * `montarLaLosaDeNuevo` sigue devolviendo su suelo recién hecho: es la cuenta entera, sin memoria.
  */
 const RECUERDO_DEL_REPARTO = new Map<string, ContenidoDeLosa>();
 const LOSAS_QUE_SE_RECUERDAN = 512;
+const SUELOS_COMPARTIDOS = new Map<string, readonly CeldaDeSuelo[]>();
+
+/**
+ * EL SUELO DE UNA CLASE Y UN GIRO, el primero que se montó. `celdas` es el recién montado: si
+ * ya había uno, se tira y se usa aquél, que es igual. Una losa que no está en el catálogo no
+ * tiene celdas y no se guarda nada: así caben como mucho las 96 del catálogo.
+ */
+function sueloCompartido(idDeLosa: string, giro: Giro, celdas: readonly CeldaDeSuelo[]): readonly CeldaDeSuelo[] {
+  if (celdas.length === 0) return celdas;
+  const llave = `${idDeLosa}|${String(giro)}`;
+  const ya = SUELOS_COMPARTIDOS.get(llave);
+  if (ya !== undefined) return ya;
+  SUELOS_COMPARTIDOS.set(llave, celdas);
+  return celdas;
+}
 
 /*
  * ═══ Y LO QUE TRABAJA, CONTADO ═══
@@ -886,17 +919,26 @@ const LOSAS_QUE_SE_RECUERDAN = 512;
 let losasMontadas = 0;
 let losasRecordadas = 0;
 
-/** Lo que ha trabajado el reparto desde que se cargó el módulo. */
+/** Lo que ha trabajado el reparto desde que se cargó el módulo, y lo que guarda ahora. */
 export interface CuentasDelReparto {
   /** Losas montadas de verdad: las veces que ha corrido `montarLaLosaDeNuevo`. */
   readonly montadas: number;
   /** Las veces que `montarLaLosa` ya la tenía en la memoria. */
   readonly recordadas: number;
+  /** Cuántas losas hay ahora en la memoria: nunca más de 512. */
+  readonly enLaMemoria: number;
+  /** Cuántos suelos compartidos hay: nunca más de los del catálogo por sus cuatro giros. */
+  readonly suelos: number;
 }
 
 /** Las cuentas del reparto, tal como van. */
 export function cuentasDelReparto(): CuentasDelReparto {
-  return { montadas: losasMontadas, recordadas: losasRecordadas };
+  return {
+    montadas: losasMontadas,
+    recordadas: losasRecordadas,
+    enLaMemoria: RECUERDO_DEL_REPARTO.size,
+    suelos: SUELOS_COMPARTIDOS.size,
+  };
 }
 
 /**
@@ -912,7 +954,8 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
     losasRecordadas++;
     return recordado;
   }
-  const montado = montarLaLosaDeNuevo(idDeLosa, giro, semilla);
+  const nuevo = montarLaLosaDeNuevo(idDeLosa, giro, semilla);
+  const montado: ContenidoDeLosa = { celdas: sueloCompartido(idDeLosa, giro, nuevo.celdas), puestas: nuevo.puestas };
   if (RECUERDO_DEL_REPARTO.size >= LOSAS_QUE_SE_RECUERDAN) {
     const masAntigua = RECUERDO_DEL_REPARTO.keys().next();
     if (masAntigua.done !== true) RECUERDO_DEL_REPARTO.delete(masAntigua.value);

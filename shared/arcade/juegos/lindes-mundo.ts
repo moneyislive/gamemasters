@@ -99,6 +99,7 @@ import { arenaDe, sePuedeEstar } from '../../mecanicas/mundo';
 import type { Arena, Cuerpo, MundoDeclarado, Sitio } from '../../mecanicas/mundo';
 import { ALTO_Y_RADIO_DEL_MODELO, HUECO_DE_LA_PUERTA, HUELLA_DEL_MODELO } from './lindes-huellas';
 import type { HuellaDelModelo } from './lindes-huellas';
+import { LOSAS_EN_TOTAL } from './lindes-losas';
 import type { Giro } from './lindes-losas';
 import { ESCALA_DEL_PACK, LADO_DE_LOSA } from './lindes-medidas';
 import { comoEstorbaLaPuesta } from './lindes-piezas';
@@ -227,7 +228,7 @@ export function cajasDeLaPuesta(
 
 /* ─── EL TABLERO ENTERO ──────────────────────────────────────────────────── */
 
-/**
+/*
  * ═══ LO QUE NO CAMBIA NO SE VUELVE A CALCULAR ═══
  *
  * Una losa puesta no cambia nunca, y el mundo se pide entero en cada jugada —el aparato al
@@ -248,10 +249,101 @@ export function cajasDeLaPuesta(
  * orden —de la vecina del noroeste a la del sureste— y no en el orden en que llegaron las losas:
  * si dependiera de ese orden, un empate entre dos distancias podría resolverse distinto en frío
  * que de memoria, y el mismo tablero daría dos mundos.
+ *
+ * ═══ Y SE RECUERDA POR MESA, PORQUE EL SERVIDOR TIENE MUCHAS ═══
+ *
+ * Esta memoria era del PROCESO —1.024 losas, y al llenarse se olvidaba la que entró antes—, igual
+ * que la del reparto, de 512. Al aparato le sobra: mira una mesa. Pero el servidor deriva el mundo
+ * de CADA mesa de botas cada vez que cambia, y una mesa llena son 72 losas. Contado en rueda —una
+ * jugada cada vez en una mesa distinta, con los tableros de cien partidas del robot—: con siete
+ * mesas llenas, una jugada que pone losa monta UNA losa y una que no pone ninguna no monta nada;
+ * con ocho, 23 y 72, porque el reparto ya no cabe; con veinte, 66 losas montadas, 66 cajas y 66
+ * sitios de nacer POR JUGADA: el tablero entero en frío, cada vez. Olvidar lo que entró antes,
+ * con las mesas en rueda, es olvidar justo lo que va a hacer falta a continuación.
+ *
+ * Así que la memoria es POR MESA —la mesa es su semilla, que sale de su código— y lo que no cabe
+ * se olvida POR MESAS: sale entera la que lleva más tiempo sin derivarse. Una mesa que se sigue
+ * jugando no pierde nunca media memoria, y la que sale es la que menos falta va a hacer. De cada
+ * losa se guarda lo justo para no volver a montarla:
+ *
+ *   · SUS CAJAS, en números de cuatro en cuatro: es lo que el mundo pide en cada jugada.
+ *   · DÓNDE CAE CADA PIEZA, de dos en dos, y el SUELO de su clase y su giro, que el reparto
+ *     comparte entre todas las losas iguales: es todo lo que mira `sitioParaNacer`, y hace falta
+ *     cuando una losa nueva cae al lado y hay que volver a buscar dónde se nace.
+ *   · SU SITIO DE NACER, con la llave del vecindario con la que se buscó.
+ *
+ * Y no el reparto entero, que es lo que habría pedido lo más directo —recordar el
+ * `ContenidoDeLosa`—: sus piezas son 8,5 kB por losa, y con cien mesas eso solo pasaría de 60 MB.
+ * Lo medido, en la cabecera de `LOSAS_QUE_SE_RECUERDAN`.
+ *
+ * La memoria de una mesa se queda con las losas de su último tablero, ni una más: si una partida
+ * se rebobina, lo que se quitó no se queda ocupando sitio.
  */
-const LOSAS_QUE_SE_RECUERDAN = 1024;
-const RECUERDO_DE_CAJAS = new Map<string, readonly CuerpoDeLasLindes[]>();
-const RECUERDO_DE_NACER = new Map<string, Sitio>();
+/** Lo que una mesa recuerda de una de sus losas. */
+export interface LosaRecordada {
+  /** Sus cajas, de cuatro en cuatro —`x0, z0, x1, z1`—, en el orden en que salen de sus piezas. */
+  readonly cajas: readonly number[];
+  /** Dónde cae cada pieza de su reparto, de dos en dos —`x, z`—, en el orden del reparto. */
+  readonly piezas: readonly number[];
+  /** Su suelo: el del reparto, compartido con todas las losas de su clase y su giro. */
+  readonly celdas: readonly CeldaDeSuelo[];
+  /** La llave del vecindario con el que se buscó `nace`. Vacía si todavía no se ha buscado. */
+  vecindario: string;
+  nace: Sitio | null;
+}
+
+/**
+ * UNA MEMORIA DE MESAS. La del proceso es la que usan el aparato y el servidor; quien quiera
+ * medir o comparar en frío se hace otra, y la del proceso no se entera.
+ */
+export interface MemoriaDeLasLindes {
+  /** Cuántas losas caben, entre todas sus mesas. */
+  readonly tope: number;
+  /**
+   * Sus mesas, por semilla, en el orden en que se derivaron por última vez: la primera es la que
+   * lleva más tiempo sin derivarse. De cada una, sus losas por llave.
+   */
+  readonly mesas: Map<number, ReadonlyMap<string, LosaRecordada>>;
+  /** Cuántas losas hay, sumando todas las mesas. */
+  losas: number;
+  /** Cuántas mesas se han olvidado enteras por no caber. */
+  olvidadas: number;
+}
+
+/**
+ * CUÁNTAS LOSAS SE RECUERDAN, ENTRE TODAS LAS MESAS: las de 128 mesas llenas.
+ *
+ * En losas y no en mesas porque lo que se ocupa es por losa: una mesa que empieza cuesta lo que
+ * lleva puesto. Medido con `process.memoryUsage()` tras recoger basura, con los tableros de cien
+ * partidas del robot derivados en rueda: 2,7 kB por losa, 195 por mesa llena, y 36,5 MB en total
+ * con las cien (7.188 losas), de los que unos 18 son fijos y no crecen con las mesas —los suelos
+ * compartidos y las 512 losas del reparto—. Con el tope lleno serían unos 42. Antes, las memorias
+ * del proceso llenas ocupaban 77 MB, y a partir de la octava mesa no servían de nada.
+ *
+ * Con más mesas jugando a la vez que las que caben, las que más tiempo llevan quietas vuelven a
+ * derivarse en frío, que es lo que antes les pasaba a todas a partir de la octava.
+ */
+export const LOSAS_QUE_SE_RECUERDAN = 128 * LOSAS_EN_TOTAL;
+
+/** Una memoria de mesas vacía, con su tope en losas. */
+export function memoriaDeLasLindes(tope: number): MemoriaDeLasLindes {
+  return { tope, mesas: new Map<number, ReadonlyMap<string, LosaRecordada>>(), losas: 0, olvidadas: 0 };
+}
+
+const LA_MEMORIA_DEL_PROCESO = memoriaDeLasLindes(LOSAS_QUE_SE_RECUERDAN);
+
+/** Lo que hay en una memoria de mesas, contado. */
+export interface LoQueSeRecuerda {
+  readonly mesas: number;
+  readonly losas: number;
+  readonly olvidadas: number;
+  readonly tope: number;
+}
+
+/** Lo que hay en una memoria de mesas: la del proceso, si no se dice otra. */
+export function loQueSeRecuerda(memoria: MemoriaDeLasLindes = LA_MEMORIA_DEL_PROCESO): LoQueSeRecuerda {
+  return { mesas: memoria.mesas.size, losas: memoria.losas, olvidadas: memoria.olvidadas, tope: memoria.tope };
+}
 
 /*
  * ═══ Y LO QUE TRABAJA, CONTADO ═══
@@ -284,62 +376,28 @@ export function cuentasDelMundo(): CuentasDelMundo {
   return { cajasCalculadas, cajasRecordadas, nacimientosCalculados, nacimientosRecordados, arenasParaNacer };
 }
 
-function recordar<T>(recuerdo: Map<string, T>, llave: string, valor: T): T {
-  if (recuerdo.size >= LOSAS_QUE_SE_RECUERDAN) {
-    const masAntigua = recuerdo.keys().next();
-    if (masAntigua.done !== true) recuerdo.delete(masAntigua.value);
-  }
-  recuerdo.set(llave, valor);
-  return valor;
-}
-
 /** La llave de una losa puesta: todo aquello de lo que dependen sus piezas y su sitio. */
 function llaveDeLaLosa(l: LosaParaElMundo, semilla: number): string {
   return `${l.losa}|${String(l.giro)}|${String(l.x)}|${String(l.y)}|${String(semilla)}`;
 }
 
-/** Cada losa, montada con el reparto y con su semilla, como la monta la escena. */
-function montarTodas(losas: readonly LosaParaElMundo[], semilla: number): ContenidoDeLosa[] {
-  const salida: ContenidoDeLosa[] = [];
-  for (const l of losas) salida.push(montarLaLosa(l.losa, l.giro, semillaDeLaLosa(semilla, l.x, l.y)));
-  return salida;
+/** Una losa, montada con el reparto y con su semilla, como la monta la escena. */
+function montarUna(l: LosaParaElMundo, semilla: number): ContenidoDeLosa {
+  return montarLaLosa(l.losa, l.giro, semillaDeLaLosa(semilla, l.x, l.y));
 }
 
-/** Los cuerpos de UNA losa, con de dónde sale cada uno. `indice` es el de la losa en la lista. */
-function cuerposDeUnaLosa(
-  l: LosaParaElMundo,
-  contenido: ContenidoDeLosa,
-  semilla: number,
-  indice: number,
-): CuerpoDeLasLindes[] {
-  const llave = llaveDeLaLosa(l, semilla);
-  let suyos = RECUERDO_DE_CAJAS.get(llave);
-  if (suyos !== undefined) cajasRecordadas++;
-  if (suyos === undefined) {
-    cajasCalculadas++;
-    const cx = l.x * LADO_DE_LOSA;
-    const cz = -l.y * LADO_DE_LOSA;
-    const nuevos: CuerpoDeLasLindes[] = [];
-    for (const p of contenido.puestas) {
-      for (const c of cajasDeLaPuesta(p, cx, cz)) {
-        nuevos.push({ cuerpo: c.cuerpo, pieza: p.pieza, porque: p.porque, losa: 0, forma: c.forma });
-      }
-    }
-    suyos = recordar(RECUERDO_DE_CAJAS, llave, nuevos);
-  }
-  /* Lo recordado lleva `losa: 0`: el índice es de la lista de esta llamada, no de la losa. */
-  return suyos.map((c) => ({ cuerpo: c.cuerpo, pieza: c.pieza, porque: c.porque, losa: indice, forma: c.forma }));
-}
-
-function cuerposDe(
-  losas: readonly LosaParaElMundo[],
-  contenidos: readonly ContenidoDeLosa[],
-  semilla: number,
-): CuerpoDeLasLindes[] {
+/**
+ * LAS CAJAS DE UNA LOSA, con de dónde sale cada una. `indice` es el de la losa en la lista. De aquí
+ * salen las de `cuerposDeLasLindes` y las que recuerda cada mesa: la cuenta es una sola.
+ */
+function cajasDeUnaLosa(l: LosaParaElMundo, contenido: ContenidoDeLosa, indice: number): CuerpoDeLasLindes[] {
+  cajasCalculadas++;
+  const cx = l.x * LADO_DE_LOSA;
+  const cz = -l.y * LADO_DE_LOSA;
   const salida: CuerpoDeLasLindes[] = [];
-  for (let i = 0; i < losas.length; i++) {
-    for (const c of cuerposDeUnaLosa(losas[i] as LosaParaElMundo, contenidos[i] as ContenidoDeLosa, semilla, i)) {
-      salida.push(c);
+  for (const p of contenido.puestas) {
+    for (const c of cajasDeLaPuesta(p, cx, cz)) {
+      salida.push({ cuerpo: c.cuerpo, pieza: p.pieza, porque: p.porque, losa: indice, forma: c.forma });
     }
   }
   return salida;
@@ -348,11 +406,44 @@ function cuerposDe(
 /**
  * LOS CUERPOS DE UN TABLERO, con de dónde sale cada uno.
  *
- * Son EXACTAMENTE los de `mundoDeLasLindes`, en el mismo orden —el mundo se hace con esta misma
- * lista, quitándole el origen—, así que contarlos aquí es contar lo que hay en el mundo.
+ * Son EXACTAMENTE los de `mundoDeLasLindes`, en el mismo orden —salen de la misma cuenta,
+ * `cajasDeUnaLosa`, y el mundo se queda con sus números—, así que contarlos aquí es contar lo que
+ * hay en el mundo. No pasa por la memoria de las mesas: es para contar y dibujar, no para jugar, y
+ * así `verify:lindes-mundo` compara lo que sale de memoria con lo que sale de la cuenta.
  */
 export function cuerposDeLasLindes(losas: readonly LosaParaElMundo[], semilla: number): CuerpoDeLasLindes[] {
-  return cuerposDe(losas, montarTodas(losas, semilla), semilla);
+  const salida: CuerpoDeLasLindes[] = [];
+  for (let i = 0; i < losas.length; i++) {
+    const l = losas[i] as LosaParaElMundo;
+    for (const c of cajasDeUnaLosa(l, montarUna(l, semilla), i)) salida.push(c);
+  }
+  return salida;
+}
+
+/** Lo que una mesa recuerda de una losa que no tenía: se monta —o se toma de la escena— y se resume. */
+function recordarLaLosa(l: LosaParaElMundo, semilla: number): LosaRecordada {
+  const contenido = montarUna(l, semilla);
+  const cajas: number[] = [];
+  for (const c of cajasDeUnaLosa(l, contenido, 0)) cajas.push(c.cuerpo.x0, c.cuerpo.z0, c.cuerpo.x1, c.cuerpo.z1);
+  const piezas: number[] = [];
+  for (const p of contenido.puestas) piezas.push(p.x, p.z);
+  return { cajas, piezas, celdas: contenido.celdas, vecindario: '', nace: null };
+}
+
+/**
+ * OLVIDA MESAS ENTERAS mientras no quepan, empezando por la que lleva más tiempo sin derivarse. La
+ * que se acaba de derivar va la última y no sale nunca: aunque ella sola no cupiera, es la que se
+ * está jugando.
+ */
+function olvidarLasQueNoCaben(memoria: MemoriaDeLasLindes): void {
+  while (memoria.losas > memoria.tope && memoria.mesas.size > 1) {
+    const primera = memoria.mesas.entries().next();
+    if (primera.done === true) return;
+    const [semilla, suyas] = primera.value;
+    memoria.mesas.delete(semilla);
+    memoria.losas -= suyas.size;
+    memoria.olvidadas++;
+  }
 }
 
 /* ─── DÓNDE SE NACE ──────────────────────────────────────────────────────── */
@@ -376,12 +467,21 @@ function rumboMasParecido(vx: number, vz: number): number {
 }
 
 /**
+ * Lo que mira quien busca dónde nacer en una losa: su suelo y dónde cae cada pieza. Un
+ * `ContenidoDeLosa` lo es, y también lo que guarda la memoria de una mesa, que no guarda más.
+ */
+interface LoQueMiraQuienNace {
+  readonly celdas: readonly CeldaDeSuelo[];
+  readonly puestas: readonly { readonly x: number; readonly z: number }[];
+}
+
+/**
  * EL SITIO DONDE SE NACE EN UNA LOSA. Ver la cabecera: la lógica que tenía `nacerEnLaLosa`, con la
  * arena de este mundo como juez de si se puede estar.
  */
 function sitioParaNacer(
   l: LosaParaElMundo,
-  dentro: ContenidoDeLosa,
+  dentro: LoQueMiraQuienNace,
   arena: Arena,
   cerca: readonly Cuerpo[],
 ): Sitio {
@@ -480,7 +580,7 @@ function casillaDeLaLosa(x: number, y: number): string {
 /**
  * Los cuerpos que pueden importar para nacer en la losa `(x, y)`: los de ella y sus ocho vecinas
  * que tocan su cuadrado con margen. SIEMPRE en el mismo orden —de la vecina del noroeste a la del
- * sureste—, y no en el de la lista de losas: ver la cabecera de `LOSAS_QUE_SE_RECUERDAN`.
+ * sureste—, y no en el de la lista de losas: ver «LO QUE NO CAMBIA NO SE VUELVE A CALCULAR», arriba.
  */
 function cuerposCercaDe(l: LosaParaElMundo, porCasilla: ReadonlyMap<string, LoDeUnaCasilla>): Cuerpo[] {
   const cx = l.x * LADO_DE_LOSA;
@@ -515,44 +615,85 @@ function llaveDelVecindario(l: LosaParaElMundo, porCasilla: ReadonlyMap<string, 
   return partes.join(';');
 }
 
-/** EL MUNDO DE UN TABLERO DE LAS LINDES. Función pura: la misma vista da el mismo mundo en los dos lados. */
-export function mundoDeLasLindes(losas: readonly LosaParaElMundo[], semilla: number): MundoDeclarado {
-  const contenidos = montarTodas(losas, semilla);
+/**
+ * EL MUNDO DE UN TABLERO DE LAS LINDES. Función pura: la misma vista da el mismo mundo en los dos
+ * lados. La memoria sólo decide cuánto se trabaja para sacarlo, nunca qué sale: por defecto es la
+ * del proceso, y quien pase otra —un comprobador que quiere el mundo en frío— no toca ésa.
+ */
+export function mundoDeLasLindes(
+  losas: readonly LosaParaElMundo[],
+  semilla: number,
+  memoria: MemoriaDeLasLindes = LA_MEMORIA_DEL_PROCESO,
+): MundoDeclarado {
+  /*
+   * La mesa sale de donde estaba y vuelve a entrar la última, que es lo que la hace la más
+   * reciente. Sus losas se descuentan ya, y se vuelven a contar las de este tablero al terminar:
+   * si algo fallara a medias, la mesa quedaría olvidada, que es seguro, y la cuenta, bien.
+   */
+  const antes = memoria.mesas.get(semilla);
+  if (antes !== undefined) {
+    memoria.mesas.delete(semilla);
+    memoria.losas -= antes.size;
+  }
+  const suyas = new Map<string, LosaRecordada>();
+  const recordadas: LosaRecordada[] = [];
   const pisables = losas.map((l) => ({ x: l.x, y: l.y }));
   const cuerpos: Cuerpo[] = [];
   const porCasilla = new Map<string, LoDeUnaCasilla>();
   for (let i = 0; i < losas.length; i++) {
     const l = losas[i] as LosaParaElMundo;
-    const suyos = cuerposDeUnaLosa(l, contenidos[i] as ContenidoDeLosa, semilla, i).map((c) => c.cuerpo);
-    for (const c of suyos) cuerpos.push(c);
-    porCasilla.set(casillaDeLaLosa(l.x, l.y), { llave: llaveDeLaLosa(l, semilla), cuerpos: suyos });
+    const llave = llaveDeLaLosa(l, semilla);
+    let r = suyas.get(llave) ?? antes?.get(llave);
+    if (r === undefined) r = recordarLaLosa(l, semilla);
+    else cajasRecordadas++;
+    suyas.set(llave, r);
+    recordadas.push(r);
+    /* Sus cajas vuelven a ser cuerpos: los mismos números, en el mismo orden. */
+    const suyos: Cuerpo[] = [];
+    for (let k = 0; k + 3 < r.cajas.length; k += 4) {
+      const c: Cuerpo = {
+        x0: r.cajas[k] as number,
+        z0: r.cajas[k + 1] as number,
+        x1: r.cajas[k + 2] as number,
+        z1: r.cajas[k + 3] as number,
+      };
+      suyos.push(c);
+      cuerpos.push(c);
+    }
+    porCasilla.set(casillaDeLaLosa(l.x, l.y), { llave, cuerpos: suyos });
   }
   /*
    * La arena con la que se decide dónde se nace es la de este mismo mundo, sin los sitios de
    * nacer: `nace` no cambia ni el suelo ni los cuerpos, así que la del mundo terminado contesta
-   * lo mismo en cada uno. Y sólo se levanta si alguna losa no tiene su sitio recordado.
+   * lo mismo en cada uno. Y sólo se levanta si alguna losa no tiene su sitio recordado con el
+   * vecindario de ahora.
    */
   let arena: Arena | null = null;
   const nace: Sitio[] = [];
   for (let i = 0; i < losas.length; i++) {
     const l = losas[i] as LosaParaElMundo;
-    const llave = llaveDelVecindario(l, porCasilla);
-    let sitio = RECUERDO_DE_NACER.get(llave);
-    if (sitio !== undefined) nacimientosRecordados++;
-    if (sitio === undefined) {
-      if (arena === null) {
-        arenasParaNacer++;
-        arena = arenaDe({ lado: LADO_DE_LOSA, pisables, vados: [], cuerpos, nace: [] });
-      }
-      nacimientosCalculados++;
-      sitio = recordar(
-        RECUERDO_DE_NACER,
-        llave,
-        sitioParaNacer(l, contenidos[i] as ContenidoDeLosa, arena, cuerposCercaDe(l, porCasilla)),
-      );
+    const r = recordadas[i] as LosaRecordada;
+    const vecindario = llaveDelVecindario(l, porCasilla);
+    if (r.nace !== null && r.vecindario === vecindario) {
+      nacimientosRecordados++;
+      nace.push(r.nace);
+      continue;
     }
+    if (arena === null) {
+      arenasParaNacer++;
+      arena = arenaDe({ lado: LADO_DE_LOSA, pisables, vados: [], cuerpos, nace: [] });
+    }
+    nacimientosCalculados++;
+    const puestas: { x: number; z: number }[] = [];
+    for (let k = 0; k + 1 < r.piezas.length; k += 2) puestas.push({ x: r.piezas[k] as number, z: r.piezas[k + 1] as number });
+    const sitio = sitioParaNacer(l, { celdas: r.celdas, puestas }, arena, cuerposCercaDe(l, porCasilla));
+    r.vecindario = vecindario;
+    r.nace = sitio;
     nace.push(sitio);
   }
+  memoria.mesas.set(semilla, suyas);
+  memoria.losas += suyas.size;
+  olvidarLasQueNoCaben(memoria);
   return {
     lado: LADO_DE_LOSA,
     pisables,
