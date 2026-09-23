@@ -253,6 +253,37 @@ const LOSAS_QUE_SE_RECUERDAN = 1024;
 const RECUERDO_DE_CAJAS = new Map<string, readonly CuerpoDeLasLindes[]>();
 const RECUERDO_DE_NACER = new Map<string, Sitio>();
 
+/*
+ * ═══ Y LO QUE TRABAJA, CONTADO ═══
+ *
+ * Como en `lindes-reparto.ts`: cuántas veces se ha hecho cada cosa y cuántas se ha sacado de la
+ * memoria. Nada de aquí lo lee; está para que un comprobador CUENTE lo que cuesta una jugada.
+ */
+let cajasCalculadas = 0;
+let cajasRecordadas = 0;
+let nacimientosCalculados = 0;
+let nacimientosRecordados = 0;
+let arenasParaNacer = 0;
+
+/** Lo que ha trabajado el mundo desde que se cargó el módulo. Lo del reparto va en `cuentasDelReparto`. */
+export interface CuentasDelMundo {
+  /** Losas cuyas cajas se han sacado de sus piezas. */
+  readonly cajasCalculadas: number;
+  /** Losas cuyas cajas estaban en la memoria. */
+  readonly cajasRecordadas: number;
+  /** Sitios de nacer buscados celda a celda (`sitioParaNacer`). */
+  readonly nacimientosCalculados: number;
+  /** Sitios de nacer que estaban en la memoria. */
+  readonly nacimientosRecordados: number;
+  /** Arenas levantadas para decidir dónde se nace: una por mundo, y sólo si algún sitio faltaba. */
+  readonly arenasParaNacer: number;
+}
+
+/** Las cuentas del mundo, tal como van. */
+export function cuentasDelMundo(): CuentasDelMundo {
+  return { cajasCalculadas, cajasRecordadas, nacimientosCalculados, nacimientosRecordados, arenasParaNacer };
+}
+
 function recordar<T>(recuerdo: Map<string, T>, llave: string, valor: T): T {
   if (recuerdo.size >= LOSAS_QUE_SE_RECUERDAN) {
     const masAntigua = recuerdo.keys().next();
@@ -283,7 +314,9 @@ function cuerposDeUnaLosa(
 ): CuerpoDeLasLindes[] {
   const llave = llaveDeLaLosa(l, semilla);
   let suyos = RECUERDO_DE_CAJAS.get(llave);
+  if (suyos !== undefined) cajasRecordadas++;
   if (suyos === undefined) {
+    cajasCalculadas++;
     const cx = l.x * LADO_DE_LOSA;
     const cz = -l.y * LADO_DE_LOSA;
     const nuevos: CuerpoDeLasLindes[] = [];
@@ -505,8 +538,13 @@ export function mundoDeLasLindes(losas: readonly LosaParaElMundo[], semilla: num
     const l = losas[i] as LosaParaElMundo;
     const llave = llaveDelVecindario(l, porCasilla);
     let sitio = RECUERDO_DE_NACER.get(llave);
+    if (sitio !== undefined) nacimientosRecordados++;
     if (sitio === undefined) {
-      if (arena === null) arena = arenaDe({ lado: LADO_DE_LOSA, pisables, vados: [], cuerpos, nace: [] });
+      if (arena === null) {
+        arenasParaNacer++;
+        arena = arenaDe({ lado: LADO_DE_LOSA, pisables, vados: [], cuerpos, nace: [] });
+      }
+      nacimientosCalculados++;
       sitio = recordar(
         RECUERDO_DE_NACER,
         llave,

@@ -876,6 +876,29 @@ export const TOPE_DE_CASAS = 12;
 const RECUERDO_DEL_REPARTO = new Map<string, ContenidoDeLosa>();
 const LOSAS_QUE_SE_RECUERDAN = 512;
 
+/*
+ * ═══ Y LO QUE TRABAJA, CONTADO ═══
+ *
+ * Cuántas losas se han montado de verdad y cuántas se han sacado de la memoria desde que se cargó
+ * el módulo. Nada del reparto lo lee y no decide nada: está para que un comprobador CUENTE lo que
+ * cuesta una jugada en vez de cronometrarla, que en una máquina ocupada miente.
+ */
+let losasMontadas = 0;
+let losasRecordadas = 0;
+
+/** Lo que ha trabajado el reparto desde que se cargó el módulo. */
+export interface CuentasDelReparto {
+  /** Losas montadas de verdad: las veces que ha corrido `montarLaLosaDeNuevo`. */
+  readonly montadas: number;
+  /** Las veces que `montarLaLosa` ya la tenía en la memoria. */
+  readonly recordadas: number;
+}
+
+/** Las cuentas del reparto, tal como van. */
+export function cuentasDelReparto(): CuentasDelReparto {
+  return { montadas: losasMontadas, recordadas: losasRecordadas };
+}
+
 /**
  * LEVANTA UNA LOSA ENTERA.
  *
@@ -885,7 +908,10 @@ const LOSAS_QUE_SE_RECUERDAN = 512;
 export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): ContenidoDeLosa {
   const llave = `${idDeLosa}|${String(giro)}|${String(semilla)}`;
   const recordado = RECUERDO_DEL_REPARTO.get(llave);
-  if (recordado !== undefined) return recordado;
+  if (recordado !== undefined) {
+    losasRecordadas++;
+    return recordado;
+  }
   const montado = montarLaLosaDeNuevo(idDeLosa, giro, semilla);
   if (RECUERDO_DEL_REPARTO.size >= LOSAS_QUE_SE_RECUERDAN) {
     const masAntigua = RECUERDO_DEL_REPARTO.keys().next();
@@ -897,6 +923,7 @@ export function montarLaLosa(idDeLosa: string, giro: Giro, semilla: number): Con
 
 /** Lo que hace `montarLaLosa` cuando no lo recuerda. Exportado para quien quiera medir el coste. */
 export function montarLaLosaDeNuevo(idDeLosa: string, giro: Giro, semilla: number): ContenidoDeLosa {
+  losasMontadas++;
   const losa = losaPorId(idDeLosa);
   if (losa === null) return { celdas: [], puestas: [] };
 
