@@ -35,6 +35,8 @@
  *  8. LA ESCRITURA DIFERIDA (`tickHz > 0`) NO RESUCITA LO OLVIDADO: con el volcado retenido a
  *     mitad —justo antes de renombrar— se pide olvidar la mesa, se suelta, y ni el fichero ni la
  *     mesa vuelven. Y con el volcado sólo pendiente, olvidarla lo cancela.
+ *  9. UNA TERMINADA GUARDADA CON EL PLAZO PUESTO sale de la memoria como cualquier terminada, sin
+ *     que se escriba su fichero: el plazo se le apaga al leerla, no en su primera lectura.
  *
  * ═══ EL RELOJ SE ADELANTA EN PROCESO, CAMBIANDO `Date.now` ═══
  *
@@ -972,6 +974,70 @@ if (tieneLaMemoriaNueva) {
       );
       comprobar('y no queda ningún candado suelto', mesas.candadosDeMesaVivos() === 0, mesas.candadosDeMesaVivos());
     }
+
+    // -------------------------------------------------------------------------
+    paso('Una terminada guardada con el plazo puesto sale de la memoria como cualquier terminada');
+    // -------------------------------------------------------------------------
+
+    {
+      /*
+       * La versión que rearmaba el plazo después de cerrar dejó en disco mesas TERMINADAS con
+       * `venceEn` puesto. Leídas, la primera lectura les apagaba el plazo EN MEMORIA
+       * (`ponerAlDiaElPlazo`) sin escribirlo —una terminada no escribe—, y desde ahí la de memoria
+       * ya no era la de su fichero: el desalojo no la soltaba nunca. La de control es igual pero sin
+       * el plazo puesto, y ésa ya salía.
+       */
+      const ahora = Date.now();
+      const terminadaConPlazo = (codigo: string, venceEn: number | null) => ({
+        version: 2,
+        mesa: {
+          codigo,
+          mesa: {
+            id: codigo,
+            arcade: FRIO,
+            asientos: ['aTERM0000'],
+            estado: { tics: 0, jugadas: 1, notas: [''], fin: true },
+            rev: 3,
+            tic: 0,
+            semilla: 1,
+            terminada: true,
+            diario: [],
+            empezada: true,
+          },
+          sillas: [{ id: 'aTERM0000', nombre: 'Quien acabó', llave: `LLAVE${codigo}${'0'.repeat(14)}` }],
+          plazoMs: 60_000,
+          venceEn,
+          turnoDesde: ahora,
+          abiertaEn: ahora,
+          ultimoToqueEn: ahora,
+          modalidad: 'normal',
+        },
+      });
+      fs.writeFileSync(ficheroDe(MESAS, 'TERMV'), JSON.stringify(terminadaConPlazo('TERMV', ahora - 1_000)), 'utf8');
+      fs.writeFileSync(ficheroDe(MESAS, 'TERMN'), JSON.stringify(terminadaConPlazo('TERMN', null)), 'utf8');
+      const ficheroConPlazo = fs.readFileSync(ficheroDe(MESAS, 'TERMV'), 'utf8');
+
+      const vista = await mesas.mirar('TERMV', null);
+      await mesas.mirar('TERMN', null);
+      comprobar(
+        'leída, dice que está terminada y que no vence',
+        vista.terminada && vista.venceEn === null,
+        { terminada: vista.terminada, venceEn: vista.venceEn },
+      );
+      adelantar(2 * HORA);
+      await mesas.barrerAhora();
+      const sigueLaDelPlazo = await estabaEnMemoria('TERMV');
+      const sigueLaDeControl = await estabaEnMemoria('TERMN');
+      comprobar(
+        'y dos horas sin mirarla, SALE de la memoria como la de control: no se queda fijada',
+        !sigueLaDelPlazo && !sigueLaDeControl,
+        { sigueLaDelPlazo, sigueLaDeControl },
+      );
+      comprobar(
+        'sin que se haya escrito su fichero: leerla y soltarla no cambian nada en el disco',
+        fs.readFileSync(ficheroDe(MESAS, 'TERMV'), 'utf8') === ficheroConPlazo,
+      );
+    }
   } catch (error) {
     fallos.push(`la prueba se cayó: ${error instanceof Error ? error.stack : String(error)}`);
   }
@@ -994,7 +1060,7 @@ if (fallos.length > 0) {
 }
 
 /* EL GUARDIA: un comprobador que se cae a mitad sin decirlo se parece mucho a uno verde. */
-const COMPROBACIONES_ESCRITAS = 68;
+const COMPROBACIONES_ESCRITAS = 71;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones escritas.`);
   process.exit(2);

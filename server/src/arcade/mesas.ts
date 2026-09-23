@@ -1064,6 +1064,19 @@ function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string): MesaEnCurs
   if (!esInstante(m.plazoMs) || m.plazoMs < 0) m.plazoMs = 0;
   if (m.venceEn !== null && !esInstante(m.venceEn)) m.venceEn = null;
   /*
+   * ═══ Y UNA MESA QUE YA NO PUEDE VENCER NO TRAE VENCIMIENTO ═══
+   *
+   * La versión que rearmaba el plazo después de cerrar dejó en disco mesas TERMINADAS con `venceEn`
+   * puesto. Al traerlas, su primera lectura se lo apagaba en memoria —`ponerAlDiaElPlazo` lo hace con
+   * toda mesa terminada o sin plazo— y no lo escribía, porque una terminada no escribe. Desde ahí la
+   * mesa de memoria ya no era la de su fichero, y el desalojo, que sólo suelta lo que es igual a lo
+   * escrito, no la soltaba nunca: una partida acabada fijada en memoria hasta el barrido del mes.
+   *
+   * Se apaga AQUÍ, que es exactamente lo que haría esa primera lectura: así la foto de lo leído ya lo
+   * trae apagado, y volver a leer el fichero da lo mismo. La misma condición que `ponerAlDiaElPlazo`.
+   */
+  if (m.plazoMs === 0 || m.mesa.terminada) m.venceEn = null;
+  /*
    * ═══ Y LA FIGURA DE CADA SILLA, QUE ES UN CAMPO QUE LAS MESAS VIEJAS NO TRAEN ═══
    *
    * Una silla guardada antes de que existiera `figura` llega sin la clave, y eso
@@ -1601,7 +1614,9 @@ function avisarAlCanalDeQueSeOlvida(codigo: string): void {
  *     disco en su siguiente lectura y ahí se le mete el tic, como si nunca hubiera salido. Lo único
  *     que se toca en memoria sin escribirlo es `venceEn` cuando un tic no cambia nada; por eso esa
  *     diferencia sólo se perdona si los dos plazos —el de memoria y el del disco— ya han vencido,
- *     que es cuando la siguiente lectura mete el tic igual en los dos mundos.
+ *     que es cuando la siguiente lectura mete el tic igual en los dos mundos. Y el `venceEn` de una
+ *     mesa terminada o sin plazo se apaga AL LEERLA (`alDiaDesdeElDisco`) y no en su primera
+ *     lectura: si no, sería otra diferencia sin escribir, y ésa no se perdonaría nunca.
  *  4. LOS DESPERTADORES viven en el canal y sólo guardan el código: al saltar sueltan una lectura
  *     que entra por `conLaMesa`, que carga lo que haga falta. Y una mesa con alguien APARCADO no se
  *     desaloja: lo cuenta `mientrasSeEspera`, que la ruta pone alrededor de `esperarCambio`.
