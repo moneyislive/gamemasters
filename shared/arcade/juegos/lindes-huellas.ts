@@ -5,10 +5,11 @@
  *
  * Es la caja en planta de cada modelo de `tablero.glb` que estorba al andar, medida por debajo
  * de la cabeza de una persona, con el origen donde el reparto pone la pieza y en unidades del
- * pack; y, de las piedras, las rocas y los tocones, que estorban sólo si pasan de la cintura, su
- * alto y el radio de su planta. Cómo se mide y por qué así está en la cabecera del guion que la
- * escribe; quién estorba y quién no, en `comoEstorba` (`lindes-piezas.ts`); y cómo se convierte
- * en una caja del mundo —escala, largo, giro—, en `lindes-mundo.ts`.
+ * pack; y, de cada uno, su alto —con el que se decide si una piedra pasa de la cintura— y el
+ * radio de su planta —con el que se cubre lo que va girado de cualquier manera—. Cómo se mide y
+ * por qué así está en la cabecera del guion que la escribe; quién estorba y quién no, en
+ * `comoEstorba` (`lindes-piezas.ts`); y cómo se convierte en una caja del mundo —escala, largo,
+ * giro—, en `lindes-mundo.ts`.
  *
  * Es literal porque la usa `shared/`, que corre en el servidor y en Hermes y no abre un `.glb`.
  * `verify:lindes-mundo` la vuelve a medir y exige los mismos números: si se recompila el pack,
@@ -66,15 +67,40 @@ export interface AltoYRadioDelModelo {
   readonly radio: number;
 }
 
-/** De lo que estorba sólo si pasa de la cintura: las piedras, las rocas y los tocones. */
+/**
+ * De todo lo que estorba, con los mismos nombres que la huella. El alto lo usan las piedras, las
+ * rocas y los tocones, que estorban sólo si pasan de la cintura; el radio, todo lo que el reparto
+ * pone girado a un ángulo que no es un cuarto de vuelta.
+ */
 export const ALTO_Y_RADIO_DEL_MODELO: Readonly<Record<string, AltoYRadioDelModelo>> = {
+  'almiar': { alto: 0.1787, radio: 0.2155 },
+  'arbol-a': { alto: 1.0939, radio: 0.3019 },
+  'arbol-b': { alto: 1.1127, radio: 0.3601 },
+  'arboleda-grande': { alto: 0.9132, radio: 1.1048 },
+  'arboleda-media': { alto: 1.2749, radio: 0.9694 },
+  'arboleda-pequena': { alto: 1.0885, radio: 0.7912 },
+  'atalaya': { alto: 2.4854, radio: 0.6053 },
+  'casa': { alto: 1.2801, radio: 0.6262 },
+  'colina-a': { alto: 0.3073, radio: 0.5936 },
+  'concejo': { alto: 1.8862, radio: 0.9656 },
+  'cuadras': { alto: 0.61, radio: 1.0805 },
+  'ermita': { alto: 0.8532, radio: 1.0651 },
+  'herreria': { alto: 0.9801, radio: 0.738 },
+  'iglesia': { alto: 1.6451, radio: 0.694 },
+  'mercado': { alto: 0.9761, radio: 1.0573 },
+  'molino': { alto: 1.4579, radio: 0.5916 },
+  'muro': { alto: 1.1, radio: 1.0441 },
+  'muro-puerta': { alto: 1.3641, radio: 1.0441 },
   'piedra': { alto: 0.28, radio: 0.2655 },
   'roca-a': { alto: 0.0694, radio: 0.1568 },
   'roca-b': { alto: 0.1346, radio: 0.1569 },
   'roca-c': { alto: 0.1947, radio: 0.1869 },
   'roca-d': { alto: 0.163, radio: 0.1556 },
   'roca-e': { alto: 0.1947, radio: 0.2596 },
+  'taberna': { alto: 1.3967, radio: 0.768 },
+  'taller': { alto: 1.144, radio: 0.9911 },
   'tocon': { alto: 0.2277, radio: 0.0894 },
+  'vigia': { alto: 1.1096, radio: 0.5901 },
 };
 
 /**
