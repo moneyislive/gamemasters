@@ -992,8 +992,11 @@ class FormaDeMesaRota extends Error {
  *
  * `nombre` es sólo para el registro, y está porque un descarte mudo aquí es una
  * partida que desaparece sin que nadie pueda averiguar por qué. Ver `leerUna`.
+ *
+ * `fechaDelFichero` es la de su última escritura, en epoch ms, y sólo hace falta —y sólo la
+ * pide `leerUna`— cuando el fichero no trae `abiertaEn`: ver la reposición de las fechas.
  */
-function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string): MesaEnCurso | null {
+function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string, fechaDelFichero?: number): MesaEnCurso | null {
   if (typeof leido.version !== 'number' || !VERSIONES_QUE_SE_LEEN.includes(leido.version)) {
     /*
      * SE DICE, Y ÉSTE ES EL ÚNICO SITIO DONDE SE PUEDE DECIR.
@@ -1033,18 +1036,31 @@ function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string): MesaEnCurs
    *
    * Se REPONE en vez de descartar la mesa. Descartarla sería tirar una partida
    * entera por un campo de contabilidad que no cambia ninguna regla del juego, y
-   * `abiertaEn` —o, en el peor caso, ahora mismo— es una aproximación que a la
-   * escala de días de La Larga no cambia ninguna decisión.
+   * `abiertaEn` es una aproximación que a la escala de días de La Larga no cambia
+   * ninguna decisión.
+   *
+   * ═══ Y SI TAMPOCO TRAE `abiertaEn`, LA FECHA DEL FICHERO, NO LA DE AHORA ═══
+   *
+   * Se reponía con la hora de LEERLA, y eso tenía un precio que no se veía: una mesa sin
+   * fechas salía recién tocada en cada lectura, así que el barrido de los treinta días —que
+   * escoge por la fecha del fichero pero confirma con `ultimoToqueEn`— la encontraba siempre
+   * fresca y no la borraba NUNCA. La fecha del fichero es la de su última escritura, y todo
+   * toque escribe: es lo mejor que se sabe de cuándo se tocó, y no se mueve entre lecturas.
+   * Sólo si no se puede saber —el fichero se fue entre leerlo y mirarlo— se cae a la de ahora.
    */
   const ahora = Date.now();
   if (!esInstante(m.abiertaEn)) {
-    m.abiertaEn = ahora;
-    /*
-     * La única reposición que depende de CUÁNDO se lee: volver a leer el fichero daría otra hora.
-     * Así que esta mesa no es igual a su fichero hasta que se vuelva a escribir, y no se desaloja
-     * antes. Ver «La memoria».
-     */
-    if (typeof m === 'object' && m !== null) repuestasConLaHora.add(m);
+    if (fechaDelFichero !== undefined && esInstante(fechaDelFichero)) {
+      m.abiertaEn = fechaDelFichero;
+    } else {
+      m.abiertaEn = ahora;
+      /*
+       * La única reposición que depende de CUÁNDO se lee: volver a leer el fichero daría otra hora.
+       * Así que esta mesa no es igual a su fichero hasta que se vuelva a escribir, y no se desaloja
+       * antes. Ver «La memoria». Con la fecha del fichero no pasa: releerlo da la misma.
+       */
+      repuestasConLaHora.add(m);
+    }
   }
   if (!esInstante(m.ultimoToqueEn)) m.ultimoToqueEn = m.abiertaEn;
   /*
@@ -1157,6 +1173,21 @@ function noExiste(error: unknown): boolean {
   return (error as { code?: string } | null)?.code === 'ENOENT';
 }
 
+/** ¿Trae el fichero una mesa sin fecha de apertura? Sólo entonces hace falta la fecha del fichero. */
+function sinFechaDeApertura(leido: unknown): boolean {
+  const m = esObjeto(leido) ? leido.mesa : undefined;
+  return esObjeto(m) && !esInstante(m.abiertaEn);
+}
+
+/** Cuándo se escribió por última vez el fichero de una mesa, o `undefined` si no se puede saber. */
+async function fechaDelFichero(codigo: string): Promise<number | undefined> {
+  try {
+    return (await fsp.stat(ficheroDe(codigo))).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
 const almacenEnFichero: AlmacenDeMesas = {
   async leerUna(codigo) {
     let texto: string;
@@ -1173,7 +1204,10 @@ const almacenEnFichero: AlmacenDeMesas = {
       return null;
     }
     try {
-      return alDiaDesdeElDisco(JSON.parse(texto) as Partial<Guardado>, `${codigo}.json`);
+      const leido = JSON.parse(texto) as Partial<Guardado>;
+      /* La fecha del fichero sólo se pide si hace falta: casi nunca, y es otra llamada al disco. */
+      const fecha = sinFechaDeApertura(leido) ? await fechaDelFichero(codigo) : undefined;
+      return alDiaDesdeElDisco(leido, `${codigo}.json`, fecha);
     } catch (error) {
       /*
        * Una mesa ilegible se salta y se DICE, en vez de tumbar la petición o desaparecer en
@@ -1318,6 +1352,8 @@ export function ponerAlmacenDeMesas(otro: AlmacenDeMesas): void {
    */
   ultimoBarridoEn = 0;
   ultimoBarridoDelDiscoEn = 0;
+  /* Y lo que el barrido no entendió era de la carpeta de antes. */
+  noSeEntendieronAlBarrer.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -1636,7 +1672,9 @@ function avisarAlCanalDeQueSeOlvida(codigo: string): void {
  *     sin cargar: la fecha de escritura del fichero escoge las candidatas —todo toque escribe, así
  *     que lo que no se ha escrito en un mes no se ha tocado en un mes— y sólo de ésas se lee el
  *     fichero para confirmar su `ultimoToqueEn` antes de borrar, bajo su candado. Lo que no se
- *     entiende no se borra, como siempre: puede entenderlo la instancia de al lado.
+ *     entiende no se borra, como siempre: puede entenderlo la instancia de al lado; y tampoco se
+ *     relee ni se recuenta cada hora (`noSeEntendieronAlBarrer`). Un fichero sin fechas se juzga
+ *     por la del propio fichero, no por la hora de leerlo, que lo haría eterno.
  *  9. `codigoLibre` no da un código que exista en disco aunque no esté en memoria (`existe`).
  *     Sin esto, una mesa desalojada podía perder su código —y su fichero— con el `abrir` de un
  *     desconocido.
@@ -1838,6 +1876,8 @@ async function leerDelDisco(codigo: string): Promise<MesaEnCurso | undefined> {
 async function traerDelDisco(codigo: string): Promise<MesaEnCurso | undefined> {
   const m = await leerDelDisco(codigo);
   if (m === undefined) return undefined;
+  /* Si el barrido la tenía por ilegible, ya no lo es: que la vuelva a mirar. */
+  noSeEntendieronAlBarrer.delete(codigo);
   leidasDelDisco++;
   anotarLoGuardado(m);
   /*
@@ -1888,6 +1928,26 @@ export async function mientrasSeEspera<T>(codigo: string, esperar: () => Promise
 let ultimoBarridoDelDiscoEn = 0;
 let barriendoElDisco: Promise<void> | null = null;
 
+/**
+ * LO QUE EL BARRIDO DEL DISCO YA LEYÓ Y NO ENTENDIÓ, para no releerlo cada hora.
+ *
+ * ═══ `fallosAlLeer` ACABABA MIDIENDO EL TIEMPO ═══
+ *
+ * Lo que no se entiende no se borra —puede entenderlo otra versión—, así que un fichero ilegible y
+ * viejo seguía siendo candidato en cada barrido: se volvía a leer cada hora, se volvía a decir en el
+ * registro y se volvía a contar. Con uno solo en la carpeta, `fallosAlLeer` subía uno por hora sin
+ * que nadie pidiera nada, y el diagnóstico ya no decía cuántas mesas no se pueden leer sino cuánto
+ * llevaba el proceso en pie.
+ *
+ * Así que el barrido apunta lo que no entendió y no lo relee: cada fichero así se lee, se dice y se
+ * cuenta UNA vez por proceso, que es lo que hacía la carga de golpe de antes al arrancar. La lista se
+ * poda en cada barrido con lo que sigue siendo candidato —un fichero que desaparece o se reescribe
+ * sale solo, y no crece más que la carpeta—, y una lectura buena por la puerta de siempre
+ * (`traerDelDisco`) lo quita. PEDIR esa mesa sí la relee y la cuenta cada vez: eso ya no es el
+ * barrido, es una petición que falla, y cada una se cuenta.
+ */
+const noSeEntendieronAlBarrer = new Set<string>();
+
 /** Arranca el barrido del disco si toca, SIN esperarlo: la petición que lo dispara no paga nada. */
 function barrerElDiscoSiToca(ahora: number): void {
   if (almacen.viejas === undefined || barriendoElDisco !== null) return;
@@ -1915,8 +1975,13 @@ async function barrerElDisco(ahora: number): Promise<void> {
   const viejas = almacen.viejas;
   const leerUna = almacen.leerUna;
   if (viejas === undefined || leerUna === undefined) return;
-  for (const codigo of await viejas(ahora - OLVIDO_MS)) {
-    if (mesas.has(codigo)) continue;
+  const candidatas = new Set(await viejas(ahora - OLVIDO_MS));
+  /* Lo que ya no es candidato sale de la lista de lo que no se entendió: ver arriba. */
+  for (const codigo of noSeEntendieronAlBarrer) {
+    if (!candidatas.has(codigo)) noSeEntendieronAlBarrer.delete(codigo);
+  }
+  for (const codigo of candidatas) {
+    if (mesas.has(codigo) || noSeEntendieronAlBarrer.has(codigo)) continue;
     /*
      * Mesa a mesa y con su red, como los barridos de la memoria (ver `laLimpiezaNoPudoCon`): antes una
      * sola que reventara cortaba el recorrido entero, y las de detrás esperaban otra hora. Con el
@@ -1927,8 +1992,16 @@ async function barrerElDisco(ahora: number): Promise<void> {
       await conElCandado(codigo, async () => {
         if (mesas.has(codigo)) return;
         const m = await leerUna(codigo);
-        /* Lo que no se entiende no se borra: puede entenderlo la instancia de al lado. */
-        if (m === null || !(ahora - m.ultimoToqueEn > OLVIDO_MS)) return;
+        /*
+         * Lo que no se entiende no se borra: puede entenderlo la instancia de al lado. Y se apunta,
+         * para no releerlo ni volver a contarlo en el barrido de dentro de una hora. Si ya no existe,
+         * no hay nada que apuntar: se fue mientras se miraba.
+         */
+        if (m === null) {
+          if (almacen.existe?.(codigo) === true) noSeEntendieronAlBarrer.add(codigo);
+          return;
+        }
+        if (!(ahora - m.ultimoToqueEn > OLVIDO_MS)) return;
         try {
           await almacen.borrar(codigo);
         } catch (error) {

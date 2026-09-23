@@ -24,7 +24,9 @@
  *  4. `abrir` NO REPARTE EL CÓDIGO DE UNA MESA DORMIDA: con el azar forzado a dar ese código, sale
  *     otro, y el fichero de la dormida queda intacto.
  *  5. EL BARRIDO DE TREINTA DÍAS sigue borrando del disco lo viejo que no está en memoria, se lo
- *     dice al canal, y no borra lo que no entiende ni lo que su fichero dice que se tocó ayer.
+ *     dice al canal, y no borra lo que no entiende ni lo que su fichero dice que se tocó ayer. Lo
+ *     que no entiende tampoco lo RELEE cada hora —`fallosAlLeer` no puede medir el tiempo—, y un
+ *     fichero sin fechas se juzga por la del fichero y se acaba barriendo.
  *  6. UN FICHERO CON JSON BUENO Y FORMA ROTA —sin la mesa del árbitro, con `sillas: null`, con una
  *     silla sin llave…— es un ilegible más: 404, contado en `fallosAlLeer`, fuera de la memoria y
  *     con su fichero intacto. Antes entraba en la tabla y tumbaba el `abrir` de todo el servidor
@@ -737,6 +739,17 @@ if (tieneLaMemoriaNueva) {
         JSON.stringify({ version: 99, mesa: (mesaGuardada('YYYYY', FRIO) as { mesa: unknown }).mesa }),
         'utf8',
       );
+      /*
+       * Y una SIN FECHAS —sin `abiertaEn`, `ultimoToqueEn` ni `turnoDesde`—, escrita con la fecha de
+       * verdad del disco, que para este reloj es de hace un mes. Se reponía con la hora de LEERLA, así
+       * que el barrido, que confirma con `ultimoToqueEn`, la encontraba siempre recién tocada y no la
+       * borraba nunca.
+       */
+      const sinFechas = { ...(mesaGuardada('SINFE', FRIO) as { mesa: Record<string, unknown> }).mesa };
+      delete sinFechas.abiertaEn;
+      delete sinFechas.ultimoToqueEn;
+      delete sinFechas.turnoDesde;
+      fs.writeFileSync(ficheroDe(MESAS, 'SINFE'), JSON.stringify({ version: 2, mesa: sinFechas }), 'utf8');
       /* Desde aquí se apunta todo lo que se le dice al canal, y lo que se trae a la memoria. */
       olvidadasEnElCanal.length = 0;
       const leidasAntes = mesas.memoriaDeLasMesas().leidasDelDisco;
@@ -779,7 +792,38 @@ if (tieneLaMemoriaNueva) {
         'la ilegible y la de otra versión siguen ahí: lo que no se entiende no se borra',
         fs.existsSync(ficheroDe(MESAS, 'ZZZZZ')) && fs.existsSync(ficheroDe(MESAS, 'YYYYY')),
       );
+      comprobar(
+        'la que no traía fechas se barre también, por la fecha de su fichero, y se le dice al canal',
+        !fs.existsSync(ficheroDe(MESAS, 'SINFE')) && olvidadasEnElCanal.includes('SINFE'),
+        { sigue: fs.existsSync(ficheroDe(MESAS, 'SINFE')), canal: olvidadasEnElCanal },
+      );
       comprobar('y no queda ningún candado suelto', mesas.candadosDeMesaVivos() === 0, mesas.candadosDeMesaVivos());
+
+      /*
+       * Y LO QUE NO ENTIENDE NO SE RELEE CADA HORA. Con la ilegible y la de otra versión en la
+       * carpeta, cada barrido las volvía a leer, a decir y a contar, y `fallosAlLeer` acababa
+       * midiendo cuánto llevaba el proceso en pie. Tres barridos más, dos horas entre cada uno.
+       */
+      const fallosAntes = mesas.saludDelAlmacen().fallosAlLeer;
+      for (let vuelta = 0; vuelta < 3; vuelta++) {
+        adelantar(2 * HORA);
+        await mesas.barrerAhora();
+      }
+      comprobar(
+        'y el barrido no relee cada hora lo que no entiende: tres barridos más, ni un fallo al leer más',
+        mesas.saludDelAlmacen().fallosAlLeer === fallosAntes,
+        { antes: fallosAntes, ahora: mesas.saludDelAlmacen().fallosAlLeer },
+      );
+      comprobar(
+        'y no releerlas no es borrarlas: siguen ahí',
+        fs.existsSync(ficheroDe(MESAS, 'ZZZZZ')) && fs.existsSync(ficheroDe(MESAS, 'YYYYY')),
+      );
+      const pedida = await loQueLanza(() => mesas.mirar('ZZZZZ', null));
+      comprobar(
+        'pero PEDIRLA sí la relee y la cuenta: eso es una petición que falla, y cada una cuenta',
+        pedida.startsWith('MesaDesconocida') && mesas.saludDelAlmacen().fallosAlLeer === fallosAntes + 1,
+        { pedida, antes: fallosAntes, ahora: mesas.saludDelAlmacen().fallosAlLeer },
+      );
     }
 
     // -------------------------------------------------------------------------
@@ -1060,7 +1104,7 @@ if (fallos.length > 0) {
 }
 
 /* EL GUARDIA: un comprobador que se cae a mitad sin decirlo se parece mucho a uno verde. */
-const COMPROBACIONES_ESCRITAS = 71;
+const COMPROBACIONES_ESCRITAS = 75;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones escritas.`);
   process.exit(2);
