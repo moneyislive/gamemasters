@@ -37,9 +37,14 @@
 import type { Ref } from 'react';
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { abrirGlb } from './embarcadero/cargar';
-import type { Traer } from './embarcadero/tipos';
-import { rutaDelReloj } from './ruta-de-modelos';
+import type { RelojCargado } from './comun/reloj';
+
+/*
+ * EL CARGADOR, `relojDe`, Y LO QUE DEVUELVE, `RelojCargado`, viven en `comun/reloj.ts`: ahí está el
+ * porqué. Se reexportan para que quien los buscara aquí los siga encontrando.
+ */
+export { relojDe } from './comun/reloj';
+export type { RelojCargado } from './comun/reloj';
 
 /**
  * ═══ LA SILUETA QUE OCUPA EL RELOJ EN SU HUECO, en fracciones del lado ═══
@@ -101,12 +106,6 @@ export const VACIADO_DEL_RELOJ = 0.34;
  * INSTANTES y el reloj saca la fracción en su `useFrame`, que es donde ya se está mirando el
  * tiempo de todas formas.
  */
-/** El `.glb` del reloj tal como llega: su escena y los clips que trae dentro. */
-export interface RelojCargado {
-  readonly escena: THREE.Object3D;
-  readonly clips: readonly THREE.AnimationClip[];
-}
-
 /**
  * EL RELOJ YA MONTADO: lo que hay que tener a mano para pintarlo y para moverlo.
  *
@@ -118,40 +117,6 @@ export interface RelojMontado {
   readonly clon: THREE.Group;
   readonly mezclador: THREE.AnimationMixer;
   readonly montones: readonly { readonly malla: THREE.Mesh; readonly arriba: boolean }[];
-}
-
-/**
- * TRAE `reloj.glb` UNA VEZ POR `traer`, y no una vez por escena.
- *
- * ═══ POR QUÉ ESTÁ AQUÍ ═══
- *
- * Porque lo tenían El Burgo y Riberas, cada uno el suyo, y en cuanto Las Lindes quiso el
- * mismo reloj la copia iba por tres. Son doce renglones y da igual copiarlos hasta el día que
- * alguien cambie la ruta del modelo o el trato que se le da a un 404: entonces hay que
- * acordarse de los tres sitios, y no hay nada que lo recuerde.
- *
- * El `WeakMap` va contra el `traer` y no contra nada global: dos clientes distintos —el
- * escritorio y la app— tienen su propio `traer`, y así uno no se queda con el modelo del otro.
- *
- * Y si no llega, se DICE por consola. Un respaldo mudo es un fallo que nadie ve; ahora que no
- * hay respaldo, el aviso es lo único que queda.
- */
-const relojes = new WeakMap<Traer, Promise<RelojCargado | null>>();
-export function relojDe(traer: Traer): Promise<RelojCargado | null> {
-  const hecho = relojes.get(traer);
-  if (hecho !== undefined) return hecho;
-  const promesa = traer(rutaDelReloj())
-    .then((bytes) => abrirGlb(bytes))
-    .then((gltf): RelojCargado => ({ escena: gltf.scene, clips: gltf.animations }))
-    .catch((fallo: unknown): null => {
-      relojes.delete(traer);
-      console.warn(
-        `El reloj de arena no ha llegado (${rutaDelReloj()}: ${fallo instanceof Error ? fallo.message : String(fallo)}): la mesa se queda sin él, pero el asa de pasar el turno sigue puesta.`,
-      );
-      return null;
-    });
-  relojes.set(traer, promesa);
-  return promesa;
 }
 
 /**

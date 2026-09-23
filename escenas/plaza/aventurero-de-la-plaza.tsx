@@ -4,7 +4,8 @@
  * ═══ QUÉ HAY AQUÍ Y QUÉ NO ═══
  *
  * Lo que pertenece a UN asiento y se mueve con él: la `SkinnedMesh` clonada con su
- * mezclador (`aventureros/marioneta.ts`, la misma del Muelle y la del tablero), el clip
+ * mezclador (`aventureros/marioneta.ts`, la misma del Muelle y la del tablero, montada y
+ * pintada con `usarMarioneta` y `<Marioneta>` de `comun/marioneta.tsx`), el clip
  * que toca según `gestos-de-la-plaza.ts`, por dónde anda al llegar y al irse, hacia
  * dónde mira, el disco de contacto y el humo del cambio de figura. El NOMBRE no: lo
  * pinta el HUD. El BANCO, la FAROLA y el ESTANDARTE tampoco: son del puesto, estén
@@ -29,7 +30,7 @@
  *
  * ═══ NUNCA T-POSE ═══
  *
- * La pose de enlace del rig ES la T. `montaMarioneta` devuelve `null` mientras no haya
+ * La pose de enlace del rig ES la T. `usarMarioneta` devuelve `null` mientras no haya
  * biblioteca de clips, y entonces la figura NO se enseña: se ve el puesto con su farola
  * y su estandarte un instante antes que a su dueño. `clipDeLaPlaza` no pide `t-pose` por
  * construcción, y `reproduce` cae a `reposo-a` si le piden un clip que no exista.
@@ -51,7 +52,8 @@ import {
 import type { EstadoDeAventurero, ModoDeNacer, Suceso } from '../embarcadero/gestos';
 import { escalaDePantallaDe, geometriaDeMotas, materialDeMotas } from '../embarcadero/particulas';
 import type { Calidad } from '../embarcadero/tipos';
-import { desmontaMarioneta, giroCorto, montaMarioneta, reproduce } from '../aventureros/marioneta';
+import { giroCorto, reproduce } from '../aventureros/marioneta';
+import { Marioneta, usarMarioneta } from '../comun/marioneta';
 import { clipDeLaPlaza, largoDelCamino, metrosDeLaSalida, progresoDeLaEntrada, puntoDelCamino } from './gestos-de-la-plaza';
 import { MONUMENTO, SUELO_DE_LA_PLAZA, rumboDe } from './la-plaza';
 import type { PuestoDeLaPlaza } from './la-plaza';
@@ -127,14 +129,7 @@ export function AventureroDeLaPlaza(props: PropsDelAventureroDeLaPlaza): JSX.Ele
   }, [llegadas]);
 
   /* La marioneta: el clon con su mezclador. Se rehace al cambiar la figura visible o al llegar la biblioteca. */
-  const cargado = figuras.get(figuraVisible);
-  const marioneta = useMemo(() => (cargado === undefined ? null : montaMarioneta(cargado, biblioteca)), [cargado, biblioteca]);
-  useEffect(
-    () => () => {
-      if (marioneta !== null) desmontaMarioneta(marioneta);
-    },
-    [marioneta],
-  );
+  const marioneta = usarMarioneta(figuras.get(figuraVisible), biblioteca);
 
   /* El humo del cambio de figura: catorce motas que viven 1,3 s, como en el Muelle. */
   const humo = useMemo(() => {
@@ -275,18 +270,17 @@ export function AventureroDeLaPlaza(props: PropsDelAventureroDeLaPlaza): JSX.Ele
 
   return (
     <group>
-      <group ref={grupo} visible={false}>
-        {marioneta === null ? null : <primitive object={marioneta.raiz} />}
+      <Marioneta de={marioneta} grupo={grupo} visible={false}>
         {/*
           El disco de contacto va en las dos calidades: la escena no proyecta sombras en
           ningún cliente (ningún `Canvas` activa el mapa de sombras), y sin algo oscuro
-          bajo los pies la figura flota sobre la acera.
+          bajo los pies la figura flota sobre la acera. Sin marioneta no se monta, como ella.
         */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]} raycast={() => null}>
           <circleGeometry args={[0.75, SEGMENTOS_DEL_DISCO]} />
           <meshBasicMaterial color={color} transparent opacity={calidad === 'sobria' ? 0.34 : 0.26} depthWrite={false} />
         </mesh>
-      </group>
+      </Marioneta>
 
       <points ref={grupoDelHumo} geometry={humo.geometria} material={humo.material} visible={false} frustumCulled={false} />
     </group>

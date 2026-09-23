@@ -21,9 +21,8 @@
  * dos sitios donde se decide qué es legal.
  */
 import type { Giro } from '../../shared/arcade/juegos/lindes-losas';
+import type { ModoDeCamaraDeTablero, PropsDeEscenaDeTablero } from '../comun/tablero';
 import type { Calidad, Traer } from '../embarcadero/tipos';
-import type { MandosDeFuera } from '../paseo/mandos';
-import type { CanalDeBotas } from '../paseo/mesa-de-botas';
 
 /** Una losa puesta en el tablero. */
 export interface LosaEnElTablero {
@@ -88,26 +87,27 @@ export interface TableroDeLasLindesEn3D {
   readonly deLaBolsa: number;
 }
 
-/** Desde dónde se mira. */
-export type ModoDeCamaraDeLasLindes =
-  /** Desde arriba, como quien mira la mesa. */
-  | { readonly modo: 'mesa' }
-  /** Detrás del hombro de un aventurero que anda por encima de las losas. */
-  | { readonly modo: 'hombro'; readonly asiento: string }
-  /** Desde su cara. */
-  | { readonly modo: 'ojos'; readonly asiento: string };
+/**
+ * Desde dónde se mira: desde arriba, como quien mira la mesa; detrás del hombro de un aventurero que
+ * anda por encima de las losas; o desde su cara. Son las tres de cualquier tablero
+ * (`comun/tablero.ts`), que nacieron aquí; el nombre se queda porque lo usan los clientes.
+ */
+export type ModoDeCamaraDeLasLindes = ModoDeCamaraDeTablero;
 
 /**
- * Lo que la escena recibe.
+ * Lo que la escena recibe: lo de cualquier escena de tablero (`comun/tablero.ts`: el código —de él
+ * sale la semilla del paisaje, y de ningún otro sitio—, `traer`, la calidad, la cámara, la palanca,
+ * el canal de Boots on Board y los tres avisos) y lo de Las Lindes, que es esto. Aquí la calidad dice
+ * hasta dónde se pinta el relleno y si se pinta lo menudo (`detalle.ts`), y la juzga `calidadDelValle`
+ * con lo que llega por `alMedir`, que sólo mide desde que el tablero está cargado: antes no hay valle
+ * que medir.
  *
  * Y una prop más que no está aquí: `complementosDelTablero`, con qué se abre `tablero.glb` en un
  * teléfono. Es un tipo de `three`, y este fichero no nombra `three` porque lo lee el servidor;
  * vive en `Lindes.tsx`, en `PropsDeLaEscenaDeLasLindes`.
  */
-export interface PropsDeLasLindes {
+export interface PropsDeLasLindes extends PropsDeEscenaDeTablero<ModoDeCamaraDeLasLindes> {
   readonly tablero: TableroDeLasLindesEn3D;
-  /** El código de la mesa. De aquí sale la semilla del paisaje, y de ningún otro sitio. */
-  readonly codigo: string;
   /*
    * ═══ AQUÍ HABÍA UNA `ventana`, Y NADIE LA LEÍA ═══
    *
@@ -130,14 +130,6 @@ export interface PropsDeLasLindes {
    * Si algún día el lienzo de Las Lindes se hace de pantalla completa con algo encima,
    * esto vuelve, y vuelve porque hará falta y no por simetría.
    */
-  readonly traer: Traer;
-  /**
-   * `plena` o `sobria`: hasta dónde se pinta el relleno y si se pinta lo menudo (`detalle.ts`).
-   * La decide quien monta la escena con lo que ésta mide por `alMedir` (`calidadDelValle`); lo
-   * que cuenta una regla se pinta igual en las dos.
-   */
-  readonly calidad: Calidad;
-  readonly camara: ModoDeCamaraDeLasLindes;
   /** Con qué giro se enseña la losa de la mano mientras se elige dónde ponerla. */
   readonly giroEnMano: Giro;
   /**
@@ -149,25 +141,6 @@ export interface PropsDeLasLindes {
    * exactamente lo que pasaba antes de que esto existiera.
    */
   readonly figura?: string;
-  /**
-   * LA PALANCA Y EL BOTÓN DE CORRER, cuando el aparato no tiene teclado.
-   *
-   * La escena lee el teclado ella sola —donde hay `document`—, pero en iOS y en Android no lo
-   * hay, y sin esto en la app NO SE PODÍA ANDAR. La app monta los mandos táctiles
-   * (`app/src/arcade/mandos-del-paseo.tsx`) y los escribe en esta referencia; la escena los lee
-   * en su bucle, sin pasar por React. Opcional porque el escritorio anda con el teclado.
-   */
-  readonly mandos?: { readonly current: MandosDeFuera };
-  /**
-   * EL CANAL DE BOOTS ON BOARD, sólo en una mesa de la modalidad `botas`.
-   *
-   * Con él la escena abre el canal de la mesa (`paseo/usar-el-canal.ts`), le cuenta cada tic de
-   * quien pasea, deja que el servidor lo corrija y pinta a los demás asientos andando
-   * (`paseo/los-demas.tsx`). Sin él —la mesa de siempre— no se abre nada y no se paga nada: ni un
-   * socket ni una llamada por tic. Quién lo pasa y cuándo lo deciden los clientes con
-   * `esMesaDeBotas`, y en ningún otro sitio.
-   */
-  readonly canal?: CanalDeBotas;
   /**
    * SI SE PUEDE PASAR EL TURNO AHORA, y qué hacer si se toca el reloj.
    *
@@ -188,19 +161,6 @@ export interface PropsDeLasLindes {
    */
   readonly alSenalarHueco?: (x: number | null, y: number | null) => void;
   readonly alTocarLosa?: (casilla: string) => void;
-  readonly alEstarListo?: () => void;
-  readonly alFallar?: (motivo: string) => void;
-  /**
-   * LO QUE CUESTA PINTAR, una vez por segundo: la media de milisegundos de ESE segundo y cuántos
-   * fotogramas cubre —el contrato de `embarcadero/tipos.ts`, que es lo que lee `juzgarCalidad`—,
-   * y sólo desde que el tablero está cargado: antes no hay valle que medir.
-   */
-  readonly alMedir?: (m: {
-    triangulos: number;
-    llamadas: number;
-    ms: number;
-    fotogramas: number;
-  }) => void;
 }
 
 /** Lo que se reexporta para que quien monte la escena no importe de dos sitios. */

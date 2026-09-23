@@ -33,9 +33,11 @@
  *     FIGURA MÁS PESADA, no de la media.
  *   · Que a los bultos propios no se les ve el interior desde el aire (la LUPA CENITAL que
  *     salió de perder los tejados de la ciudad entera con 277 comprobaciones en verde).
- *   · Y que el cielo del zarpe acaba EXACTAMENTE en el mediodía del tablero, leído del
+ *   · Que el cielo del zarpe acaba EXACTAMENTE en el mediodía del tablero, leído del
  *     fuente de `Burgo.tsx`: si el tablero cambia de cielo, esto se pone rojo en vez de
  *     dejar un corte de color al cambiar de pantalla.
+ *   · Y que la cámara la mueve el bucle COMÚN de los lobbies (`comun/bucle-del-lobby.ts`),
+ *     el mismo del Muelle, que avisa del zarpe una sola vez: leído del fuente.
  *
  * ═══ CADA REGLA CON SU VACUNA ═══
  *
@@ -869,6 +871,49 @@ paso('La calle rodea la plaza con sus cebras y sus esquinas curvas');
 }
 
 // ---------------------------------------------------------------------------
+paso('El bucle de cámara es el común de los lobbies, el mismo del Muelle, y avisa del zarpe una sola vez');
+// ---------------------------------------------------------------------------
+
+/*
+ * `Plaza.tsx` copiaba el bucle de `Embarcadero.tsx` renglón a renglón, y ahora los dos usan
+ * `usarElBucleDelLobby` (`comun/bucle-del-lobby.ts`). Node no mide un `useFrame`, así que se mira el
+ * FUENTE sin comentarios: que cada lobby lo monte UNA vez y no guarde ni un trozo del bucle viejo, y
+ * que el común cumpla el contrato del zarpe —sin mundo se avisa en cuanto se pide; con mundo, al acabar
+ * la grúa; y una sola vez—. Un `alZarpar` que no llega deja al cliente en el lobby para siempre, sin un
+ * error. Los tres fuentes se juzgan juntos para que cada caso envenenado rompa una sola cosa.
+ */
+{
+  const fuente = (f: string): string => sinComentarios(fs.readFileSync(path.join(RAIZ, f), 'utf8'));
+  const SEPARADOR = '\n/* ── otro fichero ── */\n';
+  const juntos = [fuente('plaza/Plaza.tsx'), fuente('embarcadero/Embarcadero.tsx'), fuente('comun/bucle-del-lobby.ts')].join(SEPARADOR);
+  const cumple = (t: string): boolean => {
+    const [laPlazaTsx = '', elMuelle = '', elBucle = ''] = t.split(SEPARADOR);
+    const conElComun = (escena: string): boolean =>
+      (escena.match(/\busarElBucleDelLobby\(\{/g) ?? []).length === 1 && !/\bprimerFotograma\b|\bDURACION_DEL_ZARPE\b|\bgiraAlrededorDelObjetivo\b/.test(escena);
+    return (
+      conElComun(laPlazaTsx) &&
+      conElComun(elMuelle) &&
+      /u = pinza\(\(t - z\.desde\) \/ DURACION_DEL_ZARPE, 0, 1\);/.test(elBucle) &&
+      /if \(!o\.hayMundo\) \{\s*z\.avisado = true;\s*o\.alZarpar\?\.\(\);/.test(elBucle) &&
+      /if \(u >= 1 && !z\.avisado\) \{\s*z\.avisado = true;\s*o\.alZarpar\?\.\(\);/.test(elBucle)
+    );
+  };
+  comprobar('la Plaza y el Muelle mueven la cámara con el bucle común, una vez cada uno y sin trozos del suyo; y el bucle avisa del zarpe una sola vez, con mundo o sin él', cumple(juntos));
+  const envenenados = [
+    juntos.replace('usarElBucleDelLobby({', 'usarOtroBucle({'),
+    juntos.replace(SEPARADOR, `\nconst primerFotograma = useRef(true);${SEPARADOR}`),
+    juntos.replace(/(if \(!o\.hayMundo\) \{\s*z\.avisado = true;)\s*o\.alZarpar\?\.\(\);/, '$1'),
+    juntos.replace('if (u >= 1 && !z.avisado) {', 'if (u >= 1) {'),
+  ];
+  envenenados.forEach((envenenado, i) => {
+    comprobar(
+      `se ve fallar con el caso envenenado ${String(i + 1)}: un lobby sin el bucle común, uno con un trozo del suyo, un zarpe sin mundo que no avisa, o uno que avisa en cada fotograma`,
+      envenenado !== juntos && !cumple(envenenado),
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
 
 console.log('');
 if (fallos.length > 0) {
@@ -882,7 +927,7 @@ if (fallos.length > 0) {
  * código cero y una lista corta de aciertos, y eso se lee como verde. El número va a mano
  * y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 98;
+const COMPROBACIONES_ESCRITAS = 103;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +

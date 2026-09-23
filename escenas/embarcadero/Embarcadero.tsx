@@ -10,7 +10,8 @@
  * (`particulas.ts`), los seis amarres con su plataforma y su farol, y un
  * `Aventurero` por asiento ocupado. La cámara es una sola y viva: toda pose es
  * un objetivo de `camara.ts` al que se llega por amortiguado exponencial, y sólo
- * en el primer fotograma se asigna en seco.
+ * en el primer fotograma se asigna en seco; el bucle que la lleva es el común de
+ * los lobbies (`comun/bucle-del-lobby.ts`), el mismo de la Plaza.
  *
  * ═══ CÓMO SE CUENTAN LAS LLAMADAS, QUE ES LO QUE MANDA ═══
  *
@@ -42,7 +43,8 @@
  * esperar a nada. `alMedir` va una vez por segundo con la media real de
  * milisegundos del reloj de `useFrame` (cada fotograma acotado a 100 ms: un
  * navegador en segundo plano deja pasar segundos entre dos, y la media salía en
- * miles) y cuántos fotogramas cubre.
+ * miles) y cuántos fotogramas cubre. `alEstarListo` y `alMedir` los lleva el
+ * gancho común de `comun/arranque.ts`, el mismo de las demás escenas.
  *
  * ═══ `zarpando` ES DE IDA ═══
  *
@@ -74,7 +76,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { ESCALA_DEL_PACK, ESCALON, LAMINA } from '../escala';
 import { tiempoDelMar } from '../tiempo-del-mar';
@@ -82,17 +83,7 @@ import { geometriaDelMar, materialDelAgua } from './agua';
 import { Aventurero } from './aventurero';
 import { generarCala, semillaDeCodigo, sorteo } from './cala';
 import type { Amarre, Cala, PiezaPuesta, TeselaDeLaCala } from './cala';
-import {
-  amortiguado,
-  conRespiracion,
-  DURACION_DE_LA_LLEGADA,
-  DURACION_DEL_ZARPE,
-  easeInOutQuart,
-  encuadre,
-  poseDeLlegada,
-  poseDeZarpe,
-} from './camara';
-import type { Pose } from './camara';
+import { amortiguado, DURACION_DE_LA_LLEGADA, encuadre, poseDeLlegada, poseDeZarpe } from './camara';
 import { aplana, cargadorPara, fundir, matrizDePuesta } from './cargar';
 import type { AventureroCargado, CatalogoDelEmbarcadero, Instanciable, ParteAFundir } from './cargar';
 import { COLOR_DEL_HORIZONTE, colorDeLaNiebla, materialDelCielo } from './cielo';
@@ -120,6 +111,8 @@ import {
 import { colorDeAsiento } from './tema';
 import { soltarTintes, tenirGeometria } from './tinte';
 import type { AsientoEnElMuelle, PropsDelEmbarcadero } from './tipos';
+import { usarArranqueYMedida } from '../comun/arranque';
+import { usarElBucleDelLobby } from '../comun/bucle-del-lobby';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
 
@@ -130,8 +123,6 @@ const COLOR_DEL_FAROL = new THREE.Color('#ffb765');
 const COLOR_DE_LA_LLAMA = '#ffa040';
 /** La niebla: empieza detrás del caserío y se cierra antes del canto del mar. */
 const NIEBLA = { cerca: 70, lejos: 560 } as const;
-/** Cuánto se espera a `traer` antes de levantar el telón con lo que haya. */
-const TOPE_DE_ARRANQUE_MS = 15_000;
 /** Los que ya estaban al montar nacen escalonados así, sin coreografía. */
 const ESCALON_DE_NACIMIENTO = 0.25;
 /** El farol a cada intensidad: ocupado y presente, ausente, y amarre vacío (el noray a oscuras). */
@@ -943,9 +934,18 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   const figurasListas = useRef(new Set<FiguraId>());
   const figurasFallidas = useRef(new Set<FiguraId>());
   const embarcaderoResuelto = useRef(false);
-  const [arranque, ponerArranque] = useState(false);
-  const arranqueRef = useRef(false);
-  arranqueRef.current = arranque;
+
+  /*
+   * EL ARRANQUE Y LA MEDIDA, con el gancho común (`comun/arranque.ts`): `alEstarListo` dos fotogramas
+   * después de `arrancar`, o a los quince segundos con cielo, agua y luz —diciendo que el embarcadero
+   * no contestó, si no lo hizo—, y `alMedir` una vez por segundo.
+   */
+  const arrancar = usarArranqueYMedida(props, {
+    llave: cargador,
+    alVencerElTope: () => {
+      if (!embarcaderoResuelto.current) falla('el embarcadero no ha contestado en quince segundos');
+    },
+  });
 
   const figuraLocalRef = useRef(figuraLocal);
   figuraLocalRef.current = figuraLocal;
@@ -961,15 +961,17 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
    * llama desde cada promesa que termina y desde el cambio de figura local.
    */
   const compruebaArranque = (): void => {
-    if (!vivo.current || arranqueRef.current || !embarcaderoResuelto.current) return;
+    if (!vivo.current || !embarcaderoResuelto.current) return;
     const local = figuraLocalRef.current;
-    if (local === null || figurasListas.current.has(local) || figurasFallidas.current.has(local)) ponerArranque(true);
+    if (local === null || figurasListas.current.has(local) || figurasFallidas.current.has(local)) arrancar();
   };
 
   /*
    * 1. El embarcadero: lo primero, con o sin él se avisa. Depende sólo del
    * cargador: `falla` y `compruebaArranque` leen referencias, no cierres, y volver
    * a pedir el embarcadero al cambiar cualquier otra cosa sería pedirlo dos veces.
+   * El tope —si `traer` no contesta, se levanta el telón con cielo, agua y luz— lo
+   * lleva el gancho de arranque, con el cargador de llave.
    */
   useEffect(() => {
     cargador.embarcadero().then(
@@ -985,15 +987,6 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
         compruebaArranque();
       },
     );
-    /* El tope: si `traer` no contesta, se levanta el telón con cielo, agua y luz. */
-    const tope = setTimeout(() => {
-      if (!vivo.current || arranqueRef.current) return;
-      if (!embarcaderoResuelto.current) falla('el embarcadero no ha contestado en quince segundos');
-      ponerArranque(true);
-    }, TOPE_DE_ARRANQUE_MS);
-    return () => {
-      clearTimeout(tope);
-    };
   }, [cargador]);
 
   /* 2. Las figuras que hacen falta, la local la primera; 3. la biblioteca, después de la primera figura. */
@@ -1088,169 +1081,55 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   const tablas = catalogo?.alturaDeLasTablas ?? 0;
 
   // -------------------------------------------------------------------------
-  // La cámara, el zarpe, la llegada, el arrastre y las medidas
+  // La cámara, el zarpe, la llegada y el arrastre: el bucle común de un lobby
   // -------------------------------------------------------------------------
 
-  const camara = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  /*
+   * El bucle entero —el zarpe de ida y su aviso, el amanecer que corre con él, la mirada al amarre de
+   * quien atraca, el arrastre de la cúpula (±25° con el dedo, ±2° con el ratón), la respiración y el
+   * amortiguado— es `usarElBucleDelLobby` (`comun/bucle-del-lobby.ts`), el mismo de la Plaza. Aquí va
+   * lo que es del Muelle: su encuadre, la llegada hacia un amarre, la grúa a la pose aérea, los planos
+   * que dejan dentro la cúpula y el mar, y lo que amanece.
+   */
   const tamanoDelLienzo = useThree((s) => s.size);
-  useEffect(() => {
-    /* El plano lejano tiene que dejar dentro la cúpula y el mar; la cámara de serie de r3f se queda en mil. */
-    camara.near = 0.3;
-    camara.far = Math.max(camara.far, RADIO_DEL_CIELO * 2.2);
-    camara.updateProjectionMatrix();
-  }, [camara]);
-
-  const primerFotograma = useRef(true);
-  const posicionActual = useMemo(() => new THREE.Vector3(), []);
-  const objetivoActual = useMemo(() => new THREE.Vector3(), []);
-  const fovActual = useRef(55);
-  const llegada = useRef<{ desde: number; amarre: Amarre } | null>(null);
-  const zarpe = useRef<{ pedido: boolean; desde: number | null; avisado: boolean }>({ pedido: false, desde: null, avisado: false });
-  const amanecer = useRef(0);
-  const arrastre = useRef({ activo: false, x0: 0, objetivo: 0, actual: 0 });
-  const fotogramasDesdeElArranque = useRef(0);
-  const listoAvisado = useRef(false);
-  const medida = useRef({ segundos: 0, fotogramas: 0 });
   const colorDeNiebla = useMemo(() => new THREE.Color(COLOR_DEL_HORIZONTE), []);
-
-  useEffect(() => {
-    /* De ida: un `false` después del `true` no deshace nada (ver la cabecera). */
-    if (zarpando === true) zarpe.current = { pedido: true, desde: null, avisado: false };
-  }, [zarpando]);
-
-  /* Cuántos han atracado desde que se montó: los que esperan saludan al que llega. */
-  const [llegadas, ponerLlegadas] = useState(0);
-  const alAtracar = useMemo(
-    () => (amarre: Amarre) => {
-      llegada.current = { desde: -1, amarre };
-      ponerLlegadas((n) => n + 1);
-    },
-    [],
-  );
-
   const ocupados = Math.max(1, sentados.length);
   const franja = pinza(ventana.franjaInferior, 0, 0.8);
   const aspectoDeLaVentana =
     ventana.ancho > 0 && ventana.alto > 0 ? ventana.ancho / ventana.alto : tamanoDelLienzo.width / Math.max(1, tamanoDelLienzo.height);
 
-  useFrame((s, dtCrudo) => {
-    const t = s.clock.elapsedTime;
-    const dt = Math.min(0.1, Math.max(0, dtCrudo));
-    const cam = s.camera as THREE.PerspectiveCamera;
-
-    /* ─ El arranque: dos fotogramas después de que el mundo esté (o haya fallado), se avisa. ─ */
-    if (arranqueRef.current && !listoAvisado.current) {
-      fotogramasDesdeElArranque.current++;
-      if (fotogramasDesdeElArranque.current >= 2) {
-        listoAvisado.current = true;
-        avisos.current.alEstarListo?.();
-      }
-    }
-
-    /* ─ El zarpe. ─ */
-    const z = zarpe.current;
-    if (z.pedido && z.desde === null && !z.avisado) {
-      if (catalogo === null) {
-        /* Sin mundo no hay coreografía: se avisa en cuanto se puede. */
-        z.avisado = true;
-        avisos.current.alZarpar?.();
-      } else {
-        z.desde = t;
-      }
-    }
-    let u = 0;
-    if (z.desde !== null) {
-      u = pinza((t - z.desde) / DURACION_DEL_ZARPE, 0, 1);
-      if (u >= 1 && !z.avisado) {
-        z.avisado = true;
-        avisos.current.alZarpar?.();
-      }
-    }
-    const amanecerObjetivo = z.desde === null ? 0 : easeInOutQuart(u);
-    amanecer.current += (amanecerObjetivo - amanecer.current) * (z.desde === null ? amortiguado(dt, 2) : 1);
-
-    /* ─ El cielo, la niebla y el agua siguen al amanecer. ─ */
-    cielo.uniforms.amanecer.value = amanecer.current;
-    colorDeLaNiebla(amanecer.current, colorDeNiebla);
-    if (niebla.current !== null) niebla.current.color.copy(colorDeNiebla);
-    /* Plegado, como el mar del delta: sin tope, el agua degenera con los minutos (`tiempo-del-mar.ts`). */
-    mar.material.uniforms.tiempo.value = tiempoDelMar(t);
-    mar.material.uniforms.brillo.value = 1 - 0.85 * amanecer.current;
-    if (cupula.current !== null) cupula.current.position.copy(cam.position);
-
-    /* ─ La cámara: el objetivo de este fotograma. ─ */
-    const aspecto = ventana.ancho > 0 && ventana.alto > 0 ? ventana.ancho / ventana.alto : s.size.width / Math.max(1, s.size.height);
-    let pose: Pose = conRespiracion(encuadre(ocupados, aspecto, franja), t);
-    const ar = arrastre.current;
-    ar.actual += (ar.objetivo - ar.actual) * amortiguado(dt, ar.activo ? 10 : 4);
-    if (Math.abs(ar.actual) > 1e-4) pose = giraAlrededorDelObjetivo(pose, ar.actual);
-    const ll = llegada.current;
-    if (ll !== null) {
-      if (ll.desde < 0) ll.desde = t;
-      const v = (t - ll.desde) / DURACION_DE_LA_LLEGADA;
-      if (v >= 1) llegada.current = null;
-      else pose = poseDeLlegada(pose, ll.amarre, v);
-    }
-    if (z.desde !== null) pose = poseDeZarpe(pose, u);
-
-    /* ─ Y el amortiguado hacia él: la posición más viva que el objetivo, que sigue con 0,25 s. ─ */
-    if (primerFotograma.current) {
-      primerFotograma.current = false;
-      posicionActual.set(pose.posicion.x, pose.posicion.y, pose.posicion.z);
-      objetivoActual.set(pose.objetivo.x, pose.objetivo.y, pose.objetivo.z);
-      fovActual.current = pose.fov;
-    } else {
-      posicionActual.lerp(auxPosicion.set(pose.posicion.x, pose.posicion.y, pose.posicion.z), amortiguado(dt, 6));
-      objetivoActual.lerp(auxPosicion.set(pose.objetivo.x, pose.objetivo.y, pose.objetivo.z), amortiguado(dt, 4));
-      fovActual.current += (pose.fov - fovActual.current) * amortiguado(dt, 4);
-    }
-    cam.position.copy(posicionActual);
-    cam.lookAt(objetivoActual);
-    if (Math.abs(cam.fov - fovActual.current) > 0.01) {
-      cam.fov = fovActual.current;
-      cam.updateProjectionMatrix();
-    }
-
-    /* ─ La medida: una vez por segundo, con la media real y cada fotograma acotado a 100 ms. ─ */
-    const m = medida.current;
-    m.segundos += dt;
-    m.fotogramas++;
-    if (m.segundos >= 1) {
-      const info = s.gl.info.render;
-      avisos.current.alMedir?.({
-        triangulos: info.triangles,
-        llamadas: info.calls,
-        ms: (m.segundos * 1000) / m.fotogramas,
-        fotogramas: m.fotogramas,
-      });
-      m.segundos = 0;
-      m.fotogramas = 0;
-    }
+  const { mirarA, alPulsar, alMover, alSoltar } = usarElBucleDelLobby({
+    ventana,
+    hayMundo: catalogo !== null,
+    zarpando,
+    alZarpar: props.alZarpar,
+    arrastre: ARRASTRE,
+    /* El plano lejano tiene que dejar dentro la cúpula y el mar; la cámara de serie de r3f se queda en mil. */
+    planos: { cerca: 0.3, lejos: RADIO_DEL_CIELO * 2.2 },
+    reposo: (aspecto) => encuadre(ocupados, aspecto, franja),
+    mirada: { duracion: DURACION_DE_LA_LLEGADA, pose: poseDeLlegada },
+    zarpe: poseDeZarpe,
+    alAvanzar: ({ t, luz: amanecer, camara: cam }) => {
+      /* ─ El cielo, la niebla y el agua siguen al amanecer. ─ */
+      cielo.uniforms.amanecer.value = amanecer;
+      colorDeLaNiebla(amanecer, colorDeNiebla);
+      if (niebla.current !== null) niebla.current.color.copy(colorDeNiebla);
+      /* Plegado, como el mar del delta: sin tope, el agua degenera con los minutos (`tiempo-del-mar.ts`). */
+      mar.material.uniforms.tiempo.value = tiempoDelMar(t);
+      mar.material.uniforms.brillo.value = 1 - 0.85 * amanecer;
+      if (cupula.current !== null) cupula.current.position.copy(cam.position);
+    },
   });
 
-  /*
-   * EL ARRASTRE: ±25° con el dedo, ±2° con el ratón (pulsado o no), y vuelta con
-   * muelle al soltar. Lo recibe UN solo objeto, la cúpula, que rodea a la cámara
-   * y por tanto está bajo el puntero siempre: cuando lo recibían también el mar y
-   * la cúpula, pasar del uno al otro disparaba un `leave` en medio del arrastre y
-   * lo cortaba. El `leave` de la cúpula sólo llega al salir del lienzo, y ahí sí
-   * hay que soltar.
-   */
-  const alPulsar = (e: ThreeEvent<PointerEvent>): void => {
-    arrastre.current.activo = true;
-    arrastre.current.x0 = e.pointer.x;
-  };
-  const alMover = (e: ThreeEvent<PointerEvent>): void => {
-    const ar = arrastre.current;
-    const tipo = (e as { pointerType?: string }).pointerType ?? 'touch';
-    const tope = tipo === 'mouse' ? ARRASTRE.raton : ARRASTRE.dedo;
-    if (ar.activo) ar.objetivo = pinza((e.pointer.x - ar.x0) * tope, -tope, tope);
-    else if (tipo === 'mouse') ar.objetivo = e.pointer.x * ARRASTRE.raton;
-  };
-  const alSoltar = (): void => {
-    arrastre.current.activo = false;
-    arrastre.current.objetivo = 0;
-  };
+  /* Cuántos han atracado desde que se montó: los que esperan saludan al que llega, y la cámara lo mira. */
+  const [llegadas, ponerLlegadas] = useState(0);
+  const alAtracar = useMemo(
+    () => (amarre: Amarre) => {
+      mirarA(amarre);
+      ponerLlegadas((n) => n + 1);
+    },
+    [mirarA],
+  );
 
   // -------------------------------------------------------------------------
 
@@ -1337,20 +1216,4 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
       ))}
     </>
   );
-}
-
-/** Gira la posición de una pose alrededor de su objetivo, en horizontal. Para el arrastre. */
-function giraAlrededorDelObjetivo(pose: Pose, angulo: number): Pose {
-  const rx = pose.posicion.x - pose.objetivo.x;
-  const rz = pose.posicion.z - pose.objetivo.z;
-  const cos = Math.cos(angulo);
-  const sin = Math.sin(angulo);
-  return {
-    ...pose,
-    posicion: {
-      x: pose.objetivo.x + rx * cos + rz * sin,
-      y: pose.posicion.y,
-      z: pose.objetivo.z - rx * sin + rz * cos,
-    },
-  };
 }

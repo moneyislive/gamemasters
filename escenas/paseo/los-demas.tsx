@@ -9,7 +9,9 @@
  * canal (`canal-de-botas.ts`) lleva la figura que eligió —la de serie del asiento si no eligió,
  * `figuraQueSePinta`, igual que en el Muelle—, en el sitio interpolado entre dos fotos, girada a
  * su rumbo por el camino corto y con el clip que da su velocidad (`zancada.ts`): quien se para
- * contra una pared se queda quieto aunque esté pulsando, también visto desde fuera.
+ * contra una pared se queda quieto aunque esté pulsando, también visto desde fuera. Y no es una
+ * copia: el fotograma de la figura es `mueveAQuienAnda`, el de quien pasea, y la figura se trae, se
+ * monta y se pinta con lo común (`comun/marioneta.tsx`).
  *
  * ═══ NADA SE CARGA POR FOTOGRAMA ═══
  *
@@ -39,24 +41,18 @@
  * mientras es intocable la figura parpadea, y sus corazones van en su rótulo, encima del nombre.
  * Los corazones se repintan sólo el fotograma en que cambian; el resto, se leen números.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
-import { cargadorPara } from '../embarcadero/cargar';
-import type { AventureroCargado } from '../embarcadero/cargar';
 import { figuraQueSePinta } from '../embarcadero/figuras';
 import type { Traer } from '../embarcadero/tipos';
-import { desmontaMarioneta, giroCorto, montaMarioneta, reproduce } from '../aventureros/marioneta';
-import type { Marioneta } from '../aventureros/marioneta';
-import { giroDeLaMarioneta } from './camaras';
+import { Marioneta, usarLaFigura, usarMarioneta } from '../comun/marioneta';
 import type { ClienteDelCanal } from './canal-de-botas';
 import type { AsientoQueAnda } from './mesa-de-botas';
+import { mueveAQuienAnda } from './quien-anda';
+import type { RumboPintado } from './quien-anda';
 import { ALTURA_DEL_ROTULO, altoDelRotulo, geometriaDelRotulo, ponerLosCorazones } from './rotulo';
-import { clipDelPaso, ritmoDelClip } from './zancada';
-
-/** Lo deprisa que se vuelve una figura hacia su rumbo, por segundo: el mismo de `quien-anda.tsx`. */
-const LO_QUE_SE_VUELVE = 9;
 
 /** Lo deprisa que la altura pintada alcanza la del suelo, por segundo: el mismo del paseo. */
 const LO_QUE_SE_ASIENTA = 14;
@@ -110,13 +106,9 @@ interface UnoDeLosDemasProps {
 }
 
 function UnoDeLosDemas({ traer, cliente, asiento, nombre, figura, color, alturaEn }: UnoDeLosDemasProps): JSX.Element {
-  const [cargada, setCargada] = useState<AventureroCargado | null>(null);
-  const [biblioteca, setBiblioteca] = useState<readonly THREE.AnimationClip[]>([]);
-  const [montada, setMontada] = useState<THREE.Object3D | null>(null);
-  const marioneta = useRef<Marioneta | null>(null);
   const cuerpo = useRef<THREE.Group>(null);
   const placa = useRef<THREE.Group>(null);
-  const rumboAhora = useRef<number | null>(null);
+  const rumbo = useRef<RumboPintado>({ de: null, ahora: null });
   const alturaAhora = useRef<number | null>(null);
   /* Cómo están pintados sus corazones: sólo se repintan cuando esto cambia. */
   const corazonesPintados = useRef<string | null>(null);
@@ -128,46 +120,10 @@ function UnoDeLosDemas({ traer, cliente, asiento, nombre, figura, color, alturaE
    * dice en la consola y se le sigue viendo el rótulo.
    */
   const laFigura = figuraQueSePinta(asiento, figura);
-  useEffect(() => {
-    let vivo = true;
-    const cargador = cargadorPara(traer);
-    void cargador
-      .aventurero(laFigura)
-      .then((a) => {
-        if (vivo) setCargada(a);
-      })
-      .catch((e: unknown) => {
-        console.warn(`No ha llegado la figura de ${nombre} (${laFigura}): ${e instanceof Error ? e.message : String(e)}`);
-      });
-    void cargador
-      .animaciones()
-      .then((clips) => {
-        if (vivo) setBiblioteca(clips);
-      })
-      .catch((e: unknown) => {
-        console.warn(`No han llegado los gestos de las figuras: ${e instanceof Error ? e.message : String(e)}`);
-      });
-    return () => {
-      vivo = false;
-    };
-  }, [laFigura, nombre, traer]);
-
-  useEffect(() => {
-    if (cargada === null || biblioteca.length === 0) return;
-    const m = montaMarioneta(cargada, biblioteca);
-    if (m === null) {
-      console.warn(`La figura ${laFigura} ha llegado sin el clip de reposo: a ${nombre} sólo se le ve el rótulo.`);
-      return;
-    }
-    marioneta.current = m;
-    setMontada(m.raiz);
-    rumboAhora.current = null;
-    return () => {
-      desmontaMarioneta(m);
-      marioneta.current = null;
-      setMontada(null);
-    };
-  }, [biblioteca, cargada, laFigura, nombre]);
+  const { cargado, biblioteca } = usarLaFigura(traer, laFigura, (que, motivo) => {
+    console.warn(que === 'figura' ? `No ha llegado la figura de ${nombre} (${laFigura}): ${motivo}` : `No han llegado los gestos de las figuras: ${motivo}`);
+  });
+  const marioneta = usarMarioneta(cargado, biblioteca, `a ${nombre} sólo se le ve el rótulo`);
 
   /*
    * La placa se compone una vez por nombre y color —con sus corazones, escondidos hasta que el canal
@@ -208,33 +164,12 @@ function UnoDeLosDemas({ traer, cliente, asiento, nombre, figura, color, alturaE
     const y = antes === null ? suelo : antes + (suelo - antes) * cuanto;
     alturaAhora.current = y;
 
-    const m = marioneta.current;
-    if (g !== null && m !== null) {
-      /* Intocable, parpadea: ver `refriega.ts`. */
-      g.visible = como === null || como.seVe;
-      g.position.set(pose.x, y, pose.z);
-      /* El rumbo se alcanza por el camino corto, como el de quien pasea. */
-      const rumbo = rumboAhora.current;
-      if (rumbo === null) {
-        rumboAhora.current = pose.rumbo;
-      } else {
-        const falta = giroCorto(rumbo, pose.rumbo);
-        rumboAhora.current = rumbo + Math.min(Math.abs(falta), LO_QUE_SE_VUELVE * dt) * Math.sign(falta);
-      }
-      g.rotation.y = giroDeLaMarioneta(rumboAhora.current ?? pose.rumbo);
-      const gesto = como?.gesto ?? null;
-      if (como !== null && gesto !== null) {
-        /* Un gesto de la refriega manda sobre el paso mientras dura; el mezclador cuenta en segundos. */
-        reproduce(m, gesto.clip, gesto.bucle, gesto.desde / 1000, como.a / 1000);
-      } else {
-        /* El clip y su ritmo, de la velocidad MEDIDA entre dos fotos: ver `zancada.ts`. */
-        const clip = clipDelPaso(pose.velocidad);
-        reproduce(m, clip, true, 0, 0);
-        const accion = m.acciones.get(clip);
-        if (accion !== undefined && accion === m.actual) accion.timeScale = ritmoDelClip(clip, pose.velocidad);
-      }
-      m.mezclador.update(dt);
-    }
+    /*
+     * La figura, como la de quien pasea (`mueveAQuienAnda`): parpadea si es intocable, se vuelve por
+     * el camino corto, y el gesto de la refriega manda sobre el paso, que va a la velocidad MEDIDA
+     * entre dos fotos. Aquí sólo cambia de dónde sale la pose —la foto— y la altura, que es la suya.
+     */
+    if (g !== null && marioneta !== null) mueveAQuienAnda(marioneta, g, pose, y, como, rumbo.current, dt);
 
     /* Sus corazones: se repintan sólo si han cambiado. */
     const pintar = como === null ? 'sin' : `${String(como.corazones.llenos)}:${String(como.corazones.apagados)}`;
@@ -254,11 +189,7 @@ function UnoDeLosDemas({ traer, cliente, asiento, nombre, figura, color, alturaE
 
   return (
     <>
-      {montada === null ? null : (
-        <group ref={cuerpo} visible={false}>
-          <primitive object={montada} />
-        </group>
-      )}
+      <Marioneta de={marioneta} grupo={cuerpo} visible={false} />
       {geometria === null ? null : (
         <group ref={placa} visible={false}>
           <mesh geometry={geometria} material={material} />
