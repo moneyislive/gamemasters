@@ -73,6 +73,7 @@
     "verify:riberas-mundo": "tsx scripts/verificar-riberas-mundo.ts",
     "verify:protocolo-de-botas": "tsx scripts/verificar-protocolo-de-botas.ts",
     "verify:botin": "tsx scripts/verificar-botin.ts",
+    "verify:robot-generico": "tsx scripts/verificar-robot-generico.ts",
     "verify:marcador": "tsx scripts/verificar-marcador.ts",
     "verify:canvaskit": "tsx scripts/verificar-canvaskit.ts",
     "verify:bucle": "tsx scripts/verificar-bucle.ts",

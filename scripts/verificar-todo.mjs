@@ -813,6 +813,21 @@ const BATERIA = [
     porque:
       'una mesa de Riberas con veinticuatro horas por turno se abre con la misma petición que una de treinta segundos, sobrevive a que el proceso muera con turnos jugados antes y después, resincroniza a quien vuelve con un `rev` de hace tres días, deja que el plazo del ausente venza por la lectura de otro, mantiene en la partida a quien cerró la app, y tras tres días sin que nadie mire ha perdido UN turno y no setenta y dos — con el reloj inyectado, no esperando',
   },
+  /*
+   * ═══ EL ROBOT GENÉRICO: CADA ARCADE DE MESA, JUGADO SIN SABER A QUÉ SE JUEGA ═══
+   *
+   * Va detrás de los de cada juego: aquéllos saben las reglas y éste ninguna. Lo que sólo mira
+   * éste es lo que un juego NUEVO no trae de serie. Recorre el registro, así que un arcade que se
+   * dé de alta mañana entra solo, y exige por su nombre los cuatro de hoy para que un filtro roto
+   * no se lea como vigilado. No es `lento`: no levanta servidor. Unos 35 s, casi todos de Riberas.
+   */
+  {
+    nombre: 'el robot genérico',
+    donde: 'server',
+    guion: 'verify:robot-generico',
+    porque:
+      'los arcades de mesa del registro se juegan con un robot que sólo sabe lo que la plataforma sabe —la vista, `opciones()`, `turnoDe` y `seAcabo`—, tres semillas y dos vueltas: nada revienta, toda opción ofrecida y elegida se puede hacer (ni rechazada, ni muda, ni copia sin cambio), al espectador no se le ofrece nada, ni `arcade:` ni ids repetidos, cada partida termina o sigue viva por jugadas y no por el reloj, mueven todos, todo tipo ofrecido a menudo se hace, la misma semilla da la misma partida y el diario reejecutado el mismo estado; y el bucle que elige lo primero no pasa esos suelos',
+  },
   {
     nombre: 'núcleo del arcade quieto',
     donde: 'server',
