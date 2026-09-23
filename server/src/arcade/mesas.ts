@@ -1588,7 +1588,8 @@ function avisarAlCanalDeQueSeOlvida(codigo: string): void {
  *     turno), así que dos peticiones a una mesa fría la leen una sola vez. El desalojo no toca una
  *     mesa con el candado cogido o con alguien en la cola (`candados`), así que ninguna operación
  *     en vuelo pierde su mesa a mitad. El barrido del disco y `olvidarMesa` borran bajo el mismo
- *     candado, para que nadie esté leyendo un fichero que se borra.
+ *     candado, para que nadie esté leyendo un fichero que se borra; y el volcado diferido escribe
+ *     bajo él (`volcarLoPendiente`), para que ningún fichero se escriba DESPUÉS de borrarse.
  *  2. LA ESCRITURA —síncrona con `tickHz: 0`, diferida con `tickHz > 0`—. Sólo se desaloja una
  *     mesa si lo que hay en memoria es EXACTAMENTE lo último que el almacén confirmó haber escrito:
  *     una foto por referencia —`mesa` y `sillas` se sustituyen enteros en cada cambio, nunca se
@@ -2130,17 +2131,42 @@ function guardarDiferido(codigo: string): void {
  * síncrono no es un descuido: en el diferido no hay ninguna petición esperando
  * —quien movió recibió su respuesta hace un segundo— así que no hay a quién
  * contestarle. Lo que queda es el registro y `/api/arcade/diagnostico`.
+ *
+ * ═══ CADA MESA SE VUELCA BAJO SU CANDADO, Y SE VUELVE A BUSCAR DENTRO ═══
+ *
+ * Se volcaba sin él: se cogía la mesa de la tabla y se escribía, y mientras tanto `olvidarMesa`
+ * —que sí va bajo el candado— podía entrar, sacarla de la tabla y borrar su fichero. El renombrado
+ * del volcado aterrizaba DESPUÉS del borrado y la mesa olvidada volvía a estar en el disco, con sus
+ * llaves; y desde que las mesas se leen a demanda, se servía en la siguiente petición. Un `DELETE`
+ * que contesta «olvidada» y una partida que sigue ahí. El revisor lo midió por la ruta, sin
+ * retardos inventados: 27 de 36.
+ *
+ * Con el candado, las dos cosas no se pisan: o el volcado escribe entero y el olvido borra
+ * después, o el olvido va primero y el volcado, al buscar la mesa DENTRO, ya no la encuentra y no
+ * escribe nada. Eso es lo que significa que olvidar una mesa cancela su volcado pendiente: el que
+ * aún no ha empezado lo quita `olvidarMesa` de `pendientesDeGuardar`, y el que ya estaba en la cola
+ * del candado se encuentra la mesa olvidada.
+ *
+ * De una en una y no todas a la vez: cada una espera sólo a su mesa, y una mesa con cola no retrasa
+ * el volcado de las demás más que lo que tarda en escribirse.
  */
 async function volcarLoPendiente(): Promise<void> {
   const codigos = [...pendientesDeGuardar];
   pendientesDeGuardar.clear();
   for (const codigo of codigos) {
-    const m = mesas.get(codigo);
-    if (!m) continue;
     try {
-      await escribir(m);
+      await conElCandado(codigo, async () => {
+        const m = mesas.get(codigo);
+        if (!m) return;
+        try {
+          await escribir(m);
+        } catch (error) {
+          anotarElFallo(codigo, error);
+        }
+      });
     } catch (error) {
-      anotarElFallo(codigo, error);
+      /* Un volcado es de fondo: lo que reviente aquí no puede dejar sin volcar a las de detrás. */
+      console.error(`[arcade] El volcado diferido no ha podido con la mesa ${codigo}; sigue con las demás:`, error);
     }
   }
 }

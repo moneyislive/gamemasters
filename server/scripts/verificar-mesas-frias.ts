@@ -32,6 +32,9 @@
  *     variantes y trece horas de reloj.
  *  7. Y LA LIMPIEZA NO TUMBA A NADIE: con dos mesas envenenadas a mano en la memoria, `mirar`,
  *     `revisionDe`, `abrir` y el barrido siguen contestando.
+ *  8. LA ESCRITURA DIFERIDA (`tickHz > 0`) NO RESUCITA LO OLVIDADO: con el volcado retenido a
+ *     mitad —justo antes de renombrar— se pide olvidar la mesa, se suelta, y ni el fichero ni la
+ *     mesa vuelven. Y con el volcado sólo pendiente, olvidarla lo cancela.
  *
  * ═══ EL RELOJ SE ADELANTA EN PROCESO, CAMBIANDO `Date.now` ═══
  *
@@ -44,6 +47,7 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
@@ -900,6 +904,74 @@ if (tieneLaMemoriaNueva) {
       await mesas.olvidarMesa(sinToque.mesa.codigo);
       comprobar('y no queda ningún candado suelto', mesas.candadosDeMesaVivos() === 0, mesas.candadosDeMesaVivos());
     }
+
+    // -------------------------------------------------------------------------
+    paso('La escritura diferida se vuelca bajo el candado: olvidar a mitad de volcado no resucita la mesa');
+    // -------------------------------------------------------------------------
+
+    {
+      /*
+       * EL AGUJERO: con `tickHz > 0` la escritura se difiere un segundo, y se volcaba SIN el candado
+       * de la mesa. Un `DELETE` que llegaba con el volcado a medias borraba el fichero, y el
+       * renombrado del volcado aterrizaba DESPUÉS: la mesa olvidada volvía a estar en el disco con
+       * sus llaves, y desde que las mesas se leen a demanda se servía en la siguiente petición. El
+       * revisor lo midió sin retardos inventados: 27 de 36 `DELETE` por la ruta.
+       *
+       * Aquí no se juega a acertar el milisegundo: se RETIENE el renombrado del volcado de esa mesa
+       * —el último paso de la escritura atómica— hasta que se ha pedido olvidarla, y entonces se
+       * suelta. Es exactamente el orden que la carrera producía, sin depender de la suerte.
+       */
+      const conRename = fsp as unknown as { rename: typeof fsp.rename };
+      const renombrarDeVerdad = conRename.rename;
+      let laQueSeRetiene = '';
+      const renombrado = retenida();
+      const llego = retenida();
+      conRename.rename = async (desde, hasta) => {
+        if (laQueSeRetiene !== '' && path.basename(String(hasta)) === `${laQueSeRetiene}.json`) {
+          llego.soltar();
+          await renombrado.promesa;
+        }
+        return renombrarDeVerdad(desde, hasta);
+      };
+      try {
+        const enVuelo = await mesas.abrir({ arcade: DIFERIDO, nombre: 'Olga', plazoSegundos: 0 });
+        laQueSeRetiene = enVuelo.mesa.codigo;
+        await mesas.mover(enVuelo.mesa.codigo, enVuelo.silla.llave, 0, { tipo: 'jugar', carga: 'en vuelo' });
+        const aTiempo = await Promise.race([llego.promesa.then(() => true), dormir(5_000).then(() => false)]);
+        comprobar('el volcado diferido llega a escribir la mesa, y se le retiene justo antes de renombrar', aTiempo);
+        const olvido = mesas.olvidarMesa(enVuelo.mesa.codigo);
+        await dormir(150);
+        renombrado.soltar();
+        await olvido;
+        await dormir(150);
+        comprobar(
+          'olvidada con el volcado A MEDIAS, su fichero no vuelve a aparecer',
+          !fs.existsSync(ficheroDe(MESAS, enVuelo.mesa.codigo)),
+        );
+        const vuelve = await loQueLanza(() => mesas.mirar(enVuelo.mesa.codigo, enVuelo.silla.llave));
+        comprobar(
+          'ni la mesa: pedirla es «no existe», y no una partida resucitada con sus llaves',
+          vuelve.startsWith('MesaDesconocida'),
+          vuelve,
+        );
+      } finally {
+        renombrado.soltar();
+        conRename.rename = renombrarDeVerdad;
+      }
+
+      /* Y con el volcado sólo PENDIENTE —todavía no ha empezado—, olvidarla lo cancela. */
+      const pendiente = await mesas.abrir({ arcade: DIFERIDO, nombre: 'Pau', plazoSegundos: 0 });
+      await mesas.mover(pendiente.mesa.codigo, pendiente.silla.llave, 0, { tipo: 'jugar', carga: 'pendiente' });
+      await mesas.olvidarMesa(pendiente.mesa.codigo);
+      await dormir(1_300);
+      const vuelvePendiente = await loQueLanza(() => mesas.mirar(pendiente.mesa.codigo, pendiente.silla.llave));
+      comprobar(
+        'y olvidada con el volcado sólo PENDIENTE, el volcado se cancela: ni fichero ni mesa',
+        !fs.existsSync(ficheroDe(MESAS, pendiente.mesa.codigo)) && vuelvePendiente.startsWith('MesaDesconocida'),
+        vuelvePendiente,
+      );
+      comprobar('y no queda ningún candado suelto', mesas.candadosDeMesaVivos() === 0, mesas.candadosDeMesaVivos());
+    }
   } catch (error) {
     fallos.push(`la prueba se cayó: ${error instanceof Error ? error.stack : String(error)}`);
   }
@@ -922,7 +994,7 @@ if (fallos.length > 0) {
 }
 
 /* EL GUARDIA: un comprobador que se cae a mitad sin decirlo se parece mucho a uno verde. */
-const COMPROBACIONES_ESCRITAS = 63;
+const COMPROBACIONES_ESCRITAS = 68;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones escritas.`);
   process.exit(2);
