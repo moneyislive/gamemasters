@@ -56,6 +56,8 @@ import {
 import { elCanal, ponerCanal } from './canal';
 import { cuandoSeCierreUnaMesa, cuandoSeOlvideUnaMesa } from './arcade/mesas';
 import { canalDeSondeo } from './canal/sondeo';
+import { cerrarLaMesaDeBotas, darDeAltaLosQueSeRecorren, montarElCanalDeBotas } from './botas';
+import type { ContextoDelCors } from './puerta/origenes';
 import arcadeRouter from './routes/arcade';
 import modelosRouter from './routes/modelos';
 import boardRouter from './routes/board';
@@ -117,14 +119,17 @@ app.set('trust proxy', env.saltosDeConfianza);
  * SIN `Origin` —la app nativa, `curl`, los comprobadores— se sirve como siempre. El detalle, y lo
  * que el CORS no es, en `puerta/origenes.ts`; lo comprueba `verify:cors`, con este servidor
  * levantado de verdad.
+ *
+ * La MISMA lista decide desde qué páginas se abre el canal de Boots on Board, que es un WebSocket
+ * y no pasa por el CORS (ver `botas/enchufe.ts`): por eso el contexto es una constante y no un
+ * literal dentro de la llamada.
  */
-app.use(
-  corsDeLaCasa({
-    produccion: process.env.NODE_ENV === 'production',
-    publico: env.publicOrigin,
-    extra: env.origenesPermitidos,
-  }),
-);
+const contextoDelCors: ContextoDelCors = {
+  produccion: process.env.NODE_ENV === 'production',
+  publico: env.publicOrigin,
+  extra: env.origenesPermitidos,
+};
+app.use(corsDeLaCasa(contextoDelCors));
 
 /*
  * EL LIMITE DE CUERPO, y por qué son dos y no uno.
@@ -460,8 +465,21 @@ function comprobarArranque(): void {
    * se decide aquí. `anunciar` y no `avisarCambio` a secas porque queda GUARDADO
    * con su revisión: quien estuviera en segundo plano lo recupera al volver.
    */
+  /*
+   * Los dos ganchos son de UN solo oyente —`mesas.ts` guarda una función, no una lista—, así que
+   * todo el que tenga que enterarse va DENTRO del mismo: el canal de Boots on Board también cierra
+   * sus canales (`mesaCerrada`) cuando la mesa se acaba o desaparece. Va en un `finally` para que
+   * un fallo del aviso de la mesa no deje a nadie andando por un tablero acabado (y lo que lance
+   * cualquiera de los dos lo apunta `mesas.ts`). Lo que cierran el `POST /cerrar` y el `DELETE`,
+   * que no pasan por estos ganchos, lo ve el canal por su cuenta al preguntar la revisión, como
+   * mucho un segundo después.
+   */
   cuandoSeCierreUnaMesa((codigo, rev) => {
-    elCanal().anunciar(codigo, rev, { clave: 'arcade:mesa-cerrada', texto: 'Se acabó la partida.' });
+    try {
+      elCanal().anunciar(codigo, rev, { clave: 'arcade:mesa-cerrada', texto: 'Se acabó la partida.' });
+    } finally {
+      cerrarLaMesaDeBotas(codigo, 'La partida se ha acabado.');
+    }
   });
 
   /*
@@ -471,7 +489,11 @@ function comprobarArranque(): void {
    * barrido de las viejas es el único camino por el que una mesa desaparece sola.
    */
   cuandoSeOlvideUnaMesa((codigo) => {
-    elCanal().olvidar(codigo);
+    try {
+      elCanal().olvidar(codigo);
+    } finally {
+      cerrarLaMesaDeBotas(codigo, 'La mesa ya no existe.');
+    }
   });
 
   /*
@@ -810,6 +832,17 @@ if (arcadesDeFuera.length > 0) {
   console.log(`[arcade] de fuera: ${puestos.join(', ') || '(ninguno)'}`);
 }
 
+/*
+ * ═══ LOS JUEGOS QUE SE RECORREN ADMITEN LA MODALIDAD `botas`, Y ANTES DE ESCUCHAR ═══
+ *
+ * `arcade/modalidades.ts` nace vacío a propósito: un arcade admite Boots on Board si y sólo si
+ * alguien escribió el productor de su mundo (`shared/arcade/juegos/mundos.ts`). Aquí se dan de
+ * alta los instalados que lo tienen —después de los de fuera, para que ninguno se quede sin
+ * mirar—. Antes de escuchar, por lo mismo que el canal de la mesa: una mesa `botas` pedida en el
+ * primer segundo de vida del proceso no puede recibir un 400 que un segundo después no daría.
+ */
+const seRecorren = darDeAltaLosQueSeRecorren();
+
 comprobarArranque();
 
 await initStore();
@@ -860,7 +893,7 @@ if (deFuera.length > 0) {
   if (env.juegos) instalarSoloEstos(env.juegos);
 }
 
-app.listen(env.port, env.host, () => {
+const servidorHttp = app.listen(env.port, env.host, () => {
   const storageLabel =
     getStorageKind() === 'mongo'
       ? 'MongoDB Atlas (mongoose)'
@@ -891,6 +924,9 @@ app.listen(env.port, env.host, () => {
   console.log(
     `   » Sala de Arcade ...... ${salaCompilada ? `http://localhost:${env.port}/sala (desde ${salaCompilada})` : 'no compilada (npm run build -w escritorio; en desarrollo, Vite en el 5175)'}`,
   );
+  console.log(
+    `   » Boots on Board ...... ${seRecorren.length > 0 ? `${seRecorren.join(', ')} (canal en /api/arcade/mesas/:codigo/botas)` : 'ningún juego declara su mundo'}`,
+  );
   console.log(`   » Subidas ............. ${uploadsDir}`);
   console.log(
     `   » Acceso .............. ${passwordRequired() ? 'protegido con contraseña (APP_PASSWORD)' : 'ABIERTO — sin APP_PASSWORD configurada'}`,
@@ -902,3 +938,14 @@ app.listen(env.port, env.host, () => {
   console.log('   El telón se levanta. Que comience el misterio.');
   console.log('');
 });
+
+/*
+ * ═══ Y EL CANAL DE BOOTS ON BOARD, EN EL MISMO SERVIDOR HTTP ═══
+ *
+ * Un WebSocket por asiento en `/api/arcade/mesas/:codigo/botas` (`docs/BOOTS-ON-BOARD.md` §7.3 B):
+ * se engancha al `upgrade` del servidor que acaba de devolver `app.listen`, antes de que pueda
+ * llegar ninguna conexión, con la misma lista de orígenes que el CORS. Montarlo engancha también
+ * la despedida de `SIGTERM`: los canales se cierran con 1001 antes de que el proceso se vaya. El
+ * detalle, en `botas/`.
+ */
+montarElCanalDeBotas(servidorHttp, contextoDelCors);

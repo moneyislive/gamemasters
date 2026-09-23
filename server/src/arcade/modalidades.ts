@@ -1,19 +1,19 @@
 /**
- * QUÉ JUEGOS SE PUEDEN JUGAR BAJANDO AL TABLERO. La costura, vacía a propósito.
+ * QUÉ JUEGOS SE PUEDEN JUGAR BAJANDO AL TABLERO. La costura, que nace vacía a propósito.
  *
- * ═══ POR QUÉ ESTE FICHERO EXISTE, Y POR QUÉ HOY NO ADMITE A NADIE ═══
+ * ═══ POR QUÉ ESTE FICHERO EXISTE, Y POR QUÉ NACE SIN ADMITIR A NADIE ═══
  *
  * La modalidad `botas` —Boots on Board, `docs/BOOTS-ON-BOARD.md`— se elige al abrir la mesa y
  * no cambia (decisión de Miguel del 20-sep-2026). Pero no todos los juegos se pueden recorrer:
  * para bajar al tablero hace falta que el juego DECLARE su mundo —el `MundoDeclarado` del §3:
- * suelo, cuerpos, dónde se nace—, y a día de hoy ningún juego lo tiene conectado a su mesa. Lo
- * trae el paso 3 del §6.
+ * suelo, cuerpos, dónde se nace—, y eso lo dice el registro de mundos,
+ * `shared/arcade/juegos/mundos.ts`: un juego se recorre si y sólo si alguien escribió su productor.
  *
- * Hasta entonces la respuesta honrada a «¿admite botas este juego?» es NO para todos, y eso es
- * exactamente lo que da el registro vacío: una mesa `botas` pedida hoy se contesta con un 400
- * que dice por qué, en vez de abrirse y dejar a cuatro personas delante de un tablero que no se
- * puede pisar. Un «sí» por defecto sería el fallo mudo de siempre: la mesa se abre, se guarda
- * treinta días, y nadie se entera de que su modalidad no significa nada.
+ * Mientras nadie lo dé de alta, la respuesta honrada a «¿admite botas este juego?» es NO, y eso es
+ * exactamente lo que da el registro vacío: una mesa `botas` pedida para un juego sin mundo se
+ * contesta con un 400 que dice por qué, en vez de abrirse y dejar a cuatro personas delante de un
+ * tablero que no se puede pisar. Un «sí» por defecto sería el fallo mudo de siempre: la mesa se
+ * abre, se guarda treinta días, y nadie se entera de que su modalidad no significa nada.
  *
  * ═══ POR QUÉ VIVE FUERA DEL NÚCLEO SELLADO ═══
  *
@@ -22,15 +22,18 @@
  * así que no puede vivir allí: la mesa sólo pregunta por el identificador que ya tiene, y la
  * respuesta se decide aquí.
  *
- * ═══ Y DE DÓNDE LLEGARÁN LAS ALTAS DE VERDAD ═══
+ * ═══ Y DE DÓNDE LLEGAN LAS ALTAS DE VERDAD ═══
  *
- * No de este fichero. `shared/` no puede importar nada de `server/`, así que el día que un juego
- * declare su mundo lo hará en SU ALTA, en `shared/arcade/juegos/`, y la pregunta de aquí abajo
- * pasará a hacérsele al registro de altas («¿trae mundo este arcade?»). Hasta ese día la única
- * forma de dar de alta un juego es `admitirBotas`, y quien la usa son las pruebas: un
- * envoltorio que la llama ANTES de importar el servidor, igual que `verify:mesa` instala un
- * arcade roto sin tocar el arranque. No hay variable de entorno para esto, a propósito: una
- * costura de prueba que se puede encender desde el panel de un despliegue es una puerta.
+ * No de este fichero, que no puede saber qué juegos tienen mundo sin importar juegos —y lo importa
+ * `mesas.ts`, que está sellado y no puede nombrar ninguno—. Las da el ARRANQUE: `index.ts` llama a
+ * `darDeAltaLosQueSeRecorren` (`botas/index.ts`) antes de escuchar, que llama a `admitirBotas` con
+ * cada arcade instalado para el que `sePuedeRecorrer` es verdad. Lo comprueba `verify:modalidad`
+ * contra el servidor de verdad: cada juego de servidor abre `botas` si y sólo si tiene mundo.
+ *
+ * Y las pruebas siguen usando `admitirBotas` para dar de alta un juego a mano: un envoltorio que
+ * la llama ANTES de importar el servidor, igual que `verify:mesa` instala un arcade roto sin tocar
+ * el arranque. No hay variable de entorno para esto, a propósito: una costura de prueba que se
+ * puede encender desde el panel de un despliegue es una puerta.
  *
  * ═══ ANCLADA AL ÁMBITO GLOBAL, COMO LAS OTRAS TABLAS DE ALTAS ═══
  *
@@ -57,7 +60,8 @@ export function admiteBotas(arcade: ArcadeId): boolean {
 }
 
 /**
- * DA DE ALTA UN JUEGO COMO RECORRIBLE. Hoy sólo lo llaman las pruebas; ver la cabecera.
+ * DA DE ALTA UN JUEGO COMO RECORRIBLE. Lo llaman el arranque —con los que tienen mundo— y las
+ * pruebas; ver la cabecera.
  *
  * No comprueba que el juego esté instalado ni que tenga mesa de servidor, y no hace falta: una
  * mesa de un arcade que no está instalado no se abre (`ArcadeNoInstalado`) y una de un arcade

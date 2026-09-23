@@ -72,6 +72,7 @@ import {
 } from '../arcade/mesas';
 import type { Modalidad, VistaDeMesa } from '../arcade/mesas';
 import { admiteBotas } from '../arcade/modalidades';
+import { diagnosticoDeBotas, seRecorreAqui } from '../botas';
 import {
   anunciarInicio,
   ArcadeSinRecords,
@@ -380,10 +381,23 @@ const contadorDeAperturas = limitarIntentos({
  * nada que hacer»—; hasta hoy no la llamaba nadie desde una respuesta. Es un
  * campo NUEVO y por tanto opcional en el otro extremo: un cliente empaquetado
  * contra un servidor más viejo no lo recibirá, y eso no puede ser un fallo.
+ *
+ * ═══ Y `sePuedeRecorrer`, QUE TAMPOCO ESTÁ EN EL MANIFIESTO ═══
+ *
+ * Si se puede bajar al tablero de este arcade EN ESTE SERVIDOR: que la mesa admita la modalidad
+ * `botas` y que haya mundo que recorrer (`seRecorreAqui` en `botas/index.ts`). Los clientes lo usan
+ * para OFRECER la modalidad al abrir mesa, y por la misma razón que `publicaOpciones` no puede
+ * vivir en el manifiesto: «este juego se recorre» es que exista el productor de su mundo, que es
+ * código de este proceso, y no una bandera que alguien pueda poner a `true`. Opcional en el otro
+ * extremo, igual: un servidor viejo no lo manda, y un cliente que no lo recibe no ofrece `botas`.
  */
 router.get('/arcade', (_req, res) => {
   res.json({
-    arcades: arcadesInstalados().map((m) => ({ ...m, publicaOpciones: hayOpciones(m.id) })),
+    arcades: arcadesInstalados().map((m) => ({
+      ...m,
+      publicaOpciones: hayOpciones(m.id),
+      sePuedeRecorrer: seRecorreAqui(m.id),
+    })),
   });
 });
 
@@ -1280,6 +1294,13 @@ router.get('/arcade/presupuesto', (_req, res) => {
  * es lo que dice desde fuera que un proceso nuevo NO ha leído la carpeta entera.
  * Contar las del disco aquí costaría recorrer la carpeta en cada petición, y esta
  * ruta no pide credencial.
+ *
+ * ═══ Y `botas`: EL CANAL DE BOOTS ON BOARD ═══
+ *
+ * Salas, canales, si el temporizador está en marcha —parado sin salas, que es lo que dice desde
+ * fuera que un servidor sin nadie andando no hace nada—, fotos mandadas y saltadas, pasos
+ * aceptados, correcciones por motivo y cierres por motivo. Sólo cuentas: ni un código de mesa, ni
+ * un asiento, ni una llave, porque esto se sirve sin credencial.
  */
 router.get('/arcade/diagnostico', (_req, res) => {
   res.json({
@@ -1289,6 +1310,7 @@ router.get('/arcade/diagnostico', (_req, res) => {
     almacen: saludDelAlmacen(),
     avisosDeArcade: avisosAbiertos(),
     memoria: memoriaDeLasMesas(),
+    botas: diagnosticoDeBotas(),
   });
 });
 

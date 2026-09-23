@@ -11,8 +11,10 @@
  * servidor levantado de verdad—:
  *
  *  1. Sin decir nada, la mesa es `normal`, y la vista lo dice.
- *  2. `botas` sólo se abre para un juego que la ADMITE, y hoy no la admite ninguno: el registro
- *     de `modalidades.ts` nace vacío. Se da de alta un juego en la prueba y entonces sí.
+ *  2. `botas` sólo se abre para un juego que la ADMITE. El registro de `modalidades.ts` nace vacío
+ *     —en proceso sigue vacío hasta que la prueba da de alta un juego— y el ARRANQUE del servidor
+ *     da de alta los que se recorren (`shared/arcade/juegos/mundos.ts`), y sólo ésos: por el cable,
+ *     cada juego de servidor abre `botas` si y sólo si tiene mundo, y el catálogo dice lo mismo.
  *  3. Un valor raro —otra palabra, otra capitalización, un número, un nulo— es un 400 legible y
  *     no deja mesa detrás.
  *  4. La modalidad SOBREVIVE a que el proceso muera, y un fichero de antes del campo —o con una
@@ -25,8 +27,9 @@
  * Porque cada una ve lo que la otra no. En proceso se ve lo que no sale por el cable —que la
  * autoridad, llamada desde otra puerta que no sea la ruta, se niega igual; que el acceso por llave
  * no proyecta, contado—. Por el cable se ve lo que en proceso no existe: el arranque de verdad
- * con su registro vacío, la ruta con sus 400, y un proceso nuevo leyendo lo que escribió el viejo.
- * Es la lección de esta casa escrita dos veces: verde en proceso, roto al arrancar.
+ * con su registro dado de alta desde los mundos, la ruta con sus 400, y un proceso nuevo leyendo
+ * lo que escribió el viejo. Es la lección de esta casa escrita dos veces: verde en proceso, roto al
+ * arrancar.
  *
  * El juego que se da de alta como recorrible se da de alta con un ENVOLTORIO que importa
  * `modalidades.ts`, llama a `admitirBotas` y después importa el servidor tal cual, sin tocarlo.
@@ -41,6 +44,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { instalarArcade, olvidarArcade, rechazar } from '../../shared/arcade';
 import type { ManifiestoDeArcade, Movimiento } from '../../shared/arcade';
+import { arcadesQueSeRecorren } from '../../shared/arcade/juegos/mundos';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -470,23 +474,53 @@ async function reiniciar(conBotas: boolean): Promise<void> {
 }
 
 try {
-  paso('Por el cable: el servidor de verdad arranca SIN ningún juego que admita `botas`');
+  paso('Por el cable: el servidor de verdad arranca admitiendo `botas` en los juegos que se recorren, y sólo en ésos');
 
   await reiniciar(false);
   {
-    const pedida = await pedir('/arcade/mesas', {
-      metodo: 'POST',
-      cuerpo: { arcade: 'riberas', nombre: 'Ana', modalidad: 'botas' },
-    });
+    /*
+     * DERIVADO, NO ESCRITO: qué juegos se recorren lo dice el registro de mundos, así que el día
+     * que Riberas declare el suyo esto sigue midiendo lo mismo sin tocarlo. Se prueban TODOS los
+     * juegos de servidor del catálogo, con y sin mundo, y el catálogo tiene que decir lo mismo.
+     */
+    const catalogo = await pedir('/arcade');
+    const deServidor = ((catalogo.datos.arcades ?? []) as Array<{ id: string; sede: string; sePuedeRecorrer?: unknown }>).filter(
+      (a) => a.sede === 'servidor',
+    );
+    const conMundo = new Set<string>(arcadesQueSeRecorren());
     comprobar(
-      'sin el alta, `botas` para Riberas es un 400 que dice por qué',
-      pedida.estado === 400 && pedida.datos.motivo === 'modalidad-no-admitida',
-      pedida,
+      'hay juegos de servidor con mundo y sin él, que si no esto sólo mira una cara',
+      deServidor.some((a) => conMundo.has(a.id)) && deServidor.some((a) => !conMundo.has(a.id)),
+      deServidor.map((a) => a.id),
+    );
+    const mal: unknown[] = [];
+    let unoSinMundo: Respuesta | null = null;
+    for (const a of deServidor) {
+      const pedida = await pedir('/arcade/mesas', {
+        metodo: 'POST',
+        cuerpo: { arcade: a.id, nombre: 'Ana', modalidad: 'botas' },
+      });
+      const seRecorre = conMundo.has(a.id);
+      const bien = seRecorre
+        ? pedida.estado === 201 && pedida.datos.mesa?.modalidad === 'botas' && a.sePuedeRecorrer === true
+        : pedida.estado === 400 && pedida.datos.motivo === 'modalidad-no-admitida' && a.sePuedeRecorrer === false;
+      if (!bien) mal.push({ arcade: a.id, seRecorre, estado: pedida.estado, catalogo: a.sePuedeRecorrer, datos: pedida.datos });
+      if (!seRecorre && unoSinMundo === null) unoSinMundo = pedida;
+    }
+    comprobar(
+      'cada juego de servidor abre `botas` si y sólo si se recorre, y el catálogo dice lo mismo (`sePuedeRecorrer`)',
+      mal.length === 0,
+      mal,
     );
     comprobar(
-      'y el mensaje ofrece la salida: la modalidad normal',
-      typeof pedida.datos.error === 'string' && pedida.datos.error.includes('normal'),
-      pedida.datos.error,
+      'y el 400 del que no se recorre ofrece la salida: la modalidad normal',
+      unoSinMundo !== null && typeof unoSinMundo.datos.error === 'string' && unoSinMundo.datos.error.includes('normal'),
+      unoSinMundo?.datos,
+    );
+    comprobar(
+      'y el arranque lo dice en su registro',
+      loQueDijoElServidor.includes('Boots on Board') && [...conMundo].every((id) => loQueDijoElServidor.includes(id)),
+      loQueDijoElServidor.slice(-900),
     );
   }
 
@@ -505,6 +539,19 @@ try {
     });
     comprobar('con `botas` y el juego dado de alta, 201 y `botas`', conBotas.estado === 201 && conBotas.datos.mesa?.modalidad === 'botas', conBotas);
     abiertas.botas = { codigo: conBotas.datos.codigo, llave: conBotas.datos.llave };
+
+    /*
+     * Dado de alta A MANO —la costura de las pruebas— la mesa se abre, pero el catálogo sólo ofrece
+     * bajar al tablero si además hay mundo que recorrer: si no, se abriría una mesa en la que el
+     * canal no deja entrar a nadie. Derivado del registro de mundos, por si Riberas declara el suyo.
+     */
+    const catalogo = await pedir('/arcade');
+    const deRiberas = ((catalogo.datos.arcades ?? []) as Array<{ id: string; sePuedeRecorrer?: unknown }>).find((a) => a.id === 'riberas');
+    comprobar(
+      'y el catálogo sólo lo ofrece si además tiene mundo: `sePuedeRecorrer` es el alta Y el mundo',
+      deRiberas !== undefined && deRiberas.sePuedeRecorrer === arcadesQueSeRecorren().includes('riberas'),
+      deRiberas,
+    );
 
     const explicita = await pedir('/arcade/mesas', {
       metodo: 'POST',
@@ -628,7 +675,7 @@ if (fallos.length > 0) {
  * EL GUARDIA DE «NO SE HAN HECHO TODAS»: un comprobador que se cae a mitad sin decirlo se parece
  * mucho a uno verde. El número es el que se hace hoy, contado, y se sube al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 57;
+const COMPROBACIONES_ESCRITAS = 60;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(
     `Sólo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones escritas: algo se ha ` +
@@ -639,9 +686,9 @@ if (hechas < COMPROBACIONES_ESCRITAS) {
 
 console.log(
   `✔ ${hechas} comprobaciones. Una mesa se abre en \`normal\` o en \`botas\` y no cambia: sin decir nada\n` +
-    '  es normal, `botas` sólo para un juego dado de alta —y hoy no lo está ninguno—, lo mal escrito es\n' +
-    '  un 400 que no deja mesa, la modalidad sobrevive a que el proceso muera, y un fichero de antes se\n' +
-    '  lee como normal. Y reconocer una llave no proyecta, no mete el tic, no marca presencia y no\n' +
-    '  escribe.',
+    '  es normal, `botas` sólo para un juego dado de alta —y el arranque da de alta los que se recorren,\n' +
+    '  y sólo ésos—, lo mal escrito es un 400 que no deja mesa, la modalidad sobrevive a que el proceso\n' +
+    '  muera, y un fichero de antes se lee como normal. Y reconocer una llave no proyecta, no mete el\n' +
+    '  tic, no marca presencia y no escribe.',
 );
 process.exit(0);

@@ -89,7 +89,8 @@
     "verify:lectura-barata": "tsx scripts/verificar-lectura-barata.ts",
     "verify:cors": "tsx scripts/verificar-cors.ts",
     "verify:mesas-frias": "tsx scripts/verificar-mesas-frias.ts",
-    "verify:sala-de-botas": "tsx scripts/verificar-sala-de-botas.ts"
+    "verify:sala-de-botas": "tsx scripts/verificar-sala-de-botas.ts",
+    "verify:botas": "tsx scripts/verificar-botas.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

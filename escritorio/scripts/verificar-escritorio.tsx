@@ -55,6 +55,7 @@ import { arcadesInstalados, avanzar, hayOpciones, opcionesDeArcade, proyectar } 
 import type { ContextoMovimiento, ManifiestoDeArcade, Opcion } from '../../shared/arcade';
 import { MUEBLES_DEL_CONTRATO } from '../../shared/arcade/tipos';
 import '../../shared/arcade/juegos';
+import { sePuedeRecorrer } from '../../shared/arcade/juegos/mundos';
 import {
   ACEPTAR,
   CLASES_DE_CARTA,
@@ -430,9 +431,20 @@ function cuantos(html: string, etiqueta: string): number {
  * servidor vivo, y este comprobador no levanta ninguno. Lo que sí compra es lo
  * otro —que la decisión del catálogo sea correcta CON el campo puesto y CON el
  * campo ausente—, que es lo que se rompía.
+ *
+ * Y `sePuedeRecorrer`, el tercero: la ruta publica «la mesa admite `botas` Y hay
+ * mundo» (`seRecorreAqui` en `server/src/botas/index.ts`), y como el arranque da
+ * de alta en `admiteBotas` justo los que tienen mundo, en un servidor de verdad
+ * es `sePuedeRecorrer` del registro de mundos —que es lo que se copia aquí, porque
+ * el alta del arranque no ocurre en este proceso—. Que la ruta lo mande de verdad
+ * lo comprueban `verify:modalidad` y `verify:botas`, con el servidor levantado.
  */
 function elCatalogoQuePublicaElServidor(): ArcadeDelCatalogo[] {
-  return arcadesInstalados().map((m) => ({ ...m, publicaOpciones: hayOpciones(m.id) }));
+  return arcadesInstalados().map((m) => ({
+    ...m,
+    publicaOpciones: hayOpciones(m.id),
+    sePuedeRecorrer: sePuedeRecorrer(m.id),
+  }));
 }
 
 /**
