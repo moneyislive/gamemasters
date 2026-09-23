@@ -11,6 +11,10 @@
  *
  * Por eso aquí hay más muestras MALAS que buenas, y cada una tiene que dar `null`. Sin servidor ni
  * red: el canal de verdad lo prueba su propio comprobador de punta a punta.
+ *
+ * Usa el arnés común (`arnes.ts`): `comprobar`, el informe y el suelo, con su salida propia —un 2—
+ * si alguna vez se hacen menos comprobaciones de las escritas. Las llamadas a `comprobar` son las
+ * de siempre, y el número también.
  */
 import {
   CIERRE,
@@ -20,16 +24,9 @@ import {
   TOPE_DE_MENSAJE_BYTES,
   VERSION_DEL_CANAL,
 } from '../../shared/mecanicas/canal-de-botas';
+import { arnes } from './arnes';
 
-const fallos: string[] = [];
-let hechas = 0;
-
-function comprobar(que: string, bien: boolean, detalle?: unknown): void {
-  hechas++;
-  if (bien) return;
-  const cola = detalle === undefined ? '' : ` — ${typeof detalle === 'string' ? detalle : JSON.stringify(detalle)}`;
-  fallos.push(`${que}${cola}`);
-}
+const { comprobar, terminar } = arnes();
 
 const j = (v: unknown): string => JSON.stringify(v);
 
@@ -148,15 +145,13 @@ comprobar('y escapa lo que no es un código', rutaDelCanal('A/B?c') === '/api/ar
   );
 }
 
-/* El suelo: que se ha mirado de verdad todo lo que se dice arriba. */
-comprobar('se han mirado todas las muestras', hechas >= 57, { hechas });
-
-console.log('');
-if (fallos.length > 0) {
-  console.log(`${String(fallos.length)} de ${String(hechas)} comprobaciones han fallado:\n`);
-  for (const f of fallos) console.log(`  ✗ ${f}`);
-  process.exit(1);
-}
-console.log(`${String(hechas)} comprobaciones`);
-console.log('\nLos lectores del canal de Boots on Board devuelven null ante cualquier cosa que no sea');
-console.log('exactamente un mensaje bien formado, en los dos sentidos.');
+/*
+ * El suelo: que se ha mirado de verdad todo lo que se dice arriba. Lo pone el arnés y cuenta como
+ * la última comprobación, igual que contaba cuando se escribía aquí a mano: 57 y ésta, 58.
+ */
+terminar({
+  escritas: 58,
+  enVerde:
+    'Los lectores del canal de Boots on Board devuelven null ante cualquier cosa que no sea\n' +
+    '  exactamente un mensaje bien formado, en los dos sentidos.',
+});
