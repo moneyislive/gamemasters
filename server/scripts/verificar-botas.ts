@@ -29,6 +29,14 @@
  *     un atropello → 4005; sin `hola` → 4000; un mensaje de más de 256 bytes → 1009 (lo corta `ws`).
  *   · Un origen ajeno no abre el canal (403), una ruta que no es la del canal tampoco (404).
  *   · La mesa se cierra → 4006 a todos. El diagnóstico lo cuenta, y el temporizador se para.
+ *   · LA REFRIEGA CON MESAS DE VERDAD DE LOS TRES JUEGOS QUE SE RECORREN —El Burgo, Riberas y Las
+ *     Lindes, a la vez—: cada mesa se abre y se empieza por la API y, si hace falta, se juega por la
+ *     API hasta que quien va a caer tiene algo que llevarse; bajan dos aparatos, se encuentran a medio
+ *     camino andando sobre el mundo de la mesa (un A* sobre la misma estructura), uno tumba al otro
+ *     con tres golpes por el cable, y el botín LLEGA A LA MESA: `mirar` enseña, en una revisión, que
+ *     lo que pierde uno lo gana el otro. Luego renace, se vuelven a encontrar, lo tumba otra vez
+ *     antes del minuto y la mesa NO se mueve: una vez y no dos. Y `arcade:botin` por HTTP sigue
+ *     siendo un 400.
  *   · Y la llave no sale NUNCA en lo que escribe el servidor.
  *
  * Con SUELOS: fotos recibidas, pasos aceptados y correcciones. Una prueba que no corrige nada no
@@ -40,18 +48,37 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { WebSocket } from 'ws';
-import { CIERRE, leerMensajeDelServidor, rutaDelCanal, VERSION_DEL_CANAL } from '../../shared/mecanicas/canal-de-botas';
+import {
+  CAIDO_MS,
+  CIERRE,
+  INTOCABLE_MS,
+  leerMensajeDelServidor,
+  RECARGA_DEL_GOLPE_MS,
+  rutaDelCanal,
+  VERSION_DEL_CANAL,
+} from '../../shared/mecanicas/canal-de-botas';
 import type { MensajeDelServidor } from '../../shared/mecanicas/canal-de-botas';
-import { pasoDelTic, RADIO_DEL_PASEANTE, TICS_POR_SEGUNDO } from '../../shared/mecanicas/andar';
+import { pasoDelTic, RADIO_DEL_PASEANTE, rumboDeRadianes, TICS_POR_SEGUNDO } from '../../shared/mecanicas/andar';
 import { deNumero, UNO } from '../../shared/mecanicas/fijo';
 import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena } from '../../shared/mecanicas/mundo';
+import { turnoDeLaVista } from '../../shared/mecanicas/turno-declarado';
 import { arcadesQueSeRecorren, mundoDeLaMesa, SEMILLA_DE_PORTADA_DE_LAS_LINDES } from '../../shared/arcade/juegos/mundos';
 import { cuerposDeLasLindes } from '../../shared/arcade/juegos/lindes-mundo';
 import { tableroEnTres } from '../../shared/arcade/juegos/lindes-en-tres';
-import { LINDES } from '../../shared/arcade/juegos/lindes';
+import { LINDES, PASAR, PLANTAR, PONER, PUNTOS_DEL_BOTIN } from '../../shared/arcade/juegos/lindes';
+import { CLASES_DE_COSA } from '../../shared/arcade/juegos/lindes-losas';
+import { BURGO } from '../../shared/arcade/juegos/burgo';
+import {
+  DESCARTAR,
+  FICHAS_DEL_BOTIN,
+  MOVER_EL_ESTIAJE,
+  PASAR as PASAR_EN_RIBERAS,
+  RIBERAS,
+  TIRAR as TIRAR_EN_RIBERAS,
+} from '../../shared/arcade/juegos/riberas';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
-import { seAndaElTramo, UN_TIC_CON_HOLGURA } from '../src/botas/canal';
+import { RADIO_DEL_LANZAMIENTO, REBOBINADO_MS, seAndaElTramo, UN_TIC_CON_HOLGURA } from '../src/botas/canal';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -258,6 +285,12 @@ class Aparato {
     this.enviar(JSON.stringify({ t: 'aqui', n: this.n, x, z, r, m }));
   }
 
+  /** «Golpeo», en el siguiente tic, mirando a `r`. */
+  golpe(r: number): void {
+    this.n++;
+    this.enviar(JSON.stringify({ t: 'golpe', n: this.n, r }));
+  }
+
   async esperar(que: () => boolean, ms = 3000): Promise<boolean> {
     const fin = Date.now() + ms;
     while (Date.now() < fin) {
@@ -405,6 +438,128 @@ function crucesDeMuralla(arena: Arena, codigo: string, vista: unknown): Cruce[] 
   return salida;
 }
 
+/** Un montón binario de claves por prioridad, para el A* de abajo. */
+class Monton {
+  private readonly prioridades: number[] = [];
+  private readonly claves: number[] = [];
+
+  get vacio(): boolean {
+    return this.claves.length === 0;
+  }
+
+  meter(prioridad: number, clave: number): void {
+    let i = this.claves.length;
+    this.prioridades.push(prioridad);
+    this.claves.push(clave);
+    while (i > 0) {
+      const padre = (i - 1) >> 1;
+      if ((this.prioridades[padre] as number) <= prioridad) break;
+      this.prioridades[i] = this.prioridades[padre] as number;
+      this.claves[i] = this.claves[padre] as number;
+      i = padre;
+    }
+    this.prioridades[i] = prioridad;
+    this.claves[i] = clave;
+  }
+
+  sacar(): number {
+    const arriba = this.claves[0] as number;
+    const ultimaP = this.prioridades.pop() as number;
+    const ultimaK = this.claves.pop() as number;
+    const n = this.claves.length;
+    if (n > 0) {
+      let i = 0;
+      for (;;) {
+        const hijo = 2 * i + 1;
+        if (hijo >= n) break;
+        const menor = hijo + 1 < n && (this.prioridades[hijo + 1] as number) < (this.prioridades[hijo] as number) ? hijo + 1 : hijo;
+        if ((this.prioridades[menor] as number) >= ultimaP) break;
+        this.prioridades[i] = this.prioridades[menor] as number;
+        this.claves[i] = this.claves[menor] as number;
+        i = menor;
+      }
+      this.prioridades[i] = ultimaP;
+      this.claves[i] = ultimaK;
+    }
+    return arriba;
+  }
+}
+
+/**
+ * UN CAMINO LARGO: A* sobre la misma rejilla de una unidad que `camino`, con sus ocho vecinos y cada
+ * tramo con su recta libre. La búsqueda en anchura se queda corta para lo que separa dos sitios de
+ * nacer —de 36 unidades en la glorieta del Burgo a más de 130 en Riberas—. Devuelve los puntos
+ * DESPUÉS de `desde`, acabando exactamente en `hasta`; `null` si no lo encuentra.
+ */
+function caminoLargo(arena: Arena, desde: Andante, hasta: Andante, limite = 320, presupuesto = 600_000): Andante[] | null {
+  const PASO = U;
+  const R = RADIO_DEL_PASEANTE;
+  const ancho = 2 * limite + 1;
+  const clave = (i: number, j: number): number => (i + limite) * ancho + (j + limite);
+  const hi = (hasta.x - desde.x) / PASO;
+  const hj = (hasta.z - desde.z) / PASO;
+  const estimado = (i: number, j: number): number => {
+    const di = Math.abs(i - hi);
+    const dj = Math.abs(j - hj);
+    return Math.max(di, dj) + (Math.SQRT2 - 1) * Math.min(di, dj);
+  };
+  const VECINOS: readonly (readonly [number, number])[] = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1],
+  ];
+  const coste = new Map<number, number>([[clave(0, 0), 0]]);
+  const previo = new Map<number, number>();
+  const cerrados = new Set<number>();
+  const abiertos = new Monton();
+  abiertos.meter(estimado(0, 0), clave(0, 0));
+  let fin: number | null = null;
+  for (let vueltas = 0; !abiertos.vacio && vueltas < presupuesto; vueltas++) {
+    const k = abiertos.sacar();
+    if (cerrados.has(k)) continue;
+    cerrados.add(k);
+    const i = Math.floor(k / ancho) - limite;
+    const j = (k % ancho) - limite;
+    const p = { x: desde.x + i * PASO, z: desde.z + j * PASO };
+    if (Math.hypot(hasta.x - p.x, hasta.z - p.z) <= deNumero(1.3) && seAndaEnRecta(arena, p, hasta, R)) {
+      fin = k;
+      break;
+    }
+    for (const [di, dj] of VECINOS) {
+      const ni = i + di;
+      const nj = j + dj;
+      if (Math.abs(ni) > limite || Math.abs(nj) > limite) continue;
+      const nk = clave(ni, nj);
+      if (cerrados.has(nk)) continue;
+      const nuevo = (coste.get(k) as number) + (di !== 0 && dj !== 0 ? Math.SQRT2 : 1);
+      if (nuevo >= (coste.get(nk) ?? Infinity)) continue;
+      const q = { x: desde.x + ni * PASO, z: desde.z + nj * PASO };
+      if (!sePuedeEstar(arena, q.x, q.z, R) || !seAndaEnRecta(arena, p, q, R)) continue;
+      coste.set(nk, nuevo);
+      previo.set(nk, k);
+      abiertos.meter(nuevo + estimado(ni, nj), nk);
+    }
+  }
+  if (fin === null) return null;
+  const puntos: Andante[] = [hasta];
+  for (let c = fin; c !== clave(0, 0); c = previo.get(c) as number) {
+    const i = Math.floor(c / ancho) - limite;
+    const j = (c % ancho) - limite;
+    puntos.push({ x: desde.x + i * PASO, z: desde.z + j * PASO });
+  }
+  return puntos.reverse();
+}
+
+/** El rumbo (0-255) que mira de `desde` hacia `hacia`. En coma flotante: esto es la prueba, no arbitra nada. */
+function rumboHacia(desde: Andante, hacia: Andante): number {
+  return rumboDeRadianes(Math.atan2(hacia.x - desde.x, -(hacia.z - desde.z)));
+}
+
 /** Un sorteo sembrado para el paseo: el mismo número, el mismo paseo. */
 function sorteo(semilla: number): () => number {
   let x = semilla >>> 0;
@@ -424,6 +579,343 @@ function aparato(codigo: string, opciones: { origen?: string; ruta?: string } = 
   const a = new Aparato(codigo, opciones);
   aparatos.push(a);
   return a;
+}
+
+// ---------------------------------------------------------------------------
+// LA REFRIEGA CON MESAS DE VERDAD
+// ---------------------------------------------------------------------------
+
+interface Sentado {
+  readonly nombre: string;
+  readonly asiento: string;
+  readonly llave: string;
+}
+
+interface OpcionDeVerdad {
+  readonly id: string;
+  readonly tipo: string;
+  readonly carga?: unknown;
+  readonly declaracion?: true;
+}
+
+/**
+ * CÓMO SE PREPARA CADA JUEGO para que quien cae tenga algo que llevarse, y dónde se lee lo que tiene.
+ *
+ *   · El Burgo: todos empiezan con dinero, así que basta con empezar. Se sientan SEIS para que los dos
+ *     que pelean nazcan en los brazos de la glorieta —(0, 18) y (0, −18)— y no en dos puertas de la
+ *     muralla, a setecientas unidades una de otra. Los otros cuatro no bajan: son estatuas en sus
+ *     puertas, y por eso quien cae no tiene dónde renacer lejos y lo hace en la glorieta.
+ *   · Riberas: se coloca —eligiendo lo primero que ofrece el juego— hasta que alguien tiene más fichas
+ *     de las que se lleva un botín.
+ *   · Las Lindes: los canales se abren NADA MÁS EMPEZAR, con una sola losa en la mesa y un solo sitio
+ *     de nacer, así que los dos nacen a un paso; y luego se juega por la API, como el robot de
+ *     `verify:lindes` —plantando por clases y poniendo pegado a lo que hay—, hasta que alguien tiene
+ *     más puntos de los que se lleva un botín. Quien más tiene es quien cae.
+ *
+ * «Más de lo que se lleva un botín» y no «algo»: con lo justo, el primer botín le deja sin nada y el
+ * segundo saldría sin efecto de todas formas, así que «una vez y no dos» no podría ponerse rojo.
+ */
+interface JuegoDeLaRefriega {
+  readonly arcade: string;
+  readonly nombres: readonly string[];
+  /** Los canales se abren antes de preparar la mesa, y no después. */
+  readonly canalAntes: boolean;
+  /** Quién tumba (`a`) y quién cae (`b`), con la mesa ya preparada; los demás no bajan nunca. */
+  readonly quienes: (sentados: readonly Sentado[], vista: unknown) => { a: Sentado; b: Sentado } | null;
+  /** Se juega hasta que esto dice que sí, eligiendo con `elegir`. `null`: no hace falta jugar. */
+  readonly hasta: ((vista: unknown) => boolean) | null;
+  readonly elegir: (vista: unknown, opciones: readonly OpcionDeVerdad[], paso: number) => OpcionDeVerdad | undefined;
+  /** Lo que tiene un asiento, en la vista del espectador: dinero, fichas o puntos. */
+  readonly bolsa: (vista: unknown, asiento: string) => number;
+}
+
+const vistaComo = <T>(v: unknown): T => v as T;
+
+const LOS_TRES: readonly JuegoDeLaRefriega[] = [
+  {
+    arcade: BURGO,
+    nombres: ['Ana', 'Bruno', 'Carla', 'Diego', 'Elena', 'Fede'],
+    canalAntes: false,
+    quienes: (s) => ({ a: s[4] as Sentado, b: s[5] as Sentado }),
+    hasta: null,
+    elegir: () => undefined,
+    bolsa: (v, asiento) => vistaComo<{ jugadores: { asiento: string; mrs: number }[] }>(v).jugadores.find((j) => j.asiento === asiento)?.mrs ?? NaN,
+  },
+  {
+    /*
+     * Hasta que alguien tenga MÁS de lo que se lleva un botín: si no, el segundo botín saldría sin
+     * efecto por falta de nada que llevarse, y «una vez y no dos» no podría ponerse rojo. Se vio: en
+     * Las Lindes, con un caído de tres puntos justos, la regla de la pareja quitada y la mesa quieta.
+     */
+    arcade: RIBERAS,
+    nombres: ['Ana', 'Bruno'],
+    canalAntes: false,
+    quienes: (s, v) => {
+      const colonos = vistaComo<{ colonos: { asiento: string; bienes: number }[] }>(v).colonos;
+      const bienes = (x: Sentado): number => colonos.find((c) => c.asiento === x.asiento)?.bienes ?? 0;
+      const b = [...s].sort((x, y) => bienes(y) - bienes(x))[0];
+      const a = s.find((x) => x !== b);
+      return a === undefined || b === undefined || bienes(b) <= FICHAS_DEL_BOTIN ? null : { a, b };
+    },
+    hasta: (v) => vistaComo<{ colonos: { bienes: number }[] }>(v).colonos.some((c) => c.bienes > FICHAS_DEL_BOTIN),
+    /* Como el jugador de `verify:botin`: coloca en lo primero, descarta si hay que descartar, y si no mueve el estiaje, tira o pasa. */
+    elegir: (v, opciones) => {
+      const momento = vistaComo<{ momento: string }>(v).momento;
+      const porTipo = (tipo: string): OpcionDeVerdad | undefined => opciones.find((o) => o.tipo === tipo);
+      if (momento === 'colocando') return opciones[0];
+      if (momento === 'descartando') return porTipo(DESCARTAR);
+      return porTipo(MOVER_EL_ESTIAJE) ?? porTipo(TIRAR_EN_RIBERAS) ?? porTipo(PASAR_EN_RIBERAS);
+    },
+    bolsa: (v, asiento) => vistaComo<{ colonos: { asiento: string; bienes: number }[] }>(v).colonos.find((c) => c.asiento === asiento)?.bienes ?? NaN,
+  },
+  {
+    arcade: LINDES,
+    nombres: ['Ana', 'Bruno'],
+    canalAntes: true,
+    quienes: (s, v) => {
+      const labriegos = vistaComo<{ labriegos: { asiento: string; puntos: number }[] }>(v).labriegos;
+      const puntos = (x: Sentado): number => labriegos.find((l) => l.asiento === x.asiento)?.puntos ?? 0;
+      const b = [...s].sort((x, y) => puntos(y) - puntos(x))[0];
+      const a = s.find((x) => x !== b);
+      return a === undefined || b === undefined || puntos(b) <= PUNTOS_DEL_BOTIN ? null : { a, b };
+    },
+    hasta: (v) => vistaComo<{ labriegos: { puntos: number }[] }>(v).labriegos.some((l) => l.puntos > PUNTOS_DEL_BOTIN),
+    elegir: (v, opciones, paso) => {
+      const quiere = CLASES_DE_COSA[paso % CLASES_DE_COSA.length] as string;
+      const plantar = opciones.find((o) => o.tipo === PLANTAR && o.id.startsWith(`plantar:${quiere}:`)) ?? opciones.find((o) => o.tipo === PLANTAR);
+      if (plantar !== undefined) return plantar;
+      const poner = opciones.filter((o) => o.tipo === PONER);
+      if (poner.length === 0) return opciones.find((o) => o.tipo === PASAR) ?? opciones[0];
+      const puestas = new Set(vistaComo<{ losas: { x: number; y: number }[] }>(v).losas.map((l) => `${String(l.x)},${String(l.y)}`));
+      let mejor = poner[0];
+      let vecinasDeLaMejor = -1;
+      for (const o of poner) {
+        const c = o.carga as { x: number; y: number };
+        let vecinas = 0;
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if ((dx !== 0 || dy !== 0) && puestas.has(`${String(c.x + dx)},${String(c.y + dy)}`)) vecinas++;
+        if (vecinas > vecinasDeLaMejor) {
+          vecinasDeLaMejor = vecinas;
+          mejor = o;
+        }
+      }
+      return mejor;
+    },
+    bolsa: (v, asiento) => vistaComo<{ labriegos: { asiento: string; puntos: number }[] }>(v).labriegos.find((l) => l.asiento === asiento)?.puntos ?? NaN,
+  },
+];
+
+/** Abre una mesa `botas` de verdad, sienta a todos y la empieza con la opción que ofrece el propio juego. */
+async function mesaDeLaRefriega(juego: JuegoDeLaRefriega): Promise<{ codigo: string; sentados: Sentado[] }> {
+  const abierta = await pedir('/arcade/mesas', {
+    metodo: 'POST',
+    cuerpo: { arcade: juego.arcade, nombre: juego.nombres[0], modalidad: 'botas', plazoSegundos: 0 },
+  });
+  const codigo = String(abierta.datos.codigo);
+  const sentados: Sentado[] = [{ nombre: juego.nombres[0] as string, asiento: String(abierta.datos.asiento), llave: String(abierta.datos.llave) }];
+  for (const nombre of juego.nombres.slice(1)) {
+    const r = await pedir(`/arcade/mesas/${codigo}/asientos`, { metodo: 'POST', cuerpo: { nombre } });
+    sentados.push({ nombre, asiento: String(r.datos.asiento), llave: String(r.datos.llave) });
+  }
+  for (const s of sentados) llaves.push(s.llave);
+  const vista = await pedir(`/arcade/mesas/${codigo}`, { llave: (sentados[0] as Sentado).llave });
+  const empezar = ((vista.datos.mesa?.opciones ?? []) as OpcionDeVerdad[]).find((o) => o.tipo === `${juego.arcade}:empezar`);
+  await pedir(`/arcade/mesas/${codigo}/movimientos`, {
+    metodo: 'POST',
+    llave: (sentados[0] as Sentado).llave,
+    cuerpo: { rev: vista.datos.mesa.rev, tipo: `${juego.arcade}:empezar`, carga: empezar?.carga ?? null },
+  });
+  return { codigo, sentados };
+}
+
+/** Juega POR LA API hasta que `juego.hasta` diga que sí: a quien le toca, lo que su juego le ofrece. */
+async function jugarPorLaApi(juego: JuegoDeLaRefriega, codigo: string, sentados: readonly Sentado[]): Promise<number> {
+  if (juego.hasta === null) return 0;
+  for (let paso = 0; paso < 400; paso++) {
+    const espectador = await pedir(`/arcade/mesas/${codigo}`);
+    if (juego.hasta(espectador.datos.mesa.vista)) return paso;
+    const turno = turnoDeLaVista(espectador.datos.mesa.vista);
+    const quien = turno.declarado ? sentados.find((s) => s.asiento === turno.de) : undefined;
+    if (quien === undefined) return -1;
+    const suya = await pedir(`/arcade/mesas/${codigo}`, { llave: quien.llave });
+    const opciones = ((suya.datos.mesa?.opciones ?? []) as OpcionDeVerdad[]).filter((o) => o.declaracion !== true);
+    const elegida = juego.elegir(suya.datos.mesa.vista, opciones, paso);
+    if (elegida === undefined) return -1;
+    const r = await pedir(`/arcade/mesas/${codigo}/movimientos`, {
+      metodo: 'POST',
+      llave: quien.llave,
+      cuerpo: { rev: suya.datos.mesa.rev, tipo: elegida.tipo, carga: elegida.carga ?? null },
+    });
+    if (r.estado !== 200) return -1;
+  }
+  return -1;
+}
+
+/**
+ * LOS DOS SE ENCUENTRAN A MEDIO CAMINO: un camino de uno al otro sobre el mundo de la mesa, y cada
+ * uno anda su mitad, a la vez, un punto cada 55 ms —veintiséis unidades por segundo en diagonal, por
+ * debajo de lo que el presupuesto deja correr—. Acaban en dos puntos seguidos del camino: a menos de
+ * un paso y con la recta libre entre ellos. `false` si no hay camino.
+ */
+async function encontrarse(arena: Arena, a: Aparato, b: Aparato): Promise<boolean> {
+  if (Math.hypot(b.x - a.x, b.z - a.z) <= deNumero(2) && seAndaEnRecta(arena, a, b, RADIO_DEL_LANZAMIENTO)) return true;
+  const ruta = caminoLargo(arena, { x: a.x, z: a.z }, { x: b.x, z: b.z });
+  if (ruta === null) return false;
+  const todo = [{ x: a.x, z: a.z }, ...ruta];
+  const k = Math.floor((todo.length - 1) / 2);
+  const deA = todo.slice(1, k + 1);
+  const deB = todo.slice(k + 1, todo.length - 1).reverse();
+  for (let i = 0; i < Math.max(deA.length, deB.length); i++) {
+    await dormir(55);
+    const pa = deA[i];
+    const pb = deB[i];
+    if (pa !== undefined) {
+      a.x = pa.x;
+      a.z = pa.z;
+      a.aqui(a.x, a.z, 0, 2);
+    }
+    if (pb !== undefined) {
+      b.x = pb.x;
+      b.z = pb.z;
+      b.aqui(b.x, b.z, 0, 2);
+    }
+  }
+  return true;
+}
+
+/** Tres golpes de `a` a `b`, con la recarga en medio, y espera a que `b` sepa que ha caído otra vez. */
+async function tumbar(a: Aparato, b: Aparato): Promise<boolean> {
+  const caidas = b.de('cae').length;
+  await dormir(REBOBINADO_MS + 100);
+  const r = rumboHacia(a, b);
+  for (let i = 0; i < 3; i++) {
+    a.golpe(r);
+    await dormir(RECARGA_DEL_GOLPE_MS + 80);
+  }
+  return b.esperar(() => b.de('cae').length > caidas, 3000);
+}
+
+/** La mesa vista por un espectador: su revisión y su vista. */
+async function comoEsta(codigo: string): Promise<{ rev: number; vista: unknown }> {
+  const r = await pedir(`/arcade/mesas/${codigo}`);
+  return { rev: Number(r.datos.mesa?.rev), vista: r.datos.mesa?.vista };
+}
+
+/**
+ * UNA REFRIEGA ENTERA EN UNA MESA DE VERDAD: se prepara, bajan los dos, se encuentran, A tumba a B y el
+ * botín entra en la mesa —`mirar` lo enseña—; B renace, se vuelven a encontrar, A lo tumba otra vez
+ * antes del minuto y la mesa NO se mueve; y el botín mandado por HTTP sigue siendo un 400. Devuelve una
+ * línea para el registro; las comprobaciones van dentro, con el nombre del juego delante.
+ */
+async function refriegaDeVerdad(juego: JuegoDeLaRefriega): Promise<string> {
+  const n = juego.arcade;
+  try {
+    const { codigo, sentados } = await mesaDeLaRefriega(juego);
+    let a: Aparato | null = null;
+    let b: Aparato | null = null;
+    const porAsiento = new Map<string, Aparato>();
+    if (juego.canalAntes) {
+      for (const s of sentados) {
+        const ap = aparato(codigo);
+        await ap.entrar(s.llave);
+        porAsiento.set(s.asiento, ap);
+      }
+    }
+    const jugadas = await jugarPorLaApi(juego, codigo, sentados);
+    const tras = await comoEsta(codigo);
+    const quienes = juego.quienes(sentados, tras.vista);
+    comprobar(`${n}: la mesa de verdad se abre, se empieza y —jugando por la API si hace falta— quien va a caer tiene algo que llevarse`, jugadas >= 0 && quienes !== null, { jugadas });
+    if (quienes === null) return `${n}: no se ha podido preparar`;
+    a = porAsiento.get(quienes.a.asiento) ?? aparato(codigo);
+    b = porAsiento.get(quienes.b.asiento) ?? aparato(codigo);
+    if (!juego.canalAntes) {
+      await a.entrar(quienes.a.llave);
+      await b.entrar(quienes.b.llave);
+    }
+    comprobar(
+      `${n}: los dos bajan: \`dentro\` y, justo detrás, \`vidas\` con todos los sentados`,
+      [a, b].every((x) => {
+        const [primero, segundo] = x.mensajes;
+        return primero?.t === 'dentro' && segundo?.t === 'vidas' && segundo.v.length === sentados.length;
+      }),
+      [a.crudos.slice(0, 2), b.crudos.slice(0, 2)],
+    );
+    const mundo = mundoDeLaMesa(juego.arcade, tras.vista, codigo);
+    if (mundo === null) return `${n}: sin mundo`;
+    const arena = arenaDe(mundo);
+    const lejos = Math.hypot(b.x - a.x, b.z - a.z) / U;
+    const juntos = await encontrarse(arena, a, b);
+    comprobar(
+      `${n}: se encuentran andando por el mundo de la mesa —${lejos.toFixed(0)} u—, sin una corrección`,
+      juntos && a.de('corrige').length === 0 && b.de('corrige').length === 0,
+      { juntos, corrigeA: a.de('corrige'), corrigeB: b.de('corrige') },
+    );
+
+    const antes = await comoEsta(codigo);
+    const cayo = await tumbar(a, b);
+    comprobar(
+      `${n}: tres golpes por el cable: \`da\` con 2, 1 y 0, y \`cae\`, a los dos`,
+      cayo &&
+        b.de('da').map((x) => x.vida).join(',') === '2,1,0' &&
+        a.ultimo('cae')?.a === quienes.b.asiento &&
+        b.ultimo('cae')?.por === quienes.a.asiento,
+      { da: b.de('da'), cae: b.ultimo('cae') },
+    );
+    let despues = antes;
+    for (let i = 0; i < 60 && despues.rev === antes.rev; i++) {
+      await dormir(50);
+      despues = await comoEsta(codigo);
+    }
+    const pierde = juego.bolsa(antes.vista, quienes.b.asiento) - juego.bolsa(despues.vista, quienes.b.asiento);
+    const gana = juego.bolsa(despues.vista, quienes.a.asiento) - juego.bolsa(antes.vista, quienes.a.asiento);
+    comprobar(
+      `${n}: el botín LLEGA A LA MESA: en una revisión, \`mirar\` enseña que lo que pierde quien cayó lo gana quien lo tumbó`,
+      despues.rev === antes.rev + 1 && pierde > 0 && pierde === gana,
+      { rev: [antes.rev, despues.rev], pierde, gana },
+    );
+
+    const renacio = await b.esperar(() => b.de('renace').length > 0, CAIDO_MS + 3000);
+    const renace = b.ultimo('renace');
+    const renacidoEn = Date.now();
+    const aDondeRenace = renace === undefined ? NaN : Math.hypot(renace.x - a.x, renace.z - a.z) / U;
+    if (renace !== undefined) {
+      b.x = renace.x;
+      b.z = renace.z;
+    }
+    const otraVez = renacio && (await encontrarse(arena, a, b));
+    comprobar(
+      `${n}: renace —a ${aDondeRenace.toFixed(0)} u de quien lo tumbó— y se vuelven a encontrar`,
+      renacio && otraVez && a.de('corrige').length === 0 && b.de('corrige').length === 0,
+      { renace, corrigeA: a.de('corrige'), corrigeB: b.de('corrige') },
+    );
+    await dormir(Math.max(0, renacidoEn + INTOCABLE_MS + 150 - Date.now()));
+    const antesDeLaSegunda = await comoEsta(codigo);
+    const cayoOtraVez = await tumbar(a, b);
+    await dormir(1200);
+    const trasLaSegunda = await comoEsta(codigo);
+    comprobar(
+      `${n}: tumbado otra vez antes del minuto: \`cae\`, pero la mesa NO se mueve —el botín, una vez y no dos—`,
+      cayoOtraVez &&
+        trasLaSegunda.rev === antesDeLaSegunda.rev &&
+        juego.bolsa(trasLaSegunda.vista, quienes.b.asiento) === juego.bolsa(antesDeLaSegunda.vista, quienes.b.asiento),
+      { cayoOtraVez, rev: [antesDeLaSegunda.rev, trasLaSegunda.rev] },
+    );
+
+    const porHttp = await pedir(`/arcade/mesas/${codigo}/movimientos`, {
+      metodo: 'POST',
+      llave: quienes.a.llave,
+      cuerpo: { rev: trasLaSegunda.rev, tipo: 'arcade:botin', carga: { de: quienes.b.asiento, para: quienes.a.asiento } },
+    });
+    const alFinal = await comoEsta(codigo);
+    comprobar(
+      `${n}: y el botín mandado por HTTP, aun por quien se lo llevaría, sigue siendo un 400 \`movimiento-reservado\`, y la mesa igual`,
+      porHttp.estado === 400 && porHttp.datos?.motivo === 'movimiento-reservado' && alFinal.rev === trasLaSegunda.rev,
+      { estado: porHttp.estado, datos: porHttp.datos },
+    );
+    return `${n}: ${String(jugadas)} jugadas por la API; a ${lejos.toFixed(0)} u al bajar; botín de ${String(pierde)}; renace a ${aDondeRenace.toFixed(0)} u`;
+  } catch (error) {
+    comprobar(`${n}: la refriega de verdad no se cae`, false, error instanceof Error ? error.stack : String(error));
+    return `${n}: se cayó`;
+  }
 }
 
 try {
@@ -740,6 +1232,23 @@ try {
     comprobar('sin salas, el temporizador está PARADO', d.salas === 0 && d.temporizador === false, { salas: d.salas, temporizador: d.temporizador });
   }
 
+  paso('La refriega con mesas de VERDAD de los tres juegos: dos aparatos se tumban, y el botín llega a la mesa una vez y no dos');
+  {
+    const antes = await diagnostico();
+    const resultados = await Promise.all(LOS_TRES.map((juego) => refriegaDeVerdad(juego)));
+    for (const r of resultados) console.log(`  ${r}`);
+    const d = await diagnostico();
+    comprobar(
+      'y el diagnóstico lo cuenta: seis caídas, tres renacidas al menos, tres botines que ENTRAN y tres que la pareja ya había cobrado',
+      d.caidas - antes.caidas === 6 &&
+        d.renacidas - antes.renacidas >= 3 &&
+        d.botines.entro - antes.botines.entro === 3 &&
+        d.botines.porPareja - antes.botines.porPareja === 3 &&
+        d.botines.fallos === 0,
+      { caidas: d.caidas - antes.caidas, renacidas: d.renacidas - antes.renacidas, botines: d.botines },
+    );
+  }
+
   comprobar(
     'todo lo que ha mandado el servidor lo lee el lector estricto del aparato',
     aparatos.every((x) => x.ilegibles() === 0),
@@ -780,7 +1289,7 @@ if (fallos.length > 0) {
  * EL GUARDIA DE «NO SE HAN HECHO TODAS»: un comprobador que se cae a mitad sin decirlo se parece
  * mucho a uno verde. El número es el que se hace hoy, contado, y se sube al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 62;
+const COMPROBACIONES_ESCRITAS = 87;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.log(`Sólo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones escritas.`);
   process.exit(2);
@@ -790,6 +1299,7 @@ console.log(
   `✔ ${String(hechas)} comprobaciones, ${BINARIO === null ? 'con tsx' : 'contra el COMPILADO'}. El canal de Boots on Board por el cable:\n` +
     '  `hola` → `dentro` donde se puede estar, un paseo legal aceptado entero y visto por el otro, el\n' +
     '  teletransporte, la muralla y la carrera corregidos, los siete cierres con su código, el origen\n' +
-    '  y la ruta, el diagnóstico, el temporizador parado sin salas, y ni una llave en la salida.',
+    '  y la ruta, el diagnóstico, el temporizador parado sin salas; la refriega en mesas de verdad del\n' +
+    '  Burgo, Riberas y Las Lindes, con el botín en la mesa una vez y no dos; y ni una llave en la salida.',
 );
 process.exit(0);
