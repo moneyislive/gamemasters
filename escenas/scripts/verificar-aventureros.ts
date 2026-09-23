@@ -5,7 +5,7 @@
  *
  * `compilar-aventureros.ts` deja siete `.glb` en `escenas/modelos/aventureros/`:
  * seis personajes con el rig `Rig_Medium` y la textura horneada en el color de cada
- * vértice, y una biblioteca de doce clips sin malla que vale para los seis. Esto
+ * vértice, y una biblioteca de trece clips sin malla que vale para los seis. Esto
  * vuelve a abrir esos siete ficheros DESDE FUERA —con `@gltf-transform`, que no
  * toca los nombres, y luego con el `GLTFLoader` de three, que sí— y comprueba lo
  * que, si estuviera mal, no daría ningún error en ninguna consola:
@@ -20,8 +20,9 @@
  *   · Que el esqueleto es EL MISMO en los siete ficheros, hueso a hueso: un clip
  *     grabado para un rig con otras longitudes de hueso se carga, se reproduce, y
  *     deforma al personaje sin quejarse.
- *   · Que la biblioteca trae exactamente los doce clips, con nuestros nombres, y
- *     ni una malla, ni una piel, ni un material dentro.
+ *   · Que la biblioteca trae exactamente los trece clips, con nuestros nombres, y
+ *     ni una malla, ni una piel, ni un material dentro; y que `caer`, el de la
+ *     refriega, acaba en el suelo, que es donde se queda clavado hasta renacer.
  *   · Y lo que de verdad decide si un personaje se mueve: que cada pista de cada
  *     clip ENCUENTRA SU HUESO en cada personaje DESPUÉS de que `GLTFLoader` haya
  *     saneado los nombres. Los huesos del pack se llaman `foot.l` y al cargar se
@@ -89,7 +90,7 @@ const HUESOS = [
 const PERSONAJES = ['caballero', 'barbaro', 'maga', 'exploradora', 'picaro', 'encapuchado'];
 const CLIPS = [
   'reposo-a', 'reposo-b', 'andar', 'correr', 'saludar', 'recoger',
-  'aparecer', 'usar', 'lanzar', 'golpe', 'salto', 't-pose',
+  'aparecer', 'usar', 'lanzar', 'golpe', 'caer', 'salto', 't-pose',
 ];
 const BIBLIOTECA = 'animaciones';
 const TOPE_DE_PERSONAJE = 450 * 1024;
@@ -303,7 +304,7 @@ paso('El esqueleto es el mismo en los siete ficheros');
 }
 
 // ---------------------------------------------------------------------------
-paso('La biblioteca trae los doce clips y nada más');
+paso('La biblioteca trae los trece clips y nada más');
 // ---------------------------------------------------------------------------
 
 {
@@ -312,7 +313,7 @@ paso('La biblioteca trae los doce clips y nada más');
   const clips = root.listAnimations();
   const nombres = clips.map((a) => a.getName());
 
-  comprobar('animaciones.glb trae exactamente los doce clips, con nuestros nombres', mismos(nombres, CLIPS), nombres);
+  comprobar('animaciones.glb trae exactamente los trece clips, con nuestros nombres', mismos(nombres, CLIPS), nombres);
 
   /*
    * Los nombres de clip no pasan por `sanitizeNodeName` —eso es para nodos—, pero
@@ -361,7 +362,7 @@ paso('La biblioteca trae los doce clips y nada más');
     duraciones[clip.getName()] = Number(fin.toFixed(3));
   }
   comprobar('cada pista apunta a un hueso del rig, y ninguna a un nodo borrado', pistasRotas.length === 0, pistasRotas.slice(0, 6));
-  comprobar('entre los doce clips se mueven los 23 huesos, ni uno menos', mismos([...destinos], HUESOS), [...destinos]);
+  comprobar('entre los trece clips se mueven los 23 huesos, ni uno menos', mismos([...destinos], HUESOS), [...destinos]);
   /*
    * `T-Pose` viene del pack con UNA clave y duración cero, y con duración cero el
    * mezclador de three da `NaN` al repetir. El compilador le añade un fotograma;
@@ -377,10 +378,31 @@ paso('La biblioteca trae los doce clips y nada más');
     return c === 't-pose' ? d <= 0 || d > 0.1 : d < 0.5 || d > 3;
   });
   comprobar(
-    'los once clips de movimiento duran entre medio segundo y tres, y la t-pose un fotograma',
+    'los doce clips de movimiento duran entre medio segundo y tres, y la t-pose un fotograma',
     raras.length === 0,
     duraciones,
   );
+
+  /*
+   * `caer` ACABA EN EL SUELO. Es el clip de quien se queda sin vida en la refriega de Boots on
+   * Board, y se queda clavado en su último fotograma hasta renacer (`escenas/paseo/refriega.ts`):
+   * si un día el compilador cogiera otro clip —o el pack cambiara el suyo por uno que acaba de pie—,
+   * el caído estaría de pie cinco segundos sin que fallara nada. Se mira la cadera, que es lo que
+   * baja al tumbarse: en su última clave tiene que quedar por debajo de la mitad de donde empieza.
+   * Y la cuenta se ve distinguir: `golpe`, que acaba erguido, no la pasa.
+   */
+  const laCadera = (nombre: string): { readonly inicio: number; readonly fin: number } | null => {
+    const clip = clips.find((a) => a.getName() === nombre);
+    const canal = clip?.listChannels().find((c) => c.getTargetNode()?.getName() === 'hips' && c.getTargetPath() === 'translation');
+    const salida = canal?.getSampler()?.getOutput() ?? null;
+    if (salida === null || salida.getCount() < 2) return null;
+    return { inicio: salida.getElement(0, [])[1] as number, fin: salida.getElement(salida.getCount() - 1, [])[1] as number };
+  };
+  const acabaAbajo = (c: { readonly inicio: number; readonly fin: number } | null): boolean => c !== null && c.inicio > 0 && c.fin < c.inicio / 2;
+  const alCaer = laCadera('caer');
+  const alRecibir = laCadera('golpe');
+  comprobar('`caer` acaba en el suelo: en su última clave la cadera queda por debajo de la mitad de donde empieza', acabaAbajo(alCaer), alCaer);
+  comprobar('y la cuenta distingue: `golpe`, que acaba de pie, no la pasa', alRecibir !== null && !acabaAbajo(alRecibir), alRecibir);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,7 +476,7 @@ function cargaConThree(ruta: string): Promise<GLTF> {
 
   const biblioteca = cargados.get(BIBLIOTECA);
   const clips = biblioteca?.animations ?? [];
-  comprobar('la biblioteca llega con los doce clips', mismos(clips.map((c) => c.name), CLIPS), clips.map((c) => c.name));
+  comprobar('la biblioteca llega con los trece clips', mismos(clips.map((c) => c.name), CLIPS), clips.map((c) => c.name));
 
   /*
    * LA COMPROBACIÓN QUE DECIDE SI SE MUEVEN. `PropertyBinding.findNode` es lo que el
@@ -503,7 +525,7 @@ if (fallos.length > 0) {
  * cae a la mitad termina con código cero y una lista corta de aciertos, y eso se lee
  * como verde. El número va a mano y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 28;
+const COMPROBACIONES_ESCRITAS = 30;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
@@ -518,9 +540,9 @@ if (fallos.length === 0) {
   console.log(
     '\nLos seis aventureros llevan el mismo rig de veintitrés huesos, el color horneado en cada\n' +
       'vértice y ninguna textura que el móvil no sepa abrir; miden lo que mide una persona en\n' +
-      'escala.ts; y cada pista de los doce clips encuentra su hueso en cada personaje con el\n' +
-      'nombre que GLTFLoader deja al cargar. Lo que esto NO prueba es que se vean bien: para\n' +
-      'eso hace falta mirar.',
+      'escala.ts; cada pista de los trece clips encuentra su hueso en cada personaje con el\n' +
+      'nombre que GLTFLoader deja al cargar; y quien cae en la refriega acaba en el suelo. Lo que\n' +
+      'esto NO prueba es que se vean bien: para eso hace falta mirar.',
   );
   process.exit(0);
 }

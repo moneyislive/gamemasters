@@ -29,12 +29,19 @@
  *     usar           ← Use_Item        ← Rig_Medium_General.glb
  *     lanzar         ← Throw           ← Rig_Medium_General.glb
  *     golpe          ← Hit_A           ← Rig_Medium_General.glb
+ *     caer           ← Death_A         ← Rig_Medium_General.glb
  *     salto          ← Jump_Full_Short ← Rig_Medium_MovementBasic.glb
  *     t-pose         ← T-Pose          ← Rig_Medium_General.glb
  *
+ * `caer` llegó con la refriega de Boots on Board: quien se queda sin vida cae al suelo y se queda
+ * tumbado hasta renacer (`escenas/paseo/refriega.ts`). Es `Death_A` y no `Death_B` porque dura
+ * 0,8 s contra 2,6: tumbado se queda cinco segundos, y una caída de casi tres se comería la mitad
+ * del tiempo en el suelo cayendo. (`Death_A_Pose` y `Death_B_Pose` son una clave suelta, la pose
+ * final sin la caída: se tiran como el resto.)
+ *
  * Los dos ficheros de animación traen dentro un maniquí (`Mannequin_*`: seis mallas,
  * una piel y un material) que sirve para verlas en un visor y aquí no sirve para
- * nada: se tira, y en `animaciones.glb` quedan SÓLO los 24 nodos del rig y los doce
+ * nada: se tira, y en `animaciones.glb` quedan SÓLO los 24 nodos del rig y los trece
  * clips. Ni una malla, ni una piel, ni un material.
  *
  * ═══ LA TEXTURA SE HORNEA A COLOR POR VÉRTICE, Y POR QUÉ ═══
@@ -120,7 +127,7 @@ const PERSONAJES: ReadonlyArray<{ nombre: string; fichero: string }> = [
 ];
 
 /**
- * Los doce clips: nombre nuestro ← clip del pack ← fichero.
+ * Los trece clips: nombre nuestro ← clip del pack ← fichero.
  *
  * `T-Pose` viene en los DOS ficheros de animación y es el mismo; se coge el de
  * `General` y el otro se tira, para que no salgan dos clips con el mismo nombre.
@@ -137,6 +144,7 @@ const CLIPS: ReadonlyArray<{ nombre: string; clip: string; fuente: Fuente }> = [
   { nombre: 'usar', clip: 'Use_Item', fuente: 'General' },
   { nombre: 'lanzar', clip: 'Throw', fuente: 'General' },
   { nombre: 'golpe', clip: 'Hit_A', fuente: 'General' },
+  { nombre: 'caer', clip: 'Death_A', fuente: 'General' },
   { nombre: 'salto', clip: 'Jump_Full_Short', fuente: 'MovementBasic' },
   { nombre: 't-pose', clip: 'T-Pose', fuente: 'General' },
 ];
@@ -282,7 +290,7 @@ function tiraElClip(anim: Animation): void {
  *
  * Se le añade una segunda clave IDÉNTICA un fotograma después —1/30 s, que es el
  * paso al que el pack graba todo lo demás—. La pose no cambia; el clip pasa a durar
- * 0,033 s y se reproduce, repite y funde como los otros once.
+ * 0,033 s y se reproduce, repite y funde como los otros doce.
  */
 function daUnFotogramaMas(anim: Animation): void {
   const UN_FOTOGRAMA = 1 / 30;
@@ -387,7 +395,7 @@ async function compilaAnimaciones(io: NodeIO): Promise<MedidaDeClip[]> {
    * `resample` quita las claves que no aportan nada —la mayoría de las pistas de
    * escala y de traslación son constantes, y el pack las guarda a treinta claves
    * por segundo igual—; `dedup` de accesores funde los que quedan iguales —las
-   * pistas constantes de un mismo hueso son el mismo par de claves en los doce
+   * pistas constantes de un mismo hueso son el mismo par de claves en los trece
    * clips— y `prune` tira los accesores huérfanos, los búferes vacíos y los nodos
    * que ya no apunta nadie. Los huesos hoja (`toes.*`, `handslot.*`) se quedan
    * porque las pistas los apuntan; si un día ningún clip los moviera, `prune` los
