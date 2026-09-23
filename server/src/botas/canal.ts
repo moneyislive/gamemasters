@@ -543,6 +543,16 @@ export class CanalDeBotas {
       return;
     }
 
+    if (m.t === 'golpe') {
+      /*
+       * EL GOLPE, TODAVÍA SIN REFRIEGA. El contrato ya lo lee (la ronda 3 de Boots on Board), pero
+       * la sala aún no lo arbitra: se cuenta y se ignora, como el paso de quien aún está entrando.
+       * Un aparato nuevo contra este servidor golpea al aire, y no se le echa por ello.
+       */
+      this.cuentas.ignorados++;
+      return;
+    }
+
     this.validar(c, m, ahora);
   }
 

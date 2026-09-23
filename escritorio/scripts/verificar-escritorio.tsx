@@ -96,7 +96,6 @@ import type { LaMesa, MesaVista, ResultadoDelMovimiento } from '../src/mesa';
 /* Boots on Board: el veredicto guardado de este navegador, y las palabras y la compuerta que pintan los vestíbulos. */
 import { elVeredictoDelAparato, guardarElVeredicto } from '../src/mesa';
 import { MARCA_DE_BOTAS, MOTIVO_NO_LLEGA, MOTIVO_SIN_MEDIR } from '../../escenas/compuerta-de-botas';
-import { sePuedeRecorrer } from '../../shared/arcade/juegos/mundos';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
 import { haEmpezado } from '../src/empezada';
 import { Muelle } from '../src/muelle';
