@@ -46,7 +46,9 @@ console.warn = (...a) => avisos.push(a.join(' '));
 let antes = 0;
 let despues = 0;
 const filas = [];
-for (const f of fs.readdirSync(ENTRA).filter((x) => x.endsWith('.glb')).sort()) {
+// COMPRIMIR_SOLO=a.glb,b.glb comprime sólo esos (`empaquetar.py clips` rehace los clips sin tocar las figuras)
+const SOLO = process.env.COMPRIMIR_SOLO ? new Set(process.env.COMPRIMIR_SOLO.split(',')) : null;
+for (const f of fs.readdirSync(ENTRA).filter((x) => x.endsWith('.glb') && (!SOLO || SOLO.has(x))).sort()) {
   const bruto = fs.readFileSync(path.join(ENTRA, f));
   const doc = await io.readBinary(bruto);
   doc.setLogger(new Logger(Logger.Verbosity.WARN));

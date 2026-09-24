@@ -4,6 +4,9 @@
 #   bash arte/forja/rehacer.sh                 todo: figuras, piezas, clips, empaquetado, capturas y batería
 #   bash arte/forja/rehacer.sh sin-capturas    lo mismo sin las capturas (lo que hace falta para el juego)
 #   bash arte/forja/rehacer.sh figuras|clips|piezas|empaquetar|capturas|bateria     una fase suelta
+#   bash arte/forja/rehacer.sh captura         saca las muestras de la captura (arte/ual/, CC0) a obra/captura/
+#   bash arte/forja/rehacer.sh solo-clips      captura, clips, empaquetado SÓLO de los clips y batería
+#   bash arte/forja/rehacer.sh empaquetar-clips   sólo los dos GLB de clips y sus entradas de reparto.json
 #   FIGS="celador-hombre-alto" bash arte/forja/rehacer.sh figuras                   sólo esas figuras
 #
 # Sale con código distinto de 0 si falla un Blender, el empaquetado o la batería. Los registros de
@@ -53,18 +56,26 @@ en_paralelo() {   # en_paralelo <funcion> <elementos...>: como mucho $PARALELO a
 una_figura() { correr "obra/tmp/out_$1.txt" --python forja.py -- fig="$1" pasos=construir; }
 unas_capturas() { correr "obra/tmp/out_capt_$1.txt" --python forja.py -- fig="$1" pasos=hoja,cara,lod,manos,tiras; }
 un_sexo() { correr "obra/tmp/out_clips_$1.txt" --python forja.py -- fig=clips sexo="$1"; }
+# la captura (captura.py): de los GLB de UAL a obra/captura/ual.npz; los clips con receta la leen al hornearse
+fase_captura() {   # con CAPTURA=0 se hornea la forja pura y no hace falta arte/ual/
+  if [ "${CAPTURA:-1}" = "0" ]; then echo "== captura (CAPTURA=0: la forja pura)"; return 0; fi
+  echo "== captura"; correr obra/tmp/out_captura.txt --python captura.py -- extraer
+}
 una_comprobacion() { "$B" -b --factory-startup --python-exit-code 1 --python comprobar.py -- fig="$1" > "obra/tmp/comp_$1.txt" 2>&1; }
 
 fase_figuras() { echo "== figuras ($(echo $FIGS | wc -w))"; en_paralelo una_figura $FIGS; }
 fase_clips() { echo "== clips"; en_paralelo un_sexo m f; }
 fase_piezas() { echo "== piezas"; correr obra/tmp/out_piezas.txt --python forja.py -- fig=piezas; }
 fase_empaquetar() { echo "== empaquetar"; "$PY" empaquetar.py; }
+fase_empaquetar_clips() { echo "== empaquetar (solo los clips)"; "$PY" empaquetar.py clips; }
 fase_capturas() { echo "== capturas"; en_paralelo unas_capturas $FIGS; "$B" -b --factory-startup --python-exit-code 1 --python mosaico.py > obra/tmp/out_mosaico.txt 2>&1; }
 fase_bateria() {
   echo "== bateria"
   local fallo=0
   en_paralelo una_comprobacion $FIGS || fallo=1
   "$PY" validar.py > obra/tmp/validacion.txt 2>&1 || fallo=1
+  # la batería del movimiento (bisagras, marcha, fundidos, golpes, la mano en la cara): sobre el esqueleto, los dos sexos
+  "$B" -b --factory-startup --python-exit-code 1 --python comprobar_movimiento.py > obra/tmp/movimiento.txt 2>&1 || fallo=1
   node en_three.mjs > obra/tmp/en_three.txt 2>&1 || fallo=1
   "$PY" resumen.py || fallo=1
   return $fallo
@@ -73,7 +84,15 @@ fase_bateria() {
 estado=0
 case "$MODO" in
   figuras) fase_figuras || estado=1 ;;
+  captura) fase_captura || estado=1 ;;
   clips) fase_clips || estado=1 ;;
+  empaquetar-clips) fase_empaquetar_clips || estado=1 ;;
+  solo-clips)
+    fase_captura || { echo "Fallo la captura: mira obra/tmp/out_captura.txt (falta arte/ual/?)"; exit 1; }
+    fase_clips || { echo "Fallo el horneado: mira obra/tmp/out_clips_*.txt"; exit 1; }
+    fase_empaquetar_clips || { echo "Fallo el empaquetado de los clips"; exit 1; }
+    fase_bateria || estado=1
+    ;;
   piezas) fase_piezas || estado=1 ;;
   empaquetar) fase_empaquetar || estado=1 ;;
   capturas) fase_capturas || estado=1 ;;
@@ -81,6 +100,7 @@ case "$MODO" in
   todo|sin-capturas)
     fase_figuras || { echo "Fallo alguna figura: mira obra/tmp/out_*.txt"; exit 1; }
     fase_piezas || { echo "Fallo las piezas: mira obra/tmp/out_piezas.txt"; exit 1; }
+    fase_captura || { echo "Fallo la captura: mira obra/tmp/out_captura.txt (falta arte/ual/?)"; exit 1; }
     fase_clips || { echo "Fallo el horneado: mira obra/tmp/out_clips_*.txt"; exit 1; }
     fase_empaquetar || { echo "Fallo el empaquetado"; exit 1; }
     if [ "$MODO" = "todo" ]; then fase_capturas || estado=1; fi

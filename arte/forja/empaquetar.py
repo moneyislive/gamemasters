@@ -437,9 +437,8 @@ def _clip_json(sexo):
     return json.load(open(os.path.join(OBRA, 'clips-%s.json' % sexo), encoding='utf-8'))
 
 
-def escribir_manifiesto(familias, clips, piezas):
-    """reparto.json. La forma es la que ya lee el cliente (`escritorio/src/quiebro/personajes/reparto.ts`,
-    escrito contra la primera entrega): los campos que había siguen con su tipo y lo nuevo se AÑADE."""
+def lista_de_clips():
+    """Las entradas `clips` del manifiesto (y los mapas de gestos) desde obra/clips-{m,f}.json."""
     meta = {s_: _clip_json(s_) for s_ in 'mf'}
     gestos = meta['m'].pop('_gestos', {})
     por_direccion = meta['m'].pop('_por_direccion', {})
@@ -452,8 +451,10 @@ def escribir_manifiesto(familias, clips, piezas):
     lista_clips = {}
     for nombre, d in meta['m'].items():
         df = meta['f'].get(nombre, {})
+        # de dónde sale el clip (la captura de UAL, la forja o una mezcla: captura.py); el cliente no lo lee
         c = {'duracionMs': round(d['fotogramas'] * 1000 / fps), 'fotogramas': d['fotogramas'], 'fps': fps,
-             'bucle': d['bucle'], 'raiz': bool(d.get('raiz_animada')), 'descripcion': d.get('descripcion', '')}
+             'bucle': d['bucle'], 'raiz': bool(d.get('raiz_animada')), 'descripcion': d.get('descripcion', ''),
+             'fuente': d.get('fuente', 'forja')}
         if 'metros_por_ciclo' in d:
             c['zancadaM'] = d['metros_por_ciclo']
             c['velocidadMs'] = d['velocidad_m_s']
@@ -467,6 +468,10 @@ def escribir_manifiesto(familias, clips, piezas):
             c['recorridoM'] = d['recorrido_m']
             c['alturaImpactoM'] = d['altura_impacto_m']
             c['efector'] = d['efector']
+            if 'alcance_m' in df:
+                # el de la mujer, medido en su esqueleto (la revisión: el manifiesto no lo decía)
+                c.setdefault('mujer', {}).update({'alcanceM': df['alcance_m'], 'recorridoM': df['recorrido_m'],
+                                                  'alturaImpactoM': df['altura_impacto_m']})
         if 'disparos_ms' in d:
             c['disparosMs'] = d['disparos_ms']
         if 'intocable_ms' in d:
@@ -486,6 +491,13 @@ def escribir_manifiesto(familias, clips, piezas):
     for g, clip in gestos.items():
         if clip not in lista_clips:
             fallo('el gesto %s apunta a un clip que no existe: %s' % (g, clip))
+    return lista_clips, gestos, por_direccion, por_clase, entra_con, marcha
+
+
+def escribir_manifiesto(familias, clips, piezas):
+    """reparto.json. La forma es la que ya lee el cliente (`escritorio/src/quiebro/personajes/reparto.ts`,
+    escrito contra la primera entrega): los campos que había siguen con su tipo y lo nuevo se AÑADE."""
+    lista_clips, gestos, por_direccion, por_clase, entra_con, marcha = lista_de_clips()
     esqueletos = {}
     for s_, nombre in SEXO.items():
         c = clips[s_]
@@ -662,5 +674,56 @@ def _a_srgb(c):
     return 12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
 
 
+def solo_clips():
+    """`python empaquetar.py clips`: rehace SÓLO los clips (los de la captura, con las figuras de siempre).
+    Empaqueta obra/clips-{m,f}.glb, comprime esos dos y en reparto.json cambia las entradas de `clips` y
+    los bytes de esos dos ficheros (y los totales que los cuentan); lo demás del manifiesto (figuras,
+    clases, gestos, esqueletos) se queda como estaba, byte a byte. Falla si un gesto apunta a un clip que
+    ya no está o si los esqueletos de los clips no son los de siempre."""
+    os.makedirs(EMP, exist_ok=True)
+    ruta = os.path.join(REC, 'reparto.json')
+    man = json.load(open(ruta, encoding='utf-8'))
+    print('== clips')
+    clips = {s: empaquetar_clips(s) for s in 'mf'}
+    if FALLOS or not all(clips.values()):
+        return 1
+    for s_, nombre in SEXO.items():
+        e = esqueleto_de(clips[s_]['gltf'], s_)
+        if e['huesos'] != man['esqueletos'][nombre]['huesos']:
+            fallo('los huesos de %s no son los del manifiesto' % clips[s_]['archivo'])
+    print('== comprimir (node comprimir.mjs, sólo los clips)')
+    sys.stdout.flush()
+    solo = ','.join(c['archivo'] for c in clips.values())
+    r = subprocess.run(['node', os.path.join(AQUI, 'comprimir.mjs')], env=dict(os.environ, REPARTO_SALIDA=REC, COMPRIMIR_SOLO=solo))
+    if r.returncode != 0:
+        fallo('comprimir.mjs salio con %d' % r.returncode)
+        return 1
+    lista_clips, gestos, por_direccion, por_clase, entra_con, marcha = lista_de_clips()
+    for g, e in man['gestos'].items():
+        for c in [e['clip']] + list(e.get('porDireccion', {}).values()) + list(e.get('porClase', {}).values()) + \
+                ([e['entraCon']] if e.get('entraCon') else []):
+            if c not in lista_clips:
+                fallo('el gesto %s del manifiesto pide el clip %s, que ya no se hornea' % (g, c))
+    man['clips'] = lista_clips
+    b = man['bytes']
+    for c in clips.values():
+        b['porArchivo'][c['archivo']] = os.path.getsize(os.path.join(REC, c['archivo']))
+    todos = sorted(f for f in os.listdir(REC) if f.endswith('.glb'))
+    b['total'] = sum(os.path.getsize(os.path.join(REC, f)) for f in todos)
+    b['primeraNocheN0']['total'] = sum(os.path.getsize(os.path.join(REC, f)) for f in b['primeraNocheN0']['archivos'])
+    if b['total'] > TOPE:
+        fallo('los GLB suman %d bytes: mas que el tope de %d' % (b['total'], TOPE))
+    with open(ruta, 'w', encoding='utf-8', newline='\n') as f:
+        json.dump(man, f, ensure_ascii=False, indent=1)
+        f.write('\n')
+    print('== reparto.json (clips): %s; total %d bytes (tope %d); primera noche N0 %d bytes' % (
+        ', '.join('%s %d' % (c['archivo'], b['porArchivo'][c['archivo']]) for c in clips.values()), b['total'], TOPE,
+        b['primeraNocheN0']['total']))
+    if FALLOS:
+        print('%d FALLOS' % len(FALLOS))
+        return 1
+    return 0
+
+
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(solo_clips() if sys.argv[1:] == ['clips'] else main())

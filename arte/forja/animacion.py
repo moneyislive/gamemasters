@@ -231,9 +231,278 @@ def _giro_y(q):
     return math.degrees(2.0 * math.atan2(q.y, q.w))
 
 
+ADELANTE = Vector((0.0, -1.0, 0.0))
+# ═══ LOS TOPES DE LAS BISAGRAS (captura, segunda pasada) ═══ La revisión midió codos que se doblaban 47-84°
+# fuera de su eje y tibias giradas 44° sobre una rodilla recta en todo lo que salía de la captura: la IK
+# de la primera pasada giraba cada hueso «lo justo» y dejaba el giro propio que traía la captura, y en UAL
+# ese giro del húmero y del muslo NO es el de su bisagra (medido en sus datos: el eje en que dobla el codo
+# se aparta 20-44° del que dice su reposo en el percentil 90, fotograma a fotograma). Ahora el codo y la
+# rodilla doblan SOBRE SU EJE: el plano lo ponen las articulaciones (hombro, codo, muñeca), y el húmero y
+# el muslo toman el giro que ese plano pide. Lo que la mano gira de más respecto al antebrazo (la
+# pronación) va al hueso `giro_` y a la muñeca, con topes.
+CODO_MAX = 145.0            # flexión del codo (grados)
+RODILLA_MAX = 155.0
+TIBIA_RECTA = 14.0          # lo que la tibia puede girar sobre la rodilla casi recta respecto al pie...
+TIBIA_DOBLADA = 32.0        # ...y doblada (hasta 45°; más recogida, el pie no dice hacia dónde va la rodilla)
+MUNECA_MAX = 72.0           # lo que la mano se dobla respecto al antebrazo
+PRONACION_MAX = 110.0       # lo que la mano gira sobre el antebrazo
+_BISAGRAS = {}
+
+
+def _marco_yx(y, x):
+    """Marco (columnas X, Y, Z) con Y = y y X = x hecho perpendicular a y."""
+    y = y.normalized()
+    x = x - y * x.dot(y)
+    if x.length < 1e-9:
+        x = y.orthogonal()
+    x.normalize()
+    return Matrix((x, y, x.cross(y))).transposed()
+
+
+def bisagra_de_reposo(sk, raiz_b, medio_b, fin_b, doblez):
+    """Direcciones de reposo de los dos huesos y el eje de la bisagra en reposo (Y1 × hacia donde dobla: el
+    antebrazo, hacia delante; la tibia, hacia atrás). El mismo convenio que la batería del movimiento."""
+    clave = (id(sk), raiz_b)
+    if clave not in _BISAGRAS:
+        Y1 = (sk.head[medio_b] - sk.head[raiz_b]).normalized()
+        Y2 = (sk.head[fin_b] - sk.head[medio_b]).normalized()
+        n0 = Y1.cross(doblez).normalized()
+        _BISAGRAS[clave] = (Y1, Y2, n0, _marco_yx(Y1, n0), _marco_yx(Y2, n0))
+    return _BISAGRAS[clave]
+
+
+def _girar_sobre(v, eje, ang):
+    return Matrix.Rotation(ang, 3, eje) @ v
+
+
+def _angulo_sobre(a, b, eje):
+    """El ángulo (rad, con signo) de a a b alrededor de `eje` (los dos perpendiculares a él)."""
+    return math.atan2(eje.dot(a.cross(b)), a.dot(b))
+
+
+def _ik_bisagra(sk, D, head, raiz_b, medio_b, fin_b, T, doblez, l1, l2, eje_por_defecto, w=1.0, polo=None,
+                flex_max=150.0, eje_del_pie=None, eje_fijo=False):
+    """IK DE DOS HUESOS CON BISAGRA sobre una pose FK (la captura). El codo (la rodilla) dobla sólo sobre su eje:
+    el de reposo (`bisagra_de_reposo`) llevado al plano en que la articulación dobla. Ese plano lo da donde está
+    el codo en la FK (o `polo`, hacia donde apunta); con el brazo casi recto, `eje_por_defecto` (el eje que la FK
+    ya llevaba, o el que pide el pie en la rodilla), y entre medias se gira de uno a otro alrededor de la recta
+    hombro-muñeca. La rodilla, además, no se aparta del pie más de TIBIA_RECTA / TIBIA_DOBLADA (la tibia girada
+    sobre la rodilla se ve como una pierna arqueada con el pie abierto). La flexión, como mucho `flex_max`.
+    Mezcla con la FK por w. Escribe D y head del primer hueso, del segundo y de la cabeza del tercero."""
+    Y1, Y2, n0, F1, F2 = bisagra_de_reposo(sk, raiz_b, medio_b, fin_b, doblez)
+    H = head[raiz_b]
+    K0 = head[medio_b]
+    d = T - H
+    dist = d.length
+    if dist < 1e-6:
+        return
+    u = d / dist
+    # la flexión, con su tope: el fin no se acerca a la raíz más de lo que deja doblar flex_max
+    dmin = math.sqrt(max(1e-9, l1 * l1 + l2 * l2 + 2.0 * l1 * l2 * math.cos(math.radians(flex_max))))
+    if dist < dmin:
+        T = H + u * dmin
+        dist = dmin
+    dmax = (l1 + l2) * 0.9995
+    ca = max(-1.0, min(1.0, (l1 * l1 + l2 * l2 - min(dist, dmax) ** 2) / (2.0 * l1 * l2)))
+    flex = 180.0 - math.degrees(math.acos(ca))
+    # el eje de la bisagra
+    n_def = eje_por_defecto - u * eje_por_defecto.dot(u)
+    if n_def.length < 1e-6:
+        n_def = u.orthogonal()
+    n_def.normalize()
+    if polo is not None:
+        v_fk = polo - u * polo.dot(u)
+        dobla = 1.0
+    else:
+        v_fk = (K0 - H) - u * (K0 - H).dot(u)
+        # cuánto dobla la FK (el seno del ángulo del primer hueso con la recta): recta, manda el eje por defecto
+        dobla = suave(min(1.0, max(0.0, (v_fk.length / l1 - 0.05) / 0.2)))
+    n = n_def
+    # con un eje de fiar (`eje_fijo`: el seguido en el tiempo, que donde el brazo dobla de verdad YA es el de la FK), ése;
+    # si no, del eje por defecto al de la FK según cuánto dobla
+    if v_fk.length > 1e-6 and dobla > 0.0 and not eje_fijo:
+        n_fk = v_fk.normalized().cross(u)          # el eje que dobla hacia v_fk (ver _ik2: -(u × v))
+        n = _girar_sobre(n_def, u, _angulo_sobre(n_def, n_fk, u) * dobla)
+    # (el pie sólo dice hacia dónde va la rodilla con la pierna casi recta: recogida, con la rodilla arriba y el pie
+    # delante, «la rodilla hacia la punta del pie» le daba la vuelta: los saltos de 150° en el quiebro hacia atrás)
+    if eje_del_pie is not None and flex < 45.0:
+        n_p = eje_del_pie - u * eje_del_pie.dot(u)
+        if n_p.length > 1e-6:
+            n_p.normalize()
+            tope = math.radians(TIBIA_RECTA + (TIBIA_DOBLADA - TIBIA_RECTA) * suave(min(1.0, flex / 45.0)))
+            a = _angulo_sobre(n_p, n, u)
+            if abs(a) > tope:
+                n = _girar_sobre(n_p, u, math.copysign(tope, a))
+    n.normalize()
+    y1, y2, _ = _ik2(H, T, l1, l2, u.cross(n), 1)
+    D1 = _marco_yx(y1, n) @ F1.transposed()
+    D2 = _marco_yx(y2, n) @ F2.transposed()
+    if w < 1.0:
+        D1 = D[raiz_b].to_quaternion().slerp(D1.to_quaternion(), w).to_matrix()
+        D2 = D[medio_b].to_quaternion().slerp(D2.to_quaternion(), w).to_matrix()
+    D[raiz_b] = D1
+    D[medio_b] = D2
+    head[medio_b] = H + D1 @ (sk.head[medio_b] - sk.head[raiz_b])
+    head[fin_b] = head[medio_b] + D2 @ (sk.head[fin_b] - sk.head[medio_b])
+
+
+def _muneca_con_topes(Da, Dm, eje, giro=None):
+    """La mano (giro en el mundo Dm) respecto al antebrazo (Da), con topes: se dobla como mucho MUNECA_MAX y gira
+    sobre el antebrazo (`eje`, su dirección de reposo) como mucho PRONACION_MAX. `giro` (grados): el giro sobre el
+    antebrazo ya decidido (captura.bisagras_seguidas lo sigue en el tiempo: cerca de media vuelta, el signo saltaba
+    de +110 a -110 de un fotograma a otro)."""
+    q = (Da.transposed() @ Dm).to_quaternion()
+    v = Vector((q.x, q.y, q.z))
+    p = eje * v.dot(eje)
+    tw = Quaternion((q.w, p.x, p.y, p.z))
+    if tw.magnitude < 1e-9:
+        tw = Quaternion()
+    tw.normalize()
+    sw = q @ tw.inverted()
+    a_tw = 2.0 * math.atan2(Vector((tw.x, tw.y, tw.z)).dot(eje), tw.w)
+    a_tw = (a_tw + math.pi) % (2.0 * math.pi) - math.pi
+    lim = math.radians(PRONACION_MAX)
+    cambia = False
+    if giro is not None:
+        g = max(-lim, min(lim, math.radians(giro)))
+        if abs(g - a_tw) > 1e-4:
+            tw = Quaternion(eje, g)
+            cambia = True
+    elif abs(a_tw) > lim:
+        tw = Quaternion(eje, math.copysign(lim, a_tw))
+        cambia = True
+    eje_sw, a_sw = sw.to_axis_angle()
+    if a_sw > math.pi:
+        a_sw -= 2.0 * math.pi
+    lim = math.radians(MUNECA_MAX)
+    if abs(a_sw) > lim:
+        sw = Quaternion(eje_sw, math.copysign(lim, a_sw))
+        cambia = True
+    if not cambia:
+        return Dm
+    return Da @ (sw @ tw).to_matrix()
+
+
+def _resolver_fk(sk, p, falda=None):
+    """La pose de la CAPTURA (captura.py): `_fk` trae, por hueso, su giro local en ejes del mundo en
+    reposo (D[padre]⁻¹·D[hueso]); `cad`, la cabeza de caderas como en `resolver`. Encima, la IK de las
+    piernas a los tobillos `pie_s` (con peso `ikp_s`; el pie conserva su giro de la captura en el mundo)
+    y la de los brazos a las muñecas `mano_s` (`ikb_s`; la mano conserva su giro). Mismas salidas que
+    `resolver`, para que el horneado (suelo, raíz, faldón) no distinga de dónde sale la pose."""
+    e = sk.esc
+    I3 = Matrix.Identity(3)
+    desp = v3(p.get('desp', (0, 0, 0))) * e
+    raiz = v3(p.get('raiz', (0, 0, 0))) * e
+    Q = p['_fk']
+    D, head = {}, {}
+    D['raiz'] = I3
+    head['raiz'] = sk.head['raiz'] + raiz
+    D['caderas'] = Q.get('caderas', I3)
+    head['caderas'] = sk.head['caderas'] + v3(p['cad']) * e + desp
+
+    def fk(b, q):
+        par = sk.parent[b]
+        D[b] = D[par] @ q
+        head[b] = head[par] + D[par] @ (sk.head[b] - sk.head[par])
+
+    for b in ('columna', 'columna1', 'pecho', 'cuello', 'cabeza'):
+        fk(b, Q.get(b, I3))
+    for s, sg in (('L', 1), ('R', -1)):
+        for b in ('hombro_', 'brazo_', 'antebrazo_', 'mano_'):
+            fk(b + s, Q.get(b + s, I3))
+        # ═══ EL CODO, BISAGRA ═══ (ver `_ik_bisagra`) siempre: a la muñeca de la FK, o a `mano_s` con peso
+        # `ikb_s`; hacia donde está el codo de la FK (o hacia `codo_s`, si lo dan). La mano conserva su giro.
+        Dm = D['mano_' + s]
+        w = p.get('ikb_' + s, 0.0)
+        T = head['mano_' + s]
+        if w > 1e-4:
+            T = T.lerp(v3(p['mano_' + s]) * e + desp, min(1.0, w))
+        polo = p.get('codo_' + s)
+        _, _, n0, _, _ = bisagra_de_reposo(sk, 'brazo_' + s, 'antebrazo_' + s, 'mano_' + s, ADELANTE)
+        # con el brazo casi recto, el eje de la bisagra: el que la captura deja seguido en el tiempo (`eje_codo_s`,
+        # captura.bisagras_seguidas), o el que ya llevaba el húmero
+        fijo = p.get('eje_codo_' + s) is not None
+        eje = v3(p['eje_codo_' + s]) if fijo else D['brazo_' + s] @ n0
+        _ik_bisagra(sk, D, head, 'brazo_' + s, 'antebrazo_' + s, 'mano_' + s, T, ADELANTE, sk.l_brazo, sk.l_antebrazo,
+                    eje, polo=v3(polo) if polo is not None and w > 1e-4 else None, flex_max=CODO_MAX, eje_fijo=fijo)
+        D['mano_' + s] = Dm
+        orm = p.get('orm_' + s)
+        if orm is not None:
+            R_m = sk.R['mano_' + s]
+            Dm = _marco_mano(orm[0], orm[1], s) @ R_m.transposed()
+            q0 = D['mano_' + s].to_quaternion()
+            D['mano_' + s] = q0.slerp(Dm.to_quaternion(), orm[2] if len(orm) > 2 else 1.0).to_matrix()
+        D['mano_' + s] = _muneca_con_topes(D['antebrazo_' + s], D['mano_' + s],
+                                           (sk.head['mano_' + s] - sk.head['antebrazo_' + s]).normalized(),
+                                           giro=p.get('pronacion_' + s) if orm is None else None)
+        R_m = sk.R['mano_' + s]
+        Da = D['antebrazo_' + s]
+        L = R_m.transposed() @ (Da.transposed() @ D['mano_' + s]) @ R_m
+        tau = _giro_y(L.to_quaternion())
+        tau = (tau + 180.0) % 360.0 - 180.0
+        R_g = sk.R['giro_' + s]
+        fk('giro_' + s, R_g @ Ry(0.5 * tau) @ R_g.transposed())
+        if p.get('_dedos_' + s):
+            # los dedos de la forja (un agarre: el paraguas, el auricular) sobre la mano de la captura
+            c1, c2 = p.get('ded_' + s, (16.0, 24.0))
+            fk('dedos_' + s, rot_eje(sk.R['dedos_' + s].col[0], c1))
+            fk('dedos2_' + s, rot_eje(sk.R['dedos2_' + s].col[0], c2))
+            a1, a2 = p.get('pul_' + s, (8.0, 6.0))
+            Rp = sk.R['pulgar_' + s]
+            fk('pulgar_' + s, rot_eje(Rp.col[0], a1 * sg) @ rot_eje(Rp.col[2], a2))
+        else:
+            for b in ('dedos_', 'dedos2_', 'pulgar_'):
+                fk(b + s, Q.get(b + s, I3))
+        fk('agarre_' + s, I3)
+        for b in ('muslo_', 'pierna_', 'pie_', 'punta_'):
+            fk(b + s, Q.get(b + s, I3))
+        # ═══ LA RODILLA, BISAGRA ═══ al tobillo `pie_s` (peso `ikp_s`) o al de la FK; hacia donde está la
+        # rodilla de la FK y, con la pierna casi recta, hacia donde apunta el pie. El pie conserva su giro.
+        w = p.get('ikp_' + s, 0.0)
+        Dp, Dq = D['pie_' + s], D['punta_' + s]
+        T = head['pie_' + s]
+        if w > 1e-4:
+            T = T.lerp(v3(p['pie_' + s]) * e + desp, min(1.0, w))
+        pie_adelante = Dp @ (sk.bola[s] - sk.talon[s])
+        pierna_dir = T - head['muslo_' + s]
+        eje_pie = pie_adelante.cross(pierna_dir)      # la rodilla hacia la punta del pie
+        # (con el pie de puntillas en la línea de la pierna, la patada, el pie no dice hacia dónde va la rodilla)
+        if eje_pie.length < 0.4 * pie_adelante.length * max(pierna_dir.length, 1e-6):
+            eje_pie = None
+        _, _, n0, _, _ = bisagra_de_reposo(sk, 'muslo_' + s, 'pierna_' + s, 'pie_' + s, -ADELANTE)
+        fijo = p.get('eje_rodilla_' + s) is not None
+        if fijo:
+            eje = v3(p['eje_rodilla_' + s])
+        else:
+            eje = eje_pie if eje_pie is not None else D['muslo_' + s] @ n0
+        _ik_bisagra(sk, D, head, 'muslo_' + s, 'pierna_' + s, 'pie_' + s, T, -ADELANTE, sk.l_muslo, sk.l_pierna,
+                    eje, flex_max=RODILLA_MAX, eje_del_pie=eje_pie, eje_fijo=fijo)
+        D['pie_' + s] = Dp
+        D['punta_' + s] = Dq
+        head['punta_' + s] = head['pie_' + s] + Dp @ (sk.head['punta_' + s] - sk.head['pie_' + s])
+    for b in sk.falda:
+        if falda is not None and b in falda:
+            par = sk.parent[b]
+            D[b] = falda[b]
+            head[b] = head[par] + D[par] @ (sk.head[b] - sk.head[par])
+        else:
+            fk(b, I3)
+    out = {}
+    for b in sk.orden:
+        par = sk.parent[b]
+        q = D[b] if par is None else D[par].inverted() @ D[b]
+        L = sk.R[b].inverted() @ q @ sk.R[b]
+        out[b] = L.to_quaternion()
+    loc = sk.R['caderas'].inverted() @ (head['caderas'] - sk.head['caderas'] - raiz)
+    loc_r = sk.R['raiz'].inverted() @ raiz
+    return out, loc, loc_r, D, head
+
+
 def resolver(sk, p, falda=None):
     """pose -> (rotaciones locales {hueso: Quaternion}, loc local de caderas, loc de raiz,
     matrices de mundo D (delta de rotacion) y cabezas)."""
+    if '_fk' in p:
+        return _resolver_fk(sk, p, falda)
     e = sk.esc
     desp = v3(p.get('desp', (0, 0, 0))) * e
     raiz = v3(p.get('raiz', (0, 0, 0))) * e
@@ -272,11 +541,26 @@ def resolver(sk, p, falda=None):
                 if dg.length > 1e-6:
                     Tg = S + dg.normalized() * (min(g[3], 0.9995) * (sk.l_brazo + sk.l_antebrazo))
                     T = T.lerp(Tg, min(1.0, g[4]))
-            y1, y2, n = _ik2(S, T, sk.l_brazo, sk.l_antebrazo, p['codo_' + s], 1)
+            polo = v3(p['codo_' + s])
+            if w < 0.9999:
+                # ═══ DE LA FK A LA IK, EN POSICIONES (segunda pasada de la captura) ═══ Mezclar los GIROS de la
+                # solución FK y de la IK (slerp de cada hueso) hacía pasar el brazo por poses que no son ninguna de
+                # las dos: el húmero daba media vuelta en un fotograma al soltar la guardia (la revisión: 150-180° en
+                # los quiebros, el avance y la Entrada). Ahora se mezclan la MUÑECA y hacia dónde apunta el codo, y la
+                # IK resuelve esa pose intermedia: w=0 es la FK (el codo de la FK ya dobla sobre su bisagra) y w=1, la IK.
+                K0 = head['antebrazo_' + s]
+                W0 = K0 + D['antebrazo_' + s] @ (sk.head['mano_' + s] - sk.head['antebrazo_' + s])
+                T = W0.lerp(T, w)
+                u = (T - S).normalized()
+                v_fk = (K0 - S) - u * (K0 - S).dot(u)
+                v_ik = polo - u * polo.dot(u)
+                if v_fk.length > 1e-6 and v_ik.length > 1e-6:
+                    # el codo gira alrededor de la recta hombro-muñeca de donde lo tiene la FK a donde lo pide la IK
+                    # (mezclar las dos direcciones pasaba por cero cuando eran opuestas, y el codo saltaba de lado)
+                    polo = _girar_sobre(v_fk.normalized(), u, _angulo_sobre(v_fk.normalized(), v_ik.normalized(), u) * w)
+            y1, y2, n = _ik2(S, T, sk.l_brazo, sk.l_antebrazo, polo, 1)
             Db = _marco(n, y1) @ sk.R['brazo_' + s].inverted()
             Da = _marco(n, y2) @ sk.R['antebrazo_' + s].inverted()
-            Db = D['brazo_' + s].to_quaternion().slerp(Db.to_quaternion(), w).to_matrix()
-            Da = D['antebrazo_' + s].to_quaternion().slerp(Da.to_quaternion(), w).to_matrix()
             D['brazo_' + s] = Db
             D['antebrazo_' + s] = Da
             head['antebrazo_' + s] = S + Db @ (sk.head['antebrazo_' + s] - sk.head['brazo_' + s])
@@ -1443,6 +1727,27 @@ class Faldon:
                 for jj in range(j, 4):
                     pos[c][jj] = pos[c][jj] + delta
 
+    # ═══ SEGUNDA PASADA DE LA CAPTURA: TUMBADO, TOPES DE VELOCIDAD Y EL MUSLO ═══ La revisión vio el faldón doblado
+    # en una caja bajo la cadera o dado la vuelta (169° de la vertical) todo el KO, y en el jab el panel de delante
+    # tieso a la altura de la rodilla 400 ms. Tres causas: la tela quería colgar hacia el suelo aunque el cuerpo
+    # estuviese tumbado (el objetivo sólo seguía la guiñada de la cadera), nada limitaba lo que un panel gira de un
+    # fotograma a otro, y los golpes no tenían tope. Ahora, tumbado, la forma a la que tiende es la de reposo llevada
+    # por la pelvis entera (extendida sobre las piernas y el suelo) con un tope de 25°; y al acabar, ningún hueso del
+    # faldón gira más de VEL_MAX por fotograma respecto a la cadera ni, de pie, un panel de delante se aparta más de
+    # MUSLO_MAX del muslo hacia delante (se vuelven a chocar las cápsulas).
+    VEL_MAX = 25.0
+    MUSLO_MAX = 60.0
+    BAJO_MAX = 50.0
+    TOPE_TUMBADO = 25.0
+
+    @staticmethod
+    def tumbado(D, head):
+        """0 de pie (la cadera a menos de ~53° de la vertical), 1 tumbado (a más de ~80°)."""
+        arriba = head['columna'] - head['caderas']
+        if arriba.length < 1e-9:
+            return 0.0
+        return suave(min(1.0, max(0.0, (0.6 - arriba.normalized().z) / 0.4)))
+
     def simular(self, cuadros, viento=(0, 0, 0), bucle=False, tope=None):
         """cuadros: lista de (D, head) por fotograma. Devuelve lista de dict hueso -> D (mundo)."""
         tope = self.TOPE if tope is None else tope
@@ -1544,9 +1849,13 @@ class Faldon:
             y0, y1 = rumbo(D), rumbo(D2)
             dy = (y1 - y0 + math.pi) % (2 * math.pi) - math.pi
             arr0, arr1 = arrastre(D, y0), arrastre(D2, y1)
+            tb0, tb1 = self.tumbado(D, head), self.tumbado(D2, head2)
+            qc0, qc1 = D['caderas'].to_quaternion(), D2['caderas'].to_quaternion()
             for sub in range(self.SUBPASOS):
                 a = (sub + 1) / self.SUBPASOS
                 Rz_ = Matrix.Rotation(y0 + dy * a, 3, 'Z')
+                tb = tb0 + (tb1 - tb0) * a
+                Dc_ = qc0.slerp(qc1, a).to_matrix() if tb > 0.0 else None
                 caps = [(p0.lerp(p1, a), q0.lerp(q1, a), ra, rb) for (p0, q0, ra, rb), (p1, q1, _, _) in zip(caps0, caps1)]
                 arr = arr0 if a < 0.5 else arr1
                 for c in range(8):
@@ -1557,7 +1866,11 @@ class Faldon:
                     for j in range(1, 4):
                         x, xp = pos[c][j], prev[c][j]
                         vel = (x - xp) / dt
-                        tgt = pos[c][j - 1] + (Rz_ @ (Rc @ dirs0[c][j - 1])) * self.largos[c][j - 1]
+                        dr = Rz_ @ (Rc @ dirs0[c][j - 1])
+                        if tb > 0.0:
+                            # tumbado: la tela se extiende con la pelvis (sobre las piernas y el suelo), no cuelga
+                            dr = (dr * (1.0 - tb) + (Dc_ @ dirs0[c][j - 1]) * tb).normalized()
+                        tgt = pos[c][j - 1] + dr * self.largos[c][j - 1]
                         if j == 1:
                             # el primer hueso va cosido al talle (mitad con la pelvis, mitad colgando)
                             # salvo cuando el muslo lo empuja: entonces manda el arrastre
@@ -1596,7 +1909,7 @@ class Faldon:
                                 corr = dv * ((L - r0 * 0.45) / L) * 0.5
                                 pos[ca][j] = pa + corr
                                 pos[cb][j] = pb - corr
-                    self._topes(pos, objetivo(D2, head2), D2, tope)
+                    self._topes(pos, objetivo(D2, head2), D2, tope + (self.TOPE_TUMBADO - tope) * tb1 if tb1 > 0 else tope)
                     self._colisiones(pos, caps)
                 self._talle(pos, D2, head2)
             if idx >= registro_desde:
@@ -1613,7 +1926,80 @@ class Faldon:
                 for c in range(8):
                     for j in range(1, 4):
                         salida[f][c][j] = salida[f][c][j] - err[c][j] * a
-        return salida
+        return self._limitar(cuadros[:len(salida)], salida, tope)
+
+    def _limitar(self, cuadros, estados, tope=None):
+        """Los topes de después de simular: velocidad (VEL_MAX por fotograma, en el marco de la cadera) y, de pie, el
+        panel de delante contra su muslo (MUSLO_MAX) y el bajo de cada panel contra la vertical (`BAJO_MAX`; al correr
+        y en los quiebros, con su viento, más). Luego las cápsulas y los largos otra vez."""
+        sk = self.sk
+        cv = math.cos(math.radians(self.VEL_MAX))
+        cm = math.cos(math.radians(self.MUSLO_MAX))
+        # ═══ EL BAJO NO VUELA ═══ en el jab de la captura los tramos de abajo de todos los paneles se abrían 65-83° de la
+        # vertical cinco fotogramas (la cadera gira y vuelve, y la tela sigue): una gabardina pesa, no es una falda de vuelo
+        bajo_max = self.BAJO_MAX if (tope is None or tope < 45) else self.BAJO_MAX + 25.0
+        cb = math.cos(math.radians(bajo_max))
+        abajo = Vector((0.0, 0.0, -1.0))
+        abajo_muslo = {s: (sk.tail['muslo_' + s] - sk.head['muslo_' + s]).normalized() for s in 'LR'}
+
+        def acercar(d, hacia, cmin):
+            """d girado hacia `hacia` hasta que su coseno con él sea cmin (si no lo es ya)."""
+            c = d.dot(hacia)
+            if c >= cmin:
+                return d
+            perp = d - hacia * c
+            if perp.length < 1e-9:
+                return hacia.copy()
+            perp.normalize()
+            return hacia * cmin + perp * math.sqrt(max(0.0, 1.0 - cmin * cmin))
+        prev_local = None
+        for f, ((D, head), est) in enumerate(zip(cuadros, estados)):
+            Dc = D['caderas']
+            DcT = Dc.transposed()
+            de_pie = self.tumbado(D, head) < 0.5
+            adelante = Dc @ Vector((0.0, -1.0, 0.0))
+            locales = []
+            cambio = False
+            for c in range(8):
+                s = 'L' if c < 4 else 'R'
+                muslo = (D['muslo_' + s] @ abajo_muslo[s]).normalized()
+                fila = []
+                for j in range(3):
+                    L = self.largos[c][j]
+                    d = est[c][j + 1] - est[c][j]
+                    d = d.normalized() if d.length > 1e-9 else Dc @ Vector((0.0, 0.0, -1.0))
+                    nuevo = d
+                    if de_pie and c % 4 in (0, 1) and d.dot(adelante) > muslo.dot(adelante):
+                        nuevo = acercar(nuevo, muslo, cm)
+                    if de_pie and j >= 1:
+                        nuevo = acercar(nuevo, abajo, cb)
+                    dl = DcT @ nuevo
+                    if prev_local is not None:
+                        # sólo lo que se ALEJA de la forma de reposo va con tope de velocidad: volver a colgar, no
+                        reposo = (self.local[c][j + 1] - self.local[c][j]).normalized()
+                        if dl.dot(reposo) < prev_local[c][j].dot(reposo):
+                            dl = acercar(dl, prev_local[c][j], cv)
+                            nuevo = Dc @ dl
+                    fila.append(dl)
+                    if (nuevo - d).length > 1e-6:
+                        cambio = True
+                    est[c][j + 1] = est[c][j] + nuevo * L
+                locales.append(fila)
+            if cambio:
+                self._colisiones(est, self._capsulas(D, head))
+                self._rigido(est)
+                # y el talle otra vez (lo último que hacía la simulación: sin él, las juntas que el tope o las cápsulas
+                # movían quedaban por encima de la cadera en 388 fotogramas de la batería)
+                self._talle(est, D, head)
+                locales = []
+                for c in range(8):
+                    fila = []
+                    for j in range(3):
+                        d = est[c][j + 1] - est[c][j]
+                        fila.append((DcT @ d).normalized() if d.length > 1e-9 else Vector((0.0, 0.0, -1.0)))
+                    locales.append(fila)
+            prev_local = locales
+        return estados
 
     def _vecinas(self, c):
         """Cadenas a cada lado de la cadena c (misma mitad; la trasera cruza a la otra mitad)."""
@@ -1760,6 +2146,13 @@ def _suelo(sk, nubes, p, c, fr, log=None):
             x = p['cad']
             p['cad'] = (x[0], x[1], x[2] - (min(zc0, zall) - 0.0005) / e)
             cambio = True
+        elif '_fk' in p and not piesfk and _en_contacto(c, fr) and z0[otro].min() > 0.003:
+            # la captura (captura.py): los pies van con IK a su sitio y bajar la cadera no los mete en el
+            # suelo; si en un tramo tumbado flota el cuerpo con los pies apoyados, baja el cuerpo (con las piernas
+            # en FK, las de la forja de rodillas, no: los pies bajarían con él)
+            x = p['cad']
+            p['cad'] = (x[0], x[1], x[2] - (float(z0[otro].min()) - 0.0005) / e)
+            cambio = True
         zmin = zc0
         if not cambio:
             break
@@ -1782,12 +2175,16 @@ def _suavizar_serie(X, sigma=2.0):
 FALDON_FINAL = {}
 
 
+SK = None      # el esqueleto que se está horneando (lo lee captura.py: sus recetas dependen de él)
+
+
 def hornear(arm, sk, nombre, nubes, faldon, log=print):
-    global VIAJE
+    global VIAJE, SK
     c = CLIPS[nombre]
     n = c['frames']
     e = sk.esc
     VIAJE = 1.0 / e
+    SK = sk
     poses = []
     resultados = []
     zmins = []
@@ -1982,6 +2379,7 @@ def hornear_todo(arm, nubes=(), log=print, clips=None):
         for k in ('efector', 'levanta_desde', 'cae_en', 'tope_faldon'):
             if k in c:
                 d[k] = c[k]
+        d['fuente'] = c.get('fuente', 'forja')
         if c.get('contacto'):
             d['contacto_suelo_fotogramas'] = [list(x) for x in c['contacto']]
         if c.get('vuelo'):

@@ -1,5 +1,5 @@
-"""El resumen de la batería: junta obra/comprobacion_<figura>.json, obra/validacion.json y
-obra/en_three.json en obra/resumen_bateria.json y decide el código de salida (1 si algo falla).
+"""El resumen de la batería: junta obra/comprobacion_<figura>.json, obra/validacion.json, obra/movimiento_{m,f}.json
+y obra/en_three.json en obra/resumen_bateria.json y decide el código de salida (1 si algo falla).
 
 Una parte que no se escribió cuenta como fallo: una batería a la que le falta un trozo no está en
 verde, está sin mirar.
@@ -37,6 +37,12 @@ if v is None:
     fallos.append('no hay validacion.json')
 else:
     fallos += ['validar: %s' % x for x in v['errores']]
+for s_ in ('m', 'f'):
+    mv = cargar('movimiento_%s.json' % s_)
+    if mv is None:
+        fallos.append('no hay movimiento_%s.json' % s_)
+    else:
+        fallos += ['movimiento (%s): %s' % (s_, x) for x in mv['fallos']]
 t = cargar('en_three.json')
 if t is None:
     fallos.append('no hay en_three.json')

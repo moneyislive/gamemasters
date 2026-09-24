@@ -77,10 +77,13 @@ def fase_clips():
     info['_entra_con'] = clips.ENTRA_CON
     info['_marcha'] = clips.MARCHA
     nombre = 'clips-%s.glb' % sexo
-    construir.exportar_glb(os.path.join(OBRA, nombre), [arm], animaciones=True)
-    json.dump(info, open(os.path.join(OBRA, nombre.replace('.glb', '.json')), 'w'), indent=1, ensure_ascii=False)
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OBRA, 'tmp', 'clips_%s.blend' % sexo))
-    log(nombre, os.path.getsize(os.path.join(OBRA, nombre)))
+    # `salida=<carpeta>`: un horneado de ensayo (unos clips) fuera de obra/, sin pisar el de verdad
+    sal = os.path.abspath(args['salida']) if args.get('salida') else OBRA
+    os.makedirs(sal, exist_ok=True)
+    construir.exportar_glb(os.path.join(sal, nombre), [arm], animaciones=True)
+    json.dump(info, open(os.path.join(sal, nombre.replace('.glb', '.json')), 'w'), indent=1, ensure_ascii=False)
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(sal if args.get('salida') else os.path.join(OBRA, 'tmp'), 'clips_%s.blend' % sexo))
+    log(nombre, os.path.getsize(os.path.join(sal, nombre)))
 
 
 def fase_piezas():

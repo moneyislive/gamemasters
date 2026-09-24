@@ -37,6 +37,8 @@ FIG = args.get('fig', 'desvelado-hombre-gabardina')
 CLIPS = args.get('clips', 'guardia').split('+')
 VISTAS = args.get('vistas', 'juego,perfil').split(',')
 N = int(args.get('n', '8'))
+# `ampliar=2`: las tiras al doble de resolución (para mirar de cerca una pose de la captura)
+K = float(args.get('ampliar', '1'))
 SAL = os.path.abspath(args.get('salida') or os.path.join(DIR, 'capturas', 'ensayo'))
 os.makedirs(SAL, exist_ok=True)
 OBRA = os.path.join(DIR, 'obra')
@@ -132,17 +134,17 @@ def main():
                 sc = bpy.context.scene
                 if vista == 'juego':
                     # el teléfono va apaisado: 16:9 con 75° de campo VERTICAL (el de three)
-                    sc.render.resolution_x, sc.render.resolution_y = 640, 360
+                    sc.render.resolution_x, sc.render.resolution_y = int(640 * K), int(360 * K)
                     escena.camara_juego(cam, r.x, r.y, 0.0, 3.2 if nombre not in EFECTOR else 4.0, esc)
                 else:
-                    sc.render.resolution_x, sc.render.resolution_y = 360, 520
+                    sc.render.resolution_x, sc.render.resolution_y = int(360 * K), int(520 * K)
                     cam.data.sensor_fit = 'AUTO'
                     lado = {'perfil': 90, 'frente': 0, 'tresq': 35, 'espalda': 180}[vista]
                     escena.encuadrar(cam, centro=(h.x, h.y, 0.9 * esc), dist=4.2 * esc, alto_cam=1.2 * esc, lente=40, lado=lado)
                 p = os.path.join(SAL, '_e_%s_%s_%d.png' % (nombre, vista, fr))
                 im = escena.render(p)
                 if vista == 'juego':
-                    im = im[40:340, 170:470]          # el centro del encuadre: el cuerpo y el blanco
+                    im = im[int(40 * K):int(340 * K), int(170 * K):int(470 * K)]   # el centro del encuadre: el cuerpo y el blanco
                 fila.append(im)
                 if not args.get('guardar'):
                     os.remove(p)

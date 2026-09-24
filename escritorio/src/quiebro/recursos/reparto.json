@@ -36,7 +36,7 @@
   "mismoNombre": "en un fichero con varias variantes, una zona puede tener un material por variante con el mismo nombre y otro color (el abrigo de la gabardina no es el de la chaqueta corta)"
  },
  "bytes": {
-  "total": 5541484,
+  "total": 5621216,
   "tope": 8388608,
   "porArchivo": {
    "celador-hombre-lod1.glb": 194028,
@@ -45,8 +45,8 @@
    "celador-mujer-lod1.glb": 72516,
    "celador-mujer-lod2.glb": 35512,
    "celador-mujer.glb": 136780,
-   "clips-hombre.glb": 781912,
-   "clips-mujer.glb": 777324,
+   "clips-hombre.glb": 820888,
+   "clips-mujer.glb": 818080,
    "desvelado-hombre-gabardina.glb": 139580,
    "desvelado-hombre-ligera.glb": 123088,
    "desvelado-hombre-lod1.glb": 198952,
@@ -85,7 +85,7 @@
     "pieza-pistola.glb",
     "pieza-paraguas.glb"
    ],
-   "total": 3114752,
+   "total": 3194484,
    "nota": "el propio a LOD0 (su estilo, en los dos sexos: cuenta la gabardina, las tres pesan casi igual); companeros, Celadores y Prestados cercanos a LOD1; la multitud en el maniqui LOD3 de los durmientes"
   }
  },
@@ -1739,20 +1739,22 @@
  },
  "clips": {
   "reposo": {
-   "duracionMs": 2000,
-   "fotogramas": 60,
+   "duracionMs": 2500,
+   "fotogramas": 75,
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "respiracion y peso"
+   "descripcion": "reposo de pie: respiración y peso que pasa de un pie a otro (captura, con los pies casi a la par: la de UAL los separa 40 cm de delante a atrás)",
+   "fuente": "UAL1 Idle_Loop"
   },
   "guardia": {
-   "duracionMs": 1000,
-   "fotogramas": 30,
+   "duracionMs": 2500,
+   "fotogramas": 75,
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "guardia de combate en bucle: puños a la barbilla, la izquierda delante (los golpes empiezan y acaban en su fotograma 0)"
+   "descripcion": "guardia de combate en bucle: la de los golpes de la captura (la izquierda delante, el puño de delante a la altura del pómulo) con la respiración y el peso del reposo encima; los golpes empiezan y acaban en su fotograma 0",
+   "fuente": "mezcla: UAL1 Punch_Jab (fotograma 0, el puño de delante adelantado) + UAL1 Idle_Loop aditivo en el tronco"
   },
   "guardia-celador": {
    "duracionMs": 1000,
@@ -1760,34 +1762,37 @@
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "guardia del Celador: erguido y casi de frente, las dos manos abiertas delante de la cara (para las Entradas de frente)"
+   "descripcion": "guardia del Celador: erguido y casi de frente, las dos manos abiertas delante de la cara (para las Entradas de frente)",
+   "fuente": "forja"
   },
   "pasear": {
-   "duracionMs": 1000,
-   "fotogramas": 30,
+   "duracionMs": 1167,
+   "fotogramas": 35,
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "paso de calle de los durmientes (1,3 m/s)",
-   "zancadaM": 1.3,
-   "velocidadMs": 1.3,
+   "descripcion": "paso de calle de los durmientes a 1,3 m/s (captura: 103 pasos por minuto, simétrico)",
+   "fuente": "UAL1 Walk_Loop",
+   "zancadaM": 1.515,
+   "velocidadMs": 1.299,
    "mujer": {
-    "zancadaM": 1.222,
-    "velocidadMs": 1.222
+    "zancadaM": 1.425,
+    "velocidadMs": 1.221
    }
   },
   "andar": {
-   "duracionMs": 733,
-   "fotogramas": 22,
+   "duracionMs": 933,
+   "fotogramas": 28,
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "andar decidido a 2 m/s",
-   "zancadaM": 1.467,
-   "velocidadMs": 2.0,
+   "descripcion": "andar decidido a 2 m/s (captura: el paso de calle a 129 pasos por minuto, la zancada por IK y el braceo más amplio)",
+   "fuente": "UAL1 Walk_Loop",
+   "zancadaM": 1.756,
+   "velocidadMs": 1.882,
    "mujer": {
-    "zancadaM": 1.379,
-    "velocidadMs": 1.88
+    "zancadaM": 1.668,
+    "velocidadMs": 1.787
    }
   },
   "trotar": {
@@ -1796,40 +1801,43 @@
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "trote a 5 m/s",
-   "zancadaM": 3.333,
-   "velocidadMs": 5.0,
+   "descripcion": "trote a 5 m/s (captura: 180 pasos por minuto, cada pie apoyado un tercio del ciclo, la cadera bota 7 cm)",
+   "fuente": "UAL1 Jog_Fwd_Loop",
+   "zancadaM": 3.379,
+   "velocidadMs": 5.069,
    "mujer": {
-    "zancadaM": 3.133,
-    "velocidadMs": 4.7
+    "zancadaM": 3.171,
+    "velocidadMs": 4.757
    }
   },
   "correr": {
-   "duracionMs": 600,
-   "fotogramas": 18,
+   "duracionMs": 667,
+   "fotogramas": 20,
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "carrera a 7 m/s",
-   "zancadaM": 4.2,
-   "velocidadMs": 7.0,
+   "descripcion": "carrera a 7 m/s (captura: 180 pasos por minuto de 2,33 m, cada pie apoyado un cuarto del ciclo)",
+   "fuente": "UAL1 Sprint_Loop",
+   "zancadaM": 4.723,
+   "velocidadMs": 7.085,
    "mujer": {
-    "zancadaM": 3.948,
-    "velocidadMs": 6.58
+    "zancadaM": 4.43,
+    "velocidadMs": 6.644
    }
   },
   "andar-paraguas": {
-   "duracionMs": 1000,
-   "fotogramas": 30,
+   "duracionMs": 1167,
+   "fotogramas": 35,
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "pasear con el paraguas (pieza aparte en agarre_R, puno con el pulgar arriba)",
-   "zancadaM": 1.3,
-   "velocidadMs": 1.3,
+   "descripcion": "pasear con el paraguas: el paso de la captura con el brazo derecho de la forja (puño delante del pecho, pulgar arriba; la pieza en agarre_R)",
+   "fuente": "mezcla: UAL1 Walk_Loop + brazo derecho de la forja",
+   "zancadaM": 1.515,
+   "velocidadMs": 1.299,
    "mujer": {
-    "zancadaM": 1.222,
-    "velocidadMs": 1.222
+    "zancadaM": 1.425,
+    "velocidadMs": 1.221
    }
   },
   "retroceder": {
@@ -1839,6 +1847,7 @@
    "bucle": true,
    "raiz": false,
    "descripcion": "andar hacia atras (braceo contrario a la pierna, como andar)",
+   "fuente": "forja",
    "zancadaM": 1.12,
    "velocidadMs": 1.05,
    "mujer": {
@@ -1853,6 +1862,7 @@
    "bucle": true,
    "raiz": false,
    "descripcion": "paso lateral hacia la izquierda del personaje (+X Blender)",
+   "fuente": "forja",
    "zancadaM": 0.64,
    "velocidadMs": 1.2,
    "mujer": {
@@ -1867,6 +1877,7 @@
    "bucle": true,
    "raiz": false,
    "descripcion": "paso lateral hacia la derecha del personaje",
+   "fuente": "forja",
    "zancadaM": 0.64,
    "velocidadMs": 1.2,
    "mujer": {
@@ -1880,7 +1891,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "quiebro a su izquierda: impulso con el pie derecho clavado 0-2, vuelo rasante tendido 60° de lado 2-8, aterriza con la izquierda cuando la raíz ha frenado (9-10); 3,5 m en 300 ms, intocable 250",
+   "descripcion": "quiebro a su izquierda: impulso con el pie derecho clavado 0-2, vuelo rasante tendido 60° de lado 2-8, aterriza con la izquierda cuando la raíz ha frenado (9-10); 3,5 m en 300 ms, intocable 250; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (quiebro-izquierda) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "intocableMs": [
     0,
     250
@@ -1904,7 +1916,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "quiebro a su derecha: el mismo, hacia el otro lado (no es el espejo: acaba en la guardia de la izquierda delante)",
+   "descripcion": "quiebro a su derecha: el mismo, hacia el otro lado (no es el espejo: acaba en la guardia de la izquierda delante); empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (quiebro-derecha) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "intocableMs": [
     0,
     250
@@ -1928,7 +1941,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "quiebro hacia atrás: impulso con el pie de delante, salto bajo girando los hombros (40° hacia atrás, no más: el arco hondo es de la franquicia), los antebrazos cubren la cara",
+   "descripcion": "quiebro hacia atrás: impulso con el pie de delante, salto bajo girando los hombros (40° hacia atrás, no más: el arco hondo es de la franquicia), los antebrazos cubren la cara; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (quiebro-atras) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "intocableMs": [
     0,
     250
@@ -1952,7 +1966,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "quiebro hacia delante: zambullida por debajo del golpe, 60° hacia delante con la cabeza por delante y los antebrazos cubriéndola",
+   "descripcion": "quiebro hacia delante: zambullida por debajo del golpe, 60° hacia delante con la cabeza por delante y los antebrazos cubriéndola; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (quiebro-delante) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "intocableMs": [
     0,
     250
@@ -1976,7 +1991,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "quiebro torpe (el tercero seguido) a su izquierda: se inclina poco, bracea y da un paso de más al llegar; sin la postura del intocable",
+   "descripcion": "quiebro torpe (el tercero seguido) a su izquierda: se inclina poco, bracea y da un paso de más al llegar; sin la postura del intocable; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (quiebro-torpe) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "desplazamientoM": [
     3.5,
     0.0,
@@ -1996,7 +2012,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "quiebro torpe a su derecha",
+   "descripcion": "quiebro torpe a su derecha; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (quiebro-torpe-derecha) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "desplazamientoM": [
     -3.5,
     0.0,
@@ -2016,7 +2033,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "quiebro torpe hacia atrás",
+   "descripcion": "quiebro torpe hacia atrás; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (quiebro-torpe-atras) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "desplazamientoM": [
     0.0,
     0.0,
@@ -2036,7 +2054,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "quiebro torpe hacia delante",
+   "descripcion": "quiebro torpe hacia delante; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (quiebro-torpe-delante) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "desplazamientoM": [
     0.0,
     0.0,
@@ -2056,7 +2075,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "golpe recibido de frente: latigazo de la cabeza 0-2, paso atrás con el pie derecho 2-8, recupera la guardia en su sitio hasta 18 (600 ms); sin raíz (el empujón, si lo hay, lo pone el juego)"
+   "descripcion": "golpe recibido de frente (captura, sumada a la guardia): el tronco y la cabeza se van atrás, los brazos se abren y vuelve a la guardia en su sitio (600 ms); sin raíz",
+   "fuente": "mezcla: UAL1 Punch_Jab (guardia) + UAL2 Idle_Shield_Break aditivo"
   },
   "tocado-espalda": {
    "duracionMs": 667,
@@ -2064,7 +2084,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "golpe recibido por la espalda: la cadera sale hacia delante y la cabeza atrás 0-2, traspiés hacia delante con el pie derecho 2-9, se gira a medias buscando al que pega y vuelve a la guardia en su sitio (20); sin raíz"
+   "descripcion": "golpe recibido por la espalda: la cadera sale hacia delante y la cabeza atrás 0-2, traspiés hacia delante con el pie derecho 2-9, se gira a medias buscando al que pega y vuelve a la guardia en su sitio (20); sin raíz; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (tocado-espalda) con la guardia de UAL1 Punch_Jab en los dos extremos"
   },
   "descolocado": {
    "duracionMs": 1000,
@@ -2072,26 +2093,28 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "descolocado: el golpe que no encuentra nada tira del cuerpo; tropieza hacia delante y boquea con los brazos (clavado 1 s tras un quiebro limpio; el cliente corta a los 400 ms si es un fallo); sin raíz"
+   "descripcion": "descolocado: el golpe que no encuentra nada tira del cuerpo; tropieza hacia delante y boquea con los brazos (clavado 1 s tras un quiebro limpio; el cliente corta a los 400 ms si es un fallo); sin raíz; empieza en la guardia de la captura",
+   "fuente": "mezcla: forja (descolocado) con la guardia de UAL1 Punch_Jab en el principio"
   },
   "caer": {
-   "duracionMs": 667,
-   "fotogramas": 20,
+   "duracionMs": 1500,
+   "fotogramas": 45,
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "cae de espaldas y se queda tumbado (sin levantarse): latigazo 0-2, la espalda en el suelo en 11; su último fotograma es el primero de desconectado y de levantarse",
-   "caeEnMs": 367,
+   "descripcion": "cae de espaldas y se queda tumbado (captura): sale de la guardia (7 fotogramas), se le doblan las rodillas, se sienta y cae; su último fotograma es el primero de desconectado y de levantarse (la cadera sobre la raíz)",
+   "fuente": "mezcla: UAL1 Punch_Jab (guardia) + UAL1 Death01 + UAL2 LayToIdle (fotograma 0)",
+   "caeEnMs": 833,
    "desplazamientoM": [
+    -0.011,
     0.0,
-    0.0,
-    -0.58
+    -0.614
    ],
    "mujer": {
     "desplazamientoM": [
+     -0.011,
      0.0,
-     0.0,
-     -0.545
+     -0.577
     ]
    },
    "tumbado": true
@@ -2102,19 +2125,20 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "derribado de frente, entero en 1,5 s (el derribo del Cierre y de la Réplica, 30 tics): cae de espaldas (la espalda en el suelo en 11), se queda un instante y se levanta desde el 21 hasta la guardia en 45",
-   "caeEnMs": 367,
-   "levantaDesdeMs": 700,
+   "descripcion": "derribado de frente, entero en 1,5 s (captura): el golpe lo levanta del suelo y cae de espaldas (la espalda en el suelo en 9), rebota y se levanta desde el 16 hasta la guardia en 45",
+   "fuente": "mezcla: UAL2 Hit_Knockback + UAL2 LayToIdle",
+   "caeEnMs": 300,
+   "levantaDesdeMs": 533,
    "desplazamientoM": [
+    -0.001,
     0.0,
-    0.0,
-    -0.28
+    0.018
    ],
    "mujer": {
     "desplazamientoM": [
+     -0.001,
      0.0,
-     0.0,
-     -0.263
+     0.017
     ]
    },
    "tumbado": true
@@ -2125,7 +2149,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "derribado por la espalda, entero en 1,5 s: la cadera sale hacia delante 0-2, traspiés 2-6, cae de rodillas (11) parando con las manos y queda boca abajo (13-20); empuja hasta a gatas, planta un pie y se levanta a la guardia (45)",
+   "descripcion": "derribado por la espalda, entero en 1,5 s: la cadera sale hacia delante 0-2, traspiés 2-6, cae de rodillas (11) parando con las manos y queda boca abajo (13-20); empuja hasta a gatas, planta un pie y se levanta a la guardia (45); empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (derribado-espalda) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "caeEnMs": 367,
    "levantaDesdeMs": 667,
    "desplazamientoM": [
@@ -2135,7 +2160,7 @@
    ],
    "mujer": {
     "desplazamientoM": [
-     0.0,
+     -0.0,
      0.0,
      0.987
     ]
@@ -2143,22 +2168,23 @@
    "tumbado": true
   },
   "levantarse": {
-   "duracionMs": 800,
-   "fotogramas": 24,
+   "duracionMs": 1133,
+   "fotogramas": 34,
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "levantarse desde tumbado (la cadera sobre la raíz): se sienta con la mano derecha apoyada 0-6, recoge los pies y empuja 6-10, en cuclillas sobre los pies 13, guardia 24 (800 ms); la raíz sigue a la cadera",
+   "descripcion": "levantarse desde tumbado (captura): desde el último fotograma de caer se sienta apoyando las manos, recoge los pies y se levanta a la guardia (1,13 s); la raíz sigue a la cadera",
+   "fuente": "UAL2 LayToIdle (desde el final de caer)",
    "desplazamientoM": [
+    0.008,
     0.0,
-    0.0,
-    0.3
+    0.306
    ],
    "mujer": {
     "desplazamientoM": [
+     0.008,
      0.0,
-     0.0,
-     0.282
+     0.288
     ]
    },
    "tumbado": true
@@ -2169,7 +2195,8 @@
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "desconectado: tumbado boca arriba respirando (la cadera sobre el origen, como el último fotograma de caer y el primero de levantarse)",
+   "descripcion": "desconectado: tumbado boca arriba respirando; es EXACTAMENTE el último fotograma de caer (la cadera sobre el origen) y el primero de levantarse",
+   "fuente": "UAL1 Death01 + UAL2 LayToIdle (el final de caer) con respiración",
    "tumbado": true
   },
   "entrada": {
@@ -2178,24 +2205,28 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "Entrada: acometida volada de 5,5 m en 400 ms (la raíz del juego, en línea recta) que acaba en un directo de derecha: impulso con el pie de atrás clavado 0-2, vuelo bajo 2-10, apoya el pie de delante 11 y el puño llega al blanco en 12; guardia en el sitio nuevo 24",
+   "descripcion": "Entrada: acometida volada de 5,5 m en 400 ms (la raíz del juego, en línea recta) que acaba en un directo de derecha: impulso con el pie de atrás clavado 0-2, vuelo bajo 2-10, apoya el pie de delante 11 y el puño llega al blanco en 12; guardia en el sitio nuevo 24; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (entrada) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "impactoMs": 400,
-   "alcanceM": 0.935,
-   "recorridoM": 0.65,
-   "alturaImpactoM": 1.434,
+   "alcanceM": 0.94,
+   "recorridoM": 0.817,
+   "alturaImpactoM": 1.398,
    "efector": "mano_R",
-   "desplazamientoM": [
-    0.0,
-    0.0,
-    5.5
-   ],
    "mujer": {
+    "alcanceM": 0.94,
+    "recorridoM": 0.839,
+    "alturaImpactoM": 1.236,
     "desplazamientoM": [
      0.0,
      0.0,
      5.5
     ]
-   }
+   },
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    5.5
+   ]
   },
   "seguida-1": {
    "duracionMs": 667,
@@ -2203,12 +2234,18 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "jab de izquierda (primer toque de la Tanda): carga 0-2, paso y puño recto al impacto 7, la cabeza se aparta a la derecha, vuelta a la guardia 20",
+   "descripcion": "jab de izquierda (captura): de la guardia al impacto en 7 (233 ms) con un paso corto del pie de delante, el puño a la cara, y vuelta con chasquido (12 cm en 5 fotogramas) a la guardia en 20",
+   "fuente": "UAL1 Punch_Jab",
    "impactoMs": 233,
-   "alcanceM": 0.959,
-   "recorridoM": 0.55,
-   "alturaImpactoM": 1.436,
-   "efector": "mano_L"
+   "alcanceM": 0.971,
+   "recorridoM": 0.627,
+   "alturaImpactoM": 1.417,
+   "efector": "mano_L",
+   "mujer": {
+    "alcanceM": 0.904,
+    "recorridoM": 0.617,
+    "alturaImpactoM": 1.305
+   }
   },
   "seguida-2": {
    "duracionMs": 800,
@@ -2216,12 +2253,18 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "directo de derecha (segundo toque): carga 0-3, la cadera gira 50° y el talón de atrás pivota, puño recto al impacto 8, la cabeza se aparta a la izquierda, vuelta 24",
+   "descripcion": "directo de derecha (captura): carga (la cadera atrás 4 cm), la cadera gira y entra y el talón de atrás pivota, el puño a la cara en el impacto 8 (267 ms), vuelta con chasquido y guardia en 24",
+   "fuente": "UAL1 Punch_Cross",
    "impactoMs": 267,
-   "alcanceM": 0.964,
-   "recorridoM": 0.681,
-   "alturaImpactoM": 1.429,
-   "efector": "mano_R"
+   "alcanceM": 0.952,
+   "recorridoM": 0.853,
+   "alturaImpactoM": 1.417,
+   "efector": "mano_R",
+   "mujer": {
+    "alcanceM": 0.913,
+    "recorridoM": 0.824,
+    "alturaImpactoM": 1.322
+   }
   },
   "cierre": {
    "duracionMs": 1000,
@@ -2229,12 +2272,18 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "patada circular de derecha que empuja: carga 0-3, rodilla arriba y al lado 3-6, la cadera gira ~125° sobre la bola del pie de apoyo y la pierna barre a 1,3 m, impacto 10, recoge y vuelve 30",
+   "descripcion": "patada circular de derecha que empuja: carga 0-3, rodilla arriba y al lado 3-6, la cadera gira ~125° sobre la bola del pie de apoyo y la pierna barre a 1,3 m, impacto 10, recoge y vuelve 30; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (cierre) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "impactoMs": 333,
    "alcanceM": 0.988,
-   "recorridoM": 1.724,
+   "recorridoM": 1.745,
    "alturaImpactoM": 1.371,
-   "efector": "pie_R"
+   "efector": "pie_R",
+   "mujer": {
+    "alcanceM": 0.925,
+    "recorridoM": 1.64,
+    "alturaImpactoM": 1.286
+   }
   },
   "empellon": {
    "duracionMs": 1000,
@@ -2242,12 +2291,18 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "Empellón: empujón con las dos palmas que rompe la guardia; recoge las manos al pecho 0-6, paso largo 6-15 y los codos se estiran a la altura del pecho del blanco (impacto 15), empuja y vuelve a la guardia en su sitio (el juego no mueve al que empuja: sin raíz)",
+   "descripcion": "Empellón: empujón con las dos palmas que rompe la guardia; recoge las manos al pecho 0-6, paso largo 6-15 y los codos se estiran a la altura del pecho del blanco (impacto 15), empuja y vuelve a la guardia en su sitio (el juego no mueve al que empuja: sin raíz); empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (empellon) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "impactoMs": 500,
-   "alcanceM": 1.242,
-   "recorridoM": 0.967,
-   "alturaImpactoM": 1.321,
-   "efector": "mano_R"
+   "alcanceM": 1.274,
+   "recorridoM": 1.128,
+   "alturaImpactoM": 1.317,
+   "efector": "mano_R",
+   "mujer": {
+    "alcanceM": 1.176,
+    "recorridoM": 1.047,
+    "alturaImpactoM": 1.233
+   }
   },
   "replica": {
    "duracionMs": 1000,
@@ -2255,12 +2310,18 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "Réplica: palmada imparable con pisotón; se enrosca 0-1 (la palma a la cadera, la otra mano apunta), estalla 2-6 con el pie de delante clavándose (impacto 6), empuja 6-10, aguanta un instante y vuelve a la guardia en su sitio: el remate del Remanso",
+   "descripcion": "Réplica: palmada imparable con pisotón; se enrosca 0-1 (la palma a la cadera, la otra mano apunta), estalla 2-6 con el pie de delante clavándose (impacto 6), empuja 6-10, aguanta un instante y vuelve a la guardia en su sitio: el remate del Remanso; empieza y acaba en la guardia de la captura",
+   "fuente": "mezcla: forja (replica) con la guardia de UAL1 Punch_Jab en los dos extremos",
    "impactoMs": 200,
-   "alcanceM": 1.073,
-   "recorridoM": 0.806,
-   "alturaImpactoM": 1.277,
-   "efector": "mano_R"
+   "alcanceM": 1.099,
+   "recorridoM": 0.974,
+   "alturaImpactoM": 1.275,
+   "efector": "mano_R",
+   "mujer": {
+    "alcanceM": 1.008,
+    "recorridoM": 0.899,
+    "alturaImpactoM": 1.191
+   }
   },
   "avance": {
    "duracionMs": 600,
@@ -2268,24 +2329,28 @@
    "fps": 30,
    "bucle": false,
    "raiz": true,
-   "descripcion": "avance: la acometida contra la bala, vuelo de 10 m en 400 ms (la raíz del juego) que aterriza en la palmada de la Réplica (impacto 12)",
+   "descripcion": "avance: la acometida contra la bala, vuelo de 10 m en 400 ms (la raíz del juego) que aterriza en la palmada de la Réplica (impacto 12); empieza en la guardia de la captura",
+   "fuente": "mezcla: forja (avance) con la guardia de UAL1 Punch_Jab en el principio",
    "impactoMs": 400,
-   "alcanceM": 1.122,
-   "recorridoM": 0.865,
-   "alturaImpactoM": 1.23,
+   "alcanceM": 1.151,
+   "recorridoM": 1.032,
+   "alturaImpactoM": 1.227,
    "efector": "mano_R",
-   "desplazamientoM": [
-    0.0,
-    0.0,
-    10.0
-   ],
    "mujer": {
+    "alcanceM": 1.056,
+    "recorridoM": 0.952,
+    "alturaImpactoM": 1.148,
     "desplazamientoM": [
      0.0,
      0.0,
      10.0
     ]
-   }
+   },
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    10.0
+   ]
   },
   "respuesta": {
    "duracionMs": 800,
@@ -2294,24 +2359,36 @@
    "bucle": false,
    "raiz": false,
    "descripcion": "respuesta de la guardia del Celador: barre con el antebrazo izquierdo hacia fuera 0-4, baja el puño derecho a la cadera y sube un gancho al mentón (impacto 9) mientras se levanta de las rodillas",
+   "fuente": "forja",
    "impactoMs": 300,
    "alcanceM": 0.899,
    "recorridoM": 0.663,
    "alturaImpactoM": 1.611,
-   "efector": "mano_R"
+   "efector": "mano_R",
+   "mujer": {
+    "alcanceM": 0.82,
+    "recorridoM": 0.6,
+    "alturaImpactoM": 1.501
+   }
   },
   "golpe-de-prestado": {
-   "duracionMs": 1200,
-   "fotogramas": 36,
+   "duracionMs": 1500,
+   "fotogramas": 45,
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "golpe de Prestado: vuelta de brazo torpe y telegrafiada (el puño atrás, junto a la oreja, 0-14), paso y gancho abierto al impacto 21, se pasa de rosca y tropieza; sin raíz",
+   "descripcion": "golpe de Prestado (captura): sale del paso de calle, el brazo derecho se va atrás, lento y telegrafiado (0-19), barre en un gancho abierto que cruza por delante a la altura del pecho en el impacto 21 (700 ms), se pasa un palmo y se recoge; la cadera no se hunde ni se vuelca (hasta 25°)",
+   "fuente": "UAL2 Melee_Hook + Melee_Hook_Rec",
    "impactoMs": 700,
-   "alcanceM": 1.253,
-   "recorridoM": 1.368,
-   "alturaImpactoM": 1.307,
-   "efector": "mano_R"
+   "alcanceM": 0.94,
+   "recorridoM": 0.75,
+   "alturaImpactoM": 1.3,
+   "efector": "mano_R",
+   "mujer": {
+    "alcanceM": 0.94,
+    "recorridoM": 0.749,
+    "alturaImpactoM": 1.222
+   }
   },
   "apuntar": {
    "duracionMs": 1000,
@@ -2319,7 +2396,8 @@
    "fps": 30,
    "bucle": true,
    "raiz": false,
-   "descripcion": "apuntar: pistola a una mano con el brazo recto, perfilado, la izquierda a la espalda (la pistola, pieza aparte en agarre_R)"
+   "descripcion": "apuntar: pistola a una mano con el brazo recto, perfilado, la izquierda a la espalda (la pistola, pieza aparte en agarre_R)",
+   "fuente": "forja"
   },
   "disparar": {
    "duracionMs": 800,
@@ -2328,6 +2406,7 @@
    "bucle": false,
    "raiz": false,
    "descripcion": "disparar: rafaga de tres balas (0, 150 y 300 ms) con el retroceso del canon",
+   "fuente": "forja",
    "impactoMs": 0,
    "disparosMs": [
     0,
@@ -2342,6 +2421,7 @@
    "bucle": true,
    "raiz": false,
    "descripcion": "desalojable: de rodillas, vencido, respirando (3 s a merced del remate)",
+   "fuente": "forja",
    "tumbado": true
   },
   "rematar": {
@@ -2350,7 +2430,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "rematar: la palma sobre la cabeza del Celador arrodillado (a 1,15 m y 0,55 m delante) y la mantiene 1,2 s"
+   "descripcion": "rematar: la palma sobre la cabeza del Celador arrodillado (a 1,15 m y 0,55 m delante) y la mantiene 1,2 s",
+   "fuente": "forja"
   },
   "absorber": {
    "duracionMs": 1400,
@@ -2359,6 +2440,7 @@
    "bucle": false,
    "raiz": false,
    "descripcion": "absorber: el Celador caido recibe los hilos del Prestado de rodillas, brazos abiertos (0-18), y se levanta (18-42)",
+   "fuente": "forja",
    "tumbado": true
   },
   "rescatar": {
@@ -2367,7 +2449,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "rescatar: se agacha junto al companero tumbado, le agarra la mano (0-18) y tira hacia arriba hasta ponerlo de pie (18-45)"
+   "descripcion": "rescatar: se agacha junto al companero tumbado, le agarra la mano (0-18) y tira hacia arriba hasta ponerlo de pie (18-45)",
+   "fuente": "forja"
   },
   "descolgar": {
    "duracionMs": 1500,
@@ -2375,7 +2458,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "descolgar el auricular de la cabina (1,44 m, delante a la derecha) y llevárselo a la oreja (1,5 s, CABINA.descolgarTics): el auricular va en agarre_R, del micro en la boca al altavoz en la oreja"
+   "descripcion": "descolgar el auricular (captura): alarga la derecha hacia la cabina, lo coge (13) y se lo lleva a la oreja (25), agarrado, con el puño en la mejilla y el lado del pulgar en la oreja como en la forja (1,5 s, CABINA.descolgarTics); el auricular va en agarre_R",
+   "fuente": "mezcla: UAL1 Interact (en espejo) + UAL2 Idle_TalkingPhone_Loop + la mano de la forja"
   },
   "imprimirse": {
    "duracionMs": 1200,
@@ -2383,7 +2467,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "imprimirse: el Celador recien compactado se yergue (0-8) y se ajusta los punos, primero el izquierdo (10-20) y luego el derecho (22-32)"
+   "descripcion": "imprimirse: el Celador recien compactado se yergue (0-8) y se ajusta los punos, primero el izquierdo (10-20) y luego el derecho (22-32)",
+   "fuente": "forja"
   },
   "salir": {
    "duracionMs": 1000,
@@ -2391,7 +2476,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "salir por la cabina: con el auricular en la oreja se pone rigido, mira arriba y se alza de puntillas mientras se deshace en glifos"
+   "descripcion": "salir por la cabina: con el auricular en la oreja se pone rigido, mira arriba y se alza de puntillas mientras se deshace en glifos; empieza en el último fotograma de descolgar (captura)",
+   "fuente": "mezcla: forja (salir) desde el último fotograma de descolgar (captura)"
   },
   "victoria": {
    "duracionMs": 1467,
@@ -2399,7 +2485,8 @@
    "fps": 30,
    "bucle": false,
    "raiz": false,
-   "descripcion": "puno cerrado arriba: carga 0-8, puno al cielo 14, mantiene; la izquierda en puno a la cintura"
+   "descripcion": "puno cerrado arriba: carga 0-8, puno al cielo 14, mantiene; la izquierda en puno a la cintura",
+   "fuente": "forja"
   }
  },
  "gestos": {

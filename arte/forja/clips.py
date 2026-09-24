@@ -415,7 +415,12 @@ def _entrada(fr):
               'pie_R': (-0.16, y(10) + 0.42, 0.18), 'pier_R': (-30.0, -20.0),
               'mano_L': muneca((0.15, y(10) - 0.85, 1.34), PUNO_GUARDIA_L[1]),
               'mano_R': muneca((-0.14, y(10) - 0.66, 1.32), PUNO_GUARDIA_R[1]), 'golpe_R': golpe(d, 0.99, 0.3)}, 'sale2'),
-        (11, {'cad': (0.0, -L + 0.02, -0.15), 'pie_L': (0.12, -L - 0.30, 0.0), 'pier_L': (-10.0, 0.0)}, 'lineal'),
+        # (las manos van con el cuerpo: sin su sitio en el 11, la derecha se quedaba donde estaba en el 10 mientras el
+        # cuerpo avanzaba 0,9 m y el brazo apuntaba atrás un fotograma; el húmero daba media vuelta en dos. Ahora el
+        # puño se recoge a la cadera en el 11 y sale de ahí al blanco en el 12: el pico de velocidad sigue en el impacto)
+        (11, {'cad': (0.0, -L + 0.02, -0.15), 'pie_L': (0.12, -L - 0.30, 0.0), 'pier_L': (-10.0, 0.0),
+              'mano_L': muneca((0.15, -L + 0.02 - 0.85, 1.36), PUNO_GUARDIA_L[1]),
+              'mano_R': muneca((-0.33, -L + 0.02 + 0.10, 1.04), (-0.2, -1.0, 0.1)), 'codo_R': (-0.5, 0.8, -0.4)}, 'lineal'),
         # impacto: el pie de delante clavado desde el 10, la cadera por delante de la raíz (el cuerpo aún
         # lleva el impulso), directo de derecha a la barbilla del blanco
         (12, {'cad': (0.02, -L - 0.12, -0.12), 'cad_r': (10, 3, 8), 'col': (10, 2, 4), 'col1': (8, 2, 6), 'pec': (6, 2, 8),
@@ -445,8 +450,9 @@ def _avance(fr):
     d = (0.06, -1.0, 0.02)
     ks = claves([
         (0, G, 'suave'),
+        # (las manos van con el cuerpo, que se lanza 30 cm: se quedaban en la guardia de antes y el brazo apuntaba atrás)
         (1, {'cad': (0.0, -0.30, -0.22), 'cad_r': (30, 0, -16), 'col': (12, 0, 0), 'col1': (8, 0, 0), 'cab': (-22, 0, 8),
-             'pie_L': (0.10, -0.55, 0.12)}, 'suave'),
+             'pie_L': (0.10, -0.55, 0.12), 'mano_L': G_en(0.0, -0.36)['mano_L'], 'mano_R': G_en(0.0, -0.36)['mano_R']}, 'suave'),
         (3, {'cad': (0.0, y(3) + 0.2, 0.0), 'cad_r': (48, 0, -6), 'col': (10, 0, 0), 'col1': (6, 0, 0), 'cab': (-34, 0, 4),
              'ikp_L': 0.0, 'ikp_R': 0.0, 'mus_L': (-40, 0, 6), 'rodfk_L': 70.0, 'tobfk_L': 20.0,
              'mus_R': (30, 0, -4), 'rodfk_R': 40.0, 'tobfk_R': 40.0,
@@ -1200,3 +1206,10 @@ POR_CLASE = {'guardia': {'celador': 'guardia-celador', 'tirador': 'guardia-celad
 # lo que se pinta ANTES de un gesto sostenido que empieza en el suelo (desconectado: la caída)
 ENTRA_CON = {'desconectado': 'caer'}
 QUIEBRO_POR_DIRECCION = POR_DIRECCION['quiebro']
+
+# ═══ LA CAPTURA ═══ Los clips que tienen receta en captura.py (la captura de movimiento de UAL, CC0,
+# reorientada a este esqueleto, sola o mezclada con capas de aquí) sustituyen a los de arriba con el MISMO
+# nombre; los demás se quedan como están. CAPTURA=0 en el entorno hornea la forja pura.
+import captura  # noqa: E402
+
+CAPTURADOS = captura.registrar(CLIPS)
