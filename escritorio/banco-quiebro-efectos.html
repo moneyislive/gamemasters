@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE LOS EFECTOS DEL QUIEBRO.
+
+      Entrada APARTE de `index.html`, como los otros bancos y por lo mismo: esto no es una pantalla
+      del producto, es el sitio donde se juzga a ojo lo que ningún comprobador puede ver —que la
+      Grafía se lee, que el anillo se cierra donde toca y se entiende a 20 m, que la bala lenta se
+      ve lenta, que el Remanso cuelga las chispas en el aire y no los anillos—. Lo que sí se puede
+      contar (el alfabeto, el reloj, el presupuesto) lo cuenta `scripts/verificar-quiebro-efectos.ts`.
+
+      Una calle de prueba oscura, con niebla, cuatro maniquíes y un botón por efecto. Sin servidor:
+      los sucesos se inyectan como los inyectaría el juego, con el `timeStamp` del toque como `t`.
+
+      Se abre en http://localhost:5291/sala/banco-quiebro-efectos.html (o el puerto del Vite del
+      escritorio). Mandos: ?nivel=0..3
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banco de pruebas · efectos del Quiebro</title>
+    <meta name="theme-color" content="#05080a" />
+  </head>
+  <body style="margin: 0; background: #05080a">
+    <div id="raiz"></div>
+    <script type="module" src="/src/quiebro/efectos/banco.tsx"></script>
+  </body>
+</html>

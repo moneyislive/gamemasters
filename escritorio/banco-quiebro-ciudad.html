@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE LA CIUDAD DEL QUIEBRO.
+
+      Entrada APARTE de `index.html`, como los demás bancos y por lo mismo: esto no es una pantalla
+      del producto ni pasa por el enrutador de la Sala. Aquí se mira el barrio de una noche con su
+      atmósfera y nada más (sin juego, sin personajes): si la calle parece mojada, si el ritmo de las
+      ventanas es de ciudad, si la niebla da profundidad, y cuánto cuesta cada pieza por nivel.
+
+      Se abre en http://localhost:5291/sala/banco-quiebro-ciudad.html (el Vite de este árbol).
+      Mandos en la dirección: ?nivel=2&codigo=QUIEB&noche=1&camara=hombro&vista=calle
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banco · la ciudad del Quiebro</title>
+    <meta name="theme-color" content="#050807" />
+    <script>
+      /*
+        SÓLO SE RECARGA POR LO SUYO. Vite manda «recarga la página» a TODAS las pestañas abiertas
+        cuando cambia un módulo sin frontera de recarga en caliente, sea de la página que sea; con
+        varios bancos abiertos a la vez en este árbol, uno que se reescribe cada segundo tumba este
+        cada segundo y no llega a pintarse un fotograma (pasó el 24-sep). Aquí se deja pasar la
+        recarga sólo si el módulo es de la ciudad, de la atmósfera, del barrio o esta página.
+        Es cosa del banco de desarrollo: en producción no hay Vite ni socket.
+      */
+      (function () {
+        var Original = window.WebSocket;
+        var propios = ['/quiebro/ciudad/', '/quiebro/atmosfera/', 'quiebro-barrio', 'banco-quiebro-ciudad'];
+        function Filtrado(url, protocolos) {
+          var ws = protocolos === undefined ? new Original(url) : new Original(url, protocolos);
+          if (String(protocolos).indexOf('vite-hmr') === -1) return ws;
+          var anadir = ws.addEventListener.bind(ws);
+          ws.addEventListener = function (tipo, fn, opciones) {
+            if (tipo !== 'message') return anadir(tipo, fn, opciones);
+            return anadir(
+              'message',
+              function (e) {
+                try {
+                  var d = JSON.parse(e.data);
+                  if (d && d.type === 'full-reload') {
+                    var camino = String(d.path || '');
+                    var nuestro = propios.some(function (p) {
+                      return camino.indexOf(p) >= 0;
+                    });
+                    if (camino !== '' && camino !== '*' && !nuestro) {
+                      console.info('[banco de la ciudad] recarga ajena ignorada: ' + camino);
+                      return;
+                    }
+                  }
+                } catch (_) {}
+                fn.call(ws, e);
+              },
+              opciones,
+            );
+          };
+          return ws;
+        }
+        Filtrado.prototype = Original.prototype;
+        ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function (k) {
+          Filtrado[k] = Original[k];
+        });
+        window.WebSocket = Filtrado;
+      })();
+    </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #050807;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/quiebro/ciudad/banco.tsx"></script>
+  </body>
+</html>

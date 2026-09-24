@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DEL SONIDO DEL QUIEBRO: la primera vez que la plataforma suena.
+
+      Entrada APARTE de `index.html`, como los demás bancos y por lo mismo: la Sala tiene su enrutador
+      probado por `verify:escritorio`, y esto no es una pantalla del producto. Es el sitio donde se
+      juzga, con auriculares, lo que ningún comprobador puede: que un golpe suena a golpe, que la lluvia
+      se mete bajo la marquesina, que la cabina se oye a 150 m y que se puede QUEBRAR DE OÍDO (la prueba
+      mide el desvío de cada quiebro con el instante del toque).
+
+      Las cuentas (relojes, planificador, silbido, partitura) las prueba en Node
+      `escritorio/scripts/verificar-quiebro-sonido.ts`; el grafo de WebAudio, la «Autoprueba» del final
+      de esta página, que renderiza cada escena sin altavoz.
+
+      Se abre en http://localhost:5291/sala/banco-quiebro-sonido.html (o el puerto que tenga el Vite
+      del escritorio). Hay que tocar BAJAR (o cualquier botón) para que el navegador deje sonar.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banco de pruebas · el sonido del Quiebro</title>
+    <meta name="theme-color" content="#06110f" />
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/quiebro/sonido/banco.tsx"></script>
+  </body>
+</html>

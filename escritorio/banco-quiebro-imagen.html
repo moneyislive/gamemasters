@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE LA IMAGEN DEL QUIEBRO: el posproceso y la calidad automática, sin servidor.
+
+      Entrada APARTE de `index.html`, como `banco3d.html` y `banco-burgo.html` y por lo mismo: la
+      Sala tiene su enrutador probado por `verify:escritorio`, y una página para MIRAR no justifica
+      tocarlo. Aquí se juzga lo que ningún comprobador puede juzgar: si la noche se ve como tiene que
+      verse en cada nivel (N0-N3), si el Remanso se lee, si la capa nítida sigue igual de legible, y
+      cómo baja y sube el gobernador con el lastre. Lo que DECIDE (el gobernador, la tabla, el sondeo,
+      la gradación) lo prueba `escritorio/scripts/verificar-quiebro-calidad.ts` en Node.
+
+      La cabecera de `src/quiebro/posproceso/banco.tsx` cuenta los mandos. En la URL:
+      ?nivel=auto|0|1|2|3  ?remanso=0..1  ?lastre=0..4000  ?panel=0
+
+      Se abre en http://localhost:5291/sala/banco-quiebro-imagen.html (o el puerto que tenga el
+      Vite del escritorio). Con viewport de móvil a propósito: el banco se mira también en el teléfono.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Banco de pruebas · la imagen del Quiebro</title>
+    <meta name="theme-color" content="#020605" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #020605;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/quiebro/posproceso/banco.tsx"></script>
+  </body>
+</html>

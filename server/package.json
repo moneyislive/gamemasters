@@ -71,6 +71,7 @@
     "verify:burgo-mundo": "tsx scripts/verificar-burgo-mundo.ts",
     "verify:lindes-mundo": "tsx scripts/verificar-lindes-mundo.ts",
     "verify:riberas-mundo": "tsx scripts/verificar-riberas-mundo.ts",
+    "verify:quiebro-barrio": "tsx scripts/verificar-quiebro-barrio.ts",
     "verify:protocolo-de-botas": "tsx scripts/verificar-protocolo-de-botas.ts",
     "verify:botin": "tsx scripts/verificar-botin.ts",
     "verify:robot-generico": "tsx scripts/verificar-robot-generico.ts",
@@ -95,6 +96,7 @@
     "verify:sala-de-botas": "tsx scripts/verificar-sala-de-botas.ts",
     "verify:botas": "tsx scripts/verificar-botas.ts",
     "verify:cuotas-de-botas": "tsx scripts/verificar-cuotas-de-botas.ts",
+    "verify:liza-protocolo": "tsx scripts/verificar-liza-protocolo.ts",
     "medir:botas": "node --expose-gc --import tsx scripts/medir-botas.ts"
   },
   "dependencies": {

@@ -143,7 +143,7 @@ origen en el centro, `x` al este, `z` al sur (el norte es `−z`, como en `mundo
 - `cajas`: TODA la estructura con la que se choca (AABB con clase `alta`), en metros;
 - `cabinas`: 4 candidatas a 60-110 m del centro más la de refugio; `zonas` (cabinas, apariciones,
   impresiones); `limites` (`glorieta48`, `glorieta60`, `barrio`); `nace` por papel;
-- `grafo` de calles (16 cruces y sus aristas) para que los NPC naveguen;
+- `grafo` de calles (los 16 cruces delante y una rejilla detrás: 404 nudos) para que los NPC naveguen;
 - el ADORNO que tiene que salir igual en todos los aparatos: tiempo (`llovizna|aguacero|niebla`),
   hora, nombre del barrio, neones con sus rótulos inventados.
 - `mundoDelBarrio(barrio): MundoDeclarado` (el contrato de `mundo.ts`, en metros: `lado` de casilla 2 m,
@@ -170,8 +170,10 @@ importa de `shared/arcade/juegos/` salvo el registro `lizas.ts` (y ése sólo de
   sale del `Azar` sembrado dentro del estado; el tiempo, del número de tic. Las entradas llevan los
   milisegundos del aparato y el desfase que la capa de E/S usó para ese asiento, de modo que el juicio
   del quiebro se hace en el reloj del propio aparato (diseño §4.3) y el desfase se cancela.
-  `salaNueva(declaracion, asientos, semilla)` y `rehacerLaSala(declaracion, vista)` (reanudar tras un
-  despliegue desde los puntos de control). Así la sala se prueba entera en Node y en Hermes.
+  Una sola firma, `salaNueva(declaracion, semilla)`: empezar la fase en curso desde el punto de control
+  ES reanudarla (el productor pone los puntos de control en `alEmpezar` y en `equipo.recurso`), así
+  que tras un despliegue la sala se rehace con la misma llamada. Así se prueba entera en Node y en Hermes.
+  La firma exacta manda en `shared/mecanicas/liza/tipos-de-la-sala.ts`.
 - `server/src/liza/`: TODA la E/S. Un `upgrade` propio en la ruta de la Liza que, si la ruta no es
   suya, deja pasar (hay otro oyente, el de Boots on Board) salvo que tampoco sea de botas (entonces
   404: se sabe con `codigoDeLaRuta` de `botas/enchufe.ts`). Cuotas con `crearCuotas`. Un solo
@@ -194,7 +196,7 @@ interface PuertoDeMesa {
   vista: unknown;                   // la vista pública de la mesa (VistaDelQuiebro), la última
   opciones: readonly Opcion[];
   rev: number;
-  mover(movimiento: { tipo: string; carga?: unknown }): Promise<void>;
+  mover(movimiento: { tipo: string; carga?: unknown }): Promise<SalidaDelMovimiento>; // para reintentar sólo ante un 409
   suscribir(avisar: () => void): () => void;   // cambios de vista/opciones
 }
 ```
@@ -204,8 +206,8 @@ abre su propia mesa contra el servidor. **El puente** (app y `/jugar` ↔ docume
 mensajes tipados y versión: el anfitrión manda `{t:'mesa', v:1, codigo, yo, llave, servidor, vista,
 opciones, rev}` en cada cambio, y el documento contesta `{t:'mover', v:1, id, movimiento}` y
 `{t:'listo'|'salir'|'medida', …}`. La llave NUNCA viaja en la URL. El documento comprueba el origen
-de cada mensaje (en el WebView llega por `window.ReactNativeWebView`, en el iframe por `event.origin`
-igual al del servidor).
+de cada mensaje contra el SUYO propio (`vieneDelAnfitrion` de `contrato.ts`; nunca contra lo que diga
+el mensaje); en el WebView la app los mete con `injectJavaScript` y no hay origen que comparar.
 
 ---
 
@@ -252,7 +254,9 @@ falta un cambio fuera, se dice en el informe final y lo integra el coordinador.
 | **sala** | `shared/mecanicas/liza/{sala,cuerpo,combate,proyectiles,cerebro,encuentros}.ts`, `server/scripts/verificar-liza.ts` (con una liza de juguete) |
 | **servidor** | `server/src/liza/*`, la línea de montaje en `server/src/index.ts`, `server/scripts/verificar-sala-de-la-liza.ts` (robots WebSocket), `server/scripts/medir-liza.ts` |
 | **ciudad** | `escritorio/src/quiebro/ciudad/*`, `escritorio/src/quiebro/atmosfera/*` |
-| **imagen** | `escritorio/src/quiebro/posproceso/*`, `escritorio/src/quiebro/calidad/*`, `escritorio/src/quiebro/efectos/*` |
+| **imagen** | `escritorio/src/quiebro/posproceso/*`, `escritorio/src/quiebro/calidad/*` |
+| **efectos** | `escritorio/src/quiebro/efectos/*` |
+| **coordinador** | `escritorio/src/quiebro/cuerpos.ts` (la frontera juego ↔ personajes), los documentos de `docs/quiebro/` |
 | **personajes** | `escritorio/src/quiebro/personajes/*`, `escritorio/src/quiebro/recursos/*`, `arte/forja/*` |
 | **juego** | `escritorio/src/quiebro/{Quiebro.tsx,documento.tsx,red,mandos,camara,hud}/*`, `escritorio/quiebro.html` |
 | **sonido** | `escritorio/src/quiebro/sonido/*` |
