@@ -1,0 +1,2544 @@
+{
+ "version": 2,
+ "estado": "definitivo",
+ "nota": "Lee siempre este manifiesto: no escribas nombres de fichero, malla ni clip a mano. Lo fabrica arte/forja/empaquetar.py (orden unica: bash arte/forja/rehacer.sh).",
+ "ejes": {
+  "unidad": "m",
+  "arriba": "+Y",
+  "frente": "+Z",
+  "izquierdaDelPersonaje": "+X",
+  "suelo": "y = 0"
+ },
+ "carga": {
+  "compresion": "EXT_meshopt_compression (y KHR_mesh_quantization en normales y color)",
+  "obligatorio": "import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'; cargador.setMeshoptDecoder(MeshoptDecoder) ANTES de cargar: sin el, la carga falla entera",
+  "posiciones": "en float y en el espacio de la malla (la forja deja las mallas en el origen del esqueleto)",
+  "clonar": "SkeletonUtils.clone(gltf.scene) por cuerpo (three/examples/jsm/utils/SkeletonUtils.js)"
+ },
+ "materiales": {
+  "lod0": "un material por zona (mat_piel, mat_abrigo, mat_forro...) con su color; COLOR_0 = oclusion (el iris en mat_ojos)",
+  "lejos": "LOD1 y LOD2: mat_lod_mate y mat_lod_brillo; COLOR_0 rgb = color de la zona x oclusion, a = oclusion; _zona = indice en figuras[f].zonas (los materiales del LOD0 de la familia en orden alfabetico)",
+  "tenibles": {
+   "mat_forro": {
+    "por": "asiento",
+    "nota": "forro de la prenda y ribetes (bocamangas, cinturon, cremallera, bajo interior del faldon): el color saturado del asiento, que se lee a 60 m"
+   },
+   "mat_traje": {
+    "por": "paleta",
+    "nota": "traje de chaqueta del Celador (chaqueta y pantalon): cuatro colores apagados; el cliente elige uno por entidad"
+   },
+   "mat_corbata": {
+    "por": "paleta",
+    "deLa": "mat_traje",
+    "nota": "la corbata va con el traje: con el mismo indice de color que mat_traje"
+   }
+  },
+  "mismoNombre": "en un fichero con varias variantes, una zona puede tener un material por variante con el mismo nombre y otro color (el abrigo de la gabardina no es el de la chaqueta corta)"
+ },
+ "bytes": {
+  "total": 5541484,
+  "tope": 8388608,
+  "porArchivo": {
+   "celador-hombre-lod1.glb": 194028,
+   "celador-hombre-lod2.glb": 77052,
+   "celador-hombre.glb": 381096,
+   "celador-mujer-lod1.glb": 72516,
+   "celador-mujer-lod2.glb": 35512,
+   "celador-mujer.glb": 136780,
+   "clips-hombre.glb": 781912,
+   "clips-mujer.glb": 777324,
+   "desvelado-hombre-gabardina.glb": 139580,
+   "desvelado-hombre-ligera.glb": 123088,
+   "desvelado-hombre-lod1.glb": 198952,
+   "desvelado-hombre-lod2.glb": 80992,
+   "desvelado-hombre-mole.glb": 138764,
+   "desvelado-mujer-gabardina.glb": 141424,
+   "desvelado-mujer-ligera.glb": 124456,
+   "desvelado-mujer-lod1.glb": 202072,
+   "desvelado-mujer-lod2.glb": 81236,
+   "desvelado-mujer-mole.glb": 142504,
+   "durmiente-hombre-lod1.glb": 240960,
+   "durmiente-hombre-lod2.glb": 89448,
+   "durmiente-hombre-lod3.glb": 57036,
+   "durmiente-hombre.glb": 462932,
+   "durmiente-mujer-lod1.glb": 241280,
+   "durmiente-mujer-lod2.glb": 89992,
+   "durmiente-mujer-lod3.glb": 56956,
+   "durmiente-mujer.glb": 462880,
+   "pieza-paraguas.glb": 7400,
+   "pieza-pistola.glb": 3312
+  },
+  "primeraNocheN0": {
+   "archivos": [
+    "desvelado-hombre-gabardina.glb",
+    "desvelado-mujer-gabardina.glb",
+    "desvelado-hombre-lod1.glb",
+    "desvelado-mujer-lod1.glb",
+    "celador-hombre-lod1.glb",
+    "celador-mujer-lod1.glb",
+    "durmiente-hombre-lod1.glb",
+    "durmiente-mujer-lod1.glb",
+    "durmiente-hombre-lod3.glb",
+    "durmiente-mujer-lod3.glb",
+    "clips-hombre.glb",
+    "clips-mujer.glb",
+    "pieza-pistola.glb",
+    "pieza-paraguas.glb"
+   ],
+   "total": 3114752,
+   "nota": "el propio a LOD0 (su estilo, en los dos sexos: cuenta la gabardina, las tres pesan casi igual); companeros, Celadores y Prestados cercanos a LOD1; la multitud en el maniqui LOD3 de los durmientes"
+  }
+ },
+ "esqueletos": {
+  "hombre": {
+   "clips": "clips-hombre.glb",
+   "huesos": [
+    "cabeza",
+    "cuello",
+    "giro_L",
+    "dedos2_L",
+    "dedos_L",
+    "pulgar_L",
+    "agarre_L",
+    "mano_L",
+    "antebrazo_L",
+    "brazo_L",
+    "hombro_L",
+    "giro_R",
+    "dedos2_R",
+    "dedos_R",
+    "pulgar_R",
+    "agarre_R",
+    "mano_R",
+    "antebrazo_R",
+    "brazo_R",
+    "hombro_R",
+    "pecho",
+    "columna1",
+    "columna",
+    "punta_L",
+    "pie_L",
+    "pierna_L",
+    "muslo_L",
+    "faldon03_L",
+    "faldon02_L",
+    "faldon01_L",
+    "faldon13_L",
+    "faldon12_L",
+    "faldon11_L",
+    "faldon23_L",
+    "faldon22_L",
+    "faldon21_L",
+    "faldon33_L",
+    "faldon32_L",
+    "faldon31_L",
+    "punta_R",
+    "pie_R",
+    "pierna_R",
+    "muslo_R",
+    "faldon03_R",
+    "faldon02_R",
+    "faldon01_R",
+    "faldon13_R",
+    "faldon12_R",
+    "faldon11_R",
+    "faldon23_R",
+    "faldon22_R",
+    "faldon21_R",
+    "faldon33_R",
+    "faldon32_R",
+    "faldon31_R",
+    "caderas",
+    "raiz"
+   ],
+   "raiz": "raiz",
+   "caderas": "caderas",
+   "cabeza": "cabeza",
+   "agarre": {
+    "derecha": "agarre_R",
+    "izquierda": "agarre_L",
+    "ejes": "+X hacia los nudillos (el canon), +Y por el pulgar (el eje del paraguas), origen en el hueco del puno"
+   },
+   "faldon": {
+    "cadenas": [
+     {
+      "huesos": [
+       "faldon01_L",
+       "faldon02_L",
+       "faldon03_L"
+      ],
+      "largosM": [
+       0.1624,
+       0.17,
+       0.18
+      ]
+     },
+     {
+      "huesos": [
+       "faldon11_L",
+       "faldon12_L",
+       "faldon13_L"
+      ],
+      "largosM": [
+       0.1637,
+       0.1702,
+       0.1804
+      ]
+     },
+     {
+      "huesos": [
+       "faldon21_L",
+       "faldon22_L",
+       "faldon23_L"
+      ],
+      "largosM": [
+       0.1634,
+       0.1701,
+       0.1801
+      ]
+     },
+     {
+      "huesos": [
+       "faldon31_L",
+       "faldon32_L",
+       "faldon33_L"
+      ],
+      "largosM": [
+       0.1619,
+       0.1701,
+       0.1803
+      ]
+     },
+     {
+      "huesos": [
+       "faldon01_R",
+       "faldon02_R",
+       "faldon03_R"
+      ],
+      "largosM": [
+       0.1624,
+       0.1701,
+       0.1803
+      ]
+     },
+     {
+      "huesos": [
+       "faldon11_R",
+       "faldon12_R",
+       "faldon13_R"
+      ],
+      "largosM": [
+       0.1637,
+       0.1701,
+       0.1801
+      ]
+     },
+     {
+      "huesos": [
+       "faldon21_R",
+       "faldon22_R",
+       "faldon23_R"
+      ],
+      "largosM": [
+       0.1634,
+       0.1701,
+       0.1802
+      ]
+     },
+     {
+      "huesos": [
+       "faldon31_R",
+       "faldon32_R",
+       "faldon33_R"
+      ],
+      "largosM": [
+       0.1619,
+       0.1702,
+       0.1805
+      ]
+     }
+    ],
+    "horneado": true,
+    "nota": "El faldon va horneado en los clips (muelle, inercia, viento, choque con las piernas y arrastre del muslo). Para muelles en el cliente encima de lo horneado (giros bruscos, mezclas): cada cadena cuelga de caderas con tres huesos de arriba abajo; los parametros del horneado van en muelle.",
+    "muelle": {
+     "rigidez": [
+      160,
+      70,
+      38
+     ],
+     "amortiguamiento": 5.0,
+     "arrastreDelAire": 0.8,
+     "holguraM": 0.008,
+     "estiramientoEntreCadenas": 1.07,
+     "topeGradosPorDefecto": 70,
+     "topeGrados": {
+      "pasear": 22,
+      "andar": 26,
+      "trotar": 35,
+      "correr": 50,
+      "quiebro": 50
+     },
+     "nota": "el tope es el angulo maximo de cada junta respecto a su forma de reposo llevada por caderas; ninguna junta pasa por encima de la cabeza de caderas"
+    }
+   }
+  },
+  "mujer": {
+   "clips": "clips-mujer.glb",
+   "huesos": [
+    "cabeza",
+    "cuello",
+    "giro_L",
+    "dedos2_L",
+    "dedos_L",
+    "pulgar_L",
+    "agarre_L",
+    "mano_L",
+    "antebrazo_L",
+    "brazo_L",
+    "hombro_L",
+    "giro_R",
+    "dedos2_R",
+    "dedos_R",
+    "pulgar_R",
+    "agarre_R",
+    "mano_R",
+    "antebrazo_R",
+    "brazo_R",
+    "hombro_R",
+    "pecho",
+    "columna1",
+    "columna",
+    "punta_L",
+    "pie_L",
+    "pierna_L",
+    "muslo_L",
+    "faldon03_L",
+    "faldon02_L",
+    "faldon01_L",
+    "faldon13_L",
+    "faldon12_L",
+    "faldon11_L",
+    "faldon23_L",
+    "faldon22_L",
+    "faldon21_L",
+    "faldon33_L",
+    "faldon32_L",
+    "faldon31_L",
+    "punta_R",
+    "pie_R",
+    "pierna_R",
+    "muslo_R",
+    "faldon03_R",
+    "faldon02_R",
+    "faldon01_R",
+    "faldon13_R",
+    "faldon12_R",
+    "faldon11_R",
+    "faldon23_R",
+    "faldon22_R",
+    "faldon21_R",
+    "faldon33_R",
+    "faldon32_R",
+    "faldon31_R",
+    "caderas",
+    "raiz"
+   ],
+   "raiz": "raiz",
+   "caderas": "caderas",
+   "cabeza": "cabeza",
+   "agarre": {
+    "derecha": "agarre_R",
+    "izquierda": "agarre_L",
+    "ejes": "+X hacia los nudillos (el canon), +Y por el pulgar (el eje del paraguas), origen en el hueco del puno"
+   },
+   "faldon": {
+    "cadenas": [
+     {
+      "huesos": [
+       "faldon01_L",
+       "faldon02_L",
+       "faldon03_L"
+      ],
+      "largosM": [
+       0.1534,
+       0.1598,
+       0.1692
+      ]
+     },
+     {
+      "huesos": [
+       "faldon11_L",
+       "faldon12_L",
+       "faldon13_L"
+      ],
+      "largosM": [
+       0.1544,
+       0.16,
+       0.1696
+      ]
+     },
+     {
+      "huesos": [
+       "faldon21_L",
+       "faldon22_L",
+       "faldon23_L"
+      ],
+      "largosM": [
+       0.1542,
+       0.1599,
+       0.1693
+      ]
+     },
+     {
+      "huesos": [
+       "faldon31_L",
+       "faldon32_L",
+       "faldon33_L"
+      ],
+      "largosM": [
+       0.153,
+       0.1599,
+       0.1695
+      ]
+     },
+     {
+      "huesos": [
+       "faldon01_R",
+       "faldon02_R",
+       "faldon03_R"
+      ],
+      "largosM": [
+       0.1534,
+       0.1599,
+       0.1695
+      ]
+     },
+     {
+      "huesos": [
+       "faldon11_R",
+       "faldon12_R",
+       "faldon13_R"
+      ],
+      "largosM": [
+       0.1544,
+       0.1599,
+       0.1694
+      ]
+     },
+     {
+      "huesos": [
+       "faldon21_R",
+       "faldon22_R",
+       "faldon23_R"
+      ],
+      "largosM": [
+       0.1542,
+       0.1599,
+       0.1694
+      ]
+     },
+     {
+      "huesos": [
+       "faldon31_R",
+       "faldon32_R",
+       "faldon33_R"
+      ],
+      "largosM": [
+       0.153,
+       0.1601,
+       0.1698
+      ]
+     }
+    ],
+    "horneado": true,
+    "nota": "El faldon va horneado en los clips (muelle, inercia, viento, choque con las piernas y arrastre del muslo). Para muelles en el cliente encima de lo horneado (giros bruscos, mezclas): cada cadena cuelga de caderas con tres huesos de arriba abajo; los parametros del horneado van en muelle.",
+    "muelle": {
+     "rigidez": [
+      160,
+      70,
+      38
+     ],
+     "amortiguamiento": 5.0,
+     "arrastreDelAire": 0.8,
+     "holguraM": 0.008,
+     "estiramientoEntreCadenas": 1.07,
+     "topeGradosPorDefecto": 70,
+     "topeGrados": {
+      "pasear": 22,
+      "andar": 26,
+      "trotar": 35,
+      "correr": 50,
+      "quiebro": 50
+     },
+     "nota": "el tope es el angulo maximo de cada junta respecto a su forma de reposo llevada por caderas; ninguna junta pasa por encima de la cabeza de caderas"
+    }
+   }
+  }
+ },
+ "figuras": {
+  "desvelado-hombre-gabardina": {
+   "clase": "desvelado",
+   "esqueleto": "hombre",
+   "zonas": [
+    "mat_abrigo",
+    "mat_calzado",
+    "mat_camisa",
+    "mat_forro",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_suela",
+    "mat_tela"
+   ],
+   "familia": "desvelado-hombre",
+   "lods": [
+    {
+     "archivo": "desvelado-hombre-gabardina.glb",
+     "bytes": 139580,
+     "triangulos": 7940,
+     "mallas": {
+      "gabardina": 7940
+     },
+     "materiales": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    {
+     "archivo": "desvelado-hombre-lod1.glb",
+     "bytes": 198952,
+     "triangulos": 4066,
+     "mallas": {
+      "gabardina": 4066
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "desvelado-hombre-lod2.glb",
+     "bytes": 80992,
+     "triangulos": 1076,
+     "mallas": {
+      "gabardina": 1076
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "gabardina": {
+     "escala": 1.0,
+     "triangulos": [
+      7940,
+      4066,
+      1076
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    }
+   }
+  },
+  "desvelado-hombre-ligera": {
+   "clase": "desvelado",
+   "esqueleto": "hombre",
+   "zonas": [
+    "mat_abrigo",
+    "mat_calzado",
+    "mat_camisa",
+    "mat_forro",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_suela",
+    "mat_tela"
+   ],
+   "familia": "desvelado-hombre",
+   "lods": [
+    {
+     "archivo": "desvelado-hombre-ligera.glb",
+     "bytes": 123088,
+     "triangulos": 6822,
+     "mallas": {
+      "ligera": 6822
+     },
+     "materiales": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    {
+     "archivo": "desvelado-hombre-lod1.glb",
+     "bytes": 198952,
+     "triangulos": 3600,
+     "mallas": {
+      "ligera": 3600
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "desvelado-hombre-lod2.glb",
+     "bytes": 80992,
+     "triangulos": 880,
+     "mallas": {
+      "ligera": 880
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "ligera": {
+     "escala": 1.0,
+     "triangulos": [
+      6822,
+      3600,
+      880
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    }
+   }
+  },
+  "desvelado-hombre-mole": {
+   "clase": "desvelado",
+   "esqueleto": "hombre",
+   "zonas": [
+    "mat_abrigo",
+    "mat_calzado",
+    "mat_camisa",
+    "mat_forro",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_suela",
+    "mat_tela"
+   ],
+   "familia": "desvelado-hombre",
+   "lods": [
+    {
+     "archivo": "desvelado-hombre-mole.glb",
+     "bytes": 138764,
+     "triangulos": 7858,
+     "mallas": {
+      "mole": 7858
+     },
+     "materiales": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    {
+     "archivo": "desvelado-hombre-lod1.glb",
+     "bytes": 198952,
+     "triangulos": 3984,
+     "mallas": {
+      "mole": 3984
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "desvelado-hombre-lod2.glb",
+     "bytes": 80992,
+     "triangulos": 1060,
+     "mallas": {
+      "mole": 1060
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "mole": {
+     "escala": 1.0,
+     "triangulos": [
+      7858,
+      3984,
+      1060
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    }
+   }
+  },
+  "desvelado-mujer-gabardina": {
+   "clase": "desvelado",
+   "esqueleto": "mujer",
+   "zonas": [
+    "mat_abrigo",
+    "mat_calzado",
+    "mat_camisa",
+    "mat_forro",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_suela",
+    "mat_tela"
+   ],
+   "familia": "desvelado-mujer",
+   "lods": [
+    {
+     "archivo": "desvelado-mujer-gabardina.glb",
+     "bytes": 141424,
+     "triangulos": 8036,
+     "mallas": {
+      "gabardina": 8036
+     },
+     "materiales": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    {
+     "archivo": "desvelado-mujer-lod1.glb",
+     "bytes": 202072,
+     "triangulos": 4008,
+     "mallas": {
+      "gabardina": 4008
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "desvelado-mujer-lod2.glb",
+     "bytes": 81236,
+     "triangulos": 1072,
+     "mallas": {
+      "gabardina": 1072
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "gabardina": {
+     "escala": 1.0,
+     "triangulos": [
+      8036,
+      4008,
+      1072
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    }
+   }
+  },
+  "desvelado-mujer-ligera": {
+   "clase": "desvelado",
+   "esqueleto": "mujer",
+   "zonas": [
+    "mat_abrigo",
+    "mat_calzado",
+    "mat_camisa",
+    "mat_forro",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_suela",
+    "mat_tela"
+   ],
+   "familia": "desvelado-mujer",
+   "lods": [
+    {
+     "archivo": "desvelado-mujer-ligera.glb",
+     "bytes": 124456,
+     "triangulos": 6854,
+     "mallas": {
+      "ligera": 6854
+     },
+     "materiales": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    {
+     "archivo": "desvelado-mujer-lod1.glb",
+     "bytes": 202072,
+     "triangulos": 3656,
+     "mallas": {
+      "ligera": 3656
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "desvelado-mujer-lod2.glb",
+     "bytes": 81236,
+     "triangulos": 880,
+     "mallas": {
+      "ligera": 880
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "ligera": {
+     "escala": 1.0,
+     "triangulos": [
+      6854,
+      3656,
+      880
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    }
+   }
+  },
+  "desvelado-mujer-mole": {
+   "clase": "desvelado",
+   "esqueleto": "mujer",
+   "zonas": [
+    "mat_abrigo",
+    "mat_calzado",
+    "mat_camisa",
+    "mat_forro",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_suela",
+    "mat_tela"
+   ],
+   "familia": "desvelado-mujer",
+   "lods": [
+    {
+     "archivo": "desvelado-mujer-mole.glb",
+     "bytes": 142504,
+     "triangulos": 8030,
+     "mallas": {
+      "mole": 8030
+     },
+     "materiales": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    {
+     "archivo": "desvelado-mujer-lod1.glb",
+     "bytes": 202072,
+     "triangulos": 4110,
+     "mallas": {
+      "mole": 4110
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "desvelado-mujer-lod2.glb",
+     "bytes": 81236,
+     "triangulos": 1060,
+     "mallas": {
+      "mole": 1060
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "mole": {
+     "escala": 1.0,
+     "triangulos": [
+      8030,
+      4110,
+      1060
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_forro",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    }
+   }
+  },
+  "celador-hombre": {
+   "clase": "celador",
+   "esqueleto": "hombre",
+   "zonas": [
+    "mat_calzado",
+    "mat_camisa",
+    "mat_corbata",
+    "mat_gafas",
+    "mat_montura",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_sombrero",
+    "mat_suela",
+    "mat_traje"
+   ],
+   "lods": [
+    {
+     "archivo": "celador-hombre.glb",
+     "bytes": 381096,
+     "triangulos": 24046,
+     "mallas": {
+      "alto": 8020,
+      "ancho": 8024,
+      "mayor": 8002
+     },
+     "materiales": [
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_gafas",
+      "mat_montura",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_sombrero",
+      "mat_suela",
+      "mat_traje"
+     ]
+    },
+    {
+     "archivo": "celador-hombre-lod1.glb",
+     "bytes": 194028,
+     "triangulos": 11720,
+     "mallas": {
+      "alto": 3956,
+      "ancho": 3824,
+      "mayor": 3940
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "celador-hombre-lod2.glb",
+     "bytes": 77052,
+     "triangulos": 2966,
+     "mallas": {
+      "alto": 980,
+      "ancho": 992,
+      "mayor": 994
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "alto": {
+     "escala": 1.06,
+     "triangulos": [
+      8020,
+      3956,
+      980
+     ],
+     "zonas": [
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_gafas",
+      "mat_montura",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_traje"
+     ]
+    },
+    "ancho": {
+     "escala": 1.02,
+     "triangulos": [
+      8024,
+      3824,
+      992
+     ],
+     "zonas": [
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_gafas",
+      "mat_montura",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_traje"
+     ]
+    },
+    "mayor": {
+     "escala": 0.98,
+     "triangulos": [
+      8002,
+      3940,
+      994
+     ],
+     "zonas": [
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_gafas",
+      "mat_montura",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_sombrero",
+      "mat_suela",
+      "mat_traje"
+     ]
+    }
+   }
+  },
+  "celador-mujer": {
+   "clase": "celador",
+   "esqueleto": "mujer",
+   "zonas": [
+    "mat_calzado",
+    "mat_camisa",
+    "mat_corbata",
+    "mat_gafas",
+    "mat_montura",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_suela",
+    "mat_traje"
+   ],
+   "lods": [
+    {
+     "archivo": "celador-mujer.glb",
+     "bytes": 136780,
+     "triangulos": 7808,
+     "mallas": {
+      "mujer": 7808
+     },
+     "materiales": [
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_gafas",
+      "mat_montura",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_traje"
+     ]
+    },
+    {
+     "archivo": "celador-mujer-lod1.glb",
+     "bytes": 72516,
+     "triangulos": 3800,
+     "mallas": {
+      "mujer": 3800
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "celador-mujer-lod2.glb",
+     "bytes": 35512,
+     "triangulos": 996,
+     "mallas": {
+      "mujer": 996
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "mujer": {
+     "escala": 1.0,
+     "triangulos": [
+      7808,
+      3800,
+      996
+     ],
+     "zonas": [
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_gafas",
+      "mat_montura",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_traje"
+     ]
+    }
+   }
+  },
+  "durmiente-hombre": {
+   "clase": "durmiente",
+   "esqueleto": "hombre",
+   "zonas": [
+    "mat_abrigo",
+    "mat_calzado",
+    "mat_camisa",
+    "mat_corbata",
+    "mat_franja",
+    "mat_interior",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_suela",
+    "mat_tela"
+   ],
+   "lods": [
+    {
+     "archivo": "durmiente-hombre.glb",
+     "bytes": 462932,
+     "triangulos": 29990,
+     "mallas": {
+      "lluvia": 7502,
+      "obra": 7570,
+      "sudadera": 7248,
+      "camarero": 7670
+     },
+     "materiales": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_franja",
+      "mat_interior",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    {
+     "archivo": "durmiente-hombre-lod1.glb",
+     "bytes": 240960,
+     "triangulos": 15242,
+     "mallas": {
+      "lluvia": 3774,
+      "obra": 3898,
+      "sudadera": 3652,
+      "camarero": 3918
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "durmiente-hombre-lod2.glb",
+     "bytes": 89448,
+     "triangulos": 3882,
+     "mallas": {
+      "lluvia": 978,
+      "obra": 980,
+      "sudadera": 962,
+      "camarero": 962
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "durmiente-hombre-lod3.glb",
+     "bytes": 57036,
+     "triangulos": 1500,
+     "mallas": {
+      "lluvia": 380,
+      "obra": 380,
+      "sudadera": 380,
+      "camarero": 360
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "lluvia": {
+     "escala": 1.0,
+     "triangulos": [
+      7502,
+      3774,
+      978,
+      380
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_interior",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    "obra": {
+     "escala": 1.0,
+     "triangulos": [
+      7570,
+      3898,
+      980,
+      380
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_franja",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    "sudadera": {
+     "escala": 1.0,
+     "triangulos": [
+      7248,
+      3652,
+      962,
+      380
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    "camarero": {
+     "escala": 1.0,
+     "triangulos": [
+      7670,
+      3918,
+      962,
+      360
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    }
+   }
+  },
+  "durmiente-mujer": {
+   "clase": "durmiente",
+   "esqueleto": "mujer",
+   "zonas": [
+    "mat_abrigo",
+    "mat_calzado",
+    "mat_camisa",
+    "mat_corbata",
+    "mat_franja",
+    "mat_interior",
+    "mat_ojos",
+    "mat_pelo",
+    "mat_piel",
+    "mat_suela",
+    "mat_tela"
+   ],
+   "lods": [
+    {
+     "archivo": "durmiente-mujer.glb",
+     "bytes": 462880,
+     "triangulos": 29898,
+     "mallas": {
+      "lluvia": 7584,
+      "obra": 7658,
+      "sudadera": 7220,
+      "camarero": 7436
+     },
+     "materiales": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_franja",
+      "mat_interior",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    {
+     "archivo": "durmiente-mujer-lod1.glb",
+     "bytes": 241280,
+     "triangulos": 15182,
+     "mallas": {
+      "lluvia": 3802,
+      "obra": 4002,
+      "sudadera": 3580,
+      "camarero": 3798
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "durmiente-mujer-lod2.glb",
+     "bytes": 89992,
+     "triangulos": 3920,
+     "mallas": {
+      "lluvia": 980,
+      "obra": 980,
+      "sudadera": 980,
+      "camarero": 980
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    },
+    {
+     "archivo": "durmiente-mujer-lod3.glb",
+     "bytes": 56956,
+     "triangulos": 1472,
+     "mallas": {
+      "lluvia": 366,
+      "obra": 380,
+      "sudadera": 346,
+      "camarero": 380
+     },
+     "materiales": [
+      "mat_lod_brillo",
+      "mat_lod_mate"
+     ]
+    }
+   ],
+   "variantes": {
+    "lluvia": {
+     "escala": 1.0,
+     "triangulos": [
+      7584,
+      3802,
+      980,
+      366
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_interior",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    "obra": {
+     "escala": 1.0,
+     "triangulos": [
+      7658,
+      4002,
+      980,
+      380
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_franja",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    "sudadera": {
+     "escala": 1.0,
+     "triangulos": [
+      7220,
+      3580,
+      980,
+      346
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    },
+    "camarero": {
+     "escala": 1.0,
+     "triangulos": [
+      7436,
+      3798,
+      980,
+      380
+     ],
+     "zonas": [
+      "mat_abrigo",
+      "mat_calzado",
+      "mat_camisa",
+      "mat_corbata",
+      "mat_ojos",
+      "mat_pelo",
+      "mat_piel",
+      "mat_suela",
+      "mat_tela"
+     ]
+    }
+   }
+  }
+ },
+ "clases": {
+  "desvelado": {
+   "variante": "indice del estilo: 0 gabardina, 1 ligera, 2 mole (IDS_DE_ESTILO); el sexo lo elige el cliente por asiento",
+   "variantes": [
+    {
+     "estilo": "gabardina",
+     "hombre": {
+      "figura": "desvelado-hombre-gabardina",
+      "mallas": [
+       "gabardina"
+      ]
+     },
+     "mujer": {
+      "figura": "desvelado-mujer-gabardina",
+      "mallas": [
+       "gabardina"
+      ]
+     }
+    },
+    {
+     "estilo": "ligera",
+     "hombre": {
+      "figura": "desvelado-hombre-ligera",
+      "mallas": [
+       "ligera"
+      ]
+     },
+     "mujer": {
+      "figura": "desvelado-mujer-ligera",
+      "mallas": [
+       "ligera"
+      ]
+     }
+    },
+    {
+     "estilo": "mole",
+     "hombre": {
+      "figura": "desvelado-hombre-mole",
+      "mallas": [
+       "mole"
+      ]
+     },
+     "mujer": {
+      "figura": "desvelado-mujer-mole",
+      "mallas": [
+       "mole"
+      ]
+     }
+    }
+   ],
+   "tenibles": {
+    "mat_forro": "asiento"
+   }
+  },
+  "celador": {
+   "variante": "numero % 4 (la silueta); el color del traje, otro indice (sugerencia: (id >> 2) % 4)",
+   "variantes": [
+    {
+     "silueta": "alto",
+     "figura": "celador-hombre",
+     "mallas": [
+      "alto"
+     ],
+     "escala": 1.06
+    },
+    {
+     "silueta": "ancho",
+     "figura": "celador-hombre",
+     "mallas": [
+      "ancho"
+     ],
+     "escala": 1.02
+    },
+    {
+     "silueta": "mujer",
+     "figura": "celador-mujer",
+     "mallas": [
+      "mujer"
+     ],
+     "escala": 1.0
+    },
+    {
+     "silueta": "mayor",
+     "figura": "celador-hombre",
+     "mallas": [
+      "mayor"
+     ],
+     "escala": 0.98
+    }
+   ],
+   "tenibles": {
+    "mat_traje": "paleta",
+    "mat_corbata": "paleta"
+   },
+   "paletaDelTraje": {
+    "marengo": "#3e4044",
+    "pardo": "#544434",
+    "verde-botella": "#223c2e",
+    "azul-noche": "#202840"
+   },
+   "paletaDeLaCorbata": {
+    "marengo": "#68242c",
+    "pardo": "#244638",
+    "verde-botella": "#5a304e",
+    "azul-noche": "#647080"
+   },
+   "nota": "cada silueta es su propia malla (el sombrero del mayor ya viene en ella) con su montura de gafas, su pelo y su camisa; `escala` es la de la figura entera. La corbata se tiñe con el MISMO indice de color que el traje (paletaDeLaCorbata tiene las mismas claves y el mismo orden que paletaDelTraje)"
+  },
+  "tirador": {
+   "como": "celador",
+   "pieza": "pistola",
+   "nota": "el mismo Celador con la pistola colgada de agarre_R"
+  },
+  "prestado": {
+   "como": "durmiente",
+   "nota": "indice del durmiente (0-47): su aspecto {cuerpo, ropa, paraguas} sale de quiebro-durmientes; el Prestado conserva su ropa"
+  }
+ },
+ "durmientes": {
+  "cuerpos": [
+   {
+    "sexo": "hombre",
+    "figura": "durmiente-hombre",
+    "ropas": [
+     {
+      "nombre": "lluvia",
+      "mallas": [
+       "lluvia"
+      ]
+     },
+     {
+      "nombre": "obra",
+      "mallas": [
+       "obra"
+      ]
+     },
+     {
+      "nombre": "sudadera",
+      "mallas": [
+       "sudadera"
+      ]
+     },
+     {
+      "nombre": "camarero",
+      "mallas": [
+       "camarero"
+      ]
+     }
+    ]
+   },
+   {
+    "sexo": "mujer",
+    "figura": "durmiente-mujer",
+    "ropas": [
+     {
+      "nombre": "lluvia",
+      "mallas": [
+       "lluvia"
+      ]
+     },
+     {
+      "nombre": "obra",
+      "mallas": [
+       "obra"
+      ]
+     },
+     {
+      "nombre": "sudadera",
+      "mallas": [
+       "sudadera"
+      ]
+     },
+     {
+      "nombre": "camarero",
+      "mallas": [
+       "camarero"
+      ]
+     }
+    ]
+   }
+  ],
+  "paraguas": "paraguas",
+  "nota": "AspectoDelDurmiente.cuerpo 0|1 -> cuerpos[cuerpo]; .ropa 0-3 -> ropas[ropa]; .paraguas -> pieza paraguas en agarre_R y clip andar-paraguas"
+ },
+ "piezas": {
+  "pistola": {
+   "archivo": "pieza-pistola.glb",
+   "bytes": 3312,
+   "triangulos": 88,
+   "materiales": [
+    "mat_arma"
+   ],
+   "hueso": "agarre_R",
+   "como": "figura.getObjectByName('agarre_R').add(pieza) sin transformacion: ya viene en el marco del agarre"
+  },
+  "paraguas": {
+   "archivo": "pieza-paraguas.glb",
+   "bytes": 7400,
+   "triangulos": 400,
+   "materiales": [
+    "mat_paraguas",
+    "mat_varilla",
+    "mat_mango"
+   ],
+   "hueso": "agarre_R",
+   "como": "figura.getObjectByName('agarre_R').add(pieza) sin transformacion: ya viene en el marco del agarre"
+  }
+ },
+ "marcha": {
+  "atras": "retroceder",
+  "izquierda": "lateral-izquierda",
+  "derecha": "lateral-derecha"
+ },
+ "clips": {
+  "reposo": {
+   "duracionMs": 2000,
+   "fotogramas": 60,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "respiracion y peso"
+  },
+  "guardia": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "guardia de combate en bucle: puños a la barbilla, la izquierda delante (los golpes empiezan y acaban en su fotograma 0)"
+  },
+  "guardia-celador": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "guardia del Celador: erguido y casi de frente, las dos manos abiertas delante de la cara (para las Entradas de frente)"
+  },
+  "pasear": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "paso de calle de los durmientes (1,3 m/s)",
+   "zancadaM": 1.3,
+   "velocidadMs": 1.3,
+   "mujer": {
+    "zancadaM": 1.222,
+    "velocidadMs": 1.222
+   }
+  },
+  "andar": {
+   "duracionMs": 733,
+   "fotogramas": 22,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "andar decidido a 2 m/s",
+   "zancadaM": 1.467,
+   "velocidadMs": 2.0,
+   "mujer": {
+    "zancadaM": 1.379,
+    "velocidadMs": 1.88
+   }
+  },
+  "trotar": {
+   "duracionMs": 667,
+   "fotogramas": 20,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "trote a 5 m/s",
+   "zancadaM": 3.333,
+   "velocidadMs": 5.0,
+   "mujer": {
+    "zancadaM": 3.133,
+    "velocidadMs": 4.7
+   }
+  },
+  "correr": {
+   "duracionMs": 600,
+   "fotogramas": 18,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "carrera a 7 m/s",
+   "zancadaM": 4.2,
+   "velocidadMs": 7.0,
+   "mujer": {
+    "zancadaM": 3.948,
+    "velocidadMs": 6.58
+   }
+  },
+  "andar-paraguas": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "pasear con el paraguas (pieza aparte en agarre_R, puno con el pulgar arriba)",
+   "zancadaM": 1.3,
+   "velocidadMs": 1.3,
+   "mujer": {
+    "zancadaM": 1.222,
+    "velocidadMs": 1.222
+   }
+  },
+  "retroceder": {
+   "duracionMs": 1067,
+   "fotogramas": 32,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "andar hacia atras (braceo contrario a la pierna, como andar)",
+   "zancadaM": 1.12,
+   "velocidadMs": 1.05,
+   "mujer": {
+    "zancadaM": 1.053,
+    "velocidadMs": 0.987
+   }
+  },
+  "lateral-izquierda": {
+   "duracionMs": 533,
+   "fotogramas": 16,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "paso lateral hacia la izquierda del personaje (+X Blender)",
+   "zancadaM": 0.64,
+   "velocidadMs": 1.2,
+   "mujer": {
+    "zancadaM": 0.602,
+    "velocidadMs": 1.128
+   }
+  },
+  "lateral-derecha": {
+   "duracionMs": 533,
+   "fotogramas": 16,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "paso lateral hacia la derecha del personaje",
+   "zancadaM": 0.64,
+   "velocidadMs": 1.2,
+   "mujer": {
+    "zancadaM": 0.602,
+    "velocidadMs": 1.128
+   }
+  },
+  "quiebro-izquierda": {
+   "duracionMs": 467,
+   "fotogramas": 14,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "quiebro a su izquierda: impulso con el pie derecho clavado 0-2, vuelo rasante tendido 60° de lado 2-8, aterriza con la izquierda cuando la raíz ha frenado (9-10); 3,5 m en 300 ms, intocable 250",
+   "intocableMs": [
+    0,
+    250
+   ],
+   "desplazamientoM": [
+    3.5,
+    0.0,
+    -0.0
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     3.5,
+     0.0,
+     -0.0
+    ]
+   }
+  },
+  "quiebro-derecha": {
+   "duracionMs": 467,
+   "fotogramas": 14,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "quiebro a su derecha: el mismo, hacia el otro lado (no es el espejo: acaba en la guardia de la izquierda delante)",
+   "intocableMs": [
+    0,
+    250
+   ],
+   "desplazamientoM": [
+    -3.5,
+    0.0,
+    -0.0
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     -3.5,
+     0.0,
+     -0.0
+    ]
+   }
+  },
+  "quiebro-atras": {
+   "duracionMs": 467,
+   "fotogramas": 14,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "quiebro hacia atrás: impulso con el pie de delante, salto bajo girando los hombros (40° hacia atrás, no más: el arco hondo es de la franquicia), los antebrazos cubren la cara",
+   "intocableMs": [
+    0,
+    250
+   ],
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    -3.5
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     -3.5
+    ]
+   }
+  },
+  "quiebro-delante": {
+   "duracionMs": 467,
+   "fotogramas": 14,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "quiebro hacia delante: zambullida por debajo del golpe, 60° hacia delante con la cabeza por delante y los antebrazos cubriéndola",
+   "intocableMs": [
+    0,
+    250
+   ],
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    3.5
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     3.5
+    ]
+   }
+  },
+  "quiebro-torpe": {
+   "duracionMs": 533,
+   "fotogramas": 16,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "quiebro torpe (el tercero seguido) a su izquierda: se inclina poco, bracea y da un paso de más al llegar; sin la postura del intocable",
+   "desplazamientoM": [
+    3.5,
+    0.0,
+    -0.0
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     3.5,
+     0.0,
+     -0.0
+    ]
+   }
+  },
+  "quiebro-torpe-derecha": {
+   "duracionMs": 533,
+   "fotogramas": 16,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "quiebro torpe a su derecha",
+   "desplazamientoM": [
+    -3.5,
+    0.0,
+    -0.0
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     -3.5,
+     0.0,
+     -0.0
+    ]
+   }
+  },
+  "quiebro-torpe-atras": {
+   "duracionMs": 533,
+   "fotogramas": 16,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "quiebro torpe hacia atrás",
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    -3.5
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     -3.5
+    ]
+   }
+  },
+  "quiebro-torpe-delante": {
+   "duracionMs": 533,
+   "fotogramas": 16,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "quiebro torpe hacia delante",
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    3.5
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     3.5
+    ]
+   }
+  },
+  "tocado": {
+   "duracionMs": 600,
+   "fotogramas": 18,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "golpe recibido de frente: latigazo de la cabeza 0-2, paso atrás con el pie derecho 2-8, recupera la guardia en su sitio hasta 18 (600 ms); sin raíz (el empujón, si lo hay, lo pone el juego)"
+  },
+  "tocado-espalda": {
+   "duracionMs": 667,
+   "fotogramas": 20,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "golpe recibido por la espalda: la cadera sale hacia delante y la cabeza atrás 0-2, traspiés hacia delante con el pie derecho 2-9, se gira a medias buscando al que pega y vuelve a la guardia en su sitio (20); sin raíz"
+  },
+  "descolocado": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "descolocado: el golpe que no encuentra nada tira del cuerpo; tropieza hacia delante y boquea con los brazos (clavado 1 s tras un quiebro limpio; el cliente corta a los 400 ms si es un fallo); sin raíz"
+  },
+  "caer": {
+   "duracionMs": 667,
+   "fotogramas": 20,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "cae de espaldas y se queda tumbado (sin levantarse): latigazo 0-2, la espalda en el suelo en 11; su último fotograma es el primero de desconectado y de levantarse",
+   "caeEnMs": 367,
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    -0.58
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     -0.545
+    ]
+   },
+   "tumbado": true
+  },
+  "derribado": {
+   "duracionMs": 1500,
+   "fotogramas": 45,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "derribado de frente, entero en 1,5 s (el derribo del Cierre y de la Réplica, 30 tics): cae de espaldas (la espalda en el suelo en 11), se queda un instante y se levanta desde el 21 hasta la guardia en 45",
+   "caeEnMs": 367,
+   "levantaDesdeMs": 700,
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    -0.28
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     -0.263
+    ]
+   },
+   "tumbado": true
+  },
+  "derribado-espalda": {
+   "duracionMs": 1500,
+   "fotogramas": 45,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "derribado por la espalda, entero en 1,5 s: la cadera sale hacia delante 0-2, traspiés 2-6, cae de rodillas (11) parando con las manos y queda boca abajo (13-20); empuja hasta a gatas, planta un pie y se levanta a la guardia (45)",
+   "caeEnMs": 367,
+   "levantaDesdeMs": 667,
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    1.05
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     0.987
+    ]
+   },
+   "tumbado": true
+  },
+  "levantarse": {
+   "duracionMs": 800,
+   "fotogramas": 24,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "levantarse desde tumbado (la cadera sobre la raíz): se sienta con la mano derecha apoyada 0-6, recoge los pies y empuja 6-10, en cuclillas sobre los pies 13, guardia 24 (800 ms); la raíz sigue a la cadera",
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    0.3
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     0.282
+    ]
+   },
+   "tumbado": true
+  },
+  "desconectado": {
+   "duracionMs": 2000,
+   "fotogramas": 60,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "desconectado: tumbado boca arriba respirando (la cadera sobre el origen, como el último fotograma de caer y el primero de levantarse)",
+   "tumbado": true
+  },
+  "entrada": {
+   "duracionMs": 800,
+   "fotogramas": 24,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "Entrada: acometida volada de 5,5 m en 400 ms (la raíz del juego, en línea recta) que acaba en un directo de derecha: impulso con el pie de atrás clavado 0-2, vuelo bajo 2-10, apoya el pie de delante 11 y el puño llega al blanco en 12; guardia en el sitio nuevo 24",
+   "impactoMs": 400,
+   "alcanceM": 0.935,
+   "recorridoM": 0.65,
+   "alturaImpactoM": 1.434,
+   "efector": "mano_R",
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    5.5
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     5.5
+    ]
+   }
+  },
+  "seguida-1": {
+   "duracionMs": 667,
+   "fotogramas": 20,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "jab de izquierda (primer toque de la Tanda): carga 0-2, paso y puño recto al impacto 7, la cabeza se aparta a la derecha, vuelta a la guardia 20",
+   "impactoMs": 233,
+   "alcanceM": 0.959,
+   "recorridoM": 0.55,
+   "alturaImpactoM": 1.436,
+   "efector": "mano_L"
+  },
+  "seguida-2": {
+   "duracionMs": 800,
+   "fotogramas": 24,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "directo de derecha (segundo toque): carga 0-3, la cadera gira 50° y el talón de atrás pivota, puño recto al impacto 8, la cabeza se aparta a la izquierda, vuelta 24",
+   "impactoMs": 267,
+   "alcanceM": 0.964,
+   "recorridoM": 0.681,
+   "alturaImpactoM": 1.429,
+   "efector": "mano_R"
+  },
+  "cierre": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "patada circular de derecha que empuja: carga 0-3, rodilla arriba y al lado 3-6, la cadera gira ~125° sobre la bola del pie de apoyo y la pierna barre a 1,3 m, impacto 10, recoge y vuelve 30",
+   "impactoMs": 333,
+   "alcanceM": 0.988,
+   "recorridoM": 1.724,
+   "alturaImpactoM": 1.371,
+   "efector": "pie_R"
+  },
+  "empellon": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "Empellón: empujón con las dos palmas que rompe la guardia; recoge las manos al pecho 0-6, paso largo 6-15 y los codos se estiran a la altura del pecho del blanco (impacto 15), empuja y vuelve a la guardia en su sitio (el juego no mueve al que empuja: sin raíz)",
+   "impactoMs": 500,
+   "alcanceM": 1.242,
+   "recorridoM": 0.967,
+   "alturaImpactoM": 1.321,
+   "efector": "mano_R"
+  },
+  "replica": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "Réplica: palmada imparable con pisotón; se enrosca 0-1 (la palma a la cadera, la otra mano apunta), estalla 2-6 con el pie de delante clavándose (impacto 6), empuja 6-10, aguanta un instante y vuelve a la guardia en su sitio: el remate del Remanso",
+   "impactoMs": 200,
+   "alcanceM": 1.073,
+   "recorridoM": 0.806,
+   "alturaImpactoM": 1.277,
+   "efector": "mano_R"
+  },
+  "avance": {
+   "duracionMs": 600,
+   "fotogramas": 18,
+   "fps": 30,
+   "bucle": false,
+   "raiz": true,
+   "descripcion": "avance: la acometida contra la bala, vuelo de 10 m en 400 ms (la raíz del juego) que aterriza en la palmada de la Réplica (impacto 12)",
+   "impactoMs": 400,
+   "alcanceM": 1.122,
+   "recorridoM": 0.865,
+   "alturaImpactoM": 1.23,
+   "efector": "mano_R",
+   "desplazamientoM": [
+    0.0,
+    0.0,
+    10.0
+   ],
+   "mujer": {
+    "desplazamientoM": [
+     0.0,
+     0.0,
+     10.0
+    ]
+   }
+  },
+  "respuesta": {
+   "duracionMs": 800,
+   "fotogramas": 24,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "respuesta de la guardia del Celador: barre con el antebrazo izquierdo hacia fuera 0-4, baja el puño derecho a la cadera y sube un gancho al mentón (impacto 9) mientras se levanta de las rodillas",
+   "impactoMs": 300,
+   "alcanceM": 0.899,
+   "recorridoM": 0.663,
+   "alturaImpactoM": 1.611,
+   "efector": "mano_R"
+  },
+  "golpe-de-prestado": {
+   "duracionMs": 1200,
+   "fotogramas": 36,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "golpe de Prestado: vuelta de brazo torpe y telegrafiada (el puño atrás, junto a la oreja, 0-14), paso y gancho abierto al impacto 21, se pasa de rosca y tropieza; sin raíz",
+   "impactoMs": 700,
+   "alcanceM": 1.253,
+   "recorridoM": 1.368,
+   "alturaImpactoM": 1.307,
+   "efector": "mano_R"
+  },
+  "apuntar": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "apuntar: pistola a una mano con el brazo recto, perfilado, la izquierda a la espalda (la pistola, pieza aparte en agarre_R)"
+  },
+  "disparar": {
+   "duracionMs": 800,
+   "fotogramas": 24,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "disparar: rafaga de tres balas (0, 150 y 300 ms) con el retroceso del canon",
+   "impactoMs": 0,
+   "disparosMs": [
+    0,
+    150,
+    300
+   ]
+  },
+  "desalojable": {
+   "duracionMs": 2000,
+   "fotogramas": 60,
+   "fps": 30,
+   "bucle": true,
+   "raiz": false,
+   "descripcion": "desalojable: de rodillas, vencido, respirando (3 s a merced del remate)",
+   "tumbado": true
+  },
+  "rematar": {
+   "duracionMs": 1200,
+   "fotogramas": 36,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "rematar: la palma sobre la cabeza del Celador arrodillado (a 1,15 m y 0,55 m delante) y la mantiene 1,2 s"
+  },
+  "absorber": {
+   "duracionMs": 1400,
+   "fotogramas": 42,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "absorber: el Celador caido recibe los hilos del Prestado de rodillas, brazos abiertos (0-18), y se levanta (18-42)",
+   "tumbado": true
+  },
+  "rescatar": {
+   "duracionMs": 1500,
+   "fotogramas": 45,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "rescatar: se agacha junto al companero tumbado, le agarra la mano (0-18) y tira hacia arriba hasta ponerlo de pie (18-45)"
+  },
+  "descolgar": {
+   "duracionMs": 1500,
+   "fotogramas": 45,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "descolgar el auricular de la cabina (1,44 m, delante a la derecha) y llevárselo a la oreja (1,5 s, CABINA.descolgarTics): el auricular va en agarre_R, del micro en la boca al altavoz en la oreja"
+  },
+  "imprimirse": {
+   "duracionMs": 1200,
+   "fotogramas": 36,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "imprimirse: el Celador recien compactado se yergue (0-8) y se ajusta los punos, primero el izquierdo (10-20) y luego el derecho (22-32)"
+  },
+  "salir": {
+   "duracionMs": 1000,
+   "fotogramas": 30,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "salir por la cabina: con el auricular en la oreja se pone rigido, mira arriba y se alza de puntillas mientras se deshace en glifos"
+  },
+  "victoria": {
+   "duracionMs": 1467,
+   "fotogramas": 44,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "puno cerrado arriba: carga 0-8, puno al cielo 14, mantiene; la izquierda en puno a la cintura"
+  }
+ },
+ "gestos": {
+  "reposo": {
+   "clip": "reposo"
+  },
+  "andar": {
+   "clip": "andar"
+  },
+  "trotar": {
+   "clip": "trotar"
+  },
+  "correr": {
+   "clip": "correr"
+  },
+  "quiebro": {
+   "clip": "quiebro-izquierda",
+   "porDireccion": {
+    "izquierda": "quiebro-izquierda",
+    "derecha": "quiebro-derecha",
+    "atras": "quiebro-atras",
+    "delante": "quiebro-delante"
+   }
+  },
+  "quiebro-torpe": {
+   "clip": "quiebro-torpe",
+   "porDireccion": {
+    "izquierda": "quiebro-torpe",
+    "derecha": "quiebro-torpe-derecha",
+    "atras": "quiebro-torpe-atras",
+    "delante": "quiebro-torpe-delante"
+   }
+  },
+  "tocado": {
+   "clip": "tocado",
+   "porDireccion": {
+    "atras": "tocado",
+    "izquierda": "tocado",
+    "derecha": "tocado",
+    "delante": "tocado-espalda"
+   }
+  },
+  "descolocado": {
+   "clip": "descolocado"
+  },
+  "derribado": {
+   "clip": "derribado",
+   "porDireccion": {
+    "atras": "derribado",
+    "izquierda": "derribado",
+    "derecha": "derribado",
+    "delante": "derribado-espalda"
+   }
+  },
+  "levantarse": {
+   "clip": "levantarse"
+  },
+  "entrada": {
+   "clip": "entrada"
+  },
+  "seguida-1": {
+   "clip": "seguida-1"
+  },
+  "seguida-2": {
+   "clip": "seguida-2"
+  },
+  "cierre": {
+   "clip": "cierre"
+  },
+  "empellon": {
+   "clip": "empellon"
+  },
+  "replica": {
+   "clip": "replica"
+  },
+  "avance": {
+   "clip": "avance"
+  },
+  "guardia": {
+   "clip": "guardia",
+   "porClase": {
+    "celador": "guardia-celador",
+    "tirador": "guardia-celador"
+   }
+  },
+  "respuesta": {
+   "clip": "respuesta"
+  },
+  "golpe-de-prestado": {
+   "clip": "golpe-de-prestado"
+  },
+  "apuntar": {
+   "clip": "apuntar"
+  },
+  "disparar": {
+   "clip": "disparar"
+  },
+  "desalojable": {
+   "clip": "desalojable"
+  },
+  "rematar": {
+   "clip": "rematar"
+  },
+  "absorber": {
+   "clip": "absorber"
+  },
+  "rescatar": {
+   "clip": "rescatar"
+  },
+  "descolgar": {
+   "clip": "descolgar"
+  },
+  "imprimirse": {
+   "clip": "imprimirse"
+  },
+  "salir": {
+   "clip": "salir"
+  },
+  "desconectado": {
+   "clip": "desconectado",
+   "entraCon": "caer"
+  },
+  "victoria": {
+   "clip": "victoria"
+  }
+ },
+ "usoDeLosClips": {
+  "locomocion": "en el sitio; timeScale = velocidad / velocidadMs (mujer.velocidadMs para la mujer); pasear (1,3 m/s) por debajo de 1,5 m/s",
+  "marcha": "andar de cara al blanco: atras, izquierda o derecha segun el angulo entre rumbo y velocidad",
+  "raiz": "si raiz es true, la pista raiz.position lleva el desplazamiento que el juego YA aplica al sitio: quitala (clip.tracks.filter(t => t.name !== \"raiz.position\")) y deja que el juego mueva el cuerpo",
+  "impacto": "anticipacion elastica: estira o encoge [0, impactoMs] para que el impacto caiga en CuerpoPintado.impactoMs",
+  "unaVez": "los que no son bucle: LoopOnce y clampWhenFinished",
+  "quiebro": "porDireccion segun direccionDelGesto respecto a rumbo: izquierda es +X del personaje",
+  "porDireccion": "la direccion es la del DESPLAZAMIENTO respecto a la cara: en el quiebro, hacia donde se va; en tocado y derribado, hacia donde empuja el golpe (me pegan de frente: atras -> tocado; por la espalda: delante -> tocado-espalda)",
+  "porClase": "el clip de ese gesto para una clase de cuerpo (la guardia del Celador y del tirador es otra)",
+  "entraCon": "el clip que se pinta ANTES de un gesto sostenido que empieza en el suelo (caer antes de desconectado)",
+  "derribado": "el derribado entero dura 1,5 s (los 30 tics del derribo) y acaba de pie en guardia: la espalda da en el suelo en caeEnMs y se levanta desde levantaDesdeMs; si el derribo dura menos (el Cierre del Celador, 20 tics), estira el clip a la duracion del estado. levantarse es la levantada sola, desde el tumbado de desconectado (el rescate)",
+  "escala": "una variante con escala distinta de 1 (el Celador alto, 1,06) da zancadas mas largas: multiplica zancadaM y velocidadMs por la escala o los pies patinan",
+  "alcance": "alcanceM: lo que llega el golpe desde la raiz en el impacto; el blanco a 1,1 m tiene la superficie a ~0,9",
+  "pistas": "un hueso que un clip no nombra esta en su pose de enlace (three lo devuelve solo a ella)"
+ }
+}

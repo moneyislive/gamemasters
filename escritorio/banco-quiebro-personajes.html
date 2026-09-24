@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE LOS PERSONAJES DEL QUIEBRO.
+
+      Entrada APARTE de `index.html`, como los otros bancos: no es una pantalla del producto, es el sitio
+      donde se juzga a ojo lo que ningún comprobador ve —que la Tanda no parece de maniquí, que el pie no
+      patina al andar en círculo, que el quiebro a la derecha pisa a la derecha, que un Celador se
+      distingue de un desvelado a 60 m bajo la lluvia, que la multitud no marcha al unísono—. Lo que sí se
+      puede contar (que cada gesto tiene clip, que el golpe cae en su instante, el presupuesto, el sitio de
+      los durmientes) lo cuenta `scripts/verificar-quiebro-personajes.ts`.
+
+      Una calle oscura con farolas de sodio y lluvia, todas las figuras y variantes en fila, un cuerpo que
+      anda en círculo a la velocidad que se le pida, y la multitud del guion de una noche de verdad. Sin
+      servidor: los cuerpos los escribe el banco como los escribiría el juego.
+
+      Se abre en http://localhost:5291/sala/banco-quiebro-personajes.html (o el puerto del Vite del
+      escritorio). Mandos en la página y en `window.__banco`. Parámetros: ?nivel=0..3,
+      ?camara=cerca|fila|lejos|60|cenital (lejos: las filas a 20 m, en rebaño en N0), ?gesto=<gesto>, ?ciudad=1,
+      ?leer=1 (el lienzo guarda lo pintado, para `__banco.pixelesDe(id)`).
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banco de pruebas · personajes del Quiebro</title>
+    <meta name="theme-color" content="#05080a" />
+  </head>
+  <body style="margin: 0; background: #05080a">
+    <div id="raiz"></div>
+    <script type="module" src="/src/quiebro/personajes/banco.tsx"></script>
+  </body>
+</html>

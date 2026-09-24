@@ -1,0 +1,8 @@
+# Lo que fabrica la forja no se versiona: se rehace con una orden (ver README.md).
+# En git van los guiones; el resultado que baja el juego va en escritorio/src/quiebro/recursos/.
+obra/
+capturas/
+__pycache__/
+*.blend
+*.blend1
+*.pyc

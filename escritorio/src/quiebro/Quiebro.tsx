@@ -78,6 +78,7 @@ export interface PropsDelQuiebro {
  * compilar: sin el fichero, el mapa sale vacío y se pintan las siluetas provisionales; con él, se pinta
  * su componente (`PersonajesDelQuiebro`, o `Personajes`), que recibe las mismas props. */
 interface ModuloDePersonajes {
+  readonly CuerposDelQuiebro?: ComponentType<PropsDelPintorDeCuerpos>;
   readonly PersonajesDelQuiebro?: ComponentType<PropsDelPintorDeCuerpos>;
   readonly Personajes?: ComponentType<PropsDelPintorDeCuerpos>;
 }
@@ -85,7 +86,7 @@ const MODULOS_DE_PERSONAJES = import.meta.glob<ModuloDePersonajes>('./personajes
 
 function elPintorDeCuerpos(): ComponentType<PropsDelPintorDeCuerpos> {
   for (const m of Object.values(MODULOS_DE_PERSONAJES)) {
-    const c = m.PersonajesDelQuiebro ?? m.Personajes;
+    const c = m.CuerposDelQuiebro ?? m.PersonajesDelQuiebro ?? m.Personajes;
     if (c !== undefined) return c;
   }
   return SiluetasProvisionales;
