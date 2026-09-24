@@ -50,12 +50,15 @@
  *    manifiesto y el productor de su fichero de liza. Nada más: la sala, el cable, la geometría y los
  *    veredictos son de la plataforma.
  *
- * Hoy la tabla está VACÍA a propósito: la primera fila la pone el juego que la estrena, cuando su
- * productor pase su comprobador. Mientras, `verify:liza-protocolo` prueba el registro con uno de
- * juguete (`registroDeLizas`), para que «cero filas» no se lea como «vigilado».
+ * La primera fila la puso El Quiebro, el juego que estrena la Liza, cuando su productor pasó su
+ * comprobador (`verify:quiebro` exige `problemasDeLaDeclaracion` vacío en cientos de vistas de su
+ * robot, en todas sus fases, y el mismo aforo en todas). `verify:liza-protocolo` sigue probando el
+ * registro con uno de juguete (`registroDeLizas`) y, además, cada fila de verdad.
  */
 import type { LizaDeclarada } from '../../mecanicas/liza/declaracion';
 import type { ArcadeId } from '../tipos';
+import { QUIEBRO } from './quiebro';
+import { lizaDelQuiebro } from './quiebro-liza';
 
 /**
  * Cómo se saca la liza de una mesa: de su vista pública y su código. `null` si la vista no es la de
@@ -104,7 +107,7 @@ export function registroDeLizas(filas: readonly FilaDeLizas[]): RegistroDeLizas 
 }
 
 /** LAS FILAS DE LA PLATAFORMA. Ver en la cabecera cómo se da de alta un juego. */
-const FILAS_DE_LIZAS: readonly FilaDeLizas[] = [];
+const FILAS_DE_LIZAS: readonly FilaDeLizas[] = [[QUIEBRO, lizaDelQuiebro]];
 
 const REGISTRO: RegistroDeLizas = registroDeLizas(FILAS_DE_LIZAS);
 

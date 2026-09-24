@@ -51,6 +51,7 @@ import type { PanelDeTablero, TableroDeclarado } from '../../shared/mecanicas/ta
 import { RIBERAS } from '../../shared/arcade/juegos/riberas';
 import { BURGO } from '../../shared/arcade/juegos/burgo';
 import { LINDES } from '../../shared/arcade/juegos/lindes';
+import { QUIEBRO } from '../../shared/arcade/juegos/quiebro';
 import {
   elPregonEnTres,
   panelesEnTres,
@@ -61,6 +62,7 @@ import { BurgoEnTres, MarcadorDelBurgo } from './burgo-en-tres';
 import { LindesEnTres, MarcadorDeLasLindes } from './lindes-en-tres';
 import type { LaMesa, MesaVista } from './mesa';
 import type { ArcadeDelCatalogo } from './muebles';
+import { QuiebroEnTres } from './quiebro-en-tres';
 import { MarcadorDeRiberas, RiberasEnTres } from './riberas-en-tres';
 
 /**
@@ -133,6 +135,18 @@ export const PINTORES_PROPIOS: Readonly<Record<string, PintorPropio>> = {
   [LINDES]: {
     Pintor: LindesEnTres,
     Marcador: MarcadorDeLasLindes,
+  },
+  /*
+   * ═══ EL CUARTO, Y EL PRIMERO QUE NO PINTA UNA ESCENA DE `escenas/` ═══
+   *
+   * El Quiebro es un juego de acción: su pintor pone el juego entero a pantalla completa
+   * (`quiebro-en-tres.tsx`, con `src/quiebro/` detrás en su propio trozo) y cae al retablo con el
+   * plano del barrio si no arranca. Sin marcador ni pregón ni criba: lo que la mesa tiene que decir
+   * fuera del juego —el marcador en paneles— ya viene en el tablero declarado de su vista, y el
+   * carril de la Sala lo pinta tal cual cuando la noche no está puesta.
+   */
+  [QUIEBRO]: {
+    Pintor: QuiebroEnTres,
   },
   [BURGO]: {
     Pintor: BurgoEnTres,

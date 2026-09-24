@@ -72,6 +72,7 @@
     "verify:lindes-mundo": "tsx scripts/verificar-lindes-mundo.ts",
     "verify:riberas-mundo": "tsx scripts/verificar-riberas-mundo.ts",
     "verify:quiebro-barrio": "tsx scripts/verificar-quiebro-barrio.ts",
+    "verify:quiebro": "tsx scripts/verificar-quiebro.ts",
     "verify:protocolo-de-botas": "tsx scripts/verificar-protocolo-de-botas.ts",
     "verify:botin": "tsx scripts/verificar-botin.ts",
     "verify:robot-generico": "tsx scripts/verificar-robot-generico.ts",
@@ -97,7 +98,10 @@
     "verify:botas": "tsx scripts/verificar-botas.ts",
     "verify:cuotas-de-botas": "tsx scripts/verificar-cuotas-de-botas.ts",
     "verify:liza-protocolo": "tsx scripts/verificar-liza-protocolo.ts",
-    "medir:botas": "node --expose-gc --import tsx scripts/medir-botas.ts"
+    "verify:liza": "tsx scripts/verificar-liza.ts",
+    "verify:sala-de-la-liza": "tsx scripts/verificar-sala-de-la-liza.ts",
+    "medir:botas": "node --expose-gc --import tsx scripts/medir-botas.ts",
+    "medir:liza": "node --expose-gc --import tsx scripts/medir-liza.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

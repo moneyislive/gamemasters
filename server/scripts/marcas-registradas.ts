@@ -252,6 +252,75 @@ const FORMAS_CASTELLANAS: MarcaVetada[] = [
 ];
 
 /**
+ * LA FRANQUICIA VECINA DE «EL QUIEBRO», en las formas que la nombran sin duda posible.
+ *
+ * ═══ POR QUÉ ESTE JUEGO TIENE FAMILIA PROPIA ═══
+ *
+ * El Quiebro usa tropos que no son de nadie —una ciudad simulada de madrugada, trajeados con gafas,
+ * la cámara lenta ganada, símbolos que caen— y la película de 1999 que los hizo famosos juntos sigue
+ * siendo obra en plazo y marca viva de su estudio, con sus secuelas y sus personajes. La defensa del
+ * juego es que su EXPRESIÓN sea suya (§1 de `docs/EL-QUIEBRO.md`: su alfabeto, sus nombres, sus
+ * siluetas); esta lista es la red para el día que alguien escriba la referencia en un rótulo, un
+ * gancho o una ficha de tienda «para que se entienda».
+ *
+ * ═══ POR QUÉ LAS FORMAS COMPUESTAS Y NO LA PALABRA SUELTA ═══
+ *
+ * Por la regla de la cabecera: sólo entran nombres inequívocos, y los ambiguos van con acompañante. La
+ * palabra suelta del título es un término de álgebra, el nombre de una rama de este repositorio y una
+ * pieza corriente de identificadores; vetada a secas, el comprobador saltaría con cualquier texto
+ * técnico y acabaría desactivado, que es peor que no tenerlo. Lo mismo el apellido del antagonista, que
+ * es el más común del mundo anglosajón. Lo que se cuela en un producto en español es el título con su
+ * artículo, las secuelas por su nombre y los personajes por el suyo, y eso es lo que está aquí.
+ *
+ * Y lo que la lista NO puede cazar —la evocación entera, la ropa que muta, la posesión de
+ * transeúntes— lo cubren la lista de lo que no sale del §1 del diseño y la revisión antes de publicar.
+ * Antes de hacer publicidad, consulta legal: está en los pendientes del §14.
+ */
+const LA_FRANQUICIA_VECINA_DEL_QUIEBRO: MarcaVetada[] = [
+  {
+    nombre: 'The Matrix',
+    porque:
+      'El título de la película de 1999 de Warner Bros., obra en plazo y marca viva en videojuegos. Va con su artículo porque la palabra suelta es un término técnico corriente y el nombre de una rama de este repositorio: vetarla sola tumbaría identificadores legítimos.',
+  },
+  {
+    nombre: 'Matrix Reloaded',
+    porque: 'La segunda película (2003), con el nombre compuesto con el que se estrenó también en España. Misma casa y mismo riesgo que el título.',
+  },
+  {
+    nombre: 'Matrix Revolutions',
+    porque: 'La tercera película (2003). Se escribe igual en castellano, así que una sola grafía la cubre.',
+  },
+  {
+    nombre: 'Matrix Resurrections',
+    porque: 'La cuarta película (2021): la más reciente, y la que alguien tendría más fresca al escribir una ficha de tienda.',
+  },
+  {
+    nombre: 'Agente Smith',
+    porque:
+      'El antagonista, en la forma en que se dobló en España. Va con el cargo delante porque el apellido suelto es el más común del mundo anglosajón; y es justo el personaje que los Celadores de El Quiebro NO son (distintos, sin auricular y sin poseer a nadie).',
+  },
+  {
+    nombre: 'Agent Smith',
+    porque: 'El mismo personaje en inglés, que es como aparece en la mercancía y como lo escribiría quien copia de una web.',
+  },
+  {
+    nombre: 'Morpheus',
+    porque:
+      'El mentor de la película, con su grafía inglesa. El dios del sueño se escribe en castellano «Morfeo» —«en brazos de Morfeo» es una frase corriente— y ése NO se veta: sólo la forma que en un texto en español únicamente sirve para nombrar al personaje.',
+  },
+  {
+    nombre: 'Nabucodonosor',
+    porque:
+      'La nave de la película, con su nombre del doblaje. También es el rey de Babilonia, y aun así entra: ningún juego de esta casa necesita al rey, y junto a El Quiebro sólo se leería como la nave. Si un día un juego histórico lo necesita, ésta es la línea que se discute, con el argumento escrito aquí.',
+  },
+  {
+    nombre: 'Bullet Time',
+    porque:
+      'La expresión inglesa de la cámara lenta que la película popularizó y que su estudio registró como marca para videojuegos. Es la palabra que alguien pondría en la ficha para explicar el Remanso, y por eso el Remanso tiene nombre propio.',
+  },
+];
+
+/**
  * TODA la lista, que es lo que lee el comprobador.
  *
  * Se junta aquí y no se exporta por familias porque quien comprueba no tiene por
@@ -265,4 +334,5 @@ export const MARCAS_VETADAS: readonly MarcaVetada[] = [
   ...MARCAS_QUE_PARECEN_PALABRAS,
   ...PERSONAS_CON_MARCA_VIVA,
   ...FORMAS_CASTELLANAS,
+  ...LA_FRANQUICIA_VECINA_DEL_QUIEBRO,
 ];

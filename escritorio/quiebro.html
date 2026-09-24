@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL DOCUMENTO SUELTO DE EL QUIEBRO: lo que carga el WebView apaisado de la app y el iframe de
+      /jugar en el iPhone. La mesa le llega por el puente de `src/quiebro/contrato.ts` (postMessage, o
+      `window.quiebroDelAnfitrion` en el WebView); la llave NUNCA va en esta dirección.
+
+      A diferencia de index.html, éste SÍ es para un teléfono: ancho del aparato, sin zoom (un pellizco
+      en plena pelea no puede agrandar la página) y `viewport-fit=cover` para pintar hasta los bordes
+      redondeados; las zonas seguras las respeta el HUD con `env(safe-area-inset-*)`.
+
+      Para jugar sin anfitrión (en un navegador, contra el servidor de este árbol):
+        http://localhost:5291/sala/quiebro.html?prueba=1               abre una mesa nueva
+        http://localhost:5291/sala/quiebro.html?prueba=1&codigo=XXXXX  se sienta en una ya abierta
+      Con `&tactil=1` se ven los mandos del teléfono en un PC.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#020605" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>El Quiebro</title>
+    <script>
+      /*
+        EN EL MODO DE PRUEBA, VITE NO RECARGA ESTA PÁGINA POR SU CUENTA. La mesa de prueba vive sólo en
+        la memoria de la pestaña (la llave no se guarda en ningún sitio), y el servidor de desarrollo
+        manda «recarga» a TODAS las pestañas cada vez que otro frente toca un fichero sin frontera de
+        recarga: cada recarga abría una mesa nueva a media noche (pasó el 24-sep). Con `?prueba=1` se
+        ignoran esas recargas y se dice en la consola; se recarga a mano. Fuera del modo de prueba, y en
+        producción (donde no hay Vite ni su socket), esto no hace nada.
+      */
+      (function () {
+        if (!/[?&]prueba=1(&|$)/.test(location.search)) return;
+        var Original = window.WebSocket;
+        function Filtrado(url, protocolos) {
+          var ws = protocolos === undefined ? new Original(url) : new Original(url, protocolos);
+          if (String(protocolos).indexOf('vite-hmr') === -1) return ws;
+          var anadir = ws.addEventListener.bind(ws);
+          ws.addEventListener = function (tipo, fn, opciones) {
+            if (tipo !== 'message') return anadir(tipo, fn, opciones);
+            return anadir(
+              'message',
+              function (e) {
+                try {
+                  var d = JSON.parse(e.data);
+                  if (d && d.type === 'full-reload') {
+                    console.info('[el Quiebro, prueba] recarga de Vite ignorada: ' + String(d.path || '*') + ' (recarga a mano)');
+                    return;
+                  }
+                } catch (_) {}
+                fn.call(ws, e);
+              },
+              opciones,
+            );
+          };
+          return ws;
+        }
+        Filtrado.prototype = Original.prototype;
+        ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function (k) {
+          Filtrado[k] = Original[k];
+        });
+        window.WebSocket = Filtrado;
+      })();
+    </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #020605;
+        overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/quiebro/documento.tsx"></script>
+  </body>
+</html>

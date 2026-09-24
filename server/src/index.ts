@@ -58,6 +58,7 @@ import { cuandoSeCierreUnaMesa, cuandoSeOlvideUnaMesa } from './arcade/mesas';
 import { canalDeSondeo } from './canal/sondeo';
 import { cerrarLaMesaDeBotas, darDeAltaLosQueSeRecorren, montarElCanalDeBotas } from './botas';
 import { configurarProcedencia, delegandoEnExpress } from './botas/cuotas';
+import { montarLaLiza } from './liza';
 import type { ContextoDelCors } from './puerta/origenes';
 import arcadeRouter from './routes/arcade';
 import modelosRouter from './routes/modelos';
@@ -962,3 +963,4 @@ const servidorHttp = app.listen(env.port, env.host, () => {
  * detalle, en `botas/`.
  */
 montarElCanalDeBotas(servidorHttp, contextoDelCors);
+montarLaLiza(servidorHttp, contextoDelCors);

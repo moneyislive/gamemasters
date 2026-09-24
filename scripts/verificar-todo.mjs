@@ -1110,6 +1110,103 @@ const BATERIA = [
     porque:
       'la ciudad de 648 que se genera con el código de la mesa tiene sentido con VEINTE semillas: el esqueleto es el mismo en todas —dos anillos de bulevar, cuatro avenidas de cuatro celdas que llegan enteras y encaradas a las casillas 5, 15, 25 y 35, glorieta de doce celdas con su isleta—, la red de calles es conexa y cada losa del pack encaja con sus vecinas por las caras que la tabla dice y el `.glb` confirma al rasterizarlo; toda parcela da a una calle y lo que no da a ninguna es patio de manzana; los trece distritos de reserva más el barrio de chalets y los cuatro tejidos están enteros, no se pisan y ninguno muerde una avenida; ninguno de los setecientos edificios se sale de su parcela ni se solapa con otro, todos tienen portal y sus plantas caben en la cáscara del pack; nada se sale del recinto ni se planta en mitad de la calzada; los coches aparcan sólo sobre la recta lisa y a 4,20 del eje, las doce rutas de calle no comparten ni una celda y ninguna se sale del carril, sus horarios no retroceden y ninguno para en verde; los muebles de las salas caben entre sus tabiques, no se atraviesan y dejan libre el barrido de la puerta; al partir la ciudad en grupos no se pierde ni un triángulo ni una celda y bajar de nivel siempre ahorra; y el montaje que la cámara tiene delante desde nueve poses —la glorieta, los cuatro cuadrantes, la boca de una Puerta, un rincón, la pose de salida y el confín— cabe en los 692.000 triángulos de un PC y en los 84.000 de un móvil, viéndose caer la ciudad entera en L1, que pesa millón y medio, y viéndose fallar el umbral viejo, que dejaba la pose de salida en nueve mil triángulos de manchas',
   },
+
+  // ── La Liza y El Quiebro ───────────────────────────────────────────────────
+  /*
+   * ═══ EL MÓDULO HERMANO DE BOOTS ON BOARD Y EL JUEGO QUE LO ESTRENA, EN ESTE ORDEN ═══
+   *
+   * `docs/LA-LIZA.md` y `docs/quiebro/ARQUITECTURA.md`. Van juntos y DETRÁS de Boots on Board
+   * porque la Liza usa sin tocarlas sus piezas —`mundo.ts`, `andar.ts`, las cuotas y el enchufe—:
+   * si aquéllas están rojas, esto no significa nada. Y entre ellos, de abajo arriba, como se
+   * construyeron:
+   *
+   *   1. EL CONTRATO (`verify:liza-protocolo`): la declaración, el cable, la geometría, el registro
+   *      con una liza de juguete, la vista de El Quiebro y el puente del documento. Cuatro frentes
+   *      lo implementan sin poder preguntarse; si miente, los cuatro se equivocan a la vez.
+   *   2. EL BARRIO (`verify:quiebro-barrio`): el mundo sobre el que se juzga. Es el mismo en el
+   *      servidor, el escritorio, el WebView y el iPhone, o cada uno anda por el suyo.
+   *   3. LAS REGLAS DE LA MESA (`verify:quiebro`) y LA SALA PURA (`verify:liza`), que sólo tienen
+   *      sentido sobre un contrato y un mundo que se sostienen.
+   *   4. LA SALA DE VERDAD, con robots WebSocket (`verify:sala-de-la-liza`): lenta, porque levanta el
+   *      servidor, y por eso con `lento`.
+   *   5. EL CLIENTE DEL ESCRITORIO, pieza a pieza: la calidad, la ciudad, los efectos, el sonido y el
+   *      juego. Se prueban en Node, sin lienzo; lo que sólo se ve con los ojos está en sus bancos
+   *      (`escritorio/banco-quiebro-*.html`), y eso no lo compra ningún comprobador.
+   *
+   * Las marcas vetadas del juego (`server/scripts/marcas-registradas.ts`) no tienen entrada aquí: las
+   * mira `procedencia y marcas`, más arriba, con las cadenas de TODOS los juegos del binario.
+   */
+  {
+    nombre: 'la Liza · el contrato',
+    donde: 'server',
+    guion: 'verify:liza-protocolo',
+    porque:
+      'los contratos que cuatro frentes implementan sin poder preguntarse dicen lo que prometen: `rumboHacia` da lo mismo que `atan2` en los 256 rumbos y en veinte mil direcciones, la prueba de losa coincide con una versión en coma flotante escrita aparte y un empujón nunca se para dentro de una caja; una liza DE JUGUETE —que no es ningún juego— pasa `problemasDeLaDeclaracion` y cada una de sus versiones rotas no, con el problema nombrado; cada mensaje del cable va y vuelve igual por su escritor y su lector, los lectores tiran cualquier clave de más o de menos, la subida más larga cabe en 256 bytes y la bajada más larga en su tope; los veredictos `arcade:*` se leen estrictos y la ronda más pesada cabe en la carga que admite la mesa; el registro de lizas se prueba con uno de juguete para que cero filas no se lean como vigilado; y la vista de El Quiebro, sus nombres y el puente del documento tiran lo mal formado, ningún nombre dice una palabra de la franquicia vecina y el documento no acepta un mensaje por lo que el propio mensaje diga de sí mismo',
+  },
+  {
+    nombre: 'El Quiebro · el barrio',
+    donde: 'server',
+    guion: 'verify:quiebro-barrio',
+    porque:
+      'el barrio de la noche sale sólo de (código, noche) y es el mismo en el servidor, el escritorio, el WebView y el iPhone: en 200 noches las cajas están bien formadas, dentro del cerco y sin pisarse, nacer, cabinas y zonas no tienen una caja encima, cada cabina queda a 60-110 m andando, el grafo tiene los 16 cruces delante y es conexo, y todo el suelo libre se alcanza; se anda y se navega sobre la arena de `mundo.ts` sin tocarla; los 48 durmientes, en 20.000 tics, siempre sobre suelo y fuera de toda caja, en la calzada sólo por un paso en verde; Node y Hermes dan la misma huella; y derivar el barrio y su mundo cuesta 3 ms o menos en frío — con la máquina muy cargada ese cronómetro puede dar un rojo que no es del barrio: mirar antes de repetir',
+  },
+  {
+    nombre: 'El Quiebro · la mesa',
+    donde: 'server',
+    guion: 'verify:quiebro',
+    porque:
+      'la mesa de El Quiebro lleva la noche entera fase a fase —la reunión donde sólo se empieza, la Bajada, las oleadas con sus rondas sumadas por fase y su punto de control, las pausas con retoque y voto por mayoría estricta, la Llamada, el recuento, otra noche con el nivel que sube y baja, la Memoria del Sistema, las diez noches, la noche interrumpida, rendirse y cerrar—; cada rechazo lleva su motivo, y un veredicto firmado por un asiento, rancio o fuera de su fase no entra; `componerReglamento` da las tablas del diseño; la vista es la misma para todos y se lee con su lector estricto, con el plano del barrio de unos 3 kB; el productor devuelve `null` sin lanzar ante lo que no es una vista y, en cientos de vistas de partidas del robot, declaraciones sin problemas con el mismo aforo; y el robot llega al final de noches ganadas y perdidas, con la misma partida para la misma semilla',
+  },
+  {
+    nombre: 'la Liza · la sala pura',
+    donde: 'server',
+    guion: 'verify:liza',
+    porque:
+      'la sala pura se juega con una liza de JUGUETE y aparatos simulados con su reloj, su ida y vuelta y un desfase mal estimado a propósito: nacer y empezar la fase con sus seis pasos, la puesta al día con los instantes reescritos en el reloj nuevo, el sitio validado y corregido, EL JUICIO DE LA ESQUIVA IGUAL con 0, +40 y −40 ms de error de desfase y con 50, 150 y 250 ms de ida y vuelta, el Remanso y la Réplica, la cadena al ritmo en el reloj del aparato, la guardia, el empujón contra caja, las balas contra los sitios declarados, los turnos, lo que se lleva, los finales y sus veredictos (el reloj y el ausente una vez), un robot que lee sacando el doble que uno que aporrea, y la misma huella tic a tic en Node y en Hermes con la sala rehecha que reanuda',
+  },
+  {
+    nombre: 'la Liza · la sala de verdad',
+    donde: 'server',
+    guion: 'verify:sala-de-la-liza',
+    lento: true,
+    porque:
+      'la E/S de la sala con el reloj en la mano: en proceso, con una sala de mentira, qué entra y cuándo (la conexión sólo con `hola` y pong, el desfase exacto), qué sale, a quién y en qué orden, los `tic` partidos, la foto una vez, la mesa leída como mucho una vez por segundo, el aforo, los cierres con su código, el temporizador único; el enchufe con `ws` de verdad —las rutas, el origen, el 404, los 256 bytes, el ping—; el montaje de verdad cerrando con 1001 en SIGTERM; y de punta a punta, un servidor hijo en un puerto que da el sistema con una mesa de El Quiebro abierta por HTTP y robots `ws` que andan, quiebran y golpean',
+  },
+  {
+    nombre: 'El Quiebro · la calidad',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-calidad',
+    porque:
+      'lo que DECIDE la imagen, en Node y sin lienzo: con qué nivel arranca cada aparato inventado, cuándo baja el gobernador (más de 22 ms de media en 60 fotogramas), que sube a prueba tras 20 s con holgura y no vuelve a un nivel que falló, que ignora la pestaña oculta; qué camino de pintado lleva cada nivel y que N2-N3 sin HalfFloat CREADO caen al barato; que la LUT es su fórmula y el tono de N0 se puede poner en la three instalada; y que cada sombreador declara exactamente los uniformes que su material le da — cada regla con su serie de tiempos y su vacuna',
+  },
+  {
+    nombre: 'El Quiebro · la ciudad',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-ciudad',
+    porque:
+      'la ciudad se construye para 50 barrios de verdad en los cuatro niveles sin un NaN; lo que MIDE cada pieza cabe en el renglón que declara y la suma en el 60 % de los topes del juego; lo pintado ES la estructura, mirado en los triángulos de la franja de andar: nada pintado que estorbe sin chocar y ninguna caja invisible; el mismo barrio da la misma geometría dos veces; y cada parcheo de sombreador encuentra su trozo en three r185',
+  },
+  {
+    nombre: 'El Quiebro · los efectos',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-efectos',
+    porque:
+      'la Grafía es un alfabeto propio y no ruido —48 glifos de 5×7 distintos, ninguno simétrico ni espejo de otro, ninguno parecido a una cifra, hechos con los signos del español—; el reloj del Remanso recupera exactamente lo que quita sin adelantarse al verdadero; las señales de juego —el anillo, la bala— van SIEMPRE en el reloj verdadero y el anillo se cierra en el impacto exacto; el anillo se lee a 20 m en la pantalla más pobre de N0; y el presupuesto de los efectos cabe en su parte de la escena en todos los niveles, con lo que es de juego igual en todos',
+  },
+  {
+    nombre: 'El Quiebro · el sonido',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-sonido',
+    porque:
+      'el silbido del anillo muere en el instante del impacto oído —es jugabilidad: se quiebra de oído—, el planificador se salta lo atrasado en vez de disparar una ráfaga al volver de segundo plano, el pulso de «a compás» es el que se oye, la cabina se oye a 150 m y por el lado en que está, y el Remanso se come los agudos sin tocar las señales; todo con relojes simulados, sin WebAudio',
+  },
+  {
+    nombre: 'El Quiebro · el juego',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-juego',
+    porque:
+      'el cliente del juego sobre el contrato, sin navegador: el reloj de cada canal empieza en cero y parte en tics de 50 ms; el canal dice `hola` y un `eco` detrás y no reconecta tras los cierres que reintentar no arregla; la predicción es la de la sala —miles de tics por el barrio de verdad, y cada tramo mandado es uno que la sala acepta—; la interpolación, el guion que funde sin retroceder, la sala vista que cada `dentro` deja en blanco, el diccionario que lee la declaración, la partida entera contra un enchufe de mentira con la pulsación y su `ms`, los mandos, el enganche que no apunta tras una pared, la cámara que no entra en las cajas, la pausa que reintenta sólo con una vista nueva, el puerto de prueba con la llave en la cabecera y nunca en la dirección, y los fuentes sin `onClick`, sin la llave en el almacén y en LF',
+  },
   {
     nombre: 'escritorio honrado',
     donde: 'escritorio',

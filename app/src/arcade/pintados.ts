@@ -46,10 +46,16 @@ import type { ComponentType } from 'react';
 import { MUEBLES_DEL_CONTRATO } from '../../../shared/arcade/tipos';
 import type { ArcadeId, ManifiestoDeArcade, MuebleDeArcade } from '../../../shared/arcade';
 import { BURGO, EL_ARCADE, FRENTE, LINDES, PEONZA, RIBERAS } from '../../../shared/arcade/juegos';
+/*
+ * Del fichero del juego y no del índice, como `lindes-en-tres-escena.tsx` con el suyo: aquí sólo hace
+ * falta el identificador, y el índice ya lo carga entero quien instala los arcades del binario.
+ */
+import { QUIEBRO } from '../../../shared/arcade/juegos/quiebro';
 import type { LoQuePintaEsteBinario } from './del-servidor';
 import { ElArcade } from './arcade';
 import { ElBurgoEnTres } from './burgo-en-tres';
 import { LasLindesEnTres } from './lindes-en-tres';
+import { ElQuiebroEnTres } from './quiebro-en-tres';
 import { LaPeonza } from './escena';
 import { LaFrente } from './frente';
 import { MUEBLES } from './muebles';
@@ -158,6 +164,18 @@ export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {
    * pantalla entera.
    */
   [LINDES]: LasLindesEnTres,
+  /*
+   * EL QUIEBRO, EL PRIMER PINTOR QUE NO PINTA CON EXPO-GL.
+   *
+   * Su fila apunta a su envoltura perezosa como las otras tres, y lo que ésa trae es un pintor del
+   * mismo contrato: el vestíbulo, el latido y la barra siguen siendo de la plataforma. Lo distinto está
+   * dentro: la noche es el documento suelto del escritorio en un WebView apaisado —en `/jugar`, un
+   * `iframe`—, que recibe la mesa por el puente (`docs/quiebro/ARQUITECTURA.md` §0.2). Sigue siendo un
+   * juego de mueble `tablero`: su vista trae el plano del barrio, y el retablo es lo que se pinta si la
+   * noche no abre. Un APK anterior a esta fila no llega nunca a esa pantalla: pinta El Quiebro con el
+   * mueble genérico, que es ese mismo plano.
+   */
+  [QUIEBRO]: ElQuiebroEnTres,
   /*
    * LA PEONZA, que es la puerta del mueble `escena` de la fase 5 y no un
    * juego-prueba. Va aquí y no en `LOS_MUEBLES_GENERICOS` porque `escena` es un

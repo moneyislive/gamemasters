@@ -76,6 +76,14 @@ import {
   seAcabo as seAcaboLasLindes,
 } from './lindes';
 import type { EstadoDeLasLindes } from './lindes';
+import {
+  avanzarElQuiebro,
+  MANIFIESTO_QUIEBRO,
+  opcionesDelQuiebro,
+  proyectarElQuiebro,
+  seAcabo as seAcaboElQuiebro,
+} from './quiebro';
+import type { EstadoDelQuiebro } from './quiebro';
 import { laCifraDeElArcade } from './puntuaciones';
 
 export {
@@ -660,4 +668,60 @@ instalarArcade<EstadoDeLasLindes | undefined, unknown>({
   loSecreto: loSecretoDeLasLindes,
   opciones: opcionesDeLasLindes,
   seAcabo: seAcaboLasLindes,
+});
+
+/*
+ * ═══ EL QUIEBRO SALE CON APELLIDO DONDE CHOCA, COMO LAS LINDES ═══
+ *
+ * `EMPEZAR` y `seAcabo` ya los exportan La Frente y los demás; `RENDIRSE`, El Burgo. Los verbos de la
+ * mesa llevan `_QUIEBRO` todos, aunque alguno no choque hoy, para que se lean como una familia. Quien
+ * importe de `./quiebro` directamente los tiene sin apellido. Las tablas (`quiebro-reglas.ts`), la
+ * vista (`quiebro-vista.ts`) y el productor de la Liza (`quiebro-liza.ts`) no pasan por aquí: los
+ * clientes los importan de su fichero, y así instalar los arcades no carga el barrio.
+ */
+export {
+  APRENDIZ as APRENDIZ_QUIEBRO,
+  avanzarElQuiebro,
+  CERRAR as CERRAR_QUIEBRO,
+  ELEGIR as ELEGIR_QUIEBRO,
+  EMPEZAR as EMPEZAR_QUIEBRO,
+  ESTILO as ESTILO_QUIEBRO,
+  MANIFIESTO_QUIEBRO,
+  mesaEnLaReunion as mesaDelQuiebroEnLaReunion,
+  opcionesDeLaMesa as opcionesDeLaMesaDelQuiebro,
+  opcionesDelQuiebro,
+  OTRA_NOCHE as OTRA_NOCHE_QUIEBRO,
+  PLANO_DEL_TABLERO as PLANO_DEL_TABLERO_DEL_QUIEBRO,
+  proyectarElQuiebro,
+  QUIEBRO,
+  REANUDAR as REANUDAR_QUIEBRO,
+  RENDIRSE as RENDIRSE_QUIEBRO,
+  seAcabo as seAcaboElQuiebro,
+  seVotaTras as seVotaTrasLaOleadaDelQuiebro,
+  tableroDelQuiebro,
+} from './quiebro';
+export type { EstadoDelQuiebro, MesaDelQuiebro } from './quiebro';
+
+/**
+ * «EL QUIEBRO», el octavo: el primero de acción, lidiado a pie en la sala de la Liza.
+ *
+ * ═══ SU ALTA ES LA DE LAS LINDES MENOS `loSecreto`, Y ESA ES LA NOTICIA ═══
+ *
+ * Un arcade cuyo modo principal es la acción en tiempo real —golpes anunciados, balas, veinte tics
+ * por segundo— entra por la misma puerta que un juego de losas: manifiesto, reductor, proyección,
+ * `opciones` y `seAcabo`. Lo rápido no pasa por la mesa: vive en la sala de la Liza, y a la mesa sólo
+ * le llegan veredictos gruesos (`arcade:ronda`, `arcade:reloj`, `arcade:ausente`) por la puerta de la
+ * plataforma. Su fila en `lizas.ts` es lo que dice que se lidia; aquí sólo se instala la mesa.
+ *
+ * Sin `loSecreto` porque declara `secretos: false`: la vista es la misma para todos. La proyección
+ * está porque una mesa de servidor de más de un asiento la exige siempre, y porque es la que pone el
+ * dibujo con los nombres (ver la cabecera de `quiebro.ts`). Los dos parámetros se escriben a mano por
+ * lo mismo que en Riberas: la mesa nace `undefined`, y la vista llega por la red como `unknown`.
+ */
+instalarArcade<EstadoDelQuiebro | undefined, unknown>({
+  manifiesto: MANIFIESTO_QUIEBRO,
+  avanzar: avanzarElQuiebro,
+  proyeccion: proyectarElQuiebro,
+  opciones: opcionesDelQuiebro,
+  seAcabo: seAcaboElQuiebro,
 });

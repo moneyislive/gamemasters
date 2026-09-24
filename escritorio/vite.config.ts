@@ -1,4 +1,7 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /**
@@ -25,9 +28,49 @@ import react from '@vitejs/plugin-react';
  */
 const SERVIDOR = process.env.GM_API_URL ?? 'http://localhost:5174';
 
+/**
+ * ═══ EN DESARROLLO, `/sala/quiebro` ES LA SALA, COMO EN PRODUCCIÓN ═══
+ *
+ * La Sala enruta cada arcade por su id (`/sala/riberas`, `/sala/quiebro`), y desde El Quiebro hay
+ * además un `quiebro.html` en esta carpeta: el documento suelto del juego. En producción no chocan:
+ * `express.static` sólo sirve un fichero por su nombre EXACTO, así que `/sala/quiebro` cae al comodín
+ * y contesta la Sala. Pero el servidor de desarrollo de Vite, cuando una ruta sin extensión tiene un
+ * `.html` con ese nombre, sirve ESE `.html`: `/sala/quiebro` abría el documento suelto esperando a un
+ * anfitrión que no llega nunca, y a la mesa del Quiebro no se podía llegar desde la Sala en desarrollo.
+ * Medido abriéndolo: «Esperando a la mesa…» con la Sala en ninguna parte.
+ *
+ * Esto quita ESA traducción y sólo ésa: una ruta de un solo tramo, sin extensión, que tenga su `.html`
+ * al lado se sirve con la Sala (`index.html`), que es lo que hace el servidor de verdad. Los bancos y el
+ * documento se siguen abriendo por su nombre con `.html`, que es como se abren en todas partes; y en el
+ * empaquetado no cambia nada, porque esto sólo se monta al servir (`apply: 'serve'`).
+ */
+function laSalaComoEnProduccion(): Plugin {
+  return {
+    name: 'la-sala-como-en-produccion',
+    apply: 'serve',
+    configureServer(servidor) {
+      /* Registrado aquí y no devuelto: así corre ANTES que los intermediarios de Vite. */
+      servidor.middlewares.use((peticion, _respuesta, siguiente) => {
+        const url = peticion.url ?? '';
+        const corte = url.indexOf('?');
+        const ruta = corte < 0 ? url : url.slice(0, corte);
+        const nombre = /^\/sala\/([A-Za-z0-9-]+)$/.exec(ruta)?.[1];
+        if (
+          (peticion.method === 'GET' || peticion.method === 'HEAD') &&
+          nombre !== undefined &&
+          existsSync(fileURLToPath(new URL(`./${nombre}.html`, import.meta.url)))
+        ) {
+          peticion.url = `/sala/${corte < 0 ? '' : url.slice(corte)}`;
+        }
+        siguiente();
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: '/sala/',
-  plugins: [react()],
+  plugins: [react(), laSalaComoEnProduccion()],
   /*
    * ═══ UNA SOLA COPIA DE R3F, DE `three` Y DE `react`, AUNQUE HAYA VARIAS EN EL DISCO ═══
    *
@@ -56,6 +99,32 @@ export default defineConfig({
    */
   build: {
     rollupOptions: {
+      /*
+       * ═══ DOS PÁGINAS EN EL EMPAQUETADO: LA SALA Y EL DOCUMENTO SUELTO DEL QUIEBRO ═══
+       *
+       * Hasta El Quiebro el empaquetado tenía una sola entrada —`index.html`, la Sala— y los
+       * `banco*.html` se quedaban fuera a propósito: son páginas para MIRAR en desarrollo, y en
+       * producción no las pide nadie. `quiebro.html` no es un banco. Es la página que cargan el
+       * WebView apaisado de la app y el `iframe` de `/jugar` (`docs/quiebro/ARQUITECTURA.md` §0.2):
+       * el juego entero sin la Sala alrededor, que recibe la mesa por el puente de
+       * `src/quiebro/contrato.ts`. Sin esta entrada el servidor sirve `/sala/quiebro.html` con el
+       * comodín de la Sala —el `index.html`—, y el teléfono abriría la Sala de PC dentro del WebView
+       * sin un solo error: la página carga, sólo que es otra.
+       *
+       * Con `input` escrito, Vite deja de deducir la entrada, así que `index.html` va aquí también:
+       * es la mitad de «sin romper lo demás». Las dos comparten el trozo `tres` y los módulos que
+       * tengan en común; cada una se lleva sólo lo que importa. Y las rutas son ABSOLUTAS, sacadas de
+       * este fichero y no del directorio desde el que se lance la orden: `npm run build -w escritorio`
+       * y `npx vite build` desde otra carpeta tienen que empaquetar lo mismo.
+       *
+       * Si `quiebro.html` faltara, el empaquetado FALLA diciendo qué entrada no encuentra. Es lo que
+       * tiene que pasar: un despliegue sin el documento no es un despliegue más pequeño, es una app que
+       * abre una página equivocada.
+       */
+      input: {
+        index: fileURLToPath(new URL('./index.html', import.meta.url)),
+        quiebro: fileURLToPath(new URL('./quiebro.html', import.meta.url)),
+      },
       output: {
         manualChunks: { tres: ['three', '@react-three/fiber'] },
       },
