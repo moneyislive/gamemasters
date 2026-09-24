@@ -42,7 +42,7 @@
 import { seAndaEnRecta, sePuedeEstar } from '../mundo';
 import { UNO } from '../fijo';
 import { TICS_POR_SEGUNDO } from '../andar';
-import { TOPE_DEL_RASTRO } from './tipos-de-la-sala';
+import { AQUIS_PARA_ESTAR, TICS_DE_LA_VUELTA, TOPE_DEL_RASTRO } from './tipos-de-la-sala';
 import type { EntradaAqui, EstadoEnCurso, RedDelAsiento, SitioEnElTic } from './tipos-de-la-sala';
 import type { CajaDeLaLiza, LizaDeclarada, PapelDeNacer, PuestaDeEstado, ReglasDeAsiento, SitioDeNacer } from './declaracion';
 import { puntoDelTramo } from './geometria';
@@ -342,9 +342,12 @@ function corregir(p: PasoEnCurso, a: AsientoEnCurso, n: number): void {
  * y una ida y vuelta asimétrica mueven ese instante: un `aqui` bueno que se calla de más sólo pierde su
  * sitio (el siguiente lo trae entero, que los sitios son absolutos); uno malo que se validara de menos
  * costaría otro `corrige`.
+ *
+ * `n` es 0 cuando se recoloca a quien acaba de conectar sin haber dicho nada todavía: el `corrige` lo
+ * admite (ver `Corrige` en `protocolo.ts`).
  */
 function mandarCorrige(p: PasoEnCurso, a: AsientoEnCurso, n: number, x: number, z: number): void {
-  p.correcciones.push({ asiento: a.numero, n: n < 1 ? 1 : n, x, z });
+  p.correcciones.push({ asiento: a.numero, n: n < 0 ? 0 : n, x, z });
   a.corregidoEnTic = p.k;
   const llega = msDelTic(p.k) + Math.ceil(a.red.rttMs / 2) + a.red.desfaseMs;
   a.enVueloHastaN = Math.floor(llega / MS_POR_TIC) + 1;
@@ -363,19 +366,34 @@ export type ResultadoDelAqui = 'tirado' | 'aceptado' | 'callado' | 'presupuesto'
 export function validarAqui(p: PasoEnCurso, a: AsientoEnCurso, e: EntradaAqui): ResultadoDelAqui {
   if (!a.conCuerpo) return 'tirado';
   if (e.n <= a.ultimoTicDelAparato) return 'tirado';
+  const anterior = a.ultimoTicDelAparato;
   a.ultimoTicDelAparato = e.n;
   a.ultimoAquiEnTic = p.k;
   a.mira = e.r;
-  /* Volver del ausente: basta con decir algo (ver `PresenciaDeclarada`). */
+  const tic = ticDelAqui(p, e);
+  /*
+   * ¿ES UN `aqui` VIVO? El que cierra una racha de tics del aparato seguidos (ver `AQUIS_PARA_ESTAR` en
+   * `tipos-de-la-sala.ts`). Y ¿JUEGA? El que pulsa algo o se mueve: una pestaña oculta no hace ninguna de
+   * las dos cosas. Cualquiera de los dos aleja el ausente; sólo el vivo lo acaba. Se mira ANTES de validar
+   * el sitio: un aparato despierto que dice un sitio malo sigue despierto.
+   */
+  a.aquisSeguidos = e.n === anterior + 1 ? a.aquisSeguidos + 1 : 1;
+  const vivo = a.aquisSeguidos >= AQUIS_PARA_ESTAR;
+  const juega = e.accion !== null || e.x !== a.x || e.z !== a.z;
+  if (vivo || juega) a.vivoEnTic = p.k;
+  /*
+   * VOLVER DEL AUSENTE, al primer `aqui` vivo (con «basta con decir algo», la ráfaga de una pestaña frenada
+   * lo devolvía cada segundo: ver `tipos-de-la-sala.ts`). Se valida el sitio DESPUÉS: el `aqui` que lo
+   * devuelve lo manda un aparato que sabía que estaba ausente, quieto donde se quedó.
+   */
   const activo = enCurso(a.estado, p.k);
-  if (activo !== null && activo.estado === p.declaracion.presencia.estadoAusente) ponerEstado(p, a, null);
+  if (vivo && activo !== null && activo.estado === p.declaracion.presencia.estadoAusente) volverDelAusente(p, a, activo);
   if (p.declaracion.fase.modo === 'quieta') return 'aceptado';
 
   const reglas = p.declaracion.asientos[a.numero - 1] as ReglasDeAsiento;
   const dx = e.x - a.x;
   const dz = e.z - a.z;
   const unTic = corteDelTic(reglas);
-  const tic = ticDelAqui(p, e);
   if (dx === 0 && dz === 0) {
     a.marcha = e.m;
     a.corregidoEnTic = -1;
@@ -438,9 +456,43 @@ function ticDelAqui(p: PasoEnCurso, e: EntradaAqui): number {
 /* ─── LA PRESENCIA ───────────────────────────────────────────────────────── */
 
 /**
- * EL AUSENTE MOMENTÁNEO (ver `PresenciaDeclarada`): sin `aqui` durante `ausenteTrasTics`, quien está en
- * pie pasa al estado ausente —intocable y fuera de los turnos— hasta su próximo `aqui`. Sólo en el modo
- * encuentro.
+ * VUELVE DEL AUSENTE: suma el rato a lo que lleva ausente en la fase y, en un encuentro, entra en su VUELTA
+ * —la puesta de quien reaparece, recortada a `TICS_DE_LA_VUELTA`: medio segundo de intocable para ver lo
+ * que tiene delante—, que se acaba en cuanto empieza una acción (`atenderLaAccionDelAqui`, en
+ * `combate.ts`). Fuera de un encuentro, libre. Por qué así, en `AQUIS_PARA_ESTAR` (`tipos-de-la-sala.ts`).
+ */
+function volverDelAusente(p: PasoEnCurso, a: AsientoEnCurso, ausente: EstadoEnCurso): void {
+  a.ausenteAcumulado += p.k - ausente.desdeTic;
+  if (p.declaracion.fase.modo !== 'encuentro') {
+    ponerEstado(p, a, null);
+    return;
+  }
+  const e = puestaDesde(p.declaracion.equipo.reaparicion.puesta, p.k, 0);
+  const tope = p.k + TICS_DE_LA_VUELTA;
+  const hasta = e.hastaTic < tope ? e.hastaTic : tope;
+  ponerEstado(p, a, {
+    ...e,
+    hastaTic: hasta,
+    intocableHastaTic: e.intocableHastaTic < hasta ? e.intocableHastaTic : hasta,
+    soltableEnTic: e.soltableEnTic < hasta ? e.soltableEnTic : hasta,
+  });
+  a.vueltaHastaTic = hasta;
+}
+
+/** ¿Está en la VUELTA del ausente (y no en otra cosa que se le haya puesto encima)? */
+export function enLaVuelta(p: PasoEnCurso, a: AsientoEnCurso): boolean {
+  if (p.k >= a.vueltaHastaTic) return false;
+  const activo = enCurso(a.estado, p.k);
+  return activo !== null && activo.estado === p.declaracion.equipo.reaparicion.puesta.estado && activo.hastaTic === a.vueltaHastaTic;
+}
+
+/**
+ * EL AUSENTE MOMENTÁNEO (ver `PresenciaDeclarada`): sin un `aqui` VIVO ni uno que juegue durante
+ * `ausenteTrasTics` (ver `AQUIS_PARA_ESTAR` en `tipos-de-la-sala.ts`), quien está en pie pasa al estado ausente —intocable, fuera
+ * de los turnos, y sin andar ni pegar— hasta su próximo `aqui` vivo. Sólo en el modo encuentro. Al pasar,
+ * `alQuedarAusente` (`combate.ts`) le suelta lo que sostenía, olvida sus esquivas y su acometida, y CORTA
+ * lo que tenía anunciado en contra: «los NPC lo ignoran» es también que el golpe que venía no llega, ni
+ * esquivado ni dado.
  *
  * ═══ PISA EL ESTADO QUE TUVIERA, MENOS LA CAÍDA ═══
  *
@@ -450,16 +502,16 @@ function ticDelAqui(p: PasoEnCurso, e: EntradaAqui): number {
  * pueda hacer nada. El diseño dice «a los 2 s sin aqui, intocable y los NPC lo ignoran», sin «salvo que».
  * Así que pisa cualquier estado —y suelta lo que sostenía— menos la caída, que tiene su propio reloj.
  */
-export function mirarLaPresencia(p: PasoEnCurso, soltar: (a: AsientoEnCurso) => void): void {
+export function mirarLaPresencia(p: PasoEnCurso, alQuedarAusente: (a: AsientoEnCurso) => void): void {
   const pr = p.declaracion.presencia;
   for (const a of p.asientos) {
     if (!a.conCuerpo || a.vida <= 0) continue;
     const activo = enCurso(a.estado, p.k);
     if (activo !== null && activo.estado === pr.estadoAusente) continue;
-    const desde = a.ultimoAquiEnTic > p.fase.desdeTic ? a.ultimoAquiEnTic : p.fase.desdeTic;
+    const desde = a.vivoEnTic > p.fase.desdeTic ? a.vivoEnTic : p.fase.desdeTic;
     if (p.k - desde < pr.ausenteTrasTics) continue;
-    if (a.sostenida !== null) soltar(a);
     ponerEstado(p, a, estadoSinFin(pr.estadoAusente, p.k));
+    alQuedarAusente(a);
   }
 }
 
@@ -473,9 +525,18 @@ export function sinCanalDeMas(p: PasoEnCurso, a: AsientoEnCurso): boolean {
 }
 
 /**
- * ¿SE FUE? Lleva `veredictoTrasTics` sin canal, o ese mismo tiempo en el ausente con el canal abierto (la
- * pestaña oculta que no vuelve). Quien se fue no cuenta como alguien que pueda seguir en el encuentro
- * (`alguienPuedeSeguir` en `encuentros.ts`).
+ * ¿SE FUE? Lleva `veredictoTrasTics` sin canal, o está ausente y lleva ese mismo tiempo ausente EN LA FASE
+ * contando todos sus ratos (`ausenteAcumulado` más el de ahora): la pestaña oculta que no vuelve, y la que
+ * vuelve un segundo de cada minuto. Quien se fue no cuenta como alguien que pueda seguir en el encuentro
+ * (`alguienPuedeSeguir` en `encuentros.ts`); si vuelve, vuelve a contar.
+ *
+ * ═══ POR QUÉ TODOS LOS RATOS ═══
+ *
+ * Con sólo el de ahora, 57 segundos oculto y uno a la vista, en bucle, no llegaba nunca a sesenta
+ * seguidos: con el encuentro en solitario las entidades no tenían a quién perseguir, el reloj vencía y la
+ * oleada salía AGUANTADA sin jugarla —las ocho que midió la revisión del frente, sin gastar una moneda—,
+ * cuando el mismo asiento quieto las perdía todas. La gracia del diseño («quien se cae tiene 60 s») es de
+ * la fase, no de cada rato.
  *
  * ═══ POR QUÉ HACE FALTA ═══
  *
@@ -496,7 +557,8 @@ export function sinCanalDeMas(p: PasoEnCurso, a: AsientoEnCurso): boolean {
 export function seFue(p: PasoEnCurso, a: AsientoEnCurso): boolean {
   if (sinCanalDeMas(p, a)) return true;
   const activo = enCurso(a.estado, p.k);
-  return activo !== null && activo.estado === p.declaracion.presencia.estadoAusente && p.k - activo.desdeTic >= p.declaracion.presencia.veredictoTrasTics;
+  if (activo === null || activo.estado !== p.declaracion.presencia.estadoAusente) return false;
+  return a.ausenteAcumulado + (p.k - activo.desdeTic) >= p.declaracion.presencia.veredictoTrasTics;
 }
 
 /** ¿Puede estar un cuerpo de radio `radio` en `(x, z)`? La pregunta de `mundo.ts`, con la arena del paso. */

@@ -42,9 +42,14 @@ export const DISTANCIA_ABIERTA = 4;
 /** Con enemigos a menos de esto, se abre. */
 export const ENEMIGOS_CERCA_M = 5;
 export const ALTO_DE_LA_CAMARA = 1.7;
-/** El pivote: el pecho del desvelado, y un poco a la derecha (el «hombro»). */
+/**
+ * El pivote: el pecho del desvelado, y a la derecha (el «hombro»). Con 0,45 m el cuerpo quedaba casi en
+ * el centro de la pantalla (al 44 % del ancho), tapando justo lo que viene; a 0,7 m queda a la izquierda
+ * del centro (al 41 % en PC, como en el encuadre de referencia de Miguel) y el centro queda libre para el
+ * blanco. Sigue a 3,2 m DETRÁS del pivote y a 1,7 m de alto (diseño §7): sólo se corre el hombro.
+ */
 export const ALTO_DEL_PIVOTE = 1.5;
-export const HOMBRO_M = 0.45;
+export const HOMBRO_M = 0.7;
 /** El cabeceo, en radianes: de −10° a +35° (positivo = la cámara sube y mira hacia abajo). */
 export const CABECEO_MINIMO = (-10 * Math.PI) / 180;
 export const CABECEO_MAXIMO = (35 * Math.PI) / 180;
@@ -53,6 +58,25 @@ export const CABECEO_DE_REPOSO = Math.asin((ALTO_DE_LA_CAMARA - ALTO_DEL_PIVOTE)
 /** Campo de visión: 75° en el móvil, 70° en PC. */
 export const FOV_MOVIL = 75;
 export const FOV_PC = 70;
+/**
+ * EL ENCUADRE DE CINE: UNA PROPUESTA, NO LO QUE SE JUEGA. El campo de visión de 70° es VERTICAL (es el
+ * `fov` de three): en una pantalla de 16:9 son 102° en horizontal, y con él los edificios se van al
+ * fondo, la plaza parece enorme y el desvelado ocupa el 42 % del alto (en la referencia de Miguel, más
+ * del 70 %, cortado por el muslo). La propuesta de dirección de arte: fijar el HORIZONTAL en 78°, sacar
+ * de él el vertical según la forma de la pantalla (49° en 16:9, 63° en 4:3, 75° en vertical, entre 48 y
+ * 75), acercar la cámara de 3,2 a 2,5 m y dejar que en la pelea se abra a 3,6 m y 6° más.
+ *
+ * Cambia cifras del §7 del diseño (y las que mira `scripts/verificar-quiebro-juego.ts`), así que NO se
+ * aplica sin el visto bueno de Miguel. Mientras, se puede MIRAR en desarrollo con `?encuadre=cine` (la
+ * lupa de `posproceso/lupa.ts` corrige la cámara del juego justo antes de pintar). Adoptarla es usar
+ * estas constantes en `encuadrar` (con el aspecto del lienzo en la situación) y cambiar el §7.
+ */
+export const FOV_HORIZONTAL_DE_CINE = 78;
+export const FOV_VERTICAL_DE_CINE_MINIMO = 48;
+export const FOV_VERTICAL_DE_CINE_MAXIMO = 75;
+export const DISTANCIA_DE_CINE = 2.5;
+export const DISTANCIA_ABIERTA_DE_CINE = 3.6;
+export const FOV_ABIERTO_DE_CINE = 6;
 /** El Remanso: 20° de órbita y 8° menos de campo. */
 export const ORBITA_DEL_REMANSO = (20 * Math.PI) / 180;
 export const FOV_DEL_REMANSO = 8;

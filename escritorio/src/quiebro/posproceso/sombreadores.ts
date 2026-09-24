@@ -21,6 +21,8 @@
  *   · `CON_PROFUNDIDAD`: el enfoque del Remanso mira la profundidad de la escena (N3). Sin ella, el
  *     enfoque sólo mira la distancia al centro de la pantalla, que con la cámara al hombro es donde
  *     están el desvelado y su blanco.
+ *   · `CON_REFLEJOS`: el reflejo en pantalla del suelo mojado (N3, con `CON_PROFUNDIDAD`). Ver
+ *     `GLSL_REFLEJO_EN_EL_SUELO` más abajo.
  *   · `CON_OCLUSION`: multiplica por la oclusión ambiental que el pase de oclusión dejó en su textura
  *     (N3). Se aplica AQUÍ y no en el pase de oclusión por una razón de WebGL, contada en
  *     `compositor.ts` (el bucle de realimentación con la textura de profundidad).
@@ -37,6 +39,94 @@
  * funciones de espacio de color como `sRGBTransferOETF`). Nada de `#include <colorspace_pars_fragment>`
  * aquí: three ya lo pone y repetirlo no compila.
  */
+import { GLSL_CHARCOS, GLSL_RUIDO } from '../ciudad/glsl';
+
+/**
+ * EL REFLEJO EN PANTALLA DEL SUELO MOJADO (N3, diseño §8: «SSR sólo en la máscara de charcos»).
+ *
+ * El asfalto ya refleja un cielo falso y las tarjetas estiran bajo cada luz su brillo; lo que ninguna de
+ * las dos puede es reflejar LO QUE HAY: la fachada de enfrente con sus ventanas, el neón, el Celador que
+ * viene. Esto lo hace con lo que ya está pintado: para cada píxel de suelo (se reconoce reconstruyendo
+ * de la profundidad su sitio en el mundo y la normal con dos vecinos: horizontal y a menos de 25 cm),
+ * se refleja el rayo de la cámara en el plano del suelo y se recorre en el espacio de la vista con pasos
+ * que crecen, hasta que pasa por detrás de lo pintado; entonces se afina con una bisección y se lee el
+ * color de la imagen en ese punto. Cuánto se ve depende del Fresnel del agua (a ras, mucho; mirando al
+ * suelo, casi nada) y de la MISMA máscara de charcos que el asfalto (`charcoQ`): en el charco es un
+ * espejo; en el asfalto sólo mojado, un velo. Lo que se sale de la pantalla se funde, no se corta.
+ *
+ * Todo en lineal, antes del ACES: el reflejo de un neón brilla como el neón. Cuesta unas treinta
+ * lecturas de profundidad por píxel de suelo; en una gráfica dedicada no se nota.
+ */
+export const GLSL_REFLEJO_EN_EL_SUELO = /* glsl */ `
+uniform mat4 uProyeccion;
+uniform mat4 uProyeccionInversa;
+uniform mat4 uVistaInversa;
+uniform float uReflejos;
+${GLSL_RUIDO}
+${GLSL_CHARCOS}
+vec3 vistaEn( vec2 uv ) {
+	float d = texture2D( tProfundidad, uv ).x;
+	vec4 p = uProyeccionInversa * vec4( uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0 );
+	return p.xyz / p.w;
+}
+vec2 pantallaDe( vec3 v ) {
+	vec4 p = uProyeccion * vec4( v, 1.0 );
+	return ( p.xy / p.w ) * 0.5 + 0.5;
+}
+vec3 reflejoEnElSuelo( vec2 uv, vec3 c ) {
+	if ( uReflejos <= 0.0 || texture2D( tProfundidad, uv ).x >= 0.99999 ) return c;
+	vec2 px = 1.0 / uResolucion;
+	vec3 P = vistaEn( uv );
+	vec3 W = ( uVistaInversa * vec4( P, 1.0 ) ).xyz;
+	if ( W.y > 0.25 ) return c;
+	vec3 Wx = ( uVistaInversa * vec4( vistaEn( uv + vec2( px.x, 0.0 ) ), 1.0 ) ).xyz;
+	vec3 Wy = ( uVistaInversa * vec4( vistaEn( uv + vec2( 0.0, px.y ) ), 1.0 ) ).xyz;
+	vec3 nW = cross( Wy - W, Wx - W );
+	if ( abs( nW.y ) < 0.9 * length( nW ) ) return c;
+	/* Cuánta agua: el charco es un espejo; el asfalto mojado, un velo. */
+	float agua = W.y > 0.05 ? charcoDeLaAceraQ( W.xz ) : charcoQ( W.xz );
+	agua = max( agua, 0.22 );
+	vec3 arriba = normalize( transpose( mat3( uVistaInversa ) ) * vec3( 0.0, 1.0, 0.0 ) );
+	vec3 V = normalize( P );
+	vec3 R = reflect( V, arriba );
+	float cosT = clamp( dot( -V, arriba ), 0.0, 1.0 );
+	float F = 0.02 + 0.98 * pow( 1.0 - cosT, 5.0 );
+	float t = 0.25;
+	float antes = 0.0;
+	vec2 dar = vec2( -1.0 );
+	for ( int i = 0; i < 26; i ++ ) {
+		vec3 Q = P + R * t;
+		vec2 uq = pantallaDe( Q );
+		if ( uq.x < 0.0 || uq.x > 1.0 || uq.y < 0.0 || uq.y > 1.0 || Q.z > -0.05 ) break;
+		float zEscena = vistaEn( uq ).z;
+		if ( Q.z < zEscena && zEscena - Q.z < 0.6 + t * 0.08 ) {
+			/* Afinar: bisección entre el paso de antes y éste. */
+			float a = antes;
+			float b = t;
+			for ( int k = 0; k < 5; k ++ ) {
+				float m = 0.5 * ( a + b );
+				vec3 Qm = P + R * m;
+				if ( Qm.z < vistaEn( pantallaDe( Qm ) ).z ) b = m; else a = m;
+			}
+			dar = pantallaDe( P + R * b );
+			break;
+		}
+		antes = t;
+		t = t * 1.22 + 0.12;
+	}
+	if ( dar.x < 0.0 ) return c;
+	/* Un temblor de agua, fijo en el mundo, para que el charco no sea un espejo de laboratorio. */
+	dar += ( vec2( ruidoQ( W.xz * 7.0 ), ruidoQ( W.zx * 7.0 + 13.0 ) ) - 0.5 ) * 0.006 * agua;
+	vec2 borde = smoothstep( vec2( 0.0 ), vec2( 0.08 ), dar ) * ( 1.0 - smoothstep( vec2( 0.92 ), vec2( 1.0 ), dar ) );
+	float peso = F * agua * borde.x * borde.y * uReflejos * ( 1.0 - smoothstep( 25.0, 45.0, t ) );
+	/* Lo reflejado más oscuro que el suelo sólo lo tapa en parte: el suelo ya lleva el brillo estirado de
+	   las farolas (las tarjetas), que es un reflejo también, y borrarlo con el de una fachada oscura
+	   apagaba las calles. Lo más claro (ventanas, neones, faros) entra entero. */
+	vec3 visto = texture2D( tEntrada, dar ).rgb;
+	float masClaro = step( dot( c, vec3( 0.2126, 0.7152, 0.0722 ) ), dot( visto, vec3( 0.2126, 0.7152, 0.0722 ) ) );
+	return mix( c, visto, clamp( peso * mix( 0.35, 1.0, masClaro ), 0.0, 1.0 ) );
+}
+`;
 
 /** El vértice común: el triángulo que cubre la pantalla de `FullScreenQuad`, sin matrices. */
 export const VERTICE_DE_PANTALLA = /* glsl */ `
@@ -47,6 +137,11 @@ void main() {
 }`;
 
 export const UNIFORMES_DEL_UBER = [
+  'uProyeccion',
+  'uProyeccionInversa',
+  'uVistaInversa',
+  'uReflejos',
+  'uHumedad',
   'tEntrada',
   'tLut',
   'tBrillo',
@@ -99,6 +194,10 @@ uniform sampler2D tOclusion;
 uniform float uOclusion;
 
 varying vec2 vUv;
+
+#ifdef CON_REFLEJOS
+${GLSL_REFLEJO_EN_EL_SUELO}
+#endif
 
 const float LADO = ${LADO_DE_LA_LUT_EN_EL_UBER}.0;
 const vec3 PESOS_DE_LA_LUMA = vec3( 0.2126, 0.7152, 0.0722 );
@@ -161,6 +260,11 @@ void main() {
 		}
 	}
 
+#ifdef CON_REFLEJOS
+	/* El suelo mojado refleja lo que hay (N3), en lineal y antes del mapeo tonal. */
+	c = reflejoEnElSuelo( uv, c );
+#endif
+
 #ifdef CON_OCLUSION
 	/* La oclusión (N3) se calcula a media resolución en su pase y se aplica aquí, en lineal. */
 	c *= mix( 1.0, texture2D( tOclusion, uv ).r, uOclusion );
@@ -181,12 +285,24 @@ void main() {
 	vec3 graduado = texture( tLut, c * ( ( LADO - 1.0 ) / LADO ) + 0.5 / LADO ).rgb;
 	c = mix( c, graduado, uFuerzaDeLaLut );
 
-	/* El Remanso quita el 70 % del color. */
+	/* El Remanso quita el 70 % del color, y lo que queda se enfría: el tiempo parado es frío. */
 	float l = dot( c, PESOS_DE_LA_LUMA );
 	c = mix( c, vec3( l ), 0.7 * uRemanso );
+	c *= mix( vec3( 1.0 ), vec3( 0.9, 1.0, 1.06 ), uRemanso );
 
 	/* Viñeta, que se cierra un poco más en el Remanso. */
 	c *= 1.0 - uVineta * ( 1.0 + 0.8 * uRemanso ) * smoothstep( 0.2, 1.1, r2 );
+
+	/*
+	 * EL REMANSO ES UN MOMENTO DE CINE: dos bandas negras entran desde arriba y desde abajo (hasta el
+	 * 7,5 % de la altura cada una) y salen con él. Es la señal que el ojo lee como «esto es un plano», y
+	 * no tapa nada que importe: los anillos y los contornos van en la capa nítida, encima.
+	 */
+	if ( uRemanso > 0.001 ) {
+		float banda = 0.075 * uRemanso * uRemanso * ( 3.0 - 2.0 * uRemanso );
+		float px = 1.0 / uResolucion.y;
+		c *= smoothstep( banda - px, banda + px, vUv.y ) * smoothstep( banda - px, banda + px, 1.0 - vUv.y );
+	}
 
 	/*
 	 * Grano de película, más en los medios tonos que en los negros y los blancos. Nunca menos de un
@@ -275,5 +391,8 @@ void main() {
 	float r2 = ( d.x * d.x * uAspecto * uAspecto + d.y * d.y ) / ( 0.25 * uAspecto * uAspecto + 0.25 );
 	float oscuro = 1.0 - 0.55 * uRemanso * smoothstep( 0.1, 1.0, r2 );
 	vec3 frio = mix( vec3( 1.0 ), vec3( 0.86, 0.97, 1.0 ), 0.6 * uRemanso );
-	gl_FragColor = vec4( frio * oscuro, 1.0 );
+	/* Las bandas de cine, como en el uber: multiplicar por cero es lo único que N0 necesita para ellas. */
+	float banda = 0.075 * uRemanso * uRemanso * ( 3.0 - 2.0 * uRemanso );
+	float cine = step( banda, vUv.y ) * step( banda, 1.0 - vUv.y );
+	gl_FragColor = vec4( frio * oscuro * cine, 1.0 );
 }`;

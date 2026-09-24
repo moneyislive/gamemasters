@@ -41,8 +41,12 @@
  * 1 rojo, 2 bloque saltado, 3 reventado), como hacen los demás comprobadores del Quiebro.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import '../../shared/arcade/juegos';
-import { avanzarConMotivo, vistaDeAsiento } from '../../shared/arcade';
+import { avanzarConMotivo, opcionesDeArcade, vistaDeAsiento } from '../../shared/arcade';
+import type { Opcion } from '../../shared/arcade';
+import { DURACION_MS, ESTILOS } from '../../shared/arcade/juegos/quiebro-reglas';
 import { lizaDeLaMesa } from '../../shared/arcade/juegos/lizas';
 import { leerVistaDelQuiebro } from '../../shared/arcade/juegos/quiebro-vista';
 import { barrioDeLaNoche, mundoDeLaLizaDelBarrio, ID_DE_LIMITE_EN_LA_LIZA } from '../../shared/arcade/juegos/quiebro-barrio';
@@ -63,7 +67,9 @@ import {
   CIERRE_DE_LA_LIZA,
   ECO_CADA_MS,
   leerMensajeDelAparato,
+  RESULTADO,
   textoDeLaSala,
+  TOPE_DE_AQUIS_DE_GOLPE,
   VERSION_DE_LA_LIZA,
 } from '../../shared/mecanicas/liza/protocolo';
 import type { Aqui, MensajeDeLaSala, MensajeDelAparato, SucesoDelTic } from '../../shared/mecanicas/liza/protocolo';
@@ -76,9 +82,15 @@ import { ALCANZA_M, FUNDIDO_MS, LineaDelCuerpo, pintadoNuevo } from '../src/quie
 import { dentroDelLimite, PasoPropio } from '../src/quiebro/red/prediccion';
 import { SalaVista } from '../src/quiebro/red/sala-vista';
 import { leerLaLiza } from '../src/quiebro/red/diccionario';
-import { Partida } from '../src/quiebro/red/partida';
+import { Partida, ROTULO_DE_LA_VUELTA_MS } from '../src/quiebro/red/partida';
+import { CAIDA_MINIMA_MS, CAIDA_MS, GiroEnLoAlto, RelojDeLaBajada } from '../src/quiebro/red/bajada';
 import { PuertoDePrueba, PLAZO_DE_LA_MESA_S } from '../src/quiebro/red/puerto-de-prueba';
 import { EstadoDeLosMandos, sinZonaMuerta, ZONA_MUERTA } from '../src/quiebro/mandos/estado';
+import { escucharElFondo, EVENTO_DEL_FONDO } from '../src/quiebro/mandos/fondo';
+import { engancharElTeclado } from '../src/quiebro/mandos/teclado';
+import { quienesFaltanEnLaBajada } from '../src/quiebro/hud/lectura';
+import { Reunion, RotuloDeLaBajada } from '../src/quiebro/hud/Pantallas';
+import type { PuertoDeMesa } from '../src/quiebro/contrato';
 import { anguloEntre, direccionHacia, elegirBlanco } from '../src/quiebro/mandos/enganche';
 import { camaraNueva, DISTANCIA_ABIERTA, DISTANCIA_AL_HOMBRO, encuadrar, FOV_PC, losaEnTresEjes } from '../src/quiebro/camara/encuadre';
 import type { CajaAlta } from '../src/quiebro/camara/encuadre';
@@ -202,18 +214,19 @@ function reglasDelDiseno(asiento: string): ReglasDeAsiento {
       golpe(ACC.seguida2, { anuncioTics: 5, cadena: cadena(ACC.seguida1, 4), efecto: efecto(10, puesta(EST.tocado, 10)) }),
       golpe(ACC.cierre, { anuncioTics: 7, cadena: cadena(ACC.seguida2, 7), efecto: efecto(20, puesta(EST.derribado, 30), u(3)) }),
       golpe(ACC.empellon, { anuncioTics: 10, recargaTics: 60, efecto: efecto(8, puesta(EST.tocado, 24), u(4), true) }),
-      golpe(ACC.replica, { anuncioTics: 3, imparable: true, soloEn: [EST.remanso], alFallar: null, efecto: efecto(25, puesta(EST.derribado, 30)) }),
+      golpe(ACC.replica, { anuncioTics: 3, avance: u(4.5), imparable: true, soloEn: [EST.remanso], alFallar: null, efecto: efecto(25, puesta(EST.derribado, 30)) }),
     ],
     esquiva: {
       accion: ACC.quiebro,
-      puesta: puesta(EST.quiebro, 9, 0, u(3.5), 6),
+      /* Como la de verdad: el quiebro (3,5 m) más la holgura que la sala admite encima (0,5 m). */
+      puesta: puesta(EST.quiebro, 9, 0, u(4), 6),
       ventanaMs: 200,
       esquivaHastaMs: 250,
       primeras: { cuantas: 3, ventanaMs: 300 },
       torpe: { cada: 3, enTics: 24 },
       alAcertar: { puesta: puesta(EST.remanso, 20, 20), alAutor: puesta(EST.descolocado, 20) },
-      contraProyectil: { distancia: u(10), tics: 8, accion: ACC.replica },
-      ruptura: { coste: 50, desde: [EST.tocado], puesta: puesta(EST.quiebro, 9, 6, u(3.5), 6) },
+      contraProyectil: { distancia: u(14), tics: 10, accion: ACC.replica },
+      ruptura: { coste: 50, desde: [EST.tocado], puesta: puesta(EST.quiebro, 9, 6, u(4), 6) },
     },
     rescate: { accion: ACC.rescate, radio: u(1.5), mantenerTics: 30, puesta: puesta(EST.rescatando, 30), vidaAlVolver: 40, medidorAmbos: 0 },
     medidor: { tope: 100, porLimpia: 35, porRitmo: 5, porRemate: 20, porChoque: 10 },
@@ -595,7 +608,8 @@ function azarDe(semilla: number): () => number {
     const fuerza = azar() < 0.1 ? 0 : 0.3 + azar() * 0.7;
     const correr = azar() < 0.3;
     if (!paso.desplazandose() && t % 37 === 11) {
-      paso.desplazar(Math.floor(azar() * 256), REGLAS.esquiva.puesta.distanciaExtra, 6, false);
+      /* El aparato quiebra lo del estilo (la puesta menos la holgura) y la sala admite la puesta entera. */
+      paso.desplazar(Math.floor(azar() * 256), REGLAS.esquiva.puesta.distanciaExtra - u(0.5), 6, false);
       validador.darExtra(REGLAS.esquiva.puesta.distanciaExtra);
       quiebros++;
     } else if (!paso.desplazandose() && t % 101 === 50) {
@@ -966,6 +980,8 @@ await (async () => {
   };
   const vista = (): unknown => vistaDeAsiento('quiebro', estado, null, sentados);
   mandar('s1', 'empezar', null);
+  /* El segundo baja con la Mole: su Réplica es la que menos avanza, y la Acometida tiene que llegar igual. */
+  const conLaMole = mandar('s2', 'estilo', { id: 'mole' });
   const enLaBajada = leerVistaDelQuiebro(vista());
   if (enLaBajada?.reloj !== null && enLaBajada?.reloj !== undefined) mandar(null, 'arcade:reloj', { id: enLaBajada.reloj.id });
   const cruda = vista();
@@ -1005,6 +1021,24 @@ await (async () => {
   );
   const clases = real.clases.map((c) => l.cuerpoDeLaClase(c.id)).sort().join();
   comprobar('las clases de verdad son un Prestado, un Celador y un tirador', clases === 'celador,prestado,tirador', clases);
+  /*
+   * LA ACOMETIDA LLEGA SIEMPRE AL TIRADOR (decisión del coordinador, 24-sep): el vuelo, más lo que avanza la
+   * Réplica que lanza (la de cada estilo), más su alcance y su holgura, tiene que cubrir lo más lejos que
+   * se pone un tirador. Con los 10 m del diseño la Mole se quedaba corta a partir de 15,8 m y cualquiera
+   * a partir de 16,8, y el tirador busca hasta 18.
+   */
+  const tirador = real.clases.find((c) => l.cuerpoDeLaClase(c.id) === 'tirador');
+  const lejosM = (tirador?.cerebro.distanciaMaxima ?? 0) / UNO;
+  const alcancesM = real.asientos.map((a) => {
+    const c = a.esquiva.contraProyectil;
+    const replica = a.acciones.find((x) => x.id === c.accion);
+    return (c.distancia + (replica?.avance ?? 0) + (replica?.alcance ?? 0) + (replica?.holgura ?? 0)) / UNO;
+  });
+  comprobar(
+    'la Acometida llega siempre al tirador: vuelo, avance de la Réplica y alcance cubren lo más lejos que se pone, con todos los estilos (también la Mole)',
+    conLaMole === null && tirador !== undefined && lejosM >= 8 && alcancesM.length === 2 && Math.min(...alcancesM) >= lejosM,
+    { conLaMole, lejosM, alcancesM },
+  );
   comprobar(
     'los avisos de verdad, en el orden del diseño: marcar, Rescate, Voy, ¡Desalójalo!',
     l.avisos.marcar !== 0 && l.avisos.rescate !== 0 && l.avisos.voy !== 0 && l.avisos.desalojalo !== 0 && new Set([l.avisos.marcar, l.avisos.rescate, l.avisos.voy, l.avisos.desalojalo]).size === 4,
@@ -1149,7 +1183,7 @@ paso('8. La partida entera, contra un enchufe de mentira');
   const quiebro = e.leidos().filter((m): m is Aqui => m.t === 'aqui' && m.a !== 0 && m.a[0] === ACC.quiebro)[0];
   comprobar('QUIEBRO viaja con su acción, sin blanco y con el `ms` de su evento', quiebro !== undefined && quiebro.a !== 0 && quiebro.a[1] === Math.floor(quiebroEn - origen) && quiebro.a[2] === 0, quiebro);
   const recorrido = Math.hypot((partida.paso?.x ?? 0) - antesDelQuiebroX, (partida.paso?.z ?? 0) - antesDelQuiebroZ) / UNO;
-  comprobar('y el cuerpo se desplaza hacia la palanca los 3,5 m del quiebro (sin esperar a la sala)', recorrido > 3 && recorrido < 3.6, recorrido);
+  comprobar('y el cuerpo se desplaza hacia la palanca los 3,5 m del quiebro (sin esperar a la sala, y no los 4 que la sala admite con su holgura)', recorrido > 3.3 && recorrido < 3.6, recorrido);
 
   /* USAR junto a un Celador desalojable: se mantiene, con el MISMO `ms` en cada `aqui`. */
   const p = partida.pintadoDe(1);
@@ -1340,6 +1374,475 @@ await (async () => {
   p.cerrar();
 })();
 
+/* ─────────────────────────────── 10 bis. El pulido del cliente ─────────────────────────────── */
+
+/*
+ * Lo que trajo el pulido de la sala (el informe «pulido-reglas-sala», su «Lo que tiene que saber el
+ * frente del cliente») y lo que pidió el coordinador el 24-sep: la Bajada como preparación con su reloj
+ * de verdad, el ausente (propio y ajeno) y el juego al fondo, la Acometida entera y el código en el modo
+ * de prueba. Cada comprobación se vio roja rompiendo el producto en un espejo del árbol.
+ */
+paso('10 bis. La preparación, el ausente, el fondo, la Acometida entera y la mesa de otra pestaña');
+await (async () => {
+  const sinComentariosDe = (x: string): string => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  /* ── La Bajada: su reloj y la caída de la cámara (`red/bajada.ts`) ── */
+  const visto = (fase: string, reloj: { id: string; duraMs: number } | null, todosListos: boolean, deLaSala: { clave: string; relojHastaMs: number | null; llegoMs: number } | null = null, noche = 1) => ({
+    fase,
+    noche,
+    reloj,
+    todosListos,
+    clave: fase === 'bajada' ? `n${String(noche)}.b` : `n${String(noche)}.o1`,
+    deLaSala,
+  });
+  const R15 = { id: 'n1.b', duraMs: DURACION_MS.bajada };
+  const R6 = { id: 'n1.b.listos', duraMs: DURACION_MS.bajadaConTodos };
+  {
+    const b = new RelojDeLaBajada();
+    const t0 = 100_000;
+    b.observar(visto('bajada', R15, false), t0);
+    const alEmpezar = b.leer(t0);
+    b.observar(visto('bajada', R15, false), t0 + 5600);
+    const aLos56 = b.leer(t0 + 5600);
+    b.observar(visto('bajada', R15, false), t0 + 15000 - CAIDA_MS - 50);
+    const antesDeCaer = b.leer(t0 + 15000 - CAIDA_MS - 50);
+    b.observar(visto('bajada', R15, false), t0 + 15000 - CAIDA_MS);
+    b.observar(visto('bajada', R15, false), t0 + 15000 - CAIDA_MS + 200);
+    const alFinal = b.leer(t0 + 15000 - CAIDA_MS + 200);
+    comprobar(
+      'sin nadie listo, la Bajada dura sus 15 s: la cámara espera arriba a los 5,6 s (la caída de antes) y sólo cae cuando ya no queda más que lo que tarda en caer',
+      alEmpezar.quedaMs === 15000 && alEmpezar.caida === 0 && aLos56.caida === 0 && aLos56.quedaMs === 9400 && antesDeCaer.caida === 0 && alFinal.caida !== null && alFinal.caida > 0 && alFinal.caida < 0.1,
+      { alEmpezar, aLos56, antesDeCaer, alFinal },
+    );
+  }
+  {
+    const b = new RelojDeLaBajada();
+    const t0 = 200_000;
+    b.observar(visto('bajada', R15, false), t0);
+    b.observar(visto('bajada', R6, true), t0 + 2000);
+    const alListo = b.leer(t0 + 2000);
+    b.observar(visto('bajada', R6, true), t0 + 4000);
+    const aMedias = b.leer(t0 + 4000);
+    b.observar(visto('bajada', R6, true), t0 + 5990);
+    const casi = b.leer(t0 + 5990);
+    comprobar(
+      'con todos listos a los 2 s el reloj es el de la caída (6 s desde que EMPEZÓ la Bajada) y la cámara cae en los 4 s que quedan',
+      alListo.quedaMs === 4000 && alListo.caida === 0 && aMedias.caida === 0.5 && casi.caida !== null && casi.caida > 0.99 && casi.quedaMs === 10,
+      { alListo, aMedias, casi },
+    );
+  }
+  {
+    const b = new RelojDeLaBajada();
+    const t0 = 300_000;
+    b.observar(visto('bajada', R15, false), t0);
+    b.observar(visto('oleada', null, false), t0 + 1000);
+    const enLaOleada = b.leer(t0 + 1000 + CAIDA_MINIMA_MS / 2);
+    b.observar(visto('oleada', null, false), t0 + 1000 + CAIDA_MINIMA_MS + 10);
+    const despues = b.leer(t0 + 1000 + CAIDA_MINIMA_MS + 10);
+    comprobar(
+      'si la Bajada se acaba antes de caer (el último listo con el reloj vencido), la caída sigue en la oleada lo mínimo, y luego manda la pelea',
+      enLaOleada.caida === 0.5 && enLaOleada.quedaMs === null && despues.caida === null,
+      { enLaOleada, despues },
+    );
+  }
+  {
+    /* Una pestaña que se recarga a los 10 s: la sala dice que al reloj de 15 s le quedan 5. */
+    const b = new RelojDeLaBajada();
+    const t0 = 400_000;
+    b.observar(visto('bajada', R15, false, { clave: 'n1.re', relojHastaMs: t0 + 2000, llegoMs: t0 - 50 }), t0);
+    const conLaVieja = b.leer(t0);
+    b.observar(visto('bajada', R15, false, { clave: 'n1.b', relojHastaMs: t0 + 5000, llegoMs: t0 + 10 }), t0 + 10);
+    const conLaSuya = b.leer(t0 + 10);
+    b.observar(visto('bajada', R15, false, { clave: 'n1.b', relojHastaMs: t0 + 5000, llegoMs: t0 + 10 }), t0 + 510);
+    const cayendo = b.leer(t0 + 510);
+    comprobar(
+      'el principio de la Bajada lo dice la sala (su suceso `fase` de ESTA fase), y el de otra fase (el recuento de la noche de antes) no cuenta',
+      conLaVieja.quedaMs === 15000 && conLaSuya.quedaMs === 4990 && cayendo.caida !== null && cayendo.caida > 0.05,
+      { conLaVieja, conLaSuya, cayendo },
+    );
+  }
+  {
+    /*
+     * LA CAÍDA NO DA VUELTAS: con la página abierta 1168 s (la cuarta noche de una mesa), la Bajada entera
+     * a 60 fotogramas por segundo. El giro de la cámara en lo alto se suma fotograma a fotograma; sacado
+     * del reloj de la página, la caída barría 6,2 vueltas y saltaba de un lado de la plaza al otro.
+     */
+    const b = new RelojDeLaBajada();
+    const giro = new GiroEnLoAlto();
+    const t0 = 1_168_000;
+    let antes: number | null = null;
+    let saltoMayor = 0;
+    let barridoEnLaCaida = 0;
+    let fotogramasCayendo = 0;
+    for (let t = t0; t <= t0 + DURACION_MS.bajada + 400; t += 16) {
+      b.observar(t < t0 + DURACION_MS.bajada ? visto('bajada', R15, false) : visto('oleada', null, false), t);
+      const c = b.caida(t);
+      const a = giro.avanzar(t, c ?? 1);
+      if (antes !== null) {
+        const d = Math.abs(a - antes);
+        saltoMayor = Math.max(saltoMayor, d);
+        if (c !== null && c > 0) {
+          barridoEnLaCaida += d;
+          fotogramasCayendo++;
+        }
+      }
+      antes = a;
+    }
+    comprobar(
+      'la cámara cae sin dar vueltas lleve lo que lleve abierta la página: en toda la caída gira unas centésimas de radián, y nada de golpe entre dos fotogramas',
+      fotogramasCayendo > 250 && barridoEnLaCaida < 0.15 && saltoMayor < 0.002,
+      { fotogramasCayendo, barridoEnLaCaida, saltoMayor },
+    );
+    const camara = sinComentariosDe(readFileSync(new URL('../src/quiebro/camara/Camara.tsx', import.meta.url), 'utf8'));
+    comprobar(
+      'y la cámara de la Bajada usa ese giro sumado, no uno sacado del reloj de la página',
+      /new GiroEnLoAlto\(\)/.test(camara) && /\.avanzar\(ahora, caida \?\? 0\)/.test(camara) && !/VUELTA_EN_LO_ALTO/.test(camara),
+    );
+  }
+
+  /* ── Quién falta, y lo que pintan la reunión y la preparación ── */
+  let estado: unknown = undefined;
+  const asientos = ['s1', 's2', 's3'];
+  const sentados = asientos.map((asiento) => ({ asiento, nombre: asiento }));
+  const mandar = (quien: string | null, tipo: string, carga: unknown): string | null => {
+    const s = avanzarConMotivo('quiebro', estado, { tipo, carga }, { quien, azar: 20260924, tic: 0, asientos });
+    if (s.motivo === null) estado = s.estado;
+    return s.motivo;
+  };
+  const vista = (): VistaDelQuiebro => leerVistaDelQuiebro(vistaDeAsiento('quiebro', estado, null, sentados)) as VistaDelQuiebro;
+  const opcionesDe = (quien: string): Opcion[] => [...opcionesDeArcade('quiebro', vistaDeAsiento('quiebro', estado, null, sentados), quien)];
+  const puertoDe = (v: VistaDelQuiebro, yo: string, opciones: readonly Opcion[], mandados: { tipo: string; carga: unknown }[]): PuertoDeMesa => ({
+    codigo: 'QUIEB',
+    yo,
+    llave: null,
+    servidor: '',
+    vista: v,
+    opciones,
+    rev: 1,
+    mover: async (m) => {
+      mandados.push({ tipo: m.tipo, carga: m.carga });
+      return { resultado: 'hecho', motivo: '' };
+    },
+    suscribir: () => () => undefined,
+  });
+  const enLaReunion = vista();
+  const htmlDeLaReunion = renderToStaticMarkup(createElement(Reunion, { vista: enLaReunion, puerto: puertoDe(enLaReunion, 's1', [...opcionesDe('s1'), { id: 'estilo:ligera', tipo: 'estilo', carga: { id: 'ligera' }, rotulo: 'Ligera', ayuda: '' }], []), mover: async () => ({ resultado: 'hecho' as const, motivo: '' }), enlaceParaEntrar: 'http://x/sala/quiebro.html?prueba=1&codigo=QUIEB' }));
+  const tarjetasConBoton = (htmlDeLaReunion.match(/<button[^>]*class="q-tarjeta/g) ?? []).length;
+  comprobar(
+    'la reunión ENSEÑA los estilos sin un solo botón que mande (aunque le llegara la opción): el estilo se elige al bajar; y en el modo de prueba enseña la dirección de la segunda pestaña',
+    tarjetasConBoton === 0 && (htmlDeLaReunion.match(/class="q-tarjeta/g) ?? []).length === 3 && htmlDeLaReunion.includes('?prueba=1&amp;codigo=QUIEB'),
+    { tarjetasConBoton },
+  );
+  mandar('s1', 'empezar', null);
+  mandar('s2', 'estilo', { id: 'mole' });
+  const enLaBajada = vista();
+  const faltan = quienesFaltanEnLaBajada(enLaBajada);
+  comprobar('en la Bajada faltan los que no han dicho que están listos (elegir estilo ya es estarlo), y fuera de ella nadie', faltan.join() === '0,2' && quienesFaltanEnLaBajada(enLaReunion).length === 0, faltan);
+  const relojVisto = new RelojDeLaBajada();
+  relojVisto.observar(visto('bajada', enLaBajada.reloj, false), performance.now());
+  const mandados: { tipo: string; carga: unknown }[] = [];
+  const htmlDeS1 = renderToStaticMarkup(createElement(RotuloDeLaBajada, { vista: enLaBajada, rotulo: 'Glorieta', puerto: puertoDe(enLaBajada, 's1', opcionesDe('s1'), mandados), mover: async () => ({ resultado: 'hecho' as const, motivo: '' }), bajada: relojVisto }));
+  const htmlDeS2 = renderToStaticMarkup(createElement(RotuloDeLaBajada, { vista: enLaBajada, rotulo: 'Glorieta', puerto: puertoDe(enLaBajada, 's2', opcionesDe('s2'), mandados), mover: async () => ({ resultado: 'hecho' as const, motivo: '' }), bajada: relojVisto }));
+  comprobar(
+    'la preparación enseña el reloj de verdad, los estilos que se pueden elegir, BAJAR a quien aún no está listo, y quién falta',
+    /0:1[45]/.test(htmlDeS1) && (htmlDeS1.match(/<button[^>]*class="q-tarjeta/g) ?? []).length === 3 && htmlDeS1.includes(`>${NOMBRES_DEL_QUIEBRO.mesa.bajar}<`) && htmlDeS1.includes('Faltan'),
+    htmlDeS1.slice(0, 400),
+  );
+  const quiebrosDeLasTarjetas = (['gabardina', 'ligera', 'mole'] as const).map((id) => `${NOMBRES_DEL_QUIEBRO.quiebros.quiebro} ${ESTILOS[id].quiebroMetros.toFixed(1).replace('.', ',')} m`);
+  comprobar(
+    'las tarjetas dicen el quiebro de la tabla de estilos (3,5 m la Gabardina), no el presupuesto con la holgura que la sala admite encima',
+    quiebrosDeLasTarjetas.every((q) => htmlDeS1.includes(q)),
+    { quiebrosDeLasTarjetas, cifras: htmlDeS1.match(/class="cifras">[^<]*/g) },
+  );
+  comprobar(
+    'a quien ya está listo, ni estilos ni BAJAR: se le dice «listo» y con qué estilo baja',
+    !htmlDeS2.includes(`>${NOMBRES_DEL_QUIEBRO.mesa.bajar}<`) && !/<button[^>]*class="q-tarjeta/.test(htmlDeS2) && htmlDeS2.includes('Listo') && htmlDeS2.includes(NOMBRES_DEL_QUIEBRO.estilos.mole),
+  );
+
+  /* ── El ausente, el propio y el de los demás; y el aparato callado al fondo ── */
+  const relojes = new RelojesDeMentira();
+  const mandos = new EstadoDeLosMandos();
+  const enchufes: EnchufeDeMentira[] = [];
+  const partida = new Partida({
+    direccion: 'ws://x/api/arcade/mesas/QUIEB/liza',
+    llave: 'k1',
+    fabrica: (d) => {
+      const e = new EnchufeDeMentira(d);
+      enchufes.push(e);
+      return e;
+    },
+    relojes,
+    mandos,
+  });
+  partida.ponerLaDeclaracion(LIZA, BARRIO, 'a1');
+  partida.asegurarElCanal(true);
+  const e = enchufes[0] as EnchufeDeMentira;
+  e.abrir();
+  const origen = relojes.t;
+  e.llega({ t: 'dentro', yo: 1, k: 1000, x: NACE.x, z: NACE.z, r: 0, hz: 20 });
+  e.llega({ t: 'tic', k: 1000, ev: [{ e: 'fase', clave: 'n1-o1', modo: 2, limite: ID_DE_LIMITE_EN_LA_LIZA.glorieta48, relojMs: 0, encuentroTics: 3000 }] });
+  e.llega({ t: 'eco', c: 0, k: 1000, ms: 50_000 });
+  const fotograma = (ms: number): void => {
+    relojes.t += ms;
+    partida.fotograma(relojes.t, ms / 1000);
+  };
+  const yoX = Math.round((NACE.x / UNO) * 100);
+  const yoZ = Math.round((NACE.z / UNO) * 100);
+  const fotoConDos = (k: number, estDel2: number): void => e.llega({ t: 'foto', k, p: [[2, yoX + 300, yoZ, 0, 0, estDel2]] });
+  fotoConDos(1000, 0);
+  fotoConDos(1002, 0);
+  fotograma(1);
+  for (let i = 0; i < 10; i++) fotograma(16);
+  e.llega({ t: 'tic', k: 1010, ev: [{ e: 'estado', a: 1, est: EST.ausente, tics: 20000, into: 20000 }, { e: 'estado', a: 2, est: EST.ausente, tics: 20000, into: 20000 }] });
+  fotoConDos(1012, EST.ausente);
+  fotoConDos(1014, EST.ausente);
+  for (let i = 0; i < 12; i++) fotograma(16);
+  const ausenteYo = partida.ausencia(relojes.t);
+  const tenueYo = partida.pintadoDe(1)?.tenue === true;
+  const tenueEl2 = partida.pintadoDe(2)?.tenue === true;
+  const sentidoDel2 = partida.sentidoDe(2, relojes.t);
+  e.llega({ t: 'tic', k: 1030, ev: [{ e: 'estado', a: 1, est: EST.reaparecido, tics: 10, into: 10 }, { e: 'estado', a: 2, est: 0, tics: 0, into: 0 }] });
+  fotoConDos(1030, 0);
+  fotoConDos(1032, 0);
+  for (let i = 0; i < 12; i++) fotograma(16);
+  const deVuelta = partida.ausencia(relojes.t);
+  const tenueTrasVolver = partida.pintadoDe(1)?.tenue === true || partida.pintadoDe(2)?.tenue === true;
+  relojes.t += ROTULO_DE_LA_VUELTA_MS;
+  fotograma(16);
+  const yaNada = partida.ausencia(relojes.t);
+  comprobar(
+    'ausente, el HUD lo dice y mi cuerpo va tenue; al volver, «de vuelta» un momento y luego nada',
+    ausenteYo === 'ausente' && tenueYo && deVuelta === 'vuelta' && yaNada === null && !tenueTrasVolver,
+    { ausenteYo, tenueYo, deVuelta, yaNada },
+  );
+  comprobar('un compañero ausente se pinta tenue (y su sentido es «ausente», para su rótulo)', tenueEl2 && sentidoDel2 === 'ausente', { tenueEl2, sentidoDel2 });
+  /* Al fondo: ni un `aqui`; de vuelta, como mucho los del tope de golpe, y luego uno por tic. */
+  const antesDelFondo = e.leidos().length;
+  partida.callar(true);
+  for (let i = 0; i < 60; i++) fotograma(50);
+  const alFondo = e.leidos().slice(antesDelFondo).filter((m) => m.t === 'aqui').length;
+  partida.callar(false);
+  fotograma(50);
+  const rafaga = e.leidos().slice(antesDelFondo).filter((m): m is Aqui => m.t === 'aqui');
+  for (let i = 0; i < 10; i++) fotograma(50);
+  const despues = e.leidos().slice(antesDelFondo).filter((m): m is Aqui => m.t === 'aqui').map((m) => m.n);
+  const seguidos = despues.slice(rafaga.length).every((n, i, xs) => i === 0 || n === (xs[i - 1] as number) + 1);
+  comprobar(
+    'al fondo el aparato se calla (3 s sin un `aqui`: la sala lo da por ausente) y al volver manda como mucho la ráfaga del tope y luego uno por tic',
+    alFondo === 0 && rafaga.length >= 1 && rafaga.length <= TOPE_DE_AQUIS_DE_GOLPE && despues.length >= rafaga.length + 9 && seguidos,
+    { alFondo, rafaga: rafaga.length, despues: despues.length },
+  );
+
+  /* ── La Acometida ajena, entera; la propia, en el instante de su anuncio ── */
+  const tiradorX = yoX + 1100;
+  const k2 = 1200;
+  e.llega({ t: 'tic', k: k2, ev: [{ e: 'nace', id: 20, clase: 3, x: tiradorX, z: yoZ + 300, r: 0 }] });
+  e.llega({ t: 'foto', k: k2, p: [[2, yoX, yoZ + 300, 64, 0, 0], [20, tiradorX, yoZ + 300, 192, 0, 0]] });
+  e.llega({ t: 'foto', k: k2 + 2, p: [[2, yoX, yoZ + 300, 64, 0, 0], [20, tiradorX, yoZ + 300, 192, 0, 0]] });
+  for (let i = 0; i < 12; i++) fotograma(16);
+  const msCanal = Math.floor(relojes.t - origen);
+  e.llega({ t: 'tic', k: k2 + 10, ev: [{ e: 'anuncio', id: 77, de: 2, a: 20, acc: ACC.replica, t: msCanal + 650, x: yoX, z: yoZ + 300 }] });
+  for (let i = 0; i < 40; i++) fotograma(16);
+  const alLlegar = partida.pintadoDe(2);
+  const tirador = partida.pintadoDe(20);
+  const queda = alLlegar === null || tirador === null ? Number.NaN : Math.hypot(alLlegar.x - tirador.x, alLlegar.z - tirador.z);
+  const vuela = alLlegar?.gesto === 'avance';
+  /* La misma Réplica, con su anuncio corto (tras un quiebro cuerpo a cuerpo), no vuela. */
+  for (let i = 0; i < 80; i++) fotograma(16);
+  const msCanal2 = Math.floor(relojes.t - origen);
+  e.llega({ t: 'foto', k: k2 + 200, p: [[2, yoX, yoZ + 300, 64, 0, 0], [20, tiradorX, yoZ + 300, 192, 0, 0]] });
+  e.llega({ t: 'foto', k: k2 + 202, p: [[2, yoX, yoZ + 300, 64, 0, 0], [20, tiradorX, yoZ + 300, 192, 0, 0]] });
+  for (let i = 0; i < 70; i++) fotograma(16);
+  e.llega({ t: 'tic', k: k2 + 230, ev: [{ e: 'anuncio', id: 78, de: 2, a: 20, acc: ACC.replica, t: Math.floor(relojes.t - origen) + 150, x: yoX, z: yoZ + 300 }] });
+  for (let i = 0; i < 12; i++) fotograma(16);
+  const corta = partida.pintadoDe(2);
+  const quedaCorta = corta === null || tirador === null ? Number.NaN : Math.hypot(corta.x - tiradorX / 100, corta.z - (yoZ + 300) / 100);
+  void msCanal2;
+  comprobar(
+    'la Acometida de un compañero se pinta ENTERA: su guion vuela hasta el tirador (y no sólo el avance de la Réplica) y llega al impacto',
+    vuela && queda < (REGLAS.acciones.find((a) => a.id === ACC.replica)?.alcance ?? 0) / UNO + 0.3,
+    { queda, gesto: alLlegar?.gesto },
+  );
+  const avanceDeLaReplica = (REGLAS.acciones.find((a) => a.id === ACC.replica)?.avance ?? 0) / UNO;
+  comprobar(
+    'la misma Réplica con su anuncio corto (tras un quiebro cuerpo a cuerpo) no vuela: avanza lo suyo y no más',
+    quedaCorta > 11 - avanceDeLaReplica - 0.3 && corta?.gesto !== 'avance',
+    { quedaCorta, avanceDeLaReplica, gesto: corta?.gesto },
+  );
+  /* La mía: la limpia contra la bala y el anuncio de mi Réplica en el mismo lote, el anuncio DELANTE. */
+  for (let i = 0; i < 80; i++) fotograma(16);
+  const impactoMio = Math.floor(relojes.t - origen) + 700;
+  /* Un Celador a 3 m al norte, en el cono de la cámara: el blanco que GOLPE buscaría a media Acometida. */
+  e.llega({ t: 'tic', k: k2 + 298, ev: [{ e: 'nace', id: 21, clase: 1, x: yoX, z: yoZ - 300, r: 128 }] });
+  e.llega({ t: 'tic', k: k2 + 300, ev: [{ e: 'bala', id: 90, de: 20, p: 1, x: tiradorX, z: yoZ, r: 192, t: Math.floor(relojes.t - origen) - 100 }] });
+  e.llega({
+    t: 'tic',
+    k: k2 + 302,
+    ev: [
+      { e: 'anuncio', id: 91, de: 1, a: 20, acc: ACC.replica, t: impactoMio, x: yoX, z: yoZ },
+      { e: 'impacta', bala: 90, a: 1, r: RESULTADO.limpia, dano: 0, vida: 100 },
+      { e: 'estado', a: 1, est: EST.remanso, tics: 20, into: 20 },
+    ],
+  });
+  fotograma(16);
+  const mio = partida.pintadoDe(1);
+  comprobar(
+    'mi Acometida vuela con el instante del anuncio de mi Réplica aunque llegue DELANTE de la limpia en el mismo lote',
+    mio?.gesto === 'avance' && mio.impactoMs === impactoMio + origen,
+    { gesto: mio?.gesto, impacto: mio?.impactoMs, esperado: impactoMio + origen },
+  );
+  /*
+   * GOLPE A MEDIA ACOMETIDA. En el vuelo el estado es el Remanso, que no bloquea, y quien aprendió «limpio
+   * y luego GOLPE» pulsa. La sala lo tira (a media anuncio sólo vale encadenar); el aparato lo atendía, y
+   * cambiaba el vuelo por el avance de una Réplica que nunca salió, hacia el Celador de al lado: la
+   * Acometida acababa lejos del tirador.
+   */
+  const tiradorQuieto = { x: tiradorX / 100, z: (yoZ + 300) / 100 };
+  const aDe = (c: { x: number; z: number } | null): number => (c === null ? Number.NaN : Math.hypot(c.x - tiradorQuieto.x, c.z - tiradorQuieto.z));
+  const alQuebrar = aDe(partida.pintadoDe(1));
+  const leidosAntesDelGolpe = e.leidos().length;
+  const atendidasAntes = partida.pulsacionesAtendidas.length;
+  for (let i = 0; i < 7; i++) fotograma(16);
+  mandos.pulsar('golpe', relojes.t);
+  /* Del tirador, fotograma a fotograma: volando hacia él, la distancia no crece nunca. */
+  let seAleja = 0;
+  let antesDelFotograma = aDe(partida.pintadoDe(1));
+  let gestoTrasPulsar: string | undefined;
+  for (let i = 0; i < 43; i++) {
+    fotograma(16);
+    if (i === 2) gestoTrasPulsar = partida.pintadoDe(1)?.gesto;
+    const ahora = aDe(partida.pintadoDe(1));
+    seAleja = Math.max(seAleja, ahora - antesDelFotograma);
+    antesDelFotograma = ahora;
+  }
+  const alAcabarDeVolar = aDe(partida.pintadoDe(1));
+  const golpesMandados = e.leidos().slice(leidosAntesDelGolpe).filter((m): m is Aqui => m.t === 'aqui' && m.a !== 0);
+  const alcanceDeLaReplica = (REGLAS.acciones.find((a) => a.id === ACC.replica)?.alcance ?? 0) / UNO;
+  nota(`Acometida con GOLPE a los 128 ms, en el Remanso: de ${alQuebrar.toFixed(1)} m a ${alAcabarDeVolar.toFixed(1)} m del tirador, alejándose como mucho ${seAleja.toFixed(2)} m en un fotograma (alcance de la Réplica ${alcanceDeLaReplica.toFixed(1)} m)`);
+  comprobar(
+    'GOLPE a media Acometida no se manda, no cambia el gesto y no corta el vuelo: se llega al tirador sin desviarse, igual que sin tocar nada',
+    golpesMandados.length === 0 && partida.pulsacionesAtendidas.length === atendidasAntes && gestoTrasPulsar === 'avance' && alQuebrar > 8 && seAleja < 0.05 && alAcabarDeVolar < alcanceDeLaReplica + 0.5,
+    { golpesMandados: golpesMandados.map((m) => m.a), gestoTrasPulsar, alQuebrar, seAleja, alAcabarDeVolar },
+  );
+  /* Pasado el impacto sí: la pulsación vuelve a ser de la sala. */
+  for (let i = 0; i < 20; i++) fotograma(16);
+  mandos.pulsar('golpe', relojes.t);
+  fotograma(60);
+  const trasElImpacto = e.leidos().slice(leidosAntesDelGolpe).filter((m): m is Aqui => m.t === 'aqui' && m.a !== 0);
+  comprobar('pasado el impacto de la Acometida, GOLPE vuelve a mandarse', trasElImpacto.length === 1, trasElImpacto.map((m) => m.a));
+  partida.cerrar();
+
+  /* ── Soltar los mandos al irse al fondo (`mandos/fondo.ts`) y lo que manda la app ── */
+  const m = new EstadoDeLosMandos();
+  m.pulsar('golpe', 1);
+  m.ponerPalanca(0, 1, 2);
+  m.soltarTodo();
+  comprobar('soltarlo todo tira también las pulsaciones sin atender (un GOLPE de antes de irse no sale al volver)', m.tomarPulsaciones().length === 0 && m.fuerza === 0);
+  /*
+   * EL PUENTE DE LA APP, LEÍDO Y NO IMPORTADO: `verify:fronteras` no deja que `escritorio/` importe de
+   * `app/` (la primera versión lo importaba, y la batería entera salía roja por ello). De su fuente se
+   * sacan el nombre del evento y la plantilla del guion que la app inyecta, y la plantilla se evalúa TAL
+   * CUAL con esos dos nombres: lo que se prueba es lo que la app manda.
+   */
+  const puenteDeLaApp = readFileSync(new URL('../../app/src/arcade/quiebro-puente.ts', import.meta.url), 'utf8');
+  const EVENTO_DEL_FONDO_DE_LA_APP = /export const EVENTO_DEL_FONDO = '([^'\n]+)';/.exec(puenteDeLaApp)?.[1] ?? '';
+  const plantillaDelFondo = /export function guionDelFondo\(alFondo: boolean\): string \{\s*return (`[^`]*`);\s*\}/.exec(puenteDeLaApp)?.[1] ?? null;
+  const guionDelFondo = (alFondo: boolean): string =>
+    plantillaDelFondo === null ? '' : String(new Function('EVENTO_DEL_FONDO', 'alFondo', `return ${plantillaDelFondo};`)(EVENTO_DEL_FONDO_DE_LA_APP, alFondo));
+  comprobar('se lee el puente de la app: el nombre del evento y la plantilla de su guion', EVENTO_DEL_FONDO_DE_LA_APP.length > 0 && plantillaDelFondo !== null);
+  const ventana = new EventTarget() as EventTarget & Record<string, unknown>;
+  const documento = new EventTarget() as EventTarget & { visibilityState: string; pointerLockElement: unknown; exitPointerLock: () => void };
+  documento.visibilityState = 'visible';
+  documento.pointerLockElement = null;
+  documento.exitPointerLock = () => undefined;
+  const g = globalThis as unknown as Record<string, unknown>;
+  const antesW = g.window;
+  const antesD = g.document;
+  g.window = ventana;
+  g.document = documento;
+  try {
+    const avisos: boolean[] = [];
+    const dejar = escucharElFondo((f) => avisos.push(f));
+    documento.visibilityState = 'hidden';
+    documento.dispatchEvent(new Event('visibilitychange'));
+    documento.visibilityState = 'visible';
+    documento.dispatchEvent(new Event('visibilitychange'));
+    ventana.dispatchEvent(new Event('pagehide'));
+    ventana.dispatchEvent(new Event('pageshow'));
+    /* Lo que mete la app con `injectJavaScript`, tal cual. */
+    new Function(guionDelFondo(true))();
+    new Function(guionDelFondo(false))();
+    dejar();
+    comprobar(
+      'el fondo se entera de la pestaña oculta, de la página que se va y de la app al fondo (con el guion que inyecta la app, y el mismo nombre de evento)',
+      avisos.join() === 'true,false,true,false,true,false' && EVENTO_DEL_FONDO === EVENTO_DEL_FONDO_DE_LA_APP,
+      avisos,
+    );
+    /* La app se va al fondo sin nadie escuchando (la partida se rehace entre medias) y una escucha nueva empieza. */
+    new Function(guionDelFondo(true))();
+    const avisosDeLaNueva: boolean[] = [];
+    const dejarLaNueva = escucharElFondo((f) => avisosDeLaNueva.push(f));
+    new Function(guionDelFondo(false))();
+    dejarLaNueva();
+    comprobar(
+      'una escucha que empieza con la app ya al fondo (la partida rehecha en segundo plano) nace al fondo, y vuelve con el aviso de la app',
+      avisosDeLaNueva.join() === 'true,false',
+      avisosDeLaNueva,
+    );
+    const mt = new EstadoDeLosMandos();
+    const superficie = new EventTarget() as EventTarget & HTMLElement;
+    const soltarTeclado = engancharElTeclado(mt, { superficie, activo: () => true });
+    const tecla = new Event('keydown') as Event & { code: string; repeat: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean };
+    Object.assign(tecla, { code: 'KeyW', repeat: false, ctrlKey: false, metaKey: false, altKey: false });
+    ventana.dispatchEvent(tecla);
+    const conLaW = mt.fuerza;
+    ventana.dispatchEvent(new CustomEvent(EVENTO_DEL_FONDO, { detail: true }));
+    const trasElFondo = mt.fuerza;
+    soltarTeclado();
+    comprobar('con la W pisada, la app al fondo suelta el teclado (la palanca a cero)', conLaW > 0 && trasElFondo === 0, { conLaW, trasElFondo });
+  } finally {
+    g.window = antesW;
+    g.document = antesD;
+  }
+  const leerFuente = (ruta: string): string => sinComentariosDe(readFileSync(new URL(ruta, import.meta.url), 'utf8'));
+  const tactil = leerFuente('../src/quiebro/mandos/Tactil.tsx');
+  comprobar(
+    'los mandos táctiles sueltan los dedos al perder el foco y al irse al fondo (no sólo el teclado)',
+    /addEventListener\('blur'/.test(tactil) && /escucharElFondo\(/.test(tactil) && /mandos\.soltarTodo\(\)/.test(tactil) && /d\.palanca = null/.test(tactil),
+  );
+  const documentoDeLaApp = leerFuente('../../app/src/arcade/quiebro-documento.tsx');
+  comprobar('el WebView de la app avisa al documento al pasar a segundo plano y al volver (`AppState` → `guionDelFondo`)', /AppState\.addEventListener\('change'/.test(documentoDeLaApp) && /injectJavaScript\(guionDelFondo\(/.test(documentoDeLaApp));
+  const juego = leerFuente('../src/quiebro/Quiebro.tsx');
+  comprobar('el juego escucha el fondo, suelta los mandos y calla la partida', /escucharElFondo\(/.test(juego) && /partida\?\.callar\(fondo\)/.test(juego) && /mandos\.soltarTodo\(\)/.test(juego));
+
+  /* ── Otra pestaña se sienta en la mesa con su código ── */
+  const pedidas: { ruta: string; init: RequestInit | undefined }[] = [];
+  const buscar = async (ruta: string, init?: RequestInit): Promise<Response> => {
+    pedidas.push({ ruta, init });
+    if (init?.method === 'POST') return new Response(JSON.stringify({ asiento: 'a2', llave: 'otra-llave', mesa: { codigo: 'QUIEB', rev: 7, yo: 'a2', vista: {}, opciones: [] } }), { status: 200 });
+    return new Promise<Response>((_, rechazar) => init?.signal?.addEventListener('abort', () => rechazar(new Error('cortado'))));
+  };
+  const segunda = await PuertoDePrueba.entrar(buscar, 'QUIEB', 'Prueba');
+  const cuerpoDeEntrar = JSON.parse(String(pedidas[0]?.init?.body ?? '{}')) as { arcade?: string };
+  comprobar(
+    'con `&codigo=` el puerto de prueba se SIENTA en esa mesa (POST …/:codigo/asientos, del arcade quiebro) y no abre otra; la llave, en memoria y nunca en una dirección',
+    pedidas[0]?.ruta === '/api/arcade/mesas/QUIEB/asientos' && cuerpoDeEntrar.arcade === 'quiebro' && segunda.yo === 'a2' && segunda.llave === 'otra-llave' && pedidas.every((q) => !q.ruta.includes('otra-llave')),
+    pedidas.map((q) => q.ruta),
+  );
+  segunda.cerrar();
+  const doc = leerFuente('../src/quiebro/documento.tsx');
+  comprobar(
+    'el documento de prueba pasa a la reunión la dirección con el código de ESTA mesa (sin llave), y «Otra mesa» abre una nueva',
+    /enlaceParaEntrar=\{enlaceParaEntrar\(puerto\.codigo\)\}/.test(doc) && /\?prueba=1&codigo=\$\{encodeURIComponent\(codigo\)\}/.test(doc) && /ponerALaMesa\(null\)/.test(doc),
+  );
+
+  /* ── La app vuelve a vertical al salir de la noche (Android gira con el sensor desde `orientation: default`) ── */
+  const escena = leerFuente('../../app/src/arcade/quiebro-en-tres-escena.tsx');
+  comprobar(
+    'al salir de la noche la app se bloquea en VERTICAL si no había otro bloqueo, nunca `unlockAsync` a ciegas',
+    !/unlockAsync\(/.test(escena) && /OrientationLock\.PORTRAIT_UP/.test(escena) && /lockAsync\(bloqueoAlSalir\(/.test(escena),
+  );
+})();
+
 /* ─────────────────────────────── 11. Los fuentes ─────────────────────────────── */
 
 paso('11. Los fuentes del frente');
@@ -1370,4 +1873,4 @@ paso('11. Los fuentes del frente');
   );
 }
 
-terminar(123);
+terminar(154);

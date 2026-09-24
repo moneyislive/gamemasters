@@ -121,7 +121,10 @@ function estado(id: number, bloqueaPaso: boolean, bloqueaAccion: boolean, cancel
  *     extra de su puesta. Se puede golpear desde su tic soltable.
  *   · Tocado se corta con el quiebro (la ruptura, que cuesta Foco); rescatar y descolgar, también, y
  *     además un golpe los corta.
- *   · El Remanso, el reaparecido y el ausente no bloquean nada: son intocables por su puesta.
+ *   · El Remanso y el reaparecido no bloquean nada: son intocables por su puesta.
+ *   · El ausente (§5) bloquea el paso y las acciones: es intocable y los NPC lo ignoran, y a cambio ni
+ *     anda ni pega. Sin eso, un aparato que se saltaba un tic de cada diez jugaba intocable (ver
+ *     `AQUIS_PARA_ESTAR` en `tipos-de-la-sala.ts`); la Liza lo exige.
  */
 const ESTADOS: readonly EstadoDeclarado[] = [
   estado(E.quiebro, true, true, [], false),
@@ -136,7 +139,7 @@ const ESTADOS: readonly EstadoDeclarado[] = [
   estado(E.rescatando, true, true, [A.quiebro], true),
   estado(E.descolgando, true, true, [A.quiebro], true),
   estado(E.vigia, true, true, [], false),
-  estado(E.ausente, false, false, [], false),
+  estado(E.ausente, true, true, [], false),
   estado(E.desalojable, true, true, [], false),
   estado(E.absorbiendo, true, true, [], false),
 ];
@@ -181,6 +184,11 @@ function cadena(tras: number, anuncioTics: number, alCompas: number | null): Cad
  * empuja), el Empellón que rompe la guardia, la Réplica imparable del Remanso y, con el retoque, su
  * segundo golpe. Fallar deja descolocado 8 tics, salvo la Réplica, que no se falla más que por
  * distancia.
+ *
+ * La Réplica AVANZA lo que se quebró y un metro más (`ReglasDelDesvelado.replica.avanceMetros`): quien
+ * falló contra un limpio queda clavado donde lanzó, y el quiebro de lado te ha llevado a 3,5 m de él. Es la
+ * acometida corta del §4.4; el aparato la hace (`partida.ts`, como la de la Entrada) y la sala cuenta con
+ * ella al resolver (`AccionDeclarada.avance`).
  */
 function accionesDelDesvelado(r: ReglasDelDesvelado): AccionDeclarada[] {
   const alcance = m(GOLPES.alcanceMetros);
@@ -237,7 +245,7 @@ function accionesDelDesvelado(r: ReglasDelDesvelado): AccionDeclarada[] {
       ...base,
       id: A.replica,
       anuncioTics: r.replica.anuncioTics,
-      avance: 0,
+      avance: m(r.replica.avanceMetros),
       cadena: null,
       efecto: efecto(r.replica.dano, r.replica.dano, r.replica.puntos, r.replica.puntos, derribado(r.replica.derribadoTics), 0, SIN_CHOQUE, false),
       imparable: true,
@@ -304,8 +312,14 @@ function reglasDeAsiento(r: ReglasDelDesvelado, a: AsientoDelQuiebro, c: Reglame
       primeras: { cuantas: r.quiebro.aprendiz, ventanaMs: r.quiebro.aprendizMs },
       torpe: { cada: Q.torpe.cada, enTics: Q.torpe.enTics },
       alAcertar: {
-        /* El Remanso admite además la Acometida contra una bala: hasta 10 m, y el diseño da 11 de extra. */
-        puesta: puesta(E.remanso, Q.remansoTics, Q.remansoTics, Q.remansoTics, m(Q.acometida.metros + 1)),
+        /*
+         * El Remanso no admite distancia de más: no la necesita. Lo que se recorre en él lo pone quien lo
+         * recorre —la Réplica su avance (`intentarGolpe`), la Acometida contra una bala su vuelo
+         * (`contraProyectil`, en `proyectiles.ts`), un quiebro el suyo—, cada uno con su gracia. La primera
+         * versión le daba los 11 m de la Acometida a TODO Remanso: un segundo en que el presupuesto de paso
+         * admitía teletransportarse once metros sin haber esquivado ninguna bala.
+         */
+        puesta: puesta(E.remanso, Q.remansoTics, Q.remansoTics, Q.remansoTics, 0),
         alAutor: puesta(E.descolocado, Q.descolocaAlQueFallaTics),
       },
       contraProyectil: { distancia: m(Q.acometida.metros), tics: Q.acometida.tics, accion: A.replica },

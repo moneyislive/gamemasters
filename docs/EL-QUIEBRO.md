@@ -2,7 +2,7 @@
 
 # El Quiebro: documento de diseño
 
-**Estado:** definitivo para construir la primera versión.
+**Estado:** definitivo para construir la primera versión. Puesto al día el 24-sep-2026 con lo que ya es verdad en el código (la preparación en la Bajada, el ausente momentáneo, la Acometida de 14 m, la forja propia de personajes, el alba gris): donde el diseño cambió al construirlo, este texto dice lo de hoy y, si importa, por qué.
 **Base:** «El Quiebro», que ganó con los tres jueces (media 7,5). Lleva injertos de «El Desvelo» (la avaricia y la ciudad), de «La Línea» (el nivel de noche, la Memoria del Sistema, los avisos y el rol sin cuerpo) y de «La Corriente» (el reglamento publicado en la vista, la foto por equipo y la multitud determinista). Corrige todos los fallos graves que señalaron los jueces.
 
 ---
@@ -13,7 +13,7 @@
 |---|---|---|---|
 | 1 | La plataforma grande va antes de que nadie juegue (pasaba en las cuatro propuestas) | los tres | Se invierte el orden. Primero el banco en teléfono, la lista de clips y la prueba de sensación en una plaza gris. Después, una sala de la Liza **mínima** y genérica probada con una liza de juguete. El juego va al final (§13). |
 | 2 | Ni una cifra medida en un teléfono | los tres | El banco en aparato real se hace la semana 1. Los topes de N0-N3 son provisionales hasta entonces (§8, §14). |
-| 3 | La Tanda puede verse flotante o de maniquí | jugador | Se listan los clips reales de UAL1/UAL2 antes de cerrar la Tanda, y se compran las versiones Source si faltan. La acometida es procedural, con parón y cortes de cámara. Hay un criterio con gente (§13, §14). |
+| 3 | La Tanda puede verse flotante o de maniquí | jugador | Los clips se hacen en casa, uno por gesto, en la forja de Blender (`arte/forja/`), con los golpes medidos contra su blanco y el faldón simulado. La acometida es procedural, con parón y cortes de cámara. Hay un criterio con gente (§13, §14). |
 | 4 | Variedad corta: se agota en una semana | jugador | La v1 trae avaricia de esquirlas, nivel de noche de 1 a 5, Memoria del Sistema, 6 recetas, 3 averías, 6 retoques y 3 estilos (§6). |
 | 5 | La ciudad es un telón (una glorieta con muros) | jugador, espectáculo | La Llamada es una carrera de 60-110 m por las calles del barrio, con gente y tráfico. Se añaden la Bajada y el Amanecer (§5, §8). |
 | 6 | El desfase de reloj vuelve aleatorio el quiebro limpio | técnica | El anuncio viaja traducido al reloj de cada destinatario. El quiebro se juzga en el reloj del propio aparato, con milisegundos (§4.3, §12). |
@@ -65,11 +65,11 @@ Cabe en una frase: **«ser quien ve venir el golpe»**.
 | t | Qué pasa | Qué se aprende |
 |---|---|---|
 | 0-3 s | Una azotea bajo la lluvia, con la ciudad abajo, y un único botón: **BAJAR**. Ese toque desbloquea el audio. La carga empezó al tocar la tarjeta. | Nada todavía: solo la promesa |
-| 3-8 s | **La Bajada.** La cámara cae entre fachadas mientras el barrio se escribe en alambre de glifos y se viste. Aparece el rótulo «Glorieta del Relojero, 3:12». La Bajada tapa la derivación del mundo, la carga y la conexión del canal. | El tono |
-| 8-12 s | La palanca nace donde apoyas el pulgar: «Muévete». Dos durmientes se paran en la acera, tiemblan en glifos y echan a andar hacia ti **con su misma ropa**: son Prestados. | Moverse, y que la gente puede volverse contra ti |
-| 12-18 s | Un Prestado levanta el puño y el anillo se cierra con un silbido que sube de tono: «**QUIEBRO** cuando se cierre». En los 3 primeros quiebros de este aparato, la ventana limpia es de 300 ms. Aciertas y llega el **Remanso**: la lluvia se para. | El núcleo: leer y quebrar |
-| 18-24 s | «**¡GOLPE!**»: Réplica, Tanda con la música marcando el compás y un Cierre que lo **estampa** contra el cristal del quiosco. | Castigar con ritmo |
-| 24-30 s | El segundo Prestado te toca a ti solo. Luego llega el **Bis**: las farolas parpadean igual dos veces y una bandada de palomas despega dos veces. «Vienen más». | La señal de oleada |
+| 3-9 s | **La Bajada.** Es la preparación: la cámara espera en lo alto, dando la vuelta despacio sobre la plaza, mientras el barrio se escribe en alambre de glifos y se viste, con el rótulo «Glorieta del Relojero, 3:12». Se elige estilo o se pulsa **BAJAR** («me quedo con el mío»); en cuanto están todos, la cámara cae entre fachadas hasta el hombro. Con todos listos al llegar dura 6 s, contados desde que empezó; si alguien sigue eligiendo, hasta 15 (y el resto de la tabla se corre con ella). La Bajada tapa la derivación del mundo, la carga y la conexión del canal. | El tono, y el estilo |
+| 9-13 s | La palanca nace donde apoyas el pulgar: «Muévete». Dos durmientes se paran en la acera, tiemblan en glifos y echan a andar hacia ti **con su misma ropa**: son Prestados. | Moverse, y que la gente puede volverse contra ti |
+| 13-19 s | Un Prestado levanta el puño y el anillo se cierra con un silbido que sube de tono: «**QUIEBRO** cuando se cierre». En los 3 primeros quiebros de este aparato, la ventana limpia es de 300 ms. Aciertas y llega el **Remanso**: la lluvia se para. | El núcleo: leer y quebrar |
+| 19-25 s | «**¡GOLPE!**»: Réplica, Tanda con la música marcando el compás y un Cierre que lo **estampa** contra el cristal del quiosco. | Castigar con ritmo |
+| 25-31 s | El segundo Prestado te toca a ti solo. Luego llega el **Bis**: las farolas parpadean igual dos veces y una bandada de palomas despega dos veces. «Vienen más». | La señal de oleada |
 
 ### 2.2 Bucle de 30 segundos (combate): leer, quebrar, castigar, desalojar
 
@@ -83,13 +83,13 @@ Cada ciclo dura 6-10 s y deja Foco, puntos, esquirlas y un plano de cine.
 
 ### 2.3 Bucle de una partida: una **noche** de 6 a 10 minutos
 
-Bajada (6 s) → **Oleada 1** (Prestados) → pausa con retoque → **Oleada 2** (primer Celador) → pausa con retoque → **Oleada 3** (con Celador tirador) → pausa con retoque y **voto: «Llamar ya» o «Aguantar»** → hasta 2 **oleadas de propina** → **Bis** → **La Llamada**, una carrera a la cabina → Amanecer y recuento.
+Bajada (la preparación, de 6 a 15 s) → **Oleada 1** (Prestados) → pausa con retoque → **Oleada 2** (primer Celador) → pausa con retoque → **Oleada 3** (con Celador tirador) → pausa con retoque y **voto: «Llamar ya» o «Aguantar»** → hasta 2 **oleadas de propina** → **Bis** → **La Llamada**, una carrera a la cabina → Amanecer y recuento.
 
 La tensión sube por tres vías. Las oleadas escalan. La avaricia pesa: las esquirlas solo valen si sales por la cabina. Y las monedas del equipo son el colchón común: si se acaban, se pierde.
 
 ### 2.4 Bucle de sesión: varias noches en la misma mesa
 
-«**Otra noche**» es una ronda nueva de la **misma mesa**: no hace falta lobby, código nuevo ni apertura del limitador. Trae un barrio nuevo (la semilla es el código más el número de noche), una avería, una receta y una contramedida de la Memoria del Sistema. Además, el **nivel de noche** sube si ganasteis y baja si perdisteis.
+«**Otra noche**» es una ronda nueva de la **misma mesa**: no hace falta lobby, código nuevo ni apertura del limitador. Trae un barrio nuevo (la semilla es el código más el número de noche), una avería (desde la segunda noche: la primera es la del aprendiz y va sin ninguna), una receta y una contramedida de la Memoria del Sistema. Además, el **nivel de noche** sube si ganasteis y baja si perdisteis.
 
 Lo que empuja a jugar «una más»:
 - la escalera de niveles, de Llovizna a Tormenta;
@@ -110,7 +110,7 @@ Lo que empuja a jugar «una más»:
 - «**Abrir mesa**»: da código y enlace para compartir.
 - «**Entrar con código**».
 
-**Elección de rol: tres ESTILOS** por asiento. Se eligen en la reunión y entre noches, como movimiento de mesa. En la v1 solo cambian números; las habilidades de Foco 100 llegan en la fase 2.
+**Elección de rol: tres ESTILOS** por asiento. Se eligen en la **Bajada**, que es la preparación de cada noche, y entre noches (recuento y final), como movimiento de mesa; elegir estilo en la Bajada ya es decir que se está listo. En la reunión se enseñan, con sus cifras, pero no se eligen: la mesa de la plataforma se cierra a los que llegan en cuanto un asiento cambia el estado, y un estilo elegido mientras se espera a los amigos les dejaría fuera con el código en la mano. En la v1 solo cambian números; las habilidades de Foco 100 llegan en la fase 2.
 
 | Estilo | Aguante | Quiebro | Golpes | Rasgo | Papel que invita a hacer |
 |---|---|---|---|---|---|
@@ -144,7 +144,7 @@ La presión se reparte con **turnos de ataque**, al estilo de los brawlers:
 - En la cabina se forma una cola bajo presión: 6 × 1,5 s = 9 s.
 - La cámara automática solo encuadra tu blanco enganchado y a ti. Los anillos que no son tuyos se pintan en tenue.
 
-**NPC que llenan huecos.** No hacen falta aliados del servidor. El número de enemigos escala con **n**, los desvelados presentes al empezar cada oleada. Un asiento ausente (sin canal durante 60 s) deja de contar en la oleada siguiente.
+**NPC que llenan huecos.** No hacen falta aliados del servidor. El número de enemigos escala con **n**, los desvelados presentes al empezar cada oleada. Un asiento ausente (sin canal durante 60 s, o 60 s seguidos de ausente momentáneo, §5) deja de contar en la oleada siguiente.
 
 **Modos posteriores, que reutilizan la misma pelea:**
 - **La Azotea** (fase 3): todos contra todos, de 2 a 6 jugadores.
@@ -172,7 +172,7 @@ La presión se reparte con **turnos de ataque**, al estilo de los brawlers:
 - Se acelera de 0 a 5 m/s en 3 tics. El giro es libre, con desplazamiento lateral relativo a la cámara.
 - **Presupuesto corto** (el servidor valida el SITIO): 7,0 × 1,25 = **8,75 m/s**, con 1 s acumulable como mucho.
 - **Presupuesto largo**: **80 m cada 10 s**. Impide ir con holgura permanente, y lo suspenden los estados que llevan distancia extra.
-- **Extras por estado**: quiebro +4,0 m, Entrada +5,5 m, acometida contra bala +11 m y ser empujado +5 m. En el estado *descolocado* el presupuesto es 0.
+- **Extras por estado**: quiebro +4,0 m, Entrada +5,5 m, la Acometida contra bala su vuelo más el avance de su Réplica (14 m + 3,5 a 5,5 m) y ser empujado +5 m. En el estado *descolocado* el presupuesto es 0. El Remanso no admite distancia de más: cada desplazamiento pone la suya.
 - No hay salto en la v1. Los bancos, quioscos y coches aparcados son estructura y se rodean. Saltar vallas llega en la fase 2 como estado «en el aire».
 
 ### 4.3 El Quiebro, el quiebro limpio y cómo se juzga
@@ -205,7 +205,7 @@ Con un quiebro limpio, el **servidor arbitra** esto:
 - el que falló queda **DESCOLOCADO 20 tics**, clavado;
 - **+35 de Foco**;
 - **Réplica:** anuncio de 3 tics, imparable (ni se esquiva ni se para), 25 de daño y derribado. Se pierde si no se usa dentro del Remanso;
-- contra una **bala**, el limpio da **Acometida**: vuelas hasta 10 m hacia el tirador en 8 tics y terminas en Réplica.
+- contra una **bala**, el limpio da **Acometida**: vuelas hasta **14 m** hacia el tirador en **10 tics** y terminas en Réplica. La sala la lanza en el mismo tic de la limpia, como un solo golpe: su anuncio sale ya (todos ven la acometida entera, y los demás aparatos la pintan volando) y su impacto cae cuando el aparato termina de volar y de golpear. El diseño decía 10 m en 8 tics, y con el avance de la Réplica (de 3,5 m la Mole a 5,5 m la Ligera) y su alcance (2,3 m) no llegaba a un tirador a más de 15,8-16,8 m; el tirador se pone hasta a 18. Con 14 m llega siempre (decisión del coordinador, 24-sep). A media Acometida, GOLPE no hace nada: con un golpe propio anunciado, la sala sólo atiende el eslabón siguiente dentro de su ventana (el segundo golpe de la Réplica doble), y el aparato tampoco lo manda ni corta el vuelo. La primera versión del cliente sí lo atendía, y quien pulsaba «limpio y luego GOLPE» contra una bala se quedaba parado a seis metros del tirador.
 
 **Presentación en el cliente.** Es adorno de una ventaja ya arbitrada:
 - El reloj con que se pintan los **cuerpos ajenos** y el adorno (lluvia, civiles, partículas) va a ×0,3 durante 0,45 s, y después a ×1,6 hasta recuperar unos 315 ms. En total, unos 1,0 s.
@@ -223,7 +223,7 @@ Con un quiebro limpio, el **servidor arbitra** esto:
 | **Seguida** ×2 | 5 tics (**4 a compás**) | 10 (**15 a compás**) | Tocado 10 tics |
 | **Cierre** | 7 tics | 20 | Derribado 30 tics, empuje de 3 m |
 
-- **Impacto válido:** el blanco está a 2,3 m o menos (1,1 m de alcance más la holgura de interpolación).
+- **Impacto válido:** el blanco está a 2,3 m o menos (1,1 m de alcance más la holgura de interpolación). Un golpe con avance (la Entrada, la Réplica) lo anda el APARATO en cuanto se pulsa; la sala sólo le da por andado lo que puede ir de camino en los `aqui` que aún no ha visto (un tic por tic sin ver, como mucho `comp` más uno), nunca lo que no anduvo: quien no avanza falla más allá de unos 2,3 m.
 - **Fallo:** blanco lejos, blanco que quiebra o guardia. Deja **DESCOLOCADO 8 tics**.
 - **Encadenar:** se pulsa entre −100 y +250 ms respecto del impacto anterior. **A compás** es a ±75 ms. Se juzga en el reloj del aparato frente al impacto que él mismo pintó, así que no depende de la red. A compás es una **bonificación** (+5 de daño y +5 de Foco) y nunca hace falta para avanzar. **Plan B:** si en el banco la tasa a compás baja del 15 %, el reglamento lo ensancha a ±100 ms.
 - La pulsación hecha durante la recuperación se guarda 3 tics.
@@ -363,10 +363,10 @@ Todo se multiplica por la racha (hasta ×2) y por el factor de nivel. El recuent
 ## 5. Flujo de partida, victoria y revancha
 
 1. **Reunión** (vestíbulo de la casa con tema propio en la v1; el Bar Desvelo en la fase 2).
-   - Cada asiento elige estilo. Se ve el código.
+   - Se ven el código y los tres estilos con sus cifras; el estilo se elige en la Bajada (§3).
    - Cualquiera pulsa EMPEZAR: con 1 asiento en «Jugar ya», con 1 o más en una mesa abierta.
    - **Al empezar, la mesa se cierra.**
-2. **Bajada** (6 s): barrio, avería y contramedida en el rótulo.
+2. **Bajada: la preparación** (hasta 15 s): barrio, nivel, avería y contramedida en el rótulo, y el reloj. Cada asiento elige estilo o pulsa **BAJAR** (el movimiento `listo`, «me quedo con el mío»); elegir estilo también cuenta como listo, y se cambia una vez por tramo. Se ve quién falta. Con todos listos, el reloj pasa a ser el de la caída, 6 s contados desde que empezó la Bajada (o ninguno, si ya pasaron), y la cámara cae entre fachadas en lo que quede; si la Bajada acaba antes de que haya caído, la caída sigue un par de segundos dentro de la oleada. Sin todos, a los 15 s se baja igual.
 3. **Oleada** (≤150 s), luego **Pausa** (15 s):
    - cada asiento elige 1 de los **3 retoques** que le ofrece la vista;
    - desde la oleada 3, además, **vota** «Llamar ya» o «Aguantar»;
@@ -390,7 +390,7 @@ Todo se multiplica por la racha (hasta ×2) y por el factor de nivel. El recuent
 
 **Desconexiones y despliegues:**
 - quien se cae tiene 60 s de gracia; después es un asiento **ausente**, porque no hay verbo para levantarse, y la siguiente oleada escala a los presentes;
-- pestaña oculta o llamada entrante: a los 2 s sin `aqui` pasa a *ausente momentáneo*, queda intocable y los NPC lo ignoran;
+- **ausente momentáneo** (pestaña oculta, llamada entrante, la app en segundo plano): a los 2 s sin un `aqui` **vivo** —el que cierra diez tics seguidos del aparato; un `aqui` que pulsa algo o se mueve también cuenta— el asiento queda ausente: intocable, fuera de los turnos, ningún NPC lo persigue ni le apunta, y a cambio **ni anda ni pega** (lo que pulse no cuenta ni se guarda, y lo que había lanzado y no ha llegado se corta). Lo que venía contra él se corta sin daño. Vuelve con diez `aqui` vivos seguidos y una vuelta corta: 10 tics de intocable que corta su primera acción. El aparato, al irse al fondo, suelta todos los mandos y **deja de mandar** (la app se lo dice al documento del WebView con su `AppState`), así que la sala lo sabe también en los aparatos que no frenan sus temporizadores; el HUD lo dice con un panel al volver, y a los compañeros se les ve tenues con su rótulo encima. Para «se fue» (y no contar en la oleada siguiente) el ausente se suma entero en la fase: 60 s;
 - un **despliegue** cierra el canal con 1001: la sala se rehace desde la mesa y **reanuda la oleada en curso desde su principio**, con aguante lleno y las esquirlas y monedas del último punto de control. Como mucho se pierde una oleada;
 - si durante una fase de juego llegan dos tics perezosos seguidos sin ningún veredicto entre medias (sala muerta sin nadie), la noche pasa a «interrumpida», con las opciones **Reanudar** y **Rendirse**.
 
@@ -410,13 +410,13 @@ Todo se multiplica por la racha (hasta ×2) y por el factor de nivel. El recuent
    - Marea: Prestados continuos contra un tope de vivos.
    - Francotirador: tirador en un borde con Prestados de escolta.
    - Emboscada: la impresión nace detrás del grupo.
-3. **Averías** (una por noche, sorteada con la semilla). La v1 trae 3 más «ninguna»:
+3. **Averías** (una por noche desde la segunda, barajadas por mesa: la primera noche es la del aprendiz y va sin avería). La v1 trae 3 más «ninguna»:
    - **Eco:** cada ataque enemigo se repite como fantasma 1 s después en el mismo sitio. Hay que quebrar dos veces.
    - **Cristal:** todos a media vida y puntos ×1,5.
    - **Apagón:** las farolas se apagan; los enemigos pierden el contorno a más de 15 m, igual para todos los aparatos.
    La fase 2 añade Hora punta, Compás, Plomo, Resbalón y Prisa.
 4. **Retoques.** Se elige 1 de 3 en cada pausa. La v1 trae 6:
-   - **Paso largo:** quiebro de 5 m y +1 tic de intocable.
+   - **Paso largo:** +1,5 m sobre el quiebro de su estilo (la Gabardina llega a los 5 m; cada estilo conserva su diferencia) y 50 ms más de esquiva, que es el «+1 tic de intocable» en el reloj del aparato.
    - **Ventana ancha:** +50 ms de ventana limpia.
    - **Réplica doble:** 25 + 15.
    - **Puño de plomo:** empujes de 5 m y estampado +25.
@@ -491,6 +491,8 @@ El mando de consola (Gamepad API) llega en la fase 2.
 
 - **Cámara:** al hombro, a 3,2 m detrás y 1,7 m de alto. Campo de visión de 75° en el móvil y 70° en PC. Se abre a 4 m con enemigos a menos de 5 m. No atraviesa paredes (segmento-AABB contra estructura) y no se balancea al correr.
 - **HUD:**
+  - en la Bajada, la preparación: el reloj de verdad, los estilos que se pueden elegir, BAJAR y quién falta;
+  - el ausente: un panel en el centro mientras la sala te tiene por ausente, «De vuelta» al volver, y el rótulo sobre el compañero ausente;
   - barra de aguante y anillo de Foco;
   - esquirlas «n → valor» y monedas;
   - el reloj de la oleada o de la Llamada;
@@ -531,15 +533,15 @@ Lo ocupan quien está desconectado esperando y quien ya salió por la cabina.
   - fuera del límite jugable (balcones, calles cortadas, tras las vallas) hay **gente de fondo** cuya densidad sí depende del nivel.
 - **Tráfico:** coches en marcha solo en las avenidas exteriores y en las calles cortadas. Dentro del área jugable solo hay coches **aparcados**, que son estructura.
 - **Cielo:** tras la niebla, columnas tenues de la Grafía que suben.
+- **La luz del barrio** sale de la hora de la noche (la misma en todos los aparatos): de la 1:00 a las 2:59, **madrugada** de sodio; de las 3:00 a las 4:59, **alba gris**, un cielo cubierto verde-gris sin sol, luz difusa, niebla en capas que se come los bajos y las torres lejanas en silueta, con las farolas aún encendidas y pocas ventanas con luz; cuanto más tarde, más clara.
 
-**Personajes** (CC0):
-- Universal Base Characters de Quaternius, reducidos al compilar a unos 8.000 triángulos el propio y unos 4.000 los NPC y compañeros.
-- Trajes de MakeHuman (suits01) para los Celadores y gafas modeladas en casa (menos de 300 triángulos).
-- Tres atuendos de desvelado (gabardina, chaqueta corta y abrigo grueso), con el forro y el contorno del color del asiento.
-- Durmientes: 2 cuerpos × 4 ropas, con paraguas.
-- Animaciones de UAL1 y UAL2 (locomoción, combos, esquivas, reacciones, caídas, pistola, «usar»).
-- Los Prestados lejanos (a más de 12 m) usan el mismo VAT que los durmientes; solo los cercanos llevan esqueleto.
-- Como todos los clientes son motores de navegador, se admiten texturas PNG. El tope de descarga para la primera noche en N0 es de **8 MB**; el resto baja en segundo plano, con 20 MB en total como mucho.
+**Personajes: la forja propia** (`arte/forja/`, creación propia; nada descargado). El borrador contaba con Quaternius, MakeHuman y los paquetes de animación UAL; al construirlo se hicieron en casa, por código, con Blender 4.2 sin ventana (campos de distancia, *surface nets*, pesos, animación y exportación):
+- **Seis desvelados**: hombre y mujer con Gabardina, Ligera y Mole, con el forro del color del asiento. LOD0 de unos 8.000 triángulos, LOD1 de 4.000 y LOD2 de 1.000.
+- **Cuatro Celadores** (alto y enjuto, ancho, mujer y mayor con sombrero; el tirador es el mismo con la pistola en la mano), con gafas de cinco monturas, ninguna redonda, y el traje de una de cuatro telas.
+- **Durmientes**: 2 cuerpos × 4 ropas de calle, con paraguas; y un LOD3, el maniquí de unos 400 triángulos de la multitud.
+- **Los clips**, uno por gesto del juego (46, con sus variantes por dirección y por clase): locomoción, la Tanda, esquivas, reacciones, caídas, pistola, «usar»; los golpes medidos contra su blanco y el faldón simulado.
+- En el cliente, **una llamada por cuerpo** (las zonas de material fundidas en una geometría con su paleta, y el contorno en el mismo sombreador). Los cuerpos lejanos sin esqueleto y la multitud van en **rebaños** con los huesos horneados en textura: los desvelados lejanos, en el maniquí del primer estilo de su cuerpo teñido con el color de SU estilo y el de su asiento (dos llamadas y no seis); los Prestados, en el de los durmientes. Sólo los cercanos llevan esqueleto.
+- El reparto entero comprimido (meshopt) pesa unos 5,5 MB y la primera noche en N0 unos 3,1. El tope de descarga para la primera noche en N0 sigue en **8 MB**, con 20 MB en total como mucho.
 
 **Momentos de espectáculo (lo que tiene que lucir):**
 1. **La Bajada.** Caída entre fachadas mientras el barrio se escribe en alambre de glifos y se viste.
@@ -574,6 +576,8 @@ Lo ocupan quien está desconectado esperando y quien ya salió por la cabina.
 | Gente de fondo y coches en marcha | 0 / 4 | 24 / 8 | 60 / 16 | 120 / 30 |
 | Esqueletos de NPC | Los cercanos, animación lejana a 7 Hz | Hasta 12 | Hasta 20 | Hasta 20 |
 | Topes provisionales | 150.000 triángulos, 60 llamadas | 250.000, 90 | 600.000, 150 | 1.500.000, 250 |
+
+**El presupuesto se juzga con el juego entero delante.** Cada pieza declara su renglón (los personajes, un cuarto de cada tope), pero lo que manda es el tope del juego entero. Medido en el juego real el 24-sep (`/sala/quiebro.html?prueba=1`, una noche en solitario con enemigos en pantalla, cada nivel forzado, `renderer.info` de la escena), lo que no son personajes gasta en el peor fotograma 25 llamadas en N0, 23 en N1, 23 en N2 y 18 en N3 (y 38.000, 91.000, 176.000 y 125.000 triángulos); con el peor caso de los personajes (15, 19, 31 y 39 llamadas) queda muy por debajo de 60, 90, 150 y 250. Los seis estilos de la forja, cada uno en su rebaño, pasaban a los personajes de su cuarto en N0 y N1; se juntaron los rebaños de los desvelados en vez de subir la cuota. Las cifras y cómo se tomaron están en `escritorio/src/quiebro/personajes/presupuesto.ts`.
 
 **Gobernador propio** (`escritorio/src/quiebro/calidad/niveles.ts`):
 - arranca en N1, o en lo que diga un sondeo que **crea de verdad** un render target HalfFloat (no se fía de `getExtension`);
@@ -636,12 +640,13 @@ Reductor puro en `shared/arcade/juegos/quiebro.ts`.
 
 | Origen | Tipo | Cuándo | Frecuencia |
 |---|---|---|---|
-| Asiento | `estilo {id}` | Reunión y final | Rara |
 | Asiento | `empezar` | Reunión | 1 |
+| Asiento | `estilo {id}` | Bajada (y deja listo) y entre noches; una vez por tramo | Rara |
+| Asiento | `listo` (BAJAR) | Bajada, a quien aún no lo está | ≤ 1 por noche |
 | Asiento | `elegir {retoque, voto}` | Pausa (una por asiento) | ≤ 6 × 5 por noche |
 | Asiento | `rendirse` / `reanudar` / `otra-noche` / `cerrar` | Según la fase | Rara |
 | Sala (`meterDeLaPlataforma`) | `arcade:ronda {n, resultado, cuentas}` | Al cerrar cada oleada y la Llamada | 4-6 por noche |
-| Sala | `arcade:reloj {id}` | Pausa vencida sin todas las elecciones | ≤ 4 por noche |
+| Sala | `arcade:reloj {id}` | Pausa o Bajada vencidas sin todos. Uno que no es el de la fase en curso (llegó tarde) entra **sin efecto**: el mismo estado, sin motivo | ≤ 5 por noche |
 | Sala | `arcade:ausente {a}` | 60 s sin canal en una fase de juego | Rara |
 
 - `cuentas` es una fila de enteros por asiento: `[asiento, puntos, esquirlas, aguante, limpios, desalojos, estampados, rescates, caidas, salio]`, más las monedas. Su significado lo declara el juego y el reductor lo valida.
@@ -653,7 +658,8 @@ Reductor puro en `shared/arcade/juegos/quiebro.ts`.
 
 - **Por asiento:**
   - sitio validado y rastro de 64 sitios;
-  - estado del cuerpo con su tic de fin (quiebro, tocado, derribado, descolocado, remanso, desconectado, rematando, descolgando, sin cuerpo);
+  - estado del cuerpo con su tic de fin (quiebro, tocado, derribado, descolocado, remanso, desconectado, rematando, descolgando, sin cuerpo, ausente);
+  - su presencia: el último `aqui` vivo, el ausente que lleva sumado en la fase y su vuelta;
   - aguante, Foco y paso de la Tanda;
   - recargas y racha;
   - **esquirlas que lleva**;
@@ -726,7 +732,7 @@ Tiene **ruta propia**: `/api/arcade/mesas/:codigo/liza`. No toca el canal v1, ni
 - Del servidor al aparato:
   - `dentro {yo, k, x, z, r, hz}`;
   - `foto {k, p}`, con tuplas `[id, x_cm, z_cm, mira, marcha, estado]`: los asientos son 1-6 y las entidades empiezan en 16;
-  - `tic {k, ev:[…]}`, que agrupa los sucesos del mismo tic: `anuncio {de, a, acc, t}` (con `t` en el reloj del destinatario), `resuelve`, `estado`, `nace`, `seva`, `bala`, `carga`, `monton`, `recoge`, `sale`, `aviso` y `fase`;
+  - `tic {k, ev:[…]}`, que agrupa los sucesos del mismo tic: `anuncio {de, a, acc, t}` (con `t` en el reloj del destinatario), `resuelve`, `estado`, `nace`, `seva`, `apunta {de, a, p, x, z, t}` (la línea de apuntado: sale al empezar a apuntar, con `t` el instante de la primera bala; `a` 0 es «lo deja»), `bala`, `carga`, `monton`, `recoge`, `sale`, `aviso` y `fase`;
   - `eco {c, k, ms}`, `corrige` y `fuera`.
 - **Medir la ida y vuelta:** el `eco` de aplicación da la mediana de las 5 últimas en el aparato, porque la API WebSocket del navegador no expone los ping de protocolo. El servidor mide además con el ping de `ws`, que los navegadores contestan solos.
 
@@ -774,11 +780,11 @@ Tiene **ruta propia**: `/api/arcade/mesas/:codigo/liza`. No toca el canal v1, ni
 
 **Aforo:**
 - presupuesto inicial del juego: el **40 %** de la instancia (unos 200 ms/s), es decir, unas **13 salas llenas o 40 solitarias**, o su mezcla;
-- la admisión se hace por coste declarado (U);
+- la admisión se hace por coste declarado (U). El Quiebro declara el **mismo aforo en todas sus mesas y fases** (20 entidades, 12 balas y 16 montones: la oleada más llena de seis, el guardián de la Llamada y los Celadores caídos que siguen ocupando su número), porque la sala se admite al nacer y no puede crecer, y en la reunión aún no se sabe cuántos se sientan. El precio: una sala en solitario se admite como si fuera llena;
 - los coeficientes se afinan con `medir:liza` en el propio plan starter;
 - si el juego triunfa, la palanca es subir de plan, no recortar la simulación.
 
-**Memoria:** unos 250 kB por sala (mundo de unas 60 cajas con su índice, grafo de 16 nudos, rastros y NPC con arrays preasignados, sin asignaciones por tic). Con 40 salas, unos 10 MB.
+**Memoria:** unos 250 kB por sala (mundo de unas 60 cajas con su índice, el grafo del barrio —los 16 cruces delante y una rejilla detrás, 404 nudos, por el que los NPC navegan con Dijkstra ponderado—, rastros y NPC con arrays preasignados, sin asignaciones por tic). Con 40 salas, unos 10 MB.
 
 **Otros costes:**
 - **Derivar el barrio** cuesta 3 ms o menos en frío, una vez por noche, con el turno de derivación.
@@ -797,10 +803,10 @@ Tiene **ruta propia**: `/api/arcade/mesas/:codigo/liza`. No toca el canal v1, ni
 - **Banco en aparato real:**
   - un Android de gama media con el WebView;
   - un iPhone por /jugar;
-  - contenido: 20 personajes UBC con esqueleto a 8.000/4.000 triángulos, 48 durmientes VAT, la glorieta de cajas, lluvia y un pase de brillo;
+  - contenido: 20 personajes de la forja con esqueleto a 8.000/4.000 triángulos, 48 durmientes en rebaño, la glorieta de cajas, lluvia y un pase de brillo;
   - se cuentan llamadas, triángulos y subidas de textura de huesos, y se comprueba si se crea un render target HalfFloat.
   - De aquí salen los topes N0-N3.
-- **Lista real de clips** de UAL1 y UAL2 Standard, abriendo los .glb. Si faltan combos, reacciones o caídas, se propone la compra de las Source (unos 15 $ cada una, siguen siendo CC0).
+- **Los clips de la forja** (`arte/forja/clips.py`), uno por gesto, con su batería (pies que no patinan, golpes que llegan, el faldón que no atraviesa las piernas). Ya no hace falta comprar nada.
 - Probar el **WebView en el APK**: `react-native-webview` y apaisado con `expo-screen-orientation`.
 
 **Hito 1. Prueba de sensación.** Un desvelado contra Prestados en una plaza gris, con servidor local y latencia inyectada de 50, 150 y 250 ms, más jitter de 30-60 ms y un desfase de reloj de ±40 ms. Se afinan los anuncios, la ventana limpia, el parón, la anticipación elástica y el Remanso. **No se sigue** hasta que:
@@ -890,7 +896,7 @@ Tiene **ruta propia**: `/api/arcade/mesas/:codigo/liza`. No toca el canal v1, ni
 |---|---|---|---|---|
 | 1 | La sensación se hunde con red móvil mala | Prueba de sensación con latencia, jitter y desfase inyectados (criterios en el hito 1) | Hito 1 | Ensanchar la ventana; alargar anuncios; «a compás» a ±100 ms |
 | 2 | Rendimiento en el WebView | Banco en aparato: llamadas, triángulos y subidas de huesos | Semana 1 | Más VAT y menos esqueletos; maniquí de 200 triángulos; menos lluvia. **Los 48 durmientes y la estructura no bajan** |
-| 3 | La Tanda se ve de maniquí | Lista de clips; 5 personas puntúan «se ve como una peli» frente a «maniquí» | Semana 1 y hito 3 | Comprar las Source; acometida procedural; cortes de cámara; parón |
+| 3 | La Tanda se ve de maniquí | Los clips de la forja; 5 personas puntúan «se ve como una peli» frente a «maniquí» | Semana 1 y hito 3 | Rehacer los clips en la forja; acometida procedural; cortes de cámara; parón |
 | 4 | Aporrear rinde tanto como leer | Robot que lee frente a robot que aporrea | Hito 1 | Quiebro torpe más estricto; más castigo al fallo |
 | 5 | La variedad se agota | Noches por mesa y vuelta al día siguiente | Pruebas con gente | Adelantar plantillas y averías de la fase 2 |
 | 6 | CPU y salida de datos en el starter | `medir:liza`: 13 salas llenas y 40 solitarias con robots; `/api/arcade/diagnostico` y la RAM | Hito 2 | Bajar el tope de NPC vivos; subir de plan |
@@ -906,7 +912,6 @@ Tiene **ruta propia**: `/api/arcade/mesas/:codigo/liza`. No toca el canal v1, ni
 
 **Pendiente de decisión de Miguel:**
 - aprobar el APK con `react-native-webview` y el apaisado (lo compila Miguel);
-- comprar las Source de UAL1 y UAL2 (unos 30 $);
 - récords persistentes por nombre (hoy viven en memoria y se pierden en cada despliegue);
 - consulta legal antes de la publicidad;
 - disciplina de despliegue en horas de juego.

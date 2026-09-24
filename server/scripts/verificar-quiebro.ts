@@ -70,6 +70,12 @@
  *     franja de la glorieta en la que la revisión dejó clavados a seis de seis;
  *   · el recuento y el final comparten el cambio de estilo: llenar el aguante otra vez al pasar al final
  *     (una línea) le devolvía a cada uno un cambio más, y sólo lo ve el aparato que machaca en el final.
+ *
+ * La tercera pasada (24-sep-2026, el pulido de las reglas de la sala) hizo de la Bajada la preparación
+ * —15 s de tope, «listo» y estilo en ella, 6 s desde el principio si están todos listos—, tomó sin efecto
+ * el reloj que llega tarde (la sala lo manda: lee la vista una vez por segundo) y dio a la Réplica su
+ * avance. Cada comprobación nueva o cambiada se vio roja en un espejo (`scratchpad/pulido-reglas-sala/
+ * roturas.py`), y el suelo quedó en 318.
  */
 import '../../shared/arcade/juegos';
 import {
@@ -431,7 +437,11 @@ paso('La Bajada: la noche 1 empieza, se elige estilo y se dice lo del aprendiz')
   comprobar('EMPEZAR se acepta', mandar(A, 's2', 'empezar', null) === null);
   const me = laMesa(A);
   const v = apuntar(A);
-  comprobar('la noche 1 empieza en la Bajada con su reloj de 6 s', me.fase.tipo === 'bajada' && me.reloj?.id === 'n1.b' && me.reloj.duraMs === 6000 && me.noche?.numero === 1);
+  comprobar(
+    'la noche 1 empieza en la Bajada con el reloj de su tope, 15 s: hasta que estén todos listos o venza',
+    me.fase.tipo === 'bajada' && me.reloj?.id === 'n1.b' && me.reloj.duraMs === 15000 && me.noche?.numero === 1,
+    me.reloj,
+  );
   comprobar(
     'la noche 1 va en Llovizna, sin avería ni contramedida, con una receta, la glorieta y 3 monedas',
     me.reglamento.nivel === 1 &&
@@ -445,7 +455,11 @@ paso('La Bajada: la noche 1 empieza, se elige estilo y se dice lo del aprendiz')
   comprobar('todos empiezan con el aguante lleno de la Gabardina, sin Foco ni esquirlas', me.asientos.every((a) => a.control.aguante === 100 && a.control.foco === 0 && a.control.esquirlas === 0));
   comprobar('con la noche empezada no se vuelve a empezar', (mandar(A, 's1', 'empezar', null) ?? '').includes('ya ha empezado'));
   const o1 = opcionesDeArcade(QUIEBRO, v, 's1').map((o) => o.id);
-  comprobar('en la Bajada se ofrecen rendirse, los otros dos estilos y el aprendiz', o1.length === 4 && o1.indexOf('rendirse') >= 0 && o1.indexOf('estilo:ligera') >= 0 && o1.indexOf('estilo:mole') >= 0 && o1.indexOf('aprendiz') >= 0 && o1.indexOf('estilo:gabardina') < 0, o1);
+  comprobar(
+    'en la Bajada se ofrecen rendirse, los otros dos estilos, «listo» y el aprendiz',
+    o1.length === 5 && o1.indexOf('rendirse') >= 0 && o1.indexOf('estilo:ligera') >= 0 && o1.indexOf('estilo:mole') >= 0 && o1.indexOf('listo') >= 0 && o1.indexOf('aprendiz') >= 0 && o1.indexOf('estilo:gabardina') < 0,
+    o1,
+  );
   comprobar('elegir el estilo que ya se lleva se rechaza (no se ofrece: sería un botón mudo)', mandar(A, 's1', 'estilo', { id: 'gabardina' }) !== null);
   comprobar(
     'elegir la Mole cambia el estilo; el punto de control se queda como se bajó (es la marca del cambio)',
@@ -460,9 +474,28 @@ paso('La Bajada: la noche 1 empieza, se elige estilo y se dice lo del aprendiz')
   comprobar('la Ligera se elige igual', mandar(A, 's2', 'estilo', { id: 'ligera' }) === null && laMesa(A).reglamento.asientos[1]?.estilo === 'ligera');
   comprobar('el aprendiz pone 3 quiebros de aprender', mandar(A, 's3', 'aprendiz', null) === null && laMesa(A).asientos[2]?.aprendiz === 3);
   comprobar('y no se vuelve a ofrecer a quien ya los tiene', mandar(A, 's3', 'aprendiz', null) !== null);
+  /*
+   * LA PREPARACIÓN DE LA BAJADA: elegir estilo es estar listo, y quien se queda con el suyo lo dice con
+   * «listo». Con todos listos el reloj pasa al de la Bajada de siempre (6 s, contados desde que empezó: la
+   * caída tapa la carga) y, si ya pasaron, vence en el acto; si no, el de 15 s.
+   */
+  const deS1 = opcionesDeArcade(QUIEBRO, vista(A), 's1').map((o) => o.id);
+  comprobar('quien ya eligió estilo está listo: no se le ofrece «listo» ni otro estilo', deS1.indexOf('listo') < 0 && deS1.every((o) => !o.startsWith('estilo:')) && laMesa(A).asientos[0]?.haElegido === true, deS1);
+  comprobar('con uno sin estar listo, sigue el reloj de 15 s', laMesa(A).reloj?.id === 'n1.b' && laMesa(A).reloj?.duraMs === 15000, laMesa(A).reloj);
+  comprobar('y la vista de la Bajada con listos se lee', leerVistaDelQuiebro(apuntar(A)) !== null);
+  comprobar(
+    'con todos listos, el reloj pasa a «n1.b.listos» de 6 s y la Bajada sigue (la caída tapa la carga)',
+    mandar(A, 's3', 'listo', null) === null && fase(A).tipo === 'bajada' && laMesa(A).reloj?.id === 'n1.b.listos' && laMesa(A).reloj?.duraMs === 6000,
+    laMesa(A).reloj,
+  );
+  comprobar('«listo» dos veces se rechaza con motivo', (mandar(A, 's3', 'listo', null) ?? '').length > 0);
+  const tarde = probar(A, null, 'arcade:reloj', { id: 'n1.b' });
+  comprobar('el reloj de 15 s que llega cuando ya se cambió entra sin efecto: el mismo objeto, sin motivo', tarde.mismo && tarde.motivo === null, tarde);
+  apuntar(A);
   comprobar('elegir retoque fuera de la pausa se rechaza con motivo', (mandar(A, 's1', 'elegir', { retoque: 'iman', voto: null }) ?? '').includes('pausa'));
   comprobar('una ronda en la Bajada se rechaza: llega fuera de su fase', (mandar(A, null, 'arcade:ronda', carga(11, 'ganada', filasIguales(A, {}), 3)) ?? '').includes('fuera de su fase'));
-  comprobar('un reloj que no es el de la fase se rechaza', (mandar(A, null, 'arcade:reloj', { id: 'n1.p1' }) ?? '').includes('no es el de la fase'));
+  const rancio = probar(A, null, 'arcade:reloj', { id: 'n1.p1' });
+  comprobar('un reloj que no es el de la fase entra SIN EFECTO: el mismo objeto, sin motivo (la sala no sabe que la mesa ya cambió)', rancio.mismo && rancio.motivo === null, rancio);
   comprobar('un reloj firmado por un asiento se rechaza', mandar(A, 's1', 'arcade:reloj', { id: 'n1.b' }) !== null);
   comprobar('un reloj con una clave de más se rechaza', mandar(A, null, 'arcade:reloj', { id: 'n1.b', extra: 1 }) !== null);
   comprobar('un movimiento de la plataforma que no es de este juego se rechaza con motivo', (mandar(A, null, 'arcade:botin', { a: 1 }) ?? '').includes('no es de El Quiebro'));
@@ -600,6 +633,12 @@ paso('Las pausas: retoques ofrecidos, elección y lo que pasa al cerrarse');
   comprobar('con uno sin elegir la pausa sigue', fase(A).tipo === 'pausa');
   mandar(A, 's3', 'elegir', { retoque: ofrecidos[2]?.[0] as IdDeRetoque, voto: null });
   comprobar('cuando han elegido todos los presentes, viene la oleada 2 sin esperar al reloj', fase(A).tipo === 'oleada' && (fase(A) as { oleada: number }).oleada === 2);
+  const tardio = probar(A, null, 'arcade:reloj', { id: 'n1.p1' });
+  comprobar(
+    'y el reloj de esa pausa, que la sala mete porque aún no se ha enterado, entra sin efecto: el mismo objeto, sin motivo',
+    tardio.mismo && tardio.motivo === null,
+    tardio,
+  );
   comprobar('fuera de la pausa no queda nada ofrecido ni elegido', laMesa(A).asientos.every((a) => a.ofrecidos.length === 0 && !a.haElegido && a.voto === null));
   apuntar(A);
 
@@ -1414,6 +1453,23 @@ paso('El productor, en lo que dice de cada cosa');
   );
   comprobar('la Tanda encadena Entrada, Seguida, Seguida y Cierre, con compás en las Seguidas', forma(r?.acciones.filter((a) => a.cadena !== null).map((a) => [a.id, a.cadena?.tras[0], a.cadena?.ritmoMs])) === forma([[2, 1, 75], [3, 2, 75], [4, 3, 0]]));
   comprobar('el Empellón rompe la guardia y la Réplica es imparable y sólo en el Remanso', r?.acciones.some((a) => a.id === ACCION_DEL_QUIEBRO.empellon && a.efecto.rompeGuardia && a.recargaTics === 60) === true && r.acciones.some((a) => a.id === ACCION_DEL_QUIEBRO.replica && a.imparable && a.soloEn[0] === ESTADO_DEL_QUIEBRO.remanso));
+  const replica = r?.acciones.find((a) => a.id === ACCION_DEL_QUIEBRO.replica);
+  comprobar(
+    'la Réplica AVANZA lo que se quebró y un metro (3,5 + 1 con la gabardina: llega tras el quiebro de lado), y el Remanso no regala distancia (antes, 11 m a todo Remanso)',
+    replica?.avance === Math.round(4.5 * UNO) && r?.esquiva.alAcertar.puesta.distanciaExtra === 0,
+    { avance: replica === undefined ? null : replica.avance / UNO, extraDelRemanso: r === undefined ? null : r.esquiva.alAcertar.puesta.distanciaExtra / UNO },
+  );
+  /*
+   * EL AUSENTE (§5) NI ANDA NI PEGA: intocable e ignorado, y a cambio bloquea el paso y las acciones. Sin eso
+   * (antes no bloqueaba nada) un aparato que se saltaba un tic de cada diez jugaba intocable, ignorado por
+   * todos y pegando (la revisión del pulido; ver `AQUIS_PARA_ESTAR` en `tipos-de-la-sala.ts`).
+   */
+  const ausente = o1.estados.find((x) => x.id === o1.presencia.estadoAusente);
+  comprobar(
+    'el ausente momentáneo es el suyo (§5) y ni anda ni pega: su estado bloquea el paso y las acciones, sin nada que lo cancele',
+    o1.presencia.estadoAusente === ESTADO_DEL_QUIEBRO.ausente && ausente !== undefined && ausente.bloqueaPaso && ausente.bloqueaAccion && ausente.cancelaCon.length === 0,
+    ausente,
+  );
   const celador = o1.clases.find((c) => c.id === CLASE_DEL_QUIEBRO.celador);
   comprobar('el Celador: 90 de vida, guardia que para la Entrada y esquiva el Empellón la mitad, y desalojable con 3 esquirlas', celador?.vida === 90 && celador.guardia?.para[0] === ACCION_DEL_QUIEBRO.entrada && celador.guardia.esquivaAlAzar.probabilidad === UNO / 2 && celador.alCaer.tipo === 'rematable' && celador.alCaer.suelta.n === 3);
   comprobar('el Trasvase: absorbe a un Prestado a 12 m, o se reimprime a 15 m y 2 s, con 45', celador?.alCaer.tipo === 'rematable' && celador.alCaer.siNo.absorbe === CLASE_DEL_QUIEBRO.prestado && celador.alCaer.siNo.vida === 45 && celador.alCaer.siNo.reapareceTras === 40);
@@ -1434,7 +1490,7 @@ paso('El productor, en lo que dice de cada cosa');
 }
 
 terminar({
-  escritas: 310,
+  escritas: 319,
   enVerde:
     'La mesa lleva la noche entera —reunión, Bajada, oleadas, pausas con voto, Llamada, recuento, final—,\n' +
     '  rechaza con motivo lo que no es y lo que llega rancio, sube y baja el nivel, recuerda la noche anterior y\n' +

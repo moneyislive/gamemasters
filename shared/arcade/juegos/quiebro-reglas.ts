@@ -200,7 +200,11 @@ export const GOLPES = {
   seguida: { anuncioTics: 5, anuncioAlCompas: 4, dano: 10, danoAlCompas: 15, tocadoTics: 10, avanceMetros: 0.5, puntos: 10, puntosAlCompas: 15 },
   cierre: { anuncioTics: 7, dano: 20, derribadoTics: 30, empujeMetros: 3, avanceMetros: 0.5, puntos: 10 },
   empellon: { anuncioTics: 10, dano: 8, tocadoTics: 24, empujeMetros: 4, recargaTics: 60, puntos: 10 },
-  replica: { anuncioTics: 3, dano: 25, derribadoTics: 30, puntos: 25 },
+  /**
+   * La Réplica avanza lo que se quebró y un metro más: tras el quiebro de lado, quien falló queda clavado
+   * donde estaba y hay que volver a él (la acometida corta; §4.4). Sin avance salía `fallada` siempre.
+   */
+  replica: { anuncioTics: 3, dano: 25, derribadoTics: 30, puntos: 25, avanceTrasElQuiebroMetros: 1 },
   replicaDoble: { anuncioTics: 3, dano: 15, puntos: 15 },
   /** Encadenar: de −100 a +250 ms del impacto anterior; a compás, ±75 ms. En el reloj del aparato. */
   cadena: { antesMs: 100, despuesMs: 250, compasMs: 75 },
@@ -227,8 +231,13 @@ export const QUIEBRO_DEL_DESVELADO = {
   remansoTics: 20,
   /** Lo que queda clavado quien falló contra un limpio. */
   descolocaAlQueFallaTics: 20,
-  /** Contra una bala: vuelas hasta 10 m hacia el tirador en 8 tics y terminas en Réplica. */
-  acometida: { metros: 10, tics: 8 },
+  /**
+   * Contra una bala: vuelas hasta 14 m hacia el tirador en 10 tics y terminas en Réplica. Los 10 m del
+   * diseño se quedaban cortos: con el avance de la Réplica (3,5 m la Mole) y su alcance (2,3 m) no se
+   * llegaba a un tirador a más de 15,8 m, y el tirador se pone hasta a 18. Así llega siempre (decisión
+   * del coordinador, 24-sep).
+   */
+  acometida: { metros: 14, tics: 10 },
   /** El quiebro de ruptura: 50 de Foco para salir de un tocado con 6 tics de intocable. */
   ruptura: { coste: 50, intocableTics: 6 },
 } as const;
@@ -279,8 +288,16 @@ export const ESQUIRLAS = { tope: 12, recogidaMetros: 1.2, montonTics: 400, porCe
  */
 export const CABINA = { suenaTics: 1000, suenaTicsCorta: 800, otraTics: 800, descolgarTics: 30, metros: 1.5 } as const;
 
-/** Cuánto dura cada fase con reloj (§5), en ms: la sala los hace vencer con `arcade:reloj`. */
-export const DURACION_MS = { bajada: 6000, pausa: 15000, recuento: 20000 } as const;
+/**
+ * Cuánto dura cada fase con reloj (§5), en ms: la sala los hace vencer con `arcade:reloj`.
+ *
+ * LA BAJADA ES TAMBIÉN LA PREPARACIÓN: el estilo sólo se puede elegir ahí (en la reunión cerraría la mesa
+ * a los que aún no han llegado: ver `quiebro.ts`), y con los 6 s de la caída no daba tiempo a leer las
+ * tres tarjetas. Así que la Bajada dura hasta que todos están listos —eligieron estilo o dijeron «listo»—,
+ * con `bajadaConTodos` (los 6 s de la caída, contados desde que empezó) como mínimo, y `bajada` (15 s)
+ * como tope.
+ */
+export const DURACION_MS = { bajada: 15000, bajadaConTodos: 6000, pausa: 15000, recuento: 20000 } as const;
 
 /** El reloj de una oleada: 150 s (§4.10). Si vence, la oleada queda «aguantada». */
 export const OLEADA_TICS = 3000;
@@ -794,7 +811,8 @@ export interface ReglasDelDesvelado {
     readonly recargaTics: number;
     readonly puntos: number;
   };
-  readonly replica: { readonly anuncioTics: number; readonly dano: number; readonly derribadoTics: number; readonly puntos: number };
+  /** `avanceMetros`: lo que acomete hacia quien falló (lo que se quebró, y un metro más). */
+  readonly replica: { readonly anuncioTics: number; readonly dano: number; readonly derribadoTics: number; readonly puntos: number; readonly avanceMetros: number };
   /** El segundo golpe de la Réplica, o `null` sin el retoque. */
   readonly replicaDoble: { readonly anuncioTics: number; readonly dano: number; readonly puntos: number } | null;
   readonly estampado: { readonly dano: number; readonly tics: number };
@@ -934,7 +952,13 @@ function reglasDelDesvelado(
       recargaTics: g.empellon.recargaTics,
       puntos: g.empellon.puntos,
     },
-    replica: { anuncioTics: g.replica.anuncioTics, dano: golpe(g.replica.dano), derribadoTics: g.replica.derribadoTics, puntos: g.replica.puntos },
+    replica: {
+      anuncioTics: g.replica.anuncioTics,
+      dano: golpe(g.replica.dano),
+      derribadoTics: g.replica.derribadoTics,
+      puntos: g.replica.puntos,
+      avanceMetros: e.quiebroMetros + (pasoLargo ? RETOQUES.pasoLargo.quiebroMetros : 0) + g.replica.avanceTrasElQuiebroMetros,
+    },
     replicaDoble: tiene('replica-doble') ? { anuncioTics: g.replicaDoble.anuncioTics, dano: golpe(g.replicaDoble.dano), puntos: g.replicaDoble.puntos } : null,
     estampado: { dano: plomo ? RETOQUES.punoDePlomo.estampadoDano : g.estampado.dano, tics: g.estampado.tics },
     rescate: {

@@ -74,6 +74,7 @@ import { LADO_DE_LA_LUT, tablaDeLaLut } from './gradacion';
 import type { UniformeDeDesenfocar, UniformeDeExtraer, UniformeDelUber, UniformeDelVelo } from './sombreadores';
 import { DESENFOCAR, EXTRAER, UBER, VELO, VERTICE_DE_PANTALLA } from './sombreadores';
 import { falloDelTono, ponerElTonoPropio } from './tono';
+import { UNIFORMES_DE_LA_CIUDAD } from '../ciudad/retoques';
 
 /** La capa de lo que se pinta al final, nítido y sin posproceso. Ver la cabecera. */
 export const CAPA_NITIDA = 31;
@@ -96,6 +97,8 @@ export interface AjustesDeLaImagen {
   readonly rangoDelFocoM: number;
   /** En N3, cuánto oscurece la oclusión ambiental (0-1). */
   readonly oclusion: number;
+  /** En N3, cuánto se ve el reflejo en pantalla del suelo mojado (0-1). */
+  readonly reflejos: number;
 }
 
 /** El aspecto de la noche. Provisional hasta el banco en aparato; se afina AQUÍ o por `ajustes`. */
@@ -114,6 +117,7 @@ export const IMAGEN_DE_LA_NOCHE: AjustesDeLaImagen = {
   brilloBarato: { fuerza: 2, umbral: 0.62, rodilla: 0.2 },
   rangoDelFocoM: 6,
   oclusion: 0.8,
+  reflejos: 0.85,
 };
 
 /** Lo que cambia en cada fotograma. */
@@ -145,7 +149,7 @@ export function crearElCompositor(
   const elegido = caminoPara(nivel, capacidades.mediaFlotante);
   if (elegido.camino === 'directo') return new CaminoDirecto(renderer);
   if (elegido.camino === 'barato') return new CaminoBarato(renderer, elegido.aviso);
-  return new CaminoPleno(renderer, elegido.oclusion, elegido.enfoqueConProfundidad, elegido.brilloReducido);
+  return new CaminoPleno(renderer, elegido.oclusion, elegido.enfoqueConProfundidad, elegido.brilloReducido, elegido.reflejos);
 }
 
 /* ─────────────────────────────── Lo común ─────────────────────────────── */
@@ -216,10 +220,25 @@ function crearElUber(lut: THREE.Data3DTexture, defines: Record<string, string>):
     uRangoDelFoco: IMAGEN_DE_LA_NOCHE.rangoDelFocoM,
     tOclusion: null,
     uOclusion: IMAGEN_DE_LA_NOCHE.oclusion,
+    uProyeccion: new THREE.Matrix4(),
+    uProyeccionInversa: new THREE.Matrix4(),
+    uVistaInversa: new THREE.Matrix4(),
+    uReflejos: 0,
+    uHumedad: 0.5,
   });
   /* `toneMappingExposure` lo declara el trozo de three que el uber incluye con `ENTRADA_HDR`. */
   const material = materialDePantalla('quiebro.uber', UBER, { ...u, toneMappingExposure: { value: 1 } }, defines);
   return { material, u };
+}
+
+/**
+ * La exposición del uber es la del renderizador: N0 y N1 la aplican en cada material (el ACES de three
+ * la lee de `toneMappingExposure`) y el uber de N2-N3 la tenía fija en 1, así que N2 y N3 salían un 10 %
+ * más oscuros que N0 y N1 con la misma escena (el juego pone 1,1). Ahora es la misma en los tres caminos.
+ */
+function exposicionDelUber(material: THREE.ShaderMaterial, renderer: THREE.WebGLRenderer): void {
+  const u = material.uniforms['toneMappingExposure'];
+  if (u !== undefined) u.value = renderer.toneMappingExposure;
 }
 
 /** Lo que cambia por fotograma en el uber, igual en los dos caminos que lo usan. */
@@ -656,13 +675,17 @@ class CaminoPleno implements Compositor {
   private ancho = 0;
   private alto = 0;
 
-  constructor(renderer: THREE.WebGLRenderer, conOclusion: boolean, conProfundidad: boolean, brilloReducido: boolean) {
+  private readonly conReflejos: boolean;
+
+  constructor(renderer: THREE.WebGLRenderer, conOclusion: boolean, conProfundidad: boolean, brilloReducido: boolean, conReflejos = false) {
     this.renderer = renderer;
     this.tonoAntes = renderer.toneMapping;
     /* La escena va a un blanco (sin mapeo en el material): el ACES lo pone el uber a mano. */
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.lut = texturaDeLaLut();
 
+    /* El reflejo del suelo lee la profundidad: sin ella no hay reflejo (y no se pide). */
+    this.conReflejos = conReflejos && conProfundidad;
     const quiereProfundidad = conOclusion || conProfundidad;
     const blanco = quiereProfundidad
       ? new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(1, 1) })
@@ -688,6 +711,7 @@ class CaminoPleno implements Compositor {
 
     const defines: Record<string, string> = { ENTRADA_HDR: '' };
     if (conProfundidad) defines['CON_PROFUNDIDAD'] = '';
+    if (this.conReflejos) defines['CON_REFLEJOS'] = '';
     if (this.oclusion !== null) defines['CON_OCLUSION'] = '';
     this.uber = crearElUber(this.lut, defines);
     if (this.oclusion !== null) this.uber.u.tOclusion.value = this.oclusion.gtaoMap;
@@ -726,9 +750,17 @@ class CaminoPleno implements Compositor {
     this.brillo.threshold = f.ajustes.brillo.umbral;
     const u = this.uber.u;
     alimentarElUber(u, f);
+    exposicionDelUber(this.uber.material, r);
     if (camara instanceof THREE.PerspectiveCamera) {
       u.uCerca.value = camara.near;
       u.uLejos.value = camara.far;
+    }
+    if (this.conReflejos) {
+      (u.uProyeccion.value as THREE.Matrix4).copy(camara.projectionMatrix);
+      (u.uProyeccionInversa.value as THREE.Matrix4).copy(camara.projectionMatrixInverse);
+      (u.uVistaInversa.value as THREE.Matrix4).copy(camara.matrixWorld);
+      u.uHumedad.value = UNIFORMES_DE_LA_CIUDAD.uHumedad.value;
+      u.uReflejos.value = f.ajustes.reflejos;
     }
     contando(r, (apuntarLaEscena) => {
       this.escena.alPintar = apuntarLaEscena;

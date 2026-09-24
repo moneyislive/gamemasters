@@ -65,21 +65,21 @@ juego** (`verify:liza-protocolo` hoy; `verify:liza` con la sala).
 | B | Mundo v2 | `MundoDeLaLiza` | El `MundoDeclarado` de `mundo.ts` TAL CUAL como suelo, más escala, clase de cada caja, zonas, límites, grafo y sitios de nacer por papel | Los objetivos y zonas de Boots on Board |
 | C | Reglamento del cuerpo | `CuerpoDeclarado` en cada `ReglasDeAsiento` | Marchas, radio, presupuesto corto y largo, vida | Velocidades por juego en Boots on Board (hoy globales) |
 | D | Estados temporizados | `EstadoDeclarado` (qué es) + `PuestaDeEstado` (cuánto dura) | Si se anda, si se actúa, qué lo corta, cuánto es intocable, cuánta distancia extra admite | La esquiva y «en el aire» |
-| E | Acciones anunciadas | `AccionDeclarada`, `EngancheDeclarado`, `CadenaDeclarada`, `EfectoDeclarado` | Anuncio en tics, alcance, acometida, enganche con radio y cono, cadena con ventana y ritmo, daño, estado, empuje, recarga | La refriega de Boots on Board |
+| E | Acciones anunciadas | `AccionDeclarada`, `EngancheDeclarado`, `CadenaDeclarada`, `EfectoDeclarado` | Anuncio en tics, alcance, **avance**, enganche con radio y cono, cadena con ventana y ritmo, daño, estado, empuje, recarga. El avance lo anda el aparato al pulsar; la sala sólo le acredita lo que puede ir de camino en los `aqui` que aún no ha visto (`llegaConSuAvance`), nunca lo que no anduvo | La refriega de Boots on Board |
 | F | Esquiva en ventana | `EsquivaDeclarada` | Ventana limpia en ms del aparato, qué da acertar y qué fallar | Cualquier juego con parada o esquiva |
 | G | Guardia | `GuardiaDeclarada` | Cono, estados en que no para, respuesta | Un escudo |
 | H | Empuje contra la estructura | `EfectoDeclarado.empuje` y `.alChocar`; `trayectoria` en `geometria.ts` | Extra de daño y de tics si el empuje choca; segmento-AABB por prueba de losa en Q16.16 | Empujones; y la misma prueba es la línea de vista |
-| I | Proyectiles | `ProyectilDeclarado` | Apuntar, velocidad, radio, alcance, daño, ráfaga; juzgados contra los sitios que el blanco declaró | Una lanza o un arco |
+| I | Proyectiles | `ProyectilDeclarado` | Apuntar, velocidad, radio, alcance, daño, ráfaga; juzgados contra los sitios que el blanco declaró. La línea de apuntado viaja como suceso `apunta`; y la limpia contra una bala lanza en el mismo tic, como UN golpe, la acción de `contraProyectil`, con su vuelo dentro del avance | Una lanza o un arco |
 | J | Entidades del servidor | `ClaseDeEntidad`, `CerebroDeclarado`, `AlCaerDeclarado` | Vida, marchas, acciones, guardia, cerebro genérico (acechar, rondar, atacar con turno, disparar con vista, seguir el grafo), aparición y qué pasa al caer | Animales o guardianes de un tablero |
 | K | Turnos de ataque | `TurnosDeclarados` | Cuántas amenazas admite cada asiento y a quién no se le asigna ninguna | Cualquier juego contra NPC |
 | L | Encuentros | `EncuentroDeclarado`, `GrupoDeclarado` | Grupos por clase y zona, escalados por presentes, con tope de vivos y reloj | Hordas en cualquier liza |
 | M | Zonas de acción sostenida | `ZonaDeAccionDeclarada` | Mantener N tics dentro de un radio, capacidad, qué produce, si el daño lo rompe | Puertos y talleres de un tablero |
 | N | Portables | `PortableDeclarado` | Contador por asiento con tope, montón al caer, pago al salir | Generaliza `arcade:botin` |
 | O | Recurso de equipo, rescate y desconexión | `EquipoDeclarado`, `RescateDeclarado` | Recurso común, rescate manteniendo, reaparición pagando | Cualquier cooperativo |
-| P | Rol sin cuerpo | `SinCuerpoDeclarado`, `PresenciaDeclarada` | Quien no tiene sitio vive por `eco`, recibe la foto y manda avisos; el ausente es intocable | Espectadores de cualquier mesa |
+| P | Rol sin cuerpo y presencia | `SinCuerpoDeclarado`, `PresenciaDeclarada` | Quien no tiene sitio vive por `eco`, recibe la foto y manda avisos. El **ausente momentáneo**: sin un `aqui` vivo en `ausenteTrasTics`, intocable, fuera de los turnos, ignorado por las entidades, y ni anda ni pega (ver §2.3) | Espectadores de cualquier mesa; la pestaña oculta de cualquier juego a pie |
 | Q | Avisos | `AvisosDeclarados` | Clases, vida, a qué apuntan y cada cuánto | Comunicación sin voz en cualquier juego |
 | R | Relojes de fase | `FaseDeLaLiza.reloj` | La vista declara `{id, duraMs}` y la sala mete `arcade:reloj {id}` una vez | Cualquier arena con rondas |
-| S | Veredictos | `VeredictosDeclarados` y las cargas `arcade:*` | `arcade:ronda {n, resultado, cuentas, recurso}`, `arcade:reloj`, `arcade:ausente`; qué columna es cada número | Todo el motor |
+| S | Veredictos | `VeredictosDeclarados` y las cargas `arcade:*` | `arcade:ronda {n, resultado, cuentas, recurso}`, `arcade:reloj`, `arcade:ausente`; qué columna es cada número. Idempotentes: un reloj que no es el de la fase en curso, o un ausente repetido, entra **sin efecto** (el mismo estado, sin motivo), no se rechaza | Todo el motor |
 | T | Protocolo | `protocolo.ts` | JSON con claves exactas y lectores estrictos; la acción viaja dentro del `aqui` | — |
 | U | Aforo | `AforoDeLaSala`; coste y admisión en `lizas.ts` | Lo más que vive a la vez en la sala, que es también su coste declarado | Todas las lizas |
 | V | Azar sembrado | `FaseDeLaLiza.semilla` | Semilla pública de la fase: cualquier fallo se reproduce con lo que ya es público | Reproducir fallos |
@@ -106,7 +106,12 @@ equipo con bits ocultos (W): llegará con el modo que la necesite, no antes.
    la plataforma.
 4. **Su reductor** atiende `arcade:ronda`, `arcade:reloj` y `arcade:ausente` DELANTE de su portillo de
    opciones —como el tic y el botín—, rechaza con motivo lo malformado y acepta una ronda sólo si su
-   `n` es la de la fase en curso: una ronda repetida tras rehacerse la sala no se suma dos veces.
+   `n` es la de la fase en curso: una ronda repetida tras rehacerse la sala no se suma dos veces. Lo
+   que llega tarde pero bien formado —el `arcade:reloj` de un reloj que la mesa ya cambió, el mismo
+   ausente otra vez— entra SIN EFECTO: el mismo estado y sin motivo. La sala sigue mandando, y un
+   veredicto rancio no puede tumbar nada ni hacer que la sala reintente para siempre. Y si la vista
+   cambia su reloj dentro de la misma fase (la preparación que se acorta cuando están todos listos),
+   la sala lo vuelve a armar contando desde el principio de la fase, sin empezarla otra vez.
 5. **Su comprobador** exige `problemasDeLaDeclaracion(liza) === []` en TODAS las fases que el
    productor saca, y el mismo `aforo` en todas.
 
@@ -132,8 +137,27 @@ gruesos por `meterDeLaPlataforma`. Los asientos escriben en la mesa por la vía 
   MISMA arena (`arenaDeLaLiza`) y, en `a`, la acción del tic con el `timeStamp` de su pulsación —no
   el del fotograma—. Las acciones viajan dentro del `aqui` para no vaciar el cubo de 25 mensajes.
 - Recibe `dentro`, `foto` (una cadena por sala), `tic` con los sucesos agrupados —el `anuncio` con el
-  instante del impacto YA en su reloj—, `eco`, `corrige` y `fuera`.
-- Pinta a los demás 150 ms atrás y lo ajeno por guion desde el suceso; predice sólo lo propio.
+  instante del impacto YA en su reloj; el `apunta` con el de la primera bala, o `a` 0 si la entidad lo
+  deja—, `eco`, `corrige` (que puede traer `n` 0) y `fuera`.
+- Pinta a los demás 150 ms atrás y lo ajeno por guion desde el suceso; predice sólo lo propio. Un golpe
+  ajeno con avance se pinta con su avance, y el que lleva el vuelo de una limpia contra bala (su anuncio
+  tarda más que el suyo) se pinta volando entero hasta su blanco.
+- **Lo que el aparato no pide.** Con un golpe propio anunciado y sin resolver, la sala sólo atiende el
+  eslabón siguiente de su cadena dentro de su ventana (`intentarGolpe`); el aparato hace lo mismo antes de
+  mandar, y una pulsación que la sala tiraría ni sale, ni mueve el cuerpo, ni cambia el gesto. Si no, el
+  aparato anda un avance que la sala nunca lanzó y el golpe que sí lanzó se juzga con el cuerpo en otra
+  parte (en El Quiebro, GOLPE a media Acometida la dejaba a seis metros del tirador).
+- **La presencia.** Un `aqui` es VIVO si cierra `AQUIS_PARA_ESTAR` (10) tics seguidos del aparato; uno
+  que pulsa algo o se mueve también cuenta. Tras un parón el aparato manda como mucho
+  `TOPE_DE_AQUIS_DE_GOLPE` (8) de golpe, así que la ráfaga de una pestaña frenada no basta para seguir
+  presente: a los `ausenteTrasTics` sin uno vivo el asiento queda **ausente**. Ausente, lo que pulsa no
+  cuenta ni se guarda, lo que había lanzado y no ha llegado se corta, lo que venía contra él se corta sin
+  daño y sus esquivas se olvidan. Vuelve con una serie viva y una vuelta corta (`TICS_DE_LA_VUELTA`, 10,
+  de intocable) que se acaba con su primera acción. Para «se fue» cuenta el ausente sumado en la fase,
+  no el último tramo: esconderse y asomarse en bucle no hace aguantar una ronda. El aparato de El
+  Quiebro, además, se CALLA al irse al fondo (la pestaña oculta, la página que se va, la app en segundo
+  plano): suelta los mandos y deja de mandar, y la sala lo da por ausente aunque el motor no frene sus
+  temporizadores.
 
 ### 2.4 · Cómo se juzga una esquiva sin que el desfase importe
 
@@ -272,15 +296,15 @@ sala.
 
 ---
 
-## 6 · Estado a 24-sep-2026
+## 6 · Estado a 24-sep-2026 (tras el pulido)
 
 | Pieza | Fichero | Estado |
 |---|---|---|
-| Contratos (declaración, cable, geometría, tipos de la sala) | `shared/mecanicas/liza/*` | escritos, con `verify:liza-protocolo` en verde y una liza de juguete |
-| Registro, coste y admisión | `shared/arcade/juegos/lizas.ts` | escrito, con la tabla VACÍA hasta que el primer productor pase su comprobador |
-| La sala pura | `shared/mecanicas/liza/sala.ts` y piezas | en obras (frente «sala»), con `verify:liza` |
-| La E/S del servidor | `server/src/liza/` | en obras (frente «servidor»), con `verify:sala-de-la-liza` (robots WebSocket) y `medir:liza` fuera de la batería |
-| El primer juego | El Quiebro (`docs/EL-QUIEBRO.md`) | en obras por frentes (`docs/quiebro/ARQUITECTURA.md` §6) |
+| Contratos (declaración, cable, geometría, tipos de la sala) | `shared/mecanicas/liza/*` | escritos, con `verify:liza-protocolo` y dos lizas de juguete; `apunta`, la presencia y el avance ya en el contrato |
+| Registro, coste y admisión | `shared/arcade/juegos/lizas.ts` | escrito, con El Quiebro en la tabla (su aforo, el mismo en todas sus mesas y fases) |
+| La sala pura | `shared/mecanicas/liza/sala.ts` y piezas | escrita, con `verify:liza` y la tanda Node/Hermes de `verify:determinismo` jugando la sala de El Quiebro |
+| La E/S del servidor | `server/src/liza/` | escrita, con `verify:sala-de-la-liza` (robots WebSocket) y `medir:liza` fuera de la batería |
+| El primer juego | El Quiebro (`docs/EL-QUIEBRO.md`) | se juega entero en el navegador, en solitario y a varias pestañas (`/sala/quiebro.html?prueba=1&codigo=…`); falta el aparato real (`docs/quiebro/ARQUITECTURA.md` §6) |
 
 Nada se ha empujado. Cualquier cambio que esta propuesta pida en un fichero de Boots on Board se pide
 por escrito a su sesión, no se hace desde aquí (`docs/EL-QUIEBRO.md` §14, riesgo 9).

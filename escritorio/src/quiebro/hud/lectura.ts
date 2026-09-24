@@ -96,6 +96,20 @@ export function miIndice(vista: VistaDelQuiebro, yo: string | null): number {
   return vista.asientos.findIndex((a) => a.asiento === yo);
 }
 
+/**
+ * QUIÉN FALTA EN LA BAJADA: los índices de los asientos a los que la mesa espera (los que no están
+ * ausentes de la mesa) y aún no han dicho que están listos. Vacío fuera de la Bajada, y vacío también
+ * con todos listos: entonces la mesa ya cambió su reloj por el de la caída.
+ */
+export function quienesFaltanEnLaBajada(vista: VistaDelQuiebro): number[] {
+  if (vista.fase.tipo !== 'bajada') return [];
+  const faltan: number[] = [];
+  vista.asientos.forEach((a, k) => {
+    if (!a.haElegido && !a.ausente) faltan.push(k);
+  });
+  return faltan;
+}
+
 /** ¿Se vota en esta pausa? */
 export function seVotaEnLaPausa(vista: VistaDelQuiebro): boolean {
   return vista.fase.tipo === 'pausa' && vista.fase.oleada >= PRIMERA_PAUSA_CON_VOTO;

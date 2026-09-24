@@ -17,6 +17,8 @@ export interface CaminoElegido {
   readonly camino: CaminoDelPosproceso;
   /** Oclusión a media resolución y enfoque con profundidad: sólo en el camino pleno de N3. */
   readonly oclusion: boolean;
+  /** El reflejo en pantalla del suelo mojado: sólo en el camino pleno de N3 (`reflejoEnCharcos`). */
+  readonly reflejos: boolean;
   readonly enfoqueConProfundidad: boolean;
   /** El brillo del camino pleno se calcula a media resolución de más (N2) o a la de siempre (N3). */
   readonly brilloReducido: boolean;
@@ -27,15 +29,16 @@ export interface CaminoElegido {
 export function caminoPara(nivel: NivelDeCalidad, mediaFlotante: boolean): CaminoElegido {
   const palancas = TABLA_DE_NIVELES[nivel];
   if (palancas.posproceso === 'ninguno') {
-    return { camino: 'directo', oclusion: false, enfoqueConProfundidad: false, brilloReducido: false, aviso: null };
+    return { camino: 'directo', oclusion: false, reflejos: false, enfoqueConProfundidad: false, brilloReducido: false, aviso: null };
   }
   if (palancas.posproceso === 'barato') {
-    return { camino: 'barato', oclusion: false, enfoqueConProfundidad: false, brilloReducido: false, aviso: null };
+    return { camino: 'barato', oclusion: false, reflejos: false, enfoqueConProfundidad: false, brilloReducido: false, aviso: null };
   }
   if (!mediaFlotante) {
     return {
       camino: 'barato',
       oclusion: false,
+      reflejos: false,
       enfoqueConProfundidad: false,
       brilloReducido: false,
       aviso: `${palancas.nombre} pide el compositor pleno, pero este aparato no creó un blanco HalfFloat: se pinta con el camino barato de N1`,
@@ -44,6 +47,7 @@ export function caminoPara(nivel: NivelDeCalidad, mediaFlotante: boolean): Camin
   return {
     camino: 'pleno',
     oclusion: palancas.oclusion,
+    reflejos: palancas.reflejoEnCharcos,
     enfoqueConProfundidad: palancas.enfoqueConProfundidad,
     brilloReducido: nivel < 3,
     aviso: null,

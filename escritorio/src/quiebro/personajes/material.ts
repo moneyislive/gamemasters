@@ -45,6 +45,10 @@ import * as THREE from 'three';
 import { nieblaEn } from '../atmosfera/niebla';
 import { parchear } from '../atmosfera/parcheo';
 import type { Retoque } from '../atmosfera/parcheo';
+import { UNIFORMES_DE_LA_LUZ } from '../atmosfera/paleta';
+import { RETOQUE_MUNDO, UNIFORMES_DE_LA_CIUDAD } from '../ciudad/retoques';
+import { GLSL_CIELO_REFLEJADO } from '../ciudad/glsl';
+import { GLSL_ALTURA } from '../ciudad/reflejos';
 import type { MallaFundida } from './malla';
 import { ZONAS_COMO_MUCHO } from './reparto';
 
@@ -115,6 +119,18 @@ float bayerQ(vec2 p) {
 `;
 
 /**
+ * LO QUE SE PEGA A LA LENTE SE FUNDE: un cuerpo a menos de 1,2 m de la cámara (un durmiente que cruza
+ * por delante, uno mismo cuando una pared empuja la cámara contra la espalda) se descarta con la misma
+ * trama de 4×4 que lo tenue, más cuanto más cerca. Tapaba un tercio de la pantalla con una chaqueta.
+ */
+const FUNDIDO_EN_LA_LENTE = /* glsl */ `
+{
+  float dLenteQ = length(vPosMundoQ - cameraPosition);
+  if (dLenteQ < 1.2 && bayerQ(gl_FragCoord.xy) > smoothstep(0.3, 1.2, dLenteQ)) discard;
+}
+`;
+
+/**
  * Lo tenue y el corte del REBAÑO: lo mismo, pero por cabeza (el atributo `aCorteQ`: tenue, altura y modo
  * del corte). La primera versión le ponía al rebaño los descartes de los cuerpos con esqueleto, que leen
  * uniformes que el rebaño nunca rellenaba: un compañero lejano no salía tenue y un Celador que se
@@ -122,6 +138,7 @@ float bayerQ(vec2 p) {
  * revisión con `readPixels`).
  */
 const DESCARTES_DEL_REBANO = /* glsl */ `
+${FUNDIDO_EN_LA_LENTE}
 if (vCorteQ.x > 0.0 && bayerQ(gl_FragCoord.xy) < vCorteQ.x) discard;
 float bandaQ = 0.0;
 if (vCorteQ.z > 0.5) {
@@ -131,8 +148,10 @@ if (vCorteQ.z > 0.5) {
 }
 `;
 
+
 /** Lo tenue y el corte: se descarta antes de iluminar nada. */
 const DESCARTES = /* glsl */ `
+${FUNDIDO_EN_LA_LENTE}
 if (uTenueQ > 0.0 && bayerQ(gl_FragCoord.xy) < uTenueQ) discard;
 float bandaQ = 0.0;
 if (uCorteQ.y > 0.5) {
@@ -151,10 +170,16 @@ function contornoFinal(contorno: string, lleno: string, amenaza: string): string
     vec3 nQ = normalize(normal);
     vec3 vQ = normalize(vViewPosition);
     float ndvQ = abs(dot(nQ, vQ));
-    float anchoQ = max(fwidth(ndvQ), 1e-4) * 2.2;
+    /*
+     * El filo, de un píxel y poco (era de más de dos: de cerca parecía el resaltado de selección de un
+     * editor), y de cerca a media fuerza: a cuatro metros el cuerpo ya se lee solo, y lo que tiene que
+     * verse es su ropa. De lejos no cambia nada: a 60 m manda el relleno, igual que antes.
+     */
+    float anchoQ = max(fwidth(ndvQ), 1e-4) * 1.2;
     float filoQ = 1.0 - smoothstep(0.0, anchoQ, ndvQ - 0.015);
     float resplandorQ = pow(1.0 - ndvQ, 4.0) * 0.4;
-    float mezclaQ = clamp(max(filoQ, resplandorQ) + ${lleno}, 0.0, 1.0);
+    float cercaQ = mix(0.5, 1.0, smoothstep(4.0, 15.0, length(vPosMundoQ - cameraPosition)));
+    float mezclaQ = clamp(max(filoQ, resplandorQ) * cercaQ + ${lleno}, 0.0, 1.0);
     if (${amenaza}) {
       float rayaQ = step(0.45, fract(gl_FragCoord.y * 0.25 - uRelojQ * 3.0));
       mezclaQ *= mix(0.5, 1.0, rayaQ);
@@ -173,19 +198,126 @@ diffuseColor.rgb = uColorZonaQ[izQ] * vColor.rgb * vColor.a;
 diffuseColor.a = 1.0;
 `;
 
+/* ─────────────────────────────── La luz de la calle en los cuerpos ─────────────────────────────── */
+
+/**
+ * LA LUZ DE LA CALLE EN LOS CUERPOS, en todos los niveles. Hasta ahora un cuerpo sólo recibía el
+ * hemisferio (0,22) y, desde N2, las cuatro farolas de verdad: en N0 y N1 el desvelado era un maniquí
+ * negro con un filo de color, bajo una farola que iluminaba el suelo a su lado. Aquí recibe lo mismo
+ * que la ciudad, por el mismo camino:
+ *
+ *   · la luz HORNEADA de la calle (farolas, rótulos, escaparates) en la difusa, leída en su sitio y con
+ *     su normal. Las farolas horneadas pesan `uFarolasEnLosCuerpos` (1 en N0-N1; menos en N2+, donde la
+ *     cercana ya es una luz real y contarla dos veces la quemaría);
+ *   · el CIELO FALSO que reflejan los charcos y los cristales, en el brillo: así la gabardina mojada
+ *     brilla con el mismo cielo que el asfalto (madrugada oscura, alba gris);
+ *   · una LUZ DE BORDE del color del aire (`uBordeDeLosCuerpos`, de la paleta de la luz): el cielo y la
+ *     niebla que recortan la figura por detrás, sobre todo en hombros y cabeza. Va en el brillo (y no en
+ *     la difusa) porque en una tela oscura el borde es brillo de Fresnel, no color;
+ *   · lo MOJADO: con la humedad de la noche, lo que mira al cielo (hombros, cabeza, brazos) se alisa.
+ *
+ * Nada de esto toca el contorno (va después, sobre el color ya hecho) ni lo tenue ni el corte.
+ */
+const RETOQUE_LUZ_DEL_CUERPO: Retoque = {
+  nombre: 'luz-del-cuerpo',
+  orden: 50,
+  uniformes: {
+    uLuzCalle: UNIFORMES_DE_LA_CIUDAD.uLuzCalle,
+    uLuzCalleCaja: UNIFORMES_DE_LA_CIUDAD.uLuzCalleCaja,
+    uColorDeSodio: UNIFORMES_DE_LA_CIUDAD.uColorDeSodio,
+    uFarolas: UNIFORMES_DE_LA_CIUDAD.uFarolas,
+    uHumedad: UNIFORMES_DE_LA_CIUDAD.uHumedad,
+    uFarolasEnLosCuerpos: UNIFORMES_DE_LA_LUZ.uFarolasEnLosCuerpos,
+    uBordeDeLosCuerpos: UNIFORMES_DE_LA_LUZ.uBordeDeLosCuerpos,
+    uReflejoCenit: UNIFORMES_DE_LA_LUZ.uReflejoCenit,
+    uReflejoHorizonte: UNIFORMES_DE_LA_LUZ.uReflejoHorizonte,
+    uReflejoMuro: UNIFORMES_DE_LA_LUZ.uReflejoMuro,
+    uReflejoVentanas: UNIFORMES_DE_LA_LUZ.uReflejoVentanas,
+    uReflejoMedia: UNIFORMES_DE_LA_LUZ.uReflejoMedia,
+  },
+  fragmento: [
+    {
+      buscar: '#include <lights_pars_begin>',
+      como: 'despues',
+      texto: /* glsl */ `
+${GLSL_CIELO_REFLEJADO}
+uniform sampler2D uLuzCalle;
+uniform vec4 uLuzCalleCaja;
+uniform vec3 uColorDeSodio;
+uniform float uFarolas;
+uniform float uHumedad;
+uniform float uFarolasEnLosCuerpos;
+uniform vec3 uBordeDeLosCuerpos;
+vec3 luzDelCuerpoQ(vec3 p, vec3 n) {
+  vec2 uvL = (p.xz + n.xz * 0.6 - uLuzCalleCaja.xy) * uLuzCalleCaja.zw;
+  if (uvL.x < 0.0 || uvL.y < 0.0 || uvL.x > 1.0 || uvL.y > 1.0) return vec3(0.0);
+  vec4 m = texture(uLuzCalle, uvL);
+  /* La farola está arriba: lo que mira hacia arriba la recibe más que lo que mira al suelo. */
+  float haciaArriba = 0.55 + 0.45 * clamp(n.y + 0.4, 0.0, 1.0);
+  return (m.rgb + uColorDeSodio * m.a * uFarolas * uFarolasEnLosCuerpos) * haciaArriba;
+}`,
+    },
+    {
+      buscar: '#include <metalnessmap_fragment>',
+      como: 'antes',
+      texto: /* glsl */ `
+{
+  vec3 nMojadoQ = normalize(vNorMundoQ);
+  float mojadoQ = uHumedad * (0.35 + 0.65 * smoothstep(0.1, 0.8, nMojadoQ.y));
+  roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.5, mojadoQ);
+}`,
+    },
+    {
+      buscar: '#include <lights_fragment_end>',
+      como: 'antes',
+      texto: /* glsl */ `
+{
+  vec3 nC = normalize(normal * mat3(viewMatrix));
+  vec3 vC = normalize(cameraPosition - vPosMundoQ);
+  #if defined( RE_IndirectSpecular )
+    radiance += cieloReflejadoQ(reflect(-vC, nC), material.roughness);
+    float ndvC = clamp(dot(nC, vC), 0.0, 1.0);
+    float bordeC = pow(1.0 - ndvC, 3.0) * (0.6 + 0.4 * clamp(nC.y + 0.5, 0.0, 1.0));
+    radiance += uBordeDeLosCuerpos * bordeC * 4.0;
+  #endif
+  irradiance += luzDelCuerpoQ(vPosMundoQ, nC) * 1.2;
+}`,
+    },
+  ],
+};
+
 /* ─────────────────────────────── El cuerpo con esqueleto ─────────────────────────────── */
+
+/**
+ * LOS PIES EN EL SUELO. La raíz de cada cuerpo va a cota 0 (el juego es plano), pero la acera y la plaza
+ * están 15 cm más altas (`ALTURA_DE_LA_ACERA`): en ellas los pies se hundían en la losa y su mancha de
+ * contacto quedaba debajo, invisible. Aquí, sólo para pintar, el cuerpo sube a la altura del suelo que
+ * pisa su raíz (el mapa de alturas de la ciudad, el mismo en que se posan las salpicaduras). La
+ * partida no se entera: posición, choques y cámara siguen en el plano.
+ */
+function SOBRE_EL_SUELO(matriz: string): string {
+  return /* glsl */ `
+{
+  mat4 mSueloQ = ${matriz};
+  float hSueloQ = alturaDelSueloQ((mSueloQ * vec4(0.0, 0.0, 0.0, 1.0)).xz);
+  transformed.y += hSueloQ / max(length(mSueloQ[1].xyz), 1e-4);
+}`;
+}
+
+/** Los uniformes del mapa de alturas, para `SOBRE_EL_SUELO`. */
+const UNIFORMES_DEL_SUELO = { uAlturas: UNIFORMES_DE_LA_CIUDAD.uAlturas, uAlturasCaja: UNIFORMES_DE_LA_CIUDAD.uAlturasCaja };
 
 function retoqueDelCuerpo(u: UniformesDelCuerpo): Retoque {
   return {
     nombre: 'personaje-quiebro',
     orden: 20,
-    uniformes: u as unknown as Record<string, THREE.IUniform>,
+    uniformes: { ...(u as unknown as Record<string, THREE.IUniform>), ...UNIFORMES_DEL_SUELO },
     vertice: [
-      { buscar: '#include <common>', como: 'despues', texto: 'attribute float zona;\nvarying float vZonaQ;\nvarying float vAlturaQ;' },
+      { buscar: '#include <common>', como: 'despues', texto: `attribute float zona;\nvarying float vZonaQ;\nvarying float vAlturaQ;\n${GLSL_ALTURA}` },
       {
         buscar: '#include <skinning_vertex>',
         como: 'despues',
-        texto: 'vZonaQ = zona;\nvAlturaQ = (modelMatrix * vec4(transformed, 1.0)).y;',
+        texto: `${SOBRE_EL_SUELO('modelMatrix')}\nvZonaQ = zona;\nvAlturaQ = (modelMatrix * vec4(transformed, 1.0)).y;`,
       },
     ],
     fragmento: [
@@ -230,7 +362,7 @@ export function materialDeCuerpo(malla: MallaFundida): MaterialDeCuerpo {
   });
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 1, vertexColors: true });
   material.name = 'personaje-quiebro';
-  parchear(material, retoqueDelCuerpo(u), retoqueDelContorno());
+  parchear(material, RETOQUE_MUNDO, retoqueDelCuerpo(u), RETOQUE_LUZ_DEL_CUERPO, retoqueDelContorno());
   nieblaEn(material);
   return { material, u };
 }
@@ -326,7 +458,7 @@ export function materialDeRebano(malla: MallaFundida): { material: THREE.MeshSta
   const retoque: Retoque = {
     nombre: `rebano-quiebro-${String(malla.huesos.length)}`,
     orden: 20,
-    uniformes: u as unknown as Record<string, THREE.IUniform>,
+    uniformes: { ...(u as unknown as Record<string, THREE.IUniform>), ...UNIFORMES_DEL_SUELO },
     vertice: [
       {
         buscar: '#include <common>',
@@ -340,6 +472,7 @@ attribute vec4 aVestidoQ;
 attribute vec4 aContornoQ;
 attribute vec4 aCorteQ;
 uniform highp sampler2D uHuesosQ;
+${GLSL_ALTURA}
 uniform float uPrimeraPiezaQ;
 varying float vZonaQ;
 varying float vAlturaQ;
@@ -375,6 +508,7 @@ objectNormal = normalize(mat3(pielQ) * objectNormal);`,
 transformed = (pielQ * vec4(transformed, 1.0)).xyz;
 /* El paraguas fundido: en quien no lo lleva (ropa < 8), sus vértices se pliegan a un punto y no se ven. */
 if (zona >= uPrimeraPiezaQ - 0.5 && aVestidoQ.x < 7.5) transformed = vec3(0.0, -10.0, 0.0);
+${SOBRE_EL_SUELO('modelMatrix * instanceMatrix')}
 vZonaQ = zona;
 vVestidoQ = aVestidoQ;
 vContornoQ = aContornoQ;
@@ -443,7 +577,7 @@ diffuseColor.a = 1.0;`,
   };
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 1, vertexColors: true });
   material.name = 'rebano-quiebro';
-  parchear(material, retoque, contorno);
+  parchear(material, RETOQUE_MUNDO, retoque, RETOQUE_LUZ_DEL_CUERPO, contorno);
   nieblaEn(material);
   return { material, u };
 }

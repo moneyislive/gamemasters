@@ -47,7 +47,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { COSENO, SENO } from '../../shared/mecanicas/andar';
 import { enteroEntre, sembrar } from '../../shared/mecanicas/azar';
 import type { Azar } from '../../shared/mecanicas/azar';
@@ -98,12 +98,15 @@ import {
   aCentesimas,
   CIERRE_DE_LA_LIZA,
   deCentesimas,
+  RESULTADO,
   leerMensajeDeLaSala,
   leerMensajeDelAparato,
   leerSuceso,
+  MOTIVO_DE_IRSE,
   rutaDeLaLiza,
   textoDeLaSala,
   textoDelAparato,
+  TOPE_DE_AQUIS_DE_GOLPE,
   TOPE_DE_BAJADA_BYTES,
   TOPE_DE_CENTESIMAS,
   TOPE_DE_MS,
@@ -113,6 +116,11 @@ import {
   VERSION_DE_LA_LIZA,
 } from '../../shared/mecanicas/liza/protocolo';
 import type { MensajeDeLaSala, MensajeDelAparato, SucesoDelTic, TuplaDeFoto } from '../../shared/mecanicas/liza/protocolo';
+import { AQUIS_PARA_ESTAR } from '../../shared/mecanicas/liza/tipos-de-la-sala';
+import { SalaVista } from '../../escritorio/src/quiebro/red/sala-vista';
+import type { Novedad } from '../../escritorio/src/quiebro/red/sala-vista';
+import { RelojDelCanal } from '../../escritorio/src/quiebro/red/reloj';
+import { balaAcabada, recorridoDeLaBala } from '../../escritorio/src/quiebro/efectos/cuentas';
 import {
   arcadesQueSeLidian,
   cabeOtraSala,
@@ -924,10 +932,12 @@ const SUCESOS: readonly SucesoDelTic[] = [
   { e: 'zona', id: 3, tics: 1000 },
   { e: 'cuenta', a: 1, vida: 80, medidor: 35, puntos: 1250, mult: 72090 },
   { e: 'recurso', n: 2 },
+  { e: 'apunta', de: 18, a: 1, p: 1, x: 100, z: -100, t: 123000 },
+  { e: 'apunta', de: 18, a: 0, p: 1, x: 100, z: -100, t: 0 },
 ];
 {
   const clases = new Set(SUCESOS.map((s) => s.e));
-  comprobar('la lista de muestra lleva las diecisiete clases de suceso', clases.size === 17, [...clases]);
+  comprobar('la lista de muestra lleva las dieciocho clases de suceso', clases.size === 18, [...clases]);
 }
 const DE_LA_SALA: readonly MensajeDeLaSala[] = [
   { t: 'dentro', yo: 1, k: 400, x: -u(3), z: -u(3), r: 32, hz: 20 },
@@ -940,6 +950,16 @@ const DE_LA_SALA: readonly MensajeDeLaSala[] = [
 for (const m of DE_LA_SALA) {
   const texto = textoDeLaSala(m);
   comprobar(`la sala: \`${m.t}\` va y vuelve igual`, igual(leerMensajeDeLaSala(texto), m), texto.slice(0, 300));
+}
+{
+  /* La sala recoloca a quien acaba de conectar y aún no ha dicho nada: le corrige su tic 0, como el del `aqui`. */
+  const cero: MensajeDeLaSala = { t: 'corrige', n: 0, x: -u(3), z: u(2) };
+  comprobar('un `corrige` del tic 0 del aparato va y vuelve igual (antes se mandaba como del 1)', igual(leerMensajeDeLaSala(textoDeLaSala(cero)), cero));
+  comprobar(
+    'ninguna ráfaga de `aqui` que el aparato manda tras un parón basta sola para volver de ausente: el tope de golpe es menor que los seguidos que hacen falta',
+    TOPE_DE_AQUIS_DE_GOLPE < AQUIS_PARA_ESTAR && TOPE_DE_AQUIS_DE_GOLPE >= 1,
+    { TOPE_DE_AQUIS_DE_GOLPE, AQUIS_PARA_ESTAR },
+  );
 }
 {
   const conSobras = textoDeLaSala({ t: 'tic', k: 1, ev: [{ ...(SUCESOS[4] as SucesoDelTic), sobra: 1 } as unknown as SucesoDelTic] });
@@ -983,6 +1003,12 @@ paso('Lo que dice la sala: lo que se rechaza');
     ['un dentro con el asiento 16', j({ t: 'dentro', yo: 16, k: 1, x: 0, z: 0, r: 0, hz: 20 })],
     ['un dentro sin hz', j({ t: 'dentro', yo: 1, k: 1, x: 0, z: 0, r: 0 })],
     ['un corrige con la x con decimales', j({ t: 'corrige', n: 1, x: 0.5, z: 0 })],
+    ['un corrige de un tic negativo', j({ t: 'corrige', n: -1, x: 0, z: 0 })],
+    ['un apunta que lo deja con instante (dejarlo no tiene)', tic({ e: 'apunta', de: 18, a: 0, p: 1, x: 0, z: 0, t: 5 })],
+    ['un apunta desde un asiento (sólo apuntan las entidades)', tic({ e: 'apunta', de: 3, a: 1, p: 1, x: 0, z: 0, t: 5 })],
+    ['un apunta sin proyectil', tic({ e: 'apunta', de: 18, a: 1, p: 0, x: 0, z: 0, t: 5 })],
+    ['un apunta sin su sitio', tic({ e: 'apunta', de: 18, a: 1, p: 1, t: 5 })],
+    ['un apunta con una clave de más', tic({ e: 'apunta', de: 18, a: 1, p: 1, x: 0, z: 0, t: 5, r: 3 })],
     ['un eco sin ms', j({ t: 'eco', c: 1, k: 1 })],
     ['un fuera con una clave de más', j({ t: 'fuera', motivo: 'x', codigo: 4104 })],
     ['un mensaje sin t', j({ k: 1, ev: [SUCESOS[0]] })],
@@ -1013,9 +1039,10 @@ paso('Lo que dice la sala: lo que cabe en el cable');
     { e: 'zona', id: 255, tics: 72000 },
     { e: 'cuenta', a: 15, vida: 1000000, medidor: 1000000, puntos: Number.MAX_SAFE_INTEGER, mult: TOPE_DE_MULTIPLICADOR },
     { e: 'recurso', n: 1000000 },
+    { e: 'apunta', de: 65535, a: 65535, p: 255, x: C, z: C, t: -T },
   ];
   const noLeidos = LARGOS.filter((s) => leerSuceso(JSON.parse(j(s))) === null);
-  comprobar('el más largo de cada una de las diecisiete clases se lee (son de verdad los topes)', noLeidos.length === 0 && new Set(LARGOS.map((s) => s.e)).size === 17, noLeidos);
+  comprobar('el más largo de cada una de las dieciocho clases se lee (son de verdad los topes)', noLeidos.length === 0 && new Set(LARGOS.map((s) => s.e)).size === 18, noLeidos);
   let peor = LARGOS[0] as SucesoDelTic;
   for (const s of LARGOS) if (bytes(j(s)) > bytes(j(peor))) peor = s;
   const lleno = textoDeLaSala({ t: 'tic', k: Number.MAX_SAFE_INTEGER, ev: Array.from({ length: TOPE_DE_SUCESOS }, () => peor) });
@@ -1384,8 +1411,8 @@ const enFase = (fase: unknown, noche: unknown = VISTA.noche): unknown => ({
   comprobar('los movimientos sin carga llevan null (o nada), y un objeto no es «sin carga»', esCargaVacia(null) && esCargaVacia(undefined) && !esCargaVacia({}));
   const tipos = Object.values(MOVIMIENTO_DEL_QUIEBRO);
   comprobar(
-    'los movimientos de asiento son los del diseño más «aprendiz», sin repetir y sin el prefijo de la plataforma',
-    tipos.length === 8 && new Set(tipos).size === 8 && tipos.every((t) => !t.startsWith('arcade:')) && tipos.indexOf('aprendiz') >= 0,
+    'los movimientos de asiento son los del diseño más «aprendiz» y «listo» (la Bajada es la preparación), sin repetir y sin el prefijo de la plataforma',
+    tipos.length === 9 && new Set(tipos).size === 9 && tipos.every((t) => !t.startsWith('arcade:')) && tipos.indexOf('aprendiz') >= 0 && tipos.indexOf('listo') >= 0,
     tipos,
   );
   const fila = (n: number, salio: number): number[] => [n, 300, 6, 0, 70, 35, 4, 3, 9, 1, 2, 0, 1, 0, 2, salio];
@@ -1491,12 +1518,316 @@ paso('El puente entre el anfitrión y el documento');
 }
 
 /*
- * El suelo: cada comprobación de arriba —339 y ésta, 340—, contada con la tabla del registro de la
- * plataforma VACÍA (con cada juego que se dé de alta salen dos más, y eso no es un fallo: el arnés lo
- * dice). Si un bloque deja de correr, sale 2 y no verde.
+/*
+ * ═══ LO QUE EL APARATO HACE CON LA LÍNEA DE APUNTADO Y CON LA BALA ═══
+ *
+ * Del otro lado del cable: la memoria del aparato (`sala-vista.ts`) guarda la línea de un `apunta` con su
+ * instante pasado a su reloj, la quita con `a` 0 o con el `seva` de quien apuntaba; el puente a los efectos
+ * (`escenificar.ts`) la pinta con ese instante y la retira; y la bala vuela con la velocidad y el alcance de
+ * SU proyectil en la declaración, no con los 20 m/s escritos en los efectos. `escenificar.ts` se carga en
+ * tiempo de ejecución por su ruta: arrastra tipos de piezas de React que el `tsc` del servidor no compila, y
+ * con los efectos y el sonido de mentira no los necesita.
+ */
+paso('El aparato: la línea de apuntado y la bala de su proyectil');
+{
+  const reloj = new RelojDelCanal(1000);
+  const sv = new SalaVista();
+  sv.aplicar({ t: 'dentro', yo: 1, k: 40, x: 0, z: 0, r: 0, hz: 20 }, 1000, reloj);
+  sv.aplicar({ t: 'tic', k: 41, ev: [{ e: 'nace', id: 18, clase: 3, x: 0, z: 800, r: 128 }] }, 1050, reloj);
+  sv.aplicar({ t: 'tic', k: 42, ev: [{ e: 'apunta', de: 18, a: 1, p: 1, x: 0, z: 800, t: 2600 }] }, 1100, reloj);
+  const linea = sv.apuntados.get(18);
+  const novedadDeLinea = sv.novedades.find((n) => n.tipo === 'suceso' && n.suceso.e === 'apunta');
+  comprobar(
+    'la memoria del aparato guarda la línea con su instante pasado a su reloj, y la novedad la lleva',
+    linea !== undefined && linea.a === 1 && linea.finMs === reloj.aPerformance(2600) && linea.x === 0 && linea.z === 8 && novedadDeLinea?.tipo === 'suceso' && novedadDeLinea.apuntado === linea,
+    { linea, finMs: reloj.aPerformance(2600) },
+  );
+  sv.aplicar({ t: 'tic', k: 43, ev: [{ e: 'apunta', de: 18, a: 0, p: 1, x: 0, z: 800, t: 0 }] }, 1150, reloj);
+  const seQuita = !sv.apuntados.has(18);
+  sv.aplicar({ t: 'tic', k: 44, ev: [{ e: 'apunta', de: 18, a: 1, p: 1, x: 0, z: 800, t: 3000 }] }, 1200, reloj);
+  sv.aplicar({ t: 'tic', k: 45, ev: [{ e: 'seva', id: 18, por: MOTIVO_DE_IRSE.cae, quien: 0 }] }, 1250, reloj);
+  comprobar('y la quita cuando quien apunta lo deja (`a` 0) y cuando se va (`seva`)', seQuita && !sv.apuntados.has(18), [...sv.apuntados.keys()]);
+
+  /* El puente a los efectos, con los efectos y el sonido de mentira: lo que pide pintar. */
+  const pedidos: { que: string; datos: unknown }[] = [];
+  const partida = {
+    pulsacionesAtendidas: [] as unknown[],
+    paraLaEscena: [] as Novedad[],
+    lectura: { proyectil: (id: number) => (id === 1 ? { velocidad: u(12), alcance: u(18) } : null), gestoDeLaAccion: () => 'entrada', amenazaDeLaAccion: () => 'prestado', clase: () => null },
+    sala: { yo: 1 },
+    sitioDe: () => ({ x: 0, z: 0 }),
+    pintadoDe: () => null,
+    ticDeLosDurmientes: () => 0,
+  };
+  let asas = 0;
+  const sistema = {
+    localizar: null as unknown,
+    vaciar: () => {},
+    apuntados: {
+      apuntar: (a: unknown) => {
+        pedidos.push({ que: 'apuntar', datos: a });
+        return ++asas;
+      },
+      retirar: (asa: number) => {
+        pedidos.push({ que: 'retirar', datos: asa });
+        return true;
+      },
+    },
+    balas: {
+      disparar: (b: unknown) => {
+        pedidos.push({ que: 'disparar', datos: b });
+        return ++asas;
+      },
+      acabar: () => true,
+    },
+  };
+  const sonido = { sonar: () => undefined, cabina: () => undefined };
+  const RUTA_DEL_PUENTE = path.join(REPO, 'escritorio', 'src', 'quiebro', 'red', 'escenificar.ts');
+  let puente: { drenar(ahora: number): void } | null = null;
+  try {
+    const m = (await import(pathToFileURL(RUTA_DEL_PUENTE).href)) as { Escenificador: new (p: unknown, s: unknown, so: unknown) => { drenar(ahora: number): void } };
+    puente = new m.Escenificador(partida, sistema, sonido);
+  } catch (e) {
+    nota(`el puente no se carga: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const sv2 = new SalaVista();
+  const pasar = (m: Parameters<SalaVista['aplicar']>[0], ahora: number): void => {
+    sv2.aplicar(m, ahora, reloj);
+    partida.paraLaEscena.push(...sv2.novedades.splice(0));
+    puente?.drenar(ahora);
+  };
+  pasar({ t: 'dentro', yo: 1, k: 40, x: 0, z: 0, r: 0, hz: 20 }, 1000);
+  pasar({ t: 'tic', k: 41, ev: [{ e: 'nace', id: 18, clase: 3, x: 0, z: 800, r: 128 }] }, 1050);
+  pasar({ t: 'tic', k: 42, ev: [{ e: 'apunta', de: 18, a: 1, p: 1, x: 0, z: 800, t: 2600 }] }, 1100);
+  const apuntar = pedidos.find((x) => x.que === 'apuntar')?.datos as { inicio: number; fin: number; desde: unknown; hacia: unknown } | undefined;
+  comprobar(
+    'el puente pinta la línea desde quien apunta hasta su blanco, fijada en el instante que dijo la sala',
+    puente !== null && apuntar !== undefined && apuntar.inicio === 1100 && apuntar.fin === reloj.aPerformance(2600) && apuntar.desde === 18 && apuntar.hacia === 1,
+    pedidos,
+  );
+  pasar({ t: 'tic', k: 43, ev: [{ e: 'apunta', de: 18, a: 0, p: 1, x: 0, z: 800, t: 0 }] }, 1150);
+  const retirada = pedidos.some((x) => x.que === 'retirar' && x.datos === 1);
+  pasar({ t: 'tic', k: 44, ev: [{ e: 'bala', id: 30, de: 18, p: 1, x: 0, z: 800, r: 128, t: 2700 }] }, 1200);
+  const disparo = pedidos.find((x) => x.que === 'disparar')?.datos as { velocidad?: number; alcance?: number } | undefined;
+  comprobar('y la quita cuando la sala dice que lo deja', retirada, pedidos);
+  comprobar(
+    'la bala vuela con la velocidad y el alcance de SU proyectil (12 m/s y 18 m aquí), no con los del diseño escritos en los efectos',
+    disparo !== undefined && disparo.velocidad === 12 && disparo.alcance === 18,
+    disparo,
+  );
+  const bala = { salida: 0, x: 0, y: 1.35, z: 0, rumbo: 0, fin: null };
+  comprobar(
+    'y los efectos la mueven con ellos: a 12 m/s y 24 m, 6 m a los 500 ms (10 sin ellos), parada en sus 24 m (no en 30) y viva hasta los 2 s (no 1,5)',
+    recorridoDeLaBala({ ...bala, velocidad: 12, alcance: 24 }, 500) === 6 &&
+      recorridoDeLaBala(bala, 500) === 10 &&
+      recorridoDeLaBala({ ...bala, velocidad: 12, alcance: 24 }, 5000) === 24 &&
+      recorridoDeLaBala(bala, 5000) === 30 &&
+      !balaAcabada({ ...bala, velocidad: 12, alcance: 24 }, 1800) &&
+      balaAcabada(bala, 1800) &&
+      balaAcabada({ ...bala, velocidad: 12, alcance: 24 }, 2200),
+  );
+}
+
+/*
+ * ═══ EL APARATO, TRAS UNA LIMPIA CONTRA UNA BALA: VUELA Y, SI NO LLEGA, AVANZA ═══
+ *
+ * La sala juzga el golpe tras el vuelo como un golpe con avance: el vuelo y el avance de la acción, contados
+ * sólo lo que puede ir de camino (la revisión del pulido: antes regalaba el avance a quien no lo andaba).
+ * Así que el aparato tiene que hacerlos los dos: 10 m hacia el tirador en 8 tics sin pasar de su alcance
+ * y, si aún no llega, el avance de la Réplica. Con la partida del cliente de verdad (`partida.ts`, cargada
+ * por su ruta, como el puente de arriba) contra un enchufe y unos relojes de mentira, con los números de
+ * El Quiebro: un tirador a 13 m y otro a 8 m, y el aparato tiene que acabar a su alcance de los dos.
+ */
+paso('El aparato: tras una limpia contra una bala vuela hacia el tirador y, si aún no llega, avanza; y acomete en todo estado en que la sala lanza');
+{
+  class EnchufeDeMentira {
+    readyState = 0;
+    readonly mandado: string[] = [];
+    onopen: ((e: unknown) => void) | null = null;
+    onmessage: ((e: { readonly data: unknown }) => void) | null = null;
+    onclose: ((e: { readonly code: number; readonly reason: string }) => void) | null = null;
+    onerror: ((e: unknown) => void) | null = null;
+    constructor(readonly direccion: string) {}
+    send(texto: string): void {
+      this.mandado.push(texto);
+    }
+    close(): void {
+      this.readyState = 3;
+    }
+    abrir(): void {
+      this.readyState = 1;
+      this.onopen?.({});
+    }
+    llega(m: MensajeDeLaSala): void {
+      this.onmessage?.({ data: textoDeLaSala(m) });
+    }
+  }
+  class RelojesDeMentira {
+    t = 5_000;
+    ahora(): number {
+      return this.t;
+    }
+    despues(): unknown {
+      return 0;
+    }
+    cancelar(): void {}
+    azar(): number {
+      return 0.5;
+    }
+  }
+  type PartidaDelCliente = {
+    paso: { x: number; z: number } | null;
+    giroDeLaCamara: number;
+    ponerLaDeclaracion(l: LizaDeclarada, barrio: unknown, asiento: string): void;
+    asegurarElCanal(si: boolean): void;
+    fotograma(ahora: number, dt: number): void;
+    cerrar(): void;
+  };
+  type MandosDelCliente = { pulsar(boton: string, t: number): void };
+  const cargar = async <T>(...ruta: string[]): Promise<T | null> => {
+    try {
+      return (await import(pathToFileURL(path.join(REPO, ...ruta)).href)) as T;
+    } catch (e) {
+      nota(`${ruta.join('/')} no se carga: ${e instanceof Error ? e.message : String(e)}`);
+      return null;
+    }
+  };
+  const P = await cargar<{ Partida: new (o: unknown) => PartidaDelCliente }>('escritorio', 'src', 'quiebro', 'red', 'partida.ts');
+  const M = await cargar<{ EstadoDeLosMandos: new () => MandosDelCliente }>('escritorio', 'src', 'quiebro', 'mandos', 'estado.ts');
+  const R = await cargar<{ jugarAlQuiebro: (o: { asientos: number; semilla: number; noches: number; politica: 'gana'; travesuras: boolean }) => { vistas: readonly unknown[] } }>('server', 'scripts', 'robot-de-quiebro.ts');
+  const Q = await cargar<{ lizaDelQuiebro: (v: unknown, c: string) => LizaDeclarada | null }>('shared', 'arcade', 'juegos', 'quiebro-liza.ts');
+  const B = await cargar<{ barrioDeLaNoche: (c: string, n: number) => unknown }>('shared', 'arcade', 'juegos', 'quiebro-barrio.ts');
+  const MU = await cargar<{ seAndaEnRecta: (a: unknown, d: { x: number; z: number }, h: { x: number; z: number }, r: number) => boolean }>('shared', 'mecanicas', 'mundo.ts');
+  let liza: LizaDeclarada | null = null;
+  if (R !== null && Q !== null) {
+    for (const v of R.jugarAlQuiebro({ asientos: 1, semilla: 7, noches: 1, politica: 'gana', travesuras: false }).vistas) {
+      const l = Q.lizaDelQuiebro(v, 'K7M2P');
+      if (liza === null && l !== null && l.fase.modo === 'encuentro') liza = l;
+    }
+  }
+  /**
+   * El aparato de verdad en su sitio de nacer, con una entidad de la `clase` a `lejos` metros en una dirección
+   * por la que se anda en recta (y la cámara mirando hacia ella), ya pintada. `null` si falta algo.
+   */
+  const montar = (lejos: number, clase: number) => {
+    if (P === null || M === null || B === null || MU === null || liza === null) return null;
+    const l = liza;
+    const reglas = l.asientos[0] as ReglasDeAsiento;
+    const nace = l.mundo.nace.find((n) => n.papel === 'asiento') as { x: number; z: number };
+    const arena = arenaDeLaLiza(l);
+    let dx = 0;
+    let dz = 0;
+    for (const [ax, az] of [[0, -1], [1, 0], [0, 1], [-1, 0], [0.7071, -0.7071], [0.7071, 0.7071], [-0.7071, 0.7071], [-0.7071, -0.7071]] as const) {
+      if (dx === 0 && dz === 0 && MU.seAndaEnRecta(arena, nace, { x: nace.x + Math.round(ax * u(lejos + 0.5)), z: nace.z + Math.round(az * u(lejos + 0.5)) }, reglas.cuerpo.radio)) {
+        dx = ax;
+        dz = az;
+      }
+    }
+    if (dx === 0 && dz === 0) return null;
+    const tx = nace.x + Math.round(dx * u(lejos));
+    const tz = nace.z + Math.round(dz * u(lejos));
+    const relojes = new RelojesDeMentira();
+    const enchufes: EnchufeDeMentira[] = [];
+    const mandos = new M.EstadoDeLosMandos();
+    const partida = new P.Partida({
+      direccion: 'ws://x/api/arcade/mesas/K7M2P/liza',
+      llave: 'k1',
+      fabrica: (d: string) => {
+        const e = new EnchufeDeMentira(d);
+        enchufes.push(e);
+        return e;
+      },
+      relojes,
+      mandos,
+    });
+    partida.ponerLaDeclaracion(l, B.barrioDeLaNoche('K7M2P', 1), reglas.asiento);
+    partida.asegurarElCanal(true);
+    partida.giroDeLaCamara = Math.atan2(dx, -dz);
+    const e = enchufes[0] as EnchufeDeMentira;
+    e.abrir();
+    const fotograma = (ms: number): void => {
+      relojes.t += ms;
+      partida.fotograma(relojes.t, ms / 1000);
+    };
+    e.llega({ t: 'dentro', yo: 1, k: 1000, x: nace.x, z: nace.z, r: 0, hz: 20 });
+    e.llega({ t: 'tic', k: 1000, ev: [{ e: 'fase', clave: l.fase.clave, modo: 2, limite: l.fase.limite, relojMs: 0, encuentroTics: 3000 }] });
+    e.llega({ t: 'eco', c: 0, k: 1000, ms: 50_000 });
+    fotograma(1);
+    const cx = aCentesimas(tx);
+    const cz = aCentesimas(tz);
+    e.llega({ t: 'tic', k: 1002, ev: [{ e: 'nace', id: 16, clase, x: cx, z: cz, r: 0 }] });
+    for (let k = 1002; k <= 1012; k += 2) {
+      e.llega({ t: 'foto', k, p: [[16, cx, cz, 0, 0, 0]] });
+      fotograma(100);
+    }
+    return { l, reglas, partida, mandos, e, relojes, fotograma, tx, tz, cx, cz };
+  };
+  const volar = (lejos: number): { recorrido: number; alFinal: number; alcance: number } | null => {
+    const m = montar(lejos, 3);
+    if (m === null || m.partida.paso === null) return null;
+    const golpe = m.reglas.acciones.find((x) => x.id === m.reglas.esquiva.contraProyectil.accion) as AccionDeclarada;
+    const x0 = m.partida.paso.x;
+    const z0 = m.partida.paso.z;
+    m.e.llega({
+      t: 'tic',
+      k: 1014,
+      ev: [
+        { e: 'bala', id: 30, de: 16, p: 1, x: m.cx, z: m.cz, r: 0, t: 0 },
+        { e: 'impacta', bala: 30, a: 1, r: RESULTADO.limpia, dano: 0, vida: 100 },
+      ],
+    });
+    for (let i = 0; i < 60; i++) m.fotograma(16);
+    const paso1 = m.partida.paso;
+    m.partida.cerrar();
+    if (paso1 === null) return null;
+    return { recorrido: Math.hypot(paso1.x - x0, paso1.z - z0) / UNO, alFinal: Math.hypot(m.tx - paso1.x, m.tz - paso1.z) / UNO, alcance: golpe.alcance / UNO };
+  };
+  const a13 = volar(13);
+  const a8 = volar(8);
+  nota(`tirador a 13 m: ${j(a13)} · a 8 m: ${j(a8)}`);
+  comprobar(
+    'tras una limpia contra la bala de un tirador a 13 m, el aparato vuela 10 m y avanza lo que le falta: acaba a su alcance; y a 8 m, vuela hasta su alcance sin más',
+    a13 !== null && a8 !== null && a13.recorrido > 11.5 && Math.abs(a13.alFinal - a13.alcance) < 0.2 && Math.abs(a8.alFinal - a8.alcance) < 0.2 && a8.recorrido < 7.2,
+    { a13, a8 },
+  );
+
+  /*
+   * Y LA ACOMETIDA DE UN GOLPE PULSADO, EN CUALQUIER ESTADO EN QUE LA SALA LO LANZA: libre y también en el
+   * intocable de quien reaparece o vuelve de estar ausente, que no bloquea las acciones. El aparato la hacía
+   * sólo libre o en el Remanso, y no se notaba porque la sala le daba el avance entero; ya no se lo da.
+   */
+  const entradaEn = (estado: number): { recorrido: number; alFinal: number } | null => {
+    const m = montar(5, 2);
+    if (m === null || m.partida.paso === null) return null;
+    if (estado !== 0) m.e.llega({ t: 'tic', k: 1014, ev: [{ e: 'estado', a: 1, est: estado, tics: 10, into: 10 }] });
+    m.fotograma(16);
+    const x0 = m.partida.paso.x;
+    const z0 = m.partida.paso.z;
+    m.mandos.pulsar('golpe', m.relojes.t);
+    for (let i = 0; i < 40; i++) m.fotograma(16);
+    const paso1 = m.partida.paso;
+    m.partida.cerrar();
+    if (paso1 === null) return null;
+    return { recorrido: Math.hypot(paso1.x - x0, paso1.z - z0) / UNO, alFinal: Math.hypot(m.tx - paso1.x, m.tz - paso1.z) / UNO };
+  };
+  const libre = entradaEn(0);
+  const enLaVuelta = liza === null ? null : entradaEn(liza.equipo.reaparicion.puesta.estado);
+  const alcanceDeLaEntrada = liza === null ? 0 : ((liza.asientos[0] as ReglasDeAsiento).acciones.find((x) => x.cadena === null && x.soloEn.length === 0 && !x.efecto.rompeGuardia)?.alcance ?? 0) / UNO;
+  nota(`la Entrada contra un Celador a 5 m: libre ${j(libre)} · en la vuelta ${j(enLaVuelta)} · su alcance ${alcanceDeLaEntrada}`);
+  comprobar(
+    'la Entrada pulsada contra un Celador a 5 m acomete hasta su alcance libre y también en la vuelta de quien estuvo ausente (la reaparición no bloquea las acciones)',
+    libre !== null && enLaVuelta !== null && alcanceDeLaEntrada > 0 && Math.abs(libre.alFinal - alcanceDeLaEntrada) < 0.2 && Math.abs(enLaVuelta.alFinal - alcanceDeLaEntrada) < 0.2,
+    { libre, enLaVuelta, alcanceDeLaEntrada },
+  );
+}
+
+/*
+ * El suelo: cada comprobación de este fichero —358—, contada con la tabla del registro de la plataforma
+ * VACÍA (con cada juego que se dé de alta salen dos más, y eso no es un fallo: el arnés lo dice). Si un
+ * bloque deja de correr, sale 2 y no verde.
  */
 terminar({
-  escritas: 340,
+  escritas: 358,
   enVerde:
     'El cable de la Liza va y vuelve en los dos sentidos, rechaza lo que no es exactamente un mensaje y lo\n' +
     '  más largo cabe; la liza de juguete se declara sin problemas y sus versiones rotas no; rumboHacia y la\n' +

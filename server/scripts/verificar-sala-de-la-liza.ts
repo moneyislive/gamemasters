@@ -968,7 +968,7 @@ paso('A4 · Lo que sale de un paso: a quién, en qué orden, partido si no cabe,
   const tipoDeLoQueSalio = a1.textos.slice(sinNada).map((t) => /^\{"t":"([a-z]+)"/.exec(t)?.[1] ?? '?');
   comprobar('un paso sin sucesos no manda ningún `tic` (ni vacío)', !tipoDeLoQueSalio.includes('tic'), tipoDeLoQueSalio);
 
-  /* La corrección del tic 0 del aparato: el lector pide n ≥ 1. */
+  /* La corrección del tic 0 del aparato: sale como del 0, que el lector admite como el del `aqui`. */
   motor.guion = (_s, _t, entradas) => (entradas.some((e) => e.tipo === 'aviso') ? { correcciones: [{ asiento: 1, n: 0, x: 0, z: 0 }] } : null);
   const antesCero = a1.textos.length;
   await reloj.avanzar(1000);
@@ -976,7 +976,7 @@ paso('A4 · Lo que sale de un paso: a quién, en qué orden, partido si no cabe,
   await reloj.avanzar(MS_POR_TIC);
   motor.guion = () => null;
   const cero = a1.textos.slice(antesCero).map((t) => leerMensajeDeLaSala(t)).find((m) => m?.t === 'corrige');
-  comprobar('la corrección del tic 0 del aparato sale como del 1: el aparato la puede leer', cero?.t === 'corrige' && cero.n === 1, cero);
+  comprobar('la corrección del tic 0 del aparato sale como del 0, sin inventarse otro tic, y el aparato la lee', cero?.t === 'corrige' && cero.n === 0, cero);
   comprobar('nada de lo que ha salido en todo el bloque es ilegible', a1.ilegibles() + a3.ilegibles() + a4.ilegibles() === 0);
   canal.apagar();
 }

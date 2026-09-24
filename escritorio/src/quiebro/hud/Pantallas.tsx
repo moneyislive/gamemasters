@@ -24,14 +24,16 @@ import type { IdDeEstilo, IdDeRetoque, IdDeVoto } from '../../../../shared/arcad
 import type { VistaDelQuiebro } from '../../../../shared/arcade/juegos/quiebro-vista';
 import { MOVIMIENTO_DEL_QUIEBRO } from '../../../../shared/arcade/juegos/quiebro-vista';
 import { lizaDeLaMesa } from '../../../../shared/arcade/juegos/lizas';
+import { QUIEBRO_DEL_DESVELADO } from '../../../../shared/arcade/juegos/quiebro-reglas';
 import { numeroDelAsiento } from '../../../../shared/mecanicas/liza/declaracion';
 import { UNO } from '../../../../shared/mecanicas/fijo';
 import type { Opcion } from '../../../../shared/arcade';
 import type { PuertoDeMesa, SalidaDelMovimiento } from '../contrato';
+import type { RelojDeLaBajada } from '../red/bajada';
 import { COLORES_DE_ASIENTO } from '../red/partida';
 import { Boton } from './Boton';
 import type { EleccionPendiente } from './lectura';
-import { cifra, etiquetaDeLaFase, loQueLeQueda, miIndice, queHacerConLaEleccion, relojEnTexto, seVotaEnLaPausa } from './lectura';
+import { cifra, etiquetaDeLaFase, loQueLeQueda, miIndice, queHacerConLaEleccion, quienesFaltanEnLaBajada, relojEnTexto, seVotaEnLaPausa } from './lectura';
 
 /** El id del arcade en el registro. */
 export const ID_DEL_QUIEBRO = 'quiebro';
@@ -93,17 +95,41 @@ function cifrasDeLosEstilos(vista: VistaDelQuiebro, codigo: string, yo: string |
     if (liza === null) continue;
     const r = liza.asientos[numeroDelAsiento(liza, yo) - 1];
     if (r === undefined) continue;
-    const quiebro = (r.esquiva.puesta.distanciaExtra / UNO).toFixed(1).replace('.', ',');
+    /*
+     * El quiebro que se JUEGA, no el presupuesto: la liza declara lo que el quiebro puede desplazar con la
+     * holgura que la sala admite encima (`QUIEBRO_DEL_DESVELADO.holguraMetros`, medio metro), y con ella la
+     * tarjeta de la Gabardina decía 4,0 m donde el reglamento y el diseño dicen 3,5 (y 5,5 con el Paso
+     * largo, donde el diseño dice 5).
+     */
+    const quiebro = (r.esquiva.puesta.distanciaExtra / UNO - QUIEBRO_DEL_DESVELADO.holguraMetros).toFixed(1).replace('.', ',');
     salida[id] = `${NOMBRES_DEL_QUIEBRO.cuentas.aguante} ${String(r.cuerpo.vidaTope)} · ${NOMBRES_DEL_QUIEBRO.quiebros.quiebro} ${quiebro} m`;
   }
   return salida;
 }
 
-export function Estilos({ vista, codigo, yo, opciones, mover }: { vista: VistaDelQuiebro; codigo: string; yo: string | null; opciones: readonly Opcion[]; mover: Mover }): JSX.Element {
+/**
+ * LAS TARJETAS DE LOS ESTILOS. Con `mover`, cada una manda su `estilo` si la mesa lo ofrece; SIN él
+ * (la reunión) sólo se enseñan: ahí el reductor no admite estilo, y un botón que manda lo que se va a
+ * rechazar es un botón que miente.
+ */
+export function Estilos({ vista, codigo, yo, opciones, mover }: { vista: VistaDelQuiebro; codigo: string; yo: string | null; opciones: readonly Opcion[]; mover: Mover | null }): JSX.Element {
   const i = miIndice(vista, yo);
   const actual = i >= 0 ? vista.reglamento.asientos[i]?.estilo : undefined;
   const cifras = useMemo(() => cifrasDeLosEstilos(vista, codigo, yo), [vista, codigo, yo]);
-  const sePuede = laOpcion(opciones, MOVIMIENTO_DEL_QUIEBRO.estilo) !== null;
+  const sePuede = mover !== null && laOpcion(opciones, MOVIMIENTO_DEL_QUIEBRO.estilo) !== null;
+  if (mover === null) {
+    return (
+      <div className="q-fila">
+        {IDS_DE_ESTILO.map((id) => (
+          <div key={id} className={actual === id ? 'q-tarjeta elegida' : 'q-tarjeta'} aria-disabled="true">
+            <span className="nombre">{NOMBRES_DEL_QUIEBRO.estilos[id]}</span>
+            <span className="detalle">{PAPEL_DEL_ESTILO[id]}</span>
+            {cifras[id] !== undefined ? <span className="cifras">{cifras[id]}</span> : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="q-fila">
       {IDS_DE_ESTILO.map((id) => (
@@ -113,7 +139,7 @@ export function Estilos({ vista, codigo, yo, opciones, mover }: { vista: VistaDe
           elegido={actual === id}
           desactivado={!sePuede || i < 0}
           alPulsar={() => {
-            if (actual !== id) void mover(MOVIMIENTO_DEL_QUIEBRO.estilo, { id });
+            if (actual !== id && sePuede) void mover(MOVIMIENTO_DEL_QUIEBRO.estilo, { id });
           }}
         >
           <span className="nombre">{NOMBRES_DEL_QUIEBRO.estilos[id]}</span>
@@ -131,15 +157,23 @@ export interface PropsDeLaReunion {
   readonly vista: VistaDelQuiebro;
   readonly puerto: PuertoDeMesa;
   readonly mover: Mover;
+  /**
+   * EL MODO DE PRUEBA: la dirección con que otra pestaña se sienta en ESTA mesa
+   * (`?prueba=1&codigo=…`), o `undefined` fuera de él (en la Sala y en la app, el código ya lo reparte el
+   * anfitrión con su enlace).
+   */
+  readonly enlaceParaEntrar?: string;
 }
 
 /*
  * EL ESTILO Y EL APRENDIZ NO SE MANDAN EN LA REUNIÓN: el reductor (`quiebro.ts`, `opcionesDeLaMesa`) sólo
  * admite EMPEZAR mientras la mesa se reúne, porque la lista de sentados aún cambia y la reunión se
- * rehace con ella. El estilo se elige en la Bajada y entre noches, y el aprendiz lo manda `Quiebro.tsx`
- * al llegar la Bajada. Aquí se enseñan los estilos (con sus cifras de verdad) y se dice cuándo se eligen.
+ * rehace con ella. El estilo se elige en la Bajada —que es la preparación, y elegirlo ya es estar
+ * listo— y entre noches; el aprendiz lo manda `Quiebro.tsx` al llegar la Bajada. Aquí los estilos se
+ * ENSEÑAN (con sus cifras de verdad, sin `mover`: `Estilos` no pinta botones) y se dice cuándo se eligen.
  */
-export function Reunion({ vista, puerto, mover }: PropsDeLaReunion): JSX.Element {
+export function Reunion({ vista, puerto, mover, enlaceParaEntrar }: PropsDeLaReunion): JSX.Element {
+  const [copiado, ponerCopiado] = useState(false);
   const [yendo, ponerYendo] = useState(false);
   const empezar = laOpcion(puerto.opciones, MOVIMIENTO_DEL_QUIEBRO.empezar);
   const i = miIndice(vista, puerto.yo);
@@ -172,9 +206,26 @@ export function Reunion({ vista, puerto, mover }: PropsDeLaReunion): JSX.Element
             ))}
           </div>
         </div>
-        <h2>{NOMBRES_DEL_QUIEBRO.mesa.elegirEstilo}</h2>
-        <Estilos vista={vista} codigo={puerto.codigo} yo={puerto.yo} opciones={puerto.opciones} mover={mover} />
-        {laOpcion(puerto.opciones, MOVIMIENTO_DEL_QUIEBRO.estilo) === null ? <span className="q-nota">El estilo se elige al bajar a la calle y entre noches.</span> : null}
+        {enlaceParaEntrar !== undefined ? (
+          <div className="q-enlace">
+            <span className="q-nota">Para jugar a dos en este navegador, abre esto en otra pestaña: se sienta en esta mesa.</span>
+            <code>{enlaceParaEntrar}</code>
+            <Boton
+              clase="q-boton secundario"
+              alPulsar={() => {
+                void navigator.clipboard?.writeText(enlaceParaEntrar).then(
+                  () => ponerCopiado(true),
+                  () => ponerCopiado(false),
+                );
+              }}
+            >
+              {copiado ? 'Copiado' : 'Copiar'}
+            </Boton>
+          </div>
+        ) : null}
+        <h2>Los estilos</h2>
+        <Estilos vista={vista} codigo={puerto.codigo} yo={puerto.yo} opciones={puerto.opciones} mover={null} />
+        <span className="q-nota">El estilo se elige al bajar a la calle (elegirlo ya es estar listo) y entre noches.</span>
         <div className="q-fila derecha" style={{ alignItems: 'center' }}>
           <span className="q-nota">Al empezar, la mesa se cierra: nadie más se sienta esta noche.</span>
           <Boton clase="q-boton principal" desactivado={empezar === null || yendo} alPulsar={() => void alEmpezar()}>
@@ -440,24 +491,103 @@ export function Cerrada({ alSalir }: { readonly alSalir: (() => void) | undefine
   );
 }
 
-/* ─────────────────────────── La Bajada ─────────────────────────── */
+/* ─────────────────────────── La Bajada: la preparación ─────────────────────────── */
 
-export function RotuloDeLaBajada({ vista, rotulo, puerto, mover }: { readonly vista: VistaDelQuiebro; readonly rotulo: string | null; readonly puerto: PuertoDeMesa; readonly mover: Mover }): JSX.Element {
+export interface PropsDeLaBajada {
+  readonly vista: VistaDelQuiebro;
+  readonly rotulo: string | null;
+  readonly puerto: PuertoDeMesa;
+  readonly mover: Mover;
+  readonly bajada: RelojDeLaBajada;
+}
+
+/**
+ * LA BAJADA ES LA PREPARACIÓN (`quiebro.ts`): hasta 15 s para elegir estilo o decir BAJAR, que es el
+ * movimiento `listo` («me quedo con el mío»); elegir estilo también cuenta como listo. Con todos listos,
+ * la mesa acorta el reloj al de la caída y la cámara cae (`red/bajada.ts`).
+ *
+ * Aquí se enseña lo que hace falta para decidir en esos segundos: el reloj de verdad (el de la vista,
+ * no seis segundos supuestos), los estilos y BAJAR mientras la mesa los ofrezca a este asiento, y quién
+ * falta. Tras decir que está listo, la mesa ya no le ofrece nada: se dice «listo» y con qué estilo baja,
+ * y se espera a los demás con el reloj delante.
+ */
+export function RotuloDeLaBajada({ vista, rotulo, puerto, mover, bajada }: PropsDeLaBajada): JSX.Element {
+  /* El reloj se repinta solo: la vista no cambia mientras corre. */
+  const [, repintar] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => repintar((n) => (n + 1) % 1_000_000), 250);
+    return () => clearInterval(id);
+  }, []);
+  const [yendo, ponerYendo] = useState(false);
   const r = vista.reglamento;
   const detalle = [
     `${NOMBRES_DEL_QUIEBRO.cuentas.nivel} ${nombreDelNivel(r.nivel)}`,
     r.averia === 'ninguna' ? null : NOMBRES_DEL_QUIEBRO.averias[r.averia],
     r.contramedida === 'ninguna' ? null : `${NOMBRES_DEL_QUIEBRO.cuentas.memoria}: ${NOMBRES_DEL_QUIEBRO.contramedidas[r.contramedida]}`,
   ].filter((x): x is string => x !== null);
+  const quedaMs = bajada.quedaMs(performance.now());
+  const i = miIndice(vista, puerto.yo);
+  const mio = i >= 0 ? vista.asientos[i] : undefined;
+  const miEstilo = i >= 0 ? (r.asientos[i]?.estilo ?? null) : null;
+  const listo = laOpcion(puerto.opciones, MOVIMIENTO_DEL_QUIEBRO.listo);
+  const faltan = quienesFaltanEnLaBajada(vista);
+  const todos = faltan.length === 0;
+  const decirListo = async (): Promise<void> => {
+    if (listo === null || yendo) return;
+    ponerYendo(true);
+    try {
+      await mover(listo.tipo, listo.carga);
+    } finally {
+      ponerYendo(false);
+    }
+  };
   return (
     <div className="q-bajada">
       <div className="barrio q-rotulo-neon">{rotulo ?? NOMBRES_DEL_QUIEBRO.fases.bajada}</div>
       <div className="detalle">{detalle.join(' · ')}</div>
-      {laOpcion(puerto.opciones, MOVIMIENTO_DEL_QUIEBRO.estilo) !== null ? (
-        <div className="q-bajada-estilos">
-          <Estilos vista={vista} codigo={puerto.codigo} yo={puerto.yo} opciones={puerto.opciones} mover={mover} />
+      <div className="q-preparacion q-panel">
+        <div className="cabeza">
+          <span className="q-titulo">{todos ? 'Todos listos: a la calle' : 'Preparación'}</span>
+          {quedaMs !== null ? <span className={quedaMs < 5000 ? 'reloj aprieta' : 'reloj'}>{relojEnTexto(quedaMs)}</span> : null}
         </div>
-      ) : null}
+        {mio === undefined ? (
+          <p className="q-nota">Miras esta mesa sin asiento.</p>
+        ) : mio.haElegido ? (
+          <p className="listo">
+            Listo: bajas con la <b>{miEstilo === null ? '' : NOMBRES_DEL_QUIEBRO.estilos[miEstilo]}</b>.
+          </p>
+        ) : (
+          <>
+            {laOpcion(puerto.opciones, MOVIMIENTO_DEL_QUIEBRO.estilo) !== null ? (
+              <div className="q-bajada-estilos">
+                <Estilos vista={vista} codigo={puerto.codigo} yo={puerto.yo} opciones={puerto.opciones} mover={mover} />
+              </div>
+            ) : null}
+            <div className="q-fila derecha" style={{ alignItems: 'center' }}>
+              <span className="q-nota">
+                Elegir otro estilo ya es estar listo. O baja con la {miEstilo === null ? 'tuya' : NOMBRES_DEL_QUIEBRO.estilos[miEstilo]}:
+              </span>
+              <Boton clase="q-boton principal" desactivado={listo === null || yendo} alPulsar={() => void decirListo()}>
+                {NOMBRES_DEL_QUIEBRO.mesa.bajar}
+              </Boton>
+            </div>
+          </>
+        )}
+        <div className="q-asientos">
+          {vista.asientos.map((a, k) => (
+            <div key={a.asiento} className={a.haElegido ? 'q-asiento listo' : a.ausente ? 'q-asiento ausente' : 'q-asiento'}>
+              <Muestra i={k} />
+              {nombreDelAsiento(k, k === i)} · {NOMBRES_DEL_QUIEBRO.estilos[r.asientos[k]?.estilo ?? 'gabardina']} ·{' '}
+              {a.haElegido ? 'listo' : a.ausente ? NOMBRES_DEL_QUIEBRO.estados.ausente.toLowerCase() : 'eligiendo…'}
+            </div>
+          ))}
+        </div>
+        {!todos ? (
+          <p className="q-nota">
+            {faltan.length > 1 ? 'Faltan' : 'Falta'}: {faltan.map((k) => nombreDelAsiento(k, k === i)).join(', ')}. Si no, a la calle cuando se acabe el reloj.
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

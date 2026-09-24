@@ -37,6 +37,8 @@ import type { CajaXZ, NivelDeLaCiudad, PlanoDeLaCiudad } from '../src/quiebro/ci
 import { NIVELES_DE_LA_CIUDAD } from '../src/quiebro/ciudad/tipos';
 import { FALLOS_DEL_PARCHEO } from '../src/quiebro/atmosfera/parcheo';
 import { materialesDe } from '../src/quiebro/atmosfera/parcheo';
+import { luzDeLaHora, luzQueManda } from '../src/quiebro/atmosfera/luz-del-barrio';
+import { nieblaEn } from '../src/quiebro/atmosfera/niebla';
 
 const { comprobar, paso, nota, terminar } = arnes();
 
@@ -338,4 +340,66 @@ paso('el parcheo encuentra sus trozos en los sombreadores de three');
   ciudad.liberar();
 }
 
-terminar({ escritas: 16, enVerde: 'La ciudad se construye, cabe, pinta su estructura y nada más, y es la misma en todos los aparatos.' });
+paso('la luz del barrio sale de la hora de la noche, igual en todos los aparatos');
+{
+  comprobar(
+    'de la 1:00 a las 2:59 es madrugada; de las 3:00 a las 4:59, alba, más clara cuanto más tarde',
+    luzDeLaHora('1:00').luz === 'madrugada' &&
+      luzDeLaHora('2:59').luz === 'madrugada' &&
+      luzDeLaHora('3:00').luz === 'alba' &&
+      luzDeLaHora('4:59').luz === 'alba' &&
+      luzDeLaHora('3:00').claridad < luzDeLaHora('4:59').claridad &&
+      luzDeLaHora('4:59').claridad <= 1,
+  );
+  const luces = new Map<string, number>();
+  let iguales = true;
+  for (let i = 0; i < 60; i++) {
+    const codigo = `L${String(i * 7919 + 13)}`;
+    const a = luzQueManda(planoDelBarrio(codigo, 1 + (i % 4)).hora, null);
+    const b = luzQueManda(planoDelBarrio(codigo, 1 + (i % 4)).hora, null);
+    if (a.luz !== b.luz || a.claridad !== b.claridad) iguales = false;
+    luces.set(a.luz, (luces.get(a.luz) ?? 0) + 1);
+  }
+  nota(`en 60 noches: ${String(luces.get('madrugada') ?? 0)} de madrugada y ${String(luces.get('alba') ?? 0)} de alba`);
+  comprobar('el mismo barrio da la misma luz, y en 60 noches salen las dos (ninguna por debajo de 15)', iguales && (luces.get('madrugada') ?? 0) >= 15 && (luces.get('alba') ?? 0) >= 15, [...luces]);
+  comprobar('forzarla sólo cambia la luz pedida', luzQueManda('1:30', 'alba').luz === 'alba' && luzQueManda('4:10', 'madrugada').luz === 'madrugada' && luzQueManda('4:10', null).luz === 'alba');
+}
+
+paso('la niebla de altura no rompe a quien calcula su propia profundidad de niebla');
+{
+  /* Así eran las chispas y los trazos de los efectos: declaran la niebla de three y escriben
+     `vFogDepth` a mano. Con el retoque, su programa no compilaba y no se pintaban nunca. */
+  const propio = new THREE.ShaderMaterial({
+    vertexShader: `#include <fog_pars_vertex>
+void main() {
+  #ifdef USE_FOG
+  vFogDepth = 1.0;
+  #endif
+  gl_Position = vec4(0.0);
+}`,
+    fragmentShader: `#include <fog_pars_fragment>
+void main() { gl_FragColor = vec4(1.0); }`,
+    fog: true,
+  });
+  nieblaEn(propio);
+  const deFabrica = new THREE.ShaderMaterial({
+    vertexShader: `#include <fog_pars_vertex>
+void main() {
+  vec4 mvPosition = vec4(0.0);
+  #include <fog_vertex>
+  gl_Position = mvPosition;
+}`,
+    fragmentShader: `#include <fog_pars_fragment>
+void main() { gl_FragColor = vec4(1.0);
+#include <fog_fragment>
+}`,
+    fog: true,
+  });
+  nieblaEn(deFabrica);
+  comprobar(
+    'el que escribe su vFogDepth se queda con la niebla de three; el que incluye fog_vertex lleva la de altura',
+    propio.userData['sinNieblaDeAltura'] === true && propio.userData['parcheoDelQuiebro'] === undefined && deFabrica.userData['parcheoDelQuiebro'] !== undefined,
+  );
+}
+
+terminar({ escritas: 20, enVerde: 'La ciudad se construye, cabe, pinta su estructura y nada más, y es la misma en todos los aparatos; su luz sale de la hora del barrio.' });

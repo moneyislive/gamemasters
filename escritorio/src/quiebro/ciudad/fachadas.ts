@@ -38,6 +38,7 @@ import * as THREE from 'three';
 import type { Retoque } from '../atmosfera/parcheo';
 import { parchear } from '../atmosfera/parcheo';
 import { nieblaEn } from '../atmosfera/niebla';
+import { UNIFORMES_DE_LA_LUZ } from '../atmosfera/paleta';
 import { Molde } from './geometria';
 import { LARGO_DE_UNA_TIENDA, NUMERO_DEL_ESTILO, colorDeLaVentana, encendida, hashQ as hashDelJs, queTienda } from './hash';
 import { RETOQUE_ENTORNO, RETOQUE_MUNDO, RETOQUE_SOLO_BRILLO, UNIFORMES_DE_LA_CIUDAD } from './retoques';
@@ -80,6 +81,9 @@ varying vec2 vPlantaQ;
 varying vec2 vUvQ;
 uniform float uVentanas;
 uniform float uRejillaDeGlifos;
+uniform float uLuzDeVentanas;
+uniform float uVentanasEncendidas;
+uniform float uClaridad;
 
 vec3 colorDeLuzQ(float h) {
   if (h < 0.45) return vec3(1.0, 0.56, 0.24);
@@ -92,7 +96,10 @@ float encendidaQ(float celda, float planta, float semilla, int estilo) {
   float hv = hashQ(vec2(celda, planta), semilla);
   float hp = hashQ(vec2(planta, 91.0), semilla);
   float prob = estilo == 3 ? (hp < 0.16 ? 0.8 : 0.04) : 0.12 + 0.2 * hp;
-  return hv < prob ? 1.0 : 0.0;
+  /* La luz del barrio apaga una parte (al alba quedan pocas): un segundo sorteo, así que las que siguen
+     encendidas son un subconjunto de las de la regla de hash.ts, que es la que coloca los reflejos. */
+  float sigue = hashQ(vec2(celda, planta), semilla + 53.0) < uVentanasEncendidas ? 1.0 : 0.0;
+  return hv < prob ? sigue : 0.0;
 }
 
 /* Igual que queTienda() de hash.ts: 0 persiana, 1 escaparate encendido, 2 portal, 3 apagado o reja. */
@@ -126,8 +133,9 @@ vec3 muroQ(int estilo, vec2 q, float tinte, float semilla, float vano, float pb,
     float x = q.x + mod(fila, 2.0) * 0.55;
     float j = max(lineaQ(q.y, 0.5, 0.012, px.y), lineaQ(x, 1.1, 0.012, px.x));
     float pieza = hashQ(vec2(floor(x / 1.1), fila), semilla + 3.0);
-    vec3 base = tinte < 0.4 ? vec3(0.52, 0.47, 0.38) : tinte < 0.7 ? vec3(0.46, 0.44, 0.40) : vec3(0.55, 0.45, 0.32);
-    return base * (0.9 + 0.18 * pieza) * (1.0 - 0.3 * j);
+    vec3 base = tinte < 0.4 ? vec3(0.48, 0.45, 0.38) : tinte < 0.7 ? vec3(0.44, 0.43, 0.40) : vec3(0.5, 0.44, 0.35);
+    /* La llaga, apenas: con un 30 % más oscura la sillería era una cuadrícula dibujada. */
+    return base * (0.92 + 0.14 * pieza) * (1.0 - 0.1 * j);
   }
   if (estilo == 1) {
     vec2 b = vec2(0.25, 0.075);
@@ -135,38 +143,45 @@ vec3 muroQ(int estilo, vec2 q, float tinte, float semilla, float vano, float pb,
     float x = q.x + mod(fila, 2.0) * b.x * 0.5;
     float j = max(lineaQ(q.y, b.y, 0.012, px.y), lineaQ(x, b.x, 0.012, px.x));
     float pieza = hashQ(vec2(floor(x / b.x), fila), semilla + 5.0);
+    /* Ladrillo viejo y sucio, no rojo de catálogo: saturado, bajo la luz cálida, salía naranja. */
     vec3 ladrillo = tinte < 0.6
-      ? mix(vec3(0.24, 0.07, 0.035), vec3(0.34, 0.12, 0.055), pieza)
-      : mix(vec3(0.42, 0.28, 0.13), vec3(0.50, 0.36, 0.18), pieza);
+      ? mix(vec3(0.2, 0.085, 0.055), vec3(0.27, 0.13, 0.085), pieza)
+      : mix(vec3(0.34, 0.26, 0.16), vec3(0.41, 0.32, 0.21), pieza);
+    vec3 mortero = vec3(0.21, 0.2, 0.18);
     float lejos = smoothstep(b.y / 6.0, b.y / 3.0, px.y);
-    ladrillo = mix(ladrillo, mix(ladrillo, vec3(0.30, 0.28, 0.25), 0.2), lejos);
-    return mix(ladrillo, vec3(0.30, 0.28, 0.25), j);
+    ladrillo = mix(ladrillo, mix(ladrillo, mortero, 0.15), lejos);
+    return mix(ladrillo, mortero, j * 0.45);
   }
   if (estilo == 2) {
     float j = max(lineaQ(q.x, vano, 0.025, px.x), lineaQ(q.y - pb, hp, 0.025, px.y));
     vec3 base = vec3(0.27, 0.27, 0.26) * (0.8 + 0.35 * tinte);
     base *= 0.82 + 0.3 * fbmQ(q * vec2(0.5, 0.09) + semilla * 0.01);
-    return base * (1.0 - 0.5 * j);
+    return base * (1.0 - 0.18 * j);
   }
   if (estilo == 3) {
     rugosidad = 0.1;
     return vec3(0.012, 0.016, 0.02) + vec3(0.0, 0.004, 0.006) * tinte;
   }
   if (estilo == 5) {
-    /* Azulejo vidriado de 15 cm: brilla, y lleva un dibujo a dos tonos cada cuatro piezas. */
-    float j = max(lineaQ(q.x, 0.15, 0.006, px.x), lineaQ(q.y, 0.15, 0.006, px.y));
-    vec2 celda = floor(q / 0.15);
-    float dibujo = mod(celda.x + celda.y, 4.0) < 1.0 ? 1.0 : 0.0;
-    vec3 a = tinte < 0.3 ? vec3(0.08, 0.16, 0.35) : tinte < 0.55 ? vec3(0.06, 0.24, 0.18) : tinte < 0.8 ? vec3(0.45, 0.32, 0.12) : vec3(0.5, 0.5, 0.48);
-    vec3 b = vec3(0.55, 0.55, 0.52);
+    /*
+     * Placa cerámica vidriada de 60 × 30 cm a matajuntas: brilla, y cada pieza tiene su tono. Era un
+     * azulejo de 15 cm con la junta clara: de lejos, un cuarto de baño.
+     */
+    vec2 b = vec2(0.6, 0.3);
+    float fila = floor(q.y / b.y);
+    float x = q.x + mod(fila, 2.0) * b.x * 0.5;
+    float j = max(lineaQ(q.y, b.y, 0.006, px.y), lineaQ(x, b.x, 0.006, px.x));
+    vec2 celda = vec2(floor(x / b.x), fila);
+    vec3 a = tinte < 0.3 ? vec3(0.13, 0.17, 0.22) : tinte < 0.55 ? vec3(0.12, 0.19, 0.17) : tinte < 0.8 ? vec3(0.34, 0.29, 0.2) : vec3(0.42, 0.42, 0.4);
     float lejos = smoothstep(0.02, 0.05, px.y);
-    vec3 teja = mix(mix(a, b, dibujo * 0.3), mix(a, b, 0.08), lejos);
-    rugosidad = 0.18;
-    return mix(teja * (0.9 + 0.2 * hashQ(celda, semilla + 7.0)), vec3(0.35), j);
+    vec3 teja = a * (0.9 + 0.16 * hashQ(celda, semilla + 7.0) * (1.0 - lejos));
+    rugosidad = 0.2;
+    return mix(teja, teja * 1.15 + 0.01, j * 0.35 * (1.0 - lejos));
   }
   /* Revoco pintado: ocre, crema, almagre o gris azulado, con manchas grandes. */
-  vec3 base = tinte < 0.3 ? vec3(0.50, 0.35, 0.19) : tinte < 0.55 ? vec3(0.56, 0.49, 0.37)
-    : tinte < 0.8 ? vec3(0.46, 0.25, 0.17) : vec3(0.34, 0.37, 0.38);
+  /* Apagados a propósito: saturados, bajo el sodio y el ACES, salían de dibujo animado. */
+  vec3 base = tinte < 0.3 ? vec3(0.47, 0.39, 0.28) : tinte < 0.55 ? vec3(0.55, 0.51, 0.43)
+    : tinte < 0.8 ? vec3(0.41, 0.28, 0.22) : vec3(0.36, 0.38, 0.38);
   #if NIVEL_Q >= 1
   float mancha = fbmQ(q * vec2(0.35, 0.18) + semilla * 0.01);
   #else
@@ -214,6 +229,7 @@ vec3 cuartoQ(vec2 p, vec3 d, vec3 tam, float h, float luz, vec3 colorLuz, float 
     float producto = floor(celdaP);
     float hp = hashQ(vec2(producto, fila), 71.0);
     vec3 colorP = 0.3 + 0.35 * vec3(hashQ(vec2(producto, 1.0), fila + 3.0), hashQ(vec2(producto, 2.0), fila + 3.0), hashQ(vec2(producto, 4.0), fila + 3.0));
+    colorP = mix(vec3(dot(colorP, vec3(0.333))), colorP, 0.55);
     float hay = step(fy, 0.35 + 0.5 * hp) * step(0.2, hp) * step(0.1, fract(celdaP));
     alb = mix(mix(alb, colorP, hay), vec3(0.55), balda);
   }
@@ -232,14 +248,16 @@ vec3 cuartoQ(vec2 p, vec3 d, vec3 tam, float h, float luz, vec3 colorLuz, float 
   vec3 lampara = vec3(tam.x * 0.5, tam.y - 0.25, tam.z * 0.45);
   float dl = length(c - lampara);
   vec3 ilum = luz * colorLuz * potencia * (0.12 + 2.0 / (1.0 + dl * dl * 0.5));
-  ilum += (1.0 - luz) * vec3(0.006, 0.008, 0.011);
+  /* Un cuarto apagado no es negro: de madrugada le llega la calle; al alba, la luz del día por la ventana. */
+  ilum += (1.0 - luz) * mix(vec3(0.006, 0.008, 0.011), vec3(0.07, 0.08, 0.078), uClaridad);
   return alb * ilum;
 }
 
 /* LA VENTANA PLANA (lejos o N0): un degradado hacia el techo y la intensidad del hash. */
 vec3 planaQ(vec2 w, float h, float luz, vec3 colorLuz) {
   float grad = mix(0.55, 1.1, w.y);
-  return luz * colorLuz * grad * (0.35 + 0.65 * fract(h * 7.13)) + (1.0 - luz) * vec3(0.003, 0.004, 0.005);
+  vec3 apagada = mix(vec3(0.003, 0.004, 0.005), vec3(0.03, 0.036, 0.035) * (0.6 + 0.8 * fract(h * 3.7)), uClaridad);
+  return luz * colorLuz * grad * (0.35 + 0.65 * fract(h * 7.13)) + (1.0 - luz) * apagada;
 }
 
 /* VISILLOS Y PERSIANAS: lo que tapa el cuarto desde dentro. w en 0-1 dentro del hueco. */
@@ -292,14 +310,25 @@ const CUERPO_DEL_FRAGMENTO = /* glsl */ `
   bool plano = abs(Ng.y) > 0.5;
 
   if (tipo > 2.5 && tipo < 3.5) {
-    float n = fbmQ(P.xz * 1.3);
-    albedo = vec3(0.045, 0.045, 0.043) * (0.7 + 0.6 * n);
-    rug = 0.94;
+    /*
+     * LA AZOTEA: grava y tela asfáltica a parches, con los charcos que deja la lluvia. Antes era un
+     * negro liso (0,045): desde el aire el barrio eran cajas negras, y la vista aérea de las
+     * referencias es justo lo contrario, azoteas claras llenas de cosas.
+     */
+    float n = fbmQ(P.xz * 0.35);
+    float g = ruidoQ(P.xz * 5.0);
+    vec3 grava = mix(vec3(0.19, 0.19, 0.175), vec3(0.27, 0.26, 0.24), n) * (0.85 + 0.3 * g * (1.0 - smoothstep(0.05, 0.2, pxm)));
+    vec3 tela = vec3(0.075, 0.075, 0.072) * (0.8 + 0.4 * n);
+    float parche = step(0.55, hashQ(floor(P.xz / 7.0), semilla + 3.0));
+    albedo = mix(grava, tela, parche * 0.85);
+    float charco = smoothstep(0.6, 0.66, fbmQ(P.xz * 0.23 + semilla * 0.01));
+    albedo *= 1.0 - 0.5 * charco;
+    rug = mix(0.93, 0.08, charco);
   } else if (tipo > 4.5) {
     /* El techo del soportal: yeso sucio y, cada 4 m, un plafón encendido. */
     albedo = vec3(0.22, 0.21, 0.19) * (0.8 + 0.3 * fbmQ(P.xz * 0.8));
     float plafon = 1.0 - smoothstep(0.18, 0.18 + pxm, length(fract(P.xz / 4.0) - 0.5) * 4.0);
-    emision += vec3(1.0, 0.8, 0.55) * 1.6 * plafon * uVentanas;
+    emision += vec3(1.0, 0.8, 0.55) * 1.6 * plafon * uVentanas * uLuzDeVentanas;
   } else if (tipo > 3.5) {
     /* Barandilla de hierro: barrotes cada 12 cm, pasamanos y travesaño. u a lo largo, v de 0 a 0.95. */
     float barra = 1.0 - smoothstep(0.012, 0.012 + px.x, abs(fract(q.x / 0.12) - 0.5) * 0.12);
@@ -323,6 +352,19 @@ const CUERPO_DEL_FRAGMENTO = /* glsl */ `
       albedo = estilo == 3 ? vec3(0.35, 0.37, 0.4) : vec3(0.48, 0.45, 0.4) * (0.85 + 0.2 * fbmQ(q * 0.7));
       met = estilo == 3 ? 0.8 : 0.0;
       rug = estilo == 3 ? 0.35 : 0.8;
+      if (estilo == 6) {
+        /* La madera del depósito de agua: duelas verticales y los aros de hierro. */
+        float duela = lineaQ(q.x, 0.18, 0.02, px.x);
+        float aro = lineaQ(q.y, 0.7, 0.05, px.y);
+        albedo = vec3(0.2, 0.13, 0.08) * (0.8 + 0.3 * fbmQ(q * vec2(4.0, 0.3))) * (1.0 - 0.35 * duela);
+        albedo = mix(albedo, vec3(0.05), aro);
+        rug = 0.85;
+      } else if (estilo == 7) {
+        /* Chapa galvanizada de la maquinaria y las patas. */
+        albedo = vec3(0.34, 0.35, 0.35) * (0.8 + 0.3 * fbmQ(q * 1.7));
+        met = 0.5;
+        rug = 0.5;
+      }
     }
     if (tipo < 0.5 && !plano && q.y >= pb) {
       /* ─── LAS PLANTAS DE VIVIENDAS U OFICINAS ─── */
@@ -340,17 +382,33 @@ const CUERPO_DEL_FRAGMENTO = /* glsl */ `
         vec2 dd = abs(l) - medio;
         float sd = length(max(dd, 0.0)) + min(max(dd.x, dd.y), 0.0);
         vec2 gdir = dd.x > dd.y ? vec2(sign(l.x), 0.0) : vec2(0.0, sign(l.y));
-        float marco = (estilo == 0 || estilo == 4 || estilo == 5) ? 0.16 : estilo == 1 ? 0.11 : 0.05;
+        /*
+         * EL HUECO, COMO LO HACE UN ALBAÑIL: el recerco (moldura del color de la piedra, un punto más
+         * claro, no un marco de dibujo animado), el derrame en sombra, el alféizar que vuela debajo y
+         * mira al cielo, el dintel encima, y dentro la carpintería con su parteluz y su travesaño, que
+         * es lo que hace que una ventana se lea como ventana y no como un agujero de luz.
+         */
+        /* El recerco, fino (un 40 % menos que la primera versión, que era un marco de dibujo animado). */
+        float marco = (estilo == 0 || estilo == 4 || estilo == 5) ? 0.066 : estilo == 1 ? 0.04 : estilo == 3 ? 0.03 : 0.04;
         float enMarco = (1.0 - smoothstep(marco, marco + pxm, sd)) * smoothstep(-pxm, 0.0, sd);
         float cristal = 1.0 - smoothstep(-0.09 - pxm, -0.09, sd);
         float derrame = (1.0 - smoothstep(-pxm, 0.0, sd)) * (1.0 - cristal);
-        vec3 colorMarco = estilo == 2 ? vec3(0.06) : estilo == 3 ? vec3(0.32, 0.34, 0.37)
-          : estilo == 1 ? vec3(0.5, 0.48, 0.44) : vec3(0.58, 0.55, 0.49);
+        vec3 piedraClara = estilo == 1 ? vec3(0.34, 0.32, 0.29) : albedo * 1.1 + 0.01;
+        vec3 colorMarco = estilo == 2 ? albedo * 0.6 : estilo == 3 ? vec3(0.32, 0.34, 0.37) : piedraClara;
         albedo = mix(albedo, colorMarco, enMarco);
-        met = mix(met, estilo == 3 ? 0.85 : 0.0, enMarco);
-        rug = mix(rug, estilo == 3 ? 0.3 : 0.7, enMarco);
+        met = mix(met, estilo == 3 ? 0.6 : 0.0, enMarco);
+        rug = mix(rug, estilo == 3 ? 0.45 : 0.75, enMarco);
         nLocal.xy += gdir * enMarco * smoothstep(marco * 0.4, marco, sd) * 0.7;
-        albedo = mix(albedo, albedo * 0.45, derrame);
+        if (estilo != 3 && estilo != 2) {
+          /* Alféizar: 12 cm bajo el hueco y 12 más ancho a cada lado; su canto mira al cielo. */
+          float bajoHueco = step(abs(l.x), medio.x + 0.12) * (1.0 - smoothstep(0.0, pxm, -medio.y - l.y - 0.13)) * smoothstep(-pxm, 0.0, -medio.y - l.y - marco * 0.5);
+          albedo = mix(albedo, piedraClara * 1.05, bajoHueco);
+          nLocal.y += bajoHueco * 0.9;
+          /* Dintel: una pieza clara sobre el hueco, y bajo ella la sombra que echa dentro. */
+          float dintel = step(abs(l.x), medio.x + marco) * smoothstep(-pxm, 0.0, l.y - medio.y - marco * 0.5) * (1.0 - smoothstep(0.0, pxm, l.y - medio.y - 0.24));
+          albedo = mix(albedo, piedraClara, dintel * (estilo == 1 ? 1.0 : 0.6));
+        }
+        albedo = mix(albedo, albedo * 0.4, derrame);
         nLocal.xy -= gdir * derrame * 0.8;
         if (cristal > 0.0) {
           float luz = encendidaQ(celda, planta, semilla, estilo);
@@ -369,14 +427,63 @@ const CUERPO_DEL_FRAGMENTO = /* glsl */ `
           }
           #endif
           dentro = visillosQ(dentro, w, hv, luz, colorLuz, px);
+          /* La carpintería: bastidor de 4 cm, parteluz si el hueco pasa de 0,9 m y travesaño al 70 %.
+             Con el píxel más grueso que el perfil se funde en un tono medio en vez de tramar. */
+          float anchoH = 2.0 * medio.x;
+          float altoH = 2.0 * medio.y;
+          float perfil = 0.045;
+          float bastidor = 1.0 - smoothstep(-0.09 - perfil - pxm, -0.09 - perfil, sd);
+          bastidor = cristal - bastidor;
+          float parteluz = anchoH > 0.9 && estilo != 3 ? 1.0 - smoothstep(perfil * 0.5, perfil * 0.5 + pxm, abs(w.x - 0.5) * anchoH) : 0.0;
+          float travesano = estilo != 3 ? 1.0 - smoothstep(perfil * 0.5, perfil * 0.5 + pxm, abs(w.y - 0.72) * altoH) : 0.0;
+          float carpinteria = clamp(max(bastidor, max(parteluz, travesano) * cristal), 0.0, 1.0) * (1.0 - smoothstep(0.02, 0.05, pxm));
+          float hk = hashQ(vec2(floor(celda / 3.0), 61.0), semilla);
+          vec3 colorCarp = estilo == 3 ? vec3(0.3, 0.32, 0.34) : hk < 0.4 ? vec3(0.62, 0.6, 0.56) : hk < 0.7 ? vec3(0.035, 0.05, 0.042) : vec3(0.12, 0.075, 0.045);
           float fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(V, Ng), 0.0), 5.0);
-          albedo = mix(albedo, vec3(0.015, 0.017, 0.019), cristal);
-          rug = mix(rug, 0.05, cristal);
+          float vidrio = cristal * (1.0 - carpinteria);
+          albedo = mix(albedo, vec3(0.015, 0.017, 0.019), vidrio);
+          albedo = mix(albedo, colorCarp, carpinteria);
+          rug = mix(rug, 0.05, vidrio);
+          rug = mix(rug, 0.45, carpinteria);
           met = mix(met, 0.0, cristal);
-          emision += dentro * cristal * (1.0 - fresnel) * uVentanas;
+          emision += dentro * vidrio * (1.0 - fresnel) * uVentanas * uLuzDeVentanas;
           vec2 inclina = vec2(hashQ(vec2(celda, planta), semilla + 41.0), hashQ(vec2(celda, planta), semilla + 43.0)) - 0.5;
-          nLocal.xy += inclina * 0.05 * cristal;
+          nLocal.xy += inclina * 0.05 * vidrio;
+          /*
+           * EL HUECO TIENE FONDO. La carpintería va 14 cm metida en el muro: el rayo que entra por el
+           * borde del hueco, en vez de dar en el cristal, da en la jamba, en el dintel por debajo o en el
+           * alféizar, según hacia dónde se mire (desde la calle, el dintel se ve por debajo, en sombra).
+           * Sin geometría: dónde cae el rayo a 14 cm de profundidad, y si cae fuera del cristal.
+           */
+          if (estilo != 3) {
+            vec3 rR = vec3(dot(-V, T), -V.y, max(dot(V, Ng), 0.08));
+            vec2 mG = medio - vec2(0.09);
+            vec2 finR = l + rR.xy / rR.z * 0.14;
+            vec2 sobraR = abs(finR) - mG;
+            float revelado = smoothstep(-pxm, pxm, max(sobraR.x, sobraR.y)) * cristal;
+            if (revelado > 0.0) {
+              bool techoR = sobraR.y > sobraR.x && finR.y > 0.0;
+              bool sueloR = sobraR.y > sobraR.x && finR.y < 0.0;
+              float rugR;
+              vec3 muroR = muroQ(estilo, q, tinte, semilla, vano, pb, hp, px, rugR);
+              vec3 colorR = techoR ? muroR * 0.3 : sueloR ? muroR * 0.95 : muroR * 0.55;
+              albedo = mix(albedo, colorR, revelado);
+              emision *= 1.0 - revelado;
+              rug = mix(rug, 0.85, revelado);
+              met = mix(met, 0.0, revelado);
+            }
+          }
         }
+      }
+      /* La imposta: una faja clara en cada forjado (en el revoco, uno sí y otro no), que da el ritmo
+         horizontal de las fachadas de piedra. Su canto de arriba mira al cielo. */
+      if (estilo == 0 || estilo == 4 || estilo == 1) {
+        float fp0 = (q.y - pb) - planta * hp;
+        float toca = estilo == 4 ? step(mod(planta, 2.0), 0.5) : estilo == 1 ? step(mod(planta, 3.0), 0.5) : 1.0;
+        float faja = (1.0 - smoothstep(0.16, 0.16 + px.y, fp0)) * toca * (1.0 - smoothstep(0.05, 0.12, px.y));
+        vec3 clara = estilo == 1 ? vec3(0.34, 0.32, 0.29) : albedo * 1.08 + 0.01;
+        albedo = mix(albedo, clara, faja);
+        nLocal.y += faja * smoothstep(0.08, 0.16, fp0) * 0.8;
       }
     } else if (tipo < 0.5 && !plano) {
       /* ─── LA PLANTA BAJA: tiendas cada 6 m (como los rótulos del barrio), portales y persianas ─── */
@@ -429,6 +536,8 @@ const CUERPO_DEL_FRAGMENTO = /* glsl */ `
           float producto = floor(u / 0.22 + fila * 3.1);
           float hp = hashQ(vec2(producto, fila), 71.0);
           vec3 colorP = 0.3 + 0.35 * vec3(hashQ(vec2(producto, 1.0), fila + 3.0), hashQ(vec2(producto, 2.0), fila + 3.0), hashQ(vec2(producto, 4.0), fila + 3.0));
+          /* El género, apagado: de lejos, cajas de colores puros eran confeti encima del cristal. */
+          colorP = mix(vec3(dot(colorP, vec3(0.333))), colorP, 0.45);
           float hay = step(fy, 0.3 + 0.5 * hp) * step(0.25, hp) * step(0.4, q.y) * step(q.y, 2.4);
           float balda = (1.0 - step(0.06, fy)) * step(0.4, q.y) * step(q.y, 2.5);
           vec3 fondo = mix(vec3(0.5, 0.48, 0.45), colorP, hay);
@@ -448,7 +557,7 @@ const CUERPO_DEL_FRAGMENTO = /* glsl */ `
         albedo = mix(albedo, mix(vec3(0.015), vec3(0.4), montante), hueco);
         met = mix(met, montante, hueco);
         rug = mix(rug, 0.06, hueco);
-        emision += dentro * hueco * (1.0 - montante) * (1.0 - fresnel) * uVentanas;
+        emision += dentro * hueco * (1.0 - montante) * (1.0 - fresnel) * uVentanas * uLuzDeVentanas;
       } else if (cual == 2) {
         vec2 lp = vec2((ft - 0.5) * wT, q.y - 1.35);
         vec2 dp = abs(lp) - vec2(0.7, 1.35);
@@ -461,7 +570,7 @@ const CUERPO_DEL_FRAGMENTO = /* glsl */ `
         float reja = max(1.0 - smoothstep(0.015, 0.015 + px.x, abs(fract(lp.x / 0.16) - 0.5) * 0.16),
                          1.0 - smoothstep(0.02, 0.02 + px.y, abs(fract((q.y - 1.0) / 0.55) - 0.5) * 0.55));
         float zaguan = hashQ(vec2(tienda, 17.0), semilla) < 0.6 ? 1.0 : 0.15;
-        emision += vec3(1.0, 0.68, 0.36) * 0.16 * zaguan * mix(0.6, 1.0, (q.y - 1.0) / 1.5) * vidrio * (1.0 - reja) * uVentanas;
+        emision += vec3(1.0, 0.68, 0.36) * 0.16 * zaguan * mix(0.6, 1.0, (q.y - 1.0) / 1.5) * vidrio * (1.0 - reja) * uVentanas * uLuzDeVentanas;
         albedo = mix(albedo, mix(vec3(0.01), vec3(0.02), reja), vidrio);
         nLocal.xy -= (dp.x > dp.y ? vec2(sign(lp.x), 0.0) : vec2(0.0, sign(lp.y))) * (puerta - vidrio) * smoothstep(-0.18, -0.05, sp) * 0.6;
       } else if (bajo == 1) {
@@ -476,7 +585,7 @@ const CUERPO_DEL_FRAGMENTO = /* glsl */ `
         albedo = mix(albedo, mix(vec3(0.015), vec3(0.02), barrote), ventana);
         rug = mix(rug, mix(0.05, 0.5, barrote), ventana);
         met = mix(met, 0.4 * barrote, ventana);
-        emision += dentro * ventana * (1.0 - barrote) * (1.0 - fresnel) * uVentanas;
+        emision += dentro * ventana * (1.0 - barrote) * (1.0 - fresnel) * uVentanas * uLuzDeVentanas;
       } else {
         albedo = mix(albedo, vec3(0.012), hueco);
         rug = mix(rug, 0.05, hueco);
@@ -495,8 +604,17 @@ const CUERPO_DEL_FRAGMENTO = /* glsl */ `
       #else
       float reguero = 0.0;
       #endif
-      if (estilo != 3 && estilo != 5) albedo *= 1.0 - sucio - reguero;
+      /* Manchas grandes de humedad y de polvo, en todos los niveles: un muro de ciudad nunca es de un
+         solo tono, y de lejos es lo único que le quita el aspecto de maqueta. */
+      float manchas = ruidoQ(q * vec2(0.09, 0.05) + semilla * 0.37);
+      if (estilo != 3 && estilo != 5) albedo *= (1.0 - sucio - reguero) * (0.86 + 0.24 * manchas);
       rug = mix(rug, rug * 0.55, 1.0 - smoothstep(0.0, 1.8, P.y));
+      /* El cañón de la calle: abajo llega menos cielo que arriba. Un degradado suave que asienta los
+         edificios en la calle y hace que las plantas altas, más claras, den la escala. */
+      albedo *= mix(0.78, 1.0, smoothstep(1.5, 22.0, P.y));
+      /* Y el pie del muro, donde se junta con la acera: metro y medio que se oscurece (la oclusión que
+         no hay). Sin él, la fachada parecía posada sobre el suelo en vez de salir de él. */
+      if (tipo < 0.5) albedo *= mix(0.58, 1.0, smoothstep(0.0, 1.5, P.y - 0.15));
     }
   }
 
@@ -523,6 +641,9 @@ function retoqueDeLaFachada(nivel: NivelDeLaCiudad): Retoque {
     uniformes: {
       uVentanas: UNIFORMES_DE_LA_CIUDAD.uVentanas,
       uRejillaDeGlifos: UNIFORMES_DE_LA_CIUDAD.uRejillaDeGlifos,
+      uLuzDeVentanas: UNIFORMES_DE_LA_LUZ.uLuzDeVentanas,
+      uVentanasEncendidas: UNIFORMES_DE_LA_LUZ.uVentanasEncendidas,
+      uClaridad: UNIFORMES_DE_LA_LUZ.uClaridad,
     },
     defines: { NIVEL_Q: DETALLE_DEL_NIVEL[nivel].interiores ? '1' : '0' },
     vertice: [
@@ -870,6 +991,7 @@ function escribirElRemate(m: Molde, e: EdificioDelPlano, v: Volumen, estilo: num
     const cuantos = 1 + Math.floor(azarEn(e.semilla, 21) * 4);
     const anchoV = v.x1 - v.x0;
     const fondoV = v.z1 - v.z0;
+    m.poner('aCara', 1, CHAPA_DE_AZOTEA, 0, TIPO.relieve);
     for (let i = 0; i < cuantos; i++) {
       const w = 1.2 + azarEn(e.semilla, 30 + i) * 2.2;
       const d = 1.0 + azarEn(e.semilla, 40 + i) * 1.8;
@@ -879,6 +1001,48 @@ function escribirElRemate(m: Molde, e: EdificioDelPlano, v: Volumen, estilo: num
       const z = v.z0 + 1 + azarEn(e.semilla, 70 + i) * (fondoV - 2 - d);
       m.caja(x, v.y1, z, x + w, v.y1 + h, z + d, 'nseoa');
     }
+    escribirLaAzotea(m, e, v, estilo);
+  }
+}
+
+/** El «estilo» de lo que es de chapa en una azotea y de lo que es de madera (lo lee el sombreador). */
+const CHAPA_DE_AZOTEA = 7;
+const MADERA_DE_AZOTEA = 6;
+
+/**
+ * LO QUE HAY EN UNA AZOTEA, además de la maquinaria: la caseta de la escalera y, en los edificios de
+ * ladrillo, piedra y revoco, a veces el depósito de agua de madera sobre sus patas con su tejadillo
+ * cónico, que es lo que dice «ciudad americana» desde el aire. Todo por el hash del edificio, igual en
+ * todos los aparatos, y sólo con relieve (N1+ en el barrio, N2+ en el anillo). Cuesta unos 150
+ * triángulos por edificio; nada de esto estorba ni se choca: está en la azotea.
+ */
+function escribirLaAzotea(m: Molde, e: EdificioDelPlano, v: Volumen, estilo: number): void {
+  const anchoV = v.x1 - v.x0;
+  const fondoV = v.z1 - v.z0;
+  if (anchoV < 8 || fondoV < 8) return;
+  const h = (k: number): number => azarEn(e.semilla, 200 + k);
+  /* La caseta: en una esquina, de 2,6 a 3,6 m de lado y 2,8 de alto. */
+  m.poner('aCara', 1, estilo === 3 ? 2 : estilo, 0, TIPO.relieve);
+  const lc = 2.6 + h(1) * 1.0;
+  const cx = h(2) < 0.5 ? v.x0 + 1.2 : v.x1 - 1.2 - lc;
+  const cz = h(3) < 0.5 ? v.z0 + 1.2 : v.z1 - 1.2 - lc;
+  m.caja(cx, v.y1, cz, cx + lc, v.y1 + 2.8, cz + lc, 'nseoa');
+  /* El depósito de agua. */
+  if (e.estilo !== 'vidrio' && e.estilo !== 'hormigon' && h(4) < 0.55) {
+    const r = 1.2 + h(5) * 0.6;
+    const px = h(6) < 0.5 ? v.x1 - 2.2 - r : v.x0 + 2.2 + r;
+    const pz = h(7) < 0.5 ? v.z1 - 2.2 - r : v.z0 + 2.2 + r;
+    const patas = 1.6 + h(8) * 0.8;
+    const alto = 2.4 + h(9) * 1.2;
+    m.poner('aCara', 1, CHAPA_DE_AZOTEA, 0, TIPO.relieve);
+    const g = 0.09;
+    const o = r * 0.62;
+    for (const [dx, dz] of [[-o, -o], [o, -o], [-o, o], [o, o]] as const) {
+      m.caja(px + dx - g, v.y1, pz + dz - g, px + dx + g, v.y1 + patas, pz + dz + g, 'nseo');
+    }
+    m.poner('aCara', 1, MADERA_DE_AZOTEA, 0, TIPO.relieve);
+    m.cilindro(px, pz, v.y1 + patas, v.y1 + patas + alto, r, r, 10, true);
+    m.cilindro(px, pz, v.y1 + patas + alto, v.y1 + patas + alto + r * 0.7, r * 1.06, 0.08, 10, false);
   }
 }
 
@@ -916,6 +1080,63 @@ function escaparatesDe(c: Cara, semilla: number, toques: readonly Toque[], venta
     const [px, pz] = c.mira === 'n' || c.mira === 's' ? [a, c.plano] : [c.plano, a];
     ventanas.push({ x: px + nx * 0.05, y: 1.7, z: pz + nz * 0.05, color, escaparate: true, normal: [nx, nz] });
   }
+}
+
+/**
+ * UNA CARA DE CALLE, para lo que se cuelga de ella (toldos, aparatos de aire, escaleras de incendios:
+ * `voladizos.ts`). Da las mismas cuentas que el sombreador: dónde cae cada hueco y cada tienda, y qué
+ * tramos tapa un vecino.
+ */
+export interface CaraDeCalle {
+  readonly edificio: EdificioDelPlano;
+  readonly indice: number;
+  readonly mira: Orientacion;
+  readonly desde: number;
+  readonly hasta: number;
+  readonly y0: number;
+  readonly y1: number;
+  readonly bajo: BajoDeLaFachada;
+  readonly semilla: number;
+  /** El punto en planta a `u` metros de su borde izquierdo (mirándola). */
+  punto(u: number): readonly [number, number];
+  /** ¿Tapa un vecino el punto `a` (coordenada del mundo a lo largo de la cara) a la altura `y`? */
+  tapado(a: number, y: number): boolean;
+  /** Los huecos, con la rejilla del sombreador: celda, planta, u, altura del centro y del alféizar. */
+  huecos(avisar: (celda: number, planta: number, u: number, yCentro: number, ySuelo: number) => void): void;
+}
+
+/** Las caras de los edificios que dan a una calle (las que tienen fachada). */
+export function carasDeCalle(edificios: readonly EdificioDelPlano[]): CaraDeCalle[] {
+  const todos: Volumen[] = edificios.flatMap((e) => e.volumenes);
+  const cerca = indiceDeVolumenes(todos);
+  const salida: CaraDeCalle[] = [];
+  for (const e of edificios) {
+    e.volumenes.forEach((v, iv) => {
+      for (const c of carasDe(v)) {
+        const fachada = e.fachadas.find((f) => f.mira === c.mira);
+        if (fachada === undefined) continue;
+        const toques = cerca(c)
+          .filter((o) => o !== v)
+          .map((o) => tocaLaCara(c, o))
+          .filter((t): t is Toque => t !== null);
+        salida.push({
+          edificio: e,
+          indice: iv,
+          mira: c.mira,
+          desde: c.desde,
+          hasta: c.hasta,
+          y0: c.y0,
+          y1: c.y1,
+          bajo: fachada.bajo,
+          semilla: semillaDeLaCara(e, iv, c.mira),
+          punto: (u) => puntoDeLaCara(c, u),
+          tapado: (a, y) => toques.some((t) => a >= t.desde && a <= t.hasta && y >= t.y0 && y <= t.y1),
+          huecos: (avisar) => recorrerLosHuecos(e, v, c, toques, avisar),
+        });
+      }
+    });
+  }
+  return salida;
 }
 
 /** Construye las fachadas del barrio para un nivel. */

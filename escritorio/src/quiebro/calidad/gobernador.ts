@@ -329,7 +329,14 @@ export function leerElRecuerdo(crudo: unknown): RecuerdoDelAparato | null {
 
 /**
  * El arranque con el recuerdo encima: si la gráfica es la misma, se empieza en lo que aguantó la
- * última vez, pero NUNCA por encima del techo de hoy (el sondeo de hoy manda sobre el de ayer).
+ * última vez, pero NUNCA por encima del techo de hoy (el sondeo de hoy manda sobre el de ayer) y NUNCA
+ * más de un nivel por debajo de lo que dice el sondeo de hoy.
+ *
+ * Ese «un nivel como mucho» es por una RTX 4070 SUPER que arrancaba cada noche en N0: su recuerdo decía
+ * N0, aprendido con el panel del navegador oculto (los fotogramas frenados a 1 Hz sin que la página se
+ * diera por oculta), y desde N0 el gobernador tarda más de un minuto en subir, a 20 s por peldaño. El
+ * recuerdo sirve para ahorrarle a un aparato que el sondeo sobrestima los tirones de la primera bajada,
+ * y para eso basta un nivel; lo que no puede es borrar lo que el aparato es.
  */
 export function arranqueConRecuerdo(
   inicial: NivelDeCalidad,
@@ -338,5 +345,23 @@ export function arranqueConRecuerdo(
   recuerdo: RecuerdoDelAparato | null,
 ): NivelDeCalidad {
   if (recuerdo === null || recuerdo.grafica !== grafica) return inicial;
-  return recuerdo.nivel > techo ? techo : recuerdo.nivel;
+  const suelo = inicial > 0 ? ((inicial - 1) as NivelDeCalidad) : inicial;
+  const nivel = recuerdo.nivel < suelo ? suelo : recuerdo.nivel;
+  return nivel > techo ? techo : nivel;
+}
+
+/**
+ * La media de ventana a partir de la cual una bajada NO se recuerda: 90 ms es menos de 11 fotogramas
+ * por segundo, casi todos contados con el tope de 100. Eso no es una gráfica que no llega: es
+ * `requestAnimationFrame` frenado (un panel oculto, una ventana tapada, la app en segundo plano sin que
+ * la página lo diga). La bajada se hace igual —esta noche va a lo seguro—, pero no se guarda para la
+ * siguiente.
+ */
+export const MEDIA_DE_FOTOGRAMAS_FRENADOS_MS = 90;
+
+/** ¿Se guarda este cambio como el recuerdo del aparato? */
+export function seRecuerda(cambio: CambioDelGobernador): boolean {
+  if (cambio.motivo === 'prueba-superada') return true;
+  if (cambio.motivo === 'bajar-nivel' || cambio.motivo === 'prueba-fallida') return cambio.mediaMs < MEDIA_DE_FOTOGRAMAS_FRENADOS_MS;
+  return false;
 }

@@ -27,7 +27,6 @@ import { useEffect, useMemo } from 'react';
 import type { JSX } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
-  ALCANCE_DE_LA_BALA,
   ALTURA_DE_LA_BALA,
   ALTURA_DEL_ANILLO,
   COLOR_DE_LA_AMENAZA,
@@ -37,13 +36,14 @@ import {
   LARGO_DE_LA_ESTELA,
   ONDA_DEL_IMPACTO_MS,
   RECOGIDA_DE_LA_ESTELA_MS,
-  VELOCIDAD_DE_LA_BALA,
   VIDA_DE_LA_ONDA_MS,
+  alcanceDeLaBala,
   componentesLineales,
   direccionDelRumbo,
   edadDeLaOnda,
   radioDeLaOndaDelImpacto,
   recorridoDeLaBala,
+  velocidadDeLaBala,
 } from './cuentas';
 import { subirLasPrimeras } from './geometrias';
 import { mallaDeEfecto, pxPorMetroDeLaCamara } from './malla';
@@ -73,7 +73,7 @@ export function Trazos({ sistema }: { sistema: SistemaDeEfectos }): JSX.Element 
   const pieza = useMemo(() => mallaDeEfecto('trazos', { aA: 4, aB: 4, aC: 4, aColorA: 4, aColorB: 4, aTramo: 4 }), []);
   useEffect(() => () => pieza.soltar(), [pieza]);
   const sitio = useMemo(() => ({ x: 0, y: 0, z: 0 }), []);
-  const bala = useMemo(() => ({ salida: 0, x: 0, y: 0, z: 0, rumbo: 0, fin: null as number | null }), []);
+  const bala = useMemo(() => ({ salida: 0, x: 0, y: 0, z: 0, rumbo: 0, fin: null as number | null, velocidad: 0, alcance: 0 }), []);
   const dir = useMemo(() => ({ x: 0, z: 0 }), []);
   const todos = useMemo(() => Object.values(pieza.atributos), [pieza]);
 
@@ -145,8 +145,8 @@ export function Trazos({ sistema }: { sistema: SistemaDeEfectos }): JSX.Element 
       const d = recorridoDeLaBala(bala, t);
       direccionDelRumbo(bala.rumbo, dir);
       /* Cuándo se paró (alcance o fin), para recoger la estela hacia la cabeza. */
-      const parada = bala.salida + (d / VELOCIDAD_DE_LA_BALA) * 1000;
-      const recogida = bala.fin !== null || d >= ALCANCE_DE_LA_BALA ? Math.min(1, Math.max(0, (t - parada) / RECOGIDA_DE_LA_ESTELA_MS)) : 0;
+      const parada = bala.salida + (d / velocidadDeLaBala(bala)) * 1000;
+      const recogida = bala.fin !== null || d >= alcanceDeLaBala(bala) ? Math.min(1, Math.max(0, (t - parada) / RECOGIDA_DE_LA_ESTELA_MS)) : 0;
       const largo = Math.min(d, LARGO_DE_LA_ESTELA) * (1 - recogida);
       const k = n * 4;
       A[k] = bala.x + dir.x * (d - largo);
@@ -194,7 +194,7 @@ const FOGONAZO = componentesLineales(0xfff4de);
 export function Ondas({ sistema }: { sistema: SistemaDeEfectos }): JSX.Element {
   const pieza = useMemo(() => mallaDeEfecto('ondas', { aCentro: 4, aEje: 4, aForma: 4, aColor: 3 }), []);
   useEffect(() => () => pieza.soltar(), [pieza]);
-  const bala = useMemo(() => ({ salida: 0, x: 0, y: 0, z: 0, rumbo: 0, fin: null as number | null }), []);
+  const bala = useMemo(() => ({ salida: 0, x: 0, y: 0, z: 0, rumbo: 0, fin: null as number | null, velocidad: 0, alcance: 0 }), []);
   const dir = useMemo(() => ({ x: 0, z: 0 }), []);
   const todos = useMemo(() => Object.values(pieza.atributos), [pieza]);
 

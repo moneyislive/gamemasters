@@ -21,6 +21,7 @@
  * apagan. Lo que queda tapado por delante (un coche, un pilar) lo hace la prueba de profundidad.
  */
 import * as THREE from 'three';
+import { UNIFORMES_DE_LA_LUZ } from '../atmosfera/paleta';
 import { nieblaEn } from '../atmosfera/niebla';
 import { GLSL_CHARCOS, GLSL_RUIDO } from './glsl';
 import { UNIFORMES_DE_LA_CIUDAD } from './retoques';
@@ -59,6 +60,7 @@ attribute vec4 aFuente;
 attribute vec4 aColor;
 attribute float aVisible;
 uniform float uFarolas;
+uniform float uTarjetas;
 ${GLSL_ALTURA}
 varying vec2 vQ;
 varying vec3 vColor;
@@ -83,7 +85,7 @@ void main() {
   vec4 mvPosition = viewMatrix * vec4(xz.x, y, xz.y, 1.0);
   gl_Position = projectionMatrix * mvPosition;
   vQ = position.xy * 2.0;
-  vColor = aColor.rgb * mix(1.0, uFarolas, aColor.w) * aVisible;
+  vColor = aColor.rgb * mix(1.0, uFarolas, aColor.w) * aVisible * uTarjetas;
   vPosQ = vec3(xz.x, y, xz.y);
   vSueloQ = y;
   vMedidaQ = vec2(ancho, largo);
@@ -110,7 +112,7 @@ void main() {
   float nucleo = exp(-(a * a + l * l * 0.35) / (w2 * 0.45));
   /* La estela: fina de través y larga a lo largo, con la caída más lenta hacia la cámara. */
   float estela = exp(-a * a / (w2 * 0.35)) * exp(-abs(vQ.y) * (vQ.y < 0.0 ? 1.8 : 3.2));
-  float ch = vSueloQ > 0.05 ? charcoQ(vPosQ.xz * 1.6 + 40.0) * 0.8 : charcoQ(vPosQ.xz);
+  float ch = vSueloQ > 0.05 ? charcoDeLaAceraQ(vPosQ.xz) : charcoQ(vPosQ.xz);
   float brillo = (nucleo * ch * 0.7 + estela * mix(0.22, 0.1, ch)) * (vSueloQ > 0.05 ? 0.6 : 1.0);
   vec3 V = cameraPosition - vPosQ;
   float cosT = clamp(V.y / length(V), 0.0, 1.0);
@@ -132,6 +134,7 @@ export function materialDeLasTarjetas(): THREE.ShaderMaterial {
       uTiempo: UNIFORMES_DE_LA_CIUDAD.uTiempo,
       uHumedad: UNIFORMES_DE_LA_CIUDAD.uHumedad,
       uFarolas: UNIFORMES_DE_LA_CIUDAD.uFarolas,
+      uTarjetas: UNIFORMES_DE_LA_LUZ.uTarjetas,
       uAlturas: UNIFORMES_DE_LA_CIUDAD.uAlturas,
       uAlturasCaja: UNIFORMES_DE_LA_CIUDAD.uAlturasCaja,
     },

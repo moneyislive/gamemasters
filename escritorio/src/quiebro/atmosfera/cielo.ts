@@ -1,6 +1,7 @@
 /**
- * EL CIELO CUBIERTO DE MADRUGADA: degradado analítico, nubes bajas iluminadas desde abajo por la
- * ciudad y, muy tenues detrás de la bruma, columnas que suben.
+ * EL CIELO CUBIERTO DE MADRUGADA (O DEL ALBA): degradado analítico, nubes bajas iluminadas desde abajo
+ * por la ciudad (o por el claro del horizonte) y, muy tenues detrás de la bruma, columnas que suben.
+ * Los colores son de la luz del barrio (`paleta.ts`, uniformes `uCielo*` y `uNube*`).
  *
  * ═══ POR QUÉ ASÍ ═══
  *
@@ -17,6 +18,7 @@
  */
 import * as THREE from 'three';
 import { nieblaEn } from './niebla';
+import { UNIFORMES_DE_LA_LUZ } from './paleta';
 
 export const UNIFORMES_DEL_CIELO = {
   /** Tiempo del adorno, en segundos. */
@@ -46,6 +48,14 @@ const FRAGMENTO = /* glsl */ `
 uniform float uTiempo;
 uniform float uColumnas;
 uniform float uAmanecer;
+uniform vec3 uCieloCenit;
+uniform vec3 uCieloHorizonte;
+uniform vec3 uNubeOscura;
+uniform vec3 uNubeClara;
+uniform float uCobertura;
+uniform vec3 uResplandor;
+uniform float uClaroDelCielo;
+uniform vec3 uLuzDelCielo;
 varying vec3 vDir;
 float hashC(vec2 p) {
   uvec2 q = uvec2(ivec2(floor(p)) + 65536);
@@ -65,17 +75,47 @@ float fbmC(vec2 p) {
 void main() {
   vec3 d = normalize(vDir);
   float h = max(d.y, 0.0);
-  vec3 cenit = vec3(0.004, 0.006, 0.007);
-  vec3 horizonte = vec3(0.045, 0.058, 0.052);
-  vec3 cielo = mix(horizonte, cenit, pow(h, 0.55));
-  /* Nubes: un techo a 600 m; su panza la tiñe el sodio de la ciudad. */
-  if (d.y > 0.02) {
-    vec2 p = d.xz / d.y * 0.6 + vec2(uTiempo * 0.004, uTiempo * 0.0015);
+  vec3 cielo = mix(uCieloHorizonte, uCieloCenit, pow(h, 0.5));
+  /* El claro: el cielo cubierto es más luminoso hacia donde está el sol detrás de las nubes. */
+  float claro = pow(max(dot(d, uLuzDelCielo), 0.0), 3.0) * uClaroDelCielo;
+  cielo *= 1.0 + 0.45 * claro;
+  /*
+   * Nubes: un techo a 600 m en dos escalas (las masas grandes y su textura). La panza la tiñe lo que
+   * hay debajo: el sodio de la ciudad de madrugada, el cielo claro del horizonte al alba. Hacia el
+   * horizonte las nubes se ven de canto y se aclaran; arriba son la parte más oscura del cielo, que es
+   * lo que da peso a un cielo cubierto.
+   */
+  if (d.y > 0.0) {
+    vec2 p = d.xz / (d.y + 0.08) * 0.6 + vec2(uTiempo * 0.004, uTiempo * 0.0015);
+    #ifdef CIELO_FINO
+    /*
+     * Las nubes, retorcidas: el ruido se lee en un sitio desplazado por otro ruido, y las masas dejan de
+     * ser manchas redondas para ser jirones con dirección, que es como se ve un cielo de lluvia.
+     */
+    vec2 torcer = vec2(fbmC(p * 0.8 + 3.1), fbmC(p * 0.8 + 7.7)) - 0.5;
+    p += torcer * 1.3;
+    #endif
     float n = fbmC(p * 2.2);
-    float nube = smoothstep(0.38, 0.75, n);
-    vec3 panza = mix(vec3(0.028, 0.03, 0.026), vec3(0.075, 0.058, 0.04), smoothstep(0.35, 0.0, d.y));
-    cielo = mix(cielo, panza * (0.6 + 0.8 * n), nube * (1.0 - smoothstep(0.7, 1.0, d.y) * 0.4));
+    float masas = fbmC(p * 0.55 + 11.0);
+    float umbral = 1.0 - uCobertura;
+    float nube = smoothstep(umbral - 0.15, umbral + 0.3, 0.55 * n + 0.55 * masas);
+    float bajo = smoothstep(0.5, 0.02, d.y);
+    vec3 panza = mix(uNubeOscura, uNubeClara, clamp(0.25 + 0.5 * (n - 0.5) + 0.7 * bajo * (0.5 + 0.5 * masas), 0.0, 1.0));
+    /* El resplandor de la ciudad en la panza, cerca del horizonte (de madrugada). */
+    panza += uResplandor * bajo * (0.55 + 0.45 * masas);
+    /* Y el borde claro de las nubes hacia el sol escondido (al alba). */
+    panza *= 1.0 + 0.6 * claro * (1.0 - n);
+    #ifdef CIELO_FINO
+    /* Un segundo techo, más alto y más lento: un velo que modula la luz entre los jirones. */
+    vec2 p2 = d.xz / (d.y + 0.25) * 0.3 + vec2(uTiempo * 0.0015, uTiempo * 0.0006) + torcer * 0.4;
+    float velo = fbmC(p2 * 1.4 + 23.0);
+    cielo *= 0.82 + 0.36 * velo;
+    #endif
+    cielo = mix(cielo, panza, nube * smoothstep(0.0, 0.05, d.y) * (1.0 - smoothstep(0.75, 1.0, d.y) * 0.3));
   }
+  /* La calima del horizonte: la franja donde el cielo y la niebla se tocan. */
+  cielo = mix(cielo, uCieloHorizonte, (1.0 - smoothstep(0.0, 0.1, abs(d.y))) * 0.55);
+  if (d.y < 0.0) cielo = mix(cielo, uCieloHorizonte * 0.6, smoothstep(0.0, -0.3, d.y));
   /* Las columnas: trazos verdes que suben, muy tenues. */
   if (uColumnas > 0.0 && d.y > 0.03 && d.y < 0.6) {
     float az = atan(d.z, d.x);
@@ -99,13 +139,34 @@ void main() {
 }
 `;
 
-/** El radio de la cúpula: dentro del plano lejano de cualquier cámara del juego. */
-export const RADIO_DEL_CIELO = 900;
+/**
+ * El radio de la cúpula. Se pinta siempre en el fondo (su profundidad es la del plano lejano, ver el
+ * vértice), así que el radio sólo decide cuánta niebla atraviesa su rayo: con 900 m la bruma plana se
+ * comía el cielo del alba entero, sin una nube; con 600, el horizonte sigue fundido con la bruma de la
+ * calle y las nubes se ven desde unos 15° de altura.
+ */
+export const RADIO_DEL_CIELO = 600;
 
-export function crearElCielo(): THREE.Mesh {
+/**
+ * La cúpula. `fino` (N1+) retuerce las nubes y pone el segundo techo: tres ruidos más por píxel de
+ * cielo, que en N0 no se pagan.
+ */
+export function crearElCielo(fino = true): THREE.Mesh {
   const material = new THREE.ShaderMaterial({
     name: 'quiebro-cielo',
-    uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), ...UNIFORMES_DEL_CIELO },
+    defines: fino ? { CIELO_FINO: '' } : {},
+    uniforms: {
+      ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+      ...UNIFORMES_DEL_CIELO,
+      uCieloCenit: UNIFORMES_DE_LA_LUZ.uCieloCenit,
+      uCieloHorizonte: UNIFORMES_DE_LA_LUZ.uCieloHorizonte,
+      uNubeOscura: UNIFORMES_DE_LA_LUZ.uNubeOscura,
+      uNubeClara: UNIFORMES_DE_LA_LUZ.uNubeClara,
+      uCobertura: UNIFORMES_DE_LA_LUZ.uCobertura,
+      uResplandor: UNIFORMES_DE_LA_LUZ.uResplandor,
+      uClaroDelCielo: UNIFORMES_DE_LA_LUZ.uClaroDelCielo,
+      uLuzDelCielo: UNIFORMES_DE_LA_LUZ.uLuzDelCielo,
+    },
     vertexShader: VERTICE,
     fragmentShader: FRAGMENTO,
     side: THREE.BackSide,

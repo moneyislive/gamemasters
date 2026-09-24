@@ -62,7 +62,10 @@ import {
   FRENADA_MS,
   RECUPERACION_MS,
   RETRASO_MAXIMO_MS,
+  PICO_DE_LA_REJILLA_DESDE_MS,
+  PICO_DE_LA_REJILLA_MS,
   crearRelojDePresentacion,
+  rejillaDelRemanso,
   retrasoDeUnRemanso,
 } from '../src/quiebro/efectos/reloj';
 import type { RelojDePresentacion } from '../src/quiebro/efectos/reloj';
@@ -557,6 +560,16 @@ paso('El reloj de presentación: el Remanso devuelve exactamente lo que quita');
   );
   const mal = juzgarElReloj(relojQueRecuperaMal(), inicio);
   comprobar('VACUNA: un reloj que recupera a ×1,59 no pasa el juez (le quedan 5 ms sin devolver)', !mal.exacto, mal);
+  const centro = inicio + PICO_DE_LA_REJILLA_DESDE_MS + PICO_DE_LA_REJILLA_MS / 2;
+  comprobar(
+    'la rejilla de glifos del pico: 0,3 s dentro de la frenada, llena en el centro, nada fuera ni sin Remanso',
+    PICO_DE_LA_REJILLA_MS === 300 &&
+      PICO_DE_LA_REJILLA_DESDE_MS + PICO_DE_LA_REJILLA_MS <= FRENADA_MS &&
+      rejillaDelRemanso(inicio, centro) === 1 &&
+      rejillaDelRemanso(inicio, inicio + 10) === 0 &&
+      rejillaDelRemanso(inicio, inicio + PICO_DE_LA_REJILLA_DESDE_MS + PICO_DE_LA_REJILLA_MS + 1) === 0 &&
+      rejillaDelRemanso(null, centro) === 0,
+  );
 }
 
 /* ─────────────────────────────── 3. Las señales de juego ─────────────────────────────── */
@@ -864,4 +877,4 @@ paso('El sistema: asas que caducan, ranuras que no crecen, chispas que se siembr
   );
 }
 
-terminar(73);
+terminar(74);

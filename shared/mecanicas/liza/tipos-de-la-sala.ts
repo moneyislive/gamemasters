@@ -62,8 +62,13 @@
  *      se vio 40 ms antes o después en tiempo de pared, y la persona pulsó con el anillo; la resta no lo
  *      nota. Recalcular `I + desfase de ahora` al juzgar metería la diferencia entre dos estimaciones:
  *      eso es lo que NO se hace.
- *   5. La sala espera la pulsación hasta el tic del impacto más `comp` (`RedDeclarada`), y entonces
- *      resuelve.
+ *   5. La sala espera la pulsación hasta el tic del impacto más `comp` (`RedDeclarada`) MÁS UN TIC
+ *      (`TICS_DEL_AQUI`), y entonces resuelve. El `comp` cubre la red —media ida y vuelta y el error del
+ *      desfase—; el tic de más, que la pulsación viaja en el `aqui` del final de SU tic del aparato, hasta
+ *      50 ms después de pulsar. Sin él, que una esquiva pulsada a tiempo saliera limpia dependía de en qué
+ *      punto de su tic estuviera el aparato (lo midió la revisión del frente de la sala: pulsando 30 ms
+ *      antes del impacto, 63 limpias de 81 combinaciones de fase, desfase y red; con él, todas). Contra
+ *      una entidad, o al aire, no hay pulsación que esperar y se resuelve en el impacto.
  *
  * Lo mismo con la CADENA de golpes del autor: su `tAutor` guardado contra el `ms` de su pulsación. Y
  * con las balas: la salida de cada una en el reloj de cada asiento (`BalaDeLaSala.salidaEnSuReloj`).
@@ -87,9 +92,9 @@
  * ═══ QUÉ PUEDEN LEER LOS DEMÁS DEL ESTADO ═══
  *
  * La E/S y los comprobadores leen `tic`, `declaracion`, `fase` y, de cada asiento, `numero`, `asiento`,
- * `conectado` y `conCuerpo`. Todo lo demás es de la sala: está escrito aquí para que el estado sea dato
- * llano —se puede comparar entre Node y Hermes, guardar y reproducir—, no para que nadie lo toque desde
- * fuera. La única excepción a «dato llano» es `arena`: se deriva de la declaración y viaja por
+ * `conectado` y `conCuerpo`. Todo lo demás es de la sala: está escrito aquí —TODO, también lo que sólo
+ * usa ella para validar y juzgar— para que el estado sea dato llano —se puede comparar entre Node y
+ * Hermes, guardar y reproducir— y lo diga el contrato entero, no para que nadie lo toque desde fuera. La única excepción a «dato llano» es `arena`: se deriva de la declaración y viaja por
  * referencia para no derivarla en cada tic; no se serializa ni se compara.
  */
 import type { Azar } from '../azar';
@@ -101,10 +106,74 @@ import type {
   ResultadoDeRonda,
   VeredictoDeLaLiza,
 } from './declaracion';
-import type { SucesoDelTic, TuplaDeFoto } from './protocolo';
+import type { CodigoDeIrse, SucesoDelTic, TuplaDeFoto } from './protocolo';
 
 /** Cuántos sitios validados guarda la sala de cada asiento: 64 tics, 3,2 s, para juzgar balas. */
 export const TOPE_DEL_RASTRO = 64;
+
+/**
+ * LO QUE TARDA UNA PULSACIÓN EN SALIR DEL APARATO: un tic (ver el punto 5 de la cabecera). La sala espera
+ * un anuncio contra un asiento hasta `impacto + comp` más este tic, y da por buena una pulsación de hasta
+ * `comp` más este tic atrás.
+ */
+export const TICS_DEL_AQUI = 1;
+
+/**
+ * ═══ UN `aqui` VIVO, Y POR QUÉ «DOS SEGUNDOS SIN `aqui`» NO BASTABA ═══
+ *
+ * El ausente momentáneo (`PresenciaDeclarada`) es para el aparato que no está jugando aunque tenga el
+ * canal abierto: la pestaña oculta, la llamada entrante, el WebView en segundo plano. Y el navegador no
+ * siempre PARA esa pestaña: Chrome la FRENA, con los temporizadores a uno por segundo, y el aparato manda
+ * cada segundo sus últimos tics de golpe (el cliente, ocho). Contando sólo «algún `aqui`», nunca pasaban
+ * dos segundos, nunca quedaba ausente —y si quedaba, la ráfaga siguiente lo devolvía—, y el jugador de la
+ * pestaña oculta caía en el primer encuentro sin poder hacer nada (lo vio el frente del cliente).
+ *
+ * Así que lo que cuenta es el `aqui` VIVO: el que cierra una serie de `AQUIS_PARA_ESTAR` tics del aparato
+ * SEGUIDOS (cada `n` el anterior más uno). Un aparato a la vista manda un `aqui` por cada tic suyo, y una
+ * red que se atasca le entrega a la sala muchos de golpe pero sin huecos; uno frenado se salta tics
+ * enteros y tras cada parada manda como mucho `TOPE_DE_AQUIS_DE_GOLPE` (`protocolo.ts`), menos que una
+ * serie: no la hace nunca. Sin `aqui` vivo `ausenteTrasTics`, ausente; y se vuelve al primer `aqui` vivo:
+ * medio segundo seguido de aparato despierto. Conectar un canal y reaparecer cuentan como uno (el aparato
+ * acaba de dar señales de vida y aún no ha podido hacer su serie).
+ *
+ * No se mira si llegan A TIEMPO. Una primera versión lo exigía (a media ida y vuelta de su tic, con tres
+ * de holgura) y cazaba igual a la pestaña frenada; pero ese «a tiempo» se cuenta con el desfase ESTIMADO
+ * del aparato, y un desfase mal estimado en un par de tics dejaba a un jugador despierto ausente para
+ * siempre: intocable, e ignorado por todos. Un fallo así es peor que el que se arregla.
+ *
+ * ═══ Y POR QUÉ ESTAR AUSENTE NO PUEDE SER UNA VENTAJA ═══
+ *
+ * La sala no distingue una pestaña frenada de un aparato que FINGE estarlo: le basta con saltarse un `n`
+ * de cada diez para no hacer nunca su serie. Lo midió la revisión del frente: el ausente de entonces ni
+ * bloqueaba el paso ni las acciones, y un aparato así jugaba el combate entero intocable (el 96 % de los
+ * tics), ignorado por todos, y pegando: 16 774 de daño hecho y ninguno recibido, contra 8 904 y 330 del
+ * honrado en el mismo asiento. Y volviendo con el intocable de quien reaparece —dos segundos— y
+ * callándose otra vez, era intocable el 81 % del tiempo sin dejar nunca de pelear. Así que la regla es que
+ * al ausente sólo se llega SIN JUGAR, y que estar ausente CUESTA lo que protege:
+ *   · QUIEN JUEGA NO SE QUEDA AUSENTE. Un `aqui` que pulsa algo o que se mueve aleja el ausente igual que
+ *     uno vivo: una pestaña oculta no genera ninguno de los dos (el aparato suelta los mandos al ocultarse),
+ *     y un aparato que se salta tics pero sigue peleando no llega nunca a él. Sin esto, cada vez que le
+ *     llegaba el ausente se le cortaba todo lo que le habían lanzado en el último segundo, y callarse con
+ *     huecos, volver y seguir era negocio aunque el ausente no dejara pegar. Con esto, a quien juega el
+ *     ausente no le toca: su sala sale igual, suceso a suceso, que si no existiera (bloque 22 de
+ *     `verify:liza`). Sólo el `aqui` vivo, en cambio, SACA del ausente: un aparato frenado con un mando
+ *     atascado no sale y entra cada segundo.
+ *   · EL AUSENTE NI ANDA NI PEGA. Su estado bloquea el paso y las acciones —`problemasDeLaDeclaracion` lo
+ *     exige— y quien queda ausente se queda sin lo que tenía empezado: lo que lanzó y no ha llegado sale
+ *     `cortada` (entra en un estado que bloquea: ver `combate.ts`), también el golpe tras el vuelo, y sus
+ *     esquivas se olvidan (una bala que lo cruza lo juzga su intocable, no una ventana).
+ *   · LA VUELTA ES CORTA Y NO SIRVE PARA PEGAR. Vuelve con la puesta de quien reaparece recortada a
+ *     `TICS_DE_LA_VUELTA` —medio segundo de intocable: lo que tarda en ver lo que tiene delante, que un
+ *     golpe que no vio venir no lo reciba en su primer tic—, y esa vuelta SE ACABA en cuanto empieza una
+ *     acción (golpe, esquiva o sostenida), con su intocable. Intocable y pegando a la vez, nunca.
+ *   · Y SE CUENTA ENTERO. El ausente que «se fue» (`seFue` en `cuerpo.ts`) suma todos los ratos de la fase
+ *     (`CuerpoDeAsiento.ausenteAcumulado`), no sólo el de ahora: con 57 segundos oculto y uno a la vista en
+ *     bucle, nunca llegaba a sesenta seguidos y el encuentro en solitario acababa AGUANTADO sin jugarlo.
+ */
+export const AQUIS_PARA_ESTAR = 10;
+
+/** Lo que dura, como mucho, la vuelta del ausente: su intocable corto (ver arriba). Medio segundo. */
+export const TICS_DE_LA_VUELTA = 10;
 
 /* ─── LO QUE ENTRA ───────────────────────────────────────────────────────── */
 
@@ -220,9 +289,10 @@ export interface Correccion {
  * orden: la `fase` vigente (con lo que le queda a cada reloj); el `recurso`; una `cuenta` por asiento;
  * una `carga` por asiento y portable que lleve algo; un `nace` por entidad viva (en su sitio de ahora);
  * un `estado` por cuerpo que esté en alguno (con los tics que LE QUEDAN); un `monton` por montón; la
- * `zona` activa si la hay; una `bala` por bala en vuelo y un `anuncio` por anuncio pendiente, los dos con
- * el instante en SU reloj nuevo. Sin esto, quien reconecta vería una plaza vacía con golpes que salen de
- * la nada: es el mismo papel que `vidas` tiene en el canal de botas.
+ * `zona` activa si la hay; una `bala` por bala en vuelo, un `apunta` por entidad que esté apuntando y un
+ * `anuncio` por anuncio pendiente, los tres con el instante en SU reloj nuevo. Sin esto, quien reconecta
+ * vería una plaza vacía con golpes que salen de la nada: es el mismo papel que `vidas` tiene en el canal
+ * de botas.
  *
  * El aparato, al recibir `dentro`, TIRA todo lo que sabía de la sala y se queda con lo que venga detrás:
  * no sabe qué se perdió, y una sala que renació tras un despliegue no tiene nada que ver con la de antes.
@@ -393,6 +463,59 @@ export interface CuerpoDeAsiento {
   readonly ultimoAvisoEnTic: number;
   /** Si ya se metió su `arcade:ausente` en esta fase. */
   readonly ausenteDado: boolean;
+  /**
+   * Cuántos `aqui` de tics del aparato seguidos lleva AHORA (ver `AQUIS_PARA_ESTAR`): vuelve a 1 con un
+   * hueco en los `n`, y a 0 con cada canal nuevo. Llegar tarde no lo corta: ver por qué en la cabecera de
+   * `AQUIS_PARA_ESTAR`.
+   */
+  readonly aquisSeguidos: number;
+  /**
+   * El tic de la sala de su último `aqui` VIVO (el que cierra una serie de `AQUIS_PARA_ESTAR`) o que JUEGA
+   * (pulsa algo o se mueve), o de lo que cuenta como tal: conectar un canal y reaparecer. El ausente
+   * momentáneo se cuenta desde aquí.
+   */
+  readonly vivoEnTic: number;
+  /**
+   * Hasta este tic de la sala (excluido) dura la VUELTA del ausente —la puesta de reaparición recortada a
+   * `TICS_DE_LA_VUELTA`—, que se acaba al empezar cualquier acción; −1 si no está volviendo. Sirve para
+   * no confundirla con la reaparición tras caer, que tiene la misma puesta y no se acaba así.
+   */
+  readonly vueltaHastaTic: number;
+  /**
+   * Los tics que lleva ausente en esta fase SIN contar el rato de ahora: cada vuelta suma el suyo. Con él
+   * se mira si «se fue» (ver `seFue`): el ausente se cuenta entero, no sólo el último rato.
+   */
+  readonly ausenteAcumulado: number;
+  /*
+   * ── LO QUE LA SALA LLEVA PARA VALIDAR Y JUZGAR ──
+   *
+   * La primera sala los llevaba en tipos suyos que extendían éstos (`paso-en-curso.ts`); se suben al
+   * contrato porque entran en la huella canónica —se comparan entre Node y Hermes y se guardan con un
+   * fallo— y un estado con campos que el contrato no dice es un estado que nadie más sabe leer.
+   */
+  /**
+   * El tic de la sala del último `corrige` pendiente, o −1: EL SILENCIO TRAS CORREGIR. Los `aqui` que ya
+   * venían de camino desde el sitio malo no se corrigen otra vez durante un segundo (lo aprendió Boots on
+   * Board: si no, el aparato salta atrás por cada paso que tenía en vuelo).
+   */
+  readonly corregidoEnTic: number;
+  /**
+   * CUÁLES venían de camino: los de tic del aparato hasta éste, aquél en que el `corrige` le llega (el tic
+   * de la sala más media ida y vuelta, en su reloj, y uno de margen). Los de después ya salieron desde el
+   * sitio corregido y se validan como cualquiera.
+   */
+  readonly enVueloHastaN: number;
+  /** El `n` del `aqui` del que salió el sitio de ahora (`x`, `z`), o −1 si lo puso la sala (la escuadra es para UN tic del aparato). */
+  readonly nDelSitio: number;
+  /**
+   * Hasta este tic de la sala (excluido) el presupuesto corto puede pasar de su tope: la DISTANCIA EXTRA
+   * que dio una esquiva, un avance o un empujón, con la gracia de lo que tarda en llegar su último `aqui`.
+   */
+  readonly extraHastaTic: number;
+  /** Hasta este tic de la sala (excluido) sólo puede empezar acciones que se encadenen (`recuperacionTics`). */
+  readonly recuperaHastaTic: number;
+  /** Hasta este tic de la sala (incluido) ya se juzgaron las balas contra él: cada asiento declara sus sitios con su retraso. */
+  readonly balasHastaTic: number;
 }
 
 /**
@@ -447,6 +570,8 @@ export interface EntidadDeLaSala {
   readonly cerebro: CerebroEnCurso;
   readonly cadena: EslabonDeLaCadena | null;
   readonly recargas: readonly { readonly accion: IdDeclarado; readonly hastaTic: number }[];
+  /** Hasta este tic de la sala (excluido) no abre otro ataque: la recuperación de su último golpe. */
+  readonly recuperaHastaTic: number;
 }
 
 /**
@@ -472,10 +597,22 @@ export interface AnuncioPendiente {
   readonly tAutor: number | null;
   /** Se lanzó al ritmo (anuncio corto y efecto al ritmo). */
   readonly alRitmo: boolean;
-  /** Lo que la sala esperará una esquiva tras el impacto: el `comp` del blanco al anunciar, en ms. */
+  /**
+   * Lo que la sala esperará una esquiva tras el impacto: el `comp` del blanco al anunciar, en ms. Se
+   * resuelve en `impactoEnTic + ticsQueCubren(esperaMs) + TICS_DEL_AQUI` (ver el punto 5 de la cabecera).
+   */
   readonly esperaMs: number;
   /** Si es la repetición sin autor de otro (ver `TurnosDeclarados.repetirTrasTics`): no se vuelve a repetir. */
   readonly esRepeticion: boolean;
+  /**
+   * EL AVANCE DE UN GOLPE DE ASIENTO (Q16.16): lo que su aparato puede acercarse desde `x, z` hasta el
+   * impacto —el `avance` de la acción; en el golpe tras el vuelo contra una bala, el vuelo y ese avance—,
+   * y lo más que anda en un tic haciéndolo. Con eso se juzga si llega (`llegaConSuAvance` en `combate.ts`):
+   * la sala sólo le da por andado lo que puede estar todavía de camino en los tics que aún no ha visto.
+   * 0 en los golpes de entidad (su avance lo hace la sala) y en las acciones sin avance.
+   */
+  readonly avance: number;
+  readonly avancePorTic: number;
 }
 
 /** UNA BALA EN VUELO. Su sitio en cada tic sale de aquí con `geometria.desplazado`. */
@@ -494,6 +631,14 @@ export interface BalaDeLaSala {
    * impacto contra el asiento `i` cae en `salidaEnSuReloj[i] + tics de vuelo × MS_POR_TIC`.
    */
   readonly salidaEnSuReloj: readonly number[];
+  /** El tic de la sala en que se para (contra la estructura o por su alcance), calculado al salir. */
+  readonly finTic: number;
+  /** Por qué se para en `finTic`: `choca` o `alcance` (`MOTIVO_DE_IRSE`). */
+  readonly finPor: CodigoDeIrse;
+  /** Los asientos contra los que ya se juzgó, un bit por número: la que atraviesa a quien la esquivó no lo juzga otra vez. */
+  readonly juzgadaContra: number;
+  /** Lo que recorre antes de pararse, en Q16.16 (ver `paradaDeLaBala` en `proyectiles.ts`). */
+  readonly parada: number;
 }
 
 /** UN MONTÓN en el suelo. */
@@ -549,7 +694,11 @@ export interface FaseEnCurso {
   readonly clave: string;
   /** El tic de la sala en que EMPEZÓ (ver `FaseDeLaLiza`): de aquí cuenta su reloj. */
   readonly desdeTic: number;
-  /** Si ya emitió el `arcade:reloj` de esta fase. */
+  /**
+   * Si ya emitió el `arcade:reloj` del reloj VIGENTE de esta fase. La mesa puede cambiar el reloj sin
+   * cambiar de fase (acortarlo cuando ya están todos: ver `RelojDeFase`); un reloj con otro `id` vuelve a
+   * armarlo.
+   */
   readonly relojDado: boolean;
 }
 

@@ -37,10 +37,12 @@ import {
   PRIMER_NUMERO_DE_ENTIDAD,
   RESULTADO,
   RETRASO_DE_LOS_DEMAS_MS,
+  TOPE_DE_AQUIS_DE_GOLPE,
 } from '../../../../shared/mecanicas/liza/protocolo';
 import type { AccionDelAparato, MensajeDeLaSala } from '../../../../shared/mecanicas/liza/protocolo';
 import type { Barrio } from '../../../../shared/arcade/juegos/quiebro-barrio';
 import { durmienteMasCercano } from '../../../../shared/arcade/juegos/quiebro-durmientes';
+import { QUIEBRO_DEL_DESVELADO } from '../../../../shared/arcade/juegos/quiebro-reglas';
 import type { ClaseDeCuerpo, CuerpoPintado, FuenteDeCuerpos, Gesto } from '../cuerpos';
 import type { Boton, EstadoDeLosMandos } from '../mandos/estado';
 import { direccionDeLaPalanca } from '../mandos/estado';
@@ -60,8 +62,12 @@ import type { AnuncioVisto, Novedad } from './sala-vista';
 /** Los colores de asiento (contorno y forro): saturados, distintos del ámbar del jugador y del verde del código. */
 export const COLORES_DE_ASIENTO: readonly string[] = ['#ff4d6d', '#46c8ff', '#b4ff4a', '#c38bff', '#ff9a3c', '#fff04d'];
 
-/** Cuántos tics se ponen al día de golpe como mucho (una pestaña que vuelve de estar oculta no manda 400 `aqui`). */
-const TICS_DE_GOLPE = 8;
+/**
+ * Cuántos tics se MANDAN de golpe como mucho tras una parada (una pestaña que vuelve de estar oculta no
+ * manda 400 `aqui`). Es el `TOPE_DE_AQUIS_DE_GOLPE` del protocolo: la sala cuenta con que no pase de ahí
+ * para distinguir una pestaña frenada (que se salta tics) de una despierta (ver `AQUIS_PARA_ESTAR`).
+ */
+const TICS_DE_GOLPE = TOPE_DE_AQUIS_DE_GOLPE;
 /** Lo más atrás que se simula tras una parada larga: dos segundos. */
 const TICS_QUE_SE_RECUPERAN = 40;
 /** Para correr sin Mayúsculas: palanca a fondo 0,8 s y sin enemigos a menos de 8 m (diseño §4.2). */
@@ -73,12 +79,16 @@ const ENEMIGOS_QUE_ABREN_LA_CAMARA_M = 5;
 const COLA_DEL_GOLPE_MS = 260;
 /** Lo que dura el viaje de mi quiebro: los seis primeros tics (diseño §4.3). */
 const TICS_DEL_VIAJE_DEL_QUIEBRO = 6;
+/** Lo que la sala admite de más sobre el quiebro, en Q16.16: no se anda (ver `empezarElQuiebro`). */
+const HOLGURA_DEL_QUIEBRO = Math.round(QUIEBRO_DEL_DESVELADO.holguraMetros * UNO);
 /** Lo que tarda en llegar un empujón que recibo. */
 const TICS_DEL_EMPUJON = Math.round(EMPUJON_MS / MS_POR_TIC);
 /** En el Apagón, más allá de esto los enemigos no llevan contorno (diseño §6.3). */
 const CONTORNO_EN_EL_APAGON_M = 15;
 /** Los ms que se tarda en girar la cara hacia donde se va. */
 const GIRO_DE_LA_CARA_S = 0.09;
+/** Lo que dura el rótulo «de vuelta» tras dejar de estar ausente. */
+export const ROTULO_DE_LA_VUELTA_MS = 2500;
 
 /** Lo que USAR hace aquí y ahora (para el botón y para el cable). */
 export interface UsoPosible {
@@ -158,8 +168,25 @@ export class Partida implements FuenteDeCuerpos {
   blanco = 0;
   /** Quien falló el último golpe contra mi quiebro limpio: a quien va la Réplica. */
   private autorDelLimpio = 0;
+  /**
+   * LA ACOMETIDA A MEDIAS: tras el vuelo hacia el tirador, el avance de la acción que la sala lanzó con él
+   * (la Réplica), si al acabar de volar aún no llego. La sala juzga el golpe con el vuelo y ese avance
+   * juntos (`contraProyectil` en `declaracion.ts`): sin él, un tirador a más de diez metros y pico se
+   * quedaba fuera de alcance.
+   */
+  private acometidaPendiente: { tirador: number; accion: IdDeclarado } | null = null;
   /** ¿Se ha dado ya algún paso en esta partida? (el rótulo «Muévete» de la primera noche). */
   seHaMovido = false;
+  /**
+   * AL FONDO (`mandos/fondo.ts`): la pestaña oculta, la página que se va o la app en segundo plano. Callado,
+   * el aparato no da tics ni manda `aqui`, y la sala lo da por ausente a los 2 s; al volver, la parada se
+   * recupera como cualquier otra (se simulan los tics perdidos y salen como mucho `TICS_DE_GOLPE`).
+   */
+  private callada = false;
+  /** Desde cuándo la sala me tiene por ausente (ms de `performance.now()`), o `null`. */
+  private ausenteDesdeMs: number | null = null;
+  /** Cuándo volví de estar ausente (el primer estado que no lo es), para el rótulo de la vuelta. */
+  private vueltaMs = Number.NEGATIVE_INFINITY;
   /**
    * La avería del Apagón (diseño §6.3): los enemigos pierden el contorno a más de 15 m, igual en todos
    * los aparatos. Lo pone quien lee la vista.
@@ -235,6 +262,7 @@ export class Partida implements FuenteDeCuerpos {
     this.sostenida = null;
     this.eslabon = null;
     this.gesto = null;
+    this.acometidaPendiente = null;
   }
 
   private alMensaje(m: MensajeDeLaSala, reloj: RelojDelCanal, ahora: number): void {
@@ -257,6 +285,8 @@ export class Partida implements FuenteDeCuerpos {
         this.conjuntoDePrestados.clear();
         this.tengoCuerpo = true;
         this.recolocarDesdeLaFoto = false;
+        /* La puesta al día vuelve a mandar mi estado, ausente incluido, si lo estoy. */
+        this.ausenteDesdeMs = null;
         this.miraPropia = radianesDelRumbo(n.r);
         this.miraPintada = this.miraPropia;
         this.paso?.colocar(n.x, n.z);
@@ -271,6 +301,7 @@ export class Partida implements FuenteDeCuerpos {
           this.antesX = this.paso.x;
           this.antesZ = this.paso.z;
           if (this.gesto !== null && (this.gesto.gesto === 'quiebro' || this.gesto.gesto === 'avance')) this.gesto = null;
+          this.acometidaPendiente = null;
         }
         return;
       case 'fuera':
@@ -313,6 +344,13 @@ export class Partida implements FuenteDeCuerpos {
       case 'estado': {
         if (s.a !== yo) return;
         const sentido = lectura?.sentidoDelEstado(s.est) ?? 'otro';
+        /* La ausencia (el HUD la cuenta): desde cuándo, y cuándo se volvió de ella. */
+        if (sentido === 'ausente') {
+          if (this.ausenteDesdeMs === null) this.ausenteDesdeMs = ahora;
+        } else if (this.ausenteDesdeMs !== null) {
+          this.ausenteDesdeMs = null;
+          this.vueltaMs = ahora;
+        }
         if (sentido === 'sin-cuerpo') {
           this.tengoCuerpo = false;
           this.paso?.pararElDesplazamiento();
@@ -403,12 +441,22 @@ export class Partida implements FuenteDeCuerpos {
         const x = this.paso.x / UNO;
         const z = this.paso.z / UNO;
         const lejos = Math.hypot(tirador.x - x, tirador.z - z);
-        const alcance = (lectura.accion(contra.accion)?.alcance ?? UNO) / UNO;
+        const accion = lectura.accion(contra.accion);
+        const alcance = (accion?.alcance ?? UNO) / UNO;
         const vuelo = Math.max(0, Math.min(contra.distancia / UNO, lejos - alcance));
+        /*
+         * El impacto va detrás del vuelo y del anuncio de la acción. La sala lanza la Réplica en el mismo
+         * tic de la limpia, y su `anuncio` viene en el mismo lote: si llegó delante, su instante manda (si
+         * llega detrás, lo pone el `anuncio`, como a cualquier golpe mío).
+         */
+        let impactoMs = ahora + (contra.tics + (accion?.anuncioTics ?? 0)) * MS_POR_TIC;
+        for (const an of this.sala.anuncios.values()) if (an.de === yo && an.acc === contra.accion && an.impactoMs > ahora) impactoMs = an.impactoMs;
         if (vuelo > 0.1) {
           const rumbo = rumboDeRadianes(direccionHacia(tirador.x - x, tirador.z - z));
           this.paso.desplazar(rumbo, Math.round(vuelo * UNO), Math.max(1, contra.tics), false);
-          this.gesto = { gesto: 'avance', desdeMs: ahora, impactoMs: ahora + contra.tics * MS_POR_TIC, hastaMs: ahora + contra.tics * MS_POR_TIC + COLA_DEL_GOLPE_MS, direccion: radianesDelRumbo(rumbo), accion: contra.accion };
+          this.gesto = { gesto: 'avance', desdeMs: ahora, impactoMs, hastaMs: impactoMs + COLA_DEL_GOLPE_MS, direccion: radianesDelRumbo(rumbo), accion: contra.accion };
+          /* Y al acabar de volar, el avance de la acción si aún no llego (ver `acometidaPendiente`). */
+          if (accion !== null && accion.avance > 0) this.acometidaPendiente = { tirador: n.bala === null ? 0 : n.bala.de, accion: contra.accion };
         }
         return;
       }
@@ -417,11 +465,45 @@ export class Partida implements FuenteDeCuerpos {
     }
   }
 
-  /** EL GUION DE UN GOLPE AJENO: sale de donde se pinta al sitio del anuncio y la acometida hacia su blanco. */
+  /**
+   * EL AVANCE DE LA ACCIÓN TRAS EL VUELO DE LA ACOMETIDA: hacia el tirador, lo que le falte hasta su
+   * alcance y no más que el avance de la acción, en los tics de su anuncio (como la acometida de un golpe
+   * pulsado). Si ya llego, nada.
+   */
+  private seguirLaAcometida(): void {
+    const pendiente = this.acometidaPendiente;
+    this.acometidaPendiente = null;
+    const l = this.lectura;
+    if (pendiente === null || l === null || this.paso === null) return;
+    const accion = l.accion(pendiente.accion);
+    const tirador = this.porNumero.get(pendiente.tirador);
+    if (accion === null || tirador === undefined) return;
+    const x = this.paso.x / UNO;
+    const z = this.paso.z / UNO;
+    const avanza = Math.max(0, Math.min(accion.avance / UNO, Math.hypot(tirador.x - x, tirador.z - z) - accion.alcance / UNO));
+    if (avanza <= 0.05) return;
+    this.paso.desplazar(rumboDeRadianes(direccionHacia(tirador.x - x, tirador.z - z)), Math.round(avanza * UNO), Math.max(1, accion.anuncioTics), false);
+  }
+
+  /**
+   * EL GUION DE UN GOLPE AJENO: sale de donde se pinta al sitio del anuncio y la acometida hacia su blanco.
+   *
+   * ═══ LA ACOMETIDA AJENA SE VUELA ENTERA ═══
+   *
+   * Contra una bala, el limpio de un compañero lanza su Réplica en el mismo tic (la sala la juzga con el
+   * vuelo y el avance juntos: `contraProyectil`), así que lo que llega aquí es el anuncio de una Réplica
+   * con un anuncio LARGO —el vuelo más el suyo— desde donde estaba al quebrar. Con sólo el avance de la
+   * acción (unos 4 m) el guion lo dejaba a medio camino y la foto, al alcanzarlo, lo arrastraba por el
+   * aire hasta el tirador: se veía un salto corto y luego un deslizamiento de diez metros. Así que si el
+   * anuncio es de la acción `contraProyectil` de su asiento y le queda más que su anuncio y medio vuelo,
+   * es una Acometida: el guion vuela el vuelo y el avance, y LLEGA AL IMPACTO (no a la cola del golpe:
+   * catorce metros que llegan tarde son un puño que no toca).
+   */
   private guionDelGolpe(a: AnuncioVisto, ahora: number): void {
     const lectura = this.lectura;
     if (lectura === null) return;
     const accion = lectura.accion(a.acc);
+    const acometida = this.esUnaAcometida(a, accion, ahora);
     let destinoX = a.x;
     let destinoZ = a.z;
     let rumbo: number | null = null;
@@ -431,23 +513,37 @@ export class Partida implements FuenteDeCuerpos {
       const dz = blanco.z - a.z;
       rumbo = direccionHacia(dx, dz);
       const lejos = Math.hypot(dx, dz);
-      if (accion !== null && accion.avance > 0 && lejos > 0.01) {
-        const avanza = Math.max(0, Math.min(accion.avance / UNO, lejos - accion.alcance / UNO));
+      const hasta = (accion?.avance ?? 0) + acometida;
+      if (accion !== null && hasta > 0 && lejos > 0.01) {
+        const avanza = Math.max(0, Math.min(hasta / UNO, lejos - accion.alcance / UNO));
         destinoX += (dx / lejos) * avanza;
         destinoZ += (dz / lejos) * avanza;
       }
     }
     const recuperacion = accion === null ? 0 : accion.recuperacionTics * MS_POR_TIC;
     this.linea(a.de).empezar({
-      gesto: lectura.gestoDeLaAccion(a.acc),
+      gesto: acometida > 0 ? 'avance' : lectura.gestoDeLaAccion(a.acc),
       desdeMs: ahora,
-      finMs: Math.max(ahora + 1, a.impactoMs + Math.max(COLA_DEL_GOLPE_MS, recuperacion)),
+      finMs: acometida > 0 ? Math.max(ahora + 1, a.impactoMs) : Math.max(ahora + 1, a.impactoMs + Math.max(COLA_DEL_GOLPE_MS, recuperacion)),
       impactoMs: a.impactoMs,
       destinoX,
       destinoZ,
       rumbo,
       direccion: rumbo,
     });
+  }
+
+  /**
+   * ¿ES EL ANUNCIO DE UNA ACOMETIDA? Lo que vuela (Q16.16) si lo es, 0 si no. Un asiento, la acción que
+   * su reglamento lanza contra una bala, y un anuncio que tarda más que el suyo y medio vuelo: la misma
+   * Réplica tras un quiebro cuerpo a cuerpo no vuela.
+   */
+  private esUnaAcometida(a: AnuncioVisto, accion: AccionDeclarada | null, ahora: number): number {
+    const l = this.lectura;
+    if (l === null || accion === null || a.de <= 0 || a.de >= PRIMER_NUMERO_DE_ENTIDAD) return 0;
+    const contra = l.liza.asientos[a.de - 1]?.esquiva.contraProyectil;
+    if (contra === undefined || contra.accion !== a.acc || contra.distancia <= 0) return 0;
+    return a.impactoMs - ahora > (accion.anuncioTics + contra.tics / 2) * MS_POR_TIC ? contra.distancia : 0;
   }
 
   private linea(numero: number): LineaDelCuerpo {
@@ -472,6 +568,35 @@ export class Partida implements FuenteDeCuerpos {
   /** ¿Tengo cuerpo? (sin él, Vigía). */
   conCuerpo(): boolean {
     return this.tengoCuerpo;
+  }
+
+  /** Al fondo o de vuelta (ver `callada`). */
+  callar(alFondo: boolean): void {
+    this.callada = alFondo;
+    if (alFondo) {
+      this.sostenida = null;
+      this.pendientes.length = 0;
+    }
+  }
+
+  /** ¿Está callada por irse al fondo? */
+  estaCallada(): boolean {
+    return this.callada;
+  }
+
+  /**
+   * MI AUSENCIA, para el HUD: `ausente` mientras la sala me tiene por ausente; `vuelta` los primeros
+   * `ROTULO_DE_LA_VUELTA_MS` tras volver; `null` si nada.
+   */
+  ausencia(ahora: number): 'ausente' | 'vuelta' | null {
+    if (this.lectura !== null && this.tengoCuerpo && this.sentidoPropio(ahora) === 'ausente') return 'ausente';
+    return ahora - this.vueltaMs < ROTULO_DE_LA_VUELTA_MS ? 'vuelta' : null;
+  }
+
+  /** Lo que significa ahora el estado del cuerpo `numero` (un asiento o una entidad). */
+  sentidoDe(numero: number, ahora: number): SentidoDelEstado {
+    const l = this.lectura;
+    return l === null ? 'libre' : l.sentidoDelEstado(this.sala.estadoEn(numero, ahora));
   }
 
   /** ¿Estoy jugando de verdad? (canal dentro, liza leída, un asiento en ella). */
@@ -695,6 +820,17 @@ export class Partida implements FuenteDeCuerpos {
     }
     if (accion === 0) return;
     const declarada = l.accion(accion);
+    /*
+     * A MEDIA ANUNCIO SÓLO VALE ENCADENAR, como en la sala (`intentarGolpe` en `combate.ts`): con un golpe
+     * mío anunciado y sin resolver, la sala tira toda pulsación que no sea el eslabón siguiente dentro de su
+     * ventana. Aquí se tira igual, sin mandarla, sin mover el cuerpo y sin cambiar el gesto. Antes el
+     * aparato la atendía: GOLPE a media Acometida (el estado es el Remanso, que no bloquea) sustituía el
+     * vuelo por el avance de una Réplica que la sala nunca lanzó, y la Acometida se juzgaba con el cuerpo
+     * parado a seis metros del tirador (medido en el juego el 24-sep: 15,9 m al empezar, 6,1 al acabar,
+     * fallada; sin tocar nada, 2,1 m y dada). El QUIEBRO no pasa por aquí: en la sala va por otro camino
+     * (`empezarEsquiva`), que no mira lo anunciado.
+     */
+    if (boton !== 'quiebro' && !this.cabeTrasMiGolpe(declarada, timeStamp)) return;
     const blanco = boton === 'quiebro' ? 0 : this.blancoDe(declarada, palancaX, palancaY);
     if (blanco !== 0) this.blanco = blanco;
     this.pendientes.push([accion, ms, blanco]);
@@ -706,10 +842,21 @@ export class Partida implements FuenteDeCuerpos {
       return;
     }
     if (declarada === null) return;
+    /*
+     * ¿LA LANZA LA SALA YA? Libre, en un estado que no bloquea las acciones (el Remanso, el intocable de quien
+     * reaparece o vuelve de estar ausente) o en mi quiebro desde su tic soltable. Entonces la acometida la
+     * hago yo, entera: la sala sólo me da por andado lo que puede ir de camino en los `aqui` que aún no ha
+     * visto, no lo que no anduve (`llegaConSuAvance` en `combate.ts`).
+     */
+    const est = this.sala.estadoEn(this.sala.yo, ahora);
+    const declaradoEst = est === 0 ? null : l.estado(est);
+    const miQuiebro = this.gesto !== null && this.gesto.gesto === 'quiebro' ? this.gesto : null;
+    const saleYa =
+      declaradoEst === null || !declaradoEst.bloqueaAccion || (sentido === 'quiebro' && miQuiebro !== null && timeStamp >= miQuiebro.desdeMs + r.esquiva.puesta.soltableDesdeTic * MS_POR_TIC);
     const impactoMs = timeStamp + declarada.anuncioTics * MS_POR_TIC;
     this.gesto = { gesto: l.gestoDeLaAccion(accion), desdeMs: timeStamp, impactoMs, hastaMs: impactoMs + COLA_DEL_GOLPE_MS, direccion: null, accion };
     const objetivo = blanco === 0 ? undefined : this.porNumero.get(blanco);
-    if (objetivo !== undefined && declarada.avance > 0 && (sentido === 'libre' || sentido === 'remanso')) {
+    if (objetivo !== undefined && declarada.avance > 0 && saleYa) {
       const x = this.paso.x / UNO;
       const z = this.paso.z / UNO;
       const lejos = Math.hypot(objetivo.x - x, objetivo.z - z);
@@ -720,6 +867,37 @@ export class Partida implements FuenteDeCuerpos {
         this.gesto.direccion = radianesDelRumbo(rumbo);
       }
     }
+  }
+
+  /**
+   * MI GOLPE PENDIENTE en el instante `t`: el anuncio mío que la sala aún no ha resuelto y cuyo impacto no
+   * ha llegado, o `null`. Es lo que mira la sala (`anuncioDelAutor`) con el reloj del aparato. La
+   * Acometida entra por aquí sin más: el anuncio de su Réplica sale en el mismo tic que la limpia y llega
+   * en el mismo lote, que se atiende entero antes de mirar ninguna pulsación. Una pulsación de DESPUÉS del
+   * impacto no lo tiene pendiente aunque el `resuelve` aún no haya llegado: cuando su `aqui` llegue a la
+   * sala, la sala ya lo habrá resuelto.
+   */
+  private golpePendiente(t: number): { readonly accion: IdDeclarado; readonly impactoMs: number } | null {
+    const yo = this.sala.yo;
+    let el: { accion: IdDeclarado; impactoMs: number } | null = null;
+    for (const an of this.sala.anuncios.values()) {
+      if (an.de === yo && an.impactoMs > t && (el === null || an.impactoMs > el.impactoMs)) el = { accion: an.acc, impactoMs: an.impactoMs };
+    }
+    return el;
+  }
+
+  /**
+   * ¿La sala atendería ahora `accion`, pulsada en `t`, con lo que tengo anunciado? Sin golpe pendiente,
+   * sí (lo demás lo juzga ella). Con él, sólo si es un eslabón que va tras él y cae en su ventana, de
+   * `antesMs` antes del impacto a `despuesMs` después.
+   */
+  private cabeTrasMiGolpe(accion: AccionDeclarada | null, t: number): boolean {
+    const pendiente = this.golpePendiente(t);
+    if (pendiente === null) return true;
+    const c = accion?.cadena ?? null;
+    if (c === null || !c.tras.includes(pendiente.accion)) return false;
+    const delta = t - pendiente.impactoMs;
+    return delta >= -c.antesMs && delta <= c.despuesMs;
   }
 
   /** El quiebro: hacia la palanca o, suelta, de lado respecto a la amenaza más próxima (diseño §4.3). */
@@ -736,7 +914,14 @@ export class Partida implements FuenteDeCuerpos {
     let direccion = direccionDeLaPalanca(palancaX, palancaY, this.giroDeLaCamara);
     if (direccion === null) direccion = this.ladoDelQuiebro();
     const tics = Math.min(TICS_DEL_VIAJE_DEL_QUIEBRO, puesta.tics);
-    if (puesta.distanciaExtra > 0) this.paso.desplazar(rumboDeRadianes(direccion), puesta.distanciaExtra, tics, false);
+    /*
+     * Lo que se quiebra es lo del estilo (3,5 m la Gabardina, diseño §4.3), no lo que la sala admite: la
+     * puesta declara el quiebro MÁS la holgura del presupuesto (`QUIEBRO_DEL_DESVELADO.holguraMetros`), y el
+     * aparato se comía esa holgura entera —quebraba 4 m— mientras las tarjetas, la tabla y el diseño
+     * decían 3,5.
+     */
+    const distancia = Math.max(0, puesta.distanciaExtra - HOLGURA_DEL_QUIEBRO);
+    if (distancia > 0) this.paso.desplazar(rumboDeRadianes(direccion), distancia, tics, false);
     this.gesto = { gesto: 'quiebro', desdeMs: timeStamp, impactoMs: null, hastaMs: timeStamp + puesta.tics * MS_POR_TIC, direccion, accion: r.esquiva.accion };
   }
 
@@ -780,6 +965,8 @@ export class Partida implements FuenteDeCuerpos {
     const l = this.lectura;
     const paso = this.paso;
     if (reloj === null || l === null || paso === null || !this.canal.dentro() || this.sala.yo === 0) return;
+    /* Al fondo, ni tics ni `aqui`: la parada se recupera al volver, como la de una pestaña frenada. */
+    if (this.callada) return;
     const n = reloj.tic(ahora);
     if (this.ultimoTicSimulado < 0) this.ultimoTicSimulado = n - 1;
     if (n <= this.ultimoTicSimulado) return;
@@ -802,6 +989,7 @@ export class Partida implements FuenteDeCuerpos {
     const est = this.sala.estadoEn(this.sala.yo, ahora);
     const declarado = est === 0 ? null : l.estado(est);
     const bloqueado = declarado !== null && declarado.bloqueaPaso;
+    if (this.acometidaPendiente !== null && !paso.desplazandose()) this.seguirLaAcometida();
     const dado = paso.paso(
       { rumbo: direccion === null ? null : rumboDeRadianes(direccion), fuerza: this.mandos.fuerza, correr },
       bloqueado,
@@ -985,7 +1173,8 @@ export class Partida implements FuenteDeCuerpos {
         c.direccionDelGesto = null;
       }
       c.contorno = true;
-      c.tenue = !this.tengoCuerpo;
+      /* Ausente, mi cuerpo se ve tenue: la calle no me ve, y así lo sé también sin leer el rótulo. */
+      c.tenue = !this.tengoCuerpo || l.sentidoDelEstado(est) === 'ausente';
       if (this.tengoCuerpo) {
         lista.push(c);
         vivos.add(yo);
@@ -1058,7 +1247,8 @@ export class Partida implements FuenteDeCuerpos {
       }
       const mio = yo > 0 ? this.porNumero.get(yo) : undefined;
       c.contorno = !(this.apagon && numero >= PRIMER_NUMERO_DE_ENTIDAD && mio !== undefined && Math.hypot(c.x - mio.x, c.z - mio.z) > CONTORNO_EN_EL_APAGON_M);
-      c.tenue = false;
+      /* Un compañero ausente, en tenue: está, pero ni se le ve la calle ni la calle a él (ver el HUD). */
+      c.tenue = numero < PRIMER_NUMERO_DE_ENTIDAD && sentido === 'ausente';
       lista.push(c);
       vivos.add(numero);
     }

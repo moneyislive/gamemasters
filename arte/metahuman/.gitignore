@@ -1,0 +1,4 @@
+# Las exportaciones de MetaHuman no se versionan: pesan cientos de megas y se rehacen desde Unreal (ver docs/quiebro/METAHUMAN.md).
+*
+!.gitignore
+!README.md

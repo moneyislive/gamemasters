@@ -54,6 +54,7 @@ import type { CodigoDeResultado } from './protocolo';
 import {
   bloqueaLaAccion,
   contar,
+  dejarDeApuntar,
   enCurso,
   ensuciarCuenta,
   estadoSinFin,
@@ -73,6 +74,7 @@ import type { AsientoEnCurso, EntidadEnCurso, PasoEnCurso } from './paso-en-curs
 import {
   compTics,
   darExtra,
+  enLaVuelta,
   largo,
   librar,
   ponerEstado,
@@ -114,6 +116,14 @@ export function entidadEnPie(e: EntidadEnCurso): boolean {
   return e.vida > 0 && m !== 'caida' && m !== 'absorber' && m !== 'deshecha';
 }
 
+/** La vida de un cuerpo por su número (0 si no está): la que va en un `resuelve`. */
+function vidaDe(p: PasoEnCurso, n: number): number {
+  const a = asientoDe(p, n);
+  if (a !== null) return a.vida;
+  const e = entidadDe(p, n);
+  return e === null ? 0 : e.vida;
+}
+
 /** El anuncio sin resolver que lanzó este cuerpo (no una repetición), o `null`. */
 export function anuncioDelAutor(p: PasoEnCurso, n: number): AnuncioPendiente | null {
   for (const an of p.anuncios) if (an.de === n && !an.esRepeticion) return an;
@@ -134,6 +144,8 @@ function montarAnuncio(
   impactoEnTic: number,
   alRitmo: boolean,
   esRepeticion: boolean,
+  avance: number,
+  avancePorTic: number,
 ): AnuncioPendiente {
   const impactoMs = msDelTic(impactoEnTic);
   const blanco = asientoDe(p, a);
@@ -153,13 +165,24 @@ function montarAnuncio(
     alRitmo,
     esperaMs: blanco === null ? 0 : blanco.red.compMs,
     esRepeticion,
+    avance,
+    avancePorTic,
   };
+}
+
+/** Lo más que anda en un tic quien recorre `distancia` en `tics` tics (hacia arriba: nunca de menos). */
+function porTic(distancia: number, tics: number): number {
+  return distancia <= 0 ? 0 : Math.ceil(distancia / (tics > 0 ? tics : 1));
 }
 
 /**
  * LANZA UN GOLPE: lo apunta como pendiente y, si ya salió (`lanzadoEnTic` ≤ ahora), lo anuncia. Un
  * golpe de entidad contra un asiento programa además su repetición sin autor si la liza la pide
  * (`TurnosDeclarados.repetirTrasTics`), que se anuncia cuando le toca salir.
+ *
+ * El de un ASIENTO lleva su avance (`AnuncioPendiente.avance`): el de la acción, que el aparato hace en
+ * los tics de su anuncio; y con `vuelo`, además el de la acometida tras una bala, que vuela antes de
+ * golpear (ver `lanzarLaAcometida`). Lo más que anda en un tic es lo más rápido de los dos.
  */
 export function lanzarAnuncio(
   p: PasoEnCurso,
@@ -172,17 +195,29 @@ export function lanzarAnuncio(
   lanzadoEnTic: number,
   masTics: number,
   esRepeticion: boolean,
+  vuelo: { readonly distancia: number; readonly tics: number } | null = null,
 ): AnuncioPendiente {
   const tics = alRitmo && accion.cadena !== null ? accion.cadena.anuncioTicsAlRitmo : accion.anuncioTics;
   let impacto = lanzadoEnTic + tics + masTics;
   if (impacto <= p.k) impacto = p.k + 1;
-  const an = montarAnuncio(p, p.siguienteAnuncio, de, x, z, accion.id, a, lanzadoEnTic, impacto, alRitmo, esRepeticion);
+  let avance = 0;
+  let avancePorTic = 0;
+  if (asientoDe(p, de) !== null) {
+    avance = accion.avance;
+    avancePorTic = porTic(accion.avance, tics);
+    if (vuelo !== null && vuelo.distancia > 0) {
+      avance += vuelo.distancia;
+      const delVuelo = porTic(vuelo.distancia, vuelo.tics);
+      if (delVuelo > avancePorTic) avancePorTic = delVuelo;
+    }
+  }
+  const an = montarAnuncio(p, p.siguienteAnuncio, de, x, z, accion.id, a, lanzadoEnTic, impacto, alRitmo, esRepeticion, avance, avancePorTic);
   p.siguienteAnuncio++;
   p.anuncios.push(an);
   if (lanzadoEnTic <= p.k) anunciar(p, an);
   const tras = p.declaracion.turnos.repetirTrasTics;
   if (!esRepeticion && tras > 0 && de >= PRIMER_NUMERO_DE_ENTIDAD && asientoDe(p, a) !== null) {
-    p.anuncios.push(montarAnuncio(p, p.siguienteAnuncio, 0, x, z, accion.id, a, lanzadoEnTic + tras, impacto + tras, alRitmo, true));
+    p.anuncios.push(montarAnuncio(p, p.siguienteAnuncio, 0, x, z, accion.id, a, lanzadoEnTic + tras, impacto + tras, alRitmo, true, 0, 0));
     p.siguienteAnuncio++;
   }
   return an;
@@ -250,12 +285,21 @@ export function anunciarProgramados(p: PasoEnCurso): void {
 
 /**
  * LA ACCIÓN DE UN `aqui` (o su falta). Primero, la sostenida: el primer `aqui` sin ella —o con otra, o
- * con la misma y otro `ms`, que es otra pulsación— la suelta (ver `protocolo.ts`). Después, lo pulsado.
+ * con la misma y otro `ms`, que es otra pulsación— la suelta (ver `protocolo.ts`). Después, lo pulsado:
+ * si está en la vuelta del ausente, la vuelta se acaba antes (ver `TICS_DE_LA_VUELTA`).
  */
 export function atenderLaAccionDelAqui(p: PasoEnCurso, a: AsientoEnCurso, accion: AccionRecibida | null, desfaseMs: number): void {
   const s = a.sostenida;
   if (s !== null && (accion === null || accion.id !== s.accion || accion.msDelAparato !== s.msDelAparato)) soltarLaSostenida(p, a);
   if (accion === null || !a.conCuerpo || a.vida <= 0) return;
+  /* El ausente no pulsa: lo que mande hasta volver ni cuenta ni se guarda para después (saldría en su vuelta). */
+  const activo = enCurso(a.estado, p.k);
+  if (activo !== null && activo.estado === p.declaracion.presencia.estadoAusente) return;
+  /* La vuelta del ausente se acaba al actuar, con su intocable: intocable y pegando a la vez, nunca (ver `enLaVuelta`). */
+  if (enLaVuelta(p, a)) {
+    a.vueltaHastaTic = -1;
+    ponerEstado(p, a, null);
+  }
   const reglas = p.declaracion.asientos[a.numero - 1] as ReglasDeAsiento;
   const indices = p.indices.porAsiento[a.numero - 1];
   if (indices === undefined) return;
@@ -431,21 +475,77 @@ export function reintentarGuardadas(p: PasoEnCurso): void {
 }
 
 /**
- * EL FINAL DEL VUELO de una esquiva limpia contra una bala: la sala lanza sola la acción de
- * `contraProyectil` contra el tirador, sin mirar recargas ni `soloEn` (la lanza ella, no se pulsa).
+ * LA ACOMETIDA TRAS UNA LIMPIA CONTRA UNA BALA (`contraProyectil`): la sala lanza YA, sola, la acción de
+ * `contraProyectil` contra el tirador —sin mirar recargas ni `soloEn`: la lanza ella, no se pulsa—, con el
+ * impacto al final del vuelo y de su propio avance; y le admite al asiento la distancia de los dos.
+ *
+ * ═══ POR QUÉ AHORA, Y NO AL ACABAR EL VUELO ═══
+ *
+ * La primera versión la lanzaba a los `contraProyectil.tics` de la limpia, desde donde la sala veía al
+ * asiento entonces. Pero el vuelo lo hace el APARATO, que se entera de la limpia media ida y vuelta
+ * después, y sus `aqui` llegan otra media más tarde: la sala lo veía a medio vuelo, y lo que le faltaba
+ * por volar se le contaba como avance ya hecho de la acción. Con 250 ms de ida y vuelta fallaban 48 de 74
+ * con el tirador a menos de 12 m (lo midió la revisión del frente). Ahora el golpe es UNO, del sitio de la
+ * limpia al impacto: el anuncio sale ya —todos ven la acometida entera—, su impacto cae cuando el aparato
+ * termina de volar y de golpear (lo que tarda en enterarse, el vuelo y el anuncio de la acción), y su
+ * avance es el vuelo más el de la acción (`AnuncioPendiente.avance`), juzgado como el de cualquier golpe.
  */
-export function lanzarAcometidas(p: PasoEnCurso): void {
-  for (const a of p.asientos) {
-    const ac = a.acometida;
-    if (ac === null || p.k < ac.enTic) continue;
-    a.acometida = null;
-    if (!a.conCuerpo || a.vida <= 0) continue;
-    const reglas = p.declaracion.asientos[a.numero - 1] as ReglasDeAsiento;
-    const golpe = p.indices.porAsiento[a.numero - 1]?.acciones[reglas.esquiva.contraProyectil.accion];
-    if (golpe === undefined) continue;
-    const e = entidadDe(p, ac.blanco);
-    a.cadena = null;
-    lanzarAnuncio(p, a.numero, a.x, a.z, golpe, e !== null && entidadEnPie(e) ? e.numero : 0, false, p.k, 0, false);
+export function lanzarLaAcometida(p: PasoEnCurso, a: AsientoEnCurso, reglas: ReglasDeAsiento, tirador: number): void {
+  if (!a.conCuerpo || a.vida <= 0) return;
+  const cp = reglas.esquiva.contraProyectil;
+  const golpe = p.indices.porAsiento[a.numero - 1]?.acciones[cp.accion];
+  if (golpe === undefined) return;
+  /*
+   * Una acometida a la vez: una esquiva que sale limpia contra dos balas de la misma ráfaga golpea una vez.
+   * Pero se le admite otra vez el vuelo, por si su aparato vuelve a salir desde donde está.
+   */
+  for (const an of p.anuncios) {
+    if (an.de !== a.numero || an.accion !== cp.accion) continue;
+    darExtra(a, cp.distancia, an.impactoEnTic);
+    return;
+  }
+  const e = entidadDe(p, tirador);
+  const enterarse = ticsQueCubren(Math.ceil(a.red.rttMs / 2)) + TICS_DEL_AQUI;
+  a.cadena = null;
+  const an = lanzarAnuncio(p, a.numero, a.x, a.z, golpe, e !== null && entidadEnPie(e) ? e.numero : 0, false, p.k, enterarse + cp.tics, false, cp);
+  darExtra(a, cp.distancia + golpe.avance, an.impactoEnTic);
+}
+
+/* ─── EL AUSENTE MOMENTÁNEO ──────────────────────────────────────────────── */
+
+/**
+ * LO QUE PASA AL QUEDAR AUSENTE (lo llama `mirarLaPresencia`, con el estado ausente ya puesto): suelta lo
+ * que sostenía, olvida lo pulsado y guardado, su eslabón y sus esquivas —una bala que lo cruce la juzga su
+ * intocable, no una ventana: si no, una esquiva de justo antes le daba el premio de una limpia encima del
+ * ausente—, y se CORTA en el acto cada golpe anunciado contra él y cada uno que él lanzó y no ha llegado
+ * —sin daño, `resuelve` con `cortada`—, soltando el turno de la entidad que lo lanzó; las repeticiones que
+ * aún no habían salido se quitan sin más, que nunca se anunciaron. El ausente ni pega ni le pegan (ver
+ * `AQUIS_PARA_ESTAR` en `tipos-de-la-sala.ts`).
+ */
+export function alQuedarAusente(p: PasoEnCurso, a: AsientoEnCurso): void {
+  soltarLaSostenida(p, a);
+  a.guardada = null;
+  a.cadena = null;
+  a.esquivasRecientes = [];
+  a.vueltaHastaTic = -1;
+  let i = 0;
+  while (i < p.anuncios.length) {
+    const an = p.anuncios[i] as AnuncioPendiente;
+    if (an.de === a.numero) {
+      p.anuncios.splice(i, 1);
+      if (an.lanzadoEnTic <= p.k) contar(p, 0, { e: 'resuelve', id: an.id, r: RESULTADO.cortada, dano: 0, vida: vidaDe(p, an.a) });
+      continue;
+    }
+    if (an.a !== a.numero) {
+      i++;
+      continue;
+    }
+    p.anuncios.splice(i, 1);
+    if (an.lanzadoEnTic > p.k) continue;
+    contar(p, 0, { e: 'resuelve', id: an.id, r: RESULTADO.cortada, dano: 0, vida: a.vida });
+    if (an.esRepeticion) continue;
+    const autor = entidadDe(p, an.de);
+    if (autor !== null) terminarElAtaque(p, autor, accionDelAnuncio(p, an) ?? null, p.k);
   }
 }
 
@@ -615,7 +715,6 @@ function salirPorLaZona(p: PasoEnCurso, a: AsientoEnCurso, reglas: ReglasDeAsien
   a.contadores.salio = 1;
   a.conCuerpo = false;
   a.guardada = null;
-  a.acometida = null;
   ponerEstado(p, a, estadoSinFin(p.declaracion.sinCuerpo.estado, p.k));
   contar(p, 0, { e: 'sale', a: a.numero, zona });
   ensuciarCuenta(p, a.numero);
@@ -841,7 +940,7 @@ function resolverDelAsiento(p: PasoEnCurso, an: AnuncioPendiente, accion: Accion
   const clase = e === null ? undefined : p.indices.clases[e.clase];
   let r: number = RESULTADO.da;
   if (e === null || clase === undefined || !entidadEnPie(e)) r = RESULTADO.fallada;
-  else if (!dentroDelRadio(e.x - a.x, e.z - a.z, accion.alcance + accion.holgura)) r = RESULTADO.fallada;
+  else if (!llegaConSuAvance(a, an, accion, e.x, e.z)) r = RESULTADO.fallada;
   else if (!accion.imparable && guardaDeFrente(p, e, clase, accion, a)) r = RESULTADO.parada;
   else if (!accion.imparable && esquivaAlAzar(p, e, clase, accion, a)) r = RESULTADO.esquivada;
   else if (e.cerebro.modo === 'aparecer' || intocableEn(e.estado, an.impactoEnTic)) r = RESULTADO.esquivada;
@@ -860,6 +959,43 @@ function resolverDelAsiento(p: PasoEnCurso, an: AnuncioPendiente, accion: Accion
   } else if ((r === RESULTADO.fallada || r === RESULTADO.esquivada) && accion.alFallar !== null) {
     ponerPuesta(p, a, accion.alFallar, an.impactoEnTic, 0);
   }
+}
+
+/**
+ * ¿LLEGA EL GOLPE DE UN ASIENTO A `(bx, bz)`? A su alcance más su holgura desde donde está ahora; y, si
+ * avanza, más lo que TODAVÍA PUEDE ESTAR DE CAMINO: lo que anda en un tic (`avancePorTic`) por los tics
+ * que la sala aún no ha visto de él —desde su último sitio declarado hasta el impacto, y no más de un
+ * `comp` y un tic—, sin pasar de lo que le quedaba de su avance (`avance` menos lo que ya se movió desde
+ * donde lo lanzó).
+ *
+ * ═══ POR QUÉ NO BASTA CON DONDE ESTÁ AHORA ═══
+ *
+ * La acometida del avance la hace el APARATO (la sala se la admite como distancia extra), y sus `aqui`
+ * llegan media ida y vuelta después. Un golpe de tres tics —la Réplica de un juego, tras una esquiva de
+ * lado de 3,5 m— se resolvía con el sitio de ANTES de acometer y salía `fallada` siempre (lo midió el
+ * frente del cliente jugando).
+ *
+ * ═══ Y POR QUÉ NO TODO LO QUE LE QUEDABA ═══
+ *
+ * La segunda versión le daba entero lo que le quedaba del avance, y un aparato que NO SE MOVÍA acertaba la
+ * Entrada desde 7,5 m: alcance y avance enteros, sin acometer nunca (lo midió la revisión del frente; el
+ * diseño dice «impacto válido a 2,3 m o menos»). Lo que se ha andado de verdad lo cuentan los `aqui`; lo
+ * único que la sala no puede saber es lo que va en los que aún no han llegado, y eso tiene tope: los tics
+ * sin ver por lo que se anda en uno.
+ */
+function llegaConSuAvance(a: AsientoEnCurso, an: AnuncioPendiente, accion: AccionDeclarada, bx: number, bz: number): boolean {
+  const alcance = accion.alcance + accion.holgura;
+  if (dentroDelRadio(bx - a.x, bz - a.z, alcance)) return true;
+  if (an.avance <= 0) return false;
+  const hecho = largo(a.x - an.x, a.z - an.z);
+  const queda = an.avance > hecho ? an.avance - hecho : 0;
+  const ultimo = a.rastro.length > 0 ? (a.rastro[a.rastro.length - 1] as { tic: number }).tic : an.lanzadoEnTic;
+  let sinVer = an.impactoEnTic - (ultimo > an.lanzadoEnTic ? ultimo : an.lanzadoEnTic);
+  const tope = compTics(a) + TICS_DEL_AQUI;
+  if (sinVer > tope) sinVer = tope;
+  if (sinVer <= 0) return false;
+  const deCamino = an.avancePorTic * sinVer;
+  return dentroDelRadio(bx - a.x, bz - a.z, alcance + (queda < deCamino ? queda : deCamino));
 }
 
 /** ¿Está la entidad en un estado que la deja sin guardia (y sin esquiva al azar)? */
@@ -909,6 +1045,7 @@ function responder(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad, a: 
   e.mira = rumboDeA(e.x, e.z, a.x, a.z, e.mira);
   if (e.blanco !== a.numero) e.turno = 'ninguno';
   e.blanco = a.numero;
+  dejarDeApuntar(p, e);
   e.cerebro = { ...e.cerebro, modo: 'atacar', desdeTic: p.k };
   lanzarAnuncio(p, e.numero, e.x, e.z, accion, a.numero, false, p.k, mas, false);
 }
@@ -1137,7 +1274,6 @@ export function caeElAsiento(p: PasoEnCurso, a: AsientoEnCurso, desde: number): 
   ensuciarCuenta(p, a.numero);
   soltarLaSostenida(p, a);
   a.guardada = null;
-  a.acometida = null;
   dejarCaerLoQueLleva(p, a);
   ponerPuesta(p, a, p.declaracion.equipo.caida, desde < p.k ? p.k : desde, 0);
 }
@@ -1147,6 +1283,7 @@ export function caeElAsiento(p: PasoEnCurso, a: AsientoEnCurso, desde: number): 
  * nadie la remata lo decide su cerebro cuando la caída acaba (ver `cerebro.ts`).
  */
 export function caeLaEntidad(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad): void {
+  dejarDeApuntar(p, e);
   e.turno = 'ninguno';
   e.blanco = 0;
   if (clase.alCaer.tipo === 'irse') {
@@ -1195,6 +1332,7 @@ export function avanzarLasCaidas(p: PasoEnCurso): void {
        * ausente —pisando su estado de recién vuelto— antes de que su aparato supiera que volvía.
        */
       a.ultimoAquiEnTic = p.k;
+      a.vivoEnTic = p.k;
       recolocar(p, a, reglas, s.x, s.z, s.rumbo);
       ponerPuesta(p, a, eq.reaparicion.puesta, p.k, 0);
       ensuciarCuenta(p, a.numero);

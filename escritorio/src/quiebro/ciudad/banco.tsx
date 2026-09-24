@@ -17,6 +17,7 @@
  * Arrastrar con el ratón mira; WASD anda (o vuela en la libre, con Q/E para bajar y subir);
  * Mayúsculas corre. Los selectores cambian nivel, código, noche, cámara, vista y tiempo. Todo va en
  * la dirección para repetir una captura: `?nivel=2&codigo=QWXYZ&noche=3&camara=hombro&vista=calle`.
+ * La luz del barrio sale de la hora de la noche, como en el juego; `?luz=madrugada|alba` la fuerza.
  *
  * Se abre en http://localhost:5291/sala/banco-quiebro-ciudad.html (el puerto del Vite del árbol).
  */
@@ -32,6 +33,7 @@ import { planoDelBarrio } from './plano';
 import type { NivelDeLaCiudad, PlanoDeLaCiudad, TiempoDelPlano } from './tipos';
 import { NIVELES_DE_LA_CIUDAD } from './tipos';
 import { Atmosfera } from '../atmosfera/Atmosfera';
+import { luzForzada, luzQueManda } from '../atmosfera/luz-del-barrio';
 import { FALLOS_DEL_PARCHEO } from '../atmosfera/parcheo';
 import { SOLO_BRILLO_EN_SU_SITIO, UNIFORMES_DE_LA_CIUDAD } from './retoques';
 import { UNIFORMES_DE_LOS_HALOS } from './halos';
@@ -373,7 +375,14 @@ function Banco(): JSX.Element {
       >
         <Ciudad plano={plano} nivel={ajustes.nivel} alConstruir={setCiudad} tic={tic} />
         {ciudad !== null ? (
-          <Atmosfera tiempo={plano.tiempo} nivel={ajustes.nivel} farolas={ciudad.farolas} semilla={plano.semilla} farolasEncendidas={apagon ? 0 : 1} />
+          <Atmosfera
+            tiempo={plano.tiempo}
+            nivel={ajustes.nivel}
+            farolas={ciudad.farolas}
+            semilla={plano.semilla}
+            farolasEncendidas={apagon ? 0 : 1}
+            luz={luzQueManda(plano.hora, luzForzada())}
+          />
         ) : null}
         <Mando modo={ajustes.camara} vista={ajustes.vista} plano={plano} />
         <Medidor alMedir={setMedida} />

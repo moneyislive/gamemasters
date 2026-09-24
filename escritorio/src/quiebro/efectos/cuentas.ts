@@ -197,9 +197,12 @@ export function anilloEnPantalla(
 
 /* ─────────────────────────────── Las balas ─────────────────────────────── */
 
-/** Velocidad de la bala lenta: 20 m/s (diseño §4.6). */
+/**
+ * Velocidad de la bala lenta: 20 m/s (diseño §4.6). Es la que se usa cuando la bala no trae la suya: en
+ * partida la trae siempre, la de su proyectil en la declaración (ver `BalaDeEfecto.velocidad`).
+ */
 export const VELOCIDAD_DE_LA_BALA = 20;
-/** Alcance: 30 m. */
+/** Alcance: 30 m. Igual: el de la declaración manda cuando viene. */
 export const ALCANCE_DE_LA_BALA = 30;
 /** Radio de la bala: 0,2 m. Lo que se pinta de núcleo, no de estela. */
 export const RADIO_DE_LA_BALA = 0.2;
@@ -236,18 +239,34 @@ export interface BalaDeEfecto {
   readonly rumbo: number;
   /** Instante en que el servidor la dio por acabada (golpe o pared), o `null` si sigue. */
   readonly fin: number | null;
+  /**
+   * m/s y metros de SU proyectil en la declaración, que son con los que la sala la juzga. Sin ellos, los
+   * del diseño (`VELOCIDAD_DE_LA_BALA`, `ALCANCE_DE_LA_BALA`): el banco de efectos no tiene declaración.
+   */
+  readonly velocidad?: number;
+  readonly alcance?: number;
+}
+
+/** La velocidad de la bala, m/s: la suya o, si no la trae, la del diseño. */
+export function velocidadDeLaBala(bala: { readonly velocidad?: number }): number {
+  return bala.velocidad !== undefined && bala.velocidad > 0 ? bala.velocidad : VELOCIDAD_DE_LA_BALA;
+}
+
+/** El alcance de la bala, m: el suyo o, si no lo trae, el del diseño. */
+export function alcanceDeLaBala(bala: { readonly alcance?: number }): number {
+  return bala.alcance !== undefined && bala.alcance > 0 ? bala.alcance : ALCANCE_DE_LA_BALA;
 }
 
 /** Metros que ha recorrido la bala en `t`. Se para en su alcance y en su `fin`. */
 export function recorridoDeLaBala(bala: BalaDeEfecto, t: number): number {
   const hasta = bala.fin === null ? t : Math.min(t, bala.fin);
-  const recorrido = ((hasta - bala.salida) * VELOCIDAD_DE_LA_BALA) / 1000;
-  return Math.min(ALCANCE_DE_LA_BALA, Math.max(0, recorrido));
+  const recorrido = ((hasta - bala.salida) * velocidadDeLaBala(bala)) / 1000;
+  return Math.min(alcanceDeLaBala(bala), Math.max(0, recorrido));
 }
 
 /** ¿Ya no hay nada que pintar de la bala? (se paró y la estela terminó de recogerse). */
 export function balaAcabada(bala: BalaDeEfecto, t: number): boolean {
-  const paradaNatural = bala.salida + (ALCANCE_DE_LA_BALA / VELOCIDAD_DE_LA_BALA) * 1000;
+  const paradaNatural = bala.salida + (alcanceDeLaBala(bala) / velocidadDeLaBala(bala)) * 1000;
   const parada = bala.fin === null ? paradaNatural : Math.min(bala.fin, paradaNatural);
   return t > parada + RECOGIDA_DE_LA_ESTELA_MS;
 }
@@ -259,7 +278,7 @@ export function balaAcabada(bala: BalaDeEfecto, t: number): boolean {
 export function edadDeLaOnda(bala: BalaDeEfecto, k: number, t: number): number {
   const distancia = (k + 1) * ESPACIO_ENTRE_ONDAS;
   if (distancia > recorridoDeLaBala(bala, t) + 1e-9) return -1;
-  const nace = bala.salida + (distancia / VELOCIDAD_DE_LA_BALA) * 1000;
+  const nace = bala.salida + (distancia / velocidadDeLaBala(bala)) * 1000;
   const edad = t - nace;
   return edad >= 0 && edad < VIDA_DE_LA_ONDA_MS ? edad : -1;
 }

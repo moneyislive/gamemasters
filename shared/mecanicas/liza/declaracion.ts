@@ -321,6 +321,11 @@ export interface EstadoDeclarado {
    * No empieza acciones, salvo las de `cancelaCon` (en cualquier tic) y, desde el tic
    * `soltableDesdeTic` de su puesta, cualquiera. La que empiece así TERMINA el estado. Un estado que
    * no bloquea deja empezar lo que sea y NO se termina por ello (quien ataca en él sigue en él).
+   *
+   * LA ESQUIVA TAMBIÉN: en un estado que no bloquea se esquiva SIN SALIR de él. La esquiva cuenta —para la
+   * ventana, para la torpe, para las `primeras`— y desplaza —su distancia extra se admite—, pero no pone
+   * su estado encima: el cuerpo sigue en el suyo, con su intocable y lo que se pueda hacer en él. Si lo
+   * pusiera, esquivar dentro del premio de una limpia lo acabaría y se perdería lo que el premio da.
    */
   readonly bloqueaAccion: boolean;
   /** Acciones (por id) que se pueden empezar en este estado y que, al empezar, lo terminan. */
@@ -453,6 +458,13 @@ export interface AccionDeclarada {
   /**
    * Cuánto AVANZA el autor hacia el blanco durante el anuncio (0 = nada), parándose antes del blanco y
    * de la estructura; el presupuesto de paso se lo admite como distancia extra.
+   *
+   * Con avance, una acción ALCANZA a `alcance + avance`: una entidad la empieza desde ahí (se acerca
+   * mientras anuncia), y el golpe de un asiento se resuelve contando lo que aún le quedaba por avanzar
+   * —`avance` menos lo que ya se movió desde donde la lanzó—: el avance lo hace el aparato y sus `aqui`
+   * llegan media ida y vuelta después, así que un golpe corto tras un desplazamiento largo del autor se
+   * juzgaría con el sitio de antes de avanzar y fallaría siempre. Quien se aleja en vez de avanzar lo va
+   * gastando; quien no avanza nada no llega más lejos que su avance.
    */
   readonly avance: Longitud;
   /** Tras qué se encadena, o `null` si es una acción que ABRE (no va tras nada). */
@@ -563,8 +575,12 @@ export interface EsquivaDeclarada {
   /** Lo que pasa con una LIMPIA: el estado del que esquiva y el del autor que falló. */
   readonly alAcertar: { readonly puesta: PuestaDeEstado; readonly alAutor: PuestaDeEstado };
   /**
-   * Una limpia contra una BALA no descoloca a nadie (el tirador está lejos): el que esquiva vuela
-   * hasta `distancia` hacia el tirador en `tics` tics y la sala le lanza `accion` contra él al llegar.
+   * Una limpia contra una BALA no descoloca a nadie (el tirador está lejos): da el VUELO. La sala
+   * lanza en el acto `accion` contra el tirador, con el impacto al final del vuelo —lo que tarda el aparato
+   * en enterarse de la limpia, `tics` de vuelo y el anuncio de la acción— y un avance que es el vuelo más
+   * el de la acción. El aparato vuela hasta `distancia` hacia el tirador en `tics` tics (sin pasar de su
+   * alcance) y, si aún no llega, hace el avance de la acción: la sala le admite las dos distancias y juzga
+   * el golpe como cualquier otro con avance (ver `AnuncioPendiente.avance` en `tipos-de-la-sala.ts`).
    */
   readonly contraProyectil: { readonly distancia: Longitud; readonly tics: Tics; readonly accion: IdDeclarado };
   /**
@@ -677,7 +693,13 @@ export interface GuardiaDeclarada {
   readonly salvoEn: readonly IdDeclarado[];
   /** Lo que le pasa al autor al que le para. */
   readonly alParar: PuestaDeEstado;
-  /** Con qué acción de SU clase contesta al parar (no gasta turno); 0 = no contesta. */
+  /**
+   * Con qué acción de SU clase contesta al parar (no gasta turno); 0 = no contesta. Es SÓLO respuesta:
+   * aunque no vaya tras nada, el cerebro no la usa para abrir un ataque por su cuenta —con turno y a su
+   * alcance, abriría con ella y la guardia no tendría nada que contestar—. Una clase cuyas acciones sin
+   * `cadena` son sólo su respuesta sólo contesta, y se admite; una con acciones y ninguna que abra ni
+   * conteste no atacaría nunca, y `problemasDeLaDeclaracion` la señala.
+   */
   readonly respuesta: IdDeclarado;
   /**
    * Lo que viene de frente y esquiva a veces: si la acción está en `acciones`, con probabilidad
@@ -916,6 +938,13 @@ export type FinDelEncuentro =
  *     `relojTics`. En los tres casos el resultado es `ganada` si salieron al menos `salenComoMinimo`, y
  *     `perdida` si no: aquí no hay «aguantar», y quien sale no deja fuera a los demás —el encuentro
  *     sigue mientras alguien pueda salir—.
+ *
+ * «PUEDE SEGUIR» quien tiene cuerpo y vida, quien espera sin cuerpo una vuelta con fin, y quien cayó con
+ * recurso en el equipo para pagarla. NO cuenta quien ya salió ni quien SE FUE: sin canal
+ * `presencia.veredictoTrasTics`, o ausente momentáneo ese mismo tiempo (ver `PresenciaDeclarada`). Si
+ * contara, un asiento vacío no caería nunca y el encuentro no se perdería: acabaría «aguantado» al vencer
+ * su reloj, o encendería otra zona pagando por quien no está. El ausente momentáneo, en cambio, sí puede
+ * seguir: una pestaña oculta unos segundos no pierde el encuentro.
  */
 export interface EncuentroDeclarado {
   /** El `n` del `arcade:ronda` con que se cierra (≥ 1). */
@@ -941,6 +970,12 @@ export interface EncuentroDeclarado {
  * en el primer tic en que han pasado `duraMs` desde que EMPEZÓ la fase. Así la mesa no necesita tics
  * propios para cerrar una fase por tiempo. Lo que le queda viaja en el suceso `fase` (`relojMs`), que es
  * con lo que el aparato lo pinta.
+ *
+ * DENTRO DE UNA MISMA FASE la vista puede CAMBIARLO —otro `id`, otra duración: por ejemplo, porque ya
+ * están todos listos y no hace falta esperar el tope—. La sala lo vuelve a armar y lo cuenta también desde
+ * que empezó la fase, no desde el cambio: si esa duración ya pasó, vence en ese mismo paso. El mismo
+ * `id` otra vez (la misma vista, releída) no lo repite. Y el reloj que la sala metió sin saber que la
+ * mesa ya había cambiado le llega a la mesa tarde: la mesa lo toma sin efecto (ver `CargaDeReloj`).
  */
 export interface RelojDeFase {
   /** Una clave corta (`esClaveCorta`); distinta en cada fase que lo lleve. */
@@ -1053,13 +1088,37 @@ export interface SinCuerpoDeclarado {
   readonly estado: IdDeclarado;
 }
 
-/** CÓMO SE ESTÁ Y SE DEJA DE ESTAR. Sólo cuenta en el modo `encuentro`: en calma nadie ataca. */
+/**
+ * CÓMO SE ESTÁ Y SE DEJA DE ESTAR. Sólo cuenta en el modo `encuentro`: en calma nadie ataca.
+ *
+ * ═══ DOS AUSENCIAS, Y NO SON LA MISMA ═══
+ *
+ *   · EL AUSENTE MOMENTÁNEO (`ausenteTrasTics`): el aparato que tiene canal pero no dice nada VIVO ni
+ *     juega (no pulsa ni se mueve) —una pestaña oculta que el navegador frena, una llamada entrante, la
+ *     aplicación en segundo plano—. Pasa
+ *     a `estadoAusente`: intocable, fuera de los turnos, ninguna entidad lo persigue ni le apunta, y lo
+ *     que ya venía contra él se corta sin daño (`resuelve` cortada). Y a cambio NI ANDA NI PEGA: su
+ *     estado bloquea el paso y las acciones (se exige), lo que él había lanzado se corta también y lo
+ *     que sostenía se suelta —si no, fingirse ausente era jugar intocable—.
+ *     Vuelve con el primer `aqui` VIVO, con su VUELTA: la puesta de quien reaparece
+ *     (`equipo.reaparicion.puesta`) recortada a `TICS_DE_LA_VUELTA` —medio segundo de intocable, porque
+ *     quien vuelve de no estar no puede recibir en su primer tic un golpe que no vio—, que se acaba en
+ *     cuanto empieza una acción. «Vivo» es el `aqui` que cierra `AQUIS_PARA_ESTAR` tics del aparato
+ *     seguidos: la ráfaga que una pestaña frenada manda tras cada parón (como mucho
+ *     `TOPE_DE_AQUIS_DE_GOLPE`) no lo es, y por eso no la devuelve. Ver `tipos-de-la-sala.ts`.
+ *   · EL QUE SE FUE (`veredictoTrasTics`): sin CANAL ese tiempo —y entonces la sala mete `arcade:ausente`
+ *     en la mesa, una vez por asiento y fase; la mesa toma sin efecto el de quien ya consta—, o ausente
+ *     momentáneo ese mismo tiempo EN LA FASE, sumando todos sus ratos (mientras lo esté), que la mesa no
+ *     necesita saber. Ninguno de los dos cuenta ya para «puede seguir» (ver `EncuentroDeclarado`).
+ */
 export interface PresenciaDeclarada {
   /**
-   * Sin `aqui` tantos tics (pestaña oculta, llamada entrante), el asiento pasa a `estadoAusente`:
-   * intocable mientras dure, y fuera de los turnos. Vuelve al primer `aqui`.
+   * Sin un `aqui` VIVO ni uno que juegue tantos tics, el asiento pasa a `estadoAusente` (el ausente
+   * momentáneo de arriba).
+   * Vuelve al primer `aqui` vivo, con su vuelta.
    */
   readonly ausenteTrasTics: Tics;
+  /** Un estado que bloquea el paso y las acciones y que ninguna acción cancela: el ausente ni anda ni pega. */
   readonly estadoAusente: IdDeclarado;
   /** Sin CANAL tantos tics, la sala mete `arcade:ausente` en la mesa (una vez por asiento y fase). */
   readonly veredictoTrasTics: Tics;
@@ -1213,7 +1272,18 @@ export interface CargaDeRonda {
   readonly recurso: number;
 }
 
-/** `arcade:reloj {id}`: venció el reloj de fase `id` (ver `RelojDeFase`). */
+/**
+ * `arcade:reloj {id}`: venció el reloj de fase `id` (ver `RelojDeFase`).
+ *
+ * ═══ EL RELOJ QUE LLEGA TARDE ENTRA SIN EFECTO ═══
+ *
+ * La sala lee la vista de la mesa a su ritmo, así que a menudo mete el reloj de una fase que la mesa ya
+ * dejó —la pausa en que eligieron todos antes de que venciera, el tope de una fase cuyo reloj cambió—.
+ * La mesa lo toma SIN EFECTO: el mismo estado, sin motivo. Rechazarlo sería decir que la sala hizo algo
+ * mal, y no lo hizo. Lo mismo el `arcade:ausente` de quien ya consta como ausente: la sala lo repite en
+ * cada fase de combate. Lo que sí se rechaza es lo que ninguna sala sana manda: una carga que no tiene
+ * la forma, o un veredicto firmado por un asiento.
+ */
 export interface CargaDeReloj {
   readonly id: string;
 }
@@ -1792,12 +1862,14 @@ function revisar(d: LizaDeclarada, p: string[]): void {
         for (const a of c.acciones) suyas.push(a.id);
         idsSinRepetir(r, `${donde}.acciones`, suyas);
         let abren = 0;
+        const respuesta = c.guardia === null ? 0 : c.guardia.respuesta;
         for (let j = 0; j < c.acciones.length; j++) {
           const a = c.acciones[j] as AccionDeclarada;
           accion(r, `${donde}.acciones[${String(j)}]`, a, estados, suyas);
-          if (a.cadena === null) abren++;
+          if (a.cadena === null && a.id !== respuesta) abren++;
         }
-        if (c.acciones.length > 0 && abren === 0) p.push(`${donde}.acciones: ninguna abre (todas llevan cadena): no atacaría nunca`);
+        /* La respuesta de la guardia no abre (el cerebro no la usa para atacar), pero una clase que sólo contesta ataca: al parar. */
+        if (c.acciones.length > 0 && abren === 0 && respuesta === 0) p.push(`${donde}.acciones: ninguna abre (todas llevan cadena): no atacaría nunca`);
       }
       for (const id of suyas) accionesDeClases.push(id);
       if (entero(r, `${donde}.proyectil`, c.proyectil, 0, TOPE_DE_ID) && c.proyectil !== 0) {
@@ -2055,6 +2127,13 @@ function revisar(d: LizaDeclarada, p: string[]): void {
   tics(r, 'presencia.ausenteTrasTics', d.presencia.ausenteTrasTics, 1);
   if (entero(r, 'presencia.estadoAusente', d.presencia.estadoAusente, 1, TOPE_DE_ID)) {
     existe(r, 'presencia.estadoAusente', d.presencia.estadoAusente, estados, 'el estado');
+    /* El ausente ni anda ni pega: si no, fingirse ausente sería jugar intocable (ver `PresenciaDeclarada`). */
+    for (const e of Array.isArray(d.estados) ? d.estados : []) {
+      if (e === null || typeof e !== 'object' || e.id !== d.presencia.estadoAusente) continue;
+      if (e.bloqueaPaso !== true || e.bloqueaAccion !== true || !Array.isArray(e.cancelaCon) || e.cancelaCon.length > 0) {
+        p.push('presencia.estadoAusente: tiene que bloquear el paso y las acciones, sin nada que lo cancele: el ausente ni anda ni pega');
+      }
+    }
   }
   tics(r, 'presencia.veredictoTrasTics', d.presencia.veredictoTrasTics, 1);
 

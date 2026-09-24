@@ -83,7 +83,7 @@
 import '../../shared/arcade/juegos';
 import { arcadesInstalados, hayFinal, hayOpciones, necesitaMesa, reejecutarEn } from '../../shared/arcade';
 import type { ArcadeId, ManifiestoDeArcade } from '../../shared/arcade';
-import { BURGO, LINDES, RIBERAS, RONDA } from '../../shared/arcade/juegos';
+import { BURGO, LINDES, QUIEBRO, RIBERAS, RONDA } from '../../shared/arcade/juegos';
 import { canonico } from '../../shared/mecanicas/canonico';
 import { arnes } from './arnes';
 import { jugarConElRobotGenerico } from './robot-generico';
@@ -102,7 +102,7 @@ const SEMILLAS: readonly number[] = [1, 20260923, 3141592653];
  * recorre el registro, y esto exige que en lo recorrido estén éstos. Un juego que se dé de BAJA
  * obliga a quitarlo de aquí, a propósito; uno que se dé de ALTA entra solo.
  */
-const LOS_DE_HOY: readonly ArcadeId[] = [RONDA, RIBERAS, BURGO, LINDES];
+const LOS_DE_HOY: readonly ArcadeId[] = [RONDA, RIBERAS, BURGO, LINDES, QUIEBRO];
 
 /**
  * Cuántas miradas tiene que haberse ofrecido un tipo, sumando las semillas, para exigir que se
@@ -436,15 +436,17 @@ nota(`caen con él: ${caidos.length === 0 ? 'ninguno' : caidos.join(', ')}`);
 nota(`todo junto: ${((performance.now() - inicio) / 1000).toFixed(1)} s (las dos vueltas y la vacuna)`);
 
 /*
- * EL SUELO. Hoy: 1 (ninguno en silencio) + 4 (los de hoy) + por cada uno de los 4 juegos 1 (declara
- * su final) + 3 partidas × 12 + 2 (alguna termina, todo se hizo) = 4 × 39 = 156, + 1 (la vacuna) +
- * 1 (este suelo) = 163. Un juego nuevo suma 39 y deja el suelo por debajo, que es lo correcto: el
- * arnés lo dice para que se suba el número.
+ * EL SUELO. Hoy: 1 (ninguno en silencio) + 5 (los de hoy) + por cada uno de los 5 juegos 1 (declara
+ * su final) + 3 partidas × 12 + 2 (alguna termina, todo se hizo) = 5 × 39 = 195, + 1 (la vacuna) +
+ * 1 (este suelo) = 203. Un juego nuevo suma 39 y deja el suelo por debajo, que es lo correcto: el
+ * arnés lo dice para que se suba el número. El Quiebro entró en la lista de hoy el 24-sep-2026: ya se
+ * jugaba (entró solo, por el registro), pero nada exigía que siguiera entre los que se juegan, y el
+ * suelo se había quedado en 163 con 202 hechas.
  */
 terminar({
-  escritas: 163,
+  escritas: 203,
   enVerde:
-    'Los cuatro arcades de mesa se juegan sin saber a qué se juega: cada opción ofrecida y\n' +
+    'Los cinco arcades de mesa se juegan sin saber a qué se juega: cada opción ofrecida y\n' +
     '  elegida se puede hacer, nada revienta, al espectador no se le ofrece nada, cada partida termina o\n' +
     '  llega al tope viva, cada tipo ofrecido a menudo se hizo, la misma semilla da la misma partida y el\n' +
     '  diario reejecutado da el mismo estado. Y el bucle viejo no pasa los suelos.\n' +

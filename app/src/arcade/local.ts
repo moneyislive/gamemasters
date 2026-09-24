@@ -367,8 +367,13 @@ export function usarElAparatoQuieto(mientrasHagaFalta: boolean): void {
     void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(
       () => undefined,
     );
+    /*
+     * Al salir se VUELVE A VERTICAL, no se suelta: desde que `app.json` va con `"orientation":
+     * "default"` (El Quiebro se juega apaisado), soltar el bloqueo en Android deja la app girando
+     * con el sensor. La vertical es la de la app entera (`app/_layout.tsx`).
+     */
     return () => {
-      void ScreenOrientation.unlockAsync().catch(() => undefined);
+      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
     };
   }, []);
 

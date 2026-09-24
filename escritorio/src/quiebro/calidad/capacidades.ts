@@ -25,7 +25,17 @@
  *   · sin media coma flotante creada de verdad, el techo es N1 (el compositor pleno no puede existir);
  *   · un pintor por software (SwiftShader, llvmpipe…) o una gráfica de móvil vieja arranca en N0;
  *   · un PC con gráfica dedicada arranca en N3, uno con integrada en N2;
- *   · un aparato táctil nunca pasa de N2 (N3 es «PC con gráfica dedicada»).
+ *   · un aparato táctil SIN gráfica dedicada no pasa de N2 (N3 es «PC con gráfica dedicada»).
+ *
+ * ═══ MANDA LA GRÁFICA, NO EL DEDO ═══
+ *
+ * La primera versión ponía techo N2 a todo lo que tuviera el puntero «grueso». Pero hay PC de sobremesa
+ * y portátiles con pantalla táctil y gráfica dedicada (el propio panel de pruebas de la casa dice diez
+ * puntos de contacto y una RTX 4070): se quedaban en N2 para siempre. El dedo dice cómo se juega, no
+ * lo que la gráfica aguanta. Así que el techo lo pone la gráfica: el nombre desenmascarado de
+ * `WEBGL_debug_renderer_info` (que dice «NVIDIA GeForce…», «Radeon RX…») más lo que el sondeo CREÓ de
+ * verdad (media flotante, flotante en vértices, texturas). Si el nombre es de una gráfica de móvil o de
+ * tableta (Adreno, Mali, PowerVR, Apple GPU, Tegra), el táctil sigue siendo N2.
  */
 import type { NivelDeCalidad } from './niveles';
 
@@ -108,6 +118,17 @@ const MOVIL_MODESTO =
 const DEDICADA_DE_PC =
   /nvidia|geforce|quadro|\brtx\b|\bgtx\b|radeon(?:\(tm\))? ?(?:rx|pro|r9|r7|hd [5-9]\d{3})|intel\(r\) arc|\barc\(tm\) a\d|apple m\d (?:pro|max|ultra)/i;
 
+/**
+ * Lo que delata una gráfica de móvil o tableta aunque diga «NVIDIA» (los Tegra de las tabletas y de la
+ * consola portátil) o no diga nada útil («Apple GPU» es como Safari enmascara el iPhone y el iPad).
+ */
+const GRAFICA_DE_MOVIL = /adreno|mali|powervr|apple gpu|tegra|videocore|vivante|immortalis|xclipse/i;
+
+/** ¿Es una gráfica dedicada de PC? Por el nombre, y nunca si el nombre delata un móvil. */
+export function esGraficaDedicadaDePc(grafica: string): boolean {
+  return DEDICADA_DE_PC.test(grafica) && !GRAFICA_DE_MOVIL.test(grafica);
+}
+
 const NIVEL_MAS_BAJO = (a: NivelDeCalidad, b: NivelDeCalidad): NivelDeCalidad => (a < b ? a : b);
 
 /** El nivel de arranque y el techo, con su porqué. Pura: la prueba el comprobador con aparatos inventados. */
@@ -127,8 +148,10 @@ export function veredictoDelSondeo(c: CapacidadesDelAparato): VeredictoDelSondeo
     return { inicial: 0, techo: 0, porque };
   }
 
-  let techo: NivelDeCalidad = c.tactil ? 2 : 3;
-  if (c.tactil) porque.push('aparato táctil: el techo es N2 (N3 es para PC con gráfica dedicada)');
+  const dedicada = esGraficaDedicadaDePc(c.grafica);
+  let techo: NivelDeCalidad = c.tactil && !dedicada ? 2 : 3;
+  if (c.tactil && !dedicada) porque.push('aparato táctil sin gráfica dedicada: el techo es N2 (N3 es para PC con gráfica dedicada)');
+  if (c.tactil && dedicada) porque.push(`pantalla táctil, pero «${c.grafica}» es una gráfica dedicada de PC: manda la gráfica, no el dedo`);
 
   if (!c.mediaFlotante) {
     techo = NIVEL_MAS_BAJO(techo, 1);
@@ -152,12 +175,12 @@ export function veredictoDelSondeo(c: CapacidadesDelAparato): VeredictoDelSondeo
   if (modesto) {
     inicial = 0;
     porque.push('pistas de aparato modesto (gráfica, memoria o núcleos): se arranca en N0');
+  } else if (dedicada) {
+    inicial = 3;
+    porque.push(`«${c.grafica}» parece una gráfica dedicada de PC: se arranca en N3`);
   } else if (c.tactil) {
     inicial = 1;
     porque.push('móvil o tableta sin pistas de modesto: se arranca en N1, como pide el diseño');
-  } else if (DEDICADA_DE_PC.test(c.grafica)) {
-    inicial = 3;
-    porque.push(`«${c.grafica}» parece una gráfica dedicada de PC: se arranca en N3`);
   } else if (c.grafica === '') {
     inicial = 1;
     porque.push('el navegador no dice qué gráfica hay: se arranca en N1');

@@ -515,13 +515,30 @@
   background: linear-gradient(180deg, rgba(2, 6, 5, 0.1), rgba(2, 6, 5, 0.55));
 }
 
+/*
+ * La hoja, centrada con `margin: auto` y no con el `align-items` de la pantalla: centrada así, una hoja
+ * más alta que la pantalla se salía POR ARRIBA (la reunión en un teléfono tumbado de 360 px empezaba
+ * 7 px fuera, con su contenido desbordando el panel), y lo de arriba no se alcanza desplazando. Con el
+ * margen automático, si cabe va en medio y si no, empieza arriba y la pantalla entera se desplaza.
+ */
 .q-hoja {
   width: min(880px, 100%);
-  max-height: 100%;
+  margin: auto 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 18px 22px;
+}
+
+/*
+ * El botón que decide (EMPEZAR, en la reunión) es la última fila, y se queda pegado abajo mientras se
+ * desplaza lo demás: en un teléfono tumbado la reunión mide 580 px y a EMPEZAR sólo se llegaba bajando.
+ */
+.q-hoja > .q-fila.derecha:last-child {
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0;
+  background: linear-gradient(180deg, rgba(4, 10, 12, 0), rgba(4, 10, 12, 0.92) 28%);
 }
 
 .q-hoja h1 {
@@ -800,6 +817,171 @@
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--q-codigo);
+}
+
+/* La preparación: el reloj, los estilos o BAJAR, y quién falta. Cabe en un teléfono apaisado. */
+.q-preparacion {
+  width: min(760px, calc(100% - 32px));
+  margin: 16px auto 0;
+  padding: 12px 16px;
+  text-align: left;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.q-preparacion .cabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.q-preparacion .reloj {
+  font-family: var(--q-cifra);
+  font-size: 26px;
+  color: var(--q-texto);
+}
+
+.q-preparacion .reloj.aprieta {
+  color: var(--q-ambar);
+}
+
+.q-preparacion .listo {
+  margin: 0;
+  font-size: 17px;
+  color: var(--q-ambar-claro);
+}
+
+.q-preparacion .q-bajada-estilos {
+  width: 100%;
+  margin: 0;
+}
+
+.q-preparacion .q-boton.principal {
+  font-size: 18px;
+  padding: 10px 28px;
+}
+
+.q-asiento.listo {
+  border-color: rgba(255, 171, 64, 0.55);
+}
+
+.q-asiento.ausente {
+  opacity: 0.55;
+}
+
+@media (max-height: 460px) {
+  /*
+   * Un teléfono tumbado: la pantalla deja a la izquierda el sitio del botón del menú (≡), que tapaba el
+   * «REUNIÓN» de la hoja, y la hoja se aprieta para que quepa lo que se decide.
+   */
+  .q-pantalla {
+    padding-left: calc(64px + var(--q-izq));
+  }
+
+  .q-hoja {
+    gap: 8px;
+    padding: 12px 16px;
+  }
+
+  .q-hoja h1 {
+    font-size: 24px;
+  }
+
+  .q-hoja .q-tarjeta .detalle {
+    display: none;
+  }
+
+  .q-enlace {
+    margin: 0;
+  }
+
+  .q-bajada {
+    top: 4%;
+  }
+
+  .q-bajada .barrio {
+    font-size: clamp(20px, 4vw, 32px);
+  }
+
+  .q-bajada .detalle {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  .q-preparacion {
+    margin-top: 8px;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .q-preparacion .q-tarjeta .nombre {
+    font-size: 16px;
+  }
+}
+
+/* ─── El ausente: el propio en el centro, los compañeros con su rótulo encima ─── */
+
+.q-ausente {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  width: min(460px, calc(100% - 32px));
+  padding: 14px 18px;
+  text-align: center;
+  animation: q-aparece 240ms ease-out both;
+}
+
+.q-ausente p {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.q-rotulos-de-la-gente {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.q-rotulos-de-la-gente .rotulo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: none;
+  padding: 2px 8px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: var(--q-tenue);
+  background: rgba(4, 10, 12, 0.66);
+  border: 1px solid var(--q-filo);
+  border-radius: 3px;
+}
+
+/* ─── En la reunión del modo de prueba: la dirección para la segunda pestaña ─── */
+
+.q-enlace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.q-enlace code {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--q-cifra);
+  font-size: 13px;
+  color: var(--q-ambar-claro);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* ─── Gira el teléfono ─── */

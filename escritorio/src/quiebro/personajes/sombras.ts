@@ -11,6 +11,23 @@
  * 35 m en la multitud: más lejos no se distingue.
  */
 import * as THREE from 'three';
+import { parchear } from '../atmosfera/parcheo';
+import { UNIFORMES_DE_LA_LUZ } from '../atmosfera/paleta';
+import { GLSL_ALTURA } from '../ciudad/reflejos';
+import { UNIFORMES_DE_LA_CIUDAD } from '../ciudad/retoques';
+
+/**
+ * La mancha se posa en el suelo que pisa: en la calzada a cota 0, en la acera y en la plaza 15 cm más
+ * arriba. A cota fija quedaba DEBAJO de la losa de la acera y de la plaza, justo donde se pelea: no se
+ * veía nunca. Lee el mismo mapa de alturas que las salpicaduras, en el centro de cada mancha.
+ */
+const SOBRE_EL_SUELO = /* glsl */ `
+{
+  vec3 origenQ = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  mvPosition.xyz += (viewMatrix * vec4(0.0, alturaDelSueloQ(origenQ.xz), 0.0, 0.0)).xyz;
+  gl_Position = projectionMatrix * mvPosition;
+}
+`;
 
 function texturaRadial(): THREE.DataTexture {
   const n = 32;
@@ -58,12 +75,26 @@ export class Sombras {
     });
     material.userData.sinNieblaDeAltura = true;
     material.name = 'sombra-de-contacto';
+    parchear(material, {
+      nombre: 'sombra-sobre-el-suelo',
+      orden: 10,
+      uniformes: { uAlturas: UNIFORMES_DE_LA_CIUDAD.uAlturas, uAlturasCaja: UNIFORMES_DE_LA_CIUDAD.uAlturasCaja },
+      vertice: [
+        { buscar: '#include <common>', como: 'despues', texto: GLSL_ALTURA },
+        { buscar: '#include <project_vertex>', como: 'despues', texto: SOBRE_EL_SUELO },
+      ],
+    });
     this.malla = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), material, capacidad);
     this.malla.name = 'sombras-de-contacto';
     this.malla.count = 0;
     this.malla.frustumCulled = false;
     this.malla.renderOrder = -1;
     this.malla.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    /* Lo oscura que es, de la luz del barrio: al alba, con todo iluminado por el cielo, una mancha al
+       60 % no se veía. */
+    this.malla.onBeforeRender = (): void => {
+      material.opacity = Math.min(1, 0.6 * UNIFORMES_DE_LA_LUZ.uSombraDeContacto.value);
+    };
   }
 
   empezar(): void {

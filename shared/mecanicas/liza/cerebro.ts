@@ -46,12 +46,12 @@
  */
 import { COSENO, DT_DEL_TIC, SENO } from '../andar';
 import { por, UNO } from '../fijo';
-import { unPaso } from '../mundo';
+import { seAndaEnRecta, unPaso } from '../mundo';
 import type { AsientoEnCurso, EntidadEnCurso, PasoEnCurso } from './paso-en-curso';
 import type { ModoDelCerebro } from './tipos-de-la-sala';
-import { bloqueaElPaso, bloqueaLaAccion, contar, enCurso, nuevoNumero, tirar } from './paso-en-curso';
+import { bloqueaElPaso, bloqueaLaAccion, contar, contarApuntado, dejarDeApuntar, enCurso, nuevoNumero, tirar } from './paso-en-curso';
 import type { AccionDeclarada, ClaseDeEntidad, ZonaDelMundo } from './declaracion';
-import { dentroDelRadio, distanciaAlCuadrado, hayLineaDeVista, rumboHacia, trayectoria } from './geometria';
+import { dentroDelRadio, desplazado, distanciaAlCuadrado, hayLineaDeVista, rumboHacia, trayectoria } from './geometria';
 import { aCentesimas, MOTIVO_DE_IRSE } from './protocolo';
 import { compTics, dentroDelLimite, largo, ponerEstadoALaEntidad, sePuedeEstarEn } from './cuerpo';
 import { anuncioDelAutor, asientoDe, entidadEnPie, lanzarAnuncio, rumboDeA } from './combate';
@@ -65,13 +65,19 @@ let CUERPO_A_CUERPO = new Int32Array(16);
 let DISPARO = new Int32Array(16);
 let ANUNCIOS = new Int32Array(16);
 let PERSIGUEN = new Int32Array(16);
-/** El recorrido en anchura del grafo: distancias en saltos y cola. */
-let SALTOS = new Int32Array(0);
-let COLA = new Int32Array(0);
+/** El camino más corto por el grafo: distancias andadas (Q16.16) y el montículo (nudo y clave). */
+let DISTANCIA = new Float64Array(0);
+let MONTON = new Int32Array(0);
+let CLAVE = new Float64Array(0);
+let TAM = 0;
 /** Los nudos más cercanos a un punto, para buscar el primero que se vea. */
 const CERCANOS = 6;
 const NUDO_CERCANO = new Int32Array(CERCANOS);
 const DISTANCIA_CERCANA = new Float64Array(CERCANOS);
+/** Los de ésos que se ven desde donde está la entidad (`primerNudo`). */
+const VISIBLES = new Int32Array(CERCANOS);
+/** Cuántos de `NUDO_CERCANO` dejó la última pregunta de `nudoVisibleMasCercano` (menos de `CERCANOS` si hay pocos nudos). */
+let HALLADOS = 0;
 
 /** A qué distancia de un nudo se da por llegado: una unidad. */
 const LLEGADO = UNO;
@@ -212,6 +218,7 @@ function pensarUna(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad): nu
   if (bloqueaLaAccion(p.indices, e.estado, k) || bloqueaElPaso(p.indices, e.estado, k)) {
     /* Aturdida: no piensa ni se mueve, y el turno que tuviera se suelta (salvo el del golpe en vuelo). */
     const m = e.cerebro.modo;
+    dejarDeApuntar(p, e);
     if (m === 'apuntar' || m === 'disparar') e.cerebro = { ...e.cerebro, modo: 'acechar', desdeTic: k, repiensaEnTic: k, balasPorSalir: 0 };
     if (e.cerebro.modo !== 'atacar') soltarTurno(e, clase);
     return 0;
@@ -234,7 +241,15 @@ function pensarUna(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad): nu
     pensar(p, e, clase);
     b = blancoValido(p, e.blanco);
   }
-  if (b === null) return 0;
+  if (b === null) {
+    /* Sin nadie a quien perseguir (el asiento cayó, espera volver o está ausente) también entra: ver «entrar primero». */
+    const dentro = puntoParaEntrar(p, e.x, e.z);
+    if (dentro === null) return 0;
+    /* En recta si se llega con los hombros; si no, por el grafo (y si el grafo no sabe, lo que se pueda en recta). */
+    if (seLlega(p, e.x, e.z, dentro.x, dentro.z, clase.radio) && entrarSiEstaFuera(p, e, clase)) return 0;
+    if (!entrarPorElGrafo(p, e, clase)) entrarSiEstaFuera(p, e, clase);
+    return 0;
+  }
   const quiere = intentarAtacar(p, e, clase, b);
   if (quiere === QUIERE.atacado) return 0;
   moverse(p, e, clase, b, quiere);
@@ -338,9 +353,24 @@ function pensar(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad): void 
     e.blanco = elegido.numero;
   }
   let nudo = e.cerebro.nudo;
-  if (hayLineaDeVista(p.arena.cuerpos, e.x, e.z, elegido.x, elegido.z)) nudo = -1;
-  else if (clase.cerebro.sigueElGrafo && p.declaracion.mundo.grafo.nudos.length > 0 && nudo < 0) nudo = nudoVisibleMasCercano(p, e.x, e.z);
+  if (enRecta(p, e, elegido, clase)) nudo = -1;
+  else if (clase.cerebro.sigueElGrafo && p.declaracion.mundo.grafo.nudos.length > 0 && nudo < 0) nudo = primerNudo(p, e.x, e.z, elegido, clase.radio);
   e.cerebro = { ...e.cerebro, modo: modoDeLaBanda(e.cerebro.modo, elegido.x - e.x, elegido.z - e.z, clase), nudo, repiensaEnTic: p.k + clase.cerebro.decideCadaTics };
+}
+
+/** Cerca de su blanco, lo que decide si se va en recta es si se LLEGA con los hombros, no si se ve. */
+const CERCA_PARA_ANDAR = 6 * UNO;
+
+/**
+ * ¿VA EN RECTA A SU BLANCO? Si lo ve; y, a menos de `CERCA_PARA_ANDAR`, si además llega andando con su
+ * radio. Con sólo la línea de vista, un blanco pegado a la esquina de un pilar se «veía» por el filo y la
+ * entidad temblaba contra el pilar con turno, a 1,8 m, sin rodearlo nunca (lo midió el banco con las
+ * declaraciones de un juego). Lejos no se pregunta: recorrer el tramo entero es caro y, lejos, el
+ * camino se vuelve a pensar al acercarse.
+ */
+function enRecta(p: PasoEnCurso, e: EntidadEnCurso, b: AsientoEnCurso, clase: ClaseDeEntidad): boolean {
+  const cerca = dentroDelRadio(b.x - e.x, b.z - e.z, CERCA_PARA_ANDAR);
+  return seLlega(p, e.x, e.z, b.x, b.z, cerca ? clase.radio : 0);
 }
 
 /**
@@ -367,9 +397,12 @@ function demasiadoCerca(dx: number, dz: number, clase: ClaseDeEntidad): boolean 
 
 /**
  * EL NUDO DEL GRAFO MÁS CERCANO QUE SE VE desde `(x, z)`: de los `CERCANOS` más cercanos, el primero con
- * línea de vista. −1 si ninguno. Los más cercanos se sacan de una pasada, sin ordenar la lista entera.
+ * línea de vista —y, si se da un `radio`, al que un cuerpo de ese radio llega andando en recta
+ * (`seAndaEnRecta`): la línea de vista es un segmento sin grosor, y un nudo que se ve rozando la esquina
+ * de un pilar no se alcanza con los hombros—. −1 si ninguno. Los más cercanos se sacan de una pasada, sin
+ * ordenar la lista entera.
  */
-function nudoVisibleMasCercano(p: PasoEnCurso, x: number, z: number): number {
+function nudoVisibleMasCercano(p: PasoEnCurso, x: number, z: number, radio: number): number {
   const nudos = p.declaracion.mundo.grafo.nudos;
   let cuantos = 0;
   for (let i = 0; i < nudos.length; i++) {
@@ -386,52 +419,189 @@ function nudoVisibleMasCercano(p: PasoEnCurso, x: number, z: number): number {
     NUDO_CERCANO[j] = i;
     if (cuantos < CERCANOS) cuantos++;
   }
+  HALLADOS = cuantos;
   for (let j = 0; j < cuantos; j++) {
     const i = NUDO_CERCANO[j] as number;
     const n = nudos[i] as { x: number; z: number };
-    if (hayLineaDeVista(p.arena.cuerpos, x, z, n.x, n.z)) return i;
+    if (seLlega(p, x, z, n.x, n.z, radio)) return i;
   }
   return -1;
 }
 
+/** Un punto reutilizable para `seAndaEnRecta`, que pide objetos `{x, z}`: sin crear uno por pregunta. */
+const DESDE = { x: 0, z: 0 };
+const HASTA = { x: 0, z: 0 };
+
+/** ¿Se ve (radio 0), o se llega andando en recta con ese radio, de `(x0, z0)` a `(x1, z1)`? */
+function seLlega(p: PasoEnCurso, x0: number, z0: number, x1: number, z1: number, radio: number): boolean {
+  if (!hayLineaDeVista(p.arena.cuerpos, x0, z0, x1, z1)) return false;
+  if (radio <= 0) return true;
+  DESDE.x = x0;
+  DESDE.z = z0;
+  HASTA.x = x1;
+  HASTA.z = z1;
+  return seAndaEnRecta(p.arena, DESDE, HASTA, radio);
+}
+
 /**
- * EL SIGUIENTE NUDO desde `desde` hacia el asiento `b`: el vecino más cerca en saltos del nudo que ve a
- * `b` (recorrido en anchura desde ése). −1 si `desde` ya es ese nudo o no hay camino: entonces en recta.
+ * LAS DISTANCIAS POR EL GRAFO HASTA EL NUDO `meta`, andadas y no en saltos, en `DISTANCIA` (Q16.16; −1 =
+ * no se llega). Dijkstra con un montículo binario de arrays del módulo, con orden total (distancia, y
+ * a igual distancia el índice menor): el mismo recorrido en cualquier motor.
+ *
+ * ═══ POR QUÉ ANDADAS Y NO EN SALTOS ═══
+ *
+ * La primera versión contaba saltos (un recorrido en anchura). Con un grafo de verdad —los cruces de las
+ * calles delante, unidos por tramos de 48 m, y una rejilla fina detrás— un tramo de calle vale UN salto
+ * y cruzar la plaza por la rejilla, doce: las entidades que salían por una boca de calle se iban por la
+ * calle hasta la esquina en vez de entrar en la plaza, y se pasaban seis o diez segundos fuera del límite
+ * de la fase caminando por su borde (lo midió el banco con las declaraciones de un juego, punto 4 del
+ * encargo del frente). Andado, el camino corto es el corto.
  */
-function siguienteNudo(p: PasoEnCurso, desde: number, b: AsientoEnCurso): number {
-  const meta = nudoVisibleMasCercano(p, b.x, b.z);
-  if (meta < 0 || meta === desde) return -1;
-  const cuantos = p.declaracion.mundo.grafo.nudos.length;
-  if (SALTOS.length < cuantos) {
-    SALTOS = new Int32Array(cuantos);
-    COLA = new Int32Array(cuantos);
-  }
-  SALTOS.fill(-1, 0, cuantos);
+function distanciasHasta(p: PasoEnCurso, meta: number): void {
+  const nudos = p.declaracion.mundo.grafo.nudos;
+  const cuantos = nudos.length;
   const inicio = p.indices.inicio;
   const vecinos = p.indices.vecinos;
-  let cabeza = 0;
-  let cola = 0;
-  SALTOS[meta] = 0;
-  COLA[cola++] = meta;
-  while (cabeza < cola) {
-    const u = COLA[cabeza++] as number;
-    const du = SALTOS[u] as number;
+  const aristas = inicio[cuantos] as number;
+  if (DISTANCIA.length < cuantos) DISTANCIA = new Float64Array(cuantos);
+  if (MONTON.length < aristas + cuantos + 1) {
+    MONTON = new Int32Array(aristas + cuantos + 1);
+    CLAVE = new Float64Array(aristas + cuantos + 1);
+  }
+  DISTANCIA.fill(-1, 0, cuantos);
+  TAM = 0;
+  DISTANCIA[meta] = 0;
+  meterEnElMonton(meta, 0);
+  while (TAM > 0) {
+    const u = MONTON[0] as number;
+    const du = CLAVE[0] as number;
+    TAM--;
+    if (TAM > 0) {
+      MONTON[0] = MONTON[TAM] as number;
+      CLAVE[0] = CLAVE[TAM] as number;
+      let i = 0;
+      for (;;) {
+        const iz = 2 * i + 1;
+        const de = iz + 1;
+        let m = i;
+        if (iz < TAM && antes(iz, m)) m = iz;
+        if (de < TAM && antes(de, m)) m = de;
+        if (m === i) break;
+        cambiar(i, m);
+        i = m;
+      }
+    }
+    if (du > (DISTANCIA[u] as number)) continue;
+    const nu = nudos[u] as { x: number; z: number };
     for (let j = inicio[u] as number; j < (inicio[u + 1] as number); j++) {
       const v = vecinos[j] as number;
-      if ((SALTOS[v] as number) >= 0) continue;
-      SALTOS[v] = du + 1;
-      COLA[cola++] = v;
+      const nv = nudos[v] as { x: number; z: number };
+      const dv = du + largo(nv.x - nu.x, nv.z - nu.z);
+      const ya = DISTANCIA[v] as number;
+      if (ya >= 0 && ya <= dv) continue;
+      DISTANCIA[v] = dv;
+      meterEnElMonton(v, dv);
     }
   }
+}
+
+/** Mete `nudo` con la clave `d` en el montículo y lo sube a su sitio. */
+function meterEnElMonton(nudo: number, d: number): void {
+  let i = TAM++;
+  MONTON[i] = nudo;
+  CLAVE[i] = d;
+  while (i > 0) {
+    const padre = (i - 1) >> 1;
+    if (!antes(i, padre)) break;
+    cambiar(i, padre);
+    i = padre;
+  }
+}
+
+/** En el montículo, ¿va la posición `i` antes que la `j`? Distancia, y a igual distancia el nudo menor. */
+function antes(i: number, j: number): boolean {
+  const a = CLAVE[i] as number;
+  const b = CLAVE[j] as number;
+  return a < b || (a === b && (MONTON[i] as number) < (MONTON[j] as number));
+}
+
+function cambiar(i: number, j: number): void {
+  const n = MONTON[i] as number;
+  const d = CLAVE[i] as number;
+  MONTON[i] = MONTON[j] as number;
+  CLAVE[i] = CLAVE[j] as number;
+  MONTON[j] = n;
+  CLAVE[j] = d;
+}
+
+/**
+ * EL SIGUIENTE NUDO desde `desde` hacia el asiento `b`: el vecino por el que se llega antes, ANDANDO, al
+ * nudo que ve a `b` (ver `distanciasHasta`). −1 si `desde` ya es ese nudo o no hay camino: entonces en
+ * recta.
+ */
+function siguienteNudo(p: PasoEnCurso, desde: number, b: AsientoEnCurso, radio: number): number {
+  return siguienteHacia(p, desde, nudoVisibleMasCercano(p, b.x, b.z, radio));
+}
+
+/** El siguiente nudo desde `desde` hacia el nudo `meta`, andando (ver `siguienteNudo`). −1 si ya está o no hay camino. */
+function siguienteHacia(p: PasoEnCurso, desde: number, meta: number): number {
+  if (meta < 0 || meta === desde) return -1;
+  distanciasHasta(p, meta);
+  const nudos = p.declaracion.mundo.grafo.nudos;
+  const inicio = p.indices.inicio;
+  const vecinos = p.indices.vecinos;
+  const nd = nudos[desde] as { x: number; z: number };
   let mejor = -1;
-  let mejorSaltos = -1;
+  let mejorD = -1;
   for (let j = inicio[desde] as number; j < (inicio[desde + 1] as number); j++) {
     const v = vecinos[j] as number;
-    const s = SALTOS[v] as number;
-    if (s < 0) continue;
-    if (mejor < 0 || s < mejorSaltos || (s === mejorSaltos && v < mejor)) {
+    const falta = DISTANCIA[v] as number;
+    if (falta < 0) continue;
+    const nv = nudos[v] as { x: number; z: number };
+    const d = falta + largo(nv.x - nd.x, nv.z - nd.z);
+    if (mejor < 0 || d < mejorD || (d === mejorD && v < mejor)) {
       mejor = v;
-      mejorSaltos = s;
+      mejorD = d;
+    }
+  }
+  return mejor;
+}
+
+/**
+ * EL PRIMER NUDO desde donde está la entidad hacia `b`: de los `CERCANOS` nudos más cercanos que VE, el
+ * que deja menos camino ANDADO hasta el nudo que ve a `b`, contando lo que hay hasta él. El más cercano
+ * a secas podía estar detrás, y el camino empezaba dando la vuelta. −1 si no ve ninguno.
+ */
+function primerNudo(p: PasoEnCurso, x: number, z: number, b: AsientoEnCurso, radio: number): number {
+  return primerNudoHacia(p, x, z, nudoVisibleMasCercano(p, b.x, b.z, radio), radio);
+}
+
+/** El primer nudo desde `(x, z)` hacia el nudo `meta` (ver `primerNudo`): −1 si no ve ninguno. */
+function primerNudoHacia(p: PasoEnCurso, x: number, z: number, meta: number, radio: number): number {
+  const desde = nudoVisibleMasCercano(p, x, z, radio);
+  if (meta < 0 || desde < 0) return desde;
+  const nudos = p.declaracion.mundo.grafo.nudos;
+  /* `nudoVisibleMasCercano` deja en NUDO_CERCANO los más cercanos a (x, z): se copian antes de otra pregunta. */
+  const hallados = HALLADOS;
+  let cuantos = 0;
+  for (let j = 0; j < hallados; j++) {
+    const i = NUDO_CERCANO[j] as number;
+    const n = nudos[i] as { x: number; z: number };
+    if (!seLlega(p, x, z, n.x, n.z, radio)) continue;
+    VISIBLES[cuantos++] = i;
+  }
+  distanciasHasta(p, meta);
+  let mejor = desde;
+  let mejorD = -1;
+  for (let j = 0; j < cuantos; j++) {
+    const i = VISIBLES[j] as number;
+    const falta = DISTANCIA[i] as number;
+    if (falta < 0) continue;
+    const n = nudos[i] as { x: number; z: number };
+    const d = falta + largo(n.x - x, n.z - z);
+    if (mejorD < 0 || d < mejorD || (d === mejorD && i < mejor)) {
+      mejor = i;
+      mejorD = d;
     }
   }
   return mejor;
@@ -457,6 +627,11 @@ type Quiere = (typeof QUIERE)[keyof typeof QUIERE];
  * disparo, con el blanco entre sus dos distancias y a la vista. Las dos cosas, sólo con turno. Si no ataca,
  * dice qué le haría falta para poder (ver `QUIERE`).
  *
+ * «ALCANZA» ES SU ALCANCE MÁS SU AVANCE: el golpe acerca a quien lo lanza durante el anuncio (ver
+ * `avanzarAlAtacar`), así que desde ahí ya llega. Con el alcance a secas, en cuanto dos se pegaban a un
+ * asiento el tercero se quedaba a 1,3 m sin hueco para llegar al 1,1 y no atacaba nunca, con turno y
+ * con el asiento quieto delante (lo midió el banco con las declaraciones de un juego).
+ *
  * Quien dispara no se acerca a golpear: su sitio es su banda de tiro, y el cuerpo a cuerpo es para
  * cuando se le echan encima.
  */
@@ -474,7 +649,7 @@ function intentarAtacar(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad
       const activo = enCurso(e.estado, k);
       if (activo === null || accion.soloEn.indexOf(activo.estado) < 0) continue;
     }
-    if (!dentroDelRadio(dx, dz, accion.alcance)) {
+    if (!dentroDelRadio(dx, dz, accion.alcance + accion.avance)) {
       if (proyectil === undefined && !acercarse) acercarse = turnoPosible(p, e, clase, b, 'cuerpoACuerpo');
       continue;
     }
@@ -488,6 +663,7 @@ function intentarAtacar(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad
   if (!concederTurno(p, e, clase, b, 'disparo')) return QUIERE.nada;
   e.mira = rumboDeA(e.x, e.z, b.x, b.z, e.mira);
   e.cerebro = { ...e.cerebro, modo: 'apuntar', desdeTic: k, repiensaEnTic: k + proyectil.apuntarTics, apuntaX: b.x, apuntaZ: b.z, balasPorSalir: 0 };
+  contarApuntado(p, e, b.numero, 0);
   return QUIERE.atacado;
 }
 
@@ -544,6 +720,7 @@ function avanzarAlAtacar(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntida
 /**
  * APUNTAR Y DISPARAR: apunta `apuntarTics` al sitio que el blanco tenga al TERMINAR de apuntar —apuntar
  * a donde estará sería adivinar— y dispara la ráfaga, una bala cada `cadaTics`. Al acabar suelta el turno.
+ * Lo que dura el apuntado sale al cable (`apunta`, al empezar); si lo deja sin disparar, también.
  * Si el blanco entra en un estado de `excluyen` (su premio, sobre todo) lo deja: el turno se le dio antes,
  * pero «nunca a quien está en su premio» es también no seguir disparándole (y la cadena de un golpe
  * tampoco sigue: ver `seguirTrasElImpacto` en `combate.ts`). Lo que ya vuela, vuela.
@@ -556,6 +733,7 @@ function apuntarYDisparar(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntid
   const dejarlo = blancoFijo !== null && excluido(p, blancoFijo);
   if (proyectil === undefined || (e.cerebro.modo === 'apuntar' && b === null) || dejarlo) {
     const aMedias = e.cerebro.modo === 'disparar';
+    dejarDeApuntar(p, e);
     soltarTurno(e, clase);
     if (aMedias) e.recuperaHastaTic = k + clase.cerebro.decideCadaTics;
     e.cerebro = { ...e.cerebro, modo: 'acechar', desdeTic: k, repiensaEnTic: k, balasPorSalir: 0 };
@@ -592,6 +770,8 @@ function moverse(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad, b: As
   const dz = b.z - e.z;
   const modo = modoDeLaBanda(e.cerebro.modo, dx, dz, clase);
   if (modo !== e.cerebro.modo) e.cerebro = { ...e.cerebro, modo };
+  /* Quien está fuera del límite de la fase, primero entra (ver «entrar primero» abajo). */
+  if (entrarSiEstaFuera(p, e, clase)) return;
   if (modo === 'rondar' && quiere !== QUIERE.acercarse) {
     if (demasiadoCerca(dx, dz, clase)) {
       darPaso(p, e, clase, b.x, b.z, true);
@@ -608,14 +788,123 @@ function moverse(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad, b: As
   if (nudo >= 0 && nudo < nudos.length) {
     const n = nudos[nudo] as { x: number; z: number };
     if (dentroDelRadio(n.x - e.x, n.z - e.z, LLEGADO)) {
-      nudo = siguienteNudo(p, nudo, b);
+      nudo = siguienteNudo(p, nudo, b, clase.radio);
       e.cerebro = { ...e.cerebro, nudo };
     }
   } else nudo = -1;
   if (nudo >= 0) {
     const n = nudos[nudo] as { x: number; z: number };
     darPaso(p, e, clase, n.x, n.z, false);
-  } else darPaso(p, e, clase, b.x, b.z, false);
+  } else haciaSuBlanco(p, e, clase, b);
+}
+
+/**
+ * ═══ Y SI OTRA LE TAPA EL BLANCO, LO RODEA ═══
+ *
+ * Cerca de su blanco, con otra entidad pegada a él justo en medio (una que ataca, o un Celador caído), el
+ * paso recto no acerca y los desvíos tampoco: la que llega detrás temblaba a 1,75 m, con turno y el
+ * asiento quieto delante, hasta que la otra se iba (lo midió el banco). Así que, si ningún paso la acerca,
+ * rodea: va a un punto a la misma distancia del blanco y unos 30° más allá, hacia un lado que cambia cada
+ * dos segundos (el número de la entidad y el tic lo eligen: nada de azar que gastar), hasta que el paso
+ * recto vuelve a acercar.
+ */
+function haciaSuBlanco(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad, b: AsientoEnCurso): void {
+  if (elegirPaso(p, e, clase, b.x, b.z, false, true) && PASO.avanza) {
+    aplicarPaso(e);
+    return;
+  }
+  const d = largo(b.x - e.x, b.z - e.z);
+  if (d > 0 && d <= clase.cerebro.distanciaMaxima + 2 * UNO) {
+    const lado = ((e.numero + Math.floor(p.k / 40)) & 1) === 0 ? RODEO : 256 - RODEO;
+    const t = desplazado(b.x, b.z, (rumboDeA(b.x, b.z, e.x, e.z, 0) + lado) % 256, d);
+    if (elegirPaso(p, e, clase, t.x, t.z, false, true) && PASO.avanza) {
+      aplicarPaso(e);
+      return;
+    }
+  }
+  if (elegirPaso(p, e, clase, b.x, b.z, false, true)) aplicarPaso(e);
+}
+
+/** Lo que se desplaza el punto al que va quien rodea: 21 rumbos, unos 30°. */
+const RODEO = 21;
+
+/**
+ * ═══ ENTRAR PRIMERO ═══
+ *
+ * Las entidades salen de zonas que pueden estar fuera del límite de la fase —las bocas de las calles que
+ * dan a la plaza— y el límite no se cruza hacia fuera (ver `darPaso`). La primera versión las mandaba
+ * derechas a su blanco o por el grafo, y el grafo de un juego de verdad tiene sus nudos de calle JUSTO en
+ * el borde del límite: seguían la calle un centímetro por fuera durante seis o diez segundos sin entrar
+ * nunca en la plaza (lo midió el banco con las declaraciones de ese juego). Así que quien está fuera va
+ * primero al punto del límite más cercano, una unidad hacia dentro, con un paso que acerque de verdad; si
+ * sólo se lo impide otra entidad —dos que bajan juntas por la calle, una por dentro y otra por fuera, la de
+ * fuera no entraba en veinte metros—, la pisa; y si ni así, sigue su camino de siempre.
+ *
+ * Y ENTRA AUNQUE NO TENGA A QUIÉN PERSEGUIR. La segunda versión sólo entraba al moverse hacia su blanco,
+ * y sin ninguno —el único asiento caído, esperando volver o ausente— las que nacían en ese rato se quedaban
+ * donde nacían, fuera: la revisión del frente vio veinte más de cinco segundos en una calle, la peor
+ * quince, hasta que el asiento reaparecía (`entrarSiEstaFuera`, desde `pensarUna`).
+ *
+ * El punto de dentro del límite más cercano a `(x, z)`, a una unidad del borde; `null` si ya está dentro
+ * (o la fase no tiene límite).
+ */
+function puntoParaEntrar(p: PasoEnCurso, x: number, z: number): { x: number; z: number } | null {
+  if (dentroDelLimite(p, x, z)) return null;
+  const l = p.indices.limites[p.declaracion.fase.limite];
+  if (l === undefined) return null;
+  const c = l.caja;
+  const margen = c.x1 - c.x0 > 2 * UNO && c.z1 - c.z0 > 2 * UNO ? UNO : 0;
+  const cx = x < c.x0 + margen ? c.x0 + margen : x > c.x1 - margen ? c.x1 - margen : x;
+  const cz = z < c.z0 + margen ? c.z0 + margen : z > c.z1 - margen ? c.z1 - margen : z;
+  return { x: cx, z: cz };
+}
+
+/**
+ * SIN BLANCO Y CON LA ESTRUCTURA EN MEDIO, ENTRA POR EL GRAFO: hacia el nudo de DENTRO del límite más
+ * cercano, por el camino andado más corto (el nudo al que va se guarda en su cerebro, como cuando
+ * persigue). Con blanco no hace falta: lo que la tapa lo rodea yendo a por él. Sin grafo, o sin nudos
+ * dentro, se queda donde está: no hay por dónde. Lo vio la liza de juguete: la que nacía detrás de un muro
+ * pegado al borde no entraba nunca con el paso directo, que no acercaba.
+ */
+function entrarPorElGrafo(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad): boolean {
+  const nudos = p.declaracion.mundo.grafo.nudos;
+  if (!clase.cerebro.sigueElGrafo || nudos.length === 0) return false;
+  let meta = -1;
+  let metaD = 0;
+  for (let i = 0; i < nudos.length; i++) {
+    const n = nudos[i] as { x: number; z: number };
+    if (!dentroDelLimite(p, n.x, n.z)) continue;
+    const d = distanciaAlCuadrado(n.x - e.x, n.z - e.z);
+    if (meta < 0 || d < metaD) {
+      meta = i;
+      metaD = d;
+    }
+  }
+  if (meta < 0) return false;
+  let nudo = e.cerebro.nudo;
+  if (nudo >= 0 && nudo < nudos.length) {
+    const n = nudos[nudo] as { x: number; z: number };
+    if (dentroDelRadio(n.x - e.x, n.z - e.z, LLEGADO)) nudo = siguienteHacia(p, nudo, meta);
+  } else nudo = primerNudoHacia(p, e.x, e.z, meta, clase.radio);
+  if (nudo !== e.cerebro.nudo) e.cerebro = { ...e.cerebro, nudo };
+  if (nudo < 0) return false;
+  const n = nudos[nudo] as { x: number; z: number };
+  return darPaso(p, e, clase, n.x, n.z, false);
+}
+
+/** Si está fuera del límite, da un paso para entrar (ver «entrar primero»): `true` si lo dio. */
+function entrarSiEstaFuera(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad): boolean {
+  const dentro = puntoParaEntrar(p, e.x, e.z);
+  if (dentro === null) return false;
+  if (elegirPaso(p, e, clase, dentro.x, dentro.z, false, true) && PASO.avanza) {
+    aplicarPaso(e);
+    return true;
+  }
+  if (elegirPaso(p, e, clase, dentro.x, dentro.z, false, false) && PASO.avanza) {
+    aplicarPaso(e);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -635,28 +924,74 @@ const DESVIOS = [0, 16, 240, 32, 224, 48, 208, 64, 192];
  * calles que dan a una plaza). La primera versión exigía el límite a cada paso, y las que nacían fuera
  * se quedaban clavadas para siempre donde salían: ningún paso caía dentro. Ahora sólo se le exige a la
  * que ya está dentro.
+ *
+ * ═══ UN PASO QUE NO ACERCA NO ES UN PASO ═══
+ *
+ * `unPaso` resbala contra la estructura: contra la esquina de un pilar, el paso recto devuelve un sitio
+ * un palmo de lado que no acerca nada, y la primera versión se quedaba con el primer desvío que MOVÍA. Con
+ * el blanco al otro lado del pilar, la entidad temblaba contra él cien tics con turno y a 1,8 m (lo midió
+ * el banco con las declaraciones de un juego). Ahora se queda con el primer desvío que ACERCA (o aleja,
+ * si se aparta) al menos un cuarto de paso —rodea la esquina—, y sólo si ninguno lo hace, con el primero
+ * que mueve.
  */
 function darPaso(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad, tx: number, tz: number, alejarse: boolean): boolean {
+  if (!elegirPaso(p, e, clase, tx, tz, alejarse, true)) return false;
+  aplicarPaso(e);
+  return true;
+}
+
+/** El paso elegido por `elegirPaso`: dónde, hacia qué rumbo, y si acerca (o aleja) de verdad. */
+const PASO = { x: 0, z: 0, rumbo: 0, avanza: false };
+
+/**
+ * ELIGE EL PASO de `darPaso` sin darlo (en `PASO`): `false` si ningún desvío mueve. `contraOtras` a
+ * `false` deja pisar a las demás entidades: sólo lo usa quien tiene que entrar en el límite (ver «entrar
+ * primero»), que no puede quedarse fuera porque otra le vaya al lado por dentro.
+ */
+function elegirPaso(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad, tx: number, tz: number, alejarse: boolean, contraOtras: boolean): boolean {
   const dx = tx - e.x;
   const dz = tz - e.z;
   if (dx === 0 && dz === 0) return false;
   let r0 = rumboHacia(dx, dz);
   if (alejarse) r0 = (r0 + 128) % 256;
   const dentro = dentroDelLimite(p, e.x, e.z);
+  const antes = largo(dx, dz);
+  const paso = por(clase.velocidad, DT_DEL_TIC);
+  const cuarto = Math.floor(paso / 4) < Math.floor(antes / 4) ? Math.floor(paso / 4) : Math.floor(antes / 4);
+  let hay = false;
   for (let i = 0; i < DESVIOS.length; i++) {
     const r = (r0 + (DESVIOS[i] as number)) % 256;
     const vx = por(clase.velocidad, SENO[r] as number);
     const vz = -por(clase.velocidad, COSENO[r] as number);
     const q = unPaso(p.arena, e, vx, vz, DT_DEL_TIC, clase.radio);
     if (q.x === e.x && q.z === e.z) continue;
-    if ((dentro && !dentroDelLimite(p, q.x, q.z)) || chocaConOtra(p, e, q.x, q.z, clase.radio)) continue;
-    e.x = q.x;
-    e.z = q.z;
-    e.marcha = 1;
-    e.mira = r;
-    return true;
+    if ((dentro && !dentroDelLimite(p, q.x, q.z)) || (contraOtras && chocaConOtra(p, e, q.x, q.z, clase.radio))) continue;
+    const despues = largo(tx - q.x, tz - q.z);
+    const gana = alejarse ? despues - antes : antes - despues;
+    if (gana >= cuarto) {
+      PASO.x = q.x;
+      PASO.z = q.z;
+      PASO.rumbo = r;
+      PASO.avanza = true;
+      return true;
+    }
+    if (!hay) {
+      hay = true;
+      PASO.x = q.x;
+      PASO.z = q.z;
+      PASO.rumbo = r;
+      PASO.avanza = false;
+    }
   }
-  return false;
+  return hay;
+}
+
+/** Da el paso que dejó `elegirPaso` en `PASO`. */
+function aplicarPaso(e: EntidadEnCurso): void {
+  e.x = PASO.x;
+  e.z = PASO.z;
+  e.marcha = 1;
+  e.mira = PASO.rumbo;
 }
 
 /**

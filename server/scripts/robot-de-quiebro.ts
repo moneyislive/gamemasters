@@ -26,11 +26,18 @@
  * ═══ Y LAS TRAVESURAS ═══
  *
  * Con `travesuras`, además, prueba lo que una sala rota o un aparato viejo mandaría: la ronda de otra
- * oleada, un reloj que no es el de la fase, un veredicto firmado por un asiento, cuentas que no
- * cuadran, un estilo en la reunión, un segundo cambio de estilo, el aprendiz fuera de la primera noche,
- * dos tics perezosos seguidos. Lo que espera que se rechace lo apunta como rechazo esperado; lo que
- * sale distinto de lo que esperaba —rechazado, aceptado o sin efecto—, como INESPERADO, que es lo que
- * el comprobador exige vacío.
+ * oleada, un veredicto firmado por un asiento, cuentas que no cuadran, un estilo en la reunión, un
+ * segundo cambio de estilo, el aprendiz fuera de la primera noche, dos tics perezosos seguidos. Lo que
+ * espera que se rechace lo apunta como rechazo esperado; lo que sale distinto de lo que esperaba
+ * —rechazado, aceptado o sin efecto—, como INESPERADO, que es lo que el comprobador exige vacío.
+ *
+ * ═══ Y LO QUE UNA SALA DE VERDAD MANDA TARDE ═══
+ *
+ * El reloj de una fase que la mesa ya dejó —la pausa en que eligieron todos antes de que venciera, el de
+ * 15 s de una Bajada en que ya estaban todos listos— lo manda la sala de verdad a menudo, porque lee la
+ * vista una vez por segundo. La mesa lo tiene que tomar SIN EFECTO, no rechazarlo: el robot lo manda así,
+ * a veces, y espera el mismo estado. Un reloj de una fase que no existe también entra sin efecto: ninguna
+ * sala lo manda, pero no es de nadie ni cambia nada.
  *
  * ═══ CORRE EN CUALQUIER MOTOR ═══
  *
@@ -378,12 +385,15 @@ function enLaBajada(p: Partida, v: VistaDelQuiebro, travesuras: boolean): void {
   }
   for (const a of conectados(p)) {
     if (unoDeCada(p, 3) && hacer(p, a, 'estilo') && travesuras && p.hechas['dos-estilos'] !== true) {
-      /* Un segundo cambio en la misma Bajada: el estilo se cambia una vez por tramo. */
+      /* Un segundo cambio en la misma Bajada: el estilo se cambia una vez por tramo (y elegirlo es estar listo). */
       p.hechas['dos-estilos'] = true;
       mandar(p, a, { tipo: 'estilo', carga: { id: 'gabardina' } }, 'rechazo');
       mandar(p, a, { tipo: 'estilo', carga: { id: 'ligera' } }, 'rechazo');
+      mandar(p, a, { tipo: 'listo', carga: null }, 'rechazo');
     }
     if (v.noche !== null && v.noche.numero === 1 && unoDeCada(p, 2)) hacer(p, a, 'aprendiz');
+    /* Casi todos dicen que están listos (BAJAR); alguno no, y entonces la Bajada acaba por su reloj de 15 s. */
+    if (!unoDeCada(p, 5)) hacer(p, a, 'listo');
   }
   if (travesuras && v.noche !== null && v.noche.numero === 2 && p.hechas['aprendiz-tarde'] !== true) {
     p.hechas['aprendiz-tarde'] = true;
@@ -391,7 +401,7 @@ function enLaBajada(p: Partida, v: VistaDelQuiebro, travesuras: boolean): void {
   }
   if (travesuras && p.hechas['bajada'] !== true) {
     p.hechas['bajada'] = true;
-    mandar(p, null, { tipo: 'arcade:reloj', carga: { id: 'n9.b' } }, 'rechazo');
+    mandar(p, null, { tipo: 'arcade:reloj', carga: { id: 'n9.b' } }, 'sinEfecto');
     mandar(p, null, { tipo: 'arcade:ronda', carga: { n: 11, resultado: 'ganada', cuentas: [], recurso: 0 } }, 'rechazo');
     mandar(p, p.asientos[0] as string, { tipo: 'arcade:reloj', carga: { id: (v.reloj as { id: string }).id } }, 'rechazo');
     mandar(p, p.asientos[0] as string, { tipo: 'elegir', carga: { retoque: 'iman', voto: null } }, 'rechazo');
@@ -399,7 +409,11 @@ function enLaBajada(p: Partida, v: VistaDelQuiebro, travesuras: boolean): void {
     mandar(p, null, movimientoDeTic(), 'entra');
   }
   const ahora = vistaDe(p);
-  if (ahora.fase.tipo === 'bajada' && ahora.reloj !== null) mandar(p, null, { tipo: 'arcade:reloj', carga: { id: ahora.reloj.id } }, 'entra');
+  if (ahora.fase.tipo === 'bajada' && ahora.reloj !== null) {
+    /* Con todos listos, a veces llega antes el de 15 s que la sala metió sin saberlo: sin efecto. */
+    if (ahora.reloj.id !== (v.reloj as { id: string }).id && unoDeCada(p, 2)) mandar(p, null, { tipo: 'arcade:reloj', carga: { id: (v.reloj as { id: string }).id } }, 'sinEfecto');
+    mandar(p, null, { tipo: 'arcade:reloj', carga: { id: ahora.reloj.id } }, 'entra');
+  }
 }
 
 function enLaOleada(p: Partida, v: VistaDelQuiebro, travesuras: boolean): void {
@@ -451,7 +465,7 @@ function enLaPausa(p: Partida, v: VistaDelQuiebro, travesuras: boolean): void {
       /* El voto donde no toca, y el que falta donde toca. */
       mandar(p, a.asiento, { tipo: 'elegir', carga: { retoque: ofrecido, voto: k >= 3 && k < 5 ? null : 'aguantar' } }, 'rechazo');
     }
-    mandar(p, null, { tipo: 'arcade:reloj', carga: { id: 'n1.p9' } }, 'rechazo');
+    mandar(p, null, { tipo: 'arcade:reloj', carga: { id: 'n1.p9' } }, 'sinEfecto');
   }
   /* Alguno de los que no tenían canal vuelve en la pausa, y elige. */
   if (p.sinCanal.length > 0 && unoDeCada(p, 3)) p.sinCanal.splice(unoEntre(p, 0, p.sinCanal.length - 1), 1);
@@ -469,6 +483,10 @@ function enLaPausa(p: Partida, v: VistaDelQuiebro, travesuras: boolean): void {
   }
   const ahora = vistaDe(p);
   if (ahora.fase.tipo === 'pausa' && ahora.reloj !== null) mandar(p, null, { tipo: 'arcade:reloj', carga: { id: ahora.reloj.id } }, 'entra');
+  else if (v.reloj !== null && unoDeCada(p, 2)) {
+    /* Eligieron todos antes de que venciera: la sala, que aún no se ha enterado, mete el reloj de la pausa igual. */
+    mandar(p, null, { tipo: 'arcade:reloj', carga: { id: v.reloj.id } }, 'sinEfecto');
+  }
 }
 
 function enLaLlamada(p: Partida): void {

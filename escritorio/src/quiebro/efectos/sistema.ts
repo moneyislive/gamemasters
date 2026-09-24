@@ -48,11 +48,13 @@ import {
   TRAS_EL_IMPACTO_MS,
   IMPRESION_MS,
   azarDe,
+  alcanceDeLaBala,
   balaAcabada,
   chispasDelImpacto,
   componentesLineales,
   dondeCaeLaEsquirla,
   parpadeoDelImpacto,
+  velocidadDeLaBala,
   velocidadDeLasChispas,
   vidaDeLaChispa,
 } from './cuentas';
@@ -314,6 +316,9 @@ export class Balas {
   readonly rumbo = new Uint8Array(BALAS_A_LA_VEZ);
   /** NaN mientras la bala sigue. */
   readonly fin = new Float64Array(BALAS_A_LA_VEZ);
+  /** m/s y m de su proyectil; 0 = los del diseño (ver `BalaDeEfecto.velocidad`). */
+  readonly velocidad = new Float64Array(BALAS_A_LA_VEZ);
+  readonly alcance = new Float64Array(BALAS_A_LA_VEZ);
 
   /** Una bala nueva (el aviso `bala`: origen, rumbo e instante de salida). */
   disparar(b: BalaDeEfecto): number {
@@ -324,6 +329,8 @@ export class Balas {
     this.z[i] = b.z;
     this.rumbo[i] = ((Math.floor(b.rumbo) % 256) + 256) % 256;
     this.fin[i] = b.fin === null ? Number.NaN : b.fin;
+    this.velocidad[i] = velocidadDeLaBala(b);
+    this.alcance[i] = alcanceDeLaBala(b);
     return this.ranuras.asa(i);
   }
 
@@ -336,7 +343,7 @@ export class Balas {
   }
 
   /** La bala de la ranura `i` escrita en `destino` (un objeto que la pieza reutiliza). */
-  leer(i: number, destino: { salida: number; x: number; y: number; z: number; rumbo: number; fin: number | null }): void {
+  leer(i: number, destino: { salida: number; x: number; y: number; z: number; rumbo: number; fin: number | null; velocidad: number; alcance: number }): void {
     destino.salida = this.salida[i] as number;
     destino.x = this.x[i] as number;
     destino.y = this.y[i] as number;
@@ -344,9 +351,11 @@ export class Balas {
     destino.rumbo = this.rumbo[i] as number;
     const fin = this.fin[i] as number;
     destino.fin = fin === fin ? fin : null;
+    destino.velocidad = this.velocidad[i] as number;
+    destino.alcance = this.alcance[i] as number;
   }
 
-  private readonly lectura = { salida: 0, x: 0, y: 0, z: 0, rumbo: 0, fin: null as number | null };
+  private readonly lectura = { salida: 0, x: 0, y: 0, z: 0, rumbo: 0, fin: null as number | null, velocidad: 0, alcance: 0 };
 
   barrer(t: number): void {
     for (let i = 0; i < BALAS_A_LA_VEZ; i++) {

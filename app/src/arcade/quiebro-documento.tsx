@@ -50,14 +50,21 @@
  * `DONDE_ESCUCHA`, en `quiebro-puente.ts`). No por `postMessage` del WebView: ése entrega el mensaje como
  * un evento sin origen, y el documento sólo acepta lo que llega de su anfitrión (`vieneDelAnfitrion` de
  * `contrato.ts`).
+ *
+ * ═══ LA APP AL FONDO, EL DOCUMENTO LO SABE ═══
+ *
+ * Cuando `AppState` deja de estar `active` (otra app, una llamada, la cortina de avisos, la pantalla que
+ * se apaga) se le dice al documento con `guionDelFondo` (`quiebro-puente.ts`), y al volver otra vez: el
+ * juego suelta los mandos y se calla, y la sala lo da por ausente. El WebView de Android no lo sabría
+ * solo —su `onHostPause` no hace nada— y seguiría jugando sin nadie delante.
  */
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import type { MutableRefObject } from 'react';
-import { StyleSheet, TurboModuleRegistry, View } from 'react-native';
+import { AppState, StyleSheet, TurboModuleRegistry, View } from 'react-native';
 import type { WebView as ElVisor } from 'react-native-webview';
 import type { ShouldStartLoadRequest, WebViewMessageEvent } from 'react-native-webview/lib/WebViewTypes';
 import { SALA } from './muebles';
-import { guionQueEntrega } from './quiebro-puente';
+import { guionDelFondo, guionQueEntrega } from './quiebro-puente';
 
 /** Lo que la pantalla le da a la superficie del documento, en las dos plataformas. */
 export interface LoQueVeElDocumento {
@@ -110,6 +117,18 @@ export function ElDocumentoDelQuiebro({ direccion, origen, alRecibir, buzon, alF
       buzon.current = null;
     };
   }, [buzon]);
+
+  /* La app al fondo y de vuelta, al documento (ver la cabecera). Sólo cuando cambia de verdad. */
+  useEffect(() => {
+    let alFondo = AppState.currentState !== 'active';
+    const suscripcion = AppState.addEventListener('change', (estado) => {
+      const ahora = estado !== 'active';
+      if (ahora === alFondo) return;
+      alFondo = ahora;
+      visor.current?.injectJavaScript(guionDelFondo(ahora));
+    });
+    return () => suscripcion.remove();
+  }, []);
 
   if (!hayVisor) return <View style={estilos.suelo} />;
 

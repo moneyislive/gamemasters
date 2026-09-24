@@ -60,8 +60,8 @@
  *
  * Todo lo que pasa en un tic sale en un mensaje `tic` con la lista `ev`. Cada suceso lleva su clase en
  * la clave `e` —no en `t`, que en el anuncio es el INSTANTE del impacto, como dice el diseño—. Los
- * instantes (`anuncio.t`, `bala.t`) van en el reloj DEL DESTINATARIO: por eso el `tic` se escribe por
- * aparato, y la foto, que no lleva nada de nadie en particular, una vez por sala.
+ * instantes (`anuncio.t`, `bala.t`, `apunta.t`) van en el reloj DEL DESTINATARIO: por eso el `tic` se
+ * escribe por aparato, y la foto, que no lleva nada de nadie en particular, una vez por sala.
  *
  * Un `tic` nunca va vacío (si no pasó nada, no se manda). Y si lo de un tic no cabe en uno
  * (`TOPE_DE_SUCESOS`) —la puesta al día de quien entra con la sala llena, por ejemplo—, van VARIOS
@@ -123,6 +123,18 @@ export const ECOS_DE_LA_MEDIANA = 5;
 
 /** Un `aviso` por aparato cada tanto como mucho (la declaración puede pedir más espacio, no menos). */
 export const AVISO_CADA_MS = 1000;
+
+/**
+ * LO MÁS QUE MANDA UN APARATO DE GOLPE TRAS UNA PARADA: sus últimos ocho tics, y los de antes no.
+ *
+ * Tras una parada (un fotograma que se come medio segundo, una pestaña que el navegador frena a un
+ * temporizador por segundo) el aparato simula los tics que se perdió para que su paso siga siendo el
+ * mismo, pero sólo MANDA los últimos `TOPE_DE_AQUIS_DE_GOLPE`: cuatrocientos `aqui` de golpe vaciarían el
+ * cubo, y los viejos ya no le sirven a nadie. Es contrato y no detalle del cliente porque la sala lo usa:
+ * una serie de `aqui` seguidos más larga que esto (`AQUIS_PARA_ESTAR`, en `tipos-de-la-sala.ts`) sólo la
+ * hace un aparato despierto, y así distingue la pestaña frenada de la que está a la vista.
+ */
+export const TOPE_DE_AQUIS_DE_GOLPE = 8;
 
 /**
  * Lo que se retrasa lo que se pinta del paseo de los DEMÁS, en ms: dos fotos entre las que interpolar.
@@ -341,7 +353,12 @@ export interface EcoDeLaSala {
   readonly ms: number;
 }
 
-/** Lo que dijiste en tu tic `n` no vale: vuelves a `(x, z)`, el último sitio bueno, en Q16.16. */
+/**
+ * Lo que dijiste en tu tic `n` no vale: vuelves a `(x, z)`, el último sitio bueno, en Q16.16. `n` puede
+ * ser 0, como el del `aqui`: la sala que recoloca a quien acaba de conectar y aún no ha dicho nada (una
+ * fase que empieza, una reaparición) le corrige su tic 0. Antes el lector pedía `n ≥ 1` y el canal lo
+ * mandaba como del 1, que no era verdad: un contrato que obliga a mentir en el cable.
+ */
 export interface Corrige {
   readonly t: 'corrige';
   readonly n: number;
@@ -460,6 +477,29 @@ export interface SucesoBala {
   readonly t: number;
 }
 
+/**
+ * LA LÍNEA DE APUNTADO: la entidad `de` apunta su proyectil `p` desde `(x, z)` (centésimas) al cuerpo
+ * `a` —su blanco: la línea le sigue— hasta el instante `t`, en ms del reloj de QUIEN LO RECIBE. En `t`
+ * la línea se fija donde esté `a` y sale la ráfaga: una `bala` por bala, la primera en ese instante, con
+ * la velocidad y el alcance de `p` en la declaración. `a` 0 es que LO DEJA sin disparar —su blanco se
+ * fue, se quedó ausente o entró en su premio; la aturdieron, cayó, contestó con su guardia—: la línea se
+ * quita, y `t` va a 0. Si `de` se va (`seva`), su línea se va con ella. Una entidad apunta una vez cada
+ * vez: otro `apunta` suyo sustituye al anterior.
+ *
+ * Es lo único que la sala dice de un disparo antes de que salga. Sin ella los `apuntarTics` de la
+ * declaración (12 en el primer juego que dispara: 0,6 s) pasaban en silencio y la primera noticia era
+ * la bala.
+ */
+export interface SucesoApunta {
+  readonly e: 'apunta';
+  readonly de: number;
+  readonly a: number;
+  readonly p: number;
+  readonly x: number;
+  readonly z: number;
+  readonly t: number;
+}
+
 /** El asiento `a` lleva ahora `n` del portable `p`. */
 export interface SucesoCarga {
   readonly e: 'carga';
@@ -557,6 +597,7 @@ export type SucesoDelTic =
   | SucesoNace
   | SucesoSeVa
   | SucesoBala
+  | SucesoApunta
   | SucesoCarga
   | SucesoMonton
   | SucesoRecoge
@@ -724,6 +765,13 @@ export function leerSuceso(v: unknown): SucesoDelTic | null {
       if (!esEntero(v.id, PRIMER_NUMERO_DE_ENTIDAD, TOPE_DE_NUMERO) || !esNumero(v.de) || !esId(v.p)) return null;
       if (!esCentesima(v.x) || !esCentesima(v.z) || !esRumbo(v.r) || !esInstante(v.t)) return null;
       return { e, id: v.id, de: v.de, p: v.p, x: v.x, z: v.z, r: v.r, t: v.t };
+    case 'apunta':
+      if (!conClaves(v, ['e', 'de', 'a', 'p', 'x', 'z', 't'])) return null;
+      if (!esEntero(v.de, PRIMER_NUMERO_DE_ENTIDAD, TOPE_DE_NUMERO) || !esEntero(v.a, 0, TOPE_DE_NUMERO) || !esId(v.p)) return null;
+      if (!esCentesima(v.x) || !esCentesima(v.z) || !esInstante(v.t)) return null;
+      /* Dejarlo no tiene instante: una línea que se quita con un `t` es una línea que no dice qué pasa. */
+      if (v.a === 0 && v.t !== 0) return null;
+      return { e, de: v.de, a: v.a, p: v.p, x: v.x, z: v.z, t: v.t };
     case 'carga':
       if (!conClaves(v, ['e', 'a', 'p', 'n'])) return null;
       if (!esAsiento(v.a) || !esId(v.p) || !esCantidad(v.n)) return null;
@@ -818,7 +866,7 @@ export function leerMensajeDeLaSala(texto: string): MensajeDeLaSala | null {
       return { t, c: v.c, k: v.k, ms: v.ms };
     case 'corrige':
       if (!conClaves(v, ['t', 'n', 'x', 'z'])) return null;
-      if (!esEntero(v.n, 1, TOPE_DE_TIC_DEL_APARATO) || !esCoordenada(v.x) || !esCoordenada(v.z)) return null;
+      if (!esEntero(v.n, 0, TOPE_DE_TIC_DEL_APARATO) || !esCoordenada(v.x) || !esCoordenada(v.z)) return null;
       return { t, n: v.n, x: v.x, z: v.z };
     case 'fuera':
       if (!conClaves(v, ['t', 'motivo'])) return null;
@@ -858,6 +906,8 @@ function sucesoLimpio(s: SucesoDelTic): SucesoDelTic {
       return { e: s.e, id: s.id, por: s.por, quien: s.quien };
     case 'bala':
       return { e: s.e, id: s.id, de: s.de, p: s.p, x: s.x, z: s.z, r: s.r, t: s.t };
+    case 'apunta':
+      return { e: s.e, de: s.de, a: s.a, p: s.p, x: s.x, z: s.z, t: s.t };
     case 'carga':
       return { e: s.e, a: s.a, p: s.p, n: s.n };
     case 'monton':

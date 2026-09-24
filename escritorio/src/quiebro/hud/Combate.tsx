@@ -15,9 +15,19 @@
  * los montones de esquirlas. Así se juega igual en silencio» (diseño §7, §9). Cada clase de marca tiene
  * forma además de color (rombo la cabina, aro el caído, punto pequeño el montón), para quien no distingue
  * el rojo del verde.
+ *
+ * ═══ EL AUSENTE SE DICE, EL PROPIO Y EL DE LOS DEMÁS ═══
+ *
+ * La sala da por ausente a quien lleva 2 s sin contestar (pestaña oculta, llamada, la app al fondo): no
+ * anda, no pega, nadie le persigue ni le pega. Quien vuelve lo ve en el acto —mientras la sala no le
+ * recibe diez `aqui` seguidos sigue ausente, y el mando no responde—, así que el HUD lo dice con un
+ * panel en el centro, y al volver un rótulo corto. De los compañeros, su cuerpo va tenue (`partida.ts`)
+ * y encima lleva su rótulo, proyectado con la cámara del lienzo desde el mismo `requestAnimationFrame`
+ * que mueve la brújula: si no, un compañero tenue en mitad de la pelea parece un fallo de dibujo.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { JSX } from 'react';
+import type { JSX, MutableRefObject } from 'react';
+import * as THREE from 'three';
 import { NOMBRES_DEL_QUIEBRO } from '../../../../shared/arcade/juegos/quiebro-nombres';
 import { PORTABLE_ESQUIRLA } from '../../../../shared/arcade/juegos/quiebro-vista';
 import type { VistaDelQuiebro } from '../../../../shared/arcade/juegos/quiebro-vista';
@@ -41,6 +51,8 @@ export interface PropsDelCombate {
   readonly aprendiz: boolean;
   /** ¿Se ven los mandos táctiles? Entonces no se enseña la chuleta de teclas encima de ellos. */
   readonly tactil: boolean;
+  /** La cámara del lienzo (la pone `Quiebro.tsx`), para poner los rótulos encima de los cuerpos. */
+  readonly ojo: MutableRefObject<THREE.Camera | null>;
 }
 
 /** Cada cuánto se repintan las cifras. */
@@ -55,7 +67,7 @@ function usarElPulso(ms: number): number {
   return n;
 }
 
-export function Combate({ vista, yo, partida, escena, mandos, aprendiz, tactil }: PropsDelCombate): JSX.Element {
+export function Combate({ vista, yo, partida, escena, mandos, aprendiz, tactil, ojo }: PropsDelCombate): JSX.Element {
   usarElPulso(REPINTADO_MS);
   const ahora = performance.now();
   const i = miIndice(vista, yo);
@@ -128,6 +140,10 @@ export function Combate({ vista, yo, partida, escena, mandos, aprendiz, tactil }
     }
   } else if (partida === null && yo !== null) delCanal = null;
 
+  /* Mi ausencia (ver la cabecera). */
+  const ausencia = partida?.ausencia(ahora) ?? null;
+  if (ausencia === 'vuelta' && rotulo === null) rotulo = { texto: 'De vuelta', clase: 'q-rotulo limpio' };
+
   const uso = partida?.usoPosible(ahora) ?? null;
   const progreso = partida?.progresoDeUsar(ahora) ?? null;
   const golpeado = escena !== null && ahora - escena.ultimoGolpeRecibidoMs < 200;
@@ -172,6 +188,7 @@ export function Combate({ vista, yo, partida, escena, mandos, aprendiz, tactil }
         {quedaMs !== null ? <div className={aprieta ? 'cifra aprieta' : 'cifra'}>{relojEnTexto(quedaMs)}</div> : null}
       </div>
       <Brujula partida={partida} />
+      <RotulosDeLaGente partida={partida} ojo={ojo} />
 
       <div className="q-botin">
         <div className="esquirlas" aria-label={NOMBRES_DEL_QUIEBRO.cuentas.esquirlas}>
@@ -227,8 +244,83 @@ export function Combate({ vista, yo, partida, escena, mandos, aprendiz, tactil }
         </div>
       ) : null}
 
+      {ausencia === 'ausente' ? (
+        <div className="q-ausente q-panel" role="status">
+          <div className="q-titulo">{NOMBRES_DEL_QUIEBRO.estados.ausente}</div>
+          <p>La calle ha dejado de verte: nadie te persigue ni te pega, y tú ni andas ni golpeas.</p>
+          <p className="q-nota">Vuelves en cuanto el aparato contesta, con medio segundo de intocable.</p>
+        </div>
+      ) : null}
+
       {delCanal !== null ? <div className="q-canal q-panel">{delCanal}</div> : null}
     </>
+  );
+}
+
+/** Cuántos rótulos de compañero caben (los asientos de una mesa menos el propio). */
+const ROTULOS = 5;
+/** A qué altura sobre el suelo va el rótulo: un palmo por encima de la cabeza. */
+const ALTO_DEL_ROTULO_M = 2.15;
+
+/**
+ * LOS RÓTULOS DE LOS COMPAÑEROS AUSENTES, encima de su cuerpo (ver la cabecera). Fuera de React, como la
+ * brújula: la cámara se mueve sesenta veces por segundo. Un compañero detrás de la cámara no lleva rótulo.
+ */
+function RotulosDeLaGente({ partida, ojo }: { readonly partida: Partida | null; readonly ojo: MutableRefObject<THREE.Camera | null> }): JSX.Element {
+  const raiz = useRef<HTMLDivElement>(null);
+  const rotulos = useRef<(HTMLDivElement | null)[]>([]);
+  useEffect(() => {
+    let vivo = true;
+    let pedido = 0;
+    const punto = new THREE.Vector3();
+    const pintar = (): void => {
+      if (!vivo) return;
+      pedido = requestAnimationFrame(pintar);
+      let k = 0;
+      const camara = ojo.current;
+      const caja = raiz.current;
+      if (partida !== null && camara !== null && caja !== null) {
+        const ahora = performance.now();
+        const yo = partida.yo();
+        const ancho = caja.clientWidth;
+        const alto = caja.clientHeight;
+        for (const c of partida.cuerpos()) {
+          if (k >= ROTULOS) break;
+          if (c.id >= PRIMER_NUMERO_DE_ENTIDAD || c.id === yo || partida.sentidoDe(c.id, ahora) !== 'ausente') continue;
+          punto.set(c.x, ALTO_DEL_ROTULO_M, c.z).project(camara);
+          if (punto.z > 1 || punto.z < -1) continue;
+          const r = rotulos.current[k++];
+          if (r === null || r === undefined) continue;
+          r.style.display = 'block';
+          r.style.transform = `translate(${String(Math.round((punto.x * 0.5 + 0.5) * ancho))}px, ${String(Math.round((0.5 - punto.y * 0.5) * alto))}px) translate(-50%, -100%)`;
+          r.style.borderColor = c.color ?? '';
+          const texto = `${NOMBRES_DEL_QUIEBRO.gente.desvelado} ${String(c.id)} · ${NOMBRES_DEL_QUIEBRO.estados.ausente.toLowerCase()}`;
+          if (r.textContent !== texto) r.textContent = texto;
+        }
+      }
+      for (; k < ROTULOS; k++) {
+        const r = rotulos.current[k];
+        if (r !== null && r !== undefined) r.style.display = 'none';
+      }
+    };
+    pedido = requestAnimationFrame(pintar);
+    return () => {
+      vivo = false;
+      cancelAnimationFrame(pedido);
+    };
+  }, [partida, ojo]);
+  return (
+    <div ref={raiz} className="q-rotulos-de-la-gente" aria-hidden="true">
+      {Array.from({ length: ROTULOS }, (_, k) => (
+        <div
+          key={k}
+          className="rotulo"
+          ref={(e) => {
+            rotulos.current[k] = e;
+          }}
+        />
+      ))}
+    </div>
   );
 }
 

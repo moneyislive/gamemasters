@@ -25,14 +25,23 @@
  * del fotograma anterior y la partida da sus tics y escribe los cuerpos de éste; (−2) la cámara se pone
  * detrás de mi cuerpo ya movido; (−1) los efectos y los cuerpos se pintan; (0) la ciudad; (1) el
  * posproceso pinta el fotograma. Nadie más pinta con prioridad positiva en este lienzo.
+ *
+ * ═══ AL FONDO, CALLADO ═══
+ *
+ * Cuando la pestaña se oculta, la página se va o la app pasa a segundo plano (`mandos/fondo.ts`), se
+ * sueltan TODOS los mandos y la partida deja de mandar `aqui` (`Partida.callar`): la sala lo da por
+ * ausente a los 2 s, que es lo que el diseño promete (§5). Sin callarse, un aparato que no frena sus
+ * temporizadores al fondo seguiría presente y los Celadores pegarían a nadie.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ComponentType, JSX } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import type { ComponentType, JSX, MutableRefObject } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import type { Camera } from 'three';
 import { barrioDeLaNoche, despejarLaPlaza } from '../../../shared/arcade/juegos/quiebro-barrio';
 import type { Barrio } from '../../../shared/arcade/juegos/quiebro-barrio';
 import { lizaDeLaMesa } from '../../../shared/arcade/juegos/lizas';
 import { IDS_DE_ESTILO, NOMBRES_DEL_QUIEBRO } from '../../../shared/arcade/juegos/quiebro-nombres';
+import { claveDeLaFase } from '../../../shared/arcade/juegos/quiebro-liza';
 import { leerVistaDelQuiebro } from '../../../shared/arcade/juegos/quiebro-vista';
 import type { VistaDelQuiebro } from '../../../shared/arcade/juegos/quiebro-vista';
 import type { LizaDeclarada } from '../../../shared/mecanicas/liza/declaracion';
@@ -42,19 +51,23 @@ import { LaCiudadDeNoche } from './ciudad/LaCiudadDeNoche';
 import { EfectosDelQuiebro, crearRelojDePresentacion, crearSistemaDeEfectos } from './efectos';
 import type { SistemaDeEfectos } from './efectos';
 import { Posproceso } from './posproceso/Posproceso';
-import { usarElNivel } from './calidad/usar-el-nivel';
+import { forzarElNivel, usarElNivel } from './calidad/usar-el-nivel';
+import { laCuentaDe } from './calidad/medida';
 import { crearSonido } from './sonido';
 import type { ModoDeLaMusica, Sonido } from './sonido';
 import { CamaraDelQuiebro } from './camara/Camara';
 import type { ModoDeLaCamara } from './camara/Camara';
 import { EstadoDeLosMandos } from './mandos/estado';
+import { escucharElFondo } from './mandos/fondo';
 import { engancharElTeclado } from './mandos/teclado';
 import { MandosTactiles } from './mandos/Tactil';
+import { RelojDeLaBajada } from './red/bajada';
 import { direccionDeLaLiza } from './red/canal';
 import type { Enchufe } from './red/canal';
 import { Escenificador } from './red/escenificar';
 import { Partida } from './red/partida';
 import { Hud } from './hud/Hud';
+import { quienesFaltanEnLaBajada } from './hud/lectura';
 import { ID_DEL_QUIEBRO } from './hud/Pantallas';
 import { SiluetasProvisionales } from './provisional/Siluetas';
 import type { PropsDelPintorDeCuerpos } from './provisional/Siluetas';
@@ -70,6 +83,8 @@ export interface PropsDelQuiebro {
   readonly alOtraMesa?: () => void;
   /** Lo que midió el gobernador de calidad, para el anfitrión que lo guarda. */
   readonly alMedir?: (nivel: 0 | 1 | 2 | 3, calidad: 'sobria' | 'plena') => void;
+  /** Sólo en el modo de prueba: la dirección con que otra pestaña se sienta en esta mesa (la reunión la enseña). */
+  readonly enlaceParaEntrar?: string;
 }
 
 /* ═══ LOS PERSONAJES, SI YA ESTÁN ═══
@@ -157,7 +172,7 @@ const RELOJES_DEL_NAVEGADOR = {
   azar: () => Math.random(),
 };
 
-export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir }: PropsDelQuiebro): JSX.Element {
+export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enlaceParaEntrar }: PropsDelQuiebro): JSX.Element {
   /* ─── La mesa ─── */
   const [rev, ponerRev] = useState(0);
   useEffect(() => puerto.suscribir(() => ponerRev((r) => (r + 1) % 1_000_000)), [puerto]);
@@ -200,16 +215,30 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir }: Pr
   }, [codigo, llave, servidor, mandos]);
   useEffect(() => () => partida?.cerrar(), [partida]);
   const escena = useMemo(() => (partida === null ? null : new Escenificador(partida, sistema, sonido)), [partida, sistema, sonido]);
+  /* El reloj de la Bajada (la preparación) y la cámara del lienzo, que el HUD lee fuera de él. */
+  const bajada = useMemo(() => new RelojDeLaBajada(), []);
+  const ojo = useRef<Camera | null>(null);
 
   /*
    * SÓLO EN DESARROLLO: las piezas vivas en `window.__quiebro`, para mirarlas desde la consola (como
    * `window.__banco` en los bancos). El empaquetado no lo lleva: `import.meta.env.DEV` es `false` allí y
-   * el bloque entero se cae al compilar.
+   * el bloque entero se cae al compilar. La escena añade lo suyo (`medir`, el renderizador).
    */
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    (window as unknown as { __quiebro?: unknown }).__quiebro = { partida, mandos, sistema, sonido };
-  }, [partida, mandos, sistema, sonido]);
+    const w = window as unknown as { __quiebro?: Record<string, unknown> };
+    w.__quiebro = { ...(w.__quiebro ?? {}), partida, mandos, sistema, sonido, bajada, forzarElNivel };
+  }, [partida, mandos, sistema, sonido, bajada]);
+
+  /* Al fondo, callado (ver la cabecera). */
+  useEffect(
+    () =>
+      escucharElFondo((fondo) => {
+        mandos.soltarTodo();
+        partida?.callar(fondo);
+      }),
+    [mandos, partida],
+  );
 
   /* El latido de la red, aparte de los fotogramas (ver `Partida.latir`). */
   useEffect(() => {
@@ -266,12 +295,10 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir }: Pr
   }, [vista, primeraNoche, puerto, rev]);
 
   /* ─── La música, el ambiente y los rótulos de cada fase ─── */
-  const [bajadaDesdeMs, ponerBajadaDesde] = useState(0);
   const [rotuloDeFase, ponerRotuloDeFase] = useState<string | null>(null);
   const oleada = vista !== null && (vista.fase.tipo === 'oleada' || vista.fase.tipo === 'pausa') ? vista.fase.oleada : 0;
   useEffect(() => {
     sonido.musica({ modo: musicaDeLaFase(vista) });
-    if (fase === 'bajada') ponerBajadaDesde(performance.now());
     let texto: string | null = null;
     if (fase === 'oleada' && oleada >= 2) texto = NOMBRES_DEL_QUIEBRO.pantalla.vienenMas;
     if (fase === 'llamada') {
@@ -327,6 +354,9 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir }: Pr
   );
 
   const modo: ModoDeLaCamara = vista === null || fase === 'reunion' || fase === 'final' || fase === 'cerrada' || partida === null ? 'orbita' : fase === 'bajada' ? 'bajada' : 'juego';
+  /* Lo que el reloj de la Bajada mira en cada fotograma: la clave de la fase y si están todos listos. */
+  const claveDeLaMesa = useMemo(() => (vista === null ? '' : claveDeLaFase(vista)), [vista]);
+  const todosListos = useMemo(() => vista !== null && vista.fase.tipo === 'bajada' && quienesFaltanEnLaBajada(vista).length === 0, [vista]);
   const recarga = partida?.lectura?.accion(partida.lectura.botones.empellon)?.recargaTics ?? 0;
 
   return (
@@ -350,7 +380,10 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir }: Pr
             sonido={sonido}
             mandos={mandos}
             modo={modo}
-            bajadaDesdeMs={bajadaDesdeMs}
+            bajada={bajada}
+            claveDeLaMesa={claveDeLaMesa}
+            todosListos={todosListos}
+            ojo={ojo}
             tactil={tactil}
             alNivel={alNivel}
           />
@@ -386,6 +419,9 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir }: Pr
           alSalir={alSalir}
           alOtraMesa={alOtraMesa ?? (() => alSalir?.())}
           avisoDelSilencio={avisoDelSilencio}
+          bajada={bajada}
+          ojo={ojo}
+          {...(enlaceParaEntrar === undefined ? {} : { enlaceParaEntrar })}
         />
       </div>
     </div>
@@ -402,9 +438,17 @@ interface PropsDeLaEscena {
   readonly sonido: Sonido;
   readonly mandos: EstadoDeLosMandos;
   readonly modo: ModoDeLaCamara;
-  readonly bajadaDesdeMs: number;
+  readonly bajada: RelojDeLaBajada;
+  readonly claveDeLaMesa: string;
+  readonly todosListos: boolean;
+  readonly ojo: MutableRefObject<Camera | null>;
   readonly tactil: boolean;
   readonly alNivel: (n: 0 | 1 | 2 | 3) => void;
+}
+
+/** Lo que el director de los personajes dice que pintó (el de `personajes/director.ts`, sin importarlo). */
+interface DirectorQueMide {
+  readonly medida: { readonly llamadas: number; readonly triangulos: number };
 }
 
 /** LO QUE VA DENTRO DEL LIENZO: el nivel, el bucle y las piezas de cada frente. */
@@ -414,11 +458,58 @@ function Escena(p: PropsDeLaEscena): JSX.Element {
   const { alNivel } = p;
   useEffect(() => alNivel(nivel.nivel), [nivel.nivel, alNivel]);
   const ultimaRacha = useRef(-1);
+  const camara = useThree((s) => s.camera);
+  const gl = useThree((s) => s.gl);
+  p.ojo.current = camara;
+  const director = useRef<DirectorQueMide | null>(null);
+  const nivelVivo = useRef(nivel.nivel);
+  nivelVivo.current = nivel.nivel;
+  const alDirector = useCallback((d: unknown) => {
+    director.current = (d as DirectorQueMide | null) ?? null;
+  }, []);
+
+  /*
+   * SÓLO EN DESARROLLO: `__quiebro.medir()` dice lo que cuesta el fotograma DE VERDAD —la escena y el
+   * total con los pases, como los cuenta el posproceso (`calidad/medida.ts`), y lo que pintaron los
+   * personajes según su director—. Es lo que se mira para repartir las cuotas del presupuesto con el
+   * juego entero delante, y no pieza a pieza en su banco.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const w = window as unknown as { __quiebro?: Record<string, unknown> };
+    w.__quiebro = {
+      ...(w.__quiebro ?? {}),
+      gl,
+      medir: () => {
+        const c = laCuentaDe(gl);
+        const d = director.current;
+        return {
+          nivel: nivelVivo.current,
+          escena: c === null ? { llamadas: gl.info.render.calls, triangulos: gl.info.render.triangles } : { llamadas: c.llamadasDeLaEscena, triangulos: c.triangulosDeLaEscena },
+          total: c === null ? null : { llamadas: c.llamadas, triangulos: c.triangulos },
+          personajes: d === null ? null : { llamadas: d.medida.llamadas, triangulos: d.medida.triangulos },
+        };
+      },
+    };
+  }, [gl]);
 
   useFrame((_estado, dt) => {
     const ahora = performance.now();
     p.escena?.drenar(ahora);
     p.partida?.fotograma(ahora, Math.min(0.1, dt));
+    /* La Bajada: lo que ve la mesa y lo que dijo la sala (ver `red/bajada.ts`). */
+    const faseDeLaSala = p.partida?.sala.fase ?? null;
+    p.bajada.observar(
+      {
+        fase: p.vista?.fase.tipo ?? null,
+        noche: p.vista?.noche?.numero ?? null,
+        reloj: p.vista?.reloj ?? null,
+        todosListos: p.todosListos,
+        clave: p.claveDeLaMesa,
+        deLaSala: faseDeLaSala,
+      },
+      ahora,
+    );
     p.escena?.cadaFotograma(ahora, p.barrio);
     remanso.current = p.sistema.reloj.intensidad(ahora);
     /* La racha mete percusión (diseño §9): se le dice a la música sólo cuando cambia. */
@@ -438,6 +529,7 @@ function Escena(p: PropsDeLaEscena): JSX.Element {
   const reloj = useCallback(() => p.sistema.reloj.presentado(performance.now()) / 1000, [p.sistema]);
   const tic = useCallback(() => p.partida?.ticDeLosDurmientes() ?? performance.now() / 50, [p.partida]);
   const presentado = useCallback((t: number) => p.sistema.reloj.presentado(t), [p.sistema]);
+  const caida = useCallback((t: number) => p.bajada.caida(t), [p.bajada]);
   const noche = p.vista?.noche?.numero ?? null;
 
   return (
@@ -448,7 +540,7 @@ function Escena(p: PropsDeLaEscena): JSX.Element {
         <LaCiudadDeNoche codigo={p.codigo} noche={1} nivel={nivel.nivel} reloj={reloj} />
       )}
       <EfectosDelQuiebro sistema={p.sistema} nivel={nivel.nivel} semillaDelCielo={p.barrio?.semilla ?? 1} />
-      {p.partida !== null ? <PintorDeCuerpos fuente={p.partida} nivel={nivel.nivel} barrio={p.barrio} presentado={presentado} /> : null}
+      {p.partida !== null ? <PintorDeCuerpos fuente={p.partida} nivel={nivel.nivel} barrio={p.barrio} presentado={presentado} alDirector={alDirector} /> : null}
       {p.partida !== null && p.escena !== null ? (
         <CamaraDelQuiebro
           partida={p.partida}
@@ -458,7 +550,7 @@ function Escena(p: PropsDeLaEscena): JSX.Element {
           sonido={p.sonido}
           barrio={p.barrio}
           modo={p.modo}
-          bajadaDesdeMs={p.bajadaDesdeMs}
+          caida={caida}
           tactil={p.tactil}
         />
       ) : (

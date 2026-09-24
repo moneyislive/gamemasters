@@ -39,14 +39,22 @@
  * quita las cuentas. «La proyección es la identidad» sigue siendo verdad en lo que importa, que es que
  * la sala (`mirar(codigo, null)`) y cada aparato leen exactamente lo mismo.
  *
- * ═══ EN LA REUNIÓN SÓLO SE PUEDE EMPEZAR ═══
+ * ═══ EN LA REUNIÓN SÓLO SE PUEDE EMPEZAR, Y LA BAJADA ES LA PREPARACIÓN ═══
  *
  * El diseño elige el estilo «en la reunión», y aquí se elige en la BAJADA y entre noches. No es un
  * capricho: la mesa de la plataforma se cierra a los que llegan en cuanto un asiento cambia el estado
  * (`Mesa.empezada`, en `server/src/arcade/mesas.ts`), así que un estilo elegido mientras se espera a
  * los amigos les dejaría fuera con el código en la mano. Con `empezar` como único movimiento de la
- * reunión, «al empezar, la mesa se cierra» (§5.1) es literal. El aparato guarda lo que se eligió en
- * el vestíbulo y lo manda en cuanto ve la Bajada (6 s, de sobra); lo mismo el aviso de aprendiz.
+ * reunión, «al empezar, la mesa se cierra» (§5.1) es literal.
+ *
+ * Con los 6 s de la caída no daba tiempo a elegir con calma, así que la Bajada dura hasta que todos
+ * están LISTOS: elegir estilo es estar listo (se cambia una vez por tramo), y quien se queda con el suyo
+ * lo dice con `listo` (el botón BAJAR). Su reloj es el de 15 s (`DURACION_MS.bajada`) mientras falte
+ * alguien, y con el último listo la mesa lo CAMBIA por el de la caída (`n….b.listos`, 6 s contados desde
+ * que empezó la Bajada: la caída tapa la carga del barrio y el canal). La sala vence el reloj que tenga
+ * la vista (ver `RelojDeFase` en la Liza), y el de 15 s que llegue tarde entra sin efecto. No hay una
+ * fase nueva: la vista, el productor y el cliente ya conocían la Bajada. El aparato manda el aviso de
+ * aprendiz en cuanto la ve, y lo que se eligió en el vestíbulo, si quiere, como su estilo.
  *
  * ═══ EL DIARIO TIENE TOPE ═══
  *
@@ -197,6 +205,7 @@ export const MANIFIESTO_QUIEBRO: ManifiestoDeArcade = {
 /** Los tipos de movimiento, con el nombre corto: los de `quiebro-vista.ts`. */
 export const EMPEZAR = MOVIMIENTO_DEL_QUIEBRO.empezar;
 export const ESTILO = MOVIMIENTO_DEL_QUIEBRO.estilo;
+export const LISTO = MOVIMIENTO_DEL_QUIEBRO.listo;
 export const APRENDIZ = MOVIMIENTO_DEL_QUIEBRO.aprendiz;
 export const ELEGIR = MOVIMIENTO_DEL_QUIEBRO.elegir;
 export const RENDIRSE = MOVIMIENTO_DEL_QUIEBRO.rendirse;
@@ -314,6 +323,14 @@ function esFaseDeJuego(fase: FaseDelQuiebro): boolean {
 /** ¿Es un tramo entre noches (recuento o final)? Ahí se pide otra noche, se cierra y se cambia de estilo. */
 function esEntreNoches(fase: FaseDelQuiebro): boolean {
   return fase.tipo === 'recuento' || fase.tipo === 'final';
+}
+
+/**
+ * El reloj de la Bajada cuando ya están todos listos: el de la caída. Otro `id` que el de 15 s, para que
+ * la sala lo vuelva a armar y para que el de 15 s que llegue tarde no cuente.
+ */
+function relojDeLaBajadaConTodos(noche: number): RelojDelQuiebro {
+  return { id: `n${String(noche)}.b.listos`, duraMs: DURACION_MS.bajadaConTodos };
 }
 
 /** El reloj de una fase: claves cortas de la Liza, distintas en cada fase de cada noche. */
@@ -499,9 +516,12 @@ export function avanzarElQuiebro(
       break;
     case ESTILO: {
       const c = leerCargaDeEstilo(movimiento.carga);
-      salida = c === null ? rechazar(actual, 'Ese estilo no existe.') : cambiarDeEstilo(mesa, i, c.id);
+      salida = c === null ? rechazar(actual, 'Ese estilo no existe.') : cambiarDeEstilo(mesa, i, c.id, vivo.avisados);
       break;
     }
+    case LISTO:
+      salida = conTodosListos(conAsiento(mesa, i, { ...(mesa.asientos[i] as AsientoDelQuiebro), haElegido: true }), vivo.avisados);
+      break;
     case APRENDIZ:
       salida = conAsiento(mesa, i, { ...(mesa.asientos[i] as AsientoDelQuiebro), aprendiz: QUIEBROS_DE_APRENDIZ });
       break;
@@ -583,7 +603,7 @@ function estaOfrecido(opciones: readonly Opcion[], movimiento: Movimiento): bool
 function porQueNoSeOfrece(m: MesaDelQuiebro, quien: string | null, movimiento: Movimiento): string {
   const i = indiceDe(m, quien);
   if (i < 0) return 'No estás sentado a esta mesa.';
-  const tipos: readonly string[] = [EMPEZAR, ESTILO, APRENDIZ, ELEGIR, RENDIRSE, REANUDAR, OTRA_NOCHE, CERRAR];
+  const tipos: readonly string[] = [EMPEZAR, ESTILO, LISTO, APRENDIZ, ELEGIR, RENDIRSE, REANUDAR, OTRA_NOCHE, CERRAR];
   if (tipos.indexOf(movimiento.tipo) < 0) return 'El Quiebro no conoce ese movimiento.';
   const f = m.fase.tipo;
   switch (movimiento.tipo) {
@@ -592,11 +612,16 @@ function porQueNoSeOfrece(m: MesaDelQuiebro, quien: string | null, movimiento: M
     case ESTILO:
       if (f === 'reunion') return 'El estilo se elige en la Bajada: si se eligiera aquí, la mesa se cerraría a los que aún no han llegado.';
       if (f !== 'bajada' && !esEntreNoches(m.fase)) return 'El estilo se elige en la Bajada o entre noches.';
+      if (f === 'bajada' && (m.asientos[i] as AsientoDelQuiebro).haElegido) {
+        return puedeCambiarDeEstilo(m, i) ? 'Ya estás listo para bajar con tu estilo.' : 'Ya has cambiado de estilo al bajar: uno por Bajada, y otro entre noches.';
+      }
       return puedeCambiarDeEstilo(m, i)
         ? 'Ese estilo ya lo llevas, o no existe.'
         : f === 'bajada'
           ? 'Ya has cambiado de estilo al bajar: uno por Bajada, y otro entre noches.'
           : 'Ya has cambiado de estilo entre noches: uno aquí, y otro al bajar.';
+    case LISTO:
+      return f === 'bajada' ? 'Ya estás listo para bajar.' : 'Lo de estar listo se dice en la Bajada.';
     case APRENDIZ:
       if (f === 'bajada' && m.noche !== null && m.noche.numero === 1) return 'Ya tienes los quiebros de aprender.';
       return 'Lo de la primera noche se dice en la Bajada de la primera noche.';
@@ -684,13 +709,29 @@ function empezar(actual: EstadoDelQuiebro, m: MesaDelQuiebro, ctx: ContextoMovim
 /**
  * CAMBIA DE ESTILO: sólo el reglamento. El aguante del punto de control se queda como estaba, que es
  * como la vista sabe que el cambio de este tramo ya se hizo (ver «El diario tiene tope»); el lleno del
- * estilo nuevo llega al abrir la oleada 1 o al empezar la noche siguiente.
+ * estilo nuevo llega al abrir la oleada 1 o al empezar la noche siguiente. En la Bajada, además, deja al
+ * asiento LISTO (ver la cabecera): el cambio de este tramo es su elección.
  */
-function cambiarDeEstilo(m: MesaDelQuiebro, i: number, estilo: IdDeEstilo): MesaDelQuiebro {
+function cambiarDeEstilo(m: MesaDelQuiebro, i: number, estilo: IdDeEstilo, avisados: readonly string[]): MesaDelQuiebro {
   const asientos = m.reglamento.asientos.slice();
   const eleccion = asientos[i] as { asiento: string; estilo: IdDeEstilo; retoques: readonly IdDeRetoque[] };
   asientos[i] = { ...eleccion, estilo };
-  return { ...m, reglamento: { ...m.reglamento, asientos } };
+  const cambiada: MesaDelQuiebro = { ...m, reglamento: { ...m.reglamento, asientos } };
+  if (m.fase.tipo !== 'bajada') return cambiada;
+  return conTodosListos(conAsiento(cambiada, i, { ...(cambiada.asientos[i] as AsientoDelQuiebro), haElegido: true }), avisados);
+}
+
+/**
+ * EN LA BAJADA, CON TODOS LISTOS, EL RELOJ DE LA CAÍDA: los que se espera (ni ausentes ni avisados) han
+ * dicho que están listos, y el reloj de 15 s se cambia por el de 6 (ver la cabecera). Si falta alguien,
+ * o ya se había cambiado, la misma mesa.
+ */
+function conTodosListos(m: MesaDelQuiebro, avisados: readonly string[]): MesaDelQuiebro {
+  if (m.fase.tipo !== 'bajada' || !hanElegidoTodos(m, avisados)) return m;
+  const noche = nochesJugadas(m) < 1 ? 1 : nochesJugadas(m);
+  const reloj = relojDeLaBajadaConTodos(noche);
+  if (m.reloj !== null && m.reloj.id === reloj.id) return m;
+  return { ...m, reloj };
 }
 
 /**
@@ -792,7 +833,10 @@ function elegir(m: MesaDelQuiebro, i: number, retoque: IdDeRetoque, voto: 'llama
   return hanElegidoTodos(conEleccion, avisados) ? cerrarLaPausa(conEleccion, avisados) : conEleccion;
 }
 
-/** ¿Han elegido todos aquellos a los que se espera? Sin nadie a quien esperar, no: se espera al reloj. */
+/**
+ * ¿Han elegido todos aquellos a los que se espera (en la pausa, su retoque; en la Bajada, que están
+ * listos)? Sin nadie a quien esperar, no: se espera al reloj.
+ */
 function hanElegidoTodos(m: MesaDelQuiebro, avisados: readonly string[]): boolean {
   let esperados = 0;
   for (let i = 0; i < m.asientos.length; i++) {
@@ -872,14 +916,25 @@ function interrumpir(m: MesaDelQuiebro, avisados: readonly string[]): MesaDelQui
   return aLaFase(base, { tipo: 'interrumpida', en });
 }
 
-/** `arcade:reloj {id}`: venció el reloj de la fase. Sólo vale el de la fase en curso. */
+/**
+ * `arcade:reloj {id}`: venció el reloj de la fase. Sólo el de la fase en curso cambia algo.
+ *
+ * ═══ EL RELOJ QUE LLEGA TARDE ENTRA SIN EFECTO, NO SE RECHAZA ═══
+ *
+ * La sala mete el reloj de una fase cuando vence, y la mesa pudo cambiar de fase un momento antes: todos
+ * eligieron en la pausa, o estaban listos en la Bajada, y la vista nueva aún no le había llegado a la sala
+ * (la lee una vez por segundo como mucho). Eso no es un error de nadie: es lo normal. Rechazarlo lo
+ * apuntaba como rechazo en el registro de la sala («no es el de la fase en curso»), con un motivo que
+ * asustaba a quien lo leía. Así que un reloj BIEN FORMADO que no es el de la fase en curso —atrasado,
+ * repetido, o de un reloj que la mesa ya cambió— devuelve el MISMO estado: la plataforma lo cuenta como
+ * `sinEfecto` (`meterDeLaPlataforma`), aparte de los rechazos. Lo que sí se rechaza con motivo es lo que
+ * ninguna sala de verdad manda: la forma mala o un reloj firmado por un asiento.
+ */
 function elReloj(e: EstadoDelQuiebro, carga: unknown, ctx: ContextoMovimiento): EstadoDelQuiebro | Rechazo<EstadoDelQuiebro> {
   const c = leerCargaDeReloj(carga, ctx.quien);
   if (c === null) return rechazar(e, 'El reloj no tiene la forma de la Liza, o lo manda alguien que no es la sala.');
   const m = e.mesa;
-  if (m.reloj === null || c.id !== m.reloj.id) {
-    return rechazar(e, `El reloj «${c.id}» no es el de la fase en curso: llega repetido o atrasado.`);
-  }
+  if (m.reloj === null || c.id !== m.reloj.id) return e;
   switch (m.fase.tipo) {
     case 'bajada':
       return seguir(e, aLaFase(conElAguanteLleno(m), { tipo: 'oleada', oleada: 1 }), null);
@@ -911,6 +966,7 @@ function elAusente(e: EstadoDelQuiebro, carga: unknown, ctx: ContextoMovimiento)
   if (a.ausente || e.avisados.indexOf(c.a) >= 0) return e;
   const conAviso: EstadoDelQuiebro = { mesa: m, perezosos: 0, avisados: [...e.avisados, c.a] };
   if (m.fase.tipo === 'pausa' && hanElegidoTodos(m, conAviso.avisados)) return seguir(conAviso, cerrarLaPausa(m, conAviso.avisados), null);
+  if (m.fase.tipo === 'bajada') return { ...conAviso, mesa: conTodosListos(m, conAviso.avisados) };
   return conAviso;
 }
 
@@ -1026,6 +1082,7 @@ function opcionSinCarga(id: string, tipo: string, rotulo: string, ayuda: string)
 const N = NOMBRES_DEL_QUIEBRO;
 
 const OPCION_EMPEZAR = opcionSinCarga('empezar', EMPEZAR, N.mesa.empezar, 'Empieza la noche. A partir de aquí no se sienta nadie más.');
+const OPCION_LISTO = opcionSinCarga('listo', LISTO, N.mesa.bajar, 'Me quedo con este estilo. En cuanto estén todos, a la calle.');
 const OPCION_RENDIRSE = opcionSinCarga('rendirse', RENDIRSE, N.mesa.rendirse, 'La noche se da por perdida para todos, y el nivel de la siguiente baja.');
 const OPCION_REANUDAR = opcionSinCarga('reanudar', REANUDAR, N.mesa.reanudar, 'Vuelve a la calle: la fase en que se quedó la noche empieza otra vez desde el último punto de control.');
 const OPCION_OTRA_NOCHE = opcionSinCarga('otra-noche', OTRA_NOCHE, N.mesa.otraNoche, 'Otro barrio en la misma mesa. El nivel sube si ganasteis y baja si no.');
@@ -1084,7 +1141,7 @@ export function opcionesDeLaMesa(m: MesaDelQuiebro, quien: QuienMira): Opcion[] 
     case 'reunion':
       return [OPCION_EMPEZAR];
     case 'bajada':
-      return [OPCION_RENDIRSE, ...estilos, ...(puedeAprender(m, i) ? [OPCION_APRENDIZ] : [])];
+      return [OPCION_RENDIRSE, ...(a.haElegido ? [] : estilos), ...(puedeAprender(m, i) ? [OPCION_APRENDIZ] : []), ...(a.haElegido ? [] : [OPCION_LISTO])];
     case 'oleada':
     case 'llamada':
       return [OPCION_RENDIRSE];
@@ -1230,7 +1287,7 @@ function panelesDelQuiebro(m: MesaDelQuiebro, sentados: LosSentados): TableroDec
     const estilo = (r.asientos[i] as { estilo: IdDeEstilo }).estilo;
     /* En la Bajada el aguante que cuenta es el lleno del estilo elegido: el del punto de control es el de antes de cambiar. */
     const aguante = m.fase.tipo === 'bajada' ? aguanteLleno(estilo, r.averia) : a.control.aguante;
-    const marcas = `${a.ausente ? ` · ${N.estados.ausente.toLowerCase()}` : ''}${a.salio ? ' · salió' : ''}`;
+    const marcas = `${a.ausente ? ` · ${N.estados.ausente.toLowerCase()}` : ''}${a.salio ? ' · salió' : ''}${m.fase.tipo === 'bajada' && a.haElegido ? ' · listo' : ''}`;
     gente.push(`${nombre(a.asiento)} (${N.estilos[estilo]}): ${String(a.puntos)} ${N.cuentas.puntos.toLowerCase()}, ${String(a.control.esquirlas)} ${N.cuentas.esquirlas.toLowerCase()}, ${String(aguante)} de ${N.cuentas.aguante.toLowerCase()}${marcas}`);
   }
   if (gente.length > 0) paneles.push({ titulo: N.gente.desvelados, lineas: gente });

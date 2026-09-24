@@ -15,11 +15,12 @@
  * detrás» (`tipos-de-la-sala.ts`, `Bienvenida`): tras un despliegue la sala que renace no tiene nada
  * que ver con la de antes, y quien entra a media fase recibe la puesta al día entera —la fase, el
  * recurso, una cuenta por asiento, un `nace` por entidad viva, un `estado` por cuerpo que esté en
- * alguno, los montones, la zona, las balas y los anuncios pendientes— justo detrás.
+ * alguno, los montones, la zona, las balas, las líneas de apuntado y los anuncios pendientes— justo
+ * detrás.
  *
  * ═══ LOS INSTANTES ═══
  *
- * Los que trae el cable (`anuncio.t`, `bala.t`) están en el reloj DEL CANAL de este aparato y se guardan
+ * Los que trae el cable (`anuncio.t`, `bala.t`, `apunta.t`) están en el reloj DEL CANAL de este aparato y se guardan
  * pasados a `performance.now()`, que es el reloj con que pinta todo el cliente. Los que se cuentan
  * en tics de la sala desde que llegan (lo que le queda a un estado, a un reloj de fase, a una zona) se
  * guardan como «hasta tal instante» contado desde que llegó el mensaje: el error es media ida y vuelta,
@@ -80,6 +81,20 @@ export interface BalaVista {
   readonly salidaMs: number;
 }
 
+/** Una entidad que apunta (`apunta`): a quién, desde dónde y cuándo se fija la línea y sale la ráfaga. */
+export interface ApuntadoVisto {
+  readonly de: number;
+  readonly a: number;
+  /** El proyectil que va a salir (su velocidad y su alcance, en la declaración). */
+  readonly p: number;
+  /** Desde dónde apunta, en metros. */
+  readonly x: number;
+  readonly z: number;
+  /** Cuándo se fija, en ms de `performance.now()`. */
+  readonly finMs: number;
+  readonly llegoMs: number;
+}
+
 export interface MontonVisto {
   readonly id: number;
   readonly p: number;
@@ -135,6 +150,8 @@ export type Novedad =
       readonly entidad: EntidadVista | null;
       /** El montón de un `recoge` o de un `seva` de montón. */
       readonly monton: MontonVisto | null;
+      /** La línea de un `apunta` (la nueva, o la que se quita con `a` 0) o la de quien se va (`seva`). */
+      readonly apuntado: ApuntadoVisto | null;
     };
 
 /** Cuántos avisos se recuerdan (para la brújula y el rótulo). */
@@ -153,6 +170,8 @@ export class SalaVista {
   readonly estados = new Map<number, EstadoVisto>();
   readonly anuncios = new Map<number, AnuncioVisto>();
   readonly balas = new Map<number, BalaVista>();
+  /** Las líneas de apuntado, por la entidad que apunta. */
+  readonly apuntados = new Map<number, ApuntadoVisto>();
   readonly montones = new Map<number, MontonVisto>();
   readonly salidos = new Set<number>();
   zona: ZonaVista | null = null;
@@ -174,6 +193,7 @@ export class SalaVista {
     this.estados.clear();
     this.anuncios.clear();
     this.balas.clear();
+    this.apuntados.clear();
     this.montones.clear();
     this.salidos.clear();
     this.zona = null;
@@ -235,6 +255,7 @@ export class SalaVista {
     let bala: BalaVista | null = null;
     let entidad: EntidadVista | null = null;
     let monton: MontonVisto | null = null;
+    let apuntado: ApuntadoVisto | null = null;
     switch (s.e) {
       case 'anuncio':
         anuncio = {
@@ -289,9 +310,11 @@ export class SalaVista {
         entidad = this.entidades.get(s.id) ?? null;
         bala = this.balas.get(s.id) ?? null;
         monton = this.montones.get(s.id) ?? null;
+        apuntado = this.apuntados.get(s.id) ?? null;
         this.entidades.delete(s.id);
         this.balas.delete(s.id);
         this.montones.delete(s.id);
+        this.apuntados.delete(s.id);
         /*
          * Una entidad que SE DESHACE vuelve con el mismo número: se quita de las tablas, pero sus
          * anuncios pendientes los resuelve la sala con su `resuelve`; aquí no se tocan.
@@ -309,6 +332,15 @@ export class SalaVista {
           salidaMs: reloj.aPerformance(s.t),
         };
         this.balas.set(s.id, bala);
+        break;
+      case 'apunta':
+        if (s.a === 0) {
+          apuntado = this.apuntados.get(s.de) ?? null;
+          this.apuntados.delete(s.de);
+        } else {
+          apuntado = { de: s.de, a: s.a, p: s.p, x: s.x / 100, z: s.z / 100, finMs: reloj.aPerformance(s.t), llegoMs: ahora };
+          this.apuntados.set(s.de, apuntado);
+        }
         break;
       case 'carga': {
         let porPortable = this.cargas.get(s.a);
@@ -358,7 +390,7 @@ export class SalaVista {
         this.recurso = s.n;
         break;
     }
-    this.novedades.push({ tipo: 'suceso', k, llegoMs: ahora, suceso: s, anuncio, bala, entidad, monton });
+    this.novedades.push({ tipo: 'suceso', k, llegoMs: ahora, suceso: s, anuncio, bala, entidad, monton, apuntado });
   }
 
   /** ¿Es el número `n` de una entidad (o bala o montón)? Los asientos van del 1 al 15. */

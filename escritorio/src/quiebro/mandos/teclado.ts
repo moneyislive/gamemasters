@@ -30,6 +30,7 @@
  * «coger el ratón» sea un Empellón al aire. Con el ratón ya bloqueado, cada clic es lo que dice la tabla.
  */
 import type { EstadoDeLosMandos } from './estado';
+import { escucharElFondo } from './fondo';
 
 /** Radianes por píxel de ratón bloqueado. */
 const GIRO_POR_PIXEL = 0.0022;
@@ -169,14 +170,14 @@ export function engancharElTeclado(mandos: EstadoDeLosMandos, o: OpcionesDelTecl
     arrastrando = false;
     mandos.soltarTodo();
   };
-  const alCambiarLaVisibilidad = (): void => {
-    if (document.visibilityState === 'hidden') alPerderElFoco();
-  };
 
   window.addEventListener('keydown', alBajar);
   window.addEventListener('keyup', alSubir);
   window.addEventListener('blur', alPerderElFoco);
-  document.addEventListener('visibilitychange', alCambiarLaVisibilidad);
+  /* La pestaña oculta, la página que se va o la app al fondo (`fondo.ts`): lo mismo, y a la vuelta nada pulsado. */
+  const dejarElFondo = escucharElFondo((alFondo) => {
+    if (alFondo) alPerderElFoco();
+  });
   document.addEventListener('pointerlockerror', alErrorDelBloqueo);
   o.superficie.addEventListener('mousedown', alBajarElRaton);
   window.addEventListener('mouseup', alSubirElRaton);
@@ -187,7 +188,7 @@ export function engancharElTeclado(mandos: EstadoDeLosMandos, o: OpcionesDelTecl
     window.removeEventListener('keydown', alBajar);
     window.removeEventListener('keyup', alSubir);
     window.removeEventListener('blur', alPerderElFoco);
-    document.removeEventListener('visibilitychange', alCambiarLaVisibilidad);
+    dejarElFondo();
     document.removeEventListener('pointerlockerror', alErrorDelBloqueo);
     o.superficie.removeEventListener('mousedown', alBajarElRaton);
     window.removeEventListener('mouseup', alSubirElRaton);

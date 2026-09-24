@@ -84,9 +84,27 @@ export const RENGLONES_DECLARADOS: Readonly<Record<string, PorNivel>> = {
     3: { triangulos: 56_000, llamadas: 1 },
   },
   'luces del mobiliario': igual({ triangulos: 2_600, llamadas: 1 }),
+  /*
+   * Toldos, aparatos de aire y banderolas en todos; escaleras de incendios y cables desde N1. Peor de
+   * 4.000 noches (400 códigos × 10), medido el 24-sep: 2.296 en N0 y 13.672 en N1-N3, más un 15-30 %.
+   * Lo decide el barrio con más fachadas de ladrillo altas (las escaleras de incendios son casi todo).
+   */
+  voladizos: {
+    0: { triangulos: 3_000, llamadas: 1 },
+    1: { triangulos: 16_000, llamadas: 1 },
+    2: { triangulos: 16_000, llamadas: 1 },
+    3: { triangulos: 16_000, llamadas: 1 },
+  },
   cristal: igual({ triangulos: 600, llamadas: 1 }),
   'rótulos de neón': igual({ triangulos: 160, llamadas: 1 }),
   horizonte: igual({ triangulos: 128, llamadas: 1 }),
+  /* Diez triángulos por caja lejana (`CAJAS_LEJANAS` de `anillo.ts`): 600 / 1.200 / 2.000 / 3.000. */
+  'ciudad lejana': {
+    0: { triangulos: 6_000, llamadas: 1 },
+    1: { triangulos: 12_000, llamadas: 1 },
+    2: { triangulos: 20_000, llamadas: 1 },
+    3: { triangulos: 30_000, llamadas: 1 },
+  },
   'tarjetas de reflejo': {
     0: { triangulos: 600, llamadas: 1 },
     1: { triangulos: 820, llamadas: 1 },
@@ -130,7 +148,7 @@ export const RENGLONES_DECLARADOS: Readonly<Record<string, PorNivel>> = {
   'haces de luz': {
     0: { triangulos: 0, llamadas: 0 },
     1: { triangulos: 0, llamadas: 0 },
-    2: { triangulos: 0, llamadas: 0 },
+    2: { triangulos: 90 * 32, llamadas: 1 },
     3: { triangulos: 90 * 32, llamadas: 1 },
   },
 };

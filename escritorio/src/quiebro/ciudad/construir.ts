@@ -24,7 +24,8 @@ import { DETALLE_DEL_NIVEL } from './tipos';
 import { ATRIBUTOS_DE_LA_FACHADA, escribirLasFachadas, huellasDeLasFachadas, materialDeFachada } from './fachadas';
 import { construirElSuelo, islasDe, materialDeLaAcera, materialDelAsfalto } from './suelo';
 import type { FuenteHorneada } from './luz-de-la-calle';
-import { hornearLaLuz, mapaDeAlturas, texturaDeAlturas, texturaDeLaLuz, uniformeDeLaCaja } from './luz-de-la-calle';
+import type { Oclusor } from './luz-de-la-calle';
+import { hornearLaLuz, mapaDeAlturas, mapaDeOclusion, texturaDeAlturas, texturaDeLaLuz, texturaDeOclusion, uniformeDeLaCaja } from './luz-de-la-calle';
 import type { FuenteDeReflejo } from './reflejos';
 import { TarjetasDeReflejo, materialDeLasTarjetas } from './reflejos';
 import type { FuenteDeHalo } from './halos';
@@ -32,9 +33,10 @@ import { mallaDeHalos, materialDeLosHalos } from './halos';
 import { UNIFORMES_DE_LA_CIUDAD } from './retoques';
 import { Molde, triangulosDe } from './geometria';
 import { construirElMobiliario } from './mobiliario';
+import { escribirLosVoladizos } from './voladizos';
 import { escribirLosCoches } from './coches';
 import { materialDelCristal, materialDelMobiliario, materialEmisivo } from './materiales';
-import { anilloDe, crearElHorizonte } from './anillo';
+import { anilloDe, CAJAS_LEJANAS, crearElHorizonte, crearLaCiudadLejana } from './anillo';
 import { construirLosRotulos } from './neones';
 import { Tren } from './tren';
 import { Vapor } from './vapor';
@@ -139,6 +141,10 @@ export function construirLaCiudad(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiudad
     rotulos.liberar();
   });
   poner(pieza('mobiliario y coches', malla('mobiliario', mob.mobiliario.geometria(), materialMobiliario, true, true), true));
+  /* Lo que cuelga por encima de la cabeza: toldos, aparatos de aire, escaleras de incendios, cables y
+     banderolas. Mismo material que el mobiliario, su propia llamada (ver `voladizos.ts`). */
+  const voladizos = escribirLosVoladizos(plano, nivel);
+  poner(pieza('voladizos', malla('voladizos', voladizos.geometria(), materialMobiliario, true, true), true));
   poner(pieza('luces del mobiliario', malla('emisivo', mob.emisivo.geometria(), materialLuz, false, false)));
   const cristal = malla('cristal', mob.cristal.geometria(), materialCristal, false, false);
   cristal.renderOrder = 1;
@@ -152,6 +158,12 @@ export function construirLaCiudad(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiudad
     (horizonte.material as THREE.Material).dispose();
   });
   poner(pieza('horizonte', horizonte));
+  const lejana = crearLaCiudadLejana(plano.semilla, CAJAS_LEJANAS[nivel]);
+  liberar.push(() => {
+    lejana.geometry.dispose();
+    (lejana.material as THREE.Material).dispose();
+  });
+  poner(pieza('ciudad lejana', lejana));
 
   /* ─── Las fuentes de luz ─── */
   const horneadas: FuenteHorneada[] = [];
@@ -207,6 +219,16 @@ export function construirLaCiudad(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiudad
     anillo.extension,
   );
   const texturaAlturas = texturaDeAlturas(alturas);
+  /*
+   * La oclusión del suelo: el pie de cada edificio (metro y medio), y el hueco bajo coches, bancos,
+   * quioscos, cabinas y farolas. Lo que estorba ya está en `estorba`; los edificios son lo grande.
+   */
+  const oclusores: Oclusor[] = [
+    ...[...huellasDeLasFachadas(plano.edificios), ...huellasDeLasFachadas(anillo.edificios)].map((c) => ({ caja: c, fuerza: 0.55, alcance: 1.6, debajo: 0.3 })),
+    ...mob.estorba.map((c) => ({ caja: c, fuerza: 0.5, alcance: 0.7, debajo: 0.4 })),
+    ...plano.coches.map((c) => ({ caja: c.caja, fuerza: 0.6, alcance: 0.7, debajo: 0.25 })),
+  ];
+  const texturaOclusion = texturaDeOclusion(mapaDeOclusion(oclusores, anillo.extension));
   const caja = uniformeDeLaCaja(anillo.extension);
   const humedad = plano.tiempo === 'aguacero' ? 0.9 : plano.tiempo === 'niebla' ? 0.35 : 0.55;
   /*
@@ -219,12 +241,15 @@ export function construirLaCiudad(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiudad
     UNIFORMES_DE_LA_CIUDAD.uLuzCalleCaja.value.copy(caja);
     UNIFORMES_DE_LA_CIUDAD.uAlturas.value = texturaAlturas;
     UNIFORMES_DE_LA_CIUDAD.uAlturasCaja.value.copy(caja);
+    UNIFORMES_DE_LA_CIUDAD.uOclusionSuelo.value = texturaOclusion;
+    UNIFORMES_DE_LA_CIUDAD.uOclusionCaja.value.copy(caja);
     UNIFORMES_DE_LA_CIUDAD.uHumedad.value = humedad;
   };
   tomarLosUniformes();
   liberar.push(() => {
     texturaLuz.dispose();
     texturaAlturas.dispose();
+    texturaOclusion.dispose();
   });
 
   /* ─── Tarjetas y halos ─── */

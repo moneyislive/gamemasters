@@ -35,9 +35,21 @@ const SUELO = { acera: 0, plaza: 1, patio: 2 } as const;
 
 /* ═══════════════════════════════ LA CALZADA ═══════════════════════════════ */
 
+/** La oclusión horneada del suelo (`mapaDeOclusion`), leída con la caja del mapa de alturas. */
+const GLSL_OCLUSION_DEL_SUELO = /* glsl */ `
+uniform sampler2D uOclusionSuelo;
+uniform vec4 uOclusionCaja;
+float oclusionDelSueloQ(vec2 xz) {
+  vec2 uvO = (xz - uOclusionCaja.xy) * uOclusionCaja.zw;
+  if (uvO.x < 0.0 || uvO.y < 0.0 || uvO.x > 1.0 || uvO.y > 1.0) return 1.0;
+  return texture(uOclusionSuelo, uvO).r;
+}
+`;
+
 const DECLARACIONES_DEL_ASFALTO = /* glsl */ `
 varying vec4 vTramoQ;
 varying vec4 vCalleQ;
+${GLSL_OCLUSION_DEL_SUELO}
 ${GLSL_CHARCOS}
 ${GLSL_ONDAS}
 float rayaQ(float x, float medio, float px) {
@@ -71,9 +83,15 @@ float charcoFinal = 0.0;
 
   /* Charcos: los del ruido y la cuneta junto al bordillo; el lomo de la calle queda más seco. */
   float ch = charcoQ(P.xz);
+  float rodada = 0.0;
   if (esTramo) {
-    float cuneta = smoothstep(medioAncho - 0.9, medioAncho - 0.15, abs(t)) * smoothstep(0.35, 0.55, fbmQ(vec2(s * 0.3, t)));
+    /* La cuneta: una lámina de agua pegada al bordillo, de orilla nítida y ancho que va y viene. */
+    float anchoCuneta = 0.25 + 0.45 * fbmQ(vec2(s * 0.21, 3.0));
+    float cuneta = step(medioAncho - anchoCuneta, abs(t)) * smoothstep(0.38, 0.46, fbmQ(vec2(s * 0.3, t * 0.5)));
     ch = max(ch * (0.55 + 0.45 * smoothstep(0.4, 2.2, abs(t))), cuneta);
+    /* Las rodadas: donde pisan las ruedas el firme está gastado y liso, y brilla más (sin charco). */
+    float carril = abs(abs(t) - medioAncho * 0.5);
+    rodada = (1.0 - smoothstep(0.55, 0.95, abs(carril - 0.75) + 0.6)) * (0.6 + 0.4 * fbmQ(vec2(s * 0.15, t)));
   }
   charcoFinal = ch;
 
@@ -97,12 +115,16 @@ float charcoFinal = 0.0;
   float mojado = 0.5;
   vec3 alb = mix(seco * mojado, seco * 0.3, ch);
   alb = mix(alb, blanco * mix(0.75, 0.55, ch), pintura);
-  float rug = mix(0.42 + 0.2 * grano, 0.025, ch);
+  float rug = mix(0.34 + 0.18 * grano, 0.025, ch);
+  rug = mix(rug, 0.2, rodada * (1.0 - ch));
   rug = mix(rug, mix(0.35, 0.03, ch), pintura);
+  /* El pie de las fachadas, el hueco bajo los coches aparcados: la oclusión horneada. */
+  alb *= oclusionDelSueloQ(P.xz);
 
   vec3 nW = vec3(0.0, 1.0, 0.0);
   #if NIVEL_Q >= 1
-  float cerca = 1.0 - smoothstep(20.0, 35.0, length(cameraPosition - P));
+  /* Las ondas, sólo dentro del charco y sólo cerca: a más de 8-12 m un anillo de 15 cm es ruido. */
+  float cerca = 1.0 - smoothstep(8.0, 12.0, length(cameraPosition - P));
   if (ch > 0.01 && cerca > 0.0) {
     vec2 g = ondasQ(P.xz, uTiempo) * ch * cerca;
     nW = normalize(vec3(-g.x, 1.0, -g.y));
@@ -125,7 +147,11 @@ function retoqueDelAsfalto(nivel: NivelDeLaCiudad): Retoque {
   return {
     nombre: `asfalto-n${nivel}`,
     orden: 10,
-    uniformes: { uHumedad: UNIFORMES_DE_LA_CIUDAD.uHumedad },
+    uniformes: {
+      uHumedad: UNIFORMES_DE_LA_CIUDAD.uHumedad,
+      uOclusionSuelo: UNIFORMES_DE_LA_CIUDAD.uOclusionSuelo,
+      uOclusionCaja: UNIFORMES_DE_LA_CIUDAD.uOclusionCaja,
+    },
     defines: { NIVEL_Q: String(DETALLE_DEL_NIVEL[nivel].ondas ? 1 : 0) },
     vertice: [
       {
@@ -161,6 +187,7 @@ export function materialDelAsfalto(nivel: NivelDeLaCiudad): THREE.MeshStandardMa
 const DECLARACIONES_DE_LA_ACERA = /* glsl */ `
 varying vec4 vIslaQ;
 varying float vSueloQ;
+${GLSL_OCLUSION_DEL_SUELO}
 ${GLSL_CHARCOS}
 `;
 
@@ -178,6 +205,8 @@ float charcoFinal = 0.0;
   vec3 alb;
   float rug;
   vec3 nW = Ng;
+  /* El agua que se queda en las juntas (de la baldosa y del adoquín): más oscura y más lisa. */
+  float enJunta = 0.0;
   if (Ng.y < 0.5 || borde < 0.3) {
     /* El bordillo: granito claro, con las juntas cada metro a lo largo del canto. */
     bool alLargoDeZ = Ng.y > 0.5 ? dx < dz : abs(Ng.x) > 0.5;
@@ -196,6 +225,7 @@ float charcoFinal = 0.0;
     float pieza = hashQ(floor(q), 21.0);
     alb = vec3(0.26, 0.25, 0.235) * (0.85 + 0.25 * pieza) * (1.0 - 0.45 * junta);
     rug = 0.55;
+    enJunta = junta * cerca;
     vec2 gt = t3 * taco * cerca * 1.2;
     nW = normalize(vec3(gt.x, 1.0, gt.y));
   } else if (tipo < 1.5) {
@@ -209,16 +239,22 @@ float charcoFinal = 0.0;
     alb = vec3(0.17, 0.165, 0.16) * (0.75 + 0.4 * pieza * cerca + 0.2 * (1.0 - cerca)) * (1.0 - 0.35 * junta);
     alb *= 0.8 + 0.4 * fbmQ(P.xz * 0.3);
     rug = 0.5;
+    enJunta = junta;
   } else {
     /* El patio de manzana: cemento viejo. */
     alb = vec3(0.12, 0.12, 0.115) * (0.7 + 0.6 * fbmQ(P.xz * 0.5));
     rug = 0.8;
   }
   /* Mojado: más oscuro, más liso, y charcos pequeños en los hundimientos. */
-  float ch = Ng.y > 0.5 ? charcoQ(P.xz * 1.6 + 40.0) * 0.8 : 0.0;
+  float ch = Ng.y > 0.5 ? charcoDeLaAceraQ(P.xz) : 0.0;
   charcoFinal = ch;
   alb *= mix(0.62, 0.35, ch);
-  rug = mix(rug * 0.65, 0.03, ch);
+  /* Mojada, pero la piedra no es un espejo fuera del charco: con la rugosidad a dos tercios, al alba la
+     plaza entera reflejaba el cielo claro y era la parte más luminosa de la imagen. */
+  rug = mix(rug * 0.8, 0.03, ch);
+  rug = mix(rug, 0.08, enJunta * 0.7);
+  alb *= 1.0 - 0.25 * enJunta;
+  alb *= oclusionDelSueloQ(P.xz);
   nW = normalize(mix(nW, Ng, ch));
   diffuseColor.rgb = alb;
   roughnessFactor = rug;
@@ -230,7 +266,11 @@ float charcoFinal = 0.0;
 const RETOQUE_DE_LA_ACERA: Retoque = {
   nombre: 'acera',
   orden: 10,
-  uniformes: { uHumedad: UNIFORMES_DE_LA_CIUDAD.uHumedad },
+  uniformes: {
+    uHumedad: UNIFORMES_DE_LA_CIUDAD.uHumedad,
+    uOclusionSuelo: UNIFORMES_DE_LA_CIUDAD.uOclusionSuelo,
+    uOclusionCaja: UNIFORMES_DE_LA_CIUDAD.uOclusionCaja,
+  },
   vertice: [
     {
       buscar: '#include <common>',

@@ -227,7 +227,6 @@ export function cerrarElEncuentro(p: PasoEnCurso, resultado: ResultadoDeRonda): 
   for (const a of p.asientos) {
     soltarLaSostenida(p, a);
     a.guardada = null;
-    a.acometida = null;
   }
   for (const e of p.entidades) if (e.cerebro.modo !== 'deshecha') contar(p, 0, { e: 'seva', id: e.numero, por: MOTIVO_DE_IRSE.disuelta, quien: 0 });
   for (const b of p.balas) contar(p, 0, { e: 'seva', id: b.numero, por: MOTIVO_DE_IRSE.disuelta, quien: 0 });

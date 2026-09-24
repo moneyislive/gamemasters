@@ -135,6 +135,70 @@ export function mapaDeAlturas(islas: readonly CajaXZ[], caja: CajaXZ, porMetro =
   return { datos, lado, caja };
 }
 
+/* ─────────────────────────── La oclusión del suelo ─────────────────────────── */
+
+/**
+ * Algo que le tapa el cielo al suelo de alrededor: un edificio, un coche aparcado, un banco, el pie de
+ * una farola. `fuerza` es cuánto oscurece pegado a su canto (0-1), `alcance` hasta dónde llega (m) y
+ * `debajo` cuánta luz queda justo debajo (lo que se ve bajo un coche o un banco).
+ */
+export interface Oclusor {
+  readonly caja: CajaXZ;
+  readonly fuerza: number;
+  readonly alcance: number;
+  readonly debajo: number;
+}
+
+/**
+ * LA OCLUSIÓN DEL SUELO, HORNEADA: cuánto cielo y cuánta calle le llegan a cada trozo de acera y de
+ * calzada (255 todo, 0 nada). El pie de una fachada, el hueco bajo un coche o un banco y el de una
+ * farola se oscurecen: son las sombras de contacto que una ciudad tiene siempre, con cualquier luz, y
+ * sin las que todo parecía posado encima del suelo en vez de estar en él. Misma caja y mismo paso que
+ * el mapa de alturas (dos téxeles por metro), así que el suelo los lee con la misma cuenta.
+ */
+export function mapaDeOclusion(oclusores: readonly Oclusor[], caja: CajaXZ, porMetro = 2): MapaDeAlturas {
+  const lado = Math.ceil(Math.max(caja.x1 - caja.x0, caja.z1 - caja.z0) * porMetro);
+  const luz = new Float32Array(lado * lado).fill(1);
+  const px = (caja.x1 - caja.x0) / lado;
+  const pz = (caja.z1 - caja.z0) / lado;
+  for (const o of oclusores) {
+    const c = o.caja;
+    const i0 = Math.max(0, Math.floor((c.x0 - o.alcance - caja.x0) / px));
+    const i1 = Math.min(lado - 1, Math.ceil((c.x1 + o.alcance - caja.x0) / px));
+    const k0 = Math.max(0, Math.floor((c.z0 - o.alcance - caja.z0) / pz));
+    const k1 = Math.min(lado - 1, Math.ceil((c.z1 + o.alcance - caja.z0) / pz));
+    for (let k = k0; k <= k1; k++) {
+      const z = caja.z0 + (k + 0.5) * pz;
+      const dz = Math.max(c.z0 - z, 0, z - c.z1);
+      for (let i = i0; i <= i1; i++) {
+        const x = caja.x0 + (i + 0.5) * px;
+        const dx = Math.max(c.x0 - x, 0, x - c.x1);
+        const d = Math.hypot(dx, dz);
+        let queda: number;
+        if (d <= 0) queda = o.debajo;
+        else if (d >= o.alcance) continue;
+        else {
+          const t = 1 - d / o.alcance;
+          queda = 1 - o.fuerza * t * t;
+        }
+        const j = k * lado + i;
+        luz[j] = (luz[j] as number) * queda;
+      }
+    }
+  }
+  const datos = new Uint8Array(lado * lado);
+  for (let j = 0; j < datos.length; j++) datos[j] = Math.round(Math.min(1, Math.max(0, luz[j] as number)) * 255);
+  return { datos, lado, caja };
+}
+
+/** La oclusión del suelo para la GPU: un byte por téxel, con filtro (sus bordes son suaves). */
+export function texturaDeOclusion(m: MapaDeAlturas): THREE.DataTexture {
+  const t = texturaDeAlturas(m);
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
+  return t;
+}
+
 export function texturaDeAlturas(m: MapaDeAlturas): THREE.DataTexture {
   const t = new THREE.DataTexture(m.datos, m.lado, m.lado, THREE.RedFormat, THREE.UnsignedByteType);
   t.magFilter = THREE.NearestFilter;

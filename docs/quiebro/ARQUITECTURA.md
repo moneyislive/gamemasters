@@ -40,7 +40,7 @@ diseño en una MECÁNICA, gana el documento de diseño; en una RUTA o un NOMBRE 
    ajena en ningún texto, rótulo, comentario visible ni dato: ver `docs/EL-QUIEBRO.md` §1.
 6. **Sin descargas de arte ni dependencias nuevas** salvo `react-native-webview` en `app/` (aprobada por
    Miguel). El posproceso sale de `three/examples/jsm/postprocessing` (r185) y de sombreadores propios.
-   Los personajes salen de la forja de Blender (`arte/forja/`, §6.6).
+   Los personajes salen de la forja de Blender (`arte/forja/`, ver su README y §6.1).
 
 ---
 
@@ -223,7 +223,13 @@ el mensaje); en el WebView la app los mete con `injectJavaScript` y no hay orige
   diga el sondeo), baja deprisa (media > 22 ms en 60 fotogramas), sube despacio (20 s con holgura) y no
   vuelve a un nivel que ya falló; ignora la pestaña oculta; cuenta llamadas y triángulos.
 - **Presupuestos provisionales**: N0 150k tri / 60 llamadas · N1 250k / 90 · N2 600k / 150 ·
-  N3 1,5M / 250. Cada pieza declara su renglón y un comprobador suma.
+  N3 1,5M / 250. Cada pieza declara su renglón y un comprobador suma; pero lo que manda es el tope del
+  juego ENTERO, medido en el juego real con `__quiebro.medir()` (en desarrollo) y cada nivel forzado. Lo
+  último medido está en `personajes/presupuesto.ts` (`RESTO_DEL_JUEGO_MEDIDO`), y `verify:quiebro-personajes`
+  exige que el peor caso de los personajes más eso quepa en cada tope.
+- **Al fondo, callado**: la pestaña oculta, la página que se va o la app en segundo plano sueltan los
+  mandos y callan la partida (`mandos/fondo.ts`); la sala lo da por ausente a los 2 s. La app avisa al
+  WebView con `EVENTO_DEL_FONDO` desde su `AppState`.
 
 ---
 
@@ -245,6 +251,26 @@ el mensaje); en el WebView la app los mete con `injectJavaScript` y no hay orige
 
 Cada frente es dueño EXCLUSIVO de sus ficheros. Tocar un fichero de otro frente está prohibido; si hace
 falta un cambio fuera, se dice en el informe final y lo integra el coordinador.
+
+### 6.1 El reparto de hoy: la oleada del pulido (24-sep-2026)
+
+Tras las dos primeras oleadas el juego se juega entero, y el trabajo se juntó en tres frentes que
+trabajan a la vez en el mismo árbol, más los que siguen como estaban. Es el que vale ahora:
+
+| Frente | Ficheros |
+|---|---|
+| **reglas y sala** | `shared/mecanicas/liza/*`, `shared/arcade/juegos/{quiebro,quiebro-liza,quiebro-reglas,quiebro-vista,quiebro-nombres,lizas}.ts`, `server/src/liza/*` y sus comprobadores de `server/scripts/` (`liza-de-juguete`, `verificar-liza*`, `verificar-quiebro`, `robot-de-quiebro`, `verificar-sala-de-la-liza`, `verificar-robot-generico`, `guion-determinismo`, `verificar-determinismo`). Sus cambios de contrato los sigue el cliente en `red/` cuando le obligan, y lo dice en su informe |
+| **dirección de arte** | `escritorio/src/quiebro/{ciudad,atmosfera,posproceso,efectos,calidad}/*`, `personajes/material.ts`, `personajes/sombras.ts`, `camara/encuadre.ts` y sus comprobadores (`verify:quiebro-{calidad,ciudad,efectos}`) |
+| **cliente** | `escritorio/src/quiebro/{Quiebro.tsx,documento.tsx}`, `red/*`, `mandos/*`, `hud/*`, `provisional/*`, `camara/Camara.tsx`, `personajes/*` menos `material.ts` y `sombras.ts`, `escritorio/scripts/verificar-quiebro-{juego,personajes}.ts`, `app/src/arcade/quiebro-*.tsx\|ts`, y los documentos `docs/EL-QUIEBRO.md`, `docs/LA-LIZA.md`, este y `arte/forja/README.md`. De `shared/`, sólo el número de la Acometida (`quiebro-reglas.ts`), por decisión del coordinador |
+| **forja** | `arte/forja/*` (menos el README) y `escritorio/src/quiebro/recursos/*`: lo fabrica `rehacer.sh`, no se toca a mano |
+| **sonido** | `escritorio/src/quiebro/sonido/*` |
+| **integración** | `escritorio/src/pintores.ts`, `escritorio/src/quiebro-en-tres.tsx`, `escritorio/vite.config.ts`, `app/src/arcade/pintados.ts`, `app/app.json`, `app/package.json`, `app/app/_layout.tsx` (si hace falta), `scripts/verificar-todo.mjs`, `server/package.json`, `server/scripts/marcas-registradas.ts` |
+| **coordinador** | `escritorio/src/quiebro/{contrato,cuerpos}.ts` (las fronteras), `escritorio/quiebro.html`, los commits y las decisiones abiertas |
+
+Lo que sigue cerrado para todos: el núcleo sellado y lo de Boots on Board del §0, y `shared/` y
+`server/` fuera del frente de reglas y sala.
+
+### 6.2 El reparto de la primera oleada (historia)
 
 | Frente | Ficheros |
 |---|---|

@@ -18,12 +18,22 @@
  * un dedo que se va por encima de un botón no lo pulsa. Lo que cambia en cada fotograma (el pomo de la
  * palanca, si USAR se ve, sus anillos) se escribe en el DOM a mano desde un `requestAnimationFrame`, sin
  * pasar por React.
+ *
+ * ═══ AL IRSE, SE SUELTA TODO ═══
+ *
+ * Un dedo en la palanca cuando llega una llamada, o se baja la cortina de avisos, o se cambia de app, no
+ * manda nunca su `pointerup`: el sistema se queda con el toque. Sin soltarlo aquí, la palanca seguiría
+ * empujando al volver —y mientras tanto, si el aparato sigue en marcha, el asiento «jugaría» solo y la
+ * sala no lo daría por ausente (ver `fondo.ts`)—. Así que al perder el foco, al ocultarse la pestaña, al
+ * irse la página o al pasar la app al fondo se olvidan los tres dedos, la base de la palanca se esconde y
+ * los mandos quedan a cero. El teclado ya lo hacía (`teclado.ts`); el táctil, no.
  */
 import { useEffect, useRef } from 'react';
 import type { JSX, PointerEvent as EventoDePuntero } from 'react';
 import { NOMBRES_DEL_QUIEBRO } from '../../../../shared/arcade/juegos/quiebro-nombres';
 import type { Partida } from '../red/partida';
 import type { Boton, EstadoDeLosMandos } from './estado';
+import { escucharElFondo } from './fondo';
 
 /** El radio de la base de la palanca, en pt CSS (diseño §7). */
 export const RADIO_DE_LA_PALANCA = 56;
@@ -84,6 +94,28 @@ export function MandosTactiles({ mandos, partida, zurdo, recargaDelEmpellonMs }:
       cancelAnimationFrame(pedido);
     };
   }, [partida, recargaDelEmpellonMs]);
+
+  /* Al perder el foco o irse al fondo, los tres dedos se olvidan (ver la cabecera). */
+  useEffect(() => {
+    const soltarLosDedos = (): void => {
+      const d = dedos.current;
+      d.palanca = null;
+      d.mirada = null;
+      d.usar = null;
+      if (base.current !== null) base.current.style.display = 'none';
+      if (pomo.current !== null) pomo.current.style.transform = 'translate(0px, 0px)';
+      for (const b of raiz.current?.querySelectorAll('.pulsada') ?? []) b.classList.remove('pulsada');
+      mandos.soltarTodo();
+    };
+    window.addEventListener('blur', soltarLosDedos);
+    const dejarElFondo = escucharElFondo((alFondo) => {
+      if (alFondo) soltarLosDedos();
+    });
+    return () => {
+      window.removeEventListener('blur', soltarLosDedos);
+      dejarElFondo();
+    };
+  }, [mandos]);
 
   /* Un dedo que se levanta fuera (o que el sistema cancela) suelta lo suyo. */
   const soltar = (e: EventoDePuntero<HTMLElement>): void => {

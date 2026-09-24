@@ -182,7 +182,10 @@ export interface AsientoDelQuiebro {
    * fuera de pausa.
    */
   readonly ofrecidos: readonly IdDeRetoque[];
-  /** Si ya eligió en la pausa en curso (su único movimiento de la pausa). `false` fuera de pausa. */
+  /**
+   * Si ya eligió lo de la fase en curso: en una PAUSA, su retoque (su único movimiento de la pausa); en la
+   * BAJADA, que está listo para bajar (eligió estilo o dijo `listo`). `false` en cualquier otra fase.
+   */
   readonly haElegido: boolean;
   /**
    * Su voto en la pausa en curso, o `null` si no votó. Sólo puede haberlo en una pausa desde la oleada
@@ -273,12 +276,17 @@ export interface VistaDelQuiebro {
  * carga van con `carga: null`.
  */
 export const MOVIMIENTO_DEL_QUIEBRO = {
-  /** `{id}`: elegir estilo (en la reunión y al final de una noche). */
-  estilo: 'estilo',
   /**
-   * Sin carga: «este aparato juega su primera noche» (lo sabe él, por su almacén local). En la reunión
-   * y al final, antes de empezar: el reductor le pone `aprendiz` a `QUIEBROS_DE_APRENDIZ` para la
-   * noche que empieza. En «Jugar ya» va justo antes de `empezar`.
+   * `{id}`: elegir estilo. En la Bajada (donde además deja al asiento listo) y entre noches, uno por
+   * tramo; en la reunión no, que cerraría la mesa a los que aún no han llegado (ver `quiebro.ts`).
+   */
+  estilo: 'estilo',
+  /** Sin carga: «estoy listo, me quedo con mi estilo» (en la Bajada, a quien aún no lo está). */
+  listo: 'listo',
+  /**
+   * Sin carga: «este aparato juega su primera noche» (lo sabe él, por su almacén local). Sólo en la
+   * Bajada de la noche 1: el reductor le pone `aprendiz` a `QUIEBROS_DE_APRENDIZ`, y el aparato lo manda
+   * en cuanto ve la Bajada.
    */
   aprendiz: 'aprendiz',
   /** Sin carga: empezar la noche (en la reunión). La mesa se cierra. */
@@ -511,7 +519,7 @@ function leerAsiento(v: unknown, fase: FaseDelQuiebro): AsientoDelQuiebro | null
   const ofrecidos = enPausa ? leerListaDeIds(v.ofrecidos, IDS_DE_RETOQUE, 1, RETOQUES_OFRECIDOS) : leerListaDeIds(v.ofrecidos, IDS_DE_RETOQUE, 0, 0);
   if (ofrecidos === null) return null;
   if (typeof v.haElegido !== 'boolean' || typeof v.ausente !== 'boolean' || typeof v.salio !== 'boolean') return null;
-  if (v.haElegido && !enPausa) return null;
+  if (v.haElegido && !enPausa && fase.tipo !== 'bajada') return null;
   const voto = v.voto;
   if (voto !== null) {
     if (!unoDe(voto, IDS_DE_VOTO)) return null;

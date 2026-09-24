@@ -73,6 +73,23 @@ export function guionQueEntrega(texto: string): string {
 }
 
 /**
+ * EL EVENTO CON QUE LA APP AVISA AL DOCUMENTO DE QUE SE VA AL FONDO (o vuelve). Lo escucha el juego
+ * (`escritorio/src/quiebro/mandos/fondo.ts`, `EVENTO_DEL_FONDO`): al fondo suelta los mandos y deja de
+ * mandar sus pasos, y la sala lo da por ausente a los 2 s —intocable, sin nadie que le persiga—. Hace
+ * falta porque el WebView de Android no se entera solo: `react-native-webview` no hace nada en
+ * `onHostPause`, sus temporizadores siguen corriendo con la app en segundo plano, y un dedo que estaba en
+ * la palanca al cambiar de app seguiría empujando. Va por aquí y no por el puente de `contrato.ts`: es
+ * una señal sin datos, del sistema y no de la mesa. Copiado por lo de Metro (ver la cabecera);
+ * `verify:quiebro-juego` exige que los dos nombres sean el mismo.
+ */
+export const EVENTO_DEL_FONDO = 'quiebro:fondo';
+
+/** El JavaScript que avisa al documento de que la app se va al fondo (`true`) o vuelve (`false`). */
+export function guionDelFondo(alFondo: boolean): string {
+  return `(function(){try{window.dispatchEvent(new CustomEvent(${JSON.stringify(EVENTO_DEL_FONDO)},{detail:${alFondo ? 'true' : 'false'}}));}catch(e){}})();true;`;
+}
+
+/**
  * El origen de una dirección (`https://anfitrion[:puerto]`, en minúsculas), o `null` si no es http(s).
  * A mano y no con `URL`: el `URL` de React Native no implementa `origin` en todos los motores.
  */

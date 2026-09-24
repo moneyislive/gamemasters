@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
@@ -37,6 +38,16 @@ void SplashScreen.preventAutoHideAsync();
  * Riberas sin decir por qué).
  */
 armarElParteDeFallos();
+
+/*
+ * LA APP ES VERTICAL, AUNQUE `app.json` YA NO LO DIGA. Desde El Quiebro el manifiesto va con
+ * `"orientation": "default"` para que su pantalla pueda ponerse apaisada con `lockAsync`, y en
+ * Android eso deja el resto de la app girando con el sensor desde el arranque (`initialOrientation`
+ * del plugin sólo vale para iOS). Se bloquea aquí, antes de la primera pantalla; las que necesitan
+ * otra orientación (El Quiebro, La Frente) la piden al entrar y devuelven la vertical al salir. En
+ * la web `lockAsync` puede no estar: el rechazo se traga, que una web girada no rompe nada.
+ */
+void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
 
 export default function Raiz(): JSX.Element | null {
   const [cinzel, errorCinzel] = useCinzel({ Cinzel_600SemiBold, Cinzel_700Bold });

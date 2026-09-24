@@ -83,6 +83,7 @@ import { fundirElLod, paletaBase, simplificarMalla } from '../src/quiebro/person
 import { COLOR_DE_AMENAZA } from '../src/quiebro/personajes/material';
 import { crearLaMultitud, moverLaMultitud, ticPintado, APARTE_COMO_MUCHO_M } from '../src/quiebro/personajes/multitud';
 import { PIEZAS, construirPieza, triangulosDe } from '../src/quiebro/personajes/piezas';
+import { TABLA_DE_NIVELES } from '../src/quiebro/calidad/niveles';
 import {
   CUERPOS_COMO_MUCHO,
   NIVELES,
@@ -94,6 +95,7 @@ import {
   lodElegido,
   lodParaTope,
   renglonDeLosPersonajes,
+  RESTO_DEL_JUEGO_MEDIDO,
   triangulosConTope,
   triangulosDelLod,
   repartirElDetalle,
@@ -948,6 +950,21 @@ for (const n of NIVELES) {
     `N${String(n)}: el peor caso de los personajes (${String(r.llamadas)} llamadas, ${r.triangulos.toLocaleString('es')} triángulos) cabe en su cuarto (${String(cuota.llamadas)}, ${cuota.triangulos.toLocaleString('es')})`,
     r.llamadas <= cuota.llamadas && r.triangulos <= cuota.triangulos,
     r.desglose.filter((d) => d.triangulos > 0).map((d) => `${d.que}: ${d.triangulos} tri, ${String(d.llamadas)} ll.`),
+  );
+}
+/*
+ * LO QUE MANDA ES EL TOPE DEL JUEGO ENTERO: el peor caso de los personajes más lo que el resto del juego
+ * gastó en el peor fotograma medido en el juego real (`RESTO_DEL_JUEGO_MEDIDO`, con cómo se midió). La
+ * cuota de un cuarto es un reparto; esto es la cuenta que decide si hace falta cambiarlo.
+ */
+for (const n of NIVELES) {
+  const r = renglonDeLosPersonajes(reparto, n);
+  const resto = RESTO_DEL_JUEGO_MEDIDO[n];
+  const tope = TABLA_DE_NIVELES[n].topes;
+  comprobar(
+    `N${String(n)}: el juego entero cabe en su tope: ${String(r.llamadas)} de los personajes + ${String(resto.llamadas)} medidas del resto ≤ ${String(tope.llamadas)} llamadas, y ${(r.triangulos + resto.triangulos).toLocaleString('es')} ≤ ${tope.triangulos.toLocaleString('es')} triángulos`,
+    resto.llamadas > 0 && resto.triangulos > 0 && r.llamadas + resto.llamadas <= tope.llamadas && r.triangulos + resto.triangulos <= tope.triangulos,
+    { personajes: [r.llamadas, r.triangulos], resto, tope },
   );
 }
 {
@@ -1989,4 +2006,4 @@ paso('Sin asignar por fotograma (lo que asigna el código de los personajes, sin
 }
 
 director.liberar();
-terminar(133);
+terminar(157);

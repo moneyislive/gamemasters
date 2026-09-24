@@ -22,7 +22,9 @@
 import * as THREE from 'three';
 import { nieblaEn } from './niebla';
 import { UNIFORMES_DE_LA_CIUDAD } from '../ciudad/retoques';
+import { GLSL_CHARCOS, GLSL_RUIDO } from '../ciudad/glsl';
 import { GLSL_ALTURA } from '../ciudad/reflejos';
+import { UNIFORMES_DE_LA_LUZ } from './paleta';
 
 export const UNIFORMES_DE_LA_LLUVIA = {
   /** Tiempo del adorno. */
@@ -59,6 +61,7 @@ uniform float uVelocidad;
 uniform vec2 uViento;
 uniform float uRadio;
 uniform float uFuerza;
+uniform vec3 uAmbienteDeLaLluvia;
 ${GLSL_LUZ}
 varying vec2 vQ;
 varying vec3 vColor;
@@ -85,7 +88,7 @@ void main() {
   /* Cerca de la cámara se apaga (una gota a 20 cm sería una viga); lejos también. */
   float fade = smoothstep(0.6, 2.0, d) * (1.0 - smoothstep(uRadio * 0.7, uRadio, d));
   /* La luz de la calle ilumina la gota según su altura: la farola está a 6 m, el suelo más abajo. */
-  vec3 luz = luzEnQ(xz) * smoothstep(-1.0, 5.0, y) * 0.5 + vec3(0.025, 0.035, 0.032);
+  vec3 luz = luzEnQ(xz) * smoothstep(-1.0, 5.0, y) * 0.5 + uAmbienteDeLaLluvia;
   vColor = luz * fade * uFuerza * 0.2;
   #include <fog_vertex>
 }
@@ -129,6 +132,7 @@ export function crearLaLluvia(cuantas: number, semilla: number): THREE.Instanced
       uLuzCalleCaja: UNIFORMES_DE_LA_CIUDAD.uLuzCalleCaja,
       uColorDeSodio: UNIFORMES_DE_LA_CIUDAD.uColorDeSodio,
       uFarolas: UNIFORMES_DE_LA_CIUDAD.uFarolas,
+      uAmbienteDeLaLluvia: UNIFORMES_DE_LA_LUZ.uAmbienteDeLaLluvia,
     },
     vertexShader: VERTICE,
     fragmentShader: FRAGMENTO,
@@ -147,13 +151,21 @@ export function crearLaLluvia(cuantas: number, semilla: number): THREE.Instanced
 
 /* ─────────────────────────────── Salpicaduras ─────────────────────────────── */
 
+/*
+ * LAS SALPICADURAS SON ANILLOS EN EL AGUA, no en la acera: un anillo sólo se abre donde hay agua quieta
+ * (el mismo `charcoQ` que el suelo), mide como mucho 15 cm y se apaga entre 8 y 12 m. Repartidos por
+ * igual en la acera seca eran círculos idénticos, como pegatinas.
+ */
 const VERTICE_DE_SALPICADURA = /* glsl */ `
 #include <common>
 #include <fog_pars_vertex>
 attribute vec4 aGota;
 uniform float uTiempo;
+uniform vec3 uAmbienteDeLaLluvia;
 ${GLSL_ALTURA}
 ${GLSL_LUZ}
+${GLSL_RUIDO}
+${GLSL_CHARCOS}
 varying vec2 vQ;
 varying float vEdad;
 varying vec3 vColor;
@@ -166,13 +178,15 @@ void main() {
   vec2 off = vec2(h1(ciclo + aGota.x * 91.0), h1(ciclo * 1.7 + aGota.y * 57.0)) * 18.0;
   vec2 xz = mod(off - cameraPosition.xz + 9.0, 18.0) - 9.0 + cameraPosition.xz;
   float y = alturaDelSueloQ(xz) + 0.012;
-  float r = 0.03 + edad * 0.09;
+  float r = 0.02 + edad * 0.055;
   vec3 p = vec3(xz.x + position.x * 2.0 * r, y, xz.y - position.y * 2.0 * r);
   vec4 mvPosition = viewMatrix * vec4(p, 1.0);
   gl_Position = projectionMatrix * mvPosition;
   vQ = position.xy * 2.0;
   vEdad = edad;
-  vColor = luzEnQ(xz) * 0.25 + vec3(0.02, 0.025, 0.025);
+  float agua = y > 0.07 ? charcoDeLaAceraQ(xz) : charcoQ(xz);
+  float lejos = 1.0 - smoothstep(8.0, 12.0, length(xz - cameraPosition.xz));
+  vColor = (luzEnQ(xz) * 0.25 + uAmbienteDeLaLluvia * 0.8) * smoothstep(0.2, 0.6, agua) * lejos;
   #include <fog_vertex>
 }
 `;
@@ -186,7 +200,7 @@ varying vec3 vColor;
 void main() {
   float r = length(vQ);
   float anillo = exp(-pow((r - 0.8) * 7.0, 2.0)) * (1.0 - vEdad) * (1.0 - vEdad);
-  if (anillo < 0.003) discard;
+  if (anillo < 0.003 || max(vColor.r, max(vColor.g, vColor.b)) < 1e-4) discard;
   gl_FragColor = vec4(vColor * anillo * 0.35, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -204,12 +218,14 @@ export function crearLasSalpicaduras(cuantas: number, semilla: number): THREE.In
     uniforms: {
       ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
       uTiempo: UNIFORMES_DE_LA_CIUDAD.uTiempo,
+      uHumedad: UNIFORMES_DE_LA_CIUDAD.uHumedad,
       uAlturas: UNIFORMES_DE_LA_CIUDAD.uAlturas,
       uAlturasCaja: UNIFORMES_DE_LA_CIUDAD.uAlturasCaja,
       uLuzCalle: UNIFORMES_DE_LA_CIUDAD.uLuzCalle,
       uLuzCalleCaja: UNIFORMES_DE_LA_CIUDAD.uLuzCalleCaja,
       uColorDeSodio: UNIFORMES_DE_LA_CIUDAD.uColorDeSodio,
       uFarolas: UNIFORMES_DE_LA_CIUDAD.uFarolas,
+      uAmbienteDeLaLluvia: UNIFORMES_DE_LA_LUZ.uAmbienteDeLaLluvia,
     },
     vertexShader: VERTICE_DE_SALPICADURA,
     fragmentShader: FRAGMENTO_DE_SALPICADURA,

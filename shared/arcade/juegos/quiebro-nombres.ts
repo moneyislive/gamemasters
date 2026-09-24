@@ -255,6 +255,7 @@ export const NOMBRES_DEL_QUIEBRO = {
     abrirMesa: 'Abrir mesa',
     entrarConCodigo: 'Entrar con código',
     empezar: 'EMPEZAR',
+    bajar: 'BAJAR',
     elegirEstilo: 'Elige estilo',
     elegirRetoque: 'Elige un retoque',
     otraNoche: 'Otra noche',

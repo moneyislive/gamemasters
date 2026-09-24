@@ -166,6 +166,32 @@ export const POLITICA: Readonly<Record<Nivel, PoliticaDePersonajes>> = {
   },
 };
 
+/**
+ * LO QUE GASTA EL RESTO DEL JUEGO, MEDIDO EN EL JUEGO REAL (24-sep-2026), para juzgar la cuota contra
+ * el tope del juego ENTERO y no contra un reparto de papel.
+ *
+ * Cómo se tomó: `/sala/quiebro.html?prueba=1` en un Chrome de esta máquina, noches enteras jugadas en
+ * solitario y a dos pestañas, con enemigos en pantalla (de 2 a 4 a menos de 30 m: la oleada 1, la 3
+ * con su tirador y la Llamada, con el barrio abierto), cada nivel forzado con `forzarElNivel` y de 25 a
+ * 40 muestras por nivel de `__quiebro.medir()`: la escena como la cuenta el posproceso
+ * (`calidad/medida.ts`, sin los pases, que no cuentan para los topes) menos lo que su director dice que
+ * pintaron los personajes. Es el PEOR fotograma medido, redondeado hacia arriba: la ciudad, la lluvia,
+ * los efectos (instanciados: sus llamadas no crecen con los cuerpos) y el cielo. Lo que el frente de
+ * dirección de arte añada después se vuelve a medir con la misma orden.
+ *
+ * Lo que dice: el peor caso de los personajes (15, 19, 31 y 39 llamadas) más esto cabe de sobra en los
+ * topes (60, 90, 150 y 250), así que la cuota de un cuarto no hace falta subirla. Con los seis estilos
+ * de la forja, cada uno en su rebaño, sí se pasaba de su cuarto en N0 y N1 (19 de 15, 23 de 22); la
+ * salida fue juntar los rebaños de los desvelados (ver «Los desvelados lejanos» en `director.ts`), no
+ * subir la cuota. `verify:quiebro-personajes` suma las dos cosas contra el tope de cada nivel.
+ */
+export const RESTO_DEL_JUEGO_MEDIDO: Readonly<Record<Nivel, { readonly triangulos: number; readonly llamadas: number }>> = {
+  0: { triangulos: 38_000, llamadas: 25 },
+  1: { triangulos: 91_000, llamadas: 23 },
+  2: { triangulos: 176_000, llamadas: 23 },
+  3: { triangulos: 125_000, llamadas: 18 },
+};
+
 /** La cuota de los personajes en un nivel. */
 export function cuotaDelNivel(nivel: Nivel): { triangulos: number; llamadas: number } {
   const t = TABLA_DE_NIVELES[nivel].topes;
@@ -243,19 +269,25 @@ export function triangulosDePieza(reparto: Reparto, nombre: string): number {
   return TRIANGULOS_DE_PIEZA[base] ?? 0;
 }
 
-/** Las figuras que puede pintar cada papel. */
-function figurasDeCuerpo(reparto: Reparto): { desvelado: string[]; celador: string[]; npc: string[]; durmiente: string[] } {
+/**
+ * Las figuras que puede pintar cada papel. `rebanoDelDesvelado` son las del PRIMER estilo de cada cuerpo:
+ * el desvelado lejano va en su maniquí, sea cual sea su estilo (ver «Los desvelados lejanos» en
+ * `director.ts`), y así los rebaños de desvelados son dos llamadas y no una por estilo.
+ */
+function figurasDeCuerpo(reparto: Reparto): { desvelado: string[]; rebanoDelDesvelado: string[]; celador: string[]; npc: string[]; durmiente: string[] } {
   const desvelado = new Set<string>();
   for (const v of reparto.clases.desvelado.variantes) {
     desvelado.add(v.hombre.figura);
     desvelado.add(v.mujer.figura);
   }
+  const primero = reparto.clases.desvelado.variantes[0];
+  const rebanoDelDesvelado = primero === undefined ? [] : [...new Set([primero.hombre.figura, primero.mujer.figura])];
   const durmiente = new Set<string>();
   for (const c of reparto.durmientes.cuerpos) durmiente.add(c.figura);
   const celador = new Set<string>();
   for (const v of reparto.clases.celador.variantes) celador.add(v.figura);
   const npc = new Set<string>([...durmiente, ...celador]);
-  return { desvelado: [...desvelado], celador: [...celador], npc: [...npc], durmiente: [...durmiente] };
+  return { desvelado: [...desvelado], rebanoDelDesvelado, celador: [...celador], npc: [...npc], durmiente: [...durmiente] };
 }
 
 /** El peor de unas figuras con un tope, en su variante más cara. */
@@ -315,8 +347,8 @@ export function renglonDeLosPersonajes(reparto: Reparto, nivel: Nivel): RenglonD
   d.push({ que: 'el propio', triangulos: maximo(reparto, figuras.desvelado, p.trisPropio), llamadas: 1 });
   d.push({ que: `${String(cerca)} cercanos con esqueleto`, triangulos: cerca * maximo(reparto, todas, p.trisCerca), llamadas: cerca });
   d.push({ que: `${String(lejos)} lejanos con esqueleto`, triangulos: lejos * maximo(reparto, todas, p.trisLejos), llamadas: lejos });
-  /* Sin esqueleto: los Prestados van en el rebaño de la multitud; los demás, uno por figura. */
-  const rebanosDeCuerpos = [...new Set([...figuras.desvelado, ...figuras.celador])];
+  /* Sin esqueleto: los Prestados van en el rebaño de la multitud; los desvelados, en el de su cuerpo; los Celadores, uno por figura. */
+  const rebanosDeCuerpos = [...new Set([...figuras.rebanoDelDesvelado, ...figuras.celador])];
   d.push({
     que: `${String(sinEsqueleto)} sin esqueleto (texturas de huesos)`,
     triangulos: sinEsqueleto * Math.max(maximoDelManiqui(reparto, rebanosDeCuerpos, p.trisRebano), maximoDelManiqui(reparto, figuras.durmiente, p.trisMultitud) + paraguasLigero),

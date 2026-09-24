@@ -39,7 +39,8 @@ import { soltarElAtlas } from './atlas';
 import { ChispasDeImpacto, EsquirlasAmbar } from './chispas';
 import { Hilos } from './hilos';
 import type { Nivel } from './presupuesto';
-import { crearRelojDePresentacion } from './reloj';
+import { crearRelojDePresentacion, rejillaDelRemanso } from './reloj';
+import { UNIFORMES_DE_LA_CIUDAD } from '../ciudad/retoques';
 import type { SistemaDeEfectos } from './sistema';
 import { crearSistemaDeEfectos } from './sistema';
 import { CieloDeGrafia, MarcoDelBis, MuroDelBis, PantallasDeGrafia, SiluetasDeGrafia } from './tapices';
@@ -62,7 +63,10 @@ export interface PropsDeLosEfectos {
 export function EfectosDelQuiebro({ sistema, nivel, semillaDelCielo = 1, sinCielo = false }: PropsDeLosEfectos): JSX.Element {
   useFrame(() => {
     sistema.nivel = nivel;
-    sistema.fotograma(performance.now());
+    const ahora = performance.now();
+    sistema.fotograma(ahora);
+    /* El pico del Remanso: las fachadas enseñan su rejilla de glifos (el uniforme es de la ciudad). */
+    UNIFORMES_DE_LA_CIUDAD.uRejillaDeGlifos.value = rejillaDelRemanso(sistema.reloj.ultimoInicio(), ahora);
   }, -1);
   useEffect(() => () => soltarElAtlas(), []);
 

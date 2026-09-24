@@ -92,8 +92,12 @@ function ponerElTiempo(t: Tapiz, segundos: number): void {
 
 /* ─────────────────────────────── El cielo ─────────────────────────────── */
 
-/** Brillo de las columnas del cielo: tenues, que se lean como textura y no como letrero. */
-const BRILLO_DEL_CIELO = 0.45;
+/**
+ * Brillo de las columnas del cielo: tenues, que se lean como textura y no como letrero. Con 0,45 se
+ * leían como letrero: van sin niebla (viven detrás de ella) y en la vista aérea, y en el alba sobre el
+ * cielo claro, eran lluvia de código a toda pantalla. El diseño las pide «tenues, tras la niebla».
+ */
+const BRILLO_DEL_CIELO = 0.18;
 
 export function CieloDeGrafia({ sistema, semilla = 1 }: { sistema: SistemaDeEfectos; semilla?: number }): JSX.Element {
   /* Sin niebla: viven detrás de ella y se ven a través, que es lo que pide el diseño. */

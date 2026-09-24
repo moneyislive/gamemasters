@@ -22,8 +22,9 @@
  * El juicio es el de siempre (`EsquivaDeclarada`): la bala no toca su sitio → sigue; la ventana en el
  * reloj de su aparato, con el instante `salida en su reloj + tics de vuelo × 50` → limpia o esquivada, y
  * la bala sigue; su intocable en ese tic → esquivada; si no, da, y la bala se acaba ahí (`impacta`).
- * Una limpia contra una bala no descoloca al tirador, que está lejos: da el vuelo de `contraProyectil`
- * y la acción que la sala lanza al llegar (`acometida`, en `combate.ts`).
+ * Una limpia contra una bala no descoloca al tirador, que está lejos: da la acometida de `contraProyectil`
+ * —el vuelo hacia él y su acción, que la sala lanza en el acto con el impacto al final (`lanzarLaAcometida`,
+ * en `combate.ts`)—.
  *
  * Una bala que se para (estructura o alcance) sigue en la sala hasta que todos los horizontes pasan su
  * último tic: un asiento con la red lenta todavía puede estar en su camino en un tic que aún no se juzgó.
@@ -37,8 +38,8 @@ import { aCentesimas, MOTIVO_DE_IRSE, RESULTADO } from './protocolo';
 import type { CodigoDeResultado } from './protocolo';
 import { bitDe, contar, intocableEn, msDelTic, nuevoNumero, ticsQueCubren } from './paso-en-curso';
 import type { AsientoEnCurso, BalaInterna, EntidadEnCurso, PasoEnCurso } from './paso-en-curso';
-import { darExtra, fraccionDentroDeLaCaja, sitioEnElTic } from './cuerpo';
-import { golpearAsiento, juzgarLaVentana, premiarLimpia } from './combate';
+import { fraccionDentroDeLaCaja, sitioEnElTic } from './cuerpo';
+import { golpearAsiento, juzgarLaVentana, lanzarLaAcometida, premiarLimpia } from './combate';
 
 /* ─── DÓNDE ESTÁ UNA BALA (sala y aparato) ───────────────────────────────── */
 
@@ -231,9 +232,7 @@ function juzgarElTic(p: PasoEnCurso, b: BalaInterna, proyectil: ProyectilDeclara
   contar(p, 0, { e: 'impacta', bala: b.numero, a: a.numero, r: r as CodigoDeResultado, dano: 0, vida: a.vida });
   if (r === RESULTADO.limpia) {
     premiarLimpia(p, a, reglas, t);
-    const cp = reglas.esquiva.contraProyectil;
-    darExtra(a, cp.distancia, p.k + cp.tics);
-    a.acometida = { blanco: b.de, enTic: p.k + cp.tics };
+    lanzarLaAcometida(p, a, reglas, b.de);
   }
   return r;
 }

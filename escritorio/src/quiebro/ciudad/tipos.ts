@@ -233,7 +233,7 @@ export interface DetalleDelNivel {
   readonly cochesFinos: boolean;
   /** Coches en marcha por las avenidas de fuera. */
   readonly trafico: number;
-  /** Conos de luz de las farolas en la niebla (N3). */
+  /** Conos de luz de las farolas en la niebla (N2+). */
   readonly haces: boolean;
   /** Bocas de alcantarilla que echan vapor. */
   readonly vapor: number;
@@ -284,7 +284,8 @@ export const DETALLE_DEL_NIVEL: Readonly<Record<NivelDeLaCiudad, DetalleDelNivel
     relieve: true,
     cochesFinos: true,
     trafico: 16,
-    haces: false,
+    /* Los conos de luz desde N2 (pedido de dirección de arte): una llamada y unos 3.000 triángulos. */
+    haces: true,
     vapor: 6,
     reflejosDeVentanas: 320,
     lados: 10,

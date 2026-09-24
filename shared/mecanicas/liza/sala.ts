@@ -15,7 +15,7 @@
  *      (un `estado`, un `resuelve`) llega detrás de lo que lo explica, nunca de algo que no conoce.
  *   4. EL TIC, si la fase no es `quieta`: los presupuestos; y en un encuentro vivo, por este orden, las
  *      repeticiones que salen, los impactos que tocan, las balas, las pulsaciones guardadas, las
- *      acometidas, las sostenidas, las caídas, la presencia, las entidades, lo que sale del encuentro,
+ *      sostenidas, las caídas, la presencia, las entidades, lo que sale del encuentro,
  *      los montones, y si se acabó. Los impactos van antes que las guardadas para que un golpe encadenado
  *      salga en el mismo tic en que se resuelve el anterior; las entidades, después de los impactos,
  *      para que piensen sabiendo cómo acabó su golpe.
@@ -44,6 +44,7 @@ import {
   bitDe,
   cerrarPaso,
   contar,
+  contarApuntado,
   enCurso,
   ensuciarCarga,
   ensuciarCuenta,
@@ -54,12 +55,12 @@ import {
 import type { AsientoEnCurso, BalaInterna, CuerpoInterno, EstadoInterno, PasoEnCurso } from './paso-en-curso';
 import { dentroDelLimite, mirarLaPresencia, recolocar, redDelAsiento, rellenarPresupuestos, sinCanalDeMas, sitioDeNacer, topeDelCorto, validarAqui } from './cuerpo';
 import {
+  alQuedarAusente,
   anunciarProgramados,
   atenderLaAccionDelAqui,
   avanzarLasCaidas,
   avanzarSostenidas,
   instanteParaElAsiento,
-  lanzarAcometidas,
   reintentarGuardadas,
   resolverAnuncios,
   soltarLaSostenida,
@@ -133,13 +134,16 @@ export function salaNueva(declaracion: LizaDeclarada, semilla: number): EstadoDe
       red: { rttMs: 0, compMs: comp, desfaseMs: 0 },
       ultimoAvisoEnTic: -1,
       ausenteDado: false,
+      aquisSeguidos: 0,
+      vivoEnTic: 0,
+      vueltaHastaTic: -1,
+      ausenteAcumulado: 0,
       corregidoEnTic: -1,
       enVueloHastaN: -1,
       nDelSitio: -1,
       extraHastaTic: 0,
       recuperaHastaTic: 0,
       balasHastaTic: 0,
-      acometida: null,
     });
   }
   const sala: EstadoInterno = {
@@ -209,10 +213,9 @@ function simular(p: PasoEnCurso): void {
   resolverAnuncios(p);
   avanzarLasBalas(p);
   reintentarGuardadas(p);
-  lanzarAcometidas(p);
   avanzarSostenidas(p);
   avanzarLasCaidas(p);
-  mirarLaPresencia(p, (a) => soltarLaSostenida(p, a));
+  mirarLaPresencia(p, (a) => alQuedarAusente(p, a));
   pensarLasEntidades(p);
   avanzarElEncuentro(p);
   caducarMontones(p);
@@ -285,9 +288,10 @@ function empezarLaFase(p: PasoEnCurso): void {
     a.recargas = [];
     a.esquivasRecientes = [];
     a.guardada = null;
-    a.acometida = null;
     a.firmeGastadoEnTic = -1;
     a.ausenteDado = false;
+    a.vueltaHastaTic = -1;
+    a.ausenteAcumulado = 0;
     a.recuperaHastaTic = 0;
     a.extraHastaTic = 0;
     a.balasHastaTic = p.k;
@@ -369,6 +373,9 @@ function conectar(p: PasoEnCurso, e: EntradaConexion): void {
   a.conexionCambioEnTic = p.k;
   a.red = redDelAsiento(p.declaracion, e.rttMs, e.desfaseMs);
   a.ultimoTicDelAparato = -1;
+  /* Un canal nuevo es una señal de vida: tiene `ausenteTrasTics` para hacer su racha de `aqui` vivos. */
+  a.aquisSeguidos = 0;
+  if (p.k > a.vivoEnTic) a.vivoEnTic = p.k;
   a.nDelSitio = -1;
   a.guardada = null;
   soltarLaSostenida(p, a);
@@ -396,8 +403,9 @@ function conectar(p: PasoEnCurso, e: EntradaConexion): void {
 
 /**
  * UNA DECLARACIÓN NUEVA. Con otra `clave` es otra fase y se empieza; con la misma, son otros números para
- * lo que empiece desde ahora. Si la arena cambió se deriva otra. Una declaración con OTROS asientos (otro
- * número, otro orden) no es de esta mesa: los números del cable saldrían de otro sitio, y se ignora.
+ * lo que empiece desde ahora, y un reloj con otro `id` se vuelve a armar. Si la arena cambió se deriva
+ * otra. Una declaración con OTROS asientos (otro número, otro orden) no es de esta mesa: los números del
+ * cable saldrían de otro sitio, y se ignora.
  */
 function tomarLaVista(p: PasoEnCurso, e: EntradaVista): void {
   const d = e.declaracion;
@@ -407,7 +415,19 @@ function tomarLaVista(p: PasoEnCurso, e: EntradaVista): void {
   p.declaracion = d;
   p.indices = indicesDe(d);
   if (d.mundo !== antes.mundo) p.arena = arenaDeLaLiza(d);
-  if (d.fase.clave !== p.fase.clave) empezarLaFase(p);
+  if (d.fase.clave !== p.fase.clave) {
+    empezarLaFase(p);
+    return;
+  }
+  /*
+   * LA MISMA FASE CON OTRO RELOJ: la mesa lo acortó (ver `RelojDeFase`). Es otro reloj y vence una vez
+   * él también, contando desde que empezó la fase. Si el viejo ya había vencido, su veredicto llegó a una
+   * mesa que ya lo había cambiado —y lo tomó sin efecto—: sin volver a armarse, la fase se quedaba
+   * esperando un veredicto que no iba a llegar.
+   */
+  const idAntes = antes.fase.reloj === null ? null : antes.fase.reloj.id;
+  const idAhora = d.fase.reloj === null ? null : d.fase.reloj.id;
+  if (idAhora !== idAntes && p.fase.relojDado) p.fase = { ...p.fase, relojDado: false };
 }
 
 /**
@@ -442,8 +462,8 @@ function avisar(p: PasoEnCurso, n: number, clase: number, objetivo: number): voi
  * PONE AL DÍA A QUIEN CONECTÓ: su `dentro` y, sólo para él, en el orden de `Bienvenida`: la fase, el
  * recurso, una `cuenta` por asiento, una `carga` por asiento y portable que lleve algo, un `nace` por
  * entidad (en su sitio de ahora), un `estado` por cuerpo que esté en alguno (con lo que le queda), un
- * `monton` por montón, la zona activa, una `bala` por bala y un `anuncio` por anuncio, los dos con el
- * instante en su reloj nuevo.
+ * `monton` por montón, la zona activa, una `bala` por bala, un `apunta` por entidad que esté apuntando y
+ * un `anuncio` por anuncio, los tres con el instante en su reloj nuevo.
  */
 function ponerAlDia(p: PasoEnCurso, n: number): void {
   const a = asiento(p, n);
@@ -494,6 +514,7 @@ function ponerAlDia(p: PasoEnCurso, n: number): void {
       t: b.salidaEnSuReloj[n - 1] as number,
     });
   }
+  for (const e of p.entidades) if (e.cerebro.modo === 'apuntar') contarApuntado(p, e, e.blanco, n);
   for (const an of p.anuncios) {
     if (an.lanzadoEnTic > p.k) continue;
     contar(p, n, { e: 'anuncio', id: an.id, de: an.de, a: an.a, acc: an.accion, t: instanteParaElAsiento(an, a), x: aCentesimas(an.x), z: aCentesimas(an.z) });

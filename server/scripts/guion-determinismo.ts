@@ -53,6 +53,16 @@ import type { EstadoDelArcade, Rumbo } from '../../shared/arcade/juegos/arcade';
 import { jugarConElRobot, loQueHaceElRobot } from './robot-del-burgo';
 import { jugarLasLindes } from './robot-de-las-lindes';
 import { PLANTAR } from '../../shared/arcade/juegos/lindes';
+import { barrioDeLaNoche, despejarLaPlaza, mundoDeLaLizaDelBarrio, mundoDelBarrio, pasoAbierto, trenEn } from '../../shared/arcade/juegos/quiebro-barrio';
+import type { Barrio } from '../../shared/arcade/juegos/quiebro-barrio';
+import { DURMIENTES, durmienteMasCercano, escribirLosDurmientes, guionDeLosDurmientes } from '../../shared/arcade/juegos/quiebro-durmientes';
+import { Aparato, Banco, fnv, guerrero, idsDe, jugarLaLizaDeJuguete, jugarLaLizaSinBlanco, paseante, salidasDe } from './liza-de-juguete';
+import type { JugadaDeLaLiza, JugadaSinBlanco } from './liza-de-juguete';
+import { jugarAlQuiebro } from './robot-de-quiebro';
+import { lizaDelQuiebro } from '../../shared/arcade/juegos/quiebro-liza';
+import type { LizaDeclarada } from '../../shared/mecanicas/liza/declaracion';
+import type { EstadoDeLaSala } from '../../shared/mecanicas/liza/tipos-de-la-sala';
+import { huellaDeLaSala } from '../../shared/mecanicas/liza/sala';
 
 /**
  * Las semillas con las que se juega. Cuatro, y ninguna redonda.
@@ -230,6 +240,272 @@ export const CUANTOS_EN_LAS_LINDES: readonly number[] = [2, 3, 4, 5];
 /** Tope de pasos del robot por partida: acota, no decide (medido: acaban solas en 94-123). */
 export const TOPE_DE_PASOS_DE_LAS_LINDES = 600;
 
+/* ─── EL QUIEBRO: SU BARRIO, SU SALA Y SU MESA ───────────────────────────── */
+
+/**
+ * EL BARRIO DE UNA MESA DE EL QUIEBRO, levantado en cualquier motor: la ciudad de la noche (cajas, zonas,
+ * grafo), su mundo para la Liza, la plaza despejada, y los 48 durmientes en nueve tics escogidos —el 0, los
+ * bordes de un minuto, uno lejano y uno negativo—, con el más cercano a dos puntos, el tren y un paso de
+ * cebra. Todo es función sólo del código y la noche: si un motor lo levantara distinto, la sala de uno y
+ * el cliente de otro jugarían en ciudades distintas.
+ *
+ * Es la propuesta del frente del barrio (su informe, «propuesta para `guion-determinismo.ts`»), con los
+ * nudos para su suelo. La huella son unos 300 kB por mesa, sin las casillas pisables, que son una
+ * constante del barrio y sólo se cuentan.
+ */
+export interface BarrioDelQuiebro {
+  codigo: string;
+  noche: number;
+  cajas: number;
+  nudos: number;
+  /** Cuántos durmientes van andando, sumados los nueve tics: con cero, el guion no se ejercita. */
+  andando: number;
+  huella: string;
+  durmientes: string;
+}
+
+/** Las mesas de las que se levanta el barrio: código y noche. Escritas, como las semillas. */
+export const MESAS_DEL_QUIEBRO: readonly (readonly [string, number])[] = [
+  ['QWXYZ', 1],
+  ['K7M2P', 3],
+  ['ZZZZZ', 10],
+  ['ABCDE', 7],
+];
+/** Los tics en que se miran los durmientes. El negativo está a propósito: el guion lo admite. */
+export const TICS_DEL_QUIEBRO: readonly number[] = [0, 1, 599, 600, 1199, 12345, 20000, 123457, -777];
+
+/** El barrio de una mesa y noche, con sus durmientes. Ver `BarrioDelQuiebro`. */
+export function levantarUnBarrioDelQuiebro(codigo: string, noche: number): BarrioDelQuiebro {
+  const b = barrioDeLaNoche(codigo, noche);
+  const d = despejarLaPlaza(b);
+  const plano = new Int32Array(DURMIENTES * 4);
+  const partes: string[] = [];
+  let andando = 0;
+  for (const t of TICS_DEL_QUIEBRO) {
+    escribirLosDurmientes(b, t, plano);
+    for (let i = 0; i < plano.length; i++) partes.push(String(plano[i]));
+    for (let i = 0; i < DURMIENTES; i++) if (plano[i * 4 + 3] === 1) andando++;
+    partes.push(`|${String(durmienteMasCercano(b, t, 0, 0))}|${String(durmienteMasCercano(b, t, 40 * 65536, -20 * 65536, [0, 1, 2]))}`);
+    const tren = trenEn(b, t);
+    partes.push(tren === null ? '-' : `${String(tren.cabeza)}:${String(tren.cola)}`, pasoAbierto(b, 5, 'x', t) ? '1' : '0');
+  }
+  const mundo = mundoDelBarrio(b);
+  const liza = (x: Barrio): unknown => {
+    const l = mundoDeLaLizaDelBarrio(x);
+    return { ...l, suelo: { ...l.suelo, pisables: l.suelo.pisables.length } };
+  };
+  return {
+    codigo,
+    noche,
+    cajas: b.cajas.length,
+    nudos: b.grafo.nudos.length,
+    andando,
+    huella: canonico([b, { ...mundo, pisables: mundo.pisables.length }, liza(b), d, liza(d), guionDeLosDurmientes(b)]),
+    durmientes: partes.join(','),
+  };
+}
+
+/**
+ * La liza de juguete, jugada: cuántas semillas y cuántos tics. Dos y no cuatro porque en Hermes 0.12 —un
+ * intérprete sin JIT— cada partida de seiscientos tics con la sala llena cuesta segundos; con dos se
+ * recorren igual el ausente, el cambio de fase y la fase nueva (lo miden los suelos del comprobador).
+ */
+export const SEMILLAS_DE_LA_LIZA: readonly number[] = [1, 20260831];
+export const TICS_DE_LA_LIZA = 600;
+
+/**
+ * LA SALA DE EL QUIEBRO JUGADA: un combate de verdad de una mesa (la declaración que sale de la vista que da
+ * su robot, `lizaDelQuiebro`) jugado por los robots del banco en la sala de la Liza, con sus entidades, sus
+ * tiradores, su barrio de cuatrocientos nudos y su límite, en cualquier motor.
+ *
+ * ═══ POR QUÉ, SI YA SE JUEGA LA LIZA DE JUGUETE ═══
+ *
+ * Porque la de juguete tiene un grafo de siete nudos y ninguna entidad que nazca fuera del límite: la
+ * revisión del pulido metió en `puntoParaEntrar` —lo que hace entrar en la glorieta a las que salen de las
+ * bocas de las calles— la clausura sobre el `let` de un bucle que Hermes 0.12 no liga por iteración, y la
+ * tanda salió en verde. Forzando en Node lo que haría Hermes, la huella de la sala con las declaraciones de
+ * El Quiebro cambiaba y la del juguete no. Aquí el asiento 1 se calla un rato (queda ausente: sin nadie a
+ * quien perseguir si juega solo) para que también se recorra lo que entra sin blanco.
+ */
+export interface SalaDelQuiebroJugada {
+  semilla: number;
+  asientos: number;
+  clave: string;
+  tics: number;
+  /** Anuncios, balas y líneas de apuntado que le llegaron al asiento 1; entidades nacidas; veces que alguien quedó ausente. */
+  anuncios: number;
+  balas: number;
+  lineas: number;
+  nacidas: number;
+  ausentes: number;
+  /** Entidades que entraron en el límite de la fase desde fuera, y de ésas, las que lo hicieron sin nadie a quien perseguir. */
+  entraron: number;
+  entraronSinBlanco: number;
+  /** El hilo de todo lo que salió de la sala, tic a tic, y el estado final (FNV sobre la forma canónica). */
+  salidas: string;
+  huella: string;
+}
+
+/**
+ * Las mesas cuya sala se juega: semilla, asientos y qué combate. En solitario, la primera oleada: sus
+ * Prestados salen de las bocas de las calles, fuera de la glorieta, en tres tandas —la segunda mientras el
+ * asiento está callado: entran sin nadie a quien perseguir—. Entre dos, la primera oleada con tirador
+ * (balas y líneas). Escritas, como las semillas.
+ */
+export const SALAS_DEL_QUIEBRO: readonly (readonly [number, number, 'primera' | 'tiradores'])[] = [
+  [3, 1, 'primera'],
+  [7, 2, 'tiradores'],
+];
+export const TICS_DE_LA_SALA_DEL_QUIEBRO = 900;
+/** Los tics de la liza sin blanco: sus cuatro entidades nacen entre el 60 y el 120, y entran antes del 250. */
+export const TICS_DE_LA_LIZA_SIN_BLANCO = 300;
+/** Cuándo se calla el asiento 1 y cuándo vuelve (tics del banco). */
+const CALLA_EN = 60;
+const VUELVE_EN = 500;
+
+/** ¿Tiene la fase algún grupo de una clase que dispara? (sin cierres: ver la cabecera de `liza-de-juguete.ts`) */
+function conTiradores(l: LizaDeclarada): boolean {
+  const en = l.fase.encuentro;
+  if (en === null) return false;
+  for (const g of en.grupos) for (const c of l.clases) if (c.id === g.clase && c.proyectil !== 0) return true;
+  return false;
+}
+
+/** ¿Hay algún asiento a quien perseguir: con cuerpo, con vida, y ni ausente ni sin cuerpo? */
+function hayBlanco(s: EstadoDeLaSala): boolean {
+  const d = s.declaracion;
+  for (const a of s.asientos) {
+    if (!a.conCuerpo || a.vida <= 0) continue;
+    const e = a.estado;
+    const est = e !== null && s.tic >= e.desdeTic && s.tic < e.hastaTic ? e.estado : 0;
+    if (est !== d.presencia.estadoAusente && est !== d.sinCuerpo.estado) return true;
+  }
+  return false;
+}
+
+/** ¿Está `(x, z)` dentro del límite de la fase? */
+function dentroDelLimiteDe(s: EstadoDeLaSala, x: number, z: number): boolean {
+  for (const l of s.declaracion.mundo.limites) {
+    if (l.id !== s.declaracion.fase.limite) continue;
+    return x >= l.caja.x0 && x <= l.caja.x1 && z >= l.caja.z0 && z <= l.caja.z1;
+  }
+  return true;
+}
+
+/** La sala de un combate de El Quiebro con esa semilla y asientos, jugada `tics` tics. Ver `SalaDelQuiebroJugada`. */
+export function jugarLaSalaDelQuiebro(semilla: number, asientos: number, cual: 'primera' | 'tiradores', tics: number): SalaDelQuiebroJugada {
+  const partida = jugarAlQuiebro({ asientos, semilla, noches: 2, politica: 'gana', travesuras: false });
+  let l: LizaDeclarada | null = null;
+  for (const v of partida.vistas) {
+    const x = lizaDelQuiebro(v, 'K7M2P');
+    if (l !== null || x === null || x.fase.modo !== 'encuentro' || x.fase.encuentro === null) continue;
+    if (cual === 'primera' || conTiradores(x)) l = x;
+  }
+  const vacia: SalaDelQuiebroJugada = { semilla, asientos, clave: '', tics: 0, anuncios: 0, balas: 0, lineas: 0, nacidas: 0, ausentes: 0, entraron: 0, entraronSinBlanco: 0, salidas: '', huella: '' };
+  if (l === null) return vacia;
+  const ids = idsDe(l);
+  const aparatos: Aparato[] = [];
+  for (let i = 1; i <= l.asientos.length; i++) {
+    aparatos.push(new Aparato(i, 3000 * i, 20 * i, 60 + 40 * i, (17 * i) % 50, i === 2 ? paseante(semilla * 31 + i, ids) : guerrero(110, ids)));
+  }
+  const b = new Banco(l, l.fase.semilla, aparatos);
+  b.guardarPasos = false;
+  for (let i = 1; i <= l.asientos.length; i++) b.conectar(i);
+  const primero = aparatos[0] as Aparato;
+  const dentro = new Map<number, boolean>();
+  let anuncios = 0;
+  let balas = 0;
+  let lineas = 0;
+  let nacidas = 0;
+  let ausentes = 0;
+  let entraron = 0;
+  let entraronSinBlanco = 0;
+  let salidas = '';
+  for (let t = 0; t < tics; t++) {
+    if (t === CALLA_EN) primero.mudo = true;
+    if (t === VUELVE_EN) primero.mudo = false;
+    const p = b.tic();
+    salidas = fnv(salidas + salidasDe(p));
+    for (const x of p.sucesos) {
+      const e = x.suceso;
+      if (x.para === 1 && e.e === 'anuncio') anuncios++;
+      else if (x.para === 1 && e.e === 'bala') balas++;
+      else if (x.para === 1 && e.e === 'apunta' && e.a !== 0) lineas++;
+      else if (x.para === 0 && e.e === 'nace') nacidas++;
+      else if (x.para === 0 && e.e === 'estado' && e.est === l.presencia.estadoAusente) ausentes++;
+    }
+    const sinBlanco = !hayBlanco(p.sala);
+    for (const e of p.sala.entidades) {
+      const ahora = dentroDelLimiteDe(p.sala, e.x, e.z);
+      const antes = dentro.get(e.numero);
+      if (antes === false && ahora) {
+        entraron++;
+        if (sinBlanco) entraronSinBlanco++;
+      }
+      dentro.set(e.numero, ahora);
+    }
+    if (p.sala.encuentro !== null && p.sala.encuentro.resultado !== null) break;
+  }
+  return {
+    semilla,
+    asientos,
+    clave: l.fase.clave,
+    tics: b.k,
+    anuncios,
+    balas,
+    lineas,
+    nacidas,
+    ausentes,
+    entraron,
+    entraronSinBlanco,
+    salidas,
+    huella: fnv(huellaDeLaSala(b.sala)),
+  };
+}
+
+/**
+ * UNA MESA DE EL QUIEBRO jugada por su robot (`robot-de-quiebro.ts`): la reunión, la Bajada con su
+ * preparación, las oleadas y pausas con voto, la Llamada, el recuento y el final, con las travesuras de una
+ * sala vieja o rota dentro. Lo rápido no entra —eso es la Liza, arriba—: aquí se compara el reductor de la
+ * mesa, que es el que cuenta monedas, aguante y puntos.
+ */
+export interface JugadaDelQuiebro {
+  semilla: number;
+  asientos: number;
+  pasos: number;
+  /** Entradas del diario: lo que cambió el estado. */
+  diario: number;
+  noches: number;
+  fases: number;
+  /** Rechazos esperados (las travesuras) y lo que no salió como se esperaba (vacío en una partida sana). */
+  rechazados: number;
+  inesperados: number;
+  terminada: boolean;
+  huella: string;
+}
+
+/** Cuántos se sientan en cada mesa de El Quiebro: una por semilla, en este orden (el aforo es de 1 a 6). */
+export const ASIENTOS_EN_EL_QUIEBRO: readonly number[] = [1, 3, 4, 6];
+/** Cuántas noches juega cada mesa. */
+export const NOCHES_DEL_QUIEBRO = 2;
+
+/** Una mesa de El Quiebro con esa semilla y los que le tocan. Ver `JugadaDelQuiebro`. */
+export function jugarUnaDelQuiebro(semilla: number, asientos: number): JugadaDelQuiebro {
+  const p = jugarAlQuiebro({ asientos, semilla, noches: NOCHES_DEL_QUIEBRO, politica: 'mezcla', travesuras: true });
+  return {
+    semilla,
+    asientos,
+    pasos: p.pasos,
+    diario: p.diario.length,
+    noches: p.noches.length,
+    fases: p.fases.length,
+    rechazados: p.rechazosEsperados.length,
+    inesperados: p.inesperados.length,
+    terminada: p.terminada,
+    huella: p.huella,
+  };
+}
+
 /** Y lo que sale de jugarlas todas, más quién las jugó. */
 export interface Tanda {
   /**
@@ -254,6 +530,16 @@ export interface Tanda {
   burgo: JugadaDelBurgo[];
   /** Las partidas de Las Lindes, una por semilla. */
   lindes: JugadaDeLasLindes[];
+  /** Los barrios de El Quiebro, uno por mesa de `MESAS_DEL_QUIEBRO`. */
+  quiebro: BarrioDelQuiebro[];
+  /** La liza de juguete jugada, una por semilla de `SEMILLAS_DE_LA_LIZA`. */
+  liza: JugadaDeLaLiza[];
+  /** Las mesas de El Quiebro, una por semilla. */
+  mesasDelQuiebro: JugadaDelQuiebro[];
+  /** La sala de un combate de El Quiebro, jugada: una por mesa de `SALAS_DEL_QUIEBRO`. */
+  salasDelQuiebro: SalaDelQuiebroJugada[];
+  /** La liza de juguete sin nadie a quien perseguir, con las que nacen detrás de un muro (ver `lizaSinBlanco`). */
+  lizaSinBlanco: JugadaSinBlanco;
 }
 
 /** Cómo se llama el motor que está ejecutando esto. Ver `Tanda.motor`. */
@@ -454,7 +740,18 @@ export function jugarLaTanda(): Tanda {
   for (let i = 0; i < SEMILLAS.length; i++) {
     lindes.push(jugarUnaDeLasLindes(SEMILLAS[i] as number, CUANTOS_EN_LAS_LINDES[i] as number));
   }
-  return { motor: queMotorSoy(), jugadas, burgo, lindes };
+  const quiebro: BarrioDelQuiebro[] = [];
+  for (const mesa of MESAS_DEL_QUIEBRO) quiebro.push(levantarUnBarrioDelQuiebro(mesa[0], mesa[1]));
+  const liza: JugadaDeLaLiza[] = [];
+  for (const semilla of SEMILLAS_DE_LA_LIZA) liza.push(jugarLaLizaDeJuguete(semilla, TICS_DE_LA_LIZA));
+  const mesasDelQuiebro: JugadaDelQuiebro[] = [];
+  for (let i = 0; i < SEMILLAS.length; i++) {
+    mesasDelQuiebro.push(jugarUnaDelQuiebro(SEMILLAS[i] as number, ASIENTOS_EN_EL_QUIEBRO[i] as number));
+  }
+  const salasDelQuiebro: SalaDelQuiebroJugada[] = [];
+  for (const sala of SALAS_DEL_QUIEBRO) salasDelQuiebro.push(jugarLaSalaDelQuiebro(sala[0], sala[1], sala[2], TICS_DE_LA_SALA_DEL_QUIEBRO));
+  const lizaSinBlanco = jugarLaLizaSinBlanco(TICS_DE_LA_LIZA_SIN_BLANCO);
+  return { motor: queMotorSoy(), jugadas, burgo, lindes, quiebro, liza, mesasDelQuiebro, salasDelQuiebro, lizaSinBlanco };
 }
 
 /**

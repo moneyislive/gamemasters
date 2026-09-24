@@ -10,8 +10,11 @@
  *
  *   · `orbita`: sin noche en juego (la reunión, el final). La cámara da vueltas despacio sobre la plaza:
  *     la ciudad se ve viva detrás de las pantallas de la mesa.
- *   · `bajada`: la Bajada (diseño §2.1, §8): cae entre fachadas desde lo alto hasta el hombro en unos
- *     seis segundos, mientras el barrio se escribe. Tapa la conexión del canal.
+ *   · `bajada`: la Bajada (diseño §2.1, §8), que ahora es la PREPARACIÓN: la cámara espera en lo alto,
+ *     dando la vuelta despacio sobre la plaza mientras el barrio se escribe y cada cual elige, y cae entre
+ *     fachadas hasta el hombro cuando están todos (o cuando ya sólo queda lo que tarda en caer). Cuándo y
+ *     cuánto lo dice `red/bajada.ts` (`caida`), no un reloj de seis segundos: la Bajada dura hasta 15 s,
+ *     y si acaba antes de haber caído, la caída sigue un par de segundos dentro de la oleada.
  *   · `juego`: al hombro, con todo lo de `encuadrar`; o Vigía si no tengo cuerpo.
  *
  * Corre en su `useFrame` con prioridad −2: después del bucle de la partida (que ya puso mi cuerpo en su
@@ -24,6 +27,7 @@ import type { Barrio, CajaDelBarrio } from '../../../../shared/arcade/juegos/qui
 import type { EstadoDeLosMandos } from '../mandos/estado';
 import type { Partida } from '../red/partida';
 import type { Escenificador } from '../red/escenificar';
+import { GiroEnLoAlto } from '../red/bajada';
 import type { SistemaDeEfectos } from '../efectos';
 import type { Sonido } from '../sonido';
 import type { CajaAlta, EncuadreDeLaCamara } from './encuadre';
@@ -39,8 +43,11 @@ export interface PropsDeLaCamara {
   readonly sonido: Sonido;
   readonly barrio: Barrio | null;
   readonly modo: ModoDeLaCamara;
-  /** Cuándo empezó la Bajada (ms de `performance.now()`). */
-  readonly bajadaDesdeMs: number;
+  /**
+   * Por dónde va la caída de la Bajada en `ahora`: 0 arriba, 1 al hombro, `null` si no hay caída que
+   * pintar (`RelojDeLaBajada.caida`).
+   */
+  readonly caida: (ahora: number) => number | null;
   readonly tactil: boolean;
 }
 
@@ -66,9 +73,6 @@ export function cajaParaLaCamara(c: CajaDelBarrio): CajaAlta {
   return { x0: c.x0, z0: c.z0, x1: c.x1, z1: c.z1, alto: c.alto >= 0.9 ? Math.max(c.alto, 6) : c.alto };
 }
 
-/** Lo que dura la caída de la Bajada. */
-const BAJADA_MS = 5600;
-
 function suave(t: number): number {
   const x = Math.max(0, Math.min(1, t));
   return x * x * (3 - 2 * x);
@@ -84,6 +88,7 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
   const primera = useRef(true);
   const mirar = useRef(new THREE.Vector3());
   const adelante = useRef(new THREE.Vector3());
+  const vuelta = useRef(new GiroEnLoAlto());
 
   useFrame((_s, dt) => {
     const ahora = performance.now();
@@ -122,10 +127,16 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
         vigia: !p.partida.conCuerpo(),
         cajas,
       });
-      if (p.modo === 'bajada') {
-        /* La caída: desde muy arriba sobre la plaza hasta el hombro, frenando al final. */
-        const f = suave((ahora - p.bajadaDesdeMs) / BAJADA_MS);
-        const alto = { x: cuerpo.x * 0.4, y: 70, z: cuerpo.z * 0.4 + 26 };
+      const caida = p.caida(ahora);
+      if (p.modo === 'bajada' || (caida !== null && caida < 1)) {
+        /*
+         * LA CAÍDA: desde muy arriba sobre la plaza hasta el hombro, frenando al final. Mientras se espera
+         * (0), en lo alto y dando la vuelta despacio: la ciudad se escribe debajo y se ve entera.
+         */
+        const f = suave(caida ?? 0);
+        /* El giro, sumado y no sacado del reloj de la página (ver `GiroEnLoAlto`). */
+        const a = vuelta.current.avanzar(ahora, caida ?? 0);
+        const alto = { x: cuerpo.x * 0.4 + Math.sin(a) * 26, y: 70, z: cuerpo.z * 0.4 + Math.cos(a) * 26 };
         encuadre = {
           ojo: {
             x: alto.x + (alHombro.ojo.x - alto.x) * f,

@@ -24,8 +24,16 @@
  * ═══ EL MODO DE PRUEBA (`?prueba=1`) ═══
  *
  * Sin anfitrión: el documento abre su propia mesa contra el servidor (`red/puerto-de-prueba.ts`) y se
- * juega en el navegador sin la Sala. Con `&codigo=XXXXX` se sienta en una mesa ya abierta: dos pestañas,
- * dos desvelados. La llave vive sólo en la memoria de la pestaña.
+ * juega en el navegador sin la Sala. Con `&codigo=XXXXX` se sienta en una mesa ya abierta (`POST
+ * …/:codigo/asientos`, como quien entra con código) en vez de abrir otra: dos pestañas, dos desvelados.
+ * La reunión enseña esa dirección con el código de la mesa, lista para copiar. La llave vive sólo en la
+ * memoria de la pestaña, y nunca en esa dirección.
+ *
+ * ═══ AL FONDO ═══
+ *
+ * El juego se calla cuando se va al fondo (`mandos/fondo.ts`). La pestaña y el `iframe` lo saben por su
+ * `visibilitychange`; el WebView de Android no siempre, así que la app le mete `EVENTO_DEL_FONDO` con
+ * `injectJavaScript` al cambiar su `AppState`. Aquí no hay nada que hacer: lo escucha el juego.
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
@@ -199,11 +207,13 @@ function DePrueba({ codigo }: { readonly codigo: string | null }): JSX.Element {
   const [puerto, ponerPuerto] = useState<PuertoDePrueba | null>(null);
   const [fallo, ponerFallo] = useState<string | null>(null);
   const [intento, ponerIntento] = useState(0);
+  /* El código de la dirección vale para la primera mesa: «Otra mesa» abre una nueva, no vuelve a sentarse en ésa. */
+  const [aLaMesa, ponerALaMesa] = useState(codigo);
   useEffect(() => {
     let vivo = true;
     let abierto: PuertoDePrueba | null = null;
     const buscar = (ruta: string, init?: RequestInit): Promise<Response> => fetch(ruta, init);
-    const pedido = codigo === null ? PuertoDePrueba.abrir(buscar, 'Prueba') : PuertoDePrueba.entrar(buscar, codigo, 'Prueba');
+    const pedido = aLaMesa === null ? PuertoDePrueba.abrir(buscar, 'Prueba') : PuertoDePrueba.entrar(buscar, aLaMesa, 'Prueba');
     pedido.then(
       (p) => {
         if (!vivo) {
@@ -222,20 +232,27 @@ function DePrueba({ codigo }: { readonly codigo: string | null }): JSX.Element {
       vivo = false;
       abierto?.cerrar();
     };
-  }, [codigo, intento]);
+  }, [aLaMesa, intento]);
   if (fallo !== null) return <Esperando texto={fallo} reintentar={() => ponerIntento((n) => n + 1)} />;
-  if (puerto === null) return <Esperando texto="Abriendo una mesa de prueba…" />;
+  if (puerto === null) return <Esperando texto={aLaMesa === null ? 'Abriendo una mesa de prueba…' : `Sentándose en la mesa ${aLaMesa}…`} />;
   return (
     <Quiebro
       puerto={puerto}
       incrustado={false}
+      enlaceParaEntrar={enlaceParaEntrar(puerto.codigo)}
       alOtraMesa={() => {
         puerto.cerrar();
         ponerPuerto(null);
+        ponerALaMesa(null);
         ponerIntento((n) => n + 1);
       }}
     />
   );
+}
+
+/** La dirección con que otra pestaña se sienta en la mesa `codigo`: la de este documento, sin nada más. */
+function enlaceParaEntrar(codigo: string): string {
+  return `${location.origin}${location.pathname}?prueba=1&codigo=${encodeURIComponent(codigo)}`;
 }
 
 function Esperando({ texto, reintentar }: { readonly texto: string; readonly reintentar?: () => void }): JSX.Element {

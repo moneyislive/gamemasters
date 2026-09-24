@@ -4,8 +4,8 @@
  *
  * ═══ QUÉ SE ENSEÑA EN CADA FASE ═══
  *
- *   reunión ........ la reunión (estilo, EMPEZAR, el código de la mesa)
- *   bajada ......... el rótulo del barrio sobre la caída de la cámara
+ *   reunión ........ la reunión (los estilos para mirar, EMPEZAR, el código de la mesa)
+ *   bajada ......... la preparación: el rótulo del barrio, el reloj, estilo o BAJAR, y quién falta
  *   oleada, llamada  la pelea (`Combate.tsx`) y los mandos
  *   pausa .......... la pelea detrás y la elección del retoque (y el voto) delante
  *   recuento, final  el recuento; en el final, además, las tres salidas
@@ -17,12 +17,14 @@
  * la primera vez en un iPhone, de que el interruptor de silencio calla los golpes.
  */
 import { useState } from 'react';
-import type { JSX } from 'react';
+import type { JSX, MutableRefObject } from 'react';
+import type { Camera } from 'three';
 import { NOMBRES_DEL_QUIEBRO } from '../../../../shared/arcade/juegos/quiebro-nombres';
 import type { VistaDelQuiebro } from '../../../../shared/arcade/juegos/quiebro-vista';
 import { MOVIMIENTO_DEL_QUIEBRO } from '../../../../shared/arcade/juegos/quiebro-vista';
 import type { PuertoDeMesa } from '../contrato';
 import type { EstadoDeLosMandos } from '../mandos/estado';
+import type { RelojDeLaBajada } from '../red/bajada';
 import type { Escenificador } from '../red/escenificar';
 import type { Partida } from '../red/partida';
 import { COLORES_DE_ASIENTO } from '../red/partida';
@@ -57,6 +59,12 @@ export interface PropsDelHud {
   readonly alSalir: (() => void) | undefined;
   readonly alOtraMesa: () => void;
   readonly avisoDelSilencio: boolean;
+  /** El reloj de la Bajada (lo que le queda, la caída). */
+  readonly bajada: RelojDeLaBajada;
+  /** La cámara del lienzo, para los rótulos encima de los cuerpos. */
+  readonly ojo: MutableRefObject<Camera | null>;
+  /** En el modo de prueba, la dirección con que otra pestaña se sienta en esta mesa. */
+  readonly enlaceParaEntrar?: string;
 }
 
 export function Hud(p: PropsDelHud): JSX.Element {
@@ -77,14 +85,14 @@ export function Hud(p: PropsDelHud): JSX.Element {
   const quedaDeLaPausa = p.partida?.sala.fase?.relojHastaMs ?? null;
   return (
     <>
-      {enPelea && f !== 'bajada' ? <Combate vista={v} yo={p.puerto.yo} partida={p.partida} escena={p.escena} mandos={p.mandos} aprendiz={p.primeraNoche} tactil={p.tactil} /> : null}
-      {f === 'bajada' ? <RotuloDeLaBajada vista={v} rotulo={p.rotuloDelBarrio} puerto={p.puerto} mover={p.mover} /> : null}
+      {enPelea && f !== 'bajada' ? <Combate vista={v} yo={p.puerto.yo} partida={p.partida} escena={p.escena} mandos={p.mandos} aprendiz={p.primeraNoche} tactil={p.tactil} ojo={p.ojo} /> : null}
+      {f === 'bajada' ? <RotuloDeLaBajada vista={v} rotulo={p.rotuloDelBarrio} puerto={p.puerto} mover={p.mover} bajada={p.bajada} /> : null}
       {p.rotuloDeFase !== null && (f === 'oleada' || f === 'llamada') ? (
         <div key={p.rotuloDeFase} className="q-rotulo q-rotulo-neon">
           {p.rotuloDeFase}
         </div>
       ) : null}
-      {f === 'reunion' ? <Reunion vista={v} puerto={p.puerto} mover={p.mover} /> : null}
+      {f === 'reunion' ? <Reunion vista={v} puerto={p.puerto} mover={p.mover} {...(p.enlaceParaEntrar === undefined ? {} : { enlaceParaEntrar: p.enlaceParaEntrar })} /> : null}
       {f === 'pausa' ? <Pausa vista={v} puerto={p.puerto} mover={p.mover} relojHastaMs={quedaDeLaPausa} /> : null}
       {f === 'recuento' || f === 'final' ? <Recuento vista={v} puerto={p.puerto} mover={p.mover} alOtraMesa={p.alOtraMesa} /> : null}
       {f === 'interrumpida' ? <Interrumpida puerto={p.puerto} mover={p.mover} /> : null}
@@ -195,11 +203,14 @@ function Marcador({ vista, puerto, partida }: { readonly vista: VistaDelQuiebro;
           {vista.asientos.map((a, k) => {
             const c = partida?.sala.cuentas.get(k + 1);
             const esquirlas = partida?.sala.cargas.has(k + 1) === true ? partida.sala.lleva(k + 1, 1) : a.control.esquirlas;
+            /* Ausente: el de la mesa (60 s sin canal) o el momentáneo de la sala (2 s sin contestar). */
+            const ausente = a.ausente || partida?.sentidoDe(k + 1, performance.now()) === 'ausente';
             return (
               <tr key={a.asiento} className={k === i ? 'mia' : ''}>
                 <td>
                   <span className="muestra" style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 5, marginRight: 8, background: COLORES_DE_ASIENTO[k % COLORES_DE_ASIENTO.length] }} />
                   {k === i ? 'Tú' : `${NOMBRES_DEL_QUIEBRO.gente.desvelado} ${String(k + 1)}`}
+                  {ausente ? <span className="q-nota"> · {NOMBRES_DEL_QUIEBRO.estados.ausente.toLowerCase()}</span> : null}
                 </td>
                 <td className="cifra">{cifra(a.puntos + (c?.puntos ?? 0))}</td>
                 <td className="cifra">{c?.vida ?? a.control.aguante}</td>

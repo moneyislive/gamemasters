@@ -134,8 +134,13 @@ export class EstadoDeLosMandos {
     return this.cola.splice(0, this.cola.length);
   }
 
-  /** Todo suelto: la pestaña se ocultó, o se perdió el foco (un dedo que no levantó no sigue empujando). */
+  /**
+   * Todo suelto: la pestaña se ocultó, la app se fue al fondo o se perdió el foco (un dedo que no levantó
+   * no sigue empujando). Las pulsaciones sin atender se tiran también: un GOLPE pulsado justo antes de
+   * irse no sale al volver, contra lo que haya entonces delante.
+   */
   soltarTodo(): void {
+    this.cola.length = 0;
     this.palancaX = 0;
     this.palancaY = 0;
     this.fuerza = 0;

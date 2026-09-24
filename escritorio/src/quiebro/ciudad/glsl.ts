@@ -57,9 +57,10 @@ float fbmQ(vec2 p) {
 `;
 
 /**
- * EL CIELO FALSO QUE SE REFLEJA. Cielo cubierto casi negro en el cénit, el resplandor de la ciudad
- * en el horizonte y, por debajo de unos 25°, «el cañón de la calle»: fachadas oscuras con ventanas
- * encendidas. Es lo que hace que un charco mirado a ras de suelo se llene de puntos de luz y que el
+ * EL CIELO FALSO QUE SE REFLEJA. El cielo cubierto (casi negro en el cénit de madrugada, gris verdoso
+ * al alba), el resplandor del horizonte y, por debajo de unos 25°, «el cañón de la calle»: fachadas
+ * con ventanas encendidas. Los colores son de la luz del barrio (`atmosfera/paleta.ts`, uniformes
+ * `uReflejo*`), los mismos que usa la cúpula, para que el charco y el cielo digan lo mismo. Es lo que hace que un charco mirado a ras de suelo se llene de puntos de luz y que el
  * cristal de un escaparate no sea un negro plano. No coincide con los edificios de verdad —para eso
  * están las tarjetas de reflejo y, en N3, el reflejo en pantalla del frente de imagen—, pero se mueve
  * como se mueve un reflejo lejano, que es lo que el ojo mira.
@@ -67,18 +68,25 @@ float fbmQ(vec2 p) {
  * Radiancia lineal. La rugosidad difumina hacia la media.
  */
 export const GLSL_CIELO_REFLEJADO = /* glsl */ `
+uniform vec3 uReflejoCenit;
+uniform vec3 uReflejoHorizonte;
+uniform vec3 uReflejoMuro;
+uniform float uReflejoVentanas;
+uniform vec3 uReflejoMedia;
 vec3 cieloReflejadoQ(vec3 r, float rugosidad) {
   float h = r.y;
-  vec3 cenit = vec3(0.004, 0.0065, 0.007);
-  vec3 horizonte = vec3(0.050, 0.072, 0.066);
-  vec3 cielo = mix(horizonte, cenit, pow(clamp(h, 0.0, 1.0), 0.5));
+  vec3 cielo = mix(uReflejoHorizonte, uReflejoCenit, pow(clamp(h, 0.0, 1.0), 0.5));
   float fachada = 1.0 - smoothstep(0.16, 0.44, h);
+  /* Las calles van a lo largo de los ejes: un rayo que corre por la calle sale por el fondo, al cielo,
+     y no choca con el muro. Es la franja clara que deja el final de la calle en el asfalto mojado. */
+  float ejeR = max(abs(r.x), abs(r.z)) / max(length(r.xz), 1e-4);
+  fachada *= 1.0 - smoothstep(0.975, 0.998, ejeR) * 0.85;
   if (fachada > 0.0) {
     /* El muro de enfrente oscurece el horizonte en cualquier superficie; sus ventanas, en cambio,
        sólo se ven en un espejo (charco, luna, azulejo): en lo rugoso serían puntos sueltos que
        saltan de un píxel a otro, como nieve. Se van del todo a partir de rugosidad 0,2. */
-    vec3 muro = vec3(0.010, 0.012, 0.012);
-    float nitido = 1.0 - smoothstep(0.03, 0.2, rugosidad);
+    vec3 muro = uReflejoMuro;
+    float nitido = (1.0 - smoothstep(0.03, 0.2, rugosidad)) * uReflejoVentanas;
     if (nitido > 0.0) {
       float az = atan(r.z, r.x);
       vec2 celda = vec2(az * 36.0, h * 64.0);
@@ -91,23 +99,40 @@ vec3 cieloReflejadoQ(vec3 r, float rugosidad) {
     }
     cielo = mix(cielo, muro, fachada * (1.0 - smoothstep(0.3, 0.9, rugosidad)));
   }
-  cielo = mix(cielo, vec3(0.006, 0.007, 0.007), smoothstep(0.0, -0.25, h));
-  vec3 media = vec3(0.018, 0.024, 0.023);
-  return mix(cielo, media, smoothstep(0.25, 0.95, rugosidad));
+  cielo = mix(cielo, uReflejoMuro * 0.5, smoothstep(0.0, -0.25, h));
+  return mix(cielo, uReflejoMedia, smoothstep(0.25, 0.95, rugosidad));
 }
 `;
 
 /**
  * LOS CHARCOS: dónde hay agua quieta, de 0 (asfalto sólo mojado) a 1 (espejo). Ruido de mundo a dos
- * escalas: manchas de 5-8 m y bordes irregulares. `uHumedad` mueve el umbral (el aguacero encharca
- * más que la llovizna). La usan el asfalto, la acera y las tarjetas de reflejo.
+ * escalas: dónde se hunde el firme (pocas zonas, de 10-15 m) y, dentro, charcos de uno a tres metros
+ * con el borde recortado y NÍTIDO (el agua quieta tiene orilla; una mancha que se desvanece en dos
+ * metros es un camuflaje, y así se veía desde lo alto). `uHumedad` mueve el umbral (el aguacero
+ * encharca más que la llovizna). La usan el asfalto, la acera, las tarjetas de reflejo, las
+ * salpicaduras y el reflejo en pantalla de N3. Lo que va pegado a la geometría (la cuneta junto al
+ * bordillo, las juntas de las losas) lo pone cada suelo encima.
  */
 export const GLSL_CHARCOS = /* glsl */ `
 uniform float uHumedad;
 float charcoQ(vec2 xz) {
-  float n = fbmQ(xz * 0.13) * 0.7 + fbmQ(xz * 0.71 + 31.0) * 0.3;
-  float umbral = mix(0.6, 0.5, uHumedad);
-  return smoothstep(umbral, umbral + 0.05, n);
+  float hundido = fbmQ(xz * 0.07);
+  float forma = fbmQ(xz * 0.42 + 31.0);
+  float n = hundido * 0.55 + forma * 0.45;
+  float umbral = mix(0.57, 0.49, uHumedad);
+  return smoothstep(umbral, umbral + 0.018, n);
+}
+/*
+ * Los charcos de la ACERA y de la PLAZA: la losa drena mejor que el asfalto, así que son menos y más
+ * pequeños (el mismo ruido, más fino y con el umbral más alto), y nunca un espejo entero (0,8). Vista
+ * desde arriba (la Bajada, la Vigía), la plaza con los charcos del asfalto era un camuflaje de manchas.
+ * El agua de las juntas la pone la acera encima.
+ */
+float charcoDeLaAceraQ(vec2 xz) {
+  vec2 p = xz * 2.1 + 40.0;
+  float n = fbmQ(p * 0.07) * 0.5 + fbmQ(p * 0.42 + 31.0) * 0.5;
+  float umbral = mix(0.61, 0.54, uHumedad);
+  return smoothstep(umbral, umbral + 0.018, n) * 0.8;
 }
 `;
 
@@ -153,9 +178,17 @@ vec3 luzDeLaCalleQ(vec3 p, vec3 n) {
   vec2 uvL = (xz - uLuzCalleCaja.xy) * uLuzCalleCaja.zw;
   if (uvL.x < 0.0 || uvL.y < 0.0 || uvL.x > 1.0 || uvL.y > 1.0) return vec3(0.0);
   vec4 m = texture(uLuzCalle, uvL);
-  vec3 e = m.rgb + uColorDeSodio * m.a * uFarolas;
   float alto = max(p.y - 0.25, 0.0);
-  float caida = n.y > 0.6 ? (p.y > 2.4 ? 0.0 : 1.0) : exp(-alto * 0.14) * (0.55 + 0.45 * smoothstep(0.0, 3.0, alto));
-  return e * caida * uLuzDeLaCalle;
+  if (n.y > 0.6) return (m.rgb + uColorDeSodio * m.a * uFarolas) * (p.y > 2.4 ? 0.0 : 1.0) * uLuzDeLaCalle;
+  /*
+   * En un muro, cada fuente se apaga a su manera. La farola (canal a) cuelga a unos 6 m y separada
+   * del muro: ilumina sobre todo a su altura y se va por encima. Lo demás (escaparates, rótulos,
+   * portales) está pegado al muro a 2-4 m: sube poco, porque la luz le llega al muro de canto. Con una
+   * sola caída para todo, un escaparate blanco pintaba de gris la fachada entera hasta el tejado y la
+   * calle se veía plana, como a pleno día.
+   */
+  float cFarola = (0.45 + 0.55 * smoothstep(0.0, 4.0, alto)) * exp(-max(alto - 5.5, 0.0) * 0.4);
+  float cBajo = exp(-alto * 0.35);
+  return (m.rgb * cBajo + uColorDeSodio * m.a * uFarolas * cFarola) * uLuzDeLaCalle;
 }
 `;

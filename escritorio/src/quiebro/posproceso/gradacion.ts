@@ -57,12 +57,20 @@ export interface AjustesDeLaGradacion {
   readonly saturacionViva: number;
 }
 
-/** El color de la noche. Provisional hasta verlo en el banco en aparato; se cambia AQUÍ. */
+/**
+ * El color de la noche. Provisional hasta verlo en el banco en aparato; se cambia AQUÍ.
+ *
+ * El tinte llega hasta los MEDIOS TONOS (se apaga del todo en una luma de pantalla de 0,82, no en la
+ * de 0,55 de la primera versión): con él sólo en las sombras, el verde de la paleta no aparecía en
+ * ninguna captura, porque lo que llena la imagen de una calle son medios tonos. Y es más verde que
+ * cian (el azul casi no sube): así son las referencias de Miguel, donde el rojo y el azul van a la par
+ * y el verde por encima.
+ */
 export const GRADACION_DE_LA_NOCHE: AjustesDeLaGradacion = {
   hundimientoMinimo: 0.55,
   hundimientoHasta: 0.22,
-  tinteDeSombras: [0.86, 1.06, 1.03],
-  sombrasHasta: 0.55,
+  tinteDeSombras: [0.87, 1.05, 0.97],
+  sombrasHasta: 0.82,
   protegeDesde: 0.4,
   protegeDelTodo: 0.8,
   saturacionNeutra: 0.88,

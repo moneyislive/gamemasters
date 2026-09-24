@@ -71,6 +71,25 @@ export function retrasoDeUnRemanso(inicio: number, t: number): number {
   return 0;
 }
 
+/** Cuándo empieza el pico del Remanso en que la ciudad enseña su rejilla, y cuánto dura (diseño §8). */
+export const PICO_DE_LA_REJILLA_DESDE_MS = 90;
+export const PICO_DE_LA_REJILLA_MS = 300;
+
+/**
+ * LA REJILLA DE GLIFOS EN EL PICO DEL REMANSO (diseño §8, momento 2: «en el pico, durante 0,3 s, las
+ * fachadas se transparentan en su rejilla de glifos»). De 0 a 1 y vuelta a 0, en media onda, dentro de
+ * la frenada: la ciudad deja ver su código un instante y se vuelve a vestir antes de que el tiempo
+ * recupere su paso. Es adorno: se calcula con el reloj VERDADERO desde el inicio del Remanso.
+ */
+export function rejillaDelRemanso(inicio: number | null, t: number): number {
+  if (inicio === null) return 0;
+  const e = t - inicio - PICO_DE_LA_REJILLA_DESDE_MS;
+  if (!(e > 0) || e >= PICO_DE_LA_REJILLA_MS) return 0;
+  const x = e / PICO_DE_LA_REJILLA_MS;
+  /* Media onda sin trigonometría: 4·x·(1−x) sube a 1 en el centro y vuelve a 0. */
+  return 4 * x * (1 - x);
+}
+
 export interface RelojDePresentacion {
   /** El tiempo verdadero: el mismo `t`. Para anillos, balas, líneas y silbidos. */
   verdadero(t: number): number;

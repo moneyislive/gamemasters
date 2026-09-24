@@ -86,11 +86,23 @@ import {
 // ---------------------------------------------------------------------------
 
 /**
- * DE LADO MIENTRAS SE JUEGA, Y COMO ESTABA AL SALIR.
+ * DE LADO MIENTRAS SE JUEGA, Y EN VERTICAL AL SALIR.
  *
- * Se apunta el bloqueo que había ANTES y se devuelve ése, no un `unlockAsync` a ciegas: la app arranca
- * en vertical (en iOS por `initialOrientation` en `app.json`; La Frente bloquea el suyo) y una pantalla
- * que soltara todo dejaría girar al resto de la app sin que nadie lo haya decidido.
+ * Se apunta el bloqueo que había ANTES. Si era uno de verdad (vertical, apaisado…), se devuelve ése. Si
+ * no había ninguno —`DEFAULT`, que es como arranca la app—, se bloquea en VERTICAL (`PORTRAIT_UP`) y no
+ * se suelta a ciegas con `unlockAsync`:
+ *
+ *   · Para que el WebView pueda ponerse de lado, `app.json` dice `"orientation": "default"`. En iOS el
+ *     resto de la app sigue en vertical por `initialOrientation` del complemento de orientación, que es
+ *     SÓLO de iOS (escribe `EXDefaultScreenOrientationMask` en el Info.plist). En Android `default` es
+ *     `screenOrientation="unspecified"` en el manifiesto: la app entera gira con el sensor.
+ *   · Soltar al salir de la noche dejaba ese giro a la vista justo al volver a la mesa. Bloquear en
+ *     vertical deja la app como la dejó `"portrait"` hasta hoy. La Frente no lo nota: bloquea su vertical
+ *     al entrar y lo suelta al salir, como siempre (`local.ts`).
+ *
+ * Lo que esto NO arregla: hasta que alguien entra en El Quiebro, en Android la app arranca sin bloqueo y
+ * gira con el sensor. Eso se arregla al arrancar la app (`app/app/_layout.tsx`, que no es de esta
+ * pantalla) o volviendo a `"portrait"` en `app.json` para Android con un complemento propio.
  *
  * Todo va envuelto en `catch` por lo que cuenta `local.ts`: en la web el bloqueo pide pantalla completa y
  * casi nunca se concede, y un fallo al pedir lo que no se puede tener no puede costar la noche. En
@@ -113,14 +125,23 @@ function usarLaNocheApaisada(activa: boolean): void {
     return () => {
       viva = false;
       const eraAsi = antes;
-      const libre =
-        eraAsi === null ||
-        eraAsi === ScreenOrientation.OrientationLock.DEFAULT ||
-        eraAsi === ScreenOrientation.OrientationLock.UNKNOWN ||
-        eraAsi === ScreenOrientation.OrientationLock.OTHER;
-      void (libre ? ScreenOrientation.unlockAsync() : ScreenOrientation.lockAsync(eraAsi)).catch(() => undefined);
+      void ScreenOrientation.lockAsync(bloqueoAlSalir(eraAsi)).catch(() => undefined);
     };
   }, [activa]);
+}
+
+/**
+ * EL BLOQUEO AL SALIR DE LA NOCHE: el que había antes si era uno de verdad; si no había ninguno (o no se
+ * supo), vertical. Nunca «suelto» (ver `usarLaNocheApaisada`).
+ */
+export function bloqueoAlSalir(antes: ScreenOrientation.OrientationLock | null): ScreenOrientation.OrientationLock {
+  const libre =
+    antes === null ||
+    antes === ScreenOrientation.OrientationLock.DEFAULT ||
+    antes === ScreenOrientation.OrientationLock.ALL ||
+    antes === ScreenOrientation.OrientationLock.UNKNOWN ||
+    antes === ScreenOrientation.OrientationLock.OTHER;
+  return libre ? ScreenOrientation.OrientationLock.PORTRAIT_UP : antes;
 }
 
 /** La etiqueta del cerrojo de pantalla de la noche. */

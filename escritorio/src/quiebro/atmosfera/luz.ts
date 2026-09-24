@@ -6,8 +6,11 @@
  *
  *   · El HEMISFERIO pone el fondo: el cielo cubierto verdoso por arriba y el suelo mojado, pardo,
  *     por abajo. Es lo único que ve un muro sin farola delante.
- *   · La DIRECCIONAL es el resplandor difuso de las nubes, muy tenue y casi cenital; da volumen a
- *     los personajes y, desde N2, las sombras (sólo esta luz, sólo en 40 m alrededor de la cámara).
+ *   · La DIRECCIONAL es el resplandor difuso de las nubes: de madrugada muy tenue y casi cenital; al
+ *     alba, la parte clara del cielo cubierto, de lado y blanda. Da volumen a los personajes y, desde
+ *     N2, las sombras (sólo esta luz, sólo en 40 m alrededor de la cámara).
+ *   · Colores, intensidades, de dónde viene la direccional y lo oscura que es su sombra salen de la
+ *     paleta de la luz del barrio (`paleta.ts`, `ponerLaPaleta`).
  *   · Las farolas NO son luces: están horneadas en el mapa de la luz de la calle. Las 4-6 más
  *     cercanas SÍ se encienden de verdad en N2+ para dar el brillo en el suelo mojado y la luz de
  *     lado a los personajes; en la ciudad sólo ponen brillo (retoque `solo-brillo`), así que no
@@ -18,6 +21,7 @@
  * (el frente de personajes lo pinta aparte).
  */
 import * as THREE from 'three';
+import type { PaletaDeLaLuz } from './paleta';
 
 /** Una farola que puede encender una luz real. */
 export interface FarolaEncendible {
@@ -28,8 +32,12 @@ export interface FarolaEncendible {
 
 /** La intensidad de una farola (candelas, con caída física 1/d²). La misma que en el horneado. */
 export const INTENSIDAD_DE_FAROLA = 140;
-/** El color del sodio en sRGB (lo que se ve). */
-export const COLOR_DE_SODIO = '#ff9a3c';
+/**
+ * El color de las farolas de verdad en sRGB: el mismo sodio viejo que la luz horneada
+ * (`uColorDeSodio` de `ciudad/retoques.ts`), no el ámbar de la cabeza. Con el ámbar puro, el brillo
+ * de la farola cercana en el suelo mojado era una mancha naranja.
+ */
+export const COLOR_DE_SODIO = '#ffca8d';
 
 export interface OpcionesDeLasLuces {
   /** Cuántas luces puntuales reales (0 en N0-N1). */
@@ -46,9 +54,13 @@ export class LucesDeLaNoche {
   private readonly destino: (FarolaEncendible | null)[] = [];
   private readonly farolas: readonly FarolaEncendible[];
   private encendido = 1;
+  /** Cuánto de su intensidad dan las farolas de verdad con esta luz (al alba, menos). */
+  private intensidadDeLaLuz = 1;
   private reloj = 0;
   private readonly foco = new THREE.Vector3();
   private readonly adelante = new THREE.Vector3();
+  /** De dónde viene la direccional, respecto del foco (lo pone la paleta). */
+  private readonly desde = new THREE.Vector3(18, 60, 26);
 
   constructor(farolas: readonly FarolaEncendible[], opciones: OpcionesDeLasLuces) {
     this.farolas = farolas;
@@ -82,6 +94,23 @@ export class LucesDeLaNoche {
     }
   }
 
+  /**
+   * La luz del barrio (ver `paleta.ts`): colores e intensidades del hemisferio y de la direccional,
+   * de dónde viene ésta y lo oscura que es su sombra. No cambia el NÚMERO de luces ni si hay sombras
+   * (eso recompilaría), así que se puede llamar cuando se quiera.
+   */
+  ponerLaPaleta(p: PaletaDeLaLuz): void {
+    this.hemisferio.color.set(p.hemisferio.cielo);
+    this.hemisferio.groundColor.set(p.hemisferio.suelo);
+    this.hemisferio.intensity = p.hemisferio.intensidad;
+    this.direccional.color.set(p.direccional.color);
+    this.direccional.intensity = p.direccional.intensidad;
+    this.desde.set(p.direccional.desde[0], p.direccional.desde[1], p.direccional.desde[2]);
+    this.direccional.shadow.intensity = p.direccional.sombra;
+    this.intensidadDeLaLuz = p.farolasReales.intensidad;
+    this.direccional.position.copy(this.direccional.target.position).add(this.desde);
+  }
+
   /** 1 farolas encendidas, 0 el Apagón. */
   set farolasEncendidas(v: number) {
     this.encendido = v;
@@ -105,7 +134,7 @@ export class LucesDeLaNoche {
       const x = Math.round(this.foco.x / texel) * texel;
       const z = Math.round(this.foco.z / texel) * texel;
       this.direccional.target.position.set(x, 0, z);
-      this.direccional.position.set(x + 18, 60, z + 26);
+      this.direccional.position.set(x + this.desde.x, this.desde.y, z + this.desde.z);
       this.direccional.target.updateMatrixWorld();
     }
 
@@ -131,7 +160,7 @@ export class LucesDeLaNoche {
       const luz = this.reales[i] as THREE.PointLight;
       const d = this.destino[i] ?? null;
       const enSuSitio = d !== null && Math.abs(luz.position.x - d.x) < 0.01 && Math.abs(luz.position.z - d.z) < 0.01;
-      const objetivo = d !== null && enSuSitio ? INTENSIDAD_DE_FAROLA * this.encendido : 0;
+      const objetivo = d !== null && enSuSitio ? INTENSIDAD_DE_FAROLA * this.encendido * this.intensidadDeLaLuz : 0;
       luz.intensity += (objetivo - luz.intensity) * paso;
       if (d !== null && !enSuSitio && luz.intensity < 2) {
         luz.position.set(d.x, d.y - 0.35, d.z);

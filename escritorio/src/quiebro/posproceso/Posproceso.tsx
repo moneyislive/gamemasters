@@ -35,6 +35,24 @@ import { sondearElAparato } from '../calidad/sondeo';
 import type { AjustesDeLaImagen, Compositor } from './compositor';
 import { IMAGEN_DE_LA_NOCHE, crearElCompositor } from './compositor';
 import type { CaminoDelPosproceso } from './camino';
+import { apuntarEnLaLupa, camaraDeLaLupa } from './lupa';
+import { UNIFORMES_DE_LA_LUZ } from '../atmosfera/paleta';
+
+/**
+ * EL UMBRAL DEL BRILLO SUBE CON EL ALBA. De madrugada lo único que pasa de 1 son las farolas, los
+ * neones y las ventanas, y es lo que tiene que brillar. Al alba, el cielo cubierto ES lo más claro de
+ * la imagen y pasa de 1: con el umbral de la noche brillaba el cielo entero y su velo levantaba los
+ * negros de toda la imagen (la plaza de N3 no bajaba de 64 sobre 255, la de N0, sin brillo, de 13).
+ * El umbral sube con la claridad de la luz del barrio (`uClaridad`: 0 de madrugada, 0,7-1 al alba).
+ */
+function conLaLuz(base: AjustesDeLaImagen, claridad: number): AjustesDeLaImagen {
+  if (claridad <= 0) return base;
+  return {
+    ...base,
+    brillo: { ...base.brillo, umbral: base.brillo.umbral + 1.6 * claridad },
+    brilloBarato: { ...base.brilloBarato, umbral: Math.min(0.94, base.brilloBarato.umbral + 0.32 * claridad) },
+  };
+}
 
 /** Un número, o una referencia que se lee en cada fotograma. */
 export type NumeroVivo = number | { readonly current: number };
@@ -66,9 +84,12 @@ function leerNumero(n: NumeroVivo | undefined, porOmision: number): number {
 
 export function Posproceso(props: PropsDelPosproceso): null {
   const gl = useThree((s) => s.gl);
+  const escenaViva = useThree((s) => s.scene);
+  const camaraViva = useThree((s) => s.camera);
   const capacidades = useMemo(() => props.capacidades ?? sondearElAparato(gl), [props.capacidades, gl]);
   const compositor = useRef<Compositor | null>(null);
   const semilla = useRef(0);
+  const conClaridad = useRef<{ base: AjustesDeLaImagen | null; claridad: number; ajustes: AjustesDeLaImagen }>({ base: null, claridad: -1, ajustes: IMAGEN_DE_LA_NOCHE });
   const dicho = useRef<{ camino: CaminoDelPosproceso; aviso: string | null } | null>(null);
 
   useEffect(() => {
@@ -81,7 +102,11 @@ export function Posproceso(props: PropsDelPosproceso): null {
     };
   }, [gl, props.nivel, capacidades]);
 
+  /* La lupa del frente de imagen: sólo en desarrollo (ver `lupa.ts`). */
+  useEffect(() => apuntarEnLaLupa(gl, escenaViva, camaraViva), [gl, escenaViva, camaraViva]);
+
   useFrame((estado) => {
+    camaraDeLaLupa(estado.camera);
     const c = compositor.current;
     if (c === null) {
       /* Entre soltar un compositor y montar el siguiente no puede quedar un fotograma sin pintar. */
@@ -89,7 +114,15 @@ export function Posproceso(props: PropsDelPosproceso): null {
       return;
     }
     semilla.current = (semilla.current + 1) % 1_000_000;
-    const ajustes: AjustesDeLaImagen = props.ajustes === undefined ? IMAGEN_DE_LA_NOCHE : { ...IMAGEN_DE_LA_NOCHE, ...props.ajustes };
+    const base: AjustesDeLaImagen = props.ajustes === undefined ? IMAGEN_DE_LA_NOCHE : { ...IMAGEN_DE_LA_NOCHE, ...props.ajustes };
+    const claridad = UNIFORMES_DE_LA_LUZ.uClaridad.value;
+    const cc = conClaridad.current;
+    if (cc.base !== base || cc.claridad !== claridad) {
+      cc.base = base;
+      cc.claridad = claridad;
+      cc.ajustes = conLaLuz(base, claridad);
+    }
+    const ajustes = cc.ajustes;
     c.pintar(estado.scene, estado.camera, {
       remanso: leerNumero(props.remanso, 0),
       foco: leerNumero(props.foco, FOCO_POR_OMISION),

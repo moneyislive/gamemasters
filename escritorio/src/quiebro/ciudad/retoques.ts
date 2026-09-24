@@ -22,11 +22,19 @@
  */
 import * as THREE from 'three';
 import type { Retoque } from '../atmosfera/parcheo';
+import { UNIFORMES_DE_LA_LUZ } from '../atmosfera/paleta';
 import { GLSL_CHARCOS, GLSL_CIELO_REFLEJADO, GLSL_LUZ_DE_LA_CALLE, GLSL_ONDAS, GLSL_RUIDO } from './glsl';
 
 /** Una textura de 1×1 negra para que ningún material se compile sin su mapa de luz. */
 function texturaNegra(): THREE.DataTexture {
   const t = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, THREE.RGBAFormat);
+  t.needsUpdate = true;
+  return t;
+}
+
+/** Una textura de 1×1 blanca: sin oclusión horneada, el suelo no se oscurece. */
+function texturaBlanca(): THREE.DataTexture {
+  const t = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
   t.needsUpdate = true;
   return t;
 }
@@ -40,8 +48,20 @@ export const UNIFORMES_DE_LA_CIUDAD = {
   /** El mapa de alturas del suelo (0 calzada, 1 isla) y su caja, para posar tarjetas y salpicaduras. */
   uAlturas: { value: texturaNegra() as THREE.Texture },
   uAlturasCaja: { value: new THREE.Vector4(-1, -1, 0.5, 0.5) },
-  /** El color del sodio (lineal) por el que se multiplica el canal de las farolas. */
-  uColorDeSodio: { value: new THREE.Color(1.0, 0.52, 0.16) },
+  /**
+   * La oclusión horneada del suelo (`mapaDeOclusion`): 1 a cielo abierto, menos al pie de las fachadas
+   * y bajo coches, bancos y farolas. Su caja es la del mapa de alturas. Sin mapa, una textura blanca.
+   */
+  uOclusionSuelo: { value: texturaBlanca() as THREE.Texture },
+  uOclusionCaja: { value: new THREE.Vector4(-1, -1, 0.5, 0.5) },
+  /**
+   * El color de la luz de las farolas EN LO QUE ILUMINAN (lineal): el canal de las farolas del mapa
+   * horneado se multiplica por él. Es un sodio viejo, más blanco que el de la cabeza de la farola (la
+   * cabeza, su halo y su reflejo siguen siendo ámbar puro): con el ámbar saturado en el suelo y en las
+   * fachadas, la calle entera salía marrón, el verde-cian de la paleta no asomaba en ninguna parte y el
+   * ámbar dejaba de ser «lo del jugador» (§1), porque lo era todo.
+   */
+  uColorDeSodio: { value: new THREE.Color(1.0, 0.6, 0.27) },
   /** 1 = farolas encendidas; 0 = la avería del Apagón. Llega al mapa, a los halos y a las tarjetas. */
   uFarolas: { value: 1 },
   /** Cuánto pesa la luz horneada (para comparar en el banco). */
@@ -99,6 +119,11 @@ export const RETOQUE_ENTORNO: Retoque = {
     uColorDeSodio: UNIFORMES_DE_LA_CIUDAD.uColorDeSodio,
     uFarolas: UNIFORMES_DE_LA_CIUDAD.uFarolas,
     uLuzDeLaCalle: UNIFORMES_DE_LA_CIUDAD.uLuzDeLaCalle,
+    uReflejoCenit: UNIFORMES_DE_LA_LUZ.uReflejoCenit,
+    uReflejoHorizonte: UNIFORMES_DE_LA_LUZ.uReflejoHorizonte,
+    uReflejoMuro: UNIFORMES_DE_LA_LUZ.uReflejoMuro,
+    uReflejoVentanas: UNIFORMES_DE_LA_LUZ.uReflejoVentanas,
+    uReflejoMedia: UNIFORMES_DE_LA_LUZ.uReflejoMedia,
   },
   fragmento: [
     {
@@ -142,15 +167,27 @@ function retoqueSoloBrillo(): Retoque {
   const antes = 'IncidentLight directLight;';
   const despues = '#if ( NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )';
   const bien = trozo.includes(antes) && trozo.includes(despues);
+  /*
+   * Y el brillo, templado (`uBrilloDeLasFarolas`, de la paleta de la luz): una farola de verdad es un
+   * punto sin tamaño, y en una losa medio rugosa su brillo de GGX salía como una mancha naranja de dos
+   * metros a cada lado del jugador (y al alba era lo único que se veía en la plaza).
+   */
   const texto = bien
     ? trozo
-        .replace(antes, `vec3 difusaAntesQ = reflectedLight.directDiffuse;\n${antes}`)
-        .replace(despues, `reflectedLight.directDiffuse = difusaAntesQ;\n${despues}`)
+        .replace(antes, `vec3 difusaAntesQ = reflectedLight.directDiffuse;\nvec3 brilloAntesQ = reflectedLight.directSpecular;\n${antes}`)
+        .replace(
+          despues,
+          `reflectedLight.directDiffuse = difusaAntesQ;\nreflectedLight.directSpecular = brilloAntesQ + (reflectedLight.directSpecular - brilloAntesQ) * uBrilloDeLasFarolas;\n${despues}`,
+        )
     : '#include <lights_fragment_begin>';
   return {
     nombre: 'solo-brillo',
     orden: 20,
-    fragmento: [{ buscar: '#include <lights_fragment_begin>', como: 'en-lugar', texto }],
+    uniformes: { uBrilloDeLasFarolas: UNIFORMES_DE_LA_LUZ.uBrilloDeLasFarolas },
+    fragmento: [
+      { buscar: '#include <lights_pars_begin>', como: 'despues', texto: 'uniform float uBrilloDeLasFarolas;' },
+      { buscar: '#include <lights_fragment_begin>', como: 'en-lugar', texto },
+    ],
     ...(bien ? {} : { defines: { QUIEBRO_SIN_SOLO_BRILLO: '1' } }),
   };
 }

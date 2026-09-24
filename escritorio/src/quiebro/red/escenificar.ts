@@ -11,9 +11,12 @@
  *
  * ═══ LAS DOS REGLAS DE LOS RELOJES ═══
  *
- *   · Las SEÑALES de juego (anillo, silbido, bala) van en el reloj VERDADERO: el anillo se cierra en el
- *     `impactoMs` que tradujo la sala a mi reloj, y el silbido muere en ese mismo instante (diseño §4.4:
- *     «anillos, balas, líneas de apuntado y silbidos van SIEMPRE en el reloj verdadero»).
+ *   · Las SEÑALES de juego (anillo, silbido, línea de apuntado, bala) van en el reloj VERDADERO: el anillo
+ *     se cierra en el `impactoMs` que tradujo la sala a mi reloj, y el silbido muere en ese mismo instante;
+ *     la línea se fija en el `finMs` de su `apunta` (diseño §4.4: «anillos, balas, líneas de apuntado y
+ *     silbidos van SIEMPRE en el reloj verdadero»).
+ *   · La bala vuela con la velocidad y el alcance de SU proyectil en la declaración (`lectura.proyectil`):
+ *     son los números con que la sala la juzga. Los de `efectos/cuentas.ts` quedan para el banco.
  *   · El Remanso se pide al llegar el VEREDICTO (`resuelve` limpio contra mí): lo arbitrado se aplica
  *     siempre; el adorno, como mucho uno cada 2 s (lo decide `reloj.remansar`).
  *
@@ -86,6 +89,8 @@ function materialDeLaCaja(barrio: Barrio | null, caja: number): Material {
 export class Escenificador {
   private readonly anillos = new Map<number, { asa: number; silbido: ManejoDelAnillo | null }>();
   private readonly balas = new Map<number, number>();
+  /** La línea de apuntado de cada entidad que apunta: su asa en `sistema.apuntados`. */
+  private readonly apuntados = new Map<number, number>();
   private readonly montones = new Map<number, number[]>();
   private haz: { zona: number; asa: number } | null = null;
   private trenPasando = false;
@@ -117,6 +122,7 @@ export class Escenificador {
     for (const a of this.anillos.values()) a.silbido?.cancelar();
     this.anillos.clear();
     this.balas.clear();
+    this.apuntados.clear();
     this.montones.clear();
     this.haz = null;
     this.sistema.vaciar();
@@ -250,9 +256,30 @@ export class Escenificador {
       case 'bala': {
         const b = n.bala;
         if (b === null) return;
-        const asa = this.sistema.balas.disparar({ salida: b.salidaMs, x: b.x, y: 1.35, z: b.z, rumbo: b.r, fin: null });
+        const pr = l === null ? null : l.proyectil(b.p);
+        const asa = this.sistema.balas.disparar({
+          salida: b.salidaMs,
+          x: b.x,
+          y: 1.35,
+          z: b.z,
+          rumbo: b.r,
+          fin: null,
+          ...(pr === null ? {} : { velocidad: pr.velocidad / UNO, alcance: pr.alcance / UNO }),
+        });
         this.balas.set(b.id, asa);
         this.sonido.sonar('disparo', { posicion: { x: b.x, y: 1.35, z: b.z }, enMs: b.salidaMs });
+        return;
+      }
+      case 'apunta': {
+        /* Otro `apunta` de la misma entidad sustituye al anterior; con `a` 0, lo deja sin disparar. */
+        const antes = this.apuntados.get(s.de);
+        if (antes !== undefined) {
+          this.sistema.apuntados.retirar(antes);
+          this.apuntados.delete(s.de);
+        }
+        const ap = n.apuntado;
+        if (s.a === 0 || ap === null) return;
+        this.apuntados.set(s.de, this.sistema.apuntados.apuntar({ inicio: ahora, fin: ap.finMs, desde: s.de, hacia: s.a }));
         return;
       }
       case 'nace': {
@@ -264,6 +291,12 @@ export class Escenificador {
         return;
       }
       case 'seva': {
+        /* Quien se va deja de apuntar. Si ya disparó, la línea se fue sola (se fija y se apaga). */
+        const linea = this.apuntados.get(s.id);
+        if (linea !== undefined) {
+          this.sistema.apuntados.retirar(linea);
+          this.apuntados.delete(s.id);
+        }
         const asaDeBala = this.balas.get(s.id);
         if (asaDeBala !== undefined) {
           this.sistema.balas.acabar(asaDeBala, ahora);

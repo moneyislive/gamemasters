@@ -1191,12 +1191,8 @@ export class CanalDeLaLiza {
     for (const co of paso.correcciones) {
       const c = sala.canales.get(co.asiento);
       if (c === undefined || c.estado !== 'dentro') continue;
-      /*
-       * El lector del aparato pide `n ≥ 1` y el `aqui` admite `n = 0` (el primer tramo de 50 ms del
-       * canal): una corrección de ese tic se manda como del 1, que es lo más cercano que se puede leer.
-       * Tirarla dejaría al aparato andando desde un sitio que la sala no acepta.
-       */
-      const corrige = textoDeLaSala({ t: 'corrige', n: Math.max(1, co.n), x: co.x, z: co.z });
+      /* `n` 0 se manda tal cual: el lector del aparato lo admite, como el del `aqui` (ver `Corrige`). */
+      const corrige = textoDeLaSala({ t: 'corrige', n: co.n, x: co.x, z: co.z });
       if (this.mandar(c, corrige, 'sustituible')) this.cuentas.correcciones++;
     }
 

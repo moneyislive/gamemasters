@@ -32,6 +32,18 @@
  * llevan su ropa de verdad y el paraguas de la forja. Lo mismo para los cuerpos lejanos sin esqueleto
  * de N0 y N1: un maniquí por figura, teñido, con TODOS los gestos horneados (`lejanos.ts`).
  *
+ * ═══ LOS DESVELADOS LEJANOS, UN REBAÑO POR CUERPO Y NO POR ESTILO ═══
+ *
+ * El reparto de la forja hizo de cada estilo su propia figura (gabardina, ligera y mole, de hombre y de
+ * mujer): seis figuras de desvelado, y un rebaño por figura eran seis llamadas sólo para los desvelados
+ * lejanos. Con los dos Celadores, el peor caso de N0 subía a 19 llamadas contra las 15 de su cuota
+ * (`verify:quiebro-personajes`). Así que el desvelado lejano va en el maniquí del PRIMER estilo de su
+ * cuerpo (`figuraDelRebano`), teñido con la ropa de SU estilo —la tabla sale de la paleta de cada figura
+ * de estilo— y el forro y el contorno de su asiento: dos llamadas, hombre y mujer. Lo que se pierde a
+ * más de doce metros es el corte del abrigo (el faldón de la gabardina, el volumen de la mole), que en el
+ * maniquí de 400 triángulos ya no se leía; el color del estilo y el del asiento, que es lo que se lee a
+ * sesenta metros, se quedan.
+ *
  * ═══ SIN ASIGNAR POR FOTOGRAMA ═══
  *
  * La primera versión pedía unos 430 KiB por fotograma en N0 y 570 en N2 (25-34 MB/s a 60 fps, lo midió
@@ -213,6 +225,8 @@ export class DirectorDeLosPersonajes {
   private readonly zancadaDe = (i: number): number => this.zancadas[i] as number;
   private readonly figurasRecordadas = new Map<number, FiguraRecordada>();
   private readonly maniquis = new Map<string, Map<number, { lod: LodElegido; maniqui: readonly string[] | null }>>();
+  /** La figura del rebaño de los desvelados lejanos, por cuerpo (ver «Los desvelados lejanos»). */
+  private readonly figurasDelRebano = new Map<string, FiguraDelCuerpo>();
   private readonly escalas = new WeakMap<FiguraDelCuerpo, number>();
   private readonly marchasLejanas = new WeakMap<FiguraDelCuerpo, MarchaDelLejano>();
   private readonly colores = new Map<string, THREE.Color>();
@@ -371,7 +385,24 @@ export class DirectorDeLosPersonajes {
       );
     }
     if (clase === 'desvelado') {
-      const listas = r.clases.desvelado.variantes.map((v) => (figura.sexo === 'hombre' ? v.hombre.mallas : v.mujer.mallas));
+      const porEstilo = r.clases.desvelado.variantes.map((v) => (figura.sexo === 'hombre' ? v.hombre : v.mujer));
+      /*
+       * Cada estilo, su figura (el reparto de la forja): la ropa de cada uno sale de SU paleta, en su LOD
+       * más ligero, aunque el rebaño pinte el maniquí del primero (ver «Los desvelados lejanos»).
+       */
+      if (porEstilo.some((e) => e.figura !== figura.figura)) {
+        const ropas: { abrigo: string; tela: string; camisa: string }[] = [];
+        for (const e of porEstilo) {
+          const lods = r.figuras[e.figura]?.lods.length ?? 1;
+          const paleta = this.almacen.paletaDeVariante(e.figura, Math.max(0, lods - 1), e.mallas);
+          if (paleta === null) return null;
+          const zonas = r.figuras[e.figura]?.zonas ?? [];
+          const z = (n: string): THREE.Color | undefined => paleta[zonas.indexOf(n)]?.color;
+          ropas.push({ abrigo: hex(z('mat_abrigo') ?? z('mat_traje')), tela: hex(z('mat_tela') ?? z('mat_traje')), camisa: hex(z('mat_camisa')) });
+        }
+        return { ropas, camisaDelContorno: true };
+      }
+      const listas = porEstilo.map((e) => e.mallas);
       if (listas.every((x) => x === null)) return TABLA_DE_DESVELADOS;
       return deVariantes(listas, true);
     }
@@ -399,6 +430,20 @@ export class DirectorDeLosPersonajes {
     const nuevo = { lod: lodElegido(r, figura, tope, maniqui), maniqui };
     porTope.set(tope, nuevo);
     return nuevo;
+  }
+
+  /**
+   * LA FIGURA DEL REBAÑO de un cuerpo lejano: la suya, salvo el desvelado, que va en la del primer estilo
+   * de su cuerpo (ver «Los desvelados lejanos»). Recordada por cuerpo: no se construye en cada fotograma.
+   */
+  private figuraDelRebano(c: CuerpoPintado, figura: FiguraDelCuerpo): FiguraDelCuerpo {
+    if (c.clase !== 'desvelado') return figura;
+    let f = this.figurasDelRebano.get(figura.sexo);
+    if (f === undefined) {
+      f = figuraDelCuerpo(this.ctx.reparto, { id: c.id, clase: 'desvelado', variante: 0, color: null }, null);
+      this.figurasDelRebano.set(figura.sexo, f);
+    }
+    return f;
   }
 
   /** La clase de rebaño: los desvelados, la ropa de los durmientes (multitud y Prestados) y los trajes. */
@@ -901,7 +946,7 @@ export class DirectorDeLosPersonajes {
     if (!this.visible(c.x, c.z)) return 'fuera';
     const pol = this.nivelPreparado !== null ? POLITICA[this.nivelPreparado] : POLITICA[0];
     const esPrestado = c.clase === 'prestado';
-    const rb = esPrestado ? this.rebano(figura, pol.trisMultitud, 'multitud', 'prestado', crear) : this.rebano(figura, tope, 'lejanos', c.clase, crear);
+    const rb = esPrestado ? this.rebano(figura, pol.trisMultitud, 'multitud', 'prestado', crear) : this.rebano(this.figuraDelRebano(c, figura), tope, 'lejanos', c.clase, crear);
     if (rb === null) return 'sin-rebano';
     const pose = this.lejanos.pose(c, t, dt, this.marchaLejana(figura), this.poseLejana);
     const reposo = rb.textura.clips.get(rb.reposo);

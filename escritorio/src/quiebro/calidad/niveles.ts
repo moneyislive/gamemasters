@@ -148,7 +148,9 @@ export const TABLA_DE_NIVELES: Readonly<Record<NivelDeCalidad, PalancasDelNivel>
     enfoqueConProfundidad: false,
     reflejoEnCharcos: false,
     charcos: { ondas: true, salpicaduras: true },
-    fachadas: { interioresHastaM: 60, farolasReales: 4, haces: false },
+    /* Los haces, desde N2 y no sólo en N3 como decía la primera tabla: en un PC con integrada cuestan una
+       llamada y son lo que más «noche mojada» pone por su precio. */
+    fachadas: { interioresHastaM: 60, farolasReales: 4, haces: true },
     sombras: { hastaM: 40, cascadas: 1 },
     lluvia: 6000,
     durmientes: { triangulosDelVat: 1500, conEsqueleto: 8 },

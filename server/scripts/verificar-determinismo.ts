@@ -161,6 +161,35 @@
  * Y UN HUECO QUE NO CIERRA ESTE FICHERO: `verify:pureza` mira `shared/arcade` y
  * `shared/mecanicas` (`verificar-pureza.ts:104`), no `server/scripts/`. Los dos robots que
  * entran en el paquete viven fuera de su alcance.
+ *
+ * ═══ Y EL QUIEBRO, QUE ENTRÓ EL OCTAVO Y CON TRES COSAS ═══
+ *
+ * El primer juego de acción trae al paquete tres cosas que corren en los dos motores de verdad —la sala en
+ * el servidor, el barrio y los durmientes también en el móvil—, y las tres entran con sus suelos DELANTE:
+ *
+ *  1. EL BARRIO de cuatro mesas (`MESAS_DEL_QUIEBRO`): la ciudad, su mundo para la Liza, la plaza despejada y
+ *     los 48 durmientes en nueve tics. Suelo: más de 200 cajas, un grafo que no es sólo los 16 cruces, y
+ *     durmientes andando.
+ *  2. LA LIZA DE JUGUETE JUGADA (`jugarLaLizaDeJuguete`): seiscientos tics de la sala llena con los robots
+ *     del banco decidiendo sobre lo que oyen, un asiento que se queda ausente y vuelve, y dos cambios de
+ *     fase. Suelo: golpes, balas, líneas de apuntado, ausentes, nacimientos y las tres fases. Sin él, una
+ *     sala que dejara de sacar entidades coincidiría en los dos motores en la nada.
+ *  3. LA MESA DE EL QUIEBRO jugada por su robot, con travesuras. Suelo: se cierra tras sus dos noches, sin
+ *     nada inesperado, con diario y rechazos.
+ *  4. LA SALA DE EL QUIEBRO JUGADA (`jugarLaSalaDelQuiebro`, la revisión del pulido): un combate de verdad de
+ *     una mesa —su barrio de cuatrocientos nudos, su límite, sus clases— jugado novecientos tics por los
+ *     robots del banco, con un asiento que se calla. La liza de juguete no la sustituye: su grafo tiene siete
+ *     nudos y nada nace fuera de su límite, y una clausura sobre el `let` de un bucle metida en
+ *     `puntoParaEntrar` salía en verde. Suelo: golpes, nacimientos, entidades que entran en el límite (y, en
+ *     solitario, alguna sin nadie a quien perseguir), un ausente y, entre dos, balas con su línea.
+ *  5. LA LIZA SIN BLANCO (`jugarLaLizaSinBlanco`): las que nacen fuera del límite, detrás de un muro, sin
+ *     nadie a quien perseguir, y entran rodeándolo por el grafo —lo único que recorre `entrarPorElGrafo`,
+ *     que en las bocas de las calles de El Quiebro casi nunca corre—. Suelo: nacen cuatro y entran las cuatro.
+ *
+ * Se vio rojo, a propósito y en un espejo del árbol, con una clausura sobre el `let` de un bucle metida en
+ * la sala (Hermes da otro número a lo que nace): caen las dos lizas en el escalón 2, con todos los
+ * suelos en verde y nada más en rojo. Con la liza jugada veinte tics en vez de seiscientos caen sus dos
+ * suelos; con tres barrios, el de las piezas; y con la mesa sin travesuras, el suyo.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -180,11 +209,18 @@ import {
   jugarGrabando,
   jugarLaTanda,
   jugarUna,
+  MESAS_DEL_QUIEBRO,
+  NOCHES_DEL_QUIEBRO,
+  SALAS_DEL_QUIEBRO,
   SEMILLAS,
+  SEMILLAS_DE_LA_LIZA,
   segundosDeLaTanda,
+  TICS_DE_LA_LIZA_SIN_BLANCO,
+  TICS_DE_LA_LIZA,
   TOPE_DE_PASOS,
 } from './guion-determinismo';
-import type { Jugada, JugadaDelBurgo, JugadaDeLasLindes, Tanda } from './guion-determinismo';
+import type { BarrioDelQuiebro, Jugada, JugadaDelBurgo, JugadaDeLasLindes, JugadaDelQuiebro, SalaDelQuiebroJugada, Tanda } from './guion-determinismo';
+import type { JugadaDeLaLiza, JugadaSinBlanco } from './liza-de-juguete';
 /*
  * Las clases del recuento salen del juego y no de una lista escrita aquí: si mañana se añade
  * una quinta, este comprobador la exige sola en vez de seguir en verde sin mirarla.
@@ -452,6 +488,125 @@ comprobar(
   comprobar('y la clase rara —la ermita— sale en cantidad, no de milagro', (porClaseEnTotal['ermita'] ?? 0) >= 10, {
     porClaseEnTotal,
   });
+}
+
+/*
+ * ═══ Y EL QUIEBRO, CON LOS SUELOS DELANTE ═══
+ *
+ * Ver la cabecera. Una lista vacía —un barrio que no se levanta, una liza que no juega, una mesa que no
+ * arranca— coincide en los dos motores porque coincide en la nada: por eso cada una trae su suelo y el
+ * número de piezas se exige antes de mirar huellas.
+ */
+paso('El Quiebro, dos veces en Node: su barrio, la Liza jugada, su mesa y su sala');
+
+comprobar(
+  `la tanda trae los ${MESAS_DEL_QUIEBRO.length} barrios, las ${SEMILLAS_DE_LA_LIZA.length} lizas y las ${SEMILLAS.length} mesas de El Quiebro`,
+  MESAS_DEL_QUIEBRO.length === 4 &&
+    primera.quiebro.length === MESAS_DEL_QUIEBRO.length &&
+    SEMILLAS_DE_LA_LIZA.length >= 2 &&
+    primera.liza.length === SEMILLAS_DE_LA_LIZA.length &&
+    primera.mesasDelQuiebro.length === SEMILLAS.length,
+  { barrios: primera.quiebro.length, lizas: primera.liza.length, mesas: primera.mesasDelQuiebro.length },
+);
+{
+  for (let i = 0; i < primera.quiebro.length; i++) {
+    const a = primera.quiebro[i] as BarrioDelQuiebro;
+    const b = segunda.quiebro[i] as BarrioDelQuiebro | undefined;
+    console.log(
+      `  barrio ${a.codigo} noche ${String(a.noche).padStart(2)} · ${String(a.cajas).padStart(3)} cajas · ${a.nudos} nudos · ` +
+        `${String(a.andando).padStart(3)} durmientes andando en ${String(9)} tics · ${Math.round(a.huella.length / 1024)} kB de huella`,
+    );
+    comprobar(
+      `el barrio de ${a.codigo} (noche ${a.noche}) es un barrio: más de 200 cajas, un grafo que no es sólo los cruces y durmientes que andan`,
+      a.cajas >= 200 && a.nudos > 16 && a.andando > 0,
+      { cajas: a.cajas, nudos: a.nudos, andando: a.andando },
+    );
+    comprobar(
+      `y se levanta igual dos veces: ciudad, mundo, Liza, plaza despejada, guion y durmientes`,
+      b !== undefined && a.huella === b.huella && a.durmientes === b.durmientes,
+      b === undefined ? 'falta el segundo' : a.huella !== b.huella ? dondeDifieren(a.huella, b.huella) : a.durmientes === b.durmientes ? undefined : dondeDifieren(a.durmientes, b.durmientes),
+    );
+  }
+  for (let i = 0; i < primera.liza.length; i++) {
+    const a = primera.liza[i] as JugadaDeLaLiza;
+    const b = segunda.liza[i] as JugadaDeLaLiza | undefined;
+    console.log(
+      `  liza de juguete, semilla ${String(a.semilla).padStart(10)} · ${a.tics} tics · ${String(a.anuncios).padStart(3)} anuncios · ` +
+        `${String(a.balas).padStart(3)} balas · ${String(a.lineas).padStart(3)} líneas · ${a.ausentes} ausentes · ${String(a.nacidas).padStart(3)} nacidas · ${a.fases} fases`,
+    );
+    comprobar(
+      `la liza de juguete de la semilla ${a.semilla} se juega de verdad: golpes, balas con su línea, un ausente, entidades que nacen y las tres fases`,
+      a.tics === TICS_DE_LA_LIZA && a.anuncios >= 30 && a.balas >= 100 && a.lineas >= 40 && a.resueltos >= 30 && a.nacidas >= 20 && a.ausentes >= 1 && a.fases >= 3,
+      { ...a, salidas: undefined, huella: undefined },
+    );
+    comprobar(
+      `y da lo mismo dos veces: todo lo que sale en cada tic, y el estado final`,
+      b !== undefined && a.salidas === b.salidas && a.huella === b.huella,
+      b === undefined ? 'falta la segunda' : { primera: [a.salidas, a.huella], segunda: [b.salidas, b.huella] },
+    );
+  }
+  comprobar(
+    `y trae las ${SALAS_DEL_QUIEBRO.length} salas de El Quiebro jugadas`,
+    SALAS_DEL_QUIEBRO.length >= 2 && primera.salasDelQuiebro.length === SALAS_DEL_QUIEBRO.length,
+    primera.salasDelQuiebro.length,
+  );
+  for (let i = 0; i < primera.salasDelQuiebro.length; i++) {
+    const a = primera.salasDelQuiebro[i] as SalaDelQuiebroJugada;
+    const b = segunda.salasDelQuiebro[i] as SalaDelQuiebroJugada | undefined;
+    console.log(
+      `  sala de El Quiebro, semilla ${String(a.semilla).padStart(10)} · ${a.asientos} asientos · ${a.clave} · ${a.tics} tics · ${String(a.anuncios).padStart(3)} anuncios · ` +
+        `${String(a.balas).padStart(3)} balas · ${String(a.lineas).padStart(3)} líneas · ${a.nacidas} nacidas · ${a.entraron} entraron (${a.entraronSinBlanco} sin blanco) · ${a.ausentes} ausentes`,
+    );
+    comprobar(
+      `la sala de El Quiebro de la semilla ${a.semilla} se juega de verdad: golpes, entidades que nacen fuera y entran en el límite${a.asientos === 1 ? ' (alguna sin nadie a quien perseguir)' : ', balas con su línea'} y un ausente`,
+      a.tics >= 800 &&
+        a.anuncios >= 15 &&
+        a.nacidas >= 6 &&
+        a.entraron >= 3 &&
+        a.ausentes >= 1 &&
+        (a.asientos > 1 || a.entraronSinBlanco >= 1) &&
+        (a.asientos === 1 || (a.balas >= 20 && a.lineas >= 8)),
+      { ...a, salidas: undefined, huella: undefined },
+    );
+    comprobar(
+      `y da lo mismo dos veces: todo lo que sale en cada tic, y el estado final`,
+      b !== undefined && a.salidas === b.salidas && a.huella === b.huella,
+      b === undefined ? 'falta la segunda' : { primera: [a.salidas, a.huella], segunda: [b.salidas, b.huella] },
+    );
+  }
+  {
+    const a = primera.lizaSinBlanco as JugadaSinBlanco | undefined;
+    const b = segunda.lizaSinBlanco as JugadaSinBlanco | undefined;
+    if (a !== undefined) console.log(`  liza sin blanco · ${a.tics} tics · ${a.nacidas} nacidas · ${a.entraron} entraron rodeando el muro`);
+    comprobar(
+      'la liza sin blanco se juega de verdad: nacen cuatro detrás del muro, sin nadie a quien perseguir, y entran las cuatro',
+      a !== undefined && a.tics === TICS_DE_LA_LIZA_SIN_BLANCO && a.nacidas >= 4 && a.entraron === a.nacidas,
+      a === undefined ? 'no está' : { ...a, salidas: undefined, huella: undefined },
+    );
+    comprobar(
+      'y da lo mismo dos veces',
+      a !== undefined && b !== undefined && a.salidas === b.salidas && a.huella === b.huella,
+      a === undefined || b === undefined ? 'falta' : { primera: [a.salidas, a.huella], segunda: [b.salidas, b.huella] },
+    );
+  }
+  for (let i = 0; i < primera.mesasDelQuiebro.length; i++) {
+    const a = primera.mesasDelQuiebro[i] as JugadaDelQuiebro;
+    const b = segunda.mesasDelQuiebro[i] as JugadaDelQuiebro | undefined;
+    console.log(
+      `  mesa de El Quiebro, semilla ${String(a.semilla).padStart(10)} · ${a.asientos} asientos · ${String(a.diario).padStart(3)} en el diario · ` +
+        `${a.noches} noches · ${String(a.fases).padStart(2)} fases · ${a.rechazados} travesuras rechazadas · ${a.terminada ? 'se cierra' : 'NO SE CIERRA'}`,
+    );
+    comprobar(
+      `la mesa de El Quiebro de la semilla ${a.semilla} se juega entera: sus ${NOCHES_DEL_QUIEBRO} noches y se cierra, sin nada inesperado y con las travesuras rechazadas`,
+      a.terminada && a.inesperados === 0 && a.noches === NOCHES_DEL_QUIEBRO && a.diario >= 25 && a.fases >= 10 && a.rechazados >= 10,
+      { ...a, huella: undefined },
+    );
+    comprobar(
+      `y da el mismo estado dos veces`,
+      b !== undefined && a.huella === b.huella,
+      b === undefined ? 'falta la segunda' : a.huella === b.huella ? undefined : dondeDifieren(a.huella, b.huella),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -740,6 +895,78 @@ if (enNode !== null && enHermes !== null) {
   }
 
   /*
+   * ═══ Y EL QUIEBRO EN LOS DOS MOTORES ═══
+   *
+   * Una tanda sin `quiebro`, sin `liza` o sin `mesasDelQuiebro` es ROJO, no «no aplica»: un paquete de
+   * Hermes que se cayera a medias o uno viejo los traería vacíos o ausentes.
+   */
+  const quiebroEnNode = Array.isArray(enNode.quiebro) ? enNode.quiebro : [];
+  const quiebroEnHermes = Array.isArray(enHermes.quiebro) ? enHermes.quiebro : [];
+  const lizaEnNode = Array.isArray(enNode.liza) ? enNode.liza : [];
+  const lizaEnHermes = Array.isArray(enHermes.liza) ? enHermes.liza : [];
+  const mesasEnNode = Array.isArray(enNode.mesasDelQuiebro) ? enNode.mesasDelQuiebro : [];
+  const mesasEnHermes = Array.isArray(enHermes.mesasDelQuiebro) ? enHermes.mesasDelQuiebro : [];
+  const salasEnNode = Array.isArray(enNode.salasDelQuiebro) ? enNode.salasDelQuiebro : [];
+  const salasEnHermes = Array.isArray(enHermes.salasDelQuiebro) ? enHermes.salasDelQuiebro : [];
+  comprobar(
+    'las dos tandas traen los barrios, las lizas y las mesas de El Quiebro, y las mismas',
+    quiebroEnNode.length === MESAS_DEL_QUIEBRO.length &&
+      quiebroEnHermes.length === MESAS_DEL_QUIEBRO.length &&
+      lizaEnNode.length === SEMILLAS_DE_LA_LIZA.length &&
+      lizaEnHermes.length === SEMILLAS_DE_LA_LIZA.length &&
+      mesasEnNode.length === SEMILLAS.length &&
+      mesasEnHermes.length === SEMILLAS.length &&
+      salasEnNode.length === SALAS_DEL_QUIEBRO.length &&
+      salasEnHermes.length === SALAS_DEL_QUIEBRO.length,
+    `Node ${quiebroEnNode.length}/${lizaEnNode.length}/${mesasEnNode.length}/${salasEnNode.length} · Hermes ${quiebroEnHermes.length}/${lizaEnHermes.length}/${mesasEnHermes.length}/${salasEnHermes.length}`,
+  );
+  {
+    const a = enNode.lizaSinBlanco as JugadaSinBlanco | undefined;
+    const b = enHermes.lizaSinBlanco as JugadaSinBlanco | undefined;
+    comprobar(
+      'la liza sin blanco, jugada, da LO MISMO en Node y en Hermes: cada salida de cada tic, el estado final y las que entraron',
+      a !== undefined && b !== undefined && a.salidas === b.salidas && a.huella === b.huella && a.entraron === b.entraron && a.nacidas === b.nacidas,
+      { node: a, hermes: b },
+    );
+  }
+  for (let i = 0; i < Math.min(salasEnNode.length, salasEnHermes.length); i++) {
+    const a = salasEnNode[i] as SalaDelQuiebroJugada;
+    const b = salasEnHermes[i] as SalaDelQuiebroJugada;
+    comprobar(
+      `la sala de El Quiebro de la semilla ${a.semilla}, jugada, da LO MISMO en Node y en Hermes: cada salida de cada tic, el estado final y las cuentas`,
+      a.salidas === b.salidas && a.huella === b.huella && a.anuncios === b.anuncios && a.balas === b.balas && a.nacidas === b.nacidas && a.entraron === b.entraron && a.entraronSinBlanco === b.entraronSinBlanco,
+      { node: a, hermes: b },
+    );
+  }
+  for (let i = 0; i < Math.min(quiebroEnNode.length, quiebroEnHermes.length); i++) {
+    const a = quiebroEnNode[i] as BarrioDelQuiebro;
+    const b = quiebroEnHermes[i] as BarrioDelQuiebro;
+    comprobar(
+      `el barrio de ${a.codigo} (noche ${a.noche}) y sus durmientes salen IGUALES en Node y en Hermes`,
+      a.huella === b.huella && a.durmientes === b.durmientes,
+      a.huella !== b.huella ? dondeDifieren(a.huella, b.huella) : a.durmientes === b.durmientes ? undefined : dondeDifieren(a.durmientes, b.durmientes),
+    );
+  }
+  for (let i = 0; i < Math.min(lizaEnNode.length, lizaEnHermes.length); i++) {
+    const a = lizaEnNode[i] as JugadaDeLaLiza;
+    const b = lizaEnHermes[i] as JugadaDeLaLiza;
+    comprobar(
+      `la liza de juguete de la semilla ${a.semilla}, jugada, da LO MISMO en Node y en Hermes: cada salida de cada tic, el estado final y las cuentas`,
+      a.salidas === b.salidas && a.huella === b.huella && a.anuncios === b.anuncios && a.balas === b.balas && a.lineas === b.lineas && a.nacidas === b.nacidas && a.ausentes === b.ausentes,
+      { node: a, hermes: b },
+    );
+  }
+  for (let i = 0; i < Math.min(mesasEnNode.length, mesasEnHermes.length); i++) {
+    const a = mesasEnNode[i] as JugadaDelQuiebro;
+    const b = mesasEnHermes[i] as JugadaDelQuiebro;
+    comprobar(
+      `la mesa de El Quiebro de la semilla ${a.semilla} da el MISMO estado final en Node y en Hermes`,
+      a.huella === b.huella && a.diario === b.diario && a.pasos === b.pasos,
+      a.huella === b.huella ? `Node ${a.diario}/${a.pasos} · Hermes ${b.diario}/${b.pasos}` : dondeDifieren(a.huella, b.huella),
+    );
+  }
+
+  /*
    * Y lo mismo contra la tanda que se jugó EN PROCESO al principio. Node fuera y
    * Node dentro deberían coincidir siempre; que no coincidieran significaría que
    * el empaquetado cambia el comportamiento —una optimización de esbuild, un
@@ -753,11 +980,21 @@ if (enNode !== null && enHermes !== null) {
     ...primera.jugadas.map((j) => j.huella),
     ...primera.burgo.map((j) => j.huella),
     ...primera.lindes.map((j) => j.huella),
+    ...primera.quiebro.map((q) => q.huella + q.durmientes),
+    ...primera.liza.map((l) => l.salidas + l.huella),
+    ...primera.mesasDelQuiebro.map((m) => m.huella),
+    ...primera.salasDelQuiebro.map((l) => l.salidas + l.huella),
+    primera.lizaSinBlanco.salidas + primera.lizaSinBlanco.huella,
   ]);
   const deFuera = canonico([
     ...enNode.jugadas.map((j) => j.huella),
     ...burgoEnNode.map((j) => j.huella),
     ...lindesEnNode.map((j) => j.huella),
+    ...quiebroEnNode.map((q) => q.huella + q.durmientes),
+    ...lizaEnNode.map((l) => l.salidas + l.huella),
+    ...mesasEnNode.map((m) => m.huella),
+    ...salasEnNode.map((l) => l.salidas + l.huella),
+    enNode.lizaSinBlanco === undefined ? '' : enNode.lizaSinBlanco.salidas + enNode.lizaSinBlanco.huella,
   ]);
   comprobar(
     'el paquete de esbuild da lo mismo que el mismo código sin empaquetar',
@@ -906,6 +1143,10 @@ if (fallos.length === 0) {
       '  tiran por el ausente, y cuatro de Las Lindes que vacían la bolsa de 72 losas y plantan en\n' +
       '  las cuatro clases, dan el mismo estado final en los dos motores — con botines de la\n' +
       '  refriega metidos entre medias en las ocho.\n' +
+      '  Y El Quiebro: cuatro barrios con sus durmientes, dos lizas de juguete jugadas seiscientos tics\n' +
+      '  con un ausente y dos cambios de fase, cuatro mesas jugadas por su robot con travesuras, y dos\n' +
+      '  salas de sus combates de verdad jugadas novecientos tics, con entidades que entran en el límite;\n' +
+      '  y la liza sin blanco, con las que entran rodeando un muro sin nadie a quien perseguir.\n' +
       '  Sin mirar, y dicho a propósito: recoger un labriego y pasar de turno no salen en estas\n' +
       '  cuatro semillas de Las Lindes, así que esas dos ramas no las compara nadie todavía.',
   );

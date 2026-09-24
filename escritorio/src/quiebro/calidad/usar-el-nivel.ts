@@ -28,7 +28,7 @@
  * mirar cada nivel; una lista de ajustes lo usaría para «calidad: baja»). Al volver a `null`, el
  * gobernador empieza de nuevo desde lo que dijo el sondeo: lo aprendido con otro nivel forzado no vale.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { Calidad } from '../../../../escenas/embarcadero/tipos';
 import type { NivelDeCalidad, PalancasDelNivel } from './niveles';
@@ -44,6 +44,7 @@ import {
   gobernar,
   leerElRecuerdo,
   recuerdoDe,
+  seRecuerda,
 } from './gobernador';
 import { sondearElAparato } from './sondeo';
 import { laCuentaDe } from './medida';
@@ -92,10 +93,42 @@ const NADA_MEDIDO: LoUltimoMedido = {
   triangulos: 0,
 };
 
+/*
+ * ═══ EL NIVEL FORZADO DESDE FUERA ═══
+ *
+ * Quien monta el gancho puede pasar `fijo`; quien NO lo monta (una captura del juego real, la lupa del
+ * frente de imagen, `?nivel=0..3` en la dirección con el servidor de desarrollo) también tiene que poder
+ * mirar cada nivel sin tocar la raíz del juego. `fijo` manda sobre esto; esto manda sobre el gobernador.
+ */
+function nivelDeLaDireccion(): NivelDeCalidad | null {
+  /* Sólo en desarrollo: en el juego empaquetado el nivel lo deciden el sondeo y el gobernador. */
+  const env = import.meta.env as { readonly DEV?: boolean } | undefined;
+  if (env?.DEV !== true || typeof location === 'undefined') return null;
+  const pedido = new URLSearchParams(location.search).get('nivel');
+  if (pedido === '0' || pedido === '1' || pedido === '2' || pedido === '3') return Number(pedido) as NivelDeCalidad;
+  return null;
+}
+let nivelForzado: NivelDeCalidad | null = nivelDeLaDireccion();
+const oyentesDelNivel = new Set<() => void>();
+
+/** Fuerza un nivel en todos los lienzos que usen el gancho sin `fijo` (o lo suelta con `null`). */
+export function forzarElNivel(nivel: NivelDeCalidad | null): void {
+  nivelForzado = nivel;
+  for (const avisar of oyentesDelNivel) avisar();
+}
+
+function suscribirAlNivel(avisar: () => void): () => void {
+  oyentesDelNivel.add(avisar);
+  return () => {
+    oyentesDelNivel.delete(avisar);
+  };
+}
+
 export function usarElNivel(opciones: OpcionesDelNivel = {}): ElNivel {
   const gl = useThree((s) => s.gl);
   const setDpr = useThree((s) => s.setDpr);
-  const fijo = opciones.fijo ?? null;
+  const forzado = useSyncExternalStore(suscribirAlNivel, () => nivelForzado, () => null);
+  const fijo = opciones.fijo ?? forzado;
   const recordar = opciones.recordar !== false;
 
   /* El sondeo va en caché por renderizador: repetirlo (modo estricto) no vuelve a pintar nada. */
@@ -167,9 +200,10 @@ export function usarElNivel(opciones: OpcionesDelNivel = {}): ElNivel {
     if (cambio.de.nivel !== cambio.a.nivel || cambio.de.dpr !== cambio.a.dpr) setDonde(cambio.a);
     /*
      * El recuerdo: el nivel que aguantó (prueba superada) o el que quedó tras bajar (el de arriba
-     * falló aquí). Subir a prueba no se recuerda: todavía no ha demostrado nada.
+     * falló aquí), salvo que la bajada viniera de fotogramas frenados (`seRecuerda`). Subir a prueba no
+     * se recuerda: todavía no ha demostrado nada.
      */
-    if (recordar && (cambio.motivo === 'prueba-superada' || cambio.motivo === 'bajar-nivel' || cambio.motivo === 'prueba-fallida')) {
+    if (recordar && seRecuerda(cambio)) {
       escribirEnElAlmacen(LLAVE_DEL_RECUERDO, JSON.stringify(recuerdoDe(cambio.a.nivel, capacidades.grafica)));
     }
     alCambiar.current?.(cambio);

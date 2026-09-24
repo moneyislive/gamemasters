@@ -50,6 +50,11 @@ export interface PropsDelPintorDeCuerpos {
   readonly barrio: Barrio | null;
   /** El reloj de presentación de los cuerpos ajenos (el Remanso lo frena), en ms. */
   readonly presentado: (t: number) => number;
+  /**
+   * Quien pinta de verdad (`personajes/`) avisa aquí de su director, que sabe lo que pintó: el juego lo
+   * lee sólo en desarrollo, para medir (`__quiebro.medir()`). Las siluetas no tienen director.
+   */
+  readonly alDirector?: (director: unknown) => void;
 }
 
 /** Cuántos cuerpos caben: seis asientos y el aforo más grande de la Liza. */

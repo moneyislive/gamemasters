@@ -15,38 +15,14 @@
  * Las listas de dentro de cada cuerpo —el rastro, los tramos, las esquivas— se copian SÓLO cuando se
  * escriben: un asiento quieto no copia su rastro.
  *
- * ═══ LO QUE LA SALA GUARDA ADEMÁS DE LO QUE PROMETE EL CONTRATO ═══
+ * ═══ LO QUE LA SALA GUARDA PARA VALIDAR Y JUZGAR, YA EN EL CONTRATO ═══
  *
- * `tipos-de-la-sala.ts` es de otro frente y no se edita aquí. Le faltan siete cosas sin las que la sala
- * no se puede escribir bien, y van en tipos que EXTIENDEN los del contrato (`CuerpoInterno`,
- * `EntidadInterna`, `BalaInterna`): el estado sigue siendo un `EstadoDeLaSala` válido para quien lo
- * lea por el contrato, y sigue siendo dato llano que `canonico.ts` compara. Cada una dice por qué:
- *
- *   · `corregidoEnTic` — el silencio tras corregir. Lo aprendió Boots on Board (`botas/canal.ts`,
- *     paso 2 de su validación): tras un `corrige`, los `aqui` que ya venían de camino desde el sitio
- *     malo no se corrigen otra vez durante un segundo; si no, el aparato salta atrás por cada paso que
- *     tenía en vuelo.
- *   · `enVueloHastaN` — CUÁLES venían de camino: los de tic del aparato hasta éste, que es aquel en que
- *     el `corrige` le llega (el tic de la sala más media ida y vuelta, en su reloj, y uno de margen).
- *     Los de después ya salieron desde el sitio corregido y se validan como cualquiera. La primera
- *     versión lo decidía por la distancia al sitio corregido —más de un paso de un tic, «viene de
- *     camino»— y se tragaba entera la esquiva que el aparato empezaba justo después: sus pasos son más
- *     largos que uno de andar (ver `cuerpo.ts`).
- *   · `nDelSitio` — el tic del aparato del último sitio aceptado: la tolerancia de la escuadra es para
- *     el tramo de UN tic del aparato, sea de andar o de esquivar (ver `cuerpo.ts`).
- *   · `extraHastaTic` — hasta cuándo vale la DISTANCIA EXTRA que se le admitió. Un avance, un empujón o
- *     una esquiva la dan; el aparato hace ese recorrido y sus `aqui` llegan media ida y vuelta tarde, a
- *     veces después de que el estado que la dio haya acabado. Sin una gracia, la mala red castiga.
- *   · `recuperaHastaTic` — la recuperación tras un golpe (`AccionDeclarada.recuperacionTics`), que no
- *     es un estado ni una recarga de una acción concreta.
- *   · `balasHastaTic` — hasta qué tic de la sala se juzgaron ya las balas contra ESTE asiento: cada
- *     asiento declara sus sitios con su propio retraso (ver `proyectiles.ts`).
- *   · `acometida` — la acción que la sala lanza sola cuando termina el vuelo de una esquiva limpia
- *     contra una bala (`EsquivaDeclarada.contraProyectil`).
- * Y en las balas, `finTic`/`finPor` —cuándo y por qué se para, calculado al salir— y `juzgadaContra`,
- * los asientos contra los que ya se juzgó (una bala que atraviesa a quien la esquivó no lo vuelve a
- * juzgar en el tic siguiente). En las entidades, su `recuperaHastaTic`. El informe del frente propone
- * subirlas al contrato tal cual.
+ * La primera sala llevaba siete campos que `tipos-de-la-sala.ts` no decía —el silencio tras corregir,
+ * qué venía de camino, la distancia extra, la recuperación, hasta dónde se juzgaron las balas, la
+ * acometida; y en las balas y las entidades, lo suyo— en tipos que extendían los del contrato. Entraban
+ * en la huella canónica, así que eran estado de verdad que el contrato no contaba: se han subido allí
+ * (ver cada campo), junto con los dos del `aqui` vivo del ausente momentáneo. Los nombres de aquí quedan
+ * como alias para las piezas de la sala.
  *
  * ═══ LOS ÍNDICES, Y POR QUÉ UN `WeakMap` NO ROMPE LA PUREZA ═══
  *
@@ -74,7 +50,7 @@ import type {
   VeredictoDeLaLiza,
   ZonaDelMundo,
 } from './declaracion';
-import { PRIMER_NUMERO_DE_ENTIDAD, TOPE_DE_NUMERO } from './protocolo';
+import { aCentesimas, PRIMER_NUMERO_DE_ENTIDAD, TOPE_DE_NUMERO } from './protocolo';
 import type { CodigoDeIrse, SucesoDelTic } from './protocolo';
 import type {
   AnuncioPendiente,
@@ -103,18 +79,8 @@ export const SIN_FIN = 2147483647;
 /** Tras un `corrige`, cuánto se callan los `aqui` que ya venían de camino: un segundo, como en botas. */
 export const SILENCIO_TRAS_CORREGIR_TICS = 20;
 
-/**
- * LO QUE TARDA UNA PULSACIÓN EN SALIR DEL APARATO: un tic. La pulsación viaja dentro del `aqui` del tic
- * del aparato en que se pulsó, y ese `aqui` sale al acabar el tic: hasta 50 ms después de pulsar. El
- * `comp` (`RedDeclarada`) cubre la red —media ida y vuelta y el error del desfase— y no esto, así que la
- * sala espera un anuncio hasta `impacto + comp` MÁS este tic, y da por buena una pulsación hasta
- * `comp` más este tic atrás.
- *
- * Sin él, el veredicto de una esquiva pulsada a tiempo dependía de en qué punto de su tic estuviera el
- * aparato: el revisor del frente lo midió con nueve fases dentro del tic, y quebrar 30 ms antes del
- * impacto salía limpia en 63 de 81 combinaciones de fase, error del desfase y red. Con él, en todas.
- */
-export const TICS_DEL_AQUI = 1;
+/** Lo que tarda una pulsación en salir del aparato, y lo que hace vivo a un `aqui`: son del contrato. */
+export { AQUIS_PARA_ESTAR, TICS_DE_LA_VUELTA, TICS_DEL_AQUI } from './tipos-de-la-sala';
 
 /** Cuántas esquivas recientes guarda un asiento: las que pueden decidir una ventana o un torpe. */
 export const TOPE_DE_ESQUIVAS_RECIENTES = 8;
@@ -122,54 +88,12 @@ export const TOPE_DE_ESQUIVAS_RECIENTES = 8;
 /** Los tipos de acción que un asiento puede mandar por el cable (`IndicesDelAsiento.tipo`). */
 export const TIPO_DE_ACCION = { ninguna: 0, golpe: 1, esquiva: 2, rescate: 3, remate: 4, zona: 5 } as const;
 
-/* ─── LO QUE LA SALA GUARDA ADEMÁS DEL CONTRATO (ver la cabecera) ─────────── */
+/* ─── LOS TIPOS DEL ESTADO, CON EL NOMBRE QUE USAN LAS PIEZAS (ver la cabecera) ─── */
 
-/** La acción que la sala lanzará sola al acabar el vuelo de una esquiva limpia contra una bala. */
-export interface AcometidaPendiente {
-  /** El número de la entidad contra la que se lanza. */
-  readonly blanco: number;
-  /** El tic de la sala en que se lanza. */
-  readonly enTic: number;
-}
-
-export interface CuerpoInterno extends CuerpoDeAsiento {
-  /** El tic de la sala del último `corrige` que sigue pendiente, o −1. */
-  readonly corregidoEnTic: number;
-  /** Los `aqui` con `n` hasta éste ya venían de camino cuando el último `corrige` llegó al aparato. */
-  readonly enVueloHastaN: number;
-  /** El `n` del `aqui` del que salió el sitio de ahora (`x`, `z`), o −1 si lo puso la sala. */
-  readonly nDelSitio: number;
-  /** Hasta este tic de la sala (excluido) el presupuesto corto puede pasar de su tope. */
-  readonly extraHastaTic: number;
-  /** Hasta este tic de la sala (excluido) sólo puede empezar acciones que se encadenen. */
-  readonly recuperaHastaTic: number;
-  /** Hasta este tic de la sala (incluido) ya se juzgaron las balas contra este asiento. */
-  readonly balasHastaTic: number;
-  readonly acometida: AcometidaPendiente | null;
-}
-
-export interface EntidadInterna extends EntidadDeLaSala {
-  /** Hasta este tic de la sala (excluido) no abre otro ataque. */
-  readonly recuperaHastaTic: number;
-}
-
-export interface BalaInterna extends BalaDeLaSala {
-  /** El tic de la sala en que se para (contra la estructura o por su alcance). */
-  readonly finTic: number;
-  /** Por qué se para en `finTic`: `choca` o `alcance`. */
-  readonly finPor: CodigoDeIrse;
-  /** Los asientos contra los que ya se juzgó, un bit por número (el bit `n` es el asiento `n`). */
-  readonly juzgadaContra: number;
-  /** Lo que recorre antes de pararse, en Q16.16 (ver `paradaDeLaBala` en `proyectiles.ts`). */
-  readonly parada: number;
-}
-
-/** El estado de la sala tal como lo lleva ella: el del contrato, con sus cuerpos internos. */
-export interface EstadoInterno extends EstadoDeLaSala {
-  readonly asientos: readonly CuerpoInterno[];
-  readonly entidades: readonly EntidadInterna[];
-  readonly balas: readonly BalaInterna[];
-}
+export type CuerpoInterno = CuerpoDeAsiento;
+export type EntidadInterna = EntidadDeLaSala;
+export type BalaInterna = BalaDeLaSala;
+export type EstadoInterno = EstadoDeLaSala;
 
 /* ─── LA COPIA DE TRABAJO ────────────────────────────────────────────────── */
 
@@ -286,6 +210,34 @@ export function contar(p: PasoEnCurso, para: number, suceso: SucesoDelTic): void
   p.sucesos.push({ para, suceso });
 }
 
+/**
+ * LA LÍNEA DE APUNTADO DE `e` CONTRA `a`, para `para` (0 = todos los canales, cada uno con el instante
+ * en SU reloj): se fija en el tic en que `e` deja de apuntar, `cerebro.repiensaEnTic`. Ver `SucesoApunta`.
+ */
+export function contarApuntado(p: PasoEnCurso, e: EntidadEnCurso, a: number, para: number): void {
+  const clase = p.indices.clases[e.clase];
+  if (clase === undefined || clase.proyectil === 0) return;
+  const fija = msDelTic(e.cerebro.repiensaEnTic);
+  const x = aCentesimas(e.x);
+  const z = aCentesimas(e.z);
+  for (const s of p.asientos) {
+    if (!s.conectado || (para !== 0 && s.numero !== para)) continue;
+    contar(p, s.numero, { e: 'apunta', de: e.numero, a, p: clase.proyectil, x, z, t: fija + s.red.desfaseMs });
+  }
+}
+
+/**
+ * `e` DEJA DE APUNTAR SIN DISPARAR: si estaba apuntando, sale su `apunta` con `a` 0 y la línea se quita.
+ * Se llama ANTES de cambiarle el modo; lo que sale de apuntar hacia la ráfaga no la llama (la línea se
+ * fija sola en su instante).
+ */
+export function dejarDeApuntar(p: PasoEnCurso, e: EntidadEnCurso): void {
+  if (e.cerebro.modo !== 'apuntar') return;
+  const clase = p.indices.clases[e.clase];
+  if (clase === undefined || clase.proyectil === 0) return;
+  contar(p, 0, { e: 'apunta', de: e.numero, a: 0, p: clase.proyectil, x: aCentesimas(e.x), z: aCentesimas(e.z), t: 0 });
+}
+
 /** Marca que la `cuenta` de un asiento cambió: sale una al final del paso, no una por cada cambio. */
 export function ensuciarCuenta(p: PasoEnCurso, numero: number): void {
   p.cuentaSucia |= 1 << numero;
@@ -309,7 +261,10 @@ export interface IndicesDelAsiento {
 /** Lo de una clase de entidad que se busca por id. */
 export interface IndicesDeLaClase {
   readonly acciones: readonly (AccionDeclarada | undefined)[];
-  /** Las acciones que ABREN un ataque (`cadena: null`), en su orden. */
+  /**
+   * Las acciones con que el cerebro ABRE un ataque, en su orden: las que no van tras nada (`cadena:
+   * null`) salvo la respuesta de su guardia, que es de la guardia (ver `GuardiaDeclarada.respuesta`).
+   */
   readonly abren: readonly AccionDeclarada[];
 }
 
@@ -359,7 +314,8 @@ function construirIndices(d: LizaDeclarada): IndicesDeLaLiza {
   for (let i = 0; i < 256; i++) porClase.push(undefined);
   for (const c of d.clases) {
     const abren: AccionDeclarada[] = [];
-    for (const a of c.acciones) if (a.cadena === null) abren.push(a);
+    const respuesta = c.guardia === null ? 0 : c.guardia.respuesta;
+    for (const a of c.acciones) if (a.cadena === null && a.id !== respuesta) abren.push(a);
     porClase[c.id] = { acciones: porId(c.acciones), abren };
   }
   const zonasDeLaClase: (ZonaDelMundo[] | undefined)[] = [];

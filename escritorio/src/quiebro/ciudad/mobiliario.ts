@@ -56,7 +56,7 @@ function anguloDe(o: Orientacion): number {
 }
 
 /** La matriz que pone una pieza local (origen en su pie, +z a su frente) en (x, y, z) mirando a `o`. */
-function colocar(x: number, y: number, z: number, o: Orientacion): THREE.Matrix4 {
+export function colocar(x: number, y: number, z: number, o: Orientacion): THREE.Matrix4 {
   return new THREE.Matrix4().makeRotationY(anguloDe(o)).setPosition(x, y, z);
 }
 

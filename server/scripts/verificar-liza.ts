@@ -51,6 +51,24 @@
  *      enganche, el intocable al aparecer, el grafo, el trasvase, la reimpresión, los avisos, el pago
  *      triangular al salir, la zona que se enciende al pagar y la que se rompe con un golpe; y que rondar
  *      es esperar turno: quien puede golpear se acerca a su alcance, y quien dispara busca la vista.
+ *  18. El Quiebro jugado de verdad —sus declaraciones de dos mesas, de 1 a 4 asientos y tres semillas,
+ *      con robots que golpean, pasean y se quedan quietos—: ninguna entidad pasa más de 3 s junto a su
+ *      blanco, con turno posible, sin anunciar y sin ir a ninguna parte, y todas entran en el límite de la
+ *      fase antes de 5 s —también con los asientos caídos o ausentes, sin nadie a quien perseguir—; la
+ *      Réplica tras el quiebro de lado de 3,5 m da con 100 y 250 ms de ida y vuelta, y el golpe tras el
+ *      vuelo contra una bala con 60, 150 y 250; y cada ráfaga de sus tiradores sale con su línea de apuntado.
+ *  19. El ausente momentáneo: el aparato frenado (la pestaña oculta, que manda sus `aqui` de golpe una
+ *      vez por segundo) o congelado queda ausente a los 2 s, intocable e ignorado, y lo que venía contra él
+ *      se corta sin daño; vuelve al primer `aqui` VIVO, con su intocable; y no es el que se fue.
+ *  20. El golpe con avance llega aunque el paso del aparato llegue tarde; la respuesta de la guardia no
+ *      abre; un reloj de fase nuevo dentro de la misma fase se vuelve a armar sin empezar la fase otra vez.
+ *  21. La línea de apuntado (`apunta`): sale al empezar a apuntar, se fija en la salida exacta de la
+ *      primera bala, se deja si el blanco se queda ausente, y llega en la puesta al día.
+ *  22. Lo que encontró la revisión del pulido: quien juega saltándose tics no queda ausente (la sala sale
+ *      igual que sin ausente); el ausente ni anda ni pega, y lo que lanzó se corta; su vuelta es corta y
+ *      se acaba al golpear; el ausente se cuenta entero en la fase; el avance no se regala a quien no
+ *      avanza; el golpe tras el vuelo contra una bala da si el aparato vuela y no si no; y las que nacen
+ *      fuera sin nadie a quien perseguir entran, rodeando lo que las tapa.
  *
  * ═══ LO QUE ESTE COMPROBADOR ENCONTRÓ MIENTRAS SE ESCRIBÍA ═══
  *
@@ -92,6 +110,15 @@
  * en rojo, restaura y compara con `cmp`; `scratchpad/sala/pasada2/rojos2.py` hace lo mismo con las
  * roturas de la segunda pasada, y antes pone en el espejo la sala que se revisó. La lista de roturas y
  * qué comprobación cazó cada una está en el informe del frente.
+ *
+ * La tercera pasada (el pulido de las reglas de la sala, 24-sep-2026: el ausente momentáneo, la Réplica
+ * con avance, la respuesta que no abre, el reloj que se vuelve a armar, los NPC que no se quedan quietos
+ * ni fuera, y la línea de apuntado) hizo lo mismo con `scratchpad/pulido-reglas-sala/roturas.py`: cada
+ * comprobación nueva de los bloques 18 a 21 se vio roja con su rotura, y el cerebro de antes entero
+ * (`npc-cerebro-viejo`) tumba las dos del bloque 18 que miden a los NPC.
+ *
+ * Y su revisión (la cuarta pasada) con `scratchpad/pulido-reglas-sala/p2/roturas2.py`: cada comprobación
+ * del bloque 22 y las dos nuevas del 18 se vieron rojas con la regla de antes puesta otra vez en un espejo.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -102,7 +129,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { arnes } from './arnes';
 import { UNO } from '../../shared/mecanicas/fijo';
 import { DT_DEL_TIC, COSENO, SENO } from '../../shared/mecanicas/andar';
-import { arenaDe, unPaso } from '../../shared/mecanicas/mundo';
+import { arenaDe, seAndaEnRecta, unPaso } from '../../shared/mecanicas/mundo';
 import type { Arena } from '../../shared/mecanicas/mundo';
 import {
   arenaDeLaLiza,
@@ -126,7 +153,7 @@ import type {
   ReglasDeAsiento,
 } from '../../shared/mecanicas/liza/declaracion';
 import { CONTADORES_DE_ASIENTO } from '../../shared/mecanicas/liza/declaracion';
-import { leerMensajeDeLaSala, MOTIVO_DE_IRSE, RESULTADO, textoDeLaSala } from '../../shared/mecanicas/liza/protocolo';
+import { leerMensajeDeLaSala, MOTIVO_DE_IRSE, RESULTADO, textoDeLaSala, TOPE_DE_AQUIS_DE_GOLPE } from '../../shared/mecanicas/liza/protocolo';
 import type { SucesoDelTic, TuplaDeFoto } from '../../shared/mecanicas/liza/protocolo';
 import type {
   AccionRecibida,
@@ -134,786 +161,57 @@ import type {
   EstadoDeLaSala,
   PasoDeLaSala,
 } from '../../shared/mecanicas/liza/tipos-de-la-sala';
+import { AQUIS_PARA_ESTAR, TICS_DE_LA_VUELTA } from '../../shared/mecanicas/liza/tipos-de-la-sala';
 import { avanzarLaSala, huellaDeLaSala, salaNueva } from '../../shared/mecanicas/liza/sala';
 import { canonico } from '../../shared/mecanicas/canonico';
 import { sitioDeLaBala } from '../../shared/mecanicas/liza/proyectiles';
 import { rumboHacia } from '../../shared/mecanicas/liza/geometria';
+import {
+  A,
+  accion,
+  anunciosContraMi,
+  Aparato,
+  aporreador,
+  Banco,
+  bancoLleno,
+  caja,
+  CAJAS,
+  clase,
+  claseTiradora,
+  COLUMNAS,
+  efecto,
+  E,
+  fnv,
+  grupoFijo,
+  guerrero,
+  IDS_DEL_JUGUETE,
+  idsDe,
+  juguete,
+  lector,
+  lizaLlena,
+  lizaSinBlanco,
+  montarJuguete,
+  paseante,
+  TICS_PARA_ENTRAR,
+  TICS_QUIETA,
+  vigilarLasLineas,
+  vigilarLosNpc,
+  por,
+  porN,
+  premioDe,
+  puesta,
+  quieto,
+  reglas,
+  salidasDe,
+  u,
+} from './liza-de-juguete';
+import type { IdsDelRobot, OpcionesDelJuguete, Robot } from './liza-de-juguete';
 
 const { comprobar, paso, nota, terminar } = arnes();
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(AQUI, '..', '..');
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * LA LIZA DE JUGUETE
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-/** Una longitud en Q16.16. */
-const u = (x: number): number => Math.round(x * UNO);
-
-/** Los estados del juguete. */
-const E = {
-  esquivando: 1,
-  tocado: 2,
-  premio: 3,
-  derribado: 4,
-  sosteniendo: 5,
-  sinCuerpo: 6,
-  ausente: 7,
-  descolocado: 8,
-  caidaEntidad: 9,
-  reaparecido: 10,
-  caidaAsiento: 11,
-  rematando: 12,
-  absorbiendo: 13,
-} as const;
-
-/** Las acciones del juguete. */
-const A = {
-  entrada: 1,
-  seguida: 2,
-  cierre: 3,
-  replica: 4,
-  empellon: 5,
-  esquiva: 10,
-  rescate: 11,
-  remate: 12,
-  zona: 13,
-  golpe: 40,
-  segundo: 41,
-  respuesta: 42,
-} as const;
-
-function puesta(estado: number, tics: number, intocableTics = 0, distanciaExtra = 0, soltableDesdeTic = tics): PuestaDeEstado {
-  return { estado, tics, intocableTics, distanciaExtra, soltableDesdeTic };
-}
-
-/** Los estados que bloquean acciones (para que una puesta sin soltar lleve `soltableDesdeTic` = tics). */
-function efecto(dano: number, p: PuestaDeEstado | null, empuje = 0, extra: Partial<EfectoDeclarado> = {}): EfectoDeclarado {
-  return {
-    dano,
-    danoAlRitmo: dano,
-    puntos: 10,
-    puntosAlRitmo: 10,
-    puesta: p,
-    empuje,
-    alChocar: { dano: empuje > 0 ? 15 : 0, tics: empuje > 0 && p !== null ? 10 : 0 },
-    rompeGuardia: false,
-    ...extra,
-  };
-}
-
-function accion(id: number, extra: Partial<AccionDeclarada>): AccionDeclarada {
-  return {
-    id,
-    anuncioTics: 8,
-    alcance: u(1.1),
-    holgura: u(1.2),
-    enganche: { radio: u(7), conoRumbos: 43, holgura: u(0.5) },
-    avance: 0,
-    cadena: null,
-    efecto: efecto(10, puesta(E.tocado, 12)),
-    imparable: false,
-    recargaTics: 0,
-    recuperacionTics: 0,
-    soloEn: [],
-    alFallar: puesta(E.descolocado, 8),
-    ...extra,
-  };
-}
-
-function reglas(asiento: string): ReglasDeAsiento {
-  return {
-    asiento,
-    cuerpo: {
-      radio: u(0.35),
-      marchas: [u(2), u(5), u(7)],
-      aceleracionTics: 3,
-      presupuestoCorto: { velocidad: u(8.75), acumulaTics: 20 },
-      presupuestoLargo: { distancia: u(80), enTics: 200 },
-      vidaTope: 100,
-      vidaAlRematar: 10,
-      firmeCadaTics: 0,
-      guardaTics: 3,
-    },
-    acciones: [
-      accion(A.entrada, { avance: u(2) }),
-      accion(A.seguida, {
-        anuncioTics: 5,
-        cadena: { tras: [A.entrada], antesMs: 100, despuesMs: 250, ritmoMs: 75, anuncioTicsAlRitmo: 4, soloSiDio: false },
-        efecto: efecto(10, puesta(E.tocado, 10), 0, { danoAlRitmo: 15, puntosAlRitmo: 15 }),
-      }),
-      accion(A.cierre, {
-        anuncioTics: 7,
-        cadena: { tras: [A.seguida], antesMs: 100, despuesMs: 250, ritmoMs: 75, anuncioTicsAlRitmo: 6, soloSiDio: false },
-        efecto: efecto(20, puesta(E.derribado, 30), u(3)),
-      }),
-      /* Con avance: tras una esquiva de lado de 3,5 m, sin él la réplica no llega (ver el informe del frente). */
-      accion(A.replica, { anuncioTics: 3, avance: u(4), imparable: true, soloEn: [E.premio], alFallar: null, enganche: { radio: u(10), conoRumbos: 64, holgura: u(1) }, efecto: efecto(25, puesta(E.derribado, 30)) }),
-      accion(A.empellon, { anuncioTics: 10, recargaTics: 60, efecto: efecto(8, puesta(E.tocado, 24), u(4), { rompeGuardia: true }) }),
-    ],
-    esquiva: {
-      accion: A.esquiva,
-      /* Nueve tics, golpear desde el sexto, sin intocable: lo que esquiva es la ventana. */
-      puesta: puesta(E.esquivando, 9, 0, u(4), 6),
-      ventanaMs: 200,
-      esquivaHastaMs: 250,
-      primeras: { cuantas: 0, ventanaMs: 300 },
-      torpe: { cada: 3, enTics: 24 },
-      alAcertar: { puesta: puesta(E.premio, 20, 20), alAutor: puesta(E.descolocado, 20) },
-      contraProyectil: { distancia: u(10), tics: 8, accion: A.replica },
-      ruptura: { coste: 50, desde: [E.tocado], puesta: puesta(E.esquivando, 9, 6, u(4), 6) },
-    },
-    rescate: { accion: A.rescate, radio: u(1.5), mantenerTics: 30, puesta: puesta(E.sosteniendo, 30), vidaAlVolver: 40, medidorAmbos: 0 },
-    medidor: { tope: 100, porLimpia: 35, porRitmo: 5, porRemate: 20, porChoque: 10 },
-    puntos: { factor: UNO, multiplicador: { paso: 6554, tope: 2 * UNO }, porLimpia: 50, porChoque: 30, porRemate: 100, porRescate: 75, porSalir: 150 },
-    alEmpezar: { vida: 100, medidor: 0, lleva: [{ portable: 1, n: 0 }] },
-  };
-}
-
-/** Una tabla por presentes de `n` asientos con `f(presentes)`. */
-function porN(n: number, f: (presentes: number) => number): number[] {
-  const t: number[] = [];
-  for (let i = 1; i <= n; i++) t.push(f(i));
-  return t;
-}
-
-function clase(extra: Partial<ClaseDeEntidad> = {}): ClaseDeEntidad {
-  return {
-    id: 1,
-    vida: 40,
-    radio: u(0.35),
-    velocidad: u(4),
-    acciones: [
-      accion(A.golpe, { anuncioTics: 11, enganche: null, alFallar: null }),
-      accion(A.segundo, {
-        anuncioTics: 6,
-        enganche: null,
-        alFallar: null,
-        cadena: { tras: [A.golpe], antesMs: 0, despuesMs: 0, ritmoMs: 0, anuncioTicsAlRitmo: 6, soloSiDio: true },
-      }),
-      /* La respuesta sólo la lanza la guardia: con `soloEn` un estado en que la entidad no está nunca, el cerebro no abre con ella. */
-      accion(A.respuesta, { anuncioTics: 6, alcance: u(1.5), enganche: null, alFallar: null, soloEn: [E.premio], efecto: efecto(15, puesta(E.tocado, 12)) }),
-    ],
-    proyectil: 0,
-    guardia: {
-      conoRumbos: 43,
-      para: [A.entrada],
-      salvoEn: [E.tocado, E.derribado, E.descolocado],
-      alParar: puesta(E.descolocado, 8),
-      respuesta: A.respuesta,
-      esquivaAlAzar: { acciones: [A.empellon], probabilidad: 0 },
-    },
-    /* Se acerca hasta 0,9 (dentro del golpe de 1,1) y no vuelve a por él hasta que se le va a más de 1,5. */
-    cerebro: { distanciaMinima: u(0.9), distanciaMaxima: u(1.5), decideCadaTics: 4, costeCuerpoACuerpo: 1, costeDisparo: 1, sigueElGrafo: true },
-    aparicion: { modo: 'imprimir', tics: 10 },
-    alCaer: {
-      tipo: 'rematable',
-      puesta: puesta(E.caidaEntidad, 60),
-      remate: { accion: A.remate, radio: u(2.5), mantenerTics: 24, puesta: puesta(E.rematando, 24, 24) },
-      suelta: { portable: 1, n: 3 },
-      siNo: { absorbe: 1, radio: u(12), absorbiendo: puesta(E.absorbiendo, 12), vida: 20, reapareceTras: 40, claseDeZona: 1, distanciaMinima: u(10) },
-    },
-    ...extra,
-  };
-}
-
-/** El tirador: la misma clase, que ronda entre 6 y 14 y dispara. */
-function claseTiradora(extra: Partial<ClaseDeEntidad> = {}): ClaseDeEntidad {
-  return clase({
-    cerebro: { distanciaMinima: u(6), distanciaMaxima: u(14), decideCadaTics: 4, costeCuerpoACuerpo: 1, costeDisparo: 1, sigueElGrafo: true },
-    proyectil: 1,
-    ...extra,
-  });
-}
-
-const CAJAS = [
-  { x0: -2, z0: 4, x1: 2, z1: 8 },
-  { x0: 8, z0: -1, x1: 12, z1: 1 },
-  { x0: -14, z0: 10, x1: -6, z1: 11 },
-  { x0: 4, z0: 14, x1: 6, z1: 15 },
-];
-
-function caja(x0: number, z0: number, x1: number, z1: number): { x0: number; z0: number; x1: number; z1: number } {
-  return { x0: u(x0), z0: u(z0), x1: u(x1), z1: u(z1) };
-}
-
-const COLUMNAS: ColumnaDeCuenta[] = [
-  ...CONTADORES_DE_ASIENTO.map((que) => ({ que })),
-  { que: 'lleva', portable: 1 },
-  { que: 'cobrado', portable: 1 },
-];
-
-interface OpcionesDelJuguete {
-  asientos?: number;
-  clase?: ClaseDeEntidad;
-  grupos?: (n: number) => GrupoDeclarado[];
-  fin?: 'vaciar' | 'salida';
-  modo?: 'quieta' | 'calma' | 'encuentro';
-  relojTics?: number;
-  reloj?: { id: string; duraMs: number } | null;
-  clave?: string;
-  recurso?: number;
-  presentes?: number;
-  primeras?: { cuantas: number; ventanaMs: number };
-  repetirTrasTics?: number;
-  nace?: { x: number; z: number }[];
-  zonasExtra?: { id: number; clase: number; caja: { x0: number; z0: number; x1: number; z1: number } }[];
-  limite?: number;
-  semilla?: number;
-  aforo?: { entidades: number; balas: number; montones: number };
-  capacidad?: number;
-  guarda?: number;
-  zonaTics?: number;
-  medidor?: number;
-  ruptura?: PuestaDeEstado;
-  reaparicion?: { x: number; z: number };
-  lleva?: number;
-  danoDeBala?: number;
-}
-
-/**
- * La liza de juguete, con lo que cambie cada prueba. Una variante que la propia Liza no acepta REVIENTA
- * aquí: una prueba montada sobre una declaración rota no prueba nada (y la primera versión de este
- * guion se pasó un rato buscando por qué no salía nadie de una zona que no existía).
- */
-function juguete(o: OpcionesDelJuguete = {}): LizaDeclarada {
-  const d = montarJuguete(o);
-  const problemas = problemasDeLaDeclaracion(d);
-  if (problemas.length > 0) throw new Error(`la liza de juguete de esta prueba está mal declarada: ${problemas.slice(0, 3).join(' | ')}`);
-  return d;
-}
-
-function montarJuguete(o: OpcionesDelJuguete): LizaDeclarada {
-  const n = o.asientos ?? 2;
-  const pisables: { x: number; y: number }[] = [];
-  for (let y = -12; y <= 12; y++) for (let x = -12; x <= 12; x++) pisables.push({ x, y });
-  const nace = o.nace ?? [
-    { x: -3, z: -8 },
-    { x: 3, z: -8 },
-    { x: -6, z: -8 },
-    { x: 6, z: -8 },
-    { x: -9, z: -8 },
-    { x: 9, z: -8 },
-  ];
-  const zonaDeAccion = {
-    claseDeZona: 2,
-    accion: A.zona,
-    radio: u(1.5),
-    mantenerTics: 30,
-    capacidad: o.capacidad ?? 1,
-    puesta: puesta(E.sosteniendo, 30),
-    rompeConDano: true,
-    activaTics: o.zonaTics ?? 1000,
-    alApagarse: { coste: 1, siguienteTics: 800 },
-  };
-  const grupos: GrupoDeclarado[] = o.grupos !== undefined ? o.grupos(n) : [
-    { clase: 1, cuantos: porN(n, (p) => 2 + 2 * p), vivasALaVez: porN(n, (p) => 1 + p), claseDeZona: 1, desdeTic: 0, cadaTics: 20, eleccion: 'azar' },
-  ];
-  const modo = o.modo ?? 'encuentro';
-  const fase: FaseDeLaLiza = {
-    clave: o.clave ?? 'n1-e1',
-    modo,
-    limite: o.limite ?? 1,
-    semilla: o.semilla ?? 12345,
-    reloj: o.reloj ?? null,
-    encuentro:
-      modo !== 'encuentro'
-        ? null
-        : {
-            ronda: 1,
-            presentes: o.presentes ?? n,
-            relojTics: o.relojTics ?? 6000,
-            vivasALaVez: porN(n, (p) => Math.min(14, p + 3 + (n >= 6 ? 8 : 0))),
-            grupos,
-            fin: (o.fin ?? 'vaciar') === 'vaciar' ? { tipo: 'vaciar' } : { tipo: 'salida', zona: zonaDeAccion, salenComoMinimo: porN(n, (p) => Math.ceil(p / 2)) },
-          },
-  };
-  const asientos: ReglasDeAsiento[] = [];
-  for (let i = 1; i <= n; i++) {
-    const r = reglas(`a${String(i)}`);
-    asientos.push({
-      ...r,
-      cuerpo: { ...r.cuerpo, guardaTics: o.guarda ?? r.cuerpo.guardaTics },
-      esquiva: { ...r.esquiva, primeras: o.primeras ?? r.esquiva.primeras, ruptura: { ...r.esquiva.ruptura, puesta: o.ruptura ?? r.esquiva.ruptura.puesta } },
-      alEmpezar: { ...r.alEmpezar, medidor: o.medidor ?? r.alEmpezar.medidor, lleva: [{ portable: 1, n: o.lleva ?? 0 }] },
-    });
-  }
-  const estado = (id: number, bloqueaPaso: boolean, bloqueaAccion: boolean, cancelaCon: number[] = [], seCortaConDano = false) => ({
-    id,
-    bloqueaPaso,
-    bloqueaAccion,
-    cancelaCon,
-    seCortaConDano,
-  });
-  return {
-    version: VERSION_DE_LA_DECLARACION,
-    mundo: {
-      metrosPorUnidad: UNO,
-      suelo: { lado: 2, pisables, vados: [], cuerpos: CAJAS, nace: [] },
-      clasesDeCaja: [1, 1, 1, 1],
-      zonas: [
-        { id: 1, clase: 1, caja: caja(18, 18, 20, 20) },
-        { id: 2, clase: 1, caja: caja(-20, 18, -18, 20) },
-        { id: 3, clase: 1, caja: caja(18, -20, 20, -18) },
-        { id: 4, clase: 1, caja: caja(-20, -20, -18, -18) },
-        { id: 5, clase: 2, caja: caja(-1, -21, 1, -19) },
-        { id: 6, clase: 2, caja: caja(-1, 19, 1, 21) },
-        ...(o.zonasExtra ?? []),
-      ],
-      limites: [
-        { id: 1, caja: caja(-22, -22, 22, 22) },
-        { id: 2, caja: caja(-10, -10, 10, 10) },
-      ],
-      grafo: {
-        nudos: [
-          { x: u(-5), z: u(2) },
-          { x: u(5), z: u(2) },
-          { x: u(5), z: u(10) },
-          { x: u(-5), z: u(10) },
-          { x: u(-16), z: u(8) },
-          { x: u(-16), z: u(13) },
-          { x: u(-4), z: u(13) },
-        ],
-        aristas: [
-          [0, 1],
-          [1, 2],
-          [2, 3],
-          [3, 0],
-          [0, 4],
-          [4, 5],
-          [5, 6],
-          [6, 3],
-        ],
-      },
-      nace: [
-        ...nace.slice(0, n).map((s) => ({ papel: 'asiento' as const, x: u(s.x), z: u(s.z), rumbo: 0 })),
-        { papel: 'reaparicion' as const, x: u(o.reaparicion?.x ?? 0), z: u(o.reaparicion?.z ?? -15), rumbo: 0 },
-      ],
-    },
-    fase,
-    asientos,
-    estados: [
-      estado(E.esquivando, false, true),
-      estado(E.tocado, true, true, [A.esquiva]),
-      estado(E.premio, false, false),
-      estado(E.derribado, true, true),
-      estado(E.sosteniendo, true, true, [], true),
-      estado(E.sinCuerpo, true, true),
-      estado(E.ausente, true, true),
-      estado(E.descolocado, true, true),
-      estado(E.caidaEntidad, true, true),
-      estado(E.reaparecido, false, false),
-      estado(E.caidaAsiento, true, true),
-      estado(E.rematando, true, true),
-      estado(E.absorbiendo, true, true),
-    ],
-    clases: [o.clase ?? clase()],
-    proyectiles: [{ id: 1, apuntarTics: 12, balas: 3, cadaTics: 3, velocidad: u(20), radio: u(0.2), alcance: u(30), efecto: efecto(o.danoDeBala ?? 12, puesta(E.tocado, 10)) }],
-    turnos: { cuerpoACuerpo: 2, disparo: 1, anunciosALaVez: 3, excluyen: [E.premio, E.sinCuerpo, E.ausente, E.reaparecido], alargarConLaRed: true, repetirTrasTics: o.repetirTrasTics ?? 0 },
-    portables: [{ id: 1, tope: 12, radioDeRecogida: u(1.2), montonTics: 400, pago: { tipo: 'triangular', porUnidad: 10 } }],
-    equipo: {
-      recurso: o.recurso ?? 2,
-      caida: puesta(E.caidaAsiento, 240),
-      reaparicion: { coste: 1, esperaTics: 160, vida: 60, puesta: puesta(E.reaparecido, 40, 40) },
-    },
-    sinCuerpo: { estado: E.sinCuerpo },
-    presencia: { ausenteTrasTics: 40, estadoAusente: E.ausente, veredictoTrasTics: 1200 },
-    avisos: {
-      clases: [
-        { id: 1, vidaTics: 80, objetivo: 'entidad' },
-        { id: 2, vidaTics: 60, objetivo: 'asiento' },
-        { id: 3, vidaTics: 60, objetivo: 'ninguno' },
-      ],
-      cadaTics: 20,
-    },
-    red: { compBaseMs: 25, compTopeMs: 150, esperaDeSitiosMs: 250 },
-    veredictos: { columnas: COLUMNAS },
-    aforo: o.aforo ?? { entidades: 14, balas: 12, montones: 8 },
-  };
-}
-
-/** Un grupo de `cuantos` de la clase 1 que salen de la zona `zona` (clase de zona) a la vez. */
-function grupoFijo(n: number, cuantos: number, claseDeZona: number, vivas = cuantos, cadaTics = 0): GrupoDeclarado {
-  return { clase: 1, cuantos: porN(n, () => cuantos), vivasALaVez: porN(n, () => vivas), claseDeZona, desdeTic: 0, cadaTics, eleccion: 'azar' };
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * EL BANCO: UNA E/S SIMULADA CON APARATOS QUE TIENEN SU RELOJ Y SU RED
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * La sala da un paso cada 50 ms de pared (el paso `k` en `k·50`). Lo que sale de un paso llega a cada
- * aparato media ida y vuelta después; cada aparato despierta una vez por tic, a su FASE dentro del tic,
- * lee lo que le ha llegado, deja decidir a su robot y manda su `aqui`, que llega a la sala media ida y
- * vuelta después y entra en el primer paso que venga. El reloj del aparato es el de pared más su
- * desfase VERDADERO `D`; la E/S cree que es `D + error`: es el número que viaja en cada entrada, y el
- * error que la sala tiene que aguantar sin que cambie ningún veredicto.
- */
-
-interface Pulsacion {
-  id: number;
-  ms: number;
-  blanco: number;
-}
-
-interface Llegada {
-  llega: number;
-  orden: number;
-  suceso: SucesoDelTic | null;
-  dentro: { x: number; z: number } | null;
-  corrige: { x: number; z: number } | null;
-  foto: readonly TuplaDeFoto[] | null;
-}
-
-type Robot = (a: Aparato, b: Banco, relojMs: number) => void;
-
-class Aparato {
-  readonly numero: number;
-  readonly D: number;
-  readonly error: number;
-  readonly rtt: number;
-  readonly fase: number;
-  robot: Robot;
-  x = 0;
-  z = 0;
-  mira = 0;
-  conectado = false;
-  buzon: Llegada[] = [];
-  /** Lo que ha oído, en orden: `[instante de llegada (pared), suceso]`. */
-  oido: { llega: number; suceso: SucesoDelTic }[] = [];
-  ultimaFoto: readonly TuplaDeFoto[] = [];
-  planes: Pulsacion[] = [];
-  sosten: Pulsacion | null = null;
-  meta: { x: number; z: number } | null = null;
-  /** La esquiva que está haciendo: tics que le quedan y hacia dónde. */
-  esquivaTics = 0;
-  esquivaRumbo = 0;
-  bloqueadoHasta = -1;
-  mandadas = 0;
-  /** Hasta su `dentro` no sabe dónde está, y no manda `aqui` (ver `Bienvenida`). */
-  dentro = false;
-  /** Si al esquivar se desplaza (lo normal) o se queda donde está (para juzgar la ventana sin el alcance). */
-  desplazaAlEsquivar = true;
-  /** Con el canal abierto pero sin mandar `aqui`: la pestaña oculta (ver el bloque 12). */
-  mudo = false;
-  /** A qué velocidad anda hacia su meta (Q16.16 por segundo): trote, salvo que la prueba pida otra. */
-  velocidad = u(5);
-  /** La acometida de un golpe con avance: hacia dónde y cuánto le queda (la hace el aparato; la sala la admite). */
-  acomete: { x: number; z: number; queda: number } | null = null;
-  constructor(numero: number, D: number, error: number, rtt: number, fase: number, robot: Robot) {
-    this.numero = numero;
-    this.D = D;
-    this.error = error;
-    this.rtt = rtt;
-    this.fase = fase;
-    this.robot = robot;
-  }
-  reloj(pared: number): number {
-    return pared + this.D;
-  }
-  planear(id: number, ms: number, blanco: number): void {
-    this.planes.push({ id, ms: Math.max(0, Math.round(ms)), blanco });
-    this.planes.sort((p, q) => p.ms - q.ms);
-  }
-}
-
-class Banco {
-  sala: EstadoDeLaSala;
-  readonly aparatos: Aparato[];
-  readonly arena: Arena;
-  enVuelo: { llega: number; orden: number; entrada: EntradaDeLaSala }[] = [];
-  orden = 0;
-  /** Todos los pasos, para leer lo que salió. */
-  pasos: PasoDeLaSala[] = [];
-  /** Lo que ha costado `avanzarLaSala`, en ms, y cuántas veces. */
-  costeMs = 0;
-  llamadas = 0;
-  /** Las entradas de cada paso, para reproducirlas (Hermes, determinismo). */
-  grabadas: EntradaDeLaSala[][] = [];
-  guardarPasos = true;
-  constructor(d: LizaDeclarada, semilla: number, aparatos: Aparato[]) {
-    this.sala = salaNueva(d, semilla);
-    this.aparatos = aparatos;
-    this.arena = arenaDeLaLiza(d);
-  }
-  get k(): number {
-    return this.sala.tic;
-  }
-  aparato(n: number): Aparato {
-    return this.aparatos[n - 1] as Aparato;
-  }
-  meter(llega: number, entrada: EntradaDeLaSala): void {
-    this.enVuelo.push({ llega, orden: this.orden++, entrada });
-  }
-  conectar(n: number): void {
-    const a = this.aparato(n);
-    a.conectado = true;
-    a.dentro = false;
-    a.buzon = [];
-    a.planes = [];
-    a.sosten = null;
-    this.meter(this.k * 50 + 1, { tipo: 'conexion', asiento: n, rttMs: a.rtt, desfaseMs: a.D + a.error });
-  }
-  desconectar(n: number): void {
-    const a = this.aparato(n);
-    a.conectado = false;
-    this.meter(this.k * 50 + 1, { tipo: 'desconexion', asiento: n });
-  }
-  /** Un paso de la sala y una vuelta de todos los aparatos. */
-  tic(): PasoDeLaSala {
-    const T = (this.k + 1) * 50;
-    const listas: { llega: number; orden: number; entrada: EntradaDeLaSala }[] = [];
-    const quedan: { llega: number; orden: number; entrada: EntradaDeLaSala }[] = [];
-    for (const v of this.enVuelo) (v.llega <= T ? listas : quedan).push(v);
-    listas.sort((p, q) => p.llega - q.llega || p.orden - q.orden);
-    this.enVuelo = quedan;
-    const entradas = listas.map((v) => v.entrada);
-    this.grabadas.push(entradas);
-    const antes = performance.now();
-    const p = avanzarLaSala(this.sala, entradas);
-    this.costeMs += performance.now() - antes;
-    this.llamadas++;
-    if (this.guardarPasos) this.pasos.push(p);
-    this.sala = p.sala;
-    for (const a of this.aparatos) {
-      if (!a.conectado) continue;
-      const llega = T + a.rtt / 2;
-      for (const b of p.bienvenidas) if (b.asiento === a.numero) a.buzon.push({ llega, orden: this.orden++, suceso: null, dentro: { x: b.x, z: b.z }, corrige: null, foto: null });
-      for (const c of p.correcciones) if (c.asiento === a.numero) a.buzon.push({ llega, orden: this.orden++, suceso: null, dentro: null, corrige: { x: c.x, z: c.z }, foto: null });
-      for (const s of p.sucesos) if (s.para === 0 || s.para === a.numero) a.buzon.push({ llega, orden: this.orden++, suceso: s.suceso, dentro: null, corrige: null, foto: null });
-      if (p.fotoDebida !== null) a.buzon.push({ llega, orden: this.orden++, suceso: null, dentro: null, corrige: null, foto: p.fotoDebida });
-    }
-    for (const a of this.aparatos) if (a.conectado) this.despertar(a, T + a.fase);
-    return p;
-  }
-  /** El aparato lee lo que le llegó, su robot decide, y manda su `aqui`. */
-  private despertar(a: Aparato, pared: number): void {
-    const listo: Llegada[] = [];
-    const resto: Llegada[] = [];
-    for (const l of a.buzon) (l.llega <= pared ? listo : resto).push(l);
-    listo.sort((p, q) => p.llega - q.llega || p.orden - q.orden);
-    a.buzon = resto;
-    for (const l of listo) {
-      if (l.dentro !== null) {
-        a.dentro = true;
-        a.x = l.dentro.x;
-        a.z = l.dentro.z;
-        a.oido = [];
-        a.esquivaTics = 0;
-      }
-      if (l.corrige !== null) {
-        a.x = l.corrige.x;
-        a.z = l.corrige.z;
-        a.esquivaTics = 0;
-      }
-      if (l.foto !== null) a.ultimaFoto = l.foto;
-      if (l.suceso !== null) {
-        a.oido.push({ llega: l.llega, suceso: l.suceso });
-        const s = l.suceso;
-        if (s.e === 'estado' && s.a === a.numero) {
-          const bloquea = s.est === E.tocado || s.est === E.derribado || s.est === E.descolocado || s.est === E.caidaAsiento || s.est === E.sosteniendo || s.est === E.rematando;
-          a.bloqueadoHasta = bloquea ? a.reloj(l.llega) + s.tics * 50 : -1;
-        }
-      }
-    }
-    const reloj = a.reloj(pared);
-    const yo = this.sala.asientos[a.numero - 1];
-    if (yo === undefined || !yo.conCuerpo || !a.dentro || a.mudo) return;
-    a.robot(a, this, reloj);
-    this.andar(a, reloj);
-    let accion: AccionRecibida | null = null;
-    const primera = a.planes[0];
-    if (primera !== undefined && primera.ms <= reloj) {
-      a.planes.shift();
-      accion = { id: primera.id, msDelAparato: primera.ms, blanco: primera.blanco };
-      if (primera.id === (this.sala.declaracion.asientos[a.numero - 1]?.esquiva.accion ?? A.esquiva) && a.desplazaAlEsquivar) {
-        a.esquivaTics = 6;
-        a.esquivaRumbo = (a.mira + 64) % 256;
-      }
-      if (a.sosten !== null && a.sosten.id !== primera.id) a.sosten = null;
-      const golpe = this.sala.declaracion.asientos[a.numero - 1]?.acciones.find((x) => x.id === primera.id);
-      const blanco = a.ultimaFoto.find((t) => t[0] === primera.blanco);
-      if (golpe !== undefined && golpe.avance > 0 && blanco !== undefined) a.acomete = { x: Math.round((blanco[1] * UNO) / 100), z: Math.round((blanco[2] * UNO) / 100), queda: golpe.avance };
-    } else if (a.sosten !== null) accion = { id: a.sosten.id, msDelAparato: a.sosten.ms, blanco: a.sosten.blanco };
-    const n = Math.floor(reloj / 50);
-    a.mandadas++;
-    this.meter(pared + a.rtt / 2, { tipo: 'aqui', asiento: a.numero, n, x: a.x, z: a.z, r: a.mira, m: 0, accion, desfaseMs: a.D + a.error });
-  }
-  /** Lo que el aparato predice de su propio paso: la esquiva desplaza; si no, anda hacia su meta. */
-  private andar(a: Aparato, reloj: number): void {
-    const radio = u(0.35);
-    if (a.acomete !== null) {
-      const dx = a.acomete.x - a.x;
-      const dz = a.acomete.z - a.z;
-      const d = Math.sqrt(dx * dx + dz * dz);
-      const tramo = Math.min(u(0.6), a.acomete.queda, d - u(1));
-      /* Por debajo de 5 cm la acometida ha acabado: seguir con pasos de nada la dejaba colgada para siempre. */
-      if (tramo < u(0.05)) a.acomete = null;
-      else {
-        const q = unPaso(this.arena, a, Math.round((dx * tramo) / d), Math.round((dz * tramo) / d), UNO, radio);
-        a.acomete.queda -= tramo;
-        a.x = q.x;
-        a.z = q.z;
-        return;
-      }
-    }
-    if (a.esquivaTics > 0) {
-      a.esquivaTics--;
-      const v = u(3.5 / 0.3);
-      const q = unPaso(this.arena, a, por(v, SENO[a.esquivaRumbo] as number), -por(v, COSENO[a.esquivaRumbo] as number), DT_DEL_TIC, radio);
-      a.x = q.x;
-      a.z = q.z;
-      return;
-    }
-    if (reloj < a.bloqueadoHasta || a.meta === null) return;
-    const dx = a.meta.x - a.x;
-    const dz = a.meta.z - a.z;
-    if (Math.abs(dx) + Math.abs(dz) < u(0.3)) return;
-    const r = rumboHacia(dx, dz);
-    const v = a.velocidad;
-    const q = unPaso(this.arena, a, por(v, SENO[r] as number), -por(v, COSENO[r] as number), DT_DEL_TIC, radio);
-    a.x = q.x;
-    a.z = q.z;
-    a.mira = r;
-  }
-  /** Los sucesos para todos que salieron en los pasos guardados, con su tic. */
-  sucesos(): { k: number; s: SucesoDelTic }[] {
-    const t: { k: number; s: SucesoDelTic }[] = [];
-    for (const p of this.pasos) for (const s of p.sucesos) if (s.para === 0) t.push({ k: p.sala.tic, s: s.suceso });
-    return t;
-  }
-  veredictos(): { k: number; tipo: string; carga: unknown }[] {
-    const t: { k: number; tipo: string; carga: unknown }[] = [];
-    for (const p of this.pasos) for (const v of p.veredictos) t.push({ k: p.sala.tic, tipo: v.tipo, carga: v.carga });
-    return t;
-  }
-  correr(tics: number): void {
-    for (let i = 0; i < tics; i++) this.tic();
-  }
-}
-
-/** `por` de `fijo.ts`, sin importarlo dos veces con otro nombre. */
-function por(a: number, b: number): number {
-  return ((a * b) / UNO) | 0;
-}
-
-/* ─── LOS ROBOTS ─────────────────────────────────────────────────────────── */
-
-/** No hace nada: está, y manda su `aqui` quieto. */
-const quieto: Robot = () => {};
-
-/** Los anuncios contra mí que he oído y aún no he atendido, por id. */
-function anunciosContraMi(a: Aparato, desde: number): { id: number; t: number; de: number; acc: number }[] {
-  const lista: { id: number; t: number; de: number; acc: number }[] = [];
-  for (let i = desde; i < a.oido.length; i++) {
-    const s = (a.oido[i] as { suceso: SucesoDelTic }).suceso;
-    if (s.e === 'anuncio' && s.a === a.numero) lista.push({ id: s.id, t: s.t, de: s.de, acc: s.acc });
-  }
-  return lista;
-}
-
-/**
- * EL QUE LEE: esquiva cada anuncio contra él a `X` ms de su impacto (en SU reloj: el `t` que le llegó),
- * nunca dos esquivas a menos de 450 ms (no se deja caer en la torpe); con el premio, lanza la réplica
- * contra quien le atacó; y remata lo que cae cerca. `X` fijo es lo que usa el bloque 4.
- */
-/** Los ids con que juega un robot: los del juguete, o los que diga una declaración (ver `idsDe`). */
-interface IdsDelRobot {
-  readonly esquiva: number;
-  readonly replica: number;
-  readonly remate: number;
-  readonly entrada: number;
-}
-
-const IDS_DEL_JUGUETE: IdsDelRobot = { esquiva: A.esquiva, replica: A.replica, remate: A.remate, entrada: A.entrada };
-
-/** Los ids de una declaración cualquiera: su esquiva, lo que lanza tras una limpia, su remate y la primera acción que abre con blanco. */
-function idsDe(d: LizaDeclarada): IdsDelRobot {
-  const r = d.asientos[0] as ReglasDeAsiento;
-  let remate = 0;
-  for (const c of d.clases) if (remate === 0 && c.alCaer.tipo === 'rematable') remate = c.alCaer.remate.accion;
-  const entrada = r.acciones.find((x) => x.cadena === null && x.enganche !== null && x.soloEn.length === 0);
-  return { esquiva: r.esquiva.accion, replica: r.esquiva.contraProyectil.accion, remate, entrada: entrada?.id ?? 0 };
-}
-
-function lector(X: number, opciones: { replica?: boolean; rematar?: boolean; esquivar?: boolean; consumir?: boolean; ids?: IdsDelRobot } = {}): Robot {
-  const ids = opciones.ids ?? IDS_DEL_JUGUETE;
-  const atendidos = new Set<number>();
-  let leido = 0;
-  let ultimaEsquiva = -1e9;
-  let premioHasta = -1;
-  let replicaContra = 0;
-  let ultimoAtacante = 0;
-  return (a, b, reloj) => {
-    if (leido > a.oido.length) leido = 0;
-    for (let i = leido; i < a.oido.length; i++) {
-      const s = (a.oido[i] as { suceso: SucesoDelTic; llega: number }).suceso;
-      const llega = (a.oido[i] as { llega: number }).llega;
-      if (s.e === 'anuncio' && s.a === a.numero && !atendidos.has(s.id) && opciones.esquivar !== false) {
-        atendidos.add(s.id);
-        ultimoAtacante = s.de;
-        const quiere = s.t - X;
-        const cuando = quiere < reloj ? reloj : quiere;
-        if (cuando - ultimaEsquiva >= 450) {
-          a.planear(ids.esquiva, cuando, 0);
-          ultimaEsquiva = cuando;
-        }
-      }
-      if (s.e === 'estado' && s.a === a.numero && premioDe(b.sala.declaracion, a.numero) === s.est) {
-        premioHasta = a.reloj(llega) + s.tics * 50;
-        replicaContra = ultimoAtacante;
-      }
-    }
-    leido = a.oido.length;
-    if (opciones.consumir === true) {
-      a.oido = [];
-      leido = 0;
-    }
-    if (opciones.replica !== false && replicaContra >= 16 && reloj < premioHasta) {
-      a.planear(ids.replica, reloj, replicaContra);
-      replicaContra = 0;
-    }
-    if (opciones.rematar === true && a.planes.length === 0) {
-      const sala = b.sala;
-      let objetivo = 0;
-      for (const e of sala.entidades) {
-        if (e.cerebro.modo !== 'caida') continue;
-        if (Math.abs(e.x - a.x) + Math.abs(e.z - a.z) > u(3)) continue;
-        objetivo = e.numero;
-      }
-      if (objetivo !== 0 && (a.sosten === null || a.sosten.blanco !== objetivo)) a.sosten = { id: ids.remate, ms: reloj, blanco: objetivo };
-      if (objetivo === 0 && a.sosten !== null && a.sosten.id === ids.remate) a.sosten = null;
-    }
-  };
-}
-
-/** El estado del premio de una limpia de este asiento, según su declaración. */
-function premioDe(d: LizaDeclarada, n: number): number {
-  return d.asientos[n - 1]?.esquiva.alAcertar.puesta.estado ?? -1;
-}
-
-/** EL QUE APORREA: esquiva cada tres tics y golpea (entrada al más cercano) en los otros, sin mirar nada. */
-function aporreador(): Robot {
-  let vuelta = 0;
-  return (a, b, reloj) => {
-    vuelta++;
-    if (vuelta % 3 === 0) a.planear(A.esquiva, reloj, 0);
-    else {
-      let mejor = 0;
-      let mejorD = Infinity;
-      for (const t of a.ultimaFoto) {
-        if (t[0] < 16) continue;
-        const d = Math.abs(t[1] - a.x * 100 / UNO) + Math.abs(t[2] - a.z * 100 / UNO);
-        if (d < mejorD) {
-          mejorD = d;
-          mejor = t[0];
-        }
-      }
-      if (mejor !== 0) a.planear(A.entrada, reloj, mejor);
-    }
-    void b;
-  };
-}
 
 /* ─── AYUDAS PARA LEER LO QUE SALIÓ ──────────────────────────────────────── */
 
@@ -1692,10 +990,23 @@ paso('5 · El premio de la limpia, la réplica y la acometida tras una bala');
   const limpia = impactos.find((x) => x.s.r === RESULTADO.limpia);
   const acometida = bT.pasos.flatMap((p) => p.sucesos.filter((s) => s.para === 1 && s.suceso.e === 'anuncio' && s.suceso.de === 1 && s.suceso.acc === A.replica).map((s) => ({ k: p.sala.tic, s: s.suceso })));
   comprobar('una esquiva limpia contra una bala sale `impacta` limpia (la bala sigue su camino)', limpia !== undefined, impactos.map((x) => x.s.r));
+  /*
+   * LA ACOMETIDA SALE EN EL ACTO (ver `lanzarLaAcometida`): la réplica contra el tirador, anunciada en el
+   * mismo tic de la limpia, con el impacto al final del vuelo —lo que tarda el aparato en enterarse (100 ms
+   * de ida y vuelta: un tic y el del `aqui`), los 8 del vuelo y los 3 de su anuncio— y el vuelo en su avance.
+   */
+  const pendienteT = bT.pasos.flatMap((p) => p.sala.anuncios.filter((an) => an.de === 1 && an.accion === A.replica))[0];
   comprobar(
-    'y a los `contraProyectil.tics` la sala lanza sola la réplica contra el tirador',
-    limpia !== undefined && acometida.length >= 1 && acometida[0]!.k === limpia.k + 8 && acometida[0]!.s.e === 'anuncio' && acometida[0]!.s.a >= 16,
-    { limpia: limpia?.k, acometida: acometida.map((x) => x.k) },
+    'y en ese mismo tic la sala lanza sola la acometida: la réplica contra el tirador, con el impacto tras enterarse, volar y su anuncio (2 + 8 + 3 tics) y el vuelo en su avance',
+    limpia !== undefined &&
+      acometida.length >= 1 &&
+      acometida[0]!.k === limpia.k &&
+      acometida[0]!.s.e === 'anuncio' &&
+      acometida[0]!.s.a >= 16 &&
+      pendienteT !== undefined &&
+      pendienteT.impactoEnTic - pendienteT.lanzadoEnTic === 13 &&
+      pendienteT.avance === u(10) + u(4),
+    { limpia: limpia?.k, acometida: acometida.map((x) => x.k), pendienteT },
   );
 }
 
@@ -2530,55 +1841,6 @@ paso('12 · Los finales del encuentro y los veredictos de la mesa');
  * 13 · EL QUE LEE CONTRA EL QUE APORREA
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * EL GUERRERO: lee (esquiva cada anuncio a `X` ms de su impacto y replica en su premio), remata lo que
- * cae, va a por la entidad en pie más cercana y la golpea con la entrada cuando la tiene a tiro. Es el
- * jugador de los robots: el que llena la sala en los bloques de determinismo y de coste.
- */
-function guerrero(X: number, ids: IdsDelRobot = IDS_DEL_JUGUETE): Robot {
-  const leer = lector(X, { replica: true, consumir: true, ids });
-  let ultimoGolpe = -1e9;
-  return (a, b, reloj) => {
-    leer(a, b, reloj);
-    let caida: { x: number; z: number; numero: number } | null = null;
-    let enPie: { x: number; z: number; numero: number } | null = null;
-    let dCaida = Infinity;
-    let dPie = Infinity;
-    for (const e of b.sala.entidades) {
-      const d = Math.abs(e.x - a.x) + Math.abs(e.z - a.z);
-      if (e.cerebro.modo === 'caida') {
-        if (d < dCaida) {
-          caida = e;
-          dCaida = d;
-        }
-      } else if (e.vida > 0 && e.cerebro.modo !== 'deshecha' && e.cerebro.modo !== 'aparecer' && d < dPie) {
-        enPie = e;
-        dPie = d;
-      }
-    }
-    if (caida !== null && dCaida < u(2.4)) {
-      a.meta = null;
-      if (a.sosten === null || a.sosten.blanco !== caida.numero) a.sosten = { id: ids.remate, ms: reloj, blanco: caida.numero };
-      return;
-    }
-    if (a.sosten !== null && a.sosten.id === ids.remate) a.sosten = null;
-    const ir = caida !== null && dCaida < u(10) ? caida : enPie;
-    if (ir === null) return;
-    const dx = ir.x - a.x;
-    const dz = ir.z - a.z;
-    const d = Math.sqrt(dx * dx + dz * dz);
-    if (d > u(1.6)) {
-      a.meta = { x: ir.x - Math.round((dx * u(1.2)) / d), z: ir.z - Math.round((dz * u(1.2)) / d) };
-      return;
-    }
-    a.meta = null;
-    a.mira = rumboHacia(dx === 0 && dz === 0 ? 1 : dx, dz);
-    if (ir === enPie && a.planes.length === 0 && reloj - ultimoGolpe > 500 && ids.entrada !== 0) {
-      ultimoGolpe = reloj;
-      a.planear(ids.entrada, reloj, ir.numero);
-    }
-  };
-}
 
 paso('13 · Un robot que LEE saca al menos el doble que uno que APORREA');
 {
@@ -2615,47 +1877,6 @@ paso('13 · Un robot que LEE saca al menos el doble que uno que APORREA');
  * 14 · DETERMINISMO, SALA REHECHA Y NODE CONTRA HERMES
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/** FNV-1a de 32 bits, en hexadecimal: una huella corta de un texto largo. */
-function fnv(texto: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < texto.length; i++) {
-    h ^= texto.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h.toString(16);
-}
-
-function salidasDe(p: PasoDeLaSala): string {
-  return canonico({ sucesos: p.sucesos, veredictos: p.veredictos, foto: p.fotoDebida, correcciones: p.correcciones, bienvenidas: p.bienvenidas });
-}
-
-/**
- * La sala llena: seis asientos con guerreros, y entidades que disparan hasta catorce a la vez. Con poco
- * daño y recurso de sobra: la primera versión mataba a los seis en un minuto, el encuentro se perdía y el
- * «coste de la sala llena» se medía con la sala vacía.
- */
-function lizaLlena(o: OpcionesDelJuguete = {}): LizaDeclarada {
-  return juguete({
-    asientos: 6,
-    clase: claseTiradora({ acciones: [accion(A.golpe, { anuncioTics: 11, enganche: null, alFallar: null, efecto: efecto(1, puesta(E.tocado, 12)) })], guardia: null }),
-    danoDeBala: 1,
-    recurso: 50,
-    relojTics: 20000,
-    grupos: (n) => [{ clase: 1, cuantos: porN(n, () => 400), vivasALaVez: porN(n, () => 14), claseDeZona: 1, desdeTic: 0, cadaTics: 4, eleccion: 'azar' }],
-    ...o,
-  });
-}
-
-function bancoLleno(d: LizaDeclarada, semilla: number): Banco {
-  const aparatos: Aparato[] = [];
-  const rtts = [50, 90, 130, 170, 210, 250];
-  const errores = [0, 40, -40, 17, -23, 35];
-  for (let i = 1; i <= 6; i++) aparatos.push(new Aparato(i, 1000 * i + 37 * i * i, errores[i - 1] as number, rtts[i - 1] as number, (13 * i) % 50, guerrero(80 + 20 * i)));
-  const b = new Banco(d, semilla, aparatos);
-  for (let i = 1; i <= 6; i++) b.conectar(i);
-  b.guardarPasos = false;
-  return b;
-}
 
 paso('14 · Determinismo: el mismo paso con la misma semilla, el estado intacto, la sala rehecha y Node contra Hermes');
 const GRABACION = { tics: 300, entradas: [] as EntradaDeLaSala[][], huellas: [] as string[], salidas: [] as string[] };
@@ -2993,9 +2214,959 @@ else {
   comprobar('y el aforo es el mismo en todas sus fases (la sala se admite por él al nacer)', aforos.size === 1, [...aforos]);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 18 · EL QUIEBRO JUGADO DE VERDAD: LOS NPC PELEAN Y ENTRAN
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Jugando en el navegador, el frente del cliente vio Prestados quietos junto al jugador sin anunciar y
+ * otros atascados donde nacían, fuera de la glorieta. Aquí se reproduce con la sala de verdad y las
+ * declaraciones de verdad de El Quiebro —las de las vistas que da el robot de su mesa, noches 1 y 2, con
+ * 1, 2, 3 y 4 asientos y tres semillas en dos barrios—, con un banco que juega: un guerrero que va a por
+ * todo, un paseante que no se deja rodear, uno quieto y otro guerrero. Y se cuenta con la vigilancia de
+ * `vigilarLosNpc` (en `liza-de-juguete.ts`), que mira la sala desde fuera, sin ninguna cuenta del cerebro:
+ *
+ *   · cuántas entidades pasan más de 3 s junto a su blanco, con turno posible, sin anunciar y sin ir a
+ *     ninguna parte;
+ *   · cuántas pasan más de 5 s desde que nacen sin entrar en el límite de la fase.
+ *
+ * Las dos, a cero. Con el cerebro de la segunda oleada salían 4 y 43 aquí (el paso por el grafo contaba
+ * saltos, no metros: se iban por la calle, un centímetro por fuera del borde; y la que llegaba detrás de
+ * otra, o a la esquina de un pilar, temblaba a 1,4-1,8 m con turno sin rodear nada).
+ */
+paso('18 · El Quiebro jugado de verdad: ninguna entidad quieta junto a su blanco con turno, y todas entran en el límite');
+const DEL_QUIEBRO_JUGADO = 7;
+if (HAY_QUIEBRO) {
+  const productor = (await import(pathToFileURL(RUTA_DEL_PRODUCTOR).href)) as { lizaDelQuiebro: (vista: unknown, codigo: string) => LizaDeclarada | null };
+  const robotDeLaMesa = (await import(pathToFileURL(RUTA_DEL_ROBOT).href)) as {
+    jugarAlQuiebro: (o: { asientos: number; semilla: number; noches: number; politica: 'gana' | 'pierde' | 'mezcla'; travesuras: boolean }) => { vistas: readonly unknown[] };
+  };
+  let fases = 0;
+  let nacidas = 0;
+  let conCelador = 0;
+  let conTirador = 0;
+  const quietas: string[] = [];
+  const fuera: string[] = [];
+  let peorQuieta = 0;
+  let peorFuera = 0;
+  let lineasDelQuiebro = 0;
+  let rafagasDelQuiebro = 0;
+  let dejadasDelQuiebro = 0;
+  const lineasMalas: string[] = [];
+  for (const codigo of ['K7M2P', 'ABCDE']) {
+    for (const asientos of [1, 2, 3, 4]) {
+      for (const semilla of [3, 7, 11]) {
+        const partida = robotDeLaMesa.jugarAlQuiebro({ asientos, semilla, noches: 2, politica: 'gana', travesuras: false });
+        const vistas = new Map<string, LizaDeclarada>();
+        for (const v of partida.vistas) {
+          const l = productor.lizaDelQuiebro(v, codigo);
+          if (l !== null && l.fase.modo === 'encuentro' && !vistas.has(l.fase.clave)) vistas.set(l.fase.clave, l);
+        }
+        for (const [clave, l] of vistas) {
+          const ids = idsDe(l);
+          const aparatos: Aparato[] = [];
+          for (let i = 1; i <= l.asientos.length; i++) {
+            const robot = i === 1 ? guerrero(110, ids) : i === 2 ? paseante(semilla * 31 + i, ids) : i === 3 ? quieto : guerrero(90, ids);
+            aparatos.push(new Aparato(i, 3000 * i, 20 * i, 60 + 40 * i, (17 * i) % 50, robot));
+          }
+          const b = new Banco(l, l.fase.semilla, aparatos);
+          b.guardarPasos = false;
+          for (let i = 1; i <= l.asientos.length; i++) b.conectar(i);
+          const v = vigilarLosNpc(l);
+          const vl = vigilarLasLineas(l);
+          for (let t = 0; t < 1500; t++) {
+            const p = b.tic();
+            v.mirar(p.sala);
+            vl.mirar(p);
+            if (p.sala.encuentro !== null && p.sala.encuentro.resultado !== null) break;
+          }
+          const r = v.resumen();
+          const rl = vl.resumen();
+          lineasDelQuiebro += rl.lineas;
+          rafagasDelQuiebro += rl.rafagas;
+          dejadasDelQuiebro += rl.dejadas;
+          for (const x of rl.malas) lineasMalas.push(`${codigo} ${String(asientos)}a s${String(semilla)} ${clave}: ${x}`);
+          fases++;
+          nacidas += r.nacidas;
+          if (l.fase.encuentro?.grupos.some((g) => g.clase === 2) === true) conCelador++;
+          if (l.fase.encuentro?.grupos.some((g) => g.clase === 3) === true) conTirador++;
+          if (r.peorQuieta > peorQuieta) peorQuieta = r.peorQuieta;
+          if (r.peorFuera > peorFuera) peorFuera = r.peorFuera;
+          for (const x of r.quietas) quietas.push(`${codigo} ${String(asientos)}a s${String(semilla)} ${clave}: ${x}`);
+          for (const x of r.fuera) fuera.push(`${codigo} ${String(asientos)}a s${String(semilla)} ${clave}: ${x}`);
+        }
+      }
+    }
+  }
+  nota(
+    `${String(fases)} combates de El Quiebro (${String(conCelador)} con Celadores, ${String(conTirador)} con tiradores), ${String(nacidas)} entidades nacidas; ` +
+      `la racha quieta más larga ${String(peorQuieta)} tics (tope ${String(TICS_QUIETA)}), lo más que tardó una en entrar ${String(peorFuera)} tics (tope ${String(TICS_PARA_ENTRAR)})`,
+  );
+  comprobar('se jugaron los combates de verdad: noches 1 y 2, con Celadores y con tiradores', fases >= 180 && conCelador >= 60 && conTirador >= 30 && nacidas >= 1800, { fases, conCelador, conTirador, nacidas });
+  comprobar('ninguna entidad pasa más de 3 s junto a su blanco, con turno posible, sin anunciar y sin ir a ninguna parte', quietas.length === 0, quietas.slice(0, 6));
+  comprobar('ninguna entidad pasa más de 5 s desde que nace sin entrar en el límite de la fase', fuera.length === 0, fuera.slice(0, 6));
+  nota(`líneas de apuntado de sus tiradores: ${String(lineasDelQuiebro)} abiertas, ${String(rafagasDelQuiebro)} ráfagas, ${String(dejadasDelQuiebro)} dejadas sin disparar`);
+  comprobar(
+    'con El Quiebro, cada ráfaga de sus tiradores sale con su línea de apuntado, en el instante en que la línea se fija, y ninguna línea se queda colgada',
+    lineasDelQuiebro >= 200 && rafagasDelQuiebro >= 150 && lineasMalas.length === 0,
+    { lineasDelQuiebro, rafagasDelQuiebro, dejadasDelQuiebro, malas: lineasMalas.slice(0, 6) },
+  );
+
+  /*
+   * LA RÉPLICA DE EL QUIEBRO TRAS UN QUIEBRO DE 3,5 M. La Réplica es de tres tics e imparable; tras el
+   * quiebro de lado el que falló queda clavado a unos 3,6 m, fuera de su alcance (1,1 + 1,2): sin avance
+   * salía `fallada` siempre (lo vio el frente del cliente jugando). Con el banco quebrando de verdad (3,5 m
+   * de lado) y replicando en el Remanso contra quien falló, con 100 y 250 ms de ida y vuelta.
+   */
+  const partida1 = robotDeLaMesa.jugarAlQuiebro({ asientos: 1, semilla: 7, noches: 1, politica: 'gana', travesuras: false });
+  let oleada1: LizaDeclarada | null = null;
+  for (const v of partida1.vistas) {
+    const l = productor.lizaDelQuiebro(v, 'K7M2P');
+    if (l !== null && l.fase.modo === 'encuentro' && oleada1 === null) oleada1 = l;
+  }
+  const replicasDelQuiebro = (rtt: number): { lanzadas: number; dan: number; otras: string[] } => {
+    if (oleada1 === null) return { lanzadas: 0, dan: 0, otras: ['sin oleada'] };
+    const ids = idsDe(oleada1);
+    const b = bancoDeUno(oleada1, new Aparato(1, 6000, 0, rtt, 17, lector(100, { replica: true, ids })), oleada1.fase.semilla);
+    b.correr(900);
+    const lanzadas = new Set<number>();
+    for (const p of b.pasos) for (const x of p.sucesos) if (x.para === 1 && x.suceso.e === 'anuncio' && x.suceso.de === 1 && x.suceso.acc === ids.replica) lanzadas.add(x.suceso.id);
+    let dan = 0;
+    const otras: string[] = [];
+    for (const x of sucesosDe(b, 'resuelve')) {
+      if (!lanzadas.has(x.s.id)) continue;
+      if (x.s.r === RESULTADO.da) dan++;
+      else otras.push(NOMBRE_DEL_RESULTADO[x.s.r] ?? String(x.s.r));
+    }
+    return { lanzadas: lanzadas.size, dan, otras };
+  };
+  const q100 = replicasDelQuiebro(100);
+  const q250 = replicasDelQuiebro(250);
+  comprobar(
+    'con los números de El Quiebro, la Réplica tras un quiebro de lado de 3,5 m da siempre contra quien quedó clavado (100 y 250 ms de ida y vuelta)',
+    q100.lanzadas >= 2 && q250.lanzadas >= 2 && q100.otras.length === 0 && q250.otras.length === 0,
+    { q100, q250 },
+  );
+
+  /*
+   * SIN BLANCO, TAMBIÉN ENTRAN (la revisión del pulido). Los robots de arriba casi nunca mueren, y así no se
+   * veía lo que pasaba sin nadie a quien perseguir: las que nacían mientras el único asiento estaba caído,
+   * esperando volver o ausente se quedaban en la boca de la calle —veinte más de cinco segundos, la peor
+   * quince—. Aquí los asientos no esquivan (caen) y uno se calla desde el principio (ausente).
+   */
+  const fueraSinBlanco: string[] = [];
+  let peorSinBlanco = 0;
+  let nacidasSinBlanco = 0;
+  let ticsSinBlanco = 0;
+  for (const codigo of ['K7M2P', 'ZX9QW']) {
+    for (const asientos of [1, 2]) {
+      for (const semilla of [3, 11]) {
+        const partida = robotDeLaMesa.jugarAlQuiebro({ asientos, semilla, noches: 2, politica: 'gana', travesuras: false });
+        const vistas = new Map<string, LizaDeclarada>();
+        for (const v of partida.vistas) {
+          const l = productor.lizaDelQuiebro(v, codigo);
+          if (l !== null && l.fase.modo === 'encuentro' && !vistas.has(l.fase.clave)) vistas.set(l.fase.clave, l);
+        }
+        for (const [clave, l] of vistas) {
+          const aparatos: Aparato[] = [];
+          for (let i = 1; i <= l.asientos.length; i++) {
+            const ap = new Aparato(i, 3000 * i, 20 * i, 60 + 40 * i, (17 * i) % 50, quieto);
+            if (i === 2) ap.mudo = true;
+            aparatos.push(ap);
+          }
+          const b = new Banco(l, l.fase.semilla, aparatos);
+          b.guardarPasos = false;
+          for (let i = 1; i <= l.asientos.length; i++) b.conectar(i);
+          const v = vigilarLosNpc(l);
+          for (let t = 0; t < 1500; t++) {
+            const p = b.tic();
+            v.mirar(p.sala);
+            let alguno = false;
+            for (const a of p.sala.asientos) {
+              const e = a.estado;
+              const est = e !== null && p.sala.tic >= e.desdeTic && p.sala.tic < e.hastaTic ? e.estado : 0;
+              if (a.conCuerpo && a.vida > 0 && est !== l.presencia.estadoAusente) alguno = true;
+            }
+            if (!alguno) ticsSinBlanco++;
+            if (p.sala.encuentro !== null && p.sala.encuentro.resultado !== null) break;
+          }
+          const r = v.resumen();
+          nacidasSinBlanco += r.nacidas;
+          if (r.peorFuera > peorSinBlanco) peorSinBlanco = r.peorFuera;
+          for (const x of r.fuera) fueraSinBlanco.push(`${codigo} ${String(asientos)}a s${String(semilla)} ${clave}: ${x}`);
+        }
+      }
+    }
+  }
+  nota(`con asientos que caen o se callan: ${String(nacidasSinBlanco)} nacidas, ${String(ticsSinBlanco)} tics sin ningún blanco, lo más que tardó una en entrar ${String(peorSinBlanco)} tics`);
+  comprobar(
+    'con los asientos caídos, esperando volver o ausentes (nadie a quien perseguir), ninguna entidad pasa tampoco más de 5 s sin entrar en el límite',
+    nacidasSinBlanco >= 380 && ticsSinBlanco >= 30000 && fueraSinBlanco.length === 0,
+    { nacidasSinBlanco, ticsSinBlanco, peorSinBlanco, fuera: fueraSinBlanco.slice(0, 6) },
+  );
+
+  /*
+   * EL GOLPE TRAS EL VUELO CONTRA UNA BALA, CON LOS NÚMEROS DE EL QUIEBRO (la revisión del pulido: con 250 ms
+   * de ida y vuelta fallaban 48 de 74 con el tirador a menos de 12 m). Un asiento que esquiva una bala de
+   * cada tres de sus tiradores y, si sale limpia, vuela hacia el tirador —10 m en 8 tics, sin pasar de su
+   * alcance— y hace el avance de la Réplica si aún no llega, como el cliente. Casi todas tienen que dar con
+   * 60, 150 y 250 ms: las que no, son de un tirador que se aparta o una esquina en medio.
+   *
+   * SÓLO CUENTAN LAS QUE TIENEN LA LÍNEA LIBRE hasta el tirador al lanzarse. Con la Acometida de 14 m en 10
+   * tics (24-sep) el robot, que nunca anda por su cuenta, se quedaba volando contra la misma esquina en una
+   * fase entera (semilla 3, `n2.o3`: 33 de las 34 falladas a 60 ms), y eso mide al robot, no a la sala. Las
+   * de tras una esquina se cuentan aparte y se enseñan.
+   */
+  const acometidas: Record<string, { da: number; otras: number; trasUnaEsquina: number }> = {};
+  for (const semilla of [3, 7, 11]) {
+    const partida = robotDeLaMesa.jugarAlQuiebro({ asientos: 1, semilla, noches: 2, politica: 'gana', travesuras: false });
+    const vistas = new Map<string, LizaDeclarada>();
+    for (const v of partida.vistas) {
+      const l = productor.lizaDelQuiebro(v, 'K7M2P');
+      if (l !== null && l.fase.modo === 'encuentro' && !vistas.has(l.fase.clave)) vistas.set(l.fase.clave, l);
+    }
+    for (const l0 of vistas.values()) {
+      const en = l0.fase.encuentro;
+      const g = en === null ? undefined : en.grupos.find((x) => (l0.clases.find((c) => c.id === x.clase)?.proyectil ?? 0) !== 0);
+      if (en === null || g === undefined) continue;
+      const l: LizaDeclarada = { ...l0, fase: { ...l0.fase, encuentro: { ...en, grupos: [{ ...g, cuantos: g.cuantos.map(() => 2), vivasALaVez: g.vivasALaVez.map(() => 1), desdeTic: 0, cadaTics: 0 }] } } };
+      const reglasL = l.asientos[0] as ReglasDeAsiento;
+      const cp = reglasL.esquiva.contraProyectil;
+      const golpe = reglasL.acciones.find((x) => x.id === cp.accion) as AccionDeclarada;
+      const proyectil = l.proyectiles[0] as LizaDeclarada['proyectiles'][number];
+      for (const rtt of [60, 150, 250]) {
+        const vistasBalas = new Set<number>();
+        let leido = 0;
+        let tramo: { dx: number; dz: number; quedan: number; luego: boolean; tirador: number } | null = null;
+        const robot: Robot = (a, b, reloj) => {
+          for (let i = leido; i < a.oido.length; i++) {
+            const s = a.oido[i]!.suceso;
+            if (s.e === 'bala' && !vistasBalas.has(s.id)) {
+              vistasBalas.add(s.id);
+              const ang = (s.r / 256) * 2 * Math.PI;
+              const along = (a.x / UNO - s.x / 100) * Math.sin(ang) - (a.z / UNO - s.z / 100) * Math.cos(ang);
+              if (vistasBalas.size % 3 === 1) a.planear(reglasL.esquiva.accion, s.t + (along / (proyectil.velocidad / UNO)) * 1000 - 90, 0);
+            }
+            if (s.e === 'impacta' && s.a === 1 && s.r === RESULTADO.limpia) {
+              const e = b.sala.entidades.find((q) => q.cerebro.modo !== 'caida' && (l.clases.find((c) => c.id === q.clase)?.proyectil ?? 0) !== 0);
+              if (e !== undefined) {
+                const lejos = Math.hypot(e.x - a.x, e.z - a.z);
+                const d1 = Math.max(0, Math.min(cp.distancia, lejos - golpe.alcance));
+                tramo = { dx: ((e.x - a.x) / lejos) * (d1 / cp.tics), dz: ((e.z - a.z) / lejos) * (d1 / cp.tics), quedan: cp.tics, luego: true, tirador: e.numero };
+                a.esquivaTics = 0;
+              }
+            }
+          }
+          leido = a.oido.length;
+          if (tramo === null) return;
+          a.esquivaTics = 0;
+          if (tramo.quedan > 0) {
+            const q = unPaso(b.arena, a, Math.round(tramo.dx), Math.round(tramo.dz), UNO, u(0.35));
+            a.x = q.x;
+            a.z = q.z;
+            tramo.quedan--;
+            return;
+          }
+          const numero = tramo.tirador;
+          const e = b.sala.entidades.find((q) => q.numero === numero);
+          if (!tramo.luego || e === undefined) {
+            tramo = null;
+            return;
+          }
+          const lejos = Math.hypot(e.x - a.x, e.z - a.z);
+          const d2 = Math.max(0, Math.min(golpe.avance, lejos - golpe.alcance));
+          tramo = { dx: ((e.x - a.x) / lejos) * (d2 / golpe.anuncioTics), dz: ((e.z - a.z) / lejos) * (d2 / golpe.anuncioTics), quedan: d2 > u(0.05) ? golpe.anuncioTics : 0, luego: false, tirador: numero };
+        };
+        const b = bancoDeUno(l, new Aparato(1, 5000, 0, rtt, 17, robot), l.fase.semilla);
+        b.guardarPasos = false;
+        const mias = new Set<number>();
+        const cuenta = (acometidas[`${String(rtt)} ms`] ??= { da: 0, otras: 0, trasUnaEsquina: 0 });
+        for (let t = 0; t < 1500; t++) {
+          const p = b.tic();
+          for (const x of p.sucesos) {
+            if (x.para === 1 && x.suceso.e === 'anuncio' && x.suceso.de === 1 && x.suceso.acc === cp.accion) {
+              const s = x.suceso;
+              const tirador = b.sala.entidades.find((q) => q.numero === s.a);
+              const desde = { x: Math.round((s.x / 100) * UNO), z: Math.round((s.z / 100) * UNO) };
+              if (tirador !== undefined && seAndaEnRecta(b.arena, desde, tirador, u(0.35))) mias.add(s.id);
+              else cuenta.trasUnaEsquina++;
+            }
+            if (x.para === 0 && x.suceso.e === 'resuelve' && mias.has(x.suceso.id)) {
+              if (x.suceso.r === RESULTADO.da) cuenta.da++;
+              else cuenta.otras++;
+            }
+          }
+          if (p.sala.encuentro !== null && p.sala.encuentro.resultado !== null) break;
+        }
+      }
+    }
+  }
+  const todasLasAcometidas = Object.values(acometidas);
+  nota(`golpes tras el vuelo contra bala con los números de El Quiebro: ${JSON.stringify(acometidas)}`);
+  comprobar(
+    'con los números de El Quiebro, el golpe tras el vuelo contra una bala con la línea libre da en el 95 % o más con 60, 150 y 250 ms de ida y vuelta (y se lanza en todos)',
+    todasLasAcometidas.length === 3 && todasLasAcometidas.every((c) => c.da + c.otras >= 40 && c.da * 100 >= (c.da + c.otras) * 95),
+    acometidas,
+  );
+} else nota('todavía no existe el productor de El Quiebro: este bloque no mira nada, y el suelo no cuenta con él');
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 19 · EL AUSENTE MOMENTÁNEO: LA PESTAÑA OCULTA, LA LLAMADA, EL WEBVIEW EN SEGUNDO PLANO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * El diseño (§5): «pestaña oculta o llamada entrante: a los 2 s sin `aqui` pasa a ausente momentáneo,
+ * queda intocable y los NPC lo ignoran». Y el frente del cliente vio caer en la oleada 1 a un jugador con
+ * la pestaña oculta. Lo que pasaba: el navegador no PARA una pestaña oculta, la FRENA —los temporizadores
+ * a uno por segundo— y el aparato manda cada segundo sus ocho últimos tics de golpe. Nunca estaban dos
+ * segundos sin `aqui`, así que nunca quedaba ausente; y si lo quedaba, el primer `aqui` de la ráfaga lo
+ * devolvía. Aquí, con el aparato frenado de verdad (`Aparato.dormido`), con el aparato congelado (`mudo`,
+ * el WebView parado) y con el que vuelve.
+ */
+paso('19 · El ausente momentáneo: frenado o congelado, intocable e ignorado; y vuelve al primer aqui vivo, con su intocable');
+const DEL_AUSENTE = 5;
+{
+  const zonaCerca = { id: 9, clase: 9, caja: caja(-1.5, -7, 1.5, -6.5) };
+  const pegona = clase({ guardia: null, acciones: [accion(A.golpe, { anuncioTics: 11, enganche: null, alFallar: null, efecto: efecto(3, puesta(E.tocado, 12)) })] });
+  const d = juguete({ asientos: 1, clase: pegona, grupos: (n) => [grupoFijo(n, 2, 9, 2)], zonasExtra: [zonaCerca], nace: [{ x: 0, z: -8 }], relojTics: 4000 });
+  const estadoDe = (b: Banco, k = b.k): number => {
+    const e = b.sala.asientos[0]!.estado;
+    return e !== null && k >= e.desdeTic && k < e.hastaTic ? e.estado : 0;
+  };
+
+  /* FRENADO: ocho tics de golpe cada veinte, durante treinta segundos. */
+  const bF = bancoDeUno(d, new Aparato(1, 4000, 10, 100, 17, quieto));
+  bF.correr(80);
+  const vidaAntes = bF.sala.asientos[0]!.vida;
+  const pegadoAntes = vidaAntes < 100;
+  bF.aparato(1).dormido = { cada: 20, deGolpe: TOPE_DE_AQUIS_DE_GOLPE };
+  let ausenteEn = -1;
+  let seSalio = -1;
+  let golpesDentro = 0;
+  let anunciosDentro = 0;
+  for (let i = 0; i < 600; i++) {
+    const p = bF.tic();
+    const est = estadoDe(bF);
+    if (ausenteEn < 0 && est === E.ausente) ausenteEn = bF.k;
+    if (ausenteEn >= 0 && seSalio < 0 && est !== E.ausente) seSalio = bF.k;
+    if (ausenteEn >= 0) {
+      for (const s of p.sucesos) if (s.suceso.e === 'resuelve' && s.suceso.r === RESULTADO.da && s.suceso.dano > 0) golpesDentro++;
+      for (const an of p.sala.anuncios) if (an.a === 1 && an.lanzadoEnTic === bF.k) anunciosDentro++;
+    }
+  }
+  const vidaDespues = bF.sala.asientos[0]!.vida;
+  comprobar(
+    'con la pestaña FRENADA (ocho aqui de golpe cada segundo) pasa al ausente en tres segundos como mucho y no sale mientras siga frenada',
+    ausenteEn > 0 && ausenteEn - 80 <= 60 && seSalio < 0,
+    { ausenteEn, seSalio },
+  );
+  comprobar(
+    'y mientras está ausente nadie le lanza nada ni le quita vida (antes sí le pegaban)',
+    pegadoAntes && anunciosDentro === 0 && golpesDentro === 0 && vidaDespues > 0,
+    { vidaAntes, vidaDespues, anunciosDentro, golpesDentro },
+  );
+
+  /* VUELVE: la pestaña vuelve a estar a la vista, y al primer aqui VIVO sale del ausente con su intocable. */
+  bF.aparato(1).dormido = null;
+  let vuelveEn = -1;
+  let vuelveCon: { est: number; into: number } | null = null;
+  for (let i = 0; i < 80 && vuelveEn < 0; i++) {
+    const p = bF.tic();
+    if (estadoDe(bF) !== E.ausente) {
+      vuelveEn = bF.k;
+      const e = bF.sala.asientos[0]!.estado;
+      vuelveCon = e === null ? { est: 0, into: 0 } : { est: e.estado, into: e.intocableHastaTic - bF.k };
+      void p;
+    }
+  }
+  const reaparece = d.equipo.reaparicion.puesta;
+  comprobar(
+    'al volver a la vista sale del ausente en un segundo como mucho, y con el intocable de quien reaparece',
+    vuelveEn > 0 && vuelveEn - (80 + 600) <= 20 && vuelveCon !== null && vuelveCon.est === reaparece.estado && vuelveCon.into > 0,
+    { vuelveEn, vuelveCon },
+  );
+
+  /* CONGELADO: el WebView en segundo plano no manda nada. Lo que tenía anunciado contra él se corta. */
+  const bC = bancoDeUno(d, new Aparato(1, 4000, 10, 100, 17, quieto));
+  bC.correr(80);
+  bC.aparato(1).mudo = true;
+  const ids = new Set<number>();
+  let cortadas = 0;
+  let otras = 0;
+  let ausenteC = -1;
+  for (let i = 0; i < 120; i++) {
+    const antes = bC.sala.anuncios.filter((an) => an.a === 1).map((an) => an.id);
+    const p = bC.tic();
+    if (ausenteC < 0 && estadoDe(bC) === E.ausente) {
+      ausenteC = bC.k;
+      for (const id of antes) ids.add(id);
+    }
+    for (const s of p.sucesos) {
+      if (s.suceso.e !== 'resuelve' || !ids.has(s.suceso.id)) continue;
+      if (s.suceso.r === RESULTADO.cortada && bC.k === ausenteC) cortadas++;
+      else otras++;
+    }
+  }
+  const quedan = bC.sala.anuncios.filter((an) => an.a === 1).length;
+  comprobar(
+    'congelado (sin ningún aqui), al pasar al ausente los golpes que tenía anunciados se CORTAN en ese mismo tic, sin daño, y no queda ninguno contra él',
+    ausenteC > 0 && ids.size > 0 && cortadas === ids.size && otras === 0 && quedan === 0,
+    { ausenteC, anunciados: ids.size, cortadas, otras, quedan },
+  );
+  const turnos = bC.sala.entidades.filter((e) => e.blanco === 1 && e.turno !== 'ninguno').length;
+  comprobar('y ninguna entidad se queda con un turno contra el ausente', ausenteC > 0 && turnos === 0, { turnos });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 20 · LO QUE PIDIÓ EL PULIDO: EL ALCANCE CON AVANCE, LA RESPUESTA DE LA GUARDIA Y EL RELOJ QUE CAMBIA
+ * ═══════════════════════════════════════════════════════════════════════════ */
+paso('20 · El golpe con avance llega aunque el paso del aparato llegue tarde; la respuesta de la guardia no abre; un reloj nuevo vuelve a armarse');
+const DEL_PULIDO = 4;
+{
+  /*
+   * LA RÉPLICA TRAS UNA ESQUIVA QUE DESPLAZA. El bloque 5 la prueba sin desplazarse al esquivar, a
+   * propósito; aquí con la esquiva de lado de 3,5 m y la acometida de su avance hecha por el aparato. Su
+   * anuncio es de tres tics: los `aqui` de la acometida llegan media ida y vuelta después, y la sala la
+   * resolvía con el sitio de ANTES de acometer (`fallada`). Lo que se mira ahora al resolver es lo que aún
+   * podía acercarse con su avance (ver `AccionDeclarada.avance`).
+   */
+  const d = lizaDelDuelo();
+  const replicasCon = (rtt: number): { lanzadas: number; dan: number; otras: string[] } => {
+    const ap = new Aparato(1, 8000, 0, rtt, 17, lector(100, { replica: true }));
+    const b = bancoDeUno(d, ap);
+    b.correr(400);
+    const ids = new Set<number>();
+    for (const p of b.pasos) for (const x of p.sucesos) if (x.para === 1 && x.suceso.e === 'anuncio' && x.suceso.de === 1 && x.suceso.acc === A.replica) ids.add(x.suceso.id);
+    let dan = 0;
+    const otras: string[] = [];
+    for (const x of sucesosDe(b, 'resuelve')) {
+      if (!ids.has(x.s.id)) continue;
+      if (x.s.r === RESULTADO.da) dan++;
+      else otras.push(NOMBRE_DEL_RESULTADO[x.s.r] ?? String(x.s.r));
+    }
+    return { lanzadas: ids.size, dan, otras };
+  };
+  const r100 = replicasCon(100);
+  const r250 = replicasCon(250);
+  comprobar(
+    'la réplica pulsada tras una esquiva de lado de 3,5 m, con su acometida, da siempre contra el que quedó clavado (con 100 y con 250 ms de ida y vuelta)',
+    r100.lanzadas >= 2 && r250.lanzadas >= 2 && r100.otras.length === 0 && r250.otras.length === 0,
+    { r100, r250 },
+  );
+
+  /*
+   * LA RESPUESTA DE LA GUARDIA NO ABRE. La lanza la guardia al parar, sin turno; el cerebro no abre un
+   * ataque con ella aunque vaya la primera de su clase y no lleve `soloEn` (el juguete la escondía con un
+   * `soloEn` imposible; El Quiebro no: sólo el orden de su lista la dejaba detrás de la Entrada).
+   */
+  const base = clase();
+  const golpe = base.acciones.find((x) => x.id === A.golpe)!;
+  const respuesta = { ...base.acciones.find((x) => x.id === A.respuesta)!, soloEn: [] as number[] };
+  const conLaRespuestaPrimero = clase({ acciones: [respuesta, golpe] });
+  const dR = juguete({ asientos: 1, clase: conLaRespuestaPrimero, grupos: (n) => [grupoFijo(n, 2, 7, 2)], zonasExtra: [ZONA_DELANTE], nace: [{ x: 0, z: -8 }] });
+  const bR = bancoDeUno(dR, new Aparato(1, 8000, 0, 100, 17, quieto));
+  bR.correr(400);
+  let conRespuesta = 0;
+  let conGolpe = 0;
+  for (const p of bR.pasos) {
+    for (const x of p.sucesos) {
+      if (x.para !== 1 || x.suceso.e !== 'anuncio' || x.suceso.de < 16) continue;
+      if (x.suceso.acc === A.respuesta) conRespuesta++;
+      if (x.suceso.acc === A.golpe) conGolpe++;
+    }
+  }
+  comprobar('el cerebro no abre nunca con la respuesta de su guardia, aunque vaya la primera de su clase: abre con lo demás', conGolpe >= 3 && conRespuesta === 0, { conGolpe, conRespuesta });
+
+  /*
+   * UN RELOJ NUEVO EN LA MISMA FASE VUELVE A ARMARSE. La mesa acorta el reloj de una fase sin cambiarla
+   * (la Bajada de El Quiebro, cuando ya están todos). Si el reloj viejo ya había vencido —y su veredicto
+   * llegó tarde a una mesa que ya lo había cambiado—, el nuevo tiene que vencer igual: si no, la fase se
+   * queda colgada hasta el tic perezoso de su plazo.
+   */
+  const dC = juguete({ asientos: 1, modo: 'calma', nace: [{ x: 0, z: -8 }], reloj: { id: 'r1', duraMs: 1000 } });
+  const m = new Mano(dC);
+  const relojes: string[] = [];
+  for (let i = 0; i < 30; i++) for (const v of m.ir(m.yo.x, m.yo.z).veredictos) if (v.tipo === VEREDICTO_DE_RELOJ) relojes.push((v.carga as { id: string }).id);
+  const conOtro = { ...dC, fase: { ...dC.fase, reloj: { id: 'r2', duraMs: 1000 } } };
+  const apuntar = (paso: PasoDeLaSala): void => {
+    for (const v of paso.veredictos) if (v.tipo === VEREDICTO_DE_RELOJ) relojes.push((v.carga as { id: string }).id);
+  };
+  apuntar(m.paso([{ tipo: 'vista', declaracion: conOtro }]));
+  for (let i = 0; i < 5; i++) apuntar(m.ir(m.yo.x, m.yo.z));
+  const igual = { ...conOtro, asientos: conOtro.asientos.slice() };
+  apuntar(m.paso([{ tipo: 'vista', declaracion: igual }]));
+  for (let i = 0; i < 5; i++) apuntar(m.ir(m.yo.x, m.yo.z));
+  comprobar(
+    'el reloj vence una vez; con otro id en la misma fase vence el nuevo (una vez), y la misma vista otra vez no lo repite',
+    relojes.join(',') === 'r1,r2',
+    relojes,
+  );
+  comprobar('y cambiar el reloj no empieza la fase otra vez', m.sala.fase.clave === dC.fase.clave && m.sala.fase.desdeTic <= 1, m.sala.fase);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 21 · LA LÍNEA DE APUNTADO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * El tirador apunta `apuntarTics` (12 en El Quiebro) antes de cada ráfaga. Eso pasaba en silencio: la
+ * primera noticia era la bala, y la línea de apuntado del diseño (§4.6) no tenía de dónde salir en el
+ * cliente. Ahora sale `apunta` al empezar —quién, a quién, desde dónde y el instante en que la línea se
+ * fija, en el reloj de cada uno—, y `apunta` con `a` 0 si lo deja sin disparar. Ver `SucesoApunta`.
+ */
+paso('21 · La línea de apuntado: sale al empezar, se fija en la salida de la primera bala, y se deja si no dispara');
+const DEL_APUNTADO = 5;
+{
+  const dA = juguete({ asientos: 1, clase: claseTiradora({ guardia: null }), grupos: (n) => [grupoFijo(n, 1, 8)], zonasExtra: [{ id: 8, clase: 8, caja: caja(-0.2, 1.8, 0.2, 2.2) }], nace: [{ x: 0, z: -8 }] });
+  const bA = bancoDeUno(dA, new Aparato(1, 3000, 0, 100, 17, quieto));
+  const vA = vigilarLasLineas(dA);
+  for (let i = 0; i < 400; i++) vA.mirar(bA.tic());
+  const rA = vA.resumen();
+  comprobar(
+    'contra quien se queda quieto, cada ráfaga del tirador sale con su línea: abierta 12 tics antes y fijada en el instante EXACTO de la primera bala, en el reloj de quien la recibe (y la que no dispara porque cayó, se deja)',
+    rA.rafagas >= 3 && rA.lineas === rA.rafagas + rA.dejadas && rA.malas.length === 0,
+    rA,
+  );
+
+  /* Con 3 s de apuntar, quien calla al ver la línea queda ausente a los 2 s: el tirador lo deja, y lo dice. */
+  const pr = dA.proyectiles[0] as LizaDeclarada['proyectiles'][number];
+  const dLargo: LizaDeclarada = { ...dA, proyectiles: [{ ...pr, apuntarTics: 60 }] };
+  const callarAlVerLaLinea: Robot = (a) => {
+    if (a.mudo) return;
+    for (const x of a.oido) {
+      if (x.suceso.e === 'apunta' && x.suceso.a === 1) {
+        a.mudo = true;
+        return;
+      }
+    }
+  };
+  const bC = bancoDeUno(dLargo, new Aparato(1, 3000, 0, 100, 17, callarAlVerLaLinea));
+  const vC = vigilarLasLineas(dLargo);
+  for (let i = 0; i < 400; i++) vC.mirar(bC.tic());
+  const rC = vC.resumen();
+  const lineasC = sucesosDe(bC, 'apunta');
+  const propiasC: { k: number; a: number }[] = [];
+  for (const p of bC.pasos) for (const x of p.sucesos) if (x.para === 1 && x.suceso.e === 'apunta') propiasC.push({ k: p.sala.tic, a: x.suceso.a });
+  const ausenteEn = sucesosDe(bC, 'estado').find((x) => x.s.a === 1 && x.s.est === E.ausente)?.k ?? -1;
+  const dejaEn = lineasC.find((x) => x.s.a === 0)?.k ?? -1;
+  const abreEn = propiasC[0]?.k ?? -1;
+  comprobar(
+    'quien se queda ausente mientras le apuntan: la línea se deja (`apunta` con a 0) en cuanto está ausente, antes de fijarse, y no sale ninguna bala',
+    abreEn >= 0 && ausenteEn > abreEn && dejaEn === ausenteEn && dejaEn < abreEn + 60 && sucesosDe(bC, 'bala').length === 0 && rC.dejadas === 1 && rC.malas.length === 0,
+    { abreEn, ausenteEn, dejaEn, balas: sucesosDe(bC, 'bala').length, rC },
+  );
+  comprobar('y mientras sigue ausente nadie vuelve a apuntarle', propiasC.length === 1, propiasC);
+
+  /* Quien reconecta con la línea en el aire la recibe en su puesta al día, en su reloj nuevo. */
+  const bP = bancoDeUno(dA, new Aparato(1, 3000, 0, 100, 17, quieto));
+  while (bP.k < 400 && !bP.sala.entidades.some((e) => e.cerebro.modo === 'apuntar')) bP.tic();
+  bP.tic();
+  const tirador = bP.sala.entidades.find((e) => e.cerebro.modo === 'apuntar');
+  const pP = avanzarLaSala(bP.sala, [{ tipo: 'conexion', asiento: 1, rttMs: 60, desfaseMs: 777777 }]);
+  const suyosP = pP.sucesos.filter((x) => x.para === 1).map((x) => x.suceso);
+  const lineaP = suyosP.find((x) => x.e === 'apunta');
+  const naceP = suyosP.findIndex((x) => x.e === 'nace' && tirador !== undefined && x.id === tirador.numero);
+  comprobar(
+    'quien reconecta con la línea en el aire la recibe en su puesta al día: detrás del `nace` de quien apunta, a su blanco y fijada en su reloj NUEVO',
+    tirador !== undefined &&
+      lineaP !== undefined &&
+      lineaP.e === 'apunta' &&
+      lineaP.de === tirador.numero &&
+      lineaP.a === tirador.blanco &&
+      lineaP.t === tirador.cerebro.repiensaEnTic * 50 + 777777 &&
+      naceP >= 0 &&
+      naceP < suyosP.indexOf(lineaP),
+    { tirador: tirador === undefined ? null : { n: tirador.numero, blanco: tirador.blanco, fija: tirador.cerebro.repiensaEnTic }, lineaP },
+  );
+  comprobar('y todo lo que ha salido, las líneas incluidas, lo lee el aparato', todoSeLee(bA.pasos) && todoSeLee(bC.pasos) && todoSeLee([pP]) && propiasC.length >= 1 && lineasC.length >= 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 22 · LO QUE ENCONTRÓ LA REVISIÓN DEL PULIDO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La revisión adversaria del pulido (24-sep-2026) encontró seis fallos que la batería no veía. Cinco son
+ * de la sala y se miran aquí con la liza de juguete (el sexto, que la tanda de dos motores no jugaba la
+ * sala de un juego, es de `verify:determinismo`):
+ *   1. Saltándose un `aqui` de cada diez se era intocable a voluntad sin dejar de jugar: el ausente no
+ *      bloqueaba nada y la vuelta daba dos segundos de intocable.
+ *   2. El golpe tras el vuelo contra una bala fallaba con red lenta: la sala lo lanzaba cuando veía al
+ *      asiento a medio vuelo, y lo que le faltaba por volar se le contaba como avance ya hecho.
+ *   3. El alcance con avance le daba el avance entero a quien no avanzaba: la entrada desde 7,5 m sin moverse.
+ *   4. Sin nadie a quien perseguir, las entidades que nacían fuera del límite se quedaban fuera.
+ *   5. Ocultar la pestaña 57 s de cada 58 aguantaba cualquier encuentro en solitario.
+ */
+paso('22 · La revisión del pulido: el ausente no es ventaja, el vuelo contra bala llega, el avance no se regala y las que nacen sin blanco entran');
+const DE_LA_REVISION = 11;
+{
+  /** Envuelve la E/S del banco: el asiento `n` se salta el `aqui` de cada décimo tic mientras `cuando()`, y lleva su acción al siguiente. */
+  const conHuecos = (b: Banco, n: number, cuando: () => boolean): void => {
+    const meter = b.meter.bind(b);
+    let pendiente: AccionRecibida | null = null;
+    b.meter = (llega: number, e: EntradaDeLaSala): void => {
+      if (e.tipo === 'aqui' && e.asiento === n) {
+        if (cuando() && e.n % 10 === 9) {
+          if (e.accion !== null) pendiente = e.accion;
+          return;
+        }
+        if (e.accion === null && pendiente !== null) e = { ...e, accion: pendiente };
+        pendiente = null;
+      }
+      meter(llega, e);
+    };
+  };
+  const estadoDe = (b: Banco, n = 1): number => {
+    const e = b.sala.asientos[n - 1]!.estado;
+    return e !== null && b.k >= e.desdeTic && b.k < e.hastaTic ? e.estado : 0;
+  };
+
+  /*
+   * 1a · QUIEN JUEGA NO QUEDA AUSENTE. Un guerrero que se salta un tic de cada diez —no hace nunca una serie
+   * viva— pero que anda y pega: la sala tiene que ser LA MISMA, suceso a suceso, que si el ausente no
+   * existiera (`ausenteTrasTics` enorme). Con la regla de antes quedaba ausente en cuanto pasaban dos
+   * segundos, intocable y pegando.
+   */
+  const dT = juguete({
+    asientos: 1,
+    recurso: 50,
+    relojTics: 20000,
+    grupos: (n) => [{ clase: 1, cuantos: porN(n, () => 200), vivasALaVez: porN(n, () => 3), claseDeZona: 1, desdeTic: 0, cadaTics: 20, eleccion: 'azar' }],
+  });
+  const jugarConHuecos = (d: LizaDeclarada): { hilo: string; ausentes: number; maxSeguidos: number; anuncios: number } => {
+    const b = bancoDeUno(d, new Aparato(1, 4000, 10, 100, 17, guerrero(110)));
+    conHuecos(b, 1, () => true);
+    b.guardarPasos = false;
+    let hilo = '';
+    let ausentes = 0;
+    let maxSeguidos = 0;
+    let anuncios = 0;
+    for (let i = 0; i < 800; i++) {
+      const p = b.tic();
+      hilo = fnv(hilo + salidasDe(p));
+      if (estadoDe(b) === E.ausente) ausentes++;
+      const seguidos = p.sala.asientos[0]!.aquisSeguidos;
+      if (seguidos > maxSeguidos) maxSeguidos = seguidos;
+      for (const x of p.sucesos) if (x.para === 1 && x.suceso.e === 'anuncio' && x.suceso.de === 1) anuncios++;
+    }
+    return { hilo, ausentes, maxSeguidos, anuncios };
+  };
+  const conElAusente = jugarConHuecos(dT);
+  const sinElAusente = jugarConHuecos({ ...dT, presencia: { ...dT.presencia, ausenteTrasTics: 1000000 } });
+  comprobar(
+    'quien se salta un tic de cada diez (nunca hace una serie viva) pero anda y pega no queda nunca ausente: la sala sale igual, suceso a suceso, que si el ausente no existiera',
+    conElAusente.maxSeguidos < AQUIS_PARA_ESTAR && conElAusente.anuncios >= 20 && conElAusente.ausentes === 0 && conElAusente.hilo === sinElAusente.hilo,
+    { conElAusente, sinElAusente: sinElAusente.hilo },
+  );
+
+  /*
+   * 1b · EL AUSENTE NI ANDA NI PEGA, Y SU VUELTA NO SIRVE PARA PEGAR. Quieto y con huecos, queda ausente;
+   * después intenta andar y golpear sin hacer serie: nada de eso entra. Al volver (serie viva), su vuelta
+   * es corta, y en cuanto golpea se acaba, con su intocable, en ese mismo tic.
+   */
+  const dA = juguete({ asientos: 1, clase: sacoQuieto(), grupos: (n) => [grupoFijo(n, 1, 7)], zonasExtra: [ZONA_DELANTE], nace: [{ x: 0, z: -8 }] });
+  let fase: 'quieto' | 'intenta' | 'vuelve' = 'quieto';
+  let ultimoGolpe = -1e9;
+  let yaVolvio = false;
+  const tramposo: Robot = (a, b, reloj) => {
+    const e = b.sala.entidades[0];
+    if (fase === 'quieto') return;
+    if (fase === 'intenta') {
+      a.meta = { x: u(3), z: u(-8) };
+      if (e !== undefined && reloj - ultimoGolpe >= 500) {
+        a.planear(A.entrada, reloj, e.numero);
+        ultimoGolpe = reloj;
+      }
+      return;
+    }
+    a.meta = null;
+    if (!yaVolvio && b.sala.asientos[0]!.vueltaHastaTic > b.k && e !== undefined) {
+      yaVolvio = true;
+      a.planear(A.entrada, reloj, e.numero);
+    }
+  };
+  const apA = new Aparato(1, 4000, 0, 100, 17, tramposo);
+  const bA = bancoDeUno(dA, apA);
+  conHuecos(bA, 1, () => fase !== 'vuelve');
+  bA.correr(80);
+  const quedoAusente = estadoDe(bA) === E.ausente;
+  fase = 'intenta';
+  const x0 = bA.sala.asientos[0]!.x;
+  const z0 = bA.sala.asientos[0]!.z;
+  const vida0 = bA.sala.entidades[0]?.vida ?? -1;
+  let suyos = 0;
+  for (let i = 0; i < 100; i++) for (const x of bA.tic().sucesos) if (x.para === 1 && x.suceso.e === 'anuncio' && x.suceso.de === 1) suyos++;
+  const sigueAusente = estadoDe(bA) === E.ausente;
+  const movido = bA.sala.asientos[0]!.x !== x0 || bA.sala.asientos[0]!.z !== z0;
+  const vida1 = bA.sala.entidades[0]?.vida ?? -1;
+  comprobar(
+    'quien se calla sin jugar queda ausente, y ausente no anda ni pega aunque lo intente (sin hacer una serie viva): ni un anuncio suyo, su sitio no se mueve y su blanco no pierde vida',
+    quedoAusente && sigueAusente && suyos === 0 && !movido && vida0 > 0 && vida1 === vida0,
+    { quedoAusente, sigueAusente, suyos, movido, vida0, vida1 },
+  );
+  fase = 'vuelve';
+  apA.meta = null;
+  let vuelta: { k: number; est: number; dura: number; into: number } | null = null;
+  let golpe: { k: number; libreEnElTic: boolean; intocable: boolean } | null = null;
+  for (let i = 0; i < 40 && golpe === null; i++) {
+    const p = bA.tic();
+    const a = p.sala.asientos[0]!;
+    if (vuelta === null && estadoDe(bA) !== E.ausente && a.estado !== null) {
+      vuelta = { k: bA.k, est: a.estado.estado, dura: a.estado.hastaTic - a.estado.desdeTic, into: a.estado.intocableHastaTic - bA.k };
+    }
+    const lanzado = p.sucesos.some((x) => x.para === 1 && x.suceso.e === 'anuncio' && x.suceso.de === 1);
+    if (lanzado) {
+      const libre = p.sucesos.some((x) => x.suceso.e === 'estado' && x.suceso.a === 1 && x.suceso.est === 0);
+      golpe = { k: bA.k, libreEnElTic: libre, intocable: a.estado !== null && bA.k < a.estado.intocableHastaTic && bA.k < a.estado.hastaTic };
+    }
+  }
+  comprobar(
+    'vuelve al primer aqui vivo con su vuelta —la puesta de reaparición, medio segundo como mucho— y su primer golpe la acaba en ese mismo tic, con su intocable: intocable y pegando a la vez, nunca',
+    vuelta !== null &&
+      vuelta.est === dA.equipo.reaparicion.puesta.estado &&
+      vuelta.dura <= TICS_DE_LA_VUELTA &&
+      vuelta.into > 0 &&
+      golpe !== null &&
+      golpe.k < vuelta.k + vuelta.dura &&
+      golpe.libreEnElTic &&
+      !golpe.intocable,
+    { vuelta, golpe },
+  );
+
+  /*
+   * 1d · LO QUE PULSA ESTANDO AUSENTE NO SALE AL VOLVER. A mano, `aqui` a `aqui`: se calla con huecos hasta
+   * quedar ausente; después manda su serie, y en el `aqui` de justo antes del que la cierra —aún ausente—
+   * pulsa la entrada. No cuenta, ni se guarda: guardada, saldría en el mismo tic en que vuelve, intocable.
+   */
+  const mD = new Mano(dA);
+  for (let i = 0; i < 70; i++) {
+    const n = mD.sala.tic + 1;
+    if (n % 10 === 9) mD.paso([]);
+    else mD.ir(mD.yo.x, mD.yo.z);
+  }
+  while ((mD.sala.tic + 1) % 10 !== 9) mD.ir(mD.yo.x, mD.yo.z);
+  mD.paso([]);
+  const ausenteD = mD.yo.estado !== null && mD.yo.estado.estado === E.ausente;
+  const sacoD = mD.sala.entidades[0];
+  let suyosD = 0;
+  let volvioD = false;
+  for (let i = 1; i <= AQUIS_PARA_ESTAR + 20; i++) {
+    const accion = i === AQUIS_PARA_ESTAR - 1 && sacoD !== undefined ? { id: A.entrada, msDelAparato: (mD.sala.tic + 1) * 50, blanco: sacoD.numero } : null;
+    const p = mD.ir(mD.yo.x, mD.yo.z, accion);
+    if (i === AQUIS_PARA_ESTAR) volvioD = mD.yo.estado !== null && mD.yo.estado.estado === dA.equipo.reaparicion.puesta.estado;
+    for (const x of p.sucesos) if (x.suceso.e === 'anuncio' && x.suceso.de === 1) suyosD++;
+  }
+  comprobar(
+    'lo que pulsa estando ausente —en el aqui de justo antes del que cierra su serie viva— ni cuenta ni se guarda: vuelve con ese aqui y no sale ningún golpe suyo',
+    ausenteD && sacoD !== undefined && volvioD && suyosD === 0,
+    { ausenteD, volvioD, suyosD },
+  );
+
+  /* 1e · Y LA LIZA LO EXIGE: una declaración con un ausente que deja andar, pegar o cancelarse no se acepta. */
+  const conOtroAusente = (cambio: Partial<{ bloqueaPaso: boolean; bloqueaAccion: boolean; cancelaCon: number[] }>): string[] =>
+    problemasDeLaDeclaracion({ ...dA, estados: dA.estados.map((x) => (x.id === E.ausente ? { ...x, ...cambio } : x)) }).filter((x) => x.startsWith('presencia.estadoAusente'));
+  const rechazos = [conOtroAusente({ bloqueaPaso: false }).length, conOtroAusente({ bloqueaAccion: false }).length, conOtroAusente({ cancelaCon: [A.esquiva] }).length, conOtroAusente({}).length];
+  comprobar('la Liza no acepta un ausente que deje andar, pegar o cancelarse con una acción (y sí el que no)', rechazos.join(',') === '1,1,1,0', rechazos);
+
+  /*
+   * 1c · LO QUE LANZÓ Y NO HA LLEGADO SE CORTA. Con un golpe de tres segundos de anuncio: lo lanza, se calla,
+   * y a los dos segundos queda ausente con el golpe en el aire. Sale `cortada` en ese tic, sin daño.
+   */
+  const dL = { ...dA, asientos: dA.asientos.map((r) => ({ ...r, acciones: r.acciones.map((x) => (x.id === A.entrada ? { ...x, anuncioTics: 60 } : x)) })) };
+  let lanzo = false;
+  const lanzaYCalla: Robot = (a, b, reloj) => {
+    if (lanzo) {
+      if (a.planes.length === 0) a.mudo = true;
+      return;
+    }
+    const e = b.sala.entidades[0];
+    if (e !== undefined && e.cerebro.modo !== 'aparecer' && b.k > 20) {
+      lanzo = true;
+      a.planear(A.entrada, reloj, e.numero);
+    }
+  };
+  const bL = bancoDeUno(dL, new Aparato(1, 4000, 0, 100, 17, lanzaYCalla));
+  bL.correr(160);
+  const suyoL = bL.pasos.flatMap((p) => p.sala.anuncios.filter((an) => an.de === 1))[0];
+  const ausenteL = sucesosDe(bL, 'estado').find((x) => x.s.a === 1 && x.s.est === E.ausente)?.k ?? -1;
+  const resueltoL = suyoL === undefined ? undefined : sucesosDe(bL, 'resuelve').find((x) => x.s.id === suyoL.id);
+  comprobar(
+    'lo que lanzó y no ha llegado cuando queda ausente sale `cortada` en ese mismo tic, sin daño: el ausente no pega',
+    suyoL !== undefined && ausenteL > 0 && ausenteL < suyoL.impactoEnTic && resueltoL !== undefined && resueltoL.k === ausenteL && resueltoL.s.r === RESULTADO.cortada && (bL.sala.entidades[0]?.vida ?? 0) === 200,
+    { suyoL: suyoL === undefined ? null : { lanzado: suyoL.lanzadoEnTic, impacto: suyoL.impactoEnTic }, ausenteL, resueltoL },
+  );
+
+  /*
+   * 5 · EL AUSENTE SE CUENTA ENTERO. Solo, contra entidades que no atacan, con la pestaña oculta 57 s y a
+   * la vista 0,7 s, en bucle: con el ausente contado a trozos nunca se «iba» y el encuentro acababa
+   * AGUANTADO al vencer su reloj. Ahora, a los `veredictoTrasTics` de ausente EN LA FASE, se fue, y el
+   * encuentro se pierde. Quien se oculta treinta segundos una vez y vuelve, no.
+   */
+  const dV = juguete({ asientos: 1, clase: sacoQuieto(), grupos: (n) => [grupoFijo(n, 1, 7)], zonasExtra: [ZONA_DELANTE], nace: [{ x: 0, z: -8 }], relojTics: 3000 });
+  const final = (vaiven: boolean): { resultado: string | null; k: number } => {
+    const ap = new Aparato(1, 4000, 0, 100, 17, quieto);
+    const b = bancoDeUno(dV, ap);
+    b.guardarPasos = false;
+    for (let t = 0; t < 3200; t++) {
+      ap.mudo = vaiven ? t % 1154 >= 14 : t >= 100 && t < 700;
+      const p = b.tic();
+      if (p.sala.encuentro !== null && p.sala.encuentro.resultado !== null) return { resultado: p.sala.encuentro.resultado, k: b.k };
+    }
+    return { resultado: null, k: b.k };
+  };
+  const conVaiven = final(true);
+  const unaVez = final(false);
+  comprobar(
+    'oculto 57 s y a la vista 0,7 s en bucle, a los 60 s de ausente EN LA FASE se fue: el encuentro en solitario se pierde antes de su reloj, no sale aguantado; oculto 30 s una vez, sigue y lo aguanta',
+    conVaiven.resultado === 'perdida' && conVaiven.k < 3000 && unaVez.resultado === 'aguantada',
+    { conVaiven, unaVez },
+  );
+
+  /*
+   * 3 · EL AVANCE NO SE REGALA. La entrada del juguete avanza 2 m: contra un saco a 3,6 m (fuera de 1,1 +
+   * 1,2) da si el aparato acomete, y NO si se queda quieto —la sala sólo le cuenta lo que puede ir de camino
+   * en los tics que aún no ha visto—. Con la regla de antes, el quieto también daba.
+   */
+  const dE = juguete({ asientos: 1, clase: sacoQuieto(), grupos: (n) => [grupoFijo(n, 1, 7)], zonasExtra: [{ id: 7, clase: 7, caja: caja(-0.1, -4.5, 0.1, -4.3) }], nace: [{ x: 0, z: -8 }] });
+  const entradaDesdeLejos = (acomete: boolean, rtt: number): string => {
+    let hecho = false;
+    const robot: Robot = (a, b, reloj) => {
+      if (!acomete) a.acomete = null;
+      const e = b.sala.entidades[0];
+      if (!hecho && e !== undefined && e.cerebro.modo !== 'aparecer' && b.k > 20 && a.ultimaFoto.some((t) => t[0] === e.numero)) {
+        hecho = true;
+        a.planear(A.entrada, reloj, e.numero);
+      }
+    };
+    const b = bancoDeUno(dE, new Aparato(1, 4000, 0, rtt, 17, robot));
+    b.correr(80);
+    const mia = b.pasos.flatMap((p) => p.sucesos.filter((x) => x.para === 1 && x.suceso.e === 'anuncio' && x.suceso.de === 1))[0];
+    const r = mia === undefined || mia.suceso.e !== 'anuncio' ? undefined : sucesosDe(b, 'resuelve').find((x) => x.s.id === (mia.suceso as { id: number }).id);
+    return r === undefined ? 'nada' : (NOMBRE_DEL_RESULTADO[r.s.r] ?? String(r.s.r));
+  };
+  const alcance = { acomete100: entradaDesdeLejos(true, 100), acomete250: entradaDesdeLejos(true, 250), quieto100: entradaDesdeLejos(false, 100), quieto250: entradaDesdeLejos(false, 250) };
+  comprobar(
+    'la entrada con 2 m de avance contra un saco a 3,6 m da si el aparato acomete y sale `fallada` si se queda quieto, con 100 y 250 ms de ida y vuelta: el avance no se le da a quien no avanza',
+    alcance.acomete100 === 'da' && alcance.acomete250 === 'da' && alcance.quieto100 === 'fallada' && alcance.quieto250 === 'fallada',
+    alcance,
+  );
+
+  /*
+   * 2 · EL GOLPE TRAS EL VUELO CONTRA UNA BALA. Un tirador que no se mueve a 10 m y otro a 12,5 m; el
+   * aparato esquiva limpio su bala, vuela hacia él 10 m en 8 tics (sin pasar de su alcance) y, si aún no
+   * llega, hace el avance de su acción (lo que hace el cliente de El Quiebro). Tiene que dar con 60, 150 y
+   * 250 ms de ida y vuelta; y quien no vuela, fallar: la sala no le regala el vuelo.
+   */
+  const conTirador = (zona: { x0: number; z0: number; x1: number; z1: number }): LizaDeclarada =>
+    juguete({ asientos: 1, clase: claseTiradora({ guardia: null, velocidad: 0, vida: 500, acciones: [] }), grupos: (n) => [grupoFijo(n, 1, 8)], zonasExtra: [{ id: 8, clase: 8, caja: zona }], nace: [{ x: 0, z: -8 }] });
+  const golpesTrasElVuelo = (d: LizaDeclarada, rtt: number, vuela: boolean): string[] => {
+    const cp = (d.asientos[0] as ReglasDeAsiento).esquiva.contraProyectil;
+    const golpe = (d.asientos[0] as ReglasDeAsiento).acciones.find((x) => x.id === cp.accion) as AccionDeclarada;
+    const esquivadas = new Set<number>();
+    let leido = 0;
+    let ultimaEsquiva = -1e9;
+    let tramo: { dx: number; dz: number; quedan: number; luego: boolean } | null = null;
+    const robot: Robot = (a, b, reloj) => {
+      /* Entre vuelo y vuelo, vuelve a su sitio: el tirador no dispara a quien tiene encima. */
+      a.meta = tramo === null ? { x: 0, z: u(-8) } : null;
+      for (let i = leido; i < a.oido.length; i++) {
+        const s = a.oido[i]!.suceso;
+        if (s.e === 'bala' && !esquivadas.has(s.id)) {
+          esquivadas.add(s.id);
+          const bx = Math.round((s.x * UNO) / 100);
+          const bz = Math.round((s.z * UNO) / 100);
+          for (let t = 1; t < 60; t++) {
+            const q = sitioDeLaBala(bx, bz, s.r, u(20), t, u(30));
+            if (Math.abs(q.x - a.x) < u(0.55) && Math.abs(q.z - a.z) < u(0.55)) {
+              const cuando = Math.max(reloj, s.t + t * 50 - 60);
+              if (cuando - ultimaEsquiva >= 450) {
+                a.planear(A.esquiva, cuando, 0);
+                ultimaEsquiva = cuando;
+              }
+              break;
+            }
+          }
+        }
+        if (vuela && s.e === 'impacta' && s.a === 1 && s.r === RESULTADO.limpia) {
+          const e = b.sala.entidades[0];
+          if (e !== undefined) {
+            const lejos = Math.hypot(e.x - a.x, e.z - a.z);
+            const d1 = Math.max(0, Math.min(cp.distancia, lejos - golpe.alcance));
+            tramo = { dx: ((e.x - a.x) / lejos) * (d1 / cp.tics), dz: ((e.z - a.z) / lejos) * (d1 / cp.tics), quedan: cp.tics, luego: true };
+          }
+        }
+      }
+      leido = a.oido.length;
+      if (tramo === null) return;
+      if (tramo.quedan > 0) {
+        const q = unPaso(b.arena, a, Math.round(tramo.dx), Math.round(tramo.dz), UNO, u(0.35));
+        a.x = q.x;
+        a.z = q.z;
+        tramo.quedan--;
+        return;
+      }
+      const e = b.sala.entidades[0];
+      if (!tramo.luego || e === undefined) {
+        tramo = null;
+        return;
+      }
+      const lejos = Math.hypot(e.x - a.x, e.z - a.z);
+      const d2 = Math.max(0, Math.min(golpe.avance, lejos - golpe.alcance));
+      tramo = { dx: ((e.x - a.x) / lejos) * (d2 / golpe.anuncioTics), dz: ((e.z - a.z) / lejos) * (d2 / golpe.anuncioTics), quedan: d2 > u(0.05) ? golpe.anuncioTics : 0, luego: false };
+    };
+    const ap = new Aparato(1, 3000, 0, rtt, 17, robot);
+    ap.desplazaAlEsquivar = false;
+    const b = bancoDeUno(d, ap);
+    b.correr(1200);
+    const mias = new Set<number>();
+    for (const p of b.pasos) for (const x of p.sucesos) if (x.para === 1 && x.suceso.e === 'anuncio' && x.suceso.de === 1 && x.suceso.acc === cp.accion) mias.add(x.suceso.id);
+    return sucesosDe(b, 'resuelve')
+      .filter((x) => mias.has(x.s.id))
+      .map((x) => NOMBRE_DEL_RESULTADO[x.s.r] ?? String(x.s.r));
+  };
+  const a10 = conTirador(caja(-0.2, 1.8, 0.2, 2.2));
+  const a12 = conTirador(caja(5.8, 2.8, 6.2, 3.2));
+  const vuelos: Record<string, string[]> = {};
+  for (const rtt of [60, 150, 250]) {
+    vuelos[`10m@${String(rtt)}`] = golpesTrasElVuelo(a10, rtt, true);
+    vuelos[`12,5m@${String(rtt)}`] = golpesTrasElVuelo(a12, rtt, true);
+  }
+  const todos = Object.values(vuelos);
+  comprobar(
+    'tras una limpia contra la bala de un tirador a 10 y a 12,5 m, el golpe tras el vuelo da siempre si el aparato vuela y avanza, con 60, 150 y 250 ms de ida y vuelta',
+    todos.every((v) => v.length >= 2 && v.every((r) => r === 'da')),
+    vuelos,
+  );
+  const sinVolar = [...golpesTrasElVuelo(a10, 60, false), ...golpesTrasElVuelo(a10, 250, false)];
+  comprobar('y si el aparato no vuela, sale `fallada`: la sala no le da por hecho el vuelo', sinVolar.length >= 2 && sinVolar.every((r) => r === 'fallada'), sinVolar);
+
+  /*
+   * 4 · SIN NADIE A QUIEN PERSEGUIR, TAMBIÉN ENTRAN. Un asiento que se calla desde el principio (ausente a
+   * los dos segundos: nadie lo persigue) y un límite de 20 × 20 con la zona de salida fuera, justo detrás
+   * del muro que lo bordea: las que nacen tienen que entrar igual, rodeando el muro por el grafo. Con el
+   * cerebro de antes se quedaban donde nacían; y yendo sólo en recta, contra el muro.
+   */
+  /* Nacen todas DESPUÉS de que el asiento quede ausente —sin blanco desde el primer tic— y detrás del muro (`lizaSinBlanco`, que juega también la tanda de dos motores). */
+  const dF = lizaSinBlanco();
+  const apF = new Aparato(1, 4000, 0, 100, 17, quieto);
+  apF.mudo = true;
+  const bF = bancoDeUno(dF, apF);
+  bF.guardarPasos = false;
+  const vF = vigilarLosNpc(dF);
+  let ausenteF = 0;
+  for (let i = 0; i < 400; i++) {
+    const p = bF.tic();
+    vF.mirar(p.sala);
+    if (estadoDe(bF) === E.ausente) ausenteF++;
+  }
+  const rF = vF.resumen();
+  comprobar(
+    'con el único asiento ausente (nadie a quien perseguir), las entidades que nacen fuera del límite entran igual en menos de 5 s',
+    ausenteF >= 300 && rF.nacidas >= 4 && rF.fuera.length === 0 && rF.peorFuera <= TICS_PARA_ENTRAR,
+    { ausenteF, nacidas: rF.nacidas, peorFuera: rF.peorFuera, fuera: rF.fuera.slice(0, 4) },
+  );
+}
+
 /*
- * El suelo: 139 comprobaciones de la Liza sola, y las de El Quiebro si su productor está (el bloque 16
- * lo dice en su nota cuando no). Escrito exacto: un bloque que deja de correr lo baja del suelo.
+ * El suelo: 139 comprobaciones de la Liza sola, más las del ausente (bloque 19), las del pulido (20),
+ * las de la línea de apuntado (21) y las de su revisión (22), y las de El Quiebro si su productor está (el
+ * bloque 16 lo dice en su nota cuando no). Escrito exacto: un bloque que deja de correr lo baja del suelo.
  */
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3265,7 +3436,7 @@ paso('17 · Los avisos, el pago de lo que se lleva, la zona que se enciende y la
 }
 
 terminar({
-  escritas: 139 + (HAY_QUIEBRO ? DEL_QUIEBRO : 0),
+  escritas: 139 + DEL_AUSENTE + DEL_PULIDO + DEL_APUNTADO + DE_LA_REVISION + (HAY_QUIEBRO ? DEL_QUIEBRO + DEL_QUIEBRO_JUGADO : 0),
   enVerde:
     'La sala de la Liza nace y empieza cada fase como dice su contrato, valida el sitio y corrige lo que no cuadra,\n' +
     'juzga la esquiva en el reloj del aparato con el mismo veredicto con cualquier desfase y red, reparte los turnos,\n' +

@@ -33,7 +33,7 @@ import {
   escaleraDeDpr,
 } from '../src/quiebro/calidad/niveles';
 import type { CapacidadesDelAparato } from '../src/quiebro/calidad/capacidades';
-import { veredictoDelSondeo } from '../src/quiebro/calidad/capacidades';
+import { esGraficaDedicadaDePc, veredictoDelSondeo } from '../src/quiebro/calidad/capacidades';
 import type { CambioDelGobernador, EstadoDelGobernador, MuestraDelFotograma } from '../src/quiebro/calidad/gobernador';
 import {
   DURACION_DE_LA_PRUEBA_MS,
@@ -45,6 +45,7 @@ import {
   gobernar,
   leerElRecuerdo,
   recuerdoDe,
+  seRecuerda,
 } from '../src/quiebro/calidad/gobernador';
 import { caminoPara } from '../src/quiebro/posproceso/camino';
 import {
@@ -450,6 +451,26 @@ paso('El recuerdo por aparato');
     arranqueConRecuerdo(1, 3, 'A', recuerdoDe(0, 'A')) === 0 && arranqueConRecuerdo(1, 1, 'A', recuerdoDe(3, 'A')) === 1 &&
       arranqueConRecuerdo(2, 3, 'B', recuerdoDe(0, 'A')) === 2 && arranqueConRecuerdo(2, 3, 'A', null) === 2,
   );
+  /*
+   * La RTX 4070 SUPER del panel: el sondeo dice N3, el recuerdo (aprendido con el panel oculto) N0. Se
+   * arranca en N2, no en N0: un nivel por debajo del sondeo como mucho.
+   */
+  comprobar(
+    'un recuerdo muy por debajo del sondeo de hoy sólo baja un nivel: una gráfica de N3 con un N0 recordado arranca en N2',
+    arranqueConRecuerdo(3, 3, 'A', recuerdoDe(0, 'A')) === 2 && arranqueConRecuerdo(2, 3, 'A', recuerdoDe(0, 'A')) === 1 &&
+      arranqueConRecuerdo(0, 1, 'A', recuerdoDe(0, 'A')) === 0,
+    [arranqueConRecuerdo(3, 3, 'A', recuerdoDe(0, 'A')), arranqueConRecuerdo(2, 3, 'A', recuerdoDe(0, 'A'))],
+  );
+  /* Y lo que baja con los fotogramas frenados no se guarda: la serie de 1 s visible de más arriba. */
+  const frenada = correr(enEstado(1, 0), 600, muestra(1000));
+  const normal = correr(enEstado(2, 0), 600, muestra(30));
+  const bajadasFrenadas = frenada.cambios.filter((c) => c.motivo === 'bajar-nivel' || c.motivo === 'prueba-fallida');
+  const bajadasNormales = normal.cambios.filter((c) => c.motivo === 'bajar-nivel' || c.motivo === 'prueba-fallida');
+  comprobar(
+    'una bajada con los fotogramas frenados (media de 100 ms) se hace pero NO se recuerda; una de 30 ms, sí',
+    bajadasFrenadas.length > 0 && bajadasFrenadas.every((c) => !seRecuerda(c)) && bajadasNormales.length > 0 && bajadasNormales.every((c) => seRecuerda(c)),
+    { frenadas: bajadasFrenadas.map((c) => c.mediaMs), normales: bajadasNormales.map((c) => c.mediaMs) },
+  );
 }
 
 /* ─────────────────────────────── C. El sondeo ─────────────────────────────── */
@@ -499,6 +520,16 @@ paso('El nivel de arranque según el aparato');
     ['sin flotante en los vértices', { ...pc, flotanteEnVertices: false }, 0, 0],
     ['sin WebGL2', { ...pc, webgl2: false }, 0, 0],
     ['sondeo reventado', { ...pc, fallo: 'contexto perdido' }, 0, 1],
+    /* Manda la gráfica, no el dedo: un PC con pantalla táctil y gráfica dedicada es N3 (el panel de la casa). */
+    [
+      'PC táctil con RTX 4070 (puntero grueso)',
+      { ...pc, grafica: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)', tactil: true },
+      3,
+      3,
+    ],
+    ['portátil táctil con Radeon RX', { ...pc, grafica: 'ANGLE (AMD, AMD Radeon RX 7600S Direct3D11 vs_5_0 ps_5_0, D3D11)', tactil: true }, 3, 3],
+    ['portátil táctil con Intel Iris (integrada)', { ...pc, grafica: 'ANGLE (Intel, Intel(R) Iris(R) Xe Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)', tactil: true }, 1, 2],
+    ['tableta con NVIDIA Tegra (dice «NVIDIA» y es de móvil)', { ...movil, grafica: 'NVIDIA Tegra X1 (nvgpu)/integrated' }, 1, 2],
   ];
   const mal = casos
     .map(([que, c, inicial, techo]) => ({ que, esperado: [inicial, techo], dado: veredictoDelSondeo(c) }))
@@ -506,11 +537,16 @@ paso('El nivel de arranque según el aparato');
     .map((x) => ({ que: x.que, esperado: x.esperado, dado: [x.dado.inicial, x.dado.techo], porque: x.dado.porque }));
   comprobar(`los ${String(casos.length)} aparatos inventados arrancan donde deben, con su porqué`, mal.length === 0, mal);
   comprobar(
-    'nunca se arranca por encima del techo, y un táctil nunca tiene techo N3',
+    'nunca se arranca por encima del techo, y un táctil sólo tiene techo N3 si su gráfica es dedicada de PC',
     casos.every(([, c]) => {
       const v = veredictoDelSondeo(c);
-      return v.inicial <= v.techo && (!c.tactil || v.techo <= 2);
+      return v.inicial <= v.techo && (!c.tactil || v.techo <= 2 || esGraficaDedicadaDePc(c.grafica));
     }),
+  );
+  comprobar(
+    'una gráfica de móvil nunca pasa por dedicada, aunque diga «NVIDIA»',
+    !esGraficaDedicadaDePc('NVIDIA Tegra X1 (nvgpu)/integrated') && !esGraficaDedicadaDePc('Apple GPU') && !esGraficaDedicadaDePc('Mali-G710') &&
+      esGraficaDedicadaDePc('ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)'),
   );
 }
 
@@ -687,7 +723,7 @@ paso('Cada sombreador declara exactamente los uniformes que su material le da');
 }
 
 terminar({
-  escritas: 66,
+  escritas: 69,
   enVerde:
     'Los niveles son los del §8; el gobernador baja deprisa, sube a prueba, no vuelve a lo que falló y no se deja engañar por la pestaña oculta; el sondeo arranca a cada aparato donde toca; la gradación respeta la paleta y la LUT es su fórmula; el tono de N0 entra en la three instalada; y los sombreadores declaran lo que sus materiales les dan.',
 });
