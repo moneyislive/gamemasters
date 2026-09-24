@@ -305,7 +305,9 @@ import {
   CORRIMIENTO_EN_APAISADO,
   LIMITES_DEL_BURGO,
   MIRADOR_DEL_BURGO,
+  NIEBLA_DE_LA_MESA,
   elAnilloSeVeJuntoALaCaja,
+  nieblaDeLaMesa,
   poseDeSalida,
   poseDeSalidaAlLadoDeLaCaja,
   poseDelBurgo,
@@ -5267,6 +5269,92 @@ paso('El señalado: la escena dice qué casilla mira el puntero, y no dos veces 
   comprobar(
     'y con ratón no se apaga nada al soltar el botón —el cursor sigue donde estaba—, con lo desconocido contando como dedo: en la app el suceso de expo-gl no siempre trae `pointerType`',
     /\.pointerType \?\? 'touch'\) !== 'mouse'/.test(fuenteDelBurgo),
+  );
+}
+
+// ---------------------------------------------------------------------------
+paso('La niebla de la mesa se retira con el ojo: en un móvil en vertical el anillo no queda detrás de ella');
+// ---------------------------------------------------------------------------
+
+{
+  /*
+   * EL BURGO EN BLANCO (24-sep-2026). En la app publicada, el tablero se abría todo blanco en un
+   * móvil en vertical, y ninguna comprobación lo veía: las de arriba miden que las cuatro esquinas
+   * CAIGAN en el lienzo, y caían —detrás de la niebla—. En retrato el ojo se retira para que quepa el
+   * ancho del anillo (de 3 a 4 veces lo de un monitor) y la niebla era fija, de 1.140 a 2.281
+   * unidades: con el ojo a 2.766, un 100 % de niebla en el centro y en la esquina más cercana. Esto
+   * mide lo que se VE al abrir el tablero, con la cuenta de la niebla lineal de three: cuánta
+   * niebla cae sobre el centro del anillo y sobre su esquina más cercana, en los tres lienzos de
+   * arriba y en tres móviles en vertical de verdad. Y trae su vacuna: con la niebla fija de la app
+   * publicada, un móvil tiene que salir con el anillo entero detrás.
+   */
+  const LIENZOS = [
+    ...VENTANAS,
+    { nombre: 'móvil 390×600', ancho: 390, alto: 600 },
+    { nombre: 'móvil 390×760', ancho: 390, alto: 760 },
+    { nombre: 'móvil 412×640', ancho: 412, alto: 640 },
+  ];
+  /*
+   * Un 25 %: un monitor de 16:9 tiene en el centro del tablero un 14 % desde la pose de salida —en
+   * apaisado se retira un 20 % y corre la mirada hacia la cámara— y un 21 % desde la que se aparta de
+   * la caja del escritorio, y así se ha jugado en el escritorio desde siempre. El fallo era un 100 %.
+   */
+  const TOPE_DE_NIEBLA_EN_LA_SALIDA = 0.25;
+  /*
+   * Desde las poses con las que abre de verdad cada cliente, y se queda la peor: la de salida, y la
+   * que se aparta de la caja de los dados —abajo a la derecha en el escritorio, arriba en la app—.
+   */
+  const ESQUINAS_DE_LOS_CLIENTES = ['abajo-derecha', 'arriba-derecha'] as const;
+  const nieblaEnLaSalida = (
+    niebla: (proporcion: number) => { readonly cerca: number; readonly lejos: number },
+  ): { readonly nombre: string; readonly centro: number; readonly esquina: number }[] =>
+    LIENZOS.map((v) => {
+      const ventana = { ancho: v.ancho, alto: v.alto, franjaInferior: 0 };
+      const { cerca, lejos } = niebla(v.ancho / v.alto);
+      const cercanias = [
+        poseDeSalida(ventana),
+        ...ESQUINAS_DE_LOS_CLIENTES.map((esquina) =>
+          poseDeSalidaAlLadoDeLaCaja(ventana, poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA, { esquina, margen: 12 }).rectangulo),
+        ),
+      ];
+      const medidas = cercanias.map((cercania) => {
+        const ojo = poseDelBurgo(cercania, MIRADOR_DEL_BURGO, ventana).posicion;
+        const cuanta = (x: number, z: number): number => {
+          const d = Math.hypot(ojo.x - x, ojo.y, ojo.z - z);
+          return Math.min(1, Math.max(0, (d - cerca) / (lejos - cerca)));
+        };
+        const esquina = Math.min(...[-MEDIO_LADO, MEDIO_LADO].flatMap((x) => [-MEDIO_LADO, MEDIO_LADO].map((z) => cuanta(x, z))));
+        return { centro: cuanta(0, 0), esquina };
+      });
+      const peor = (que: 'centro' | 'esquina'): number => Math.round(Math.max(...medidas.map((m) => m[que])) * 100) / 100;
+      return { nombre: v.nombre, centro: peor('centro'), esquina: peor('esquina') };
+    });
+  const conLaDeVerdad = nieblaEnLaSalida(nieblaDeLaMesa);
+  comprobar(
+    'desde las poses de salida de los dos clientes, en todos los lienzos —monitor, tableta y tres móviles en vertical— el centro del anillo y su esquina más cercana tienen como mucho un 25 % de niebla —la de un monitor—',
+    conLaDeVerdad.every((m) => m.centro <= TOPE_DE_NIEBLA_EN_LA_SALIDA && m.esquina <= TOPE_DE_NIEBLA_EN_LA_SALIDA),
+    conLaDeVerdad,
+  );
+  const enUnMonitor = nieblaDeLaMesa(16 / 9);
+  comprobar(
+    'y en un monitor la niebla es la de siempre: de dos a cuatro alcances',
+    enUnMonitor.cerca === NIEBLA_DE_LA_MESA.cerca &&
+      enUnMonitor.lejos === NIEBLA_DE_LA_MESA.lejos &&
+      NIEBLA_DE_LA_MESA.cerca === ALCANCE_DEL_BURGO * 2 &&
+      NIEBLA_DE_LA_MESA.lejos === ALCANCE_DEL_BURGO * 4,
+    enUnMonitor,
+  );
+  const conLaFija = nieblaEnLaSalida(() => NIEBLA_DE_LA_MESA);
+  comprobar(
+    'se ve fallar: con la niebla fija —la de la app publicada—, un móvil en vertical tiene el anillo entero detrás de ella',
+    conLaFija.some((m) => m.centro >= 1 && m.esquina >= 1),
+    conLaFija,
+  );
+  const escenaDeLaNiebla = sinComentarios(fs.readFileSync(path.join(CARPETA, 'Burgo.tsx'), 'utf8'));
+  comprobar(
+    'y la escena la pone con la proporción del LIENZO —la misma con la que se retira el ojo— sin rehacer la niebla: nace con la de un monitor y la retiran `near` y `far`',
+    /const tamano = useThree\(\(s\) => s\.size\);\s*const laNieblaDeLaMesa = nieblaDeLaMesa\(tamano\.width \/ Math\.max\(1, tamano\.height\)\);/.test(escenaDeLaNiebla) &&
+      /<fog\s+attach="fog"\s+args=\{\[COLOR_DE_LA_NIEBLA, NIEBLA_DE_LA_MESA\.cerca, NIEBLA_DE_LA_MESA\.lejos\]\}\s+near=\{laNieblaDeLaMesa\.cerca\}\s+far=\{laNieblaDeLaMesa\.lejos\}\s*\/>/.test(escenaDeLaNiebla),
   );
 }
 

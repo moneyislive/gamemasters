@@ -313,7 +313,15 @@ import {
   sitiosDeLosHoteles,
   textoDelDinero,
 } from './bandeja-de-los-dados';
-import { ALCANCE_DEL_BURGO, ALTURA_MINIMA_DEL_OJO_DEL_BURGO, AMORTIGUACION_DEL_SEGUIMIENTO, CERCANIA_DE_SEGUIMIENTO, REPOSO_TRAS_SEGUIR } from './camara-del-burgo';
+import {
+  ALCANCE_DEL_BURGO,
+  ALTURA_MINIMA_DEL_OJO_DEL_BURGO,
+  AMORTIGUACION_DEL_SEGUIMIENTO,
+  CERCANIA_DE_SEGUIMIENTO,
+  NIEBLA_DE_LA_MESA,
+  REPOSO_TRAS_SEGUIR,
+  nieblaDeLaMesa,
+} from './camara-del-burgo';
 import { AMBAR_DEL_CONCEJO, coloresDeLasBanderas, geometriaParaInstanciar, geometriaTenidaDe, soltarTintesDeGeometrias } from './tinte-del-burgo';
 import { Aventurero } from './Aventurero';
 import { gestoAlSalir, senaladoTrasElGesto } from './tipos';
@@ -330,8 +338,7 @@ const COLOR_DEL_HORIZONTE = '#e9e0c8';
 const COLOR_DE_LA_NIEBLA = '#d6dfe4';
 /** La cúpula, más cerca que el plano lejano de los dos clientes (alcance × 8). */
 const RADIO_DEL_CIELO = ALCANCE_DEL_BURGO * 6;
-/** La niebla lineal: de dos a cuatro alcances (§5.6). */
-const NIEBLA = { cerca: ALCANCE_DEL_BURGO * 2, lejos: ALCANCE_DEL_BURGO * 4 } as const;
+/* La niebla de la mesa —lineal, de dos a cuatro alcances (§5.6), retirada con el ojo— es `nieblaDeLaMesa`. */
 /** Las luces de mediodía: sin sombras en ningún cliente. */
 const LUZ = { hemisferio: { cielo: '#d8e8ff', suelo: '#8a7a5a', intensidad: 0.85 }, sol: { rumbo: [1, 2, 1.2] as const, color: '#fff3dd', intensidad: 1.7 } } as const;
 /** Los colores del suelo propio, banda a banda (LA-CIUDAD.md §2). */
@@ -1707,6 +1714,12 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   }, [props.alTocarCasilla, props.alSenalarCasilla]);
 
   const tamano = useThree((s) => s.size);
+  /*
+   * La niebla de la mesa se retira con el ojo, que en retrato se retira para que quepa el anillo:
+   * fija, dejaba el tablero entero detrás de ella y la app lo pintaba en blanco (`nieblaDeLaMesa`).
+   * Con la proporción del LIENZO, la misma con la que se retira el ojo.
+   */
+  const laNieblaDeLaMesa = nieblaDeLaMesa(tamano.width / Math.max(1, tamano.height));
   const reloj = useThree((s) => s.clock);
   /** Las aceras repintadas este fotograma por un empeño en curso: al acabar, vuelven a su color base. */
   const acerasEnCurso = useRef(new Set<number>());
@@ -2911,7 +2924,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
   return (
     <>
-      <fog attach="fog" args={[COLOR_DE_LA_NIEBLA, NIEBLA.cerca, NIEBLA.lejos]} />
+      {/* Nace con la niebla de un monitor; `near` y `far` la retiran con el ojo sin rehacerla. */}
+      <fog attach="fog" args={[COLOR_DE_LA_NIEBLA, NIEBLA_DE_LA_MESA.cerca, NIEBLA_DE_LA_MESA.lejos]} near={laNieblaDeLaMesa.cerca} far={laNieblaDeLaMesa.lejos} />
 
       {/* El fondo: la cúpula de mediodía pegada a la cámara. Se dibuja la primera y no escribe profundidad. */}
       <mesh ref={cupula} geometry={geometrias.cielo} material={materiales.cielo} frustumCulled={false} renderOrder={-10} raycast={() => null} />

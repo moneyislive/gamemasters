@@ -262,3 +262,29 @@ export function poseDeSalidaAlLadoDeLaCaja(ventana: Ventana, caja: RectanguloEnP
 export function distanciaDeSalida(proporcion: number): number {
   return ALCANCE_DEL_BURGO * LEJANIA * alejarseParaQueQuepa(proporcion);
 }
+
+/**
+ * LA NIEBLA DE LA MESA: lineal, de dos a cuatro alcances en un monitor, y RETIRADA LO MISMO QUE EL
+ * OJO en cualquier otra pantalla.
+ *
+ * ═══ POR QUÉ SE RETIRA, QUE ES LO QUE PUSO EL BURGO EN BLANCO EN LA APP ═══
+ *
+ * En retrato, `alejarseParaQueQuepa` retira el ojo lo que hace falta para que quepa el ancho del
+ * anillo —en un móvil, de tres a cuatro veces lo de un monitor—, y la niebla era FIJA: de 1.140 a
+ * 2.281 unidades. Con el ojo a 2.766 (un lienzo de 390 × 600) el anillo entero quedaba DETRÁS de
+ * la niebla, y la app publicada (1.6.0) pintaba el tablero de su color —casi blanco— cada vez que
+ * se abría en vertical: medido el 24-sep-2026 con el código de producción, un 100 % de niebla en el
+ * centro y en la esquina más cercana; en un monitor, un 6 %, y por eso nadie lo vio desde el
+ * escritorio. Retirada con el ojo, cualquier pantalla ve el anillo con la niebla de un monitor, y un
+ * monitor la ve exactamente como antes (el retiro allí es 1).
+ *
+ * A pie no se usa: la cámara va detrás de la figura, no se retira, y su niebla es la suya
+ * (`NIEBLA_A_PIE`). La proporción es la del LIENZO —la misma con la que la cámara se retira—, no la
+ * de la pantalla.
+ */
+export const NIEBLA_DE_LA_MESA = { cerca: ALCANCE_DEL_BURGO * 2, lejos: ALCANCE_DEL_BURGO * 4 } as const;
+
+export function nieblaDeLaMesa(proporcion: number): { readonly cerca: number; readonly lejos: number } {
+  const retiro = alejarseParaQueQuepa(proporcion);
+  return { cerca: NIEBLA_DE_LA_MESA.cerca * retiro, lejos: NIEBLA_DE_LA_MESA.lejos * retiro };
+}
