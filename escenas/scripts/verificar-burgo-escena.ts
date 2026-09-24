@@ -305,7 +305,9 @@ import {
   CORRIMIENTO_EN_APAISADO,
   LIMITES_DEL_BURGO,
   MIRADOR_DEL_BURGO,
+  NIEBLA_DE_LA_MESA,
   elAnilloSeVeJuntoALaCaja,
+  nieblaDeLaMesa,
   poseDeSalida,
   poseDeSalidaAlLadoDeLaCaja,
   poseDelBurgo,
@@ -5488,7 +5490,7 @@ paso('A pie por el Burgo: el paseo común con el mundo de la mesa, de qué sitio
       elFotograma > reponeEn &&
       /const sg = seguimiento\.current;/.test(c) &&
       /useFrame\(\(s, dtCrudo\) => \{\s*if \(aPie\) return;\s*const dt = Math\.min\(0\.1, Math\.max\(0, dtCrudo\)\);\s*const ahora = s\.clock\.elapsedTime;\s*const cam = s\.camera as THREE\.PerspectiveCamera;\s*const sg = seguimiento\.current;/.test(c) &&
-      /n\.near = aPie \? NIEBLA_A_PIE\.cerca : NIEBLA\.cerca;\s*n\.far = aPie \? NIEBLA_A_PIE\.lejos : NIEBLA\.lejos;/.test(c) &&
+      /n\.near = aPie \? NIEBLA_A_PIE\.cerca : mesa\.cerca;\s*n\.far = aPie \? NIEBLA_A_PIE\.lejos : mesa\.lejos;/.test(c) &&
       /aPie \? UMBRALES_A_PIE\[c\.ciudad\.calidad\] : undefined\)/.test(c) &&
       /if \(aPie \|\| !plena \|\| !INTERRUPTORES_DEL_BANCO\.interiores/.test(c)
     );
@@ -5777,6 +5779,91 @@ paso('A pie por el Burgo: el paseo común con el mundo de la mesa, de qué sitio
   }
   comprobar(`en ${String(CODIGOS_A_PIE.length)} mesas y en las dos calidades, los ${String(murosMirados)} muros del estadio que se PINTAN van dentro de su distrito y ninguno pisa una calle`, estadiosMal.length === 0 && murosMirados === CODIGOS_A_PIE.length * 2 * 4, estadiosMal.slice(0, 4));
   comprobar(`se ve fallar: con la cuenta de antes, girados dos veces, salen ${String(cruzabanAntes)} faltas —muros fuera del distrito y sobre la calle—`, cruzabanAntes >= CODIGOS_A_PIE.length * 2 * 2, cruzabanAntes);
+}
+
+// ---------------------------------------------------------------------------
+paso('La niebla de la mesa se retira con el ojo: en un móvil en vertical el anillo no queda detrás de ella');
+// ---------------------------------------------------------------------------
+
+{
+  /*
+   * EL BURGO EN BLANCO (24-sep-2026). En la app publicada, el tablero se abría todo blanco en un
+   * móvil en vertical, y ninguna comprobación lo veía: las de arriba miden que las cuatro esquinas
+   * CAIGAN en el lienzo, y caían —detrás de la niebla—. En retrato el ojo se retira para que quepa el
+   * ancho del anillo (de 3 a 4 veces lo de un monitor) y la niebla era fija, de 1.140 a 2.281
+   * unidades: con el ojo a 2.766, un 100 % de niebla en el centro y en la esquina más cercana. Esto
+   * mide lo que se VE al abrir el tablero, con la cuenta de la niebla lineal de three: cuánta
+   * niebla cae sobre el centro del anillo y sobre su esquina más cercana, en los tres lienzos de
+   * arriba y en tres móviles en vertical de verdad. Y trae su vacuna: con la niebla fija de la app
+   * publicada, un móvil tiene que salir con el anillo entero detrás.
+   */
+  const LIENZOS = [
+    ...VENTANAS,
+    { nombre: 'móvil 390×600', ancho: 390, alto: 600 },
+    { nombre: 'móvil 390×760', ancho: 390, alto: 760 },
+    { nombre: 'móvil 412×640', ancho: 412, alto: 640 },
+  ];
+  /*
+   * Un 25 %: un monitor de 16:9 tiene en el centro del tablero un 14 % desde la pose de salida —en
+   * apaisado se retira un 20 % y corre la mirada hacia la cámara— y un 21 % desde la que se aparta de
+   * la caja del escritorio, y así se ha jugado en el escritorio desde siempre. El fallo era un 100 %.
+   */
+  const TOPE_DE_NIEBLA_EN_LA_SALIDA = 0.25;
+  /*
+   * Desde las poses con las que abre de verdad cada cliente, y se queda la peor: la de salida, y la
+   * que se aparta de la caja de los dados —abajo a la derecha en el escritorio, arriba en la app—.
+   */
+  const ESQUINAS_DE_LOS_CLIENTES = ['abajo-derecha', 'arriba-derecha'] as const;
+  const nieblaEnLaSalida = (
+    niebla: (proporcion: number) => { readonly cerca: number; readonly lejos: number },
+  ): { readonly nombre: string; readonly centro: number; readonly esquina: number }[] =>
+    LIENZOS.map((v) => {
+      const ventana = { ancho: v.ancho, alto: v.alto, franjaInferior: 0 };
+      const { cerca, lejos } = niebla(v.ancho / v.alto);
+      const cercanias = [
+        poseDeSalida(ventana),
+        ...ESQUINAS_DE_LOS_CLIENTES.map((esquina) =>
+          poseDeSalidaAlLadoDeLaCaja(ventana, poseDeLaBandeja(v.ancho, v.alto, CAMPO_DE_LA_CAMARA, { esquina, margen: 12 }).rectangulo),
+        ),
+      ];
+      const medidas = cercanias.map((cercania) => {
+        const ojo = poseDelBurgo(cercania, MIRADOR_DEL_BURGO, ventana).posicion;
+        const cuanta = (x: number, z: number): number => {
+          const d = Math.hypot(ojo.x - x, ojo.y, ojo.z - z);
+          return Math.min(1, Math.max(0, (d - cerca) / (lejos - cerca)));
+        };
+        const esquina = Math.min(...[-MEDIO_LADO, MEDIO_LADO].flatMap((x) => [-MEDIO_LADO, MEDIO_LADO].map((z) => cuanta(x, z))));
+        return { centro: cuanta(0, 0), esquina };
+      });
+      const peor = (que: 'centro' | 'esquina'): number => Math.round(Math.max(...medidas.map((m) => m[que])) * 100) / 100;
+      return { nombre: v.nombre, centro: peor('centro'), esquina: peor('esquina') };
+    });
+  const conLaDeVerdad = nieblaEnLaSalida(nieblaDeLaMesa);
+  comprobar(
+    'desde las poses de salida de los dos clientes, en todos los lienzos —monitor, tableta y tres móviles en vertical— el centro del anillo y su esquina más cercana tienen como mucho un 25 % de niebla —la de un monitor—',
+    conLaDeVerdad.every((m) => m.centro <= TOPE_DE_NIEBLA_EN_LA_SALIDA && m.esquina <= TOPE_DE_NIEBLA_EN_LA_SALIDA),
+    conLaDeVerdad,
+  );
+  const enUnMonitor = nieblaDeLaMesa(16 / 9);
+  comprobar(
+    'y en un monitor la niebla es la de siempre: de dos a cuatro alcances',
+    enUnMonitor.cerca === NIEBLA_DE_LA_MESA.cerca &&
+      enUnMonitor.lejos === NIEBLA_DE_LA_MESA.lejos &&
+      NIEBLA_DE_LA_MESA.cerca === ALCANCE_DEL_BURGO * 2 &&
+      NIEBLA_DE_LA_MESA.lejos === ALCANCE_DEL_BURGO * 4,
+    enUnMonitor,
+  );
+  const conLaFija = nieblaEnLaSalida(() => NIEBLA_DE_LA_MESA);
+  comprobar(
+    'se ve fallar: con la niebla fija —la de la app publicada—, un móvil en vertical tiene el anillo entero detrás de ella',
+    conLaFija.some((m) => m.centro >= 1 && m.esquina >= 1),
+    conLaFija,
+  );
+  const escenaDeLaNiebla = sinComentarios(fs.readFileSync(path.join(CARPETA, 'Burgo.tsx'), 'utf8'));
+  comprobar(
+    'y la escena la pone en cada fotograma con la proporción del LIENZO —la misma con la que se retira el ojo—, y a pie la de a pie',
+    /const mesa = nieblaDeLaMesa\(s\.size\.width \/ Math\.max\(1, s\.size\.height\)\);\s*n\.near = aPie \? NIEBLA_A_PIE\.cerca : mesa\.cerca;\s*n\.far = aPie \? NIEBLA_A_PIE\.lejos : mesa\.lejos;/.test(escenaDeLaNiebla),
+  );
 }
 
 // ---------------------------------------------------------------------------
