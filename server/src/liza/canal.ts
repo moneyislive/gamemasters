@@ -110,6 +110,25 @@
  * carga al coste medido de su sala, y el diagnóstico lo dice aparte (`validaciones`). Sin eso, el coste
  * medido no veía lo que más cuesta de cada cambio de mesa (revisión del frente, hallazgo 6).
  *
+ * ═══ EL MUNDO SE REVISA UNA VEZ, Y ESO SE CUENTA ═══
+ *
+ * De validar, lo caro es el MUNDO: con uno grande —miles de casillas, cajas y nudos— son veinte o treinta
+ * milisegundos síncronos, más que el tic del temporizador de TODAS las salas. Por eso la Liza lo revisa una
+ * vez por objeto mundo y lo guarda (`validacionesDelMundo` en `declaracion.ts`), y el productor de un juego
+ * guarda los suyos: de fase en fase y de voto en voto llega el MISMO objeto, y la validación sólo mira lo
+ * demás. Son dos memorias de otros, y si una se rompe no falla nada: sólo se paga cada vez. Así que aquí se
+ * CUENTAN —no se cronometran—, las dos por separado:
+ *
+ *   · `validacionesDelMundo`: cuántas revisiones de un mundo hicieron de verdad las validaciones de este
+ *     canal (lo que el contador de la Liza sube DENTRO de cada `problemasDeLaDeclaracion` de aquí, leído del
+ *     mismo módulo que valida: otro camino puede cargar otra copia con su propio contador a cero).
+ *   · `mundosNuevos`: cuántas declaraciones validadas traían un mundo que no es el mismo objeto que el de la
+ *     última aceptada por su sala (la primera de cada sala cuenta).
+ *
+ * Sanas, `validacionesDelMundo ≤ mundosNuevos ≪ validaciones.veces`: un mundo por sala y partida, revisado
+ * como mucho una vez por proceso. Si la Liza deja de guardar, `validacionesDelMundo` sube hasta `veces`; si
+ * es el productor el que deja de guardar, lo que sube hasta `veces` es `mundosNuevos`.
+ *
  * ═══ SI CAMBIAN LOS ASIENTOS, LA SALA SE REHACE ═══
  *
  * La sala pura nace con los asientos de su declaración y no los cambia nunca: una `EntradaVista` con
@@ -164,7 +183,7 @@
  * paso revienta se cierra sola ella: con el mismo estado y las mismas entradas volvería a reventar veinte
  * veces por segundo, y quien vuelva a entrar la hará nacer otra vez desde la mesa.
  */
-import { MS_POR_TIC, numeroDelAsiento, problemasDeLaDeclaracion } from '../../../shared/mecanicas/liza/declaracion';
+import { MS_POR_TIC, numeroDelAsiento, problemasDeLaDeclaracion, validacionesDelMundo } from '../../../shared/mecanicas/liza/declaracion';
 import type { AforoDeLaSala, LizaDeclarada, VeredictoDeLaLiza } from '../../../shared/mecanicas/liza/declaracion';
 import {
   CIERRE_DE_LA_LIZA,
@@ -475,6 +494,16 @@ export interface DiagnosticoDeLaLiza {
    * dentro del coste medido de su sala.
    */
   validaciones: { veces: number; ms: number; msMasLenta: number };
+  /**
+   * De esas validaciones, cuántas revisaron un MUNDO de verdad y no desde la memoria de la Liza: se
+   * cuentan, no se cronometran. Ver «el mundo se revisa una vez, y eso se cuenta» en la cabecera.
+   */
+  validacionesDelMundo: number;
+  /**
+   * Cuántas declaraciones validadas traían un mundo que no es el MISMO OBJETO que el de la última aceptada
+   * por su sala (la primera de cada sala cuenta): lo que haría falta revisar si la Liza no guardara nada.
+   */
+  mundosNuevos: number;
   /** La mediana, entre los canales dentro, de su ida y vuelta mediana; `null` sin canales dentro. */
   idaYVueltaMs: number | null;
   origenesNegados: number;
@@ -520,6 +549,8 @@ export function cuentasVacias(): DiagnosticoDeLaLiza {
     veredictos: { entro: 0, sinEfecto: 0, rechazado: 0, terminada: 0, apartado: 0, sinMesa: 0, fallos: 0 },
     lecturas: { revisiones: 0, vistas: 0, declaracionesNuevas: 0, ilegibles: 0, conProblemas: 0, conOtroAforo: 0, fallos: 0 },
     validaciones: { veces: 0, ms: 0, msMasLenta: 0 },
+    validacionesDelMundo: 0,
+    mundosNuevos: 0,
     idaYVueltaMs: null,
     origenesNegados: 0,
     cuotasNegadas: { global: 0, sinSaludar: 0, concurrencia: 0, ritmo: 0 },
@@ -933,7 +964,7 @@ export class CanalDeLaLiza {
     if (!this.lizas.sePuedeLidiar(v.arcade)) {
       return { clave: 'mesaQueNo', motivo: 'Este juego no se juega a pie en este servidor.' };
     }
-    const { liza, problemas, us } = this.sacarLaLiza(v.arcade, v.vista, codigo);
+    const { liza, problemas, us } = this.sacarLaLiza(v.arcade, v.vista, codigo, null);
     if (liza === null) {
       this.cuentas.lecturas.ilegibles++;
       return { clave: 'mesaQueNo', motivo: 'La mesa no dice todavía cómo se juega a pie.' };
@@ -988,12 +1019,25 @@ export class CanalDeLaLiza {
   /**
    * LA DECLARACIÓN DE UNA VISTA, Y SUS PROBLEMAS, CRONOMETRADO: es lo más caro que se hace por una mesa
    * (ver «la mesa, como mucho una lectura por segundo»). Devuelve lo que costó en µs para cargarlo a su
-   * sala, y lo cuenta en `validaciones`.
+   * sala, y lo cuenta en `validaciones`. `anterior` es la última declaración aceptada por la sala (`null`
+   * al abrirla): con ella se cuentan los mundos nuevos, y las revisiones del mundo se cuentan por lo que el
+   * contador de la Liza sube DENTRO de esta validación (ver «el mundo se revisa una vez, y eso se cuenta»).
    */
-  private sacarLaLiza(arcade: string, vista: unknown, codigo: string): { liza: LizaDeclarada | null; problemas: readonly string[]; us: number } {
+  private sacarLaLiza(
+    arcade: string,
+    vista: unknown,
+    codigo: string,
+    anterior: LizaDeclarada | null,
+  ): { liza: LizaDeclarada | null; problemas: readonly string[]; us: number } {
     const t0 = this.cronometro();
     const liza = this.lizas.lizaDeLaMesa(arcade, vista, codigo);
-    const problemas = liza === null ? [] : problemasDeLaDeclaracion(liza);
+    let problemas: readonly string[] = [];
+    if (liza !== null) {
+      const revisadosAntes = validacionesDelMundo();
+      problemas = problemasDeLaDeclaracion(liza);
+      this.cuentas.validacionesDelMundo += validacionesDelMundo() - revisadosAntes;
+      if (anterior === null || liza.mundo !== anterior.mundo) this.cuentas.mundosNuevos++;
+    }
     const ms = Math.max(0, this.cronometro() - t0);
     const v = this.cuentas.validaciones;
     v.veces++;
@@ -1473,7 +1517,7 @@ export class CanalDeLaLiza {
       }
       /* La revisión se apunta aunque la declaración no valga: leerla otra vez no la va a arreglar. */
       sala.rev = v.rev;
-      const { liza, problemas, us } = this.sacarLaLiza(sala.arcade, v.vista, sala.codigo);
+      const { liza, problemas, us } = this.sacarLaLiza(sala.arcade, v.vista, sala.codigo, sala.declaracion);
       sala.usEnLaVentana += us;
       if (liza === null) {
         this.cuentas.lecturas.ilegibles++;

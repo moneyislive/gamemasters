@@ -129,25 +129,49 @@ export function lizaDeLaMesa(arcade: ArcadeId, vista: unknown, codigo: string): 
 /* ─── EL COSTE Y LA ADMISIÓN ─────────────────────────────────────────────── */
 
 /**
- * EL MODELO DE COSTE DE UNA SALA, en MICROSEGUNDOS DE CPU POR SEGUNDO de un PC de desarrollo, sacado de
- * la tabla del §12 del diseño: validar los `aqui` de un asiento y mandarle sus mensajes; mover, pensar
- * y mirar de una entidad; el vuelo de una bala; y lo fijo de una sala (el tic, la foto). Con él, una
- * sala llena (6 asientos, 14 entidades, 12 balas) cuesta 5.580 y una en solitario (1, 6, 6) 2.090,
- * que es lo que el diseño estimaba (≈ 5,9 y 1,9 ms/s). Los coeficientes se afinan con `medir:liza` en el
- * plan donde corre de verdad; lo que no cambia es que el coste sale de lo DECLARADO, nunca de lo que
- * esté vivo en cada momento, para que admitir una sala sea una promesa que se puede cumplir.
+ * EL MODELO DE COSTE DE UNA SALA, en MICROSEGUNDOS DE CPU POR SEGUNDO de un PC de desarrollo: validar los
+ * `aqui` de un asiento y mandarle sus mensajes; mover, pensar y mirar de una entidad; el vuelo de una
+ * bala; y lo fijo de una sala (el tic, la foto, los racimos y los campos por meta). Lo que no cambia es
+ * que el coste sale de lo DECLARADO, nunca de lo que esté vivo en cada momento, para que admitir una sala
+ * sea una promesa que se puede cumplir. Los coeficientes se afinan con `medir:liza` en el plan donde corre
+ * de verdad.
+ *
+ * ═══ LA CIUDAD ABIERTA LOS SUBE (`docs/quiebro/CIUDAD-ABIERTA.md`, §5.6) ═══
+ *
+ * Con el barrio de 156 m eran base 100 y 250 por entidad (§12 del diseño: sala llena ≈ 5,9 ms/s). En una
+ * ciudad de 540 m, con 3.500 nudos y 1.300 cajas y los índices de la Liza (§5.4), la tabla del §5.6 da
+ * ≈ 7,9 ms/s una sala llena de seis con sus 20 entidades: lo fijo sube (racimos, disparos, los campos por
+ * meta que se rehacen al trote) y cada entidad cuesta más (su línea de vista y su camino van por una
+ * ciudad, no por una glorieta). Con el aforo de El Quiebro (20 entidades y 12 balas en todas sus mesas),
+ * una sala llena declara 8.380 µs/s y caben 9 por proceso (antes 11); una en solitario, 7.130, y caben 11
+ * (antes 13). La palanca de caber más —declarar el aforo por asientos al empezar— es de la plataforma y
+ * queda fuera de esta obra (§7, decisión 4).
+ *
+ * ═══ POR QUÉ NO SE BAJAN AUNQUE LA MESA REAL MIDA UN TERCIO ═══
+ *
+ * `medir:liza` del 24-sep, con el Sistema de la entrega 1 que persigue a cualquiera y no olvida (ver
+ * `PERSECUCION_DEL_SISTEMA` en `quiebro-reglas.ts`), en µs/s, mediana y p90: la mesa real, 10 salas de seis,
+ * 1.543 y 2.634, y 10 en solitario, 812 y 3.100; la ciudad con 20 vivas sin fin, agrupados, 3.566 y 7.356, y
+ * dispersos por las seis plazas, 5.189 y 9.481. Lo declarado es la promesa de la admisión y tiene que cubrir
+ * lo peor que la sala puede hacer con su aforo, no la mediana de una partida: con un Sistema que no suelta a
+ * nadie, un grupo disperso lo arrastra entero por la ciudad, y en un A/B en el mismo proceso eso dobla el
+ * coste de la sala frente al olvido de la travesía (y lo deja igual con el grupo junto). Bajarlos a lo de la
+ * mesa real dejaría entrar salas que, dispersas, no caben. El p90 de los dispersos ya pasa de lo declarado
+ * (con la máquina ocupada por otras pruebas): ese reparto, el Sistema saliendo de las seis plazas a la vez, es
+ * el de la entrega 2, que trae de vuelta el olvido; si con él no baja, lo que sube es `porEntidad`.
  */
 export const COSTE_DE_UNA_SALA = {
-  base: 100,
+  base: 400,
   porAsiento: 250,
-  porEntidad: 250,
+  porEntidad: 300,
   porBala: 40,
 } as const;
 
 /**
  * EL PRESUPUESTO DE TODAS LAS SALAS DE UN PROCESO, en la misma unidad: 80.000 µs/s de PC. En la
  * instancia de producción (unas 2,5 veces más lenta, medio núcleo) son unos 200 ms/s: el 40 % que el
- * diseño reserva al juego. Unas catorce salas llenas o treinta y ocho en solitario, o su mezcla.
+ * diseño reserva al juego. Con los coeficientes de la ciudad, nueve salas llenas de El Quiebro u once en
+ * solitario (su aforo es el mismo), o su mezcla con las de otros juegos.
  */
 export const PRESUPUESTO_DE_LAS_LIZAS = 80000;
 

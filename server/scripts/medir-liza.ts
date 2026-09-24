@@ -6,6 +6,8 @@
  *   npm run medir:liza -- --salas 40 --asientos 1       (cuarenta solitarias)
  *   npm run medir:liza -- --juguete                     (con una liza de juguete en vez del juego de verdad)
  *   npm run medir:liza -- --segundos 20
+ *   npm run medir:liza -- --ciudad                      (9 salas de 6 en la ciudad de 540 m: dispersos y agrupados)
+ *   npm run medir:liza -- --ciudad --disposicion dispersos --salas 11
  *
  * No es un comprobador y no va en la batería: da CIFRAS para el modelo de coste de `lizas.ts`
  * (`COSTE_DE_UNA_SALA`, `PRESUPUESTO_DE_LAS_LIZAS`), que hoy son las estimaciones del §12 del diseño.
@@ -65,13 +67,17 @@ import { WebSocket } from 'ws';
 import { UNO } from '../../shared/mecanicas/fijo';
 import { sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Arena } from '../../shared/mecanicas/mundo';
-import { arenaDeLaLiza, reglasDelNumero, VERSION_DE_LA_DECLARACION } from '../../shared/mecanicas/liza/declaracion';
+import { arenaDeLaLiza, reglasDelNumero, TOPE_DE_CANTIDAD, TOPE_DE_TICS, VERSION_DE_LA_DECLARACION } from '../../shared/mecanicas/liza/declaracion';
 import type {
   AccionDeclarada,
   EfectoDeclarado,
+  EncuentroDeclarado,
+  GrupoDeclarado,
   LizaDeclarada,
+  MundoDeLaLiza,
   PuestaDeEstado,
   ReglasDeAsiento,
+  SitioDeNacer,
 } from '../../shared/mecanicas/liza/declaracion';
 import { desplazado, rumboHacia } from '../../shared/mecanicas/liza/geometria';
 import {
@@ -220,6 +226,11 @@ export class RobotDeLaLiza {
   readonly corregidos: { n: number; x: number; z: number }[] = [];
   /** Lo último que mandó en un `aqui` (para mirar una corrección contra ello). */
   ultimoAqui: { n: number; x: number; z: number } | null = null;
+  /**
+   * Dónde le puso la sala en su último `dentro` (Q16.16): donde nace quien entra o vuelve a entrar. Es
+   * lo que mira `verify:sala-de-la-liza` para «quien vuelve nace junto al grupo».
+   */
+  ultimoDentro: { x: number; z: number } | null = null;
 
   constructor(private readonly o: OpcionesDelRobot) {
     this.forma = o.forma ?? 'lee';
@@ -277,6 +288,7 @@ export class RobotDeLaLiza {
         this.yo = m.yo;
         this.x = m.x;
         this.z = m.z;
+        this.ultimoDentro = { x: m.x, z: m.z };
         this.mira = m.r;
         this.dentro = true;
         this.entidades.clear();
@@ -688,6 +700,175 @@ export function lizaDeEncuentro(asientos: readonly string[], semilla = 4242): Li
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * EL ESCENARIO «CIUDAD» (docs/quiebro/CIUDAD-ABIERTA.md §5.6)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La sala de El Quiebro cuando su mundo es la ciudad de 540 m —4.761 casillas, unas 1.300 cajas, más de
+ * 3.000 nudos— en vez de una glorieta: lo que el diseño pide medir antes de dar la ciudad por buena («una
+ * sala llena en 9 ms/s o menos en PC», con 9 salas a la vez, que es lo que cabe por lo declarado).
+ *
+ * Es lo ÚNICO de este fichero que nombra un juego, y a propósito: la ciudad es suya. Todo lo demás —la mesa,
+ * el reductor, el productor, las reglas de cada asiento, las clases del Sistema, la sala, el canal— es de
+ * verdad; sobre la declaración que da el productor se cambian tres cosas (y lo que las nombra), y nada más:
+ *
+ *   · EL MUNDO: el de la ciudad (`mundoDeLaLizaDeLaCiudad` de la columna, sin tocar) de la traza y la plaza
+ *     de la Bajada que se le den a la mesa, el MISMO objeto en todas sus declaraciones, como lo guarda el
+ *     productor. Con `dispersos`, además, el asiento `i` nace en la plaza `i` (un sitio de cada plaza
+ *     delante) y las zonas de las seis plazas se juntan por su tipo (Fallo, impresión, boca), para que el
+ *     Sistema salga de todas a la vez: lo peor de la entrega 2, seis frentes a la vez.
+ *   · EL LÍMITE: `ciudad` en todas las fases. La Bajada con el suyo, la plaza, no se puede declarar con la
+ *     ciudad tal como está —sus sitios de nacer de las otras plazas y de los refugios quedan fuera, y
+ *     `problemasDeLaDeclaracion` lo exige—, y no es lo que se mide.
+ *   · EL ENCUENTRO, si lo hay: uno SIN FIN con las vivas del aforo (las 20 del juego): Prestados por las
+ *     bocas, Celadores impresos y dos tiradores, sin un número que se acabe y con el reloj en su tope, como
+ *     el de juguete. Si no, la oleada se vacía a media ventana y se mide otra cosa. Y lo que nombra zonas
+ *     del mundo de antes —dónde reaparece lo que nadie remata— pasa a las bocas de éste.
+ *
+ * Por qué no se espera a que el productor dé la ciudad él solo: porque medir no puede depender de que el
+ * frente que lo escribe haya acabado, y porque «dispersos» y «20 vivas» no los da ninguna fase del juego de
+ * hoy. Lo que sí es del productor —el mundo guardado y validado una vez— lo mira `verify:sala-de-la-liza`
+ * con el de verdad.
+ */
+
+/** Cómo se reparten los asientos por la ciudad. */
+export type DisposicionEnLaCiudad = 'dispersos' | 'agrupados';
+
+/** El juego cuya ciudad es. */
+export const ARCADE_DE_LA_CIUDAD = 'quiebro';
+
+/** Lo que se hace con la liza de una mesa para medirla en la ciudad. Ver la cabecera del escenario. */
+export interface CiudadDelBanco {
+  readonly disposicion: DisposicionEnLaCiudad;
+  /** La ciudad de la mesa `codigo`: la traza (0-31) y la plaza de la Bajada (1-6). Antes de su primera liza. */
+  ponerLaMesa(codigo: string, traza: number, bajada: number): void;
+  /** La liza de la mesa en su ciudad. Lanza si a la mesa no se le ha puesto ciudad. */
+  enLaCiudad(liza: LizaDeclarada, codigo: string): LizaDeclarada;
+  /** El mundo de la ciudad de la mesa (el mismo objeto siempre), o `null` si no se le ha puesto. */
+  mundoDe(codigo: string): MundoDeLaLiza | null;
+}
+
+/** La puerta del diseño (§6.3): una sala llena de la ciudad cuesta esto o menos en PC, en µs de CPU por segundo. */
+export const SALA_LLENA_EN_LA_CIUDAD_US = 9000;
+
+/** Cuántas de las vivas del encuentro sin fin son Celadores y tiradores; el resto, Prestados. */
+const CELADORES_SIN_FIN = 4;
+const TIRADORES_SIN_FIN = 2;
+
+/**
+ * EL ESCENARIO «CIUDAD», listo para usar: carga la ciudad (la columna de `quiebro-ciudad.ts`) y las clases
+ * del juego a la primera llamada, para que el banco de siempre y el robot no las carguen.
+ */
+export async function ciudadDelBanco(disposicion: DisposicionEnLaCiudad): Promise<CiudadDelBanco> {
+  const C = await import('../../shared/arcade/juegos/quiebro-ciudad');
+  const { CLASE_DEL_QUIEBRO } = await import('../../shared/arcade/juegos/quiebro-reglas');
+  const TIPOS = ['fallo', 'impresion', 'boca'] as const;
+  /* Con `dispersos`, la clase de cada zona de plaza pasa a la de su tipo (1-3), la misma en las seis. */
+  const juntas = new Map<number, number>();
+  for (let p = 1; p <= C.PLAZAS_POR_CIUDAD; p++) {
+    for (let k = 0; k < TIPOS.length; k++) juntas.set(C.claseDeZonaDePlaza(p, TIPOS[k] as (typeof TIPOS)[number]), k + 1);
+  }
+  const mesas = new Map<string, { traza: number; bajada: number; mundo: MundoDeLaLiza | null }>();
+
+  const dispersar = (base: MundoDeLaLiza): MundoDeLaLiza => {
+    /* Los de asiento vienen de seis en seis por plaza, la de la Bajada delante: un sitio de cada plaza, delante. */
+    const deAsiento = base.nace.filter((s) => s.papel === 'asiento');
+    const delante: SitioDeNacer[] = [];
+    for (let p = 0; p < C.PLAZAS_POR_CIUDAD; p++) {
+      const s = deAsiento[p * C.SITIOS_DE_ASIENTO_POR_PLAZA];
+      if (s === undefined) throw new Error(`El mundo de la ciudad no trae ${String(C.SITIOS_DE_ASIENTO_POR_PLAZA)} sitios de asiento por plaza.`);
+      delante.push(s);
+    }
+    return {
+      ...base,
+      zonas: base.zonas.map((z) => {
+        const tipo = juntas.get(z.clase);
+        return tipo === undefined ? z : { ...z, clase: tipo };
+      }),
+      nace: [...delante, ...base.nace.filter((s) => !delante.includes(s))],
+    };
+  };
+
+  const mundoDe = (codigo: string): MundoDeLaLiza | null => {
+    const m = mesas.get(codigo);
+    if (m === undefined) return null;
+    if (m.mundo === null) {
+      const ciudad = C.ciudadDeLaMesa(m.traza, codigo);
+      const base = C.mundoDeLaLizaDeLaCiudad(C.ciudadDeLaNoche(ciudad, codigo, 1, [m.bajada]), false);
+      m.mundo = disposicion === 'agrupados' ? base : dispersar(base);
+    }
+    return m.mundo;
+  };
+
+  /** De qué zonas sale cada tipo: las de la plaza de la Bajada, o las de todas con `dispersos`. */
+  const zonaDe = (bajada: number, tipo: (typeof TIPOS)[number]): number =>
+    disposicion === 'agrupados' ? C.claseDeZonaDePlaza(bajada, tipo) : TIPOS.indexOf(tipo) + 1;
+
+  const sinFin = (en: EncuentroDeclarado, vivas: number, bajada: number): EncuentroDeclarado => {
+    const plantilla = en.grupos[0];
+    if (plantilla === undefined) throw new Error('El encuentro del productor no trae ningún grupo del que copiar la forma.');
+    const porPresentes = (v: number): number[] => en.vivasALaVez.map(() => v);
+    const grupo = (clase: number, claseDeZona: number, vivasDelGrupo: number, desdeTic: number, cadaTics: number): GrupoDeclarado => ({
+      ...plantilla,
+      clase,
+      cuantos: porPresentes(TOPE_DE_CANTIDAD),
+      vivasALaVez: porPresentes(vivasDelGrupo),
+      claseDeZona,
+      desdeTic,
+      cadaTics,
+      eleccion: 'azar',
+    });
+    return {
+      ...en,
+      relojTics: TOPE_DE_TICS,
+      vivasALaVez: porPresentes(vivas),
+      /* Sin fin de verdad: ni se vacía ni tiene salida (la de la Llamada nombra zonas de otro mundo). */
+      fin: { tipo: 'vaciar' },
+      grupos: [
+        grupo(CLASE_DEL_QUIEBRO.prestado, zonaDe(bajada, 'boca'), vivas - CELADORES_SIN_FIN - TIRADORES_SIN_FIN, 0, 10),
+        grupo(CLASE_DEL_QUIEBRO.celador, zonaDe(bajada, 'impresion'), CELADORES_SIN_FIN, 40, 40),
+        grupo(CLASE_DEL_QUIEBRO.tirador, zonaDe(bajada, 'boca'), TIRADORES_SIN_FIN, 60, 60),
+      ],
+    };
+  };
+
+  return {
+    disposicion,
+    ponerLaMesa: (codigo, traza, bajada) => {
+      C.partesDeLaTraza(traza);
+      if (!Number.isInteger(bajada) || bajada < 1 || bajada > C.PLAZAS_POR_CIUDAD) throw new RangeError(`No hay plaza ${String(bajada)}.`);
+      mesas.set(codigo, { traza, bajada, mundo: null });
+    },
+    enLaCiudad: (liza, codigo) => {
+      const mundo = mundoDe(codigo);
+      const m = mesas.get(codigo);
+      if (mundo === null || m === undefined) throw new Error(`A la mesa ${codigo} no se le ha puesto ciudad (\`ponerLaMesa\`).`);
+      const en = liza.fase.encuentro;
+      /*
+       * Lo que vuelve a aparecer si nadie lo remata lo hace en zonas de una clase: si el productor nombra una
+       * que este mundo no tiene (la de su mundo de antes), sale por las bocas, como los Prestados.
+       */
+      const hay = new Set(mundo.zonas.map((z) => z.clase));
+      const clases = liza.clases.map((c) =>
+        c.alCaer.tipo === 'rematable' && !hay.has(c.alCaer.siNo.claseDeZona)
+          ? { ...c, alCaer: { ...c.alCaer, siNo: { ...c.alCaer.siNo, claseDeZona: zonaDe(m.bajada, 'boca') } } }
+          : c,
+      );
+      return {
+        ...liza,
+        mundo,
+        clases,
+        fase: {
+          ...liza.fase,
+          limite: C.ID_DEL_LIMITE_DE_LA_CIUDAD,
+          encuentro: en === null ? null : sinFin(en, liza.aforo.entidades, m.bajada),
+        },
+      };
+    },
+    mundoDe,
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * EL BANCO (sólo si este fichero es el guion que se corre)
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -710,17 +891,36 @@ async function banco(): Promise<void> {
     return i >= 0 && v !== undefined ? v : pd;
   };
   const JUGUETE = args.includes('--juguete');
+  const CIUDAD = args.includes('--ciudad');
   const RED = args.includes('--red');
   const { enchufarLaLiza } = await import('../src/liza/enchufe');
   const SEGUNDOS = Number(opcion('segundos', '10'));
-  const tandas: { salas: number; asientos: number }[] =
-    opcion('salas', '').length > 0
-      ? [{ salas: Number(opcion('salas', '1')), asientos: Number(opcion('asientos', '6')) }]
+  if (JUGUETE && CIUDAD) {
+    console.error('`--juguete` y `--ciudad` son dos escenarios distintos: uno u otro.');
+    process.exit(1);
+  }
+  /*
+   * Con `--ciudad`, 9 salas de 6 por defecto —las que caben por lo declarado, que es como se miden: con una
+   * sola, en Windows, la cifra sale inflada para todos— en las dos disposiciones, los dispersos primero.
+   */
+  const disposiciones: DisposicionEnLaCiudad[] = ((): DisposicionEnLaCiudad[] => {
+    const d = opcion('disposicion', 'las-dos');
+    if (d === 'dispersos' || d === 'agrupados') return [d];
+    if (d !== 'las-dos') {
+      console.error(`--disposicion ${d}: tiene que ser dispersos, agrupados o las-dos.`);
+      process.exit(1);
+    }
+    return ['dispersos', 'agrupados'];
+  })();
+  const tandas: { salas: number; asientos: number; disposicion: DisposicionEnLaCiudad | null }[] = CIUDAD
+    ? disposiciones.map((disposicion) => ({ salas: Number(opcion('salas', '9')), asientos: Number(opcion('asientos', '6')), disposicion }))
+    : opcion('salas', '').length > 0
+      ? [{ salas: Number(opcion('salas', '1')), asientos: Number(opcion('asientos', '6')), disposicion: null }]
       : [
-          { salas: 1, asientos: 6 },
-          { salas: 1, asientos: 1 },
-          { salas: 10, asientos: 6 },
-          { salas: 10, asientos: 1 },
+          { salas: 1, asientos: 6, disposicion: null },
+          { salas: 1, asientos: 1, disposicion: null },
+          { salas: 10, asientos: 6, disposicion: null },
+          { salas: 10, asientos: 1, disposicion: null },
         ];
 
   /* La carpeta de las mesas ANTES de cargar `mesas.ts`, que la lee al cargarse. */
@@ -737,22 +937,39 @@ async function banco(): Promise<void> {
   ponerCanal(canalDeSondeo);
   const gc = (globalThis as { gc?: () => void }).gc;
 
-  const arcade = JUGUETE ? null : (lizas.arcadesQueSeLidian()[0] ?? null);
+  const arcade = JUGUETE ? null : CIUDAD ? ARCADE_DE_LA_CIUDAD : (lizas.arcadesQueSeLidian()[0] ?? null);
   if (!JUGUETE && arcade === null) {
     console.error('El registro de lizas está vacío: no hay juego de verdad que medir. Usa `--juguete`, o da de alta un juego en `lizas.ts`.');
     process.exit(1);
   }
+  if (CIUDAD && !lizas.sePuedeLidiar(ARCADE_DE_LA_CIUDAD)) {
+    console.error(`«${ARCADE_DE_LA_CIUDAD}» no está en el registro de lizas: no hay ciudad que medir.`);
+    process.exit(1);
+  }
   console.log(
-    `\nMIDIENDO LA LIZA — ${JUGUETE ? 'liza de juguete (encuentro sin fin, aforo de sala llena)' : `el juego «${String(arcade)}» con su mesa de verdad`}, ${String(SEGUNDOS)} s por tanda\n`,
+    `\nMIDIENDO LA LIZA — ${
+      JUGUETE
+        ? 'liza de juguete (encuentro sin fin, aforo de sala llena)'
+        : CIUDAD
+          ? `el juego «${String(arcade)}» con su mesa de verdad, EN LA CIUDAD (encuentro sin fin con las vivas del aforo, límite ciudad)`
+          : `el juego «${String(arcade)}» con su mesa de verdad`
+    }, ${String(SEGUNDOS)} s por tanda\n`,
   );
 
   for (const tanda of tandas) {
     gc?.();
     const montonAntes = process.memoryUsage().heapUsed;
+    /* El escenario «ciudad», si toca: la liza del productor, pasada a la ciudad (ver su cabecera). */
+    const ciudad = tanda.disposicion === null ? null : await ciudadDelBanco(tanda.disposicion);
+    const lizaDe = (a: string, v: unknown, codigo: string): LizaDeclarada | null => {
+      const l = lizas.lizaDeLaMesa(a, v, codigo);
+      return l === null || ciudad === null ? l : ciudad.enLaCiudad(l, codigo);
+    };
     /** Cada robot con su mesa y el buzón de lo que le ha bajado y aún no ha leído. */
     const enElBanco: { robot: RobotDeLaLiza; codigo: string; buzon: string[] }[] = [];
     const lizasDeLaMesa = new Map<string, LizaDeclarada | null>();
     const vistasDeMentira = new Map<string, LizaDeclarada>();
+    const registro: string[] = [];
     let veredictosDeJuguete = 0;
 
     /* La mesa de mentira del juguete: la llave es `código:asiento`, y los veredictos se cuentan. */
@@ -771,9 +988,17 @@ async function banco(): Promise<void> {
     const canal = new CanalDeLaLiza({
       reloj: liza.RELOJ_DE_LA_LIZA,
       mesa: JUGUETE ? mesaDeJuguete : liza.LA_MESA_DE_LA_LIZA,
-      lizas: JUGUETE ? { sePuedeLidiar: (a) => a === 'juguete', lizaDeLaMesa: (_a, v) => v as LizaDeclarada } : liza.LAS_LIZAS_DE_VERDAD,
+      lizas: JUGUETE
+        ? { sePuedeLidiar: (a) => a === 'juguete', lizaDeLaMesa: (_a, v) => v as LizaDeclarada }
+        : ciudad !== null
+          ? { sePuedeLidiar: liza.LAS_LIZAS_DE_VERDAD.sePuedeLidiar, lizaDeLaMesa: lizaDe }
+          : liza.LAS_LIZAS_DE_VERDAD,
       motor: liza.EL_MOTOR_DE_VERDAD,
-      registrar: () => {},
+      /* Se guarda y se calla: sólo se dice si la tanda no llega al combate (una liza que no se abre, por ejemplo). */
+      registrar: (l) => {
+        registro.push(l);
+        if (registro.length > 50) registro.shift();
+      },
     });
     /* Con `--red`, el enchufe de verdad en un servidor HTTP de este proceso, en un puerto del sistema. */
     let red: { servidor: http.Server; puerto: number; clientes: WebSocket[] } | null = null;
@@ -790,7 +1015,7 @@ async function banco(): Promise<void> {
     /** La liza de una mesa de verdad, al día: la misma función que el servidor, sobre la vista de espectador. */
     const ponerAlDia = async (codigo: string): Promise<void> => {
       const v = await mesas.mirar(codigo, null);
-      lizasDeLaMesa.set(codigo, lizas.lizaDeLaMesa(v.arcade, v.vista, codigo));
+      lizasDeLaMesa.set(codigo, lizaDe(v.arcade, v.vista, codigo));
     };
 
     for (let s = 0; s < tanda.salas; s++) {
@@ -806,6 +1031,11 @@ async function banco(): Promise<void> {
       } else {
         const abierta = await mesas.abrir({ arcade: arcade as string, nombre: 'R1', plazoSegundos: 300 });
         codigo = abierta.mesa.codigo;
+        /*
+         * Su ciudad, antes de su primera liza: trazas repartidas por los cuatro dibujos y sus simetrías, y la
+         * Bajada en cada una de las seis plazas por turno (tres plantillas: glorieta, porticada y patio).
+         */
+        ciudad?.ponerLaMesa(codigo, (s * 9) % 32, 1 + (s % 6));
         llaves.push(abierta.silla.llave);
         for (let i = 1; i < tanda.asientos; i++) llaves.push((await mesas.sentarse(codigo, `R${String(i + 1)}`)).llave);
         /* Se empieza con lo primero que la mesa le ofrece al primer asiento, hasta que esté empezada. */
@@ -928,11 +1158,23 @@ async function banco(): Promise<void> {
     const juntasMsPorS = juntas.reduce((s, x) => s + x, 0) / Math.max(1, juntas.length) / 1000;
     const presupuesto = lizas.PRESUPUESTO_DE_LAS_LIZAS;
     console.log(
-      `· ${String(tanda.salas)} sala(s) de ${String(tanda.asientos)} asiento(s), ${String(robots.length)} robots — ` +
+      `· ${String(tanda.salas)} sala(s) de ${String(tanda.asientos)} asiento(s)${tanda.disposicion === null ? '' : ` en la ciudad, ${tanda.disposicion}`}, ${String(robots.length)} robots — ` +
         (llegoAlCombate
           ? `en combate a los ${esperado.toFixed(1)} s`
           : `SIN COMBATE en ${esperado.toFixed(0)} s: lo que sigue NO es el coste de una sala en combate`),
     );
+    if (!llegoAlCombate && registro.length > 0) console.log(`    lo último que dijo el canal: ${registro.slice(-3).join(' · ')}`);
+    if (ciudad !== null) {
+      const mundos = codigos.map((c) => ciudad.mundoDe(c)).filter((m): m is MundoDeLaLiza => m !== null);
+      const cuenta = (f: (m: MundoDeLaLiza) => number): string => {
+        const v = mundos.map(f);
+        return v.length === 0 ? '—' : `${String(Math.min(...v))}-${String(Math.max(...v))}`;
+      };
+      console.log(
+        `    la ciudad de cada sala: ${cuenta((m) => m.suelo.pisables.length)} casillas, ${cuenta((m) => m.suelo.cuerpos.length)} cajas, ` +
+          `${cuenta((m) => m.grafo.nudos.length)} nudos, ${cuenta((m) => m.grafo.aristas.length)} aristas, ${cuenta((m) => m.zonas.length)} zonas`,
+      );
+    }
     console.log(
       `    coste medido por sala: mediana ${String(Math.round(mediana))} µs/s, p90 ${String(Math.round(p90))} µs/s ` +
         `(declarado ${String(Math.round(declarado))} µs/s; salas vivas ${String(d1.salas)}; ` +
@@ -942,6 +1184,13 @@ async function banco(): Promise<void> {
       `    en el presupuesto (${String(presupuesto)} µs/s) caben ${String(Math.floor(presupuesto / Math.max(1, declarado)))} salas así por lo declarado, ` +
         `y ${p90 > 0 ? String(Math.floor(presupuesto / p90)) : '—'} por lo medido (p90)`,
     );
+    if (ciudad !== null) {
+      const juicio = (v: number): string => (v <= SALA_LLENA_EN_LA_CIUDAD_US ? 'dentro' : 'FUERA');
+      console.log(
+        `    la puerta de la ciudad (una sala llena en ${String(SALA_LLENA_EN_LA_CIUDAD_US)} µs/s o menos, en PC): ` +
+          `mediana ${juicio(mediana)}, p90 ${juicio(p90)}${tanda.salas < 9 ? ' — con menos de 9 salas la cifra no vale: en Windows sale inflada' : ''}`,
+      );
+    }
     console.log(
       `    hilo principal ocupado (robots incluidos): ${hiloMsPorS.toFixed(1)} ms/s, cota de lo que las salas dicen costar juntas: ` +
         `${juntasMsPorS.toFixed(1)} ms/s${juntasMsPorS > hiloMsPorS ? '  ← ¡MÁS QUE EL HILO ENTERO: la medida del canal está mal!' : ''}`,
@@ -951,6 +1200,10 @@ async function banco(): Promise<void> {
         `(en Windows, a golpes de 15,6 ms: no es cota); pasos: ${String(Math.round((d1.pasos - d0.pasos) / segundos))}/s; ` +
         `reanclajes: ${String(d1.reanclajes - d0.reanclajes)}; validaciones en la ventana: ${String(d1.validaciones.veces - d0.validaciones.veces)} ` +
         `(la más lenta de la tanda, contando al abrir las salas: ${d1.validaciones.msMasLenta.toFixed(1)} ms)`,
+    );
+    console.log(
+      `    validaciones de la tanda: ${String(d1.validaciones.veces)}, ${d1.validaciones.ms.toFixed(1)} ms en total; ` +
+        `mundos revisados de verdad: ${String(d1.validacionesDelMundo)}, de ${String(d1.mundosNuevos)} mundos nuevos para sus salas`,
     );
     console.log(
       `    bajada por aparato: ${(bajado / robots.length / segundos / 1024).toFixed(2)} kB/s; ` +

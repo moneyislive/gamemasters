@@ -14,7 +14,15 @@
  * pintor necesita la caja ya metida. Sólo desde las caras que dan a la calle; por las medianeras el
  * volumen sigue a paño con el vecino, como en una manzana de verdad.
  */
-import type { Barrio, CajaDelBarrio, Cara, EstiloDeFachada as EstiloDelBarrio } from '../../../../shared/arcade/juegos/quiebro-barrio';
+import type {
+  Barrio,
+  CajaDelBarrio,
+  Cara,
+  EstiloDeFachada as EstiloDelBarrio,
+  FachadaDelEdificio,
+  RotuloDelBarrio,
+  TramoDeAltura,
+} from '../../../../shared/arcade/juegos/quiebro-barrio';
 import { ANCHO_DE_ACERA, ANCHO_DE_CALZADA, EJES_DE_CALLE, MEDIO_BARRIO, barrioDeLaNoche, trenEn } from '../../../../shared/arcade/juegos/quiebro-barrio';
 import type {
   CabinaDelPlano,
@@ -39,7 +47,8 @@ export function orientacionDelRumbo(rumbo: number): Orientacion {
   return r === 0 ? 'n' : r === 1 ? 'e' : r === 2 ? 's' : 'o';
 }
 
-function orientacionDeLaCara(c: Cara): Orientacion {
+/** La cara de una fachada (norte, este…) a la orientación del plano. */
+export function orientacionDeLaCara(c: Cara): Orientacion {
   return c === 'norte' ? 'n' : c === 'este' ? 'e' : c === 'sur' ? 's' : 'o';
 }
 
@@ -73,6 +82,72 @@ function tipoDeCoche(c: CajaXZ): TipoDeCoche {
   return h < 0.55 ? 'turismo' : h < 0.8 ? 'taxi' : 'furgoneta';
 }
 
+/** Lo de un edificio que el pintor necesita, como lo dan el barrio y la ciudad (los dos salen del mismo generador). */
+export interface EdificioQueSeTraduce {
+  readonly huella: CajaXZ;
+  readonly tramos: readonly TramoDeAltura[];
+  readonly estilo: EstiloDelBarrio;
+  readonly tono: number;
+  readonly vano: number;
+  readonly balcones: boolean;
+  readonly semilla: number;
+  readonly fachadas: readonly FachadaDelEdificio[];
+}
+
+/**
+ * UN EDIFICIO DEL PLANO a partir del del barrio o de la ciudad: los volúmenes con sus retranqueos hechos
+ * (sólo desde las caras que dan a la calle), la altura de planta, las fachadas y los soportales. `bajo` es
+ * su caja de choque (la planta baja, ya metida en cada cara con soportal) y `pilares` las de sus pilares.
+ */
+export function edificioDelPlano(e: EdificioQueSeTraduce, bajo: CajaXZ, soportales: readonly Cara[], pilares: readonly CajaXZ[]): EdificioDelPlano {
+  const caras = e.fachadas.map((f) => orientacionDeLaCara(f.cara));
+  const volumenes: Volumen[] = [];
+  e.tramos.forEach((t, i) => {
+    const planta = i === 0 ? bajo : t.entrante > 0 ? metida(e.huella, caras, t.entrante) : e.huella;
+    volumenes.push({ ...planta, y0: t.desde, y1: t.hasta });
+  });
+  const cuerpo = e.tramos[1] ?? e.tramos[0];
+  const alturaDePlanta = cuerpo === undefined || cuerpo.plantas === 0 ? 3 : (cuerpo.hasta - cuerpo.desde) / cuerpo.plantas;
+  const fondo = (c: Cara): number =>
+    c === 'norte' ? bajo.z0 - e.huella.z0 : c === 'sur' ? e.huella.z1 - bajo.z1 : c === 'oeste' ? bajo.x0 - e.huella.x0 : e.huella.x1 - bajo.x1;
+  return {
+    huella: e.huella,
+    caja: bajo,
+    volumenes,
+    estilo: ESTILO[e.estilo],
+    tono: (e.tono + 0.5) / 4,
+    vano: e.vano,
+    balcones: e.balcones,
+    plantaBaja: e.tramos[0]?.hasta ?? 4.5,
+    alturaDePlanta,
+    fachadas: e.fachadas.map((f) => ({ mira: orientacionDeLaCara(f.cara), bajo: f.bajo })),
+    soportales: soportales.map((c) => ({ mira: orientacionDeLaCara(c), fondo: fondo(c) })).filter((s) => s.fondo > 0.01),
+    pilares,
+    semilla: e.semilla,
+  };
+}
+
+/** Un rótulo del barrio o de la ciudad, como lo pinta el plano. */
+export function rotuloDelPlano(r: RotuloDelBarrio): RotuloDelPlano {
+  return {
+    texto: r.texto,
+    x: r.x,
+    y: r.y,
+    z: r.z,
+    mira: orientacionDeLaCara(r.cara),
+    ancho: r.ancho,
+    alto: r.alto,
+    color: r.color,
+    forma: r.clase === 'tienda' ? 'fachada' : 'bandera',
+    parpadea: r.parpadea,
+  };
+}
+
+/** Un coche aparcado en su caja: el tipo y la semilla por el hash de su sitio, igual en todos los aparatos. */
+export function cocheDelPlano(caja: CajaXZ, mira: number): CocheDelPlano {
+  return { tipo: tipoDeCoche(caja), caja, mira: orientacionDelRumbo(mira), semilla: Math.round(azarEn(Math.round(caja.x0 * 4), Math.round(caja.z1 * 4)) * 65535) };
+}
+
 /** El plano del barrio de verdad. */
 export function planoDe(barrio: Barrio): PlanoDeLaCiudad {
   const cajas = barrio.cajas;
@@ -90,39 +165,9 @@ export function planoDe(barrio: Barrio): PlanoDeLaCiudad {
     }
   }
 
-  const edificios: EdificioDelPlano[] = barrio.edificios.map((e) => {
-    const caras = e.fachadas.map((f) => orientacionDeLaCara(f.cara));
-    const bajo = cajaDe(cajas[e.caja]);
-    const volumenes: Volumen[] = [];
-    e.tramos.forEach((t, i) => {
-      const planta = i === 0 ? bajo : t.entrante > 0 ? metida(e.huella, caras, t.entrante) : e.huella;
-      volumenes.push({ ...planta, y0: t.desde, y1: t.hasta });
-    });
-    const cuerpo = e.tramos[1] ?? e.tramos[0];
-    const alturaDePlanta = cuerpo === undefined || cuerpo.plantas === 0 ? 3 : (cuerpo.hasta - cuerpo.desde) / cuerpo.plantas;
-    const soportal =
-      e.soportal === null
-        ? null
-        : {
-            mira: orientacionDeLaCara(e.soportal),
-            fondo: Math.max(bajo.x0 - e.huella.x0, e.huella.x1 - bajo.x1, bajo.z0 - e.huella.z0, e.huella.z1 - bajo.z1),
-          };
-    return {
-      huella: e.huella,
-      caja: bajo,
-      volumenes,
-      estilo: ESTILO[e.estilo],
-      tono: (e.tono + 0.5) / 4,
-      vano: e.vano,
-      balcones: e.balcones,
-      plantaBaja: e.tramos[0]?.hasta ?? 4.5,
-      alturaDePlanta,
-      fachadas: e.fachadas.map((f) => ({ mira: orientacionDeLaCara(f.cara), bajo: f.bajo })),
-      soportal,
-      pilares: e.pilares.map((i) => cajaDe(cajas[i])),
-      semilla: e.semilla,
-    };
-  });
+  const edificios: EdificioDelPlano[] = barrio.edificios.map((e) =>
+    edificioDelPlano(e, cajaDe(cajas[e.caja]), e.soportal === null ? [] : [e.soportal], e.pilares.map((i) => cajaDe(cajas[i]))),
+  );
 
   const deTipo = (tipo: CajaDelBarrio['tipo']): CajaDelBarrio[] => cajas.filter((c) => c.tipo === tipo);
   const conFrente = (c: CajaDelBarrio): PiezaConFrente => ({ caja: cajaDe(c), mira: orientacionDelRumbo(c.mira) });
@@ -144,10 +189,7 @@ export function planoDe(barrio: Barrio): PlanoDeLaCiudad {
     };
   });
 
-  const coches: CocheDelPlano[] = deTipo('coche').map((c) => {
-    const caja = cajaDe(c);
-    return { tipo: tipoDeCoche(caja), caja, mira: orientacionDelRumbo(c.mira), semilla: Math.round(azarEn(Math.round(c.x0 * 4), Math.round(c.z1 * 4)) * 65535) };
-  });
+  const coches: CocheDelPlano[] = deTipo('coche').map((c) => cocheDelPlano(cajaDe(c), c.mira));
 
   const cabinas: CabinaDelPlano[] = [...barrio.cabinas, barrio.refugio].map((c) => ({
     x: c.poste.x,
@@ -157,18 +199,7 @@ export function planoDe(barrio: Barrio): PlanoDeLaCiudad {
     caja: cajaDe(cajas[c.caja]),
   }));
 
-  const rotulos: RotuloDelPlano[] = barrio.adorno.rotulos.map((r) => ({
-    texto: r.texto,
-    x: r.x,
-    y: r.y,
-    z: r.z,
-    mira: orientacionDeLaCara(r.cara),
-    ancho: r.ancho,
-    alto: r.alto,
-    color: r.color,
-    forma: r.clase === 'tienda' ? 'fachada' : 'bandera',
-    parpadea: r.parpadea,
-  }));
+  const rotulos: RotuloDelPlano[] = barrio.adorno.rotulos.map(rotuloDelPlano);
 
   const t = barrio.tren;
   const tren = {

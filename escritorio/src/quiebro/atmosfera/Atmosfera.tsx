@@ -21,11 +21,20 @@
  * (`paleta.ts`): cielo, reflejos, niebla y sus capas, hemisferio, direccional, ventanas, halos,
  * tarjetas, lluvia y la luz de los cuerpos. Son uniformes y propiedades de luces: cambiarla no
  * recompila nada, así que se puede forzar en caliente para mirar las dos.
+ *
+ * ═══ EL CIELO, LA LLUVIA Y LAS SALPICADURAS, AL CAMBIAR DE NIVEL ═══
+ *
+ * Se rehacen con el nivel (el cielo fino desde N1, más gotas, salpicaduras desde N2). Antes se soltaba el
+ * viejo antes de pintar el nuevo, y three compilaba otra vez programas que ya tenía (la revisión de
+ * rendimiento del 24-sep los vio en cada tirón de cambio de nivel). Ahora van en un RELEVO
+ * (`calidad/precompilar.ts`): se pinta el que hay hasta que el nuevo está compilado para el pintado de ese
+ * momento, y el viejo se suelta después.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { RelevoDePieza, guardarLosProgramas, usarAlPintarLaEscena } from '../calidad/precompilar';
 import { crearElCielo, UNIFORMES_DEL_CIELO } from './cielo';
 import { crearLaLluvia, crearLasSalpicaduras, UNIFORMES_DE_LA_LLUVIA } from './lluvia';
 import type { FarolaEncendible } from './luz';
@@ -41,7 +50,8 @@ import { ponerLaPaleta, UNIFORMES_DE_LA_LUZ } from './paleta';
 export interface PropsDeLaAtmosfera {
   readonly tiempo: TiempoDeLaNoche;
   readonly nivel: NivelDeLaCiudad;
-  readonly farolas: readonly FarolaEncendible[];
+  /** Las farolas que pueden encenderse de verdad (N2+): fijas, o las de la ventana de celdas de ahora. */
+  readonly farolas: readonly FarolaEncendible[] | (() => readonly FarolaEncendible[]);
   readonly semilla: number;
   /** El tiempo del adorno (el Remanso lo frena). */
   readonly reloj?: () => number;
@@ -91,10 +101,11 @@ export function Atmosfera({ tiempo, nivel, farolas, semilla, reloj, farolasEncen
   }, [gl, detalle.sombras]);
 
   const cieloFino = nivel >= 1;
-  const cielo = useMemo(() => crearElCielo(cieloFino), [cieloFino]);
-  const lluvia = useMemo(() => crearLaLluvia(detalle.lluvia, semilla), [detalle.lluvia, semilla]);
+  /* Con su niebla ya puesta: se compilan antes de colgarse (ver la cabecera), y la de después sería otro programa. */
+  const cielo = useMemo(() => conNiebla(crearElCielo(cieloFino)), [cieloFino]);
+  const lluvia = useMemo(() => conNiebla(crearLaLluvia(detalle.lluvia, semilla)), [detalle.lluvia, semilla]);
   const salpicaduras = useMemo(
-    () => (detalle.salpicaduras > 0 ? crearLasSalpicaduras(detalle.salpicaduras, semilla) : null),
+    () => (detalle.salpicaduras > 0 ? conNiebla(crearLasSalpicaduras(detalle.salpicaduras, semilla)) : null),
     [detalle.salpicaduras, semilla],
   );
   const luces = useMemo(
@@ -102,28 +113,30 @@ export function Atmosfera({ tiempo, nivel, farolas, semilla, reloj, farolasEncen
     [farolas, detalle.lucesReales, detalle.sombras],
   );
 
+  /* Los relevos del cielo, la lluvia y las salpicaduras (ver la cabecera). */
+  const relevos = useMemo(
+    () => ({ cielo: new RelevoDePieza(new THREE.Group()), lluvia: new RelevoDePieza(new THREE.Group()), salpicaduras: new RelevoDePieza(new THREE.Group()) }),
+    [],
+  );
+  useLayoutEffect(() => relevos.cielo.poner(cielo, () => soltarLaMalla(cielo)), [relevos, cielo]);
+  useLayoutEffect(() => relevos.lluvia.poner(lluvia, () => soltarLaMalla(lluvia)), [relevos, lluvia]);
+  useLayoutEffect(() => {
+    if (salpicaduras === null) relevos.salpicaduras.liberar();
+    else relevos.salpicaduras.poner(salpicaduras, () => soltarLaMalla(salpicaduras));
+  }, [relevos, salpicaduras]);
   useEffect(
     () => () => {
-      cielo.geometry.dispose();
-      (cielo.material as THREE.Material).dispose();
+      relevos.cielo.liberar();
+      relevos.lluvia.liberar();
+      relevos.salpicaduras.liberar();
     },
-    [cielo],
+    [relevos],
   );
-  useEffect(
-    () => () => {
-      lluvia.geometry.dispose();
-      (lluvia.material as THREE.Material).dispose();
-    },
-    [lluvia],
-  );
-  useEffect(
-    () => () => {
-      if (salpicaduras === null) return;
-      salpicaduras.geometry.dispose();
-      (salpicaduras.material as THREE.Material).dispose();
-    },
-    [salpicaduras],
-  );
+  usarAlPintarLaEscena((gl, escena, camara) => {
+    relevos.cielo.enElPintado(gl, escena, camara);
+    relevos.lluvia.enElPintado(gl, escena, camara);
+    relevos.salpicaduras.enElPintado(gl, escena, camara);
+  });
   useEffect(
     () => () => {
       luces.direccional.shadow.map?.dispose();
@@ -150,6 +163,10 @@ export function Atmosfera({ tiempo, nivel, farolas, semilla, reloj, farolasEncen
   }, [scene, cielo, lluvia, luces, conSombras]);
 
   useFrame((estado, dt) => {
+    /* Lo relevado en el fotograma anterior, ya sin pintarse y con sus programas en lo nuevo. */
+    relevos.cielo.soltarLoViejo();
+    relevos.lluvia.soltarLoViejo();
+    relevos.salpicaduras.soltarLoViejo();
     const t = reloj !== undefined ? reloj() : estado.clock.elapsedTime;
     UNIFORMES_DEL_CIELO.uTiempo.value = t;
     luces.farolasEncendidas = farolasEncendidas;
@@ -164,10 +181,27 @@ export function Atmosfera({ tiempo, nivel, farolas, semilla, reloj, farolasEncen
 
   return (
     <>
-      <primitive object={cielo} />
-      <primitive object={lluvia} />
-      {salpicaduras !== null ? <primitive object={salpicaduras} /> : null}
+      <primitive object={relevos.cielo.grupo} />
+      <primitive object={relevos.lluvia.grupo} />
+      <primitive object={relevos.salpicaduras.grupo} />
       <primitive object={luces.grupo} />
     </>
   );
+}
+
+/** Le pone la niebla de altura antes de colgarla (ver `cielo` y `lluvia`). */
+function conNiebla<T extends THREE.Object3D>(o: T): T {
+  nieblaEnLaEscena(o);
+  return o;
+}
+
+/**
+ * Suelta la geometría y GUARDA el material con sus programas (`guardarLosProgramas`): el cielo fino y el llano, o
+ * la lluvia de dos niveles, vuelven al volver el nivel, y así no se enlazan otra vez. Dos por pieza: las dos
+ * variantes que alternan.
+ */
+function soltarLaMalla(m: THREE.Mesh | THREE.Points | THREE.LineSegments): void {
+  m.geometry.dispose();
+  const material = m.material as THREE.Material;
+  guardarLosProgramas(`atmosfera-${material.name}`, [material], 2);
 }

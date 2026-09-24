@@ -26,8 +26,8 @@
  * sala en cuanto llega, pero su cuerpo pintado sigue siendo el del fotograma anterior hasta que la
  * partida vuelva a escribir, y es ahí donde tiene que salir el desalojo o arrancar el Trasvase.
  */
-import type { Barrio } from '../../../../shared/arcade/juegos/quiebro-barrio';
-import { trenEn } from '../../../../shared/arcade/juegos/quiebro-barrio';
+import { cajasDelLugar, posteDeLaZona, trenDelLugar, trenEnElLugar, velocidadDelTren } from './lugar';
+import type { LugarDeLaNoche } from './lugar';
 import { UNO } from '../../../../shared/mecanicas/fijo';
 import { MOTIVO_DE_IRSE, PRIMER_NUMERO_DE_ENTIDAD, RESULTADO } from '../../../../shared/mecanicas/liza/protocolo';
 import type { Gesto } from '../cuerpos';
@@ -77,13 +77,29 @@ function fuerzaDelGesto(g: Gesto): number {
   }
 }
 
-/** El material contra el que se estampa, por el tipo de caja del barrio. */
-function materialDeLaCaja(barrio: Barrio | null, caja: number): Material {
-  const c = barrio?.cajas[caja - 1];
+/**
+ * El material contra el que se estampa, por el tipo de la caja (la del barrio o la de la ciudad: el índice
+ * del `empuja` es el de las cajas del mundo más uno, y las del lugar van en ese orden).
+ */
+function materialDeLaCaja(lugar: LugarDeLaNoche | null, caja: number): Material {
+  const c = cajasDelLugar(lugar)[caja - 1];
   if (c === undefined) return 'piedra';
-  if (c.tipo === 'coche' || c.tipo === 'farola' || c.tipo === 'valla' || c.tipo === 'cabina') return 'chapa';
-  if (c.tipo === 'quiosco' || c.tipo === 'quiosco-de-prensa') return 'cristal';
-  return 'piedra';
+  switch (c.tipo) {
+    case 'coche':
+    case 'farola':
+    case 'valla':
+    case 'cabina':
+    case 'contenedor':
+    case 'carretilla':
+    case 'corte':
+    case 'refugio':
+      return 'chapa';
+    case 'quiosco':
+    case 'quiosco-de-prensa':
+      return 'cristal';
+    default:
+      return 'piedra';
+  }
 }
 
 export class Escenificador {
@@ -146,16 +162,16 @@ export class Escenificador {
   }
 
   /** Lo que se hace en cada fotograma aunque no llegue nada: el Remanso que suena, el tren. */
-  cadaFotograma(ahora: number, barrio: Barrio | null): void {
+  cadaFotograma(ahora: number, lugar: LugarDeLaNoche | null): void {
     this.sonido.remanso(this.sistema.reloj.intensidad(ahora));
-    if (barrio !== null) {
+    if (lugar !== null) {
       const tic = this.partida.ticDeLosDurmientes();
-      const tren = trenEn(barrio, tic);
+      const tren = trenEnElLugar(lugar, tic);
       if (tren !== null && !this.trenPasando) {
-        const t = barrio.tren;
+        const t = trenDelLugar(lugar);
         const desde = t.eje === 'x' ? { x: t.sentido > 0 ? t.desde : t.hasta, y: t.alto, z: t.linea } : { x: t.linea, y: t.alto, z: t.sentido > 0 ? t.desde : t.hasta };
         const hasta = t.eje === 'x' ? { x: t.sentido > 0 ? t.hasta : t.desde, y: t.alto, z: t.linea } : { x: t.linea, y: t.alto, z: t.sentido > 0 ? t.hasta : t.desde };
-        this.sonido.tren(desde, hasta, Math.abs(t.hasta - t.desde) / 14);
+        this.sonido.tren(desde, hasta, Math.abs(t.hasta - t.desde) / velocidadDelTren(lugar));
       }
       this.trenPasando = tren !== null;
     }
@@ -376,7 +392,7 @@ export class Escenificador {
         const x = quien.x + Math.sin(rumbo) * metros;
         const z = quien.z - Math.cos(rumbo) * metros;
         this.sistema.impacto({ x, y: 1.1, z, fuerza: 1, dx: -Math.sin(rumbo), dy: 0.3, dz: Math.cos(rumbo) }, ahora + 200);
-        this.sonido.sonar('estampado', { material: materialDeLaCaja(p.barrio, s.caja), posicion: { x, y: 1.1, z }, enMs: ahora + 200 });
+        this.sonido.sonar('estampado', { material: materialDeLaCaja(p.lugar, s.caja), posicion: { x, y: 1.1, z }, enMs: ahora + 200 });
         this.sacudida = Math.max(this.sacudida, 0.8);
         return;
       }
@@ -388,23 +404,11 @@ export class Escenificador {
   /** El sitio de la cabina de la zona `id` de la Liza (el poste), en metros. */
   private cabinaDeLaZona(id: number): { x: number; z: number } | null {
     const l = this.partida.lectura;
-    const barrio = this.partida.barrio;
     const z = l?.zona(id) ?? null;
     if (z === null) return null;
     const cx = (z.caja.x0 + z.caja.x1) / 2 / UNO;
     const cz = (z.caja.z0 + z.caja.z1) / 2 / UNO;
-    if (barrio !== null) {
-      let mejor: { x: number; z: number } | null = null;
-      let lejos = Number.POSITIVE_INFINITY;
-      for (const c of [...barrio.cabinas, barrio.refugio]) {
-        const d = Math.hypot(c.poste.x - cx, c.poste.z - cz);
-        if (d < lejos) {
-          lejos = d;
-          mejor = { x: c.poste.x, z: c.poste.z };
-        }
-      }
-      if (mejor !== null && lejos < 6) return mejor;
-    }
-    return { x: cx, z: cz };
+    const poste = posteDeLaZona(this.partida.lugar, id, cx, cz);
+    return poste === null ? { x: cx, z: cz } : { x: poste.x, z: poste.z };
   }
 }

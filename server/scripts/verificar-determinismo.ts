@@ -180,16 +180,24 @@
  *     una mesa —su barrio de cuatrocientos nudos, su límite, sus clases— jugado novecientos tics por los
  *     robots del banco, con un asiento que se calla. La liza de juguete no la sustituye: su grafo tiene siete
  *     nudos y nada nace fuera de su límite, y una clausura sobre el `let` de un bucle metida en
- *     `puntoParaEntrar` salía en verde. Suelo: golpes, nacimientos, entidades que entran en el límite (y, en
- *     solitario, alguna sin nadie a quien perseguir), un ausente y, entre dos, balas con su línea.
+ *     `puntoParaEntrar` salía en verde. Suelo: golpes, nacimientos, un ausente y, entre dos, balas con su
+ *     línea. (Hasta la ciudad abierta también entidades que entraban en el límite; con el límite de la
+ *     ciudad ya no nace nada fuera, y la entrada la juega la 5.)
  *  5. LA LIZA SIN BLANCO (`jugarLaLizaSinBlanco`): las que nacen fuera del límite, detrás de un muro, sin
  *     nadie a quien perseguir, y entran rodeándolo por el grafo —lo único que recorre `entrarPorElGrafo`,
  *     que en las bocas de las calles de El Quiebro casi nunca corre—. Suelo: nacen cuatro y entran las cuatro.
+ *  6. LA LIZA ABIERTA CON L10 (`jugarLaLizaAbiertaConOlvido`): la ciudad de juguete con el alcance de blanco
+ *     y el olvido, uno que corre y otro que se calla. Suelo: entidades que nacen, que se olvidan y que su
+ *     grupo vuelve a sacar, golpes, ninguna con su blanco más allá del alcance más lo que anda un golpe, y
+ *     entidades que se ACERCAN sin blanco a quien las acompaña (la franja entre el alcance y el olvido, que
+ *     la revisión de la entrega 1 encontró sin salida) sin que ninguna se quede parada ahí.
  *
  * Se vio rojo, a propósito y en un espejo del árbol, con una clausura sobre el `let` de un bucle metida en
  * la sala (Hermes da otro número a lo que nace): caen las dos lizas en el escalón 2, con todos los
  * suelos en verde y nada más en rojo. Con la liza jugada veinte tics en vez de seiscientos caen sus dos
- * suelos; con tres barrios, el de las piezas; y con la mesa sin travesuras, el suyo.
+ * suelos; con tres barrios, el de las piezas; y con la mesa sin travesuras, el suyo. Con la sala que no se
+ * acerca sin blanco (la de antes de la revisión de la entrega 1: 0 tics acercándose y 11 paradas), o con la
+ * vigilancia de los NPC ciega a la franja, caen los dos de la liza abierta con L10.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -213,14 +221,18 @@ import {
   NOCHES_DEL_QUIEBRO,
   SALAS_DEL_QUIEBRO,
   SEMILLAS,
+  SEMILLA_DE_LA_LIZA_ABIERTA,
+  SEMILLA_DE_LA_LIZA_CON_OLVIDO,
   SEMILLAS_DE_LA_LIZA,
   segundosDeLaTanda,
+  TICS_DE_LA_LIZA_ABIERTA,
+  TICS_DE_LA_LIZA_CON_OLVIDO,
   TICS_DE_LA_LIZA_SIN_BLANCO,
   TICS_DE_LA_LIZA,
   TOPE_DE_PASOS,
 } from './guion-determinismo';
 import type { BarrioDelQuiebro, Jugada, JugadaDelBurgo, JugadaDeLasLindes, JugadaDelQuiebro, SalaDelQuiebroJugada, Tanda } from './guion-determinismo';
-import type { JugadaDeLaLiza, JugadaSinBlanco } from './liza-de-juguete';
+import type { JugadaConOlvido, JugadaDeLaLiza, JugadaDeLaLizaAbierta, JugadaSinBlanco } from './liza-de-juguete';
 /*
  * Las clases del recuento salen del juego y no de una lista escrita aquí: si mañana se añade
  * una quinta, este comprobador la exige sola en vez de seguir en verde sin mirarla.
@@ -557,15 +569,17 @@ comprobar(
       `  sala de El Quiebro, semilla ${String(a.semilla).padStart(10)} · ${a.asientos} asientos · ${a.clave} · ${a.tics} tics · ${String(a.anuncios).padStart(3)} anuncios · ` +
         `${String(a.balas).padStart(3)} balas · ${String(a.lineas).padStart(3)} líneas · ${a.nacidas} nacidas · ${a.entraron} entraron (${a.entraronSinBlanco} sin blanco) · ${a.ausentes} ausentes`,
     );
+    /*
+     * Desde la ciudad abierta (entrega 1: el límite es la ciudad en todas las fases de combate) nada nace
+     * fuera del límite en El Quiebro, así que ya no se le pide que entren: lo que recorre la entrada —y la
+     * entrada sin nadie a quien perseguir— lo juega la liza sin blanco (5), en los dos motores. Y con L10
+     * declarado (el olvido: lo que se queda junto al que se calla se olvida, porque el ausente no acompaña),
+     * la sala de uno golpea menos mientras su asiento está callado: 12 anuncios con L10 y 18 sin él, con
+     * seis olvidos y seis nacidas de más. El suelo pide 10.
+     */
     comprobar(
-      `la sala de El Quiebro de la semilla ${a.semilla} se juega de verdad: golpes, entidades que nacen fuera y entran en el límite${a.asientos === 1 ? ' (alguna sin nadie a quien perseguir)' : ', balas con su línea'} y un ausente`,
-      a.tics >= 800 &&
-        a.anuncios >= 15 &&
-        a.nacidas >= 6 &&
-        a.entraron >= 3 &&
-        a.ausentes >= 1 &&
-        (a.asientos > 1 || a.entraronSinBlanco >= 1) &&
-        (a.asientos === 1 || (a.balas >= 20 && a.lineas >= 8)),
+      `la sala de El Quiebro de la semilla ${a.semilla} se juega de verdad: golpes, entidades que nacen${a.asientos === 1 ? '' : ', balas con su línea'} y un ausente`,
+      a.tics >= 800 && a.anuncios >= 10 && a.nacidas >= 6 && a.ausentes >= 1 && (a.asientos === 1 || (a.balas >= 20 && a.lineas >= 8)),
       { ...a, salidas: undefined, huella: undefined },
     );
     comprobar(
@@ -586,6 +600,78 @@ comprobar(
     comprobar(
       'y da lo mismo dos veces',
       a !== undefined && b !== undefined && a.salidas === b.salidas && a.huella === b.huella,
+      a === undefined || b === undefined ? 'falta' : { primera: [a.salidas, a.huella], segunda: [b.salidas, b.huella] },
+    );
+  }
+  {
+    /*
+     * LA LIZA ABIERTA: la que enciende los índices de la Liza por dentro (ver `TICS_DE_LA_LIZA_ABIERTA`). Su
+     * suelo mira también que los índices CONTESTARON: sin eso, una ciudad que por lo que fuera no los
+     * encendiera compararía el recorrido de siempre en los dos motores y saldría en verde.
+     */
+    const a = primera.lizaAbierta as JugadaDeLaLizaAbierta | undefined;
+    const b = segunda.lizaAbierta as JugadaDeLaLizaAbierta | undefined;
+    if (a !== undefined) {
+      console.log(
+        `  liza abierta, semilla ${a.semilla} · ${a.cajas} cajas · ${a.nudos} nudos · ${a.tics} tics · ${a.anuncios} anuncios · ${a.balas} balas · ${a.nacidas} nacidas · ` +
+          `${a.losasPorCeldas} losas y ${a.nudosPorCeldas} nudos por celdas · campos: ${a.camposAcotados} acotados, ${a.camposReusados} reusados, ${a.camposCompletados} completados`,
+      );
+    }
+    comprobar(
+      'la liza abierta se juega de verdad y por los índices: golpes, balas y entidades que nacen; losas y nudos por celdas; campos acotados, reusados y completados',
+      a !== undefined &&
+        a.semilla === SEMILLA_DE_LA_LIZA_ABIERTA &&
+        a.tics === TICS_DE_LA_LIZA_ABIERTA &&
+        a.cajas >= 512 &&
+        a.nudos >= 512 &&
+        a.anuncios >= 10 &&
+        a.balas >= 30 &&
+        a.nacidas >= 14 &&
+        a.losasPorCeldas > 0 &&
+        a.nudosPorCeldas > 0 &&
+        a.camposAcotados > 0 &&
+        a.camposReusados > 0 &&
+        a.camposCompletados > 0,
+      a === undefined ? 'no está' : { ...a, salidas: undefined, huella: undefined },
+    );
+    comprobar(
+      'y da lo mismo dos veces: todo lo que sale en cada tic, el estado final y lo que contestó cada índice',
+      a !== undefined && b !== undefined && canonico(a) === canonico(b),
+      a === undefined || b === undefined ? 'falta' : { primera: { ...a, salidas: undefined, huella: undefined }, segunda: { ...b, salidas: undefined, huella: undefined }, hilos: [a.salidas, a.huella, b.salidas, b.huella] },
+    );
+  }
+  {
+    /*
+     * LA LIZA ABIERTA CON L10: el alcance de blanco y el olvido, que corren en cada tic de la sala de una liza
+     * abierta. Su suelo mira que el olvido OCURRIÓ —si no, los dos motores coincidirían en no olvidar nada—,
+     * que nadie tuvo su blanco más allá del alcance (45) más lo que anda un golpe ya lanzado, y que en la
+     * franja entre el alcance y el olvido hubo entidades ACERCÁNDOSE sin blanco (`acercarseSinBlanco`: si no,
+     * los dos motores coincidirían en no recorrerlo) y ninguna parada.
+     */
+    const a = primera.lizaConOlvido as JugadaConOlvido | undefined;
+    const b = segunda.lizaConOlvido as JugadaConOlvido | undefined;
+    if (a !== undefined) {
+      console.log(
+        `  liza abierta con L10, semilla ${a.semilla} · ${a.tics} tics · ${a.nacidas} nacidas · ${a.olvidadas} olvidadas · ${a.anuncios} anuncios · el blanco más lejano a ${a.masLejos} · ` +
+          `${a.acercandose} tics acercándose sin blanco · ${a.paradas} paradas`,
+      );
+    }
+    comprobar(
+      'la liza abierta con L10 se juega de verdad: entidades que nacen, se olvidan y su grupo vuelve a sacar, golpes, ningún blanco más allá del alcance, y las que se quedan sin blanco acompañadas se acercan',
+      a !== undefined &&
+        a.semilla === SEMILLA_DE_LA_LIZA_CON_OLVIDO &&
+        a.tics === TICS_DE_LA_LIZA_CON_OLVIDO &&
+        a.olvidadas >= 3 &&
+        a.nacidas >= 14 + a.olvidadas &&
+        a.anuncios >= 10 &&
+        a.masLejos <= 50 &&
+        a.acercandose >= 500 &&
+        a.paradas === 0,
+      a === undefined ? 'no está' : { ...a, salidas: undefined, huella: undefined },
+    );
+    comprobar(
+      'y la liza abierta con L10 da lo mismo dos veces en el mismo proceso',
+      a !== undefined && b !== undefined && canonico(a) === canonico(b),
       a === undefined || b === undefined ? 'falta' : { primera: [a.salidas, a.huella], segunda: [b.salidas, b.huella] },
     );
   }
@@ -929,6 +1015,24 @@ if (enNode !== null && enHermes !== null) {
       { node: a, hermes: b },
     );
   }
+  {
+    const a = enNode.lizaAbierta as JugadaDeLaLizaAbierta | undefined;
+    const b = enHermes.lizaAbierta as JugadaDeLaLizaAbierta | undefined;
+    comprobar(
+      'la liza abierta, jugada con los índices de la Liza, da LO MISMO en Node y en Hermes: cada salida de cada tic, el estado final y lo que contestó cada índice',
+      a !== undefined && b !== undefined && a.losasPorCeldas > 0 && a.camposCompletados > 0 && canonico(a) === canonico(b),
+      a === undefined || b === undefined ? 'falta' : { node: { ...a, salidas: undefined, huella: undefined }, hermes: { ...b, salidas: undefined, huella: undefined }, hilos: [a.salidas, a.huella, b.salidas, b.huella] },
+    );
+  }
+  {
+    const a = enNode.lizaConOlvido as JugadaConOlvido | undefined;
+    const b = enHermes.lizaConOlvido as JugadaConOlvido | undefined;
+    comprobar(
+      'la liza abierta con L10 (alcance de blanco y olvido), jugada, da LO MISMO en Node y en Hermes: cada salida de cada tic, el estado final, lo que se olvidó y lo que se acercó sin blanco',
+      a !== undefined && b !== undefined && a.olvidadas >= 3 && a.acercandose >= 500 && canonico(a) === canonico(b),
+      a === undefined || b === undefined ? 'falta' : { node: { ...a, salidas: undefined, huella: undefined }, hermes: { ...b, salidas: undefined, huella: undefined }, hilos: [a.salidas, a.huella, b.salidas, b.huella] },
+    );
+  }
   for (let i = 0; i < Math.min(salasEnNode.length, salasEnHermes.length); i++) {
     const a = salasEnNode[i] as SalaDelQuiebroJugada;
     const b = salasEnHermes[i] as SalaDelQuiebroJugada;
@@ -985,6 +1089,8 @@ if (enNode !== null && enHermes !== null) {
     ...primera.mesasDelQuiebro.map((m) => m.huella),
     ...primera.salasDelQuiebro.map((l) => l.salidas + l.huella),
     primera.lizaSinBlanco.salidas + primera.lizaSinBlanco.huella,
+    primera.lizaAbierta.salidas + primera.lizaAbierta.huella,
+    primera.lizaConOlvido.salidas + primera.lizaConOlvido.huella,
   ]);
   const deFuera = canonico([
     ...enNode.jugadas.map((j) => j.huella),
@@ -995,6 +1101,8 @@ if (enNode !== null && enHermes !== null) {
     ...mesasEnNode.map((m) => m.huella),
     ...salasEnNode.map((l) => l.salidas + l.huella),
     enNode.lizaSinBlanco === undefined ? '' : enNode.lizaSinBlanco.salidas + enNode.lizaSinBlanco.huella,
+    enNode.lizaAbierta === undefined ? '' : enNode.lizaAbierta.salidas + enNode.lizaAbierta.huella,
+    enNode.lizaConOlvido === undefined ? '' : enNode.lizaConOlvido.salidas + enNode.lizaConOlvido.huella,
   ]);
   comprobar(
     'el paquete de esbuild da lo mismo que el mismo código sin empaquetar',
@@ -1147,6 +1255,10 @@ if (fallos.length === 0) {
       '  con un ausente y dos cambios de fase, cuatro mesas jugadas por su robot con travesuras, y dos\n' +
       '  salas de sus combates de verdad jugadas novecientos tics, con entidades que entran en el límite;\n' +
       '  y la liza sin blanco, con las que entran rodeando un muro sin nadie a quien perseguir.\n' +
+      '  Y la liza abierta, una ciudad de juguete de ochocientas cajas y ochocientos nudos jugada\n' +
+      '  cuatrocientos tics POR LOS ÍNDICES de la Liza: losas y nudos por celdas, y campos por meta.\n' +
+      '  Y la misma ciudad con el alcance de blanco y el olvido, setecientos tics: lo que se olvida,\n' +
+      '  lo que su grupo vuelve a sacar y lo que se acerca sin blanco sale igual en los dos motores.\n' +
       '  Sin mirar, y dicho a propósito: recoger un labriego y pasar de turno no salen en estas\n' +
       '  cuatro semillas de Las Lindes, así que esas dos ramas no las compara nadie todavía.',
   );

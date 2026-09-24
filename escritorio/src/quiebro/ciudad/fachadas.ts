@@ -800,10 +800,27 @@ export interface OpcionesDeLasFachadas {
   readonly relieve: boolean;
   /** Recoger ventanas encendidas y escaparates (para las tarjetas y la luz horneada). */
   readonly ventanas: boolean;
+  /**
+   * Volúmenes que NO se escriben pero tapan: los de los edificios de al lado que van en otra celda (el
+   * cerco es una fila continua de fachadas partida en las rayas de las celdas). Sin ellos, la cara que da
+   * al vecino de la otra celda saldría con ventanas en vez de medianera.
+   */
+  readonly vecinos?: readonly Volumen[];
 }
 
 /** Los atributos del molde de las fachadas. */
 export const ATRIBUTOS_DE_LA_FACHADA = { aCara: 4, aVolumen: 4, aPlanta: 2 } as const;
+
+/**
+ * UNA CAJA DE RELIEVE con los atributos de la fachada: pared lisa del estilo, sin huecos. Para lo que va con
+ * las fachadas sin ser un edificio (la viga y los pilares del Elevado en lo lejano).
+ */
+export function cajaDeRelieve(m: Molde, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, estilo: EstiloDeFachada, caras = 'nseoa'): void {
+  m.poner('aCara', 1, NUMERO_DEL_ESTILO[estilo], 0, TIPO.relieve);
+  m.poner('aVolumen', 4.5, y1, 0.5, 3);
+  m.poner('aPlanta', 3, BAJO.sinCalle);
+  m.caja(x0, y0, z0, x1, y1, z1, caras);
+}
 
 /** Lo que estorba de las fachadas: la planta baja de cada edificio y los pilares de su soportal. */
 export function huellasDeLasFachadas(edificios: readonly EdificioDelPlano[]): CajaXZ[] {
@@ -815,15 +832,32 @@ export function huellasDeLasFachadas(edificios: readonly EdificioDelPlano[]): Ca
  * Devuelve las ventanas encendidas bajas y los escaparates (si se piden).
  */
 export function escribirLasFachadas(m: Molde, edificios: readonly EdificioDelPlano[], opciones: OpcionesDeLasFachadas): VentanaEncendida[] {
-  const todos: Volumen[] = edificios.flatMap((e) => e.volumenes);
-  const cerca = indiceDeVolumenes(todos);
   const ventanas: VentanaEncendida[] = [];
+  for (const _ of fachadasPorPartes(m, edificios, opciones, ventanas)) {
+    /* de un tirón */
+  }
+  return ventanas;
+}
+
+/** Cada cuántos balcones se cede el paso: seis son unos 700 triángulos con sus barandillas. */
+const BALCONES_POR_TROZO = 6;
+
+/**
+ * LAS FACHADAS A TROZOS: lo mismo que `escribirLasFachadas`, cediendo el paso después de cada cara, de
+ * cada azotea y de cada puñado de balcones. Es lo que usa la ventana de celdas (`celdas.ts`) para que el
+ * trabajo de un fotograma no pase de su tope de triángulos: una cara con balcones son 1.500 triángulos, y
+ * un edificio entero de N3 pasa de 5.000. Las ventanas encendidas y los escaparates van a `ventanas`.
+ */
+export function* fachadasPorPartes(m: Molde, edificios: readonly EdificioDelPlano[], opciones: OpcionesDeLasFachadas, ventanas: VentanaEncendida[]): Generator<void, void, void> {
+  const todos: Volumen[] = [...edificios.flatMap((e) => e.volumenes), ...(opciones.vecinos ?? [])];
+  const cerca = indiceDeVolumenes(todos);
 
   for (const e of edificios) {
     const estilo = NUMERO_DEL_ESTILO[e.estilo];
     const tinte = Math.min(0.99, Math.max(0, e.tono + (azarEn(e.semilla, 7) - 0.5) * 0.1));
     const balcones = opciones.relieve && e.balcones && e.estilo !== 'vidrio' && e.estilo !== 'hormigon';
-    e.volumenes.forEach((v, iv) => {
+    for (let iv = 0; iv < e.volumenes.length; iv++) {
+      const v = e.volumenes[iv] as Volumen;
       for (const c of carasDe(v)) {
         const ancho = c.hasta - c.desde;
         const semilla = semillaDeLaCara(e, iv, c.mira);
@@ -851,15 +885,23 @@ export function escribirLasFachadas(m: Molde, edificios: readonly EdificioDelPla
             muroDeLaCara(m, c, a, b, ya, yb);
           }
         }
+        yield;
         if (fachada !== undefined && (opciones.ventanas || balcones)) {
+          const huecos: (readonly [number, number])[] = [];
           recorrerLosHuecos(e, v, c, toques, (celda, planta, ux, y, ySuelo) => {
             const [nx, nz] = normalDe(c.mira);
             const [px, pz] = puntoDeLaCara(c, ux);
             if (opciones.ventanas && planta <= 3 && encendida(celda, planta, semilla, estilo)) {
               ventanas.push({ x: px + nx * 0.05, y, z: pz + nz * 0.05, color: colorDeLaVentana(celda, planta, semilla), escaparate: false, normal: [nx, nz] });
             }
-            if (balcones && planta <= 5) escribirUnBalcon(m, e, c, ux, ySuelo, estilo, semilla, ancho, v.y1, tinte);
+            if (balcones && planta <= 5) huecos.push([ux, ySuelo]);
           });
+          for (let k = 0; k < huecos.length; k++) {
+            const [ux, ySuelo] = huecos[k] as readonly [number, number];
+            escribirUnBalcon(m, e, c, ux, ySuelo, estilo, semilla, ancho, v.y1, tinte);
+            if ((k + 1) % BALCONES_POR_TROZO === 0) yield;
+          }
+          if (huecos.length % BALCONES_POR_TROZO !== 0) yield;
         }
         if (opciones.ventanas && fachada !== undefined && fachada.bajo !== 'portales' && v.y0 < 0.01) {
           escaparatesDe(c, semilla, toques, ventanas);
@@ -871,10 +913,11 @@ export function escribirLasFachadas(m: Molde, edificios: readonly EdificioDelPla
       m.poner('aPlanta', e.alturaDePlanta, BAJO.sinCalle);
       m.losa(v.x0, v.z0, v.x1, v.z1, v.y1, true);
       if (opciones.relieve) escribirElRemate(m, e, v, estilo, tinte, iv);
-    });
+      yield;
+    }
     escribirElSoportal(m, e, estilo, tinte);
+    yield;
   }
-  return ventanas;
 }
 
 /**
@@ -1048,18 +1091,24 @@ function escribirLaAzotea(m: Molde, e: EdificioDelPlano, v: Volumen, estilo: num
 
 /** El techo del soportal (la cara de abajo del cuerpo que vuela) y sus pilares. */
 function escribirElSoportal(m: Molde, e: EdificioDelPlano, estilo: number, tinte: number): void {
-  if (e.soportal === null) return;
+  if (e.soportales.length === 0) return;
   const h = e.huella;
   const b = e.caja;
   const y = e.plantaBaja;
   m.poner('aCara', 1, estilo, 0, TIPO.techoDeSoportal);
   m.poner('aVolumen', e.plantaBaja, y, tinte, e.vano);
   m.poner('aPlanta', e.alturaDePlanta, BAJO.sinCalle);
-  const s = e.soportal.mira;
-  if (s === 'n') m.losa(h.x0, h.z0, h.x1, b.z0, y, false);
-  else if (s === 's') m.losa(h.x0, b.z1, h.x1, h.z1, y, false);
-  else if (s === 'e') m.losa(b.x1, h.z0, h.x1, h.z1, y, false);
-  else m.losa(h.x0, h.z0, b.x0, h.z1, y, false);
+  /* Con soportal en dos caras que hacen esquina, el techo de la esquina lo pone el de la cara norte o sur:
+     dos losas en el mismo plano parpadearían. */
+  const tiene = (o: string): boolean => e.soportales.some((x) => x.mira === o);
+  const z0 = tiene('n') ? b.z0 : h.z0;
+  const z1 = tiene('s') ? b.z1 : h.z1;
+  for (const { mira: s } of e.soportales) {
+    if (s === 'n') m.losa(h.x0, h.z0, h.x1, b.z0, y, false);
+    else if (s === 's') m.losa(h.x0, b.z1, h.x1, h.z1, y, false);
+    else if (s === 'e') m.losa(b.x1, z0, h.x1, z1, y, false);
+    else m.losa(h.x0, z0, b.x0, z1, y, false);
+  }
   m.poner('aCara', 1, estilo, 0, TIPO.relieve);
   for (const p of e.pilares) m.caja(p.x0, 0, p.z0, p.x1, y, p.z1, 'nseo');
 }
@@ -1106,8 +1155,8 @@ export interface CaraDeCalle {
 }
 
 /** Las caras de los edificios que dan a una calle (las que tienen fachada). */
-export function carasDeCalle(edificios: readonly EdificioDelPlano[]): CaraDeCalle[] {
-  const todos: Volumen[] = edificios.flatMap((e) => e.volumenes);
+export function carasDeCalle(edificios: readonly EdificioDelPlano[], vecinos: readonly Volumen[] = []): CaraDeCalle[] {
+  const todos: Volumen[] = [...edificios.flatMap((e) => e.volumenes), ...vecinos];
   const cerca = indiceDeVolumenes(todos);
   const salida: CaraDeCalle[] = [];
   for (const e of edificios) {

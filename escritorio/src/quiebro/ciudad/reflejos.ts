@@ -26,6 +26,7 @@ import { nieblaEn } from '../atmosfera/niebla';
 import { GLSL_CHARCOS, GLSL_RUIDO } from './glsl';
 import { UNIFORMES_DE_LA_CIUDAD } from './retoques';
 import type { CajaXZ } from './tipos';
+import { rellenarInstancias } from './geometria';
 import { ALTURA_DE_LA_ACERA } from './tipos';
 
 /** Una fuente que se refleja en el suelo. */
@@ -184,7 +185,8 @@ export class RejillaDeHuellas {
 
   /** ¿Se ve en planta el punto B desde A? Muestras cada `paso` m, sin el último metro. */
   seVe(ax: number, az: number, bx: number, bz: number, paso = 2): boolean {
-    const d = Math.hypot(bx - ax, bz - az);
+    /* `Math.sqrt` y no `Math.hypot`: ése empaqueta sus argumentos en el montón (ver `visibilidad`). */
+    const d = Math.sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
     const n = Math.floor((d - 0.8) / paso);
     for (let i = 1; i <= n; i++) {
       const f = (i * paso) / d;
@@ -192,6 +194,66 @@ export class RejillaDeHuellas {
     }
     return true;
   }
+
+  /**
+   * LA VISIBILIDAD DE TODAS LAS FUENTES desde `(ax, az)`, de una vez: en `visibles[i]`, 1 si la fuente `i` está a
+   * menos de `alcance` y se ve (`seVe`, con muestras cada 2 m), 0 si no. Devuelve si cambió alguna. Es lo mismo
+   * que `seVe` fuente a fuente, pero en UN bucle sin llamadas por fuente ni por muestra: pasar números con
+   * decimales de una función a otra que no se funde con ella los empaqueta en el montón, y con cientos de
+   * fuentes y decenas de muestras cada seis fotogramas eran 3-10 KiB de basura por fotograma con la cámara
+   * QUIETA (revisión de rendimiento del 24-sep). Y sin `Math.hypot`, que también los empaqueta (en Node 20,
+   * 32 KiB por llamada con 400 fuentes, contra 0,07 con `Math.sqrt`). El comprobador mira que dé lo mismo que
+   * `seVe` y cuenta lo que asigna la ciudad quieta.
+   */
+  visibilidad(ax: number, az: number, fuentes: readonly FuenteDeReflejo[], alcance: number, visibles: Float32Array): boolean {
+    const celda = this.celda;
+    const mapa = this.mapa;
+    let cambio = false;
+    const n = Math.min(fuentes.length, visibles.length);
+    for (let i = 0; i < n; i++) {
+      const f = fuentes[i] as FuenteDeReflejo;
+      const dx = f.x - ax;
+      const dz = f.z - az;
+      /* Con `Math.hypot` este bucle dejaba 30 KiB por llamada: empaqueta sus dos argumentos en el montón. */
+      const d = Math.sqrt(dx * dx + dz * dz);
+      let v = d < alcance ? 1 : 0;
+      if (v === 1) {
+        const muestras = Math.floor((d - 0.8) / 2);
+        for (let k = 1; k <= muestras && v === 1; k++) {
+          const t = (k * 2) / d;
+          const x = ax + dx * t;
+          const z = az + dz * t;
+          const lista = mapa.get((Math.floor(x / celda) + 4096) * 8192 + (Math.floor(z / celda) + 4096));
+          if (lista === undefined) continue;
+          for (let h = 0; h < lista.length; h++) {
+            const c = lista[h] as CajaXZ;
+            if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1) {
+              v = 0;
+              break;
+            }
+          }
+        }
+      }
+      if (visibles[i] !== v) {
+        visibles[i] = v;
+        cambio = true;
+      }
+    }
+    return cambio;
+  }
+}
+
+/** Las listas instanciadas de unas fuentes, con sitio para `n` (lo que sobra, a cero). */
+function datosDeLasTarjetas(fuentes: readonly FuenteDeReflejo[], n: number): { aFuente: Float32Array; aColor: Float32Array; aVisible: Float32Array } {
+  const aFuente = new Float32Array(Math.max(1, n) * 4);
+  const aColor = new Float32Array(Math.max(1, n) * 4);
+  const aVisible = new Float32Array(Math.max(1, n));
+  fuentes.forEach((f, i) => {
+    aFuente.set([f.x, f.y, f.z, f.tamano], i * 4);
+    aColor.set([f.color[0], f.color[1], f.color[2], f.farola ? 1 : 0], i * 4);
+    aVisible[i] = 1;
+  });
+  return { aFuente, aColor, aVisible };
 }
 
 /** Hasta dónde se miran las fuentes: más lejos, la niebla ya se las ha comido. */
@@ -199,29 +261,25 @@ const ALCANCE_DE_LOS_REFLEJOS = 110;
 
 export class TarjetasDeReflejo {
   readonly malla: THREE.InstancedMesh;
-  private readonly fuentes: readonly FuenteDeReflejo[];
-  private readonly visible: THREE.InstancedBufferAttribute;
-  private readonly rejilla: RejillaDeHuellas;
+  private fuentes: readonly FuenteDeReflejo[];
+  private rejilla: RejillaDeHuellas;
   private fotograma = 0;
 
-  constructor(fuentes: readonly FuenteDeReflejo[], tapan: readonly CajaXZ[], material: THREE.Material) {
+  /**
+   * `capacidad`: cuántas fuentes caben sin cambiar de atributo. El barrio las pone todas de una vez; la
+   * ciudad abierta las cambia con la ventana de celdas (`poner`) y pide holgura.
+   */
+  constructor(fuentes: readonly FuenteDeReflejo[], tapan: readonly CajaXZ[], material: THREE.Material, capacidad = fuentes.length) {
     this.fuentes = fuentes;
     this.rejilla = new RejillaDeHuellas(tapan);
     const plano = new THREE.PlaneGeometry(1, 1);
-    const n = Math.max(1, fuentes.length);
-    const fuente = new Float32Array(n * 4);
-    const color = new Float32Array(n * 4);
-    const visible = new Float32Array(n);
-    fuentes.forEach((f, i) => {
-      fuente.set([f.x, f.y, f.z, f.tamano], i * 4);
-      color.set([f.color[0], f.color[1], f.color[2], f.farola ? 1 : 0], i * 4);
-      visible[i] = 1;
-    });
-    plano.setAttribute('aFuente', new THREE.InstancedBufferAttribute(fuente, 4));
-    plano.setAttribute('aColor', new THREE.InstancedBufferAttribute(color, 4));
-    this.visible = new THREE.InstancedBufferAttribute(visible, 1);
-    this.visible.setUsage(THREE.DynamicDrawUsage);
-    plano.setAttribute('aVisible', this.visible);
+    const n = Math.max(1, capacidad, fuentes.length);
+    const d = datosDeLasTarjetas(fuentes, n);
+    plano.setAttribute('aFuente', new THREE.InstancedBufferAttribute(d.aFuente, 4));
+    plano.setAttribute('aColor', new THREE.InstancedBufferAttribute(d.aColor, 4));
+    const visible = new THREE.InstancedBufferAttribute(d.aVisible, 1);
+    visible.setUsage(THREE.DynamicDrawUsage);
+    plano.setAttribute('aVisible', visible);
     this.malla = new THREE.InstancedMesh(plano, material, fuentes.length);
     this.malla.name = 'quiebro-tarjetas-de-reflejo';
     /* La posición la calcula el sombreador desde la cámara: la esfera de las instancias no dice nada. */
@@ -229,22 +287,29 @@ export class TarjetasDeReflejo {
     this.malla.renderOrder = 2;
   }
 
-  /** Cada pocos fotogramas: apaga las fuentes tapadas o lejanas. */
+  /** Cambia las fuentes y lo que las tapa (la ventana de celdas se movió). La visibilidad se rehace entera. */
+  poner(fuentes: readonly FuenteDeReflejo[], tapan: readonly CajaXZ[], camara: THREE.Vector3): void {
+    this.fuentes = fuentes;
+    this.rejilla = new RejillaDeHuellas(tapan);
+    rellenarInstancias(this.malla, datosDeLasTarjetas(fuentes, fuentes.length), fuentes.length);
+    this.actualizar(camara, true);
+  }
+
+  private get visible(): THREE.InstancedBufferAttribute {
+    return this.malla.geometry.getAttribute('aVisible') as THREE.InstancedBufferAttribute;
+  }
+
+  /** Cada pocos fotogramas: apaga las fuentes tapadas o lejanas (sin basura: ver `RejillaDeHuellas.visibilidad`). */
   actualizar(camara: THREE.Vector3, forzar = false): void {
     this.fotograma++;
     if (!forzar && this.fotograma % 6 !== 0) return;
     const datos = this.visible.array as Float32Array;
-    let cambio = false;
-    for (let i = 0; i < this.fuentes.length; i++) {
-      const f = this.fuentes[i] as FuenteDeReflejo;
-      const d = Math.hypot(f.x - camara.x, f.z - camara.z);
-      const v = d < ALCANCE_DE_LOS_REFLEJOS && this.rejilla.seVe(camara.x, camara.z, f.x, f.z) ? 1 : 0;
-      if (datos[i] !== v) {
-        datos[i] = v;
-        cambio = true;
-      }
+    const cambio = this.rejilla.visibilidad(camara.x, camara.z, this.fuentes, ALCANCE_DE_LOS_REFLEJOS, datos);
+    if (cambio) {
+      const v = this.visible;
+      v.clearUpdateRanges();
+      v.needsUpdate = true;
     }
-    if (cambio) this.visible.needsUpdate = true;
   }
 
   get cuantas(): number {

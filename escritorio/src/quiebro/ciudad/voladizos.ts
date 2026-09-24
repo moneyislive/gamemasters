@@ -29,7 +29,7 @@ import type { CaraDeCalle } from './fachadas';
 import { colocar } from './mobiliario';
 import { LARGO_DE_UNA_TIENDA, queTienda } from './hash';
 import { azarEn } from './azar';
-import type { NivelDeLaCiudad, PlanoDeLaCiudad } from './tipos';
+import type { CajaXZ, CalleDelPlano, FarolaDelPlano, NivelDeLaCiudad, PlanoDeLaCiudad } from './tipos';
 import { ALTURA_DE_LA_ACERA } from './tipos';
 
 type Rgb = readonly [number, number, number];
@@ -147,16 +147,36 @@ export interface OpcionesDeLosVoladizos {
   readonly aires: number;
 }
 
-function opcionesDelNivel(nivel: NivelDeLaCiudad): OpcionesDeLosVoladizos {
+export function opcionesDeLosVoladizos(nivel: NivelDeLaCiudad): OpcionesDeLosVoladizos {
   return nivel === 0 ? { escaleras: false, cables: false, aires: 0.5 } : { escaleras: true, cables: true, aires: 1 };
 }
 
 /** ESCRIBE LOS VOLADIZOS del barrio para un nivel. Devuelve su molde (color y acabado por vértice). */
 export function escribirLosVoladizos(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiudad): Molde {
-  const o = opcionesDelNivel(nivel);
+  const o = opcionesDeLosVoladizos(nivel);
   const m = new Molde(ATRIBUTOS_DEL_MOBILIARIO, true);
-  const caras = carasDeCalle(plano.edificios);
+  for (const _ of voladizosDeLasCaras(m, carasDeCalle(plano.edificios), o)) {
+    /* de un tirón */
+  }
+  if (o.cables) {
+    /* Un cable sólo se cuelga entre dos fachadas: en un cruce o junto a la plaza quedaría en el aire. */
+    const hayFachada = (x: number, z: number): boolean =>
+      plano.edificios.some((ed) => {
+        const h = ed.huella;
+        return Math.hypot(Math.max(h.x0 - x, 0, x - h.x1), Math.max(h.z0 - z, 0, z - h.z1)) < 1.2;
+      });
+    const sinTren = plano.calles.filter((calle) => !(plano.tren !== null && plano.tren.eje === calle.corre && Math.abs(plano.tren.linea - calle.en) < calle.calzada));
+    escribirLosCables(m, cablesDeLasCalles(sinTren, plano.limite, plano.semilla, hayFachada));
+  }
+  escribirLasBanderolas(m, plano.farolas, plano.semilla);
+  return m;
+}
 
+/**
+ * LO QUE CUELGA DE LAS CARAS DE CALLE (toldos, aparatos de aire, escaleras de incendios), cediendo el
+ * paso después de cada cara: una escalera de incendios de diez plantas son más de mil triángulos.
+ */
+export function* voladizosDeLasCaras(m: Molde, caras: readonly CaraDeCalle[], o: OpcionesDeLosVoladizos): Generator<void, void, void> {
   for (const c of caras) {
     const e = c.edificio;
     const ancho = c.hasta - c.desde;
@@ -176,7 +196,10 @@ export function escribirLosVoladizos(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiu
         m.con(sobreLaCara(c, uDe(c, a), 0), () => toldo(m, (t1 - t0) / 2 - 0.45, e.plantaBaja - 1.2));
       }
     }
-    if (c.indice === 0) continue;
+    if (c.indice === 0) {
+      yield;
+      continue;
+    }
     /* ─── Aparatos de aire bajo alguna ventana (no en el vidrio: allí es un muro cortina). ─── */
     if (e.estilo !== 'vidrio') {
       tono(m, CHAPA_CLARA, ACABADO.chapa);
@@ -207,60 +230,72 @@ export function escribirLosVoladizos(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiu
         escaleraDeIncendios(m, sobreLaCara(c, u, 0), Math.min(2 * vano - 0.3, 5.2), suelos);
       }
     }
+    yield;
   }
+}
 
-  /* ─── Cables de fachada a fachada, cruzando las calles del barrio (no por donde pasa el tren). ─── */
-  if (o.cables) {
-    tono(m, CABLE, ACABADO.caucho);
-    const L = plano.limite;
-    /* Un cable sólo se cuelga entre dos fachadas: en un cruce o junto a la plaza quedaría en el aire. */
-    const hayFachada = (x: number, z: number): boolean =>
-      plano.edificios.some((ed) => {
-        const h = ed.huella;
-        return Math.hypot(Math.max(h.x0 - x, 0, x - h.x1), Math.max(h.z0 - z, 0, z - h.z1)) < 1.2;
-      });
-    for (const calle of plano.calles) {
-      if (plano.tren !== null && plano.tren.eje === calle.corre && Math.abs(plano.tren.linea - calle.en) < calle.calzada) continue;
-      const medio = calle.calzada / 2 + calle.acera;
-      const desde = Math.max(calle.desde, calle.corre === 'x' ? L.x0 : L.z0) + 8;
-      const hasta = Math.min(calle.hasta, calle.corre === 'x' ? L.x1 : L.z1) - 8;
-      let s = desde + azarEn(plano.semilla, calle.en, 0xca) * 10;
-      let k = 0;
-      while (s < hasta) {
-        const y0 = 6.5 + azarEn(plano.semilla, calle.en, k, 1) * 2.5;
-        const y1 = y0 + (azarEn(plano.semilla, calle.en, k, 2) - 0.5) * 1.2;
-        const sesgo = (azarEn(plano.semilla, calle.en, k, 3) - 0.5) * 3;
-        const extremo = (t: number): readonly [number, number] => {
-          const aa = s + sesgo * t;
-          const bb = calle.en - medio + 2 * medio * t;
-          return calle.corre === 'x' ? [aa, bb] : [bb, aa];
-        };
-        const [xa, za] = extremo(0);
-        const [xb, zb] = extremo(1);
-        if (!hayFachada(xa, za) || !hayFachada(xb, zb)) {
-          s += 6;
-          k++;
-          continue;
-        }
-        const puntos: V3[] = [];
-        for (let i = 0; i <= 6; i++) {
-          const t = i / 6;
-          const y = y0 + (y1 - y0) * t - 0.7 * 4 * t * (1 - t);
-          const a = s + sesgo * t;
-          const b = calle.en - medio + 2 * medio * t;
-          puntos.push(calle.corre === 'x' ? [a, y, b] : [b, y, a]);
-        }
-        m.tubo(puntos, 0.014, 3);
-        s += 13 + azarEn(plano.semilla, calle.en, k, 4) * 12;
+/**
+ * LOS CABLES DE FACHADA A FACHADA que cruzan las calles, como polilíneas: `hayFachada` dice si hay una
+ * fachada a mano en cada punta (un cable no se cuelga del aire). Sale de la semilla y de la coordenada de
+ * cada calle, así que la ciudad los calcula todos de una vez y cada celda pinta los suyos.
+ */
+export function cablesDeLasCalles(
+  calles: readonly CalleDelPlano[],
+  limite: CajaXZ,
+  semilla: number,
+  hayFachada: (x: number, z: number) => boolean,
+): V3[][] {
+  const salida: V3[][] = [];
+  for (const calle of calles) {
+    const medio = calle.calzada / 2 + calle.acera;
+    const desde = Math.max(calle.desde, calle.corre === 'x' ? limite.x0 : limite.z0) + 8;
+    const hasta = Math.min(calle.hasta, calle.corre === 'x' ? limite.x1 : limite.z1) - 8;
+    let s = desde + azarEn(semilla, calle.en, 0xca) * 10;
+    let k = 0;
+    while (s < hasta) {
+      const y0 = 6.5 + azarEn(semilla, calle.en, k, 1) * 2.5;
+      const y1 = y0 + (azarEn(semilla, calle.en, k, 2) - 0.5) * 1.2;
+      const sesgo = (azarEn(semilla, calle.en, k, 3) - 0.5) * 3;
+      const inicio = s;
+      const extremo = (t: number): readonly [number, number] => {
+        const aa = inicio + sesgo * t;
+        const bb = calle.en - medio + 2 * medio * t;
+        return calle.corre === 'x' ? [aa, bb] : [bb, aa];
+      };
+      const [xa, za] = extremo(0);
+      const [xb, zb] = extremo(1);
+      if (!hayFachada(xa, za) || !hayFachada(xb, zb)) {
+        s += 6;
         k++;
+        continue;
       }
+      const puntos: V3[] = [];
+      for (let i = 0; i <= 6; i++) {
+        const t = i / 6;
+        const y = y0 + (y1 - y0) * t - 0.7 * 4 * t * (1 - t);
+        const a = s + sesgo * t;
+        const b = calle.en - medio + 2 * medio * t;
+        puntos.push(calle.corre === 'x' ? [a, y, b] : [b, y, a]);
+      }
+      salida.push(puntos);
+      s += 13 + azarEn(semilla, calle.en, k, 4) * 12;
+      k++;
     }
   }
+  return salida;
+}
 
-  /* ─── Banderolas en las farolas de calle: una lona colgada del fuste, a 3-4,3 m. ─── */
-  for (const f of plano.farolas) {
+/** Escribe unos cables (polilíneas) como tubos finos. */
+export function escribirLosCables(m: Molde, cables: readonly (readonly V3[])[]): void {
+  tono(m, CABLE, ACABADO.caucho);
+  for (const puntos of cables) m.tubo(puntos, 0.014, 3);
+}
+
+/** Las banderolas en las farolas de calle: una lona colgada del fuste, a 3-4,3 m. */
+export function escribirLasBanderolas(m: Molde, farolas: readonly FarolaDelPlano[], semilla: number): void {
+  for (const f of farolas) {
     if (f.brazo === null) continue;
-    const h = azarEn(plano.semilla, Math.round(f.x * 10), Math.round(f.z * 10), 0xba);
+    const h = azarEn(semilla, Math.round(f.x * 10), Math.round(f.z * 10), 0xba);
     if (h > 0.55) continue;
     tono(m, BANDEROLAS[Math.floor(h * 7.3) % BANDEROLAS.length] as Rgb, LONA);
     m.con(colocar(f.x, ALTURA_DE_LA_ACERA, f.z, f.brazo), () => {
@@ -269,5 +304,4 @@ export function escribirLosVoladizos(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiu
       m.muro(0.005, 0.56, 0.005, 0.12, 3.1, 4.28);
     });
   }
-  return m;
 }

@@ -40,6 +40,7 @@ import type {
   AccionDeclarada,
   ClaseDeEntidad,
   EstadoDeclarado,
+  GrafoDelMundo,
   LimiteDelMundo,
   LizaDeclarada,
   PortableDeclarado,
@@ -342,24 +343,7 @@ function construirIndices(d: LizaDeclarada): IndicesDeLaLiza {
   const porAsiento: IndicesDelAsiento[] = [];
   for (const r of d.asientos) porAsiento.push(indicesDelAsiento(r, remates, zona));
 
-  /* El grafo, en listas compactas: se recorre en anchura muchas veces y no se quiere basura. */
-  const cuantos = d.mundo.grafo.nudos.length;
-  const grado = new Int32Array(cuantos + 1);
-  for (const arista of d.mundo.grafo.aristas) {
-    grado[arista[0]] = (grado[arista[0]] as number) + 1;
-    grado[arista[1]] = (grado[arista[1]] as number) + 1;
-  }
-  const inicio = new Int32Array(cuantos + 1);
-  for (let i = 0; i < cuantos; i++) inicio[i + 1] = (inicio[i] as number) + (grado[i] as number);
-  const vecinos = new Int32Array(inicio[cuantos] as number);
-  const puesto = new Int32Array(cuantos);
-  for (const arista of d.mundo.grafo.aristas) {
-    const [u, v] = arista;
-    vecinos[(inicio[u] as number) + (puesto[u] as number)] = v;
-    puesto[u] = (puesto[u] as number) + 1;
-    vecinos[(inicio[v] as number) + (puesto[v] as number)] = u;
-    puesto[v] = (puesto[v] as number) + 1;
-  }
+  const { inicio, vecinos } = listasDelGrafo(d.mundo.grafo);
 
   return {
     estados: porId(d.estados),
@@ -377,6 +361,40 @@ function construirIndices(d: LizaDeclarada): IndicesDeLaLiza {
     inicio,
     vecinos,
   };
+}
+
+/**
+ * EL GRAFO, EN LISTAS COMPACTAS: se recorre muchas veces y no se quiere basura. Sale sólo del grafo, así
+ * que se guarda por la identidad del GRAFO y no de la declaración: con una ciudad (tres mil y pico nudos,
+ * cuatro mil y pico aristas) cada voto y cada fase traen una declaración nueva con el MISMO mundo, y
+ * rehacerlas en cada una era trabajo tirado (el diseño de la ciudad abierta, §5.4). Los campos de
+ * distancias de `cerebro.ts` se guardan igual, por el grafo, y leen estas listas.
+ */
+const LISTAS_DE_LOS_GRAFOS = new WeakMap<GrafoDelMundo, { readonly inicio: Int32Array; readonly vecinos: Int32Array }>();
+
+function listasDelGrafo(grafo: GrafoDelMundo): { readonly inicio: Int32Array; readonly vecinos: Int32Array } {
+  const hechas = LISTAS_DE_LOS_GRAFOS.get(grafo);
+  if (hechas !== undefined) return hechas;
+  const cuantos = grafo.nudos.length;
+  const grado = new Int32Array(cuantos + 1);
+  for (const arista of grafo.aristas) {
+    grado[arista[0]] = (grado[arista[0]] as number) + 1;
+    grado[arista[1]] = (grado[arista[1]] as number) + 1;
+  }
+  const inicio = new Int32Array(cuantos + 1);
+  for (let i = 0; i < cuantos; i++) inicio[i + 1] = (inicio[i] as number) + (grado[i] as number);
+  const vecinos = new Int32Array(inicio[cuantos] as number);
+  const puesto = new Int32Array(cuantos);
+  for (const arista of grafo.aristas) {
+    const [u, v] = arista;
+    vecinos[(inicio[u] as number) + (puesto[u] as number)] = v;
+    puesto[u] = (puesto[u] as number) + 1;
+    vecinos[(inicio[v] as number) + (puesto[v] as number)] = u;
+    puesto[v] = (puesto[v] as number) + 1;
+  }
+  const listas = { inicio, vecinos };
+  LISTAS_DE_LOS_GRAFOS.set(grafo, listas);
+  return listas;
 }
 
 function indicesDelAsiento(r: ReglasDeAsiento, remates: readonly number[], zona: number): IndicesDelAsiento {

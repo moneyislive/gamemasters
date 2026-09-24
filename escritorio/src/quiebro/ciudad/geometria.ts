@@ -27,17 +27,38 @@ import * as THREE from 'three';
 /** Un vector de tres, sin objetos. */
 export type V3 = readonly [number, number, number];
 
+/** Una lista tipada con sitio de sobra: crece al doble cuando se llena. */
+function crecer(a: Float32Array, cabe: number): Float32Array<ArrayBuffer> {
+  const b = new Float32Array(cabe);
+  b.set(a);
+  return b;
+}
+
 export class Molde {
-  private readonly pos: number[] = [];
-  private readonly nor: number[] = [];
-  private readonly uvs: number[] = [];
-  private readonly col: number[] = [];
-  private readonly idx: number[] = [];
-  private readonly extras = new Map<string, { tam: number; datos: number[]; actual: number[] }>();
+  /*
+   * Las listas son TIPADAS y crecen al doble: con listas de números de JavaScript, cada celda de la ciudad
+   * abierta (que se construye a trozos mientras se juega) soltaba miles de reservas y el recolector paraba un
+   * fotograma de vez en cuando uno o dos milisegundos. Los valores son los mismos: antes se pasaban a 32 bits
+   * al hacer la geometría, ahora al escribirlos.
+   */
+  private cabenV = 256;
+  private cabenI = 768;
+  private nV = 0;
+  private nI = 0;
+  private pos = new Float32Array(3 * 256);
+  private nor = new Float32Array(3 * 256);
+  private uvs = new Float32Array(2 * 256);
+  private col: Float32Array;
+  private idx = new Uint32Array(768);
+  private readonly extras = new Map<string, { tam: number; datos: Float32Array; actual: number[] }>();
+  private readonly listaDeExtras: { tam: number; datos: Float32Array; actual: number[] }[] = [];
   private readonly conColor: boolean;
   private colorActual: V3 = [1, 1, 1];
   private matriz: THREE.Matrix4 | null = null;
   private matrizNormal: THREE.Matrix3 | null = null;
+  /** Una matriz de normales por nivel de `con`, que se reutilizan (antes, una nueva por pieza). */
+  private readonly normales: THREE.Matrix3[] = [];
+  private profundidad = 0;
   private readonly v = new THREE.Vector3();
 
   /**
@@ -46,9 +67,30 @@ export class Molde {
    */
   constructor(extras: Readonly<Record<string, number>> = {}, conColor = false) {
     for (const [nombre, tam] of Object.entries(extras)) {
-      this.extras.set(nombre, { tam, datos: [], actual: new Array<number>(tam).fill(0) });
+      const e = { tam, datos: new Float32Array(tam * 256), actual: new Array<number>(tam).fill(0) };
+      this.extras.set(nombre, e);
+      this.listaDeExtras.push(e);
     }
     this.conColor = conColor;
+    this.col = new Float32Array(conColor ? 3 * 256 : 0);
+  }
+
+  private crecerV(): void {
+    const cabe = this.cabenV * 2;
+    this.pos = crecer(this.pos, cabe * 3);
+    this.nor = crecer(this.nor, cabe * 3);
+    this.uvs = crecer(this.uvs, cabe * 2);
+    if (this.conColor) this.col = crecer(this.col, cabe * 3);
+    for (const e of this.listaDeExtras) e.datos = crecer(e.datos, cabe * e.tam);
+    this.cabenV = cabe;
+  }
+
+  private crecerI(): void {
+    const cabe = this.cabenI * 2;
+    const b = new Uint32Array(cabe);
+    b.set(this.idx);
+    this.idx = b;
+    this.cabenI = cabe;
   }
 
   /** El valor que llevarán los vértices siguientes en el atributo `nombre`. */
@@ -72,11 +114,18 @@ export class Molde {
   con(m: THREE.Matrix4, hacer: () => void): void {
     const antes = this.matriz;
     const antesN = this.matrizNormal;
+    let n = this.normales[this.profundidad];
+    if (n === undefined) {
+      n = new THREE.Matrix3();
+      this.normales[this.profundidad] = n;
+    }
+    this.profundidad++;
     this.matriz = m;
-    this.matrizNormal = new THREE.Matrix3().getNormalMatrix(m);
+    this.matrizNormal = n.getNormalMatrix(m);
     try {
       hacer();
     } finally {
+      this.profundidad--;
       this.matriz = antes;
       this.matrizNormal = antesN;
     }
@@ -84,23 +133,44 @@ export class Molde {
 
   /** Añade un vértice y devuelve su índice. */
   vertice(x: number, y: number, z: number, nx: number, ny: number, nz: number, u: number, w: number): number {
+    if (this.nV >= this.cabenV) this.crecerV();
+    const k = this.nV;
+    const k3 = k * 3;
     if (this.matriz !== null && this.matrizNormal !== null) {
       this.v.set(x, y, z).applyMatrix4(this.matriz);
-      this.pos.push(this.v.x, this.v.y, this.v.z);
+      this.pos[k3] = this.v.x;
+      this.pos[k3 + 1] = this.v.y;
+      this.pos[k3 + 2] = this.v.z;
       this.v.set(nx, ny, nz).applyMatrix3(this.matrizNormal).normalize();
-      this.nor.push(this.v.x, this.v.y, this.v.z);
+      this.nor[k3] = this.v.x;
+      this.nor[k3 + 1] = this.v.y;
+      this.nor[k3 + 2] = this.v.z;
     } else {
-      this.pos.push(x, y, z);
-      this.nor.push(nx, ny, nz);
+      this.pos[k3] = x;
+      this.pos[k3 + 1] = y;
+      this.pos[k3 + 2] = z;
+      this.nor[k3] = nx;
+      this.nor[k3 + 1] = ny;
+      this.nor[k3 + 2] = nz;
     }
-    this.uvs.push(u, w);
-    if (this.conColor) this.col.push(this.colorActual[0], this.colorActual[1], this.colorActual[2]);
-    for (const e of this.extras.values()) for (let i = 0; i < e.tam; i++) e.datos.push(e.actual[i] as number);
-    return this.pos.length / 3 - 1;
+    this.uvs[k * 2] = u;
+    this.uvs[k * 2 + 1] = w;
+    if (this.conColor) {
+      this.col[k3] = this.colorActual[0];
+      this.col[k3 + 1] = this.colorActual[1];
+      this.col[k3 + 2] = this.colorActual[2];
+    }
+    for (const e of this.listaDeExtras) for (let i = 0; i < e.tam; i++) e.datos[k * e.tam + i] = e.actual[i] as number;
+    this.nV = k + 1;
+    return k;
   }
 
   tri(a: number, b: number, c: number): void {
-    this.idx.push(a, b, c);
+    if (this.nI + 3 > this.cabenI) this.crecerI();
+    this.idx[this.nI] = a;
+    this.idx[this.nI + 1] = b;
+    this.idx[this.nI + 2] = c;
+    this.nI += 3;
   }
 
   /**
@@ -322,27 +392,116 @@ export class Molde {
 
   /** Triángulos escritos hasta ahora. */
   get triangulos(): number {
-    return this.idx.length / 3;
+    return this.nI / 3;
   }
 
   get vacio(): boolean {
-    return this.idx.length === 0;
+    return this.nI === 0;
+  }
+
+  /** Los atributos que escribe este molde, en el orden en que `volcar` los da. */
+  atributos(): readonly AtributoDelMolde[] {
+    const lista: AtributoDelMolde[] = [
+      { nombre: 'position', tam: 3 },
+      { nombre: 'normal', tam: 3 },
+      { nombre: 'uv', tam: 2 },
+    ];
+    if (this.conColor) lista.push({ nombre: 'color', tam: 3 });
+    for (const [nombre, e] of this.extras) lista.push({ nombre, tam: e.tam });
+    return lista;
+  }
+
+  /**
+   * LO ESCRITO, EN LISTAS TIPADAS y sin `BufferGeometry`: lo que guarda una celda de la ventana (ver
+   * `celdas.ts`) para copiarlo a trozos en la mitad de atrás de la malla de su familia. Mismo orden de
+   * atributos que `atributos()`.
+   */
+  volcar(): GeometriaVolcada {
+    const n = this.nV;
+    const datos = new Map<string, Float32Array>();
+    datos.set('position', this.pos.slice(0, n * 3));
+    datos.set('normal', this.nor.slice(0, n * 3));
+    datos.set('uv', this.uvs.slice(0, n * 2));
+    if (this.conColor) datos.set('color', this.col.slice(0, n * 3));
+    for (const [nombre, e] of this.extras) datos.set(nombre, e.datos.slice(0, n * e.tam));
+    return { vertices: n, atributos: this.atributos(), datos, indices: this.idx.slice(0, this.nI) };
   }
 
   /** La geometría indexada, con `position`, `normal`, `uv`, `color` si lo lleva, y los extras. */
   geometria(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uvs, 2));
-    if (this.conColor) g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    for (const [nombre, e] of this.extras) g.setAttribute(nombre, new THREE.Float32BufferAttribute(e.datos, e.tam));
-    const cuantos = this.pos.length / 3;
-    g.setIndex(cuantos > 65535 ? new THREE.Uint32BufferAttribute(this.idx, 1) : new THREE.Uint16BufferAttribute(this.idx, 1));
+    const n = this.nV;
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos.slice(0, n * 3), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(this.nor.slice(0, n * 3), 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(this.uvs.slice(0, n * 2), 2));
+    if (this.conColor) g.setAttribute('color', new THREE.BufferAttribute(this.col.slice(0, n * 3), 3));
+    for (const [nombre, e] of this.extras) g.setAttribute(nombre, new THREE.BufferAttribute(e.datos.slice(0, n * e.tam), e.tam));
+    const indices = this.idx.subarray(0, this.nI);
+    g.setIndex(n > 65535 ? new THREE.BufferAttribute(indices.slice(), 1) : new THREE.BufferAttribute(Uint16Array.from(indices), 1));
     g.computeBoundingBox();
     g.computeBoundingSphere();
     return g;
   }
+}
+
+/** Un atributo de un molde: su nombre en el sombreador y cuántos números lleva por vértice. */
+export interface AtributoDelMolde {
+  readonly nombre: string;
+  readonly tam: number;
+}
+
+/** Lo que `Molde.volcar` devuelve: los vértices, cada atributo en su lista y los índices. */
+export interface GeometriaVolcada {
+  readonly vertices: number;
+  readonly atributos: readonly AtributoDelMolde[];
+  readonly datos: ReadonlyMap<string, Float32Array>;
+  readonly indices: Uint32Array;
+}
+
+/**
+ * UN MOLDE QUE NO GUARDA NADA: recorre los mismos constructores (las mismas matrices, los mismos
+ * sorteos por hash) sin escribir un solo vértice. Sirve para sacar las FUENTES DE LUZ de una celda que
+ * no está en la ventana —la luz horneada llega más lejos que el detalle— con las mismas cuentas que
+ * cuando se construye de verdad, sin copiar la lógica de cada pieza en otro sitio.
+ */
+export class MoldeQueNoGuarda extends Molde {
+  override vertice(): number {
+    return 0;
+  }
+
+  override tri(): void {
+    /* nada */
+  }
+
+  override con(_m: THREE.Matrix4, hacer: () => void): void {
+    hacer();
+  }
+}
+
+/**
+ * RELLENA LAS INSTANCIAS de una malla instanciada con listas nuevas (una por atributo instanciado, ya en su
+ * forma) y deja `count` en `cuantas`. Si una lista no cabe en su atributo, el atributo se cambia por uno
+ * más grande (con holgura, para que no vuelva a pasar al andar). Lo usan las piezas que siguen a la ventana
+ * de celdas —tarjetas, halos, vapor y haces—: su llamada es la misma, sólo cambia lo que llevan dentro.
+ */
+export function rellenarInstancias(malla: THREE.InstancedMesh, datos: Readonly<Record<string, Float32Array>>, cuantas: number): void {
+  const g = malla.geometry;
+  for (const [nombre, lista] of Object.entries(datos)) {
+    const a = g.getAttribute(nombre) as THREE.InstancedBufferAttribute | undefined;
+    if (a === undefined) throw new Error(`la malla ${malla.name} no tiene el atributo ${nombre}`);
+    if (lista.length <= a.array.length) {
+      (a.array as Float32Array).set(lista);
+      a.clearUpdateRanges();
+      a.addUpdateRange(0, Math.max(a.itemSize, lista.length));
+      a.needsUpdate = true;
+    } else {
+      const nuevo = new THREE.InstancedBufferAttribute(new Float32Array(Math.ceil((lista.length / a.itemSize) * 1.5) * a.itemSize), a.itemSize);
+      nuevo.setUsage(THREE.DynamicDrawUsage);
+      nuevo.array.set(lista);
+      g.setAttribute(nombre, nuevo);
+    }
+  }
+  malla.count = cuantas;
 }
 
 /** Los triángulos que pinta una geometría (indexada o no). */

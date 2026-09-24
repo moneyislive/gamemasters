@@ -74,6 +74,26 @@
  * menos de 100. `verify:liza-protocolo` escribe los más largos que el lector admite y mira que caben. Y
  * los lectores exigen ASCII imprimible: así la longitud en letras ES la longitud en bytes, sin codificar
  * nada para contarla.
+ *
+ * ═══ LO QUE TRAE LA LIZA ABIERTA (L1-L12 de `declaracion.ts`) ═══
+ *
+ * Tres cambios, y ninguno sube `VERSION_DE_LA_LIZA`: mientras esta rama no esté desplegada no hay aparatos
+ * que hablen la forma de antes, así que se ajustan los lectores (si se desplegara antes, sube a 2).
+ *
+ *   · `nace` lleva `ro`: la ronda de guion de la que sale, su número más uno, o 0 si no sale de ninguna. En
+ *     el cable va SIEMPRE, desde ya: el escritor le pone 0 al `nace` que la sala escribe todavía sin él
+ *     (`SucesoNaceSinRonda`, sólo para escribir mientras la sala no tenga rondas), y el lector exige las
+ *     siete claves. Quien lo lea usa `rondaDelNace`.
+ *   · `disparo {g, ro, x, z}`: salta algo que esperaba, y es el aviso que se ve venir. `g` es el número del
+ *     grupo (su puesto en el encuentro más uno) y `ro` el de la ronda (más uno), o 0 cada uno: un grupo que
+ *     salta solo lleva `ro` 0; el aviso de una ronda que llama a su refuerzo lleva los dos; y una ronda que
+ *     se materializa (o que ya lo estaba, en la puesta al día) lleva `g` 0. Nunca los dos a 0. `(x, z)` es
+ *     el punto del disparo, en centésimas.
+ *   · `progreso {zona, tics}`: lo que lleva un objetivo que se cumple leyendo en la zona `zona`, a 2 Hz
+ *     mientras sube.
+ *
+ * Y la puesta al día de quien entra (`Bienvenida`, en `tipos-de-la-sala.ts`) añade, tras los `nace`, un
+ * `disparo` por grupo que ya saltó y por ronda que ya se materializó, y el `progreso` de lo leído.
  */
 import { TICS_POR_SEGUNDO } from '../andar';
 import { UNO } from '../fijo';
@@ -84,8 +104,10 @@ import {
   TOPE_DE_CAJAS,
   TOPE_DE_CANTIDAD,
   TOPE_DE_ENTIDADES,
+  TOPE_DE_GRUPOS,
   TOPE_DE_ID,
   TOPE_DE_MULTIPLICADOR,
+  TOPE_DE_RONDAS,
   TOPE_DE_TICS,
 } from './declaracion';
 import { TOPE_DE_LA_LIZA } from './geometria';
@@ -439,7 +461,11 @@ export interface SucesoEmpuja {
   readonly caja: number;
 }
 
-/** Nace la entidad `id` de la clase `clase` en `(x, z)` (centésimas) mirando a `r`. */
+/**
+ * Nace la entidad `id` de la clase `clase` en `(x, z)` (centésimas) mirando a `r`; `ro` es la ronda de guion
+ * de la que sale (su número más uno), o 0 si no sale de ninguna: con él, el aparato deja de pintar a ese
+ * miembro por su guion y lo pinta por la foto, sin que el paso se vea.
+ */
 export interface SucesoNace {
   readonly e: 'nace';
   readonly id: number;
@@ -447,6 +473,20 @@ export interface SucesoNace {
   readonly x: number;
   readonly z: number;
   readonly r: number;
+  readonly ro: number;
+}
+
+/**
+ * EL `nace` DE ANTES DE LAS RONDAS, SÓLO PARA ESCRIBIR: el que la sala escribe mientras no tenga rondas, sin
+ * `ro`. El escritor lo manda con `ro` 0 y el lector no lo devuelve nunca (exige las siete claves). Se quita
+ * cuando la sala escriba `ro`, y con él esta línea de la unión: no es otra forma del cable, es la de hoy
+ * mientras dura la obra.
+ */
+export type SucesoNaceSinRonda = Omit<SucesoNace, 'ro'>;
+
+/** La ronda de un `nace` (número más uno, 0 = ninguna), se haya escrito con `ro` o sin él. */
+export function rondaDelNace(s: SucesoNace | SucesoNaceSinRonda): number {
+  return 'ro' in s ? s.ro : 0;
 }
 
 /**
@@ -588,6 +628,26 @@ export interface SucesoRecurso {
   readonly n: number;
 }
 
+/**
+ * SALTA ALGO QUE ESPERABA (L2, L3): el grupo `g` (su puesto en el encuentro más uno) y la ronda `ro` (más
+ * uno), o 0 cada uno, pero nunca los dos; `(x, z)`, el punto del disparo en centésimas. Es el aviso que se
+ * ve venir antes de que salga nadie (ver la cabecera).
+ */
+export interface SucesoDisparo {
+  readonly e: 'disparo';
+  readonly g: number;
+  readonly ro: number;
+  readonly x: number;
+  readonly z: number;
+}
+
+/** Lo leído de un objetivo que se cumple leyendo en la zona `zona`: `tics` de los que pide (L4). */
+export interface SucesoProgreso {
+  readonly e: 'progreso';
+  readonly zona: number;
+  readonly tics: number;
+}
+
 export type SucesoDelTic =
   | SucesoAnuncio
   | SucesoResuelve
@@ -595,6 +655,7 @@ export type SucesoDelTic =
   | SucesoEstado
   | SucesoEmpuja
   | SucesoNace
+  | SucesoNaceSinRonda
   | SucesoSeVa
   | SucesoBala
   | SucesoApunta
@@ -606,7 +667,9 @@ export type SucesoDelTic =
   | SucesoFase
   | SucesoZona
   | SucesoCuenta
-  | SucesoRecurso;
+  | SucesoRecurso
+  | SucesoDisparo
+  | SucesoProgreso;
 
 /* ─── CONVERSIONES ───────────────────────────────────────────────────────── */
 
@@ -753,9 +816,10 @@ export function leerSuceso(v: unknown): SucesoDelTic | null {
       if (!esNumero(v.a) || !esRumbo(v.r) || !esEntero(v.d, 0, 2 * TOPE_DE_CENTESIMAS) || !esEntero(v.caja, 0, TOPE_DE_CAJAS)) return null;
       return { e, a: v.a, r: v.r, d: v.d, caja: v.caja };
     case 'nace':
-      if (!conClaves(v, ['e', 'id', 'clase', 'x', 'z', 'r'])) return null;
+      if (!conClaves(v, ['e', 'id', 'clase', 'x', 'z', 'r', 'ro'])) return null;
       if (!esEntero(v.id, PRIMER_NUMERO_DE_ENTIDAD, TOPE_DE_NUMERO) || !esId(v.clase) || !esCentesima(v.x) || !esCentesima(v.z) || !esRumbo(v.r)) return null;
-      return { e, id: v.id, clase: v.clase, x: v.x, z: v.z, r: v.r };
+      if (!esEntero(v.ro, 0, TOPE_DE_RONDAS)) return null;
+      return { e, id: v.id, clase: v.clase, x: v.x, z: v.z, r: v.r, ro: v.ro };
     case 'seva':
       if (!conClaves(v, ['e', 'id', 'por', 'quien'])) return null;
       if (!esEntero(v.id, PRIMER_NUMERO_DE_ENTIDAD, TOPE_DE_NUMERO) || !esMotivo(v.por) || !esEntero(v.quien, 0, TOPE_DE_NUMERO)) return null;
@@ -814,6 +878,16 @@ export function leerSuceso(v: unknown): SucesoDelTic | null {
       if (!conClaves(v, ['e', 'n'])) return null;
       if (!esCantidad(v.n)) return null;
       return { e, n: v.n };
+    case 'disparo':
+      if (!conClaves(v, ['e', 'g', 'ro', 'x', 'z'])) return null;
+      if (!esEntero(v.g, 0, TOPE_DE_GRUPOS) || !esEntero(v.ro, 0, TOPE_DE_RONDAS) || !esCentesima(v.x) || !esCentesima(v.z)) return null;
+      /* Algo tiene que saltar: un disparo de nada no avisa de nada. */
+      if (v.g === 0 && v.ro === 0) return null;
+      return { e, g: v.g, ro: v.ro, x: v.x, z: v.z };
+    case 'progreso':
+      if (!conClaves(v, ['e', 'zona', 'tics'])) return null;
+      if (!esId(v.zona) || !esEntero(v.tics, 0, TOPE_DE_TICS)) return null;
+      return { e, zona: v.zona, tics: v.tics };
     default:
       return null;
   }
@@ -901,7 +975,7 @@ function sucesoLimpio(s: SucesoDelTic): SucesoDelTic {
     case 'empuja':
       return { e: s.e, a: s.a, r: s.r, d: s.d, caja: s.caja };
     case 'nace':
-      return { e: s.e, id: s.id, clase: s.clase, x: s.x, z: s.z, r: s.r };
+      return { e: s.e, id: s.id, clase: s.clase, x: s.x, z: s.z, r: s.r, ro: rondaDelNace(s) };
     case 'seva':
       return { e: s.e, id: s.id, por: s.por, quien: s.quien };
     case 'bala':
@@ -926,6 +1000,10 @@ function sucesoLimpio(s: SucesoDelTic): SucesoDelTic {
       return { e: s.e, a: s.a, vida: s.vida, medidor: s.medidor, puntos: s.puntos, mult: s.mult };
     case 'recurso':
       return { e: s.e, n: s.n };
+    case 'disparo':
+      return { e: s.e, g: s.g, ro: s.ro, x: s.x, z: s.z };
+    case 'progreso':
+      return { e: s.e, zona: s.zona, tics: s.tics };
   }
 }
 

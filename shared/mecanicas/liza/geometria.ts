@@ -46,8 +46,8 @@
  *
  * La exactitud de todo lo de arriba cuelga de que los productos quepan en 2^53. Con coordenadas de
  * hasta ±512 unidades (`TOPE_DE_LA_LIZA`, 2^25 en Q16.16) las diferencias no pasan de 2^26 y los
- * productos cruzados de la losa de 2^52,1. Un mundo de liza mide unas 160 unidades de lado: sobra por
- * más de tres veces. Fuera de ahí estas funciones LANZAN `FueraDeLaLiza`, como `por()` lanza
+ * productos cruzados de la losa de 2^52,1. Un mundo de liza de una plaza mide unas 160 unidades de lado,
+ * y el de una ciudad 544: caben. Fuera de ahí estas funciones LANZAN `FueraDeLaLiza`, como `por()` lanza
  * `FueraDeRango`: un resultado equivocado e igual en todos los motores es el fallo que `fijo.ts`
  * existe para no repetir, y un número que no cabe no se arregla recortándolo —recortar un vector por
  * ejes le cambia el rumbo—. La sala no llega aquí con nada de fuera: los lectores del protocolo ya
@@ -57,7 +57,9 @@
  *
  * Ni cuánto alcanza un golpe ni cuánto se empuja: eso es de la declaración de cada liza. Ni la
  * elección del blanco con «mejor nota»: eso es del aparato. Aquí sólo están las preguntas de
- * geometría, con una respuesta que no depende de quién pregunte.
+ * geometría, con una respuesta que no depende de quién pregunte. Ni de cuánto cueste: con muchas
+ * cajas, `primeraLosa` pregunta a un índice por celdas que da la MISMA respuesta (ver «los índices de
+ * la Liza», abajo, y `verify:liza`, que lo compara con la fuerza bruta).
  */
 import { COSENO, RUMBOS, SENO } from '../andar';
 import { por, UNO } from '../fijo';
@@ -362,9 +364,10 @@ export interface ChoqueConLosa {
  * `null` si no toca ninguna.
  *
  * Si dos cajas se tocan en la misma fracción gana la de índice menor, para que la respuesta no
- * dependa de nada más que de la lista. Se recorren todas: un mundo de liza tiene del orden de cien
- * cajas, cada una se descarta en cuatro comparaciones si no cae en el rectángulo del tramo, y un
- * índice por cajones ataría esto a una constante privada de `mundo.ts` que puede cambiar sin avisar.
+ * dependa de nada más que de la lista. Un mundo de liza de una plaza tiene del orden de cien cajas y
+ * se recorren todas: cada una se descarta en cuatro comparaciones si no cae en el rectángulo del tramo.
+ * Desde `CAJAS_PARA_INDEXAR` (una ciudad, con sus mil trescientas) se pregunta a las celdas de abajo, y
+ * la respuesta es LA MISMA, empates incluidos (ver «el índice de losas»).
  */
 export function primeraLosa(
   cuerpos: ArrayLike<number>,
@@ -384,6 +387,13 @@ export function primeraLosa(
   const maxX = ax < bx ? bx : ax;
   const minZ = az < bz ? az : bz;
   const maxZ = az < bz ? bz : az;
+  if (INDICES.activos && cuerpos.length >= 4 * CAJAS_PARA_INDEXAR) {
+    const ix = indiceDeLosas(cuerpos);
+    if (ix !== null) {
+      CUENTAS_DE_LOS_INDICES.losasPorCeldas++;
+      return primeraLosaPorCeldas(ix, cuerpos, ax, az, bx, bz, radio, minX, maxX, minZ, maxZ);
+    }
+  }
   let mejor: ChoqueConLosa | null = null;
   for (let i = 0; i < cuerpos.length; i += 4) {
     const x0 = (cuerpos[i] as number) - radio;
@@ -405,6 +415,243 @@ export function primeraLosa(
     if (mejor === null || f < mejor.fraccion) mejor = { caja: i / 4, fraccion: f };
   }
   return mejor;
+}
+
+/* ─── LOS ÍNDICES DE LA LIZA: EL INTERRUPTOR Y LAS CUENTAS ───────────────── *
+ *
+ * La Liza de una ciudad (el diseño de la ciudad abierta, §5.4) pregunta lo mismo que la de una plaza
+ * con diez veces más cajas y nudos, y recorrerlos todos en cada pregunta costaba más que la sala entera.
+ * Así que hay tres índices: el de losas (aquí), y en `cerebro.ts` el de nudos y los campos por meta.
+ * Ninguno cambia una respuesta —ése es su contrato, y `verify:liza` lo mide contra la fuerza bruta—,
+ * así que la sala no los ve: sólo cuestan menos.
+ *
+ * `usarLosIndicesDeLaLiza(false)` los apaga y todo va por el recorrido de siempre. Es para los
+ * comprobadores, que juegan la MISMA sala con y sin ellos y comparan tic a tic; ningún código de juego
+ * lo llama. Y las cuentas dicen cuántas preguntas fueron por cada índice: sin ellas, un índice que
+ * dejara de usarse daría las mismas respuestas que la fuerza bruta porque SERÍA la fuerza bruta, y esa
+ * comparación saldría en verde sin mirar nada.
+ */
+
+/** Si los índices están encendidos. Ver la cabecera del bloque. */
+const INDICES = { activos: true };
+
+/** Enciende o apaga los índices de la Liza (sólo para los comprobadores). Devuelve cómo estaban. */
+export function usarLosIndicesDeLaLiza(si: boolean): boolean {
+  const antes = INDICES.activos;
+  INDICES.activos = si;
+  return antes;
+}
+
+/** ¿Están encendidos los índices de la Liza? Lo pregunta `cerebro.ts`. */
+export function losIndicesDeLaLizaEstanActivos(): boolean {
+  return INDICES.activos;
+}
+
+/** Cuántas preguntas ha contestado cada índice desde que se cargó el módulo. */
+export interface CuentasDeLosIndices {
+  /** `primeraLosa` contestada por celdas. */
+  losasPorCeldas: number;
+  /** Índices de losas construidos. */
+  indicesDeLosas: number;
+  /** Los K nudos más cercanos buscados por celdas. */
+  nudosPorCeldas: number;
+  /** Índices de nudos construidos. */
+  indicesDeNudos: number;
+  /** Campos de distancias hechos acotados, y los que se sacaron ya hechos de la memoria. */
+  camposAcotados: number;
+  camposReusados: number;
+  /** Campos que alguien leyó fuera de su cota y se completaron: siguiendo su montículo, o rehechos enteros. */
+  camposSeguidos: number;
+  camposRehechos: number;
+}
+
+/** Las cuentas, que escriben este módulo y `cerebro.ts`. Se leen con `cuentasDeLosIndices`. */
+export const CUENTAS_DE_LOS_INDICES: CuentasDeLosIndices = {
+  losasPorCeldas: 0,
+  indicesDeLosas: 0,
+  nudosPorCeldas: 0,
+  indicesDeNudos: 0,
+  camposAcotados: 0,
+  camposReusados: 0,
+  camposSeguidos: 0,
+  camposRehechos: 0,
+};
+
+/** Una copia de las cuentas, para restar un antes y un después. */
+export function cuentasDeLosIndices(): CuentasDeLosIndices {
+  return { ...CUENTAS_DE_LOS_INDICES };
+}
+
+/* ─── EL ÍNDICE DE LOSAS, EN CELDAS DE 16 UNIDADES ───────────────────────── *
+ *
+ * A partir de `CAJAS_PARA_INDEXAR`, las cajas se apuntan en celdas de 16 unidades —cada caja en TODAS
+ * las que toca— y una pregunta sólo mira las de las celdas que pisa el rectángulo del tramo ensanchado
+ * por el radio. No se usan los cajones de `mundo.ts`: su lado es privado de aquel fichero, y la cabecera
+ * de `primeraLosa` ya dice por qué no se ata a él.
+ *
+ * ═══ EL MISMO RESULTADO, POR CONSTRUCCIÓN ═══
+ *
+ * Una caja que pasa el descarte del recorrido lineal tiene su intervalo `[x0, x1]` cortando a
+ * `[minX − radio, maxX + radio]`, y lo mismo en `z`: un punto de ese corte cae en una celda que está en
+ * la lista de la caja y en el rectángulo de la pregunta, así que es candidata. A las candidatas se les
+ * pasa LA MISMA prueba (el mismo descarte y la misma `losa`), y como no se visitan en orden de índice, el
+ * desempate se hace explícito: a igual fracción, el índice menor, que es el que se quedaba el recorrido
+ * lineal. Una caja que toca varias celdas se mira una vez por pregunta (un sello por caja, sin ordenar).
+ *
+ * ═══ CUÁNDO NO SE INDEXA ═══
+ *
+ * Si alguna caja no es de enteros dentro de la liza, la lista se queda en el recorrido de siempre: allí
+ * `exigirEntero` lanza con la PRIMERA caja mala que el tramo alcanza, en orden de índice, y un índice la
+ * encontraría en otro orden y con otro mensaje. Una arena de un mundo validado nunca lo tiene; así además
+ * las celdas no pasan de 64 por lado.
+ *
+ * ═══ EL CONTRATO QUE PIDE ═══
+ *
+ * El índice se monta la primera vez que se pregunta por una lista y se recuerda por su IDENTIDAD (un
+ * `WeakMap`, como los índices de `paso-en-curso.ts`): la `Arena.cuerpos` de una sala no cambia mientras
+ * dura su mundo. Una lista por la que ya se ha preguntado no se muta; ninguna de la casa lo hace.
+ */
+
+/** Desde cuántas cajas se indexa: el barrio de una plaza (≈ 250) sigue con el recorrido de siempre. */
+export const CAJAS_PARA_INDEXAR = 512;
+
+/** El lado de una celda del índice: 16 unidades en Q16.16 (2^20). Potencia de dos: la división es exacta. */
+export const CELDA_DEL_INDICE = 16 * UNO;
+
+interface IndiceDeLosas {
+  readonly desdeX: number;
+  readonly desdeZ: number;
+  readonly ancho: number;
+  readonly fondo: number;
+  /** Las cajas de la celda `k` son `cajas[inicio[k]] … cajas[inicio[k + 1] − 1]`, de menor a mayor. */
+  readonly inicio: Int32Array;
+  readonly cajas: Int32Array;
+  /** En qué vuelta se miró cada caja por última vez: para no mirarla dos veces en la misma pregunta. */
+  readonly sello: Int32Array;
+  vuelta: number;
+}
+
+/** Los índices hechos, por la identidad de la lista; `null`: esa lista no se indexa (ver la cabecera). */
+const INDICES_DE_LOSAS = new WeakMap<object, IndiceDeLosas | null>();
+
+/** En qué celda del índice cae una coordenada Q16.16. */
+export function celdaDelIndice(v: number): number {
+  return Math.floor(v / CELDA_DEL_INDICE);
+}
+
+function indiceDeLosas(cuerpos: ArrayLike<number>): IndiceDeLosas | null {
+  if (typeof cuerpos !== 'object' || cuerpos === null) return null;
+  const hecho = INDICES_DE_LOSAS.get(cuerpos);
+  if (hecho !== undefined) return hecho;
+  const n = cuerpos.length / 4;
+  for (let i = 0; i < cuerpos.length; i++) {
+    const v = cuerpos[i] as number;
+    if (!Number.isInteger(v) || v > TOPE_DE_LA_LIZA || v < -TOPE_DE_LA_LIZA) {
+      INDICES_DE_LOSAS.set(cuerpos, null);
+      return null;
+    }
+  }
+  let desdeX = 0;
+  let desdeZ = 0;
+  let hastaX = -1;
+  let hastaZ = -1;
+  for (let i = 0; i < n; i++) {
+    const a = celdaDelIndice(cuerpos[i * 4] as number);
+    const b = celdaDelIndice(cuerpos[i * 4 + 1] as number);
+    const c = celdaDelIndice(cuerpos[i * 4 + 2] as number);
+    const d = celdaDelIndice(cuerpos[i * 4 + 3] as number);
+    if (i === 0 || a < desdeX) desdeX = a;
+    if (i === 0 || b < desdeZ) desdeZ = b;
+    if (i === 0 || c > hastaX) hastaX = c;
+    if (i === 0 || d > hastaZ) hastaZ = d;
+  }
+  const ancho = hastaX - desdeX + 1;
+  const fondo = hastaZ - desdeZ + 1;
+  const celdas = ancho * fondo;
+  const inicio = new Int32Array(celdas + 1);
+  for (let i = 0; i < n; i++) {
+    const a = celdaDelIndice(cuerpos[i * 4] as number) - desdeX;
+    const b = celdaDelIndice(cuerpos[i * 4 + 1] as number) - desdeZ;
+    const c = celdaDelIndice(cuerpos[i * 4 + 2] as number) - desdeX;
+    const d = celdaDelIndice(cuerpos[i * 4 + 3] as number) - desdeZ;
+    for (let z = b; z <= d; z++) for (let x = a; x <= c; x++) inicio[z * ancho + x + 1] = (inicio[z * ancho + x + 1] as number) + 1;
+  }
+  for (let k = 0; k < celdas; k++) inicio[k + 1] = (inicio[k + 1] as number) + (inicio[k] as number);
+  const puesto = inicio.slice(0, celdas);
+  const cajas = new Int32Array(inicio[celdas] as number);
+  for (let i = 0; i < n; i++) {
+    const a = celdaDelIndice(cuerpos[i * 4] as number) - desdeX;
+    const b = celdaDelIndice(cuerpos[i * 4 + 1] as number) - desdeZ;
+    const c = celdaDelIndice(cuerpos[i * 4 + 2] as number) - desdeX;
+    const d = celdaDelIndice(cuerpos[i * 4 + 3] as number) - desdeZ;
+    for (let z = b; z <= d; z++) {
+      for (let x = a; x <= c; x++) {
+        const k = z * ancho + x;
+        cajas[puesto[k] as number] = i;
+        puesto[k] = (puesto[k] as number) + 1;
+      }
+    }
+  }
+  const indice: IndiceDeLosas = { desdeX, desdeZ, ancho, fondo, inicio, cajas, sello: new Int32Array(n), vuelta: 0 };
+  INDICES_DE_LOSAS.set(cuerpos, indice);
+  CUENTAS_DE_LOS_INDICES.indicesDeLosas++;
+  return indice;
+}
+
+/** `primeraLosa` por las celdas del índice: la misma respuesta (ver «el índice de losas»). */
+function primeraLosaPorCeldas(
+  ix: IndiceDeLosas,
+  cuerpos: ArrayLike<number>,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  radio: number,
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number,
+): ChoqueConLosa | null {
+  if (ix.vuelta >= 2147483647) {
+    ix.sello.fill(0);
+    ix.vuelta = 0;
+  }
+  ix.vuelta++;
+  const vuelta = ix.vuelta;
+  let cx0 = celdaDelIndice(minX - radio) - ix.desdeX;
+  let cx1 = celdaDelIndice(maxX + radio) - ix.desdeX;
+  let cz0 = celdaDelIndice(minZ - radio) - ix.desdeZ;
+  let cz1 = celdaDelIndice(maxZ + radio) - ix.desdeZ;
+  if (cx0 < 0) cx0 = 0;
+  if (cz0 < 0) cz0 = 0;
+  if (cx1 >= ix.ancho) cx1 = ix.ancho - 1;
+  if (cz1 >= ix.fondo) cz1 = ix.fondo - 1;
+  let mejorCaja = -1;
+  let mejorFraccion = 0;
+  for (let z = cz0; z <= cz1; z++) {
+    for (let x = cx0; x <= cx1; x++) {
+      const k = z * ix.ancho + x;
+      const hasta = ix.inicio[k + 1] as number;
+      for (let j = ix.inicio[k] as number; j < hasta; j++) {
+        const c = ix.cajas[j] as number;
+        if (ix.sello[c] === vuelta) continue;
+        ix.sello[c] = vuelta;
+        const i = c * 4;
+        const x0 = (cuerpos[i] as number) - radio;
+        const z0 = (cuerpos[i + 1] as number) - radio;
+        const x1 = (cuerpos[i + 2] as number) + radio;
+        const z1 = (cuerpos[i + 3] as number) + radio;
+        if (x0 >= maxX || x1 <= minX || z0 >= maxZ || z1 <= minZ) continue;
+        const f = losa(ax, az, bx, bz, x0, z0, x1, z1);
+        if (f === null) continue;
+        if (mejorCaja < 0 || f < mejorFraccion || (f === mejorFraccion && c < mejorCaja)) {
+          mejorCaja = c;
+          mejorFraccion = f;
+        }
+      }
+    }
+  }
+  return mejorCaja < 0 ? null : { caja: mejorCaja, fraccion: mejorFraccion };
 }
 
 /**

@@ -103,20 +103,26 @@ export function materialDeLosHalos(): THREE.ShaderMaterial {
   return m;
 }
 
-export function mallaDeHalos(fuentes: readonly FuenteDeHalo[], material: THREE.Material): THREE.InstancedMesh {
-  const plano = new THREE.PlaneGeometry(1, 1);
-  const n = Math.max(1, fuentes.length);
-  const fuente = new Float32Array(n * 4);
-  const color = new Float32Array(n * 4);
-  const parpadeo = new Float32Array(n);
+/** Las listas instanciadas de unos halos, con sitio para `n`. */
+export function datosDeLosHalos(fuentes: readonly FuenteDeHalo[], n = fuentes.length): { aFuente: Float32Array; aColor: Float32Array; aParpadeo: Float32Array } {
+  const aFuente = new Float32Array(Math.max(1, n) * 4);
+  const aColor = new Float32Array(Math.max(1, n) * 4);
+  const aParpadeo = new Float32Array(Math.max(1, n));
   fuentes.forEach((f, i) => {
-    fuente.set([f.x, f.y, f.z, f.radio], i * 4);
-    color.set([f.color[0], f.color[1], f.color[2], f.farola ? 1 : 0], i * 4);
-    parpadeo[i] = f.parpadeo;
+    aFuente.set([f.x, f.y, f.z, f.radio], i * 4);
+    aColor.set([f.color[0], f.color[1], f.color[2], f.farola ? 1 : 0], i * 4);
+    aParpadeo[i] = f.parpadeo;
   });
-  plano.setAttribute('aFuente', new THREE.InstancedBufferAttribute(fuente, 4));
-  plano.setAttribute('aColor', new THREE.InstancedBufferAttribute(color, 4));
-  plano.setAttribute('aParpadeo', new THREE.InstancedBufferAttribute(parpadeo, 1));
+  return { aFuente, aColor, aParpadeo };
+}
+
+/** Los halos de unas fuentes, con sitio para `capacidad` (la ciudad abierta los cambia con la ventana). */
+export function mallaDeHalos(fuentes: readonly FuenteDeHalo[], material: THREE.Material, capacidad = fuentes.length): THREE.InstancedMesh {
+  const plano = new THREE.PlaneGeometry(1, 1);
+  const d = datosDeLosHalos(fuentes, Math.max(capacidad, fuentes.length));
+  plano.setAttribute('aFuente', new THREE.InstancedBufferAttribute(d.aFuente, 4));
+  plano.setAttribute('aColor', new THREE.InstancedBufferAttribute(d.aColor, 4));
+  plano.setAttribute('aParpadeo', new THREE.InstancedBufferAttribute(d.aParpadeo, 1));
   const malla = new THREE.InstancedMesh(plano, material, fuentes.length);
   malla.name = 'quiebro-halos';
   malla.frustumCulled = false;

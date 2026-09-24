@@ -54,7 +54,8 @@
  *  18. El Quiebro jugado de verdad —sus declaraciones de dos mesas, de 1 a 4 asientos y tres semillas,
  *      con robots que golpean, pasean y se quedan quietos—: ninguna entidad pasa más de 3 s junto a su
  *      blanco, con turno posible, sin anunciar y sin ir a ninguna parte, y todas entran en el límite de la
- *      fase antes de 5 s —también con los asientos caídos o ausentes, sin nadie a quien perseguir—; la
+ *      fase antes de 5 s —también con los asientos caídos o ausentes, sin nadie a quien perseguir—, ninguna
+ *      pasa más de 10 s acechando a su blanco lejos de él sin moverse (el bolsillo de la cabina); la
  *      Réplica tras el quiebro de lado de 3,5 m da con 100 y 250 ms de ida y vuelta, y el golpe tras el
  *      vuelo contra una bala con 60, 150 y 250; y cada ráfaga de sus tiradores sale con su línea de apuntado.
  *  19. El ausente momentáneo: el aparato frenado (la pestaña oculta, que manda sus `aqui` de golpe una
@@ -69,6 +70,23 @@
  *      se acaba al golpear; el ausente se cuenta entero en la fase; el avance no se regala a quien no
  *      avanza; el golpe tras el vuelo contra una bala da si el aparato vuela y no si no; y las que nacen
  *      fuera sin nadie a quien perseguir entran, rodeando lo que las tapa.
+ *  23. La Liza por dentro (el diseño de la ciudad abierta, §5.4), en ciudades de juguete de 300 × 300
+ *      (`lizaAbierta`): `primeraLosa` por celdas contra la fuerza bruta en 100.000 tramos de cada uno de
+ *      veinte mundos, empates incluidos; los K nudos más cercanos por celdas contra la lista; los campos por
+ *      meta contra el Dijkstra entero; la MISMA sala tic a tic con y sin índices; y la validación del
+ *      mundo, una vez por mundo y con las mismas frases con memoria y sin ella.
+ *  24. L10, el alcance de blanco y el olvido (la ciudad abierta, §3.4 y §5.5): el alcance exacto en su
+ *      frontera (1/65536 de más o de menos), el tirador que suelta su línea cuando el blanco se le va, el
+ *      olvido al tic y en su frontera, la olvidada que vuelve a la cola (un `vaciar` no se gana alejándose),
+ *      el ausente que no acompaña y el caído que sí, la caída y la deshecha sin reloj, la ciudad de juguete
+ *      jugada contra la regla escrita aparte tic a tic, y la forma transitoria sin L10 igual a la de antes; y
+ *      la franja entre el alcance y el olvido: la que se queda sin blanco acompañada se acerca, en la frontera
+ *      exacta y en la ciudad, y ninguna se queda parada ahí.
+ *  25. La revisión de la entrega 1 de la ciudad abierta: la entidad cuyo camino hasta su blanco rodea una
+ *      manzana llega a anunciarle (en la ciudad de juguete y en la de El Quiebro), en los combates de El
+ *      Quiebro con todos huyendo por las calles ninguna se queda parada en la franja, y un mundo nuevo —una
+ *      fase nueva, o el mismo mundo cambiado dentro de la fase— no deja a ningún asiento dentro de una caja
+ *      (también con las noches de verdad de El Quiebro).
  *
  * ═══ LO QUE ESTE COMPROBADOR ENCONTRÓ MIENTRAS SE ESCRIBÍA ═══
  *
@@ -119,22 +137,33 @@
  *
  * Y su revisión (la cuarta pasada) con `scratchpad/pulido-reglas-sala/p2/roturas2.py`: cada comprobación
  * del bloque 22 y las dos nuevas del 18 se vieron rojas con la regla de antes puesta otra vez en un espejo.
+ *
+ * Las de L10 (bloque 24), con `scratchpad/ciudad-liza/ola-b/rojos.py`: once roturas de la sala, cada una
+ * con su comprobación en rojo. Dos no se vieron a la primera y cambió la comprobación, no la rotura: el
+ * alcance que sólo se mira al repensar (cada cuatro tics) acababa el tic a 44,9 porque la entidad anda hacia
+ * su blanco después de mirarlo —ahora se comprueba que lo suelta EN EL TIC, con la regla escrita aquí—; y
+ * el olvido a la distancia menos uno no se veía porque la frontera se medía a la esquina de la zona y no al
+ * sitio en que la entidad sale de verdad.
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { arnes } from './arnes';
 import { UNO } from '../../shared/mecanicas/fijo';
 import { DT_DEL_TIC, COSENO, SENO } from '../../shared/mecanicas/andar';
-import { arenaDe, seAndaEnRecta, unPaso } from '../../shared/mecanicas/mundo';
+import { arenaDe, seAndaEnRecta, sePuedeEstar, unPaso } from '../../shared/mecanicas/mundo';
 import type { Arena } from '../../shared/mecanicas/mundo';
 import {
+  alcanceDeBlancoDe,
   arenaDeLaLiza,
   leerCargaDeRonda,
+  olvidoDelEncuentro,
   problemasDeLaDeclaracion,
+  validacionesDelMundo,
   VERSION_DE_LA_DECLARACION,
   VEREDICTO_DE_AUSENTE,
   VEREDICTO_DE_RELOJ,
@@ -149,11 +178,12 @@ import type {
   FaseDeLaLiza,
   GrupoDeclarado,
   LizaDeclarada,
+  OlvidoDeclarado,
   PuestaDeEstado,
   ReglasDeAsiento,
 } from '../../shared/mecanicas/liza/declaracion';
-import { CONTADORES_DE_ASIENTO } from '../../shared/mecanicas/liza/declaracion';
-import { leerMensajeDeLaSala, MOTIVO_DE_IRSE, RESULTADO, textoDeLaSala, TOPE_DE_AQUIS_DE_GOLPE } from '../../shared/mecanicas/liza/protocolo';
+import { CLASE_DE_CAJA, CONTADORES_DE_ASIENTO } from '../../shared/mecanicas/liza/declaracion';
+import { leerMensajeDeLaSala, MOTIVO_DE_IRSE, PRIMER_NUMERO_DE_ENTIDAD, RESULTADO, textoDeLaSala, TOPE_DE_AQUIS_DE_GOLPE } from '../../shared/mecanicas/liza/protocolo';
 import type { SucesoDelTic, TuplaDeFoto } from '../../shared/mecanicas/liza/protocolo';
 import type {
   AccionRecibida,
@@ -163,14 +193,23 @@ import type {
 } from '../../shared/mecanicas/liza/tipos-de-la-sala';
 import { AQUIS_PARA_ESTAR, TICS_DE_LA_VUELTA } from '../../shared/mecanicas/liza/tipos-de-la-sala';
 import { avanzarLaSala, huellaDeLaSala, salaNueva } from '../../shared/mecanicas/liza/sala';
-import { canonico } from '../../shared/mecanicas/canonico';
+import { canonico, porQueNoEsCanonico } from '../../shared/mecanicas/canonico';
 import { sitioDeLaBala } from '../../shared/mecanicas/liza/proyectiles';
 import { rumboHacia } from '../../shared/mecanicas/liza/geometria';
+import type { CuentasDeLosIndices } from '../../shared/mecanicas/liza/geometria';
 import {
   A,
   accion,
   anunciosContraMi,
   Aparato,
+  AzarDeJuguete,
+  ALCANCE_DE_LA_ABIERTA,
+  bancoDeLaCiudad,
+  corredor,
+  EJES_DEL_MUNDO_ABIERTO,
+  lizaAbierta,
+  lizaAbiertaConOlvido,
+  OLVIDO_DE_LA_ABIERTA,
   aporreador,
   Banco,
   bancoLleno,
@@ -193,6 +232,7 @@ import {
   montarJuguete,
   paseante,
   TICS_PARA_ENTRAR,
+  TICS_ATASCADA,
   TICS_QUIETA,
   vigilarLasLineas,
   vigilarLosNpc,
@@ -2227,14 +2267,25 @@ else {
  *
  *   · cuántas entidades pasan más de 3 s junto a su blanco, con turno posible, sin anunciar y sin ir a
  *     ninguna parte;
- *   · cuántas pasan más de 5 s desde que nacen sin entrar en el límite de la fase.
+ *   · cuántas pasan más de 5 s desde que nacen sin entrar en el límite de la fase;
+ *   · y, con la ciudad abierta (L10), cuántas pasan más de 3 s paradas sin nadie a su alcance y con alguien
+ *     a la distancia del olvido: la franja que la primera versión de L10 dejaba sin salida;
+ *   · cuántas pasan más de 10 s acechando a su blanco LEJOS de él sin moverse (`TICS_ATASCADA`): en la
+ *     Llamada de la ciudad abierta, cuatro Prestados se quedaban 772 tics en el bolsillo de la cabina —entre
+ *     su poste, un coche y la fachada, sin llegar a ninguno de sus seis nudos más cercanos— persiguiendo a
+ *     su blanco a 85-92 m (ver `nudoParaSalir` en `cerebro.ts`).
  *
- * Las dos, a cero. Con el cerebro de la segunda oleada salían 4 y 43 aquí (el paso por el grafo contaba
+ * Las cuatro, a cero. Con el cerebro de la segunda oleada salían 4 y 43 aquí (el paso por el grafo contaba
  * saltos, no metros: se iban por la calle, un centímetro por fuera del borde; y la que llegaba detrás de
  * otra, o a la esquina de un pilar, temblaba a 1,4-1,8 m con turno sin rodear nada).
+ *
+ * La tercera SÓLO SE CUENTA si algún combate declara olvido: sin olvido no hay franja, y una comprobación que
+ * no mira nada se leería como vigilada. En la entrega 1 su productor no lo declara (sus encuentros siguen a
+ * la plaza), y la nota lo dice; la franja de su ciudad la juega el bloque 25, con el L10 del diseño.
  */
 paso('18 · El Quiebro jugado de verdad: ninguna entidad quieta junto a su blanco con turno, y todas entran en el límite');
-const DEL_QUIEBRO_JUGADO = 7;
+/** Ocho, y una más si algún combate de El Quiebro declara olvido (ver arriba): se suma al comprobarla. */
+let DEL_QUIEBRO_JUGADO = 8;
 if (HAY_QUIEBRO) {
   const productor = (await import(pathToFileURL(RUTA_DEL_PRODUCTOR).href)) as { lizaDelQuiebro: (vista: unknown, codigo: string) => LizaDeclarada | null };
   const robotDeLaMesa = (await import(pathToFileURL(RUTA_DEL_ROBOT).href)) as {
@@ -2244,10 +2295,16 @@ if (HAY_QUIEBRO) {
   let nacidas = 0;
   let conCelador = 0;
   let conTirador = 0;
+  let conOlvido = 0;
   const quietas: string[] = [];
   const fuera: string[] = [];
+  const paradas: string[] = [];
+  const atascadas: string[] = [];
   let peorQuieta = 0;
   let peorFuera = 0;
+  let peorParada = 0;
+  let peorAtascada = 0;
+  let acercandose = 0;
   let lineasDelQuiebro = 0;
   let rafagasDelQuiebro = 0;
   let dejadasDelQuiebro = 0;
@@ -2289,10 +2346,16 @@ if (HAY_QUIEBRO) {
           nacidas += r.nacidas;
           if (l.fase.encuentro?.grupos.some((g) => g.clase === 2) === true) conCelador++;
           if (l.fase.encuentro?.grupos.some((g) => g.clase === 3) === true) conTirador++;
+          if (l.fase.encuentro !== null && olvidoDelEncuentro(l.fase.encuentro) !== null) conOlvido++;
           if (r.peorQuieta > peorQuieta) peorQuieta = r.peorQuieta;
           if (r.peorFuera > peorFuera) peorFuera = r.peorFuera;
+          if (r.peorParada > peorParada) peorParada = r.peorParada;
+          if (r.peorAtascada > peorAtascada) peorAtascada = r.peorAtascada;
+          acercandose += r.acercandose;
           for (const x of r.quietas) quietas.push(`${codigo} ${String(asientos)}a s${String(semilla)} ${clave}: ${x}`);
           for (const x of r.fuera) fuera.push(`${codigo} ${String(asientos)}a s${String(semilla)} ${clave}: ${x}`);
+          for (const x of r.paradas) paradas.push(`${codigo} ${String(asientos)}a s${String(semilla)} ${clave}: ${x}`);
+          for (const x of r.atascadas) atascadas.push(`${codigo} ${String(asientos)}a s${String(semilla)} ${clave}: ${x}`);
         }
       }
     }
@@ -2304,6 +2367,26 @@ if (HAY_QUIEBRO) {
   comprobar('se jugaron los combates de verdad: noches 1 y 2, con Celadores y con tiradores', fases >= 180 && conCelador >= 60 && conTirador >= 30 && nacidas >= 1800, { fases, conCelador, conTirador, nacidas });
   comprobar('ninguna entidad pasa más de 3 s junto a su blanco, con turno posible, sin anunciar y sin ir a ninguna parte', quietas.length === 0, quietas.slice(0, 6));
   comprobar('ninguna entidad pasa más de 5 s desde que nace sin entrar en el límite de la fase', fuera.length === 0, fuera.slice(0, 6));
+  nota(`la racha más larga acechando a su blanco lejos de él sin moverse: ${String(peorAtascada)} tics (tope ${String(TICS_ATASCADA)})`);
+  comprobar(
+    'ninguna entidad pasa más de 10 s acechando a su blanco lejos de él sin moverse: la que no llega en recta a ningún nudo cercano (el bolsillo de la cabina) busca uno más lejos',
+    atascadas.length === 0,
+    atascadas.slice(0, 6),
+  );
+  if (conOlvido > 0) {
+    nota(
+      `la franja entre el alcance y el olvido (L10): ${String(conOlvido)} de ${String(fases)} combates con olvido, ` +
+        `${String(acercandose)} tics de entidades acercándose sin blanco, la racha parada más larga ${String(peorParada)} tics (tope ${String(TICS_QUIETA)})`,
+    );
+    DEL_QUIEBRO_JUGADO++;
+    comprobar(
+      'ninguna entidad pasa más de 3 s parada sin nadie a su alcance y con alguien a la distancia del olvido (L10): la que se queda sin blanco acompañada se acerca',
+      paradas.length === 0,
+      paradas.slice(0, 6),
+    );
+  } else {
+    nota(`la franja entre el alcance y el olvido (L10): ninguno de los ${String(fases)} combates declara olvido, así que aquí no hay franja que vigilar (la juega el bloque 25)`);
+  }
   nota(`líneas de apuntado de sus tiradores: ${String(lineasDelQuiebro)} abiertas, ${String(rafagasDelQuiebro)} ráfagas, ${String(dejadasDelQuiebro)} dejadas sin disparar`);
   comprobar(
     'con El Quiebro, cada ráfaga de sus tiradores sale con su línea de apuntado, en el instante en que la línea se fija, y ninguna línea se queda colgada',
@@ -3163,10 +3246,1735 @@ const DE_LA_REVISION = 11;
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 23 · LA LIZA POR DENTRO: ÍNDICES QUE NO CAMBIAN NI UN RESULTADO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * El diseño de la ciudad abierta (§5.4) le pone a la Liza tres índices y una memoria: las losas y los
+ * nudos por celdas, los campos de distancias por meta, y la validación del mundo guardada por su
+ * identidad. Su contrato es no cambiar NI UN resultado, y aquí se mide contra la fuerza bruta, que es la
+ * misma Liza con los índices apagados (`usarLosIndicesDeLaLiza`):
+ *
+ *   · 100.000 tramos en cada uno de veinte mundos abiertos (la caja y la fracción, empates incluidos);
+ *   · los K nudos más cercanos a 50.000 puntos, a una malla barajada y al empate en la raya de una celda;
+ *   · lo que falta andando por el grafo, preguntado a los campos (acotados, seguidos y rehechos);
+ *   · la misma sala, tic a tic, con y sin índices;
+ *   · y la validación: con y sin memoria, las mismas frases, y el mundo revisado UNA vez.
+ *
+ * ═══ POR QUÉ `createRequire` ═══
+ *
+ * Con `tsx`, `geometria.ts` importada desde este guion es OTRA copia del módulo que la que carga la sala por
+ * dentro, y un interruptor puesto en ésa no apaga nada: la comparación saldría igual porque serían las
+ * mismas respuestas. `createRequire` da la copia de la sala. Y las cuentas de cada índice van de suelo: con
+ * el interruptor encendido tienen que moverse tantas veces como preguntas hubo, y apagado, ninguna.
+ */
+paso('23 · La Liza por dentro: índices contra la fuerza bruta, la misma sala tic a tic y el mundo validado una vez');
+const POR_DENTRO = 12;
+{
+  const requerir = createRequire(import.meta.url);
+  const GEO = requerir('../../shared/mecanicas/liza/geometria') as typeof import('../../shared/mecanicas/liza/geometria');
+  const CER = requerir('../../shared/mecanicas/liza/cerebro') as typeof import('../../shared/mecanicas/liza/cerebro');
+  const conIndices = <T>(si: boolean, f: () => T): T => {
+    const antes = GEO.usarLosIndicesDeLaLiza(si);
+    try {
+      return f();
+    } finally {
+      GEO.usarLosIndicesDeLaLiza(antes);
+    }
+  };
+  const resta = (a: CuentasDeLosIndices, b: CuentasDeLosIndices): CuentasDeLosIndices => ({
+    losasPorCeldas: b.losasPorCeldas - a.losasPorCeldas,
+    indicesDeLosas: b.indicesDeLosas - a.indicesDeLosas,
+    nudosPorCeldas: b.nudosPorCeldas - a.nudosPorCeldas,
+    indicesDeNudos: b.indicesDeNudos - a.indicesDeNudos,
+    camposAcotados: b.camposAcotados - a.camposAcotados,
+    camposReusados: b.camposReusados - a.camposReusados,
+    camposSeguidos: b.camposSeguidos - a.camposSeguidos,
+    camposRehechos: b.camposRehechos - a.camposRehechos,
+  });
+  const nada = (c: CuentasDeLosIndices): boolean => c.losasPorCeldas === 0 && c.nudosPorCeldas === 0 && c.camposAcotados === 0 && c.camposReusados === 0 && c.camposSeguidos === 0 && c.camposRehechos === 0;
+  const TOPE = GEO.TOPE_DE_LA_LIZA - 1;
+  const acotar = (v: number): number => (v > TOPE ? TOPE : v < -TOPE ? -TOPE : v);
+
+  /* ── Los veinte mundos abiertos ─────────────────────────────────────────── */
+  const DESPLAZAMIENTOS = [
+    [0, 0], [-350, 340], [350, -350], [-200, -350], [340, 200], [0, -350], [-350, 0], [120, 340], [-60, -120], [350, 350],
+    [-350, -350], [200, -60], [10, 20], [-340, 150], [260, -280], [-120, 280], [330, -10], [-280, -200], [70, -330], [-10, -10],
+  ];
+  const mundos: { d: LizaDeclarada; cuerpos: Int32Array; x0: number; z0: number }[] = [];
+  for (let i = 0; i < DESPLAZAMIENTOS.length; i++) {
+    const [dx, dz] = DESPLAZAMIENTOS[i] as number[];
+    const d = lizaAbierta({ semilla: 101 + i, desplazamiento: { x: dx as number, z: dz as number }, repartidos: i % 2 === 1 });
+    mundos.push({ d, cuerpos: arenaDeLaLiza(d).cuerpos, x0: u(-150 + (dx as number)), z0: u(-150 + (dz as number)) });
+  }
+  let minCajas = Infinity;
+  let minNudos = Infinity;
+  let extremo = 0;
+  for (const m of mundos) {
+    minCajas = Math.min(minCajas, m.d.mundo.suelo.cuerpos.length);
+    minNudos = Math.min(minNudos, m.d.mundo.grafo.nudos.length);
+    for (let i = 0; i < m.cuerpos.length; i++) extremo = Math.max(extremo, Math.abs(m.cuerpos[i] as number));
+  }
+  comprobar(
+    `los ${mundos.length} mundos abiertos se declaran bien y encienden los índices (${GEO.CAJAS_PARA_INDEXAR} cajas y ${CER.NUDOS_PARA_INDEXAR} nudos o más), con cajas a ±500 unidades`,
+    mundos.length === 20 && minCajas >= GEO.CAJAS_PARA_INDEXAR && minNudos >= CER.NUDOS_PARA_INDEXAR && extremo >= u(495),
+    { minCajas, minNudos, extremo: extremo / UNO },
+  );
+
+  /* ── Las losas: 100.000 tramos por mundo ────────────────────────────────── */
+  const TRAMOS = 100000;
+  const RADIOS = [0, u(0.2), u(0.35), u(0.35), u(1), u(3), u(20)];
+  const LARGOS = [1, 12, 30, 60, 160];
+  const resolver = (cuerpos: Int32Array, t: Float64Array): Float64Array => {
+    const r = new Float64Array((t.length / 5) * 2);
+    for (let i = 0, j = 0; i < t.length; i += 5, j += 2) {
+      const c = GEO.primeraLosa(cuerpos, t[i] as number, t[i + 1] as number, t[i + 2] as number, t[i + 3] as number, t[i + 4] as number);
+      r[j] = c === null ? -1 : c.caja;
+      r[j + 1] = c === null ? -1 : c.fraccion;
+    }
+    return r;
+  };
+  let distintasL = 0;
+  let chocanL = 0;
+  let empates = 0;
+  let empatesMirados = 0;
+  let menosParejas = Infinity;
+  const ejemplosL: unknown[] = [];
+  let msBruta = 0;
+  let msCeldas = 0;
+  const antesDeLasLosas = GEO.cuentasDeLosIndices();
+  let apagadasL: CuentasDeLosIndices | null = null;
+  for (let w = 0; w < mundos.length; w++) {
+    const { cuerpos, x0, z0 } = mundos[w] as (typeof mundos)[number];
+    const azar = new AzarDeJuguete(7000 + w);
+    const t = new Float64Array(TRAMOS * 5);
+    const cajas = cuerpos.length / 4;
+    const deEmpate: number[] = [];
+    /*
+     * Las parejas de EMPATE: dos cajas con el mismo canto de entrada (`x0`, o `z0`) cuyas franjas ensanchadas
+     * por un cuerpo se solapan (los bolardos de una valla). Un tramo por el solape que cruza ese canto entra
+     * en las dos en la misma fracción, y tiene que ganar la de índice menor.
+     */
+    const RADIO_DEL_EMPATE = u(0.35);
+    const parejas: { enX: boolean; canto: number; medio: number }[] = [];
+    for (let a = 0; a < cuerpos.length; a += 4) {
+      for (let b = a + 4; b < cuerpos.length; b += 4) {
+        for (let eje = 0; eje < 2; eje++) {
+          if (cuerpos[a + eje] !== cuerpos[b + eje]) continue;
+          const otro = 1 - eje;
+          const lo = Math.max(cuerpos[a + otro] as number, cuerpos[b + otro] as number) - RADIO_DEL_EMPATE;
+          const hi = Math.min(cuerpos[a + otro + 2] as number, cuerpos[b + otro + 2] as number) + RADIO_DEL_EMPATE;
+          const medio = Math.floor((lo + hi) / 2);
+          if (lo < medio && medio < hi) parejas.push({ enX: eje === 0, canto: cuerpos[a + eje] as number, medio });
+        }
+      }
+    }
+    menosParejas = Math.min(menosParejas, parejas.length);
+    for (let i = 0; i < TRAMOS; i++) {
+      const familia = azar.entre(100);
+      let ax: number;
+      let az: number;
+      let bx: number;
+      let bz: number;
+      let radio = RADIOS[azar.entre(RADIOS.length)] as number;
+      if (familia < 30) {
+        ax = x0 - u(10) + azar.entre(u(320) >>> 4) * 16;
+        az = z0 - u(10) + azar.entre(u(320) >>> 4) * 16;
+        const l = LARGOS[azar.entre(LARGOS.length)] as number;
+        bx = ax + u(azar.entre(2 * l * 100 + 1) / 100 - l);
+        bz = az + u(azar.entre(2 * l * 100 + 1) / 100 - l);
+      } else if (familia < 50) {
+        const e = u((EJES_DEL_MUNDO_ABIERTO[azar.entre(EJES_DEL_MUNDO_ABIERTO.length)] as number) + 150) + (azar.entre(121) - 60) * 6554;
+        const s = azar.entre(u(300) >>> 4) * 16;
+        const l = u(azar.entre(1201) / 10 - 60);
+        if (azar.cien(50)) {
+          ax = x0 + s;
+          bx = ax + l;
+          az = z0 + e;
+          bz = az;
+        } else {
+          az = z0 + s;
+          bz = az + l;
+          ax = x0 + e;
+          bx = ax;
+        }
+      } else if (familia < 60) {
+        const raya = (v: number): number => Math.floor(v / GEO.CELDA_DEL_INDICE) * GEO.CELDA_DEL_INDICE + (azar.entre(3) - 1);
+        ax = raya(x0 + azar.entre(u(300) >>> 4) * 16);
+        az = raya(z0 + azar.entre(u(300) >>> 4) * 16);
+        bx = azar.cien(50) ? raya(ax + u(azar.entre(61) - 30)) : ax + u(azar.entre(61) - 30);
+        bz = azar.cien(50) ? raya(az + u(azar.entre(61) - 30)) : az;
+      } else if (familia < 77) {
+        const c = azar.entre(cajas) * 4;
+        const cx0 = cuerpos[c] as number;
+        const cz0 = cuerpos[c + 1] as number;
+        const cx1 = cuerpos[c + 2] as number;
+        const cz1 = cuerpos[c + 3] as number;
+        const donde = azar.entre(4);
+        ax = donde === 0 ? cx0 : donde === 1 ? Math.floor((cx0 + cx1) / 2) : donde === 2 ? cx0 - 1 : cx1;
+        az = donde === 0 ? cz0 : Math.floor((cz0 + cz1) / 2);
+        if (familia < 72) {
+          bx = ax + u(azar.entre(61) - 30);
+          bz = az + u(azar.entre(61) - 30);
+        } else {
+          bx = ax;
+          bz = az;
+        }
+      } else {
+        /* El empate: por el solape de una pareja, cruzando su canto común. */
+        const par = parejas[azar.entre(parejas.length)] as (typeof parejas)[number];
+        radio = RADIO_DEL_EMPATE;
+        const l = u(1 + azar.entre(20));
+        if (par.enX) {
+          az = par.medio;
+          bz = az;
+          ax = par.canto - l;
+          bx = par.canto + l;
+        } else {
+          ax = par.medio;
+          bx = ax;
+          az = par.canto - l;
+          bz = par.canto + l;
+        }
+        if (deEmpate.length < 2000) deEmpate.push(i);
+      }
+      t[i * 5] = acotar(ax);
+      t[i * 5 + 1] = acotar(az);
+      t[i * 5 + 2] = acotar(bx);
+      t[i * 5 + 3] = acotar(bz);
+      t[i * 5 + 4] = radio;
+    }
+    let t0 = performance.now();
+    const bruta = conIndices(false, () => resolver(cuerpos, t));
+    msBruta += performance.now() - t0;
+    if (w === 0) apagadasL = resta(antesDeLasLosas, GEO.cuentasDeLosIndices());
+    t0 = performance.now();
+    const celdas = conIndices(true, () => resolver(cuerpos, t));
+    msCeldas += performance.now() - t0;
+    for (let j = 0; j < bruta.length; j += 2) {
+      if (bruta[j] !== -1) chocanL++;
+      if (bruta[j] !== celdas[j] || bruta[j + 1] !== celdas[j + 1]) {
+        distintasL++;
+        if (ejemplosL.length < 4) ejemplosL.push({ mundo: w, tramo: Array.from(t.subarray((j / 2) * 5, (j / 2) * 5 + 5)), bruta: [bruta[j], bruta[j + 1]], celdas: [celdas[j], celdas[j + 1]] });
+      }
+    }
+    /* Los empates de verdad: cuántas cajas entran en la fracción de la primera (sólo las que pasan el descarte). */
+    for (const i of deEmpate) {
+      const f = bruta[i * 2 + 1] as number;
+      if (f < 0) continue;
+      empatesMirados++;
+      const ax = t[i * 5] as number;
+      const az = t[i * 5 + 1] as number;
+      const bx = t[i * 5 + 2] as number;
+      const bz = t[i * 5 + 3] as number;
+      const r = t[i * 5 + 4] as number;
+      let iguales = 0;
+      for (let c = 0; c < cuerpos.length; c += 4) {
+        if ((cuerpos[c] as number) - r >= Math.max(ax, bx) || (cuerpos[c + 2] as number) + r <= Math.min(ax, bx)) continue;
+        if ((cuerpos[c + 1] as number) - r >= Math.max(az, bz) || (cuerpos[c + 3] as number) + r <= Math.min(az, bz)) continue;
+        if (GEO.pruebaDeLosa(ax, az, bx, bz, cuerpos[c] as number, cuerpos[c + 1] as number, cuerpos[c + 2] as number, cuerpos[c + 3] as number, r) === f) iguales++;
+      }
+      if (iguales >= 2) empates++;
+    }
+  }
+  const lasLosas = resta(antesDeLasLosas, GEO.cuentasDeLosIndices());
+  const preguntasL = TRAMOS * mundos.length;
+  nota(
+    `losas: ${preguntasL} tramos en ${mundos.length} mundos (${chocanL} chocan; ${empates} empates de verdad en ${empatesMirados} tramos de empate), ` +
+      `fuerza bruta ${((msBruta * 1000) / preguntasL).toFixed(2)} µs y por celdas ${((msCeldas * 1000) / preguntasL).toFixed(2)} µs por tramo`,
+  );
+  comprobar(
+    'primeraLosa por celdas da la MISMA caja y la MISMA fracción que la fuerza bruta en 100.000 tramos de cada uno de los 20 mundos (desde dentro, nulos, por las rayas de las celdas y en los empates)',
+    distintasL === 0 && chocanL > preguntasL / 10 && chocanL < preguntasL && menosParejas > 0 && empates >= 20000,
+    { distintasL, chocanL, empates, empatesMirados, menosParejas, ejemplos: ejemplosL },
+  );
+  comprobar(
+    'y las contestó el índice —cada pregunta con él encendido, una cuenta, y un índice por mundo— y ninguna con él apagado',
+    apagadasL !== null && nada(apagadasL) && lasLosas.losasPorCeldas === preguntasL && lasLosas.indicesDeLosas === mundos.length,
+    { apagadas: apagadasL, encendidas: lasLosas },
+  );
+
+  /* ── Los K nudos más cercanos ───────────────────────────────────────────── */
+  let preguntasN = 0;
+  let distintasN = 0;
+  const ejemplosN: unknown[] = [];
+  const antesDeLosNudos = GEO.cuentasDeLosIndices();
+  const compararNudos = (nudos: readonly { x: number; z: number }[], x: number, z: number, que: string): void => {
+    const a = conIndices(false, () => CER.nudosMasCercanosParaProbar(nudos, x, z)).join(',');
+    const b = conIndices(true, () => CER.nudosMasCercanosParaProbar(nudos, x, z)).join(',');
+    preguntasN++;
+    if (a !== b) {
+      distintasN++;
+      if (ejemplosN.length < 4) ejemplosN.push({ que, x: x / UNO, z: z / UNO, lista: a, celdas: b });
+    }
+  };
+  for (let w = 0; w < 5; w++) {
+    const { d, x0, z0 } = mundos[w] as (typeof mundos)[number];
+    const nudos = d.mundo.grafo.nudos;
+    const azar = new AzarDeJuguete(9100 + w);
+    for (let i = 0; i < 10000; i++) {
+      const familia = azar.entre(4);
+      if (familia === 0) {
+        const n = nudos[azar.entre(nudos.length)] as { x: number; z: number };
+        compararNudos(nudos, n.x, n.z, 'en un nudo');
+      } else if (familia === 1) {
+        const n = nudos[azar.entre(nudos.length)] as { x: number; z: number };
+        compararNudos(nudos, n.x + u(2.5), n.z, 'a medio camino entre dos');
+      } else if (familia === 2) {
+        const x = Math.floor((x0 + azar.entre(u(320) >>> 4) * 16) / GEO.CELDA_DEL_INDICE) * GEO.CELDA_DEL_INDICE;
+        compararNudos(nudos, x, z0 + azar.entre(u(300) >>> 4) * 16, 'en una raya');
+      } else compararNudos(nudos, x0 - u(20) + azar.entre(u(340) >>> 4) * 16, z0 - u(20) + azar.entre(u(340) >>> 4) * 16, 'donde sea');
+    }
+  }
+  /* La malla barajada: nudos cada 8 (el índice menor puede estar en un anillo de fuera) y puntos cada 4. */
+  {
+    const azar = new AzarDeJuguete(77);
+    const malla: { x: number; z: number }[] = [];
+    for (let j = -12; j <= 12; j++) for (let i = -12; i <= 12; i++) malla.push({ x: u(i * 8), z: u(j * 8) });
+    for (let i = malla.length - 1; i > 0; i--) {
+      const k = azar.entre(i + 1);
+      const t = malla[i] as { x: number; z: number };
+      malla[i] = malla[k] as { x: number; z: number };
+      malla[k] = t;
+    }
+    for (let j = -26; j <= 26; j++) for (let i = -26; i <= 26; i++) compararNudos(malla, u(i * 4), u(j * 4), 'la malla barajada');
+  }
+  /*
+   * EL EMPATE EN LA RAYA, construido: el punto (11, 8) está a 5 de la raya x = 16, donde empieza la celda de
+   * al lado; siete nudos de su celda a 5 justos, y uno a 5 justo EN la raya, con el índice menor. Tiene que
+   * salir el primero (el anillo a la misma distancia que el sexto todavía se mira). En los cuatro giros, y
+   * con seiscientos nudos lejos para que el índice se encienda.
+   */
+  for (let giro = 0; giro < 4; giro++) {
+    const dibujo = [[16, 8], [6, 8], [11, 3], [11, 13], [14, 4], [14, 12], [15, 5], [15, 11], [40, 40], [-30, 20]];
+    const girar = (x: number, z: number): number[] => (giro === 0 ? [x, z] : giro === 1 ? [z, x] : giro === 2 ? [x, 48 - z] : [48 - z, x]);
+    const nudos: { x: number; z: number }[] = [];
+    for (const [x, z] of dibujo) {
+      const [gx, gz] = girar(x as number, z as number);
+      nudos.push({ x: u(gx as number), z: u(gz as number) });
+    }
+    for (let i = 0; i < 600; i++) nudos.push({ x: u(200 + (i % 30) * 2), z: u(200 + Math.floor(i / 30) * 2) });
+    const [px, pz] = girar(11, 8);
+    compararNudos(nudos, u(px as number), u(pz as number), `el empate en la raya, giro ${String(giro)}`);
+  }
+  const losNudos = resta(antesDeLosNudos, GEO.cuentasDeLosIndices());
+  nota(`nudos: ${preguntasN} preguntas de los ${String(6)} más cercanos, con el índice encendido y apagado`);
+  comprobar(
+    'los K nudos más cercanos por celdas son los MISMOS y en el mismo orden que en lista: 50.000 puntos de cinco mundos, una malla barajada y el empate en la raya en sus cuatro giros',
+    distintasN === 0 && preguntasN === 50000 + 53 * 53 + 4,
+    { distintasN, preguntasN, ejemplos: ejemplosN },
+  );
+  comprobar('y los contestó el índice: una cuenta por pregunta encendida, y ninguna apagada', losNudos.nudosPorCeldas === preguntasN, losNudos);
+
+  /* ── Los campos por meta ────────────────────────────────────────────────── */
+  {
+    const { d } = mundos[3] as (typeof mundos)[number];
+    const nudos = d.mundo.grafo.nudos;
+    const N = nudos.length;
+    /* Y un nudo suelto, sin aristas: nadie llega a él, y preguntarlo hace completar el campo. */
+    const conSuelto: LizaDeclarada = { ...d, mundo: { ...d.mundo, grafo: { nudos: [...nudos, { x: nudos[0]!.x + u(3), z: nudos[0]!.z + u(3) }], aristas: d.mundo.grafo.aristas } } };
+    const azar = new AzarDeJuguete(4242);
+    const todos: number[] = [];
+    for (let i = 0; i <= N; i++) todos.push(i);
+    for (let i = todos.length - 1; i > 0; i--) {
+      const k = azar.entre(i + 1);
+      const t = todos[i] as number;
+      todos[i] = todos[k] as number;
+      todos[k] = t;
+    }
+    const cercanos = (m: number): number[] => {
+      const c: number[] = [];
+      for (let i = 0; i < N; i++) if (Math.abs(nudos[i]!.x - nudos[m]!.x) + Math.abs(nudos[i]!.z - nudos[m]!.z) <= u(40)) c.push(i);
+      return c;
+    };
+    let preguntasC = 0;
+    let distintasC = 0;
+    const ejemplosC: unknown[] = [];
+    const antesDeLosCampos = GEO.cuentasDeLosIndices();
+    const compararCampo = (meta: number, leer: readonly number[]): void => {
+      const a = conIndices(false, () => CER.faltaPorElGrafoParaProbar(conSuelto, meta, leer));
+      const b = conIndices(true, () => CER.faltaPorElGrafoParaProbar(conSuelto, meta, leer));
+      preguntasC++;
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] === b[i]) continue;
+        distintasC++;
+        if (ejemplosC.length < 4) ejemplosC.push({ meta, nudo: leer[i], entero: a[i], campo: b[i] });
+        break;
+      }
+    };
+    let anterior = -1;
+    for (let i = 0; i < 60; i++) {
+      const m = azar.entre(N);
+      compararCampo(m, cercanos(m));
+      if (anterior >= 0) compararCampo(anterior, todos);
+      compararCampo(m, todos);
+      compararCampo(azar.entre(N), todos);
+      anterior = m;
+    }
+    compararCampo(N, todos);
+    const losCampos = resta(antesDeLosCampos, GEO.cuentasDeLosIndices());
+    nota(`campos: ${preguntasC} metas leídas enteras o en parte; ${JSON.stringify(losCampos)}`);
+    comprobar(
+      'lo que falta andando hasta cada meta, preguntado a los campos guardados, es EXACTAMENTE lo del Dijkstra entero: dentro de la cota, fuera de ella y hasta un nudo al que no se llega',
+      distintasC === 0 && preguntasC === 60 * 4 - 1 + 1,
+      { distintasC, preguntasC, ejemplos: ejemplosC },
+    );
+    comprobar(
+      'y los campos se hicieron acotados, se sacaron de la memoria, se completaron siguiendo su montículo y rehaciéndolo',
+      losCampos.camposAcotados > 60 && losCampos.camposReusados > 60 && losCampos.camposSeguidos > 30 && losCampos.camposRehechos > 30,
+      losCampos,
+    );
+  }
+
+  /* ── La misma sala, tic a tic, con y sin los índices ───────────────────── */
+  {
+    const dA = lizaAbierta({ semilla: 7, repartidos: true });
+    const ids = idsDe(dA);
+    const aparatos: Aparato[] = [];
+    for (let i = 1; i <= 6; i++) aparatos.push(new Aparato(i, 2000 * i, 15 * i, 50 + 35 * i, (11 * i) % 50, i % 2 === 0 ? paseante(31 * i + 5, ids, 130) : guerrero(90 + 10 * i, ids)));
+    const bA = new Banco(dA, 777, aparatos);
+    bA.guardarPasos = false;
+    for (let i = 1; i <= 6; i++) bA.conectar(i);
+    const TICS = 1200;
+    const huellaDelEstado = (s: EstadoDeLaSala): string => fnv(canonico({ ...s, declaracion: null, arena: null }));
+    const estados: string[] = [];
+    const salidas: string[] = [];
+    let anuncios = 0;
+    let balas = 0;
+    let nacidas = 0;
+    const antesDelBanco = GEO.cuentasDeLosIndices();
+    for (let k = 0; k < TICS; k++) {
+      const p = bA.tic();
+      estados.push(huellaDelEstado(p.sala));
+      salidas.push(fnv(salidasDe(p)));
+      for (const x of p.sucesos) {
+        if (x.para === 1 && x.suceso.e === 'anuncio') anuncios++;
+        else if (x.para === 1 && x.suceso.e === 'bala') balas++;
+        else if (x.para === 0 && x.suceso.e === 'nace') nacidas++;
+      }
+    }
+    const delBanco = resta(antesDelBanco, GEO.cuentasDeLosIndices());
+    const reproducir = (indices: boolean): { malos: number; primera: number; ms: number; cuentas: CuentasDeLosIndices } => {
+      const antes = GEO.cuentasDeLosIndices();
+      let malos = 0;
+      let primera = -1;
+      let ms = 0;
+      conIndices(indices, () => {
+        let sala = salaNueva(dA, 777);
+        for (let k = 0; k < TICS; k++) {
+          const t0 = performance.now();
+          const p = avanzarLaSala(sala, bA.grabadas[k] as EntradaDeLaSala[]);
+          ms += performance.now() - t0;
+          sala = p.sala;
+          if (huellaDelEstado(p.sala) !== estados[k] || fnv(salidasDe(p)) !== salidas[k]) {
+            malos++;
+            if (primera < 0) primera = k;
+          }
+        }
+      });
+      return { malos, primera, ms, cuentas: resta(antes, GEO.cuentasDeLosIndices()) };
+    };
+    const apagados = reproducir(false);
+    const encendidos = reproducir(true);
+    nota(
+      `la sala abierta, ${TICS} tics con seis asientos repartidos: ${anuncios} anuncios y ${balas} balas al asiento 1, ${nacidas} nacidas; ` +
+        `sin índices ${((apagados.ms / TICS) * 1000).toFixed(0)} µs por tic, con índices ${((encendidos.ms / TICS) * 1000).toFixed(0)} µs`,
+    );
+    comprobar(
+      'la MISMA sala tic a tic —cada estado y todo lo que sale— jugada con los índices, reproducida sin ellos y otra vez con ellos, en una ciudad de juguete con los asientos repartidos',
+      apagados.malos === 0 && encendidos.malos === 0 && estados.length === TICS,
+      { apagados: { malos: apagados.malos, primera: apagados.primera }, encendidos: { malos: encendidos.malos, primera: encendidos.primera } },
+    );
+    comprobar(
+      'y se jugó de verdad y por los índices: golpes, balas y entidades que nacen; losas y nudos por celdas, y campos acotados, reusados y completados; y reproducida sin índices, ninguno',
+      anuncios >= 20 &&
+        balas >= 50 &&
+        nacidas >= 15 &&
+        delBanco.losasPorCeldas > 0 &&
+        delBanco.nudosPorCeldas > 0 &&
+        delBanco.camposAcotados > 0 &&
+        delBanco.camposReusados > 0 &&
+        delBanco.camposSeguidos + delBanco.camposRehechos > 0 &&
+        nada(apagados.cuentas) &&
+        encendidos.cuentas.losasPorCeldas === delBanco.losasPorCeldas,
+      { anuncios, balas, nacidas, delBanco, apagados: apagados.cuentas, encendidos: encendidos.cuentas },
+    );
+  }
+
+  /* ── La validación del mundo, una vez, y la misma con y sin memoria ──────── */
+  {
+    const dV = lizaAbierta({ semilla: 11 });
+    problemasDeLaDeclaracion(dV);
+    const v0 = validacionesDelMundo();
+    let enLosVotos = 0;
+    const tVoto: number[] = [];
+    for (let i = 0; i < 30; i++) {
+      const voto: LizaDeclarada = { ...dV, fase: { ...dV.fase, semilla: i + 1 }, asientos: dV.asientos.slice() };
+      const t0 = performance.now();
+      enLosVotos += problemasDeLaDeclaracion(voto).length;
+      tVoto.push(performance.now() - t0);
+    }
+    const v1 = validacionesDelMundo();
+    const t0 = performance.now();
+    const deOtroMundo = problemasDeLaDeclaracion({ ...dV, mundo: { ...dV.mundo } });
+    const tNoche = performance.now() - t0;
+    const v2 = validacionesDelMundo();
+    tVoto.sort((a, b) => a - b);
+    nota(`validar la liza abierta: una vez por mundo ${tNoche.toFixed(2)} ms; por voto, mediana ${(tVoto[15] as number).toFixed(2)} ms y peor ${(tVoto[29] as number).toFixed(2)} ms`);
+    comprobar(
+      'treinta declaraciones nuevas con el MISMO mundo no lo revisan otra vez (0 revisiones), y un mundo nuevo igual se revisa una vez; ninguna tiene problemas',
+      v1 - v0 === 0 && v2 - v1 === 1 && enLosVotos === 0 && deOtroMundo.length === 0,
+      { enLosVotos: v1 - v0, otroMundo: v2 - v1, problemas: enLosVotos + deOtroMundo.length },
+    );
+
+    /* Las roturas, cada una con la frase que le toca (`null`: ninguna) y construida dos veces: dos identidades. */
+    const clonarMundo = (): Record<string, unknown> => JSON.parse(JSON.stringify(dV.mundo)) as Record<string, unknown>;
+    const conMundo = (f: (m: Record<string, unknown>) => void) => (): LizaDeclarada => {
+      const m = clonarMundo();
+      f(m);
+      return { ...dV, mundo: m as unknown as LizaDeclarada['mundo'] };
+    };
+    const suelo = (m: Record<string, unknown>): Record<string, unknown[]> => m['suelo'] as Record<string, unknown[]>;
+    const grafo = (m: Record<string, unknown>): Record<string, unknown[]> => m['grafo'] as Record<string, unknown[]>;
+    class ListaRara extends Array<unknown> {}
+    const LLANO = 'no es dato llano (no pasa por canonico.ts): ';
+    const FORMA = 'la declaración no tiene la forma del contrato: ';
+    const roturas: [string, () => LizaDeclarada, string | null][] = [
+      ['la buena', () => ({ ...dV, mundo: clonarMundo() as unknown as LizaDeclarada['mundo'] }), null],
+      ['una casilla con decimales', conMundo((m) => (suelo(m)['pisables']![5] = { x: 1.5, y: 0 })), 'una casilla son dos enteros'],
+      ['una casilla con una clave de más', conMundo((m) => (suelo(m)['pisables']![7] = { x: 3, y: 1, z: 2 })), null],
+      ['una casilla con una clave sin definir', conMundo((m) => (suelo(m)['pisables']![9] = { x: 3, y: 1, z: undefined })), LLANO],
+      ['una casilla con NaN', conMundo((m) => (suelo(m)['pisables']![11] = { x: Number.NaN, y: 1 })), LLANO],
+      ['una casilla que es una lista', conMundo((m) => (suelo(m)['pisables']![13] = [1, 2])), 'una casilla son dos enteros'],
+      ['las casillas en una lista rara', conMundo((m) => (suelo(m)['pisables'] = ListaRara.from(suelo(m)['pisables']!))), null],
+      ['una caja del revés', conMundo((m) => (suelo(m)['cuerpos']![20] = { x0: 5, z0: 5, x1: 4, z1: 6 })), 'la caja está del revés'],
+      ['una caja con una fecha', conMundo((m) => (suelo(m)['cuerpos']![21] = { x0: 5, z0: 5, x1: 6, z1: new Date(0) })), LLANO],
+      ['una caja fuera de la liza', conMundo((m) => (suelo(m)['cuerpos']![23] = { x0: 600, z0: 5, x1: 601, z1: 6 })), 'se sale de la liza'],
+      ['una clase de caja de menos', conMundo((m) => (m['clasesDeCaja'] as unknown[]).pop()), 'una clase por caja'],
+      ['un nudo con decimales', conMundo((m) => (grafo(m)['nudos']![30] = { x: 1.5, z: 0 })), 'mundo.grafo.nudos[30].x'],
+      ['un nudo que es un Map', conMundo((m) => (grafo(m)['nudos']![31] = new Map())), LLANO],
+      ['sin grafo (lanza a medias)', conMundo((m) => delete m['grafo']), FORMA],
+      [
+        'una casilla con decimales y sin grafo (lanza DESPUÉS de una frase: la frase se queda)',
+        conMundo((m) => {
+          suelo(m)['pisables']![5] = { x: 1.5, y: 0 };
+          delete m['grafo'];
+        }),
+        'una casilla son dos enteros',
+      ],
+      ['sin suelo (lanza al principio)', conMundo((m) => delete m['suelo']), FORMA],
+      ['una arista repetida', conMundo((m) => grafo(m)['aristas']!.push(grafo(m)['aristas']![0])), 'está dos veces'],
+      ['una arista repetida del revés', conMundo((m) => grafo(m)['aristas']!.push([...(grafo(m)['aristas']![0] as number[])].reverse())), 'está dos veces'],
+      ['una arista de tres', conMundo((m) => (grafo(m)['aristas']![3] = [1, 2, 3])), 'un par de índices de nudo'],
+      ['una zona con una clave de más', conMundo((m) => ((m['zonas'] as Record<string, unknown>[])[2]!['otra'] = 1)), null],
+      ['una zona con su caja con una fecha', conMundo((m) => ((m['zonas'] as Record<string, Record<string, unknown>>[])[3]!['caja']!['x0'] = new Date(0))), LLANO],
+      ['un sitio sin papel', conMundo((m) => delete (m['nace'] as Record<string, unknown>[])[2]!['papel']), "tiene que ser 'asiento' o 'reaparicion'"],
+      ['un sitio con el papel sin definir', conMundo((m) => ((m['nace'] as Record<string, unknown>[])[3]!['papel'] = undefined)), LLANO],
+      ['un ciclo en el mundo', conMundo((m) => (m['yo'] = m)), LLANO],
+      ['un ciclo por el suelo', conMundo((m) => (suelo(m)['atras'] = m as unknown as unknown[])), LLANO],
+      ['el mundo nulo', () => ({ ...dV, mundo: null as unknown as LizaDeclarada['mundo'] }), FORMA],
+      ['una declaración que no es llana', () => Object.assign(Object.create({ heredado: 1 }) as object, dV) as LizaDeclarada, LLANO],
+    ];
+    const malas: unknown[] = [];
+    let canonicas = 0;
+    let conFrase = 0;
+    for (const [nombre, hacer, frase] of roturas) {
+      const d1 = hacer();
+      const primera = problemasDeLaDeclaracion(d1);
+      const deMemoria = problemasDeLaDeclaracion(d1);
+      const deOtra = problemasDeLaDeclaracion(hacer());
+      const generico = porQueNoEsCanonico(d1);
+      const igual = JSON.stringify(primera) === JSON.stringify(deMemoria) && JSON.stringify(primera) === JSON.stringify(deOtra);
+      const canonicoBien = generico === null ? !primera.some((x) => x.startsWith(LLANO)) : primera[0] === `${LLANO}${generico}`;
+      const fraseBien = frase === null ? primera.length === 0 : primera.some((x) => x.includes(frase));
+      if (generico !== null) canonicas++;
+      if (frase !== null) conFrase++;
+      if (!igual || !canonicoBien || !fraseBien) malas.push({ nombre, igual, canonicoBien, fraseBien, primera: primera.slice(0, 2), deMemoria: igual ? undefined : deMemoria.slice(0, 2), deOtra: igual ? undefined : deOtra.slice(0, 2) });
+    }
+    comprobar(
+      `las ${roturas.length} roturas del mundo dan la frase que les toca, la MISMA con memoria y sin ella, y el chequeo canónico deprisa dice exactamente lo del genérico`,
+      malas.length === 0 && canonicas >= 8 && conFrase >= 20,
+      { malas, canonicas, conFrase },
+    );
+
+    const mismoSuelo: LizaDeclarada = { ...dV, fase: { ...dV.fase, semilla: 99 } };
+    const otroSuelo: LizaDeclarada = { ...dV, mundo: { ...dV.mundo, suelo: { ...dV.mundo.suelo } } };
+    const a1 = arenaDeLaLiza(dV);
+    const a2 = arenaDeLaLiza(mismoSuelo);
+    const a3 = arenaDeLaLiza(otroSuelo);
+    comprobar(
+      'la arena se guarda por el suelo: el mismo suelo da la MISMA arena, y otro suelo igual, otra arena igual',
+      a1 === a2 && a1 !== a3 && a1.cuerpos.join(',') === a3.cuerpos.join(',') && a1.pisable.join('') === a3.pisable.join(''),
+    );
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 24 · L10: EL ALCANCE DE BLANCO Y EL OLVIDO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La primera declaración de la liza abierta que la sala cumple (el diseño de la ciudad abierta, §3.4 y §5.5),
+ * con su segundo uso, que no es ningún juego: la plaza de juguete para las fronteras exactas, y la ciudad de
+ * juguete de 300 × 300 (`lizaAbiertaConOlvido`: alcance de 45, olvido a 90 en 200 tics) para jugarla entera
+ * contra la regla escrita aquí aparte, tic a tic.
+ *
+ *   · EL ALCANCE: con el alcance JUSTO a la distancia, la entidad toma al asiento y le anuncia; con 1/65536
+ *     menos, ni lo toma, ni da un paso, ni anuncia. El tirador suelta su línea de apuntado cuando su blanco
+ *     se le va, y nunca apunta a quien está más allá. En la ciudad nadie persigue más allá de su alcance, y
+ *     sin el alcance la misma partida persigue a más de cien unidades.
+ *   · EL OLVIDO: al tic, ni uno antes ni uno después, con el asiento a 1/65536 más de la distancia; nunca,
+ *     justo a ella. La olvidada vuelve a la cola de su grupo y un `vaciar` no se gana alejándose. El ausente
+ *     no acompaña, el caído sí y el que espera sin cuerpo no. Caída y deshecha no les corre el reloj. Y en la
+ *     ciudad olvida EXACTAMENTE lo que la regla de aquí dice, tic a tic, con un asiento que se calla un rato.
+ *   · LA FRANJA ENTRE LOS DOS (la revisión de la entrega 1): sin nadie a su alcance pero con alguien a la
+ *     distancia del olvido, la entidad ANDA hacia él sin hacerlo su blanco; justo en la frontera, y en la
+ *     ciudad, donde ninguna se queda parada ahí más de 3 s (la primera versión se quedaba para siempre).
+ *   · LA FORMA TRANSITORIA —sin los dos campos, como la escriben los productores que aún no declaran L10— es
+ *     la sala de antes, tic a tic.
+ */
+paso('24 · L10: el alcance de blanco y el olvido, exactos en sus fronteras y jugados en una ciudad');
+const DEL_OLVIDO = 12;
+{
+  const DISUELTA = MOTIVO_DE_IRSE.disuelta;
+  /** El menor entero `r` con `r² ≥ d2`: la distancia a la que un punto empieza a estar «a `r` o menos». */
+  const raizPorArriba = (d2: number): number => {
+    let r = Math.floor(Math.sqrt(d2));
+    while (r * r < d2) r++;
+    while (r > 0 && (r - 1) * (r - 1) >= d2) r--;
+    return r;
+  };
+  const conAlcance = (c: ClaseDeEntidad, alcance: number): ClaseDeEntidad => ({
+    ...c,
+    cerebro: {
+      distanciaMinima: c.cerebro.distanciaMinima,
+      distanciaMaxima: c.cerebro.distanciaMaxima,
+      decideCadaTics: c.cerebro.decideCadaTics,
+      costeCuerpoACuerpo: c.cerebro.costeCuerpoACuerpo,
+      costeDisparo: c.cerebro.costeDisparo,
+      sigueElGrafo: c.cerebro.sigueElGrafo,
+      alcanceDeBlanco: alcance,
+    },
+  });
+  const unoQuieto = (d: LizaDeclarada, mudo = false): Banco => {
+    const ap = new Aparato(1, 1000, 0, 100, 17, quieto);
+    ap.mudo = mudo;
+    return bancoDeUno(d, ap);
+  };
+  /** Lo que sale para todos de `tics` pasos de un banco: `nace`, `seva` (con su motivo), los `estado` del asiento 1 y las rondas. */
+  interface Registro {
+    naces: number[][];
+    sevas: number[][];
+    olvidos: number[][];
+    estados: number[][];
+    rondas: [number, string][];
+  }
+  const registro = (b: Banco, tics: number): Registro => {
+    const r: Registro = { naces: [], sevas: [], olvidos: [], estados: [], rondas: [] };
+    for (let i = 0; i < tics; i++) {
+      const p = b.tic();
+      const k = p.sala.tic;
+      for (const x of p.sucesos) {
+        if (x.para !== 0) continue;
+        const s = x.suceso;
+        if (s.e === 'nace') r.naces.push([k, s.id]);
+        else if (s.e === 'seva') {
+          r.sevas.push([k, s.id, s.por]);
+          if (s.por === DISUELTA) r.olvidos.push([k, s.id]);
+        } else if (s.e === 'estado' && s.a === 1) r.estados.push([k, s.est]);
+      }
+      for (const v of p.veredictos) if (v.tipo === VEREDICTO_DE_RONDA) r.rondas.push([k, (v.carga as CargaDeRonda).resultado]);
+    }
+    return r;
+  };
+
+  /* ── El alcance, justo en su frontera ───────────────────────────────────── */
+  {
+    const conUna = (alcance: number): LizaDeclarada => juguete({ asientos: 1, clase: conAlcance(clase(), alcance), grupos: (n) => [grupoFijo(n, 1, 1)] });
+    /* Dónde sale la entidad: la misma salida con cualquier alcance (el azar de la sala no lo mira antes). */
+    const b0 = unoQuieto(conUna(0));
+    let sale: { x: number; z: number } | null = null;
+    for (let i = 0; i < 5 && sale === null; i++) {
+      b0.tic();
+      const e = b0.sala.entidades[0];
+      if (e !== undefined) sale = { x: e.x, z: e.z };
+    }
+    const a0 = b0.sala.asientos[0] as EstadoDeLaSala['asientos'][number];
+    const r = sale === null ? 0 : raizPorArriba((a0.x - sale.x) * (a0.x - sale.x) + (a0.z - sale.z) * (a0.z - sale.z));
+    const jugar = (alcance: number): { mismaSalida: boolean; tomo: boolean; anuncios: number; quieta: boolean } => {
+      const b = unoQuieto(conUna(alcance));
+      let primera: { x: number; z: number } | null = null;
+      let mismaSalida = false;
+      let tomo = false;
+      let anuncios = 0;
+      let quieta = true;
+      for (let i = 0; i < 400; i++) {
+        const p = b.tic();
+        const e = p.sala.entidades[0];
+        if (e !== undefined) {
+          if (primera === null) {
+            primera = { x: e.x, z: e.z };
+            mismaSalida = sale !== null && e.x === sale.x && e.z === sale.z;
+          }
+          if (e.blanco === 1) tomo = true;
+          if (e.x !== primera.x || e.z !== primera.z) quieta = false;
+        }
+        for (const x of p.sucesos) if (x.suceso.e === 'anuncio' && x.suceso.a === 1 && x.suceso.de >= 16) anuncios++;
+      }
+      return { mismaSalida, tomo, anuncios, quieta };
+    };
+    const justo = jugar(r);
+    const menos = jugar(r - 1);
+    nota(`alcance: la entidad sale a ${(r / UNO).toFixed(5)} unidades del asiento, y se juega con ese alcance y con 1/65536 menos`);
+    comprobar(
+      'con el alcance JUSTO a su distancia la entidad toma al asiento por blanco, va y le anuncia; con 1/65536 menos, en 400 tics ni lo toma, ni da un paso, ni anuncia',
+      r > u(10) && justo.mismaSalida && menos.mismaSalida && justo.tomo && justo.anuncios >= 1 && !justo.quieta && !menos.tomo && menos.anuncios === 0 && menos.quieta,
+      { r, justo, menos },
+    );
+  }
+
+  /* ── El tirador suelta la línea cuando su blanco se le va ─────────────────── */
+  {
+    const ALCANCE = u(10);
+    const tirador = claseTiradora({ guardia: null, acciones: [accion(A.golpe, { anuncioTics: 11, enganche: null, alFallar: null, efecto: efecto(1, puesta(E.tocado, 12)) })] });
+    const d = juguete({
+      asientos: 2,
+      clase: conAlcance(tirador, ALCANCE),
+      danoDeBala: 1,
+      recurso: 50,
+      relojTics: 20000,
+      grupos: (n) => [{ clase: 1, cuantos: porN(n, () => 400), vivasALaVez: porN(n, () => 4), claseDeZona: 1, desdeTic: 0, cadaTics: 20, eleccion: 'azar' }],
+    });
+    /* El asiento 1 da vueltas a la plaza, al trote, pasando junto a las cuatro esquinas: de allí salen los tiradores. */
+    const b = new Banco(d, 11, [new Aparato(1, 1000, 0, 100, 17, corredor(16)), new Aparato(2, 2000, 20, 150, 29, paseante(5, IDS_DEL_JUGUETE, 20))]);
+    b.guardarPasos = false;
+    b.conectar(1);
+    b.conectar(2);
+    let apuntes = 0;
+    let soltadas = 0;
+    const malos: unknown[] = [];
+    let previas = b.sala.entidades;
+    for (let i = 0; i < 3000; i++) {
+      const p = b.tic();
+      for (const x of p.sucesos) {
+        const s = x.suceso;
+        if (s.e !== 'apunta') continue;
+        if (x.para === 1 && s.a !== 0) apuntes++;
+        if (x.para === 0 && s.a === 0) {
+          const antes = previas.find((e) => e.numero === s.de);
+          const blanco = antes === undefined || antes.blanco < 1 ? undefined : p.sala.asientos[antes.blanco - 1];
+          if (antes !== undefined && blanco !== undefined && (blanco.x - antes.x) * (blanco.x - antes.x) + (blanco.z - antes.z) * (blanco.z - antes.z) > ALCANCE * ALCANCE) soltadas++;
+        }
+      }
+      for (const e of p.sala.entidades) {
+        if (e.cerebro.modo !== 'apuntar') continue;
+        const a = p.sala.asientos[e.blanco - 1];
+        if (a === undefined || (a.x - e.x) * (a.x - e.x) + (a.z - e.z) * (a.z - e.z) > ALCANCE * ALCANCE) {
+          if (malos.length < 4) malos.push({ k: p.sala.tic, entidad: e.numero, blanco: e.blanco });
+          else malos.push(null);
+        }
+      }
+      previas = p.sala.entidades;
+    }
+    nota(`el tirador de alcance 10: ${apuntes} líneas de apuntado contra el asiento 1, ${soltadas} soltadas porque el blanco se le fue`);
+    comprobar(
+      'ningún tirador apunta en ningún tic a un asiento a más de su alcance, y el que se le va a media línea la suelta (apunta 0)',
+      malos.length === 0 && apuntes >= 20 && soltadas >= 3,
+      { malos: malos.slice(0, 4), cuantosMalos: malos.length, apuntes, soltadas },
+    );
+  }
+
+  /* ── El olvido, al tic y en la frontera ──────────────────────────────────── */
+  /*
+   * Una zona de 1/65536 de lado en (15, 15), con un grupo de uno que sale de ella; el asiento, quieto en
+   * (−3, −8), a unas 29 unidades; alcance de 5: nadie lo persigue. Las cuatro esquinas de la zona están a
+   * `rMin` o `rMax` redondeados hacia arriba, que difieren en uno como mucho.
+   */
+  const Z9 = { id: 9, clase: 9, caja: { x0: u(15), z0: u(15), x1: u(15) + 1, z1: u(15) + 1 } };
+  const ASIENTO = { x: u(-3), z: u(-8) };
+  const esquinas: number[] = [];
+  for (const x of [Z9.caja.x0, Z9.caja.x1]) for (const z of [Z9.caja.z0, Z9.caja.z1]) esquinas.push((x - ASIENTO.x) * (x - ASIENTO.x) + (z - ASIENTO.z) * (z - ASIENTO.z));
+  const rMin = raizPorArriba(Math.min(...esquinas));
+  const rMax = raizPorArriba(Math.max(...esquinas));
+  const T = 60;
+  const enLaEsquina = (olvido: OlvidoDeclarado | null, o: OpcionesDelJuguete = {}, alcance = u(5), c: ClaseDeEntidad = clase()): LizaDeclarada =>
+    juguete({ asientos: 1, zonasExtra: [Z9], clase: conAlcance(c, alcance), grupos: (n) => [grupoFijo(n, 1, 9)], olvido, ...o });
+  {
+    /* Seis vueltas con el asiento más allá de las cuatro esquinas: cada vez sale en una, y en todas se olvida. */
+    const bFuera = unoQuieto(enLaEsquina({ distancia: rMin - 1, tics: T }));
+    const fuera = registro(bFuera, 6 * T + 10);
+    const k0 = fuera.naces[0]?.[0] ?? -1;
+    let alTic = fuera.naces.length === 7 && fuera.olvidos.length === 6;
+    for (let i = 0; i < 6 && alTic; i++) {
+      const nace = fuera.naces[i] as number[];
+      const olvido = fuera.olvidos[i] as number[];
+      const otra = fuera.naces[i + 1] as number[];
+      alTic = nace[0] === k0 + i * T && olvido[0] === k0 + (i + 1) * T && olvido[1] === nace[1] && otra[0] === olvido[0];
+    }
+    /*
+     * Y la frontera EXACTA con el sitio en que sale de verdad (el mismo con cualquier olvido: el azar no lo
+     * mira antes): justo a su distancia no se olvida nunca; con 1/65536 menos, a los T tics.
+     */
+    const b0 = unoQuieto(enLaEsquina(null));
+    let sale: { x: number; z: number } | null = null;
+    for (let i = 0; i < 5 && sale === null; i++) {
+      b0.tic();
+      const e = b0.sala.entidades[0];
+      if (e !== undefined) sale = { x: e.x, z: e.z };
+    }
+    const r = sale === null ? 0 : raizPorArriba((sale.x - ASIENTO.x) * (sale.x - ASIENTO.x) + (sale.z - ASIENTO.z) * (sale.z - ASIENTO.z));
+    const justo = registro(unoQuieto(enLaEsquina({ distancia: r, tics: T })), 6 * T + 10);
+    const debajo = registro(unoQuieto(enLaEsquina({ distancia: r - 1, tics: T })), T + 10);
+    const quieto0 = bFuera.sala.asientos[0];
+    comprobar(
+      'el olvido llega AL TIC: con el asiento a 1/65536 más de la distancia, la entidad se va a los T tics justos de nacer y su grupo la saca otra vez en ese mismo tic, seis veces; con el asiento JUSTO a la distancia, no se va nunca',
+      rMax - rMin <= 1 &&
+        r >= rMin &&
+        r <= rMax &&
+        quieto0 !== undefined &&
+        quieto0.x === ASIENTO.x &&
+        quieto0.z === ASIENTO.z &&
+        alTic &&
+        justo.olvidos.length === 0 &&
+        justo.naces.length === 1 &&
+        debajo.olvidos.length === 1 &&
+        debajo.olvidos[0]?.[0] === (debajo.naces[0]?.[0] ?? -1) + T,
+      { rMin, rMax, r, fuera: { naces: fuera.naces, olvidos: fuera.olvidos }, justo: { naces: justo.naces, olvidos: justo.olvidos }, debajo: { naces: debajo.naces, olvidos: debajo.olvidos } },
+    );
+  }
+
+  /* ── Sin nadie a su alcance pero acompañada: se acerca ───────────────────── */
+  {
+    /*
+     * La revisión de la entrega 1 de la ciudad abierta: entre el alcance y la distancia del olvido la primera
+     * versión dejaba a la entidad sin blanco y sin olvidarse, quieta para siempre. En la misma esquina, con
+     * alcance de 5 (el asiento, a unas 29, le queda lejos): con el olvido JUSTO a la distancia a la que sale,
+     * está acompañada desde el primer tic, y tiene que ANDAR hacia el asiento sin hacerlo su blanco, tomarlo
+     * al tenerlo a su alcance y anunciarle; con 1/65536 menos está sola, y ni da un paso: se olvida a los T.
+     */
+    const b0 = unoQuieto(enLaEsquina(null));
+    let sale: { x: number; z: number } | null = null;
+    for (let i = 0; i < 5 && sale === null; i++) {
+      b0.tic();
+      const e = b0.sala.entidades[0];
+      if (e !== undefined) sale = { x: e.x, z: e.z };
+    }
+    const r = sale === null ? 0 : raizPorArriba((sale.x - ASIENTO.x) * (sale.x - ASIENTO.x) + (sale.z - ASIENTO.z) * (sale.z - ASIENTO.z));
+    const jugar = (olvido: OlvidoDeclarado): { anda: boolean; sinBlancoAndando: number; tomo: number; anuncia: number; nace: number; olvidada: number; blancoLejos: boolean } => {
+      const b = unoQuieto(enLaEsquina(olvido));
+      let primera: { n: number; x: number; z: number } | null = null;
+      let anda = false;
+      let sinBlancoAndando = 0;
+      let tomo = -1;
+      let anuncia = -1;
+      let nace = -1;
+      let olvidada = -1;
+      let blancoLejos = false;
+      let antes: { x: number; z: number } | null = null;
+      for (let i = 0; i < 400; i++) {
+        const p = b.tic();
+        const k = p.sala.tic;
+        for (const x of p.sucesos) {
+          const s = x.suceso;
+          if (x.para === 0 && s.e === 'nace' && nace < 0) nace = k;
+          if (x.para === 0 && s.e === 'seva' && s.por === DISUELTA && primera !== null && s.id === primera.n && olvidada < 0) olvidada = k;
+          if (x.para === 1 && s.e === 'anuncio' && s.a === 1 && s.de >= 16 && anuncia < 0) anuncia = k;
+        }
+        const e = p.sala.entidades.find((x) => primera === null || x.numero === primera.n);
+        if (e === undefined) continue;
+        if (primera === null) primera = { n: e.numero, x: e.x, z: e.z };
+        if (e.x !== primera.x || e.z !== primera.z) anda = true;
+        if (antes !== null && (e.x !== antes.x || e.z !== antes.z) && e.blanco === 0) sinBlancoAndando++;
+        antes = { x: e.x, z: e.z };
+        if (e.blanco === 1) {
+          if (tomo < 0) tomo = k;
+          const a = p.sala.asientos[0] as EstadoDeLaSala['asientos'][number];
+          if ((a.x - e.x) * (a.x - e.x) + (a.z - e.z) * (a.z - e.z) > u(5) * u(5) + u(1) * u(1) && e.cerebro.modo !== 'atacar') blancoLejos = true;
+        }
+      }
+      return { anda, sinBlancoAndando, tomo, anuncia, nace, olvidada, blancoLejos };
+    };
+    const acompanada = jugar({ distancia: r, tics: T });
+    const sola = jugar({ distancia: r - 1, tics: T });
+    nota(`acompañada (olvido a ${(r / UNO).toFixed(5)}): ${acompanada.sinBlancoAndando} tics andando sin blanco, lo toma en el tic ${acompanada.tomo} y le anuncia en el ${acompanada.anuncia}`);
+    comprobar(
+      'sin nadie a su alcance pero ACOMPAÑADA (el asiento justo a la distancia del olvido), la entidad anda hacia él sin hacerlo su blanco, lo toma al tenerlo a su alcance y le anuncia, sin olvidarse; con 1/65536 menos, sola: ni un paso, y se olvida a los T tics',
+      r > u(10) &&
+        acompanada.anda &&
+        acompanada.sinBlancoAndando >= 60 &&
+        acompanada.tomo > 0 &&
+        acompanada.anuncia > acompanada.tomo &&
+        acompanada.olvidada < 0 &&
+        !acompanada.blancoLejos &&
+        !sola.anda &&
+        sola.tomo < 0 &&
+        sola.nace > 0 &&
+        sola.olvidada === sola.nace + T,
+      { r, acompanada, sola },
+    );
+  }
+
+  /* ── La olvidada vuelve a la cola: un `vaciar` no se gana alejándose ─────── */
+  {
+    /* Los `seva … disuelta` del tic en que se cierra el encuentro son del cierre (se disuelve lo que queda), no olvidos. */
+    const dos = (olvido: OlvidoDeclarado | null): { r: Registro; olvidos: number } => {
+      const r = registro(unoQuieto(enLaEsquina(olvido, { relojTics: 400, grupos: (n) => [grupoFijo(n, 2, 9)] })), 420);
+      const cierre = r.rondas[0]?.[0] ?? Infinity;
+      return { r, olvidos: r.olvidos.filter((x) => (x[0] as number) < cierre).length };
+    };
+    const con = dos({ distancia: rMin - 1, tics: T });
+    const sin = dos(null);
+    comprobar(
+      'la olvidada vuelve a la cola de su grupo: dos que se olvidan cada T tics no dejan ganar el vaciar lejos de ellas —se aguanta al vencer el reloj—, y sin olvido no se olvida ninguna',
+      con.r.rondas.length === 1 &&
+        con.r.rondas[0]?.[0] === 401 &&
+        con.r.rondas[0]?.[1] === 'aguantada' &&
+        con.olvidos >= 10 &&
+        con.r.naces.length === con.olvidos + 2 &&
+        sin.olvidos === 0 &&
+        sin.r.naces.length === 2 &&
+        sin.r.rondas.length === 1 &&
+        sin.r.rondas[0]?.[1] === 'aguantada',
+      { con: { rondas: con.r.rondas, olvidos: con.olvidos, naces: con.r.naces.length }, sin: { rondas: sin.r.rondas, olvidos: sin.olvidos, naces: sin.r.naces.length } },
+    );
+  }
+
+  /* ── El ausente no acompaña ──────────────────────────────────────────────── */
+  {
+    const olvido = { distancia: u(60), tics: T };
+    const presente = registro(unoQuieto(enLaEsquina(olvido)), 300);
+    const ausente = registro(unoQuieto(enLaEsquina(olvido), true), 300);
+    const ka = ausente.estados.find((x) => x[1] === E.ausente)?.[0] ?? -1;
+    comprobar(
+      'el ausente no acompaña: con el asiento presente a su lado (a 60) nada se olvida; ausente, la entidad se va a los T tics justos del último en que lo tuvo presente',
+      presente.olvidos.length === 0 && ka > 0 && ausente.olvidos.length >= 1 && ausente.olvidos[0]?.[0] === ka - 1 + T,
+      { presente: presente.olvidos, ka, ausente: ausente.olvidos.slice(0, 3) },
+    );
+  }
+
+  /* ── El caído acompaña; el que espera sin cuerpo, no ─────────────────────── */
+  {
+    const fuerte = clase({ guardia: null, acciones: [accion(A.golpe, { anuncioTics: 11, enganche: null, alFallar: null, efecto: efecto(60, puesta(E.tocado, 12)) })] });
+    const r = registro(unoQuieto(enLaEsquina({ distancia: u(40), tics: T }, {}, u(40), fuerte)), 600);
+    const kc = r.estados.find((x) => x[1] === E.caidaAsiento)?.[0] ?? -1;
+    const ks = r.estados.find((x) => x[1] === E.sinCuerpo && x[0] > kc)?.[0] ?? -1;
+    const enLaCaida = r.olvidos.filter((x) => (x[0] as number) >= kc && (x[0] as number) < ks);
+    const primeroTras = r.olvidos.find((x) => (x[0] as number) >= ks);
+    comprobar(
+      'el caído acompaña: mientras está en el suelo, a su lado, no se olvida nada; en cuanto espera sin cuerpo, la que tenía al lado se va a los T tics justos',
+      kc > 0 && ks - kc === 240 && enLaCaida.length === 0 && primeroTras !== undefined && primeroTras[0] === ks - 1 + T,
+      { kc, ks, enLaCaida, primeroTras, olvidos: r.olvidos.slice(0, 4) },
+    );
+  }
+
+  /* ── Caída y deshecha: no les corre el reloj ─────────────────────────────── */
+  {
+    /*
+     * Una entidad que lleva sola desde que nació (a 29 del único asiento, con olvido a 10) se deja CAÍDA por
+     * dentro de la sala, sin nadie que la remate: a los 150 tics se deshace, a los 40 vuelve a salir con su
+     * mismo número, y sólo entonces empieza a contar. Con el reloj corriendo en la caída, se habría ido a
+     * los T tics de nacer, tendida.
+     */
+    const b = unoQuieto(enLaEsquina({ distancia: u(10), tics: T }));
+    for (let i = 0; i < 30; i++) b.tic();
+    const e0 = b.sala.entidades[0] as EstadoDeLaSala['entidades'][number];
+    const k = b.sala.tic;
+    b.sala = {
+      ...b.sala,
+      entidades: [
+        {
+          ...e0,
+          vida: 0,
+          turno: 'ninguno',
+          blanco: 0,
+          estado: { estado: E.caidaEntidad, desdeTic: k, hastaTic: k + 150, intocableHastaTic: k, soltableEnTic: k + 150, distanciaExtra: 0 },
+          cerebro: { modo: 'caida', desdeTic: k, repiensaEnTic: k + 150, nudo: -1, apuntaX: e0.x, apuntaZ: e0.z, balasPorSalir: 0 },
+        },
+      ],
+    };
+    const r = registro(b, 400);
+    const deshecha = r.sevas.find((x) => x[1] === e0.numero && x[2] === MOTIVO_DE_IRSE.seDeshace)?.[0] ?? -1;
+    const vuelve = r.naces.find((x) => x[1] === e0.numero)?.[0] ?? -1;
+    const olvido = r.olvidos[0];
+    comprobar(
+      'caída y deshecha no les corre el reloj: la que llevaba sola desde que nació no se olvida tendida ni deshecha, y al volver a salir se va a los T tics justos',
+      deshecha === k + 150 && vuelve === deshecha + 40 && olvido !== undefined && olvido[1] === e0.numero && olvido[0] === vuelve + T && r.olvidos.filter((x) => (x[0] as number) < vuelve).length === 0,
+      { k, deshecha, vuelve, olvidos: r.olvidos.slice(0, 3), sevas: r.sevas.slice(0, 3) },
+    );
+  }
+
+  /* ── En la ciudad: nadie persigue más allá, y se olvida lo que dice la regla ── */
+  {
+    const TICS = 1500;
+    const OLVIDO = OLVIDO_DE_LA_ABIERTA;
+    const jugarLaCiudad = (d: LizaDeclarada, vigilar: boolean) => {
+      const b = bancoDeLaCiudad(d, 29);
+      const cuarto = b.aparato(4);
+      /* La regla, escrita aquí: el último tic en que cada entidad no estaba sola (o nació). */
+      const cerca = new Map<number, number>();
+      let previas = b.sala.entidades;
+      let masLejos = 0;
+      let persiguiendo = 0;
+      let seLeVan = 0;
+      let siguen = 0;
+      const ejemplosDeSiguen: unknown[] = [];
+      let olvidos = 0;
+      let distintos = 0;
+      let juntoAUnAusente = 0;
+      const ejemplos: unknown[] = [];
+      /* Y la franja entre el alcance y el olvido, mirada desde fuera (ver `vigilarLosNpc`). */
+      const v = vigilarLosNpc(d);
+      for (let t = 0; t < TICS; t++) {
+        if (t === 250) cuarto.mudo = true;
+        if (t === 700) cuarto.mudo = false;
+        const p = b.tic();
+        v.mirar(p.sala);
+        const k = p.sala.tic;
+        const reales: number[] = [];
+        for (const x of p.sucesos) if (x.para === 0 && x.suceso.e === 'seva' && x.suceso.por === DISUELTA) reales.push(x.suceso.id);
+        olvidos += reales.length;
+        const estadoEn = (a: EstadoDeLaSala['asientos'][number]): number => (a.estado !== null && k >= a.estado.desdeTic && k < a.estado.hastaTic ? a.estado.estado : 0);
+        if (vigilar) {
+          const esperadas: number[] = [];
+          for (const e of previas) {
+            const corre = e.cerebro.modo === 'aparecer' || e.cerebro.modo === 'acechar' || e.cerebro.modo === 'rondar';
+            let acompanada = false;
+            let ausenteCerca = false;
+            for (const a of p.sala.asientos) {
+              if (!a.conCuerpo) continue;
+              const cerquita = (a.x - e.x) * (a.x - e.x) + (a.z - e.z) * (a.z - e.z) <= OLVIDO.distancia * OLVIDO.distancia;
+              const est = estadoEn(a);
+              if (est === E.ausente || est === E.sinCuerpo) {
+                if (cerquita && est === E.ausente) ausenteCerca = true;
+                continue;
+              }
+              if (cerquita) acompanada = true;
+            }
+            if (!corre || acompanada) cerca.set(e.numero, k);
+            else if (k - (cerca.get(e.numero) ?? k) >= OLVIDO.tics) {
+              esperadas.push(e.numero);
+              if (ausenteCerca) juntoAUnAusente++;
+            }
+          }
+          const a1 = reales.slice().sort((x, y) => x - y).join(',');
+          const a2 = esperadas.slice().sort((x, y) => x - y).join(',');
+          if (a1 !== a2) {
+            distintos++;
+            if (ejemplos.length < 4) ejemplos.push({ k, reales: a1, esperadas: a2 });
+          }
+        }
+        for (const e of p.sala.entidades) if (!cerca.has(e.numero)) cerca.set(e.numero, k);
+        for (const n of reales) cerca.delete(n);
+        /*
+         * Lo más lejos que una tiene a su blanco al acabar el tic: todas, y las que persiguen (sin golpe ni
+         * ráfaga en curso, que siguen con su blanco aunque se vaya). Éstas lo miran en el tic antes de dar su
+         * paso, así que acaban a su alcance más un paso como mucho: soltarlo sólo al repensar se pasaría.
+         */
+        for (const e of p.sala.entidades) {
+          if (e.blanco < 1) continue;
+          const a = p.sala.asientos[e.blanco - 1];
+          if (a === undefined) continue;
+          const lejos = Math.sqrt((a.x - e.x) * (a.x - e.x) + (a.z - e.z) * (a.z - e.z)) / UNO;
+          if (lejos > masLejos) masLejos = lejos;
+          if (e.cerebro.modo !== 'atacar' && e.cerebro.modo !== 'disparar' && lejos > persiguiendo) persiguiendo = lejos;
+        }
+        /*
+         * SUELTA EN EL MISMO TIC, mirado desde fuera: la que acecha o ronda con blanco se pregunta en el tic
+         * `k` con su sitio de antes de andar (el del tic anterior) y el de su blanco en `k` (ya validado). Si
+         * ahí queda más allá de su alcance, al acabar `k` ya no es su blanco. Se miran sólo las que siguen
+         * acechando, rondando o apuntando y sin estado en `k` (la aturdida no piensa, y con razón no suelta).
+         */
+        for (const antes of previas) {
+          if (antes.blanco < 1 || (antes.cerebro.modo !== 'acechar' && antes.cerebro.modo !== 'rondar')) continue;
+          const ahora = p.sala.entidades.find((e) => e.numero === antes.numero);
+          const a = p.sala.asientos[antes.blanco - 1];
+          if (ahora === undefined || a === undefined) continue;
+          if (ahora.cerebro.modo !== 'acechar' && ahora.cerebro.modo !== 'rondar' && ahora.cerebro.modo !== 'apuntar') continue;
+          if (ahora.estado !== null && k >= ahora.estado.desdeTic && k < ahora.estado.hastaTic) continue;
+          if ((a.x - antes.x) * (a.x - antes.x) + (a.z - antes.z) * (a.z - antes.z) <= ALCANCE_DE_LA_ABIERTA * ALCANCE_DE_LA_ABIERTA) continue;
+          seLeVan++;
+          if (ahora.blanco === antes.blanco) {
+            siguen++;
+            if (ejemplosDeSiguen.length < 3) ejemplosDeSiguen.push({ k, entidad: antes.numero, blanco: antes.blanco });
+          }
+        }
+        previas = p.sala.entidades;
+      }
+      return { masLejos, persiguiendo, seLeVan, siguen, ejemplosDeSiguen, olvidos, distintos, juntoAUnAusente, ejemplos, vigilancia: v.resumen() };
+    };
+    const con = jugarLaCiudad(lizaAbiertaConOlvido(29), true);
+    const sin = jugarLaCiudad(lizaAbierta({ semilla: 29, repartidos: true }), false);
+    const ALCANCE = ALCANCE_DE_LA_ABIERTA / UNO;
+    nota(
+      `la ciudad, ${TICS} tics con seis asientos repartidos: con L10, el blanco más lejano a ${con.masLejos.toFixed(2)} (persiguiendo, ${con.persiguiendo.toFixed(2)}), ` +
+        `${con.seLeVan} veces que a una se le fue el blanco más allá de ${String(ALCANCE)} (${con.siguen} lo siguieron), ${con.olvidos} olvidos (${con.juntoAUnAusente} junto a un ausente); ` +
+        `sin L10, el blanco más lejano a ${sin.masLejos.toFixed(1)}`,
+    );
+    comprobar(
+      'en la ciudad nadie tiene por blanco a quien está más allá de su alcance: la que acecha suelta a su blanco EN EL TIC en que se le va más allá de 45, la que persigue acaba cada tic a 45 más un paso como mucho (y la que golpea, a lo que anda su golpe); sin el alcance, la misma partida persigue a más de cien',
+      con.siguen === 0 && con.seLeVan >= 3 && con.persiguiendo <= ALCANCE + 0.25 && con.masLejos <= ALCANCE + 5 && sin.masLejos > 100,
+      { con: { masLejos: con.masLejos, persiguiendo: con.persiguiendo, seLeVan: con.seLeVan, siguen: con.siguen, ejemplos: con.ejemplosDeSiguen }, sin: sin.masLejos },
+    );
+    const vg = con.vigilancia;
+    nota(`la franja entre el alcance y el olvido en la ciudad: ${vg.acercandose} tics de entidades acercándose sin blanco, la racha parada más larga ${vg.peorParada} tics (tope ${TICS_QUIETA})`);
+    comprobar(
+      'y en la ciudad ninguna entidad pasa más de 3 s parada sin nadie a su alcance con alguien a la distancia del olvido: la que se queda sin blanco acompañada se ACERCA (y se vio acercarse)',
+      vg.paradas.length === 0 && vg.acercandose >= 200,
+      { paradas: vg.paradas.slice(0, 6), peorParada: vg.peorParada, acercandose: vg.acercandose },
+    );
+    comprobar(
+      'y en la ciudad se olvida EXACTAMENTE lo que dice la regla escrita aquí aparte —ni una de más, ni una de menos, ni un tic antes ni después—, con un asiento que se calla un rato',
+      con.distintos === 0 && con.olvidos >= 5,
+      { distintos: con.distintos, olvidos: con.olvidos, ejemplos: con.ejemplos },
+    );
+  }
+
+  /* ── La forma transitoria es la sala de antes ────────────────────────────── */
+  {
+    const d = lizaLlena();
+    const b = bancoLleno(d, 99);
+    const TICS = 600;
+    const huellaDelEstado = (s: EstadoDeLaSala): string => fnv(canonico({ ...s, declaracion: null, arena: null }));
+    const estados: string[] = [];
+    const salidas: string[] = [];
+    for (let k = 0; k < TICS; k++) {
+      const p = b.tic();
+      estados.push(huellaDelEstado(p.sala));
+      salidas.push(fnv(salidasDe(p)));
+    }
+    const en = d.fase.encuentro;
+    const transitoria: LizaDeclarada = {
+      ...d,
+      clases: d.clases.map((c) => ({
+        ...c,
+        cerebro: {
+          distanciaMinima: c.cerebro.distanciaMinima,
+          distanciaMaxima: c.cerebro.distanciaMaxima,
+          decideCadaTics: c.cerebro.decideCadaTics,
+          costeCuerpoACuerpo: c.cerebro.costeCuerpoACuerpo,
+          costeDisparo: c.cerebro.costeDisparo,
+          sigueElGrafo: c.cerebro.sigueElGrafo,
+        },
+      })),
+      fase: {
+        ...d.fase,
+        encuentro: en === null ? null : { ronda: en.ronda, presentes: en.presentes, relojTics: en.relojTics, vivasALaVez: en.vivasALaVez, grupos: en.grupos, fin: en.fin },
+      },
+    };
+    const problemas = problemasDeLaDeclaracion(transitoria);
+    const entera = en !== null && 'olvido' in en && en.olvido === null && d.clases.every((c) => 'alcanceDeBlanco' in c.cerebro && c.cerebro.alcanceDeBlanco === 0);
+    const sinLosCampos = transitoria.fase.encuentro !== null && !('olvido' in transitoria.fase.encuentro) && transitoria.clases.every((c) => !('alcanceDeBlanco' in c.cerebro));
+    let sala = salaNueva(transitoria, 99);
+    let malos = 0;
+    let primera = -1;
+    for (let k = 0; k < TICS; k++) {
+      const p = avanzarLaSala(sala, b.grabadas[k] as EntradaDeLaSala[]);
+      sala = p.sala;
+      if (huellaDelEstado(p.sala) !== estados[k] || fnv(salidasDe(p)) !== salidas[k]) {
+        malos++;
+        if (primera < 0) primera = k;
+      }
+    }
+    comprobar(
+      'la forma transitoria (sin alcance de blanco ni olvido, como la escriben los productores que aún no declaran L10) es la sala de antes: la MISMA tic a tic que la entera neutra (alcance 0, olvido null), 600 tics de la sala llena',
+      problemas.length === 0 && entera && sinLosCampos && malos === 0,
+      { problemas: problemas.slice(0, 3), entera, sinLosCampos, malos, primera },
+    );
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 25 · LA REVISIÓN DE LA ENTREGA 1 DE LA CIUDAD ABIERTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Una revisión adversaria jugó la sala de verdad en la ciudad de verdad (540 m, unos 3.250 nudos) y encontró
+ * dos fallos de la Liza con todo lo de arriba en verde:
+ *
+ *   · LAS QUE RODEAN UNA MANZANA SE QUEDABAN EN LA ESQUINA. Con el asiento a 37-42 m en recta y a 82-168 por
+ *     las calles, el camino corto se aleja en recta: a los 45,1 m la entidad soltaba al asiento y, sin blanco y
+ *     acompañada, ni se movía ni se olvidaba nunca (4 de 60 persecuciones; en partida, hasta diez así). Aquí se
+ *     buscan en el grafo parejas de nudos así —a su alcance en recta, con el camino corto pasando por lo menos
+ *     dos unidades más allá de su alcance— y se juega cada una: una entidad que sale de uno contra un asiento
+ *     quieto en el otro, que tiene que recibir su anuncio, sin que la vigilancia la vea parada. En la ciudad de
+ *     juguete siempre; en la de El Quiebro, con su Prestado, si su productor está. Y en la de El Quiebro, tres
+ *     combates de verdad con todos HUYENDO por las calles, como los jugó la revisión: ni una parada en la franja.
+ *   · UN MUNDO NUEVO LE CAÍA ENCIMA A UN ASIENTO. Al cambiar de noche un sitio libre podía quedar dentro de una
+ *     caja nueva, y la sala dejaba allí al asiento: cada paso se le corregía de vuelta. Aquí, en la plaza de
+ *     juguete con una fase nueva y con el mismo mundo cambiado dentro de la fase; y con las noches de verdad
+ *     de El Quiebro (un sitio de la plaza de la Bajada que la noche de antes estaba libre y ésta es caja).
+ */
+paso('25 · La revisión de la entrega 1: las que rodean una manzana llegan, y a nadie le cae una caja encima');
+const DE_LA_ENTREGA_1 = 3;
+const DE_LA_ENTREGA_1_EN_EL_QUIEBRO = 3;
+
+/** Una pareja de nudos para una persecución que rodea: el del asiento y el de la salida, y sus distancias en unidades. */
+interface Rodeo {
+  readonly asiento: number;
+  readonly sale: number;
+  readonly recta: number;
+  readonly calles: number;
+  /** Lo más lejos del asiento, en recta, a lo largo del camino corto por el grafo. */
+  readonly lejos: number;
+}
+
+/** Las distancias andadas por el grafo hasta el nudo `hasta` (en unidades), y el siguiente nudo hacia él. */
+function caminosHacia(nudos: readonly { x: number; z: number }[], vecinos: readonly number[][], hasta: number): { dist: Float64Array; siguiente: Int32Array } {
+  const dist = new Float64Array(nudos.length).fill(Number.POSITIVE_INFINITY);
+  const siguiente = new Int32Array(nudos.length).fill(-1);
+  const monton: number[][] = [];
+  const meter = (d: number, i: number): void => {
+    monton.push([d, i]);
+    let j = monton.length - 1;
+    while (j > 0) {
+      const pa = (j - 1) >> 1;
+      if ((monton[pa] as number[])[0]! <= d) break;
+      monton[j] = monton[pa] as number[];
+      monton[pa] = [d, i];
+      j = pa;
+    }
+  };
+  const sacar = (): number[] => {
+    const cima = monton[0] as number[];
+    const ultimo = monton.pop() as number[];
+    if (monton.length > 0) {
+      monton[0] = ultimo;
+      let j = 0;
+      for (;;) {
+        const iz = 2 * j + 1;
+        const de = iz + 1;
+        let m = j;
+        if (iz < monton.length && (monton[iz] as number[])[0]! < (monton[m] as number[])[0]!) m = iz;
+        if (de < monton.length && (monton[de] as number[])[0]! < (monton[m] as number[])[0]!) m = de;
+        if (m === j) break;
+        const t = monton[j] as number[];
+        monton[j] = monton[m] as number[];
+        monton[m] = t;
+        j = m;
+      }
+    }
+    return cima;
+  };
+  dist[hasta] = 0;
+  meter(0, hasta);
+  while (monton.length > 0) {
+    const [du, i] = sacar() as [number, number];
+    if (du > (dist[i] as number)) continue;
+    const a = nudos[i] as { x: number; z: number };
+    for (const v of vecinos[i] as number[]) {
+      const b = nudos[v] as { x: number; z: number };
+      const dv = du + Math.hypot(b.x - a.x, b.z - a.z) / UNO;
+      if (dv < (dist[v] as number)) {
+        dist[v] = dv;
+        siguiente[v] = i;
+        meter(dv, v);
+      }
+    }
+  }
+  return { dist, siguiente };
+}
+
+/**
+ * HASTA `cuantos` PERSECUCIONES QUE RODEAN en el grafo de `d`, con alcance `alcance` (unidades): un nudo libre
+ * para el asiento (sorteado con `semilla`) y, de los que le quedan a su alcance en recta (de 8 a `alcance − 1`)
+ * y a 200 o menos por el grafo, uno cuyo camino corto pasa a `alcance + 2` o más en recta. Uno por asiento.
+ */
+function rodeosDelGrafo(d: LizaDeclarada, alcance: number, cuantos: number, semilla: number): Rodeo[] {
+  const nudos = d.mundo.grafo.nudos;
+  const vecinos: number[][] = nudos.map(() => []);
+  for (const [a, b] of d.mundo.grafo.aristas) {
+    (vecinos[a] as number[]).push(b);
+    (vecinos[b] as number[]).push(a);
+  }
+  const arena = arenaDeLaLiza(d);
+  const libre = (i: number): boolean => sePuedeEstar(arena, (nudos[i] as { x: number }).x, (nudos[i] as { z: number }).z, u(0.5));
+  const azar = new AzarDeJuguete(semilla);
+  const rodeos: Rodeo[] = [];
+  const usados = new Set<number>();
+  for (let intento = 0; intento < 3000 && rodeos.length < cuantos; intento++) {
+    const P = azar.entre(nudos.length);
+    if (usados.has(P) || !libre(P)) continue;
+    usados.add(P);
+    const p = nudos[P] as { x: number; z: number };
+    const { dist, siguiente } = caminosHacia(nudos, vecinos, P);
+    const valen: Rodeo[] = [];
+    for (let S = 0; S < nudos.length; S++) {
+      const s = nudos[S] as { x: number; z: number };
+      const recta = Math.hypot(s.x - p.x, s.z - p.z) / UNO;
+      const calles = dist[S] as number;
+      if (recta < 8 || recta > alcance - 1 || !(calles <= 200)) continue;
+      let lejos = 0;
+      for (let v = S; v >= 0 && v !== P; v = siguiente[v] as number) {
+        const q = nudos[v] as { x: number; z: number };
+        const r = Math.hypot(q.x - p.x, q.z - p.z) / UNO;
+        if (r > lejos) lejos = r;
+      }
+      if (lejos < alcance + 2 || !libre(S)) continue;
+      valen.push({ asiento: P, sale: S, recta, calles, lejos });
+    }
+    if (valen.length > 0) rodeos.push(valen[azar.entre(valen.length)] as Rodeo);
+  }
+  return rodeos;
+}
+
+/**
+ * UNA PERSECUCIÓN QUE RODEA, JUGADA: la declaración de `d` con una zona de un metro en el nudo de salida, un solo
+ * grupo de UNA entidad de la clase `claseId` que sale de ella, y el asiento 1, quieto, naciendo en su nudo. Hasta
+ * `tics` tics o hasta su primer anuncio contra el asiento; y lo que vio la vigilancia de los NPC.
+ */
+function jugarElRodeo(d: LizaDeclarada, r: Rodeo, claseId: number, tics: number): { llega: number; paradas: string[]; acercandose: number } {
+  const nudos = d.mundo.grafo.nudos;
+  const s = nudos[r.sale] as { x: number; z: number };
+  const p = nudos[r.asiento] as { x: number; z: number };
+  const ids = new Set(d.mundo.zonas.map((z) => z.id));
+  const clases = new Set(d.mundo.zonas.map((z) => z.clase));
+  let zid = 255;
+  while (ids.has(zid)) zid--;
+  let zc = 255;
+  while (clases.has(zc)) zc--;
+  const h = u(0.5);
+  const en = d.fase.encuentro;
+  if (en === null) throw new Error('el rodeo se juega en una fase con encuentro');
+  const unos = en.vivasALaVez.map(() => 1);
+  const dd: LizaDeclarada = {
+    ...d,
+    mundo: {
+      ...d.mundo,
+      zonas: [...d.mundo.zonas, { id: zid, clase: zc, caja: { x0: s.x - h, z0: s.z - h, x1: s.x + h, z1: s.z + h } }],
+      nace: [{ papel: 'asiento', x: p.x, z: p.z, rumbo: 0 }, ...d.mundo.nace],
+    },
+    fase: {
+      ...d.fase,
+      encuentro: { ...en, vivasALaVez: unos, relojTics: tics + 200, fin: { tipo: 'vaciar' }, grupos: [{ clase: claseId, cuantos: unos, vivasALaVez: unos, claseDeZona: zc, desdeTic: 0, cadaTics: 0, eleccion: 'azar' }] },
+    },
+  };
+  const problemas = problemasDeLaDeclaracion(dd);
+  if (problemas.length > 0) throw new Error(`el rodeo está mal declarado: ${problemas.slice(0, 3).join(' | ')}`);
+  const b = new Banco(dd, 777, [new Aparato(1, 3000, 20, 60, 7, quieto)]);
+  b.guardarPasos = false;
+  b.conectar(1);
+  const v = vigilarLosNpc(dd);
+  let llega = -1;
+  for (let t = 0; t < tics && llega < 0; t++) {
+    const paso = b.tic();
+    v.mirar(paso.sala);
+    for (const x of paso.sucesos) if (x.para === 1 && x.suceso.e === 'anuncio' && x.suceso.a === 1 && x.suceso.de >= PRIMER_NUMERO_DE_ENTIDAD) llega = paso.sala.tic;
+  }
+  const res = v.resumen();
+  return { llega, paradas: res.paradas, acercandose: res.acercandose };
+}
+
+/** Todas las de una lista de rodeos, contadas: cuántas llegan, las que no y lo que vio la vigilancia. */
+function jugarLosRodeos(d: LizaDeclarada, rodeos: readonly Rodeo[], claseId: number, tics: number): { llegan: number; noLlegan: string[]; paradas: string[]; acercandose: number; peorLlegada: number } {
+  let llegan = 0;
+  let acercandose = 0;
+  let peorLlegada = 0;
+  const noLlegan: string[] = [];
+  const paradas: string[] = [];
+  for (const r of rodeos) {
+    const j = jugarElRodeo(d, r, claseId, tics);
+    const donde = `asiento en el nudo ${String(r.asiento)}, sale del ${String(r.sale)} (${r.recta.toFixed(1)} en recta, ${r.calles.toFixed(1)} por el grafo, hasta ${r.lejos.toFixed(1)} de camino)`;
+    if (j.llega >= 0) {
+      llegan++;
+      if (j.llega > peorLlegada) peorLlegada = j.llega;
+    } else noLlegan.push(donde);
+    for (const x of j.paradas) paradas.push(`${donde}: ${x}`);
+    acercandose += j.acercandose;
+  }
+  return { llegan, noLlegan, paradas, acercandose, peorLlegada };
+}
+
+/**
+ * LA DECLARACIÓN `l` CON L10: la suya si su productor declara el alcance de blanco de su clase 1 y el olvido
+ * de su encuentro; si no (la entrega 1 de El Quiebro no los declara: sus encuentros siguen a la plaza), con los
+ * números del diseño de la ciudad abierta (§3.4: 45 m de alcance a todas las clases, y 90 m en 10 s de olvido),
+ * que son los que vuelven con la travesía. Lo que se prueba es la sala con L10 en SU ciudad, no el número.
+ */
+function conL10(l: LizaDeclarada): { liza: LizaDeclarada; delProductor: boolean } {
+  const en = l.fase.encuentro;
+  if (en === null) throw new Error('L10 se pone en una fase con encuentro');
+  const clase1 = l.clases.find((c) => c.id === 1);
+  if (clase1 !== undefined && alcanceDeBlancoDe(clase1.cerebro) > 0 && olvidoDelEncuentro(en) !== null) return { liza: l, delProductor: true };
+  return {
+    liza: {
+      ...l,
+      clases: l.clases.map((c) => ({ ...c, cerebro: { ...c.cerebro, alcanceDeBlanco: u(45) } })),
+      fase: { ...l.fase, encuentro: { ...en, olvido: { distancia: u(90), tics: 200 } } },
+    },
+    delProductor: false,
+  };
+}
+
+/**
+ * EL QUE HUYE POR LAS CALLES (la revisión de la entrega 1 lo llamó así): elige un nudo del grafo a 60-200 en
+ * recta de donde está —con un congruencial de su semilla— y va a él por el camino más corto del grafo, nudo a
+ * nudo; al llegar, otro. Es el que deja atrás a lo que lo persigue y lo hace rodear manzanas: con él la
+ * revisión vio de dos a diez entidades paradas en la franja entre el alcance y el olvido por combate.
+ */
+function huidorPorElGrafo(d: LizaDeclarada, semilla: number): Robot {
+  const nudos = d.mundo.grafo.nudos;
+  const vecinos: number[][] = nudos.map(() => []);
+  for (const [a, b] of d.mundo.grafo.aristas) {
+    (vecinos[a] as number[]).push(b);
+    (vecinos[b] as number[]).push(a);
+  }
+  let s = semilla >>> 0;
+  let camino: number[] = [];
+  const cercano = (x: number, z: number): number => {
+    let m = 0;
+    let md = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < nudos.length; i++) {
+      const n = nudos[i] as { x: number; z: number };
+      const dd = (n.x - x) * (n.x - x) + (n.z - z) * (n.z - z);
+      if (dd < md) {
+        md = dd;
+        m = i;
+      }
+    }
+    return m;
+  };
+  return (a) => {
+    if (camino.length === 0) {
+      for (let k = 0; k < 50 && camino.length === 0; k++) {
+        s = (Math.imul(s, 1103515245) + 12345) >>> 0;
+        const i = (s >>> 4) % nudos.length;
+        const n = nudos[i] as { x: number; z: number };
+        const r = Math.hypot(n.x - a.x, n.z - a.z) / UNO;
+        if (r < 60 || r > 200) continue;
+        const { siguiente } = caminosHacia(nudos, vecinos, i);
+        for (let v = cercano(a.x, a.z); v >= 0 && camino.length < 5000; v = siguiente[v] as number) {
+          camino.push(v);
+          if (v === i) break;
+        }
+      }
+    }
+    while (camino.length > 0) {
+      const n = nudos[camino[0] as number] as { x: number; z: number };
+      if (Math.abs(n.x - a.x) + Math.abs(n.z - a.z) < u(0.4)) camino.shift();
+      else break;
+    }
+    const n = camino.length > 0 ? (nudos[camino[0] as number] as { x: number; z: number }) : null;
+    a.meta = n === null ? null : { x: n.x, z: n.z };
+  };
+}
+
+/**
+ * UN COMBATE CON TODOS HUYENDO POR LAS CALLES (`huidorPorElGrafo`; el segundo, a 6,5 u/s): hasta `tics` tics o
+ * hasta que el encuentro se resuelva, con la vigilancia de los NPC mirando cada tic.
+ */
+function jugarHuyendo(d: LizaDeclarada, semilla: number, tics: number): { tics: number; paradas: string[]; peorParada: number; acercandose: number; olvidadas: number } {
+  const aparatos: Aparato[] = [];
+  for (let i = 1; i <= d.asientos.length; i++) {
+    const ap = new Aparato(i, 2000 * i, 15 * i, 50 + 35 * i, (11 * i) % 50, huidorPorElGrafo(d, semilla * 97 + i));
+    if (i === 2) ap.velocidad = u(6.5);
+    aparatos.push(ap);
+  }
+  const b = new Banco(d, d.fase.semilla, aparatos);
+  b.guardarPasos = false;
+  for (let i = 1; i <= d.asientos.length; i++) b.conectar(i);
+  const v = vigilarLosNpc(d);
+  let olvidadas = 0;
+  let t = 0;
+  for (; t < tics; t++) {
+    const p = b.tic();
+    v.mirar(p.sala);
+    for (const x of p.sucesos) if (x.para === 0 && x.suceso.e === 'seva' && x.suceso.por === MOTIVO_DE_IRSE.disuelta && p.sala.encuentro?.resultado === null) olvidadas++;
+    if (p.sala.encuentro !== null && p.sala.encuentro.resultado !== null) break;
+  }
+  const r = v.resumen();
+  return { tics: t, paradas: r.paradas, peorParada: r.peorParada, acercandose: r.acercandose, olvidadas };
+}
+
+{
+  /* ── En la ciudad de juguete, las que rodean una manzana llegan ─────────── */
+  {
+    const d = lizaAbierta({ semilla: 3, asientos: 1, alcanceDeBlanco: ALCANCE_DE_LA_ABIERTA, olvido: OLVIDO_DE_LA_ABIERTA });
+    const rodeos = rodeosDelGrafo(d, ALCANCE_DE_LA_ABIERTA / UNO, 16, 5);
+    const j = jugarLosRodeos(d, rodeos, 2, 1400);
+    nota(
+      `la ciudad de juguete: ${rodeos.length} persecuciones que rodean (de ${Math.min(...rodeos.map((x) => x.recta)).toFixed(1)} a ${Math.max(...rodeos.map((x) => x.recta)).toFixed(1)} en recta, ` +
+        `hasta ${Math.max(...rodeos.map((x) => x.lejos)).toFixed(1)} de camino); llegan ${j.llegan}, la última en el tic ${j.peorLlegada}; ${j.acercandose} tics acercándose sin blanco`,
+    );
+    comprobar(
+      'en la ciudad de juguete, la entidad que persigue a un asiento a su alcance en recta pero cuyo camino por las calles se aleja más allá de él (rodea una manzana) LLEGA a anunciarle, en todas, sin quedarse parada en la esquina',
+      rodeos.length >= 12 && j.llegan === rodeos.length && j.paradas.length === 0 && j.acercandose >= 100,
+      { rodeos: rodeos.length, llegan: j.llegan, noLlegan: j.noLlegan.slice(0, 4), paradas: j.paradas.slice(0, 4), acercandose: j.acercandose },
+    );
+  }
+
+  /* ── Un mundo nuevo no deja a nadie dentro de una caja ──────────────────── */
+  {
+    const CAJA_NUEVA = { x0: 5, z0: -4, x1: 7, z1: -2 };
+    const META = { x: u(6), z: u(-3) };
+    const conLaCaja = (d: LizaDeclarada): LizaDeclarada => ({
+      ...d,
+      mundo: { ...d.mundo, suelo: { ...d.mundo.suelo, cuerpos: [...d.mundo.suelo.cuerpos, CAJA_NUEVA] }, clasesDeCaja: [...d.mundo.clasesDeCaja, 1] },
+    });
+    const dA = juguete({ asientos: 1, modo: 'calma', clave: 'n1-a' });
+    const radio = (dA.asientos[0] as ReglasDeAsiento).cuerpo.radio;
+    /*
+     * El asiento anda a (6, −3), libre en el mundo de la fase A, y llega la vista nueva: `otra` es la fase B con
+     * la caja (5, −4)-(7, −2) encima de él; `misma` es la fase A con esa caja (el mundo cambia sin cambiar la
+     * fase). En las dos, al tomarla tiene que quedar en su sitio de nacer, donde cabe, avisado con un `corrige`,
+     * y desde ahí andar sin que se le corrija nada.
+     */
+    const jugar = (nueva: LizaDeclarada): { llego: boolean; cabeAntes: boolean; cabeDespues: boolean; enSuSitio: boolean; corrigeAlTomar: number; corrigeAndando: number; anda: number } => {
+      let meta: { x: number; z: number } | null = META;
+      const robot: Robot = (a) => {
+        a.meta = meta;
+      };
+      const b = new Banco(dA, 5, [new Aparato(1, 1000, 0, 100, 17, robot)]);
+      b.guardarPasos = false;
+      b.conectar(1);
+      for (let i = 0; i < 160; i++) b.tic();
+      const a0 = b.sala.asientos[0] as EstadoDeLaSala['asientos'][number];
+      const llego = Math.abs(a0.x - META.x) + Math.abs(a0.z - META.z) < u(0.5);
+      const cabeAntes = sePuedeEstar(arenaDeLaLiza(dA), a0.x, a0.z, radio);
+      meta = null;
+      b.meter(b.k * 50 + 1, { tipo: 'vista', declaracion: nueva });
+      let corrigeAlTomar = 0;
+      for (let i = 0; i < 10; i++) corrigeAlTomar += b.tic().correcciones.length;
+      const a1 = b.sala.asientos[0] as EstadoDeLaSala['asientos'][number];
+      const nace = nueva.mundo.nace.find((x) => x.papel === 'asiento') as { x: number; z: number };
+      const cabeDespues = sePuedeEstar(arenaDeLaLiza(nueva), a1.x, a1.z, radio);
+      const enSuSitio = a1.x === nace.x && a1.z === nace.z;
+      meta = { x: u(0), z: u(-12) };
+      let corrigeAndando = 0;
+      for (let i = 0; i < 60; i++) corrigeAndando += b.tic().correcciones.length;
+      const a2 = b.sala.asientos[0] as EstadoDeLaSala['asientos'][number];
+      const anda = Math.hypot(a2.x - a1.x, a2.z - a1.z) / UNO;
+      return { llego, cabeAntes, cabeDespues, enSuSitio, corrigeAlTomar, corrigeAndando, anda };
+    };
+    const otra = jugar(conLaCaja(juguete({ asientos: 1, modo: 'calma', clave: 'n1-b' })));
+    const misma = jugar(conLaCaja(dA));
+    const bien = (x: ReturnType<typeof jugar>): boolean => x.llego && x.cabeAntes && x.cabeDespues && x.enSuSitio && x.corrigeAlTomar >= 1 && x.corrigeAndando === 0 && x.anda >= 2;
+    comprobar(
+      'una FASE NUEVA con una caja encima del sitio del asiento lo saca a su sitio de nacer (con su `corrige`), donde cabe, y desde ahí anda sin correcciones',
+      problemasDeLaDeclaracion(conLaCaja(juguete({ asientos: 1, modo: 'calma', clave: 'n1-b' }))).length === 0 && bien(otra),
+      otra,
+    );
+    comprobar('y el MISMO mundo cambiado sin cambiar la fase, también', problemasDeLaDeclaracion(conLaCaja(dA)).length === 0 && bien(misma), misma);
+  }
+
+  /* ── Con El Quiebro: su ciudad y sus noches ─────────────────────────────── */
+  if (HAY_QUIEBRO) {
+    const productor = (await import(pathToFileURL(RUTA_DEL_PRODUCTOR).href)) as { lizaDelQuiebro: (vista: unknown, codigo: string) => LizaDeclarada | null };
+    const robotDeLaMesa = (await import(pathToFileURL(RUTA_DEL_ROBOT).href)) as {
+      jugarAlQuiebro: (o: { asientos: number; semilla: number; noches: number; politica: 'gana' | 'pierde' | 'mezcla'; travesuras: boolean }) => { vistas: readonly unknown[] };
+    };
+    type VistaLeida = { noche: { numero: number } | null; fase: { tipo: string } };
+
+    /* Las persecuciones que rodean, en la ciudad de verdad, con su Prestado (la clase 1) y su alcance. */
+    const partida = robotDeLaMesa.jugarAlQuiebro({ asientos: 1, semilla: 5, noches: 1, politica: 'gana', travesuras: false });
+    let oleada: LizaDeclarada | null = null;
+    for (const v of partida.vistas) {
+      const l = productor.lizaDelQuiebro(v, 'K7M2P');
+      if (oleada === null && l !== null && l.fase.modo === 'encuentro' && l.fase.encuentro !== null && (v as VistaLeida).fase.tipo === 'oleada') oleada = l;
+    }
+    /* Con el alcance y el olvido que declare su productor, o con los del diseño si no los declara (ver `conL10`). */
+    const puesta = oleada === null ? null : conL10(oleada);
+    const conElL10 = puesta === null ? null : puesta.liza;
+    const delProductor = puesta !== null && puesta.delProductor;
+    const prestadoConL10 = conElL10?.clases.find((c) => c.id === 1);
+    const alcance = prestadoConL10 === undefined ? 0 : alcanceDeBlancoDe(prestadoConL10.cerebro) / UNO;
+    const rodeos = conElL10 === null || alcance <= 0 ? [] : rodeosDelGrafo(conElL10, alcance, 16, 7);
+    const j = conElL10 === null ? { llegan: 0, noLlegan: [], paradas: [], acercandose: 0, peorLlegada: 0 } : jugarLosRodeos(conElL10, rodeos, 1, 1400);
+    const deQuien = delProductor ? 'L10 de su productor' : 'L10 con los números del diseño: su productor no lo declara en esta entrega';
+    nota(
+      `la ciudad de El Quiebro (${conElL10?.mundo.grafo.nudos.length ?? 0} nudos, alcance ${alcance} m, ${deQuien}): ${rodeos.length} persecuciones que rodean, ` +
+        `hasta ${rodeos.length > 0 ? Math.max(...rodeos.map((x) => x.lejos)).toFixed(1) : '0'} m de camino; llegan ${j.llegan}, la última en el tic ${j.peorLlegada}`,
+    );
+    comprobar(
+      'en la ciudad de El Quiebro, el Prestado que persigue a un asiento a su alcance en recta pero cuyo camino rodea la manzana LLEGA a anunciarle, en todas, sin quedarse parado en la esquina',
+      rodeos.length >= 12 && j.llegan === rodeos.length && j.paradas.length === 0,
+      { rodeos: rodeos.length, llegan: j.llegan, noLlegan: j.noLlegan.slice(0, 4), paradas: j.paradas.slice(0, 4) },
+    );
+
+    /*
+     * Los combates de verdad con TODOS HUYENDO POR LAS CALLES (`huidorPorElGrafo`), como los jugó la revisión:
+     * con la primera versión, de dos a diez entidades paradas por combate en la franja, la peor 1.868 tics. Las
+     * tres fases de la revisión donde más salían (la oleada 3 con seis asientos, la 2 con cuatro, y la Llamada
+     * con seis), con su L10 o con el del diseño; la vigilancia de los NPC mira cada tic.
+     */
+    const huidas: { nombre: string; tics: number; paradas: string[]; peorParada: number; acercandose: number; olvidadas: number }[] = [];
+    for (const [nombre, asientos, semilla, tipo, numero] of [
+      ['oleada 3, 6 asientos', 6, 11, 'oleada', 3],
+      ['oleada 2, 4 asientos', 4, 77, 'oleada', 2],
+      ['la Llamada, 6 asientos', 6, 91, 'llamada', 0],
+    ] as const) {
+      const pj = robotDeLaMesa.jugarAlQuiebro({ asientos, semilla, noches: 2, politica: 'gana', travesuras: false });
+      let fase: LizaDeclarada | null = null;
+      for (const v of pj.vistas) {
+        const vl = v as VistaLeida & { fase: { oleada?: number } };
+        if (fase !== null || vl.fase.tipo !== tipo || (tipo === 'oleada' && vl.fase.oleada !== numero)) continue;
+        const l = productor.lizaDelQuiebro(v, 'K7M2P');
+        if (l !== null && l.fase.encuentro !== null) fase = l;
+      }
+      if (fase === null) continue;
+      const d = conL10(fase).liza;
+      if (problemasDeLaDeclaracion(d).length > 0) continue;
+      huidas.push({ nombre, ...jugarHuyendo(d, semilla, 2400) });
+    }
+    const paradasHuyendo = huidas.flatMap((h) => h.paradas.map((x) => `${h.nombre}: ${x}`));
+    const acercandoseHuyendo = huidas.reduce((s, h) => s + h.acercandose, 0);
+    nota(
+      `la ciudad de El Quiebro con todos huyendo por las calles (${deQuien}): ` +
+        huidas.map((h) => `${h.nombre}, ${h.tics} tics, ${h.olvidadas} olvidadas, la racha parada más larga ${h.peorParada}, ${h.acercandose} tics acercándose`).join('; '),
+    );
+    comprobar(
+      'en los combates de El Quiebro con todos huyendo por las calles, ninguna entidad pasa más de 3 s parada sin nadie a su alcance y con alguien a la distancia del olvido: la que se queda sin blanco acompañada se ACERCA (y se vio acercarse)',
+      huidas.length === 3 && paradasHuyendo.length === 0 && acercandoseHuyendo >= 1000,
+      { jugadas: huidas.length, paradas: paradasHuyendo.slice(0, 6), acercandose: acercandoseHuyendo },
+    );
+
+    /*
+     * Las noches de verdad: la pausa de la noche n (límite ciudad) y la Bajada de la n + 1 (la plaza nueva). Se
+     * busca, con un paso de 1 m, un sitio de esa plaza libre en el mundo de la pausa y dentro de una caja en el de
+     * la Bajada; el asiento nace ahí en la pausa (se puede estar), llega la vista de la Bajada, y tiene que quedar
+     * donde cabe y andar. Se paran las semillas al tercer caso.
+     *
+     * Con la ciudad abierta la ciudad de una mesa es LA MISMA todas las noches (`docs/quiebro/CIUDAD-ABIERTA.md`),
+     * así que el cambio de noche ya no pone cajas nuevas y la búsqueda sale en cero. El caso no ha dejado de poder
+     * darse —cualquier vista que cambie el suelo bajo un asiento lo da, y la ciudad crecerá a 828 m—, así que si
+     * las noches no lo traen se FABRICA sobre una pareja de verdad: la misma Bajada con una caja de 2 m más, puesta
+     * encima de un sitio libre de su plaza con sitio libre alrededor. Contar cero casos y darlo por bueno sería
+     * un verde que no mira nada.
+     */
+    let casos = 0;
+    let buscadas = 0;
+    let fabricados = 0;
+    const malos: unknown[] = [];
+    const parejas: { semilla: number; noche: number; pausa: LizaDeclarada; bajada: LizaDeclarada }[] = [];
+    const probarElCambio = (pausa: LizaDeclarada, bajada: LizaDeclarada, sitio: { x: number; z: number }, quien: { semilla: number; noche: number; fabricado: boolean }): { x: number; z: number } => {
+      const arB = arenaDeLaLiza(bajada);
+      const radio = (bajada.asientos[0] as ReglasDeAsiento).cuerpo.radio;
+      const aqui: LizaDeclarada = { ...pausa, mundo: { ...pausa.mundo, nace: [{ papel: 'asiento', x: sitio.x, z: sitio.z, rumbo: 0 }, ...pausa.mundo.nace] } };
+      let meta: { x: number; z: number } | null = null;
+      const robot: Robot = (a) => {
+        a.meta = meta;
+      };
+      const b = new Banco(aqui, 5, [new Aparato(1, 3000, 20, 60, 7, robot)]);
+      b.guardarPasos = false;
+      b.conectar(1);
+      for (let t = 0; t < 40; t++) b.tic();
+      const a0 = b.sala.asientos[0] as EstadoDeLaSala['asientos'][number];
+      const enElSitio = a0.x === sitio.x && a0.z === sitio.z;
+      b.meter(b.k * 50 + 1, { tipo: 'vista', declaracion: bajada });
+      for (let t = 0; t < 20; t++) b.tic();
+      const a1 = b.sala.asientos[0] as EstadoDeLaSala['asientos'][number];
+      const queda = { x: a1.x, z: a1.z };
+      const cabe = sePuedeEstar(arB, a1.x, a1.z, radio);
+      let andado = 0;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const desde = b.sala.asientos[0] as EstadoDeLaSala['asientos'][number];
+        meta = { x: desde.x + dx * 6 * UNO, z: desde.z + dz * 6 * UNO };
+        for (let t = 0; t < 40; t++) b.tic();
+        const hasta = b.sala.asientos[0] as EstadoDeLaSala['asientos'][number];
+        const d = Math.hypot(hasta.x - desde.x, hasta.z - desde.z) / UNO;
+        if (d > andado) andado = d;
+      }
+      if (!enElSitio || !cabe || andado < 2) malos.push({ ...quien, sitio: { x: sitio.x / UNO, z: sitio.z / UNO }, enElSitio, cabe, andado, queda: { x: queda.x / UNO, z: queda.z / UNO } });
+      return queda;
+    };
+    for (let semilla = 1; semilla <= 12 && casos < 3; semilla++) {
+      const pj = robotDeLaMesa.jugarAlQuiebro({ asientos: 1, semilla, noches: 4, politica: 'gana', travesuras: false });
+      const pausas = new Map<number, LizaDeclarada>();
+      const bajadas = new Map<number, LizaDeclarada>();
+      for (const v of pj.vistas) {
+        const vl = v as VistaLeida;
+        if (vl.noche === null) continue;
+        const n = vl.noche.numero;
+        if (vl.fase.tipo === 'pausa' && !pausas.has(n)) {
+          const l = productor.lizaDelQuiebro(v, 'K7M2P');
+          if (l !== null) pausas.set(n, l);
+        }
+        if (vl.fase.tipo === 'bajada' && !bajadas.has(n)) {
+          const l = productor.lizaDelQuiebro(v, 'K7M2P');
+          if (l !== null) bajadas.set(n, l);
+        }
+      }
+      for (const [n, pausa] of pausas) {
+        const bajada = bajadas.get(n + 1);
+        if (bajada === undefined || casos >= 3) continue;
+        buscadas++;
+        parejas.push({ semilla, noche: n, pausa, bajada });
+        const arA = arenaDeLaLiza(pausa);
+        const arB = arenaDeLaLiza(bajada);
+        const radio = (bajada.asientos[0] as ReglasDeAsiento).cuerpo.radio;
+        const lim = bajada.mundo.limites.find((x) => x.id === bajada.fase.limite);
+        if (lim === undefined) continue;
+        let sitio: { x: number; z: number } | null = null;
+        for (let x = lim.caja.x0; x <= lim.caja.x1 && sitio === null; x += UNO) {
+          for (let z = lim.caja.z0; z <= lim.caja.z1; z += UNO) {
+            if (sePuedeEstar(arA, x, z, radio) && !sePuedeEstar(arB, x, z, radio)) {
+              sitio = { x, z };
+              break;
+            }
+          }
+        }
+        if (sitio === null) continue;
+        casos++;
+        probarElCambio(pausa, bajada, sitio, { semilla, noche: n, fabricado: false });
+      }
+    }
+    /*
+     * El caso fabricado: en cada pareja, el primer sitio de la plaza de la Bajada (paso de 1 m) libre en los dos
+     * mundos y con 4 m libres a los cuatro lados —para que haya adónde echarlo—, lejos de los sitios de nacer, se
+     * tapa con una caja alta de 2 × 2 m. La Bajada así tiene que seguir siendo una declaración sin problemas; si
+     * no, se prueba el siguiente sitio. Se exige además que el asiento SE MUEVA: si quedara en el sitio, la caja
+     * no lo habría tapado y el caso no probaría nada.
+     */
+    const movidos: string[] = [];
+    for (let i = 0; i < parejas.length && casos + fabricados < 1; i++) {
+      const { semilla, noche, pausa, bajada } = parejas[i] as (typeof parejas)[number];
+      const arA = arenaDeLaLiza(pausa);
+      const arB = arenaDeLaLiza(bajada);
+      const radio = (bajada.asientos[0] as ReglasDeAsiento).cuerpo.radio;
+      const lim = bajada.mundo.limites.find((x) => x.id === bajada.fase.limite);
+      if (lim === undefined) continue;
+      const libre = (x: number, z: number): boolean => sePuedeEstar(arA, x, z, radio) && sePuedeEstar(arB, x, z, radio);
+      const lejosDeNacer = (x: number, z: number): boolean =>
+        bajada.mundo.nace.every((s) => Math.abs(s.x - x) > 4 * UNO || Math.abs(s.z - z) > 4 * UNO) &&
+        pausa.mundo.nace.every((s) => Math.abs(s.x - x) > 4 * UNO || Math.abs(s.z - z) > 4 * UNO);
+      for (let x = lim.caja.x0 + 4 * UNO; x <= lim.caja.x1 - 4 * UNO && casos + fabricados < 1; x += UNO) {
+        for (let z = lim.caja.z0 + 4 * UNO; z <= lim.caja.z1 - 4 * UNO; z += UNO) {
+          if (!libre(x, z) || !lejosDeNacer(x, z)) continue;
+          if (![[4, 0], [-4, 0], [0, 4], [0, -4]].every(([dx, dz]) => libre(x + (dx as number) * UNO, z + (dz as number) * UNO))) continue;
+          const caja = { x0: x / UNO - 1, z0: z / UNO - 1, x1: x / UNO + 1, z1: z / UNO + 1 };
+          const tapada: LizaDeclarada = {
+            ...bajada,
+            mundo: {
+              ...bajada.mundo,
+              suelo: { ...bajada.mundo.suelo, cuerpos: [...bajada.mundo.suelo.cuerpos, caja] },
+              clasesDeCaja: [...bajada.mundo.clasesDeCaja, CLASE_DE_CAJA.alta],
+            },
+          };
+          if (sePuedeEstar(arenaDeLaLiza(tapada), x, z, radio)) continue;
+          if (problemasDeLaDeclaracion(tapada).length > 0) continue;
+          fabricados++;
+          const queda = probarElCambio(pausa, tapada, { x, z }, { semilla, noche, fabricado: true });
+          const movido = Math.hypot(queda.x - x, queda.z - z) / UNO;
+          movidos.push(`semilla ${semilla}, noche ${noche}: tapado en (${x / UNO}, ${z / UNO}), queda a ${movido.toFixed(2)} m`);
+          if (movido < radio / UNO) malos.push({ semilla, noche, fabricado: true, queda: { x: queda.x / UNO, z: queda.z / UNO }, porque: 'no se movió: la caja no lo tapaba' });
+          break;
+        }
+      }
+    }
+    nota(
+      `las noches de verdad de El Quiebro: ${buscadas} cambios de noche mirados, ${casos} con un sitio de la plaza nueva que la noche de antes estaba libre y ésta es caja` +
+        (fabricados > 0 ? `; ${fabricados} fabricado (${movidos.join('; ')})` : ''),
+    );
+    comprobar(
+      'con las noches de verdad de El Quiebro, el asiento que acaba una noche donde la Bajada de la siguiente pone una caja empieza donde cabe y anda (al menos un caso visto, de las noches o fabricado sobre una de ellas)',
+      casos + fabricados >= 1 && malos.length === 0,
+      { casos, fabricados, buscadas, malos: malos.slice(0, 4) },
+    );
+  }
+}
+
 /*
  * El suelo: 139 comprobaciones de la Liza sola, más las del ausente (bloque 19), las del pulido (20),
- * las de la línea de apuntado (21) y las de su revisión (22), y las de El Quiebro si su productor está (el
- * bloque 16 lo dice en su nota cuando no). Escrito exacto: un bloque que deja de correr lo baja del suelo.
+ * las de la línea de apuntado (21), las de su revisión (22), las de la Liza por dentro (23), las de L10
+ * (24) y las de la revisión de la entrega 1 (25), y las de El Quiebro si su productor está (el bloque 16
+ * lo dice en su nota cuando no). Escrito exacto: un bloque que deja de correr lo baja del suelo.
  */
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3436,10 +5244,18 @@ paso('17 · Los avisos, el pago de lo que se lleva, la zona que se enciende y la
 }
 
 terminar({
-  escritas: 139 + DEL_AUSENTE + DEL_PULIDO + DEL_APUNTADO + DE_LA_REVISION + (HAY_QUIEBRO ? DEL_QUIEBRO + DEL_QUIEBRO_JUGADO : 0),
+  escritas:
+    139 + DEL_AUSENTE + DEL_PULIDO + DEL_APUNTADO + DE_LA_REVISION + POR_DENTRO + DEL_OLVIDO + DE_LA_ENTREGA_1 + (HAY_QUIEBRO ? DEL_QUIEBRO + DEL_QUIEBRO_JUGADO + DE_LA_ENTREGA_1_EN_EL_QUIEBRO : 0),
   enVerde:
     'La sala de la Liza nace y empieza cada fase como dice su contrato, valida el sitio y corrige lo que no cuadra,\n' +
     'juzga la esquiva en el reloj del aparato con el mismo veredicto con cualquier desfase y red, reparte los turnos,\n' +
     'juzga las balas contra los sitios declarados, conserva lo que se lleva, acaba sus encuentros con una ronda, da el\n' +
-    'mismo paso en Node y en Hermes, renace reanudando la fase, y una sala llena cuesta menos de lo que el diseño estimó.',
+    'mismo paso en Node y en Hermes, renace reanudando la fase, y una sala llena cuesta menos de lo que el diseño estimó.\n' +
+    'Y por dentro, con una ciudad: las losas y los nudos por celdas y los campos por meta dan lo mismo que la fuerza\n' +
+    'bruta, la sala es la misma tic a tic con y sin ellos, y el mundo se valida una vez y dice lo mismo que sin memoria.\n' +
+    'Y L10: nadie tiene por blanco ni apunta a quien está más allá de su alcance, la que se queda sin blanco con alguien a\n' +
+    'la distancia del olvido se acerca, lo que se queda lejos de todos se olvida al tic y vuelve a la cola de su grupo, el\n' +
+    'ausente no acompaña y el caído sí, y la forma transitoria sin L10 es la sala de antes. Y la revisión de la entrega 1:\n' +
+    'las persecuciones que rodean una manzana llegan, con todos huyendo por las calles de El Quiebro nadie se queda parado\n' +
+    'en la franja, y un mundo nuevo no deja a ningún asiento dentro de una caja.',
 });

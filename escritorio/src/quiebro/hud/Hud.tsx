@@ -12,11 +12,18 @@
  *   interrumpida ... Reanudar o Rendirse
  *   cerrada ........ la mesa cerrada
  *
+ * ═══ EL MAPA, EN LA CIUDAD ABIERTA ═══
+ *
+ * Si la noche se juega en la ciudad (`red/lugar.ts`), en la pelea y en la pausa van además el minimapa
+ * (`Minimapa.tsx`, arriba a la izquierda bajo el menú), el botón PLANO bajo AVISO y el plano entero
+ * (`Plano.tsx`, que se abre con el botón, tocando el minimapa o con la M), leyendo el mapa VIVO de la
+ * partida (`red/orientarse.ts`). En el barrio no: cabe entero en la pantalla y no hay nada que buscar.
+ *
  * Antes que todo eso, UNA VEZ por montaje: la azotea con BAJAR. Ese toque desbloquea el audio (diseño
  * §2.1, §9: el navegador no deja sonar hasta que la persona toca algo), y es también cuando se avisa,
  * la primera vez en un iPhone, de que el interruptor de silencio calla los golpes.
  */
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { JSX, MutableRefObject } from 'react';
 import type { Camera } from 'three';
 import { NOMBRES_DEL_QUIEBRO } from '../../../../shared/arcade/juegos/quiebro-nombres';
@@ -31,6 +38,9 @@ import { COLORES_DE_ASIENTO } from '../red/partida';
 import type { Sonido } from '../sonido';
 import { Boton } from './Boton';
 import { Combate } from './Combate';
+import { Minimapa } from './Minimapa';
+import { BotonDelPlano, Plano, usarLaTeclaDelPlano } from './Plano';
+import type { FuenteDelMapa, OrdenesDelMapa } from '../orientacion';
 import { cifra, miIndice } from './lectura';
 import type { Mover } from './Pantallas';
 import { Cerrada, Interrumpida, laOpcion, Pausa, Recuento, Reunion, RotuloDeLaBajada } from './Pantallas';
@@ -65,10 +75,24 @@ export interface PropsDelHud {
   readonly ojo: MutableRefObject<Camera | null>;
   /** En el modo de prueba, la dirección con que otra pestaña se sienta en esta mesa. */
   readonly enlaceParaEntrar?: string;
+  /** El mapa vivo de la partida (`red/orientarse.ts`), o `null` sin partida. */
+  readonly mapa: (FuenteDelMapa & OrdenesDelMapa) | null;
+  /** ¿Se juega en la ciudad abierta? (el minimapa y el plano sólo van en ella). */
+  readonly enLaCiudad: boolean;
 }
 
 export function Hud(p: PropsDelHud): JSX.Element {
   const v = p.vista;
+  const [plano, ponerPlano] = useState(false);
+  const alternarElPlano = useCallback(() => ponerPlano((a) => !a), []);
+  const cerrarElPlano = useCallback(() => ponerPlano(false), []);
+  const f0 = v?.fase.tipo ?? null;
+  const conMapa = p.bajado && p.enLaCiudad && p.mapa !== null && (f0 === 'oleada' || f0 === 'llamada' || f0 === 'pausa');
+  usarLaTeclaDelPlano(alternarElPlano, conMapa && !p.menu);
+  /* Fuera de la pelea y de la pausa el plano se cierra: al volver a la calle no aparece abierto. */
+  useEffect(() => {
+    if (!conMapa) ponerPlano(false);
+  }, [conMapa]);
   if (!p.bajado) return <Azotea alBajar={p.alBajar} />;
   if (v === null) {
     return (
@@ -97,6 +121,13 @@ export function Hud(p: PropsDelHud): JSX.Element {
       {f === 'recuento' || f === 'final' ? <Recuento vista={v} puerto={p.puerto} mover={p.mover} alOtraMesa={p.alOtraMesa} /> : null}
       {f === 'interrumpida' ? <Interrumpida puerto={p.puerto} mover={p.mover} /> : null}
       {f === 'cerrada' ? <Cerrada alSalir={p.alSalir} /> : null}
+      {conMapa && p.mapa !== null ? (
+        <>
+          <Minimapa fuente={p.mapa} zurdo={p.zurdo && p.tactil} alTocar={alternarElPlano} />
+          <BotonDelPlano abierto={plano} alAlternar={alternarElPlano} zurdo={p.zurdo && p.tactil} tactil={p.tactil} />
+          <Plano fuente={p.mapa} ordenes={p.mapa} abierto={plano} alCerrar={cerrarElPlano} />
+        </>
+      ) : null}
       {p.marcador && enPelea ? <Marcador vista={v} puerto={p.puerto} partida={p.partida} /> : null}
       <Boton clase="q-menu-boton" etiqueta={NOMBRES_DEL_QUIEBRO.botones.menu} alPulsar={() => p.alMenu(!p.menu)}>
         ≡

@@ -24,13 +24,19 @@
  *   · `farolasEncendidas` (prop) y `UNIFORMES_DE_LA_CIUDAD.uFarolas`: la avería del Apagón.
  *   · `UNIFORMES_DE_LOS_HALOS.uHalos`: bajarlo cuando el compositor ya pone brillo (N1+).
  */
-import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { JSX } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { camaraDeLaLupa } from '../posproceso/lupa';
 import { Ciudad } from './Ciudad';
 import type { CiudadConstruida } from './construir';
 import { planoDelBarrio } from './plano';
 import type { NivelDeLaCiudad } from './tipos';
 import { Atmosfera } from '../atmosfera/Atmosfera';
+import { CiudadAbierta } from './CiudadAbierta';
+import type { CiudadAbiertaConstruida } from './abierta';
+import { ciudadParaPintar } from './abierta';
+import { UNIFORMES_DE_LA_CIUDAD } from './retoques';
 import { luzForzada, luzQueManda, suscribirALaLuz } from '../atmosfera/luz-del-barrio';
 
 export interface PropsDeLaCiudadDeNoche {
@@ -45,6 +51,21 @@ export interface PropsDeLaCiudadDeNoche {
   readonly farolasEncendidas?: number;
   /** Avisa con la ciudad construida (el presupuesto y las cabezas de farola, por ejemplo). */
   readonly alConstruir?: (ciudad: CiudadConstruida) => void;
+  /**
+   * LA CIUDAD ABIERTA (`docs/quiebro/CIUDAD-ABIERTA.md`): con `traza` (0-31, la de la vista de la mesa) se
+   * pinta la ciudad de 540 m de esa traza y del código, con la ventana de celdas (`abierta.ts`), en vez del
+   * barrio de la noche. Sin ella, el barrio de siempre: el juego pasa a la ciudad cuando la vista traiga su
+   * traza (ola B), sin tocar nada más aquí.
+   */
+  readonly traza?: number;
+  /** Las plazas de los Fallos de la noche (la primera, la de la Bajada), como en la vista. */
+  readonly fallos?: readonly number[];
+  /** «Plazas despejadas» (la Memoria del Sistema). */
+  readonly despejadas?: boolean;
+  /** Avisa con la ciudad abierta construida (el banco mira su ventana y su luz). */
+  readonly alConstruirLaAbierta?: (ciudad: CiudadAbiertaConstruida) => void;
+  /** Monta la ventana de la ciudad abierta de un tirón alrededor de este punto (el banco). */
+  readonly montarYa?: { readonly x: number; readonly z: number };
 }
 
 /**
@@ -60,7 +81,115 @@ function barrioDeLaDireccion(): string | null {
 }
 const BARRIO_FORZADO = barrioDeLaDireccion();
 
-export function LaCiudadDeNoche({ codigo, noche, nivel, reloj, tic, farolasEncendidas = 1, alConstruir }: PropsDeLaCiudadDeNoche): JSX.Element {
+/**
+ * SÓLO EN DESARROLLO: `?abierta=N` (la traza, 0-31) pinta la ciudad abierta de esa traza aunque la vista de la
+ * mesa aún no traiga la suya, y `&fallos=1,4,6` sus Fallos (números de plaza, el primero la Bajada). Es para
+ * mirar y medir la ciudad DENTRO DEL JUEGO —con el posproceso, los efectos y la atmósfera de verdad— mientras
+ * la sala siga en el barrio: lo pintado no es lo que se choca, así que sirve con la cámara fija de la lupa y
+ * no para jugar. No se llama `traza` porque el banco de la ciudad abierta ya usa ese nombre para lo suyo. En
+ * el empaquetado no existe.
+ */
+function trazaDeLaDireccion(): { readonly traza: number; readonly fallos: readonly number[] } | null {
+  const env = import.meta.env as { readonly DEV?: boolean } | undefined;
+  if (env?.DEV !== true || typeof location === 'undefined') return null;
+  const p = new URLSearchParams(location.search);
+  const t = p.get('abierta');
+  if (t === null || !/^\d{1,2}$/.test(t) || Number(t) > 31) return null;
+  const f = p.get('fallos');
+  const fallos = f !== null && /^[1-6](,[1-6]){0,4}$/.test(f) ? f.split(',').map(Number) : [];
+  return { traza: Number(t), fallos: fallos.filter((n, k) => fallos.indexOf(n) === k) };
+}
+const TRAZA_FORZADA = trazaDeLaDireccion();
+
+export function LaCiudadDeNoche(props: PropsDeLaCiudadDeNoche): JSX.Element {
+  const traza = TRAZA_FORZADA?.traza ?? props.traza;
+  const fallos = TRAZA_FORZADA !== null ? TRAZA_FORZADA.fallos : props.fallos;
+  return (
+    <>
+      {LUPA_ANTES_DE_LA_CIUDAD ? <LaLupaAntesDeLaCiudad /> : null}
+      {traza === undefined ? <ElBarrioDeNoche {...props} /> : <LaCiudadAbiertaDeNoche {...props} traza={traza} fallos={fallos ?? SIN_FALLOS} />}
+    </>
+  );
+}
+
+/*
+ * SÓLO EN DESARROLLO: LA CÁMARA FIJA DE LA LUPA, ANTES DE LA CIUDAD. La lupa del frente de imagen
+ * (`posproceso/lupa.ts`) pone su cámara fija justo antes de pintar, en el `useFrame` del posproceso (prioridad
+ * 1), y para entonces la ciudad (0), la atmósfera y los efectos ya han leído la cámara del juego. Con el
+ * barrio daba casi igual; con la ciudad abierta, la ventana de celdas, la luz por losetas, las luces de verdad
+ * y la sombra se quedaban donde está el jugador mientras la lupa miraba otra calle, y lo que se medía no era
+ * cruzar la ciudad. Aquí se pone la misma cámara fija detrás de la del juego (−2) y antes que nadie más, y la
+ * del posproceso la vuelve a poner igual. Sin cámara fija no se toca nada: el encuadre de cine de la lupa se
+ * aplica una sola vez, en su sitio.
+ */
+const LUPA_ANTES_DE_LA_CIUDAD = (import.meta.env as { readonly DEV?: boolean } | undefined)?.DEV === true;
+
+function LaLupaAntesDeLaCiudad(): null {
+  useFrame((estado) => {
+    const fija = (window as unknown as { __quiebroImagen?: { camaraFija?: unknown } }).__quiebroImagen?.camaraFija;
+    if (fija !== null && fija !== undefined) camaraDeLaLupa(estado.camera);
+  }, -1.5);
+  return null;
+}
+
+/** Sin llamar dos veces: la lista de los Fallos es la misma aunque la vista traiga otro arreglo igual. */
+const SIN_FALLOS: readonly number[] = [];
+
+/** LA CIUDAD ABIERTA de la noche, con su atmósfera: la luz sale de la hora de la noche de la ciudad. */
+function LaCiudadAbiertaDeNoche({
+  codigo,
+  noche,
+  nivel,
+  reloj,
+  tic,
+  farolasEncendidas = 1,
+  traza,
+  fallos = SIN_FALLOS,
+  despejadas = false,
+  alConstruirLaAbierta,
+  montarYa,
+}: PropsDeLaCiudadDeNoche & { readonly traza: number }): JSX.Element {
+  const claveDeFallos = fallos.join(',');
+  const fuente = useMemo(
+    () => ciudadParaPintar(traza, codigo, noche, fallos, despejadas),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [traza, codigo, noche, claveDeFallos, despejadas],
+  );
+  const hora = `${String(fuente.noche.hora.h)}:${fuente.noche.hora.m < 10 ? '0' : ''}${String(fuente.noche.hora.m)}`;
+  const forzada = useSyncExternalStore(suscribirALaLuz, luzForzada, () => null);
+  const luz = useMemo(() => luzQueManda(hora, forzada), [hora, forzada]);
+  const [ciudad, setCiudad] = useState<CiudadAbiertaConstruida | null>(null);
+  const alTener = useCallback(
+    (c: CiudadAbiertaConstruida) => {
+      setCiudad(c);
+      alConstruirLaAbierta?.(c);
+    },
+    [alConstruirLaAbierta],
+  );
+  /* El Apagón llega también a la luz horneada, a las tarjetas y a los halos (el uniforme es de todos). */
+  useEffect(() => {
+    UNIFORMES_DE_LA_CIUDAD.uFarolas.value = farolasEncendidas;
+  }, [farolasEncendidas]);
+  return (
+    <>
+      <CiudadAbierta fuente={fuente} nivel={nivel} reloj={reloj} tic={tic} montarYa={montarYa} alConstruir={alTener} />
+      {ciudad !== null ? (
+        <Atmosfera
+          tiempo={ciudad.tiempo}
+          nivel={nivel}
+          farolas={ciudad.farolas}
+          semilla={ciudad.semilla}
+          reloj={reloj}
+          farolasEncendidas={farolasEncendidas}
+          luz={luz}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** EL BARRIO de la noche (el de hoy), con su atmósfera. */
+function ElBarrioDeNoche({ codigo, noche, nivel, reloj, tic, farolasEncendidas = 1, alConstruir }: PropsDeLaCiudadDeNoche): JSX.Element {
   const plano = useMemo(
     () => (BARRIO_FORZADO !== null ? planoDelBarrio(BARRIO_FORZADO, 1) : planoDelBarrio(codigo, noche)),
     [codigo, noche],

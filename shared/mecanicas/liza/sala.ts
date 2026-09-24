@@ -15,10 +15,12 @@
  *      (un `estado`, un `resuelve`) llega detrás de lo que lo explica, nunca de algo que no conoce.
  *   4. EL TIC, si la fase no es `quieta`: los presupuestos; y en un encuentro vivo, por este orden, las
  *      repeticiones que salen, los impactos que tocan, las balas, las pulsaciones guardadas, las
- *      sostenidas, las caídas, la presencia, las entidades, lo que sale del encuentro,
+ *      sostenidas, las caídas, la presencia, el olvido, las entidades, lo que sale del encuentro,
  *      los montones, y si se acabó. Los impactos van antes que las guardadas para que un golpe encadenado
  *      salga en el mismo tic en que se resuelve el anterior; las entidades, después de los impactos,
- *      para que piensen sabiendo cómo acabó su golpe.
+ *      para que piensen sabiendo cómo acabó su golpe. El olvido (L10), después de la presencia —quien se
+ *      acaba de quedar ausente ya no acompaña— y antes de las entidades: la olvidada no piensa, y su grupo
+ *      puede sacar otra en ese mismo tic.
  *   5. Los RELOJES: el `arcade:reloj` de la fase (una vez) y el `arcade:ausente` de quien lleva sin
  *      canal lo que diga la presencia (una vez por asiento y fase, sólo en encuentro).
  *   6. Las CUENTAS que cambiaron (`cuenta`, `carga`, `recurso`): una por asiento al final, no una por
@@ -53,7 +55,7 @@ import {
   sucesoDeEstado,
 } from './paso-en-curso';
 import type { AsientoEnCurso, BalaInterna, CuerpoInterno, EstadoInterno, PasoEnCurso } from './paso-en-curso';
-import { dentroDelLimite, mirarLaPresencia, recolocar, redDelAsiento, rellenarPresupuestos, sinCanalDeMas, sitioDeNacer, topeDelCorto, validarAqui } from './cuerpo';
+import { dentroDelLimite, mirarLaPresencia, recolocar, redDelAsiento, rellenarPresupuestos, sePuedeEstarEn, sinCanalDeMas, sitioDeNacer, topeDelCorto, validarAqui } from './cuerpo';
 import {
   alQuedarAusente,
   anunciarProgramados,
@@ -67,7 +69,7 @@ import {
 } from './combate';
 import { avanzarLasBalas } from './proyectiles';
 import { pensarLasEntidades } from './cerebro';
-import { avanzarElEncuentro, empezarElEncuentro, mirarElFinal, vidaDelBlanco } from './encuentros';
+import { avanzarElEncuentro, empezarElEncuentro, mirarElFinal, olvidarLasEntidades, vidaDelBlanco } from './encuentros';
 import { caducarMontones, llevaDe, recogerMontones } from './portables';
 
 /* ─── NACER ──────────────────────────────────────────────────────────────── */
@@ -216,6 +218,7 @@ function simular(p: PasoEnCurso): void {
   avanzarSostenidas(p);
   avanzarLasCaidas(p);
   mirarLaPresencia(p, (a) => alQuedarAusente(p, a));
+  olvidarLasEntidades(p);
   pensarLasEntidades(p);
   avanzarElEncuentro(p);
   caducarMontones(p);
@@ -251,9 +254,19 @@ function estadoVisible(p: PasoEnCurso, a: AsientoEnCurso): number {
 }
 
 /**
- * EMPIEZA LA FASE DE LA DECLARACIÓN: los seis pasos de `FaseDeLaLiza`, en su orden. Quien no tenía cuerpo
- * o queda fuera del límite nuevo aparece en su sitio de nacer (y su aparato, si tiene canal, recibe el
- * `corrige`); todos quedan libres, y el aparato lo sabe por un `estado` 0 de quien no lo estaba.
+ * EMPIEZA LA FASE DE LA DECLARACIÓN: los seis pasos de `FaseDeLaLiza`, en su orden. Quien no tenía cuerpo,
+ * queda fuera del límite nuevo o queda DENTRO DE LA ESTRUCTURA del mundo nuevo aparece en su sitio de nacer (y
+ * su aparato, si tiene canal, recibe el `corrige`); todos quedan libres, y el aparato lo sabe por un `estado` 0
+ * de quien no lo estaba.
+ *
+ * ═══ UN MUNDO NUEVO PUEDE CAERLE ENCIMA ═══
+ *
+ * La primera versión sólo miraba el cuerpo y el límite. Con un mundo que cambia de una fase a otra (en la
+ * ciudad abierta, cada noche trae sus coches, sus quioscos y sus obras) un asiento que acababa la fase en un
+ * sitio libre podía empezar la siguiente dentro de una caja nueva: la sala lo dejaba allí, `sePuedeEstar` le
+ * decía que no, y cada paso que daba se corregía de vuelta al mismo sitio —treinta correcciones por segundo,
+ * sin salir nunca— (lo midió la revisión de la entrega 1: 8 de 36 cambios de noche con sitios así en la plaza
+ * de la Bajada nueva). Lo mismo si el mundo cambia sin cambiar la fase (`tomarLaVista`): ver `sacarDeLaEstructura`.
  */
 function empezarLaFase(p: PasoEnCurso): void {
   const d = p.declaracion;
@@ -295,7 +308,7 @@ function empezarLaFase(p: PasoEnCurso): void {
     a.recuperaHastaTic = 0;
     a.extraHastaTic = 0;
     a.balasHastaTic = p.k;
-    if (!a.conCuerpo || !dentroDelLimite(p, a.x, a.z)) {
+    if (!a.conCuerpo || !dentroDelLimite(p, a.x, a.z) || !sePuedeEstarEn(p, a.x, a.z, r.cuerpo.radio)) {
       const s = sitioDeNacer(p, a.numero, 'asiento');
       a.conCuerpo = true;
       recolocar(p, a, r, s.x, s.z, s.rumbo);
@@ -404,8 +417,9 @@ function conectar(p: PasoEnCurso, e: EntradaConexion): void {
 /**
  * UNA DECLARACIÓN NUEVA. Con otra `clave` es otra fase y se empieza; con la misma, son otros números para
  * lo que empiece desde ahora, y un reloj con otro `id` se vuelve a armar. Si la arena cambió se deriva
- * otra. Una declaración con OTROS asientos (otro número, otro orden) no es de esta mesa: los números del
- * cable saldrían de otro sitio, y se ignora.
+ * otra, y quien ya no cabe donde está vuelve a su sitio de nacer (`sacarDeLaEstructura`). Una declaración
+ * con OTROS asientos (otro número, otro orden) no es de esta mesa: los números del cable saldrían de otro
+ * sitio, y se ignora.
  */
 function tomarLaVista(p: PasoEnCurso, e: EntradaVista): void {
   const d = e.declaracion;
@@ -419,6 +433,7 @@ function tomarLaVista(p: PasoEnCurso, e: EntradaVista): void {
     empezarLaFase(p);
     return;
   }
+  if (d.mundo !== antes.mundo) sacarDeLaEstructura(p);
   /*
    * LA MISMA FASE CON OTRO RELOJ: la mesa lo acortó (ver `RelojDeFase`). Es otro reloj y vence una vez
    * él también, contando desde que empezó la fase. Si el viejo ya había vencido, su veredicto llegó a una
@@ -428,6 +443,22 @@ function tomarLaVista(p: PasoEnCurso, e: EntradaVista): void {
   const idAntes = antes.fase.reloj === null ? null : antes.fase.reloj.id;
   const idAhora = d.fase.reloj === null ? null : d.fase.reloj.id;
   if (idAhora !== idAntes && p.fase.relojDado) p.fase = { ...p.fase, relojDado: false };
+}
+
+/**
+ * EL MUNDO CAMBIÓ SIN CAMBIAR LA FASE: quien tiene cuerpo y ya no cabe donde está vuelve a su sitio de nacer,
+ * como al empezar una fase (ver «un mundo nuevo puede caerle encima» en `empezarLaFase`), soltando lo que
+ * sostenía. Nada más de la fase cambia. El mismo mundo en otro objeto no mueve a nadie: todos caben donde estaban.
+ */
+function sacarDeLaEstructura(p: PasoEnCurso): void {
+  for (const a of p.asientos) {
+    if (!a.conCuerpo) continue;
+    const r = p.declaracion.asientos[a.numero - 1] as ReglasDeAsiento;
+    if (sePuedeEstarEn(p, a.x, a.z, r.cuerpo.radio)) continue;
+    const s = sitioDeNacer(p, a.numero, 'asiento');
+    soltarLaSostenida(p, a);
+    recolocar(p, a, r, s.x, s.z, s.rumbo);
+  }
 }
 
 /**

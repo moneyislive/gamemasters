@@ -16,6 +16,9 @@
  * las deshechas CUENTAN como vivas: ocupan su número y van a volver. La zona de cada una se elige como
  * dice el grupo (`EleccionDeZona`); el sitio dentro de la zona, con el azar de la sala.
  *
+ * Y lo que un encuentro con olvido (L10) olvida —lo que se queda lejos de todos— vuelve a la cola de su
+ * grupo y sale otra vez con sus mismas reglas (ver `olvidarLasEntidades`).
+ *
  * ═══ CÓMO ACABA ═══
  *
  * Acabar es UN `arcade:ronda` con el resultado, las cuentas de la fase y el recurso; y disolver lo que
@@ -27,13 +30,14 @@
  * dejaba de pagar la zona de salida por quien no iba a salir (ver `seFue` en `cuerpo.ts`).
  */
 import type { ColumnaDeCuenta, GrupoDeclarado, ResultadoDeRonda, ZonaDeAccionDeclarada, ZonaDelMundo } from './declaracion';
-import { porPresentes, veredictoDeRonda } from './declaracion';
+import { olvidoDelEncuentro, porPresentes, veredictoDeRonda } from './declaracion';
 import { COSENO, SENO } from '../andar';
 import { por } from '../fijo';
+import { dentroDelRadio } from './geometria';
 import { MOTIVO_DE_IRSE, RESULTADO } from './protocolo';
 import type { GrupoEnCurso } from './tipos-de-la-sala';
-import { contar, SIN_FIN, tirar } from './paso-en-curso';
-import type { AsientoEnCurso, PasoEnCurso } from './paso-en-curso';
+import { contar, enCurso, SIN_FIN, tirar } from './paso-en-curso';
+import type { AsientoEnCurso, EntidadEnCurso, PasoEnCurso } from './paso-en-curso';
 import { soltarLaSostenida } from './combate';
 import { miraAlMasCercano, nuevaEntidad, puntoEnLaZona } from './cerebro';
 import { seFue } from './cuerpo';
@@ -185,6 +189,79 @@ function zonaDeSalida(p: PasoEnCurso, g: GrupoDeclarado): ZonaDelMundo | null {
     if (alguien) return mejor;
   }
   return zonas[tirar(p, zonas.length)] as ZonaDelMundo;
+}
+
+/* ─── EL OLVIDO (L10) ────────────────────────────────────────────────────── */
+
+/**
+ * LO QUE SE QUEDA LEJOS DE TODOS SE OLVIDA (`EncuentroDeclarado.olvido`; ver `OlvidoDeclarado`). Cada tic,
+ * antes de que piensen las entidades:
+ *
+ *   · la que aparece, acecha o ronda con algún asiento PRESENTE a la distancia del olvido o menos pone su
+ *     reloj en este tic (`cercaEnTic`); y la que ataca, apunta, dispara, está caída, absorbe o está deshecha
+ *     también, porque no le corre: tiene su curso, y al acabarlo empieza a contar de cero;
+ *   · la que ya lleva los tics del olvido sin nadie se va —`seva` con `disuelta`, sin soltar nada— y VUELVE A
+ *     LA COLA DE SU GRUPO (una salida menos), que la volverá a sacar con sus reglas: en este mismo tic, si
+ *     su ritmo y sus vivas a la vez lo dejan (`sacarEntidades` va después).
+ *
+ * ═══ POR QUÉ VUELVE A LA COLA ═══
+ *
+ * La olvidada que contara como salida dejaría ganar un `vaciar` alejándose: unos segundos lejos de todo y
+ * el encuentro, vacío. Vuelve, y lo que había que pelear se pelea: donde el grupo saca a los suyos.
+ *
+ * ═══ POR QUÉ NO CORRE ATACANDO NI APUNTANDO ═══
+ *
+ * Nada que se olvide deja nada a medias: ni un golpe anunciado sin autor que lo siga, ni una línea de
+ * apuntado sin su `apunta` de cierre, ni una caída que nadie remata. Y con el alcance de blanco dentro de la
+ * distancia del olvido —lo exige `problemasDeLaDeclaracion`—, lo que persigue a alguien lo tiene cerca.
+ */
+export function olvidarLasEntidades(p: PasoEnCurso): void {
+  const declarado = p.declaracion.fase.encuentro;
+  const en = p.encuentro;
+  if (declarado === null || en === null || en.resultado !== null) return;
+  const olvido = olvidoDelEncuentro(declarado);
+  if (olvido === null) return;
+  let quedan: EntidadEnCurso[] | null = null;
+  let grupos: GrupoEnCurso[] | null = null;
+  for (let i = 0; i < p.entidades.length; i++) {
+    const e = p.entidades[i] as EntidadEnCurso;
+    if (!leCorreElReloj(e) || acompanada(p, e, olvido.distancia)) e.cercaEnTic = p.k;
+    else if (p.k - e.cercaEnTic >= olvido.tics) {
+      if (quedan === null) quedan = p.entidades.slice(0, i);
+      contar(p, 0, { e: 'seva', id: e.numero, por: MOTIVO_DE_IRSE.disuelta, quien: 0 });
+      if (e.grupo >= 0 && e.grupo < en.grupos.length) {
+        if (grupos === null) grupos = en.grupos.slice();
+        const g = grupos[e.grupo] as GrupoEnCurso;
+        grupos[e.grupo] = { ...g, salidas: g.salidas > 0 ? g.salidas - 1 : 0 };
+      }
+      continue;
+    }
+    if (quedan !== null) quedan.push(e);
+  }
+  if (quedan !== null) p.entidades = quedan;
+  if (grupos !== null) p.encuentro = { ...en, grupos };
+}
+
+/** ¿Le corre el reloj del olvido? Sólo si aparece, acecha o ronda (ver `olvidarLasEntidades`). */
+function leCorreElReloj(e: EntidadEnCurso): boolean {
+  const m = e.cerebro.modo;
+  return m === 'aparecer' || m === 'acechar' || m === 'rondar';
+}
+
+/**
+ * ¿Tiene a algún asiento PRESENTE a `distancia` o menos en recta? Presente es con cuerpo y ni ausente ni sin
+ * cuerpo: el caído cuenta, el ausente momentáneo no (ver `OlvidoDeclarado`).
+ */
+function acompanada(p: PasoEnCurso, e: EntidadEnCurso, distancia: number): boolean {
+  const ausente = p.declaracion.presencia.estadoAusente;
+  const sinCuerpo = p.declaracion.sinCuerpo.estado;
+  for (const a of p.asientos) {
+    if (!a.conCuerpo) continue;
+    const activo = enCurso(a.estado, p.k);
+    if (activo !== null && (activo.estado === ausente || activo.estado === sinCuerpo)) continue;
+    if (dentroDelRadio(a.x - e.x, a.z - e.z, distancia)) return true;
+  }
+  return false;
 }
 
 /* ─── ACABAR ─────────────────────────────────────────────────────────────── */

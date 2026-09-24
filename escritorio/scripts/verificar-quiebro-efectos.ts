@@ -77,6 +77,7 @@ import {
   anilloEnPantalla,
   balaAcabada,
   bisEn,
+  cieloVistoDesde,
   columnasDelCielo,
   desalojoEn,
   direccionDelRumbo,
@@ -730,6 +731,33 @@ paso('Las líneas de tiempo: impresión en 1,2 s, desalojo, Trasvase en 0,6 s, e
   }
   comprobar('las esquirlas caen en corona de 0,3 a 0,8 m: dentro del radio de recogida (1,2 m) siempre', dentro);
   comprobar('las columnas del cielo están todas detrás de la niebla del barrio (170 m o más del centro)', columnasDelCielo(176, 3).every((c) => Math.hypot(c.x, c.z) >= EXIGE.cieloDesde - 1e-9));
+  /*
+   * En la ciudad abierta de 540 m, 170 m del CENTRO caen dentro de la ciudad (el 24-sep, un paño de glifos
+   * pegado a una torre de las Torres): las columnas siguen a quien mira (`cieloVistoDesde`). Desde cualquier
+   * sitio de la ciudad, y del borde, todas quedan detrás de la niebla, a 170-290 m del ojo.
+   */
+  const columnas = columnasDelCielo(176, 3);
+  const bases = new Float32Array(176 * 4);
+  let peorCerca = Infinity;
+  let peorLejos = 0;
+  let ojos = 0;
+  for (let x = -272; x <= 272; x += 34) {
+    for (let z = -272; z <= 272; z += 34) {
+      bases.fill(Number.NaN);
+      cieloVistoDesde(bases, columnas, 176, x, z);
+      ojos++;
+      for (let i = 0; i < 176; i++) {
+        const d = Math.hypot((bases[i * 4] as number) - x, (bases[i * 4 + 2] as number) - z);
+        peorCerca = Number.isNaN(d) ? -1 : Math.min(peorCerca, d);
+        peorLejos = Math.max(peorLejos, d);
+      }
+    }
+  }
+  comprobar(
+    `las columnas del cielo siguen a quien mira: desde ${String(ojos)} sitios de la ciudad abierta (±272) todas quedan a 170-290 m del ojo`,
+    peorCerca >= EXIGE.cieloDesde - 1e-3 && peorLejos <= 290 + 1e-3,
+    { peorCerca, peorLejos },
+  );
 }
 
 /* ─────────────────────────────── 6. El presupuesto ─────────────────────────────── */
@@ -877,4 +905,4 @@ paso('El sistema: asas que caducan, ranuras que no crecen, chispas que se siembr
   );
 }
 
-terminar(74);
+terminar(75);

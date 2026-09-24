@@ -40,17 +40,19 @@ import {
   TOPE_DE_AQUIS_DE_GOLPE,
 } from '../../../../shared/mecanicas/liza/protocolo';
 import type { AccionDelAparato, MensajeDeLaSala } from '../../../../shared/mecanicas/liza/protocolo';
-import type { Barrio } from '../../../../shared/arcade/juegos/quiebro-barrio';
-import { durmienteMasCercano } from '../../../../shared/arcade/juegos/quiebro-durmientes';
+import type { NocheDeLaCiudad } from '../../../../shared/arcade/juegos/quiebro-ciudad';
 import { QUIEBRO_DEL_DESVELADO } from '../../../../shared/arcade/juegos/quiebro-reglas';
 import type { ClaseDeCuerpo, CuerpoPintado, FuenteDeCuerpos, Gesto } from '../cuerpos';
 import type { Boton, EstadoDeLosMandos } from '../mandos/estado';
+import type { FuenteConGente, GenteDeLaNoche } from '../personajes/multitud';
 import { direccionDeLaPalanca } from '../mandos/estado';
 import { direccionHacia, elegirBlanco } from '../mandos/enganche';
 import type { Candidato } from '../mandos/enganche';
 import { CanalDeLaLiza } from './canal';
 import type { EstadoDelCanal, FabricaDeEnchufes, Relojes } from './canal';
 import { leerLaLiza } from './diccionario';
+import { genteDelLugar } from './lugar';
+import type { LugarDeLaNoche } from './lugar';
 import type { LecturaDeLaLiza, SentidoDelEstado } from './diccionario';
 import { EMPUJON_MS, LineaDelCuerpo, pintadoNuevo } from './guion';
 import { muestraNueva } from './interpolacion';
@@ -131,12 +133,17 @@ export interface PulsacionAtendida {
   readonly blanco: number;
 }
 
-export class Partida implements FuenteDeCuerpos {
+export class Partida implements FuenteDeCuerpos, FuenteConGente {
   readonly sala = new SalaVista();
   readonly canal: CanalDeLaLiza;
   readonly mandos: EstadoDeLosMandos;
   lectura: LecturaDeLaLiza | null = null;
-  barrio: Barrio | null = null;
+  /**
+   * DÓNDE SE JUEGA: el barrio de hoy o la ciudad abierta (`lugar.ts`), el que cuadra con el mundo de la
+   * liza. Lo leen la cámara, el sonido, los personajes (su gente) y el mapa.
+   */
+  lugar: LugarDeLaNoche | null = null;
+  private gente: GenteDeLaNoche | null = null;
   paso: PasoPropio | null = null;
   /** La cámara mira hacia aquí (radianes, convenio de `andar.ts`): la palanca empuja relativa a ella. */
   giroDeLaCamara = 0;
@@ -222,11 +229,13 @@ export class Partida implements FuenteDeCuerpos {
   /* ─────────────────────────── La declaración ─────────────────────────── */
 
   /**
-   * La vista de la mesa cambió: la liza que sale de ella (o `null` si no se lee), el barrio de la noche
-   * y mi asiento. No abre ni cierra el canal: eso lo decide `asegurarElCanal`.
+   * La vista de la mesa cambió: la liza que sale de ella (o `null` si no se lee), el lugar de la noche
+   * (`lugarDeLaMesa`, el que cuadra con esa liza) y mi asiento. No abre ni cierra el canal: eso lo decide
+   * `asegurarElCanal`.
    */
-  ponerLaDeclaracion(liza: LizaDeclarada | null, barrio: Barrio | null, asiento: string | null): void {
-    this.barrio = barrio;
+  ponerLaDeclaracion(liza: LizaDeclarada | null, lugar: LugarDeLaNoche | null, asiento: string | null): void {
+    this.lugar = lugar;
+    this.gente = genteDelLugar(lugar);
     if (liza === null) {
       this.lectura = null;
       return;
@@ -387,17 +396,19 @@ export class Partida implements FuenteDeCuerpos {
         return;
       }
       case 'nace': {
-        if (lectura === null || this.barrio === null) return;
+        const gente = this.gente;
+        if (lectura === null || gente === null) return;
         if (lectura.cuerpoDeLaClase(s.clase) !== 'prestado') return;
         /*
          * EL CIVIL QUE SE VUELVE PRESTADO: el durmiente de guion más cercano al punto, en el tic en que la
-         * sala lo hizo nacer, con la misma función pura en todos los aparatos (diseño §4.8). Los que ya son
-         * Prestados no cuentan.
+         * sala lo hizo nacer, con la misma función pura en todos los aparatos (diseño §4.8): la del barrio,
+         * o en la ciudad la de sus unos 630, a 60 m como mucho (más lejos no hay nadie de quien salir: las
+         * Naves de madrugada, y el Prestado se imprime). Los que ya son Prestados no cuentan.
          */
         const excluidos = [...this.conjuntoDePrestados];
         let durmiente: number | null = null;
         try {
-          durmiente = durmienteMasCercano(this.barrio, n.k, Math.round((s.x / 100) * UNO), Math.round((s.z / 100) * UNO), excluidos);
+          durmiente = gente.masCercano(n.k, Math.round((s.x / 100) * UNO), Math.round((s.z / 100) * UNO), excluidos);
         } catch {
           durmiente = null;
         }
@@ -1263,6 +1274,16 @@ export class Partida implements FuenteDeCuerpos {
 
   prestados(): ReadonlySet<number> {
     return this.conjuntoDePrestados;
+  }
+
+  /** La gente de la noche (los personajes la pintan: ver `FuenteConGente` en `personajes/multitud.ts`). */
+  genteDeLaNoche(): GenteDeLaNoche | null {
+    return this.gente;
+  }
+
+  /** La noche de la ciudad abierta, si se juega en ella (el mapa la pinta), o `null` en el barrio. */
+  nocheDeLaCiudad(): NocheDeLaCiudad | null {
+    return this.lugar !== null && this.lugar.tipo === 'ciudad' ? this.lugar.noche : null;
   }
 
   ticDeLosDurmientes(): number {

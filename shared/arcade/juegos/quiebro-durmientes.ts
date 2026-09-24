@@ -74,10 +74,18 @@
  * uno con decimales —un punto en metros, casi siempre— LANZA en vez de elegir en silencio a otro
  * civil. Un tic que no es un número finito también lanza (`ticDelBarrio`): la primera versión
  * dejaba con `NaN` a los 48 en el origen, dentro de la fuente, y `x: null` en `sitioDelDurmiente`.
+ *
+ * ═══ Y LOS DE LA CIUDAD ABIERTA ═══
+ *
+ * Al final del fichero, «Los durmientes de la ciudad»: los unos 630 de la ciudad de 540 m, con las firmas
+ * de `quiebro-ciudad.ts`. Lo de arriba es el barrio de hoy y conserva su firma hasta que la multitud pase a
+ * éstas (ola B de `docs/quiebro/CIUDAD-ABIERTA.md`).
  */
 import { UNO } from '../../mecanicas/fijo';
 import { chorroDeAzar, claveDeLaNoche, ticDelBarrio, TICS_DEL_SEMAFORO, TICS_EN_VERDE } from './quiebro-barrio';
-import type { Barrio } from './quiebro-barrio';
+import type { Barrio, Rectangulo as RectanguloDelBarrio, TramoDeAcera } from './quiebro-barrio';
+import { celdaDe, CELDA_MAXIMA, CELDA_MINIMA, CELDAS, huecoDelIndice, indiceDeCelda, indiceDeHueco, RADIO_DEL_PRESTADO, tramoDeLaCara } from './quiebro-ciudad';
+import type { CiudadDeLaMesa, CuantosDurmientes, DurmienteMasCercano, DurmientesCerca, IdDeDistrito, NocheDeLaCiudad, SitioDeUnDurmiente } from './quiebro-ciudad';
 
 /** Cuántos durmientes de guion tiene cada barrio. En todos los niveles, siempre estos. */
 export const DURMIENTES = 48;
@@ -519,3 +527,421 @@ export function durmienteMasCercano(barrio: Barrio, tic: number, x: number, z: n
   }
   return mejor;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  LOS DURMIENTES DE LA CIUDAD (docs/quiebro/CIUDAD-ABIERTA.md §5.8)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Pasan de 48 a unos 630, en unas 320 cuadrillas, con la densidad de cada distrito (§2.2): 7 por manzana
+ * en el Casco, 6 en el Ensanche y en la Lonja, 2 en las Naves, 4 en las Torres, y 10 en cada plaza. Con las
+ * reglas del barrio —guion y no gente que decide, vueltas de minutos exactos, semáforos con margen, nunca
+ * dentro de una caja por la acera por bandas— y tres cambios:
+ *
+ *   · EL REPARTO ES DE LA MESA Y EL GUION DE LA NOCHE. Quién es cada durmiente (su cuadrilla, su puesto,
+ *     su cuerpo y su ropa) y por dónde da la vuelta sale de la ciudad de la mesa (`CÓDIGO#d<hueco>`): sus
+ *     índices son los mismos todas las noches, que es lo que nombra `FuenteDeCuerpos.prestados()`. A qué
+ *     paso va, dónde empieza, cuándo espera y si lleva paraguas sale de la noche (`CÓDIGO#noche#d<k>`).
+ *   · CADA CUADRILLA DA LA VUELTA A SU MANZANA, o a dos cruzando por la cebra (§5.8), por el anillo de
+ *     aceras de `quiebro-ciudad.ts` (a 1 m de la línea de solar). Así la caja de su vuelta se sabe sin
+ *     escribir el guion, y las cuadrillas que pueden estar cerca de un punto se buscan en las celdas de 48 m
+ *     sin tocar las demás.
+ *   · EL GUION SE ESCRIBE CUANDO HACE FALTA, cuadrilla a cuadrilla, y se guarda por noche: nadie escribe
+ *     630 guiones para pintar los 64 de al lado. Da igual quién lo pida primero y en qué orden: cada guion
+ *     sale de su propio chorro. La cuadrilla cuya vuelta pasa por la acera de una obra no sale esa noche
+ *     (`null`): la obra corta la acera entera.
+ *
+ * Los semáforos de las avenidas piden más margen (`MARGEN_DEL_VERDE_EN_LA_AVENIDA`): de acera a acera son
+ * 22 m y no 10, y el último de una cuadrilla de tres al paso más lento sale de la calzada 380 tics después
+ * de que el primero empiece a cruzar. Hoy no cruza ninguna: el reparto no da vueltas a dos por una avenida
+ * (y `verify:quiebro-barrio` lo mira), así que ese margen sólo cuenta el día que las dé.
+ */
+
+/** Cuántos durmientes da cada manzana de cada distrito (§2.2), y cada plaza. */
+export const DURMIENTES_POR_MANZANA: Readonly<Record<IdDeDistrito, number>> = { casco: 7, ensanche: 6, lonja: 6, naves: 2, torres: 4 };
+export const DURMIENTES_POR_PLAZA = 10;
+/** El margen de verde para cruzar una avenida: 21 s (ver la cabecera de esta parte). */
+export const MARGEN_DEL_VERDE_EN_LA_AVENIDA = 420;
+/** Un paso de cebra más largo que esto cruza una avenida. */
+const PASO_DE_CALLE = 12;
+/** De cada cien cuadrillas de manzana, cuántas dan la vuelta a dos. */
+const VUELTAS_A_DOS = 30;
+
+/** UNA CUADRILLA DE LA CIUDAD: los huecos a los que da la vuelta, sus nudos de acera en orden, sus miembros, el primero de ellos y la caja de su vuelta. */
+export interface CuadrillaDeLaCiudad {
+  readonly huecos: readonly number[];
+  readonly vuelta: readonly number[];
+  readonly miembros: number;
+  readonly primero: number;
+  readonly caja: RectanguloDelBarrio;
+  /** Los tramos de calle por cuya acera pasa: si uno tiene obra, no sale. */
+  readonly tramos: readonly number[];
+}
+
+/** Cómo es cada durmiente de la ciudad: su cuadrilla, su puesto en la fila, su cuerpo (0-1) y su ropa (0-3). */
+export interface DurmienteDeLaCiudad {
+  readonly cuadrilla: number;
+  readonly puesto: number;
+  readonly cuerpo: number;
+  readonly ropa: number;
+}
+
+/** EL REPARTO DE UNA CIUDAD: sus cuadrillas, sus durmientes y, por celda, las cuadrillas cuya vuelta la toca. */
+export interface RepartoDeLosDurmientes {
+  readonly cuadrillas: readonly CuadrillaDeLaCiudad[];
+  readonly durmientes: readonly DurmienteDeLaCiudad[];
+  readonly porCelda: readonly (readonly number[])[];
+}
+
+const REPARTOS = new WeakMap<CiudadDeLaMesa, RepartoDeLosDurmientes>();
+
+/** Los nudos de acera de la vuelta a un hueco, o a dos (el del este o el del sur), en el sentido de las agujas del reloj. */
+function nudosDeLaVueltaEnLaCiudad(n: number, m: number | null, alEste: boolean): number[] {
+  if (m === null) return [4 * n, 4 * n + 1, 4 * n + 2, 4 * n + 3];
+  if (alEste) return [4 * n, 4 * n + 1, 4 * m, 4 * m + 1, 4 * m + 2, 4 * m + 3, 4 * n + 2, 4 * n + 3];
+  return [4 * n, 4 * n + 1, 4 * n + 2, 4 * m + 1, 4 * m + 2, 4 * m + 3, 4 * m, 4 * n + 3];
+}
+
+/** Un tramo de acera entre dos nudos, por los dos sentidos. */
+function tramosDeAceraPorPareja(ciudad: CiudadDeLaMesa): Map<number, TramoDeAcera> {
+  const salida = new Map<number, TramoDeAcera>();
+  const n = ciudad.aceras.nudos.length;
+  for (const t of ciudad.aceras.tramos) {
+    salida.set(t.a * n + t.b, t);
+    salida.set(t.b * n + t.a, t);
+  }
+  return salida;
+}
+
+const PAREJAS = new WeakMap<CiudadDeLaMesa, Map<number, TramoDeAcera>>();
+
+function parejasDe(ciudad: CiudadDeLaMesa): Map<number, TramoDeAcera> {
+  let p = PAREJAS.get(ciudad);
+  if (p === undefined) {
+    p = tramosDeAceraPorPareja(ciudad);
+    PAREJAS.set(ciudad, p);
+  }
+  return p;
+}
+
+/**
+ * EL REPARTO DE LOS DURMIENTES DE UNA CIUDAD. Hueco a hueco, en su orden: los de su densidad, en cuadrillas
+ * de una a tres; las de una plaza dan la vuelta a su plaza, y las de una manzana a la suya o, tres de cada
+ * diez, a la suya y a la del este o la del sur si están al otro lado de una calle (no de una avenida) y no
+ * es una plaza. Puro, y guardado por ciudad.
+ */
+export function repartoDeLosDurmientes(ciudad: CiudadDeLaMesa): RepartoDeLosDurmientes {
+  const hecho = REPARTOS.get(ciudad);
+  if (hecho !== undefined) return hecho;
+  const parejas = parejasDe(ciudad);
+  const cuantosNudos = ciudad.aceras.nudos.length;
+  const cuadrillas: CuadrillaDeLaCiudad[] = [];
+  const durmientes: DurmienteDeLaCiudad[] = [];
+  for (const h of ciudad.huecos) {
+    const ch = chorroDeAzar(`${ciudad.codigo}#d${String(h.indice)}`);
+    const plaza = h.uso === 'plaza';
+    let quedan = plaza ? DURMIENTES_POR_PLAZA : DURMIENTES_POR_MANZANA[h.distrito];
+    while (quedan > 0) {
+      const tirada = ch.entero(0, 99);
+      const miembros = Math.min(quedan, tirada < 45 ? 1 : tirada < 80 ? 2 : 3);
+      quedan -= miembros;
+      let otro: number | null = null;
+      let alEste = true;
+      if (!plaza && ch.sale(VUELTAS_A_DOS)) {
+        alEste = ch.sale(50);
+        const i = h.i + (alEste ? 1 : 0);
+        const j = h.j + (alEste ? 0 : 1);
+        if (Math.abs(i) <= HUECO_MAXIMO_DE_LA_CIUDAD && Math.abs(j) <= HUECO_MAXIMO_DE_LA_CIUDAD) {
+          const m = indiceDeHueco(i, j);
+          const vuelta = nudosDeLaVueltaEnLaCiudad(h.indice, m, alEste);
+          let vale = ciudad.huecos[m]?.uso !== 'plaza';
+          for (let k = 0; k < vuelta.length && vale; k++) {
+            const t = parejas.get((vuelta[k] as number) * cuantosNudos + (vuelta[(k + 1) % vuelta.length] as number));
+            if (t === undefined || (t.tipo === 'paso' && t.largo > PASO_DE_CALLE)) vale = false;
+          }
+          if (vale) otro = m;
+        }
+      }
+      const vuelta = nudosDeLaVueltaEnLaCiudad(h.indice, otro, alEste);
+      let x0 = Infinity;
+      let z0 = Infinity;
+      let x1 = -Infinity;
+      let z1 = -Infinity;
+      for (const k of vuelta) {
+        const p = ciudad.aceras.nudos[k] as { x: number; z: number };
+        x0 = Math.min(x0, p.x - APARTE_EN_METROS);
+        z0 = Math.min(z0, p.z - APARTE_EN_METROS);
+        x1 = Math.max(x1, p.x + APARTE_EN_METROS);
+        z1 = Math.max(z1, p.z + APARTE_EN_METROS);
+      }
+      /* Los tramos de calle por cuya acera pasa: las caras de cada hueco que la vuelta recorre. */
+      const tramos: number[] = [];
+      const caras = (n: number, sin: 'este' | 'sur' | 'oeste' | 'norte' | null): void => {
+        const { i, j } = huecoDelIndice(n);
+        for (const cara of ['norte', 'este', 'sur', 'oeste'] as const) if (cara !== sin) tramos.push(tramoDeLaCara(i, j, cara).tramo);
+      };
+      if (otro === null) caras(h.indice, null);
+      else {
+        caras(h.indice, alEste ? 'este' : 'sur');
+        caras(otro, alEste ? 'oeste' : 'norte');
+      }
+      const k = cuadrillas.length;
+      cuadrillas.push(Object.freeze({ huecos: Object.freeze(otro === null ? [h.indice] : [h.indice, otro]), vuelta: Object.freeze(vuelta), miembros, primero: durmientes.length, caja: Object.freeze({ x0, z0, x1, z1 }), tramos: Object.freeze(tramos) }));
+      for (let puesto = 0; puesto < miembros; puesto++) durmientes.push(Object.freeze({ cuadrilla: k, puesto, cuerpo: ch.entero(0, 1), ropa: ch.entero(0, 3) }));
+    }
+  }
+  const porCelda: number[][] = [];
+  for (let c = 0; c < CELDAS; c++) porCelda.push([]);
+  for (let k = 0; k < cuadrillas.length; k++) {
+    const c = (cuadrillas[k] as CuadrillaDeLaCiudad).caja;
+    const a = celdaDe(c.x0, c.z0);
+    const b = celdaDe(c.x1, c.z1);
+    if (a === null || b === null) continue;
+    for (let j = a.j; j <= b.j; j++) for (let i = a.i; i <= b.i; i++) (porCelda[indiceDeCelda(i, j)] as number[]).push(k);
+  }
+  const reparto: RepartoDeLosDurmientes = Object.freeze({ cuadrillas: Object.freeze(cuadrillas), durmientes: Object.freeze(durmientes), porCelda: Object.freeze(porCelda.map((l) => Object.freeze(l))) });
+  REPARTOS.set(ciudad, reparto);
+  return reparto;
+}
+
+/** El mayor índice de hueco en cada eje (el de `quiebro-ciudad.ts`, escrito aquí para leerse sin saltar). */
+const HUECO_MAXIMO_DE_LA_CIUDAD = 5;
+/** Lo que se aparta de su carril el de cada puesto, en metros: el `APARTE` del barrio. */
+const APARTE_EN_METROS = 0.375;
+
+/** CUÁNTOS DURMIENTES TIENE LA CIUDAD DE UNA MESA: los mismos todas las noches. */
+export function durmientesDeLaCiudad(ciudad: CiudadDeLaMesa): number {
+  return repartoDeLosDurmientes(ciudad).durmientes.length;
+}
+
+/** El guion de una cuadrilla en una noche, o `null` si esa noche no sale. */
+export interface GuionDeUnaCuadrilla {
+  readonly cuadrilla: CuadrillaDeDurmientes;
+  readonly paraguas: readonly boolean[];
+}
+
+/** Los guiones escritos, por noche (el vestido de la noche: sus semáforos) y cuadrilla. */
+const GUIONES_DE_LA_CIUDAD = new WeakMap<readonly number[], Map<number, GuionDeUnaCuadrilla | null>>();
+
+/**
+ * EL GUION DE LA CUADRILLA `k` EN UNA NOCHE, escrito la primera vez que se pide y guardado. `null` si su
+ * vuelta pasa por la acera de una obra. Lo que se escribe es lo del barrio: tic a tic, a su paso, esperando
+ * en cada paso de cebra a su verde con el margen de su calle, y descansando al final hasta un número exacto
+ * de minutos.
+ */
+export function guionDeLaCuadrillaEnLaCiudad(noche: NocheDeLaCiudad, k: number): GuionDeUnaCuadrilla | null {
+  const reparto = repartoDeLosDurmientes(noche.ciudad);
+  const c = reparto.cuadrillas[k];
+  if (c === undefined) throw new RangeError(`No hay cuadrilla ${String(k)}: son ${String(reparto.cuadrillas.length)}.`);
+  let porCuadrilla = GUIONES_DE_LA_CIUDAD.get(noche.semaforos);
+  if (porCuadrilla === undefined) {
+    porCuadrilla = new Map();
+    GUIONES_DE_LA_CIUDAD.set(noche.semaforos, porCuadrilla);
+  }
+  const hecho = porCuadrilla.get(k);
+  if (hecho !== undefined) return hecho;
+  let sale = true;
+  for (const corte of noche.cortes) if (c.tramos.includes(corte.tramo)) sale = false;
+  const guion = sale ? escribirLaVueltaEnLaCiudad(noche, c, k) : null;
+  porCuadrilla.set(k, guion);
+  return guion;
+}
+
+function escribirLaVueltaEnLaCiudad(noche: NocheDeLaCiudad, c: CuadrillaDeLaCiudad, k: number): GuionDeUnaCuadrilla {
+  const ciudad = noche.ciudad;
+  const ch = chorroDeAzar(`${claveDeLaNoche(ciudad.codigo, noche.noche)}#d${String(k)}`);
+  const paso = ch.uno(PASOS_POR_TIC);
+  const alReves = ch.sale(50);
+  let nudos = c.vuelta.slice();
+  if (alReves) nudos = nudos.reverse();
+  const empieza = ch.entero(0, nudos.length - 1);
+  const fase = ch.entero(0, TICS_DEL_SEMAFORO - 1);
+  const parejas = parejasDe(ciudad);
+  const cuantosNudos = ciudad.aceras.nudos.length;
+  const trozos: TrozoDeLaVuelta[] = [];
+  let t = 0;
+  let arco = 0;
+  for (let s = 0; s < nudos.length; s++) {
+    const u = nudos[(empieza + s) % nudos.length] as number;
+    const v = nudos[(empieza + s + 1) % nudos.length] as number;
+    const p = ciudad.aceras.nudos[u] as { x: number; z: number };
+    const q = ciudad.aceras.nudos[v] as { x: number; z: number };
+    const x = p.x * UNO;
+    const z = p.z * UNO;
+    const dx = Math.sign(q.x - p.x);
+    const dz = Math.sign(q.z - p.z);
+    const largo = (Math.abs(q.x - p.x) + Math.abs(q.z - p.z)) * UNO;
+    const tramo = parejas.get(u * cuantosNudos + v) as TramoDeAcera;
+    const cruce = tramo.tipo === 'paso' ? tramo.cruce : null;
+    if (cruce !== null) {
+      /* El semáforo en el tic de la vuelta: el de la ciudad es `t − fase` más vueltas enteras, que son minutos exactos. */
+      const margen = tramo.largo > PASO_DE_CALLE ? MARGEN_DEL_VERDE_EN_LA_AVENIDA : MARGEN_DEL_VERDE;
+      const f = modulo(t - fase + (noche.semaforos[cruce] ?? 0), TICS_DEL_SEMAFORO);
+      let espera = 0;
+      if (dx !== 0) espera = f <= TICS_EN_VERDE - margen ? 0 : TICS_DEL_SEMAFORO - f;
+      else espera = f >= TICS_EN_VERDE && f <= TICS_DEL_SEMAFORO - margen ? 0 : modulo(TICS_EN_VERDE - f, TICS_DEL_SEMAFORO);
+      if (espera > 0) {
+        trozos.push({ hace: ESPERA, desde: t, hasta: t + espera, x, z, dx, dz, largo: 0, arco, cruce });
+        t += espera;
+      }
+    }
+    const dura = Math.ceil(largo / paso);
+    trozos.push({ hace: ANDA, desde: t, hasta: t + dura, x, z, dx, dz, largo, arco, cruce });
+    t += dura;
+    arco += largo;
+  }
+  const periodo = Math.ceil((t + DESCANSO_MINIMO) / TICS_DEL_SEMAFORO) * TICS_DEL_SEMAFORO;
+  const primero = trozos[0] as TrozoDeLaVuelta;
+  const ultimo = trozos[trozos.length - 1] as TrozoDeLaVuelta;
+  trozos.push({ hace: DESCANSA, desde: t, hasta: periodo, x: ultimo.x + ultimo.dx * ultimo.largo, z: ultimo.z + ultimo.dz * ultimo.largo, dx: primero.dx, dz: primero.dz, largo: 0, arco, cruce: null });
+  const desfase = fase + TICS_DEL_SEMAFORO * ch.entero(0, periodo / TICS_DEL_SEMAFORO - 1);
+  const andados: number[] = [];
+  for (let s = 0; s < trozos.length; s++) if ((trozos[s] as TrozoDeLaVuelta).hace === ANDA) andados.push(s);
+  const conParaguas = noche.tiempo !== 'niebla';
+  const paraguas: boolean[] = [];
+  for (let puesto = 0; puesto < c.miembros; puesto++) paraguas.push(conParaguas && ch.sale(60));
+  return Object.freeze({
+    cuadrilla: Object.freeze({ miembros: c.miembros, paso, periodo, desfase, perimetro: arco, trozos: Object.freeze(trozos.map((x) => Object.freeze(x))), andados: Object.freeze(andados) }),
+    paraguas: Object.freeze(paraguas),
+  });
+}
+
+/** El durmiente `i` de la ciudad de una noche: su reparto y su guion (o `null` si no sale). Lanza con un índice que no existe. */
+function elDurmiente(noche: NocheDeLaCiudad, i: number): { d: DurmienteDeLaCiudad; guion: GuionDeUnaCuadrilla | null } {
+  const reparto = repartoDeLosDurmientes(noche.ciudad);
+  const d = Number.isInteger(i) ? reparto.durmientes[i] : undefined;
+  if (d === undefined) throw new RangeError(`No hay durmiente ${String(i)}: son ${String(reparto.durmientes.length)}, del 0 al ${String(reparto.durmientes.length - 1)}.`);
+  return { d, guion: guionDeLaCuadrillaEnLaCiudad(noche, d.cuadrilla) };
+}
+
+/** Dónde está el de puesto `puesto` de una cuadrilla en el tic `t` (ya entero). */
+function enSuSitio(c: CuadrillaDeDurmientes, puesto: number, t: number): SitioDelDurmiente {
+  const { trozo, arco } = comoVa(c, t);
+  const p = enElArco(c, arco, puesto * HUECO_EN_LA_FILA);
+  const a = apartado(puesto);
+  return { x: p.x + a, z: p.z + a, rumbo: p.rumbo, anda: trozo.hace === ANDA };
+}
+
+/**
+ * EL SITIO DEL DURMIENTE `i` EN EL TIC `tic`, en Q16.16, con su rumbo y si anda; `null` si esta noche no
+ * sale (su vuelta pasa por una obra). Puro: depende de la noche y del tic. Lanza con un tic que no es un
+ * número finito o un índice que no existe.
+ */
+export function sitioDelDurmienteEnLaCiudad(noche: NocheDeLaCiudad, i: number, tic: number): SitioDelDurmiente | null {
+  const t = ticDelBarrio(tic);
+  const { d, guion } = elDurmiente(noche, i);
+  return guion === null ? null : enSuSitio(guion.cuadrilla, d.puesto, t);
+}
+
+/** Cómo se ve el durmiente `i` esta noche: su cuadrilla, su puesto, su cuerpo, su ropa y si lleva paraguas (nunca con niebla). */
+export function aspectoDelDurmienteEnLaCiudad(noche: NocheDeLaCiudad, i: number): AspectoDelDurmiente {
+  const { d, guion } = elDurmiente(noche, i);
+  return { cuadrilla: d.cuadrilla, puesto: d.puesto, cuerpo: d.cuerpo, ropa: d.ropa, paraguas: guion !== null && guion.paraguas[d.puesto] === true };
+}
+
+/** El punto que se pregunta, en Q16.16: entero y dentro de la Liza. Lanza si no (un punto en metros, casi siempre). */
+function comprobarElPunto(x: number, z: number): void {
+  if (!Number.isInteger(x) || !Number.isInteger(z) || Math.abs(x) > TOPE_DEL_PUNTO || Math.abs(z) > TOPE_DEL_PUNTO) {
+    throw new RangeError(`El punto va en Q16.16 (enteros hasta ±${String(TOPE_DEL_PUNTO)}), y llegó (${String(x)}, ${String(z)}): ¿en metros?`);
+  }
+}
+
+/**
+ * Los durmientes a `radio` metros o menos de (`x`, `z`) —Q16.16— en el tic `t`, con su distancia al
+ * cuadrado (enteros exactos: las diferencias no pasan de 2^26). Sólo mira las cuadrillas de las celdas que
+ * toca el cuadrado del radio.
+ */
+function losDeCerca(noche: NocheDeLaCiudad, t: number, x: number, z: number, radio: number): { i: number; d: number }[] {
+  if (!(radio >= 0) || !Number.isFinite(radio)) throw new RangeError(`El radio va en metros y tiene que ser un número finito, y llegó ${String(radio)}.`);
+  const reparto = repartoDeLosDurmientes(noche.ciudad);
+  const r = radio * UNO;
+  const r2 = r * r;
+  const xm = x / UNO;
+  const zm = z / UNO;
+  const a = { i: Math.max(CELDA_MINIMA, Math.floor((xm - radio + 24) / 48)), j: Math.max(CELDA_MINIMA, Math.floor((zm - radio + 24) / 48)) };
+  const b = { i: Math.min(CELDA_MAXIMA, Math.floor((xm + radio + 24) / 48)), j: Math.min(CELDA_MAXIMA, Math.floor((zm + radio + 24) / 48)) };
+  const vistas = new Set<number>();
+  const salida: { i: number; d: number }[] = [];
+  for (let cj = a.j; cj <= b.j; cj++) {
+    for (let ci = a.i; ci <= b.i; ci++) {
+      for (const k of reparto.porCelda[indiceDeCelda(ci, cj)] as readonly number[]) {
+        if (vistas.has(k)) continue;
+        vistas.add(k);
+        const guion = guionDeLaCuadrillaEnLaCiudad(noche, k);
+        if (guion === null) continue;
+        const c = reparto.cuadrillas[k] as CuadrillaDeLaCiudad;
+        for (let puesto = 0; puesto < c.miembros; puesto++) {
+          const s = enSuSitio(guion.cuadrilla, puesto, t);
+          const dx = s.x - x;
+          const dz = s.z - z;
+          const d = dx * dx + dz * dz;
+          if (d <= r2) salida.push({ i: c.primero + puesto, d });
+        }
+      }
+    }
+  }
+  return salida;
+}
+
+/**
+ * EL DURMIENTE MÁS CERCANO a (`x`, `z`) —Q16.16, enteros— en el tic `tic`, a `radio` metros o menos (60 por
+ * defecto), sin los `excluidos`: el que sale de un Prestado. A igual distancia, el de índice menor; `null`
+ * si no hay nadie (las Naves de madrugada: el Prestado se imprime). Igual en todos los aparatos.
+ */
+export function durmienteMasCercanoEnLaCiudad(noche: NocheDeLaCiudad, tic: number, x: number, z: number, excluidos: readonly number[], radio: number = RADIO_DEL_PRESTADO): number | null {
+  const t = ticDelBarrio(tic);
+  comprobarElPunto(x, z);
+  let mejor: number | null = null;
+  let mejorD = 0;
+  for (const c of losDeCerca(noche, t, x, z, radio)) {
+    if (excluidos.includes(c.i)) continue;
+    if (mejor === null || c.d < mejorD || (c.d === mejorD && c.i < mejor)) {
+      mejor = c.i;
+      mejorD = c.d;
+    }
+  }
+  return mejor;
+}
+
+/**
+ * LOS DURMIENTES CERCA de (`x`, `z`) —Q16.16— a `radio` metros o menos, en orden de (distancia, índice),
+ * como mucho `tope`: los que se pintan (los 64 más cercanos a 90 m) y los candidatos a Prestado (los de 40 m
+ * de cada jugador). Lanza con un punto que no es Q16.16, un radio que no es un número o un tic que no lo es.
+ */
+export function durmientesCercaEnLaCiudad(noche: NocheDeLaCiudad, tic: number, x: number, z: number, radio: number, tope: number): readonly number[] {
+  const t = ticDelBarrio(tic);
+  comprobarElPunto(x, z);
+  const todos = losDeCerca(noche, t, x, z, radio);
+  todos.sort((a, b) => a.d - b.d || a.i - b.i);
+  const salida: number[] = [];
+  for (let k = 0; k < todos.length && k < tope; k++) salida.push((todos[k] as { i: number }).i);
+  return salida;
+}
+
+/**
+ * LOS SITIOS DE UNOS DURMIENTES EN UNA LISTA PLANA, sin un objeto por cabeza: `x, z, rumbo, anda` por
+ * índice de `indices`, en Q16.16, para la multitud del cliente, que lo lee en cada fotograma. Uno que esta
+ * noche no sale se escribe con `anda` a −1.
+ */
+export function escribirLosDurmientesDeLaCiudad(noche: NocheDeLaCiudad, tic: number, indices: readonly number[], destino: Int32Array): void {
+  if (destino.length < indices.length * 4) throw new RangeError(`Hacen falta ${String(indices.length * 4)} enteros y hay ${String(destino.length)}.`);
+  const t = ticDelBarrio(tic);
+  for (let k = 0; k < indices.length; k++) {
+    const { d, guion } = elDurmiente(noche, indices[k] as number);
+    if (guion === null) {
+      destino[4 * k] = 0;
+      destino[4 * k + 1] = 0;
+      destino[4 * k + 2] = 0;
+      destino[4 * k + 3] = -1;
+      continue;
+    }
+    const s = enSuSitio(guion.cuadrilla, d.puesto, t);
+    destino[4 * k] = s.x;
+    destino[4 * k + 1] = s.z;
+    destino[4 * k + 2] = s.rumbo;
+    destino[4 * k + 3] = s.anda ? 1 : 0;
+  }
+}
+
+/* Las firmas de la columna (`quiebro-ciudad.ts`, «Los durmientes de la ciudad»): si una deja de cumplirse, no compila. */
+const FIRMAS_DE_LA_COLUMNA: readonly [CuantosDurmientes, SitioDeUnDurmiente, DurmienteMasCercano, DurmientesCerca] = [durmientesDeLaCiudad, sitioDelDurmienteEnLaCiudad, durmienteMasCercanoEnLaCiudad, durmientesCercaEnLaCiudad];
+void FIRMAS_DE_LA_COLUMNA;

@@ -29,6 +29,23 @@
  *  10. EL PUERTO DE PRUEBA abre en `quiebro` con el plazo de 300 s, lleva la llave en la cabecera y NUNCA
  *      en la dirección, y lee el rechazo silencioso como `LaMesa`.
  *  11. LOS FUENTES: ni un `onClick`, la llave nunca al almacén ni a la URL, fin de línea LF.
+ *  12. EL MAPA DE LA CIUDAD ABIERTA (CIUDAD-ABIERTA §5.9): en el mapa no hay calle pintada donde hay una
+ *      pared ni pared donde se anda, píxel a píxel; el minimapa gira la ciudad y las marcas con la misma
+ *      cuenta; el plano toca en `pointerdown` (rumbo a un Fallo o a una cabina, «Aquí» en el nudo más
+ *      cercano); los metros son los de la sala; y el hilo cabe en su tope, va por delante y no se mueve
+ *      del suelo. Con la ciudad de verdad en cuanto exista, y siempre con la de ensayo.
+ *  13. LA CIUDAD SE PISA (CIUDAD-ABIERTA, entrega 1): el cliente juega donde juega la sala (`red/lugar.ts`:
+ *      la ciudad si el mundo de la liza es el de su traza, el barrio si no); con el límite `ciudad` la
+ *      predicción cruza la ciudad entera por calles y la sala de verdad no corrige ni un paso; la partida
+ *      saca los Prestados de la gente de la ciudad; el mapa VIVO de la partida (`red/orientarse.ts`) da
+ *      las marcas con los metros por calles, el «Aquí» y el rumbo; la cámara no atraviesa las cajas de la
+ *      ciudad; y el HUD monta el minimapa, el botón PLANO y el plano sólo en la ciudad. Con el productor de
+ *      verdad (bloque 7 bis): en una oleada el límite es `ciudad` y se sale de la plaza.
+ *  13 bis. LO QUE SE VIO JUGANDO LA ENTREGA 1 (revisión del 24-sep): el rótulo de la Bajada dice «Plaza ·
+ *      Distrito · h:mm» con los nombres de `quiebro-nombres.ts` en las 192 plazas de las 32 trazas; el rumbo
+ *      a cada una de las 640 cabinas acaba donde USAR descuelga, por un último tramo que se anda, y sus
+ *      metros llegan a 0 allí; el ojo que pinta la cámara nunca queda dentro de una caja ni detrás del cerco
+ *      en las salidas de avenida; y lo que va suelto sobre la escena lleva su sombra de noche.
  *
  * ═══ CÓMO SE SABE QUE MIRA ═══
  *
@@ -46,7 +63,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import '../../shared/arcade/juegos';
 import { avanzarConMotivo, opcionesDeArcade, vistaDeAsiento } from '../../shared/arcade';
 import type { Opcion } from '../../shared/arcade';
-import { DURACION_MS, ESTILOS } from '../../shared/arcade/juegos/quiebro-reglas';
+import { CABINA, DURACION_MS, ESTILOS } from '../../shared/arcade/juegos/quiebro-reglas';
 import { lizaDeLaMesa } from '../../shared/arcade/juegos/lizas';
 import { leerVistaDelQuiebro } from '../../shared/arcade/juegos/quiebro-vista';
 import { barrioDeLaNoche, mundoDeLaLizaDelBarrio, ID_DE_LIMITE_EN_LA_LIZA } from '../../shared/arcade/juegos/quiebro-barrio';
@@ -54,8 +71,9 @@ import { sePuedeLidiar } from '../../shared/arcade/juegos/lizas';
 import { NOMBRES_DEL_QUIEBRO } from '../../shared/arcade/juegos/quiebro-nombres';
 import type { VistaDelQuiebro } from '../../shared/arcade/juegos/quiebro-vista';
 import { UNO } from '../../shared/mecanicas/fijo';
-import { seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
+import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import { arenaDeLaLiza, problemasDeLaDeclaracion, VERSION_DE_LA_DECLARACION } from '../../shared/mecanicas/liza/declaracion';
+import { faltaPorElGrafoParaProbar } from '../../shared/mecanicas/liza/cerebro';
 import type {
   AccionDeclarada,
   EfectoDeclarado,
@@ -95,6 +113,66 @@ import { anguloEntre, direccionHacia, elegirBlanco } from '../src/quiebro/mandos
 import { camaraNueva, DISTANCIA_ABIERTA, DISTANCIA_AL_HOMBRO, encuadrar, FOV_PC, losaEnTresEjes } from '../src/quiebro/camara/encuadre';
 import type { CajaAlta } from '../src/quiebro/camara/encuadre';
 import { queHacerConLaEleccion, relojEnTexto, valorDeLasEsquirlas, etiquetaDeLaFase, cifra } from '../src/quiebro/hud/lectura';
+import type { NocheDeLaCiudad } from '../../shared/arcade/juegos/quiebro-ciudad';
+import { BORDE_DE_LA_CIUDAD, campoHasta, ciudadDeLaMesa, ciudadDeLaNoche, nudoMasCercano, TRAZAS, triosDeFallos } from '../../shared/arcade/juegos/quiebro-ciudad';
+import type { FuenteDelMapa, MarcaDelMapa, OrdenesDelMapa, RumboTendido } from '../src/quiebro/orientacion';
+import { alMinimapa, alPlano, LADO_DEL_LIENZO, LADO_DEL_MINIMAPA_PT, METROS_DEL_HILO, METROS_DEL_RESCATE, metrosQueSeEnsenan, TECLA_DEL_PLANO, TRIANGULOS_DEL_HILO } from '../src/quiebro/orientacion';
+import type { ColoresDelMapa, LienzoDelMapa, PincelDelMapa } from '../src/quiebro/hud/mapa';
+import {
+  alPlanoEnPantalla,
+  aplicar,
+  esLaTeclaDelPlano,
+  giradoComoCss,
+  giroQueFalta,
+  LIENZO_DEL_PLANO,
+  lienzoDeLaNoche,
+  MARGEN_DEL_BORDE_PT,
+  pintarLaCiudad,
+  RADIO_DEL_MINIMAPA_M,
+  seEnsenaEnElMapa,
+  sitioEnElMinimapa,
+  tocarElPlano,
+  transformacionDelMinimapa,
+} from '../src/quiebro/hud/mapa';
+import {
+  CamposPorMeta,
+  hiloNuevo,
+  INICIO_DEL_HILO,
+  metrosHastaElSitio,
+  metrosPorCalles,
+  mismoObjetivo,
+  nudoDelObjetivo,
+  NUMEROS_POR_GLIFO,
+  objetivoDeLaMarca,
+  PASO_DEL_GLIFO,
+  rumboHacia,
+  tenderElHilo,
+  tramoFinal,
+  TRIANGULOS_POR_GLIFO,
+} from '../src/quiebro/hud/rumbo';
+import { nocheDeEnsayo } from '../src/quiebro/hud/ciudad-de-ensayo';
+import { Minimapa } from '../src/quiebro/hud/Minimapa';
+import { BotonDelPlano, Plano } from '../src/quiebro/hud/Plano';
+import {
+  ID_DEL_LIMITE_DE_LA_CIUDAD,
+  caminoPorElCampo,
+  claseDeZonaDePlaza,
+  despejarLasPlazas,
+  distanciaPorCalles,
+  idDeZonaDeCabina,
+  mundoDeLaLizaDeLaCiudad,
+} from '../../shared/arcade/juegos/quiebro-ciudad';
+import type { GrafoDeLaCiudad } from '../../shared/arcade/juegos/quiebro-ciudad';
+import { durmienteMasCercanoEnLaCiudad } from '../../shared/arcade/juegos/quiebro-durmientes';
+import { rumboDeRadianes } from '../../shared/mecanicas/andar';
+import { cajasDelLugar, lugarDeLaMesa, rotuloDelLugar } from '../src/quiebro/red/lugar';
+import type { LugarDeLaNoche } from '../src/quiebro/red/lugar';
+import { OrientacionDeLaPartida } from '../src/quiebro/red/orientarse';
+import type { PartidaQueOrienta } from '../src/quiebro/red/orientarse';
+import { genteDeLaCiudad } from '../src/quiebro/personajes/multitud';
+import { cajaParaLaCamara, ojoFueraDeLasCajas } from '../src/quiebro/camara/Camara';
+import { Hud } from '../src/quiebro/hud/Hud';
+import type { CuerpoPintado } from '../src/quiebro/cuerpos';
 
 /* ─────────────────────────────── El arnés, en corto ─────────────────────────────── */
 
@@ -1064,6 +1142,31 @@ await (async () => {
     pz = d.z;
   }
   comprobar('con el reglamento de verdad, 3.000 tics quebrando y corriendo: todo tramo en recta, dentro del límite y donde se puede estar', malos === 0, malos);
+  /*
+   * LA CIUDAD SE PISA (CIUDAD-ABIERTA, entrega 1): en la oleada el límite es la ciudad entera, el cliente
+   * juega en la ciudad de la traza de la vista, y andando por sus calles se sale de la plaza sin que el
+   * contrato tire un solo tramo. Mientras el productor diera el barrio, esto sale ROJO con su porqué.
+   */
+  const leidoDeVerdad = lugarDeLaMesa(leida, 'QUIEB', real);
+  const lugarDeVerdad = leidoDeVerdad.lugar;
+  comprobar(
+    'con el productor de verdad, en la oleada el límite es la CIUDAD (no la plaza) y el cliente juega en la ciudad de la traza de la vista',
+    real.fase.limite === ID_DEL_LIMITE_DE_LA_CIUDAD && lugarDeVerdad !== null && lugarDeVerdad.tipo === 'ciudad' && lugarDeVerdad.traza === leida?.traza,
+    { limite: real.fase.limite, lugar: lugarDeVerdad?.tipo ?? null, aviso: leidoDeVerdad.aviso, traza: leida?.traza ?? null },
+  );
+  /* Sin la ciudad no hay calles que andar: la comprobación sale roja igual (no se salta). */
+  const andado =
+    lugarDeVerdad !== null && lugarDeVerdad.tipo === 'ciudad'
+      ? andarPorLaCiudad(real, r, lugarDeVerdad.noche.grafo, [nace.x / UNO, nace.z / UNO], [
+          [200, -200],
+          [-200, 200],
+        ])
+      : { metros: 0, lejos: 0, llegadas: 0, malos: ['el lugar no es la ciudad'], tics: 0 };
+  comprobar(
+    `con la liza de verdad, por las calles de la ciudad hasta dos esquinas lejanas (${String(Math.round(andado.metros))} m, hasta ${String(Math.round(andado.lejos))} m de la plaza): todo tramo dentro del límite, en recta y donde se puede estar`,
+    andado.malos.length === 0 && andado.llegadas === 2 && andado.lejos > 150,
+    andado.malos.slice(0, 4),
+  );
   const correcciones = await contraLaSala(real, r, 1600, 5);
   if (correcciones === null) nota('Sin sala, la liza de verdad no se juega contra ella.');
   else {
@@ -1094,7 +1197,7 @@ paso('8. La partida entera, contra un enchufe de mentira');
     relojes,
     mandos,
   });
-  partida.ponerLaDeclaracion(LIZA, BARRIO, 'a1');
+  partida.ponerLaDeclaracion(LIZA, { tipo: 'barrio', barrio: BARRIO }, 'a1');
   partida.asegurarElCanal(true);
   const e = enchufes[0] as EnchufeDeMentira;
   e.abrir();
@@ -1573,7 +1676,7 @@ await (async () => {
     relojes,
     mandos,
   });
-  partida.ponerLaDeclaracion(LIZA, BARRIO, 'a1');
+  partida.ponerLaDeclaracion(LIZA, { tipo: 'barrio', barrio: BARRIO }, 'a1');
   partida.asegurarElCanal(true);
   const e = enchufes[0] as EnchufeDeMentira;
   e.abrir();
@@ -1873,4 +1976,1202 @@ paso('11. Los fuentes del frente');
   );
 }
 
-terminar(154);
+/* ─────────────────────────────── 12. El mapa de la ciudad abierta ─────────────────────────────── */
+
+/*
+ * El minimapa, el plano y el rumbo (docs/quiebro/CIUDAD-ABIERTA.md §5.9), sobre la ciudad de verdad si
+ * `ciudadDeLaMesa` ya existe y siempre sobre la de ensayo (`hud/ciudad-de-ensayo.ts`), que tiene la forma
+ * de la columna. Lo que se pinta se mira con un pincel que rasteriza rectángulos: el mapa sólo usa
+ * `fillRect`, así que la rejilla ve lo que verá el lienzo.
+ */
+paso('12. El mapa de la ciudad abierta: minimapa, plano y rumbo');
+{
+  const L = LADO_DEL_LIENZO;
+  const B = BORDE_DE_LA_CIUDAD;
+
+  /** Un pincel que rasteriza rectángulos por el centro del píxel, como el lienzo sin suavizado. */
+  class RejillaDelMapa implements PincelDelMapa {
+    fillStyle: unknown = '';
+    readonly pixeles = new Uint16Array(L * L);
+    readonly colores: string[] = ['(sin pintar)'];
+    private readonly indices = new Map<string, number>();
+    rectangulos = 0;
+    fillRect(x: number, y: number, ancho: number, alto: number): void {
+      const color = String(this.fillStyle);
+      let c = this.indices.get(color);
+      if (c === undefined) {
+        c = this.colores.length;
+        this.colores.push(color);
+        this.indices.set(color, c);
+      }
+      const x0 = Math.max(0, Math.ceil(x - 0.5));
+      const x1 = Math.min(L, Math.ceil(x + ancho - 0.5));
+      const y0 = Math.max(0, Math.ceil(y - 0.5));
+      const y1 = Math.min(L, Math.ceil(y + alto - 0.5));
+      for (let py = y0; py < y1; py++) for (let px = x0; px < x1; px++) this.pixeles[py * L + px] = c;
+      this.rectangulos++;
+    }
+    clase(px: number, py: number): string {
+      return this.colores[this.pixeles[py * L + px] as number] as string;
+    }
+    /** La clase del píxel donde cae el punto del mundo `(x, z)`. */
+    en(x: number, z: number): string {
+      return this.clase(Math.min(L - 1, Math.max(0, Math.floor(x + B))), Math.min(L - 1, Math.max(0, Math.floor(z + B))));
+    }
+  }
+  const DISTRITOS_DEL_MAPA = ['casco', 'ensanche', 'lonja', 'naves', 'torres'] as const;
+  const porDistrito = (p: string): Record<(typeof DISTRITOS_DEL_MAPA)[number], string> =>
+    ({ casco: `${p}:casco`, ensanche: `${p}:ensanche`, lonja: `${p}:lonja`, naves: `${p}:naves`, torres: `${p}:torres` });
+  /* Una paleta de palabras: cada píxel dice QUÉ es, no de qué color. */
+  const PALABRAS: ColoresDelMapa = {
+    vacio: 'vacio',
+    calle: 'calle',
+    avenida: 'avenida',
+    mediana: 'mediana',
+    plaza: 'plaza',
+    soportal: 'soportal',
+    coche: 'coche',
+    estorbo: 'estorbo',
+    corte: 'corte',
+    corteClaro: 'corte',
+    salida: 'salida',
+    filo: porDistrito('filo'),
+    tejado: porDistrito('tejado'),
+  };
+  const SE_ANDA = new Set(['calle', 'avenida', 'mediana', 'plaza', 'soportal']);
+
+  const ensayo = nocheDeEnsayo();
+  /*
+   * La ciudad de verdad, si ya se escribe. Sin escribir (`CiudadSinEscribir`, por el nombre y no con
+   * `instanceof`: `tsx` puede cargar `shared/` dos veces) no se mira; escrita pero sin poderse derivar es
+   * un ROJO con su porqué, y no un guion reventado: sin ciudad no hay mapa que valga.
+   */
+  let deVerdad: NocheDeLaCiudad | null = null;
+  let sinDerivar: string | null = null;
+  try {
+    const c = ciudadDeLaMesa(0, 'K7M2P');
+    const trio = triosDeFallos(c, 1)[0];
+    deVerdad = ciudadDeLaNoche(c, 'K7M2P', 1, trio === undefined ? [1] : [1, trio[0], trio[1]]);
+  } catch (e) {
+    if (!(e instanceof Error) || e.name !== 'CiudadSinEscribir') sinDerivar = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+  }
+  if (sinDerivar !== null) comprobar('la ciudad de verdad (traza 0, noche 1) se deriva para pintarla', false, sinDerivar);
+  nota(
+    deVerdad !== null
+      ? 'la ciudad de verdad ya existe: se mira además de la de ensayo'
+      : sinDerivar !== null
+        ? 'la ciudad de verdad existe pero no se deriva: se mira la de ensayo'
+        : '`ciudadDeLaMesa` aún lanza CiudadSinEscribir (frente Traza): se mira la ciudad de ensayo',
+  );
+
+  /** Todo lo que depende de la ciudad: 7 comprobaciones por ciudad. */
+  const mirar = (noche: NocheDeLaCiudad, nombre: string): void => {
+    /* 1. Lo pintado que estorba coincide píxel a píxel con las cajas que se pintan. */
+    const rejilla = new RejillaDelMapa();
+    const rectangulos = pintarLaCiudad(rejilla, noche, PALABRAS);
+    const ocupado = new Uint8Array(L * L);
+    for (const c of noche.cajas) {
+      if (!seEnsenaEnElMapa(c.tipo)) continue;
+      const x0 = Math.max(0, Math.ceil(c.x0 + B - 0.5));
+      const x1 = Math.min(L, Math.ceil(c.x1 + B - 0.5));
+      const y0 = Math.max(0, Math.ceil(c.z0 + B - 0.5));
+      const y1 = Math.min(L, Math.ceil(c.z1 + B - 0.5));
+      for (let py = y0; py < y1; py++) for (let px = x0; px < x1; px++) ocupado[py * L + px] = 1;
+    }
+    let calleEnPared = 0;
+    let paredEnCalle = 0;
+    let sinPintar = 0;
+    let paredes = 0;
+    let ejemplo: unknown = null;
+    for (let py = 0; py < L; py++) {
+      for (let px = 0; px < L; px++) {
+        const clase = rejilla.clase(px, py);
+        const pared = ocupado[py * L + px] === 1;
+        if (clase === '(sin pintar)') sinPintar++;
+        else if (SE_ANDA.has(clase) && pared) {
+          calleEnPared++;
+          ejemplo ??= { px, py, clase, mundo: [px - B + 0.5, py - B + 0.5] };
+        } else if (!SE_ANDA.has(clase) && !pared) {
+          paredEnCalle++;
+          ejemplo ??= { px, py, clase, mundo: [px - B + 0.5, py - B + 0.5] };
+        }
+        if (pared) paredes++;
+      }
+    }
+    comprobar(
+      `${nombre}: en el mapa no hay calle pintada donde hay una pared ni pared donde se anda, píxel a píxel (y no es un mapa vacío)`,
+      calleEnPared === 0 && paredEnCalle === 0 && sinPintar === 0 && paredes > L * L * 0.15,
+      { calleEnPared, paredEnCalle, sinPintar, paredes, ejemplo },
+    );
+
+    /* 2. Cada edificio con el tejado de su distrito; cada plaza, cada avenida y cada corte, en su tono. */
+    const malos: unknown[] = [];
+    for (const e of noche.ciudad.edificios) {
+      const c = noche.ciudad.cajas[e.caja];
+      if (c === undefined || c.x1 - c.x0 <= 2 || c.z1 - c.z0 <= 2) continue;
+      const hay = rejilla.en((c.x0 + c.x1) / 2, (c.z0 + c.z1) / 2);
+      if (hay !== `tejado:${e.distrito}`) malos.push({ edificio: e.indice, distrito: e.distrito, hay });
+    }
+    for (const h of noche.ciudad.huecos) {
+      if (h.uso !== 'plaza') continue;
+      let visto = false;
+      for (let z = Math.ceil(h.solar.z0 + B) + 0.5; z < h.solar.z1 + B && !visto; z += 1) {
+        for (let x = Math.ceil(h.solar.x0 + B) + 0.5; x < h.solar.x1 + B && !visto; x += 1) {
+          if (ocupado[Math.floor(z) * L + Math.floor(x)] === 1) continue;
+          if (rejilla.clase(Math.floor(x), Math.floor(z)) !== 'plaza') malos.push({ plaza: h.plaza, hay: rejilla.clase(Math.floor(x), Math.floor(z)) });
+          visto = true;
+        }
+      }
+    }
+    for (const a of noche.ciudad.avenidas) {
+      const m = (a.desde + a.hasta) / 2 + 3;
+      const hay = a.eje === 'x' ? rejilla.en(m, a.linea) : rejilla.en(a.linea, m);
+      const lado = a.eje === 'x' ? rejilla.en(m, a.linea + a.ancho / 2 - 2) : rejilla.en(a.linea + a.ancho / 2 - 2, m);
+      if (hay !== 'mediana' && hay !== 'estorbo' && hay !== 'coche') malos.push({ avenida: a.id, hay });
+      if (lado !== 'avenida' && lado !== 'estorbo' && lado !== 'coche') malos.push({ avenida: a.id, lado });
+    }
+    for (const corte of noche.cortes) {
+      const c = noche.cajas[corte.caja];
+      if (c !== undefined && rejilla.en((c.x0 + c.x1) / 2, (c.z0 + c.z1) / 2) !== 'corte') malos.push({ corte: corte.tramo });
+    }
+    comprobar(`${nombre}: cada edificio lleva el tejado de su distrito, y las plazas, las avenidas y los cortes de obra se ven en su tono`, malos.length === 0 && noche.ciudad.edificios.length > 50, malos.slice(0, 6));
+    comprobar(`${nombre}: la ciudad entera se pinta con un número acotado de rectángulos (${String(rectangulos)})`, rectangulos === rejilla.rectangulos && rectangulos > 100 && rectangulos <= 4000, rectangulos);
+
+    /* 3. Los metros del mapa son los de la sala: de plaza a plaza (de nudo a nudo, que es como se mide la tabla), los de la tabla de la ciudad. */
+    const base = noche.ciudad.grafo;
+    const plazas = noche.ciudad.plazas;
+    const camposBase = new CamposPorMeta();
+    const hilo = hiloNuevo();
+    const distintos: unknown[] = [];
+    for (const a of plazas) {
+      for (const b of plazas) {
+        const campo = camposBase.campo(base, b.nudo);
+        const desde = base.nudos[a.nudo] ?? a.centro;
+        const metros = metrosPorCalles(base, campo, desde.x, desde.z);
+        tenderElHilo(base, { campo }, desde.x, desde.z, hilo);
+        const tabla = metrosQueSeEnsenan(noche.ciudad.distancias[a.numero - 1]?.[b.numero - 1] ?? Number.NaN);
+        if (metros !== tabla || hilo.metros !== tabla) distintos.push({ de: a.numero, a: b.numero, metros, hilo: hilo.metros, tabla });
+      }
+    }
+    comprobar(`${nombre}: de plaza a plaza, los metros por calles del mapa y del hilo son los de la tabla de distancias de la ciudad`, distintos.length === 0 && plazas.length === 6, distintos.slice(0, 5));
+
+    /* 3 bis. Y son los que ANDA LA SALA: su Dijkstra (`cerebro.ts`), preguntado como ella lo pregunta, sobre el grafo de la noche en Q16.16. */
+    const conLaCiudad = {
+      ...LIZA,
+      mundo: { ...LIZA.mundo, grafo: { nudos: noche.grafo.nudos.map((q) => ({ x: q.x * UNO, z: q.z * UNO })), aristas: noche.grafo.aristas.map((e) => [e.a, e.b] as const) } },
+    } as LizaDeclarada;
+    const todos = noche.grafo.nudos.map((_, i) => i);
+    const camposDeLaNoche = new CamposPorMeta();
+    const contraLaSala: unknown[] = [];
+    let leidos = 0;
+    const unaCabina = noche.ciudad.cabinas[7];
+    const metasDeLaSala = [plazas[0]?.nudo ?? 0, plazas[3]?.nudo ?? 1, unaCabina === undefined ? (plazas[5]?.nudo ?? 2) : nudoDelObjetivo(noche, { tipo: 'zona', zona: unaCabina.zona })];
+    for (const metaDeLaSala of metasDeLaSala) {
+      const sala = faltaPorElGrafoParaProbar(conLaCiudad, metaDeLaSala, todos);
+      const campo = camposDeLaNoche.campo(noche.grafo, metaDeLaSala);
+      for (const v of todos) {
+        const q = noche.grafo.nudos[v] as { x: number; z: number };
+        const s = sala[v] as number;
+        const enLaSala = s < 0 ? -1 : metrosQueSeEnsenan(s / UNO);
+        const enElMapa = metrosPorCalles(noche.grafo, campo, q.x, q.z);
+        leidos++;
+        if (enLaSala !== enElMapa && contraLaSala.length < 5) contraLaSala.push({ meta: metaDeLaSala, nudo: v, enLaSala, enElMapa });
+      }
+    }
+    comprobar(
+      `${nombre}: en cada nudo, los metros que enseña el HUD son los que anda la sala hasta la misma meta (su Dijkstra, con los cortes de la noche)`,
+      contraLaSala.length === 0 && leidos >= 3 * 1900,
+      { contraLaSala, leidos },
+    );
+
+    /* 4. El rumbo a cada objetivo, con los nudos de la noche; lo que no existe no tiende nada. */
+    const campos = new CamposPorMeta();
+    const objetivosMalos: unknown[] = [];
+    for (const p of plazas) if (nudoDelObjetivo(noche, { tipo: 'fallo', plaza: p.numero }) !== p.nudo) objetivosMalos.push({ plaza: p.numero });
+    for (const c of noche.ciudad.cabinas) {
+      const n = nudoDelObjetivo(noche, { tipo: 'zona', zona: c.zona });
+      const q = noche.grafo.nudos[n];
+      if (q === undefined || Math.hypot(q.x - c.sitio.x, q.z - c.sitio.z) > 12) objetivosMalos.push({ cabina: c.indice, n });
+    }
+    for (const r of noche.ciudad.refugios) if (nudoDelObjetivo(noche, { tipo: 'zona', zona: r.zona }) < 0) objetivosMalos.push({ refugio: r.indice });
+    const invalidos = [
+      nudoDelObjetivo(noche, { tipo: 'fallo', plaza: 9 }),
+      nudoDelObjetivo(noche, { tipo: 'zona', zona: 250 }),
+      nudoDelObjetivo(noche, { tipo: 'nudo', nudo: -1 }),
+      nudoDelObjetivo(noche, { tipo: 'nudo', nudo: noche.grafo.nudos.length }),
+    ];
+    const alFallo = rumboHacia(noche, { tipo: 'fallo', plaza: plazas[2]?.numero ?? 3 }, 1, campos);
+    comprobar(
+      `${nombre}: el rumbo sale del nudo de la plaza de un Fallo y del más cercano a una cabina o un refugio, con el campo del grafo de la noche; lo que la noche no tiene no tiende nada`,
+      objetivosMalos.length === 0 &&
+        noche.ciudad.cabinas.length > 0 &&
+        noche.ciudad.refugios.length > 0 &&
+        invalidos.every((n) => n === -1) &&
+        rumboHacia(noche, { tipo: 'fallo', plaza: 9 }, 1, campos) === null &&
+        alFallo !== null &&
+        alFallo.campo === campos.campo(noche.grafo, alFallo.nudo) &&
+        alFallo.campo.metros[alFallo.nudo] === 0,
+      { objetivosMalos: objetivosMalos.slice(0, 4), invalidos, cabinas: noche.ciudad.cabinas.length, refugios: noche.ciudad.refugios.length },
+    );
+
+    /* 5. El hilo, andando de la Bajada a un Fallo: tope, sitio, paso y quieto en el suelo. */
+    const meta = plazas[noche.fallos[2] !== undefined ? noche.fallos[2] - 1 : 5] as (typeof plazas)[number];
+    const rumbo = rumboHacia(noche, { tipo: 'fallo', plaza: meta.numero }, 1, campos) as RumboTendido;
+    const x = { x: (plazas[0] as (typeof plazas)[number]).centro.x + 0.6, z: (plazas[0] as (typeof plazas)[number]).centro.z + 0.4 };
+    const antes: { x: number; z: number; g: number }[] = [];
+    let pasos = 0;
+    let glifos = 0;
+    let llegaAlFinal = false;
+    const faltas: unknown[] = [];
+    for (; pasos < 1500; pasos++) {
+      tenderElHilo(noche.grafo, rumbo, x.x, x.z, hilo);
+      if (hilo.cuantos * TRIANGULOS_POR_GLIFO > TRIANGULOS_DEL_HILO) faltas.push({ pasos, tope: hilo.cuantos });
+      /* Lo andado por la ruta hasta cada glifo, y que el glifo esté en ella. */
+      const aLoLargo = (gx: number, gz: number): number => {
+        let andado = 0;
+        for (let i = 0; i + 1 < hilo.puntos; i++) {
+          const ax = hilo.ruta[i * 2] as number;
+          const az = hilo.ruta[i * 2 + 1] as number;
+          const bx = hilo.ruta[i * 2 + 2] as number;
+          const bz = hilo.ruta[i * 2 + 3] as number;
+          const largo = Math.abs(bx - ax) + Math.abs(bz - az);
+          const enX = Math.min(ax, bx) - 1e-6 <= gx && gx <= Math.max(ax, bx) + 1e-6;
+          const enZ = Math.min(az, bz) - 1e-6 <= gz && gz <= Math.max(az, bz) + 1e-6;
+          if (enX && enZ && (Math.abs(ax - bx) < 1e-9 ? Math.abs(gx - ax) < 1e-6 : Math.abs(gz - az) < 1e-6)) return andado + Math.abs(gx - ax) + Math.abs(gz - az);
+          andado += largo;
+        }
+        return Number.NaN;
+      };
+      const ahora: { x: number; z: number; g: number }[] = [];
+      let previo = Number.NaN;
+      for (let k = 0; k < hilo.cuantos; k++) {
+        const o = k * NUMEROS_POR_GLIFO;
+        const g = { x: hilo.glifos[o] as number, z: hilo.glifos[o + 1] as number, g: hilo.glifos[o + 3] as number };
+        const s = aLoLargo(g.x, g.z);
+        if (!(s >= INICIO_DEL_HILO - 1e-4 && s <= METROS_DEL_HILO + 1e-4)) faltas.push({ pasos, k, fuera: s });
+        if (k > 0 && Math.abs(s - previo - PASO_DEL_GLIFO) > 1e-3) faltas.push({ pasos, k, paso: s - previo });
+        previo = s;
+        ahora.push(g);
+      }
+      /* Quieto en el suelo: lo que ya estaba sigue en su sitio con su mismo glifo, y aparece uno como mucho. */
+      let nuevos = 0;
+      for (const g of ahora) {
+        const ya = antes.find((a) => Math.abs(a.x - g.x) < 1e-3 && Math.abs(a.z - g.z) < 1e-3);
+        if (ya === undefined) nuevos++;
+        else if (ya.g !== g.g) faltas.push({ pasos, cambia: g });
+      }
+      if (pasos > 0 && nuevos > 1) faltas.push({ pasos, nuevos });
+      antes.length = 0;
+      antes.push(...ahora);
+      glifos += hilo.cuantos;
+      if (hilo.metros === 0 || hilo.puntos < 2) {
+        llegaAlFinal = hilo.llega;
+        break;
+      }
+      if (hilo.llega && hilo.cuantos > 0) {
+        const o = (hilo.cuantos - 1) * NUMEROS_POR_GLIFO;
+        const m = noche.grafo.nudos[meta.nudo] as { x: number; z: number };
+        if (Math.abs((hilo.glifos[o] as number) - m.x) > 1e-6 || Math.abs((hilo.glifos[o + 1] as number) - m.z) > 1e-6) faltas.push({ pasos, ultimoNoEnLaMeta: [hilo.glifos[o], hilo.glifos[o + 1]] });
+      }
+      /* Medio metro por la ruta. */
+      const tx = (hilo.ruta[2] as number) - x.x;
+      const tz = (hilo.ruta[3] as number) - x.z;
+      const l = Math.hypot(tx, tz);
+      if (l <= 0.5) {
+        x.x = hilo.ruta[2] as number;
+        x.z = hilo.ruta[3] as number;
+      } else {
+        x.x += (tx / l) * 0.5;
+        x.z += (tz / l) * 0.5;
+      }
+    }
+    comprobar(
+      `${nombre}: andando de la Bajada a un Fallo, el hilo cabe en sus ${String(TRIANGULOS_DEL_HILO)} triángulos, va por la ruta a ${String(INICIO_DEL_HILO)}-${String(METROS_DEL_HILO)} m por delante con un glifo cada ${String(PASO_DEL_GLIFO)} m, no se mueve del suelo y acaba en la meta`,
+      faltas.length === 0 && pasos > 100 && glifos > 1000 && llegaAlFinal,
+      { faltas: faltas.slice(0, 5), pasos, glifos, llegaAlFinal },
+    );
+  };
+
+  mirar(ensayo, 'ensayo');
+  if (deVerdad !== null) mirar(deVerdad, 'de verdad');
+
+  /* 6. El lienzo de la noche se pinta UNA vez: por la identidad de la noche. */
+  let lienzosHechos = 0;
+  let rectangulosPintados = 0;
+  const crear = (): LienzoDelMapa => {
+    lienzosHechos++;
+    const pincel: PincelDelMapa = {
+      fillStyle: '',
+      fillRect: () => {
+        rectangulosPintados++;
+      },
+    };
+    return { width: 0, height: 0, getContext: () => pincel };
+  };
+  const otra = nocheDeEnsayo(2);
+  const primero = lienzoDeLaNoche(ensayo, crear);
+  const pintados = rectangulosPintados;
+  const segundo = lienzoDeLaNoche(ensayo, crear);
+  lienzoDeLaNoche(ensayo, crear);
+  lienzoDeLaNoche(otra, crear);
+  comprobar(
+    'el lienzo de la ciudad se pinta una sola vez por noche (y otra noche es otro lienzo)',
+    primero !== null && primero === segundo && primero.width === L && lienzosHechos === 2 && pintados > 100 && rectangulosPintados > pintados,
+    { lienzosHechos, pintados, rectangulosPintados },
+  );
+
+  /* 7. El minimapa: el lienzo girado y las marcas caen en el mismo sitio, con cualquier mirada. */
+  const lado = LADO_DEL_MINIMAPA_PT;
+  const k = lado / 2 / RADIO_DEL_MINIMAPA_M;
+  let peor = 0;
+  let probados = 0;
+  for (const giro of [0, 0.7, Math.PI / 2, 2.5, -1.2, Math.PI, 5.9]) {
+    for (const yo of [
+      { x: 0, z: 0 },
+      { x: -130.25, z: 77.5 },
+      { x: 250, z: -260 },
+    ]) {
+      const m = transformacionDelMinimapa(yo, giro, lado, RADIO_DEL_MINIMAPA_M);
+      for (let i = 0; i < 12; i++) {
+        const p = { x: yo.x + 70 * Math.cos(i * 1.7), z: yo.z + 55 * Math.sin(i * 2.3) };
+        const lienzo = alPlano(p.x, p.z);
+        const a = aplicar(m, lienzo.u, lienzo.v);
+        const s = sitioEnElMinimapa(p.x, p.z, yo, giro, lado, RADIO_DEL_MINIMAPA_M);
+        const e = alMinimapa(p.x - yo.x, p.z - yo.z, giro);
+        if (s.enElBorde) continue;
+        peor = Math.max(peor, Math.hypot(a.u - s.u, a.v - s.v), Math.hypot(s.u - (lado / 2 + e.u * k), s.v - (lado / 2 + e.v * k)));
+        probados++;
+      }
+    }
+  }
+  comprobar('el minimapa lleva la ciudad y las marcas con la MISMA cuenta en cualquier mirada (el lienzo girado y `alMinimapa` coinciden)', peor < 1e-9 && probados > 150, { peor, probados });
+
+  const delante = sitioEnElMinimapa(0, -30, { x: 0, z: 0 }, 0, lado, RADIO_DEL_MINIMAPA_M);
+  const alEste = sitioEnElMinimapa(30, 0, { x: 0, z: 0 }, Math.PI / 2, lado, RADIO_DEL_MINIMAPA_M);
+  const alSur = sitioEnElMinimapa(0, 30, { x: 0, z: 0 }, Math.PI / 2, lado, RADIO_DEL_MINIMAPA_M);
+  const lejos = sitioEnElMinimapa(0, -200, { x: 0, z: 0 }, 0, lado, RADIO_DEL_MINIMAPA_M);
+  comprobar(
+    'lo que se mira sale arriba (el norte mirando al norte, el este mirando al este), el sur mirando al este sale a la derecha, y un Fallo a 200 m va al canto en su dirección',
+    casi(delante.u, lado / 2) && delante.v < lado / 2 - 20 && casi(alEste.u, lado / 2) && alEste.v < lado / 2 - 20 && alSur.u > lado / 2 + 20 && casi(alSur.v, lado / 2) &&
+      lejos.enElBorde && casi(lejos.v, MARGEN_DEL_BORDE_PT) && casi(lejos.u, lado / 2) && casi(lejos.angulo, 0) && !delante.enElBorde,
+    { delante, alEste, alSur, lejos },
+  );
+
+  let peorCss = 0;
+  for (const [pintado, ahora] of [
+    [0, 0.3],
+    [1.2, 0.9],
+    [-2, -2.4],
+    [3, -3],
+  ] as const) {
+    for (let i = 0; i < 8; i++) {
+      const p = { x: 40 * Math.cos(i), z: 30 * Math.sin(i * 1.3) };
+      const s0 = sitioEnElMinimapa(p.x, p.z, { x: 0, z: 0 }, pintado, lado, RADIO_DEL_MINIMAPA_M);
+      const s1 = sitioEnElMinimapa(p.x, p.z, { x: 0, z: 0 }, ahora, lado, RADIO_DEL_MINIMAPA_M);
+      const g = giradoComoCss(s0.u - lado / 2, s0.v - lado / 2, giroQueFalta(pintado, ahora));
+      peorCss = Math.max(peorCss, Math.hypot(g.u - (s1.u - lado / 2), g.v - (s1.v - lado / 2)));
+    }
+  }
+  comprobar('entre dos refrescos, girar con CSS lo que falta deja cada cosa donde la pondría un refresco', peorCss < 1e-9, peorCss);
+
+  /* 8. El plano, a toques: todo en `pointerdown`, y cada toque hace lo que dice el diseño. */
+  const hechas: string[] = [];
+  const ordenes: OrdenesDelMapa = {
+    aqui: (n) => hechas.push(`aqui ${String(n)}`),
+    tenderElRumbo: (o) => hechas.push(`rumbo ${JSON.stringify(o)}`),
+    soltarElRumbo: () => hechas.push('soltar'),
+  };
+  const plaza3 = ensayo.ciudad.plazas[2] as (typeof ensayo.ciudad.plazas)[number];
+  const cabina = ensayo.ciudad.cabinas[3] as (typeof ensayo.ciudad.cabinas)[number];
+  const marca = (clase: MarcaDelMapa['clase'], x: number, z: number, quien: number): MarcaDelMapa => ({ clase, x, z, color: null, metros: -1, quien, rumbo: false });
+  let marcas: MarcaDelMapa[] = [marca('fallo', plaza3.centro.x, plaza3.centro.z, plaza3.numero), marca('cabina', cabina.sitio.x, cabina.sitio.z, cabina.zona), marca('companero', 0, 10, 2)];
+  let tendido: RumboTendido | null = null;
+  const fuenteDelMapa: FuenteDelMapa = {
+    noche: () => ensayo,
+    yo: () => ({ x: 0, z: 6, mira: 0 }),
+    giroDeLaCamara: () => 0,
+    marcas: () => marcas,
+    rumbo: () => tendido,
+    vigia: () => false,
+  };
+  /* Un plano de 592 pt: un pt por metro, para que ida y vuelta del toque sean exactas y un empate sea un empate. */
+  const ladoDelPlano = LIENZO_DEL_PLANO;
+  const caja = { left: 100, top: 20, width: ladoDelPlano, height: ladoDelPlano };
+  const toque = (x: number, z: number, dx = 0, dy = 0, raton = -1): { clientX: number; clientY: number; button: number; pointerType: string; parado: number; preventDefault(): void; stopPropagation(): void } => {
+    const p = alPlanoEnPantalla(x, z, ladoDelPlano);
+    return {
+      clientX: caja.left + p.u + dx,
+      clientY: caja.top + p.v + dy,
+      button: raton < 0 ? 0 : raton,
+      pointerType: raton < 0 ? 'touch' : 'mouse',
+      parado: 0,
+      preventDefault() {
+        this.parado |= 1;
+      },
+      stopPropagation() {
+        this.parado |= 2;
+      },
+    };
+  };
+  const t1 = toque(plaza3.centro.x, plaza3.centro.z, 8, -6);
+  const r1 = tocarElPlano(t1, caja, fuenteDelMapa, ordenes);
+  comprobar(
+    'tocar a 10 pt de un Fallo tiende el rumbo a su plaza, y el toque no sigue hacia los mandos de debajo',
+    r1 !== null && r1.tipo === 'rumbo' && hechas.at(-1) === `rumbo ${JSON.stringify({ tipo: 'fallo', plaza: plaza3.numero })}` && t1.parado === 3,
+    { r1, hechas, parado: t1.parado },
+  );
+  tendido = rumboHacia(ensayo, { tipo: 'fallo', plaza: plaza3.numero }, 1, new CamposPorMeta());
+  const r2 = tocarElPlano(toque(plaza3.centro.x, plaza3.centro.z, -4, 5), caja, fuenteDelMapa, ordenes);
+  tendido = null;
+  comprobar('tocar otra vez el Fallo del rumbo lo suelta', r2 !== null && r2.tipo === 'soltar' && hechas.at(-1) === 'soltar', { r2, hechas });
+
+  const sitio = { x: 30.5, z: 101.25 };
+  const r3 = tocarElPlano(toque(sitio.x, sitio.z), caja, fuenteDelMapa, ordenes);
+  const esperado = nudoMasCercano(ensayo.grafo, sitio.x, sitio.z);
+  const lejosDelFallo = tocarElPlano(toque(plaza3.centro.x, plaza3.centro.z, 30, 0), caja, fuenteDelMapa, ordenes);
+  comprobar(
+    'tocar un sitio manda «Aquí» sobre el nudo más cercano de ESE sitio (con el margen del plano descontado), y a 30 pt de un Fallo ya no es el Fallo',
+    r3 !== null && r3.tipo === 'aqui' && r3.nudo === esperado && hechas.at(-2) === `aqui ${String(esperado)}` && lejosDelFallo !== null && lejosDelFallo.tipo === 'aqui',
+    { r3, esperado, lejosDelFallo },
+  );
+
+  const cuantasAntes = hechas.length;
+  const fuera = tocarElPlano(toque(-B - 15, 0), caja, fuenteDelMapa, ordenes);
+  const derecho = toque(sitio.x, sitio.z, 0, 0, 2);
+  const conElDerecho = tocarElPlano(derecho, caja, fuenteDelMapa, ordenes);
+  const conElIzquierdo = tocarElPlano(toque(sitio.x, sitio.z, 0, 0, 0), caja, fuenteDelMapa, ordenes);
+  comprobar(
+    'fuera de la ciudad no se toca nada, y el botón derecho del ratón no toca (ni se come el evento); el izquierdo, sí',
+    fuera === null && conElDerecho === null && derecho.parado === 0 && conElIzquierdo !== null && conElIzquierdo.tipo === 'aqui' && hechas.length === cuantasAntes + 1,
+    { fuera, conElDerecho, parado: derecho.parado, conElIzquierdo, hechas: hechas.slice(cuantasAntes) },
+  );
+
+  marcas = [marca('cabina', sitio.x + 4, sitio.z, cabina.zona), marca('fallo', sitio.x - 4, sitio.z, plaza3.numero), marca('companero', sitio.x, sitio.z, 2)];
+  const empate = tocarElPlano(toque(sitio.x, sitio.z), caja, fuenteDelMapa, ordenes);
+  marcas = [marca('cabina', sitio.x + 4, sitio.z, cabina.zona)];
+  const aCabina = tocarElPlano(toque(sitio.x, sitio.z), caja, fuenteDelMapa, ordenes);
+  comprobar(
+    'a igual distancia del dedo gana el Fallo sobre la cabina, un compañero no tiende rumbo, y tocar una cabina tiende el rumbo a su zona',
+    empate !== null && empate.tipo === 'rumbo' && mismoObjetivo(empate.objetivo, { tipo: 'fallo', plaza: plaza3.numero }) && aCabina !== null && aCabina.tipo === 'rumbo' && mismoObjetivo(aCabina.objetivo, { tipo: 'zona', zona: cabina.zona }) &&
+      objetivoDeLaMarca(marca('companero', 0, 0, 2)) === null && objetivoDeLaMarca(marca('fallo', 0, 0, 0)) === null,
+    { empate, aCabina },
+  );
+
+  /* 9. Los campos, uno por (grafo, meta), guardados; el grafo de otra noche es otro campo. */
+  const campos = new CamposPorMeta(2);
+  const g1 = ensayo.grafo;
+  const g2 = otra.grafo;
+  const c1 = campos.campo(g1, 10);
+  const c1b = campos.campo(g1, 10);
+  const c2 = campos.campo(g2, 10);
+  campos.campo(g1, 11);
+  const c1c = campos.campo(g1, 10);
+  comprobar(
+    'los campos se guardan por grafo y meta (el mismo objeto), el grafo de otra noche calcula el suyo y el más viejo se tira',
+    c1 === c1b && c2 !== c1 && c1c !== c1 && campos.calculados === 4 && c1.metros[10] === 0,
+    { calculados: campos.calculados },
+  );
+
+  /* 10. El hilo empieza donde está el propio, no en el nudo que ya dejó atrás. */
+  const calle = -24;
+  const desde = nudoMasCercano(ensayo.grafo, -72, calle);
+  const hasta = nudoMasCercano(ensayo.grafo, 72, calle);
+  const deFrente = hiloNuevo();
+  const propio = { x: -72 + 2.9, z: calle + 1.5 };
+  tenderElHilo(ensayo.grafo, { campo: campoHasta(ensayo.grafo, hasta) }, propio.x, propio.z, deFrente);
+  const detras: number[] = [];
+  for (let i = 0; i < deFrente.cuantos; i++) {
+    const gx = deFrente.glifos[i * NUMEROS_POR_GLIFO] as number;
+    const gz = deFrente.glifos[i * NUMEROS_POR_GLIFO + 1] as number;
+    if (gx < propio.x + INICIO_DEL_HILO - 1e-6 || gz !== calle) detras.push(gx);
+  }
+  comprobar(
+    'con el propio ya pasado el nudo más cercano, el hilo sale por delante de él y ni un glifo queda a su espalda',
+    nudoMasCercano(ensayo.grafo, propio.x, propio.z) === desde && deFrente.cuantos > 20 && detras.length === 0 && Math.abs((deFrente.glifos[2] as number) - Math.PI / 2) < 1e-6,
+    { detras, cuantos: deFrente.cuantos, rumbo: deFrente.glifos[2] },
+  );
+
+  /* 11. La M, los componentes y los fuentes. */
+  const tecla = (code: string, extra: Partial<{ repeat: boolean; ctrlKey: boolean; target: unknown }> = {}) => ({ code, repeat: extra.repeat ?? false, ctrlKey: extra.ctrlKey ?? false, metaKey: false, altKey: false, target: extra.target ?? null });
+  comprobar(
+    'la M abre y cierra el plano; repetida, con Ctrl o escribiendo en un campo, no',
+    TECLA_DEL_PLANO === 'KeyM' &&
+      esLaTeclaDelPlano(tecla('KeyM'), TECLA_DEL_PLANO) &&
+      !esLaTeclaDelPlano(tecla('KeyM', { repeat: true }), TECLA_DEL_PLANO) &&
+      !esLaTeclaDelPlano(tecla('KeyM', { ctrlKey: true }), TECLA_DEL_PLANO) &&
+      !esLaTeclaDelPlano(tecla('KeyM', { target: { tagName: 'INPUT' } }), TECLA_DEL_PLANO) &&
+      !esLaTeclaDelPlano(tecla('KeyN'), TECLA_DEL_PLANO),
+  );
+  const planoAbierto = renderToStaticMarkup(createElement(Plano, { fuente: fuenteDelMapa, ordenes, abierto: true, alCerrar: () => undefined }));
+  const planoCerrado = renderToStaticMarkup(createElement(Plano, { fuente: fuenteDelMapa, ordenes, abierto: false, alCerrar: () => undefined }));
+  const boton = renderToStaticMarkup(createElement(BotonDelPlano, { abierto: true, alAlternar: () => undefined }));
+  const mini = renderToStaticMarkup(createElement(Minimapa, { fuente: fuenteDelMapa }));
+  const miniTocable = renderToStaticMarkup(createElement(Minimapa, { fuente: fuenteDelMapa, alTocar: () => undefined }));
+  comprobar(
+    'el plano cerrado no pinta nada; abierto lleva su lienzo de toques, la leyenda y cerrar; PLANO dice si está abierto; el minimapa sólo se toca si se le da a qué',
+    planoCerrado === '' &&
+      /class="marcas"/.test(planoAbierto) &&
+      planoAbierto.includes('q-plano-leyenda') &&
+      planoAbierto.includes('aria-label="Cerrar el plano"') &&
+      boton.includes('aria-pressed="true"') &&
+      boton.includes('aria-label="Plano"') &&
+      mini.includes('q-minimapa') &&
+      mini.includes('role="img"') &&
+      miniTocable.includes('role="button"'),
+    { planoAbierto: planoAbierto.slice(0, 300), boton, mini: mini.slice(0, 200) },
+  );
+  const raizDelHud = new URL('../src/quiebro/hud/', import.meta.url);
+  const sinComentarios = (t: string): string => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const plano = sinComentarios(readFileSync(new URL('Plano.tsx', raizDelHud), 'utf8'));
+  const minimapa = sinComentarios(readFileSync(new URL('Minimapa.tsx', raizDelHud), 'utf8'));
+  comprobar(
+    'el plano toca en `onPointerDown` con `tocarElPlano`, y el minimapa también: ni un `onClick`',
+    /onPointerDown=\{alTocar\}/.test(plano) && /tocarElPlano\(e,/.test(plano) && /onPointerDown=\{tocable \? alBajar/.test(minimapa) && !/\bonClick\b/.test(plano + minimapa),
+  );
+}
+
+
+/* ─────────────────────────────── 13. La ciudad se pisa ─────────────────────────────── */
+
+/**
+ * ANDA POR LAS CALLES de la ciudad con la predicción: de `desde` (metros) a cada objetivo, nudo a nudo por el
+ * camino corto del grafo (el hilo de rumbo del HUD), al trote y a la carrera, contra el contrato de la sala
+ * escrito aquí: cada tramo dentro del límite de la fase, en recta y donde se puede estar. Devuelve lo andado,
+ * lo más lejos que se llegó de donde se empezó y los tramos malos.
+ */
+function andarPorLaCiudad(
+  liza: LizaDeclarada,
+  reglas: ReglasDeAsiento,
+  grafo: GrafoDeLaCiudad,
+  desde: readonly [number, number],
+  objetivos: readonly (readonly [number, number])[],
+  alPaso?: (x: number, z: number, t: number) => void,
+): { metros: number; lejos: number; llegadas: number; malos: string[]; tics: number } {
+  const arena = arenaDeLaLiza(liza);
+  const limite = arenaYLimite(liza);
+  const p = new PasoPropio(arena, reglas.cuerpo);
+  p.colocar(u(desde[0]), u(desde[1]));
+  const malos: string[] = [];
+  let metros = 0;
+  let lejos = 0;
+  let llegadas = 0;
+  let t = 0;
+  for (const [ox, oz] of objetivos) {
+    const meta = nudoMasCercano(grafo, ox, oz);
+    const campo = campoHasta(grafo, meta);
+    const camino = caminoPorElCampo(grafo, campo, nudoMasCercano(grafo, p.x / UNO, p.z / UNO), Number.POSITIVE_INFINITY);
+    let k = 0;
+    for (let vuelta = 0; vuelta < 4000 && k < camino.length; vuelta++, t++) {
+      const n = grafo.nudos[camino[k] as number] as { x: number; z: number };
+      const dx = n.x - p.x / UNO;
+      const dz = n.z - p.z / UNO;
+      if (Math.hypot(dx, dz) < 0.6) {
+        k++;
+        vuelta--;
+        t--;
+        continue;
+      }
+      const antesX = p.x;
+      const antesZ = p.z;
+      const d = p.paso({ rumbo: rumboDeRadianes(Math.atan2(dx, -dz)), fuerza: 1, correr: t % 400 < 300 }, false, limite);
+      if (!dentroDelLimite(limite, d.x, d.z)) malos.push(`fuera del límite en (${String(d.x / UNO)}, ${String(d.z / UNO)})`);
+      else if (!seAndaEnRecta(arena, { x: antesX, z: antesZ }, { x: d.x, z: d.z }, reglas.cuerpo.radio)) malos.push(`tramo que no se anda en recta hasta (${String(d.x / UNO)}, ${String(d.z / UNO)})`);
+      else if (!sePuedeEstar(arena, d.x, d.z, reglas.cuerpo.radio)) malos.push(`un sitio donde no se puede estar: (${String(d.x / UNO)}, ${String(d.z / UNO)})`);
+      metros += Math.hypot(d.x - antesX, d.z - antesZ) / UNO;
+      lejos = Math.max(lejos, Math.hypot(d.x / UNO - desde[0], d.z / UNO - desde[1]));
+      alPaso?.(d.x, d.z, t);
+    }
+    const final = grafo.nudos[meta] as { x: number; z: number };
+    if (Math.hypot(final.x - p.x / UNO, final.z - p.z / UNO) < 1) llegadas++;
+  }
+  return { metros, lejos, llegadas, malos, tics: t };
+}
+
+paso('13. La ciudad se pisa: el lugar, el límite `ciudad`, la gente, el mapa vivo, la cámara y el HUD');
+await (async () => {
+  const CODIGO = 'QUIEB';
+  const NOCHE_C = ciudadDeLaNoche(ciudadDeLaMesa(9, CODIGO), CODIGO, 1, [1]);
+  const GRAFO = NOCHE_C.grafo;
+  const PLAZA = NOCHE_C.ciudad.plazas[0]?.centro ?? { x: 0, z: 0 };
+  /* La liza del diseño con el mundo de la ciudad, su límite y clases de zona que la ciudad tiene. */
+  const impresion = claseDeZonaDePlaza(1, 'impresion');
+  const base = lizaDelDiseno('encuentro');
+  const lizaDeLaCiudad = (modo: 'encuentro' | 'calma', despejadas = false): LizaDeclarada => {
+    const l = lizaDelDiseno(modo);
+    return {
+      ...l,
+      mundo: mundoDeLaLizaDeLaCiudad(NOCHE_C, despejadas),
+      fase: {
+        ...l.fase,
+        limite: ID_DEL_LIMITE_DE_LA_CIUDAD,
+        encuentro: l.fase.encuentro === null ? null : { ...l.fase.encuentro, grupos: l.fase.encuentro.grupos.map((g) => ({ ...g, claseDeZona: impresion })) },
+      },
+      clases: l.clases.map((c) => (c.alCaer.tipo === 'rematable' ? { ...c, alCaer: { ...c.alCaer, siNo: { ...c.alCaer.siNo, claseDeZona: impresion } } } : c)),
+    };
+  };
+  const LIZA_C = lizaDeLaCiudad('encuentro');
+  const problemas = problemasDeLaDeclaracion(LIZA_C);
+  comprobar('la liza del diseño sobre la ciudad de verdad (mundo, límite `ciudad`, zonas de la ciudad) es una liza que la sala acepta', problemas.length === 0, problemas.slice(0, 4));
+  void base;
+  const REGLAS_C = LIZA_C.asientos[0] as ReglasDeAsiento;
+  const naceC = LIZA_C.mundo.nace.find((x) => x.papel === 'asiento') ?? { x: u(PLAZA.x), z: u(PLAZA.z), rumbo: 0, papel: 'asiento' as const };
+
+  /* ── El lugar: la ciudad sólo si el mundo de la liza es el de su traza ── */
+  const vistaFalsa = (traza: number | null, contramedida = 'ninguna'): VistaDelQuiebro =>
+    ({ traza, noche: { numero: 1, receta: 'enjambre', fallos: [1] }, reglamento: { contramedida } }) as unknown as VistaDelQuiebro;
+  const conCiudad = lugarDeLaMesa(vistaFalsa(9), CODIGO, LIZA_C);
+  const conBarrio = lugarDeLaMesa(vistaFalsa(9), CODIGO, LIZA);
+  const sinLiza = lugarDeLaMesa(vistaFalsa(9), CODIGO, null);
+  const sinTraza = lugarDeLaMesa(vistaFalsa(null), CODIGO, LIZA);
+  /* Lo que hace el productor de verdad: sus sitios de nacer y sus clases de zona encima, con el mismo suelo. */
+  const comoElProductor: LizaDeclarada = { ...LIZA_C, mundo: { ...LIZA_C.mundo, nace: LIZA_C.mundo.nace.slice(0, 12), zonas: LIZA_C.mundo.zonas.map((z) => ({ ...z })) } };
+  const delProductor = lugarDeLaMesa(vistaFalsa(9), CODIGO, comoElProductor);
+  const despejada = lugarDeLaMesa(vistaFalsa(9), CODIGO, lizaDeLaCiudad('encuentro', true));
+  comprobar(
+    'el lugar es la ciudad si el mundo de la liza es el de su traza (también con lo que el productor pone encima), y la noche es la misma que deriva la sala',
+    conCiudad.lugar?.tipo === 'ciudad' && conCiudad.lugar.noche === NOCHE_C && conCiudad.aviso === null && delProductor.lugar?.tipo === 'ciudad' && sinLiza.lugar?.tipo === 'ciudad',
+    { conCiudad: conCiudad.lugar?.tipo, delProductor: delProductor.lugar?.tipo, sinLiza: sinLiza.lugar?.tipo },
+  );
+  comprobar(
+    'con la traza en la vista y el mundo del barrio en la liza (una obra a medias) se juega en el barrio y se dice por qué; sin traza, el barrio',
+    conBarrio.lugar?.tipo === 'barrio' && conBarrio.aviso !== null && sinTraza.lugar?.tipo === 'barrio' && sinTraza.aviso === null,
+    { conBarrio: conBarrio.lugar?.tipo, aviso: conBarrio.aviso, sinTraza: sinTraza.lugar?.tipo },
+  );
+  comprobar(
+    'las «Plazas despejadas» se reconocen por el mundo de la liza aunque la contramedida se llame de otro modo: la noche es la despejada',
+    despejada.lugar?.tipo === 'ciudad' && despejada.lugar.despejadas && despejada.lugar.noche === despejarLasPlazas(NOCHE_C) && cajasDelLugar(despejada.lugar).length === lizaDeLaCiudad('calma', true).mundo.suelo.cuerpos.length,
+    { tipo: despejada.lugar?.tipo, despejadas: despejada.lugar?.tipo === 'ciudad' ? despejada.lugar.despejadas : null },
+  );
+  const LUGAR_C = conCiudad.lugar as LugarDeLaNoche;
+
+  /* ── La predicción cruza la ciudad, y la sala de verdad no corrige ni un paso ── */
+  const esquinas: readonly (readonly [number, number])[] = [
+    [240, -240],
+    [240, 240],
+    [-240, 240],
+    [-240, -240],
+  ];
+  const cruce = andarPorLaCiudad(LIZA_C, REGLAS_C, GRAFO, [naceC.x / UNO, naceC.z / UNO], esquinas);
+  comprobar(
+    `con el límite \`ciudad\`, por las calles hasta las cuatro esquinas (${String(Math.round(cruce.metros))} m, hasta ${String(Math.round(cruce.lejos))} m de la plaza): todo tramo dentro del límite, en recta y donde se puede estar`,
+    cruce.malos.length === 0 && cruce.llegadas === 4 && cruce.lejos > 300 && cruce.metros > 1500,
+    { malos: cruce.malos.slice(0, 4), llegadas: cruce.llegadas, lejos: cruce.lejos },
+  );
+  const sala = await (async (): Promise<{ correcciones: number; lejos: number; tics: number } | null> => {
+    const ruta = new URL('../../shared/mecanicas/liza/sala.ts', import.meta.url);
+    if (!existsSync(ruta)) return null;
+    const modulo = (await import(ruta.href)) as { salaNueva?: SalaNueva; avanzarLaSala?: AvanzarLaSala };
+    if (typeof modulo.salaNueva !== 'function' || typeof modulo.avanzarLaSala !== 'function') return null;
+    const avanzar = modulo.avanzarLaSala;
+    const liza = lizaDeLaCiudad('calma');
+    let s = modulo.salaNueva(liza, liza.fase.semilla);
+    s = avanzar(s, [{ tipo: 'conexion', asiento: 1, rttMs: 60, desfaseMs: 0 }]).sala;
+    const a0 = s.asientos[0];
+    let correcciones = 0;
+    let lejos = 0;
+    const origen = { x: (a0?.x ?? naceC.x) / UNO, z: (a0?.z ?? naceC.z) / UNO };
+    const andado = andarPorLaCiudad(liza, liza.asientos[0] as ReglasDeAsiento, GRAFO, [origen.x, origen.z], [esquinas[0] as readonly [number, number], [0, 0]], (x, z, t) => {
+      const paso = avanzar(s, [{ tipo: 'aqui', asiento: 1, n: t + 1, x, z, r: 0, m: 3, accion: null, desfaseMs: 0 }]);
+      s = paso.sala;
+      correcciones += paso.correcciones.length;
+      const a = s.asientos[0];
+      if (a !== undefined) lejos = Math.max(lejos, Math.hypot(a.x / UNO - origen.x, a.z / UNO - origen.z));
+    });
+    return { correcciones, lejos, tics: andado.tics };
+  })();
+  if (sala === null) nota('Sin la sala de verdad, el cruce no se juega contra ella.');
+  else {
+    comprobar(
+      `contra la sala de verdad, con la liza de la ciudad en calma: ${String(sala.tics)} tics por las calles hasta una esquina y de vuelta, ni una corrección, y la sala me deja a ${String(Math.round(sala.lejos))} m de donde nací`,
+      sala.correcciones === 0 && sala.lejos > 300 && sala.tics > 900,
+      sala,
+    );
+  }
+
+  /* ── La partida en la ciudad: el límite, la gente y lo que da al mapa ── */
+  const relojes = new RelojesDeMentira();
+  const mandos = new EstadoDeLosMandos();
+  const enchufes: EnchufeDeMentira[] = [];
+  const partida = new Partida({
+    direccion: 'ws://x/api/arcade/mesas/QUIEB/liza',
+    llave: 'k1',
+    fabrica: (d) => {
+      const e = new EnchufeDeMentira(d);
+      enchufes.push(e);
+      return e;
+    },
+    relojes,
+    mandos,
+  });
+  partida.ponerLaDeclaracion(LIZA_C, LUGAR_C, 'a1');
+  partida.asegurarElCanal(true);
+  const e = enchufes[0] as EnchufeDeMentira;
+  e.abrir();
+  e.llega({ t: 'dentro', yo: 1, k: 1000, x: naceC.x, z: naceC.z, r: 0, hz: 20 });
+  e.llega({ t: 'tic', k: 1000, ev: [{ e: 'fase', clave: 'n1-o1', modo: 2, limite: ID_DEL_LIMITE_DE_LA_CIUDAD, relojMs: 0, encuentroTics: 3000 }] });
+  e.llega({ t: 'eco', c: 0, k: 1000, ms: 50_000 });
+  const fotograma = (ms: number): void => {
+    relojes.t += ms;
+    partida.fotograma(relojes.t, ms / 1000);
+  };
+  fotograma(1);
+  comprobar(
+    'la partida en la ciudad da a los personajes la gente de la ciudad y al mapa la noche de la ciudad (y en el barrio, ninguna noche)',
+    partida.genteDeLaNoche() === genteDeLaCiudad(NOCHE_C) && partida.nocheDeLaCiudad() === NOCHE_C,
+  );
+  /*
+   * Hacia el norte a la carrera, doce segundos: con el límite de la plaza (60 × 60, el de la Bajada) no se
+   * pasaba de 30 m de su centro, y con la glorieta de antes, de 24.
+   */
+  partida.giroDeLaCamara = 0;
+  mandos.correrPedido = true;
+  const salidaDe = { x: PLAZA.x, z: PLAZA.z };
+  let lejosDelNace = 0;
+  let fuera = 0;
+  for (let i = 0; i < 720; i++) {
+    const libre = (dir: number): boolean => {
+      const c = partida.pintadoDe(1);
+      return c !== null && seAndaEnRecta(arenaDeLaLiza(LIZA_C), { x: u(c.x), z: u(c.z) }, { x: u(c.x + Math.sin(dir) * 1.5), z: u(c.z - Math.cos(dir) * 1.5) }, REGLAS_C.cuerpo.radio);
+    };
+    /* Hacia el norte si se puede, si no hacia el este o el oeste: sale de la plaza por su calle. */
+    const dir = libre(0) ? 0 : libre(Math.PI / 2) ? Math.PI / 2 : -Math.PI / 2;
+    mandos.ponerPalanca(Math.sin(dir), Math.cos(dir), relojes.t);
+    fotograma(16.7);
+    const c = partida.pintadoDe(1);
+    if (c !== null) lejosDelNace = Math.max(lejosDelNace, Math.max(Math.abs(c.x - salidaDe.x), Math.abs(c.z - salidaDe.z)));
+  }
+  for (const a of e.leidos()) if (a.t === 'aqui' && !dentroDelLimite(arenaYLimite(LIZA_C), a.x, a.z)) fuera++;
+  comprobar(`con el límite \`ciudad\` la partida sale de la plaza: a ${String(Math.round(lejosDelNace))} m de su centro en doce segundos (la plaza llega a 30), y ningún \`aqui\` fuera del límite`, lejosDelNace > 45 && fuera === 0, { lejosDelNace, fuera });
+  mandos.ponerPalanca(0, 0, relojes.t);
+  /* Un Prestado nace a 5 m: sale del durmiente de la ciudad que dice la función pura, en todos los aparatos. */
+  const yoAhora = partida.pintadoDe(1) as CuerpoPintado;
+  const kNace = 1000 + Math.floor((relojes.t - 5000) / 50);
+  const px = Math.round((yoAhora.x + 5) * 100);
+  const pz = Math.round(yoAhora.z * 100);
+  e.llega({ t: 'tic', k: kNace, ev: [{ e: 'nace', id: 30, clase: 2, x: px, z: pz, r: 0 }] });
+  fotograma(16);
+  const esperado = durmienteMasCercanoEnLaCiudad(NOCHE_C, kNace, Math.round((px / 100) * UNO), Math.round((pz / 100) * UNO), []);
+  comprobar(
+    `el Prestado que nace sale del durmiente de la ciudad más cercano, el de la función pura (${String(esperado)}), y ya no se pinta como civil`,
+    esperado !== null && partida.prestados().has(esperado) && partida.prestados().size === 1,
+    { esperado, prestados: [...partida.prestados()] },
+  );
+
+  /* ── El mapa vivo de la partida ── */
+  let ahora = 1000;
+  const cuerpos: CuerpoPintado[] = [];
+  const cuerpo = (id: number, x: number, z: number, color: string | null): CuerpoPintado => ({ id, clase: id < 16 ? 'desvelado' : 'prestado', variante: 0, color, x, z, rumbo: 0.5, velocidad: 0, gesto: 'reposo', gestoDesdeMs: 0, impactoMs: null, direccionDelGesto: null, contorno: true, tenue: false });
+  const nudoCerca = (x: number, z: number): { x: number; z: number } => GRAFO.nudos[nudoMasCercano(GRAFO, x, z)] as { x: number; z: number };
+  const yo0 = nudoCerca(PLAZA.x + 30, PLAZA.z);
+  cuerpos.push(cuerpo(1, yo0.x, yo0.z, '#ff4d6d'));
+  const lejano = nudoCerca(PLAZA.x + 150, PLAZA.z - 90);
+  cuerpos.push(cuerpo(2, lejano.x, lejano.z, '#46c8ff'));
+  const cercano = nudoCerca(yo0.x, yo0.z + 18);
+  cuerpos.push(cuerpo(3, cercano.x, cercano.z, '#b4ff4a'));
+  const sentidos = new Map<number, string>([[3, 'caido']]);
+  let conCuerpo = true;
+  let zona: { id: number; hastaMs: number } | null = null;
+  const falsa = {
+    nocheDeLaCiudad: () => NOCHE_C as NocheDeLaCiudad | null,
+    yo: () => 1 as number | null,
+    pintadoDe: (n: number) => cuerpos.find((c) => c.id === n) ?? null,
+    cuerpos: () => cuerpos,
+    conCuerpo: () => conCuerpo,
+    jugando: () => true,
+    sentidoDe: (n: number) => sentidos.get(n) ?? 'libre',
+    get sala() {
+      return { zona } as unknown as Partida['sala'];
+    },
+    giroDeLaCamara: 0.3,
+  } as unknown as PartidaQueOrienta;
+  const mapa = new OrientacionDeLaPartida(falsa, () => ahora);
+  const porCalles = (x0: number, z0: number, x1: number, z1: number): number => metrosQueSeEnsenan(distanciaPorCalles(GRAFO, campoHasta(GRAFO, nudoMasCercano(GRAFO, x0, z0)), x1, z1));
+  let marcas = mapa.marcas();
+  const m2 = marcas.find((m) => m.quien === 2);
+  const m3 = marcas.find((m) => m.quien === 3);
+  comprobar(
+    'el mapa vivo da cada compañero con el color de su asiento y sus metros POR CALLES desde mí (los del grafo de la noche, no en recta)',
+    m2 !== undefined && m2.clase === 'companero' && m2.color === '#46c8ff' && m2.metros === porCalles(yo0.x, yo0.z, lejano.x, lejano.z) && m2.metros > Math.hypot(lejano.x - yo0.x, lejano.z - yo0.z) - 1,
+    { m2, calles: porCalles(yo0.x, yo0.z, lejano.x, lejano.z) },
+  );
+  comprobar(
+    `un compañero caído a ${String(METROS_DEL_RESCATE)} m o menos por calles sale como «Rescate»; el del mapa y el de la brújula son el mismo número`,
+    m3 !== undefined && m3.clase === 'caido' && m3.metros >= 0 && m3.metros <= 40 && m2?.clase !== 'caido',
+    m3,
+  );
+  const cabina = NOCHE_C.ciudad.cabinas[4];
+  zona = cabina === undefined ? null : { id: idDeZonaDeCabina(4), hastaMs: ahora + 50_000 };
+  ahora += 200;
+  marcas = mapa.marcas();
+  const mc = marcas.find((m) => m.clase === 'cabina');
+  const metaDeLaCabina = cabina === undefined ? -1 : nudoMasCercano(GRAFO, cabina.sitio.x, cabina.sitio.z);
+  /*
+   * Hasta su SITIO, donde se descuelga, y no hasta el nudo de la calzada que tiene al lado (4,5-6 m más
+   * allá): el campo del nudo más lo que hay de él al sitio por los ejes, como la mide el productor al
+   * elegirla. Con los del nudo, el pie del minimapa decía «1 m» en mitad de la calzada y la Llamada se
+   * perdía allí (revisión del 24-sep).
+   */
+  const nudoDeLaCabina = GRAFO.nudos[metaDeLaCabina];
+  const delNudoAlSitio = cabina === undefined || nudoDeLaCabina === undefined ? -1 : Math.abs(nudoDeLaCabina.x - cabina.sitio.x) + Math.abs(nudoDeLaCabina.z - cabina.sitio.z);
+  const hastaElNudo = metaDeLaCabina < 0 ? -1 : distanciaPorCalles(GRAFO, campoHasta(GRAFO, metaDeLaCabina), yo0.x, yo0.z);
+  comprobar(
+    'la cabina que suena sale en su poste, en ámbar, con los metros por calles hasta su SITIO (el campo de su nudo más lo del nudo al sitio, como la mide el productor), no hasta el nudo de la calzada',
+    mc !== undefined && cabina !== undefined && mc.x === cabina.poste.x && mc.z === cabina.poste.z && mc.color === null && delNudoAlSitio >= 4 && mc.metros === metrosQueSeEnsenan(hastaElNudo + delNudoAlSitio),
+    { mc, meta: metaDeLaCabina, hastaElNudo, delNudoAlSitio },
+  );
+  /* «Aquí»: tiende el rumbo propio a un nudo; otra vez, lo suelta; y el rumbo a la cabina la marca. */
+  const nudoLejos = nudoMasCercano(GRAFO, -200, 200);
+  mapa.aqui(nudoLejos);
+  ahora += 200;
+  const aqui = mapa.marcas().find((m) => m.clase === 'aviso');
+  const rumboAqui = mapa.rumbo();
+  const nLejos = GRAFO.nudos[nudoLejos] as { x: number; z: number };
+  comprobar(
+    '«Aquí» en el plano tiende MI rumbo a ese nudo: su marca, con mi color y los metros del campo del rumbo (los de la sala)',
+    rumboAqui !== null && rumboAqui.nudo === nudoLejos && aqui !== undefined && aqui.rumbo && aqui.x === nLejos.x && aqui.z === nLejos.z && aqui.color === '#ff4d6d' && aqui.metros === metrosPorCalles(GRAFO, rumboAqui.campo, yo0.x, yo0.z),
+    { aqui, nudo: rumboAqui?.nudo },
+  );
+  mapa.aqui(nudoLejos);
+  ahora += 200;
+  const soltado = mapa.rumbo() === null && mapa.marcas().every((m) => m.clase !== 'aviso');
+  mapa.tenderElRumbo({ tipo: 'zona', zona: zona?.id ?? 0 });
+  ahora += 200;
+  const cabinaDelRumbo = mapa.marcas().find((m) => m.clase === 'cabina');
+  comprobar('el mismo «Aquí» otra vez suelta el rumbo; tocar la cabina lo tiende a ella y su marca lo dice', soltado && cabinaDelRumbo?.rumbo === true && mapa.rumbo()?.nudo === metaDeLaCabina, { soltado, cabinaDelRumbo });
+  /* Lo que cuesta: las marcas se rehacen a 10 Hz y el campo desde mí sólo si cambia mi nudo. */
+  const antes = mapa.camposDesdeMi;
+  const rehechasAntes = mapa.rehechas;
+  ahora += 150;
+  mapa.marcas();
+  mapa.marcas();
+  const unaVez = mapa.rehechas - rehechasAntes;
+  ahora += 150;
+  mapa.marcas();
+  const mismoNudo = mapa.camposDesdeMi === antes;
+  const otro = nudoCerca(yo0.x + 60, yo0.z);
+  (cuerpos[0] as CuerpoPintado).x = otro.x;
+  (cuerpos[0] as CuerpoPintado).z = otro.z;
+  ahora += 150;
+  mapa.marcas();
+  comprobar(
+    'dos preguntas en el mismo refresco (el minimapa y el plano) rehacen la lista una vez; el campo desde mí se rehace sólo al cambiar de nudo',
+    unaVez === 1 && mismoNudo && mapa.camposDesdeMi === antes + 1,
+    { unaVez, antes, despues: mapa.camposDesdeMi },
+  );
+  /* El Vigía: los enemigos cerca de un compañero; y nunca más de 20 marcas. */
+  conCuerpo = false;
+  /* Primero doce lejos de todos (si el Vigía no mirara la distancia, llenarían la lista), luego dieciocho cerca del compañero lejano. */
+  for (let k = 0; k < 12; k++) cuerpos.push(cuerpo(16 + k, lejano.x + (k % 4) * 8, lejano.z + 90 + Math.floor(k / 4) * 10, null));
+  for (let k = 0; k < 18; k++) cuerpos.push(cuerpo(28 + k, lejano.x + (k % 6) * 6 - 15, lejano.z + Math.floor(k / 6) * 12 - 12, null));
+  ahora += 200;
+  marcas = mapa.marcas();
+  const enemigos = marcas.filter((m) => m.clase === 'enemigo');
+  const lejosDeTodos = enemigos.filter((m) => cuerpos.every((c) => c.id >= 16 || c.id === 1 || Math.hypot(c.x - m.x, c.z - m.z) > 60));
+  comprobar(
+    'sin cuerpo (Vigía) el mapa enseña los enemigos a 60 m o menos de un compañero, y nunca más de 20 marcas',
+    mapa.vigia() && mapa.yo() === null && enemigos.length > 0 && lejosDeTodos.length === 0 && marcas.length <= 20,
+    { enemigos: enemigos.length, lejosDeTodos: lejosDeTodos.length, total: marcas.length },
+  );
+  /* Otra noche: el mismo objetivo con el campo de su grafo. En el barrio, nada. */
+  const otraNoche = ciudadDeLaNoche(ciudadDeLaMesa(9, CODIGO), CODIGO, 2, [3]);
+  let noche: NocheDeLaCiudad | null = otraNoche;
+  (falsa as unknown as { nocheDeLaCiudad: () => NocheDeLaCiudad | null }).nocheDeLaCiudad = () => noche;
+  const rumboAntes = mapa.rumbo();
+  const rumboOtra = mapa.rumbo();
+  void rumboAntes;
+  const metaOtra = nudoMasCercano(otraNoche.grafo, cabina?.sitio.x ?? 0, cabina?.sitio.z ?? 0);
+  const retendido = rumboOtra !== null && rumboOtra.nudo === metaOtra && rumboOtra.campo === mapa.campos.campo(otraNoche.grafo, metaOtra);
+  noche = null;
+  ahora += 200;
+  comprobar('con otra noche el rumbo se vuelve a tender al mismo objetivo en su grafo; en el barrio no hay mapa (ni marcas ni rumbo)', retendido && mapa.marcas().length === 0 && mapa.rumbo() === null && mapa.noche() === null, { retendido });
+
+  /* ── La cámara no atraviesa las cajas de la ciudad ── */
+  const cajasCamara = cajasDelLugar(LUGAR_C).map(cajaParaLaCamara);
+  const edificio = NOCHE_C.cajas.find((c) => c.tipo === 'edificio' && c.alto > 8 && c.x1 - c.x0 > 20);
+  let dentroDeUna = 0;
+  let probadas = 0;
+  if (edificio !== undefined) {
+    const cx = (edificio.x0 + edificio.x1) / 2;
+    const z = edificio.z1 + 1.2;
+    for (let k = 0; k < 64; k++) {
+      const giro = (k / 64) * Math.PI * 2;
+      const estado = camaraNueva(giro);
+      const en = encuadrar(estado, { x: cx, z, dt: 1, enemigosCerca: false, blanco: null, mandaElDedo: true, remanso: 0, tactil: false, vigia: false, cajas: cajasCamara });
+      probadas++;
+      for (const c of cajasCamara) if (en.ojo.x > c.x0 && en.ojo.x < c.x1 && en.ojo.z > c.z0 && en.ojo.z < c.z1 && en.ojo.y < c.alto) dentroDeUna++;
+    }
+  }
+  comprobar('pegado a la fachada de un edificio de la ciudad, en 64 giros la cámara nunca queda dentro de una caja (las de la ciudad entera, no las del barrio)', edificio !== undefined && probadas === 64 && dentroDeUna === 0 && cajasCamara.length === NOCHE_C.cajas.length, { dentroDeUna, cajas: cajasCamara.length });
+
+  /* ── El HUD monta el minimapa, el botón PLANO y el plano sólo en la ciudad, y sólo en la calle ── */
+  let estadoMesa: unknown = undefined;
+  const asientos = ['s1'];
+  const sentados = asientos.map((asiento) => ({ asiento, nombre: asiento }));
+  const mandar = (quien: string | null, tipo: string, carga: unknown): void => {
+    const r = avanzarConMotivo('quiebro', estadoMesa, { tipo, carga }, { quien, azar: 7, tic: 0, asientos });
+    if (r.motivo === null) estadoMesa = r.estado;
+  };
+  mandar('s1', 'empezar', null);
+  const enBajada = leerVistaDelQuiebro(vistaDeAsiento('quiebro', estadoMesa, 's1', sentados));
+  if (enBajada?.reloj !== null && enBajada?.reloj !== undefined) mandar(null, 'arcade:reloj', { id: enBajada.reloj.id });
+  const enOleada = leerVistaDelQuiebro(vistaDeAsiento('quiebro', estadoMesa, 's1', sentados));
+  const puerto: PuertoDeMesa = {
+    codigo: CODIGO,
+    yo: 's1',
+    llave: 'k',
+    servidor: '',
+    vista: null,
+    opciones: [],
+    rev: 1,
+    mover: async () => ({ ok: true }) as unknown as Awaited<ReturnType<PuertoDeMesa['mover']>>,
+    suscribir: () => () => undefined,
+  };
+  const pintarElHud = (vista: VistaDelQuiebro | null, enLaCiudad: boolean): string =>
+    renderToStaticMarkup(
+      createElement(Hud, {
+        vista,
+        puerto,
+        partida,
+        escena: null,
+        mandos,
+        sonido: { volumenDe: () => 1, silenciado: () => false } as unknown as Parameters<typeof Hud>[0]['sonido'],
+        mover: async () => ({ ok: true }) as unknown as Awaited<ReturnType<Parameters<typeof Hud>[0]['mover']>>,
+        bajado: true,
+        alBajar: () => undefined,
+        primeraNoche: false,
+        rotuloDelBarrio: null,
+        rotuloDeFase: null,
+        marcador: false,
+        alMarcador: () => undefined,
+        menu: false,
+        alMenu: () => undefined,
+        zurdo: false,
+        alZurdo: () => undefined,
+        tactil: true,
+        alSalir: undefined,
+        alOtraMesa: () => undefined,
+        avisoDelSilencio: false,
+        bajada: new RelojDeLaBajada(),
+        ojo: { current: null },
+        mapa,
+        enLaCiudad,
+      }),
+    );
+  const conMapa = (html: string): boolean => /q-mapa-mini/.test(html) && /q-plano-boton/.test(html);
+  const oleadaEnLaCiudad = enOleada === null ? '' : pintarElHud(enOleada, true);
+  const oleadaEnElBarrio = enOleada === null ? '' : pintarElHud(enOleada, false);
+  const bajadaEnLaCiudad = enBajada === null ? '' : pintarElHud(enBajada, true);
+  comprobar(
+    'el HUD de la oleada en la ciudad lleva el minimapa y el botón PLANO; en el barrio y en la Bajada, no',
+    enOleada?.fase.tipo === 'oleada' && conMapa(oleadaEnLaCiudad) && !conMapa(oleadaEnElBarrio) && enBajada?.fase.tipo === 'bajada' && !conMapa(bajadaEnLaCiudad),
+    { fase: enOleada?.fase.tipo, ciudad: conMapa(oleadaEnLaCiudad), barrio: conMapa(oleadaEnElBarrio), bajada: conMapa(bajadaEnLaCiudad) },
+  );
+  const fuenteDelJuego = readFileSync(new URL('../src/quiebro/Quiebro.tsx', import.meta.url), 'utf8');
+  comprobar(
+    'el juego monta el mapa vivo de SU partida y pinta la ciudad del lugar (traza, plazas y despejadas), con la cámara y la gente del mismo lugar',
+    /new OrientacionDeLaPartida\(partida\)/.test(fuenteDelJuego) &&
+      /mapa=\{mapa\}/.test(fuenteDelJuego) &&
+      /traza: lugar\.traza, fallos: lugar\.fallos, despejadas: lugar\.despejadas/.test(fuenteDelJuego) &&
+      /\{\.\.\.deLaCiudad\}/.test(fuenteDelJuego) &&
+      /lugar=\{p\.lugar\}/.test(fuenteDelJuego) &&
+      /ponerLaDeclaracion\(liza, lugar, puerto\.yo\)/.test(fuenteDelJuego),
+  );
+})();
+
+/* ─────────────────────────────── 13 bis. Lo que se vio jugando la entrega 1 ─────────────────────────────── */
+
+paso('13 bis. Lo que se vio jugando: el rótulo de la Bajada, el rumbo hasta donde se descuelga, el ojo fuera de las cajas y el HUD que se lee');
+{
+  const CODIGO = 'QUIEB';
+
+  /*
+   * EL RÓTULO DE LA BAJADA. Se leía con un molde a una forma que `quiebro-nombres.ts` no tiene (`.plazas` y
+   * `.distritos` en la raíz): compilaba, la búsqueda fallaba siempre y cada plaza salía con el nombre de una
+   * glorieta del barrio y sin distrito (en la mesa V78QY, el Patio de Carga de las Naves era «Glorieta de la
+   * Estrella, 3:13»). Se mira en las 6 plazas de las 32 trazas por el camino del juego (`lugarDeLaMesa` con
+   * la vista, `rotuloDelLugar`), contra lo que dicen las listas por su índice.
+   */
+  const nombres = NOMBRES_DEL_QUIEBRO.ciudad;
+  let rotulos = 0;
+  const rotulosMalos: unknown[] = [];
+  const plazasVistas = new Set<string>();
+  for (let t = 0; t < TRAZAS; t++) {
+    for (const p of ciudadDeLaMesa(t, CODIGO).plazas) {
+      const vista = { traza: t, noche: { numero: 2, receta: 'enjambre', fallos: [p.numero] }, reglamento: { contramedida: 'ninguna' } } as unknown as VistaDelQuiebro;
+      const lugar = lugarDeLaMesa(vista, CODIGO, null).lugar;
+      const rotulo = rotuloDelLugar(lugar);
+      rotulos++;
+      const hora = lugar?.tipo === 'ciudad' ? lugar.noche.hora : null;
+      const nombre = nombres.plazas[p.nombre];
+      const esperado = hora === null || nombre === undefined ? null : `${nombre} · ${nombres.distritos[p.distrito]} · ${String(hora.h)}:${hora.m < 10 ? '0' : ''}${String(hora.m)}`;
+      if (esperado !== null && rotulo === esperado) plazasVistas.add(nombre as string);
+      else if (rotulosMalos.length < 4) rotulosMalos.push({ traza: t, plaza: p.numero, rotulo, esperado });
+    }
+  }
+  comprobar(
+    `el rótulo de la Bajada es «Plaza · Distrito · h:mm» con los nombres de \`quiebro-nombres.ts\` por su índice, en las ${String(rotulos)} plazas de las 32 trazas (${String(plazasVistas.size)} plazas con nombre distinto)`,
+    rotulos === TRAZAS * 6 && rotulosMalos.length === 0 && plazasVistas.size >= 6,
+    rotulosMalos,
+  );
+
+  /*
+   * EL RUMBO A UNA CABINA ACABA DONDE SE DESCUELGA. Los nudos van por el centro de la calzada y el nudo más
+   * cercano a una cabina queda a 4,5-6 m de su sitio: un hilo que acababa en él dejaba al jugador en la
+   * calzada con «1 m» en el minimapa y sin poder descolgar (revisión del 24-sep: la Llamada se perdió así).
+   * Se tiende como lo tienden el minimapa y el plano, desde la Glorieta, a las 20 cabinas de las 32 trazas.
+   */
+  let cabinas = 0;
+  let lejosDeLaZona = 0;
+  let peorAlCentro = 0;
+  let tramosQueNoSeAndan = 0;
+  let metrosMalos = 0;
+  const cabinasMalas: unknown[] = [];
+  const hiloDeLaCabina = hiloNuevo();
+  for (let t = 0; t < TRAZAS; t++) {
+    const noche = ciudadDeLaNoche(ciudadDeLaMesa(t, CODIGO), CODIGO, 1, [1]);
+    const arena = arenaDe(mundoDeLaLizaDeLaCiudad(noche, false).suelo);
+    const campos = new CamposPorMeta();
+    const desde = noche.ciudad.plazas[0]?.centro ?? { x: 0, z: 0 };
+    for (const c of noche.ciudad.cabinas) {
+      cabinas++;
+      const objetivo = { tipo: 'zona', zona: c.zona } as const;
+      const rumbo = rumboHacia(noche, objetivo, 1, campos);
+      const zona = noche.ciudad.zonas.find((z) => z.id === c.zona);
+      if (rumbo === null || zona === undefined) {
+        tramosQueNoSeAndan++;
+        continue;
+      }
+      const tramo = tramoFinal(noche, objetivo);
+      tenderElHilo(noche.grafo, rumbo, desde.x + 3, desde.z + 20, hiloDeLaCabina, tramo);
+      const n = hiloDeLaCabina.puntos;
+      const fx = hiloDeLaCabina.ruta[(n - 1) * 2] as number;
+      const fz = hiloDeLaCabina.ruta[(n - 1) * 2 + 1] as number;
+      /* Lo que mira USAR para descolgar (`usoPosible`): el centro de la zona, a `radio` o menos. */
+      const alCentro = Math.hypot(fx - (zona.caja.x0 + zona.caja.x1) / 2, fz - (zona.caja.z0 + zona.caja.z1) / 2);
+      peorAlCentro = Math.max(peorAlCentro, alCentro);
+      if (!(alCentro <= CABINA.metros)) {
+        lejosDeLaZona++;
+        if (cabinasMalas.length < 3) cabinasMalas.push({ traza: t, cabina: c.indice, final: [fx, fz], sitio: c.sitio, alCentro });
+      }
+      /* Del nudo meta al final, cada tramo se anda en recta con el radio de una persona: el contrato de la sala. */
+      const meta = noche.grafo.nudos[rumbo.nudo] as { x: number; z: number };
+      let k = -1;
+      for (let i = 0; i < n; i++) if (hiloDeLaCabina.ruta[i * 2] === meta.x && hiloDeLaCabina.ruta[i * 2 + 1] === meta.z) k = i;
+      let seAnda = k >= 0 && hiloDeLaCabina.rutaEntera;
+      for (let i = Math.max(0, k); seAnda && i < n - 1; i++) {
+        const a = { x: u(hiloDeLaCabina.ruta[i * 2] as number), z: u(hiloDeLaCabina.ruta[i * 2 + 1] as number) };
+        const b = { x: u(hiloDeLaCabina.ruta[i * 2 + 2] as number), z: u(hiloDeLaCabina.ruta[i * 2 + 3] as number) };
+        seAnda = seAndaEnRecta(arena, a, b, u(0.35)) && sePuedeEstar(arena, b.x, b.z, u(0.35));
+      }
+      if (!seAnda) tramosQueNoSeAndan++;
+      /* Los metros: 0 en el sitio; en el nudo de la calzada, lo que falta de verdad. */
+      if (metrosHastaElSitio(noche.grafo, rumbo.campo, tramo, c.sitio.x, c.sitio.z) !== 0 || metrosHastaElSitio(noche.grafo, rumbo.campo, tramo, meta.x, meta.z) < 4) metrosMalos++;
+    }
+  }
+  comprobar(
+    `el rumbo a cada una de las ${String(cabinas)} cabinas de las 32 trazas acaba a ${String(CABINA.metros)} m o menos del centro de su zona, donde USAR descuelga (lo más lejos, ${peorAlCentro.toFixed(2)} m), por un último tramo que se anda; sus metros son 0 allí y 4 o más en el nudo de la calzada`,
+    cabinas === TRAZAS * 20 && lejosDeLaZona === 0 && tramosQueNoSeAndan === 0 && metrosMalos === 0,
+    { lejosDeLaZona, tramosQueNoSeAndan, metrosMalos, cabinasMalas },
+  );
+  const fuenteDe = (ruta: string): string => readFileSync(new URL(ruta, import.meta.url), 'utf8');
+  const conElTramo = /tenderElHilo\(noche\.grafo, rumbo, yo\.x, yo\.z, hilo, tramoFinal\(noche, rumbo\.objetivo\)\)/;
+  comprobar(
+    'el minimapa y el plano tienden el hilo con el último tramo del objetivo, y el mapa vivo mide sus metros hasta el sitio',
+    conElTramo.test(fuenteDe('../src/quiebro/hud/Minimapa.tsx')) &&
+      conElTramo.test(fuenteDe('../src/quiebro/hud/Plano.tsx')) &&
+      /metrosHastaElSitio\(noche\.grafo, this\.campos\.campo\(noche\.grafo, meta\), tramoFinal\(noche, objetivo\)/.test(fuenteDe('../src/quiebro/red/orientarse.ts')),
+  );
+
+  /*
+   * EL OJO NUNCA DENTRO DE UNA CAJA. Con la espalda contra una pared el hombro de `encuadrar` ya cae dentro de
+   * su margen y el ojo acaba detrás de la cara: en las tres salidas de avenida, dentro del cerco y de la
+   * cortina de glifos, con un cuarto de la pantalla en blanco (revisión del 24-sep). Se prueba el ojo que se
+   * PINTA (`ojoFueraDeLasCajas` sobre el de `encuadrar`, lo que hace `Camara.tsx`) en 16 giros: en las tres
+   * salidas de las 32 trazas, pegado al cerco por todo el ancho de la avenida, y pegado a cada fachada en
+   * cuatro trazas.
+   */
+  const PLANO_CERCANO = 0.1;
+  const dentroDeUnaCaja = (o: { x: number; y: number; z: number }, cajas: readonly CajaAlta[], margen: number): boolean =>
+    cajas.some((c) => o.x > c.x0 - margen && o.x < c.x1 + margen && o.z > c.z0 - margen && o.z < c.z1 + margen && o.y < c.alto + margen);
+  let giros = 0;
+  let dentroAntes = 0;
+  let dentroDespues = 0;
+  let enLasSalidas = 0;
+  let detrasAntes = 0;
+  let detrasDespues = 0;
+  for (let t = 0; t < TRAZAS; t++) {
+    const noche = ciudadDeLaNoche(ciudadDeLaMesa(t, CODIGO), CODIGO, 1, [1]);
+    const arena = arenaDe(mundoDeLaLizaDeLaCiudad(noche, false).suelo);
+    const cajas = noche.cajas.map(cajaParaLaCamara);
+    const probar = (x: number, z: number, salida: boolean): void => {
+      if (!sePuedeEstar(arena, u(x), u(z), u(0.35))) return;
+      for (let k = 0; k < 16; k++) {
+        const en = encuadrar(camaraNueva((k / 16) * Math.PI * 2), { x, z, dt: 1, enemigosCerca: false, blanco: null, mandaElDedo: true, remanso: 0, tactil: false, vigia: false, cajas });
+        const ojo = ojoFueraDeLasCajas(x, z, en.ojo, cajas);
+        giros++;
+        if (dentroDeUnaCaja(en.ojo, cajas, 0)) dentroAntes++;
+        /* Fuera, y a más del plano cercano de la cámara (0,1 m) de toda cara. */
+        if (dentroDeUnaCaja(ojo, cajas, PLANO_CERCANO)) dentroDespues++;
+        if (!salida) continue;
+        enLasSalidas++;
+        if (Math.max(Math.abs(en.ojo.x), Math.abs(en.ojo.z)) > BORDE_DE_LA_CIUDAD) detrasAntes++;
+        if (Math.max(Math.abs(ojo.x), Math.abs(ojo.z)) > BORDE_DE_LA_CIUDAD - 0.1) detrasDespues++;
+      }
+    };
+    for (const av of noche.ciudad.avenidas) {
+      for (const extremo of [av.desde, av.hasta]) {
+        if (Math.abs(extremo) < BORDE_DE_LA_CIUDAD) continue;
+        const largo = Math.sign(extremo) * (BORDE_DE_LA_CIUDAD - 0.36);
+        for (let d = -11; d <= 11; d++) probar(av.eje === 'x' ? largo : av.linea + d, av.eje === 'x' ? av.linea + d : largo, true);
+      }
+    }
+    if (t % 8 !== 0) continue;
+    for (const c of noche.cajas) {
+      if (c.tipo !== 'edificio') continue;
+      const cx = (c.x0 + c.x1) / 2;
+      const cz = (c.z0 + c.z1) / 2;
+      probar(cx, c.z0 - 0.36, false);
+      probar(cx, c.z1 + 0.36, false);
+      probar(c.x0 - 0.36, cz, false);
+      probar(c.x1 + 0.36, cz, false);
+    }
+  }
+  comprobar(
+    `el ojo que se pinta nunca queda dentro de una caja ni detrás de la cara del cerco: ${String(giros)} giros (${String(enLasSalidas)} en las salidas de avenida); el de \`encuadrar\` quedaba dentro en ${String(dentroAntes)} y detrás del cerco en ${String(detrasAntes)}`,
+    giros > 30000 && enLasSalidas > 5000 && dentroAntes > 0 && detrasAntes > 0 && dentroDespues === 0 && detrasDespues === 0,
+    { giros, enLasSalidas, dentroAntes, detrasAntes, dentroDespues, detrasDespues },
+  );
+  const fuenteDeLaCamara = fuenteDe('../src/quiebro/camara/Camara.tsx');
+  comprobar(
+    'la cámara del juego pinta ese ojo (el de `encuadrar` pasado por `ojoFueraDeLasCajas`), salvo el Vigía',
+    /const ojo = vigia \? encuadrado\.ojo : ojoFueraDeLasCajas\(cuerpo\.x, cuerpo\.z, encuadrado\.ojo, cajas\);/.test(fuenteDeLaCamara) &&
+      /const alHombro: EncuadreDeLaCamara = ojo === encuadrado\.ojo \? encuadrado : \{ \.\.\.encuadrado, ojo \};/.test(fuenteDeLaCamara),
+  );
+
+  /*
+   * EL HUD SE LEE DELANTE DE LA CORTINA. El reloj claro quedaba sobre un fondo de luminancia media 160 y la
+   * etiqueta del aguante, al 62 %, sobre 138 (revisión del 24-sep). Todo texto que va suelto sobre la escena
+   * lleva la sombra de noche `--q-halo` pegada a la letra, la primera de su lista (la que se pinta encima);
+   * la cifra del Foco, un trazo de noche bajo el relleno; y los grupos (el reloj, los vitales y el botín), un
+   * fondo de noche difuminado (`--q-bruma`).
+   */
+  const css = fuenteDe('../src/quiebro/hud/hud.css');
+  const regla = (selector: string): string => {
+    const i = css.indexOf(`\n${selector} {`);
+    return i < 0 ? '' : css.slice(i, css.indexOf('\n}', i));
+  };
+  const sueltos = ['.q-aguante .pie', '.q-reloj .etiqueta', '.q-reloj .cifra', '.q-reloj .cifra.aprieta', '.q-brujula .punto', '.q-botin .esquirlas', '.q-botin .mas', '.q-botin .monedas', '.q-botin .puntos', '.q-rotulo.pista', '.q-teclas'];
+  const sinHalo = sueltos.filter((selector) => !/\n  text-shadow: var\(--q-halo\)[,;]/.test(regla(selector)));
+  const halo =
+    /\n  --q-halo: 0 0 2px rgba\(2, 6, 7, 0\.95\), 0 0 5px rgba\(2, 6, 7, 0\.85\), 0 0 10px rgba\(2, 6, 7, 0\.6\);/.test(regla('.quiebro-raiz')) &&
+    /\n  --q-bruma: radial-gradient\(closest-side, rgba\(3, 7, 9, 0\.55\), rgba\(3, 7, 9, 0\)\);/.test(regla('.quiebro-raiz'));
+  const foco = /paint-order: stroke;/.test(regla('.q-foco .cifra')) && /stroke: rgba\(2, 6, 7, 0\.9\);/.test(regla('.q-foco .cifra'));
+  const sinBruma = ['.q-reloj', '.q-vitales', '.q-botin'].filter((selector) => !/\n  background: var\(--q-bruma\);/.test(regla(selector)));
+  comprobar(
+    `lo que va suelto sobre la escena (${String(sueltos.length)} textos y la cifra del Foco) lleva la sombra de noche pegada a la letra, primera de su lista, y sus grupos un fondo de noche: se lee también delante de la cortina de glifos`,
+    halo && sinHalo.length === 0 && foco && sinBruma.length === 0,
+    { halo, sinHalo, foco, sinBruma },
+  );
+}
+
+terminar(210);

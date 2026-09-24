@@ -80,13 +80,14 @@
  *
  * La sala manda `arcade:ausente` de quien lleva 60 s sin canal, una vez por asiento y por fase de
  * combate. Si la mesa lo marcara en el acto, la vista de la MISMA fase —la misma clave— diría otros
- * presentes, el productor declararía otro límite (de la glorieta de 60 a la de 48 al pasar de cuatro
- * a tres) y la sala lo aplicaría sin empezar fase: quien estuviera entre los 24 y los 30 m se quedaría
- * clavado fuera, con cada paso corregido. El diseño lo dice al revés: el ausente «deja de contar en la
- * oleada siguiente» (§3), y la oleada escala con los presentes «al empezar» (§4.10). Así que el aviso
- * se guarda en el estado (`avisados`, fuera de la vista) y se vuelve `ausente` al cambiar de fase; en
- * la pausa, al avisado ya no se le espera. Dentro de una fase los presentes sólo pueden crecer —quien
- * vuelve y mueve—, y un límite que crece no deja a nadie fuera.
+ * presentes y el productor declararía otro encuentro, escalado para otros, que la sala no toma sin
+ * empezar fase: la mesa y la sala contarían con presentes distintos. (Con el barrio era peor: el límite
+ * de la glorieta encogía de 60 a 48 m al pasar de cuatro a tres, y quien estuviera en la franja se
+ * quedaba clavado fuera; con la ciudad abierta el límite ya no depende de los presentes.) El diseño lo
+ * dice al revés: el ausente «deja de contar en la oleada siguiente» (§3), y la oleada escala con los
+ * presentes «al empezar» (§4.10). Así que el aviso se guarda en el estado (`avisados`, fuera de la
+ * vista) y se vuelve `ausente` al cambiar de fase; en la pausa, al avisado ya no se le espera. Dentro de
+ * una fase los presentes sólo pueden crecer —quien vuelve y mueve—.
  *
  * ═══ Y QUIEN VUELVE, VUELVE ═══
  *
@@ -106,6 +107,17 @@
  * Amanecer ya pasaron. Así el robot genérico llega al final sin sala, y una mesa abandonada no se
  * queda colgada en una fase que no termina.
  *
+ * ═══ LA CIUDAD DE LA MESA, Y DÓNDE SE BAJA ═══
+ *
+ * La ciudad abierta (`docs/quiebro/CIUDAD-ABIERTA.md`) es de la MESA: al empezar la primera noche el
+ * reductor sortea su traza (una de 32) con el azar del contexto, y la guarda en la vista (`traza`) las
+ * diez noches (§7, decisión 2: se aprende). Cada noche elige su plaza de la Bajada (`noche.fallos[0]`): la
+ * Glorieta del Relojero la primera, y desde la segunda otra de las seis, distinta de la anterior (§3.2).
+ * En la entrega 1 las oleadas siguen en esa plaza y la noche no tiene más plazas; con los Fallos 2 y 3
+ * (entrega 2) la lista crece aquí mismo, entre los tríos válidos de la traza. El código, que da los
+ * edificios, no llega nunca al reductor: por eso la traza es un número de la vista y no sale de él
+ * (§2.6), y el retablo pinta la ciudad con los datos de la traza sin derivarla (ver `PLANO_DEL_TABLERO`).
+ *
  * ═══ LAS TRES REGLAS DE SIEMPRE ═══
  *
  * No muta; no mira el reloj ni el azar del sistema (el azar es `ctx.azar`, la semilla de la mesa,
@@ -119,12 +131,12 @@ import { comoSeLlama } from '../tipos';
 import type { ArcadeId, LosSentados, ManifiestoDeArcade, QuienMira } from '../tipos';
 import type { ContextoMovimiento, Movimiento } from '../movimiento';
 import type { Opcion } from '../opciones';
-import { barajar, sembrar } from '../../mecanicas/azar';
+import { barajar, enteroEntre, sembrar } from '../../mecanicas/azar';
 import { canonico } from '../../mecanicas/canonico';
 import { semillaDelCodigo } from '../../mecanicas/semilla';
 import type { TableroDeclarado } from '../../mecanicas/tablero-declarado';
-import { IDS_DE_ESTILO, IDS_DE_RECETA, IDS_DE_RETOQUE, IDS_DE_TITULO, NOMBRES_DEL_QUIEBRO, PRIMER_NIVEL, nombreDelNivel } from './quiebro-nombres';
-import type { IdDeAveria, IdDeEstilo, IdDeReceta, IdDeRetoque, IdDeTitulo } from './quiebro-nombres';
+import { IDS_DE_ESTILO, IDS_DE_RECETA, IDS_DE_RETOQUE, IDS_DE_TITULO, NOMBRES_DEL_QUIEBRO, PRIMER_NIVEL, nombreDePlaza, nombreDelNivel } from './quiebro-nombres';
+import type { IdDeAveria, IdDeDistritoConNombre, IdDeEstilo, IdDeReceta, IdDeRetoque, IdDeTitulo } from './quiebro-nombres';
 import {
   AGUANTE,
   AVERIAS,
@@ -136,7 +148,6 @@ import {
   aguanteLleno,
   comoEsElEstilo,
   contramedidaTrasLaNoche,
-  limiteDeLaFase,
   monedasAlEmpezar,
   nivelTrasLaNoche,
   porCiento,
@@ -144,15 +155,21 @@ import {
   rondaDeLaFase,
   salenParaGanar,
 } from './quiebro-reglas';
+/* Sólo datos (las cuatro trazas dibujadas, sin una cuenta): el retablo pinta la ciudad sin derivarla. */
+import { TRAZAS_DE_LA_CIUDAD } from './quiebro-trazas';
 import {
   ASIENTOS_COMO_MUCHO,
   MOVIMIENTO_DEL_QUIEBRO,
   NOCHES_COMO_MUCHO,
   OLEADAS_COMO_MUCHO,
   OLEADAS_FIJAS,
+  PLAZAS_DE_LA_CIUDAD,
+  PLAZA_DE_LA_PRIMERA_BAJADA,
   PRIMERA_PAUSA_CON_VOTO,
   QUIEBROS_DE_APRENDIZ,
   RETOQUES_OFRECIDOS,
+  TRAZAS_POSIBLES,
+  bajadaDeLaNoche,
   VEREDICTO_DE_AUSENTE,
   VEREDICTO_DE_RELOJ,
   VEREDICTO_DE_RONDA,
@@ -277,6 +294,7 @@ export function mesaEnLaReunion(asientos: readonly string[]): MesaDelQuiebro {
   return {
     fase: { tipo: 'reunion' },
     reloj: null,
+    traza: null,
     noche: null,
     asientos: asientos.map(asientoNuevo),
     monedas: monedasAlEmpezar(PRIMER_NIVEL, 'ninguna'),
@@ -416,6 +434,27 @@ function averiaDeLaNoche(azar: number, numero: number): IdDeAveria {
   if (numero <= 1) return 'ninguna';
   const orden = barajar(sembrar(semillaPara(azar, 'averias')), AVERIAS_QUE_SE_SORTEAN).valor;
   return orden[(numero - 2) % orden.length] as IdDeAveria;
+}
+
+/**
+ * LA TRAZA DE LA MESA (`docs/quiebro/CIUDAD-ABIERTA.md`, §2.6): una de las 32, sorteada una vez por mesa al
+ * empezar. «Otra noche» trae la misma ciudad (§7, decisión 2): cambiar eso es sortearla aquí también.
+ */
+function trazaDeLaMesa(azar: number): number {
+  return enteroEntre(sembrar(semillaPara(azar, 'traza')), 0, TRAZAS_POSIBLES - 1).valor;
+}
+
+/**
+ * LA PLAZA DE LA BAJADA de la noche `numero` (§3.2): la primera noche, la Glorieta del Relojero, para que
+ * los primeros treinta segundos (§2.1 del diseño) sean los de siempre para quien estrena el aparato; las
+ * demás, una de las otras cinco de la anterior, sorteada con el azar de la mesa. En la entrega 1 es
+ * también donde van las oleadas: su plaza es el Fallo de la noche entera.
+ */
+function bajadaDeLaNocheNueva(azar: number, numero: number, anterior: number | null): number {
+  if (numero <= 1 || anterior === null) return PLAZA_DE_LA_PRIMERA_BAJADA;
+  const otras: number[] = [];
+  for (let p = 1; p <= PLAZAS_DE_LA_CIUDAD; p++) if (p !== anterior) otras.push(p);
+  return otras[enteroEntre(sembrar(semillaPara(azar, `bajada#${String(numero)}`)), 0, otras.length - 1).valor] as number;
 }
 
 /** Los retoques que se le ofrecen a un asiento en una pausa: tres de los que aún no tiene esta noche. */
@@ -658,7 +697,8 @@ function sumaDeLaNoche(m: MesaDelQuiebro): { reapariciones: number; limpios: num
 /**
  * UNA NOCHE NUEVA: número, nivel (sube si la anterior se ganó, baja si no), avería, receta, la
  * contramedida de la Memoria del Sistema (sacada de los contadores de la anterior, que aún están en la
- * mesa) y los puntos de control a lleno. Los estilos siguen; los retoques, los puntos y los contadores
+ * mesa), la plaza de la Bajada, la traza de la mesa (sorteada en la primera; ver la cabecera) y los
+ * puntos de control a lleno. Los estilos siguen; los retoques, los puntos y los contadores
  * vuelven a cero; los quiebros de aprender se apagan (eran de la primera noche), y los ausentes siguen
  * ausentes hasta que muevan o jueguen.
  */
@@ -686,10 +726,12 @@ function nuevaNoche(m: MesaDelQuiebro, numero: number, azar: number): MesaDelQui
     contadores: CONTADORES_A_CERO,
   }));
   const fase: FaseDelQuiebro = { tipo: 'bajada' };
+  const bajadaAnterior = m.noche === null ? null : bajadaDeLaNoche(m.noche);
   return {
     fase,
     reloj: relojDe(numero, fase),
-    noche: { numero, receta: recetaDeLaNoche(azar, numero), plantilla: 'glorieta' },
+    traza: m.traza ?? trazaDeLaMesa(azar),
+    noche: { numero, receta: recetaDeLaNoche(azar, numero), fallos: [bajadaDeLaNocheNueva(azar, numero, bajadaAnterior)] },
     asientos,
     monedas: monedasAlEmpezar(nivel, contramedida),
     historial: m.historial,
@@ -1085,7 +1127,7 @@ const OPCION_EMPEZAR = opcionSinCarga('empezar', EMPEZAR, N.mesa.empezar, 'Empie
 const OPCION_LISTO = opcionSinCarga('listo', LISTO, N.mesa.bajar, 'Me quedo con este estilo. En cuanto estén todos, a la calle.');
 const OPCION_RENDIRSE = opcionSinCarga('rendirse', RENDIRSE, N.mesa.rendirse, 'La noche se da por perdida para todos, y el nivel de la siguiente baja.');
 const OPCION_REANUDAR = opcionSinCarga('reanudar', REANUDAR, N.mesa.reanudar, 'Vuelve a la calle: la fase en que se quedó la noche empieza otra vez desde el último punto de control.');
-const OPCION_OTRA_NOCHE = opcionSinCarga('otra-noche', OTRA_NOCHE, N.mesa.otraNoche, 'Otro barrio en la misma mesa. El nivel sube si ganasteis y baja si no.');
+const OPCION_OTRA_NOCHE = opcionSinCarga('otra-noche', OTRA_NOCHE, N.mesa.otraNoche, 'Otra noche en la misma ciudad. El nivel sube si ganasteis y baja si no.');
 const OPCION_CERRAR = opcionSinCarga('cerrar', CERRAR, N.mesa.cerrarLaMesa, 'Se acabó la mesa para todos.');
 const OPCION_APRENDIZ = opcionSinCarga(
   'aprendiz',
@@ -1191,34 +1233,167 @@ export function proyectarElQuiebro(estado: EstadoDelQuiebro | undefined, quien: 
 }
 
 /**
- * EL PLANO QUE SE DIBUJA, en metros (x al este, z al sur, que en el dibujo es la `y` hacia abajo: el
- * norte queda arriba). Son las cifras de la traza de `quiebro-barrio.ts`, escritas aquí para que la
- * mesa no cargue el barrio entero —su módulo monta el grafo al cargarse, y la app instala todos los
- * arcades al arrancar—. `verify:quiebro` comprueba que siguen siendo las del barrio.
+ * EL PLANO QUE SE DIBUJA: la ciudad de la mesa (`docs/quiebro/CIUDAD-ABIERTA.md`, §2 y §5.2), con `x` al
+ * este y `z` al sur, que en el dibujo es la `y` hacia abajo: el norte queda arriba. Las cuentas van en
+ * metros; el tablero, en pasos de `unidad` (6 m), porque toda cifra del plano es múltiplo de 6 —ejes de
+ * 24 + 48k, solares de 36, el canto en 270— y dos cifras por coordenada en vez de tres son cien bytes
+ * menos en cada vista.
  *
- * Lo que NO se dibuja, y por qué: los edificios, las cabinas y el refugio salen de (código, noche), y
- * el código de la mesa no llega nunca al reductor ni a la proyección (`ContextoMovimiento` no lo
- * lleva, y la semilla de la mesa es otra). Pintar una cabina que no es la que suena sería peor que no
- * pintarla. La traza —manzanas, glorieta y calles— no depende del código, y ésa sí va.
+ * ═══ SIN DERIVAR LA CIUDAD ═══
+ *
+ * La mesa se carga al arrancar la app (se instalan todos los arcades), y `quiebro-ciudad.ts` deriva
+ * ciudades: cargarlo aquí le costaría su montaje a quien sólo quiere la lista de juegos. Así que el
+ * retablo sale de los DATOS de las cuatro trazas dibujadas (`quiebro-trazas.ts`, que no hace ni una
+ * cuenta) y de estas cifras del §2, con la simetría de la traza. `verify:quiebro` compara en las 32 trazas
+ * cada plaza, cada distrito, cada avenida y cada calle mayor del retablo con los de `ciudadDeLaMesa`, y la
+ * simetría de aquí con la de allí en todos los huecos: si la ciudad se mueve y el retablo no, sale rojo.
+ *
+ * ═══ QUÉ SE DIBUJA, Y QUÉ NO ═══
+ *
+ * Los cinco distritos (caras con su nombre), las seis plazas (caras con el suyo; las de la noche,
+ * destacadas y en verde-cian, que es el color del Sistema que falla) y las dos avenidas (líneas). No van
+ * los edificios, las cabinas ni los refugios: salen del código, que no llega nunca al reductor ni a la
+ * proyección, y pintar una cabina que no es la que suena sería peor que no pintarla. Tampoco el límite de
+ * la fase: ya no encierra nada que dibujar, salvo en la Bajada, y la plaza de la Bajada va destacada.
+ *
+ * Y tampoco las calles, ni siquiera las mayores que pide el §5.2: son las líneas ±120, que casi enteras
+ * son ya el borde de algún distrito, y como líneas costaban 350 B de los 4.096 del tope. Una cara del
+ * tablero son unos 190 B de forma fija, así que once caras y dos líneas se llevan 2,4 kB; lo que queda es
+ * para los paneles, que son lo que se lee, con seis nombres de 24 letras y diez noches de historial (lo
+ * mide `verify:quiebro`, y lo ve rojo con las 24 calles).
  */
 export const PLANO_DEL_TABLERO = {
-  medioBarrio: 78,
-  ladoDeManzana: 36,
-  solares: [-66, -18, 30],
-  /** Los ejes de las cuatro calles de cada sentido (el centro de su calzada). */
-  calles: [-72, -24, 24, 72],
-  laGlorieta: 4,
-  limites: { glorieta48: 24, glorieta60: 30, barrio: 78 },
+  /** De acera a acera exterior son 540 m (§2.1): ±270. */
+  borde: 270,
+  /** El paso de la rejilla: el hueco `(i, j)` es la celda `[48i − 24, 48i + 24]`, con su solar en medio. */
+  paso: 48,
+  medioSolar: 18,
+  /** Los huecos van de −5 a 5. */
+  huecoMaximo: 5,
+  /** Las líneas ±120 separan los distritos y llevan las avenidas y las calles mayores. */
+  mayor: 120,
+  /** Lo que mide un paso del dibujo del tablero, en metros. */
+  unidad: 6,
 } as const;
 
 /** Los colores, en la forma corta de tres cifras: el tablero viaja en cada vista y cada byte cuenta doce veces. */
 const COLOR = {
-  manzana: '#233',
-  glorieta: '#243',
   borde: '#445',
-  calle: '#567',
-  limite: '#fb0',
+  ciudad: '#223',
+  plaza: '#354',
+  /** Verde-cian: lo del Sistema que falla (§1 del diseño). El ámbar es del jugador, y aquí no sale. */
+  fallo: '#2a9',
+  avenida: '#89a',
 } as const;
+
+/** El tono de cada distrito: el de su carácter (§2.2), oscuro para que se lean los rótulos. */
+const COLOR_DEL_DISTRITO: Readonly<Record<IdDeDistritoConNombre, string>> = { casco: '#433', ensanche: '#423', lonja: '#343', naves: '#333', torres: '#235' };
+
+/** Un rectángulo del plano, en metros. */
+interface CajaDelPlano {
+  readonly x0: number;
+  readonly z0: number;
+  readonly x1: number;
+  readonly z1: number;
+}
+
+/**
+ * LA SIMETRÍA `s` DE UNA TRAZA: el bit 4 cambia los ejes y luego el 1 da la vuelta a `x` y el 2 a `z`. Es
+ * `puntoSimetrico` de `quiebro-ciudad.ts`, la misma cuenta escrita aquí para no cargar aquel módulo (ver
+ * la cabecera del plano); `verify:quiebro` compara las dos en todos los huecos y las ocho simetrías. Sin
+ * `−0`: la forma canónica del tablero no lo distingue, pero un `Object.is` sí.
+ */
+function girar(s: number, x: number, z: number): { readonly x: number; readonly z: number } {
+  const a = (s & 4) !== 0 ? z : x;
+  const b = (s & 4) !== 0 ? x : z;
+  return { x: (s & 1) !== 0 && a !== 0 ? -a : a, z: (s & 2) !== 0 && b !== 0 ? -b : b };
+}
+
+function girarCaja(s: number, c: CajaDelPlano): CajaDelPlano {
+  const p = girar(s, c.x0, c.z0);
+  const q = girar(s, c.x1, c.z1);
+  return { x0: p.x < q.x ? p.x : q.x, z0: p.z < q.z ? p.z : q.z, x1: p.x < q.x ? q.x : p.x, z1: p.z < q.z ? q.z : p.z };
+}
+
+/** Lo que ocupan los huecos `i0…i1` × `j0…j1`: sus celdas, y en el canto de la ciudad hasta la acera exterior. */
+function cajaDeLosHuecos(i0: number, i1: number, j0: number, j1: number): CajaDelPlano {
+  const P = PLANO_DEL_TABLERO;
+  const desde = (k: number): number => (k <= -P.huecoMaximo ? -P.borde : P.paso * k - P.paso / 2);
+  const hasta = (k: number): number => (k >= P.huecoMaximo ? P.borde : P.paso * k + P.paso / 2);
+  return { x0: desde(i0), z0: desde(j0), x1: hasta(i1), z1: hasta(j1) };
+}
+
+/**
+ * LOS CINCO DISTRITOS EN LA TRAZA DIBUJADA, en huecos (`[id, i0, i1, j0, j1]`): el molinete del §2.2, el
+ * Casco en las 5 × 5 del centro y cada distrito de fuera en una franja de 3 × 8 con su esquina.
+ */
+const DISTRITOS_DIBUJADOS: readonly (readonly [IdDeDistritoConNombre, number, number, number, number])[] = [
+  ['casco', -2, 2, -2, 2],
+  ['naves', -2, 5, -5, -3],
+  ['lonja', -5, -3, -5, 2],
+  ['ensanche', -5, 2, 3, 5],
+  ['torres', 3, 5, -2, 5],
+];
+
+/**
+ * LAS AVENIDAS EN LA TRAZA DIBUJADA (`[id, x0, z0, x1, z1]`, por su eje): el Elevado a lo largo de `x` por
+ * z = −120, de canto a canto; el Bulevar a lo largo de `z` por x = 120, del Elevado al canto sur (§2.1).
+ */
+const AVENIDAS_DIBUJADAS: readonly (readonly ['elevado' | 'bulevar', number, number, number, number])[] = [
+  ['elevado', -270, -120, 270, -120],
+  ['bulevar', 120, -120, 120, 270],
+];
+
+/** Una plaza del plano: número (1-6), centro, nombre y distrito. */
+export interface PlazaDelPlano {
+  readonly numero: number;
+  readonly x: number;
+  readonly z: number;
+  readonly nombre: string;
+  readonly distrito: IdDeDistritoConNombre;
+}
+
+/** EL PLANO DE UNA TRAZA: sus distritos, sus plazas (en orden de número) y sus dos avenidas. */
+export interface PlanoDeLaTraza {
+  readonly distritos: readonly { readonly id: IdDeDistritoConNombre; readonly caja: CajaDelPlano }[];
+  readonly plazas: readonly PlazaDelPlano[];
+  readonly avenidas: readonly { readonly id: 'elevado' | 'bulevar'; readonly caja: CajaDelPlano }[];
+}
+
+/** Los planos ya hechos: 32 como mucho, uno por traza, y no dependen de nada más. */
+const PLANOS = new Map<number, PlanoDeLaTraza>();
+
+/**
+ * EL PLANO DE LA TRAZA `traza` (0-31), de los datos de su traza dibujada y su simetría (ver la cabecera
+ * del plano). Una traza fuera de rango da un plano vacío: el retablo no lanza.
+ */
+export function planoDeLaTraza(traza: number): PlanoDeLaTraza {
+  const hecho = PLANOS.get(traza);
+  if (hecho !== undefined) return hecho;
+  const dibujada = Number.isInteger(traza) && traza >= 0 && traza < TRAZAS_POSIBLES ? TRAZAS_DE_LA_CIUDAD[Math.floor(traza / 8)] : undefined;
+  if (dibujada === undefined) return { distritos: [], plazas: [], avenidas: [] };
+  const s = traza % 8;
+  const H = PLANO_DEL_TABLERO.huecoMaximo;
+  const distritos = DISTRITOS_DIBUJADOS.map(([id, i0, i1, j0, j1]) => ({ id, caja: girarCaja(s, cajaDeLosHuecos(i0, i1, j0, j1)) }));
+  const plazas: PlazaDelPlano[] = [];
+  for (let j = -H; j <= H; j++) {
+    const fila = dibujada.huecos[j + H] ?? '';
+    for (let i = -H; i <= H; i++) {
+      const letra = fila.charAt(i + H);
+      const numero = letra.length === 1 ? '123456'.indexOf(letra) + 1 : 0;
+      if (numero < 1) continue;
+      const c = girar(s, PLANO_DEL_TABLERO.paso * i, PLANO_DEL_TABLERO.paso * j);
+      let distrito: IdDeDistritoConNombre = 'casco';
+      for (const [id, i0, i1, j0, j1] of DISTRITOS_DIBUJADOS) if (i >= i0 && i <= i1 && j >= j0 && j <= j1) distrito = id;
+      plazas.push({ numero, x: c.x, z: c.z, nombre: nombreDePlaza(dibujada.nombres[numero - 1] ?? -1), distrito });
+    }
+  }
+  plazas.sort((a, b) => a.numero - b.numero);
+  const avenidas = AVENIDAS_DIBUJADAS.map(([id, x0, z0, x1, z1]) => ({ id, caja: girarCaja(s, { x0, z0, x1, z1 }) }));
+  const plano: PlanoDeLaTraza = { distritos, plazas, avenidas };
+  PLANOS.set(traza, plano);
+  return plano;
+}
 
 /** Cómo se rotula la fase, para el panel y el aviso. */
 function rotuloDeLaFase(m: MesaDelQuiebro): string {
@@ -1250,8 +1425,12 @@ function elAviso(m: MesaDelQuiebro): string {
   switch (f.tipo) {
     case 'reunion':
       return `${N.fases.reunion}: cuando estéis, que alguien pulse ${N.mesa.empezar}.`;
-    case 'bajada':
-      return `${N.fases.bajada}: el barrio se escribe. Elige estilo si no lo has hecho.`;
+    case 'bajada': {
+      /* Dónde se baja: «Plaza · Distrito», como el rótulo de la Bajada (§2.7 de la ciudad abierta). */
+      const p = m.traza === null || m.noche === null ? undefined : planoDeLaTraza(m.traza).plazas[bajadaDeLaNoche(m.noche) - 1];
+      const donde = p === undefined ? '' : ` a ${p.nombre} · ${N.ciudad.distritos[p.distrito]}`;
+      return `${N.fases.bajada}${donde}: la ciudad se escribe. Elige estilo si no lo has hecho.`;
+    }
     case 'oleada':
       return `${rotuloDeLaFase(m)}: el Sistema entra en la plaza.`;
     case 'pausa':
@@ -1276,37 +1455,37 @@ function panelesDelQuiebro(m: MesaDelQuiebro, sentados: LosSentados): TableroDec
 
   const noche: string[] = [rotuloDeLaFase(m)];
   if (m.noche !== null) {
-    noche.push(`Avería: ${N.averias[r.averia]} · ${N.cuentas.memoria}: ${N.contramedidas[r.contramedida]}`);
+    /* La avería y la Memoria, sólo si las hay: «Sin avería» en cada vista de la primera noche es ruido que pesa. */
+    const sistema: string[] = [];
+    if (r.averia !== 'ninguna') sistema.push(`Avería: ${N.averias[r.averia]}`);
+    if (r.contramedida !== 'ninguna') sistema.push(`${N.cuentas.memoria}: ${N.contramedidas[r.contramedida]}`);
+    if (sistema.length > 0) noche.push(sistema.join(' · '));
     noche.push(`Receta: ${N.recetas[m.noche.receta]} · ${N.cuentas.monedas}: ${String(m.monedas)}`);
   }
   paneles.push({ titulo: m.noche === null ? N.fases.reunion : `${N.cuentas.noche} ${String(m.noche.numero)} · ${nombreDelNivel(r.nivel)}`, lineas: noche });
 
+  /*
+   * Una línea por desvelado, y en la pausa lo que eligió o que aún elige al final de la suya (antes iba en
+   * un panel aparte que repetía los seis nombres: pesaba lo que dos calles, y el retablo tiene 4 kB). Lo
+   * que se le ofrece a cada cual va en sus `opciones`, con su botón.
+   */
   const gente: string[] = [];
   for (let i = 0; i < m.asientos.length; i++) {
     const a = m.asientos[i] as AsientoDelQuiebro;
     const estilo = (r.asientos[i] as { estilo: IdDeEstilo }).estilo;
     /* En la Bajada el aguante que cuenta es el lleno del estilo elegido: el del punto de control es el de antes de cambiar. */
     const aguante = m.fase.tipo === 'bajada' ? aguanteLleno(estilo, r.averia) : a.control.aguante;
-    const marcas = `${a.ausente ? ` · ${N.estados.ausente.toLowerCase()}` : ''}${a.salio ? ' · salió' : ''}${m.fase.tipo === 'bajada' && a.haElegido ? ' · listo' : ''}`;
-    gente.push(`${nombre(a.asiento)} (${N.estilos[estilo]}): ${String(a.puntos)} ${N.cuentas.puntos.toLowerCase()}, ${String(a.control.esquirlas)} ${N.cuentas.esquirlas.toLowerCase()}, ${String(aguante)} de ${N.cuentas.aguante.toLowerCase()}${marcas}`);
-  }
-  if (gente.length > 0) paneles.push({ titulo: N.gente.desvelados, lineas: gente });
-
-  if (m.fase.tipo === 'pausa') {
-    /* Lo que eligió cada uno, o que aún elige. Lo que se le ofrece a cada cual va en sus `opciones`, con su botón. */
-    const retoques: string[] = [];
-    for (let i = 0; i < m.asientos.length; i++) {
-      const a = m.asientos[i] as AsientoDelQuiebro;
+    let marcas = `${a.ausente ? ` · ${N.estados.ausente.toLowerCase()}` : ''}${a.salio ? ' · salió' : ''}${m.fase.tipo === 'bajada' && a.haElegido ? ' · listo' : ''}`;
+    if (m.fase.tipo === 'pausa') {
       const tiene = (r.asientos[i] as { retoques: readonly IdDeRetoque[] }).retoques;
       const ultimo = tiene[tiene.length - 1];
-      retoques.push(
-        a.haElegido && ultimo !== undefined
-          ? `${nombre(a.asiento)}: ${N.retoques[ultimo]}${a.voto === null ? '' : ` · ${N.votos[a.voto]}`}`
-          : `${nombre(a.asiento)}: eligiendo`,
-      );
+      marcas += a.haElegido && ultimo !== undefined ? ` · ${N.retoques[ultimo]}${a.voto === null ? '' : ` · ${N.votos[a.voto]}`}` : ' · eligiendo';
     }
-    paneles.push({ titulo: 'Retoques', lineas: retoques });
+    gente.push(`${nombre(a.asiento)} (${N.estilos[estilo]}): ${String(a.puntos)} · ${String(a.control.esquirlas)} · ${String(aguante)}${marcas}`);
   }
+  /* Las tres cifras de cada línea, dichas una vez en el título: seis veces «puntos, esquirlas, de aguante» eran 200 B del tope. */
+  const leyenda = `${N.cuentas.puntos.toLowerCase()}, ${N.cuentas.esquirlas.toLowerCase()} y ${N.cuentas.aguante.toLowerCase()}`;
+  if (gente.length > 0) paneles.push({ titulo: `${N.gente.desvelados}: ${leyenda}`, lineas: gente });
 
   const ultima = m.historial[m.historial.length - 1];
   if (esEntreNoches(m.fase) && ultima !== undefined && ultima.titulos.length > 0) {
@@ -1349,65 +1528,54 @@ function accionesComunes(m: MesaDelQuiebro): TableroDeclarado['acciones'] {
   return comunes.map((o) => ({ id: o.id, rotulo: o.rotulo, ayuda: o.ayuda, disponible: true, toque: { tipo: o.tipo, carga: o.carga } }));
 }
 
-/** Una línea del plano, sin toque. */
-function linea(id: string, desde: { x: number; y: number }, hasta: { x: number; y: number }, color: string, tenue: boolean): TableroDeclarado['lineas'][number] {
-  return { id, desde, hasta, color, grosor: 1, tenue, toque: null };
+/** Una cara del plano: un rectángulo, sin toque. */
+function cara(id: string, c: CajaDelPlano, relleno: string, rotulo: string, destacada: boolean): TableroDeclarado['caras'][number] {
+  const u = PLANO_DEL_TABLERO.unidad;
+  return {
+    id,
+    puntos: [
+      { x: c.x0 / u, y: c.z0 / u },
+      { x: c.x1 / u, y: c.z0 / u },
+      { x: c.x1 / u, y: c.z1 / u },
+      { x: c.x0 / u, y: c.z1 / u },
+    ],
+    relleno,
+    borde: COLOR.borde,
+    rotulo,
+    cifra: '',
+    destacada,
+    toque: null,
+  };
 }
 
 /**
  * EL TABLERO: el respaldo honrado del escritorio (y de cualquier cliente que no pinte la escena). La
- * traza del barrio —las ocho manzanas, la glorieta y las ocho calles por su eje— con el límite de la
- * fase en ámbar, el marcador y la noche en paneles, y los botones que valen para todos. Unos 4 kB: se
- * manda en cada vista.
+ * ciudad de la mesa —sus cinco distritos, sus seis plazas con las de la noche destacadas y sus dos
+ * avenidas (ver `PLANO_DEL_TABLERO`)—, el marcador y la noche en paneles, y los botones que
+ * valen para todos. En la reunión todavía no hay traza: la ciudad sin escribir y la Glorieta del
+ * Relojero, que está en el centro de todas. 4 kB como mucho: se manda en cada vista.
  */
 export function tableroDelQuiebro(m: MesaDelQuiebro, sentados: LosSentados): TableroDeclarado {
   const P = PLANO_DEL_TABLERO;
   const caras: TableroDeclarado['caras'] = [];
-  for (let fila = 0; fila < 3; fila++) {
-    for (let columna = 0; columna < 3; columna++) {
-      const indice = fila * 3 + columna;
-      const x0 = P.solares[columna] as number;
-      const z0 = P.solares[fila] as number;
-      const x1 = x0 + P.ladoDeManzana;
-      const z1 = z0 + P.ladoDeManzana;
-      const esGlorieta = indice === P.laGlorieta;
-      caras.push({
-        id: `m${String(indice)}`,
-        puntos: [
-          { x: x0, y: z0 },
-          { x: x1, y: z0 },
-          { x: x1, y: z1 },
-          { x: x0, y: z1 },
-        ],
-        relleno: esGlorieta ? COLOR.glorieta : COLOR.manzana,
-        borde: COLOR.borde,
-        rotulo: esGlorieta ? N.lugares.glorieta : '',
-        cifra: '',
-        destacada: false,
-        toque: null,
-      });
-    }
-  }
   const lineas: TableroDeclarado['lineas'] = [];
-  const b = P.medioBarrio;
-  for (let k = 0; k < P.calles.length; k++) {
-    const eje = P.calles[k] as number;
-    lineas.push(linea(`c${String(k)}`, { x: -b, y: eje }, { x: b, y: eje }, COLOR.calle, true));
-    lineas.push(linea(`c${String(k + P.calles.length)}`, { x: eje, y: -b }, { x: eje, y: b }, COLOR.calle, true));
-  }
-  if (esFaseDeJuego(m.fase) || m.fase.tipo === 'interrumpida') {
-    const lado = P.limites[limiteDeLaFase(m.fase, presentesDeLaMesa(m.asientos))];
-    const esquinas = [
-      { x: -lado, y: -lado },
-      { x: lado, y: -lado },
-      { x: lado, y: lado },
-      { x: -lado, y: lado },
-    ];
-    for (let k = 0; k < 4; k++) {
-      lineas.push(linea(`l${String(k)}`, esquinas[k] as { x: number; y: number }, esquinas[(k + 1) % 4] as { x: number; y: number }, COLOR.limite, false));
+  const plaza = (x: number, z: number): CajaDelPlano => ({ x0: x - P.medioSolar, z0: z - P.medioSolar, x1: x + P.medioSolar, z1: z + P.medioSolar });
+  if (m.traza === null || m.noche === null) {
+    caras.push(cara('ciudad', { x0: -P.borde, z0: -P.borde, x1: P.borde, z1: P.borde }, COLOR.ciudad, '', false));
+    caras.push(cara(`p${String(PLAZA_DE_LA_PRIMERA_BAJADA)}`, plaza(0, 0), COLOR.plaza, nombreDePlaza(0), false));
+  } else {
+    const plano = planoDeLaTraza(m.traza);
+    const fallos = m.noche.fallos;
+    for (const d of plano.distritos) caras.push(cara(d.id, d.caja, COLOR_DEL_DISTRITO[d.id], N.ciudad.distritos[d.id], false));
+    for (const p of plano.plazas) {
+      const deLaNoche = fallos.indexOf(p.numero) >= 0;
+      caras.push(cara(`p${String(p.numero)}`, plaza(p.x, p.z), deLaNoche ? COLOR.fallo : COLOR.plaza, p.nombre, deLaNoche));
     }
+    const u = P.unidad;
+    for (const a of plano.avenidas) lineas.push({ id: a.id, desde: { x: a.caja.x0 / u, y: a.caja.z0 / u }, hasta: { x: a.caja.x1 / u, y: a.caja.z1 / u }, color: COLOR.avenida, grosor: 3, tenue: false, toque: null });
   }
-  const borde = P.medioBarrio + 4;
+  /* Un paso de margen alrededor del cerco. */
+  const borde = P.borde / P.unidad + 1;
   return {
     vista: { x: -borde, y: -borde, ancho: 2 * borde, alto: 2 * borde },
     caras,

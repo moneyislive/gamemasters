@@ -30,10 +30,22 @@
  * Lo manda el gobernador (`calidad/`, de otro frente) como prop. Cambiarlo no rehace ninguna malla:
  * cada pieza reserva la capacidad del nivel más alto y el nivel sólo dice cuántas instancias se
  * pintan. El atlas se suelta al desmontar la raíz.
+ *
+ * ═══ COMPILADOS ANTES DE HACER FALTA ═══
+ *
+ * Casi todos los efectos se pintan de tarde en tarde (el muro del Bis, sólo en un Bis), y three compila el
+ * programa de un material la primera vez que lo pinta, esperando al compilador en ese fotograma: el muro, con
+ * sus dos caras, eran 49 ms en el primer Bis de la noche (revisión de rendimiento del 24-sep). Al montarse, en
+ * el primer pintado principal, se piden los programas de TODOS (también de lo que no se ve, y las dos caras de
+ * lo que tiene dos: `renderer.compile` lo hace como el pintado): el compilador los hace mientras tanto y el
+ * primer Bis ya los encuentra. Tras cada cambio de nivel los vuelve a pedir `usarLaPrecompilacionAlCambiar`
+ * (`calidad/precompilar.ts`), con el estado nuevo del renderizador.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import { useFrame } from '@react-three/fiber';
+import type * as THREE from 'three';
+import { usarAlPintarLaEscena } from '../calidad/precompilar';
 import { AnillosDelAnuncio } from './anillos';
 import { soltarElAtlas } from './atlas';
 import { ChispasDeImpacto, EsquirlasAmbar } from './chispas';
@@ -70,8 +82,18 @@ export function EfectosDelQuiebro({ sistema, nivel, semillaDelCielo = 1, sinCiel
   }, -1);
   useEffect(() => () => soltarElAtlas(), []);
 
+  /* Los programas de todos los efectos, pedidos en el primer pintado principal (ver la cabecera). */
+  const grupo = useRef<THREE.Group>(null);
+  const porCompilar = useRef(true);
+  usarAlPintarLaEscena((gl, escena, camara) => {
+    const g = grupo.current;
+    if (!porCompilar.current || g === null) return;
+    porCompilar.current = false;
+    gl.compile(g, camara, escena);
+  });
+
   return (
-    <group name="efectos-del-quiebro">
+    <group name="efectos-del-quiebro" ref={grupo}>
       {sinCielo ? null : <CieloDeGrafia sistema={sistema} semilla={semillaDelCielo} />}
       <PantallasDeGrafia sistema={sistema} />
       <MuroDelBis sistema={sistema} />

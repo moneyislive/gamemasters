@@ -25,8 +25,8 @@
  *   6. LAS TABLAS (`componerReglamento`): estilos, retoques, niveles, averías, propinas, el factor de
  *      puntos exacto (y el mismo en la declaración), la tabla del §4.10 por presentes y la Memoria.
  *   7. LA VISTA Y EL TABLERO: la misma para todos, leída por `leerVistaDelQuiebro` en TODAS las vistas
- *      que salen, con el tablero válido, de unos 4 kB y con los nombres; y el plano —manzanas, glorieta
- *      y calles—, el del barrio.
+ *      que salen, con el tablero válido, de 4 kB como mucho y con los nombres; y el plano, el de la ciudad
+ *      de su traza.
  *   8. EL PRODUCTOR (`lizaDelQuiebro`): `null` sin lanzar ante lo que no es una vista; y en las
  *      cientos de vistas de las partidas del robot, declaraciones sin problemas, con el mismo aforo, la
  *      clave que cambia sólo con la fase, el encuentro, los presentes, los límites y el reglamento de
@@ -36,6 +36,15 @@
  *      todas las fases, con gente que se va y vuelve; las travesuras se rechazan y nada sale
  *      inesperado, el diario de cada noche cabe en su tope, la misma semilla da la misma partida y el
  *      diario reejecutado da el mismo estado.
+ *  10. LA CIUDAD ABIERTA (entrega 1, `docs/quiebro/CIUDAD-ABIERTA.md`): la traza, sorteada al empezar y la
+ *      misma las diez noches; la plaza de la Bajada de cada noche (la Glorieta la primera, y siempre otra
+ *      que la anterior); el límite (la plaza en la Bajada, la ciudad en todo lo demás); el mundo de la
+ *      noche, que es el de la ciudad y el MISMO objeto toda la noche, con sus sitios de nacer en la plaza de
+ *      la Bajada y su memoria de 16; los grupos, de esa plaza, y la Llamada en las cabinas a 100-160 m por
+ *      calles, mirado en las 32 trazas con cada plaza; L10 sin tope y sin olvido, y lo que eso hace en la sala
+ *      de verdad (el grupo quieto lejos de la plaza no aguanta una oleada sin pelear, y en la carrera a la
+ *      cabina lo que sale de la plaza lo persigue); el retablo, que es la ciudad de la traza en 4 kB; los
+ *      nombres de la ciudad; y el coste de una sala con ella.
  *
  * Lo que NO afirma: que la sala arbitre bien (eso es `verify:liza`, con una liza de juguete) ni que
  * los números sean divertidos (eso lo dice la gente jugando). Y el robot genérico de la casa, que
@@ -76,6 +85,35 @@
  * el reloj que llega tarde (la sala lo manda: lee la vista una vez por segundo) y dio a la Réplica su
  * avance. Cada comprobación nueva o cambiada se vio roja en un espejo (`scratchpad/pulido-reglas-sala/
  * roturas.py`), y el suelo quedó en 318.
+ *
+ * La cuarta pasada (24-sep-2026, la ciudad abierta, entrega 1) cambió el barrio por la ciudad de 540 m:
+ * la traza en la vista, la plaza de la Bajada de cada noche, el límite `ciudad`, el mundo de la noche con
+ * su memoria de 16, la Llamada en las cabinas de la banda cercana, L10, el retablo de la ciudad en 4 kB y
+ * el coste nuevo. Sus 53 roturas, en un espejo del scratchpad (`scratchpad/ciudad-reglas/roturas.py`) y
+ * restauradas con `filecmp`, pusieron en rojo cada comprobación nueva o cambiada por su nombre, con salida
+ * 1, y el suelo quedó en 355. Las que enseñaron algo:
+ *
+ *   · la memoria que echa al que ENTRÓ primero en vez de al que lleva más sin usarse salía en verde: la
+ *     comprobación usaba la segunda más vieja, que con las dos políticas se queda. Ahora se usa la más vieja
+ *     de dieciséis recién hechas con un código que nadie más usa, y una decimoséptima decide;
+ *   · dos roturas que tumbaban el guion (salida 3) antes de llegar a su comprobación se cambiaron por otras
+ *     que la alcanzan: un nombre de distrito de MÁS y no uno cambiado, y la reunión sin su cara de ciudad.
+ *
+ * La quinta pasada (24-sep-2026, el arreglo de la entrega 1 tras la revisión de la sala) quitó el olvido y el
+ * tope de alcance de los encuentros (`PERSECUCION_DEL_SISTEMA`): con ellos, el grupo quieto lejos de la plaza
+ * aguantaba las oleadas sin un golpe. La comprobación de L10 cambió a la forma nueva, y dos nuevas juegan la
+ * sala de verdad (con el banco de `liza-de-juguete.ts`): el grupo quieto a 150 m y la carrera a la cabina. Sus
+ * roturas, en un espejo del scratchpad (`scratchpad/ciudad-reglas/arreglo/roturas.py`) y restauradas con
+ * `filecmp`, las pusieron en rojo por su nombre con salida 1, y el suelo quedó en 357. La que enseñó algo: con
+ * el olvido de antes, la franja de 45 a 90 m ya cerrada en la Liza dejaba en verde el caso de la revisión (el
+ * grupo a 118-123 m, que ahora sí recibe al Sistema); por eso el grupo quieto se pone a 150 m, donde ninguna
+ * boca lo tiene a 90 y el olvido de antes aún lo dejaba en paz.
+ *
+ * En la misma pasada, tras la revisión de jugar (la Llamada que suena lejos), la cabina pasó al reloj de la
+ * ciudad (60 s, 50 en Temporal y Tormenta; §3.9 de CIUDAD-ABIERTA), que va con la banda de 100-160 m que ya
+ * se usaba. Las roturas de antes y las tres del reloj (el de la glorieta entero, sólo el corto, y el Temporal
+ * con el largo) se repitieron en un espejo nuevo del árbol (`scratchpad/ciudad-reglas/arreglo2/roturas.py`):
+ * todas en rojo por su nombre con salida 1, restauradas byte a byte y con la huella del espejo intacta.
  */
 import '../../shared/arcade/juegos';
 import {
@@ -97,15 +135,18 @@ import {
 import type { AsientoNombrado, Movimiento, QuienMira } from '../../shared/arcade';
 import { canonico } from '../../shared/mecanicas/canonico';
 import { UNO } from '../../shared/mecanicas/fijo';
-import { accionesDelCable, problemasDeLaDeclaracion } from '../../shared/mecanicas/liza/declaracion';
+import { accionesDelCable, alcanceDeBlancoDe, arenaDeLaLiza, olvidoDelEncuentro, problemasDeLaDeclaracion } from '../../shared/mecanicas/liza/declaracion';
+import { MOTIVO_DE_IRSE } from '../../shared/mecanicas/liza/protocolo';
+import type { EstadoDeLaSala } from '../../shared/mecanicas/liza/tipos-de-la-sala';
+import { sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { GrupoDeclarado, LizaDeclarada } from '../../shared/mecanicas/liza/declaracion';
 import { esTableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
-import { arcadesQueSeLidian, costeDeLaLiza, lizaDeLaMesa, sePuedeLidiar } from '../../shared/arcade/juegos/lizas';
-import { MANIFIESTO_QUIEBRO, PLANO_DEL_TABLERO, QUIEBRO } from '../../shared/arcade/juegos/quiebro';
+import { arcadesQueSeLidian, cabeOtraSala, COSTE_DE_UNA_SALA, costeDeLaLiza, lizaDeLaMesa, PRESUPUESTO_DE_LAS_LIZAS, sePuedeLidiar } from '../../shared/arcade/juegos/lizas';
+import { MANIFIESTO_QUIEBRO, PLANO_DEL_TABLERO, planoDeLaTraza, QUIEBRO, tableroDelQuiebro } from '../../shared/arcade/juegos/quiebro';
 import type { EstadoDelQuiebro, MesaDelQuiebro } from '../../shared/arcade/juegos/quiebro';
-import { barrioDeLaNoche, EJES_DE_CALLE, ID_DE_LIMITE_EN_LA_LIZA, LA_GLORIETA, LADO_DE_MANZANA, MEDIO_BARRIO, SOLARES } from '../../shared/arcade/juegos/quiebro-barrio';
-import { AFORO_DEL_QUIEBRO, claveDeLaFase, lizaDelQuiebro } from '../../shared/arcade/juegos/quiebro-liza';
-import { IDS_DE_AVERIA, IDS_DE_ESTILO, IDS_DE_RECETA, IDS_DE_RETOQUE, NOMBRES_DEL_QUIEBRO } from '../../shared/arcade/juegos/quiebro-nombres';
+import * as C from '../../shared/arcade/juegos/quiebro-ciudad';
+import { AFORO_DEL_QUIEBRO, CLASE_DE_LA_CABINA_QUE_SUENA, claveDeLaFase, lizaDelQuiebro } from '../../shared/arcade/juegos/quiebro-liza';
+import { IDS_DE_AVERIA, IDS_DE_ESTILO, IDS_DE_RECETA, IDS_DE_RETOQUE, NOMBRES_DEL_QUIEBRO, nombreDeCalle, nombreDePasaje, nombreDePlaza } from '../../shared/arcade/juegos/quiebro-nombres';
 import type { IdDeRetoque } from '../../shared/arcade/juegos/quiebro-nombres';
 import {
   ACCION_DEL_QUIEBRO,
@@ -120,12 +161,15 @@ import {
   monedasAlEmpezar,
   nivelDelSistema,
   nivelTrasLaNoche,
+  PERSECUCION_DEL_SISTEMA,
   rondaDeLaFase,
 } from '../../shared/arcade/juegos/quiebro-reglas';
 import type { ReglamentoCompuesto, VistaParaComponer } from '../../shared/arcade/juegos/quiebro-reglas';
-import { COLUMNAS_DE_LA_RONDA, leerVistaDelQuiebro } from '../../shared/arcade/juegos/quiebro-vista';
+import { bajadaDeLaNoche, COLUMNAS_DE_LA_RONDA, FALLOS_COMO_MUCHO, leerVistaDelQuiebro, PLAZA_DE_LA_PRIMERA_BAJADA, PLAZAS_DE_LA_CIUDAD, TRAZAS_POSIBLES } from '../../shared/arcade/juegos/quiebro-vista';
 import type { FaseDelQuiebro, VistaDelQuiebro } from '../../shared/arcade/juegos/quiebro-vista';
 import { arnes } from './arnes';
+import { Aparato, Banco, quieto } from './liza-de-juguete';
+import type { Robot } from './liza-de-juguete';
 import { jugarAlQuiebro } from './robot-de-quiebro';
 import type { PartidaDelRobotDelQuiebro } from './robot-de-quiebro';
 
@@ -342,13 +386,12 @@ function topeDeLaNoche(asientos: number, numero: number): number {
 }
 
 /**
- * LO QUE PESA EL TABLERO COMO MUCHO, en la forma canónica. El diseño lo estimaba en unos 3 kB; con las
- * ocho calles dibujadas (el plano de la traza entero) son unos 4 en la vista más cargada: la pausa de
- * seis asientos con nombres largos y diez noches de historial. Viaja con cada revisión de la mesa, unas
- * cincuenta por noche, mientras la sala le manda a cada aparato 4,4 kB por SEGUNDO de fotos (§12): el
- * kilobyte de las calles no se nota, y el tope está para que el tablero no crezca sin que nadie lo vea.
+ * LO QUE PESA EL TABLERO COMO MUCHO, en BYTES de su forma canónica en UTF-8: 4 kB, lo que fija la ciudad
+ * abierta (`docs/quiebro/CIUDAD-ABIERTA.md`, §5.2 y §6.4). Viaja con cada revisión de la mesa, unas
+ * cincuenta por noche; el tope está para que el retablo no crezca sin que nadie lo vea (con las 24 calles
+ * dibujadas, que es la rotura del §6.4, se va a casi 7). Antes era 5.120 caracteres, con el barrio.
  */
-const TOPE_DEL_TABLERO = 5120;
+const TOPE_DEL_TABLERO = 4096;
 
 /** Lo que de una noche depende de la sala y no de la mesa: se descuenta antes de comparar con el tope. */
 const DE_LA_SALA = ['arcade:ausente', TIC, 'reanudar'];
@@ -443,14 +486,18 @@ paso('La Bajada: la noche 1 empieza, se elige estilo y se dice lo del aprendiz')
     me.reloj,
   );
   comprobar(
-    'la noche 1 va en Llovizna, sin avería ni contramedida, con una receta, la glorieta y 3 monedas',
+    'la noche 1 va en Llovizna, sin avería ni contramedida, con una receta, 3 monedas, su traza, y baja a la Glorieta del Relojero',
     me.reglamento.nivel === 1 &&
       me.reglamento.averia === 'ninguna' &&
       me.reglamento.contramedida === 'ninguna' &&
       IDS_DE_RECETA.indexOf(me.noche?.receta ?? 'enjambre') >= 0 &&
-      me.noche?.plantilla === 'glorieta' &&
+      forma(me.noche?.fallos) === forma([PLAZA_DE_LA_PRIMERA_BAJADA]) &&
+      me.traza !== null &&
+      Number.isInteger(me.traza) &&
+      me.traza >= 0 &&
+      me.traza < TRAZAS_POSIBLES &&
       me.monedas === 3,
-    { reglamento: me.reglamento, noche: me.noche, monedas: me.monedas },
+    { reglamento: me.reglamento, noche: me.noche, traza: me.traza, monedas: me.monedas },
   );
   comprobar('todos empiezan con el aguante lleno de la Gabardina, sin Foco ni esquirlas', me.asientos.every((a) => a.control.aguante === 100 && a.control.foco === 0 && a.control.esquirlas === 0));
   comprobar('con la noche empezada no se vuelve a empezar', (mandar(A, 's1', 'empezar', null) ?? '').includes('ya ha empezado'));
@@ -858,7 +905,7 @@ paso('Los ausentes');
   comprobar('un ausente firmado por un asiento se rechaza', mandar(c, 's1', 'arcade:ausente', { a: 's2' }) !== null);
   comprobar('un ausente con una clave de más se rechaza', mandar(c, null, 'arcade:ausente', { a: 's2', b: 1 }) !== null);
   const liza4 = lizaDelQuiebro(vista(c), CODIGO) ?? SIN_LIZA;
-  comprobar('con cuatro presentes se juega en la glorieta de 60', liza4.fase.limite === ID_DE_LIMITE_EN_LA_LIZA.glorieta60);
+  comprobar('en la Bajada el límite es su plaza, con cuatro presentes igual que con uno', liza4.fase.limite === C.idDelLimiteDePlaza(PLAZA_DE_LA_PRIMERA_BAJADA));
   comprobar(
     'el ausente en la Bajada entra como avisado, y la MISMA fase no cambia: ni la vista ni la liza',
     mandar(c, null, 'arcade:ausente', { a: 's4' }) === null && laMesa(c).asientos[3]?.ausente === false && forma(lizaDelQuiebro(vista(c), CODIGO)) === forma(liza4),
@@ -867,7 +914,7 @@ paso('Los ausentes');
   comprobar('el mismo aviso otra vez entra sin efecto: el mismo objeto, sin motivo (la sala lo repite por fase)', repetido.mismo && repetido.motivo === null, repetido);
   relojDeAhora(c);
   const liza3 = lizaDelQuiebro(vista(c), CODIGO) ?? SIN_LIZA;
-  comprobar('al cambiar de fase ya cuenta: la oleada 1 escala para tres y se juega en la de 48', laMesa(c).asientos[3]?.ausente === true && liza3.fase.encuentro?.presentes === 3 && liza3.fase.limite === ID_DE_LIMITE_EN_LA_LIZA.glorieta48, liza3.fase.encuentro?.presentes);
+  comprobar('al cambiar de fase ya cuenta: la oleada 1 escala para tres, y se juega en la ciudad entera', laMesa(c).asientos[3]?.ausente === true && liza3.fase.encuentro?.presentes === 3 && liza3.fase.limite === C.ID_DEL_LIMITE_DE_LA_CIUDAD, liza3.fase.encuentro?.presentes);
   const yaConsta = probar(c, null, 'arcade:ausente', { a: 's4' });
   comprobar('y el aviso de quien ya consta como ausente, sin efecto', yaConsta.mismo && yaConsta.motivo === null, yaConsta);
   mandar(c, null, 'arcade:ronda', laRondaDeAhora(c, 'ganada', filasIguales(c, {})));
@@ -895,7 +942,7 @@ paso('Los ausentes a media oleada: la fase en curso no cambia, y quien vuelve, v
   mandar(c, 's1', 'empezar', null);
   relojDeAhora(c);
   const antes = lizaDelQuiebro(vista(c), CODIGO) ?? SIN_LIZA;
-  comprobar('la oleada 1 de cuatro se juega en la glorieta de 60, para cuatro', antes.fase.limite === ID_DE_LIMITE_EN_LA_LIZA.glorieta60 && antes.fase.encuentro?.presentes === 4);
+  comprobar('la oleada 1 de cuatro se juega en la ciudad entera, para cuatro', antes.fase.limite === C.ID_DEL_LIMITE_DE_LA_CIUDAD && antes.fase.encuentro?.presentes === 4);
   mandar(c, null, 'arcade:ausente', { a: 's4' });
   const despues = lizaDelQuiebro(vista(c), CODIGO) ?? SIN_LIZA;
   comprobar(
@@ -907,8 +954,8 @@ paso('Los ausentes a media oleada: la fase en curso no cambia, y quien vuelve, v
   mandar(c, null, 'arcade:ronda', laRondaDeAhora(c, 'ganada', [{}, {}, {}, { quiebros: 2, puntos: 40 }]));
   const pausa = lizaDelQuiebro(vista(c), CODIGO) ?? SIN_LIZA;
   comprobar(
-    'en la pausa ya es ausente aunque la ronda lo enseñe jugando (manda el aviso), y la pausa se juega en la de 48',
-    laMesa(c).asientos[3]?.ausente === true && pausa.fase.clave === 'n1.p1' && pausa.fase.limite === ID_DE_LIMITE_EN_LA_LIZA.glorieta48,
+    'en la pausa ya es ausente aunque la ronda lo enseñe jugando (manda el aviso), y la pausa se anda por la ciudad',
+    laMesa(c).asientos[3]?.ausente === true && pausa.fase.clave === 'n1.p1' && pausa.fase.limite === C.ID_DEL_LIMITE_DE_LA_CIUDAD,
   );
   eligenTodos(c, null);
   comprobar('en la pausa no se le espera: eligen los tres y viene la oleada 2', fase(c).tipo === 'oleada' && (fase(c) as { oleada: number }).oleada === 2);
@@ -1057,16 +1104,18 @@ paso('La tabla del §4.10, por presentes');
   const prestados = l.grupos.filter((x) => x.clase === 'prestado');
   const vivasDePrestados = [0, 1, 2, 3, 4, 5].map((i) => prestados.reduce((s, x) => s + (x.vivas[i] ?? 0), 0));
   comprobar(
-    'la Llamada: Prestados de uno en uno cada 2 s, uno de cerca y otro de lejos, con 4, 5, 7, 7, 9 y 9 vivos',
+    'la Llamada: Prestados de uno en uno cada 2 s, uno de la plaza y otro de la cabina que suena, con 4, 5, 7, 7, 9 y 9 vivos',
     forma(vivasDePrestados) === forma([4, 5, 7, 7, 9, 9]) &&
       prestados.length === 2 &&
       prestados[0]?.zona === 'aparicion' &&
-      prestados[1]?.zona === 'aparicion-lejana' &&
+      prestados[0]?.eleccion === 'azar' &&
+      prestados[1]?.zona === 'cabina' &&
+      prestados[1]?.eleccion === 'zonaDeAccion' &&
       prestados.every((x) => x.cadaTics === 80) &&
       (prestados[1]?.desdeTic ?? 0) - (prestados[0]?.desdeTic ?? 0) === 40,
     { vivasDePrestados, prestados },
   );
-  comprobar('y un Celador guarda la cabina desde el Aguacero, no antes', l.grupos.some((x) => x.eleccion === 'zonaDeAccion' && x.clase === 'celador') && !encuentroDeLaLlamada(2, 2, 6).grupos.some((x) => x.eleccion === 'zonaDeAccion'));
+  comprobar('y un Celador guarda la cabina desde el Aguacero, no antes', l.grupos.some((x) => x.eleccion === 'zonaDeAccion' && x.clase === 'celador') && !encuentroDeLaLlamada(2, 2, 6).grupos.some((x) => x.eleccion === 'zonaDeAccion' && x.clase === 'celador'));
 }
 
 paso('La Memoria del Sistema: la contramedida más fuerte');
@@ -1109,34 +1158,25 @@ paso('La vista es la misma para todos, y el tablero es el respaldo honrado');
   const v0 = vistaDeAsiento(QUIEBRO, g.estado, null, largos) as VistaDelQuiebro;
   comprobar('la vista no depende de quién mira', forma(v1) === forma(v0) && forma(v2) === forma(v0));
   comprobar('la vista se lee con el lector estricto', leerVistaDelQuiebro(v0) !== null);
-  const pesa = forma(v0.tablero).length;
-  comprobar(`el tablero es un tablero declarado de unos 4 kB (${String(TOPE_DEL_TABLERO)} B como mucho con seis asientos y nombres largos, en la pausa)`, esTableroDeclarado(v0.tablero) && pesa <= TOPE_DEL_TABLERO, pesa);
+  const pesa = bytes(v0.tablero);
+  comprobar(`el tablero es un tablero declarado de 4 kB como mucho (${String(TOPE_DEL_TABLERO)} B con seis asientos y nombres largos, en la pausa)`, esTableroDeclarado(v0.tablero) && pesa <= TOPE_DEL_TABLERO, pesa);
   nota(`el tablero más pesado mirado: ${String(pesa)} bytes`);
   const texto = forma(v0.tablero.paneles);
   comprobar('los paneles llevan los nombres y no los identificadores de asiento', largos.every((s) => texto.includes(s.nombre)) && !texto.includes('"s1'), texto.slice(0, 300));
   comprobar('las acciones del tablero son las que valen para todos (en la pausa, rendirse)', v0.tablero.acciones.length === 1 && v0.tablero.acciones[0]?.toque.tipo === 'rendirse');
-  const calles = v0.tablero.lineas.filter((l) => l.id.startsWith('c'));
-  const limite = v0.tablero.lineas.filter((l) => l.id.startsWith('l'));
+  const bajadaDeG = bajadaDeLaNoche(laMesa(g).noche as NonNullable<MesaDelQuiebro['noche']>);
   comprobar(
-    'el plano: ocho manzanas y la glorieta, las ocho calles por su eje de punta a punta, y el límite de la fase',
-    v0.tablero.caras.length === 9 &&
-      v0.tablero.caras.filter((c) => c.rotulo === NOMBRES_DEL_QUIEBRO.lugares.glorieta).length === 1 &&
-      calles.length === 8 &&
-      calles.every((l) => (l.desde.x === l.hasta.x && Math.abs(l.desde.y - l.hasta.y) === 2 * MEDIO_BARRIO) || (l.desde.y === l.hasta.y && Math.abs(l.desde.x - l.hasta.x) === 2 * MEDIO_BARRIO)) &&
-      limite.length === 4 &&
-      v0.tablero.lineas.length === 12,
-    v0.tablero.lineas.map((l) => l.id),
+    'el plano: los cinco distritos y las seis plazas con su nombre, la de la Bajada destacada, y las dos avenidas',
+    v0.tablero.caras.length === 11 &&
+      v0.tablero.caras.filter((c) => c.rotulo.length > 0).length === 11 &&
+      forma(v0.tablero.caras.filter((c) => c.destacada).map((c) => c.id)) === forma([`p${String(bajadaDeG)}`]) &&
+      forma(v0.tablero.lineas.map((l) => l.id)) === forma(['elevado', 'bulevar']),
+    { caras: v0.tablero.caras.map((c) => `${c.id}${c.destacada ? '*' : ''}`), lineas: v0.tablero.lineas.map((l) => l.id) },
   );
   comprobar(
-    'el plano del tablero es el del barrio (solares, manzana, borde, glorieta y ejes de calle)',
-    forma(PLANO_DEL_TABLERO.solares) === forma(SOLARES) &&
-      PLANO_DEL_TABLERO.ladoDeManzana === LADO_DE_MANZANA &&
-      PLANO_DEL_TABLERO.medioBarrio === MEDIO_BARRIO &&
-      PLANO_DEL_TABLERO.laGlorieta === LA_GLORIETA &&
-      forma(PLANO_DEL_TABLERO.calles) === forma(EJES_DE_CALLE),
+    'las cifras del plano son las del §2.1: 540 m de acera a acera, la rejilla de 48, solares de 36 y la raya de ±120',
+    PLANO_DEL_TABLERO.borde === C.BORDE_DE_LA_CIUDAD && PLANO_DEL_TABLERO.paso === C.PASO_DE_LA_REJILLA && PLANO_DEL_TABLERO.medioSolar === C.MEDIO_SOLAR && PLANO_DEL_TABLERO.huecoMaximo === C.HUECO_MAXIMO && PLANO_DEL_TABLERO.mayor === Math.abs(C.EJE_DEL_ELEVADO),
   );
-  const limites = barrioDeLaNoche(CODIGO, 1).limites.map((x) => `${x.id}:${String(x.caja.x1)}`).join(',');
-  comprobar('y sus límites, los del barrio', limites === `glorieta48:${String(PLANO_DEL_TABLERO.limites.glorieta48)},glorieta60:${String(PLANO_DEL_TABLERO.limites.glorieta60)},barrio:${String(PLANO_DEL_TABLERO.limites.barrio)}`, limites);
   vistasAMano.push(v0);
 }
 
@@ -1311,7 +1351,7 @@ paso('Todas las vistas se leen, y el productor da de cada una una liza sin probl
       ilegibles++;
       continue;
     }
-    if (forma(v.tablero).length > TOPE_DEL_TABLERO || !esTableroDeclarado(v.tablero)) pesaMas++;
+    if (bytes(v.tablero) > TOPE_DEL_TABLERO || !esTableroDeclarado(v.tablero)) pesaMas++;
     const l = lizaDelQuiebro(v, CODIGO);
     if (l === null) {
       sinLiza++;
@@ -1354,8 +1394,8 @@ paso('Todas las vistas se leen, y el productor da de cada una una liza sin probl
       if (v.fase.tipo === 'llamada' && (e.fin.tipo !== 'salida' || e.fin.zona.accion !== ACCION_DEL_QUIEBRO.descolgar || forma(e.fin.salenComoMinimo) !== forma(v.asientos.map((_, i) => Math.ceil((i + 1) / 2))))) encuentroMal++;
       if (v.fase.tipo === 'oleada' && e.fin.tipo !== 'vaciar') encuentroMal++;
     }
-    const idDelLimite = v.fase.tipo === 'llamada' ? ID_DE_LIMITE_EN_LA_LIZA.barrio : ['oleada', 'pausa', 'bajada'].indexOf(v.fase.tipo) >= 0 ? (Math.max(1, presentes) <= 3 ? ID_DE_LIMITE_EN_LA_LIZA.glorieta48 : ID_DE_LIMITE_EN_LA_LIZA.glorieta60) : null;
-    if (idDelLimite !== null && l.fase.limite !== idDelLimite) limiteMal++;
+    const idDelLimite = v.fase.tipo === 'bajada' && v.noche !== null ? C.idDelLimiteDePlaza(bajadaDeLaNoche(v.noche)) : C.ID_DEL_LIMITE_DE_LA_CIUDAD;
+    if (l.fase.limite !== idDelLimite) limiteMal++;
     const c = componerReglamento(v) as ReglamentoCompuesto;
     for (let i = 0; i < l.asientos.length; i++) {
       const r = l.asientos[i];
@@ -1393,7 +1433,7 @@ paso('Todas las vistas se leen, y el productor da de cada una una liza sin probl
   comprobar('dentro de una misma fase el límite nunca encoge (un ausente cuenta desde la fase siguiente)', mismaFaseVista >= 100 && encoge === 0, { mismaFaseVista, encoge });
   comprobar('y el encuentro de una fase de combate no cambia mientras dura', encuentroCambia === 0, encuentroCambia);
   comprobar('hay encuentro en las oleadas y la Llamada, con su ronda, sus presentes y su final', encuentroMal === 0, encuentroMal);
-  comprobar('el límite es la glorieta de 48 o de 60 según los presentes, y el barrio en la Llamada', limiteMal === 0, limiteMal);
+  comprobar('el límite es la plaza de la Bajada en la Bajada, y la ciudad entera en todo lo demás (también en las oleadas)', limiteMal === 0, limiteMal);
   comprobar('el reglamento de cada asiento es el de las tablas y su punto de control', reglamentoMal === 0, reglamentoMal);
 }
 
@@ -1430,7 +1470,7 @@ paso('Las recetas: cada una reparte las oleadas como dice');
   const mareaO1 = deClase(ma?.o1, P.prestado)[0];
   comprobar('«Marea»: la mitad más de Prestados, contra un tope de vivos a la mitad', mareaO1?.cuantos[0] === 9 && mareaO1.vivasALaVez[0] === 3 && mareaO1.cadaTics === 20);
   const fr = porReceta['francotirador'];
-  comprobar('«Francotirador»: un tirador desde el borde ya en la oleada 2', tresTandas(fr?.o1) && deClase(fr?.o2, P.tirador).length === 1 && deClase(fr?.o2, P.tirador)[0]?.claseDeZona === 1 && deClase(fr?.o2, P.tirador)[0]?.desdeTic === 0);
+  comprobar('«Francotirador»: un tirador desde el borde ya en la oleada 2', tresTandas(fr?.o1) && deClase(fr?.o2, P.tirador).length === 1 && deClase(fr?.o2, P.tirador)[0]?.claseDeZona === C.claseDeZonaDePlaza(PLAZA_DE_LA_PRIMERA_BAJADA, 'boca') && deClase(fr?.o2, P.tirador)[0]?.desdeTic === 0);
   const em = porReceta['emboscada'];
   comprobar('«Emboscada»: la impresión de los Celadores, a la espalda del grupo', tresTandas(em?.o1) && deClase(em?.o2, P.celador)[0]?.eleccion === 'aLaEspalda');
 }
@@ -1476,25 +1516,672 @@ paso('El productor, en lo que dice de cada cosa');
   comprobar('el tirador dispara ráfagas de 3 balas a 20 m/s que quitan 12', o1.proyectiles[0]?.balas === 3 && o1.proyectiles[0].velocidad === 20 * UNO && o1.proyectiles[0].efecto.dano === 12);
   comprobar('las esquirlas pagan en triangular por 10, con tope de 12', o1.portables[0]?.pago.tipo === 'triangular' && o1.portables[0].pago.porUnidad === 10 && o1.portables[0].tope === 12);
   comprobar('las columnas de la ronda son las de la vista', forma(o1.veredictos.columnas) === forma(COLUMNAS_DE_LA_RONDA));
-  comprobar('el coste de la sala sale del aforo de la mesa', costeDeLaLiza(o1) === 100 + 250 * 2 + 250 * AFORO_DEL_QUIEBRO.entidades + 40 * AFORO_DEL_QUIEBRO.balas);
-  /* La Llamada, en Aguacero: con guardián, y la cabina de 50 s. */
+  comprobar('el coste de la sala sale del aforo de la mesa', costeDeLaLiza(o1) === 400 + 250 * 2 + 300 * AFORO_DEL_QUIEBRO.entidades + 40 * AFORO_DEL_QUIEBRO.balas, costeDeLaLiza(o1));
+  /* La Llamada, en Llovizna: sin guardián, y la cabina de 60 s de la ciudad (50 en Temporal y Tormenta). */
   const k = mesaNueva(1);
   mandar(k, 's1', 'empezar', null);
   hastaLaOleada(k, 3);
   mandar(k, null, 'arcade:ronda', laRondaDeAhora(k, 'ganada', filasIguales(k, {})));
   eligenTodos(k, 'llamar');
   const ll = lizaDelQuiebro(vista(k), CODIGO) ?? SIN_LIZA;
-  comprobar('en la Llamada: el barrio entero, fin por la cabina, sale uno de uno', ll.fase.limite === ID_DE_LIMITE_EN_LA_LIZA.barrio && ll.fase.encuentro?.fin.tipo === 'salida' && forma(ll.fase.encuentro.fin.salenComoMinimo) === '[1]');
-  comprobar('la cabina suena 50 s, y otra 40 por moneda', ll.fase.encuentro?.fin.tipo === 'salida' && ll.fase.encuentro.fin.zona.activaTics === 1000 && ll.fase.encuentro.fin.zona.alApagarse.siguienteTics === 800 && ll.fase.encuentro.relojTics === 1000 + 800 * laMesa(k).monedas + 1);
-  comprobar('en Llovizna la Llamada no tiene guardián', !(ll.fase.encuentro?.grupos ?? []).some((g) => g.eleccion === 'zonaDeAccion'));
+  comprobar('en la Llamada: la ciudad entera, fin por la cabina, sale uno de uno', ll.fase.limite === C.ID_DEL_LIMITE_DE_LA_CIUDAD && ll.fase.encuentro?.fin.tipo === 'salida' && forma(ll.fase.encuentro.fin.salenComoMinimo) === '[1]');
+  /*
+   * El reloj de la Llamada de la ciudad (CIUDAD-ABIERTA §3.9): 60 s en Llovizna, Chaparrón y Aguacero, 50 en
+   * Temporal y Tormenta, y 40 la de cada moneda. Va con la banda de 100-160 m por calles; con el de la
+   * glorieta (50 y 40 s, para 60-110 m) la revisión de jugar llegó a una cabina a 126 m con 5 s de margen.
+   */
+  const relojes = [1, 2, 3, 4, 5].map((n) => filaDelNivel(n).cabinaTics);
+  comprobar(
+    'la cabina suena 60 s (50 en Temporal y Tormenta: el reloj de la ciudad, §3.9), y otra 40 por moneda',
+    ll.fase.encuentro?.fin.tipo === 'salida' &&
+      ll.fase.encuentro.fin.zona.activaTics === 1200 &&
+      ll.fase.encuentro.fin.zona.alApagarse.siguienteTics === 800 &&
+      ll.fase.encuentro.relojTics === 1200 + 800 * laMesa(k).monedas + 1 &&
+      forma(relojes) === forma([1200, 1200, 1200, 1000, 1000]),
+    { relojes },
+  );
+  comprobar('en Llovizna la Llamada no tiene guardián', !(ll.fase.encuentro?.grupos ?? []).some((g) => g.eleccion === 'zonaDeAccion' && g.clase === CLASE_DEL_QUIEBRO.celador));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 7 · LA CIUDAD ABIERTA (entrega 1: `docs/quiebro/CIUDAD-ABIERTA.md`)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Los bytes de la forma canónica en UTF-8: lo que de verdad viaja (una «ú» son dos). */
+function bytes(x: unknown): number {
+  return Buffer.byteLength(forma(x), 'utf8');
+}
+
+paso('La ciudad de la mesa: la traza se sortea al empezar y se queda; cada noche baja a una plaza');
+{
+  comprobar(
+    'las cuentas de la ciudad que la vista escribe a mano son las de `quiebro-ciudad.ts`: 32 trazas, 6 plazas, la Glorieta del Relojero la 1',
+    TRAZAS_POSIBLES === C.TRAZAS && PLAZAS_DE_LA_CIUDAD === C.PLAZAS_POR_CIUDAD && PLAZA_DE_LA_PRIMERA_BAJADA === C.LA_GLORIETA_DEL_RELOJERO && FALLOS_COMO_MUCHO === 5,
+  );
+  const r = mesaNueva(2, 5);
+  mandar(r, null, TIC);
+  comprobar('en la reunión no hay traza ni noche (la traza se sortea al empezar)', vista(r).traza === null && vista(r).noche === null);
+  const trazas = new Set<number>();
+  let fuera = 0;
+  let distintas = 0;
+  for (let semilla = 1; semilla <= 400; semilla++) {
+    const x = mesaNueva(1, semilla);
+    mandar(x, 's1', 'empezar', null);
+    const t = laMesa(x).traza;
+    if (t === null || !Number.isInteger(t) || t < 0 || t >= TRAZAS_POSIBLES) fuera++;
+    else trazas.add(t);
+    const y = mesaNueva(1, semilla);
+    mandar(y, 's1', 'empezar', null);
+    if (laMesa(y).traza !== t) distintas++;
+  }
+  comprobar('cuatrocientas mesas sacan las 32 trazas, todas de 0 a 31', trazas.size === TRAZAS_POSIBLES && fuera === 0, { distintas: trazas.size, fuera });
+  comprobar('y la misma mesa saca siempre la misma: sale del azar de la mesa, no del reloj', distintas === 0, distintas);
+  /* Las partidas del robot: diez noches por mesa, con sus Bajadas. */
+  let trazaQueCambia = 0;
+  let masDeUna = 0;
+  let primeraFuera = 0;
+  let repite = 0;
+  let cambiaEnLaNoche = 0;
+  const bajan = new Set<number>();
+  for (const p of partidas) {
+    let traza: number | null = null;
+    const porNoche = new Map<number, string>();
+    for (const v of p.vistas) {
+      if (v.noche === null) continue;
+      if (traza === null) traza = v.traza;
+      if (v.traza !== traza) trazaQueCambia++;
+      if (v.noche.fallos.length !== 1) masDeUna++;
+      const f = forma(v.noche.fallos);
+      const antes = porNoche.get(v.noche.numero);
+      if (antes !== undefined && antes !== f) cambiaEnLaNoche++;
+      porNoche.set(v.noche.numero, f);
+      bajan.add(bajadaDeLaNoche(v.noche));
+    }
+    for (const [numero, f] of porNoche) {
+      if (numero === 1 && f !== `[${String(PLAZA_DE_LA_PRIMERA_BAJADA)}]`) primeraFuera++;
+      const anterior = porNoche.get(numero - 1);
+      if (anterior !== undefined && anterior === f) repite++;
+    }
+  }
+  comprobar('en las partidas del robot la traza es la misma en todas las vistas de una mesa, las diez noches', trazaQueCambia === 0, trazaQueCambia);
+  comprobar('la noche 1 baja siempre a la Glorieta del Relojero, y cada noche lleva una sola plaza (la entrega 1: las oleadas en ella)', primeraFuera === 0 && masDeUna === 0, { primeraFuera, masDeUna });
+  comprobar('cada noche baja a una plaza distinta de la de la anterior, y dentro de una noche no cambia', repite === 0 && cambiaEnLaNoche === 0, { repite, cambiaEnLaNoche });
+  comprobar('y entre todas las mesas se baja a las seis plazas', bajan.size === PLAZAS_DE_LA_CIUDAD, [...bajan]);
+}
+
+paso('El mundo de la noche: la ciudad, el mismo objeto toda la noche, y el límite');
+{
+  /* Todas las vistas de una misma noche de una mesa dan el MISMO objeto de mundo; cada noche, el suyo. */
+  let distintosEnUnaNoche = 0;
+  let iguales = 0;
+  let noches = 0;
+  let repetidoEnOtraNoche = 0;
+  for (const p of partidas) {
+    const deLaNoche = new Map<number, unknown>();
+    for (const v of p.vistas) {
+      if (v.noche === null) continue;
+      const l = lizaDelQuiebro(v, CODIGO);
+      if (l === null) continue;
+      const antes = deLaNoche.get(v.noche.numero);
+      if (antes === undefined) {
+        noches++;
+        for (const otro of deLaNoche.values()) if (otro === l.mundo) repetidoEnOtraNoche++;
+        deLaNoche.set(v.noche.numero, l.mundo);
+      } else if (antes !== l.mundo) distintosEnUnaNoche++;
+      else iguales++;
+    }
+  }
+  comprobar(
+    'el mundo es el MISMO objeto en todas las vistas de una noche, de la Bajada al final (la sala lo valida y hace su arena una vez)',
+    distintosEnUnaNoche === 0 && iguales >= 200,
+    { distintosEnUnaNoche, iguales, noches },
+  );
+  comprobar('y otro en cada noche de la mesa', repetidoEnOtraNoche === 0 && noches >= 30, { repetidoEnOtraNoche, noches });
+
+  /* El mundo es el de la ciudad: la traza, el código, la noche y sus plazas. */
+  const m = mesaNueva(3, 91);
+  mandar(m, 's1', 'empezar', null);
+  relojDeAhora(m);
+  const v = vista(m);
+  const l = lizaDelQuiebro(v, CODIGO) ?? SIN_LIZA;
+  const traza = v.traza ?? 0;
+  const ciudad = C.ciudadDeLaMesa(traza, CODIGO);
+  const noche = C.ciudadDeLaNoche(ciudad, CODIGO, 1, [1]);
+  const mundo = l.mundo;
+  comprobar(
+    'el mundo es el de la ciudad de la traza, el código y la noche: sus cajas, sus 4.761 casillas de 8 m, su grafo con obras y sus siete límites',
+    mundo.suelo.cuerpos.length === noche.cajas.length &&
+      mundo.suelo.pisables.length === C.CASILLAS_DE_LA_CIUDAD &&
+      mundo.suelo.lado === 8 &&
+      mundo.grafo.nudos.length === noche.grafo.nudos.length &&
+      mundo.grafo.aristas.length === noche.grafo.aristas.length &&
+      forma(mundo.limites.map((x) => x.id)) === forma([C.ID_DEL_LIMITE_DE_LA_CIUDAD, 2, 3, 4, 5, 6, 7]),
+    { cuerpos: [mundo.suelo.cuerpos.length, noche.cajas.length], nudos: [mundo.grafo.nudos.length, noche.grafo.nudos.length] },
+  );
+  const zonasBien = mundo.zonas.length === ciudad.zonas.length && ciudad.zonas.every((z, i) => {
+    const w = mundo.zonas[i];
+    if (w === undefined || w.id !== z.id || w.caja.x0 !== z.caja.x0 * UNO || w.caja.z1 !== z.caja.z1 * UNO) return false;
+    return w.clase === z.clase || (z.clase === C.CLASE_DE_ZONA_DE_CABINA && w.clase === CLASE_DE_LA_CABINA_QUE_SUENA);
+  });
+  comprobar('sus zonas son las de la ciudad, con sus ids y sus cajas; sólo algunas cabinas cambian de clase (las de la Llamada)', zonasBien);
+  const clasesDeLaCiudad = new Set<number>([C.CLASE_DE_ZONA_DE_CABINA, C.CLASE_DE_ZONA_DE_REFUGIO]);
+  for (let pl = 1; pl <= C.PLAZAS_POR_CIUDAD; pl++) for (const t of ['fallo', 'impresion', 'boca'] as const) clasesDeLaCiudad.add(C.claseDeZonaDePlaza(pl, t));
+  for (let k = 0; k < C.ARCAS_POR_CIUDAD; k++) clasesDeLaCiudad.add(C.claseDeZonaDeArca(k));
+  comprobar('y la clase de la cabina que suena no pisa ninguna de la numeración de la ciudad', !clasesDeLaCiudad.has(CLASE_DE_LA_CABINA_QUE_SUENA) && CLASE_DE_LA_CABINA_QUE_SUENA >= 1 && CLASE_DE_LA_CABINA_QUE_SUENA <= 255);
+  const plaza = ciudad.plazas[0] as (typeof ciudad.plazas)[number];
+  const sitios = plaza.nace.map((s) => `${String(s.x * UNO)},${String(s.z * UNO)},${String(s.rumbo)}`);
+  const nace = mundo.nace;
+  const lim = plaza.limite;
+  comprobar(
+    'se nace y se reaparece en la plaza de la Bajada: sus seis sitios de asiento, y los mismos seis de reaparición, dentro de su límite (la Liza lo exige en la Bajada)',
+    nace.length === 12 &&
+      nace.slice(0, 6).every((s, i) => s.papel === 'asiento' && `${String(s.x)},${String(s.z)},${String(s.rumbo)}` === sitios[i]) &&
+      nace.slice(6).every((s, i) => s.papel === 'reaparicion' && `${String(s.x)},${String(s.z)},${String(s.rumbo)}` === sitios[i]) &&
+      nace.every((s) => s.x >= lim.x0 * UNO && s.x <= lim.x1 * UNO && s.z >= lim.z0 * UNO && s.z <= lim.z1 * UNO),
+    nace.map((s) => `${s.papel}@${String(s.x / UNO)},${String(s.z / UNO)}`),
+  );
+
+  /* La clave de la memoria lleva las plazas de la noche y «Plazas despejadas». */
+  const otraPlaza = { ...v, noche: { ...(v.noche as NonNullable<typeof v.noche>), fallos: [4] } };
+  const l4 = lizaDelQuiebro(otraPlaza, CODIGO) ?? SIN_LIZA;
+  const p4 = ciudad.plazas[3] as (typeof ciudad.plazas)[number];
+  comprobar(
+    'con otra plaza de Bajada, otro mundo: se nace en ella',
+    l4.mundo !== mundo && (l4.mundo.nace[0]?.x ?? 0) === (p4.nace[0]?.x ?? -1) * UNO && (l4.mundo.nace[0]?.z ?? 0) === (p4.nace[0]?.z ?? -1) * UNO && problemasDeLaDeclaracion(l4).length === 0,
+    problemasDeLaDeclaracion(l4).slice(0, 3),
+  );
+  const despejada = { ...v, reglamento: { ...v.reglamento, contramedida: 'plaza-despejada' as const } };
+  const ld = lizaDelQuiebro(despejada, CODIGO) ?? SIN_LIZA;
+  comprobar(
+    'y con «Plazas despejadas», otro: el de la noche despejada, con menos cajas',
+    ld.mundo !== mundo && ld.mundo.suelo.cuerpos.length === C.despejarLasPlazas(noche).cajas.length && ld.mundo.suelo.cuerpos.length < mundo.suelo.cuerpos.length,
+    [ld.mundo.suelo.cuerpos.length, mundo.suelo.cuerpos.length],
+  );
+  /*
+   * La memoria: 16 mundos, y sale el que lleva más sin usarse. Con un código que nadie más usa, dieciséis
+   * noches nuevas la llenan; se usa la más vieja y entra una decimoséptima: la usada se queda (el mismo
+   * objeto) y la que iba detrás se rehace. Con una memoria que echa al que entró primero, sin mirar el uso,
+   * sería al revés; con una más corta, la usada ya se habría ido.
+   */
+  const deNoche = (n: number, f: number): VistaDelQuiebro => ({ ...v, noche: { ...(v.noche as NonNullable<typeof v.noche>), numero: n, fallos: [f] } });
+  const llaves: [number, number][] = [];
+  for (let n = 1; n <= 3; n++) for (let f = 1; f <= 6; f++) llaves.push([n, f]);
+  const MEMORIA = 'MEMOR';
+  const dieciseis = llaves.slice(0, 16).map(([n, f]) => lizaDelQuiebro(deNoche(n, f), MEMORIA)?.mundo);
+  const usada = lizaDelQuiebro(deNoche(1, 1), MEMORIA)?.mundo;
+  lizaDelQuiebro(deNoche(3, 5), MEMORIA);
+  const usadaTras17 = lizaDelQuiebro(deNoche(1, 1), MEMORIA)?.mundo;
+  const segundaTras17 = lizaDelQuiebro(deNoche(1, 2), MEMORIA)?.mundo;
+  comprobar(
+    'la memoria guarda 16 mundos y echa al que lleva más sin usarse: con 17 noches, la más vieja recién usada se queda y la siguiente se rehace',
+    dieciseis.every((x) => x !== undefined) && usada === dieciseis[0] && usadaTras17 === dieciseis[0] && segundaTras17 !== dieciseis[1],
+    { usadaIgual: usada === dieciseis[0], usadaSeQueda: usadaTras17 === dieciseis[0], siguienteRehecha: segundaTras17 !== dieciseis[1] },
+  );
+  /* La reunión: un mundo fijo, el mismo para todas las mesas. */
+  const r1 = lizaDelQuiebro(vista(mesaNueva(2, 7)), 'ABCDE');
+  const r2 = lizaDelQuiebro(vista(mesaNueva(4, 8)), 'ZYXWV');
+  comprobar(
+    'en la reunión, sin traza, un mundo fijo: el mismo objeto para dos mesas de dos códigos, y sin problemas',
+    r1 !== null && r2 !== null && r1.mundo === r2.mundo && problemasDeLaDeclaracion(r1).length === 0 && r1.fase.modo === 'quieta',
+  );
+}
+
+paso('Los grupos salen de la plaza de la Bajada, y la Llamada suena a 100-160 m por calles');
+{
+  /* Una noche 2 que baja a otra plaza: sus oleadas salen de ella. */
+  const m = mesaNueva(2, 33);
+  mandar(m, 's1', 'empezar', null);
+  mandar(m, 's1', 'rendirse', null);
+  relojDeAhora(m);
+  mandar(m, 's1', 'otra-noche', null);
+  const b = bajadaDeLaNoche(laMesa(m).noche as NonNullable<MesaDelQuiebro['noche']>);
+  const bajada = lizaDelQuiebro(vista(m), CODIGO) ?? SIN_LIZA;
+  comprobar(`en la Bajada de la noche 2 (a la plaza ${String(b)}), el límite es su plaza`, b !== PLAZA_DE_LA_PRIMERA_BAJADA && bajada.fase.limite === C.idDelLimiteDePlaza(b), { b, limite: bajada.fase.limite });
+  hastaLaOleada(m, 3);
+  const o3 = lizaDelQuiebro(vista(m), CODIGO) ?? SIN_LIZA;
+  const deLaPlaza = [C.claseDeZonaDePlaza(b, 'boca'), C.claseDeZonaDePlaza(b, 'impresion')];
+  const grupos = o3.fase.encuentro?.grupos ?? [];
+  comprobar(
+    'y sus oleadas salen de las bocas y los huecos de impresión de esa plaza, con la ciudad entera de límite',
+    grupos.length > 0 && grupos.every((g) => deLaPlaza.indexOf(g.claseDeZona) >= 0) && o3.fase.limite === C.ID_DEL_LIMITE_DE_LA_CIUDAD,
+    grupos.map((g) => g.claseDeZona),
+  );
+  const celador = o3.clases.find((c) => c.id === CLASE_DEL_QUIEBRO.celador);
+  comprobar('el Celador que no se desaloja se reimprime en las bocas de esa plaza', celador?.alCaer.tipo === 'rematable' && celador.alCaer.siNo.claseDeZona === C.claseDeZonaDePlaza(b, 'boca'));
+  /* La Llamada, en Aguacero (con guardián). */
+  const k = mesaNueva(1, 12);
+  mandar(k, 's1', 'empezar', null);
+  hastaLaOleada(k, 3);
+  mandar(k, null, 'arcade:ronda', laRondaDeAhora(k, 'ganada', filasIguales(k, {})));
+  eligenTodos(k, 'llamar');
+  const vl = vista(k);
+  const aguacero = { ...vl, reglamento: { ...vl.reglamento, nivel: 3 } };
+  const ll = lizaDelQuiebro(aguacero, CODIGO) ?? SIN_LIZA;
+  const gl = ll.fase.encuentro?.grupos ?? [];
+  const fin = ll.fase.encuentro?.fin;
+  comprobar(
+    'en la Llamada la cabina que suena es de su clase, y de ella salen el guardián y el cordón; los de detrás, de la plaza',
+    fin?.tipo === 'salida' &&
+      fin.zona.claseDeZona === CLASE_DE_LA_CABINA_QUE_SUENA &&
+      gl.some((g) => g.clase === CLASE_DEL_QUIEBRO.celador && g.eleccion === 'zonaDeAccion' && g.claseDeZona === CLASE_DE_LA_CABINA_QUE_SUENA) &&
+      gl.some((g) => g.clase === CLASE_DEL_QUIEBRO.prestado && g.eleccion === 'zonaDeAccion' && g.claseDeZona === CLASE_DE_LA_CABINA_QUE_SUENA) &&
+      gl.some((g) => g.clase === CLASE_DEL_QUIEBRO.prestado && g.eleccion === 'azar' && g.claseDeZona === C.claseDeZonaDePlaza(1, 'boca')),
+    gl.map((g) => `${String(g.clase)}:${String(g.eleccion)}:${String(g.claseDeZona)}`),
+  );
+  /* En las 32 trazas y con cada plaza de Bajada: las cabinas de la Llamada son las de la banda, y hay alguna. */
+  const mal: string[] = [];
+  let sinNinguna = 0;
+  let conProblemas = 0;
+  let menos = Number.POSITIVE_INFINITY;
+  let mas = 0;
+  for (let traza = 0; traza < C.TRAZAS; traza++) {
+    const ciudad = C.ciudadDeLaMesa(traza, CODIGO);
+    for (let bj = 1; bj <= C.PLAZAS_POR_CIUDAD; bj++) {
+      const w = { ...vl, traza, noche: { ...(vl.noche as NonNullable<typeof vl.noche>), numero: 3, fallos: [bj] } };
+      const lw = lizaDelQuiebro(w, CODIGO);
+      if (lw === null) {
+        mal.push(`${String(traza)}/${String(bj)}: sin liza`);
+        continue;
+      }
+      if (problemasDeLaDeclaracion(lw).length > 0) conProblemas++;
+      const suenan = lw.mundo.zonas.filter((z) => z.clase === CLASE_DE_LA_CABINA_QUE_SUENA).map((z) => z.id);
+      const n = C.ciudadDeLaNoche(ciudad, CODIGO, 3, [bj]);
+      const campo = C.campoHasta(n.grafo, (ciudad.plazas[bj - 1] as (typeof ciudad.plazas)[number]).nudo);
+      const [desde, hasta] = C.BANDA_DE_LA_CABINA_CERCANA;
+      const enBanda = ciudad.cabinas
+        .filter((c) => {
+          const d = C.distanciaPorCalles(n.grafo, campo, c.sitio.x, c.sitio.z);
+          return d >= desde && d <= hasta;
+        })
+        .map((c) => c.zona);
+      if (enBanda.length === 0) sinNinguna++;
+      if (forma(suenan) !== forma(enBanda)) mal.push(`${String(traza)}/${String(bj)}: ${forma(suenan)} y en la banda ${forma(enBanda)}`);
+      if (suenan.length < menos) menos = suenan.length;
+      if (suenan.length > mas) mas = suenan.length;
+    }
+  }
+  comprobar(
+    'en las 32 trazas, bajando a cada una de las 6 plazas, la Llamada suena en las cabinas a 100-160 m por calles con las obras de la noche, sólo en ésas, y siempre hay alguna',
+    mal.length === 0 && sinNinguna === 0 && menos >= 1,
+    mal.slice(0, 4),
+  );
+  comprobar('y esas 192 declaraciones no tienen problemas', conProblemas === 0, conProblemas);
+  /*
+   * L10 en la entrega 1: el Sistema no suelta a nadie (`PERSECUCION_DEL_SISTEMA`). Escrito en la forma entera
+   * —la clave del olvido en el encuentro y la del alcance en cada cerebro, aunque sean `null` y 0—, que es
+   * la que se quedará cuando la Liza quite la transitoria. Lo que hace en la sala, en el paso siguiente.
+   */
+  const olvidos = [o3, ll].map((x) => (x.fase.encuentro === null ? 'sin encuentro' : olvidoDelEncuentro(x.fase.encuentro)));
+  const clasesDeLasDos = [...o3.clases, ...ll.clases];
+  const alcances = clasesDeLasDos.map((c) => alcanceDeBlancoDe(c.cerebro));
+  const enteras = [o3, ll].every((x) => x.fase.encuentro !== null && 'olvido' in x.fase.encuentro) && clasesDeLasDos.every((c) => 'alcanceDeBlanco' in c.cerebro);
+  comprobar(
+    'en la entrega 1 ningún encuentro olvida y ninguna clase tiene tope de alcance, en la forma entera de L10: el Sistema no suelta a nadie',
+    enteras && olvidos.every((o) => o === null) && alcances.length === 6 && alcances.every((a) => a === 0) && PERSECUCION_DEL_SISTEMA.alcanceMetros === 0 && PERSECUCION_DEL_SISTEMA.olvido === null,
+    { enteras, olvidos, alcances: alcances.map((a) => a / UNO) },
+  );
+  nota(`cabinas que pueden sonar en la Llamada, por traza y Bajada: de ${String(menos)} a ${String(mas)}`);
+}
+
+paso('El Sistema no suelta a nadie: ni quedarse lejos de la plaza ni la carrera a la cabina lo dejan atrás');
+{
+  /*
+   * LO QUE VIO LA REVISIÓN DE LA SALA (24-sep): con el olvido de la travesía (90 m, 10 s) y el alcance de
+   * 45 m, el grupo quieto a 118-123 m de la plaza de la Bajada aguantaba las oleadas 1 a 4 sin recibir un
+   * golpe —lo que salía de las bocas no tenía a nadie a su alcance, se olvidaba y volvía a salir—, y en la
+   * Llamada los que salían de la plaza se quedaban atrás. Se juega aquí con la sala de verdad (por el banco
+   * de `liza-de-juguete.ts`, el de `verify:liza`) y la declaración del productor sin tocar, salvo los sitios
+   * de nacer del primer caso: el grupo empieza quieto a 150-157 m de la plaza, donde ninguna boca lo tiene a
+   * 90 m, que es donde el olvido lo dejaba en paz aun con la franja de 45 a 90 m cerrada en la Liza.
+   */
+  const lizaDeLaPartida = (asientos: number, semilla: number, noche: number, tipo: 'oleada' | 'llamada', oleada: number): LizaDeclarada | null => {
+    const p = jugarAlQuiebro({ asientos, semilla, noches: noche, politica: 'gana', travesuras: false });
+    for (const v of p.vistas) {
+      if (v.noche === null || v.noche.numero !== noche || v.fase.tipo !== tipo) continue;
+      if (v.fase.tipo === 'oleada' && v.fase.oleada !== oleada) continue;
+      const l = lizaDelQuiebro(v, CODIGO);
+      if (l !== null && l.fase.encuentro !== null) return l;
+    }
+    return null;
+  };
+  /** Los anuncios distintos de una partida (cada uno sale para cada aparato: se cuentan por su id). */
+  const jugarEnElBanco = (d: LizaDeclarada, robots: readonly Robot[], mirar: (s: EstadoDeLaSala, tic: number) => void): { tics: number; resultado: string; anuncios: number; primero: number; olvidadas: number } => {
+    const aparatos: Aparato[] = [];
+    for (let i = 1; i <= d.asientos.length; i++) aparatos.push(new Aparato(i, 2000 * i, 15 * i, 50 + 35 * i, (11 * i) % 50, robots[i - 1] ?? quieto));
+    const b = new Banco(d, d.fase.semilla, aparatos);
+    b.guardarPasos = false;
+    for (let i = 1; i <= d.asientos.length; i++) b.conectar(i);
+    const vistos = new Set<number>();
+    let primero = -1;
+    let olvidadas = 0;
+    let t = 0;
+    const tope = (d.fase.encuentro?.relojTics ?? 0) + 60;
+    for (; t < tope; t++) {
+      const p = b.tic();
+      for (const x of p.sucesos) {
+        const s = x.suceso;
+        if (s.e === 'anuncio' && !vistos.has(s.id)) {
+          vistos.add(s.id);
+          if (primero < 0) primero = t;
+        }
+        if (s.e === 'seva' && x.para === 0 && s.por === MOTIVO_DE_IRSE.disuelta && p.sala.encuentro !== null && p.sala.encuentro.resultado === null) olvidadas++;
+      }
+      mirar(p.sala, t);
+      if (p.sala.encuentro !== null && p.sala.encuentro.resultado !== null) break;
+    }
+    return { tics: t, resultado: String(b.sala.encuentro?.resultado ?? null), anuncios: vistos.size, primero, olvidadas };
+  };
+
+  /* 1 · Quedarse quieto lejos de la plaza. */
+  const casos: readonly (readonly [number, number, number, number])[] = [
+    [4, 5, 1, 1],
+    [4, 11, 1, 2],
+    [6, 23, 1, 3],
+    [1, 5, 1, 4],
+    [3, 7, 2, 2],
+  ];
+  const lejos: string[] = [];
+  const mal: string[] = [];
+  for (const [asientos, semilla, noche, oleada] of casos) {
+    const que = `${String(asientos)} asientos, noche ${String(noche)}, oleada ${String(oleada)}`;
+    const l = lizaDeLaPartida(asientos, semilla, noche, 'oleada', oleada);
+    if (l === null) {
+      mal.push(`${que}: sin liza`);
+      continue;
+    }
+    const W = l.mundo;
+    const arena = arenaDeLaLiza(l);
+    const plaza = W.nace[0];
+    const radio = l.asientos[0]?.cuerpo.radio ?? 0;
+    const sitios: { papel: 'asiento'; x: number; z: number; rumbo: number }[] = [];
+    for (const n of W.grafo.nudos) {
+      if (plaza === undefined || sitios.length >= asientos) break;
+      const r = Math.hypot(n.x - plaza.x, n.z - plaza.z) / UNO;
+      if (r >= 150 && r <= 157 && sePuedeEstar(arena, n.x, n.z, radio)) sitios.push({ papel: 'asiento', x: n.x, z: n.z, rumbo: 0 });
+    }
+    if (sitios.length < asientos) {
+      mal.push(`${que}: no hay ${String(asientos)} sitios a 150-157 m de la plaza`);
+      continue;
+    }
+    const d: LizaDeclarada = { ...l, mundo: { ...W, nace: [...sitios, ...W.nace.slice(sitios.length)] } };
+    const r = jugarEnElBanco(d, [], () => {});
+    lejos.push(`${que}: '${r.resultado}' en el tic ${String(r.tics)}, ${String(r.anuncios)} anuncios (el primero en el ${String(r.primero)}), ${String(r.olvidadas)} olvidadas`);
+    if (r.anuncios < 10 || r.olvidadas > 0) mal.push(lejos[lejos.length - 1] as string);
+  }
+  comprobar(
+    'un grupo quieto a 150 m de la plaza de la Bajada no aguanta una oleada sin pelear: el Sistema va a por él y no olvida a nadie (oleadas 1 a 4, y la 2 de la noche 2, en otra plaza)',
+    mal.length === 0 && lejos.length === casos.length,
+    mal.length > 0 ? mal : lejos,
+  );
+  for (const x of lejos) nota(`lejos de la plaza · ${x}`);
+
+  /*
+   * 2 · LA CARRERA A LA CABINA: todos corren al trote por las calles hasta la que suena (la dice el suceso
+   * `zona`) y se quedan allí. Mientras quede alguien con cuerpo y vida, ninguna entidad que acecha o ronda se
+   * queda sin blanco (con el alcance de 45 m, lo que salía de la plaza se quedaba sin nadie en cuanto el grupo
+   * se alejaba), nada se olvida, y alguno de los que salen de la plaza alcanza al grupo a 10 m.
+   */
+  const corredorALaCabina = (l: LizaDeclarada): Robot => {
+    const nudos = l.mundo.grafo.nudos;
+    const vecinos: number[][] = nudos.map(() => []);
+    for (const [a, b] of l.mundo.grafo.aristas) {
+      vecinos[a]?.push(b);
+      vecinos[b]?.push(a);
+    }
+    const nudo = (i: number): { x: number; z: number } => nudos[i] as { x: number; z: number };
+    const largo = (a: number, b: number): number => Math.hypot(nudo(a).x - nudo(b).x, nudo(a).z - nudo(b).z);
+    const cercano = (x: number, z: number): number => {
+      let mejor = -1;
+      let mejorD = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < nudos.length; i++) {
+        const dd = Math.hypot(nudo(i).x - x, nudo(i).z - z);
+        if (dd < mejorD) {
+          mejorD = dd;
+          mejor = i;
+        }
+      }
+      return mejor;
+    };
+    const camino = (desde: number, meta: number): number[] => {
+      const dist = new Float64Array(nudos.length).fill(Number.POSITIVE_INFINITY);
+      dist[meta] = 0;
+      const cola = [meta];
+      for (let k = 0; k < cola.length; k++) {
+        const u = cola[k] as number;
+        for (const v of vecinos[u] ?? []) {
+          const nd = (dist[u] as number) + largo(u, v);
+          if (nd < (dist[v] as number)) {
+            dist[v] = nd;
+            cola.push(v);
+          }
+        }
+      }
+      const salida = [desde];
+      let u = desde;
+      for (let paso = 0; u !== meta && paso < nudos.length; paso++) {
+        let siguiente = -1;
+        for (const v of vecinos[u] ?? []) if (siguiente < 0 || (dist[v] as number) + largo(u, v) < (dist[siguiente] as number) + largo(u, siguiente)) siguiente = v;
+        if (siguiente < 0) break;
+        u = siguiente;
+        salida.push(u);
+      }
+      return salida;
+    };
+    const zonas = new Map(l.mundo.zonas.map((z) => [z.id, z] as const));
+    const deCada = new Map<number, { zona: number; resto: number[]; destino: { x: number; z: number } | null }>();
+    return (a) => {
+      let st = deCada.get(a.numero);
+      if (st === undefined) {
+        st = { zona: -1, resto: [], destino: null };
+        deCada.set(a.numero, st);
+      }
+      let zona = st.zona;
+      for (const o of a.oido) if (o.suceso.e === 'zona' && o.suceso.tics > 0) zona = o.suceso.id;
+      const z = zonas.get(zona);
+      if (zona !== st.zona && z !== undefined) {
+        const cx = Math.floor((z.caja.x0 + z.caja.x1) / 2);
+        const cz = Math.floor((z.caja.z0 + z.caja.z1) / 2);
+        st.zona = zona;
+        st.destino = { x: cx, z: cz };
+        st.resto = camino(cercano(a.x, a.z), cercano(cx, cz));
+      }
+      while (st.resto.length > 0 && Math.hypot(nudo(st.resto[0] as number).x - a.x, nudo(st.resto[0] as number).z - a.z) < 0.4 * UNO) st.resto.shift();
+      a.meta = st.resto.length > 0 ? nudo(st.resto[0] as number) : st.destino;
+    };
+  };
+  const carreras: string[] = [];
+  const malCarrera: string[] = [];
+  for (const [asientos, semilla] of [[4, 5], [4, 11], [6, 23], [6, 77]] as const) {
+    const que = `${String(asientos)} asientos, semilla ${String(semilla)}`;
+    const l = lizaDeLaPartida(asientos, semilla, 1, 'llamada', 0);
+    if (l === null) {
+      malCarrera.push(`${que}: sin Llamada`);
+      continue;
+    }
+    let sinBlanco = 0;
+    const deLaPlaza = new Map<number, number>();
+    const robot = corredorALaCabina(l);
+    const r = jugarEnElBanco(
+      l,
+      l.asientos.map(() => robot),
+      (s) => {
+        const hayBlanco = s.asientos.some((a) => a.conCuerpo && a.vida > 0);
+        for (const e of s.entidades) {
+          const m = e.cerebro.modo;
+          if (hayBlanco && e.blanco === 0 && (m === 'acechar' || m === 'rondar')) sinBlanco++;
+          if (e.grupo !== 0) continue;
+          let cerca = deLaPlaza.get(e.numero) ?? Number.POSITIVE_INFINITY;
+          for (const a of s.asientos) if (a.conCuerpo) cerca = Math.min(cerca, Math.hypot(a.x - e.x, a.z - e.z) / UNO);
+          deLaPlaza.set(e.numero, cerca);
+        }
+      },
+    );
+    const llegan = [...deLaPlaza.values()].filter((x) => x <= 10).length;
+    carreras.push(`${que}: ${String(r.tics)} tics, ${String(r.anuncios)} anuncios, ${String(sinBlanco)} entidad-tics sin blanco, ${String(r.olvidadas)} olvidadas, de la plaza ${String(llegan)} de ${String(deLaPlaza.size)} llegan a 10 m`);
+    if (sinBlanco > 0 || r.olvidadas > 0 || llegan < 1) malCarrera.push(carreras[carreras.length - 1] as string);
+  }
+  comprobar(
+    'en la carrera a la cabina lo que sale de la plaza persigue al grupo: nada se queda sin blanco ni se olvida, y los de la plaza lo alcanzan',
+    malCarrera.length === 0 && carreras.length === 4,
+    malCarrera.length > 0 ? malCarrera : carreras,
+  );
+  for (const x of carreras) nota(`la Llamada · ${x}`);
+}
+
+paso('El retablo: la ciudad de la traza sin derivarla, en 4 kB');
+{
+  const malas: string[] = [];
+  for (let traza = 0; traza < C.TRAZAS; traza++) {
+    const ciudad = C.ciudadDeLaMesa(traza, CODIGO);
+    const plano = planoDeLaTraza(traza);
+    /* Las plazas: número, centro, distrito y nombre. */
+    const plazas = forma(plano.plazas.map((p) => [p.numero, p.x, p.z, p.distrito, p.nombre]));
+    const deLaCiudad = forma(ciudad.plazas.map((p) => [p.numero, p.centro.x, p.centro.z, p.distrito, nombreDePlaza(p.nombre)]));
+    if (plazas !== deLaCiudad) malas.push(`traza ${String(traza)}, plazas: ${plazas.slice(0, 120)} y ${deLaCiudad.slice(0, 120)}`);
+    /* Los distritos: el centro de cada hueco cae en la cara de su distrito y en ninguna otra. */
+    for (const h of ciudad.huecos) {
+      const x = 48 * h.i;
+      const z = 48 * h.j;
+      const dentro = plano.distritos.filter((d) => x > d.caja.x0 && x < d.caja.x1 && z > d.caja.z0 && z < d.caja.z1).map((d) => d.id);
+      if (dentro.length !== 1 || dentro[0] !== h.distrito) malas.push(`traza ${String(traza)}, hueco (${String(h.i)}, ${String(h.j)}): ${h.distrito} y el retablo dice ${forma(dentro)}`);
+    }
+    /* Las avenidas: por su eje, de punta a punta. */
+    for (const a of ciudad.avenidas) {
+      const r = plano.avenidas.find((x) => x.id === a.id);
+      const esperada = a.eje === 'x' ? { x0: a.desde, z0: a.linea, x1: a.hasta, z1: a.linea } : { x0: a.linea, z0: a.desde, x1: a.linea, z1: a.hasta };
+      if (r === undefined || forma(r.caja) !== forma(esperada)) malas.push(`traza ${String(traza)}, ${a.id}: ${forma(r?.caja)} y ${forma(esperada)}`);
+    }
+    if (plano.avenidas.length !== ciudad.avenidas.length || plano.distritos.length !== 5) malas.push(`traza ${String(traza)}: ${String(plano.avenidas.length)} avenidas y ${String(plano.distritos.length)} distritos`);
+  }
+  comprobar('en las 32 trazas, las plazas, los distritos y las avenidas del retablo son los de la ciudad (su simetría es la de `quiebro-ciudad.ts`)', malas.length === 0, malas.slice(0, 4));
+  /* El tablero de una vista: sus caras y sus líneas son las del plano de su traza, en pasos de 6 m. */
+  const g = mesaNueva(2, 44);
+  mandar(g, 's1', 'empezar', null);
+  const vg = vista(g);
+  const plano = planoDeLaTraza(vg.traza ?? -1);
+  const u = PLANO_DEL_TABLERO.unidad;
+  const caras = vg.tablero.caras;
+  const cajaDe = (c: (typeof caras)[number]): string => forma({ x0: (c.puntos[0]?.x ?? 0) * u, z0: (c.puntos[0]?.y ?? 0) * u, x1: (c.puntos[2]?.x ?? 0) * u, z1: (c.puntos[2]?.y ?? 0) * u });
+  const distritosBien = plano.distritos.every((d) => {
+    const c = caras.find((x) => x.id === d.id);
+    return c !== undefined && cajaDe(c) === forma(d.caja) && c.rotulo === NOMBRES_DEL_QUIEBRO.ciudad.distritos[d.id] && !c.destacada;
+  });
+  const plazasBien = plano.plazas.every((p) => {
+    const c = caras.find((x) => x.id === `p${String(p.numero)}`);
+    const deLaNoche = (vg.noche?.fallos ?? []).indexOf(p.numero) >= 0;
+    return c !== undefined && cajaDe(c) === forma({ x0: p.x - 18, z0: p.z - 18, x1: p.x + 18, z1: p.z + 18 }) && c.rotulo === p.nombre && c.destacada === deLaNoche;
+  });
+  const lineas = vg.tablero.lineas;
+  comprobar(
+    'el tablero dibuja los cinco distritos con su nombre, las seis plazas con el suyo (la de la Bajada, destacada) y las dos avenidas, en pasos de 6 m',
+    caras.length === 11 && distritosBien && plazasBien && lineas.length === 2 && lineas.every((l) => plano.avenidas.some((a) => forma({ x0: l.desde.x * u, z0: l.desde.y * u, x1: l.hasta.x * u, z1: l.hasta.y * u }) === forma(a.caja))),
+    { caras: caras.map((c) => c.id), lineas: lineas.map((l) => l.id) },
+  );
+  comprobar(
+    'y todas las cifras del tablero son enteras (múltiplos de 6 m)',
+    caras.every((c) => c.puntos.every((p) => Number.isInteger(p.x) && Number.isInteger(p.y))) && lineas.every((l) => [l.desde.x, l.desde.y, l.hasta.x, l.hasta.y].every((x) => Number.isInteger(x))),
+  );
+  const enLaReunion = vista(mesaNueva(3, 45)).tablero;
+  comprobar('en la reunión, sin traza: la ciudad sin escribir y la Glorieta del Relojero, que está en el centro de todas', enLaReunion.caras.length === 2 && enLaReunion.caras[1]?.rotulo === nombreDePlaza(0) && enLaReunion.lineas.length === 0);
+  /*
+   * EL MÁS PESADO: cada vista de las partidas del robot con seis nombres de 24 letras (lo más que admite la
+   * mesa), puntos de seis cifras, doce esquirlas, avería y Memoria a la vez, y la pausa con retoque y voto.
+   */
+  const largos = ['s1', 's2', 's3', 's4', 's5', 's6'].map((asiento, i) => ({ asiento, nombre: `Desvelada Número ${String(i)}${'x'.repeat(6)}` }));
+  let peor = 0;
+  let donde = '';
+  for (const p of partidas) {
+    if (p.asientos.length !== 6) continue;
+    for (const v of p.vistas) {
+      const { tablero: _t, ...sin } = v;
+      void _t;
+      const cargada: MesaDelQuiebro = {
+        ...sin,
+        asientos: sin.asientos.map((a) => ({ ...a, puntos: 123456, control: { ...a.control, esquirlas: 12 } })),
+        reglamento: { ...sin.reglamento, averia: 'cristal', contramedida: 'plaza-despejada', asientos: sin.reglamento.asientos.map((e) => ({ ...e, retoques: [...e.retoques, 'replica-doble' as const] })) },
+        mejorNoche: sin.mejorNoche === null ? null : { ...sin.mejorNoche, puntos: 123456 },
+      };
+      const pesa = bytes(tableroDelQuiebro(cargada, largos));
+      if (pesa > peor) {
+        peor = pesa;
+        donde = `${forma(v.fase)}, noche ${String(v.noche?.numero ?? 0)}`;
+      }
+    }
+  }
+  comprobar(`el retablo más pesado, con seis nombres de 24 letras, cabe en ${String(TOPE_DEL_TABLERO)} B (en UTF-8)`, peor > 0 && peor <= TOPE_DEL_TABLERO, { peor, donde });
+  nota(`el retablo más pesado: ${String(peor)} B, en ${donde}`);
+}
+
+paso('Los nombres de la ciudad');
+{
+  const n = NOMBRES_DEL_QUIEBRO.ciudad;
+  const sinRepetir = (l: readonly string[]): boolean => new Set(l).size === l.length && l.every((x) => x.trim().length > 0);
+  comprobar(
+    'plazas, calles y pasajes llegan a lo que pide la columna (16, 40 y 24), sin repetir; y la plaza 0 es la Glorieta del Relojero',
+    n.plazas.length >= C.NOMBRES_DE_PLAZA_COMO_MINIMO && n.calles.length >= C.NOMBRES_DE_CALLE_COMO_MINIMO && n.pasajes.length >= C.NOMBRES_DE_PASAJE_COMO_MINIMO && sinRepetir(n.plazas) && sinRepetir(n.calles) && sinRepetir(n.pasajes) && n.plazas[0] === 'Glorieta del Relojero',
+    { plazas: n.plazas.length, calles: n.calles.length, pasajes: n.pasajes.length },
+  );
+  comprobar('los distritos con nombre son los de la ciudad', forma(Object.keys(n.distritos).slice().sort((a, b) => (a < b ? -1 : 1))) === forma(C.DISTRITOS.slice().sort((a, b) => (a < b ? -1 : 1))));
+  const sinNombre: string[] = [];
+  for (let traza = 0; traza < C.TRAZAS; traza++) {
+    const ciudad = C.ciudadDeLaMesa(traza, CODIGO);
+    const plazas = ciudad.plazas.map((p) => nombreDePlaza(p.nombre));
+    if (!sinRepetir(plazas) || plazas[0] !== n.plazas[0]) sinNombre.push(`traza ${String(traza)}: ${forma(plazas)}`);
+    for (const c of ciudad.calles) if (c.nombre >= 0 && nombreDeCalle(c.nombre) === '') sinNombre.push(`traza ${String(traza)}: calle ${String(c.indice)} (${String(c.nombre)})`);
+    for (const c of ciudad.callejones) if (nombreDePasaje(c.nombre) === '') sinNombre.push(`traza ${String(traza)}: pasaje del hueco ${String(c.hueco)} (${String(c.nombre)})`);
+  }
+  comprobar('en las 32 trazas cada plaza, cada calle y cada pasaje tiene nombre, y la Glorieta del Relojero es la 1', sinNombre.length === 0, sinNombre.slice(0, 4));
+}
+
+paso('El coste de una sala de la ciudad');
+{
+  const c = COSTE_DE_UNA_SALA;
+  const llena = c.base + 6 * c.porAsiento + AFORO_DEL_QUIEBRO.entidades * c.porEntidad + AFORO_DEL_QUIEBRO.balas * c.porBala;
+  const sola = c.base + 1 * c.porAsiento + AFORO_DEL_QUIEBRO.entidades * c.porEntidad + AFORO_DEL_QUIEBRO.balas * c.porBala;
+  comprobar('el coste declarado es el del §5.6 (base 400, 250 por asiento, 300 por entidad, 40 por bala): 8.380 µs/s la sala llena y 7.130 la solitaria', c.base === 400 && c.porAsiento === 250 && c.porEntidad === 300 && c.porBala === 40 && llena === 8380 && sola === 7130, { llena, sola });
+  comprobar(
+    'caben 9 salas llenas y no 10, y 11 solitarias y no 12',
+    cabeOtraSala(Array.from({ length: 8 }, () => llena), llena) && !cabeOtraSala(Array.from({ length: 9 }, () => llena), llena) && cabeOtraSala(Array.from({ length: 10 }, () => sola), sola) && !cabeOtraSala(Array.from({ length: 11 }, () => sola), sola),
+    { presupuesto: PRESUPUESTO_DE_LAS_LIZAS },
+  );
+}
+
+paso('La vista con la ciudad, leída con desconfianza');
+{
+  const v = vista(A);
+  const conNoche = (n: Record<string, unknown>): unknown => ({ ...v, noche: { ...(v.noche as object), ...n } });
+  const MALAS: readonly [string, unknown][] = [
+    ['con la traza 32', { ...v, traza: 32 }],
+    ['con la traza −1', { ...v, traza: -1 }],
+    ['con la traza 1,5', { ...v, traza: 1.5 }],
+    ['con noche y sin traza', { ...v, traza: null }],
+    ['sin la clave de la traza', (() => { const { traza: _t, ...sin } = v; void _t; return sin; })()],
+    ['con una noche sin plazas', conNoche({ fallos: [] })],
+    ['con la plaza 7', conNoche({ fallos: [7] })],
+    ['con la plaza 0', conNoche({ fallos: [0] })],
+    ['con una plaza repetida', conNoche({ fallos: [2, 2] })],
+    ['con seis plazas en una noche', conNoche({ fallos: [1, 2, 3, 4, 5, 6] })],
+    ['con una plaza que no es un número', conNoche({ fallos: ['1'] })],
+    ['con la plantilla de antes en la noche', conNoche({ plantilla: 'glorieta' })],
+  ];
+  const leidas = MALAS.filter(([, x]) => leerVistaDelQuiebro(x) !== null).map(([que]) => que);
+  comprobar(`se rechazan las ${String(MALAS.length)} vistas con la traza o las plazas mal`, leidas.length === 0, leidas);
+  const reunion = vista(mesaNueva(2, 9));
+  comprobar(
+    'y se leen la de cinco plazas distintas y, en la reunión, la de traza nula (y no una con traza)',
+    leerVistaDelQuiebro(conNoche({ fallos: [3, 1, 6, 2, 5] })) !== null && leerVistaDelQuiebro(reunion) !== null && leerVistaDelQuiebro({ ...reunion, traza: 4 }) === null,
+  );
 }
 
 terminar({
-  escritas: 319,
+  escritas: 357,
   enVerde:
     'La mesa lleva la noche entera —reunión, Bajada, oleadas, pausas con voto, Llamada, recuento, final—,\n' +
     '  rechaza con motivo lo que no es y lo que llega rancio, sube y baja el nivel, recuerda la noche anterior y\n' +
     '  cierra a las diez; los ausentes cuentan desde la fase siguiente y quien vuelve, vuelve; el diario de\n' +
-    '  cada noche tiene tope; las tablas son las del diseño; toda vista se lee y su tablero cabe; y el productor\n' +
-    '  da una liza sin problemas, con el mismo aforo, en cada una de las vistas de las partidas del robot.',
+    '  cada noche tiene tope; las tablas son las del diseño; toda vista se lee y su retablo cabe en 4 kB; y el\n' +
+    '  productor da una liza sin problemas, con el mismo aforo, en cada una de las vistas de las partidas del\n' +
+    '  robot, sobre la ciudad de la mesa: la misma toda la noche, la plaza de la Bajada de límite en la Bajada\n' +
+    '  y la ciudad entera en lo demás, la Llamada en una cabina a 100-160 m por calles, y un Sistema que no\n' +
+    '  suelta a nadie: ni quedarse lejos de la plaza aguanta una oleada, ni la carrera a la cabina lo deja atrás.',
 });

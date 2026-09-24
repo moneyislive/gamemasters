@@ -7,8 +7,16 @@
  *
  * Los del juego entero son los provisionales del diseño (§8): N0 150.000 triángulos y 60 llamadas,
  * N1 250.000 / 90, N2 600.000 / 150, N3 1.500.000 / 250, hasta que el banco en aparato real diga
- * otra cosa. La ciudad y su atmósfera se quedan con el 60 % (`CUOTA_DE_LA_CIUDAD`): el resto es de
- * los personajes, los efectos, el posproceso y el HUD, que no son de este frente.
+ * otra cosa. La ciudad y su atmósfera se quedan con el 50 % (`CUOTA_DE_LA_CIUDAD`; el 60 % hasta la
+ * ciudad abierta, §5.7 de `docs/quiebro/CIUDAD-ABIERTA.md`, que la baja para dejar sitio a los personajes
+ * de calidad): el resto es de los personajes, los efectos, el posproceso y el HUD, que no son de este
+ * frente.
+ *
+ * ═══ DOS LIBROS: EL BARRIO Y LA CIUDAD ABIERTA ═══
+ *
+ * El barrio de hoy (`construir.ts`) y la ciudad abierta (`abierta.ts`) tienen piezas distintas, y cada una
+ * su libro de renglones: `RENGLONES_DECLARADOS` y `RENGLONES_DE_LA_CIUDAD_ABIERTA`. Los dos caben en la
+ * misma cuota. El barrio se va cuando el juego monte la ciudad (ola B); su libro, con él.
  *
  * ═══ CADA PIEZA DECLARA SU RENGLÓN ═══
  *
@@ -46,7 +54,7 @@ export const TOPES_DEL_JUEGO: Readonly<Record<NivelDeLaCiudad, Coste>> = {
 };
 
 /** Lo que se lleva la ciudad (con su atmósfera) de cada tope. */
-export const CUOTA_DE_LA_CIUDAD = 0.6;
+export const CUOTA_DE_LA_CIUDAD = 0.5;
 
 /** Lo que la ciudad puede gastar en un nivel: la cuota del tope. */
 export function topeDeLaCiudad(nivel: NivelDeLaCiudad): Coste {
@@ -54,7 +62,7 @@ export function topeDeLaCiudad(nivel: NivelDeLaCiudad): Coste {
   return { triangulos: Math.floor(t.triangulos * CUOTA_DE_LA_CIUDAD), llamadas: Math.floor(t.llamadas * CUOTA_DE_LA_CIUDAD) };
 }
 
-type PorNivel = Readonly<Record<NivelDeLaCiudad, Coste>>;
+export type PorNivel = Readonly<Record<NivelDeLaCiudad, Coste>>;
 
 function igual(c: Coste): PorNivel {
   return { 0: c, 1: c, 2: c, 3: c };
@@ -66,12 +74,13 @@ function igual(c: Coste): PorNivel {
  * crecido la pieza o el barrio, y las dos cosas hay que mirarlas. Peores medidos, N0/N1/N2/N3:
  * fachadas 3.286 / 35.246 / 45.518 / 45.518 (los balcones de N1 son casi todo), mobiliario y coches
  * 20.516 / 37.576 / 43.152 / 48.728, tarjetas 480 / 680 / 1.000 / 1.094; el resto no cambia con el
- * barrio o apenas (ver el comprobador).
+ * barrio o apenas (ver el comprobador). Con la cuota al 50 %, las fachadas y el mobiliario de N1 se
+ * quedan con un 12 % sobre lo medido (antes, un 20 %): lo declarado de N1 tiene que caber en 125.000.
  */
 export const RENGLONES_DECLARADOS: Readonly<Record<string, PorNivel>> = {
   fachadas: {
     0: { triangulos: 4_000, llamadas: 1 },
-    1: { triangulos: 42_000, llamadas: 1 },
+    1: { triangulos: 39_500, llamadas: 1 },
     2: { triangulos: 54_000, llamadas: 1 },
     3: { triangulos: 54_000, llamadas: 1 },
   },
@@ -79,7 +88,7 @@ export const RENGLONES_DECLARADOS: Readonly<Record<string, PorNivel>> = {
   aceras: igual({ triangulos: 1_200, llamadas: 1 }),
   'mobiliario y coches': {
     0: { triangulos: 24_000, llamadas: 1 },
-    1: { triangulos: 44_000, llamadas: 1 },
+    1: { triangulos: 42_000, llamadas: 1 },
     2: { triangulos: 50_000, llamadas: 1 },
     3: { triangulos: 56_000, llamadas: 1 },
   },
@@ -153,6 +162,91 @@ export const RENGLONES_DECLARADOS: Readonly<Record<string, PorNivel>> = {
   },
 };
 
+/**
+ * EL LIBRO DE LA CIUDAD ABIERTA. La ventana lleva lo de sus celdas y cambia al andar: su renglón es el PEOR
+ * de todas las ventanas de las 32 trazas (lo recorre `verify:quiebro-ciudad` celda a celda), más un 15 %.
+ * Lo lejano, el suelo y el borde son de toda la ciudad y no cambian al andar. Lo instanciado (tarjetas,
+ * halos, vapor, haces) sigue a la ventana. Los números los mide el comprobador y los enseña; si uno se
+ * pasa, o ha crecido la pieza o la ciudad.
+ */
+export const RENGLONES_DE_LA_CIUDAD_ABIERTA: Readonly<Record<string, PorNivel>> = {
+  /*
+   * Peores medidos el 24-sep en las 3.200 ventanas (32 trazas de la columna × 25 cámaras × 4 niveles),
+   * N0/N1/N2/N3: fachadas 790 / 9.270 / 76.454 / 107.346 (en N1, relieve sólo en la celda del centro),
+   * mobiliario 15.038 / 37.850 / 62.424 / 105.218, emisivo 1.202 / 1.202 / 1.940 / 2.982, cristal
+   * 340 / 340 / 538 / 768, neones 2.190 / 2.190 / 3.616 / 5.692, lejos 11.952, tarjetas 528 / 722 / 1.768 /
+   * 3.256, halos 306 / 306 / 536 / 818, haces — / — / 3.840 / 5.920.
+   */
+  'ventana · fachadas': {
+    0: { triangulos: 1_200, llamadas: 1 },
+    1: { triangulos: 11_000, llamadas: 1 },
+    2: { triangulos: 88_000, llamadas: 1 },
+    3: { triangulos: 124_000, llamadas: 1 },
+  },
+  'ventana · mobiliario': {
+    0: { triangulos: 17_500, llamadas: 1 },
+    1: { triangulos: 43_500, llamadas: 1 },
+    2: { triangulos: 72_000, llamadas: 1 },
+    3: { triangulos: 121_000, llamadas: 1 },
+  },
+  'ventana · emisivo': {
+    0: { triangulos: 1_400, llamadas: 1 },
+    1: { triangulos: 1_400, llamadas: 1 },
+    2: { triangulos: 2_300, llamadas: 1 },
+    3: { triangulos: 3_500, llamadas: 1 },
+  },
+  'ventana · cristal': {
+    0: { triangulos: 400, llamadas: 1 },
+    1: { triangulos: 400, llamadas: 1 },
+    2: { triangulos: 650, llamadas: 1 },
+    3: { triangulos: 900, llamadas: 1 },
+  },
+  'ventana · neones': {
+    0: { triangulos: 2_600, llamadas: 1 },
+    1: { triangulos: 2_600, llamadas: 1 },
+    2: { triangulos: 4_200, llamadas: 1 },
+    3: { triangulos: 6_600, llamadas: 1 },
+  },
+  lejos: igual({ triangulos: 14_000, llamadas: 1 }),
+  'suelo · asfalto': igual({ triangulos: 2_600, llamadas: 1 }),
+  'suelo · aceras': igual({ triangulos: 4_600, llamadas: 1 }),
+  borde: igual({ triangulos: 80, llamadas: 1 }),
+  horizonte: igual({ triangulos: 128, llamadas: 1 }),
+  /* Diez triángulos por caja lejana: la mitad de cajas que en el barrio (ver `abierta.ts`). */
+  'ciudad lejana': {
+    0: { triangulos: 3_000, llamadas: 1 },
+    1: { triangulos: 6_000, llamadas: 1 },
+    2: { triangulos: 10_000, llamadas: 1 },
+    3: { triangulos: 15_000, llamadas: 1 },
+  },
+  'tarjetas de reflejo': {
+    0: { triangulos: 700, llamadas: 1 },
+    1: { triangulos: 1_000, llamadas: 1 },
+    2: { triangulos: 2_100, llamadas: 1 },
+    3: { triangulos: 3_800, llamadas: 1 },
+  },
+  halos: {
+    0: { triangulos: 500, llamadas: 1 },
+    1: { triangulos: 500, llamadas: 1 },
+    2: { triangulos: 800, llamadas: 1 },
+    3: { triangulos: 1_000, llamadas: 1 },
+  },
+  'tren · coches': igual({ triangulos: 140, llamadas: 1 }),
+  'tren · ventanas': igual({ triangulos: 100, llamadas: 1 }),
+  vapor: {
+    0: { triangulos: 24, llamadas: 1 },
+    1: { triangulos: 48, llamadas: 1 },
+    2: { triangulos: 72, llamadas: 1 },
+    3: { triangulos: 96, llamadas: 1 },
+  },
+  'haces de luz': {
+    0: { triangulos: 0, llamadas: 0 },
+    1: { triangulos: 0, llamadas: 0 },
+    2: { triangulos: 4_500, llamadas: 1 },
+    3: { triangulos: 6_900, llamadas: 1 },
+  },
+};
+
 /** Los renglones de la atmósfera (cielo, lluvia, salpicaduras), que salen de sus números. */
 export function renglonesDeLaAtmosfera(nivel: NivelDeLaCiudad): RenglonDeLaCiudad[] {
   const d = DETALLE_DEL_NIVEL[nivel];
@@ -188,8 +282,15 @@ export interface PresupuestoSumado {
   readonly excesos: readonly string[];
 }
 
-/** La suma de una ciudad construida (más su atmósfera) contra su cuota y sus renglones. */
-export function presupuestoDeLaCiudad(renglones: readonly RenglonDeLaCiudad[], nivel: NivelDeLaCiudad): PresupuestoSumado {
+/**
+ * La suma de una ciudad construida (más su atmósfera) contra su cuota y sus renglones. `libro`: el del
+ * barrio (de salida) o el de la ciudad abierta.
+ */
+export function presupuestoDeLaCiudad(
+  renglones: readonly RenglonDeLaCiudad[],
+  nivel: NivelDeLaCiudad,
+  libro: Readonly<Record<string, PorNivel>> = RENGLONES_DECLARADOS,
+): PresupuestoSumado {
   const todos = [...renglones, ...renglonesDeLaAtmosfera(nivel)];
   const conSombras = DETALLE_DEL_NIVEL[nivel].sombras > 0;
   let triangulos = 0;
@@ -204,7 +305,7 @@ export function presupuestoDeLaCiudad(renglones: readonly RenglonDeLaCiudad[], n
       sombraT += r.triangulos;
       sombraL += r.llamadas;
     }
-    const declarado = (RENGLONES_DECLARADOS[r.nombre] ?? RENGLONES_DECLARADOS_DE_LA_ATMOSFERA[r.nombre])?.[nivel];
+    const declarado = (libro[r.nombre] ?? RENGLONES_DECLARADOS_DE_LA_ATMOSFERA[r.nombre])?.[nivel];
     if (declarado === undefined) excesos.push(`${r.nombre}: sin renglón declarado`);
     else if (r.triangulos > declarado.triangulos || r.llamadas > declarado.llamadas) {
       excesos.push(`${r.nombre}: ${String(r.triangulos)} tri / ${String(r.llamadas)} llamadas > ${String(declarado.triangulos)} / ${String(declarado.llamadas)}`);
@@ -223,11 +324,11 @@ export function presupuestoDeLaCiudad(renglones: readonly RenglonDeLaCiudad[], n
   };
 }
 
-/** Lo que suman los renglones DECLARADOS de un nivel (sin sombras): lo que el diseño reserva. */
-export function sumaDeLoDeclarado(nivel: NivelDeLaCiudad): Coste {
+/** Lo que suman los renglones DECLARADOS de un nivel (sin sombras) en un libro: lo que el diseño reserva. */
+export function sumaDeLoDeclarado(nivel: NivelDeLaCiudad, libro: Readonly<Record<string, PorNivel>> = RENGLONES_DECLARADOS): Coste {
   let triangulos = 0;
   let llamadas = 0;
-  for (const tabla of [RENGLONES_DECLARADOS, RENGLONES_DECLARADOS_DE_LA_ATMOSFERA]) {
+  for (const tabla of [libro, RENGLONES_DECLARADOS_DE_LA_ATMOSFERA]) {
     for (const porNivel of Object.values(tabla)) {
       triangulos += porNivel[nivel].triangulos;
       llamadas += porNivel[nivel].llamadas;

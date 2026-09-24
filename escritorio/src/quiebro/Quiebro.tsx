@@ -26,6 +26,15 @@
  * detrás de mi cuerpo ya movido; (−1) los efectos y los cuerpos se pintan; (0) la ciudad; (1) el
  * posproceso pinta el fotograma. Nadie más pinta con prioridad positiva en este lienzo.
  *
+ * ═══ EL BARRIO O LA CIUDAD ═══
+ *
+ * Dónde se juega lo dice `red/lugar.ts` (`lugarDeLaMesa`): la ciudad abierta de 540 m cuando la vista trae
+ * su traza Y el mundo de la liza es el de esa ciudad; si no, el barrio de siempre. Con ese lugar se pinta
+ * la ciudad (`LaCiudadDeNoche` con la traza, las plazas y las despejadas), choca la cámara, suenan el tren
+ * y la lluvia, se lee el rótulo de la Bajada y la gente de los personajes; y en la ciudad, el minimapa y el
+ * plano leen el mapa vivo de la partida (`red/orientarse.ts`). El lugar se guarda por identidad: la vista
+ * cambia con cada voto y la noche no, y un lugar nuevo en cada voto rehacía la cámara y los personajes.
+ *
  * ═══ AL FONDO, CALLADO ═══
  *
  * Cuando la pestaña se oculta, la página se va o la app pasa a segundo plano (`mandos/fondo.ts`), se
@@ -37,8 +46,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, JSX, MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import type { Camera } from 'three';
-import { barrioDeLaNoche, despejarLaPlaza } from '../../../shared/arcade/juegos/quiebro-barrio';
-import type { Barrio } from '../../../shared/arcade/juegos/quiebro-barrio';
 import { lizaDeLaMesa } from '../../../shared/arcade/juegos/lizas';
 import { IDS_DE_ESTILO, NOMBRES_DEL_QUIEBRO } from '../../../shared/arcade/juegos/quiebro-nombres';
 import { claveDeLaFase } from '../../../shared/arcade/juegos/quiebro-liza';
@@ -66,6 +73,9 @@ import { direccionDeLaLiza } from './red/canal';
 import type { Enchufe } from './red/canal';
 import { Escenificador } from './red/escenificar';
 import { Partida } from './red/partida';
+import { lugarDeLaMesa, rotuloDelLugar, semillaDelLugar, tiempoDelLugar } from './red/lugar';
+import type { LugarDeLaNoche } from './red/lugar';
+import { OrientacionDeLaPartida } from './red/orientarse';
 import { Hud } from './hud/Hud';
 import { quienesFaltanEnLaBajada } from './hud/lectura';
 import { ID_DEL_QUIEBRO } from './hud/Pantallas';
@@ -179,13 +189,6 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
   const vistaCruda = puerto.vista;
   const codigo = puerto.codigo;
   const vista = useMemo(() => leerVistaDelQuiebro(vistaCruda), [vistaCruda, rev]);
-  const numeroDeNoche = vista?.noche?.numero ?? null;
-  const despejada = vista?.reglamento.contramedida === 'plaza-despejada';
-  const barrio = useMemo<Barrio | null>(() => {
-    if (numeroDeNoche === null) return null;
-    const b = barrioDeLaNoche(codigo, numeroDeNoche);
-    return despejada ? despejarLaPlaza(b) : b;
-  }, [codigo, numeroDeNoche, despejada]);
   const liza = useMemo<LizaDeclarada | null>(() => {
     if (vista === null) return null;
     try {
@@ -194,6 +197,25 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
       return null;
     }
   }, [vista, vistaCruda, codigo]);
+  /* Dónde se juega, guardado por identidad (ver «El barrio o la ciudad»). */
+  const lugarAnterior = useRef<LugarDeLaNoche | null>(null);
+  const avisoDelLugar = useRef<string | null>(null);
+  const lugar = useMemo<LugarDeLaNoche | null>(() => {
+    const leido = lugarDeLaMesa(vista, codigo, liza);
+    if (leido.aviso !== null && leido.aviso !== avisoDelLugar.current && import.meta.env.DEV) console.warn(`[quiebro] ${leido.aviso}`);
+    avisoDelLugar.current = leido.aviso;
+    const antes = lugarAnterior.current;
+    const nuevo = leido.lugar;
+    const mismo =
+      antes !== null &&
+      nuevo !== null &&
+      ((antes.tipo === 'barrio' && nuevo.tipo === 'barrio' && antes.barrio === nuevo.barrio) ||
+        (antes.tipo === 'ciudad' && nuevo.tipo === 'ciudad' && antes.noche === nuevo.noche && antes.fallos.join(',') === nuevo.fallos.join(',')));
+    const elegido = mismo ? antes : nuevo;
+    lugarAnterior.current = elegido;
+    return elegido;
+  }, [vista, codigo, liza]);
+  const enLaCiudad = lugar !== null && lugar.tipo === 'ciudad';
 
   /* ─── Lo que vive lo que vive el juego ─── */
   const mandos = useMemo(() => new EstadoDeLosMandos(), []);
@@ -215,6 +237,8 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
   }, [codigo, llave, servidor, mandos]);
   useEffect(() => () => partida?.cerrar(), [partida]);
   const escena = useMemo(() => (partida === null ? null : new Escenificador(partida, sistema, sonido)), [partida, sistema, sonido]);
+  /* El mapa vivo de la partida: el minimapa, el plano y el rumbo lo leen (ver `red/orientarse.ts`). */
+  const mapa = useMemo(() => (partida === null ? null : new OrientacionDeLaPartida(partida)), [partida]);
   /* El reloj de la Bajada (la preparación) y la cámara del lienzo, que el HUD lee fuera de él. */
   const bajada = useMemo(() => new RelojDeLaBajada(), []);
   const ojo = useRef<Camera | null>(null);
@@ -227,8 +251,8 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const w = window as unknown as { __quiebro?: Record<string, unknown> };
-    w.__quiebro = { ...(w.__quiebro ?? {}), partida, mandos, sistema, sonido, bajada, forzarElNivel };
-  }, [partida, mandos, sistema, sonido, bajada]);
+    w.__quiebro = { ...(w.__quiebro ?? {}), partida, mandos, sistema, sonido, bajada, forzarElNivel, mapa, lugar };
+  }, [partida, mandos, sistema, sonido, bajada, mapa, lugar]);
 
   /* Al fondo, callado (ver la cabecera). */
   useEffect(
@@ -250,11 +274,11 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
   /* La declaración y el canal siguen a la vista. */
   useEffect(() => {
     if (partida === null) return;
-    partida.ponerLaDeclaracion(liza, barrio, puerto.yo);
+    partida.ponerLaDeclaracion(liza, lugar, puerto.yo);
     partida.estilos = vista?.reglamento.asientos.map((a) => Math.max(0, IDS_DE_ESTILO.indexOf(a.estilo))) ?? [];
     partida.apagon = vista?.reglamento.averia === 'apagon';
     partida.asegurarElCanal(hayQueJugar(vista) && liza !== null);
-  }, [partida, liza, barrio, vista, puerto.yo]);
+  }, [partida, liza, lugar, vista, puerto.yo]);
 
   /* ─── BAJAR, y lo que recuerda el aparato ─── */
   const [bajado, ponerBajado] = useState(false);
@@ -317,8 +341,8 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase, oleada]);
   useEffect(() => {
-    if (barrio !== null) sonido.ambiente({ tiempo: barrio.adorno.tiempo, bajoTecho: 0, ciudad: 1 });
-  }, [barrio, sonido]);
+    if (lugar !== null) sonido.ambiente({ tiempo: tiempoDelLugar(lugar), bajoTecho: 0, ciudad: 1 });
+  }, [lugar, sonido]);
 
   /* ─── Mover en la mesa ─── */
   const mover = useCallback((tipo: string, carga: unknown): Promise<SalidaDelMovimiento> => puerto.mover({ tipo, carga }), [puerto]);
@@ -373,7 +397,7 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
           <Escena
             codigo={codigo}
             vista={vista}
-            barrio={barrio}
+            lugar={lugar}
             partida={partida}
             escena={escena}
             sistema={sistema}
@@ -389,7 +413,7 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
           />
         </Canvas>
       </div>
-      <div className="quiebro-hud">
+      <div className={enLaCiudad && bajado && (fase === 'oleada' || fase === 'llamada' || fase === 'pausa') ? 'quiebro-hud q-con-minimapa' : 'quiebro-hud'}>
         {bajado && tactil && (fase === 'oleada' || fase === 'llamada') && !menu ? (
           <MandosTactiles mandos={mandos} partida={partida} zurdo={zurdo} recargaDelEmpellonMs={recarga * 50} />
         ) : null}
@@ -404,7 +428,7 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
           bajado={bajado}
           alBajar={alBajar}
           primeraNoche={primeraNoche}
-          rotuloDelBarrio={barrio?.adorno.rotulo ?? null}
+          rotuloDelBarrio={rotuloDelLugar(lugar)}
           rotuloDeFase={rotuloDeFase}
           marcador={marcador}
           alMarcador={ponerMarcador}
@@ -421,6 +445,8 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
           avisoDelSilencio={avisoDelSilencio}
           bajada={bajada}
           ojo={ojo}
+          mapa={mapa}
+          enLaCiudad={enLaCiudad}
           {...(enlaceParaEntrar === undefined ? {} : { enlaceParaEntrar })}
         />
       </div>
@@ -431,7 +457,7 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
 interface PropsDeLaEscena {
   readonly codigo: string;
   readonly vista: VistaDelQuiebro | null;
-  readonly barrio: Barrio | null;
+  readonly lugar: LugarDeLaNoche | null;
   readonly partida: Partida | null;
   readonly escena: Escenificador | null;
   readonly sistema: SistemaDeEfectos;
@@ -445,6 +471,9 @@ interface PropsDeLaEscena {
   readonly tactil: boolean;
   readonly alNivel: (n: 0 | 1 | 2 | 3) => void;
 }
+
+/** La plaza de la reunión: la Glorieta del Relojero (la misma lista siempre, para no rehacer la ciudad). */
+const FALLOS_DE_LA_REUNION: readonly number[] = Object.freeze([1]);
 
 /** Lo que el director de los personajes dice que pintó (el de `personajes/director.ts`, sin importarlo). */
 interface DirectorQueMide {
@@ -510,7 +539,7 @@ function Escena(p: PropsDeLaEscena): JSX.Element {
       },
       ahora,
     );
-    p.escena?.cadaFotograma(ahora, p.barrio);
+    p.escena?.cadaFotograma(ahora, p.lugar);
     remanso.current = p.sistema.reloj.intensidad(ahora);
     /* La racha mete percusión (diseño §9): se le dice a la música sólo cuando cambia. */
     const partida = p.partida;
@@ -531,16 +560,27 @@ function Escena(p: PropsDeLaEscena): JSX.Element {
   const presentado = useCallback((t: number) => p.sistema.reloj.presentado(t), [p.sistema]);
   const caida = useCallback((t: number) => p.bajada.caida(t), [p.bajada]);
   const noche = p.vista?.noche?.numero ?? null;
+  const lugar = p.lugar;
+  /* La ciudad abierta con su traza, sus plazas y sus despejadas; el barrio, sin nada de eso. */
+  const deLaCiudad = lugar !== null && lugar.tipo === 'ciudad' ? { traza: lugar.traza, fallos: lugar.fallos, despejadas: lugar.despejadas } : {};
+  const barrio = lugar !== null && lugar.tipo === 'barrio' ? lugar.barrio : null;
 
   return (
     <>
       {noche !== null ? (
-        <LaCiudadDeNoche codigo={p.codigo} noche={noche} nivel={nivel.nivel} reloj={reloj} tic={tic} farolasEncendidas={p.vista?.reglamento.averia === 'apagon' ? 0 : 1} />
+        <LaCiudadDeNoche codigo={p.codigo} noche={noche} nivel={nivel.nivel} reloj={reloj} tic={tic} farolasEncendidas={p.vista?.reglamento.averia === 'apagon' ? 0 : 1} {...deLaCiudad} />
+      ) : p.vista !== null ? (
+        /*
+         * La reunión: aún no hay traza (se sortea al empezar) y la cámara da vueltas sobre la Glorieta del
+         * Relojero, que está en el centro de todas. Se pinta la de la traza 0, como el mundo de la reunión
+         * del productor; al empezar, la Bajada escribe la de la mesa desde lo alto.
+         */
+        <LaCiudadDeNoche codigo={p.codigo} noche={1} nivel={nivel.nivel} reloj={reloj} traza={0} fallos={FALLOS_DE_LA_REUNION} />
       ) : (
         <LaCiudadDeNoche codigo={p.codigo} noche={1} nivel={nivel.nivel} reloj={reloj} />
       )}
-      <EfectosDelQuiebro sistema={p.sistema} nivel={nivel.nivel} semillaDelCielo={p.barrio?.semilla ?? 1} />
-      {p.partida !== null ? <PintorDeCuerpos fuente={p.partida} nivel={nivel.nivel} barrio={p.barrio} presentado={presentado} alDirector={alDirector} /> : null}
+      <EfectosDelQuiebro sistema={p.sistema} nivel={nivel.nivel} semillaDelCielo={semillaDelLugar(lugar)} />
+      {p.partida !== null ? <PintorDeCuerpos fuente={p.partida} nivel={nivel.nivel} barrio={barrio} presentado={presentado} alDirector={alDirector} /> : null}
       {p.partida !== null && p.escena !== null ? (
         <CamaraDelQuiebro
           partida={p.partida}
@@ -548,7 +588,7 @@ function Escena(p: PropsDeLaEscena): JSX.Element {
           escena={p.escena}
           sistema={p.sistema}
           sonido={p.sonido}
-          barrio={p.barrio}
+          lugar={p.lugar}
           modo={p.modo}
           caida={caida}
           tactil={p.tactil}

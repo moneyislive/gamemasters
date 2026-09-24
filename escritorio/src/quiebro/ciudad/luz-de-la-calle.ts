@@ -50,41 +50,66 @@ export const TEXELES_DE_LA_LUZ = 1024;
 
 export function hornearLaLuz(fuentes: readonly FuenteHorneada[], caja: CajaXZ, lado = TEXELES_DE_LA_LUZ): LuzHorneada {
   const datos = new Float32Array(lado * lado * 4);
-  const ancho = caja.x1 - caja.x0;
-  const fondo = caja.z1 - caja.z0;
-  const px = ancho / lado;
-  const pz = fondo / lado;
-  for (const f of fuentes) {
-    const i0 = Math.max(0, Math.floor((f.x - f.alcance - caja.x0) / px));
-    const i1 = Math.min(lado - 1, Math.ceil((f.x + f.alcance - caja.x0) / px));
-    const k0 = Math.max(0, Math.floor((f.z - f.alcance - caja.z0) / pz));
-    const k1 = Math.min(lado - 1, Math.ceil((f.z + f.alcance - caja.z0) / pz));
-    const h = Math.max(0.3, f.y - ALTURA_DE_LA_ACERA * 0.5);
-    const a2 = f.alcance * f.alcance;
-    for (let k = k0; k <= k1; k++) {
-      const z = caja.z0 + (k + 0.5) * pz;
-      const dz = z - f.z;
-      for (let i = i0; i <= i1; i++) {
-        const x = caja.x0 + (i + 0.5) * px;
-        const dx = x - f.x;
-        const r2 = dx * dx + dz * dz;
-        if (r2 > a2) continue;
-        if (f.haciaFuera !== undefined && dx * f.haciaFuera[0] + dz * f.haciaFuera[1] < -0.2) continue;
-        /* Se apaga suave al llegar al alcance, para que no se vea el borde del disco. */
-        const borde = 1 - r2 / a2;
-        const e = ((f.intensidad * h) / Math.pow(r2 + h * h, 1.5)) * borde * borde;
-        const j = (k * lado + i) * 4;
-        if (f.color === null) {
-          datos[j + 3] = (datos[j + 3] as number) + e;
-        } else {
-          datos[j] = (datos[j] as number) + e * f.color[0];
-          datos[j + 1] = (datos[j + 1] as number) + e * f.color[1];
-          datos[j + 2] = (datos[j + 2] as number) + e * f.color[2];
-        }
+  for (const f of fuentes) hornearUnaFuente(f, caja, lado, datos);
+  return { datos, lado, caja };
+}
+
+/**
+ * HORNEA UNA FUENTE en un mapa de `lado × lado` téxeles que cubre `caja`, sumando a `datos`. Devuelve los
+ * téxeles que ha mirado: es la medida del trabajo con la que la luz por losetas (`losetas.ts`) reparte el
+ * horneado entre fotogramas.
+ */
+export function hornearUnaFuente(f: FuenteHorneada, caja: CajaXZ, lado: number, datos: Float32Array): number {
+  const px = (caja.x1 - caja.x0) / lado;
+  const pz = (caja.z1 - caja.z0) / lado;
+  const i0 = Math.max(0, Math.floor((f.x - f.alcance - caja.x0) / px));
+  const i1 = Math.min(lado - 1, Math.ceil((f.x + f.alcance - caja.x0) / px));
+  const k0 = Math.max(0, Math.floor((f.z - f.alcance - caja.z0) / pz));
+  const k1 = Math.min(lado - 1, Math.ceil((f.z + f.alcance - caja.z0) / pz));
+  if (i1 < i0 || k1 < k0) return 0;
+  const h = Math.max(0.3, f.y - ALTURA_DE_LA_ACERA * 0.5);
+  const h2 = h * h;
+  const ih = f.intensidad * h;
+  const a2 = f.alcance * f.alcance;
+  const inversoA2 = 1 / a2;
+  const fuera = f.haciaFuera;
+  const color = f.color;
+  let mirados = 0;
+  /*
+   * Fila a fila, y en cada fila sólo el tramo que cae dentro del disco (el resto no suma nada): es lo mismo
+   * que recorrer el cuadrado entero, en tres cuartos del trabajo. `s·√s` es `s^1,5` sin `Math.pow`, que era
+   * la mitad del coste de la luz por losetas.
+   */
+  for (let k = k0; k <= k1; k++) {
+    const z = caja.z0 + (k + 0.5) * pz;
+    const dz = z - f.z;
+    const dz2 = dz * dz;
+    if (dz2 > a2) continue;
+    const w = Math.sqrt(a2 - dz2);
+    const desde = Math.max(i0, Math.ceil((f.x - w - caja.x0) / px - 0.5));
+    const hasta = Math.min(i1, Math.floor((f.x + w - caja.x0) / px - 0.5));
+    mirados += Math.max(0, hasta - desde + 1);
+    for (let i = desde; i <= hasta; i++) {
+      const x = caja.x0 + (i + 0.5) * px;
+      const dx = x - f.x;
+      const r2 = dx * dx + dz2;
+      if (r2 > a2) continue;
+      if (fuera !== undefined && dx * fuera[0] + dz * fuera[1] < -0.2) continue;
+      /* Se apaga suave al llegar al alcance, para que no se vea el borde del disco. */
+      const borde = 1 - r2 * inversoA2;
+      const s = r2 + h2;
+      const e = (ih / (s * Math.sqrt(s))) * borde * borde;
+      const j = (k * lado + i) * 4;
+      if (color === null) {
+        datos[j + 3] = (datos[j + 3] as number) + e;
+      } else {
+        datos[j] = (datos[j] as number) + e * color[0];
+        datos[j + 1] = (datos[j + 1] as number) + e * color[1];
+        datos[j + 2] = (datos[j + 2] as number) + e * color[2];
       }
     }
   }
-  return { datos, lado, caja };
+  return mirados;
 }
 
 /** La textura de media precisión para la GPU. */
@@ -157,16 +182,38 @@ export interface Oclusor {
  * el mapa de alturas (dos téxeles por metro), así que el suelo los lee con la misma cuenta.
  */
 export function mapaDeOclusion(oclusores: readonly Oclusor[], caja: CajaXZ, porMetro = 2): MapaDeAlturas {
+  const g = mapaDeOclusionAPasos(oclusores, caja, porMetro);
+  for (;;) {
+    const r = g.next();
+    if (r.done === true) return r.value;
+  }
+}
+
+/** Los téxeles que mira cada paso de `mapaDeOclusionAPasos` (unos 3-4 ms de PC). */
+const TEXELES_DE_OCLUSION_POR_PASO = 400_000;
+
+/**
+ * El mismo mapa A PASOS: los mismos oclusores en el mismo orden (el resultado es el mismo byte a byte), con
+ * una pausa cada vez que lo mirado pasa de `TEXELES_DE_OCLUSION_POR_PASO`. La ciudad de 540 m son unos 25 ms
+ * de PC de una vez: con la base de la noche construida a pasos (`abierta.ts`), no para el juego.
+ */
+export function* mapaDeOclusionAPasos(oclusores: readonly Oclusor[], caja: CajaXZ, porMetro = 2): Generator<void, MapaDeAlturas, void> {
   const lado = Math.ceil(Math.max(caja.x1 - caja.x0, caja.z1 - caja.z0) * porMetro);
   const luz = new Float32Array(lado * lado).fill(1);
   const px = (caja.x1 - caja.x0) / lado;
   const pz = (caja.z1 - caja.z0) / lado;
+  let mirados = 0;
   for (const o of oclusores) {
     const c = o.caja;
     const i0 = Math.max(0, Math.floor((c.x0 - o.alcance - caja.x0) / px));
     const i1 = Math.min(lado - 1, Math.ceil((c.x1 + o.alcance - caja.x0) / px));
     const k0 = Math.max(0, Math.floor((c.z0 - o.alcance - caja.z0) / pz));
     const k1 = Math.min(lado - 1, Math.ceil((c.z1 + o.alcance - caja.z0) / pz));
+    mirados += Math.max(0, i1 - i0 + 1) * Math.max(0, k1 - k0 + 1);
+    if (mirados > TEXELES_DE_OCLUSION_POR_PASO) {
+      mirados = 0;
+      yield;
+    }
     for (let k = k0; k <= k1; k++) {
       const z = caja.z0 + (k + 0.5) * pz;
       const dz = Math.max(c.z0 - z, 0, z - c.z1);

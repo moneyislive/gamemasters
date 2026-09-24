@@ -34,6 +34,7 @@ import {
   COLORES,
   SILUETAS,
   bisEn,
+  cieloVistoDesde,
   columnasDelCielo,
   componentesLineales,
   desalojoEn,
@@ -103,9 +104,11 @@ export function CieloDeGrafia({ sistema, semilla = 1 }: { sistema: SistemaDeEfec
   /* Sin niebla: viven detrás de ella y se ven a través, que es lo que pide el diseño. */
   const pieza = useMemo(() => mallaDeEfecto('cielo', ATRIBUTOS, { niebla: false }), []);
   useEffect(() => () => pieza.soltar(), [pieza]);
+  const columnas = useMemo(() => columnasDelCielo(pieza.capacidad, semilla), [pieza, semilla]);
+  /* Desde dónde se escribieron las columnas, y cuántas: se reescriben sólo si el ojo se mueve o cambia el nivel. */
+  const escritas = useRef({ x: Number.NaN, z: Number.NaN, n: -1 });
   /* Las columnas se escriben una vez para la capacidad entera; el nivel sólo dice cuántas se pintan. */
   useEffect(() => {
-    const columnas = columnasDelCielo(pieza.capacidad, semilla);
     const a = pieza.atributos;
     columnas.forEach((c, n) => {
       cuatro(a.aBase, n, c.x, c.base, c.z, DE_CARA);
@@ -117,11 +120,21 @@ export function CieloDeGrafia({ sistema, semilla = 1 }: { sistema: SistemaDeEfec
     });
     cerrar(pieza, 0);
     for (const at of Object.values(pieza.atributos)) subirLasPrimeras(at, columnas.length);
-  }, [pieza, semilla]);
+    escritas.current = { x: Number.NaN, z: Number.NaN, n: -1 };
+  }, [pieza, semilla, columnas]);
 
-  useFrame(() => {
-    pieza.pintar(ajuste('columnasDelCielo', sistema.nivel));
+  useFrame((estado) => {
+    const n = ajuste('columnasDelCielo', sistema.nivel);
+    pieza.pintar(n);
     ponerElTiempo(pieza, sistema.segundos(sistema.ahora.presentado));
+    /* Siguen al ojo en planta (ver `cieloVistoDesde`): 16 bytes por columna, sólo cuando el ojo se mueve. */
+    const ojo = estado.camera.position;
+    const e = escritas.current;
+    if (n !== e.n || Math.abs(ojo.x - e.x) > 0.01 || Math.abs(ojo.z - e.z) > 0.01) {
+      cieloVistoDesde(pieza.atributos.aBase.array as Float32Array, columnas, n, ojo.x, ojo.z);
+      subirLasPrimeras(pieza.atributos.aBase, n);
+      escritas.current = { x: ojo.x, z: ojo.z, n };
+    }
   });
   return <primitive object={pieza.malla} />;
 }

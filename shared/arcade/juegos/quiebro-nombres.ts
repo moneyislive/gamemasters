@@ -23,9 +23,19 @@
  * ID rompe las mesas abiertas y los reglamentos publicados, y por eso los tipos de id (`IdDeEstilo`…) se
  * derivan de estas claves: el lector de la vista y las tablas de reglas usan los mismos.
  *
+ * ═══ LOS NOMBRES DE LA CIUDAD, POR ÍNDICE ═══
+ *
+ * La ciudad abierta (`docs/quiebro/CIUDAD-ABIERTA.md`, §2.7) rotula cada esquina y cada plaza. La traza
+ * no lleva nombres sino ÍNDICES a las listas de `ciudad` (`quiebro-ciudad.ts`: `PlazaDeLaCiudad.nombre`,
+ * `CalleDeLaCiudad.nombre`, `CallejonDeLaCiudad.nombre`), y los largos mínimos de esas listas los fija
+ * allí la columna (`NOMBRES_DE_PLAZA_COMO_MINIMO` y compañía): `verify:quiebro` los compara, y compara
+ * también que cada plaza de las 32 trazas tenga el nombre de su distrito y su plantilla. El 0 de las
+ * plazas es la Glorieta del Relojero, la del centro en todas las trazas. Todos inventados: ni una calle
+ * que exista, ni una de la franquicia vecina.
+ *
  * ═══ QUÉ NO ESTÁ AQUÍ ═══
  *
- * Los nombres del barrio (calles, neones, la hora): los inventa la semilla de cada noche en
+ * Los nombres del barrio de antes (calles, neones, la hora), que inventa la semilla de cada noche en
  * `quiebro-barrio.ts`. Y los números: los tiene `quiebro-reglas.ts`.
  */
 
@@ -85,9 +95,151 @@ export const NOMBRES_DEL_QUIEBRO = {
   /** Los niveles de noche, del 1 al 5, en orden. */
   niveles: ['Llovizna', 'Chaparrón', 'Aguacero', 'Temporal', 'Tormenta'],
 
-  /** Las plantillas de plaza (una en la v1). */
+  /** Las plantillas de plaza de la v1 de la ciudad abierta (§2.3); la fase 2 trae más. */
   plantillas: {
     glorieta: 'Glorieta',
+    porticada: 'Porticada',
+    patio: 'Patio de carga',
+  },
+
+  /**
+   * LA CIUDAD ABIERTA (§2): sus distritos, sus avenidas y las listas por índice de plazas, calles y
+   * pasajes (ver la cabecera). Las plazas van por plantilla y distrito como las pone la traza: el 0 es la
+   * Glorieta del Relojero; 1, 6 y 11, la porticada del Casco; 2, 7 y 12, el patio de las Naves; 3, 8 y
+   * 13, la porticada de la Lonja; 4, 9 y 14, la glorieta del Ensanche; 5, 10 y 15, la de las Torres.
+   */
+  ciudad: {
+    distritos: {
+      casco: 'El Casco',
+      ensanche: 'El Ensanche',
+      lonja: 'La Lonja',
+      naves: 'Las Naves',
+      torres: 'Las Torres',
+    },
+    avenidas: {
+      elevado: 'Avenida del Elevado',
+      bulevar: 'El Bulevar',
+    },
+    plazas: [
+      'Glorieta del Relojero',
+      'Plaza Mayor',
+      'Patio de Carga',
+      'Plaza de la Lonja',
+      'Glorieta del Ensanche',
+      'Plaza de las Torres',
+      'Plaza de los Soportales',
+      'Patio del Muelle Seco',
+      'Plaza del Pescado',
+      'Glorieta de los Faroles',
+      'Plaza del Vidrio',
+      'Plaza de la Campana',
+      'Patio de las Grúas',
+      'Plaza de las Especias',
+      'Glorieta de la Fuente Vieja',
+      'Plaza del Mirador',
+    ],
+    calles: [
+      'Calle del Sereno',
+      'Calle de la Lluvia',
+      'Calle del Insomnio',
+      'Calle de los Relojes',
+      'Calle del Farol',
+      'Calle de la Madrugada',
+      'Calle del Paraguas',
+      'Calle de las Persianas',
+      'Calle del Tranvía',
+      'Calle de los Charcos',
+      'Calle de la Niebla',
+      'Calle del Andén',
+      'Calle de la Esquina Rota',
+      'Calle de los Neones',
+      'Calle del Buzón',
+      'Calle del Adoquín',
+      'Calle de la Gotera',
+      'Calle del Escaparate',
+      'Calle de los Toldos',
+      'Calle del Carbón',
+      'Calle de la Imprenta',
+      'Calle de las Antenas',
+      'Calle del Semáforo',
+      'Calle del Almanaque',
+      'Calle de los Tejados',
+      'Calle del Portal',
+      'Calle de la Farmacia',
+      'Calle del Quiosco',
+      'Calle de las Golondrinas',
+      'Calle del Reloj Parado',
+      'Calle de la Última Parada',
+      'Calle del Vapor',
+      'Calle de los Balcones',
+      'Calle del Zaguán',
+      'Calle de la Vía Muerta',
+      'Calle del Desvelo',
+      'Calle de la Tinta',
+      'Calle del Hilo',
+      'Calle de las Cornisas',
+      'Calle del Último Tranvía',
+    ],
+    pasajes: [
+      'Pasaje del Gato',
+      'Pasaje Oscuro',
+      'Pasaje del Tendedero',
+      'Pasaje de las Goteras',
+      'Pasaje del Cartero',
+      'Pasaje de la Escalera',
+      'Pasaje del Humo',
+      'Pasaje de los Cubos',
+      'Pasaje del Silbido',
+      'Pasaje de la Cal',
+      'Pasaje del Remiendo',
+      'Pasaje del Candil',
+      'Pasaje de la Rendija',
+      'Pasaje del Alambre',
+      'Pasaje del Susurro',
+      'Pasaje de la Chatarra',
+      'Pasaje del Vaho',
+      'Pasaje de la Muralla',
+      'Pasaje del Clavo',
+      'Pasaje de las Latas',
+      'Pasaje de la Polilla',
+      'Pasaje del Paragüero',
+      'Pasaje de la Lavandería',
+      'Pasaje del Afilador',
+    ],
+  },
+
+  /**
+   * LO QUE SE LEE DE LA NOCHE EN LA CIUDAD (§3, §7.5 de la ciudad abierta). La entrega 1 sólo abre la
+   * ciudad —las oleadas siguen en la plaza de la Bajada—, así que las fases se siguen rotulando con
+   * `fases`; estas palabras entran ya para que pasen por `verify:procedencia` y el cliente las tome de un
+   * solo sitio cuando lleguen los Fallos (entrega 2).
+   */
+  noche: {
+    tramo: 'Tramo',
+    tregua: 'Tregua',
+    fallo: 'Fallo',
+    lectura: 'Lectura',
+    custodio: 'Custodio',
+    emboscada: 'Emboscada',
+    ronda: 'Ronda',
+    madrugon: 'Madrugón',
+    andarin: 'El Andarín',
+  },
+
+  /** EL MINIMAPA Y EL PLANO (§5.9): sus rótulos, los que hoy escribe `hud/mapa.ts`. */
+  mapa: {
+    plano: 'Plano',
+    cerrar: 'Cerrar el plano',
+    aqui: 'Aquí',
+    soltarRumbo: 'Soltar el rumbo',
+    tu: 'Tú',
+    fallo: 'Fallo',
+    cabina: 'Cabina',
+    companero: 'Compañero',
+    refugio: 'Refugio',
+    vigia: 'Vigía',
+    ayuda: 'Toca un sitio: «Aquí». Toca un Fallo o una cabina: rumbo.',
+    minimapa: 'Minimapa',
   },
 
   /** Los títulos del recuento. */
@@ -314,4 +466,27 @@ export const ULTIMO_NIVEL = NOMBRES_DEL_QUIEBRO.niveles.length;
 export function nombreDelNivel(nivel: number): string {
   if (!Number.isInteger(nivel) || nivel < PRIMER_NIVEL || nivel > ULTIMO_NIVEL) return '';
   return NOMBRES_DEL_QUIEBRO.niveles[nivel - 1] as string;
+}
+
+/** Los distritos con su nombre: las claves son los `IdDeDistrito` de `quiebro-ciudad.ts` (lo mira `verify:quiebro`). */
+export type IdDeDistritoConNombre = keyof typeof NOMBRES_DEL_QUIEBRO.ciudad.distritos;
+
+/** Un nombre de una lista por índice; cadena vacía fuera de ella (un índice raro no se pinta como `undefined`). */
+function deLaLista(lista: readonly string[], i: number): string {
+  return Number.isInteger(i) && i >= 0 && i < lista.length ? (lista[i] as string) : '';
+}
+
+/** El nombre de la plaza de índice `i` (`PlazaDeLaCiudad.nombre`). */
+export function nombreDePlaza(i: number): string {
+  return deLaLista(NOMBRES_DEL_QUIEBRO.ciudad.plazas, i);
+}
+
+/** El nombre de la calle de índice `i` (`CalleDeLaCiudad.nombre`; −1, la avenida, no tiene: va por `ciudad.avenidas`). */
+export function nombreDeCalle(i: number): string {
+  return deLaLista(NOMBRES_DEL_QUIEBRO.ciudad.calles, i);
+}
+
+/** El nombre del pasaje de índice `i` (`CallejonDeLaCiudad.nombre`). */
+export function nombreDePasaje(i: number): string {
+  return deLaLista(NOMBRES_DEL_QUIEBRO.ciudad.pasajes, i);
 }

@@ -44,6 +44,25 @@
  *   U aforo ........................... `AforoDeLaSala`; el coste y la admisión, en `lizas.ts`
  *   V azar de sala sembrado ........... `FaseDeLaLiza.semilla`
  *
+ * Y las de la liza ABIERTA —una liza grande que se recorre entera, con objetivos repartidos por ella—, que
+ * entran en `LizaDeclarada` el día que la sala las cumpla y hasta entonces viven con su forma fijada en «Lo
+ * que entra» (ver `AmpliacionDeLaLiza`):
+ *
+ *   L1 salir de un nudo ............... `EleccionPorNudo`, en `GrupoDeclarado.eleccion`
+ *   L2 cuándo salta un grupo .......... `DisparoDeGrupo`, en `GrupoDeclarado.disparo`
+ *   L3 rondas de guion ................ `RondasDeclaradas`, en `EncuentroDeclarado.rondas`
+ *   L4 un objetivo que se cumple ...... `FinPorObjetivo`, otra forma de `FinDelEncuentro`
+ *   L5 varias zonas y sus bandas ...... `ZonaDeAccionAmpliada`, y `EleccionPorBanda`
+ *   L6 dónde se nace y se vuelve ...... `FaseDeLaLiza.puntoDeControl` y `EquipoDeclarado.reaparicion.donde`
+ *   L7 con qué zona se cerró .......... `CargaDeRondaConZona`
+ *   L8 un aviso sobre un nudo ......... `ObjetivoDeAviso`
+ *   L9 el golpe al desprevenido ....... `DesprevenidaDeclarada`, en `ClaseDeEntidad.desprevenida`
+ *   L10 alcance de blanco y olvido .... `CerebroDeclarado.alcanceDeBlanco` y `EncuentroDeclarado.olvido`: YA
+ *                                       ESTÁN en `LizaDeclarada` —la sala los cumple—, con una forma
+ *                                       transitoria sin ellos (`CerebroSinAlcance`, `EncuentroSinOlvido`)
+ *   L11 racimos ....................... `RacimosDeclarados`, en `EncuentroDeclarado.racimos`
+ *   L12 una zona que suelta ........... `EfectoDeLaZona`, y `EncuentroDeclarado.zonasDeAccion`
+ *
  * ═══ CADA FASE EMPIEZA DESDE LA DECLARACIÓN, Y ESO ES EL PUNTO DE CONTROL ═══
  *
  * La sala no guarda nada entre fases que la mesa no tenga: cuando llega una declaración con otra
@@ -105,6 +124,9 @@
  * Ningún campo falta a veces: un campo que a veces está es dos contratos, y el segundo no lo comprueba
  * nadie (lo dice `mundo.ts`, y lo exige `canonico.ts`, que rechaza `undefined`). Donde puede no haber
  * nada va `null`, dicho en el tipo; donde un cero significa «nada», lo dice el comentario del campo.
+ * La única excepción está dicha y tiene fecha de caducidad: mientras los productores pasan a la forma
+ * entera de L10, un cerebro sin alcance de blanco y un encuentro sin olvido son OTRA forma, con su nombre
+ * (`CerebroSinAlcance`, `EncuentroSinOlvido`), que se revisa y se juega como «sin tope, sin olvido».
  *
  * ═══ QUÉ NO ESTÁ AQUÍ ═══
  *
@@ -214,6 +236,24 @@ export const TOPE_DE_CAJAS = 4096;
 
 /** La clase de una caja de la estructura. `baja` se reserva para lo que un día se salte. */
 export const CLASE_DE_CAJA = { alta: 1, baja: 2 } as const;
+
+/*
+ * LOS TOPES DE LA LIZA ABIERTA (L1-L12). Viajan en el cable —`disparo.g`, `disparo.ro`, `nace.ro`, el
+ * `objetivo` de un aviso sobre un nudo— y por eso tienen tope aquí y no en cada juego.
+ */
+/** Cuántos grupos puede tener un encuentro: su número en `disparo.g` va del 1 al 64. */
+export const TOPE_DE_GRUPOS = 64;
+/** Cuántas rondas de guion puede tener un encuentro: su número en `nace.ro` y `disparo.ro` va del 1 al 32. */
+export const TOPE_DE_RONDAS = 32;
+/** Cuántos miembros puede llevar una ronda. */
+export const TOPE_DE_MIEMBROS = 6;
+/**
+ * Cuántos nudos puede tener el grafo: el `objetivo` de un aviso sobre un nudo es su índice más uno, y el
+ * `objetivo` del cable va de 0 a 65.535 (`TOPE_DE_NUMERO` de `protocolo.ts`).
+ */
+export const TOPE_DE_NUDOS = 65535;
+/** Cuántas zonas de acción puede haber activas a la vez, y cuántas bandas de distancia (una por activa). */
+export const TOPE_DE_BANDAS = 3;
 
 /* ─── B · EL MUNDO ───────────────────────────────────────────────────────── */
 
@@ -725,6 +765,42 @@ export interface CerebroDeclarado {
   readonly costeDisparo: number;
   /** Navega por el grafo cuando no hay recta; si no, va en recta y resbala. */
   readonly sigueElGrafo: boolean;
+  /**
+   * L10 · EL ALCANCE DE BLANCO: ninguna entidad de esta clase ELIGE por blanco a un asiento a más de esto en
+   * recta —ni cuenta como su perseguidora, ni toma turno contra él, ni le apunta—, y el que tenía lo suelta en
+   * el mismo tic en que se le va más allá (el que está justo a esa distancia todavía vale). El golpe que ya
+   * lanzó y la ráfaga que ya empezó a disparar siguen, como siguen con cualquier blanco que se va. 0 = sin tope
+   * (lo de antes de la liza abierta).
+   *
+   * SIN NADIE A SU ALCANCE: si el encuentro tiene olvido (`OlvidoDeclarado`) y algún asiento que valdría de
+   * blanco está a su `distancia` o menos —la entidad está ACOMPAÑADA—, anda hacia el más cercano por el camino
+   * por el que lo perseguiría, sin hacerlo su blanco, hasta tenerlo a su alcance; si no, se queda donde está (y,
+   * con olvido, le corre el reloj). La primera versión se quedaba quieta también acompañada, y entre el alcance y
+   * la distancia del olvido quedaba una franja sin salida —sin blanco y sin olvidarse, para siempre—: bastaba con
+   * que el camino hasta su blanco rodeara una manzana.
+   *
+   * Es lo que deja huir de verdad en una liza grande: sin él, todo lo vivo cruzaba el mundo detrás del único
+   * asiento que se alejaba, y el combate se iba con él; con él, lo vivo va detrás de quien tiene cerca y se
+   * olvida de quien lo deja atrás. Con olvido tiene que caber en su distancia: así lo que persigue a alguien
+   * tiene a alguien cerca y no se olvida nunca a media persecución.
+   */
+  readonly alcanceDeBlanco: Longitud;
+}
+
+/**
+ * TRANSITORIO (liza abierta, entrega 1): el cerebro como lo escribe un productor que todavía no declara su
+ * alcance de blanco. Vale lo mismo que `alcanceDeBlanco: 0` —sin tope—, y la sala lo lee así
+ * (`alcanceDeBlancoDe`). Existe para que los productores que ya había sigan compilando y validando mientras
+ * pasan a la forma entera; cuando la escriban todos, se quita de `ClaseDeEntidad.cerebro` y queda
+ * `CerebroDeclarado` a secas. Es la forma de la casa para un contrato que crece a la vez que sus productores
+ * (la misma que la escritura del `nace` sin ronda en `protocolo.ts`): dos formas dichas y comprobadas, no un
+ * campo que a veces está.
+ */
+export type CerebroSinAlcance = Omit<CerebroDeclarado, 'alcanceDeBlanco'>;
+
+/** El alcance de blanco de un cerebro (ver `CerebroDeclarado.alcanceDeBlanco`): 0, sin tope, en la forma transitoria. */
+export function alcanceDeBlancoDe(c: CerebroDeclarado | CerebroSinAlcance): Longitud {
+  return 'alcanceDeBlanco' in c && c.alcanceDeBlanco !== undefined ? c.alcanceDeBlanco : 0;
 }
 
 /**
@@ -796,7 +872,8 @@ export interface ClaseDeEntidad {
   /** Con qué dispara (id de `LizaDeclarada.proyectiles`), o 0 si no dispara. */
   readonly proyectil: IdDeclarado;
   readonly guardia: GuardiaDeclarada | null;
-  readonly cerebro: CerebroDeclarado;
+  /** Su cerebro; sin alcance de blanco, sólo mientras dura la forma transitoria (ver `CerebroSinAlcance`). */
+  readonly cerebro: CerebroDeclarado | CerebroSinAlcance;
   /** Cómo aparece y cuántos tics tarda en poder actuar (durante ellos, intocable). */
   readonly aparicion: { readonly modo: ModoDeAparicion; readonly tics: Tics };
   readonly alCaer: AlCaerDeclarado;
@@ -945,8 +1022,26 @@ export type FinDelEncuentro =
  * contara, un asiento vacío no caería nunca y el encuentro no se perdería: acabaría «aguantado» al vencer
  * su reloj, o encendería otra zona pagando por quien no está. El ausente momentáneo, en cambio, sí puede
  * seguir: una pestaña oculta unos segundos no pierde el encuentro.
+ *
+ * Es `EncuentroConOlvido`, o su forma transitoria sin `olvido` (ver `EncuentroSinOlvido`).
  */
-export interface EncuentroDeclarado {
+export type EncuentroDeclarado = EncuentroConOlvido | EncuentroSinOlvido;
+
+/**
+ * TRANSITORIO (liza abierta, entrega 1): el encuentro como lo escribe un productor que todavía no declara
+ * olvido. Vale lo mismo que `olvido: null`, y la sala lo lee así (`olvidoDelEncuentro`). Se quita cuando
+ * todos los productores escriban la forma entera, y entonces `EncuentroConOlvido` pasa a llamarse
+ * `EncuentroDeclarado` (ver `CerebroSinAlcance`, que es lo mismo para el alcance de blanco).
+ */
+export type EncuentroSinOlvido = Omit<EncuentroConOlvido, 'olvido'>;
+
+/** El olvido de un encuentro (ver `OlvidoDeclarado`): `null`, sin olvido, en la forma transitoria. */
+export function olvidoDelEncuentro(en: EncuentroDeclarado): OlvidoDeclarado | null {
+  return 'olvido' in en && en.olvido !== undefined ? en.olvido : null;
+}
+
+/** UN ENCUENTRO, en su forma entera (ver `EncuentroDeclarado`). */
+export interface EncuentroConOlvido {
   /** El `n` del `arcade:ronda` con que se cierra (≥ 1). */
   readonly ronda: number;
   /**
@@ -961,6 +1056,8 @@ export interface EncuentroDeclarado {
   readonly vivasALaVez: PorPresentes;
   readonly grupos: readonly GrupoDeclarado[];
   readonly fin: FinDelEncuentro;
+  /** L10 · Lo que se olvida de quien se queda lejos de todos (ver `OlvidoDeclarado`); `null`, nada. */
+  readonly olvido: OlvidoDeclarado | null;
 }
 
 /* ─── R, V · LA FASE ─────────────────────────────────────────────────────── */
@@ -1326,14 +1423,424 @@ export interface LizaDeclarada {
   readonly aforo: AforoDeLaSala;
 }
 
+/* ─── LO QUE ENTRA: LA LIZA ABIERTA (L1-L12) ─────────────────────────────── */
+
+/*
+ * ═══ POR QUÉ ESTÁN AQUÍ Y NO DENTRO DE `LizaDeclarada` TODAVÍA ═══
+ *
+ * Una declaración que la sala no cumple es una promesa que nadie guarda: un productor la escribiría,
+ * `problemasDeLaDeclaracion` la daría por buena y la sala haría otra cosa sin decir nada. Así que cada una
+ * entra en su sitio de `LizaDeclarada` el MISMO DÍA que la sala la cumpla, con su segundo uso nombrado y su
+ * prueba en una liza de juguete abierta. Hasta entonces vive aquí con su FORMA fijada, su SITIO dicho y su
+ * REVISIÓN escrita (`problemasDeLaAmpliacion`), para que quien la produce y quien la cumple trabajen a la vez
+ * contra lo mismo sin preguntarse. Quien la cablea mueve su revisión a `revisar`: la forma no cambia.
+ *
+ * ═══ LO QUE COMPARTEN: EL RACIMO Y EL PUNTO DE UN DISPARO ═══
+ *
+ *   · UN RACIMO (L11) son los asientos con cuerpo unidos en cadena: dos quedan unidos a `une` o menos y se
+ *     separan a más de `separa` (la diferencia es la histéresis). La sala los rehace cada `cadaTics`. El
+ *     PRINCIPAL es el de más miembros; empate, el que tiene el asiento de número menor. Su CENTRO es la media
+ *     de los sitios de sus miembros en Q16.16, truncada hacia abajo (`Math.floor(suma / miembros)`), y su
+ *     RUMBO, `rumboHacia` de lo que se movió ese centro en los últimos `rumboTics` (quieto: hacia el centro
+ *     de la zona pendiente más cercana por el grafo; sin ninguna, 0). Sin `racimos` declarados, todos los
+ *     asientos con cuerpo son un solo racimo.
+ *   · EL PUNTO DE UN DISPARO (L2) es desde donde se mide dónde sale lo que salta, y su rumbo: con `entrar`,
+ *     el centro de la zona y el rumbo del racimo principal; con `calma`, el centro y el rumbo del racimo que
+ *     lleva la calma; con `rezagado`, el sitio y la mirada del asiento; con `ronda`, el sitio y la mirada del
+ *     miembro que avisó; y con `tic`, el centro y el rumbo del racimo principal en el tic en que sale cada
+ *     una. Sale en el suceso `disparo` (menos con `tic`, que no espera a nada).
+ */
+
+/** L1 · Hacia dónde se busca el nudo, visto desde el rumbo del punto del disparo. */
+export type SesgoDelNudo = 'delante' | 'detras' | 'cualquiera';
+
+/**
+ * L1 · SALIR DE UN NUDO DEL GRAFO: cada entidad del grupo sale en un nudo a `desde`-`hasta` en recta del
+ * punto del disparo, que cumpla:
+ *
+ *   · con `sesgo` `delante`, dentro de ±`conoRumbos` del rumbo del punto; `detras`, dentro del cono opuesto;
+ *     `cualquiera`, sin cono (y `conoRumbos` no pesa: va a 0).
+ *   · con `sinVista`, que no se vea desde ningún asiento con cuerpo (prueba de losa de su sitio al nudo).
+ *
+ * Los que cumplen, en orden de (distancia al punto, índice): la entidad `k` del disparo toma el `k`-ésimo
+ * (módulo cuántos). Si no hay ninguno, se busca en la banda siguiente del mismo ancho (`hasta` a
+ * `2·hasta − desde`); si tampoco, las dos otra vez sin cono; y si tampoco, esa entidad espera al tic
+ * siguiente. Segundo uso: hordas que salen de las calles de cualquier liza abierta.
+ */
+export interface EleccionPorNudo {
+  readonly tipo: 'nudo';
+  readonly desde: Longitud;
+  readonly hasta: Longitud;
+  readonly sesgo: SesgoDelNudo;
+  readonly conoRumbos: Rumbos;
+  readonly sinVista: boolean;
+}
+
+/**
+ * L5 · SALIR DE LA ZONA DE ACCIÓN ACTIVA DE UNA BANDA: la de la banda `banda` (0 = la primera de las
+ * `bandas` de la zona del fin). Es la `zonaDeAccion` de hoy cuando hay varias activas: quien guarda una
+ * salida guarda ésa.
+ */
+export interface EleccionPorBanda {
+  readonly tipo: 'zonaDeAccion';
+  readonly banda: number;
+}
+
+/** L1 y L5 · Lo que será `GrupoDeclarado.eleccion`: lo de hoy, un nudo o la zona activa de una banda. */
+export type EleccionDeGrupo = EleccionDeZona | EleccionPorNudo | EleccionPorBanda;
+
+/**
+ * L2 · CUÁNDO SALTA UN GRUPO. Hoy todo grupo sale desde el tic `desdeTic` del encuentro; con un disparo que
+ * no es `tic`, el grupo ESPERA hasta que se cumple lo suyo, y entonces:
+ *
+ *   · la sala manda el suceso `disparo` con el número del grupo y el punto (el aviso que se ve venir);
+ *   · `desdeTic` cuenta desde ESE tic (el aviso dura eso) y `cadaTics` como hoy;
+ *   · `cuantos` es lo que sale CADA VEZ que salta (con `tic` y `entrar`, salta una vez; con `rezagado`, es
+ *     lo que sale como mucho por cada asiento mientras lo sea).
+ *
+ * Todo lo que sale cuenta en los `vivasALaVez` del encuentro, como hoy.
+ */
+export type DisparoDeGrupo = DisparoPorTic | DisparoAlEntrar | DisparoPorCalma | DisparoPorRezagado | DisparoPorRonda;
+
+/** El de hoy: sale desde el tic `desdeTic` del encuentro. */
+export interface DisparoPorTic {
+  readonly tipo: 'tic';
+}
+
+/**
+ * Salta cuando hay al menos `minimo` (por presentes) asientos con cuerpo a `radio` o menos del centro de la
+ * zona `zona`. Los grupos del mismo `conjunto` (1-255; 0 = de ninguno) son EXCLUYENTES: en el tic en que
+ * salta uno, saltan con él los de su conjunto que esperan en la MISMA zona, y los que esperan en otra quedan
+ * ANULADOS (no saltan nunca en este encuentro). Es un objetivo que se activa al llegar: el primero al que se
+ * llega es el que se juega. Segundo uso: un objetivo que se activa al llegar, en cualquier liza.
+ */
+export interface DisparoAlEntrar {
+  readonly tipo: 'entrar';
+  readonly zona: IdDeclarado;
+  readonly radio: Longitud;
+  readonly minimo: PorPresentes;
+  readonly conjunto: number;
+}
+
+/**
+ * Salta cuando un racimo lleva `tics` SIN COMBATE —ninguna entidad a `radioDeCombate` o menos de ninguno de
+ * sus miembros, y ningún golpe dado ni recibido por ellos— contados desde que empezó el encuentro o desde su
+ * último combate, y su centro está a más de `lejosDeZonas.distancia` del centro de toda zona de los grupos
+ * `entrar` del conjunto `lejosDeZonas.conjunto` que aún esperan (conjunto 0: sin esa condición). Al saltar,
+ * su cuenta vuelve a cero. Salta `veces` como mucho en el encuentro, contando todos los racimos.
+ *
+ * Tiene su cuenta el racimo principal, y además los `secundarios.racimos` más grandes de los demás con
+ * `secundarios.miembros` o más (empate, el del asiento menor). Lo que sale para un racimo secundario de `m`
+ * miembros es `max(secundarios.minimo, ⌊cuantos · m / presentes⌋)`.
+ */
+export interface DisparoPorCalma {
+  readonly tipo: 'calma';
+  readonly tics: Tics;
+  readonly radioDeCombate: Longitud;
+  readonly lejosDeZonas: { readonly conjunto: number; readonly distancia: Longitud };
+  readonly veces: number;
+  readonly secundarios: { readonly racimos: number; readonly miembros: number; readonly minimo: number };
+}
+
+/**
+ * Salta por cada asiento con cuerpo que lleva más de `tics` a más de `distancia` del asiento con cuerpo más
+ * cercano (sólo hay rezagado con dos o más con cuerpo): mientras lo sea, le sale una cada `cadaTics`, con
+ * `vivas` vivas como mucho por rezagado. El suceso `disparo` sale cuando pasa a rezagado, no con cada una.
+ */
+export interface DisparoPorRezagado {
+  readonly tipo: 'rezagado';
+  readonly distancia: Longitud;
+  readonly tics: Tics;
+  readonly cadaTics: Tics;
+  readonly vivas: number;
+}
+
+/**
+ * L3 · Lo salta el aviso de una ronda que lo nombra en su `refuerzo`, y nada más: sin esa ronda, no saltaría
+ * nunca (`problemasDeLaAmpliacion` lo exige).
+ */
+export interface DisparoPorRonda {
+  readonly tipo: 'ronda';
+}
+
+/**
+ * L3 · UNA RONDA DE GUION: unas entidades que dan vueltas a un circuito del grafo SIN SER ENTIDADES. Su sitio
+ * es una función pura del tic —`sitioDeLaRonda(ronda, grafo, tic, miembro)`, en `rondas.ts`, con `tic` los
+ * tics desde que empezó el encuentro—, así que lejos no cuestan nada y todos los aparatos las pintan en el
+ * mismo sitio.
+ *
+ *   · `miembros`: la clase de cada uno, en fila: el primero delante y cada uno `separacion` detrás del
+ *     anterior, a lo largo del circuito. `ruta`: los nudos del circuito, cerrado (de cada uno al siguiente, y
+ *     del último al primero, hay arista). Van a `paso` con `desfaseTics`.
+ *   · SE MATERIALIZA cuando un asiento con cuerpo pasa a `materializa` o menos de un miembro, con
+ *     `RondasDeclaradas.aLaVez` materializadas como mucho: cada miembro nace EN SU SITIO DEL GUION (`nace`
+ *     con `ro`), sigue el circuito (el modo `patrullar` del cerebro) y el paso no se ve.
+ *   · VE a un asiento con cuerpo a `vista.radio` o menos, dentro de ±`vista.conoRumbos` de su mirada y con
+ *     línea de vista; OYE al que está a `oido.radio` o menos, o a `oido.aLaCarrera` si va en su marcha más
+ *     rápida. Al ver u oír, AVISA: salta el grupo `refuerzo` (su número, 1…; 0 = ninguno) desde el miembro que
+ *     avisó, y la ronda pelea como cualquier entidad. Si en cambio le pegan primero a un miembro desprevenido
+ *     (L9), el aviso espera `alarmaTics`: si la ronda entera cae antes, no avisa.
+ *   · Si se olvidan (L10) todos sus miembros vivos, `alOlvidarse` dice si vuelve a su guion (`guion`) o se
+ *     acaba en este encuentro (`consumida`). Derrotada, se acaba siempre.
+ *
+ * Segundo uso: guardias que hacen su ronda en cualquier tablero; animales que pastan.
+ */
+export interface RondaDeclarada {
+  readonly miembros: readonly IdDeclarado[];
+  readonly ruta: readonly number[];
+  readonly paso: Velocidad;
+  readonly separacion: Longitud;
+  readonly desfaseTics: Tics;
+  readonly materializa: Longitud;
+  readonly alOlvidarse: 'guion' | 'consumida';
+  readonly vista: { readonly radio: Longitud; readonly conoRumbos: Rumbos };
+  readonly oido: { readonly radio: Longitud; readonly aLaCarrera: Longitud };
+  readonly alarmaTics: Tics;
+  readonly refuerzo: number;
+}
+
+/** L3 · Las rondas de un encuentro: su número en el cable (`ro`) es su puesto en `lista` más uno. */
+export interface RondasDeclaradas {
+  readonly aLaVez: number;
+  readonly lista: readonly RondaDeclarada[];
+}
+
+/** L3 · Dónde está un miembro de una ronda en un tic: lo que devuelve `sitioDeLaRonda`. Q16.16 y rumbo 0-255. */
+export interface SitioDeUnMiembro {
+  readonly x: Longitud;
+  readonly z: Longitud;
+  readonly rumbo: Rumbos;
+}
+
+/**
+ * L4 · CÓMO SE CUMPLE UN OBJETIVO:
+ *   · `vaciar` — lo que sacaron los grupos del conjunto que saltaron ya salió entero, no queda nada vivo y no
+ *     queda ningún montón suyo en el suelo (como el `vaciar` de hoy, pero sólo con ésos);
+ *   · `rematar` — se remata una entidad de la clase `clase` salida de un grupo del conjunto;
+ *   · `leer` — los asientos que mantienen `accion` a `radio` o menos del centro de la zona que abrió el
+ *     objetivo suman, cada tic, `min(cuántos, capacidad)`; se cumple al llegar a `tics`. Con `rompeConDano`
+ *     un golpe corta al que lee (tiene que volver a pulsar), pero lo leído no se borra. Quien lee está en
+ *     `puesta`. La sala manda `progreso` a 2 Hz mientras suba.
+ */
+export type ComoSeCumple =
+  | { readonly tipo: 'vaciar' }
+  | { readonly tipo: 'rematar'; readonly clase: IdDeclarado }
+  | {
+      readonly tipo: 'leer';
+      readonly accion: IdDeclarado;
+      readonly radio: Longitud;
+      readonly tics: Tics;
+      readonly capacidad: number;
+      readonly rompeConDano: boolean;
+      readonly puesta: PuestaDeEstado;
+    };
+
+/**
+ * L4 · UN ENCUENTRO QUE SE GANA CUMPLIENDO UN OBJETIVO: la otra forma de `FinDelEncuentro`. El objetivo se
+ * ABRE cuando salta el primer grupo `entrar` de su `conjunto` (1-255), y su zona es la de ese grupo. Al
+ * cumplirse, la sala mete el `arcade:ronda` `ganada` con esa zona (L7) en ese mismo tic, deja de sacar a
+ * nadie, y disuelve lo que quede vivo a los `disuelveTrasTics`. Si vence el reloj, `aguantada` con la zona
+ * que se abrió (o 0 si no se abrió ninguna): la mesa sabe así si se perdió un objetivo o sigue pendiente. Si
+ * nadie puede seguir, `perdida`.
+ */
+export interface FinPorObjetivo {
+  readonly tipo: 'objetivo';
+  readonly conjunto: number;
+  readonly como: ComoSeCumple;
+  readonly disuelveTrasTics: Tics;
+}
+
+/**
+ * L5 · UNA BANDA DE DISTANCIA: de `desde` a `hasta` POR EL GRAFO desde el centro del racimo principal (del
+ * nudo más cercano a él al nudo más cercano al centro de la zona), y lo que se suma a los puntos de quien
+ * sale por una zona de esa banda (0 = nada; con factor y multiplicador, como toda suma).
+ */
+export interface BandaDeDistancia {
+  readonly desde: Longitud;
+  readonly hasta: Longitud;
+  readonly puntos: number;
+}
+
+/**
+ * L12 · QUÉ HACE UNA ZONA DE ACCIÓN a quien acaba de mantenerla: `salir` (lo de hoy: cobra y sale) o
+ * `soltar` un montón de `cuantos` del portable `portable` en su centro, y apagarse. Segundo uso: cofres,
+ * talleres.
+ */
+export type EfectoDeLaZona = { readonly tipo: 'salir' } | { readonly tipo: 'soltar'; readonly portable: IdDeclarado; readonly cuantos: number };
+
+/**
+ * L5 y L12 · LA ZONA DE ACCIÓN AMPLIADA: la de hoy, y además
+ *   · `activasALaVez` (1-3): con más de una, se activa una por banda, cada una la zona de su clase que caiga
+ *     en su banda (sorteada con el azar de la sala entre las que caen); con `bandas` vacía, sorteada entre
+ *     las de su clase, como hoy (y entonces `activasALaVez` es 1);
+ *   · `relevo`: dónde se busca la que se enciende al apagarse una con asientos aún en juego (`null`: entre
+ *     las de su clase, como hoy);
+ *   · `efecto`: `salir` en la zona del fin; `soltar` en las de `EncuentroDeclarado.zonasDeAccion`.
+ * La `capacidad` es de cada zona.
+ */
+export interface ZonaDeAccionAmpliada extends ZonaDeAccionDeclarada {
+  readonly activasALaVez: number;
+  readonly bandas: readonly BandaDeDistancia[];
+  readonly relevo: BandaDeDistancia | null;
+  readonly efecto: EfectoDeLaZona;
+}
+
+/** L6 · Un punto del mundo, en Q16.16. */
+export interface PuntoDelMundo {
+  readonly x: Longitud;
+  readonly z: Longitud;
+}
+
+/**
+ * L6 · DÓNDE SE NACE Y SE VUELVE.
+ *   · `FaseDeLaLiza.puntoDeControl: PuntoDelMundo | null`: con un punto, quien nace al EMPEZAR la fase lo
+ *     hace en los sitios de papel `asiento` ordenados por su distancia a él (empate, el índice menor): el
+ *     asiento `i` toma el `i`-ésimo, módulo cuántos. Quien entra A MEDIA FASE, en el más cercano al centro
+ *     del racimo principal (sin racimo, al punto). Con `null`, como hoy (el asiento `i` usa el sitio `i`).
+ *   · `EquipoDeclarado.reaparicion.donde`: `orden` es lo de hoy; `cercaDelGrupo`, quien reaparece lo hace
+ *     en el sitio de papel `reaparicion` más cercano al centro del racimo principal (sin racimo, al punto de
+ *     control; sin él, como hoy) en el que no haya otro cuerpo a dos radios o menos (todos ocupados: el
+ *     más cercano).
+ */
+export type DondeSeNace = 'orden' | 'cercaDelGrupo';
+
+/**
+ * L7 · EL `arcade:ronda` CON LA ZONA CON QUE SE CERRÓ: la de un objetivo (L4) o la de salida, o 0 si no hay
+ * ninguna. Es lo que deja a la mesa marcar QUÉ objetivo se resolvió y mover su punto de control sin
+ * adivinarlo. Segundo uso: un objetivo cumplido en un tablero. Pesa 11 bytes más que hoy, y la ronda más
+ * pesada sigue cabiendo en la carga de la mesa (`verify:liza-protocolo`).
+ */
+export interface CargaDeRondaConZona extends CargaDeRonda {
+  readonly zona: number;
+}
+
+/**
+ * L8 · A QUÉ APUNTA UN AVISO: lo de hoy, o un NUDO del grafo: el `objetivo` del cable es su índice más uno
+ * (cabe en el tope de 65.535, así que el cable no cambia de forma). Segundo uso: marcar un sitio en
+ * cualquier juego.
+ */
+export type ObjetivoDeAviso = ClaseDeAviso['objetivo'] | 'nudo';
+
+/**
+ * L9 · EL GOLPE AL DESPREVENIDO: el primer impacto de un asiento a un miembro de una ronda que aún no ha
+ * visto ni oído a nadie hace `factor` veces su daño (Q16.16, de ×1 a `TOPE_DE_MULTIPLICADOR`) y da `puntos`
+ * al autor. Va en `ClaseDeEntidad.desprevenida` (`null`: sin esto). Segundo uso: el sigilo de cualquier liza.
+ */
+export interface DesprevenidaDeclarada {
+  readonly factor: Proporcion;
+  readonly puntos: number;
+}
+
+/**
+ * L10 · EL OLVIDO (`EncuentroDeclarado.olvido`; ya en `LizaDeclarada`: la sala lo cumple). Una entidad que
+ * pasa `tics` seguidos sin ningún asiento PRESENTE a `distancia` o menos en recta se va (`seva` con
+ * `disuelta`, sin soltar nada) y VUELVE A LA COLA DE SU GRUPO: cuenta como no salida, y el grupo la vuelve a
+ * sacar con sus reglas —su zona, su ritmo, sus vivas a la vez—. Si se fuera sin más, alejarse ganaría un
+ * `vaciar` sin pelear.
+ *
+ *   · PRESENTE es tener cuerpo y no estar ausente ni sin cuerpo: el caído cuenta (la pelea sigue donde
+ *     cayó); el ausente momentáneo no (nadie lo persigue, y lo que se quedara a su lado esperaría a nadie).
+ *   · EL RELOJ sólo corre mientras la entidad aparece, acecha o ronda: la que ataca, apunta, dispara, está
+ *     caída, absorbe o está deshecha tiene su propio curso, y cuando lo acaba empieza a contar de cero. Así
+ *     no se olvida nada con un golpe, una línea de apuntado o un remate a medias.
+ *   · Se mira cada tic antes de pensar: la olvidada ya no piensa, y el grupo puede sacar a otra en ese
+ *     mismo tic si sus reglas lo dejan.
+ *
+ * Con el ALCANCE DE BLANCO (`CerebroDeclarado.alcanceDeBlanco`) se puede huir de verdad: lo vivo se queda
+ * donde está la gente y nadie cruza el mundo persiguiendo a uno. Con olvido, cada clase declara un alcance de
+ * 1 a `distancia` (`problemasDeLaDeclaracion` lo exige): lo que persigue a alguien lo tiene cerca, y no se
+ * olvida a media persecución. Y entre las dos distancias no hay dónde quedarse: la entidad que no tiene a
+ * nadie a su alcance pero sí a alguien a `distancia` o menos anda hacia él (ver `alcanceDeBlanco`), así que
+ * cada una o pelea, o se acerca, o se olvida. Segundo uso: cualquier liza abierta (la de juguete de 300 × 300
+ * de `verify:liza`).
+ */
+export interface OlvidoDeclarado {
+  /** Hasta dónde se está acompañado (Q16.16, ≥ 1). */
+  readonly distancia: Longitud;
+  /** Cuántos tics seguidos sin nadie presente a esa distancia hacen olvidarse (≥ 1). */
+  readonly tics: Tics;
+}
+
+/** L11 · LOS RACIMOS (ver arriba): une y separa en Q16.16 (`une ≤ separa`), cada cuántos tics y el rumbo de cuántos. */
+export interface RacimosDeclarados {
+  readonly une: Longitud;
+  readonly separa: Longitud;
+  readonly cadaTics: Tics;
+  readonly rumboTics: Tics;
+}
+
+/**
+ * LA AMPLIACIÓN DE UNA LIZA: L1-L12 puestas DONDE IRÁN, para revisarlas contra una `LizaDeclarada` de hoy
+ * con `problemasDeLaAmpliacion`. Cada campo dice su sitio:
+ *
+ *   · `grupos` — uno por grupo del encuentro, en su orden: su `eleccion` (L1, L5) y su `disparo` (L2).
+ *   · `rondas` (L3), `racimos` (L11) y `zonasDeAccion` (L12) — en `EncuentroDeclarado`.
+ *   · `fin` (L4) — el `FinDelEncuentro` cuando es un objetivo; `null`, el de hoy.
+ *   · `salida` (L5) — la zona del fin `salida`, ampliada; `null` si el fin no es de salida.
+ *   · `puntoDeControl` (L6) — en `FaseDeLaLiza`; `reaparicion` (L6) — en `EquipoDeclarado.reaparicion.donde`.
+ *   · `avisos` (L8) — uno por clase de aviso, en su orden: lo que será su `objetivo`.
+ *   · `clases` (L9) — una por clase de entidad, en su orden: su `desprevenida`.
+ *
+ * L7 no tiene sitio aquí: es la carga del veredicto (`CargaDeRondaConZona`), no la declaración. Y L10 ya no:
+ * entró en `LizaDeclarada` (el alcance, en el cerebro de cada clase; el olvido, en el encuentro), y su
+ * revisión con ella, en `problemasDeLaDeclaracion`.
+ */
+export interface AmpliacionDeLaLiza {
+  readonly grupos: readonly { readonly eleccion: EleccionDeGrupo; readonly disparo: DisparoDeGrupo }[];
+  readonly rondas: RondasDeclaradas | null;
+  readonly fin: FinPorObjetivo | null;
+  readonly salida: ZonaDeAccionAmpliada | null;
+  readonly zonasDeAccion: readonly ZonaDeAccionAmpliada[];
+  readonly racimos: RacimosDeclarados | null;
+  readonly puntoDeControl: PuntoDelMundo | null;
+  readonly reaparicion: DondeSeNace;
+  readonly avisos: readonly ObjetivoDeAviso[];
+  readonly clases: readonly { readonly desprevenida: DesprevenidaDeclarada | null }[];
+}
+
+/** La ampliación que no amplía nada: lo de hoy dicho con la forma de mañana (para empezar a producirla). */
+export function ampliacionDeHoy(d: LizaDeclarada): AmpliacionDeLaLiza {
+  const encuentro = d.fase.encuentro;
+  const grupos: { readonly eleccion: EleccionDeGrupo; readonly disparo: DisparoDeGrupo }[] = [];
+  if (encuentro !== null) for (const g of encuentro.grupos) grupos.push({ eleccion: g.eleccion, disparo: { tipo: 'tic' } });
+  const salida =
+    encuentro !== null && encuentro.fin.tipo === 'salida'
+      ? { ...encuentro.fin.zona, activasALaVez: 1, bandas: [], relevo: null, efecto: { tipo: 'salir' } as const }
+      : null;
+  const avisos: ObjetivoDeAviso[] = [];
+  for (const c of d.avisos.clases) avisos.push(c.objetivo);
+  const clases: { readonly desprevenida: DesprevenidaDeclarada | null }[] = [];
+  for (let i = 0; i < d.clases.length; i++) clases.push({ desprevenida: null });
+  return { grupos, rondas: null, fin: null, salida, zonasDeAccion: [], racimos: null, puntoDeControl: null, reaparicion: 'orden', avisos, clases };
+}
+
 /* ─── AYUDAS QUE USAN LOS DOS LADOS ──────────────────────────────────────── */
 
 /**
  * LA ARENA DE UNA LIZA: la de `mundo.ts`, derivada del suelo. La MISMA llamada en la sala y en el
  * aparato: si el aparato predijera su paso con otra arena, andaría por sitios que la sala no acepta.
+ *
+ * Es una función pura del suelo, así que se guarda por su IDENTIDAD: la revisión de la declaración la
+ * deriva para mirar los sitios de nacer, y la sala y el aparato la vuelven a pedir con el mismo suelo
+ * (una ciudad son 4.761 casillas y 1.300 cajas: ver «la validación del mundo»). Y así la sala, el aparato y
+ * el índice de losas de `geometria.ts`, que se guarda por la identidad de `Arena.cuerpos`, trabajan sobre
+ * la misma. Una `Arena` no se muta: nadie en la casa lo hace.
  */
 export function arenaDeLaLiza(liza: LizaDeclarada): Arena {
-  return arenaDe(liza.mundo.suelo);
+  return arenaDelSuelo(liza.mundo.suelo);
+}
+
+const ARENAS = new WeakMap<object, Arena>();
+
+function arenaDelSuelo(suelo: MundoDeclarado): Arena {
+  const guardable = typeof suelo === 'object' && suelo !== null;
+  if (guardable) {
+    const hecha = ARENAS.get(suelo);
+    if (hecha !== undefined) return hecha;
+  }
+  const arena = arenaDe(suelo);
+  if (guardable) ARENAS.set(suelo, arena);
+  return arena;
 }
 
 /** El número en el cable de un asiento (1-15), o 0 si no está en la liza. */
@@ -1647,63 +2154,13 @@ function accion(r: Revision, donde: string, a: AccionDeclarada, estados: readonl
   if (a.alFallar !== null) puesta(r, `${donde}.alFallar`, a.alFallar, estados);
 }
 
-function revisar(d: LizaDeclarada, p: string[]): void {
-  const r: Revision = { p, bloquean: [] };
-  const noCanonico = porQueNoEsCanonico(d);
-  if (noCanonico !== null) p.push(`no es dato llano (no pasa por canonico.ts): ${noCanonico}`);
-  if (d.version !== VERSION_DE_LA_DECLARACION) p.push(`version: es ${String(d.version)} y este contrato es la ${String(VERSION_DE_LA_DECLARACION)}`);
-
-  /* ── Los catálogos, primero: todo lo demás los nombra ─────────────────── */
-  const estados: number[] = [];
-  if (lista(r, 'estados', d.estados)) {
-    for (let i = 0; i < d.estados.length; i++) {
-      const e = d.estados[i] as EstadoDeclarado;
-      if (entero(r, `estados[${String(i)}].id`, e.id, 1, TOPE_DE_ID)) estados.push(e.id);
-      booleano(r, `estados[${String(i)}].bloqueaPaso`, e.bloqueaPaso);
-      booleano(r, `estados[${String(i)}].bloqueaAccion`, e.bloqueaAccion);
-      if (e.bloqueaAccion === true) r.bloquean.push(e.id);
-      booleano(r, `estados[${String(i)}].seCortaConDano`, e.seCortaConDano);
-      lista(r, `estados[${String(i)}].cancelaCon`, e.cancelaCon);
-    }
-    idsSinRepetir(r, 'estados', estados);
-  }
-  const portables: number[] = [];
-  if (lista(r, 'portables', d.portables)) {
-    if (d.portables.length > TOPE_DE_PORTABLES) p.push(`portables: hay ${String(d.portables.length)} y caben ${String(TOPE_DE_PORTABLES)}`);
-    for (let i = 0; i < d.portables.length; i++) {
-      const po = d.portables[i] as PortableDeclarado;
-      const donde = `portables[${String(i)}]`;
-      if (entero(r, `${donde}.id`, po.id, 1, TOPE_DE_ID)) portables.push(po.id);
-      cantidad(r, `${donde}.tope`, po.tope, 1);
-      longitud(r, `${donde}.radioDeRecogida`, po.radioDeRecogida, 1);
-      tics(r, `${donde}.montonTics`, po.montonTics, 1);
-      if (po.pago.tipo !== 'triangular' && po.pago.tipo !== 'lineal') p.push(`${donde}.pago.tipo: tiene que ser 'triangular' o 'lineal'`);
-      if (entero(r, `${donde}.pago.porUnidad`, po.pago.porUnidad, 0, TOPE_DE_CANTIDAD) && Number.isInteger(po.tope)) {
-        const lleno = pagoDelPortable(po, po.tope);
-        if (lleno > TOPE_DE_CANTIDAD) p.push(`${donde}.pago: lleno (${String(po.tope)}) vale ${String(lleno)}, más que ${String(TOPE_DE_CANTIDAD)}: los puntos de esa suma darían la vuelta`);
-      }
-    }
-    idsSinRepetir(r, 'portables', portables);
-  }
-  const proyectiles: number[] = [];
-  if (lista(r, 'proyectiles', d.proyectiles)) {
-    for (let i = 0; i < d.proyectiles.length; i++) {
-      const pr = d.proyectiles[i] as ProyectilDeclarado;
-      const donde = `proyectiles[${String(i)}]`;
-      if (entero(r, `${donde}.id`, pr.id, 1, TOPE_DE_ID)) proyectiles.push(pr.id);
-      tics(r, `${donde}.apuntarTics`, pr.apuntarTics, 1);
-      cantidad(r, `${donde}.balas`, pr.balas, 1);
-      tics(r, `${donde}.cadaTics`, pr.cadaTics);
-      longitud(r, `${donde}.velocidad`, pr.velocidad, 1);
-      radio(r, `${donde}.radio`, pr.radio);
-      longitud(r, `${donde}.alcance`, pr.alcance, 1);
-      efecto(r, `${donde}.efecto`, pr.efecto, estados);
-    }
-    idsSinRepetir(r, 'proyectiles', proyectiles);
-  }
-
-  /* ── El mundo ─────────────────────────────────────────────────────────── */
-  const m = d.mundo;
+/**
+ * EL BLOQUE DEL MUNDO de la revisión: lo que sólo mira `m`. Es el de siempre, línea a línea, sacado a
+ * su función para poder hacerse UNA vez por mundo (ver «la validación del mundo»); lo único que cambió
+ * dentro es el conjunto de las aristas repetidas.
+ */
+function bloqueDelMundo(m: MundoDeLaLiza, r: Revision): { sueloBien: boolean; zonas: number[]; clasesDeZona: number[]; limites: number[] } {
+  const p = r.p;
   entero(r, 'mundo.metrosPorUnidad', m.metrosPorUnidad, 1, 1000 * UNO);
   const suelo = m.suelo;
   /*
@@ -1809,7 +2266,8 @@ function revisar(d: LizaDeclarada, p: string[]): void {
       entero(r, `mundo.grafo.nudos[${String(i)}].z`, n.z, -TOPE_DE_LA_LIZA, TOPE_DE_LA_LIZA);
     }
     if (lista(r, 'mundo.grafo.aristas', m.grafo.aristas)) {
-      const vistas: string[] = [];
+      /* Un conjunto y no `indexOf` sobre una lista: con las cinco mil aristas de una ciudad, 13 ms contra medio. */
+      const vistas = new Set<string>();
       for (let i = 0; i < m.grafo.aristas.length; i++) {
         const a = m.grafo.aristas[i];
         const donde = `mundo.grafo.aristas[${String(i)}]`;
@@ -1821,8 +2279,8 @@ function revisar(d: LizaDeclarada, p: string[]): void {
         if (!entero(r, donde, u, 0, cuantos - 1) || !entero(r, donde, v, 0, cuantos - 1)) continue;
         if (u === v) p.push(`${donde}: une un nudo consigo mismo`);
         const llave = u < v ? `${String(u)}-${String(v)}` : `${String(v)}-${String(u)}`;
-        if (vistas.indexOf(llave) >= 0) p.push(`${donde}: la arista ${llave} está dos veces`);
-        vistas.push(llave);
+        if (vistas.has(llave)) p.push(`${donde}: la arista ${llave} está dos veces`);
+        vistas.add(llave);
       }
     }
   }
@@ -1842,6 +2300,249 @@ function revisar(d: LizaDeclarada, p: string[]): void {
   }
   if (nacenAsientos === 0) p.push('mundo.nace: no hay ningún sitio con papel \'asiento\': ¿dónde aparece quien entra?');
   if (nacenReapariciones === 0) p.push('mundo.nace: no hay ningún sitio con papel \'reaparicion\': ¿dónde vuelve quien cae?');
+  return { sueloBien, zonas, clasesDeZona, limites };
+}
+
+/* ─── LA VALIDACIÓN DEL MUNDO, UNA VEZ POR MUNDO ─────────────────────────── *
+ *
+ * El productor de un juego guarda sus mundos (el diseño de la ciudad abierta, §5.3), así que mientras
+ * dura una partida el mundo es EL MISMO objeto en cada voto, cada fase y cada reanudación, y la sala lo
+ * valida cada vez que llega una declaración. Con el mundo de una plaza no importaba; con el de una ciudad (4.761
+ * casillas, 1.300 cajas, 3.400 nudos, 4.300 aristas) la revisión entera costaba 20-25 ms, síncronos, en
+ * cada voto de cada mesa: más que el tic de 50 ms del único temporizador de todas las salas (§5.4).
+ *
+ * Así que lo que sólo mira el mundo se revisa UNA vez por identidad del mundo y se guarda (un `WeakMap`,
+ * como los índices de `paso-en-curso.ts`): sus frases, y lo que el resto de la revisión lee de él. Lo que
+ * cruza el mundo con lo demás —los sitios de nacer contra el radio de los asientos y el límite de la
+ * fase, las clases de zona que nombra el encuentro— se sigue mirando en cada declaración. El resultado es
+ * EL MISMO, frase a frase y en el mismo orden: las frases guardadas son las del bloque del mundo, que no
+ * lee nada fuera de `m`, y se ponen donde iban. Si el bloque lanzaba a medias (un mundo sin la forma del
+ * contrato), se guarda también lo que lanzó y se vuelve a lanzar donde lanzaba.
+ *
+ * ═══ Y EL CHEQUEO CANÓNICO, TIPADO DONDE LA LISTA ES GRANDE ═══
+ *
+ * `porQueNoEsCanonico` escribe la declaración entera en su forma canónica para ver si se puede, y con una
+ * ciudad era lo más caro de todo. Las listas grandes del mundo tienen UNA forma posible —objetos llanos
+ * con sus claves y números finitos (una caja dentro de cada zona, una cadena en el papel de cada sitio),
+ * pares de números, números—, así que se miran tipadas, una vez por mundo. Si la tienen, la declaración
+ * es canónica si y sólo si lo es con esas listas vacías: `canonico.ts` no ve nada más en esos elementos
+ * (ni ciclos, ni profundidad que llegue a su tope, ni nada que no sea un número finito o una cadena). Y si
+ * algo no cuadra, se pregunta al recorrido genérico sobre la declaración ENTERA, para dar exactamente su
+ * mensaje.
+ *
+ * El contrato que pide, que ya era el de la casa: una declaración no se muta después de hecha.
+ */
+
+interface MundoRevisado {
+  /** Las frases del bloque del mundo, en su orden. */
+  readonly problemas: readonly string[];
+  /** Lo que lanzó el bloque a medias, para volver a lanzarlo donde lanzaba; `null` si acabó. */
+  readonly fallo: { readonly error: unknown } | null;
+  readonly sueloBien: boolean;
+  readonly clasesDeZona: readonly number[];
+  readonly limites: readonly number[];
+  /** El mundo con sus listas grandes vacías, si todas tienen su única forma; si no, `null` (ver la cabecera). */
+  readonly ligero: Readonly<Record<string, unknown>> | null;
+}
+
+const MUNDOS_REVISADOS = new WeakMap<object, MundoRevisado>();
+
+let VALIDACIONES_DEL_MUNDO = 0;
+
+/**
+ * CUÁNTAS VECES SE HA REVISADO UN MUNDO DE VERDAD (no desde la memoria) desde que se cargó el módulo. El
+ * diagnóstico del servidor las CUENTA —no las cronometra—: con el productor guardando sus mundos tiene
+ * que salir una por mundo que saca (el diseño de la ciudad abierta, §5.6). Se lee desde el MISMO módulo
+ * que valida: un comprobador que lo importe por otro camino puede leer la copia que nadie usó.
+ */
+export function validacionesDelMundo(): number {
+  return VALIDACIONES_DEL_MUNDO;
+}
+
+function revisarElMundo(m: MundoDeLaLiza): MundoRevisado {
+  const guardable = typeof m === 'object' && m !== null;
+  if (guardable) {
+    const hecho = MUNDOS_REVISADOS.get(m);
+    if (hecho !== undefined) return hecho;
+  }
+  VALIDACIONES_DEL_MUNDO++;
+  const r: Revision = { p: [], bloquean: [] };
+  let revisado: MundoRevisado;
+  try {
+    const b = bloqueDelMundo(m, r);
+    revisado = { problemas: r.p, fallo: null, sueloBien: b.sueloBien, clasesDeZona: b.clasesDeZona, limites: b.limites, ligero: mundoLigero(m) };
+  } catch (error) {
+    revisado = { problemas: r.p, fallo: { error }, sueloBien: false, clasesDeZona: [], limites: [], ligero: null };
+  }
+  if (guardable) MUNDOS_REVISADOS.set(m, revisado);
+  return revisado;
+}
+
+/** ¿Es un objeto llano (`{}` o sin prototipo), como lo pide `canonico.ts`? */
+function llano(v: unknown): v is Record<string, unknown> {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
+  const padre = Object.getPrototypeOf(v) as object | null;
+  return padre === null || padre === Object.prototype;
+}
+
+/** ¿Es una lista de las de siempre (no una subclase con otro `map`), como las que escribe un productor? */
+function listaLlana(v: unknown): v is readonly unknown[] {
+  return Array.isArray(v) && Object.getPrototypeOf(v) === Array.prototype;
+}
+
+function numeroFinito(v: unknown): boolean {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
+/**
+ * ¿Es `o` un objeto llano con EXACTAMENTE las claves `claves` (las que `canonico.ts` ve: propias y
+ * enumerables), todas números finitos salvo `texto`, que es una cadena, y `caja`, que es una caja?
+ */
+function conSuForma(o: unknown, claves: readonly string[], texto: string, caja: string): boolean {
+  if (!llano(o)) return false;
+  const suyas = Object.keys(o);
+  if (suyas.length !== claves.length) return false;
+  for (let k = 0; k < suyas.length; k++) {
+    const clave = suyas[k] as string;
+    if (claves.indexOf(clave) < 0) return false;
+    const valor: unknown = o[clave];
+    if (clave === texto ? typeof valor !== 'string' : clave === caja ? !conSuForma(valor, CLAVES_DE_CAJA, '', '') : !numeroFinito(valor)) return false;
+  }
+  return true;
+}
+
+/** Una lista de objetos llanos con su forma (ver `conSuForma`). */
+function objetosConSuForma(v: unknown, claves: readonly string[], texto = '', caja = ''): boolean {
+  if (!listaLlana(v)) return false;
+  for (let i = 0; i < v.length; i++) if (!conSuForma(v[i], claves, texto, caja)) return false;
+  return true;
+}
+
+/** Una lista de pares de números finitos, cada par una lista de las de siempre. */
+function paresDeNumeros(v: unknown): boolean {
+  if (!listaLlana(v)) return false;
+  for (let i = 0; i < v.length; i++) {
+    const a: unknown = v[i];
+    if (!listaLlana(a) || a.length !== 2 || !numeroFinito(a[0]) || !numeroFinito(a[1])) return false;
+  }
+  return true;
+}
+
+/** Una lista de números finitos. */
+function numeros(v: unknown): boolean {
+  if (!listaLlana(v)) return false;
+  for (let i = 0; i < v.length; i++) if (!numeroFinito(v[i])) return false;
+  return true;
+}
+
+const CLAVES_DE_CASILLA: readonly string[] = ['x', 'y'];
+const CLAVES_DE_CAJA: readonly string[] = ['x0', 'z0', 'x1', 'z1'];
+const CLAVES_DE_NUDO: readonly string[] = ['x', 'z'];
+const CLAVES_DE_ZONA: readonly string[] = ['id', 'clase', 'caja'];
+const CLAVES_DE_SITIO: readonly string[] = ['papel', 'x', 'z', 'rumbo'];
+
+/**
+ * EL MUNDO CON SUS LISTAS GRANDES VACÍAS —casillas, cajas, clases de caja, nudos, aristas, zonas y sitios
+ * de nacer—, si todas tienen su única forma; `null` si alguna no (o si mirarlo lanza): entonces se
+ * pregunta al genérico.
+ */
+function mundoLigero(m: unknown): Readonly<Record<string, unknown>> | null {
+  try {
+    if (!llano(m)) return null;
+    const suelo: unknown = m['suelo'];
+    const grafo: unknown = m['grafo'];
+    if (!llano(suelo) || !llano(grafo)) return null;
+    if (
+      !objetosConSuForma(suelo['pisables'], CLAVES_DE_CASILLA) ||
+      !objetosConSuForma(suelo['cuerpos'], CLAVES_DE_CAJA) ||
+      !numeros(m['clasesDeCaja']) ||
+      !objetosConSuForma(grafo['nudos'], CLAVES_DE_NUDO) ||
+      !paresDeNumeros(grafo['aristas']) ||
+      !objetosConSuForma(m['zonas'], CLAVES_DE_ZONA, '', 'caja') ||
+      !objetosConSuForma(m['nace'], CLAVES_DE_SITIO, 'papel')
+    ) {
+      return null;
+    }
+    return { ...m, suelo: { ...suelo, pisables: [], cuerpos: [] }, clasesDeCaja: [], grafo: { ...grafo, nudos: [], aristas: [] }, zonas: [], nace: [] };
+  } catch {
+    return null;
+  }
+}
+
+/** `porQueNoEsCanonico(d)`, con el mundo guardado y tipado: el MISMO resultado (ver la cabecera). */
+function porQueNoEsCanonicoDeprisa(d: LizaDeclarada): string | null {
+  if (!llano(d)) return porQueNoEsCanonico(d);
+  const m: unknown = d.mundo;
+  if (!llano(m)) return porQueNoEsCanonico(d);
+  const ligero = revisarElMundo(m as unknown as MundoDeLaLiza).ligero;
+  if (ligero === null) return porQueNoEsCanonico(d);
+  return porQueNoEsCanonico({ ...d, mundo: ligero }) === null ? null : porQueNoEsCanonico(d);
+}
+
+function revisar(d: LizaDeclarada, p: string[]): void {
+  const r: Revision = { p, bloquean: [] };
+  const noCanonico = porQueNoEsCanonicoDeprisa(d);
+  if (noCanonico !== null) p.push(`no es dato llano (no pasa por canonico.ts): ${noCanonico}`);
+  if (d.version !== VERSION_DE_LA_DECLARACION) p.push(`version: es ${String(d.version)} y este contrato es la ${String(VERSION_DE_LA_DECLARACION)}`);
+
+  /* ── Los catálogos, primero: todo lo demás los nombra ─────────────────── */
+  const estados: number[] = [];
+  if (lista(r, 'estados', d.estados)) {
+    for (let i = 0; i < d.estados.length; i++) {
+      const e = d.estados[i] as EstadoDeclarado;
+      if (entero(r, `estados[${String(i)}].id`, e.id, 1, TOPE_DE_ID)) estados.push(e.id);
+      booleano(r, `estados[${String(i)}].bloqueaPaso`, e.bloqueaPaso);
+      booleano(r, `estados[${String(i)}].bloqueaAccion`, e.bloqueaAccion);
+      if (e.bloqueaAccion === true) r.bloquean.push(e.id);
+      booleano(r, `estados[${String(i)}].seCortaConDano`, e.seCortaConDano);
+      lista(r, `estados[${String(i)}].cancelaCon`, e.cancelaCon);
+    }
+    idsSinRepetir(r, 'estados', estados);
+  }
+  const portables: number[] = [];
+  if (lista(r, 'portables', d.portables)) {
+    if (d.portables.length > TOPE_DE_PORTABLES) p.push(`portables: hay ${String(d.portables.length)} y caben ${String(TOPE_DE_PORTABLES)}`);
+    for (let i = 0; i < d.portables.length; i++) {
+      const po = d.portables[i] as PortableDeclarado;
+      const donde = `portables[${String(i)}]`;
+      if (entero(r, `${donde}.id`, po.id, 1, TOPE_DE_ID)) portables.push(po.id);
+      cantidad(r, `${donde}.tope`, po.tope, 1);
+      longitud(r, `${donde}.radioDeRecogida`, po.radioDeRecogida, 1);
+      tics(r, `${donde}.montonTics`, po.montonTics, 1);
+      if (po.pago.tipo !== 'triangular' && po.pago.tipo !== 'lineal') p.push(`${donde}.pago.tipo: tiene que ser 'triangular' o 'lineal'`);
+      if (entero(r, `${donde}.pago.porUnidad`, po.pago.porUnidad, 0, TOPE_DE_CANTIDAD) && Number.isInteger(po.tope)) {
+        const lleno = pagoDelPortable(po, po.tope);
+        if (lleno > TOPE_DE_CANTIDAD) p.push(`${donde}.pago: lleno (${String(po.tope)}) vale ${String(lleno)}, más que ${String(TOPE_DE_CANTIDAD)}: los puntos de esa suma darían la vuelta`);
+      }
+    }
+    idsSinRepetir(r, 'portables', portables);
+  }
+  const proyectiles: number[] = [];
+  if (lista(r, 'proyectiles', d.proyectiles)) {
+    for (let i = 0; i < d.proyectiles.length; i++) {
+      const pr = d.proyectiles[i] as ProyectilDeclarado;
+      const donde = `proyectiles[${String(i)}]`;
+      if (entero(r, `${donde}.id`, pr.id, 1, TOPE_DE_ID)) proyectiles.push(pr.id);
+      tics(r, `${donde}.apuntarTics`, pr.apuntarTics, 1);
+      cantidad(r, `${donde}.balas`, pr.balas, 1);
+      tics(r, `${donde}.cadaTics`, pr.cadaTics);
+      longitud(r, `${donde}.velocidad`, pr.velocidad, 1);
+      radio(r, `${donde}.radio`, pr.radio);
+      longitud(r, `${donde}.alcance`, pr.alcance, 1);
+      efecto(r, `${donde}.efecto`, pr.efecto, estados);
+    }
+    idsSinRepetir(r, 'proyectiles', proyectiles);
+  }
+
+  /* ── El mundo: una vez por mundo (ver «la validación del mundo») ───────── */
+  const m = d.mundo;
+  const mr = revisarElMundo(m);
+  for (const x of mr.problemas) p.push(x);
+  if (mr.fallo !== null) throw mr.fallo.error;
+  const suelo = m.suelo;
+  const sueloBien = mr.sueloBien;
+  const clasesDeZona = mr.clasesDeZona;
+  const limites = mr.limites;
 
   /* ── Las clases de entidad ────────────────────────────────────────────── */
   const clases: number[] = [];
@@ -1895,6 +2596,8 @@ function revisar(d: LizaDeclarada, p: string[]): void {
       cantidad(r, `${donde}.cerebro.costeCuerpoACuerpo`, ce.costeCuerpoACuerpo);
       cantidad(r, `${donde}.cerebro.costeDisparo`, ce.costeDisparo);
       booleano(r, `${donde}.cerebro.sigueElGrafo`, ce.sigueElGrafo);
+      /* L10: en la forma transitoria no está, y vale 0 (ver `CerebroSinAlcance`). */
+      if ('alcanceDeBlanco' in ce) longitud(r, `${donde}.cerebro.alcanceDeBlanco`, ce.alcanceDeBlanco);
       if (c.aparicion.modo !== 'imprimir' && c.aparicion.modo !== 'desdePunto') p.push(`${donde}.aparicion.modo: tiene que ser 'imprimir' o 'desdePunto'`);
       tics(r, `${donde}.aparicion.tics`, c.aparicion.tics);
       const ac = c.alCaer;
@@ -2085,7 +2788,7 @@ function revisar(d: LizaDeclarada, p: string[]): void {
     if (Number.isInteger(ra) && ra > radioMayor && ra <= TOPE_DE_RADIO) radioMayor = ra;
   }
   if (sueloBien && Array.isArray(m.nace)) {
-    const arena = arenaDe(suelo);
+    const arena = arenaDelSuelo(suelo);
     for (let i = 0; i < m.nace.length; i++) {
       const s = m.nace[i] as SitioDeNacer;
       if (!Number.isInteger(s.x) || !Number.isInteger(s.z)) continue;
@@ -2225,6 +2928,34 @@ function revisar(d: LizaDeclarada, p: string[]): void {
         }
       }
     }
+    /* L10 · El olvido: en la forma transitoria no está, y vale `null` (ver `EncuentroSinOlvido`). */
+    if ('olvido' in en && en.olvido !== null) {
+      const o: unknown = en.olvido;
+      if (typeof o !== 'object' || o === null || Array.isArray(o)) p.push('fase.encuentro.olvido: tiene que ser {distancia, tics} o null');
+      else {
+        const ol = o as OlvidoDeclarado;
+        longitud(r, 'fase.encuentro.olvido.distancia', ol.distancia, 1);
+        tics(r, 'fase.encuentro.olvido.tics', ol.tics, 1);
+        /*
+         * Lo que persigue a alguien no se olvida a media persecución: cada clase persigue de 1 a la distancia
+         * del olvido. Sin tope (0, o la forma transitoria), una entidad que siguiera a uno más allá de esa
+         * distancia se iría persiguiéndolo.
+         */
+        if (Number.isInteger(ol.distancia) && Array.isArray(d.clases)) {
+          for (let i = 0; i < d.clases.length; i++) {
+            const c = d.clases[i] as ClaseDeEntidad;
+            if (c === null || typeof c !== 'object' || c.cerebro === null || typeof c.cerebro !== 'object') continue;
+            const alcance = alcanceDeBlancoDe(c.cerebro);
+            if (Number.isInteger(alcance) && (alcance < 1 || alcance > ol.distancia)) {
+              p.push(
+                `clases[${String(i)}].cerebro.alcanceDeBlanco: es ${alcance === 0 ? 'sin tope (0)' : String(alcance / UNO)} y, con olvido a ${String(ol.distancia / UNO)} unidades, ` +
+                  'cada clase persigue de 1 a esa distancia: lo que persiguiera más lejos se olvidaría persiguiendo',
+              );
+            }
+          }
+        }
+      }
+    }
     const fin = en.fin;
     if (fin.tipo === 'vaciar') {
       if (en.grupos.length === 0) p.push("fase.encuentro.fin: un encuentro que acaba al vaciarse sin grupos está ganado antes de empezar");
@@ -2247,6 +2978,333 @@ function revisar(d: LizaDeclarada, p: string[]): void {
       }
     } else {
       p.push("fase.encuentro.fin.tipo: tiene que ser 'vaciar' o 'salida'");
+    }
+  }
+}
+
+/* ─── LA REVISIÓN DE LO QUE ENTRA ────────────────────────────────────────── */
+
+/**
+ * QUÉ LE PASA A UNA AMPLIACIÓN (L1-L12) contra la declaración que amplía; `[]` si está bien. Como
+ * `problemasDeLaDeclaracion`: rangos y coherencia —todo lo que nombra existe, cada lista tiene un valor por
+ * lo que acompaña, lo que viaja cabe en el cable, lo vivo cabe en el aforo—, y nunca lanza. No revisa la
+ * declaración: para eso está la otra. Las dos juntas dicen lo que dirá `revisar` cuando cada pieza entre en
+ * `LizaDeclarada`, y esta parte se mueve allí con ella.
+ */
+export function problemasDeLaAmpliacion(d: LizaDeclarada, a: AmpliacionDeLaLiza): string[] {
+  const p: string[] = [];
+  try {
+    revisarLaAmpliacion(d, a, p);
+  } catch (error) {
+    p.push(`la ampliación no tiene la forma del contrato: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return p;
+}
+
+function banda(r: Revision, donde: string, b: BandaDeDistancia): void {
+  longitud(r, `${donde}.desde`, b.desde);
+  longitud(r, `${donde}.hasta`, b.hasta, 1);
+  if (b.desde >= b.hasta) r.p.push(`${donde}: la banda va de ${String(b.desde)} a ${String(b.hasta)}, y tiene que ir de menos a más`);
+  cantidad(r, `${donde}.puntos`, b.puntos);
+}
+
+/** Una zona de acción ampliada: lo de hoy (como en `revisar`) y lo que entra. */
+function zonaAmpliada(
+  r: Revision,
+  donde: string,
+  z: ZonaDeAccionAmpliada,
+  estados: readonly number[],
+  clasesDeZona: readonly number[],
+  portables: readonly number[],
+  nudos: number,
+): void {
+  if (clasesDeZona.indexOf(z.claseDeZona) < 0) r.p.push(`${donde}.claseDeZona: no hay ninguna zona de la clase ${String(z.claseDeZona)} que activar`);
+  entero(r, `${donde}.accion`, z.accion, 1, TOPE_DE_ID);
+  longitud(r, `${donde}.radio`, z.radio, 1);
+  tics(r, `${donde}.mantenerTics`, z.mantenerTics, 1);
+  cantidad(r, `${donde}.capacidad`, z.capacidad, 1);
+  puesta(r, `${donde}.puesta`, z.puesta, estados);
+  booleano(r, `${donde}.rompeConDano`, z.rompeConDano);
+  tics(r, `${donde}.activaTics`, z.activaTics, 1);
+  cantidad(r, `${donde}.alApagarse.coste`, z.alApagarse.coste);
+  tics(r, `${donde}.alApagarse.siguienteTics`, z.alApagarse.siguienteTics, 1);
+  if (entero(r, `${donde}.activasALaVez`, z.activasALaVez, 1, TOPE_DE_BANDAS) && lista(r, `${donde}.bandas`, z.bandas)) {
+    if (z.bandas.length === 0 && z.activasALaVez !== 1) r.p.push(`${donde}.activasALaVez: sin bandas se activa una, como hoy; con ${String(z.activasALaVez)} a la vez va una banda por cada una`);
+    if (z.bandas.length > 0 && z.bandas.length !== z.activasALaVez) r.p.push(`${donde}.bandas: hay ${String(z.bandas.length)} y se activan ${String(z.activasALaVez)} a la vez (una banda por cada una)`);
+    for (let i = 0; i < z.bandas.length; i++) banda(r, `${donde}.bandas[${String(i)}]`, z.bandas[i] as BandaDeDistancia);
+    if ((z.bandas.length > 0 || z.relevo !== null) && nudos === 0) r.p.push(`${donde}.bandas: se miden por el grafo, y el mundo no tiene grafo`);
+  }
+  if (z.relevo !== null) banda(r, `${donde}.relevo`, z.relevo);
+  const e = z.efecto;
+  if (e.tipo === 'soltar') {
+    if (entero(r, `${donde}.efecto.portable`, e.portable, 1, TOPE_DE_ID)) existe(r, `${donde}.efecto.portable`, e.portable, portables, 'el portable');
+    cantidad(r, `${donde}.efecto.cuantos`, e.cuantos, 1);
+  } else if (e.tipo !== 'salir') {
+    r.p.push(`${donde}.efecto.tipo: tiene que ser 'salir' o 'soltar'`);
+  }
+}
+
+function revisarLaAmpliacion(d: LizaDeclarada, a: AmpliacionDeLaLiza, p: string[]): void {
+  const r: Revision = { p, bloquean: [] };
+  for (const e of d.estados) if (e.bloqueaAccion === true) r.bloquean.push(e.id);
+  const noCanonico = porQueNoEsCanonico(a);
+  if (noCanonico !== null) p.push(`no es dato llano (no pasa por canonico.ts): ${noCanonico}`);
+
+  /* ── Lo que la ampliación nombra de la declaración ────────────────────── */
+  const estados: number[] = [];
+  for (const e of d.estados) estados.push(e.id);
+  const zonas: number[] = [];
+  const clasesDeZona: number[] = [];
+  for (const z of d.mundo.zonas) {
+    zonas.push(z.id);
+    clasesDeZona.push(z.clase);
+  }
+  const clases: number[] = [];
+  for (const c of d.clases) clases.push(c.id);
+  const portables: number[] = [];
+  for (const po of d.portables) portables.push(po.id);
+  const nudos = d.mundo.grafo.nudos.length;
+  const cuantosAsientos = d.asientos.length;
+  const encuentro = d.fase.encuentro;
+  const grupos = encuentro === null ? [] : encuentro.grupos;
+  /* Los ids de acción que ya están cogidos: los de los asientos, los de las clases, los remates y la zona de hoy. */
+  const cogidos: number[] = [];
+  for (const s of d.asientos) {
+    for (const ac of s.acciones) cogidos.push(ac.id);
+    cogidos.push(s.esquiva.accion, s.rescate.accion);
+  }
+  for (const c of d.clases) {
+    for (const ac of c.acciones) cogidos.push(ac.id);
+    if (c.alCaer.tipo === 'rematable') cogidos.push(c.alCaer.remate.accion);
+  }
+  if (encuentro !== null && encuentro.fin.tipo === 'salida') cogidos.push(encuentro.fin.zona.accion);
+  const salidaDeHoy = encuentro !== null && encuentro.fin.tipo === 'salida' ? encuentro.fin.zona : null;
+
+  if (nudos > TOPE_DE_NUDOS) p.push(`mundo.grafo.nudos: hay ${String(nudos)} y caben ${String(TOPE_DE_NUDOS)}: el aviso sobre un nudo lleva su índice más uno en el cable`);
+
+  /* ── L5 · La zona del fin, ampliada ───────────────────────────────────── */
+  if (a.salida !== null) {
+    if (salidaDeHoy === null) p.push('salida: el encuentro no acaba por una zona de acción; va a null');
+    else {
+      if (a.salida.claseDeZona !== salidaDeHoy.claseDeZona || a.salida.accion !== salidaDeHoy.accion) {
+        p.push('salida: no es la zona del fin del encuentro (otra clase de zona u otra acción): se amplía la que hay, no otra');
+      }
+      zonaAmpliada(r, 'salida', a.salida, estados, clasesDeZona, portables, nudos);
+      if (a.salida.efecto.tipo !== 'salir') p.push("salida.efecto: la zona del fin hace salir; 'soltar' es de las zonas de acción del encuentro");
+    }
+  } else if (salidaDeHoy !== null) {
+    p.push('salida: el encuentro acaba por una zona de acción, y falta su ampliación');
+  }
+  const bandasDeLaSalida = a.salida === null ? 0 : a.salida.bandas.length;
+
+  /* ── L3 · Las rondas (antes que los grupos: un grupo `ronda` necesita una que lo nombre) ── */
+  const refuerzos: number[] = [];
+  if (a.rondas !== null) {
+    const ro = a.rondas;
+    if (encuentro === null) p.push('rondas: sin encuentro no hay rondas; va a null');
+    entero(r, 'rondas.aLaVez', ro.aLaVez, 1, TOPE_DE_RONDAS);
+    if (lista(r, 'rondas.lista', ro.lista)) {
+      if (ro.lista.length === 0 || ro.lista.length > TOPE_DE_RONDAS) p.push(`rondas.lista: hay ${String(ro.lista.length)} y tienen que ser de 1 a ${String(TOPE_DE_RONDAS)}`);
+      const aristas = new Set<string>();
+      for (const [u, v] of d.mundo.grafo.aristas) aristas.add(u < v ? `${String(u)}-${String(v)}` : `${String(v)}-${String(u)}`);
+      let masMiembros = 0;
+      for (let k = 0; k < ro.lista.length; k++) {
+        const ronda = ro.lista[k] as RondaDeclarada;
+        const donde = `rondas.lista[${String(k)}]`;
+        if (lista(r, `${donde}.miembros`, ronda.miembros)) {
+          if (ronda.miembros.length === 0 || ronda.miembros.length > TOPE_DE_MIEMBROS) p.push(`${donde}.miembros: hay ${String(ronda.miembros.length)} y tienen que ser de 1 a ${String(TOPE_DE_MIEMBROS)}`);
+          if (ronda.miembros.length > masMiembros) masMiembros = ronda.miembros.length;
+          for (const c of ronda.miembros) existe(r, `${donde}.miembros`, c, clases, 'la clase');
+        }
+        if (lista(r, `${donde}.ruta`, ronda.ruta)) {
+          if (ronda.ruta.length < 2) p.push(`${donde}.ruta: un circuito tiene dos nudos o más`);
+          let bien = true;
+          for (let i = 0; i < ronda.ruta.length; i++) if (!entero(r, `${donde}.ruta[${String(i)}]`, ronda.ruta[i], 0, Math.max(0, nudos - 1))) bien = false;
+          if (bien && ronda.ruta.length >= 2) {
+            for (let i = 0; i < ronda.ruta.length; i++) {
+              const u = ronda.ruta[i] as number;
+              const v = ronda.ruta[(i + 1) % ronda.ruta.length] as number;
+              const llave = u < v ? `${String(u)}-${String(v)}` : `${String(v)}-${String(u)}`;
+              if (!aristas.has(llave)) p.push(`${donde}.ruta: del nudo ${String(u)} al ${String(v)} no hay arista: el circuito salta por encima de lo que se anda`);
+            }
+          }
+        }
+        longitud(r, `${donde}.paso`, ronda.paso, 1);
+        longitud(r, `${donde}.separacion`, ronda.separacion);
+        tics(r, `${donde}.desfaseTics`, ronda.desfaseTics);
+        longitud(r, `${donde}.materializa`, ronda.materializa, 1);
+        if (ronda.alOlvidarse !== 'guion' && ronda.alOlvidarse !== 'consumida') p.push(`${donde}.alOlvidarse: tiene que ser 'guion' o 'consumida'`);
+        longitud(r, `${donde}.vista.radio`, ronda.vista.radio);
+        entero(r, `${donde}.vista.conoRumbos`, ronda.vista.conoRumbos, 0, CUARTO_DE_VUELTA);
+        longitud(r, `${donde}.oido.radio`, ronda.oido.radio);
+        longitud(r, `${donde}.oido.aLaCarrera`, ronda.oido.aLaCarrera);
+        if (ronda.oido.aLaCarrera < ronda.oido.radio) p.push(`${donde}.oido: a la carrera se oye más lejos, no menos`);
+        tics(r, `${donde}.alarmaTics`, ronda.alarmaTics);
+        if (entero(r, `${donde}.refuerzo`, ronda.refuerzo, 0, grupos.length) && ronda.refuerzo !== 0) {
+          refuerzos.push(ronda.refuerzo);
+          const g = Array.isArray(a.grupos) ? a.grupos[ronda.refuerzo - 1] : undefined;
+          if (g !== undefined && g.disparo.tipo !== 'ronda') p.push(`${donde}.refuerzo: el grupo ${String(ronda.refuerzo)} no salta con el aviso de una ronda (su disparo es '${String(g.disparo.tipo)}')`);
+        }
+      }
+      if (encuentro !== null && Number.isInteger(ro.aLaVez)) {
+        for (let n = 1; n <= cuantosAsientos; n++) {
+          const vivas = porPresentes(encuentro.vivasALaVez, n) + ro.aLaVez * masMiembros;
+          if (vivas > d.aforo.entidades) {
+            p.push(`rondas: con ${String(n)} presentes, lo vivo del encuentro más ${String(ro.aLaVez)} rondas de ${String(masMiembros)} son ${String(vivas)} y el aforo es ${String(d.aforo.entidades)}`);
+          }
+        }
+      }
+    }
+  }
+
+  /* ── L1, L2, L5 · Los grupos ──────────────────────────────────────────── */
+  const conjuntosQueSeAbren: number[] = [];
+  if (lista(r, 'grupos', a.grupos)) {
+    if (a.grupos.length !== grupos.length) p.push(`grupos: hay ${String(a.grupos.length)} y el encuentro tiene ${String(grupos.length)} (uno por grupo, en su orden)`);
+    if (grupos.length > TOPE_DE_GRUPOS) p.push(`grupos: el encuentro tiene ${String(grupos.length)} y caben ${String(TOPE_DE_GRUPOS)}: su número viaja en disparo.g`);
+    for (let i = 0; i < a.grupos.length; i++) {
+      const g = a.grupos[i] as { readonly eleccion: EleccionDeGrupo; readonly disparo: DisparoDeGrupo };
+      const donde = `grupos[${String(i)}]`;
+      const el = g.eleccion;
+      if (typeof el === 'string') {
+        if (el !== 'azar' && el !== 'aLaEspalda' && el !== 'zonaDeAccion') p.push(`${donde}.eleccion: tiene que ser 'azar', 'aLaEspalda', 'zonaDeAccion', un nudo o una banda`);
+        if (el === 'zonaDeAccion' && salidaDeHoy === null) p.push(`${donde}.eleccion: 'zonaDeAccion' en un encuentro sin zona de acción: no saldría nunca`);
+      } else if (el !== null && typeof el === 'object' && el.tipo === 'nudo') {
+        longitud(r, `${donde}.eleccion.desde`, el.desde);
+        longitud(r, `${donde}.eleccion.hasta`, el.hasta, 1);
+        if (el.desde >= el.hasta) p.push(`${donde}.eleccion: la banda de nudos va de ${String(el.desde)} a ${String(el.hasta)}, y tiene que ir de menos a más`);
+        if (el.sesgo !== 'delante' && el.sesgo !== 'detras' && el.sesgo !== 'cualquiera') p.push(`${donde}.eleccion.sesgo: tiene que ser 'delante', 'detras' o 'cualquiera'`);
+        entero(r, `${donde}.eleccion.conoRumbos`, el.conoRumbos, 0, CUARTO_DE_VUELTA);
+        if (el.sesgo === 'cualquiera' && el.conoRumbos !== 0) p.push(`${donde}.eleccion.conoRumbos: sin sesgo no hay cono; va a 0`);
+        booleano(r, `${donde}.eleccion.sinVista`, el.sinVista);
+        if (nudos === 0) p.push(`${donde}.eleccion: sale de un nudo, y el mundo no tiene grafo`);
+      } else if (el !== null && typeof el === 'object' && el.tipo === 'zonaDeAccion') {
+        if (bandasDeLaSalida === 0) p.push(`${donde}.eleccion: sale de la zona de una banda, y la zona del fin no tiene bandas`);
+        else entero(r, `${donde}.eleccion.banda`, el.banda, 0, bandasDeLaSalida - 1);
+      } else {
+        p.push(`${donde}.eleccion: tiene que ser 'azar', 'aLaEspalda', 'zonaDeAccion', un nudo o una banda`);
+      }
+      const di = g.disparo;
+      const dd = `${donde}.disparo`;
+      switch (di.tipo) {
+        case 'tic':
+          break;
+        case 'entrar':
+          if (entero(r, `${dd}.zona`, di.zona, 1, TOPE_DE_ID)) existe(r, `${dd}.zona`, di.zona, zonas, 'la zona');
+          longitud(r, `${dd}.radio`, di.radio, 1);
+          tablaPorPresentes(r, `${dd}.minimo`, di.minimo, cuantosAsientos, 1);
+          if (Array.isArray(di.minimo)) {
+            for (let n = 0; n < di.minimo.length; n++) {
+              if ((di.minimo[n] as number) > n + 1) p.push(`${dd}.minimo[${String(n)}]: con ${String(n + 1)} presentes no pueden llegar ${String(di.minimo[n])}: no saltaría nunca`);
+            }
+          }
+          if (entero(r, `${dd}.conjunto`, di.conjunto, 0, TOPE_DE_ID) && di.conjunto !== 0) conjuntosQueSeAbren.push(di.conjunto);
+          break;
+        case 'calma':
+          tics(r, `${dd}.tics`, di.tics, 1);
+          longitud(r, `${dd}.radioDeCombate`, di.radioDeCombate);
+          entero(r, `${dd}.lejosDeZonas.conjunto`, di.lejosDeZonas.conjunto, 0, TOPE_DE_ID);
+          longitud(r, `${dd}.lejosDeZonas.distancia`, di.lejosDeZonas.distancia);
+          cantidad(r, `${dd}.veces`, di.veces, 1);
+          entero(r, `${dd}.secundarios.racimos`, di.secundarios.racimos, 0, TOPE_DE_ASIENTOS);
+          entero(r, `${dd}.secundarios.miembros`, di.secundarios.miembros, 2, TOPE_DE_ASIENTOS);
+          cantidad(r, `${dd}.secundarios.minimo`, di.secundarios.minimo);
+          if (a.racimos === null && di.secundarios.racimos > 0) p.push(`${dd}.secundarios: sin racimos declarados todos son uno; no hay secundarios que contar`);
+          break;
+        case 'rezagado':
+          longitud(r, `${dd}.distancia`, di.distancia, 1);
+          tics(r, `${dd}.tics`, di.tics, 1);
+          tics(r, `${dd}.cadaTics`, di.cadaTics, 1);
+          cantidad(r, `${dd}.vivas`, di.vivas, 1);
+          break;
+        case 'ronda':
+          if (refuerzos.indexOf(i + 1) < 0) p.push(`${dd}: ninguna ronda lo nombra en su refuerzo: no saltaría nunca`);
+          break;
+        default:
+          p.push(`${dd}.tipo: tiene que ser 'tic', 'entrar', 'calma', 'rezagado' o 'ronda'`);
+      }
+    }
+  }
+
+  /* ── L4 · El fin por objetivo ─────────────────────────────────────────── */
+  if (a.fin !== null) {
+    const f = a.fin;
+    if (encuentro === null) p.push('fin: sin encuentro no hay fin; va a null');
+    if (a.salida !== null) p.push('fin: un encuentro acaba de una forma; con un objetivo, la zona del fin (salida) va a null');
+    if (f.tipo !== 'objetivo') p.push("fin.tipo: tiene que ser 'objetivo'");
+    if (entero(r, 'fin.conjunto', f.conjunto, 1, TOPE_DE_ID) && conjuntosQueSeAbren.indexOf(f.conjunto) < 0) {
+      p.push(`fin.conjunto: ningún grupo 'entrar' es del conjunto ${String(f.conjunto)}: el objetivo no se abriría nunca`);
+    }
+    const c = f.como;
+    if (c.tipo === 'rematar') {
+      if (entero(r, 'fin.como.clase', c.clase, 1, TOPE_DE_ID)) {
+        existe(r, 'fin.como.clase', c.clase, clases, 'la clase');
+        const clase = d.clases.find((x) => x.id === c.clase);
+        if (clase !== undefined && clase.alCaer.tipo !== 'rematable') p.push(`fin.como.clase: la clase ${String(c.clase)} no se remata: el objetivo no se cumpliría nunca`);
+      }
+    } else if (c.tipo === 'leer') {
+      if (entero(r, 'fin.como.accion', c.accion, 1, TOPE_DE_ID) && cogidos.indexOf(c.accion) >= 0) p.push(`fin.como.accion: el id de acción ${String(c.accion)} ya lo usa otra acción`);
+      longitud(r, 'fin.como.radio', c.radio, 1);
+      tics(r, 'fin.como.tics', c.tics, 1);
+      cantidad(r, 'fin.como.capacidad', c.capacidad, 1);
+      booleano(r, 'fin.como.rompeConDano', c.rompeConDano);
+      puesta(r, 'fin.como.puesta', c.puesta, estados);
+    } else if (c.tipo !== 'vaciar') {
+      p.push("fin.como.tipo: tiene que ser 'vaciar', 'rematar' o 'leer'");
+    }
+    tics(r, 'fin.disuelveTrasTics', f.disuelveTrasTics);
+  }
+
+  /* ── L12 · Las zonas de acción del encuentro ──────────────────────────── */
+  if (lista(r, 'zonasDeAccion', a.zonasDeAccion)) {
+    if (a.zonasDeAccion.length > 0 && encuentro === null) p.push('zonasDeAccion: sin encuentro no hay zonas de acción; va vacía');
+    for (let i = 0; i < a.zonasDeAccion.length; i++) {
+      const z = a.zonasDeAccion[i] as ZonaDeAccionAmpliada;
+      const donde = `zonasDeAccion[${String(i)}]`;
+      zonaAmpliada(r, donde, z, estados, clasesDeZona, portables, nudos);
+      if (z.efecto.tipo !== 'soltar') p.push(`${donde}.efecto: una zona de acción que no es el fin suelta; 'salir' es de la zona del fin`);
+      if (Number.isInteger(z.accion) && cogidos.indexOf(z.accion) >= 0) p.push(`${donde}.accion: el id de acción ${String(z.accion)} ya lo usa otra acción`);
+    }
+  }
+
+  /* ── L11 · Racimos (el olvido, L10, ya se revisa con la declaración) ───── */
+  if (a.racimos !== null) {
+    const ra = a.racimos;
+    longitud(r, 'racimos.une', ra.une, 1);
+    longitud(r, 'racimos.separa', ra.separa, 1);
+    if (ra.une > ra.separa) p.push('racimos: se separan antes de unirse (une tiene que ser menor o igual que separa)');
+    tics(r, 'racimos.cadaTics', ra.cadaTics, 1);
+    tics(r, 'racimos.rumboTics', ra.rumboTics, 1);
+  }
+
+  /* ── L6 · Dónde se nace y se vuelve ───────────────────────────────────── */
+  if (a.puntoDeControl !== null) {
+    const pc = a.puntoDeControl;
+    const bien = entero(r, 'puntoDeControl.x', pc.x, -TOPE_DE_LA_LIZA, TOPE_DE_LA_LIZA) && entero(r, 'puntoDeControl.z', pc.z, -TOPE_DE_LA_LIZA, TOPE_DE_LA_LIZA);
+    const limite = d.mundo.limites.find((l) => l.id === d.fase.limite);
+    if (bien && limite !== undefined && (pc.x < limite.caja.x0 || pc.x > limite.caja.x1 || pc.z < limite.caja.z0 || pc.z > limite.caja.z1)) {
+      p.push(`puntoDeControl: queda fuera del límite ${String(d.fase.limite)} de la fase`);
+    }
+  }
+  if (a.reaparicion !== 'orden' && a.reaparicion !== 'cercaDelGrupo') p.push("reaparicion: tiene que ser 'orden' o 'cercaDelGrupo'");
+
+  /* ── L8, L9 · Avisos y clases ─────────────────────────────────────────── */
+  if (lista(r, 'avisos', a.avisos)) {
+    if (a.avisos.length !== d.avisos.clases.length) p.push(`avisos: hay ${String(a.avisos.length)} y la liza declara ${String(d.avisos.clases.length)} clases de aviso (una por clase, en su orden)`);
+    for (let i = 0; i < a.avisos.length; i++) {
+      const o = a.avisos[i];
+      if (o !== 'entidad' && o !== 'asiento' && o !== 'ninguno' && o !== 'nudo') p.push(`avisos[${String(i)}]: tiene que ser 'entidad', 'asiento', 'ninguno' o 'nudo'`);
+      if (o === 'nudo' && nudos === 0) p.push(`avisos[${String(i)}]: apunta a un nudo, y el mundo no tiene grafo`);
+    }
+  }
+  if (lista(r, 'clases', a.clases)) {
+    if (a.clases.length !== d.clases.length) p.push(`clases: hay ${String(a.clases.length)} y la liza declara ${String(d.clases.length)} clases de entidad (una por clase, en su orden)`);
+    for (let i = 0; i < a.clases.length; i++) {
+      const c = a.clases[i] as { readonly desprevenida: DesprevenidaDeclarada | null };
+      if (c.desprevenida !== null) {
+        entero(r, `clases[${String(i)}].desprevenida.factor`, c.desprevenida.factor, UNO, TOPE_DE_MULTIPLICADOR);
+        cantidad(r, `clases[${String(i)}].desprevenida.puntos`, c.desprevenida.puntos);
+      }
     }
   }
 }

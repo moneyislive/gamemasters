@@ -38,6 +38,7 @@ import { FALLOS_DEL_PARCHEO } from '../atmosfera/parcheo';
 import { SOLO_BRILLO_EN_SU_SITIO, UNIFORMES_DE_LA_CIUDAD } from './retoques';
 import { UNIFORMES_DE_LOS_HALOS } from './halos';
 import { CUOTA_DE_LA_CIUDAD, presupuestoDeLaCiudad } from './presupuesto';
+import { BancoAbierto } from './banco-abierto';
 
 type ModoDeCamara = 'libre' | 'hombro';
 
@@ -501,9 +502,12 @@ function Banco(): JSX.Element {
   );
 }
 
-/* La raíz se guarda en el elemento: al recargar este módulo en caliente no se crea otra encima. */
+/*
+ * La raíz se guarda en el elemento: al recargar este módulo en caliente no se crea otra encima. Con
+ * `?ciudad=abierta`, el banco de la ciudad de 540 m (`banco-abierto.tsx`) en vez del del barrio.
+ */
 const raiz = document.getElementById('raiz') as (HTMLElement & { __raizDelBanco?: Root }) | null;
 if (raiz !== null) {
   raiz.__raizDelBanco ??= createRoot(raiz);
-  raiz.__raizDelBanco.render(<Banco />);
+  raiz.__raizDelBanco.render(new URLSearchParams(window.location.search).get('ciudad') === 'abierta' ? <BancoAbierto /> : <Banco />);
 }

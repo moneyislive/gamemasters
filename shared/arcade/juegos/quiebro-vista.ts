@@ -23,8 +23,21 @@
  * retoques de cada asiento) y `componerReglamento` de `quiebro-reglas.ts` lo traduce a números, igual
  * en la sala y en el aparato. Y esos ids están UNA vez: en `reglamento`. Ni la noche repite el nivel ni
  * el asiento repite su estilo. Lo mismo el número de la noche: vive en `noche.numero` y la fase no lo
- * repite. Dos sitios para el mismo dato son la ocasión de que dejen de coincidir —el barrio se siembra
- * con el número de noche, y dos números distintos son dos barrios: la sala corregiría cada paso—.
+ * repite. Dos sitios para el mismo dato son la ocasión de que dejen de coincidir —la ciudad se viste
+ * con el número de noche, y dos números distintos son dos noches: la sala corregiría cada paso—.
+ *
+ * ═══ LA CIUDAD: `traza` Y `noche.fallos` (`docs/quiebro/CIUDAD-ABIERTA.md`, §2.6 y §5.2) ═══
+ *
+ * La ciudad es de la MESA: su traza (0-31, una de las 4 dibujadas con una de las 8 simetrías) la sortea
+ * el reductor al empezar y se queda las diez noches; los edificios salen del código, que el reductor no
+ * conoce. Así que `traza` va en la raíz de la vista, y con ella y el código la sala (por el productor),
+ * el cliente y el retablo derivan la misma ciudad. `null` sólo mientras no hay noche (la reunión).
+ *
+ * `noche.fallos` son las plazas de la noche (1-6, sin repetir, cinco como mucho): la PRIMERA es la de la
+ * Bajada (F1) y detrás irán los Fallos 2 y 3 y las propinas (entrega 2). El diseño dice «`bajada` y
+ * `fallos`»; aquí la Bajada es `fallos[0]` y no un campo aparte, por lo de arriba: dos sitios para el
+ * mismo dato. En la entrega 1 la lista es sólo la Bajada: las oleadas siguen en su plaza. La
+ * `plantilla` de la noche se retiró (§5.2): cada plaza trae la suya en la traza.
  *
  * ═══ LOS PUNTOS DE CONTROL ═══
  *
@@ -38,28 +51,8 @@ import { esTableroDeclarado } from '../../mecanicas/tablero-declarado';
 import type { TableroDeclarado } from '../../mecanicas/tablero-declarado';
 import { esClaveCorta, leerCargaDeRonda } from '../../mecanicas/liza/declaracion';
 import type { ColumnaDeCuenta, ResultadoDeRonda } from '../../mecanicas/liza/declaracion';
-import {
-  IDS_DE_AVERIA,
-  IDS_DE_CONTRAMEDIDA,
-  IDS_DE_ESTILO,
-  IDS_DE_PLANTILLA,
-  IDS_DE_RECETA,
-  IDS_DE_RETOQUE,
-  IDS_DE_TITULO,
-  IDS_DE_VOTO,
-  PRIMER_NIVEL,
-  ULTIMO_NIVEL,
-} from './quiebro-nombres';
-import type {
-  IdDeAveria,
-  IdDeContramedida,
-  IdDeEstilo,
-  IdDePlantilla,
-  IdDeReceta,
-  IdDeRetoque,
-  IdDeTitulo,
-  IdDeVoto,
-} from './quiebro-nombres';
+import { IDS_DE_AVERIA, IDS_DE_CONTRAMEDIDA, IDS_DE_ESTILO, IDS_DE_RECETA, IDS_DE_RETOQUE, IDS_DE_TITULO, IDS_DE_VOTO, PRIMER_NIVEL, ULTIMO_NIVEL } from './quiebro-nombres';
+import type { IdDeAveria, IdDeContramedida, IdDeEstilo, IdDeReceta, IdDeRetoque, IdDeTitulo, IdDeVoto } from './quiebro-nombres';
 
 /*
  * Los veredictos de la plataforma son de la Liza, que es genérica: aquí se reexportan con su forma
@@ -93,6 +86,21 @@ export const ESQUIRLAS_COMO_MUCHO = 12;
 export const PRIMERA_PAUSA_CON_VOTO = 3;
 /** Los quiebros con la ventana de aprender en la primera noche de un aparato. */
 export const QUIEBROS_DE_APRENDIZ = 3;
+
+/*
+ * LAS CUENTAS DE LA CIUDAD QUE LA VISTA NECESITA. Son las de `quiebro-ciudad.ts` (`TRAZAS`,
+ * `PLAZAS_POR_CIUDAD`, `LA_GLORIETA_DEL_RELOJERO`), escritas aquí porque la vista, el reductor y el
+ * retablo se cargan al arrancar la app y ese módulo deriva ciudades: `verify:quiebro` las compara.
+ */
+
+/** Las trazas de la ciudad: 4 dibujadas × 8 simetrías. `traza` va de 0 a 31. */
+export const TRAZAS_POSIBLES = 32;
+/** Las plazas de una ciudad, de la 1 a la 6. */
+export const PLAZAS_DE_LA_CIUDAD = 6;
+/** La plaza de la Bajada de la primera noche de toda mesa: la Glorieta del Relojero (§3.2). */
+export const PLAZA_DE_LA_PRIMERA_BAJADA = 1;
+/** Las plazas de una noche como mucho: la de la Bajada, los Fallos 2 y 3 y dos propinas (§5.2). */
+export const FALLOS_COMO_MUCHO = 5;
 
 /* ─── LA FASE ────────────────────────────────────────────────────────────── */
 
@@ -134,10 +142,19 @@ export interface RelojDelQuiebro {
  * si el reductor quiere, en una mesa cerrada: en cualquier otra fase hay noche, y el lector lo exige.
  */
 export interface NocheDelQuiebro {
-  /** 1-10. Con el código de la mesa, siembra el barrio. El único sitio donde está. */
+  /** 1-10. Con el código de la mesa, viste la ciudad de esa noche. El único sitio donde está. */
   readonly numero: number;
   readonly receta: IdDeReceta;
-  readonly plantilla: IdDePlantilla;
+  /**
+   * Las plazas de la noche (1-6, sin repetir, de 1 a `FALLOS_COMO_MUCHO`): la primera, la de la Bajada
+   * (ver la cabecera). En la entrega 1, sólo ésa.
+   */
+  readonly fallos: readonly number[];
+}
+
+/** LA PLAZA DE LA BAJADA de una noche: su primera plaza (ver la cabecera). */
+export function bajadaDeLaNoche(noche: Pick<NocheDelQuiebro, 'fallos'>): number {
+  return noche.fallos[0] ?? PLAZA_DE_LA_PRIMERA_BAJADA;
 }
 
 /* ─── LOS ASIENTOS ───────────────────────────────────────────────────────── */
@@ -256,6 +273,11 @@ export interface MejorNoche {
 export interface VistaDelQuiebro {
   readonly fase: FaseDelQuiebro;
   readonly reloj: RelojDelQuiebro | null;
+  /**
+   * La traza de la ciudad de la mesa, 0-31 (ver la cabecera). `null` si y sólo si `noche` es `null`: la
+   * sortea el reductor al empezar la primera noche y ya no cambia.
+   */
+  readonly traza: number | null;
   /** La noche en curso o la que va a empezar (ver `NocheDelQuiebro` para cuándo es `null`). */
   readonly noche: NocheDelQuiebro | null;
   readonly asientos: readonly AsientoDelQuiebro[];
@@ -265,7 +287,7 @@ export interface VistaDelQuiebro {
   readonly historial: readonly NocheJugada[];
   readonly mejorNoche: MejorNoche | null;
   readonly reglamento: ReglamentoDelQuiebro;
-  /** El plano del barrio con el marcador en paneles: el respaldo de quien no pinta la escena. */
+  /** El plano de la ciudad con el marcador en paneles: el respaldo de quien no pinta la escena. */
   readonly tablero: TableroDeclarado;
 }
 
@@ -499,6 +521,17 @@ function leerFase(v: unknown): FaseDelQuiebro | null {
   }
 }
 
+/** Las plazas de una noche: de 1 a `FALLOS_COMO_MUCHO`, cada una de 1 a `PLAZAS_DE_LA_CIUDAD`, sin repetir. */
+function leerLasPlazas(v: unknown): number[] | null {
+  if (!Array.isArray(v) || v.length < 1 || v.length > FALLOS_COMO_MUCHO) return null;
+  const salida: number[] = [];
+  for (const p of v as unknown[]) {
+    if (!entero(p, 1, PLAZAS_DE_LA_CIUDAD) || salida.indexOf(p) >= 0) return null;
+    salida.push(p);
+  }
+  return salida;
+}
+
 /** Una lista de ids que existen, sin repetir y con `minimo`…`tope` elementos. */
 function leerListaDeIds<T extends string>(v: unknown, ids: readonly T[], minimo: number, tope: number): T[] | null {
   if (!Array.isArray(v) || v.length < minimo || v.length > tope) return null;
@@ -606,7 +639,8 @@ function leerNocheJugada(v: unknown, sentados: readonly string[]): NocheJugada |
  * exactamente una vista bien formada y coherente:
  *   · una clave de más o de menos en cualquier nivel, un id que no existe, un número fuera de rango;
  *   · dos asientos iguales, o un reglamento que no habla de los mismos asientos, en el mismo orden;
- *   · una fase de noche sin noche;
+ *   · una fase de noche sin noche; una traza sin noche o una noche sin traza, o fuera de 0-31;
+ *   · una noche sin plazas, con más de cinco, con una repetida o con una que no es de la ciudad;
  *   · retoques ofrecidos fuera de pausa o repetidos, una elección fuera de pausa, un voto en una pausa
  *     que no vota;
  *   · un historial desordenado o que habla de noches que aún no han pasado, o de asientos que no son
@@ -616,7 +650,7 @@ function leerNocheJugada(v: unknown, sentados: readonly string[]): NocheJugada |
  * cliente enseña el tablero de respaldo si lo hay (`tableroDeLaVista`) y dice que no entiende la mesa.
  */
 export function leerVistaDelQuiebro(x: unknown): VistaDelQuiebro | null {
-  if (!conClaves(x, ['fase', 'reloj', 'noche', 'asientos', 'monedas', 'historial', 'mejorNoche', 'reglamento', 'tablero'])) return null;
+  if (!conClaves(x, ['fase', 'reloj', 'traza', 'noche', 'asientos', 'monedas', 'historial', 'mejorNoche', 'reglamento', 'tablero'])) return null;
   const fase = leerFase(x.fase);
   if (fase === null) return null;
 
@@ -631,12 +665,17 @@ export function leerVistaDelQuiebro(x: unknown): VistaDelQuiebro | null {
   let noche: NocheDelQuiebro | null = null;
   if (x.noche !== null) {
     const n = x.noche;
-    if (!conClaves(n, ['numero', 'receta', 'plantilla']) || !entero(n.numero, 1, NOCHES_COMO_MUCHO)) return null;
-    if (!unoDe(n.receta, IDS_DE_RECETA) || !unoDe(n.plantilla, IDS_DE_PLANTILLA)) return null;
-    noche = { numero: n.numero, receta: n.receta, plantilla: n.plantilla };
+    if (!conClaves(n, ['numero', 'receta', 'fallos']) || !entero(n.numero, 1, NOCHES_COMO_MUCHO)) return null;
+    if (!unoDe(n.receta, IDS_DE_RECETA)) return null;
+    const fallos = leerLasPlazas(n.fallos);
+    if (fallos === null) return null;
+    noche = { numero: n.numero, receta: n.receta, fallos };
   }
-  /* Toda fase de una noche habla de una noche: sin ella no hay barrio que sembrar. */
+  /* Toda fase de una noche habla de una noche: sin ella no hay ciudad que vestir. */
   if (noche === null && fase.tipo !== 'reunion' && fase.tipo !== 'cerrada') return null;
+  /* La traza, si y sólo si hay noche: se sortea al empezar la primera (ver la cabecera). */
+  const traza = x.traza;
+  if (noche === null ? traza !== null : !entero(traza, 0, TRAZAS_POSIBLES - 1)) return null;
 
   if (!Array.isArray(x.asientos) || x.asientos.length < 1 || x.asientos.length > ASIENTOS_COMO_MUCHO) return null;
   const asientos: AsientoDelQuiebro[] = [];
@@ -685,6 +724,7 @@ export function leerVistaDelQuiebro(x: unknown): VistaDelQuiebro | null {
   return {
     fase,
     reloj,
+    traza: noche === null ? null : (traza as number),
     noche,
     asientos,
     monedas: x.monedas,

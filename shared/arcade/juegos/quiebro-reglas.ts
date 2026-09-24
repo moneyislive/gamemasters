@@ -34,7 +34,7 @@
  *
  * ═══ LO QUE NO ESTÁ ═══
  *
- * Ni el reductor (`quiebro.ts`), ni la declaración de la Liza (`quiebro-liza.ts`), ni el barrio. Este
+ * Ni el reductor (`quiebro.ts`), ni la declaración de la Liza (`quiebro-liza.ts`), ni la ciudad. Este
  * fichero no importa nada que se ejecute salvo los nombres y la vista: lo cargan la app y el
  * escritorio al arrancar, y tiene que costar poco.
  */
@@ -42,8 +42,6 @@ import { IDS_DE_RETOQUE, NOMBRES_DEL_QUIEBRO, PRIMER_NIVEL, ULTIMO_NIVEL } from 
 import type { IdDeAveria, IdDeContramedida, IdDeEstilo, IdDeReceta, IdDeRetoque } from './quiebro-nombres';
 import { OLEADAS_COMO_MUCHO, OLEADAS_FIJAS } from './quiebro-vista';
 import type { AsientoDelQuiebro, FaseDelQuiebro, ReglamentoDelQuiebro } from './quiebro-vista';
-/* Sólo el tipo: el barrio se deriva en el productor, y cargarlo aquí costaría su montaje a quien sólo quiere números. */
-import type { IdDeLimite } from './quiebro-barrio';
 
 /* ─── LOS IDS DEL CABLE ──────────────────────────────────────────────────── */
 
@@ -283,10 +281,19 @@ export const CAIDA = {
 export const ESQUIRLAS = { tope: 12, recogidaMetros: 1.2, montonTics: 400, porCelador: 3 } as const;
 
 /**
- * LA CABINA (§4.11): suena 50 s (40 en los niveles 4 y 5); si calla con gente dentro, una moneda y
+ * LA CABINA (§4.11): suena 60 s (50 en los niveles 4 y 5); si calla con gente dentro, una moneda y
  * suena otra 40 s; se descuelga manteniendo 1,5 s a 1,5 m, de uno en uno.
+ *
+ * Los 60 y 50 s son los de la Llamada de la ciudad (`docs/quiebro/CIUDAD-ABIERTA.md`, §3.7 y §3.9), y van
+ * con su banda: la cabina suena a 100-160 m por calles (`BANDA_DE_LA_CABINA_CERCANA`, ver `quiebro-liza.ts`),
+ * que al trote son 20-32 s de carrera limpia. Los 50 y 40 s de antes eran los de la glorieta, con la cabina a
+ * 60-110 m: la entrega 1 pasó a la banda de la ciudad y se quedó con el reloj de la glorieta, y la revisión de
+ * jugar llegó a una a 126 m con 5 s de margen. Y la entrega 1 mide la banda desde la plaza de la Bajada, no
+ * desde el grupo (medirla desde el grupo es L5, de la sala): el reloj de la ciudad es lo que ponen las reglas.
+ * Medido en las 32 trazas bajando a cada plaza: desde 105 m de la plaza o menos (lo que se corre en una pausa)
+ * la cabina queda a 245 m por calles como mucho, 49 s al trote; desde 150 m, a 287; desde 200 m, a 341.
  */
-export const CABINA = { suenaTics: 1000, suenaTicsCorta: 800, otraTics: 800, descolgarTics: 30, metros: 1.5 } as const;
+export const CABINA = { suenaTics: 1200, suenaTicsCorta: 1000, otraTics: 800, descolgarTics: 30, metros: 1.5 } as const;
 
 /**
  * Cuánto dura cada fase con reloj (§5), en ms: la sala los hace vencer con `arcade:reloj`.
@@ -382,7 +389,7 @@ export interface FilaDeNivel {
 
 /**
  * LAS CINCO FILAS. Los extras son acumulativos: el Aguacero trae el primer Celador de más y el
- * guardián de la cabina, el Temporal además la Llamada de 40 s y la Tormenta un Celador más.
+ * guardián de la cabina, el Temporal además la Llamada de 50 s y la Tormenta un Celador más.
  */
 export const NIVELES: readonly FilaDeNivel[] = [
   { nivel: 1, ventanaMs: 200, anuncioPorCiento: 100, danoPorCiento: 100, monedas: 3, celadoresDeMas: 0, guardian: false, cabinaTics: CABINA.suenaTics, puntosPorCiento: 100 },
@@ -554,8 +561,20 @@ export function composicionDeLaOleada(oleada: number, n: number, nivel: number, 
   return { prestados, celadores, tiradores };
 }
 
-/** Por dónde entra un grupo: las clases de zona del barrio (`quiebro-barrio.ts`). */
-export type ZonaDeEntrada = 'aparicion' | 'aparicion-lejana' | 'impresion' | 'cabina';
+/**
+ * POR DÓNDE ENTRA UN GRUPO, dicho por su papel; el productor lo pasa a las clases de zona de la ciudad
+ * (`quiebro-ciudad.ts`, «La numeración que ve la Liza»). En la entrega 1 las oleadas siguen en la plaza
+ * de la Bajada (`docs/quiebro/CIUDAD-ABIERTA.md`, §6.1), así que:
+ *
+ *   · `aparicion` — las 8 bocas de las calles de la plaza de la Bajada (lo que en el barrio eran los
+ *     cruces de alrededor y las bocas): de ahí salen los Prestados y el tirador del Francotirador;
+ *   · `impresion` — los 8 huecos de impresión de esa plaza: los Celadores y los tiradores impresos;
+ *   · `cabina` — la cabina que suena en la Llamada (ver `encuentroDeLaLlamada`).
+ *
+ * Lo que el barrio llamaba `aparicion-lejana` —los cruces de fuera— no existe en la ciudad: una plaza
+ * no tiene «fuera» a 40 m, tiene 540 m de ciudad. Ver la Llamada.
+ */
+export type ZonaDeEntrada = 'aparicion' | 'impresion' | 'cabina';
 
 /** Cómo se elige la zona de cada uno: la `EleccionDeZona` de la Liza. */
 export type EleccionDeEntrada = 'azar' | 'aLaEspalda' | 'zonaDeAccion';
@@ -710,10 +729,24 @@ export function ticsDeLaLlamada(cabinaTics: number, monedas: number): number {
 }
 
 /**
- * LA LLAMADA (§4.11): Prestados de uno en uno cada 2 s, uno desde la plaza y el siguiente desde los
- * cruces de fuera —los de cerca persiguen, los de lejos cortan el paso: la carrera es por el barrio
- * entero—, con los vivos de la tabla repartidos entre los dos, y un Celador guardando la cabina
- * desde el Aguacero. Salen tantos como caben en lo que puede durar.
+ * LA LLAMADA (§4.11): Prestados de uno en uno cada 2 s, uno desde la plaza y el siguiente desde la
+ * cabina que suena, con los vivos de la tabla repartidos entre los dos, y desde el Aguacero un Celador, el
+ * guardián, que nace en la cabina. Salen tantos como caben en lo que puede durar. La carrera es por la
+ * ciudad: los de la plaza corren DETRÁS del grupo, y los de la cabina (el guardián también) le salen al
+ * paso y, cuando llega, le hacen el cordón.
+ *
+ * Los de la cabina salían en el barrio de los cruces de fuera, a cuarenta metros de la plaza y de camino a
+ * cualquier cabina. En la ciudad la cabina está a 100-160 m por calles (ver `quiebro-liza.ts`), y lo que
+ * queda de camino depende de por dónde se vaya: nacen EN la cabina (`zonaDeAccion`, como el guardián),
+ * que es el «cordón» de la cercana de la entrega 2 (`docs/quiebro/CIUDAD-ABIERTA.md`, §3.7) sin inventar
+ * sitios sueltos, que son de nudos (L1).
+ *
+ * Los de la plaza salen de las bocas de la plaza de la Bajada, que es donde el grupo pelea las oleadas, y no
+ * de donde el grupo está al sonar: son la mitad «por detrás» del §3.7 sin sus nudos alrededor del grupo (L1,
+ * entrega 2). Con el olvido de la travesía se quedaban atrás —la revisión de la sala vio llegar a 45 m a 2 de
+ * cada 8 u 9, y olvidarse a 3 o 4—; sin él (`PERSECUCION_DEL_SISTEMA`) siguen al grupo por las calles hasta la
+ * cabina, que es donde se para a descolgar. Si el grupo se fue lejos de la plaza en la última pausa, llegan
+ * tarde o no llegan: el Prestado anda a 4 m/s y el trote es de 5.
  */
 export function encuentroDeLaLlamada(nivel: number, monedas: number, asientos: number): EncuentroDeLaNoche {
   const fila = filaDelNivel(nivel);
@@ -726,7 +759,7 @@ export function encuentroDeLaLlamada(nivel: number, monedas: number, asientos: n
   const cada = 2 * LLAMADA_CADA_TICS;
   const grupos: GrupoDeLaNoche[] = [
     grupo('prestado', tabla(asientos, () => Math.ceil(total / 2)), vivasDePrestados, 'aparicion', 'azar', 0, cada, deCerca),
-    grupo('prestado', tabla(asientos, () => Math.floor(total / 2)), vivasDePrestados, 'aparicion-lejana', 'azar', LLAMADA_CADA_TICS, cada, deLejos),
+    grupo('prestado', tabla(asientos, () => Math.floor(total / 2)), vivasDePrestados, 'cabina', 'zonaDeAccion', LLAMADA_CADA_TICS, cada, deLejos),
   ];
   if (fila.guardian) grupos.push(grupo('celador', tabla(asientos, () => 1), vivas, 'cabina', 'zonaDeAccion', 0, 0, null));
   return { vivas, grupos };
@@ -747,15 +780,57 @@ export function presentesDeLaMesa(asientos: readonly Pick<AsientoDelQuiebro, 'au
 }
 
 /**
- * EL LÍMITE DE UNA FASE, por su id en el barrio: la glorieta de 48 m con tres presentes o menos, la
- * de 60 con cuatro o más (§4.10), y el barrio entero en la Llamada (§4.11). Las fases sin combate
- * usan la de 60: ahí sólo se anda, y los sitios de nacer caben en las dos.
+ * EL LÍMITE DE UNA FASE, dicho por lo que es: la plaza de la Bajada o la ciudad entera. El productor lo
+ * pasa a su id de la Liza (`idDelLimiteDePlaza` e `ID_DEL_LIMITE_DE_LA_CIUDAD` de `quiebro-ciudad.ts`).
  */
-export function limiteDeLaFase(fase: FaseDelQuiebro, presentes: number): IdDeLimite {
-  if (fase.tipo === 'llamada' || (fase.tipo === 'interrumpida' && fase.en.tipo === 'llamada')) return 'barrio';
-  if (fase.tipo === 'oleada' || fase.tipo === 'pausa' || fase.tipo === 'bajada') return presentes <= 3 ? 'glorieta48' : 'glorieta60';
-  return 'glorieta60';
+export type LimiteDeLaFase = { readonly tipo: 'ciudad' } | { readonly tipo: 'plaza'; readonly plaza: number };
+
+/**
+ * EL LÍMITE DE UNA FASE (`docs/quiebro/CIUDAD-ABIERTA.md`, §3.1): en la Bajada, su plaza (60 × 60 m, la
+ * número `bajada`); en TODO lo demás, la ciudad, también en las oleadas y en la pausa, que siguen en la
+ * plaza de la Bajada pero ya no la encierran: la queja de Miguel, tal cual. Ya no depende de los
+ * presentes —la glorieta de 48 y la de 60 se fueron con el barrio—, así que dentro de una fase el límite
+ * no cambia nunca, venga el ausente que venga.
+ */
+export function limiteDeLaFase(fase: FaseDelQuiebro, bajada: number): LimiteDeLaFase {
+  return fase.tipo === 'bajada' ? { tipo: 'plaza', plaza: bajada } : { tipo: 'ciudad' };
 }
+
+/**
+ * A QUIÉN PERSIGUE EL SISTEMA Y SI OLVIDA (declaración L10 de la Liza: el alcance de blanco de cada clase y
+ * el olvido de cada encuentro; §3.4 de la ciudad abierta). Los declara el productor, en metros de aquí.
+ *
+ * ═══ EN LA ENTREGA 1, EL SISTEMA NO SUELTA A NADIE ═══
+ *
+ * Todo encuentro de la entrega 1 está ANCLADO a un sitio: la oleada, a la plaza de la Bajada (sus bocas y
+ * sus huecos de impresión); la Llamada, a esa plaza y a la cabina que suena. Con el olvido del §3.4 (lo que
+ * pasa 10 s sin nadie a 90 m se disuelve y vuelve a la cola de su grupo) y su alcance de 45 m, alejarse del
+ * ancla era un refugio: lo que salía de la plaza no tenía a nadie cerca, se olvidaba y volvía a salir de la
+ * plaza, y la oleada acababa «aguantada» a los 150 s sin un solo golpe. La revisión de la sala lo midió con
+ * el grupo quieto a 118-123 m (0 anuncios en las oleadas 1 a 4, todos a vida llena); con la franja de 45 a
+ * 90 m ya cerrada en la Liza, sigue igual a 140 y a 170 m. Y pasar las oleadas así y ganar la Llamada es
+ * subir de nivel sin pelear.
+ *
+ * El olvido es para la TRAVESÍA: huir de una emboscada por un callejón sin arrastrar al Sistema por la
+ * ciudad. En la entrega 1 no hay travesía con combate —la pausa es calma—, y alejarse de una oleada no es
+ * huir de una emboscada: es no jugarla. Así que aquí el Sistema persigue a cualquiera, esté donde esté
+ * (alcance 0, «sin tope»), y no olvida (sin olvido): la oleada va a donde vaya el grupo, como iba en la
+ * glorieta, y en la Llamada los de la plaza corren detrás del grupo y los de la cabina le salen al paso. El
+ * precio es el del §4 («separarse se paga»): quien se va lejos se lleva detrás su parte de la oleada, y
+ * hasta que se la quita de encima no se vacía.
+ *
+ * Los números del §3.4 (90 m y 10 s de olvido, 45 m de alcance) vuelven con lo que NACE donde está el grupo
+ * —emboscadas, rezagado y la presión de la Llamada, que salen de nudos a su alrededor (L1, entrega 2)—:
+ * entonces alejarse sí es escapar, y lo que se queda atrás se puede olvidar sin regalar la ronda.
+ */
+export interface PersecucionDelSistema {
+  /** Ninguna clase toma por blanco a un asiento a más de esto en recta; 0 = sin tope. */
+  readonly alcanceMetros: number;
+  /** Lo que pasa `tics` sin nadie a `metros` se disuelve y vuelve a su grupo; `null` = no se olvida nada. */
+  readonly olvido: { readonly metros: number; readonly tics: number } | null;
+}
+
+export const PERSECUCION_DEL_SISTEMA: PersecucionDelSistema = { alcanceMetros: 0, olvido: null };
 
 /* ─── LAS RONDAS Y LAS FASES QUE NUMERA LA MESA ──────────────────────────── */
 

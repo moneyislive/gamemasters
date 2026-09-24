@@ -30,7 +30,14 @@
  *   9. LA MULTITUD: en cada tic entero cada durmiente está EXACTAMENTE donde `sitioDelDurmiente` dice;
  *      entre tics, en el tramo que los une; los Prestados no se pintan; nadie se aparta más de medio
  *      metro. Y la textura de huesos da la misma piel que el esqueleto de three.
+ *  9 bis. LA MULTITUD DE LA CIUDAD ABIERTA (CIUDAD-ABIERTA §5.8): de sus unos 630 se pintan los cercanos,
+ *      los mismos que dice `durmientesCercaEnLaCiudad` (64 a 90 m), cada uno EXACTAMENTE en su sitio del
+ *      guion; los candidatos a Prestado de cada jugador (40 m) siempre; nunca más de 64; el presupuesto
+ *      con 64 durmientes a la vista cabe; el director pinta la gente que le da la fuente del juego; y
+ *      pintar la ciudad no asigna más por fotograma que el barrio.
  *  10. LA CARGA: cada `.glb` se lee una vez aunque lo pidan muchos, y liberar suelta lo de la GPU.
+ *  10 bis. EL PROGRAMA DE LOS PERSONAJES NO SE ENLAZA DOS VECES: un cuerpo soltado se desecha al fotograma
+ *      siguiente y nunca en el mismo, y sin nadie el último se guarda sin desechar hasta que vuelve alguien.
  *
  * ═══ CÓMO SE SABE QUE MIRA ═══
  *
@@ -81,7 +88,11 @@ import type { HuesosEnTextura } from '../src/quiebro/personajes/huesos-en-textur
 import { MeshoptSimplifier } from 'three/examples/jsm/libs/meshopt_simplifier.module.js';
 import { fundirElLod, paletaBase, simplificarMalla } from '../src/quiebro/personajes/malla';
 import { COLOR_DE_AMENAZA } from '../src/quiebro/personajes/material';
-import { crearLaMultitud, moverLaMultitud, ticPintado, APARTE_COMO_MUCHO_M } from '../src/quiebro/personajes/multitud';
+import { crearLaMultitud, genteDeLaCiudad, genteDelBarrio, moverLaMultitud, ticPintado, APARTE_COMO_MUCHO_M, DURMIENTES_PINTADOS_COMO_MUCHO } from '../src/quiebro/personajes/multitud';
+import type { GenteDeLaNoche, MiradaDeLaMultitud } from '../src/quiebro/personajes/multitud';
+import { ciudadDeLaMesa, ciudadDeLaNoche, DURMIENTES_QUE_SE_PINTAN, RADIO_DE_LO_QUE_SE_PINTA, RADIO_DE_LOS_CANDIDATOS } from '../../shared/arcade/juegos/quiebro-ciudad';
+import type { NocheDeLaCiudad } from '../../shared/arcade/juegos/quiebro-ciudad';
+import { durmientesCercaEnLaCiudad, durmientesDeLaCiudad, sitioDelDurmienteEnLaCiudad } from '../../shared/arcade/juegos/quiebro-durmientes';
 import { PIEZAS, construirPieza, triangulosDe } from '../src/quiebro/personajes/piezas';
 import { TABLA_DE_NIVELES } from '../src/quiebro/calidad/niveles';
 import {
@@ -1098,8 +1109,8 @@ paso('El contorno se lee igual en todos los niveles, y la amenaza no es un color
 
 paso('La multitud: el sitio del guion, sin Prestados, y el medio metro de apartarse');
 type Mover = typeof moverLaMultitud;
-const moverDesplazado: Mover = (m, barrio, tic, dt, pres, obs, z, r) => {
-  moverLaMultitud(m, barrio, tic, dt, pres, obs, z, r);
+const moverDesplazado: Mover = (m, gente, tic, dt, pres, obs, z, r) => {
+  moverLaMultitud(m, gente, tic, dt, pres, obs, z, r);
   for (let i = 0; i < DURMIENTES; i++) m.x[i] = (m.x[i] as number) + 0.25;
 };
 const juezDelSitio = (mover: Mover): { bien: boolean; detalle?: unknown } => {
@@ -1115,7 +1126,7 @@ const juezDelSitio = (mover: Mover): { bien: boolean; detalle?: unknown } => {
     const m = crearLaMultitud();
     for (let k = 0; k < 120; k++) {
       const tic = Math.floor(r() * 200000) - 100000;
-      mover(m, barrio, tic, 16, new Set(), [], 1.3, 2000);
+      mover(m, genteDelBarrio(barrio), tic, 16, new Set(), [], 1.3, 2000);
       for (let i = 0; i < DURMIENTES; i++) {
         const s = sitioDelDurmiente(barrio, i, tic);
         const e = Math.hypot((m.x[i] as number) - s.x / UNO, (m.z[i] as number) - s.z / UNO);
@@ -1137,7 +1148,7 @@ juzgar('en 360 tics enteros al azar de tres noches, los 48 están EXACTAMENTE do
   for (let k = 0; k < 200; k++) {
     const base = Math.floor(r() * 50000);
     const f = r();
-    moverLaMultitud(m, barrio, base + f, 16, new Set(), [], 1.3, 2000);
+    moverLaMultitud(m, genteDelBarrio(barrio), base + f, 16, new Set(), [], 1.3, 2000);
     for (let i = 0; i < DURMIENTES; i++) {
       const a = sitioDelDurmiente(barrio, i, base);
       const b = sitioDelDurmiente(barrio, i, base + 1);
@@ -1153,18 +1164,180 @@ juzgar('en 360 tics enteros al azar de tres noches, los 48 están EXACTAMENTE do
     }
   }
   comprobar('entre dos tics cada durmiente está en el tramo que une sus dos sitios (o en el primero, si salta)', fuera === 0, fuera);
-  moverLaMultitud(m, barrio, 1234, 16, new Set([3, 17, 40]), [], 1.3, 2000);
+  moverLaMultitud(m, genteDelBarrio(barrio), 1234, 16, new Set([3, 17, 40]), [], 1.3, 2000);
   comprobar('los durmientes que son Prestados no se pintan como civiles', m.visible[3] === 0 && m.visible[17] === 0 && m.visible[40] === 0 && m.visible[4] === 1);
   /* Un cuerpo encima de cada durmiente, en muchos fotogramas: nadie se aparta más de medio metro. */
   let peor = 0;
   for (let k = 0; k < 120; k++) {
     const obs = Array.from({ length: DURMIENTES }, (_, i) => ({ x: (m.x[i] as number) + (r() - 0.5) * 0.4, z: (m.z[i] as number) + (r() - 0.5) * 0.4 }));
     obs.push(...obs.map((o) => ({ x: o.x + 0.3, z: o.z })));
-    moverLaMultitud(m, barrio, 1234 + k * 0.3, 16, new Set(), obs, 1.3, 2000);
+    moverLaMultitud(m, genteDelBarrio(barrio), 1234 + k * 0.3, 16, new Set(), obs, 1.3, 2000);
     for (let i = 0; i < DURMIENTES; i++) peor = Math.max(peor, Math.hypot(m.apartX[i] as number, m.apartZ[i] as number));
   }
   comprobar('con cuerpos encima, ningún durmiente se aparta más de medio metro de su sitio (§8)', peor <= APARTE_COMO_MUCHO_M + 1e-9 && peor > 0.1, peor);
   comprobar('el tic pintado es el de la sala sin Remanso, y va 315 ms (6,3 tics) atrás en el peor momento del Remanso', ticPintado(500, 1000, 1000) === 500 && Math.abs(ticPintado(500, 1000, 685) - 493.7) < 1e-9);
+}
+
+
+/* ═══════════════════════════════ 9 bis. La multitud de la ciudad ═══════════════════════════════ */
+
+paso('La multitud de la ciudad: los cercanos de sus unos 630, exactos en su sitio, y los candidatos siempre');
+/** Tres noches de tres ciudades (tres trazas con tres simetrías distintas), con la Bajada en su plaza. */
+const NOCHES_DE_LA_CIUDAD: readonly NocheDeLaCiudad[] = (
+  [
+    [3, 'QUIEB', 2, [1]],
+    [14, 'TKQRY', 1, [2]],
+    [27, 'LLUVIA', 4, [5]],
+  ] as const
+).map(([traza, codigo, noche, fallos]) => ciudadDeLaNoche(ciudadDeLaMesa(traza, codigo), codigo, noche, fallos));
+type MoverEnLaCiudad = (m: ReturnType<typeof crearLaMultitud>, gente: GenteDeLaNoche, tic: number, mirada: MiradaDeLaMultitud) => void;
+const moverEnLaCiudad: MoverEnLaCiudad = (m, gente, tic, mirada) => moverLaMultitud(m, gente, tic, 16, new Set(), [], 1.3, 2000, mirada);
+/** La vacuna: elige desde doce metros más al este de donde está el centro. */
+const moverDesdeOtroSitio: MoverEnLaCiudad = (m, gente, tic, mirada) => moverLaMultitud(m, gente, tic, 16, new Set(), [], 1.3, 2000, { centro: { x: mirada.centro.x + 12, z: mirada.centro.z }, jugadores: mirada.jugadores });
+/** La vacuna de los candidatos: se olvida de los jugadores. */
+const moverSinJugadores: MoverEnLaCiudad = (m, gente, tic, mirada) => moverLaMultitud(m, gente, tic, 16, new Set(), [], 1.3, 2000, { centro: mirada.centro, jugadores: [] });
+{
+  const r = azar(41);
+  /* Puntos de la calle de cada noche: nudos del grafo, al azar. */
+  const puntos = NOCHES_DE_LA_CIUDAD.map((n) => Array.from({ length: 40 }, () => n.grafo.nudos[Math.floor(r() * n.grafo.nudos.length)] as { x: number; z: number }));
+  const tics = Array.from({ length: 40 }, () => Math.floor(r() * 400000) - 200000);
+  const juezDeLaLista = (mover: MoverEnLaCiudad): { bien: boolean; detalle?: unknown } => {
+    let distintas = 0;
+    let fuera = 0;
+    let mirados = 0;
+    let pintados = 0;
+    let donde = '';
+    NOCHES_DE_LA_CIUDAD.forEach((noche, k) => {
+      const gente = genteDeLaCiudad(noche);
+      (puntos[k] as { x: number; z: number }[]).forEach((c, j) => {
+        const tic = tics[j] as number;
+        const m = crearLaMultitud();
+        mover(m, gente, tic, { centro: c, jugadores: [] });
+        const esperado = durmientesCercaEnLaCiudad(noche, tic, Math.round(c.x * UNO), Math.round(c.z * UNO), RADIO_DE_LO_QUE_SE_PINTA, DURMIENTES_QUE_SE_PINTAN);
+        const lista = Array.from(m.lista.subarray(0, m.cuantos));
+        mirados++;
+        if (lista.join() !== esperado.join()) {
+          distintas++;
+          if (donde === '') donde = `traza ${String(noche.ciudad.traza)} en (${String(c.x)}, ${String(c.z)}), tic ${String(tic)}: ${String(lista.length)} frente a ${String(esperado.length)}`;
+        }
+        for (const i of lista) {
+          pintados++;
+          const s = sitioDelDurmienteEnLaCiudad(noche, i, tic);
+          if (s === null || Math.abs((m.x[i] as number) - s.x / UNO) > 1e-9 || Math.abs((m.z[i] as number) - s.z / UNO) > 1e-9) fuera++;
+        }
+      });
+    });
+    return { bien: distintas === 0 && fuera === 0 && mirados === 120 && pintados > 3000, detalle: { distintas, fuera, mirados, pintados, donde } };
+  };
+  juzgar(
+    'en 120 sitios y tics al azar de tres ciudades, se pintan justo los que dice durmientesCercaEnLaCiudad (64 a 90 m, por distancia e índice) y cada uno EXACTAMENTE en su sitio del guion',
+    juezDeLaLista,
+    moverEnLaCiudad,
+    moverDesdeOtroSitio,
+    'la lista elegida desde doce metros más allá',
+  );
+  const juezDeLosCandidatos = (mover: MoverEnLaCiudad): { bien: boolean; detalle?: unknown } => {
+    let faltan = 0;
+    let mirados = 0;
+    let masDeLaCuenta = 0;
+    let candidatosComoMucho = 0;
+    NOCHES_DE_LA_CIUDAD.forEach((noche, k) => {
+      const gente = genteDeLaCiudad(noche);
+      (puntos[k] as { x: number; z: number }[]).forEach((c, j) => {
+        const tic = tics[j] as number;
+        /* El propio en el centro y un compañero a 70 m: fuera de los 64 más cercanos al centro, casi siempre. */
+        const otro = { x: c.x + (j % 2 === 0 ? 70 : -70), z: c.z };
+        const m = crearLaMultitud();
+        mover(m, gente, tic, { centro: c, jugadores: [c, otro] });
+        const enLaLista = new Set(Array.from(m.lista.subarray(0, m.cuantos)));
+        const candidatos = new Set<number>();
+        for (const jg of [c, otro]) for (const i of durmientesCercaEnLaCiudad(noche, tic, Math.round(jg.x * UNO), Math.round(jg.z * UNO), RADIO_DE_LOS_CANDIDATOS, 1000)) candidatos.add(i);
+        candidatosComoMucho = Math.max(candidatosComoMucho, candidatos.size);
+        if (m.cuantos > DURMIENTES_QUE_SE_PINTAN) masDeLaCuenta++;
+        if (candidatos.size > DURMIENTES_QUE_SE_PINTAN) return;
+        mirados++;
+        for (const i of candidatos) if (!enLaLista.has(i)) faltan++;
+      });
+    });
+    return { bien: faltan === 0 && masDeLaCuenta === 0 && mirados >= 100, detalle: { faltan, masDeLaCuenta, mirados, candidatosComoMucho } };
+  };
+  juzgar(
+    'con el propio y un compañero a 70 m, los candidatos a Prestado de los dos (a 40 m) se pintan SIEMPRE, y nunca más de 64',
+    juezDeLosCandidatos,
+    moverEnLaCiudad,
+    moverSinJugadores,
+    'la multitud que no mira a los jugadores',
+  );
+  /* Andando por la ciudad, fotograma a fotograma: la lista cambia, los Prestados no se pintan y quien sale deja de pintarse. */
+  const noche = NOCHES_DE_LA_CIUDAD[0] as NocheDeLaCiudad;
+  const gente = genteDeLaCiudad(noche);
+  const m = crearLaMultitud();
+  const prestados = new Set<number>();
+  let visiblesFuera = 0;
+  let prestadosPintados = 0;
+  let masDeLaCuenta = 0;
+  let cambios = 0;
+  let antes = '';
+  const nudos = noche.grafo.nudos;
+  for (let f = 0; f < 1200; f++) {
+    const c = nudos[Math.floor(f / 40) * 37 % nudos.length] as { x: number; z: number };
+    const tic = 5000 + f / 3;
+    if (f % 90 === 0 && m.cuantos > 3) {
+      prestados.clear();
+      prestados.add(m.lista[1] as number);
+      prestados.add(m.lista[2] as number);
+    }
+    moverLaMultitud(m, gente, tic, 16, prestados, [], 1.3, 2000, { centro: c, jugadores: [c] });
+    const lista = Array.from(m.lista.subarray(0, m.cuantos));
+    const clave = lista.join();
+    if (clave !== antes) cambios++;
+    antes = clave;
+    if (m.cuantos > DURMIENTES_PINTADOS_COMO_MUCHO) masDeLaCuenta++;
+    const enLaLista = new Set(lista);
+    for (let i = 0; i < m.visible.length; i++) {
+      if (m.visible[i] === 1 && !enLaLista.has(i)) visiblesFuera++;
+      if (m.visible[i] === 1 && prestados.has(i)) prestadosPintados++;
+    }
+  }
+  comprobar(
+    `andando 1.200 fotogramas por la ciudad (${String(cambios)} listas distintas): ningún Prestado se pinta, nadie fuera de la lista se pinta, y nunca más de ${String(DURMIENTES_PINTADOS_COMO_MUCHO)}`,
+    visiblesFuera === 0 && prestadosPintados === 0 && masDeLaCuenta === 0 && cambios > 20,
+    { visiblesFuera, prestadosPintados, masDeLaCuenta, cambios },
+  );
+  comprobar(
+    'la gente de la ciudad es toda la de la mesa (durmientesDeLaCiudad), y la multitud se hace de su tamaño',
+    gente.total === durmientesDeLaCiudad(noche.ciudad) && gente.total > 500 && m.x.length === gente.total,
+    { total: gente.total, arrays: m.x.length },
+  );
+}
+
+paso('El presupuesto con la ciudad: con los 64 durmientes a la vista, el juego entero cabe en su tope');
+/*
+ * `personajes/presupuesto.ts` (de otro frente) cuenta los 48 del barrio. Con la ciudad se pintan hasta
+ * `DURMIENTES_PINTADOS_COMO_MUCHO` (64): lo mismo que el renglón, más los que faltan con el maniquí de su
+ * línea de la multitud (misma llamada: el mismo rebaño) y su sombra de contacto. Lo que MANDA es el tope
+ * del juego entero (§8 de EL-QUIEBRO), con lo medido del resto; el cuarto de los personajes es un reparto,
+ * y si no cabe se dice (en N0 no cabe: 16 maniquíes más son unos 6.800 triángulos, y la ciudad bajó su
+ * cuota del 60 al 50 % precisamente para dejar sitio a los personajes, §5.7 de CIUDAD-ABIERTA).
+ */
+for (const n of NIVELES) {
+  const r = renglonDeLosPersonajes(reparto, n);
+  const linea = r.desglose.find((d) => /durmientes en la multitud/.test(d.que));
+  const cuantosEnLaLinea = Number(/^(\d+)/.exec(linea?.que ?? '')?.[1] ?? 'NaN');
+  const porCabeza = linea === undefined || !(cuantosEnLaLinea > 0) ? Number.NaN : linea.triangulos / cuantosEnLaLinea;
+  const mas = DURMIENTES_PINTADOS_COMO_MUCHO - DURMIENTES;
+  const triangulos = r.triangulos + mas * (porCabeza + 2);
+  const cuota = cuotaDelNivel(n);
+  const resto = RESTO_DEL_JUEGO_MEDIDO[n];
+  const tope = TABLA_DE_NIVELES[n].topes;
+  comprobar(
+    `N${String(n)}: con ${String(DURMIENTES_PINTADOS_COMO_MUCHO)} durmientes a la vista, los personajes (${triangulos.toLocaleString('es')} tri, ${String(r.llamadas)} ll.) más lo medido del resto (${resto.triangulos.toLocaleString('es')}, ${String(resto.llamadas)}) caben en el tope del juego (${tope.triangulos.toLocaleString('es')}, ${String(tope.llamadas)})`,
+    Number.isFinite(porCabeza) && porCabeza > 0 && triangulos + resto.triangulos <= tope.triangulos && r.llamadas + resto.llamadas <= tope.llamadas,
+    { porCabeza, triangulos, resto, tope },
+  );
+  if (triangulos > cuota.triangulos || r.llamadas > cuota.llamadas) {
+    nota(`N${String(n)}: con la ciudad los personajes pasan de su cuarto (${triangulos.toLocaleString('es')} de ${cuota.triangulos.toLocaleString('es')} triángulos): lo decide el dueño de presupuesto.ts.`);
+  }
 }
 
 paso('La textura de huesos da la misma piel que el esqueleto de three');
@@ -1902,6 +2075,148 @@ paso('Si el gobernador baja de N2 a N0 en plena pelea, nadie desaparece ni un fo
   d8.liberar();
 }
 
+paso('Un cuerpo que se suelta no se desecha hasta que otro se ha pintado: el programa de los personajes no se enlaza dos veces');
+{
+  /*
+   * three tira el programa de sombreado de un material en cuanto se desecha el último material que lo usa.
+   * Entre noches no queda nadie, y sin cuerpo propio en N0 puede no quedar ningún cuerpo con esqueleto: si el
+   * material del último se desechaba, `personaje-quiebro` (85 KB de fragmento) se volvía a compilar y
+   * enlazar con el mismo fuente al volver alguien (revisión de rendimiento del 24-sep: 9 veces en 18
+   * minutos, una con una tarea de 78 ms). Se cuenta en qué fotograma se suelta cada cuerpo y en cuál se
+   * desecha su material: un NPC que cambia de figura (un número de entidad que se reutiliza), el paso de N2
+   * a N0 con tres NPC a 20 m, luego sin nadie, luego con alguien otra vez, y al liberar el director.
+   */
+  const d9 = new DirectorDeLosPersonajes(reparto, (a) => join(RECURSOS, a), lectorDeNode);
+  const yo = cuerpoDePrueba(1, 'desvelado', 0);
+  const lejos: CuerpoPintado[] = [16, 17, 18].map((id, k) => ({ ...cuerpoDePrueba(id, id === 18 ? 'tirador' : 'celador', k), color: null, x: -3 + k * 3, z: -20 }));
+  const todos = [yo, ...lejos];
+  const lista: CuerpoPintado[] = [...todos];
+  const fuente = fuenteDe(lista, 1);
+  const cam = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 400);
+  cam.position.set(0, 1.7, 3);
+  cam.lookAt(0, 1, -20);
+  cam.updateMatrixWorld();
+  type Cuerpo = NonNullable<ReturnType<typeof d9.cuerpo>>;
+  let n = 0;
+  const idDe = new Map<Cuerpo, number>();
+  const soltadoEn = new Map<Cuerpo, number>();
+  const desechadoEn = new Map<Cuerpo, number>();
+  /* Cuántas veces un número estrenó cuerpo en el mismo fotograma en que soltó el suyo. */
+  let rehechos = 0;
+  let t = 300000;
+  const fotograma = (nivel: Nivel): void => {
+    n++;
+    t += 16.7;
+    d9.fotograma(fuente, nivel, null, cam, t, (v) => v);
+    for (const c of todos) {
+      const cu = d9.cuerpo(c.id);
+      if (cu === null || idDe.has(cu)) continue;
+      idDe.set(cu, c.id);
+      let material: THREE.Material | null = null;
+      cu.raiz.traverse((o) => {
+        const m = (o as THREE.Mesh).material;
+        if (material === null && m instanceof THREE.Material) material = m;
+      });
+      (material as THREE.Material | null)?.addEventListener('dispose', () => {
+        if (!desechadoEn.has(cu)) desechadoEn.set(cu, n);
+      });
+    }
+    for (const [cu, id] of idDe) {
+      if (soltadoEn.has(cu) || d9.cuerpo(id) === cu) continue;
+      soltadoEn.set(cu, n);
+      if (d9.cuerpo(id) !== null) rehechos++;
+    }
+  };
+  for (let k = 0; k < 6000 && !(lejos.every((c) => d9.cuerpo(c.id) !== null) && d9.medida.porHornear === 0 && k > 60); k++) {
+    fotograma(2);
+    if (k % 3 === 0) await esperarUnPoco(2);
+  }
+  const enN2 = lejos.filter((c) => d9.cuerpo(c.id) !== null).length;
+  /* El Celador 16 pasa a ser otro (otra silueta): su cuerpo se suelta y se rehace en el mismo fotograma. */
+  const antesDeCambiar = d9.cuerpo(16);
+  (lejos[0] as CuerpoPintado).variante = 1;
+  for (let k = 0; k < 1500 && d9.cuerpo(16) === antesDeCambiar; k++) {
+    fotograma(2);
+    if (k % 3 === 0) await esperarUnPoco(2);
+  }
+  fotograma(2);
+  for (let k = 0; k < 90; k++) {
+    fotograma(0);
+    if (k % 3 === 0) await esperarUnPoco(2);
+  }
+  const soltadosConGente = soltadoEn.size;
+  const mismoFotograma = [...soltadoEn].filter(([cu, s]) => desechadoEn.get(cu) === s).length;
+  const sinDesechar = [...soltadoEn].filter(([cu, s]) => s < n && !desechadoEn.has(cu)).length;
+  /* Sin nadie: se suelta todo, y el último se guarda sin desechar (su material tiene el programa). */
+  lista.length = 0;
+  for (let k = 0; k < 600 && !(todos.every((c) => d9.cuerpo(c.id) === null) && k > 10); k++) fotograma(0);
+  for (let k = 0; k < 10; k++) fotograma(0);
+  const guardados = d9.soltadosSinDesechar;
+  const quedanSinDesechar = [...soltadoEn].filter(([cu]) => !desechadoEn.has(cu)).length;
+  const todosSueltos = todos.every((c) => d9.cuerpo(c.id) === null);
+  /* Vuelve alguien: en cuanto se ha pintado, el guardado se desecha. */
+  lista.push(yo);
+  for (let k = 0; k < 400 && d9.cuerpo(1) === null; k++) {
+    fotograma(0);
+    if (k % 3 === 0) await esperarUnPoco(2);
+  }
+  fotograma(0);
+  fotograma(0);
+  const trasVolver = d9.soltadosSinDesechar;
+  const soltados = soltadoEn.size;
+  const desechadosAntesDeLiberar = [...soltadoEn].filter(([cu]) => desechadoEn.has(cu)).length;
+  d9.liberar();
+  const alLiberar = [...idDe.keys()].filter((cu) => !desechadoEn.has(cu)).length;
+  comprobar(
+    `un cuerpo soltado se desecha al fotograma siguiente, nunca en el mismo (${String(soltadosConGente)} soltados con gente delante, ${String(rehechos)} de ellos rehechos en el acto al cambiar de figura); sin nadie, el último se guarda sin desechar hasta que alguien se pinta; y al liberar el director no queda ninguno`,
+    enN2 === 3 && rehechos >= 1 && soltadosConGente >= 4 && mismoFotograma === 0 && sinDesechar === 0 && todosSueltos && guardados === 1 && quedanSinDesechar === 1 && trasVolver === 0 && desechadosAntesDeLiberar === soltados && alLiberar === 0 && d9.soltadosSinDesechar === 0,
+    { enN2, rehechos, soltadosConGente, mismoFotograma, sinDesechar, todosSueltos, guardados, quedanSinDesechar, trasVolver, soltados, desechadosAntesDeLiberar, alLiberar },
+  );
+}
+
+
+paso('El director pinta la gente de la ciudad que le da la fuente del juego, y nunca más de 64');
+{
+  /*
+   * El juego da su gente por la fuente (`genteDeLaNoche`, lo que hace `red/partida.ts`); el barrio que le
+   * pasa `CuerposDelQuiebro.tsx` es entonces `null`. Sin eso el director no pintaba a nadie en la ciudad.
+   */
+  const noche = NOCHES_DE_LA_CIUDAD[0] as NocheDeLaCiudad;
+  const gente = genteDeLaCiudad(noche);
+  const plaza = noche.ciudad.plazas[0]?.centro ?? { x: 0, z: 0 };
+  const lista: CuerpoPintado[] = [{ ...cuerpoDePrueba(1, 'desvelado', 0), x: plaza.x, z: plaza.z + 20 }];
+  let tic = 7000;
+  const prestados = new Set<number>();
+  const conGente = { cuerpos: () => lista, prestados: () => prestados, ticDeLosDurmientes: () => tic, yo: () => 1, genteDeLaNoche: () => gente };
+  const sinGente: FuenteDeCuerpos = { cuerpos: () => lista, prestados: () => prestados, ticDeLosDurmientes: () => tic, yo: () => 1 };
+  const cam = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 400);
+  cam.position.set(plaza.x, 30, plaza.z + 45);
+  cam.lookAt(plaza.x, 0, plaza.z);
+  cam.updateMatrixWorld();
+  const pintar = async (fuente: FuenteDeCuerpos, n: number): Promise<{ maximo: number; ultimo: number }> => {
+    const d = new DirectorDeLosPersonajes(reparto, (a) => join(RECURSOS, a), lectorDeNode);
+    let t = 200000;
+    let maximo = 0;
+    for (let k = 0; k < n; k++) {
+      t += 1000 / 60;
+      tic += 1 / 3;
+      d.fotograma(fuente, 0, null, cam, t, (v) => v);
+      maximo = Math.max(maximo, d.medida.multitud);
+      if (k % 4 === 0) await esperarUnPoco(2);
+    }
+    const ultimo = d.medida.multitud;
+    d.liberar();
+    return { maximo, ultimo };
+  };
+  const con = await pintar(conGente, 900);
+  const sin = await pintar(sinGente, 120);
+  comprobar(
+    `con la gente de la ciudad en la fuente (y el barrio nulo) se pinta la multitud: ${String(con.maximo)} a la vez como mucho, de ${String(DURMIENTES_PINTADOS_COMO_MUCHO)}; sin gente ni barrio, nadie`,
+    con.maximo > 16 && con.maximo <= DURMIENTES_PINTADOS_COMO_MUCHO && sin.maximo === 0,
+    { con, sin },
+  );
+}
+
 paso('Sin asignar por fotograma (lo que asigna el código de los personajes, sin contar el mezclador de three)');
 {
   /*
@@ -1942,7 +2257,14 @@ paso('Sin asignar por fotograma (lo que asigna el código de los personajes, sin
    * ocho más cercanos). La primera versión eran 430 y 570.
    */
   const TOPE_DE_BYTES: Readonly<Record<0 | 2, number>> = { 0: 16 * 1024, 2: 28 * 1024 };
-  for (const nivel of [0, 2] as const) {
+  /*
+   * Y en la ciudad abierta (N0), con la gente de la ciudad en la fuente: elegir a los 64 de entre unos
+   * 630 una vez por tic no tiene que asignar más que pintar a los 48 del barrio.
+   */
+  const gentePorNivel: Readonly<Record<string, GenteDeLaNoche | null>> = { '0': null, '2': null, ciudad: genteDeLaCiudad(NOCHES_DE_LA_CIUDAD[0] as NocheDeLaCiudad) };
+  for (const vuelta of ['0', '2', 'ciudad'] as const) {
+    const nivel = vuelta === '2' ? 2 : 0;
+    const genteDeLaVuelta = gentePorNivel[vuelta] ?? null;
     const d7 = new DirectorDeLosPersonajes(reparto, (a) => join(RECURSOS, a), lectorDeNode);
     const lista: CuerpoPintado[] = [];
     for (let id = 1; id <= 6; id++) lista.push(cuerpoDePrueba(id, 'desvelado', id % 3));
@@ -1951,7 +2273,10 @@ paso('Sin asignar por fotograma (lo que asigna el código de los personajes, sin
     for (let k = 0; k < 6; k++) lista.push({ ...cuerpoDePrueba(24 + k, 'prestado', k * 7), color: null });
     const prestados = new Set([0, 7, 14, 21, 28, 35]);
     let tic = 5000;
-    const fuente: FuenteDeCuerpos = { cuerpos: () => lista, prestados: () => prestados, ticDeLosDurmientes: () => tic, yo: () => 1 };
+    const fuente: FuenteDeCuerpos =
+      genteDeLaVuelta === null
+        ? { cuerpos: () => lista, prestados: () => prestados, ticDeLosDurmientes: () => tic, yo: () => 1 }
+        : ({ cuerpos: () => lista, prestados: () => prestados, ticDeLosDurmientes: () => tic, yo: () => 1, genteDeLaNoche: () => genteDeLaVuelta } as FuenteDeCuerpos);
     const gestos: readonly Gesto[] = ['correr', 'trotar', 'andar', 'reposo', 'guardia', 'entrada', 'seguida-1', 'tocado', 'quiebro'];
     const cam = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 400);
     cam.position.set(0, 1.7, 0.01);
@@ -1979,7 +2304,7 @@ paso('Sin asignar por fotograma (lo que asigna el código de los personajes, sin
       t += 1000 / 60;
       tic += 1 / 3;
       mover();
-      d7.fotograma(fuente, nivel, noche2, cam, t, (v) => v);
+      d7.fotograma(fuente, nivel, genteDeLaVuelta === null ? noche2 : null, cam, t, (v) => v);
     };
     for (let k = 0; k < 2400; k++) {
       paso();
@@ -1992,18 +2317,19 @@ paso('Sin asignar por fotograma (lo que asigna el código de los personajes, sin
       return { bien: b < TOPE_DE_BYTES[nivel], detalle: `${(b / 1024).toFixed(1)} KiB por fotograma` };
     };
     const v = await juezDeLaMemoria(paso);
-    comprobar(`N${String(nivel)} con 20 cuerpos cambiando de gesto y la multitud: el código de los personajes asigna menos de ${String(TOPE_DE_BYTES[nivel] / 1024)} KiB por fotograma`, v.bien, v.detalle);
-    nota(`N${String(nivel)}: ${String(v.detalle)} (sin contar el mezclador de three)`);
+    const deQue = genteDeLaVuelta === null ? 'la multitud' : 'la multitud de la CIUDAD (64 de unos 630)';
+    comprobar(`N${String(nivel)} con 20 cuerpos cambiando de gesto y ${deQue}: el código de los personajes asigna menos de ${String(TOPE_DE_BYTES[nivel] / 1024)} KiB por fotograma`, v.bien, v.detalle);
+    nota(`N${String(nivel)}${genteDeLaVuelta === null ? '' : ' (ciudad)'}: ${String(v.detalle)} (sin contar el mezclador de three)`);
     const e = await juezDeLaMemoria(() => {
       paso();
       basura.push(new Array(4000).fill(0));
       if (basura.length > 50) basura.length = 0;
     });
-    comprobar(`la vacuna «32 KiB más por fotograma» sale roja en N${String(nivel)} (el juez de la memoria mira)`, !e.bien, e.detalle);
+    comprobar(`la vacuna «32 KiB más por fotograma» sale roja en N${String(nivel)}${genteDeLaVuelta === null ? '' : ' con la ciudad'} (el juez de la memoria mira)`, !e.bien, e.detalle);
     d7.liberar();
   }
   sesion.disconnect();
 }
 
 director.liberar();
-terminar(157);
+terminar(171);

@@ -57,7 +57,7 @@ function arranques(limite: number): { dentro: number[]; primero: number[]; segun
   return { dentro, primero, segundo };
 }
 
-function parcelas(dado: Dado, s: CajaXZ): CajaXZ[] {
+export function parcelas(dado: Dado, s: CajaXZ): CajaXZ[] {
   const cuantos = enteroCon(dado, 1, 3);
   if (cuantos === 1) return [s];
   const porX = dado() < 0.5;
@@ -72,7 +72,7 @@ function parcelas(dado: Dado, s: CajaXZ): CajaXZ[] {
 }
 
 /** Las caras de una parcela que caen en el borde del solar: sus fachadas. */
-function fachadasDe(p: CajaXZ, s: CajaXZ, dado: Dado): FachadaDelPlano[] {
+export function fachadasDe(p: CajaXZ, s: CajaXZ, dado: Dado): FachadaDelPlano[] {
   const caras: Orientacion[] = [];
   if (p.z0 === s.z0) caras.push('n');
   if (p.z1 === s.z1) caras.push('s');
@@ -82,12 +82,12 @@ function fachadasDe(p: CajaXZ, s: CajaXZ, dado: Dado): FachadaDelPlano[] {
 }
 
 /** Cuántas plantas: [mínimo, máximo] de un edificio bajo y de una torre. */
-interface Plantas {
+export interface Plantas {
   readonly bajo: readonly [number, number];
   readonly torre: readonly [number, number];
 }
 
-function edificio(dado: Dado, p: CajaXZ, s: CajaXZ, torre: boolean, semilla: number, alturas: Plantas): EdificioDelPlano {
+export function edificio(dado: Dado, p: CajaXZ, s: CajaXZ, torre: boolean, semilla: number, alturas: Plantas): EdificioDelPlano {
   const estilos: readonly EstiloDeFachada[] = torre
     ? ['vidrio', 'vidrio', 'hormigon', 'piedra']
     : ['revoco', 'ladrillo', 'piedra', 'azulejo', 'hormigon', 'revoco', 'vidrio'];
@@ -126,7 +126,7 @@ function edificio(dado: Dado, p: CajaXZ, s: CajaXZ, torre: boolean, semilla: num
     plantaBaja: pb,
     alturaDePlanta: hp,
     fachadas,
-    soportal: null,
+    soportales: [],
     pilares: [],
     semilla,
   };
@@ -366,15 +366,15 @@ const LEJANA_HASTA = 540;
  * la MISMA lista se ponen, así que N3 es N0 con más cajas, nunca otra ciudad. Casi todas de 4 a 15
  * plantas; alguna torre de 25 a 40. Diez triángulos por caja (sin la cara de abajo), una llamada.
  */
-export function crearLaCiudadLejana(semilla: number, cuantas: number): THREE.InstancedMesh {
+export function crearLaCiudadLejana(semilla: number, cuantas: number, desde = LEJANA_DESDE, hasta = LEJANA_HASTA): THREE.InstancedMesh {
   const sitios: { x: number; z: number; orden: number }[] = [];
   const PASO_L = 11;
-  const celdas = Math.ceil(LEJANA_HASTA / PASO_L);
+  const celdas = Math.ceil(hasta / PASO_L);
   for (let i = -celdas; i <= celdas; i++) {
     for (let k = -celdas; k <= celdas; k++) {
       const x = (i + 0.5) * PASO_L;
       const z = (k + 0.5) * PASO_L;
-      if (Math.max(Math.abs(x), Math.abs(z)) < LEJANA_DESDE || Math.hypot(x, z) > LEJANA_HASTA) continue;
+      if (Math.max(Math.abs(x), Math.abs(z)) < desde || Math.hypot(x, z) > hasta) continue;
       /* Las calles: una fila y una columna de cada cuatro quedan libres. */
       if (((i % 4) + 4) % 4 === 0 || ((k % 4) + 4) % 4 === 0) continue;
       sitios.push({ x, z, orden: mezclar(semilla, i, k, 0x1e7a) });

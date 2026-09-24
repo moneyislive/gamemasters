@@ -34,7 +34,7 @@ import { UNO } from '../../shared/mecanicas/fijo';
 import { DT_DEL_TIC, COSENO, SENO } from '../../shared/mecanicas/andar';
 import { unPaso } from '../../shared/mecanicas/mundo';
 import type { Arena } from '../../shared/mecanicas/mundo';
-import { arenaDeLaLiza, problemasDeLaDeclaracion, VERSION_DE_LA_DECLARACION, CONTADORES_DE_ASIENTO } from '../../shared/mecanicas/liza/declaracion';
+import { alcanceDeBlancoDe, arenaDeLaLiza, olvidoDelEncuentro, problemasDeLaDeclaracion, VERSION_DE_LA_DECLARACION, CONTADORES_DE_ASIENTO } from '../../shared/mecanicas/liza/declaracion';
 import type {
   AccionDeclarada,
   ClaseDeEntidad,
@@ -43,14 +43,17 @@ import type {
   FaseDeLaLiza,
   GrupoDeclarado,
   LizaDeclarada,
+  OlvidoDeclarado,
   PuestaDeEstado,
   ReglasDeAsiento,
 } from '../../shared/mecanicas/liza/declaracion';
+import { MOTIVO_DE_IRSE } from '../../shared/mecanicas/liza/protocolo';
 import type { SucesoDelTic, TuplaDeFoto } from '../../shared/mecanicas/liza/protocolo';
 import type { AccionRecibida, EntradaDeLaSala, EstadoDeLaSala, PasoDeLaSala } from '../../shared/mecanicas/liza/tipos-de-la-sala';
 import { avanzarLaSala, huellaDeLaSala, salaNueva } from '../../shared/mecanicas/liza/sala';
 import { canonico } from '../../shared/mecanicas/canonico';
 import { hayLineaDeVista, rumboHacia } from '../../shared/mecanicas/liza/geometria';
+import { cuentasDeLosIndices } from '../../shared/mecanicas/liza/cerebro';
 
 /**
  * EL CRONÓMETRO DEL BANCO, si el motor tiene uno: en Node, `performance.now()` (global desde la 16); en
@@ -221,8 +224,8 @@ export function clase(extra: Partial<ClaseDeEntidad> = {}): ClaseDeEntidad {
       respuesta: A.respuesta,
       esquivaAlAzar: { acciones: [A.empellon], probabilidad: 0 },
     },
-    /* Se acerca hasta 0,9 (dentro del golpe de 1,1) y no vuelve a por él hasta que se le va a más de 1,5. */
-    cerebro: { distanciaMinima: u(0.9), distanciaMaxima: u(1.5), decideCadaTics: 4, costeCuerpoACuerpo: 1, costeDisparo: 1, sigueElGrafo: true },
+    /* Se acerca hasta 0,9 (dentro del golpe de 1,1) y no vuelve a por él hasta que se le va a más de 1,5. Sin tope de alcance (L10). */
+    cerebro: { distanciaMinima: u(0.9), distanciaMaxima: u(1.5), decideCadaTics: 4, costeCuerpoACuerpo: 1, costeDisparo: 1, sigueElGrafo: true, alcanceDeBlanco: 0 },
     aparicion: { modo: 'imprimir', tics: 10 },
     alCaer: {
       tipo: 'rematable',
@@ -238,7 +241,7 @@ export function clase(extra: Partial<ClaseDeEntidad> = {}): ClaseDeEntidad {
 /** El tirador: la misma clase, que ronda entre 6 y 14 y dispara. */
 export function claseTiradora(extra: Partial<ClaseDeEntidad> = {}): ClaseDeEntidad {
   return clase({
-    cerebro: { distanciaMinima: u(6), distanciaMaxima: u(14), decideCadaTics: 4, costeCuerpoACuerpo: 1, costeDisparo: 1, sigueElGrafo: true },
+    cerebro: { distanciaMinima: u(6), distanciaMaxima: u(14), decideCadaTics: 4, costeCuerpoACuerpo: 1, costeDisparo: 1, sigueElGrafo: true, alcanceDeBlanco: 0 },
     proyectil: 1,
     ...extra,
   });
@@ -287,6 +290,8 @@ export interface OpcionesDelJuguete {
   reaparicion?: { x: number; z: number };
   lleva?: number;
   danoDeBala?: number;
+  /** El olvido del encuentro (L10); sin decir, `null`. */
+  olvido?: OlvidoDeclarado | null;
 }
 
 /**
@@ -344,6 +349,7 @@ export function montarJuguete(o: OpcionesDelJuguete): LizaDeclarada {
             vivasALaVez: porN(n, (p) => Math.min(14, p + 3 + (n >= 6 ? 8 : 0))),
             grupos,
             fin: (o.fin ?? 'vaciar') === 'vaciar' ? { tipo: 'vaciar' } : { tipo: 'salida', zona: zonaDeAccion, salenComoMinimo: porN(n, (p) => Math.ceil(p / 2)) },
+            olvido: o.olvido ?? null,
           },
   };
   const asientos: ReglasDeAsiento[] = [];
@@ -1082,6 +1088,423 @@ export function jugarLaLizaSinBlanco(tics: number): JugadaSinBlanco {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * LA LIZA ABIERTA: UNA CIUDAD DE JUGUETE DE 300 × 300 (bloque 23 de `verify:liza` y `verify:determinismo`)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La Liza por dentro tiene tres índices —las losas y los nudos por celdas, y los campos de distancias por
+ * meta— que sólo se encienden con un mundo grande: desde 512 cajas o 512 nudos (el diseño de la ciudad
+ * abierta, §5.4; los campos se guardan con cualquier grafo). La liza de juguete tiene cuatro cajas y siete
+ * nudos, y el barrio de El Quiebro 250 y 404: ninguno enciende los índices de celdas. Ésta sí, y no es
+ * ningún juego: una rejilla de manzanas de 30 unidades con calles de 10, farolas en las aceras, coches
+ * junto al bordillo, plazas con quiosco y bancos, un cerco, y el grafo por el eje de cada calle con un
+ * nudo cada 5 unidades. Unas 800 cajas y 850 nudos.
+ *
+ * ═══ LO QUE LLEVA A PROPÓSITO ═══
+ *
+ *   · Las cajas BARAJADAS: el índice no las visita en orden de índice, así que el desempate por el índice
+ *     menor tiene que hacerse explícito, y aquí se nota si no.
+ *   · Vallas de bolardos en columna, separados menos que el ancho de un cuerpo: un tramo que las cruza
+ *     con radio entra en dos a la vez —el EMPATE—, y cada valla va, si cabe, en una raya de las celdas del
+ *     índice (múltiplos de 16 unidades).
+ *   · Un desplazamiento del mundo entero: con él las coordenadas llegan a −500 y a +500, y las celdas
+ *     negativas (`Math.floor` de un negativo) se prueban igual que las positivas.
+ *   · Los asientos REPARTIDOS por las esquinas: las metas quedan a más de 160 unidades andadas, la cota de
+ *     un campo, y los campos se tienen que completar (siguiendo su montículo o rehaciéndolo).
+ *
+ * Corre en cualquier motor, como todo este fichero: el azar es un congruencial de enteros sin signo.
+ */
+
+/** Un azar de enteros, el mismo en cualquier motor: el congruencial del paseante, 24 bits por tirada. */
+export class AzarDeJuguete {
+  private s: number;
+  constructor(semilla: number) {
+    this.s = semilla >>> 0;
+  }
+  /** Un entero de `[0, n)`, con `n` ≥ 1. */
+  entre(n: number): number {
+    this.s = (Math.imul(this.s, 1103515245) + 12345) >>> 0;
+    return (this.s >>> 8) % n;
+  }
+  /** Verdadero `veces` de cada cien. */
+  cien(veces: number): boolean {
+    return this.entre(100) < veces;
+  }
+}
+
+/** Cómo se levanta un mundo abierto: cada semilla es otra ciudad, y el desplazamiento la mueve entera. */
+export interface OpcionesDelMundoAbierto {
+  semilla?: number;
+  /** Cuánto se mueve el mundo, en unidades (múltiplos de 10, para que las casillas sigan cuadrando). */
+  desplazamiento?: { x: number; z: number };
+  /** Los asientos, juntos en el cruce del centro o repartidos por las esquinas. */
+  repartidos?: boolean;
+  /** Cuántos asientos (sitios de nacer con papel `asiento`). */
+  asientos?: number;
+  /** (Sólo `lizaAbierta`.) El alcance de blanco de las dos clases (L10); sin decir, 0: sin tope. */
+  alcanceDeBlanco?: number;
+  /** (Sólo `lizaAbierta`.) El olvido del encuentro (L10); sin decir, `null`. */
+  olvido?: OlvidoDeclarado | null;
+}
+
+/** Los ejes de las calles del mundo abierto, en unidades sin desplazar: de −140 a 140 cada 40. */
+export const EJES_DEL_MUNDO_ABIERTO: readonly number[] = [-140, -100, -60, -20, 20, 60, 100, 140];
+
+interface SitioDeNacerDeJuguete {
+  papel: 'asiento' | 'reaparicion';
+  x: number;
+  z: number;
+  rumbo: number;
+}
+
+/**
+ * EL MUNDO DE UNA LIZA ABIERTA (ver la cabecera del bloque). Cajas y casillas en unidades (el contrato de
+ * `mundo.ts`); zonas, límites, nudos y sitios de nacer en Q16.16.
+ */
+export function mundoAbierto(o: OpcionesDelMundoAbierto = {}): LizaDeclarada['mundo'] {
+  const azar = new AzarDeJuguete(o.semilla ?? 1);
+  const ox = o.desplazamiento?.x ?? 0;
+  const oz = o.desplazamiento?.z ?? 0;
+  const cajas: { x0: number; z0: number; x1: number; z1: number }[] = [];
+  const poner = (x0: number, z0: number, x1: number, z1: number): void => {
+    cajas.push({ x0: x0 + ox, z0: z0 + oz, x1: x1 + ox, z1: z1 + oz });
+  };
+  const ejes = EJES_DEL_MUNDO_ABIERTO;
+  /* Las manzanas: edificio entero, partido por un pasaje de 4, o plaza con quiosco, bancos y una valla. */
+  for (let j = 0; j + 1 < ejes.length; j++) {
+    for (let i = 0; i + 1 < ejes.length; i++) {
+      const x0 = (ejes[i] as number) + 5;
+      const x1 = (ejes[i + 1] as number) - 5;
+      const z0 = (ejes[j] as number) + 5;
+      const z1 = (ejes[j + 1] as number) - 5;
+      const uso = azar.entre(100);
+      if (uso < 18) {
+        poner(x0 + 12, z0 + 12, x0 + 15, z0 + 15);
+        for (let b = 0; b < 4; b++) {
+          const bx = x0 + 3 + azar.entre(22);
+          const bz = z0 + 3 + azar.entre(22);
+          poner(bx, bz, bx + 2, bz + 0.6);
+        }
+        /* La valla: en la raya de una celda del índice si cae dentro de la plaza; si no, a 4 del borde. */
+        let vx = Math.ceil((x0 + ox) / 16) * 16 - ox;
+        if (vx < x0 + 2 || vx > x1 - 2) vx = x0 + 4;
+        for (let k = 0; k < 14; k++) poner(vx, z0 + 4 + k, vx + 0.4, z0 + 4.4 + k);
+      } else if (uso < 45) {
+        if (azar.cien(50)) {
+          poner(x0, z0, x0 + 13, z1);
+          poner(x0 + 17, z0, x1, z1);
+        } else {
+          poner(x0, z0, x1, z0 + 13);
+          poner(x0, z0 + 17, x1, z1);
+        }
+      } else poner(x0, z0, x1, z1);
+    }
+  }
+  /* Las aceras y la calzada: farolas a 4 del eje, y coches junto al bordillo de las calles norte-sur. */
+  for (const e of ejes) {
+    for (let t = 0; t + 1 < ejes.length; t++) {
+      const desde = (ejes[t] as number) + 6;
+      const hasta = (ejes[t + 1] as number) - 6;
+      for (let s = desde; s + 0.3 <= hasta; s += 7) {
+        for (let lado = -1; lado <= 1; lado += 2) {
+          if (azar.cien(70)) poner(e + lado * 4, s, e + lado * 4 + 0.3, s + 0.3);
+          if (azar.cien(70)) poner(s, e + lado * 4, s + 0.3, e + lado * 4 + 0.3);
+          if (azar.cien(12) && s + 4.4 <= hasta) {
+            const a = lado > 0 ? e + 0.7 : e - 2.5;
+            poner(a, s, a + 1.8, s + 4.4);
+          }
+        }
+      }
+    }
+  }
+  /* El cerco, de 148 a 150 por los cuatro lados. */
+  poner(-150, -150, 150, -148);
+  poner(-150, 148, 150, 150);
+  poner(-150, -148, -148, 148);
+  poner(148, -148, 150, 148);
+  /* Barajadas: el orden de la lista no dice nada del sitio. */
+  for (let i = cajas.length - 1; i > 0; i--) {
+    const k = azar.entre(i + 1);
+    const t = cajas[i] as { x0: number; z0: number; x1: number; z1: number };
+    cajas[i] = cajas[k] as { x0: number; z0: number; x1: number; z1: number };
+    cajas[k] = t;
+  }
+
+  /* El grafo por los ejes: un nudo cada 5 unidades en cada calle, y los cruces compartidos. */
+  const nudos: { x: number; z: number }[] = [];
+  const aristas: [number, number][] = [];
+  const indice = new Map<string, number>();
+  const nudo = (x: number, z: number): number => {
+    const llave = `${String(x)},${String(z)}`;
+    const ya = indice.get(llave);
+    if (ya !== undefined) return ya;
+    nudos.push({ x: u(x + ox), z: u(z + oz) });
+    indice.set(llave, nudos.length - 1);
+    return nudos.length - 1;
+  };
+  for (const e of ejes) {
+    let antesH = -1;
+    let antesV = -1;
+    for (let s = -140; s <= 140; s += 5) {
+      const h = nudo(s, e);
+      const v = nudo(e, s);
+      if (antesH >= 0) aristas.push([antesH, h]);
+      if (antesV >= 0) aristas.push([antesV, v]);
+      antesH = h;
+      antesV = v;
+    }
+  }
+
+  /* Todo pisable. La `y` de una casilla es la `z` CAMBIADA DE SIGNO (el norte arriba: ver `sueloEn` en `mundo.ts`). */
+  const pisables: { x: number; y: number }[] = [];
+  for (let y = -15; y <= 15; y++) for (let x = -15; x <= 15; x++) pisables.push({ x: x + ox / 10, y: y - oz / 10 });
+  const zonas: { id: number; clase: number; caja: { x0: number; z0: number; x1: number; z1: number } }[] = [];
+  const cruces = [-140, -60, 20, 100];
+  for (const zx of cruces) for (const zz of cruces) zonas.push({ id: zonas.length + 1, clase: 1, caja: caja(zx - 1 + ox, zz - 1 + oz, zx + 1 + ox, zz + 1 + oz) });
+  zonas.push({ id: zonas.length + 1, clase: 2, caja: caja(-21 + ox, 19 + oz, -19 + ox, 21 + oz) });
+  const n = o.asientos ?? 6;
+  const sitios =
+    o.repartidos === true
+      ? [[-140, -140], [140, 140], [140, -140], [-140, 140], [-20, -140], [20, 140]]
+      : [[-20, -20], [20, -20], [-20, 20], [20, 20], [-20, -18], [20, -18]];
+  const nace: SitioDeNacerDeJuguete[] = [];
+  for (let i = 0; i < n; i++) {
+    const s = sitios[i % sitios.length] as number[];
+    nace.push({ papel: 'asiento', x: u((s[0] as number) + ox), z: u((s[1] as number) + oz), rumbo: 0 });
+  }
+  nace.push({ papel: 'reaparicion', x: u(-20 + ox), z: u(20 + oz), rumbo: 0 });
+  nace.push({ papel: 'reaparicion', x: u(100 + ox), z: u(-60 + oz), rumbo: 0 });
+  const clasesDeCaja: number[] = [];
+  for (let i = 0; i < cajas.length; i++) clasesDeCaja.push(1);
+  return {
+    metrosPorUnidad: UNO,
+    suelo: { lado: 10, pisables, vados: [], cuerpos: cajas, nace: [] },
+    clasesDeCaja,
+    zonas,
+    limites: [
+      { id: 1, caja: caja(-150 + ox, -150 + oz, 150 + ox, 150 + oz) },
+      { id: 2, caja: caja(-25 + ox, -25 + oz, 25 + ox, 25 + oz) },
+    ],
+    grafo: { nudos, aristas },
+    nace,
+  };
+}
+
+/**
+ * LA LIZA ABIERTA: la sala llena de `lizaLlena` —tiradores que golpean y disparan con poco daño, recurso de
+ * sobra— más una segunda clase que sólo golpea, en un mundo abierto. Los grupos salen de las dieciséis
+ * zonas repartidas por la ciudad, así que las entidades la CRUZAN por el grafo hasta su blanco.
+ */
+export function lizaAbierta(o: OpcionesDelMundoAbierto = {}): LizaDeclarada {
+  const n = o.asientos ?? 6;
+  const alcanceDeBlanco = o.alcanceDeBlanco ?? 0;
+  const tiradora0 = claseTiradora({ acciones: [accion(A.golpe, { anuncioTics: 11, enganche: null, alFallar: null, efecto: efecto(1, puesta(E.tocado, 12)) })], guardia: null });
+  const golpeadora0 = clase({ id: 2, guardia: null, acciones: [accion(A.golpe, { anuncioTics: 11, enganche: null, alFallar: null, efecto: efecto(1, puesta(E.tocado, 12)) })] });
+  const tiradora: ClaseDeEntidad = { ...tiradora0, cerebro: { ...tiradora0.cerebro, alcanceDeBlanco } };
+  const golpeadora: ClaseDeEntidad = { ...golpeadora0, cerebro: { ...golpeadora0.cerebro, alcanceDeBlanco } };
+  const base = montarJuguete({
+    olvido: o.olvido ?? null,
+    asientos: n,
+    clase: tiradora,
+    danoDeBala: 1,
+    recurso: 50,
+    relojTics: 20000,
+    grupos: (m) => [
+      { clase: 1, cuantos: porN(m, () => 400), vivasALaVez: porN(m, () => 7), claseDeZona: 1, desdeTic: 0, cadaTics: 5, eleccion: 'azar' },
+      { clase: 2, cuantos: porN(m, () => 400), vivasALaVez: porN(m, () => 7), claseDeZona: 1, desdeTic: 0, cadaTics: 5, eleccion: 'azar' },
+    ],
+  });
+  const d: LizaDeclarada = { ...base, mundo: mundoAbierto({ ...o, asientos: n }), clases: [tiradora, golpeadora] };
+  const problemas = problemasDeLaDeclaracion(d);
+  if (problemas.length > 0) throw new Error(`la liza abierta está mal declarada: ${problemas.slice(0, 3).join(' | ')}`);
+  return d;
+}
+
+/** Lo que sale de jugar la liza abierta: las cuentas para los suelos, lo que contestó cada índice, y el hilo y el estado. */
+export interface JugadaDeLaLizaAbierta {
+  semilla: number;
+  tics: number;
+  cajas: number;
+  nudos: number;
+  anuncios: number;
+  balas: number;
+  nacidas: number;
+  /** Lo que contestó cada índice de la Liza en la partida (ver `cuentasDeLosIndices`). */
+  losasPorCeldas: number;
+  nudosPorCeldas: number;
+  camposAcotados: number;
+  camposReusados: number;
+  camposCompletados: number;
+  salidas: string;
+  huella: string;
+}
+
+/**
+ * LA LIZA ABIERTA JUGADA `tics` TICS, en cualquier motor: seis asientos repartidos por las esquinas, tres
+ * guerreros que se quedan donde nacen y tres paseantes que cruzan la ciudad, contra las dos clases.
+ */
+export function jugarLaLizaAbierta(semilla: number, tics: number): JugadaDeLaLizaAbierta {
+  const d = lizaAbierta({ semilla, repartidos: true });
+  const ids = idsDe(d);
+  const aparatos: Aparato[] = [];
+  for (let i = 1; i <= 6; i++) {
+    aparatos.push(new Aparato(i, 2000 * i, 15 * i, 50 + 35 * i, (11 * i) % 50, i % 2 === 0 ? paseante(semilla * 31 + i, ids, 130) : guerrero(90 + 10 * i, ids)));
+  }
+  const b = new Banco(d, (semilla * 7919 + 13) >>> 0, aparatos);
+  b.guardarPasos = false;
+  for (let i = 1; i <= 6; i++) b.conectar(i);
+  const antes = cuentasDeLosIndices();
+  let anuncios = 0;
+  let balas = 0;
+  let nacidas = 0;
+  let salidas = '';
+  for (let t = 0; t < tics; t++) {
+    const p = b.tic();
+    salidas = fnv(salidas + salidasDe(p));
+    for (const x of p.sucesos) {
+      const e = x.suceso;
+      if (x.para === 1 && e.e === 'anuncio') anuncios++;
+      else if (x.para === 1 && e.e === 'bala') balas++;
+      else if (x.para === 0 && e.e === 'nace') nacidas++;
+    }
+  }
+  const despues = cuentasDeLosIndices();
+  return {
+    semilla,
+    tics: b.k,
+    cajas: d.mundo.suelo.cuerpos.length,
+    nudos: d.mundo.grafo.nudos.length,
+    anuncios,
+    balas,
+    nacidas,
+    losasPorCeldas: despues.losasPorCeldas - antes.losasPorCeldas,
+    nudosPorCeldas: despues.nudosPorCeldas - antes.nudosPorCeldas,
+    camposAcotados: despues.camposAcotados - antes.camposAcotados,
+    camposReusados: despues.camposReusados - antes.camposReusados,
+    camposCompletados: despues.camposSeguidos - antes.camposSeguidos + (despues.camposRehechos - antes.camposRehechos),
+    salidas,
+    huella: fnv(huellaDeLaSala(b.sala)),
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * LA LIZA ABIERTA CON L10: ALCANCE DE BLANCO Y OLVIDO (bloque 24 de `verify:liza` y `verify:determinismo`)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La misma ciudad de juguete con los números de una liza abierta de verdad (el diseño de la ciudad abierta,
+ * §3.4): ninguna entidad persigue a un asiento a más de 45 unidades, y la que pasa diez segundos sin nadie
+ * presente a 90 se olvida y vuelve a la cola de su grupo. Con los asientos repartidos por las esquinas y los
+ * paseantes cruzando la ciudad, pasa todo: persecuciones que se sueltan, entidades que se quedan solas y se
+ * olvidan, grupos que las vuelven a sacar.
+ */
+
+/** El alcance de blanco de la liza abierta con L10: 45 unidades. */
+export const ALCANCE_DE_LA_ABIERTA = u(45);
+/** Y su olvido: a 90 unidades, en 200 tics (diez segundos). */
+export const OLVIDO_DE_LA_ABIERTA: OlvidoDeclarado = { distancia: u(90), tics: 200 };
+
+/** La liza abierta con L10 (ver arriba). */
+export function lizaAbiertaConOlvido(semilla: number): LizaDeclarada {
+  return lizaAbierta({ semilla, repartidos: true, alcanceDeBlanco: ALCANCE_DE_LA_ABIERTA, olvido: OLVIDO_DE_LA_ABIERTA });
+}
+
+/** Lo que sale de jugarla: cuántas nacieron y cuántas se olvidaron, lo más lejos que una tuvo su blanco, y el hilo y el estado. */
+export interface JugadaConOlvido {
+  semilla: number;
+  tics: number;
+  nacidas: number;
+  /** Los `seva` con `disuelta` a media partida: el encuentro no se acaba ni cambia de fase, así que todos son olvidos. */
+  olvidadas: number;
+  anuncios: number;
+  /** La mayor distancia de una entidad a su blanco al acabar un tic, en unidades y hacia arriba. */
+  masLejos: number;
+  /**
+   * Lo que vio la vigilancia de los NPC (`vigilarLosNpc`) en la franja entre el alcance y el olvido: los tics de
+   * entidades que se acercaban sin blanco a quien las acompañaba (`acercarseSinBlanco`, en `cerebro.ts`) y las
+   * que se quedaron paradas ahí más de tres segundos. Así la jugada de dos motores recorre ese camino de verdad.
+   */
+  acercandose: number;
+  paradas: number;
+  salidas: string;
+  huella: string;
+}
+
+/**
+ * EL QUE CORRE: da vueltas a un cuadrado de medio lado `lado` —por los ejes de las calles de fuera, en la
+ * ciudad de juguete— de esquina en esquina. Con la velocidad de su aparato a la carrera (7 u/s) deja atrás a
+ * lo que lo persigue (4 u/s): es el que se va del alcance de lo que le sigue.
+ */
+export function corredor(lado: number): Robot {
+  const esquinas = [[-lado, -lado], [lado, -lado], [lado, lado], [-lado, lado]];
+  let i = 2;
+  return (a) => {
+    const q = esquinas[i] as number[];
+    if (Math.abs(a.x - u(q[0] as number)) + Math.abs(a.z - u(q[1] as number)) < u(0.6)) i = (i + 1) % esquinas.length;
+    const s = esquinas[i] as number[];
+    a.meta = { x: u(s[0] as number), z: u(s[1] as number) };
+  };
+}
+
+/**
+ * LOS SEIS DE LA CIUDAD, conectados: tres guerreros que se quedan en su esquina (1, 3 y 5), el que corre
+ * por las calles de fuera (2) y dos paseantes que la cruzan (4 y 6). Lo usan la jugada de dos motores y el
+ * bloque 24 de `verify:liza`, que vigila la regla del olvido tic a tic sobre la misma partida.
+ */
+export function bancoDeLaCiudad(d: LizaDeclarada, semilla: number): Banco {
+  const ids = idsDe(d);
+  const aparatos: Aparato[] = [];
+  for (let i = 1; i <= 6; i++) {
+    const robot = i === 2 ? corredor(140) : i % 2 === 0 ? paseante(semilla * 31 + i, ids, 130) : guerrero(90 + 10 * i, ids);
+    const ap = new Aparato(i, 2000 * i, 15 * i, 50 + 35 * i, (11 * i) % 50, robot);
+    if (i === 2) ap.velocidad = u(7);
+    aparatos.push(ap);
+  }
+  const b = new Banco(d, (semilla * 7919 + 13) >>> 0, aparatos);
+  b.guardarPasos = false;
+  for (let i = 1; i <= 6; i++) b.conectar(i);
+  return b;
+}
+
+/**
+ * LA LIZA ABIERTA CON L10 JUGADA `tics` TICS, en cualquier motor, con los seis de `bancoDeLaCiudad`; y el
+ * cuarto se calla del sexto al tercio de la partida: ausente, ni lo persigue nadie ni acompaña a nadie.
+ */
+export function jugarLaLizaAbiertaConOlvido(semilla: number, tics: number): JugadaConOlvido {
+  const d = lizaAbiertaConOlvido(semilla);
+  const b = bancoDeLaCiudad(d, semilla);
+  const cuarto = b.aparato(4);
+  const callaEn = Math.floor(tics / 6);
+  const vuelveEn = Math.floor(tics / 3);
+  const vigilancia = vigilarLosNpc(d);
+  let nacidas = 0;
+  let olvidadas = 0;
+  let anuncios = 0;
+  let masLejos = 0;
+  let salidas = '';
+  for (let t = 0; t < tics; t++) {
+    if (t === callaEn) cuarto.mudo = true;
+    if (t === vuelveEn) cuarto.mudo = false;
+    const p = b.tic();
+    vigilancia.mirar(p.sala);
+    salidas = fnv(salidas + salidasDe(p));
+    for (const x of p.sucesos) {
+      const e = x.suceso;
+      if (x.para === 0 && e.e === 'nace') nacidas++;
+      else if (x.para === 0 && e.e === 'seva' && e.por === MOTIVO_DE_IRSE.disuelta) olvidadas++;
+      else if (x.para === 1 && e.e === 'anuncio') anuncios++;
+    }
+    for (const e of b.sala.entidades) {
+      if (e.blanco < 1) continue;
+      const a = b.sala.asientos[e.blanco - 1];
+      if (a === undefined) continue;
+      const lejos = Math.ceil(Math.sqrt((a.x - e.x) * (a.x - e.x) + (a.z - e.z) * (a.z - e.z)) / UNO);
+      if (lejos > masLejos) masLejos = lejos;
+    }
+  }
+  const vista = vigilancia.resumen();
+  return { semilla, tics: b.k, nacidas, olvidadas, anuncios, masLejos, acercandose: vista.acercandose, paradas: vista.paradas.length, salidas, huella: fnv(huellaDeLaSala(b.sala)) };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * EL PASEANTE Y LA VIGILANCIA DE LOS NPC (bloque 18 de `verify:liza`)
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1109,13 +1532,31 @@ export function paseante(semilla: number, ids: IdsDelRobot, lado = 20): Robot {
 /** Lo que se vigila de las entidades en un banco (ver `vigilarLosNpc`). */
 export interface VigilanciaDeNpc {
   mirar(s: EstadoDeLaSala): void;
-  resumen(): { nacidas: number; quietas: string[]; fuera: string[]; peorQuieta: number; peorFuera: number };
+  resumen(): {
+    nacidas: number;
+    quietas: string[];
+    fuera: string[];
+    paradas: string[];
+    atascadas: string[];
+    peorQuieta: number;
+    peorFuera: number;
+    peorParada: number;
+    peorAtascada: number;
+    acercandose: number;
+  };
 }
 
 /** Tics seguidos con turno, cerca y sin ir a ninguna parte que hacen a una entidad «quieta»: tres segundos. */
 export const TICS_QUIETA = 60;
 /** Tics desde que nace que tiene una entidad para entrar en el límite de la fase: cinco segundos. */
 export const TICS_PARA_ENTRAR = 100;
+/**
+ * Tics seguidos sin moverse, acechando a su blanco lejos de él, que hacen a una entidad «atascada»: diez
+ * segundos. Más que los tres de `TICS_QUIETA` porque lejos de su blanco la pueden tapar otras un rato —con el
+ * L10 del diseño, junto a un asiento quieto rodeado, hasta 151 tics— sin que sea un atasco: lo que no sale
+ * nunca (el bolsillo de la cabina, 772 tics) pasa de largo cualquier umbral.
+ */
+export const TICS_ATASCADA = 200;
 
 /**
  * LA VIGILANCIA DEL PUNTO 4, mirada desde FUERA de la sala: sólo su estado, sin ninguna cuenta interna del
@@ -1130,10 +1571,28 @@ export const TICS_PARA_ENTRAR = 100;
  *     entidad quieta junto al jugador.
  *   · FUERA DEL LÍMITE: viva, más de `TICS_PARA_ENTRAR` desde que nació sin haber tenido nunca el centro
  *     dentro del límite de la fase.
+ *   · PARADA SIN NADIE A SU ALCANCE Y ACOMPAÑADA (L10; la revisión de la entrega 1 de la ciudad abierta): en
+ *     pie y libre, acechando o rondando, con alcance de blanco y un encuentro con olvido, SIN ningún asiento
+ *     que valdría de blanco a su alcance y con alguno a la distancia del olvido o menos, y sin haber ido a
+ *     ninguna parte en el último segundo. Es la franja que la primera versión dejaba sin salida: sin blanco
+ *     y sin olvidarse, quieta para siempre. Más de `TICS_QUIETA` seguidos así es una entidad parada. Las que
+ *     están así y SÍ se mueven se cuentan (`acercandose`, en tics): es lo que dice que la franja se vio.
+ *   · ATASCADA LEJOS DE SU BLANCO (la pasada de arreglo de la entrega 1): en pie y libre, acechando, con su
+ *     blanco un asiento válido a más de su distancia máxima y un metro, y sin haber ido a ninguna parte en el
+ *     último segundo, más de `TICS_ATASCADA` seguidos. Es lo que las dos de arriba no miran: la que persigue
+ *     de lejos y no avanza. Así se quedaban los Prestados de la Llamada en el bolsillo de la cabina (ver
+ *     `nudoParaSalir` en `cerebro.ts`).
  */
 export function vigilarLosNpc(d0: LizaDeclarada): VigilanciaDeNpc {
   const racha = new Map<number, number>();
   const peorRacha = new Map<number, number>();
+  const rachaParada = new Map<number, number>();
+  const paradas = new Map<number, string>();
+  let peorParada = 0;
+  const rachaAtascada = new Map<number, number>();
+  const atascadas = new Map<number, string>();
+  let peorAtascada = 0;
+  let acercandose = 0;
   const nacio = new Map<number, number>();
   const entro = new Set<number>();
   const fuera = new Map<number, string>();
@@ -1219,12 +1678,55 @@ export function vigilarLosNpc(d0: LizaDeclarada): VigilanciaDeNpc {
             quieta = abre && dentro(3 * UNO, dx, dz) && posible(e, c, b, 'cuerpoACuerpo');
           }
         }
+        /* L10: sin ningún asiento a su alcance y con alguno a la distancia del olvido (ver la cabecera). */
+        let parada = false;
+        let acompana = -1;
+        const olvido = d.fase.encuentro === null ? null : olvidoDelEncuentro(d.fase.encuentro);
+        const alcance = alcanceDeBlancoDe(c.cerebro);
+        if (olvido !== null && alcance > 0 && viva && (modo === 'acechar' || modo === 'rondar') && !(est !== 0 && bloquea(est)) && k >= recupera && !anuncia) {
+          let aSuAlcance = false;
+          for (const a of s.asientos) {
+            if (valido(a.numero) === null) continue;
+            const dx = a.x - e.x;
+            const dz = a.z - e.z;
+            if (dentro(alcance, dx, dz)) aSuAlcance = true;
+            else if (dentro(olvido.distancia, dx, dz)) {
+              const dd = Math.sqrt(dx * dx + dz * dz) / UNO;
+              if (acompana < 0 || dd < acompana) acompana = dd;
+            }
+          }
+          parada = !aSuAlcance && acompana >= 0;
+        }
         const h = historia.get(e.numero) ?? [];
         h.push({ x: e.x, z: e.z });
         if (h.length > 21) h.shift();
         historia.set(e.numero, h);
         const hace = h[0] as { x: number; z: number };
-        if (quieta && h.length === 21 && (e.x - hace.x) * (e.x - hace.x) + (e.z - hace.z) * (e.z - hace.z) >= UNO * UNO) quieta = false;
+        const movio = h.length === 21 && (e.x - hace.x) * (e.x - hace.x) + (e.z - hace.z) * (e.z - hace.z) >= UNO * UNO;
+        if (quieta && movio) quieta = false;
+        if (parada && movio) {
+          parada = false;
+          acercandose++;
+        }
+        /* Atascada lejos: acechando a su blanco, más allá de su distancia máxima y un metro, sin moverse. */
+        const atascada =
+          viva && modo === 'acechar' && b !== null && !(est !== 0 && bloquea(est)) && k >= recupera && !anuncia && h.length === 21 && !movio && !dentro(c.cerebro.distanciaMaxima + UNO, b.x - e.x, b.z - e.z);
+        const ra = atascada ? (rachaAtascada.get(e.numero) ?? 0) + 1 : 0;
+        rachaAtascada.set(e.numero, ra);
+        if (ra > peorAtascada) peorAtascada = ra;
+        if (ra > TICS_ATASCADA && !atascadas.has(e.numero) && b !== null) {
+          const dist = Math.sqrt((b.x - e.x) * (b.x - e.x) + (b.z - e.z) * (b.z - e.z)) / UNO;
+          atascadas.set(e.numero, `#${String(e.numero)} (clase ${String(e.clase)}) atascada en (${(e.x / UNO).toFixed(1)}, ${(e.z / UNO).toFixed(1)}) con su blanco ${String(e.blanco)} a ${dist.toFixed(1)}, en el tic ${String(k)}`);
+        }
+        const rp = parada ? (rachaParada.get(e.numero) ?? 0) + 1 : 0;
+        rachaParada.set(e.numero, rp);
+        if (rp > peorParada) peorParada = rp;
+        if (rp > TICS_QUIETA && !paradas.has(e.numero)) {
+          paradas.set(
+            e.numero,
+            `#${String(e.numero)} (clase ${String(e.clase)}) parada en (${(e.x / UNO).toFixed(1)}, ${(e.z / UNO).toFixed(1)}) sin nadie a su alcance y con un asiento a ${acompana.toFixed(1)}, en el tic ${String(k)}`,
+          );
+        }
         const r = quieta ? (racha.get(e.numero) ?? 0) + 1 : 0;
         racha.set(e.numero, r);
         if (r > (peorRacha.get(e.numero) ?? 0)) peorRacha.set(e.numero, r);
@@ -1237,7 +1739,18 @@ export function vigilarLosNpc(d0: LizaDeclarada): VigilanciaDeNpc {
     resumen() {
       let peorQuieta = 0;
       for (const v of peorRacha.values()) if (v > peorQuieta) peorQuieta = v;
-      return { nacidas: nacio.size, quietas: [...quietas.values()], fuera: [...fuera.values()], peorQuieta, peorFuera };
+      return {
+        nacidas: nacio.size,
+        quietas: [...quietas.values()],
+        fuera: [...fuera.values()],
+        paradas: [...paradas.values()],
+        atascadas: [...atascadas.values()],
+        peorQuieta,
+        peorFuera,
+        peorParada,
+        peorAtascada,
+        acercandose,
+      };
     },
   };
 }

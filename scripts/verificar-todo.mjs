@@ -3,6 +3,8 @@
  *
  *   npm run verificar          ← todo, incluidas las dos veladas que arrancan servidor
  *   npm run verificar -- --rapido   ← salta esas dos (unos tres minutos menos)
+ *   npm run verificar -- --censo    ← sólo el censo, en un momento: ¿está aquí todo comprobador que
+ *                                     hay? (ver «EL CENSO», detrás de la BATERIA)
  *
  * ═══ POR QUÉ HACE FALTA ═══
  *
@@ -28,7 +30,9 @@
  *
  * QUÉ SE QUEDA FUERA, Y POR QUÉ. `verify:mongo` mira la base de producción;
  * `oro:capturar` es destructivo; `verify:aguante` tarda minutos y es una prueba
- * de carga. Los demás están todos aquí.
+ * de carga. Los demás están todos aquí. (Desde el 24-sep-2026 esta frase ya no
+ * se cree: la lista que manda es FUERA_A_PROPOSITO, y «el censo» pone rojo a
+ * cualquier comprobador que no esté ni aquí ni allí.)
  *
  * ═══ Y AQUÍ HABÍA UN CUARTO MOTIVO QUE ERA FALSO ═══
  *
@@ -55,11 +59,13 @@
  * merecen la pena si lo anterior está en verde.
  */
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rapido = process.argv.includes('--rapido');
+const soloElCenso = process.argv.includes('--censo');
 
 /** @type {Array<{ nombre: string, donde: string, guion: string, lento?: boolean, porque: string }>} */
 const BATERIA = [
@@ -482,7 +488,7 @@ const BATERIA = [
     donde: 'server',
     guion: 'verify:determinismo',
     porque:
-      'el mismo registro da el mismo estado dos veces, da el mismo estado en Node y en Hermes, y la partida expandida desde su repetición da el mismo estado que la jugada — comparado con `canonico.ts` y no con `JSON.stringify`',
+      'el mismo registro da el mismo estado dos veces, da el mismo estado en Node y en Hermes, y la partida expandida desde su repetición da el mismo estado que la jugada — comparado con `canonico.ts` y no con `JSON.stringify`; y lo mismo El Quiebro: su barrio, su mesa y la sala de la Liza jugada tic a tic —una liza de juguete, una sin blanco y la liza abierta de ochocientas cajas que enciende los índices de la ciudad, con suelos que exigen que cada índice haya contestado— dan lo mismo dos veces y en los dos motores',
   },
   /*
    * ═══ POR QUÉ ESTE VA JUSTO DETRÁS DEL DE ARRIBA, Y NO ES EL MISMO ═══
@@ -1123,15 +1129,38 @@ const BATERIA = [
    *   1. EL CONTRATO (`verify:liza-protocolo`): la declaración, el cable, la geometría, el registro
    *      con una liza de juguete, la vista de El Quiebro y el puente del documento. Cuatro frentes
    *      lo implementan sin poder preguntarse; si miente, los cuatro se equivocan a la vez.
-   *   2. EL BARRIO (`verify:quiebro-barrio`): el mundo sobre el que se juzga. Es el mismo en el
-   *      servidor, el escritorio, el WebView y el iPhone, o cada uno anda por el suyo.
+   *   2. LA CIUDAD Y EL BARRIO (`verify:quiebro-barrio`): el mundo sobre el que se juzga. Es el mismo
+   *      en el servidor, el escritorio, el WebView y el iPhone, o cada uno anda por el suyo.
    *   3. LAS REGLAS DE LA MESA (`verify:quiebro`) y LA SALA PURA (`verify:liza`), que sólo tienen
    *      sentido sobre un contrato y un mundo que se sostienen.
    *   4. LA SALA DE VERDAD, con robots WebSocket (`verify:sala-de-la-liza`): lenta, porque levanta el
    *      servidor, y por eso con `lento`.
-   *   5. EL CLIENTE DEL ESCRITORIO, pieza a pieza: la calidad, la ciudad, los efectos, el sonido y el
-   *      juego. Se prueban en Node, sin lienzo; lo que sólo se ve con los ojos está en sus bancos
-   *      (`escritorio/banco-quiebro-*.html`), y eso no lo compra ningún comprobador.
+   *   5. EL CLIENTE DEL ESCRITORIO, pieza a pieza: la calidad, la ciudad pintada, los efectos, los
+   *      personajes, el sonido y el juego. Se prueban en Node, sin lienzo; lo que sólo se ve con los ojos
+   *      está en sus bancos (`escritorio/banco-quiebro-*.html`), y eso no lo compra ningún comprobador.
+   *
+   * ═══ LA CIUDAD ABIERTA (`docs/quiebro/CIUDAD-ABIERTA.md`), Y POR QUÉ NO HAY GUIONES NUEVOS ═══
+   *
+   * La entrega 1 («la ciudad se pisa») cambió lo que miran siete de éstos sin cambiarles el nombre de
+   * guion, a propósito (§6.4): `verify:quiebro-barrio` pasó a mirar la ciudad de 540 m en sus 32 trazas
+   * y se quedó el nombre para no tocar la batería; `verify:quiebro-ciudad` pasó del barrio pintado a la
+   * ventana de celdas; y el contrato, la sala pura, el determinismo (más arriba, con los de la fase 3),
+   * los efectos y el juego ganaron sus bloques. Lo que sí cambia es lo que dice cada `porque` —un
+   * renglón que cuenta el barrio de antes mientras el comprobador mira la ciudad sería la mentira que la
+   * cabecera de este fichero ya apunta— y dos NOMBRES, porque había dos «la ciudad»: la del servidor es
+   * la ciudad que se anda (`la ciudad y el barrio`) y la del escritorio la que se ve (`la ciudad pintada`).
+   *
+   * Y cuestan: mirar la ciudad ENTERA y no una muestra es lo que se pidió, y se paga en la batería. Medido
+   * el 24-sep-2026 en esta máquina y con otros trabajando: `verify:quiebro-barrio` unos 2 min 15 s,
+   * `verify:quiebro-ciudad` un minuto, `verify:liza` 50 s (antes 15) y `verify:quiebro-personajes` 40 s.
+   * Ninguno levanta servidor, así que ninguno es `lento`: van también con `--rapido`.
+   *
+   * ═══ Y `verify:quiebro-personajes`, QUE ESTABA ESCRITO Y NO LO CORRÍA NADIE ═══
+   *
+   * 157 comprobaciones en verde sobre los `.glb` de verdad, y no estaba ni en `escritorio/package.json`
+   * ni aquí: el §6.4 lo apuntó el mismo día. Es el quinto caso de esta clase en este fichero, y por eso
+   * esta lista ahora se CUENTA antes de correr (`el censo`, abajo del todo): un `verificar-*` sin guion,
+   * o un guion de comprobador que no está aquí ni fuera con su porqué, pone la batería en rojo.
    *
    * Las marcas vetadas del juego (`server/scripts/marcas-registradas.ts`) no tienen entrada aquí: las
    * mira `procedencia y marcas`, más arriba, con las cadenas de TODOS los juegos del binario.
@@ -1141,14 +1170,14 @@ const BATERIA = [
     donde: 'server',
     guion: 'verify:liza-protocolo',
     porque:
-      'los contratos que cuatro frentes implementan sin poder preguntarse dicen lo que prometen: `rumboHacia` da lo mismo que `atan2` en los 256 rumbos y en veinte mil direcciones, la prueba de losa coincide con una versión en coma flotante escrita aparte y un empujón nunca se para dentro de una caja; una liza DE JUGUETE —que no es ningún juego— pasa `problemasDeLaDeclaracion` y cada una de sus versiones rotas no, con el problema nombrado; cada mensaje del cable va y vuelve igual por su escritor y su lector, los lectores tiran cualquier clave de más o de menos, la subida más larga cabe en 256 bytes y la bajada más larga en su tope; los veredictos `arcade:*` se leen estrictos y la ronda más pesada cabe en la carga que admite la mesa; el registro de lizas se prueba con uno de juguete para que cero filas no se lean como vigilado; y la vista de El Quiebro, sus nombres y el puente del documento tiran lo mal formado, ningún nombre dice una palabra de la franquicia vecina y el documento no acepta un mensaje por lo que el propio mensaje diga de sí mismo',
+      'los contratos que cuatro frentes implementan sin poder preguntarse dicen lo que prometen: `rumboHacia` da lo mismo que `atan2` en los 256 rumbos y en veinte mil direcciones, la prueba de losa coincide con una versión en coma flotante escrita aparte y un empujón nunca se para dentro de una caja; una liza DE JUGUETE —que no es ningún juego— pasa `problemasDeLaDeclaracion` y cada una de sus versiones rotas no, con el problema nombrado; cada mensaje del cable va y vuelve igual por su escritor y su lector, los lectores tiran cualquier clave de más o de menos, la subida más larga cabe en 256 bytes y la bajada más larga en su tope; los veredictos `arcade:*` se leen estrictos y la ronda más pesada cabe en la carga que admite la mesa; el registro de lizas se prueba con uno de juguete para que cero filas no se lean como vigilado; y la vista de El Quiebro, sus nombres y el puente del documento tiran lo mal formado, ningún nombre dice una palabra de la franquicia vecina y el documento no acepta un mensaje por lo que el propio mensaje diga de sí mismo; y lo mismo la columna de la ciudad abierta: las declaraciones de la liza abierta (L1-L12) pasan con sus ampliaciones de juguete y cada versión rota no, `disparo`, `progreso` y el `ro` de `nace` van y vuelven por el cable y caben en sus topes, las medidas de 540 m caben en la Liza y en el cable, las ocho simetrías son ocho permutaciones con su inversa, zonas, clases y límites no se pisan y caben en 255, las celdas reparten el plano y las cajas sin dejarse ni repetir nada, los campos de distancias dan lo de Bellman-Ford y el nudo más cercano lo de la fuerza bruta, y el minimapa y el plano salen del derecho',
   },
   {
-    nombre: 'El Quiebro · el barrio',
+    nombre: 'El Quiebro · la ciudad y el barrio',
     donde: 'server',
     guion: 'verify:quiebro-barrio',
     porque:
-      'el barrio de la noche sale sólo de (código, noche) y es el mismo en el servidor, el escritorio, el WebView y el iPhone: en 200 noches las cajas están bien formadas, dentro del cerco y sin pisarse, nacer, cabinas y zonas no tienen una caja encima, cada cabina queda a 60-110 m andando, el grafo tiene los 16 cruces delante y es conexo, y todo el suelo libre se alcanza; se anda y se navega sobre la arena de `mundo.ts` sin tocarla; los 48 durmientes, en 20.000 tics, siempre sobre suelo y fuera de toda caja, en la calzada sólo por un paso en verde; Node y Hermes dan la misma huella; y derivar el barrio y su mundo cuesta 3 ms o menos en frío — con la máquina muy cargada ese cronómetro puede dar un rojo que no es del barrio: mirar antes de repetir',
+      'la ciudad de 540 m sale sólo de (traza, código) y su noche de (ciudad, noche, Fallos), y es la misma en el servidor, el escritorio, el WebView y el iPhone — mirada ENTERA, las 32 trazas con diez noches cada una y no una muestra: cajas en cuartos de metro, dentro de ±272, sin pisarse y en el orden del contrato; el grafo sólo por los ejes, conexo y andable arista a arista con el radio de una persona; con las 4-6 obras de cada noche, todo el suelo libre alcanzable desde la Glorieta, sin bolsas; los tríos de Fallos a 260 m o menos por calles; desde el nudo de cada plaza, una cabina en cada banda; el mundo de la Liza exacto en Q16.16 y `nace` en su orden; las tres plantillas en sus ocho giros y las cuatro trazas dibujadas con su tabla de distancias, que es la del grafo; los 635 durmientes, siempre sobre suelo y fuera de toda caja, en la calzada sólo en verde, sin salir si su vuelta pasa por una obra, igual pedidos en cualquier orden y el más cercano el de la fuerza bruta; una traza nueva con su noche y su mundo en 8 ms; y la misma huella en Node y en Hermes. Y el barrio de hoy, igual que antes, mientras el cliente lo pinte: 200 noches bien formadas, cabinas a 60-110 m andando y sus 48 durmientes. Con la máquina muy cargada los dos cronómetros (el barrio en 3 ms y la PUERTA de la ciudad en 8) pueden dar un rojo que no es de la ciudad: mirar antes de repetir, y correrlo solo',
   },
   {
     nombre: 'El Quiebro · la mesa',
@@ -1162,7 +1191,7 @@ const BATERIA = [
     donde: 'server',
     guion: 'verify:liza',
     porque:
-      'la sala pura se juega con una liza de JUGUETE y aparatos simulados con su reloj, su ida y vuelta y un desfase mal estimado a propósito: nacer y empezar la fase con sus seis pasos, la puesta al día con los instantes reescritos en el reloj nuevo, el sitio validado y corregido, EL JUICIO DE LA ESQUIVA IGUAL con 0, +40 y −40 ms de error de desfase y con 50, 150 y 250 ms de ida y vuelta, el Remanso y la Réplica, la cadena al ritmo en el reloj del aparato, la guardia, el empujón contra caja, las balas contra los sitios declarados, los turnos, lo que se lleva, los finales y sus veredictos (el reloj y el ausente una vez), un robot que lee sacando el doble que uno que aporrea, y la misma huella tic a tic en Node y en Hermes con la sala rehecha que reanuda',
+      'la sala pura se juega con una liza de JUGUETE y aparatos simulados con su reloj, su ida y vuelta y un desfase mal estimado a propósito: nacer y empezar la fase con sus seis pasos, la puesta al día con los instantes reescritos en el reloj nuevo, el sitio validado y corregido, EL JUICIO DE LA ESQUIVA IGUAL con 0, +40 y −40 ms de error de desfase y con 50, 150 y 250 ms de ida y vuelta, el Remanso y la Réplica, la cadena al ritmo en el reloj del aparato, la guardia, el empujón contra caja, las balas contra los sitios declarados, los turnos, lo que se lleva, los finales y sus veredictos (el reloj y el ausente una vez), un robot que lee sacando el doble que uno que aporrea, y la misma huella tic a tic en Node y en Hermes con la sala rehecha que reanuda; y la Liza por dentro que la ciudad abierta necesita, en ciudades de juguete de 300 × 300: la primera losa por celdas contra la fuerza bruta en 100.000 tramos de cada uno de veinte mundos, empates incluidos, los K nudos más cercanos por celdas contra la lista, los campos por meta contra el Dijkstra entero, la MISMA sala tic a tic con los índices y sin ellos, y la validación del mundo una sola vez por mundo y con las mismas frases con memoria que sin ella — por eso tarda unos 50 s y no 15',
   },
   {
     nombre: 'la Liza · la sala de verdad',
@@ -1180,18 +1209,36 @@ const BATERIA = [
       'lo que DECIDE la imagen, en Node y sin lienzo: con qué nivel arranca cada aparato inventado, cuándo baja el gobernador (más de 22 ms de media en 60 fotogramas), que sube a prueba tras 20 s con holgura y no vuelve a un nivel que falló, que ignora la pestaña oculta; qué camino de pintado lleva cada nivel y que N2-N3 sin HalfFloat CREADO caen al barato; que la LUT es su fórmula y el tono de N0 se puede poner en la three instalada; y que cada sombreador declara exactamente los uniformes que su material le da — cada regla con su serie de tiempos y su vacuna',
   },
   {
-    nombre: 'El Quiebro · la ciudad',
+    nombre: 'El Quiebro · la ciudad pintada',
     donde: 'escritorio',
     guion: 'verify:quiebro-ciudad',
     porque:
-      'la ciudad se construye para 50 barrios de verdad en los cuatro niveles sin un NaN; lo que MIDE cada pieza cabe en el renglón que declara y la suma en el 60 % de los topes del juego; lo pintado ES la estructura, mirado en los triángulos de la franja de andar: nada pintado que estorbe sin chocar y ninguna caja invisible; el mismo barrio da la misma geometría dos veces; y cada parcheo de sombreador encuentra su trozo en three r185',
+      'la ciudad abierta se pinta por una ventana de celdas de 48 m con la ciudad entera detrás en LOD1 y el borde de glifos, y en sus 32 trazas de verdad —no la sintética— × 25 cámaras × 4 niveles: lo declarado y lo medido caben en el 50 % de los topes del juego y ninguna familia tiene que crecer; lo pintado ES la estructura, celda a celda en los triángulos de la franja de andar: nada pintado que estorbe sin chocar y ninguna caja invisible; ninguna celda lleva un NaN; cruzándola a 7 m/s las llamadas no cambian, ningún trozo ni fotograma pasa su tope de triángulos, de bytes ni de filas de luz, la ventana nueva llega a tiempo y quien cruza nunca pisa la franja del fundido; una ventana que ya nadie quiere no se pinta; la luz por losetas es la de hornearla de una vez; el borde cubre las tres salidas; y la misma traza da la misma ventana. Y el barrio de hoy, igual que antes: 50 barrios en los cuatro niveles sin un NaN y en su cuota, lo pintado es la estructura, el mismo barrio da la misma geometría y cada parcheo de sombreador encuentra su trozo en three r185',
   },
   {
     nombre: 'El Quiebro · los efectos',
     donde: 'escritorio',
     guion: 'verify:quiebro-efectos',
     porque:
-      'la Grafía es un alfabeto propio y no ruido —48 glifos de 5×7 distintos, ninguno simétrico ni espejo de otro, ninguno parecido a una cifra, hechos con los signos del español—; el reloj del Remanso recupera exactamente lo que quita sin adelantarse al verdadero; las señales de juego —el anillo, la bala— van SIEMPRE en el reloj verdadero y el anillo se cierra en el impacto exacto; el anillo se lee a 20 m en la pantalla más pobre de N0; y el presupuesto de los efectos cabe en su parte de la escena en todos los niveles, con lo que es de juego igual en todos',
+      'la Grafía es un alfabeto propio y no ruido —48 glifos de 5×7 distintos, ninguno simétrico ni espejo de otro, ninguno parecido a una cifra, hechos con los signos del español—; el reloj del Remanso recupera exactamente lo que quita sin adelantarse al verdadero; las señales de juego —el anillo, la bala— van SIEMPRE en el reloj verdadero y el anillo se cierra en el impacto exacto; el anillo se lee a 20 m en la pantalla más pobre de N0; el presupuesto de los efectos cabe en su parte de la escena en todos los niveles, con lo que es de juego igual en todos; y las columnas del cielo siguen a quien mira: desde cualquier sitio de la ciudad abierta, también desde su borde, quedan todas a 170-290 m del ojo, detrás de la niebla',
+  },
+  /*
+   * ═══ LOS PERSONAJES, DETRÁS DE LA CIUDAD Y DE LOS EFECTOS ═══
+   *
+   * Porque su presupuesto es lo que QUEDA: exige que el peor caso de los personajes más lo que gasta el
+   * resto del juego quepa en cada tope, y ese resto —la ciudad, la lluvia, los efectos y el cielo— es
+   * una CONSTANTE medida en el juego real (`RESTO_DEL_JUEGO_MEDIDO`, en `personajes/presupuesto.ts`). Si
+   * los de arriba están rojos este renglón no significa nada; y aunque estén verdes, sólo significa algo
+   * mientras esa medida sea la del juego de hoy: con la ciudad abierta montada hay que volver a tomarla.
+   * Lee los `.glb` de `recursos/` que fabrica la forja (`arte/forja/rehacer.sh`): un rojo aquí después
+   * de rehacerlos es un clip, un hueso o una zona que la forja ya no da. Unos 40 s.
+   */
+  {
+    nombre: 'El Quiebro · los personajes',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-personajes',
+    porque:
+      'los personajes hacen lo que prometen, con los `.glb` de verdad y sin navegador: el manifiesto del reparto se lee y uno roto no; todo gesto de `cuerpos.ts` tiene su clip en el `.glb` de cada esqueleto, con su duración, y cada golpe su instante de impacto dentro del clip; los materiales y las zonas que se tiñen están donde el manifiesto dice, las del LOD1 son las del LOD0, y lo que no sale —las gafas, el auricular, el cuero negro— no sale; la anticipación elástica cruza el fotograma de impacto a menos de un milisegundo del anuncio, también con el mezclador de three y un esqueleto de verdad, cerca y lejos; los fundidos suman 1; el pie apoyado no patina; el espejo pone cada hueso en el reflejo de su pareja a menos de un milímetro; el renglón de cada nivel cabe en su cuota con lo medido del resto del juego, cada LOD tiene los triángulos que declara y el que se va sólo se desvanece si cabe; la multitud está EXACTAMENTE donde el guion de los durmientes dice en cada tic, sin Prestados; la textura de huesos da la misma piel que el esqueleto; si el gobernador baja en plena pelea nadie desaparece; y cada `.glb` se lee una vez — cada juez aplicado a lo de verdad y a su vacuna, que tiene que salir roja',
   },
   {
     nombre: 'El Quiebro · el sonido',
@@ -1205,7 +1252,7 @@ const BATERIA = [
     donde: 'escritorio',
     guion: 'verify:quiebro-juego',
     porque:
-      'el cliente del juego sobre el contrato, sin navegador: el reloj de cada canal empieza en cero y parte en tics de 50 ms; el canal dice `hola` y un `eco` detrás y no reconecta tras los cierres que reintentar no arregla; la predicción es la de la sala —miles de tics por el barrio de verdad, y cada tramo mandado es uno que la sala acepta—; la interpolación, el guion que funde sin retroceder, la sala vista que cada `dentro` deja en blanco, el diccionario que lee la declaración, la partida entera contra un enchufe de mentira con la pulsación y su `ms`, los mandos, el enganche que no apunta tras una pared, la cámara que no entra en las cajas, la pausa que reintenta sólo con una vista nueva, el puerto de prueba con la llave en la cabecera y nunca en la dirección, y los fuentes sin `onClick`, sin la llave en el almacén y en LF',
+      'el cliente del juego sobre el contrato, sin navegador: el reloj de cada canal empieza en cero y parte en tics de 50 ms; el canal dice `hola` y un `eco` detrás y no reconecta tras los cierres que reintentar no arregla; la predicción es la de la sala —miles de tics por el barrio de verdad, y cada tramo mandado es uno que la sala acepta—; la interpolación, el guion que funde sin retroceder, la sala vista que cada `dentro` deja en blanco, el diccionario que lee la declaración, la partida entera contra un enchufe de mentira con la pulsación y su `ms`, los mandos, el enganche que no apunta tras una pared, la cámara que no entra en las cajas, la pausa que reintenta sólo con una vista nueva, el puerto de prueba con la llave en la cabecera y nunca en la dirección, y los fuentes sin `onClick`, sin la llave en el almacén y en LF; y el mapa de la ciudad abierta, con la ciudad de ensayo y con la de verdad: ni calle pintada donde hay pared ni pared donde se anda, píxel a píxel; cada tejado con el color de su distrito; los metros de plaza a plaza son los de la tabla y los de cada nudo los que anda la sala; el minimapa gira la ciudad y las marcas con la misma cuenta; el plano actúa en `pointerdown` —rumbo a un Fallo o a una cabina, «Aquí» en el nudo más cercano, nada fuera de la ciudad ni con el botón derecho—; el lienzo se pinta una vez por noche; y el hilo de rumbo cabe en su tope, va por la ruta, no se mueve del suelo y acaba en la meta',
   },
   {
     nombre: 'escritorio honrado',
@@ -1216,13 +1263,156 @@ const BATERIA = [
   },
 ];
 
+/*
+ * ═══ EL CENSO: ¿ESTÁ AQUÍ TODO COMPROBADOR QUE HAY? ═══
+ *
+ * La BATERIA se escribe a mano, y los comprobadores también, en otro sitio y a menudo por otra gente:
+ * se separan solos. Este fichero apunta cuatro veces la misma clase de fallo —comprobadores escritos,
+ * verdes y sin correr—, y la quinta fue `verify:quiebro-personajes` (24-sep-2026): 157 comprobaciones
+ * sin guion en `escritorio/package.json` y sin renglón aquí, que se encontró leyendo un diseño y no
+ * porque ninguna red avisara. Por eso, antes de correr nada, se cuenta:
+ *
+ *   1. todo fichero `verificar-*` de `scripts/` o de `src/comprobadores/` de un paquete lo corre algún
+ *      guion de su `package.json`;
+ *   2. todo guion de comprobador —`typecheck`, `verify`, `verify:*`, `oro:*`, `jugar:*`, o cualquiera
+ *      que corra un `verificar-*`— está en la BATERIA, o en FUERA_A_PROPOSITO con su porqué;
+ *   3. todo renglón de la BATERIA existe en su `package.json`, y está una sola vez;
+ *   4. todo lo de FUERA_A_PROPOSITO existe y no está además en la BATERIA: una excepción que ya no hace
+ *      falta es otra frase que nadie vuelve a comprobar (ver «un cuarto motivo que era falso», arriba).
+ *
+ * Los `medir:*` no entran: son bancos, miden, y lo que miden depende de la máquina.
+ *
+ * EL CENSO SE VIGILA CON LA PROPIA BATERIA. Un filtro roto cuenta cero y se da por bueno; aquí no
+ * puede, porque cada renglón de la BATERIA es un caso que el filtro del paso 2 TIENE que reconocer como
+ * comprobador, y cada `verificar-*` que esos renglones corren es uno que el barrido del paso 1 TIENE que
+ * haber visto. Si no, rojo, y con el nombre.
+ *
+ * Cuesta unos milisegundos, así que va también con `--rapido`; y con `--censo` va solo.
+ */
+/** @type {Record<string, string>} La clave es «paquete guion»; el valor, por qué no está en la BATERIA. */
+const FUERA_A_PROPOSITO = {
+  'server verify:mongo': 'mira la base de producción',
+  'server oro:capturar': 'es destructivo: reescribe los maestros de oro',
+  'server verify:aguante': 'tarda minutos y es una prueba de carga',
+};
+
+const CARPETAS_DE_COMPROBADORES = ['scripts', 'src/comprobadores'];
+const FICHERO_VERIFICAR = /^verificar-[\w.-]+\.(?:ts|tsx|mts|cts|js|mjs|cjs)$/;
+/** Lo que una orden de `package.json` corre: `scripts/verificar-x.ts`, `src/comprobadores/verificar-y.mjs`… */
+const CORRE_UN_VERIFICAR = /(?:[\w.-]+\/)*verificar-[\w.-]+\.(?:ts|tsx|mts|cts|js|mjs|cjs)\b/g;
+const NOMBRE_DE_COMPROBADOR = /^(?:typecheck|verify)$|^(?:verify|oro|jugar):/;
+
+/** @param {string} nombre @param {string} orden */
+function esComprobador(nombre, orden) {
+  return NOMBRE_DE_COMPROBADOR.test(nombre) || [...String(orden).matchAll(CORRE_UN_VERIFICAR)].length > 0;
+}
+
+/** @returns {{ problemas: string[], paquetes: number, guiones: number, ficheros: number }} */
+function elCenso() {
+  /** @type {string[]} */
+  const problemas = [];
+  const paquetes = new Set(BATERIA.map((p) => p.donde));
+  for (const clave of Object.keys(FUERA_A_PROPOSITO)) paquetes.add(clave.split(' ')[0]);
+  try {
+    for (const w of JSON.parse(fs.readFileSync(path.join(RAIZ, 'package.json'), 'utf8')).workspaces ?? []) paquetes.add(w);
+  } catch (e) {
+    problemas.push(`no se puede leer el package.json de la raíz: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  /** @type {Map<string, Record<string, string>>} */
+  const guionesDe = new Map();
+  for (const donde of [...paquetes].sort()) {
+    try {
+      guionesDe.set(donde, JSON.parse(fs.readFileSync(path.join(RAIZ, donde, 'package.json'), 'utf8')).scripts ?? {});
+    } catch (e) {
+      problemas.push(`no se puede leer \`${donde}/package.json\`: ${e instanceof Error ? e.message : String(e)}`);
+      guionesDe.set(donde, {});
+    }
+  }
+
+  // 1. Todo `verificar-*` lo corre algún guion de su paquete.
+  const vistos = new Set();
+  for (const [donde, guiones] of guionesDe) {
+    const ordenes = Object.values(guiones).map(String);
+    for (const carpeta of CARPETAS_DE_COMPROBADORES) {
+      const dir = path.join(RAIZ, donde, carpeta);
+      if (!fs.existsSync(dir)) continue;
+      for (const f of fs.readdirSync(dir).filter((f) => FICHERO_VERIFICAR.test(f)).sort()) {
+        vistos.add(`${donde}/${carpeta}/${f}`);
+        if (!ordenes.some((o) => o.includes(`${carpeta}/${f}`))) {
+          problemas.push(`\`${donde}/${carpeta}/${f}\` no lo corre ningún guion de \`${donde}/package.json\`: es un fichero, no una red`);
+        }
+      }
+    }
+  }
+
+  // 3. Cada renglón de la BATERIA existe, una vez; y el filtro y el barrido lo reconocen.
+  const enLaBateria = new Set();
+  for (const p of BATERIA) {
+    const clave = `${p.donde} ${p.guion}`;
+    if (enLaBateria.has(clave)) problemas.push(`\`${p.guion}\` de \`${p.donde}\` está dos veces en la BATERIA`);
+    enLaBateria.add(clave);
+    const guiones = guionesDe.get(p.donde) ?? {};
+    if (!Object.hasOwn(guiones, p.guion)) {
+      problemas.push(`«${p.nombre}» corre \`${p.guion}\` en \`${p.donde}\`, y \`${p.donde}/package.json\` no tiene ese guion`);
+      continue;
+    }
+    const orden = String(guiones[p.guion]);
+    if (!esComprobador(p.guion, orden)) {
+      problemas.push(`EL FILTRO DEL CENSO ESTÁ ROTO: no reconoce como comprobador a «${p.nombre}» (\`${p.guion}\`), que está en la BATERIA`);
+    }
+    for (const [ruta] of orden.matchAll(CORRE_UN_VERIFICAR)) {
+      const clavePaquete = path.posix.normalize(`${p.donde}/${ruta}`);
+      if (fs.existsSync(path.join(RAIZ, clavePaquete)) && !vistos.has(clavePaquete)) {
+        problemas.push(`EL BARRIDO DEL CENSO ESTÁ ROTO: «${p.nombre}» corre \`${clavePaquete}\` y el barrido no lo vio`);
+      }
+    }
+  }
+
+  // 2. Todo guion de comprobador está en la BATERIA o fuera a propósito.
+  let comprobadores = 0;
+  for (const [donde, guiones] of guionesDe) {
+    for (const [nombre, orden] of Object.entries(guiones).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+      if (!esComprobador(nombre, orden)) continue;
+      comprobadores++;
+      const clave = `${donde} ${nombre}`;
+      if (!enLaBateria.has(clave) && !Object.hasOwn(FUERA_A_PROPOSITO, clave)) {
+        problemas.push(`\`${nombre}\` de \`${donde}/package.json\` es un comprobador y no está en la BATERIA: entra con su porqué, o va a FUERA_A_PROPOSITO diciendo por qué no`);
+      }
+    }
+  }
+
+  // 4. Lo de fuera existe y no está además dentro.
+  for (const [clave, porque] of Object.entries(FUERA_A_PROPOSITO)) {
+    const [donde, nombre] = clave.split(' ');
+    if (!Object.hasOwn(guionesDe.get(donde) ?? {}, nombre)) problemas.push(`FUERA_A_PROPOSITO aparta \`${nombre}\` de \`${donde}\` («${porque}») y ya no existe: sobra la excepción`);
+    if (enLaBateria.has(clave)) problemas.push(`\`${nombre}\` de \`${donde}\` está en la BATERIA y en FUERA_A_PROPOSITO a la vez`);
+  }
+
+  return { problemas, paquetes: guionesDe.size, guiones: comprobadores, ficheros: vistos.size };
+}
+
+const desdeElCenso = process.hrtime.bigint();
+const censo = elCenso();
+const msDelCenso = Number((process.hrtime.bigint() - desdeElCenso) / 1_000_000n);
+const cuentaDelCenso = `${censo.guiones} guiones de comprobador en ${censo.paquetes} paquetes y ${censo.ficheros} ficheros \`verificar-*\`, ${Object.keys(FUERA_A_PROPOSITO).length} fuera a propósito`;
+
+if (soloElCenso) {
+  console.log(`\nEl censo · ${cuentaDelCenso}\n`);
+  for (const p of censo.problemas) console.log(`  ✗ ${p}`);
+  console.log(censo.problemas.length === 0 ? '  ✓ todos corren en la batería o están fuera con su porqué' : `\n${censo.problemas.length} problemas en el censo`);
+  process.exit(censo.problemas.length === 0 ? 0 : 1);
+}
 
 const aCorrer = BATERIA.filter((p) => !(rapido && p.lento));
 
-console.log(`\nLa batería · ${aCorrer.length} comprobadores${rapido ? ' (sin las veladas largas)' : ''}\n`);
+console.log(`\nLa batería · el censo y ${aCorrer.length} comprobadores${rapido ? ' (sin las veladas largas)' : ''}\n`);
 
 /** @type {Array<{ nombre: string, ok: boolean, ms: number, salida: string }>} */
 const resultados = [];
+
+resultados.push({ nombre: 'el censo', ok: censo.problemas.length === 0, ms: msDelCenso, salida: [cuentaDelCenso, ...censo.problemas.map((p) => `✗ ${p}`)].join('\n') });
+console.log(`  ${'el censo'.padEnd(24)} ${censo.problemas.length === 0 ? '✓' : '✗'}  ${(msDelCenso / 1000).toFixed(1)}s  (${cuentaDelCenso})`);
 
 for (const prueba of aCorrer) {
   process.stdout.write(`  ${prueba.nombre.padEnd(24)} `);

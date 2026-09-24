@@ -32,6 +32,20 @@
  * Así que lo que depende de cómo se porta la sala pura se mira TAMBIÉN con la de verdad, la mesa de
  * verdad y el registro de verdad, con el reloj en la mano para que dure segundos (bloque `C1`).
  *
+ * ═══ LA CIUDAD DE 540 M (docs/quiebro/CIUDAD-ABIERTA.md, entrega 1) ═══
+ *
+ * Con un mundo de miles de casillas, cajas y nudos, validar el mundo en cada voto costaba más que el tic de
+ * todas las salas; así que el mundo se revisa UNA vez por objeto y el diagnóstico lo CUENTA
+ * (`validacionesDelMundo` y `mundosNuevos`, ver la cabecera de `canal.ts`). Se mira en tres sitios: con la
+ * sala de mentira, exacto (A13c); con la sala, la mesa y el canal de verdad sobre la ciudad de la columna,
+ * con la Bajada fuera de la Glorieta (C1b, que no espera a que el productor dé la ciudad él solo); y de
+ * punta a punta, en cada proceso del servidor (D), que además exige que el productor de verdad dé la
+ * ciudad: la Bajada encerrada en su plaza y la oleada con el límite `ciudad`. Y «quien vuelve nace junto
+ * al grupo» —a 45 m o menos de alguno del grupo tal como estaba, la vara del racimo—, tanto quien se cae
+ * a media oleada y vuelve como
+ * quien vuelve tras un despliegue: sin L6 (entrega 2), eso lo da el orden de los sitios de nacer, los de la
+ * plaza de la Bajada delante, y C1b lo mira donde importa, con la Bajada en otra plaza.
+ *
  * LA DE PUNTA A PUNTA, LENTA (tres o cuatro minutos: dos arranques y una oleada entera, que acaba
  * vaciada o cuando vence su reloj de ciento cincuenta segundos). Lo que en proceso no se ve
  * —que `index.ts` monte la Liza, que el registro de verdad dé la liza de la mesa, que la sala de verdad
@@ -124,7 +138,7 @@ process.env.MESAS_DIR = CARPETA_DE_MESAS;
 const SIN_SERVIDOR = process.argv.includes('--sin-servidor');
 
 /** Las comprobaciones que hace este guion hoy, contando el suelo (ver `arnes.ts`). */
-const ESCRITAS = 169;
+const ESCRITAS = 183;
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 
 const { comprobar, paso, nota, terminar } = arnes();
@@ -1463,6 +1477,50 @@ paso('A13b · Sacar y validar la declaración va al coste medido de su sala y al
   canal.apagar();
 }
 
+paso('A13c · El mundo se revisa una vez por objeto, y el diagnóstico lo CUENTA: `validacionesDelMundo` y `mundosNuevos`');
+{
+  /*
+   * La mesa cambia cuatro veces de fase con el MISMO objeto mundo —lo que hace un productor que guarda sus
+   * mundos— y una quinta con otro objeto igual por dentro. Son cinco validaciones, dos mundos nuevos y dos
+   * revisiones de verdad: las demás salen de la memoria de la Liza. Un mundo recién hecho, que nadie ha
+   * validado en este proceso: si otro camino ya lo hubiera revisado, la memoria contestaría y aquí saldría
+   * cero, que no es verde (el suelo es exacto).
+   */
+  const mesa = new MesaDeMentira();
+  const motor = new MotorDeMentira();
+  const canal = canalNuevo(mesa, motor);
+  const base = juguete(['a1']);
+  const m = mesa.poner('MUNDO', base, { L1: 'a1' });
+  await entrar(canal, 'MUNDO', 'L1');
+  const alAbrir = canal.diagnostico();
+  for (const clave of ['f2', 'f3', 'f4']) {
+    m.vista = { liza: { ...base, fase: { ...base.fase, clave } } };
+    m.rev++;
+    await reloj.avanzar(REVISAR_LA_MESA_CADA_MS + MS_POR_TIC);
+  }
+  const mismoMundo = canal.diagnostico();
+  m.vista = { liza: { ...base, mundo: { ...base.mundo }, fase: { ...base.fase, clave: 'f5' } } };
+  m.rev++;
+  await reloj.avanzar(REVISAR_LA_MESA_CADA_MS + MS_POR_TIC);
+  const otroMundo = canal.diagnostico();
+  comprobar(
+    'al abrir la sala: una validación, un mundo nuevo, una revisión del mundo',
+    alAbrir.validaciones.veces === 1 && alAbrir.mundosNuevos === 1 && alAbrir.validacionesDelMundo === 1,
+    { veces: alAbrir.validaciones.veces, nuevos: alAbrir.mundosNuevos, revisados: alAbrir.validacionesDelMundo },
+  );
+  comprobar(
+    'tres fases más con el MISMO mundo: cuatro validaciones, y el mundo sigue revisado UNA vez (ni un mundo nuevo más)',
+    mismoMundo.validaciones.veces === 4 && mismoMundo.lecturas.declaracionesNuevas === 3 && mismoMundo.mundosNuevos === 1 && mismoMundo.validacionesDelMundo === 1,
+    { veces: mismoMundo.validaciones.veces, metidas: mismoMundo.lecturas.declaracionesNuevas, nuevos: mismoMundo.mundosNuevos, revisados: mismoMundo.validacionesDelMundo },
+  );
+  comprobar(
+    'y otro objeto mundo, aunque sea igual por dentro: un mundo nuevo y una revisión más',
+    otroMundo.validaciones.veces === 5 && otroMundo.mundosNuevos === 2 && otroMundo.validacionesDelMundo === 2,
+    { veces: otroMundo.validaciones.veces, nuevos: otroMundo.mundosNuevos, revisados: otroMundo.validacionesDelMundo },
+  );
+  canal.apagar();
+}
+
 paso('A14 · Apagar (SIGTERM): 1001 a todos con su `fuera`, y no entra nadie más');
 {
   const mesa = new MesaDeMentira();
@@ -1829,6 +1887,241 @@ paso('C1 · La sala, la mesa y el registro de VERDAD, con el reloj en la mano: q
   canal.apagar();
 }
 
+/*
+ * «NACE CERCA DEL GRUPO», en la vara del diseño de la ciudad abierta: la del RACIMO (§4, dos asientos se
+ * separan a más de 45 m) y la del alcance de blanco (§3.4, ninguna entidad toma turno contra un asiento a
+ * más de 45 m). Quien vuelve a 45 m o menos de alguno del grupo —tal como estaba el grupo al irse él,
+ * él incluido— vuelve a SU pelea; quien vuelve más lejos de todos vuelve a otra parte de la ciudad.
+ *
+ * Se mide contra el grupo de ANTES, y no contra el centro: dos que se separan persiguiendo a quien tienen
+ * más cerca siguen siendo un grupo (§4 los une en cadena), y el centro de los dos puede no ser de nadie.
+ */
+const CERCA_DEL_GRUPO = 45 * UNO;
+
+/** La distancia entre dos puntos Q16.16, en Q16.16 (en coma flotante: esto es un comprobador). */
+function distancia(a: { x: number; z: number }, b: { x: number; z: number }): number {
+  return Math.hypot(a.x - b.x, a.z - b.z);
+}
+
+/** A qué distancia queda `p` del más cercano del grupo (Q16.16), o `Infinity` sin grupo o sin sitio. */
+function alGrupo(p: { x: number; z: number } | null, grupo: readonly { x: number; z: number }[]): number {
+  if (p === null) return Number.POSITIVE_INFINITY;
+  let d = Number.POSITIVE_INFINITY;
+  for (const g of grupo) d = Math.min(d, distancia(p, g));
+  return d;
+}
+
+const enMetros = (p: { x: number; z: number } | null | undefined): string => (p === null || p === undefined ? '—' : `(${(p.x / UNO).toFixed(1)}, ${(p.z / UNO).toFixed(1)})`);
+const metrosAlGrupo = (p: { x: number; z: number } | null, grupo: readonly { x: number; z: number }[]): number | null => {
+  const d = alGrupo(p, grupo);
+  return Number.isFinite(d) ? Math.round((d / UNO) * 10) / 10 : null;
+};
+
+paso('C1b · En la ciudad de 540 m, con la sala, la mesa y el canal de VERDAD y el reloj en la mano: el mundo se revisa UNA vez, y quien vuelve nace junto al grupo');
+{
+  /*
+   * La ciudad no espera a que el productor la dé: la mesa, el reductor, el productor y la sala son de verdad,
+   * y su liza pasa a la ciudad con el escenario «ciudad» de `medir-liza.ts` —el mundo de la columna
+   * (`mundoDeLaLizaDeLaCiudad`, de 4.761 casillas y unas 1.300 cajas), el MISMO objeto en toda la partida,
+   * el límite `ciudad` y un encuentro sin fin—. Con la Bajada en la plaza 3 y no en la Glorieta: así el
+   * orden de los sitios de nacer —los de la plaza de la Bajada DELANTE— es lo que decide dónde vuelve
+   * quien vuelve, y un orden que no la pusiera delante lo mandaría a otra plaza, a cien metros o más.
+   * El productor de verdad —que ya da la ciudad, y el bloque D lo exige— lo juega el bloque D.
+   *
+   *   · Se empieza la partida, la sala hace vencer la Bajada y el Sistema sale: con la Bajada y la oleada,
+   *     dos declaraciones con el MISMO mundo: una sola revisión del mundo y un solo mundo nuevo.
+   *   · Bea se cae a media oleada y vuelve: junto a Ana (la sala le guardó el cuerpo).
+   *   · El canal se apaga —un despliegue— y otro canal hace nacer la sala otra vez de la mesa: quien vuelve
+   *     nace en la plaza de la Bajada, junto a donde peleaba el grupo. Y ese canal, en el MISMO proceso, no
+   *     vuelve a revisar el mundo: la memoria de la Liza es del proceso (en uno nuevo, una: bloque D).
+   */
+  await import('../../shared/arcade/juegos');
+  const mesas = await import('../src/arcade/mesas');
+  const deVerdad = await import('../src/liza/index');
+  const vistaDelQuiebro = await import('../../shared/arcade/juegos/quiebro-vista');
+  const laCiudad = await import('../../shared/arcade/juegos/quiebro-ciudad');
+  const { RobotDeLaLiza, ciudadDelBanco, ARCADE_DE_LA_CIUDAD } = await import('./medir-liza');
+  const { ponerCanal } = await import('../src/canal');
+  const { canalDeSondeo } = await import('../src/canal/sondeo');
+  ponerCanal(canalDeSondeo);
+  const TRAZA = 13;
+  const BAJADA = 3;
+
+  const ciudad = await ciudadDelBanco('agrupados');
+  const abierta = await mesas.abrir({ arcade: ARCADE_DE_LA_CIUDAD, nombre: 'Ana', plazoSegundos: 300 });
+  const codigo = abierta.mesa.codigo;
+  const sentada = await mesas.sentarse(codigo, 'Bea');
+  ciudad.ponerLaMesa(codigo, TRAZA, BAJADA);
+  const lizas: LasLizas = {
+    sePuedeLidiar: deVerdad.LAS_LIZAS_DE_VERDAD.sePuedeLidiar,
+    lizaDeLaMesa: (a, v, c) => {
+      const l = deVerdad.LAS_LIZAS_DE_VERDAD.lizaDeLaMesa(a, v, c);
+      return l === null ? null : ciudad.enLaCiudad(l, c);
+    },
+  };
+  const nuevoCanal = (): CanalDeLaLiza =>
+    new CanalDeLaLiza({ reloj, mesa: deVerdad.LA_MESA_DE_LA_LIZA, lizas, motor: deVerdad.EL_MOTOR_DE_VERDAD, registrar: (l) => registro.push(l) });
+  let canal = nuevoCanal();
+  const declarada: { liza: LizaDeclarada | null } = { liza: null };
+  const alDia = async (): Promise<void> => {
+    const v = await mesas.mirar(codigo, null);
+    declarada.liza = lizas.lizaDeLaMesa(v.arcade, v.vista, codigo);
+  };
+  const reunida = await mesas.mirar(codigo, abierta.silla.llave);
+  const empezar = reunida.opciones.find((o) => o.tipo === vistaDelQuiebro.MOVIMIENTO_DEL_QUIEBRO.empezar);
+  await mesas.mover(codigo, abierta.silla.llave, reunida.rev, { tipo: vistaDelQuiebro.MOVIMIENTO_DEL_QUIEBRO.empezar, carga: empezar?.carga ?? null });
+  await alDia();
+
+  /* Los robots, como en C1, con el canal que haya en cada momento: el de antes del despliegue o el de después. */
+  const SIN_VUELTA: readonly number[] = [
+    CIERRE_DE_LA_LIZA.llaveMala,
+    CIERRE_DE_LA_LIZA.reemplazado,
+    CIERRE_DE_LA_LIZA.mesaCerrada,
+    CIERRE_DE_LA_LIZA.versionVieja,
+    CIERRE_DE_LA_LIZA.mesaQueNo,
+  ];
+  interface EnLaCiudad {
+    readonly robot: InstanceType<typeof RobotDeLaLiza>;
+    readonly buzon: string[];
+    readonly cierres: number[];
+    conexion: ConexionDeLaLiza | null;
+    vuelveEn: number | null;
+  }
+  const robots: EnLaCiudad[] = [];
+  const conectar = (r: EnLaCiudad): void => {
+    const cx = canal.abrir(codigo, {
+      enviar: (texto) => r.buzon.push(texto),
+      cerrar: (codigoDeCierre) => {
+        if (r.conexion !== cx) return;
+        r.cierres.push(codigoDeCierre);
+        r.conexion = null;
+        r.robot.dentro = false;
+        if (!SIN_VUELTA.includes(codigoDeCierre)) r.vuelveEn = reloj.t + 500;
+      },
+      pendientes: () => 0,
+      ping: (n) => void Promise.resolve().then(() => cx.pong(n)),
+    });
+    r.conexion = cx;
+    r.robot.abrir();
+  };
+  const bajar = (llave: string): EnLaCiudad => {
+    const r: EnLaCiudad = {
+      robot: new RobotDeLaLiza({ llave, reloj: () => reloj.t, liza: () => declarada.liza, mandar: (texto) => r.conexion?.recibir(texto) }),
+      buzon: [],
+      cierres: [],
+      conexion: null,
+      vuelveEn: null,
+    };
+    robots.push(r);
+    conectar(r);
+    return r;
+  };
+  /** Corre el reloj a pasos de 25 ms hasta que se cumpla `listo` o pasen `ms`: ver `correr` en C1. */
+  const correrHasta = async (listo: () => boolean, ms: number): Promise<boolean> => {
+    const fin = reloj.t + ms;
+    let vuelta = 0;
+    while (reloj.t < fin && !listo()) {
+      await reloj.avanzar(25);
+      for (const r of robots) {
+        if (r.vuelveEn !== null && reloj.t >= r.vuelveEn) {
+          r.vuelveEn = null;
+          conectar(r);
+        }
+        for (const texto of r.buzon.splice(0)) r.robot.recibir(texto);
+        r.robot.latir();
+      }
+      if (++vuelta % 20 === 0) {
+        await alDia();
+        await dormir(1);
+      }
+    }
+    return listo();
+  };
+  const nacidas = (r: EnLaCiudad): number => r.robot.cuentas.sucesos.nace ?? 0;
+
+  const ana = bajar(abierta.silla.llave);
+  const bea = bajar(sentada.llave);
+  const enCombate = await correrHasta(() => ana.robot.dentro && bea.robot.dentro && nacidas(ana) > 0 && declarada.liza?.fase.modo === 'encuentro', 30_000);
+  await correrHasta(() => false, 3000);
+  const mundo = ciudad.mundoDe(codigo);
+  const plaza = mundo?.limites.find((l) => l.id === laCiudad.idDelLimiteDePlaza(BAJADA))?.caja ?? null;
+  comprobar(
+    'la sala de verdad juega EN LA CIUDAD: el mundo de 4.761 casillas, el límite `ciudad`, las dos dentro y el Sistema que sale',
+    enCombate &&
+      mundo !== null &&
+      plaza !== null &&
+      declarada.liza?.mundo === mundo &&
+      mundo.suelo.pisables.length === laCiudad.CASILLAS_DE_LA_CIUDAD &&
+      declarada.liza.fase.limite === laCiudad.ID_DEL_LIMITE_DE_LA_CIUDAD &&
+      ana.robot.dentro &&
+      bea.robot.dentro,
+    { enCombate, casillas: mundo?.suelo.pisables.length, cajas: mundo?.suelo.cuerpos.length, fase: declarada.liza?.fase.clave, ana: ana.cierres, bea: bea.cierres, registro: registro.slice(-3) },
+  );
+  const dA = canal.diagnostico();
+  comprobar(
+    'la Bajada y la oleada con el MISMO mundo: dos validaciones o más, UN mundo nuevo y UNA revisión del mundo, contadas en el diagnóstico',
+    dA.validaciones.veces >= 2 && dA.mundosNuevos === 1 && dA.validacionesDelMundo === 1,
+    { veces: dA.validaciones.veces, nuevos: dA.mundosNuevos, revisados: dA.validacionesDelMundo, ms: dA.validaciones.ms },
+  );
+
+  /* Bea se cae a media oleada (cierra ella) y vuelve a entrar. */
+  const grupoAlCaerse = robots.map((r) => ({ x: r.robot.x, z: r.robot.z }));
+  const dentrosDeBea = bea.robot.cuentas.dentros;
+  bea.conexion?.seCerro();
+  bea.conexion = null;
+  bea.robot.dentro = false;
+  await correrHasta(() => false, 400);
+  conectar(bea);
+  const volvio = await correrHasta(() => bea.robot.dentro && bea.robot.cuentas.dentros > dentrosDeBea, 3000);
+  const beaAlVolver = bea.robot.ultimoDentro;
+  comprobar(
+    'quien se cae a media oleada y vuelve, vuelve junto al grupo: a 45 m o menos de alguno de como estaba al irse',
+    volvio && alGrupo(beaAlVolver, grupoAlCaerse) <= CERCA_DEL_GRUPO,
+    { volvio, bea: enMetros(beaAlVolver), grupo: grupoAlCaerse.map(enMetros), metros: metrosAlGrupo(beaAlVolver, grupoAlCaerse) },
+  );
+
+  /* Un despliegue: el canal se apaga, y otro hace nacer la sala de la mesa. */
+  await correrHasta(() => false, 1500);
+  const grupo = robots.map((r) => ({ x: r.robot.x, z: r.robot.z }));
+  const nacidasAntes = nacidas(ana);
+  const dentrosAntes = robots.map((r) => r.robot.cuentas.dentros);
+  canal.apagar();
+  canal = nuevoCanal();
+  const renacio = await correrHasta(
+    () => robots.every((r, i) => r.robot.dentro && r.robot.cuentas.dentros > (dentrosAntes[i] as number)) && nacidas(ana) > nacidasAntes,
+    5000,
+  );
+  const dondeVuelven = robots.map((r) => r.robot.ultimoDentro);
+  const enLaPlaza = (p: { x: number; z: number } | null): boolean =>
+    p !== null && plaza !== null && p.x >= plaza.x0 && p.x <= plaza.x1 && p.z >= plaza.z0 && p.z <= plaza.z1;
+  comprobar(
+    'tras el despliegue la sala renace de la mesa, y quien vuelve nace junto al grupo: en la plaza de la Bajada, a 45 m o menos de donde peleaba',
+    renacio && ana.cierres.includes(1001) && dondeVuelven.every((p) => enLaPlaza(p) && alGrupo(p, grupo) <= CERCA_DEL_GRUPO),
+    {
+      renacio,
+      grupo: grupo.map(enMetros),
+      vuelven: dondeVuelven.map(enMetros),
+      metros: dondeVuelven.map((p) => metrosAlGrupo(p, grupo)),
+      plaza: plaza === null ? null : [enMetros({ x: plaza.x0, z: plaza.z0 }), enMetros({ x: plaza.x1, z: plaza.z1 })],
+    },
+  );
+  const dB = canal.diagnostico();
+  comprobar(
+    'y el canal nuevo, en el MISMO proceso, valida y no vuelve a revisar el mundo: la memoria de la Liza es del proceso',
+    dB.validaciones.veces >= 1 && dB.mundosNuevos === 1 && dB.validacionesDelMundo === 0,
+    { veces: dB.validaciones.veces, nuevos: dB.mundosNuevos, revisados: dB.validacionesDelMundo },
+  );
+  nota(
+    `  la ciudad de la traza ${String(TRAZA)} con la Bajada en la plaza ${String(BAJADA)}: ${String(mundo?.suelo.pisables.length ?? 0)} casillas, ` +
+      `${String(mundo?.suelo.cuerpos.length ?? 0)} cajas, ${String(mundo?.grafo.nudos.length ?? 0)} nudos; ` +
+      `${String(dA.validaciones.veces)} validaciones (${dA.validaciones.ms.toFixed(1)} ms, la más lenta ${dA.validaciones.msMasLenta.toFixed(1)}) ` +
+      `con ${String(dA.validacionesDelMundo)} revisión del mundo; Bea vuelve a ${String(metrosAlGrupo(beaAlVolver, grupoAlCaerse))} m del grupo ` +
+      `(Ana y ella estaban a ${(distancia(grupoAlCaerse[0] as { x: number; z: number }, grupoAlCaerse[1] as { x: number; z: number }) / UNO).toFixed(1)} m); ` +
+      `tras el despliegue nacen a ${dondeVuelven.map((p) => String(metrosAlGrupo(p, grupo))).join(' y ')} m del grupo, que peleaba en ${grupo.map(enMetros).join(' y ')}`,
+  );
+  canal.apagar();
+}
+
 paso('C · `montarLaLiza` con la mesa de verdad: un veredicto por la vía interna, el diagnóstico, y SIGTERM');
 {
   /* Los arcades de la casa dados de alta, como en el servidor; y la mesa, con su carpeta temporal. */
@@ -1949,7 +2242,8 @@ if (SIN_SERVIDOR) {
  *
  *   1. El diagnóstico de la Liza está en su ruta y el servidor arrancó sin salas ni temporizador.
  *   2. Se abre una mesa de El Quiebro por HTTP (`POST /api/arcade/mesas`), se sienta un segundo, y se
- *      empieza con la opción que ofrece la propia mesa.
+ *      empieza con la opción que ofrece la propia mesa. El registro de verdad saca de ella LA CIUDAD de
+ *      540 m (4.761 casillas de 8 m) y, en la Bajada, el límite de SU plaza —la que dice la vista—.
  *   3. Una llave mala cierra con 4101; la ruta de botas sigue siendo de botas (su canal contesta con SU
  *      código: la mesa es `normal`); una ruta de nadie, 404.
  *   4. Bajan dos robots por `ws` (el de `medir-liza.ts`: andan, quiebran cuando les anuncian un golpe y
@@ -1957,7 +2251,9 @@ if (SIN_SERVIDOR) {
  *   5. Uno salta treinta unidades de golpe: le llega `corrige` con su `n` y su último sitio bueno, vuelve
  *      ahí, y lo que anda después se acepta.
  *   6. La sala hace vencer el reloj de la Bajada: `arcade:reloj` entra en la mesa —la revisión sube y
- *      la vista pasa a la oleada— y la sala se entera sola y saca entidades.
+ *      la vista pasa a la oleada— y la sala se entera sola y saca entidades. Y la oleada se pelea en la
+ *      ciudad ENTERA: su límite es `ciudad`, con el MISMO mundo que la Bajada (entrega 1 de la ciudad
+ *      abierta: lo que contesta la queja, dicho por el registro que usa el servidor).
  *   7. A media oleada se MATA el servidor (sin despedida: un fallo, no un despliegue) y se levanta otro
  *      con la misma carpeta: los robots vuelven a entrar y la sala RENACE de la mesa en la misma fase —la
  *      misma clave, el encuentro desde su principio, entidades otra vez—.
@@ -1971,6 +2267,7 @@ paso('D · De punta a punta: el servidor de verdad, una mesa de El Quiebro y rob
 {
   const lizasDeVerdad = await import('../../shared/arcade/juegos/lizas');
   const vistaDelQuiebro = await import('../../shared/arcade/juegos/quiebro-vista');
+  const laCiudad = await import('../../shared/arcade/juegos/quiebro-ciudad');
   const botas = await import('../../shared/mecanicas/canal-de-botas');
   const { RobotDeLaLiza } = await import('./medir-liza');
   const ARCADE = 'quiebro';
@@ -2109,6 +2406,38 @@ paso('D · De punta a punta: el servidor de verdad, una mesa de El Quiebro y rob
     latidos.push(setInterval(() => void ponerAlDia().catch(() => undefined), 500));
     const primera = declarada.liza;
     comprobar('el registro de verdad saca la liza de la mesa, y es válida', primera !== null && problemasDeLaDeclaracion(primera).length === 0, primera === null ? null : problemasDeLaDeclaracion(primera).slice(0, 3));
+    /*
+     * Qué mundo da el productor de verdad: LA CIUDAD de 540 m, y en la Bajada el límite de su plaza (la
+     * primera de la noche en la vista: en la noche 1, la Glorieta del Relojero). Hasta la entrega 1 esto
+     * se decía sin juzgarlo, porque el productor aún daba el barrio; ya no: si vuelve al barrio, o la
+     * Bajada deja de encerrar en su plaza, esto sale rojo.
+     */
+    const vistaEnLaBajada = vistaDelQuiebro.leerVistaDelQuiebro((await laMesa(codigo))?.vista);
+    const nocheEnLaBajada = vistaEnLaBajada?.noche ?? null;
+    const plazaDeLaBajada = nocheEnLaBajada === null ? null : vistaDelQuiebro.bajadaDeLaNoche(nocheEnLaBajada);
+    const mundoEnLaBajada = primera?.mundo ?? null;
+    comprobar(
+      'el productor de verdad da LA CIUDAD de 540 m —4.761 casillas de 8 m— y, en la Bajada, el límite de su plaza',
+      primera !== null &&
+        mundoEnLaBajada !== null &&
+        plazaDeLaBajada !== null &&
+        mundoEnLaBajada.suelo.lado === laCiudad.LADO_DE_CASILLA_DE_LA_CIUDAD &&
+        mundoEnLaBajada.suelo.pisables.length === laCiudad.CASILLAS_DE_LA_CIUDAD &&
+        primera.fase.limite === laCiudad.idDelLimiteDePlaza(plazaDeLaBajada),
+      {
+        casillas: mundoEnLaBajada?.suelo.pisables.length,
+        lado: mundoEnLaBajada?.suelo.lado,
+        plazaDeLaBajada,
+        limite: primera?.fase.limite,
+      },
+    );
+    if (primera !== null && mundoEnLaBajada !== null) {
+      nota(
+        `  el productor de verdad da ${String(mundoEnLaBajada.suelo.pisables.length)} casillas de ${String(mundoEnLaBajada.suelo.lado)} m, ` +
+          `${String(mundoEnLaBajada.suelo.cuerpos.length)} cajas y ${String(mundoEnLaBajada.grafo.nudos.length)} nudos; ` +
+          `la Bajada en la plaza ${String(plazaDeLaBajada)}, límite ${String(primera.fase.limite)}`,
+      );
+    }
 
     /* 3 · Llave mala, la ruta de botas y la de nadie. */
     const mala = new ClienteDeVerdad(puerto, rutaDeLaLiza(codigo));
@@ -2217,17 +2546,61 @@ paso('D · De punta a punta: el servidor de verdad, una mesa de El Quiebro y rob
     await hasta(() => (ana.robot.cuentas.sucesos.nace ?? 0) > 0, 15000);
     const claveDeLaOleada = ana.robot.fase;
     comprobar('y la sala se entera sola: fase nueva por el canal y entidades que nacen', (ana.robot.cuentas.sucesos.nace ?? 0) > 0 && claveDeLaOleada.length > 0, ana.robot.cuentas.sucesos);
+    /*
+     * La oleada, en la ciudad ENTERA: lo que contesta la queja («sólo se juega en una plaza»). La mesa ya
+     * está en la oleada, así que la declaración que el registro de verdad saca de ella es la de la oleada:
+     * límite `ciudad`, y el MISMO objeto mundo que en la Bajada —si no, el servidor revisaría otro mundo, y
+     * lo contaría abajo como un mundo nuevo—.
+     */
+    await ponerAlDia();
+    const enLaOleada = declarada.liza;
+    comprobar(
+      'y la oleada se pelea en la ciudad ENTERA: su límite es `ciudad`, con el MISMO mundo que la Bajada',
+      enLaOleada !== null &&
+        mundoEnLaBajada !== null &&
+        enLaOleada.fase.modo === 'encuentro' &&
+        enLaOleada.fase.limite === laCiudad.ID_DEL_LIMITE_DE_LA_CIUDAD &&
+        enLaOleada.mundo === mundoEnLaBajada,
+      { modo: enLaOleada?.fase.modo, limite: enLaOleada?.fase.limite, mismoMundo: enLaOleada !== null && enLaOleada.mundo === mundoEnLaBajada },
+    );
 
-    /* 7 · A media oleada, el servidor se muere; otro renace de la mesa. */
-    await dormir(1500);
+    /* 6b · Bea se cae a media oleada —cierra ella— y vuelve con otro canal: junto al grupo. */
+    await dormir(800);
+    const grupoAlCaerse = [ana.robot, bea.robot].map((r) => ({ x: r.x, z: r.z }));
+    bea.ws.close();
+    await hasta(() => bea.cierre() !== null, 3000);
+    const beaVuelve = bajarUnRobot(llaveBea);
+    await hasta(() => beaVuelve.robot.dentro, 8000);
+    const beaAlVolver = beaVuelve.robot.ultimoDentro;
+    comprobar(
+      'quien se cae a media oleada y vuelve, vuelve junto al grupo: a 45 m o menos de alguno de como estaba al irse',
+      beaVuelve.robot.dentro && alGrupo(beaAlVolver, grupoAlCaerse) <= CERCA_DEL_GRUPO,
+      { dentro: beaVuelve.robot.dentro, bea: enMetros(beaAlVolver), grupo: grupoAlCaerse.map(enMetros), metros: metrosAlGrupo(beaAlVolver, grupoAlCaerse), cierre: bea.cierre() },
+    );
+
+    /*
+     * 7 · A media oleada, el servidor se muere; otro renace de la mesa. Antes, lo que ha validado este
+     * proceso: la Bajada y la oleada con el MISMO mundo (el productor lo guarda), revisado UNA vez (la Liza
+     * lo guarda), y las dos cosas CONTADAS en el diagnóstico. Y dónde peleaba el grupo.
+     */
+    await dormir(700);
+    const dAntesDeMorir = await diagnostico();
+    comprobar(
+      'una sola validación del mundo en la partida, contada en el diagnóstico: la Bajada y la oleada, dos validaciones o más con UN mundo nuevo revisado UNA vez',
+      Number((dAntesDeMorir.validaciones as { veces?: number } | undefined)?.veces ?? 0) >= 2 &&
+        dAntesDeMorir.mundosNuevos === 1 &&
+        dAntesDeMorir.validacionesDelMundo === 1,
+      { validaciones: dAntesDeMorir.validaciones, mundosNuevos: dAntesDeMorir.mundosNuevos, validacionesDelMundo: dAntesDeMorir.validacionesDelMundo },
+    );
+    const grupo = [ana.robot, beaVuelve.robot].map((r) => ({ x: r.x, z: r.z }));
     const revAntesDeMorir = (await laMesa(codigo))?.rev ?? -1;
     const faseAntesDeMorir = faseDe(await laMesa(codigo));
     await matar();
-    await hasta(() => ana.cierre() !== null && bea.cierre() !== null, 5000);
+    await hasta(() => ana.cierre() !== null && beaVuelve.cierre() !== null, 5000);
     comprobar(
       'matado el servidor, los canales que estaban dentro se caen sin despedida (1006)',
-      ana.robot.cuentas.dentros > 0 && bea.robot.cuentas.dentros > 0 && ana.cierre() === 1006 && bea.cierre() === 1006,
-      [ana.cierre(), bea.cierre()],
+      ana.robot.cuentas.dentros > 0 && beaVuelve.robot.cuentas.dentros > 0 && ana.cierre() === 1006 && beaVuelve.cierre() === 1006,
+      [ana.cierre(), beaVuelve.cierre()],
     );
     hijo = levantar();
     comprobar('otro servidor arranca en el mismo puerto y con la misma carpeta', await esperarAlServidor(), dicho.slice(-800));
@@ -2248,6 +2621,18 @@ paso('D · De punta a punta: el servidor de verdad, una mesa de El Quiebro y rob
       'los robots vuelven a entrar y la sala RENACE en la misma fase: la misma clave, y entidades otra vez',
       ana2.robot.dentro && bea2.robot.dentro && ana2.robot.fase === claveDeLaOleada && (ana2.robot.cuentas.sucesos.nace ?? 0) > 0,
       { clave: ana2.robot.fase, antes: claveDeLaOleada, sucesos: ana2.robot.cuentas.sucesos },
+    );
+    const vuelven = [ana2.robot.ultimoDentro, bea2.robot.ultimoDentro];
+    comprobar(
+      'y quien vuelve tras el despliegue nace junto al grupo: a 45 m o menos de alguno de donde peleaban',
+      vuelven.every((p) => alGrupo(p, grupo) <= CERCA_DEL_GRUPO),
+      { grupo: grupo.map(enMetros), vuelven: vuelven.map(enMetros), metros: vuelven.map((p) => metrosAlGrupo(p, grupo)) },
+    );
+    nota(
+      `  Bea vuelve a media oleada a ${String(metrosAlGrupo(beaAlVolver, grupoAlCaerse))} m del grupo; tras el despliegue nacen a ` +
+        `${vuelven.map((p) => String(metrosAlGrupo(p, grupo))).join(' y ')} m del grupo, que peleaba en ${grupo.map(enMetros).join(' y ')}; ` +
+        `el proceso que murió validó ${String((dAntesDeMorir.validaciones as { veces?: number } | undefined)?.veces ?? '—')} veces ` +
+        `con ${String(dAntesDeMorir.validacionesDelMundo)} revisión del mundo`,
     );
     const d1 = await diagnostico();
     comprobar('el diagnóstico del servidor nuevo: una sala, dos dentro, el temporizador en marcha', d1.salas === 1 && d1.enSala === 2 && d1.temporizador === true, d1);
@@ -2279,6 +2664,21 @@ paso('D · De punta a punta: el servidor de verdad, una mesa de El Quiebro y rob
       'con lo que se jugó dentro: la ronda trae puntos a la mesa',
       vistaTras !== null && vistaTras.asientos.some((a) => a.puntos > 0),
       vistaTras?.asientos.map((a) => ({ puntos: a.puntos, contadores: a.contadores })),
+    );
+    /*
+     * Y el proceso nuevo, lo mismo que el viejo: la oleada al renacer y la pausa, el MISMO mundo, revisado
+     * UNA vez (en un proceso nuevo la memoria de la Liza está vacía: el suelo es uno, no cero). La sala lee
+     * la mesa como mucho una vez por segundo, así que se le deja leer la pausa.
+     */
+    let dTras = await diagnostico();
+    for (let i = 0; i < 20 && Number((dTras.validaciones as { veces?: number } | undefined)?.veces ?? 0) < 2; i++) {
+      await dormir(250);
+      dTras = await diagnostico();
+    }
+    comprobar(
+      'y en el servidor nuevo, lo mismo: la oleada y la pausa, dos validaciones o más con UN mundo nuevo revisado UNA vez, contadas en el diagnóstico',
+      Number((dTras.validaciones as { veces?: number } | undefined)?.veces ?? 0) >= 2 && dTras.mundosNuevos === 1 && dTras.validacionesDelMundo === 1,
+      { validaciones: dTras.validaciones, mundosNuevos: dTras.mundosNuevos, validacionesDelMundo: dTras.validacionesDelMundo },
     );
     comprobar(
       'los robots golpean y sus golpes dan, sin un mensaje ilegible en toda la oleada',

@@ -19,9 +19,12 @@
  *   · Los PERSONAJES deciden cómo se ve ese gesto: qué clip, con qué fundido, a qué ritmo (el paso se
  *     sincroniza con `velocidad`), la anticipación elástica (estirar la preparación para que el golpe
  *     llegue en `impactoMs`), el nivel de detalle y la multitud. No saben de la Liza.
- *   · Los 48 DURMIENTES no pasan por aquí: los pinta el frente de personajes con la función pura de
+ *   · Los DURMIENTES no pasan por aquí: los pinta el frente de personajes con la función pura de
  *     `shared/arcade/juegos/quiebro-durmientes.ts`, que da el mismo sitio en todos los aparatos. El juego
  *     sólo le dice qué durmientes están «prestados» ahora (no se pintan como civiles mientras lo son).
+ *     Con la ciudad abierta pasan de 48 a unos 630 y se pintan los cercanos (`durmientesCercaEnLaCiudad`,
+ *     firmas en `quiebro-ciudad.ts`); sus índices son los de la ciudad de la mesa, iguales todas las noches.
+ *   · Lo que el HUD necesita para ORIENTARSE (minimapa, plano, rumbo) no pasa por aquí: es `orientacion.ts`.
  */
 
 /** Qué clase de cuerpo es. Decide el reparto de figuras y la paleta. */
@@ -97,7 +100,10 @@ export interface CuerpoPintado {
 export interface FuenteDeCuerpos {
   /** Los cuerpos de este fotograma. La lista y sus objetos pueden reutilizarse entre fotogramas. */
   cuerpos(): readonly CuerpoPintado[];
-  /** Los durmientes (índices 0-47) que ahora son Prestados y NO deben pintarse como civiles. */
+  /**
+   * Los durmientes que ahora son Prestados y NO deben pintarse como civiles: índices 0-47 con el barrio de
+   * hoy, y los de `durmientesDeLaCiudad` con la ciudad abierta.
+   */
   prestados(): ReadonlySet<number>;
   /** El tic de los durmientes (50 ms), el mismo número en todos los aparatos: el del reloj de la sala. */
   ticDeLosDurmientes(): number;

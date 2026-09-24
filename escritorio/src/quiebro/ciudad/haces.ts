@@ -57,12 +57,17 @@ void main() {
 }
 `;
 
-export function crearLosHaces(cabezas: readonly { readonly x: number; readonly y: number; readonly z: number }[]): THREE.InstancedMesh {
+/** La lista instanciada de unas cabezas de farola, con sitio para `n`. */
+export function datosDeLosHaces(cabezas: readonly { readonly x: number; readonly y: number; readonly z: number }[], n = cabezas.length): { aCabeza: Float32Array } {
+  const aCabeza = new Float32Array(Math.max(1, n) * 3);
+  cabezas.forEach((c, i) => aCabeza.set([c.x, c.y, c.z], i * 3));
+  return { aCabeza };
+}
+
+export function crearLosHaces(cabezas: readonly { readonly x: number; readonly y: number; readonly z: number }[], capacidad = cabezas.length): THREE.InstancedMesh {
   const cono = new THREE.CylinderGeometry(0.18, 2.6, ALTO, 16, 1, true);
   cono.translate(0, -ALTO / 2, 0);
-  const datos = new Float32Array(Math.max(1, cabezas.length) * 3);
-  cabezas.forEach((c, i) => datos.set([c.x, c.y, c.z], i * 3));
-  cono.setAttribute('aCabeza', new THREE.InstancedBufferAttribute(datos, 3));
+  cono.setAttribute('aCabeza', new THREE.InstancedBufferAttribute(datosDeLosHaces(cabezas, Math.max(capacidad, cabezas.length)).aCabeza, 3));
   const material = new THREE.ShaderMaterial({
     name: 'quiebro-haces',
     uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uFarolas: UNIFORMES_DE_LA_CIUDAD.uFarolas, uHaces: UNIFORMES_DE_LA_LUZ.uHaces },

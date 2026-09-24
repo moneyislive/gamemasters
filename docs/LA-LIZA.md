@@ -84,6 +84,27 @@ juego** (`verify:liza-protocolo` hoy; `verify:liza` con la sala).
 | U | Aforo | `AforoDeLaSala`; coste y admisión en `lizas.ts` | Lo más que vive a la vez en la sala, que es también su coste declarado | Todas las lizas |
 | V | Azar sembrado | `FaseDeLaLiza.semilla` | Semilla pública de la fase: cualquier fallo se reproduce con lo que ya es público | Reproducir fallos |
 
+**Lo que entra: la liza abierta (L1-L12).** Una liza grande que se recorre entera, con objetivos
+repartidos por ella (el diseño de la ciudad abierta de El Quiebro, `docs/quiebro/CIUDAD-ABIERTA.md` §5.5).
+Cada una de sus doce declaraciones vive con su forma fijada en `AmpliacionDeLaLiza`, con su revisión en
+`problemasDeLaAmpliacion`, hasta que la sala la cumple; entonces entra en `LizaDeclarada` y su revisión
+pasa a `problemasDeLaDeclaracion`. Ya ha entrado una:
+
+| # | Declaración | En el código | Qué dice | Segundo uso |
+|---|---|---|---|---|
+| L10 | Alcance de blanco y olvido | `CerebroDeclarado.alcanceDeBlanco` y `EncuentroDeclarado.olvido` | Ninguna entidad toma por blanco —ni cuenta como su perseguidora, ni toma turno, ni apunta— a un asiento a más de su alcance (0 = sin tope), y suelta al que se le va. La que se queda sin nadie a su alcance pero ACOMPAÑADA (algún asiento que valdría de blanco a `olvido.distancia` o menos) anda hacia el más cercano por el camino por el que lo perseguiría, sin hacerlo su blanco; sola, se queda donde está. La que pasa `olvido.tics` sin ningún asiento PRESENTE a `olvido.distancia` (el caído cuenta; el ausente y el que espera sin cuerpo, no) se va con `seva … disuelta` y vuelve a la cola de su grupo: alejarse no gana un `vaciar`. El reloj sólo corre mientras aparece, acecha o ronda. Con olvido, cada clase persigue de 1 a su distancia. Así no queda estado sin salida: con blanco pelea, acompañada se acerca, sola se olvida | Cualquier liza abierta: la ciudad de juguete de 300 × 300 de `verify:liza` (bloques 24 y 25) |
+
+Mientras sus productores no la escriban, L10 admite una **forma transitoria**: un cerebro sin
+`alcanceDeBlanco` (`CerebroSinAlcance`) y un encuentro sin `olvido` (`EncuentroSinOlvido`), que valen y se
+juegan exactamente como «sin tope, sin olvido» (`alcanceDeBlancoDe`, `olvidoDelEncuentro`; `verify:liza`
+lo compara tic a tic). Es la misma forma que el `nace` sin ronda del cable: dos contratos dichos y
+comprobados, no un campo que a veces está. El productor de El Quiebro ya escribe la forma entera, y en su
+entrega 1 con «sin tope, sin olvido» (alcance 0 y olvido `null`: sus encuentros están anclados a la plaza de
+la Bajada o a la cabina; ver `PERSECUCION_DEL_SISTEMA` en `quiebro-reglas.ts`); los 45 m de alcance y el
+olvido a 90 m en 10 s del diseño vuelven con la travesía, y mientras tanto `verify:liza` (bloque 25) juega
+su ciudad con ellos puestos. Las lizas de juguete de otros comprobadores todavía no la escriben. Se quita
+cuando todos la escriban.
+
 **Lo que la Liza no declara, a propósito.** Ningún nombre que se lea: los ids son enteros de 1 a 255
 y los nombres son del juego. Ninguna altura: el mundo sigue siendo plano como el de `mundo.ts`, y «en
 el aire» será un ESTADO (D) con cajas de clase `baja` (B), no una coordenada `y`. Ninguna foto por
@@ -123,6 +144,12 @@ dentro del estado, el tiempo es el número de tic, y toda la E/S —el WebSocket
 firma para nacer, `salaNueva(declaracion, semilla)`: empezar la fase en curso desde el punto de
 control ES reanudarla, así que tras un despliegue la sala se rehace con la misma llamada y como mucho
 se pierde una fase. La sala se prueba entera en Node y en Hermes, sin servidor.
+
+Al empezar una fase, quien no tiene cuerpo, queda fuera del límite nuevo o queda DENTRO DE LA ESTRUCTURA
+del mundo nuevo aparece en su sitio de nacer, con su `corrige`; y si el mundo cambia sin cambiar la fase,
+quien ya no cabe donde está, también. Un mundo que cambia de una fase a otra (en la ciudad abierta de El
+Quiebro, cada noche trae sus coches y sus obras) podía dejar a un asiento dentro de una caja nueva, con
+cada paso corregido de vuelta al mismo sitio.
 
 La sala LEE la mesa (la vista pública, al subir la revisión) y ESCRIBE en ella sólo veredictos
 gruesos por `meterDeLaPlataforma`. Los asientos escriben en la mesa por la vía de siempre
@@ -290,9 +317,11 @@ sala.
 - **La altura.** Ninguna de las dos la tiene. La propuesta es la misma para las dos: «en el aire» como
   estado temporizado con cajas `baja`, no una `y`; lo que obligue a subir de verdad va en su propia
   decisión, porque toca `mundo.ts`, `andar.ts` y la foto de los dos canales.
-- **El coste.** El modelo de `lizas.ts` sale de la tabla del diseño del juego (≈ 5,9 ms/s una sala
-  llena en PC, ≈ 1,9 en solitario) y se afina con `medir:liza` en el plan donde corre. Si Boots on Board
-  adopta el aforo, sus coeficientes salen de `medir:botas`, no de éstos.
+- **El coste.** El modelo de `lizas.ts` sale de la tabla del diseño del juego: con la ciudad abierta
+  (`docs/quiebro/CIUDAD-ABIERTA.md` §5.6), base 400, 250 por asiento, 300 por entidad y 40 por bala, y una
+  sala llena de El Quiebro declara 8.380 µs/s (caben 9 por proceso; antes, con el barrio, ≈ 5,9 ms/s y
+  13). Se afina con `medir:liza` en el plan donde corre. Si Boots on Board adopta el aforo, sus
+  coeficientes salen de `medir:botas`, no de éstos.
 
 ---
 
@@ -305,6 +334,7 @@ sala.
 | La sala pura | `shared/mecanicas/liza/sala.ts` y piezas | escrita, con `verify:liza` y la tanda Node/Hermes de `verify:determinismo` jugando la sala de El Quiebro |
 | La E/S del servidor | `server/src/liza/` | escrita, con `verify:sala-de-la-liza` (robots WebSocket) y `medir:liza` fuera de la batería |
 | El primer juego | El Quiebro (`docs/EL-QUIEBRO.md`) | se juega entero en el navegador, en solitario y a varias pestañas (`/sala/quiebro.html?prueba=1&codigo=…`); falta el aparato real (`docs/quiebro/ARQUITECTURA.md` §6) |
+| La liza abierta (L1-L12) | `AmpliacionDeLaLiza` en `declaracion.ts`; los índices por dentro en `geometria.ts` y `cerebro.ts` | los índices (losas y nudos por celdas, campos por meta, la validación del mundo una vez) escritos y comprobados contra la fuerza bruta; **L10 cumplido por la sala** (`cerebro.ts`: `blancoAlAlcance` y `acercarseSinBlanco`; `encuentros.ts`: `olvidarLasEntidades`), con los bloques 24 y 25 de `verify:liza` (el 25, con la ciudad de El Quiebro y el L10 del diseño mientras su productor no lo declara: persecuciones que rodean una manzana y combates con todos huyendo por las calles) y su partida en Node y en Hermes en `verify:determinismo`, que se acerca sin blanco en los dos motores; las otras once, con su forma y su revisión, esperando a la sala. Y el cerebro ya no se clava donde no llega en recta a ninguno de sus nudos cercanos —el bolsillo de la cabina de la Llamada, entre su poste, un coche y la fachada—: busca uno más lejos (`nudoParaSalir`), y el bloque 18 vigila que nada pase 10 s acechando lejos de su blanco sin moverse |
 
 Nada se ha empujado. Cualquier cambio que esta propuesta pida en un fichero de Boots on Board se pide
 por escrito a su sesión, no se hace desde aquí (`docs/EL-QUIEBRO.md` §14, riesgo 9).

@@ -19,6 +19,20 @@
  *
  * Todo se mide para un teléfono tumbado (unos 390 px de alto): las cifras importantes a 20 px o más, los
  * botones al tamaño del diseño (§7) en pt CSS, y las zonas seguras (`env(safe-area-inset-*)`) respetadas.
+ *
+ * ═══ LO QUE VA SUELTO SOBRE LA ESCENA LLEVA HALO DE NOCHE ═══
+ *
+ * El reloj, el aguante, el Foco y el botín no van en panel: flotan sobre la ciudad. Sobre la noche se
+ * leen solos, pero la ciudad no siempre es noche: en las tres salidas de avenida, de cara a la cortina de
+ * glifos (que se aviva al acercarse), el reloj claro quedaba sobre un fondo de luminancia media 160 y la
+ * etiqueta del aguante, al 62 %, sobre 138 (revisión del 24-sep): no se leían. Así que todo texto suelto
+ * lleva `--q-halo`, una sombra de noche pegada a la letra, y los grupos (el reloj, los vitales y el
+ * botín), además, un fondo de noche difuminado (`--q-bruma`). Donde el texto ya tenía su brillo de color,
+ * el halo va PRIMERO en la lista de sombras, que en CSS es la que se pinta encima: pegado a la letra manda
+ * la noche y el brillo asoma por fuera. La cifra del Foco, que es de SVG, lleva lo mismo como trazo por
+ * debajo del relleno (`paint-order: stroke`). `verify:quiebro-juego` mira que cada texto suelto lo lleve.
+ * Visto en el juego el 24-sep, a 3,2 m de la cortina de la salida sur del Elevado: el fondo detrás del
+ * reloj sigue en 159 de media (la cortina es de dirección de arte), y el reloj, AGUANTE y el botín se leen.
  */
 
 .quiebro-raiz {
@@ -33,6 +47,10 @@
   --q-filo: rgba(63, 242, 194, 0.28);
   --q-texto: #eef7f3;
   --q-tenue: rgba(222, 240, 232, 0.62);
+  /* La sombra de noche de lo que va suelto sobre la escena (ver la cabecera). */
+  --q-halo: 0 0 2px rgba(2, 6, 7, 0.95), 0 0 5px rgba(2, 6, 7, 0.85), 0 0 10px rgba(2, 6, 7, 0.6);
+  /* El fondo de noche difuminado de lo que va suelto en grupo (el reloj, los vitales, el botín). */
+  --q-bruma: radial-gradient(closest-side, rgba(3, 7, 9, 0.55), rgba(3, 7, 9, 0));
   --q-rojo: #ff4d6d;
   --q-letra: 'Bahnschrift', 'DIN Alternate', 'Avenir Next Condensed', 'Roboto Condensed', 'Arial Narrow', 'Helvetica Neue', sans-serif;
   --q-cifra: 'Cascadia Mono', 'SF Mono', 'JetBrains Mono', 'Roboto Mono', Consolas, monospace;
@@ -157,6 +175,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 4px 16px;
+  margin: -4px -16px;
+  background: var(--q-bruma);
 }
 
 .q-foco {
@@ -179,6 +200,9 @@
   fill: var(--q-codigo);
   font-family: var(--q-cifra);
   font-size: 13px;
+  paint-order: stroke;
+  stroke: rgba(2, 6, 7, 0.9);
+  stroke-width: 3px;
 }
 
 .q-foco.ruptura .lleno {
@@ -226,6 +250,7 @@
   letter-spacing: 0.12em;
   color: var(--q-tenue);
   text-transform: uppercase;
+  text-shadow: var(--q-halo);
 }
 
 .q-aguante .pie b {
@@ -248,6 +273,8 @@
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
+  padding: 0 18px 2px;
+  background: var(--q-bruma);
 }
 
 .q-reloj .etiqueta {
@@ -255,6 +282,7 @@
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--q-codigo);
+  text-shadow: var(--q-halo);
 }
 
 .q-reloj .cifra {
@@ -262,12 +290,12 @@
   font-size: 24px;
   line-height: 1.05;
   color: var(--q-texto);
-  text-shadow: 0 0 10px rgba(63, 242, 194, 0.45);
+  text-shadow: var(--q-halo), 0 0 10px rgba(63, 242, 194, 0.45);
 }
 
 .q-reloj .cifra.aprieta {
   color: var(--q-ambar);
-  text-shadow: 0 0 12px rgba(255, 171, 64, 0.8);
+  text-shadow: var(--q-halo), 0 0 12px rgba(255, 171, 64, 0.8);
 }
 
 .q-brujula {
@@ -348,6 +376,7 @@
   font-size: 11px;
   font-family: var(--q-cifra);
   color: rgba(63, 242, 194, 0.55);
+  text-shadow: var(--q-halo);
   transform: translateX(-50%);
 }
 
@@ -358,13 +387,16 @@
   top: calc(10px + var(--q-arr));
   right: calc(64px + var(--q-der));
   text-align: right;
+  padding: 2px 14px;
+  margin: -2px -14px;
+  background: var(--q-bruma);
 }
 
 .q-botin .esquirlas {
   font-family: var(--q-cifra);
   font-size: 20px;
   color: var(--q-ambar-claro);
-  text-shadow: 0 0 10px rgba(255, 171, 64, 0.6);
+  text-shadow: var(--q-halo), 0 0 10px rgba(255, 171, 64, 0.6);
 }
 
 .q-botin .esquirlas .gema {
@@ -381,6 +413,7 @@
   font-size: 12px;
   letter-spacing: 0.08em;
   color: var(--q-tenue);
+  text-shadow: var(--q-halo);
 }
 
 .q-botin .monedas {
@@ -389,6 +422,7 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--q-tenue);
+  text-shadow: var(--q-halo);
 }
 
 .q-botin .monedas i {
@@ -412,6 +446,7 @@
   font-size: 13px;
   color: var(--q-codigo);
   margin-top: 2px;
+  text-shadow: var(--q-halo);
 }
 
 /* ─── Los rótulos grandes del centro ─── */
@@ -433,7 +468,7 @@
   bottom: calc(26% + var(--q-aba));
   font-size: clamp(16px, 2.6vw, 24px);
   color: var(--q-ambar-claro);
-  text-shadow: 0 0 14px rgba(255, 171, 64, 0.6);
+  text-shadow: var(--q-halo), 0 0 14px rgba(255, 171, 64, 0.6);
 }
 
 .q-rotulo.limpio {
@@ -1252,6 +1287,7 @@
   color: var(--q-tenue);
   text-align: right;
   line-height: 1.6;
+  text-shadow: var(--q-halo);
 }
 
 .q-teclas kbd {
@@ -1299,4 +1335,281 @@
   width: min(620px, 92vw);
   padding: 14px 18px;
   pointer-events: none;
+}
+
+/* ─── La ciudad abierta: el minimapa, el plano y su botón (CIUDAD-ABIERTA §5.9) ─── */
+
+/*
+ * El minimapa va arriba a la izquierda, bajo el menú (≡), y su pie con los metros del rumbo debajo. Con
+ * la opción zurda AVISO pasa a la izquierda, así que el minimapa se va a la derecha, bajo el botín. Los
+ * avisos de la izquierda bajan por debajo del minimapa cuando lo hay (`q-con-minimapa` en `.quiebro-hud`).
+ */
+.q-mapa-mini {
+  position: absolute;
+  top: calc(60px + var(--q-arr));
+  left: calc(10px + var(--q-izq));
+  width: 112px;
+  pointer-events: none;
+}
+
+.q-mapa-mini.zurdo {
+  left: auto;
+  right: calc(10px + var(--q-der));
+  top: calc(96px + var(--q-arr));
+}
+
+.q-minimapa {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--q-noche-densa);
+  border: 1px solid var(--q-filo);
+  box-shadow:
+    0 0 0 1px rgba(3, 7, 9, 0.7),
+    0 0 18px rgba(63, 242, 194, 0.12);
+  outline: none;
+}
+
+.q-minimapa[role='button'] {
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.q-minimapa[role='button']:focus-visible {
+  border-color: var(--q-codigo);
+}
+
+.q-minimapa .lienzo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 50%;
+}
+
+.q-minimapa .yo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Un filo de sombra por dentro del canto: el mapa se hunde en el panel y las flechas del canto se leen. */
+.q-minimapa::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 12px 2px rgba(2, 6, 7, 0.85);
+  pointer-events: none;
+}
+
+.q-mapa-mini .pie {
+  margin-top: 4px;
+  min-height: 14px;
+  text-align: center;
+  font-family: var(--q-cifra);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--q-ambar-claro);
+  text-shadow: 0 0 6px rgba(2, 6, 7, 0.95), 0 0 2px rgba(2, 6, 7, 0.95);
+}
+
+.quiebro-hud.q-con-minimapa .q-avisos {
+  top: calc(196px + var(--q-arr));
+}
+
+/* El botón PLANO: 44 pt bajo AVISO (AVISO va a 90 pt de arriba), en el lado de AVISO. */
+.q-plano-boton {
+  position: absolute;
+  top: calc(144px + var(--q-arr));
+  right: calc(16px + var(--q-der));
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1px;
+  border-radius: 4px;
+  border: 1px solid var(--q-filo);
+  background: rgba(4, 10, 12, 0.55);
+  color: var(--q-codigo);
+  font-family: var(--q-letra);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.q-plano-boton.zurdo {
+  right: auto;
+  left: calc(16px + var(--q-izq));
+}
+
+.q-plano-boton.elegida {
+  border-color: var(--q-codigo);
+  background: rgba(15, 111, 90, 0.35);
+  box-shadow: 0 0 14px rgba(63, 242, 194, 0.35);
+}
+
+.q-plano-boton svg {
+  width: 20px;
+  height: 20px;
+}
+
+.q-plano-boton .rotulo {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.q-plano-boton kbd {
+  font-family: var(--q-cifra);
+  font-size: 9px;
+  line-height: 1;
+  color: var(--q-tenue);
+}
+
+/* El plano: encima del juego, sin taparlo entero y sin coger los toques de fuera de su hoja. */
+.q-plano {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(8px + var(--q-arr)) calc(8px + var(--q-der)) calc(8px + var(--q-aba)) calc(8px + var(--q-izq));
+  pointer-events: none;
+  z-index: 20;
+}
+
+.q-plano-hoja {
+  display: flex;
+  align-items: stretch;
+  background: rgba(4, 10, 12, 0.66);
+  pointer-events: auto;
+  touch-action: none;
+  animation: q-aparece 160ms ease-out both;
+}
+
+.q-plano-mapa {
+  position: relative;
+  flex: none;
+  border: 1px solid var(--q-filo);
+  border-radius: 3px;
+  overflow: hidden;
+  background: #040809;
+}
+
+.q-plano-mapa canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.q-plano-mapa .marcas {
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.q-plano-lado {
+  width: 172px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.q-plano-leyenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--q-tenue);
+}
+
+.q-plano-leyenda i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 9px;
+  vertical-align: -1px;
+}
+
+.q-plano-leyenda .tu i {
+  background: var(--q-ambar-claro);
+  clip-path: polygon(50% 0, 100% 100%, 50% 72%, 0 100%);
+}
+
+.q-plano-leyenda .fallo i {
+  background: var(--q-codigo);
+  box-shadow: 0 0 6px var(--q-codigo);
+}
+
+.q-plano-leyenda .cabina i {
+  background: var(--q-ambar);
+  transform: rotate(45deg) scale(0.8);
+}
+
+.q-plano-leyenda .companero i {
+  border-radius: 50%;
+  background: #46c8ff;
+}
+
+.q-plano-leyenda .refugio i {
+  border: 1.5px solid rgba(222, 240, 232, 0.8);
+}
+
+.q-plano-leyenda .aqui i {
+  border-radius: 50%;
+  border: 1.5px solid var(--q-magenta);
+}
+
+.q-plano-lado .q-nota {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--q-tenue);
+}
+
+.q-plano-lado .q-boton {
+  font-size: 13px;
+  padding: 9px 12px;
+}
+
+.q-plano-cerrar {
+  margin-top: auto;
+  align-self: flex-end;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* De pie (una ventana estrecha del PC): la columna pasa debajo, en una fila, sin leyenda. */
+@media (max-aspect-ratio: 1/1) {
+  .q-plano-hoja {
+    flex-direction: column;
+  }
+
+  .q-plano-lado {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .q-plano-leyenda,
+  .q-plano-lado .q-nota {
+    display: none;
+  }
+
+  .q-plano-cerrar {
+    margin: 0 0 0 auto;
+  }
 }

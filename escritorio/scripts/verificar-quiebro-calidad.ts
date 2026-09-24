@@ -70,6 +70,19 @@ import {
 } from '../src/quiebro/posproceso/sombreadores';
 import { LINEA_DE_FABRICA, ponerElTonoPropio, textoDelTonoPropio } from '../src/quiebro/posproceso/tono';
 import { ShaderChunk } from 'three';
+import * as THREE from 'three';
+import type { Compilador } from '../src/quiebro/calidad/precompilar';
+import {
+  BloqueAlCambiar,
+  Compilacion,
+  PINTADOS_EN_BLOQUE,
+  RelevoDePieza,
+  alPintarLaEscena,
+  claveDelPintado,
+  compilarEnBloque,
+  guardarLosProgramas,
+  materialesGuardados,
+} from '../src/quiebro/calidad/precompilar';
 
 const { comprobar, paso, nota, terminar } = arnes();
 
@@ -722,8 +735,193 @@ paso('Cada sombreador declara exactamente los uniformes que su material le da');
   );
 }
 
+paso('Compilar antes de pintar: la cita en el pintado, la compilación aparte, el relevo de una pieza y el bloque al cambiar de nivel');
+{
+  /*
+   * La revisión de rendimiento (24-sep) vio cada cambio de nivel pararse 150-400 ms esperando al compilador,
+   * y el muro del Bis compilarse en el primer Bis de la noche (49 ms). `calidad/precompilar.ts` decide CUÁNDO
+   * se compila; aquí, con un renderizador falso: un «programa» por material y estado que no ha visto, y
+   * `compileAsync` que no acaba hasta que se le dice.
+   */
+  class CompiladorFalso implements Compilador {
+    estado = 'a';
+    readonly info: { programs: { id: number }[] } = { programs: [] };
+    readonly compilados: THREE.Object3D[] = [];
+    private readonly claves = new Set<string>();
+    private readonly pendientes: (() => void)[] = [];
+    compile(objeto: THREE.Object3D): unknown {
+      this.compilados.push(objeto);
+      objeto.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        for (const x of m === undefined ? [] : Array.isArray(m) ? m : [m]) {
+          const k = `${x.uuid}|${this.estado}`;
+          if (this.claves.has(k)) continue;
+          this.claves.add(k);
+          this.info.programs.push({ id: this.info.programs.length });
+        }
+      });
+      return undefined;
+    }
+    compileAsync(objeto: THREE.Object3D): Promise<unknown> {
+      this.compile(objeto);
+      return new Promise((r) => this.pendientes.push(() => r(undefined)));
+    }
+    acabar(): void {
+      for (const f of this.pendientes.splice(0)) f();
+    }
+  }
+  const vuelta = (): Promise<void> => new Promise((r) => setImmediate(r));
+  const pieza = (): THREE.Mesh => new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial());
+  const gl = new CompiladorFalso();
+  const camara = new THREE.PerspectiveCamera();
+  const escena = new THREE.Scene();
+
+  /* La cita: encadenada con el onBeforeRender que hubiera, con el renderizador de ese pintado, y se quita. */
+  const vistos: string[] = [];
+  escena.onBeforeRender = () => {
+    vistos.push('antes');
+  };
+  const quitar = alPintarLaEscena(escena, (r, s, c) => {
+    vistos.push(r === gl && s === escena && c === camara ? 'cita' : 'cita con otra cosa');
+  });
+  const pintar = (): void => (escena.onBeforeRender as unknown as (...a: unknown[]) => void).call(escena, gl, escena, camara, null);
+  pintar();
+  quitar();
+  pintar();
+  comprobar('la cita en el pintado llama con el renderizador, la escena y la cámara de ese pintado, después del onBeforeRender que hubiera, y se quita', vistos.join(',') === 'antes,cita,antes', vistos);
+
+  /* La compilación de una pieza que aún no se pinta. */
+  const p1 = pieza();
+  const comp = new Compilacion(p1);
+  const dijo: boolean[] = [];
+  dijo.push(comp.enElPintado(gl, escena, camara));
+  dijo.push(comp.enElPintado(gl, escena, camara));
+  gl.acabar();
+  await vuelta();
+  dijo.push(comp.enElPintado(gl, escena, camara));
+  gl.estado = 'b';
+  dijo.push(comp.enElPintado(gl, escena, camara));
+  gl.acabar();
+  await vuelta();
+  dijo.push(comp.enElPintado(gl, escena, camara));
+  comprobar(
+    'una pieza compilada aparte no está lista mientras se compila, sí cuando acaba y el pintado no le pide programas nuevos, y vuelve a compilarse si el estado del renderizador cambió',
+    dijo.join(',') === 'false,false,true,false,true' && comp.pedidas === 2 && comp.rehechas === 1,
+    { dijo, pedidas: comp.pedidas, rehechas: comp.rehechas },
+  );
+  const aMedias = new Compilacion(pieza());
+  aMedias.enElPintado(gl, escena, camara);
+  let soltadas = 0;
+  aMedias.soltarCuandoSePueda(() => soltadas++);
+  const soltadasAMedias = soltadas;
+  gl.acabar();
+  await vuelta();
+  let soltadaYa = 0;
+  new Compilacion(pieza()).soltarCuandoSePueda(() => soltadaYa++);
+  comprobar('lo que se está compilando no se suelta a medias (three mira sus materiales): se suelta al acabar; lo que no se compila, ya', soltadasAMedias === 0 && soltadas === 1 && soltadaYa === 1, {
+    soltadasAMedias,
+    soltadas,
+    soltadaYa,
+  });
+
+  /* El relevo de una pieza suelta (el cielo, la lluvia). */
+  gl.estado = 'a';
+  const grupo = new THREE.Group();
+  const relevo = new RelevoDePieza(grupo);
+  const [c1, c2, c3, c4] = [pieza(), pieza(), pieza(), pieza()];
+  const sueltas: string[] = [];
+  relevo.poner(c1, () => sueltas.push('c1'));
+  const primeraYa = relevo.mostrada === c1 && grupo.children.length === 1 && grupo.children[0] === c1;
+  relevo.poner(c2, () => sueltas.push('c2'));
+  relevo.enElPintado(gl, escena, camara);
+  relevo.enElPintado(gl, escena, camara);
+  const esperaALaCompilacion = relevo.mostrada === c1 && grupo.children[0] === c1;
+  gl.acabar();
+  await vuelta();
+  relevo.enElPintado(gl, escena, camara);
+  const relevada = relevo.mostrada === c2 && grupo.children.length === 1 && grupo.children[0] === c2;
+  const sueltasEnElRelevo = sueltas.length;
+  relevo.soltarLoViejo();
+  const sueltasDespues = sueltas.join(',');
+  relevo.poner(c3, () => sueltas.push('c3'));
+  relevo.enElPintado(gl, escena, camara);
+  relevo.poner(c4, () => sueltas.push('c4'));
+  const c3AMedias = sueltas.includes('c3');
+  gl.acabar();
+  await vuelta();
+  const c3Dejada = sueltas.includes('c3') && relevo.mostrada === c2;
+  relevo.liberar();
+  comprobar(
+    'el relevo de una pieza: la primera se ve ya, la nueva sólo cuando está compilada, la vieja se suelta en el fotograma siguiente al relevo, y una que se deja se suelta cuando acaba de compilarse',
+    primeraYa && esperaALaCompilacion && relevada && sueltasEnElRelevo === 0 && sueltasDespues === 'c1' && !c3AMedias && c3Dejada && relevo.relevos === 1 && grupo.children.length === 0,
+    { primeraYa, esperaALaCompilacion, relevada, sueltasEnElRelevo, sueltasDespues, c3AMedias, c3Dejada, relevos: relevo.relevos },
+  );
+
+  /* El bloque al cambiar de nivel. */
+  const bloque = new BloqueAlCambiar(0);
+  const toca: boolean[] = [];
+  for (let k = 0; k < 3; k++) toca.push(bloque.toca('E0'));
+  bloque.ponerLaClave(0);
+  toca.push(bloque.toca('E0'));
+  bloque.ponerLaClave(1);
+  for (let k = 0; k < PINTADOS_EN_BLOQUE + 2; k++) toca.push(bloque.toca('E0'));
+  toca.push(bloque.toca('E1'));
+  toca.push(bloque.toca('E1'));
+  const esperado = [false, false, false, false, ...Array.from({ length: PINTADOS_EN_BLOQUE }, () => true), false, false, true, false];
+  const renderizador = (tono: number, color: string, sombras: boolean): Parameters<typeof claveDelPintado>[0] => ({ toneMapping: tono, outputColorSpace: color, shadowMap: { enabled: sombras } });
+  const claves = new Set([
+    claveDelPintado(renderizador(0, 'srgb', false), false),
+    claveDelPintado(renderizador(4, 'srgb', false), false),
+    claveDelPintado(renderizador(0, 'srgb-linear', false), false),
+    claveDelPintado(renderizador(0, 'srgb', true), false),
+    claveDelPintado(renderizador(0, 'srgb', false), true),
+  ]);
+  comprobar(
+    `tras un cambio de nivel se compila en bloque ${String(PINTADOS_EN_BLOQUE)} pintados, y una vez cuando cambia el estado del renderizador (mapeo tonal, color de salida, sombras o blanco); nunca más`,
+    toca.join(',') === esperado.join(',') && claves.size === 5 && bloque.bloques === PINTADOS_EN_BLOQUE + 1,
+    { toca, esperado, claves: claves.size, bloques: bloque.bloques },
+  );
+  const enLaEscena = new THREE.Scene();
+  const visible = pieza();
+  const apagada = pieza();
+  apagada.visible = false;
+  const dentroApagado = pieza();
+  dentroApagado.visible = false;
+  visible.add(dentroApagado);
+  enLaEscena.add(visible, apagada);
+  const antes = gl.compilados.length;
+  compilarEnBloque(gl, enLaEscena, camara);
+  const pedidos = gl.compilados.slice(antes);
+  comprobar(
+    'el bloque pide lo que cuelga de la escena y se ve (con lo apagado de dentro: el muro del Bis está montado y apagado hasta el Bis), y no lo que está apagado entero',
+    pedidos.length === 1 && pedidos[0] === visible && gl.info.programs.length > 0,
+    pedidos.map((o) => o.uuid),
+  );
+
+  /* Los programas que se guardan: lo soltado no se suelta hasta que llega otro juego de su clave (o más, si se pide). */
+  const soltados = new Set<string>();
+  const material = (nombre: string): THREE.Material => {
+    const m = new THREE.MeshBasicMaterial({ name: nombre });
+    m.addEventListener('dispose', () => soltados.add(nombre));
+    return m;
+  };
+  guardarLosProgramas('prueba-uno', [material('a1'), material('a2')]);
+  const trasElPrimero = soltados.size;
+  guardarLosProgramas('prueba-uno', [material('b1')]);
+  const trasElSegundo = [...soltados].sort().join(',');
+  guardarLosProgramas('prueba-dos', [material('c1')], 2);
+  guardarLosProgramas('prueba-dos', [material('c2')], 2);
+  const conDos = soltados.has('c1') || soltados.has('c2');
+  guardarLosProgramas('prueba-dos', [material('c3')], 2);
+  comprobar(
+    'lo que se guarda con sus programas no se suelta hasta que llegan más juegos de su clave de los que se guardan, y entonces se suelta el más viejo',
+    trasElPrimero === 0 && trasElSegundo === 'a1,a2' && !conDos && soltados.has('c1') && !soltados.has('c2') && materialesGuardados('prueba-uno') === 1 && materialesGuardados('prueba-dos') === 2,
+    { trasElPrimero, trasElSegundo, conDos, soltados: [...soltados] },
+  );
+}
+
 terminar({
-  escritas: 69,
+  escritas: 76,
   enVerde:
-    'Los niveles son los del §8; el gobernador baja deprisa, sube a prueba, no vuelve a lo que falló y no se deja engañar por la pestaña oculta; el sondeo arranca a cada aparato donde toca; la gradación respeta la paleta y la LUT es su fórmula; el tono de N0 entra en la three instalada; y los sombreadores declaran lo que sus materiales les dan.',
+    'Los niveles son los del §8; el gobernador baja deprisa, sube a prueba, no vuelve a lo que falló y no se deja engañar por la pestaña oculta; el sondeo arranca a cada aparato donde toca; la gradación respeta la paleta y la LUT es su fórmula; el tono de N0 entra en la three instalada; los sombreadores declaran lo que sus materiales les dan; y lo que se va a pintar se compila antes, sin esperar al compilador en el fotograma que lo usa.',
 });

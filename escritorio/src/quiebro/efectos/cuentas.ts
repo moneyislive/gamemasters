@@ -552,7 +552,10 @@ export function dondeCaeLaEsquirla(i: number, n: number, semilla: number): { dx:
 
 /* ─────────────────────────────── El cielo ─────────────────────────────── */
 
-/** Las columnas del cielo viven entre estas distancias del centro: detrás de la niebla del barrio. */
+/**
+ * Las columnas del cielo viven entre estas distancias de QUIEN MIRA: detrás de la niebla, en el barrio y en la
+ * ciudad abierta (ver `cieloVistoDesde`).
+ */
 export const CIELO_CERCA = 170;
 export const CIELO_LEJOS = 290;
 
@@ -583,4 +586,26 @@ export function columnasDelCielo(n: number, semilla: number): ColumnaDelCielo[] 
     });
   }
   return salen;
+}
+
+/**
+ * LAS COLUMNAS DEL CIELO SIGUEN A QUIEN MIRA, en planta, como la cúpula y el horizonte: la `x` y la `z` de
+ * cada columna son su sitio RESPECTO del ojo. En el barrio de 156 m daba igual clavarlas en el mundo a
+ * 170-290 m del centro, porque quien mira no salía de ±78 y las tenía siempre detrás de la niebla. En la
+ * ciudad abierta de 540 m esas distancias caen DENTRO de la ciudad: 167 de las 176 columnas quedaban sobre sus
+ * manzanas, sin niebla, y desde la calle se veía un paño de glifos pegado a una torre de las Torres (el
+ * 24-sep, traza 0, mirando desde (168, 40)). Siguiendo al ojo, desde cualquier calle están a 170-290 m y
+ * detrás de la niebla, que es lo que pide el §8, y no se confunden con nada que esté EN la ciudad (las
+ * columnas de los Fallos, que sí marcan un sitio).
+ *
+ * Escribe en `bases` (el atributo `aBase`, cuatro números por columna) la `x` y la `z` de las `n` primeras
+ * vistas desde `(ojoX, ojoZ)`; la altura y el modo no se tocan.
+ */
+export function cieloVistoDesde(bases: Float32Array, columnas: readonly ColumnaDelCielo[], n: number, ojoX: number, ojoZ: number): void {
+  const cuantas = Math.min(n, columnas.length, Math.floor(bases.length / 4));
+  for (let i = 0; i < cuantas; i++) {
+    const c = columnas[i] as ColumnaDelCielo;
+    bases[i * 4] = ojoX + c.x;
+    bases[i * 4 + 2] = ojoZ + c.z;
+  }
 }

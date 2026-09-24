@@ -70,8 +70,11 @@ export interface EdificioDelPlano {
   readonly alturaDePlanta: number;
   /** Las caras que dan a la calle, con lo que hay en su bajo. */
   readonly fachadas: readonly FachadaDelPlano[];
-  /** El soportal, si lo tiene: la cara y lo que se mete. */
-  readonly soportal: { readonly mira: Orientacion; readonly fondo: number } | null;
+  /**
+   * Los soportales: la cara de cada uno y lo que se mete. El barrio pone uno como mucho; la ciudad, uno
+   * por cara que lo lleve (`EdificioDeLaCiudad.soportales`).
+   */
+  readonly soportales: readonly { readonly mira: Orientacion; readonly fondo: number }[];
   /** Los pilares del soportal (estructura). */
   readonly pilares: readonly CajaXZ[];
   /** Entero no negativo: siembra ventanas, colores y tiendas. */
@@ -229,6 +232,12 @@ export interface DetalleDelNivel {
   readonly sombras: number;
   /** Balcones, cornisas, pretiles y maquinaria de azotea. */
   readonly relieve: boolean;
+  /**
+   * La ciudad abierta: el relieve sólo en la celda del CENTRO de la ventana (N1, «3 × 3, con relieve hasta
+   * 40 m», §5.7). Quien mira está a 30 m como mucho de ese centro, así que el relieve le llega hasta unos
+   * 40-50 m; con él en las nueve celdas, los balcones eran 42.000 triángulos y N1 no cabía en su 50 %.
+   */
+  readonly relieveSoloEnElCentro: boolean;
   /** Coches con ruedas, retrovisores y faros, o la caja con cabina. */
   readonly cochesFinos: boolean;
   /** Coches en marcha por las avenidas de fuera. */
@@ -241,6 +250,11 @@ export interface DetalleDelNivel {
   readonly reflejosDeVentanas: number;
   /** Lados de los cilindros (postes, ruedas, columnas). */
   readonly lados: number;
+  /**
+   * La ciudad abierta: el detalle y la LOD1 se funden con tramado en la franja del borde de la ventana de
+   * celdas (N1+). En N0 no: el `discard` le quita al teléfono modesto el rechazo temprano por profundidad.
+   */
+  readonly fundido: boolean;
 }
 
 export const DETALLE_DEL_NIVEL: Readonly<Record<NivelDeLaCiudad, DetalleDelNivel>> = {
@@ -252,12 +266,14 @@ export const DETALLE_DEL_NIVEL: Readonly<Record<NivelDeLaCiudad, DetalleDelNivel
     lucesReales: 0,
     sombras: 0,
     relieve: false,
+    relieveSoloEnElCentro: false,
     cochesFinos: false,
     trafico: 4,
     haces: false,
     vapor: 2,
     reflejosDeVentanas: 60,
     lados: 6,
+    fundido: false,
   },
   1: {
     interiores: true,
@@ -267,12 +283,14 @@ export const DETALLE_DEL_NIVEL: Readonly<Record<NivelDeLaCiudad, DetalleDelNivel
     lucesReales: 0,
     sombras: 0,
     relieve: true,
+    relieveSoloEnElCentro: true,
     cochesFinos: true,
     trafico: 8,
     haces: false,
     vapor: 4,
     reflejosDeVentanas: 160,
     lados: 8,
+    fundido: true,
   },
   2: {
     interiores: true,
@@ -282,6 +300,7 @@ export const DETALLE_DEL_NIVEL: Readonly<Record<NivelDeLaCiudad, DetalleDelNivel
     lucesReales: 4,
     sombras: 1024,
     relieve: true,
+    relieveSoloEnElCentro: false,
     cochesFinos: true,
     trafico: 16,
     /* Los conos de luz desde N2 (pedido de dirección de arte): una llamada y unos 3.000 triángulos. */
@@ -289,6 +308,7 @@ export const DETALLE_DEL_NIVEL: Readonly<Record<NivelDeLaCiudad, DetalleDelNivel
     vapor: 6,
     reflejosDeVentanas: 320,
     lados: 10,
+    fundido: true,
   },
   3: {
     interiores: true,
@@ -298,11 +318,13 @@ export const DETALLE_DEL_NIVEL: Readonly<Record<NivelDeLaCiudad, DetalleDelNivel
     lucesReales: 6,
     sombras: 2048,
     relieve: true,
+    relieveSoloEnElCentro: false,
     cochesFinos: true,
     trafico: 30,
     haces: true,
     vapor: 8,
     reflejosDeVentanas: 520,
     lados: 12,
+    fundido: true,
   },
 };

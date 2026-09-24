@@ -56,8 +56,8 @@ import { PLANTAR } from '../../shared/arcade/juegos/lindes';
 import { barrioDeLaNoche, despejarLaPlaza, mundoDeLaLizaDelBarrio, mundoDelBarrio, pasoAbierto, trenEn } from '../../shared/arcade/juegos/quiebro-barrio';
 import type { Barrio } from '../../shared/arcade/juegos/quiebro-barrio';
 import { DURMIENTES, durmienteMasCercano, escribirLosDurmientes, guionDeLosDurmientes } from '../../shared/arcade/juegos/quiebro-durmientes';
-import { Aparato, Banco, fnv, guerrero, idsDe, jugarLaLizaDeJuguete, jugarLaLizaSinBlanco, paseante, salidasDe } from './liza-de-juguete';
-import type { JugadaDeLaLiza, JugadaSinBlanco } from './liza-de-juguete';
+import { Aparato, Banco, fnv, guerrero, idsDe, jugarLaLizaAbierta, jugarLaLizaAbiertaConOlvido, jugarLaLizaDeJuguete, jugarLaLizaSinBlanco, paseante, salidasDe } from './liza-de-juguete';
+import type { JugadaConOlvido, JugadaDeLaLiza, JugadaDeLaLizaAbierta, JugadaSinBlanco } from './liza-de-juguete';
 import { jugarAlQuiebro } from './robot-de-quiebro';
 import { lizaDelQuiebro } from '../../shared/arcade/juegos/quiebro-liza';
 import type { LizaDeclarada } from '../../shared/mecanicas/liza/declaracion';
@@ -359,6 +359,23 @@ export const SALAS_DEL_QUIEBRO: readonly (readonly [number, number, 'primera' | 
 export const TICS_DE_LA_SALA_DEL_QUIEBRO = 900;
 /** Los tics de la liza sin blanco: sus cuatro entidades nacen entre el 60 y el 120, y entran antes del 250. */
 export const TICS_DE_LA_LIZA_SIN_BLANCO = 300;
+/**
+ * LA LIZA ABIERTA (`liza-de-juguete.ts`): una ciudad de juguete de 300 × 300 con ochocientas cajas y
+ * ochocientos nudos, que es lo que enciende los índices de la Liza por dentro —las losas y los nudos por
+ * celdas, y los campos por meta acotados y completados— (el diseño de la ciudad abierta, §5.4). Con la
+ * liza de juguete y el barrio no se encienden, y el código que la sala de una ciudad corre en cada tic no
+ * lo compararía nadie entre los dos motores. Semilla y tics, escritos.
+ */
+export const SEMILLA_DE_LA_LIZA_ABIERTA = 5;
+export const TICS_DE_LA_LIZA_ABIERTA = 400;
+/**
+ * LA LIZA ABIERTA CON L10 (`jugarLaLizaAbiertaConOlvido`): la misma ciudad con el alcance de blanco (45) y el
+ * olvido (a 90, en 200 tics) de una liza abierta de verdad, con uno que corre por las calles de fuera y otro
+ * que se calla un rato. Setecientos tics: el olvido no llega antes del 200, y así caben varios y lo que su
+ * grupo vuelve a sacar.
+ */
+export const SEMILLA_DE_LA_LIZA_CON_OLVIDO = 13;
+export const TICS_DE_LA_LIZA_CON_OLVIDO = 700;
 /** Cuándo se calla el asiento 1 y cuándo vuelve (tics del banco). */
 const CALLA_EN = 60;
 const VUELVE_EN = 500;
@@ -540,6 +557,10 @@ export interface Tanda {
   salasDelQuiebro: SalaDelQuiebroJugada[];
   /** La liza de juguete sin nadie a quien perseguir, con las que nacen detrás de un muro (ver `lizaSinBlanco`). */
   lizaSinBlanco: JugadaSinBlanco;
+  /** La liza abierta, jugada: la que enciende los índices de la Liza (ver `TICS_DE_LA_LIZA_ABIERTA`). */
+  lizaAbierta: JugadaDeLaLizaAbierta;
+  /** La liza abierta con el alcance de blanco y el olvido (L10), jugada (ver `TICS_DE_LA_LIZA_CON_OLVIDO`). */
+  lizaConOlvido: JugadaConOlvido;
 }
 
 /** Cómo se llama el motor que está ejecutando esto. Ver `Tanda.motor`. */
@@ -751,7 +772,9 @@ export function jugarLaTanda(): Tanda {
   const salasDelQuiebro: SalaDelQuiebroJugada[] = [];
   for (const sala of SALAS_DEL_QUIEBRO) salasDelQuiebro.push(jugarLaSalaDelQuiebro(sala[0], sala[1], sala[2], TICS_DE_LA_SALA_DEL_QUIEBRO));
   const lizaSinBlanco = jugarLaLizaSinBlanco(TICS_DE_LA_LIZA_SIN_BLANCO);
-  return { motor: queMotorSoy(), jugadas, burgo, lindes, quiebro, liza, mesasDelQuiebro, salasDelQuiebro, lizaSinBlanco };
+  const lizaAbierta = jugarLaLizaAbierta(SEMILLA_DE_LA_LIZA_ABIERTA, TICS_DE_LA_LIZA_ABIERTA);
+  const lizaConOlvido = jugarLaLizaAbiertaConOlvido(SEMILLA_DE_LA_LIZA_CON_OLVIDO, TICS_DE_LA_LIZA_CON_OLVIDO);
+  return { motor: queMotorSoy(), jugadas, burgo, lindes, quiebro, liza, mesasDelQuiebro, salasDelQuiebro, lizaSinBlanco, lizaAbierta, lizaConOlvido };
 }
 
 /**

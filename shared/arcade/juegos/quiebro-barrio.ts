@@ -654,7 +654,8 @@ export function claveDeLaNoche(codigo: string, noche: number): string {
   return `${codigo.toUpperCase()}#${String(normalizarLaNoche(noche))}`;
 }
 
-function normalizarLaNoche(noche: number): number {
+/** La noche entera: lo que no es un número finito es la 0, los decimales se truncan, y sin −0. */
+export function normalizarLaNoche(noche: number): number {
   return Number.isFinite(noche) ? Math.trunc(noche) || 0 : 0;
 }
 
@@ -1888,6 +1889,207 @@ export function despejarLaPlaza(barrio: Barrio): Barrio {
     refugio: { ...barrio.refugio, caja: indice(barrio.refugio.caja) },
     tren: { ...barrio.tren, pilares: barrio.tren.pilares.map(indice) },
   };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  EL GENERADOR DE MANZANAS DE LA CIUDAD ABIERTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La ciudad de 540 m (`quiebro-ciudad.ts`, `docs/quiebro/CIUDAD-ABIERTA.md` §2.4 y §5.1) viste sus
+ * manzanas con esto. Se parte en dos a propósito, porque las dos mitades duran distinto:
+ *
+ *   · LA FORMA de una manzana —su huella, su caja de choque (UNA por manzana maciza, dos si la parte un
+ *     callejón, retranqueada `FONDO_DEL_SOPORTAL` en cada cara con soportal) y sus pilares, uno cada
+ *     `PILARES_DE_SOPORTAL_EN_LA_CIUDAD`— es de la TRAZA, la hace la ciudad y es la misma para todas las
+ *     mesas de esa traza;
+ *   · EL VESTIDO —alturas, estilo, qué planta baja lleva cada fachada, ventanas y rótulos— es del CÓDIGO de
+ *     la mesa, con un chorro por manzana (`CÓDIGO#m<hueco>`): lo hace `vestirLaManzana`.
+ *
+ * Lo que se conserva del barrio: la acera por bandas (la ciudad pone farolas, postes, quioscos y coches en
+ * las mismas bandas), los cuartos de metro, el soportal de 3 m, los retranqueos, los rótulos inventados
+ * enteros sobre la pared de su planta baja y un chorro por aspecto. Lo que cambia: la manzana ya no se
+ * reparte en dos a cuatro edificios (la caja era una por edificio y la ciudad tiene 121 huecos: serían más
+ * de 400 cajas sólo de edificios, contra un tope de 2.400 para todo), y las plantas salen del distrito.
+ */
+
+/** Cada cuánto lleva pilar un soportal de la ciudad: 6 m (el del barrio, 4). */
+export const PILARES_DE_SOPORTAL_EN_LA_CIUDAD = 6;
+
+/** Los cinco distritos, con los nombres de `quiebro-ciudad.ts` (el tipo se repite aquí para no importarlo). */
+export type DistritoDeLaManzana = 'casco' | 'ensanche' | 'lonja' | 'naves' | 'torres';
+
+/** Una fachada de la forma: una cara de la huella que da a una calle o a un callejón, y si lleva soportal. */
+export interface FachadaDeLaForma {
+  readonly cara: Cara;
+  readonly linea: number;
+  readonly desde: number;
+  readonly hasta: number;
+  readonly soportal: boolean;
+}
+
+/** UNA PARTE DE MANZANA, como la da la traza: su huella, su caja de choque y sus fachadas. */
+export interface ParteDeLaManzana {
+  readonly huella: Rectangulo;
+  readonly caja: Rectangulo;
+  readonly fachadas: readonly FachadaDeLaForma[];
+}
+
+/** Lo que el código le pone a una parte: sus alturas y sus fachadas. Lo demás de `EdificioDeLaCiudad`, la ciudad. */
+export interface EdificioVestido {
+  readonly tramos: readonly TramoDeAltura[];
+  readonly alto: number;
+  readonly estilo: EstiloDeFachada;
+  readonly tono: number;
+  readonly vano: number;
+  readonly balcones: boolean;
+  readonly semilla: number;
+  readonly fachadas: readonly FachadaDelEdificio[];
+}
+
+/** La manzana vestida: un edificio por parte, y sus rótulos (`edificio` es el índice de la PARTE). */
+export interface ManzanaVestida {
+  readonly edificios: readonly EdificioVestido[];
+  readonly rotulos: readonly RotuloDelBarrio[];
+}
+
+/** El carácter de cada distrito (§2.2): plantas contando la baja, estilos, tiendas, balcones y neones, en %. */
+interface CaracterDelDistrito {
+  readonly plantas: readonly [number, number];
+  readonly estilos: readonly EstiloDeFachada[];
+  readonly tiendas: number;
+  readonly balcones: number;
+  readonly neon: number;
+}
+
+const CARACTER: Readonly<Record<DistritoDeLaManzana, CaracterDelDistrito>> = {
+  casco: { plantas: [3, 6], estilos: ['piedra', 'revoco', 'azulejo', 'ladrillo'], tiendas: 65, balcones: 50, neon: 60 },
+  ensanche: { plantas: [5, 9], estilos: ['ladrillo', 'revoco', 'azulejo'], tiendas: 75, balcones: 70, neon: 75 },
+  lonja: { plantas: [3, 5], estilos: ['ladrillo', 'hormigon', 'revoco'], tiendas: 70, balcones: 30, neon: 50 },
+  naves: { plantas: [1, 2], estilos: ['hormigon', 'ladrillo'], tiendas: 10, balcones: 0, neon: 20 },
+  torres: { plantas: [12, 30], estilos: ['vidrio', 'hormigon'], tiendas: 40, balcones: 10, neon: 40 },
+};
+
+/**
+ * Las alturas de una parte. La planta baja siempre es la primera (4,5 m) y el cuerpo la segunda; los
+ * edificios de cuatro plantas o más pueden retranquearse como en el barrio. Las naves son de una o dos
+ * plantas de 7 a 9 m en total (§2.2): la baja y un cuerpo que llega hasta ahí, sin retranqueos.
+ */
+function alturasDelDistrito(ch: ChorroDeAzar, distrito: DistritoDeLaManzana): TramoDeAltura[] {
+  if (distrito === 'naves') {
+    const plantas = ch.entero(1, 2);
+    const alto = 7 + 0.5 * ch.entero(0, 4);
+    return [
+      { plantas: 1, desde: 0, hasta: ALTO_DE_LA_PLANTA_BAJA, entrante: 0 },
+      { plantas, desde: ALTO_DE_LA_PLANTA_BAJA, hasta: alto, entrante: 0 },
+    ];
+  }
+  const [minimo, maximo] = CARACTER[distrito].plantas;
+  const plantas = ch.entero(minimo, maximo) - 1;
+  let arriba = ALTO_DE_LA_PLANTA_BAJA + plantas * ALTO_DE_UNA_PLANTA;
+  const tramos: TramoDeAltura[] = [
+    { plantas: 1, desde: 0, hasta: ALTO_DE_LA_PLANTA_BAJA, entrante: 0 },
+    { plantas, desde: ALTO_DE_LA_PLANTA_BAJA, hasta: arriba, entrante: 0 },
+  ];
+  if (plantas >= 4 && ch.sale(45)) {
+    const primero = ch.entero(1, 2);
+    tramos.push({ plantas: primero, desde: arriba, hasta: arriba + primero * ALTO_DE_UNA_PLANTA, entrante: RETRANQUEOS[0] as number });
+    arriba += primero * ALTO_DE_UNA_PLANTA;
+    if (plantas >= 6 && ch.sale(35)) tramos.push({ plantas: 1, desde: arriba, hasta: arriba + ALTO_DE_UNA_PLANTA, entrante: RETRANQUEOS[1] as number });
+  }
+  return tramos;
+}
+
+/**
+ * VISTE UNA MANZANA con el chorro `clave` (la ciudad le pasa `CÓDIGO#m<hueco>`): para cada parte, sus
+ * alturas, su estilo, qué hay en la planta baja de cada fachada —el soportal si la forma lo trae; si no,
+ * tiendas o portales según el distrito— y la semilla de sus ventanas; y los rótulos, con las mismas reglas
+ * que el barrio: los de escaparate ENTEROS en la pared de su planta baja (la caja de choque, metida el
+ * fondo del soportal si lo hay), dos por fachada como mucho, y una banderola de neón por manzana según el
+ * distrito. Los textos salen barajados por manzana y no se repiten dentro de ella; entre manzanas sí, como
+ * en cualquier ciudad con dos bares que se llaman igual.
+ */
+export function vestirLaManzana(clave: string, distrito: DistritoDeLaManzana, partes: readonly ParteDeLaManzana[]): ManzanaVestida {
+  const ch = chorroDeAzar(clave);
+  const caracter = CARACTER[distrito];
+  const edificios: EdificioVestido[] = [];
+  for (const parte of partes) {
+    const tramos = alturasDelDistrito(ch, distrito);
+    const fachadas: FachadaDelEdificio[] = [];
+    for (const f of parte.fachadas) {
+      const bajo: PlantaBaja = f.soportal ? 'soportal' : ch.sale(caracter.tiendas) ? 'tiendas' : 'portales';
+      fachadas.push({ cara: f.cara, linea: f.linea, desde: f.desde, hasta: f.hasta, bajo });
+    }
+    edificios.push({
+      tramos,
+      alto: (tramos[tramos.length - 1] as TramoDeAltura).hasta,
+      estilo: ch.uno(caracter.estilos),
+      tono: ch.entero(0, 3),
+      vano: ch.uno(VANOS),
+      balcones: ch.sale(caracter.balcones),
+      semilla: ch.entero(0, 4294967295),
+      fachadas,
+    });
+  }
+  const tiendas = ch.barajados(ROTULOS_DE_TIENDA);
+  const rotulos: RotuloDelBarrio[] = [];
+  let siguienteTienda = 0;
+  for (let e = 0; e < edificios.length; e++) {
+    const bajo = (partes[e] as ParteDeLaManzana).caja;
+    for (const f of (edificios[e] as EdificioVestido).fachadas) {
+      if (f.bajo === 'portales') continue;
+      const porX = f.cara === 'norte' || f.cara === 'sur';
+      const pared0 = Math.max(f.desde, porX ? bajo.x0 : bajo.z0);
+      const pared1 = Math.min(f.hasta, porX ? bajo.x1 : bajo.z1);
+      if (pared1 - pared0 < 3) continue;
+      const escaparates = Math.max(1, Math.floor((pared1 - pared0) / 6));
+      const fondo = f.bajo === 'soportal' ? FONDO_DEL_SOPORTAL : 0;
+      let puestos = 0;
+      for (let k = 0; k < escaparates && puestos < 2 && siguienteTienda < tiendas.length; k++) {
+        if (!ch.sale(45)) continue;
+        const desde = pared0 + 6 * k;
+        const hasta = k === escaparates - 1 ? pared1 : desde + 6;
+        const p = puntoDeLaFachada(f, (desde + hasta) / 2, fondo);
+        rotulos.push({
+          texto: tiendas[siguienteTienda] as string,
+          clase: 'tienda',
+          color: ch.uno(COLORES_DE_ROTULO),
+          edificio: e,
+          cara: f.cara,
+          x: p.x,
+          z: p.z,
+          y: 3.5,
+          ancho: Math.min(4.5, hasta - desde - 1.5),
+          alto: 0.75,
+          parpadea: ch.sale(8),
+        });
+        siguienteTienda++;
+        puestos++;
+      }
+    }
+  }
+  if (edificios.length > 0 && ch.sale(caracter.neon)) {
+    const e = ch.entero(0, edificios.length - 1);
+    const suyo = edificios[e] as EdificioVestido;
+    if (suyo.fachadas.length > 0) {
+      const f = ch.uno(suyo.fachadas);
+      const alto = ch.uno(ALTOS_DE_NEON);
+      const p = puntoDeLaFachada(f, ch.sale(50) ? f.desde + 1 : f.hasta - 1, 0);
+      rotulos.push({
+        texto: ch.uno(ROTULOS_DE_NEON),
+        clase: 'neon',
+        color: ch.uno(COLORES_DE_ROTULO),
+        edificio: e,
+        cara: f.cara,
+        x: p.x,
+        z: p.z,
+        y: ALTO_DE_LA_PLANTA_BAJA + ALTO_DE_UNA_PLANTA + alto / 2,
+        ancho: 1,
+        alto,
+        parpadea: ch.sale(25),
+      });
+    }
+  }
+  return { edificios, rotulos };
 }
 
 /* ─── El mundo declarado ──────────────────────────────────────────────────── */

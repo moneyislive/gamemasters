@@ -572,6 +572,13 @@ export interface EntidadDeLaSala {
   readonly recargas: readonly { readonly accion: IdDeclarado; readonly hastaTic: number }[];
   /** Hasta este tic de la sala (excluido) no abre otro ataque: la recuperación de su último golpe. */
   readonly recuperaHastaTic: number;
+  /**
+   * EL RELOJ DEL OLVIDO (L10, `OlvidoDeclarado`): el último tic de la sala en que tuvo a un asiento presente a
+   * la distancia del olvido o menos —o en que nació, o en que no le corría el reloj (atacando, apuntando,
+   * disparando, caída, absorbiendo o deshecha)—. Se olvida cuando `tic − cercaEnTic` llega a los tics del
+   * olvido. Sin olvido en el encuentro, se queda en el tic en que nació.
+   */
+  readonly cercaEnTic: number;
 }
 
 /**

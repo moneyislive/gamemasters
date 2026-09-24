@@ -17,11 +17,18 @@
  *      `problemasDeLaDeclaracion`, y cada una de sus versiones rotas no, con el problema nombrado: entre
  *      ellas, las que el cable o la plataforma no podrían transportar (un aforo que no cabe en la foto, un
  *      suelo fuera de la liza o de lado nulo, un sitio de nacer dentro de una caja o fuera del límite) y
- *      las que tendrían dos jueces para un impacto (una esquiva con intocable).
+ *      las que tendrían dos jueces para un impacto (una esquiva con intocable). Y lo mismo con las
+ *      declaraciones de la liza ABIERTA (L1-L12), que aún no están en la sala: dos ampliaciones de juguete
+ *      pasan `problemasDeLaAmpliacion` y cada una de sus versiones rotas no; y la ronda más pesada con su
+ *      zona (L7) sigue cabiendo en la mesa. L10 (el alcance de blanco y el olvido) ya entró en
+ *      `LizaDeclarada`: la de juguete lo declara entero, su forma transitoria —sin ellos— también pasa y se
+ *      lee como «sin tope, sin olvido», y sus versiones rotas no pasan.
  *   3. EL CABLE (`protocolo.ts`): cada mensaje, en los dos sentidos, va y vuelve igual por su escritor y
  *      su lector; los lectores tiran cualquier clave de más o de menos, cualquier tipo o rango
  *      equivocado; la subida más larga que el lector admite cabe en 256 bytes; y la bajada más larga —la
- *      foto llena y el `tic` lleno de los sucesos más largos— cabe en su tope.
+ *      foto llena y el `tic` lleno de los sucesos más largos— cabe en su tope. Con los sucesos de la liza
+ *      abierta: `disparo`, `progreso` y el `ro` de `nace`, que viaja siempre (el `nace` que la sala escribe
+ *      todavía sin él sale con 0).
  *   4. LOS VEREDICTOS, EL REGISTRO Y EL COSTE: los lectores de `arcade:*` son estrictos; el `arcade:ronda`
  *      más pesado que se puede declarar cabe en la carga que admite la mesa (`presupuesto.ts`); el
  *      registro de lizas se prueba con uno de juguete —cero filas no se leen como «vigilado»—; y el
@@ -30,6 +37,13 @@
  *      tiran lo demás, incluida la vista incoherente (una noche sin número, un historial del futuro); los
  *      nombres no dicen ninguna palabra de la franquicia vecina; y el puente no acepta un mensaje por lo
  *      que el propio mensaje diga de sí mismo.
+ *   6. LA COLUMNA DE LA CIUDAD ABIERTA (`quiebro-ciudad.ts`, `orientacion.ts`): las medidas de 540 m
+ *      caben en la Liza y en el cable; el molinete de distritos es el del diseño con las ocho simetrías,
+ *      que son ocho permutaciones distintas con su inversa; la numeración de zonas, clases y límites es
+ *      única y cabe en 255; las celdas reparten el plano y las cajas sin dejarse ni repetir nada; los
+ *      campos de distancias dan lo de Bellman-Ford y el nudo más cercano lo de la fuerza bruta; los tríos
+ *      de Fallos, los de la fuerza bruta; las firmas sin escribir lanzan `CiudadSinEscribir` y nada más
+ *      (y en cuanto den una ciudad, se mira su forma); y el HUD pone el minimapa y el plano del derecho.
  *
  * Hay más muestras MALAS que buenas a propósito: la promesa de un lector estricto es `null` ante lo
  * que no sea exactamente un mensaje, y eso sólo se demuestra enseñándole lo que no es.
@@ -56,23 +70,36 @@ import { UNO } from '../../shared/mecanicas/fijo';
 import { arenaDe, chocaConCuerpo } from '../../shared/mecanicas/mundo';
 import {
   accionesDelCable,
+  alcanceDeBlancoDe,
+  ampliacionDeHoy,
   arenaDeLaLiza,
   esClaveCorta,
   leerCargaDeAusente,
   leerCargaDeReloj,
   leerCargaDeRonda,
   numeroDelAsiento,
+  olvidoDelEncuentro,
   pesoDeLaRondaMasLarga,
+  problemasDeLaAmpliacion,
   problemasDeLaDeclaracion,
   TOPE_DE_ASIENTOS,
+  TOPE_DE_CANTIDAD,
   TOPE_DE_CARGA_DE_LA_MESA,
+  TOPE_DE_CASILLAS,
   TOPE_DE_COLUMNAS,
   TOPE_DE_ENTIDADES,
+  TOPE_DE_GRUPOS,
+  TOPE_DE_ID,
   TOPE_DE_MULTIPLICADOR,
+  TOPE_DE_NUDOS,
+  TOPE_DE_RONDAS,
+  TOPE_DE_TICS,
   VERSION_DE_LA_DECLARACION,
 } from '../../shared/mecanicas/liza/declaracion';
 import type {
   AccionDeclarada,
+  AmpliacionDeLaLiza,
+  CargaDeRondaConZona,
   EfectoDeclarado,
   LizaDeclarada,
   PuestaDeEstado,
@@ -90,6 +117,7 @@ import {
   pruebaDeLosa,
   puntoDelTramo,
   rumboHacia,
+  TOPE_DE_DIFERENCIA,
   TOPE_DE_LA_LIZA,
   tramoTocaCuerpo,
   trayectoria,
@@ -103,7 +131,9 @@ import {
   leerMensajeDelAparato,
   leerSuceso,
   MOTIVO_DE_IRSE,
+  rondaDelNace,
   rutaDeLaLiza,
+  TOPE_DE_NUMERO,
   textoDeLaSala,
   textoDelAparato,
   TOPE_DE_AQUIS_DE_GOLPE,
@@ -157,6 +187,65 @@ import {
   vieneDelAnfitrion,
 } from '../../escritorio/src/quiebro/contrato';
 import type { MensajeDelAnfitrion, MensajeDelDocumento } from '../../escritorio/src/quiebro/contrato';
+import {
+  ARCAS_POR_CIUDAD,
+  BORDE_DE_LA_CIUDAD,
+  CABINAS_POR_CIUDAD,
+  cajasDeLaCelda,
+  caminoPorElCampo,
+  campoHasta,
+  caraSimetrica,
+  CASILLAS_DE_LA_CIUDAD,
+  CASILLAS_DEL_CENTRO_AL_BORDE,
+  celdaDe,
+  celdaDelIndice,
+  CELDAS,
+  CERCO_DE_LA_CIUDAD,
+  ciudadDeLaMesa,
+  CiudadSinEscribir,
+  CLASE_DE_ZONA_DE_CABINA,
+  CLASE_DE_ZONA_DE_REFUGIO,
+  claseDeZonaDeArca,
+  claseDeZonaDePlaza,
+  CRUCES,
+  DISTRITOS,
+  distanciaPorCalles,
+  distritoDelHueco,
+  EJES_DE_LA_CIUDAD,
+  FALLO_MAS_CERCA,
+  FALLO_MAS_LEJOS,
+  huecoAntesDeLaSimetria,
+  huecoDelIndice,
+  HUECOS,
+  huecoSimetrico,
+  ID_DEL_LIMITE_DE_LA_CIUDAD,
+  idDelLimiteDePlaza,
+  idDeZonaDeArca,
+  idDeZonaDeCabina,
+  idDeZonaDePlaza,
+  idDeZonaDeRefugio,
+  indiceDeCelda,
+  indiceDeHueco,
+  LADO_DE_CASILLA_DE_LA_CIUDAD,
+  LADO_DE_LA_CIUDAD,
+  nudoMasCercano,
+  partesDeLaTraza,
+  PLAZAS_POR_CIUDAD,
+  puntoAntesDeLaSimetria,
+  puntoSimetrico,
+  queZonaEs,
+  rectanguloDeLaCelda,
+  REFUGIOS_POR_CIUDAD,
+  rumboSimetrico,
+  SIMETRIAS,
+  TRAMOS,
+  TRAZAS,
+  triosDeFallos,
+  ULTIMA_ZONA_DE_LA_CIUDAD,
+} from '../../shared/arcade/juegos/quiebro-ciudad';
+import type { CajaDeLaCiudad, GrafoDeLaCiudad, IdDeDistrito, PlazaDeLaCiudad, TipoDeZonaDePlaza } from '../../shared/arcade/juegos/quiebro-ciudad';
+import { barrioDeLaNoche } from '../../shared/arcade/juegos/quiebro-barrio';
+import { alMinimapa, alPlano, delPlano, LADO_DEL_LIENZO, metrosQueSeEnsenan } from '../../escritorio/src/quiebro/orientacion';
 import { TOPE_CARGA_BYTES } from '../src/arcade/presupuesto';
 import { arnes } from './arnes';
 import { sinComentarios } from './sin-comentarios';
@@ -614,6 +703,7 @@ function lizaDeJuguete(): LizaDeclarada {
           },
           salenComoMinimo: [1, 1],
         },
+        olvido: { distancia: u(90), tics: 200 },
       },
     },
     asientos: [reglas('a1'), reglas('a2')],
@@ -645,7 +735,7 @@ function lizaDeJuguete(): LizaDeclarada {
           respuesta: 41,
           esquivaAlAzar: { acciones: [2], probabilidad: UNO / 2 },
         },
-        cerebro: { distanciaMinima: 0, distanciaMaxima: u(1.1), decideCadaTics: 4, costeCuerpoACuerpo: 2, costeDisparo: 1, sigueElGrafo: true },
+        cerebro: { distanciaMinima: 0, distanciaMaxima: u(1.1), decideCadaTics: 4, costeCuerpoACuerpo: 2, costeDisparo: 1, sigueElGrafo: true, alcanceDeBlanco: u(45) },
         aparicion: { modo: 'imprimir', tics: 24 },
         alCaer: {
           tipo: 'rematable',
@@ -663,7 +753,7 @@ function lizaDeJuguete(): LizaDeclarada {
         acciones: [golpe(42, { anuncioTics: 14, enganche: null, alFallar: null, efecto: efecto(8, null) })],
         proyectil: 0,
         guardia: null,
-        cerebro: { distanciaMinima: 0, distanciaMaxima: u(1.1), decideCadaTics: 4, costeCuerpoACuerpo: 1, costeDisparo: 0, sigueElGrafo: false },
+        cerebro: { distanciaMinima: 0, distanciaMaxima: u(1.1), decideCadaTics: 4, costeCuerpoACuerpo: 1, costeDisparo: 0, sigueElGrafo: false, alcanceDeBlanco: u(45) },
         aparicion: { modo: 'desdePunto', tics: 10 },
         alCaer: { tipo: 'irse' },
       },
@@ -794,6 +884,20 @@ const ROTAS: readonly [string, string, unknown, string][] = [
   ['portables sin sitio para sus montones', 'aforo.montones', 0, 'ningún montón cabe'],
   ['una lista que falta', 'mundo.limites', QUITAR, 'tiene que ser una lista'],
   ['el catálogo de estados entero, que falta', 'estados', QUITAR, 'la forma del contrato'],
+  /* L10, ya en la declaración: el alcance de blanco de cada clase y el olvido del encuentro. */
+  ['un olvido a distancia 0', 'fase.encuentro.olvido.distancia', 0, 'olvido.distancia'],
+  ['un olvido sin su distancia', 'fase.encuentro.olvido.distancia', QUITAR, 'olvido.distancia'],
+  ['un olvido que no espera nada (0 tics)', 'fase.encuentro.olvido.tics', 0, 'olvido.tics'],
+  ['un olvido de más de una hora', 'fase.encuentro.olvido.tics', TOPE_DE_TICS + 1, 'olvido.tics'],
+  ['un olvido que es un número', 'fase.encuentro.olvido', 90, '{distancia, tics} o null'],
+  ['un olvido sin definir (undefined)', 'fase.encuentro.olvido', undefined, '{distancia, tics} o null'],
+  /* «alcanceDeBlanco: vale» es la frase del rango; la de «cabe en el olvido» dice «alcanceDeBlanco: es». */
+  ['un alcance de blanco negativo', 'clases.1.cerebro.alcanceDeBlanco', -u(1), 'alcanceDeBlanco: vale'],
+  ['un alcance de blanco con decimales', 'clases.0.cerebro.alcanceDeBlanco', 1.5, 'alcanceDeBlanco: vale'],
+  ['un alcance de blanco más allá de la liza', 'clases.0.cerebro.alcanceDeBlanco', 2 * TOPE_DE_LA_LIZA + 1, 'alcanceDeBlanco: vale'],
+  ['un alcance de blanco más largo que el olvido', 'clases.0.cerebro.alcanceDeBlanco', u(91), 'se olvidaría persiguiendo'],
+  ['una clase sin tope (0) en un encuentro con olvido', 'clases.1.cerebro.alcanceDeBlanco', 0, 'sin tope (0)'],
+  ['una clase sin alcance (la forma transitoria) en un encuentro con olvido', 'clases.1.cerebro.alcanceDeBlanco', QUITAR, 'sin tope (0)'],
 ];
 for (const [que, ruta, valor, dice] of ROTAS) {
   const rota = conCambio(JUGUETE, ruta, valor) as LizaDeclarada;
@@ -814,6 +918,248 @@ for (const [que, ruta, valor, dice] of ROTAS) {
   /* La que la revisión encontró en verde: ventana de 250 ms y 1 tic de intocable, con torpe. */
   const doble = conCambio(conCambio(JUGUETE, 'asientos.0.esquiva.esquivaHastaMs', 250), 'asientos.0.esquiva.puesta.intocableTics', 1) as LizaDeclarada;
   comprobar('una esquiva que se juzgaría dos veces (ventana e intocable) no pasa', problemasDeLaDeclaracion(doble).some((p) => p.includes('no tiene intocable')));
+}
+{
+  /*
+   * L10 · LA FORMA TRANSITORIA Y LA NEUTRA. La de juguete declara L10 entero (alcance de 45 en las dos
+   * clases, olvido a 90 en 200 tics). Sin alcance en ningún cerebro ni olvido en el encuentro —como la
+   * escriben los productores que aún no declaran L10— no tiene problemas y se lee como «sin tope, sin
+   * olvido»; y la entera con alcance 0 y olvido `null`, igual. Lo que se comprueba jugando, en `verify:liza`.
+   */
+  const sinL10 = conCambio(conCambio(conCambio(JUGUETE, 'fase.encuentro.olvido', QUITAR), 'clases.0.cerebro.alcanceDeBlanco', QUITAR), 'clases.1.cerebro.alcanceDeBlanco', QUITAR) as LizaDeclarada;
+  const neutra = conCambio(conCambio(conCambio(JUGUETE, 'fase.encuentro.olvido', null), 'clases.0.cerebro.alcanceDeBlanco', 0), 'clases.1.cerebro.alcanceDeBlanco', 0) as LizaDeclarada;
+  comprobar(
+    'L10: la forma transitoria (sin alcance de blanco ni olvido) y la neutra (alcance 0, olvido null) no tienen problemas',
+    problemasDeLaDeclaracion(sinL10).length === 0 && problemasDeLaDeclaracion(neutra).length === 0,
+    [...problemasDeLaDeclaracion(sinL10), ...problemasDeLaDeclaracion(neutra)],
+  );
+  const enSinL10 = sinL10.fase.encuentro;
+  const enNeutra = neutra.fase.encuentro;
+  const enEntera = JUGUETE.fase.encuentro;
+  comprobar(
+    'L10: la transitoria se lee como la neutra —sin tope y sin olvido— y la entera con sus números',
+    enSinL10 !== null &&
+      enNeutra !== null &&
+      enEntera !== null &&
+      !('olvido' in enSinL10) &&
+      olvidoDelEncuentro(enSinL10) === null &&
+      olvidoDelEncuentro(enNeutra) === null &&
+      igual(olvidoDelEncuentro(enEntera), { distancia: u(90), tics: 200 }) &&
+      sinL10.clases.every((c) => !('alcanceDeBlanco' in c.cerebro) && alcanceDeBlancoDe(c.cerebro) === 0) &&
+      neutra.clases.every((c) => alcanceDeBlancoDe(c.cerebro) === 0) &&
+      JUGUETE.clases.every((c) => alcanceDeBlancoDe(c.cerebro) === u(45)),
+  );
+  const hoy = ampliacionDeHoy(JUGUETE);
+  comprobar(
+    'L10 ya no está en la ampliación: ni olvido ni alcance de blanco en la de hoy (entró en la declaración)',
+    !('olvido' in hoy) && hoy.clases.length === 2 && hoy.clases.every((c) => Object.keys(c).join(',') === 'desprevenida'),
+    hoy,
+  );
+}
+
+/*
+ * ═══ LA LIZA ABIERTA: L1-L12, ANTES DE QUE LA SALA LAS CUMPLA ═══
+ *
+ * (L10 ya la cumple: está arriba, con la declaración.)
+ *
+ * Las declaraciones nuevas viven con su forma en `AmpliacionDeLaLiza` hasta que la sala las cumpla (ver
+ * «Lo que entra» en `declaracion.ts`). Aquí se revisan contra dos lizas de juguete: la de arriba con cuatro
+ * grupos (se sale por una zona de acción con dos bandas, hay una ronda, una calma y un rezagado) y la
+ * misma con un encuentro que se gana cumpliendo un objetivo (dos grupos que se abren al entrar, excluyentes).
+ * Las dos ampliaciones buenas no tienen problemas, y cada una de sus versiones rotas sí, con el problema
+ * nombrado.
+ */
+paso('La liza abierta (L1-L12): las ampliaciones buenas y sus versiones rotas');
+
+/** El juguete con cuatro grupos: los dos de arriba, uno para el rezagado y otro para el refuerzo de la ronda. */
+const JUGUETE_ABIERTO = conCambio(JUGUETE, 'fase.encuentro.grupos', [
+  ...(JUGUETE.fase.encuentro?.grupos ?? []),
+  { clase: 2, cuantos: [2, 2], vivasALaVez: [2, 2], claseDeZona: 1, desdeTic: 0, cadaTics: 20, eleccion: 'azar' },
+  { clase: 2, cuantos: [2, 2], vivasALaVez: [2, 2], claseDeZona: 1, desdeTic: 40, cadaTics: 0, eleccion: 'azar' },
+]) as LizaDeclarada;
+/** Y el mismo con un encuentro que acaba al vaciarse (el objetivo de la ampliación lo sustituye). */
+const JUGUETE_CON_OBJETIVO = conCambio(conCambio(JUGUETE_ABIERTO, 'fase.encuentro.fin', { tipo: 'vaciar' }), 'fase.encuentro.grupos.1.eleccion', 'azar') as LizaDeclarada;
+
+const AMPLIADA: AmpliacionDeLaLiza = {
+  grupos: [
+    {
+      eleccion: { tipo: 'nudo', desde: u(2), hasta: u(6), sesgo: 'delante', conoRumbos: 43, sinVista: true },
+      disparo: { tipo: 'calma', tics: 400, radioDeCombate: u(15), lejosDeZonas: { conjunto: 0, distancia: u(60) }, veces: 2, secundarios: { racimos: 1, miembros: 2, minimo: 3 } },
+    },
+    { eleccion: { tipo: 'zonaDeAccion', banda: 1 }, disparo: { tipo: 'tic' } },
+    { eleccion: { tipo: 'nudo', desde: u(2), hasta: u(5), sesgo: 'detras', conoRumbos: 43, sinVista: true }, disparo: { tipo: 'rezagado', distancia: u(70), tics: 200, cadaTics: 300, vivas: 2 } },
+    { eleccion: { tipo: 'nudo', desde: u(2), hasta: u(6), sesgo: 'cualquiera', conoRumbos: 0, sinVista: true }, disparo: { tipo: 'ronda' } },
+  ],
+  rondas: {
+    aLaVez: 1,
+    lista: [
+      {
+        miembros: [2, 2],
+        ruta: [0, 1, 2, 3],
+        paso: u(1.4),
+        separacion: u(1.5),
+        desfaseTics: 17,
+        materializa: u(60),
+        alOlvidarse: 'guion',
+        vista: { radio: u(20), conoRumbos: 43 },
+        oido: { radio: u(6), aLaCarrera: u(12) },
+        alarmaTics: 40,
+        refuerzo: 4,
+      },
+    ],
+  },
+  fin: null,
+  salida: {
+    claseDeZona: 2,
+    accion: 13,
+    radio: u(1.5),
+    mantenerTics: 30,
+    capacidad: 1,
+    puesta: nada(5, 30),
+    rompeConDano: true,
+    activaTics: 1000,
+    alApagarse: { coste: 1, siguienteTics: 800 },
+    activasALaVez: 2,
+    bandas: [
+      { desde: u(5), hasta: u(8), puntos: 0 },
+      { desde: u(9), hasta: u(13), puntos: 100 },
+    ],
+    relevo: { desde: u(5), hasta: u(10), puntos: 0 },
+    efecto: { tipo: 'salir' },
+  },
+  zonasDeAccion: [
+    {
+      claseDeZona: 1,
+      accion: 14,
+      radio: u(1.5),
+      mantenerTics: 20,
+      capacidad: 1,
+      puesta: nada(5, 20),
+      rompeConDano: true,
+      activaTics: 1000,
+      alApagarse: { coste: 0, siguienteTics: 1 },
+      activasALaVez: 1,
+      bandas: [],
+      relevo: null,
+      efecto: { tipo: 'soltar', portable: 1, cuantos: 2 },
+    },
+  ],
+  racimos: { une: u(35), separa: u(45), cadaTics: 10, rumboTics: 40 },
+  puntoDeControl: { x: u(-3), z: u(-3) },
+  reaparicion: 'cercaDelGrupo',
+  avisos: ['entidad', 'asiento', 'nudo'],
+  clases: [{ desprevenida: { factor: 2 * UNO, puntos: 40 } }, { desprevenida: null }],
+};
+
+const CON_OBJETIVO: AmpliacionDeLaLiza = {
+  ...ampliacionDeHoy(JUGUETE_CON_OBJETIVO),
+  grupos: [
+    { eleccion: 'azar', disparo: { tipo: 'entrar', zona: 1, radio: u(30), minimo: [1, 1], conjunto: 1 } },
+    { eleccion: 'azar', disparo: { tipo: 'entrar', zona: 2, radio: u(30), minimo: [1, 2], conjunto: 1 } },
+    { eleccion: { tipo: 'nudo', desde: u(2), hasta: u(6), sesgo: 'cualquiera', conoRumbos: 0, sinVista: false }, disparo: { tipo: 'tic' } },
+    { eleccion: 'azar', disparo: { tipo: 'tic' } },
+  ],
+  fin: { tipo: 'objetivo', conjunto: 1, como: { tipo: 'leer', accion: 20, radio: u(1.5), tics: 240, capacidad: 2, rompeConDano: true, puesta: nada(5, 20) }, disuelveTrasTics: 60 },
+};
+{
+  comprobar('(control: el juguete de cuatro grupos y el del objetivo son declaraciones sin problemas)', problemasDeLaDeclaracion(JUGUETE_ABIERTO).length === 0 && problemasDeLaDeclaracion(JUGUETE_CON_OBJETIVO).length === 0, [
+    ...problemasDeLaDeclaracion(JUGUETE_ABIERTO),
+    ...problemasDeLaDeclaracion(JUGUETE_CON_OBJETIVO),
+  ]);
+  const hoy = ampliacionDeHoy(JUGUETE);
+  comprobar(
+    'la ampliación de hoy (todo sale por tic, nada de lo nuevo) no tiene problemas, y dice lo de hoy con la forma de mañana',
+    problemasDeLaAmpliacion(JUGUETE, hoy).length === 0 && hoy.grupos.length === 2 && hoy.grupos.every((g) => g.disparo.tipo === 'tic') && hoy.salida?.activasALaVez === 1 && hoy.reaparicion === 'orden',
+    problemasDeLaAmpliacion(JUGUETE, hoy),
+  );
+  comprobar('la ampliada (nudos, calma, rezagado, una ronda, dos bandas, un arca, racimos…) no tiene problemas', problemasDeLaAmpliacion(JUGUETE_ABIERTO, AMPLIADA).length === 0, problemasDeLaAmpliacion(JUGUETE_ABIERTO, AMPLIADA));
+  const comos: readonly [string, unknown][] = [
+    ['leyendo', CON_OBJETIVO.fin?.como],
+    ['rematando', { tipo: 'rematar', clase: 1 }],
+    ['vaciando', { tipo: 'vaciar' }],
+  ];
+  for (const [que, como] of comos) {
+    const a = conCambio(CON_OBJETIVO, 'fin.como', como) as AmpliacionDeLaLiza;
+    comprobar(`la de un objetivo que se cumple ${que} no tiene problemas`, problemasDeLaAmpliacion(JUGUETE_CON_OBJETIVO, a).length === 0, problemasDeLaAmpliacion(JUGUETE_CON_OBJETIVO, a));
+  }
+}
+{
+  const grafoEnorme = { nudos: Array.from({ length: TOPE_DE_NUDOS + 1 }, () => ({ x: 0, z: 0 })), aristas: [] };
+  const sesentaYCinco = Array.from({ length: TOPE_DE_GRUPOS + 1 }, () => ({ clase: 2, cuantos: [1, 1], vivasALaVez: [1, 1], claseDeZona: 1, desdeTic: 0, cadaTics: 0, eleccion: 'azar' }));
+  const conGruposDeMas = conCambio(JUGUETE_CON_OBJETIVO, 'fase.encuentro.grupos', sesentaYCinco) as LizaDeclarada;
+  const ROTAS_DE_LA_AMPLIACION: readonly [string, LizaDeclarada, AmpliacionDeLaLiza, string, unknown, string][] = [
+    ['un grupo de menos', JUGUETE_ABIERTO, AMPLIADA, 'grupos', AMPLIADA.grupos.slice(0, 3), 'uno por grupo'],
+    ['un nudo con la banda del revés', JUGUETE_ABIERTO, AMPLIADA, 'grupos.0.eleccion.hasta', u(1), 'de menos a más'],
+    ['un sesgo que no existe', JUGUETE_ABIERTO, AMPLIADA, 'grupos.0.eleccion.sesgo', 'arriba', 'sesgo'],
+    ['un cono en un nudo sin sesgo', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'grupos.2.eleccion.conoRumbos', 10, 'sin sesgo no hay cono'],
+    ['la zona de una banda que no hay', JUGUETE_ABIERTO, AMPLIADA, 'grupos.1.eleccion.banda', 2, 'eleccion.banda'],
+    ['la zona de una banda sin bandas', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'grupos.3.eleccion', { tipo: 'zonaDeAccion', banda: 0 }, 'no tiene bandas'],
+    ['un disparo que no existe', JUGUETE_ABIERTO, AMPLIADA, 'grupos.1.disparo', { tipo: 'pronto' }, "tiene que ser 'tic'"],
+    ['entrar en una zona que no hay', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'grupos.0.disparo.zona', 9, 'no está declarado'],
+    ['un mínimo para entrar que no se puede cumplir', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'grupos.1.disparo.minimo', [2, 2], 'no saltaría nunca'],
+    ['un mínimo que no es uno por presentes', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'grupos.1.disparo.minimo', [1], 'uno por cada número de presentes'],
+    ['una calma con racimos secundarios y sin racimos', JUGUETE_ABIERTO, AMPLIADA, 'racimos', null, 'no hay secundarios'],
+    ['una calma que no salta nunca (0 veces)', JUGUETE_ABIERTO, AMPLIADA, 'grupos.0.disparo.veces', 0, 'disparo.veces'],
+    ['un rezagado a distancia 0', JUGUETE_ABIERTO, AMPLIADA, 'grupos.2.disparo.distancia', 0, 'disparo.distancia'],
+    ['un grupo que salta con una ronda y ninguna lo nombra', JUGUETE_ABIERTO, AMPLIADA, 'rondas', null, 'ninguna ronda lo nombra'],
+    ['una ronda cuyo circuito salta por encima de lo que se anda', JUGUETE_ABIERTO, AMPLIADA, 'rondas.lista.0.ruta', [0, 2], 'no hay arista'],
+    ['una ronda por un nudo que no hay', JUGUETE_ABIERTO, AMPLIADA, 'rondas.lista.0.ruta', [0, 1, 7], 'ruta[2]'],
+    ['una ronda de una clase que no hay', JUGUETE_ABIERTO, AMPLIADA, 'rondas.lista.0.miembros', [7], 'la clase'],
+    ['una ronda de siete miembros', JUGUETE_ABIERTO, AMPLIADA, 'rondas.lista.0.miembros', [2, 2, 2, 2, 2, 2, 2], 'de 1 a 6'],
+    ['una ronda que oye menos a la carrera', JUGUETE_ABIERTO, AMPLIADA, 'rondas.lista.0.oido.aLaCarrera', u(3), 'a la carrera'],
+    ['una ronda que llama a un grupo que no salta con ella', JUGUETE_ABIERTO, AMPLIADA, 'rondas.lista.0.refuerzo', 3, 'no salta con el aviso'],
+    ['rondas que no caben en el aforo', JUGUETE_ABIERTO, AMPLIADA, 'rondas.aLaVez', 4, 'el aforo es'],
+    ['treinta y tres rondas', JUGUETE_ABIERTO, AMPLIADA, 'rondas.lista', Array.from({ length: TOPE_DE_RONDAS + 1 }, () => AMPLIADA.rondas?.lista[0]), `de 1 a ${String(TOPE_DE_RONDAS)}`],
+    ['un objetivo que ningún grupo abre', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'fin.conjunto', 2, 'no se abriría nunca'],
+    ['rematar una clase que no se remata', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'fin.como', { tipo: 'rematar', clase: 2 }, 'no se remata'],
+    ['leer con el id de otra acción', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'fin.como.accion', 12, 'ya lo usa otra acción'],
+    ['leer con capacidad 0', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'fin.como.capacidad', 0, 'fin.como.capacidad'],
+    ['un objetivo que no se cumple de ninguna forma conocida', JUGUETE_CON_OBJETIVO, CON_OBJETIVO, 'fin.como', { tipo: 'aguantar' }, "tiene que ser 'vaciar'"],
+    ['un objetivo en un encuentro que acaba por una salida', JUGUETE_ABIERTO, AMPLIADA, 'fin', CON_OBJETIVO.fin, 'acaba de una forma'],
+    ['dos zonas activas con una banda', JUGUETE_ABIERTO, AMPLIADA, 'salida.bandas', AMPLIADA.salida?.bandas.slice(0, 1), 'una banda por cada una'],
+    ['una banda del revés', JUGUETE_ABIERTO, AMPLIADA, 'salida.bandas.0.hasta', u(1), 'de menos a más'],
+    ['cuatro zonas activas a la vez', JUGUETE_ABIERTO, AMPLIADA, 'salida.activasALaVez', 4, 'activasALaVez'],
+    ['la ampliación de otra zona que la del fin', JUGUETE_ABIERTO, AMPLIADA, 'salida.accion', 99, 'se amplía la que hay'],
+    ['una zona del fin que suelta', JUGUETE_ABIERTO, AMPLIADA, 'salida.efecto', { tipo: 'soltar', portable: 1, cuantos: 1 }, 'la zona del fin hace salir'],
+    ['sin la ampliación de la zona del fin', JUGUETE_ABIERTO, AMPLIADA, 'salida', null, 'falta su ampliación'],
+    ['una zona que suelta un portable que no hay', JUGUETE_ABIERTO, AMPLIADA, 'zonasDeAccion.0.efecto.portable', 3, 'el portable'],
+    ['una zona que suelta con el id de otra acción', JUGUETE_ABIERTO, AMPLIADA, 'zonasDeAccion.0.accion', 13, 'ya lo usa otra acción'],
+    ['una zona de acción del encuentro que hace salir', JUGUETE_ABIERTO, AMPLIADA, 'zonasDeAccion.0.efecto', { tipo: 'salir' }, "'salir' es de la zona del fin"],
+    ['racimos que se separan antes de unirse', JUGUETE_ABIERTO, AMPLIADA, 'racimos.une', u(50), 'se separan antes de unirse'],
+    ['un punto de control fuera del límite de la fase', JUGUETE_ABIERTO, AMPLIADA, 'puntoDeControl', { x: u(13), z: 0 }, 'fuera del límite'],
+    ['una forma de reaparecer que no existe', JUGUETE_ABIERTO, AMPLIADA, 'reaparicion', 'lejos', 'reaparicion'],
+    ['un aviso de más', JUGUETE_ABIERTO, AMPLIADA, 'avisos', ['entidad', 'asiento', 'nudo', 'nudo'], 'una por clase'],
+    ['un aviso que apunta a algo que no existe', JUGUETE_ABIERTO, AMPLIADA, 'avisos.2', 'plaza', "'nudo'"],
+    ['una clase de entidad de menos', JUGUETE_ABIERTO, AMPLIADA, 'clases', AMPLIADA.clases.slice(0, 1), 'clases de entidad'],
+    ['un golpe al desprevenido que hace la mitad', JUGUETE_ABIERTO, AMPLIADA, 'clases.0.desprevenida.factor', UNO / 2, 'desprevenida.factor'],
+    ['una ampliación que no es dato llano', JUGUETE_ABIERTO, AMPLIADA, 'racimos.cadaTics', undefined, 'canonico'],
+    ['más nudos de los que el aviso lleva en el cable', conCambio(JUGUETE_ABIERTO, 'mundo.grafo', grafoEnorme) as LizaDeclarada, AMPLIADA, 'rondas', null, `caben ${String(TOPE_DE_NUDOS)}`],
+    ['sesenta y cinco grupos', conGruposDeMas, { ...ampliacionDeHoy(conGruposDeMas) }, 'reaparicion', 'orden', `caben ${String(TOPE_DE_GRUPOS)}`],
+  ];
+  for (const [que, base, buena, ruta, valor, dice] of ROTAS_DE_LA_AMPLIACION) {
+    const rota = conCambio(buena, ruta, valor) as AmpliacionDeLaLiza;
+    let problemas: string[] = [];
+    let lanzo: unknown = null;
+    try {
+      problemas = problemasDeLaAmpliacion(base, rota);
+    } catch (error) {
+      lanzo = error;
+    }
+    comprobar(`ampliación rota (${que}): tiene problemas, sin lanzar, y alguno dice «${dice}»`, lanzo === null && problemas.some((p) => p.includes(dice)), lanzo === null ? problemas.slice(0, 4) : String(lanzo));
+  }
+}
+{
+  /* L7: la ronda más pesada, con su zona, sigue cabiendo en la carga de la mesa. */
+  const cuentas: number[][] = [];
+  for (let i = 0; i < TOPE_DE_ASIENTOS; i++) cuentas.push([TOPE_DE_ASIENTOS, ...Array.from({ length: TOPE_DE_COLUMNAS }, () => Number.MAX_SAFE_INTEGER)]);
+  const conZona: CargaDeRondaConZona = { n: TOPE_DE_CANTIDAD, resultado: 'aguantada', cuentas, recurso: TOPE_DE_CANTIDAD, zona: TOPE_DE_ID };
+  const pesa = canonico(conZona).length;
+  comprobar(
+    'L7: el arcade:ronda más pesado CON su zona (quince asientos, veinticuatro columnas, la zona 255) cabe en la carga de la mesa, y pesa 11 bytes más que sin ella',
+    pesa <= TOPE_CARGA_BYTES && pesa - pesoDeLaRondaMasLarga(TOPE_DE_ASIENTOS, TOPE_DE_COLUMNAS) === 11,
+    { pesa, tope: TOPE_CARGA_BYTES, sin: pesoDeLaRondaMasLarga(TOPE_DE_ASIENTOS, TOPE_DE_COLUMNAS) },
+  );
+  comprobar('L8: el índice de un nudo más uno cabe en el objetivo de un aviso del cable (hasta 65.535)', TOPE_DE_NUDOS === TOPE_DE_NUMERO, { TOPE_DE_NUDOS, TOPE_DE_NUMERO });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -918,7 +1264,7 @@ const SUCESOS: readonly SucesoDelTic[] = [
   { e: 'estado', a: 16, est: 0, tics: 0, into: 0 },
   { e: 'empuja', a: 17, r: 64, d: 300, caja: 2 },
   { e: 'empuja', a: 18, r: 0, d: 500, caja: 0 },
-  { e: 'nace', id: 17, clase: 1, x: -1200, z: 51200, r: 128 },
+  { e: 'nace', id: 17, clase: 1, x: -1200, z: 51200, r: 128, ro: 0 },
   { e: 'seva', id: 17, por: 2, quien: 1 },
   { e: 'seva', id: 19, por: 3, quien: 17 },
   { e: 'bala', id: 30, de: 18, p: 1, x: 100, z: -100, r: 200, t: -5 },
@@ -934,10 +1280,15 @@ const SUCESOS: readonly SucesoDelTic[] = [
   { e: 'recurso', n: 2 },
   { e: 'apunta', de: 18, a: 1, p: 1, x: 100, z: -100, t: 123000 },
   { e: 'apunta', de: 18, a: 0, p: 1, x: 100, z: -100, t: 0 },
+  { e: 'nace', id: 40, clase: 2, x: 300, z: -700, r: 64, ro: 3 },
+  { e: 'disparo', g: 2, ro: 0, x: -2400, z: 1800 },
+  { e: 'disparo', g: 4, ro: 1, x: 300, z: -700 },
+  { e: 'disparo', g: 0, ro: 3, x: 300, z: -700 },
+  { e: 'progreso', zona: 1, tics: 120 },
 ];
 {
   const clases = new Set(SUCESOS.map((s) => s.e));
-  comprobar('la lista de muestra lleva las dieciocho clases de suceso', clases.size === 18, [...clases]);
+  comprobar('la lista de muestra lleva las veinte clases de suceso (las dieciocho de hoy, `disparo` y `progreso`)', clases.size === 20, [...clases]);
 }
 const DE_LA_SALA: readonly MensajeDeLaSala[] = [
   { t: 'dentro', yo: 1, k: 400, x: -u(3), z: -u(3), r: 32, hz: 20 },
@@ -964,6 +1315,16 @@ for (const m of DE_LA_SALA) {
 {
   const conSobras = textoDeLaSala({ t: 'tic', k: 1, ev: [{ ...(SUCESOS[4] as SucesoDelTic), sobra: 1 } as unknown as SucesoDelTic] });
   comprobar('el escritor de la sala no deja pasar claves de más en un suceso', leerMensajeDeLaSala(conSobras) !== null, conSobras);
+  /* El `nace` que la sala escribe hoy, sin ronda: al cable sale con `ro` 0, y el lector lo lee con él. */
+  const deHoy = textoDeLaSala({ t: 'tic', k: 1, ev: [{ e: 'nace', id: 17, clase: 1, x: 0, z: 0, r: 0 }] });
+  const leido = leerMensajeDeLaSala(deHoy);
+  const nace = leido?.t === 'tic' ? leido.ev[0] : undefined;
+  comprobar(
+    'un `nace` escrito sin ronda (el de la sala de hoy) sale al cable con `ro` 0, se lee con él, y `rondaDelNace` da 0 de los dos',
+    deHoy.includes('"ro":0') && nace !== undefined && nace.e === 'nace' && rondaDelNace(nace) === 0 && rondaDelNace({ e: 'nace', id: 17, clase: 1, x: 0, z: 0, r: 0 }) === 0,
+    deHoy,
+  );
+  comprobar('y uno con ronda la conserva', rondaDelNace({ e: 'nace', id: 40, clase: 2, x: 0, z: 0, r: 0, ro: 3 }) === 3);
 }
 
 paso('Lo que dice la sala: lo que se rechaza');
@@ -983,6 +1344,20 @@ paso('Lo que dice la sala: lo que se rechaza');
     ['un estado con más intocable que duración', tic({ e: 'estado', a: 1, est: 3, tics: 5, into: 6 })],
     ['un nace con número de asiento', tic({ ...SUCESOS[8], id: 3 })],
     ['un nace fuera de la liza', tic({ ...SUCESOS[8], x: TOPE_DE_CENTESIMAS + 1 })],
+    ['un nace sin `ro` (la forma de antes, que ya no viaja)', tic({ e: 'nace', id: 17, clase: 1, x: 0, z: 0, r: 0 })],
+    ['un nace con un `ro` fuera de rango (33)', tic({ ...SUCESOS[8], ro: TOPE_DE_RONDAS + 1 })],
+    ['un nace con un `ro` negativo', tic({ ...SUCESOS[8], ro: -1 })],
+    ['un nace con un `ro` con decimales', tic({ ...SUCESOS[8], ro: 1.5 })],
+    ['un disparo sin `ro` (le falta una clave)', tic({ e: 'disparo', g: 2, x: 0, z: 0 })],
+    ['un disparo sin `g` (le falta una clave)', tic({ e: 'disparo', ro: 1, x: 0, z: 0 })],
+    ['un disparo con una clave de más', tic({ e: 'disparo', g: 2, ro: 0, x: 0, z: 0, t: 5 })],
+    ['un disparo de nada (grupo y ronda a 0)', tic({ e: 'disparo', g: 0, ro: 0, x: 0, z: 0 })],
+    ['un disparo de un grupo que no cabe (65)', tic({ e: 'disparo', g: TOPE_DE_GRUPOS + 1, ro: 0, x: 0, z: 0 })],
+    ['un disparo de una ronda que no cabe (33)', tic({ e: 'disparo', g: 0, ro: TOPE_DE_RONDAS + 1, x: 0, z: 0 })],
+    ['un disparo fuera de la liza', tic({ e: 'disparo', g: 1, ro: 0, x: TOPE_DE_CENTESIMAS + 1, z: 0 })],
+    ['un progreso de la zona 0', tic({ e: 'progreso', zona: 0, tics: 5 })],
+    ['un progreso de más de una hora', tic({ e: 'progreso', zona: 1, tics: TOPE_DE_TICS + 1 })],
+    ['un progreso sin tics', tic({ e: 'progreso', zona: 1 })],
     ['un seva por un motivo que no existe', tic({ e: 'seva', id: 17, por: 0, quien: 0 })],
     ['un seva sin quién (la forma vieja)', tic({ e: 'seva', id: 17, por: 2 })],
     ['una carga de una entidad (sólo llevan los asientos)', tic({ ...SUCESOS[12], a: 16 })],
@@ -1027,7 +1402,7 @@ paso('Lo que dice la sala: lo que cabe en el cable');
     { e: 'impacta', bala: 65535, a: 65535, r: 6, dano: 1000000, vida: 1000000 },
     { e: 'estado', a: 65535, est: 255, tics: 72000, into: 72000 },
     { e: 'empuja', a: 65535, r: 255, d: 2 * TOPE_DE_CENTESIMAS, caja: 4096 },
-    { e: 'nace', id: 65535, clase: 255, x: C, z: C, r: 255 },
+    { e: 'nace', id: 65535, clase: 255, x: C, z: C, r: 255, ro: TOPE_DE_RONDAS },
     { e: 'seva', id: 65535, por: 8, quien: 65535 },
     { e: 'bala', id: 65535, de: 65535, p: 255, x: C, z: C, r: 255, t: -T },
     { e: 'carga', a: 15, p: 255, n: 1000000 },
@@ -1040,9 +1415,11 @@ paso('Lo que dice la sala: lo que cabe en el cable');
     { e: 'cuenta', a: 15, vida: 1000000, medidor: 1000000, puntos: Number.MAX_SAFE_INTEGER, mult: TOPE_DE_MULTIPLICADOR },
     { e: 'recurso', n: 1000000 },
     { e: 'apunta', de: 65535, a: 65535, p: 255, x: C, z: C, t: -T },
+    { e: 'disparo', g: TOPE_DE_GRUPOS, ro: TOPE_DE_RONDAS, x: C, z: C },
+    { e: 'progreso', zona: 255, tics: TOPE_DE_TICS },
   ];
   const noLeidos = LARGOS.filter((s) => leerSuceso(JSON.parse(j(s))) === null);
-  comprobar('el más largo de cada una de las dieciocho clases se lee (son de verdad los topes)', noLeidos.length === 0 && new Set(LARGOS.map((s) => s.e)).size === 18, noLeidos);
+  comprobar('el más largo de cada una de las veinte clases se lee (son de verdad los topes)', noLeidos.length === 0 && new Set(LARGOS.map((s) => s.e)).size === 20, noLeidos);
   let peor = LARGOS[0] as SucesoDelTic;
   for (const s of LARGOS) if (bytes(j(s)) > bytes(j(peor))) peor = s;
   const lleno = textoDeLaSala({ t: 'tic', k: Number.MAX_SAFE_INTEGER, ev: Array.from({ length: TOPE_DE_SUCESOS }, () => peor) });
@@ -1188,22 +1565,27 @@ paso('El registro de lizas, con uno de juguete');
 
 paso('El coste de una sala y la admisión');
 {
+  /*
+   * Los coeficientes de la ciudad abierta (`docs/quiebro/CIUDAD-ABIERTA.md` §5.6: base 400, 250 por asiento,
+   * 300 por entidad y 40 por bala). Antes eran los del barrio (base 100 y 250 por entidad), con la sala llena
+   * en unos 5,9 ms/s y trece por proceso.
+   */
   const coste = costeDeLaLiza(JUGUETE);
-  comprobar('la liza de juguete (2 asientos, 14 entidades, 12 balas) cuesta 4.580 µs/s', coste === 4580, coste);
-  const llena = { ...JUGUETE, asientos: Array.from({ length: 6 }, (_, i) => reglas(`s${String(i)}`)), aforo: { entidades: 14, balas: 12, montones: 8 } };
-  const sola = { ...JUGUETE, asientos: [reglas('s0')], aforo: { entidades: 6, balas: 6, montones: 8 } };
+  comprobar('la liza de juguete (2 asientos, 14 entidades, 12 balas) cuesta 5.580 µs/s', coste === 5580, coste);
+  const llena = { ...JUGUETE, asientos: Array.from({ length: 6 }, (_, i) => reglas(`s${String(i)}`)), aforo: { entidades: 20, balas: 12, montones: 8 } };
+  const sola = { ...JUGUETE, asientos: [reglas('s0')], aforo: { entidades: 20, balas: 12, montones: 8 } };
   const [cLlena, cSola] = [costeDeLaLiza(llena), costeDeLaLiza(sola)];
   comprobar(
-    'y lo que el diseño estimaba (§12): la sala llena unos 5,9 ms/s y la solitaria unos 1,9, con un 10 % de margen',
-    Math.abs(cLlena - 5900) <= 590 && Math.abs(cSola - 1900) <= 190,
+    'y lo que declara el diseño de la ciudad abierta (§5.6), con el aforo de 20 entidades y 12 balas: la sala llena de seis 8.380 µs/s y la solitaria 7.130',
+    cLlena === 8380 && cSola === 7130,
     { llena: cLlena, sola: cSola },
   );
   comprobar(
-    'caben unas trece salas llenas y no veinte; y unas cuarenta solitarias y no cincuenta',
-    cabeOtraSala(Array.from({ length: 12 }, () => cLlena), cLlena) &&
-      !cabeOtraSala(Array.from({ length: 19 }, () => cLlena), cLlena) &&
-      cabeOtraSala(Array.from({ length: 34 }, () => cSola), cSola) &&
-      !cabeOtraSala(Array.from({ length: 49 }, () => cSola), cSola),
+    'caben nueve salas llenas y no diez; y once solitarias y no doce',
+    cabeOtraSala(Array.from({ length: 8 }, () => cLlena), cLlena) &&
+      !cabeOtraSala(Array.from({ length: 9 }, () => cLlena), cLlena) &&
+      cabeOtraSala(Array.from({ length: 10 }, () => cSola), cSola) &&
+      !cabeOtraSala(Array.from({ length: 11 }, () => cSola), cSola),
     { presupuesto: PRESUPUESTO_DE_LAS_LIZAS },
   );
   comprobar('y en un proceso vacío, una sala cabe', cabeOtraSala([], cLlena));
@@ -1283,10 +1665,16 @@ const asientoDeVista = (asiento: string): Record<string, unknown> => ({
   control: { aguante: 70, foco: 35, esquirlas: 6 },
   contadores: { limpios: 4, rachaMasLarga: 3, amenazas: 9, desalojos: 1, estampados: 2, rescates: 0, caidas: 1, reapariciones: 0, esquirlasCobradas: 0 },
 });
+/*
+ * Con la ciudad abierta (§5.2 de `docs/quiebro/CIUDAD-ABIERTA.md`) la vista lleva la `traza` de la mesa en la
+ * raíz —`null` si y sólo si no hay noche— y la noche, sus Fallos (la plaza de la Bajada la primera) en vez de
+ * su plantilla.
+ */
 const VISTA = {
   fase: { tipo: 'pausa', oleada: 3 },
   reloj: { id: 'n2-p3', duraMs: 15000 },
-  noche: { numero: 2, receta: 'pinza', plantilla: 'glorieta' },
+  traza: 7,
+  noche: { numero: 2, receta: 'pinza', fallos: [3, 1, 5] },
   asientos: [asientoDeVista('a1'), { ...asientoDeVista('a2'), haElegido: true, voto: 'aguantar' }],
   monedas: 3,
   historial: [
@@ -1318,6 +1706,7 @@ const VISTA = {
 const enFase = (fase: unknown, noche: unknown = VISTA.noche): unknown => ({
   ...VISTA,
   fase,
+  traza: noche === null ? null : VISTA.traza,
   noche,
   asientos: [
     { ...asientoDeVista('a1'), ofrecidos: [] },
@@ -1678,7 +2067,7 @@ paso('El aparato: tras una limpia contra una bala vuela hacia el tirador y, si a
   type PartidaDelCliente = {
     paso: { x: number; z: number } | null;
     giroDeLaCamara: number;
-    ponerLaDeclaracion(l: LizaDeclarada, barrio: unknown, asiento: string): void;
+    ponerLaDeclaracion(l: LizaDeclarada, lugar: unknown, asiento: string): void;
     asegurarElCanal(si: boolean): void;
     fotograma(ahora: number, dt: number): void;
     cerrar(): void;
@@ -1696,21 +2085,35 @@ paso('El aparato: tras una limpia contra una bala vuela hacia el tirador y, si a
   const M = await cargar<{ EstadoDeLosMandos: new () => MandosDelCliente }>('escritorio', 'src', 'quiebro', 'mandos', 'estado.ts');
   const R = await cargar<{ jugarAlQuiebro: (o: { asientos: number; semilla: number; noches: number; politica: 'gana'; travesuras: boolean }) => { vistas: readonly unknown[] } }>('server', 'scripts', 'robot-de-quiebro.ts');
   const Q = await cargar<{ lizaDelQuiebro: (v: unknown, c: string) => LizaDeclarada | null }>('shared', 'arcade', 'juegos', 'quiebro-liza.ts');
-  const B = await cargar<{ barrioDeLaNoche: (c: string, n: number) => unknown }>('shared', 'arcade', 'juegos', 'quiebro-barrio.ts');
+  const L = await cargar<{ lugarDeLaMesa: (v: unknown, c: string, l: LizaDeclarada | null) => { lugar: unknown; aviso: string | null } }>('escritorio', 'src', 'quiebro', 'red', 'lugar.ts');
   const MU = await cargar<{ seAndaEnRecta: (a: unknown, d: { x: number; z: number }, h: { x: number; z: number }, r: number) => boolean }>('shared', 'mecanicas', 'mundo.ts');
   let liza: LizaDeclarada | null = null;
+  /* La vista de la que sale `liza`: el aparato la lee con su lugar (`lugarDeLaMesa`), como el juego. */
+  let vistaDeLaLiza: unknown = null;
   if (R !== null && Q !== null) {
     for (const v of R.jugarAlQuiebro({ asientos: 1, semilla: 7, noches: 1, politica: 'gana', travesuras: false }).vistas) {
       const l = Q.lizaDelQuiebro(v, 'K7M2P');
-      if (liza === null && l !== null && l.fase.modo === 'encuentro') liza = l;
+      if (liza === null && l !== null && l.fase.modo === 'encuentro') {
+        liza = l;
+        vistaDeLaLiza = v;
+      }
     }
   }
+  /*
+   * EL LUGAR DE LA NOCHE, el que el juego le da al aparato con la misma vista y la misma liza (`lugarDeLaMesa`
+   * en `red/lugar.ts`): la ciudad de esa noche. Hasta la entrega 1 de la ciudad abierta se le daba el barrio de
+   * la noche a secas; desde que `ponerLaDeclaracion` toma un `LugarDeLaNoche`, aquel barrio suelto reventaba
+   * dentro de la gente de la noche, y con el lugar de verdad el aparato pisa el mismo mundo que su liza.
+   */
+  const leido = L === null || liza === null ? null : L.lugarDeLaMesa(vistaDeLaLiza, 'K7M2P', liza);
+  if (leido !== null && leido.aviso !== null) nota(`el lugar de la noche no cuadra con su liza: ${leido.aviso}`);
+  const lugar = leido === null ? null : leido.lugar;
   /**
    * El aparato de verdad en su sitio de nacer, con una entidad de la `clase` a `lejos` metros en una dirección
    * por la que se anda en recta (y la cámara mirando hacia ella), ya pintada. `null` si falta algo.
    */
   const montar = (lejos: number, clase: number) => {
-    if (P === null || M === null || B === null || MU === null || liza === null) return null;
+    if (P === null || M === null || lugar === null || MU === null || liza === null) return null;
     const l = liza;
     const reglas = l.asientos[0] as ReglasDeAsiento;
     const nace = l.mundo.nace.find((n) => n.papel === 'asiento') as { x: number; z: number };
@@ -1740,7 +2143,7 @@ paso('El aparato: tras una limpia contra una bala vuela hacia el tirador y, si a
       relojes,
       mandos,
     });
-    partida.ponerLaDeclaracion(l, B.barrioDeLaNoche('K7M2P', 1), reglas.asiento);
+    partida.ponerLaDeclaracion(l, lugar, reglas.asiento);
     partida.asegurarElCanal(true);
     partida.giroDeLaCamara = Math.atan2(dx, -dz);
     const e = enchufes[0] as EnchufeDeMentira;
@@ -1821,16 +2224,500 @@ paso('El aparato: tras una limpia contra una bala vuela hacia el tirador y, si a
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 6 · LA COLUMNA DE LA CIUDAD ABIERTA (docs/quiebro/CIUDAD-ABIERTA.md)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** ¿Lanza `f` un error de la clase `clase`? */
+function lanza(f: () => unknown, clase: new (...a: never[]) => Error = RangeError): boolean {
+  try {
+    f();
+  } catch (error) {
+    return error instanceof clase;
+  }
+  return false;
+}
+
+/** Un múltiplo de 0,25 m entre `a` y `b` metros, del generador sembrado. */
+const cuarto = (a: number, b: number): number => entre(a * 4, b * 4) / 4;
+
+paso('La ciudad: las medidas del §2.1 caben en la Liza y en el cable');
+{
+  comprobar(
+    'los ejes de calle son los doce de 24 + 48k, de −264 a 264: 144 cruces, 264 tramos y 11 × 11 = 121 huecos',
+    EJES_DE_LA_CIUDAD.length === 12 && EJES_DE_LA_CIUDAD.every((e, k) => e === 24 + 48 * (k - 6)) && CRUCES === 144 && TRAMOS === 264 && HUECOS === 121,
+    EJES_DE_LA_CIUDAD,
+  );
+  comprobar('540 m de acera a acera, y el cerco hasta ±272', LADO_DE_LA_CIUDAD === 540 && BORDE_DE_LA_CIUDAD === 270 && CERCO_DE_LA_CIUDAD === 272);
+  comprobar(
+    'las casillas de 8 m son 69 × 69 = 4.761, cubren el cerco entero y caben en el tope de casillas del suelo',
+    CASILLAS_DE_LA_CIUDAD === 4761 && LADO_DE_CASILLA_DE_LA_CIUDAD * (CASILLAS_DEL_CENTRO_AL_BORDE + 0.5) >= CERCO_DE_LA_CIUDAD && CASILLAS_DE_LA_CIUDAD <= TOPE_DE_CASILLAS,
+  );
+  const q = CERCO_DE_LA_CIUDAD * UNO;
+  comprobar(
+    '±272 m caben en la liza, los 544 de diferencia en el tope de diferencias y la diagonal al cuadrado por debajo de 2^53',
+    q <= TOPE_DE_LA_LIZA && 2 * q <= TOPE_DE_DIFERENCIA && distanciaAlCuadrado(2 * q, 2 * q) <= 9007199254740992,
+    { q, TOPE_DE_LA_LIZA, TOPE_DE_DIFERENCIA },
+  );
+  comprobar('y en el cable son ±27.200 centésimas, con un tope de 51.200', aCentesimas(q) === 27200 && aCentesimas(q) <= TOPE_DE_CENTESIMAS);
+}
+
+paso('La ciudad: los distritos del molinete y las ocho simetrías');
+{
+  const MAPA = [...Array.from({ length: 3 }, () => 'OOONNNNNNNN'), ...Array.from({ length: 5 }, () => 'OOOCCCCCEEE'), ...Array.from({ length: 3 }, () => 'SSSSSSSSEEE')];
+  const letra: Readonly<Record<IdDeDistrito, string>> = { casco: 'C', ensanche: 'S', lonja: 'O', naves: 'N', torres: 'E' };
+  let distintas = 0;
+  for (let j = -5; j <= 5; j++) for (let i = -5; i <= 5; i++) if (letra[distritoDelHueco(0, i, j)] !== (MAPA[j + 5] as string)[i + 5]) distintas++;
+  comprobar('el molinete dibujado es el mapa del §2.2, hueco a hueco', distintas === 0, { distintas });
+  let malasCuentas = 0;
+  const firmas = new Set<string>();
+  let sinInversa = 0;
+  let noBiyectivas = 0;
+  let glorietaMovida = 0;
+  for (let s = 0; s < SIMETRIAS; s++) {
+    const cuentas: Record<string, number> = {};
+    const imagen = new Set<number>();
+    let firma = '';
+    for (let n = 0; n < HUECOS; n++) {
+      const { i, j } = huecoDelIndice(n);
+      const d = distritoDelHueco(s, i, j);
+      cuentas[d] = (cuentas[d] ?? 0) + 1;
+      const h = huecoSimetrico(s, i, j);
+      imagen.add(indiceDeHueco(h.i, h.j));
+      firma += `${String(indiceDeHueco(h.i, h.j))},`;
+      const v = huecoAntesDeLaSimetria(s, h.i, h.j);
+      if (v.i !== i || v.j !== j) sinInversa++;
+    }
+    if (cuentas.casco !== 25 || DISTRITOS.some((d) => d !== 'casco' && cuentas[d] !== 24)) malasCuentas++;
+    if (imagen.size !== HUECOS) noBiyectivas++;
+    const g = huecoSimetrico(s, 0, 0);
+    if (g.i !== 0 || g.j !== 0 || distritoDelHueco(s, 0, 0) !== 'casco') glorietaMovida++;
+    firmas.add(firma);
+  }
+  comprobar('con cada simetría, el Casco tiene 25 huecos y cada distrito de fuera 24', malasCuentas === 0, { malasCuentas });
+  comprobar(
+    'las ocho simetrías son ocho permutaciones DISTINTAS de los 121 huecos, cada una con su inversa, y ninguna mueve la Glorieta ni la saca del Casco',
+    firmas.size === 8 && noBiyectivas === 0 && sinInversa === 0 && glorietaMovida === 0,
+    { distintas: firmas.size, noBiyectivas, sinInversa, glorietaMovida },
+  );
+  let malosPuntos = 0;
+  for (let k = 0; k < 4000; k++) {
+    const s = entre(0, 7);
+    const x = cuarto(-272, 272);
+    const z = cuarto(-272, 272);
+    const x2 = cuarto(-272, 272);
+    const z2 = cuarto(-272, 272);
+    const p = puntoSimetrico(s, x, z);
+    const p2 = puntoSimetrico(s, x2, z2);
+    const v = puntoAntesDeLaSimetria(s, p.x, p.z);
+    if (v.x !== x || v.z !== z || Math.abs(p.x - p2.x) + Math.abs(p.z - p2.z) !== Math.abs(x - x2) + Math.abs(z - z2)) malosPuntos++;
+  }
+  comprobar('en 4.000 puntos al azar, la inversa deshace la simetría y la distancia por los ejes entre dos no cambia', malosPuntos === 0, { malosPuntos });
+  let malosRumbos = 0;
+  let malasCaras = 0;
+  for (let s = 0; s < SIMETRIAS; s++) {
+    for (let r = 0; r < 256; r++) {
+      const v = puntoSimetrico(s, SENO[r] as number, -(COSENO[r] as number));
+      if (rumboHacia(v.x, v.z) !== rumboSimetrico(s, r)) malosRumbos++;
+    }
+    for (const [cara, rumbo] of [['norte', 0], ['este', 64], ['sur', 128], ['oeste', 192]] as const) {
+      const r = rumboSimetrico(s, rumbo);
+      const esperada = r === 0 ? 'norte' : r === 64 ? 'este' : r === 128 ? 'sur' : 'oeste';
+      if (caraSimetrica(s, cara) !== esperada) malasCaras++;
+    }
+  }
+  comprobar('rumboSimetrico lleva cada uno de los 256 rumbos a donde apunta su vector llevado por la simetría, y las caras con ellos', malosRumbos === 0 && malasCaras === 0, { malosRumbos, malasCaras });
+  const partes = new Set<string>();
+  for (let t = 0; t < TRAZAS; t++) {
+    const pa = partesDeLaTraza(t);
+    partes.add(`${String(pa.dibujo)}·${String(pa.simetria)}`);
+  }
+  comprobar(
+    'las 32 trazas son cada dibujo con cada simetría una vez, y una traza fuera de 0-31 lanza',
+    partes.size === 32 && lanza(() => partesDeLaTraza(32)) && lanza(() => partesDeLaTraza(-1)) && lanza(() => partesDeLaTraza(1.5)),
+  );
+}
+
+paso('La ciudad: la numeración que ve la Liza');
+{
+  const TIPOS: readonly [TipoDeZonaDePlaza, number][] = [['fallo', 1], ['impresion', 8], ['boca', 8]];
+  const ids: number[] = [];
+  let malasInversas = 0;
+  for (let plaza = 1; plaza <= PLAZAS_POR_CIUDAD; plaza++) {
+    for (const [tipo, cuantas] of TIPOS) {
+      for (let k = 0; k < cuantas; k++) {
+        const id = idDeZonaDePlaza(plaza, tipo, k);
+        ids.push(id);
+        const q = queZonaEs(id);
+        if (q === null || q.que !== 'plaza' || q.plaza !== plaza || q.tipo !== tipo || q.k !== k) malasInversas++;
+      }
+    }
+  }
+  const otras: readonly [string, number, (k: number) => number][] = [
+    ['cabina', CABINAS_POR_CIUDAD, idDeZonaDeCabina],
+    ['refugio', REFUGIOS_POR_CIUDAD, idDeZonaDeRefugio],
+    ['arca', ARCAS_POR_CIUDAD, idDeZonaDeArca],
+  ];
+  for (const [que, cuantas, id] of otras) {
+    for (let k = 0; k < cuantas; k++) {
+      ids.push(id(k));
+      const q = queZonaEs(id(k));
+      if (q === null || q.que !== que || q.k !== k) malasInversas++;
+    }
+  }
+  comprobar(
+    'las 148 zonas de una ciudad llevan ids distintos del 1 al 148, dentro de los 255 de la Liza',
+    ids.length === 148 && new Set(ids).size === 148 && Math.min(...ids) === 1 && Math.max(...ids) === ULTIMA_ZONA_DE_LA_CIUDAD && ULTIMA_ZONA_DE_LA_CIUDAD <= TOPE_DE_ID,
+    { cuantas: ids.length, distintas: new Set(ids).size, ULTIMA_ZONA_DE_LA_CIUDAD },
+  );
+  comprobar('queZonaEs es la inversa de las cuatro, y no reconoce ni el 0 ni el 149', malasInversas === 0 && queZonaEs(0) === null && queZonaEs(149) === null && queZonaEs(1.5) === null, { malasInversas });
+  const clases: number[] = [CLASE_DE_ZONA_DE_CABINA, CLASE_DE_ZONA_DE_REFUGIO];
+  for (let plaza = 1; plaza <= PLAZAS_POR_CIUDAD; plaza++) for (const [tipo] of TIPOS) clases.push(claseDeZonaDePlaza(plaza, tipo));
+  for (let k = 0; k < ARCAS_POR_CIUDAD; k++) clases.push(claseDeZonaDeArca(k));
+  comprobar('las clases de zona (18 de plaza, la de cabina, la de refugio y 16 de arca) son distintas y de 1 a 255', new Set(clases).size === clases.length && clases.length === 36 && clases.every((c) => c >= 1 && c <= TOPE_DE_ID), clases);
+  const limites = [ID_DEL_LIMITE_DE_LA_CIUDAD, ...Array.from({ length: PLAZAS_POR_CIUDAD }, (_, k) => idDelLimiteDePlaza(k + 1))];
+  comprobar('los límites: la ciudad el 1 y las plazas del 2 al 7', igual(limites, [1, 2, 3, 4, 5, 6, 7]), limites);
+  comprobar(
+    'y lo que no es de ninguna ciudad lanza en vez de dar un número',
+    lanza(() => idDeZonaDePlaza(7, 'fallo', 0)) && lanza(() => idDeZonaDePlaza(1, 'fallo', 1)) && lanza(() => idDeZonaDePlaza(1, 'boca', 8)) && lanza(() => idDeZonaDeCabina(20)) && lanza(() => idDelLimiteDePlaza(0)) && lanza(() => claseDeZonaDeArca(16)),
+  );
+}
+
+paso('La ciudad: las celdas del cliente');
+{
+  let idas = 0;
+  for (let k = 0; k < CELDAS; k++) {
+    const c = celdaDelIndice(k);
+    if (indiceDeCelda(c.i, c.j) !== k) idas++;
+  }
+  comprobar('169 celdas de 48 m, de −6 a 6, y cada índice va y vuelve', CELDAS === 169 && idas === 0, { idas });
+  let fuera = 0;
+  const ejemplos: unknown[] = [];
+  for (let k = 0; k < 20000; k++) {
+    /* Un cuarto de los puntos, justo en una raya entre celdas: es donde se equivoca una división. */
+    const x = k % 4 === 0 ? 48 * entre(-6, 6) - 24 : cuarto(-312, 311.75);
+    const z = cuarto(-312, 311.75);
+    const c = celdaDe(x, z);
+    const r = c === null ? null : rectanguloDeLaCelda(c.i, c.j);
+    if (r === null || !(r.x0 <= x && x < r.x1 && r.z0 <= z && z < r.z1)) {
+      fuera++;
+      if (ejemplos.length < 5) ejemplos.push({ x, z, c, r });
+    }
+  }
+  comprobar('cada punto de ±312 cae en una celda, la que lo cubre (medio abierta: la raya es de la de la derecha)', fuera === 0 && celdaDe(24, 0)?.i === 1 && celdaDe(-24, 0)?.i === 0 && celdaDe(23.75, 0)?.i === 0, { fuera, ejemplos });
+  let descentrados = 0;
+  for (let n = 0; n < HUECOS; n++) {
+    const { i, j } = huecoDelIndice(n);
+    const c = celdaDe(48 * i, 48 * j);
+    if (c === null || c.i !== i || c.j !== j) descentrados++;
+  }
+  comprobar('cada hueco es el centro de su celda, y el cerco cae en el anillo de ±6', descentrados === 0 && celdaDe(271, 0)?.i === 6 && celdaDe(-272, 0)?.i === -6, { descentrados });
+  comprobar('fuera de ±312 no hay celda, ni para lo que no es un número', celdaDe(312, 0) === null && celdaDe(-312.25, 0) === null && celdaDe(Number.NaN, 0) === null && lanza(() => indiceDeCelda(7, 0)));
+
+  const cajas: CajaDeLaCiudad[] = [];
+  const caja = (x0: number, z0: number, x1: number, z1: number): CajaDeLaCiudad => ({ x0, z0, x1, z1, tipo: 'coche', clase: 'alta', alto: 1.5, mira: 0, edificio: null, despejable: false, hueco: null, plaza: 0 });
+  for (let k = 0; k < 3000; k++) {
+    const x0 = cuarto(-272, 270);
+    const z0 = cuarto(-272, 270);
+    cajas.push(caja(x0, z0, x0 + cuarto(0.25, 2), z0 + cuarto(0.25, 2)));
+  }
+  /* Y los que cruzan una raya: un pilar de la mediana en el eje −120, y una caja justo encima de un cruce. */
+  cajas.push(caja(-120.5, -80, -119.5, -79), caja(23.5, 23.5, 24.5, 24.5));
+  const veces = new Array<number>(cajas.length).fill(0);
+  let desordenadas = 0;
+  let enOtra = 0;
+  for (let k = 0; k < CELDAS; k++) {
+    const { i, j } = celdaDelIndice(k);
+    const lista = cajasDeLaCelda({ cajas }, i, j);
+    for (let n = 0; n < lista.length; n++) {
+      const c = cajas[lista[n] as number] as CajaDeLaCiudad;
+      veces[lista[n] as number] = (veces[lista[n] as number] as number) + 1;
+      if (n > 0 && (lista[n] as number) <= (lista[n - 1] as number)) desordenadas++;
+      const r = rectanguloDeLaCelda(i, j);
+      const cx = (c.x0 + c.x1) / 2;
+      const cz = (c.z0 + c.z1) / 2;
+      if (!(r.x0 <= cx && cx < r.x1 && r.z0 <= cz && cz < r.z1)) enOtra++;
+    }
+  }
+  comprobar(
+    'cajasDeLaCelda reparte: cada caja en una celda y sólo en una, la de su centro, en orden de índice (el pilar de la raya −120, en la de −2)',
+    veces.every((v) => v === 1) && desordenadas === 0 && enOtra === 0 && cajasDeLaCelda({ cajas }, -2, -2).includes(3000) && cajasDeLaCelda({ cajas }, 1, 1).includes(3001),
+    { sinCelda: veces.filter((v) => v !== 1).length, desordenadas, enOtra },
+  );
+}
+
+paso('La ciudad: los campos de distancias contra la fuerza bruta');
+{
+  /** Un grafo por los ejes: una rejilla de `n × n` con pasos de cuartos al azar, sin algunas aristas (rodeos e islas). */
+  const rejilla = (n: number, quitar: number): GrafoDeLaCiudad => {
+    const xs: number[] = [0];
+    const zs: number[] = [0];
+    for (let k = 1; k < n; k++) {
+      xs.push((xs[k - 1] as number) + cuarto(1, 12));
+      zs.push((zs[k - 1] as number) + cuarto(1, 12));
+    }
+    const nudos: { x: number; z: number }[] = [];
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) nudos.push({ x: (xs[i] as number) - 100, z: (zs[j] as number) - 100 });
+    const aristas: { a: number; b: number; largo: number; tramo: null }[] = [];
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const a = j * n + i;
+        if (i + 1 < n && entre(0, 99) >= quitar) aristas.push({ a, b: a + 1, largo: (xs[i + 1] as number) - (xs[i] as number), tramo: null });
+        if (j + 1 < n && entre(0, 99) >= quitar) aristas.push({ a, b: a + n, largo: (zs[j + 1] as number) - (zs[j] as number), tramo: null });
+      }
+    }
+    return { nudos, aristas };
+  };
+  const bellmanFord = (g: GrafoDeLaCiudad, meta: number): number[] => {
+    const d = new Array<number>(g.nudos.length).fill(-1);
+    d[meta] = 0;
+    for (let vuelta = 0; vuelta < g.nudos.length; vuelta++) {
+      let cambio = false;
+      for (const a of g.aristas) {
+        const p = g.nudos[a.a] as { x: number; z: number };
+        const q2 = g.nudos[a.b] as { x: number; z: number };
+        const l = Math.abs(q2.x - p.x) + Math.abs(q2.z - p.z);
+        for (const [u, v] of [[a.a, a.b], [a.b, a.a]] as const) {
+          const du = d[u] as number;
+          if (du < 0) continue;
+          const dv = d[v] as number;
+          if (dv < 0 || du + l < dv) {
+            d[v] = du + l;
+            cambio = true;
+          }
+        }
+      }
+      if (!cambio) break;
+    }
+    return d;
+  };
+  const grafos: GrafoDeLaCiudad[] = [rejilla(12, 0), rejilla(15, 15), rejilla(18, 35), rejilla(10, 60), barrioDeLaNoche('K7M2P', 1).grafo];
+  let campos = 0;
+  let distintos = 0;
+  let noLlegan = 0;
+  let noEnteros = 0;
+  for (const g of grafos) {
+    for (let k = 0; k < 6; k++) {
+      const meta = entre(0, g.nudos.length - 1);
+      const campo = campoHasta(g, meta);
+      const bf = bellmanFord(g, meta);
+      campos++;
+      for (let n = 0; n < g.nudos.length; n++) {
+        if (campo.metros[n] !== bf[n]) distintos++;
+        if (bf[n] === -1) noLlegan++;
+        if (!Number.isInteger((campo.metros[n] as number) * UNO)) noEnteros++;
+      }
+    }
+  }
+  comprobar(
+    `campoHasta da lo mismo que Bellman-Ford en ${String(campos)} campos (rejillas con rodeos e islas, y el grafo del barrio), con −1 donde no se llega`,
+    distintos === 0 && noLlegan > 0,
+    { distintos, noLlegan },
+  );
+  comprobar('y sus metros por UNO son enteros exactos: los mismos que mide la sala en Q16.16 por el mismo grafo', noEnteros === 0, { noEnteros });
+
+  let malosCercanos = 0;
+  const ejemplos: unknown[] = [];
+  for (const g of grafos) {
+    for (let k = 0; k < 4000; k++) {
+      let x: number;
+      let z: number;
+      const n0 = g.nudos[entre(0, g.nudos.length - 1)] as { x: number; z: number };
+      const n1 = g.nudos[entre(0, g.nudos.length - 1)] as { x: number; z: number };
+      if (k % 4 === 0) {
+        /* A medio camino entre dos nudos: empates exactos a menudo. */
+        x = (n0.x + n1.x) / 2;
+        z = (n0.z + n1.z) / 2;
+      } else if (k % 4 === 1) {
+        x = n0.x;
+        z = n0.z;
+      } else {
+        x = cuarto(-400, 400);
+        z = cuarto(-400, 400);
+      }
+      let mejor = -1;
+      let mejorD = 0;
+      for (let n = 0; n < g.nudos.length; n++) {
+        const p = g.nudos[n] as { x: number; z: number };
+        const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
+        if (mejor < 0 || d < mejorD) {
+          mejor = n;
+          mejorD = d;
+        }
+      }
+      if (nudoMasCercano(g, x, z) !== mejor) {
+        malosCercanos++;
+        if (ejemplos.length < 5) ejemplos.push({ x, z, dado: nudoMasCercano(g, x, z), mejor });
+      }
+    }
+  }
+  comprobar('nudoMasCercano da el de la fuerza bruta (y a igual distancia, el menor) en 20.000 puntos, dentro, encima y lejos del grafo', malosCercanos === 0 && nudoMasCercano({ nudos: [], aristas: [] }, 0, 0) === -1, { malosCercanos, ejemplos });
+
+  const g = grafos[2] as GrafoDeLaCiudad;
+  const meta = 0;
+  const campo = campoHasta(g, meta);
+  let malasSumas = 0;
+  let malosCaminos = 0;
+  let sinCamino = -1;
+  for (let k = 0; k < 500; k++) {
+    const x = cuarto(-110, 60);
+    const z = cuarto(-110, 60);
+    const n = nudoMasCercano(g, x, z);
+    const p = g.nudos[n] as { x: number; z: number };
+    const esperada = (campo.metros[n] as number) < 0 ? -1 : (campo.metros[n] as number) + Math.abs(p.x - x) + Math.abs(p.z - z);
+    if (distanciaPorCalles(g, campo, x, z) !== esperada) malasSumas++;
+  }
+  for (let n = 0; n < g.nudos.length; n++) {
+    const hasta = campo.metros[n] as number;
+    if (hasta < 0) {
+      sinCamino = n;
+      continue;
+    }
+    const entero = caminoPorElCampo(g, campo, n, Number.POSITIVE_INFINITY);
+    let bien = entero[0] === n && entero[entero.length - 1] === meta;
+    let andado = 0;
+    for (let s = 1; s < entero.length && bien; s++) {
+      const u = entero[s - 1] as number;
+      const v = entero[s] as number;
+      const pu = g.nudos[u] as { x: number; z: number };
+      const pv = g.nudos[v] as { x: number; z: number };
+      const l = Math.abs(pu.x - pv.x) + Math.abs(pu.z - pv.z);
+      const arista = g.aristas.some((a) => (a.a === u && a.b === v) || (a.a === v && a.b === u));
+      if (!arista || (campo.metros[u] as number) - (campo.metros[v] as number) !== l) bien = false;
+      andado += l;
+    }
+    if (bien && andado !== hasta) bien = false;
+    const corto = caminoPorElCampo(g, campo, n, 20);
+    let andadoCorto = 0;
+    for (let s = 1; s < corto.length; s++) andadoCorto += (campo.metros[corto[s - 1] as number] as number) - (campo.metros[corto[s] as number] as number);
+    const ultimo = corto.length < 2 ? 0 : (campo.metros[corto[corto.length - 2] as number] as number) - (campo.metros[corto[corto.length - 1] as number] as number);
+    if (corto[corto.length - 1] !== meta && (andadoCorto < 20 || andadoCorto - ultimo >= 20)) bien = false;
+    if (!bien) malosCaminos++;
+  }
+  comprobar('distanciaPorCalles suma al campo del nudo más cercano lo que falta hasta él por los ejes (−1 si no se llega)', malasSumas === 0, { malasSumas });
+  comprobar(
+    'caminoPorElCampo baja arista a arista por un camino corto hasta la meta, lo que mide el campo, y se para en cuanto pasa los metros pedidos',
+    malosCaminos === 0 && sinCamino >= 0 && caminoPorElCampo(g, campo, sinCamino, 60).length === 0,
+    { malosCaminos, sinCamino },
+  );
+}
+
+paso('La ciudad: los tríos de Fallos');
+{
+  const distritos: readonly IdDeDistrito[] = ['casco', 'casco', 'naves', 'lonja', 'torres', 'ensanche'];
+  let tablas = 0;
+  let distintas = 0;
+  let conTrio = 0;
+  for (let t = 0; t < 200; t++) {
+    const d: number[][] = Array.from({ length: 6 }, () => new Array<number>(6).fill(0));
+    for (let a = 0; a < 6; a++) {
+      for (let b = a + 1; b < 6; b++) {
+        const m = 2 * entre(40, 150);
+        (d[a] as number[])[b] = m;
+        (d[b] as number[])[a] = m;
+      }
+    }
+    const plazas = distritos.map((distrito, k) => ({ numero: k + 1, distrito }) as unknown as PlazaDeLaCiudad);
+    for (let bajada = 1; bajada <= 6; bajada++) {
+      tablas++;
+      const dados = triosDeFallos({ plazas, distancias: d }, bajada);
+      const esperados: [number, number][] = [];
+      const bien = (a: number, b: number): boolean => {
+        const m = (d[a - 1] as number[])[b - 1] as number;
+        return m >= FALLO_MAS_CERCA && m <= FALLO_MAS_LEJOS;
+      };
+      for (let f2 = 1; f2 <= 6; f2++) {
+        for (let f3 = f2 + 1; f3 <= 6; f3++) {
+          const tres = [distritos[bajada - 1], distritos[f2 - 1], distritos[f3 - 1]];
+          if (f2 === bajada || f3 === bajada || new Set(tres).size !== 3) continue;
+          if (bien(bajada, f2) && bien(bajada, f3) && bien(f2, f3)) esperados.push([f2, f3]);
+        }
+      }
+      if (!igual(dados, esperados)) distintas++;
+      if (esperados.length > 0) conTrio++;
+    }
+  }
+  comprobar(`triosDeFallos da exactamente los de la fuerza bruta, en orden, en ${String(tablas)} Bajadas (y no son todas vacías)`, distintas === 0 && conTrio > 50, { distintas, conTrio });
+  comprobar('y con una Bajada que no es una plaza, lanza', lanza(() => triosDeFallos({ plazas: [], distancias: [] }, 0)) && lanza(() => triosDeFallos({ plazas: [], distancias: [] }, 7)));
+}
+
+paso('La ciudad: las firmas que escribe el frente Traza');
+{
+  let ciudad: ReturnType<typeof ciudadDeLaMesa> | null = null;
+  let error: unknown = null;
+  try {
+    ciudad = ciudadDeLaMesa(0, 'K7M2P');
+  } catch (e) {
+    error = e;
+  }
+  comprobar(
+    'ciudadDeLaMesa da una ciudad o lanza CiudadSinEscribir, y nada más; con una traza fuera de 0-31 lanza RangeError',
+    ((ciudad !== null && error === null) || error instanceof CiudadSinEscribir) && lanza(() => ciudadDeLaMesa(32, 'K7M2P')) && lanza(() => ciudadDeLaMesa(-1, 'K7M2P')),
+    error instanceof Error ? error.message : error,
+  );
+  if (ciudad === null) {
+    nota('ciudadDeLaMesa aún no está escrita (la escribe Traza en la ola A): su forma se mirará aquí en cuanto dé una ciudad');
+  } else {
+    const c = ciudad;
+    const huecosEnOrden = c.huecos.length === HUECOS && c.huecos.every((h, n) => h.indice === n && indiceDeHueco(h.i, h.j) === n && h.distrito === distritoDelHueco(c.simetria, h.i, h.j));
+    const plaza1 = c.plazas[0];
+    comprobar(
+      'la ciudad de la mesa: 121 huecos en orden con el distrito de su simetría, 6 plazas con la Glorieta del Relojero la 1 en (0, 0), 144 cruces, 264 tramos, 169 celdas, 20 cabinas y 10 refugios',
+      huecosEnOrden &&
+        c.plazas.length === PLAZAS_POR_CIUDAD &&
+        c.plazas.every((p, k) => p.numero === k + 1) &&
+        plaza1 !== undefined &&
+        plaza1.hueco === indiceDeHueco(0, 0) &&
+        c.cruces.length === CRUCES &&
+        c.tramos.length === TRAMOS &&
+        c.celdas.length === CELDAS &&
+        c.cabinas.length === CABINAS_POR_CIUDAD &&
+        c.refugios.length === REFUGIOS_POR_CIUDAD &&
+        partesDeLaTraza(c.traza).simetria === c.simetria,
+    );
+    comprobar('y sus zonas van en orden de id (su puesto más uno) y caben en 255', c.zonas.every((z, k) => z.id === k + 1) && c.zonas.length <= ULTIMA_ZONA_DE_LA_CIUDAD);
+  }
+}
+
+paso('El HUD: del mundo al minimapa y al plano');
+{
+  const cerca = (p: { u: number; v: number }, u: number, v: number): boolean => Math.abs(p.u - u) < 1e-9 && Math.abs(p.v - v) < 1e-9;
+  comprobar('mirando al norte, lo del norte sale arriba y lo del este a la derecha', cerca(alMinimapa(0, -10, 0), 0, -10) && cerca(alMinimapa(10, 0, 0), 10, 0), [alMinimapa(0, -10, 0), alMinimapa(10, 0, 0)]);
+  comprobar(
+    'mirando al este, lo del este sale arriba y lo del norte a la izquierda',
+    cerca(alMinimapa(10, 0, Math.PI / 2), 0, -10) && cerca(alMinimapa(0, -10, Math.PI / 2), -10, 0),
+    [alMinimapa(10, 0, Math.PI / 2), alMinimapa(0, -10, Math.PI / 2)],
+  );
+  let malas = 0;
+  for (let k = 0; k < 1000; k++) {
+    const x = cuarto(-270, 270);
+    const z = cuarto(-270, 270);
+    const p = alPlano(x, z);
+    const w = delPlano(p.u, p.v);
+    if (w.x !== x || w.z !== z) malas++;
+  }
+  comprobar(
+    'el plano pone el norte arriba: el noroeste en (0, 0), el sureste en el lado del lienzo (540), y delPlano lo deshace',
+    malas === 0 && LADO_DEL_LIENZO === 540 && cerca(alPlano(-270, -270), 0, 0) && cerca(alPlano(270, 270), 540, 540),
+    { malas },
+  );
+  comprobar('los metros se enseñan al metro, y −1 si no se llega', metrosQueSeEnsenan(123.4) === 123 && metrosQueSeEnsenan(123.5) === 124 && metrosQueSeEnsenan(-1) === -1 && metrosQueSeEnsenan(Number.NaN) === -1);
+}
+
 /*
- * El suelo: cada comprobación de este fichero —358—, contada con la tabla del registro de la plataforma
- * VACÍA (con cada juego que se dé de alta salen dos más, y eso no es un fallo: el arnés lo dice). Si un
- * bloque deja de correr, sale 2 y no verde.
+ * El suelo: cada comprobación de este fichero —479—, contada con un arcade en el registro de la plataforma
+ * (El Quiebro: con cada juego que se dé de alta salen dos más, y eso no es un fallo: el arnés lo dice) y
+ * con `ciudadDeLaMesa` ya escrita (su forma: dos). Las de L10 en la declaración son quince: doce roturas y
+ * tres de su forma transitoria y de la ampliación, que pierde las dos suyas. Si un bloque deja de correr,
+ * sale 2 y no verde.
  */
 terminar({
-  escritas: 358,
+  escritas: 479,
   enVerde:
     'El cable de la Liza va y vuelve en los dos sentidos, rechaza lo que no es exactamente un mensaje y lo\n' +
-    '  más largo cabe; la liza de juguete se declara sin problemas y sus versiones rotas no; rumboHacia y la\n' +
-    '  prueba de losa coinciden con Math.atan2 y con la coma flotante; la ronda más pesada cabe en la mesa, el\n' +
-    '  registro y el coste se prueban con uno de juguete; y la vista, los nombres y el puente se leen estrictos.',
+    '  más largo cabe; la liza de juguete se declara sin problemas y sus versiones rotas no, y lo mismo las\n' +
+    '  declaraciones de la liza abierta (L1-L12); rumboHacia y la prueba de losa coinciden con Math.atan2 y con\n' +
+    '  la coma flotante; la ronda más pesada cabe en la mesa, el registro y el coste se prueban con uno de\n' +
+    '  juguete; la vista, los nombres y el puente se leen estrictos; y la columna de la ciudad abierta cuenta,\n' +
+    '  numera, reparte y mide como dice.',
 });

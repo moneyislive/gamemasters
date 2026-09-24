@@ -38,25 +38,74 @@
  * se sigue al de ahora mientras no tenga más de UNO por encima del mínimo, para que dos asientos a la
  * misma distancia no hagan dar media vuelta a la entidad en cada decisión.
  *
+ * Y SÓLO A QUIEN ESTÁ A SU ALCANCE (L10, `CerebroDeclarado.alcanceDeBlanco`): en una liza grande, sin él,
+ * todo lo vivo cruzaba el mundo detrás del único que se alejaba. Quien se le va más allá deja de ser su
+ * blanco en ese mismo tic (`blancoAlAlcance`). Lo que se queda lejos de todos lo recoge el olvido
+ * (`olvidarLasEntidades`, en `encuentros.ts`).
+ *
+ * ═══ SIN NADIE A SU ALCANCE PERO ACOMPAÑADA, SE ACERCA ═══
+ *
+ * Entre el alcance y la distancia del olvido había una franja en la que una entidad no tenía blanco y
+ * tampoco se olvidaba: la primera versión la dejaba donde estaba, y allí se quedaba PARA SIEMPRE mientras
+ * alguien siguiera a esa distancia. Bastaba con rodear una manzana: el camino por las calles se aleja en
+ * recta, a los 45,1 m soltaba al asiento y se quedaba en la esquina, a la vista y sin olvidarse, ocupando
+ * su hueco de vivas y sin dejar vaciar el encuentro (lo midió la revisión de la entrega 1 con la ciudad de
+ * verdad: 4 de 60 persecuciones, y en partida hasta diez paradas así, la peor 1.868 tics). Ahora la que no
+ * tiene a nadie a su alcance pero está ACOMPAÑADA —algún asiento que valdría de blanco a la distancia del
+ * olvido o menos— anda hacia el más cercano por el mismo camino que si lo persiguiera
+ * (`acercarseSinBlanco`), sin hacerlo su blanco: ni cuenta como perseguidora, ni toma turno, ni apunta
+ * hasta tenerlo a su alcance. Sola, se queda donde está y le corre el olvido. Así no queda estado sin
+ * salida: con blanco, pelea; acompañada, se acerca; sola, se olvida. Sin olvido declarado no hay franja
+ * que medir, y sin nadie a su alcance se queda donde está, como antes.
+ *
  * ═══ SIN BASURA EN LO CALIENTE ═══
  *
  * El cerebro corre por cada entidad en cada tic. Los recuentos de turnos, las distancias del grafo y la
  * cola del recorrido en anchura viven en arrays del módulo que se rellenan ENTEROS antes de usarse:
  * ningún resultado depende de lo que quedara del tic anterior, y no se crea un array por pregunta.
+ *
+ * ═══ Y LO QUE SE GUARDA, SÓLO CUESTA MENOS ═══
+ *
+ * Con una ciudad (el diseño de la ciudad abierta, §5.4) hay dos memorias más, y las dos son funciones
+ * puras del grafo guardadas por su identidad: el índice de los nudos por celdas y los campos de
+ * distancias por meta. Ninguna cambia una respuesta —`verify:liza` juega la misma sala con y sin ellas
+ * y compara tic a tic—; sólo dejan de repetir lo que ya se sabía.
  */
 import { COSENO, DT_DEL_TIC, SENO } from '../andar';
 import { por, UNO } from '../fijo';
 import { seAndaEnRecta, unPaso } from '../mundo';
 import type { AsientoEnCurso, EntidadEnCurso, PasoEnCurso } from './paso-en-curso';
 import type { ModoDelCerebro } from './tipos-de-la-sala';
-import { bloqueaElPaso, bloqueaLaAccion, contar, contarApuntado, dejarDeApuntar, enCurso, nuevoNumero, tirar } from './paso-en-curso';
-import type { AccionDeclarada, ClaseDeEntidad, ZonaDelMundo } from './declaracion';
-import { dentroDelRadio, desplazado, distanciaAlCuadrado, hayLineaDeVista, rumboHacia, trayectoria } from './geometria';
+import { bloqueaElPaso, bloqueaLaAccion, contar, contarApuntado, dejarDeApuntar, enCurso, indicesDe, nuevoNumero, tirar } from './paso-en-curso';
+import type { AccionDeclarada, ClaseDeEntidad, LizaDeclarada, ZonaDelMundo } from './declaracion';
+import { alcanceDeBlancoDe, olvidoDelEncuentro } from './declaracion';
+import {
+  celdaDelIndice,
+  CELDA_DEL_INDICE,
+  CUENTAS_DE_LOS_INDICES,
+  dentroDelRadio,
+  desplazado,
+  distanciaAlCuadrado,
+  hayLineaDeVista,
+  losIndicesDeLaLizaEstanActivos,
+  rumboHacia,
+  TOPE_DE_LA_LIZA,
+  trayectoria,
+} from './geometria';
 import { aCentesimas, MOTIVO_DE_IRSE } from './protocolo';
 import { compTics, dentroDelLimite, largo, ponerEstadoALaEntidad, sePuedeEstarEn } from './cuerpo';
 import { anuncioDelAutor, asientoDe, entidadEnPie, lanzarAnuncio, rumboDeA } from './combate';
 import { puestaDesde } from './paso-en-curso';
 import { dispararBala } from './proyectiles';
+
+/**
+ * El interruptor y las cuentas de los índices de la Liza (`geometria.ts`), también desde aquí. Con `tsx`,
+ * un guion que importa `geometria.ts` directamente puede tener OTRA copia del módulo que la que carga la
+ * sala por dentro (lo que se importa desde un guion y lo que se pide desde `shared/` van por dos caminos),
+ * y un interruptor puesto en la copia que nadie usa no apaga nada: la comparación con y sin índices saldría
+ * igual porque serían los mismos. Lo que se re-exporta desde aquí es lo de la copia que usa el cerebro.
+ */
+export { cuentasDeLosIndices, usarLosIndicesDeLaLiza } from './geometria';
 
 /* ─── LOS ARRAYS DEL MÓDULO (ver «sin basura en lo caliente») ─────────────── */
 
@@ -65,8 +114,13 @@ let CUERPO_A_CUERPO = new Int32Array(16);
 let DISPARO = new Int32Array(16);
 let ANUNCIOS = new Int32Array(16);
 let PERSIGUEN = new Int32Array(16);
-/** El camino más corto por el grafo: distancias andadas (Q16.16) y el montículo (nudo y clave). */
-let DISTANCIA = new Float64Array(0);
+/**
+ * El camino más corto por el grafo: las distancias andadas (Q16.16) hasta la meta EN USO y el montículo
+ * (nudo y clave). `DISTANCIA` apunta al campo de esa meta (ver «los campos por meta»), o a `DISTANCIA_SUELTA`
+ * con los índices apagados, que es el Dijkstra entero de siempre en cada pregunta.
+ */
+let DISTANCIA: Float64Array = new Float64Array(0);
+let DISTANCIA_SUELTA: Float64Array = new Float64Array(0);
 let MONTON = new Int32Array(0);
 let CLAVE = new Float64Array(0);
 let TAM = 0;
@@ -105,6 +159,7 @@ export function nuevaEntidad(p: PasoEnCurso, clase: ClaseDeEntidad, grupo: numbe
     cadena: null,
     recargas: [],
     recuperaHastaTic: 0,
+    cercaEnTic: p.k,
   };
   p.entidades.push(e);
   contar(p, 0, { e: 'nace', id: e.numero, clase: clase.id, x: aCentesimas(x), z: aCentesimas(z), r: mira });
@@ -236,15 +291,20 @@ function pensarUna(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad): nu
     apuntarYDisparar(p, e, clase);
     return 0;
   }
-  let b = blancoValido(p, e.blanco);
+  let b = blancoAlAlcance(p, e, clase, e.blanco);
   if (k >= e.cerebro.repiensaEnTic || b === null) {
     pensar(p, e, clase);
-    b = blancoValido(p, e.blanco);
+    b = blancoAlAlcance(p, e, clase, e.blanco);
   }
   if (b === null) {
     /* Sin nadie a quien perseguir (el asiento cayó, espera volver o está ausente) también entra: ver «entrar primero». */
     const dentro = puntoParaEntrar(p, e.x, e.z);
-    if (dentro === null) return 0;
+    if (dentro === null) {
+      /* Dentro y sin nadie a su alcance: si está acompañada, se acerca (ver la cabecera); si no, se queda. */
+      const guia = acompananteMasCercano(p, e);
+      if (guia !== null) acercarseSinBlanco(p, e, clase, guia);
+      return 0;
+    }
     /* En recta si se llega con los hombros; si no, por el grafo (y si el grafo no sabe, lo que se pueda en recta). */
     if (seLlega(p, e.x, e.z, dentro.x, dentro.z, clase.radio) && entrarSiEstaFuera(p, e, clase)) return 0;
     if (!entrarPorElGrafo(p, e, clase)) entrarSiEstaFuera(p, e, clase);
@@ -263,6 +323,103 @@ function blancoValido(p: PasoEnCurso, n: number): AsientoEnCurso | null {
   const activo = enCurso(a.estado, p.k);
   if (activo !== null && (activo.estado === p.declaracion.presencia.estadoAusente || activo.estado === p.declaracion.sinCuerpo.estado)) return null;
   return a;
+}
+
+/**
+ * EL ASIENTO `n` COMO BLANCO DE `e`: válido (`blancoValido`) y a su ALCANCE DE BLANCO o menos en recta (L10;
+ * con 0, sin tope, a cualquier distancia). Es LA pregunta por el blanco de una entidad —con ella elige
+ * (`pensar`), lo mantiene en cada tic (`pensarUna`) y apunta (`apuntarYDisparar`)—, así que no queda un
+ * camino por el que persiga, tome turno o apunte contra quien se le fue más allá: en el tic en que se va,
+ * lo suelta. El que está justo a esa distancia todavía vale (`dentroDelRadio` es «o menos»).
+ */
+function blancoAlAlcance(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad, n: number): AsientoEnCurso | null {
+  const a = blancoValido(p, n);
+  if (a === null) return null;
+  const alcance = alcanceDeBlancoDe(clase.cerebro);
+  return alcance === 0 || dentroDelRadio(a.x - e.x, a.z - e.z, alcance) ? a : null;
+}
+
+/**
+ * EL ASIENTO QUE ACOMPAÑA A UNA ENTIDAD SIN BLANCO (ver «sin nadie a su alcance pero acompañada» en la
+ * cabecera): de los que valdrían de blanco (`blancoValido`), el más cercano en recta a la distancia del olvido
+ * del encuentro o menos; empate, el de número menor. `null` si el encuentro no declara olvido o no hay ninguno.
+ *
+ * Es la pregunta del olvido (`acompanada`, en `encuentros.ts`) con una diferencia a propósito: allí acompaña
+ * también el caído —la pelea sigue donde cayó, y lo que está a su lado no se olvida—, pero hacia él no se anda,
+ * como no se le persigue. Lo que tiene al lado sólo a un caído espera sin olvidarse, como esperaba antes.
+ */
+function acompananteMasCercano(p: PasoEnCurso, e: EntidadEnCurso): AsientoEnCurso | null {
+  const en = p.declaracion.fase.encuentro;
+  const olvido = en === null ? null : olvidoDelEncuentro(en);
+  if (olvido === null) return null;
+  let mejor: AsientoEnCurso | null = null;
+  let mejorD = 0;
+  for (const a of p.asientos) {
+    if (blancoValido(p, a.numero) === null || !dentroDelRadio(a.x - e.x, a.z - e.z, olvido.distancia)) continue;
+    const d = distanciaAlCuadrado(a.x - e.x, a.z - e.z);
+    if (mejor === null || d < mejorD) {
+      mejor = a;
+      mejorD = d;
+    }
+  }
+  return mejor;
+}
+
+/**
+ * SE ACERCA A `a` SIN HACERLO SU BLANCO, acechando: por el mismo camino que si lo persiguiera (el de `moverse`,
+ * sin banda ni turno, que aquí no hay), yendo al nudo del grafo que lleve y, al llegar, al siguiente; en recta
+ * si lo ve (y, cerca, si llega con los hombros). El primer nudo se busca sólo cuando no lleva ninguno. En cuanto
+ * `a` le queda a su alcance, `pensar` lo toma por blanco en ese mismo tic y sigue por el mismo camino. Dos
+ * diferencias con perseguir: a qué nudo se va cuando ninguno ve al asiento (ver `metaParaAcercarse`), y que si
+ * otra le tapa el paso al nudo, la pisa (ver `pasoAunqueLaTapeOtra`).
+ */
+function acercarseSinBlanco(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad, a: AsientoEnCurso): void {
+  if (e.cerebro.modo !== 'acechar') e.cerebro = { ...e.cerebro, modo: 'acechar' };
+  const nudos = p.declaracion.mundo.grafo.nudos;
+  let nudo = e.cerebro.nudo;
+  if (nudo >= 0 && nudo < nudos.length) {
+    const n = nudos[nudo] as { x: number; z: number };
+    if (dentroDelRadio(n.x - e.x, n.z - e.z, LLEGADO)) nudo = siguienteHacia(p, nudo, metaParaAcercarse(p, a, clase.radio));
+  } else if (clase.cerebro.sigueElGrafo && nudos.length > 0 && !enRecta(p, e, a, clase)) nudo = primerNudoHacia(p, e.x, e.z, metaParaAcercarse(p, a, clase.radio), clase.radio);
+  else nudo = -1;
+  if (nudo !== e.cerebro.nudo) e.cerebro = { ...e.cerebro, nudo };
+  if (nudo >= 0) {
+    const n = nudos[nudo] as { x: number; z: number };
+    pasoAunqueLaTapeOtra(p, e, clase, n.x, n.z);
+  } else haciaSuBlanco(p, e, clase, a);
+}
+
+/**
+ * UN PASO HACIA `(tx, tz)` QUE ACERQUE AUNQUE OTRA LA TAPE: primero sin meterse en otra; si así ningún paso
+ * acerca, pisándola, como la que entra en el límite (ver «entrar primero»); y si ni así, el de siempre. Lo
+ * usa la que se acerca sin blanco: en la frontera del olvido, la que va delante y queda a más de su distancia
+ * se para a esperar que la olviden, y la de detrás, acompañada por unos centímetros, se quedaba temblando
+ * contra ella hasta que la olvidaban —130 tics, lo vio la vigilancia en una Llamada de El Quiebro con L10—.
+ */
+function pasoAunqueLaTapeOtra(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad, tx: number, tz: number): void {
+  if (elegirPaso(p, e, clase, tx, tz, false, true) && PASO.avanza) {
+    aplicarPaso(e);
+    return;
+  }
+  if (elegirPaso(p, e, clase, tx, tz, false, false) && PASO.avanza) {
+    aplicarPaso(e);
+    return;
+  }
+  if (elegirPaso(p, e, clase, tx, tz, false, true)) aplicarPaso(e);
+}
+
+/**
+ * EL NUDO AL QUE SE VA PARA ACERCARSE A `a`: el que lo ve y llega hasta él andando (`nudoVisibleMasCercano`, el
+ * de perseguir); y si ninguno de los más cercanos llega —un asiento detrás de una valla que se ve pero no se
+ * cruza, o en un rincón sin grafo—, el más cercano a secas. Al perseguir, sin nudo que vea al blanco se va en
+ * recta y se rodea lo que estorba de cerca; pero desde la franja del olvido la recta cruza manzanas enteras, y
+ * la entidad temblaba entre su nudo y un paso contra la fachada, acompañada y sin llegar nunca a su alcance (lo
+ * vio la vigilancia de la ciudad de juguete: 649 tics, con el asiento detrás de una valla de bolardos). Por el
+ * más cercano llega por las calles hasta su lado, y ahí ya lo tiene a su alcance y lo persigue.
+ */
+function metaParaAcercarse(p: PasoEnCurso, a: AsientoEnCurso, radio: number): number {
+  const meta = nudoVisibleMasCercano(p, a.x, a.z, radio);
+  return meta >= 0 || HALLADOS === 0 ? meta : (NUDO_CERCANO[0] as number);
 }
 
 /** Suelta el turno que tenga (los recuentos del tic se corrigen para las que piensan después). */
@@ -315,12 +472,12 @@ function concederTurno(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad,
 /* ─── PENSAR: A QUIÉN, Y POR DÓNDE ───────────────────────────────────────── */
 
 function pensar(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad): void {
-  const actual = blancoValido(p, e.blanco);
+  const actual = blancoAlAlcance(p, e, clase, e.blanco);
   let minimo = -1;
   let elegido: AsientoEnCurso | null = null;
   let elegidoD = 0;
   for (const a of p.asientos) {
-    if (blancoValido(p, a.numero) === null) continue;
+    if (blancoAlAlcance(p, e, clase, a.numero) === null) continue;
     const persiguen = (PERSIGUEN[a.numero] as number) - (a.numero === e.blanco ? 1 : 0);
     const d = distanciaAlCuadrado(a.x - e.x, a.z - e.z);
     if (minimo < 0 || persiguen < minimo) minimo = persiguen;
@@ -400,10 +557,38 @@ function demasiadoCerca(dx: number, dz: number, clase: ClaseDeEntidad): boolean 
  * línea de vista —y, si se da un `radio`, al que un cuerpo de ese radio llega andando en recta
  * (`seAndaEnRecta`): la línea de vista es un segmento sin grosor, y un nudo que se ve rozando la esquina
  * de un pilar no se alcanza con los hombros—. −1 si ninguno. Los más cercanos se sacan de una pasada, sin
- * ordenar la lista entera.
+ * ordenar la lista entera (o, con un grafo de ciudad, por las celdas del índice de abajo: los mismos).
  */
 function nudoVisibleMasCercano(p: PasoEnCurso, x: number, z: number, radio: number): number {
   const nudos = p.declaracion.mundo.grafo.nudos;
+  const cuantos = losMasCercanos(nudos, x, z);
+  HALLADOS = cuantos;
+  for (let j = 0; j < cuantos; j++) {
+    const i = NUDO_CERCANO[j] as number;
+    const n = nudos[i] as { x: number; z: number };
+    if (seLlega(p, x, z, n.x, n.z, radio)) return i;
+  }
+  return -1;
+}
+
+/**
+ * LOS `CERCANOS` NUDOS MÁS CERCANOS A `(x, z)`, en `NUDO_CERCANO` (y sus distancias al cuadrado en
+ * `DISTANCIA_CERCANA`), en orden de distancia y, a igual distancia, de índice. Devuelve cuántos (menos de
+ * `CERCANOS` si el grafo tiene menos).
+ */
+function losMasCercanos(nudos: readonly { x: number; z: number }[], x: number, z: number): number {
+  if (losIndicesDeLaLizaEstanActivos() && nudos.length >= NUDOS_PARA_INDEXAR) {
+    const ix = indiceDeNudos(nudos);
+    if (ix !== null) {
+      CUENTAS_DE_LOS_INDICES.nudosPorCeldas++;
+      return losMasCercanosPorCeldas(ix, nudos, x, z);
+    }
+  }
+  return losMasCercanosEnLista(nudos, x, z);
+}
+
+/** Recorriendo la lista entera, en orden: lo de siempre, y lo que da el orden (distancia, índice) sin decirlo. */
+function losMasCercanosEnLista(nudos: readonly { x: number; z: number }[], x: number, z: number): number {
   let cuantos = 0;
   for (let i = 0; i < nudos.length; i++) {
     const n = nudos[i] as { x: number; z: number };
@@ -419,13 +604,155 @@ function nudoVisibleMasCercano(p: PasoEnCurso, x: number, z: number, radio: numb
     NUDO_CERCANO[j] = i;
     if (cuantos < CERCANOS) cuantos++;
   }
-  HALLADOS = cuantos;
-  for (let j = 0; j < cuantos; j++) {
-    const i = NUDO_CERCANO[j] as number;
+  return cuantos;
+}
+
+/**
+ * Para los comprobadores: los nudos más cercanos a `(x, z)`, en su orden, por donde vaya la sala (por
+ * celdas o en lista, según `usarLosIndicesDeLaLiza`). Con los índices encendidos y apagados tienen que
+ * salir los mismos.
+ */
+export function nudosMasCercanosParaProbar(nudos: readonly { x: number; z: number }[], x: number, z: number): number[] {
+  const cuantos = losMasCercanos(nudos, x, z);
+  const lista: number[] = [];
+  for (let j = 0; j < cuantos; j++) lista.push(NUDO_CERCANO[j] as number);
+  return lista;
+}
+
+/* ─── LOS NUDOS POR CELDAS (el diseño de la ciudad abierta, §5.4, punto 3) ───── *
+ *
+ * Con una ciudad son tres mil y pico nudos, y la pregunta de arriba los recorría todos varias veces por
+ * decisión. Desde `NUDOS_PARA_INDEXAR` se apuntan en las celdas de 16 unidades de `geometria.ts` y se
+ * recorren anillos de celdas alrededor de la del punto, hasta que el anillo siguiente queda MÁS LEJOS que
+ * el `CERCANOS`-ésimo candidato: fuera del cuadrado ya mirado no hay nada más cerca que su borde.
+ *
+ * ═══ LOS MISMOS, EN EL MISMO ORDEN ═══
+ *
+ * El recorrido en lista se queda, sin decirlo, con el orden (distancia, índice): visita en orden de
+ * índice y sólo desplaza a quien está ESTRICTAMENTE más lejos. Aquí los nudos no llegan en orden de índice,
+ * así que el orden se hace explícito (`meterCercano`). Y el anillo que queda a la MISMA distancia que el
+ * último candidato todavía se mira: un nudo justo en su raya, a esa distancia y con un índice menor, le
+ * quitaría el sitio. Parar con `>=` en vez de `>` lo perdía (lo vio el banco de la medida, y ahora el
+ * empate en la raya de `verify:liza`).
+ *
+ * Si algún nudo no es de enteros dentro de la liza, se queda en la lista, por la misma razón que las losas
+ * (`geometria.ts`): allí lanza el primero en orden de índice.
+ */
+export const NUDOS_PARA_INDEXAR = 512;
+
+interface IndiceDeNudos {
+  readonly desdeX: number;
+  readonly desdeZ: number;
+  readonly ancho: number;
+  readonly fondo: number;
+  /** Los nudos de la celda `k` son `lista[inicio[k]] … lista[inicio[k + 1] − 1]`. */
+  readonly inicio: Int32Array;
+  readonly lista: Int32Array;
+}
+
+const INDICES_DE_NUDOS = new WeakMap<object, IndiceDeNudos | null>();
+
+function indiceDeNudos(nudos: readonly { x: number; z: number }[]): IndiceDeNudos | null {
+  const hecho = INDICES_DE_NUDOS.get(nudos);
+  if (hecho !== undefined) return hecho;
+  let desdeX = 0;
+  let desdeZ = 0;
+  let hastaX = -1;
+  let hastaZ = -1;
+  for (let i = 0; i < nudos.length; i++) {
     const n = nudos[i] as { x: number; z: number };
-    if (seLlega(p, x, z, n.x, n.z, radio)) return i;
+    if (!Number.isInteger(n.x) || !Number.isInteger(n.z) || n.x > TOPE_DE_LA_LIZA || n.x < -TOPE_DE_LA_LIZA || n.z > TOPE_DE_LA_LIZA || n.z < -TOPE_DE_LA_LIZA) {
+      INDICES_DE_NUDOS.set(nudos, null);
+      return null;
+    }
+    const cx = celdaDelIndice(n.x);
+    const cz = celdaDelIndice(n.z);
+    if (i === 0 || cx < desdeX) desdeX = cx;
+    if (i === 0 || cz < desdeZ) desdeZ = cz;
+    if (i === 0 || cx > hastaX) hastaX = cx;
+    if (i === 0 || cz > hastaZ) hastaZ = cz;
   }
-  return -1;
+  const ancho = hastaX - desdeX + 1;
+  const fondo = hastaZ - desdeZ + 1;
+  const inicio = new Int32Array(ancho * fondo + 1);
+  for (let i = 0; i < nudos.length; i++) {
+    const n = nudos[i] as { x: number; z: number };
+    const k = (celdaDelIndice(n.z) - desdeZ) * ancho + (celdaDelIndice(n.x) - desdeX);
+    inicio[k + 1] = (inicio[k + 1] as number) + 1;
+  }
+  for (let k = 0; k < ancho * fondo; k++) inicio[k + 1] = (inicio[k + 1] as number) + (inicio[k] as number);
+  const puesto = inicio.slice(0, ancho * fondo);
+  const lista = new Int32Array(nudos.length);
+  for (let i = 0; i < nudos.length; i++) {
+    const n = nudos[i] as { x: number; z: number };
+    const k = (celdaDelIndice(n.z) - desdeZ) * ancho + (celdaDelIndice(n.x) - desdeX);
+    lista[puesto[k] as number] = i;
+    puesto[k] = (puesto[k] as number) + 1;
+  }
+  const indice: IndiceDeNudos = { desdeX, desdeZ, ancho, fondo, inicio, lista };
+  INDICES_DE_NUDOS.set(nudos, indice);
+  CUENTAS_DE_LOS_INDICES.indicesDeNudos++;
+  return indice;
+}
+
+/** Mete el nudo `i`, a distancia (al cuadrado) `d`, entre los `cuantos` que hay, con el orden (distancia, índice). */
+function meterCercano(i: number, d: number, cuantos: number): number {
+  if (cuantos === CERCANOS) {
+    const ud = DISTANCIA_CERCANA[CERCANOS - 1] as number;
+    if (d > ud || (d === ud && i > (NUDO_CERCANO[CERCANOS - 1] as number))) return cuantos;
+  }
+  let j = cuantos < CERCANOS ? cuantos : CERCANOS - 1;
+  while (j > 0) {
+    const dj = DISTANCIA_CERCANA[j - 1] as number;
+    if (!(dj > d || (dj === d && (NUDO_CERCANO[j - 1] as number) > i))) break;
+    DISTANCIA_CERCANA[j] = dj;
+    NUDO_CERCANO[j] = NUDO_CERCANO[j - 1] as number;
+    j--;
+  }
+  DISTANCIA_CERCANA[j] = d;
+  NUDO_CERCANO[j] = i;
+  return cuantos < CERCANOS ? cuantos + 1 : cuantos;
+}
+
+function mirarLaCelda(ix: IndiceDeNudos, nudos: readonly { x: number; z: number }[], cx: number, cz: number, x: number, z: number, cuantos: number): number {
+  if (cx < 0 || cz < 0 || cx >= ix.ancho || cz >= ix.fondo) return cuantos;
+  const k = cz * ix.ancho + cx;
+  const hasta = ix.inicio[k + 1] as number;
+  let c = cuantos;
+  for (let j = ix.inicio[k] as number; j < hasta; j++) {
+    const i = ix.lista[j] as number;
+    const n = nudos[i] as { x: number; z: number };
+    c = meterCercano(i, distanciaAlCuadrado(n.x - x, n.z - z), c);
+  }
+  return c;
+}
+
+function losMasCercanosPorCeldas(ix: IndiceDeNudos, nudos: readonly { x: number; z: number }[], x: number, z: number): number {
+  const cx = celdaDelIndice(x) - ix.desdeX;
+  const cz = celdaDelIndice(z) - ix.desdeZ;
+  /* El anillo más lejano que todavía toca la rejilla. */
+  const hasta = Math.max(Math.abs(cx), Math.abs(ix.ancho - 1 - cx), Math.abs(cz), Math.abs(ix.fondo - 1 - cz));
+  let cuantos = mirarLaCelda(ix, nudos, cx, cz, x, z, 0);
+  for (let r = 1; r <= hasta; r++) {
+    if (cuantos === CERCANOS) {
+      /* Lo más cerca que puede estar un nudo del anillo `r`: el borde del cuadrado de los anillos ya mirados. */
+      const x0 = (cx - r + 1 + ix.desdeX) * CELDA_DEL_INDICE;
+      const x1 = (cx + r + ix.desdeX) * CELDA_DEL_INDICE;
+      const z0 = (cz - r + 1 + ix.desdeZ) * CELDA_DEL_INDICE;
+      const z1 = (cz + r + ix.desdeZ) * CELDA_DEL_INDICE;
+      const hueco = Math.min(x - x0, x1 - x, z - z0, z1 - z);
+      if (hueco * hueco > (DISTANCIA_CERCANA[CERCANOS - 1] as number)) break;
+    }
+    for (let dx = -r; dx <= r; dx++) {
+      cuantos = mirarLaCelda(ix, nudos, cx + dx, cz - r, x, z, cuantos);
+      cuantos = mirarLaCelda(ix, nudos, cx + dx, cz + r, x, z, cuantos);
+    }
+    for (let dz = -r + 1; dz <= r - 1; dz++) {
+      cuantos = mirarLaCelda(ix, nudos, cx - r, cz + dz, x, z, cuantos);
+      cuantos = mirarLaCelda(ix, nudos, cx + r, cz + dz, x, z, cuantos);
+    }
+  }
+  return cuantos;
 }
 
 /** Un punto reutilizable para `seAndaEnRecta`, que pide objetos `{x, z}`: sin crear uno por pregunta. */
@@ -456,14 +783,122 @@ function seLlega(p: PasoEnCurso, x0: number, z0: number, x1: number, z1: number,
  * calle hasta la esquina en vez de entrar en la plaza, y se pasaban seis o diez segundos fuera del límite
  * de la fase caminando por su borde (lo midió el banco con las declaraciones de un juego, punto 4 del
  * encargo del frente). Andado, el camino corto es el corto.
+ *
+ * ═══ LOS CAMPOS POR META (el diseño de la ciudad abierta, §5.4, punto 4) ═══
+ *
+ * El Dijkstra recorría el grafo ENTERO en cada decisión de cada entidad: con una ciudad, tres mil y pico
+ * nudos cada vez. Ahora el campo de cada meta se guarda —`CAMPOS_POR_GRAFO` por grafo, y sale el que
+ * lleva más tiempo sin usarse— y se hace sólo hasta `COTA_DEL_CAMPO`: el mismo algoritmo con el mismo
+ * orden, parado cuando lo que sale del montículo pasa de la cota. Lo que queda dentro es EXACTAMENTE lo
+ * del Dijkstra entero, porque todo lo de dentro sale del montículo antes que nada de fuera y un camino
+ * que sale de la cota ya es más largo que ella. Quien lee un nudo de fuera (`falta`) hace que ese campo
+ * se complete entero: sigue su montículo donde lo dejó si nadie lo ha tocado desde entonces, y si no, lo
+ * rehace de cero, que es el Dijkstra de siempre. Ni un paso cambia: sólo se deja de calcular lo que nadie
+ * lee, y lo que ya se calculó no se repite. Un campo depende sólo del grafo y de la meta, así que se
+ * guarda por la IDENTIDAD del grafo (un `WeakMap`): la sala lo comparte entre sus declaraciones, que
+ * llevan el mismo mundo mientras dura la partida.
  */
 function distanciasHasta(p: PasoEnCurso, meta: number): void {
-  const nudos = p.declaracion.mundo.grafo.nudos;
-  const cuantos = nudos.length;
-  const inicio = p.indices.inicio;
-  const vecinos = p.indices.vecinos;
-  const aristas = inicio[cuantos] as number;
-  if (DISTANCIA.length < cuantos) DISTANCIA = new Float64Array(cuantos);
+  const grafo = p.declaracion.mundo.grafo;
+  const cuantos = grafo.nudos.length;
+  if (!losIndicesDeLaLizaEstanActivos()) {
+    if (DISTANCIA_SUELTA.length < cuantos) DISTANCIA_SUELTA = new Float64Array(cuantos);
+    DISTANCIA = DISTANCIA_SUELTA;
+    CAMPO.de = null;
+    CAMPO.cota = Number.POSITIVE_INFINITY;
+    dijkstra(p, meta, Number.POSITIVE_INFINITY);
+    return;
+  }
+  let c = CAMPOS.get(grafo);
+  if (c === undefined) {
+    c = { metas: new Int32Array(CAMPOS_POR_GRAFO).fill(-1), cotas: new Float64Array(CAMPOS_POR_GRAFO), usos: new Float64Array(CAMPOS_POR_GRAFO), campos: [], uso: 0 };
+    for (let k = 0; k < CAMPOS_POR_GRAFO; k++) c.campos.push(new Float64Array(0));
+    CAMPOS.set(grafo, c);
+  }
+  c.uso++;
+  CAMPO.de = c;
+  CAMPO.meta = meta;
+  for (let k = 0; k < CAMPOS_POR_GRAFO; k++) {
+    if (c.metas[k] !== meta) continue;
+    c.usos[k] = c.uso;
+    CAMPO.ranura = k;
+    CAMPO.cota = c.cotas[k] as number;
+    DISTANCIA = c.campos[k] as Float64Array;
+    CUENTAS_DE_LOS_INDICES.camposReusados++;
+    return;
+  }
+  let k = 0;
+  for (let j = 1; j < CAMPOS_POR_GRAFO; j++) if ((c.usos[j] as number) < (c.usos[k] as number)) k = j;
+  if ((c.campos[k] as Float64Array).length < cuantos) c.campos[k] = new Float64Array(cuantos);
+  c.metas[k] = meta;
+  c.cotas[k] = COTA_DEL_CAMPO;
+  c.usos[k] = c.uso;
+  CAMPO.ranura = k;
+  CAMPO.cota = COTA_DEL_CAMPO;
+  DISTANCIA = c.campos[k] as Float64Array;
+  CUENTAS_DE_LOS_INDICES.camposAcotados++;
+  dijkstra(p, meta, COTA_DEL_CAMPO);
+}
+
+/**
+ * Para los comprobadores: lo que falta ANDANDO desde cada nudo de `leer` hasta `meta` por el grafo de `d`
+ * (−1: no se llega), preguntado como lo pregunta la sala —el campo guardado y completado si hace falta, o
+ * el Dijkstra entero con los índices apagados—, en el orden de `leer`. Tienen que salir iguales.
+ */
+export function faltaPorElGrafoParaProbar(d: LizaDeclarada, meta: number, leer: readonly number[]): number[] {
+  const p = { declaracion: d, indices: indicesDe(d) } as unknown as PasoEnCurso;
+  distanciasHasta(p, meta);
+  const salida: number[] = [];
+  for (const v of leer) salida.push(falta(p, v));
+  return salida;
+}
+
+/** Hasta dónde se hace un campo antes de que alguien pida más: 160 unidades andadas. */
+const COTA_DEL_CAMPO = 160 * UNO;
+/** Cuántos campos se guardan por grafo: los metas de una sala llena cambian una vez por segundo o así. */
+const CAMPOS_POR_GRAFO = 8;
+
+interface CamposDelGrafo {
+  /** La meta de cada ranura (−1 = libre), hasta dónde está hecho su campo, y cuándo se usó por última vez. */
+  readonly metas: Int32Array;
+  readonly cotas: Float64Array;
+  readonly usos: Float64Array;
+  readonly campos: Float64Array[];
+  uso: number;
+}
+
+const CAMPOS = new WeakMap<object, CamposDelGrafo>();
+
+/** El campo en uso: de qué grafo (`null` con los índices apagados), en qué ranura, de qué meta y hasta dónde está hecho. */
+const CAMPO: { de: CamposDelGrafo | null; ranura: number; meta: number; cota: number } = { de: null, ranura: 0, meta: -1, cota: 0 };
+
+/** El campo cuyo Dijkstra dejó el montículo como está: sólo ése puede seguirlo (ver `falta`). */
+let DUENO_DEL_MONTON: Float64Array | null = null;
+
+/**
+ * LO QUE FALTA ANDANDO del nudo `v` a la meta en uso (−1: no se llega). Si el campo no llega a `v`
+ * (más allá de su cota, o sin tocar), se completa entero antes de contestar: ver «los campos por meta».
+ */
+function falta(p: PasoEnCurso, v: number): number {
+  const d = DISTANCIA[v] as number;
+  if (CAMPO.cota === Number.POSITIVE_INFINITY || (d >= 0 && d <= CAMPO.cota)) return d;
+  const c = CAMPO.de as CamposDelGrafo;
+  c.cotas[CAMPO.ranura] = Number.POSITIVE_INFINITY;
+  CAMPO.cota = Number.POSITIVE_INFINITY;
+  if (DUENO_DEL_MONTON === DISTANCIA) {
+    CUENTAS_DE_LOS_INDICES.camposSeguidos++;
+    recorrerElMonton(p, Number.POSITIVE_INFINITY);
+  } else {
+    CUENTAS_DE_LOS_INDICES.camposRehechos++;
+    dijkstra(p, CAMPO.meta, Number.POSITIVE_INFINITY);
+  }
+  return DISTANCIA[v] as number;
+}
+
+/** El Dijkstra hasta `meta` en `DISTANCIA`, de cero, parado al pasar de `cota` (ver `distanciasHasta`). */
+function dijkstra(p: PasoEnCurso, meta: number, cota: number): void {
+  const cuantos = p.declaracion.mundo.grafo.nudos.length;
+  const aristas = p.indices.inicio[cuantos] as number;
   if (MONTON.length < aristas + cuantos + 1) {
     MONTON = new Int32Array(aristas + cuantos + 1);
     CLAVE = new Float64Array(aristas + cuantos + 1);
@@ -472,9 +907,22 @@ function distanciasHasta(p: PasoEnCurso, meta: number): void {
   TAM = 0;
   DISTANCIA[meta] = 0;
   meterEnElMonton(meta, 0);
+  DUENO_DEL_MONTON = DISTANCIA;
+  recorrerElMonton(p, cota);
+}
+
+/**
+ * Saca del montículo hasta vaciarlo o hasta que lo siguiente pase de `cota` (que se queda dentro: así el
+ * mismo montículo se puede seguir más tarde, y seguirlo da lo mismo que no haberlo parado).
+ */
+function recorrerElMonton(p: PasoEnCurso, cota: number): void {
+  const nudos = p.declaracion.mundo.grafo.nudos;
+  const inicio = p.indices.inicio;
+  const vecinos = p.indices.vecinos;
   while (TAM > 0) {
     const u = MONTON[0] as number;
     const du = CLAVE[0] as number;
+    if (du > cota) return;
     TAM--;
     if (TAM > 0) {
       MONTON[0] = MONTON[TAM] as number;
@@ -555,10 +1003,10 @@ function siguienteHacia(p: PasoEnCurso, desde: number, meta: number): number {
   let mejorD = -1;
   for (let j = inicio[desde] as number; j < (inicio[desde + 1] as number); j++) {
     const v = vecinos[j] as number;
-    const falta = DISTANCIA[v] as number;
-    if (falta < 0) continue;
+    const queda = falta(p, v);
+    if (queda < 0) continue;
     const nv = nudos[v] as { x: number; z: number };
-    const d = falta + largo(nv.x - nd.x, nv.z - nd.z);
+    const d = queda + largo(nv.x - nd.x, nv.z - nd.z);
     if (mejor < 0 || d < mejorD || (d === mejorD && v < mejor)) {
       mejor = v;
       mejorD = d;
@@ -576,10 +1024,14 @@ function primerNudo(p: PasoEnCurso, x: number, z: number, b: AsientoEnCurso, rad
   return primerNudoHacia(p, x, z, nudoVisibleMasCercano(p, b.x, b.z, radio), radio);
 }
 
-/** El primer nudo desde `(x, z)` hacia el nudo `meta` (ver `primerNudo`): −1 si no ve ninguno. */
+/**
+ * El primer nudo desde `(x, z)` hacia el nudo `meta` (ver `primerNudo`). Si no llega a ninguno de los más
+ * cercanos, el más cercano al que llega de los de `BUSQUEDA_DE_ESCAPE` (ver `nudoParaSalir`); −1 si ni así.
+ */
 function primerNudoHacia(p: PasoEnCurso, x: number, z: number, meta: number, radio: number): number {
   const desde = nudoVisibleMasCercano(p, x, z, radio);
-  if (meta < 0 || desde < 0) return desde;
+  if (desde < 0) return nudoParaSalir(p, x, z, radio);
+  if (meta < 0) return desde;
   const nudos = p.declaracion.mundo.grafo.nudos;
   /* `nudoVisibleMasCercano` deja en NUDO_CERCANO los más cercanos a (x, z): se copian antes de otra pregunta. */
   const hallados = HALLADOS;
@@ -595,16 +1047,76 @@ function primerNudoHacia(p: PasoEnCurso, x: number, z: number, meta: number, rad
   let mejorD = -1;
   for (let j = 0; j < cuantos; j++) {
     const i = VISIBLES[j] as number;
-    const falta = DISTANCIA[i] as number;
-    if (falta < 0) continue;
+    const queda = falta(p, i);
+    if (queda < 0) continue;
     const n = nudos[i] as { x: number; z: number };
-    const d = falta + largo(n.x - x, n.z - z);
+    const d = queda + largo(n.x - x, n.z - z);
     if (mejorD < 0 || d < mejorD || (d === mejorD && i < mejor)) {
       mejor = i;
       mejorD = d;
     }
   }
   return mejor;
+}
+
+/**
+ * ═══ EL BOLSILLO: CUANDO NO SE LLEGA A NINGÚN NUDO CERCANO ═══
+ *
+ * La primera versión, si no llegaba andando en recta a ninguno de los `CERCANOS` nudos más cercanos, se iba
+ * en recta a su blanco, y contra lo que estorbaba temblaba para siempre. En la ciudad abierta pasa en un
+ * bolsillo: la cabina de la Llamada está en la acera, con su poste, y un coche aparcado justo delante; lo
+ * que sale de su zona queda entre el poste, el coche y la fachada, con los seis nudos más cercanos (los de
+ * la calzada, a 3-13 m) tapados por el coche o por el poste. La salida existe —acera arriba, rodeando el
+ * coche—, pero el primer nudo al que se llega en recta es el 21.º más cercano, a 29,5 m. Lo vio la
+ * vigilancia de los NPC en las Llamadas de verdad de El Quiebro: Prestados clavados ahí 772 tics con su
+ * blanco a 85-92 m (y, con L10, acercándose sin blanco, 780).
+ *
+ * Así que entonces se busca más lejos: de los nudos a `BUSQUEDA_DE_ESCAPE` o menos, en orden de distancia
+ * (y a igual distancia, de índice), el primero al que se llega andando en recta con su radio. Es raro —sólo
+ * cuando ninguno de los seis cercanos vale— y cuesta una pasada por los nudos más unas pocas rectas; lo que
+ * sale se guarda como el nudo de la entidad, que va a él y desde él sigue por el grafo. −1 si no hay ninguno.
+ */
+const BUSQUEDA_DE_ESCAPE = 45 * UNO;
+/** Los candidatos de `nudoParaSalir` y sus distancias al cuadrado (ver «sin basura en lo caliente»: crecen, no se crean). */
+let ESCAPE = new Int32Array(64);
+let DISTANCIA_DE_ESCAPE = new Float64Array(64);
+
+function nudoParaSalir(p: PasoEnCurso, x: number, z: number, radio: number): number {
+  const nudos = p.declaracion.mundo.grafo.nudos;
+  let n = 0;
+  for (let i = 0; i < nudos.length; i++) {
+    const q = nudos[i] as { x: number; z: number };
+    if (!dentroDelRadio(q.x - x, q.z - z, BUSQUEDA_DE_ESCAPE)) continue;
+    if (n === ESCAPE.length) {
+      const mas = new Int32Array(2 * n);
+      mas.set(ESCAPE);
+      ESCAPE = mas;
+      const masD = new Float64Array(2 * n);
+      masD.set(DISTANCIA_DE_ESCAPE);
+      DISTANCIA_DE_ESCAPE = masD;
+    }
+    ESCAPE[n] = i;
+    DISTANCIA_DE_ESCAPE[n] = distanciaAlCuadrado(q.x - x, q.z - z);
+    n++;
+  }
+  /* En orden de (distancia, índice), probando cada uno al sacarlo: se para en el primero al que se llega. */
+  for (let k = 0; k < n; k++) {
+    let m = k;
+    for (let j = k + 1; j < n; j++) {
+      const dj = DISTANCIA_DE_ESCAPE[j] as number;
+      const dm = DISTANCIA_DE_ESCAPE[m] as number;
+      if (dj < dm || (dj === dm && (ESCAPE[j] as number) < (ESCAPE[m] as number))) m = j;
+    }
+    const i = ESCAPE[m] as number;
+    const d = DISTANCIA_DE_ESCAPE[m] as number;
+    ESCAPE[m] = ESCAPE[k] as number;
+    DISTANCIA_DE_ESCAPE[m] = DISTANCIA_DE_ESCAPE[k] as number;
+    ESCAPE[k] = i;
+    DISTANCIA_DE_ESCAPE[k] = d;
+    const q = nudos[i] as { x: number; z: number };
+    if (seLlega(p, x, z, q.x, q.z, radio)) return i;
+  }
+  return -1;
 }
 
 /* ─── ATACAR Y DISPARAR ──────────────────────────────────────────────────── */
@@ -728,7 +1240,7 @@ function avanzarAlAtacar(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntida
 function apuntarYDisparar(p: PasoEnCurso, e: EntidadEnCurso, clase: ClaseDeEntidad): void {
   const k = p.k;
   const proyectil = p.indices.proyectiles[clase.proyectil];
-  const b = blancoValido(p, e.blanco);
+  const b = blancoAlAlcance(p, e, clase, e.blanco);
   const blancoFijo = asientoDe(p, e.blanco);
   const dejarlo = blancoFijo !== null && excluido(p, blancoFijo);
   if (proyectil === undefined || (e.cerebro.modo === 'apuntar' && b === null) || dejarlo) {

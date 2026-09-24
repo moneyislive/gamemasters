@@ -17,21 +17,50 @@
  *     y si acaba antes de haber caído, la caída sigue un par de segundos dentro de la oleada.
  *   · `juego`: al hombro, con todo lo de `encuadrar`; o Vigía si no tengo cuerpo.
  *
+ * En la ciudad abierta (`red/lugar.ts`) la plaza no está siempre en el origen: la Bajada puede ser en
+ * cualquiera de las seis plazas, así que lo alto de la Bajada da vueltas sobre la plaza de la Bajada (en el
+ * barrio, el origen: lo de siempre), y la cámara no atraviesa las cajas de la ciudad entera.
+ *
+ * ═══ EL OJO NUNCA DENTRO DE UNA CAJA ═══
+ *
+ * `encuadrar` prueba el tramo del HOMBRO al ojo con las cajas ensanchadas 0,25 m. Con la espalda contra
+ * una pared, el hombro ya cae dentro de ese margen: el tramo «entra» en la caja en su principio, el corte
+ * sale 0 y la distancia se queda en la mínima (0,6 m detrás del hombro), que está al otro lado de la cara.
+ * Visto el 24-sep en las tres salidas de avenida: la cámara a −270,17, dentro del cerco (−272..−270) y
+ * metida en la cortina de glifos que se aviva al acercarse, con un cuarto de la pantalla en blanco; y en
+ * cualquier fachada, 0,2 m dentro. Así que el ojo de `encuadrar` pasa por `ojoFueraDeLasCajas`: si ha
+ * quedado dentro de una caja (ensanchada `HOLGURA_DEL_OJO`, más que el plano cercano), se acerca por el
+ * tramo que sale del PECHO —el centro del cuerpo, a su radio de 0,35 m de cualquier cara y por tanto
+ * siempre fuera— hasta quedar delante de la cara; pegado al pecho, sube para mirar por encima de la cabeza.
+ * Si el ojo está fuera, no se toca: el acercarse en el acto y el alejarse suave de `encuadrar` siguen
+ * mandando. Soltar la pared no da un salto: el ojo corregido está en el tramo del pecho al de `encuadrar`,
+ * y al separarse la parte del tramo que queda dentro de la caja se acorta sin saltos hasta cero (medido al
+ * separarse de 60 fachadas en 32 giros a 7 m/s: lo que la corrección suelta en un fotograma no pasa de
+ * 0,3 m). La subida junto al pecho tampoco salta: el ojo de `encuadrar` nunca queda a menos de 0,85 m del
+ * pecho en planta (0,7 de hombro, y 0,6 detrás con 35° de cabeceo como mucho), así que al salir de la caja
+ * lo que suelta de subida son 2,5 cm como mucho.
+ *
+ * `verify:quiebro-juego` lo prueba con las cajas de la ciudad de verdad: en las tres salidas de las 32
+ * trazas y pegado a las fachadas, el ojo de `encuadrar` queda dentro de una caja en más de un tercio de los
+ * giros, y el que se pinta, en ninguno. El arreglo de fondo (el hombro dentro del margen) es de
+ * `encuadre.ts`, que es de dirección de arte.
+ *
  * Corre en su `useFrame` con prioridad −2: después del bucle de la partida (que ya puso mi cuerpo en su
  * sitio de este fotograma) y antes de los efectos y la ciudad, que leen la cámara.
  */
 import { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { Barrio, CajaDelBarrio } from '../../../../shared/arcade/juegos/quiebro-barrio';
 import type { EstadoDeLosMandos } from '../mandos/estado';
+import { cajasDelLugar, centroDeLaBajada } from '../red/lugar';
+import type { CajaDelLugar, LugarDeLaNoche } from '../red/lugar';
 import type { Partida } from '../red/partida';
 import type { Escenificador } from '../red/escenificar';
 import { GiroEnLoAlto } from '../red/bajada';
 import type { SistemaDeEfectos } from '../efectos';
 import type { Sonido } from '../sonido';
-import type { CajaAlta, EncuadreDeLaCamara } from './encuadre';
-import { CABECEO_MAXIMO, CABECEO_MINIMO, camaraNueva, encuadrar, FOV_MOVIL, FOV_PC } from './encuadre';
+import type { CajaAlta, EncuadreDeLaCamara, Punto3 } from './encuadre';
+import { ALTO_DEL_PIVOTE, CABECEO_MAXIMO, CABECEO_MINIMO, camaraNueva, encuadrar, FOV_MOVIL, FOV_PC, primerCorte } from './encuadre';
 
 export type ModoDeLaCamara = 'orbita' | 'bajada' | 'juego';
 
@@ -41,7 +70,8 @@ export interface PropsDeLaCamara {
   readonly escena: Escenificador;
   readonly sistema: SistemaDeEfectos;
   readonly sonido: Sonido;
-  readonly barrio: Barrio | null;
+  /** El lugar de la noche: sus cajas tapan a la cámara, y su plaza de la Bajada es lo que se ve desde lo alto. */
+  readonly lugar: LugarDeLaNoche | null;
   readonly modo: ModoDeLaCamara;
   /**
    * Por dónde va la caída de la Bajada en `ahora`: 0 arriba, 1 al hombro, `null` si no hay caída que
@@ -64,13 +94,50 @@ export interface PropsDeLaCamara {
  *     espaldas a ella.
  *   · Un banco, no tapa.
  */
-export function cajaParaLaCamara(c: CajaDelBarrio): CajaAlta {
+export function cajaParaLaCamara(c: CajaDelLugar): CajaAlta {
   if (c.tipo === 'fuente') {
     const cx = (c.x0 + c.x1) / 2;
     const cz = (c.z0 + c.z1) / 2;
     return { x0: cx - 0.95, z0: cz - 0.95, x1: cx + 0.95, z1: cz + 0.95, alto: 2.6 };
   }
   return { x0: c.x0, z0: c.z0, x1: c.x1, z1: c.z1, alto: c.alto >= 0.9 ? Math.max(c.alto, 6) : c.alto };
+}
+
+/** Lo que el ojo se queda fuera de cualquier caja como poco: más que el plano cercano de la cámara (0,1 m). */
+export const HOLGURA_DEL_OJO = 0.15;
+
+/** ¿Está el punto dentro de alguna caja ensanchada `margen` por los lados y por arriba? */
+function dentroDeUnaCaja(p: Punto3, cajas: readonly CajaAlta[], margen: number): boolean {
+  for (const c of cajas) {
+    if (p.x > c.x0 - margen && p.x < c.x1 + margen && p.z > c.z0 - margen && p.z < c.z1 + margen && p.y < c.alto + margen) return true;
+  }
+  return false;
+}
+
+/**
+ * Con la espalda contra la pared el ojo acaba casi en el pecho, dentro de la cabeza (la malla no se ve
+ * desde dentro, pero el encuadre queda a la altura de los ojos y sin cuerpo). Así que, a menos de
+ * `CERCA_DEL_PECHO` de él, el ojo sube hasta `SUBIDA_JUNTO_AL_PECHO` y mira por encima de la cabeza,
+ * algo hacia abajo. Subir no mete el ojo en ninguna caja: son columnas desde el suelo.
+ */
+export const CERCA_DEL_PECHO = 0.9;
+export const SUBIDA_JUNTO_AL_PECHO = 0.5;
+
+/**
+ * EL OJO FUERA DE LAS CAJAS (ver la cabecera): el `ojo` tal cual si está fuera de todas; si no, el punto del
+ * tramo del pecho de quien está en `(x, z)` al ojo donde ese tramo entra en la primera caja, ensanchada
+ * `HOLGURA_DEL_OJO` (y, pegado al pecho, más alto). Pura, para que el comprobador la pruebe con las cajas
+ * de la ciudad.
+ */
+export function ojoFueraDeLasCajas(x: number, z: number, ojo: Punto3, cajas: readonly CajaAlta[]): Punto3 {
+  if (!dentroDeUnaCaja(ojo, cajas, HOLGURA_DEL_OJO)) return ojo;
+  const pecho: Punto3 = { x, y: ALTO_DEL_PIVOTE, z };
+  const f = Math.max(0, Math.min(1, primerCorte(pecho, ojo, cajas, HOLGURA_DEL_OJO)));
+  const ox = pecho.x + (ojo.x - pecho.x) * f;
+  const oz = pecho.z + (ojo.z - pecho.z) * f;
+  const cerca = Math.hypot(ox - x, oz - z);
+  const subida = cerca < CERCA_DEL_PECHO ? (1 - cerca / CERCA_DEL_PECHO) * SUBIDA_JUNTO_AL_PECHO : 0;
+  return { x: ox, y: pecho.y + (ojo.y - pecho.y) * f + subida, z: oz };
 }
 
 function suave(t: number): number {
@@ -80,10 +147,8 @@ function suave(t: number): number {
 
 export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
   const camara = useThree((s) => s.camera);
-  const cajas = useMemo<readonly CajaAlta[]>(
-    () => (p.barrio === null ? [] : p.barrio.cajas.map(cajaParaLaCamara)),
-    [p.barrio],
-  );
+  const cajas = useMemo<readonly CajaAlta[]>(() => cajasDelLugar(p.lugar).map(cajaParaLaCamara), [p.lugar]);
+  const plaza = useMemo(() => centroDeLaBajada(p.lugar), [p.lugar]);
   const estado = useRef(camaraNueva(0));
   const primera = useRef(true);
   const mirar = useRef(new THREE.Vector3());
@@ -104,8 +169,8 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
     if (p.modo === 'orbita' || cuerpo === null) {
       const a = (ahora / 1000) * 0.05;
       encuadre = {
-        ojo: { x: Math.sin(a) * 34, y: 22, z: Math.cos(a) * 34 },
-        mira: { x: 0, y: 2, z: 0 },
+        ojo: { x: plaza.x + Math.sin(a) * 34, y: 22, z: plaza.z + Math.cos(a) * 34 },
+        mira: { x: plaza.x, y: 2, z: plaza.z },
         fov: p.tactil ? FOV_MOVIL : FOV_PC,
       };
     } else {
@@ -115,7 +180,8 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
         primera.current = false;
       }
       const blanco = p.partida.blanco === 0 ? null : p.partida.pintadoDe(p.partida.blanco);
-      const alHombro = encuadrar(e, {
+      const vigia = !p.partida.conCuerpo();
+      const encuadrado = encuadrar(e, {
         x: cuerpo.x,
         z: cuerpo.z,
         dt: Math.min(0.1, dt),
@@ -124,9 +190,12 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
         mandaElDedo: p.mandos.mandaElDedo(ahora),
         remanso: p.sistema.reloj.intensidad(ahora),
         tactil: p.tactil,
-        vigia: !p.partida.conCuerpo(),
+        vigia,
         cajas,
       });
+      /* El ojo, nunca dentro de una caja (ver la cabecera); el Vigía va a 25 m, por encima de todo. */
+      const ojo = vigia ? encuadrado.ojo : ojoFueraDeLasCajas(cuerpo.x, cuerpo.z, encuadrado.ojo, cajas);
+      const alHombro: EncuadreDeLaCamara = ojo === encuadrado.ojo ? encuadrado : { ...encuadrado, ojo };
       const caida = p.caida(ahora);
       if (p.modo === 'bajada' || (caida !== null && caida < 1)) {
         /*
@@ -136,7 +205,7 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
         const f = suave(caida ?? 0);
         /* El giro, sumado y no sacado del reloj de la página (ver `GiroEnLoAlto`). */
         const a = vuelta.current.avanzar(ahora, caida ?? 0);
-        const alto = { x: cuerpo.x * 0.4 + Math.sin(a) * 26, y: 70, z: cuerpo.z * 0.4 + Math.cos(a) * 26 };
+        const alto = { x: plaza.x + (cuerpo.x - plaza.x) * 0.4 + Math.sin(a) * 26, y: 70, z: plaza.z + (cuerpo.z - plaza.z) * 0.4 + Math.cos(a) * 26 };
         encuadre = {
           ojo: {
             x: alto.x + (alHombro.ojo.x - alto.x) * f,

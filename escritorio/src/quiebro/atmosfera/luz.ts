@@ -52,7 +52,8 @@ export class LucesDeLaNoche {
   readonly direccional: THREE.DirectionalLight;
   private readonly reales: THREE.PointLight[] = [];
   private readonly destino: (FarolaEncendible | null)[] = [];
-  private readonly farolas: readonly FarolaEncendible[];
+  /** Las farolas que pueden encenderse: una lista fija (el barrio) o la que dé la ventana de celdas ahora. */
+  private readonly farolas: () => readonly FarolaEncendible[];
   private encendido = 1;
   /** Cuánto de su intensidad dan las farolas de verdad con esta luz (al alba, menos). */
   private intensidadDeLaLuz = 1;
@@ -62,8 +63,8 @@ export class LucesDeLaNoche {
   /** De dónde viene la direccional, respecto del foco (lo pone la paleta). */
   private readonly desde = new THREE.Vector3(18, 60, 26);
 
-  constructor(farolas: readonly FarolaEncendible[], opciones: OpcionesDeLasLuces) {
-    this.farolas = farolas;
+  constructor(farolas: readonly FarolaEncendible[] | (() => readonly FarolaEncendible[]), opciones: OpcionesDeLasLuces) {
+    this.farolas = typeof farolas === 'function' ? farolas : () => farolas;
     this.grupo.name = 'quiebro-luces';
     this.hemisferio = new THREE.HemisphereLight(new THREE.Color('#5d7f7a'), new THREE.Color('#3a2c22'), 0.22);
     this.grupo.add(this.hemisferio);
@@ -142,7 +143,7 @@ export class LucesDeLaNoche {
     this.reloj += dt;
     if (this.reloj >= 0.3) {
       this.reloj = 0;
-      const cercanas = [...this.farolas]
+      const cercanas = [...this.farolas()]
         .map((f) => ({ f, d: (f.x - this.foco.x) ** 2 + (f.z - this.foco.z) ** 2 }))
         .sort((a, b) => a.d - b.d)
         .slice(0, this.reales.length)

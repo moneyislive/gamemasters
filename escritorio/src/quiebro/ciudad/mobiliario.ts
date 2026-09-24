@@ -47,7 +47,8 @@ export interface MobiliarioConstruido {
   readonly alcantarillas: { readonly x: number; readonly z: number }[];
 }
 
-const H = ALTURA_DE_LA_ACERA;
+/** La cota del bordillo: todo lo que se apoya en la acera o en la plaza arranca aquí. */
+export const H = ALTURA_DE_LA_ACERA;
 
 /** El ángulo (alrededor de y) que lleva el +z local a mirar hacia `o`. */
 function anguloDe(o: Orientacion): number {
@@ -65,30 +66,30 @@ function centro(c: CajaXZ): [number, number] {
 }
 
 /** Una caja local por centro y medidas. */
-function bloque(m: Molde, cx: number, y0: number, cz: number, ax: number, alto: number, az: number, caras = 'nseoab'): void {
+export function bloque(m: Molde, cx: number, y0: number, cz: number, ax: number, alto: number, az: number, caras = 'nseoab'): void {
   m.caja(cx - ax / 2, y0, cz - az / 2, cx + ax / 2, y0 + alto, cz + az / 2, caras);
 }
 
-type Rgb = readonly [number, number, number];
+export type Rgb = readonly [number, number, number];
 
-function tono(m: Molde, color: Rgb, acabado: readonly [number, number]): void {
+export function tono(m: Molde, color: Rgb, acabado: readonly [number, number]): void {
   m.color(color[0], color[1], color[2]);
   m.poner('aAcabado', acabado[0], acabado[1]);
 }
 
-const HIERRO: Rgb = lineal(0x16191a);
-const HIERRO_VERDE: Rgb = lineal(0x1d2e26);
-const PIEDRA: Rgb = lineal(0x6f6a60);
-const GRANITO: Rgb = lineal(0x4d4b47);
-const HORMIGON: Rgb = lineal(0x5a5a56);
-const MADERA: Rgb = lineal(0x5a3a22);
-const SODIO_HDR: Rgb = [6.5, 3.4, 1.1];
-const AMBAR_HDR: Rgb = [5.0, 2.4, 0.45];
+export const HIERRO: Rgb = lineal(0x16191a);
+export const HIERRO_VERDE: Rgb = lineal(0x1d2e26);
+export const PIEDRA: Rgb = lineal(0x6f6a60);
+export const GRANITO: Rgb = lineal(0x4d4b47);
+export const HORMIGON: Rgb = lineal(0x5a5a56);
+export const MADERA: Rgb = lineal(0x5a3a22);
+export const SODIO_HDR: Rgb = [6.5, 3.4, 1.1];
+export const AMBAR_HDR: Rgb = [5.0, 2.4, 0.45];
 
 /* ═══════════════════════════════ LAS PIEZAS ═══════════════════════════════ */
 
 /** Farola de calle: pie, fuste, brazo sobre la calzada y cabeza con el vidrio de sodio. */
-function farolaDeCalle(mo: Molde, em: Molde, x: number, z: number, brazo: Orientacion, lados: number): LuzDelMobiliario {
+export function farolaDeCalle(mo: Molde, em: Molde, x: number, z: number, brazo: Orientacion, lados: number): LuzDelMobiliario {
   const [dx, dz] = normalDe(brazo);
   tono(mo, HIERRO, ACABADO.hierro);
   mo.cilindro(x, z, H, H + 0.55, 0.2, 0.15, lados, true);
@@ -107,7 +108,7 @@ function farolaDeCalle(mo: Molde, em: Molde, x: number, z: number, brazo: Orient
 }
 
 /** Farola de plaza: pedestal, fuste y farol hexagonal con su sombrerete. */
-function farolaDePlaza(mo: Molde, em: Molde, x: number, z: number, lados: number): LuzDelMobiliario {
+export function farolaDePlaza(mo: Molde, em: Molde, x: number, z: number, lados: number): LuzDelMobiliario {
   tono(mo, HIERRO_VERDE, ACABADO.hierro);
   bloque(mo, x, H, z, 0.46, 0.55, 0.46);
   mo.cilindro(x, z, H + 0.55, H + 0.8, 0.16, 0.1, lados, false);
@@ -122,7 +123,7 @@ function farolaDePlaza(mo: Molde, em: Molde, x: number, z: number, lados: number
 }
 
 /** Banco de listones con respaldo, dentro de su caja (2 × 0,5), mirando a `mira`. */
-function banco(mo: Molde, b: PiezaConFrente): void {
+export function banco(mo: Molde, b: PiezaConFrente): void {
   const [cx, cz] = centro(b.caja);
   const largo = Math.max(b.caja.x1 - b.caja.x0, b.caja.z1 - b.caja.z0) - 0.05;
   /* El frente es `mira`: en local, +z. El largo del banco va por x local. */
@@ -160,7 +161,7 @@ function paredInterior(m: Molde, cx: number, cz: number, r: number, y0: number, 
 }
 
 /** La fuente: pilón octogonal con agua, columna y taza. */
-function fuente(mo: Molde, x: number, z: number, radio: number): void {
+export function fuente(mo: Molde, x: number, z: number, radio: number): void {
   const r = radio - 0.05;
   tono(mo, PIEDRA, ACABADO.piedra);
   mo.cilindro(x, z, H, H + 0.55, r, r, 8, false);
@@ -180,7 +181,7 @@ function fuente(mo: Molde, x: number, z: number, radio: number): void {
 }
 
 /** El quiosco de la plaza: octogonal, de hierro y cristal, con tejado de pabellón y luz dentro. */
-function quiosco(mo: Molde, em: Molde, cr: Molde, q: PiezaConFrente, lados: number): LuzDelMobiliario {
+export function quiosco(mo: Molde, em: Molde, cr: Molde, q: PiezaConFrente, lados: number): LuzDelMobiliario {
   const [x, z] = centro(q.caja);
   const r = Math.min(q.caja.x1 - q.caja.x0, q.caja.z1 - q.caja.z0) / 2 - 0.08;
   tono(mo, GRANITO, ACABADO.piedra);
@@ -211,7 +212,7 @@ function quiosco(mo: Molde, em: Molde, cr: Molde, q: PiezaConFrente, lados: numb
 }
 
 /** Quiosco de prensa cerrado de madrugada: caja verde con persiana, tejadillo y franja encendida. */
-function quioscoDePrensa(mo: Molde, em: Molde, q: PiezaConFrente): LuzDelMobiliario {
+export function quioscoDePrensa(mo: Molde, em: Molde, q: PiezaConFrente): LuzDelMobiliario {
   const [x, z] = centro(q.caja);
   const w = q.caja.x1 - q.caja.x0;
   const d = q.caja.z1 - q.caja.z0;
@@ -239,7 +240,7 @@ function quioscoDePrensa(mo: Molde, em: Molde, q: PiezaConFrente): LuzDelMobilia
  * La cabina: poste de hierro con marquesina curva que vuela sobre quien descuelga, el aparato de
  * monedas y el auricular de luz ámbar.
  */
-function cabina(mo: Molde, em: Molde, x: number, z: number, mira: Orientacion, lados: number): LuzDelMobiliario {
+export function cabina(mo: Molde, em: Molde, x: number, z: number, mira: Orientacion, lados: number): LuzDelMobiliario {
   tono(mo, HIERRO, ACABADO.hierro);
   mo.cilindro(x, z, H, H + 0.08, 0.2, 0.2, lados, true);
   mo.cilindro(x, z, H + 0.08, H + 2.75, 0.07, 0.06, lados, true);
@@ -276,7 +277,7 @@ function cabina(mo: Molde, em: Molde, x: number, z: number, mira: Orientacion, l
 }
 
 /** Las vallas donde una calle sigue fuera del barrio: barreras de hormigón rojiblancas y balizas. */
-function valla(mo: Molde, em: Molde, c: CajaXZ): LuzDelMobiliario[] {
+export function valla(mo: Molde, em: Molde, c: CajaXZ): LuzDelMobiliario[] {
   const [x, z] = centro(c);
   const enX = c.x1 - c.x0 >= c.z1 - c.z0;
   const largo = enX ? c.x1 - c.x0 : c.z1 - c.z0;
@@ -372,7 +373,7 @@ function viaDelTren(mo: Molde, plano: PlanoDeLaCiudad): void {
  * Las alcantarillas: tapas redondas en el eje de cada tramo de calzada y rejillas junto al
  * bordillo. Van a 1,5 cm sobre el asfalto (una tapa de verdad sobresale un poco, y así no parpadea).
  */
-function alcantarillas(mo: Molde, calles: readonly CalleDelPlano[], limite: CajaXZ, lados: number): { x: number; z: number }[] {
+export function alcantarillas(mo: Molde, calles: readonly CalleDelPlano[], limite: CajaXZ, lados: number): { x: number; z: number }[] {
   const salida: { x: number; z: number }[] = [];
   for (const c of calles) {
     for (let s = c.desde + 11; s < c.hasta - 5; s += 24) {

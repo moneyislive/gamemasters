@@ -17,6 +17,7 @@ import { GLSL_RUIDO } from './glsl';
 import { UNIFORMES_DE_LA_CIUDAD } from './retoques';
 import { UNIFORMES_DE_LA_LLUVIA } from '../atmosfera/lluvia';
 import { mezclar } from './azar';
+import { rellenarInstancias } from './geometria';
 
 const BOCANADAS = 6;
 
@@ -77,10 +78,25 @@ void main() {
 }
 `;
 
+/** Las bocanadas de unas bocas, en la lista instanciada, con sitio para `n` bocas. */
+function datosDelVapor(elegidas: readonly { readonly x: number; readonly z: number }[], n: number): Float32Array {
+  const datos = new Float32Array(Math.max(1, n * BOCANADAS) * 4);
+  elegidas.forEach((b, i) => {
+    for (let k = 0; k < BOCANADAS; k++) {
+      datos.set([b.x, b.z, k / BOCANADAS + (i % 3) * 0.07, (i * BOCANADAS + k) * 0.618], (i * BOCANADAS + k) * 4);
+    }
+  });
+  return datos;
+}
+
 export class Vapor {
   readonly malla: THREE.InstancedMesh;
+  private readonly cuantas: number;
+  private readonly semilla: number;
 
   constructor(bocas: readonly { readonly x: number; readonly z: number }[], cuantas: number, semilla: number) {
+    this.cuantas = cuantas;
+    this.semilla = semilla;
     const elegidas = [...bocas]
       .map((b, i) => ({ b, h: mezclar(semilla, i, 77) }))
       .sort((a, b) => a.h - b.h)
@@ -88,13 +104,7 @@ export class Vapor {
       .map((e) => e.b);
     const n = elegidas.length * BOCANADAS;
     const plano = new THREE.PlaneGeometry(1, 1);
-    const datos = new Float32Array(Math.max(1, n) * 4);
-    elegidas.forEach((b, i) => {
-      for (let k = 0; k < BOCANADAS; k++) {
-        datos.set([b.x, b.z, k / BOCANADAS + (i % 3) * 0.07, (i * BOCANADAS + k) * 0.618], (i * BOCANADAS + k) * 4);
-      }
-    });
-    plano.setAttribute('aVapor', new THREE.InstancedBufferAttribute(datos, 4));
+    plano.setAttribute('aVapor', new THREE.InstancedBufferAttribute(datosDelVapor(elegidas, Math.max(cuantas, elegidas.length)), 4));
     const material = new THREE.ShaderMaterial({
       name: 'quiebro-vapor',
       uniforms: {
@@ -117,6 +127,20 @@ export class Vapor {
     this.malla.name = 'quiebro-vapor';
     this.malla.frustumCulled = false;
     this.malla.renderOrder = 6;
+  }
+
+  /**
+   * Otras bocas (la ventana de celdas se movió): echan vapor las mismas `cuantas` de siempre, elegidas por
+   * el hash de su SITIO y no de su puesto en la lista, así que una boca que sigue en la ventana sigue
+   * echando vapor al moverse la ventana, igual en todos los aparatos.
+   */
+  poner(bocas: readonly { readonly x: number; readonly z: number }[]): void {
+    const elegidas = [...bocas]
+      .map((b) => ({ b, h: mezclar(this.semilla, Math.round(b.x * 4), Math.round(b.z * 4), 77) }))
+      .sort((a, b) => a.h - b.h)
+      .slice(0, Math.max(0, this.cuantas))
+      .map((e) => e.b);
+    rellenarInstancias(this.malla, { aVapor: datosDelVapor(elegidas, elegidas.length) }, elegidas.length * BOCANADAS);
   }
 
   liberar(): void {

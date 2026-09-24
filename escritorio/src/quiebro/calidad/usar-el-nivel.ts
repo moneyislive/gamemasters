@@ -12,6 +12,10 @@
  *   3. Cuando el gobernador cambia de nivel o de DPR, lo aplica: el DPR con `setDpr` de r3f (que
  *      redimensiona el lienzo, y el posproceso se entera solo), y el nivel como estado de React, para
  *      que la ciudad, la atmósfera, los personajes y el posproceso se vuelvan a montar con sus palancas.
+ *   4. Y en los pintados que siguen a un cambio de nivel (y en el que cambia el estado del renderizador),
+ *      pide A LA VEZ los programas de todo lo que se pinta antes de que el pintado los use
+ *      (`usarLaPrecompilacionAlCambiar`, en `precompilar.ts`): el compilador los hace en paralelo en vez de
+ *      uno detrás de otro, con el hilo principal parado en cada uno.
  *
  * Hacia fuera da el nivel, sus palancas y la palabra de la casa (`calidad`: `sobria` en N0, `plena`
  * en el resto), que es la que se guarda para la compuerta de Boots on Board si alguien la guarda.
@@ -48,6 +52,7 @@ import {
 } from './gobernador';
 import { sondearElAparato } from './sondeo';
 import { laCuentaDe } from './medida';
+import { usarLaPrecompilacionAlCambiar } from './precompilar';
 
 export interface OpcionesDelNivel {
   /** Un nivel forzado; `null` o sin dar = lo decide el gobernador. */
@@ -208,6 +213,9 @@ export function usarElNivel(opciones: OpcionesDelNivel = {}): ElNivel {
     }
     alCambiar.current?.(cambio);
   });
+
+  /* Los programas del nivel nuevo, pedidos a la vez (ver la cabecera). */
+  usarLaPrecompilacionAlCambiar(donde.nivel);
 
   const gobernadorLeido = gobernador as { readonly current: EstadoDelGobernador };
   return useMemo<ElNivel>(

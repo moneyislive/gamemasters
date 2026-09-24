@@ -17,9 +17,19 @@
  *   3. Los cuerpos que ya no vienen se desvanecen en un cuarto de segundo (con el mismo tramado de lo
  *      tenue) SI CABEN: un hueco de esqueleto libre y su LOD de lejos ya cargado (`cabeUnoQueSeVa` en
  *      `presupuesto.ts`). Si no, se van de golpe, como se fueron del juego.
- *   4. La multitud: los 48 del guion (`multitud.ts`), menos los Prestados y menos los que en N2+ llevan
- *      esqueleto por ser los más cercanos. Sin barrio (se acabó la noche) no hay multitud, y los
- *      durmientes con esqueleto se sueltan: la primera versión los dejaba congelados en la acera.
+ *   4. La multitud (`multitud.ts`): los 48 del barrio, o en la ciudad abierta los cercanos de sus unos 630
+ *      (§5.8 de CIUDAD-ABIERTA: 64 como mucho, con los candidatos a Prestado de cada jugador siempre),
+ *      menos los Prestados y menos los que en N2+ llevan esqueleto por ser los más cercanos. Sin gente (se
+ *      acabó la noche) no hay multitud, y los durmientes con esqueleto se sueltan: la primera versión los
+ *      dejaba congelados en la acera.
+ *
+ * ═══ DE DÓNDE SALE LA GENTE ═══
+ *
+ * `fotograma` recibe el barrio (lo que le pasa `CuerposDelQuiebro.tsx`), pero la gente la pide primero a
+ * la fuente (`genteDeLaFuente`): el juego (`red/partida.ts`) sabe si la noche es el barrio o la ciudad y
+ * da la suya; el banco de los personajes no da ninguna y se pinta su barrio. Lo que depende de cada
+ * durmiente (su aspecto, su figura, su zancada) se mira la primera vez que se pinta y se recuerda
+ * mientras la gente sea la misma: en la ciudad nadie mira 630 figuras para pintar 64.
  *
  * ═══ LA MULTITUD EN DOS LLAMADAS ═══
  *
@@ -60,10 +70,24 @@
  * sea lejos, para que al acercarse ya esté. Mientras el `.glb` de un LOD no está, el cuerpo usa el LOD
  * cargado más cercano; si no hay ninguno todavía, ese fotograma no se pinta (lo normal es un segundo al
  * empezar la Bajada, que es justo lo que la Bajada tapa: §2.1).
+ *
+ * ═══ UN PROGRAMA QUE NO SE ENLAZA DOS VECES ═══
+ *
+ * Todos los cuerpos con esqueleto comparten el programa de sombreado `personaje-quiebro` (85 KB de
+ * fragmento), y three lo tira en cuanto se desecha el último material que lo usa. Entre noches no queda
+ * nadie, y sin cuerpo propio (caído a Vigía, un despliegue) en N0 puede no quedar ningún cuerpo con
+ * esqueleto: se desechaba el material del último, y al volver alguien el programa se compilaba y enlazaba
+ * otra vez con el mismo fuente (la revisión de rendimiento del 24-sep lo vio enlazarse 9 veces en 18
+ * minutos, una con una tarea de 78 ms). Lo mismo cuando un número de entidad que se reutiliza cambia de
+ * figura: su cuerpo se suelta y se rehace en el mismo fotograma, y el material viejo se desechaba antes de
+ * que el nuevo se pintara. Así que un cuerpo que se suelta sale de la escena en el acto pero se desecha al
+ * fotograma SIGUIENTE (`porLiberar`), cuando ya se ha pintado quien sigue; y si no queda nadie, el último
+ * soltado se guarda sin desechar hasta que vuelva alguien: su material tiene el programa cogido. Cambiar de
+ * LOD no suelta el cuerpo (cuelga otra malla con el mismo material). `verify:quiebro-personajes` cuenta en
+ * qué fotograma se desecha cada material.
  */
 import * as THREE from 'three';
 import type { Barrio } from '../../../../shared/arcade/juegos/quiebro-barrio';
-import { DURMIENTES, guionDeLosDurmientes } from '../../../../shared/arcade/juegos/quiebro-durmientes';
 import type { CuerpoPintado, FuenteDeCuerpos } from '../cuerpos';
 import { Almacen } from './almacen';
 import type { Lector, PedidoDeHorneado } from './almacen';
@@ -75,8 +99,8 @@ import { filasDeLaMezcla, filasEn } from './huesos-en-textura';
 import type { FilasDeAnimacion, HuesosEnTextura } from './huesos-en-textura';
 import { AnimacionDeLosLejanos, clipsDeLosLejanos, poseDelLejanoNueva } from './lejanos';
 import type { MarchaDelLejano, PoseDelLejano } from './lejanos';
-import { crearLaMultitud, durmientesMasCercanos, moverLaMultitud, ticPintado } from './multitud';
-import type { Multitud, Obstaculo } from './multitud';
+import { DURMIENTES_PINTADOS_COMO_MUCHO, crearLaMultitud, durmientesMasCercanos, genteDeLaFuente, moverLaMultitud, ticPintado } from './multitud';
+import type { GenteDeLaNoche, Multitud, Obstaculo } from './multitud';
 import { huesosDelBrazoDerecho, posturaDelParaguas } from './postura';
 import { CUERPOS_COMO_MUCHO, HISTERESIS_M, POLITICA, cabeUnoQueSeVa, detalleDe, lodElegido, lodParaTope, repartirElDetalle } from './presupuesto';
 import type { LodElegido } from './presupuesto';
@@ -149,7 +173,8 @@ interface FiguraRecordada {
   clase: CuerpoPintado['clase'];
   variante: number;
   color: string | null;
-  barrio: Barrio | null;
+  /** La gente de la noche (su `clave`) de la que sale un Prestado, o `null`. */
+  gente: object | null;
   figura: FiguraDelCuerpo;
 }
 
@@ -171,6 +196,10 @@ export class DirectorDeLosPersonajes {
   private readonly ctx: ContextoDeLosCuerpos;
   private readonly marchas = new Map<string, MarchaDelEsqueleto>();
   private readonly cuerpos = new Map<number, CuerpoConEsqueleto>();
+  /** Los cuerpos soltados que aún no se han desechado (ver «Un programa que no se enlaza dos veces»). */
+  private readonly porLiberar: CuerpoConEsqueleto[] = [];
+  /** Cuántos cuerpos con esqueleto quedaron puestos al acabar el fotograma anterior: ya se han pintado. */
+  private puestosAntes = 0;
   /** La última foto de cada cuerpo con esqueleto (copia propia: el juego reutiliza sus objetos). */
   private readonly fotos = new Map<number, CuerpoPintado>();
   /** Cuándo empezó a irse cada cuerpo que ya no viene. */
@@ -187,7 +216,7 @@ export class DirectorDeLosPersonajes {
   private readonly deseados: RebanoDeseado[] = [];
   private readonly lejanos: AnimacionDeLosLejanos;
   private readonly multitud: Multitud = crearLaMultitud();
-  private readonly sombras = new Sombras(CUERPOS_COMO_MUCHO + DURMIENTES);
+  private readonly sombras = new Sombras(CUERPOS_COMO_MUCHO + DURMIENTES_PINTADOS_COMO_MUCHO);
   private readonly frustum = new THREE.Frustum();
   private readonly pv = new THREE.Matrix4();
   private readonly esfera = new THREE.Sphere(new THREE.Vector3(), 1.2);
@@ -199,13 +228,18 @@ export class DirectorDeLosPersonajes {
   private readonly medirReserva: { id: number; distancia: number }[] = [];
   private readonly obstaculos: Obstaculo[] = [];
   private readonly obstaculosReserva: { x: number; z: number }[] = [];
+  /** Los desvelados de este fotograma (sus candidatos a Prestado se pintan siempre) y desde dónde se elige la multitud. */
+  private readonly jugadores: Obstaculo[] = [];
+  private readonly centroDeLaMultitud = { x: 0, z: 0 };
+  private readonly mirada = { centro: this.centroDeLaMultitud, jugadores: this.jugadores as readonly Obstaculo[] };
   private readonly cercanos: number[] = [];
-  private readonly esCercano = new Uint8Array(DURMIENTES);
+  /* Lo de cada durmiente, del tamaño de la gente de la noche (`durmientesDe`). */
+  private esCercano = new Uint8Array(0);
   /** Los ids pintados en este fotograma, con el número del fotograma (vaciar un `Set` asigna su tabla). */
   private readonly vivos = new Map<number, number>();
   private vuelta = 0;
   /** Qué durmientes llevan esqueleto (N2+), y cuántos. */
-  private readonly durmientesConEsqueleto = new Uint8Array(DURMIENTES);
+  private durmientesConEsqueleto = new Uint8Array(0);
   private cuantosDurmientes = 0;
   /* Lo que suman `medirElFotograma` y las podas sin cierres nuevos ni iteradores. */
   private cuentaLlamadas = 0;
@@ -221,8 +255,11 @@ export class DirectorDeLosPersonajes {
   private readonly podarFigura = (_v: FiguraRecordada, id: number): void => {
     if (!this.esVivo(id) && !this.cuerpos.has(id)) this.figurasRecordadas.delete(id);
   };
-  private readonly zancadas = new Float64Array(DURMIENTES);
-  private readonly zancadaDe = (i: number): number => this.zancadas[i] as number;
+  private zancadas = new Float64Array(0);
+  private readonly zancadaDe = (i: number): number => {
+    this.asegurarElDurmiente(i);
+    return this.zancadas[i] as number;
+  };
   private readonly figurasRecordadas = new Map<number, FiguraRecordada>();
   private readonly maniquis = new Map<string, Map<number, { lod: LodElegido; maniqui: readonly string[] | null }>>();
   /** La figura del rebaño de los desvelados lejanos, por cuerpo (ver «Los desvelados lejanos»). */
@@ -230,12 +267,15 @@ export class DirectorDeLosPersonajes {
   private readonly escalas = new WeakMap<FiguraDelCuerpo, number>();
   private readonly marchasLejanas = new WeakMap<FiguraDelCuerpo, MarchaDelLejano>();
   private readonly colores = new Map<string, THREE.Color>();
-  /** Lo que depende de cada durmiente, por barrio: su aspecto y su figura (sin paraguas y con él). */
-  private barrioDeLosDurmientes: Barrio | null = null;
-  private readonly aspectos: (AspectoLeido | null)[] = new Array<AspectoLeido | null>(DURMIENTES).fill(null);
-  private readonly figurasDeDurmiente: (FiguraDelCuerpo | null)[] = new Array<FiguraDelCuerpo | null>(DURMIENTES).fill(null);
-  private readonly figurasConParaguas: (FiguraDelCuerpo | null)[] = new Array<FiguraDelCuerpo | null>(DURMIENTES).fill(null);
-  private barrio: Barrio | null = null;
+  /**
+   * Lo que depende de cada durmiente, por gente de la noche: su aspecto y su figura (sin paraguas y con
+   * él), mirados la primera vez que hacen falta (`asegurarElDurmiente`).
+   */
+  private genteDeLosDurmientes: GenteDeLaNoche | null = null;
+  private aspectos: (AspectoLeido | null)[] = [];
+  private figurasDeDurmiente: (FiguraDelCuerpo | null)[] = [];
+  private figurasConParaguas: (FiguraDelCuerpo | null)[] = [];
+  private gente: GenteDeLaNoche | null = null;
   private nivelPreparado: Nivel | null = null;
   private ultimoAhora = Number.NaN;
   private ultimoPresentado = Number.NaN;
@@ -484,7 +524,7 @@ export class DirectorDeLosPersonajes {
       const p = this.pedidos(figura.esqueleto, tipoReal);
       const textura = tabla === null ? null : this.almacen.texturaDeHuesos(figura.figura, figura.esqueleto, f.malla, p.pedidos, tipoReal);
       if (tabla === null || textura === null) return null;
-      const rebano = new Rebano(`rebano-${clave}`, f.malla, textura, tipoReal === 'multitud' ? DURMIENTES + CUERPOS_COMO_MUCHO : CUERPOS_COMO_MUCHO, tabla);
+      const rebano = new Rebano(`rebano-${clave}`, f.malla, textura, tipoReal === 'multitud' ? DURMIENTES_PINTADOS_COMO_MUCHO + CUERPOS_COMO_MUCHO : CUERPOS_COMO_MUCHO, tabla);
       hecho = { rebano, textura, pasear: p.pasear, pasearConParaguas: p.conParaguas, reposoConParaguas: p.paradoConParaguas, reposo: p.reposo };
       this.rebanos.set(clave, hecho);
       this.listaDeRebanos.push(hecho);
@@ -521,51 +561,68 @@ export class DirectorDeLosPersonajes {
     return c;
   }
 
-  /** Rehace lo que depende de los durmientes de este barrio (aspecto y figura de cada uno). */
-  private durmientesDe(barrio: Barrio | null): void {
-    if (barrio === this.barrioDeLosDurmientes) return;
-    this.barrioDeLosDurmientes = barrio;
-    this.aspectos.fill(null);
-    this.figurasDeDurmiente.fill(null);
-    this.figurasConParaguas.fill(null);
-    if (barrio === null) return;
+  /**
+   * La gente de la noche cambió: lo de cada durmiente, del tamaño nuevo y sin mirar a nadie todavía (ver
+   * `asegurarElDurmiente`). Los durmientes con esqueleto de la gente de antes se sueltan: sus índices ya
+   * no son de nadie.
+   */
+  private durmientesDe(gente: GenteDeLaNoche | null): void {
+    if (gente === this.genteDeLosDurmientes) return;
+    this.soltarLosDurmientes();
+    this.genteDeLosDurmientes = gente;
+    const total = gente === null ? 0 : gente.total;
+    this.aspectos = new Array<AspectoLeido | null>(total).fill(null);
+    this.figurasDeDurmiente = new Array<FiguraDelCuerpo | null>(total).fill(null);
+    this.figurasConParaguas = new Array<FiguraDelCuerpo | null>(total).fill(null);
+    this.zancadas = new Float64Array(total).fill(1.3);
+    this.esCercano = new Uint8Array(total);
+    this.durmientesConEsqueleto = new Uint8Array(total);
+    this.cuantosDurmientes = 0;
+  }
+
+  /**
+   * LO DE UN DURMIENTE, mirado la primera vez que hace falta y recordado mientras la gente sea la misma: su
+   * aspecto (cuerpo, ropa, paraguas), su figura sin paraguas y con el suyo, y la zancada de pasear de su
+   * esqueleto (la mujer da pasos más cortos). `null` si no hay gente o el índice no es de ella.
+   */
+  private asegurarElDurmiente(i: number): AspectoLeido | null {
+    const gente = this.genteDeLosDurmientes;
+    if (gente === null || !Number.isInteger(i) || i < 0 || i >= gente.total) return null;
+    const hecho = this.aspectos[i];
+    if (hecho !== null && hecho !== undefined) return hecho;
     const r = this.ctx.reparto;
-    const guion = guionDeLosDurmientes(barrio);
+    const a = gente.aspecto(i);
+    const aspecto: AspectoLeido = { cuerpo: a.cuerpo, ropa: a.ropa, paraguas: a.paraguas };
+    this.aspectos[i] = aspecto;
+    this.figurasDeDurmiente[i] = figuraDelDurmiente(r, i, aspecto, false);
+    this.figurasConParaguas[i] = figuraDelDurmiente(r, i, aspecto, aspecto.paraguas);
     const cuerpos = r.durmientes.cuerpos;
     const pasear = r.clips.pasear !== undefined ? 'pasear' : (r.gestos.andar?.clip ?? 'andar');
-    for (let i = 0; i < DURMIENTES; i++) {
-      const a = guion.durmientes[i];
-      if (a === undefined) continue;
-      const aspecto: AspectoLeido = { cuerpo: a.cuerpo, ropa: a.ropa, paraguas: a.paraguas };
-      this.aspectos[i] = aspecto;
-      this.figurasDeDurmiente[i] = figuraDelDurmiente(r, i, aspecto, false);
-      this.figurasConParaguas[i] = figuraDelDurmiente(r, i, aspecto, aspecto.paraguas);
-      /* La zancada de pasear de cada uno: la de su esqueleto (la mujer da pasos más cortos). */
-      const cuerpo = cuerpos[a.cuerpo % Math.max(1, cuerpos.length)];
-      const esq = cuerpo !== undefined ? (r.figuras[cuerpo.figura]?.esqueleto ?? null) : null;
-      this.zancadas[i] = pasoDelClip(r, pasear, esq)?.zancada ?? 1.3;
-    }
+    const cuerpo = cuerpos[a.cuerpo % Math.max(1, cuerpos.length)];
+    const esq = cuerpo !== undefined ? (r.figuras[cuerpo.figura]?.esqueleto ?? null) : null;
+    this.zancadas[i] = pasoDelClip(r, pasear, esq)?.zancada ?? 1.3;
+    return aspecto;
   }
 
   /**
    * LA FIGURA DE UN CUERPO, recordada por id mientras no cambien su clase, su variante, su color ni (en
-   * los Prestados) el barrio. La primera vez que se ve, se piden ya sus LODs de esqueleto: cuando se
-   * acerque, estarán.
+   * los Prestados) la gente de la noche. La primera vez que se ve, se piden ya sus LODs de esqueleto:
+   * cuando se acerque, estarán.
    */
   private figuraDe(c: CuerpoPintado, nivel: Nivel): FiguraDelCuerpo {
-    const barrio = c.clase === 'prestado' ? this.barrio : null;
+    const gente = c.clase === 'prestado' ? (this.gente?.clave ?? null) : null;
     const hecha = this.figurasRecordadas.get(c.id);
-    if (hecha !== undefined && hecha.clase === c.clase && hecha.variante === c.variante && hecha.color === c.color && hecha.barrio === barrio) return hecha.figura;
-    const aspecto = c.clase === 'prestado' && Number.isInteger(c.variante) && c.variante >= 0 && c.variante < DURMIENTES ? this.aspectos[c.variante] ?? null : null;
+    if (hecha !== undefined && hecha.clase === c.clase && hecha.variante === c.variante && hecha.color === c.color && hecha.gente === gente) return hecha.figura;
+    const aspecto = c.clase === 'prestado' ? this.asegurarElDurmiente(c.variante) : null;
     const figura = figuraDelCuerpo(this.ctx.reparto, c, aspecto);
     if (hecha !== undefined) {
       hecha.clase = c.clase;
       hecha.variante = c.variante;
       hecha.color = c.color;
-      hecha.barrio = barrio;
+      hecha.gente = gente;
       hecha.figura = figura;
     } else {
-      this.figurasRecordadas.set(c.id, { clase: c.clase, variante: c.variante, color: c.color, barrio, figura });
+      this.figurasRecordadas.set(c.id, { clase: c.clase, variante: c.variante, color: c.color, gente, figura });
     }
     const p = POLITICA[nivel];
     const r = this.ctx.reparto;
@@ -627,8 +684,13 @@ export class DirectorDeLosPersonajes {
     return nuevo;
   }
 
+  /** Suelta el cuerpo de `id`: fuera de la escena ya, desechado cuando toque (`liberarLosSoltados`). */
   private soltarCuerpo(id: number): void {
-    this.cuerpos.get(id)?.liberar();
+    const cuerpo = this.cuerpos.get(id);
+    if (cuerpo !== undefined) {
+      cuerpo.raiz.removeFromParent();
+      this.porLiberar.push(cuerpo);
+    }
     this.cuerpos.delete(id);
     this.fotos.delete(id);
     this.idas.delete(id);
@@ -660,13 +722,16 @@ export class DirectorDeLosPersonajes {
 
   /**
    * UN FOTOGRAMA. `ahora` en ms de `performance.now()`; `presentado` el reloj de presentación de los
-   * cuerpos ajenos y del adorno (el Remanso), o la identidad.
+   * cuerpos ajenos y del adorno (el Remanso), o la identidad. `barrio`, el de la noche si la fuente no da
+   * su gente (ver «De dónde sale la gente»).
    */
   fotograma(fuente: FuenteDeCuerpos, nivel: Nivel, barrio: Barrio | null, camara: THREE.Camera, ahora: number, presentado: (t: number) => number): void {
+    this.liberarLosSoltados();
     if (this.nivelPreparado !== nivel) this.preparar(nivel);
     const pol = POLITICA[nivel];
-    this.barrio = barrio;
-    this.durmientesDe(barrio);
+    const gente = genteDeLaFuente(fuente, barrio);
+    this.gente = gente;
+    this.durmientesDe(gente);
     /* ── 0. El horno, y los rebaños que el nivel quiere ── */
     if (this.almacen.trabajar(PRESUPUESTO_DEL_HORNO_MS) > 0 || this.algunoSinHacer()) this.prepararLoDeseado();
     const tPresentado = presentado(ahora);
@@ -796,11 +861,11 @@ export class DirectorDeLosPersonajes {
     if (this.figurasRecordadas.size > lista.length) this.figurasRecordadas.forEach(this.podarFigura);
     this.lejanos.podar();
 
-    /* ── 4. La multitud (y sin barrio, nadie: se sueltan los durmientes con esqueleto) ── */
+    /* ── 4. La multitud (y sin gente, nadie: se sueltan los durmientes con esqueleto) ── */
     let multitud = 0;
     let paraguas = 0;
-    if (barrio !== null) {
-      const cuentas = this.pintarLaMultitud(fuente, barrio, nivel, ahora, tPresentado, dtPresentado, cx, cy, cz);
+    if (gente !== null) {
+      const cuentas = this.pintarLaMultitud(fuente, gente, nivel, ahora, tPresentado, dtPresentado, cx, cy, cz);
       multitud = cuentas >> 8;
       paraguas = cuentas & 255;
     } else {
@@ -810,6 +875,22 @@ export class DirectorDeLosPersonajes {
     for (const rb of this.listaDeRebanos) rb.rebano.terminar();
     this.sombras.terminar();
     this.medirElFotograma(conEsqueleto, enRebano, multitud, paraguas, yendose);
+    this.puestosAntes = this.cuerpos.size;
+  }
+
+  /**
+   * DESECHA LOS CUERPOS SOLTADOS (ver «Un programa que no se enlaza dos veces»): todos si al acabar el
+   * fotograma anterior quedaba alguien puesto —ya se ha pintado, y su material tiene el programa—; si no,
+   * todos menos el último, que guarda el programa hasta que vuelva alguien.
+   */
+  private liberarLosSoltados(): void {
+    const guardar = this.puestosAntes > 0 ? 0 : 1;
+    while (this.porLiberar.length > guardar) (this.porLiberar.shift() as CuerpoConEsqueleto).liberar();
+  }
+
+  /** Cuántos cuerpos soltados esperan a desecharse (para el comprobador: como mucho uno sin nadie puesto). */
+  get soltadosSinDesechar(): number {
+    return this.porLiberar.length;
   }
 
   /** ¿Se pintó `id` en este fotograma? */
@@ -834,36 +915,63 @@ export class DirectorDeLosPersonajes {
   /** Suelta a todos los durmientes con esqueleto. */
   private soltarLosDurmientes(): void {
     if (this.cuantosDurmientes === 0) return;
-    for (let i = 0; i < DURMIENTES; i++) if (this.durmientesConEsqueleto[i] === 1) this.soltarCuerpo(PRIMER_ID_DE_DURMIENTE + i);
+    for (let i = 0; i < this.durmientesConEsqueleto.length; i++) if (this.durmientesConEsqueleto[i] === 1) this.soltarCuerpo(PRIMER_ID_DE_DURMIENTE + i);
     this.durmientesConEsqueleto.fill(0);
     this.cuantosDurmientes = 0;
   }
 
+  /**
+   * Desde dónde elige la multitud de la ciudad a quién pinta: el propio si lo hay y si no la cámara, y los
+   * desvelados de este fotograma (sus candidatos a Prestado, siempre). En el barrio no cuenta: van todos.
+   */
+  private mirarDesde(fuente: FuenteDeCuerpos, cx: number, cz: number): void {
+    const yo = fuente.yo();
+    const lista = fuente.cuerpos();
+    this.centroDeLaMultitud.x = cx;
+    this.centroDeLaMultitud.z = cz;
+    this.jugadores.length = 0;
+    for (let i = 0; i < lista.length; i++) {
+      const c = lista[i] as CuerpoPintado;
+      if (c.clase !== 'desvelado') continue;
+      if (c.id === yo) {
+        this.centroDeLaMultitud.x = c.x;
+        this.centroDeLaMultitud.z = c.z;
+      }
+      /* Los obstáculos ya llevan el sitio de cada cuerpo, en el mismo orden: se reutilizan. */
+      const o = this.obstaculos[i];
+      if (o !== undefined) this.jugadores.push(o);
+    }
+  }
+
   /** Pinta la multitud. Devuelve `multitud << 8 | paraguas` (sin asignar un objeto por fotograma). */
-  private pintarLaMultitud(fuente: FuenteDeCuerpos, barrio: Barrio, nivel: Nivel, ahora: number, tPresentado: number, dt: number, cx: number, cy: number, cz: number): number {
+  private pintarLaMultitud(fuente: FuenteDeCuerpos, gente: GenteDeLaNoche, nivel: Nivel, ahora: number, tPresentado: number, dt: number, cx: number, cy: number, cz: number): number {
     const r = this.ctx.reparto;
     const pol = POLITICA[nivel];
     const reposo = r.clips[r.gestos.reposo?.clip ?? 'reposo'];
     const tic = ticPintado(fuente.ticDeLosDurmientes(), ahora, tPresentado);
     const m = this.multitud;
-    moverLaMultitud(m, barrio, tic, dt, fuente.prestados(), this.obstaculos, this.zancadaDe, reposo?.duracionMs ?? 2000);
+    this.mirarDesde(fuente, cx, cz);
+    moverLaMultitud(m, gente, tic, dt, fuente.prestados(), this.obstaculos, this.zancadaDe, reposo?.duracionMs ?? 2000, this.mirada);
     /* Los más cercanos, con esqueleto (N2 y N3); los que dejan de serlo vuelven a la multitud. */
     durmientesMasCercanos(m, cx, cz, pol.durmientesConEsqueleto, this.cercanos, this.durmientesConEsqueleto, HISTERESIS_M);
     this.esCercano.fill(0);
     for (const i of this.cercanos) this.esCercano[i] = 1;
-    for (let i = 0; i < DURMIENTES; i++) {
-      if (this.durmientesConEsqueleto[i] !== 1 || (this.esCercano[i] === 1 && m.visible[i] === 1)) continue;
-      this.soltarCuerpo(PRIMER_ID_DE_DURMIENTE + i);
-      this.durmientesConEsqueleto[i] = 0;
-      this.cuantosDurmientes--;
+    if (this.cuantosDurmientes > 0) {
+      for (let i = 0; i < this.durmientesConEsqueleto.length; i++) {
+        if (this.durmientesConEsqueleto[i] !== 1 || (this.esCercano[i] === 1 && m.visible[i] === 1)) continue;
+        this.soltarCuerpo(PRIMER_ID_DE_DURMIENTE + i);
+        this.durmientesConEsqueleto[i] = 0;
+        this.cuantosDurmientes--;
+      }
     }
     let multitud = 0;
     let paraguas = 0;
-    for (let i = 0; i < DURMIENTES; i++) {
+    for (let q = 0; q < m.cuantos; q++) {
+      const i = m.lista[q] as number;
       if (m.visible[i] !== 1) continue;
-      const aspecto = this.aspectos[i];
+      const aspecto = this.asegurarElDurmiente(i);
       const figura = this.figurasDeDurmiente[i];
-      if (aspecto === null || aspecto === undefined || figura === null || figura === undefined) continue;
+      if (aspecto === null || figura === null || figura === undefined) continue;
       const x = (m.x[i] as number) + (m.apartX[i] as number);
       const z = (m.z[i] as number) + (m.apartZ[i] as number);
       const d = distancia3(x - cx, 1.1 - cy, z - cz);
@@ -970,7 +1078,7 @@ export class DirectorDeLosPersonajes {
     k.lleno = llenoDelContorno(d);
     const r = this.ctx.reparto;
     const trajes = coloresDelTraje(r).length;
-    const aspecto = esPrestado && Number.isInteger(c.variante) && c.variante >= 0 && c.variante < DURMIENTES ? this.aspectos[c.variante] : null;
+    const aspecto = esPrestado ? this.asegurarElDurmiente(c.variante) : null;
     k.ropa = esPrestado ? (aspecto?.ropa ?? 0) : c.clase === 'desvelado' ? c.variante : Math.floor(c.id / 4) % trajes;
     const det = detalleDelDurmiente(c.variante);
     k.pelo = det.pelo;
@@ -1047,6 +1155,9 @@ export class DirectorDeLosPersonajes {
   /** SUELTA todo lo que es suyo. */
   liberar(): void {
     for (const id of [...this.cuerpos.keys()]) this.soltarCuerpo(id);
+    for (const c of this.porLiberar) c.liberar();
+    this.porLiberar.length = 0;
+    this.puestosAntes = 0;
     this.durmientesConEsqueleto.fill(0);
     this.cuantosDurmientes = 0;
     for (const rb of this.listaDeRebanos) {

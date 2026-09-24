@@ -113,7 +113,8 @@ export class Tren {
           ? donde.cabeza
           : donde.cola - t.largo;
     const y = t.alto + SOBRE_LA_VIGA;
-    const m = new THREE.Matrix4();
+    /* La misma matriz en cada fotograma: esto va en cada fotograma y no debe dejar basura. */
+    const m = this.colocacion;
     if (t.eje === 'x') {
       m.makeRotationY(sentido > 0 ? 0 : Math.PI).setPosition(frente, y, t.linea);
     } else {
@@ -125,6 +126,8 @@ export class Tren {
       malla.matrixWorldNeedsUpdate = true;
     }
   }
+
+  private readonly colocacion = new THREE.Matrix4();
 
   liberar(): void {
     for (const m of this.grupo) m.geometry.dispose();
