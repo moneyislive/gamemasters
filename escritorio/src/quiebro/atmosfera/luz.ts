@@ -39,6 +39,36 @@ export const INTENSIDAD_DE_FAROLA = 140;
  */
 export const COLOR_DE_SODIO = '#ffca8d';
 
+/**
+ * El paso con el que el banco de fotos ASIENTA las luces de verdad (ver `pasoFijoDeLasLuces`): el mismo 0,3 s que
+ * tarda la elección de farolas, así que cada fotograma elige y el fundido (`dt × 4`, topado a 1) llega entero. En
+ * dos fotogramas con la cámara quieta las luces están en su farola y a su intensidad, pinte Edge los fotogramas
+ * que pinte.
+ */
+export const PASO_QUE_ASIENTA_LAS_LUCES = 0.3;
+
+/**
+ * SÓLO PARA EL BANCO DE FOTOS (`reloj=T` en `ciudad/banco-abierto.tsx`). Con `null` (lo de siempre, y lo único que
+ * ve el juego) las luces de verdad eligen farola cada 0,3 s de `dt` y se funden con el `dt` de cada fotograma: dos
+ * tomas iguales de N2-N3 no salen iguales, porque el `dt` es lo que tarde la máquina en pintar. Con un número, ese
+ * número sustituye al `dt` en la elección y en el fundido de TODAS las `LucesDeLaNoche`, y la foto no depende del
+ * ritmo de la máquina. La sombra de la direccional no lo mira: sigue a la cámara, no al tiempo.
+ */
+let pasoFijo: number | null = null;
+
+/** Pone (o quita, con `null`) el paso fijo de las luces de verdad. Devuelve el que había. */
+export function fijarElPasoDeLasLuces(paso: number | null): number | null {
+  if (paso !== null && !(Number.isFinite(paso) && paso > 0)) throw new Error(`paso de las luces ilegible: ${String(paso)}`);
+  const antes = pasoFijo;
+  pasoFijo = paso;
+  return antes;
+}
+
+/** El paso fijo de las luces de verdad, o `null` si van con el `dt` de los fotogramas (lo de siempre). */
+export function pasoFijoDeLasLuces(): number | null {
+  return pasoFijo;
+}
+
 export interface OpcionesDeLasLuces {
   /** Cuántas luces puntuales reales (0 en N0-N1). */
   readonly reales: number;
@@ -120,9 +150,11 @@ export class LucesDeLaNoche {
   /**
    * Por fotograma: la sombra sigue a la cámara (con el paso del téxel para que no nade), y cada
    * 0,3 s se eligen las farolas más cercanas a un punto 8 m por delante de la cámara. Una luz que
-   * cambia de farola se apaga, salta y se enciende: el salto no se ve.
+   * cambia de farola se apaga, salta y se enciende: el salto no se ve. Con el paso fijo del banco de fotos
+   * (`fijarElPasoDeLasLuces`), ese paso hace de `dt`.
    */
-  actualizar(camara: THREE.Camera, dt: number): void {
+  actualizar(camara: THREE.Camera, dtDelFotograma: number): void {
+    const dt = pasoFijo ?? dtDelFotograma;
     camara.getWorldPosition(this.foco);
     camara.getWorldDirection(this.adelante);
     this.adelante.y = 0;

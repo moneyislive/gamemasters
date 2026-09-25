@@ -36,9 +36,15 @@
  *     detalle: «a menos de 40 m no cambia nada»).
  *   · `reloj=T` para el reloj del adorno en T segundos (`reloj` de `<LaCiudadDeNoche>`): los parpadeos, las
  *     bocanadas de vapor, los glifos del borde, las ondas de los charcos, el cielo y el tren (su tic sale de T)
- *     quedan en el mismo instante en todas las tomas. Quita el ruido de N2 entre dos tomas (el vapor), NO el de N3:
- *     las luces de verdad de la atmósfera (`atmosfera/luz.ts`) eligen farola y se funden con el `dt` de los
- *     fotogramas, que no es este reloj (lo medido, en `escritorio/scripts/fotos/POSICIONES.md`).
+ *     quedan en el mismo instante en todas las tomas. Y ASIENTA las luces de verdad de la atmósfera (4 en N2, 6 en
+ *     N3, `atmosfera/luz.ts`): sin él eligen farola cada 0,3 s y se funden con el `dt` de los fotogramas, que es lo
+ *     que tarde la máquina en pintar, y dos tomas iguales de N2-N3 no salían iguales. Con `reloj=` van con un paso
+ *     fijo (`fijarElPasoDeLasLuces`) y en dos fotogramas están en su farola y a su intensidad. El DOM lo dice
+ *     (`data-luces`: `paso-fijo` o `dt`). Lo medido, en `escritorio/scripts/fotos/POSICIONES.md`.
+ *   · Un `reloj=`, `ventana=`, `mascara=` o `nivel=` SIN VALOR (o ilegible, o un nivel fuera de 0..3) no se ignora:
+ *     el banco no monta el lienzo, lo dice en pantalla y en `data-error`, y `foto.sh` se niega antes de abrir Edge.
+ *     Ignorarlo sacaba otra foto que la pedida sin decirlo (`reloj=` salía con el reloj en 0, `ventana=` con la
+ *     ventana donde la cámara, y `nivel=` o `nivel=7` en N0).
  *   · `arbol=1` no monta el lienzo: sólo dice de qué árbol sale (ver abajo). Es lo que mira `foto.sh`.
  *
  * EL DOM DICE DE QUÉ ÁRBOL SALE: un `<div id="banco-arbol">` (también con `panel=0`) lleva `data-arbol` (la carpeta
@@ -55,7 +61,7 @@
  * y una lectura de un píxel que espera a la GPU, cronometrado entero. El camino es la escalera de la esquina
  * noroeste a la sureste por las calles (1.056 m), a 7 m/s.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -70,6 +76,7 @@ import { HOLGURA_DEL_RECENTRADO, rectanguloDeLaVentana } from './ventana';
 import { LADO_DE_CELDA } from '../../../../shared/arcade/juegos/quiebro-ciudad';
 import { Posproceso } from '../posproceso/Posproceso';
 import { escaleraDeDpr } from '../calidad/niveles';
+import { PASO_QUE_ASIENTA_LAS_LUCES, fijarElPasoDeLasLuces, pasoFijoDeLasLuces } from '../atmosfera/luz';
 
 interface AjustesAbiertos {
   readonly nivel: NivelDeLaCiudad;
@@ -92,17 +99,33 @@ interface AjustesAbiertos {
   readonly reloj: number | null;
   /** `arbol=1`: sólo el árbol, sin lienzo. */
   readonly arbol: boolean;
+  /** Los parámetros de las fotos que vienen sin valor o ilegibles: con alguno, el banco no monta el lienzo. */
+  readonly errores: readonly string[];
+}
+
+/**
+ * Un número de la consulta, con `Number` pero sin su trampa: `Number('')` y `Number(' ')` dan 0, y `reloj=` salía
+ * con el reloj parado en 0 en vez de rechazarse.
+ */
+function numeroDe(texto: string): number {
+  return /^\s*$/.test(texto) ? Number.NaN : Number(texto);
 }
 
 function leer(): AjustesAbiertos {
   const p = new URLSearchParams(window.location.search);
-  const n = Number(p.get('nivel') ?? '0');
+  const errores: string[] = [];
+  const n = p.has('nivel') ? (/^[0-3]$/.test(p.get('nivel') ?? '') ? Number(p.get('nivel')) : NaN) : 0;
+  if (!NIVELES_DE_LA_CIUDAD.includes(n as NivelDeLaCiudad)) errores.push(`nivel=«${p.get('nivel') ?? ''}»: tiene que ser un nivel, de 0 a 3`);
   const t = Math.floor(Number(p.get('traza') ?? '0'));
-  const v = p.get('ventana')?.split(',').map(Number);
+  const v = p.get('ventana')?.split(',').map(numeroDe);
   const ventana = v !== undefined && v.length === 2 && v.every(Number.isFinite) ? { x: v[0] ?? 0, z: v[1] ?? 0 } : null;
-  const m = Number(p.get('mascara'));
-  const r = Number(p.get('reloj'));
+  if (p.has('ventana') && ventana === null) errores.push(`ventana=«${p.get('ventana') ?? ''}»: tiene que ser cx,cz (dos números)`);
+  const m = numeroDe(p.get('mascara') ?? '');
+  if (p.has('mascara') && !(Number.isFinite(m) && m > 0)) errores.push(`mascara=«${p.get('mascara') ?? ''}»: tiene que ser un número de metros > 0`);
+  const r = numeroDe(p.get('reloj') ?? '');
+  if (p.has('reloj') && !(Number.isFinite(r) && r >= 0)) errores.push(`reloj=«${p.get('reloj') ?? ''}»: tiene que ser un número de segundos ≥ 0`);
   return {
+    errores,
     nivel: (NIVELES_DE_LA_CIUDAD.includes(n as NivelDeLaCiudad) ? n : 0) as NivelDeLaCiudad,
     codigo: (p.get('codigo') ?? 'K7M2P').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'K7M2P',
     noche: Math.max(1, Math.floor(Number(p.get('noche') ?? '1')) || 1),
@@ -215,6 +238,8 @@ function MarcaDelArbol({ arbol, ajustes, ciudad }: { arbol: string | null; ajust
       data-camino={ajustes.camino}
       data-lluvia={ajustes.lluvia ? '1' : '0'}
       data-reloj={ajustes.reloj === null ? '' : String(ajustes.reloj)}
+      data-luces={pasoFijoDeLasLuces() === null ? 'dt' : 'paso-fijo'}
+      data-error={ajustes.errores.join(' · ')}
       data-ventana={v === null ? '' : `${String(v.cx)},${String(v.cz)}`}
       data-ventana-pedida={ajustes.ventana === null ? '' : `${String(ajustes.ventana.x)},${String(ajustes.ventana.z)}`}
       data-ventana-ocupada={ciudad === null ? '' : ciudad.ventana.ocupada ? '1' : '0'}
@@ -527,9 +552,36 @@ export function BancoAbierto(): JSX.Element {
     const t = ajustes.reloj;
     return t === null ? undefined : (): number => t;
   }, [ajustes.reloj]);
+  /*
+   * Con `reloj=`, las luces de verdad con paso fijo (ver la cabecera y `atmosfera/luz.ts`); sin él, nada cambia: el
+   * paso se queda en `null` y las luces van con el `dt`, como en el juego. Antes de pintar el primer fotograma, y
+   * se devuelve al salir para no dejarlo puesto en otra cosa que monte la misma página.
+   */
+  const conPasoFijo = ajustes.reloj !== null && !ajustes.arbol && ajustes.errores.length === 0;
+  useLayoutEffect(() => {
+    if (!conPasoFijo) return undefined;
+    const antes = fijarElPasoDeLasLuces(PASO_QUE_ASIENTA_LAS_LUCES);
+    return () => {
+      fijarElPasoDeLasLuces(antes);
+    };
+  }, [conPasoFijo]);
   const arbol = usarElArbol();
   const marca = <MarcaDelArbol arbol={arbol} ajustes={ajustes} ciudad={ciudad} />;
   if (ajustes.arbol) return <div style={{ position: 'fixed', inset: 0, background: '#050807' }}>{marca}</div>;
+  if (ajustes.errores.length > 0) {
+    /* Una foto con un parámetro sin valor sería OTRA foto que la pedida: no se monta el lienzo (ver la cabecera). */
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#050807', color: '#f88', font: '14px Consolas, monospace', padding: 16 }}>
+        {marca}
+        <p>El banco no monta la ciudad: la consulta trae parámetros sin valor o ilegibles.</p>
+        <ul>
+          {ajustes.errores.map((e) => (
+            <li key={e}>{e}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
   const presupuesto: PresupuestoSumado | null = ciudad === null ? null : presupuestoDeLaCiudad(ciudad.piezas(), ajustes.nivel, RENGLONES_DE_LA_CIUDAD_ABIERTA);
   const v = ciudad?.ventana.ahora ?? null;
   const r = v === null ? null : rectanguloDeLaVentana(v);
@@ -542,7 +594,10 @@ export function BancoAbierto(): JSX.Element {
       <Canvas
         key={`n${String(ajustes.nivel)}-${ajustes.codigo}-${String(ajustes.traza)}-${String(ajustes.noche)}-${ajustes.camino}`}
         dpr={dpr}
-        shadows={ajustes.nivel >= 2}
+        /* `percentage` (PCF) y no `true`: con `true` r3f pone PCFSoft en cada configuración del lienzo, encima del PCF
+           de `<Atmosfera>`, y three r185 lo cambia por PCF al pintar (obsoleto) después de que la precompilación haya
+           enlazado la variante blanda. Se pintaba PCF igual. */
+        shadows={ajustes.nivel >= 2 ? 'percentage' : false}
         resize={{ polyfill: MedidaInmediata as unknown as typeof ResizeObserver }}
         gl={{ antialias: true, alpha: juego, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
         camera={{ fov: 70, near: 0.1, far: 900, position: [inicio.x, inicio.y, inicio.z] }}

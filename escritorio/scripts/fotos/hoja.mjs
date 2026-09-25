@@ -17,13 +17,29 @@
  *   · `dif`: la diferencia media por canal, de 0 a 255, sólo en los píxeles que cuentan;
  *   · `cambian`: el % de esos píxeles cuya diferencia media pasa de 12;
  *   · `negro`: el % de negro puro (0,0,0) en DESPUÉS: un NaN o un material roto suelen pintar negro. §8 pide
- *     menos de 0,5 % en TODAS las fotos, y se juzga (con `--niveles`, en las dos: N1 y N3). OJO: la tanda de
- *     `d4402d0` ya lo pasa en E, H, M y N de madrugada (bajos de coches, cristales, el poste de una farola: 0,5-1,4 %;
- *     ver `POSICIONES.md`), así que esas fotos salen marcadas en todas las tandas hasta que alguien los alumbre
- *     o el plan cambie el criterio. La línea dice si ANTES ya lo pasaba, para no confundirlo con lo roto;
- *   · `nuevo`: el % de negro puro en DESPUÉS que en ANTES no lo era: lo que ha roto ESTE cambio. También se
- *     juzga (< 0,5 %), y es el que distingue un material roto del negro de siempre;
- *   · `magenta`: el % de magenta saturado en DESPUÉS (r y b > 240, g < 20): una textura que falta.
+ *     menos de 0,5 % en TODAS las fotos (con `--niveles`, en las dos: N1 y N3). La tanda «antes» ya lo pasa en H,
+ *     M y N de madrugada (bajos de coches, cristales, el poste de una farola: 0,5-1,4 %; ver `POSICIONES.md`),
+ *     y el acta de la ola 1 (§13, decisión 3) lo separa en dos:
+ *       - el HEREDADO, el que la MISMA foto de «antes» ya pasaba, es un AVISO: sale con 3, no con 1. Es heredado
+ *         sólo si es ESE negro: comparada píxel a píxel con su foto de «antes», el negro que allí no lo era no llega
+ *         al tope, y el % no ha subido un tope entero. Si no, por mucho que «antes» ya pasara, es nuevo;
+ *       - el NUEVO, el que en «antes» no pasaba del tope (o el que llega encima del heredado), es un FALLO (1).
+ *     Con dos tandas, «antes» es ANTES. Con `--niveles` o `--recentrado` las dos fotos son de la misma tanda, y
+ *     hace falta `--antes CARPETA` (la tanda «antes») para saber si ya estaba: sin ella, todo negro es un fallo,
+ *     como antes de la decisión 3. Con ella, CADA foto se juzga sólo contra SU foto de «antes» (la N3 contra la N3
+ *     de «antes», no contra la N1 de su tanda). Sobre la tanda «antes» misma: `--antes` esa misma carpeta;
+ *   · `nuevo`: el % de negro puro en DESPUÉS que en ANTES no lo era, píxel a píxel: lo que ha roto ESTE cambio.
+ *     También se juzga (< 0,5 %, fallo), y es el que distingue un material roto del negro de siempre aunque la
+ *     foto ya pasara del tope. Sólo donde ANTES es de verdad el «antes» de DESPUÉS: con dos tandas, y con
+ *     `--niveles` o `--recentrado` SIN `--antes`. Con `--antes`, ANTES es la otra foto del par (N1, o la P de antes
+ *     del cruce), y un negro que N1 no tiene y la N3 ya tenía en «antes» no es nuevo: ahí manda la regla de arriba;
+ *   · `magenta`: el % de magenta saturado en DESPUÉS (r y b > 240, g < 20): una textura que falta. §8 pide cero en
+ *     TODAS (con `--niveles`, en las dos: N1 y N3), y se parte igual que el negro, con la MISMA regla y con tope
+ *     «un píxel» (decisión del coordinador, remate de la 1b):
+ *       - el HEREDADO, el que la MISMA foto de «antes» ya tenía, y en los mismos píxeles (ninguno magenta que allí
+ *         no lo fuera), es un AVISO (3). Es el caso del rótulo rosa de la N de N1, 3-6 píxeles (`POSICIONES.md`);
+ *       - el NUEVO, en una foto que en «antes» no tenía, sin `--antes`, o en un solo píxel que en «antes» no era
+ *         magenta, es un FALLO (1).
  *
  * ═══ OPCIONES ═══
  *
@@ -41,13 +57,19 @@
  *   --json SALIDA.json         los números, para otro guion.
  *   --minimo N                 cuántos pares tiene que haber como poco (por omisión 1): cero pares mirados son cero
  *                              diferencias, y eso no es un verde.
+ *   --antes CARPETA            con `--niveles` o `--recentrado`: la tanda «antes», para separar el negro y el magenta
+ *                              heredados (aviso, 3) de los nuevos (fallo, 1). Cada foto se busca ahí por su nombre;
+ *                              la que no está se juzga como nueva.
  *
  * ═══ SALIDA ═══
  *
- * 0 si todo cabe; 1 si alguna foto de DESPUÉS llega a 0,5 % de negro (absoluto o NUEVO) o tiene magenta (los
- * criterios que valen para TODAS las fotos, §8), con `--niveles` si algún par con umbral se queda por debajo, o
- * con `--exigir-ruido` si alguna pasa del ruido; 2 si no se puede mirar (sin carpetas, menos pares que el mínimo,
- * fotos de distinto tamaño, una máscara que falta o no deja ni un píxel).
+ * 0 si todo cabe; 1 si alguna foto llega a 0,5 % de negro NUEVO o tiene magenta NUEVO (lo que su «antes» no tenía,
+ * o no en esos píxeles; y, donde se juzga, el píxel a píxel de `nuevo`: los criterios que valen para TODAS las fotos,
+ * §8), con `--niveles` si algún par con umbral se queda por debajo, o con `--exigir-ruido` si alguna pasa del ruido;
+ * 3 si nada de eso pasa pero hay negro o magenta HEREDADOS (la foto de «antes» ya los tenía: aviso, acta §13
+ * decisión 3 y remate de la 1b); 2 si no se puede mirar (sin
+ * carpetas, menos pares que el mínimo, fotos de distinto tamaño, una máscara que falta o no deja ni un píxel). El
+ * orden manda: 2 antes que 1, y 1 antes que 3.
  *
  * Usa el `sharp` que ya está en `node_modules` de la raíz: no instala nada.
  */
@@ -68,10 +90,12 @@ function fallar(mensaje) {
   process.exit(2);
 }
 
-const USO = 'uso: node hoja.mjs ANTES DESPUES | --recentrado TANDA | --niveles TANDA  [--mascara panel] [--profundidad] [--ruido TOMA2] [--exigir-ruido] [--hoja S.png] [--json S.json] [--minimo N]';
+const USO = 'uso: node hoja.mjs ANTES DESPUES | --recentrado TANDA | --niveles TANDA  [--antes TANDA_ANTES] [--mascara panel] [--profundidad] [--ruido TOMA2] [--exigir-ruido] [--hoja S.png] [--json S.json] [--minimo N]';
+/** El código de salida del aviso: sólo hay negro heredado (acta §13, decisión 3). */
+const SALIDA_DEL_AVISO = 3;
 
 function leerArgumentos(argv) {
-  const a = { carpetas: [], recentrado: null, niveles: null, mascara: [], profundidad: false, ruido: null, exigirRuido: false, hoja: null, json: null, minimo: 1 };
+  const a = { carpetas: [], recentrado: null, niveles: null, antes: null, mascara: [], profundidad: false, ruido: null, exigirRuido: false, hoja: null, json: null, minimo: 1 };
   for (let k = 0; k < argv.length; k++) {
     const x = argv[k];
     const valor = () => {
@@ -91,6 +115,7 @@ function leerArgumentos(argv) {
       }
     } else if (x === '--recentrado') a.recentrado = valor();
     else if (x === '--niveles') a.niveles = valor();
+    else if (x === '--antes') a.antes = valor();
     else if (x === '--profundidad') a.profundidad = true;
     else if (x === '--ruido') a.ruido = valor();
     else if (x === '--exigir-ruido') a.exigirRuido = true;
@@ -105,7 +130,8 @@ function leerArgumentos(argv) {
   if (a.recentrado !== null && a.niveles !== null) fallar('--recentrado y --niveles no van juntos: una cosa por vez');
   const unaTanda = a.recentrado !== null || a.niveles !== null;
   if (unaTanda ? a.carpetas.length !== 0 : a.carpetas.length !== 2) fallar(USO);
-  for (const c of [...a.carpetas, ...[a.recentrado, a.niveles, a.ruido].filter((c) => c !== null)]) {
+  if (a.antes !== null && !unaTanda) fallar('--antes es para --niveles y --recentrado: con dos tandas, «antes» es la primera');
+  for (const c of [...a.carpetas, ...[a.recentrado, a.niveles, a.ruido, a.antes].filter((c) => c !== null)]) {
     if (!fs.existsSync(c) || !fs.statSync(c).isDirectory()) fallar(`no existe la carpeta ${c}`);
   }
   if (a.exigirRuido && a.ruido === null) fallar('--exigir-ruido necesita --ruido');
@@ -205,6 +231,8 @@ function comparar(a, b, m) {
   let nuevo = 0;
   let negroA = 0;
   let magenta = 0;
+  let magentaA = 0;
+  let magentaNuevo = 0;
   let n = 0;
   for (let i = 0, p = 0; i < m.length; i++, p += 3) {
     if (m[i] === 0) continue;
@@ -218,10 +246,75 @@ function comparar(a, b, m) {
       negro++;
       if (!aNegro) nuevo++;
     }
-    if (b.px[p] > 240 && b.px[p + 1] < 20 && b.px[p + 2] > 240) magenta++;
+    const aMagenta = esMagenta(a.px, p);
+    if (aMagenta) magentaA++;
+    if (esMagenta(b.px, p)) {
+      magenta++;
+      if (!aMagenta) magentaNuevo++;
+    }
   }
   const pc = (x) => (n === 0 ? 0 : (100 * x) / n);
-  return { pixeles: n, dif: n === 0 ? 0 : suma / n, cambian: pc(cambian), negro: pc(negro), nuevo: pc(nuevo), negroAntes: pc(negroA), magenta: pc(magenta) };
+  return {
+    pixeles: n,
+    dif: n === 0 ? 0 : suma / n,
+    cambian: pc(cambian),
+    negro: pc(negro),
+    nuevo: pc(nuevo),
+    negroAntes: pc(negroA),
+    magenta: pc(magenta),
+    magentaNuevo: pc(magentaNuevo),
+    magentaAntes: pc(magentaA),
+  };
+}
+
+/** Magenta saturado: r y b > 240, g < 20 (una textura que falta). */
+function esMagenta(px, p) {
+  return px[p] > 240 && px[p + 1] < 20 && px[p + 2] > 240;
+}
+
+/**
+ * Los dos criterios que valen para TODAS las fotos (§8), con la regla del heredado de la cabecera escrita UNA vez
+ * para los dos. `pasa(pc)` es «llega al tope»: el negro, al 0,5 %; el magenta, con un solo píxel. `ahora`, `antes` y
+ * `nuevo` son los campos de `comparar` (la foto de ahora como B y su «antes» como A): el % de ahora, el de «antes» y
+ * el de ahora que en «antes» no lo era, píxel a píxel.
+ */
+const CRITERIOS = [
+  { nombre: 'negro', tope: `≥ ${TOPE_DE_NEGRO} %`, pasa: (pc) => pc >= TOPE_DE_NEGRO, ahora: 'negro', antes: 'negroAntes', nuevo: 'nuevo', decimales: 2 },
+  { nombre: 'magenta', tope: '> 0', pasa: (pc) => pc > 0, ahora: 'magenta', antes: 'magentaAntes', nuevo: 'magentaNuevo', decimales: 4 },
+];
+
+/**
+ * Juzga un criterio en una foto: `null` si no llega al tope; si llega, `{ heredado, texto }`. `enAntes` es la
+ * comparación de su foto de «antes» (como A) con ella (como B), o `null` si no hay «antes» con que compararla.
+ * Heredado sólo si su «antes» ya llegaba al tope Y lo de ahora es lo mismo: lo que no estaba en «antes» píxel a píxel
+ * no llega al tope, ni el % ha subido un tope entero (en el magenta, ni un píxel).
+ */
+function juzgar(c, pc, enAntes, sinAntes) {
+  if (!c.pasa(pc)) return null;
+  const d = c.decimales;
+  const cifra = `${c.nombre} ${pc.toFixed(d)} %`;
+  if (enAntes === null) return { heredado: false, texto: `${cifra}, ${sinAntes}` };
+  const antes = enAntes[c.antes];
+  const nuevo = enAntes[c.nuevo];
+  if (!c.pasa(antes)) return { heredado: false, texto: `${cifra}, y ANTES ${antes.toFixed(d)} %` };
+  if (c.pasa(nuevo) || c.pasa(pc - antes)) return { heredado: false, texto: `${cifra}, y ANTES ${antes.toFixed(d)} %, pero ${nuevo.toFixed(d)} % no lo era en ANTES` };
+  return { heredado: true, texto: `${cifra}, y ANTES ya ${antes.toFixed(d)} % (nuevo ${nuevo.toFixed(d)} %)` };
+}
+
+/**
+ * La MISMA foto en la tanda «antes» (`--antes`) contra la de ahora, con los mismos píxeles que cuentan: lo que da
+ * `comparar` con la de «antes» como A (`negroAntes`, `magentaAntes`: lo que ya tenía; `nuevo`, `magentaNuevo`: lo
+ * de AHORA que en ella no lo era, píxel a píxel). `null` si no hay `--antes`, la foto no está o tiene otro tamaño (y
+ * entonces se juzga como nuevo). Comparar sólo los porcentajes no basta: una foto que ya pasaba del tope dejaría
+ * pasar como «heredado» cualquier negro que llegara después, por grande que fuera o esté donde esté.
+ */
+async function laDeAntes(carpeta, fichero, actual, m) {
+  if (carpeta === null) return null;
+  const f = path.join(carpeta, path.basename(fichero));
+  if (!fs.existsSync(f)) return null;
+  const x = await cargar(f);
+  if (x.ancho !== actual.ancho || x.alto !== actual.alto || x.ancho * x.alto !== m.length) return null;
+  return comparar(x, actual, m);
 }
 
 function etiqueta(texto, ancho) {
@@ -237,6 +330,8 @@ async function main() {
   const filas = [];
   let malas = 0;
   let negras = 0;
+  let heredadas = 0;
+  const unaTanda = a.recentrado !== null || a.niveles !== null;
   let bajoElUmbral = 0;
   let sobreElRuido = 0;
   let errores = 0;
@@ -274,20 +369,50 @@ async function main() {
     const fila = { foto: f, a: par.a, b: par.b, ...r, mascaraDeProfundidad: fichProf === null ? null : path.basename(fichProf) };
     let texto = `${f}: dif ${r.dif.toFixed(2)} · cambian ${r.cambian.toFixed(1)} % · negro ${r.negro.toFixed(2)} % (nuevo ${r.nuevo.toFixed(2)} %) · magenta ${r.magenta.toFixed(3)} %`;
     if (fichProf !== null) texto += ` · a menos de 40 m: ${((100 * r.pixeles) / m.length).toFixed(0)} % de la foto`;
-    if (r.nuevo >= TOPE_DE_NEGRO || r.magenta > 0) {
+    /*
+     * `nuevo` (el negro de B que en A no lo era, píxel a píxel) sólo se juzga donde A es el «antes» de B: con dos
+     * tandas, y con `--niveles` o `--recentrado` SIN `--antes` (donde todo negro es fallo de todos modos). Con
+     * `--antes`, A es la otra foto del par (N1 de N3, o la P de antes de la de después) y no su «antes»: el negro de
+     * N3 que ya estaba en la N3 de «antes» salía como nuevo sólo porque N1 lo había perdido (lo vio la revisión 2).
+     * Entonces cada foto se juzga sólo contra la suya de «antes» (`juzgadas`, abajo).
+     */
+    if (!(unaTanda && a.antes !== null) && r.nuevo >= TOPE_DE_NEGRO) {
       malas++;
-      texto += '  ← NEGRO NUEVO O MAGENTA';
+      texto += `  ← NEGRO NUEVO (píxel a píxel contra ${unaTanda ? 'la otra foto del par' : 'ANTES'})`;
     }
-    /* El absoluto (§8: < 0,5 % en TODAS). Con `--niveles` las dos fotos son de la tanda y se juzgan las dos. */
-    const negrasDelPar = [];
-    if (par.negroEnLasDos === true && r.negroAntes >= TOPE_DE_NEGRO) negrasDelPar.push(`N1 ${r.negroAntes.toFixed(2)} %`);
-    if (r.negro >= TOPE_DE_NEGRO) {
-      negrasDelPar.push(par.negroEnLasDos === true ? `N3 ${r.negro.toFixed(2)} %` : `${r.negro.toFixed(2)} %${r.negroAntes >= TOPE_DE_NEGRO ? `, y ANTES ya ${r.negroAntes.toFixed(2)} %` : ', y ANTES no'}`);
+    /*
+     * Los absolutos (§8: negro < 0,5 % y magenta 0 en TODAS). Con `--niveles` las dos fotos son de la tanda y se juzgan
+     * las dos. El que su foto de «antes» ya tenía, y es el mismo, es HEREDADO (aviso); el otro, NUEVO (fallo). Ver la
+     * cabecera y `juzgar`.
+     */
+    const juzgadas = [];
+    if (par.negroEnLasDos === true) juzgadas.push({ rotulo: 'N1 ', r: { negro: r.negroAntes, magenta: r.magentaAntes }, fichero: par.a, foto: x, antesDelPar: null });
+    juzgadas.push({ rotulo: par.negroEnLasDos === true ? 'N3 ' : '', r, fichero: par.b, foto: y, antesDelPar: unaTanda ? null : r });
+    const nuevasDelPar = { negro: [], magenta: [] };
+    const heredadasDelPar = { negro: [], magenta: [] };
+    for (const j of juzgadas) {
+      if (!CRITERIOS.some((c) => c.pasa(j.r[c.ahora]))) continue;
+      const enAntes = j.antesDelPar ?? (await laDeAntes(a.antes, j.fichero, j.foto, m));
+      const sinAntes = a.antes === null ? 'sin --antes para saber si ya estaba' : 'sin esa foto en --antes';
+      for (const c of CRITERIOS) {
+        const juicio = juzgar(c, j.r[c.ahora], enAntes, sinAntes);
+        if (juicio !== null) (juicio.heredado ? heredadasDelPar : nuevasDelPar)[c.nombre].push(`${j.rotulo}${juicio.texto}`);
+      }
     }
-    if (negrasDelPar.length > 0) {
-      negras++;
-      texto += `  ← NEGRO ≥ ${TOPE_DE_NEGRO} % (${negrasDelPar.join(', ')})`;
+    const hayNuevas = nuevasDelPar.negro.length + nuevasDelPar.magenta.length > 0;
+    const hayHeredadas = heredadasDelPar.negro.length + heredadasDelPar.magenta.length > 0;
+    for (const c of CRITERIOS) {
+      if (nuevasDelPar[c.nombre].length > 0) texto += `  ← ${c.nombre.toUpperCase()} NUEVO ${c.tope} (${nuevasDelPar[c.nombre].join('; ')})`;
     }
+    for (const c of CRITERIOS) {
+      if (heredadasDelPar[c.nombre].length > 0) texto += `  · aviso: ${c.nombre} heredado ${c.tope} (${heredadasDelPar[c.nombre].join('; ')})`;
+    }
+    if (hayNuevas) negras++;
+    else if (hayHeredadas) heredadas++;
+    fila.negroNuevo = nuevasDelPar.negro;
+    fila.negroHeredado = heredadasDelPar.negro;
+    fila.magentaNuevo = nuevasDelPar.magenta;
+    fila.magentaHeredado = heredadasDelPar.magenta;
     if (par.umbral !== undefined) {
       fila.umbral = par.umbral;
       if (par.umbral === null) texto += ' · sin umbral en §8';
@@ -327,7 +452,8 @@ async function main() {
   console.log(
     `pares mirados: ${filas.length} de ${pares.length}` +
       (a.ruido !== null ? ` · sobre el ruido: ${sobreElRuido}` : '') +
-      ` · con negro nuevo o magenta: ${malas} · con negro ≥ ${TOPE_DE_NEGRO} %: ${negras}` +
+      (unaTanda && a.antes !== null ? '' : ` · con negro nuevo píxel a píxel dentro del par: ${malas}`) +
+      ` · con negro ≥ ${TOPE_DE_NEGRO} % o magenta NUEVOS: ${negras} · sólo con negro o magenta heredados (aviso): ${heredadas}` +
       (a.niveles !== null ? ` · por debajo del umbral de N3 contra N1: ${bajoElUmbral} de ${filas.filter((f) => f.umbral !== null && f.umbral !== undefined).length} con umbral` : ''),
   );
 
@@ -351,6 +477,10 @@ async function main() {
 
   if (errores > 0) process.exit(2);
   if (malas > 0 || negras > 0 || bajoElUmbral > 0 || (a.exigirRuido && sobreElRuido > 0)) process.exit(1);
+  if (heredadas > 0) {
+    console.log(`aviso: ${heredadas} con negro o magenta heredados de «antes» (acta §13, decisión 3): sale con ${SALIDA_DEL_AVISO}`);
+    process.exit(SALIDA_DEL_AVISO);
+  }
 }
 
 await main();
