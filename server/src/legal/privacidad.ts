@@ -39,7 +39,7 @@ import {
 } from './responsable';
 
 /** Última revisión del texto. Se enseña al final del documento. */
-export const REVISADA_EL = '2026-08-12';
+export const REVISADA_EL = '2026-09-25';
 
 function secciones(): SeccionLegal[] {
   const correo = correoDelResponsable();
@@ -104,6 +104,12 @@ function secciones(): SeccionLegal[] {
           sirve para reconocerte la próxima vez. Nada más: no se piden permisos sobre tu cuenta, ni
           acceso a tu agenda, ni a tu correo, ni a tus fotos.
         </li>
+        <li>
+          <strong>Si compras algo en el taller:</strong> el historial de tu monedero —qué
+          compraste, cuándo y cuánto gastó cada velada—, el estado de tu suscripción y de tu pase,
+          y el identificador de cliente que nos da la pasarela de pago. Los datos de tu tarjeta los
+          escribes en la página de Stripe y <strong>no llegan aquí</strong>.
+        </li>
       </ul>
 
       <p>
@@ -129,6 +135,10 @@ function secciones(): SeccionLegal[] {
           <strong>consentimiento</strong>, que das tú desde tu móvil, en «Tu perfil». Nunca lo da
           quien organiza por ti. Puedes retirarlo cuando quieras, y retirarlo no te echa de la
           partida.
+        </li>
+        <li>
+          <strong>Cobrar lo que compras y llevar tu monedero</strong>: la ejecución del contrato
+          de compra, y el cumplimiento de las obligaciones fiscales y contables que impone la ley.
         </li>
         <li>
           <strong>Entrar con tu cuenta de Google o de Apple</strong>: ejecución de la relación, y
@@ -179,6 +189,14 @@ function secciones(): SeccionLegal[] {
           <strong>Apple</strong>, si eliges «entrar con Apple». Lo mismo que Google en su papel de
           proveedor de identidad. Si usas «Ocultar mi correo», lo que llega aquí es una dirección
           de reenvío de Apple y no la tuya de verdad: funciona igual.
+        </li>
+        <li>
+          <strong>Stripe</strong>, si compras créditos, la suscripción o el pase. Es la pasarela
+          que cobra: escribes tu tarjeta en su página y aquí solo llega el resultado —qué se pagó,
+          cuándo y un identificador de cliente— junto con tu correo, para enviarte el recibo. Stripe
+          trata además tus datos de pago por su cuenta para cumplir sus propias obligaciones, como
+          la prevención del fraude; eso lo explica su política de privacidad
+          (<a href="https://stripe.com/es/privacy" rel="noopener">stripe.com/es/privacy</a>).
         </li>
         <li>
           <strong>MongoDB Atlas</strong>, la base de datos donde se guarda todo lo descrito arriba.
@@ -246,6 +264,11 @@ function secciones(): SeccionLegal[] {
         hacerlo en cualquier momento desde la propia app, en «Tu perfil» → «Borrar mi cuenta y mis
         datos». Se borra el perfil entero y, además, tu correo se retira de todas las partidas en
         las que estuviera apuntado, para que no vuelva a aparecer.
+      </p>
+      <p>
+        Lo que tiene que ver con pagos es la excepción: el historial de compras y los datos de cada
+        factura se conservan el tiempo que exigen las normas fiscales y mercantiles, hasta seis
+        años, aunque borres tu cuenta. Se guardan bloqueados y solo para eso.
       </p>`,
     },
     {

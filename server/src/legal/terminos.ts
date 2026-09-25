@@ -38,7 +38,7 @@ import {
 import { escaparHtml } from './plantilla';
 
 /** Última revisión del texto. Se enseña al final del documento. */
-export const REVISADOS_EL = '2026-08-12';
+export const REVISADOS_EL = '2026-09-25';
 
 function secciones(): SeccionLegal[] {
   const titular = escaparHtml(nombreDelResponsable());
@@ -86,7 +86,8 @@ function secciones(): SeccionLegal[] {
         menores de esa edad.
       </p>
       <p>
-        Para entrar en el taller hace falta autorización del titular. Para jugar basta con la
+        Para preparar veladas en el taller hace falta entrar con una cuenta, y el titular puede
+        limitar quién entra, o cerrar el taller, cuando lo considere. Para jugar basta con la
         invitación o el código que reparte quien organiza: esos códigos son la llave de tu partida,
         así que no los publiques ni los compartas con quien no esté invitado.
       </p>`,
@@ -102,6 +103,12 @@ function secciones(): SeccionLegal[] {
         <li>
           <strong>Puede equivocarse y puede inventarse cosas.</strong> Es ficción para jugar, y no
           debe tomarse como información cierta sobre nada ni sobre nadie.
+        </li>
+        <li>
+          <strong>Se revisa, pero no se garantiza.</strong> Antes de entregarte una trama, otra
+          pasada automática busca contradicciones y pistas que delaten al culpable antes de tiempo, y
+          corrige lo que encuentra. Eso reduce los errores; no los elimina. Lee el material antes de
+          la velada: quien organiza es quien decide si está listo para la mesa.
         </li>
         <li>
           <strong>Habla de personajes, no de personas.</strong> Los secretos, los motivos y las
@@ -154,16 +161,113 @@ function secciones(): SeccionLegal[] {
       </p>`,
     },
     {
-      titulo: 'Precio, y cómo darse de baja',
+      titulo: 'Lo que se paga',
       cuerpo: `
       <p>
-        Hoy no se cobra nada por jugar ni hay compras dentro de la aplicación. Si algún día las
-        hubiera, se avisaría antes y nunca se cobraría por algo que ya estabas usando gratis sin
-        preguntártelo primero.
+        Jugar no cuesta nada, y dentro de la app no se vende nada. Lo que se paga es preparar
+        veladas en el taller y, si quieres, aspectos para tus aventureros en la Sala de Arcade. Hay
+        tres formas:
+      </p>
+      <ul>
+        <li>
+          <strong>Créditos</strong>, sueltos o por velada. Cada velada tiene un precio en créditos
+          que depende de cuánta gente juega, del modelo y de las opciones que elijas, y que
+          <strong>se te enseña antes de confirmar</strong>. Lo que confirmas es lo que se cobra.
+        </li>
+        <li>
+          <strong>La suscripción de anfitrión</strong>: una cuota mensual que trae una bolsa de
+          créditos cada mes y, mientras esté activa, el pase de la Sala.
+        </li>
+        <li>
+          <strong>El pase de la Sala</strong>, por temporada: aspectos exclusivos para tus
+          aventureros.
+        </li>
+      </ul>
+      <p>
+        Los precios se muestran con el IVA incluido antes de pagar. Los pagos los procesa Stripe:
+        la tarjeta la escribes en su página y aquí no llega nunca. Los precios pueden cambiar; el que
+        se aplica es siempre el que se te enseña al confirmar.
+      </p>`,
+    },
+    {
+      titulo: 'Los créditos',
+      cuerpo: `
+      <p>
+        Los créditos solo sirven para usar GameMasters. <strong>No son dinero</strong>: no se
+        cambian por dinero, no se transfieren a otra cuenta y no tienen valor fuera de la
+        plataforma. Cien créditos equivalen a un euro al comprarlos sueltos.
+      </p>
+      <ul>
+        <li>
+          Una velada se cobra al empezar a generarla. Con ella vienen incluidas las operaciones que
+          indique la confirmación —volver a generarla una vez, poner al día el reparto, reescribir el
+          material, revisarla otra vez, charlar con el asistente—, hasta los límites que se indiquen
+          allí. Más allá de esos límites, esas operaciones pueden tener un coste o no estar
+          disponibles.
+        </li>
+        <li>
+          <strong>Si la generación no llega a completarse</strong>, o la revisión automática no
+          puede darla por buena, los créditos de esa velada vuelven a tu monedero automáticamente.
+          Se devuelven en créditos, no en dinero.
+        </li>
+        <li>
+          Los créditos de la suscripción caducan al renovarse el mes siguiente; los que compres
+          sueltos no caducan mientras tengas tu cuenta. Se gastan primero los de la suscripción.
+        </li>
+        <li>
+          El historial de lo que entra y sale de tu monedero está en el taller, y el recibo de cada
+          pago te llega por correo desde la pasarela.
+        </li>
+      </ul>`,
+    },
+    {
+      titulo: 'La suscripción',
+      cuerpo: `
+      <p>
+        Se renueva sola cada mes hasta que la canceles, y se cancela cuando quieras desde el portal
+        de pagos del taller, sin escribir a nadie. Al cancelarla sigue activa hasta el final del
+        periodo ya pagado y después no se renueva; no se devuelve la parte del mes que no uses.
       </p>
       <p>
+        Si el precio o lo que incluye cambian, se avisará con al menos treinta días de antelación y
+        podrás cancelarla antes de que te afecte. Si un cobro no se puede hacer, la suscripción se
+        suspende hasta que se resuelva.
+      </p>`,
+    },
+    {
+      titulo: 'El pase de la Sala',
+      cuerpo: `
+      <p>
+        Da acceso, durante la temporada que se indique al comprarlo, a aspectos exclusivos para tus
+        aventureros. Son <strong>solo estética</strong>: no dan ninguna ventaja en ningún juego, no
+        se ganan ni se pierden jugando y no se pueden transferir. Al terminar la temporada dejan de
+        estar disponibles, y tu aventurero vuelve a uno de los de serie.
+      </p>`,
+    },
+    {
+      titulo: 'Desistimiento',
+      cuerpo: `
+      <p>
+        Lo que se compra aquí es contenido digital que se entrega al momento: los créditos llegan a
+        tu monedero en cuanto se confirma el pago, y la velada empieza a generarse en cuanto la
+        confirmas. Por eso, al pagar, <strong>pides expresamente que el servicio empiece de
+        inmediato y aceptas que, desde ese momento, pierdes el derecho de desistimiento</strong>,
+        como prevé el artículo 103.m del texto refundido de la Ley General para la Defensa de los
+        Consumidores y Usuarios. Se te recuerda en la página de pago, antes de confirmar.
+      </p>
+      <p>
+        Nada de esto recorta los derechos que la ley te reconoce si lo que recibes no funciona o no
+        es lo que se te ofreció: en ese caso, escribe a <a href="mailto:${correo}">${correo}</a>.
+      </p>`,
+    },
+    {
+      titulo: 'Darse de baja',
+      cuerpo: `
+      <p>
         Darte de baja es inmediato y lo haces tú: en la app, «Tu perfil» → «Borrar mi cuenta y mis
-        datos». No hay que escribir a nadie ni esperar a que alguien lo apruebe.
+        datos». No hay que escribir a nadie ni esperar a que alguien lo apruebe. Si tienes una
+        suscripción, cancélala antes desde el portal de pagos. Al borrar la cuenta se pierden los
+        créditos que quedaran en el monedero.
       </p>`,
     },
     {
@@ -174,7 +278,12 @@ function secciones(): SeccionLegal[] {
         de lo que la ley no permite eximirse —muy en particular, los derechos que la normativa de
         consumo reconoce a las personas consumidoras, que no se ven afectados por nada de lo que
         diga esta página—. Fuera de eso, no responde de los daños indirectos ni del lucro cesante,
-        ni de lo que hagan quienes organizan o juegan una partida.
+        ni de lo que hagan quienes organizan o juegan una partida, ni de cómo salga una velada.
+      </p>
+      <p>
+        En lo que se paga, y en la medida en que la ley lo permita, la responsabilidad total del
+        titular frente a ti se limita a lo que hayas pagado en los doce meses anteriores al hecho
+        que la cause.
       </p>`,
     },
     {
@@ -184,7 +293,8 @@ function secciones(): SeccionLegal[] {
         Estos términos son un acuerdo entre tú y el titular, <strong>no con Apple ni con
         Google</strong>. Las tiendas no participan en el servicio y no dan soporte de él: cualquier
         problema, duda o reclamación sobre la app va a
-        <a href="mailto:${correo}">${correo}</a>.
+        <a href="mailto:${correo}">${correo}</a>. Dentro de la app no se vende nada: lo que se paga,
+        se paga en la web del taller.
       </p>
       <p>
         El titular es el único responsable de la aplicación y de su contenido, incluidas las
@@ -200,7 +310,8 @@ function secciones(): SeccionLegal[] {
       <p>
         Si estos términos cambian, cambia también la fecha del pie. Los cambios que afecten de
         verdad a lo que aceptaste se anunciarán dentro de la aplicación antes de que se apliquen, no
-        se dan por supuestos por haberlos publicado aquí.
+        se dan por supuestos por haberlos publicado aquí. Lo que ya hayas pagado se rige por los
+        términos que había cuando lo pagaste.
       </p>`,
     },
     {

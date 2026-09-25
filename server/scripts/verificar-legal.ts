@@ -373,6 +373,12 @@ try {
       enElCodigo: 'server/src/db/store.ts',
       enElTexto: ['MongoDB'],
     },
+    {
+      quien: 'Stripe, la pasarela que cobra créditos, suscripción y pase',
+      señal: 'api.stripe.com',
+      enElCodigo: 'server/src/cobro/pasarela.ts',
+      enElTexto: ['Stripe', 'stripe.com/es/privacy'],
+    },
   ];
 
   for (const tercero of TERCEROS) {

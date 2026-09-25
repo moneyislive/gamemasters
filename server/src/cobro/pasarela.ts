@@ -89,6 +89,17 @@ async function llamar<T>(config: ConfigDePasarela, ruta: string, datos: Record<s
   return cuerpo;
 }
 
+/**
+ * Lo que se lee junto al botón de pagar.
+ *
+ * El contenido digital se entrega al momento, y la ley de consumidores (art.
+ * 103.m TRLGDCU) pide que quien compra solicite expresamente la ejecución
+ * inmediata y sepa que así pierde el desistimiento. Se dice aquí, en el momento
+ * de pagar, y entero en los términos.
+ */
+export const AVISO_DE_DESISTIMIENTO =
+  'Al pagar pides que el servicio empiece de inmediato y aceptas que, desde ese momento, pierdes el derecho de desistimiento.';
+
 /** Lo que se vende en una sesión de pago. */
 export type Compra =
   | { tipo: 'creditos'; creditos: number; centimos: number; nombre: string; gameId?: string }
@@ -121,6 +132,18 @@ export async function abrirPago(
     locale: 'es',
     ...(opciones.cliente ? { customer: opciones.cliente } : opciones.correo ? { customer_email: opciones.correo } : {}),
     ...(config.impuestosAutomaticos ? { automatic_tax: { enabled: 'true' } } : {}),
+    /*
+     * La casilla de «acepto los términos» en la propia página de pago, sin la
+     * que no se puede pagar. Es la prueba de que se aceptaron —con la renuncia
+     * al desistimiento dentro— y la guarda Stripe con el pago. Exige tener
+     * puesta la dirección de los términos en el panel de Stripe (ver
+     * docs/GUIA-STRIPE.md): sin ella Stripe rechaza abrir el pago, y se ve en la
+     * primera prueba.
+     */
+    consent_collection: { terms_of_service: 'required' },
+    custom_text: {
+      submit: { message: AVISO_DE_DESISTIMIENTO },
+    },
   };
 
   if (compra.tipo === 'suscripcion') {
@@ -163,18 +186,6 @@ export async function abrirPago(
       tipo: compra.tipo,
       ...(compra.tipo === 'creditos' ? { creditos: String(compra.creditos), ...(compra.gameId ? { gameId: compra.gameId } : {}) } : {}),
       ...(compra.tipo === 'pase' ? { temporada: compra.temporada } : {}),
-    },
-    /*
-     * El contenido digital se entrega al momento, y la ley de consumidores
-     * (art. 103.m TRLGDCU) exige que quien compra lo pida expresamente y sepa
-     * que así pierde el desistimiento. Se le dice en el botón de pagar; el
-     * texto legal completo está en los términos.
-     */
-    custom_text: {
-      submit: {
-        message:
-          'Al pagar pides que el servicio empiece ya y aceptas que, una vez generada la velada, no hay derecho de desistimiento.',
-      },
     },
   });
   return { url: sesion.url, id: sesion.id };
