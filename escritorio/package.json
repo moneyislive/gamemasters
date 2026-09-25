@@ -13,6 +13,7 @@
     "verify:quiebro-efectos": "tsx scripts/verificar-quiebro-efectos.ts",
     "verify:quiebro-sonido": "tsx scripts/verificar-quiebro-sonido.ts",
     "verify:quiebro-ciudad": "tsx scripts/verificar-quiebro-ciudad.ts",
+    "verify:quiebro-materia": "tsx scripts/verificar-quiebro-materia.ts",
     "verify:quiebro-juego": "tsx scripts/verificar-quiebro-juego.ts",
     "verify:quiebro-personajes": "tsx scripts/verificar-quiebro-personajes.ts"
   },

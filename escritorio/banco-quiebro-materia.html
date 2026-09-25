@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE LA MATERIA DEL QUIEBRO: el sistema de materiales analítico de la ciudad (fase 1), sin
+      servidor de juego. Entrada APARTE de `index.html`, como los otros bancos: una página para MIRAR.
+
+      Pinta las cuatro superficies del prototipo del plan del detalle con los materiales de hoy (a la
+      izquierda) y con la materia (a la derecha), desde cinco distancias. La cabecera de
+      `src/quiebro/ciudad/materia/banco-materia.tsx` cuenta los mandos. En la URL:
+      ?nivel=0|1|2|3  ?expo=3  ?prueba=barniz (la comprobación g de `verify:quiebro-materia`)
+
+      Se abre en http://localhost:PUERTO/sala/banco-quiebro-materia.html con el Vite del escritorio.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Banco de pruebas · la materia del Quiebro</title>
+    <meta name="theme-color" content="#050807" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #050807;
+      }
+      canvas {
+        display: block;
+      }
+      #t {
+        position: fixed;
+        left: 0;
+        top: 0;
+        margin: 0;
+        color: #9f9;
+        font: 12px monospace;
+        background: #0008;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/src/quiebro/ciudad/materia/banco-materia.tsx"></script>
+  </body>
+</html>
