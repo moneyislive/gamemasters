@@ -27,7 +27,7 @@
  * ═══ CÓMO SE RECONOCE UN NOMBRE ═══
  *
  * Por sus palabras EXCLUSIVAS: las que tiene esa persona, sala u objeto y nadie
- * más. «Condesa Cuchi de Alcántara» se reconoce por «cuchi» y «alcantara»; la
+ * más. «Condesa Casilda de Alcántara» se reconoce por «casilda» y «alcantara»; la
  * palabra «condesa» no cuenta —es un título— y «alcantara» dejaría de contar si
  * la víctima se apellidara igual. Es la misma idea que `LexicoDeRitos` en
  * `momia-validacion.ts`: una palabra que no distingue no sirve para contar.
@@ -114,7 +114,7 @@ export class Nombres {
 
   /**
    * Cuántas veces nombra este texto a esta entidad. Se toma la palabra suya que
-   * más aparece: «Cuchi de Alcántara … Cuchi» son dos menciones, no tres.
+   * más aparece: «Casilda de Alcántara … Casilda» son dos menciones, no tres.
    */
   menciones(id: string, texto: string): number {
     const plano = normalizar(texto);

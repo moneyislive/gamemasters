@@ -62,15 +62,15 @@ const tiene = (hs: HallazgoDeRevision[], codigo: string, gravedad?: string) =>
 // La mesa: siete personas, cinco salas, cuatro objetos
 // ---------------------------------------------------------------------------
 
-const GENTE = ['Babi', 'Cuchi', 'Nacho', 'Geli', 'Margarita', 'Miguel', 'Chaco'];
+const GENTE = ['Aurora', 'Casilda', 'Ciro', 'Delfina', 'Emilia', 'Fabián', 'Gonzalo'];
 const PERSONAJES = [
-  'Bárbara Alcaraz',
-  'Condesa Cuchi Montenegro',
-  'Ignacio Velasco',
-  'Angélica Rivas',
-  'Margarita Sotomayor',
-  'Miguel Ibarra',
-  'Chaco Belmonte',
+  'Aurora Alcaraz',
+  'Condesa Casilda Montenegro',
+  'Ciro Velasco',
+  'Delfina Rivas',
+  'Emilia Sotomayor',
+  'Fabián Ibarra',
+  'Gonzalo Belmonte',
 ];
 const SALAS = ['Biblioteca', 'Invernadero', 'Bodega', 'Terraza', 'Cocina'];
 const OBJETOS = ['Samovar de cobre', 'Abrecartas de plata', 'Cordón de cortina', 'Candelabro'];
@@ -90,7 +90,7 @@ const game: GameSession = {
   settings: { language: 'es' },
 };
 
-const CULPABLE = 's1'; // Cuchi
+const CULPABLE = 's1'; // Casilda
 const ARMA = 'o1'; // el abrecartas
 const SALA = 'r2'; // la bodega
 
@@ -185,8 +185,8 @@ paso('La casa Sabrón: el resumen nombra tres veces a la asesina');
 {
   const plot = tramaEquilibrada();
   plot.synopsis =
-    'La condesa Cuchi Montenegro recibió a todos con frialdad. Nadie olvidará cómo miraba Cuchi al anfitrión, ' +
-    'ni lo que Cuchi Montenegro dijo en el brindis.';
+    'La condesa Casilda Montenegro recibió a todos con frialdad. Nadie olvidará cómo miraba Casilda al anfitrión, ' +
+    'ni lo que Casilda Montenegro dijo en el brindis.';
   const a = auditarTramaCluedo(game, plot);
   comprobar('avisa de que la apertura señala', tiene(a.hallazgos, 'apertura-senala', 'bloqueante'), a.hallazgos);
   const aviso = a.hallazgos.find((h) => h.codigo === 'apertura-senala');
@@ -206,7 +206,7 @@ paso('Villa CASAS: armas que no nombra nadie y alguien sin historia');
   // El candelabro desaparece de todo lo que ve la mesa y de los dosieres.
   for (const p of pistasDeLaTrama(plot)) p.description = p.description.replace(/candelabro/gi, 'objeto');
   for (const c of plot.characters) c.secret = (c.secret ?? '').replace(/candelabro/gi, 'objeto');
-  // Y Geli se queda sin historia.
+  // Y Delfina se queda sin historia.
   const geli = plot.characters.find((c) => c.participanteId === 's3')!;
   geli.secret = 'Nada.';
   geli.motive = '';
@@ -216,15 +216,15 @@ paso('Villa CASAS: armas que no nombra nadie y alguien sin historia');
   geli.role = '';
   geli.personalHook = '';
   for (const p of pistasDeLaTrama(plot)) {
-    p.description = p.description.replace('Angélica Rivas', 'alguien');
-    p.pointsTo = p.pointsTo.replace('Angélica Rivas', 'alguien');
+    p.description = p.description.replace('Delfina Rivas', 'alguien');
+    p.pointsTo = p.pointsTo.replace('Delfina Rivas', 'alguien');
   }
-  for (const c of plot.characters) c.knowledge = c.knowledge.map((k) => k.replace('Angélica Rivas', 'alguien'));
+  for (const c of plot.characters) c.knowledge = c.knowledge.map((k) => k.replace('Delfina Rivas', 'alguien'));
   plot.timeline = plot.timeline.map((e) => ({ ...e, participanteIds: e.participanteIds.filter((id) => id !== 's3') }));
   const a = auditarTramaCluedo(game, plot);
   comprobar('el candelabro sale como objeto sin nombrar', a.hallazgos.some((h) => h.codigo === 'objeto-sin-nombrar' && h.sobre === 'o3'), a.hallazgos);
   comprobar(
-    'y Geli como secundaria o con el dosier flaco',
+    'y Delfina como secundaria o con el dosier flaco',
     a.hallazgos.some((h) => (h.codigo === 'personaje-secundario' || h.codigo === 'dosier-flaco') && h.sobre === 's3'),
     a.hallazgos,
   );
@@ -234,15 +234,15 @@ paso('La última ronda de Villa CASAS: una pista que dicta el nombre');
 {
   const plot = tramaEquilibrada();
   const ultima = pistasDeLaTrama(plot).find((p) => p.round === 4)!;
-  ultima.description = 'Un guante con el monograma de Cuchi Montenegro, manchado de vino de la bodega.';
-  ultima.pointsTo = 'Cuchi Montenegro es la asesina.';
+  ultima.description = 'Un guante con el monograma de Casilda Montenegro, manchado de vino de la bodega.';
+  ultima.pointsTo = 'Casilda Montenegro es la asesina.';
   const a = auditarTramaCluedo(game, plot);
   comprobar('avisa de la pista que dicta', a.hallazgos.some((h) => h.codigo === 'pista-que-dicta' && h.sobre === ultima.id), a.hallazgos);
   comprobar('y en la ronda 4 es grave, no bloqueante', a.hallazgos.find((h) => h.codigo === 'pista-que-dicta')?.gravedad === 'grave');
   const temprana = tramaEquilibrada();
   const r1 = pistasDeLaTrama(temprana).find((p) => p.round === 1)!;
-  r1.description = 'Una nota firmada por Cuchi Montenegro.';
-  r1.pointsTo = 'Cuchi es la culpable.';
+  r1.description = 'Una nota firmada por Casilda Montenegro.';
+  r1.pointsTo = 'Casilda es la culpable.';
   comprobar(
     'la misma pista en la ronda 1 es bloqueante',
     tiene(auditarTramaCluedo(game, temprana).hallazgos, 'pista-que-dicta', 'bloqueante'),
@@ -252,7 +252,7 @@ paso('La última ronda de Villa CASAS: una pista que dicta el nombre');
 paso('El extremo contrario: a la culpable no la nombra nadie');
 {
   const plot = tramaEquilibrada();
-  const quitar = (t: string) => t.replace(/Condesa Cuchi Montenegro|Cuchi Montenegro|Cuchi/g, 'una invitada');
+  const quitar = (t: string) => t.replace(/Condesa Casilda Montenegro|Casilda Montenegro|Casilda/g, 'una invitada');
   for (const c of plot.characters) c.knowledge = c.knowledge.map(quitar);
   for (const p of pistasDeLaTrama(plot)) {
     if (p.round < 4) {
@@ -481,7 +481,7 @@ paso('Los parches del revisor');
 paso('Sin clave, la revisión es la auditoría');
 {
   const plot = tramaEquilibrada();
-  plot.synopsis = 'Cuchi Montenegro, Cuchi y otra vez Cuchi.';
+  plot.synopsis = 'Casilda Montenegro, Casilda y otra vez Casilda.';
   const r = await revisarTramaCluedo(game, plot, () => undefined, 'completa');
   comprobar('no reescribe nada', r.plot === plot && r.informe.pasadas === 0);
   comprobar('y el veredicto sale de lo que contó', r.informe.veredicto === 'no-apta', r.informe);

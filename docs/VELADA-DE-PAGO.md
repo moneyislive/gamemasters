@@ -26,7 +26,7 @@ Tres veladas de verdad, y lo que falló en cada una:
 | Casa Sabrón | El resumen que se leía al empezar nombraba tres veces a la asesina | Auditoría: `apertura-senala` · Detective: `filtracion-inicial` |
 | Villa CASAS | Armas genéricas que no nombraba nadie | Auditoría: `objeto-sin-nombrar`, `objeto-sin-dueno` |
 | Villa CASAS | Personajes demasiado secundarios | Auditoría: `personaje-secundario`, `dosier-flaco` |
-| Villa CASAS | Una pista de la última ronda acusaba directamente a Cuchi | Auditoría: `pista-que-dicta` · Detective: `pista-que-lo-dice-todo` |
+| Villa CASAS | Una pista de la última ronda acusaba directamente a la culpable | Auditoría: `pista-que-dicta` · Detective: `pista-que-lo-dice-todo` |
 | (lo que pidió Miguel) | No arreglarlo escondiendo al culpable | Auditoría: `culpable-a-salvo` · Detective: `culpable-invisible` |
 
 Y uno que no estaba en la lista: con siete personas el material podía pedir seis giros,
