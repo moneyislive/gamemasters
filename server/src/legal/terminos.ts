@@ -187,6 +187,12 @@ function secciones(): SeccionLegal[] {
         Los precios se muestran con el IVA incluido antes de pagar. Los pagos los procesa Stripe:
         la tarjeta la escribes en su página y aquí no llega nunca. Los precios pueden cambiar; el que
         se aplica es siempre el que se te enseña al confirmar.
+      </p>
+      <p>
+        Si en la página de pago aparece <strong>Link</strong> como vendedor, la compra la tramita
+        Link, de Stripe, como comerciante registrado: sus condiciones rigen el cobro, el recibo, el
+        IVA y las devoluciones que tramite. Estos términos siguen rigiendo el uso de GameMasters y de
+        lo que compres.
       </p>`,
     },
     {

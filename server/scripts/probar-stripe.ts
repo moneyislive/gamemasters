@@ -6,13 +6,14 @@
  * Es el último paso de docs/GUIA-STRIPE.md antes de tocar dinero. Hace contra la
  * API de Stripe lo mismo que hará el taller y, si algo falla, dice qué falta:
  *
- *   1. que el plan de suscripción existe, es mensual, en euros y cuesta lo que se
- *      anuncia (COBRO_PRECIO_SUSCRIPCION);
+ *   1. que el plan de suscripción existe, es mensual, en euros, cuesta lo que se
+ *      anuncia (COBRO_PRECIO_SUSCRIPCION) y lleva el IVA dentro; y, si vende
+ *      Stripe (STRIPE_GESTIONADO=si), que su producto tiene el código fiscal;
  *   2. que Stripe acepta abrir los tres pagos —créditos, pase y suscripción— con
  *      las opciones con que los abre el taller: la casilla de los términos, el
- *      aviso del desistimiento y, con STRIPE_IMPUESTOS=si, el IVA automático. Las
- *      direcciones de los tres se imprimen, para pagarlas con la tarjeta de
- *      prueba 4242 4242 4242 4242;
+ *      aviso del desistimiento y el IVA del camino elegido (Managed Payments o
+ *      Stripe Tax). Las direcciones de los tres se imprimen, para pagarlas con la
+ *      tarjeta de prueba 4242 4242 4242 4242;
  *   3. que el portal del cliente está guardado, abriéndolo para un cliente de
  *      prueba.
  *
@@ -43,7 +44,7 @@ if (!/^(sk|rk)_test_/.test(clave)) {
 }
 
 // Después del .env: las constantes del cobro se leen del entorno al importarse.
-const { configDePasarela, abrirPago, abrirPortal, comoFormulario } = await import('../src/cobro/pasarela');
+const { configDePasarela, abrirPago, abrirPortal, comoFormulario, CODIGO_FISCAL } = await import('../src/cobro/pasarela');
 const { PRECIO_DE_LA_SUSCRIPCION, PRECIO_DEL_PASE, bolsa, temporadaDe } = await import('../src/cobro/ofertas');
 import type { Compra } from '../src/cobro/pasarela';
 
@@ -64,8 +65,14 @@ function pista(texto: string): string {
   if (/terms of service|terms_of_service|consent/i.test(texto)) {
     return 'pon la dirección de los términos (https://harkania.onrender.com/terminos) en dashboard.stripe.com/settings/public — paso 2 de la guía.';
   }
+  if (/managed.?payments|merchant of record/i.test(texto)) {
+    return 'activa Managed Payments y acepta sus condiciones en dashboard.stripe.com/settings/managed-payments (paso 8A), o deja STRIPE_GESTIONADO=no.';
+  }
+  if (/tax.?code/i.test(texto)) {
+    return `el producto necesita un código fiscal de la lista de Managed Payments: ${CODIGO_FISCAL.veladas} (paso 3).`;
+  }
   if (/tax|head office|origin address/i.test(texto)) {
-    return 'Stripe Tax no está listo: completa dashboard.stripe.com/settings/tax (paso 8), o deja STRIPE_IMPUESTOS=no mientras pruebas.';
+    return 'Stripe Tax no está listo: completa dashboard.stripe.com/settings/tax (paso 8B), o deja STRIPE_IMPUESTOS=no mientras pruebas.';
   }
   if (/no such price/i.test(texto)) {
     return 'ese price_… no existe en el entorno de PRUEBA: los de prueba y los de verdad son distintos (paso 3).';
@@ -92,6 +99,32 @@ async function pedir<T>(metodo: 'GET' | 'POST', ruta: string, datos?: Record<str
 
 const euros = (centimos: number) => `${(centimos / 100).toFixed(2).replace('.', ',')} €`;
 const direcciones: Array<[string, string]> = [];
+const conIva = config.gestionado || config.impuestosAutomaticos;
+
+console.log(
+  `\nQuién se encarga del IVA: ${
+    config.gestionado
+      ? 'Stripe, que vende como comerciante registrado (Managed Payments, paso 8A).'
+      : config.impuestosAutomaticos
+        ? 'Stripe Tax lo calcula y lo declaras tú (paso 8B).'
+        : 'nadie en Stripe: el precio se cobra tal cual (STRIPE_GESTIONADO y STRIPE_IMPUESTOS en «no»).'
+  }`,
+);
+
+/**
+ * Si el precio no dice si lleva el IVA dentro, manda el ajuste por defecto de
+ * los impuestos de la cuenta. `null` si no se puede leer.
+ */
+async function ivaDentroPorDefecto(): Promise<boolean | null> {
+  try {
+    const ajustes = await pedir<{ defaults?: { tax_behavior?: string | null } }>('GET', '/tax/settings');
+    const comportamiento = ajustes.defaults?.tax_behavior;
+    // «Según la moneda» mete el IVA dentro en todo lo que no sea dólares.
+    return comportamiento === 'inclusive' || comportamiento === 'inferred_by_currency';
+  } catch {
+    return null;
+  }
+}
 
 console.log('\n· La clave');
 try {
@@ -114,7 +147,8 @@ if (!config.precioSuscripcion) {
       unit_amount: number | null;
       recurring: { interval: string; interval_count: number } | null;
       tax_behavior: string | null;
-    }>('GET', `/prices/${encodeURIComponent(config.precioSuscripcion)}`);
+      product: { tax_code?: string | null } | string | null;
+    }>('GET', `/prices/${encodeURIComponent(config.precioSuscripcion)}?${encodeURIComponent('expand[]')}=product`);
     if (!precio.active) mal('el plan está activo', 'el precio está archivado', 'desarchívalo o crea otro (paso 3).');
     else bien('el plan existe y está activo');
     if (precio.currency !== 'eur') mal('el plan va en euros', `va en ${precio.currency}`, 'crea el precio en EUR (paso 3).');
@@ -128,14 +162,30 @@ if (!config.precioSuscripcion) {
         'haz que coincidan: el precio de Stripe no se puede editar, así que o creas otro o cambias COBRO_PRECIO_SUSCRIPCION.',
       );
     } else bien(`y cuesta lo que se anuncia: ${euros(PRECIO_DE_LA_SUSCRIPCION)} al mes`);
-    if (config.impuestosAutomaticos && precio.tax_behavior === 'exclusive') {
-      mal(
-        'el IVA va dentro del precio',
-        'el precio es «sin impuestos incluidos»: a 14,99 € se le sumaría el IVA',
-        'crea el precio con los impuestos INCLUIDOS (paso 3).',
-      );
-    } else if (config.impuestosAutomaticos && precio.tax_behavior !== 'inclusive') {
-      aviso('el precio no dice si lleva el IVA dentro: manda el comportamiento por defecto de Stripe Tax, que debe ser «Incluido» (paso 8).');
+    if (conIva) {
+      const dentro =
+        precio.tax_behavior === 'inclusive' ? true : precio.tax_behavior === 'exclusive' ? false : await ivaDentroPorDefecto();
+      if (dentro === true) bien('el IVA va dentro del precio');
+      else if (dentro === false) {
+        mal(
+          'el IVA va dentro del precio',
+          `el precio ${precio.tax_behavior === 'exclusive' ? 'es' : 'no lo dice, y el ajuste por defecto es'} «sin impuestos incluidos»: a ${euros(PRECIO_DE_LA_SUSCRIPCION)} se le SUMARÍA el IVA`,
+          'crea el precio con los impuestos incluidos (paso 3), o pon «Incluido» por defecto en dashboard.stripe.com/settings/tax (paso 8).',
+        );
+      } else {
+        aviso('el precio no dice si lleva el IVA dentro y no se pudo leer el ajuste por defecto: compruébalo en dashboard.stripe.com/settings/tax (paso 8).');
+      }
+    }
+    if (config.gestionado) {
+      const codigo = precio.product && typeof precio.product === 'object' ? precio.product.tax_code : undefined;
+      if (codigo === CODIGO_FISCAL.veladas) bien(`y su producto lleva el código fiscal de las veladas (${codigo})`);
+      else {
+        mal(
+          'el producto de la suscripción lleva su código fiscal',
+          codigo ? `lleva ${codigo}` : 'no lleva ninguno',
+          `ponle ${CODIGO_FISCAL.veladas} en el catálogo de productos (paso 3): sin un código de su lista, Managed Payments no lo vende.`,
+        );
+      }
     }
   } catch (error) {
     mal('el plan existe', mensaje(error), pista(mensaje(error)));

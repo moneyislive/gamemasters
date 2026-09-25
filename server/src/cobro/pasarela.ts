@@ -20,12 +20,33 @@
  * Aquí NUNCA pasa un número de tarjeta: la persona los escribe en la página de
  * Stripe. Esto solo ve identificadores.
  *
+ * ═══ QUIÉN SE ENCARGA DEL IVA ═══
+ *
+ * Tres formas, de menos a más trabajo para quien vende:
+ *
+ *   · STRIPE_GESTIONADO=si — Managed Payments: Stripe (con su marca Link) es el
+ *     vendedor ante quien compra. Calcula, cobra, declara e ingresa el IVA en más
+ *     de ochenta países, y lleva el fraude, las disputas y la atención de los
+ *     cobros. Cuesta un 3,5 % más por cobro. Stripe controla parte de la página
+ *     de pago, así que hay parámetros que no admite: el IVA automático, guardar
+ *     la dirección del cliente, las facturas de los pagos sueltos.
+ *   · STRIPE_IMPUESTOS=si — Stripe Tax: Stripe calcula el IVA de cada país y lo
+ *     pone en la factura, pero lo declara quien vende (ventanilla única, OSS).
+ *   · Ninguna de las dos: el precio se cobra tal cual y el IVA es cosa de quien
+ *     vende, fuera de aquí.
+ *
+ * En las dos primeras el precio que se anuncia ya lleva el IVA dentro
+ * (`tax_behavior: inclusive`): sin decirlo, Managed Payments lo SUMARÍA encima.
+ *
  * ═══ CONFIGURACIÓN ═══
  *
  *   STRIPE_SECRET_KEY            sk_test_… en pruebas, sk_live_… en producción
  *   STRIPE_WEBHOOK_SECRET        whsec_…, el del punto de aviso dado de alta
  *   STRIPE_PRECIO_SUSCRIPCION    price_… del plan mensual (se crea en el panel de Stripe)
+ *   STRIPE_GESTIONADO            «si» para que Stripe venda como comerciante registrado
  *   STRIPE_IMPUESTOS             «si» para que Stripe Tax calcule el IVA de cada país
+ *
+ * Paso a paso, en docs/GUIA-STRIPE.md.
  */
 import crypto from 'node:crypto';
 
@@ -36,7 +57,11 @@ export interface ConfigDePasarela {
   secretoDeAvisos?: string;
   precioSuscripcion?: string;
   impuestosAutomaticos: boolean;
+  /** Stripe vende como comerciante registrado (Managed Payments). Manda sobre `impuestosAutomaticos`. */
+  gestionado: boolean;
 }
+
+const encendido = (valor: string | undefined) => valor?.trim().toLowerCase() === 'si';
 
 /** La configuración, o `null` si no hay pasarela: entonces no se vende nada. */
 export function configDePasarela(): ConfigDePasarela | null {
@@ -46,9 +71,28 @@ export function configDePasarela(): ConfigDePasarela | null {
     clave,
     secretoDeAvisos: process.env.STRIPE_WEBHOOK_SECRET?.trim() || undefined,
     precioSuscripcion: process.env.STRIPE_PRECIO_SUSCRIPCION?.trim() || undefined,
-    impuestosAutomaticos: process.env.STRIPE_IMPUESTOS?.trim().toLowerCase() === 'si',
+    impuestosAutomaticos: encendido(process.env.STRIPE_IMPUESTOS),
+    gestionado: encendido(process.env.STRIPE_GESTIONADO),
   };
 }
+
+/**
+ * Qué es lo que se vende, para el IVA. Managed Payments no acepta un producto
+ * sin código, y solo los de su lista
+ * (docs.stripe.com/payments/managed-payments/eligibility):
+ *
+ *   · las veladas —créditos sueltos y suscripción—: inteligencia artificial en
+ *     la nube, para uso personal;
+ *   · el pase de la Sala: servicio prestado por vía electrónica, el general.
+ *
+ * En la UE los dos pagan el IVA de los servicios electrónicos: el código dice
+ * qué es, no cambia el tipo. El de la suscripción se pone en su producto, en el
+ * panel de Stripe: el mismo `CODIGO_FISCAL.veladas`.
+ */
+export const CODIGO_FISCAL = {
+  veladas: 'txcd_10105001',
+  pase: 'txcd_10000000',
+} as const;
 
 /**
  * Aplana un objeto al formato de formulario de Stripe:
@@ -106,32 +150,46 @@ export type Compra =
   | { tipo: 'pase'; temporada: string; centimos: number; nombre: string }
   | { tipo: 'suscripcion' };
 
+export interface OpcionesDelPago {
+  compra: Compra;
+  cuentaId: string;
+  correo?: string;
+  cliente?: string;
+  volverOk: string;
+  volverCancelado: string;
+}
+
 /**
- * Abre una sesión de pago y devuelve la URL de Stripe.
+ * Lo que se le pide a Stripe para abrir un pago, sin pedírselo todavía: así se
+ * puede comprobar sin red qué lleva cada forma de cobrar el IVA.
  *
  * `metadata` lleva lo que el aviso necesita para apuntar la compra sin tener
  * que fiarse de nada que venga del navegador: quién compra y qué compra. El
  * precio también lo pone el servidor: el navegador solo elige qué quiere.
  */
-export async function abrirPago(
-  config: ConfigDePasarela,
-  opciones: {
-    compra: Compra;
-    cuentaId: string;
-    correo?: string;
-    cliente?: string;
-    volverOk: string;
-    volverCancelado: string;
-  },
-): Promise<{ url: string; id: string }> {
+export function datosDelPago(config: ConfigDePasarela, opciones: OpcionesDelPago): Record<string, unknown> {
   const { compra } = opciones;
+  const conIva = config.gestionado || config.impuestosAutomaticos;
   const comun: Record<string, unknown> = {
     success_url: opciones.volverOk,
     cancel_url: opciones.volverCancelado,
     client_reference_id: opciones.cuentaId,
     locale: 'es',
     ...(opciones.cliente ? { customer: opciones.cliente } : opciones.correo ? { customer_email: opciones.correo } : {}),
-    ...(config.impuestosAutomaticos ? { automatic_tax: { enabled: 'true' } } : {}),
+    ...(config.gestionado
+      ? { managed_payments: { enabled: 'true' } }
+      : config.impuestosAutomaticos
+        ? {
+            automatic_tax: { enabled: 'true' },
+            /*
+             * A quien ya compró, Stripe le calcula el IVA con la dirección que
+             * tenga guardada, y si no tiene ninguna —compró antes de activar el
+             * IVA— no abre el pago. Con esto, la que escriba en la página se
+             * guarda y se usa.
+             */
+            ...(opciones.cliente ? { customer_update: { address: 'auto' } } : {}),
+          }
+        : {}),
     /*
      * La casilla de «acepto los términos» en la propia página de pago, sin la
      * que no se puede pagar. Es la prueba de que se aceptaron —con la renuncia
@@ -148,14 +206,13 @@ export async function abrirPago(
 
   if (compra.tipo === 'suscripcion') {
     if (!config.precioSuscripcion) throw new Error('No hay plan de suscripción configurado (STRIPE_PRECIO_SUSCRIPCION).');
-    const sesion = await llamar<{ url: string; id: string }>(config, '/checkout/sessions', {
+    return {
       ...comun,
       mode: 'subscription',
       line_items: [{ price: config.precioSuscripcion, quantity: 1 }],
       metadata: { cuentaId: opciones.cuentaId, tipo: 'suscripcion' },
       subscription_data: { metadata: { cuentaId: opciones.cuentaId } },
-    });
-    return { url: sesion.url, id: sesion.id };
+    };
   }
 
   /*
@@ -163,11 +220,12 @@ export async function abrirPago(
    * una velada sale del presupuesto de ESA velada, así que no puede ser un
    * precio fijo dado de alta en el panel.
    */
-  const sesion = await llamar<{ url: string; id: string }>(config, '/checkout/sessions', {
+  return {
     ...comun,
     mode: 'payment',
     ...(opciones.cliente ? {} : { customer_creation: 'always' }),
-    invoice_creation: { enabled: 'true' },
+    // Con Managed Payments la factura y el recibo los hace Stripe, que es quien vende.
+    ...(config.gestionado ? {} : { invoice_creation: { enabled: 'true' } }),
     line_items: [
       {
         quantity: 1,
@@ -176,8 +234,11 @@ export async function abrirPago(
           unit_amount: compra.centimos,
           // El IVA va dentro del precio que se anuncia, como exige la ley para
           // quien vende a particulares.
-          ...(config.impuestosAutomaticos ? { tax_behavior: 'inclusive' } : {}),
-          product_data: { name: compra.nombre },
+          ...(conIva ? { tax_behavior: 'inclusive' } : {}),
+          product_data: {
+            name: compra.nombre,
+            ...(conIva ? { tax_code: compra.tipo === 'pase' ? CODIGO_FISCAL.pase : CODIGO_FISCAL.veladas } : {}),
+          },
         },
       },
     ],
@@ -187,7 +248,12 @@ export async function abrirPago(
       ...(compra.tipo === 'creditos' ? { creditos: String(compra.creditos), ...(compra.gameId ? { gameId: compra.gameId } : {}) } : {}),
       ...(compra.tipo === 'pase' ? { temporada: compra.temporada } : {}),
     },
-  });
+  };
+}
+
+/** Abre una sesión de pago y devuelve la URL de Stripe. */
+export async function abrirPago(config: ConfigDePasarela, opciones: OpcionesDelPago): Promise<{ url: string; id: string }> {
+  const sesion = await llamar<{ url: string; id: string }>(config, '/checkout/sessions', datosDelPago(config, opciones));
   return { url: sesion.url, id: sesion.id };
 }
 

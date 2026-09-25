@@ -11,6 +11,8 @@
  *   · la bolsa del mes se gasta antes que lo comprado y caduca al renovar, sin
  *     llevarse lo comprado;
  *   · un aviso con la firma mal, o viejo, no entra;
+ *   · la página de pago pide aceptar los términos, y el IVA va como diga quien
+ *     se encargue de él: nadie, Stripe Tax o Stripe vendiendo (Managed Payments);
  *   · y el presupuesto de una velada sube con la mesa y con el modelo.
  *
  * Corre sobre el almacén de fichero, en una carpeta temporal que borra al acabar.
@@ -34,7 +36,7 @@ process.chdir(carpeta);
 
 const { initStore, getStore } = await import('../src/db/store');
 const { abonar, cargar, reembolsar, saldoDe, delMesDe } = await import('../src/cobro/monedero');
-const { verificarAviso, comoFormulario } = await import('../src/cobro/pasarela');
+const { verificarAviso, comoFormulario, datosDelPago, CODIGO_FISCAL, AVISO_DE_DESISTIMIENTO } = await import('../src/cobro/pasarela');
 const { atenderAviso } = await import('../src/cobro/avisos');
 const { presupuestar, precioRedondo } = await import('../src/cobro/precios');
 const { temporadaDe, CREDITOS_DE_LA_SUSCRIPCION } = await import('../src/cobro/ofertas');
@@ -43,6 +45,7 @@ const { emitirSesionDeCuenta, CABECERA_CUENTA } = await import('../src/identidad
 const { tallerAbiertoPara } = await import('../src/auth');
 const { veLasHuerfanas } = await import('../src/taller/dueno');
 import type { Account } from '../../shared/live';
+import type { Compra, ConfigDePasarela } from '../src/cobro/pasarela';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -208,6 +211,54 @@ try {
     'se aplana como pide Stripe',
     form.includes(`${encodeURIComponent('line_items[0][price_data][unit_amount]')}=599`) && form.includes(`${encodeURIComponent('metadata[tipo]')}=creditos`),
     form,
+  );
+
+  paso('La página de pago, según quién se encargue del IVA');
+  const leer = (datos: Record<string, unknown>) => decodeURIComponent(comoFormulario(datos).join('&'));
+  const pasarela = (cambios: Partial<ConfigDePasarela>): ConfigDePasarela => ({
+    clave: 'sk_test_prueba',
+    precioSuscripcion: 'price_plan',
+    impuestosAutomaticos: false,
+    gestionado: false,
+    ...cambios,
+  });
+  const alPagar = { cuentaId: 'c-1', correo: 'ana@example.com', volverOk: 'https://x/?pago=ok', volverCancelado: 'https://x/?pago=cancelado' };
+  const bolsaDePrueba: Compra = { tipo: 'creditos', creditos: 1000, centimos: 1000, nombre: '1000 créditos de GameMasters' };
+  const paseDePrueba: Compra = { tipo: 'pase', temporada: '2026-T4', centimos: 499, nombre: 'Pase de la Sala' };
+
+  const sinIva = leer(datosDelPago(pasarela({}), { compra: bolsaDePrueba, ...alPagar }));
+  comprobar('los términos se aceptan en la propia página de pago', sinIva.includes('consent_collection[terms_of_service]=required'));
+  comprobar('y el desistimiento se avisa junto al botón', sinIva.includes(`custom_text[submit][message]=${AVISO_DE_DESISTIMIENTO}`));
+  comprobar('sin nadie a cargo del IVA, no se pide nada de impuestos', !/automatic_tax|managed_payments|tax_code|tax_behavior/.test(sinIva), sinIva);
+
+  const conStripeTax = leer(datosDelPago(pasarela({ impuestosAutomaticos: true }), { compra: bolsaDePrueba, ...alPagar, cliente: 'cus_1' }));
+  comprobar('con Stripe Tax se pide el IVA automático', conStripeTax.includes('automatic_tax[enabled]=true'));
+  comprobar('y a quien ya compró se le guarda la dirección que escriba', conStripeTax.includes('customer_update[address]=auto'), conStripeTax);
+  comprobar('el precio lleva el IVA dentro', conStripeTax.includes('line_items[0][price_data][tax_behavior]=inclusive'));
+  comprobar('con el código fiscal de las veladas', conStripeTax.includes(`[product_data][tax_code]=${CODIGO_FISCAL.veladas}`));
+  comprobar('y la factura del pago suelto', conStripeTax.includes('invoice_creation[enabled]=true'));
+
+  const gestionado = pasarela({ gestionado: true, impuestosAutomaticos: true });
+  const vendeStripe = leer(datosDelPago(gestionado, { compra: bolsaDePrueba, ...alPagar, cliente: 'cus_1' }));
+  comprobar('con Managed Payments, vende Stripe', vendeStripe.includes('managed_payments[enabled]=true'));
+  comprobar('sin lo que Stripe no deja tocar cuando vende él', !/automatic_tax|customer_update|invoice_creation/.test(vendeStripe), vendeStripe);
+  comprobar(
+    'el precio lleva el IVA dentro: sin decirlo, Stripe lo sumaría encima',
+    vendeStripe.includes('line_items[0][price_data][tax_behavior]=inclusive'),
+  );
+  comprobar('los créditos, con el código de las veladas', vendeStripe.includes(`[tax_code]=${CODIGO_FISCAL.veladas}`));
+  comprobar(
+    'y el pase, con el suyo',
+    leer(datosDelPago(gestionado, { compra: paseDePrueba, ...alPagar })).includes(`[tax_code]=${CODIGO_FISCAL.pase}`),
+  );
+  const suscripcionQueVendeStripe = leer(datosDelPago(gestionado, { compra: { tipo: 'suscripcion' }, ...alPagar }));
+  comprobar(
+    'la suscripción también, con su plan y la cuenta en el metadata',
+    suscripcionQueVendeStripe.includes('managed_payments[enabled]=true') &&
+      suscripcionQueVendeStripe.includes('line_items[0][price]=price_plan') &&
+      suscripcionQueVendeStripe.includes('subscription_data[metadata][cuentaId]=c-1') &&
+      !suscripcionQueVendeStripe.includes('automatic_tax'),
+    suscripcionQueVendeStripe,
   );
 
   paso('El pase de la Sala');

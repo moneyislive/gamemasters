@@ -191,9 +191,13 @@ disfraces, el guion…): ahí el modo podría recortar la generación. No está 
 
 1. **La pasarela: Stripe.** Está hecha contra su API, sin su SDK. La alternativa era un
    comerciante registrado (Paddle, Lemon Squeezy), que se encarga del IVA de cada país a
-   cambio de una comisión más alta (≈5 % + 0,50 $ frente a ≈1,5 % + 0,25 € de Stripe). Con
-   Stripe, el IVA lo calcula Stripe Tax y lo declara quien vende (ventanilla única, OSS, si
-   toca). Cómo montarlo, paso a paso: [GUIA-STRIPE.md](GUIA-STRIPE.md).
+   cambio de una comisión más alta (≈5 % + 0,50 $ frente a ≈1,5 % + 0,25 € de Stripe). Stripe
+   tiene ahora el suyo, **Managed Payments**, por un 3,5 % más: vende como comerciante
+   registrado, declara el IVA en más de 80 países y lleva el fraude, las disputas y la
+   atención de los cobros. Es el camino recomendado, porque es el que menos compromete
+   (`STRIPE_GESTIONADO=si`), y necesita que Stripe apruebe el negocio. El otro es Stripe Tax
+   (`STRIPE_IMPUESTOS=si`): Stripe calcula el IVA y lo declara quien vende (ventanilla única,
+   OSS, si toca). Cómo montar cualquiera de los dos: [GUIA-STRIPE.md](GUIA-STRIPE.md).
 2. **Los precios, como están.** Salen del coste medido y un margen de 2,5, y se cambian desde
    el entorno sin desplegar.
 3. **Los términos y la privacidad, escritos** con el criterio de comprometer lo mínimo. Lo que
@@ -218,8 +222,9 @@ disfraces, el guion…): ahí el modo podría recortar la generación. No está 
 
 Todo, en [GUIA-STRIPE.md](GUIA-STRIPE.md). En resumen:
 
-1. Stripe en el entorno de prueba: los términos en los datos públicos, el plan mensual, el
-   portal, el destino de los avisos y Stripe Tax.
+1. Stripe en el entorno de prueba: los términos en los datos públicos, el plan mensual con su
+   código fiscal, el portal, el destino de los avisos y el camino del IVA (Managed Payments o
+   Stripe Tax).
 2. `npm run probar:stripe -w server`: abre contra Stripe los mismos pagos que abrirá el
    taller y dice qué falta.
 3. Lo mismo en modo activo, con las variables en Render **antes** de fusionar.

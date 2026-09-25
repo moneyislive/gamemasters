@@ -195,7 +195,9 @@ function secciones(): SeccionLegal[] {
           que cobra: escribes tu tarjeta en su página y aquí solo llega el resultado —qué se pagó,
           cuándo y un identificador de cliente— junto con tu correo, para enviarte el recibo. Stripe
           trata además tus datos de pago por su cuenta para cumplir sus propias obligaciones, como
-          la prevención del fraude; eso lo explica su política de privacidad
+          la prevención del fraude, y, cuando la venta la tramita Link, su marca de pagos, como
+          vendedor, también para emitir el recibo, cobrar el IVA y atender las reclamaciones del
+          cobro; eso lo explica su política de privacidad
           (<a href="https://stripe.com/es/privacy" rel="noopener">stripe.com/es/privacy</a>).
         </li>
         <li>
