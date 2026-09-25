@@ -632,7 +632,7 @@ async function unaTirada(
   const stream = streamDeGeneracion(client, {
     model,
     esfuerzo: esfuerzoPara(game, 'trama'),
-    maxTokens: 64000,
+    maxTokens: 128000,
     system: SISTEMA_MOMIA,
     schema: MOMIA_TRAMA_SCHEMA,
     messages: [{ role: 'user', content: construirPromptMomia(game, cimientos.trama, entidades) }],

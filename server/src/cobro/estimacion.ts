@@ -99,30 +99,24 @@ function consumoBase(paso: PasoDeVelada, t: TamanoDeLaVelada): Consumo {
   }
 }
 
-/** Los pasos cuyo pensamiento gobierna el esfuerzo elegido. Los demás van con el suyo. */
-const PASOS_CON_ESFUERZO_ELEGIDO: PasoDeVelada[] = ['trama', 'revisor'];
-
 /**
  * Lo que costará cada paso de una velada, en tokens y en dólares.
  *
- * `esfuerzo` es el de la trama y el revisor; los pasos de apoyo llevan el suyo
- * (ver `esfuerzoPara` en `agent/anthropic.ts`), y el asistente y el Mayordomo,
- * que no pasan por ahí, el de la API.
+ * `esfuerzoDe` dice cuánto piensa cada paso: tiene que ser la misma regla que
+ * usa la generación (`esfuerzoPara` en `agent/anthropic.ts`), o el presupuesto
+ * mentiría en la dirección que más duele — la trama a medio y el revisor a alto
+ * no cuestan lo mismo que los dos a medio.
  */
 export function estimarPasos(
   pasos: PasoDeVelada[],
   tamano: TamanoDeLaVelada,
   modelo: ModelId,
-  esfuerzo: Esfuerzo,
+  esfuerzoDe: (paso: PasoDeVelada) => Esfuerzo,
 ): PasoPresupuestado[] {
   const factorModelo = FACTOR_DE_MODELO[modelo] ?? 1;
   return pasos.map((paso) => {
     const base = consumoBase(paso, tamano);
-    const factorEsfuerzo = PASOS_CON_ESFUERZO_ELEGIDO.includes(paso)
-      ? FACTOR_DE_ESFUERZO[esfuerzo]
-      : paso === 'mayordomo'
-        ? FACTOR_DE_ESFUERZO.low
-        : FACTOR_DE_ESFUERZO.medium;
+    const factorEsfuerzo = FACTOR_DE_ESFUERZO[esfuerzoDe(paso)];
     const entrada = Math.round(base.entrada * (paso === 'trama' ? 1 : factorModelo));
     const salida = Math.round(base.salida * factorEsfuerzo * factorModelo);
     return {

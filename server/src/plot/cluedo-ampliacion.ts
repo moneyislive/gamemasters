@@ -192,7 +192,7 @@ async function pedirAmpliacion(
   const stream = streamDeGeneracion(client, {
     model,
     esfuerzo: esfuerzoPara(game, 'refresco'),
-    maxTokens: 32000,
+    maxTokens: 64000,
     system: SYSTEM_AMPLIACION,
     schema: PLOT_EXTENSION_SCHEMA,
     messages: [

@@ -93,21 +93,26 @@ export function usesFallbacks(model: ModelId): boolean {
  * Los pasos de una velada que piensan, y cuánto piensa cada uno si nadie dice
  * otra cosa.
  *
- * La trama y el revisor son donde se decide si el caso se sostiene: ahí va
- * `high`, que es lo que corría Opus 5 por defecto y con lo que se midieron las
- * tramas buenas. El material es prosa sobre una trama ya cerrada, y el detective
- * repite la misma pregunta varias veces: `medium` basta. Opus 5.5 trae `medium`
- * por defecto, así que sin esta tabla la trama habría pensado menos que antes
- * de cambiar de modelo — más barata y peor, sin que nadie lo hubiera decidido.
+ * ═══ MEDIDO, NO SUPUESTO ═══
+ *
+ * La primera versión de esta tabla ponía la trama en `high`, que es lo que
+ * corría Opus 5 por defecto (31.495 tokens de salida para siete personas en
+ * Villa CASAS). Con Opus 5.5, la misma mesa a `high` agotó los 64.000 tokens a
+ * los diez minutos y medio y se perdió entera (25-sep-2026): Opus 5.5 piensa
+ * mucho más a ese nivel. Así que la trama va a `medium` —que es además el
+ * defecto de Opus 5.5— y el `high` se queda en el REVISOR, que es donde se
+ * decide si el caso se sostiene: el autor escribe, y quien lee con lupa es el
+ * revisor. El material es prosa sobre una trama cerrada y el detective repite
+ * la misma pregunta varias veces: `medium` basta.
  */
 export type PasoQuePiensa = 'trama' | 'material' | 'detective' | 'revisor' | 'refresco';
 
 const ESFUERZO_POR_PASO: Record<PasoQuePiensa, Esfuerzo> = {
-  trama: 'high',
+  trama: 'medium',
   material: 'medium',
   detective: 'medium',
   revisor: 'high',
-  refresco: 'high',
+  refresco: 'medium',
 };
 
 /**
@@ -172,7 +177,8 @@ export function streamDeGeneracion(
 
   const base = {
     model: opciones.model,
-    max_tokens: opciones.maxTokens,
+    // Haiku escribe 64.000 como mucho: pedirle más es un 400, no un techo más alto.
+    max_tokens: Math.min(opciones.maxTokens, opciones.model.startsWith('claude-haiku') ? 64_000 : 128_000),
     system: [{ type: 'text' as const, text: opciones.system, cache_control: { type: 'ephemeral' as const } }],
     output_config: outputConfig,
     messages: opciones.messages,
@@ -200,13 +206,35 @@ export function streamDeGeneracion(
  * se perdió. El SDK reintenta los fallos de conexión ANTES de que empiece el
  * stream, pero no uno que llega a mitad, que es justo el caro. Estos son los que
  * merecen otra vuelta; un 400 o un rechazo, no.
+ *
+ * Y LOS CORTES DE RED, que no llegan como error de la API. En la tercera velada
+ * de prueba, a los 5,7 minutos, la conexión se cayó con `ECONNRESET` y el SDK lo
+ * entregó como un `AnthropicError` a secas —mensaje «terminated»— con el fallo
+ * de red en su cadena de `cause`. Se busca ahí.
  */
 export function esTransitorio(error: unknown): boolean {
   if (error instanceof Anthropic.APIConnectionError) return true;
-  if (!(error instanceof Anthropic.APIError)) return false;
-  if (error.status !== undefined && [408, 409, 429, 500, 502, 503, 504, 529].includes(error.status)) return true;
-  const tipo = (error.error as { error?: { type?: string } } | undefined)?.error?.type;
-  return tipo === 'api_error' || tipo === 'overloaded_error' || tipo === 'rate_limit_error';
+  if (error instanceof Anthropic.APIError) {
+    if (error.status !== undefined && [408, 409, 429, 500, 502, 503, 504, 529].includes(error.status)) return true;
+    const tipo = (error.error as { error?: { type?: string } } | undefined)?.error?.type;
+    if (tipo === 'api_error' || tipo === 'overloaded_error' || tipo === 'rate_limit_error') return true;
+    if (error.status !== undefined) return false;
+  }
+  return esCorteDeRed(error);
+}
+
+const SENALES_DE_CORTE = ['econnreset', 'etimedout', 'epipe', 'econnaborted', 'terminated', 'socket hang up', 'other side closed', 'und_err_socket'];
+
+/** ¿Hay un corte de red en algún eslabón de la cadena de causas? */
+function esCorteDeRed(error: unknown): boolean {
+  let actual: unknown = error;
+  for (let eslabon = 0; actual && eslabon < 6; eslabon++) {
+    const e = actual as { message?: unknown; code?: unknown; cause?: unknown };
+    const texto = `${typeof e.code === 'string' ? e.code : ''} ${typeof e.message === 'string' ? e.message : ''}`.toLowerCase();
+    if (SENALES_DE_CORTE.some((s) => texto.includes(s))) return true;
+    actual = e.cause;
+  }
+  return false;
 }
 
 /** Cuántas veces se intenta una llamada de generación, contando la primera. */

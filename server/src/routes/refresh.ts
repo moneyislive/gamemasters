@@ -11,6 +11,7 @@ import { runRefresh } from '../plot/refresh';
 import { crearRouter } from '../rutas';
 import { quienPide } from '../gasto/quien';
 import { cabeHoy, mensajeDeTope } from '../gasto/tope';
+import { consumirIncluido } from '../cobro/velada';
 import { generacionEnCurso } from '../plot/pipeline';
 
 const router = crearRouter();
@@ -58,6 +59,16 @@ router.post('/games/:id/refresh', async (req, res) => {
    */
   if (generacionEnCurso(game)) {
     res.status(409).json({ error: 'Esta partida ya se está generando. Espera a que termine.' });
+    return;
+  }
+
+  /*
+   * Lo incluido en la velada: si está pagada, cada actualización cuenta contra lo que
+   * trae. La casa y el cobro apagado no cuentan nada.
+   */
+  const incluido = await consumirIncluido(req, game, 'actualizaciones');
+  if (!incluido.ok) {
+    res.status(402).json({ error: incluido.error, motivo: 'fuera-de-lo-incluido' });
     return;
   }
 

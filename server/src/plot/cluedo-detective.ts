@@ -44,6 +44,7 @@ import { pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
 import { cronologiaPublica, numeroDeRondas } from '../docs/datos';
 import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe, victimaDe } from '../juegos/cluedo';
 import { esfuerzoPara, getAnthropicClient, streamDeGeneracion, textoDe } from '../agent/anthropic';
+import { conocimientoDesbloqueado } from '../live/proyeccion';
 import { apuntarUso } from '../gasto/contador';
 
 const SISTEMA_DETECTIVE =
@@ -143,14 +144,23 @@ export interface InformeDelDetective {
  * ÚNICO que ve el detective: ni la solución, ni los secretos, ni los motivos, ni
  * el guion del Game Master, ni las ayudas —que solo se leen si la mesa se atasca—.
  *
- * Lo que cada cual sabe de los demás (`knowledge`) entra entero desde el
- * principio: en papel está todo en el dosier desde el primer minuto, y es lo
- * primero que se cuenta en la mesa. Es el peor caso, que es el que hay que medir.
+ * Lo que cada cual sabe de los demás (`knowledge`) depende de cómo se juegue:
+ *
+ *   · EN PAPEL entra entero desde el principio: está todo en el dosier desde el
+ *     primer minuto, y es lo primero que se cuenta en la mesa.
+ *   · CON LA APP se desbloquea por rondas, con la misma regla que el móvil
+ *     (`conocimientoDesbloqueado`): antes de la primera ronda no se ve nada.
+ *
+ * Una partida sin modo se mide como papel, que es el peor caso.
  */
 export function loQueSabeLaMesa(game: GameSession, plot: Plot, hasta: number): string {
   const nombreDe = (id: string) => sospechososDe(game).find((s) => s.id === id)?.name ?? id;
   const salaDe = (id?: string) => salasDe(game).find((r) => r.id === id)?.name ?? 'sin sala';
   const material = plot.material;
+  const conApp = game.settings?.modo === 'app';
+  const rondas = numeroDeRondas(plot);
+  const sabeYa = (conocimiento: string[]): string[] =>
+    conApp ? conocimiento.slice(0, hasta === 0 ? 0 : conocimientoDesbloqueado(conocimiento.length, hasta, rondas)) : conocimiento;
 
   const personas = plot.characters
     .map(
@@ -158,7 +168,7 @@ export function loQueSabeLaMesa(game: GameSession, plot: Plot, hasta: number): s
         `- id "${c.participanteId}" · ${c.characterName} (lo juega ${nombreDe(c.participanteId)}) · ${c.role}\n` +
         `  Cara pública: ${c.publicPersona}\n` +
         `  Coartada que declara: ${c.alibi ?? ''}\n` +
-        `  Lo que cuenta que sabe de otros: ${(c.knowledge ?? []).join(' | ') || '(nada)'}`,
+        `  Lo que cuenta que sabe de otros: ${sabeYa(c.knowledge ?? []).join(' | ') || '(nada, todavía)'}`,
     )
     .join('\n');
 
@@ -254,7 +264,7 @@ async function unMomento(
     model,
     // El último momento es el que decide si hay solución: piensa lo de la trama.
     esfuerzo: esfuerzoPara(game, hasta === rondas ? 'revisor' : 'detective'),
-    maxTokens: 32000,
+    maxTokens: 64000,
     system: SISTEMA_DETECTIVE,
     schema: DETECTIVE_SCHEMA,
     messages: [

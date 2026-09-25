@@ -63,7 +63,7 @@ async function unaTirada(
   const stream = streamDeGeneracion(client, {
     model,
     esfuerzo: esfuerzoPara(game, 'trama'),
-    maxTokens: 64000,
+    maxTokens: 128000,
     system: SISTEMA_NUDO,
     schema: NUDO_TRAMA_SCHEMA,
     messages: [{ role: 'user', content: construirPromptNudo(game, base) }],

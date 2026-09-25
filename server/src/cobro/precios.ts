@@ -89,16 +89,17 @@ export function presupuestar(
   pasos: PasoDeVelada[],
   tamano: TamanoDeLaVelada,
   modelo: ModelId,
-  esfuerzo: Esfuerzo,
+  esfuerzo: Esfuerzo | ((paso: PasoDeVelada) => Esfuerzo),
 ): PresupuestoDeVelada {
-  const desglose = estimarPasos(pasos, tamano, modelo, esfuerzo);
+  const esfuerzoDe = typeof esfuerzo === 'function' ? esfuerzo : () => esfuerzo;
+  const desglose = estimarPasos(pasos, tamano, modelo, esfuerzoDe);
   const costeUsd = desglose.reduce((suma, p) => suma + p.costeUsd, 0);
   const centimos = precioDeUnCoste(costeUsd);
   return {
     creditos: Math.round((centimos / 100) * CREDITOS_POR_EURO),
     centimos,
     modelo,
-    esfuerzo,
+    esfuerzo: esfuerzoDe('trama'),
     desglose,
     costeUsd: Math.round(costeUsd * 10_000) / 10_000,
     incluye: incluidoEnTexto(pasos.includes('mayordomo')),

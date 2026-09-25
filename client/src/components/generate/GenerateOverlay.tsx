@@ -12,9 +12,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { GenerateStreamEvent } from '../../../../shared/types';
-import { generateGame, generateMaterial, refreshGame } from '../../api/client';
+import { ErrorDeApi, generateGame, generateMaterial, refreshGame, revisarTrama } from '../../api/client';
 import { useAppStore } from '../../state/store';
 import { manifiestoDe } from '../../../../shared/juegos';
+import type { ConfirmacionDeVelada } from '../../../../shared/cobro';
 import './generate.css';
 
 /* =====================================================================
@@ -23,7 +24,7 @@ import './generate.css';
    aquí con un observable mínimo: el overlay se suscribe y cambia sus textos.
    ===================================================================== */
 
-type ModoCeremonia = 'generar' | 'actualizar' | 'material';
+type ModoCeremonia = 'generar' | 'actualizar' | 'material' | 'revisar';
 
 let modoCeremonia: ModoCeremonia = 'generar';
 const oyentesModo = new Set<() => void>();
@@ -113,8 +114,10 @@ async function ejecutarCeremonia(ceremonia: Ceremonia): Promise<void> {
           break;
       }
     });
-  } catch {
-    fallar(ceremonia.errorConexion);
+  } catch (error) {
+    // Lo que contestó el servidor antes de abrir el stream —sin saldo, ya en
+    // curso, tope del día— se dice tal cual; solo un fallo de red es «conexión».
+    fallar(error instanceof ErrorDeApi ? error.message : ceremonia.errorConexion);
   } finally {
     // Salvaguarda: si el stream se cortó sin `done` ni `error`.
     if (useAppStore.getState().generating) {
@@ -124,11 +127,14 @@ async function ejecutarCeremonia(ceremonia: Ceremonia): Promise<void> {
   }
 }
 
-/** Lanza la generación completa de la partida activa (desde cero). */
-export async function startGeneration(): Promise<void> {
+/**
+ * Lanza la generación completa de la partida activa (desde cero), con lo que se
+ * confirmó en `ConfirmarVelada`: el modo, las opciones avanzadas y el precio.
+ */
+export async function startGeneration(confirmacion?: ConfirmacionDeVelada): Promise<void> {
   await ejecutarCeremonia({
     modo: 'generar',
-    abrirStream: (gameId, onEvent) => generateGame(gameId, onEvent),
+    abrirStream: (gameId, onEvent) => generateGame(gameId, onEvent, confirmacion),
     etapaInicial: 'Preparando el escenario…',
     exito: {
       title: 'El misterio está servido',
@@ -178,6 +184,25 @@ export async function startMaterial(): Promise<void> {
   });
 }
 
+/**
+ * Vuelve a pasar la revisión adversaria sobre la trama tal como está: tras
+ * actualizar el reparto, si la revisión de la generación no terminó, o para
+ * una segunda opinión. Corrige lo que encuentre y guarda el informe nuevo.
+ */
+export async function startRevision(): Promise<void> {
+  await ejecutarCeremonia({
+    modo: 'revisar',
+    abrirStream: (gameId, onEvent) => revisarTrama(gameId, onEvent),
+    etapaInicial: 'Un detective que no conoce la solución lee el caso…',
+    exito: {
+      title: 'Trama revisada',
+      body: 'El informe de la revisión está en Documentos.',
+    },
+    errorTitulo: 'La revisión se torció',
+    errorConexion: 'No se pudo revisar la trama. No se ha modificado.',
+  });
+}
+
 /* =====================================================================
    Overlay
    ===================================================================== */
@@ -209,6 +234,14 @@ const FRASES_MATERIAL = [
   'Se lacra la confesión…',
 ];
 
+const FRASES_REVISAR = [
+  'Alguien que no sabe quién fue intenta adivinarlo demasiado pronto…',
+  'Se cuentan las veces que se nombra a cada invitado…',
+  'Se busca el arma de la que nadie habla…',
+  'Se comprueba que la última pista deja deducir y no lo dice…',
+  'Se reparte la sospecha con el mismo trato para todos…',
+];
+
 /** Textos del overlay por ceremonia: evita encadenar ternarios por toda la vista. */
 const TEXTOS: Record<ModoCeremonia, { kicker: string; etapa: string; idle: string; frases: string[] }> = {
   generar: {
@@ -228,6 +261,12 @@ const TEXTOS: Record<ModoCeremonia, { kicker: string; etapa: string; idle: strin
     etapa: 'Levantando el telón…',
     idle: 'El agente escribe lo que se leerá en voz alta…',
     frases: FRASES_MATERIAL,
+  },
+  revisar: {
+    kicker: 'Revisando la trama',
+    etapa: 'Un detective que no conoce la solución lee el caso…',
+    idle: 'Se busca lo que delataría el caso antes de tiempo…',
+    frases: FRASES_REVISAR,
   },
 };
 

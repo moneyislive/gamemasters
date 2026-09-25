@@ -400,6 +400,11 @@ paso('Un fallo transitorio de la API se reintenta; uno de verdad, no');
   const malPedido = new Anthropic.APIError(400, { type: 'error', error: { type: 'invalid_request_error', message: 'x' } }, 'x', undefined);
   comprobar('el api_error a mitad del stream es transitorio', esTransitorio(aMitad));
   comprobar('un 400 no lo es', !esTransitorio(malPedido));
+  // El de la tercera prueba: un AnthropicError genérico con el ECONNRESET en la causa.
+  const red = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
+  const cortado = new Anthropic.AnthropicError('terminated', { cause: new TypeError('terminated', { cause: red }) } as ErrorOptions);
+  comprobar('un corte de red a mitad del stream también', esTransitorio(cortado));
+  comprobar('un error cualquiera no', !esTransitorio(new Error('La respuesta del modelo no es un JSON válido.')));
 
   let intentos = 0;
   const avisos: string[] = [];

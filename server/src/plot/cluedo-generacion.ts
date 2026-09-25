@@ -47,7 +47,7 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
   const stream = streamDeGeneracion(client, {
     model,
     esfuerzo: esfuerzoPara(game, 'trama'),
-    maxTokens: 64000,
+    maxTokens: 128000,
     system: SYSTEM_TRAMA,
     schema: PLOT_SCHEMA,
     messages: [{ role: 'user', content: construirPrompt(game) }],
@@ -68,7 +68,7 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
   }
   if (mensaje.stop_reason === 'max_tokens') {
     throw new Error(
-      'La trama superó el límite de tokens y quedó incompleta. Reduce la cantidad de datos e inténtalo de nuevo.',
+      'La trama salió más larga de lo que cabe en una respuesta y se cortó. Vuelve a intentarlo; si se repite, baja el esfuerzo en las opciones avanzadas.',
     );
   }
 

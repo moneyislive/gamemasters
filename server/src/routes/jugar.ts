@@ -18,6 +18,7 @@ import { aceptarGuardar, borrarCuenta, perfilDe } from '../live/cuentas';
 import { firmaDeFotoValida } from '../live/fotos';
 import { vistaDeJugador } from '../live/proyeccion';
 import { guardarNotas, mutar } from '../live/sesion';
+import { preguntasDelMayordomo } from '../cobro/velada';
 import { AccionInvalida, ejecutarAccion } from '../juegos/motor';
 import { accionDeAcusacion, accionDeEntrarEnLugar, manifiestoDe } from '../../../shared/juegos';
 /*
@@ -416,6 +417,32 @@ router.post('/jugar/preguntar', async (req, res) => {
     }
     const vista = await vistaActual(cred.gameId, cred.participanteId, res);
     if (!vista) return;
+    /*
+     * EL TOPE DEL MAYORDOMO, que no tenía ninguno: cada pregunta es una llamada
+     * al modelo, y un móvil que se queda preguntando en bucle las pagaba todas.
+     * Se cuenta bajo el candado de la sesión y ANTES de llamar, para que dos
+     * preguntas a la vez no se cuelen por la misma rendija.
+     */
+    const tope = preguntasDelMayordomo(game);
+    const { resultado: cabe } = await mutar(
+      cred.gameId,
+      (sesion) => {
+        const hechas = sesion.preguntasAlMayordomo ?? 0;
+        if (hechas >= tope) return false;
+        sesion.preguntasAlMayordomo = hechas + 1;
+        return true;
+      },
+      { silenciosa: true },
+    );
+    if (!cabe) {
+      res.json({
+        respuesta:
+          tope === 0
+            ? 'Esta velada se preparó para jugarse en papel, y en papel no hay mayordomo que conteste. Quien dirige puede pasarla a la app desde el taller.'
+            : 'El mayordomo ha contestado todo lo que tenía previsto contestar esta noche y se ha retirado a descansar. Consultad vuestros dosieres.',
+      });
+      return;
+    }
     const respuesta = await consultarConsejero(game, vista, pregunta);
     res.json({ respuesta });
   } catch (error) {

@@ -23,6 +23,7 @@ import { getAnthropicClient, resolveModel, usesFallbacks } from '../agent/anthro
 import { bloquesDeSistema } from '../agent/systemPrompt';
 import { quienPide } from '../gasto/quien';
 import { cabeHoy, mensajeDeTope } from '../gasto/tope';
+import { consumirIncluido } from '../cobro/velada';
 import { executeTool, herramientasDe } from '../agent/tools';
 import { runDemoChat } from '../agent/demo';
 import { crearRouter } from '../rutas';
@@ -389,6 +390,16 @@ router.post('/games/:id/chat', async (req: Request, res: Response) => {
     const quien = quienPide(req) ?? 'sin-identificar';
     if (!cabeHoy(quien, 'charla')) {
       res.status(429).json({ error: mensajeDeTope('charla') });
+      return;
+    }
+
+    /*
+     * Lo incluido en la velada: si está pagada, cada turno con el asistente cuenta contra lo que
+     * trae. La casa y el cobro apagado no cuentan nada.
+     */
+    const incluido = await consumirIncluido(req, game, 'turnosDeAsistente');
+    if (!incluido.ok) {
+      res.status(402).json({ error: incluido.error, motivo: 'fuera-de-lo-incluido' });
       return;
     }
 

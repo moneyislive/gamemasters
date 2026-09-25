@@ -4,6 +4,7 @@
  */
 import type { PrintableDocId } from './documents';
 import type { EjeId, JuegoId } from './juegos/tipos';
+import type { CobroDeLaVelada, ModoDeJuego } from './cobro';
 
 export type { PrintableDocId };
 
@@ -540,6 +541,12 @@ export interface GameSettings {
    * la plataforma tenga calibrado para cada paso. Opción avanzada, como `model`.
    */
   esfuerzo?: Esfuerzo;
+  /**
+   * Papel o app: cómo se va a jugar. Se elige y se confirma antes de generar.
+   * Ausente en las partidas de antes: se tratan como papel, que es lo que no
+   * incluye nada que no se haya pagado.
+   */
+  modo?: ModoDeJuego;
   language: 'es';
   /**
    * A qué se juega. CATA: si falta, es CLUEDO.
@@ -704,6 +711,8 @@ export interface GameSession {
   updatedAt: string;
   /** Lo que ha costado, en tokens. Ausente en las partidas anteriores a esto. */
   gasto?: GastoDeLaPartida;
+  /** Lo que se cobró por ella y lo que le queda incluido. Ausente si nunca se cobró. */
+  cobro?: CobroDeLaVelada;
   /**
    * DONDE ESTAN LAS COSAS de una partida: una lista por categoría del juego.
    *

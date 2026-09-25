@@ -54,7 +54,7 @@ import { pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
  * jugador recibe de golpe las seis cosas que sabe, las suelta en la primera
  * ronda y la velada se queda sin gasolina a mitad.
  */
-function conocimientoDesbloqueado(total: number, round: number, totalRounds: number): number {
+export function conocimientoDesbloqueado(total: number, round: number, totalRounds: number): number {
   if (total === 0) return 0;
   if (round <= 0) return Math.min(1, total);
   // Reparto proporcional: al llegar a la última ronda está todo disponible.

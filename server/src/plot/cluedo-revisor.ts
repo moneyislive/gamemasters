@@ -370,7 +370,7 @@ export async function pedirRevision(
     const stream = streamDeGeneracion(client, {
       model,
       esfuerzo: esfuerzoPara(game, 'revisor'),
-      maxTokens: 64000,
+      maxTokens: 128000,
       system: SISTEMA_REVISOR,
       schema,
       messages,

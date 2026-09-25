@@ -14,6 +14,7 @@ import '../plot/cluedo-material';
 import { crearRouter } from '../rutas';
 import { quienPide } from '../gasto/quien';
 import { cabeHoy, mensajeDeTope } from '../gasto/tope';
+import { consumirIncluido } from '../cobro/velada';
 import { partidaParaElTaller } from '../live/proyeccion';
 import { generacionEnCurso } from '../plot/pipeline';
 import { volcarGasto } from '../gasto/contador';
@@ -84,6 +85,16 @@ router.post('/games/:id/material', async (req, res) => {
     res
       .status(409)
       .json({ error: 'Este juego no escribe material de velada: su trama ya lo trae dentro.' });
+    return;
+  }
+
+  /*
+   * Lo incluido en la velada: si está pagada, cada reescritura del material cuenta contra lo que
+   * trae. La casa y el cobro apagado no cuentan nada.
+   */
+  const incluido = await consumirIncluido(req, game, 'reescriturasDeMaterial');
+  if (!incluido.ok) {
+    res.status(402).json({ error: incluido.error, motivo: 'fuera-de-lo-incluido' });
     return;
   }
 

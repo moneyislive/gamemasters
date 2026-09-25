@@ -178,7 +178,7 @@ async function materialConApi(game: GameSession, plot: Plot, emit: Emitir): Prom
   const stream = streamDeGeneracion(client, {
     model,
     esfuerzo: esfuerzoPara(game, 'material'),
-    maxTokens: 32000,
+    maxTokens: 64000,
     system: SYSTEM_MATERIAL,
     schema: MATERIAL_SCHEMA,
     messages: [{ role: 'user', content: construirPrompt(game, plot) }],

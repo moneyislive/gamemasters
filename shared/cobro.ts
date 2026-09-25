@@ -132,3 +132,65 @@ export interface PresupuestoDeVelada {
   /** Lo que la velada trae incluido sin volver a pagar: ver `INCLUIDO_EN_LA_VELADA`. */
   incluye: string[];
 }
+
+/**
+ * CÓMO SE VA A JUGAR LA VELADA. Se elige antes de generar, y el taller lo
+ * recuerda en la confirmación.
+ *
+ * En CLUEDO la trama y su material los usan los dos modos casi por igual —los
+ * dosieres en papel, el móvil en la app—, así que el modo NO cambia lo que se
+ * escribe: cambia lo que se usa durante la partida. Con app hay Mayordomo, que
+ * contesta preguntas con el modelo; en papel no. Por eso el precio con app es
+ * algo mayor, y por eso pasar de app a papel no cuesta nada y de papel a app
+ * cuesta solo el Mayordomo.
+ */
+export type ModoDeJuego = 'papel' | 'app';
+
+/** Lo que una velada trae incluido y se ha gastado ya. */
+export interface UsosDeLaVelada {
+  regeneraciones: number;
+  actualizaciones: number;
+  reescriturasDeMaterial: number;
+  revisiones: number;
+  turnosDeAsistente: number;
+}
+
+/**
+ * Lo cobrado por una velada, guardado en la propia partida.
+ *
+ * Existe para que pagar una velada sea pagarla UNA vez: la partida sabe que está
+ * pagada, qué modo se pagó y cuánto se ha usado de lo incluido, y las
+ * operaciones de después —actualizar, reescribir el material, revisar, charlar
+ * con el asistente— lo consultan antes de cobrar nada.
+ */
+export interface CobroDeLaVelada {
+  /** Quién pagó. Ausente si la velada es de la casa (no se cobra). */
+  cuentaId?: string;
+  exenta: boolean;
+  modo: ModoDeJuego;
+  /** Créditos netos cobrados por la velada: cargos menos reembolsos. */
+  creditos: number;
+  /** Los movimientos del monedero que la tocan, para poder explicarla. */
+  movimientos: string[];
+  usos: UsosDeLaVelada;
+  el: string;
+}
+
+/** Lo que contesta `POST /games/:id/presupuesto`: lo que enseña la confirmación. */
+export interface RespuestaDelPresupuesto {
+  presupuesto: PresupuestoDeVelada;
+  /** ¿Se le cobra a quien pregunta? Si no, el taller no enseña precios. */
+  cobra: boolean;
+  saldo?: number;
+  /** Si la velada ya está pagada, en qué modo y si le queda la regeneración incluida. */
+  pagada?: { modo: ModoDeJuego; regeneracionIncluida: boolean };
+}
+
+/** Lo que viaja con la orden de generar: lo que se confirmó. */
+export interface ConfirmacionDeVelada {
+  modo: ModoDeJuego;
+  model?: string;
+  esfuerzo?: string;
+  /** El precio que se enseñó: si al cobrar sale más caro, no se cobra. */
+  creditosVistos?: number;
+}

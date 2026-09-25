@@ -256,6 +256,12 @@ export interface LiveSession {
   roundStartedAt?: string;
   /** Fin previsto de la ronda; el reloj del móvil se sincroniza con esto. */
   roundEndsAt?: string;
+  /**
+   * Cuántas preguntas ha contestado el Mayordomo en esta apertura. Cada una es
+   * una llamada al modelo, y no tenían tope: ver `preguntasDelMayordomo` en
+   * `server/src/cobro/velada.ts`.
+   */
+  preguntasAlMayordomo?: number;
   players: LivePlayer[];
   /**
    * LAS RESPUESTAS QUE HA ENTREGADO LA GENTE.
