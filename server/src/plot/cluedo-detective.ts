@@ -46,6 +46,7 @@ import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe, victi
 import { esfuerzoPara, getAnthropicClient, streamDeGeneracion, textoDe } from '../agent/anthropic';
 import { conocimientoDesbloqueado } from '../live/proyeccion';
 import { apuntarUso } from '../gasto/contador';
+import { juzgarSospecha, lecturasEnTextoComun, normalizarReparto, ordenados } from './revision-comun';
 
 const SISTEMA_DETECTIVE =
   'Eres una mesa de jugadores veteranos de misterio en vivo, de los que resuelven los casos antes que nadie. ' +
@@ -235,22 +236,6 @@ function preguntaDelMomento(hasta: number, rondas: number): string {
 // Llamadas
 // ---------------------------------------------------------------------------
 
-function normalizarReparto(entradas: Array<{ id: string; puntos: number }>, ids: string[]): Record<string, number> {
-  const puntos = new Map<string, number>();
-  for (const e of entradas ?? []) {
-    if (ids.includes(e.id) && Number.isFinite(e.puntos) && e.puntos > 0) {
-      puntos.set(e.id, (puntos.get(e.id) ?? 0) + e.puntos);
-    }
-  }
-  const total = [...puntos.values()].reduce((a, b) => a + b, 0);
-  const reparto: Record<string, number> = {};
-  for (const id of ids) {
-    // Sin ningún punto válido, a partes iguales: «no distingue a nadie».
-    reparto[id] = total > 0 ? (puntos.get(id) ?? 0) / total : 1 / Math.max(1, ids.length);
-  }
-  return reparto;
-}
-
 async function unMomento(
   game: GameSession,
   plot: Plot,
@@ -336,10 +321,6 @@ export async function interrogarAlDetective(
 // Juicio
 // ---------------------------------------------------------------------------
 
-function ordenados(reparto: Record<string, number>): Array<[string, number]> {
-  return Object.entries(reparto).sort((a, b) => b[1] - a[1]);
-}
-
 /**
  * Compara lo que leyó el detective con la solución. Umbrales pensados para no
  * saltar con el ruido de una sola lectura: una sospecha que dobla lo que tocaría
@@ -365,124 +346,45 @@ export function juzgarLecturas(
   const culpable = culpableDe(plot.solution);
   const arma = objetoDe(plot.solution);
   const sala = lugarDe(plot.solution);
-  const n = Math.max(1, sospechososDe(game).length);
-  const azar = 1 / n;
   const nombre = (id: string) => {
     const c = plot.characters.find((x) => x.participanteId === id);
     return c?.characterName ?? sospechososDe(game).find((s) => s.id === id)?.name ?? id;
   };
-  const pct = (x: number) => `${Math.round(x * 100)} %`;
-  const salida: HallazgoDeRevision[] = [];
-  let momento = 0;
-  const h = (codigo: string, gravedad: HallazgoDeRevision['gravedad'], texto: string, sobre?: string) =>
-    salida.push({ codigo, gravedad, origen: 'detective', texto, estado: 'pendiente', sobre: sobre ?? `momento-${momento}` });
 
-  for (const l of lecturas) {
-    momento = l.momento;
-    const orden = ordenados(l.reparto);
-    const [primero, segundo] = [orden[0], orden[1]];
-    const pCulpable = l.reparto[culpable] ?? 0;
-    const encabeza = primero?.[0] === culpable;
-    const ventaja = encabeza ? pCulpable - (segundo?.[1] ?? 0) : 0;
+  // La persona: el juicio común, el mismo que el del traidor o el del sello.
+  const salida = juzgarSospecha({
+    lecturas,
+    objetivo: culpable,
+    candidatos: sospechososDe(game).length,
+    rondas,
+    nombre,
+    quien: 'la persona culpable',
+    codigoInvisible: 'culpable-invisible',
+    pistaDe: (texto) => {
+      const pista = pistasDeLaTrama(plot).find((p) => p.id === texto);
+      return pista ? { id: pista.id, ronda: pista.round } : undefined;
+    },
+  });
 
-    if (l.momento === 0 && encabeza && pCulpable >= Math.max(0.3, 2 * azar) && ventaja >= 0.1) {
-      const delata = pCulpable >= Math.max(0.5, 3 * azar) && ventaja >= 0.15;
-      h(
-        'filtracion-inicial',
-        delata ? 'bloqueante' : 'grave',
-        `Antes de abrir la primera ronda, quien no sabe la solución ya señala a ${nombre(culpable)} con un ` +
-          `${pct(pCulpable)}${delata ? '' : ': la mesa empezará con un favorito'}. Por qué: ${l.razon}`,
-      );
-    } else if (l.momento > 0 && l.momento < rondas - 1 && encabeza && pCulpable >= Math.max(0.4, 2.5 * azar) && ventaja >= 0.15) {
-      const delata = l.momento === 1 && pCulpable >= Math.max(0.6, 3.5 * azar) && ventaja >= 0.2;
-      h(
-        'filtracion-temprana',
-        delata ? 'bloqueante' : 'grave',
-        `Al cerrar la ronda ${l.momento} de ${rondas}, el detective ya señala a ${nombre(culpable)} con un ` +
-          `${pct(pCulpable)} y ventaja clara. Por qué: ${l.razon}`,
-      );
-    } else if (l.momento === rondas - 1 && l.momento > 0 && pCulpable >= 0.65) {
-      h(
-        'resuelto-antes-de-tiempo',
-        'grave',
-        `Con una ronda todavía por jugar el caso ya está decidido (${nombre(culpable)}, ${pct(pCulpable)}): la última ` +
-          `ronda no aporta nada. Por qué: ${l.razon}`,
-      );
+  // El arma y la sala, que son de CLUEDO: al final, la mesa tiene que llegar a las dos.
+  const final = lecturas.find((l) => l.momento === rondas);
+  if (final) {
+    const h = (codigo: string, texto: string) =>
+      salida.push({ codigo, gravedad: 'grave', origen: 'detective', texto, estado: 'pendiente', sobre: `momento-${rondas}` });
+    const armaPrimera = ordenados(final.objetos)[0]?.[0];
+    if (arma && armaPrimera && armaPrimera !== arma) {
+      h('arma-irresoluble', `Al final el detective no llega al arma: señala otro objeto (${armaPrimera}).`);
     }
-
-    // Una pista que lo dice todo, en cualquier momento, si apunta a quien fue.
-    if (l.pistaDecisiva.trim() && encabeza) {
-      const esPista = pistasDeLaTrama(plot).find((p) => p.id === l.pistaDecisiva.trim());
-      const yaEsta = salida.some((x) => x.codigo === 'pista-que-lo-dice-todo' && x.sobre === (esPista?.id ?? l.pistaDecisiva.trim()));
-      if (!yaEsta) h(
-        'pista-que-lo-dice-todo',
-        l.momento < rondas ? 'bloqueante' : 'grave',
-        `${esPista ? `La pista «${esPista.id}» (ronda ${esPista.round})` : `La frase ${l.pistaDecisiva}`} basta ` +
-          `por sí sola para señalar a ${nombre(culpable)}, sin combinarla con nada. La noche se resuelve leyéndola, ` +
-          `no deduciendo.`,
-        esPista?.id ?? l.pistaDecisiva.trim(),
-      );
-    }
-
-    if (l.momento === rondas) {
-      if (!encabeza) {
-        h(
-          'irresoluble',
-          'bloqueante',
-          `Con TODAS las rondas jugadas, el detective acusa a ${nombre(primero?.[0] ?? '')} ` +
-            `(${pct(primero?.[1] ?? 0)}) y no a ${nombre(culpable)} (${pct(pCulpable)}). Tal como está, la mesa no ` +
-            `puede llegar a la solución. Su razonamiento: ${l.razon}`,
-        );
-      } else if (pCulpable < 0.45) {
-        h(
-          'final-flojo',
-          'grave',
-          `Al final la mesa acertaría, pero sin convicción (${pct(pCulpable)}): las pruebas no cierran el caso.`,
-        );
-      }
-      const armaPrimera = ordenados(l.objetos)[0]?.[0];
-      if (arma && armaPrimera && armaPrimera !== arma) {
-        h('arma-irresoluble', 'grave', `Al final el detective no llega al arma: señala otro objeto (${armaPrimera}).`);
-      }
-      const salaPrimera = ordenados(l.salas)[0]?.[0];
-      if (sala && salaPrimera && salaPrimera !== sala) {
-        h('sala-irresoluble', 'grave', `Al final el detective no llega a la sala del crimen: señala otra (${salaPrimera}).`);
-      }
+    const salaPrimera = ordenados(final.salas)[0]?.[0];
+    if (sala && salaPrimera && salaPrimera !== sala) {
+      h('sala-irresoluble', `Al final el detective no llega a la sala del crimen: señala otra (${salaPrimera}).`);
     }
   }
-
-  // Por abajo: que a la persona culpable no se la deje fuera de la noche.
-  const intermedias = lecturas.filter((l) => l.momento > 0 && l.momento < rondas);
-  if (intermedias.length >= 2 && intermedias.every((l) => (l.reparto[culpable] ?? 0) < azar / 2)) {
-    momento = -1;
-    h(
-      'culpable-invisible',
-      'grave',
-      `En todas las rondas intermedias la sospecha sobre ${nombre(culpable)} está por debajo de la mitad de lo que ` +
-        `le tocaría por azar: nadie la considera hasta que la última ronda la señala de golpe.`,
-      culpable,
-    );
-  }
-
   return salida;
 }
 
 /** Las lecturas en texto, para el revisor: las tres personas más señaladas en cada momento. */
 export function lecturasEnTexto(game: GameSession, plot: Plot, lecturas: LecturaCompleta[]): string {
-  const culpable = culpableDe(plot.solution);
   const nombre = (id: string) => plot.characters.find((x) => x.participanteId === id)?.characterName ?? id;
-  return lecturas
-    .map((l) => {
-      const top = ordenados(l.reparto)
-        .slice(0, 3)
-        .map(([id, p]) => `${nombre(id)}${id === culpable ? ' [CULPABLE]' : ''} ${Math.round(p * 100)} %`)
-        .join(', ');
-      return (
-        `- Momento ${l.momento}${l.momento === 0 ? ' (antes de la ronda 1)' : ` (al cerrar la ronda ${l.momento})`}: ${top}\n` +
-        `  Por qué: ${l.razon}` +
-        (l.pistaDecisiva ? `\n  Le basta una sola cosa: ${l.pistaDecisiva}` : '') +
-        (l.cadena.length ? `\n  Combina: ${l.cadena.join(', ')}` : '')
-      );
-    })
-    .join('\n');
+  return lecturasEnTextoComun(lecturas, culpableDe(plot.solution), nombre, 'CULPABLE');
 }

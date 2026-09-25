@@ -30,18 +30,15 @@
  * «Se le debe dar el mismo trato que al resto de personajes.» Por eso las
  * instrucciones hablan de EQUILIBRAR, no de bajar la sospecha sobre nadie.
  */
-import type Anthropic from '@anthropic-ai/sdk';
 import type { GameSession, GenerateStreamEvent, HallazgoDeRevision, ModelId, Plot } from '../../../shared/types';
 import { pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
 import { numeroDeRondas } from '../docs/datos';
 import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe, victimaDe } from '../juegos/cluedo';
-import { esfuerzoPara, getAnthropicClient, streamDeGeneracion, textoDe } from '../agent/anthropic';
-import { apuntarUso } from '../gasto/contador';
-import { emisorDeProgreso } from '../live/proyeccion';
 import { PERSONAJE_SCHEMA, PISTA_SCHEMA, PLOT_SCHEMA } from './cluedo-esquema';
 import { MATERIAL_SCHEMA } from './cluedo-material';
 import { buildStyleBlock } from './style';
 import type { CambiosDelRevisor } from './cluedo-parches';
+import { conversarConElRevisor, type RespuestaDelRevisor as RespuestaComun } from './revision-comun';
 
 const SISTEMA_REVISOR =
   'Eres el revisor adversario de una plataforma que vende veladas de misterio en vivo. ' +
@@ -167,12 +164,8 @@ export const REVISION_SOLO_MATERIAL_SCHEMA = objeto({
   resumenDeCambios: RESUMEN_DE_CAMBIOS,
 });
 
-export interface RespuestaDelRevisor {
-  diagnostico: string;
-  hallazgos: Array<{ codigo: string; gravedad: 'bloqueante' | 'grave' | 'menor'; sobre: string; problema: string; arreglo: string }>;
-  cambios: CambiosDelRevisor;
-  resumenDeCambios: string[];
-}
+/** Lo que devuelve el revisor de CLUEDO: la respuesta común, con los cambios de CLUEDO. */
+export type RespuestaDelRevisor = RespuestaComun<CambiosDelRevisor>;
 
 // ---------------------------------------------------------------------------
 // La trama, en texto
@@ -354,90 +347,21 @@ export async function pedirRevision(
   opciones: { soloMaterial: boolean; pasada: number },
   emit: (evento: GenerateStreamEvent) => void,
 ): Promise<RespuestaDelRevisor> {
-  const client = getAnthropicClient();
-  if (!client) throw new Error('No hay clave de API: el revisor no puede leer la trama.');
-
   /*
-   * El primer mensaje lleva su propia marca de caché: el segundo turno lo
-   * reenvía entero, y releerlo de la caché cuesta una fracción de escribirlo.
+   * Solo el material: un turno con sus hallazgos y sus cambios. Todo: la trama
+   * primero y, si hay material, su turno después, sobre la misma conversación
+   * (ver `conversarConElRevisor`). En la primera velada completa, los cuatro
+   * turnos del revisor a `high` fueron 84.000 tokens de salida y 2,47 $ de 4,09 $.
    */
-  const primero: Anthropic.MessageParam = {
-    role: 'user',
-    content: [
-      {
-        type: 'text',
-        text: construirPromptDelRevisor(game, plot, informes, opciones),
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-  };
-
-  /*
-   * El juicio —qué falla y cómo se arregla la trama— piensa lo del revisor. El
-   * material es poner al día prosa ya escrita con lo decidido: piensa lo del
-   * material. En la primera velada completa, los cuatro turnos del revisor a
-   * `high` fueron 84.000 tokens de salida y 2,47 $ de 4,09 $.
-   */
-  const turno = async (messages: Anthropic.MessageParam[], schema: Record<string, unknown>, paso: 'revisor' | 'material' = 'revisor') => {
-    const stream = streamDeGeneracion(client, {
-      model,
-      esfuerzo: esfuerzoPara(game, paso),
-      maxTokens: 128000,
-      system: SISTEMA_REVISOR,
-      schema,
-      messages,
-    });
-    // A ciegas, puntos: el revisor escribe con la solución delante.
-    stream.on('text', emisorDeProgreso(game, emit));
-    const mensaje = await stream.finalMessage();
-    apuntarUso({ concepto: 'revisor', model: mensaje.model ?? model, usage: mensaje.usage, gameId: game.id });
-    if (mensaje.stop_reason === 'refusal') throw new Error('El modelo declinó revisar la trama.');
-    if (mensaje.stop_reason === 'max_tokens') throw new Error('La revisión superó el límite de tokens y quedó incompleta.');
-    try {
-      return { mensaje, datos: JSON.parse(textoDe(mensaje)) as Partial<RespuestaDelRevisor> };
-    } catch {
-      throw new Error('La respuesta del revisor no es un JSON válido.');
-    }
-  };
-
-  if (opciones.soloMaterial) {
-    const { datos } = await turno([primero], REVISION_SOLO_MATERIAL_SCHEMA);
-    return completar(datos);
-  }
-
-  const { mensaje, datos } = await turno([primero], REVISION_TRAMA_SCHEMA);
-  const respuesta = completar(datos);
-  if (!plot.material) return respuesta;
-
-  /*
-   * El segundo turno, sobre la misma conversación. La respuesta del primero se
-   * devuelve TAL CUAL —con sus bloques de pensamiento—: en Opus 5.5 el
-   * pensamiento está ligado a la conversación, y reescribirlo lo invalidaría.
-   * Si este turno falla, se queda lo de la trama, que ya es lo importante.
-   */
-  try {
-    const { datos: material } = await turno(
-      [primero, { role: 'assistant', content: mensaje.content as Anthropic.MessageParam['content'] }, { role: 'user', content: PEDIDO_DEL_MATERIAL }],
-      REVISION_MATERIAL_SCHEMA,
-      'material',
-    );
-    return {
-      ...respuesta,
-      cambios: { ...respuesta.cambios, ...(material.cambios ?? {}) },
-      resumenDeCambios: [...respuesta.resumenDeCambios, ...(material.resumenDeCambios ?? [])],
-    };
-  } catch (error) {
-    console.warn('[revision] el turno del material falló; se queda lo de la trama:', error);
-    return respuesta;
-  }
-}
-
-/** Rellena lo que falte para que quien lo lee no tenga que preguntar campo a campo. */
-function completar(datos: Partial<RespuestaDelRevisor>): RespuestaDelRevisor {
-  return {
-    diagnostico: String(datos.diagnostico ?? ''),
-    hallazgos: Array.isArray(datos.hallazgos) ? datos.hallazgos : [],
-    cambios: (datos.cambios ?? {}) as CambiosDelRevisor,
-    resumenDeCambios: Array.isArray(datos.resumenDeCambios) ? datos.resumenDeCambios.map(String) : [],
-  };
+  return conversarConElRevisor<CambiosDelRevisor>({
+    game,
+    model,
+    emit,
+    sistema: SISTEMA_REVISOR,
+    prompt: construirPromptDelRevisor(game, plot, informes, opciones),
+    esquema: opciones.soloMaterial ? REVISION_SOLO_MATERIAL_SCHEMA : REVISION_TRAMA_SCHEMA,
+    ...(!opciones.soloMaterial && plot.material
+      ? { segundoTurno: { pedido: PEDIDO_DEL_MATERIAL, esquema: REVISION_MATERIAL_SCHEMA } }
+      : {}),
+  });
 }
