@@ -1825,23 +1825,23 @@ function hacerLaGeometria(traza: number): GeometriaDeLaTraza {
  * pone quioscos donde hay uno, y las obras no van ahí).
  */
 function losTramos(o: TrazaOrientada, solares: readonly Rectangulo[], distritos: readonly IdDeDistrito[]): { tramos: TramoDeLaCiudad[]; lados: LadoParaAmueblar[]; clasesDeCalle: ClaseDeCalle[][] } {
-  const EJES = EJES_DE_LA_CIUDAD;
-  const N = EJES.length;
+  const ejes = EJES_DE_LA_CIUDAD;
+  const N = ejes.length;
   const tramos: TramoDeLaCiudad[] = [];
   const lados: LadoParaAmueblar[] = [];
   const clasesDeCalle: ClaseDeCalle[][] = [];
   for (let c = 0; c < 2 * N; c++) {
     const eje: Eje = c < N ? 'x' : 'z';
     const k = c % N;
-    const centro = EJES[k] as number;
+    const centro = ejes[k] as number;
     const av = avenidaSobre(o.avenidas, eje, centro);
     const clases: ClaseDeCalle[] = [];
     clasesDeCalle.push(clases);
     for (let sg = 0; sg < N - 1; sg++) {
-      const desde = EJES[sg] as number;
-      const hasta = EJES[sg + 1] as number;
+      const desde = ejes[sg] as number;
+      const hasta = ejes[sg + 1] as number;
       const esAvenida = av !== null && pasaPor(av, (desde + hasta) / 2);
-      const clase: ClaseDeCalle = esAvenida ? 'avenida' : Math.abs(centro) === EJES[N - 1] ? 'exterior' : Math.abs(centro) === Math.abs(EJE_DEL_BULEVAR) ? 'mayor' : 'calle';
+      const clase: ClaseDeCalle = esAvenida ? 'avenida' : Math.abs(centro) === ejes[N - 1] ? 'exterior' : Math.abs(centro) === Math.abs(EJE_DEL_BULEVAR) ? 'mayor' : 'calle';
       clases.push(clase);
       const ancho = esAvenida ? ANCHO_DE_AVENIDA : ANCHO_DE_CALLE;
       const cruces: [number, number] = eje === 'x' ? [k * N + sg, k * N + sg + 1] : [sg * N + k, (sg + 1) * N + k];
@@ -2361,16 +2361,16 @@ function elGrafoBase(
   giradas: readonly PlantillaGirada[],
   centros: readonly Punto[],
 ): { grafo: GrafoDeLaCiudad; nudoEn: (x: number, z: number) => number } {
-  const EJES = EJES_DE_LA_CIUDAD;
-  const N = EJES.length;
-  const primero = EJES[0] as number;
-  const ultimo = EJES[N - 1] as number;
+  const ejes = EJES_DE_LA_CIUDAD;
+  const N = ejes.length;
+  const primero = ejes[0] as number;
+  const ultimo = ejes[N - 1] as number;
   const media = MEDIO_EJE_DE_LA_CALZADA_DE_AVENIDA;
   const lineas: LineaDelGrafo[] = [];
   /* Las calles: una línea por el centro de la calzada, o dos (una por calzada) donde hay avenida. */
   for (let c = 0; c < 2 * N; c++) {
     const eje: Eje = c < N ? 'x' : 'z';
-    const e = EJES[c % N] as number;
+    const e = ejes[c % N] as number;
     const av = avenidaSobre(o.avenidas, eje, e);
     if (av === null) {
       lineas.push({ eje, c: e, a0: primero, a1: ultimo, calle: c, probar: false });
@@ -2436,7 +2436,7 @@ function elGrafoBase(
     }
     return k;
   };
-  for (let f = 0; f < N; f++) for (let c = 0; c < N; c++) nudo(EJES[c] as number, EJES[f] as number);
+  for (let f = 0; f < N; f++) for (let c = 0; c < N; c++) nudo(ejes[c] as number, ejes[f] as number);
 
   /* Lo que puede estorbar a las líneas de las plazas: lo de cada plaza en todos sus sitios, ensanchado el radio. */
   const estorbos = new RejillaDeEstorbos();
@@ -2540,7 +2540,7 @@ function elGrafoBase(
     if (calle >= 0) {
       const medio = aristaPorX[i] === true ? (p.x + q.x) / 2 : (p.z + q.z) / 2;
       let sg = 0;
-      while (sg < N - 2 && medio > (EJES[sg + 1] as number)) sg++;
+      while (sg < N - 2 && medio > (ejes[sg + 1] as number)) sg++;
       tramo = (tramos[calle * (N - 1) + sg] as TramoDeLaCiudad).indice;
     }
     finales[i] = fijo({ a, b, largo: Math.abs(q.x - p.x) + Math.abs(q.z - p.z), tramo });
