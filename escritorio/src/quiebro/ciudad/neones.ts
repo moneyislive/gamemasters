@@ -22,7 +22,10 @@ import type { Molde } from './geometria';
 import { ACABADO, lineal } from './materiales';
 import { normalDe } from './fachadas';
 import { UNIFORMES_DE_LA_CIUDAD } from './retoques';
+import { glslDelParpadeo } from './glsl';
+import { mezclar } from './azar';
 import type { RotuloDelPlano } from './tipos';
+import type { ObraDeLaCelda, ParteDeLaCelda } from './celdas';
 
 const PIXELES_POR_METRO = 96;
 const ANCHO_DEL_ATLAS = 1024;
@@ -36,6 +39,21 @@ export interface FuenteDeRotulo {
   readonly color: [number, number, number];
   readonly normal: readonly [number, number];
   readonly parpadeo: number;
+  /*
+   * La CHAPA del rótulo (el halo rectangular de O3-LUZ-EN-EL-AIRE la toma de aquí; nadie más le cambia el
+   * sentido): `eje` es la dirección horizontal de su ancho, en planta y de largo 1; `ancho` lo que mide a lo largo
+   * de `eje` y `alto` de arriba abajo, en metros. En el rótulo de fachada, la chapa va pegada al muro (a lo largo
+   * de la tangente, 10 cm más por cada lado y 8 cm por arriba y por abajo); en la banderola, sale del muro (a lo
+   * largo de la normal) y mide el ancho y el alto del rótulo.
+   */
+  readonly ancho: number;
+  readonly alto: number;
+  readonly eje: readonly [number, number];
+}
+
+/** La chapa de un rótulo: lo que añade a su fuente (`FuenteDeRotulo.ancho`, `alto` y `eje`). */
+function chapaDe(r: RotuloDelPlano, tx: number, tz: number, nx: number, nz: number): Pick<FuenteDeRotulo, 'ancho' | 'alto' | 'eje'> {
+  return r.forma === 'fachada' ? { ancho: r.ancho + 0.2, alto: r.alto + 0.16, eje: [tx, tz] } : { ancho: r.ancho, alto: r.alto, eje: [nx, nz] };
 }
 
 interface Hueco {
@@ -142,13 +160,7 @@ uniform float uTiempo;
 varying vec2 vUvN;
 varying vec3 vColorN;
 varying float vParpadeoN;
-float parpadeoN(float s, float t) {
-  if (s <= 0.0) return 1.0;
-  float k = floor(t * 7.0 + s * 13.0);
-  float h = fract(sin(k * 12.9898 + s * 78.233) * 43758.5453);
-  float racha = step(0.82, fract(sin(floor(t * 0.4 + s) * 91.7) * 4375.85));
-  return mix(1.0, step(0.45, h), racha);
-}
+${glslDelParpadeo('parpadeoN')}
 void main() {
   float l = texture2D(uAtlas, vUvN).r;
   if (l < 0.01) discard;
@@ -249,7 +261,7 @@ export function construirLosRotulos(rotulos: readonly RotuloDelPlano[], mobiliar
       const [e0, e1] = esquinas as [[number, number, number], [number, number, number]];
       mobiliario.caja(Math.min(e0[0], e1[0]), e0[1], Math.min(e0[2], e1[2]), Math.max(e0[0], e1[0]), e1[1], Math.max(e0[2], e1[2]), 'nseoab');
       cara([p(-a, y0, f), p(a, y0, f), p(a, y1, f), p(-a, y1, f)], h, color, semilla);
-      fuentes.push({ x: r.x + nx * 0.2, y: r.y, z: r.z + nz * 0.2, tamano: r.ancho, color, normal: [nx, nz], parpadeo: semilla });
+      fuentes.push({ x: r.x + nx * 0.2, y: r.y, z: r.z + nz * 0.2, tamano: r.ancho, color, normal: [nx, nz], parpadeo: semilla, ...chapaDe(r, tx, tz, nx, nz) });
     } else {
       /* La banderola: una caja de 22 cm de grueso que sale del muro de 0,15 a 0,15 + ancho. */
       const g = 0.11;
@@ -263,7 +275,7 @@ export function construirLosRotulos(rotulos: readonly RotuloDelPlano[], mobiliar
       /* Por la cara +T, la derecha de quien mira es hacia el muro; por la −T, hacia fuera. */
       cara([p(g + 0.01, d1 - 0.05, y0), p(g + 0.01, d0 + 0.05, y0), p(g + 0.01, d0 + 0.05, y1), p(g + 0.01, d1 - 0.05, y1)], h, color, semilla);
       cara([p(-g - 0.01, d0 + 0.05, y0), p(-g - 0.01, d1 - 0.05, y0), p(-g - 0.01, d1 - 0.05, y1), p(-g - 0.01, d0 + 0.05, y1)], h, color, semilla);
-      fuentes.push({ x: r.x + nx * (d0 + r.ancho / 2), y: r.y, z: r.z + nz * (d0 + r.ancho / 2), tamano: r.alto * 0.7, color, normal: [nx, nz], parpadeo: semilla });
+      fuentes.push({ x: r.x + nx * (d0 + r.ancho / 2), y: r.y, z: r.z + nz * (d0 + r.ancho / 2), tamano: r.alto * 0.7, color, normal: [nx, nz], parpadeo: semilla, ...chapaDe(r, tx, tz, nx, nz) });
     }
   });
 
@@ -471,7 +483,7 @@ export function escribirRotulosDeGlifos(
         }
         u += avPx * escala;
       }
-      fuentes.push({ x: r.x + nx * 0.2, y: r.y, z: r.z + nz * 0.2, tamano: r.ancho, color, normal: [nx, nz], parpadeo: semilla });
+      fuentes.push({ x: r.x + nx * 0.2, y: r.y, z: r.z + nz * 0.2, tamano: r.ancho, color, normal: [nx, nz], parpadeo: semilla, ...chapaDe(r, tx, tz, nx, nz) });
     } else {
       const g = 0.11;
       const d0 = 0.15;
@@ -495,8 +507,22 @@ export function escribirRotulosDeGlifos(
         neon.quad(p(g + 0.01, dc + medio, y - medio), p(g + 0.01, dc - medio, y - medio), p(g + 0.01, dc - medio, y + medio), p(g + 0.01, dc + medio, y + medio), [tx, 0, tz], q);
         neon.quad(p(-g - 0.01, dc - medio, y - medio), p(-g - 0.01, dc + medio, y - medio), p(-g - 0.01, dc + medio, y + medio), p(-g - 0.01, dc - medio, y + medio), [-tx, 0, -tz], q);
       });
-      fuentes.push({ x: r.x + nx * (d0 + r.ancho / 2), y: r.y, z: r.z + nz * (d0 + r.ancho / 2), tamano: r.alto * 0.7, color, normal: [nx, nz], parpadeo: semilla });
+      fuentes.push({ x: r.x + nx * (d0 + r.ancho / 2), y: r.y, z: r.z + nz * (d0 + r.ancho / 2), tamano: r.alto * 0.7, color, normal: [nx, nz], parpadeo: semilla, ...chapaDe(r, tx, tz, nx, nz) });
     }
   }
   return fuentes;
+}
+
+/** La semilla de parpadeo de un rótulo de la ciudad abierta (0 si no parpadea), del hash de su sitio. */
+export function parpadeoDelRotulo(r: RotuloDelPlano): number {
+  return r.parpadea ? 1 + (mezclar(Math.round(r.x * 4), Math.round(r.z * 4), 0x9e) % 11) : 0;
+}
+
+/**
+ * LOS RÓTULOS DE UNA CELDA (el escritor de la familia de los neones, ver `celdas.ts`): la chapa al mobiliario,
+ * las letras a los neones y sus fuentes de luz a la obra. De un paso, como hoy.
+ */
+export function* rotulosDeLaCelda(obra: ObraDeLaCelda, parte: ParteDeLaCelda): Generator<void, void, void> {
+  obra.rotulos.push(...escribirRotulosDeGlifos(parte.rotulos, obra.m.mobiliario, obra.m.neones, obra.ciudad.atlas, parpadeoDelRotulo));
+  yield;
 }

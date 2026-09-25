@@ -17,13 +17,15 @@
  * aparatos con el mismo barrio ven lo mismo. El nivel sólo quita: N0 lleva toldos, aparatos de aire (la
  * mitad) y banderolas; las escaleras de incendios y los cables, desde N1.
  *
- * Una llamada (su propia malla, con el material del mobiliario: color y acabado por vértice, la luz
- * horneada de la calle y el cielo falso reflejado, como un banco o una farola).
+ * En el barrio viejo, una llamada (su propia malla, con el material del mobiliario: color y acabado por vértice,
+ * la luz horneada de la calle y el cielo falso reflejado, como un banco o una farola). En la ciudad abierta, al
+ * mobiliario de la celda: `voladizosDeLaCelda` es el escritor de su familia (`EscritorDeLaCelda` de `celdas.ts`),
+ * y cede después de cada cara, de los cables y de las banderolas.
  */
 import * as THREE from 'three';
-import { Molde } from './geometria';
+import type { Molde } from './geometria';
 import type { V3 } from './geometria';
-import { ACABADO, ATRIBUTOS_DEL_MOBILIARIO, lineal } from './materiales';
+import { ACABADO, lineal } from './materiales';
 import { carasDeCalle } from './fachadas';
 import type { CaraDeCalle } from './fachadas';
 import { colocar } from './mobiliario';
@@ -31,6 +33,7 @@ import { LARGO_DE_UNA_TIENDA, queTienda } from './hash';
 import { azarEn } from './azar';
 import type { CajaXZ, CalleDelPlano, FarolaDelPlano, NivelDeLaCiudad, PlanoDeLaCiudad } from './tipos';
 import { ALTURA_DE_LA_ACERA } from './tipos';
+import type { ObraDeLaCelda, ParteDeLaCelda } from './celdas';
 
 type Rgb = readonly [number, number, number];
 
@@ -151,10 +154,13 @@ export function opcionesDeLosVoladizos(nivel: NivelDeLaCiudad): OpcionesDeLosVol
   return nivel === 0 ? { escaleras: false, cables: false, aires: 0.5 } : { escaleras: true, cables: true, aires: 1 };
 }
 
-/** ESCRIBE LOS VOLADIZOS del barrio para un nivel. Devuelve su molde (color y acabado por vértice). */
-export function escribirLosVoladizos(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiudad): Molde {
-  const o = opcionesDeLosVoladizos(nivel);
-  const m = new Molde(ATRIBUTOS_DEL_MOBILIARIO, true);
+/**
+ * ESCRIBE LOS VOLADIZOS del barrio viejo en el mobiliario de su obra (el nivel y el grado, los de la obra: ver
+ * `construir.ts`), de un tirón.
+ */
+export function escribirLosVoladizos(obra: ObraDeLaCelda, plano: PlanoDeLaCiudad): void {
+  const o = opcionesDeLosVoladizos(obra.nivel);
+  const m = obra.m.mobiliario;
   for (const _ of voladizosDeLasCaras(m, carasDeCalle(plano.edificios), o)) {
     /* de un tirón */
   }
@@ -169,7 +175,21 @@ export function escribirLosVoladizos(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiu
     escribirLosCables(m, cablesDeLasCalles(sinTren, plano.limite, plano.semilla, hayFachada));
   }
   escribirLasBanderolas(m, plano.farolas, plano.semilla);
-  return m;
+}
+
+/**
+ * LO QUE CUELGA EN UNA CELDA (el escritor de su familia, ver `celdas.ts`): los voladizos de sus caras de calle
+ * (cediendo tras cada cara), los cables que le tocan (desde N1) y las banderolas de sus farolas.
+ */
+export function* voladizosDeLaCelda(obra: ObraDeLaCelda, parte: ParteDeLaCelda): Generator<void, void, void> {
+  const o = opcionesDeLosVoladizos(obra.nivel);
+  yield* voladizosDeLasCaras(obra.m.mobiliario, carasDeCalle(parte.edificios, parte.vecinos), o);
+  if (o.cables) {
+    escribirLosCables(obra.m.mobiliario, parte.cables);
+    yield;
+  }
+  escribirLasBanderolas(obra.m.mobiliario, parte.farolas, obra.ciudad.semilla);
+  yield;
 }
 
 /**

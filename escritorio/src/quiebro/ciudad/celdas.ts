@@ -29,6 +29,17 @@
  * `ventana.ts`) para cuando ha gastado su tope del fotograma. Se mide contando triángulos y no
  * cronometrando (§5.7): un reloj en un teléfono ocupado miente, y un triángulo cuesta lo mismo siempre.
  *
+ * ═══ LA OBRA Y SUS ESCRITORES ═══
+ *
+ * Lo que se escribe en una celda lo escriben SIETE escritores, uno por familia de piezas y en este orden
+ * (`ESCRITORES_DE_LA_CELDA`): las fachadas, el mobiliario (`celda-mobiliario.ts`), el viaducto (`viaducto.ts`),
+ * los coches (`coches.ts`), lo que cuelga (`voladizos.ts`), los rótulos (`neones.ts`) y el suelo (`tapas.ts`).
+ * Todos escriben en la misma OBRA (`ObraDeLaCelda`): el nivel, el grado de la celda (`grados.ts`), los moldes de
+ * las cinco familias y lo que sale de la celda (sus luces, lo que estorba, sus rótulos, sus bocas). Cada pieza es
+ * un generador que cede: entre dos cesiones no escribe más que el trozo del nivel (600 triángulos en N0, 1.000 en
+ * N1-N3, sumando familias), porque la ventana sólo empieza un trozo si le cabe entero. Quien escribe una familia
+ * nueva lo hace en su fichero, sin tocar éste.
+ *
  * Sin React y sin WebGL: el comprobador trocea y construye en Node con esto mismo.
  */
 import type { CajaDeLaCiudad, EdificioDeLaCiudad, NocheDeLaCiudad } from '../../../../shared/arcade/juegos/quiebro-ciudad';
@@ -49,7 +60,7 @@ import {
   indiceDeCelda,
   rectanguloDeLaCelda,
 } from '../../../../shared/arcade/juegos/quiebro-ciudad';
-import type { CabinaDelPlano, CajaXZ, CalleDelPlano, CocheDelPlano, EdificioDelPlano, FarolaDelPlano, FuenteDelPlano, NivelDeLaCiudad, Orientacion, PiezaConFrente, RotuloDelPlano, Volumen } from './tipos';
+import type { CabinaDelPlano, CajaXZ, CalleDelPlano, CocheDelPlano, DetalleDelNivel, EdificioDelPlano, FarolaDelPlano, FuenteDelPlano, GradoDeLaCelda, NivelDeLaCiudad, Orientacion, PiezaConFrente, RotuloDelPlano, Volumen } from './tipos';
 import { DETALLE_DEL_NIVEL } from './tipos';
 import type { GeometriaVolcada, V3 } from './geometria';
 import { Molde, MoldeQueNoGuarda } from './geometria';
@@ -57,13 +68,15 @@ import type { VentanaEncendida } from './fachadas';
 import { ATRIBUTOS_DE_LA_FACHADA, carasDeCalle, fachadasPorPartes } from './fachadas';
 import { ATRIBUTOS_DEL_MOBILIARIO, ATRIBUTOS_DE_LO_EMISIVO } from './materiales';
 import type { LuzDelMobiliario } from './mobiliario';
-import { alcantarillas, banco, cabina, farolaDeCalle, farolaDePlaza, fuente, quiosco, quioscoDePrensa, valla } from './mobiliario';
-import { escribirLosCoches } from './coches';
-import { cablesDeLasCalles, escribirLasBanderolas, escribirLosCables, opcionesDeLosVoladizos, voladizosDeLasCaras } from './voladizos';
-import type { AtlasDeGlifos } from './neones';
-import { ATRIBUTOS_DE_LOS_NEONES, escribirRotulosDeGlifos } from './neones';
-import type { TramoDeViaducto } from './piezas';
-import { arbol, carretilla, contenedor, corte, estatua, farolaDePared, muelle, soportalDePlaza, viaducto } from './piezas';
+import { mobiliarioDeLaCelda } from './celda-mobiliario';
+import { viaductoDeLaCelda } from './viaducto';
+import type { TramoDeViaducto } from './viaducto';
+import { cochesDeLaCelda } from './coches';
+import { cablesDeLasCalles, voladizosDeLaCelda } from './voladizos';
+import type { AtlasDeGlifos, FuenteDeRotulo } from './neones';
+import { ATRIBUTOS_DE_LOS_NEONES, rotulosDeLaCelda } from './neones';
+import { sueloDeLaCelda } from './tapas';
+import { GRADO_DEL_CENTRO, gradoDeLosCoches } from './grados';
 import type { FuentesDeLuz } from './fuentes';
 import type { FuenteHorneada } from './luz-de-la-calle';
 import { repartirLasLuces } from './fuentes';
@@ -522,11 +535,130 @@ function lamparasDePared(edificios: readonly EdificioDelPlano[], farolas: readon
   return salida;
 }
 
+/* ═══════════════════════════════ LA OBRA DE UNA CELDA ═══════════════════════════════ */
+
+/** Una luz de un coche aparcado que sigue encendida (la de «libre» de los taxis): para los halos. */
+export interface CocheEncendido {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly color: readonly [number, number, number];
+}
+
+/**
+ * LA OBRA DE UNA CELDA: lo que saben todos sus escritores (el nivel, el grado, los moldes de las cinco familias)
+ * y lo que sale de ella. Los escritores escriben en los moldes y APUNTAN aquí lo suyo: las luces de sus piezas,
+ * las cajas que estorban, las luces de los coches, las fuentes de los rótulos, las bocas de alcantarilla y las
+ * ventanas encendidas de las fachadas. Con ellas `construirLaCelda` reparte las fuentes de luz de la celda.
+ *
+ * El barrio viejo (`construir.ts`) escribe sus piezas con una obra suya (`obraNueva`), con su grado
+ * (`gradoDelBarrio`).
+ */
+export interface ObraDeLaCelda {
+  readonly nivel: NivelDeLaCiudad;
+  /** El grado de la celda en su ventana (`gradoDeLaCelda` de `grados.ts`). */
+  readonly grado: GradoDeLaCelda;
+  /** El relieve de hoy (`relieveDeHoy`: en N1, sólo la celda del centro), aparte del grado hasta O3-SILUETA. */
+  readonly relieveDeHoy: boolean;
+  /** El grado de los coches horneados (`gradoDeLosCoches` de `grados.ts`). */
+  readonly gradoDeLosCoches: GradoDeLaCelda;
+  readonly detalle: DetalleDelNivel;
+  /** Los lados de los cilindros (los del nivel). */
+  readonly lados: number;
+  readonly ciudad: PartesDeLaCiudad;
+  /** Los moldes de las cinco familias (que guardan, o que sólo cuentan: ver `MoldeQueNoGuarda`). */
+  readonly m: Readonly<Record<Familia, Molde>>;
+  readonly luces: LuzDelMobiliario[];
+  readonly estorba: CajaXZ[];
+  readonly cochesEncendidos: CocheEncendido[];
+  readonly rotulos: FuenteDeRotulo[];
+  readonly bocas: { x: number; z: number }[];
+  /** Las ventanas encendidas bajas y los escaparates que apuntan las fachadas (tarjetas y luz horneada). */
+  readonly ventanas: VentanaEncendida[];
+}
+
+/**
+ * EL ESCRITOR DE UNA FAMILIA en una celda. Cada `yield` es un paso: entre dos, como mucho el trozo del nivel (600
+ * triángulos en N0, 1.000 en N1-N3), sumando las cinco familias.
+ */
+export type EscritorDeLaCelda = (obra: ObraDeLaCelda, parte: ParteDeLaCelda) => Generator<void, void, void>;
+
+/**
+ * EL ESCRITOR DE UNA PIEZA (mobiliario, farolas, coches, viaducto, voladizos, rótulos, tapas): también cede, con el
+ * mismo tope entre dos `yield`, y devuelve sus luces (quien la escribe las apunta en la obra). Las piezas que hoy
+ * escriben de una vez son generadores de un solo paso.
+ */
+export type EscritorDePieza<P> = (obra: ObraDeLaCelda, pieza: P) => Generator<void, LuzDelMobiliario | readonly LuzDelMobiliario[] | void, void>;
+
+/** Los moldes de las cinco familias: que guardan, o que sólo cuentan (`MoldeQueNoGuarda`). */
+export function moldesDeLaObra(guardar: boolean): Record<Familia, Molde> {
+  return {
+    fachadas: moldeDe('fachadas', guardar),
+    mobiliario: moldeDe('mobiliario', guardar),
+    emisivo: moldeDe('emisivo', guardar),
+    cristal: moldeDe('cristal', guardar),
+    neones: moldeDe('neones', guardar),
+  };
+}
+
+export interface OpcionesDeLaObra {
+  readonly nivel: NivelDeLaCiudad;
+  readonly grado: GradoDeLaCelda;
+  readonly relieveDeHoy: boolean;
+  /** Por omisión, el del nivel y el grado (`gradoDeLosCoches`). */
+  readonly gradoDeLosCoches?: GradoDeLaCelda;
+  readonly ciudad: PartesDeLaCiudad;
+  readonly m: Readonly<Record<Familia, Molde>>;
+}
+
+/** UNA OBRA NUEVA, vacía: la de una celda o la del barrio viejo. */
+export function obraNueva(o: OpcionesDeLaObra): ObraDeLaCelda {
+  const detalle = DETALLE_DEL_NIVEL[o.nivel];
+  return {
+    nivel: o.nivel,
+    grado: o.grado,
+    relieveDeHoy: o.relieveDeHoy,
+    gradoDeLosCoches: o.gradoDeLosCoches ?? gradoDeLosCoches(o.nivel, o.grado),
+    detalle,
+    lados: detalle.lados,
+    ciudad: o.ciudad,
+    m: o.m,
+    luces: [],
+    estorba: [],
+    cochesEncendidos: [],
+    rotulos: [],
+    bocas: [],
+    ventanas: [],
+  };
+}
+
+/** LAS FACHADAS DE UNA CELDA (el primer escritor): cara a cara, con sus ventanas encendidas; sus cajas estorban. */
+function* fachadasDeLaCelda(obra: ObraDeLaCelda, parte: ParteDeLaCelda): Generator<void, void, void> {
+  yield* fachadasPorPartes(obra.m.fachadas, parte.edificios, { relieve: obra.relieveDeHoy, ventanas: true, vecinos: parte.vecinos }, obra.ventanas);
+  for (const e of parte.edificios) obra.estorba.push(e.caja, ...e.pilares);
+}
+
+/**
+ * LOS SIETE ESCRITORES DE UNA CELDA, en el orden en que escriben (ver la cabecera). El orden no se toca: de él
+ * sale el de los vértices de cada familia.
+ */
+export const ESCRITORES_DE_LA_CELDA: readonly { readonly nombre: string; readonly escribir: EscritorDeLaCelda }[] = [
+  { nombre: 'fachadas', escribir: fachadasDeLaCelda },
+  { nombre: 'mobiliario', escribir: mobiliarioDeLaCelda },
+  { nombre: 'viaducto', escribir: viaductoDeLaCelda },
+  { nombre: 'coches', escribir: cochesDeLaCelda },
+  { nombre: 'voladizos', escribir: voladizosDeLaCelda },
+  { nombre: 'rotulos', escribir: rotulosDeLaCelda },
+  { nombre: 'suelo', escribir: sueloDeLaCelda },
+];
+
 /* ═══════════════════════════════ LA CELDA CONSTRUIDA ═══════════════════════════════ */
 
 export interface CeldaConstruida {
   readonly indice: number;
   readonly nivel: NivelDeLaCiudad;
+  /** El grado con que se construyó. */
+  readonly grado: GradoDeLaCelda;
   /** Si se construyó con relieve (en N1, sólo la del centro de la ventana). */
   readonly relieve: boolean;
   /** Lo escrito de cada familia. */
@@ -540,18 +672,24 @@ export interface CeldaConstruida {
   readonly estorba: readonly CajaXZ[];
 }
 
+/**
+ * LA OBRA DE LA LUZ: grado 1 y los coches más sencillos, en moldes que no guardan. Es lo más barato de CPU, y las
+ * fuentes de luz de una celda son las mismas en todos sus grados (las farolas, los rótulos, los escaparates y las
+ * ventanas encendidas no se mueven con el grado). El relieve, el de hoy del nivel: así la luz da los mismos pasos
+ * que antes (cada paso le cuesta lo suyo en `losetas.ts`) y llega en los mismos fotogramas.
+ */
+function obraDeLaLuz(ciudad: PartesDeLaCiudad, nivel: NivelDeLaCiudad): ObraDeLaCelda {
+  return obraNueva({ nivel, grado: 1, relieveDeHoy: DETALLE_DEL_NIVEL[nivel].relieve, gradoDeLosCoches: 1, ciudad, m: moldesDeLaObra(false) });
+}
+
 /** Las fuentes de luz de una celda sin su geometría: las de la luz horneada de las celdas fuera de la ventana. */
 export function fuentesDeLaCelda(parte: ParteDeLaCelda, ciudad: PartesDeLaCiudad, nivel: NivelDeLaCiudad): FuentesDeLuz {
-  const g = construirLaCelda(parte, ciudad, nivel, false);
-  for (;;) {
-    const r = g.next();
-    if (r.done === true) return r.value.fuentes;
-  }
+  return deUnTiron(construirConLaObra(parte, obraDeLaLuz(ciudad, nivel))).fuentes;
 }
 
 /** Las fuentes horneadas de una celda sin su geometría, a pasos: lo que pide la luz por losetas. */
 export function* fuentesDeLaCeldaAPasos(parte: ParteDeLaCelda, ciudad: PartesDeLaCiudad, nivel: NivelDeLaCiudad): Generator<number, readonly FuenteHorneada[], void> {
-  const g = construirLaCelda(parte, ciudad, nivel, false);
+  const g = construirConLaObra(parte, obraDeLaLuz(ciudad, nivel));
   for (;;) {
     const r = g.next();
     if (r.done === true) return r.value.fuentes.horneadas;
@@ -562,24 +700,23 @@ export function* fuentesDeLaCeldaAPasos(parte: ParteDeLaCelda, ciudad: PartesDeL
 /**
  * CONSTRUYE UNA CELDA A TROZOS: cede después de cada pieza con los triángulos que escribió desde la última
  * vez, y al final devuelve la celda. Con `guardar` a `false` no escribe geometría (moldes que no guardan):
- * sólo saca sus fuentes de luz, con las mismas cuentas.
+ * sólo saca sus fuentes de luz, con las mismas cuentas. `grado`: el de la celda en su ventana (por omisión, el
+ * del centro de la ventana del nivel); `relieve`: el de hoy (por omisión, el del nivel).
  */
 export function* construirLaCelda(
   parte: ParteDeLaCelda,
   ciudad: PartesDeLaCiudad,
   nivel: NivelDeLaCiudad,
   guardar = true,
+  grado: GradoDeLaCelda = GRADO_DEL_CENTRO[nivel],
   relieve: boolean = DETALLE_DEL_NIVEL[nivel].relieve,
 ): Generator<number, CeldaConstruida, void> {
-  const detalle = DETALLE_DEL_NIVEL[nivel];
-  const lados = detalle.lados;
-  const m = {
-    fachadas: moldeDe('fachadas', guardar),
-    mobiliario: moldeDe('mobiliario', guardar),
-    emisivo: moldeDe('emisivo', guardar),
-    cristal: moldeDe('cristal', guardar),
-    neones: moldeDe('neones', guardar),
-  };
+  return yield* construirConLaObra(parte, obraNueva({ nivel, grado, relieveDeHoy: relieve, ciudad, m: moldesDeLaObra(guardar) }));
+}
+
+/** Los siete escritores sobre una obra, contando los triángulos de cada paso (las cinco familias juntas). */
+function* construirConLaObra(parte: ParteDeLaCelda, obra: ObraDeLaCelda): Generator<number, CeldaConstruida, void> {
+  const m = obra.m;
   let antes = 0;
   const paso = (): number => {
     const n = m.fachadas.triangulos + m.mobiliario.triangulos + m.emisivo.triangulos + m.cristal.triangulos + m.neones.triangulos;
@@ -587,123 +724,9 @@ export function* construirLaCelda(
     antes = n;
     return d;
   };
-  const luces: LuzDelMobiliario[] = [];
-  const estorba: CajaXZ[] = [];
+  for (const e of ESCRITORES_DE_LA_CELDA) for (const _ of e.escribir(obra, parte)) yield paso();
 
-  /* ─── Las fachadas ─── */
-  const ventanas: VentanaEncendida[] = [];
-  for (const _ of fachadasPorPartes(m.fachadas, parte.edificios, { relieve, ventanas: true, vecinos: parte.vecinos }, ventanas)) yield paso();
-  for (const e of parte.edificios) estorba.push(e.caja, ...e.pilares);
-
-  /* ─── El mobiliario, pieza a pieza ─── */
-  for (const f of parte.farolas) {
-    luces.push(f.brazo === null ? farolaDePlaza(m.mobiliario, m.emisivo, f.x, f.z, lados) : farolaDeCalle(m.mobiliario, m.emisivo, f.x, f.z, f.brazo, lados));
-    estorba.push(f.caja);
-    yield paso();
-  }
-  for (const l of parte.lamparas) {
-    luces.push(farolaDePared(m.mobiliario, m.emisivo, l.x, l.z, l.mira, l.alto, lados));
-    yield paso();
-  }
-  for (const b of parte.bancos) {
-    banco(m.mobiliario, b);
-    estorba.push(b.caja);
-    yield paso();
-  }
-  for (const f of parte.fuentes) {
-    fuente(m.mobiliario, f.x, f.z, f.radio);
-    estorba.push(f.caja);
-    yield paso();
-  }
-  for (const q of parte.quioscos) {
-    luces.push(quiosco(m.mobiliario, m.emisivo, m.cristal, q, lados));
-    estorba.push(q.caja);
-    yield paso();
-  }
-  for (const q of parte.quioscosDePrensa) {
-    luces.push(quioscoDePrensa(m.mobiliario, m.emisivo, q));
-    estorba.push(q.caja);
-    yield paso();
-  }
-  for (const c of parte.cabinas) {
-    luces.push(cabina(m.mobiliario, m.emisivo, c.x, c.z, c.mira, lados));
-    estorba.push(c.caja);
-    yield paso();
-  }
-  for (const v of parte.vallas) {
-    luces.push(...valla(m.mobiliario, m.emisivo, v));
-    estorba.push(v);
-    yield paso();
-  }
-  for (const c of parte.cortes) {
-    luces.push(...corte(m.mobiliario, m.emisivo, c));
-    estorba.push(c);
-    yield paso();
-  }
-  for (const t of parte.troncos) {
-    arbol(m.mobiliario, t, lados);
-    estorba.push(t);
-    yield paso();
-  }
-  for (const e of parte.estatuas) {
-    estatua(m.mobiliario, e, lados);
-    estorba.push(e);
-    yield paso();
-  }
-  for (const c of parte.contenedores) {
-    contenedor(m.mobiliario, c);
-    estorba.push(c.caja);
-    yield paso();
-  }
-  for (const c of parte.carretillas) {
-    carretilla(m.mobiliario, c, lados);
-    estorba.push(c.caja);
-    yield paso();
-  }
-  for (const c of parte.muelles) {
-    muelle(m.mobiliario, c);
-    estorba.push(c.caja);
-    yield paso();
-  }
-  viaducto(m.mobiliario, m.emisivo, parte.viaducto, parte.pilares);
-  estorba.push(...parte.pilares);
-  yield paso();
-  for (const p of parte.pilaresDePlaza) {
-    soportalDePlaza(m.mobiliario, [p], []);
-    estorba.push(p);
-    yield paso();
-  }
-  soportalDePlaza(m.mobiliario, [], parte.techosDePlaza);
-  yield paso();
-
-  /* ─── Los coches, uno a uno ─── */
-  const cochesEncendidos: { x: number; y: number; z: number; color: readonly [number, number, number] }[] = [];
-  for (const c of parte.coches) {
-    cochesEncendidos.push(...escribirLosCoches([c], m.mobiliario, m.emisivo, m.cristal, detalle.cochesFinos, lados).luces);
-    estorba.push(c.caja);
-    yield paso();
-  }
-
-  /* ─── Lo que cuelga: voladizos de las caras, cables y banderolas ─── */
-  const o = opcionesDeLosVoladizos(nivel);
-  for (const _ of voladizosDeLasCaras(m.mobiliario, carasDeCalle(parte.edificios, parte.vecinos), o)) yield paso();
-  if (o.cables) {
-    escribirLosCables(m.mobiliario, parte.cables);
-    yield paso();
-  }
-  escribirLasBanderolas(m.mobiliario, parte.farolas, ciudad.semilla);
-  yield paso();
-
-  /* ─── Los rótulos: la chapa al mobiliario, las letras a los neones ─── */
-  const parpadeo = (r: RotuloDelPlano): number => (r.parpadea ? 1 + (mezclar(Math.round(r.x * 4), Math.round(r.z * 4), 0x9e) % 11) : 0);
-  const deLosRotulos = escribirRotulosDeGlifos(parte.rotulos, m.mobiliario, m.neones, ciudad.atlas, parpadeo);
-  yield paso();
-
-  /* ─── Las alcantarillas de sus medias calles ─── */
-  const bocas = alcantarillas(m.mobiliario, ciudad.calles, parte.caja, lados).filter((b) => Math.abs(b.x) < BORDE_DE_LA_CIUDAD && Math.abs(b.z) < BORDE_DE_LA_CIUDAD);
-  yield paso();
-
-  const fuentes = repartirLasLuces(luces, deLosRotulos, cochesEncendidos, ventanas, Math.ceil(detalle.reflejosDeVentanas / 9));
+  const fuentes = repartirLasLuces(obra.luces, obra.rotulos, obra.cochesEncendidos, obra.ventanas, Math.ceil(obra.detalle.reflejosDeVentanas / 9));
   const familias = {
     fachadas: m.fachadas.volcar(),
     mobiliario: m.mobiliario.volcar(),
@@ -715,22 +738,33 @@ export function* construirLaCelda(
   for (const f of FAMILIAS) triangulos += familias[f].indices.length / 3;
   return {
     indice: parte.indice,
-    nivel,
-    relieve,
+    nivel: obra.nivel,
+    grado: obra.grado,
+    relieve: obra.relieveDeHoy,
     familias,
     triangulos,
     fuentes,
-    alcantarillas: bocas,
+    alcantarillas: obra.bocas,
     tapan: parte.edificios.map((e) => e.huella),
-    estorba,
+    estorba: obra.estorba,
   };
 }
 
-/** Construye una celda de un tirón (el comprobador y lo que no tiene prisa). */
-export function construirLaCeldaYa(parte: ParteDeLaCelda, ciudad: PartesDeLaCiudad, nivel: NivelDeLaCiudad): CeldaConstruida {
-  const g = construirLaCelda(parte, ciudad, nivel);
+/** Un generador de un tirón: lo que devuelve al acabar. */
+export function deUnTiron<T>(g: Generator<unknown, T, void>): T {
   for (;;) {
     const r = g.next();
     if (r.done === true) return r.value;
   }
+}
+
+/** Construye una celda de un tirón (el comprobador y lo que no tiene prisa), con el grado y el relieve que se pidan. */
+export function construirLaCeldaYa(
+  parte: ParteDeLaCelda,
+  ciudad: PartesDeLaCiudad,
+  nivel: NivelDeLaCiudad,
+  grado: GradoDeLaCelda = GRADO_DEL_CENTRO[nivel],
+  relieve: boolean = DETALLE_DEL_NIVEL[nivel].relieve,
+): CeldaConstruida {
+  return deUnTiron(construirLaCelda(parte, ciudad, nivel, true, grado, relieve));
 }

@@ -71,10 +71,15 @@ function bytesDeLaGeometria(g: THREE.BufferGeometry): number {
   return n;
 }
 
-/** Lo que hay que subir de una ciudad antes de enseñarla: los mapas de su base y cada malla, en su orden. */
+/**
+ * Lo que hay que subir de una ciudad antes de enseñarla: los mapas de su base, las texturas de sus capas
+ * (`CapaDeLaCiudad.texturas`, ver `capas.ts`) y cada malla, en su orden.
+ */
 export function piezasPorSubir(c: CiudadAbiertaConstruida): PiezaPorSubir[] {
   const piezas: PiezaPorSubir[] = [];
-  for (const t of [c.base.texturaAlturas, c.base.texturaOclusion, c.base.atlas.textura]) {
+  const texturas: THREE.Texture[] = [c.base.texturaAlturas, c.base.texturaOclusion, c.base.atlas.textura];
+  for (const capa of c.capas) texturas.push(...(capa.texturas?.() ?? []));
+  for (const t of texturas) {
     const img = t.image as { readonly data?: ArrayBufferView; readonly width?: number; readonly height?: number } | undefined;
     piezas.push({ textura: t, bytes: img?.data?.byteLength ?? (img?.width ?? 0) * (img?.height ?? 0) * 4 });
   }

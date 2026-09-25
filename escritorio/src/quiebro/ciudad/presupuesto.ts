@@ -28,6 +28,15 @@
  *
  * Las sombras (N2+) pintan otra vez lo que las proyecta: una llamada más y sus triángulos otra vez
  * por cada malla con `sombra`. `gl.info.render` también las cuenta, y el banco lo enseña.
+ *
+ * ═══ LA RESERVA PROVISIONAL DEL DETALLE (§7.2 y §7.6 del plan del detalle de la ciudad) ═══
+ *
+ * Mientras las familias ganan detalle (olas 2 y 3), cada renglón de la ciudad abierta se queda en lo que el plan
+ * les da (lo medido hoy más lo que suman todos los paquetes que lo tocan, más un 15 %), y los renglones de las
+ * capas nuevas ya están declarados: así nadie tiene que tocar este fichero para crecer, y el que se pase de su
+ * renglón PARA y lo dice. La única excepción es N2 fachadas: 80.000 y no 71.000, porque O3-SILUETA baja primero
+ * los balcones y después sube las cornisas. En el barrio viejo sólo sube el mobiliario de N2 y N3 (sus piezas en
+ * grado 2, `gradoDelBarrio`). El cierre (O4-CIERRE) lo baja todo a lo medido más un 15 %.
  */
 import type { NivelDeLaCiudad } from './tipos';
 import { DETALLE_DEL_NIVEL, NIVELES_DE_LA_CIUDAD } from './tipos';
@@ -86,11 +95,12 @@ export const RENGLONES_DECLARADOS: Readonly<Record<string, PorNivel>> = {
   },
   asfalto: igual({ triangulos: 500, llamadas: 1 }),
   aceras: igual({ triangulos: 1_200, llamadas: 1 }),
+  /* Reserva provisional (ver la cabecera): N2 y N3 suben de 50.000 / 56.000 por las piezas en grado 2. */
   'mobiliario y coches': {
     0: { triangulos: 24_000, llamadas: 1 },
     1: { triangulos: 42_000, llamadas: 1 },
-    2: { triangulos: 50_000, llamadas: 1 },
-    3: { triangulos: 56_000, llamadas: 1 },
+    2: { triangulos: 60_000, llamadas: 1 },
+    3: { triangulos: 66_000, llamadas: 1 },
   },
   'luces del mobiliario': igual({ triangulos: 2_600, llamadas: 1 }),
   /*
@@ -176,74 +186,148 @@ export const RENGLONES_DE_LA_CIUDAD_ABIERTA: Readonly<Record<string, PorNivel>> 
    * mobiliario 15.038 / 37.850 / 62.424 / 105.218, emisivo 1.202 / 1.202 / 1.940 / 2.982, cristal
    * 340 / 340 / 538 / 768, neones 2.190 / 2.190 / 3.616 / 5.692, lejos 11.952, tarjetas 528 / 722 / 1.768 /
    * 3.256, halos 306 / 306 / 536 / 818, haces — / — / 3.840 / 5.920.
+   *
+   * Lo declarado es la RESERVA PROVISIONAL del detalle (ver la cabecera; §7.1 del plan). Lo de antes, en el
+   * orden de los renglones: fachadas 1.200 / 11.000 / 88.000 / 124.000, mobiliario 17.500 / 43.500 / 72.000 /
+   * 121.000, emisivo 1.400 / 1.400 / 2.300 / 3.500, cristal 400 / 400 / 650 / 900, neones 2.600 / 2.600 / 4.200 /
+   * 6.600, lejos 14.000, horizonte 128, ciudad lejana 3.000 / 6.000 / 10.000 / 15.000, tarjetas 700 / 1.000 /
+   * 2.100 / 3.800, halos 500 / 500 / 800 / 1.000, tren 140 y 100, vapor 24 / 48 / 72 / 96.
    */
   'ventana · fachadas': {
-    0: { triangulos: 1_200, llamadas: 1 },
-    1: { triangulos: 11_000, llamadas: 1 },
-    2: { triangulos: 88_000, llamadas: 1 },
-    3: { triangulos: 124_000, llamadas: 1 },
+    0: { triangulos: 7_200, llamadas: 1 },
+    1: { triangulos: 24_000, llamadas: 1 },
+    2: { triangulos: 80_000, llamadas: 1 },
+    3: { triangulos: 210_000, llamadas: 1 },
   },
   'ventana · mobiliario': {
-    0: { triangulos: 17_500, llamadas: 1 },
-    1: { triangulos: 43_500, llamadas: 1 },
-    2: { triangulos: 72_000, llamadas: 1 },
-    3: { triangulos: 121_000, llamadas: 1 },
+    0: { triangulos: 21_500, llamadas: 1 },
+    1: { triangulos: 44_000, llamadas: 1 },
+    2: { triangulos: 101_000, llamadas: 1 },
+    3: { triangulos: 236_000, llamadas: 1 },
   },
   'ventana · emisivo': {
-    0: { triangulos: 1_400, llamadas: 1 },
-    1: { triangulos: 1_400, llamadas: 1 },
-    2: { triangulos: 2_300, llamadas: 1 },
-    3: { triangulos: 3_500, llamadas: 1 },
+    0: { triangulos: 2_200, llamadas: 1 },
+    1: { triangulos: 2_400, llamadas: 1 },
+    2: { triangulos: 5_200, llamadas: 1 },
+    3: { triangulos: 8_900, llamadas: 1 },
   },
   'ventana · cristal': {
-    0: { triangulos: 400, llamadas: 1 },
-    1: { triangulos: 400, llamadas: 1 },
-    2: { triangulos: 650, llamadas: 1 },
-    3: { triangulos: 900, llamadas: 1 },
+    0: { triangulos: 700, llamadas: 1 },
+    1: { triangulos: 1_350, llamadas: 1 },
+    2: { triangulos: 3_700, llamadas: 1 },
+    3: { triangulos: 6_000, llamadas: 1 },
   },
   'ventana · neones': {
-    0: { triangulos: 2_600, llamadas: 1 },
-    1: { triangulos: 2_600, llamadas: 1 },
-    2: { triangulos: 4_200, llamadas: 1 },
-    3: { triangulos: 6_600, llamadas: 1 },
+    0: { triangulos: 2_900, llamadas: 1 },
+    1: { triangulos: 3_200, llamadas: 1 },
+    2: { triangulos: 5_500, llamadas: 1 },
+    3: { triangulos: 9_000, llamadas: 1 },
   },
-  lejos: igual({ triangulos: 14_000, llamadas: 1 }),
+  /* La LOD1, con los hitos y la sección del Elevado (O3-LEJANO). */
+  lejos: igual({ triangulos: 14_300, llamadas: 1 }),
   'suelo · asfalto': igual({ triangulos: 2_600, llamadas: 1 }),
   'suelo · aceras': igual({ triangulos: 4_600, llamadas: 1 }),
   borde: igual({ triangulos: 80, llamadas: 1 }),
-  horizonte: igual({ triangulos: 128, llamadas: 1 }),
-  /* Diez triángulos por caja lejana: la mitad de cajas que en el barrio (ver `abierta.ts`). */
+  /* La capa lejana (`capas/lejana.ts`): el horizonte, con segunda fila en N2+, y la ciudad lejana. */
+  horizonte: {
+    0: { triangulos: 192, llamadas: 1 },
+    1: { triangulos: 192, llamadas: 1 },
+    2: { triangulos: 384, llamadas: 1 },
+    3: { triangulos: 384, llamadas: 1 },
+  },
+  /* Diez triángulos por caja lejana: la mitad de cajas que en el barrio (ver `capas/lejana.ts`). */
   'ciudad lejana': {
     0: { triangulos: 3_000, llamadas: 1 },
     1: { triangulos: 6_000, llamadas: 1 },
-    2: { triangulos: 10_000, llamadas: 1 },
-    3: { triangulos: 15_000, llamadas: 1 },
+    2: { triangulos: 12_000, llamadas: 1 },
+    3: { triangulos: 50_000, llamadas: 1 },
   },
   'tarjetas de reflejo': {
-    0: { triangulos: 700, llamadas: 1 },
-    1: { triangulos: 1_000, llamadas: 1 },
-    2: { triangulos: 2_100, llamadas: 1 },
-    3: { triangulos: 3_800, llamadas: 1 },
+    0: { triangulos: 800, llamadas: 1 },
+    1: { triangulos: 1_100, llamadas: 1 },
+    2: { triangulos: 2_300, llamadas: 1 },
+    3: { triangulos: 4_200, llamadas: 1 },
   },
   halos: {
     0: { triangulos: 500, llamadas: 1 },
-    1: { triangulos: 500, llamadas: 1 },
-    2: { triangulos: 800, llamadas: 1 },
-    3: { triangulos: 1_000, llamadas: 1 },
+    1: { triangulos: 600, llamadas: 1 },
+    2: { triangulos: 900, llamadas: 1 },
+    3: { triangulos: 1_200, llamadas: 1 },
   },
-  'tren · coches': igual({ triangulos: 140, llamadas: 1 }),
-  'tren · ventanas': igual({ triangulos: 100, llamadas: 1 }),
+  'tren · coches': {
+    0: { triangulos: 300, llamadas: 1 },
+    1: { triangulos: 500, llamadas: 1 },
+    2: { triangulos: 3_000, llamadas: 1 },
+    3: { triangulos: 7_000, llamadas: 1 },
+  },
+  'tren · ventanas': {
+    0: { triangulos: 200, llamadas: 1 },
+    1: { triangulos: 200, llamadas: 1 },
+    2: { triangulos: 300, llamadas: 1 },
+    3: { triangulos: 300, llamadas: 1 },
+  },
   vapor: {
-    0: { triangulos: 24, llamadas: 1 },
-    1: { triangulos: 48, llamadas: 1 },
-    2: { triangulos: 72, llamadas: 1 },
-    3: { triangulos: 96, llamadas: 1 },
+    0: { triangulos: 48, llamadas: 1 },
+    1: { triangulos: 80, llamadas: 1 },
+    2: { triangulos: 220, llamadas: 1 },
+    3: { triangulos: 400, llamadas: 1 },
   },
   'haces de luz': {
     0: { triangulos: 0, llamadas: 0 },
     1: { triangulos: 0, llamadas: 0 },
     2: { triangulos: 4_500, llamadas: 1 },
     3: { triangulos: 6_900, llamadas: 1 },
+  },
+  /* ─── Las capas nuevas (`capas.ts`), declaradas desde ya: hoy no pintan nada ─── */
+  'suelo lejano': igual({ triangulos: 256, llamadas: 1 }),
+  'luces lejanas': {
+    0: { triangulos: 2_200, llamadas: 1 },
+    1: { triangulos: 2_900, llamadas: 1 },
+    2: { triangulos: 3_500, llamadas: 1 },
+    3: { triangulos: 5_500, llamadas: 1 },
+  },
+  'remates de lo lejano': {
+    0: { triangulos: 0, llamadas: 0 },
+    1: { triangulos: 0, llamadas: 0 },
+    2: { triangulos: 19_000, llamadas: 1 },
+    3: { triangulos: 26_500, llamadas: 1 },
+  },
+  'tubos de neón': {
+    0: { triangulos: 0, llamadas: 0 },
+    1: { triangulos: 0, llamadas: 0 },
+    2: { triangulos: 5_000, llamadas: 1 },
+    3: { triangulos: 22_000, llamadas: 1 },
+  },
+  'luz pintada': {
+    0: { triangulos: 0, llamadas: 0 },
+    1: { triangulos: 200, llamadas: 1 },
+    2: { triangulos: 800, llamadas: 1 },
+    3: { triangulos: 800, llamadas: 1 },
+  },
+  /* Sólo proyectan sombra: sus 3.000 triángulos se pintan otra vez en el mapa de sombras (no cuenta en lo declarado). */
+  'sombras de lo cercano': {
+    0: { triangulos: 0, llamadas: 0 },
+    1: { triangulos: 0, llamadas: 0 },
+    2: { triangulos: 0, llamadas: 0 },
+    3: { triangulos: 3_000, llamadas: 1 },
+  },
+  'cercanos · mobiliario': {
+    0: { triangulos: 0, llamadas: 0 },
+    1: { triangulos: 2_100, llamadas: 1 },
+    2: { triangulos: 6_900, llamadas: 1 },
+    3: { triangulos: 32_200, llamadas: 1 },
+  },
+  'cercanos · cristal': {
+    0: { triangulos: 0, llamadas: 0 },
+    1: { triangulos: 150, llamadas: 1 },
+    2: { triangulos: 420, llamadas: 1 },
+    3: { triangulos: 1_400, llamadas: 1 },
+  },
+  'cercanos · emisivo': {
+    0: { triangulos: 0, llamadas: 0 },
+    1: { triangulos: 100, llamadas: 1 },
+    2: { triangulos: 210, llamadas: 1 },
+    3: { triangulos: 400, llamadas: 1 },
   },
 };
 
@@ -259,13 +343,30 @@ export function renglonesDeLaAtmosfera(nivel: NivelDeLaCiudad): RenglonDeLaCiuda
   return renglones;
 }
 
+/**
+ * La reserva provisional de la atmósfera (ver la cabecera; §7.1 y §7.2 del plan): lo que el libro guarda
+ * aunque sus números midan menos. Las salpicaduras de N3 pasan de 640 a 1.280 (LUZ-EN-EL-AIRE las dobla).
+ * Es sólo lo DECLARADO: `renglonesDeLaAtmosfera` sigue midiendo lo que hay, y lo medido se compara con esto.
+ */
+const RESERVA_DE_LA_ATMOSFERA: Readonly<Record<string, Partial<Record<NivelDeLaCiudad, Coste>>>> = {
+  salpicaduras: { 3: { triangulos: 1_280, llamadas: 1 } },
+};
+
+/** Lo declarado de la atmósfera: lo que miden sus números, o la reserva si es mayor. */
 export const RENGLONES_DECLARADOS_DE_LA_ATMOSFERA: Readonly<Record<string, PorNivel>> = Object.fromEntries(
   ['cielo', 'lluvia', 'salpicaduras'].map((nombre) => [
     nombre,
     Object.fromEntries(
       NIVELES_DE_LA_CIUDAD.map((n) => {
         const r = renglonesDeLaAtmosfera(n).find((x) => x.nombre === nombre);
-        return [n, { triangulos: r?.triangulos ?? 0, llamadas: r?.llamadas ?? 0 }];
+        const reserva = RESERVA_DE_LA_ATMOSFERA[nombre]?.[n];
+        return [
+          n,
+          {
+            triangulos: Math.max(r?.triangulos ?? 0, reserva?.triangulos ?? 0),
+            llamadas: Math.max(r?.llamadas ?? 0, reserva?.llamadas ?? 0),
+          },
+        ];
       }),
     ) as unknown as PorNivel,
   ]),

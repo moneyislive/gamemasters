@@ -192,3 +192,22 @@ vec3 luzDeLaCalleQ(vec3 p, vec3 n) {
   return (m.rgb * cBajo + uColorDeSodio * m.a * uFarolas * cFarola) * uLuzDeLaCalle;
 }
 `;
+
+/**
+ * EL PARPADEO DE UN NEÓN VIEJO: 1 encendido, 0 apagado, con semilla `s` (0, fijo) en el tiempo del adorno `t`.
+ * Lo usan los rótulos (`neones.ts`) y sus halos (`halos.ts`), y tiene que ser UNO: si cada uno lo escribe a su
+ * manera, el halo se enciende con el rótulo apagado. Cada sombreador le da su nombre (`parpadeoN` los neones,
+ * `parpadeoQ` los halos: los de siempre, y así el texto de los dos no cambia ni un byte).
+ */
+export function glslDelParpadeo(nombre: string): string {
+  return `float ${nombre}(float s, float t) {
+  if (s <= 0.0) return 1.0;
+  float k = floor(t * 7.0 + s * 13.0);
+  float h = fract(sin(k * 12.9898 + s * 78.233) * 43758.5453);
+  float racha = step(0.82, fract(sin(floor(t * 0.4 + s) * 91.7) * 4375.85));
+  return mix(1.0, step(0.45, h), racha);
+}`;
+}
+
+/** El parpadeo con su nombre común, `parpadeoQ`. */
+export const GLSL_PARPADEO = glslDelParpadeo('parpadeoQ');

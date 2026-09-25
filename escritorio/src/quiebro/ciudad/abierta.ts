@@ -20,6 +20,14 @@
  * N2+ los haces: 16 en N0, las mismas en cualquier sitio de la ciudad. El tráfico en marcha del barrio no
  * está: iba por las avenidas de fuera del barrio, y en la ciudad lo de fuera es el cerco (§2.5).
  *
+ * ═══ LAS CAPAS ═══
+ *
+ * Lo que no es la ventana, lo lejano, el suelo, el borde, lo que sigue a la ventana ni el tren es una CAPA
+ * (`capas.ts`): el horizonte y la ciudad lejana hoy, y mañana el suelo y las luces de lo lejano, los tubos, la luz
+ * pintada, los semáforos, las sombras y los coches de lo cercano. Se montan todas de la lista fija de `capas.ts`, con
+ * sus renglones, su trabajo por fotograma, sus texturas para el relevo y sus materiales con los de la ciudad: quien
+ * escribe una capa no toca este fichero.
+ *
  * ═══ LA BASE Y EL NIVEL ═══
  *
  * Construir una ciudad son unos 50-70 ms de PC, y casi todo NO depende del nivel: partirla en celdas (12 ms),
@@ -45,8 +53,11 @@ import type { NivelDeLaCiudad } from './tipos';
 import { DETALLE_DEL_NIVEL } from './tipos';
 import type { CeldaConstruida, Familia, PartesDeLaCiudad } from './celdas';
 import { FAMILIAS, fuentesDeLaCeldaAPasos, partirLaCiudad } from './celdas';
-import type { CapacidadDeLaFamilia, FotogramaDeLaVentana, SitioDeLaVentana } from './ventana';
-import { PRISA_DEL_PRINCIPIO, VentanaDeCeldas } from './ventana';
+import type { FotogramaDeLaVentana, SitioDeLaVentana } from './ventana';
+import { PRISA_DEL_PRINCIPIO, UNIFORMES_DE_LA_VENTANA, VentanaDeCeldas } from './ventana';
+import { CAPACIDAD_DE_LA_VENTANA, INSTANCIAS_DE_SALIDA } from './capacidad';
+import type { CapaDeLaCiudad, ContextoDeLaCapa, FabricaDeCapa } from './capas';
+import { CAPAS_DE_LA_CIUDAD } from './capas';
 import type { FotogramaDeLaLuz, FuentesDeUnaCelda } from './losetas';
 import { LuzPorLosetas, PRISA_DE_LA_PRIMERA_LUZ, TEXELES_DE_LA_LUZ_POR_NIVEL } from './losetas';
 import type { GeometriaDeLoLejano, LoLejano, SueloDeLaCiudad } from './lejos';
@@ -69,8 +80,7 @@ import { TarjetasDeReflejo, materialDeLasTarjetas } from './reflejos';
 import { datosDeLosHalos, mallaDeHalos, materialDeLosHalos } from './halos';
 import { Vapor } from './vapor';
 import { crearLosHaces, datosDeLosHaces } from './haces';
-import { Tren } from './tren';
-import { CAJAS_LEJANAS, crearElHorizonte, crearLaCiudadLejana } from './anillo';
+import { Tren, materialesDelTren } from './tren';
 import { parchear } from '../atmosfera/parcheo';
 import { UNIFORMES_DE_LA_CIUDAD } from './retoques';
 import { rellenarInstancias, triangulosDe } from './geometria';
@@ -107,55 +117,10 @@ export function ciudadParaPintar(traza: number, codigo: string, noche: number, f
   }
 }
 
-/* ═══════════════════════════════ LO QUE CABE ═══════════════════════════════ */
-
-/**
- * LO QUE CABE DE SALIDA EN CADA FAMILIA DE LA VENTANA (vértices e índices por mitad), por nivel: el peor de
- * todas las ventanas de las 32 trazas, medido por `verify:quiebro-ciudad`, más un 25 %. Si una ventana no
- * cabe, su malla crece (y el comprobador lo dice: no tiene que pasar).
+/*
+ * Lo que cabe de salida en cada familia de la ventana y en lo que la sigue (`CAPACIDAD_DE_LA_VENTANA`,
+ * `INSTANCIAS_DE_SALIDA`) vive en `capacidad.ts`; dónde empieza y acaba la ciudad lejana, en `capas/lejana.ts`.
  */
-export const CAPACIDAD_DE_LA_VENTANA: Readonly<Record<NivelDeLaCiudad, Readonly<Record<Familia, CapacidadDeLaFamilia>>>> = {
-  0: {
-    fachadas: { vertices: 2_000, indices: 3_000 },
-    mobiliario: { vertices: 28_500, indices: 56_500 },
-    emisivo: { vertices: 2_900, indices: 4_500 },
-    cristal: { vertices: 850, indices: 1_300 },
-    neones: { vertices: 5_500, indices: 8_300 },
-  },
-  1: {
-    fachadas: { vertices: 23_500, indices: 35_000 },
-    mobiliario: { vertices: 70_500, indices: 142_000 },
-    emisivo: { vertices: 2_900, indices: 4_500 },
-    cristal: { vertices: 850, indices: 1_300 },
-    neones: { vertices: 5_500, indices: 8_300 },
-  },
-  2: {
-    fachadas: { vertices: 191_000, indices: 287_000 },
-    mobiliario: { vertices: 116_500, indices: 234_000 },
-    emisivo: { vertices: 4_800, indices: 7_300 },
-    cristal: { vertices: 1_400, indices: 2_100 },
-    neones: { vertices: 9_100, indices: 13_600 },
-  },
-  3: {
-    fachadas: { vertices: 268_000, indices: 403_000 },
-    mobiliario: { vertices: 181_000, indices: 395_000 },
-    emisivo: { vertices: 7_200, indices: 11_200 },
-    cristal: { vertices: 1_950, indices: 2_900 },
-    neones: { vertices: 14_300, indices: 21_400 },
-  },
-};
-
-/** Cuántas instancias caben de salida en lo que sigue a la ventana (tarjetas, halos, cabezas de farola). */
-const INSTANCIAS_DE_SALIDA: Readonly<Record<NivelDeLaCiudad, number>> = { 0: 600, 1: 700, 2: 1_100, 3: 1_600 };
-
-/** Dónde empieza y acaba la ciudad lejana: pasadas las torres de detrás del cerco, y hasta el horizonte. */
-const LEJANA_DESDE = 380;
-const LEJANA_HASTA = 880;
-/**
- * Cuántas cajas lejanas: la mitad que en el barrio. Allí la ciudad lejana empezaba a 190 m y llenaba la
- * primera imagen de la Bajada; aquí empieza a 380, detrás del cerco y de sus torres, casi toda en la niebla.
- */
-const CAJAS_LEJANAS_DE_LA_CIUDAD: readonly [number, number, number, number] = [CAJAS_LEJANAS[0] / 2, CAJAS_LEJANAS[1] / 2, CAJAS_LEJANAS[2] / 2, CAJAS_LEJANAS[3] / 2];
 
 /* ═══════════════════════════════ LA BASE: LO QUE NO DEPENDE DEL NIVEL ═══════════════════════════════ */
 
@@ -292,6 +257,8 @@ export interface OpcionesDeLaCiudadAbierta {
   readonly prisa?: boolean;
   /** Nace callada: no toca ningún uniforme compartido hasta `hablar` (ver la cabecera). */
   readonly callada?: boolean;
+  /** Capas que se montan además de las de `capas.ts`, detrás de ellas (sólo el comprobador: sus capas de prueba). */
+  readonly capasDeMas?: readonly FabricaDeCapa[];
 }
 
 export interface CiudadAbiertaConstruida {
@@ -309,6 +276,8 @@ export interface CiudadAbiertaConstruida {
   readonly lejos: LoLejano;
   readonly suelo: SueloDeLaCiudad;
   readonly borde: BordeConstruido;
+  /** Las capas que lleva este nivel (las de `capas.ts` que no devolvieron `null`), en su orden. */
+  readonly capas: readonly CapaDeLaCiudad[];
   readonly atlas: AtlasDeGlifos;
   /** Lo que la atmósfera necesita: la semilla, la hora (la luz de la noche) y el tiempo. */
   readonly semilla: number;
@@ -393,15 +362,17 @@ export function construirLaCiudadAbierta(fuente: CiudadParaPintar, nivel: NivelD
 
   /* ─── Los materiales: los del barrio, con el fundido del borde de la ventana desde N1 ─── */
   const fachadas = suyo(materialDeFachada(nivel));
-  const mobiliario = suyo(materialDelMobiliario());
+  const mobiliario = suyo(materialDelMobiliario(nivel));
   if (detalle.fundido) {
     parchear(fachadas, RETOQUE_DEL_FUNDIDO);
     parchear(mobiliario, RETOQUE_DEL_FUNDIDO);
   }
-  const emisivo = suyo(materialEmisivo());
-  const cristal = suyo(materialDelCristal());
+  const emisivo = suyo(materialEmisivo(nivel));
+  const cristal = suyo(materialDelCristal(nivel));
   const neones = suyo(materialDeLosNeones(atlas.textura));
   const familias: Record<Familia, THREE.Material> = { fachadas, mobiliario, emisivo, cristal, neones };
+  /* Las capas (ver la cabecera): se montan después del borde; aquí, para que la ventana ya pueda avisarlas. */
+  const capas: CapaDeLaCiudad[] = [];
 
   /* ─── Lo que sigue a la ventana: tarjetas, halos, vapor y (N2+) haces ─── */
   const cap = INSTANCIAS_DE_SALIDA[nivel];
@@ -419,7 +390,7 @@ export function construirLaCiudadAbierta(fuente: CiudadParaPintar, nivel: NivelD
   });
   let farolasDeLaVentana: readonly CabezaDeFarola[] = [];
   const camara = new THREE.Vector3();
-  const alCambiar = (_sitio: SitioDeLaVentana, celdas: readonly CeldaConstruida[]): void => {
+  const alCambiar = (sitio: SitioDeLaVentana, celdas: readonly CeldaConstruida[]): void => {
     const reflejos = celdas.flatMap((c) => c.fuentes.reflejos);
     const tapan = celdas.flatMap((c) => c.tapan);
     tarjetas.poner(reflejos, tapan, camara);
@@ -431,6 +402,7 @@ export function construirLaCiudadAbierta(fuente: CiudadParaPintar, nivel: NivelD
       const cabezas = farolasDeLaVentana.map((c) => ({ ...c, y: c.y - 0.1 }));
       rellenarInstancias(haces, datosDeLosHaces(cabezas), cabezas.length);
     }
+    for (const capa of capas) capa.alCambiarLaVentana?.({ sitio, celdas });
   };
 
   /* ─── La ventana de celdas ─── */
@@ -468,7 +440,7 @@ export function construirLaCiudadAbierta(fuente: CiudadParaPintar, nivel: NivelD
   const suelo = base.suelo;
   const asfalto = new THREE.Mesh(suelo.asfalto, suyo(materialDelAsfalto(nivel)));
   asfalto.name = 'quiebro-asfalto';
-  const aceras = new THREE.Mesh(suelo.islas, suyo(materialDeLaAcera()));
+  const aceras = new THREE.Mesh(suelo.islas, suyo(materialDeLaAcera(nivel)));
   aceras.name = 'quiebro-aceras';
   for (const m of [asfalto, aceras]) {
     m.frustumCulled = false;
@@ -481,25 +453,32 @@ export function construirLaCiudadAbierta(fuente: CiudadParaPintar, nivel: NivelD
   grupo.add(mallaBorde);
   const borde: BordeConstruido = { malla: mallaBorde, triangulos: base.borde.triangulos, liberar: () => undefined };
 
-  /* ─── El horizonte y la ciudad lejana ─── */
-  const horizonte = crearElHorizonte();
-  horizonte.matrixAutoUpdate = false;
-  suyo(horizonte.material as THREE.Material);
-  const lejana = crearLaCiudadLejana(semilla, CAJAS_LEJANAS_DE_LA_CIUDAD[nivel], LEJANA_DESDE, LEJANA_HASTA);
-  suyo(lejana.material as THREE.Material);
-  grupo.add(horizonte, lejana);
-  soltar.push(() => {
-    horizonte.geometry.dispose();
-    lejana.geometry.dispose();
-  });
+  /* ─── Las capas: el horizonte y la ciudad lejana (hoy), y lo que vendrá (ver `capas.ts`) ─── */
+  const contexto: ContextoDeLaCapa = {
+    nivel,
+    detalle,
+    base,
+    materiales: { ...familias, lejos: materialLejos, asfalto: asfalto.material as THREE.Material, aceras: aceras.material as THREE.Material },
+    suyo,
+    uniformes: { ciudad: UNIFORMES_DE_LA_CIUDAD, ventana: UNIFORMES_DE_LA_VENTANA },
+    ventana,
+  };
+  for (const fabrica of [...CAPAS_DE_LA_CIUDAD.map((c) => c.fabrica), ...(opciones.capasDeMas ?? [])]) {
+    const capa = fabrica(contexto);
+    if (capa === null) continue;
+    capas.push(capa);
+    grupo.add(capa.objeto);
+    soltar.push(() => capa.soltar());
+  }
 
   /* ─── Tarjetas, halos, vapor y haces, a la escena ─── */
   grupo.add(tarjetas.malla, halos, vapor.malla);
   if (haces !== null) grupo.add(haces);
 
-  /* ─── El tren del Elevado ─── */
+  /* ─── El tren del Elevado, con sus materiales ─── */
   const t = noche.tren;
-  const tren = new Tren({ eje: t.eje, linea: t.linea, desde: t.desde, hasta: t.hasta, alto: t.alto, largo: t.largo, pilares: [], enTic: fuente.trenEn }, mobiliario, emisivo, detalle.sombras > 0);
+  const delTren = materialesDelTren(nivel);
+  const tren = new Tren({ eje: t.eje, linea: t.linea, desde: t.desde, hasta: t.hasta, alto: t.alto, largo: t.largo, pilares: [], enTic: fuente.trenEn }, suyo(delTren.cuerpo), suyo(delTren.luces), detalle.sombras > 0);
   for (const m of tren.mallas) grupo.add(m);
   soltar.push(() => tren.liberar());
 
@@ -538,8 +517,7 @@ export function construirLaCiudadAbierta(fuente: CiudadParaPintar, nivel: NivelD
     lista.push(pieza('suelo · asfalto', asfalto));
     lista.push(pieza('suelo · aceras', aceras));
     lista.push(pieza('borde', borde.malla, borde.triangulos));
-    lista.push(pieza('horizonte', horizonte));
-    lista.push(pieza('ciudad lejana', lejana));
+    for (const capa of capas) for (const r of capa.renglones()) lista.push({ ...r, objeto: capa.objeto });
     lista.push(pieza('tarjetas de reflejo', tarjetas.malla));
     lista.push(pieza('halos', halos));
     for (const m of tren.mallas) lista.push(pieza(`tren · ${m.name}`, m));
@@ -570,6 +548,7 @@ export function construirLaCiudadAbierta(fuente: CiudadParaPintar, nivel: NivelD
     lejos,
     suelo,
     borde,
+    capas,
     atlas,
     semilla,
     hora: base.hora,
@@ -610,9 +589,8 @@ export function construirLaCiudadAbierta(fuente: CiudadParaPintar, nivel: NivelD
       tomarLosUniformes();
       tarjetas.actualizar(camara, primera);
       tren.actualizar(tic);
-      /* El horizonte está «en el infinito»: sigue a la cámara en planta. */
-      horizonte.position.set(camara.x, 0, camara.z);
-      horizonte.updateMatrix();
+      /* Las capas, con el MISMO tic que el tren (y el horizonte de la lejana, que sigue a la cámara). */
+      for (let k = 0; k < capas.length; k++) (capas[k] as CapaDeLaCiudad).actualizar?.(c, tiempo, tic);
       primera = false;
       return fotograma;
     },

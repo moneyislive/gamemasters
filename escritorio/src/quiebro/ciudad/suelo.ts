@@ -290,7 +290,8 @@ const RETOQUE_DE_LA_ACERA: Retoque = {
   ],
 };
 
-export function materialDeLaAcera(): THREE.MeshStandardMaterial {
+/** El material de la acera y la plaza de un nivel (el nivel no cambia nada todavía: lo usará la materia). */
+export function materialDeLaAcera(_nivel: NivelDeLaCiudad): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0 });
   m.name = 'quiebro-acera';
   parchear(m, RETOQUE_MUNDO, RETOQUE_ENTORNO, RETOQUE_SOLO_BRILLO, RETOQUE_DE_LA_ACERA);
