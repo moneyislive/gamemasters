@@ -21,6 +21,7 @@ import { esElSenalado, lugaresDe, manifiestoDe, manifiestoSiExiste, personasDe }
 import type { StalenessReport } from '../../../shared/staleness';
 import { computeStaleness } from '../../../shared/staleness';
 import { ampliacionDe } from '../juegos/ampliaciones';
+import { informeSinRevisar } from '../juegos/revisores';
 import { juegoDe, repararRespuestas } from '../juegos/solucion';
 import { partidaParaElTaller } from '../live/proyeccion';
 import { volcarGasto } from '../gasto/contador';
@@ -117,6 +118,17 @@ export async function runRefresh(game: GameSession, emit: Emitir): Promise<void>
     if (informe.needsAgent && game.plot && ampliar) {
       emit({ type: 'stage', stage: 'plot', label: 'Escribiendo los personajes que faltan…' });
       await ampliar(game, game.plot, informe, emit);
+    }
+
+    /*
+     * La revisión que tuviera se queda VIEJA si esto ha tocado la trama: se
+     * revisó otro reparto. No se relanza sola —«Actualizar» tiene que seguir
+     * siendo rápido y barato—, pero se dice, y el taller ofrece revisar de nuevo.
+     */
+    if (game.plot?.revision && (informe.needsAgent || informe.brokenSolution.length > 0)) {
+      game.plot.revision = informeSinRevisar(
+        'La trama ha cambiado después de revisarla (se actualizó el reparto). Conviene revisarla de nuevo.',
+      );
     }
 
     // ---------- Etapa 4: dosieres ----------

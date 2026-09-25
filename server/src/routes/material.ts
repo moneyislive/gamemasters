@@ -9,6 +9,7 @@
 import type { GenerateStreamEvent } from '../../../shared/types';
 import { getStore } from '../db/store';
 import { generadorDeMaterial } from '../juegos/materiales';
+import { revisorDe } from '../juegos/revisores';
 import '../plot/cluedo-material';
 import { crearRouter } from '../rutas';
 import { quienPide } from '../gasto/quien';
@@ -101,6 +102,22 @@ router.post('/games/:id/material', async (req, res) => {
     emit({ type: 'stage', stage: 'material', label: 'Escribiendo el material de la velada…' });
     const material = await generador(game, game.plot, emit);
     game.plot.material = material;
+    /*
+     * Y SE REVISA, porque el material es lo que se lee en voz alta: una apertura
+     * que nombra tres veces a quien lo hizo delata igual escrita al generar que
+     * reescrita con este botón. El alcance es solo el material —la trama ya pasó
+     * la suya— y si la revisión falla, el material se queda como salió.
+     */
+    const revisor = revisorDe(game.settings?.juego);
+    if (revisor) {
+      try {
+        const revisada = await revisor(game, game.plot, emit, 'material');
+        game.plot = revisada.plot;
+        game.plot.revision = revisada.informe;
+      } catch (error) {
+        console.error('[material] la revisión del material falló; se guarda como salió:', error);
+      }
+    }
     const guardada = await store.saveGame(game);
     emit({ type: 'done', game: partidaParaElTaller(guardada) });
     // Y se vuelca lo apuntado, ya con todo guardado: si se hiciera antes, el

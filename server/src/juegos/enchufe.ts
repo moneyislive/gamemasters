@@ -48,6 +48,7 @@ import { registrarCierre } from './cierres';
 import { registrarGenerador } from './generadores';
 import { registrarInicio } from './inicios';
 import { registrarMaterial } from './materiales';
+import { registrarRevisor } from './revisores';
 import { registrarAcciones } from './motor';
 import { registrarProyeccion, registrarProyeccionParaGm } from './proyecciones';
 import { registrarTrofeos } from './trofeos';
@@ -84,6 +85,7 @@ export interface Enchufe {
   registrarGenerador: typeof registrarGenerador;
   registrarAmpliacion: typeof registrarAmpliacion;
   registrarMaterial: typeof registrarMaterial;
+  registrarRevisor: typeof registrarRevisor;
   registrarVoz: typeof registrarVoz;
 
   // Qué se imprime.
@@ -117,6 +119,7 @@ export function elEnchufe(): Enchufe {
     registrarGenerador,
     registrarAmpliacion,
     registrarMaterial,
+    registrarRevisor,
     registrarVoz,
     registrarImprimibles,
     registrarImprimiblesDeLaCasa,

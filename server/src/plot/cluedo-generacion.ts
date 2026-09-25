@@ -152,9 +152,14 @@ REQUISITOS:
    - Si una pista fija una hora, ningún personaje puede contradecirla sin que eso sea una mentira deliberada y marcada como tal en su secreto.
 9. clues: aproximadamente 2 pistas por sala, mezcla de verdaderas y señuelos; pointsTo indica qué o a quién señala cada una.
    - REPARTO POR RONDAS con el campo "round": 1 motivos, conflictos y señuelos; 2 objetos desplazados y coartadas incompletas; 3 horarios, trayectos y contradicciones; 4 evidencias decisivas.
-   - Ninguna pista que por sí sola identifique al culpable puede llevar round 1 o 2. Reparte de forma pareja entre las cuatro rondas.
-10. gmScript: al menos 6 pasos concretos para conducir la velada. Debe incluir abrir un sobre de pistas por ronda y una puesta en común al final de cada ronda.
-9. TODO en español, con elegancia de novela negra de los años 20.${buildStyleBlock(game)}`;
+   - Reparte de forma pareja entre las cuatro rondas.
+   - pointsTo lo lee quien encuentra la pista al cerrar la ronda: escribe lo que la pista SUGIERE (una hora que no cuadra, un objeto fuera de su sitio, una mentira), nunca un veredicto como «señala al asesino».
+10. CADENA DE DEDUCCIÓN (se revisa): el culpable, el arma y la sala solo se prueban COMBINANDO al menos tres pistas de al menos dos rondas distintas. Ninguna pista identifica al culpable por sí sola, tampoco las de la ronda 4: la última ronda cierra el caso al sumarse a lo anterior, no al decirlo. Y cada inocente tiene que poder descartarse con alguna prueba, o al menos quedar por debajo al final.
+11. EL MISMO TRATO (se revisa): la persona culpable recibe la misma atención que las demás en todo lo que lee la mesa —título, lema, sinopsis, ambientación, cronología pública, caras públicas y pistas de las rondas 1 a 3—. Ni más, porque se delataría; ni menos, porque nadie la sospecharía y el caso se resolvería por descarte. La sinopsis y la ambientación nombran a todas las personas por igual, o a ninguna.
+12. NADIE DE RELLENO: cada personaje tiene un secreto que merezca esconderse, un motivo creíble contra la víctima, al menos un movimiento sospechoso en la cronología y al menos dos pistas que hablen de él a lo largo de la noche. Los dosieres tienen una extensión parecida: el del culpable no puede ser el más largo.
+13. OBJETOS CON HISTORIA: cada objeto de la lista aparece por su NOMBRE en al menos una pista y en el dosier de al menos un personaje, al que está ligado (le pertenece, lo heredó, es de su oficio, lo usó esa noche o tiene una historia con él). Cada uno tiene una razón para poder ser el arma, y los que no lo son quedan descartados por alguna prueba.
+14. gmScript: al menos 6 pasos concretos para conducir la velada. Debe incluir abrir un sobre de pistas por ronda y una puesta en común al final de cada ronda.
+15. TODO en español, con elegancia de novela negra de los años 20.${buildStyleBlock(game)}`;
 }
 
 // ---------------------------------------------------------------------------

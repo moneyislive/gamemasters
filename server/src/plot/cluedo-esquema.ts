@@ -14,8 +14,8 @@
  * el pipeline valida la solución tras el parseo.
  */
 
-/** Definición reutilizable de un personaje: idéntica en el schema base y en el de ampliación. */
-const PERSONAJE_SCHEMA: Record<string, unknown> = {
+/** Definición reutilizable de un personaje: idéntica en el schema base, en el de ampliación y en el del revisor. */
+export const PERSONAJE_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
   required: [
@@ -59,7 +59,7 @@ const PERSONAJE_SCHEMA: Record<string, unknown> = {
 };
 
 /** Definición reutilizable de una pista. */
-const PISTA_SCHEMA: Record<string, unknown> = {
+export const PISTA_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
   /*

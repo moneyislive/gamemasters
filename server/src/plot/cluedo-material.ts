@@ -255,16 +255,26 @@ LA PARTIDA TIENE ${rondas} RONDAS.
 
 REQUISITOS:
 1. narrations: exactamente ${rondas + 1} entradas, con round 0 (apertura) y round 1..${rondas}. Ninguna revela la solución: son el telón que se levanta al empezar cada tramo.
-2. twists: entre 2 y ${Math.min(6, Math.max(2, sospechososDe(game).length - 1))} giros, cada uno para un sospechoso DISTINTO y NINGUNO para el culpable —si el culpable recibiera un giro se delataría solo—. Reparte entre las rondas 2 y ${rondas}. Cada uno debe darle a ese jugador algo NUEVO que contar o que ocultar.
+2. twists: entre ${Math.min(2, maximoDeGiros(sospechososDe(game).length))} y ${maximoDeGiros(sospechososDe(game).length)} giros, cada uno para un sospechoso DISTINTO y NINGUNO para el culpable —si el culpable recibiera un giro se delataría solo—. Y al menos un inocente se queda sin giro: si todos los inocentes recibieran sobre, el único sin él sería el culpable. Reparte entre las rondas 2 y ${rondas}. Cada uno debe darle a ese jugador algo NUEVO que contar o que ocultar.
 3. timelineReveals: una entrada por ronda (1..${rondas}), en orden cronológico, que vaya rellenando el tramo sin testigos. La última puede dejar la pieza final sin encajar, pero no nombra al culpable.
 4. hints: tres ayudas graduadas. La de nivel 3 puede señalar la sala o el objeto, nunca a la persona.
 5. finale: la reconstrucción, la confesión en primera persona para que la lea quien interpretó al culpable, y el epílogo.
-6. Todo en español, escrito para leerse en voz alta ante una mesa: frases cortas, sin subordinadas largas.${buildStyleBlock(game)}`;
+6. EL MISMO TRATO: ninguna narración, hecho establecido ni ayuda destaca al culpable sobre los demás. La apertura presenta a todos por igual o no nombra a nadie; si una narración nombra a alguien, nombra también a otros.
+7. Todo en español, escrito para leerse en voz alta ante una mesa: frases cortas, sin subordinadas largas.${buildStyleBlock(game)}`;
 }
 
 // ---------------------------------------------------------------------------
 // Saneado
 // ---------------------------------------------------------------------------
+
+/**
+ * Cuántos giros caben en una mesa de `personas` sin que el reparto delate a
+ * nadie: el culpable no recibe ninguno, así que al menos un inocente tiene que
+ * quedarse sin el suyo. Seis como mucho, que es lo que una noche digiere.
+ */
+export function maximoDeGiros(personas: number): number {
+  return Math.max(0, Math.min(6, personas - 2));
+}
 
 /**
  * Recorta lo que no encaja con la partida real.
@@ -286,6 +296,13 @@ function sanear(material: PrintMaterial, game: GameSession, plot: Plot): PrintMa
       vistos.add(giro.participanteId);
       return true;
     })
+    /*
+     * Y NUNCA A TODOS LOS INOCENTES. Con siete a la mesa esto dejaba pedir seis
+     * giros: uno por inocente, y el único sin sobre era quien lo hizo. El
+     * culpable ya no recibe giro por lo de arriba; lo que faltaba era que eso
+     * no se notara.
+     */
+    .slice(0, maximoDeGiros(idsValidos.size))
     .map((giro, indice) => ({
       ...giro,
       id: giro.id || `giro-${indice + 1}`,

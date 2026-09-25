@@ -648,6 +648,23 @@ export function partidaParaElTaller(game: GameSession): GameSession {
         : undefined,
       // Y lo que cada juego guarda de su trama: en la Momia, el orden verdadero.
       delJuego: undefined,
+      /*
+       * La revisión habla de la solución con todas las letras —«la pista 7
+       * señala demasiado a la condesa»—, y sus lecturas dicen a quién apuntaba
+       * la sospecha en cada ronda. A ciegas queda el veredicto y cuántas
+       * cosas se corrigieron, que es lo que hace falta para fiarse de la trama.
+       */
+      revision: plot.revision
+        ? {
+            veredicto: plot.revision.veredicto,
+            pasadas: plot.revision.pasadas,
+            hallazgos: [],
+            cambios: plot.revision.cambios.length
+              ? [`La revisión hizo ${plot.revision.cambios.length} cambios. No se detallan: juegas a ciegas.`]
+              : [],
+            revisadaEl: plot.revision.revisadaEl,
+          }
+        : undefined,
     },
   };
 }

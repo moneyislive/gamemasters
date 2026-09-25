@@ -99,6 +99,15 @@ import '../plot/cluedo-generacion';
  * los personajes que faltan sin escribir. Sin un solo error.
  */
 import '../plot/cluedo-ampliacion';
+/*
+ * Y su material de la velada y su revisión adversaria. El material se daba de
+ * alta desde `routes/material.ts`, que es quien lo usaba; ahora la tubería lo
+ * escribe también al generar, y un alta que depende de qué ruta se cargue
+ * antes es la clase de fallo mudo que este fichero existe para evitar. Sin la
+ * segunda línea la trama se entrega sin revisar, y el informe lo diría.
+ */
+import '../plot/cluedo-material';
+import '../plot/cluedo-revision';
 
 // El Misterio de la Momia: reductores, proyección del estado y trofeos.
 /*

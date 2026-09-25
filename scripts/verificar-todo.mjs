@@ -354,6 +354,12 @@ const BATERIA = [
   { nombre: 'proveedores', donde: 'server', guion: 'verify:proveedores', porque: 'entrar con Google y con correo' },
   { nombre: 'enlaces', donde: 'server', guion: 'verify:enlaces', porque: 'los enlaces firmados valen para una cosa' },
   {
+    nombre: 'revisión adversaria',
+    donde: 'server',
+    guion: 'verify:revision',
+    porque: 'lo que estropeó veladas de verdad —el resumen que acusa, el arma sin nombre, la pista que dicta— se ve antes de cobrarla',
+  },
+  {
     nombre: 'esquemas de la trama',
     donde: 'server',
     guion: 'verify:esquemas',

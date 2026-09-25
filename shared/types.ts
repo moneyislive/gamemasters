@@ -355,6 +355,13 @@ export interface HallazgoDeRevision {
   gravedad: GravedadDeHallazgo;
   /** Quién lo vio: el recuento hecho con código, el detective sin solución o el revisor. */
   origen: 'auditoria' | 'detective' | 'revisor';
+  /**
+   * De qué o de quién habla: el id de una persona, un objeto, una sala o una
+   * pista, o `momento-N` para una lectura del detective. Con el código, es lo
+   * que permite saber si un hallazgo de la primera lectura sigue ahí después de
+   * corregir.
+   */
+  sobre?: string;
   /** Explicado para el Game Master. Puede nombrar la solución. */
   texto: string;
   /** `corregido` si la revisión lo arregló; `pendiente` si sigue ahí al entregar. */
