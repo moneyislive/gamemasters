@@ -39,9 +39,17 @@ type Emitir = (evento: GenerateStreamEvent) => void;
 
 const clave = (h: HallazgoDeRevision) => `${h.codigo}|${h.sobre ?? ''}`;
 
-/** Lo que obliga a otra pasada. Lo menor se anota y no se paga otra vuelta por ello. */
+/**
+ * Lo que obliga a OTRA pasada: solo lo bloqueante.
+ *
+ * La primera pasada va siempre. La segunda costó 1,2 $ de los 4,09 $ de la
+ * primera velada completa contra la API (25-sep-2026), y la pedían avisos
+ * graves que el taller ya enseña: una mesa con un favorito, un final algo flojo.
+ * Eso se le dice al Game Master; otra vuelta del revisor se paga solo si queda
+ * algo que rompe la noche.
+ */
 function hayQueCorregir(hallazgos: HallazgoDeRevision[]): boolean {
-  return hallazgos.some((h) => h.gravedad === 'bloqueante' || h.gravedad === 'grave');
+  return hallazgos.some((h) => h.gravedad === 'bloqueante');
 }
 
 function veredictoDe(pendientes: HallazgoDeRevision[]): InformeDeRevision['veredicto'] {
@@ -176,9 +184,17 @@ export async function revisarTramaCluedo(
   }
 
   // ---- El informe ----
-  const siguen = new Set(pendientes.map(clave));
+  const siguen = new Map(pendientes.map((h) => [clave(h), h]));
   const hallazgos = sinRepetir([
-    ...hallazgosIniciales.map((h) => ({ ...h, estado: siguen.has(clave(h)) ? ('pendiente' as const) : ('corregido' as const) })),
+    /*
+     * Lo que sigue pendiente, con lo que dice la ÚLTIMA lectura: el mismo
+     * aviso de la primera («un 70 %») contaba algo que ya no es verdad cuando
+     * la corrección lo había dejado en un 40 %.
+     */
+    ...hallazgosIniciales.map((h) => {
+      const ahora = siguen.get(clave(h));
+      return ahora ? { ...ahora, estado: 'pendiente' as const } : { ...h, estado: 'corregido' as const };
+    }),
     // Lo que apareció después de corregir y no estaba al principio.
     ...pendientes.filter((h) => !hallazgosIniciales.some((i) => clave(i) === clave(h))),
     ...delRevisor,

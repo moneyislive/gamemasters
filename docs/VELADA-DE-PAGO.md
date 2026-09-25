@@ -91,16 +91,60 @@ Una velada de siete personas inventadas, por el mismo camino que producción
 | 1 | `api_error` a los 3,5 min, a mitad de la trama: se perdió todo | Reintento ante fallos transitorios |
 | 2 | A esfuerzo `high`, la trama agotó los 64.000 tokens a los 10,7 min (1,29 $ tirados) | Trama a `medium`, revisor a `high`; techo de salida a 128.000 |
 | 3 | `ECONNRESET` a los 5,7 min, no reconocido como transitorio | El reintento mira la cadena de causas |
-| 4 | *(ver abajo)* | |
+| 4 | Completa: 19,4 min y 4,09 $. Ver abajo | Segunda pasada solo si queda algo bloqueante; material del revisor a `medium`; severidad graduada del detective |
 
 **La lección para el producto**: una llamada de varios minutos se cae con frecuencia. Sin
 reintentos y sin reembolso automático, eso se lo come el cliente.
 
+### Lo que hizo la revisión en la velada completa
+
+El autor escribió una trama en la que, **antes de la primera ronda, quien no sabía la
+solución ya señalaba al asesino con un 70 %**: los dosieres, leídos juntos, lo dejaban callado
+justo entre los dos crujidos del pasadizo. En la ronda 3 estaba en un 80 % y la última ronda
+no aportaba nada. Es el fallo de la casa Sabrón, en una trama nueva.
+
+El revisor, en dos pasadas, dio movimientos sospechosos a otros tres personajes, reescribió los
+doce «apunta a» que dictaban veredicto, sacó de la cara pública del asesino su vínculo con el
+arma (y ligó el arma también a otra persona), corrigió dos contradicciones y un cabo suelto, y
+puso al día giros, ayudas, reconstrucción y confesión para que todo siguiera cuadrando.
+
+| Momento | Antes | Después |
+|---|---|---|
+| Antes de la ronda 1 | 70 % | 40 % |
+| Al cerrar la ronda 1 | 62 % | 36 % |
+| Al cerrar la ronda 2 | 75 % | 45 % |
+| Al cerrar la ronda 3 | 80 % | 66 % |
+| Final | 90 % | 77 % — sigue siendo resoluble |
+
+Lo que costó cada paso (Opus 5.5, siete personas):
+
+| Paso | Esfuerzo | Llamadas | Salida | Coste |
+|---|---|---|---|---|
+| Trama | medium | 1 | 29.413 | 0,61 $ |
+| Material | medium | 1 | 7.360 | 0,18 $ |
+| Detective | medium | 15 | 14.565 | 0,84 $ |
+| Revisor (dos pasadas) | high | 4 | 84.018 | 2,47 $ |
+
+Con esa velada el veredicto salió `no-apta`, lo que habría devuelto el dinero de una trama que
+ya estaba bien: el 40 % del principio contaba como bloqueante. Ahora hay dos escalones —la mitad
+o más con ventaja holgada bloquea; un favorito claro es aviso grave— y esa misma velada saldría
+«jugable, con algún aviso», sin segunda pasada y por menos dinero.
+
 ### El presupuesto
 
-`cobro/estimacion.ts` estima los tokens de cada paso y `cobro/tarifa.ts` los convierte a
-dólares con la tarifa oficial. El gasto real de cada velada queda en `game.gasto.costeUsd`,
-y es con lo que hay que recalibrar las constantes en cuanto haya veladas de verdad.
+`cobro/estimacion.ts` reproduce la tabla de arriba con la política nueva (una segunda pasada de
+cada cuatro veces) y `cobro/tarifa.ts` lo pasa a dólares con la tarifa oficial. Con un margen de
+2,5 y el cambio a 0,92 €/$:
+
+| Mesa | Opus 5.5 papel | Opus 5.5 app | Sonnet 5 papel | Fable 5.1 papel |
+|---|---|---|---|---|
+| 4 personas | 4,99 € | 5,99 € | 3,99 € | 13,49 € |
+| 7 personas | 6,99 € | 8,49 € | 4,49 € | 18,49 € |
+| 12 personas | 9,99 € | 12,99 € | 6,49 € | 26,99 € |
+
+El Mayordomo (lo que separa papel de app) todavía es una suposición —seis preguntas por
+persona—: no hay ninguna velada con app medida. El gasto real de cada velada queda en
+`game.gasto.costeUsd`, y es con lo que hay que recalibrar en cuanto haya veladas de verdad.
 
 ---
 

@@ -344,6 +344,17 @@ function ordenados(reparto: Record<string, number>): Array<[string, number]> {
  * Compara lo que leyó el detective con la solución. Umbrales pensados para no
  * saltar con el ruido de una sola lectura: una sospecha que dobla lo que tocaría
  * por azar y saca ventaja clara a la segunda.
+ *
+ * ═══ DOS ESCALONES, Y POR QUÉ ═══
+ *
+ * La primera velada completa contra la API (25-sep-2026, siete personas) empezó
+ * con el culpable al 70 % antes de la primera ronda: eso es una trama rota, y
+ * el revisor la dejó en un 40 %. Un 40 % con siete a la mesa es que la mesa
+ * tiene un favorito —vale un aviso— pero no que el caso esté resuelto. Con un
+ * solo escalón, el 40 % salía «bloqueante», la velada «no apta» y se habría
+ * devuelto entera una trama que ya estaba bien. Así que lo bloqueante es lo
+ * que delata de verdad (la mitad o más, con ventaja holgada), y lo intermedio
+ * se queda en grave.
  */
 export function juzgarLecturas(
   game: GameSession,
@@ -375,16 +386,18 @@ export function juzgarLecturas(
     const ventaja = encabeza ? pCulpable - (segundo?.[1] ?? 0) : 0;
 
     if (l.momento === 0 && encabeza && pCulpable >= Math.max(0.3, 2 * azar) && ventaja >= 0.1) {
+      const delata = pCulpable >= Math.max(0.5, 3 * azar) && ventaja >= 0.15;
       h(
         'filtracion-inicial',
-        'bloqueante',
+        delata ? 'bloqueante' : 'grave',
         `Antes de abrir la primera ronda, quien no sabe la solución ya señala a ${nombre(culpable)} con un ` +
-          `${pct(pCulpable)}. Por qué: ${l.razon}`,
+          `${pct(pCulpable)}${delata ? '' : ': la mesa empezará con un favorito'}. Por qué: ${l.razon}`,
       );
     } else if (l.momento > 0 && l.momento < rondas - 1 && encabeza && pCulpable >= Math.max(0.4, 2.5 * azar) && ventaja >= 0.15) {
+      const delata = l.momento === 1 && pCulpable >= Math.max(0.6, 3.5 * azar) && ventaja >= 0.2;
       h(
         'filtracion-temprana',
-        l.momento === 1 ? 'bloqueante' : 'grave',
+        delata ? 'bloqueante' : 'grave',
         `Al cerrar la ronda ${l.momento} de ${rondas}, el detective ya señala a ${nombre(culpable)} con un ` +
           `${pct(pCulpable)} y ventaja clara. Por qué: ${l.razon}`,
       );

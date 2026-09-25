@@ -309,10 +309,16 @@ paso('El juicio de las lecturas del detective');
   ];
   comprobar('una noche bien llevada no da avisos', juzgarLecturas(game, plot, bien, 4).length === 0, juzgarLecturas(game, plot, bien, 4));
 
-  const antesDeEmpezar = [lectura(0, reparto(CULPABLE, 0.45)), ...bien.slice(1)];
+  // Los números de la primera velada completa contra la API: 70 % antes de corregir, 40 % después.
+  const antesDeEmpezar = [lectura(0, reparto(CULPABLE, 0.7)), ...bien.slice(1)];
   comprobar(
-    'la mesa ya la señala antes de empezar: bloqueante',
+    'la mesa ya la señala al 70 % antes de empezar: bloqueante',
     tiene(juzgarLecturas(game, plot, antesDeEmpezar, 4), 'filtracion-inicial', 'bloqueante'),
+  );
+  const conFavorito = [lectura(0, reparto(CULPABLE, 0.4)), ...bien.slice(1)];
+  comprobar(
+    'al 40 % es un favorito, no una trama rota: grave',
+    tiene(juzgarLecturas(game, plot, conFavorito, 4), 'filtracion-inicial', 'grave'),
   );
 
   const sinSolucion = [...bien.slice(0, 4), lectura(4, reparto('s4', 0.6))];

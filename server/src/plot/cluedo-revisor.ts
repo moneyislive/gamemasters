@@ -366,10 +366,16 @@ export async function pedirRevision(
     ],
   };
 
-  const turno = async (messages: Anthropic.MessageParam[], schema: Record<string, unknown>) => {
+  /*
+   * El juicio —qué falla y cómo se arregla la trama— piensa lo del revisor. El
+   * material es poner al día prosa ya escrita con lo decidido: piensa lo del
+   * material. En la primera velada completa, los cuatro turnos del revisor a
+   * `high` fueron 84.000 tokens de salida y 2,47 $ de 4,09 $.
+   */
+  const turno = async (messages: Anthropic.MessageParam[], schema: Record<string, unknown>, paso: 'revisor' | 'material' = 'revisor') => {
     const stream = streamDeGeneracion(client, {
       model,
-      esfuerzo: esfuerzoPara(game, 'revisor'),
+      esfuerzo: esfuerzoPara(game, paso),
       maxTokens: 128000,
       system: SISTEMA_REVISOR,
       schema,
@@ -407,6 +413,7 @@ export async function pedirRevision(
     const { datos: material } = await turno(
       [primero, { role: 'assistant', content: mensaje.content as Anthropic.MessageParam['content'] }, { role: 'user', content: PEDIDO_DEL_MATERIAL }],
       REVISION_MATERIAL_SCHEMA,
+      'material',
     );
     return {
       ...respuesta,
