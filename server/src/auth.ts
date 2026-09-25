@@ -141,6 +141,20 @@ export function identidadDeTaller(req: Request): IdentidadDeTaller | null {
  * de casa y pasaporte— y su cuenta no está en `GM_ADMITIDOS` ni tiene por qué;
  * si un pasaporte no admitido cortara aquí, ese camino se cerraría solo.
  */
+/**
+ * ¿Trae esta petición la llave de la casa (la cookie de la contraseña)?
+ *
+ * Aparte de `identidadDeTaller` porque quien entra con contraseña Y nombre lleva
+ * las dos cosas, y ahí manda el pasaporte: para saber si es de la casa —y por
+ * tanto no se le cobra— hay que mirar la cookie por separado.
+ */
+export function llevaLaLlaveDeLaCasa(req: Request): boolean {
+  const password = env.appPassword;
+  if (!password) return false;
+  const cookie = leerCookie(req, COOKIE);
+  return Boolean(cookie && igualSeguro(cookie, tokenDeSesion(password)));
+}
+
 export async function tallerAbiertoPara(req: Request): Promise<boolean> {
   const pasaporte = sesionDeCuentaDePeticion(req);
   if (pasaporte) {

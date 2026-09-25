@@ -18,6 +18,7 @@ import type {
   ModelId,
 } from '../../../shared/types';
 import type { Account, LiveSession } from '../../../shared/live';
+import type { MovimientoDeSaldo } from '../../../shared/cobro';
 import { env, isModelId } from '../config';
 
 // ---------------------------------------------------------------------------
@@ -79,6 +80,17 @@ export interface Store {
    * diferencia entre reconocer a alguien y reconocer una cadena de texto.
    */
   getAccountPorIdentidad(proveedor: string, sub: string): Promise<Account | null>;
+
+  /** La cuenta que la pasarela conoce por este id de cliente: los avisos de renovación solo traen ese. */
+  getAccountPorCliente(cliente: string): Promise<Account | null>;
+
+  // ---- Monedero (ver `cobro/monedero.ts`) ----
+  /** Apunta un movimiento. El libro solo crece: no hay ni editar ni borrar. */
+  apuntarMovimiento(m: MovimientoDeSaldo): Promise<void>;
+  /** Los movimientos de una cuenta, del más antiguo al más reciente. */
+  movimientosDe(cuentaId: string): Promise<MovimientoDeSaldo[]>;
+  /** El movimiento con esta referencia, si ya existe: es lo que hace idempotente un aviso de pago. */
+  movimientoPorReferencia(referencia: string): Promise<MovimientoDeSaldo | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +164,7 @@ interface FileData {
   config: { model: ModelId };
   live: LiveSession[];
   accounts: Account[];
+  movimientos: MovimientoDeSaldo[];
 }
 
 class FileStore implements Store {
@@ -163,6 +176,7 @@ class FileStore implements Store {
     config: { model: env.defaultModel },
     live: [],
     accounts: [],
+    movimientos: [],
   };
   /** Cadena de escrituras para serializar los renames y evitar colisiones. */
   private writeChain: Promise<void> = Promise.resolve();
@@ -184,6 +198,7 @@ class FileStore implements Store {
             : { model: env.defaultModel },
         live: Array.isArray(parsed.live) ? parsed.live : [],
         accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
+        movimientos: Array.isArray(parsed.movimientos) ? parsed.movimientos : [],
       };
     } catch {
       // El fichero aún no existe (o está corrupto): se parte de un almacén vacío.
@@ -336,6 +351,29 @@ class FileStore implements Store {
     );
     return a ? structuredClone(a) : null;
   }
+
+  async getAccountPorCliente(cliente: string): Promise<Account | null> {
+    const a = this.data.accounts.find((x) => x.cobro?.clientePasarela === cliente);
+    return a ? structuredClone(a) : null;
+  }
+
+  async apuntarMovimiento(m: MovimientoDeSaldo): Promise<void> {
+    if (m.referencia && this.data.movimientos.some((x) => x.referencia === m.referencia)) return;
+    this.data.movimientos.push(structuredClone(m));
+    await this.persist();
+  }
+
+  async movimientosDe(cuentaId: string): Promise<MovimientoDeSaldo[]> {
+    return this.data.movimientos
+      .filter((m) => m.cuentaId === cuentaId)
+      .sort((a, b) => a.el.localeCompare(b.el))
+      .map((m) => structuredClone(m));
+  }
+
+  async movimientoPorReferencia(referencia: string): Promise<MovimientoDeSaldo | null> {
+    const m = this.data.movimientos.find((x) => x.referencia === referencia);
+    return m ? structuredClone(m) : null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -391,6 +429,13 @@ export const CAMPOS_UNICOS: Record<string, string[]> = {
   games: ['id'],
   live: ['id', 'code'],
   accounts: ['id', 'email'],
+  /*
+   * La referencia es lo que hace idempotente un aviso de pago: la pasarela
+   * reintenta, y el mismo pago no puede sumar dos veces. Aquí sí hace falta el
+   * índice único desde el primer día, y como la colección es nueva, se crea con
+   * él al arrancar.
+   */
+  movimientos: ['id', 'referencia'],
 };
 
 function looseModel(
@@ -451,7 +496,10 @@ export class MongoStore implements Store {
     'email',
     'id',
     'identidades.sub',
+    'cobro.clientePasarela',
   ]);
+  // El libro del monedero: se consulta por cuenta y por referencia de pago.
+  private readonly movimientos = looseModel('Movimiento', 'movimientos', ['id', 'cuentaId', 'referencia']);
 
   async listGames(): Promise<GameSummary[]> {
     const docs = (await this.games
@@ -600,6 +648,31 @@ export class MongoStore implements Store {
       .findOne({ identidades: { $elemMatch: { proveedor, sub } } })
       .lean()) as unknown as LooseDoc | null;
     return doc ? stripMongo<Account>(doc) : null;
+  }
+
+  async getAccountPorCliente(cliente: string): Promise<Account | null> {
+    const doc = (await this.accounts.findOne({ 'cobro.clientePasarela': cliente }).lean()) as unknown as LooseDoc | null;
+    return doc ? stripMongo<Account>(doc) : null;
+  }
+
+  async apuntarMovimiento(m: MovimientoDeSaldo): Promise<void> {
+    try {
+      await this.movimientos.create(m as unknown as LooseDoc);
+    } catch (error) {
+      // Un duplicado por referencia es el aviso repetido: ya está apuntado.
+      if ((error as { code?: number }).code === 11000) return;
+      throw error;
+    }
+  }
+
+  async movimientosDe(cuentaId: string): Promise<MovimientoDeSaldo[]> {
+    const docs = (await this.movimientos.find({ cuentaId }).sort({ el: 1 }).lean()) as unknown as LooseDoc[];
+    return docs.map((d) => stripMongo<MovimientoDeSaldo>(d));
+  }
+
+  async movimientoPorReferencia(referencia: string): Promise<MovimientoDeSaldo | null> {
+    const doc = (await this.movimientos.findOne({ referencia }).lean()) as unknown as LooseDoc | null;
+    return doc ? stripMongo<MovimientoDeSaldo>(doc) : null;
   }
 }
 

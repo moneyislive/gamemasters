@@ -77,6 +77,7 @@ import liveRouter from './routes/live';
 import materialRouter from './routes/material';
 import refreshRouter from './routes/refresh';
 import revisionRouter from './routes/revision';
+import cobroRouter, { avisoRouter } from './routes/cobro';
 import uploadsRouter from './routes/uploads';
 import duenoRouter from './taller/dueno';
 import { costurasDePruebaActivas } from './identidad/oidc';
@@ -168,6 +169,13 @@ app.use(corsDeLaCasa(contextoDelCors));
  * identifica no llega ni a que se lea el cuerpo.
  */
 app.use('/api/generacion/avatar', exigeIdentidad, express.json({ limit: '25mb' }));
+/*
+ * Los avisos de la pasarela de pago, ANTES del analizador de JSON: su firma se
+ * calcula sobre los bytes exactos que llegan, y un cuerpo ya parseado no se
+ * puede volver a firmar. Van fuera de la puerta del taller —Stripe no trae
+ * contraseña, trae firma— y los defiende esa firma. Ver `routes/cobro.ts`.
+ */
+app.use('/api', avisoRouter);
 app.use(express.json({ limit: '256kb' }));
 
 /*
@@ -363,6 +371,7 @@ app.use('/api', generateRouter);
 app.use('/api', refreshRouter);
 app.use('/api', materialRouter);
 app.use('/api', revisionRouter);
+app.use('/api', cobroRouter);
 app.use('/api', correoRouter);
 app.use('/api', liveRouter);
 app.use('/api', documentsRouter);

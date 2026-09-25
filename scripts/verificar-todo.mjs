@@ -344,6 +344,7 @@ const BATERIA = [
   { nombre: 'almacén', donde: 'server', guion: 'verify:almacen', porque: 'lo que se guarda se vuelve a leer igual' },
   { nombre: 'presencia', donde: 'server', guion: 'verify:presencia', porque: 'quién está conectado y quién no' },
   { nombre: 'tope de gasto', donde: 'server', guion: 'verify:tope', porque: 'un bucle no puede vaciar la cuenta' },
+  { nombre: 'cobro', donde: 'server', guion: 'verify:cobro', porque: 'cada crédito entra una vez, sale una vez y se puede explicar' },
   { nombre: 'campaña', donde: 'server', guion: 'verify:campana', porque: 'una velada de varios encuentros' },
   { nombre: 'credenciales', donde: 'server', guion: 'verify:credenciales', porque: 'con qué se entra y con qué no' },
   { nombre: 'borrado', donde: 'server', guion: 'verify:borrado', porque: 'quien pide que le borren, queda borrado' },

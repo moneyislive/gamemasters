@@ -15,6 +15,7 @@
 import type { BoardLayout, BoardMode } from './types';
 import type { CategoriaId, EjeId, JuegoId } from './juegos/tipos';
 import type { CorreoDeCuenta, IdentidadDeProveedor } from './identidad';
+import type { CobroDeLaCuenta } from './cobro';
 
 // ---------------------------------------------------------------------------
 // Estado de la partida
@@ -587,6 +588,12 @@ export interface Account {
    * modelo esculpido): aquél es un retrato y éste es un personaje que anda.
    */
   figura?: string;
+  /**
+   * Lo que se sabe del cobro de esta cuenta: su cliente en la pasarela, su
+   * suscripción y sus pases. El SALDO no está aquí: sale del libro de
+   * movimientos (ver `server/src/cobro/monedero.ts`).
+   */
+  cobro?: CobroDeLaCuenta;
 }
 
 // ---------------------------------------------------------------------------

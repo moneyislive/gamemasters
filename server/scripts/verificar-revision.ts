@@ -391,6 +391,45 @@ paso('Sin clave, la revisión es la auditoría');
   comprobar('con los hallazgos pendientes', r.informe.hallazgos.every((h) => h.estado === 'pendiente'));
 }
 
+paso('Un fallo transitorio de la API se reintenta; uno de verdad, no');
+{
+  const { StreamConReintento, esTransitorio } = await import('../src/agent/anthropic');
+  const Anthropic = (await import('@anthropic-ai/sdk')).default;
+  // El que se vio el 25-sep-2026: un `api_error` a mitad del stream, sin estado HTTP.
+  const aMitad = new Anthropic.APIError(undefined, { type: 'error', error: { type: 'api_error', message: 'Unable to complete this request right now.' } }, 'x', undefined);
+  const malPedido = new Anthropic.APIError(400, { type: 'error', error: { type: 'invalid_request_error', message: 'x' } }, 'x', undefined);
+  comprobar('el api_error a mitad del stream es transitorio', esTransitorio(aMitad));
+  comprobar('un 400 no lo es', !esTransitorio(malPedido));
+
+  let intentos = 0;
+  const avisos: string[] = [];
+  const falso = (fallo?: unknown) => ({
+    on: (_e: 'text', cb: (d: string) => void) => {
+      avisos.length === 0 && cb('');
+      return undefined;
+    },
+    finalMessage: async () => {
+      intentos += 1;
+      if (fallo && intentos < 3) throw fallo;
+      return { content: [{ type: 'text', text: '{}' }], stop_reason: 'end_turn', usage: {} };
+    },
+  });
+  const conReintento = new StreamConReintento(() => falso(aMitad), 1);
+  conReintento.on('text', (d) => d && avisos.push(d));
+  const final = await conReintento.finalMessage();
+  comprobar('se reintenta hasta que sale', final.stop_reason === 'end_turn' && intentos === 3, intentos);
+  comprobar('y se avisa de cada reintento', avisos.filter((a) => a.includes('Se vuelve a intentar')).length === 2, avisos);
+
+  intentos = 0;
+  let lanzo = false;
+  try {
+    await new StreamConReintento(() => falso(malPedido), 1).finalMessage();
+  } catch {
+    lanzo = true;
+  }
+  comprobar('un fallo de verdad no se reintenta', lanzo && intentos === 1, intentos);
+}
+
 paso('Los esquemas del detective y del revisor');
 {
   // Lo mismo que exige verify:esquemas a los de la trama: cada obligatorio existe y nada queda opcional.

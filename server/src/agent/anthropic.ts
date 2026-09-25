@@ -178,16 +178,78 @@ export function streamDeGeneracion(
     messages: opciones.messages,
   };
 
-  if (usesFallbacks(opciones.model)) {
-    return client.beta.messages.stream({
-      ...base,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-    } as unknown as Parameters<typeof client.beta.messages.stream>[0]) as unknown as StreamDeGeneracion;
+  const abrir = (): StreamDeGeneracion =>
+    usesFallbacks(opciones.model)
+      ? (client.beta.messages.stream({
+          ...base,
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default',
+        } as unknown as Parameters<typeof client.beta.messages.stream>[0]) as unknown as StreamDeGeneracion)
+      : (client.messages.stream(
+          base as unknown as Parameters<typeof client.messages.stream>[0],
+        ) as unknown as StreamDeGeneracion);
+  return new StreamConReintento(abrir);
+}
+
+/**
+ * ¿Es un fallo de los que se pasan solos?
+ *
+ * Medido el 25-sep-2026 con la primera velada de prueba: a los tres minutos y
+ * medio de escribir la trama, la API cortó el stream con `api_error` —«Unable to
+ * complete this request right now. Please try again»— y la generación entera
+ * se perdió. El SDK reintenta los fallos de conexión ANTES de que empiece el
+ * stream, pero no uno que llega a mitad, que es justo el caro. Estos son los que
+ * merecen otra vuelta; un 400 o un rechazo, no.
+ */
+export function esTransitorio(error: unknown): boolean {
+  if (error instanceof Anthropic.APIConnectionError) return true;
+  if (!(error instanceof Anthropic.APIError)) return false;
+  if (error.status !== undefined && [408, 409, 429, 500, 502, 503, 504, 529].includes(error.status)) return true;
+  const tipo = (error.error as { error?: { type?: string } } | undefined)?.error?.type;
+  return tipo === 'api_error' || tipo === 'overloaded_error' || tipo === 'rate_limit_error';
+}
+
+/** Cuántas veces se intenta una llamada de generación, contando la primera. */
+const INTENTOS = 3;
+
+/**
+ * Un stream que, si se cae por un fallo transitorio, se vuelve a pedir entero.
+ *
+ * Tiene la misma cara que el del SDK —`on('text')` y `finalMessage()`— para que
+ * ningún punto de llamada tenga que saber que existe. Quien escucha el texto ve
+ * una nota cuando se reintenta: sin ella, el progreso volvería a empezar sin
+ * explicación.
+ */
+export class StreamConReintento implements StreamDeGeneracion {
+  private readonly escuchas: Array<(delta: string) => void> = [];
+
+  constructor(
+    private readonly abrir: () => StreamDeGeneracion,
+    /** Solo para las comprobaciones, que no pueden esperar ocho segundos por intento. */
+    private readonly esperaMs = 8000,
+  ) {}
+
+  on(evento: 'text', escuchar: (delta: string) => void): this {
+    if (evento === 'text') this.escuchas.push(escuchar);
+    return this;
   }
-  return client.messages.stream(
-    base as unknown as Parameters<typeof client.messages.stream>[0],
-  ) as unknown as StreamDeGeneracion;
+
+  async finalMessage(): Promise<MensajeDeGeneracion> {
+    for (let intento = 1; ; intento++) {
+      const stream = this.abrir();
+      for (const escuchar of this.escuchas) stream.on('text', escuchar);
+      try {
+        return await stream.finalMessage();
+      } catch (error) {
+        if (intento >= INTENTOS || !esTransitorio(error)) throw error;
+        console.warn(`[anthropic] fallo transitorio (intento ${intento} de ${INTENTOS}); se reintenta:`, error);
+        for (const escuchar of this.escuchas) {
+          escuchar(`\n[La API ha fallado un momento. Se vuelve a intentar (${intento + 1} de ${INTENTOS})…]\n`);
+        }
+        await new Promise((r) => setTimeout(r, intento * this.esperaMs));
+      }
+    }
+  }
 }
 
 /** El texto de un mensaje, uniendo sus bloques de texto (los de pensamiento no). */
