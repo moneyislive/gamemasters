@@ -59,6 +59,11 @@ export interface PropsDeLaAtmosfera {
   readonly farolasEncendidas?: number;
   /** La luz del barrio (ver `luz-del-barrio.ts`); sin ella, la madrugada. */
   readonly luz?: LuzDeLaNoche;
+  /**
+   * `false` quita la lluvia y las salpicaduras (los charcos y su niebla se quedan): el banco lo usa para
+   * sacar dos fotos iguales sin el ruido de las gotas. Por omisión, llueve.
+   */
+  readonly lluvia?: boolean;
 }
 
 const MADRUGADA: LuzDeLaNoche = { luz: 'madrugada', claridad: 0 };
@@ -82,7 +87,7 @@ const HALOS_DEL_NIVEL: Readonly<Record<NivelDeLaCiudad, number>> = { 0: 1, 1: 0.
 
 const FUERZA_DE_LA_LLUVIA: Readonly<Record<TiempoDeLaNoche, number>> = { llovizna: 0.7, aguacero: 1.25, niebla: 0.4 };
 
-export function Atmosfera({ tiempo, nivel, farolas, semilla, reloj, farolasEncendidas = 1, luz = MADRUGADA }: PropsDeLaAtmosfera): JSX.Element {
+export function Atmosfera({ tiempo, nivel, farolas, semilla, reloj, farolasEncendidas = 1, luz = MADRUGADA, lluvia: llueve = true }: PropsDeLaAtmosfera): JSX.Element {
   const { scene, gl } = useThree();
   const detalle = DETALLE_DEL_NIVEL[nivel];
 
@@ -103,10 +108,10 @@ export function Atmosfera({ tiempo, nivel, farolas, semilla, reloj, farolasEncen
   const cieloFino = nivel >= 1;
   /* Con su niebla ya puesta: se compilan antes de colgarse (ver la cabecera), y la de después sería otro programa. */
   const cielo = useMemo(() => conNiebla(crearElCielo(cieloFino)), [cieloFino]);
-  const lluvia = useMemo(() => conNiebla(crearLaLluvia(detalle.lluvia, semilla)), [detalle.lluvia, semilla]);
+  const lluvia = useMemo(() => (llueve ? conNiebla(crearLaLluvia(detalle.lluvia, semilla)) : null), [llueve, detalle.lluvia, semilla]);
   const salpicaduras = useMemo(
-    () => (detalle.salpicaduras > 0 ? conNiebla(crearLasSalpicaduras(detalle.salpicaduras, semilla)) : null),
-    [detalle.salpicaduras, semilla],
+    () => (llueve && detalle.salpicaduras > 0 ? conNiebla(crearLasSalpicaduras(detalle.salpicaduras, semilla)) : null),
+    [llueve, detalle.salpicaduras, semilla],
   );
   const luces = useMemo(
     () => new LucesDeLaNoche(farolas, { reales: detalle.lucesReales, sombras: detalle.sombras }),
@@ -119,7 +124,10 @@ export function Atmosfera({ tiempo, nivel, farolas, semilla, reloj, farolasEncen
     [],
   );
   useLayoutEffect(() => relevos.cielo.poner(cielo, () => soltarLaMalla(cielo)), [relevos, cielo]);
-  useLayoutEffect(() => relevos.lluvia.poner(lluvia, () => soltarLaMalla(lluvia)), [relevos, lluvia]);
+  useLayoutEffect(() => {
+    if (lluvia === null) relevos.lluvia.liberar();
+    else relevos.lluvia.poner(lluvia, () => soltarLaMalla(lluvia));
+  }, [relevos, lluvia]);
   useLayoutEffect(() => {
     if (salpicaduras === null) relevos.salpicaduras.liberar();
     else relevos.salpicaduras.poner(salpicaduras, () => soltarLaMalla(salpicaduras));
