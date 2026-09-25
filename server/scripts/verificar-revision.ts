@@ -315,6 +315,16 @@ paso('Tu noche: el dosier del culpable, igual por fuera que los demás');
   const conEquipos = tramaEquilibrada();
   conEquipos.gmScript = [...conEquipos.gmScript, 'Al cerrar la ronda, cada equipo elige un portavoz que resume lo que ha encontrado.'];
   comprobar('un guion con equipos y portavoces se avisa', tiene(auditarTramaCluedo(game, conEquipos).hallazgos, 'guion-con-portavoces'));
+  // Lo que escribió la segunda velada de verdad: prohibirlos no es usarlos.
+  const queLosProhibe = tramaEquilibrada();
+  queLosProhibe.gmScript = [
+    ...queLosProhibe.gmScript,
+    'Recuerda las reglas: la investigación es individual; cada cual elige sala y habla solo con quien coincida allí; no hay equipos, portavoces ni informes de grupo.',
+  ];
+  comprobar(
+    'un guion que los prohíbe no se avisa',
+    !tiene(auditarTramaCluedo(game, queLosProhibe).hallazgos, 'guion-con-portavoces'),
+  );
 
   // ---- El dosier tal como sale de la imprenta ----
   await import('../src/juegos/instalados');

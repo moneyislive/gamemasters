@@ -442,9 +442,18 @@ function marcar(
     }
   }
 
-  // ---- Un guion con equipos ----
+  /*
+   * ---- Un guion con equipos ----
+   *
+   * Sin contar el paso que los PROHÍBE: la primera velada real con este aviso
+   * saltó con un guion que decía «no hay equipos, portavoces ni informes de
+   * grupo», que es justo lo que se pide.
+   */
   const PORTAVOCES = /\b(portavoz|portavoces|equipos?|por grupos|grupos de|puesta en com[uú]n)\b/i;
-  const pasoConEquipos = plot.gmScript.find((paso) => PORTAVOCES.test(paso));
+  const NEGADO = /\b(no hay|no se forman|no formes|sin|nada de|ni)\b[^.;:]{0,60}\b(portavo|equipo|grupo|puesta en com)/i;
+  const pasoConEquipos = plot.gmScript.find((paso) =>
+    paso.split(/(?<=[.;:])\s+/).some((frase) => PORTAVOCES.test(frase) && !NEGADO.test(frase)),
+  );
   if (pasoConEquipos) {
     salida.push(
       hallazgo(
