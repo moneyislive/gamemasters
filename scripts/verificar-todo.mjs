@@ -353,6 +353,12 @@ const BATERIA = [
   { nombre: 'invitaciones', donde: 'server', guion: 'verify:invitaciones', porque: 'los sobres llegan a quien deben' },
   { nombre: 'proveedores', donde: 'server', guion: 'verify:proveedores', porque: 'entrar con Google y con correo' },
   { nombre: 'enlaces', donde: 'server', guion: 'verify:enlaces', porque: 'los enlaces firmados valen para una cosa' },
+  {
+    nombre: 'esquemas de la trama',
+    donde: 'server',
+    guion: 'verify:esquemas',
+    porque: 'un obligatorio que no existe deja la sala del crimen en blanco sin que la API se queje',
+  },
   { nombre: 'trama · la Momia', donde: 'server', guion: 'verify:momia-trama', porque: 'su generación no entrega una velada rota' },
   { nombre: 'puzle · la Momia', donde: 'server', guion: 'verify:puzle-momia', porque: 'el sellado tiene solución única' },
   { nombre: 'trama · las Sombras', donde: 'server', guion: 'verify:sombras-trama', porque: 'su generación no entrega una noche rota' },

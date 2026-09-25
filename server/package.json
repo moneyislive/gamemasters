@@ -28,6 +28,7 @@
     "verify:ajeno": "tsx scripts/verificar-juego-ajeno.ts",
     "verify:campana": "tsx scripts/verificar-campana.ts",
     "verify:momia-trama": "tsx scripts/verificar-momia-trama.ts",
+    "verify:esquemas": "tsx scripts/verificar-esquemas.ts",
     "verify:credenciales": "tsx scripts/verificar-credenciales.ts",
     "verify:aguante": "tsx scripts/verificar-aguante.ts",
     "verify:borrado": "tsx scripts/verificar-borrado.ts",
