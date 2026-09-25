@@ -1325,7 +1325,12 @@ paso('Dos generaciones a la vez sobre la misma partida');
     ({ ...base, status, updatedAt }) as unknown as Parameters<typeof generacionEnCurso>[0];
 
   const ahora = new Date().toISOString();
-  const haceMedia = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  /*
+   * Una hora, y no media: el plazo pasó de veinte minutos a cuarenta y cinco
+   * cuando la velada empezó a incluir su material y su revisión adversaria
+   * (hasta dos pasadas del revisor y tres lecturas del detective).
+   */
+  const haceUnaHora = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
   comprobar('una partida lista no esta generando', !generacionEnCurso(con('ready', ahora)));
   comprobar('una recien puesta a generar, si', generacionEnCurso(con('generating', ahora)));
@@ -1334,8 +1339,8 @@ paso('Dos generaciones a la vez sobre la misma partida');
    * si ese proceso muere a mitad nadie la suelta: sin plazo quedaria bloqueada
    * para siempre y no habria forma de volver a generarla.
    */
-  comprobar('pero una colgada hace media hora ya no bloquea',
-    !generacionEnCurso(con('generating', haceMedia)));
+  comprobar('pero una colgada hace una hora ya no bloquea',
+    !generacionEnCurso(con('generating', haceUnaHora)));
   comprobar('y una fecha ilegible no bloquea tampoco',
     !generacionEnCurso(con('generating', 'no es una fecha')));
 }

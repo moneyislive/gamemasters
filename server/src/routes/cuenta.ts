@@ -12,6 +12,7 @@
  * la única revocación real que tiene el juego —cerrar y reabrir la mesa echa a
  * todo el mundo— y no se puede perder por una comodidad.
  */
+import { puedeLlevar } from '../cobro/pase';
 import { randomUUID } from 'node:crypto';
 import { env } from '../config';
 import { getStore } from '../db/store';
@@ -537,6 +538,13 @@ router.put('/cuenta/figura', async (req, res) => {
         `La figura tiene que ser de 1 a ${String(LARGO_MAXIMO_DE_FIGURA)} caracteres, sólo ` +
         'minúsculas, dígitos y guiones entre medias.',
     });
+    return;
+  }
+
+  // Las del Pase de la Sala, solo con el pase vigente (ver `cobro/pase.ts`).
+  const permiso = await puedeLlevar(req, figura);
+  if (!permiso.ok) {
+    res.status(permiso.estado).json({ error: permiso.error, motivo: permiso.motivo });
     return;
   }
 

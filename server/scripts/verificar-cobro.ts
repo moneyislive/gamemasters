@@ -22,6 +22,10 @@ import path from 'node:path';
 
 delete process.env.MONGODB_URI;
 process.env.ANTHROPIC_API_KEY = '';
+// Con el cobro ENCENDIDO: el pase solo cierra algo si hay algo que vender.
+process.env.COBRO_ACTIVO = 'si';
+process.env.PLAYER_TOKEN_SECRET = 'secreto-de-prueba-del-cobro-0123456789';
+delete process.env.GM_ADMITIDOS;
 const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'cobro-'));
 process.chdir(carpeta);
 
@@ -31,6 +35,8 @@ const { verificarAviso, comoFormulario } = await import('../src/cobro/pasarela')
 const { atenderAviso } = await import('../src/cobro/avisos');
 const { presupuestar, precioRedondo } = await import('../src/cobro/precios');
 const { temporadaDe, CREDITOS_DE_LA_SUSCRIPCION } = await import('../src/cobro/ofertas');
+const { puedeLlevar, esDelPase, paseVigente } = await import('../src/cobro/pase');
+const { emitirSesionDeCuenta, CABECERA_CUENTA } = await import('../src/identidad/sesion');
 import type { Account } from '../../shared/live';
 
 let hechas = 0;
@@ -160,6 +166,28 @@ try {
     'se aplana como pide Stripe',
     form.includes(`${encodeURIComponent('line_items[0][price_data][unit_amount]')}=599`) && form.includes(`${encodeURIComponent('metadata[tipo]')}=creditos`),
     form,
+  );
+
+  paso('El pase de la Sala');
+  const peticion = (cabecera?: string) =>
+    ({ headers: cabecera ? { [CABECERA_CUENTA]: cabecera } : {}, get: () => undefined }) as unknown as import('express').Request;
+  const sinPase: Account = { ...cuenta, id: 'sin-pase', email: 'bea@example.com', cobro: {} };
+  await store.saveAccount(sinPase);
+  comprobar('una figura de serie la lleva cualquiera', (await puedeLlevar(peticion(), 'caballero')).ok);
+  comprobar('las del pase se reconocen por su forma', esDelPase('pase-caballero-dorado') && !esDelPase('caballero'));
+  const anonimo = await puedeLlevar(peticion(), 'pase-caballero-dorado');
+  comprobar('sin cuenta, una del pase no', !anonimo.ok && anonimo.estado === 401, anonimo);
+  const sinElPase = await puedeLlevar(peticion(emitirSesionDeCuenta(sinPase, 'google')), 'pase-caballero-dorado');
+  comprobar('con cuenta y sin pase, tampoco', !sinElPase.ok && sinElPase.estado === 403, sinElPase);
+  const conElPase = (await store.getAccount(cuenta.id))!;
+  comprobar('la cuenta suscrita tiene el pase vigente', Boolean(paseVigente(conElPase)), conElPase.cobro);
+  comprobar(
+    'y con él la lleva',
+    (await puedeLlevar(peticion(emitirSesionDeCuenta(conElPase, 'google')), 'pase-caballero-dorado')).ok,
+  );
+  comprobar(
+    'un pase caducado no vale',
+    !paseVigente({ ...conElPase, cobro: { pases: [{ temporada: '2020-T1', hasta: '2020-04-01T00:00:00.000Z', via: 'compra' }] } }),
   );
 
   paso('El presupuesto');
