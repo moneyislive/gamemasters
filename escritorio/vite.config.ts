@@ -68,9 +68,24 @@ function laSalaComoEnProduccion(): Plugin {
   };
 }
 
+/**
+ * ═══ `__ARBOL_DEL_QUIEBRO__`: DE QUÉ ÁRBOL SALE LO QUE SE SIRVE ═══
+ *
+ * Con varios worktrees del repositorio abiertos a la vez, cada uno con su Vite en su puerto, un comprobador que mide
+ * en el navegador (`verify:quiebro-gl`) puede estar mirando el banco de OTRO árbol sin enterarse: verde por el
+ * trabajo de otra rama. Por eso el banco escribe en el DOM la carpeta de la que sale, que es ésta: la raíz del
+ * worktree donde está este fichero, con barras normales. El comprobador la compara con la suya.
+ *
+ * En desarrollo Vite la pone como global en cada página que sirve (`@vite/env`); en el empaquetado sólo se sustituye
+ * donde se nombra (hoy, `src/quiebro/ciudad/banco-gl.tsx`, que no entra en él): la ruta de esta máquina no llega a lo
+ * que se publica.
+ */
+const ARBOL_DEL_QUIEBRO = fileURLToPath(new URL('..', import.meta.url)).replace(/\\/g, '/').replace(/\/$/, '');
+
 export default defineConfig({
   base: '/sala/',
   plugins: [react(), laSalaComoEnProduccion()],
+  define: { __ARBOL_DEL_QUIEBRO__: JSON.stringify(ARBOL_DEL_QUIEBRO) },
   /*
    * ═══ UNA SOLA COPIA DE R3F, DE `three` Y DE `react`, AUNQUE HAYA VARIAS EN EL DISCO ═══
    *

@@ -1,10 +1,23 @@
 /**
  * La batería completa, en un solo comando.
  *
- *   npm run verificar          ← todo, incluidas las dos veladas que arrancan servidor
- *   npm run verificar -- --rapido   ← salta esas dos (unos tres minutos menos)
+ *   npm run verificar          ← todo, incluidos los `lento`: las veladas que arrancan servidor y los dos del
+ *                                Quiebro que miran la GPU (materia y gl), que necesitan el Vite del árbol que
+ *                                se comprueba: `PUERTO=<su puerto> npm run verificar` (sin él salen con 2: rojo)
+ *   npm run verificar -- --rapido   ← salta todos los `lento` (y así no pide ningún servidor)
  *   npm run verificar -- --censo    ← sólo el censo, en un momento: ¿está aquí todo comprobador que
  *                                     hay? (ver «EL CENSO», detrás de la BATERIA)
+ *
+ * ═══ DECISIONES DEL DETALLE DE LA CIUDAD DEL QUIEBRO (coordinador, revisión 2 de la ola 1b, 25-sep-2026) ═══
+ *
+ *   (a) LA BATERÍA ENTERA NECESITA `PUERTO`, el del Vite del árbol que se comprueba (no el de otro worktree: el banco
+ *       de la GPU lo mira y sale rojo). `verify:quiebro-materia` y `verify:quiebro-gl` van `lento` porque lo
+ *       necesitan, no por lo que tardan; sin él salen con 2, que aquí es rojo. Así que `npm run verificar` sin `PUERTO`
+ *       no da verde nunca, y `--rapido` no dice nada de esos dos. En PowerShell no vale el `PUERTO=… npm …` de sh (no
+ *       pone nada): `$env:PUERTO='5314'; npm run verificar`.
+ *   (b) Se confirma el +42 del tono propio de N0 (`TONO_PROPIO_DE_N0`, `verify:quiebro-gl`) en el tope de §7.4 en N0.
+ *   (c) Un módulo con varios materiales (`suelo.ts`: el asfalto y la acera) exporta UNA `TOPE_DEL_SOMBREADOR_POR_NIVEL`,
+ *       tope COMÚN de todos ellos; §7.4 sigue dando a cada uno el suyo, y `verify:quiebro-gl` usa el menor de los dos.
  *
  * ═══ POR QUÉ HACE FALTA ═══
  *
@@ -1213,7 +1226,32 @@ const BATERIA = [
     donde: 'escritorio',
     guion: 'verify:quiebro-ciudad',
     porque:
-      'la ciudad abierta se pinta por una ventana de celdas de 48 m con la ciudad entera detrás en LOD1 y el borde de glifos, y en sus 32 trazas de verdad —no la sintética— × 25 cámaras × 4 niveles: lo declarado y lo medido caben en el 50 % de los topes del juego y ninguna familia tiene que crecer; lo pintado ES la estructura, celda a celda en los triángulos de la franja de andar: nada pintado que estorbe sin chocar y ninguna caja invisible; ninguna celda lleva un NaN; cruzándola a 7 m/s las llamadas no cambian, ningún trozo ni fotograma pasa su tope de triángulos, de bytes ni de filas de luz, la ventana nueva llega a tiempo y quien cruza nunca pisa la franja del fundido; una ventana que ya nadie quiere no se pinta; la luz por losetas es la de hornearla de una vez; el borde cubre las tres salidas; y la misma traza da la misma ventana. Y el barrio de hoy, igual que antes: 50 barrios en los cuatro niveles sin un NaN y en su cuota, lo pintado es la estructura, el mismo barrio da la misma geometría y cada parcheo de sombreador encuentra su trozo en three r185',
+      'la ciudad abierta se pinta por una ventana de celdas de 48 m con la ciudad entera detrás en LOD1 y el borde de glifos, y en sus 32 trazas de verdad —no la sintética— × 25 cámaras × 4 niveles: lo declarado y lo medido caben en el 50 % de los topes del juego y ninguna familia tiene que crecer; lo pintado ES la estructura, celda a celda en los triángulos de la franja de andar: nada pintado que estorbe sin chocar y ninguna caja invisible; ninguna celda lleva un NaN; cruzándola a 7 m/s las llamadas no cambian, ningún trozo ni fotograma pasa su tope de triángulos, de bytes ni de filas de luz, la ventana nueva llega a tiempo y quien cruza nunca pisa la franja del fundido; una ventana que ya nadie quiere no se pinta; la luz por losetas es la de hornearla de una vez; el borde cubre las tres salidas; y la misma traza da la misma ventana. Y el barrio de hoy, igual que antes: 50 barrios en los cuatro niveles sin un NaN y en su cuota, lo pintado es la estructura, el mismo barrio da la misma geometría y cada parcheo de sombreador encuentra su trozo en three r185. Y lo que el detalle de la ciudad va a cambiar, vigilado antes, cada juez con su vacuna: la franja y las cajas en CADA nivel y grado (con los neones y lo que cada capa declara de su estorbo), ni una cara al revés nueva en las familias de una cara, las reglas gemelas con los mismos literales en GLSL y en JS, la Grafía lo último de la fachada, la memoria de la GPU en su tope y la de JS en la de hoy × 1,8, toda textura de un material subida por el relevo, las fuentes de luz iguales en todo grado, ningún escritor de pieza por encima del trozo entre dos pasos, cada capa con las llamadas que declara, y las comprobaciones de cada paquete con su mínimo de inspeccionados. Por eso tarda unos 3 minutos y no uno',
+  },
+  /*
+   * ═══ EL DETALLE DE LA CIUDAD: LA MATERIA Y EL MOLDE (ola 1 del plan del detalle, 25-sep-2026) ═══
+   *
+   * Los dos entraron con la ola 1 en `escritorio/package.json` y sin renglón aquí: el censo los habría puesto en rojo,
+   * que es para lo que está. `verify:quiebro-materia` mira en Node el sistema de materiales analítico y, con `PUERTO`
+   * (el Vite de ESTE árbol), en la GPU; SIN `PUERTO` se salta ese bloque y sale con 2, que esta batería lee como rojo
+   * a propósito: no se ha mirado, y no es verde. Por eso va `lento`, como `verify:quiebro-gl` más abajo: no por lo que
+   * tarda sino porque NECESITA un servidor, y con `--rapido` (que no pide ninguno) sería un rojo que no es rojo cada
+   * día. `verify:quiebro-molde`, las primitivas nuevas del molde, sólo Node: va también con `--rapido`.
+   */
+  {
+    nombre: 'El Quiebro · la materia',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-materia',
+    lento: true,
+    porque:
+      'la materia analítica de la ciudad cumple sus condiciones antes de que las familias la cableen: el sampler de ruido siempre atado y marcado, las lecturas y las cadenas PCG de cada nivel en su presupuesto (N0 con 4 lecturas y ningún fbm de adorno), la textura de ruido con su sha fijo y su varianza por mip, las derivadas sólo en el preámbulo y fuera de ramas, el nivel en el nombre del retoque, los charcos y el cielo reflejado sin tocar, y con barniz 0 el lóbulo no cambia el color en la GPU — con `PUERTO` del Vite de este árbol; sin él sale con 2 y aquí es rojo',
+  },
+  {
+    nombre: 'El Quiebro · el molde',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-molde',
+    porque:
+      'las primitivas nuevas del molde (torno, caja biselada, perfil, seccionado y extrusión por perfil) dan lo que prometen con tres juegos de parámetros cada una: sin NaN, cada triángulo con el sentido de su normal, volumen positivo en las cerradas, UV en metros continuas, el mismo recuento en el molde que no guarda, y su coste de CPU por triángulo CONTADO contra la caja y el cilindro de hoy',
   },
   {
     nombre: 'El Quiebro · los efectos',
@@ -1253,6 +1291,24 @@ const BATERIA = [
     guion: 'verify:quiebro-juego',
     porque:
       'el cliente del juego sobre el contrato, sin navegador: el reloj de cada canal empieza en cero y parte en tics de 50 ms; el canal dice `hola` y un `eco` detrás y no reconecta tras los cierres que reintentar no arregla; la predicción es la de la sala —miles de tics por el barrio de verdad, y cada tramo mandado es uno que la sala acepta—; la interpolación, el guion que funde sin retroceder, la sala vista que cada `dentro` deja en blanco, el diccionario que lee la declaración, la partida entera contra un enchufe de mentira con la pulsación y su `ms`, los mandos, el enganche que no apunta tras una pared, la cámara que no entra en las cajas, la pausa que reintenta sólo con una vista nueva, el puerto de prueba con la llave en la cabecera y nunca en la dirección, y los fuentes sin `onClick`, sin la llave en el almacén y en LF; y el mapa de la ciudad abierta, con la ciudad de ensayo y con la de verdad: ni calle pintada donde hay pared ni pared donde se anda, píxel a píxel; cada tejado con el color de su distrito; los metros de plaza a plaza son los de la tabla y los de cada nudo los que anda la sala; el minimapa gira la ciudad y las marcas con la misma cuenta; el plano actúa en `pointerdown` —rumbo a un Fallo o a una cabina, «Aquí» en el nudo más cercano, nada fuera de la ciudad ni con el botón derecho—; el lienzo se pinta una vez por noche; y el hilo de rumbo cabe en su tope, va por la ruta, no se mueve del suelo y acaba en la meta',
+  },
+  /*
+   * ═══ LA CIUDAD EN LA GPU DE VERDAD (plan del detalle, O1-VERIFICACION 9) ═══
+   *
+   * `lento` no por lo que tarda —unos minutos: la fachada tarda segundos en enlazar en ANGLE, y fxc otros tantos en
+   * compilar su HLSL— sino porque NECESITA un servidor: el Vite de ESTE árbol en `PUERTO`, y además Edge y fxc del
+   * Windows SDK. Sin cualquiera de ellos sale con 2 (no se ha mirado), que aquí es rojo: el verde de este renglón
+   * sólo lo da una batería corrida con `PUERTO` del Vite del árbol que se comprueba. El perfil de Edge y el HLSL de
+   * fxc van a `%TEMP%` separados sólo por el puerto; con varios agentes a la vez, cada uno con `CARPETA_GL=<su
+   * carpeta>` (o `PERFIL_EDGE` para el perfil sólo).
+   */
+  {
+    nombre: 'El Quiebro · la GPU',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-gl',
+    lento: true,
+    porque:
+      'la ciudad del Quiebro en una GPU de verdad (ANGLE sobre D3D11, Edge sin ventana) y servida por ESTE árbol —el DOM del banco lo dice—: las reglas gemelas de la fachada dan en la GPU lo mismo que el JS del juego (`hash.ts` y los escaparates de `escaparatesDe`) en mil semillas, todo material de la ciudad ENLAZA en N0-N3 en cada estado del pintor (el del camino del nivel, sin sombras y la segunda pasada del posproceso) con los programas que un pintor nuevo enlaza en ese estado en el tope de hoy más lo que el plan deja crecer, un cambio de nivel N1 → N2 con el relevo enlaza lo de hoy más lo que le costarían esas capas y sube lo que le cabe —y capas de prueba montadas en la ciudad como las de verdad ven que cada tope deja entrar el margen justo y ni una más—, el libro de bytes cabe en la memoria de §7.3, y las instrucciones de fxc de la fachada, el asfalto, la acera y el mobiliario caben en §7.4; y la pérdida de contexto, en informe',
   },
   {
     nombre: 'escritorio honrado',

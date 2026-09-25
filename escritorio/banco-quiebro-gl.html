@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE `verify:quiebro-gl`: los materiales de la ciudad del Quiebro compilados y ENLAZADOS en la GPU de
+      verdad (ANGLE sobre D3D11 en Edge sin ventana), sin servidor de juego. Entrada APARTE de `index.html`, como los
+      otros bancos: no entra en el empaquetado.
+
+      Compila la ciudad abierta en N0-N3 en cada estado del pintor (el principal, sin sombras y la segunda pasada del
+      posproceso), cuenta sus programas y sus bytes, saca el HLSL de ANGLE de la fachada, el mobiliario, el asfalto y
+      la acera (lo pasa por fxc el comprobador), evalúa en la GPU las reglas gemelas de `hash.ts`, simula un cambio de
+      nivel N1 → N2 con el relevo y fuerza una pérdida de contexto. La cabecera de
+      `src/quiebro/ciudad/banco-gl.tsx` lo cuenta. Deja el resultado en JSON en `#resultado-gl` y el árbol del que
+      sale en `#banco-gl-arbol`.
+
+      Se abre en http://localhost:PUERTO/sala/banco-quiebro-gl.html con el Vite del escritorio.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banco de pruebas · la ciudad del Quiebro en la GPU</title>
+    <meta name="theme-color" content="#050807" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #050807;
+        color: #9f9;
+        font: 12px monospace;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/src/quiebro/ciudad/banco-gl.tsx"></script>
+  </body>
+</html>

@@ -21,6 +21,9 @@
  *
  * Se corre con `npx tsx scripts/verificar-quiebro-calidad.ts` desde `escritorio/`.
  */
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { arnes } from '../../server/scripts/arnes';
 import { leerElVeredicto } from '../../escenas/compuerta-de-botas';
 import type { NivelDeCalidad } from '../src/quiebro/calidad/niveles';
@@ -87,6 +90,122 @@ import {
 const { comprobar, paso, nota, terminar } = arnes();
 
 /* ─────────────────────────────── Utilidades ─────────────────────────────── */
+
+/**
+ * Cuántas tablas `*_POR_NIVEL` tiene la ciudad como poco (las 8 del 25-sep: el grado del barrio y de los coches, lo
+ * cercano, el téxel de la luz, y las octavas, las lecturas y los PCG de la materia). Si el filtro dejara de verlas,
+ * «ninguna baja» saldría verde sin mirar nada.
+ */
+const MINIMO_DE_PALANCAS = 8;
+
+/** Un nombre de palanca por nivel. */
+const NOMBRE_DE_PALANCA = /^[A-Z][A-Z0-9_]*_POR_NIVEL$/;
+
+/**
+ * EL TEXTO SIN COMENTARIOS, a ojo: quita los comentarios de bloque y de línea con expresiones regulares, sin saber qué
+ * es una cadena. Con un '/*' DENTRO de una cadena se come el código hasta el siguiente cierre, declaraciones
+ * incluidas. Por eso sólo sirve para la lista secundaria de `descubrirLasPalancas` (las declaradas que no se
+ * exportan), y NUNCA para decidir qué se mira: eso lo deciden el texto crudo (`puedeTenerPalancas`) y lo que el
+ * módulo exporta de verdad.
+ */
+const sinComentarios = (t: string): string => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+
+/**
+ * LAS PALANCAS DE UN FICHERO, por dos caminos (revisiones de la ola 1b): las que su módulo EXPORTA de verdad (las
+ * claves del módulo importado con nombre `*_POR_NIVEL`), que son las que se miran, TODAS; y las que su código (sin
+ * comentarios ni `import`) DECLARA con ese nombre —con `const`, `let` o `var`, o con un `as` de una lista de
+ * `export { … }`—, que sólo sirven para poner en rojo una declarada que el módulo no exporta (no se puede mirar).
+ * El texto sin comentarios puede perder alguna declarada (ver `sinComentarios`): entonces esa lista se queda corta,
+ * pero ninguna tabla exportada deja de mirarse.
+ */
+function descubrirLasPalancas(codigo: string, exportadas: readonly string[]): { readonly aMirar: string[]; readonly sinExportar: string[] } {
+  const sinImports = sinComentarios(codigo).replace(/\bimport\s[^;]*;/g, '');
+  const declaradas = new Set<string>();
+  for (const m of sinImports.matchAll(/\b(?:const|let|var)\s+([A-Z][A-Z0-9_]*_POR_NIVEL)\b/g)) declaradas.add(m[1] as string);
+  for (const m of sinImports.matchAll(/\bas\s+([A-Z][A-Z0-9_]*_POR_NIVEL)\b/g)) declaradas.add(m[1] as string);
+  const aMirar = exportadas.filter((k) => NOMBRE_DE_PALANCA.test(k));
+  return { aMirar, sinExportar: [...declaradas].filter((d) => !aMirar.includes(d)) };
+}
+
+/**
+ * ¿Hay que importar este fichero para buscarle palancas? Si su texto CRUDO nombra `_POR_NIVEL` en cualquier sitio
+ * (revisión 2 de la ola 1b): sin quitar comentarios y sin expresiones que sepan qué es una declaración. Importar de
+ * más no cuesta nada (lo que se mira son las claves exportadas); decidirlo con el texto sin comentarios dejaba sin
+ * importar un fichero con un '/*' dentro de una cadena antes de su tabla, y su tabla sin mirar, en verde.
+ */
+function puedeTenerPalancas(crudo: string): boolean {
+  return crudo.includes('_POR_NIVEL');
+}
+
+interface TablaPorNivel {
+  readonly fichero: string;
+  readonly nombre: string;
+  readonly tabla: unknown;
+}
+
+/**
+ * LAS TABLAS QUE SE MIRAN DE UN FICHERO, y lo que está mal en él: si su texto crudo nombra `_POR_NIVEL`, se importa
+ * (con `importar`) y se juntan TODAS sus claves exportadas `*_POR_NIVEL`, más un problema por cada declarada que no
+ * se exporta.
+ */
+async function palancasDelFichero(fichero: string, crudo: string, importar: () => Promise<Record<string, unknown>>): Promise<{ readonly tablas: TablaPorNivel[]; readonly problemas: string[] }> {
+  if (!puedeTenerPalancas(crudo)) return { tablas: [], problemas: [] };
+  let modulo: Record<string, unknown>;
+  try {
+    modulo = await importar();
+  } catch (e) {
+    return { tablas: [], problemas: [`${fichero}: no se puede importar para mirar sus *_POR_NIVEL (${String(e).slice(0, 160)})`] };
+  }
+  const d = descubrirLasPalancas(crudo, Object.keys(modulo));
+  return {
+    tablas: d.aMirar.map((nombre) => ({ fichero, nombre, tabla: modulo[nombre] })),
+    problemas: d.sinExportar.map((nombre) => `${fichero}: ${nombre} no se exporta (§5.2.7: se exporta con su nombre, y así se puede mirar)`),
+  };
+}
+
+/**
+ * EL JUEZ DE UNA PALANCA POR NIVEL (plan del detalle, §5.2.7, y la decisión 1 del acta de la ola 1): `tabla` tiene los
+ * niveles 0, 1, 2 y 3, y lo que da no baja al subir de nivel. Un número no baja; un sí/no no pasa de sí a no; una
+ * tabla de objetos se mira CAMPO A CAMPO, con la misma regla en cada campo. Devuelve lo que está mal.
+ */
+function juzgarLaPalanca(nombre: string, tabla: unknown): string[] {
+  if (tabla === null || typeof tabla !== 'object') return [`${nombre} no es una tabla por nivel`];
+  const t = tabla as Record<string, unknown>;
+  const faltan = [0, 1, 2, 3].filter((n) => !(String(n) in t));
+  if (faltan.length > 0) return [`${nombre} no tiene los niveles ${faltan.join(', ')}`];
+  const problemas: string[] = [];
+  const valorQueSeMira = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'boolean' ? (v ? 1 : 0) : null);
+  const serie = (campo: string | null): void => {
+    const valores = [0, 1, 2, 3].map((n) => {
+      const v = t[String(n)];
+      return campo === null ? v : (v as Record<string, unknown> | null)?.[campo];
+    });
+    const numeros = valores.map(valorQueSeMira);
+    const donde = campo === null ? nombre : `${nombre}.${campo}`;
+    if (numeros.some((x) => x === null)) {
+      problemas.push(`${donde}: ${JSON.stringify(valores)} no son números ni sí/no`);
+      return;
+    }
+    for (let n = 1; n < 4; n++) {
+      if ((numeros[n] as number) < (numeros[n - 1] as number)) problemas.push(`${donde} baja de N${String(n - 1)} a N${String(n)}: ${JSON.stringify(valores)}`);
+    }
+  };
+  const primero = t['0'];
+  if (primero !== null && typeof primero === 'object') {
+    const campos = new Set<string>();
+    for (const n of [0, 1, 2, 3]) {
+      const v = t[String(n)];
+      if (v === null || typeof v !== 'object') {
+        problemas.push(`${nombre}: el nivel ${String(n)} no es un objeto como el 0`);
+        return problemas;
+      }
+      for (const c of Object.keys(v)) campos.add(c);
+    }
+    if (campos.size === 0) problemas.push(`${nombre}: sus objetos no tienen campos`);
+    for (const c of campos) serie(c);
+  } else serie(null);
+  return problemas;
+}
 
 const A_60_HZ = 1000 / 60;
 
@@ -920,8 +1039,86 @@ paso('Compilar antes de pintar: la cita en el pintado, la compilación aparte, e
   );
 }
 
+paso('Las palancas de la ciudad por nivel no bajan al subir de nivel, campo a campo');
+{
+  /*
+   * PLAN DEL DETALLE DE LA CIUDAD, §5.2.7 y O1-VERIFICACION (8), con la decisión 1 del acta de la ola 1: toda tabla de
+   * adorno por nivel se exporta con nombre `*_POR_NIVEL` y forma `Record<0|1|2|3, …>`, y lo que da no BAJA al subir de
+   * nivel: un número no baja, un sí no pasa a no, y una tabla de objetos (`TOPE_DEL_SOMBREADOR_POR_NIVEL`, con
+   * `{ instrucciones, lecturas }`) no baja en NINGUNO de sus campos. Se buscan en `src/quiebro/ciudad/**` con
+   * `palancasDelFichero`: se importa todo fichero cuyo texto CRUDO nombra `_POR_NIVEL`, y se miran TODAS las claves
+   * `*_POR_NIVEL` que su módulo exporta. Lo que el código declara con ese nombre (`const`, `let`, `var` o `as` en un
+   * `export { … }`, leído sin comentarios) sólo sirve para lo contrario: una tabla que se declara y no se exporta no
+   * se puede mirar, y es roja.
+   */
+  const RAIZ = fileURLToPath(new URL('../src/quiebro/ciudad/', import.meta.url));
+  const tablas: TablaPorNivel[] = [];
+  const problemas: string[] = [];
+  for (const rel of readdirSync(RAIZ, { recursive: true }) as string[]) {
+    if (!/\.tsx?$/.test(rel) || /\.d\.ts$/.test(rel)) continue;
+    const ruta = join(RAIZ, rel);
+    const delFichero = await palancasDelFichero(rel.replace(/\\/g, '/'), readFileSync(ruta, 'utf8'), async () => (await import(pathToFileURL(ruta).href)) as Record<string, unknown>);
+    tablas.push(...delFichero.tablas);
+    problemas.push(...delFichero.problemas);
+  }
+  const miradas = new Set<string>();
+  for (const t of tablas) {
+    const mal = juzgarLaPalanca(t.nombre, t.tabla);
+    if (mal.length > 0) problemas.push(...mal.map((x) => `${t.fichero}: ${x}`));
+    else miradas.add(t.nombre);
+  }
+  const distintas = new Set(tablas.map((t) => t.nombre)).size;
+  nota(`${String(distintas)} tablas *_POR_NIVEL en ciudad/** (${String(tablas.length)} exportaciones): ${[...miradas].join(', ')}`);
+  comprobar(
+    `toda tabla *_POR_NIVEL de la ciudad se exporta y no baja al subir de nivel, campo a campo (${String(distintas)} miradas; mínimo ${String(MINIMO_DE_PALANCAS)})`,
+    problemas.length === 0 && distintas >= MINIMO_DE_PALANCAS,
+    problemas,
+  );
+  /* LAS VACUNAS: una tabla que baja, un campo que baja en una tabla de objetos, un sí que pasa a no, un nivel que falta y una forma que no se lee. */
+  comprobar(
+    'vacuna: una tabla que baja, un campo de una tabla de objetos que baja, un sí que pasa a no, un nivel que falta y un valor que no es número ni sí/no salen rojos; las que suben o se quedan, no',
+    juzgarLaPalanca('BAJA_POR_NIVEL', { 0: 1, 1: 2, 2: 1, 3: 3 }).length > 0 &&
+      juzgarLaPalanca('CAMPO_POR_NIVEL', { 0: { instrucciones: 400, lecturas: 3 }, 1: { instrucciones: 900, lecturas: 3 }, 2: { instrucciones: 1400, lecturas: 2 }, 3: { instrucciones: 2000, lecturas: 4 } }).length > 0 &&
+      juzgarLaPalanca('SI_POR_NIVEL', { 0: true, 1: true, 2: false, 3: true }).length > 0 &&
+      juzgarLaPalanca('FALTA_POR_NIVEL', { 0: 1, 1: 2, 3: 3 }).length > 0 &&
+      juzgarLaPalanca('RARA_POR_NIVEL', { 0: 'a', 1: 'b', 2: 'c', 3: 'd' }).length > 0 &&
+      juzgarLaPalanca('BIEN_POR_NIVEL', { 0: 0, 1: 4, 2: 4, 3: 8 }).length === 0 &&
+      juzgarLaPalanca('OBJETOS_POR_NIVEL', { 0: { instrucciones: 461, lecturas: 3 }, 1: { instrucciones: 1000, lecturas: 3 }, 2: { instrucciones: 1500, lecturas: 4 }, 3: { instrucciones: 2000, lecturas: 4 } }).length === 0 &&
+      juzgarLaPalanca('SIES_POR_NIVEL', { 0: false, 1: false, 2: true, 3: true }).length === 0,
+  );
+  /* LA VACUNA DE LA BÚSQUEDA: una tabla con `let`, una re-exportada con otro nombre y una sin exportar se ven (la primera versión sólo veía `const`); un `import … as X_POR_NIVEL` no es una declaración. */
+  const deMentira = [
+    'export let A_POR_NIVEL = { 0: 1, 1: 2, 2: 3, 3: 4 };',
+    'const B_POR_NIVEL = { 0: 1, 1: 2, 2: 3, 3: 4 };',
+    'const c = { 0: 1, 1: 2, 2: 3, 3: 4 };',
+    'export { c as C_POR_NIVEL };',
+    "import { D as D_POR_NIVEL } from './otro';",
+  ].join('\n');
+  const vistas = descubrirLasPalancas(deMentira, ['A_POR_NIVEL', 'C_POR_NIVEL', 'OTRA_COSA']);
+  const soloImportada = descubrirLasPalancas("import { D as D_POR_NIVEL } from './otro';\nconst x = D_POR_NIVEL[0];", []);
+  comprobar(
+    'vacuna de la búsqueda: una tabla con `let` y una re-exportada con `as` se miran, una sin exportar sale roja, y un `import … as` no cuenta como declarada',
+    puedeTenerPalancas(deMentira) && vistas.aMirar.join(',') === 'A_POR_NIVEL,C_POR_NIVEL' && vistas.sinExportar.join(',') === 'B_POR_NIVEL' && soloImportada.sinExportar.length === 0,
+    { vistas, soloImportada },
+  );
+  /*
+   * LA VACUNA DEL '/*' EN UNA CADENA (revisión 2 de la ola 1b): un fichero con esa cadena antes de su tabla, y un
+   * cierre en otra cadena detrás. Quitando comentarios a ojo, la tabla desaparece del texto (la primera condición lo
+   * enseña: ESE era el camino por el que no se importaba el fichero); con el texto crudo el fichero se importa, y su
+   * tabla, que baja, se mira y sale roja.
+   */
+  const conLaCadena = ["const abre = '/*';", 'export const E_POR_NIVEL = { 0: 3, 1: 2, 2: 1, 3: 0 };', "const cierra = '*/';"].join('\n');
+  const delFicheroDeMentira = await palancasDelFichero('de-mentira.ts', conLaCadena, () => Promise.resolve({ E_POR_NIVEL: { 0: 3, 1: 2, 2: 1, 3: 0 } }));
+  const juzgadas = delFicheroDeMentira.tablas.flatMap((t) => juzgarLaPalanca(t.nombre, t.tabla));
+  comprobar(
+    "vacuna del '/*' dentro de una cadena: quitando comentarios la tabla se pierde, pero el fichero se importa por su texto crudo y su tabla, que baja, sale roja",
+    !sinComentarios(conLaCadena).includes('E_POR_NIVEL') && delFicheroDeMentira.tablas.map((t) => t.nombre).join(',') === 'E_POR_NIVEL' && juzgadas.length > 0,
+    { tablas: delFicheroDeMentira.tablas.map((t) => t.nombre), problemas: delFicheroDeMentira.problemas, juzgadas },
+  );
+}
+
 terminar({
-  escritas: 76,
+  escritas: 80,
   enVerde:
-    'Los niveles son los del §8; el gobernador baja deprisa, sube a prueba, no vuelve a lo que falló y no se deja engañar por la pestaña oculta; el sondeo arranca a cada aparato donde toca; la gradación respeta la paleta y la LUT es su fórmula; el tono de N0 entra en la three instalada; los sombreadores declaran lo que sus materiales les dan; y lo que se va a pintar se compila antes, sin esperar al compilador en el fotograma que lo usa.',
+    'Los niveles son los del §8; el gobernador baja deprisa, sube a prueba, no vuelve a lo que falló y no se deja engañar por la pestaña oculta; el sondeo arranca a cada aparato donde toca; la gradación respeta la paleta y la LUT es su fórmula; el tono de N0 entra en la three instalada; los sombreadores declaran lo que sus materiales les dan; lo que se va a pintar se compila antes, sin esperar al compilador en el fotograma que lo usa; y ninguna palanca de la ciudad baja al subir de nivel.',
 });
