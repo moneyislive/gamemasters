@@ -31,6 +31,25 @@
  *      se suelta en el fotograma siguiente al relevo; la luz nace sin subir sus ceros; los reflejos ven lo
  *      mismo que un rayo de fuerza bruta; la ciudad quieta asigna menos de 1 KiB por fotograma; y la cortina
  *      del borde se apaga en el último metro (revisión «jugar de verdad»: tapaba la pantalla).
+ *  10. LO QUE EL DETALLE DE LA CIUDAD VA A CAMBIAR, VIGILADO ANTES (plan del detalle, O1-VERIFICACION; los
+ *      jueces viven en `quiebro-ciudad/comun.ts`, y cada uno tiene aquí su VACUNA, que tiene que salir roja):
+ *        · (1) la franja y las cajas pintadas en CADA nivel y CADA grado de §3.1 (N0 {1}, N1 {1} con y sin el
+ *          relieve del centro, N2 {2, 3}, N3 {2, 3}), con la celda construida con su grado y no la guardada que
+ *          hubiera, con los neones y con las capas (lo que cada una declara de su estorbo, en su geometría);
+ *        · (2) el sentido de las caras en las familias con material de una sola cara: el CONJUNTO de las caras
+ *          al revés de hoy en la traza 0 (`quiebro-ciudad/caras-al-reves-de-hoy.json`), y ni una nueva; y en las
+ *          demás trazas, ninguna sin la FIRMA de una de las de hoy (familia, normal y altura);
+ *        · (3) la paridad GLSL ↔ JS de las reglas gemelas (`encendida`, `queTienda`, `colorDeLuz`, `huecoQ` y la
+ *          tienda de 6 m), en sus literales; y la tienda contra el JS DEL JUEGO: los escaparates que pone
+ *          `escaparatesDe` y el reparto de los toldos de `voladizos.ts` (en la GPU la mira `verify:quiebro-gl`);
+ *        · (4) la Grafía es lo último del texto final de la fachada y de lo lejano, en N0-N3;
+ *        · (5) la memoria: la de la GPU contra el tope de §7.3 y la de JS (las celdas guardadas y los moldes)
+ *          contra la de hoy × 1,8;
+ *        · (6) el relevo sube toda textura que referencia un material de la ciudad;
+ *        · (11) las fuentes de luz de una celda no dependen de su grado;
+ *        · (12) ningún escritor de pieza escribe más que el trozo entre dos pasos, en ningún grado ni nivel;
+ *        · (13) las capas cuentan: cada una pinta las llamadas que declara;
+ *      y las comprobaciones de cada paquete (`quiebro-ciudad/<paquete>.ts`), con su mínimo de inspeccionados.
  *
  * ═══ POR QUÉ LA GEOMETRÍA Y NO LAS HUELLAS QUE DEVUELVEN LOS CONSTRUCTORES ═══
  *
@@ -40,6 +59,7 @@
  *
  * Cada comprobación se vio en ROJO rompiendo a propósito una copia (ver el informe del frente).
  */
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { arnes } from '../../server/scripts/arnes';
 import { planoDelBarrio } from '../src/quiebro/ciudad/plano';
@@ -56,10 +76,92 @@ import { UNIFORMES_DE_LA_VENTANA } from '../src/quiebro/ciudad/ventana';
 import type { FuenteDeReflejo } from '../src/quiebro/ciudad/reflejos';
 import { RejillaDeHuellas } from '../src/quiebro/ciudad/reflejos';
 import { GLSL_DE_LA_CORTINA, brilloDeLaCortina } from '../src/quiebro/ciudad/borde';
-import { FAMILIAS, construirLaCeldaYa, fuentesDeLaCelda } from '../src/quiebro/ciudad/celdas';
-import type { GeometriaVolcada } from '../src/quiebro/ciudad/geometria';
-import { FRANJA_DEL_FUNDIDO, PRESUPUESTO_DE_LA_VENTANA, rectanguloDeLaVentana } from '../src/quiebro/ciudad/ventana';
+import { ESCRITORES_DE_LA_CELDA, FAMILIAS, fuentesDeLaCelda } from '../src/quiebro/ciudad/celdas';
+import type { EscritorDeLaCelda, Familia } from '../src/quiebro/ciudad/celdas';
+import { CELDAS_GUARDADAS, FRANJA_DEL_FUNDIDO, PRESUPUESTO_DE_LA_VENTANA, rectanguloDeLaVentana } from '../src/quiebro/ciudad/ventana';
 import type { SitioDeLaVentana } from '../src/quiebro/ciudad/ventana';
+import { GRADOS_DEL_NIVEL, relieveDeHoy } from '../src/quiebro/ciudad/grados';
+import type { CapaDeLaCiudad, FabricaDeCapa } from '../src/quiebro/ciudad/capas';
+import type { FuentesDeLuz } from '../src/quiebro/ciudad/fuentes';
+import { materialDeFachada } from '../src/quiebro/ciudad/fachadas';
+import { materialDeLoLejano } from '../src/quiebro/ciudad/lejos';
+import { GLSL_COMUN_DE_LA_FACHADA } from '../src/quiebro/ciudad/fachada/glsl-comun';
+import { TRAMO_DEL_HUECO } from '../src/quiebro/ciudad/fachada/glsl-hueco';
+import { TRAMO_DEL_BAJO } from '../src/quiebro/ciudad/fachada/glsl-bajo';
+import { HUECO_DEL_ESTILO } from '../src/quiebro/ciudad/fachada/tipos-de-cara';
+import type { CaraDelVolumen, ObraDeLaFachada, VentanaEncendida } from '../src/quiebro/ciudad/fachada/tipos-de-cara';
+import { escaparatesDe } from '../src/quiebro/ciudad/fachada/bajo';
+import { LARGO_DE_UNA_TIENDA, NUMERO_DEL_ESTILO, queTienda } from '../src/quiebro/ciudad/hash';
+import type { EstiloDeFachada, GradoDeLaCelda } from '../src/quiebro/ciudad/tipos';
+import type { Resultado, Tri } from './quiebro-ciudad/comun';
+import {
+  FRANJA,
+  MARCA_DEL_FIN_DE_LA_GRAFIA,
+  RejillaDeTriangulos,
+  TROZO_POR_NIVEL,
+  bytesDeLaCelda,
+  bytesEnLaGpu,
+  cajaPintada,
+  carasAlReves,
+  claveDeLaCara,
+  contextoDeLaCiudad,
+  dentroDeAlguna,
+  diferenciasDeLasFuentes,
+  estorboDeLaCapa,
+  firmaDeLaCara,
+  firmaDeLaClave,
+  franjaDe,
+  juzgarElRelevo,
+  juzgarLaFranja,
+  juzgarLaGrafia,
+  juzgarLasLlamadas,
+  juzgarLasTiendas,
+  juzgarLosToldos,
+  obraAPasos,
+  paridadDeLasGemelas,
+  pasosDeLaCelda,
+  recortarALaFranja,
+  textoDelFragmento,
+  tiendaDelGlsl,
+} from './quiebro-ciudad/comun';
+import type { TextosDeLaParidad } from './quiebro-ciudad/comun';
+import * as deParedes from './quiebro-ciudad/paredes';
+import * as deSuelo from './quiebro-ciudad/suelo';
+import * as deMobiliario from './quiebro-ciudad/mobiliario';
+import * as dePiezas from './quiebro-ciudad/piezas';
+import * as deVehiculos from './quiebro-ciudad/vehiculos';
+import * as deSilueta from './quiebro-ciudad/silueta';
+import * as deBajos from './quiebro-ciudad/bajos';
+import * as deParidad from './quiebro-ciudad/paridad';
+import * as deLejano from './quiebro-ciudad/lejano';
+import * as deNeones from './quiebro-ciudad/neones';
+import * as deLuces from './quiebro-ciudad/luces';
+import * as deCercanos from './quiebro-ciudad/cercanos';
+import * as deSemaforos from './quiebro-ciudad/semaforos';
+import * as deRemates from './quiebro-ciudad/remates';
+
+/**
+ * LAS COMPROBACIONES DE CADA PAQUETE (plan del detalle, §5.2.8): el fichero de cada dueño, importado aquí. Un paquete
+ * que no esté en esta lista no se corre: por eso se comprueba contra la lista del plan.
+ */
+const PAQUETES_DE_LA_CIUDAD: Readonly<Record<string, { readonly comprobar?: unknown }>> = {
+  paredes: deParedes,
+  suelo: deSuelo,
+  mobiliario: deMobiliario,
+  piezas: dePiezas,
+  vehiculos: deVehiculos,
+  silueta: deSilueta,
+  bajos: deBajos,
+  paridad: deParidad,
+  lejano: deLejano,
+  neones: deNeones,
+  luces: deLuces,
+  cercanos: deCercanos,
+  semaforos: deSemaforos,
+  remates: deRemates,
+};
+/** Los dueños que nombra el plan (§5.2.8). */
+const PAQUETES_DEL_PLAN = ['paredes', 'suelo', 'mobiliario', 'piezas', 'vehiculos', 'silueta', 'bajos', 'paridad', 'lejano', 'neones', 'luces', 'cercanos', 'semaforos', 'remates'] as const;
 import { CELDA_MAXIMA, CELDA_MINIMA, PLAZAS_POR_CIUDAD, ciudadDeLaMesa, ciudadDeLaNoche, mundoDeLaLizaDeLaCiudad, triosDeFallos } from '../../shared/arcade/juegos/quiebro-ciudad';
 import type { FuenteHorneada } from '../src/quiebro/ciudad/luz-de-la-calle';
 import { hornearLaLuz } from '../src/quiebro/ciudad/luz-de-la-calle';
@@ -74,10 +176,7 @@ import { nieblaEn } from '../src/quiebro/atmosfera/niebla';
 const { comprobar, paso, nota, terminar } = arnes();
 
 const SEMILLAS = 50;
-/** La franja de andar: por encima del bordillo y por debajo de la cabeza. */
-const FRANJA: readonly [number, number] = [0.2, 1.9];
-/** Tolerancia al comparar con las cajas (las caras de un muro caen justo en el borde). */
-const HOLGURA = 0.03;
+/* La franja de andar (`FRANJA`) y la holgura con que se compara con las cajas (`HOLGURA`) son las de `quiebro-ciudad/comun.ts`. */
 /** Lo que se considera «lo que estorba» al mirar la geometría. */
 const MALLAS_QUE_ESTORBAN = new Set(['quiebro-fachadas', 'quiebro-mobiliario', 'quiebro-cristal', 'quiebro-emisivo']);
 
@@ -93,12 +192,6 @@ function barrios(): { codigo: string; noche: number }[] {
 }
 
 /* ─────────────────────────── La geometría que estorba ─────────────────────────── */
-
-interface Tri {
-  readonly a: THREE.Vector3;
-  readonly b: THREE.Vector3;
-  readonly c: THREE.Vector3;
-}
 
 /** Los triángulos (en mundo) de las mallas que estorban, que tocan la franja de andar. */
 function triangulosQueEstorban(ciudad: CiudadConstruida): Tri[] {
@@ -124,34 +217,7 @@ function triangulosQueEstorban(ciudad: CiudadConstruida): Tri[] {
   return salida;
 }
 
-/** El polígono del triángulo recortado a la franja de andar (Sutherland-Hodgman en y). */
-function recortarALaFranja(t: Tri): THREE.Vector3[] {
-  let poli = [t.a, t.b, t.c];
-  for (const [limite, dentroSi] of [
-    [FRANJA[0], (y: number) => y >= FRANJA[0]],
-    [FRANJA[1], (y: number) => y <= FRANJA[1]],
-  ] as const) {
-    const nuevo: THREE.Vector3[] = [];
-    for (let i = 0; i < poli.length; i++) {
-      const p = poli[i] as THREE.Vector3;
-      const q = poli[(i + 1) % poli.length] as THREE.Vector3;
-      const pd = dentroSi(p.y);
-      const qd = dentroSi(q.y);
-      if (pd) nuevo.push(p);
-      if (pd !== qd && Math.abs(q.y - p.y) > 1e-9) nuevo.push(p.clone().lerp(q, (limite - p.y) / (q.y - p.y)));
-    }
-    poli = nuevo;
-    if (poli.length === 0) break;
-  }
-  return poli;
-}
-
-function dentroDeAlguna(x: number, z: number, cajas: readonly CajaXZ[]): boolean {
-  for (const c of cajas) {
-    if (x >= c.x0 - HOLGURA && x <= c.x1 + HOLGURA && z >= c.z0 - HOLGURA && z <= c.z1 + HOLGURA) return true;
-  }
-  return false;
-}
+/* `recortarALaFranja`, `dentroDeAlguna`, `RejillaDeTriangulos` y `cajaPintada` son los de `quiebro-ciudad/comun.ts`. */
 
 /** ¿Está un punto dentro del barrio jugable (sin contar su borde)? */
 function enElBarrio(x: number, z: number, limite: CajaXZ): boolean {
@@ -177,68 +243,6 @@ function pintadoFueraDeLasCajas(tris: readonly Tri[], plano: PlanoDeLaCiudad): s
     if (malos.length >= 5) break;
   }
   return malos;
-}
-
-/* ─────────────────────────── Los rayos que buscan cada caja ─────────────────────────── */
-
-class RejillaDeTriangulos {
-  private readonly celda = 4;
-  private readonly mapa = new Map<string, Tri[]>();
-
-  constructor(tris: readonly Tri[]) {
-    for (const t of tris) {
-      const x0 = Math.floor(Math.min(t.a.x, t.b.x, t.c.x) / this.celda);
-      const x1 = Math.floor(Math.max(t.a.x, t.b.x, t.c.x) / this.celda);
-      const z0 = Math.floor(Math.min(t.a.z, t.b.z, t.c.z) / this.celda);
-      const z1 = Math.floor(Math.max(t.a.z, t.b.z, t.c.z) / this.celda);
-      for (let i = x0; i <= x1; i++) {
-        for (let k = z0; k <= z1; k++) {
-          const clave = `${String(i)},${String(k)}`;
-          const lista = this.mapa.get(clave);
-          if (lista === undefined) this.mapa.set(clave, [t]);
-          else lista.push(t);
-        }
-      }
-    }
-  }
-
-  cerca(x0: number, z0: number, x1: number, z1: number): Set<Tri> {
-    const salida = new Set<Tri>();
-    for (let i = Math.floor(Math.min(x0, x1) / this.celda); i <= Math.floor(Math.max(x0, x1) / this.celda); i++) {
-      for (let k = Math.floor(Math.min(z0, z1) / this.celda); k <= Math.floor(Math.max(z0, z1) / this.celda); k++) {
-        for (const t of this.mapa.get(`${String(i)},${String(k)}`) ?? []) salida.add(t);
-      }
-    }
-    return salida;
-  }
-}
-
-const rayo = new THREE.Ray();
-const golpe = new THREE.Vector3();
-
-/** ¿Tiene esta caja algo pintado? 12 rayos desde fuera hacia su centro, a tres alturas. */
-function cajaPintada(c: CajaXZ, rejilla: RejillaDeTriangulos): boolean {
-  const cx = (c.x0 + c.x1) / 2;
-  const cz = (c.z0 + c.z1) / 2;
-  const salidas: readonly (readonly [number, number])[] = [
-    [c.x0 - 0.6, cz],
-    [c.x1 + 0.6, cz],
-    [cx, c.z0 - 0.6],
-    [cx, c.z1 + 0.6],
-  ];
-  const cercanos = rejilla.cerca(c.x0 - 1, c.z0 - 1, c.x1 + 1, c.z1 + 1);
-  for (const y of [0.3, 0.9, 1.5]) {
-    for (const [sx, sz] of salidas) {
-      rayo.origin.set(sx, y, sz);
-      rayo.direction.set(cx - sx, 0, cz - sz).normalize();
-      for (const t of cercanos) {
-        const p = rayo.intersectTriangle(t.a, t.b, t.c, false, golpe);
-        if (p === null) continue;
-        if (p.x >= c.x0 - HOLGURA && p.x <= c.x1 + HOLGURA && p.z >= c.z0 - HOLGURA && p.z <= c.z1 + HOLGURA) return true;
-      }
-    }
-  }
-  return false;
 }
 
 /* ─────────────────────────── La huella de una geometría ─────────────────────────── */
@@ -496,37 +500,230 @@ function camaraEn(p: { x: number; z: number }): THREE.Camera {
   return { getWorldPosition: (v: THREE.Vector3) => v.set(p.x, 1.7, p.z) } as unknown as THREE.Camera;
 }
 
-/** Los triángulos de una geometría volcada que tocan la franja de andar. */
-function franjaDe(g: GeometriaVolcada, salida: Tri[]): void {
-  const pos = g.datos.get('position');
-  if (pos === undefined) return;
-  const idx = g.indices;
-  for (let k = 0; k < idx.length; k += 3) {
-    const v = [0, 1, 2].map((d) => {
-      const j = (idx[k + d] as number) * 3;
-      return new THREE.Vector3(pos[j] as number, pos[j + 1] as number, pos[j + 2] as number);
-    }) as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
-    const y0 = Math.min(v[0].y, v[1].y, v[2].y);
-    const y1 = Math.max(v[0].y, v[1].y, v[2].y);
-    if (y1 < FRANJA[0] || y0 > FRANJA[1]) continue;
-    salida.push({ a: v[0], b: v[1], c: v[2] });
-  }
+/* `franjaDe` (los triángulos de una geometría volcada en la franja de andar) y la rejilla de las cajas son los de `quiebro-ciudad/comun.ts`. */
+
+/*
+ * ═══ LAS CELDAS DE CADA NIVEL Y CADA GRADO (plan del detalle, O1-VERIFICACION 1, 2, 5, 11 y 12) ═══
+ *
+ * Con la ciudad de cada traza y cada nivel ya montada en sus 25 cámaras, se construyen sus 169 celdas OTRA VEZ,
+ * una por variante del nivel —cada grado de §3.1 (`GRADOS_DEL_NIVEL`) con el relieve de la celda del centro, y en
+ * N1 también sin él, que es como la ventana construye las de fuera del centro (`relieveDeHoy`)—, con el grado
+ * EXPLÍCITO y no la guardada que haya: la ventana guarda la que le toca, y así la franja miraba un solo grado.
+ * Con cada celda:
+ *   · (1) sus triángulos de la franja (las cinco familias, también los neones), para cruzarlos con las cajas;
+ *   · (2) sus caras al revés en las familias con material de una sola cara: en la traza 0 contra el conjunto anotado, y en
+ *     las demás contra sus firmas (`firmaDeLaCara`);
+ *   · (5) sus bytes de JS (las 36 más pesadas de la traza en ese nivel son lo que la ventana puede guardar);
+ *   · (11) sus fuentes de luz, contra las de `fuentesDeLaCelda` (grado 1);
+ *   · (12) su paso mayor y su cola, contra el trozo del nivel.
+ * La franja se mira en TODAS las variantes, también en N1 sin el relieve del centro (así construye la ventana 8 de sus 9
+ * celdas en N1): «sin relieve lleva lo mismo y menos» no se da por hecho.
+ */
+
+interface VarianteDelNivel {
+  readonly grado: GradoDeLaCelda;
+  readonly relieve: boolean;
+  readonly franja: boolean;
 }
 
-/** Las cajas en celdas de 8 m, para preguntar «¿está este punto en alguna?» sin mirarlas todas. */
-function rejillaDeCajas(cajas: readonly CajaXZ[]): (x: number, z: number) => boolean {
-  const m = new Map<number, CajaXZ[]>();
-  for (const c of cajas) {
-    for (let i = Math.floor((c.x0 - HOLGURA) / 8); i <= Math.floor((c.x1 + HOLGURA) / 8); i++) {
-      for (let k = Math.floor((c.z0 - HOLGURA) / 8); k <= Math.floor((c.z1 + HOLGURA) / 8); k++) {
-        const clave = (i + 128) * 512 + (k + 128);
-        const l = m.get(clave);
-        if (l === undefined) m.set(clave, [c]);
-        else l.push(c);
-      }
+/** Las variantes con que la ventana de cada nivel puede construir una celda (ver arriba). */
+const VARIANTES: Readonly<Record<NivelDeLaCiudad, readonly VarianteDelNivel[]>> = (() => {
+  const v = {} as Record<NivelDeLaCiudad, VarianteDelNivel[]>;
+  for (const n of NIVELES_DE_LA_CIUDAD) {
+    v[n] = [];
+    for (const grado of GRADOS_DEL_NIVEL[n]) {
+      v[n].push({ grado, relieve: relieveDeHoy(n, true), franja: true });
+      if (relieveDeHoy(n, false) !== relieveDeHoy(n, true)) v[n].push({ grado, relieve: relieveDeHoy(n, false), franja: true });
     }
   }
-  return (x, z) => dentroDeAlguna(x, z, m.get((Math.floor(x / 8) + 128) * 512 + (Math.floor(z / 8) + 128)) ?? []);
+  return v;
+})();
+
+const nombreDeLaVariante = (n: NivelDeLaCiudad, v: VarianteDelNivel): string => `N${String(n)} g${String(v.grado)}${v.relieve ? '' : ' sin relieve'}`;
+
+/** Lo que se cuenta de la franja en cada nivel y grado (1). */
+interface CuentaDeLaFranja {
+  triangulos: number;
+  cajas: number;
+  fuera: string[];
+  sinPintar: string[];
+}
+const franjaPorGrado = new Map<string, CuentaDeLaFranja>();
+
+/**
+ * Los mínimos de inspeccionados de la franja en CADA nivel y grado, en las 32 trazas. Medido el 25-sep (`70fe237`):
+ * 40.733 cajas en cada uno, y de 2,37 M triángulos de la franja (N0) a 6,11 M (N3).
+ */
+const MINIMO_DE_CAJAS_POR_GRADO = TRAZAS_DE_LA_CIUDAD * 1100;
+const MINIMO_DE_TRIANGULOS_POR_GRADO = TRAZAS_DE_LA_CIUDAD * 30_000;
+
+/** Las caras al revés de la traza 0 (2), por clave, y cuántas caras se miraron. */
+const carasAlRevesDeHoy = new Set<string>();
+const carasAlRevesVistas = new Map<string, string>();
+let carasMiradas = 0;
+/** Las familias que se miran (las de material de una sola cara) y las que no. */
+const familiasDeUnaCara = new Set<Familia>();
+const familiasDeDosCaras = new Set<Familia>();
+
+/** Las fuentes (11): celdas comparadas y las que no casan. */
+let celdasConFuentes = 0;
+const fuentesQueCambian: string[] = [];
+
+/** Los trozos (12): el paso mayor de cada nivel y grado, y quien se pasa. */
+const pasoMayorPorGrado = new Map<string, number>();
+const pasosQueSePasan: string[] = [];
+let pasosMirados = 0;
+
+/** La memoria (5): lo peor de cada nivel, en bytes. */
+const memoriaDeJs: Record<NivelDeLaCiudad, { celdas: number; moldes: number }> = { 0: { celdas: 0, moldes: 0 }, 1: { celdas: 0, moldes: 0 }, 2: { celdas: 0, moldes: 0 }, 3: { celdas: 0, moldes: 0 } };
+const memoriaDeLaGpu: Record<NivelDeLaCiudad, { total: number; geometrias: number; texturas: number; luz: number; materia: number }> = {
+  0: { total: 0, geometrias: 0, texturas: 0, luz: 0, materia: 0 },
+  1: { total: 0, geometrias: 0, texturas: 0, luz: 0, materia: 0 },
+  2: { total: 0, geometrias: 0, texturas: 0, luz: 0, materia: 0 },
+  3: { total: 0, geometrias: 0, texturas: 0, luz: 0, materia: 0 },
+};
+
+/** Las capas (1 y 13): lo que cada una declara de su estorbo y de sus llamadas. */
+const problemasDeLasCapas: string[] = [];
+let verticesDeLasCapas = 0;
+const llamadasQueNoCasan: string[] = [];
+let capasMiradas = 0;
+/** El relevo (6): texturas miradas y las que no se suben. */
+const texturasSinSubir: string[] = [];
+let texturasMiradas = 0;
+const almacenesVistos = new Set<string>();
+
+/** Las caras al revés de hoy, anotadas (ver `quiebro-ciudad/caras-al-reves-de-hoy.json`). */
+const CARAS_AL_REVES_ANOTADAS: { readonly traza: number; readonly codigo: string; readonly caras: readonly string[] } = JSON.parse(
+  readFileSync(new URL('./quiebro-ciudad/caras-al-reves-de-hoy.json', import.meta.url), 'utf8'),
+) as { traza: number; codigo: string; caras: string[] };
+const CARAS_ANOTADAS = new Set(CARAS_AL_REVES_ANOTADAS.caras);
+/** Las firmas de las caras al revés de hoy (familia, normal y altura: ver `firmaDeLaCara`), para las demás trazas. */
+const FIRMAS_ANOTADAS = new Set(CARAS_AL_REVES_ANOTADAS.caras.map(firmaDeLaClave).filter((f): f is string => f !== null));
+/** En las demás trazas: caras miradas, al revés, y las que no tienen la firma de ninguna de hoy. */
+let carasMiradasFuera = 0;
+let carasAlRevesFuera = 0;
+let carasConOtraFirma = 0;
+const ejemplosConOtraFirma: string[] = [];
+
+/** Los triángulos del borde de glifos que tocan la franja. */
+function franjaDelBorde(ciudad: CiudadAbiertaConstruida, tris: Tri[]): void {
+  const borde = ciudad.borde.malla.geometry;
+  const posB = borde.getAttribute('position');
+  const idxB = borde.getIndex();
+  if (idxB !== null) franjaDe({ vertices: posB.count, atributos: [], datos: new Map([['position', posB.array as Float32Array]]), indices: Uint32Array.from(idxB.array as ArrayLike<number>) }, tris);
+}
+
+/** Las celdas de una traza y un nivel, en cada variante (ver arriba). */
+function mirarLasCeldas(traza: number, n: NivelDeLaCiudad, ciudad: CiudadAbiertaConstruida): void {
+  const partes = ciudad.partes;
+  const cajas = ciudad.fuente.noche.cajas;
+  /* Las capas: su estorbo (1) y sus llamadas (13). */
+  const trisDeLasCapas: Tri[] = [];
+  for (const capa of ciudad.capas) {
+    const e = estorboDeLaCapa(capa, cajas);
+    trisDeLasCapas.push(...e.tris);
+    verticesDeLasCapas += e.mirados;
+    for (const p of e.problemas) if (problemasDeLasCapas.length < 6) problemasDeLasCapas.push(`traza ${String(traza)} N${String(n)}: ${p}`);
+  }
+  const ll = juzgarLasLlamadas(ciudad);
+  capasMiradas += ll.capas;
+  for (const p of ll.problemas) if (llamadasQueNoCasan.length < 6) llamadasQueNoCasan.push(`traza ${String(traza)} N${String(n)}: ${p}`);
+  /* La memoria de la GPU (5), con la ventana de la última cámara montada. */
+  const gpu = bytesEnLaGpu(ciudad);
+  if (gpu.total > memoriaDeLaGpu[n].total) memoriaDeLaGpu[n] = { ...gpu };
+  /* El relevo (6). */
+  const r = juzgarElRelevo(ciudad);
+  texturasMiradas += r.texturas;
+  for (const a of r.deAlmacen) almacenesVistos.add(a);
+  for (const p of r.problemas) if (texturasSinSubir.length < 6) texturasSinSubir.push(`traza ${String(traza)} N${String(n)}: ${p}`);
+  /* Las familias de una cara (2): las del material con que la ventana las pinta. */
+  const ladoDe = (f: Familia): THREE.Side => (ciudad.ventana.mallas[f].malla.material as THREE.Material).side;
+  for (const f of FAMILIAS) (ladoDe(f) === THREE.DoubleSide ? familiasDeDosCaras : familiasDeUnaCara).add(f);
+
+  const fuentesDeGrado1 = new Map<number, FuentesDeLuz>();
+  const bytesDeLasCeldas: number[] = [];
+  let moldesMayor = 0;
+  for (const v of VARIANTES[n]) {
+    const nombre = nombreDeLaVariante(n, v);
+    const tris: Tri[] = v.franja ? [...trisDeLasCapas] : [];
+    if (v.franja) franjaDelBorde(ciudad, tris);
+    let pesada: { k: number; triangulos: number } = { k: -1, triangulos: -1 };
+    for (let k = 0; k < partes.celdas.length; k++) {
+      const parte = partes.celdas[k];
+      if (parte === undefined) continue;
+      const p = pasosDeLaCelda(parte, partes, n, v.grado, v.relieve);
+      const celda = p.celda;
+      /* (12) los trozos */
+      pasosMirados += p.pasos + 1;
+      pasoMayorPorGrado.set(nombre, Math.max(pasoMayorPorGrado.get(nombre) ?? 0, p.mayor));
+      if (p.mayor > TROZO_POR_NIVEL[n] && pasosQueSePasan.length < 6) {
+        const quien = obraAPasos(parte, partes, n, v.grado, v.relieve);
+        pasosQueSePasan.push(`traza ${String(traza)} ${nombre} celda ${String(k)}: ${String(p.mayor)} triángulos entre dos pasos (${quien.deQuien}) > ${String(TROZO_POR_NIVEL[n])}`);
+      }
+      /* (5) la memoria de JS */
+      bytesDeLasCeldas.push(bytesDeLaCelda(celda));
+      if (celda.triangulos > pesada.triangulos) pesada = { k, triangulos: celda.triangulos };
+      /* (11) las fuentes */
+      let g1 = fuentesDeGrado1.get(k);
+      if (g1 === undefined) {
+        g1 = fuentesDeLaCelda(parte, partes, n);
+        fuentesDeGrado1.set(k, g1);
+      }
+      celdasConFuentes++;
+      const dif = diferenciasDeLasFuentes(g1, celda.fuentes);
+      if (dif.length > 0 && fuentesQueCambian.length < 6) fuentesQueCambian.push(`traza ${String(traza)} ${nombre} celda ${String(k)}: ${dif.slice(0, 2).join('; ')}`);
+      /* NaN, (1) la franja y (2) las caras al revés */
+      for (const f of FAMILIAS) {
+        const g = celda.familias[f];
+        for (const [, datos] of g.datos) {
+          for (let i = 0; i < datos.length; i++) {
+            if (!Number.isFinite(datos[i] as number)) {
+              conNaNAbierta.push(`traza ${String(traza)} ${nombre} celda ${String(k)} ${f}`);
+              break;
+            }
+          }
+        }
+        if (v.franja) franjaDe(g, tris);
+        if (traza === CARAS_AL_REVES_ANOTADAS.traza && familiasDeUnaCara.has(f)) {
+          const alReves = carasAlReves(g, ladoDe(f));
+          carasMiradas += alReves.mirados;
+          for (const c of alReves.centros) {
+            const clave = claveDeLaCara(k, f, c);
+            carasAlRevesDeHoy.add(clave);
+            if (!carasAlRevesVistas.has(clave)) carasAlRevesVistas.set(clave, nombre);
+          }
+        } else if (familiasDeUnaCara.has(f)) {
+          /* (2) en las demás trazas: toda cara al revés con la firma de una de las de hoy (ver `firmaDeLaCara`). */
+          const alReves = carasAlReves(g, ladoDe(f));
+          carasMiradasFuera += alReves.mirados;
+          carasAlRevesFuera += alReves.centros.length;
+          for (const c of alReves.centros) {
+            const firma = firmaDeLaCara(f, c);
+            if (FIRMAS_ANOTADAS.has(firma)) continue;
+            carasConOtraFirma++;
+            if (ejemplosConOtraFirma.length < 5) ejemplosConOtraFirma.push(`traza ${String(traza)} ${nombre} celda ${String(k)}: ${firma} en (${c.centro.map((x) => x.toFixed(2)).join(', ')})`);
+          }
+        }
+      }
+    }
+    if (pesada.k >= 0) {
+      const parte = partes.celdas[pesada.k];
+      if (parte !== undefined) moldesMayor = Math.max(moldesMayor, obraAPasos(parte, partes, n, v.grado, v.relieve).moldes);
+    }
+    if (!v.franja) continue;
+    const j = juzgarLaFranja(tris, cajas);
+    const cuenta = franjaPorGrado.get(nombre) ?? { triangulos: 0, cajas: 0, fuera: [], sinPintar: [] };
+    cuenta.triangulos += j.triangulos;
+    cuenta.cajas += j.cajas;
+    for (const e of j.ejemplos) if (cuenta.fuera.length < 3) cuenta.fuera.push(`traza ${String(traza)} ${e}`);
+    for (const c of j.sinPintar) if (cuenta.sinPintar.length < 3) cuenta.sinPintar.push(`traza ${String(traza)} [${String(c.x0)}, ${String(c.z0)}]-[${String(c.x1)}, ${String(c.z1)}]`);
+    franjaPorGrado.set(nombre, cuenta);
+  }
+  /* Lo que la ventana puede guardar: las 36 celdas más pesadas de la traza en este nivel (de cualquier variante). */
+  bytesDeLasCeldas.sort((a, b) => b - a);
+  const guardadas = bytesDeLasCeldas.slice(0, CELDAS_GUARDADAS).reduce((s, b) => s + b, 0);
+  memoriaDeJs[n] = { celdas: Math.max(memoriaDeJs[n].celdas, guardadas), moldes: Math.max(memoriaDeJs[n].moldes, moldesMayor) };
 }
 
 paso('lo declarado de la ciudad abierta cabe en la cuota del 50 %');
@@ -552,12 +749,8 @@ const peorTotal: Record<NivelDeLaCiudad, { triangulos: number; llamadas: number 
 };
 const trozoMayorPorNivel: Record<NivelDeLaCiudad, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
 const enUsoPorNivel: Record<NivelDeLaCiudad, Record<string, { vertices: number; indices: number }>> = { 0: {}, 1: {}, 2: {}, 3: {} };
-const fueraDeCajaAbierta: string[] = [];
-const cajasSinPintarAbierta: string[] = [];
 const conNaNAbierta: string[] = [];
 let camarasMiradas = 0;
-let cajasMiradasAbierta = 0;
-let triangulosMiradosAbierta = 0;
 const inicioAbierta = performance.now();
 for (let traza = 0; traza < TRAZAS_DE_LA_CIUDAD; traza++) {
   const fuente = ciudadParaPintar(traza, CODIGO_DE_LA_CIUDAD, 1 + (traza % 10));
@@ -583,55 +776,8 @@ for (let traza = 0; traza < TRAZAS_DE_LA_CIUDAD; traza++) {
     for (const f of FAMILIAS) if (ciudad.ventana.mallas[f].crecidas > 0) crecidas.push(`traza ${String(traza)} N${String(n)} ${f}`);
     trozoMayorPorNivel[n] = Math.max(trozoMayorPorNivel[n], ciudad.ventana.trozoMayor);
     if (ciudad.ventana.trozoMayor > PRESUPUESTO_DE_LA_VENTANA[n].trozo) trozosQueSePasan.push(`traza ${String(traza)} N${String(n)}: ${String(ciudad.ventana.trozoMayor)} > ${String(PRESUPUESTO_DE_LA_VENTANA[n].trozo)}`);
-    /* Lo pintado contra la estructura, con TODAS las celdas (y el borde): en N0 y N3, los extremos del adorno. */
-    if (n === 0 || n === 3) {
-      const tris: Tri[] = [];
-      for (let k = 0; k < 169; k++) {
-        const parte = ciudad.partes.celdas[k];
-        if (parte === undefined) continue;
-        const celda = ciudad.ventana.celdaGuardada(k) ?? construirLaCeldaYa(parte, ciudad.partes, n);
-        for (const f of ['fachadas', 'mobiliario', 'cristal', 'emisivo'] as const) {
-          franjaDe(celda.familias[f], tris);
-          for (const [, datos] of celda.familias[f].datos) {
-            for (let i = 0; i < datos.length; i++) {
-              if (!Number.isFinite(datos[i] as number)) {
-                conNaNAbierta.push(`traza ${String(traza)} N${String(n)} celda ${String(k)} ${f}`);
-                break;
-              }
-            }
-          }
-        }
-      }
-      const borde = ciudad.borde.malla.geometry;
-      const posB = borde.getAttribute('position');
-      const idxB = borde.getIndex();
-      if (idxB !== null) {
-        franjaDe({ vertices: posB.count, atributos: [], datos: new Map([['position', posB.array as Float32Array]]), indices: Uint32Array.from(idxB.array as ArrayLike<number>) }, tris);
-      }
-      triangulosMiradosAbierta += tris.length;
-      const cajas = ciudad.fuente.noche.cajas;
-      const enUnaCaja = rejillaDeCajas(cajas);
-      let malos = 0;
-      for (const t of tris) {
-        const poli = recortarALaFranja(t);
-        if (poli.length < 3) continue;
-        const cx = poli.reduce((s, q) => s + q.x, 0) / poli.length;
-        const cz = poli.reduce((s, q) => s + q.z, 0) / poli.length;
-        for (const [px, pz] of [...poli.map((q) => [q.x, q.z] as const), [cx, cz] as const]) {
-          if (Math.abs(px) >= 270 - 0.01 || Math.abs(pz) >= 270 - 0.01) continue;
-          if (!enUnaCaja(px, pz)) {
-            if (malos < 3) fueraDeCajaAbierta.push(`traza ${String(traza)} N${String(n)} (${px.toFixed(2)}, ${pz.toFixed(2)})`);
-            malos++;
-            break;
-          }
-        }
-      }
-      const rejilla = new RejillaDeTriangulos(tris);
-      for (const c of cajas) {
-        cajasMiradasAbierta++;
-        if (!cajaPintada(c, rejilla) && cajasSinPintarAbierta.length < 6) cajasSinPintarAbierta.push(`traza ${String(traza)} N${String(n)} ${c.tipo} [${String(c.x0)}, ${String(c.z0)}]-[${String(c.x1)}, ${String(c.z1)}]`);
-      }
-    }
+    /* Las celdas de este nivel en cada grado (y lo demás del detalle): ver `mirarLasCeldas`. */
+    mirarLasCeldas(traza, n, ciudad);
     ciudad.liberar();
   }
 }
@@ -651,13 +797,405 @@ comprobar(
   NIVELES_DE_LA_CIUDAD.every((n) => (llamadasPorNivel.get(n)?.size ?? 0) === 1),
   NIVELES_DE_LA_CIUDAD.map((n) => [n, llamadasPorNivel.get(n)?.size ?? 0]),
 );
-comprobar('ninguna celda lleva NaN ni infinitos', conNaNAbierta.length === 0, conNaNAbierta.slice(0, 5));
-comprobar('se miraron cajas y triángulos de verdad (el filtro no se ha quedado vacío)', cajasMiradasAbierta > TRAZAS_DE_LA_CIUDAD * 2 * 1000 && triangulosMiradosAbierta > TRAZAS_DE_LA_CIUDAD * 2 * 20000, {
-  cajasMiradasAbierta,
-  triangulosMiradosAbierta,
-});
-comprobar('nada pintado estorba fuera de las cajas de la ciudad (celda a celda, dentro de ±270)', fueraDeCajaAbierta.length === 0, fueraDeCajaAbierta.slice(0, 5));
-comprobar('ninguna caja de la ciudad queda sin pintar (celda a celda, con el borde de glifos)', cajasSinPintarAbierta.length === 0, cajasSinPintarAbierta);
+comprobar('ninguna celda lleva NaN ni infinitos, en ningún nivel ni grado', conNaNAbierta.length === 0, conNaNAbierta.slice(0, 5));
+
+/* ═══════════════════ LO QUE EL DETALLE VA A CAMBIAR, VIGILADO ANTES (plan del detalle, O1-VERIFICACION) ═══════════════════ */
+
+/** Un contexto para las vacunas y las comprobaciones de los paquetes (la traza 0, la de las fotos). */
+const contexto = contextoDeLaCiudad(CODIGO_DE_LA_CIUDAD, TRAZAS_DE_LA_CIUDAD, nota);
+const MiB = 1024 * 1024;
+
+/** El tope de la memoria de la GPU de la ciudad, por nivel, en MiB (§7.3 del plan: la columna que vigila VERIFICACION). */
+const TOPE_DE_LA_GPU_POR_NIVEL: Readonly<Record<NivelDeLaCiudad, number>> = { 0: 24, 1: 48, 2: 128, 3: 256 };
+/**
+ * LA MEMORIA DE JS DE HOY, en MiB, medida por este comprobador en la ola 1b (25-sep, `70fe237`): las 36 celdas más
+ * pesadas de la peor traza (lo que la ventana puede guardar, con las claves por grado) y los moldes de la celda más
+ * pesada. Hasta el cierre, el tope es esto × 1,8 (§7.3); O4-CIERRE lo fija.
+ */
+const MEMORIA_DE_JS_DE_HOY: Readonly<Record<NivelDeLaCiudad, number>> = { 0: 7.9, 1: 47.4, 2: 57.6, 3: 58.4 };
+const CRECIMIENTO_DE_LA_MEMORIA_DE_JS = 1.8;
+
+/**
+ * ¿Está en verde un resultado de un paquete? En verde Y con lo mirado en su mínimo, que tiene que ser al menos 1:
+ * un filtro sin mínimo, con cero inspeccionados, daría cero fallos y se leería como vigilado.
+ */
+function resultadoEnVerde(r: Resultado): boolean {
+  return r.bien && r.minimo >= 1 && r.inspeccionados >= r.minimo;
+}
+
+/** Un escritor de prueba que escribe una caja de pie en `(x, z)` (0,6 m de lado, de 0,2 a 1,5 m) en los grados dados. */
+function cajaDePrueba(x: number, z: number, grados: readonly GradoDeLaCelda[]): { readonly nombre: string; readonly escribir: EscritorDeLaCelda } {
+  return {
+    nombre: 'pieza de prueba',
+    *escribir(obra) {
+      if (!grados.includes(obra.grado)) return;
+      obra.m.mobiliario.caja(x - 0.3, 0.2, z - 0.3, x + 0.3, 1.5, z + 0.3);
+      yield;
+    },
+  };
+}
+
+/** Un punto de la franja de una celda que no cae en ninguna caja (en su calle), para poner ahí lo que estorba. */
+function puntoLibre(caja: CajaXZ, cajas: readonly CajaXZ[]): [number, number] | null {
+  for (let i = 1; i < 12; i++) {
+    for (let k = 1; k < 12; k++) {
+      const x = caja.x0 + ((caja.x1 - caja.x0) * i) / 12;
+      const z = caja.z0 + ((caja.z1 - caja.z0) * k) / 12;
+      if (!dentroDeAlguna(x, z, cajas, 1) && Math.abs(x) < 260 && Math.abs(z) < 260) return [x, z];
+    }
+  }
+  return null;
+}
+
+/** Una capa de prueba: una malla con los vértices dados, lo que declare de su estorbo y sus renglones. */
+function capaDePrueba(
+  nombre: string,
+  posiciones: readonly number[],
+  estorbo: CapaDeLaCiudad['estorbo'],
+  renglones: CapaDeLaCiudad['renglones'] = () => [],
+  material: THREE.Material = new THREE.MeshBasicMaterial(),
+): CapaDeLaCiudad {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([...posiciones], 3));
+  const malla = new THREE.Mesh(g, material);
+  malla.name = nombre;
+  malla.frustumCulled = false;
+  return { nombre, objeto: malla, renglones, estorbo, soltar: () => g.dispose() };
+}
+
+paso('(1) la franja y las cajas pintadas, en cada nivel y cada grado, con los neones y las capas');
+{
+  for (const n of NIVELES_DE_LA_CIUDAD) {
+    for (const v of VARIANTES[n]) {
+      if (!v.franja) continue;
+      const nombre = nombreDeLaVariante(n, v);
+      const c = franjaPorGrado.get(nombre) ?? { triangulos: 0, cajas: 0, fuera: [], sinPintar: [] };
+      nota(`${nombre}: ${String(c.triangulos)} triángulos de la franja y ${String(c.cajas)} cajas mirados en ${String(TRAZAS_DE_LA_CIUDAD)} trazas (mínimos ${String(MINIMO_DE_TRIANGULOS_POR_GRADO)} y ${String(MINIMO_DE_CAJAS_POR_GRADO)})`);
+      comprobar(`${nombre}: se miraron triángulos y cajas de verdad (el filtro no se ha quedado vacío)`, c.triangulos >= MINIMO_DE_TRIANGULOS_POR_GRADO && c.cajas >= MINIMO_DE_CAJAS_POR_GRADO, c);
+      comprobar(`${nombre}: nada pintado estorba fuera de las cajas de la ciudad (celda a celda, dentro de ±270)`, c.fuera.length === 0, c.fuera);
+      comprobar(`${nombre}: ninguna caja de la ciudad queda sin pintar (celda a celda, con el borde de glifos)`, c.sinPintar.length === 0, c.sinPintar);
+    }
+  }
+  const grados = NIVELES_DE_LA_CIUDAD.map((n) => `N${String(n)} {${GRADOS_DEL_NIVEL[n].join(', ')}}`).join(', ');
+  comprobar(`los grados mirados son los de §3.1: ${grados}`, grados === 'N0 {1}, N1 {1}, N2 {2, 3}, N3 {2, 3}' && franjaPorGrado.size === 7 && franjaPorGrado.has('N1 g1 sin relieve'), [...franjaPorGrado.keys()]);
+  nota(`capas: ${String(verticesDeLasCapas)} vértices mirados contra lo que declaran de su estorbo`);
+  comprobar('cada capa cumple lo que declara de su estorbo (por encima de 1,9 m, fuera de la ciudad, pegada al muro o en la franja)', problemasDeLasCapas.length === 0 && verticesDeLasCapas > 0, { problemasDeLasCapas, verticesDeLasCapas });
+
+  /* LAS VACUNAS: una pieza que sólo sale en g3 y se sale de su caja; y una capa con un triángulo a 1 m dentro de ±270. */
+  const base = contexto.base(0);
+  const cajas = base.fuente.noche.cajas;
+  const parte = base.partes.celdas.find((p) => p.edificios.length > 0 && Math.abs(p.caja.x0) < 200 && Math.abs(p.caja.z0) < 200);
+  const punto = parte === undefined ? null : puntoLibre(parte.caja, cajas);
+  let g3 = -1;
+  let g2 = -1;
+  if (parte !== undefined && punto !== null) {
+    const escritores = [...ESCRITORES_DE_LA_CELDA, cajaDePrueba(punto[0], punto[1], [3])];
+    for (const grado of [2, 3] as const) {
+      const tris: Tri[] = [];
+      const volcadas = obraAPasos(parte, base.partes, 3, grado, true, escritores).volcar();
+      for (const f of FAMILIAS) franjaDe(volcadas[f], tris);
+      const j = juzgarLaFranja(tris, cajas, false);
+      if (grado === 3) g3 = j.fuera;
+      else g2 = j.fuera;
+    }
+  }
+  comprobar('vacuna: una pieza de prueba que sólo sale en g3, fuera de su caja, sale roja en g3 y no en g2', g3 > 0 && g2 === 0, { g3, g2, punto });
+  const fuera = estorboDeLaCapa(capaDePrueba('capa de prueba', [269, 5, 0, 269, 6, 0, 269, 5, 1], 'fuera-de-la-ciudad'), cajas);
+  const deVerdadFuera = estorboDeLaCapa(capaDePrueba('capa de prueba', [271, 5, 0, 271, 6, 0, 271, 5, 1], 'fuera-de-la-ciudad'), cajas);
+  const encima = estorboDeLaCapa(capaDePrueba('capa de prueba', [0, 1.5, 0, 1, 2.5, 0, 0, 2.5, 1], 'por-encima-de-1,9'), cajas);
+  const enLaFranja = (s: Tri[]): void => {
+    if (punto !== null) s.push({ a: new THREE.Vector3(punto[0], 0.5, punto[1]), b: new THREE.Vector3(punto[0] + 0.3, 0.5, punto[1]), c: new THREE.Vector3(punto[0], 1.2, punto[1]) });
+  };
+  const conFuncion = punto === null ? null : estorboDeLaCapa(capaDePrueba('capa de prueba', [], enLaFranja), cajas);
+  const fueraConFuncion = conFuncion === null ? -1 : juzgarLaFranja(conFuncion.tris, cajas, false).fuera;
+  comprobar(
+    'vacuna: una capa con un triángulo a 1 m dentro de ±270 que dice ir fuera de la ciudad sale roja (y a 1 m fuera, no); lo mismo por debajo de 1,9 m, y con su estorbo metido en la franja',
+    fuera.problemas.length > 0 && deVerdadFuera.problemas.length === 0 && encima.problemas.length > 0 && fueraConFuncion > 0,
+    { fuera: fuera.problemas, deVerdadFuera: deVerdadFuera.problemas, encima: encima.problemas, fueraConFuncion },
+  );
+}
+
+paso('(2) las caras al revés: el conjunto de hoy, y ni una nueva');
+{
+  const nuevas = [...carasAlRevesDeHoy].filter((c) => !CARAS_ANOTADAS.has(c));
+  const arregladas = [...CARAS_ANOTADAS].filter((c) => !carasAlRevesDeHoy.has(c));
+  nota(`traza ${String(CARAS_AL_REVES_ANOTADAS.traza)}: ${String(carasMiradas)} caras miradas en ${[...familiasDeUnaCara].join(', ')} (de una cara; ${[...familiasDeDosCaras].join(', ')} son de dos); ${String(carasAlRevesDeHoy.size)} al revés, ${String(CARAS_ANOTADAS.size)} anotadas, ${String(arregladas.length)} arregladas desde que se anotaron`);
+  comprobar('las familias de una sola cara son al menos las fachadas, el mobiliario y lo emisivo, y se miraron de verdad', ['fachadas', 'mobiliario', 'emisivo'].every((f) => familiasDeUnaCara.has(f as Familia)) && carasMiradas > 1_000_000, { unaCara: [...familiasDeUnaCara], carasMiradas });
+  comprobar('ninguna cara al revés nueva: el conjunto de las de hoy (celda, familia y sitio) no gana ninguna', nuevas.length === 0 && CARAS_AL_REVES_ANOTADAS.codigo === CODIGO_DE_LA_CIUDAD, nuevas.slice(0, 5).map((c) => `${c} (${carasAlRevesVistas.get(c) ?? '?'})`));
+  /* LA VACUNA: arreglar una y romper otra deja el NÚMERO igual; el conjunto, no. (Sobre el conjunto ANOTADO y no sobre el visto: así la vacuna no depende de cómo esté hoy el árbol.) */
+  const vistas = new Set(CARAS_ANOTADAS);
+  const quitada = vistas.values().next().value;
+  if (quitada !== undefined) vistas.delete(quitada);
+  vistas.add('84|mobiliario|0,100,0|0,10,0');
+  const nuevasDeLaVacuna = [...vistas].filter((c) => !CARAS_ANOTADAS.has(c));
+  comprobar('vacuna: arreglar una cara y romper otra (el mismo número) sale rojo, con la nueva nombrada', vistas.size === CARAS_ANOTADAS.size && nuevasDeLaVacuna.length === 1 && nuevasDeLaVacuna[0] === '84|mobiliario|0,100,0|0,10,0', nuevasDeLaVacuna);
+  const g = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
+  const pos = g.getAttribute('position').array as Float32Array;
+  const nor = g.getAttribute('normal').array as Float32Array;
+  const indices = Uint32Array.from({ length: pos.length / 3 }, (_v, i) => i);
+  const bien = carasAlReves({ vertices: pos.length / 3, atributos: [], datos: new Map([['position', pos], ['normal', nor]]), indices }, THREE.FrontSide);
+  const volteada = Uint32Array.from(indices);
+  volteada[1] = 2;
+  volteada[2] = 1;
+  const mal = carasAlReves({ vertices: pos.length / 3, atributos: [], datos: new Map([['position', pos], ['normal', nor]]), indices: volteada }, THREE.FrontSide);
+  comprobar('vacuna: en una caja de three, ninguna cara al revés; con un triángulo volteado, ése y sólo ése', bien.centros.length === 0 && bien.mirados === 12 && mal.centros.length === 1, { bien: bien.centros.length, mal: mal.centros.length });
+
+  /* EN LAS DEMÁS TRAZAS: el conjunto no se puede exigir (otras calles), la FIRMA sí (ver `firmaDeLaCara`). */
+  const trazasFuera = TRAZAS_DE_LA_CIUDAD - 1;
+  nota(`las otras ${String(trazasFuera)} trazas: ${String(carasMiradasFuera)} caras miradas, ${String(carasAlRevesFuera)} al revés, ${String(carasConOtraFirma)} sin la firma de ninguna de hoy (las de hoy: ${[...FIRMAS_ANOTADAS].join(' · ')})`);
+  comprobar(
+    `en las otras ${String(trazasFuera)} trazas, toda cara al revés tiene la firma de una de las de hoy (familia, normal y altura: el costado de los toldos), y se miraron de verdad`,
+    carasConOtraFirma === 0 && FIRMAS_ANOTADAS.size >= 1 && carasMiradasFuera >= trazasFuera * 1_000_000 && carasAlRevesFuera > 0,
+    ejemplosConOtraFirma,
+  );
+  /* LA VACUNA: el triángulo volteado de la caja (otra altura y otra normal) no tiene firma de hoy; una cara como las del costado de un toldo, sí. */
+  const firmaDelVolteado = mal.centros[0] === undefined ? null : firmaDeLaCara('mobiliario', mal.centros[0]);
+  const deUnToldo = [...CARAS_ANOTADAS][0];
+  const firmaDelToldo = deUnToldo === undefined ? null : firmaDeLaClave(deUnToldo);
+  comprobar(
+    'vacuna: una cara al revés de otra pieza (el triángulo volteado de la caja) no tiene la firma de ninguna de hoy, y la de un costado de toldo sí',
+    firmaDelVolteado !== null && !FIRMAS_ANOTADAS.has(firmaDelVolteado) && firmaDelToldo !== null && FIRMAS_ANOTADAS.has(firmaDelToldo),
+    { firmaDelVolteado, firmaDelToldo },
+  );
+}
+
+paso('(5) la memoria: la de la GPU contra §7.3 y la de JS contra la de hoy × 1,8');
+{
+  for (const n of NIVELES_DE_LA_CIUDAD) {
+    const g = memoriaDeLaGpu[n];
+    const j = memoriaDeJs[n];
+    nota(
+      `N${String(n)}: GPU ${(g.total / MiB).toFixed(1)} MiB (geometrías ${(g.geometrias / MiB).toFixed(1)}, texturas ${(g.texturas / MiB).toFixed(1)}, luz ${(g.luz / MiB).toFixed(1)}, materia ${(g.materia / MiB).toFixed(2)}) de ${String(TOPE_DE_LA_GPU_POR_NIVEL[n])}; JS ${((j.celdas + j.moldes) / MiB).toFixed(1)} MiB (${String(CELDAS_GUARDADAS)} celdas ${(j.celdas / MiB).toFixed(1)}, moldes ${(j.moldes / MiB).toFixed(1)}; hoy ${String(MEMORIA_DE_JS_DE_HOY[n])}, tope ${(MEMORIA_DE_JS_DE_HOY[n] * CRECIMIENTO_DE_LA_MEMORIA_DE_JS).toFixed(1)})`,
+    );
+    comprobar(`N${String(n)}: la ciudad cabe en la memoria de la GPU (${(g.total / MiB).toFixed(1)} de ${String(TOPE_DE_LA_GPU_POR_NIVEL[n])} MiB)`, g.total > 0 && g.total <= TOPE_DE_LA_GPU_POR_NIVEL[n] * MiB, g);
+    comprobar(
+      `N${String(n)}: la memoria de JS (celdas guardadas y moldes, ${((j.celdas + j.moldes) / MiB).toFixed(1)} MiB) no pasa de la de hoy × ${String(CRECIMIENTO_DE_LA_MEMORIA_DE_JS)}`,
+      j.celdas > 0 && j.moldes > 0 && j.celdas + j.moldes <= MEMORIA_DE_JS_DE_HOY[n] * CRECIMIENTO_DE_LA_MEMORIA_DE_JS * MiB,
+      j,
+    );
+  }
+}
+
+paso('(6) el relevo sube toda textura de un material de la ciudad, y (13) las capas pintan las llamadas que declaran');
+{
+  nota(`${String(texturasMiradas)} texturas miradas; de almacenes ya subidos: ${[...almacenesVistos].join(', ')}`);
+  comprobar('toda textura que referencia un material de la ciudad está en piezasPorSubir o es de un almacén ya subido', texturasSinSubir.length === 0 && texturasMiradas >= TRAZAS_DE_LA_CIUDAD * 4 * 3, { texturasSinSubir, texturasMiradas });
+  comprobar('cada capa pinta las llamadas que declara, y la ciudad las que suman sus piezas', llamadasQueNoCasan.length === 0 && capasMiradas >= TRAZAS_DE_LA_CIUDAD * 4, { llamadasQueNoCasan, capasMiradas });
+  /* LAS VACUNAS, en una ciudad con dos capas de prueba: una cuelga una malla sin declararla, con una textura que nadie sube; otra declara un renglón que el libro no tiene. */
+  const perdida = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+  perdida.name = 'textura de prueba';
+  const sinRenglon: FabricaDeCapa = () => capaDePrueba('capa sin renglón', [0, 30, 0, 1, 30, 0, 0, 30, 1], 'por-encima-de-1,9', () => [], new THREE.ShaderMaterial({ uniforms: { uPrueba: { value: perdida } } }));
+  const renglonAjeno: FabricaDeCapa = () => capaDePrueba('capa con renglón ajeno', [0, 31, 0, 1, 31, 0, 0, 31, 1], 'por-encima-de-1,9', () => [{ nombre: 'capa de prueba', llamadas: 1, triangulos: 1, sombra: false }]);
+  const base = contexto.base(0);
+  const c = construirLaCiudadAbierta(base.fuente, 0, { base, capasDeMas: [sinRenglon, renglonAjeno] });
+  c.montarYa(0, 0);
+  const llamadas = juzgarLasLlamadas(c);
+  const relevo = juzgarElRelevo(c);
+  const libro = presupuestoDeLaCiudad(c.piezas(), 0, RENGLONES_DE_LA_CIUDAD_ABIERTA);
+  c.liberar();
+  comprobar('vacuna: una capa de prueba que cuelga una malla sin declararla pone roja la cuenta de llamadas', llamadas.problemas.some((p) => p.includes('capa sin renglón')), llamadas.problemas);
+  comprobar('vacuna: una textura de una capa que no está en sus `texturas()` pone rojo el relevo', relevo.problemas.some((p) => p.includes('textura de prueba')), relevo.problemas);
+  comprobar('vacuna: una capa con un renglón que el libro no tiene no cabe', libro.excesos.some((e) => e.includes('capa de prueba')), libro.excesos);
+}
+
+paso('(11) las fuentes de luz de una celda no dependen de su grado');
+{
+  nota(`${String(celdasConFuentes)} celdas (de cada nivel, grado y relieve) contra sus fuentes en grado 1`);
+  comprobar('las fuentes de cada celda (horneadas, reflejos, halos y cabezas) son las de grado 1, a ±1 cm, en todo nivel y grado', fuentesQueCambian.length === 0 && celdasConFuentes >= TRAZAS_DE_LA_CIUDAD * 169 * 7, { fuentesQueCambian, celdasConFuentes });
+  /* LA VACUNA: una farola de prueba cuya luz sube 10 cm con el grado. Y sin ella, lo de prueba da lo de verdad. */
+  const base = contexto.base(0);
+  const parte = base.partes.celdas.find((p) => p.farolas.length > 0 && p.edificios.length > 0);
+  let vacuna: string[] = [];
+  let sinVacuna: string[] = ['sin celda'];
+  let comoLaDeVerdad: string[] = ['sin celda'];
+  if (parte !== undefined) {
+    const farola = { nombre: 'farola de prueba', *escribir(obra: Parameters<EscritorDeLaCelda>[0]) {
+      obra.luces.push({ tipo: 'farola', x: parte.caja.x0 + 3, y: 6 + 0.1 * obra.grado, z: parte.caja.z0 + 3 });
+      yield;
+    } };
+    const conFarola = [...ESCRITORES_DE_LA_CELDA, farola];
+    vacuna = diferenciasDeLasFuentes(obraAPasos(parte, base.partes, 3, 2, true, conFarola).fuentes(), obraAPasos(parte, base.partes, 3, 3, true, conFarola).fuentes());
+    sinVacuna = diferenciasDeLasFuentes(obraAPasos(parte, base.partes, 3, 2, true).fuentes(), obraAPasos(parte, base.partes, 3, 3, true).fuentes());
+    comoLaDeVerdad = diferenciasDeLasFuentes(obraAPasos(parte, base.partes, 3, 3, true).fuentes(), pasosDeLaCelda(parte, base.partes, 3, 3, true).celda.fuentes, 1e-6);
+  }
+  comprobar('vacuna: una farola de prueba que sube 10 cm con el grado sale roja (y sin ella, nada; y la obra de prueba da las fuentes de la celda de verdad)', vacuna.length > 0 && sinVacuna.length === 0 && comoLaDeVerdad.length === 0, { vacuna, sinVacuna, comoLaDeVerdad });
+}
+
+paso('(12) los trozos: ningún escritor de pieza escribe más que el trozo entre dos pasos, en ningún nivel ni grado');
+{
+  for (const n of NIVELES_DE_LA_CIUDAD) {
+    nota(`N${String(n)} (trozo ${String(TROZO_POR_NIVEL[n])}): ${VARIANTES[n].map((v) => `${nombreDeLaVariante(n, v)} paso mayor ${String(pasoMayorPorGrado.get(nombreDeLaVariante(n, v)) ?? 0)}`).join(' · ')}`);
+  }
+  comprobar(
+    'ningún escritor de pieza pasa del trozo de su nivel (600 en N0, 1.000 en N1-N3) entre dos pasos, contando la cola de cada celda',
+    pasosQueSePasan.length === 0 && pasoMayorPorGrado.size === NIVELES_DE_LA_CIUDAD.reduce<number>((s, n) => s + VARIANTES[n].length, 0) && pasosMirados > TRAZAS_DE_LA_CIUDAD * 169 * 7,
+    { pasosQueSePasan, pasosMirados },
+  );
+  /* LA VACUNA: un coche g3 escrito sin ceder (1.000 de chapa, 60 de lunas y 20 de faros), y el mismo cediendo. */
+  const base = contexto.base(0);
+  const parte = base.partes.celdas.find((p) => p.coches.length > 0);
+  const cochePrueba = (cede: boolean): { readonly nombre: string; readonly escribir: EscritorDeLaCelda } => ({
+    nombre: 'coche de prueba',
+    *escribir(obra) {
+      if (obra.grado !== 3) return;
+      const triangulos = (m: typeof obra.m.mobiliario, cuantos: number): void => {
+        for (let t = 0; t < cuantos; t++) {
+          const a = m.vertice(0, 30 + t * 0.001, 0, 0, 1, 0, 0, 0);
+          const b = m.vertice(1, 30 + t * 0.001, 0, 0, 1, 0, 1, 0);
+          const c = m.vertice(0, 30 + t * 0.001, 1, 0, 1, 0, 0, 1);
+          m.tri(a, c, b);
+        }
+      };
+      triangulos(obra.m.mobiliario, 1000);
+      if (cede) yield;
+      triangulos(obra.m.cristal, 60);
+      triangulos(obra.m.emisivo, 20);
+      yield;
+    },
+  });
+  const sinCeder = parte === undefined ? null : obraAPasos(parte, base.partes, 3, 3, true, [...ESCRITORES_DE_LA_CELDA, cochePrueba(false)]);
+  const cediendo = parte === undefined ? null : obraAPasos(parte, base.partes, 3, 3, true, [...ESCRITORES_DE_LA_CELDA, cochePrueba(true)]);
+  const enG2 = parte === undefined ? null : obraAPasos(parte, base.partes, 3, 2, true, [...ESCRITORES_DE_LA_CELDA, cochePrueba(false)]);
+  comprobar(
+    'vacuna: un coche g3 escrito sin ceder (1.080 triángulos en un paso) sale rojo y nombrado; cediendo tras la chapa, no; y en g2 no escribe',
+    sinCeder !== null && sinCeder.mayor > TROZO_POR_NIVEL[3] && sinCeder.deQuien === 'coche de prueba' && cediendo !== null && cediendo.mayor <= TROZO_POR_NIVEL[3] && enG2 !== null && enG2.mayor <= TROZO_POR_NIVEL[3],
+    { sinCeder: sinCeder?.mayor, quien: sinCeder?.deQuien, cediendo: cediendo?.mayor, enG2: enG2?.mayor },
+  );
+}
+
+paso('(3) la paridad GLSL ↔ JS de las reglas gemelas, en sus literales');
+{
+  const estilos = (Object.entries(NUMERO_DEL_ESTILO) as [EstiloDeFachada, number][]).sort((a, b) => a[1] - b[1]);
+  const textos: TextosDeLaParidad = {
+    hashJs: readFileSync(new URL('../src/quiebro/ciudad/hash.ts', import.meta.url), 'utf8'),
+    glslComun: GLSL_COMUN_DE_LA_FACHADA,
+    tramoDelHueco: TRAMO_DEL_HUECO,
+    tramoDelBajo: TRAMO_DEL_BAJO,
+    huecoDelEstilo: estilos.map(([e]) => HUECO_DEL_ESTILO[e]),
+    largoDeUnaTienda: LARGO_DE_UNA_TIENDA,
+  };
+  const p = paridadDeLasGemelas(textos);
+  nota(`${String(p.comparados)} números comparados entre hash.ts, HUECO_DEL_ESTILO, LARGO_DE_UNA_TIENDA y el GLSL de la fachada`);
+  comprobar('encendida, queTienda, colorDeLuz, huecoQ y la tienda de 6 m dicen lo mismo en GLSL y en JS', p.problemas.length === 0 && p.comparados >= 60, p);
+  /* LAS VACUNAS: un umbral cambiado en una copia del GLSL de cada gemela. */
+  const vacunas: readonly [string, keyof TextosDeLaParidad, string, string][] = [
+    ['encendidaQ', 'glslComun', 'hp < 0.16 ? 0.8 : 0.04', 'hp < 0.17 ? 0.8 : 0.04'],
+    ['queTiendaQ', 'glslComun', 'ht < 0.34 ? 0', 'ht < 0.35 ? 0'],
+    ['colorDeLuzQ', 'glslComun', 'if (h < 0.45)', 'if (h < 0.46)'],
+    ['la semilla del color', 'tramoDelHueco', 'semilla + 17.0);', 'semilla + 18.0);'],
+    ['huecoQ', 'glslComun', 'vec4(0.28, 0.72, 0.22, 0.80)', 'vec4(0.28, 0.72, 0.23, 0.80)'],
+    ['la tienda de 6 m', 'tramoDelBajo', 'floor(anchoCara / 6.0)', 'floor(anchoCara / 7.0)'],
+  ];
+  const sinRojo: string[] = [];
+  for (const [nombre, clave, antes, despues] of vacunas) {
+    const original = textos[clave] as string;
+    const roto = original.replace(antes, despues);
+    if (roto === original) {
+      sinRojo.push(`${nombre}: la vacuna no encuentra «${antes}»`);
+      continue;
+    }
+    if (paridadDeLasGemelas({ ...textos, [clave]: roto }).problemas.length === 0) sinRojo.push(`${nombre}: con «${despues}» sale verde`);
+  }
+  comprobar('vacuna: un umbral cambiado en una copia del GLSL de cada gemela sale rojo', sinRojo.length === 0, sinRojo);
+
+  /* LA TIENDA DE 6 M CONTRA EL JS DEL JUEGO: `escaparatesDe` llamado de verdad, y los toldos con sus mismas cuentas. */
+  const escaparates = (ancho: number, semilla: number): number[] => {
+    const puestas: VentanaEncendida[] = [];
+    escaparatesDe({ cara: { desde: 0, hasta: ancho, mira: 's', plano: 0 }, semilla, toques: [] } as unknown as CaraDelVolumen, puestas, {} as ObraDeLaFachada);
+    return puestas.map((v) => v.x);
+  };
+  const enciende = (t: number, semilla: number): boolean => queTienda(t, semilla, false) === 1;
+  const muestras: { ancho: number; semilla: number }[] = [];
+  for (let ancho = 2; ancho <= 40; ancho += 0.75) for (let semilla = 1; semilla <= 60_000; semilla += 2_999) muestras.push({ ancho, semilla });
+  const glsl = tiendaDelGlsl(TRAMO_DEL_BAJO);
+  const tiendas = glsl === null ? null : juzgarLasTiendas(glsl, escaparates, enciende, muestras);
+  const bajoJs = readFileSync(new URL('../src/quiebro/ciudad/fachada/bajo.ts', import.meta.url), 'utf8');
+  const voladizosJs = readFileSync(new URL('../src/quiebro/ciudad/voladizos.ts', import.meta.url), 'utf8');
+  const toldos = juzgarLosToldos(bajoJs, voladizosJs);
+  nota(tiendas === null ? 'la tienda: no se encuentran sus cuentas en el GLSL del bajo' : `la tienda de 6 m: ${String(tiendas.caras)} caras y ${String(tiendas.tiendas)} tiendas del GLSL contra los escaparates de escaparatesDe; toldos: ${toldos.length === 0 ? 'las mismas cuentas que los escaparates' : toldos.join('; ')}`);
+  comprobar(
+    'la tienda de 6 m del JS del juego: escaparatesDe pone sus escaparates en el centro de las tiendas del GLSL que queTienda enciende, y ninguno más; y los toldos de voladizos.ts reparten las tiendas con las mismas cuentas',
+    tiendas !== null && tiendas.problemas.length === 0 && tiendas.caras >= 1000 && tiendas.tiendas >= 3000 && toldos.length === 0,
+    { tiendas: tiendas?.problemas, toldos },
+  );
+  /* LAS VACUNAS: la tienda del GLSL a 7 m (en una copia de su texto), escaparates de otra cara y toldos con otra cuenta (en una copia de voladizos.ts). */
+  const glslDe7 = tiendaDelGlsl(TRAMO_DEL_BAJO.replace('floor(anchoCara / 6.0)', 'floor(anchoCara / 7.0)'));
+  const conOtroGlsl = glslDe7 === null ? null : juzgarLasTiendas(glslDe7, escaparates, enciende, muestras);
+  const conOtroEscaparate = glsl === null ? null : juzgarLasTiendas(glsl, (ancho, semilla) => escaparates(ancho + 0.25, semilla), enciende, muestras);
+  const toldosRotos = juzgarLosToldos(bajoJs, voladizosJs.replace('t0 + LARGO_DE_UNA_TIENDA', 't0 + LARGO_DE_UNA_TIENDA + 1'));
+  const sinToldos = juzgarLosToldos(bajoJs, voladizosJs.replace(/const\s+t1\s*=/, 'let t1 ='));
+  comprobar(
+    'vacuna: la tienda del GLSL a 7 m, los escaparates de otra cara y unos toldos con otra cuenta (o sin ella) salen rojos',
+    conOtroGlsl !== null && conOtroGlsl.problemas.length > 0 && conOtroEscaparate !== null && conOtroEscaparate.problemas.length > 0 && toldosRotos.length > 0 && sinToldos.length > 0 && voladizosJs.includes('t0 + LARGO_DE_UNA_TIENDA'),
+    { conOtroGlsl: conOtroGlsl?.problemas.length, conOtroEscaparate: conOtroEscaparate?.problemas.length, toldosRotos, sinToldos },
+  );
+}
+
+paso('(4) la Grafía es lo último del texto final de la fachada y de lo lejano, en N0-N3');
+{
+  const malos: string[] = [];
+  let textos = 0;
+  const fachadaDeHoy = textoDelFragmento(materialDeFachada(1));
+  for (const n of NIVELES_DE_LA_CIUDAD) {
+    const materiales: [string, THREE.Material][] = [
+      ['la fachada', materialDeFachada(n)],
+      ['la fachada de la ventana', contexto.ciudad(0, n).ventana.mallas.fachadas.malla.material as THREE.Material],
+      ['lo lejano', materialDeLoLejano(n, n >= 1)],
+    ];
+    for (const [nombre, m] of materiales) {
+      const t = textoDelFragmento(m);
+      if (t === '') {
+        malos.push(`N${String(n)} ${nombre}: no se pudo montar su texto`);
+        continue;
+      }
+      textos++;
+      for (const p of juzgarLaGrafia(t)) malos.push(`N${String(n)} ${nombre}: ${p}`);
+    }
+  }
+  comprobar('en N0-N3 (la fachada, la de la ventana y lo lejano), detrás del bloque de uRejillaDeGlifos va la marca y nadie escribe albedo ni emision', malos.length === 0 && textos === 12, { malos, textos });
+  /* LAS VACUNAS: una línea de la Grafía movida detrás de la marca; una escritura del color detrás; sin la marca. */
+  const lineaDeLaGrafia = /\n[ \t]*albedo \*= 1\.0 - 0\.85 \* uRejillaDeGlifos;/;
+  const movida = fachadaDeHoy.replace(lineaDeLaGrafia, '').replace(MARCA_DEL_FIN_DE_LA_GRAFIA, `${MARCA_DEL_FIN_DE_LA_GRAFIA}\n  albedo *= 1.0 - 0.85 * uRejillaDeGlifos;`);
+  const escritaDetras = fachadaDeHoy.replace(MARCA_DEL_FIN_DE_LA_GRAFIA, `${MARCA_DEL_FIN_DE_LA_GRAFIA}\n  emision.g += 0.1;`);
+  const sinMarca = fachadaDeHoy.replace(MARCA_DEL_FIN_DE_LA_GRAFIA, '');
+  const comentada = fachadaDeHoy.replace(MARCA_DEL_FIN_DE_LA_GRAFIA, `${MARCA_DEL_FIN_DE_LA_GRAFIA}\n  /* aquí antes se hacía albedo = vec3(1.0); */`);
+  comprobar(
+    'vacuna: una línea de la Grafía movida detrás de la marca, una escritura de emision detrás y la marca quitada salen rojas; un comentario que cite albedo, no',
+    lineaDeLaGrafia.test(fachadaDeHoy) && juzgarLaGrafia(movida).length > 0 && juzgarLaGrafia(escritaDetras).length > 0 && juzgarLaGrafia(sinMarca).length > 0 && juzgarLaGrafia(comentada).length === 0,
+    { movida: juzgarLaGrafia(movida), escritaDetras: juzgarLaGrafia(escritaDetras), sinMarca: juzgarLaGrafia(sinMarca), comentada: juzgarLaGrafia(comentada) },
+  );
+}
+
+paso('las comprobaciones de cada paquete (`quiebro-ciudad/<paquete>.ts`), con su mínimo de inspeccionados');
+{
+  const faltan = PAQUETES_DEL_PLAN.filter((p) => typeof PAQUETES_DE_LA_CIUDAD[p]?.comprobar !== 'function');
+  const deMas = Object.keys(PAQUETES_DE_LA_CIUDAD).filter((p) => !(PAQUETES_DEL_PLAN as readonly string[]).includes(p));
+  comprobar(`los ${String(PAQUETES_DEL_PLAN.length)} paquetes del plan están importados y exportan comprobar(ctx)`, faltan.length === 0 && deMas.length === 0, { faltan, deMas });
+  const resumen: string[] = [];
+  for (const nombre of PAQUETES_DEL_PLAN) {
+    const comprobarElPaquete = PAQUETES_DE_LA_CIUDAD[nombre]?.comprobar as ((ctx: typeof contexto) => Resultado[]) | undefined;
+    if (comprobarElPaquete === undefined) continue;
+    let resultados: Resultado[];
+    try {
+      resultados = comprobarElPaquete(contexto);
+    } catch (e) {
+      comprobar(`${nombre}: sus comprobaciones no revientan`, false, String(e));
+      continue;
+    }
+    let inspeccionados = 0;
+    for (const r of resultados) {
+      inspeccionados += r.inspeccionados;
+      comprobar(`${nombre} · ${r.que} (${String(r.inspeccionados)} inspeccionados, mínimo ${String(r.minimo)})`, resultadoEnVerde(r), r.detalle);
+    }
+    resumen.push(`${nombre} ${String(resultados.length)}${resultados.length > 0 ? ` (${String(inspeccionados)} inspeccionados)` : ''}`);
+  }
+  nota(`resultados por paquete: ${resumen.join(' · ')}`);
+  comprobar(
+    'vacuna: un resultado en verde que miró menos que su mínimo (o cero con mínimo cero y algo que mirar) sale rojo',
+    !resultadoEnVerde({ que: 'prueba', bien: true, inspeccionados: 3, minimo: 4 }) && !resultadoEnVerde({ que: 'prueba', bien: true, inspeccionados: 0, minimo: 0 }) && resultadoEnVerde({ que: 'prueba', bien: true, inspeccionados: 4, minimo: 4 }) && !resultadoEnVerde({ que: 'prueba', bien: false, inspeccionados: 9, minimo: 4 }),
+  );
+}
+contexto.soltar();
 
 paso('el juego pinta lo que choca en la sala: las cajas de la ciudad pintada son las del mundo de la Liza');
 {
@@ -1449,7 +1987,7 @@ paso('la cortina del borde no tapa la pantalla a quien se arrima a ella');
 }
 
 terminar({
-  escritas: 53,
+  escritas: 106,
   enVerde:
-    'El barrio se construye, cabe, pinta su estructura y nada más; la ciudad abierta cabe en el 50 % en sus 32 trazas, pinta celda a celda su estructura, trabaja a trozos contados con las llamadas quietas al cruzarla, su luz por losetas es la de una vez y su borde de glifos cubre las tres salidas sin tapar la pantalla; y la ciudad de otro nivel o de otra noche se prepara detrás, callada y sin prisa, y releva compilada, sin dejar basura quieta.',
+    'El barrio se construye, cabe, pinta su estructura y nada más; la ciudad abierta cabe en el 50 % en sus 32 trazas, pinta celda a celda su estructura en cada nivel y cada grado (con los neones y las capas), trabaja a trozos contados con las llamadas quietas al cruzarla, su luz por losetas es la de una vez y su borde de glifos cubre las tres salidas sin tapar la pantalla; y la ciudad de otro nivel o de otra noche se prepara detrás, callada y sin prisa, y releva compilada, sin dejar basura quieta. Y lo que el detalle va a cambiar ya tiene quien lo mire: ni una cara al revés nueva, las reglas gemelas iguales en GLSL y JS, la Grafía la última, la memoria en sus topes, toda textura subida en el relevo, las fuentes de luz iguales en todo grado, ningún escritor de pieza por encima del trozo y cada capa con las llamadas que declara.',
 });

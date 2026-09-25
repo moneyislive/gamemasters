@@ -16,7 +16,8 @@
     "verify:quiebro-materia": "tsx scripts/verificar-quiebro-materia.ts",
     "verify:quiebro-juego": "tsx scripts/verificar-quiebro-juego.ts",
     "verify:quiebro-personajes": "tsx scripts/verificar-quiebro-personajes.ts",
-    "verify:quiebro-molde": "tsx scripts/verificar-quiebro-molde.ts"
+    "verify:quiebro-molde": "tsx scripts/verificar-quiebro-molde.ts",
+    "verify:quiebro-gl": "tsx scripts/verificar-quiebro-gl.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
