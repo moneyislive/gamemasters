@@ -63,7 +63,7 @@ export const PERSONAJE_SCHEMA: Record<string, unknown> = {
         '(«A las 21:35 subiste a…»), de 110 a 170 palabras. El del culpable cuenta el crimen como lo vivió; ' +
         'el de un inocente, sus movimientos, lo que vio y su propia falta. TODOS con la misma extensión: ' +
         'el largo de un dosier no puede delatar a nadie. Coherente al minuto con la cronología, la coartada y las pistas. ' +
-        'Lo que un inocente vio puede ser una pieza del caso, nunca la prueba que por sí sola señala al culpable.',
+        'Lo que un inocente vio es ambiguo o parcial: nunca fija la hora de la muerte ni el trayecto del culpable.',
     },
   },
 };
