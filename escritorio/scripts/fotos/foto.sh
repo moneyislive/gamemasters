@@ -36,9 +36,17 @@
 # Edge con el mismo perfil se pisan); ARBOL (la carpeta esperada; por omisión la de este guion); PRESUPUESTO (ms
 # de tiempo virtual que se le da a la página, por omisión 25000); ARBOL_COMPROBADO (la pone protocolo.sh).
 #
+# VALORES VACÍOS: `reloj=`, `ventana=`, `mascara=` y `nivel=` sin valor (o ilegibles) se rechazan antes de abrir Edge.
+# El banco los tomaba por otra cosa sin decirlo: `reloj=` era el reloj parado en 0, `ventana=` la ventana donde la
+# cámara, `mascara=` la ciudad sin máscara y `nivel=` el N0. Ahora el banco también se niega (`data-error`), por si
+# alguien lo abre a mano.
+#
+# `reloj=T` ASIENTA además las luces de verdad de N2-N3 (paso fijo, `atmosfera/luz.ts`): la foto comprueba en el DOM
+# que el banco lo ha hecho (`data-luces="paso-fijo"`); un árbol sin eso sacaría luces que cambian entre tomas.
+#
 # Sale con 0 si hay foto y todo casa; 1 si no hay foto o su DOM no casa con lo pedido; 2 si no se puede mirar
-# (sin PUERTO, sin servidor, sin Edge, un parámetro repetido, un nivel que no existe, una `ventana=` que no es un
-# centro de ventana en ese nivel); 3 si el puerto sirve OTRO
+# (sin PUERTO, sin servidor, sin Edge, un parámetro repetido, uno de los de arriba vacío o ilegible, un nivel que no
+# existe, una `ventana=` que no es un centro de ventana en ese nivel); 3 si el puerto sirve OTRO
 # árbol, o uno que no dice cuál.
 set -u
 
@@ -113,12 +121,29 @@ ancho="${3:-1280}"
 alto="${4:-720}"
 # Un parámetro repetido no hace lo que parece: el banco lee el PRIMERO (`URLSearchParams.get`), y
 # «…&lluvia=0…&lluvia=1» sale sin lluvia. Pasó al fijar la R.
-repetidos="$(printf '%s' "$consulta" | tr '&' '\n' | sed -n 's/^\([^=]*\)=.*/\1/p' | sort | uniq -d | tr '\n' ' ')"
+# Las claves se cuentan también sin `=` (`&reloj&reloj=3`): el banco ve las dos.
+repetidos="$(printf '%s' "$consulta" | tr '&' '\n' | sed -e 's/=.*//' -e '/^$/d' | sort | uniq -d | tr '\n' ' ')"
 if [ -n "$repetidos" ]; then
   decir "parámetros repetidos en la consulta: $repetidos(el banco lee el primero; quita el de la base)"
   exit 2
 fi
-nivel_pedido="$(printf '%s' "&$consulta" | sed -n 's/.*&nivel=\([^&]*\).*/\1/p')"
+# ¿Lleva la consulta esta clave, con valor o sin él (`&reloj=`, `&reloj`)? Y su valor, vacío si no lo trae.
+tiene() { printf '&%s&' "$consulta" | grep -Eq "&$1(=[^&]*)?&"; }
+valor() { printf '&%s' "$consulta" | sed -n "s/.*&$1=\([^&]*\).*/\1/p"; }
+es_numero() { printf '%s' "$1" | grep -Eq '^[0-9]+(\.[0-9]+)?$'; }
+if tiene reloj && ! es_numero "$(valor reloj)"; then
+  decir "reloj=«$(valor reloj)» no es un número de segundos ≥ 0 (vacío, el banco lo tomaba por el reloj en 0; ahora se niega)"
+  exit 2
+fi
+if tiene mascara && { ! es_numero "$(valor mascara)" || awk -v m="$(valor mascara)" 'BEGIN { exit !(m <= 0) }'; }; then
+  decir "mascara=«$(valor mascara)» no es un número de metros > 0 (vacío o 0, el banco pintaba la ciudad y no la máscara; ahora se niega)"
+  exit 2
+fi
+nivel_pedido="$(valor nivel)"
+if tiene nivel && [ -z "$nivel_pedido" ]; then
+  decir "nivel= sin valor: el banco pintaría N0 sin decirlo"
+  exit 2
+fi
 case "${nivel_pedido:-0}" in
   0|1|2|3) ;;
   *) decir "nivel=«$nivel_pedido» no es un nivel (0..3): el banco pintaría N0 sin decirlo"; exit 2 ;;
@@ -126,8 +151,14 @@ esac
 # `ventana=` tiene que ser un centro de ventana DE ESE NIVEL (ver arriba): 48k con lado impar (N0, N1, N3) y 48k + 24
 # con lado par (N2). Otro se redondea al montarla, la página lo diría después de 25 s de Edge y la foto se tiraría:
 # se dice antes, sin abrir Edge.
-ventana_pedida="$(printf '%s' "&$consulta" | sed -n 's/.*&ventana=\([^&]*\).*/\1/p')"
-if [ -n "$ventana_pedida" ]; then
+# Vacía (`ventana=`) también: antes se saltaba esta comprobación y el banco montaba la ventana donde la cámara.
+ventana_pedida="$(valor ventana)"
+if tiene ventana && [ -z "$ventana_pedida" ]; then
+  # Aparte: `awk` sin ninguna línea que leer no corre su bloque, sale con 0 y la daba por buena.
+  decir "ventana= sin valor: el banco montaba la ventana donde la cámara (ahora se niega); pide ventana=cx,cz"
+  exit 2
+fi
+if tiene ventana; then
   desfase=0
   [ "${nivel_pedido:-0}" = "2" ] && desfase=24
   if ! printf '%s' "$ventana_pedida" | awk -F, -v d="$desfase" '{ if (NF != 2) exit 1; for (i = 1; i <= 2; i++) { if ($i !~ /^-?[0-9]+(\.[0-9]+)?$/) exit 1; r = ($i - d) / 48; if (r != int(r)) exit 1 } }'; then
@@ -162,6 +193,11 @@ malo=""
 nivel_pintado="$(printf '%s' "$dom" | marca nivel)"
 if [ "${nivel_pedido:-0}" != "$nivel_pintado" ]; then malo="nivel N$nivel_pintado y no N${nivel_pedido:-0}"; fi
 if [ "$(printf '%s' "$dom" | marca ciudad)" != "lista" ]; then malo="$malo la ciudad no estaba construida"; fi
+error_del_banco="$(printf '%s' "$dom" | marca error)"
+if [ -n "$error_del_banco" ]; then malo="$malo el banco rechaza la consulta ($error_del_banco)"; fi
+if tiene reloj && [ "$(printf '%s' "$dom" | marca luces)" != "paso-fijo" ]; then
+  malo="$malo con reloj= las luces de verdad no van con paso fijo (data-luces=«$(printf '%s' "$dom" | marca luces)»)"
+fi
 # La ventana a medias: la cámara lejos de donde se montó (o de `ventana=`) y la ventana recentrándose. La foto
 # sería de un estado de paso, y con `ventana=` no la pedida aunque la pintada aún lo pareciera.
 if [ "$(printf '%s' "$dom" | marca ventana-ocupada)" = "1" ]; then malo="$malo la ventana se estaba montando o recentrando"; fi

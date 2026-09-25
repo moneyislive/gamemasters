@@ -99,7 +99,10 @@ export function Atmosfera({ tiempo, nivel, farolas, semilla, reloj, farolasEncen
   useEffect(() => {
     const antes = gl.shadowMap.enabled;
     gl.shadowMap.enabled = detalle.sombras > 0;
-    gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    /* PCF y no PCFSoft: three r185 declara PCFSoft obsoleto y lo cambia por PCF dentro de `WebGLShadowMap.render`
+       (three.module.js:9148-9150), DESPUÉS de que `calidad/precompilar.ts` haya enlazado la variante blanda en
+       `onBeforeRender`: al entrar en N2+ se enlazaban en balde unos 16 programas. Lo que se pinta es lo mismo. */
+    gl.shadowMap.type = THREE.PCFShadowMap;
     return () => {
       gl.shadowMap.enabled = antes;
     };
