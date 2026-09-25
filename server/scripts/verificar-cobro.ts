@@ -165,6 +165,43 @@ try {
   comprobar('y al terminar queda cancelada', (await store.getAccount(cuenta.id))?.cobro?.suscripcion?.estado === 'cancelada');
   comprobar('un aviso de otra cosa no rompe nada', (await atenderAviso({ id: 'x', type: 'charge.updated', data: { object: {} } })).hecho.startsWith('sin tratamiento'));
 
+  // Stripe no garantiza el orden: la primera factura puede llegar antes que el
+  // pago completado, cuando la cuenta todavía no conoce a su cliente.
+  const finDelMes = { data: [{ period: { end: Math.floor(Date.now() / 1000) + 30 * 86400 } }] };
+  const nuevaCuenta = async (id: string): Promise<Account> => {
+    const c: Account = { id, email: `${id}@example.com`, displayName: id, createdAt: new Date().toISOString(), partidas: [], trofeos: [] };
+    await store.saveAccount(c);
+    return c;
+  };
+  const adelantada = await nuevaCuenta('cuenta-adelantada');
+  const primero = await atenderAviso({
+    id: 'evt_o',
+    type: 'invoice.paid',
+    data: {
+      object: {
+        id: 'in_orden',
+        customer: 'cus_456',
+        parent: { subscription_details: { subscription: 'sub_2', metadata: { cuentaId: adelantada.id } } },
+        lines: finDelMes,
+      },
+    },
+  });
+  comprobar(
+    'la factura que llega antes que el pago encuentra su cuenta y trae la bolsa',
+    delMesDe(await store.movimientosDe(adelantada.id)) === CREDITOS_DE_LA_SUSCRIPCION,
+    primero,
+  );
+  comprobar('y le apunta el cliente de la pasarela', (await store.getAccount(adelantada.id))?.cobro?.clientePasarela === 'cus_456');
+  const antigua = await nuevaCuenta('cuenta-antigua');
+  await atenderAviso({
+    id: 'evt_v',
+    type: 'invoice.paid',
+    data: {
+      object: { id: 'in_vieja', customer: 'cus_789', subscription: 'sub_3', subscription_details: { metadata: { cuentaId: antigua.id } }, lines: finDelMes },
+    },
+  });
+  comprobar('y en la forma de antes de 2025, también', delMesDe(await store.movimientosDe(antigua.id)) === CREDITOS_DE_LA_SUSCRIPCION);
+
   paso('El formulario de la pasarela');
   const form = comoFormulario({ line_items: [{ price_data: { currency: 'eur', unit_amount: 599 } }], metadata: { tipo: 'creditos' } });
   comprobar(

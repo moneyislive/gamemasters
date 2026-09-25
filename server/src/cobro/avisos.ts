@@ -38,11 +38,23 @@ async function guardarCobro(cuenta: Account, cambiar: (c: NonNullable<Account['c
   await getStore().saveAccount({ ...cuenta, cobro });
 }
 
-/** La cuenta de un objeto: por la referencia que puso el servidor al abrir el pago, o por el cliente. */
+/**
+ * La cuenta de un objeto: por la referencia que puso el servidor al abrir el pago, o por el cliente.
+ *
+ * Una factura de la suscripción no trae la referencia en su propio `metadata`:
+ * trae una copia del de la suscripción, en `parent.subscription_details` (o en
+ * `subscription_details`, en la forma de antes de 2025). Hay que leerla ahí,
+ * porque Stripe no garantiza el orden de los avisos: si la primera factura
+ * pagada llega antes que el pago completado, la cuenta todavía no conoce a su
+ * cliente, y por el cliente no se encontraría.
+ */
 async function cuentaDe(obj: Objeto): Promise<Account | null> {
   const store = getStore();
   const metadata = objeto(obj.metadata);
-  const porReferencia = texto(obj.client_reference_id) ?? texto(metadata?.cuentaId);
+  const deLaSuscripcion = objeto(
+    objeto(objeto(obj.parent)?.subscription_details)?.metadata ?? objeto(obj.subscription_details)?.metadata,
+  );
+  const porReferencia = texto(obj.client_reference_id) ?? texto(metadata?.cuentaId) ?? texto(deLaSuscripcion?.cuentaId);
   if (porReferencia) {
     const cuenta = await store.getAccount(porReferencia);
     if (cuenta) return cuenta;
@@ -133,7 +145,10 @@ export async function atenderAviso(evento: { id: string; type: string; data: { o
         referencia: `pasarela:${texto(obj.id)}`,
       });
       const fresca = (await getStore().getAccount(cuenta.id)) ?? cuenta;
+      const cliente = texto(obj.customer);
       await guardarCobro(fresca, (c) => {
+        // Si la factura llegó antes que el pago completado, el cliente se apunta aquí.
+        if (cliente && !c.clientePasarela) c.clientePasarela = cliente;
         c.suscripcion = {
           estado: 'activa',
           hasta: fin ?? c.suscripcion?.hasta ?? new Date().toISOString(),
