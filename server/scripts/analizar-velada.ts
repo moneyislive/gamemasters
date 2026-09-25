@@ -61,7 +61,12 @@ for (const g of m?.twists ?? []) {
   console.log(`  ronda ${g.round} · ${nombre(g.participanteId)}${g.participanteId === culpable ? ' ☠ (¡CULPABLE!)' : ''}: ${g.instruction}`);
 }
 
-const equipos = plot.gmScript.filter((p) => /\b(portavoz|portavoces|equipos?|por grupos|puesta en com[uú]n)\b/i.test(p));
+// Como la auditoría: la frase que los PROHÍBE («no hay equipos ni portavoces») no cuenta.
+const PORTAVOCES = /\b(portavoz|portavoces|equipos?|por grupos|grupos de|puesta en com[uú]n)\b/i;
+const NEGADO = /\b(no hay|no se forman|no formes|sin|nada de|ni)\b[^.;:]{0,60}\b(portavo|equipo|grupo|puesta en com)/i;
+const equipos = plot.gmScript.filter((p) =>
+  p.split(/(?<=[.;:])\s+/).some((frase) => PORTAVOCES.test(frase) && !NEGADO.test(frase)),
+);
 console.log(`\n· Guion: ${plot.gmScript.length} pasos · con equipos o portavoces: ${equipos.length}`);
 for (const p of equipos) console.log(`  ! ${p}`);
 
