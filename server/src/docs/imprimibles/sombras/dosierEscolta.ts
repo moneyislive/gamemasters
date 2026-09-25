@@ -61,49 +61,29 @@ import { envolverWashi, portadaWashi, sinTrama } from './comun';
 import { vistaDeLasSombras } from './datos';
 import { registrarDosieres } from '../../dosieres';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
-
-/** Lo que cabe en una cara de A4 con estos márgenes, en px de pantalla (267 mm). */
-const ALTO_DE_CARA = 1009;
+import { repartirEnCaras, type MedidasDeLaTabla } from '../caras';
 
 /**
- * Cuántas caras ocupa «Quiénes cruzan», estimado con las medidas de verdad.
+ * Las medidas de «Quiénes cruzan» con la hoja de washi (ver `../caras.ts`).
  *
- * Es la única parte del dosier que puede ocupar más de una cara —una fila por
- * persona, con su presentación—, y es la MISMA en todos los dosieres, así que
- * no puede hacer un sobre más gordo que otro. Lo que sí puede hacer es dejar el
- * total impar, y entonces, en el documento con toda la mesa impreso a doble
- * cara, el dosier siguiente empezaría en el dorso del anterior. Chromium no
- * sabe insertar la cara en blanco él solo (`break-before: right` se imprime como
- * un salto normal: medido), así que se estima aquí y se añade una de notas.
- *
- * Calibrado el 25-sep-2026 midiendo filas con Edge: una presentación de 361
+ * Calibradas el 25-sep-2026 midiendo filas con Edge: una presentación de 361
  * caracteres da una fila de 206 px (8 líneas), una de 451, 251 (10) y una de
  * 586, 299 (13); la cabecera mide 58. O sea, unos 46 caracteres y 20 px por
  * línea de presentación, más el puesto a tamaño de texto y el aire de la celda.
- * Las filas no se parten entre caras (`tr` va con `break-inside: avoid`) y la
- * cabecera se repite en cada una.
  *
  * Si la estimación falla por una fila, el total puede salir impar: eso solo
  * estropea la impresión de la mesa entera a doble cara, y a TODOS los dosieres
  * por igual. Lo que no puede hacer es que un sobre abulte más que otro.
  */
-export function carasDeLaTabla(filas: Array<{ nombre: string; blason: string; puesto: string; presentacion: string }>): number {
-  const lineas = (texto: string, porLinea: number) => Math.max(1, Math.ceil(texto.length / porLinea));
-  const CABECERA = 58; // la fila de títulos, que se repite en cada cara
-  let usado = 58 + 60 + CABECERA; // el título, la entradilla y la cabecera
-  let caras = 1;
-  for (const f of filas) {
-    const izquierda = 20 + 24 * lineas(f.nombre, 22) + 20 + (f.blason ? 20 * lineas(f.blason, 26) : 0);
-    const centro = 20 + 24 * lineas(f.puesto, 40) + 20.2 * lineas(f.presentacion, 46);
-    const alto = Math.max(izquierda, centro);
-    if (usado + alto > ALTO_DE_CARA) {
-      caras += 1;
-      usado = CABECERA;
-    }
-    usado += alto;
-  }
-  return caras;
-}
+export const MEDIDAS_DE_LA_COLUMNA: MedidasDeLaTabla = {
+  arriba: 58 + 60 + 58,
+  cabecera: 58,
+  aire: 20,
+  nombre: { linea: 24, porLinea: 22 },
+  debajo: { linea: 20, porLinea: 26 },
+  puesto: { linea: 24, porLinea: 40 },
+  presentacion: { linea: 20.2, porLinea: 46 },
+};
 
 export function dosierEscolta(
   game: GameSession,
@@ -144,23 +124,49 @@ export function dosierEscolta(
     .join('\n');
 
   /*
-   * Cuántas caras lleva cada dosier: cinco fijas más las de «Quiénes cruzan», y
-   * una de notas si el total sale impar. Se decide UNA VEZ para toda la mesa,
-   * con la tabla que es igual en todos: así todos los sobres llevan las mismas.
+   * «Quiénes cruzan»: todo el mundo, también quien lee. La misma tabla en todos
+   * los dosieres, partida en caras AQUÍ (`repartirEnCaras`) y no por el
+   * navegador: así el dosier sabe cuántas caras ocupa, y todos llevan las mismas.
    */
-  const carasDeLaColumna = carasDeLaTabla(
-    vista.escoltas.map((e) => {
-      const suyo = plot.characters.find((c) => c.participanteId === e.id);
-      return {
-        nombre: suyo?.characterName ?? e.name,
-        blason: vista.estandarteDe(e.id)?.name ?? '',
-        puesto: suyo?.role ?? '',
-        presentacion: suyo?.publicPersona ?? '',
-      };
-    }),
-  );
-  const conNotas = (5 + carasDeLaColumna) % 2 === 1;
-  const caras = 5 + carasDeLaColumna + (conNotas ? 1 : 0);
+  const filas = vista.escoltas.map((e) => {
+    const suyo = plot.characters.find((c) => c.participanteId === e.id);
+    const suBandera = vista.estandarteDe(e.id);
+    return {
+      nombre: suyo?.characterName ?? e.name,
+      debajo: [e.name, suBandera?.name ?? ''],
+      puesto: suyo?.role ?? '',
+      presentacion: suyo?.publicPersona ?? '',
+      html: `        <tr>
+          <td style="width:46mm;"><strong>${esc(suyo?.characterName ?? e.name)}</strong><br /><span style="font-size:10pt; color:#7c7159;">${esc(e.name)}</span>${
+            suBandera ? `<br /><span style="font-size:10pt;">${esc(suBandera.name)}</span>` : ''
+          }</td>
+          <td>${esc(suyo?.role ?? '')}<br /><span style="font-size:10.5pt;">${esc(suyo?.publicPersona ?? '')}</span></td>
+          <td style="width:44mm;"></td>
+        </tr>`,
+    };
+  });
+  const trozos = repartirEnCaras(filas, MEDIDAS_DE_LA_COLUMNA);
+  const columna = trozos
+    .map(
+      (indices, i) => `${i === 0 ? '' : '\n      <div class="pagina"></div>'}
+      <table>
+        <thead>
+          <tr>
+            <th style="width:46mm;">Quién</th>
+            <th>Lo que sabe todo el mundo</th>
+            <th style="width:44mm;">Sospecho porque…</th>
+          </tr>
+        </thead>
+        <tbody>
+${indices.map((j) => filas[j]!.html).join('\n')}
+        </tbody>
+      </table>`,
+    )
+    .join('');
+
+  // Cinco caras fijas más las de la tabla, y una de notas si el total sale impar.
+  const conNotas = (5 + trozos.length) % 2 === 1;
+  const caras = 5 + trozos.length + (conNotas ? 1 : 0);
   const notas = conNotas
     ? `
 
@@ -239,21 +245,6 @@ ${vista.horas
 
       const conocimiento = (personaje?.knowledge ?? [])
         .map((k) => `        <li>${esc(k)}</li>`)
-        .join('\n');
-
-      // Todo el mundo, también quien lee: la misma tabla en todos los dosieres, y la misma altura.
-      const columna = vista.escoltas
-        .map((otro) => {
-          const suyo = plot.characters.find((c) => c.participanteId === otro.id);
-          const suBandera = vista.estandarteDe(otro.id);
-          return `        <tr>
-          <td style="width:46mm;"><strong>${esc(suyo?.characterName ?? otro.name)}</strong><br /><span style="font-size:10pt; color:#7c7159;">${esc(otro.name)}</span>${
-            suBandera ? `<br /><span style="font-size:10pt;">${esc(suBandera.name)}</span>` : ''
-          }</td>
-          <td>${esc(suyo?.role ?? '')}<br /><span style="font-size:10.5pt;">${esc(suyo?.publicPersona ?? '')}</span></td>
-          <td style="width:44mm;"></td>
-        </tr>`;
-        })
         .join('\n');
 
       const batidosDelKancho = vista.horas
@@ -375,19 +366,7 @@ ${carga}
       <p style="font-size:11pt; color:#7c7159;">
         Lo que sabe de cada cual toda la columna. Es la misma hoja en todos los dosieres: tú también
         sales. La última columna es tuya: apunta de quién sospechas, y por qué.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th style="width:46mm;">Quién</th>
-            <th>Lo que sabe todo el mundo</th>
-            <th style="width:44mm;">Sospecho porque…</th>
-          </tr>
-        </thead>
-        <tbody>
-${columna}
-        </tbody>
-      </table>
+      </p>${columna}
 
       <div class="pagina"></div>
       <div class="caja junto">

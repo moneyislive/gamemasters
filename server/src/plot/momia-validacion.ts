@@ -195,8 +195,15 @@ const POSTERIORIDAD_BLANDA = ['sigue', 'siguen', 'seguida', 'seguido'];
 /* Inmediatez: lo que distingue «justo antes» de «en algún momento antes». */
 const INMEDIATEZ = ['inmediatamente', 'inmediato', 'justo', 'interpone', 'interponen', 'directamente', 'pegado', 'media', 'seguido'];
 
-/* Negación: obligatoria en `no-posicion`, prohibida en `posicion`. */
-const NEGACION = ['no', 'ni', 'nunca', 'jamas', 'tampoco', 'ninguna', 'ningun'];
+/*
+ * Negación: obligatoria en `no-posicion`, prohibida en `posicion`.
+ *
+ * CON «sin», que faltaba y en las Sombras estaba. «El rito del Agua, sin ser el
+ * tercero, abre el camino» pasaba como `posicion 3` —ni un «no» ni un «nunca»—
+ * y decía lo contrario: el sellado se quedaba sin solución y nadie lo sabía
+ * hasta la noche.
+ */
+const NEGACION = ['no', 'ni', 'nunca', 'jamas', 'tampoco', 'ninguna', 'ningun', 'sin'];
 
 /* Extremos: principio y final. */
 const EXTREMOS = ['primero', 'primera', 'ultimo', 'ultima', 'abre', 'cierra', 'principio', 'final', 'extremo'];
@@ -386,21 +393,48 @@ export function revelaElOrden(
  * comparación. No pretende ser exhaustivo: pretende cubrir cómo se dice esto en
  * castellano cuando se dice de verdad.
  */
+/*
+ * SIN «fue el», «fue ella» NI «fue quien», que estaban y eran de las genéricas:
+ * «Bruno fue el último en entrar» o «Ana fue quien encendió la lámpara» —frases
+ * de cronología de lo más normales— contaban como acusación si nombraban al
+ * saqueador, y el texto se tapaba con el recambio. Y un recambio justo donde
+ * salía su nombre señala más que la frase que se quitaba. Las acusaciones de
+ * verdad llevan su verbo, y esos se quedan.
+ */
 const SENALAMIENTOS = [
   'rompio el sello',
   'rompio el lacre',
   'abrio el sello',
   'abrio la camara sellada',
   'profano',
-  'fue quien',
-  'fue el',
-  'fue ella',
   'el saqueador',
   'la saqueadora',
   'por encargo',
   'vendio',
   'traiciono',
 ];
+
+/**
+ * Palabras que salen en un nombre de personaje y NO lo identifican.
+ *
+ * El nombre de ficción lleva a menudo su título o su oficio —«el doctor
+ * Harlow», «Lady Vance», «el capataz Hassan»—, y buscar esas palabras era dar
+ * por nombrado al saqueador en cualquier texto que hablara de «el doctor» o de
+ * «un capataz». Cada falso positivo se pagaba con un texto tapado por el
+ * recambio. Lo mismo se aprendió en las Sombras.
+ */
+const NO_IDENTIFICAN = new Set([
+  'doctor', 'doctora', 'profesor', 'profesora', 'lady', 'lord', 'senor', 'senora', 'senorita', 'miss', 'mister',
+  'capitan', 'coronel', 'teniente', 'sargento', 'capataz', 'reverendo', 'padre', 'hermano', 'hermana',
+  'joven', 'viejo', 'vieja', 'conde', 'condesa', 'baron', 'baronesa', 'madame', 'monsieur', 'herr', 'sayed',
+]);
+
+/** ¿Sale este nombre (ya normalizado) en este texto (normalizado y con espacios a los lados)? */
+function apareceElNombre(conBordes: string, nombre: string): boolean {
+  const tokens = nombre.split(' ').filter((t) => t.length >= 4 && !NO_IDENTIFICAN.has(t));
+  if (tokens.length === 0) return conBordes.includes(` ${nombre} `);
+  return tokens.some((t) => conBordes.includes(` ${t} `) || conBordes.includes(` ${t}s `));
+}
 
 /**
  * ¿Este texto SEÑALA a quien rompió el sello?
@@ -423,11 +457,7 @@ export function senalaAlSaqueador(texto: string, nombres: string[]): boolean {
 
   for (const frase of normalizar(texto).split(/[.;:!?\n]+/)) {
     const conBordes = ` ${frase} `;
-    const nombra = limpios.some((n) => {
-      const tokens = n.split(' ').filter((t) => t.length >= 4);
-      if (tokens.length === 0) return conBordes.includes(` ${n} `);
-      return tokens.some((t) => conBordes.includes(` ${t} `) || conBordes.includes(` ${t}s `));
-    });
+    const nombra = limpios.some((n) => apareceElNombre(conBordes, n));
     if (nombra && SENALAMIENTOS.some((m) => conBordes.includes(m))) return true;
   }
   return false;
@@ -437,10 +467,7 @@ export function nombraAlSaqueador(texto: string, nombres: string[]): boolean {
   const plano = ` ${normalizar(texto)} `;
   return nombres.some((n) => {
     const limpio = normalizar(n);
-    if (!limpio) return false;
-    const tokens = limpio.split(' ').filter((t) => t.length >= 4);
-    if (tokens.length === 0) return plano.includes(` ${limpio} `);
-    return tokens.some((t) => plano.includes(` ${t} `) || plano.includes(` ${t}s `));
+    return Boolean(limpio) && apareceElNombre(plano, limpio);
   });
 }
 

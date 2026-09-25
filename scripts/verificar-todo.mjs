@@ -373,6 +373,12 @@ const BATERIA = [
     porque: 'la senda dicha en voz alta, un kanchō señalado o escondido, o su sobre más gordo se ven antes de cobrarla',
   },
   {
+    nombre: 'revisión · la Momia',
+    donde: 'server',
+    guion: 'verify:revision-momia',
+    porque: 'el orden de los ritos dicho a trozos, la cámara de mañana, un saqueador señalado o escondido, o su sobre más gordo se ven antes de cobrarla',
+  },
+  {
     nombre: 'esquemas de la trama',
     donde: 'server',
     guion: 'verify:esquemas',

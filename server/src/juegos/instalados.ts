@@ -145,6 +145,12 @@ import '../docs/imprimibles/momia/dosierExpedicionario';
 // Y sus ocho plantillas de imprimible. Ver el porque en la linea de CLUEDO.
 import '../docs/imprimibles/momia/registro';
 
+/*
+ * Y su revisión adversaria, con su expedición ciega. Sin esta línea la noche se
+ * entrega con el veredicto «sin revisar» y nada falla.
+ */
+import '../plot/momia-revision';
+
 // El Paso de las Sombras: reductores, proyección del estado, consejo y trofeos.
 import '../plot/sombras-generacion';
 import '../agent/sombras-guia';

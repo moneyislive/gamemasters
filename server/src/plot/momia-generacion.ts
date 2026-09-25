@@ -151,10 +151,16 @@ export interface TramaEnsamblada {
  * concesión» — el único con pinta normal. Un filtro que señala a quien no filtró
  * es peor que no filtrar.
  */
-const RECAMBIO_OFICIO = 'miembro de la expedición';
+export const RECAMBIO_OFICIO = 'miembro de la expedición';
 
-/** Un texto de recambio cuando el modelo escribe algo que no puede salir a la mesa. */
-const RECAMBIO_PUBLICO =
+/**
+ * Un texto de recambio cuando el modelo escribe algo que no puede salir a la mesa.
+ *
+ * Se exporta para que la revisión los reconozca: un recambio es un hueco en la
+ * noche y, en una narración, una marca —sale justo donde el texto nombraba a
+ * quien rompió el sello—. La auditoría los cuenta y el revisor los reescribe.
+ */
+export const RECAMBIO_PUBLICO =
   'La expedición no se pone de acuerdo en lo que pasó aquella noche, y lo que se cuenta cambia según quién lo cuente.';
 
 /**
@@ -509,18 +515,23 @@ export function ensamblarTramaMomia(
   };
 }
 
+/** Los textos del dosier mínimo. Se exportan para que la revisión lo reconozca y lo reescriba. */
+export const DOSIER_MINIMO = {
+  publicPersona: 'Llegó con la misión y ha estado en todas las cámaras que se han abierto.',
+  secret: 'Callas algo de aquella noche que todavía no has sabido cómo contar.',
+  motive: 'Si la tumba no se sella, la concesión sigue viva otra temporada.',
+  alibi: 'Dices que estabas en el corredor cuando se apagó la lámpara.',
+  personalHook: 'Su papel se ha quedado sin escribir: improvisa con lo que sepas de la persona.',
+} as const;
+
 /** El dosier que se escribe cuando el modelo se deja a alguien. Feo, pero jugable. */
 function dosierMinimo(persona: Entidad): PlotCharacter {
   return {
     participanteId: persona.id,
     characterName: persona.name,
-    role: 'miembro de la expedición',
-    publicPersona: 'Llegó con la misión y ha estado en todas las cámaras que se han abierto.',
-    secret: 'Callas algo de aquella noche que todavía no has sabido cómo contar.',
-    motive: 'Si la tumba no se sella, la concesión sigue viva otra temporada.',
-    alibi: 'Dices que estabas en el corredor cuando se apagó la lámpara.',
+    role: RECAMBIO_OFICIO,
+    ...DOSIER_MINIMO,
     knowledge: [],
-    personalHook: 'Su papel se ha quedado sin escribir: improvisa con lo que sepas de la persona.',
   };
 }
 

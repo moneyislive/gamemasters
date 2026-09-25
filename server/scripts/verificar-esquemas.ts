@@ -40,6 +40,8 @@ import { NUDO_REVISION_SCHEMA } from '../src/plot/nudo-revisor';
 import { SOMBRAS_TRAMA_SCHEMA } from '../src/plot/sombras-esquema';
 import { SOMBRAS_REVISION_DOSIERES_SCHEMA, SOMBRAS_REVISION_SCHEMA } from '../src/plot/sombras-revisor';
 import { LECTOR_SOMBRAS_SCHEMA } from '../src/plot/sombras-lector';
+import { MOMIA_REVISION_DOSIERES_SCHEMA, MOMIA_REVISION_SCHEMA } from '../src/plot/momia-revisor';
+import { LECTOR_MOMIA_SCHEMA } from '../src/plot/momia-lector';
 
 const ESQUEMAS: Record<string, unknown> = {
   'CLUEDO · trama': PLOT_SCHEMA,
@@ -50,6 +52,9 @@ const ESQUEMAS: Record<string, unknown> = {
   'CLUEDO · revisión solo del material': REVISION_SOLO_MATERIAL_SCHEMA,
   'CLUEDO · detective': DETECTIVE_SCHEMA,
   'Momia · trama': MOMIA_TRAMA_SCHEMA,
+  'Momia · revisión': MOMIA_REVISION_SCHEMA,
+  'Momia · revisión de los dosieres': MOMIA_REVISION_DOSIERES_SCHEMA,
+  'Momia · expedición ciega': LECTOR_MOMIA_SCHEMA,
   'Nudo · trama': NUDO_TRAMA_SCHEMA,
   'Nudo · revisión': NUDO_REVISION_SCHEMA,
   'Sombras · trama': SOMBRAS_TRAMA_SCHEMA,

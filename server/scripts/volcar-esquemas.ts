@@ -19,6 +19,8 @@ import { NUDO_TRAMA_SCHEMA } from '../src/plot/nudo-prompt';
 import { NUDO_REVISION_SCHEMA } from '../src/plot/nudo-revisor';
 import { SOMBRAS_REVISION_DOSIERES_SCHEMA, SOMBRAS_REVISION_SCHEMA } from '../src/plot/sombras-revisor';
 import { LECTOR_SOMBRAS_SCHEMA } from '../src/plot/sombras-lector';
+import { MOMIA_REVISION_DOSIERES_SCHEMA, MOMIA_REVISION_SCHEMA } from '../src/plot/momia-revisor';
+import { LECTOR_MOMIA_SCHEMA } from '../src/plot/momia-lector';
 
 const destino = process.argv[2];
 if (!destino) {
@@ -38,6 +40,9 @@ const esquemas = {
   sombrasRevision: SOMBRAS_REVISION_SCHEMA,
   sombrasRevisionDosieres: SOMBRAS_REVISION_DOSIERES_SCHEMA,
   sombrasColumnaCiega: LECTOR_SOMBRAS_SCHEMA,
+  momiaRevision: MOMIA_REVISION_SCHEMA,
+  momiaRevisionDosieres: MOMIA_REVISION_DOSIERES_SCHEMA,
+  momiaExpedicionCiega: LECTOR_MOMIA_SCHEMA,
 };
 fs.writeFileSync(destino, JSON.stringify(esquemas, null, 2), 'utf8');
 console.log(`${Object.keys(esquemas).length} esquemas en ${destino}`);
