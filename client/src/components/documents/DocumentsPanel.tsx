@@ -173,10 +173,14 @@ export default function DocumentsPanel(): JSX.Element {
           {revision.veredicto === 'sin-revisar'
             ? revision.error ?? 'Este juego todavía no tiene revisión de trama.'
             : revision.pasadas === 0
-              ? 'Se ha contado con código quién aparece en cada rincón de la noche. El detective y el revisor ' +
-                'necesitan el modelo y aquí no han corrido: lo de abajo está sin corregir.'
-              : `Un detective que no conocía la solución intentó resolverla antes de tiempo, y un revisor la corrigió ` +
-                `en ${revision.pasadas} ${revision.pasadas === 1 ? 'pasada' : 'pasadas'}: ` +
+              ? 'Se ha medido con código lo que se puede contar de la noche. El revisor necesita el modelo y aquí ' +
+                'no ha corrido: lo de abajo está sin corregir.'
+              : /*
+                 * Con lector ciego (CLUEDO, la Momia, las Sombras) o sin él (el Nudo, cuyo
+                 * cuadro se mide con código): el texto dice lo que de verdad pasó.
+                 */
+                `${revision.lecturas ? 'Alguien que no conocía la solución intentó adivinarla antes de tiempo, y un' : 'Un'} ` +
+                `revisor que sí la conocía la corrigió en ${revision.pasadas} ${revision.pasadas === 1 ? 'pasada' : 'pasadas'}: ` +
                 `${corregidos} ${corregidos === 1 ? 'cosa corregida' : 'cosas corregidas'}` +
                 (revision.cambios.length ? `, ${revision.cambios.length} cambios en el texto.` : '.')}
         </p>

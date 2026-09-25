@@ -28,7 +28,7 @@
 import type { Request } from 'express';
 import type { Esfuerzo, GameSession, ModelId } from '../../../shared/types';
 import type { CobroDeLaVelada, ModoDeJuego, PresupuestoDeVelada, UsosDeLaVelada } from '../../../shared/cobro';
-import { entidadesDe, lugaresDe, personasDe } from '../../../shared/juegos';
+import { entidadesDe, lugaresDe, manifiestoDe, personasDe } from '../../../shared/juegos';
 import { esfuerzoPara, resolveModel } from '../agent/anthropic';
 import { esModeloDeVelada } from '../config';
 import { getStore } from '../db/store';
@@ -44,10 +44,24 @@ export function esModo(valor: unknown): valor is ModoDeJuego {
   return valor === 'papel' || valor === 'app';
 }
 
-/** Lo que entra en el precio de una velada según cómo se juegue. */
-export function pasosDeLaVelada(modo: ModoDeJuego): PasoDeVelada[] {
-  const comunes: PasoDeVelada[] = ['trama', 'material', 'detective', 'revisor', 'asistente'];
-  return modo === 'app' ? [...comunes, 'mayordomo'] : comunes;
+/**
+ * Lo que entra en el precio de una velada según cómo se juegue y a qué.
+ *
+ * Solo los pasos que ese juego tiene: el material aparte, si lo declara
+ * (`materialDeVelada`), y el lector ciego de la revisión, si lo tiene
+ * (`lectorCiego`). Antes eran los mismos cinco para todos, y una velada del
+ * Nudo se habría cobrado con un material y un detective que no existen.
+ */
+export function pasosDeLaVelada(modo: ModoDeJuego, juego?: string): PasoDeVelada[] {
+  const manifiesto = manifiestoDe(juego);
+  const pasos: PasoDeVelada[] = [
+    'trama',
+    ...(manifiesto.materialDeVelada ? (['material'] as const) : []),
+    ...(manifiesto.lectorCiego ? (['detective'] as const) : []),
+    'revisor',
+    'asistente',
+  ];
+  return modo === 'app' ? [...pasos, 'mayordomo'] : pasos;
 }
 
 /**
@@ -85,7 +99,7 @@ export async function presupuestoDeLaVelada(game: GameSession, opciones: Opcione
   };
   const modelo = await resolveModel(conOpciones);
   // La misma regla que la generación: cada paso piensa lo que le toca.
-  return presupuestar(pasosDeLaVelada(opciones.modo), tamanoDe(game), modelo, (paso) =>
+  return presupuestar(pasosDeLaVelada(opciones.modo, game.settings?.juego), tamanoDe(game), modelo, (paso) =>
     paso === 'asistente' ? 'medium' : paso === 'mayordomo' ? 'low' : esfuerzoPara(conOpciones, paso),
   );
 }

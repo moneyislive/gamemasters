@@ -450,4 +450,5 @@ export const CLUEDO: ManifiestoDeJuego = {
   },
 
   materialDeVelada: true,
+  lectorCiego: true,
 };

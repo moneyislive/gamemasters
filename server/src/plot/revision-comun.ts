@@ -538,6 +538,14 @@ export function juzgarSospecha(opciones: {
   /** Si la frase decisiva es una pista con ronda, cuál. */
   pistaDe?: (texto: string) => { id: string; ronda: number } | undefined;
   origen?: HallazgoDeRevision['origen'];
+  /**
+   * `resolver` (CLUEDO): la mesa tiene que llegar a la respuesta LEYENDO, pero
+   * al final y no antes. `no-delatar` (el traidor de las Sombras, quien rompió
+   * el sello en la Momia): a esa persona se la caza JUGANDO —mintiendo,
+   * votando, falsificando—, así que ningún momento, tampoco el último, debe
+   * dejar a la mesa señalándola por lo que ha leído.
+   */
+  modo?: 'resolver' | 'no-delatar';
 }): HallazgoDeRevision[] {
   const { lecturas, objetivo, rondas, nombre } = opciones;
   const azar = 1 / Math.max(1, opciones.candidatos);
@@ -546,6 +554,42 @@ export function juzgarSospecha(opciones: {
   let momento = 0;
   const h = (codigo: string, gravedad: GravedadDeHallazgo, texto: string, sobre?: string) =>
     salida.push({ codigo, gravedad, origen: opciones.origen ?? 'detective', texto, estado: 'pendiente', sobre: sobre ?? `momento-${momento}` });
+
+  if (opciones.modo === 'no-delatar') {
+    for (const l of lecturas) {
+      momento = l.momento;
+      const orden = ordenados(l.reparto);
+      const p = l.reparto[objetivo] ?? 0;
+      const encabeza = orden[0]?.[0] === objetivo;
+      const ventaja = encabeza ? p - (orden[1]?.[1] ?? 0) : 0;
+      if (encabeza && p >= Math.max(0.3, 2 * azar) && ventaja >= 0.1) {
+        const delata = p >= Math.max(0.5, 3 * azar) && ventaja >= 0.15;
+        const cuando =
+          l.momento === 0 ? 'Antes de empezar' : l.momento < rondas ? `Al cerrar la ronda ${l.momento} de ${rondas}` : 'Al final de la noche';
+        h(
+          l.momento === 0 ? 'filtracion-inicial' : l.momento < rondas ? 'filtracion-temprana' : 'filtracion-final',
+          delata ? 'bloqueante' : 'grave',
+          `${cuando}, quien no sabe la solución ya señala a ${nombre(objetivo)} con un ${pct(p)} solo por lo que ha ` +
+            `leído. A ${opciones.quien} se le caza jugando, no leyendo. Por qué: ${l.razon}`,
+        );
+      }
+      const decisiva = l.pistaDecisiva.trim();
+      if (decisiva && encabeza) {
+        const pista = opciones.pistaDe?.(decisiva);
+        const sobre = pista?.id ?? decisiva;
+        if (!salida.some((x) => x.codigo === 'pista-que-lo-dice-todo' && x.sobre === sobre)) {
+          h(
+            'pista-que-lo-dice-todo',
+            'bloqueante',
+            `${pista ? `«${pista.id}» (ronda ${pista.ronda})` : `La frase ${decisiva}`} basta por sí sola para señalar a ` +
+              `${nombre(objetivo)}. A ${opciones.quien} se le tiene que cazar jugando.`,
+            sobre,
+          );
+        }
+      }
+    }
+    return salida;
+  }
 
   for (const l of lecturas) {
     momento = l.momento;
