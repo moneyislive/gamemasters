@@ -183,6 +183,12 @@ import './nudo-amanecer';
 import './nudo-trama';
 import '../docs/imprimibles/nudo/dosierFerroviario';
 import '../docs/imprimibles/nudo/registro';
+/*
+ * Y su revisión adversaria. Sin esta línea la velada se entrega con el veredicto
+ * «sin revisar»: se juega igual, pero es una velada de pago que nadie ha leído
+ * con el cuadro delante.
+ */
+import '../plot/nudo-revision';
 
 /*
  * ═══ Y AHORA SE ELIGE CUALES QUEDAN INSTALADOS ═══

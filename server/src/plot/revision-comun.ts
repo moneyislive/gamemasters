@@ -104,6 +104,16 @@ export interface AdaptadorDeRevision<C, L extends LecturaDeMomento = LecturaDeMo
     emit: Emitir,
   ): Promise<RespuestaDelRevisor<C>>;
   parchear(game: GameSession, plot: Plot, cambios: C, soloMaterial: boolean): { plot: Plot; aplicados: string[]; rechazados: string[] };
+  /**
+   * Qué avisos puede arreglar el revisor con sus parches. Sin declarar, todos.
+   *
+   * Existe por el Nudo: su cuadro lo decide el código y el revisor solo toca
+   * prosa, así que un cuadro roto sigue roto después de cualquier pasada. Contarlo
+   * para pedir la segunda sería pagar una vuelta que no puede arreglar nada. El
+   * aviso sigue pendiente y sigue decidiendo el veredicto: solo deja de pedir
+   * otra vuelta.
+   */
+  corregible?(hallazgo: HallazgoDeRevision): boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,6 +135,14 @@ const clave = (h: HallazgoDeRevision) => `${h.codigo}|${h.sobre ?? ''}`;
  */
 export function hayQueCorregir(hallazgos: HallazgoDeRevision[]): boolean {
   return hallazgos.some((h) => h.gravedad === 'bloqueante');
+}
+
+/** Si lo que queda pendiente merece otra pasada: algo bloqueante que el revisor pueda arreglar. */
+export function mereceOtraPasada(
+  pendientes: HallazgoDeRevision[],
+  corregible?: (hallazgo: HallazgoDeRevision) => boolean,
+): boolean {
+  return hayQueCorregir(corregible ? pendientes.filter((h) => corregible(h)) : pendientes);
 }
 
 export function veredictoDe(pendientes: HallazgoDeRevision[]): InformeDeRevision['veredicto'] {
@@ -212,7 +230,7 @@ export async function ejecutarRevision<C, L extends LecturaDeMomento>(
     while (pasadas < PASADAS_MAXIMAS) {
       // La primera pasada va siempre: el revisor busca también lo que los
       // informes no saben ver. Las siguientes, solo si queda algo que las merezca.
-      if (pasadas > 0 && !hayQueCorregir(pendientes)) break;
+      if (pasadas > 0 && !mereceOtraPasada(pendientes, adaptador.corregible?.bind(adaptador))) break;
 
       emit({
         type: 'stage',
@@ -310,6 +328,49 @@ export async function ejecutarRevision<C, L extends LecturaDeMomento>(
       ...(error ? { error } : {}),
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Piezas de esquema para los revisores
+// ---------------------------------------------------------------------------
+
+export const cadena = (description: string) => ({ type: 'string', description });
+export const lista = (items: unknown, description: string) => ({ type: 'array', description, items });
+export function objeto(campos: Record<string, unknown>, description?: string): Record<string, unknown> {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: Object.keys(campos),
+    properties: campos,
+    ...(description ? { description } : {}),
+  };
+}
+
+/** La lista de hallazgos que devuelve un revisor. `codigos` sugiere los del juego. */
+export function esquemaDeHallazgos(codigos: string): Record<string, unknown> {
+  return lista(
+    objeto({
+      codigo: cadena(`En minúsculas y con guiones: ${codigos}, o el código del informe que respondes.`),
+      gravedad: { type: 'string', enum: ['bloqueante', 'grave', 'menor'] },
+      sobre: cadena('Id de la persona, pieza o momento afectado; cadena vacía si es general.'),
+      problema: cadena('Qué falla, en una o dos frases.'),
+      arreglo: cadena('Qué has cambiado para arreglarlo; cadena vacía si no era un problema de verdad.'),
+    }),
+    'Todo lo que has encontrado, incluidos los avisos de los informes que confirmes o descartes.',
+  ) as Record<string, unknown>;
+}
+
+export const RESUMEN_DE_CAMBIOS = lista(
+  { type: 'string' },
+  'Una línea por cambio, para quien dirige: qué se cambió y por qué. Vacía si no cambias nada.',
+);
+
+/** Un texto aceptable: con contenido y sin empobrecer el que había (`suelo` × su largo). */
+export function textoAceptable(nuevo: unknown, viejo: string | undefined, minimo: number, suelo = 0.5): string | undefined {
+  const t = typeof nuevo === 'string' ? nuevo.trim() : '';
+  if (t.length < minimo) return undefined;
+  if (viejo && t.length < viejo.trim().length * suelo) return undefined;
+  return t;
 }
 
 // ---------------------------------------------------------------------------

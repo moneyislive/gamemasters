@@ -32,16 +32,24 @@
  */
 import { PLOT_EXTENSION_SCHEMA, PLOT_SCHEMA } from '../src/plot/cluedo-esquema';
 import { MATERIAL_SCHEMA } from '../src/plot/cluedo-material';
+import { REVISION_MATERIAL_SCHEMA, REVISION_SOLO_MATERIAL_SCHEMA, REVISION_TRAMA_SCHEMA } from '../src/plot/cluedo-revisor';
+import { DETECTIVE_SCHEMA } from '../src/plot/cluedo-detective';
 import { MOMIA_TRAMA_SCHEMA } from '../src/plot/momia-esquema';
 import { NUDO_TRAMA_SCHEMA } from '../src/plot/nudo-prompt';
+import { NUDO_REVISION_SCHEMA } from '../src/plot/nudo-revisor';
 import { SOMBRAS_TRAMA_SCHEMA } from '../src/plot/sombras-esquema';
 
 const ESQUEMAS: Record<string, unknown> = {
   'CLUEDO · trama': PLOT_SCHEMA,
   'CLUEDO · ampliación': PLOT_EXTENSION_SCHEMA,
   'CLUEDO · material': MATERIAL_SCHEMA,
+  'CLUEDO · revisión de la trama': REVISION_TRAMA_SCHEMA,
+  'CLUEDO · revisión del material': REVISION_MATERIAL_SCHEMA,
+  'CLUEDO · revisión solo del material': REVISION_SOLO_MATERIAL_SCHEMA,
+  'CLUEDO · detective': DETECTIVE_SCHEMA,
   'Momia · trama': MOMIA_TRAMA_SCHEMA,
   'Nudo · trama': NUDO_TRAMA_SCHEMA,
+  'Nudo · revisión': NUDO_REVISION_SCHEMA,
   'Sombras · trama': SOMBRAS_TRAMA_SCHEMA,
 };
 

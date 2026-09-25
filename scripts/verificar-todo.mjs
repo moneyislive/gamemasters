@@ -361,6 +361,12 @@ const BATERIA = [
     porque: 'lo que estropeó veladas de verdad —el resumen que acusa, el arma sin nombre, la pista que dicta— se ve antes de cobrarla',
   },
   {
+    nombre: 'revisión · el Nudo',
+    donde: 'server',
+    guion: 'verify:revision-nudo',
+    porque: 'una frase que ata un convoy a su franja, un parte que cuenta cómo va la noche o un cuadro que dejó de salir se ven antes de cobrarla',
+  },
+  {
     nombre: 'esquemas de la trama',
     donde: 'server',
     guion: 'verify:esquemas',

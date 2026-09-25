@@ -32,7 +32,14 @@
  */
 import { buildStyleBlock } from './style';
 import { entidadesDe } from '../../../shared/juegos';
-import { HORAS_DE_FRANJA, NOMBRE_DE_OFICIO } from '../../../shared/juegos/nudo-tipos';
+import {
+  HORAS_DE_FRANJA,
+  NOMBRE_DE_OFICIO,
+  OFICIO_DE_PERSONA,
+  RETRASO_POR_CONVOY_VARADO,
+  RETRASO_POR_FRANJA_PERDIDA,
+  RETRASO_POR_ORDEN_RECHAZADA,
+} from '../../../shared/juegos/nudo-tipos';
 import { tramaDe } from '../juegos/nudo-trama';
 import type { GameSession, Plot } from '../../../shared/types';
 
@@ -82,17 +89,17 @@ export const NUDO_TRAMA_SCHEMA = {
           caraPublica: {
             type: 'string',
             description:
-              'Lo que cualquiera del turno sabría de esta persona: su oficio, cuánto lleva en la casa y una cosa que se le note.',
+              'Dos o tres frases. Lo que cualquiera del turno sabría de esta persona: su oficio de esta noche, cuánto lleva en la casa y una cosa que se le note.',
           },
           secreto: {
             type: 'string',
             description:
-              'Lo que no cuenta. Nadie más lo lee. NO puede tener nada que ver con el orden de los convoyes.',
+              'Dos frases. Lo que no cuenta, y nadie más lo lee: un asunto humano con peso. NUNCA sobre los convoyes ni sobre el cuadro.',
           },
           gancho: {
             type: 'string',
             description:
-              'Un consejo de interpretación en segunda persona: cómo llevar el papel esta noche.',
+              'Una o dos frases en segunda persona: cómo llevar el papel esta noche, con su oficio.',
           },
         },
       },
@@ -109,7 +116,7 @@ export const NUDO_TRAMA_SCHEMA = {
           texto: {
             type: 'string',
             description:
-              'Dos frases de ambiente: el tiempo, la línea, la estufa. NUNCA qué convoy toca.',
+              'Dos frases de ambiente de esa hora: el tiempo, la línea, la estufa. Sin nombrar ningún convoy y sin dar por hecho cómo va la noche.',
           },
         },
       },
@@ -134,14 +141,18 @@ convoy sale en cada franja— y las tiras de telegrama que lo determinan están 
 sistema y no se te enseñan. Tú no tienes que averiguarlos, no debes inventarlos y no puedes
 contradecirlos.
 
-TRES REGLAS QUE NO SE NEGOCIAN:
+CUATRO REGLAS QUE NO SE NEGOCIAN:
 
 1. NUNCA escribas ni insinúes en qué orden salen los convoyes. Ni en la sinopsis, ni en los partes,
-   ni en el guion, ni en la ficha de nadie. Es lo único que hay que averiguar en toda la velada.
+   ni en el guion, ni en la ficha de nadie. Es lo único que hay que averiguar en toda la velada. Una
+   hora pegada a un convoy —«el mixto de las dos»— también es un orden.
 2. El SECRETO de cada persona es un asunto humano —una deuda, un traslado, un miedo, algo que
    calló— y JAMÁS información sobre los convoyes ni sobre el cuadro.
 3. NO hay culpable, no hay traidor, no hay víctima y no ha muerto nadie. Esto es una noche de
    trabajo contra el reloj y contra la nieve. Si escribes un crimen, has escrito otro juego.
+4. Los PARTES se leen al abrir cada franja PASE LO QUE PASE en la mesa: a esa hora pueden haber
+   salido cuatro convoyes o ninguno. Así que no nombran ningún convoy y no dan por hecho qué ha
+   salido, qué espera, cuánto retraso lleva la estación ni cuántos quedan.
 
 TONO: seco, concreto, con dignidad de oficio. Gente que lleva años haciendo lo mismo y esta noche
 tiene que hacerlo sin el papel que lo dice. Nada de épica de folletín; la emoción está en que el
@@ -173,7 +184,7 @@ export function construirPromptNudo(game: GameSession, base: Plot): string {
       const oficio = trama?.oficioDePersona[p.id];
       return (
         `- participanteId: ${p.id} · se llama ${p.name}` +
-        (oficio ? ` · esta noche lleva ${NOMBRE_DE_OFICIO[oficio]}` : '') +
+        (oficio ? ` · esta noche es ${OFICIO_DE_PERSONA[oficio]} (${NOMBRE_DE_OFICIO[oficio]})` : '') +
         (p.description ? `\n  Quien monta la partida dice de ella: «${p.description}»` : '')
       );
     })
@@ -217,15 +228,32 @@ ${cuartos}
 LAS FRANJAS DE LA NOCHE
 ${HORAS_DE_FRANJA.map((h, i) => `${i + 1}. las ${h}`).join(' · ')}
 
+LAS REGLAS, PARA QUE EL GUION NO SE LAS INVENTE
+- En cada franja cruza como mucho un convoy, y el enclavamiento solo acepta el que toca.
+- Una orden rechazada suma ${RETRASO_POR_ORDEN_RECHAZADA} minutos de retraso. Una franja que se cierra sin que salga nadie
+  suma ${RETRASO_POR_FRANJA_PERDIDA} y el cuadro se corre entero. Al amanecer, cada convoy que no cruzó suma ${RETRASO_POR_CONVOY_VARADO}.
+- Se gana si el Correo cruza y, con la cuenta del amanecer, el retraso no pasa de ${trama?.retrasoMaximo ?? 'su tope'} minutos.
+  La cuenta se cierra al amanecer: hasta entonces se sigue jugando.
+- El cuadro sale juntando las tiras que guarda cada cual. Nadie de la mesa lo tiene entero.
+
 QUÉ TIENES QUE ESCRIBIR
 - El título y el lema de la velada.
-- La sinopsis y la ambientación.
-- Una ficha por persona, con SU participanteId exacto de la lista de arriba. Aprovecha lo que se
-  dice de cada una para que el papel le pegue: quien discute por deporte, en el enclavamiento;
-  quien no para quieto, en la garita.
-- Un parte de novedades por cada una de las ${HORAS_DE_FRANJA.length} franjas. Ambiente y solo
-  ambiente: el tiempo, la línea, la estufa, un maquinista que pita. NUNCA qué convoy toca.
-- Cinco líneas de guion para quien dirige.
+- La sinopsis (tres o cuatro frases) y la ambientación (dos). La noche es la del 14 de enero de
+  1927 y no otra; el suero va en el Correo y en ningún otro convoy.
+- Una ficha por persona, con SU participanteId exacto de la lista de arriba y a su medida: usa lo
+  que se dice de cada una para que el papel le pegue —quien discute por deporte, en el
+  enclavamiento; quien no para quieto, en la garita—. La cara pública dice su oficio de esta
+  noche con esa palabra (guardagujas, telegrafista, factor de circulación o jefe de carga) y no
+  le pone otro. Todas de una extensión parecida: nadie de relleno.
+- Un parte de novedades por cada una de las ${HORAS_DE_FRANJA.length} franjas. Ambiente de ESA hora y solo eso: la nieve,
+  el frío, la estufa, el hilo del telégrafo, un pitido lejano, la luz. Sin nombrar ningún convoy,
+  ni el Correo, y sin dar por hecho cómo va la noche. Cada uno distinto del anterior: la noche
+  avanza de la medianoche al primer gris del amanecer.
+- Cinco líneas de guion para quien dirige, que puede estar jugando a la vez: cómo conducir la
+  noche de acto en acto, fiel a las reglas de arriba y sin ningún orden.
+
+Usa los nombres de ESTA noche —los convoyes, sus cargas, los puestos de la casa, la gente—: una
+frase que valdría para cualquier velada no sirve.
 
 RECUERDA: no sabes en qué orden salen los convoyes y no debes inventártelo. Cualquier frase que
 sugiera un orden estropea la velada entera.${buildStyleBlock(game)}`;
