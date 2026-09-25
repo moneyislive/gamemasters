@@ -16,12 +16,20 @@
  * aparatos ven el mismo taxi en el mismo hueco.
  *
  * Los faros de un coche aparcado están apagados; el taxi lleva encendida la luz verde de «libre».
+ *
+ * ═══ UN COCHE, UNA PIEZA QUE CEDE ═══
+ *
+ * `cocheAparcado` es un escritor de pieza (`EscritorDePieza` de `celdas.ts`): escribe un coche en los tres moldes
+ * de su obra, apunta la luz de «libre» del taxi en `obra.cochesEncendidos` y cede. El detalle sale del grado de
+ * los coches de la obra (`gradoDeLosCoches` de `grados.ts`): hoy, grado 2 o más es el coche fino (ruedas con
+ * llanta, retrovisores y la banda del taxi), que es lo que `cochesFinos` daba en N1-N3.
  */
 import * as THREE from 'three';
 import type { Molde } from './geometria';
 import { ACABADO, lineal } from './materiales';
 import type { CocheDelPlano, Orientacion } from './tipos';
 import { azarEn } from './azar';
+import type { ObraDeLaCelda, ParteDeLaCelda } from './celdas';
 
 const PINTURAS: readonly number[] = [0x243150, 0x9a9ea3, 0x1c1d1f, 0x5a1519, 0x2a4a36, 0x6d7278, 0xc4c7c9, 0x35507a, 0x7a5634, 0x8a1c1c];
 
@@ -74,22 +82,15 @@ const FURGONETA: Silueta = {
   ruedas: [1.45, -1.4],
 };
 
-export interface CochesConstruidos {
-  /** Las luces que siguen encendidas (la de «libre» de los taxis): para los halos. */
-  readonly luces: { readonly x: number; readonly y: number; readonly z: number; readonly color: Rgb }[];
-}
-
-/** Escribe los coches aparcados en los tres moldes del mobiliario. */
-export function escribirLosCoches(
-  coches: readonly CocheDelPlano[],
-  mo: Molde,
-  em: Molde,
-  cr: Molde,
-  finos: boolean,
-  lados: number,
-): CochesConstruidos {
-  const luces: { x: number; y: number; z: number; color: Rgb }[] = [];
-  for (const c of coches) {
+/** UN COCHE APARCADO en los tres moldes de su obra, dentro de su caja (ver la cabecera). */
+export function* cocheAparcado(obra: ObraDeLaCelda, c: CocheDelPlano): Generator<void, void, void> {
+  const mo = obra.m.mobiliario;
+  const em = obra.m.emisivo;
+  const cr = obra.m.cristal;
+  const lados = obra.lados;
+  const finos = obra.gradoDeLosCoches >= 2;
+  const luces = obra.cochesEncendidos;
+  {
     const cx = (c.caja.x0 + c.caja.x1) / 2;
     const cz = (c.caja.z0 + c.caja.z1) / 2;
     const s: Silueta = c.tipo === 'furgoneta' ? FURGONETA : TURISMO;
@@ -167,5 +168,22 @@ export function escribirLosCoches(
       luces.push({ x: p.x, y: p.y, z: p.z, color: [0.1, 1.0, 0.3] });
     }
   }
-  return { luces };
+  yield;
+}
+
+/** LOS COCHES DE UNA CELDA (el escritor de su familia, ver `celdas.ts`): uno por paso, y cada caja estorba. */
+export function* cochesDeLaCelda(obra: ObraDeLaCelda, parte: ParteDeLaCelda): Generator<void, void, void> {
+  for (const c of parte.coches) {
+    yield* cocheAparcado(obra, c);
+    obra.estorba.push(c.caja);
+  }
+}
+
+/** Los coches del barrio viejo, de un tirón (`construir.ts`): sus luces van a `obra.cochesEncendidos`. */
+export function escribirLosCoches(obra: ObraDeLaCelda, coches: readonly CocheDelPlano[]): void {
+  for (const c of coches) {
+    for (const _ of cocheAparcado(obra, c)) {
+      /* de un tirón */
+    }
+  }
 }

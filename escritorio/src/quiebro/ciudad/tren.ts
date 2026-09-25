@@ -16,12 +16,28 @@
  */
 import * as THREE from 'three';
 import { Molde } from './geometria';
-import { ACABADO, ATRIBUTOS_DE_LO_EMISIVO, ATRIBUTOS_DEL_MOBILIARIO, lineal } from './materiales';
-import type { TrenDelPlano } from './tipos';
+import { ACABADO, ATRIBUTOS_DE_LO_EMISIVO, ATRIBUTOS_DEL_MOBILIARIO, lineal, materialDelMobiliario, materialEmisivo } from './materiales';
+import type { NivelDeLaCiudad, TrenDelPlano } from './tipos';
+import { DETALLE_DEL_NIVEL } from './tipos';
+import { parchear } from '../atmosfera/parcheo';
+import { RETOQUE_DEL_FUNDIDO } from './lejos';
 
 /** Lo que sube el coche sobre la cara de arriba de la viga (petos y carriles). */
 const SOBRE_LA_VIGA = 1.02;
 const COCHES = 3;
+
+/**
+ * LOS MATERIALES DEL TREN de la ciudad abierta en un nivel: la caja y las luces. Son suyos (la ciudad los registra
+ * con los demás, `suyo` de `abierta.ts`), para que el tren pueda llevar su materia sin tocar la del mobiliario.
+ * Hoy son los del mobiliario y lo emisivo, y la caja lleva el fundido del canto de la ventana desde N1, como cuando
+ * compartía el material del mobiliario de la ventana: el mismo texto y la misma llave, así que el mismo programa.
+ * Si el tren lleva el fundido o no lo decide quien le dé su materia.
+ */
+export function materialesDelTren(nivel: NivelDeLaCiudad): { readonly cuerpo: THREE.MeshStandardMaterial; readonly luces: THREE.MeshBasicMaterial } {
+  const cuerpo = materialDelMobiliario(nivel);
+  if (DETALLE_DEL_NIVEL[nivel].fundido) parchear(cuerpo, RETOQUE_DEL_FUNDIDO);
+  return { cuerpo, luces: materialEmisivo(nivel) };
+}
 
 function geometrias(largo: number): { cuerpo: THREE.BufferGeometry; luces: THREE.BufferGeometry } {
   const mo = new Molde(ATRIBUTOS_DEL_MOBILIARIO, true);

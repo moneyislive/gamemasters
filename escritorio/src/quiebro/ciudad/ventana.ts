@@ -28,14 +28,21 @@
  * cuenta en triángulos y no en milisegundos (§5.7): el reloj de un teléfono ocupado miente. Las celdas
  * hechas se guardan (las 36 últimas): volver por donde se vino no construye nada.
  *
+ * ═══ EL GRADO DE CADA CELDA ═══
+ *
+ * Cada celda se construye con el grado que le toca en SU ventana (`grados.ts`: en N2 y N3, más detalle en el
+ * bloque del centro) y se guarda por su grado y su relieve: la misma celda puede estar guardada en dos versiones,
+ * y la que cambia de grado al recentrar se construye otra vez (en N3, unas seis por recentrado, además de las
+ * nuevas). En N0 y N1 el grado es uno solo y no cambia nunca.
+ *
  * Sin WebGL: el comprobador cruza la ciudad con esto mismo en Node, fotograma a fotograma.
  */
 import * as THREE from 'three';
-import type { NivelDeLaCiudad } from './tipos';
-import { DETALLE_DEL_NIVEL } from './tipos';
-import { CELDA_MAXIMA, CELDA_MINIMA, LADO_DE_CELDA, celdaDe, indiceDeCelda } from '../../../../shared/arcade/juegos/quiebro-ciudad';
+import type { GradoDeLaCelda, NivelDeLaCiudad } from './tipos';
+import { CELDA_MAXIMA, CELDA_MINIMA, LADO_DE_CELDA, celdaDe, celdaDelIndice, indiceDeCelda } from '../../../../shared/arcade/juegos/quiebro-ciudad';
 import type { CeldaConstruida, Familia, PartesDeLaCiudad } from './celdas';
 import { FAMILIAS, atributosDeLaFamilia, construirLaCelda } from './celdas';
+import { gradoDeLaCelda, relieveDeHoy } from './grados';
 import type { GeometriaVolcada } from './geometria';
 
 /* ═══════════════════════════════ LOS NÚMEROS ═══════════════════════════════ */
@@ -85,8 +92,19 @@ export const CELDAS_GUARDADAS = 36;
 /** Cuánto más se trabaja por fotograma mientras no hay nada pintado todavía. */
 export const PRISA_DEL_PRINCIPIO = 4;
 
-/** Lo que se suma al índice de una celda para guardar su versión con relieve (N1: la del centro). */
-const CON_RELIEVE = 1000;
+/**
+ * La llave de una celda guardada: su índice (menos de 1.000), su grado y si lleva el relieve de hoy. Una misma
+ * celda puede estar guardada en varias versiones (en N2 y N3, la del bloque del centro y la del anillo).
+ */
+function llaveDeLaCelda(k: number, grado: GradoDeLaCelda, relieve: boolean): number {
+  return k + 1000 * grado + 10000 * (relieve ? 1 : 0);
+}
+
+/** El grado de la celda `k` en la ventana `v` (ver `grados.ts`): por su distancia al centro de la ventana, en celdas. */
+export function gradoEnLaVentana(nivel: NivelDeLaCiudad, v: SitioDeLaVentana, k: number): GradoDeLaCelda {
+  const { i, j } = celdaDelIndice(k);
+  return gradoDeLaCelda(nivel, (i * LADO_DE_CELDA - v.cx) / LADO_DE_CELDA, (j * LADO_DE_CELDA - v.cz) / LADO_DE_CELDA);
+}
 
 /* ═══════════════════════════════ DÓNDE ESTÁ LA VENTANA ═══════════════════════════════ */
 
@@ -441,19 +459,23 @@ export class VentanaDeCeldas {
   private *montar(destino: SitioDeLaVentana): Generator<number, void, void> {
     const p = PRESUPUESTO_DE_LA_VENTANA[this.o.nivel];
     const indices = celdasDeLaVentana(destino);
-    const detalle = DETALLE_DEL_NIVEL[this.o.nivel];
+    const nivel = this.o.nivel;
     const centro = celdaDe(destino.cx, destino.cz);
     const kCentro = centro === null ? -1 : indiceDeCelda(centro.i, centro.j);
-    /* 1 · Las celdas que falten, pieza a pieza (en N1, la del centro con relieve y las demás sin él). */
+    /*
+     * 1 · Las celdas que falten, pieza a pieza: cada una con el grado que le toca en ESTA ventana (`grados.ts`) y
+     * el relieve de hoy (en N1, la del centro con relieve y las demás sin él).
+     */
     const celdas: CeldaConstruida[] = [];
     for (const k of indices) {
-      const relieve = detalle.relieve && (!detalle.relieveSoloEnElCentro || k === kCentro);
-      const clave = relieve ? k + CON_RELIEVE : k;
+      const relieve = relieveDeHoy(nivel, k === kCentro);
+      const grado = gradoEnLaVentana(nivel, destino, k);
+      const clave = llaveDeLaCelda(k, grado, relieve);
       let c = this.guardadas.get(clave);
       if (c === undefined) {
         const parte = this.o.partes.celdas[k];
         if (parte === undefined) continue;
-        const g = construirLaCelda(parte, this.o.partes, this.o.nivel, true, relieve);
+        const g = construirLaCelda(parte, this.o.partes, nivel, true, grado, relieve);
         for (;;) {
           const r = g.next();
           if (r.done === true) {
@@ -592,9 +614,18 @@ export class VentanaDeCeldas {
     return this.guardadas.size;
   }
 
-  /** Una celda ya construida y guardada, si lo está, con relieve o sin él (la luz saca de ella sus fuentes). */
+  /**
+   * Una celda ya construida y guardada, si lo está, de cualquier grado y con relieve o sin él (la luz saca de ella
+   * sus fuentes, que son las mismas en todas sus versiones). Sin asignar nada: la luz lo pregunta cada fotograma.
+   */
   celdaGuardada(k: number): CeldaConstruida | undefined {
-    return this.guardadas.get(k) ?? this.guardadas.get(k + CON_RELIEVE);
+    for (let r = 0; r < 2; r++) {
+      for (let g = 1; g <= 3; g++) {
+        const c = this.guardadas.get(llaveDeLaCelda(k, g as GradoDeLaCelda, r === 1));
+        if (c !== undefined) return c;
+      }
+    }
+    return undefined;
   }
 
   /** Lo que se dibuja ahora, por familia, en triángulos. */

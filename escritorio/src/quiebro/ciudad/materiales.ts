@@ -9,25 +9,33 @@
  * `color` y la rugosidad y el metal en `aAcabado`. El agua (la de la fuente) es un acabado más, con
  * rugosidad casi cero, y lleva las ondas de las gotas.
  *
- *   · `mobiliario`: `MeshStandardMaterial` con color por vértice y acabado por vértice. Con los
+ *   · `mobiliario` (aquí): `MeshStandardMaterial` con color por vértice y acabado por vértice. Con los
  *     retoques de la ciudad: cielo falso reflejado, luz de la calle horneada, sólo brillo de las
  *     luces reales, y más mojado en lo que mira al cielo.
- *   · `emisivo`: lo que da luz (el vidrio de las farolas, el auricular ámbar de las cabinas, las
- *     balizas de las vallas, las ventanas del tren). Color HDR por vértice; `aEmisor` dice si es una
- *     farola (se apaga con el Apagón) o una baliza (parpadea).
- *   · `cristal`: el vidrio transparente (el quiosco de la plaza, las lunas de los coches). Su opacidad
- *     sube con el Fresnel: de frente se ve el interior; a ras, el reflejo.
+ *   · `emisivo` (`emisivo.ts`): lo que da luz (el vidrio de las farolas, el auricular ámbar de las
+ *     cabinas, las balizas de las vallas, las ventanas del tren). Color HDR por vértice; `aEmisor` dice
+ *     si es una farola (se apaga con el Apagón) o una baliza (parpadea).
+ *   · `cristal` (`cristal.ts`): el vidrio transparente (el quiosco de la plaza, las lunas de los coches).
+ *     Su opacidad sube con el Fresnel: de frente se ve el interior; a ras, el reflejo.
+ *
+ * Cada fábrica recibe el nivel (hoy no cambia nada: lo usará la materia, §2.2 del plan del detalle) y las
+ * opciones de lo cercano (`lo-cercano.ts`), que le ponen su retoque. Los de lo emisivo y el cristal se
+ * reexportan desde aquí, donde siempre estuvieron.
  */
 import * as THREE from 'three';
 import type { Retoque } from '../atmosfera/parcheo';
 import { parchear } from '../atmosfera/parcheo';
 import { nieblaEn } from '../atmosfera/niebla';
-import { GLSL_ONDAS, RETOQUE_ENTORNO, RETOQUE_MUNDO, RETOQUE_SOLO_BRILLO, UNIFORMES_DE_LA_CIUDAD } from './retoques';
+import { GLSL_ONDAS, RETOQUE_ENTORNO, RETOQUE_MUNDO, RETOQUE_SOLO_BRILLO } from './retoques';
+import type { NivelDeLaCiudad } from './tipos';
+import type { OpcionesDeLoCercano } from './lo-cercano';
+import { retoqueDeLoCercano } from './lo-cercano';
+
+export { ATRIBUTOS_DE_LO_EMISIVO, materialEmisivo } from './emisivo';
+export { materialDelCristal } from './cristal';
 
 /** Los atributos del molde del mobiliario. */
 export const ATRIBUTOS_DEL_MOBILIARIO = { aAcabado: 2 } as const;
-/** Los atributos del molde de lo emisivo: [tipo, fase]. Tipo 0 fijo, 1 farola, 2 baliza. */
-export const ATRIBUTOS_DE_LO_EMISIVO = { aEmisor: 2 } as const;
 
 /** Acabados de uso común: [rugosidad, metal]. Rugosidad < 0,03 es agua. */
 export const ACABADO = {
@@ -77,72 +85,14 @@ const RETOQUE_DEL_MOBILIARIO: Retoque = {
   ],
 };
 
-export function materialDelMobiliario(): THREE.MeshStandardMaterial {
+/**
+ * El material del mobiliario de un nivel. Con `deLaCapa`, el de la capa de lo cercano (ver `lo-cercano.ts`). El
+ * nivel no cambia nada todavía.
+ */
+export function materialDelMobiliario(nivel: NivelDeLaCiudad, opciones: OpcionesDeLoCercano = {}): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0 });
   m.name = 'quiebro-mobiliario';
-  parchear(m, RETOQUE_MUNDO, RETOQUE_ENTORNO, RETOQUE_SOLO_BRILLO, RETOQUE_DEL_MOBILIARIO);
-  nieblaEn(m);
-  return m;
-}
-
-const RETOQUE_EMISIVO: Retoque = {
-  nombre: 'emisivo',
-  orden: 10,
-  uniformes: { uFarolas: UNIFORMES_DE_LA_CIUDAD.uFarolas, uTiempo: UNIFORMES_DE_LA_CIUDAD.uTiempo },
-  vertice: [
-    { buscar: '#include <common>', como: 'despues', texto: 'attribute vec2 aEmisor;\nvarying vec2 vEmisorQ;' },
-    { buscar: '#include <uv_vertex>', como: 'despues', texto: 'vEmisorQ = aEmisor;' },
-  ],
-  fragmento: [
-    { buscar: '#include <common>', como: 'despues', texto: 'varying vec2 vEmisorQ;\nuniform float uFarolas;\nuniform float uTiempo;' },
-    {
-      buscar: '#include <color_fragment>',
-      como: 'despues',
-      texto: /* glsl */ `
-if (vEmisorQ.x > 0.5 && vEmisorQ.x < 1.5) diffuseColor.rgb *= uFarolas;
-if (vEmisorQ.x > 1.5) diffuseColor.rgb *= 0.08 + 0.92 * step(0.5, fract(uTiempo * 0.9 + vEmisorQ.y));`,
-    },
-  ],
-};
-
-export function materialEmisivo(): THREE.MeshBasicMaterial {
-  const m = new THREE.MeshBasicMaterial({ vertexColors: true });
-  m.name = 'quiebro-emisivo';
-  parchear(m, RETOQUE_EMISIVO);
-  nieblaEn(m);
-  return m;
-}
-
-const RETOQUE_DEL_CRISTAL: Retoque = {
-  nombre: 'cristal',
-  orden: 60,
-  fragmento: [
-    {
-      buscar: '#include <opaque_fragment>',
-      como: 'despues',
-      texto: /* glsl */ `
-{
-  vec3 vC = normalize(cameraPosition - vPosMundoQ);
-  vec3 nC = normalize(normal * mat3(viewMatrix));
-  float f = pow(1.0 - clamp(abs(dot(vC, nC)), 0.0, 1.0), 4.0);
-  gl_FragColor.a = mix(diffuseColor.a, 0.95, f);
-}`,
-    },
-  ],
-};
-
-export function materialDelCristal(): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(0.02, 0.03, 0.035),
-    roughness: 0.04,
-    metalness: 0,
-    transparent: true,
-    opacity: 0.3,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  m.name = 'quiebro-cristal';
-  parchear(m, RETOQUE_MUNDO, RETOQUE_ENTORNO, RETOQUE_SOLO_BRILLO, RETOQUE_DEL_CRISTAL);
+  parchear(m, RETOQUE_MUNDO, RETOQUE_ENTORNO, RETOQUE_SOLO_BRILLO, RETOQUE_DEL_MOBILIARIO, retoqueDeLoCercano(opciones.deLaCapa === true, nivel));
   nieblaEn(m);
   return m;
 }

@@ -23,6 +23,13 @@
 export type NivelDeLaCiudad = 0 | 1 | 2 | 3;
 export const NIVELES_DE_LA_CIUDAD: readonly NivelDeLaCiudad[] = [0, 1, 2, 3];
 
+/**
+ * EL GRADO de lo que se escribe en una celda (1 el más sencillo, 3 el más fino): dentro de un nivel, cuánto
+ * detalle lleva cada celda de la ventana según lo lejos que está del centro. Lo decide `grados.ts`, y cada
+ * escritor de piezas lo lee de su obra (`ObraDeLaCelda` de `celdas.ts`).
+ */
+export type GradoDeLaCelda = 1 | 2 | 3;
+
 /** Una caja en planta, alineada con los ejes. `x0 < x1`, `z0 < z1`. */
 export interface CajaXZ {
   readonly x0: number;

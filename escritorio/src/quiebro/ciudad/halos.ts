@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { nieblaEn } from '../atmosfera/niebla';
 import { UNIFORMES_DE_LA_CIUDAD } from './retoques';
+import { GLSL_PARPADEO } from './glsl';
 
 export interface FuenteDeHalo {
   readonly x: number;
@@ -42,13 +43,7 @@ uniform float uTiempo;
 uniform float uHalos;
 varying vec2 vQ;
 varying vec3 vColor;
-float parpadeoQ(float s, float t) {
-  if (s <= 0.0) return 1.0;
-  float k = floor(t * 7.0 + s * 13.0);
-  float h = fract(sin(k * 12.9898 + s * 78.233) * 43758.5453);
-  float racha = step(0.82, fract(sin(floor(t * 0.4 + s) * 91.7) * 4375.85));
-  return mix(1.0, step(0.45, h), racha);
-}
+${GLSL_PARPADEO}
 void main() {
   vec3 centro = aFuente.xyz;
   vec3 aCam = cameraPosition - centro;

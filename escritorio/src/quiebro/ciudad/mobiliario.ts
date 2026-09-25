@@ -1,15 +1,17 @@
 /**
- * EL MOBILIARIO DEL BARRIO: farolas, bancos, la fuente, el quiosco de la plaza, los de prensa, las
- * cabinas, las vallas del borde, los pilares y la viga del tren, y las alcantarillas.
+ * EL MOBILIARIO: bancos, la fuente, el quiosco de la plaza, los de prensa, las cabinas y las vallas del borde,
+ * y lo que comparten todas las piezas (la cota del bordillo, cómo se colocan, los colores). Las farolas van en
+ * `farolas.ts`, las tapas y las alcantarillas en `tapas.ts`, el viaducto en `viaducto.ts`, y qué pieza va en
+ * cada celda, en `celda-mobiliario.ts`.
  *
  * ═══ CADA COSA DENTRO DE SU CAJA ═══
  *
  * Lo que estorba al paso (un banco, el pie de una farola, el poste de una cabina) se dibuja DENTRO de
  * la caja que el barrio declara para ello, y lo que sale de la caja lo hace por encima de la cabeza
  * (el brazo de la farola a 6 m, la marquesina de la cabina a 2,3, el tejadillo del quiosco a 2,7, el
- * capitel del pilar a 7). Cada constructor devuelve la huella de lo que estorba y el comprobador la
- * cruza con la estructura: si alguien cambia el banco y le crece el respaldo fuera de su caja, el
- * comprobador lo dice antes de que un jugador se quede enganchado en el aire.
+ * capitel del pilar a 7). El comprobador cruza lo que se dibuja con la estructura: si alguien cambia el
+ * banco y le crece el respaldo fuera de su caja, el comprobador lo dice antes de que un jugador se quede
+ * enganchado en el aire.
  *
  * ═══ UN SOLO MOLDE POR MATERIAL ═══
  *
@@ -17,16 +19,23 @@
  * entero de mobiliario son tres llamadas. Las piezas se describen en su sitio local (x a lo largo,
  * z hacia su frente) y se colocan con una matriz; el nivel sólo cambia los lados de los cilindros.
  *
+ * ═══ CADA PIEZA CEDE ═══
+ *
+ * Cada pieza es un escritor de pieza (`EscritorDePieza` de `celdas.ts`): escribe en los moldes de su obra, cede
+ * el paso y devuelve sus luces. Entre dos cesiones no se escribe más que el trozo del nivel (600 triángulos en
+ * N0, 1.000 en N1-N3, sumando familias): la ventana sólo empieza un trozo si le cabe entero en el fotograma.
+ *
  * Todo lo que se apoya en la acera o en la plaza arranca a la cota del bordillo.
  */
 import * as THREE from 'three';
-import { Molde } from './geometria';
+import type { Molde } from './geometria';
 import type { V3 } from './geometria';
-import { ACABADO, ATRIBUTOS_DE_LO_EMISIVO, ATRIBUTOS_DEL_MOBILIARIO, lineal } from './materiales';
-import type { CajaXZ, CalleDelPlano, NivelDeLaCiudad, Orientacion, PiezaConFrente, PlanoDeLaCiudad } from './tipos';
-import { ALTURA_DE_LA_ACERA, DETALLE_DEL_NIVEL } from './tipos';
+import { ACABADO, lineal } from './materiales';
+import type { CabinaDelPlano, CajaXZ, FuenteDelPlano, Orientacion, PiezaConFrente } from './tipos';
+import { ALTURA_DE_LA_ACERA } from './tipos';
 import { normalDe } from './fachadas';
 import { azarEn } from './azar';
+import type { ObraDeLaCelda } from './celdas';
 
 /** Una luz que el mobiliario enciende: para hornear, reflejar y hacer halo. */
 export interface LuzDelMobiliario {
@@ -34,17 +43,6 @@ export interface LuzDelMobiliario {
   readonly y: number;
   readonly z: number;
   readonly tipo: 'farola' | 'cabina' | 'quiosco' | 'baliza' | 'prensa';
-}
-
-export interface MobiliarioConstruido {
-  readonly mobiliario: Molde;
-  readonly emisivo: Molde;
-  readonly cristal: Molde;
-  /** Lo que estorba al paso, en planta. */
-  readonly estorba: CajaXZ[];
-  readonly luces: LuzDelMobiliario[];
-  /** Las bocas de alcantarilla (para el vapor). */
-  readonly alcantarillas: { readonly x: number; readonly z: number }[];
 }
 
 /** La cota del bordillo: todo lo que se apoya en la acera o en la plaza arranca aquí. */
@@ -61,7 +59,7 @@ export function colocar(x: number, y: number, z: number, o: Orientacion): THREE.
   return new THREE.Matrix4().makeRotationY(anguloDe(o)).setPosition(x, y, z);
 }
 
-function centro(c: CajaXZ): [number, number] {
+export function centro(c: CajaXZ): [number, number] {
   return [(c.x0 + c.x1) / 2, (c.z0 + c.z1) / 2];
 }
 
@@ -88,42 +86,9 @@ export const AMBAR_HDR: Rgb = [5.0, 2.4, 0.45];
 
 /* ═══════════════════════════════ LAS PIEZAS ═══════════════════════════════ */
 
-/** Farola de calle: pie, fuste, brazo sobre la calzada y cabeza con el vidrio de sodio. */
-export function farolaDeCalle(mo: Molde, em: Molde, x: number, z: number, brazo: Orientacion, lados: number): LuzDelMobiliario {
-  const [dx, dz] = normalDe(brazo);
-  tono(mo, HIERRO, ACABADO.hierro);
-  mo.cilindro(x, z, H, H + 0.55, 0.2, 0.15, lados, true);
-  mo.cilindro(x, z, H + 0.55, H + 5.9, 0.085, 0.06, lados, true);
-  const p = (a: number, y: number): V3 => [x + dx * a, H + y, z + dz * a];
-  mo.tubo([p(0, 5.55), p(0.25, 5.95), p(0.8, 6.15), p(1.25, 6.18)], 0.045, Math.max(4, lados - 2));
-  mo.con(colocar(x + dx * 1.35, H + 6.05, z + dz * 1.35, brazo), () => {
-    bloque(mo, 0, 0.02, 0, 0.3, 0.16, 0.58);
-    em.con(colocar(x + dx * 1.35, H + 6.05, z + dz * 1.35, brazo), () => {
-      em.color(SODIO_HDR[0], SODIO_HDR[1], SODIO_HDR[2]);
-      em.poner('aEmisor', 1, 0);
-      em.losa(-0.12, -0.24, 0.12, 0.24, 0.01, false);
-    });
-  });
-  return { x: x + dx * 1.35, y: H + 6.0, z: z + dz * 1.35, tipo: 'farola' };
-}
-
-/** Farola de plaza: pedestal, fuste y farol hexagonal con su sombrerete. */
-export function farolaDePlaza(mo: Molde, em: Molde, x: number, z: number, lados: number): LuzDelMobiliario {
-  tono(mo, HIERRO_VERDE, ACABADO.hierro);
-  bloque(mo, x, H, z, 0.46, 0.55, 0.46);
-  mo.cilindro(x, z, H + 0.55, H + 0.8, 0.16, 0.1, lados, false);
-  mo.cilindro(x, z, H + 0.8, H + 3.75, 0.1, 0.075, lados, false);
-  mo.cilindro(x, z, H + 3.75, H + 3.85, 0.2, 0.2, 6, true);
-  mo.cilindro(x, z, H + 4.45, H + 4.75, 0.3, 0.04, 6, true);
-  mo.cilindro(x, z, H + 4.75, H + 4.95, 0.04, 0.02, 4, false);
-  em.color(SODIO_HDR[0] * 0.7, SODIO_HDR[1] * 0.7, SODIO_HDR[2] * 0.7);
-  em.poner('aEmisor', 1, 0);
-  em.cilindro(x, z, H + 3.85, H + 4.45, 0.19, 0.25, 6, false);
-  return { x, y: H + 4.15, z, tipo: 'farola' };
-}
-
 /** Banco de listones con respaldo, dentro de su caja (2 × 0,5), mirando a `mira`. */
-export function banco(mo: Molde, b: PiezaConFrente): void {
+export function* banco(obra: ObraDeLaCelda, b: PiezaConFrente): Generator<void, void, void> {
+  const mo = obra.m.mobiliario;
   const [cx, cz] = centro(b.caja);
   const largo = Math.max(b.caja.x1 - b.caja.x0, b.caja.z1 - b.caja.z0) - 0.05;
   /* El frente es `mira`: en local, +z. El largo del banco va por x local. */
@@ -137,6 +102,7 @@ export function banco(mo: Molde, b: PiezaConFrente): void {
     for (let i = 0; i < 3; i++) bloque(mo, 0, 0.44, 0.18 - i * 0.13, largo, 0.035, 0.11);
     for (let i = 0; i < 2; i++) bloque(mo, 0, 0.6 + i * 0.16, -0.21, largo, 0.11, 0.03);
   });
+  yield;
 }
 
 /** Un anillo plano (corona) de radio r0 a r1 a la altura y, mirando arriba. */
@@ -161,8 +127,10 @@ function paredInterior(m: Molde, cx: number, cz: number, r: number, y0: number, 
 }
 
 /** La fuente: pilón octogonal con agua, columna y taza. */
-export function fuente(mo: Molde, x: number, z: number, radio: number): void {
-  const r = radio - 0.05;
+export function* fuente(obra: ObraDeLaCelda, f: FuenteDelPlano): Generator<void, void, void> {
+  const mo = obra.m.mobiliario;
+  const { x, z } = f;
+  const r = f.radio - 0.05;
   tono(mo, PIEDRA, ACABADO.piedra);
   mo.cilindro(x, z, H, H + 0.55, r, r, 8, false);
   corona(mo, x, z, r - 0.3, r, H + 0.55, 8);
@@ -178,10 +146,14 @@ export function fuente(mo: Molde, x: number, z: number, radio: number): void {
   tono(mo, PIEDRA, ACABADO.piedra);
   mo.cilindro(x, z, H + 1.46, H + 2.05, 0.12, 0.09, 8, true);
   mo.cilindro(x, z, H + 2.05, H + 2.25, 0.18, 0.02, 8, false);
+  yield;
 }
 
 /** El quiosco de la plaza: octogonal, de hierro y cristal, con tejado de pabellón y luz dentro. */
-export function quiosco(mo: Molde, em: Molde, cr: Molde, q: PiezaConFrente, lados: number): LuzDelMobiliario {
+export function* quiosco(obra: ObraDeLaCelda, q: PiezaConFrente): Generator<void, LuzDelMobiliario, void> {
+  const mo = obra.m.mobiliario;
+  const em = obra.m.emisivo;
+  const cr = obra.m.cristal;
   const [x, z] = centro(q.caja);
   const r = Math.min(q.caja.x1 - q.caja.x0, q.caja.z1 - q.caja.z0) / 2 - 0.08;
   tono(mo, GRANITO, ACABADO.piedra);
@@ -208,11 +180,14 @@ export function quiosco(mo: Molde, em: Molde, cr: Molde, q: PiezaConFrente, lado
   em.losa(x - 0.6, z - 0.6, x + 0.6, z + 0.6, H + 2.5, false);
   em.color(1.4, 0.9, 0.5);
   em.cilindro(x, z, H + 1.3, H + 2.4, 0.25, 0.25, 8, false);
+  yield;
   return { x, y: H + 2.3, z, tipo: 'quiosco' };
 }
 
 /** Quiosco de prensa cerrado de madrugada: caja verde con persiana, tejadillo y franja encendida. */
-export function quioscoDePrensa(mo: Molde, em: Molde, q: PiezaConFrente): LuzDelMobiliario {
+export function* quioscoDePrensa(obra: ObraDeLaCelda, q: PiezaConFrente): Generator<void, LuzDelMobiliario, void> {
+  const mo = obra.m.mobiliario;
+  const em = obra.m.emisivo;
   const [x, z] = centro(q.caja);
   const w = q.caja.x1 - q.caja.x0;
   const d = q.caja.z1 - q.caja.z0;
@@ -233,14 +208,19 @@ export function quioscoDePrensa(mo: Molde, em: Molde, q: PiezaConFrente): LuzDel
     bloque(em, 0, 1.95, fondo / 2 + 0.025, largo - 0.2, 0.16, 0.02, 's');
   });
   const [fx, fz] = normalDe(q.mira);
+  yield;
   return { x: x + fx * (fondo / 2 + 0.2), y: H + 2.0, z: z + fz * (fondo / 2 + 0.2), tipo: 'prensa' };
 }
 
 /**
  * La cabina: poste de hierro con marquesina curva que vuela sobre quien descuelga, el aparato de
- * monedas y el auricular de luz ámbar.
+ * monedas y el auricular de luz ámbar. Hoy la cabina y el refugio (`c.refugio`) se escriben igual.
  */
-export function cabina(mo: Molde, em: Molde, x: number, z: number, mira: Orientacion, lados: number): LuzDelMobiliario {
+export function* cabina(obra: ObraDeLaCelda, c: CabinaDelPlano): Generator<void, LuzDelMobiliario, void> {
+  const mo = obra.m.mobiliario;
+  const em = obra.m.emisivo;
+  const lados = obra.lados;
+  const { x, z, mira } = c;
   tono(mo, HIERRO, ACABADO.hierro);
   mo.cilindro(x, z, H, H + 0.08, 0.2, 0.2, lados, true);
   mo.cilindro(x, z, H + 0.08, H + 2.75, 0.07, 0.06, lados, true);
@@ -273,11 +253,15 @@ export function cabina(mo: Molde, em: Molde, x: number, z: number, mira: Orienta
     bloque(em, 0, 2.5, 0.75, 0.6, 0.02, 0.05, 'b');
   });
   const [fx, fz] = normalDe(mira);
+  yield;
   return { x: x + fx * 0.2, y: H + 1.3, z: z + fz * 0.2, tipo: 'cabina' };
 }
 
-/** Las vallas donde una calle sigue fuera del barrio: barreras de hormigón rojiblancas y balizas. */
-export function valla(mo: Molde, em: Molde, c: CajaXZ): LuzDelMobiliario[] {
+/**
+ * Las barreras de obra de una caja: hormigón rojiblanco en perfil «new jersey» y balizas. Sin ceder: la usan la
+ * valla (una pieza) y el corte de obra (`piezas.ts`, dos filas en la misma pieza).
+ */
+export function barrerasDeObra(mo: Molde, em: Molde, c: CajaXZ): LuzDelMobiliario[] {
   const [x, z] = centro(c);
   const enX = c.x1 - c.x0 >= c.z1 - c.z0;
   const largo = enX ? c.x1 - c.x0 : c.z1 - c.z0;
@@ -315,133 +299,9 @@ export function valla(mo: Molde, em: Molde, c: CajaXZ): LuzDelMobiliario[] {
   return luces;
 }
 
-/** Los pilares del tren, la viga de un lado a otro y las bocas donde se mete en las fachadas. */
-function viaDelTren(mo: Molde, plano: PlanoDeLaCiudad): void {
-  const t = plano.tren;
-  if (t === null) return;
-  tono(mo, HORMIGON, ACABADO.hormigon);
-  for (const p of t.pilares) {
-    const [x, z] = centro(p);
-    const lado = Math.min(p.x1 - p.x0, p.z1 - p.z0);
-    bloque(mo, x, 0, z, lado, 0.35, lado);
-    bloque(mo, x, 0.35, z, lado - 0.15, t.alto - 0.35 - 0.45, lado - 0.15);
-    bloque(mo, x, t.alto - 0.45, z, lado + 0.4, 0.45, lado + 0.4);
-  }
-  const enX = t.eje === 'x';
-  const [x0, x1, z0, z1] = enX ? [t.desde, t.hasta, t.linea - 1.9, t.linea + 1.9] : [t.linea - 1.9, t.linea + 1.9, t.desde, t.hasta];
-  /* La viga: el cajón de hormigón y, encima, los petos y los carriles de acero. */
-  mo.caja(x0, t.alto, z0, x1, t.alto + 0.9, z1, enX ? 'nsab' : 'eoab');
-  tono(mo, lineal(0x3a3d3f), ACABADO.hierroViejo);
-  if (enX) {
-    mo.caja(x0, t.alto + 0.9, z0, x1, t.alto + 1.45, z0 + 0.12, 'nsa');
-    mo.caja(x0, t.alto + 0.9, z1 - 0.12, x1, t.alto + 1.45, z1, 'nsa');
-    for (const r of [-0.72, 0.72]) mo.caja(x0, t.alto + 0.9, t.linea + r - 0.04, x1, t.alto + 1.02, t.linea + r + 0.04, 'nsa');
-  } else {
-    mo.caja(x0, t.alto + 0.9, z0, x0 + 0.12, t.alto + 1.45, z1, 'eoa');
-    mo.caja(x1 - 0.12, t.alto + 0.9, z0, x1, t.alto + 1.45, z1, 'eoa');
-    for (const r of [-0.72, 0.72]) mo.caja(t.linea + r - 0.04, t.alto + 0.9, z0, t.linea + r + 0.04, t.alto + 1.02, z1, 'eoa');
-  }
-  /* Las bocas: un hueco negro con marco donde la vía entra en cada fachada. */
-  for (const extremo of [t.desde, t.hasta]) {
-    /* `hacia`: hacia dónde queda el edificio desde la plaza. La boca va 3 cm por DELANTE de la fachada. */
-    const hacia = extremo === t.desde ? -1 : 1;
-    const a = extremo - hacia * 0.03;
-    tono(mo, lineal(0x020303), [1, 0]);
-    if (enX) {
-      if (hacia < 0) mo.muro(a, z1 + 0.2, a, z0 - 0.2, t.alto, t.alto + 4.8);
-      else mo.muro(a, z0 - 0.2, a, z1 + 0.2, t.alto, t.alto + 4.8);
-    } else if (hacia < 0) {
-      mo.muro(x0 - 0.2, a, x1 + 0.2, a, t.alto, t.alto + 4.8);
-    } else {
-      mo.muro(x1 + 0.2, a, x0 - 0.2, a, t.alto, t.alto + 4.8);
-    }
-    tono(mo, HORMIGON, ACABADO.hormigon);
-    const b = extremo - hacia * 0.3;
-    if (enX) {
-      mo.caja(Math.min(a, b) - 0.25, t.alto + 4.8, z0 - 0.5, Math.max(a, b), t.alto + 5.3, z1 + 0.5, 'nseoab');
-      mo.caja(Math.min(a, b) - 0.25, t.alto, z0 - 0.5, Math.max(a, b), t.alto + 4.8, z0 - 0.2, 'nseoab');
-      mo.caja(Math.min(a, b) - 0.25, t.alto, z1 + 0.2, Math.max(a, b), t.alto + 4.8, z1 + 0.5, 'nseoab');
-    } else {
-      mo.caja(x0 - 0.5, t.alto + 4.8, Math.min(a, b) - 0.25, x1 + 0.5, t.alto + 5.3, Math.max(a, b), 'nseoab');
-      mo.caja(x0 - 0.5, t.alto, Math.min(a, b) - 0.25, x0 - 0.2, t.alto + 4.8, Math.max(a, b), 'nseoab');
-      mo.caja(x1 + 0.2, t.alto, Math.min(a, b) - 0.25, x1 + 0.5, t.alto + 4.8, Math.max(a, b), 'nseoab');
-    }
-  }
-}
-
-/**
- * Las alcantarillas: tapas redondas en el eje de cada tramo de calzada y rejillas junto al
- * bordillo. Van a 1,5 cm sobre el asfalto (una tapa de verdad sobresale un poco, y así no parpadea).
- */
-export function alcantarillas(mo: Molde, calles: readonly CalleDelPlano[], limite: CajaXZ, lados: number): { x: number; z: number }[] {
-  const salida: { x: number; z: number }[] = [];
-  for (const c of calles) {
-    for (let s = c.desde + 11; s < c.hasta - 5; s += 24) {
-      const cruza = calles.some((o) => o.corre !== c.corre && Math.abs(s - o.en) < o.calzada / 2 + o.acera + 2);
-      if (cruza) continue;
-      const lado = azarEn(Math.round(s * 4), Math.round(c.en * 4)) < 0.5 ? -1 : 1;
-      const x = c.corre === 'z' ? c.en + lado * 0.9 : s;
-      const z = c.corre === 'z' ? s : c.en + lado * 0.9;
-      if (x < limite.x0 || x > limite.x1 || z < limite.z0 || z > limite.z1) continue;
-      tono(mo, lineal(0x121314), ACABADO.hierroViejo);
-      mo.cilindro(x, z, 0, 0.015, 0.36, 0.34, Math.max(8, lados + 2), true);
-      salida.push({ x, z });
-      /* La rejilla del imbornal, pegada al bordillo. */
-      const r = c.calzada / 2 - 0.25;
-      const gx = c.corre === 'z' ? c.en - lado * r : s + 3;
-      const gz = c.corre === 'z' ? s + 3 : c.en - lado * r;
-      tono(mo, lineal(0x0c0d0e), ACABADO.hierroViejo);
-      if (c.corre === 'z') mo.caja(gx - 0.18, 0, gz - 0.35, gx + 0.18, 0.012, gz + 0.35, 'a');
-      else mo.caja(gx - 0.35, 0, gz - 0.18, gx + 0.35, 0.012, gz + 0.18, 'a');
-    }
-  }
-  return salida;
-}
-
-/* ═══════════════════════════════ TODO EL MOBILIARIO ═══════════════════════════════ */
-
-export function construirElMobiliario(plano: PlanoDeLaCiudad, nivel: NivelDeLaCiudad): MobiliarioConstruido {
-  const lados = DETALLE_DEL_NIVEL[nivel].lados;
-  const mobiliario = new Molde(ATRIBUTOS_DEL_MOBILIARIO, true);
-  const emisivo = new Molde(ATRIBUTOS_DE_LO_EMISIVO, true);
-  const cristal = new Molde({}, false);
-  const estorba: CajaXZ[] = [];
-  const luces: LuzDelMobiliario[] = [];
-
-  for (const f of plano.farolas) {
-    luces.push(f.brazo === null ? farolaDePlaza(mobiliario, emisivo, f.x, f.z, lados) : farolaDeCalle(mobiliario, emisivo, f.x, f.z, f.brazo, lados));
-    estorba.push(f.caja);
-  }
-  for (const b of plano.glorieta.bancos) {
-    banco(mobiliario, b);
-    estorba.push(b.caja);
-  }
-  const fu = plano.glorieta.fuente;
-  if (fu !== null) {
-    fuente(mobiliario, fu.x, fu.z, fu.radio);
-    estorba.push(fu.caja);
-  }
-  const qu = plano.glorieta.quiosco;
-  if (qu !== null) {
-    luces.push(quiosco(mobiliario, emisivo, cristal, qu, lados));
-    estorba.push(qu.caja);
-  }
-  for (const q of plano.quioscosDePrensa) {
-    luces.push(quioscoDePrensa(mobiliario, emisivo, q));
-    estorba.push(q.caja);
-  }
-  for (const c of plano.cabinas) {
-    luces.push(cabina(mobiliario, emisivo, c.x, c.z, c.mira, lados));
-    estorba.push(c.caja);
-  }
-  for (const v of plano.vallas) {
-    luces.push(...valla(mobiliario, emisivo, v));
-    estorba.push(v);
-  }
-  if (plano.tren !== null) {
-    viaDelTren(mobiliario, plano);
-    estorba.push(...plano.tren.pilares);
-  }
-  const bocas = alcantarillas(mobiliario, plano.calles, plano.limite, lados);
-  return { mobiliario, emisivo, cristal, estorba, luces, alcantarillas: bocas };
+/** Las vallas donde una calle sigue fuera del barrio: barreras de hormigón rojiblancas y balizas. */
+export function* valla(obra: ObraDeLaCelda, c: CajaXZ): Generator<void, LuzDelMobiliario[], void> {
+  const luces = barrerasDeObra(obra.m.mobiliario, obra.m.emisivo, c);
+  yield;
+  return luces;
 }
