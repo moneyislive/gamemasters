@@ -187,34 +187,43 @@ disfraces, el guion…): ahí el modo podría recortar la generación. No está 
   Solo estética.
 - **La casa no paga**: quien entra con la contraseña, y las cuentas de `GM_ADMITIDOS`.
 
-### Lo que hay que decidir antes de encenderlo
+### Lo que se decidió (25-sep-2026)
 
-1. **La pasarela.** Está hecha contra Stripe (sin su SDK). La alternativa es un comerciante
-   registrado (Paddle, Lemon Squeezy), que se encarga del IVA de cada país a cambio de una
-   comisión más alta (≈5 % + 0,50 $ frente a ≈1,5 % + 0,25 € de Stripe). Vendiendo a
-   particulares de toda la UE, con Stripe hay que darse de alta en la ventanilla única
-   (OSS) y activar Stripe Tax.
-2. **Los precios.** Los de arriba salen del coste medido y un margen de 2,5; se cambian
-   desde el entorno sin desplegar.
-3. **Los términos.** Hoy dicen que no se cobra nada. Hacen falta condiciones de compra y el
-   desistimiento del contenido digital (art. 103.m TRLGDCU: pedir expresamente el
-   servicio inmediato y saber que se pierde el desistimiento). La página de pago ya lo dice
-   en el botón; los términos tienen que decirlo entero, y conviene que lo lea alguien que
-   sepa de esto.
-4. **Abrir el taller al público.** Hoy solo entran la casa y `GM_ADMITIDOS`. Abrirlo a
-   cualquier cuenta tiene una trampa escrita en `taller/dueno.ts`: las partidas huérfanas
-   dejan pasar a cualquiera, y con el taller abierto eso sería enseñar la solución de las
-   partidas antiguas. Antes de abrirlo, las huérfanas tienen que quedar solo para la casa.
+1. **La pasarela: Stripe.** Está hecha contra su API, sin su SDK. La alternativa era un
+   comerciante registrado (Paddle, Lemon Squeezy), que se encarga del IVA de cada país a
+   cambio de una comisión más alta (≈5 % + 0,50 $ frente a ≈1,5 % + 0,25 € de Stripe). Con
+   Stripe, el IVA lo calcula Stripe Tax y lo declara quien vende (ventanilla única, OSS, si
+   toca). Cómo montarlo, paso a paso: [GUIA-STRIPE.md](GUIA-STRIPE.md).
+2. **Los precios, como están.** Salen del coste medido y un margen de 2,5, y se cambian desde
+   el entorno sin desplegar.
+3. **Los términos y la privacidad, escritos** con el criterio de comprometer lo mínimo. Lo que
+   se paga, qué son los créditos (no son dinero; se devuelven en créditos, solos, si la
+   velada falla o la revisión no la da por buena), la suscripción (se cancela desde el
+   portal, sin devolver la parte del mes), el pase (solo estética), el desistimiento (art.
+   103.m TRLGDCU: la renuncia se acepta en la casilla de la página de pago, y debajo del
+   botón se recuerda), «se revisa, pero no se garantiza», y la responsabilidad topada en lo
+   pagado en los doce meses anteriores. En privacidad, Stripe como tercero y los datos de
+   pago guardados hasta seis años. Conviene que lo lea alguien que sepa de esto antes de
+   cobrar.
+4. **El taller se abre a cualquier cuenta, pero solo con el cobro encendido**
+   (`tallerPublico()` = `COBRO_ACTIVO`): abrirlo sin cobrar sería regalar veladas a costa de
+   la clave de la API. Con el taller abierto, las partidas huérfanas —las anteriores a las
+   cuentas— solo las ven la casa y las cuentas admitidas (`veLasHuerfanas`): antes las veía
+   cualquiera que pasara la puerta, y eso sería enseñar la solución de las partidas
+   antiguas.
+5. **El arreglo de la sala del crimen** (rama `arreglo-sala-del-crimen`) **espera a matrix**,
+   como todo lo que se publica.
 
-### Para encenderlo (cuando esté decidido)
+### Para encenderlo
 
-1. Crear la cuenta de Stripe (en modo de prueba primero) y el plan mensual → `STRIPE_PRECIO_SUSCRIPCION`.
-2. Dar de alta el punto de aviso `https://<dominio>/api/cobro/aviso` con los eventos
-   `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`,
-   `customer.subscription.updated` y `customer.subscription.deleted` → `STRIPE_WEBHOOK_SECRET`.
-3. `STRIPE_SECRET_KEY` en Render.
-4. Términos y privacidad al día (y Stripe en la lista de terceros de `verify:legal`).
-5. `COBRO_ACTIVO=si`.
+Todo, en [GUIA-STRIPE.md](GUIA-STRIPE.md). En resumen:
+
+1. Stripe en el entorno de prueba: los términos en los datos públicos, el plan mensual, el
+   portal, el destino de los avisos y Stripe Tax.
+2. `npm run probar:stripe -w server`: abre contra Stripe los mismos pagos que abrirá el
+   taller y dice qué falta.
+3. Lo mismo en modo activo, con las variables en Render **antes** de fusionar.
+4. `COBRO_ACTIVO=si`, lo último.
 
 ---
 

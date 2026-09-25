@@ -31,6 +31,7 @@
     "verify:esquemas": "tsx scripts/verificar-esquemas.ts",
     "verify:revision": "tsx scripts/verificar-revision.ts",
     "verify:cobro": "tsx scripts/verificar-cobro.ts",
+    "probar:stripe": "tsx scripts/probar-stripe.ts",
     "verify:credenciales": "tsx scripts/verificar-credenciales.ts",
     "verify:aguante": "tsx scripts/verificar-aguante.ts",
     "verify:borrado": "tsx scripts/verificar-borrado.ts",

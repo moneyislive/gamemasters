@@ -110,7 +110,7 @@ router.post('/cobro/comprar', async (req, res) => {
       res.status(400).json({ error: 'Esa oferta no existe.' });
       return;
     }
-    compra = { tipo: 'creditos', creditos: b.creditos, centimos: b.centimos, nombre: `${b.creditos} créditos de Harkania` };
+    compra = { tipo: 'creditos', creditos: b.creditos, centimos: b.centimos, nombre: `${b.creditos} créditos de GameMasters` };
   }
 
   try {
