@@ -58,7 +58,7 @@ trama ──► material ──► auditoría ──► detective ──► revi
   algo más pobre que lo que había, nunca una sala o una ronda sin pistas.
 
 El informe queda en `plot.revision`, se ve en Documentos con «Revisar de nuevo», y a
-ciegas solo se enseña el veredicto. `verify:revision` (64 comprobaciones) reproduce los
+ciegas solo se enseña el veredicto. `verify:revision` (65 comprobaciones) reproduce los
 fallos de arriba sin salir a la red.
 
 ### Lo que enseñó la casa Sabrón (25-sep-2026)
@@ -87,13 +87,56 @@ recuadro. El culpable lo sabe por la primera frase, y la auditoría avisa de
 `noche-desigual`. `npm run medir:dosieres -w server` mide los dosieres de una partida
 guardada y dice cuánto se desvía el del culpable.
 
+### Los otros tres juegos (25-sep-2026)
+
+La Momia, las Sombras y el Nudo tienen su revisión sobre el mismo motor
+(`plot/revision-comun.ts`), cada uno con sus preguntas:
+
+| Juego | Lector ciego | Lo que busca la auditoría | Lo que el revisor no puede tocar |
+|---|---|---|---|
+| El Nudo | No: no hay a quién esconder | frases que atan un convoy a su franja (acierten o no), partes que nombran un convoy o dan por hecho cómo va la noche, crímenes, el suero fuera del Correo, oficios cruzados, prosa de plantilla; y el cuadro: sale uno, nadie lo resuelve solo, todas las tiras en alguna mano | el cuadro, las tiras, el reparto, los oficios |
+| Las Sombras | La columna ciega | la senda enumerada o sus cuatro pasos sueltos, los cazadores de una hora, un cartel que anuncia emboscada, una ayuda falsa, un desenlace con otra senda; el kanchō señalado o escondido | la senda, sus hitos y las mentiras preparadas |
+| La Momia | La expedición ciega | el orden entero o A TROZOS (con el mismo validador que los fragmentos), la cámara de mañana en una narración, una ayuda falsa, un desenlace con otro orden; el saqueador señalado o escondido | el orden, sus fragmentos y las mentiras preparadas |
+
+Lo que tienen en común:
+
+- **El juicio «no delatar», en los dos extremos.** Al traidor se le caza jugando, así
+  que ningún momento puede dejarlo en cabeza por lo leído; y si en TODOS los momentos
+  la prosa lo exculpa, también se avisa: se le tiene que poder sospechar como a
+  cualquiera. La auditoría mira lo mismo sin gastar nada (`kancho-intocable`,
+  `saqueador-distinto`…).
+- **Lo que el revisor no puede arreglar no paga una segunda pasada** (`corregible` en
+  el adaptador): decide el veredicto, pero otra vuelta no lo arreglaría.
+- **El sobre más gordo, medido.** `npm run medir:paginas -w server [partida.json]`
+  imprime cada dosier a PDF con Edge y cuenta caras. Con los maestros de oro: todos los
+  dosieres de las Sombras salían a 5 caras (el propio dosier pedía 4) y en la Momia los
+  inocentes a 3 y el saqueador a 4. Ahora son 6 para todos: la cara privada con el
+  mismo aspecto, sin el relato de «cómo lo hizo» (es de quien dirige), y la tabla de
+  quiénes van igual en todos y partida en caras por el propio dosier. Probado con ocho
+  personas y textos del largo del modelo: todos iguales y pares. Cada cara variable
+  tiene presupuesto: la auditoría avisa, los parches no dejan entrar un dosier que no
+  cabe, y si es el del traidor es bloqueante.
+- `pasosDeLaVelada` solo cobra el lector a los juegos que lo tienen (`lectorCiego`).
+
+`verify:revision-nudo` (87), `verify:revision-sombras` (87) y `verify:revision-momia`
+(76) están en la batería. `scripts/revisar-trama-real.ts --juego momia|sombras|nudo`
+prueba una velada contra la API de verdad (cuesta dinero: ver §2).
+
+**Lo que se vio al revisarlos y NO se ha cambiado**, porque es diseño:
+
+- **La Momia se resuelve pronto.** Si en la primera vigilia se visitan las cinco
+  cámaras y la mesa pone en común lo leído, entre la mitad y dos tercios de las
+  partidas generadas ya tienen un único orden posible (31-40 de cada 60, según la
+  mesa). Las otras vigilias no aportan nada al orden.
+- **Las prendas de las Sombras obligan a decir la verdad**, y el kanchō no puede: si
+  alguien le da una y le pregunta si cobra de Akechi, la noche se acaba.
+- **La guía de las Sombras no dice cómo entrega quien dirige el mojón falso** que el
+  kanchō le pide, jugando en papel.
+- **En la app del Nudo las tiras salen dos veces**: en su bloque y en «Lo que sabes»,
+  que además las da por rondas («aún recordarás…») cuando ya están todas en el sobre.
+
 ### Lo que falta
 
-- **La Momia, las Sombras y el Nudo** no tienen revisor todavía: se entregan con
-  `veredicto: 'sin-revisar'`, que el taller enseña tal cual. El registro
-  (`juegos/revisores.ts`) está listo para darlos de alta; cada uno necesita sus
-  propias preguntas (en las Sombras, por ejemplo, que el traidor no tenga el sobre
-  más gordo).
 - **Medir la calidad**: la revisión se ha probado contra trampas sembradas y contra la
   API real (ver §2), pero no contra una batería de tramas juzgadas por personas. Lo
   siguiente sería guardar diez tramas reales anonimizadas con sus fallos anotados y
