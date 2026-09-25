@@ -41,7 +41,7 @@ import type { TramaMomia } from '../../../shared/juegos/momia-tipos';
  */
 import { entidadesDe } from '../../../shared/juegos';
 import { DEMO_MODE } from '../config';
-import { getAnthropicClient, resolveModel } from '../agent/anthropic';
+import { esfuerzoPara, getAnthropicClient, resolveModel, streamDeGeneracion, textoDe } from '../agent/anthropic';
 import { cimientosDeMomia } from './momia-cimientos';
 import type { Cimientos, EntidadesDeMomia } from './momia-cimientos';
 import { MOMIA_TRAMA_SCHEMA } from './momia-esquema';
@@ -629,18 +629,19 @@ async function unaTirada(
   cimientos: Cimientos,
   emit: Emitir,
 ): Promise<RespuestaMomia> {
-  const stream = client.messages.stream({
+  const stream = streamDeGeneracion(client, {
     model,
-    max_tokens: 64000,
-    system: [{ type: 'text', text: SISTEMA_MOMIA, cache_control: { type: 'ephemeral' } }],
-    output_config: { format: { type: 'json_schema', schema: MOMIA_TRAMA_SCHEMA } },
+    esfuerzo: esfuerzoPara(game, 'trama'),
+    maxTokens: 64000,
+    system: SISTEMA_MOMIA,
+    schema: MOMIA_TRAMA_SCHEMA,
     messages: [{ role: 'user', content: construirPromptMomia(game, cimientos.trama, entidades) }],
   });
 
   stream.on('text', emisorDeProgreso(game, emit));
   const mensaje = await stream.finalMessage();
   // Lo que ha costado esta llamada. No puede tumbar la generacion.
-  apuntarUso({ concepto: 'trama', model, usage: mensaje.usage, gameId: game.id });
+  apuntarUso({ concepto: 'trama', model: mensaje.model ?? model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error(
@@ -653,10 +654,7 @@ async function unaTirada(
     );
   }
 
-  let texto = '';
-  for (const bloque of mensaje.content) {
-    if (bloque.type === 'text') texto += bloque.text;
-  }
+  const texto = textoDe(mensaje);
   try {
     return JSON.parse(texto) as RespuestaMomia;
   } catch {

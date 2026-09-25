@@ -31,7 +31,7 @@
  * escribir encima de algo que ya está montado.
  */
 import { DEMO_MODE } from '../config';
-import { getAnthropicClient, resolveModel } from '../agent/anthropic';
+import { esfuerzoPara, getAnthropicClient, resolveModel, streamDeGeneracion, textoDe } from '../agent/anthropic';
 import { registrarGenerador } from '../juegos/generadores';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso } from '../gasto/contador';
@@ -60,11 +60,12 @@ async function unaTirada(
   base: Plot,
   emit: Emitir,
 ): Promise<RespuestaNudo> {
-  const stream = client.messages.stream({
+  const stream = streamDeGeneracion(client, {
     model,
-    max_tokens: 64000,
-    system: [{ type: 'text', text: SISTEMA_NUDO, cache_control: { type: 'ephemeral' } }],
-    output_config: { format: { type: 'json_schema', schema: NUDO_TRAMA_SCHEMA } },
+    esfuerzo: esfuerzoPara(game, 'trama'),
+    maxTokens: 64000,
+    system: SISTEMA_NUDO,
+    schema: NUDO_TRAMA_SCHEMA,
     messages: [{ role: 'user', content: construirPromptNudo(game, base) }],
   });
 
@@ -75,7 +76,7 @@ async function unaTirada(
    */
   stream.on('text', emisorDeProgreso(game, emit));
   const mensaje = await stream.finalMessage();
-  apuntarUso({ concepto: 'trama', model, usage: mensaje.usage, gameId: game.id });
+  apuntarUso({ concepto: 'trama', model: mensaje.model ?? model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error(
@@ -88,10 +89,7 @@ async function unaTirada(
     );
   }
 
-  let texto = '';
-  for (const bloque of mensaje.content) {
-    if (bloque.type === 'text') texto += bloque.text;
-  }
+  const texto = textoDe(mensaje);
   try {
     return JSON.parse(texto) as RespuestaNudo;
   } catch {

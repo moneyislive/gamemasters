@@ -13,7 +13,7 @@
 import { objetosDe, salasDe, sospechososDe } from '../juegos/cluedo';
 import type { GameSession, Plot } from '../../../shared/types';
 import { DEMO_MODE } from '../config';
-import { getAnthropicClient, resolveModel } from '../agent/anthropic';
+import { esfuerzoPara, getAnthropicClient, resolveModel, streamDeGeneracion, textoDe } from '../agent/anthropic';
 import { generateDemoPlot } from './cluedo-demo';
 import { PLOT_SCHEMA } from './cluedo-esquema';
 import { buildStyleBlock } from './style';
@@ -44,12 +44,12 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
 
   const model = await resolveModel(game);
 
-  // Ruta NO beta y sin fallbacks; sin temperature/top_p/top_k ni `thinking`.
-  const stream = client.messages.stream({
+  const stream = streamDeGeneracion(client, {
     model,
-    max_tokens: 64000,
-    system: [{ type: 'text', text: SYSTEM_TRAMA, cache_control: { type: 'ephemeral' } }],
-    output_config: { format: { type: 'json_schema', schema: PLOT_SCHEMA } },
+    esfuerzo: esfuerzoPara(game, 'trama'),
+    maxTokens: 64000,
+    system: SYSTEM_TRAMA,
+    schema: PLOT_SCHEMA,
     messages: [{ role: 'user', content: construirPrompt(game) }],
   });
 
@@ -59,7 +59,7 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
 
   const mensaje = await stream.finalMessage();
   // Lo que ha costado esta llamada. No puede tumbar la generacion.
-  apuntarUso({ concepto: 'trama', model, usage: mensaje.usage, gameId: game.id });
+  apuntarUso({ concepto: 'trama', model: mensaje.model ?? model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error(
@@ -72,10 +72,7 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
     );
   }
 
-  let texto = '';
-  for (const bloque of mensaje.content) {
-    if (bloque.type === 'text') texto += bloque.text;
-  }
+  const texto = textoDe(mensaje);
 
   try {
     return JSON.parse(texto) as Plot;

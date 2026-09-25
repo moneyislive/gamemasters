@@ -4,16 +4,18 @@
  *   PUT /config → cambia el modelo activo y devuelve la AppConfig resultante
  */
 import type { AppConfig } from '../../../shared/types';
-import { DEMO_MODE, MODEL_OPTIONS, isModelId } from '../config';
+import { DEMO_MODE, MODEL_OPTIONS, env, esModeloDeVelada, isModelId } from '../config';
 import { getStorageKind, getStore } from '../db/store';
 import { identidadDeTaller } from '../auth';
+import { modeloDeLaCasa } from '../agent/anthropic';
 import { crearRouter } from '../rutas';
 
 const router = crearRouter();
 
 async function buildConfig(): Promise<AppConfig> {
   return {
-    model: await getStore().getConfigModel(),
+    // El efectivo: uno guardado que ya salió del catálogo de veladas no cuenta.
+    model: await modeloDeLaCasa(),
     models: MODEL_OPTIONS,
     hasApiKey: !DEMO_MODE,
     storage: getStorageKind(),
@@ -54,6 +56,14 @@ router.put('/config', async (req, res) => {
         error: 'Modelo no válido. Elige uno de la lista de modelos disponibles.',
       });
       return;
+    }
+    /*
+     * Uno que no escribe veladas se acepta y se guarda —el asistente y las
+     * pruebas lo usan—, pero la casa sigue escribiendo con el de por defecto:
+     * `modeloDeLaCasa` lo ignora. Se avisa aquí para que no sea un misterio.
+     */
+    if (!esModeloDeVelada(model)) {
+      console.warn(`[config] ${model} no escribe veladas: la casa sigue con ${env.defaultModel}.`);
     }
     await getStore().setConfigModel(model);
     res.json(await buildConfig());

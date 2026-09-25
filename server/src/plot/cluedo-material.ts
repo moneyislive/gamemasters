@@ -19,7 +19,7 @@ import type {
   TimelineReveal,
 } from '../../../shared/types';
 import { DEMO_MODE } from '../config';
-import { getAnthropicClient, resolveModel } from '../agent/anthropic';
+import { esfuerzoPara, getAnthropicClient, resolveModel, streamDeGeneracion, textoDe } from '../agent/anthropic';
 import { numeroDeRondas } from '../docs/datos';
 import { buildStyleBlock } from './style';
 import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe, victimaDe } from '../juegos/cluedo';
@@ -175,18 +175,19 @@ async function materialConApi(game: GameSession, plot: Plot, emit: Emitir): Prom
   if (!client) return materialDemo(game, plot, emit);
 
   const model = await resolveModel(game);
-  const stream = client.messages.stream({
+  const stream = streamDeGeneracion(client, {
     model,
-    max_tokens: 32000,
-    system: [{ type: 'text', text: SYSTEM_MATERIAL, cache_control: { type: 'ephemeral' } }],
-    output_config: { format: { type: 'json_schema', schema: MATERIAL_SCHEMA } },
+    esfuerzo: esfuerzoPara(game, 'material'),
+    maxTokens: 32000,
+    system: SYSTEM_MATERIAL,
+    schema: MATERIAL_SCHEMA,
     messages: [{ role: 'user', content: construirPrompt(game, plot) }],
   });
 
   stream.on('text', emisorDeProgreso(game, emit));
   const mensaje = await stream.finalMessage();
   // Lo que ha costado esta llamada. No puede tumbar la generacion.
-  apuntarUso({ concepto: 'material', model, usage: mensaje.usage, gameId: game.id });
+  apuntarUso({ concepto: 'material', model: mensaje.model ?? model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error('El modelo declinó escribir el material. Revisa los textos de la partida.');
@@ -197,10 +198,7 @@ async function materialConApi(game: GameSession, plot: Plot, emit: Emitir): Prom
     );
   }
 
-  let texto = '';
-  for (const bloque of mensaje.content) {
-    if (bloque.type === 'text') texto += bloque.text;
-  }
+  const texto = textoDe(mensaje);
   try {
     return JSON.parse(texto) as PrintMaterial;
   } catch {

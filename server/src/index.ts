@@ -35,6 +35,7 @@ import { JuegoNoInstalado, instalarSoloEstos, juegosInstalados } from '../../sha
 import { instalarJuegosDeFuera } from './juegos/enchufe';
 import { instalarArcadesDeFuera } from './arcade/enchufe';
 import { DEMO_MODE, env } from './config';
+import { modeloDeLaCasa } from './agent/anthropic';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
 import aterrizajeRouter from './enlaces/aterrizaje';
 import descargaRouter, { comprobarLaDescarga } from './enlaces/descarga';
@@ -859,7 +860,8 @@ const seRecorren = darDeAltaLosQueSeRecorren();
 comprobarArranque();
 
 await initStore();
-const activeModel = await getStore().getConfigModel();
+// El que de verdad escribe: uno guardado que ya no es de velada no cuenta.
+const activeModel = await modeloDeLaCasa();
 
 /*
  * En producción se escucha SOLO en el bucle local, y la razón es la línea

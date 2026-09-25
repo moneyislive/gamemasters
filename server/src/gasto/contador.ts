@@ -28,17 +28,27 @@
  */
 import { getStore } from '../db/store';
 import type { GastoDeLaPartida } from '../../../shared/types';
+import { costeEnDolares, type UsoDeTokens } from '../cobro/tarifa';
 
-/** Los conceptos que se cobran. Uno por punto de llamada. */
-export type ConceptoDeGasto = 'trama' | 'material' | 'refresco' | 'asistente' | 'consejero';
+/**
+ * Los conceptos que se cobran. Uno por punto de llamada.
+ *
+ * `detective` y `revisor` son la revisión adversaria (ver
+ * `plot/cluedo-revision.ts`): van por separado porque el detective se llama
+ * varias veces por velada y el revisor una o dos, y el presupuesto de cada uno
+ * se calibra con su propio número.
+ */
+export type ConceptoDeGasto =
+  | 'trama'
+  | 'material'
+  | 'detective'
+  | 'revisor'
+  | 'refresco'
+  | 'asistente'
+  | 'consejero';
 
 /** Lo que interesa del `usage` de la API, sea cual sea la forma que traiga. */
-interface Uso {
-  entrada: number;
-  salida: number;
-  cacheEscrita: number;
-  cacheLeida: number;
-}
+type Uso = UsoDeTokens;
 
 function leerUso(usage: unknown): Uso {
   const u = (usage ?? {}) as Record<string, unknown>;
@@ -79,6 +89,11 @@ function vacio(): GastoDeLaPartida {
  */
 const pendientes = new Map<string, Array<{ concepto: ConceptoDeGasto; model: string; uso: Uso }>>();
 
+/** Seis decimales: un céntimo de céntimo, y sin la cola de coma flotante. */
+function redondear(n: number): number {
+  return Math.round(n * 1_000_000) / 1_000_000;
+}
+
 /**
  * Apunta lo que ha costado una llamada. No toca el almacén.
  *
@@ -94,6 +109,7 @@ export function apuntarUso(opciones: {
 }): void {
   const { concepto, model, gameId } = opciones;
   const uso = leerUso(opciones.usage);
+  const costeUsd = redondear(costeEnDolares(model, uso));
 
   // Siempre, y en una línea estable para poder sumarla desde fuera con `grep`.
   console.log(
@@ -102,6 +118,7 @@ export function apuntarUso(opciones: {
       model,
       gameId: gameId ?? null,
       ...uso,
+      costeUsd,
       el: new Date().toISOString(),
     })}`,
   );
@@ -132,6 +149,7 @@ export async function volcarGasto(gameId: string): Promise<void> {
     let acumulado = game.gasto ?? vacio();
     for (const { concepto, model, uso } of cola) {
       const suConcepto = acumulado.porConcepto[concepto] ?? { llamadas: 0, entrada: 0, salida: 0 };
+      const coste = costeEnDolares(model, uso);
       acumulado = {
         llamadas: acumulado.llamadas + 1,
         entrada: acumulado.entrada + uso.entrada,
@@ -144,9 +162,11 @@ export async function volcarGasto(gameId: string): Promise<void> {
             llamadas: suConcepto.llamadas + 1,
             entrada: suConcepto.entrada + uso.entrada,
             salida: suConcepto.salida + uso.salida,
+            costeUsd: redondear((suConcepto.costeUsd ?? 0) + coste),
           },
         },
         modelos: acumulado.modelos.includes(model) ? acumulado.modelos : [...acumulado.modelos, model],
+        costeUsd: redondear((acumulado.costeUsd ?? 0) + coste),
         actualizadoEl: new Date().toISOString(),
       };
     }

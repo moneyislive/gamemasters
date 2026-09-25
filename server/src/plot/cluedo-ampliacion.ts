@@ -13,7 +13,7 @@
 import type { GameSession, Plot, PlotCharacter } from '../../../shared/types';
 import type { StalenessReport } from '../../../shared/staleness';
 import { DEMO_MODE } from '../config';
-import { getAnthropicClient, resolveModel } from '../agent/anthropic';
+import { esfuerzoPara, getAnthropicClient, resolveModel, streamDeGeneracion, textoDe as textoDelMensaje } from '../agent/anthropic';
 import { registrarAmpliacion } from '../juegos/ampliaciones';
 import { generateDemoCharacters } from './cluedo-demo';
 import { PLOT_EXTENSION_SCHEMA } from './cluedo-esquema';
@@ -189,12 +189,12 @@ async function pedirAmpliacion(
 ): Promise<AmpliacionTrama> {
   const model = await resolveModel(game);
 
-  // Ruta NO beta y sin fallbacks; sin temperature/top_p/top_k ni `thinking`.
-  const stream = client.messages.stream({
+  const stream = streamDeGeneracion(client, {
     model,
-    max_tokens: 32000,
-    system: [{ type: 'text', text: SYSTEM_AMPLIACION, cache_control: { type: 'ephemeral' } }],
-    output_config: { format: { type: 'json_schema', schema: PLOT_EXTENSION_SCHEMA } },
+    esfuerzo: esfuerzoPara(game, 'refresco'),
+    maxTokens: 32000,
+    system: SYSTEM_AMPLIACION,
+    schema: PLOT_EXTENSION_SCHEMA,
     messages: [
       { role: 'user', content: construirPromptAmpliacion(game, plot, faltantes, solucionRota) },
     ],
@@ -206,7 +206,7 @@ async function pedirAmpliacion(
 
   const mensaje = await stream.finalMessage();
   // Lo que ha costado esta llamada. No puede tumbar la generacion.
-  apuntarUso({ concepto: 'refresco', model, usage: mensaje.usage, gameId: game.id });
+  apuntarUso({ concepto: 'refresco', model: mensaje.model ?? model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error(
@@ -219,10 +219,7 @@ async function pedirAmpliacion(
     );
   }
 
-  let texto = '';
-  for (const bloque of mensaje.content) {
-    if (bloque.type === 'text') texto += bloque.text;
-  }
+  const texto = textoDelMensaje(mensaje);
 
   try {
     return JSON.parse(texto) as AmpliacionTrama;

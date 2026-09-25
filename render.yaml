@@ -108,8 +108,11 @@ services:
       - key: MESAS_DIR
         value: /var/data/mesas
 
+      # El modelo de la casa: el que escribe las veladas que no eligen otro.
+      # Uno que no sea de velada (ver `MODEL_OPTIONS` en server/src/config.ts)
+      # se ignora y se usa Opus 5.5.
       - key: ANTHROPIC_MODEL
-        value: claude-fable-5
+        value: claude-opus-5-5
       - key: MONGODB_DB
         value: harkania
 

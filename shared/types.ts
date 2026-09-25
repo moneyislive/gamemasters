@@ -7,16 +7,38 @@ import type { EjeId, JuegoId } from './juegos/tipos';
 
 export type { PrintableDocId };
 
+/**
+ * Los modelos que la plataforma sabe pedir.
+ *
+ * `claude-opus-5` y `claude-fable-5` se quedan aunque ya no se ofrezcan: hay
+ * partidas guardadas con ellos en `settings.model`, y quitar el literal del tipo
+ * no lo quita de la base de datos.
+ */
 export type ModelId =
+  | 'claude-opus-5-5'
+  | 'claude-fable-5-1'
+  | 'claude-sonnet-5'
   | 'claude-fable-5'
   | 'claude-opus-5'
-  | 'claude-sonnet-5'
   | 'claude-haiku-4-5';
+
+/**
+ * Cuánto piensa el modelo antes de escribir. Lo pensado se factura como salida,
+ * así que es la segunda palanca del precio después del modelo.
+ */
+export type Esfuerzo = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export interface ModelOption {
   id: ModelId;
   label: string;
   description: string;
+  /**
+   * ¿Se puede elegir para escribir una velada? Los que no, siguen en el catálogo
+   * para leer partidas antiguas y para el asistente, pero no se ofrecen al
+   * generar: una trama escrita con un modelo que no está a la altura es una
+   * velada pagada que sale mal.
+   */
+  paraVeladas: boolean;
 }
 
 export interface AppConfig {
@@ -306,6 +328,67 @@ export interface Plot {
    * `pistasDeLaTrama` y se escriben con `pistasParaEscribir`.
    */
   mecanicas?: Record<string, unknown>;
+  /**
+   * Lo que dijo la revisión adversaria de esta trama, si la tuvo.
+   *
+   * Es del Game Master que NO juega: habla de la solución con todas las letras.
+   * `partidaParaElTaller` lo reduce al veredicto cuando quien dirige juega a
+   * ciegas, igual que hace con la solución.
+   */
+  revision?: InformeDeRevision;
+}
+
+// ---------- Revisión adversaria ----------
+
+/**
+ * Cuánto pesa un hallazgo.
+ *
+ * `bloqueante` rompe la velada: un caso que no se puede resolver, o que se
+ * resuelve leyendo la sinopsis. `grave` la empobrece de forma que la mesa lo
+ * nota —un objeto que nadie nombra, alguien sin historia—. `menor` es pulido.
+ */
+export type GravedadDeHallazgo = 'bloqueante' | 'grave' | 'menor';
+
+export interface HallazgoDeRevision {
+  /** Estable y en minúsculas, para poder contarlos: `filtracion-temprana`, `objeto-sin-nombrar`… */
+  codigo: string;
+  gravedad: GravedadDeHallazgo;
+  /** Quién lo vio: el recuento hecho con código, el detective sin solución o el revisor. */
+  origen: 'auditoria' | 'detective' | 'revisor';
+  /** Explicado para el Game Master. Puede nombrar la solución. */
+  texto: string;
+  /** `corregido` si la revisión lo arregló; `pendiente` si sigue ahí al entregar. */
+  estado: 'corregido' | 'pendiente';
+}
+
+/**
+ * Cómo veía la mesa el caso en un momento de la velada, según el detective que
+ * NO conoce la solución. `momento` 0 es antes de la primera ronda; 1..N, al
+ * cerrar cada ronda. `reparto` va de id de persona a probabilidad (0..1).
+ */
+export interface LecturaDelDetective {
+  momento: number;
+  reparto: Record<string, number>;
+}
+
+export interface InformeDeRevision {
+  /**
+   * `apta`: nada pendiente. `apta-con-avisos`: quedan cosas menores o graves que
+   * no rompen el juego. `no-apta`: queda algo bloqueante. `sin-revisar`: la
+   * revisión no pudo hacerse (sin clave, o falló) y la trama va tal cual.
+   */
+  veredicto: 'apta' | 'apta-con-avisos' | 'no-apta' | 'sin-revisar';
+  /** Cuántas veces reescribió el revisor. */
+  pasadas: number;
+  hallazgos: HallazgoDeRevision[];
+  /** Lo que se cambió, en una línea cada cosa. */
+  cambios: string[];
+  /** La sospecha de la mesa ronda a ronda, antes y después de corregir. */
+  lecturas?: { antes: LecturaDelDetective[]; despues: LecturaDelDetective[] };
+  revisadaEl: string;
+  modelo?: string;
+  /** Si la revisión se quedó a medias, por qué. La trama se entrega igual. */
+  error?: string;
 }
 
 // ---------- Documentos por jugador ----------
@@ -440,7 +523,16 @@ export const DOCUMENT_SECTIONS: DocumentSectionInfo[] = [
 ];
 
 export interface GameSettings {
+  /**
+   * El modelo de ESTA velada. Ausente: el de la plataforma, que es lo normal.
+   * Es una opción avanzada: cambia el precio, y quien no la toca no la ve.
+   */
   model?: ModelId;
+  /**
+   * Cuánto piensa el modelo al escribir la trama y al revisarla. Ausente: lo que
+   * la plataforma tenga calibrado para cada paso. Opción avanzada, como `model`.
+   */
+  esfuerzo?: Esfuerzo;
   language: 'es';
   /**
    * A qué se juega. CATA: si falta, es CLUEDO.
@@ -581,10 +673,19 @@ export interface GastoDeLaPartida {
   /** Tokens escritos en la cache (se pagan mas caros) y leidos de ella (mas baratos). */
   cacheEscrita: number;
   cacheLeida: number;
-  /** Por concepto: `trama`, `material`, `refresco`, `asistente`, `consejero`. */
-  porConcepto: Record<string, { llamadas: number; entrada: number; salida: number }>;
+  /**
+   * Por concepto: `trama`, `material`, `revision`, `refresco`, `asistente`,
+   * `consejero`. `costeUsd` falta en los apuntes anteriores a la tarifa.
+   */
+  porConcepto: Record<string, { llamadas: number; entrada: number; salida: number; costeUsd?: number }>;
   /** Que modelos han intervenido, para poder poner precio despues. */
   modelos: string[];
+  /**
+   * Lo que ha costado de verdad, en dólares de la API, con la tarifa de cada
+   * modelo en el momento del apunte. Falta en las partidas anteriores a la
+   * tarifa: sus tokens están, su precio no.
+   */
+  costeUsd?: number;
   actualizadoEl: string;
 }
 
@@ -788,7 +889,7 @@ export type ChatStreamEvent =
 
 /** Eventos del stream de generación: POST /api/games/:id/generate */
 export type GenerateStreamEvent =
-  | { type: 'stage'; stage: 'board' | 'plot' | 'documents' | 'material'; label: string }
+  | { type: 'stage'; stage: 'board' | 'plot' | 'documents' | 'material' | 'revision'; label: string }
   | { type: 'text'; delta: string }
   | { type: 'done'; game: GameSession }
   | { type: 'error'; message: string };
