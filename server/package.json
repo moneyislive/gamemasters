@@ -30,6 +30,8 @@
     "verify:momia-trama": "tsx scripts/verificar-momia-trama.ts",
     "verify:esquemas": "tsx scripts/verificar-esquemas.ts",
     "verify:revision": "tsx scripts/verificar-revision.ts",
+    "medir:dosieres": "tsx scripts/medir-dosieres.ts",
+    "volcar:esquemas": "tsx scripts/volcar-esquemas.ts",
     "verify:cobro": "tsx scripts/verificar-cobro.ts",
     "probar:stripe": "tsx scripts/probar-stripe.ts",
     "verify:credenciales": "tsx scripts/verificar-credenciales.ts",

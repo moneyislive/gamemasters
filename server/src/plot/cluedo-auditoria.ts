@@ -156,6 +156,8 @@ export interface PesoDePersona {
   enCronologia: number;
   /** Caracteres de su propio bloque de personaje: lo que pesa su sobre. */
   largoDelDosier: number;
+  /** Caracteres de «Tu noche», el bloque que tienen todos y que al culpable le cuenta el crimen. 0 si no lo tiene. */
+  largoDeLaNoche: number;
 }
 
 export interface PesoDeCosa {
@@ -247,7 +249,7 @@ export function auditarTramaCluedo(game: GameSession, plot: Plot): AuditoriaClue
   const dosierDe = (id: string): string => {
     const c = personajeDe(id);
     if (!c) return '';
-    return [c.secret ?? '', c.motive ?? '', c.alibi ?? '', ...(c.knowledge ?? [])].join('\n');
+    return [c.secret ?? '', c.motive ?? '', c.alibi ?? '', ...(c.knowledge ?? []), c.nightStory ?? ''].join('\n');
   };
   const girosDe = (id: string): string =>
     (material?.twists ?? []).filter((g) => g.participanteId === id).map((g) => g.instruction).join('\n');
@@ -273,10 +275,11 @@ export function auditarTramaCluedo(game: GameSession, plot: Plot): AuditoriaClue
       porRonda: rondasTexto.map((t) => nombres.menciones(s.id, t)),
       enCronologia: plot.timeline.filter((e) => e.participanteIds.includes(s.id)).length,
       largoDelDosier: c
-        ? [c.role, c.publicPersona, c.secret, c.motive, c.alibi, ...(c.knowledge ?? []), c.personalHook]
+        ? [c.role, c.publicPersona, c.secret, c.motive, c.alibi, ...(c.knowledge ?? []), c.personalHook, c.nightStory]
             .filter(Boolean)
             .join(' ').length
         : 0,
+      largoDeLaNoche: c?.nightStory?.trim().length ?? 0,
     };
   });
 
@@ -382,6 +385,75 @@ function marcar(
         ),
       );
     }
+
+    /*
+     * ---- Y su noche, que es donde más se nota ----
+     *
+     * «Tu noche» es el único bloque en el que el culpable cuenta algo distinto
+     * de los demás: el crimen. Más estrecho que el total, porque en la casa
+     * Sabrón el relato del crimen —que antes solo llevaba su dosier— hacía el
+     * sobre un 23 % más largo, y eso ya se ve sobre la mesa.
+     */
+    const medianaNoche = mediana(inocentes.map((p) => p.largoDeLaNoche).filter((n) => n > 0));
+    if (medianaNoche > 0 && culpable.largoDeLaNoche > medianaNoche * 1.25) {
+      salida.push(
+        hallazgo(
+          'noche-desigual',
+          'grave',
+          `«Tu noche» de ${quien(culpable)} ocupa ${culpable.largoDeLaNoche} caracteres y la de un inocente típico ` +
+            `${Math.round(medianaNoche)}: la del culpable no puede ser la más larga, porque es la que cuenta el crimen.`,
+          culpable.participanteId,
+        ),
+      );
+    }
+  }
+
+  /*
+   * ---- Una noche para cada cual ----
+   *
+   * Si unos la tienen y otros no, el dosier de quien no la tiene es más corto
+   * y su sitio en el papel queda vacío. Una trama antigua, sin ninguna, no se
+   * marca: se escribió antes de que existiera.
+   */
+  const conNoche = personas.filter((p) => p.largoDeLaNoche > 0);
+  if (conNoche.length > 0) {
+    const medianaNocheTodos = mediana(conNoche.map((p) => p.largoDeLaNoche));
+    for (const p of personas) {
+      if (p.largoDeLaNoche === 0) {
+        salida.push(
+          hallazgo(
+            'sin-noche',
+            'grave',
+            `${quien(p)} no tiene «Tu noche» y los demás sí: su dosier sale más corto y sin nada que contar del tramo del crimen.`,
+            p.participanteId,
+          ),
+        );
+      } else if (!p.esCulpable && p.largoDeLaNoche < medianaNocheTodos * 0.5) {
+        salida.push(
+          hallazgo(
+            'noche-flaca',
+            'menor',
+            `«Tu noche» de ${quien(p)} ocupa ${p.largoDeLaNoche} caracteres frente a ${Math.round(medianaNocheTodos)} de la ` +
+              `mediana: un trámite en vez de una noche que jugar.`,
+            p.participanteId,
+          ),
+        );
+      }
+    }
+  }
+
+  // ---- Un guion con equipos ----
+  const PORTAVOCES = /\b(portavoz|portavoces|equipos?|por grupos|grupos de|puesta en com[uú]n)\b/i;
+  const pasoConEquipos = plot.gmScript.find((paso) => PORTAVOCES.test(paso));
+  if (pasoConEquipos) {
+    salida.push(
+      hallazgo(
+        'guion-con-portavoces',
+        'menor',
+        `El guion del Game Master habla de equipos o portavoces («${pasoConEquipos.slice(0, 90)}»). La investigación es ` +
+          `individual: cada cual elige sala y habla con quien coincide, sin informes de grupo.`,
+      ),
+    );
   }
 
   // ---- Personas sin historia ----
@@ -526,7 +598,7 @@ export function auditoriaEnTexto(a: AuditoriaCluedo): string {
       (p) =>
         `- ${p.esCulpable ? '[CULPABLE] ' : ''}${p.personaje || p.nombre} (${p.participanteId}): ` +
         `al empezar ${p.alEmpezar} · en dosieres ajenos ${p.enDosieresAjenos} · por ronda ${p.porRonda.join('/')} · ` +
-        `en la cronología ${p.enCronologia} · su bloque ${p.largoDelDosier} caracteres`,
+        `en la cronología ${p.enCronologia} · su bloque ${p.largoDelDosier} caracteres · su noche ${p.largoDeLaNoche}`,
     )
     .join('\n');
   const cosas = (lista: PesoDeCosa[], del: string) =>

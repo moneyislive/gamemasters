@@ -28,6 +28,7 @@ export const PERSONAJE_SCHEMA: Record<string, unknown> = {
     'alibi',
     'knowledge',
     'personalHook',
+    'nightStory',
   ],
   properties: {
     participanteId: {
@@ -54,6 +55,15 @@ export const PERSONAJE_SCHEMA: Record<string, unknown> = {
     personalHook: {
       type: 'string',
       description: 'Cómo se ha adaptado el personaje a la psicología de la persona real',
+    },
+    nightStory: {
+      type: 'string',
+      description:
+        'Tu noche: lo que hizo este personaje en el tramo del crimen, hora a hora y en SEGUNDA persona ' +
+        '(«A las 21:35 subiste a…»), de 110 a 170 palabras. El del culpable cuenta el crimen como lo vivió; ' +
+        'el de un inocente, sus movimientos, lo que vio y su propia falta. TODOS con la misma extensión: ' +
+        'el largo de un dosier no puede delatar a nadie. Coherente al minuto con la cronología, la coartada y las pistas. ' +
+        'Lo que un inocente vio puede ser una pieza del caso, nunca la prueba que por sí sola señala al culpable.',
     },
   },
 };
@@ -82,10 +92,12 @@ export const PISTA_SCHEMA: Record<string, unknown> = {
       type: 'integer',
       enum: [1, 2, 3, 4],
       description:
-        'Ronda en la que el Game Master saca esta pista. 1: motivos, conflictos y señuelos. ' +
-        '2: objetos desplazados y coartadas incompletas. 3: horarios, trayectos y contradicciones. ' +
-        '4: evidencias decisivas que cierran el caso. NINGUNA pista que por sí sola señale al ' +
-        'culpable puede ir en las rondas 1 o 2.',
+        'Ronda en la que el Game Master saca esta pista. 1: motivos y primeras contradicciones (casi ' +
+        'todos tenían motivo; algún indicio compromete a alguien por una falta que no es el crimen). ' +
+        '2: el tramo confuso y los movimientos (qué se movió y quién faltaba; separa el desorden de la ' +
+        'hora de la muerte). 3: las faltas que no son el crimen (robos, falsificaciones, chantajes; se ' +
+        'rompen coartadas aparentes). 4: la reconstrucción (piezas del trayecto del objeto, marcas horarias ' +
+        'y el rasgo del culpable). Ninguna pista, de ninguna ronda, señala por sí sola al culpable.',
     },
   },
 };

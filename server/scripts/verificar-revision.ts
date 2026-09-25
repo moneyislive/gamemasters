@@ -13,7 +13,11 @@
  *     quién fue antes de empezar, si al final no puede saberlo, o si una sola
  *     pista lo dice todo;
  *   · los PARCHES del revisor: que no toquen la solución, que no empobrezcan,
- *     que no dejen salas sin pistas ni un reparto de giros que delate.
+ *     que no dejen salas sin pistas ni un reparto de giros que delate;
+ *   · y el DOSIER IMPRESO: que el del culpable no se distinga por fuera. En la
+ *     casa Sabrón su sobre era un 23 % más gordo, porque solo él llevaba el
+ *     relato del crimen, en un recuadro rojo. La auditoría no lo veía: medía los
+ *     campos del personaje y el bloque lo añadía el que imprime.
  *
  * Y comprueba también el extremo contrario, que es el que Miguel pidió vigilar
  * expresamente: una trama «corregida» donde a la persona culpable no la nombra
@@ -279,6 +283,83 @@ paso('El sobre más gordo y los giros que delatan');
   comprobar('con siete a la mesa caben cinco giros', maximoDeGiros(7) === 5);
   comprobar('con tres, uno', maximoDeGiros(3) === 1);
   comprobar('con doce, seis', maximoDeGiros(12) === 6);
+}
+
+paso('Tu noche: el dosier del culpable, igual por fuera que los demás');
+{
+  const conNoche = (): Plot => {
+    const plot = tramaEquilibrada();
+    for (const c of plot.characters) {
+      c.nightStory =
+        'A las diez y cuarto saliste de la terraza y cruzaste el pasillo; volviste a las diez y media con las ' +
+        'manos frías y nadie te preguntó nada. Lo que hiciste en ese cuarto de hora es lo que sostienes que no hiciste.';
+    }
+    return plot;
+  };
+  const deNoche = (hs: HallazgoDeRevision[]) => hs.filter((h) => ['noche-desigual', 'sin-noche', 'noche-flaca'].includes(h.codigo));
+  comprobar('una noche pareja para cada cual no da avisos', deNoche(auditarTramaCluedo(game, conNoche()).hallazgos).length === 0);
+  comprobar('una trama antigua, sin ninguna noche, no se marca', deNoche(auditarTramaCluedo(game, tramaEquilibrada()).hallazgos).length === 0);
+
+  const larga = conNoche();
+  const suya = larga.characters.find((c) => c.participanteId === CULPABLE)!;
+  suya.nightStory = `${suya.nightStory} ${suya.nightStory}`;
+  comprobar('la noche del culpable más larga que las demás se avisa', tiene(auditarTramaCluedo(game, larga).hallazgos, 'noche-desigual', 'grave'));
+
+  const coja = conNoche();
+  delete coja.characters.find((c) => c.participanteId === 's3')!.nightStory;
+  comprobar(
+    'si a alguien le falta la noche, se avisa de quién',
+    auditarTramaCluedo(game, coja).hallazgos.some((h) => h.codigo === 'sin-noche' && h.sobre === 's3'),
+  );
+
+  const conEquipos = tramaEquilibrada();
+  conEquipos.gmScript = [...conEquipos.gmScript, 'Al cerrar la ronda, cada equipo elige un portavoz que resume lo que ha encontrado.'];
+  comprobar('un guion con equipos y portavoces se avisa', tiene(auditarTramaCluedo(game, conEquipos).hallazgos, 'guion-con-portavoces'));
+
+  // ---- El dosier tal como sale de la imprenta ----
+  await import('../src/juegos/instalados');
+  const { renderPlayerDocument } = await import('../src/docs/renderer');
+  const { CONSEJO_CULPABLE, CONSEJO_INOCENTE } = await import('../src/docs/cluedo-dosieres');
+  const conTrama: GameSession = { ...game, plot: conNoche() };
+  const textoDe = (html: string) =>
+    html
+      .replace(/<style[\s\S]*?<\/style>/g, ' ')
+      .replace(/<svg[\s\S]*?<\/svg>/g, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const dosieres = GENTE.map((_, i) => {
+    const html = renderPlayerDocument(conTrama, `s${i}`, { variant: 'blanco' })?.html ?? '';
+    return { id: `s${i}`, html, largo: textoDe(html).length };
+  });
+  const delCulpable = dosieres.find((d) => d.id === CULPABLE)!;
+  const inocentes = dosieres.filter((d) => d.id !== CULPABLE).map((d) => d.largo);
+  const medio = inocentes.reduce((a, b) => a + b, 0) / inocentes.length;
+  comprobar('los siete dosieres se componen', dosieres.every((d) => d.largo > 1000), dosieres.map((d) => d.largo));
+  comprobar(
+    'con noches parejas, el dosier impreso del culpable mide lo que los demás (±3 %)',
+    Math.abs(delCulpable.largo - medio) <= medio * 0.03,
+    { culpable: delCulpable.largo, inocentes },
+  );
+  // En el marcado, no en la hoja de estilos: la clase está definida en todos los documentos.
+  comprobar(
+    'ningún dosier de jugador lleva el recuadro rojo del asesino',
+    dosieres.every((d) => !/class="[^"]*caja--asesino/.test(d.html)),
+  );
+  comprobar(
+    'todos llevan «Tu noche» con el mismo recuadro',
+    dosieres.every((d) => d.html.includes('Tu noche') && d.html.includes('caja caja--secreto')),
+  );
+  comprobar('el culpable sabe que lo es por la primera frase', delCulpable.html.includes('Tú mataste a'));
+  comprobar(
+    'y los inocentes, que no',
+    dosieres.filter((d) => d.id !== CULPABLE).every((d) => d.html.includes('No mataste a')),
+  );
+  comprobar(
+    'los dos consejos miden lo mismo (±10 %)',
+    Math.abs(CONSEJO_CULPABLE.length - CONSEJO_INOCENTE.length) <= CONSEJO_CULPABLE.length * 0.1,
+    [CONSEJO_CULPABLE.length, CONSEJO_INOCENTE.length],
+  );
 }
 
 // ---------------------------------------------------------------------------

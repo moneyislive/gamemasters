@@ -242,8 +242,20 @@ function construirPersonajes(
       alibi,
       knowledge,
       personalHook,
+      nightStory: nocheDeDemo(esAsesino, cicla(salas, i + 1).name, salaCoartada.name, companero.name),
     };
   });
+}
+
+/**
+ * «Tu noche» de relleno, de la misma extensión para quien mató y para quien no:
+ * es lo que mide `verify:revision` al comprobar que el dosier impreso del
+ * culpable no es más largo que los demás.
+ */
+function nocheDeDemo(esAsesino: boolean, salaDeSalida: string, salaCoartada: string, companero: string): string {
+  return esAsesino
+    ? `Durante el apagón aprovechaste que nadie miraba para salir de ${salaDeSalida}. Sabías dónde iba a estar la víctima y lo que ibas a hacer. Lo hiciste deprisa, sin testigos, y volviste a tu sitio antes de que regresara la luz. Desde entonces sostienes que no te moviste: tu coartada cubre casi toda la noche, salvo esos minutos que nadie puede explicar. Si alguien te pregunta por la hora exacta, no improvises: repite tu versión.`
+    : `Durante el apagón estuviste en ${salaCoartada} con ${companero}, pero no todo el tiempo: saliste un momento a resolver un asunto tuyo que nadie debe conocer. Al volver te cruzaste con una sombra en el pasillo y no supiste decir quién era. Desde entonces repites que no te moviste, y eso te hace parecer más culpable de lo que eres. Si alguien te pregunta por la hora exacta, no improvises: repite tu versión.`;
 }
 
 function construirCronologia(
@@ -475,6 +487,7 @@ export function generateDemoCharacters(
       alibi,
       knowledge,
       personalHook,
+      nightStory: nocheDeDemo(esAsesino, salaCoartada.name, salaCoartada.name, testigo ?? 'nadie'),
     };
   });
 }

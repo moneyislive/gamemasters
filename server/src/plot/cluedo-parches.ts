@@ -69,7 +69,7 @@ function texto(v: unknown): string {
 }
 
 function largoDePersonaje(c: PlotCharacter): number {
-  return [c.role, c.publicPersona, c.secret, c.motive, c.alibi, ...(c.knowledge ?? []), c.personalHook]
+  return [c.role, c.publicPersona, c.secret, c.motive, c.alibi, ...(c.knowledge ?? []), c.personalHook, c.nightStory]
     .filter(Boolean)
     .join(' ').length;
 }
@@ -139,6 +139,7 @@ export function aplicarParches(
           ? nuevo.knowledge.map(texto).filter(Boolean)
           : viejo.knowledge,
         personalHook: texto(nuevo.personalHook) || viejo.personalHook,
+        ...(texto(nuevo.nightStory) || viejo.nightStory ? { nightStory: texto(nuevo.nightStory) || viejo.nightStory } : {}),
       };
       if (largoDePersonaje(limpio) < largoDePersonaje(viejo) * SUELO_DE_PERSONAJE) {
         rechazados.push(`personaje de ${viejo.characterName}: la versión nueva lo dejaba más pobre`);

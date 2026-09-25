@@ -179,68 +179,68 @@
   },
   "dosieres": {
     "s0/color": {
-      "huella": "edc0107e0b3cf239",
-      "largo": 27786
+      "huella": "9f730c9a8c6be8b9",
+      "largo": 28466
     },
     "s0/blanco": {
-      "huella": "32b0b9c0c57071ee",
-      "largo": 27787
+      "huella": "fd25b6a90ee15c59",
+      "largo": 28467
     },
     "s1/color": {
-      "huella": "fc3965a298dfb12b",
-      "largo": 27796
+      "huella": "b2480efe259155fd",
+      "largo": 28476
     },
     "s1/blanco": {
-      "huella": "aed9062cf281743c",
-      "largo": 27797
+      "huella": "8ec564d1a35442be",
+      "largo": 28477
     },
     "s2/color": {
-      "huella": "02b3d57e2c0e31ad",
-      "largo": 27775
+      "huella": "1028c31733d7a9eb",
+      "largo": 28455
     },
     "s2/blanco": {
-      "huella": "bac2ae001e976461",
-      "largo": 27776
+      "huella": "869d7b44b1647134",
+      "largo": 28456
     },
     "s3/color": {
-      "huella": "a8a48304aff05d6c",
-      "largo": 28805
+      "huella": "d119e30a61ef9038",
+      "largo": 28783
     },
     "s3/blanco": {
-      "huella": "56a9dd8d10c42968",
-      "largo": 28806
+      "huella": "64c7eb67b914f123",
+      "largo": 28784
     },
     "s4/color": {
-      "huella": "8815fb596cd37a37",
-      "largo": 27738
+      "huella": "046a322a9f01271f",
+      "largo": 28418
     },
     "s4/blanco": {
-      "huella": "14eeb1e4e7e8b15b",
-      "largo": 27739
+      "huella": "67f73027bcfccc1a",
+      "largo": 28419
     },
     "s5/color": {
-      "huella": "12e8965cda2df1f6",
-      "largo": 27792
+      "huella": "e06fbf9ff26bb774",
+      "largo": 28472
     },
     "s5/blanco": {
-      "huella": "6336171f454c72f5",
-      "largo": 27793
+      "huella": "96c64fcfb60a7112",
+      "largo": 28473
     },
     "s6/color": {
-      "huella": "4775ac313ffdba28",
-      "largo": 27790
+      "huella": "594b6fead7764cf8",
+      "largo": 28470
     },
     "s6/blanco": {
-      "huella": "af6a5702a67595dc",
-      "largo": 27791
+      "huella": "b53451f82dba4776",
+      "largo": 28471
     },
     "s7/color": {
-      "huella": "33879bd40276a7a3",
-      "largo": 27809
+      "huella": "318ce16522174cdb",
+      "largo": 28489
     },
     "s7/blanco": {
-      "huella": "7a4d2f49a2a8dc30",
-      "largo": 27810
+      "huella": "a535d4b4cd9fdf65",
+      "largo": 28490
     }
   },
   "tablero": {

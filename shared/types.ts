@@ -154,6 +154,18 @@ export interface PlotCharacter {
   personalHook?: string;
   /** Pistas o conocimientos que este personaje posee sobre otros */
   knowledge: string[];
+  /**
+   * «Tu noche»: lo que hizo este personaje en el tramo del crimen, hora a hora
+   * y en segunda persona. Lo tienen TODOS y con la misma extensión: el del
+   * culpable es el crimen tal como lo vivió; el de un inocente, sus movimientos,
+   * lo que vio y su propia falta.
+   *
+   * Existe porque el dosier impreso del culpable llevaba un bloque que solo
+   * tenía él —el relato del crimen—, y en la casa Sabrón eso lo hacía un 23 %
+   * más largo que los demás: su sobre era el más gordo de la mesa. Opcional
+   * porque las tramas escritas antes no lo traen.
+   */
+  nightStory?: string;
 }
 
 export interface TimelineEvent {

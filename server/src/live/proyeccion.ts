@@ -334,6 +334,8 @@ export function vistaDeJugador(
       conocimientoPendiente: Math.max(0, todoElConocimiento.length - desbloqueado),
       giros,
       cronologiaPropia,
+      // Es suya y la vivió: la tiene desde el principio, igual que en el papel.
+      ...(personaje?.nightStory ? { nocheSuya: personaje.nightStory } : {}),
       notas: jugador.notas,
       soyElSenalado,
       pediEmpezar: jugador.pideEmpezar === true,

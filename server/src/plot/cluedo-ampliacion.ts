@@ -350,6 +350,9 @@ QUÉ NECESITO:
    persona cómo aprovechar su forma de ser esta noche. Si no hay descripción, conviértelo en ventaja.
 7. "characterName": nombre de ficción que incorpore su nombre real, al estilo de los ya existentes,
    sin repetir ningún apellido o sobrenombre ya usado.
+7b. "nightStory": su noche en el tramo del crimen, hora a hora y en segunda persona, de 110 a 170
+   palabras como la de los demás: encaja con su coartada y con la cronología ya escrita, y cuenta lo
+   que vio y lo que esconde. Un dosier más corto o más largo que el resto se nota sobre la mesa.
 8. "extraClues": ${
     salasSinPista
       ? `1 o 2 pistas para las salas que se han quedado sin ninguna: ${salasSinPista}. Usa ids de pista nuevos (p. ej. "pista-nueva-1").`
@@ -391,6 +394,7 @@ function normalizarPersonajes(valor: unknown): PlotCharacter[] {
       alibi: textoDe(dato.alibi),
       knowledge: listaDeTextos(dato.knowledge),
       personalHook: textoDe(dato.personalHook),
+      ...(textoDe(dato.nightStory) ? { nightStory: textoDe(dato.nightStory) } : {}),
     });
   }
   return personajes;

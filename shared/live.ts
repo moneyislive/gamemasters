@@ -734,6 +734,12 @@ export interface VistaJugador {
      * que es quien decide qué momentos son seguros de enviar.
      */
     cronologiaPropia: MomentoVista[];
+    /**
+     * «Tu noche» contada: el mismo párrafo que lleva el dosier impreso, en
+     * segunda persona. Solo viene si la trama lo tiene —las de CLUEDO escritas
+     * desde el 25-sep-2026—; los demás juegos y las tramas viejas no lo mandan.
+     */
+    nocheSuya?: string;
     notas: string;
     /**
      * ERES TU LA RESPUESTA. Solo lo sabes tu, y le cambia el tono a la app.

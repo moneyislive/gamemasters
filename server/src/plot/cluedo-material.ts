@@ -86,7 +86,7 @@ export const MATERIAL_SCHEMA: Record<string, unknown> = {
           instruction: {
             type: 'string',
             description:
-              'De 40 a 90 palabras en SEGUNDA persona, dirigidas a ese jugador: qué acaba de recordar, admitir o descubrir, y qué debe hacer con ello. No revela quién es el culpable.',
+              'De 40 a 90 palabras en SEGUNDA persona, dirigidas a ese jugador: o confiesa su propia falta y con ella explica una pista ya vista (cuál, y por qué no era el crimen), o revela un dato preciso que tenía sin saber que importaba (una hora, un registro, lo que vio). Dice qué hacer con ello. No nombra al culpable.',
           },
         },
       },
@@ -119,8 +119,15 @@ export const MATERIAL_SCHEMA: Record<string, unknown> = {
         additionalProperties: false,
         required: ['level', 'text'],
         properties: {
-          level: { type: 'integer', enum: [1, 2, 3], description: '1 empuja, 2 orienta, 3 casi lo dice' },
-          text: { type: 'string', description: 'La ayuda, leída en voz alta a toda la mesa' },
+          level: {
+            type: 'integer',
+            enum: [1, 2, 3],
+            description: '1 separa las preguntas que hay que hacerse, 2 dice qué pruebas mirar juntas, 3 da la secuencia decisiva',
+          },
+          text: {
+            type: 'string',
+            description: 'La ayuda, leída en voz alta a toda la mesa. Ordena el razonamiento; nunca nombra a la persona, el objeto ni la sala.',
+          },
         },
       },
     },
@@ -142,7 +149,8 @@ export const MATERIAL_SCHEMA: Record<string, unknown> = {
         },
         epilogue: {
           type: 'string',
-          description: 'Qué fue de cada cual después. Cierra la velada con una nota de humor o de amargura.',
+          description:
+            'Qué fue de cada cual después: cierra el hilo de cada personaje y de cada falta que salió a la luz. Termina la velada con una nota de humor o de amargura.',
         },
       },
     },
@@ -211,8 +219,17 @@ function construirPrompt(game: GameSession, plot: Plot): string {
   const nombre = (id: string): string =>
     sospechososDe(game).find((s) => s.id === id)?.name ?? id;
 
+  // El secreto y la noche de cada cual: un giro que confiesa una falta tiene que saber cuál es.
   const personajes = plot.characters
-    .map((p) => `- id: "${p.participanteId}" · ${p.characterName} (${nombre(p.participanteId)}) · ${p.role}`)
+    .map((p) =>
+      [
+        `- id: "${p.participanteId}" · ${p.characterName} (${nombre(p.participanteId)}) · ${p.role}`,
+        p.secret ? `  secreto: ${p.secret}` : '',
+        p.nightStory ? `  su noche: ${p.nightStory}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    )
     .join('\n');
 
   const cronologia = plot.timeline
@@ -254,11 +271,11 @@ Cómo ocurrió: ${plot.solution.howItHappened}
 LA PARTIDA TIENE ${rondas} RONDAS.
 
 REQUISITOS:
-1. narrations: exactamente ${rondas + 1} entradas, con round 0 (apertura) y round 1..${rondas}. Ninguna revela la solución: son el telón que se levanta al empezar cada tramo.
-2. twists: entre ${Math.min(2, maximoDeGiros(sospechososDe(game).length))} y ${maximoDeGiros(sospechososDe(game).length)} giros, cada uno para un sospechoso DISTINTO y NINGUNO para el culpable —si el culpable recibiera un giro se delataría solo—. Y al menos un inocente se queda sin giro: si todos los inocentes recibieran sobre, el único sin él sería el culpable. Reparte entre las rondas 2 y ${rondas}. Cada uno debe darle a ese jugador algo NUEVO que contar o que ocultar.
-3. timelineReveals: una entrada por ronda (1..${rondas}), en orden cronológico, que vaya rellenando el tramo sin testigos. La última puede dejar la pieza final sin encajar, pero no nombra al culpable.
-4. hints: tres ayudas graduadas. La de nivel 3 puede señalar la sala o el objeto, nunca a la persona.
-5. finale: la reconstrucción, la confesión en primera persona para que la lea quien interpretó al culpable, y el epílogo.
+1. narrations: exactamente ${rondas + 1} entradas, con round 0 (apertura) y round 1..${rondas}. Ninguna revela la solución: son el telón que se levanta al empezar cada tramo, y cada una le dice a la mesa qué pregunta toca ahora. La apertura pone a la víctima a agraviar en público a varios invitados, no solo a uno. Las del medio separan el desorden de la noche del momento de la muerte y avisan de que no todo lo escondido es el crimen («no confundáis una mentira con un asesinato»). La última pide reconstruir el camino entero: de dónde salió el objeto, cómo llegó, qué pasó a la hora del crimen y cómo volvió quien lo hizo.
+2. twists: entre ${Math.min(2, maximoDeGiros(sospechososDe(game).length))} y ${maximoDeGiros(sospechososDe(game).length)} giros, cada uno para un sospechoso DISTINTO y NINGUNO para el culpable —si el culpable recibiera un giro se delataría solo—. Y al menos un inocente se queda sin giro: si todos los inocentes recibieran sobre, el único sin él sería el culpable. Reparte entre las rondas 1 y ${rondas}, con más hacia el final. Cada giro es de una de dos clases: la CONFESIÓN de un inocente de su propia falta, que explica una pista ya vista y la saca del caso; o un DATO preciso que un personaje tenía sin saber que importaba —una hora, un registro, lo que vio—. Los dos acotan sin nombrar a nadie: un giro que diga quién fue estropea la noche.
+3. timelineReveals: una entrada por ronda (1..${rondas}), en orden cronológico, que vaya estrechando la hora de la muerte. Una de las primeras separa el tramo confuso del crimen (por ejemplo, que la víctima seguía viva después). La última da las marcas horarias decisivas sin nombrar al culpable.
+4. hints: tres ayudas graduadas que ordenan el razonamiento sin dar respuestas: la 1 separa las preguntas que hay que hacerse (quién pudo mover el objeto, quién pudo hacer ese camino, qué rasgo encaja); la 2 dice qué pruebas mirar juntas; la 3 da la secuencia decisiva de horas o de hechos. Ninguna nombra a la persona, el objeto ni la sala.
+5. finale: la reconstrucción, la confesión en primera persona para que la lea quien interpretó al culpable, y el epílogo, que cierra el hilo de cada personaje y de cada falta que salió a la luz.
 6. EL MISMO TRATO: ninguna narración, hecho establecido ni ayuda destaca al culpable sobre los demás. La apertura presenta a todos por igual o no nombra a nadie; si una narración nombra a alguien, nombra también a otros.
 7. Todo en español, escrito para leerse en voz alta ante una mesa: frases cortas, sin subordinadas largas.${buildStyleBlock(game)}`;
 }

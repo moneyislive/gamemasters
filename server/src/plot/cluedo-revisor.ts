@@ -189,7 +189,8 @@ export function tramaEnTexto(game: GameSession, plot: Plot): string {
         `- role: ${c.role}\n- publicPersona: ${c.publicPersona}\n- secret: ${c.secret ?? ''}\n` +
         `- motive: ${c.motive ?? ''}\n- alibi: ${c.alibi ?? ''}\n` +
         `- knowledge:\n${(c.knowledge ?? []).map((k) => `  · ${k}`).join('\n') || '  (nada)'}\n` +
-        `- personalHook: ${c.personalHook ?? ''}`,
+        `- personalHook: ${c.personalHook ?? ''}\n` +
+        `- nightStory: ${c.nightStory ?? '(no tiene)'}`,
     )
     .join('\n\n');
   const cronologia = plot.timeline
@@ -312,12 +313,17 @@ TU TAREA:
    - Protagonismo: cada persona con una historia propia que jugar: un secreto que merezca esconderse, un motivo creíble contra la víctima, un movimiento sospechoso en la cronología y al menos dos pistas que hablen de ella a lo largo de la noche. Nadie de relleno.
    - Objetos: cada objeto nombrado por su nombre en pistas o dosieres, ligado a algún personaje (suyo, heredado, regalado, de su oficio, con una historia) y con una razón para poder ser el arma. Los que no lo son, descartables con alguna prueba.
    - Salas: cada sala con alguna pista y con alguien que pasó por ella.
+   - Faltas que no son el crimen: al menos la mitad de los inocentes esconde una falta propia de esa noche (un robo, una falsificación, un chantaje, algo en una copa, tocar la escena) con su pista física y su explicación. Es lo que hace que el caso se resuelva separando mentiras de asesinatos; si falta, dáselo a quien no tenga una historia que jugar.
+   - El camino hasta el culpable: el crimen se prueba reconstruyendo el trayecto del objeto (de dónde salió, cómo y cuándo se movió, qué pasó a la hora del crimen, cómo volvió quien lo hizo) y con un rasgo del culpable que otras personas comparten en parte. Si falta, constrúyelo con pistas de las rondas 3 y 4 que sean piezas, no veredictos.
+   - Lo público no resuelve: la sinopsis, la ambientación, la cronología pública y la narración de apertura no traen datos decisivos, y los agravios públicos de la víctima se reparten entre varias personas en lugar de acumularse en una.
+   - Tu noche: cada personaje tiene su nightStory, coherente al minuto con su coartada, la cronología y las pistas, y todas de una extensión parecida: la del culpable nunca la más larga ni la de un inocente un trámite. El largo del dosier impreso no puede delatar a nadie.
+   - El guion: investigación individual —cada cual elige sala y habla con quien coincide—, sin equipos, portavoces ni informes de grupo.
 2. EL MISMO TRATO PARA LA PERSONA CULPABLE. No se trata de que se la señale poco: se trata de que se la señale COMO A LAS DEMÁS. Si destaca por arriba, equilibra: da a los inocentes sospechas razonables (motivos, movimientos, objetos, mentiras menores) y reescribe lo que la subraya a ella. Si destaca por abajo —nadie la mira—, dale los mismos hilos sospechosos que a cualquiera. La verdad solo se impone al COMBINAR las pruebas de las últimas rondas.
 3. Corrige con cambios mínimos pero completos: cuando cambies un personaje, una pista o un momento, escríbelo ENTERO. Si cambias un dato que aparece en otro sitio (una hora, un objeto, una coartada, un nombre), cambia también ese otro sitio para que todo siga cuadrando.
 4. No cambies la solución. Puedes reescribir el motivo real y el relato del crimen si hace falta para que encaje con lo que corriges.
-5. No empobrezcas: no acortes secretos, coartadas, pistas ni narraciones. Si reescribes, que quede igual de rico o más, con la misma voz.
+5. No empobrezcas: no acortes secretos, coartadas, noches, pistas ni narraciones. Si reescribes, que quede igual de rico o más, con la misma voz.
 6. El «apunta a» de cada pista lo lee quien la encuentra al cerrar la ronda: tiene que decir qué sugiere (una hora que no cuadra, un objeto fuera de sitio, una mentira), no dictar un veredicto.
-7. Giros: ninguno para la persona culpable, y al menos un inocente se queda sin giro (hay ${inocentes} inocentes): si no, el único sin sobre sería quien lo hizo.
+7. Giros: ninguno para la persona culpable, y al menos un inocente se queda sin giro (hay ${inocentes} inocentes): si no, el único sin sobre sería quien lo hizo. Cada giro confiesa la falta de un inocente —y saca del caso la pista que dejó— o revela un dato preciso que alguien tenía sin saberlo; ninguno nombra al culpable.
 8. Si un aviso de los informes no es un problema de verdad, dilo en tus hallazgos con el arreglo vacío y no toques nada por él.
 
 FORMATO DE LOS CAMBIOS: cadena vacía o lista vacía significa «sin cambios» en ese campo. Los personajes y las pistas que cambian van completos; la cronología y el guion, si los tocas, enteros; narraciones y hechos por ronda, ayudas por nivel, giros por id. En resumenDeCambios, una línea por cambio para el Game Master.${
