@@ -26,6 +26,34 @@
  *        en cualquier sitio que no sea su `uniform` o el primer argumento de una `texture*`. En el texto
  *        montado, lo que ya trae three (sus `#define` con argumentos, sus funciones con sampler) no cuenta:
  *        se compara con el texto crudo de three. Cada grafía tiene su vacuna.
+ *      · UN SOLO SAMPLER, `uRuidoQ`. El contador cuenta `texture*(uRuidoQ` y nada más: un gemelo
+ *        (`uniform sampler2D uRuidoBisQ;`, atado a la misma textura) leería sin que nadie lo cuente. En
+ *        `materia/**` toda declaración `uniform …sampler…;` es exactamente `uniform sampler2D uRuidoQ;`, y
+ *        ningún `#define` nombra un tipo sampler. Esa regla es de GRAFÍA: con la palabra `sampler` partida
+ *        en la fuente de TS (`${'samp' + 'ler2D'}`) no ve nada. Por eso hay otra sobre el texto MONTADO,
+ *        con la materia y sin ella (el de hoy de la fábrica, o el mismo sin su retoque `materia-*` si ya
+ *        la lleva): (1) los samplers DECLARADOS, contados (un nombre de three redeclarado cuenta), sobre el
+ *        código activo con las macros de objeto expandidas y con los `struct` que llevan un sampler
+ *        contados como sampler: lo que añade la materia es `uRuidoQ` y nada más; y (2) las LECTURAS: por
+ *        cada sampler que no sea `uRuidoQ`, no hay más `texture*`/`texelFetch*` con la materia que sin
+ *        ella, ni en el texto activo entero ni en el peor camino de `main`. (2) no depende de cómo se
+ *        declare el gemelo (otro nombre, uno de three como `alphaMap`, por macro, en un struct); sí de que
+ *        la lectura se escriba con una `texture*`/`texelFetch*` visible, y las macros que la esconderían
+ *        (con argumentos, o cuyo cuerpo nombre una lectura) ya son rojas por su lado.
+ *      · LOS `#define` DE LA FUENTE SE BUSCAN TAMBIÉN DENTRO DE LAS CADENAS: con el `\n` escrito como
+ *        escape (`'float a;\n#define X(a) …'`) o detrás de una comilla (`${'#define X(a) …'}`). La
+ *        fuente se lee con los escapes `\\`, `\n`, `\r` y `\t` resueltos, y el `#define` se busca en
+ *        cualquier sitio de la línea, no sólo al principio. Vale para (b) y para (d).
+ *      · EL PREPROCESADOR ES EL DE GLSL ES 3.00, NO EL DE C: `GL_ES`, `__VERSION__` (300) y
+ *        `GL_FRAGMENT_PRECISION_HIGH` están definidas (un gemelo dentro de `#ifdef GL_ES` es código
+ *        activo); `\` + salto se borra sin poner espacio, antes que los comentarios (`unif\` + `orm` es
+ *        `uniform`, también en la regla de fuente); los `#if` expanden las macros como texto y dividen
+ *        entero; y lo que no modela (`~ << >> & | ^`, hexadecimal u octal, un nombre sin definir, una
+ *        macro con argumentos, una extensión `GL_*`) es ROJO, con salida 1, nunca 0. `compilar` desenrolla
+ *        los `#pragma unroll_loop_start` como three (si no, quedaría `UNROLLED_LOOP_INDEX` en un `#if`).
+ *        Las lecturas son las 14 de GLSL ES 3.00 y los 9 alias del prefijo WebGL2 de three r185
+ *        (`texture2DLodEXT`…). La resta ve el TEXTO de la materia en los 20 de prueba; y `main` LEE más
+ *        `uRuidoQ` en su peor camino en 16 (el mobiliario, con las familias neutras, no la llama).
  *      · N0 SIN RUIDO DE HASH DE ADORNO (§7.4, «0 fbmQ de adorno»): en los textos con `MATERIA_Q 0` (N0 y
  *        lo lejano), ninguna llamada a `fbmQ` ni a `ruidoQ` en ninguna rama de `main`, salvo dentro de los
  *        charcos (`charcoQ`, `charcoDeLaAceraQ`), que el plan deja en hash.
@@ -36,7 +64,10 @@
  *        lee: `Record<0|1|2|3, { instrucciones: number; lecturas: number }>`; las instrucciones de fxc son
  *        de `verify:quiebro-gl`). Hoy no existe ninguno y se inspeccionan 0; A PARTIR DE QUE un material
  *        real lleve la materia, su tope es obligatorio: el mínimo de inspeccionados es el número de
- *        superficies cuyo material real ya la lleva.
+ *        superficies cuyo material real ya la lleva. Lo lejano cuenta como real cuando
+ *        `materialDeLoLejano(n, false)` (el de la ciudad, no el de prueba) ya trae un retoque `materia-*`:
+ *        entonces entra en esa cuenta, se juzga en (a), (b) y (d) como `lejos-real-n*`, y lo que se
+ *        compara con su tope es lo medido en ÉL.
  *   c. LA TEXTURA: 128², el sha de siempre, medias por canal 127 ± 3, varianza por mip creciente, dos
  *      generaciones iguales, 20 ms como mucho en Node y 87.380 bytes con sus mips.
  *   d. LAS DERIVADAS: `dFdx`, `dFdy`, `fwidth` y `texture()` con mip implícito sólo en el preámbulo, y el
@@ -64,6 +95,15 @@
  *        mano) y por el de la ola 2 (un material que ya lleva la materia): A ≠ B, A ≠ C, A0 ≠ B0 y
  *        A0 ≠ V0 en el texto activo, y los dos caminos, el mismo texto. La vacuna: el banco de antes, que
  *        devolvía tal cual el material que ya la llevaba.
+ *      · Y EL BANCO NO TOCA EL MATERIAL QUE LE DAN: `conLasOpcionesDelBanco` devuelve una COPIA (si la
+ *        fábrica de la ola 2 devolviera un material compartido, cambiarle la lista en su sitio forzaría el
+ *        barniz en la ciudad entera). El de entrada sale con la misma lista (el mismo array, los mismos
+ *        retoques), la misma versión, los mismos `defines`, la misma llave de programa y el mismo texto
+ *        montado; la copia no comparte la lista y lleva los `defines` del original (se le pone uno de
+ *        fábrica, porque `MeshStandardMaterial.copy` los deja en `{ STANDARD: '' }` y el texto activo no
+ *        los ve); con opciones monta otro texto y otra llave, y sin ellas el mismo texto y la misma llave
+ *        que el original. Vacunas: el banco que cambia la lista en su sitio (el de antes), el `clone()` de
+ *        three a secas (pierde el parcheo), la copia sin los `defines` y la copia con otra llave.
  *
  * ═══ CÓMO SE SABE QUE MIRA ═══
  *
@@ -89,7 +129,7 @@ import { GLSL_CHARCOS, GLSL_CIELO_REFLEJADO } from '../src/quiebro/ciudad/glsl';
 import { GLSL_DE_LAS_FAMILIAS, acabado, desempaquetarAcabado, FAMILIA } from '../src/quiebro/ciudad/materia/familias';
 import type { NumeroDeFamilia } from '../src/quiebro/ciudad/materia/familias';
 import { GLSL_DE_LA_MATERIA } from '../src/quiebro/ciudad/materia/glsl';
-import { SUPERFICIES_DE_PRUEBA, conLasOpcionesDelBanco, materialConMateria, materialDeHoy } from '../src/quiebro/ciudad/materia/prueba';
+import { SUPERFICIES_DE_PRUEBA, conLasOpcionesDelBanco, copiaConLosRetoques, materialConMateria, materialDeHoy } from '../src/quiebro/ciudad/materia/prueba';
 import type { MaterialDePrueba, OpcionesDePrueba, SuperficieDePrueba } from '../src/quiebro/ciudad/materia/prueba';
 import {
   ANCLA_DEL_PREAMBULO,
@@ -138,8 +178,20 @@ function paso(titulo: string): void {
 function nota(texto: string): void {
   console.log(`  ${texto}`);
 }
+/**
+ * Un texto GLSL con algo que el preprocesador de aquí no sabe evaluar como lo evaluaría GLSL ES 3.00 (una
+ * ficha de `#if` que no modela, una macro sin definir, una extensión que depende del GPU). No se adivina:
+ * es ROJO (sale con 1, no con 3), porque lo que no se sabe leer puede esconder lo que se cuenta.
+ */
+class GlslQueNoSeModela extends Error {}
+
 const reventar = (error: unknown): void => {
   for (const f of fallos) console.log(`  ✗ ${f}`);
+  if (error instanceof GlslQueNoSeModela) {
+    console.log(`  ✗ el preprocesador no sabe evaluar un texto montado, y eso no es verde — ${error.message}`);
+    console.error(`\nROJO después de ${hechas} comprobaciones: un texto GLSL que el preprocesador no modela.\n`);
+    process.exit(1);
+  }
   console.error(`\nEL GUION HA REVENTADO después de ${hechas} comprobaciones: no es un veredicto sobre el producto.\n`);
   console.error(error);
   process.exit(3);
@@ -172,6 +224,12 @@ const EXIGE = {
   /** Mínimos de inspeccionados. */
   minimoDeMaterialesA: 20,
   minimoDeMaterialesB: 20,
+  /**
+   * b: los de prueba en los que `medir` ve subir las lecturas de `uRuidoQ` del peor camino de `main` con la
+   * materia: fachada, asfalto, acera y lo lejano en N0-N3. El mobiliario no lee en `main` (0 lecturas en
+   * los cuatro niveles) mientras sus familias sean las neutras de la ola 1: su texto entra, pero no se llama.
+   */
+  minimoDeMontadosQueLeenEnMain: 16,
   minimoDeFicherosD: 19,
   minimoDeDerivadasEnElPreambulo: 4,
   /** d: los 20 de prueba más, en N1-N3, la fachada y el mobiliario de la ventana con el fundido y lo lejano real con el suyo. */
@@ -210,6 +268,9 @@ function resolverLosTrozos(s: string): string {
   });
 }
 
+/** El `unrollLoopPattern` de three r185 (`WebGLProgram`), tal cual. */
+const DESENROLLAR = /#pragma unroll_loop_start\s+for\s*\(\s*int\s+i\s*=\s*(\d+)\s*;\s*i\s*<\s*(\d+)\s*;\s*i\s*\+\+\s*\)\s*{([\s\S]+?)}\s+#pragma unroll_loop_end/g;
+
 interface Compilado {
   readonly frag: string;
   readonly uniformes: Record<string, THREE.IUniform>;
@@ -232,6 +293,10 @@ function compilar(m: THREE.MeshStandardMaterial, nivel: NivelDeLaCiudad): Compil
     m.vertexColors ? '#define USE_COLOR' : '',
     m.fog ? '#define USE_FOG' : '',
     m.transparent ? '' : '#define OPAQUE',
+    /* Los `defines` del material, como los pone three en el prefijo (`generateDefines`). */
+    ...Object.entries((m.defines ?? {}) as Record<string, unknown>)
+      .filter(([, v]) => v !== false)
+      .map(([k, v]) => `#define ${k} ${String(v)}`),
     'uniform mat4 viewMatrix;',
     'uniform vec3 cameraPosition;',
   ]
@@ -242,77 +307,183 @@ function compilar(m: THREE.MeshStandardMaterial, nivel: NivelDeLaCiudad): Compil
     .replace(/NUM_POINT_LIGHTS/g, String(l.punto))
     .replace(/NUM_HEMI_LIGHTS/g, String(l.hemi))
     .replace(/NUM_SPOT_LIGHT_SHADOWS_WITH_MAPS|NUM_SPOT_LIGHT_SHADOWS|NUM_SPOT_LIGHT_MAPS|NUM_SPOT_LIGHT_COORDS|NUM_SPOT_LIGHTS/g, '0')
-    .replace(/NUM_RECT_AREA_LIGHTS|NUM_DIR_LIGHT_SHADOWS|NUM_POINT_LIGHT_SHADOWS|NUM_CLIPPING_PLANES|UNION_CLIPPING_PLANES/g, '0');
+    .replace(/NUM_RECT_AREA_LIGHTS|NUM_DIR_LIGHT_SHADOWS|NUM_POINT_LIGHT_SHADOWS|NUM_CLIPPING_PLANES|UNION_CLIPPING_PLANES/g, '0')
+    .replace(DESENROLLAR, (_m, desde: string, hasta: string, cuerpo: string) => {
+      /* Como `unrollLoops` de three: sin esto quedaría `UNROLLED_LOOP_INDEX` en un `#if`, y en GLSL ES un nombre sin definir no es 0. */
+      let s = '';
+      for (let i = parseInt(desde, 10); i < parseInt(hasta, 10); i++) s += cuerpo.replace(/\[\s*i\s*\]/g, `[ ${String(i)} ]`).replace(/UNROLLED_LOOP_INDEX/g, String(i));
+      return s;
+    });
   return { frag: `${prefijo}\n${f}`, uniformes: sh.uniforms };
 }
 
 /* ─────────────────────────────── Un preprocesador mínimo ─────────────────────────────── */
 
 /**
- * Evalúa las directivas `#if/#ifdef/#ifndef/#elif/#else/#endif/#define/#undef` y devuelve sólo las líneas
- * activas, sin directivas. Las expresiones: `defined`, enteros, macros (recursivas; una sin definir vale 0,
- * como en C), `! - + * / % < > <= >= == != && ||` y paréntesis. Basta para `MATERIA_Q`, `OCTAVAS_Q`,
- * `NIVEL_Q`, `MICRO_Q` y los `#if` de three.
+ * Lo que un compilador de GLSL ES 3.00 define antes de la primera línea de un FRAGMENTO (el `#version
+ * 300 es` que pone three): `GL_ES`, `__VERSION__` y, en un fragmento con `highp`, que es lo que da
+ * WebGL2, `GL_FRAGMENT_PRECISION_HIGH`. Un `#ifdef GL_ES` es VERDADERO en la GPU: un preprocesador que no
+ * lo sepa tira como inactivo lo que la GPU compila.
+ */
+const PREDEFINIDAS_DE_GLSL_ES_300: Readonly<Record<string, string>> = { GL_ES: '1', __VERSION__: '300', GL_FRAGMENT_PRECISION_HIGH: '1' };
+/** Definidas también, pero con un valor que cambia con la línea y el trozo: en un `#if` no se modelan. */
+const PREDEFINIDAS_SIN_VALOR: ReadonlySet<string> = new Set(['__LINE__', '__FILE__']);
+
+/**
+ * Las fases de GLSL ES 3.00 antes de las directivas, en su orden: (1) `\` seguida de un salto se BORRA,
+ * sin poner espacio (`unif\` + `orm` es `uniform`); (2) cada comentario se cambia por un espacio (el de
+ * `//` deja su salto; uno de bloque que cruza líneas las junta, como en C). Devuelve las líneas.
+ */
+function lineasDeGlsl(texto: string): string[] {
+  const unido = texto.replace(/\\(?:\r\n?|\n)/g, '');
+  let s = '';
+  for (let i = 0; i < unido.length; i++) {
+    if (unido[i] === '/' && unido[i + 1] === '*') {
+      const fin = unido.indexOf('*/', i + 2);
+      if (fin < 0) throw new GlslQueNoSeModela('un comentario /* sin cerrar');
+      s += ' ';
+      i = fin + 1;
+    } else if (unido[i] === '/' && unido[i + 1] === '/') {
+      while (i + 1 < unido.length && unido[i + 1] !== '\n' && unido[i + 1] !== '\r') i++;
+    } else s += unido[i];
+  }
+  return s.split(/\r\n?|\n/);
+}
+
+/**
+ * Las fichas de una expresión de `#if`. Lo que GLSL ES 3.00 admite y aquí se evalúa: nombres, enteros
+ * decimales, `defined`, `! - + * / % < > <= >= == != && ||` y paréntesis. Lo que GLSL admite y aquí NO
+ * se modela (`~`, `<<`, `>>`, `&`, `|`, `^`, literales hexadecimales u octales, sufijos) y cualquier otro
+ * carácter lanzan `GlslQueNoSeModela`: dar 0 por lo que no se entiende es tirar código que la GPU compila.
+ */
+function fichasDeUnIf(expr: string): string[] {
+  const fichas: string[] = [];
+  const FICHA = /\s+|([A-Za-z_]\w*)|(\.?\d[\w.]*)|(&&|\|\||==|!=|<=|>=|<<|>>|[()!~<>+\-*/%&|^])|([\s\S])/gy;
+  for (let m = FICHA.exec(expr); m !== null && m[0] !== ''; m = FICHA.exec(expr)) {
+    if (m[1] !== undefined) fichas.push(m[1]);
+    else if (m[2] !== undefined) {
+      if (!/^(?:0|[1-9]\d*)$/.test(m[2])) throw new GlslQueNoSeModela(`#if con un literal que no es un entero decimal («${m[2]}»: hexadecimal, octal, sufijo o decimal): «${expr}»`);
+      fichas.push(m[2]);
+    } else if (m[3] !== undefined) {
+      if (['~', '<<', '>>', '&', '|', '^'].includes(m[3])) throw new GlslQueNoSeModela(`#if con «${m[3]}», que este preprocesador no evalúa: «${expr}»`);
+      fichas.push(m[3]);
+    } else if (m[4] !== undefined) throw new GlslQueNoSeModela(`#if con «${m[4]}», que no es una ficha de GLSL: «${expr}»`);
+  }
+  return fichas;
+}
+
+/**
+ * Evalúa las directivas `#if/#ifdef/#ifndef/#elif/#else/#endif/#define/#undef` como GLSL ES 3.00 y
+ * devuelve sólo las líneas activas, sin directivas y sin comentarios (ver `lineasDeGlsl`). Las
+ * predefinidas (`PREDEFINIDAS_DE_GLSL_ES_300`) están definidas desde la primera línea. En un `#if`, las
+ * macros se expanden como texto (`#define A 1 + 1` y `#if A * 2` es 3, no 4), y la división es entera.
+ * Es ROJO (`GlslQueNoSeModela`), y no 0, lo que GLSL ES no evalúa como 0: un nombre sin definir (en
+ * GLSL ES es un error), una macro con argumentos, `defined` salido de una macro, `__LINE__`, una
+ * extensión (`GL_*` que no está en las predefinidas: depende del GPU), una ficha que no se modela (ver
+ * `fichasDeUnIf`), una expresión que no se termina de leer, o dividir por 0.
  *
  * NO expande macros en el código. Por eso, si se le da `definidas`, apunta ahí cada `#define` ACTIVO
  * (nombre → «(argumentos) cuerpo»), y (b) pone en rojo las que esconderían coste (`macrosConCoste`).
  */
 export function preprocesar(texto: string, iniciales: Readonly<Record<string, string>> = {}, definidas?: Map<string, string>): string {
-  const macros = new Map<string, string>(Object.entries(iniciales));
+  const macros = new Map<string, string>(Object.entries({ ...PREDEFINIDAS_DE_GLSL_ES_300, ...iniciales }));
+  const conArgumentos = new Set<string>();
   const pila: { padre: boolean; tomado: boolean }[] = [];
   let activo = true;
   const salida: string[] = [];
-  const valor = (expr: string, hondo = 0): number => {
-    if (hondo > 20) throw new Error(`macro recursiva: ${expr}`);
-    const sinDefined = expr
-      .replace(/defined\s*\(\s*(\w+)\s*\)/g, (_m, n: string) => (macros.has(n) ? '1' : '0'))
-      .replace(/defined\s+(\w+)/g, (_m, n: string) => (macros.has(n) ? '1' : '0'));
-    const fichas = sinDefined.match(/\d+(?:\.\d+)?[uU]?|\w+|&&|\|\||==|!=|<=|>=|[()!<>+\-*/%]/g) ?? [];
+  const estaDefinida = (n: string, expr: string): boolean => {
+    if (!/^[A-Za-z_]\w*$/.test(n)) throw new GlslQueNoSeModela(`defined sin un nombre: «${expr}»`);
+    if (PREDEFINIDAS_SIN_VALOR.has(n)) return true;
+    if (n.startsWith('GL_') && !macros.has(n)) throw new GlslQueNoSeModela(`«${n}» depende del GPU (una extensión): «${expr}»`);
+    return macros.has(n);
+  };
+  /** Las fichas con las macros expandidas y cada `defined` resuelto (`dentro`: las que se están expandiendo). */
+  const expandir = (fichas: readonly string[], dentro: ReadonlySet<string>, expr: string): string[] => {
+    const fuera: string[] = [];
+    for (let k = 0; k < fichas.length; k++) {
+      const f = fichas[k] as string;
+      if (!/^[A-Za-z_]/.test(f)) {
+        fuera.push(f);
+        continue;
+      }
+      if (f === 'defined') {
+        if (dentro.size > 0) throw new GlslQueNoSeModela(`defined salido de una macro: «${expr}»`);
+        let n: string | undefined;
+        if (fichas[k + 1] === '(') {
+          n = fichas[k + 2];
+          if (fichas[k + 3] !== ')') throw new GlslQueNoSeModela(`defined( sin cerrar: «${expr}»`);
+          k += 3;
+        } else {
+          n = fichas[k + 1];
+          k += 1;
+        }
+        fuera.push(estaDefinida(n ?? '', expr) ? '1' : '0');
+        continue;
+      }
+      if (PREDEFINIDAS_SIN_VALOR.has(f)) throw new GlslQueNoSeModela(`#if con ${f}, cuyo valor no se modela: «${expr}»`);
+      if (dentro.has(f)) throw new GlslQueNoSeModela(`#if con la macro ${f}, que se nombra a sí misma: «${expr}»`);
+      if (conArgumentos.has(f)) throw new GlslQueNoSeModela(`#if con la macro con argumentos ${f}: «${expr}»`);
+      const cuerpo = macros.get(f);
+      if (cuerpo === undefined) {
+        if (f.startsWith('GL_')) throw new GlslQueNoSeModela(`«${f}» depende del GPU (una extensión): «${expr}»`);
+        throw new GlslQueNoSeModela(`#if con «${f}», que no está definida (en GLSL ES es un error, no 0): «${expr}»`);
+      }
+      fuera.push(...expandir(fichasDeUnIf(cuerpo), new Set([...dentro, f]), expr));
+    }
+    return fuera;
+  };
+  const valor = (expr: string): number => {
+    const fichas = expandir(fichasDeUnIf(expr), new Set(), expr);
     let i = 0;
-    const mirar = (): string | undefined => fichas[i];
+    const corta = (): never => {
+      throw new GlslQueNoSeModela(`#if que no se termina de leer: «${expr}» → «${fichas.join(' ')}»`);
+    };
     const primario = (): number => {
       const t = fichas[i++];
-      if (t === undefined) throw new Error(`expresión corta: ${expr}`);
+      if (t === undefined) return corta();
       if (t === '(') {
         const v = o();
-        i++;
+        if (fichas[i++] !== ')') corta();
         return v;
       }
       if (t === '!') return primario() === 0 ? 1 : 0;
-      if (t === '-') return -primario();
+      if (t === '-') return -primario() | 0;
       if (t === '+') return primario();
-      if (/^\d/.test(t)) return parseFloat(t);
-      const m = macros.get(t);
-      if (m === undefined || m.trim() === '') return 0;
-      return valor(m, hondo + 1);
+      if (/^\d/.test(t)) return Number(t) | 0;
+      return corta();
     };
     const binario = (sig: () => number, ops: readonly string[], f: (op: string, a: number, b: number) => number) => (): number => {
       let a = sig();
-      while (ops.includes(mirar() ?? '')) {
+      while (ops.includes(fichas[i] ?? '')) {
         const op = fichas[i++] as string;
         a = f(op, a, sig());
       }
       return a;
     };
-    const mul = binario(primario, ['*', '/', '%'], (op, a, b) => (op === '*' ? a * b : op === '/' ? a / b : a % b));
-    const sum = binario(mul, ['+', '-'], (op, a, b) => (op === '+' ? a + b : a - b));
+    const mul = binario(primario, ['*', '/', '%'], (op, a, b) => {
+      if (op !== '*' && b === 0) throw new GlslQueNoSeModela(`#if que divide por 0: «${expr}»`);
+      return op === '*' ? Math.imul(a, b) : op === '/' ? Math.trunc(a / b) | 0 : a % b | 0;
+    });
+    const sum = binario(mul, ['+', '-'], (op, a, b) => (op === '+' ? a + b : a - b) | 0);
     const rel = binario(sum, ['<', '>', '<=', '>='], (op, a, b) => +(op === '<' ? a < b : op === '>' ? a > b : op === '<=' ? a <= b : a >= b));
     const igu = binario(rel, ['==', '!='], (op, a, b) => +(op === '==' ? a === b : a !== b));
     const y = binario(igu, ['&&'], (_op, a, b) => +(a !== 0 && b !== 0));
     const o = binario(y, ['||'], (_op, a, b) => +(a !== 0 || b !== 0));
-    return o();
+    const v = o();
+    if (i !== fichas.length) corta();
+    return v;
   };
-  for (const linea of texto.split('\n')) {
+  for (const linea of lineasDeGlsl(texto)) {
     const d = /^\s*#\s*(\w+)\s*(.*)$/.exec(linea);
     if (d === null) {
       if (activo) salida.push(linea);
       continue;
     }
     const directiva = d[1] as string;
-    const resto = (d[2] as string).replace(/\/\/.*$/, '').trim();
+    const resto = (d[2] as string).trim();
     if (directiva === 'if' || directiva === 'ifdef' || directiva === 'ifndef') {
       const nombre = resto.split(/\s+/)[0] ?? '';
-      const v: boolean = activo && (directiva === 'if' ? valor(resto) !== 0 : directiva === 'ifdef' ? macros.has(nombre) : !macros.has(nombre));
+      const v: boolean = activo && (directiva === 'if' ? valor(resto) !== 0 : directiva === 'ifdef' ? estaDefinida(nombre, linea) : !estaDefinida(nombre, linea));
       pila.push({ padre: activo, tomado: v });
       activo = v;
     } else if (directiva === 'elif') {
@@ -336,11 +507,17 @@ export function preprocesar(texto: string, iniciales: Readonly<Record<string, st
       if (!activo) continue;
       const m = /^(\w+)(\([^)]*\))?\s*(.*)$/.exec(resto);
       if (m !== null) {
-        macros.set(m[1] as string, m[2] !== undefined ? '' : (m[3] as string));
-        definidas?.set(m[1] as string, `${m[2] ?? ''} ${m[3] as string}`.trim());
+        const nombre = m[1] as string;
+        macros.set(nombre, m[2] !== undefined ? '' : (m[3] as string));
+        if (m[2] !== undefined) conArgumentos.add(nombre);
+        else conArgumentos.delete(nombre);
+        definidas?.set(nombre, `${m[2] ?? ''} ${m[3] as string}`.trim());
       }
     } else if (directiva === 'undef') {
-      if (activo) macros.delete(resto.split(/\s+/)[0] ?? '');
+      if (!activo) continue;
+      const nombre = resto.split(/\s+/)[0] ?? '';
+      macros.delete(nombre);
+      conArgumentos.delete(nombre);
     }
   }
   if (pila.length !== 0) throw new Error('#if sin cerrar');
@@ -355,23 +532,55 @@ interface Coste {
   pcg: number;
   /** Lecturas de textura de CUALQUIER sampler (para el tope de cada material, §5.2.9). */
   todas: number;
+  /**
+   * Lecturas de textura cuyo primer argumento NO es `uRuidoQ`, con su propio peor camino (no es
+   * `todas − lecturas`: cada una se maximiza por su lado). Para el sampler único sobre el montado: la
+   * materia no puede añadir ninguna.
+   */
+  ajenas: number;
 }
-const CERO: Coste = { lecturas: 0, pcg: 0, todas: 0 };
-const mas = (a: Coste, b: Coste): Coste => ({ lecturas: a.lecturas + b.lecturas, pcg: a.pcg + b.pcg, todas: a.todas + b.todas });
-const peor = (a: Coste, b: Coste): Coste => ({ lecturas: Math.max(a.lecturas, b.lecturas), pcg: Math.max(a.pcg, b.pcg), todas: Math.max(a.todas, b.todas) });
-const LEEN = new Set([
+const CERO: Coste = { lecturas: 0, pcg: 0, todas: 0, ajenas: 0 };
+const mas = (a: Coste, b: Coste): Coste => ({ lecturas: a.lecturas + b.lecturas, pcg: a.pcg + b.pcg, todas: a.todas + b.todas, ajenas: a.ajenas + b.ajenas });
+const peor = (a: Coste, b: Coste): Coste => ({
+  lecturas: Math.max(a.lecturas, b.lecturas),
+  pcg: Math.max(a.pcg, b.pcg),
+  todas: Math.max(a.todas, b.todas),
+  ajenas: Math.max(a.ajenas, b.ajenas),
+});
+/**
+ * Lo que LEE de una textura en el fragmento que monta three: las 14 funciones de GLSL ES 3.00 que
+ * muestrean o traen un texel, y los alias que three r185 pone en el prefijo del fragmento en WebGL2
+ * (`#define texture2DLodEXT textureLod`…, en `WebGLProgram`). `compilar` no copia ese prefijo (sus
+ * `#define` nombran lecturas y `macrosConCoste` los daría por puertas), así que el alias se cuenta aquí.
+ */
+const LECTURAS_DE_GLSL_ES_300 = [
   'texture',
-  'texture2D',
-  'textureLod',
-  'textureGrad',
-  'textureOffset',
-  'textureLodOffset',
-  'textureGradOffset',
   'textureProj',
-  'textureProjLod',
+  'textureLod',
+  'textureOffset',
   'texelFetch',
   'texelFetchOffset',
-]);
+  'textureProjOffset',
+  'textureLodOffset',
+  'textureProjLod',
+  'textureProjLodOffset',
+  'textureGrad',
+  'textureGradOffset',
+  'textureProjGrad',
+  'textureProjGradOffset',
+] as const;
+const ALIAS_DE_LECTURA_DE_THREE = [
+  'texture2D',
+  'textureCube',
+  'texture2DProj',
+  'texture2DLodEXT',
+  'texture2DProjLodEXT',
+  'textureCubeLodEXT',
+  'texture2DGradEXT',
+  'texture2DProjGradEXT',
+  'textureCubeGradEXT',
+] as const;
+const LEEN: ReadonlySet<string> = new Set<string>([...LECTURAS_DE_GLSL_ES_300, ...ALIAS_DE_LECTURA_DE_THREE]);
 
 /** Las funciones de nivel superior de un texto GLSL sin comentarios: nombre → fichas del cuerpo. */
 function funcionesDe(texto: string): Map<string, string[]> {
@@ -442,9 +651,10 @@ function medir(textoActivo: string, materia: ReadonlySet<string>): Medida {
         const n = t[k] as string;
         if (t[k + 1] !== '(' || !/^[A-Za-z_]/.test(n)) continue;
         if (LEEN.has(n)) {
-          c = mas(c, { lecturas: t[k + 2] === 'uRuidoQ' ? 1 : 0, pcg: 0, todas: 1 });
+          const delRuido = t[k + 2] === 'uRuidoQ';
+          c = mas(c, { lecturas: delRuido ? 1 : 0, pcg: 0, todas: 1, ajenas: delRuido ? 0 : 1 });
         } else if (n === 'pcgQ') {
-          if (pcgAqui) c = mas(c, { lecturas: 0, pcg: 1, todas: 0 });
+          if (pcgAqui) c = mas(c, { lecturas: 0, pcg: 1, todas: 0, ajenas: 0 });
         } else if (n !== nombre && funciones.has(n)) {
           if (n === 'fbmQ' || n === 'ruidoQ') hash++;
           const sub = costeDe(n, pcgAqui);
@@ -510,7 +720,7 @@ function medir(textoActivo: string, materia: ReadonlySet<string>): Medida {
   };
   if (!funciones.has('main')) throw new Error('el texto no tiene main');
   const m = costeDe('main', false);
-  return { lecturas: m.lecturas, pcg: m.pcg, todas: m.todas, bucles, ruidoDeHash: m.hash };
+  return { lecturas: m.lecturas, pcg: m.pcg, todas: m.todas, ajenas: m.ajenas, bucles, ruidoDeHash: m.hash };
 }
 
 /** Los nombres de las funciones de la materia (las que pone su retoque). */
@@ -534,11 +744,153 @@ function macrosConCoste(definidas: ReadonlyMap<string, string>, materia: Readonl
 
 /* ─────────────────────── b. Las puertas del contador: reglas, no grafías ─────────────────────── */
 
-/** Une las líneas partidas con `\` (GLSL ES 3.00 las admite): un `#define X \` + `dFdx(p)` es una sola línea. */
-const unirLasLineas = (s: string): string => s.replace(/\\+[ \t]*\r?\n/g, ' ');
+/**
+ * Une las líneas partidas con `\` como GLSL ES 3.00: la barra y el salto se BORRAN, sin poner espacio
+ * (`#define X \` + `dFdx(p)` es una sola línea, y `sampl\` + `er2D` es `sampler2D`). Más ancha que GLSL
+ * (admite blancos entre la barra y el salto, y varias barras): lo que une de más no compilaría.
+ */
+const unirLasLineas = (s: string): string => s.replace(/\\+[ \t]*(?:\r\n?|\n)/g, '');
 
 /** Un `#define` (con la almohadilla y la palabra separadas o no) y lo que le sigue en su línea. */
 const DEFINE = /^[ \t]*#[ \t]*define[ \t]+(\w+)(.*)$/gm;
+
+/**
+ * UN `#define` EN LA FUENTE DE TS, esté donde esté en la línea. En un texto GLSL la almohadilla va al
+ * principio de la línea; en la FUENTE que lo escribe, no: `'float a;\n#define X(a) …'` (el salto escrito
+ * como escape) o `${'#define X(a) …'}` (detrás de una comilla) lo dejan a media línea, y el `DEFINE` de
+ * arriba no los veía. Se busca en cualquier sitio, sobre la fuente con los escapes resueltos.
+ */
+const DEFINE_EN_LA_FUENTE = /#[ \t]*define[ \t]+(\w+)([^\n]*)/g;
+
+/**
+ * Resuelve los escapes de las cadenas de TS que cambian la forma de las líneas (`\\`, `\n`, `\r`, `\t`),
+ * de izquierda a derecha: `\\n` es una barra y una ene; `\\\n`, una barra y un salto (la línea partida de
+ * GLSL, que después une `unirLasLineas`). Fuera de las cadenas no hay escapes que importen aquí.
+ */
+function desescapar(s: string): string {
+  return s.replace(/\\([\\nrt])/g, (_m, c: string) => (c === '\\' ? '\\' : c === 'n' ? '\n' : c === 't' ? '\t' : ''));
+}
+
+/** La fuente de un fichero de `materia/**` como la leen sus reglas: sin comentarios, sin escapes y con las líneas `\` unidas. */
+const codigoDeLaFuente = (texto: string): string => unirLasLineas(desescapar(soloCodigo(texto)));
+
+/** Una declaración `uniform …;` (cualquier tipo, con o sin precisión, suelta o en lista). */
+const DECLARACION_UNIFORME = /\buniform\b([^;{}]*);/g;
+/** Un tipo sampler: `sampler2D`, `isampler3D`, `usamplerCube`, `sampler2DShadow`… */
+const TIPO_SAMPLER = /\b[iu]?sampler\w*\b/;
+/** La única declaración de sampler que admite `materia/**`. */
+const EL_SAMPLER_DE_LA_MATERIA = /^uniform\s+sampler2D\s+uRuidoQ\s*;$/;
+
+/**
+ * El código ACTIVO de un texto montado (el preprocesador resuelve los `#if` como GLSL ES 3.00, con las
+ * líneas `\` unidas) con sus macros de objeto expandidas, también las predefinidas (`GL_ES`,
+ * `__VERSION__`…): `#define LECTOR_Q sampler2D` + `uniform LECTOR_Q x;` se lee `uniform sampler2D x;`.
+ * Las macros con argumentos no se expanden: ésas ya son rojas por su lado (`juzgarElMontadoDelContador`),
+ * salvo las de three.
+ */
+function codigoActivoExpandido(frag: string): string {
+  const definidas = new Map<string, string>();
+  let codigo = soloCodigo(preprocesar(frag, {}, definidas));
+  const deObjeto = new Map([...Object.entries(PREDEFINIDAS_DE_GLSL_ES_300), ...[...definidas].filter(([, cuerpo]) => !cuerpo.startsWith('('))]);
+  for (let vuelta = 0; vuelta < 8 && deObjeto.size > 0; vuelta++) {
+    const antes = codigo;
+    codigo = codigo.replace(/\b[A-Za-z_]\w*\b/g, (id) => deObjeto.get(id) ?? id);
+    if (codigo === antes) break;
+  }
+  return codigo;
+}
+
+const sumarUno = (m: Map<string, number>, k: string): void => {
+  m.set(k, (m.get(k) ?? 0) + 1);
+};
+
+/**
+ * LOS SAMPLERS QUE DECLARA UN TEXTO MONTADO, contados (un multiconjunto: un nombre de three declarado
+ * otra vez cuenta dos). Sobre el código activo con las macros de objeto expandidas; un `uniform` cuyo
+ * tipo es un `struct` con un sampler dentro (directo o en otro struct) cuenta como sampler. También en
+ * lista: `uniform sampler2D a, b;`.
+ */
+function samplersDeclarados(frag: string): Map<string, number> {
+  let codigo = codigoActivoExpandido(frag);
+  /* Los struct, de izquierda a derecha: cada uno se sustituye por su nombre (los anónimos toman uno). */
+  const conSampler = new Set<string>();
+  let anonimos = 0;
+  const nombraUnSampler = (cuerpo: string): boolean => TIPO_SAMPLER.test(cuerpo) || (cuerpo.match(/[A-Za-z_]\w*/g) ?? []).some((id) => conSampler.has(id));
+  for (let vuelta = 0; vuelta < 8; vuelta++) {
+    const antes = codigo;
+    codigo = codigo.replace(/\bstruct\s*(\w*)\s*\{([^{}]*)\}/g, (_m, nombre: string, cuerpo: string) => {
+      const n = nombre !== '' ? nombre : `structAnonimoQ${String(anonimos++)}`;
+      if (nombraUnSampler(cuerpo)) conSampler.add(n);
+      return n;
+    });
+    if (codigo === antes) break;
+  }
+  const nombres = new Map<string, number>();
+  for (const d of codigo.matchAll(DECLARACION_UNIFORME)) {
+    const m = /^\s*(?:(?:lowp|mediump|highp)\s+)*(\w+)\s+([\s\S]*)$/.exec(d[1] as string);
+    if (m === null) continue;
+    const tipo = m[1] as string;
+    if (!TIPO_SAMPLER.test(tipo) && !conSampler.has(tipo)) continue;
+    for (const trozo of (m[2] as string).split(',')) {
+      const id = /^\s*(\w+)/.exec(trozo);
+      if (id !== null) sumarUno(nombres, id[1] as string);
+    }
+  }
+  return nombres;
+}
+
+/**
+ * LAS LECTURAS DE UN TEXTO MONTADO, por sampler: cuántas `texture*`/`texelFetch*` hay en el código activo
+ * (con las macros de objeto expandidas, en TODAS las funciones y ramas) con cada primer argumento. Lo
+ * que no es un nombre suelto (`(uRuidoQ)`, `uGemeloQ.t`) cuenta con su primera ficha.
+ */
+function lecturasPorSampler(frag: string): Map<string, number> {
+  const t = fichasDe(codigoActivoExpandido(frag));
+  const cuenta = new Map<string, number>();
+  for (let k = 0; k + 2 < t.length; k++) {
+    if (LEEN.has(t[k] as string) && t[k + 1] === '(') sumarUno(cuenta, t[k + 2] as string);
+  }
+  return cuenta;
+}
+
+/**
+ * EL JUICIO DEL SAMPLER ÚNICO SOBRE EL TEXTO MONTADO. No mira cómo se escribe en la fuente, sino lo que
+ * queda montado, con la materia y sin ella:
+ *   · las DECLARACIONES: lo que declara con la materia y no sin ella (contado) es `uRuidoQ` y nada más;
+ *   · las LECTURAS, en todo el texto activo: por cada sampler que no sea `uRuidoQ`, no hay más con la
+ *     materia que sin ella;
+ *   · y en el PEOR CAMINO de `main` (lo que mide `medir`), las lecturas que no son de `uRuidoQ` no suben.
+ * Las lecturas son la regla que no depende de la declaración: un gemelo con otro nombre, con un nombre
+ * de three, por macro o dentro de un struct lee de un sampler que no es `uRuidoQ`, y eso sube la cuenta.
+ * Devuelve también si la materia añadía `uRuidoQ` (`anadeElRuido`), si el texto activo de la materia
+ * (en cualquier función, se llame o no) trae lecturas de `uRuidoQ` (`leeElRuido`: prueba que la resta ve
+ * el texto de la materia, no que `main` lea), y si las lecturas de `uRuidoQ` del PEOR CAMINO de `main`
+ * suben con la materia (`mainLeeElRuido`: lo que `medir` cuenta de verdad).
+ */
+function juzgarLosSamplersDelMontado(conMateria: string, sinMateria: string): { problemas: string[]; anadeElRuido: boolean; leeElRuido: boolean; mainLeeElRuido: boolean } {
+  const problemas: string[] = [];
+  const antes = samplersDeclarados(sinMateria);
+  const nuevos = new Set<string>();
+  for (const [n, k] of samplersDeclarados(conMateria)) if (k > (antes.get(n) ?? 0)) nuevos.add(n);
+  for (const n of nuevos) if (n !== 'uRuidoQ') problemas.push(`la materia declara un sampler que no es uRuidoQ: ${n}`);
+  const leiaSin = lecturasPorSampler(sinMateria);
+  const leeCon = lecturasPorSampler(conMateria);
+  for (const [s, k] of leeCon) {
+    const k0 = leiaSin.get(s) ?? 0;
+    if (s !== 'uRuidoQ' && k > k0) problemas.push(`la materia añade ${String(k - k0)} lectura(s) de «${s}», que no es uRuidoQ`);
+  }
+  const medidaCon = medir(preprocesar(conMateria), FUNCIONES_DE_LA_MATERIA);
+  const medidaSin = medir(preprocesar(sinMateria), FUNCIONES_DE_LA_MATERIA);
+  const peorCon = medidaCon.ajenas;
+  const peorSin = medidaSin.ajenas;
+  if (peorCon > peorSin) problemas.push(`en el peor camino de main, ${String(peorCon)} lecturas de samplers que no son uRuidoQ, contra ${String(peorSin)} sin la materia`);
+  return {
+    problemas,
+    anadeElRuido: nuevos.has('uRuidoQ'),
+    leeElRuido: (leeCon.get('uRuidoQ') ?? 0) > (leiaSin.get('uRuidoQ') ?? 0),
+    mainLeeElRuido: medidaCon.lecturas > medidaSin.lecturas,
+  };
+}
 
 /**
  * Un parámetro `sampler*` en una lista de parámetros: `(sampler2D`, `, in highp sampler2D`, `(isampler3D`,
@@ -568,17 +920,25 @@ function macrosConArgumentos(texto: string): string[] {
 function juzgarLaFuenteDelContador(fuentes: readonly FuenteDeMateria[]): string[] {
   const problemas: string[] = [];
   for (const f of fuentes) {
-    const codigo = unirLasLineas(soloCodigo(f.texto));
+    const codigo = codigoDeLaFuente(f.texto);
     for (const nombre of funcionesConSampler(codigo)) problemas.push(`${f.fichero}: la función ${nombre} tiene un parámetro sampler (una lectura por parámetro no se cuenta)`);
     /* Y ningún sampler que no sea un `uniform` suelto (un campo de struct, un parámetro que se escape). */
     const samplers = [...codigo.matchAll(/\b[iu]?sampler\w*\b/g)].length;
     const uniformes = [...codigo.matchAll(/\buniform\s+(?:(?:lowp|mediump|highp)\s+)?[iu]?sampler\w*\s+\w+\s*;/g)].length;
     if (samplers > uniformes) problemas.push(`${f.fichero}: ${String(samplers - uniformes)} sampler(s) fuera de un «uniform samplerX nombre;»`);
-    for (const m of codigo.matchAll(DEFINE)) {
+    /* Y el único sampler de la materia es `uRuidoQ`: un gemelo leería sin que el contador lo cuente. */
+    for (const d of codigo.matchAll(DECLARACION_UNIFORME)) {
+      const declaracion = d[0].replace(/\s+/g, ' ').trim();
+      if (TIPO_SAMPLER.test(declaracion) && !EL_SAMPLER_DE_LA_MATERIA.test(declaracion)) {
+        problemas.push(`${f.fichero}: «${declaracion.slice(0, 80)}»: en materia/** el único sampler es «uniform sampler2D uRuidoQ;»`);
+      }
+    }
+    for (const m of codigo.matchAll(DEFINE_EN_LA_FUENTE)) {
       const nombre = m[1] as string;
       const resto = m[2] as string;
       if (resto.startsWith('(')) problemas.push(`${f.fichero}: el #define ${nombre} tiene argumentos`);
       else if (COSTE_EN_MACRO.test(resto)) problemas.push(`${f.fichero}: el cuerpo del #define ${nombre} deriva, lee o pega fichas`);
+      else if (TIPO_SAMPLER.test(resto)) problemas.push(`${f.fichero}: el #define ${nombre} nombra un tipo sampler`);
     }
   }
   return problemas;
@@ -688,6 +1048,7 @@ function juzgarLosTopes(
 
 interface Juzgable {
   readonly nombre: string;
+  readonly superficie: SuperficieDePrueba;
   readonly nivel: NivelDeLaCiudad;
   readonly material: THREE.MeshStandardMaterial;
   readonly faltan: readonly string[];
@@ -699,15 +1060,38 @@ function losMateriales(): Juzgable[] {
   for (const nivel of NIVELES) {
     for (const s of SUPERFICIES_DE_PRUEBA) {
       const h = materialConMateria(s, nivel);
-      lista.push({ nombre: `${s}-n${String(nivel)}`, nivel, material: h.material, faltan: h.faltan, yaLaLlevaba: h.yaLaLlevaba });
+      lista.push({ nombre: `${s}-n${String(nivel)}`, superficie: s, nivel, material: h.material, faltan: h.faltan, yaLaLlevaba: h.yaLaLlevaba });
     }
   }
   return lista;
 }
 
 function retoquesDe(m: THREE.Material): Retoque[] {
-  return (m.userData.parcheoDelQuiebro as { retoques: Retoque[] }).retoques;
+  return (m.userData.parcheoDelQuiebro as { retoques: Retoque[] } | undefined)?.retoques ?? [];
 }
+
+const llevaLaMateria = (m: THREE.Material): boolean => retoquesDe(m).some((r) => r.nombre.startsWith('materia-'));
+
+/**
+ * LO LEJANO DE VERDAD, SI YA LLEVA LA MATERIA. El de prueba (`materialConMateria('lejos', n)`) la lleva
+ * siempre, cableada aquí; el de la ciudad (`materialDeLoLejano(n, false)`, `ciudad/lejos.ts`) la llevará
+ * cuando LEJANO la cablee. Desde ese día es un material real con la materia: entra en `yaLaLlevan` (y su
+ * tope es obligatorio) y se juzga en (a), (b) y (d) como `lejos-real-n*`. `fabrica` es la de la ciudad; las
+ * vacunas le pasan otra. Devuelve los que la llevan y cuántos niveles miró.
+ */
+function loLejanoRealConMateria(fabrica: (n: NivelDeLaCiudad) => THREE.MeshStandardMaterial): { juzgables: Juzgable[]; mirados: number } {
+  const juzgables: Juzgable[] = [];
+  let mirados = 0;
+  for (const nivel of NIVELES) {
+    const m = fabrica(nivel);
+    mirados++;
+    if (llevaLaMateria(m)) juzgables.push({ nombre: `lejos-real-n${String(nivel)}`, superficie: 'lejos', nivel, material: m, faltan: [], yaLaLlevaba: true });
+  }
+  return { juzgables, mirados };
+}
+
+/** Las superficies cuyo material REAL ya lleva la materia. */
+const superficiesQueYaLaLlevan = (lista: readonly Juzgable[]): Set<SuperficieDePrueba> => new Set(lista.filter((j) => j.yaLaLlevaba).map((j) => j.superficie));
 
 /** Cambia en un material el retoque de la materia por otro (para las vacunas). */
 function cambiarLaMateria(m: THREE.Material, cambio: (r: Retoque) => Retoque): void {
@@ -744,7 +1128,7 @@ function juzgarElSampler(c: Compilado, fallosDelParcheo: readonly string[]): str
 
 /* ─────────────────────────────── d. Las derivadas ─────────────────────────────── */
 
-const DERIVA = /\b(dFdx\w*|dFdy\w*|fwidth\w*|texture|texture2D|textureProj|textureOffset|textureProjOffset|texture2DProj)\s*\(/g;
+const DERIVA = /\b(dFdx\w*|dFdy\w*|fwidth\w*|texture|texture2D|textureProj|textureOffset|textureProjOffset|texture2DProj|textureCube)\s*\(/g;
 const RAMA = /\bif\b|\?|\bfor\b|\bwhile\b|\bswitch\b|\bdiscard\b|\breturn\b|\bdo\b/;
 const PREAMBULO = /GLSL_PREAMBULO_DE_LA_MATERIA\s*=\s*\/\*\s*glsl\s*\*\/\s*`([\s\S]*?)`/;
 
@@ -785,8 +1169,11 @@ function juzgarLasDerivadas(fuentes: readonly FuenteDeMateria[]): { problemas: s
       if (RAMA.test(dentro)) problemas.push(`${f.fichero}: el preámbulo tiene una rama (${RAMA.exec(dentro)?.[0] ?? ''})`);
     }
     for (const d of soloCodigo(fuera).matchAll(DERIVA)) problemas.push(`${f.fichero}: «${d[0]}» fuera del preámbulo`);
-    /* Una derivada o una lectura escondidas en una macro (también dentro del preámbulo). */
-    for (const l of soloCodigo(f.texto).matchAll(/^[ \t]*#[ \t]*define[ \t]+(\w+)(.*)$/gm)) {
+    /*
+     * Una derivada o una lectura escondidas en una macro (también dentro del preámbulo), esté el
+     * `#define` donde esté en la línea de la fuente (ver `DEFINE_EN_LA_FUENTE`).
+     */
+    for (const l of codigoDeLaFuente(f.texto).matchAll(DEFINE_EN_LA_FUENTE)) {
       if (COSTE_EN_MACRO.test(l[2] as string)) problemas.push(`${f.fichero}: la macro ${l[1] as string} esconde una derivada o una lectura`);
     }
   }
@@ -930,7 +1317,8 @@ async function elBanco(puerto: string): Promise<ResultadoDelBanco | string> {
 /* ═══════════════════════════════ LAS COMPROBACIONES ═══════════════════════════════ */
 
 async function principal(): Promise<void> {
-  const materiales = losMateriales();
+  const loLejanoReal = loLejanoRealConMateria((n) => materialDeLoLejano(n, false));
+  const materiales = [...losMateriales(), ...loLejanoReal.juzgables];
 
   /* ─── a ─── */
   paso('a · el sampler siempre atado');
@@ -1020,7 +1408,7 @@ async function principal(): Promise<void> {
   /* Las puertas del contador en la FUENTE de materia/** (sin comentarios). */
   const fuentes = lasFuentesDeLaMateria();
   const puertasDeLaFuente = juzgarLaFuenteDelContador(fuentes);
-  comprobar('b · materia/**: ni funciones con sampler, ni #define con argumentos o con coste', puertasDeLaFuente.length === 0, puertasDeLaFuente);
+  comprobar('b · materia/**: ni funciones con sampler, ni #define con argumentos o con coste (tampoco en cadenas), y un solo sampler, uRuidoQ', puertasDeLaFuente.length === 0, puertasDeLaFuente);
   comprobar(`b · ficheros de materia/** mirados ${String(fuentes.length)} ≥ ${String(EXIGE.minimoDeFicherosD)}`, fuentes.length >= EXIGE.minimoDeFicherosD);
   comprobar('b · three trae sus #define con argumentos, saturate entre ellos (si no, la comparación con three no mira)', DE_THREE.macros.has('saturate'), [...DE_THREE.macros]);
   /* Vacunas de la fuente, una por grafía. */
@@ -1048,6 +1436,157 @@ async function principal(): Promise<void> {
     enLaFuente('uniform sampler2D uRuidoQ;\n#define OCTAVAS_Q 4\n/* nada de f(sampler2D t) ni #define X(a) */\nfloat f() { return 1.0; }').length === 0,
     enLaFuente('uniform sampler2D uRuidoQ;\n#define OCTAVAS_Q 4\n/* nada de f(sampler2D t) ni #define X(a) */\nfloat f() { return 1.0; }'),
   );
+  /* El sampler único: cada grafía del gemelo. */
+  for (const [que, glsl] of [
+    ['un sampler gemelo (uRuidoBisQ)', 'uniform sampler2D uRuidoQ;\nuniform sampler2D uRuidoBisQ;'],
+    ['un gemelo solo, con precisión', 'uniform highp sampler2D uRuidoBisQ;'],
+    ['un gemelo en la misma declaración', 'uniform sampler2D uRuidoQ, uRuidoBisQ;'],
+    ['uRuidoQ con precisión (la forma es una sola)', 'uniform mediump sampler2D uRuidoQ;'],
+    ['un isampler', 'uniform isampler2D uEnterosQ;'],
+    ['un samplerCube', 'uniform samplerCube uCieloQ;'],
+    ['un #define que nombra un sampler', '#define LECTOR_Q sampler2D'],
+    ['un gemelo con la palabra partida con \\ y salto (sampl\\ + er2D: GLSL la une sin espacio)', 'uniform sampler2D uRuidoQ;\nuniform sampl\\\ner2D uRuidoBisQ;'],
+  ] as const) {
+    comprobar(`b · vacuna del sampler único: ${que}`, enLaFuente(glsl).length > 0, enLaFuente(glsl));
+  }
+  /*
+   * Los `#define` dentro de las cadenas de TS: el texto de la vacuna es la FUENTE (lo que hay en el
+   * fichero), así que `\\n` aquí es la barra y la ene que se leen allí.
+   */
+  const fuenteDeVacuna = (ts: string): string[] => juzgarLaFuenteDelContador([{ fichero: 'vacuna', texto: ts }]);
+  for (const [que, ts] of [
+    ['#define con argumentos tras un \\n escapado', "export const PUERTA_Q = 'float aQ;\\n#define MEZCLAQ(a, b) mix(a, b, 0.5)';"],
+    ['#define con argumentos tras una comilla', "export const G = `float pxMundoQ;\n${'#define MEZCLAQ(a, b) mix(a, b, 0.5)'}`;"],
+    ['#define que lee, tras una comilla doble', "export const G = 'float aQ;' + \"#define LEERQ textureLod(uRuidoQ, vec2(0.0), 0.0)\";"],
+    ['#define que deriva, con la línea partida escapada', "export const G = 'float aQ;\\n#define DERQ \\\\\\n  dFdx(vPosMundoQ)';"],
+    ['#define con argumentos tras un \\t escapado', "export const G = 'float aQ;\\t#define MEZCLAQ(a) (a)';"],
+    ['un sampler gemelo tras un \\n escapado', "export const G = 'uniform sampler2D uRuidoQ;\\nuniform sampler2D uRuidoBisQ;';"],
+    ['un gemelo con la palabra partida por una barra y un salto escapados', "export const G = 'uniform sampler2D uRuidoQ;\\nuniform sampl\\\\\\ner2D uRuidoBisQ;';"],
+  ] as const) {
+    comprobar(`b · vacuna de la cadena: ${que}`, fuenteDeVacuna(ts).length > 0, fuenteDeVacuna(ts));
+  }
+  comprobar(
+    'b · y en una cadena, una macro de número tras un \\n escapado no es puerta',
+    fuenteDeVacuna("export const G = 'float aQ;\\n#define OCTAVAS_Q 4\\nuniform sampler2D uRuidoQ;';").length === 0,
+    fuenteDeVacuna("export const G = 'float aQ;\\n#define OCTAVAS_Q 4\\nuniform sampler2D uRuidoQ;';"),
+  );
+  /*
+   * El sampler único sobre el texto MONTADO, con la materia y sin ella (ver `juzgarLosSamplersDelMontado`):
+   * lo que se declara de más es `uRuidoQ` y nada más, y las lecturas de cualquier otro sampler no suben,
+   * ni en el texto activo entero ni en el peor camino de `main`. Las lecturas no dependen de cómo se
+   * declare el gemelo (otro nombre, uno de three, por macro, en un struct). «Sin ella» es el de hoy de la
+   * fábrica (el cableado de prueba es de `materia/**` y va en la resta) o, si el material real ya la
+   * lleva, él mismo sin su retoque `materia-*`.
+   */
+  const sinLaMateria = (j: Juzgable): THREE.MeshStandardMaterial =>
+    j.yaLaLlevaba ? copiaConLosRetoques(j.material, retoquesDe(j.material).filter((r) => !r.nombre.startsWith('materia-'))) : materialDeHoy(j.superficie, j.nivel);
+  let conElRuido = 0;
+  let leenElRuido = 0;
+  let mainLeeElRuido = 0;
+  for (const j of materiales) {
+    const r = juzgarLosSamplersDelMontado(compilar(j.material, j.nivel).frag, compilar(sinLaMateria(j), j.nivel).frag);
+    if (r.anadeElRuido) conElRuido++;
+    if (r.leeElRuido) leenElRuido++;
+    if (r.mainLeeElRuido) mainLeeElRuido++;
+    comprobar(`b · ${j.nombre}: la materia no declara ni lee más sampler que uRuidoQ`, r.problemas.length === 0, r.problemas);
+  }
+  comprobar(`b · montados en los que la resta ve entrar uRuidoQ ${String(conElRuido)} ≥ ${String(EXIGE.minimoDeMaterialesA)}`, conElRuido >= EXIGE.minimoDeMaterialesA);
+  comprobar(
+    `b · montados en los que la resta ve el texto de la materia (lecturas de uRuidoQ en el texto activo, en cualquier función) ${String(leenElRuido)} ≥ ${String(EXIGE.minimoDeMaterialesA)}`,
+    leenElRuido >= EXIGE.minimoDeMaterialesA,
+  );
+  comprobar(
+    `b · montados en los que las lecturas de uRuidoQ del peor camino de main suben con la materia ${String(mainLeeElRuido)} ≥ ${String(EXIGE.minimoDeMontadosQueLeenEnMain)}`,
+    mainLeeElRuido >= EXIGE.minimoDeMontadosQueLeenEnMain,
+  );
+  for (const [que, texto] of [
+    ['un sampler gemelo', 'uniform sampler2D uRuidoBisQ;'],
+    ['un gemelo con precisión', 'uniform highp sampler2D uRuidoBisQ;'],
+    ['un gemelo en la misma declaración', 'uniform float uNadaQ;\nuniform sampler2D uOtroQ, uRuidoBisQ;'],
+  ] as const) {
+    const m = materialConMateria('fachada', 2).material;
+    parchear(m, { nombre: `materia-vacuna-gemelo-${sha256(texto).slice(0, 8)}`, orden: 50, fragmento: [{ buscar: '#include <lights_pars_begin>', como: 'antes', texto }] });
+    const r = juzgarLosSamplersDelMontado(compilar(m, 2).frag, compilar(materialDeHoy('fachada', 2), 2).frag);
+    comprobar(`b · vacuna del montado: ${que}`, r.problemas.length > 0 && r.anadeElRuido, r);
+  }
+  /*
+   * Los gemelos que la regla de fuente no ve (la palabra `sampler` partida en la fuente de TS), montados
+   * como quedarían: la segunda lectura del grano de N3 por un sampler que no es `uRuidoQ`. La fachada de
+   * N3 lee el grano; el texto de la materia se cambia en su retoque y se exige que el cambio haya entrado.
+   */
+  const DECLARACION_DEL_RUIDO = 'uniform sampler2D uRuidoQ;\nuniform float uVarianzaDelGranoQ[8];';
+  const SEGUNDA_LECTURA = 'vec4 t2 = textureLod(uRuidoQ, mod(giro * p';
+  const conGemelo = (declaracion: string, lectura: string): { r: ReturnType<typeof juzgarLosSamplersDelMontado>; cambios: number } => {
+    const m = materialConMateria('fachada', 3).material;
+    let cambios = 0;
+    const cambiar = (s: string, a: string, b: string): string => {
+      const trozos = s.split(a);
+      cambios += trozos.length - 1;
+      return trozos.join(b);
+    };
+    cambiarLaMateria(m, (r) => ({
+      ...r,
+      nombre: `${r.nombre}-gemelo-${sha256(declaracion + lectura).slice(0, 8)}`,
+      fragmento: (r.fragmento ?? []).map((s) => ({ ...s, texto: cambiar(cambiar(s.texto, DECLARACION_DEL_RUIDO, declaracion), SEGUNDA_LECTURA, lectura) })),
+    }));
+    return { r: juzgarLosSamplersDelMontado(compilar(m, 3).frag, compilar(materialDeHoy('fachada', 3), 3).frag), cambios };
+  };
+  const leerPor = (s: string): string => `vec4 t2 = textureLod(${s}, mod(giro * p`;
+  for (const [que, declaracion, lectura] of [
+    ['el gemelo con un nombre de three (alphaMap)', 'uniform sampler2D uRuidoQ;\nuniform sampler2D alphaMap;\nuniform float uVarianzaDelGranoQ[8];', leerPor('alphaMap')],
+    ['el gemelo por macro (#define LECTOR_Q sampler2D)', 'uniform sampler2D uRuidoQ;\n#define LECTOR_Q sampler2D\nuniform LECTOR_Q uRuidoBisQ;\nuniform float uVarianzaDelGranoQ[8];', leerPor('uRuidoBisQ')],
+    ['el gemelo en un struct', 'uniform sampler2D uRuidoQ;\nstruct LectorQ { sampler2D t; };\nuniform LectorQ uGemeloQ;\nuniform float uVarianzaDelGranoQ[8];', leerPor('uGemeloQ.t')],
+    ['el gemelo en un struct anónimo', 'uniform sampler2D uRuidoQ;\nuniform struct { sampler2D t; } uGemeloQ;\nuniform float uVarianzaDelGranoQ[8];', leerPor('uGemeloQ.t')],
+    ['una lectura de otro sampler, sin declararlo (sólo la regla de las lecturas)', DECLARACION_DEL_RUIDO, leerPor('uRuidoBisQ')],
+  ] as const) {
+    const { r, cambios } = conGemelo(declaracion, lectura);
+    comprobar(`b · vacuna del montado: ${que}`, cambios === 2 && r.problemas.length > 0, { cambios, ...r });
+  }
+  /*
+   * Lo que GLSL ES 3.00 compila y un preprocesador de C a secas tiraría: el gemelo (en la fuente, con
+   * `${'samp' + 'ler2D'}`, que la regla de fuente no ve; aquí, ya montado) declarado y leído dentro de un
+   * `#ifdef GL_ES`, de un `#if __VERSION__` o de un `#if defined(GL_FRAGMENT_PRECISION_HIGH)`, que en la
+   * GPU son verdad; partido con `\` + salto (GLSL lo une sin espacio); y leído por un alias de three
+   * (`texture2DLodEXT`, que el prefijo de WebGL2 define como `textureLod`).
+   */
+  const gemeloDentroDe = (si: string): [string, string] => [
+    `uniform sampler2D uRuidoQ;\n${si}\nuniform sampler2D uRuidoBisQ;\n#endif\nuniform float uVarianzaDelGranoQ[8];`,
+    `\n${si}\nvec4 t3Q = textureLod(uRuidoBisQ, vec2(0.0), 0.0);\n#endif\nvec4 t2 = textureLod(uRuidoQ, mod(giro * p`,
+  ];
+  for (const [que, declaracion, lectura] of [
+    ['el gemelo dentro de #ifdef GL_ES', ...gemeloDentroDe('#ifdef GL_ES')],
+    ['el gemelo dentro de #if __VERSION__ >= 300', ...gemeloDentroDe('#if __VERSION__ >= 300')],
+    ['el gemelo dentro de #if defined(GL_FRAGMENT_PRECISION_HIGH)', ...gemeloDentroDe('#if defined(GL_FRAGMENT_PRECISION_HIGH)')],
+    ['el gemelo partido con \\ y salto (unif\\ + orm, textu\\ + reLod)', 'uniform sampler2D uRuidoQ;\nunif\\\norm sampler2D uRuidoBisQ;\nuniform float uVarianzaDelGranoQ[8];', 'vec4 t2 = textu\\\nreLod(uRuidoBisQ, mod(giro * p'],
+    ['una lectura de otro sampler por texture2DLodEXT (alias de three), sin declararlo', DECLARACION_DEL_RUIDO, 'vec4 t2 = texture2DLodEXT(uRuidoBisQ, mod(giro * p'],
+  ] as const) {
+    const { r, cambios } = conGemelo(declaracion, lectura);
+    comprobar(`b · vacuna del montado: ${que}`, cambios === 2 && r.problemas.length > 0, { cambios, ...r });
+  }
+  /* Y lo que el preprocesador no modela es ROJO, no 0: el mismo gemelo detrás de un `#if` con `~`, hexadecimal, octal o `<<`. */
+  const noSeModela = (f: () => unknown): string => {
+    try {
+      f();
+      return 'lo evaluó';
+    } catch (e) {
+      return e instanceof GlslQueNoSeModela ? '' : `otro error: ${String(e)}`;
+    }
+  };
+  for (const si of ['#if ~0', '#if 0x1', '#if 010 == 8', '#if (1 << 1) == 2', '#if 3 & 1', '#if GL_EXT_shader_texture_lod', '#ifdef GL_OVR_multiview2']) {
+    const r = noSeModela(() => conGemelo(...gemeloDentroDe(si)));
+    comprobar(`b · vacuna del montado: el gemelo detrás de «${si}» es rojo (el preprocesador no lo modela)`, r === '', r);
+  }
+  /* Y cada regla por separado: la de las declaraciones ve el struct y la macro; la de las lecturas, lo que no se declara. */
+  const soloDeclarados = (frag: string): string[] => [...samplersDeclarados(frag).keys()];
+  comprobar(
+    'b · control de las reglas del montado: la macro, el struct y el struct anónimo se leen como samplers declarados',
+    soloDeclarados('#define LECTOR_Q sampler2D\nuniform LECTOR_Q uA;\nstruct LectorQ { sampler2D t; };\nstruct OtroQ { LectorQ l; };\nuniform OtroQ uB;\nuniform struct { sampler2D t; } uC;\nuniform float uD;').join(',') === 'uA,uB,uC',
+    soloDeclarados('#define LECTOR_Q sampler2D\nuniform LECTOR_Q uA;\nstruct LectorQ { sampler2D t; };\nstruct OtroQ { LectorQ l; };\nuniform OtroQ uB;\nuniform struct { sampler2D t; } uC;\nuniform float uD;'),
+  );
+  comprobar(
+    'b · control de las reglas del montado: un nombre de three declarado dos veces cuenta dos',
+    samplersDeclarados('#define USE_ALPHAMAP\n#ifdef USE_ALPHAMAP\nuniform sampler2D alphaMap;\n#endif\nuniform sampler2D alphaMap;').get('alphaMap') === 2,
+  );
   /* Vacunas del texto MONTADO: el material de verdad con una puerta abierta, por cada grafía. */
   const conPuerta = (texto: string): string[] => {
     const m = materialConMateria('fachada', 1).material;
@@ -1064,8 +1603,29 @@ async function principal(): Promise<void> {
 
   /* El tope de cada material, SI EXISTE (§5.2.9): lo exporta la ola 2 al lado de su fábrica. */
   const topes = await losTopesQueExisten(fileURLToPath(new URL('../src/quiebro/ciudad/', import.meta.url)));
-  const lecturasDe = (s: SuperficieDePrueba, n: NivelDeLaCiudad): number | undefined => medidasB.get(`${s}-n${String(n)}`)?.todas;
-  const yaLaLlevan = new Set(materiales.filter((j) => j.yaLaLlevaba).map((j) => j.nombre.replace(/-n\d$/, '') as SuperficieDePrueba));
+  /* Lo lejano: si el de la ciudad ya lleva la materia, lo que se compara con su tope es lo medido en ÉL. */
+  const lecturasDe = (s: SuperficieDePrueba, n: NivelDeLaCiudad): number | undefined =>
+    (s === 'lejos' ? medidasB.get(`lejos-real-n${String(n)}`)?.todas : undefined) ?? medidasB.get(`${s}-n${String(n)}`)?.todas;
+  const yaLaLlevan = superficiesQueYaLaLlevan(materiales);
+  comprobar(`b · lo lejano de la ciudad, mirado en ${String(loLejanoReal.mirados)} niveles ≥ 4`, loLejanoReal.mirados >= 4);
+  nota(
+    loLejanoReal.juzgables.length === 0
+      ? 'lo lejano de la ciudad (materialDeLoLejano(n, false)) no lleva todavía la materia en ningún nivel'
+      : `lo lejano de la ciudad ya lleva la materia en ${loLejanoReal.juzgables.map((j) => j.nombre).join(', ')}: cuenta como real`,
+  );
+  /* Vacuna: una fábrica de lo lejano que ya la lleva entra en la cuenta y, sin tope para lo lejano, es rojo. */
+  const loLejanoDeVacuna = loLejanoRealConMateria((n) => {
+    const m = materialDeLoLejano(n, false);
+    parchear(m, retoqueDeLaMateria(n, { lejos: true }));
+    return m;
+  });
+  const llevanConLaVacuna = superficiesQueYaLaLlevan([...materiales, ...loLejanoDeVacuna.juzgables]);
+  const topesSinLoLejano = topes.filter((x) => !x.superficies.includes('lejos'));
+  comprobar(
+    'b · vacuna: lo lejano de la ciudad con la materia entra en «ya la llevan» y pide su tope',
+    loLejanoDeVacuna.juzgables.length === 4 && llevanConLaVacuna.has('lejos') && juzgarLosTopes(topesSinLoLejano, lecturasDe, llevanConLaVacuna).problemas.some((p) => p.startsWith('lejos:')),
+    { juzgables: loLejanoDeVacuna.juzgables.map((j) => j.nombre), llevan: [...llevanConLaVacuna] },
+  );
   const juicioDeLosTopes = juzgarLosTopes(topes, lecturasDe, yaLaLlevan);
   comprobar('b · los topes de cada material que existen se cumplen, y los que ya llevan la materia lo tienen', juicioDeLosTopes.problemas.length === 0, juicioDeLosTopes.problemas);
   comprobar(
@@ -1119,6 +1679,41 @@ async function principal(): Promise<void> {
   /* El preprocesador: una rama #if que no se toma no cuenta. */
   const pre = preprocesar('#define A 2\n#if A >= 3 && defined(B)\nno\n#elif !defined(B) && (A + 1) == 3\nsi\n#else\nno\n#endif');
   comprobar('b · el preprocesador evalúa bien', pre.trim() === 'si', pre);
+  /* Como GLSL ES 3.00: las predefinidas, la expansión como texto, la división entera, `\` + salto y los comentarios antes que las directivas. */
+  for (const [que, texto, queda] of [
+    ['GL_ES está definida', '#ifdef GL_ES\nsi\n#else\nno\n#endif', 'si'],
+    ['__VERSION__ es 300 y GL_FRAGMENT_PRECISION_HIGH, 1', '#if __VERSION__ == 300 && GL_FRAGMENT_PRECISION_HIGH == 1\nsi\n#endif', 'si'],
+    ['la macro se expande como texto (1 + 1 * 2 es 3)', '#define A 1 + 1\n#if A * 2 == 3\nsi\n#endif', 'si'],
+    ['la división es entera', '#if 7 / 2 == 3 && -7 / 2 == -3 && 7 % 3 == 1\nsi\n#endif', 'si'],
+    ['\\ + salto une la directiva sin espacio', '#def\\\nine B 1\n#if B\nsi\n#endif', 'si'],
+    ['\\ + salto une una palabra del código sin espacio', 'unif\\\norm', 'uniform'],
+    ['un #if dentro de un comentario no es un #if', '/*\n#if 0\n*/\nsi\n/*\n#endif\n*/', 'si'],
+    ['un // partido con \\ comenta la línea siguiente', '// nada \\\nno', ''],
+  ] as const) {
+    let r: string;
+    try {
+      r = preprocesar(texto).trim();
+    } catch (e) {
+      r = `lanzó: ${String(e)}`;
+    }
+    comprobar(`b · el preprocesador, como GLSL ES 3.00: ${que}`, r === queda, r);
+  }
+  for (const si of ['#if SIN_DEFINIR_Q', '#if 1 2', '#if (1', '#if 1 / 0', '#if 1.5', '#if 1u', '#if 1 ? 1 : 0', '#if __LINE__ > 0', '#define F_Q(x) x\n#if F_Q(1)', '#define V_Q\n#if V_Q', '#if ~0', '#if 0x1', '#if 010', '#if 1 << 1', '#if 1 >> 1', '#if 1 & 1', '#if 1 | 1', '#if 1 ^ 1', '#ifdef GL_EXT_shader_texture_lod', '#if defined GL_OVR_multiview2']) {
+    const r = noSeModela(() => preprocesar(`${si}\nx\n#endif`));
+    comprobar(`b · el preprocesador, ante «${si.replace(/\n/g, ' ⏎ ')}», es rojo y no 0`, r === '', r);
+  }
+  /* Cada lectura de GLSL ES 3.00 y cada alias del prefijo de three r185 cuenta, por nombre escrito aquí (no leído de LEEN). */
+  const sinContar: string[] = [];
+  for (const n of [
+    'texture', 'textureProj', 'textureLod', 'textureOffset', 'texelFetch', 'texelFetchOffset', 'textureProjOffset', 'textureLodOffset', 'textureProjLod',
+    'textureProjLodOffset', 'textureGrad', 'textureGradOffset', 'textureProjGrad', 'textureProjGradOffset',
+    'texture2D', 'textureCube', 'texture2DProj', 'texture2DLodEXT', 'texture2DProjLodEXT', 'textureCubeLodEXT', 'texture2DGradEXT', 'texture2DProjGradEXT', 'textureCubeGradEXT',
+  ]) {
+    const texto = `uniform sampler2D uRuidoQ;\nvoid main() { vec4 a = ${n}(uRuidoQ, vec2(0.0)); vec4 b = ${n}(uRuidoBisQ, vec2(0.0)); }`;
+    const m = medir(texto, new Set());
+    if (m.lecturas !== 1 || m.ajenas !== 1 || lecturasPorSampler(texto).get('uRuidoBisQ') !== 1) sinContar.push(n);
+  }
+  comprobar('b · el contador cuenta las 14 lecturas de GLSL ES 3.00 y los 9 alias de three r185', sinContar.length === 0, sinContar);
 
   /* ─── c ─── */
   paso('c · la textura de ruido');
@@ -1179,7 +1774,7 @@ async function principal(): Promise<void> {
   /* Vacunas: el prototipo (deriva en una función que se llamaba dentro del if de la familia), otras grafías, y un preámbulo con rama. */
   const prototipo = 'vec3 normalPorDerivadasQ(vec3 N, vec3 P, float h, float amp) {\n  vec3 dpx = dFdx(P);\n  vec3 dpy = dFdy(P);\n  float dhx = dFdx(h) * amp;\n  return N;\n}';
   comprobar('d · vacuna: el prototipo', juzgarLasDerivadas([{ fichero: 'prototipo', texto: `export const G = \`${prototipo}\`;` }]).problemas.length > 0);
-  for (const grafia of ['fwidth(p)', 'dFdy (p)', 'dFdxFine(p)', 'texture(uRuidoQ, p)', 'texture2D (uRuidoQ, p)', 'textureOffset(uRuidoQ, p, ivec2(1))']) {
+  for (const grafia of ['fwidth(p)', 'dFdy (p)', 'dFdxFine(p)', 'texture(uRuidoQ, p)', 'texture2D (uRuidoQ, p)', 'textureOffset(uRuidoQ, p, ivec2(1))', 'textureCube(uRuidoQ, p)']) {
     comprobar(`d · vacuna: «${grafia}»`, juzgarLasDerivadas([{ fichero: 'vacuna', texto: `const G = \`float f() { return ${grafia}.x; }\`;` }]).problemas.length > 0);
   }
   comprobar(
@@ -1193,6 +1788,13 @@ async function principal(): Promise<void> {
       `d · vacuna: «${macro.trim()}»`,
       juzgarLasDerivadas([{ fichero: 'vacuna', texto: `const G = \`\n${macro}\nfloat f(float h) { if (h > 0.0) return 1.0; return 0.0; }\`;` }]).problemas.length > 0,
     );
+  }
+  /* Y la macro dentro de una cadena de TS (el `\n` escrito como escape, o detrás de una comilla), sin paréntesis que la delate. */
+  for (const [que, ts] of [
+    ['tras un \\n escapado', "export const G = 'float aQ;\\n#define ANCHOQ fwidth';"],
+    ['tras una comilla', "export const G = `float aQ;\n${'#define DERQ dFdx'}`;"],
+  ] as const) {
+    comprobar(`d · vacuna de la cadena: una derivada por macro ${que}`, juzgarLasDerivadas([{ fichero: 'vacuna', texto: ts }]).problemas.length > 0);
   }
   comprobar(
     'd · y una macro que nombra una UV no es una derivada',
@@ -1375,6 +1977,96 @@ async function principal(): Promise<void> {
   /* La vacuna: el banco de antes, que devolvía tal cual el material que ya llevaba la materia. */
   const bancoDeAntes = juzgarLasOpciones(caminoDeLaOla2((m) => ({ material: m, faltan: [], yaLaLlevaba: true })));
   comprobar('g · vacuna: el banco que devuelve tal cual el material que ya la lleva se ve', bancoDeAntes.length > 0, bancoDeAntes);
+  /*
+   * EL BANCO NO TOCA EL MATERIAL QUE LE DAN. Si la fábrica de la ola 2 devolviera un material compartido
+   * con la ciudad, cambiarle la lista de retoques en su sitio le forzaría el barniz (o la vacuna del stub)
+   * a todo lo que lo use. `conLasOpcionesDelBanco` tiene que devolver una COPIA: el de entrada, con la
+   * misma lista (el mismo array y los mismos retoques), la misma versión y el mismo texto montado; la
+   * copia, con su propia lista; con opciones, otro texto; sin ellas, el del original.
+   */
+  type Aplicar = (m: THREE.MeshStandardMaterial, o: OpcionesDePrueba) => MaterialDePrueba;
+  const textoDe = (m: THREE.MeshStandardMaterial, n: NivelDeLaCiudad): string => sha256(soloCodigo(preprocesar(compilar(m, n).frag)));
+  const juzgarLaCopiaDelBanco = (aplicar: Aplicar): { problemas: string[]; mirados: number } => {
+    const p: string[] = [];
+    let mirados = 0;
+    for (const n of [1, 2, 3] as const) {
+      const original = materialConMateria('mobiliario', n).material;
+      /* Un `define` de fábrica, como el que podría poner la ola 2: la copia tiene que llevarlo. */
+      original.defines = { ...original.defines, COPIA_DEL_BANCO_Q: '1' };
+      const defines = JSON.stringify(original.defines);
+      const llave = original.customProgramCacheKey();
+      const lista = retoquesDe(original);
+      const elementos = [...lista];
+      const version = original.version;
+      const texto = textoDe(original, n);
+      const h = aplicar(original, { barnizForzado: 1 });
+      const sinOpciones = aplicar(original, {});
+      mirados++;
+      if (h.material === original) p.push(`N${String(n)}: devuelve el MISMO material, no una copia`);
+      if (retoquesDe(original) !== lista || lista.length !== elementos.length || lista.some((r, k) => r !== elementos[k])) p.push(`N${String(n)}: le ha cambiado la lista de retoques al de entrada`);
+      if (original.version !== version) p.push(`N${String(n)}: le ha puesto needsUpdate al de entrada`);
+      if (textoDe(original, n) !== texto) p.push(`N${String(n)}: el de entrada monta otro texto`);
+      if (h.material !== original && retoquesDe(h.material) === lista) p.push(`N${String(n)}: la copia comparte la lista con el de entrada`);
+      if (textoDe(h.material, n) === texto) p.push(`N${String(n)}: con opciones, la copia monta el mismo texto (las opciones no llegan)`);
+      if (textoDe(sinOpciones.material, n) !== texto) p.push(`N${String(n)}: sin opciones, la copia monta otro texto que el original (¿se perdió el parcheo al copiar?)`);
+      if (JSON.stringify(original.defines) !== defines) p.push(`N${String(n)}: le ha cambiado los defines al de entrada`);
+      if (JSON.stringify(h.material.defines) !== defines || JSON.stringify(sinOpciones.material.defines) !== defines) {
+        p.push(`N${String(n)}: la copia no lleva los defines del original (${JSON.stringify(h.material.defines)} contra ${defines})`);
+      }
+      if (original.customProgramCacheKey() !== llave) p.push(`N${String(n)}: le ha cambiado la llave de programa al de entrada`);
+      if (sinOpciones.material.customProgramCacheKey() !== llave) p.push(`N${String(n)}: sin opciones, la copia tiene otra llave de programa que el original`);
+      if (h.material.customProgramCacheKey() === llave) p.push(`N${String(n)}: con opciones, la copia tiene la misma llave de programa (three reusaría el programa del original)`);
+    }
+    return { problemas: p, mirados };
+  };
+  const copiaDelBanco = juzgarLaCopiaDelBanco(conLasOpcionesDelBanco);
+  comprobar('g · sin GPU: el banco devuelve una copia y el material de entrada sale intacto (N1-N3)', copiaDelBanco.problemas.length === 0 && copiaDelBanco.mirados >= 3, copiaDelBanco);
+  /* Vacunas: el banco de antes, que cambiaba la lista en su sitio; y el `clone()` de three a secas, que pierde el parcheo. */
+  const enSuSitio: Aplicar = (m, o) => {
+    const lista = retoquesDe(m);
+    const i = lista.findIndex((r) => r.nombre.startsWith('materia-'));
+    const antes = lista[i] as Retoque;
+    const faltan: string[] = [];
+    const despues =
+      o.barnizForzado !== undefined
+        ? {
+            ...antes,
+            nombre: `${antes.nombre}-barniz${String(o.barnizForzado)}`,
+            fragmento: (antes.fragmento ?? []).map((s) => ({ ...s, texto: s.texto.split('barnizQ = s.barniz;').join(`barnizQ = ${o.barnizForzado === 1 ? '1.0' : '0.0'};`) })),
+          }
+        : antes;
+    if (despues !== antes) {
+      lista[i] = despues;
+      m.needsUpdate = true;
+    }
+    return { material: m, faltan, yaLaLlevaba: true };
+  };
+  const cloneASecas: Aplicar = (m, o) => {
+    const c = m.clone();
+    return o.barnizForzado !== undefined ? conLasOpcionesDelBanco(c, o) : { material: c, faltan: [], yaLaLlevaba: true };
+  };
+  /* La copia que pierde los defines: lo que deja `MeshStandardMaterial.copy` si no se copian a mano. */
+  const sinLosDefines: Aplicar = (m, o) => {
+    const r = conLasOpcionesDelBanco(m, o);
+    r.material.defines = { STANDARD: '' };
+    return r;
+  };
+  /* La copia con otra llave de programa (como si se perdiera un `onBeforeCompile` ajeno al parcheo). */
+  const otraLlave: Aplicar = (m, o) => {
+    const r = conLasOpcionesDelBanco(m, o);
+    const suya = r.material.customProgramCacheKey.bind(r.material);
+    r.material.customProgramCacheKey = (): string => `${suya()}|ajeno-perdido`;
+    return r;
+  };
+  for (const [que, aplicar] of [
+    ['el banco que cambia la lista en su sitio (el de antes)', enSuSitio],
+    ['el clone() de three a secas', cloneASecas],
+    ['la copia que pierde los defines del original', sinLosDefines],
+    ['la copia con otra llave de programa', otraLlave],
+  ] as const) {
+    const r = juzgarLaCopiaDelBanco(aplicar);
+    comprobar(`g · vacuna de la copia: ${que}`, r.problemas.length > 0, r);
+  }
   /* El juez sobre bancos de mentira: uno bueno (tiene que pasar) y, cada vez, un solo veneno. */
   const bancoBueno = (cambio: (m: MedidaDelBarniz) => Partial<MedidaDelBarniz> = () => ({}), resto: Partial<ResultadoDelBanco> = {}): ResultadoDelBanco => ({
     modo: 'barniz',

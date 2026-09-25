@@ -18,7 +18,8 @@
  * El día que PAREDES cablee la fachada (o MOBILIARIO el mobiliario), las sustituciones de abajo dejarán de
  * encontrar su texto. No es un fallo: si el material real YA lleva un retoque `materia-*`, no se cablea
  * nada a mano. Pero las opciones del banco SÍ se aplican: su retoque `materia-*` se SUSTITUYE por el mismo
- * con las opciones (`conLasOpcionesDelBanco`), como hace `cambiarLaMateria` en el comprobador. Antes se
+ * con las opciones (`conLasOpcionesDelBanco`), en una COPIA del material: el de la fábrica no se toca,
+ * por si la ola 2 lo comparte con la ciudad. Antes se
  * devolvía tal cual, y el día que la ola 2 cableara el mobiliario, el banco habría pintado seis veces el
  * mismo coche: la vacuna de (g) sin cambiar un píxel, y (g) en rojo sin nada roto.
  *
@@ -161,24 +162,57 @@ function materiaDelBanco(base: Retoque, opciones: OpcionesDePrueba, faltan: stri
   return r;
 }
 
+/** Donde `parchear` guarda la lista de retoques de un material (`atmosfera/parcheo.ts`). */
+const LLAVE_DEL_PARCHEO = 'parcheoDelQuiebro';
+
+/**
+ * UNA COPIA del material con OTRA lista de retoques; el de entrada no se toca (ni su lista, ni sus
+ * retoques, ni su `needsUpdate`).
+ *
+ * `material.clone()` a secas no sirve: three copia `userData` por JSON (la lista de retoques saldría
+ * serializada, con la textura del ruido dentro) y NO copia `onBeforeCompile`, así que la copia llevaría la
+ * lista pero `parchear` la creería ya envuelta y no parchearía nada. Por eso se clona SIN la llave del
+ * parcheo y se le piden los retoques de nuevo, en el mismo orden. Lo que se pierde es un `onBeforeCompile`
+ * ajeno al parcheo, que en la ciudad no hay (nadie lo asigna: ver la cabecera de `parcheo.ts`); si
+ * apareciera, la copia montaría otro texto, y `verify:quiebro-materia` (g) compara el texto de la copia
+ * sin opciones con el del original, y su llave de programa (`customProgramCacheKey`).
+ *
+ * Y `defines` se copia A MANO: `MeshStandardMaterial.copy` lo deja en `{ STANDARD: '' }` (no copia los del
+ * original), así que un `defines` que pusiera una fábrica se perdería en la copia. (g) los compara.
+ */
+export function copiaConLosRetoques(m: THREE.MeshStandardMaterial, retoques: readonly Retoque[]): THREE.MeshStandardMaterial {
+  const datos = m.userData;
+  const sinElParcheo: Record<string, unknown> = { ...datos };
+  delete sinElParcheo[LLAVE_DEL_PARCHEO];
+  m.userData = sinElParcheo;
+  let copia: THREE.MeshStandardMaterial;
+  try {
+    copia = m.clone();
+  } finally {
+    m.userData = datos;
+  }
+  copia.defines = { ...m.defines };
+  parchear(copia, ...retoques);
+  return copia;
+}
+
 /**
  * EL CAMINO DE LA OLA 2: un material que YA lleva un retoque `materia-*` (el real, cuando su familia lo
- * cablee) con las opciones del banco. Se le SUSTITUYE ese retoque por el mismo con las opciones, en su
- * sitio de la lista; nada más cambia. Sin retoque de materia, lo dice en `faltan`. El comprobador lo
- * llama también sobre un material de prueba ya cableado, para ver este camino antes de que exista.
+ * cablee) con las opciones del banco. Devuelve una COPIA (`copiaConLosRetoques`) en la que ese retoque
+ * está SUSTITUIDO por el mismo con las opciones, en su sitio de la lista; nada más cambia. El material de
+ * entrada NO se toca: el día que una fábrica de la ola 2 devuelva un material compartido (uno por nivel,
+ * guardado), cambiarle la lista en su sitio le pondría el barniz forzado o la vacuna del stub a la ciudad
+ * entera. Sin retoque de materia, lo dice en `faltan` y devuelve el de entrada. El comprobador lo llama
+ * también sobre un material de prueba ya cableado, para ver este camino antes de que exista, y comprueba
+ * que el de entrada sale intacto.
  */
 export function conLasOpcionesDelBanco(m: THREE.MeshStandardMaterial, opciones: OpcionesDePrueba = {}): MaterialDePrueba {
   const lista = retoquesDe(m);
   const i = lista.findIndex((r) => r.nombre.startsWith('materia-'));
   if (i < 0) return { material: m, faltan: [`${m.name}: no lleva un retoque «materia-…»`], yaLaLlevaba: false };
   const faltan: string[] = [];
-  const antes = lista[i] as Retoque;
-  const despues = materiaDelBanco(antes, opciones, faltan);
-  if (despues !== antes) {
-    lista[i] = despues;
-    m.needsUpdate = true;
-  }
-  return { material: m, faltan, yaLaLlevaba: true };
+  const nueva = lista.map((r, k) => (k === i ? materiaDelBanco(r, opciones, faltan) : r));
+  return { material: copiaConLosRetoques(m, nueva), faltan, yaLaLlevaba: true };
 }
 
 /* ═══════════════════════════════ LA FACHADA ═══════════════════════════════ */
@@ -487,7 +521,7 @@ export function materialDeLoLejanoDePrueba(nivel: NivelDeLaCiudad, materia: bool
 /**
  * El material de hoy con la materia cableada a mano (ver la cabecera), y las opciones del banco. Si el
  * material real ya la lleva, no se cablea nada y las opciones se aplican a SU retoque de materia
- * (`conLasOpcionesDelBanco`). Cada llamada, un material nuevo.
+ * (`conLasOpcionesDelBanco`, sobre una copia). Cada llamada, un material nuevo.
  */
 export function materialConMateria(s: SuperficieDePrueba, nivel: NivelDeLaCiudad, opciones: OpcionesDePrueba = {}): MaterialDePrueba {
   if (s === 'lejos') return { material: materialDeLoLejanoDePrueba(nivel, true), faltan: [], yaLaLlevaba: false };
