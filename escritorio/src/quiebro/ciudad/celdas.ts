@@ -634,7 +634,7 @@ export function obraNueva(o: OpcionesDeLaObra): ObraDeLaCelda {
 
 /** LAS FACHADAS DE UNA CELDA (el primer escritor): cara a cara, con sus ventanas encendidas; sus cajas estorban. */
 function* fachadasDeLaCelda(obra: ObraDeLaCelda, parte: ParteDeLaCelda): Generator<void, void, void> {
-  yield* fachadasPorPartes(obra.m.fachadas, parte.edificios, { relieve: obra.relieveDeHoy, ventanas: true, vecinos: parte.vecinos }, obra.ventanas);
+  yield* fachadasPorPartes(obra.m.fachadas, parte.edificios, { relieve: obra.relieveDeHoy, grado: obra.grado, ventanas: true, vecinos: parte.vecinos }, obra.ventanas);
   for (const e of parte.edificios) obra.estorba.push(e.caja, ...e.pilares);
 }
 
