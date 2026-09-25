@@ -66,6 +66,8 @@ export interface PropsDeLaCiudadDeNoche {
   readonly alConstruirLaAbierta?: (ciudad: CiudadAbiertaConstruida) => void;
   /** Monta la ventana de la ciudad abierta de un tirón alrededor de este punto (el banco). */
   readonly montarYa?: { readonly x: number; readonly z: number };
+  /** `false`: sin lluvia ni salpicaduras (el banco, para fotos sin el ruido de las gotas). Por omisión, llueve. */
+  readonly lluvia?: boolean;
 }
 
 /**
@@ -148,6 +150,7 @@ function LaCiudadAbiertaDeNoche({
   despejadas = false,
   alConstruirLaAbierta,
   montarYa,
+  lluvia = true,
 }: PropsDeLaCiudadDeNoche & { readonly traza: number }): JSX.Element {
   const claveDeFallos = fallos.join(',');
   const fuente = useMemo(
@@ -182,6 +185,7 @@ function LaCiudadAbiertaDeNoche({
           reloj={reloj}
           farolasEncendidas={farolasEncendidas}
           luz={luz}
+          lluvia={lluvia}
         />
       ) : null}
     </>
@@ -189,7 +193,7 @@ function LaCiudadAbiertaDeNoche({
 }
 
 /** EL BARRIO de la noche (el de hoy), con su atmósfera. */
-function ElBarrioDeNoche({ codigo, noche, nivel, reloj, tic, farolasEncendidas = 1, alConstruir }: PropsDeLaCiudadDeNoche): JSX.Element {
+function ElBarrioDeNoche({ codigo, noche, nivel, reloj, tic, farolasEncendidas = 1, alConstruir, lluvia = true }: PropsDeLaCiudadDeNoche): JSX.Element {
   const plano = useMemo(
     () => (BARRIO_FORZADO !== null ? planoDelBarrio(BARRIO_FORZADO, 1) : planoDelBarrio(codigo, noche)),
     [codigo, noche],
@@ -217,6 +221,7 @@ function ElBarrioDeNoche({ codigo, noche, nivel, reloj, tic, farolasEncendidas =
           reloj={reloj}
           farolasEncendidas={farolasEncendidas}
           luz={luz}
+          lluvia={lluvia}
         />
       ) : null}
     </>

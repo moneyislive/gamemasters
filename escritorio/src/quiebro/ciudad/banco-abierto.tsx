@@ -16,6 +16,38 @@
  * dirección: `nivel`, `codigo`, `noche`, `traza`, `camara=libre|hombro`, `pos=x,y,z,rumbo,cabeceo`,
  * `luz=madrugada|alba`, `montar=1` (monta la ventana de golpe al empezar).
  *
+ * ═══ PARA JUZGAR CON FOTOS (`escritorio/scripts/fotos/`) ═══
+ *
+ *   · `panel=0` esconde el panel de medidas, que tapa un tercio de una foto de móvil.
+ *   · `lluvia=0` quita la lluvia y las salpicaduras (los charcos se quedan): dos tomas iguales se parecen más.
+ *   · `camino=juego` pinta como el juego y no como el banco: con el posproceso del nivel (`<Posproceso>`), el
+ *     DPR del peldaño alto del nivel en esta pantalla (`escaleraDeDpr`) y la exposición del juego, en vez del
+ *     DPR fijo por nivel y el mapeo ACES del banco. El banco no es la pantalla.
+ *   · `ventana=cx,cz` monta la ventana de celdas centrada en ese punto aunque la cámara esté en `pos` (la foto
+ *     del recentrado: el mismo encuadre con la ventana de antes y la de después del cruce). Implica `montar=1`.
+ *     Se queda mientras la cámara no pase de los 30 m del centro (`hayQueRecentrar`, `ventana.ts`): más lejos
+ *     la ventana se recentra sola, y el DOM lo dice (`data-ventana` distinto de `data-ventana-pedida`).
+ *     OJO EN N2: su ventana es de 4 × 4 celdas, y con un lado par el centro no cae en el centro de una celda
+ *     (48k) sino en una RAYA entre dos (48k + 24; `centroCercano`, `ventana.ts`). `ventana=0,0` en N2 se monta en
+ *     (24, 24), el DOM dice que no es la pedida y `foto.sh` tira la foto. En N2 se piden centros 48k + 24; por
+ *     eso la P del protocolo va en N0, N1 y N3 y no en N2.
+ *   · `mascara=M` no pinta la ciudad: pinta en blanco lo que está a menos de M metros de la cámara y en negro
+ *     lo demás (el cielo, lo lejano). Es la máscara de la hoja para la foto del recentrado (§8 del plan del
+ *     detalle: «a menos de 40 m no cambia nada»).
+ *   · `reloj=T` para el reloj del adorno en T segundos (`reloj` de `<LaCiudadDeNoche>`): los parpadeos, las
+ *     bocanadas de vapor, los glifos del borde, las ondas de los charcos, el cielo y el tren (su tic sale de T)
+ *     quedan en el mismo instante en todas las tomas. Quita el ruido de N2 entre dos tomas (el vapor), NO el de N3:
+ *     las luces de verdad de la atmósfera (`atmosfera/luz.ts`) eligen farola y se funden con el `dt` de los
+ *     fotogramas, que no es este reloj (lo medido, en `escritorio/scripts/fotos/POSICIONES.md`).
+ *   · `arbol=1` no monta el lienzo: sólo dice de qué árbol sale (ver abajo). Es lo que mira `foto.sh`.
+ *
+ * EL DOM DICE DE QUÉ ÁRBOL SALE: un `<div id="banco-arbol">` (también con `panel=0`) lleva `data-arbol` (la carpeta
+ * del worktree), `data-origen`, `data-nivel`, `data-camino`, `data-ventana`, `data-ventana-ocupada` (1 si la ventana
+ * se está montando o recentrando: la foto sería de un estado a medias) y `data-ciudad`. Con varios worktrees
+ * sirviendo a la vez, un puerto equivocado fotografía OTRO árbol y lo da por bueno. La carpeta sale de cómo ha
+ * resuelto el servidor de desarrollo el `shared/` que importa este módulo (`/@fs/<árbol>/shared/…`), sin tocar la
+ * configuración de Vite; en el empaquetado no hay banco ni `/@fs/`, y dice `?`.
+ *
  * ═══ MEDIR SIN `requestAnimationFrame` ═══
  *
  * El panel del navegador oculto baja los fotogramas a uno por segundo. Para medir un cruce se usa
@@ -34,7 +66,10 @@ import { NIVELES_DE_LA_CIUDAD } from './tipos';
 import { CUOTA_DE_LA_CIUDAD, RENGLONES_DE_LA_CIUDAD_ABIERTA, presupuestoDeLaCiudad } from './presupuesto';
 import type { PresupuestoSumado } from './presupuesto';
 import { FAMILIAS } from './celdas';
-import { rectanguloDeLaVentana } from './ventana';
+import { HOLGURA_DEL_RECENTRADO, rectanguloDeLaVentana } from './ventana';
+import { LADO_DE_CELDA } from '../../../../shared/arcade/juegos/quiebro-ciudad';
+import { Posproceso } from '../posproceso/Posproceso';
+import { escaleraDeDpr } from '../calidad/niveles';
 
 interface AjustesAbiertos {
   readonly nivel: NivelDeLaCiudad;
@@ -43,20 +78,149 @@ interface AjustesAbiertos {
   readonly traza: number;
   readonly camara: 'libre' | 'hombro';
   readonly montar: boolean;
+  /** `panel=0`: sin el panel de medidas. */
+  readonly panel: boolean;
+  /** `lluvia=0`: sin lluvia ni salpicaduras. */
+  readonly lluvia: boolean;
+  /** `camino=juego`: con el posproceso y el DPR del nivel. */
+  readonly camino: 'banco' | 'juego';
+  /** `ventana=cx,cz`: la ventana montada ahí, esté donde esté la cámara. */
+  readonly ventana: { readonly x: number; readonly z: number } | null;
+  /** `mascara=M`: la máscara de profundidad a M metros en vez de la ciudad. */
+  readonly mascara: number | null;
+  /** `reloj=T`: el reloj del adorno parado en T segundos (parpadeos, vapor, glifos, tren). */
+  readonly reloj: number | null;
+  /** `arbol=1`: sólo el árbol, sin lienzo. */
+  readonly arbol: boolean;
 }
 
 function leer(): AjustesAbiertos {
   const p = new URLSearchParams(window.location.search);
   const n = Number(p.get('nivel') ?? '0');
   const t = Math.floor(Number(p.get('traza') ?? '0'));
+  const v = p.get('ventana')?.split(',').map(Number);
+  const ventana = v !== undefined && v.length === 2 && v.every(Number.isFinite) ? { x: v[0] ?? 0, z: v[1] ?? 0 } : null;
+  const m = Number(p.get('mascara'));
+  const r = Number(p.get('reloj'));
   return {
     nivel: (NIVELES_DE_LA_CIUDAD.includes(n as NivelDeLaCiudad) ? n : 0) as NivelDeLaCiudad,
     codigo: (p.get('codigo') ?? 'K7M2P').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'K7M2P',
     noche: Math.max(1, Math.floor(Number(p.get('noche') ?? '1')) || 1),
     traza: Number.isFinite(t) && t >= 0 && t < 32 ? t : 0,
     camara: p.get('camara') === 'libre' ? 'libre' : 'hombro',
-    montar: p.get('montar') === '1',
+    montar: p.get('montar') === '1' || ventana !== null,
+    panel: p.get('panel') !== '0',
+    lluvia: p.get('lluvia') !== '0',
+    camino: p.get('camino') === 'juego' ? 'juego' : 'banco',
+    ventana,
+    mascara: p.has('mascara') && Number.isFinite(m) && m > 0 ? m : null,
+    reloj: p.has('reloj') && Number.isFinite(r) && r >= 0 ? r : null,
+    arbol: p.get('arbol') === '1',
   };
+}
+
+/**
+ * DE QUÉ ÁRBOL SALE ESTE BANCO (ver la cabecera): el servidor de desarrollo sirve lo que queda fuera de su raíz
+ * (`shared/`) por `/@fs/<ruta absoluta>`, y este módulo importa `shared/`: su propio texto servido lo lleva
+ * escrito. `null` mientras se pregunta; `?` si no se sabe (el empaquetado, o un servidor que no lo diga).
+ */
+function usarElArbol(): string | null {
+  const [arbol, setArbol] = useState<string | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    const env = import.meta.env as { readonly DEV?: boolean } | undefined;
+    if (env?.DEV !== true) {
+      setArbol('?');
+      return;
+    }
+    fetch(import.meta.url)
+      .then((r) => r.text())
+      .then((texto) => {
+        const m = /\/@fs\/([^"'\s]+?)\/shared\//.exec(texto);
+        if (vivo) setArbol(m?.[1] ?? '?');
+      })
+      .catch(() => {
+        if (vivo) setArbol('?');
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+  return arbol;
+}
+
+/**
+ * LA MÁSCARA DE PROFUNDIDAD (`mascara=M`): se queda con el pintado (prioridad 1, como el posproceso) y pinta la
+ * escena con un material que da blanco a menos de M metros de la cámara y negro más allá. Por las dos caras, para
+ * que un paño fino no deje pasar lo de detrás. Lo instanciado y lo agrupado se colocan con los `#include` de three.
+ */
+function MascaraDeProfundidad({ metros }: { metros: number }): null {
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        name: 'mascara-de-profundidad',
+        side: THREE.DoubleSide,
+        uniforms: { uLimite: { value: metros } },
+        vertexShader: /* glsl */ `
+          #include <common>
+          #include <batching_pars_vertex>
+          varying vec3 vVista;
+          void main() {
+            #include <batching_vertex>
+            #include <begin_vertex>
+            #include <project_vertex>
+            vVista = mvPosition.xyz;
+          }`,
+        /* La distancia se mide EN EL FRAGMENTO, con la posición en vista interpolada (que sí es lineal y sale
+           exacta). Una distancia sacada en el vértice e interpolada no lo es: en un triángulo grande (el suelo, un
+           paño de fachada) la del medio de un lado sale MAYOR que la de verdad, y el corte de los 40 m se corría. */
+        fragmentShader: /* glsl */ `
+          uniform float uLimite;
+          varying vec3 vVista;
+          void main() {
+            gl_FragColor = vec4(vec3(length(vVista) < uLimite ? 1.0 : 0.0), 1.0);
+          }`,
+      }),
+    [metros],
+  );
+  useEffect(() => () => material.dispose(), [material]);
+  useFrame((estado) => {
+    const { gl, scene, camera } = estado;
+    const antes = { override: scene.overrideMaterial, fondo: scene.background, niebla: scene.fog };
+    scene.overrideMaterial = material;
+    scene.background = null;
+    scene.fog = null;
+    gl.setClearColor(0x000000, 1);
+    try {
+      gl.render(scene, camera);
+    } finally {
+      scene.overrideMaterial = antes.override;
+      scene.background = antes.fondo;
+      scene.fog = antes.niebla;
+    }
+  }, 1);
+  return null;
+}
+
+/** Lo que dice el DOM (ver la cabecera). Oculto: está también con `panel=0` y en `arbol=1`. */
+function MarcaDelArbol({ arbol, ajustes, ciudad }: { arbol: string | null; ajustes: AjustesAbiertos; ciudad: CiudadAbiertaConstruida | null }): JSX.Element {
+  const v = ciudad?.ventana.ahora ?? null;
+  return (
+    <div
+      id="banco-arbol"
+      hidden
+      data-arbol={arbol ?? ''}
+      data-origen={window.location.origin}
+      data-nivel={ajustes.nivel}
+      data-camino={ajustes.camino}
+      data-lluvia={ajustes.lluvia ? '1' : '0'}
+      data-reloj={ajustes.reloj === null ? '' : String(ajustes.reloj)}
+      data-ventana={v === null ? '' : `${String(v.cx)},${String(v.cz)}`}
+      data-ventana-pedida={ajustes.ventana === null ? '' : `${String(ajustes.ventana.x)},${String(ajustes.ventana.z)}`}
+      data-ventana-ocupada={ciudad === null ? '' : ciudad.ventana.ocupada ? '1' : '0'}
+      data-ciudad={ciudad === null ? 'construyendo' : 'lista'}
+    />
+  );
 }
 
 /** El camino del cruce: en escalera por las calles, de la esquina noroeste a la sureste. */
@@ -204,7 +368,13 @@ function Mando({ modo, ciudad }: { modo: 'libre' | 'hombro'; ciudad: CiudadAbier
     const hombro = new THREE.Vector3(-fz, 0, fx).multiplyScalar(0.55);
     camera.position.set(s.x - dd.x * 3.2 + hombro.x, 1.7 - dd.y * 3.2, s.z - dd.z * 3.2 + hombro.z);
     camera.lookAt(s.x + dd.x * 10 + hombro.x, 1.5 + dd.y * 10, s.z + dd.z * 10 + hombro.z);
-  });
+    /*
+     * ANTES que la ciudad (−1): la ciudad lee la cámara en su `useFrame` (0) para mover la ventana y la luz. Con el
+     * mando detrás, el primer fotograma la veía donde la dejó el lienzo (en `pos`, sin los 3,2 m del hombro), y con
+     * `ventana=` en el canto de la holgura eso bastaba para pedir OTRA ventana: la foto de antes de la P salía con
+     * un recentrado a medias (lo cazó `data-ventana-ocupada`).
+     */
+  }, -1);
   return <group />;
 }
 
@@ -347,101 +517,160 @@ export function BancoAbierto(): JSX.Element {
     const pos = new URLSearchParams(window.location.search).get('pos')?.split(',').map(Number);
     return pos !== undefined && pos.length === 5 && pos.every(Number.isFinite) ? { x: pos[0] ?? 0, y: pos[1] ?? 1.7, z: pos[2] ?? 0 } : { x: 3, y: 1.7, z: 26 };
   }, []);
-  const montar = useMemo(() => (ajustes.montar ? { x: inicio.x, z: inicio.z } : undefined), [ajustes.montar, inicio]);
+  /* Con `ventana=` se monta ahí y no donde está la cámara (la foto del recentrado). */
+  const montar = useMemo(
+    () => (ajustes.ventana !== null ? { x: ajustes.ventana.x, z: ajustes.ventana.z } : ajustes.montar ? { x: inicio.x, z: inicio.z } : undefined),
+    [ajustes.ventana, ajustes.montar, inicio],
+  );
+  /* `reloj=T`: el mismo instante en todas las tomas (ver la cabecera); sin él, el reloj del lienzo. */
+  const reloj = useMemo(() => {
+    const t = ajustes.reloj;
+    return t === null ? undefined : (): number => t;
+  }, [ajustes.reloj]);
+  const arbol = usarElArbol();
+  const marca = <MarcaDelArbol arbol={arbol} ajustes={ajustes} ciudad={ciudad} />;
+  if (ajustes.arbol) return <div style={{ position: 'fixed', inset: 0, background: '#050807' }}>{marca}</div>;
   const presupuesto: PresupuestoSumado | null = ciudad === null ? null : presupuestoDeLaCiudad(ciudad.piezas(), ajustes.nivel, RENGLONES_DE_LA_CIUDAD_ABIERTA);
   const v = ciudad?.ventana.ahora ?? null;
   const r = v === null ? null : rectanguloDeLaVentana(v);
-  const dpr = ([0.75, 1, 1.25, 1.5] as const)[ajustes.nivel];
+  /* El banco pinta a un DPR fijo por nivel y sin posproceso; `camino=juego`, como el juego (ver la cabecera). */
+  const juego = ajustes.camino === 'juego';
+  const dpr = juego ? (escaleraDeDpr(ajustes.nivel, window.devicePixelRatio)[0] ?? 1) : ([0.75, 1, 1.25, 1.5] as const)[ajustes.nivel];
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#050807' }}>
+      {marca}
       <Canvas
-        key={`n${String(ajustes.nivel)}-${ajustes.codigo}-${String(ajustes.traza)}-${String(ajustes.noche)}`}
+        key={`n${String(ajustes.nivel)}-${ajustes.codigo}-${String(ajustes.traza)}-${String(ajustes.noche)}-${ajustes.camino}`}
         dpr={dpr}
         shadows={ajustes.nivel >= 2}
         resize={{ polyfill: MedidaInmediata as unknown as typeof ResizeObserver }}
-        gl={{ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
+        gl={{ antialias: true, alpha: juego, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
         camera={{ fov: 70, near: 0.1, far: 900, position: [inicio.x, inicio.y, inicio.z] }}
         onCreated={({ gl }) => {
+          if (juego) {
+            /* Lo mismo que `Quiebro.tsx`: el mapeo tonal lo pone el compositor del nivel. */
+            gl.toneMappingExposure = 1.1;
+            return;
+          }
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.15;
         }}
       >
-        <LaCiudadDeNoche codigo={ajustes.codigo} noche={ajustes.noche} nivel={ajustes.nivel} traza={ajustes.traza} montarYa={montar} alConstruirLaAbierta={setCiudad} />
+        <LaCiudadDeNoche
+          codigo={ajustes.codigo}
+          noche={ajustes.noche}
+          nivel={ajustes.nivel}
+          traza={ajustes.traza}
+          reloj={reloj}
+          montarYa={montar}
+          alConstruirLaAbierta={setCiudad}
+          lluvia={ajustes.lluvia && ajustes.mascara === null}
+        />
         <Mando modo={ajustes.camara} ciudad={ciudad} />
         <Medidor alMedir={setMedida} />
         <Exponer ciudad={ciudad} />
+        {ajustes.mascara !== null ? <MascaraDeProfundidad metros={ajustes.mascara} /> : juego ? <Posproceso nivel={ajustes.nivel} /> : null}
       </Canvas>
-      <div
-        style={{
-          position: 'absolute',
-          top: 8,
-          left: 8,
-          padding: '8px 10px',
-          background: 'rgba(0,0,0,0.62)',
-          color: '#cfe',
-          font: '12px/1.45 ui-monospace, Consolas, monospace',
-          borderRadius: 6,
-          maxWidth: 'min(520px, calc(100vw - 32px))',
-        }}
-      >
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <label>
-            nivel{' '}
-            <select value={ajustes.nivel} onChange={(e) => cambiar({ nivel: Number(e.target.value) as NivelDeLaCiudad })}>
-              {NIVELES_DE_LA_CIUDAD.map((n) => (
-                <option key={n} value={n}>
-                  N{n}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            traza{' '}
-            <input type="number" min={0} max={31} value={ajustes.traza} style={{ width: 46 }} onChange={(e) => cambiar({ traza: Math.max(0, Math.min(31, Math.floor(Number(e.target.value)) || 0)) })} />
-          </label>
-          <label>
-            código{' '}
-            <input value={ajustes.codigo} style={{ width: 70 }} onChange={(e) => cambiar({ codigo: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'K7M2P' })} />
-          </label>
-          <label>
-            noche{' '}
-            <input type="number" min={1} value={ajustes.noche} style={{ width: 46 }} onChange={(e) => cambiar({ noche: Math.max(1, Math.floor(Number(e.target.value)) || 1) })} />
-          </label>
-          <label>
-            cámara{' '}
-            <select value={ajustes.camara} onChange={(e) => cambiar({ camara: e.target.value === 'libre' ? 'libre' : 'hombro' })}>
-              <option value="hombro">hombro 1,7 m</option>
-              <option value="libre">libre</option>
-            </select>
-          </label>
-        </div>
-        {ciudad !== null ? (
-          <div style={{ marginTop: 6 }}>
-            ciudad de {ciudad.fuente.origen === 'traza' ? 'la traza' : <span style={{ color: '#fc8' }}>SINTÉTICA (la traza aún no está escrita)</span>} · {ciudad.hora} · {ciudad.tiempo}
-          </div>
-        ) : null}
-        {v !== null && r !== null && ciudad !== null ? (
-          <div>
-            ventana {v.lado}×{v.lado}: celdas [{v.i0}..{v.i1}]×[{v.j0}..{v.j1}] · cambios {ciudad.ventana.cambios} · guardadas {ciudad.ventana.celdasGuardadas} · luz {ciudad.luz.cambios}
-            <div>
-              {FAMILIAS.map((f) => `${f} ${ciudad.ventana.triangulos()[f].toLocaleString('es')}`).join(' · ')}
-            </div>
-          </div>
-        ) : null}
-        {medida !== null ? (
-          <div>
-            lienzo: {medida.triangulos.toLocaleString('es')} tri · {medida.llamadas} llamadas · {medida.ms.toFixed(1)} ms
-          </div>
-        ) : null}
-        {presupuesto !== null ? (
-          <div>
-            ciudad: {presupuesto.triangulos.toLocaleString('es')} tri · {presupuesto.llamadas} llamadas · cuota N{ajustes.nivel} ({Math.round(CUOTA_DE_LA_CIUDAD * 100)} %){' '}
-            {presupuesto.tope.triangulos.toLocaleString('es')}/{presupuesto.tope.llamadas}
-            <span style={{ color: presupuesto.cabe ? '#8f8' : '#f88' }}> {presupuesto.cabe ? 'cabe' : 'NO CABE'}</span>
-            {presupuesto.excesos.length > 0 ? <div style={{ color: '#f88' }}>{presupuesto.excesos.join(' · ')}</div> : null}
-          </div>
-        ) : null}
+      {ajustes.panel ? <PanelDelBanco ajustes={ajustes} cambiar={cambiar} ciudad={ciudad} arbol={arbol} medida={medida} presupuesto={presupuesto} v={v} r={r} /> : null}
+    </div>
+  );
+}
+
+interface PropsDelPanel {
+  readonly ajustes: AjustesAbiertos;
+  readonly cambiar: (parte: Partial<AjustesAbiertos>) => void;
+  readonly ciudad: CiudadAbiertaConstruida | null;
+  readonly arbol: string | null;
+  readonly medida: MedidaDelLienzo | null;
+  readonly presupuesto: PresupuestoSumado | null;
+  readonly v: CiudadAbiertaConstruida['ventana']['ahora'];
+  readonly r: ReturnType<typeof rectanguloDeLaVentana> | null;
+}
+
+/** El panel de medidas (`panel=0` lo quita). */
+function PanelDelBanco({ ajustes, cambiar, ciudad, arbol, medida, presupuesto, v, r }: PropsDelPanel): JSX.Element {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        padding: '8px 10px',
+        background: 'rgba(0,0,0,0.62)',
+        color: '#cfe',
+        font: '12px/1.45 ui-monospace, Consolas, monospace',
+        borderRadius: 6,
+        maxWidth: 'min(520px, calc(100vw - 32px))',
+      }}
+    >
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <label>
+          nivel{' '}
+          <select value={ajustes.nivel} onChange={(e) => cambiar({ nivel: Number(e.target.value) as NivelDeLaCiudad })}>
+            {NIVELES_DE_LA_CIUDAD.map((n) => (
+              <option key={n} value={n}>
+                N{n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          traza{' '}
+          <input type="number" min={0} max={31} value={ajustes.traza} style={{ width: 46 }} onChange={(e) => cambiar({ traza: Math.max(0, Math.min(31, Math.floor(Number(e.target.value)) || 0)) })} />
+        </label>
+        <label>
+          código{' '}
+          <input value={ajustes.codigo} style={{ width: 70 }} onChange={(e) => cambiar({ codigo: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'K7M2P' })} />
+        </label>
+        <label>
+          noche{' '}
+          <input type="number" min={1} value={ajustes.noche} style={{ width: 46 }} onChange={(e) => cambiar({ noche: Math.max(1, Math.floor(Number(e.target.value)) || 1) })} />
+        </label>
+        <label>
+          cámara{' '}
+          <select value={ajustes.camara} onChange={(e) => cambiar({ camara: e.target.value === 'libre' ? 'libre' : 'hombro' })}>
+            <option value="hombro">hombro 1,7 m</option>
+            <option value="libre">libre</option>
+          </select>
+        </label>
       </div>
+      {ciudad !== null ? (
+        <div style={{ marginTop: 6 }}>
+          ciudad de {ciudad.fuente.origen === 'traza' ? 'la traza' : <span style={{ color: '#fc8' }}>SINTÉTICA (la traza aún no está escrita)</span>} · {ciudad.hora} · {ciudad.tiempo}
+        </div>
+      ) : null}
+      <div>
+        árbol {arbol ?? '…'} · {window.location.host}
+        {ajustes.camino === 'juego' ? ' · camino del juego' : ''}
+        {ajustes.lluvia ? '' : ' · sin lluvia'}
+        {ajustes.reloj === null ? '' : ` · reloj parado en ${String(ajustes.reloj)} s`}
+      </div>
+      {ajustes.ventana !== null ? (
+        <div>
+          ventana pedida en ({ajustes.ventana.x}, {ajustes.ventana.z}): se queda con la cámara a menos de {LADO_DE_CELDA / 2 + HOLGURA_DEL_RECENTRADO} m de su centro
+        </div>
+      ) : null}
+      {v !== null && r !== null && ciudad !== null ? (
+        <div>
+          ventana {v.lado}×{v.lado}: celdas [{v.i0}..{v.i1}]×[{v.j0}..{v.j1}] · cambios {ciudad.ventana.cambios} · guardadas {ciudad.ventana.celdasGuardadas} · luz {ciudad.luz.cambios}
+          <div>
+            {FAMILIAS.map((f) => `${f} ${ciudad.ventana.triangulos()[f].toLocaleString('es')}`).join(' · ')}
+          </div>
+        </div>
+      ) : null}
+      {medida !== null ? (
+        <div>
+          lienzo: {medida.triangulos.toLocaleString('es')} tri · {medida.llamadas} llamadas · {medida.ms.toFixed(1)} ms
+        </div>
+      ) : null}
+      {presupuesto !== null ? (
+        <div>
+          ciudad: {presupuesto.triangulos.toLocaleString('es')} tri · {presupuesto.llamadas} llamadas · cuota N{ajustes.nivel} ({Math.round(CUOTA_DE_LA_CIUDAD * 100)} %){' '}
+          {presupuesto.tope.triangulos.toLocaleString('es')}/{presupuesto.tope.llamadas}
+          <span style={{ color: presupuesto.cabe ? '#8f8' : '#f88' }}> {presupuesto.cabe ? 'cabe' : 'NO CABE'}</span>
+          {presupuesto.excesos.length > 0 ? <div style={{ color: '#f88' }}>{presupuesto.excesos.join(' · ')}</div> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
