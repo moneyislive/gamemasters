@@ -106,8 +106,8 @@ function secciones(): SeccionLegal[] {
         </li>
         <li>
           <strong>Se revisa, pero no se garantiza.</strong> Antes de entregarte una trama, otra
-          pasada automática busca contradicciones y pistas que delaten al culpable antes de tiempo, y
-          corrige lo que encuentra. Eso reduce los errores; no los elimina. Lee el material antes de
+          pasada automática busca contradicciones y pistas que revelen la solución antes de tiempo,
+          y corrige lo que encuentra. Eso reduce los errores; no los elimina. Lee el material antes de
           la velada: quien organiza es quien decide si está listo para la mesa.
         </li>
         <li>
