@@ -367,6 +367,12 @@ const BATERIA = [
     porque: 'una frase que ata un convoy a su franja, un parte que cuenta cómo va la noche o un cuadro que dejó de salir se ven antes de cobrarla',
   },
   {
+    nombre: 'revisión · las Sombras',
+    donde: 'server',
+    guion: 'verify:revision-sombras',
+    porque: 'la senda dicha en voz alta, un kanchō señalado o escondido, o su sobre más gordo se ven antes de cobrarla',
+  },
+  {
     nombre: 'esquemas de la trama',
     donde: 'server',
     guion: 'verify:esquemas',

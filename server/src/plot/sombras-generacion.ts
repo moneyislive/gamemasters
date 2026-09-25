@@ -57,7 +57,7 @@ import { cimientosDeSombras } from './sombras-cimientos';
 import type { Cimientos, EntidadesDeSombras } from './sombras-cimientos';
 import { SOMBRAS_TRAMA_SCHEMA } from './sombras-esquema';
 import type { RespuestaSombras } from './sombras-esquema';
-import { SISTEMA_SOMBRAS, construirPromptSombras } from './sombras-prompt';
+import { MARCA_DE_LA_SENDA, SISTEMA_SOMBRAS, construirPromptSombras, sendaEnPalabras } from './sombras-prompt';
 import { respuestaDeDemostracion } from './sombras-demo';
 import { pasoBatido } from '../juegos/sombras-trama';
 import {
@@ -163,11 +163,20 @@ export interface TramaEnsamblada {
  * — el único con pinta normal. Un filtro que señala a quien no filtró es peor
  * que no filtrar. La lección es de la Momia y aquí nace aprendida.
  */
-const RECAMBIO_OFICIO = 'miembro de la columna';
+export const RECAMBIO_OFICIO = 'miembro de la columna';
 
-/** Un texto de recambio cuando el modelo escribe algo que no puede salir a la mesa. */
-const RECAMBIO_PUBLICO =
+/**
+ * Un texto de recambio cuando el modelo escribe algo que no puede salir a la mesa.
+ *
+ * Se exporta para que la revisión los reconozca: un recambio es un hueco en la
+ * noche y, en una narración, una marca —sale justo donde el texto nombraba a
+ * quien cobra de Akechi—. La auditoría los cuenta y el revisor los reescribe.
+ */
+export const RECAMBIO_PUBLICO =
   'De aquella noche se cuentan versiones distintas según quién la cuente, y ninguna acaba de encajar con las demás.';
+
+/** El cartel que sustituye a uno que anunciaba una emboscada. */
+export const RECAMBIO_INSCRIPCION = 'Quien pase de noche, que pase en silencio.';
 
 /**
  * Convierte la respuesta del modelo en un `Plot`, validando por el camino.
@@ -453,7 +462,7 @@ export function ensamblarTramaSombras(
             arreglo: 'sustituida',
             motivo: 'anunciaba una emboscada en un paso batido',
           });
-          texto = 'Quien pase de noche, que pase en silencio.';
+          texto = RECAMBIO_INSCRIPCION;
         }
         return [paso.id, texto];
       }),
@@ -480,8 +489,10 @@ export function ensamblarTramaSombras(
       }))
       .sort((a, b) => a.level - b.level),
     finale: {
-      // Aquí SÍ se cuenta todo: es lo que se lee al abrir el pliego.
-      reconstruction: respuesta.desenlace?.reconstruccion ?? '',
+      // Aquí SÍ se cuenta todo: es lo que se lee al abrir el pliego. La senda la pone el código (ver MARCA_DE_LA_SENDA).
+      reconstruction: (respuesta.desenlace?.reconstruccion ?? '')
+        .split(MARCA_DE_LA_SENDA)
+        .join(sendaEnPalabras(trama.sendaVerdadera, (id) => entidades.pasos.find((p) => p.id === id)?.name ?? id)),
       confession: respuesta.desenlace?.confesion ?? '',
       epilogue: respuesta.desenlace?.epilogo ?? '',
     },
@@ -543,18 +554,23 @@ export function ensamblarTramaSombras(
   };
 }
 
+/** Los textos del dosier mínimo. Se exportan para que la revisión lo reconozca y lo reescriba. */
+export const DOSIER_MINIMO = {
+  publicPersona: 'Salió de Sakai con los demás y no ha dado un paso en falso desde entonces.',
+  secret: 'Callas algo de lo que viste aquel día que todavía no has sabido cómo contar.',
+  motive: 'Llegar a la playa antes del alba, y llegar con todos.',
+  alibi: 'Dices que estabas en el patio cuando llegó la noticia. Como todo el mundo.',
+  personalHook: 'Su papel se ha quedado sin escribir: improvisa con lo que sepas de la persona.',
+} as const;
+
 /** El dosier que se escribe cuando el modelo se deja a alguien. Feo, pero jugable. */
 function dosierMinimo(persona: Entidad): PlotCharacter {
   return {
     participanteId: persona.id,
     characterName: persona.name,
     role: RECAMBIO_OFICIO,
-    publicPersona: 'Salió de Sakai con los demás y no ha dado un paso en falso desde entonces.',
-    secret: 'Callas algo de lo que viste aquel día que todavía no has sabido cómo contar.',
-    motive: 'Llegar a la playa antes del alba, y llegar con todos.',
-    alibi: 'Dices que estabas en el patio cuando llegó la noticia. Como todo el mundo.',
+    ...DOSIER_MINIMO,
     knowledge: [],
-    personalHook: 'Su papel se ha quedado sin escribir: improvisa con lo que sepas de la persona.',
   };
 }
 

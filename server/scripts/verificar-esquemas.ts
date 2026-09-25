@@ -38,6 +38,8 @@ import { MOMIA_TRAMA_SCHEMA } from '../src/plot/momia-esquema';
 import { NUDO_TRAMA_SCHEMA } from '../src/plot/nudo-prompt';
 import { NUDO_REVISION_SCHEMA } from '../src/plot/nudo-revisor';
 import { SOMBRAS_TRAMA_SCHEMA } from '../src/plot/sombras-esquema';
+import { SOMBRAS_REVISION_DOSIERES_SCHEMA, SOMBRAS_REVISION_SCHEMA } from '../src/plot/sombras-revisor';
+import { LECTOR_SOMBRAS_SCHEMA } from '../src/plot/sombras-lector';
 
 const ESQUEMAS: Record<string, unknown> = {
   'CLUEDO · trama': PLOT_SCHEMA,
@@ -51,6 +53,9 @@ const ESQUEMAS: Record<string, unknown> = {
   'Nudo · trama': NUDO_TRAMA_SCHEMA,
   'Nudo · revisión': NUDO_REVISION_SCHEMA,
   'Sombras · trama': SOMBRAS_TRAMA_SCHEMA,
+  'Sombras · revisión': SOMBRAS_REVISION_SCHEMA,
+  'Sombras · revisión de los dosieres': SOMBRAS_REVISION_DOSIERES_SCHEMA,
+  'Sombras · columna ciega': LECTOR_SOMBRAS_SCHEMA,
 };
 
 const fallos: string[] = [];

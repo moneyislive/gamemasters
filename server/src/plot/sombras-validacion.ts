@@ -472,14 +472,34 @@ export function senalaAlKancho(texto: string, nombres: string[]): boolean {
 
   for (const frase of normalizar(texto).split(/[.;:!?\n]+/)) {
     const conBordes = ` ${frase} `;
-    const nombra = limpios.some((n) => {
-      const tokens = n.split(' ').filter((t) => t.length >= 4);
-      if (tokens.length === 0) return conBordes.includes(` ${n} `);
-      return tokens.some((t) => conBordes.includes(` ${t} `) || conBordes.includes(` ${t}s `));
-    });
+    const nombra = limpios.some((n) => apareceElNombre(conBordes, n));
     if (nombra && SENALAMIENTOS.some((m) => conBordes.includes(m))) return true;
   }
   return false;
+}
+
+/**
+ * Palabras que salen en un nombre de personaje y NO lo identifican.
+ *
+ * El nombre de ficción lleva a menudo su oficio o su edad —«el joven Sōji», «la
+ * hija del mercader», «Hanzō-sama»—, y buscar esas palabras era dar por nombrado
+ * al kanchō en cualquier narración que hablara de «un joven guía» o de «la hija
+ * de alguien». Cada falso positivo se pagaba con un texto tapado por el recambio,
+ * y el recambio, encima, señala.
+ */
+const NO_IDENTIFICAN = new Set([
+  'joven', 'viejo', 'vieja', 'hija', 'hijo', 'paje', 'criado', 'criada', 'senor', 'senora', 'maestro',
+  'maestra', 'monje', 'monja', 'guia', 'hermano', 'hermana', 'padre', 'madre', 'mercader', 'lancero',
+  'sacerdote', 'doncella', 'dama', 'capitan', 'soldado', 'anciano', 'anciana', 'noble', 'samurai',
+  'ronin', 'sirviente', 'sirvienta', 'escolta', 'guardia', 'cocinero', 'cocinera', 'medico', 'viuda',
+  'viudo', 'sobrino', 'sobrina', 'primo', 'prima', 'sama', 'dono', 'sensei', 'chan',
+]);
+
+/** ¿Sale este nombre (ya normalizado) en este texto (normalizado y con espacios a los lados)? */
+function apareceElNombre(conBordes: string, nombre: string): boolean {
+  const tokens = nombre.split(' ').filter((t) => t.length >= 4 && !NO_IDENTIFICAN.has(t));
+  if (tokens.length === 0) return conBordes.includes(` ${nombre} `);
+  return tokens.some((t) => conBordes.includes(` ${t} `) || conBordes.includes(` ${t}s `));
 }
 
 /** ¿Aparece el nombre de quien cobra de Akechi, sea en el contexto que sea? */
@@ -487,10 +507,7 @@ export function nombraAlKancho(texto: string, nombres: string[]): boolean {
   const plano = ` ${normalizar(texto)} `;
   return nombres.some((n) => {
     const limpio = normalizar(n);
-    if (!limpio) return false;
-    const tokens = limpio.split(' ').filter((t) => t.length >= 4);
-    if (tokens.length === 0) return plano.includes(` ${limpio} `);
-    return tokens.some((t) => plano.includes(` ${t} `) || plano.includes(` ${t}s `));
+    return Boolean(limpio) && apareceElNombre(plano, limpio);
   });
 }
 

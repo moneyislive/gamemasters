@@ -649,6 +649,24 @@ export function juzgarSospecha(opciones: {
         }
       }
     }
+    /*
+     * Y EL EXTREMO CONTRARIO, que es el que Miguel pidió vigilar: que a quien se
+     * busca no se le exculpe. Si en TODOS los momentos quien no sabe nada le da
+     * menos de un tercio de lo que le tocaría por azar, la prosa lo ha puesto
+     * fuera de sospecha, y eso no es esconderlo bien: es jugar a su favor. Al
+     * traidor se le caza jugando, y eso exige que se le pueda sospechar como a
+     * cualquiera.
+     */
+    if (lecturas.length >= 2 && lecturas.every((l) => (l.reparto[objetivo] ?? 0) < azar / 3)) {
+      momento = -1;
+      h(
+        opciones.codigoInvisible,
+        'grave',
+        `En todos los momentos, quien no sabe la solución casi descarta a ${nombre(objetivo)} (menos de ` +
+          `${pct(azar / 3)}, cuando por azar le tocaría ${pct(azar)}): la prosa lo exculpa. A ${opciones.quien} se ` +
+          'le tiene que poder sospechar como a cualquiera.',
+      );
+    }
     return salida;
   }
 

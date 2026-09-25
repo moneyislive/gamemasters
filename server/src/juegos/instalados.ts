@@ -166,6 +166,12 @@ import '../docs/imprimibles/sombras/dosierEscolta';
 import '../docs/imprimibles/sombras/registro';
 
 /*
+ * Y su revisión adversaria, con su columna ciega. Sin esta línea la noche se
+ * entrega con el veredicto «sin revisar» y nada falla.
+ */
+import '../plot/sombras-revision';
+
+/*
  * ═══ EL NUDO DE VALDEHIERRO ═══
  *
  * Ocho lineas, y ninguna es opcional. Este juego no tiene NINGUNA importacion

@@ -17,6 +17,8 @@ import { REVISION_TRAMA_SCHEMA, REVISION_MATERIAL_SCHEMA, REVISION_SOLO_MATERIAL
 import { DETECTIVE_SCHEMA } from '../src/plot/cluedo-detective';
 import { NUDO_TRAMA_SCHEMA } from '../src/plot/nudo-prompt';
 import { NUDO_REVISION_SCHEMA } from '../src/plot/nudo-revisor';
+import { SOMBRAS_REVISION_DOSIERES_SCHEMA, SOMBRAS_REVISION_SCHEMA } from '../src/plot/sombras-revisor';
+import { LECTOR_SOMBRAS_SCHEMA } from '../src/plot/sombras-lector';
 
 const destino = process.argv[2];
 if (!destino) {
@@ -33,6 +35,9 @@ const esquemas = {
   detective: DETECTIVE_SCHEMA,
   nudoTrama: NUDO_TRAMA_SCHEMA,
   nudoRevision: NUDO_REVISION_SCHEMA,
+  sombrasRevision: SOMBRAS_REVISION_SCHEMA,
+  sombrasRevisionDosieres: SOMBRAS_REVISION_DOSIERES_SCHEMA,
+  sombrasColumnaCiega: LECTOR_SOMBRAS_SCHEMA,
 };
 fs.writeFileSync(destino, JSON.stringify(esquemas, null, 2), 'utf8');
 console.log(`${Object.keys(esquemas).length} esquemas en ${destino}`);
