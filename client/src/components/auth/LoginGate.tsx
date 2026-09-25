@@ -20,6 +20,8 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
   const [entrando, setEntrando] = useState(false);
   const [nombre, setNombre] = useState('');
   const [conGoogle, setConGoogle] = useState(false);
+  // Con el taller abierto a cualquier cuenta, la puerta invita a entrar con ella.
+  const [publico, setPublico] = useState(false);
 
   /*
    * ¿Ofrece este servidor entrar con Google? Se pregunta, no se adivina: un
@@ -43,6 +45,7 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
     getAuthStatus()
       .then((estadoAuth) => {
         if (!vigente) return;
+        setPublico(estadoAuth.publico === true);
         setEstado(!estadoAuth.required || estadoAuth.authenticated ? 'dentro' : 'bloqueado');
       })
       .catch(() => {
@@ -98,18 +101,32 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
           ⚿
         </span>
         <h1 className="gate-title">GameMasters</h1>
-        <p className="gate-subtitle">
-          Esta mansión está cerrada con llave. Diga la contraseña de la casa.
-        </p>
+        {publico && conGoogle ? (
+          <>
+            <p className="gate-subtitle">
+              Entra con tu cuenta para preparar tus veladas: tus partidas, tu monedero y tu suscripción van con ella.
+            </p>
+            <a className="btn btn--primary gate-btn" href="/api/cuenta/entrar/google">
+              Entrar con Google
+            </a>
+            <div className="gate-o">
+              <span>o, si eres de la casa</span>
+            </div>
+          </>
+        ) : (
+          <p className="gate-subtitle">
+            Esta mansión está cerrada con llave. Diga la contraseña de la casa.
+          </p>
+        )}
 
         <input
           className="input gate-input"
           type="password"
           value={password}
           onChange={(evento) => setPassword(evento.target.value)}
-          placeholder="Contraseña"
+          placeholder={publico ? 'Contraseña de la casa' : 'Contraseña'}
           aria-label="Contraseña de acceso"
-          autoFocus
+          autoFocus={!publico}
           autoComplete="current-password"
         />
 
@@ -136,7 +153,7 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
           </p>
         )}
 
-        <button className="btn btn--primary gate-btn" type="submit" disabled={entrando}>
+        <button className={`btn gate-btn${publico && conGoogle ? '' : ' btn--primary'}`} type="submit" disabled={entrando}>
           {entrando ? 'Abriendo…' : 'Entrar'}
         </button>
 
@@ -146,7 +163,7 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
           Un `fetch` no podría hacerlo —Google no deja que su pantalla se cargue
           dentro de otra— y disfrazarlo de botón solo escondería lo que pasa.
         */}
-        {conGoogle && (
+        {conGoogle && !publico && (
           <>
             <div className="gate-o">
               <span>o</span>
@@ -169,6 +186,11 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
         <a className="gate-privacidad text-dim" href="/privacidad" target="_blank" rel="noopener">
           Política de privacidad
         </a>
+        {publico && (
+          <a className="gate-privacidad text-dim" href="/terminos" target="_blank" rel="noopener">
+            Términos y condiciones de compra
+          </a>
+        )}
       </motion.form>
     </div>
   );

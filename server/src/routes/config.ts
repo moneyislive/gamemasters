@@ -3,6 +3,7 @@
  *   GET /config → AppConfig (modelo activo, catálogo, hasApiKey, storage)
  *   PUT /config → cambia el modelo activo y devuelve la AppConfig resultante
  */
+import type { Request } from 'express';
 import type { AppConfig } from '../../../shared/types';
 import { DEMO_MODE, MODEL_OPTIONS, env, esModeloDeVelada, isModelId } from '../config';
 import { getStorageKind, getStore } from '../db/store';
@@ -12,19 +13,28 @@ import { crearRouter } from '../rutas';
 
 const router = crearRouter();
 
-async function buildConfig(): Promise<AppConfig> {
+/** La misma regla que `PUT /config`: la casa, o una cuenta con permiso expreso. */
+async function puedeCambiarModelo(req: Request): Promise<boolean> {
+  const quien = identidadDeTaller(req);
+  if (!quien) return false;
+  if (quien.tipo !== 'cuenta') return true;
+  return Boolean((await getStore().getAccount(quien.cuentaId))?.taller);
+}
+
+async function buildConfig(req: Request): Promise<AppConfig> {
   return {
     // El efectivo: uno guardado que ya salió del catálogo de veladas no cuenta.
     model: await modeloDeLaCasa(),
     models: MODEL_OPTIONS,
     hasApiKey: !DEMO_MODE,
     storage: getStorageKind(),
+    puedeCambiarModelo: await puedeCambiarModelo(req),
   };
 }
 
-router.get('/config', async (_req, res) => {
+router.get('/config', async (req, res) => {
   try {
-    res.json(await buildConfig());
+    res.json(await buildConfig(req));
   } catch (err) {
     console.error('[config] Error al leer la configuración:', err);
     res.status(500).json({ error: 'No se pudo leer la configuración.' });
@@ -66,7 +76,7 @@ router.put('/config', async (req, res) => {
       console.warn(`[config] ${model} no escribe veladas: la casa sigue con ${env.defaultModel}.`);
     }
     await getStore().setConfigModel(model);
-    res.json(await buildConfig());
+    res.json(await buildConfig(req));
   } catch (err) {
     console.error('[config] Error al guardar la configuración:', err);
     res.status(500).json({ error: 'No se pudo guardar la configuración.' });

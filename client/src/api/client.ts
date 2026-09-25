@@ -71,6 +71,8 @@ export interface AuthStatus {
   /** ¿La instancia está protegida con contraseña? */
   required: boolean;
   authenticated: boolean;
+  /** ¿Puede entrar cualquier cuenta (el taller es público porque se cobra)? */
+  publico?: boolean;
 }
 
 export const getAuthStatus = () => request<AuthStatus>('/auth/status');

@@ -245,7 +245,7 @@ export async function consumirIncluido(
   if (!pagador || pagador.tipo === 'exento') return { ok: true };
   const cobro = game.cobro;
   if (!cobro || cobro.exenta) {
-    if (uso === 'turnosDeAsistente') return { ok: true }; // antes de pagar: el tope diario frena
+    if (uso === 'turnosDeAsistente') return charlaAntesDePagar(game.id);
     return { ok: false, error: 'Esta velada todavía no está pagada: genérala primero.' };
   }
   if (cobro.usos[uso] >= TOPE_DE[uso]) {
@@ -261,6 +261,32 @@ export async function consumirIncluido(
     await store.saveGame(fresca);
     game.cobro = fresca.cobro;
   }
+  return { ok: true };
+}
+
+/**
+ * Lo que se puede charlar con el asistente preparando una velada que todavía no
+ * se ha pagado. Con el taller abierto a cualquier cuenta, sin esto se podría
+ * usar el asistente sin pagar nunca: doscientos cincuenta turnos al día de tope
+ * diario son unos seis dólares diarios por cuenta. Cuarenta bastan para dar de
+ * alta a la mesa, las salas y los objetos y preguntar lo que haga falta.
+ *
+ * En memoria, por partida: se pierde al reiniciar, y está bien, porque no es
+ * contabilidad sino un freno.
+ */
+const CHARLA_ANTES_DE_PAGAR = 40;
+const charlaSinPagar = new Map<string, number>();
+
+function charlaAntesDePagar(gameId: string): { ok: true } | { ok: false; error: string } {
+  const hechas = charlaSinPagar.get(gameId) ?? 0;
+  if (hechas >= CHARLA_ANTES_DE_PAGAR) {
+    return {
+      ok: false,
+      error:
+        'Has charlado todo lo que se puede antes de generar la velada. Genérala para seguir: la velada trae sesenta turnos más con el asistente.',
+    };
+  }
+  charlaSinPagar.set(gameId, hechas + 1);
   return { ok: true };
 }
 

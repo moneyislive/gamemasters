@@ -25,6 +25,9 @@ process.env.ANTHROPIC_API_KEY = '';
 // Con el cobro ENCENDIDO: el pase solo cierra algo si hay algo que vender.
 process.env.COBRO_ACTIVO = 'si';
 process.env.PLAYER_TOKEN_SECRET = 'secreto-de-prueba-del-cobro-0123456789';
+// Con contraseña de la casa: sin ella, fuera de producción el taller está abierto a todos
+// y la puerta no se puede medir.
+process.env.APP_PASSWORD = 'clave-de-la-casa-de-prueba';
 delete process.env.GM_ADMITIDOS;
 const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'cobro-'));
 process.chdir(carpeta);
@@ -37,6 +40,8 @@ const { presupuestar, precioRedondo } = await import('../src/cobro/precios');
 const { temporadaDe, CREDITOS_DE_LA_SUSCRIPCION } = await import('../src/cobro/ofertas');
 const { puedeLlevar, esDelPase, paseVigente } = await import('../src/cobro/pase');
 const { emitirSesionDeCuenta, CABECERA_CUENTA } = await import('../src/identidad/sesion');
+const { tallerAbiertoPara } = await import('../src/auth');
+const { veLasHuerfanas } = await import('../src/taller/dueno');
 import type { Account } from '../../shared/live';
 
 let hechas = 0;
@@ -189,6 +194,38 @@ try {
     'un pase caducado no vale',
     !paseVigente({ ...conElPase, cobro: { pases: [{ temporada: '2020-T1', hasta: '2020-04-01T00:00:00.000Z', via: 'compra' }] } }),
   );
+
+  paso('El taller abierto a cualquier cuenta, porque se cobra');
+  const ahoraIso = new Date().toISOString();
+  const conGoogle: Account = {
+    ...cuenta,
+    id: 'con-google',
+    email: 'carla@example.com',
+    identidades: [{ proveedor: 'google', sub: 'g-carla', correo: 'carla@example.com', correoVerificado: true, esRelay: false, vinculadaEl: ahoraIso, vistaEl: ahoraIso }],
+    correos: [{ correo: 'carla@example.com', nivel: 'buzon', origen: 'google', anadidoEl: ahoraIso }],
+  };
+  const soloPerfil: Account = { ...cuenta, id: 'solo-perfil', email: 'dani@example.com' };
+  await store.saveAccount(conGoogle);
+  await store.saveAccount(soloPerfil);
+  comprobar(
+    'entra quien vino con Google',
+    await tallerAbiertoPara(peticion(emitirSesionDeCuenta(conGoogle, 'google'))),
+  );
+  comprobar(
+    'no entra quien solo guardó su perfil de jugador desde la app',
+    !(await tallerAbiertoPara(peticion(emitirSesionDeCuenta(soloPerfil, 'google')))),
+  );
+  comprobar('sin nada, tampoco', !(await tallerAbiertoPara(peticion())));
+  comprobar(
+    'una cuenta cualquiera no ve las partidas antiguas sin dueño',
+    !(await veLasHuerfanas(peticion(emitirSesionDeCuenta(conGoogle, 'google')), conGoogle.id)),
+  );
+  process.env.GM_ADMITIDOS = 'carla@example.com';
+  comprobar(
+    'la que la casa autoriza, sí',
+    await veLasHuerfanas(peticion(emitirSesionDeCuenta(conGoogle, 'google')), conGoogle.id),
+  );
+  delete process.env.GM_ADMITIDOS;
 
   paso('El presupuesto');
   const pasos = ['trama', 'material', 'detective', 'revisor', 'asistente'] as const;

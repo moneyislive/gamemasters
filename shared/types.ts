@@ -47,6 +47,13 @@ export interface AppConfig {
   models: ModelOption[];
   hasApiKey: boolean;
   storage: 'mongo' | 'file';
+  /**
+   * ¿Puede quien pregunta cambiar el modelo de la casa? Con el taller abierto a
+   * cualquier cuenta, el selector de la cabecera no puede estar a la vista de
+   * todos: el modelo de la casa lo decide quien la administra. Cada velada sigue
+   * pudiendo elegir el suyo en sus opciones avanzadas.
+   */
+  puedeCambiarModelo?: boolean;
 }
 
 // ---------- Entidades del juego ----------

@@ -31,7 +31,7 @@
  * de la velada de otra persona.
  */
 import { getStore } from '../db/store';
-import { identidadDeTaller } from '../auth';
+import { esDeLaCasa, identidadDeTaller, llevaLaLlaveDeLaCasa, tallerPublico } from '../auth';
 import { crearRouter } from '../rutas';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -69,9 +69,14 @@ router.use('/games/:id', async (req: Request, res: Response, next: NextFunction)
 
   const duenos = game.duenos ?? [];
   if (duenos.length === 0) {
-    // Huérfana: nadie la reclama todavía. Se deja pasar, porque esconder lo que
-    // no tiene dueño es cómo se pierde el trabajo de meses.
-    next();
+    // Huérfana: nadie la reclama todavía. Se deja pasar a la casa, porque
+    // esconder lo que no tiene dueño es cómo se pierde el trabajo de meses.
+    // A una cuenta cualquiera de un taller público, no: ver `veLasHuerfanas`.
+    if (await veLasHuerfanas(req, quien.cuentaId)) {
+      next();
+      return;
+    }
+    noExiste();
     return;
   }
   if (duenos.some((d) => d.cuentaId === quien.cuentaId)) {
@@ -83,3 +88,19 @@ router.use('/games/:id', async (req: Request, res: Response, next: NextFunction)
 });
 
 export default router;
+
+/**
+ * ¿Ve esta cuenta las partidas sin dueño?
+ *
+ * Con el taller cerrado, sí: solo entran la casa y quien ella autoriza, y las
+ * huérfanas son de la casa —se crearon con su contraseña antes de que hubiera
+ * cuentas—. Con el taller PÚBLICO, solo la casa: una cuenta cualquiera que
+ * pudiera abrir una huérfana leería la solución de una velada ajena, y quizá de
+ * una a la que la han invitado a jugar.
+ */
+export async function veLasHuerfanas(req: Request, cuentaId: string): Promise<boolean> {
+  if (!tallerPublico()) return true;
+  if (llevaLaLlaveDeLaCasa(req)) return true;
+  const cuenta = await getStore().getAccount(cuentaId);
+  return Boolean(cuenta && esDeLaCasa(cuenta));
+}

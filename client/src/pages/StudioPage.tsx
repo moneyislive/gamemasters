@@ -520,7 +520,7 @@ export default function StudioPage() {
             </button>
           )}
 
-          {config && (
+          {config?.puedeCambiarModelo && (
             <label className="studio-model">
               <span className="studio-model-label mono-caps">Modelo</span>
               <select
