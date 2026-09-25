@@ -36,6 +36,7 @@ import { atlasDeLaGrafia } from '../efectos/atlas';
 import { UNIFORMES_DE_LA_CIUDAD } from './retoques';
 import { Molde, triangulosDe } from './geometria';
 import type { SalidaDeAvenida } from './sintetica';
+import { seccionDelViaducto } from './viaducto';
 import { ALTO_DEL_VIADUCTO, ANCHO_DE_AVENIDA, BORDE_DE_LA_CIUDAD, CERCO_DE_LA_CIUDAD, SALIDA_DE_GLIFOS } from '../../../../shared/arcade/juegos/quiebro-ciudad';
 
 /** Lo que es cada cara del borde, en `aBorde.x`. */
@@ -255,22 +256,36 @@ export function geometriaDelBorde(salidas: readonly SalidaDeAvenida[], conViaduc
     m.tri(va, vc, vd);
     m.tri(va, vc, vb);
     m.tri(va, vd, vc);
-    /* La viga en alambre, por sus dos costados, del borde hasta el muro. */
+    /*
+     * La viga en alambre, por sus dos costados, del borde hasta el muro: la silueta de la sección de g1 del
+     * viaducto (`seccionDelViaducto`, la de N0-N1 y la de la LOD1), en dos caras por lado: el alma abierta y el
+     * canto del tablero con su peto. Así las aristas de glifos siguen las de la viga de verdad donde se deshace.
+     */
     if (conViaducto(s)) {
+      const sv = seccionDelViaducto(1);
+      const [fondo, alma, canto] = sv.viga as [readonly [number, number], readonly [number, number], readonly [number, number]];
+      const peto = (sv.petos[0] as readonly [number, number, number, number])[3];
+      const tramos: (readonly [readonly [number, number], readonly [number, number]])[] = [
+        [fondo, alma],
+        [[sv.medioAncho, canto[1]], [sv.medioAncho, peto]],
+      ];
       for (const lado of [-1, 1]) {
-        const t = lado * 1.9;
-        const y0 = ALTO_DEL_VIADUCTO;
-        const y1 = ALTO_DEL_VIADUCTO + 1.45;
-        m.poner('aBorde', PIEZA.viga, 0, 0, 0);
-        const a = m.vertice(...p(d0, t, y0), 0, 0, lado, 0, 0);
-        const d = m.vertice(...p(d0, t, y1), 0, 0, lado, 0, 1);
-        m.poner('aBorde', PIEZA.viga, 1, 0, 0);
-        const b = m.vertice(...p(dFin, t, y0), 0, 0, lado, 1, 0);
-        const c = m.vertice(...p(dFin, t, y1), 0, 0, lado, 1, 1);
-        m.tri(a, b, c);
-        m.tri(a, c, d);
-        m.tri(a, c, b);
-        m.tri(a, d, c);
+        for (const [q0, q1] of tramos) {
+          const t0 = lado * q0[0];
+          const t1 = lado * q1[0];
+          const y0 = ALTO_DEL_VIADUCTO + q0[1];
+          const y1 = ALTO_DEL_VIADUCTO + q1[1];
+          m.poner('aBorde', PIEZA.viga, 0, 0, 0);
+          const a = m.vertice(...p(d0, t0, y0), 0, 0, lado, 0, 0);
+          const d = m.vertice(...p(d0, t1, y1), 0, 0, lado, 0, 1);
+          m.poner('aBorde', PIEZA.viga, 1, 0, 0);
+          const b = m.vertice(...p(dFin, t0, y0), 0, 0, lado, 1, 0);
+          const c = m.vertice(...p(dFin, t1, y1), 0, 0, lado, 1, 1);
+          m.tri(a, b, c);
+          m.tri(a, c, d);
+          m.tri(a, c, b);
+          m.tri(a, d, c);
+        }
       }
     }
     /* El muro que tiembla, al final, un poco más ancho que el pasillo. */

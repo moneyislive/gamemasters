@@ -23,6 +23,7 @@ import type {
   RotuloDelBarrio,
   TramoDeAltura,
 } from '../../../../shared/arcade/juegos/quiebro-barrio';
+import type { IdDeDistrito } from '../../../../shared/arcade/juegos/quiebro-ciudad';
 import { ANCHO_DE_ACERA, ANCHO_DE_CALZADA, EJES_DE_CALLE, MEDIO_BARRIO, barrioDeLaNoche, trenEn } from '../../../../shared/arcade/juegos/quiebro-barrio';
 import type {
   CabinaDelPlano,
@@ -92,6 +93,8 @@ export interface EdificioQueSeTraduce {
   readonly balcones: boolean;
   readonly semilla: number;
   readonly fachadas: readonly FachadaDelEdificio[];
+  /** El distrito de su hueco: lo da la ciudad (`EdificioDeLaCiudad.distrito`); el barrio viejo no lo tiene. */
+  readonly distrito?: IdDeDistrito;
 }
 
 /**
@@ -124,6 +127,7 @@ export function edificioDelPlano(e: EdificioQueSeTraduce, bajo: CajaXZ, soportal
     soportales: soportales.map((c) => ({ mira: orientacionDeLaCara(c), fondo: fondo(c) })).filter((s) => s.fondo > 0.01),
     pilares,
     semilla: e.semilla,
+    ...(e.distrito !== undefined ? { distrito: e.distrito } : {}),
   };
 }
 
