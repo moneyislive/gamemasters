@@ -58,8 +58,34 @@ trama ──► material ──► auditoría ──► detective ──► revi
   algo más pobre que lo que había, nunca una sala o una ronda sin pistas.
 
 El informe queda en `plot.revision`, se ve en Documentos con «Revisar de nuevo», y a
-ciegas solo se enseña el veredicto. `verify:revision` (51 comprobaciones) reproduce los
+ciegas solo se enseña el veredicto. `verify:revision` (64 comprobaciones) reproduce los
 fallos de arriba sin salir a la red.
+
+### Lo que enseñó la casa Sabrón (25-sep-2026)
+
+La mejor velada que ha salido se corrigió a mano en agosto, en dos pasadas: primero la
+trama (un informe de validación con los arreglos) y después el paquete imprimible, que es
+el que hoy compone el taller. Miguel la dio como modelo. Lo que la hacía buena, dicho sin
+nombres, pasó a los requisitos del generador (`cluedo-generacion.ts`), del material
+(`cluedo-material.ts`) y del revisor:
+
+| Lo que tenía | Dónde se pide ahora |
+|---|---|
+| Media mesa comete esa noche **una falta que no es el crimen** (un robo, una falsificación, algo en una copa, tocar la escena), con su pista; los giros son las confesiones que las sacan del caso | trama 4 · material 2 · revisor |
+| El culpable se prueba **reconstruyendo el trayecto** del objeto y con **un rasgo suyo** (físico, de oficio o de costumbre) que otros comparten en parte | trama 5 · revisor |
+| **Cada ronda tiene su papel**: motivos → tramo confuso → faltas → reconstrucción; cada sala sale en dos rondas | trama 15 · esquema de la pista |
+| La víctima **agravia en público a varios** en la cena, y lo público **no trae datos decisivos** (la validación los quitó del prólogo) | trama 3 y 11 · revisor |
+| **Investigación individual**: sin equipos ni portavoces | trama 16 · auditoría `guion-con-portavoces` |
+| Narraciones que dicen qué pregunta toca («no confundáis una mentira con un asesinato»); cronología que estrecha la hora de la muerte; **ayudas que ordenan el razonamiento** sin nombrar a nadie; epílogo que cierra cada hilo | material 1, 3, 4 y 5 |
+| **La coartada se sostiene aunque oculte una ausencia**; solo se prohíbe inventarse otra | reglas de CLUEDO (`shared/juegos/cluedo.ts`) |
+
+Y un fallo que la corrección no llegó a ver: **el dosier del culpable era un 23 % más
+largo** que los demás, porque solo él llevaba el relato del crimen, en un recuadro rojo.
+La auditoría no lo veía, porque medía los campos del personaje y el bloque lo añadía quien
+imprime. Ahora todos tienen «Tu noche» (`nightStory`), con la misma extensión y el mismo
+recuadro. El culpable lo sabe por la primera frase, y la auditoría avisa de
+`noche-desigual`. `npm run medir:dosieres -w server` mide los dosieres de una partida
+guardada y dice cuánto se desvía el del culpable.
 
 ### Lo que falta
 
