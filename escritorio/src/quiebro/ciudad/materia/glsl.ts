@@ -98,7 +98,15 @@
  *     con `##`, es rojo; y también una función con un parámetro `sampler*` o un sampler que no sea un
  *     `uniform` suelto. Con cualquiera de ellos una derivada o una lectura se esconden a la regla de fuente
  *     y al contador del presupuesto, que cuenta `texture*(uRuidoQ, …)` y nada más: por eso `uRuidoQ` sólo
- *     se nombra como primer argumento de una lectura (lo mira también sobre el texto montado).
+ *     se nombra como primer argumento de una lectura (lo mira también sobre el texto montado). La regla de
+ *     los `#define` mira también dentro de las cadenas de TS (tras un `\n` escrito como escape o tras una
+ *     comilla), no sólo al principio de la línea.
+ *   · UN SOLO SAMPLER: `uniform sampler2D uRuidoQ;`, escrito así. Un gemelo (`uRuidoBisQ`, atado a la
+ *     misma textura) leería sin que el contador lo cuente; en `materia/**` cualquier otra declaración de
+ *     sampler, o un `#define` que nombre un tipo sampler, es rojo. Esa regla es de grafía (con `sampler`
+ *     partido en la fuente no ve nada); sobre el texto MONTADO, lo que la materia añade a los samplers
+ *     declarados (con macros y `struct`) es `uRuidoQ` y nada más, y no añade ninguna lectura de otro
+ *     sampler, se declare como se declare.
  *   · LAS COORDENADAS DEL RUIDO SE REDUCEN MÓDULO EL PERIODO ANTES DE LEER. A 300 m, `x · 48` son 14.400
  *     téxeles; reducido, la coma flotante sigue teniendo decimales para la bilineal.
  *   · SIN BUCLES: `fbmT` va desenrollado a mano (el compilador de D3D dejaba el bucle, y el de un móvil puede
