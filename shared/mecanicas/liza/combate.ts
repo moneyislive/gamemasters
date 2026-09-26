@@ -38,7 +38,7 @@
  */
 import { COSENO, SENO } from '../andar';
 import { UNO } from '../fijo';
-import type { AccionRecibida, AnuncioPendiente } from './tipos-de-la-sala';
+import type { AccionRecibida, AnuncioPendiente, SostenidaEnCurso } from './tipos-de-la-sala';
 import type {
   AccionDeclarada,
   ClaseDeEntidad,
@@ -284,12 +284,40 @@ export function anunciarProgramados(p: PasoEnCurso): void {
 /* ─── LO QUE PULSA UN ASIENTO ────────────────────────────────────────────── */
 
 /**
+ * LAS MANOS DEL TIRO CARGADO (declaración W): empezar a cargar y soltar. Viven en `tiro.ts`, que usa este
+ * fichero y el de las balas; la sala se las da a `atenderLaAccionDelAqui` para que ni éste ni aquél se
+ * importen en círculo (como `mirarLaPresencia` recibe `alQuedarAusente`).
+ */
+export interface ManosDelTiro {
+  /** Un `apuntar` sin sostenida en curso: empieza la carga si puede. */
+  empezar(p: PasoEnCurso, a: AsientoEnCurso, reglas: ReglasDeAsiento, accion: AccionRecibida, desfaseMs: number): void;
+  /**
+   * Un `soltar`: dispara la carga `carga` —la sostenida que había ANTES de este `aqui`, si era una carga viva;
+   * `null` si no la había, y entonces no sale nada—.
+   */
+  soltar(p: PasoEnCurso, a: AsientoEnCurso, reglas: ReglasDeAsiento, carga: SostenidaEnCurso | null, accion: AccionRecibida, desfaseMs: number): void;
+}
+
+/** ¿Es `s` una carga VIVA del tiro de este asiento: su sostenida de `apuntar`, y su estado de cargar en curso? */
+export function esCargaViva(p: PasoEnCurso, a: AsientoEnCurso, s: SostenidaEnCurso | null): boolean {
+  if (s === null) return false;
+  const tiro = (p.declaracion.asientos[a.numero - 1] as ReglasDeAsiento | undefined)?.tiro ?? null;
+  if (tiro === null || s.accion !== tiro.apuntar) return false;
+  const activo = enCurso(a.estado, p.k);
+  return activo !== null && activo.estado === tiro.puesta.estado;
+}
+
+/**
  * LA ACCIÓN DE UN `aqui` (o su falta). Primero, la sostenida: el primer `aqui` sin ella —o con otra, o
  * con la misma y otro `ms`, que es otra pulsación— la suelta (ver `protocolo.ts`). Después, lo pulsado:
  * si está en la vuelta del ausente, la vuelta se acaba antes (ver `TICS_DE_LA_VUELTA`).
+ *
+ * Soltar la sostenida NO dispara nada, tampoco si era la carga de un tiro: lo único que dispara es el
+ * `soltar` explícito, y éste recibe la carga tal como estaba ANTES de soltarla (`ManosDelTiro.soltar`).
  */
-export function atenderLaAccionDelAqui(p: PasoEnCurso, a: AsientoEnCurso, accion: AccionRecibida | null, desfaseMs: number): void {
+export function atenderLaAccionDelAqui(p: PasoEnCurso, a: AsientoEnCurso, accion: AccionRecibida | null, desfaseMs: number, tiro: ManosDelTiro): void {
   const s = a.sostenida;
+  const carga = esCargaViva(p, a, s) ? s : null;
   if (s !== null && (accion === null || accion.id !== s.accion || accion.msDelAparato !== s.msDelAparato)) soltarLaSostenida(p, a);
   if (accion === null || !a.conCuerpo || a.vida <= 0) return;
   /* El ausente no pulsa: lo que mande hasta volver ni cuenta ni se guarda para después (saldría en su vuelta). */
@@ -310,6 +338,10 @@ export function atenderLaAccionDelAqui(p: PasoEnCurso, a: AsientoEnCurso, accion
     if (golpe !== undefined) intentarGolpe(p, a, reglas, golpe, accion, desfaseMs, false);
   } else if (tipo === TIPO_DE_ACCION.rescate || tipo === TIPO_DE_ACCION.remate || tipo === TIPO_DE_ACCION.zona) {
     if (a.sostenida === null) empezarSostenida(p, a, reglas, tipo, accion);
+  } else if (tipo === TIPO_DE_ACCION.apuntar) {
+    if (a.sostenida === null) tiro.empezar(p, a, reglas, accion, desfaseMs);
+  } else if (tipo === TIPO_DE_ACCION.soltar) {
+    tiro.soltar(p, a, reglas, carga, accion, desfaseMs);
   }
 }
 
@@ -361,7 +393,8 @@ function guardar(a: AsientoEnCurso, accion: AccionRecibida, desfaseMs: number, h
   a.guardada = { accion, desfaseMs, hastaTic };
 }
 
-function enRecarga(a: AsientoEnCurso, accion: number, k: number): boolean {
+/** ¿Está en la recarga de `accion` en el tic `k`? (La de un golpe, y la del tiro, apuntada con su `apuntar`.) */
+export function enRecarga(a: AsientoEnCurso, accion: number, k: number): boolean {
   for (const r of a.recargas) if (r.accion === accion && r.hastaTic > k) return true;
   return false;
 }
@@ -571,6 +604,7 @@ function estadoDeLaSostenida(p: PasoEnCurso, n: number, accion: number): number 
   if (reglas === undefined) return 0;
   if (tipo === TIPO_DE_ACCION.rescate) return reglas.rescate.puesta.estado;
   if (tipo === TIPO_DE_ACCION.zona) return zonaDeAccion(p)?.puesta.estado ?? 0;
+  if (tipo === TIPO_DE_ACCION.apuntar) return reglas.tiro === null ? 0 : reglas.tiro.puesta.estado;
   if (tipo === TIPO_DE_ACCION.remate) {
     for (const c of p.declaracion.clases) if (c.alCaer.tipo === 'rematable' && c.alCaer.remate.accion === accion) return c.alCaer.remate.puesta.estado;
   }
@@ -624,11 +658,16 @@ function entrarEnLaZona(p: PasoEnCurso, a: AsientoEnCurso, zona: ZonaDeAccionDec
   ponerPuesta(p, a, zona.puesta, p.k, 0);
 }
 
-/** Suelta lo que sostiene: sale de la zona si estaba y deja el estado de sostener. */
+/**
+ * Suelta lo que sostiene: sale de la zona si estaba y deja el estado de sostener. Si era la carga de un tiro, NO
+ * dispara (lo único que dispara es `soltar`: ver `ManosDelTiro`), y apunta su pulsación en `cargaDejadaMs`: el
+ * mismo dedo, mantenido, no la vuelve a empezar.
+ */
 export function soltarLaSostenida(p: PasoEnCurso, a: AsientoEnCurso): void {
   const s = a.sostenida;
   if (s === null) return;
   a.sostenida = null;
+  if (p.indices.porAsiento[a.numero - 1]?.tipo[s.accion] === TIPO_DE_ACCION.apuntar) a.cargaDejadaMs = s.msDelAparato;
   const en = p.encuentro;
   if (en !== null && en.zona !== null && en.zona.usando.indexOf(a.numero) >= 0) {
     const usando: number[] = [];
@@ -674,6 +713,13 @@ export function avanzarSostenidas(p: PasoEnCurso): void {
       }
       if (s.desdeTic < 0) entrarEnLaZona(p, a, zona);
       else if (p.k - s.desdeTic >= zona.mantenerTics) salirPorLaZona(p, a, reglas, activa.zona);
+    } else if (tipo === TIPO_DE_ACCION.apuntar) {
+      /*
+       * LA CARGA DE UN TIRO se mantiene mientras su estado siga en curso; si se acabó (se mantuvo más de lo
+       * que dura) o lo pisó otro (el premio de una limpia contra una bala), se deja sin disparar. Lo que corta
+       * su estado con daño ya la soltó (`cortarPorDano`). No se completa sola: sólo sale con `soltar`.
+       */
+      if (!esCargaViva(p, a, s)) soltarLaSostenida(p, a);
     } else soltarLaSostenida(p, a);
   }
 }
@@ -1224,8 +1270,12 @@ function cortarPorDano(p: PasoEnCurso, b: AsientoEnCurso): void {
   if (declarado !== undefined && declarado.seCortaConDano && enCurso(b.estado, p.k) !== null) ponerEstado(p, b, null);
 }
 
-/** DA A UNA ENTIDAD: `resuelve`, empujón (la mueve la sala), daño, y su caída o su estado. */
-function golpearEntidad(
+/**
+ * DA A UNA ENTIDAD: `resuelve` (o el `impacta` de la bala de un tiro: `bala` ≠ 0), empujón (la mueve la sala),
+ * daño, y su caída o su estado. `rumbo` −1 = del autor hacia el blanco, como un golpe; la bala de un tiro
+ * empuja en la dirección de su vuelo, y su área hacia fuera desde donde estalla (ver `tiro.ts`).
+ */
+export function golpearEntidad(
   p: PasoEnCurso,
   e: EntidadEnCurso,
   clase: ClaseDeEntidad,
@@ -1235,19 +1285,22 @@ function golpearEntidad(
   reglas: ReglasDeAsiento,
   desde: number,
   anuncio: number,
+  rumbo = -1,
+  bala = 0,
 ): void {
   let dano = alRitmo ? efecto.danoAlRitmo : efecto.dano;
   let masTics = 0;
   let emp: Empujon | null = null;
   if (efecto.empuje > 0) {
-    emp = empujon(p, e.x, e.z, clase.radio, rumboDeA(a.x, a.z, e.x, e.z, a.mira), efecto.empuje);
+    emp = empujon(p, e.x, e.z, clase.radio, rumbo >= 0 ? rumbo : rumboDeA(a.x, a.z, e.x, e.z, a.mira), efecto.empuje);
     if (emp.caja >= 0) {
       dano += efecto.alChocar.dano;
       masTics = efecto.alChocar.tics;
     }
   }
   const vida = e.vida - dano > 0 ? e.vida - dano : 0;
-  contar(p, 0, { e: 'resuelve', id: anuncio, r: RESULTADO.da, dano, vida });
+  if (bala !== 0) contar(p, 0, { e: 'impacta', bala, a: e.numero, r: RESULTADO.da, dano, vida });
+  else contar(p, 0, { e: 'resuelve', id: anuncio, r: RESULTADO.da, dano, vida });
   if (emp !== null) {
     contar(p, 0, { e: 'empuja', a: e.numero, r: emp.rumbo, d: aCentesimas(emp.d), caja: emp.caja + 1 });
     e.x = emp.x;

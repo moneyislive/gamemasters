@@ -79,7 +79,7 @@ import type {
   ReglasDeAsiento,
   SitioDeNacer,
 } from '../../shared/mecanicas/liza/declaracion';
-import { desplazado, rumboHacia } from '../../shared/mecanicas/liza/geometria';
+import { desplazado, hayLineaDeVista, rumboHacia } from '../../shared/mecanicas/liza/geometria';
 import {
   deCentesimas,
   ECO_CADA_MS,
@@ -122,6 +122,13 @@ export interface OpcionesDelRobot {
    * juicio de la esquiva sin que el autor del golpe caiga antes de su impacto (el anuncio saldría cortado).
    */
   readonly golpea?: boolean;
+  /**
+   * EL TIRO CARGADO (declaración W), si su asiento lo tiene: cuando no le amenazan ni tiene nada que pulsar,
+   * y ve una entidad a su alcance, se planta, carga lo que toque en su rueda de cargas (ms) y lo suelta contra
+   * ella, mandando su número; y espera la recarga de ese nivel. Si le anuncian un golpe o le dan, lo deja. Sin
+   * decir, no lo usa.
+   */
+  readonly tiro?: readonly number[];
 }
 
 /** Lo que cuenta un robot de lo que le pasa. */
@@ -163,6 +170,21 @@ export interface CuentasDelRobot {
   pulsaciones: number;
   bytesBajados: number;
   ecos: number;
+  /**
+   * EL TIRO: las cargas que empezó, las que la sala le vio empezar (su estado de cargar), las que soltó, sus
+   * balas (el `bala` con su número), las que estallaron, las entidades que alcanzaron con daño y el daño de cada
+   * una por proyectil; y los tiros de OTROS asientos que vio salir y estallar.
+   */
+  cargas: number;
+  cargasVistas: number;
+  sueltas: number;
+  susTiros: number;
+  susEstallidos: number;
+  susAlcanzadas: number;
+  danoDeSusTiros: Record<string, number[]>;
+  clasesAlcanzadas: Record<string, number>;
+  tirosAjenos: number;
+  estallidosAjenos: number;
 }
 
 /**
@@ -221,7 +243,26 @@ export class RobotDeLaLiza {
     pulsaciones: 0,
     bytesBajados: 0,
     ecos: 0,
+    cargas: 0,
+    cargasVistas: 0,
+    sueltas: 0,
+    susTiros: 0,
+    susEstallidos: 0,
+    susAlcanzadas: 0,
+    danoDeSusTiros: {},
+    clasesAlcanzadas: {},
+    tirosAjenos: 0,
+    estallidosAjenos: 0,
   };
+  /** La carga del tiro en curso: desde cuándo (su reloj, el `ms` que repite), hasta cuándo y contra quién. */
+  private carga: { desde: number; hasta: number; blanco: number } | null = null;
+  /** Desde cuándo (su reloj) puede volver a cargar: su recarga, calculada de la declaración. */
+  private tiroListo = 0;
+  private vueltaDelTiro = 0;
+  /** Las balas de tiro que vio salir, con su proyectil y si eran suyas. */
+  private readonly balasDeTiro = new Map<number, { p: number; mia: boolean }>();
+  /** La clase de cada entidad, por lo que dijo su `nace`. */
+  private readonly clases = new Map<number, number>();
   /** Las correcciones recibidas, con el `n` que corrigen. */
   readonly corregidos: { n: number; x: number; z: number }[] = [];
   /** Lo último que mandó en un `aqui` (para mirar una corrección contra ello). */
@@ -298,6 +339,9 @@ export class RobotDeLaLiza {
         this.quietoHasta = 0;
         this.amenazaHasta = Number.NEGATIVE_INFINITY;
         this.dentroEn = ahora;
+        this.carga = null;
+        this.tiroListo = 0;
+        this.clases.clear();
         this.cuentas.dentros++;
         return;
       case 'foto':
@@ -328,6 +372,7 @@ export class RobotDeLaLiza {
               break;
             case 'nace':
               this.entidades.set(s.id, { x: deCentesimas(s.x), z: deCentesimas(s.z) });
+              this.clases.set(s.id, s.clase);
               break;
             case 'seva':
               this.entidades.delete(s.id);
@@ -336,9 +381,25 @@ export class RobotDeLaLiza {
               /* Si la sala le pone en un estado que no deja andar, no anda: si no, cada paso sería una corrección. */
               if (s.a === this.yo) {
                 const declarado = this.o.liza()?.estados.find((e) => e.id === s.est);
-                this.quietoHasta = s.est !== 0 && declarado?.bloqueaPaso === true ? ahora + s.tics * 50 : 0;
+                const tiro = this.reglas()?.reglas.tiro ?? null;
+                if (tiro !== null && s.est === tiro.puesta.estado) this.cuentas.cargasVistas++;
+                else this.quietoHasta = s.est !== 0 && declarado?.bloqueaPaso === true ? ahora + s.tics * 50 : 0;
               }
               break;
+            case 'bala':
+              if (s.de < PRIMER_NUMERO_DE_ENTIDAD) {
+                const mia = s.de === this.yo;
+                this.balasDeTiro.set(s.id, { p: s.p, mia });
+                if (mia) this.cuentas.susTiros++;
+                else this.cuentas.tirosAjenos++;
+              }
+              break;
+            case 'estalla': {
+              const b = this.balasDeTiro.get(s.bala);
+              if (b !== undefined && b.mia) this.cuentas.susEstallidos++;
+              else if (b !== undefined) this.cuentas.estallidosAjenos++;
+              break;
+            }
             case 'anuncio':
               this.anuncios.set(s.id, { de: s.de, a: s.a, acc: s.acc });
               if (s.a === this.yo && s.de !== this.yo) {
@@ -363,20 +424,36 @@ export class RobotDeLaLiza {
               if (a.a === this.yo && a.de !== this.yo) {
                 if (s.r === RESULTADO.limpia) this.cuentas.limpias++;
                 else if (s.r === RESULTADO.esquivada) this.cuentas.esquivadas++;
-                else if (s.r === RESULTADO.da) this.cuentas.meDieron++;
-                else if (s.r === RESULTADO.fallada) this.cuentas.fallaronContraMi++;
+                else if (s.r === RESULTADO.da) {
+                  this.cuentas.meDieron++;
+                  /* Un golpe corta la carga (la sala ya lo hizo): el dedo se levanta. */
+                  this.carga = null;
+                } else if (s.r === RESULTADO.fallada) this.cuentas.fallaronContraMi++;
                 else this.cuentas.cortadas++;
               } else if (a.de === this.yo && s.r === RESULTADO.da) {
                 this.cuentas.golpesQueDieron++;
               }
               break;
             }
-            case 'impacta':
+            case 'impacta': {
               if (s.a === this.yo) {
                 if (s.r === RESULTADO.limpia) this.cuentas.limpias++;
-                else if (s.r === RESULTADO.da) this.cuentas.meDieron++;
+                else if (s.r === RESULTADO.da) {
+                  this.cuentas.meDieron++;
+                  this.carga = null;
+                }
+              }
+              const b = this.balasDeTiro.get(s.bala);
+              if (b !== undefined && b.mia && s.a >= PRIMER_NUMERO_DE_ENTIDAD && s.r === RESULTADO.da) {
+                this.cuentas.susAlcanzadas++;
+                const lista = this.cuentas.danoDeSusTiros[String(b.p)] ?? [];
+                lista.push(s.dano);
+                this.cuentas.danoDeSusTiros[String(b.p)] = lista;
+                const clase = String(this.clases.get(s.a) ?? 0);
+                this.cuentas.clasesAlcanzadas[clase] = (this.cuentas.clasesAlcanzadas[clase] ?? 0) + 1;
               }
               break;
+            }
             default:
               break;
           }
@@ -444,11 +521,41 @@ export class RobotDeLaLiza {
     if (amenazado) {
       const esquiva = reglas.esquiva.accion;
       for (let i = this.pendientes.length - 1; i >= 0; i--) if ((this.pendientes[i] as { accion: number }).accion !== esquiva) this.pendientes.splice(i, 1);
+      /* Cargar es no poder quebrar: con un golpe encima, la carga se deja (sin disparar). */
+      this.carga = null;
+    }
+
+    /* EL TIRO: empezar a cargar, si toca (ver `OpcionesDelRobot.tiro`). Mientras carga, no anda. */
+    const tiro = reglas.tiro;
+    const rueda = this.o.tiro;
+    if (tiro !== null && rueda !== undefined && rueda.length > 0 && this.carga === null && !amenazado && this.pendientes.length === 0 && ahora >= this.tiroListo && ahora >= this.quietoHasta) {
+      const cargaMs = rueda[this.vueltaDelTiro % rueda.length] as number;
+      let nivel = tiro.niveles[0];
+      for (const x of tiro.niveles) if (x.desdeMs <= cargaMs) nivel = x;
+      const bala = nivel === undefined ? undefined : liza.proyectiles.find((p) => p.id === nivel.proyectil);
+      let blanco: { n: number; x: number; z: number; d: number } | null = null;
+      for (const [num, e] of this.entidades) {
+        const d = Math.sqrt((e.x - this.x) * (e.x - this.x) + (e.z - this.z) * (e.z - this.z));
+        if (bala === undefined || d < 3 * UNO || d > bala.alcance - UNO) continue;
+        if (!hayLineaDeVista(this.arena(liza).cuerpos, this.x, this.z, e.x, e.z)) continue;
+        if (blanco === null || d < blanco.d) blanco = { n: num, x: e.x, z: e.z, d };
+      }
+      if (blanco !== null) {
+        this.vueltaDelTiro++;
+        this.carga = { desde: ahora, hasta: ahora + cargaMs, blanco: blanco.n };
+        this.cuentas.cargas++;
+      }
+    }
+    if (this.carga !== null) {
+      const e = this.entidades.get(this.carga.blanco);
+      if (e !== undefined && (e.x !== this.x || e.z !== this.z)) this.mira = rumboHacia(e.x - this.x, e.z - this.z);
     }
 
     /* Andar. */
     let marcha = 0;
-    if (this.salto !== null) {
+    if (this.carga !== null) {
+      /* Plantado mientras carga: la sala lo tiene en un estado que no deja andar. */
+    } else if (this.salto !== null) {
       this.x += this.salto.dx;
       this.z += this.salto.dz;
       this.salto = null;
@@ -490,6 +597,16 @@ export class RobotDeLaLiza {
       this.pendientes.shift();
       accion = [toca.accion, ahora, toca.blanco];
       if (toca.accion === reglas.esquiva.accion) this.cuentas.esquivasPulsadas++;
+    } else if (this.carga !== null && tiro !== null) {
+      /* Mantiene `apuntar` con el mismo `ms` y, llegada su carga, suelta contra su blanco. */
+      if (ahora >= this.carga.hasta) {
+        accion = [tiro.soltar, ahora, this.carga.blanco];
+        let nivel = tiro.niveles[0];
+        for (const x of tiro.niveles) if (x.desdeMs <= ahora - this.carga.desde) nivel = x;
+        this.tiroListo = ahora + (nivel?.recargaTics ?? 0) * 50 + 150;
+        this.carga = null;
+        this.cuentas.sueltas++;
+      } else accion = [tiro.apuntar, this.carga.desde, 0];
     } else if (this.forma === 'aporrea' && ahora - this.ultimoAporreo >= APORREA_CADA_MS) {
       this.ultimoAporreo = ahora;
       accion = [reglas.esquiva.accion, ahora, 0];

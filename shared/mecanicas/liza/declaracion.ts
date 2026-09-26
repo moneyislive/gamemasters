@@ -44,8 +44,7 @@
  *   U aforo ........................... `AforoDeLaSala`; el coste y la admisión, en `lizas.ts`
  *   V azar de sala sembrado ........... `FaseDeLaLiza.semilla`
  *
- * Y una que no es de aquel §11, y que entra con su FORMA antes de que la sala la cumpla (hasta entonces la
- * revisión la rechaza entera si no es `null`: ver su cabecera):
+ * Y una que no es de aquel §11, que entró primero con su FORMA y hoy la sala ya la cumple (ver su cabecera):
  *
  *   W tiro cargado .................... `TiroDeclarado` y `NivelDelTiro`, en `ReglasDeAsiento.tiro`
  *
@@ -733,11 +732,15 @@ export interface NivelDelTiro {
    * pegado a una pared.
    */
   readonly ancho: Longitud;
-  /** El radio del ÁREA alrededor de donde se para la bala (0 = sin área: sólo el blanco directo). */
+  /**
+   * El radio del ÁREA alrededor de donde se para la bala (0 = sin área: sólo el blanco directo). Donde se para
+   * es el CENTRO del cuerpo que toca, o el punto en que la estructura la para (el del suceso `estalla`).
+   */
   readonly area: Longitud;
   /**
-   * Lo que les pasa a los del ÁREA —los cuerpos a `area` o menos del punto donde se para, con línea de vista
-   * desde él, sin el blanco directo (ése lleva el efecto de su bala)—, con el empuje hacia FUERA, desde ese
+   * Lo que les pasa a los del ÁREA —las entidades en pie cuyo centro queda a `area` más la `holgura` del tiro,
+   * o menos, del punto donde se para, con línea de vista desde él, sin el blanco directo (ése lleva el efecto
+   * de su bala, y no los dos: nadie recibe dos veces el mismo tiro)—, con el empuje hacia FUERA, desde ese
    * punto, y no del autor al blanco como en un golpe. `null` si y sólo si `area` es 0.
    */
   readonly efectoDelArea: EfectoDeclarado | null;
@@ -767,21 +770,54 @@ export interface NivelDelTiro {
  * `niveles` con `desdeMs` ≤ la carga: una tabla de enteros, sin interpolar.
  *
  * SÓLO EL `soltar` EXPLÍCITO DISPARA. Todo lo demás que acaba la sostenida —un daño que corta su estado,
- * otra pulsación en el mismo `aqui`, el fin del combate, quedarse ausente— la acaba SIN disparar y sin
- * gastar la recarga.
+ * otra pulsación en el mismo `aqui`, el fin del combate, quedarse ausente, que el estado de cargar se acabe
+ * o lo pise otro— la acaba SIN disparar y sin gastar la recarga.
+ *
+ * ═══ CUÁNDO NO SE EMPIEZA A CARGAR ═══
+ *
+ * Como una sostenida más: con el combate vivo, con cuerpo y vida, si el estado en curso lo deja
+ * (`puedeEmpezar`: el que bloquea y no se suelta, no), sin un golpe propio anunciado y sin resolver, fuera de
+ * la recuperación de un golpe (`recuperacionTics`) y fuera de la recarga del tiro. Y además, nunca en un
+ * estado que NO bloquea las acciones —el premio de una limpia, el intocable de quien reaparece—: la Liza
+ * promete que empezar una acción en él no lo acaba, y cargar pone su propio estado encima, así que lo
+ * acabaría y se llevaría lo que ese estado da. Tampoco mientras la bala del tiro anterior sigue en el aire
+ * (ver «el aforo»), ni con la MISMA pulsación de una carga que ya se dejó: tras un golpe que la corta, el dedo
+ * que sigue apretado no la vuelve a empezar (`CuerpoDeAsiento.cargaDejadaMs`); cargar otra vez es pulsar otra
+ * vez. Un `apuntar` que no puede empezar no se guarda para después: el aparato sabe lo mismo que la sala (su
+ * estado, su recarga) y no pinta una carga que la sala no ve.
+ *
+ * ═══ EL VUELO Y EL JUICIO, CONTRA LAS ENTIDADES ═══
+ *
+ * La bala sale del sitio del asiento en el tic de la PULSACIÓN de `soltar` (acotado como cualquier
+ * pulsación, y nunca antes de que empezara a cargar), y vuela como las de las entidades (`sitioDeLaBala`,
+ * parada contra la estructura con el radio de SU proyectil y recortada al límite de la fase). Se juzga contra
+ * las ENTIDADES EN PIE —nunca contra los asientos: no hay fuego amigo; ni contra las caídas, las que
+ * absorben o las deshechas— en el presente de la sala, tic de vuelo a tic de vuelo: el tramo de ese tic
+ * contra el cuadrado de cada entidad ensanchado con `ancho` del nivel, el radio de su clase y la `holgura`
+ * (`pruebaDeLosa`), y con línea de vista desde donde entra hasta su centro. Gana la que se toca en la
+ * fracción MENOR del tramo y, a igualdad, la de número menor. La guardia no para un tiro ni lo esquiva al
+ * azar —son de los golpes, de frente—; la entidad que aparece o que está en su intocable lo recibe como
+ * `esquivada`, y lo para igual con el cuerpo. El efecto al blanco directo es el de su bala, con el empuje en
+ * la dirección del vuelo.
+ *
+ * Donde se para —el centro del cuerpo que toca, o el punto en que la estructura la detiene— sale `estalla`, y
+ * si el nivel tiene área, alcanza a las demás entidades en pie de alrededor (ver `NivelDelTiro.efectoDelArea`),
+ * recorridas por su número. La que llega a su alcance sin tocar nada se va con su `seva` (`alcance`), sin
+ * estallar; la que para la estructura, estalla y se va con el suyo (`choca`).
+ *
+ * ═══ EL AFORO: UNA PLAZA POR ASIENTO ═══
+ *
+ * Las balas de un tiro no cuentan en `AforoDeLaSala.balas`, que es el de las entidades: un aforo lleno de
+ * balas de entidades no puede tragarse un tiro en silencio. Cada asiento tiene su PLAZA, una bala de tiro en
+ * el aire como mucho —no se empieza a cargar mientras vuela la anterior—, así que lo más que vuela a la vez es
+ * el aforo más un tiro por asiento, y es lo que cuenta el coste (`lizas.ts`).
  *
  * ═══ LO QUE VEN LOS DEMÁS ═══
  *
  * Quien carga está en el estado de `puesta`, que sale en la foto: los demás ven que carga, y hacia dónde por
- * su mira. La bala sale con su suceso `bala`, con `de` = el NÚMERO DEL ASIENTO; lo que alcanza, con un
- * `impacta` por cuerpo; y donde se para —contra un cuerpo o contra la estructura—, con `estalla`
- * (`protocolo.ts`), que es el centro del área.
- *
- * ═══ HOY, SÓLO LA FORMA ═══
- *
- * La sala todavía no lo cumple, así que `problemasDeLaDeclaracion` revisa su forma entera Y rechaza todo tiro
- * que no sea `null`: una declaración que la sala no cumple es una promesa que nadie guarda. Quien lo cablee
- * en la sala quita esa frase, y nada más.
+ * su mira. La bala sale con su suceso `bala`, con `de` = el NÚMERO DEL ASIENTO; donde se para —contra un
+ * cuerpo o contra la estructura—, con `estalla` (`protocolo.ts`), que es el centro del área y va ANTES de los
+ * `impacta` de lo que alcanza, uno por cuerpo.
  */
 export interface TiroDeclarado {
   /** La acción SOSTENIDA que carga (el id del cable, 1-255). */
@@ -789,8 +825,12 @@ export interface TiroDeclarado {
   /** La pulsación que dispara (el id del cable, 1-255). */
   readonly soltar: IdDeclarado;
   /**
-   * El estado de quien carga, puesto al empezar a cargar. Sus `tics` cubren la carga máxima: si durara menos,
-   * se acabaría antes que ella y la cortaría.
+   * El estado de quien carga, puesto al empezar a cargar (desde el tic de la pulsación). Sus `tics` cubren la
+   * carga máxima: si durara menos, se acabaría antes que ella y la cortaría; y son también lo más que se puede
+   * mantener, porque cuando se acaba, la carga se deja sin disparar. Es un estado que NO bloquea las acciones
+   * (la revisión lo exige: `soltar` es una acción, y en un estado que las bloquea no llegaría nunca) y que es
+   * sólo suyo —ninguna otra puesta de la liza lo pone—: el aparato sabe que alguien carga por su estado. Si
+   * bloquea el paso, su `distanciaExtra` es la holgura del paso en que se suelta o se esquiva.
    */
   readonly puesta: PuestaDeEstado;
   /** Los niveles, de 1 a `TOPE_DE_NIVELES_DEL_TIRO`, con `desdeMs` crecientes y el primero en 0. */
@@ -820,7 +860,11 @@ export interface ReglasDeAsiento {
   readonly acciones: readonly AccionDeclarada[];
   readonly esquiva: EsquivaDeclarada;
   readonly rescate: RescateDeclarado;
-  /** Su tiro cargado (W), o `null` si no tiene. Hoy, `null` siempre: ver «hoy, sólo la forma» en `TiroDeclarado`. */
+  /**
+   * Su tiro cargado (W), o `null` si no tiene. Ver `TiroDeclarado`. Entró sin subir
+   * `VERSION_DE_LA_DECLARACION`, por lo mismo que `protocolo.ts` no sube la suya: no hay aparatos en la calle
+   * que hablen la forma de antes.
+   */
   readonly tiro: TiroDeclarado | null;
   readonly medidor: MedidorDeclarado;
   readonly puntos: PuntosDeclarados;
@@ -2277,19 +2321,26 @@ function proyectilDeId(proyectiles: readonly ProyectilDeclarado[], id: number): 
 
 /**
  * LA REVISIÓN DEL TIRO CARGADO (W): su forma entera, contra los estados y los proyectiles declarados. Los
- * dos ids no se miran aquí contra los demás del asiento: van en la lista de lo que manda, con los otros.
+ * dos ids no se miran aquí contra los demás del asiento: van en la lista de lo que manda, con los otros. Lo
+ * que pide la liza entera —que su estado sea sólo suyo, que la guardia no lo nombre, que ninguna entidad
+ * dispare sus balas— se mira al final de `revisar`, con todo leído.
  */
 function revisarElTiro(r: Revision, donde: string, t: TiroDeclarado, estados: readonly number[], proyectiles: readonly ProyectilDeclarado[]): void {
   const p = r.p;
   entero(r, `${donde}.apuntar`, t.apuntar, 1, TOPE_DE_ID);
   entero(r, `${donde}.soltar`, t.soltar, 1, TOPE_DE_ID);
   puesta(r, `${donde}.puesta`, t.puesta, estados);
+  /* `soltar` es una acción: en un estado que las bloquea no se podría empezar, y la carga no saldría nunca. */
+  if (r.bloquean.indexOf(t.puesta.estado) >= 0) {
+    p.push(`${donde}.puesta.estado: el estado de cargar bloquea las acciones, y soltar es una acción: no saldría nunca; va con bloqueaAccion a false`);
+  }
   if (t.enganche !== null) {
     longitud(r, `${donde}.enganche.radio`, t.enganche.radio, 1);
     entero(r, `${donde}.enganche.conoRumbos`, t.enganche.conoRumbos, 0, CUARTO_DE_VUELTA);
     longitud(r, `${donde}.enganche.holgura`, t.enganche.holgura);
   }
-  longitud(r, `${donde}.holgura`, t.holgura);
+  /* La holgura se suma al radio de cada cuerpo en la prueba de losa: tiene su tope, como los radios. */
+  entero(r, `${donde}.holgura`, t.holgura, 0, TOPE_DE_RADIO);
   const cargaBien = entero(r, `${donde}.cargaMaximaMs`, t.cargaMaximaMs, 0, TOPE_DE_VENTANA_MS);
   if (cargaBien && Number.isInteger(t.puesta.tics) && t.puesta.tics * MS_POR_TIC < t.cargaMaximaMs) {
     p.push(
@@ -2329,6 +2380,103 @@ function revisarElTiro(r: Revision, donde: string, t: TiroDeclarado, estados: re
   idsSinRepetir(r, `${donde}.niveles: cada nivel con su bala (el aparato sabe el nivel por el proyectil del suceso bala)`, balas);
   if (cargaBien && anterior >= 0 && t.cargaMaximaMs < anterior) {
     p.push(`${donde}.cargaMaximaMs: ${String(t.cargaMaximaMs)} ms es menos de lo que pide el último nivel (${String(anterior)}): no se llegaría nunca`);
+  }
+}
+
+/** Apunta el estado de una puesta, si la hay y tiene la forma de una (la revisión mira cada una en su sitio). */
+function apuntarEstado(estados: number[], pu: PuestaDeEstado | null | undefined): void {
+  if (pu !== null && pu !== undefined && typeof pu === 'object' && Number.isInteger(pu.estado)) estados.push(pu.estado);
+}
+
+/** Los estados de las puestas de un efecto y de una acción (para `revisarLoQueElTiroPideDeLaLiza`). */
+function apuntarEstadosDeLaAccion(estados: number[], a: AccionDeclarada): void {
+  if (a === null || typeof a !== 'object') return;
+  if (a.efecto !== null && typeof a.efecto === 'object') apuntarEstado(estados, a.efecto.puesta);
+  apuntarEstado(estados, a.alFallar);
+}
+
+/**
+ * LO QUE EL TIRO PIDE DE LA LIZA ENTERA (W), con todo lo demás ya leído:
+ *
+ *   · SU ESTADO ES SÓLO SUYO. El aparato sabe que alguien carga porque lo ve en ese estado (la foto, el suceso
+ *     `estado`), y la sala sabe que sigue cargando porque su estado sigue ahí: si otra puesta de la liza lo
+ *     pusiera —un golpe, una caída, el premio de una limpia—, los dos creerían que carga quien no carga.
+ *   · LA GUARDIA NO LO NOMBRA. La guardia (y su esquiva al azar) es de los golpes, de frente: el tiro no pasa
+ *     por ella, así que una guardia que dijera que lo para sería una promesa que la sala no cumple.
+ *   · NINGUNA ENTIDAD DISPARA SUS BALAS. El aparato reconoce el nivel de un tiro por el proyectil de su `bala`:
+ *     una entidad que disparara la misma bala se pintaría como un tiro.
+ */
+function revisarLoQueElTiroPideDeLaLiza(d: LizaDeclarada, p: string[]): void {
+  if (!Array.isArray(d.asientos)) return;
+  const idsDelTiro: number[] = [];
+  const balasDelTiro: number[] = [];
+  const deCargar: { donde: string; estado: number }[] = [];
+  const otras: number[] = [];
+  for (let i = 0; i < d.asientos.length; i++) {
+    const a = d.asientos[i] as ReglasDeAsiento;
+    if (a === null || typeof a !== 'object') continue;
+    if (Array.isArray(a.acciones)) for (const ac of a.acciones) apuntarEstadosDeLaAccion(otras, ac);
+    const es = a.esquiva;
+    if (es !== null && typeof es === 'object') {
+      apuntarEstado(otras, es.puesta);
+      if (es.alAcertar !== null && typeof es.alAcertar === 'object') {
+        apuntarEstado(otras, es.alAcertar.puesta);
+        apuntarEstado(otras, es.alAcertar.alAutor);
+      }
+      if (es.ruptura !== null && typeof es.ruptura === 'object') apuntarEstado(otras, es.ruptura.puesta);
+    }
+    if (a.rescate !== null && typeof a.rescate === 'object') apuntarEstado(otras, a.rescate.puesta);
+    const ti = a.tiro;
+    if (ti === null || ti === undefined || typeof ti !== 'object') continue;
+    idsDelTiro.push(ti.apuntar, ti.soltar);
+    if (ti.puesta !== null && typeof ti.puesta === 'object') deCargar.push({ donde: `asientos[${String(i)}].tiro.puesta.estado`, estado: ti.puesta.estado });
+    if (Array.isArray(ti.niveles)) {
+      for (const n of ti.niveles) {
+        if (n === null || typeof n !== 'object') continue;
+        balasDelTiro.push(n.proyectil);
+        if (n.efectoDelArea !== null && typeof n.efectoDelArea === 'object') apuntarEstado(otras, n.efectoDelArea.puesta);
+      }
+    }
+  }
+  if (idsDelTiro.length === 0) return;
+  if (Array.isArray(d.proyectiles)) for (const pr of d.proyectiles) if (pr !== null && typeof pr === 'object' && pr.efecto !== null && typeof pr.efecto === 'object') apuntarEstado(otras, pr.efecto.puesta);
+  if (Array.isArray(d.clases)) {
+    for (let i = 0; i < d.clases.length; i++) {
+      const c = d.clases[i] as ClaseDeEntidad;
+      if (c === null || typeof c !== 'object') continue;
+      if (Array.isArray(c.acciones)) for (const ac of c.acciones) apuntarEstadosDeLaAccion(otras, ac);
+      const g = c.guardia;
+      if (g !== null && typeof g === 'object') {
+        apuntarEstado(otras, g.alParar);
+        if (Array.isArray(g.para)) for (const id of g.para) if (idsDelTiro.indexOf(id) >= 0) p.push(`clases[${String(i)}].guardia.para: nombra el tiro (${String(id)}); la guardia es de los golpes, y un tiro no pasa por ella`);
+        const az = g.esquivaAlAzar;
+        if (az !== null && typeof az === 'object' && Array.isArray(az.acciones)) {
+          for (const id of az.acciones) if (idsDelTiro.indexOf(id) >= 0) p.push(`clases[${String(i)}].guardia.esquivaAlAzar.acciones: nombra el tiro (${String(id)}); la esquiva al azar es de los golpes, y un tiro no pasa por ella`);
+        }
+      }
+      const ac = c.alCaer;
+      if (ac !== null && typeof ac === 'object' && ac.tipo === 'rematable') {
+        apuntarEstado(otras, ac.puesta);
+        if (ac.remate !== null && typeof ac.remate === 'object') apuntarEstado(otras, ac.remate.puesta);
+        if (ac.siNo !== null && typeof ac.siNo === 'object') apuntarEstado(otras, ac.siNo.absorbiendo);
+      }
+      if (Number.isInteger(c.proyectil) && c.proyectil !== 0 && balasDelTiro.indexOf(c.proyectil) >= 0) {
+        p.push(`clases[${String(i)}].proyectil: dispara ${String(c.proyectil)}, que es la bala de un nivel de un tiro; el aparato la pintaría como un tiro`);
+      }
+    }
+  }
+  const en = d.fase !== null && typeof d.fase === 'object' ? d.fase.encuentro : null;
+  if (en !== null && en !== undefined && typeof en === 'object' && en.fin !== null && typeof en.fin === 'object' && en.fin.tipo === 'salida') apuntarEstado(otras, en.fin.zona.puesta);
+  if (d.equipo !== null && typeof d.equipo === 'object') {
+    apuntarEstado(otras, d.equipo.caida);
+    if (d.equipo.reaparicion !== null && typeof d.equipo.reaparicion === 'object') apuntarEstado(otras, d.equipo.reaparicion.puesta);
+  }
+  if (d.sinCuerpo !== null && typeof d.sinCuerpo === 'object' && Number.isInteger(d.sinCuerpo.estado)) otras.push(d.sinCuerpo.estado);
+  if (d.presencia !== null && typeof d.presencia === 'object' && Number.isInteger(d.presencia.estadoAusente)) otras.push(d.presencia.estadoAusente);
+  for (const c of deCargar) {
+    if (otras.indexOf(c.estado) >= 0) {
+      p.push(`${c.donde}: el estado de cargar (${String(c.estado)}) lo pone también otra puesta de la liza; es sólo suyo, porque es como se sabe que alguien carga`);
+    }
   }
 }
 
@@ -2889,13 +3037,10 @@ function revisar(d: LizaDeclarada, p: string[]): void {
       cantidad(r, `${donde}.rescate.vidaAlVolver`, re.vidaAlVolver, 1);
       if (re.vidaAlVolver > cu.vidaTope) p.push(`${donde}.rescate.vidaAlVolver: vuelve con más vida que su tope`);
       cantidad(r, `${donde}.rescate.medidorAmbos`, re.medidorAmbos);
-      /* W · El tiro: su forma entera, y hoy, además, que la sala todavía no lo cumple (ver `TiroDeclarado`). */
+      /* W · El tiro: su forma entera (ver `TiroDeclarado`); lo que pide de la liza entera, al final. */
       const ti = a.tiro;
       if ((ti as unknown) === undefined) p.push(`${donde}.tiro: falta; un asiento sin tiro lo dice con null`);
-      else if (ti !== null) {
-        revisarElTiro(r, `${donde}.tiro`, ti, estados, Array.isArray(d.proyectiles) ? d.proyectiles : []);
-        p.push(`${donde}.tiro: la sala todavía no cumple el tiro cargado (sólo está su forma); hasta que lo cumpla va a null`);
-      }
+      else if (ti !== null) revisarElTiro(r, `${donde}.tiro`, ti, estados, Array.isArray(d.proyectiles) ? d.proyectiles : []);
       const me = a.medidor;
       cantidad(r, `${donde}.medidor.tope`, me.tope);
       cantidad(r, `${donde}.medidor.porLimpia`, me.porLimpia);
@@ -2962,6 +3107,7 @@ function revisar(d: LizaDeclarada, p: string[]): void {
     for (const a of g.para) existe(r, `clases[${String(i)}].guardia.para`, a, accionesDeAsientos, 'la acción de asiento');
     for (const a of g.esquivaAlAzar.acciones) existe(r, `clases[${String(i)}].guardia.esquivaAlAzar.acciones`, a, accionesDeAsientos, 'la acción de asiento');
   }
+  revisarLoQueElTiroPideDeLaLiza(d, p);
 
   /*
    * Los sitios de nacer, contra el suelo y contra el límite de la fase: con el radio MAYOR de los
@@ -3075,7 +3221,10 @@ function revisar(d: LizaDeclarada, p: string[]): void {
   if (af.montones > TOPE_DE_MONTONES) p.push(`aforo.montones: ${String(af.montones)} no caben (el tope de la liza es ${String(TOPE_DE_MONTONES)})`);
   if (Array.isArray(d.portables) && d.portables.length > 0 && af.montones === 0) p.push('aforo.montones: hay portables y ningún montón cabe: lo que se suelta no tendría dónde caer');
   if (Array.isArray(d.portables) && d.portables.length === 0 && af.montones !== 0) p.push('aforo.montones: sin portables no hay montones; va a 0');
-  if (Array.isArray(d.proyectiles) && d.proyectiles.length > 0 && af.balas === 0) p.push('aforo.balas: hay proyectiles y ninguna bala cabe');
+  /* El aforo de balas es el de las ENTIDADES: las de un tiro tienen su plaza aparte (ver «el aforo» en `TiroDeclarado`). */
+  let disparan = false;
+  if (Array.isArray(d.clases)) for (const c of d.clases) if (c !== null && typeof c === 'object' && c.proyectil !== 0) disparan = true;
+  if (disparan && af.balas === 0) p.push('aforo.balas: hay entidades que disparan y ninguna bala cabe');
 
   /* ── La fase ──────────────────────────────────────────────────────────── */
   const f = d.fase;

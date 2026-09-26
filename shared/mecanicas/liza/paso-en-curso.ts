@@ -86,8 +86,11 @@ export { AQUIS_PARA_ESTAR, TICS_DE_LA_VUELTA, TICS_DEL_AQUI } from './tipos-de-l
 /** Cuántas esquivas recientes guarda un asiento: las que pueden decidir una ventana o un torpe. */
 export const TOPE_DE_ESQUIVAS_RECIENTES = 8;
 
-/** Los tipos de acción que un asiento puede mandar por el cable (`IndicesDelAsiento.tipo`). */
-export const TIPO_DE_ACCION = { ninguna: 0, golpe: 1, esquiva: 2, rescate: 3, remate: 4, zona: 5 } as const;
+/**
+ * Los tipos de acción que un asiento puede mandar por el cable (`IndicesDelAsiento.tipo`). `apuntar` es la
+ * sostenida que carga un tiro y `soltar` la pulsación que lo dispara (declaración W, `TiroDeclarado`).
+ */
+export const TIPO_DE_ACCION = { ninguna: 0, golpe: 1, esquiva: 2, rescate: 3, remate: 4, zona: 5, apuntar: 6, soltar: 7 } as const;
 
 /* ─── LOS TIPOS DEL ESTADO, CON EL NOMBRE QUE USAN LAS PIEZAS (ver la cabecera) ─── */
 
@@ -145,6 +148,13 @@ export interface PasoEnCurso {
   recursoSucio: boolean;
   /** La zona de acción se apagó en este tic sin recurso para encender otra: el final lo lee (`encuentros.ts`). */
   zonaApagadaSinRecurso: boolean;
+  /**
+   * Los números de las balas de TIRO que salieron en este paso (declaración W). Su vuelo se juzga desde el tic
+   * en que salieron, que puede ser anterior (el de la pulsación); las de pasos anteriores, sólo el tic de
+   * ahora, porque lo de antes ya se juzgó. Es del paso, no del estado: una bala de tiro que sale en un paso
+   * se juzga en ese mismo paso (ver `avanzarLasBalas` en `proyectiles.ts`).
+   */
+  readonly tirosDelPaso: number[];
 }
 
 /** Abre la copia de trabajo del tic siguiente. Ver la cabecera. */
@@ -181,6 +191,7 @@ export function abrirPaso(sala: EstadoInterno): PasoEnCurso {
     cargaSucia: 0,
     recursoSucio: false,
     zonaApagadaSinRecurso: false,
+    tirosDelPaso: [],
   };
 }
 
@@ -404,6 +415,11 @@ function indicesDelAsiento(r: ReglasDeAsiento, remates: readonly number[], zona:
   tipo[r.rescate.accion] = TIPO_DE_ACCION.rescate;
   for (const id of remates) tipo[id] = TIPO_DE_ACCION.remate;
   if (zona !== 0) tipo[zona] = TIPO_DE_ACCION.zona;
+  const tiro = r.tiro;
+  if (tiro !== null && typeof tiro === 'object') {
+    tipo[tiro.apuntar] = TIPO_DE_ACCION.apuntar;
+    tipo[tiro.soltar] = TIPO_DE_ACCION.soltar;
+  }
   return { acciones: porId(r.acciones), tipo };
 }
 

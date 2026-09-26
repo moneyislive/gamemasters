@@ -110,13 +110,21 @@ export const ESTADO_DEL_QUIEBRO = {
   desalojable: 14,
   /** El Celador que se levanta a costa de un Prestado: el Trasvase. */
   absorbiendo: 15,
+  /**
+   * Cargando EL RAYO (el estado del tiro cargado de la Liza): planta al desvelado, un golpe lo corta y no
+   * bloquea las acciones —soltar es una—. Los demás lo ven cargar por este estado.
+   */
+  cargando: 16,
 } as const;
 
 /** LAS CLASES DE ENEMIGO (`nace.clase`). */
 export const CLASE_DEL_QUIEBRO = { prestado: 1, celador: 2, tirador: 3 } as const;
 
-/** EL PROYECTIL del tirador. */
-export const PROYECTIL_DEL_QUIEBRO = { bala: 1 } as const;
+/**
+ * LOS PROYECTILES: la bala del tirador, y la de cada nivel del RAYO (una por nivel: el aparato sabe qué nivel
+ * salió por el proyectil del suceso `bala`, y lo lee de la declaración, no de aquí).
+ */
+export const PROYECTIL_DEL_QUIEBRO = { bala: 1, rayo1: 2, rayo2: 3, rayo3: 4, rayo4: 5 } as const;
 
 /** LAS CLASES DE AVISO: las de `NOMBRES_DEL_QUIEBRO.avisos`. */
 export const AVISO_DEL_QUIEBRO = { marcar: 1, rescate: 2, voy: 3, desalojalo: 4 } as const;
@@ -410,12 +418,43 @@ export interface NivelDelRayo {
  * pleno AYUDA y no sustituye. El chispazo es control de grupos (descoloca a todos los de su área), no daño.
  * Sin fuego amigo, y la guardia del Celador no lo para (es energía, no un golpe).
  *
- * Lo que la tabla del diseño NO fija lo pone el frente de reglas al declararlo (`TiroDeclarado` en la Liza):
- * el medio ancho contra los cuerpos y el radio contra la estructura de cada nivel, la velocidad (el rayo
- * recorre su alcance en 1-2 tics como mucho), la holgura, la carga máxima que se cree y el estado de cargar.
+ * Lo que la tabla del diseño NO fija está en `RAYO`, aquí debajo: el medio ancho contra los cuerpos y el radio
+ * contra la estructura, la velocidad (un tic de vuelo), la holgura, el enganche y lo que dura la carga.
  *
- * HOY NO LA DECLARA NINGÚN ASIENTO (`reglas.tiro` va a `null`): la cablea el frente de reglas con la lógica de
- * la sala. Y el cliente no la lee de aquí sino de la declaración, para que no haya dos copias de un número.
+ * ═══ LA CALIBRACIÓN, CON LAS CUENTAS (frente de reglas, 26-sep) ═══
+ *
+ * Contra `GOLPES` y `ENEMIGOS`, con la Gabardina (la Ligera pega ×0,8 y la Mole cierra ×1,5):
+ *
+ *   · EL PLENO AYUDA Y NO SUSTITUYE. Pleno + Tanda a compás = 40 + 60 = 100 ≥ 90 (el Celador cae); sin compás,
+ *     40 + 50 = 90, justo. La Mole, 40 + 70 = 110. La Ligera, 40 + 48 = 88: le falta un golpe, y es su estilo
+ *     (cambia fuerza por quiebro; el rayo es igual para los tres, decisión de Miguel). Dos plenos son 80 < 90:
+ *     sin tocar al Celador no se le tumba. Al tirador (70) sí lo tumban dos plenos (80), en 12,6 s a 45 m: es
+ *     la respuesta a quien dispara desde lejos, y lenta. Al Prestado (20), un pleno o un nivel 3.
+ *   · EL RITMO. Un ciclo es la carga más la recarga (la recarga cuenta desde que sale): chispazo 0 + 3,0 s,
+ *     nivel 2 0,3 + 3,6 = 3,9 s, nivel 3 0,75 + 4,3 = 5,05 s, pleno 1,3 + 5,0 = 6,3 s. En daño a un blanco:
+ *     2,7 / 3,8 / 5,0 / 6,3 por segundo. Una Tanda a compás hace 60 en 23 tics de anuncio (1,15 s: 52 por
+ *     segundo): el rayo pega entre ocho y veinte veces menos que la mano a un blanco, y lo que da es ALCANCE
+ *     (el tirador ronda a 8-18 m: el nivel 2 ya le
+ *     llega), CONTROL y la ocasión: el chispazo descoloca 0,5 s a todo su área —corta el golpe que viene, y el
+ *     Prestado anuncia 0,7 s—; los niveles 2 y 3 dejan tocado y el pleno derriba 1,5 s, y con eso el Celador
+ *     BAJA LA GUARDIA (tocado, descolocado y derribado están en su `salvoEn`): pleno y a por él con la Tanda.
+ *     La guardia no para el rayo, y el Empellón sigue siendo lo que la rompe de cerca.
+ *   · EL ÁREA. 3, 2 y 1 m (más la holgura de 0,4): el chispazo abarca un corro de Prestados (juegan a 1-1,8 m
+ *     del desvelado), el nivel 3 al pegado a su blanco, y el pleno es una línea. A 8 de daño, un Prestado
+ *     aguanta dos chispazos; el chispazo es control, no limpieza.
+ *   · LOS PUNTOS de cada blanco (el directo y cada uno del área) son los de su DAÑO, como los de un golpe (la
+ *     Entrada da 10 y quita 10; la Réplica, 25 y 25): 8, 15, 25 y 40. Medido con los robots del banco en 18
+ *     oleadas de verdad de un asiento (cinco semillas): el que LEE saca 19.194 sin el rayo y 17.654 con él
+ *     (cargar es no poder quebrar), el que APORREA 643 sin él y 1.996 con él —el chispazo en un corro le da
+ *     3,5 blancos por disparo—: 8,8 veces menos que el que lee. Con 10 por blanco, 7,3; con la mitad en el
+ *     área, 11. La condición del diseño (el que lee, al menos el doble) sigue holgada; `verify:liza` la vigila.
+ *   · LA RECARGA de Miguel (3 s tras el chispazo, 5 s tras el pleno), con los dos niveles del medio a 3,6 y
+ *     4,3 s: más carga, más espera. No gasta Foco: el Foco sigue siendo de la ruptura.
+ *   · LOS CHOQUES. El empuje es corto (1, 1, 1,5 y 2 m) y sin el daño del estampado; en esas 18 oleadas los
+ *     robots estamparon 6 veces con el rayo: no infla la Memoria del Sistema.
+ *
+ * Lo declara cada asiento (`quiebro-liza.ts`, `tiroDelRayo`). El cliente no la lee de aquí sino de la
+ * declaración (`leerElTiro`), para que no haya dos copias de un número.
  */
 export const NIVELES_DEL_RAYO: readonly NivelDelRayo[] = [
   { nivel: 1, desdeMs: 0, areaMetros: 3, alcanceMetros: 16, dano: 8, deja: 'descolocado', dejaTics: 10, empujeMetros: 1, recargaTics: 60 },
@@ -423,6 +462,50 @@ export const NIVELES_DEL_RAYO: readonly NivelDelRayo[] = [
   { nivel: 3, desdeMs: 750, areaMetros: 1, alcanceMetros: 32, dano: 25, deja: 'tocado', dejaTics: 12, empujeMetros: 1.5, recargaTics: 86 },
   { nivel: 4, desdeMs: 1300, areaMetros: 0, alcanceMetros: 45, dano: 40, deja: 'derribado', dejaTics: 30, empujeMetros: 2, recargaTics: 100 },
 ];
+
+/**
+ * LO QUE LA TABLA DEL RAYO NO FIJA, y el productor declara con ella (`TiroDeclarado` en la Liza). Igual para los
+ * tres estilos, como la tabla.
+ */
+export const RAYO = {
+  /**
+   * Cada nivel recorre su alcance en UN tic (50 ms: tres fotogramas, lo que tarda en verse el destello): su
+   * velocidad es su alcance por 20 m/s —320, 480, 640 y 900 m/s—, así que el pleno, el que más llega, es el
+   * más rápido. Más de un tic sería una bala que se ve volar, y el rayo no se ve volar.
+   */
+  ticsDeVuelo: 1,
+  /**
+   * El medio ancho contra los CUERPOS, por nivel: el chispazo, quebrado y con ramas, abarca más; el pleno es un
+   * hilo. Se suma al radio del cuerpo (0,35) y a la holgura.
+   */
+  anchoMetros: [0.3, 0.2, 0.15, 0.1] as readonly number[],
+  /**
+   * El radio contra la ESTRUCTURA, el mismo en los cuatro: cinco centímetros, como la bala del tirador en su
+   * cuarta parte. Si fuera el ancho de los cuerpos, un chispazo pegado a una pared estallaría a sus pies.
+   */
+  radioContraLaEstructuraMetros: 0.05,
+  /**
+   * Lo que se suma a cada cuerpo al juzgar si lo toca: el aparato pinta a los demás 150 ms atrás, y un Celador
+   * al trote (5,5 m/s) anda en ese tiempo 0,8 m. Con el blanco que manda el aparato el rayo va derecho a su sitio
+   * de AHORA y esto sólo cubre el paso de la tabla de rumbos (1,4°: 0,55 m a 45 m); sin blanco, cubre la mitad
+   * de lo andado de lado. 0,4 m: el pleno pasa por un pasillo de 1,7 m de ancho (0,1 + 0,35 + 0,4 a cada lado).
+   */
+  holguraMetros: 0.4,
+  /**
+   * El ENGANCHE: la sala acepta el blanco que manda el aparato si está a su alcance (el del pleno, más medio
+   * metro), con línea de vista y dentro de ±11 rumbos (15,5°) de la mira del `aqui` que suelta. El cono cubre lo
+   * que desvía el hombro de la cámara a 3 m (la mira apunta desde 0,7 m a un lado del cuerpo) y no deja que un
+   * aparato que miente mande el rayo de espaldas.
+   */
+  enganche: { conoRumbos: 11, holguraMetros: 0.5 },
+  /** Lo más que se mantiene la carga: 8 s (el pleno se llena en 1,3). Más, y se deja sin disparar. */
+  cargarTics: 160,
+  /**
+   * El paso que la sala admite mientras se carga (el desvelado está plantado): un metro, lo que anda el aparato
+   * en el tic en que suelta y echa a andar, o en que quiebra, antes de que la sala sepa que ya no carga.
+   */
+  pasoMientrasCargaMetros: 1,
+} as const;
 
 /* ─── LOS NIVELES DE NOCHE (§4.10) ───────────────────────────────────────── */
 

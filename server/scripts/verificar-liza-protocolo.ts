@@ -961,15 +961,17 @@ for (const [que, ruta, valor, dice] of ROTAS) {
 }
 
 /*
- * ═══ W · EL TIRO CARGADO: LA FORMA, ANTES DE QUE LA SALA LO CUMPLA ═══
+ * ═══ W · EL TIRO CARGADO: SU FORMA, Y LO QUE PIDE DE LA LIZA ENTERA ═══
  *
  * El arco de juguete: se tensa manteniendo la 20 y se suelta con la 21, con cuatro niveles (de un disparo corto
  * con área a uno largo sin ella), una bala de un solo disparo por nivel y el estado 11 mientras se tensa. Su forma
- * está entera —la única frase que le saca la revisión es la de hoy: que la sala todavía no lo cumple— y cada una
- * de sus versiones rotas saca además la suya. Quien cablee el tiro en la sala quita esa frase y este bloque se
- * queda con la forma (y la comprobación de la frase, a «ningún problema»).
+ * está entera —la revisión no le saca ninguna frase: la sala ya lo cumple (`tiro.ts`, y el bloque 26 de
+ * `verify:liza` lo juega)— y cada una de sus versiones rotas saca la suya, también las que rompen lo que el tiro
+ * pide de la liza entera: su estado, que no bloquea las acciones y es sólo suyo; la guardia, que no lo nombra; y
+ * sus balas, que no dispara ninguna entidad. Y el aforo de balas es el de las entidades: sin nadie que dispare,
+ * un tiro no necesita ninguna.
  */
-paso('El tiro cargado (W): su forma entera, que hoy la sala todavía rechaza, y sus versiones rotas');
+paso('El tiro cargado (W): su forma entera, que la sala ya cumple, y sus versiones rotas');
 
 const TIRO_DE_JUGUETE = {
   apuntar: 20,
@@ -1007,13 +1009,14 @@ const JUGUETE_CON_TIRO = conCambio(
 ) as LizaDeclarada;
 {
   const problemas = problemasDeLaDeclaracion(JUGUETE_CON_TIRO);
-  comprobar(
-    'el arco de juguete tiene su forma entera: la única frase que le saca la revisión es la de hoy (la sala todavía no cumple el tiro)',
-    problemas.length === 1 && (problemas[0] ?? '').startsWith('asientos[0].tiro: la sala todavía no cumple el tiro cargado'),
-    problemas,
-  );
+  comprobar('el arco de juguete tiene su forma entera: la revisión no le saca ninguna frase (la sala ya cumple el tiro)', problemas.length === 0, problemas);
   const cable = accionesDelCable(JUGUETE_CON_TIRO, JUGUETE_CON_TIRO.asientos[0] as ReglasDeAsiento);
   comprobar('y accionesDelCable pone sus dos ids (tensar y soltar) tras el rescate', igual(cable, [1, 2, 3, 10, 11, 20, 21, 12, 13]), cable);
+  /* El aforo de balas es el de las entidades: sin ninguna que dispare, cero; con una que dispara, no. */
+  const sinTirador = conCambio(conCambio(JUGUETE_CON_TIRO, 'clases.0.proyectil', 0), 'aforo.balas', 0) as LizaDeclarada;
+  comprobar('el aforo de balas es el de las entidades: con tiros y ninguna entidad que dispare, cero balas vale', problemasDeLaDeclaracion(sinTirador).length === 0, problemasDeLaDeclaracion(sinTirador));
+  const conTirador = conCambio(JUGUETE_CON_TIRO, 'aforo.balas', 0) as LizaDeclarada;
+  comprobar('y con una que dispara, cero balas no: «hay entidades que disparan»', problemasDeLaDeclaracion(conTirador).some((p) => p.includes('hay entidades que disparan')), problemasDeLaDeclaracion(conTirador));
 }
 const ROTAS_DEL_TIRO: readonly [string, string, unknown, string][] = [
   ['tensar con el id de un golpe del asiento', 'asientos.0.tiro.apuntar', 1, 'se repite'],
@@ -1040,6 +1043,13 @@ const ROTAS_DEL_TIRO: readonly [string, string, unknown, string][] = [
   ['un enganche de más de un cuarto de vuelta', 'asientos.0.tiro.enganche.conoRumbos', 70, 'conoRumbos'],
   ['una holgura negativa', 'asientos.0.tiro.holgura', -1, 'tiro.holgura'],
   ['un asiento sin el campo del tiro', 'asientos.0.tiro', QUITAR, 'falta'],
+  /* Lo que el tiro pide de la liza entera (ver `revisarLoQueElTiroPideDeLaLiza` y `revisarElTiro`). */
+  ['un estado de tensar que bloquea las acciones (soltar no llegaría)', 'estados.10.bloqueaAccion', true, 'bloquea las acciones'],
+  ['un estado de tensar que pone también otra puesta (el premio de una limpia)', 'asientos.0.tiro.puesta.estado', 3, 'lo pone también otra puesta'],
+  ['una guardia que dice que para el tiro', 'clases.0.guardia.para', [1, 21], 'la guardia es de los golpes'],
+  ['una esquiva al azar del tiro', 'clases.0.guardia.esquivaAlAzar.acciones', [2, 20], 'la esquiva al azar es de los golpes'],
+  ['una entidad que dispara la bala de un nivel', 'clases.0.proyectil', 2, 'la bala de un nivel de un tiro'],
+  ['una holgura más ancha que el tope de los radios', 'asientos.0.tiro.holgura', u(65), 'tiro.holgura'],
 ];
 for (const [que, ruta, valor, dice] of ROTAS_DEL_TIRO) {
   const rota = conCambio(JUGUETE_CON_TIRO, ruta, valor) as LizaDeclarada;
@@ -1698,6 +1708,14 @@ paso('El coste de una sala y la admisión');
     { presupuesto: PRESUPUESTO_DE_LAS_LIZAS },
   );
   comprobar('y en un proceso vacío, una sala cabe', cabeOtraSala([], cLlena));
+  /* El tiro cargado (W): cada asiento que lo tiene, una plaza de bala aparte del aforo, y se cuenta. */
+  const conTiro = (l: typeof llena): LizaDeclarada => ({ ...l, asientos: l.asientos.map((a) => ({ ...a, tiro: TIRO_DE_JUGUETE })) }) as LizaDeclarada;
+  const [tLlena, tSola] = [costeDeLaLiza(conTiro(llena)), costeDeLaLiza(conTiro(sola))];
+  comprobar(
+    'con un tiro en cada asiento, su plaza de bala se cuenta como una bala más (8.620 y 7.170 µs/s), y siguen cabiendo nueve llenas y once solitarias',
+    tLlena === 8620 && tSola === 7170 && cabeOtraSala(Array.from({ length: 8 }, () => tLlena), tLlena) && !cabeOtraSala(Array.from({ length: 9 }, () => tLlena), tLlena) && cabeOtraSala(Array.from({ length: 10 }, () => tSola), tSola),
+    { tLlena, tSola },
+  );
 }
 
 paso('La Liza es genérica');
@@ -2819,17 +2837,18 @@ paso('El HUD: del mundo al minimapa y al plano');
  * (El Quiebro: con cada juego que se dé de alta salen dos más, y eso no es un fallo: el arnés lo dice) y
  * con `ciudadDeLaMesa` ya escrita (su forma: dos). Las de L10 en la declaración son quince: doce roturas y
  * tres de su forma transitoria y de la ampliación, que pierde las dos suyas. Si un bloque deja de correr,
- * sale 2 y no verde. El tiro cargado (W) trae treinta y dos: su forma y su cable (dos), sus veinticuatro
- * roturas y los seis `estalla` que se rechazan.
+ * sale 2 y no verde. El tiro cargado (W) trae cuarenta y una: su forma y su cable (dos), el aforo de balas
+ * que es de las entidades (dos), sus treinta roturas —las veinticuatro de su forma y las seis de lo que pide
+ * de la liza entera—, los seis `estalla` que se rechazan y su plaza de bala en el coste (una).
  */
 terminar({
-  escritas: 511,
+  escritas: 520,
   enVerde:
     'El cable de la Liza va y vuelve en los dos sentidos, rechaza lo que no es exactamente un mensaje y lo\n' +
     '  más largo cabe; la liza de juguete se declara sin problemas y sus versiones rotas no, y lo mismo las\n' +
-    '  declaraciones de la liza abierta (L1-L12) y el tiro cargado (W), que la sala aún no cumple; rumboHacia\n' +
-    '  y la prueba de losa coinciden con Math.atan2 y con\n' +
-    '  la coma flotante; la ronda más pesada cabe en la mesa, el registro y el coste se prueban con uno de\n' +
+    '  declaraciones de la liza abierta (L1-L12) y el tiro cargado (W); rumboHacia y la prueba de losa\n' +
+    '  coinciden con Math.atan2 y con la coma flotante; la ronda más pesada cabe en la mesa, el registro y el\n' +
+    '  coste se prueban con uno de\n' +
     '  juguete; la vista, los nombres y el puente se leen estrictos; y la columna de la ciudad abierta cuenta,\n' +
     '  numera, reparte y mide como dice.',
 });

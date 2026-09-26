@@ -139,7 +139,7 @@ import { accionesDelCable, alcanceDeBlancoDe, arenaDeLaLiza, olvidoDelEncuentro,
 import { MOTIVO_DE_IRSE } from '../../shared/mecanicas/liza/protocolo';
 import type { EstadoDeLaSala } from '../../shared/mecanicas/liza/tipos-de-la-sala';
 import { sePuedeEstar } from '../../shared/mecanicas/mundo';
-import type { GrupoDeclarado, LizaDeclarada } from '../../shared/mecanicas/liza/declaracion';
+import type { EfectoDeclarado, GrupoDeclarado, LizaDeclarada, ReglasDeAsiento } from '../../shared/mecanicas/liza/declaracion';
 import { esTableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { arcadesQueSeLidian, cabeOtraSala, COSTE_DE_UNA_SALA, costeDeLaLiza, lizaDeLaMesa, PRESUPUESTO_DE_LAS_LIZAS, sePuedeLidiar } from '../../shared/arcade/juegos/lizas';
 import { MANIFIESTO_QUIEBRO, PLANO_DEL_TABLERO, planoDeLaTraza, QUIEBRO, tableroDelQuiebro } from '../../shared/arcade/juegos/quiebro';
@@ -156,13 +156,19 @@ import {
   composicionDeLaOleada,
   contramedidaTrasLaNoche,
   encuentroDeLaLlamada,
+  ENEMIGOS,
   ESTADO_DEL_QUIEBRO,
+  ESTILOS,
   filaDelNivel,
+  GOLPES,
   monedasAlEmpezar,
   NIVELES_DEL_RAYO,
   nivelDelSistema,
   nivelTrasLaNoche,
   PERSECUCION_DEL_SISTEMA,
+  porCiento,
+  PROYECTIL_DEL_QUIEBRO,
+  RAYO,
   rondaDeLaFase,
 } from '../../shared/arcade/juegos/quiebro-reglas';
 import type { ReglamentoCompuesto, VistaParaComponer } from '../../shared/arcade/juegos/quiebro-reglas';
@@ -1083,7 +1089,53 @@ function componer(opciones: { nivel?: number; averia?: string; contramedida?: st
   comprobar('el factor de puntos que declara la liza es exactamente el del reglamento compuesto, en los 5 niveles y las 4 averías', distintos.length === 0, distintos);
 }
 
-paso('El rayo (docs/quiebro/EL-RAYO.md): la tabla del §1.2 y sus ids, reservados y sin declarar todavía');
+/**
+ * ¿DECLARA ESTE ASIENTO EL RAYO TAL COMO DICE SU TABLA? `null` si sí; si no, por qué. Se mira contra
+ * `NIVELES_DEL_RAYO` (que el paso del rayo compara renglón a renglón con el §1.2) y `RAYO`: los ids, el estado de
+ * cargar (que planta, se corta con un golpe y no bloquea las acciones), y cada nivel con su bala —la de su orden,
+ * de un solo disparo, que recorre su alcance en `RAYO.ticsDeVuelo`—, su área, su efecto (daño, puntos iguales al
+ * daño, lo que deja, empuje, y sin estampado) y su recarga.
+ */
+function rayoMalDeclarado(l: LizaDeclarada, r: ReglasDeAsiento): string | null {
+  const t = r.tiro;
+  if (t === null) return 'sin tiro';
+  const m = (x: number): number => Math.round(x * UNO);
+  if (t.apuntar !== ACCION_DEL_QUIEBRO.apuntarRayo || t.soltar !== ACCION_DEL_QUIEBRO.soltarRayo) return 'otros ids';
+  const est = l.estados.find((e) => e.id === t.puesta.estado);
+  if (t.puesta.estado !== ESTADO_DEL_QUIEBRO.cargando || est === undefined || !est.bloqueaPaso || est.bloqueaAccion || !est.seCortaConDano) return 'otro estado de cargar';
+  if (t.puesta.tics !== RAYO.cargarTics || t.puesta.intocableTics !== 0 || t.puesta.distanciaExtra !== m(RAYO.pasoMientrasCargaMetros)) return 'otra puesta';
+  const pleno = NIVELES_DEL_RAYO[NIVELES_DEL_RAYO.length - 1];
+  if (pleno === undefined || t.cargaMaximaMs !== pleno.desdeMs || t.holgura !== m(RAYO.holguraMetros)) return 'otra carga máxima u holgura';
+  if (t.enganche === null || t.enganche.radio !== m(pleno.alcanceMetros) || t.enganche.conoRumbos !== RAYO.enganche.conoRumbos || t.enganche.holgura !== m(RAYO.enganche.holguraMetros)) return 'otro enganche';
+  if (t.niveles.length !== NIVELES_DEL_RAYO.length) return 'otros niveles';
+  const balas = [PROYECTIL_DEL_QUIEBRO.rayo1, PROYECTIL_DEL_QUIEBRO.rayo2, PROYECTIL_DEL_QUIEBRO.rayo3, PROYECTIL_DEL_QUIEBRO.rayo4];
+  const efectoBien = (e: EfectoDeclarado | null, n: (typeof NIVELES_DEL_RAYO)[number]): boolean =>
+    e !== null &&
+    e.dano === n.dano &&
+    e.danoAlRitmo === n.dano &&
+    e.puntos === n.dano &&
+    e.puntosAlRitmo === n.dano &&
+    e.puesta !== null &&
+    e.puesta.estado === ESTADO_DEL_QUIEBRO[n.deja] &&
+    e.puesta.tics === n.dejaTics &&
+    e.empuje === m(n.empujeMetros) &&
+    e.alChocar.dano === 0 &&
+    !e.rompeGuardia;
+  for (let i = 0; i < NIVELES_DEL_RAYO.length; i++) {
+    const n = NIVELES_DEL_RAYO[i]!;
+    const d = t.niveles[i]!;
+    const bala = l.proyectiles.find((p) => p.id === d.proyectil);
+    if (d.proyectil !== balas[i] || bala === undefined) return `nivel ${String(n.nivel)}: otra bala`;
+    if (d.desdeMs !== n.desdeMs || d.area !== m(n.areaMetros) || d.recargaTics !== n.recargaTics || d.ancho !== m(RAYO.anchoMetros[i]!)) return `nivel ${String(n.nivel)}: otros números`;
+    if (bala.alcance !== m(n.alcanceMetros) || bala.velocidad !== m((n.alcanceMetros * 20) / RAYO.ticsDeVuelo) || bala.radio !== m(RAYO.radioContraLaEstructuraMetros)) return `nivel ${String(n.nivel)}: otra bala (alcance, velocidad o radio)`;
+    if (bala.apuntarTics !== 1 || bala.balas !== 1 || bala.cadaTics !== 0) return `nivel ${String(n.nivel)}: una bala de ráfaga`;
+    if (!efectoBien(bala.efecto, n)) return `nivel ${String(n.nivel)}: otro efecto directo`;
+    if (n.areaMetros === 0 ? d.efectoDelArea !== null : !efectoBien(d.efectoDelArea, n)) return `nivel ${String(n.nivel)}: otro efecto de área`;
+  }
+  return null;
+}
+
+paso('El rayo (docs/quiebro/EL-RAYO.md): la tabla del §1.2, sus ids, y su calibración contra los golpes y los enemigos');
 {
   /*
    * Cada renglón escrito a mano desde el §1.2 de EL-RAYO.md (con la recarga de Miguel: 3 s tras el chispazo y 5 s
@@ -1107,6 +1159,60 @@ paso('El rayo (docs/quiebro/EL-RAYO.md): la tabla del §1.2 y sus ids, reservado
     'los dos ids del rayo están reservados entre los del desvelado (1-19), son distintos y no los usa ninguna otra acción',
     reservados.every((id) => id >= 1 && id <= 19 && otros.indexOf(id) < 0) && reservados[0] !== reservados[1],
     { reservados, otros },
+  );
+
+  /*
+   * LA CALIBRACIÓN, con las cuentas de la cabecera de `NIVELES_DEL_RAYO`, hechas aquí con los números de `GOLPES`,
+   * `ESTILOS` y `ENEMIGOS`: si alguien sube el pleno, baja la vida del Celador o acorta la recarga, se ve.
+   */
+  const tanda = (estilo: keyof typeof ESTILOS, compas: boolean): number => {
+    const e = ESTILOS[estilo];
+    const seguida = compas ? GOLPES.seguida.danoAlCompas : GOLPES.seguida.dano;
+    return porCiento(GOLPES.entrada.dano, e.golpesPorCiento) + 2 * porCiento(seguida, e.golpesPorCiento) + porCiento(GOLPES.cierre.dano, e.cierrePorCiento);
+  };
+  const plenoR = NIVELES_DEL_RAYO[NIVELES_DEL_RAYO.length - 1]!;
+  const chispazo = NIVELES_DEL_RAYO[0]!;
+  const tandaTics = GOLPES.entrada.anuncioTics + 2 * GOLPES.seguida.anuncioAlCompas + GOLPES.cierre.anuncioTics;
+  const porSegundoDeLaTanda = tanda('gabardina', true) / (tandaTics / 20);
+  const porSegundoDelRayo = NIVELES_DEL_RAYO.map((n) => n.dano / ((n.desdeMs + n.recargaTics * 50) / 1000));
+  const cuentas = {
+    plenoMasTanda: plenoR.dano + tanda('gabardina', true),
+    plenoMasTandaSinCompas: plenoR.dano + tanda('gabardina', false),
+    plenoMasTandaMole: plenoR.dano + tanda('mole', true),
+    dosPlenos: 2 * plenoR.dano,
+    celador: ENEMIGOS.celador.vida,
+    tirador: ENEMIGOS.tirador.vida,
+    dosChispazos: 2 * chispazo.dano,
+    prestado: ENEMIGOS.prestado.vida,
+    porSegundoDeLaTanda,
+    porSegundoDelRayo,
+    recargas: NIVELES_DEL_RAYO.map((n) => n.recargaTics * 50),
+  };
+  comprobar(
+    'la calibración: el pleno AYUDA y no sustituye (pleno + Tanda tumban al Celador, también sin compás; dos plenos no), dos plenos sí tumban al tirador, dos chispazos no a un Prestado, el rayo pega a un blanco menos de la quinta parte que la mano por segundo, y la recarga va de 3 a 5 s',
+    cuentas.plenoMasTanda >= cuentas.celador &&
+      cuentas.plenoMasTandaSinCompas >= cuentas.celador &&
+      cuentas.plenoMasTandaMole >= cuentas.celador &&
+      cuentas.dosPlenos < cuentas.celador &&
+      cuentas.dosPlenos >= cuentas.tirador &&
+      cuentas.dosChispazos < cuentas.prestado &&
+      porSegundoDelRayo.every((x) => x * 5 < porSegundoDeLaTanda) &&
+      cuentas.recargas[0] === 3000 &&
+      cuentas.recargas[cuentas.recargas.length - 1] === 5000,
+    cuentas,
+  );
+  /* Lo que la tabla no fija: un tic de vuelo; el hilo del pleno cabe en medio paso de la tabla de rumbos a su alcance. */
+  const medioRumboAlAlcance = plenoR.alcanceMetros * Math.tan(Math.PI / 256);
+  const anchoDelPleno = RAYO.anchoMetros[RAYO.anchoMetros.length - 1]!;
+  comprobar(
+    'y lo que la tabla no fija: cada nivel recorre su alcance en 1-2 tics, del chispazo al pleno cada vez más fino, y el pleno enganchado da aunque la tabla de rumbos se desvíe medio paso a 45 m',
+    RAYO.ticsDeVuelo >= 1 &&
+      RAYO.ticsDeVuelo <= 2 &&
+      RAYO.anchoMetros.length === NIVELES_DEL_RAYO.length &&
+      RAYO.anchoMetros.every((x, i, t) => i === 0 || x < (t[i - 1] as number)) &&
+      anchoDelPleno + ENEMIGOS.radioMetros + RAYO.holguraMetros >= medioRumboAlAlcance &&
+      RAYO.cargarTics * 50 > plenoR.desdeMs,
+    { medioRumboAlAlcance, anchoDelPleno, holgura: RAYO.holguraMetros },
   );
 }
 
@@ -1362,7 +1468,9 @@ paso('Todas las vistas se leen, y el productor da de cada una una liza sin probl
   let otroAforo = 0;
   let malDelCable = 0;
   let conTiro = 0;
+  let conAsiento = 0;
   let rayoUsado = 0;
+  let primerRayoMal = '';
   const primeros: string[] = [];
   const claves: string[] = [];
   let claveMal = 0;
@@ -1396,11 +1504,15 @@ paso('Todas las vistas se leen, y el productor da de cada una una liza sin probl
     /* Los ids del cable de cada asiento no se pisan con los de las clases (lo mira también la declaración). */
     const deClases = l.clases.flatMap((c) => c.acciones.map((a) => a.id));
     for (const r of l.asientos) if (accionesDelCable(l, r).some((id) => deClases.indexOf(id) >= 0)) malDelCable++;
-    /* EL RAYO, hoy: ningún asiento lo declara (la sala aún no lo cumple) y nada usa sus dos ids reservados. */
+    /* EL RAYO: todo asiento lo declara, con la tabla del §1.2, y sus dos ids van por su cable y por el de nadie más. */
     for (const r of l.asientos) {
-      if (r.tiro !== null) conTiro++;
+      const porQue = rayoMalDeclarado(l, r);
+      if (porQue === null) conTiro++;
+      else if (primerRayoMal === '') primerRayoMal = `${v.fase.tipo}: ${porQue}`;
       const delRayo = [ACCION_DEL_QUIEBRO.apuntarRayo, ACCION_DEL_QUIEBRO.soltarRayo] as number[];
-      if ([...accionesDelCable(l, r), ...deClases].some((id) => delRayo.indexOf(id) >= 0)) rayoUsado++;
+      const cable = accionesDelCable(l, r);
+      if (delRayo.some((id) => cable.indexOf(id) < 0) || deClases.some((id) => delRayo.indexOf(id) >= 0)) rayoUsado++;
+      conAsiento++;
     }
     const clave = claveDeLaFase(v);
     if (claves.indexOf(clave) < 0) claves.push(clave);
@@ -1465,9 +1577,9 @@ paso('Todas las vistas se leen, y el productor da de cada una una liza sin probl
   comprobar('el aforo es el mismo en todas, la reunión incluida', otroAforo === 0, otroAforo);
   comprobar('los ids del cable de los asientos no se pisan con los del Sistema', malDelCable === 0, malDelCable);
   comprobar(
-    'el rayo todavía no se declara (`tiro: null` en todo asiento: la sala aún no cumple el tiro) y nada usa sus dos ids reservados',
-    conTiro === 0 && rayoUsado === 0,
-    { conTiro, rayoUsado },
+    'el rayo se declara en TODO asiento de toda vista con la tabla del §1.2 (sus balas de un tic, su estado de cargar que planta y se corta con un golpe, sus puntos los de su daño), y sus dos ids van por su cable y no los usa el Sistema',
+    conAsiento > 0 && conTiro === conAsiento && rayoUsado === 0,
+    { conTiro, conAsiento, rayoUsado, primerRayoMal },
   );
   comprobar('la clave de la fase cambia si y sólo si cambia la fase', claveMal === 0, claveMal);
   nota(`${String(mismaFaseVista)} vistas seguidas de la misma fase comparadas con la anterior`);
@@ -1557,7 +1669,7 @@ paso('El productor, en lo que dice de cada cosa');
   comprobar('el tirador dispara ráfagas de 3 balas a 20 m/s que quitan 12', o1.proyectiles[0]?.balas === 3 && o1.proyectiles[0].velocidad === 20 * UNO && o1.proyectiles[0].efecto.dano === 12);
   comprobar('las esquirlas pagan en triangular por 10, con tope de 12', o1.portables[0]?.pago.tipo === 'triangular' && o1.portables[0].pago.porUnidad === 10 && o1.portables[0].tope === 12);
   comprobar('las columnas de la ronda son las de la vista', forma(o1.veredictos.columnas) === forma(COLUMNAS_DE_LA_RONDA));
-  comprobar('el coste de la sala sale del aforo de la mesa', costeDeLaLiza(o1) === 400 + 250 * 2 + 300 * AFORO_DEL_QUIEBRO.entidades + 40 * AFORO_DEL_QUIEBRO.balas, costeDeLaLiza(o1));
+  comprobar('el coste de la sala sale del aforo de la mesa, con la plaza del rayo de cada asiento', costeDeLaLiza(o1) === 400 + 250 * 2 + 300 * AFORO_DEL_QUIEBRO.entidades + 40 * (AFORO_DEL_QUIEBRO.balas + 2), costeDeLaLiza(o1));
   /* La Llamada, en Llovizna: sin guardián, y la cabina de 60 s de la ciudad (50 en Temporal y Tormenta). */
   const k = mesaNueva(1);
   mandar(k, 's1', 'empezar', null);
@@ -2177,9 +2289,14 @@ paso('Los nombres de la ciudad');
 paso('El coste de una sala de la ciudad');
 {
   const c = COSTE_DE_UNA_SALA;
-  const llena = c.base + 6 * c.porAsiento + AFORO_DEL_QUIEBRO.entidades * c.porEntidad + AFORO_DEL_QUIEBRO.balas * c.porBala;
-  const sola = c.base + 1 * c.porAsiento + AFORO_DEL_QUIEBRO.entidades * c.porEntidad + AFORO_DEL_QUIEBRO.balas * c.porBala;
-  comprobar('el coste declarado es el del §5.6 (base 400, 250 por asiento, 300 por entidad, 40 por bala): 8.380 µs/s la sala llena y 7.130 la solitaria', c.base === 400 && c.porAsiento === 250 && c.porEntidad === 300 && c.porBala === 40 && llena === 8380 && sola === 7130, { llena, sola });
+  /* Con el rayo, cada asiento tiene su plaza de bala de tiro, aparte del aforo (ver `costeDeLaLiza`): una bala más por asiento. */
+  const llena = c.base + 6 * c.porAsiento + AFORO_DEL_QUIEBRO.entidades * c.porEntidad + (AFORO_DEL_QUIEBRO.balas + 6) * c.porBala;
+  const sola = c.base + 1 * c.porAsiento + AFORO_DEL_QUIEBRO.entidades * c.porEntidad + (AFORO_DEL_QUIEBRO.balas + 1) * c.porBala;
+  comprobar(
+    'el coste declarado es el del §5.6 (base 400, 250 por asiento, 300 por entidad, 40 por bala) con la plaza del rayo de cada asiento: 8.620 µs/s la sala llena y 7.170 la solitaria',
+    c.base === 400 && c.porAsiento === 250 && c.porEntidad === 300 && c.porBala === 40 && llena === 8620 && sola === 7170,
+    { llena, sola },
+  );
   comprobar(
     'caben 9 salas llenas y no 10, y 11 solitarias y no 12',
     cabeOtraSala(Array.from({ length: 8 }, () => llena), llena) && !cabeOtraSala(Array.from({ length: 9 }, () => llena), llena) && cabeOtraSala(Array.from({ length: 10 }, () => sola), sola) && !cabeOtraSala(Array.from({ length: 11 }, () => sola), sola),
@@ -2214,9 +2331,9 @@ paso('La vista con la ciudad, leída con desconfianza');
   );
 }
 
-/* El suelo: 357 de antes y 4 del rayo (su tabla, su coherencia, sus ids reservados, y que aún no se declara). */
+/* El suelo: 357 de antes y 6 del rayo (su tabla, su coherencia, sus ids reservados, su calibración, lo que la tabla no fija, y que todo asiento lo declara así). */
 terminar({
-  escritas: 361,
+  escritas: 363,
   enVerde:
     'La mesa lleva la noche entera —reunión, Bajada, oleadas, pausas con voto, Llamada, recuento, final—,\n' +
     '  rechaza con motivo lo que no es y lo que llega rancio, sube y baja el nivel, recuerda la noche anterior y\n' +

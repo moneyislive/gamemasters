@@ -99,8 +99,9 @@
  *
  * Un suceso nuevo, `estalla {bala, x, z}`: dónde se para la bala de un tiro, que es el centro de su área. Y
  * nada más: la carga viaja con la acción de siempre (una sostenida y una pulsación: ver `TiroDeclarado`), y la
- * bala de un tiro con el `bala` de siempre, con `de` = el número del asiento, que el lector ya admitía. Hoy
- * nadie lo escribe: la sala todavía no cumple el tiro.
+ * bala de un tiro con el `bala` de siempre, con `de` = el número del asiento, que el lector ya admitía; lo que
+ * alcanza, con el `impacta` de siempre, uno por cuerpo; y la que para la estructura o llega a su alcance, con
+ * su `seva` (`choca` o `alcance`), como las demás. Lo escribe la sala (`tiro.ts`).
  *
  * TAMPOCO SUBE `VERSION_DE_LA_LIZA`, por lo mismo que la liza abierta: esta rama no está desplegada y no hay
  * aparatos en la calle que hablen la versión 1 sin `estalla`. Si se desplegara antes, SÍ subiría a 2, y no por
@@ -666,7 +667,8 @@ export interface SucesoProgreso {
  * Sale en el tic en que se para y ANTES que los `impacta` de lo que alcanza, con área o sin ella (el aparato
  * pinta el estallido donde lo dice la sala, no donde cree él). No sale si la bala llega a su alcance sin tocar
  * nada: entonces sólo va su `seva`. Sólo estallan las balas de un tiro; las de las entidades se paran como
- * siempre.
+ * siempre. Contra un cuerpo, `(x, z)` es su centro y la bala acaba ahí (sin `seva`, como la que da a un
+ * asiento); contra la estructura, el punto en que se para, y detrás de sus `impacta` va su `seva` (`choca`).
  */
 export interface SucesoEstalla {
   readonly e: 'estalla';
