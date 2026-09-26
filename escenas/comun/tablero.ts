@@ -10,7 +10,8 @@
  * sitios donde un tercer juego de tablero puede declarar algo distinto sin que nadie lo vea —un
  * `alMedir` con otra forma, un `canal` de otro tipo—, y lo de Boots on Board ya se cosió dos veces por
  * la misma prop. Aquí están una vez: una escena de tablero nueva extiende esto y declara sólo lo suyo
- * (su tablero, sus toques, sus asas).
+ * (su tablero, sus toques, sus asas). Desde los hallazgos son diez: el aviso `alRecoger` va con
+ * `canal`, y por la misma razón que él.
  *
  * Lo que NO entra, a propósito: `quieto` —el Burgo lo exige y Las Lindes no—, `ventana` —Las Lindes la
  * quitó porque mide el lienzo—, y todo lo que es de un juego. Y la cámara es un PARÁMETRO: la de serie
@@ -83,6 +84,13 @@ export interface PropsDeEscenaDeTablero<Camara extends { readonly modo: string }
    * `esMesaDeBotas`, y en ningún otro sitio.
    */
   readonly canal?: CanalDeBotas;
+  /**
+   * ALGUIEN HA RECOGIDO UN HALLAZGO (docs/AVATARES-JUGABLES.md §2), sólo con `canal`: una vez por
+   * cada `recoge` del servidor, sea de quien sea. `por` es el asiento que lo cogió, `clase` lo que era
+   * —`propina`, `hierro`, `escudo`…— y `mio`, si ha sido este aparato. Para el aviso en pantalla: lo
+   * que vale lo decide el juego y llega por la mesa, no por aquí. Los brotes los pinta la escena sola.
+   */
+  readonly alRecoger?: (r: { readonly por: string; readonly clase: string; readonly mio: boolean }) => void;
   /**
    * SIEMPRE una vez, con o sin modelos: cuando lo que la escena espera ha llegado o ha fallado, y con
    * el mundo ya pintado; o a los quince segundos si `traer` no contesta. El contrato del Muelle.

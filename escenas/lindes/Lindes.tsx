@@ -100,6 +100,7 @@ import { usarElPaseo } from '../paseo/usar-el-paseo';
 import { QuienAnda } from '../paseo/quien-anda';
 import { usarElCanal } from '../paseo/usar-el-canal';
 import { LosDemas } from '../paseo/los-demas';
+import { LosHallazgos } from '../paseo/los-hallazgos';
 import type { Andante } from '../../shared/mecanicas/mundo';
 import { mundoDeLasLindes } from '../../shared/arcade/juegos/lindes-mundo';
 import type { Calidad, PropsDeLasLindes, Traer } from './tipos';
@@ -345,7 +346,7 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
    * le preguntan cómo va cada uno (`cliente`).
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
-  const elCanal = usarElCanal(props.canal, corregirAQuienPasea);
+  const elCanal = usarElCanal(props.canal, corregirAQuienPasea, props.alRecoger);
   const paseo = usarElPaseo({
     mundo,
     nace,
@@ -663,6 +664,13 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
           alturaEn={alturaEn}
         />
       )}
+
+      {/*
+        LOS HALLAZGOS, con la misma guarda y el mismo suelo: escudos sueltos por el valle, girando
+        sobre su losa con su columna de luz (`paseo/los-hallazgos.tsx`). No se tocan: ninguna de sus
+        mallas contesta a un rayo, y los huecos de abajo siguen cogiendo el toque.
+      */}
+      {props.canal === undefined || camara.modo === 'mesa' ? null : <LosHallazgos brotes={elCanal.brotes} alturaEn={alturaEn} />}
 
       {huecos !== null ? (
         <mesh geometry={huecos} onPointerDown={alBajar} onPointerUp={alTocar} onPointerMove={alSenalar}>

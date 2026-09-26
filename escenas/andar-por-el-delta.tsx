@@ -59,6 +59,7 @@ import { mundoDeRiberas } from '../shared/arcade/juegos/riberas-mundo';
 import type { Andante, MundoDeclarado } from '../shared/mecanicas/mundo';
 import type { Traer } from './embarcadero/tipos';
 import { LosDemas } from './paseo/los-demas';
+import { LosHallazgos } from './paseo/los-hallazgos';
 import type { MandosDeFuera } from './paseo/mandos';
 import type { CanalDeBotas } from './paseo/mesa-de-botas';
 import { QuienAnda } from './paseo/quien-anda';
@@ -92,9 +93,11 @@ export interface AndarPorElDeltaProps {
    * y se pinta a los demás asientos andando por el delta. Sin él no se abre nada.
    */
   readonly canal?: CanalDeBotas;
+  /** Alguien ha recogido un hallazgo: la prop `alRecoger` de la escena del delta, tal cual. */
+  readonly alRecoger?: (r: { readonly por: string; readonly clase: string; readonly mio: boolean }) => void;
 }
 
-export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos, canal }: AndarPorElDeltaProps): JSX.Element | null {
+export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos, canal, alRecoger }: AndarPorElDeltaProps): JSX.Element | null {
   const aPie = camara.modo !== 'mesa';
   const asiento = camara.modo === 'mesa' ? '' : camara.asiento;
 
@@ -130,7 +133,7 @@ export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos,
    * `QuienAnda` cómo va (`cliente`).
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
-  const elCanal = usarElCanal(canal, corregirAQuienPasea);
+  const elCanal = usarElCanal(canal, corregirAQuienPasea, alRecoger);
   const paseo = usarElPaseo({ mundo, nace, modo: camara.modo, mandos, alturaEn, alDarUnTic: elCanal.alDarUnTic, caido: elCanal.caido });
   useEffect(() => {
     corregirAQuienPasea.current = paseo.corregir;
@@ -194,6 +197,11 @@ export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos,
           alturaEn={alturaEn}
         />
       )}
+      {/*
+        LOS HALLAZGOS, con la misma `alturaEn`: hierro, pedernal, cuero y junco girando por el delta,
+        cada uno con su columna de luz (`paseo/los-hallazgos.tsx`).
+      */}
+      {canal === undefined ? null : <LosHallazgos brotes={elCanal.brotes} alturaEn={alturaEn} />}
     </>
   );
 }

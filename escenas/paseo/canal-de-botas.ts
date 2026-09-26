@@ -96,6 +96,23 @@
  *    decirlo; lo de los demás se pregunta a la hora de pintarlo.
  *  · Al cortarse, la refriega se olvida: sin canal no hay refriega, y quien estuviera en el suelo
  *    con una llave que ya no vale no puede quedarse tumbado para siempre.
+ *
+ * ═══ LOS HALLAZGOS: DOS MENSAJES QUE LLEGAN, Y NINGUNO QUE SALE ═══
+ *
+ * Lo que brota por el tablero (docs/AVATARES-JUGABLES.md §2) no se pide: el servidor recoge por
+ * quien anda cuando le acepta un sitio a `RADIO_DE_RECOGER` de un brote. Así que aquí sólo se
+ * escucha:
+ *
+ *  · `brotes` trae la lista ENTERA y SUSTITUYE a la que hubiera —no se suma—, con `x` y `z` ya
+ *    pasados a unidades del mundo. Llega pocas veces por minuto, así que se avisa con cada una
+ *    (`alCambiarLosBrotes`) y quien pinta los lee de una lista que no cambia entre aviso y aviso:
+ *    React no se entera de nada 60 veces por segundo.
+ *  · `recoge` avisa (`alRecoger`) con quién fue y si fui yo, y quita ese brote de la lista en el
+ *    acto: el `brotes` nuevo llega detrás, pero el que se acaba de coger no tiene que seguir
+ *    girando en el suelo mientras tanto.
+ *  · Sin canal no hay brotes: se olvidan al entrar de nuevo (el servidor manda los suyos detrás del
+ *    `dentro`), al cortarse y al cerrar. Un servidor sin hallazgos no los manda nunca, y la lista
+ *    se queda vacía, que es lo que tiene que pintarse.
  */
 import {
   AVISOS_QUIETO_POR_SEGUNDO,
@@ -111,6 +128,7 @@ import {
   leerMensajeDelServidor,
 } from '../../shared/mecanicas/canal-de-botas';
 import type {
+  Brotes,
   Cae,
   Corrige,
   Da,
@@ -119,6 +137,7 @@ import type {
   Foto,
   Lanza,
   MensajeDelAparato,
+  Recoge,
   Renace,
   Vidas,
 } from '../../shared/mecanicas/canal-de-botas';
@@ -408,6 +427,42 @@ export function poseEntreFotos(asiento: string, fotos: readonly Muestra[], t: nu
   };
 }
 
+/* ─── Los hallazgos, como se pintan ──────────────────────────────────────── */
+
+/** Un brote en el suelo, ya en unidades del mundo. Ver la cabecera, «LOS HALLAZGOS». */
+export interface Brote {
+  /** El número que le da el servidor: el mismo en el `recoge` que se lo lleva. */
+  readonly id: number;
+  /** Qué es —`propina`, `hierro`, `escudo`…—, de la tabla de su juego. La escena decide cómo se ve. */
+  readonly clase: string;
+  /** Hacia el este, en unidades del mundo. */
+  readonly x: number;
+  /** Hacia el sur, en unidades del mundo. */
+  readonly z: number;
+}
+
+/** Alguien se ha llevado un brote: quién, qué, y si he sido yo. */
+export interface Recogida {
+  /** El `id` del brote que se llevó. */
+  readonly h: number;
+  /** El asiento que lo recogió. */
+  readonly por: string;
+  readonly clase: string;
+  /** Si lo ha recogido este aparato: `por` es mi asiento. */
+  readonly mio: boolean;
+}
+
+/** Dos listas de brotes iguales, en el mismo orden: un `brotes` repetido no avisa a nadie. */
+function mismosBrotes(a: readonly Brote[], b: readonly Brote[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const p = a[i] as Brote;
+    const q = b[i] as Brote;
+    if (p.id !== q.id || p.clase !== q.clase || p.x !== q.x || p.z !== q.z) return false;
+  }
+  return true;
+}
+
 /* ─── El canal ───────────────────────────────────────────────────────────── */
 
 export interface OpcionesDelCanal {
@@ -426,6 +481,10 @@ export interface OpcionesDelCanal {
   readonly alCambiar?: (estado: EstadoDelCanal) => void;
   /** Cada vez que cambia QUIÉN sale en las fotos —no dónde—: para montar y desmontar figuras. */
   readonly alCambiarLosPresentes?: (asientos: readonly string[]) => void;
+  /** Cada vez que cambia la lista de brotes: con un `brotes`, con un `recoge` y al olvidarlos. */
+  readonly alCambiarLosBrotes?: (brotes: readonly Brote[]) => void;
+  /** Cada vez que alguien —yo o cualquiera— recoge un brote. */
+  readonly alRecoger?: (recogida: Recogida) => void;
   /** El constructor de sockets. Por defecto, el global. */
   readonly WebSocket?: FabricaDeSockets;
   /** El reloj. Por defecto, el de verdad. */
@@ -449,6 +508,8 @@ export interface ClienteDelCanal {
   losDemas(ahora?: number): readonly OtroQueAnda[];
   /** Quién sale en las fotos, en orden. */
   presentes(): readonly string[];
+  /** Lo que hay brotado ahora, según el último `brotes` (menos lo recogido desde entonces). */
+  brotes(): readonly Brote[];
   estado(): EstadoDelCanal;
   /** Cuántos mensajes del servidor se han tirado por no ser un mensaje bien formado. */
   ignorados(): number;
@@ -495,7 +556,10 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
   let ultimoGolpe: number | null = null;
   let cancelarLoIntocable: (() => void) | null = null;
 
-  /** Mi asiento: el que dijo el servidor, o el que dio el cliente mientras no lo haya dicho. */
+  /* Los hallazgos: la lista del último `brotes`. */
+  let brotes: readonly Brote[] = [];
+
+  /** Mi asiento:el que dijo el servidor, o el que dio el cliente mientras no lo haya dicho. */
   const miAsiento = (): string | null => yo ?? o.yo ?? null;
 
   const laDe = (asiento: string): EnLaRefriega => refriega.get(asiento) ?? REFRIEGA_DE_SERIE;
@@ -557,6 +621,18 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
     refriegaConocida = false;
     cancelarLoIntocable?.();
     cancelarLoIntocable = null;
+  }
+
+  /** La lista de brotes, sustituida entera; se avisa sólo si ha cambiado algo. */
+  function ponerBrotes(nuevos: readonly Brote[]): void {
+    if (mismosBrotes(brotes, nuevos)) return;
+    brotes = nuevos;
+    o.alCambiarLosBrotes?.(brotes);
+  }
+
+  /** Sin canal no hay brotes: se olvidan al entrar de nuevo, al cortarse y al cerrar. */
+  function olvidarLosBrotes(): void {
+    ponerBrotes([]);
   }
 
   /**
@@ -690,6 +766,20 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
       case 'vidas':
         if (fase === 'dentro') vidas(m);
         return;
+      case 'brotes':
+        if (fase === 'dentro') losBrotes(m);
+        return;
+      case 'recoge':
+        if (fase === 'dentro') recoge(m);
+        return;
+      default: {
+        /*
+         * EXHAUSTIVO A LA FUERZA: un mensaje nuevo en el contrato sin su caso aquí no compila. Hasta
+         * los hallazgos este `switch` los dejaba caer sin decir nada, y el tipo no se quejaba.
+         */
+        const sinCaso: never = m;
+        void sinCaso;
+      }
     }
   }
 
@@ -708,8 +798,9 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
     /* Las fotos de la conexión anterior se sustituyen por las de ésta en cuanto llegue la primera. */
     ultimaFoto = null;
     empezarDeNuevo = true;
-    /* Y la refriega, por la de ésta: detrás del `dentro` llega su `vidas`. */
+    /* Y la refriega, por la de ésta: detrás del `dentro` llega su `vidas`. Los brotes, igual. */
     olvidarLaRefriega();
+    olvidarLosBrotes();
     o.corregir({ x: m.x, z: m.z });
     avisar();
   }
@@ -767,6 +858,20 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
     avisar();
   }
 
+  /* ─── Los hallazgos ─── */
+
+  /** `brotes`: la lista entera, que sustituye a la que hubiera. En unidades del mundo desde aquí. */
+  function losBrotes(m: Brotes): void {
+    ponerBrotes(m.b.map(([id, clase, x, z]) => ({ id, clase, x: aNumero(x), z: aNumero(z) })));
+  }
+
+  /** `recoge`: se avisa, y el brote se quita ya, sin esperar al `brotes` que llega detrás. */
+  function recoge(m: Recoge): void {
+    if (brotes.some((b) => b.id === m.h)) ponerBrotes(brotes.filter((b) => b.id !== m.h));
+    const recogida: Recogida = { h: m.h, por: m.por, clase: m.clase, mio: m.por === miAsiento() };
+    o.alRecoger?.(recogida);
+  }
+
   /**
    * EL GOLPE DE UN TIC. Sólo dentro —quien lo llama ya lo ha mirado—, nunca caído, y no antes de
    * `RECARGA_DEL_GOLPE_MS` desde el anterior: lo que no sale se tira, no se guarda. El gesto propio,
@@ -820,6 +925,8 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
     const estuvoDentro = fase === 'dentro';
     /* Sin canal no hay refriega: ni corazones que enseñar, ni un suelo del que no se pueda levantar. */
     olvidarLaRefriega();
+    /* Ni brotes: sin canal no se recoge nada, y pintarlos sería prometer lo que no se da. */
+    olvidarLosBrotes();
     motivo = motivoDelFuera ?? motivoDelCierre(codigo, razon);
     motivoDelFuera = null;
     if (cierreSinVuelta(codigo)) {
@@ -890,6 +997,7 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
       return salida;
     },
     presentes: () => presentes,
+    brotes: () => brotes,
     estado,
     ignorados: () => tirados,
     cerrar() {
@@ -900,6 +1008,7 @@ export function abrirElCanal(o: OpcionesDelCanal): ClienteDelCanal {
       fase = 'cerrado';
       olvidarALosDemas();
       olvidarLaRefriega();
+      olvidarLosBrotes();
       cerrado = true;
       if (s !== null) soltar(s);
     },

@@ -3726,6 +3726,7 @@ export function Delta({
   figura,
   mandos,
   canal,
+  alRecoger,
 }: {
   datos: DeltaEn3D;
   modelos: CatalogoDeModelos;
@@ -3959,6 +3960,11 @@ export function Delta({
    * (`andar-por-el-delta.tsx`), que es quien lo abre y pinta a los demás. Sin él no se abre nada.
    */
   canal?: CanalDeBotas;
+  /**
+   * ALGUIEN HA RECOGIDO UN HALLAZGO, sólo con `canal`: la misma prop, con la misma forma, que el
+   * Burgo y Las Lindes (`comun/tablero.ts`). Se le pasa tal cual al paseo, que es quien tiene el canal.
+   */
+  alRecoger?: (r: { readonly por: string; readonly clase: string; readonly mio: boolean }) => void;
 }): JSX.Element {
   /**
    * Cada modelo, aplanado una vez a geometría + material para poder instanciarlo.
@@ -4842,6 +4848,7 @@ export function Delta({
           figura={figura}
           mandos={mandos}
           canal={canal}
+          alRecoger={alRecoger}
         />
       ) : null}
     </group>

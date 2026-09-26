@@ -28,11 +28,19 @@
  * (`refriegaDe`, por `cliente`), y el paseo pregunta si quien pasea está en el suelo por `caido`,
  * estable como `alDarUnTic`. El `renace` propio pasa por la costura de corregir con un rumbo, así
  * que ésta reenvía los dos. Sin canal, `caido` dice siempre que no.
+ *
+ * ═══ Y LOS HALLAZGOS, POR REACT PORQUE CAMBIAN POCO ═══
+ *
+ * La lista de brotes cambia unas pocas veces por minuto —uno recogido, uno que vuelve a brotar—,
+ * así que va en estado de React como `presentes`, y quien la pinta (`los-hallazgos.tsx`) sólo lee
+ * números en el fotograma. El aviso de recoger (`alRecoger`, la prop pública de las tres escenas)
+ * se llama siempre con la función de la última vuelta, como `alCambiar`: puede llegar una nueva en
+ * cada una sin reabrir nada.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Andante } from '../../shared/mecanicas/mundo';
 import { abrirElCanal } from './canal-de-botas';
-import type { ClienteDelCanal, EstadoDelCanal, FabricaDeSockets, RelojDelCanal } from './canal-de-botas';
+import type { Brote, ClienteDelCanal, EstadoDelCanal, FabricaDeSockets, Recogida, RelojDelCanal } from './canal-de-botas';
 import type { EntradaDelTic } from './mandos';
 import type { CanalDeBotas } from './mesa-de-botas';
 
@@ -47,20 +55,29 @@ export interface ElCanal {
   readonly estado: EstadoDelCanal | null;
   /** Para `usarElPaseo`: si quien pasea está en el suelo en la refriega. Estable; sin canal, nunca. */
   readonly caido: () => boolean;
+  /** Lo que hay brotado ahora. Cambia con cada `brotes` y cada `recoge`: pocas veces por minuto. */
+  readonly brotes: readonly Brote[];
 }
+
+/** El aviso de recoger que reciben las escenas: la forma de la prop pública `alRecoger`. */
+export type AvisoDeRecoger = (r: { readonly por: string; readonly clase: string; readonly mio: boolean }) => void;
 
 export function usarElCanal(
   canal: CanalDeBotas | undefined,
   corregir: { readonly current: (sitio: Andante, rumbo?: number) => void },
+  alRecoger?: AvisoDeRecoger,
   inyectado?: { readonly WebSocket?: FabricaDeSockets; readonly reloj?: RelojDelCanal },
 ): ElCanal {
   const cliente = useRef<ClienteDelCanal | null>(null);
   const [presentes, ponerPresentes] = useState<readonly string[]>([]);
   const [estado, ponerEstado] = useState<EstadoDelCanal | null>(null);
-  /* El aviso de fuera, siempre el de la última vuelta: puede llegar una función nueva en cada una. */
+  const [brotes, ponerBrotes] = useState<readonly Brote[]>([]);
+  /* Los avisos de fuera, siempre los de la última vuelta: puede llegar una función nueva en cada una. */
   const alCambiar = useRef(canal?.alCambiar);
+  const avisoDeRecoger = useRef(alRecoger);
   useEffect(() => {
     alCambiar.current = canal?.alCambiar;
+    avisoDeRecoger.current = alRecoger;
   });
 
   const url = canal?.url ?? null;
@@ -81,6 +98,8 @@ export function usarElCanal(
         alCambiar.current?.(e);
       },
       alCambiarLosPresentes: ponerPresentes,
+      alCambiarLosBrotes: ponerBrotes,
+      alRecoger: (r: Recogida) => avisoDeRecoger.current?.(r),
       ...(fabrica === undefined ? {} : { WebSocket: fabrica }),
       ...(reloj === undefined ? {} : { reloj }),
     });
@@ -90,6 +109,7 @@ export function usarElCanal(
       if (cliente.current === abierto) cliente.current = null;
       ponerPresentes([]);
       ponerEstado(null);
+      ponerBrotes([]);
     };
   }, [url, llave, yo, corregir, fabrica, reloj]);
 
@@ -101,7 +121,7 @@ export function usarElCanal(
 
   const conCanal = url !== null && llave !== null;
   return useMemo(
-    () => ({ alDarUnTic: conCanal ? alDarUnTic : undefined, cliente, presentes, estado: conCanal ? estado : null, caido }),
-    [alDarUnTic, caido, conCanal, estado, presentes],
+    () => ({ alDarUnTic: conCanal ? alDarUnTic : undefined, cliente, presentes, estado: conCanal ? estado : null, caido, brotes }),
+    [alDarUnTic, brotes, caido, conCanal, estado, presentes],
   );
 }

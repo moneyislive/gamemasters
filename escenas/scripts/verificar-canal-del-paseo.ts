@@ -26,6 +26,11 @@
  *     a la hora a la que se pinta a cada uno; lo intocable caduca solo; lo mal formado no cambia
  *     nada. El golpe sale sólo dentro, con su tic y su mirada, con la recarga y nunca caído; caído no
  *     se anda; `renace` recoloca y mira; y al cortarse se olvida todo.
+ *  5b. LOS HALLAZGOS. `brotes` sustituye la lista entera —en unidades del mundo, y sin avisar si no
+ *     cambia—; `recoge` avisa con `mio` del asiento que dijo el servidor y quita el brote en el acto;
+ *     lo mal formado no cambia nada; al cortarse se olvidan; un canal que no los escucha no se rompe;
+ *     cada clase tiene su pieza y el maletín la luz que más se ve. Y en las tres escenas se pintan
+ *     UNA vez, con canal y a pie, al mismo suelo que quien anda, sin tocarse, con `alRecoger` cosido.
  *  6. LA CÁMARA DE HOMBRO. Se acerca delante de un muro sin saltar, no se queda nunca al otro
  *     lado, no baja del mínimo, y vuelve a su sitio al apartarse.
  *  7. EL RÓTULO. Se escribe lo que tiene dibujo, mira a la cámara y se lee desde el hombro; la
@@ -80,7 +85,15 @@ import {
   TICS_ENTRE_AVISOS_QUIETO,
   TOPE_DE_ESPERA_MS,
 } from '../paseo/canal-de-botas';
-import type { ClienteDelCanal, EstadoDelCanal, Muestra, RelojDelCanal, SocketDelCanal } from '../paseo/canal-de-botas';
+import type { Brote, ClienteDelCanal, EstadoDelCanal, Muestra, Recogida, RelojDelCanal, SocketDelCanal } from '../paseo/canal-de-botas';
+import {
+  aspectoDe,
+  CLASE_DESCONOCIDA,
+  CLASES_DE_HALLAZGO,
+  geometriaDe,
+  geometriaDeLaLuz,
+  piezaDe,
+} from '../paseo/aspecto-de-los-hallazgos';
 import {
   acercarElHombro,
   ATRAS_DEL_HOMBRO,
@@ -206,14 +219,22 @@ interface Banco {
   readonly rumbos: (number | undefined)[];
   readonly estados: EstadoDelCanal[];
   readonly presentes: (readonly string[])[];
+  /** Cada lista de brotes que se ha avisado, en orden. Vacía si el banco no escucha los hallazgos. */
+  readonly listasDeBrotes: (readonly Brote[])[];
+  /** Cada `recoge` que se ha avisado. */
+  readonly recogidas: Recogida[];
   /** El último socket que abrió el canal. */
   socket(): SocketDePrueba;
   /** Lo que se ha mandado por el último socket, ya leído con el lector ESTRICTO del servidor. */
   leidos(): ReturnType<typeof leerMensajeDelAparato>[];
 }
 
-/** Un canal contra el servidor de mentira. `corregir` es la costura (b); por defecto sólo apunta. */
-function unBanco(corregir?: (sitio: Andante, rumbo?: number) => void): Banco {
+/**
+ * Un canal contra el servidor de mentira. `corregir` es la costura (b); por defecto sólo apunta. Con
+ * `sinHallazgos`, el canal se abre como lo abría un aparato de antes de los hallazgos: sin escuchar
+ * ni los brotes ni las recogidas.
+ */
+function unBanco(corregir?: (sitio: Andante, rumbo?: number) => void, sinHallazgos = false): Banco {
   const creados: SocketDePrueba[] = [];
   class Fabrica extends SocketDePrueba {
     constructor(url: string) {
@@ -226,6 +247,8 @@ function unBanco(corregir?: (sitio: Andante, rumbo?: number) => void): Banco {
   const rumbos: (number | undefined)[] = [];
   const estados: EstadoDelCanal[] = [];
   const presentes: (readonly string[])[] = [];
+  const listasDeBrotes: (readonly Brote[])[] = [];
+  const recogidas: Recogida[] = [];
   const cliente = abrirElCanal({
     url: DIRECCION,
     llave: LLAVE,
@@ -237,6 +260,12 @@ function unBanco(corregir?: (sitio: Andante, rumbo?: number) => void): Banco {
     },
     alCambiar: (e) => estados.push(e),
     alCambiarLosPresentes: (p) => presentes.push(p),
+    ...(sinHallazgos
+      ? {}
+      : {
+          alCambiarLosBrotes: (l: readonly Brote[]) => listasDeBrotes.push(l),
+          alRecoger: (r: Recogida) => recogidas.push(r),
+        }),
     WebSocket: Fabrica,
     reloj,
   });
@@ -253,6 +282,8 @@ function unBanco(corregir?: (sitio: Andante, rumbo?: number) => void): Banco {
     rumbos,
     estados,
     presentes,
+    listasDeBrotes,
+    recogidas,
     socket,
     leidos: () => socket().enviados.map((t) => leerMensajeDelAparato(t)),
   };
@@ -1673,6 +1704,190 @@ paso('El rótulo: se escribe lo que tiene dibujo, mira a la cámara y se lee des
 }
 
 // ---------------------------------------------------------------------------
+paso('Los hallazgos: `brotes` sustituye la lista, `recoge` avisa y dice si fui yo, y un aparato que no los escucha sigue igual');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * Los dos mensajes de los hallazgos (docs/AVATARES-JUGABLES.md §2) llegan sin que el aparato pida
+ * nada, y lo que puede ir mal va mal en silencio: una lista que se SUMA a la anterior en vez de
+ * sustituirla —los brotes recogidos se quedarían girando para siempre—, un `mio` del revés —el
+ * aviso de «has encontrado…» a quien no ha encontrado nada—, un brote cogido que sigue en el suelo
+ * hasta el `brotes` siguiente, brotes de otra conexión después de cortarse, o un canal abierto sin
+ * escuchar los hallazgos que se rompe al recibirlos.
+ */
+{
+  const llega = (b: Banco, m: unknown): void => b.socket().llega(JSON.stringify(m));
+  const q = (n: number): number => deNumero(n);
+
+  /* ── Antes de `dentro` no hay brotes ── */
+  const b = unBanco();
+  b.socket().abrir();
+  llega(b, { t: 'brotes', b: [[1, 'propina', q(1), q(2)]] });
+  comprobar('antes de `dentro` un `brotes` no pinta nada: no se sabe aún de qué mesa es', b.cliente.brotes().length === 0 && b.listasDeBrotes.length === 0, b.cliente.brotes());
+
+  /* ── `brotes` pone la lista, en unidades del mundo ── */
+  b.socket().llega(dentro(0, 0));
+  llega(b, { t: 'brotes', b: [[1, 'propina', q(1.5), q(-2)], [2, 'maletin', q(10), q(20)]] });
+  const primera = b.cliente.brotes();
+  comprobar(
+    '`brotes` pone la lista, con `x` y `z` ya en unidades del mundo, y se avisa una vez',
+    primera.length === 2 &&
+      primera[0]?.id === 1 &&
+      primera[0].clase === 'propina' &&
+      primera[0].x === 1.5 &&
+      primera[0].z === -2 &&
+      primera[1]?.id === 2 &&
+      primera[1].clase === 'maletin' &&
+      primera[1].x === 10 &&
+      b.listasDeBrotes.length === 1,
+    { primera, avisos: b.listasDeBrotes.length },
+  );
+
+  /* ── El siguiente SUSTITUYE ── */
+  llega(b, { t: 'brotes', b: [[3, 'cartera', q(4), q(4)]] });
+  const segunda = b.cliente.brotes();
+  comprobar(
+    'el `brotes` siguiente SUSTITUYE la lista entera: ni se suma, ni se queda nada del anterior',
+    segunda.length === 1 && segunda[0]?.id === 3 && segunda[0].clase === 'cartera' && b.listasDeBrotes.length === 2,
+    segunda,
+  );
+  /* Vacuna: si se sumara, la cuenta de arriba daría tres. Que la lista del aviso sea la misma que se lee. */
+  comprobar('y lo que se avisa es lo mismo que se lee', b.listasDeBrotes[1] === b.cliente.brotes());
+  llega(b, { t: 'brotes', b: [[3, 'cartera', q(4), q(4)]] });
+  comprobar('un `brotes` igual al anterior no vuelve a avisar: React no repinta por nada', b.listasDeBrotes.length === 2, b.listasDeBrotes.length);
+
+  /* ── Lo mal formado no cambia nada ── */
+  const tiradosAntes = b.cliente.ignorados();
+  llega(b, { t: 'brotes', b: [[4, 'propina', 1.5, 0]] });
+  llega(b, { t: 'brotes', b: [[4, 'propina', 0, 0], [4, 'cartera', 0, 0]] });
+  llega(b, { t: 'recoge', h: 3, por: 's2' });
+  comprobar(
+    'un `brotes` o un `recoge` mal formado —coma flotante, un id repetido, sin clase— se tira, se cuenta y no cambia nada',
+    b.cliente.ignorados() === tiradosAntes + 3 && b.cliente.brotes().length === 1 && b.cliente.brotes()[0]?.id === 3 && b.recogidas.length === 0,
+    { ignorados: b.cliente.ignorados() - tiradosAntes, brotes: b.cliente.brotes() },
+  );
+
+  /* ── `recoge` ── */
+  llega(b, { t: 'brotes', b: [[5, 'propina', q(1), q(1)], [6, 'maletin', q(2), q(2)], [7, 'cartera', q(3), q(3)]] });
+  const avisosAntes = b.listasDeBrotes.length;
+  llega(b, { t: 'recoge', h: 6, por: 's1', clase: 'maletin' });
+  const mia = b.recogidas[0];
+  comprobar(
+    '`recoge` de mi asiento avisa con `mio` y con quién y qué',
+    b.recogidas.length === 1 && mia?.mio === true && mia.por === 's1' && mia.clase === 'maletin' && mia.h === 6,
+    b.recogidas,
+  );
+  comprobar(
+    'y el brote recogido se quita en el acto, sin esperar al `brotes` que llega detrás',
+    b.cliente.brotes().map((x) => x.id).join(',') === '5,7' && b.listasDeBrotes.length === avisosAntes + 1,
+    b.cliente.brotes(),
+  );
+  llega(b, { t: 'recoge', h: 5, por: 's2', clase: 'propina' });
+  const suya = b.recogidas[1];
+  comprobar(
+    '`recoge` de otro asiento avisa también, con `mio` en falso',
+    b.recogidas.length === 2 && suya?.mio === false && suya.por === 's2' && suya.clase === 'propina' && b.cliente.brotes().map((x) => x.id).join(',') === '7',
+    b.recogidas,
+  );
+  const avisosDeListas = b.listasDeBrotes.length;
+  llega(b, { t: 'recoge', h: 99, por: 's3', clase: 'cartera' });
+  comprobar(
+    'un `recoge` de un brote que no está en la lista avisa igual —alguien lo ha cogido—, y la lista ni cambia ni avisa',
+    b.recogidas.length === 3 && b.recogidas[2]?.mio === false && b.listasDeBrotes.length === avisosDeListas && b.cliente.brotes().length === 1,
+  );
+
+  /* ── `mio` con el asiento que dice el servidor, no el que dio el cliente ── */
+  const otro = unBanco();
+  otro.socket().abrir();
+  otro.socket().llega(dentro(0, 0, 's4'));
+  llega(otro, { t: 'recoge', h: 1, por: 's4', clase: 'escudo' });
+  llega(otro, { t: 'recoge', h: 2, por: 's1', clase: 'escudo' });
+  comprobar(
+    '`mio` es del asiento que dijo el servidor en `dentro`, aunque el cliente creyera otro',
+    otro.recogidas[0]?.mio === true && otro.recogidas[1]?.mio === false,
+    otro.recogidas,
+  );
+
+  /* ── Al cortarse, al volver y al cerrar ── */
+  b.socket().cae(1006);
+  comprobar('al cortarse los brotes se olvidan, y se avisa: sin canal no se recoge nada', b.cliente.brotes().length === 0 && (b.listasDeBrotes[b.listasDeBrotes.length - 1]?.length ?? -1) === 0);
+  llega(b, { t: 'brotes', b: [[8, 'propina', 0, 0]] });
+  comprobar('y un `brotes` que llega con el canal cortado no pinta nada', b.cliente.brotes().length === 0);
+  /* La primera espera, y ni un milisegundo más: con más, el plazo de entrar corta el socket nuevo sin abrir. */
+  b.reloj.avanzar(PRIMERA_ESPERA_MS);
+  b.socket().abrir();
+  b.socket().llega(dentro(0, 0));
+  llega(b, { t: 'brotes', b: [[9, 'hierro', q(1), q(1)]] });
+  comprobar('al volver a entrar, el `brotes` de la conexión nueva pone la lista', b.cliente.brotes().length === 1 && b.cliente.brotes()[0]?.clase === 'hierro');
+  b.cliente.cerrar();
+  comprobar('y al cerrar se olvidan', b.cliente.brotes().length === 0);
+
+  /* ── Un aparato que no escucha los hallazgos ── */
+  const viejo = unBanco(undefined, true);
+  viejo.socket().abrir();
+  viejo.socket().llega(dentro(0, 0));
+  let rompio: unknown = null;
+  try {
+    llega(viejo, { t: 'brotes', b: [[1, 'junco', q(1), q(1)]] });
+    llega(viejo, { t: 'recoge', h: 1, por: 's1', clase: 'junco' });
+    llega(viejo, { t: 'recoge', h: 2, por: 's2', clase: 'cuero' });
+    viejo.socket().llega(unaFoto(1, [['s2', 1, 1, 0]]));
+  } catch (e) {
+    rompio = e instanceof Error ? e.message : String(e);
+  }
+  comprobar(
+    'un canal abierto SIN escuchar brotes ni recogidas no se rompe al recibirlos: sigue dentro, las fotos siguen llegando y no se tira nada',
+    rompio === null && viejo.cliente.estado().fase === 'dentro' && viejo.cliente.presentes().join(',') === 's2' && viejo.cliente.ignorados() === 0,
+    { rompio, fase: viejo.cliente.estado().fase, ignorados: viejo.cliente.ignorados() },
+  );
+  viejo.cliente.cerrar();
+
+  /* ── El aspecto de cada clase ── */
+  comprobar(
+    'cada clase de las tablas tiene su aspecto, y una que no se conoce sale como la esfera neutra',
+    CLASES_DE_HALLAZGO.every((k) => aspectoDe(k) === k) && aspectoDe('dragon') === CLASE_DESCONOCIDA && aspectoDe('') === CLASE_DESCONOCIDA && aspectoDe('toString') === CLASE_DESCONOCIDA,
+  );
+  const deLaEsfera = geometriaDe(CLASE_DESCONOCIDA);
+  const cuantosDeLaEsfera = deLaEsfera.getAttribute('position').count;
+  deLaEsfera.dispose();
+  const malas: string[] = [];
+  for (const k of CLASES_DE_HALLAZGO) {
+    const g = geometriaDe(k);
+    const p = g.getAttribute('position');
+    const col = g.getAttribute('color');
+    g.computeBoundingSphere();
+    const radio = g.boundingSphere?.radius ?? Number.POSITIVE_INFINITY;
+    const numeros = Array.from(p.array as ArrayLike<number>).every((v) => Number.isFinite(v));
+    if (g.index !== null || p.count === 0 || p.count % 3 !== 0 || col === undefined || col.count !== p.count || !numeros || !(radio > 0.15 && radio < 0.8) || p.count === cuantosDeLaEsfera) {
+      malas.push(`${k}: ${String(p.count)} vértices, radio ${radio.toFixed(2)}`);
+    }
+    g.dispose();
+  }
+  comprobar('y cada pieza es de primitivas fundidas: triángulos sueltos con su color, de medio metro largo, y ninguna es la esfera', malas.length === 0, malas);
+  const luz = geometriaDeLaLuz();
+  luz.computeBoundingBox();
+  comprobar(
+    'la luz sale del suelo y sube una unidad, que la instancia estira al alto de su clase',
+    (luz.boundingBox?.min.y ?? -1) >= 0 && Math.abs((luz.boundingBox?.max.y ?? 0) - 1) < 1e-6,
+    luz.boundingBox,
+  );
+  luz.dispose();
+  const maletin = piezaDe('maletin').luz;
+  const brilloDe = (c: { r: number; g: number; b: number }): number => c.r + c.g + c.b;
+  comprobar(
+    'y la del maletín es la que más se ve: la más alta, la más ancha y la más clara de todas',
+    [...CLASES_DE_HALLAZGO, CLASE_DESCONOCIDA]
+      .filter((k) => k !== 'maletin')
+      .every((k) => {
+        const l = piezaDe(aspectoDe(k)).luz;
+        return l.alto < maletin.alto && l.ancho < maletin.ancho && brilloDe(l.color) < brilloDe(maletin.color);
+      }),
+  );
+}
+
+// ---------------------------------------------------------------------------
 paso('El montaje: la escena abre el canal sólo con la prop, y los dos clientes se la pasan sólo en una mesa `botas`');
 // ---------------------------------------------------------------------------
 
@@ -1717,7 +1932,7 @@ paso('El montaje: la escena abre el canal sólo con la prop, y los dos clientes 
 
   comprobar(
     'la escena abre el canal con la prop y con nada más, y le da los tics del paseo',
-    /const elCanal = usarElCanal\(props\.canal, corregirAQuienPasea\);/.test(escena) &&
+    /const elCanal = usarElCanal\(props\.canal, corregirAQuienPasea, props\.alRecoger\);/.test(escena) &&
       /usarElPaseo\(\{[^}]*alDarUnTic: elCanal\.alDarUnTic,[^}]*\}\)/.test(escena) &&
       /corregirAQuienPasea\.current = paseo\.corregir;/.test(escena),
   );
@@ -1896,36 +2111,46 @@ paso('Los tres juegos que se andan: el canal cosido igual, los demás a la altur
     readonly fuente: string;
     /** Con qué se pide el canal: la prop de la escena. */
     readonly prop: 'props.canal' | 'canal';
+    /** Y con qué se avisa de lo recogido: la otra prop, que va con ella. */
+    readonly aviso: 'props.alRecoger' | 'alRecoger';
     /** La guarda que deja pintar a los demás sólo con canal y a pie, justo delante de `<LosDemas`. */
     readonly guarda: RegExp;
     /** Lo que le quita a esa guarda la pregunta por el canal, y lo que le quita el «a pie». */
     readonly sinCanal: readonly [string, string];
     readonly sinAPie: readonly [string, string];
+    /** La guarda de los hallazgos, a la letra: la misma pregunta que la de los demás. */
+    readonly guardaDeLosHallazgos: string;
   }
   const ESCENAS: readonly EscenaQueAnda[] = [
     {
       juego: 'Las Lindes',
       fuente: leer('../lindes/Lindes.tsx'),
       prop: 'props.canal',
+      aviso: 'props.alRecoger',
       guarda: /\{props\.canal === undefined \|\| camara\.modo === 'mesa' \? null : \(\s*<LosDemas\b/,
       sinCanal: ["{props.canal === undefined || camara.modo === 'mesa' ? null : (", "{camara.modo === 'mesa' ? null : ("],
       sinAPie: ["{props.canal === undefined || camara.modo === 'mesa' ? null : (", '{props.canal === undefined ? null : ('],
+      guardaDeLosHallazgos: "{props.canal === undefined || camara.modo === 'mesa' ? null : <LosHallazgos ",
     },
     {
       juego: 'el Burgo',
       fuente: leer('../burgo/Burgo.tsx'),
       prop: 'props.canal',
+      aviso: 'props.alRecoger',
       guarda: /\{props\.canal === undefined \|\| !aPie \? null : \(\s*<LosDemas\b/,
       sinCanal: ['{props.canal === undefined || !aPie ? null : (', '{!aPie ? null : ('],
       sinAPie: ['{props.canal === undefined || !aPie ? null : (', '{props.canal === undefined ? null : ('],
+      guardaDeLosHallazgos: '{props.canal === undefined || !aPie ? null : <LosHallazgos ',
     },
     {
       juego: 'Riberas',
       fuente: leer('../andar-por-el-delta.tsx'),
       prop: 'canal',
+      aviso: 'alRecoger',
       guarda: /if \(!aPie\) return null;\s*return \(\s*<>(?:(?!return)[\s\S])*?\{canal === undefined \? null : \(\s*<LosDemas\b/,
       sinCanal: ['{canal === undefined ? null : (', '{false ? null : ('],
       sinAPie: ['if (!aPie) return null;\n  return (', 'return ('],
+      guardaDeLosHallazgos: '{canal === undefined ? null : <LosHallazgos ',
     },
   ];
 
@@ -1950,7 +2175,7 @@ paso('Los tres juegos que se andan: el canal cosido igual, los demás a la altur
     (c: string): boolean => {
       const llamada = llamadaAlPaseo(c) ?? '';
       return (
-        new RegExp(`const elCanal = usarElCanal\\(${aLaLetra(e.prop)}, corregirAQuienPasea\\);`).test(c) &&
+        new RegExp(`const elCanal = usarElCanal\\(${aLaLetra(e.prop)}, corregirAQuienPasea, ${aLaLetra(e.aviso)}\\);`).test(c) &&
         (c.match(/\busarElCanal\(/g) ?? []).length === 1 &&
         c.indexOf('const elCanal = usarElCanal(') < c.indexOf('const paseo = usarElPaseo(') &&
         /\balDarUnTic: elCanal\.alDarUnTic\b/.test(llamada) &&
@@ -2015,7 +2240,76 @@ paso('Los tres juegos que se andan: el canal cosido igual, los demás a la altur
       e.fuente,
       [e.fuente.replace(/,\s*caido: elCanal\.caido/, ''), e.fuente.replace(/(<QuienAnda\b[\s\S]*?)\s*cliente=\{elCanal\.cliente\}/, '$1')],
     );
+    /*
+     * LOS HALLAZGOS, POR EL MISMO SITIO QUE LOS DEMÁS: UNA vez, con la misma guarda —sólo con canal y
+     * a pie—, con la lista del canal y con LA MISMA altura que el paseo le da a quien anda. Con otra
+     * altura, el maletín flota a un metro de la acera en un aparato y nadie lo ve fallar.
+     */
+    const hallazgosEn = (c: string): readonly string[] => c.match(/<LosHallazgos\b[\s\S]*?\/>/g) ?? [];
+    reglaDelFuente(
+      `${e.juego}: pinta los hallazgos UNA vez, sólo con canal y a pie, con la lista del canal y la MISMA altura del suelo que el paseo`,
+      (c) => {
+        const todos = hallazgosEn(c);
+        const el = todos[0] ?? '';
+        const altura = alturaDelPaseo(c);
+        return (
+          todos.length === 1 &&
+          c.includes(e.guardaDeLosHallazgos) &&
+          altura !== null &&
+          new RegExp(`\\balturaEn=\\{${aLaLetra(altura)}\\}`).test(el) &&
+          /\bbrotes=\{elCanal\.brotes\}/.test(el) &&
+          /import \{ LosHallazgos \} from '\.{1,2}\/paseo\/los-hallazgos';/.test(c)
+        );
+      },
+      e.fuente,
+      [
+        e.fuente.replace(e.guardaDeLosHallazgos, '{<LosHallazgos '),
+        e.fuente.replace(/(<LosHallazgos\b[\s\S]*?)alturaEn=\{[A-Za-z_$][\w$]*\}/, '$1alturaEn={() => 0}'),
+        e.fuente.replace('brotes={elCanal.brotes}', 'brotes={[]}'),
+      ],
+    );
   }
+
+  /* El aviso de recoger: con la forma EXACTA que usan los clientes, en el común y en el delta. */
+  const FORMA_DEL_AVISO = 'alRecoger?: (r: { readonly por: string; readonly clase: string; readonly mio: boolean }) => void;';
+  const comunDeTablero = leer('../comun/tablero.ts');
+  reglaDelFuente(
+    'el aviso `alRecoger` está en el contrato común de tablero con la forma exacta que usan los clientes, y ni el Burgo ni Las Lindes lo vuelven a declarar',
+    (c) => {
+      const [comun = '', burgo = '', lindes = ''] = c.split('\n/* ── otro fichero ── */\n');
+      return (
+        new RegExp(`export interface PropsDeEscenaDeTablero<[^>]*> \\{(?:(?!\\n\\})[\\s\\S])*\\breadonly ${aLaLetra(FORMA_DEL_AVISO)}`).test(comun) &&
+        ![burgo, lindes].some((t) => /\balRecoger\?:/.test(t))
+      );
+    },
+    [comunDeTablero, leer('../burgo/tipos.ts'), leer('../lindes/tipos.ts')].join('\n/* ── otro fichero ── */\n'),
+    [
+      [comunDeTablero.replace('readonly mio: boolean', 'readonly mia: boolean'), leer('../burgo/tipos.ts'), leer('../lindes/tipos.ts')].join('\n/* ── otro fichero ── */\n'),
+      [comunDeTablero, leer('../burgo/tipos.ts'), `${leer('../lindes/tipos.ts')}\ninterface Otra { readonly alRecoger?: () => void }`].join('\n/* ── otro fichero ── */\n'),
+    ],
+  );
+  const laEscenaDelDelta = leer('../delta.tsx');
+  const pasoDelDelta = leer('../andar-por-el-delta.tsx');
+  reglaDelFuente(
+    'Riberas: la escena del delta declara `alRecoger` con la misma forma y se lo pasa al paseo, que lo declara igual',
+    (c) => {
+      const [escena = '', paseo = ''] = c.split('\n/* ── otro fichero ── */\n');
+      return (
+        escena.includes(FORMA_DEL_AVISO) &&
+        /<AndarPorElDelta\b[^>]*\balRecoger=\{alRecoger\}[^>]*\/>/.test(escena) &&
+        paseo.includes(`readonly ${FORMA_DEL_AVISO}`)
+      );
+    },
+    [laEscenaDelDelta, pasoDelDelta].join('\n/* ── otro fichero ── */\n'),
+    [[laEscenaDelDelta.replace(/\n\s*alRecoger=\{alRecoger\}/, ''), pasoDelDelta].join('\n/* ── otro fichero ── */\n')],
+  );
+  const losHallazgos = leer('../paseo/los-hallazgos.tsx');
+  reglaDelFuente(
+    'los hallazgos no se tocan: ni un `onClick` ni un puntero, y ninguna de sus mallas contesta a un rayo',
+    (c) => !/\bon(Click|DoubleClick|ContextMenu|Pointer\w*)=/.test(c) && (c.match(/\.raycast = SIN_RAYO;/g) ?? []).length === 2 && !/<mesh\b/.test(c),
+    losHallazgos,
+    [losHallazgos.replace('<group name="hallazgos">', '<group name="hallazgos" onClick={() => undefined}>'), losHallazgos.replace('luz.raycast = SIN_RAYO;', '')],
+  );
 
   /*
    * El Burgo y Las Lindes lo declaran por EL MISMO contrato —`PropsDeEscenaDeTablero`, en
@@ -2128,7 +2422,8 @@ paso('Los tres juegos que se andan: el canal cosido igual, los demás a la altur
       ayudante: 'asientosQueAndanPorElDelta',
       aPie: /const bajadoEnLaMesa = useRef<string \| null>\(null\);\s*useEffect\(\(\) => \{\s*if \(!esBotas \|\| bajadoEnLaMesa\.current === puesta\.codigo\) return;\s*bajadoEnLaMesa\.current = puesta\.codigo;\s*cambiarDeCamara\('hombro'\);\s*\}, \[esBotas, puesta\.codigo, cambiarDeCamara\]\);/,
       sinAPie: ["bajadoEnLaMesa.current = puesta.codigo;\n    cambiarDeCamara('hombro');", "bajadoEnLaMesa.current = puesta.codigo;\n    ponerModo('hombro');"],
-      cartel: new RegExp(`<ComoSeAndaPorElDelta modo=\\{modo\\} ${aLaLetra(EL_CARTEL_DEL_ESCRITORIO)} \\/>`),
+      /* Detrás del cartel puede ir lo que el cartel necesite más —`tactil`, para decir «arrastra la palanca»—. */
+      cartel: new RegExp(`<ComoSeAndaPorElDelta modo=\\{modo\\} ${aLaLetra(EL_CARTEL_DEL_ESCRITORIO)}(?: [A-Za-z]\\w*=\\{[A-Za-z_$][\\w$]*\\})* \\/>`),
       sinPregunta: [EL_CARTEL_DEL_ESCRITORIO, "canal={estadoDelCanal?.texto ?? 'Conectando…'}"],
     },
   ];

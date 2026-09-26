@@ -361,6 +361,7 @@ import { usarElPaseo } from '../paseo/usar-el-paseo';
 import { QuienAnda } from '../paseo/quien-anda';
 import { usarElCanal } from '../paseo/usar-el-canal';
 import { LosDemas } from '../paseo/los-demas';
+import { LosHallazgos } from '../paseo/los-hallazgos';
 import { mundoDelBurgo } from '../../shared/arcade/juegos/burgo-mundo';
 import type { Andante, MundoDeclarado } from '../../shared/mecanicas/mundo';
 import type { SucesoDelBurgo } from '../../shared/arcade/juegos/burgo';
@@ -1547,7 +1548,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
    * paseo pregunta si quien anda está en el suelo (`caido`) y `QuienAnda` cómo va (`cliente`).
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
-  const elCanal = usarElCanal(props.canal, corregirAQuienPasea);
+  const elCanal = usarElCanal(props.canal, corregirAQuienPasea, props.alRecoger);
   const paseo = usarElPaseo({
     mundo: mundoAPie,
     nace: naceQuienAnda,
@@ -3341,6 +3342,12 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           alturaEn={alturaDelSuelo}
         />
       )}
+
+      {/*
+        LOS HALLAZGOS, con la misma guarda y el mismo suelo: propinas, carteras y maletines girando
+        por la calle, cada uno con su columna de luz, y el maletín la más alta (`paseo/los-hallazgos.tsx`).
+      */}
+      {props.canal === undefined || !aPie ? null : <LosHallazgos brotes={elCanal.brotes} alturaEn={alturaDelSuelo} />}
     </>
   );
 }
