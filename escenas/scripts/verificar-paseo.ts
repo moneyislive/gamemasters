@@ -985,7 +985,9 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
    */
   comprobar(
     'la pantalla de Las Lindes de la app monta la palanca a pie, y le pasa a la escena la misma referencia',
-    /<MandosDelPaseo mandos=\{mandos\} visibles=\{modo !== 'mesa'\} \/>/.test(pantalla) && /\bmandos=\{mandos\}\s*\n\s*\/>/.test(pantalla),
+    /* Detrás de `mandos` puede ir el aviso de los hallazgos (`alRecoger`, docs/AVATARES-JUGABLES.md §6), y nada más. */
+    /<MandosDelPaseo mandos=\{mandos\} visibles=\{modo !== 'mesa'\} \/>/.test(pantalla) &&
+      /\bmandos=\{mandos\}\s*\n\s*(?:alRecoger=\{alRecoger\}\s*\n\s*)?\/>/.test(pantalla),
   );
   comprobar(
     'y la palanca responde al dedo con `PanResponder` y escribe en esa referencia, sin `onClick`',
