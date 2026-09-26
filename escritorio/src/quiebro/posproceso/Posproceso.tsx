@@ -37,6 +37,7 @@ import { IMAGEN_DE_LA_NOCHE, crearElCompositor } from './compositor';
 import type { CaminoDelPosproceso } from './camino';
 import { apuntarEnLaLupa, camaraDeLaLupa } from './lupa';
 import { UNIFORMES_DE_LA_LUZ } from '../atmosfera/paleta';
+import type { SistemaDeEfectos } from '../efectos/sistema';
 
 /**
  * EL UMBRAL DEL BRILLO SUBE CON EL ALBA. De madrugada lo único que pasa de 1 son las farolas, los
@@ -71,6 +72,12 @@ export interface PropsDelPosproceso {
   readonly ajustes?: Partial<AjustesDeLaImagen>;
   /** Cada vez que el camino o su aviso cambian (el banco lo enseña). */
   readonly alAvisar?: (camino: CaminoDelPosproceso, aviso: string | null) => void;
+  /**
+   * EL SISTEMA DE EFECTOS del juego, para lo que el rayo pone en la imagen (`docs/quiebro/EL-RAYO.md` §3-§4: el
+   * fogonazo, el golpe y la viñeta de la carga), que se lee de él en cada fotograma. Opcional: los bancos no lo
+   * pasan. FASE 0 del contrato (`rayo/contrato.ts`): llega, y todavía no se lee.
+   */
+  readonly sistema?: SistemaDeEfectos;
 }
 
 /** Por omisión, a qué distancia está lo que importa con la cámara al hombro (3,2 m detrás + el blanco). */

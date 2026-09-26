@@ -89,6 +89,8 @@
 import * as THREE from 'three';
 import type { Barrio } from '../../../../shared/arcade/juegos/quiebro-barrio';
 import type { CuerpoPintado, FuenteDeCuerpos } from '../cuerpos';
+import { ALTO_DE_LA_BOCA_SIN_MANO } from '../rayo/contrato';
+import type { BocaDe } from '../rayo/contrato';
 import { Almacen } from './almacen';
 import type { Lector, PedidoDeHorneado } from './almacen';
 import { CuerpoConEsqueleto, PASEAR_CON_PARAGUAS, TENUE, colorDelContorno, corteDelGesto, esAmenaza, llenoDelContorno } from './cuerpo';
@@ -193,6 +195,30 @@ type AlRebano = 'pintado' | 'fuera' | 'sin-rebano';
 export class DirectorDeLosPersonajes {
   readonly grupo = new THREE.Group();
   readonly almacen: Almacen;
+  /** La fuente del último fotograma: con ella sabe `bocaDe` dónde está cada cuerpo. */
+  private ultimaFuente: FuenteDeCuerpos | null = null;
+  /**
+   * LA BOCA DEL RAYO (`rayo/contrato.ts`): dónde está la mano derecha del cuerpo `id` en este fotograma.
+   * `Quiebro.tsx` la cuelga del sistema de efectos (`sistema.boca`) al montarse el director.
+   *
+   * FASE 0 (el stub del contrato): todavía no hay mano, así que da el PIVOTE del cuerpo —su sitio pintado, a
+   * `ALTO_DE_LA_BOCA_SIN_MANO`— de la fuente del último fotograma. ANIMACIÓN la cambia por la mano de verdad
+   * (`huesosDelBrazoDerecho` en los cuerpos con esqueleto; en los lejanos, la pose horneada), con la misma firma.
+   */
+  readonly bocaDe: BocaDe = (id, salida) => {
+    const fuente = this.ultimaFuente;
+    if (fuente === null) return false;
+    const lista = fuente.cuerpos();
+    for (let i = 0; i < lista.length; i++) {
+      const c = lista[i] as CuerpoPintado;
+      if (c.id !== id) continue;
+      salida.x = c.x;
+      salida.y = ALTO_DE_LA_BOCA_SIN_MANO;
+      salida.z = c.z;
+      return true;
+    }
+    return false;
+  };
   private readonly ctx: ContextoDeLosCuerpos;
   private readonly marchas = new Map<string, MarchaDelEsqueleto>();
   private readonly cuerpos = new Map<number, CuerpoConEsqueleto>();
@@ -726,6 +752,7 @@ export class DirectorDeLosPersonajes {
    * su gente (ver «De dónde sale la gente»).
    */
   fotograma(fuente: FuenteDeCuerpos, nivel: Nivel, barrio: Barrio | null, camara: THREE.Camera, ahora: number, presentado: (t: number) => number): void {
+    this.ultimaFuente = fuente;
     this.liberarLosSoltados();
     if (this.nivelPreparado !== nivel) this.preparar(nivel);
     const pol = POLITICA[nivel];

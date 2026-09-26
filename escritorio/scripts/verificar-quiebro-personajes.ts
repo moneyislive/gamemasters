@@ -254,12 +254,16 @@ const juezDeGestos = (r: Reparto): { bien: boolean; detalle?: unknown } => {
     else if (r.clips[e.clip] === undefined) faltan.push(`${g}: clip ${e.clip} no está`);
     else for (const [d, c] of Object.entries(e.porDireccion ?? {})) if (c !== undefined && r.clips[c] === undefined) faltan.push(`${g}/${d}: ${c}`);
   }
-  return { bien: faltan.length === 0 && GESTOS.length === 31, detalle: { faltan, gestos: GESTOS.length } };
+  /* 31 de siempre y los 2 del rayo (`cargar-rayo`, `lanzar-rayo`: `rayo/contrato.ts`). */
+  return { bien: faltan.length === 0 && GESTOS.length === 33, detalle: { faltan, gestos: GESTOS.length } };
 };
 {
   const vacuna = copia(reparto) as Reparto & { gestos: Record<string, unknown> };
   delete vacuna.gestos.desalojable;
-  juzgar('los 31 gestos del contrato tienen clip, y sus clips por dirección existen', juezDeGestos, reparto, vacuna as Reparto, 'sin el gesto desalojable');
+  juzgar('los 33 gestos del contrato tienen clip, y sus clips por dirección existen', juezDeGestos, reparto, vacuna as Reparto, 'sin el gesto desalojable');
+  const sinElRayo = copia(reparto) as Reparto & { gestos: Record<string, unknown> };
+  delete sinElRayo.gestos['cargar-rayo'];
+  juzgar('y entre ellos los dos del rayo, con su clip', juezDeGestos, reparto, sinElRayo as Reparto, 'sin el gesto cargar-rayo');
 }
 for (const g of GESTOS) {
   const info = INFO_DE_GESTOS[g];
@@ -2332,4 +2336,4 @@ paso('Sin asignar por fotograma (lo que asigna el código de los personajes, sin
 }
 
 director.liberar();
-terminar(171);
+terminar(174);

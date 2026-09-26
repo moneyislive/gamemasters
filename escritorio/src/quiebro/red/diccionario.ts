@@ -19,7 +19,10 @@
  *     (`soloEn`, el Remanso) y no se esquiva (`imparable`);
  *   · un CELADOR tiene guardia, un TIRADOR tiene proyectil, un PRESTADO no tiene ni lo uno ni lo otro;
  *   · el derribo es el estado que deja el golpe que cierra la Tanda de un asiento (el Cierre) y la
- *     Réplica; el tocado, el que dejan los demás.
+ *     Réplica; el tocado, el que dejan los demás;
+ *   · el RAYO es el tiro cargado del asiento (`reglas.tiro`), leído con `leerElTiro` de `rayo/contrato.ts`: su
+ *     botón es la sostenida que carga, su estado el de su puesta («cargando»), sus gestos los de cargar y
+ *     lanzar, y cada nivel se reconoce por su bala (el `p` del suceso `bala`).
  *
  * Lo único que la estructura no distingue son las dos clases de aviso que apuntan a una entidad
  * («marcar» y «¡Desalójalo!»): se toman en el orden del diseño (§15: marcar, Rescate, Voy,
@@ -42,6 +45,8 @@ import type {
 import { arenaDeLaLiza, reglasDelNumero } from '../../../../shared/mecanicas/liza/declaracion';
 import type { Arena } from '../../../../shared/mecanicas/mundo';
 import type { ClaseDeCuerpo, Gesto } from '../cuerpos';
+import { GESTO_DE_CARGAR, GESTO_DE_LANZAR, leerElTiro } from '../rayo/contrato';
+import type { TiroLeido } from '../rayo/contrato';
 
 /** Lo que un estado significa para quien lo pinta y para los mandos. */
 export type SentidoDelEstado =
@@ -59,6 +64,8 @@ export type SentidoDelEstado =
   | 'descolgando'
   | 'desalojable'
   | 'absorbiendo'
+  /** Cargando el rayo: el estado de la puesta del tiro de un asiento (`reglas.tiro.puesta`). */
+  | 'cargando'
   | 'sin-cuerpo'
   | 'ausente'
   | 'otro';
@@ -72,6 +79,11 @@ export interface BotonesDeLaLiza {
   readonly empellon: IdDeclarado;
   readonly quiebro: IdDeclarado;
   readonly rescate: IdDeclarado;
+  /**
+   * EL RAYO: la sostenida que carga (`reglas.tiro.apuntar`), o 0 si mi asiento no tiene tiro. La pulsación que
+   * lo suelta y todos sus números están en `LecturaDeLaLiza.tiro`.
+   */
+  readonly rayo: IdDeclarado;
 }
 
 /** Cómo se lee el aviso: por clase de lo que se pide. 0 = la liza no declara ese aviso. */
@@ -97,6 +109,13 @@ export interface LecturaDeLaLiza {
   readonly reglas: ReglasDeAsiento | null;
   readonly botones: BotonesDeLaLiza;
   readonly avisos: AvisosDeLaLiza;
+  /**
+   * EL RAYO DE MI ASIENTO, leído de `reglas.tiro` con `leerElTiro` (`rayo/contrato.ts`): sus ids, su estado y
+   * sus niveles en metros y ms. `null` si mi asiento no tiene tiro (hoy, siempre: la sala todavía no lo cumple).
+   */
+  readonly tiro: TiroLeido | null;
+  /** El tiro del asiento de número `numero` (para pintar el rayo de otro por su `bala`), o `null`. */
+  tiroDelAsiento(numero: number): TiroLeido | null;
   /** El eslabón de la Tanda que va tras cada acción de mi asiento (0 = no hay). */
   siguienteEnLaTanda(accion: IdDeclarado): IdDeclarado;
   /** Una acción de quien sea (asiento o clase), por id. */
@@ -177,6 +196,19 @@ export function leerLaLiza(liza: LizaDeclarada, yo: number): LecturaDeLaLiza {
     return e;
   };
 
+  /* ─── El rayo: el tiro de cada asiento, leído con `leerElTiro` (`rayo/contrato.ts`), sin copiar ni un número ─── */
+  const tiros: (TiroLeido | null)[] = [];
+  for (const r of liza.asientos) tiros.push(leerElTiro(r.tiro ?? null, liza.proyectiles));
+  const tiro = reglas === null ? null : (tiros[yo - 1] ?? null);
+  /** Las acciones de los tiros de quien sea: la sostenida que carga y la pulsación que suelta. */
+  const cargan = new Set<number>();
+  const sueltan = new Set<number>();
+  for (const t of tiros) {
+    if (t === null) continue;
+    cargan.add(t.apuntar);
+    sueltan.add(t.soltar);
+  }
+
   /* ─── Los botones de mi asiento ─── */
   let entrada = 0;
   let replica = 0;
@@ -194,6 +226,7 @@ export function leerLaLiza(liza: LizaDeclarada, yo: number): LecturaDeLaLiza {
     empellon,
     quiebro: reglas?.esquiva.accion ?? 0,
     rescate: reglas?.rescate.accion ?? 0,
+    rayo: tiro?.apuntar ?? 0,
   };
 
   /* ─── Los estados, con su sentido ─── */
@@ -212,6 +245,7 @@ export function leerLaLiza(liza: LizaDeclarada, yo: number): LecturaDeLaLiza {
     poner(r.esquiva.ruptura.puesta.estado, 'ruptura');
     poner(r.rescate.puesta.estado, 'rescatando');
   }
+  for (const t of tiros) if (t !== null) poner(t.estado, 'cargando');
   for (const c of liza.clases) {
     if (c.alCaer.tipo === 'rematable') {
       poner(c.alCaer.puesta.estado, 'desalojable');
@@ -269,6 +303,9 @@ export function leerLaLiza(liza: LizaDeclarada, yo: number): LecturaDeLaLiza {
   const zonas = porId(liza.mundo.zonas);
 
   const gestoDeLaAccion = (id: number): Gesto => {
+    /* Las del tiro no son golpes (no están en `acciones`): cargar y lanzar el rayo. */
+    if (cargan.has(id)) return GESTO_DE_CARGAR;
+    if (sueltan.has(id)) return GESTO_DE_LANZAR;
     const a = acciones.get(id);
     if (a === undefined) return 'entrada';
     const clase = deClase.get(id) ?? null;
@@ -297,6 +334,7 @@ export function leerLaLiza(liza: LizaDeclarada, yo: number): LecturaDeLaLiza {
     descolgando: 'descolgar',
     desalojable: 'desalojable',
     absorbiendo: 'absorber',
+    cargando: GESTO_DE_CARGAR,
     'sin-cuerpo': null,
     ausente: null,
     otro: null,
@@ -309,6 +347,8 @@ export function leerLaLiza(liza: LizaDeclarada, yo: number): LecturaDeLaLiza {
     reglas,
     botones,
     avisos,
+    tiro,
+    tiroDelAsiento: (numero) => (Number.isInteger(numero) && numero >= 1 && numero <= tiros.length ? (tiros[numero - 1] ?? null) : null),
     siguienteEnLaTanda: (accion) => tras.get(accion) ?? 0,
     accion: (id) => acciones.get(id) ?? null,
     claseDeLaAccion: (id) => deClase.get(id) ?? null,

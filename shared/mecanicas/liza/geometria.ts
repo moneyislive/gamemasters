@@ -234,7 +234,7 @@ export function cuadrado(longitud: number): number {
 /**
  * ¿ESTÁ `(dx, dz)` DENTRO DEL CONO que mira hacia `mira` con medio ancho `medioAncho` rumbos?
  *
- * `medioAncho` va de 0 (sólo el rayo) a 64 (la media vuelta de delante): 43 rumbos son 60,5°. El
+ * `medioAncho` va de 0 (sólo la semirrecta de la mira) a 64 (la media vuelta de delante): 43 rumbos son 60,5°. El
  * borde cuenta como dentro, y un `(dx, dz)` nulo —el otro está justo encima— está dentro de todo cono.
  *
  * ═══ SIN RAÍCES NI CUADRADOS DE CUADRADOS ═══

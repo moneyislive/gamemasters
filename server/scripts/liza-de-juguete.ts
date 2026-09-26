@@ -185,6 +185,8 @@ export function reglas(asiento: string): ReglasDeAsiento {
       ruptura: { coste: 50, desde: [E.tocado], puesta: puesta(E.esquivando, 9, 6, u(4), 6) },
     },
     rescate: { accion: A.rescate, radio: u(1.5), mantenerTics: 30, puesta: puesta(E.sosteniendo, 30), vidaAlVolver: 40, medidorAmbos: 0 },
+    /* El tiro cargado (W) todavía no lo cumple la sala: su arco de juguete llega con quien lo cablee. */
+    tiro: null,
     medidor: { tope: 100, porLimpia: 35, porRitmo: 5, porRemate: 20, porChoque: 10 },
     puntos: { factor: UNO, multiplicador: { paso: 6554, tope: 2 * UNO }, porLimpia: 50, porChoque: 30, porRemate: 100, porRescate: 75, porSalir: 150 },
     alEmpezar: { vida: 100, medidor: 0, lleva: [{ portable: 1, n: 0 }] },

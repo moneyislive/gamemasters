@@ -2611,6 +2611,12 @@
   },
   "victoria": {
    "clip": "victoria"
+  },
+  "cargar-rayo": {
+   "clip": "apuntar"
+  },
+  "lanzar-rayo": {
+   "clip": "disparar"
   }
  },
  "usoDeLosClips": {

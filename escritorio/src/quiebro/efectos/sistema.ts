@@ -74,6 +74,8 @@ import {
   capacidadDe,
 } from './presupuesto';
 import type { RelojDePresentacion } from './reloj';
+import { crearEfectosDelRayo } from './rayo';
+import type { BocaDe, EfectosDelRayo } from '../rayo/contrato';
 
 /** Un punto del mundo, en metros (x al este, z al sur, y arriba). */
 export interface Punto {
@@ -729,6 +731,17 @@ export interface SistemaDeEfectos {
   nivel: Nivel;
   /** Dónde está cada cuerpo; `null` hasta que el juego lo ponga. */
   localizar: Localizador | null;
+  /**
+   * EL RAYO (`rayo/contrato.ts`): MANDOS lo llama con el rayo propio y `red/escenificar.ts` con los ajenos.
+   * Se lee aquí en CADA llamada (`sistema.rayo.soltar(…)`) y no se guarda: quien lo pinta puede cambiarlo por
+   * otro que lo envuelva. Empieza con el de `efectos/rayo.ts` (en la fase 0, el que no hace nada).
+   */
+  rayo: EfectosDelRayo;
+  /**
+   * Dónde está la mano (la boca del rayo) de cada cuerpo, fotograma a fotograma; `null` hasta que la pongan.
+   * La pone `Quiebro.tsx` con la de los personajes (`DirectorDeLosPersonajes.bocaDe`).
+   */
+  boca: BocaDe | null;
 
   /** El `t` del fotograma en curso, ms del aparato, y su versión presentada. */
   readonly ahora: { verdadero: number; presentado: number };
@@ -789,6 +802,8 @@ export function crearSistemaDeEfectos(reloj: RelojDePresentacion, origen: number
     origen,
     nivel: 1,
     localizar: null,
+    rayo: crearEfectosDelRayo(),
+    boca: null,
     ahora,
     anillos,
     apuntados,

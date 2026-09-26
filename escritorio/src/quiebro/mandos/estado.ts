@@ -26,8 +26,11 @@
  * Puro: ni DOM ni React.
  */
 
-/** Los botones de la pelea (diseño §7). */
-export type Boton = 'golpe' | 'quiebro' | 'empellon' | 'usar' | 'aviso';
+/**
+ * Los botones de la pelea (diseño §7), y el RAYO (`docs/quiebro/EL-RAYO.md` §3), que se MANTIENE para cargar y
+ * dispara al soltar: no pasa por la cola de pulsaciones sino por `cargarRayo`, `soltarRayo` y `cancelarRayo`.
+ */
+export type Boton = 'golpe' | 'quiebro' | 'empellon' | 'usar' | 'aviso' | 'rayo';
 
 export interface Pulsacion {
   readonly boton: Boton;
@@ -75,6 +78,11 @@ export class EstadoDeLosMandos {
   private readonly cola: Pulsacion[] = [];
   /** USAR mantenido: desde cuándo (su `timeStamp`), o `null`. */
   usarDesde: number | null = null;
+  /**
+   * EL RAYO mantenido: desde cuándo se carga (el `timeStamp` del evento que empezó), o `null`. FASE 0 del
+   * contrato (`rayo/contrato.ts`): el campo existe y nadie lo pone todavía; lo rellena MANDOS.
+   */
+  rayoDesde: number | null = null;
   /** Qué mando se usó por última vez: el HUD enseña los botones del que toca. */
   tipo: 'tactil' | 'teclado' = 'teclado';
   /** El marcador abierto (Tab, o el botón del menú). */
@@ -120,13 +128,39 @@ export class EstadoDeLosMandos {
       if (this.usarDesde === null) this.usarDesde = timeStamp;
       return;
     }
+    if (boton === 'rayo') {
+      this.cargarRayo(timeStamp);
+      return;
+    }
     this.cola.push({ boton, timeStamp, palancaX: this.palancaX, palancaY: this.palancaY });
     while (this.cola.length > COLA_COMO_MUCHO) this.cola.shift();
   }
 
-  /** Se suelta USAR (los demás botones actúan al pulsar y no tienen soltar). */
+  /** Se suelta USAR (los demás botones actúan al pulsar y no tienen soltar, salvo el rayo). */
   soltarUsar(): void {
     this.usarDesde = null;
+  }
+
+  /*
+   * EL RAYO (`docs/quiebro/EL-RAYO.md` §3), STUBS DE LA FASE 0: las firmas del contrato, en el camino de verdad
+   * (`pulsar('rayo')` llega a `cargarRayo`, y `soltarTodo` cancela), sin hacer nada todavía. MANDOS los rellena:
+   * soltar dispara (guardando su hora y el blanco que se vio); cancelar, o perder el dedo, anula SIN disparar.
+   */
+
+  /** Empieza a cargar el rayo, en el instante de su evento. STUB (fase 0): no hace nada. */
+  cargarRayo(timeStamp: number): void {
+    void timeStamp;
+  }
+
+  /** Se suelta el rayo en `timeStamp` con el blanco que se veía (0 = ninguno): dispara. STUB (fase 0): no hace nada. */
+  soltarRayo(timeStamp: number, blanco: number): void {
+    void timeStamp;
+    void blanco;
+  }
+
+  /** Se deja el rayo sin disparar (dedo perdido, daño, quiebro, menú…). */
+  cancelarRayo(): void {
+    this.rayoDesde = null;
   }
 
   /** Las pulsaciones sin atender, en orden, y se vacía la cola. */
@@ -147,6 +181,8 @@ export class EstadoDeLosMandos {
     this.aFondoDesde = null;
     this.correrPedido = false;
     this.usarDesde = null;
+    /* El rayo se CANCELA, no se suelta: irse no dispara (EL-RAYO.md §3). */
+    this.cancelarRayo();
   }
 }
 

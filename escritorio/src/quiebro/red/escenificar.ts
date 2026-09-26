@@ -32,6 +32,9 @@ import { UNO } from '../../../../shared/mecanicas/fijo';
 import { MOTIVO_DE_IRSE, PRIMER_NUMERO_DE_ENTIDAD, RESULTADO } from '../../../../shared/mecanicas/liza/protocolo';
 import type { Gesto } from '../cuerpos';
 import type { SistemaDeEfectos, VeredictoDelAnillo } from '../efectos';
+import { ALTO_DE_LA_BOCA_SIN_MANO, cargaDelNivel, nivelDelProyectil, semillaDelRayo } from '../rayo/contrato';
+import type { NivelLeido, PuntoDelRayo, TiroLeido } from '../rayo/contrato';
+import type { BalaVista } from './sala-vista';
 import type { ManejoDelAnillo, Material, Sonido, TipoDeGolpe } from '../sonido';
 import { desvioDelPulso } from '../sonido';
 import type { Partida } from './partida';
@@ -272,6 +275,16 @@ export class Escenificador {
       case 'bala': {
         const b = n.bala;
         if (b === null) return;
+        /*
+         * EL RAYO: la bala de un tiro de asiento (`de` es un asiento y `p` la bala de uno de sus niveles) no es una
+         * bala del tirador. La propia ya la soltó MANDOS al soltar el dedo; la ajena se suelta aquí.
+         */
+        const tiro = l === null || b.de < 1 || b.de >= PRIMER_NUMERO_DE_ENTIDAD ? null : l.tiroDelAsiento(b.de);
+        const nivel = tiro === null ? null : nivelDelProyectil(tiro, b.p);
+        if (tiro !== null && nivel !== null) {
+          if (b.de !== yo) this.soltarUnRayoAjeno(b, tiro, nivel);
+          return;
+        }
         const pr = l === null ? null : l.proyectil(b.p);
         const asa = this.sistema.balas.disparar({
           salida: b.salidaMs,
@@ -396,9 +409,50 @@ export class Escenificador {
         this.sacudida = Math.max(this.sacudida, 0.8);
         return;
       }
+      case 'estalla': {
+        /* EL RAYO se para (el propio también): el estallido va donde lo dice la sala, con el área de su nivel. */
+        const b = n.bala;
+        const tiro = b === null || l === null ? null : l.tiroDelAsiento(b.de);
+        const nivel = b === null || tiro === null ? null : nivelDelProyectil(tiro, b.p);
+        this.sistema.rayo.estallar({
+          quien: b?.de ?? 0,
+          bala: s.bala,
+          x: s.x / 100,
+          y: ALTO_DE_LA_BOCA_SIN_MANO,
+          z: s.z / 100,
+          nivel: nivel?.nivel ?? 0,
+          area: nivel?.area ?? 0,
+          t: ahora,
+        });
+        return;
+      }
       default:
         return;
     }
+  }
+
+  /**
+   * EL RAYO DE OTRO (`rayo/contrato.ts`): de su `bala`, un `DisparoDelRayo` —desde su boca, hacia su rumbo hasta
+   * el alcance de su nivel— que se suelta en el sistema. FASE 0 del contrato: el camino entero, con los efectos
+   * que no pintan nada; EFECTOS lo afina (dónde se para de verdad lo dice luego su `estalla`).
+   */
+  private soltarUnRayoAjeno(b: BalaVista, tiro: TiroLeido, nivel: NivelLeido): void {
+    const origen: PuntoDelRayo = { x: b.x, y: ALTO_DE_LA_BOCA_SIN_MANO, z: b.z };
+    if (this.sistema.boca !== null) this.sistema.boca(b.de, origen);
+    const rumbo = (b.r / 256) * Math.PI * 2;
+    const destino: PuntoDelRayo = { x: origen.x + Math.sin(rumbo) * nivel.alcance, y: origen.y, z: origen.z - Math.cos(rumbo) * nivel.alcance };
+    this.sistema.rayo.soltar({
+      quien: b.de,
+      bala: b.id,
+      origen,
+      destino,
+      nivel: nivel.nivel,
+      c: cargaDelNivel(tiro, nivel),
+      area: nivel.area,
+      dio: null,
+      semilla: semillaDelRayo(b.de, b.id),
+      t: b.salidaMs,
+    });
   }
 
   /** El sitio de la cabina de la zona `id` de la Liza (el poste), en metros. */

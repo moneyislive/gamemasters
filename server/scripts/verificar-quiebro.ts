@@ -159,6 +159,7 @@ import {
   ESTADO_DEL_QUIEBRO,
   filaDelNivel,
   monedasAlEmpezar,
+  NIVELES_DEL_RAYO,
   nivelDelSistema,
   nivelTrasLaNoche,
   PERSECUCION_DEL_SISTEMA,
@@ -1082,6 +1083,33 @@ function componer(opciones: { nivel?: number; averia?: string; contramedida?: st
   comprobar('el factor de puntos que declara la liza es exactamente el del reglamento compuesto, en los 5 niveles y las 4 averías', distintos.length === 0, distintos);
 }
 
+paso('El rayo (docs/quiebro/EL-RAYO.md): la tabla del §1.2 y sus ids, reservados y sin declarar todavía');
+{
+  /*
+   * Cada renglón escrito a mano desde el §1.2 de EL-RAYO.md (con la recarga de Miguel: 3 s tras el chispazo y 5 s
+   * tras el pleno), para que la tabla no se confirme a sí misma: nivel, desde (ms), área y alcance (m), daño, lo
+   * que deja y sus tics, empuje (m) y recarga (tics).
+   */
+  const delDiseno = '1,0,3,16,8,descolocado,10,1,60|2,300,2,24,15,tocado,10,1,72|3,750,1,32,25,tocado,12,1.5,86|4,1300,0,45,40,derribado,30,2,100';
+  const escrita = NIVELES_DEL_RAYO.map((n) => [n.nivel, n.desdeMs, n.areaMetros, n.alcanceMetros, n.dano, n.deja, n.dejaTics, n.empujeMetros, n.recargaTics].join(',')).join('|');
+  comprobar('la tabla de los cuatro niveles del rayo es la del §1.2, renglón a renglón', escrita === delDiseno, { escrita, delDiseno });
+  const crecen = NIVELES_DEL_RAYO.every(
+    (n, i, t) => i === 0 || (n.desdeMs > (t[i - 1] as typeof n).desdeMs && n.alcanceMetros > (t[i - 1] as typeof n).alcanceMetros && n.areaMetros < (t[i - 1] as typeof n).areaMetros && n.dano > (t[i - 1] as typeof n).dano && n.recargaTics > (t[i - 1] as typeof n).recargaTics),
+  );
+  const multiplos = NIVELES_DEL_RAYO.every((n) => [n.areaMetros, n.alcanceMetros, n.empujeMetros].every((m) => Math.abs(m * 20 - Math.round(m * 20)) < 1e-9));
+  comprobar(
+    'y es coherente: empieza en 0, con más carga más alcance, más daño, más recarga y menos área, el pleno sin área, y en múltiplos de 0,05 m',
+    NIVELES_DEL_RAYO[0]?.desdeMs === 0 && crecen && NIVELES_DEL_RAYO[NIVELES_DEL_RAYO.length - 1]?.areaMetros === 0 && multiplos && NIVELES_DEL_RAYO.every((n) => n.deja in ESTADO_DEL_QUIEBRO),
+  );
+  const reservados = [ACCION_DEL_QUIEBRO.apuntarRayo, ACCION_DEL_QUIEBRO.soltarRayo];
+  const otros = Object.entries(ACCION_DEL_QUIEBRO).filter(([k]) => k !== 'apuntarRayo' && k !== 'soltarRayo').map(([, v]) => v as number);
+  comprobar(
+    'los dos ids del rayo están reservados entre los del desvelado (1-19), son distintos y no los usa ninguna otra acción',
+    reservados.every((id) => id >= 1 && id <= 19 && otros.indexOf(id) < 0) && reservados[0] !== reservados[1],
+    { reservados, otros },
+  );
+}
+
 paso('La tabla del §4.10, por presentes');
 {
   /* Cada renglón escrito a mano desde el documento de diseño, para que no se confirme a sí mismo. */
@@ -1333,6 +1361,8 @@ paso('Todas las vistas se leen, y el productor da de cada una una liza sin probl
   let sinLiza = 0;
   let otroAforo = 0;
   let malDelCable = 0;
+  let conTiro = 0;
+  let rayoUsado = 0;
   const primeros: string[] = [];
   const claves: string[] = [];
   let claveMal = 0;
@@ -1366,6 +1396,12 @@ paso('Todas las vistas se leen, y el productor da de cada una una liza sin probl
     /* Los ids del cable de cada asiento no se pisan con los de las clases (lo mira también la declaración). */
     const deClases = l.clases.flatMap((c) => c.acciones.map((a) => a.id));
     for (const r of l.asientos) if (accionesDelCable(l, r).some((id) => deClases.indexOf(id) >= 0)) malDelCable++;
+    /* EL RAYO, hoy: ningún asiento lo declara (la sala aún no lo cumple) y nada usa sus dos ids reservados. */
+    for (const r of l.asientos) {
+      if (r.tiro !== null) conTiro++;
+      const delRayo = [ACCION_DEL_QUIEBRO.apuntarRayo, ACCION_DEL_QUIEBRO.soltarRayo] as number[];
+      if ([...accionesDelCable(l, r), ...deClases].some((id) => delRayo.indexOf(id) >= 0)) rayoUsado++;
+    }
     const clave = claveDeLaFase(v);
     if (claves.indexOf(clave) < 0) claves.push(clave);
     const faseCanonica = forma({ f: v.fase, n: v.noche?.numero ?? 0 });
@@ -1428,6 +1464,11 @@ paso('Todas las vistas se leen, y el productor da de cada una una liza sin probl
   comprobar('y ninguna tiene problemas (`problemasDeLaDeclaracion` vacío)', conProblemas === 0, primeros);
   comprobar('el aforo es el mismo en todas, la reunión incluida', otroAforo === 0, otroAforo);
   comprobar('los ids del cable de los asientos no se pisan con los del Sistema', malDelCable === 0, malDelCable);
+  comprobar(
+    'el rayo todavía no se declara (`tiro: null` en todo asiento: la sala aún no cumple el tiro) y nada usa sus dos ids reservados',
+    conTiro === 0 && rayoUsado === 0,
+    { conTiro, rayoUsado },
+  );
   comprobar('la clave de la fase cambia si y sólo si cambia la fase', claveMal === 0, claveMal);
   nota(`${String(mismaFaseVista)} vistas seguidas de la misma fase comparadas con la anterior`);
   comprobar('dentro de una misma fase el límite nunca encoge (un ausente cuenta desde la fase siguiente)', mismaFaseVista >= 100 && encoge === 0, { mismaFaseVista, encoge });
@@ -2173,8 +2214,9 @@ paso('La vista con la ciudad, leída con desconfianza');
   );
 }
 
+/* El suelo: 357 de antes y 4 del rayo (su tabla, su coherencia, sus ids reservados, y que aún no se declara). */
 terminar({
-  escritas: 357,
+  escritas: 361,
   enVerde:
     'La mesa lleva la noche entera —reunión, Bajada, oleadas, pausas con voto, Llamada, recuento, final—,\n' +
     '  rechaza con motivo lo que no es y lo que llega rancio, sube y baja el nivel, recuerda la noche anterior y\n' +

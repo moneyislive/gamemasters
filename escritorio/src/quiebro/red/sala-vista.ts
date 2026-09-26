@@ -144,7 +144,7 @@ export type Novedad =
       readonly suceso: SucesoDelTic;
       /** El anuncio de un `anuncio`, o el que resuelve un `resuelve`. */
       readonly anuncio: AnuncioVisto | null;
-      /** La bala de un `impacta` o de un `seva` de bala. */
+      /** La bala de un `impacta`, de un `estalla` (la de un tiro: quién y de qué nivel) o de un `seva` de bala. */
       readonly bala: BalaVista | null;
       /** La entidad de un `seva` de entidad. */
       readonly entidad: EntidadVista | null;
@@ -278,6 +278,10 @@ export class SalaVista {
         bala = this.balas.get(s.bala) ?? null;
         /* Si dio, la bala se acaba ahí; si la esquivó, sigue su vuelo hasta la pared o su alcance. */
         if (s.r === RESULTADO.da) this.balas.delete(s.bala);
+        break;
+      case 'estalla':
+        /* La bala de un tiro se para (llega ANTES que sus `impacta`): la novedad lleva quién la tiró y su proyectil. */
+        bala = this.balas.get(s.bala) ?? null;
         break;
       case 'estado':
         if (s.est === 0) this.estados.delete(s.a);

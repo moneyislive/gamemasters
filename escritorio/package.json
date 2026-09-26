@@ -15,6 +15,7 @@
     "verify:quiebro-ciudad": "tsx scripts/verificar-quiebro-ciudad.ts",
     "verify:quiebro-materia": "tsx scripts/verificar-quiebro-materia.ts",
     "verify:quiebro-juego": "tsx scripts/verificar-quiebro-juego.ts",
+    "verify:quiebro-rayo": "tsx scripts/verificar-quiebro-rayo.ts",
     "verify:quiebro-personajes": "tsx scripts/verificar-quiebro-personajes.ts",
     "verify:quiebro-molde": "tsx scripts/verificar-quiebro-molde.ts",
     "verify:quiebro-gl": "tsx scripts/verificar-quiebro-gl.ts"

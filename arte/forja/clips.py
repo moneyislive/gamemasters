@@ -1190,6 +1190,9 @@ GESTOS = {
     'desalojable': 'desalojable', 'rematar': 'rematar', 'absorber': 'absorber', 'rescatar': 'rescatar',
     'descolgar': 'descolgar', 'imprimirse': 'imprimirse', 'salir': 'salir', 'desconectado': 'desconectado',
     'victoria': 'victoria',
+    # EL RAYO (escritorio/src/quiebro/rayo/contrato.ts), fase 0: los clips de apuntar y disparar hasta que
+    # lleguen los de la captura (Spell_Simple_Enter/Idle_Loop/Shoot/Exit de UAL, retargeteados con captura.py)
+    'cargar-rayo': 'apuntar', 'lanzar-rayo': 'disparar',
 }
 # por dirección, relativa a la cara (`direccionDelGesto` - `rumbo`): la del DESPLAZAMIENTO. En el quiebro,
 # hacia donde se va; en el tocado y el derribado, hacia donde empuja el golpe (me pegan de frente: atrás).

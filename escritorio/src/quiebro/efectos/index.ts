@@ -29,6 +29,7 @@ export { crearRelojDePresentacion, DURACION_DEL_REMANSO_MS, ESPACIO_ENTRE_REMANS
 export type { RelojDePresentacion, TramoDelRemanso } from './reloj';
 
 export { crearSistemaDeEfectos } from './sistema';
+export { crearEfectosDelRayo } from './rayo';
 export type {
   AnuncioDeEfecto,
   ApuntadoDeEfecto,

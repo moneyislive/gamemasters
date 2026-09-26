@@ -45,6 +45,8 @@ import { QUIEBRO_DEL_DESVELADO } from '../../../../shared/arcade/juegos/quiebro-
 import type { ClaseDeCuerpo, CuerpoPintado, FuenteDeCuerpos, Gesto } from '../cuerpos';
 import type { Boton, EstadoDeLosMandos } from '../mandos/estado';
 import type { FuenteConGente, GenteDeLaNoche } from '../personajes/multitud';
+import { estadoDelRayoApagado } from '../rayo/contrato';
+import type { EstadoDelRayo } from '../rayo/contrato';
 import { direccionDeLaPalanca } from '../mandos/estado';
 import { direccionHacia, elegirBlanco } from '../mandos/enganche';
 import type { Candidato } from '../mandos/enganche';
@@ -173,6 +175,11 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
   private velocidadPintada = 0;
   /** El blanco enganchado ahora (0 = ninguno). */
   blanco = 0;
+  /**
+   * LA CARGA DEL RAYO PROPIO (`rayo/contrato.ts`): la escribe la partida una vez por fotograma, en este mismo
+   * objeto, y la leen el HUD, la cámara y los efectos. FASE 0: siempre apagada (nadie carga todavía).
+   */
+  readonly rayo: EstadoDelRayo = estadoDelRayoApagado();
   /** Quien falló el último golpe contra mi quiebro limpio: a quien va la Réplica. */
   private autorDelLimpio = 0;
   /**

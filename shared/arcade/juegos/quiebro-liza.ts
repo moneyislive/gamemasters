@@ -363,6 +363,11 @@ function reglasDeAsiento(r: ReglasDelDesvelado, a: AsientoDelQuiebro, c: Reglame
       vidaAlVolver: entre(r.rescate.aguanteAlVolver, 1, r.aguante),
       medidorAmbos: r.rescate.focoAmbos,
     },
+    /*
+     * EL RAYO, todavía sin declarar: la sala aún no cumple el tiro cargado de la Liza y rechaza uno que no sea
+     * `null`. Lo cablea el frente de reglas, con `NIVELES_DEL_RAYO` y los ids `apuntarRayo`/`soltarRayo`.
+     */
+    tiro: null,
     medidor: { tope: FOCO.tope, porLimpia: FOCO.porLimpio, porRitmo: FOCO.porCompas, porRemate: FOCO.porDesalojo, porChoque: FOCO.porEstampado },
     puntos: {
       factor: factorDePuntos(c),

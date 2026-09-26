@@ -307,6 +307,7 @@ function reglasDelDiseno(asiento: string): ReglasDeAsiento {
       ruptura: { coste: 50, desde: [EST.tocado], puesta: puesta(EST.quiebro, 9, 6, u(4), 6) },
     },
     rescate: { accion: ACC.rescate, radio: u(1.5), mantenerTics: 30, puesta: puesta(EST.rescatando, 30), vidaAlVolver: 40, medidorAmbos: 0 },
+    tiro: null,
     medidor: { tope: 100, porLimpia: 35, porRitmo: 5, porRemate: 20, porChoque: 10 },
     puntos: { factor: UNO, multiplicador: { paso: 6554, tope: 2 * UNO }, porLimpia: 50, porChoque: 30, porRemate: 100, porRescate: 75, porSalir: 150 },
     alEmpezar: { vida: 100, medidor: 0, lleva: [{ portable: 1, n: 0 }] },

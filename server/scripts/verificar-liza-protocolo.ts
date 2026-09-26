@@ -22,13 +22,15 @@
  *      pasan `problemasDeLaAmpliacion` y cada una de sus versiones rotas no; y la ronda más pesada con su
  *      zona (L7) sigue cabiendo en la mesa. L10 (el alcance de blanco y el olvido) ya entró en
  *      `LizaDeclarada`: la de juguete lo declara entero, su forma transitoria —sin ellos— también pasa y se
- *      lee como «sin tope, sin olvido», y sus versiones rotas no pasan.
+ *      lee como «sin tope, sin olvido», y sus versiones rotas no pasan. Y el tiro cargado (W), que entra con su
+ *      forma antes que la sala: un arco de juguete con la forma entera saca UNA frase —que la sala todavía no
+ *      lo cumple—, y cada versión rota, además, la suya.
  *   3. EL CABLE (`protocolo.ts`): cada mensaje, en los dos sentidos, va y vuelve igual por su escritor y
  *      su lector; los lectores tiran cualquier clave de más o de menos, cualquier tipo o rango
  *      equivocado; la subida más larga que el lector admite cabe en 256 bytes; y la bajada más larga —la
  *      foto llena y el `tic` lleno de los sucesos más largos— cabe en su tope. Con los sucesos de la liza
  *      abierta: `disparo`, `progreso` y el `ro` de `nace`, que viaja siempre (el `nace` que la sala escribe
- *      todavía sin él sale con 0).
+ *      todavía sin él sale con 0). Y con el del tiro cargado: `estalla`.
  *   4. LOS VEREDICTOS, EL REGISTRO Y EL COSTE: los lectores de `arcade:*` son estrictos; el `arcade:ronda`
  *      más pesado que se puede declarar cabe en la carga que admite la mesa (`presupuesto.ts`); el
  *      registro de lizas se prueba con uno de juguete —cero filas no se leen como «vigilado»—; y el
@@ -602,6 +604,7 @@ function reglas(asiento: string): ReglasDeAsiento {
       ruptura: { coste: 50, desde: [2], puesta: nada(1, 9, 6, u(4), 6) },
     },
     rescate: { accion: 11, radio: u(1.5), mantenerTics: 30, puesta: nada(5, 30), vidaAlVolver: 40, medidorAmbos: 0 },
+    tiro: null,
     medidor: { tope: 100, porLimpia: 35, porRitmo: 5, porRemate: 20, porChoque: 10 },
     puntos: {
       factor: UNO,
@@ -958,6 +961,103 @@ for (const [que, ruta, valor, dice] of ROTAS) {
 }
 
 /*
+ * ═══ W · EL TIRO CARGADO: LA FORMA, ANTES DE QUE LA SALA LO CUMPLA ═══
+ *
+ * El arco de juguete: se tensa manteniendo la 20 y se suelta con la 21, con cuatro niveles (de un disparo corto
+ * con área a uno largo sin ella), una bala de un solo disparo por nivel y el estado 11 mientras se tensa. Su forma
+ * está entera —la única frase que le saca la revisión es la de hoy: que la sala todavía no lo cumple— y cada una
+ * de sus versiones rotas saca además la suya. Quien cablee el tiro en la sala quita esa frase y este bloque se
+ * queda con la forma (y la comprobación de la frase, a «ningún problema»).
+ */
+paso('El tiro cargado (W): su forma entera, que hoy la sala todavía rechaza, y sus versiones rotas');
+
+const TIRO_DE_JUGUETE = {
+  apuntar: 20,
+  soltar: 21,
+  puesta: nada(11, 40),
+  niveles: [
+    { desdeMs: 0, proyectil: 2, ancho: u(0.3), area: u(3), efectoDelArea: efecto(8, nada(8, 10), u(1)), recargaTics: 60 },
+    { desdeMs: 300, proyectil: 3, ancho: u(0.2), area: u(2), efectoDelArea: efecto(15, nada(2, 10), u(1)), recargaTics: 72 },
+    { desdeMs: 750, proyectil: 4, ancho: u(0.15), area: u(1), efectoDelArea: efecto(25, nada(2, 12), u(1.5)), recargaTics: 86 },
+    { desdeMs: 1300, proyectil: 5, ancho: u(0.1), area: 0, efectoDelArea: null, recargaTics: 100 },
+  ],
+  enganche: { radio: u(40), conoRumbos: 8, holgura: u(0.5) },
+  holgura: u(0.6),
+  cargaMaximaMs: 2000,
+};
+/** Una bala de un solo disparo, la de un nivel del tiro. */
+const balaDeTiro = (id: number, alcance: number, dano: number): Record<string, unknown> => ({
+  id,
+  apuntarTics: 1,
+  balas: 1,
+  cadaTics: 0,
+  velocidad: u(400),
+  radio: u(0.05),
+  alcance: u(alcance),
+  efecto: efecto(dano, nada(2, 10)),
+});
+const JUGUETE_CON_TIRO = conCambio(
+  conCambio(
+    conCambio(JUGUETE, 'asientos.0.tiro', TIRO_DE_JUGUETE),
+    'estados',
+    [...JUGUETE.estados, { id: 11, bloqueaPaso: true, bloqueaAccion: false, cancelaCon: [], seCortaConDano: true }],
+  ),
+  'proyectiles',
+  [...JUGUETE.proyectiles, balaDeTiro(2, 16, 8), balaDeTiro(3, 24, 15), balaDeTiro(4, 32, 25), balaDeTiro(5, 45, 40)],
+) as LizaDeclarada;
+{
+  const problemas = problemasDeLaDeclaracion(JUGUETE_CON_TIRO);
+  comprobar(
+    'el arco de juguete tiene su forma entera: la única frase que le saca la revisión es la de hoy (la sala todavía no cumple el tiro)',
+    problemas.length === 1 && (problemas[0] ?? '').startsWith('asientos[0].tiro: la sala todavía no cumple el tiro cargado'),
+    problemas,
+  );
+  const cable = accionesDelCable(JUGUETE_CON_TIRO, JUGUETE_CON_TIRO.asientos[0] as ReglasDeAsiento);
+  comprobar('y accionesDelCable pone sus dos ids (tensar y soltar) tras el rescate', igual(cable, [1, 2, 3, 10, 11, 20, 21, 12, 13]), cable);
+}
+const ROTAS_DEL_TIRO: readonly [string, string, unknown, string][] = [
+  ['tensar con el id de un golpe del asiento', 'asientos.0.tiro.apuntar', 1, 'se repite'],
+  ['soltar con el mismo id que tensar', 'asientos.0.tiro.soltar', 20, 'se repite'],
+  ['soltar con el id de una acción de entidad', 'asientos.0.tiro.soltar', 40, 'clase de entidad'],
+  ['tensar con el id 0', 'asientos.0.tiro.apuntar', 0, 'tiro.apuntar'],
+  ['un estado de tensar que no existe', 'asientos.0.tiro.puesta.estado', 99, 'no está declarado'],
+  ['un estado de tensar más corto que la carga máxima', 'asientos.0.tiro.puesta.tics', 10, 'la cortaría'],
+  ['un tiro sin niveles', 'asientos.0.tiro.niveles', [], 'de 1 a 8'],
+  ['un tiro con nueve niveles', 'asientos.0.tiro.niveles', Array.from({ length: 9 }, (_, i) => ({ ...TIRO_DE_JUGUETE.niveles[3], desdeMs: i * 10 })), 'de 1 a 8'],
+  ['un primer nivel que no empieza en 0', 'asientos.0.tiro.niveles.0.desdeMs', 100, 'empieza en 0'],
+  ['niveles que no van de menos a más carga', 'asientos.0.tiro.niveles.2.desdeMs', 300, 'de menos a más carga'],
+  ['un nivel con una bala que no está', 'asientos.0.tiro.niveles.1.proyectil', 9, 'no está declarado'],
+  ['un nivel con la bala de una ráfaga', 'asientos.0.tiro.niveles.1.proyectil', 1, 'un solo disparo'],
+  ['dos niveles con la misma bala', 'asientos.0.tiro.niveles.1.proyectil', 2, 'cada nivel con su bala'],
+  ['un área con decimales', 'asientos.0.tiro.niveles.0.area', 1.5, 'niveles[0].area'],
+  ['un ancho negativo', 'asientos.0.tiro.niveles.0.ancho', -1, 'niveles[0].ancho'],
+  ['un área sin efecto', 'asientos.0.tiro.niveles.0.efectoDelArea', null, 'lleva efecto'],
+  ['un efecto de área sin área', 'asientos.0.tiro.niveles.3.efectoDelArea', efecto(8, null), 'sin área no alcanza'],
+  ['un efecto de área con un estado que no existe', 'asientos.0.tiro.niveles.0.efectoDelArea.puesta.estado', 99, 'no está declarado'],
+  ['una recarga negativa', 'asientos.0.tiro.niveles.0.recargaTics', -1, 'recargaTics'],
+  ['una carga máxima que no llega al último nivel', 'asientos.0.tiro.cargaMaximaMs', 1000, 'no se llegaría nunca'],
+  ['una carga máxima de más de diez segundos', 'asientos.0.tiro.cargaMaximaMs', 20000, 'cargaMaximaMs'],
+  ['un enganche de más de un cuarto de vuelta', 'asientos.0.tiro.enganche.conoRumbos', 70, 'conoRumbos'],
+  ['una holgura negativa', 'asientos.0.tiro.holgura', -1, 'tiro.holgura'],
+  ['un asiento sin el campo del tiro', 'asientos.0.tiro', QUITAR, 'falta'],
+];
+for (const [que, ruta, valor, dice] of ROTAS_DEL_TIRO) {
+  const rota = conCambio(JUGUETE_CON_TIRO, ruta, valor) as LizaDeclarada;
+  let problemas: string[] = [];
+  let lanzo: unknown = null;
+  try {
+    problemas = problemasDeLaDeclaracion(rota);
+  } catch (error) {
+    lanzo = error;
+  }
+  comprobar(
+    `tiro roto (${que}): sin lanzar, y alguna frase dice «${dice}»`,
+    lanzo === null && problemas.some((p) => p.includes(dice)),
+    lanzo === null ? problemas.slice(0, 4) : String(lanzo),
+  );
+}
+
+/*
  * ═══ LA LIZA ABIERTA: L1-L12, ANTES DE QUE LA SALA LAS CUMPLA ═══
  *
  * (L10 ya la cumple: está arriba, con la declaración.)
@@ -1285,10 +1385,12 @@ const SUCESOS: readonly SucesoDelTic[] = [
   { e: 'disparo', g: 4, ro: 1, x: 300, z: -700 },
   { e: 'disparo', g: 0, ro: 3, x: 300, z: -700 },
   { e: 'progreso', zona: 1, tics: 120 },
+  /* W · el tiro cargado: donde se para la bala de un tiro (el centro de su área). */
+  { e: 'estalla', bala: 30, x: 250, z: -125 },
 ];
 {
   const clases = new Set(SUCESOS.map((s) => s.e));
-  comprobar('la lista de muestra lleva las veinte clases de suceso (las dieciocho de hoy, `disparo` y `progreso`)', clases.size === 20, [...clases]);
+  comprobar('la lista de muestra lleva las veintiuna clases de suceso (las dieciocho de hoy, `disparo`, `progreso` y `estalla`)', clases.size === 21, [...clases]);
 }
 const DE_LA_SALA: readonly MensajeDeLaSala[] = [
   { t: 'dentro', yo: 1, k: 400, x: -u(3), z: -u(3), r: 32, hz: 20 },
@@ -1358,6 +1460,12 @@ paso('Lo que dice la sala: lo que se rechaza');
     ['un progreso de la zona 0', tic({ e: 'progreso', zona: 0, tics: 5 })],
     ['un progreso de más de una hora', tic({ e: 'progreso', zona: 1, tics: TOPE_DE_TICS + 1 })],
     ['un progreso sin tics', tic({ e: 'progreso', zona: 1 })],
+    ['un estalla sin su sitio', tic({ e: 'estalla', bala: 30, x: 0 })],
+    ['un estalla con una clave de más', tic({ e: 'estalla', bala: 30, x: 0, z: 0, r: 5 })],
+    ['un estalla de un número de asiento (sólo estallan balas)', tic({ e: 'estalla', bala: 3, x: 0, z: 0 })],
+    ['un estalla de una bala que no cabe (65536)', tic({ e: 'estalla', bala: 65536, x: 0, z: 0 })],
+    ['un estalla fuera de la liza', tic({ e: 'estalla', bala: 30, x: TOPE_DE_CENTESIMAS + 1, z: 0 })],
+    ['un estalla con el sitio con decimales', tic({ e: 'estalla', bala: 30, x: 0.5, z: 0 })],
     ['un seva por un motivo que no existe', tic({ e: 'seva', id: 17, por: 0, quien: 0 })],
     ['un seva sin quién (la forma vieja)', tic({ e: 'seva', id: 17, por: 2 })],
     ['una carga de una entidad (sólo llevan los asientos)', tic({ ...SUCESOS[12], a: 16 })],
@@ -1417,9 +1525,10 @@ paso('Lo que dice la sala: lo que cabe en el cable');
     { e: 'apunta', de: 65535, a: 65535, p: 255, x: C, z: C, t: -T },
     { e: 'disparo', g: TOPE_DE_GRUPOS, ro: TOPE_DE_RONDAS, x: C, z: C },
     { e: 'progreso', zona: 255, tics: TOPE_DE_TICS },
+    { e: 'estalla', bala: 65535, x: C, z: C },
   ];
   const noLeidos = LARGOS.filter((s) => leerSuceso(JSON.parse(j(s))) === null);
-  comprobar('el más largo de cada una de las veinte clases se lee (son de verdad los topes)', noLeidos.length === 0 && new Set(LARGOS.map((s) => s.e)).size === 20, noLeidos);
+  comprobar('el más largo de cada una de las veintiuna clases se lee (son de verdad los topes)', noLeidos.length === 0 && new Set(LARGOS.map((s) => s.e)).size === 21, noLeidos);
   let peor = LARGOS[0] as SucesoDelTic;
   for (const s of LARGOS) if (bytes(j(s)) > bytes(j(peor))) peor = s;
   const lleno = textoDeLaSala({ t: 'tic', k: Number.MAX_SAFE_INTEGER, ev: Array.from({ length: TOPE_DE_SUCESOS }, () => peor) });
@@ -1607,8 +1716,9 @@ paso('La Liza es genérica');
    * un campo que se llama como la mecánica de un juego es un campo que sólo ese juego usa. Se miran
    * también los comentarios: un comentario que cuenta el porqué con el juego es una puerta abierta.
    */
+  /* `rayos?` y `chispazos?`: el ataque a distancia de El Quiebro entra en la Liza como «tiro cargado» (W), y su nombre no. */
   const NOMBRES_DE_JUEGO =
-    /\b(quiebr\w*|celador\w*|prestad[oa]s?|esquirlas?|desvelad[oa]s?|durmientes?|remanso|glorieta|tandas?|gabardina|cabinas?|estampad\w*|acometid\w*|rachas?|r[ée]plicas?|empell[oó]n\w*|desaloj\w*|trasvase|vig[ií]as?|monedas?|oleadas?|aver[ií]as?|retoques?|contramedidas?|foco|aguante|noches?|glifos?|graf[ií]a)\b/i;
+    /\b(quiebr\w*|celador\w*|prestad[oa]s?|esquirlas?|desvelad[oa]s?|durmientes?|remanso|glorieta|tandas?|gabardina|cabinas?|estampad\w*|acometid\w*|rachas?|r[ée]plicas?|empell[oó]n\w*|desaloj\w*|trasvase|vig[ií]as?|monedas?|oleadas?|aver[ií]as?|retoques?|contramedidas?|foco|aguante|noches?|glifos?|graf[ií]a|rayos?|chispazos?)\b/i;
   const nombran: string[] = [];
   for (const f of ['geometria.ts', 'declaracion.ts', 'protocolo.ts', 'tipos-de-la-sala.ts']) {
     const texto = fs.readFileSync(path.join(carpeta, f), 'utf8');
@@ -2709,14 +2819,16 @@ paso('El HUD: del mundo al minimapa y al plano');
  * (El Quiebro: con cada juego que se dé de alta salen dos más, y eso no es un fallo: el arnés lo dice) y
  * con `ciudadDeLaMesa` ya escrita (su forma: dos). Las de L10 en la declaración son quince: doce roturas y
  * tres de su forma transitoria y de la ampliación, que pierde las dos suyas. Si un bloque deja de correr,
- * sale 2 y no verde.
+ * sale 2 y no verde. El tiro cargado (W) trae treinta y dos: su forma y su cable (dos), sus veinticuatro
+ * roturas y los seis `estalla` que se rechazan.
  */
 terminar({
-  escritas: 479,
+  escritas: 511,
   enVerde:
     'El cable de la Liza va y vuelve en los dos sentidos, rechaza lo que no es exactamente un mensaje y lo\n' +
     '  más largo cabe; la liza de juguete se declara sin problemas y sus versiones rotas no, y lo mismo las\n' +
-    '  declaraciones de la liza abierta (L1-L12); rumboHacia y la prueba de losa coinciden con Math.atan2 y con\n' +
+    '  declaraciones de la liza abierta (L1-L12) y el tiro cargado (W), que la sala aún no cumple; rumboHacia\n' +
+    '  y la prueba de losa coinciden con Math.atan2 y con\n' +
     '  la coma flotante; la ronda más pesada cabe en la mesa, el registro y el coste se prueban con uno de\n' +
     '  juguete; la vista, los nombres y el puente se leen estrictos; y la columna de la ciudad abierta cuenta,\n' +
     '  numera, reparte y mide como dice.',

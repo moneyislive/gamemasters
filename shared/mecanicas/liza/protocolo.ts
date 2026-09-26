@@ -94,6 +94,18 @@
  *
  * Y la puesta al día de quien entra (`Bienvenida`, en `tipos-de-la-sala.ts`) añade, tras los `nace`, un
  * `disparo` por grupo que ya saltó y por ronda que ya se materializó, y el `progreso` de lo leído.
+ *
+ * ═══ LO QUE TRAE EL TIRO CARGADO (W de `declaracion.ts`) ═══
+ *
+ * Un suceso nuevo, `estalla {bala, x, z}`: dónde se para la bala de un tiro, que es el centro de su área. Y
+ * nada más: la carga viaja con la acción de siempre (una sostenida y una pulsación: ver `TiroDeclarado`), y la
+ * bala de un tiro con el `bala` de siempre, con `de` = el número del asiento, que el lector ya admitía. Hoy
+ * nadie lo escribe: la sala todavía no cumple el tiro.
+ *
+ * TAMPOCO SUBE `VERSION_DE_LA_LIZA`, por lo mismo que la liza abierta: esta rama no está desplegada y no hay
+ * aparatos en la calle que hablen la versión 1 sin `estalla`. Si se desplegara antes, SÍ subiría a 2, y no por
+ * cortesía: el lector de antes tira el `tic` ENTERO en cuanto trae una clase de suceso que no conoce, así que un
+ * aparato viejo en una sala con tiros perdería, sin decirlo, todo lo demás que pasara en ese tic.
  */
 import { TICS_POR_SEGUNDO } from '../andar';
 import { UNO } from '../fijo';
@@ -648,6 +660,21 @@ export interface SucesoProgreso {
   readonly tics: number;
 }
 
+/**
+ * LA BALA DE UN TIRO SE PARA (W): la bala `bala` (el número de su suceso `bala`) estalla en `(x, z)`, en
+ * centésimas, contra un cuerpo o contra la estructura; y ése es el centro de su área, si su nivel la tiene.
+ * Sale en el tic en que se para y ANTES que los `impacta` de lo que alcanza, con área o sin ella (el aparato
+ * pinta el estallido donde lo dice la sala, no donde cree él). No sale si la bala llega a su alcance sin tocar
+ * nada: entonces sólo va su `seva`. Sólo estallan las balas de un tiro; las de las entidades se paran como
+ * siempre.
+ */
+export interface SucesoEstalla {
+  readonly e: 'estalla';
+  readonly bala: number;
+  readonly x: number;
+  readonly z: number;
+}
+
 export type SucesoDelTic =
   | SucesoAnuncio
   | SucesoResuelve
@@ -669,7 +696,8 @@ export type SucesoDelTic =
   | SucesoCuenta
   | SucesoRecurso
   | SucesoDisparo
-  | SucesoProgreso;
+  | SucesoProgreso
+  | SucesoEstalla;
 
 /* ─── CONVERSIONES ───────────────────────────────────────────────────────── */
 
@@ -888,6 +916,10 @@ export function leerSuceso(v: unknown): SucesoDelTic | null {
       if (!conClaves(v, ['e', 'zona', 'tics'])) return null;
       if (!esId(v.zona) || !esEntero(v.tics, 0, TOPE_DE_TICS)) return null;
       return { e, zona: v.zona, tics: v.tics };
+    case 'estalla':
+      if (!conClaves(v, ['e', 'bala', 'x', 'z'])) return null;
+      if (!esEntero(v.bala, PRIMER_NUMERO_DE_ENTIDAD, TOPE_DE_NUMERO) || !esCentesima(v.x) || !esCentesima(v.z)) return null;
+      return { e, bala: v.bala, x: v.x, z: v.z };
     default:
       return null;
   }
@@ -1004,6 +1036,8 @@ function sucesoLimpio(s: SucesoDelTic): SucesoDelTic {
       return { e: s.e, g: s.g, ro: s.ro, x: s.x, z: s.z };
     case 'progreso':
       return { e: s.e, zona: s.zona, tics: s.tics };
+    case 'estalla':
+      return { e: s.e, bala: s.bala, x: s.x, z: s.z };
   }
 }
 

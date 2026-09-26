@@ -175,6 +175,12 @@ export interface SituacionDeLaCamara {
   readonly mandaElDedo: boolean;
   /** 0..1: cuánto Remanso se ve. */
   readonly remanso: number;
+  /**
+   * 0..1: cuánto se ha cargado el rayo propio, ya suavizada (`docs/quiebro/EL-RAYO.md` §3: el zoom cierra el
+   * campo hasta 10°, sin acercar la distancia). OPCIONAL a propósito: sin ella es 0, y así siguen valiendo todas
+   * las llamadas que ya hay. FASE 0 del contrato (`rayo/contrato.ts`): todavía no pesa en el encuadre.
+   */
+  readonly carga?: number;
   /** ¿Es un aparato táctil? (el campo de visión). */
   readonly tactil: boolean;
   /** Vigía: sin cuerpo, cenital. */

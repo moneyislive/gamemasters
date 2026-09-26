@@ -96,6 +96,12 @@ export const INFO_DE_GESTOS: Readonly<Record<Gesto, InfoDelGesto>> = {
   'golpe-de-prestado': { tipo: 'golpe', duracionMs: null, entraMs: 90, direccion: 'cuerpo', ritmo: 1 },
   apuntar: { tipo: 'bucle', duracionMs: null, entraMs: 150, direccion: 'cuerpo', ritmo: 0.6 },
   disparar: { tipo: 'golpe', duracionMs: null, entraMs: 50, direccion: 'cuerpo', ritmo: 1 },
+  /*
+   * EL RAYO (`rayo/contrato.ts`), FASE 0: los mismos números que `apuntar` y `disparar`, y en el manifiesto los
+   * mismos clips, hasta que ANIMACIÓN traiga los de la captura (Spell_Simple_*: entrar, bucle, disparo, salir).
+   */
+  'cargar-rayo': { tipo: 'bucle', duracionMs: null, entraMs: 150, direccion: 'cuerpo', ritmo: 0.6 },
+  'lanzar-rayo': { tipo: 'golpe', duracionMs: null, entraMs: 50, direccion: 'cuerpo', ritmo: 1 },
   desalojable: { tipo: 'sostenido', duracionMs: null, entraMs: 150, direccion: 'no', ritmo: 1 },
   rematar: { tipo: 'bucle', duracionMs: null, entraMs: 150, direccion: 'cuerpo', ritmo: 1 },
   absorber: { tipo: 'sostenido', duracionMs: null, entraMs: 200, direccion: 'no', ritmo: 1 },

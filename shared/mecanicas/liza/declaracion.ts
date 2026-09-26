@@ -44,6 +44,11 @@
  *   U aforo ........................... `AforoDeLaSala`; el coste y la admisión, en `lizas.ts`
  *   V azar de sala sembrado ........... `FaseDeLaLiza.semilla`
  *
+ * Y una que no es de aquel §11, y que entra con su FORMA antes de que la sala la cumpla (hasta entonces la
+ * revisión la rechaza entera si no es `null`: ver su cabecera):
+ *
+ *   W tiro cargado .................... `TiroDeclarado` y `NivelDelTiro`, en `ReglasDeAsiento.tiro`
+ *
  * Y las de la liza ABIERTA —una liza grande que se recorre entera, con objetivos repartidos por ella—, que
  * entran en `LizaDeclarada` el día que la sala las cumpla y hasta entonces viven con su forma fijada en «Lo
  * que entra» (ver `AmpliacionDeLaLiza`):
@@ -254,6 +259,9 @@ export const TOPE_DE_MIEMBROS = 6;
 export const TOPE_DE_NUDOS = 65535;
 /** Cuántas zonas de acción puede haber activas a la vez, y cuántas bandas de distancia (una por activa). */
 export const TOPE_DE_BANDAS = 3;
+
+/** Cuántos niveles puede tener un tiro cargado (W): una tabla corta que el aparato también lee entera. */
+export const TOPE_DE_NIVELES_DEL_TIRO = 8;
 
 /* ─── B · EL MUNDO ───────────────────────────────────────────────────────── */
 
@@ -700,6 +708,104 @@ export interface PuntoDeControl {
   readonly lleva: readonly CargaDePortable[];
 }
 
+/* ─── W · EL TIRO CARGADO ────────────────────────────────────────────────── */
+
+/**
+ * UN NIVEL DEL TIRO: lo que sale si se suelta con `desdeMs` de carga o más (y menos que el `desdeMs` del
+ * siguiente). Todo entero y sin interpolar: la carga elige UNA fila de la tabla (ver `TiroDeclarado`).
+ */
+export interface NivelDelTiro {
+  /** Desde cuánta carga, en ms del APARATO. El del primero es 0; los demás, crecientes. */
+  readonly desdeMs: Milisegundos;
+  /**
+   * La bala que sale (id de `LizaDeclarada.proyectiles`): su velocidad, su alcance, su radio CONTRA LA
+   * ESTRUCTURA y su efecto contra el blanco DIRECTO (el primer cuerpo que toca). Es una bala de un solo
+   * disparo: `apuntarTics` 1, `balas` 1 y `cadaTics` 0, que en el tiro de un asiento no pesan (la revisión
+   * lo exige: un número que no pesa pero admite cualquier valor es un número que alguien acaba leyendo). Y
+   * cada nivel lleva la SUYA: el aparato sabe qué nivel salió por el `p` del suceso `bala`, y con dos
+   * niveles en la misma bala no lo sabría.
+   */
+  readonly proyectil: IdDeclarado;
+  /**
+   * El medio ancho CONTRA LOS CUERPOS: se suma al radio de cada cuerpo (y a la `holgura` del tiro) para ver
+   * si lo toca; 0 = sólo el radio del cuerpo. Es otro número que el radio de la bala contra la estructura, a
+   * propósito: un tiro ancho que usara su ancho contra las cajas se pararía a los pies de quien dispara
+   * pegado a una pared.
+   */
+  readonly ancho: Longitud;
+  /** El radio del ÁREA alrededor de donde se para la bala (0 = sin área: sólo el blanco directo). */
+  readonly area: Longitud;
+  /**
+   * Lo que les pasa a los del ÁREA —los cuerpos a `area` o menos del punto donde se para, con línea de vista
+   * desde él, sin el blanco directo (ése lleva el efecto de su bala)—, con el empuje hacia FUERA, desde ese
+   * punto, y no del autor al blanco como en un golpe. `null` si y sólo si `area` es 0.
+   */
+  readonly efectoDelArea: EfectoDeclarado | null;
+  /** Tics desde que sale hasta que se puede volver a cargar (0 = sin recarga). */
+  readonly recargaTics: Tics;
+}
+
+/**
+ * EL TIRO CARGADO (declaración W): se MANTIENE `apuntar` para cargar y se pulsa `soltar` para que salga una
+ * bala, con más alcance y más daño, y menos área, cuanto más se cargó. Es el ataque a distancia de un
+ * asiento. Sus dos usos nombrados: el ARCO de una liza de juguete (tensar es cargar; soltar, disparar) y el
+ * golpe en ANILLO alrededor de un punto —el área de un nivel—, como el pisotón que alcanza a todo lo que
+ * rodea a quien lo da.
+ *
+ * ═══ CÓMO VIAJA, SIN TOCAR EL CABLE ═══
+ *
+ * Con la acción de siempre, `[accion, ms, blanco]`:
+ *
+ *   · mientras carga, `aqui.a = [apuntar, msPulsar, 0]` en cada `aqui`, con el MISMO `ms`: es una acción
+ *     sostenida como las demás, y el primer `aqui` sin ella la suelta;
+ *   · al soltar, UNA vez, `aqui.a = [soltar, msSoltar, blanco]`. La dirección es la `r` de ese `aqui` (la
+ *     mira, que la sala ya arbitra) o, con un blanco que la sala acepte por `enganche`, hacia él.
+ *
+ * LA CARGA es `msSoltar − msPulsar`: dos instantes del MISMO reloj del aparato, así que el desfase no la
+ * mueve (como la ventana de la esquiva). La sala la acota por lo que vio —los tics desde que empezó a
+ * mantenerla, más lo que tarda en llegar un `aqui`— y por `cargaMaximaMs`; y el nivel es el ÚLTIMO de
+ * `niveles` con `desdeMs` ≤ la carga: una tabla de enteros, sin interpolar.
+ *
+ * SÓLO EL `soltar` EXPLÍCITO DISPARA. Todo lo demás que acaba la sostenida —un daño que corta su estado,
+ * otra pulsación en el mismo `aqui`, el fin del combate, quedarse ausente— la acaba SIN disparar y sin
+ * gastar la recarga.
+ *
+ * ═══ LO QUE VEN LOS DEMÁS ═══
+ *
+ * Quien carga está en el estado de `puesta`, que sale en la foto: los demás ven que carga, y hacia dónde por
+ * su mira. La bala sale con su suceso `bala`, con `de` = el NÚMERO DEL ASIENTO; lo que alcanza, con un
+ * `impacta` por cuerpo; y donde se para —contra un cuerpo o contra la estructura—, con `estalla`
+ * (`protocolo.ts`), que es el centro del área.
+ *
+ * ═══ HOY, SÓLO LA FORMA ═══
+ *
+ * La sala todavía no lo cumple, así que `problemasDeLaDeclaracion` revisa su forma entera Y rechaza todo tiro
+ * que no sea `null`: una declaración que la sala no cumple es una promesa que nadie guarda. Quien lo cablee
+ * en la sala quita esa frase, y nada más.
+ */
+export interface TiroDeclarado {
+  /** La acción SOSTENIDA que carga (el id del cable, 1-255). */
+  readonly apuntar: IdDeclarado;
+  /** La pulsación que dispara (el id del cable, 1-255). */
+  readonly soltar: IdDeclarado;
+  /**
+   * El estado de quien carga, puesto al empezar a cargar. Sus `tics` cubren la carga máxima: si durara menos,
+   * se acabaría antes que ella y la cortaría.
+   */
+  readonly puesta: PuestaDeEstado;
+  /** Los niveles, de 1 a `TOPE_DE_NIVELES_DEL_TIRO`, con `desdeMs` crecientes y el primero en 0. */
+  readonly niveles: readonly NivelDelTiro[];
+  /** Cómo se corrige la mira hacia un blanco que la sala acepta, o `null` si sale siempre por la mira. */
+  readonly enganche: EngancheDeclarado | null;
+  /**
+   * Lo que se suma a cada cuerpo al juzgar si la bala lo toca: el aparato pinta a los demás
+   * `RETRASO_DE_LOS_DEMAS_MS` atrás (`protocolo.ts`) y la sala no guarda los sitios pasados de lo que mueve.
+   */
+  readonly holgura: Longitud;
+  /** La carga más larga que se cree, en ms del aparato (≥ el `desdeMs` del último nivel). */
+  readonly cargaMaximaMs: Milisegundos;
+}
+
 /**
  * EL REGLAMENTO ENTERO DE UN ASIENTO, ya compuesto con todo lo que haya elegido. Ver la cabecera.
  */
@@ -710,10 +816,12 @@ export interface ReglasDeAsiento {
    */
   readonly asiento: string;
   readonly cuerpo: CuerpoDeclarado;
-  /** Sus golpes. Los ids no se repiten entre sí ni con los de su esquiva, su rescate, los remates o las zonas. */
+  /** Sus golpes. Los ids no se repiten entre sí ni con los de su esquiva, su rescate, su tiro, los remates o las zonas. */
   readonly acciones: readonly AccionDeclarada[];
   readonly esquiva: EsquivaDeclarada;
   readonly rescate: RescateDeclarado;
+  /** Su tiro cargado (W), o `null` si no tiene. Hoy, `null` siempre: ver «hoy, sólo la forma» en `TiroDeclarado`. */
+  readonly tiro: TiroDeclarado | null;
   readonly medidor: MedidorDeclarado;
   readonly puntos: PuntosDeclarados;
   readonly alEmpezar: PuntoDeControl;
@@ -1859,8 +1967,8 @@ export function reglasDelNumero(liza: LizaDeclarada, numero: number): ReglasDeAs
 
 /**
  * Todos los ids de acción que un asiento puede mandar en `aqui.a[0]`: sus golpes, su esquiva, su
- * rescate, el remate de cada clase rematable y la zona de acción del encuentro, si la hay. En orden de
- * aparición y sin repetir.
+ * rescate, los dos de su tiro (cargar y soltar) si lo tiene, el remate de cada clase rematable y la zona
+ * de acción del encuentro, si la hay. En orden de aparición y sin repetir.
  */
 export function accionesDelCable(liza: LizaDeclarada, reglas: ReglasDeAsiento): readonly IdDeclarado[] {
   const ids: number[] = [];
@@ -1870,6 +1978,10 @@ export function accionesDelCable(liza: LizaDeclarada, reglas: ReglasDeAsiento): 
   for (const a of reglas.acciones) poner(a.id);
   poner(reglas.esquiva.accion);
   poner(reglas.rescate.accion);
+  if (reglas.tiro !== null) {
+    poner(reglas.tiro.apuntar);
+    poner(reglas.tiro.soltar);
+  }
   for (const c of liza.clases) if (c.alCaer.tipo === 'rematable') poner(c.alCaer.remate.accion);
   const encuentro = liza.fase.encuentro;
   if (encuentro !== null && encuentro.fin.tipo === 'salida') poner(encuentro.fin.zona.accion);
@@ -2152,6 +2264,72 @@ function accion(r: Revision, donde: string, a: AccionDeclarada, estados: readonl
   tics(r, `${donde}.recuperacionTics`, a.recuperacionTics);
   if (lista(r, `${donde}.soloEn`, a.soloEn)) for (const e of a.soloEn) existe(r, `${donde}.soloEn`, e, estados, 'el estado');
   if (a.alFallar !== null) puesta(r, `${donde}.alFallar`, a.alFallar, estados);
+}
+
+/** El proyectil de id `id`, o `null`. Un bucle y no `find`: se llama dentro de otro bucle y sin cierres. */
+function proyectilDeId(proyectiles: readonly ProyectilDeclarado[], id: number): ProyectilDeclarado | null {
+  for (let i = 0; i < proyectiles.length; i++) {
+    const pr = proyectiles[i] as ProyectilDeclarado;
+    if (pr !== null && typeof pr === 'object' && pr.id === id) return pr;
+  }
+  return null;
+}
+
+/**
+ * LA REVISIÓN DEL TIRO CARGADO (W): su forma entera, contra los estados y los proyectiles declarados. Los
+ * dos ids no se miran aquí contra los demás del asiento: van en la lista de lo que manda, con los otros.
+ */
+function revisarElTiro(r: Revision, donde: string, t: TiroDeclarado, estados: readonly number[], proyectiles: readonly ProyectilDeclarado[]): void {
+  const p = r.p;
+  entero(r, `${donde}.apuntar`, t.apuntar, 1, TOPE_DE_ID);
+  entero(r, `${donde}.soltar`, t.soltar, 1, TOPE_DE_ID);
+  puesta(r, `${donde}.puesta`, t.puesta, estados);
+  if (t.enganche !== null) {
+    longitud(r, `${donde}.enganche.radio`, t.enganche.radio, 1);
+    entero(r, `${donde}.enganche.conoRumbos`, t.enganche.conoRumbos, 0, CUARTO_DE_VUELTA);
+    longitud(r, `${donde}.enganche.holgura`, t.enganche.holgura);
+  }
+  longitud(r, `${donde}.holgura`, t.holgura);
+  const cargaBien = entero(r, `${donde}.cargaMaximaMs`, t.cargaMaximaMs, 0, TOPE_DE_VENTANA_MS);
+  if (cargaBien && Number.isInteger(t.puesta.tics) && t.puesta.tics * MS_POR_TIC < t.cargaMaximaMs) {
+    p.push(
+      `${donde}.puesta.tics: el estado de cargar dura ${String(t.puesta.tics * MS_POR_TIC)} ms y la carga máxima es de ${String(t.cargaMaximaMs)}: ` +
+        'se acabaría antes que ella y la cortaría',
+    );
+  }
+  if (!lista(r, `${donde}.niveles`, t.niveles)) return;
+  if (t.niveles.length === 0 || t.niveles.length > TOPE_DE_NIVELES_DEL_TIRO) {
+    p.push(`${donde}.niveles: hay ${String(t.niveles.length)} y tienen que ser de 1 a ${String(TOPE_DE_NIVELES_DEL_TIRO)}`);
+  }
+  const balas: number[] = [];
+  let anterior = -1;
+  for (let i = 0; i < t.niveles.length; i++) {
+    const n = t.niveles[i] as NivelDelTiro;
+    const dn = `${donde}.niveles[${String(i)}]`;
+    if (entero(r, `${dn}.desdeMs`, n.desdeMs, 0, TOPE_DE_VENTANA_MS)) {
+      if (i === 0 && n.desdeMs !== 0) p.push(`${dn}.desdeMs: el primer nivel empieza en 0 (soltar sin carga también dispara)`);
+      else if (i > 0 && n.desdeMs <= anterior) p.push(`${dn}.desdeMs: los niveles van de menos a más carga, y ${String(n.desdeMs)} no pasa de ${String(anterior)}`);
+      anterior = n.desdeMs;
+    }
+    if (entero(r, `${dn}.proyectil`, n.proyectil, 1, TOPE_DE_ID)) {
+      balas.push(n.proyectil);
+      const pr = proyectilDeId(proyectiles, n.proyectil);
+      if (pr === null) p.push(`${dn}.proyectil: nombra el proyectil ${String(n.proyectil)}, que no está declarado`);
+      else if (pr.apuntarTics !== 1 || pr.balas !== 1 || pr.cadaTics !== 0) {
+        p.push(`${dn}.proyectil: la bala de un tiro es de un solo disparo y sin apuntar (apuntarTics 1, balas 1, cadaTics 0): esos números no pesan en un tiro`);
+      }
+    }
+    entero(r, `${dn}.ancho`, n.ancho, 0, TOPE_DE_RADIO);
+    entero(r, `${dn}.area`, n.area, 0, TOPE_DE_RADIO);
+    if (n.area === 0 && n.efectoDelArea !== null) p.push(`${dn}.efectoDelArea: sin área no alcanza a nadie; va a null`);
+    else if (n.area !== 0 && n.efectoDelArea === null) p.push(`${dn}.efectoDelArea: un área sin efecto no le hace nada a nadie; con área, lleva efecto`);
+    if (n.efectoDelArea !== null) efecto(r, `${dn}.efectoDelArea`, n.efectoDelArea, estados);
+    tics(r, `${dn}.recargaTics`, n.recargaTics);
+  }
+  idsSinRepetir(r, `${donde}.niveles: cada nivel con su bala (el aparato sabe el nivel por el proyectil del suceso bala)`, balas);
+  if (cargaBien && anterior >= 0 && t.cargaMaximaMs < anterior) {
+    p.push(`${donde}.cargaMaximaMs: ${String(t.cargaMaximaMs)} ms es menos de lo que pide el último nivel (${String(anterior)}): no se llegaría nunca`);
+  }
 }
 
 /**
@@ -2711,6 +2889,13 @@ function revisar(d: LizaDeclarada, p: string[]): void {
       cantidad(r, `${donde}.rescate.vidaAlVolver`, re.vidaAlVolver, 1);
       if (re.vidaAlVolver > cu.vidaTope) p.push(`${donde}.rescate.vidaAlVolver: vuelve con más vida que su tope`);
       cantidad(r, `${donde}.rescate.medidorAmbos`, re.medidorAmbos);
+      /* W · El tiro: su forma entera, y hoy, además, que la sala todavía no lo cumple (ver `TiroDeclarado`). */
+      const ti = a.tiro;
+      if ((ti as unknown) === undefined) p.push(`${donde}.tiro: falta; un asiento sin tiro lo dice con null`);
+      else if (ti !== null) {
+        revisarElTiro(r, `${donde}.tiro`, ti, estados, Array.isArray(d.proyectiles) ? d.proyectiles : []);
+        p.push(`${donde}.tiro: la sala todavía no cumple el tiro cargado (sólo está su forma); hasta que lo cumpla va a null`);
+      }
       const me = a.medidor;
       cantidad(r, `${donde}.medidor.tope`, me.tope);
       cantidad(r, `${donde}.medidor.porLimpia`, me.porLimpia);
@@ -2748,9 +2933,10 @@ function revisar(d: LizaDeclarada, p: string[]): void {
 
       /* Los ids que este asiento puede mandar no se pisan entre sí ni con los de las entidades. */
       const delCable = [...suyas, es.accion, re.accion, ...remates];
+      if (ti !== null && ti !== undefined) delCable.push(ti.apuntar, ti.soltar);
       const encuentro = d.fase.encuentro;
       if (encuentro !== null && encuentro.fin.tipo === 'salida') delCable.push(encuentro.fin.zona.accion);
-      idsSinRepetir(r, `${donde}: los ids de acción que manda (golpes, esquiva, rescate, remates y zona)`, delCable);
+      idsSinRepetir(r, `${donde}: los ids de acción que manda (golpes, esquiva, rescate, tiro, remates y zona)`, delCable);
       for (const id of delCable) {
         if (accionesDeClases.indexOf(id) >= 0) p.push(`${donde}: el id de acción ${String(id)} lo usa también una clase de entidad; el aparato no sabría qué pintar`);
         if (accionesDeAsientos.indexOf(id) < 0) accionesDeAsientos.push(id);

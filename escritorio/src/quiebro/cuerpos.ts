@@ -57,6 +57,13 @@ export type Gesto =
   | 'golpe-de-prestado'
   | 'apuntar'
   | 'disparar'
+  /**
+   * EL RAYO (`rayo/contrato.ts`): cargar es un bucle mientras dura la carga (con `carga` en el cuerpo), y lanzar
+   * un golpe con su impacto en el instante en que sale el destello. Los pone el juego para el propio y para los
+   * ajenos (por el estado de cargar de la foto y el `bala` de un asiento).
+   */
+  | 'cargar-rayo'
+  | 'lanzar-rayo'
   | 'desalojable'
   | 'rematar'
   | 'absorber'
@@ -94,6 +101,12 @@ export interface CuerpoPintado {
   contorno: boolean;
   /** Pintado tenue: un compañero lejano, un fantasma del Eco, el propio en Vigía. */
   tenue: boolean;
+  /**
+   * EL RAYO: cuánto lleva cargado, de 0 a 1 (la `c` de `rayo/contrato.ts`), mientras el gesto es `cargar-rayo`
+   * (el temblor y la luz crecen con ella). Opcional: sin él, 0. La del propio sale de `partida.rayo`; la de un
+   * ajeno, de cuánto lleva en su estado de cargar.
+   */
+  carga?: number;
 }
 
 /** Lo que el juego entrega a los personajes. Se lee en cada fotograma; no se copia. */

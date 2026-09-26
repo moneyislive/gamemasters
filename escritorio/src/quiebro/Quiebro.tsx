@@ -57,6 +57,7 @@ import type { PuertoDeMesa, SalidaDelMovimiento } from './contrato';
 import { LaCiudadDeNoche } from './ciudad/LaCiudadDeNoche';
 import { EfectosDelQuiebro, crearRelojDePresentacion, crearSistemaDeEfectos } from './efectos';
 import type { SistemaDeEfectos } from './efectos';
+import type { BocaDe } from './rayo/contrato';
 import { Posproceso } from './posproceso/Posproceso';
 import { forzarElNivel, usarElNivel } from './calidad/usar-el-nivel';
 import { laCuentaDe } from './calidad/medida';
@@ -478,6 +479,8 @@ const FALLOS_DE_LA_REUNION: readonly number[] = Object.freeze([1]);
 /** Lo que el director de los personajes dice que pintó (el de `personajes/director.ts`, sin importarlo). */
 interface DirectorQueMide {
   readonly medida: { readonly llamadas: number; readonly triangulos: number };
+  /** La boca del rayo (`rayo/contrato.ts`): dónde está la mano de cada cuerpo. Un pintor sin ella no la da. */
+  readonly bocaDe?: BocaDe;
 }
 
 /** LO QUE VA DENTRO DEL LIENZO: el nivel, el bucle y las piezas de cada frente. */
@@ -493,9 +496,15 @@ function Escena(p: PropsDeLaEscena): JSX.Element {
   const director = useRef<DirectorQueMide | null>(null);
   const nivelVivo = useRef(nivel.nivel);
   nivelVivo.current = nivel.nivel;
-  const alDirector = useCallback((d: unknown) => {
-    director.current = (d as DirectorQueMide | null) ?? null;
-  }, []);
+  const { sistema: sistemaDeEfectos } = p;
+  const alDirector = useCallback(
+    (d: unknown) => {
+      director.current = (d as DirectorQueMide | null) ?? null;
+      /* LA BOCA DEL RAYO: la mano que exponen los personajes, en el sistema de efectos (`rayo/contrato.ts`). */
+      sistemaDeEfectos.boca = director.current?.bocaDe ?? null;
+    },
+    [sistemaDeEfectos],
+  );
 
   /*
    * SÓLO EN DESARROLLO: `__quiebro.medir()` dice lo que cuesta el fotograma DE VERDAD —la escena y el
@@ -596,7 +605,7 @@ function Escena(p: PropsDeLaEscena): JSX.Element {
       ) : (
         <CamaraDeOrbita tactil={p.tactil} />
       )}
-      <Posproceso nivel={nivel.nivel} capacidades={nivel.capacidades} remanso={remanso} />
+      <Posproceso nivel={nivel.nivel} capacidades={nivel.capacidades} remanso={remanso} sistema={p.sistema} />
     </>
   );
 }

@@ -1293,6 +1293,20 @@ const BATERIA = [
       'el cliente del juego sobre el contrato, sin navegador: el reloj de cada canal empieza en cero y parte en tics de 50 ms; el canal dice `hola` y un `eco` detrás y no reconecta tras los cierres que reintentar no arregla; la predicción es la de la sala —miles de tics por el barrio de verdad, y cada tramo mandado es uno que la sala acepta—; la interpolación, el guion que funde sin retroceder, la sala vista que cada `dentro` deja en blanco, el diccionario que lee la declaración, la partida entera contra un enchufe de mentira con la pulsación y su `ms`, los mandos, el enganche que no apunta tras una pared, la cámara que no entra en las cajas, la pausa que reintenta sólo con una vista nueva, el puerto de prueba con la llave en la cabecera y nunca en la dirección, y los fuentes sin `onClick`, sin la llave en el almacén y en LF; y el mapa de la ciudad abierta, con la ciudad de ensayo y con la de verdad: ni calle pintada donde hay pared ni pared donde se anda, píxel a píxel; cada tejado con el color de su distrito; los metros de plaza a plaza son los de la tabla y los de cada nudo los que anda la sala; el minimapa gira la ciudad y las marcas con la misma cuenta; el plano actúa en `pointerdown` —rumbo a un Fallo o a una cabina, «Aquí» en el nudo más cercano, nada fuera de la ciudad ni con el botón derecho—; el lienzo se pinta una vez por noche; y el hilo de rumbo cabe en su tope, va por la ruta, no se mueve del suelo y acaba en la meta',
   },
   /*
+   * ═══ EL CONTRATO DEL RAYO (docs/quiebro/EL-RAYO.md §9), DETRÁS DEL JUEGO ═══
+   *
+   * Es de la fase 0 y del coordinador, no de ningún frente: lo que se prometen REGLAS, MANDOS, EFECTOS y ANIMACIÓN
+   * mientras construyen el rayo a la vez (`escritorio/src/quiebro/rayo/contrato.ts`). Detrás del juego porque lee
+   * sus piezas (el diccionario, la escena, los mandos, la cámara): si aquéllas están rojas, esto no dice nada.
+   */
+  {
+    nombre: 'El Quiebro · el contrato del rayo',
+    donde: 'escritorio',
+    guion: 'verify:quiebro-rayo',
+    porque:
+      'los cuatro frentes del rayo se dicen lo que el contrato promete, sobre la liza de verdad de una mesa: la Liza no le pone al tiro otra pega que la de hoy (la sala aún no lo cumple), `leerElTiro` da en metros y ms los niveles de la tabla del §1.2 con los ids reservados, el nivel de una carga es el de la sala y el de una bala se reconoce por su proyectil, y el diccionario saca de ahí el botón, los gestos y el estado de cargar sin copiar un número; el estado apagado, la semilla, los efectos nulos, los uniformes del destello y los dos gestos son los del contrato, que se lee en Node, en LF y sin la marca ajena; y cada stub está en su camino de verdad —los efectos del rayo cuelgan del sistema, el botón no entra en la cola y soltarlo todo cancela, la carga de la cámara es opcional, y la escena suelta el rayo de otro desde su `bala`, no suelta dos veces el propio, estalla con `estalla` y deja la bala del tirador como estaba—',
+  },
+  /*
    * ═══ LA CIUDAD EN LA GPU DE VERDAD (plan del detalle, O1-VERIFICACION 9) ═══
    *
    * `lento` no por lo que tarda —unos minutos: la fachada tarda segundos en enlazar en ANGLE, y fxc otros tantos en

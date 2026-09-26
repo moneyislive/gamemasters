@@ -68,6 +68,14 @@ export const ACCION_DEL_QUIEBRO = {
   /** Desalojar a un Celador caído: la acción sostenida del remate. */
   desalojar: 10,
   descolgar: 11,
+  /**
+   * EL RAYO (`docs/quiebro/EL-RAYO.md`), RESERVADOS: la sostenida que carga (el `apuntar` del tiro cargado de
+   * la Liza) y la pulsación que lo suelta (su `soltar`). Todavía no los declara ningún asiento: los cablea el
+   * frente de reglas junto con la lógica de la sala (ver `NIVELES_DEL_RAYO`). El cliente no los lee de aquí:
+   * los lee de la declaración (`reglas.tiro`), como todos.
+   */
+  apuntarRayo: 12,
+  soltarRayo: 13,
   golpeDePrestado: 20,
   entradaDeCelador: 21,
   seguidaDeCelador: 22,
@@ -367,6 +375,54 @@ export const ENEMIGOS = {
   /** Si nadie lo desaloja: absorbe al Prestado vivo más cercano a 12 m (0,6 s) o se reimprime a 2 s y 15 m. */
   trasvase: { metros: 12, tics: 12, vida: 45, reimprimeTics: 40, reimprimeMetros: 15 },
 } as const;
+
+/* ─── EL RAYO (docs/quiebro/EL-RAYO.md) ──────────────────────────────────── */
+
+/** Una fila de la tabla del rayo, en las unidades de este fichero (metros, ms del aparato, tics de 50 ms). */
+export interface NivelDelRayo {
+  /** 1 el chispazo … 4 el pleno. */
+  readonly nivel: number;
+  /** Desde cuánta carga sale, en ms del APARATO: sale el ÚLTIMO nivel con `desdeMs` ≤ la carga, sin interpolar. */
+  readonly desdeMs: number;
+  /** El radio del área alrededor de donde se para, en metros. 0 = sin área: el pleno es una línea. */
+  readonly areaMetros: number;
+  /** Hasta dónde llega, en metros. */
+  readonly alcanceMetros: number;
+  /** El daño a cada uno que alcanza: el blanco directo y los del área. */
+  readonly dano: number;
+  /** Lo que les deja (una clave de `ESTADO_DEL_QUIEBRO`) y cuántos tics. */
+  readonly deja: 'descolocado' | 'tocado' | 'derribado';
+  readonly dejaTics: number;
+  /** El empuje, en metros: desde el centro del área; el del pleno, desde quien dispara. */
+  readonly empujeMetros: number;
+  /** La recarga tras soltarlo, en tics de 50 ms. */
+  readonly recargaTics: number;
+}
+
+/**
+ * LOS CUATRO NIVELES DEL RAYO: la tabla del §1.2 de `docs/quiebro/EL-RAYO.md`, con la recarga que decidió
+ * Miguel el 26-sep (siempre disponible tras esperar, sin Foco: 3 s tras el chispazo y 5 s tras el pleno) y
+ * que es IGUAL PARA LOS TRES ESTILOS (también decisión suya). Son cifras de PARTIDA: el frente de reglas las
+ * calibra jugando y las justifica aquí mismo.
+ *
+ * Las referencias del diseño, para leerlas contra algo: una Tanda entera hace 60 y la Réplica 25; el Celador
+ * tiene 90 de vida, el tirador 70 y el Prestado 20. El pleno (40) más una Tanda (60) tumban a un Celador: el
+ * pleno AYUDA y no sustituye. El chispazo es control de grupos (descoloca a todos los de su área), no daño.
+ * Sin fuego amigo, y la guardia del Celador no lo para (es energía, no un golpe).
+ *
+ * Lo que la tabla del diseño NO fija lo pone el frente de reglas al declararlo (`TiroDeclarado` en la Liza):
+ * el medio ancho contra los cuerpos y el radio contra la estructura de cada nivel, la velocidad (el rayo
+ * recorre su alcance en 1-2 tics como mucho), la holgura, la carga máxima que se cree y el estado de cargar.
+ *
+ * HOY NO LA DECLARA NINGÚN ASIENTO (`reglas.tiro` va a `null`): la cablea el frente de reglas con la lógica de
+ * la sala. Y el cliente no la lee de aquí sino de la declaración, para que no haya dos copias de un número.
+ */
+export const NIVELES_DEL_RAYO: readonly NivelDelRayo[] = [
+  { nivel: 1, desdeMs: 0, areaMetros: 3, alcanceMetros: 16, dano: 8, deja: 'descolocado', dejaTics: 10, empujeMetros: 1, recargaTics: 60 },
+  { nivel: 2, desdeMs: 300, areaMetros: 2, alcanceMetros: 24, dano: 15, deja: 'tocado', dejaTics: 10, empujeMetros: 1, recargaTics: 72 },
+  { nivel: 3, desdeMs: 750, areaMetros: 1, alcanceMetros: 32, dano: 25, deja: 'tocado', dejaTics: 12, empujeMetros: 1.5, recargaTics: 86 },
+  { nivel: 4, desdeMs: 1300, areaMetros: 0, alcanceMetros: 45, dano: 40, deja: 'derribado', dejaTics: 30, empujeMetros: 2, recargaTics: 100 },
+];
 
 /* ─── LOS NIVELES DE NOCHE (§4.10) ───────────────────────────────────────── */
 
