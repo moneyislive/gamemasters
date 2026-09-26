@@ -19,8 +19,10 @@ import type { LizaDeclarada, PortableDeclarado } from '../../../../shared/mecani
 import { pagoDelPortable } from '../../../../shared/mecanicas/liza/declaracion';
 import { UNO } from '../../../../shared/mecanicas/fijo';
 import { NOMBRES_DEL_QUIEBRO } from '../../../../shared/arcade/juegos/quiebro-nombres';
-import { ESQUIRLAS_COMO_MUCHO, OLEADAS_FIJAS, PORTABLE_ESQUIRLA, PRIMERA_PAUSA_CON_VOTO } from '../../../../shared/arcade/juegos/quiebro-vista';
+import type { IdDeEstilo } from '../../../../shared/arcade/juegos/quiebro-nombres';
+import { ESQUIRLAS_COMO_MUCHO, MOVIMIENTO_DEL_QUIEBRO, OLEADAS_FIJAS, PORTABLE_ESQUIRLA, PRIMERA_PAUSA_CON_VOTO } from '../../../../shared/arcade/juegos/quiebro-vista';
 import type { VistaDelQuiebro } from '../../../../shared/arcade/juegos/quiebro-vista';
+import type { Opcion } from '../../../../shared/arcade';
 import type { SalidaDelMovimiento } from '../contrato';
 
 /** Lo que valen `n` esquirlas al salir, y con una más (o `null` si ya no cabe otra). */
@@ -108,6 +110,43 @@ export function quienesFaltanEnLaBajada(vista: VistaDelQuiebro): number[] {
     if (!a.haElegido && !a.ausente) faltan.push(k);
   });
   return faltan;
+}
+
+/*
+ * EL MENÚ DE LA NOCHE (26-sep, lo pidió Miguel): antes de la calle había TRES pantallas seguidas —la azotea con BAJAR,
+ * la reunión con EMPEZAR y los estilos que no se podían elegir, y la preparación con los estilos y otro BAJAR—. Ahora es
+ * una: se elige el estilo y un solo BAJAR hace lo de las tres. Las fases de la mesa no cambian (la reunión sigue
+ * siendo donde se sienta la gente, y el reductor sigue admitiendo el estilo sólo en la Bajada): lo que cambia es que el
+ * aparato encadena los movimientos por su cuenta.
+ */
+
+/** ¿Toca el menú de la noche? En la reunión, y en la Bajada mientras mi asiento no haya dicho que está listo. */
+export function enLaPreparacion(vista: VistaDelQuiebro | null, yo: string | null): boolean {
+  if (vista === null) return false;
+  if (vista.fase.tipo === 'reunion') return true;
+  if (vista.fase.tipo !== 'bajada') return false;
+  const i = miIndice(vista, yo);
+  const mio = i >= 0 ? vista.asientos[i] : undefined;
+  return mio !== undefined && !mio.haElegido;
+}
+
+/**
+ * LO QUE MANDA «BAJAR» en el menú de la noche, según la fase: en la reunión, EMPEZAR (la mesa se cierra y pasa a la
+ * Bajada); en la Bajada, el estilo querido si no es el que ya lleva y la mesa se lo ofrece (elegirlo ya es estar
+ * listo), o LISTO. Ya listo, sin asiento o en otra fase: nada. Devuelve la opción TAL CUAL la ofrece la mesa: el
+ * cliente no inventa movimientos. Quien pulsa BAJAR en la reunión vuelve a pasar por aquí al llegar la Bajada.
+ */
+export function queMandarAlBajar(vista: VistaDelQuiebro, yo: string | null, opciones: readonly Opcion[], estilo: IdDeEstilo | null): Opcion | null {
+  const f = vista.fase.tipo;
+  if (f === 'reunion') return opciones.find((o) => o.tipo === MOVIMIENTO_DEL_QUIEBRO.empezar) ?? null;
+  if (f !== 'bajada' || !enLaPreparacion(vista, yo)) return null;
+  const i = miIndice(vista, yo);
+  const actual = vista.reglamento.asientos[i]?.estilo ?? null;
+  if (estilo !== null && estilo !== actual) {
+    const cambio = opciones.find((o) => o.tipo === MOVIMIENTO_DEL_QUIEBRO.estilo && (o.carga as { readonly id?: unknown } | null)?.id === estilo);
+    if (cambio !== undefined) return cambio;
+  }
+  return opciones.find((o) => o.tipo === MOVIMIENTO_DEL_QUIEBRO.listo) ?? null;
 }
 
 /** ¿Se vota en esta pausa? */
