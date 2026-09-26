@@ -1,10 +1,13 @@
 /**
  * EL PLÁSTICO: la familia 6 (plástico) de `FAMILIA` (`../familias.ts`). Lo que la lleva: los carteles del
- * quiosco, las tapas de las papeleras de la cabina.
+ * quiosco de prensa, el mostrador de la cabina, las tapas de las papeleras.
  *
- * STUB DE LA OLA 1: devuelve su entrada tal cual (`superficieNeutraQ`: el albedo, la rugosidad, el metal y
- * la normal que le llegan; barniz y emisión 0). La rellena O2-MOBILIARIO en la ola 2: el velo de polvo y el
- * rayado.
+ * Es una FILA de la receta común del mobiliario (`liso.ts`, donde está el porqué y lo que significa cada número);
+ * su rama no hace nada más.
+ *
+ *   · N1: cada pieza de su tono, el VELO de polvo y sol (el gris, más arriba) y el mojado, que sólo alisa
+ *     (poro 0,1).
+ *   · N2: la mugre al pie.
  *
  * La firma es fija: `SuperficieQ superficiePlasticoQ(EntradaQ e)`. `superficieQ` la llama sólo con
  * `MATERIA_Q >= 1` (en N0 no se reparten familias). Reglas de la materia (`../glsl.ts`): nada de `dFdx`,
@@ -12,6 +15,15 @@
  * normal sale de `normalPorDerivadasQ`); toda lectura con `textureLod` y un lod de `lodQ`; nada que decida
  * (eso es `hashQ`); y lo que sube de nivel, dentro de su `#if MATERIA_Q >= n`.
  */
+import type { RecetaDeLaFamilia } from './liso';
+
+/** La receta del plástico (ver `liso.ts`). */
+export const RECETA_DEL_PLASTICO: RecetaDeLaFamilia = [
+  [0.25, 0.2, 0.1, 0],
+  [0, 0, 0, 0],
+  [0.3, 0, 0, 0],
+  [0, 0, 0, -1],
+];
 
 /** La familia 6, plástico. */
 export const GLSL_FAMILIA_PLASTICO = /* glsl */ `

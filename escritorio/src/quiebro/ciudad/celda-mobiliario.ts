@@ -3,6 +3,13 @@
  * (`EscritorDeLaCelda` de `celdas.ts`): cada pieza (`EscritorDePieza`) escribe en los moldes de la obra y cede; su
  * luz va a `obra.luces` y su caja a `obra.estorba`.
  *
+ * ═══ EL GRADO Y LOS PASOS ═══
+ *
+ * Cada pieza lee el grado de su celda en la obra (`obra.grado`, §3.1 del plan del detalle) y cede en pasos que caben
+ * en el trozo del nivel (600 triángulos en N0, 1.000 en N1-N3, sumando familias): las de `mobiliario.ts` una vez, y la
+ * fuente y el quiosco de la plaza dos en g3 (lo mira `quiebro-ciudad/mobiliario.ts`, y VERIFICACIÓN 12 para toda la
+ * celda). Una cabina de refugio (`c.refugio`) se escribe como refugio (`refugio`: la misma cabina con otra linterna).
+ *
  * El orden es el de siempre (farolas, farolas de pared, bancos, fuentes, quioscos, quioscos de prensa, cabinas,
  * vallas, cortes, árboles, estatuas, contenedores, carretillas, muelles y el soportal de las plazas): de él sale
  * el orden de los vértices de la malla, y cambiarlo cambia lo que suben las celdas sin cambiar nada de lo que se
@@ -11,7 +18,7 @@
  * lo escrito es el mismo.
  */
 import type { LuzDelMobiliario } from './mobiliario';
-import { banco, cabina, fuente, quiosco, quioscoDePrensa, valla } from './mobiliario';
+import { banco, cabina, fuente, quiosco, quioscoDePrensa, refugio, valla } from './mobiliario';
 import { farola, farolaDePared } from './farolas';
 import { arbol, carretilla, contenedor, corte, estatua, muelle, soportalDePlaza } from './piezas';
 import type { ObraDeLaCelda, ParteDeLaCelda } from './celdas';
@@ -47,7 +54,7 @@ export function* mobiliarioDeLaCelda(obra: ObraDeLaCelda, parte: ParteDeLaCelda)
     obra.estorba.push(q.caja);
   }
   for (const c of parte.cabinas) {
-    apuntar(obra, yield* cabina(obra, c));
+    apuntar(obra, yield* (c.refugio ? refugio(obra, c) : cabina(obra, c)));
     obra.estorba.push(c.caja);
   }
   for (const v of parte.vallas) {
