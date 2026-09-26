@@ -1109,6 +1109,21 @@
 
 /* ─── Los mandos táctiles ─── */
 
+/*
+ * EL MANDO DE LA PELEA (`docs/quiebro/EL-RAYO.md` §3, «Botones»): cristal oscuro con un aro fino ámbar, un icono
+ * propio en el mismo trazo que la mira del rayo y un rótulo pequeño. Cada estado se lee sin leer:
+ *
+ *   · PULSADO: se hunde (0,92), el aro destella y sale una onda;
+ *   · EN RECARGA: un barrido oscuro que se aclara en el sentido del reloj, con los segundos encima;
+ *   · APAGADO: no se puede ahora (atenuado, sin brillo);
+ *   · CONTEXTO: QUIEBRO en cian cuando un golpe viene hacia mí, GOLPE con el paso de la Tanda en su aro, RAYO
+ *     con la carga.
+ *
+ * Nada caro en N0 (`data-nivel='0'`): sin sombras ni halos animados; ni un `backdrop-filter` sobre el lienzo en
+ * ningún nivel. Los tamaños, los del diseño (§7) y hasta un 10 % más: GOLPE 92, QUIEBRO 76, RAYO 76, USAR 68,
+ * EMPELLÓN 64, AVISO 48.
+ */
+
 .q-tactil {
   position: absolute;
   inset: 0;
@@ -1116,28 +1131,78 @@
   pointer-events: auto;
 }
 
+/* La palanca: el mismo cristal, un aro con muescas, la marca de hacia dónde empuja y un pomo con su brillo. */
 .q-palanca-base {
   position: absolute;
   width: 112px;
   height: 112px;
   margin: -56px 0 0 -56px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 171, 64, 0.45);
-  background: radial-gradient(circle, rgba(255, 171, 64, 0.08), rgba(255, 171, 64, 0.02) 70%);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 171, 64, 0.03) 0%, rgba(8, 12, 14, 0.42) 62%, rgba(4, 8, 10, 0.55) 100%);
   display: none;
   pointer-events: none;
+}
+
+.q-palanca-base .marcas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.q-palanca-base .aro-palanca {
+  fill: none;
+  stroke: rgba(255, 171, 64, 0.55);
+  stroke-width: 1.5;
+}
+
+.q-palanca-base .muesca {
+  stroke: rgba(255, 214, 160, 0.3);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.q-palanca-base .muesca.mayor {
+  stroke: rgba(255, 214, 160, 0.55);
+  stroke-width: 2;
+}
+
+.q-palanca-rumbo {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/*
+ * La marca de dirección es el propio aro que se enciende hacia donde se empuja (un cuarto de vuelta): a fondo, el
+ * pomo tapa el borde, y una marca pequeña debajo de él no diría nada; el arco asoma a los dos lados.
+ */
+.q-palanca-rumbo::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: #ffd9a0;
 }
 
 .q-palanca-pomo {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 46px;
-  height: 46px;
-  margin: -23px 0 0 -23px;
+  width: 50px;
+  height: 50px;
+  margin: -25px 0 0 -25px;
   border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, rgba(255, 210, 138, 0.8), rgba(255, 156, 42, 0.45));
-  box-shadow: 0 0 16px rgba(255, 171, 64, 0.5);
+  border: 1.5px solid rgba(255, 214, 160, 0.85);
+  background: radial-gradient(circle at 42% 34%, rgba(255, 246, 228, 0.95) 0%, rgba(255, 196, 120, 0.72) 26%, rgba(214, 120, 36, 0.5) 62%, rgba(60, 30, 8, 0.55) 100%);
+  box-shadow: 0 0 18px rgba(255, 171, 64, 0.45), inset 0 -4px 8px rgba(60, 24, 0, 0.45);
+}
+
+.quiebro-raiz[data-nivel='0'] .q-palanca-pomo {
+  box-shadow: none;
 }
 
 .q-palanca-pista {
@@ -1170,99 +1235,534 @@
   transform: scaleX(-1);
 }
 
+/* En espejo, el rótulo y los segundos conservan su propio centrado (y el rótulo, su estrechamiento). */
+.q-tactil.zurdo .q-botones .q-tecla > .rotulo {
+  transform: translateX(-50%) scaleX(calc(-1 * var(--q-ajuste, 1)));
+}
+
+.q-tactil.zurdo .q-botones .q-tecla > .segundos {
+  transform: translateY(-50%) scaleX(-1);
+}
+
 .q-tactil.zurdo .q-palanca-pista {
   left: auto;
   right: calc(8% + var(--q-der));
 }
+
+/* ── El botón ── */
+
+.q-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 
 .q-tecla {
   position: absolute;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 171, 64, 0.6);
-  background: radial-gradient(circle at 45% 35%, rgba(255, 171, 64, 0.24), rgba(4, 10, 12, 0.55) 70%);
-  color: var(--q-ambar-claro);
+  background:
+    radial-gradient(118% 92% at 50% 8%, rgba(255, 228, 186, 0.16) 0%, rgba(255, 228, 186, 0) 46%),
+    radial-gradient(circle at 50% 58%, rgba(22, 26, 28, 0.58) 0%, rgba(8, 12, 14, 0.74) 62%, rgba(3, 6, 8, 0.84) 100%);
+  box-shadow: 0 0 0 1px rgba(2, 5, 6, 0.55), 0 3px 12px rgba(0, 0, 0, 0.45), 0 0 16px rgba(255, 171, 64, 0.12);
+  color: #fff1dc;
   font-family: var(--q-letra);
-  font-size: 12px;
-  letter-spacing: 0.1em;
   pointer-events: auto;
   touch-action: none;
-  transition: transform 60ms, background 60ms;
+  transition: transform 70ms ease-out, opacity 120ms;
 }
 
-.q-tecla.pulsada {
-  transform: scale(0.93);
-  background: radial-gradient(circle at 45% 35%, rgba(255, 171, 64, 0.55), rgba(255, 120, 20, 0.3) 70%);
+.quiebro-raiz[data-nivel='0'] .q-tecla {
+  box-shadow: 0 0 0 1px rgba(2, 5, 6, 0.55);
 }
+
+/* El aro: un filo ámbar y un reflejo por dentro (SVG, para que valga igual en todos los tamaños). */
+.q-tecla .aro {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.q-tecla .aro .filo {
+  fill: none;
+  stroke: url(#q-aro-ambar);
+  stroke-width: 2.2;
+  transition: stroke 90ms, stroke-width 90ms;
+}
+
+.q-tecla .aro .dentro {
+  fill: none;
+  stroke: rgba(255, 224, 180, 0.13);
+  stroke-width: 1.2;
+}
+
+.q-tecla .icono {
+  position: absolute;
+  left: 50%;
+  top: 41%;
+  width: 52%;
+  height: 52%;
+  transform: translate(-50%, -50%);
+  overflow: visible;
+  pointer-events: none;
+  transition: opacity 120ms;
+}
+
+.q-tecla .icono .acento {
+  stroke: var(--q-ambar);
+}
+
+.q-tecla .icono .acento.relleno {
+  stroke: none;
+  fill: #ffd28a;
+}
+
+/*
+ * EL RÓTULO: pequeño, estrecho y DENTRO del aro. Centrado por sí mismo (`max-content`), para que se pueda medir: la
+ * cuerda del aro a su altura manda (`cuerdaDelAro` en `Tactil.tsx`), y si una letra de reserva más ancha que la de
+ * casa no cabe, `ajustarElRotulo` lo estrecha con `--q-ajuste` en vez de dejarlo montado sobre el aro. La letra,
+ * la de casa comprimida (Bahnschrift tiene eje de anchura), o la estrecha del sistema (Android, iOS).
+ */
+.q-tecla .rotulo {
+  position: absolute;
+  left: 50%;
+  bottom: 19.5%;
+  width: max-content;
+  padding-left: 0.07em;
+  transform: translateX(-50%) scaleX(var(--q-ajuste, 1));
+  text-align: center;
+  font-family: 'Bahnschrift', 'Avenir Next Condensed', 'Roboto Condensed', 'sans-serif-condensed', 'DIN Condensed', 'Arial Narrow', var(--q-letra);
+  font-stretch: 80%;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: var(--q-ambar-claro);
+  text-shadow: 0 0 3px rgba(2, 5, 6, 0.95);
+  pointer-events: none;
+}
+
+/* Los segundos de la recarga, encima del icono apagado. */
+.q-tecla .segundos {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 41%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-family: var(--q-cifra);
+  font-size: 19px;
+  font-weight: 700;
+  color: #fff4e2;
+  text-shadow: 0 0 4px rgba(2, 5, 6, 0.95), 0 0 2px rgba(2, 5, 6, 0.95);
+  pointer-events: none;
+}
+
+.q-tecla .segundos:empty {
+  display: none;
+}
+
+/* PULSADO: se hunde, el aro destella y sale una onda. */
+.q-tecla.pulsada {
+  transform: scale(0.92);
+}
+
+.q-tecla.pulsada .aro .filo {
+  stroke: #ffe6bf;
+  stroke-width: 3;
+}
+
+.q-tecla.pulsada::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 214, 160, 0.9);
+  animation: q-onda 340ms ease-out both;
+  pointer-events: none;
+}
+
+@keyframes q-onda {
+  from {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.38);
+    opacity: 0;
+  }
+}
+
+/* APAGADO: no se puede ahora. */
+.q-tecla.apagada {
+  opacity: 0.4;
+}
+
+.q-tecla.apagada .aro .filo {
+  stroke: rgba(222, 240, 232, 0.35);
+}
+
+.q-tecla.apagada .icono,
+.q-tecla.apagada .rotulo {
+  color: rgba(222, 240, 232, 0.7);
+}
+
+/* EN RECARGA: un barrido oscuro que se aclara en el sentido del reloj (lo que falta, de la sala). */
+.q-tecla.recarga::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  /* Lo recargado, claro; lo que falta, oscuro; y el filo que barre, en ámbar. */
+  background: conic-gradient(
+    rgba(255, 171, 64, 0.1) 0 calc((1 - var(--q-barrido, 0)) * 1turn),
+    rgba(255, 196, 120, 0.9) 0 calc((1 - var(--q-barrido, 0)) * 1turn + 0.007turn),
+    rgba(1, 3, 4, 0.8) 0
+  );
+  pointer-events: none;
+}
+
+.q-tecla.recarga .icono {
+  opacity: 0.22;
+}
+
+.q-tecla.recarga .aro .filo {
+  stroke: rgba(255, 171, 64, 0.45);
+}
+
+/* ── Cada botón ── */
 
 .q-tecla.golpe {
-  width: 88px;
-  height: 88px;
+  width: 92px;
+  height: 92px;
   right: 0;
   bottom: 0;
-  font-size: 15px;
 }
 
+.q-tecla.golpe .rotulo {
+  font-size: 11px;
+  bottom: 17%;
+}
+
+/* El paso de la Tanda: cuatro puntos en lo alto del aro; los dados, encendidos; el siguiente late en su ventana. */
+.q-tecla .tanda {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.q-tecla .tanda i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1.5px solid rgba(255, 190, 110, 0.85);
+  background: rgba(6, 9, 11, 0.95);
+  display: none;
+}
+
+.q-tecla .tanda i.hay {
+  display: block;
+}
+
+.q-tecla .tanda i:nth-child(1) {
+  transform: rotate(-33deg) translateY(-44px);
+}
+.q-tecla .tanda i:nth-child(2) {
+  transform: rotate(-11deg) translateY(-44px);
+}
+.q-tecla .tanda i:nth-child(3) {
+  transform: rotate(11deg) translateY(-44px);
+}
+.q-tecla .tanda i:nth-child(4) {
+  transform: rotate(33deg) translateY(-44px);
+}
+
+.q-tecla .tanda i.dado {
+  border-color: #fff0d6;
+  background: #ffc873;
+  box-shadow: 0 0 7px rgba(255, 171, 64, 0.95);
+}
+
+.q-tecla .tanda i.siguiente {
+  border-color: #fffaf0;
+  background: #fff7ea;
+  animation: q-siguiente 190ms ease-in-out infinite alternate;
+}
+
+@keyframes q-siguiente {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.quiebro-raiz[data-nivel='0'] .q-tecla .tanda i.dado {
+  box-shadow: none;
+}
+
+/* QUIEBRO: su acento es el del código; se ENCIENDE en cian cuando un golpe viene hacia mí. */
 .q-tecla.quiebro {
-  width: 72px;
-  height: 72px;
-  right: 104px;
+  width: 76px;
+  height: 76px;
+  right: 106px;
   bottom: 2px;
-  border-color: rgba(63, 242, 194, 0.7);
+}
+
+.q-tecla.quiebro .icono .acento {
+  stroke: var(--q-codigo);
+}
+
+.q-tecla.quiebro.amenaza {
+  box-shadow: 0 0 0 1px rgba(2, 5, 6, 0.55), 0 0 calc(10px + 18px * var(--q-amenaza, 0)) rgba(63, 242, 194, calc(0.35 + 0.45 * var(--q-amenaza, 0)));
+  animation: q-amenaza 360ms ease-in-out infinite alternate;
+}
+
+.q-tecla.quiebro.amenaza::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(63, 242, 194, calc(0.12 + 0.38 * var(--q-amenaza, 0))) 0%, rgba(63, 242, 194, 0) 72%);
+  pointer-events: none;
+}
+
+.q-tecla.quiebro.amenaza .aro .filo {
+  stroke: #6cffd8;
+  stroke-width: 3;
+}
+
+.q-tecla.quiebro.amenaza .icono {
+  color: #eafff8;
+}
+
+.q-tecla.quiebro.amenaza .rotulo {
   color: #c8fff0;
-  background: radial-gradient(circle at 45% 35%, rgba(63, 242, 194, 0.22), rgba(4, 10, 12, 0.55) 70%);
+}
+
+@keyframes q-amenaza {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+
+.q-tecla.quiebro.amenaza.pulsada {
+  animation: none;
+  transform: scale(0.92);
+}
+
+.quiebro-raiz[data-nivel='0'] .q-tecla.quiebro.amenaza {
+  box-shadow: 0 0 0 2px rgba(63, 242, 194, 0.8);
+}
+
+/* La ruptura (tocado, con Foco): el quiebro que cuesta, con el aro del código a trazos. */
+.q-tecla.quiebro.ruptura .aro .filo {
+  stroke: var(--q-codigo);
+  stroke-dasharray: 9 5;
 }
 
 .q-tecla.empellon {
-  width: 60px;
-  height: 60px;
-  right: 14px;
-  bottom: 104px;
-  font-size: 11px;
+  width: 64px;
+  height: 64px;
+  right: 12px;
+  bottom: 106px;
+}
+
+.q-tecla.empellon .rotulo {
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  bottom: 23%;
+}
+
+.q-tecla.empellon .icono {
+  top: 37%;
+  width: 48%;
+  height: 48%;
+}
+
+.q-tecla.empellon .segundos {
+  top: 37%;
+  font-size: 16px;
 }
 
 .q-tecla.usar {
-  width: 64px;
-  height: 64px;
+  width: 70px;
+  height: 70px;
   right: 92px;
-  bottom: 88px;
+  bottom: 90px;
   display: none;
-  font-size: 11px;
 }
 
-.q-tecla .recarga,
-.q-tecla .progreso {
+/* USAR dice a veces DESCOLGAR (nueve letras): el rótulo sube a donde el aro es más ancho. */
+.q-tecla.usar .rotulo {
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  bottom: 24%;
+}
+
+.q-tecla.usar .icono {
+  top: 38%;
+  width: 48%;
+  height: 48%;
+}
+
+.q-tecla .progreso,
+.q-tecla .carga {
   position: absolute;
   inset: -4px;
   width: calc(100% + 8px);
   height: calc(100% + 8px);
   transform: rotate(-90deg);
+  overflow: visible;
   pointer-events: none;
 }
 
-.q-tecla .recarga circle,
-.q-tecla .progreso circle {
+.q-tecla .progreso circle,
+.q-tecla .carga circle {
   fill: none;
-  stroke-width: 3;
+  stroke-width: 3.5;
+  stroke-linecap: butt;
 }
 
-.q-tecla .recarga circle {
-  stroke: rgba(255, 171, 64, 0.8);
+/* Sin nada que enseñar, el aro no está (un trazo de largo cero con punta redonda pinta un punto). */
+.q-tecla.rayo:not(.cargando) .carga {
+  display: none;
 }
 
 .q-tecla .progreso circle {
   stroke: #fff0cc;
 }
 
+/* EL RAYO: a la izquierda, por encima de donde nace la palanca y a 28 pt del borde; la carga en su aro. */
+.q-tecla.rayo {
+  width: 76px;
+  height: 76px;
+  left: calc(28px + var(--q-izq));
+  bottom: calc(112px + var(--q-aba));
+  display: none;
+}
+
+.q-tactil.con-rayo .q-tecla.rayo {
+  display: grid;
+}
+
+.q-tactil.zurdo .q-tecla.rayo {
+  left: auto;
+  right: calc(28px + var(--q-der));
+}
+
+/* En la ciudad con la opción zurda el minimapa baja por la derecha: el RAYO se aparta de él hacia dentro. */
+.quiebro-hud.q-con-minimapa .q-tactil.zurdo .q-tecla.rayo {
+  right: calc(136px + var(--q-der));
+}
+
+.q-tecla.rayo .carga circle {
+  stroke: #ffe3b6;
+  transition: stroke 120ms;
+}
+
+.q-tecla.rayo:not(.cargando) .carga .niveles {
+  display: none;
+}
+
+.q-tecla.rayo .carga .niveles line {
+  stroke: rgba(255, 228, 190, 0.5);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.q-tecla.rayo.cargando {
+  transform: scale(1.04);
+  box-shadow: 0 0 0 1px rgba(2, 5, 6, 0.55), 0 0 22px rgba(255, 171, 64, 0.5);
+}
+
+.q-tecla.rayo.cargando .aro .filo {
+  stroke: #ffd08c;
+  stroke-width: 2.6;
+}
+
+.q-tecla.rayo.cargando .icono .acento.relleno {
+  fill: #fffaf0;
+}
+
+.q-tecla.rayo.pleno {
+  animation: q-pleno 520ms ease-in-out infinite alternate;
+}
+
+.q-tecla.rayo.pleno .carga circle {
+  stroke: #fffaf0;
+}
+
+@keyframes q-pleno {
+  from {
+    box-shadow: 0 0 0 1px rgba(2, 5, 6, 0.55), 0 0 18px rgba(255, 196, 120, 0.55);
+  }
+  to {
+    box-shadow: 0 0 0 1px rgba(2, 5, 6, 0.55), 0 0 34px rgba(255, 236, 200, 0.95);
+  }
+}
+
+.quiebro-raiz[data-nivel='0'] .q-tecla.rayo.cargando,
+.quiebro-raiz[data-nivel='0'] .q-tecla.rayo.pleno {
+  box-shadow: 0 0 0 2px rgba(255, 208, 140, 0.85);
+  animation: none;
+}
+
+/*
+ * MIENTRAS SE CARGA, la derecha es para apuntar: los botones se apagan y dejan pasar el dedo, salvo QUIEBRO. AVISO
+ * también, porque cae en la mitad que apunta; el aviso en sí no rompe la carga (en PC la Q vale: `estado.ts`).
+ */
+.q-tactil.cargando .q-botones .q-tecla:not(.quiebro),
+.q-tactil.cargando .q-tecla.aviso {
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+/* Con el RAYO a la izquierda, los avisos se apartan a su derecha (en la ciudad bajan hasta su altura). */
+.q-tactil.con-rayo:not(.zurdo) ~ .q-avisos {
+  left: calc(120px + var(--q-izq));
+}
+
 .q-tecla.aviso {
   position: relative;
-  width: 44px;
-  height: 44px;
-  font-size: 10px;
-  border-color: rgba(255, 63, 164, 0.7);
+  width: 48px;
+  height: 48px;
+}
+
+.q-tecla.aviso .aro .filo {
+  stroke: rgba(255, 63, 164, 0.75);
+}
+
+.q-tecla.aviso .icono {
+  top: 40%;
+  width: 48%;
+  height: 48%;
+  color: #ffd2ea;
+}
+
+.q-tecla.aviso .rotulo {
+  font-size: 7.5px;
+  letter-spacing: 0.05em;
+  bottom: 19%;
   color: #ffc6e6;
-  background: rgba(4, 10, 12, 0.55);
 }
 
 .q-tecla-aviso {
@@ -1274,6 +1774,107 @@
 .q-tactil.zurdo .q-tecla-aviso {
   right: auto;
   left: calc(16px + var(--q-izq));
+}
+
+/* ─── El rayo en PC: el mismo botón, de mirar, abajo a la izquierda, con la tecla al lado ─── */
+
+.q-tecla.rayo.q-rayo-pc {
+  width: 64px;
+  height: 64px;
+  left: calc(18px + var(--q-izq));
+  bottom: calc(18px + var(--q-aba));
+  pointer-events: none;
+}
+
+.q-tecla.rayo.q-rayo-pc .rotulo {
+  font-size: 8.5px;
+}
+
+.q-tecla.rayo.q-rayo-pc .tecla-pc {
+  position: absolute;
+  right: -8px;
+  bottom: -4px;
+  min-width: 18px;
+  padding: 1px 4px;
+  font-family: var(--q-cifra);
+  font-size: 11px;
+  text-align: center;
+  color: var(--q-texto);
+  background: rgba(4, 10, 12, 0.85);
+  border: 1px solid rgba(222, 240, 232, 0.35);
+  border-radius: 3px;
+}
+
+/* ─── La mira del rayo: tres marcas, blanco cálido con filo ámbar, el arco de la carga partido en tres y el punto del pleno ─── */
+
+.q-mira {
+  position: absolute;
+  left: -130px;
+  top: -130px;
+  width: 260px;
+  height: 260px;
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  --q-mira-brillo: 0;
+}
+
+.q-mira svg {
+  overflow: visible;
+}
+
+.q-mira .marca path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/*
+ * El halo: la marca más ancha y DESENFOCADA (el filtro `q-mira-difuso` de la mira), así que es un resplandor que se
+ * pierde, no un contorno de bordes duros. Más vivo con un blanco fijado y en el pleno.
+ */
+.q-mira .marca .halo {
+  stroke: rgba(255, 158, 46, calc(0.34 + 0.4 * var(--q-mira-brillo)));
+  stroke-width: 5.5;
+}
+
+/* El trazo, fino: un núcleo blanco cálido con medio píxel de filo ámbar a cada lado. */
+.q-mira .marca .filo {
+  stroke: rgba(255, 168, 60, 0.95);
+  stroke-width: 2.9;
+}
+
+.q-mira .marca .nucleo {
+  stroke: #fff7ea;
+  stroke-width: 1.9;
+}
+
+/* El arco de la carga: fino y discreto, entre marca y marca (se apaga con las marcas cerradas: `luzDelArco`). */
+.q-mira .carga {
+  fill: none;
+  stroke: rgba(255, 230, 196, calc(0.55 + 0.25 * var(--q-mira-brillo)));
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  /* Un filo de noche pegado, para que el arco se lea también sobre una farola o un cuerpo claro. */
+  filter: drop-shadow(0 0 1px rgba(2, 5, 6, 0.85));
+}
+
+/* El punto del pleno: una luz blanca con su resplandor ámbar. */
+.q-mira .punto .nucleo {
+  fill: #fffaf0;
+}
+
+.q-mira .punto .halo {
+  fill: rgba(255, 176, 72, calc(0.55 + 0.35 * var(--q-mira-brillo)));
+}
+
+.quiebro-raiz[data-nivel='0'] .q-mira .carga {
+  filter: none;
+}
+
+.quiebro-raiz[data-nivel='0'] .q-mira .marca .halo,
+.quiebro-raiz[data-nivel='0'] .q-mira .punto .halo {
+  display: none;
 }
 
 /* ─── La ayuda de teclas (PC) ─── */

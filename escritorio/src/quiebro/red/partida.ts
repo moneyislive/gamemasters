@@ -43,13 +43,24 @@ import type { AccionDelAparato, MensajeDeLaSala } from '../../../../shared/mecan
 import type { NocheDeLaCiudad } from '../../../../shared/arcade/juegos/quiebro-ciudad';
 import { QUIEBRO_DEL_DESVELADO } from '../../../../shared/arcade/juegos/quiebro-reglas';
 import type { ClaseDeCuerpo, CuerpoPintado, FuenteDeCuerpos, Gesto } from '../cuerpos';
-import type { Boton, EstadoDeLosMandos } from '../mandos/estado';
+import type { Boton, EstadoDeLosMandos, RayoSoltado } from '../mandos/estado';
 import type { FuenteConGente, GenteDeLaNoche } from '../personajes/multitud';
-import { estadoDelRayoApagado } from '../rayo/contrato';
-import type { EstadoDelRayo } from '../rayo/contrato';
+import {
+  ALTO_DE_LA_BOCA_SIN_MANO,
+  cargaDe,
+  estadoDelRayoApagado,
+  GESTO_DE_CARGAR,
+  GESTO_DE_LANZAR,
+  nivelDeLaCarga,
+  nivelDelProyectil,
+  semillaDelRayo,
+} from '../rayo/contrato';
+import type { BocaDe, EfectosDelRayo, EstadoDelRayo, NivelLeido, PuntoDelRayo, TiroLeido } from '../rayo/contrato';
 import { direccionDeLaPalanca } from '../mandos/estado';
 import { direccionHacia, elegirBlanco } from '../mandos/enganche';
 import type { Candidato } from '../mandos/enganche';
+import { ALTO_DEL_BLANCO, apuntadoNuevo, apuntarPorLaMira, elegirBlancoDelRayo, proyectar, enPantallaNuevo, radioDeEnganche, radioEnPantalla, seVe } from '../mandos/rayo';
+import type { OjoDelRayo } from '../mandos/rayo';
 import { CanalDeLaLiza } from './canal';
 import type { EstadoDelCanal, FabricaDeEnchufes, Relojes } from './canal';
 import { leerLaLiza } from './diccionario';
@@ -93,6 +104,85 @@ const CONTORNO_EN_EL_APAGON_M = 15;
 const GIRO_DE_LA_CARA_S = 0.09;
 /** Lo que dura el rótulo «de vuelta» tras dejar de estar ausente. */
 export const ROTULO_DE_LA_VUELTA_MS = 2500;
+/** Lo que dura el gesto de lanzar el rayo tras el destello (el retroceso del brazo). */
+export const LANZAR_EL_RAYO_MS = 480;
+/**
+ * Lo que se espera tras soltar a que la sala cuente la bala propia (y con ella su recarga): mientras, no se empieza
+ * otra carga. Si no llega (la sala no lo lanzó), se vuelve a poder.
+ */
+export const ESPERA_DE_LA_BALA_MS = 900;
+/** Un apunte de la cámara más viejo que esto ya no vale: se apunta por el giro (sin cámara, en las pruebas). */
+const EL_APUNTE_CADUCA_MS = 150;
+/** A qué profundidad se mide el área para el círculo de enganche mientras no hay blanco (metros). */
+const PROFUNDIDAD_SIN_BLANCO_M = 12;
+
+/**
+ * LO QUE LA PARTIDA NECESITA DE LOS EFECTOS para el rayo propio (el `SistemaDeEfectos` lo cumple tal cual: lo
+ * cuelga `Quiebro.tsx`). Se lee `rayo` en CADA llamada (contrato §5.1): EFECTOS puede envolverlo.
+ */
+export interface EfectosDeLaPartida {
+  readonly rayo: EfectosDelRayo;
+  readonly boca: BocaDe | null;
+}
+
+/**
+ * CÓMO ESTÁN LOS BOTONES, para quien los pinta (el táctil y el indicador de PC): se escribe en el mismo objeto
+ * una vez por fotograma (`leerLosBotones`). Las recargas salen de lo que dijo la SALA, no de la hora de la
+ * pulsación: un Empellón que la sala tiró no pone el botón en recarga.
+ */
+export interface EstadoDeLosBotones {
+  /** ¿Hay cuerpo con que pelear? (ausente, caído o Vigía: todo apagado). */
+  activos: boolean;
+  readonly golpe: {
+    listo: boolean;
+    /** Los golpes de la Tanda ya dados (0 = ninguno o se rompió) y cuántos tiene. */
+    paso: number;
+    de: number;
+    /** ¿Encadenaría ahora? (la ventana del siguiente está abierta). */
+    ventana: boolean;
+  };
+  readonly quiebro: {
+    listo: boolean;
+    /** Tocado con Foco para la ruptura: el quiebro que cuesta. */
+    ruptura: boolean;
+    /** Un golpe viene hacia mí: por dónde va su anillo (0 recién anunciado, 1 el impacto), o −1 si ninguno. */
+    amenaza: number;
+  };
+  readonly empellon: { listo: boolean; recarga: number; quedaMs: number };
+  readonly rayo: {
+    /** ¿Tiene tiro mi asiento? Sin él, el botón no está. */
+    hay: boolean;
+    listo: boolean;
+    /** Lo que falta de recarga (1 recién disparado, 0 lista) y cuánto, en ms. */
+    recarga: number;
+    quedaMs: number;
+    cargando: boolean;
+    /** La carga de 0 a 1 y el nivel que saldría (1…n), y la `c` desde la que sale cada nivel. */
+    c: number;
+    nivel: number;
+    umbrales: readonly number[];
+  };
+}
+
+export function botonesNuevos(): EstadoDeLosBotones {
+  return {
+    activos: false,
+    golpe: { listo: false, paso: 0, de: 0, ventana: false },
+    quiebro: { listo: false, ruptura: false, amenaza: -1 },
+    empellon: { listo: false, recarga: 0, quedaMs: 0 },
+    rayo: { hay: false, listo: false, recarga: 0, quedaMs: 0, cargando: false, c: 0, nivel: 0, umbrales: [] },
+  };
+}
+
+/** La carga propia en curso. */
+interface CargaPropia {
+  /** El `timeStamp` del evento que la empezó, y su `ms` en el reloj del canal (el que viaja en el cable). */
+  readonly desde: number;
+  readonly ms: number;
+  readonly tiro: TiroLeido;
+  /** ¿Salió ya algún `aqui` con la sostenida? (sin ninguno, el soltar llevaría detrás el suyo). */
+  enviada: boolean;
+}
 
 /** Lo que USAR hace aquí y ahora (para el botón y para el cable). */
 export interface UsoPosible {
@@ -177,9 +267,35 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
   blanco = 0;
   /**
    * LA CARGA DEL RAYO PROPIO (`rayo/contrato.ts`): la escribe la partida una vez por fotograma, en este mismo
-   * objeto, y la leen el HUD, la cámara y los efectos. FASE 0: siempre apagada (nadie carga todavía).
+   * objeto (la carga, el nivel, el área y el alcance en `fotograma`; el blanco y el punto apuntado, con la cámara
+   * de cada fotograma, en `apuntarElRayo`), y la leen el HUD, la cámara y los efectos.
    */
   readonly rayo: EstadoDelRayo = estadoDelRayoApagado();
+  /**
+   * LOS EFECTOS DEL RAYO PROPIO (contrato §5.1): la partida los llama en el acto —empezar, actualizar una vez por
+   * fotograma, cancelar, soltar—. `null` en las pruebas sin escena: entonces no se llama nada.
+   */
+  efectos: EfectosDeLaPartida | null = null;
+  /** El último disparo propio (para la cámara: su golpe de campo y su sacudida), o `null`. */
+  ultimoDisparo: { readonly t: number; readonly c: number; readonly nivel: number } | null = null;
+  /** Cómo están los botones (ver `leerLosBotones`). */
+  readonly botones: EstadoDeLosBotones = botonesNuevos();
+  private carga: CargaPropia | null = null;
+  /** Tras soltar, hasta cuándo se espera la bala propia de la sala (no se carga otra mientras). */
+  private rayoPendienteHastaMs = Number.NEGATIVE_INFINITY;
+  /** Lo que dura entera la recarga que corre ahora (la del nivel que salió), en ms. */
+  private recargaDelRayoMs = 0;
+  /** Hacia dónde salió el último rayo (para mirar hacia ahí mientras dura su gesto). */
+  private rumboDelRayo: number | null = null;
+  /** Cuándo apuntó la cámara por última vez (`apuntarElRayo`). */
+  private ultimoApunteMs = Number.NEGATIVE_INFINITY;
+  private readonly apunte = apuntadoNuevo();
+  private readonly enPantalla = enPantallaNuevo();
+  /** Las recargas que la sala ha apuntado a mis golpes: acción → hasta cuándo (ms de `performance.now()`). */
+  private readonly recargas = new Map<IdDeclarado, number>();
+  /** La Tanda de mi asiento (la Entrada y los eslabones que la siguen), leída una vez por lectura. */
+  private tandaLeida: { readonly lectura: LecturaDeLaLiza; readonly cadena: readonly IdDeclarado[] } | null = null;
+  private umbralesLeidos: { readonly tiro: TiroLeido; readonly umbrales: readonly number[] } | null = null;
   /** Quien falló el último golpe contra mi quiebro limpio: a quien va la Réplica. */
   private autorDelLimpio = 0;
   /**
@@ -272,6 +388,8 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
   /* ─────────────────────────── Lo que llega ─────────────────────────── */
 
   private olvidarLoDelReloj(): void {
+    /* Una carga a medias no sobrevive a otro canal: la sala nueva no la vio empezar. */
+    this.cancelarLaCarga(this.ultimoAhora);
     this.ultimoTicSimulado = -1;
     this.ultimoEnviado = -1;
     this.pendientes.length = 0;
@@ -279,6 +397,7 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
     this.eslabon = null;
     this.gesto = null;
     this.acometidaPendiente = null;
+    this.rayoPendienteHastaMs = Number.NEGATIVE_INFINITY;
   }
 
   private alMensaje(m: MensajeDeLaSala, reloj: RelojDelCanal, ahora: number): void {
@@ -334,6 +453,12 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
         if (s.de === yo) {
           /* LA ANTICIPACIÓN ELÁSTICA: mi gesto ya corría; ahora sabe el instante exacto del impacto. */
           const accion = lectura?.accion(s.acc) ?? null;
+          /*
+           * LA RECARGA, COMO LA APUNTA LA SALA: desde el tic en que lanzó (el impacto menos el anuncio) y sus
+           * tics de recarga (`intentarGolpe` en `combate.ts`). Sólo con su anuncio: una pulsación que la sala tiró
+           * no pone el botón en recarga.
+           */
+          if (accion !== null && accion.recargaTics > 0) this.recargas.set(s.acc, a.impactoMs + (accion.recargaTics - accion.anuncioTics) * MS_POR_TIC);
           if (this.gesto !== null && this.gesto.accion === s.acc) {
             this.gesto.impactoMs = a.impactoMs;
             this.gesto.hastaMs = a.impactoMs + COLA_DEL_GOLPE_MS;
@@ -378,6 +503,40 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
         if (sentido === 'tocado' || sentido === 'derribado' || sentido === 'caido' || sentido === 'descolocado') {
           if (this.gesto !== null && this.gesto.gesto !== 'quiebro') this.gesto = null;
         }
+        /* Y la carga del rayo: cualquier daño la corta, sin disparar (EL-RAYO.md §1.1, paso 5). La sala hace lo mismo. */
+        if (!Partida.dejaCargar(sentido)) this.cancelarLaCarga(ahora);
+        return;
+      }
+      case 'bala': {
+        /*
+         * EL RAYO DE UN ASIENTO: la bala de un nivel de su tiro. La MÍA trae la recarga (desde que salió, la de su
+         * nivel): es la sala quien la apunta. La de OTRO es su gesto de lanzar, porque ningún suceso lleva el
+         * soltar de otro: su brazo suelta cuando sale su bala.
+         */
+        const b = n.bala;
+        if (b === null || lectura === null || b.de < 1 || b.de >= PRIMER_NUMERO_DE_ENTIDAD) return;
+        const tiro = lectura.tiroDelAsiento(b.de);
+        const nivel = tiro === null ? null : nivelDelProyectil(tiro, b.p);
+        if (tiro === null || nivel === null) return;
+        if (b.de === yo) {
+          this.rayo.recargaHastaMs = b.salidaMs + nivel.recargaMs;
+          this.recargaDelRayoMs = nivel.recargaMs;
+          this.rayoPendienteHastaMs = Number.NEGATIVE_INFINITY;
+          return;
+        }
+        const quien = this.porNumero.get(b.de);
+        if (quien === undefined) return;
+        const rumbo = radianesDelRumbo(b.r);
+        this.linea(b.de).empezar({
+          gesto: GESTO_DE_LANZAR,
+          desdeMs: b.salidaMs,
+          finMs: Math.max(ahora + 1, b.salidaMs + LANZAR_EL_RAYO_MS),
+          impactoMs: b.salidaMs,
+          destinoX: quien.x,
+          destinoZ: quien.z,
+          rumbo,
+          direccion: rumbo,
+        });
         return;
       }
       case 'empuja': {
@@ -441,6 +600,7 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
         if (s.a === yo) {
           this.tengoCuerpo = false;
           this.paso?.pararElDesplazamiento();
+          this.cancelarLaCarga(ahora);
         }
         return;
       case 'fase':
@@ -449,6 +609,8 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
           this.tengoCuerpo = true;
           this.recolocarDesdeLaFoto = true;
         }
+        /* La carga no pasa de una fase a otra (la sala suelta la sostenida al cambiar de fase). */
+        this.cancelarLaCarga(ahora);
         return;
       case 'impacta': {
         /* Una bala esquivada en limpio da la Acometida: se vuela hacia el tirador (diseño §4.4). */
@@ -592,6 +754,7 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
   callar(alFondo: boolean): void {
     this.callada = alFondo;
     if (alFondo) {
+      this.cancelarLaCarga(this.ultimoAhora);
       this.sostenida = null;
       this.pendientes.length = 0;
     }
@@ -975,6 +1138,345 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
     return hueco(izquierda) > hueco(derecha) ? izquierda : derecha;
   }
 
+  /* ─────────────────────────── El rayo ─────────────────────────── */
+
+  /*
+   * EL RAYO PROPIO (`docs/quiebro/EL-RAYO.md` §1.1 y §2, contrato §5.1). Los mandos dicen lo que hicieron las manos
+   * (`rayoDesde`, el disparo `soltado`); aquí se decide si se puede, qué va por el cable y qué se ve:
+   *
+   *   · EMPEZAR: sólo en combate, con cuerpo, libre (ni tocado, ni descolocado, ni derribado, ni en el Remanso,
+   *     ni ausente), sin un golpe mío anunciado sin resolver, fuera de la recarga y sin esperar todavía la bala
+   *     del anterior. Si no se puede, la pulsación se olvida (hay que volver a pulsar). Se planta el cuerpo, se
+   *     suelta USAR y los efectos empiezan la carga.
+   *   · MIENTRAS: cada `aqui` lleva `[apuntar, msPulsar, 0]`, con el MISMO `ms` (como USAR), y mira hacia donde
+   *     se apunta; cada fotograma, `partida.rayo` y `actualizarCarga`.
+   *   · SOLTAR: UN `aqui` con `[soltar, msSoltar, blanco]` —la carga es `msSoltar − msPulsar`, dos números del
+   *     mismo reloj, y el nivel el de esa carga: el que la sala va a sacar—, y detrás los `aqui` sin acción. Si
+   *     aún no había salido ningún `aqui` con la sostenida (un toque corto), sale antes uno: la sala sólo dispara
+   *     un soltar que va tras su carga. En el acto, sin esperar a la sala: el gesto de lanzar y `soltar` en los
+   *     efectos, con lo predicho (bala 0).
+   *   · CANCELAR: no se manda nada; el primer `aqui` sin la sostenida la suelta en la sala, que no dispara nada que
+   *     no sea el soltar explícito. Ni recarga ni rayo.
+   */
+
+  /** El tiro de mi asiento, o `null` (sin él no hay rayo). */
+  tiroPropio(): TiroLeido | null {
+    return this.lectura?.tiro ?? null;
+  }
+
+  /** Los estados en que se puede cargar, o seguir cargando (el de cargar incluido). */
+  private static dejaCargar(sentido: SentidoDelEstado): boolean {
+    return sentido === 'libre' || sentido === 'reaparecido' || sentido === 'cargando';
+  }
+
+  /** ¿Se puede EMPEZAR a cargar ahora? */
+  private puedeCargar(ahora: number): boolean {
+    const tiro = this.tiroPropio();
+    const fase = this.sala.fase;
+    if (tiro === null || this.paso === null || this.relojActual === null || !this.tengoCuerpo || this.callada) return false;
+    if (!this.canal.dentro() || this.sala.yo === 0 || fase === null || fase.modo !== CODIGO_DE_MODO.encuentro) return false;
+    if (ahora < this.rayo.recargaHastaMs || ahora < this.rayoPendienteHastaMs) return false;
+    const sentido = this.sentidoPropio(ahora);
+    if (sentido !== 'libre' && sentido !== 'reaparecido') return false;
+    /* Un gesto mío a medias (un golpe sin resolver, un quiebro que aún no ha contado la sala) y un golpe anunciado. */
+    if (this.gesto !== null && ahora < this.gesto.hastaMs) return false;
+    return this.golpePendiente(ahora) === null;
+  }
+
+  /** ¿Puede seguir la carga que hay? (en combate, con cuerpo, sin daño). */
+  private puedeSeguirCargando(ahora: number): boolean {
+    const fase = this.sala.fase;
+    if (this.tiroPropio() === null || !this.tengoCuerpo || this.callada || fase === null || fase.modo !== CODIGO_DE_MODO.encuentro) return false;
+    return Partida.dejaCargar(this.sentidoPropio(ahora));
+  }
+
+  /** Lo que hicieron las manos con el rayo desde el último latido (ver arriba). */
+  private atenderElRayo(ahora: number): void {
+    /* Primero el disparo: soltar y luego quebrar en el mismo latido es un rayo y DESPUÉS un quiebro. */
+    const soltado = this.mandos.tomarRayoSoltado();
+    /*
+     * Un toque tan corto que se pulsó y se soltó entre dos latidos: la carga no llegó a empezar aquí. Si se podía,
+     * empieza con su hora y sale en el acto (el chispazo): un toque rápido no se pierde.
+     */
+    if (soltado !== null && (this.carga === null || this.carga.desde !== soltado.desde)) {
+      this.cancelarLaCarga(ahora);
+      if (this.puedeCargar(ahora)) this.empezarLaCarga(soltado.desde, ahora);
+    }
+    if (soltado !== null) this.soltarLaCarga(soltado, ahora);
+    if (this.carga !== null && this.mandos.rayoDesde !== this.carga.desde) this.cancelarLaCarga(ahora);
+    if (this.carga !== null && !this.puedeSeguirCargando(ahora)) this.cancelarLaCarga(ahora);
+    const desde = this.mandos.rayoDesde;
+    if (desde !== null && this.carga === null) {
+      if (this.puedeCargar(ahora)) this.empezarLaCarga(desde, ahora);
+      else this.mandos.cancelarRayo();
+    }
+  }
+
+  private empezarLaCarga(desde: number, ahora: number): void {
+    const tiro = this.tiroPropio();
+    const reloj = this.relojActual;
+    if (tiro === null || reloj === null) return;
+    const ms = reloj.msDeLaPulsacion(Math.max(desde, reloj.origen));
+    if (ms === null) {
+      this.mandos.cancelarRayo();
+      return;
+    }
+    this.carga = { desde, ms, tiro, enviada: false };
+    /* La carga manda sobre USAR (la sala, igual: otra sostenida suelta la anterior). */
+    this.mandos.soltarUsar();
+    this.sostenida = { accion: tiro.apuntar, ms, blanco: 0, desdeMs: ahora };
+    this.gesto = null;
+    this.rumboDelRayo = null;
+    this.rayo.blanco = 0;
+    this.ultimoApunteMs = Number.NEGATIVE_INFINITY;
+    this.efectos?.rayo.empezarCarga(this.sala.yo, desde);
+  }
+
+  /** Se deja la carga SIN disparar: nada por el cable (el `aqui` sin la sostenida la suelta en la sala). */
+  private cancelarLaCarga(ahora: number): void {
+    const carga = this.carga;
+    if (carga === null) return;
+    this.carga = null;
+    if (this.sostenida !== null && this.sostenida.accion === carga.tiro.apuntar) this.sostenida = null;
+    /* El dedo que sigue en el botón deja de cargar (una pulsación NUEVA, de después, no se toca). */
+    if (this.mandos.rayoDesde === carga.desde) this.mandos.cancelarRayo();
+    this.rayo.blanco = 0;
+    this.efectos?.rayo.cancelarCarga(this.sala.yo, ahora);
+  }
+
+  /** ¿Es `numero` un blanco que el rayo de `nivel` alcanza ahora desde donde estoy, a la vista? */
+  private blancoQueAlcanza(numero: number, nivel: NivelLeido): boolean {
+    const l = this.lectura;
+    const yo = this.porNumero.get(this.sala.yo);
+    if (numero === 0 || l === null || yo === undefined) return false;
+    for (const c of this.candidatos()) {
+      if (c.numero !== numero) continue;
+      return Math.hypot(c.x - yo.x, c.z - yo.z) <= nivel.alcance && seVe(l.arena.cuerpos, yo.x, yo.z, c.x, c.z);
+    }
+    return false;
+  }
+
+  /** SALE EL RAYO (ver arriba). */
+  private soltarLaCarga(s: RayoSoltado, ahora: number): void {
+    const carga = this.carga;
+    const reloj = this.relojActual;
+    if (carga === null || reloj === null) return;
+    this.carga = null;
+    if (this.sostenida !== null && this.sostenida.accion === carga.tiro.apuntar) this.sostenida = null;
+    const tiro = carga.tiro;
+    const yo = this.sala.yo;
+    const msSoltar = Math.max(carga.ms, reloj.msDeLaPulsacion(s.hasta) ?? reloj.ms(ahora));
+    const cargaMs = msSoltar - carga.ms;
+    const nivel = nivelDeLaCarga(tiro, cargaMs);
+    const c = cargaDe(tiro, cargaMs);
+    const blanco = this.blancoQueAlcanza(s.blanco, nivel) ? s.blanco : 0;
+    if (!carga.enviada) this.pendientes.push([tiro.apuntar, carga.ms, 0]);
+    this.pendientes.push([tiro.soltar, msSoltar, blanco]);
+
+    /* Lo que se ve en el acto: desde la mano, hasta el blanco, lo apuntado o el final del alcance. */
+    const cuerpo = this.porNumero.get(yo);
+    const x = cuerpo?.x ?? (this.paso?.x ?? 0) / UNO;
+    const z = cuerpo?.z ?? (this.paso?.z ?? 0) / UNO;
+    const origen: PuntoDelRayo = { x, y: ALTO_DE_LA_BOCA_SIN_MANO, z };
+    const boca = this.efectos?.boca ?? null;
+    if (boca !== null) boca(yo, origen);
+    const destino: PuntoDelRayo = { x, y: ALTO_DE_LA_BOCA_SIN_MANO, z };
+    const objetivo = blanco === 0 ? undefined : this.porNumero.get(blanco);
+    if (objetivo !== undefined) {
+      destino.x = objetivo.x;
+      destino.y = ALTO_DEL_BLANCO;
+      destino.z = objetivo.z;
+    } else if (ahora - this.ultimoApunteMs <= EL_APUNTE_CADUCA_MS) {
+      destino.x = this.rayo.apuntado.x;
+      destino.z = this.rayo.apuntado.z;
+    } else {
+      destino.x = x + Math.sin(this.giroDeLaCamara) * nivel.alcance;
+      destino.z = z - Math.cos(this.giroDeLaCamara) * nivel.alcance;
+    }
+    const lejos = Math.hypot(destino.x - x, destino.z - z);
+    if (lejos > nivel.alcance && lejos > 0) {
+      destino.x = x + ((destino.x - x) * nivel.alcance) / lejos;
+      destino.z = z + ((destino.z - z) * nivel.alcance) / lejos;
+    }
+    this.rumboDelRayo = lejos > 1e-3 ? direccionHacia(destino.x - x, destino.z - z) : this.giroDeLaCamara;
+    this.miraPropia = this.rumboDelRayo;
+    this.gesto = { gesto: GESTO_DE_LANZAR, desdeMs: s.hasta, impactoMs: s.hasta, hastaMs: s.hasta + LANZAR_EL_RAYO_MS, direccion: this.rumboDelRayo, accion: tiro.soltar };
+    this.rayoPendienteHastaMs = s.hasta + ESPERA_DE_LA_BALA_MS;
+    this.ultimoDisparo = { t: s.hasta, c, nivel: nivel.nivel };
+    this.rayo.blanco = 0;
+    this.efectos?.rayo.soltar({
+      quien: yo,
+      bala: 0,
+      origen,
+      destino,
+      nivel: nivel.nivel,
+      c,
+      area: nivel.area,
+      dio: blanco !== 0,
+      semilla: semillaDelRayo(yo, Math.round(s.hasta)),
+      t: s.hasta,
+    });
+  }
+
+  /**
+   * APUNTA EL RAYO con la cámara de este fotograma (la llama `Camara.tsx` al acabar de ponerse): el blanco bajo la
+   * mira —con `entrada`, el más a mano en toda la pantalla: el de la cámara que gira sola al empezar— y, sin él,
+   * el punto que toca la línea de la mira. Devuelve el blanco (0 = ninguno). Sin carga, nada.
+   */
+  apuntarElRayo(ojo: OjoDelRayo, ahora: number, entrada: boolean): number {
+    const carga = this.carga;
+    const l = this.lectura;
+    const yo = this.porNumero.get(this.sala.yo);
+    if (carga === null || l === null || yo === undefined) return 0;
+    const nivel = nivelDeLaCarga(carga.tiro, Math.max(0, ahora - carga.desde));
+    const anterior = this.rayo.blanco;
+    const delAnterior = anterior === 0 ? undefined : this.porNumero.get(anterior);
+    const profundidad =
+      delAnterior !== undefined && proyectar(ojo, delAnterior.x, ALTO_DEL_BLANCO, delAnterior.z, this.enPantalla) ? this.enPantalla.profundidad : PROFUNDIDAD_SIN_BLANCO_M;
+    const radio = entrada ? ojo.aspecto + 0.1 : radioDeEnganche(radioEnPantalla(ojo, nivel.area, profundidad));
+    const blanco = elegirBlancoDelRayo({ ojo, x: yo.x, z: yo.z, alcance: nivel.alcance, radio, anterior, cuerpos: l.arena.cuerpos }, this.candidatos());
+    this.rayo.blanco = blanco;
+    const a = this.rayo.apuntado;
+    const objetivo = blanco === 0 ? undefined : this.porNumero.get(blanco);
+    if (objetivo !== undefined) {
+      a.x = objetivo.x;
+      a.y = ALTO_DEL_BLANCO;
+      a.z = objetivo.z;
+    } else if (apuntarPorLaMira(ojo, yo.x, yo.z, nivel.alcance, nivel.radioContraLaEstructura, l.arena.cuerpos, this.apunte)) {
+      a.x = this.apunte.x;
+      a.y = ALTO_DE_LA_BOCA_SIN_MANO;
+      a.z = this.apunte.z;
+    }
+    this.ultimoApunteMs = ahora;
+    return blanco;
+  }
+
+  /** LA CARGA DE ESTE FOTOGRAMA en `partida.rayo`, y a los efectos (una vez por fotograma). */
+  private actualizarElRayo(ahora: number): void {
+    const r = this.rayo;
+    const carga = this.carga;
+    if (carga === null) {
+      r.activo = false;
+      r.desdeMs = Number.NaN;
+      r.c = 0;
+      r.nivel = 0;
+      r.blanco = 0;
+      r.area = 0;
+      r.alcance = 0;
+      return;
+    }
+    const cargaMs = Math.max(0, ahora - carga.desde);
+    const nivel = nivelDeLaCarga(carga.tiro, cargaMs);
+    r.activo = true;
+    r.desdeMs = carga.desde;
+    r.c = cargaDe(carga.tiro, cargaMs);
+    r.nivel = nivel.nivel;
+    r.area = nivel.area;
+    r.alcance = nivel.alcance;
+    /* Un blanco que ya no se alcanza (se fue, cayó, se tapó) se suelta. */
+    if (r.blanco !== 0 && !this.blancoQueAlcanza(r.blanco, nivel)) r.blanco = 0;
+    /* Sin cámara que apunte (en las pruebas, o si no llega), por el giro de la cámara hasta el alcance. */
+    if (ahora - this.ultimoApunteMs > EL_APUNTE_CADUCA_MS) {
+      const yo = this.porNumero.get(this.sala.yo);
+      if (yo !== undefined) {
+        r.apuntado.x = yo.x + Math.sin(this.giroDeLaCamara) * nivel.alcance;
+        r.apuntado.y = ALTO_DE_LA_BOCA_SIN_MANO;
+        r.apuntado.z = yo.z - Math.cos(this.giroDeLaCamara) * nivel.alcance;
+      }
+    }
+    this.efectos?.rayo.actualizarCarga(this.sala.yo, r, ahora);
+  }
+
+  /** Hasta cuándo recarga el golpe `accion` según la sala (ms de `performance.now()`), o 0. */
+  private recargaDe(accion: IdDeclarado): number {
+    return accion === 0 ? 0 : (this.recargas.get(accion) ?? 0);
+  }
+
+  /** La Tanda de mi asiento: la Entrada y los eslabones que la siguen, en orden. */
+  private cadenaDeLaTanda(l: LecturaDeLaLiza): readonly IdDeclarado[] {
+    if (this.tandaLeida !== null && this.tandaLeida.lectura === l) return this.tandaLeida.cadena;
+    const cadena: IdDeclarado[] = [];
+    let a = l.botones.entrada;
+    while (a !== 0 && cadena.length < 8 && !cadena.includes(a)) {
+      cadena.push(a);
+      a = l.siguienteEnLaTanda(a);
+    }
+    this.tandaLeida = { lectura: l, cadena };
+    return cadena;
+  }
+
+  /**
+   * CÓMO ESTÁN LOS BOTONES AHORA (ver `EstadoDeLosBotones`): lo escribe en `this.botones` y lo devuelve. Lo llama
+   * quien pinta los botones, una vez por fotograma.
+   */
+  leerLosBotones(ahora: number): EstadoDeLosBotones {
+    const b = this.botones;
+    const l = this.lectura;
+    const r = l?.reglas ?? null;
+    const sentido = this.sentidoPropio(ahora);
+    b.activos = l !== null && r !== null && this.tengoCuerpo && sentido !== 'ausente' && sentido !== 'caido' && sentido !== 'sin-cuerpo';
+    const yo = this.sala.yo;
+
+    /* GOLPE: siempre se puede pulsar; lo que cuenta es por dónde va la Tanda. */
+    const cadena = l === null ? [] : this.cadenaDeLaTanda(l);
+    b.golpe.listo = b.activos;
+    b.golpe.de = cadena.length;
+    b.golpe.paso = 0;
+    b.golpe.ventana = false;
+    const eslabon = this.eslabon;
+    if (l !== null && eslabon !== null) {
+      const i = cadena.indexOf(eslabon.accion);
+      const siguiente = l.siguienteEnLaTanda(eslabon.accion);
+      const tras = siguiente === 0 ? null : l.accion(siguiente);
+      const despues = tras?.cadena?.despuesMs ?? 0;
+      const antes = tras?.cadena?.antesMs ?? 0;
+      if (i >= 0 && ahora <= eslabon.impactoMs + Math.max(despues, 0)) b.golpe.paso = i + 1;
+      b.golpe.ventana = tras !== null && ahora >= eslabon.impactoMs - antes && ahora <= eslabon.impactoMs + despues;
+    }
+
+    /* QUIEBRO: listo o con ruptura, y encendido si viene un golpe hacia mí. */
+    const puedeQuebrar = sentido === 'libre' || sentido === 'quiebro' || sentido === 'remanso' || sentido === 'reaparecido' || sentido === 'cargando';
+    const medidor = this.sala.cuentas.get(yo)?.medidor ?? 0;
+    const ruptura = r !== null && !puedeQuebrar && r.esquiva.ruptura.desde.some((e) => l?.sentidoDelEstado(e) === sentido) && medidor >= r.esquiva.ruptura.coste;
+    b.quiebro.listo = b.activos && (puedeQuebrar || ruptura);
+    b.quiebro.ruptura = b.activos && ruptura;
+    let amenaza = -1;
+    if (yo > 0) {
+      for (const a of this.sala.anuncios.values()) {
+        if (a.a !== yo || a.impactoMs <= ahora) continue;
+        const largo = a.impactoMs - a.llegoMs;
+        const por = largo <= 0 ? 1 : Math.max(0, Math.min(1, (ahora - a.llegoMs) / largo));
+        if (por > amenaza) amenaza = por;
+      }
+    }
+    b.quiebro.amenaza = b.activos ? amenaza : -1;
+
+    /* EMPELLÓN: su recarga, la que apuntó la sala. */
+    const empellon = l?.botones.empellon ?? 0;
+    const declarado = empellon === 0 || l === null ? null : l.accion(empellon);
+    const hastaEmpellon = this.recargaDe(empellon);
+    const totalEmpellon = (declarado?.recargaTics ?? 0) * MS_POR_TIC;
+    b.empellon.quedaMs = Math.max(0, hastaEmpellon - ahora);
+    b.empellon.recarga = totalEmpellon <= 0 ? 0 : Math.min(1, b.empellon.quedaMs / totalEmpellon);
+    b.empellon.listo = b.activos && b.empellon.quedaMs <= 0;
+
+    /* RAYO: si lo hay, su recarga (la de la sala), y la carga mientras se mantiene. */
+    const tiro = this.tiroPropio();
+    b.rayo.hay = tiro !== null;
+    b.rayo.cargando = this.carga !== null;
+    b.rayo.c = this.rayo.c;
+    b.rayo.nivel = this.rayo.nivel;
+    b.rayo.quedaMs = Math.max(0, this.rayo.recargaHastaMs - ahora);
+    b.rayo.recarga = this.recargaDelRayoMs <= 0 ? 0 : Math.min(1, b.rayo.quedaMs / this.recargaDelRayoMs);
+    b.rayo.listo = b.rayo.cargando || this.puedeCargar(ahora);
+    if (tiro === null) b.rayo.umbrales = [];
+    else {
+      if (this.umbralesLeidos === null || this.umbralesLeidos.tiro !== tiro) this.umbralesLeidos = { tiro, umbrales: tiro.niveles.map((n) => cargaDe(tiro, n.desdeMs)) };
+      b.rayo.umbrales = this.umbralesLeidos.umbrales;
+    }
+    return b;
+  }
+
   /* ─────────────────────────── El bucle ─────────────────────────── */
 
   /** Los tics que tocan hasta `ahora`: paso, acción y `aqui`. */
@@ -1006,7 +1508,8 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
     const correr = this.mandos.correrPedido || (aFondo && !this.hayEnemigosA(ENEMIGOS_QUE_IMPIDEN_CORRER_M));
     const est = this.sala.estadoEn(this.sala.yo, ahora);
     const declarado = est === 0 ? null : l.estado(est);
-    const bloqueado = declarado !== null && declarado.bloqueaPaso;
+    /* Cargando, plantado desde el primer tic (EL-RAYO.md §1.1), sin esperar a que la sala mande su estado. */
+    const bloqueado = (declarado !== null && declarado.bloqueaPaso) || this.carga !== null;
     if (this.acometidaPendiente !== null && !paso.desplazandose()) this.seguirLaAcometida();
     const dado = paso.paso(
       { rumbo: direccion === null ? null : rumboDeRadianes(direccion), fuerza: this.mandos.fuerza, correr },
@@ -1014,10 +1517,19 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
       l.limite(fase.limite),
     );
     if (dado.marcha > 0) this.seHaMovido = true;
-    /* Hacia dónde miro: a mi blanco si peleo con él, si no hacia donde ando. */
+    /*
+     * Hacia dónde miro: cargando, hacia donde apunto (es el rumbo con que la sala lanza el rayo sin blanco); tras
+     * soltar, hacia donde salió mientras dura el gesto (el `aqui` del soltar sale en este tic); peleando, a mi
+     * blanco; si no, hacia donde ando.
+     */
     const blanco = this.blanco === 0 ? undefined : this.porNumero.get(this.blanco);
     const yoPintado = this.porNumero.get(this.sala.yo);
-    if (this.gesto !== null && blanco !== undefined && yoPintado !== undefined && ahora < this.gesto.hastaMs) {
+    const apuntado = this.rayo.apuntado;
+    if (this.carga !== null && yoPintado !== undefined && Math.hypot(apuntado.x - yoPintado.x, apuntado.z - yoPintado.z) > 0.05) {
+      this.miraPropia = direccionHacia(apuntado.x - yoPintado.x, apuntado.z - yoPintado.z);
+    } else if (this.gesto !== null && this.gesto.gesto === GESTO_DE_LANZAR && this.rumboDelRayo !== null && ahora < this.gesto.hastaMs) {
+      this.miraPropia = this.rumboDelRayo;
+    } else if (this.gesto !== null && blanco !== undefined && yoPintado !== undefined && ahora < this.gesto.hastaMs) {
       this.miraPropia = direccionHacia(blanco.x - yoPintado.x, blanco.z - yoPintado.z);
     } else if (dado.marcha > 0) {
       this.miraPropia = radianesDelRumbo(paso.rumboDelPaso);
@@ -1033,7 +1545,10 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
     if (pulsada !== undefined) {
       a = pulsada;
       this.sostenida = null;
-    } else if (this.sostenida !== null) a = [this.sostenida.accion, this.sostenida.ms, this.sostenida.blanco];
+    } else if (this.sostenida !== null) {
+      a = [this.sostenida.accion, this.sostenida.ms, this.sostenida.blanco];
+      if (this.carga !== null && this.sostenida.accion === this.carga.tiro.apuntar) this.carga.enviada = true;
+    }
     if (
       this.canal.enviar({
         t: 'aqui',
@@ -1051,6 +1566,8 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
 
   /** USAR: se empieza a mantener, o se suelta. */
   private atenderUsar(ahora: number): void {
+    /* Cargando, la sostenida es la del rayo (y la carga ya soltó USAR). */
+    if (this.carga !== null) return;
     const reloj = this.relojActual;
     const desde = this.mandos.usarDesde;
     if (desde === null || reloj === null) {
@@ -1075,6 +1592,8 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
    */
   latir(ahora: number): void {
     this.ultimoAhora = ahora;
+    /* El rayo antes que las pulsaciones: un soltar y un QUIEBRO del mismo latido salen en ese orden. */
+    this.atenderElRayo(ahora);
     for (const p of this.mandos.tomarPulsaciones()) this.atenderPulsacion(p.boton, p.timeStamp, ahora, p.palancaX, p.palancaY);
     this.atenderUsar(ahora);
     this.alcanzar(ahora);
@@ -1089,6 +1608,7 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
     this.paso?.fundir(dt);
     if (this.gesto !== null && ahora >= this.gesto.hastaMs) this.gesto = null;
     if (this.eslabon !== null && ahora > this.eslabon.impactoMs + 1500) this.eslabon = null;
+    this.actualizarElRayo(ahora);
     this.escribirLosCuerpos(ahora, dt);
     if (this.blanco !== 0 && !this.porNumero.has(this.blanco)) this.blanco = 0;
   }
@@ -1173,8 +1693,18 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
       c.rumbo = this.miraPintada;
       c.velocidad = this.velocidadPintada;
       const est = this.sala.estadoEn(yo, ahora);
-      const delEstado = est === 0 ? null : l.gestoDelEstado(est);
-      if (this.gesto !== null) {
+      /* El estado de cargar que aún dice la sala tras soltar o cancelar aquí no vuelve a poner la carga. */
+      const delEstadoCrudo = est === 0 ? null : l.gestoDelEstado(est);
+      const delEstado = delEstadoCrudo === GESTO_DE_CARGAR && this.carga === null ? null : delEstadoCrudo;
+      c.carga = 0;
+      if (this.carga !== null) {
+        /* CARGANDO: el gesto de cargar desde que se pulsó, con la carga de este fotograma (la ve ANIMACIÓN). */
+        c.gesto = GESTO_DE_CARGAR;
+        c.gestoDesdeMs = this.carga.desde;
+        c.impactoMs = null;
+        c.direccionDelGesto = null;
+        c.carga = this.rayo.c;
+      } else if (this.gesto !== null) {
         c.gesto = this.gesto.gesto;
         c.gestoDesdeMs = this.gesto.desdeMs;
         c.impactoMs = this.gesto.impactoMs;
@@ -1262,6 +1792,16 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
         c.gesto = Partida.locomocion(m.velocidad, m.marcha);
         c.impactoMs = null;
         c.direccionDelGesto = null;
+      }
+      /*
+       * LA CARGA DE OTRO, que no viaja: lo que lleva en su estado de cargar (desde que llegó a este aparato),
+       * contada con SU tiro. Es información de juego —se ve venir un pleno—, así que va igual en todos los niveles.
+       */
+      c.carga = 0;
+      if (c.gesto === GESTO_DE_CARGAR && l !== null) {
+        const tiro = l.tiroDelAsiento(numero);
+        const e = this.sala.estados.get(numero);
+        c.carga = tiro === null || e === undefined ? 0 : cargaDe(tiro, ahora - e.desdeMs);
       }
       const mio = yo > 0 ? this.porNumero.get(yo) : undefined;
       c.contorno = !(this.apagon && numero >= PRIMER_NUMERO_DE_ENTIDAD && mio !== undefined && Math.hypot(c.x - mio.x, c.z - mio.z) > CONTORNO_EN_EL_APAGON_M);

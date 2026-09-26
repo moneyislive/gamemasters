@@ -190,14 +190,32 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
   const vistaCruda = puerto.vista;
   const codigo = puerto.codigo;
   const vista = useMemo(() => leerVistaDelQuiebro(vistaCruda), [vistaCruda, rev]);
+  /*
+   * SÓLO EN DESARROLLO, `?rayo=juguete`: la liza de ESTE aparato con el tiro de juguete (`red/tiro-de-prueba.ts`),
+   * para probar el rayo en el juego mientras la sala no lo cumpla. El `import()` va dentro del bloque de desarrollo:
+   * el empaquetado ni lo lleva. El tiro de juguete no toca el mundo: el lugar y la ciudad son los mismos.
+   */
+  const [conTiroDeJuguete, ponerConTiroDeJuguete] = useState<((l: LizaDeclarada) => LizaDeclarada) | null>(null);
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    let pedido = false;
+    try {
+      pedido = new URLSearchParams(window.location.search).get('rayo') === 'juguete';
+    } catch {
+      pedido = false;
+    }
+    if (!pedido) return;
+    void import('./red/tiro-de-prueba').then((m) => ponerConTiroDeJuguete(() => m.conTiroDeJuguete));
+  }, []);
   const liza = useMemo<LizaDeclarada | null>(() => {
     if (vista === null) return null;
     try {
-      return lizaDeLaMesa(ID_DEL_QUIEBRO, vistaCruda, codigo);
+      const deLaMesa = lizaDeLaMesa(ID_DEL_QUIEBRO, vistaCruda, codigo);
+      return deLaMesa === null || conTiroDeJuguete === null ? deLaMesa : conTiroDeJuguete(deLaMesa);
     } catch {
       return null;
     }
-  }, [vista, vistaCruda, codigo]);
+  }, [vista, vistaCruda, codigo, conTiroDeJuguete]);
   /* Dónde se juega, guardado por identidad (ver «El barrio o la ciudad»). */
   const lugarAnterior = useRef<LugarDeLaNoche | null>(null);
   const avisoDelLugar = useRef<string | null>(null);
@@ -237,6 +255,19 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
     });
   }, [codigo, llave, servidor, mandos]);
   useEffect(() => () => partida?.cerrar(), [partida]);
+  /*
+   * EL RAYO PROPIO (contrato del rayo §5.1): la partida llama a los efectos en el acto (empezar, actualizar,
+   * cancelar, soltar), leyendo `sistema.rayo` en cada llamada, y saca la mano de `sistema.boca`.
+   */
+  useEffect(() => {
+    if (partida === null) return undefined;
+    partida.efectos = sistema;
+    return () => {
+      partida.efectos = null;
+    };
+  }, [partida, sistema]);
+  const partidaViva = useRef<Partida | null>(null);
+  partidaViva.current = partida;
   const escena = useMemo(() => (partida === null ? null : new Escenificador(partida, sistema, sonido)), [partida, sistema, sonido]);
   /* El mapa vivo de la partida: el minimapa, el plano y el rumbo lo leen (ver `red/orientarse.ts`). */
   const mapa = useMemo(() => (partida === null ? null : new OrientacionDeLaPartida(partida)), [partida]);
@@ -362,6 +393,8 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
       activo: () => jugandoAhora.current,
       alMarcador: ponerMarcador,
       alMenu: () => ponerMenu((m) => !m),
+      /* El blanco que la mira del rayo tiene debajo al soltar la R. */
+      blancoDelRayo: () => partidaViva.current?.rayo.blanco ?? 0,
     });
   }, [mandos]);
   useEffect(() => {
@@ -382,7 +415,6 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
   /* Lo que el reloj de la Bajada mira en cada fotograma: la clave de la fase y si están todos listos. */
   const claveDeLaMesa = useMemo(() => (vista === null ? '' : claveDeLaFase(vista)), [vista]);
   const todosListos = useMemo(() => vista !== null && vista.fase.tipo === 'bajada' && quienesFaltanEnLaBajada(vista).length === 0, [vista]);
-  const recarga = partida?.lectura?.accion(partida.lectura.botones.empellon)?.recargaTics ?? 0;
 
   return (
     <div className={incrustado ? 'quiebro-raiz incrustado' : 'quiebro-raiz'} data-nivel={nivelActual}>
@@ -416,7 +448,7 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
       </div>
       <div className={enLaCiudad && bajado && (fase === 'oleada' || fase === 'llamada' || fase === 'pausa') ? 'quiebro-hud q-con-minimapa' : 'quiebro-hud'}>
         {bajado && tactil && (fase === 'oleada' || fase === 'llamada') && !menu ? (
-          <MandosTactiles mandos={mandos} partida={partida} zurdo={zurdo} recargaDelEmpellonMs={recarga * 50} />
+          <MandosTactiles mandos={mandos} partida={partida} zurdo={zurdo} />
         ) : null}
         <Hud
           vista={vista}

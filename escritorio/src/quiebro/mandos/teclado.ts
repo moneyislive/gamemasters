@@ -11,10 +11,18 @@
  *   Espacio / clic der. / K ... QUIEBRO
  *   F / L ............. EMPELLÓN
  *   E (mantener) ...... USAR
+ *   R (mantener) ...... RAYO: se carga mientras se mantiene y sale al soltar la R (el ratón apunta)
  *   Mayúsculas ........ correr
  *   Q ................. AVISO
  *   Tab ............... marcador
  *   Esc ............... soltar el ratón (lo hace el navegador)
+ *
+ * ═══ EL RAYO EN PC (`docs/quiebro/EL-RAYO.md` §1.3) ═══
+ *
+ * Bajar la R empieza a cargar (la repetición de la tecla no es otra carga) y SUBIRLA dispara, con la hora de su
+ * `keyup` y el blanco que la mira tiene debajo (`blancoDelRayo`). Todo lo que quita la mano del juego CANCELA sin
+ * disparar: perder el foco (como siempre, `soltarTodo`), Esc (el menú, o soltar el ratón bloqueado: con el ratón
+ * suelto no se apunta) y abrir el plano (la M, que lo hace el HUD).
  *
  * Se leen por `event.code` —la TECLA, no la letra—: en un teclado francés la W está donde la Z, y quien
  * juega con WASD pone los dedos en el mismo sitio en todos.
@@ -47,6 +55,8 @@ export interface OpcionesDelTeclado {
   readonly alMenu?: () => void;
   /** ¿Se juega ahora? Fuera de la pelea el teclado no mueve a nadie (la reunión, la pausa). */
   readonly activo: () => boolean;
+  /** El blanco que la mira del rayo tiene debajo ahora (0 = ninguno): va con el disparo al soltar la R. */
+  readonly blancoDelRayo?: () => number;
 }
 
 /** Engancha el teclado y el ratón. Devuelve cómo soltarlos. */
@@ -79,6 +89,8 @@ export function engancharElTeclado(mandos: EstadoDeLosMandos, o: OpcionesDelTecl
       return;
     }
     if (e.code === 'Escape') {
+      /* Esc quita la mano del juego (el menú, o el ratón que deja de apuntar): la carga se deja. */
+      mandos.cancelarRayo();
       if (!bloqueado()) o.alMenu?.();
       return;
     }
@@ -104,6 +116,9 @@ export function engancharElTeclado(mandos: EstadoDeLosMandos, o: OpcionesDelTecl
         case 'KeyQ':
           mandos.pulsar('aviso', e.timeStamp);
           break;
+        case 'KeyR':
+          mandos.pulsar('rayo', e.timeStamp);
+          break;
         default:
           break;
       }
@@ -115,6 +130,8 @@ export function engancharElTeclado(mandos: EstadoDeLosMandos, o: OpcionesDelTecl
   const alSubir = (e: KeyboardEvent): void => {
     pulsadas.delete(e.code);
     if (e.code === 'KeyE') mandos.soltarUsar();
+    /* Soltar la R dispara (si había carga: si no, `soltarRayo` no hace nada). */
+    if (e.code === 'KeyR') mandos.soltarRayo(e.timeStamp, o.blancoDelRayo?.() ?? 0);
     recalcularPalanca(e.timeStamp);
   };
 
@@ -165,6 +182,13 @@ export function engancharElTeclado(mandos: EstadoDeLosMandos, o: OpcionesDelTecl
   const alErrorDelBloqueo = (): void => {
     bloqueoFallido = true;
   };
+  /* El ratón bloqueado que se suelta (Esc, que el navegador se come, o el sistema) deja de apuntar: se cancela. */
+  let estabaBloqueado = false;
+  const alCambiarElBloqueo = (): void => {
+    const ahora = bloqueado();
+    if (estabaBloqueado && !ahora) mandos.cancelarRayo();
+    estabaBloqueado = ahora;
+  };
   const alPerderElFoco = (): void => {
     pulsadas.clear();
     arrastrando = false;
@@ -179,6 +203,7 @@ export function engancharElTeclado(mandos: EstadoDeLosMandos, o: OpcionesDelTecl
     if (alFondo) alPerderElFoco();
   });
   document.addEventListener('pointerlockerror', alErrorDelBloqueo);
+  document.addEventListener('pointerlockchange', alCambiarElBloqueo);
   o.superficie.addEventListener('mousedown', alBajarElRaton);
   window.addEventListener('mouseup', alSubirElRaton);
   window.addEventListener('mousemove', alMoverElRaton);
@@ -190,6 +215,7 @@ export function engancharElTeclado(mandos: EstadoDeLosMandos, o: OpcionesDelTecl
     window.removeEventListener('blur', alPerderElFoco);
     dejarElFondo();
     document.removeEventListener('pointerlockerror', alErrorDelBloqueo);
+    document.removeEventListener('pointerlockchange', alCambiarElBloqueo);
     o.superficie.removeEventListener('mousedown', alBajarElRaton);
     window.removeEventListener('mouseup', alSubirElRaton);
     window.removeEventListener('mousemove', alMoverElRaton);

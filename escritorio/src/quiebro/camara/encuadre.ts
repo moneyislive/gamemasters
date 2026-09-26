@@ -80,6 +80,95 @@ export const FOV_ABIERTO_DE_CINE = 6;
 /** El Remanso: 20° de órbita y 8° menos de campo. */
 export const ORBITA_DEL_REMANSO = (20 * Math.PI) / 180;
 export const FOV_DEL_REMANSO = 8;
+
+/*
+ * ═══ EL ZOOM DEL RAYO (`docs/quiebro/EL-RAYO.md` §1.1 y §3) ═══
+ *
+ * Mientras se carga, el campo se cierra hasta 10° con la carga: un acercamiento LIGERO, como el de quien entorna
+ * los ojos para apuntar (75° → 65° en el teléfono), sin mira de arma. El zoom es sólo el campo; lo que se mueve la
+ * cámara es el ENCUADRE DE APUNTAR (abajo), que va aparte. La carga que llega aquí ya viene suavizada
+ * (`suavizarElZoom`): entra en ≈0,25 s y sale en ≈0,12 s, y empieza por una parte (`ZOOM_AL_EMPEZAR`) al pulsar —el
+ * zoom se nota ya en el primer cuarto de segundo— y sigue cerrándose con la carga, más al final (como el
+ * francotirador que contiene la respiración).
+ *
+ * ═══ EL ENCUADRE DE APUNTAR (decisión del coordinador del rayo, 26-sep; común a MANDOS y EFECTOS) ═══
+ *
+ * Al hombro de siempre (0,7 m) el cuerpo queda al 41 % del ancho y la mira al 50 %: lo que se apunta, y la línea de
+ * la mano a ello, van pegados a la espalda, y lo que hay detrás del cuerpo no se ve. Mientras se carga, la cámara
+ * pasa a un encuadre de apuntar, con la MISMA exponencial que el zoom (entra en ≈0,25 s, sale en ≈0,12 s):
+ *   · el hombro de 0,7 a `HOMBRO_DE_APUNTAR` (1,05 m): el cuerpo se va a un lado y deja libre el centro;
+ *   · la cámara `BAJADA_AL_APUNTAR` (0,15 m) más baja con el cabeceo de reposo (a la altura del hombro de quien
+ *     apunta: de 1,7 a 1,55 m), sin cambiar hacia dónde mira;
+ *   · y `ACERCAMIENTO_AL_APUNTAR` (0,6 m) más cerca (de 3,2 a 2,6 m; de 4 a 3,4 abierta), que el zoom de campo sigue
+ *     aparte.
+ * NO SE PELEA CON LAS PAREDES. El acercamiento no pasa por el «acercarse en el acto» de la pared: la distancia es la
+ * menor de la que deja la pared (`estado.distancia`, con su regla de siempre) y la de apuntar (suave), así que
+ * contra una pared manda la pared y en abierto la curva; ninguna de las dos salta. El hombro de más se corta en la
+ * pared de la derecha (en el acto, como la distancia: el hombro no puede meterse en una caja, que pondría la cámara
+ * a la distancia mínima de golpe) y vuelve a abrirse suave. Sin carga no cambia nada: `apunte` es 0 exacto (se
+ * redondea a cero al acabar de salir) y las cuentas son las de siempre.
+ */
+/** Lo que se cierra el campo con la carga llena, en grados. */
+export const FOV_DE_LA_CARGA = 10;
+/** La parte del zoom que entra sólo con pulsar (y el resto con la carga). */
+export const ZOOM_AL_EMPEZAR = 0.25;
+/** Lo que tarda el zoom en entrar y en salir: el 95 % en ese rato (tres constantes de tiempo). */
+export const ZOOM_ENTRA_S = 0.25;
+export const ZOOM_SALE_S = 0.12;
+/** El golpe de campo del disparo: −2° en el acto, que vuelve en 150 ms. */
+export const RETROCESO_DEL_DISPARO = 2;
+export const RETROCESO_MS = 150;
+
+/** EL ZOOM QUE SE QUIERE con la carga `c` (0..1): nada sin cargar; al pulsar, `ZOOM_AL_EMPEZAR`; lleno en el pleno. */
+export function zoomDeLaCarga(cargando: boolean, c: number): number {
+  if (!cargando) return 0;
+  const x = Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : 0;
+  return ZOOM_AL_EMPEZAR + (1 - ZOOM_AL_EMPEZAR) * x * Math.sqrt(x);
+}
+
+/** EL ZOOM SUAVIZADO: de `actual` hacia `quiere` en `dt` s, entrando en `ZOOM_ENTRA_S` y saliendo en `ZOOM_SALE_S`. */
+export function suavizarElZoom(actual: number, quiere: number, dt: number): number {
+  if (!(dt > 0)) return actual;
+  const tau = (quiere > actual ? ZOOM_ENTRA_S : ZOOM_SALE_S) / 3;
+  return actual + (quiere - actual) * (1 - Math.exp(-dt / tau));
+}
+
+/** El encuadre de apuntar (ver arriba): el hombro, lo que baja el ojo y lo que se acerca, del todo dentro. */
+export const HOMBRO_DE_APUNTAR = 1.05;
+export const BAJADA_AL_APUNTAR = 0.15;
+export const ACERCAMIENTO_AL_APUNTAR = 0.6;
+/** Por debajo de esto el encuadre de apuntar es cero exacto (las cuentas sin carga, las de siempre). */
+const APUNTE_DESPRECIABLE = 1e-3;
+/** Lo que se aparta el hombro de lo que lo corta a la derecha, además del margen de la pared (m). */
+const HOLGURA_DEL_HOMBRO = 0.05;
+/**
+ * Lo que baja el pivote (y con él el ojo y la mira: hacia dónde se mira no cambia) para que el ojo, con el cabeceo de
+ * reposo y los 0,6 m de acercamiento, quede `BAJADA_AL_APUNTAR` más bajo: acercarse ya lo baja `sen(cabeceo) · 0,6`.
+ */
+const BAJADA_DEL_PIVOTE = BAJADA_AL_APUNTAR - Math.sin(CABECEO_DE_REPOSO) * ACERCAMIENTO_AL_APUNTAR;
+
+/** EL ENCUADRE DE APUNTAR SUAVIZADO: de `actual` hacia 1 (`apuntando`) o 0 en `dt` s, con la exponencial del zoom. */
+export function suavizarElApunte(actual: number, apuntando: boolean, dt: number): number {
+  const a = suavizarElZoom(Number.isFinite(actual) ? actual : 0, apuntando ? 1 : 0, dt);
+  return !apuntando && a < APUNTE_DESPRECIABLE ? 0 : a;
+}
+
+/** EL GOLPE DE CAMPO del disparo a `ms` de él, en grados (negativo: se cierra): −2 en el acto, 0 a los 150 ms. */
+export function retrocesoDelDisparo(ms: number): number {
+  if (!(ms >= 0) || ms >= RETROCESO_MS) return 0;
+  const queda = 1 - ms / RETROCESO_MS;
+  return -RETROCESO_DEL_DISPARO * queda * queda;
+}
+
+/**
+ * LA SENSIBILIDAD CON ZOOM: con el campo cerrado, el mismo arrastre del dedo gira menos, en la proporción en que
+ * se ve más grande lo del centro (`tan(fov/2) / tan(base/2)`). Sin ella, apuntar con zoom sería apuntar con pulso
+ * de más justo cuando se afina.
+ */
+export function sensibilidadDelZoom(fov: number, base: number): number {
+  if (!(fov > 0) || !(base > 0)) return 1;
+  return Math.tan((fov * Math.PI) / 360) / Math.tan((base * Math.PI) / 360);
+}
 /** Vigía: a 25 m. */
 export const ALTO_DEL_VIGIA = 25;
 /** Lo más cerca que se pone la cámara del pivote cuando algo la tapa. */
@@ -154,10 +243,16 @@ export interface EstadoDeLaCamara {
   cabeceo: number;
   /** La distancia al pivote que tenía el fotograma anterior (para alejarse con suavidad). */
   distancia: number;
+  /** El encuadre de apuntar, 0..1 y suavizado (0 exacto sin carga). */
+  apunte: number;
+  /** El hombro con que se encuadró el fotograma anterior (m): el que usa la mira para poner un blanco debajo. */
+  hombro: number;
+  /** Lo que la pared de la derecha deja de hombro de más (m): se cierra en el acto, se abre suave. */
+  holguraDelHombro: number;
 }
 
 export function camaraNueva(giro: number): EstadoDeLaCamara {
-  return { giro, cabeceo: CABECEO_DE_REPOSO, distancia: DISTANCIA_AL_HOMBRO };
+  return { giro, cabeceo: CABECEO_DE_REPOSO, distancia: DISTANCIA_AL_HOMBRO, apunte: 0, hombro: HOMBRO_M, holguraDelHombro: HOMBRO_DE_APUNTAR - HOMBRO_M };
 }
 
 /** Lo que la cámara necesita saber del mundo en este fotograma. */
@@ -176,11 +271,16 @@ export interface SituacionDeLaCamara {
   /** 0..1: cuánto Remanso se ve. */
   readonly remanso: number;
   /**
-   * 0..1: cuánto se ha cargado el rayo propio, ya suavizada (`docs/quiebro/EL-RAYO.md` §3: el zoom cierra el
-   * campo hasta 10°, sin acercar la distancia). OPCIONAL a propósito: sin ella es 0, y así siguen valiendo todas
-   * las llamadas que ya hay. FASE 0 del contrato (`rayo/contrato.ts`): todavía no pesa en el encuadre.
+   * 0..1: el zoom del rayo propio, ya suavizado (`zoomDeLaCarga` y `suavizarElZoom`; `docs/quiebro/EL-RAYO.md` §3:
+   * cierra el campo hasta `FOV_DE_LA_CARGA` grados, sin acercar la distancia). OPCIONAL a propósito: sin ella es
+   * 0, y así siguen valiendo todas las llamadas que ya hay.
    */
   readonly carga?: number;
+  /**
+   * ¿Se está cargando el rayo propio? La cámara pasa al ENCUADRE DE APUNTAR (ver arriba), suavizado aquí con `dt`.
+   * Opcional como `carga`: sin él, no se apunta y las cuentas son las de siempre.
+   */
+  readonly apuntando?: boolean;
   /** ¿Es un aparato táctil? (el campo de visión). */
   readonly tactil: boolean;
   /** Vigía: sin cuerpo, cenital. */
@@ -229,10 +329,26 @@ export function encuadrar(estado: EstadoDeLaCamara, s: SituacionDeLaCamara): Enc
   const a = adelante(giro);
   /* El derecho del giro: (cos, sen) en (x, z). */
   const derecha = { x: Math.cos(giro), z: Math.sin(giro) };
+  /* El encuadre de apuntar (ver arriba): suave, y 0 exacto sin carga. */
+  estado.apunte = suavizarElApunte(estado.apunte, s.apuntando === true, s.dt);
+  const k = estado.apunte;
+  let hombro = HOMBRO_M;
+  let altoDelPivote = ALTO_DEL_PIVOTE;
+  if (k > 0) {
+    altoDelPivote -= BAJADA_DEL_PIVOTE * k;
+    /* Lo que la pared de la derecha deja de hombro de más: del pecho hacia el hombro de apuntar, con el margen de la pared. */
+    const pecho: Punto3 = { x: s.x, y: altoDelPivote, z: s.z };
+    const alLado: Punto3 = { x: s.x + derecha.x * HOMBRO_DE_APUNTAR, y: altoDelPivote, z: s.z + derecha.z * HOMBRO_DE_APUNTAR };
+    const corteDelHombro = primerCorte(pecho, alLado, s.cajas, MARGEN_DE_PARED);
+    const cabe = corteDelHombro < 1 ? Math.max(0, corteDelHombro * HOMBRO_DE_APUNTAR - HOLGURA_DEL_HOMBRO - HOMBRO_M) : HOMBRO_DE_APUNTAR - HOMBRO_M;
+    estado.holguraDelHombro = cabe < estado.holguraDelHombro ? cabe : suavizarElZoom(estado.holguraDelHombro, cabe, s.dt);
+    hombro = HOMBRO_M + Math.min((HOMBRO_DE_APUNTAR - HOMBRO_M) * k, estado.holguraDelHombro);
+  }
+  estado.hombro = hombro;
   const pivote: Punto3 = {
-    x: s.x + derecha.x * HOMBRO_M,
-    y: ALTO_DEL_PIVOTE,
-    z: s.z + derecha.z * HOMBRO_M,
+    x: s.x + derecha.x * hombro,
+    y: altoDelPivote,
+    z: s.z + derecha.z * hombro,
   };
   const quiereDistancia = s.enemigosCerca ? DISTANCIA_ABIERTA : DISTANCIA_AL_HOMBRO;
   const horizontal = Math.cos(estado.cabeceo);
@@ -247,7 +363,8 @@ export function encuadrar(estado: EstadoDeLaCamara, s: SituacionDeLaCamara): Enc
   /* Acercarse, en el acto; alejarse, poco a poco. */
   if (libre < estado.distancia) estado.distancia = libre;
   else estado.distancia = Math.min(libre, estado.distancia + ALEJARSE_M_POR_S * s.dt);
-  const d = estado.distancia;
+  /* Apuntando, la menor de la que deja la pared y la de apuntar (suave): ninguna salta, y contra la pared manda ella. */
+  const d = k > 0 ? Math.min(estado.distancia, quiereDistancia - ACERCAMIENTO_AL_APUNTAR * k) : estado.distancia;
   const ojo: Punto3 = {
     x: pivote.x - a.x * horizontal * d,
     y: Math.max(0.35, pivote.y + vertical * d),
@@ -259,6 +376,9 @@ export function encuadrar(estado: EstadoDeLaCamara, s: SituacionDeLaCamara): Enc
     y: pivote.y - vertical * 8 + 0.1,
     z: pivote.z + a.z * horizontal * 8,
   };
-  const fov = (s.tactil ? FOV_MOVIL : FOV_PC) - FOV_DEL_REMANSO * s.remanso;
+  /* El zoom del rayo cierra el campo y nada más (lo que se mueve la cámara es el encuadre de apuntar, arriba). */
+  const carga = s.carga === undefined || !Number.isFinite(s.carga) ? 0 : Math.max(0, Math.min(1, s.carga));
+  const zoom = FOV_DE_LA_CARGA * carga;
+  const fov = (s.tactil ? FOV_MOVIL : FOV_PC) - zoom - FOV_DEL_REMANSO * s.remanso;
   return { ojo, mira, fov };
 }
