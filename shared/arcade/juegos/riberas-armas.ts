@@ -16,6 +16,12 @@
  */
 import { ALCANCE_DEL_GOLPE, COSENO_CUADRADO_DEL_CONO } from '../../mecanicas/canal-de-botas';
 
+/**
+ * EL MOVIMIENTO DE FORJAR: `{ tipo: FORJAR, carga: { arma } }`, del colono que forja. Se ofrece
+ * (`opcionesDeRiberas`) a quien juega la partida y le alcanzan las alforjas, sea o no su turno.
+ */
+export const FORJAR = 'riberas:forjar';
+
 /** Los materiales, en el orden en que se pintan. Ninguno existe en Riberas normal. */
 export const MATERIALES = ['hierro', 'pedernal', 'cuero', 'junco'] as const;
 export type Material = (typeof MATERIALES)[number];
