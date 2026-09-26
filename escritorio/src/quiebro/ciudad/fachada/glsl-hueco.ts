@@ -2,18 +2,28 @@
  * EL HUECO: las plantas de viviendas u oficinas, con su ventana. Dos tramos:
  *
  *   - `GLSL_DEL_HUECO`, el último de las declaraciones del fragmento (detrás de `GLSL_DEL_MURO`): el cuarto
- *     falso (`cuartoQ`), la ventana plana (`planaQ`) y los visillos y persianas (`visillosQ`). Usan `hashQ`,
- *     `lineaQ` y `uClaridad`.
+ *     falso (`cuartoQ`), la ventana plana (`planaQ`), los visillos y persianas (`visillosQ`) y, desde N1, el
+ *     chorretón bajo el alféizar (`chorretonDelAlfeizarQ`). Usan `hashQ`, `lineaQ`, `uClaridad` y la materia.
  *   - `TRAMO_DEL_HUECO`, el tercero del cuerpo (detrás de `TRAMO_DE_LAS_PIEZAS`): la rejilla de plantas y vanos
- *     del sombreador, el recerco, el alféizar, el dintel, el derrame, la carpintería, el cristal con su cuarto,
- *     el fondo del hueco y la faja de la imposta en cada forjado.
+ *     del sombreador, el recerco, el alféizar con su sombra de contacto, el dintel con su vuelo, el derrame, el
+ *     chorretón, la carpintería, el cristal con su cuarto, el fondo del hueco, la faja de la imposta en cada
+ *     forjado y, en las torres de vidrio y de hormigón, las plantas de oficina encendidas, los montantes, el paño
+ *     ladeado y la corona.
  *
  * ═══ LAS VARIABLES DEL CUERPO ═══
  *
- * `TRAMO_DEL_HUECO` LEE `tipo`, `plano`, `q`, `pb`, `hp`, `techo`, `vano`, `estilo`, `semilla`, `tinte`, `px`,
- * `pxm`, `dist`, `V`, `T` y `Ng`, y los uniformes `uTiempo`, `uVentanas` y `uLuzDeVentanas`; ESCRIBE `albedo`,
- * `rug`, `met`, `emision` y `nLocal`. Abre `if (tipo < 0.5 && !plano && q.y >= pb) {`, que cierra el primer
- * carácter de `TRAMO_DEL_BAJO` (`} else if …`).
+ * `TRAMO_DEL_HUECO` LEE `tipo`, `plano`, `q`, `pb`, `hp`, `techo`, `vano`, `estilo`, `semilla`,
+ * `semillaDelEdificio`, `subestiloF`, `cima`, `edad`, `tinte`, `px`, `pxm`, `dist`, `V`, `T` y `Ng`, `albedoDelMuroQ`
+ * (el muro, para el fondo del hueco) y los uniformes `uTiempo`, `uVentanas`, `uLuzDeVentanas` y
+ * `uVentanasEncendidas`; ESCRIBE `albedo`, `rug`, `met`, `emision`, `nLocal` y `paredQ` (dónde se ve la fábrica).
+ * Abre `if (tipo < 0.5 && !plano && q.y >= pb) {`, que cierra el primer carácter de `TRAMO_DEL_BAJO` (`} else if …`).
+ *
+ * ═══ LO QUE NO VIVE DOS VECES ═══
+ *
+ * Las plantas de oficina enteras encendidas de las torres son un término APARTE de `encendidaQ`, y sólo de la
+ * cuarta planta arriba: `hash.ts` (las tarjetas de reflejo y la luz horneada) no mira más que las plantas 0-3, así
+ * que no hace falta gemela. Se deciden por EDIFICIO (`semillaDelEdificio`), no por cara: una planta encendida lo
+ * está en las cuatro fachadas de la torre. La corona, igual.
  *
  * ═══ LO QUE VIVE DOS VECES ═══
  *
@@ -109,6 +119,36 @@ vec3 visillosQ(vec3 dentro, vec2 w, float h, float luz, vec3 colorLuz, vec2 px) 
   vec3 salida = mix(dentro, tela, clamp(visillo, 0.0, 1.0) * 0.85);
   return mix(salida, plastico, persiana);
 }
+
+#if NIVEL_Q >= 1
+/*
+ * EL CHORRETÓN BAJO UN ALFÉIZAR (N1+): el agua que cae del vierteaguas se lleva el polvo y lo deja debajo, en una
+ * lengua ancha como el vierteaguas, oscura arriba y que se va hacia abajo, más larga bajo los dos extremos (por
+ * donde escurre más) y que ACABA EN DEDOS: cada punto baja lo que dice la veta (del 65 al 100 %), oscuro entero casi
+ * la primera mitad y luego a menos hasta la punta, así que el final es una orla de puntas, no una raya. La veta tiñe
+ * poco (del 85 al 100 %): con vetas de borde duro, cada ventana llevaba debajo un código de barras (la primera
+ * versión del remate), y con un 40 % de contraste, una rejilla de rayas (la revisión del remate). dx: del centro del
+ * hueco; dy: por debajo del canto del vierteaguas; medio: el medio ancho del hueco; largo: cuánto baja como mucho
+ * (lo pone quien llama: de medio metro a dos y medio por hash de la ventana, pero no más que hasta el dintel de la
+ * ventana de abajo; con más, llegaba al dintel todavía oscura y el dintel la cortaba en seco: un bloque rayado). El
+ * corte de la función, en 1,3·largo, es donde acaba el dedo más largo (el de un extremo): ahí ya vale 0. Se ve de 2
+ * a 60 m: de lejos la veta se apaga a su media con la mip y queda la lengua. N3 le pone una segunda octava a la
+ * veta, suave.
+ */
+float chorretonDelAlfeizarQ(float dx, float dy, float medio, float largo, vec2 q, float semilla) {
+  if (dy < 0.0 || dy > largo * 1.3 || abs(dx) > medio + 0.18) return 0.0;
+  float veta = ruidoT(vec2(q.x * 5.0 + semilla * 0.1, q.y * 0.55), lodQ(5.0));
+  #if NIVEL_Q >= 3
+  veta = 0.82 * veta + 0.18 * ruidoT(vec2(q.x * 19.0 + 7.0, q.y * 1.3), lodQ(19.0));
+  #endif
+  float extremos = 1.0 - smoothstep(0.0, 0.2, abs(abs(dx) - medio * 0.9));
+  float hasta = largo * mix(0.65, 1.0, smoothstep(0.25, 0.75, veta)) * (1.0 + 0.3 * extremos);
+  float t = clamp(dy / hasta, 0.0, 1.0);
+  float lengua = (1.0 - smoothstep(medio * 0.8, medio + 0.16, abs(dx))) * smoothstep(0.0, 0.02, dy);
+  /* Oscura entera casi la primera mitad y luego se va hasta la punta de cada dedo. */
+  return lengua * (1.0 - smoothstep(0.45, 1.0, t)) * mix(0.85, 1.0, veta);
+}
+#endif
 `;
 
 /** El tercer tramo del cuerpo, detrás de `TRAMO_DE_LAS_PIEZAS`. */
@@ -146,23 +186,61 @@ export const TRAMO_DEL_HUECO = /* glsl */ `
         met = mix(met, estilo == 3 ? 0.6 : 0.0, enMarco);
         rug = mix(rug, estilo == 3 ? 0.45 : 0.75, enMarco);
         nLocal.xy += gdir * enMarco * smoothstep(marco * 0.4, marco, sd) * 0.7;
+        /* La fábrica se ve fuera del hueco y del recerco: ahí pone el envejecido su relieve y su agua. */
+        paredQ = 1.0 - max(max(cristal, derrame), enMarco);
+        float hv = hashQ(vec2(celda, planta), semilla);
         if (estilo != 3 && estilo != 2) {
           /* Alféizar: 12 cm bajo el hueco y 12 más ancho a cada lado; su canto mira al cielo. */
           float bajoHueco = step(abs(l.x), medio.x + 0.12) * (1.0 - smoothstep(0.0, pxm, -medio.y - l.y - 0.13)) * smoothstep(-pxm, 0.0, -medio.y - l.y - marco * 0.5);
           albedo = mix(albedo, piedraClara * 1.05, bajoHueco);
           nLocal.y += bajoHueco * 0.9;
+          #if NIVEL_Q >= 1
+          /* La sombra de contacto bajo el vierteaguas (N1+): de 4 a 8 cm de muro que no ven el cielo. */
+          float bajoDelVierteaguas = -medio.y - 0.13 - l.y;
+          float contacto = step(0.0, bajoDelVierteaguas) * (1.0 - smoothstep(0.0, 0.04 + 0.04 * fract(hv * 5.3), bajoDelVierteaguas)) * step(abs(l.x), medio.x + 0.12);
+          albedo *= 1.0 - 0.45 * contacto;
+          #endif
           /* Dintel: una pieza clara sobre el hueco, y bajo ella la sombra que echa dentro. */
           float dintel = step(abs(l.x), medio.x + marco) * smoothstep(-pxm, 0.0, l.y - medio.y - marco * 0.5) * (1.0 - smoothstep(0.0, pxm, l.y - medio.y - 0.24));
           albedo = mix(albedo, piedraClara, dintel * (estilo == 1 ? 1.0 : 0.6));
+          #if NIVEL_Q >= 1
+          /* Y vuela un dedo (N1+): su canto de arriba mira al cielo y el de abajo al suelo. */
+          float yD = l.y - medio.y - marco * 0.5;
+          nLocal.y += dintel * (0.6 * smoothstep(0.19 - marco * 0.5, 0.235 - marco * 0.5, yD) - 0.5 * (1.0 - smoothstep(0.0, 0.035, yD)));
+          #endif
+          paredQ *= (1.0 - bajoHueco) * (1.0 - dintel);
         }
         albedo = mix(albedo, albedo * 0.4, derrame);
         nLocal.xy -= gdir * derrame * 0.8;
+        #if NIVEL_Q >= 1
+        /* EL CHORRETÓN bajo el vierteaguas de este hueco y, por encima de él, el del hueco de la planta de arriba. */
+        if (estilo != 3) {
+          float arriba = step(pb + (planta + 2.0) * hp, techo + 0.01);
+          float dyC = l.y < -medio.y - 0.13 ? -medio.y - 0.13 - l.y : mix(-1.0, hp - medio.y - 0.13 - l.y, arriba);
+          /*
+           * Cuánto hay hasta el dintel de la ventana de abajo (en la primera planta, hasta el forjado de la baja): los dedos
+           * del medio se acaban ahí, y sólo los de los extremos, ya casi sin tinte, llegan a tocarlo. Con el largo del hash sin
+           * más, llegaba al dintel oscura y el dintel la cortaba recto (la revisión del remate, la C: un bloque rayado entre
+           * ventana y ventana).
+           */
+          float hastaElDintel = l.y < -medio.y - 0.13 && planta < 0.5 ? centro.y - medio.y - 0.13 : hp - 2.0 * medio.y - 0.13 - (estilo == 2 ? marco : 0.24);
+          float ch = chorretonDelAlfeizarQ(l.x, dyC, medio.x, min(0.6 + 2.0 * fract(hv * 7.31), hastaElDintel), q, semilla) * paredQ;
+          /* Oscuro de verdad (del 65 al 95 % en el corazón, según la edad): a 25-60 m es lo que se lee de cada ventana. */
+          albedo *= 1.0 - (0.65 + 0.3 * edad) * ch;
+        }
+        #endif
         if (cristal > 0.0) {
           float luz = encendidaQ(celda, planta, semilla, estilo);
-          float hv = hashQ(vec2(celda, planta), semilla);
           float hc = hashQ(vec2(celda, planta), semilla + 17.0);
           vec3 colorLuz = colorDeLuzQ(hc);
-          if (hc > 0.9) colorLuz *= 0.45 + 0.55 * ruidoQ(vec2(uTiempo * 5.0, celda + planta * 7.0));
+          if (hc > 0.9) colorLuz *= 0.45 + 0.55 * ruidoT(vec2(uTiempo * 5.0, celda + planta * 7.0), 0.0);
+          #if NIVEL_Q >= 1
+          /* LAS PLANTAS DE OFICINA de las torres, enteras encendidas y de fluorescente, de la cuarta arriba (la cabecera). */
+          if ((estilo == 3 || estilo == 2) && planta >= 4.0 && hashQ(vec2(planta, 131.0), semillaDelEdificio) < 0.14 * smoothstep(0.2, 0.9, uVentanasEncendidas)) {
+            luz = 1.0;
+            colorLuz = vec3(0.8, 0.9, 1.0);
+          }
+          #endif
           vec2 w = clamp((l + medio) / (2.0 * medio), 0.0, 1.0);
           vec3 dentro = planaQ(w, hv, luz, colorLuz);
           #if NIVEL_Q >= 1
@@ -196,6 +274,10 @@ export const TRAMO_DEL_HUECO = /* glsl */ `
           emision += dentro * vidrio * (1.0 - fresnel) * uVentanas * uLuzDeVentanas;
           vec2 inclina = vec2(hashQ(vec2(celda, planta), semilla + 41.0), hashQ(vec2(celda, planta), semilla + 43.0)) - 0.5;
           nLocal.xy += inclina * 0.05 * vidrio;
+          #if NIVEL_Q >= 3
+          /* EL PAÑO LADEADO del muro cortina: cada dos por dos vanos, ±0,03; el reflejo de la torre se quiebra por paños. */
+          if (estilo == 3) nLocal.xy += (hash2Q(floor(vec2(celda, planta) * 0.5), semilla + 3.0) - 0.5) * 0.06 * vidrio;
+          #endif
           /*
            * EL HUECO TIENE FONDO. La carpintería va 14 cm metida en el muro: el rayo que entra por el
            * borde del hueco, en vez de dar en el cristal, da en la jamba, en el dintel por debajo o en el
@@ -211,8 +293,8 @@ export const TRAMO_DEL_HUECO = /* glsl */ `
             if (revelado > 0.0) {
               bool techoR = sobraR.y > sobraR.x && finR.y > 0.0;
               bool sueloR = sobraR.y > sobraR.x && finR.y < 0.0;
-              float rugR;
-              vec3 muroR = muroQ(estilo, q, tinte, semilla, vano, pb, hp, px, rugR);
+              /* El muro de la jamba es el de la cara: el que muroQ ya pintó en este píxel (sin volver a llamarlo). */
+              vec3 muroR = albedoDelMuroQ;
               vec3 colorR = techoR ? muroR * 0.3 : sueloR ? muroR * 0.95 : muroR * 0.55;
               albedo = mix(albedo, colorR, revelado);
               emision *= 1.0 - revelado;
@@ -221,6 +303,18 @@ export const TRAMO_DEL_HUECO = /* glsl */ `
             }
           }
         }
+        #if NIVEL_Q >= 2
+        if (estilo == 3) {
+          /* LOS MONTANTES del muro cortina: cada dos o tres vanos, un perfil de aluminio de 12 cm, de arriba abajo. */
+          float cadaM = vano * (mod(subestiloF, 2.0) > 0.5 ? 3.0 : 2.0);
+          float montante = 1.0 - smoothstep(0.06, 0.06 + px.x, abs(fract(q.x / cadaM + 0.5) - 0.5) * cadaM);
+          albedo = mix(albedo, vec3(0.2, 0.21, 0.22), montante);
+          met = mix(met, 0.7, montante);
+          rug = mix(rug, 0.35, montante);
+          emision *= 1.0 - montante;
+          nLocal.xy = mix(nLocal.xy, vec2(sign(fract(q.x / cadaM + 0.5) - 0.5) * 0.5, 0.0), montante * (1.0 - smoothstep(0.02, 0.05, pxm)));
+        }
+        #endif
       }
       /* La imposta: una faja clara en cada forjado (en el revoco, uno sí y otro no), que da el ritmo
          horizontal de las fachadas de piedra. Su canto de arriba mira al cielo. */
@@ -231,4 +325,14 @@ export const TRAMO_DEL_HUECO = /* glsl */ `
         vec3 clara = estilo == 1 ? vec3(0.34, 0.32, 0.29) : albedo * 1.08 + 0.01;
         albedo = mix(albedo, clara, faja);
         nLocal.y += faja * smoothstep(0.08, 0.16, fp0) * 0.8;
-      }`;
+        paredQ *= 1.0 - faja;
+      }
+      #if NIVEL_Q >= 1
+      /* LA CORONA de una de cada tres torres de más de 45 m: una banda encendida bajo el remate de su cima (al alba, apagada). */
+      if ((estilo == 3 || estilo == 2) && cima > 0.5 && techo > 45.0 && q.y > techo - 1.7 && hashQ(vec2(7.0, 29.0), semillaDelEdificio) < 0.3) {
+        float banda = smoothstep(techo - 1.6, techo - 1.45, q.y) * (1.0 - smoothstep(techo - 0.55, techo - 0.4, q.y));
+        albedo = mix(albedo, vec3(0.04), banda);
+        emision = mix(emision, vec3(0.95, 0.92, 0.84) * 1.3 * uVentanas * smoothstep(0.2, 0.9, uVentanasEncendidas), banda);
+        paredQ *= 1.0 - banda;
+      }
+      #endif`;

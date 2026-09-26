@@ -33,7 +33,7 @@ import type { CajaDeLaCiudad, NocheDeLaCiudad } from '../../../../shared/arcade/
 import { ACERA_DE_AVENIDA, BORDE_DE_LA_CIUDAD, EJES_DE_LA_CIUDAD, MEDIANA_DE_AVENIDA, SALIDA_DE_GLIFOS } from '../../../../shared/arcade/juegos/quiebro-ciudad';
 import type { CajaXZ, CalleDelPlano, NivelDeLaCiudad } from './tipos';
 import { Molde, triangulosDe } from './geometria';
-import { ATRIBUTOS_DE_LA_FACHADA, cajaDeRelieve, escribirLasFachadas, materialDeFachada } from './fachadas';
+import { ATRIBUTOS_DE_LA_FACHADA, TOPE_DEL_SOMBREADOR_DE_LO_LEJANO, cajaDeRelieve, escribirLasFachadas, materialDeFachada } from './fachadas';
 import type { IslaDelSuelo } from './suelo';
 import { construirElSuelo } from './suelo';
 import type { Oclusor } from './luz-de-la-calle';
@@ -108,9 +108,12 @@ function retoqueDeLoLejano(fundido: boolean): Retoque {
   };
 }
 
+/** El techo del sombreador de lo lejano (§5.2.9): el de la fachada de lo lejano (`fachadas.ts`). */
+export const TOPE_DEL_SOMBREADOR_POR_NIVEL = TOPE_DEL_SOMBREADOR_DE_LO_LEJANO;
+
 /** El material de lo lejano: el de las fachadas del nivel, con su retoque. */
 export function materialDeLoLejano(nivel: NivelDeLaCiudad, fundido: boolean): THREE.MeshStandardMaterial {
-  const m = materialDeFachada(nivel);
+  const m = materialDeFachada(nivel, { lejos: true });
   m.name = 'quiebro-lejos';
   parchear(m, retoqueDeLoLejano(fundido));
   return m;
