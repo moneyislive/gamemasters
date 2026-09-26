@@ -1363,7 +1363,7 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
   );
   comprobar(
     'y el marcador se ve también ahí, que es la rama que hoy ve todo el móvil',
-    /<ElMarcador marcador=\{marcador\} \/>/.test(respaldo),
+    /<ElMarcador marcador=\{marcador\} armaDe=\{armaDelColono\} \/>/.test(respaldo),
     'un marcador que sólo saliera con el delta no lo vería nadie que juegue desde el teléfono',
   );
 
@@ -1530,7 +1530,7 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
   comprobar(
     'el marcador sale de `marcadorEnTres` y se pinta en las dos ramas',
     /const marcador = useMemo\(\(\) => marcadorEnTres\(laVista\), \[laVista\]\);/.test(escena) &&
-      (escena.match(/<ElMarcador marcador=\{marcador\} \/>/g) ?? []).length === 2,
+      (escena.match(/<ElMarcador marcador=\{marcador\} armaDe=\{armaDelColono\} \/>/g) ?? []).length === 2,
     'los puntos de cada colono y lo que queda de mazo se ven SIEMPRE (§4 y §5 del diseño)',
   );
   /*
@@ -1585,7 +1585,7 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
   );
   comprobar(
     'la ficha recibe el marcador entero, y ni el cinco ni el «de» se escriben en la pantalla',
-    /<FichaDelColono key=\{c\.asiento\} colono=\{c\} marcador=\{marcador\} \/>/.test(escena) &&
+    /<FichaDelColono key=\{c\.asiento\} colono=\{c\} marcador=\{marcador\} arma=\{armaDe\?\.\(c\.asiento\) \?\? null\} \/>/.test(escena) &&
       !codigoDeLaEscena.some((l) => /vado\b[^\n]*\bde (5|\$\{)/.test(l)) &&
       !codigoDeLaEscena.some((l) => /`vado \$\{/.test(l)),
     'un cinco escrito aquí y otro en el escritorio se separan el día que la regla cambie',
@@ -1666,7 +1666,7 @@ paso('Los dados en la pantalla: donde caben, el botón de tirar se va con ellos,
   );
   comprobar(
     'TIRAR se cae del pie con `opcionesFueraDeLaMesa` pasándole LOS DADOS (no un interruptor) y DESPUÉS de los tres filtros de siempre',
-    /const fueraDelTablero = useMemo\(\s+\(\) => opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\),/.test(codigo) &&
+    /const fueraDelTablero = useMemo\(\(\) => \{\s+const todas = opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\);/.test(codigo) &&
       /const fueraDeLaBarra = useMemo\(\s+\(\) => opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(codigo),
   );
   comprobar(
@@ -4223,6 +4223,326 @@ paso('Boots on Board en la app: «Golpear» sólo a pie y con canal, con el toqu
   }
 }
 
+/*
+ * ═══ A PIE EN LA APP: EL AVISO AL RECOGER, LA FORJA Y LA LEVA ═══
+ *
+ * `docs/AVATARES-JUGABLES.md` §2 a §6. En una mesa de botas se recoge lo que brota por el tablero
+ * —dinero en el Burgo, materiales en Riberas, escudos en Las Lindes—, en Riberas se forjan armas y
+ * en Las Lindes se paga la leva. Lo que puede ir mal va mal en silencio:
+ *
+ *   · Que la frase del aviso diga otro número que el reductor —unos euros escritos a mano— o que
+ *     una clase rara que llega por el cable (`toString`) se lea como dinero. La frase se EJECUTA,
+ *     con la tabla del reductor sacada de su fuente.
+ *   · Que el cartel coja el dedo encima del tablero, o que se pinte abajo, donde están la palanca,
+ *     el correr y «Golpear».
+ *   · Que una pantalla no le pase `alRecoger` a su escena —el aviso no sale nunca— o que su gancho
+ *     vaya detrás de una salida temprana.
+ *   · Que la forja mande otra arma que la pulsada, o un botón encendido sin que alcance; que la
+ *     leva se encienda sin poder pagarse; o que la forja y la leva salgan DOS veces, en su panel y
+ *     en la lista genérica.
+ *   · Y que algo de esto salga en una mesa normal.
+ *
+ * Cada regla se afirma sobre el fichero de verdad y se ve CAER envenenada.
+ */
+paso('A pie en la app: el aviso al recoger en los tres juegos, la forja de Riberas y la leva de Las Lindes');
+{
+  const aPie = leer(path.join(SRC, 'arcade', 'a-pie-en-botas.tsx'));
+  const burgo = leer(path.join(SRC, 'arcade', 'burgo-en-tres-escena.tsx'));
+  const riberas = leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx'));
+  const lindes = leer(path.join(SRC, 'arcade', 'lindes-en-tres-escena.tsx'));
+  const RAIZ = path.resolve(SRC, '..', '..');
+  const armas = leer(path.join(RAIZ, 'shared', 'arcade', 'juegos', 'riberas-armas.ts'));
+  const escudos = leer(path.join(RAIZ, 'shared', 'arcade', 'juegos', 'lindes-escudos.ts'));
+  const elReductorDelBurgo = leer(path.join(RAIZ, 'shared', 'arcade', 'juegos', 'burgo.ts'));
+  const soloCodigo = (texto) =>
+    texto
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const regla = (que, prueba, bueno, envenenados, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    envenenados.forEach((envenenado, i) => {
+      comprobar(
+        `y «${que}» se ve CAER con el caso envenenado ${String(i + 1)}`,
+        envenenado !== bueno && !prueba(envenenado),
+        envenenado === bueno ? 'el envenenado no ha cambiado el fichero: la regla no se está poniendo a prueba' : porque,
+      );
+    });
+  };
+
+  /*
+   * ── Lo que se ejecuta: la frase y los movimientos, sacados del fuente con las tablas de `shared/` ──
+   *
+   * Se trocea el módulo de la app y se le pegan las tablas de verdad (los euros del reductor del
+   * Burgo, los materiales y `FORJAR` de las armas, `LEVA` de los escudos); `transpileModule` no mira
+   * tipos, así que los `import type` que se quedan fuera no molestan.
+   */
+  const trozo = (fuente, re) => re.exec(fuente)?.[0] ?? '';
+  const ejecutable = async (fuenteAPie) => {
+    const piezas = [
+      trozo(elReductorDelBurgo, /^export const EUROS_DEL_HALLAZGO[^=]*= [^;]+;/m),
+      trozo(armas, /^export const FORJAR = [^;]+;/m),
+      trozo(armas, /^export const MATERIALES = [^;]+;/m),
+      trozo(armas, /^export const NOMBRE_DEL_MATERIAL[^=]*= \{[\s\S]*?\n\};/m),
+      trozo(escudos, /^export const LEVA = [^;]+;/m),
+      trozo(fuenteAPie, /^const LO_DE_LA_CALLE[^=]*= [^;]+;/m),
+      trozo(fuenteAPie, /^function nombreDelMaterial\([\s\S]*?\n\}/m),
+      trozo(fuenteAPie, /^export function fraseDelHallazgo\([\s\S]*?\n\}/m),
+      trozo(fuenteAPie, /^export function movimientoOfrecido\([\s\S]*?\n\}/m),
+      trozo(fuenteAPie, /^export const PREFIJO_DE_FORJAR = [^;]+;/m),
+      trozo(fuenteAPie, /^export function esOpcionDeForjar\([\s\S]*?\n\}/m),
+      trozo(fuenteAPie, /^export function movimientoDeForjar\([\s\S]*?\n\}/m),
+      trozo(fuenteAPie, /^export function movimientoDeLaLeva\([\s\S]*?\n\}/m),
+    ];
+    if (piezas.some((p) => p.length === 0)) return null;
+    const js = ts.transpileModule(piezas.join('\n'), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+    }).outputText;
+    try {
+      return await import(`data:text/javascript;base64,${Buffer.from(js, 'utf8').toString('base64')}`);
+    } catch {
+      return null;
+    }
+  };
+  /** Lo que tiene que decir la frase, caso por caso: el encargo, con los números de la tabla del reductor. */
+  const frasesBuenas = (m) =>
+    m !== null &&
+    m.fraseDelHallazgo('burgo', { por: 'b', clase: 'cartera', mio: true }, 'Bruno') === '+25 € · una cartera' &&
+    m.fraseDelHallazgo('burgo', { por: 'b', clase: 'propina', mio: true }, null) === '+10 € · una propina' &&
+    m.fraseDelHallazgo('burgo', { por: 'b', clase: 'maletin', mio: true }, null) === '+60 € · un maletín' &&
+    m.fraseDelHallazgo('burgo', { por: 'b', clase: 'cartera', mio: false }, 'Bruno') === 'Bruno se lleva una cartera' &&
+    m.fraseDelHallazgo('burgo', { por: 'b', clase: 'toString', mio: true }, null) === 'Te llevas toString' &&
+    m.fraseDelHallazgo('riberas', { por: 'b', clase: 'hierro', mio: true }, null) === '+1 hierro' &&
+    m.fraseDelHallazgo('riberas', { por: 'b', clase: 'cuero', mio: false }, 'Bruno') === 'Bruno se lleva 1 cuero' &&
+    m.fraseDelHallazgo('lindes', { por: 'b', clase: 'escudo', mio: true }, null) === '+1 escudo' &&
+    m.fraseDelHallazgo('lindes', { por: 'b', clase: 'escudo', mio: false }, null) === 'Alguien se lleva un escudo';
+  const buenoEjecutado = await ejecutable(aPie);
+  const frasesEnvenenadas = [
+    aPie.replace('if (!r.mio) return `${quien} se lleva ${que}`;', 'if (r.mio) return `${quien} se lleva ${que}`;'),
+    aPie.replace(
+      'Object.prototype.hasOwnProperty.call(EUROS_DEL_HALLAZGO, r.clase) ? EUROS_DEL_HALLAZGO[r.clase] : undefined',
+      'EUROS_DEL_HALLAZGO[r.clase]',
+    ),
+    aPie.replace("return r.mio ? `+1 ${que}` : `${quien} se lleva 1 ${que}`;", "return `+1 ${que}`;"),
+  ];
+  const frasesDeLosEnvenenados = await Promise.all(frasesEnvenenadas.map((t) => ejecutable(t)));
+  comprobar(
+    'la frase del aviso, EJECUTADA: «+25 € · una cartera», «Bruno se lleva una cartera», «+1 hierro», «+1 escudo»… con los euros del reductor, y una clase rara no es dinero',
+    frasesBuenas(buenoEjecutado),
+  );
+  frasesEnvenenadas.forEach((t, i) => {
+    comprobar(
+      `y la frase del aviso se ve CAER con el caso envenenado ${String(i + 1)}`,
+      t !== aPie && !frasesBuenas(frasesDeLosEnvenenados[i] ?? null),
+      'lo mío y lo de otro al revés, `toString` leído como euros, o lo de otro dicho como si fuera mío',
+    );
+  });
+
+  /** Los movimientos, EJECUTADOS: la opción del juego con su `id`, y sin ella el contrato de `shared/`. */
+  const movimientosBuenos = (m) => {
+    if (m === null) return false;
+    const opciones = [
+      { id: 'forjar:lanza', tipo: m.FORJAR, carga: { arma: 'lanza', de: 'juego' }, rotulo: '', ayuda: '' },
+      { id: 'forjar:honda', tipo: m.FORJAR, carga: { arma: 'honda', de: 'juego' }, rotulo: '', ayuda: '' },
+      { id: 'leva', tipo: m.LEVA, carga: { de: 'juego' }, rotulo: '', ayuda: '' },
+    ];
+    const honda = m.movimientoDeForjar(opciones, 'honda');
+    const maza = m.movimientoDeForjar(opciones, 'maza');
+    const leva = m.movimientoDeLaLeva(opciones);
+    const levaSinOpcion = m.movimientoDeLaLeva([]);
+    return (
+      honda.tipo === m.FORJAR &&
+      honda.carga.arma === 'honda' &&
+      honda.carga.de === 'juego' &&
+      maza.tipo === m.FORJAR &&
+      JSON.stringify(maza.carga) === JSON.stringify({ arma: 'maza' }) &&
+      leva.tipo === m.LEVA &&
+      leva.carga.de === 'juego' &&
+      levaSinOpcion.tipo === m.LEVA &&
+      JSON.stringify(levaSinOpcion.carga) === '{}' &&
+      m.esOpcionDeForjar({ id: 'forjar:hacha', tipo: 'otro' }) &&
+      m.esOpcionDeForjar({ id: 'x', tipo: m.FORJAR }) &&
+      !m.esOpcionDeForjar({ id: 'leva', tipo: m.LEVA })
+    );
+  };
+  const movimientosEnvenenados = [
+    aPie.replace('o.id === `${PREFIJO_DE_FORJAR}${arma}`', 'o.id.startsWith(PREFIJO_DE_FORJAR)'),
+    aPie.replace('return o === undefined ? compuesto : { tipo: o.tipo, carga: o.carga };', 'return compuesto;'),
+  ];
+  const movimientosDeLosEnvenenados = await Promise.all(movimientosEnvenenados.map((t) => ejecutable(t)));
+  comprobar(
+    'forjar y la leva, EJECUTADOS: se manda la opción del juego (`forjar:<arma>`, `leva`) tal cual, la del arma PULSADA, y sin opción se compone el contrato de `shared/`',
+    movimientosBuenos(buenoEjecutado),
+  );
+  movimientosEnvenenados.forEach((t, i) => {
+    comprobar(
+      `y forjar y la leva se ven CAER con el caso envenenado ${String(i + 1)}`,
+      t !== aPie && !movimientosBuenos(movimientosDeLosEnvenenados[i] ?? null),
+      'con el prefijo a secas se forja la primera arma de la lista y no la pulsada; sin la opción del juego se pierde lo que el juego puso en la carga',
+    );
+  });
+
+  /* ── El cartel ── */
+  regla(
+    'el cartel del aviso no coge el dedo, es una región viva que está SIEMPRE montada y sólo pinta la frase cuando la hay, y los nombres se leen de una referencia (el `alRecoger` no cambia en cada sondeo)',
+    (t) => {
+      const c = soloCodigo(t);
+      const cartel = /export function ElAvisoDelHallazgo\([\s\S]*?\n\}\n/.exec(c)?.[0] ?? '';
+      return (
+        /<View style=\{\[estilos\.caja, style\]\} pointerEvents="none" accessibilityLiveRegion="polite">/.test(cartel) &&
+        /\{frase === null \? null : \(/.test(cartel) &&
+        /const nombre = losNombres\.current\.get\(r\.por\) \?\? null;/.test(c) &&
+        /\}, DURA_EL_AVISO\);\s*\},\s*\[juego\],/.test(c) &&
+        !/onClick/.test(c)
+      );
+    },
+    aPie,
+    [
+      aPie.replace(' pointerEvents="none" accessibilityLiveRegion="polite"', ' accessibilityLiveRegion="polite"'),
+      aPie.replace('}, DURA_EL_AVISO);\n    },\n    [juego],', '}, DURA_EL_AVISO);\n    },\n    [juego, nombres],'),
+    ],
+    'un cartel que coge el dedo deja sin tocar el tablero de debajo, y un `alRecoger` que cambia con los nombres hace que la escena lo vuelva a coser en cada sondeo',
+  );
+
+  /* ── Las tres pantallas ── */
+  const PANTALLAS = [
+    ['el Burgo', burgo, 'burgo', 'Burgo', 'function LaMesaEnTres('],
+    ['Riberas', riberas, 'riberas', 'Delta', 'function LaMesaEnTres('],
+    ['Las Lindes', lindes, 'lindes', 'Lindes', 'function ElValleEnLaMesa('],
+  ];
+  for (const [juego, fuente, clave, escena, pintor] of PANTALLAS) {
+    regla(
+      `${juego}: la pantalla le pasa \`alRecoger\` a su escena, su gancho va arriba (antes de la primera salida) y monta el cartel UNA vez`,
+      (t) => {
+        const c = soloCodigo(t);
+        const desde = c.indexOf(pintor);
+        const gancho = c.indexOf(`const { alRecoger, frase: fraseDelHallazgo } = usarElAvisoDelHallazgo('${clave}', nombres);`);
+        const primeraSalida = c.indexOf('\n  if (', desde);
+        return (
+          desde >= 0 &&
+          gancho > desde &&
+          (primeraSalida < 0 || gancho < primeraSalida) &&
+          new RegExp(`<${escena}\\b(?:(?!\\/>)[\\s\\S])*\\balRecoger=\\{alRecoger\\}(?:(?!\\/>)[\\s\\S])*\\/>`).test(c) &&
+          (c.match(/<ElAvisoDelHallazgo\s+frase=\{fraseDelHallazgo\}/g) ?? []).length === 1 &&
+          !/onClick/.test(c)
+        );
+      },
+      fuente,
+      [fuente.replace(/\n(\s*)alRecoger=\{alRecoger\}/, ''), `${fuente}\n<ElAvisoDelHallazgo frase={fraseDelHallazgo} />`],
+      'sin `alRecoger` la escena recoge en silencio; con dos carteles la frase sale dos veces',
+    );
+  }
+  regla(
+    'el cartel va ARRIBA en Riberas y en Las Lindes (con `top`, nunca `bottom`) y en el Burgo encima de la franja del paseo, en la pila del pie: nunca encima de la palanca ni de los botones',
+    ([r, l, b]) => {
+      const estilo = (t) => /\n  avisoDelHallazgo: \{([^}]*)\}/.exec(t)?.[1] ?? '';
+      const cb = soloCodigo(b);
+      const pie = cb.indexOf('<View style={estilos.pieFlotante} pointerEvents="box-none">');
+      const cartel = cb.indexOf('<ElAvisoDelHallazgo frase={fraseDelHallazgo}');
+      const franja = cb.indexOf('<View style={[estilos.franjaDelPaseo');
+      return (
+        /position: 'absolute', top: \d+/.test(estilo(r)) &&
+        !/bottom/.test(estilo(r)) &&
+        /position: 'absolute', top: \d+/.test(estilo(l)) &&
+        !/bottom/.test(estilo(l)) &&
+        pie >= 0 &&
+        cartel > pie &&
+        franja > cartel
+      );
+    },
+    [riberas, lindes, burgo],
+    [
+      [riberas.replace("avisoDelHallazgo: { position: 'absolute', top: 12,", "avisoDelHallazgo: { position: 'absolute', bottom: 12,"), lindes, burgo],
+      [riberas, lindes.replace("avisoDelHallazgo: { position: 'absolute', top: 48,", "avisoDelHallazgo: { position: 'absolute', bottom: 16,"), burgo],
+      [
+        riberas,
+        lindes,
+        burgo
+          .replace('<ElAvisoDelHallazgo frase={fraseDelHallazgo} style={estilos.avisoDelHallazgo} />', '')
+          .replace('{elPie(fuera)}', '{elPie(fuera)}\n<ElAvisoDelHallazgo frase={fraseDelHallazgo} style={estilos.avisoDelHallazgo} />'),
+      ],
+    ],
+    'abajo están la palanca, el correr y «Golpear», y un cartel encima los tapa justo cuando se corre a por el siguiente',
+  );
+
+  /* ── Riberas: la forja ── */
+  regla(
+    'Riberas: la forja sólo en una mesa de botas con asiento, un botón por arma encendido SÓLO si alcanza, que manda `movimientoDeForjar` por `mesa.mover`; las de forjar salen de la lista del pie, y el arma del marcador sólo en botas',
+    (t) => {
+      const c = soloCodigo(t);
+      const hoja = /function HojaDeLaForja\([\s\S]*?\n\}\n/.exec(c)?.[0] ?? '';
+      return (
+        /const conLaForja = esBotas && yo !== null;/.test(c) &&
+        /const armaDelColono = esBotas \? \(asiento: string\): Arma \| null => armaDeLaVista\(laVista, asiento\) : undefined;/.test(c) &&
+        /return conLaForja \? todas\.filter\(\(o\) => !esOpcionDeForjar\(o\)\) : todas;/.test(c) &&
+        /\{forjaAbierta && conLaForja && yo !== null && aQuien === null && comoJugarla === null && comprando === null \? \(\s*<HojaDeLaForja/.test(c) &&
+        /void mesa\.mover\(movimientoDeForjar\(opciones, arma\)\);/.test(c) &&
+        /\{conLaForja && yo !== null \? \(/.test(c) &&
+        /const apagado = quieto \|\| !alcanzaParaForjar\(alforjas, arma\);/.test(hoja) &&
+        /disabled=\{apagado\}/.test(hoja) &&
+        /if \(apagado\) return;\s*alForjar\(arma\);/.test(hoja) &&
+        /\{recetaDicha\(arma\)\}/.test(hoja) &&
+        /\{ficha\.ayuda\}/.test(hoja) &&
+        /<Pressable/.test(hoja) &&
+        !/onClick/.test(c)
+      );
+    },
+    riberas,
+    [
+      riberas.replace('const apagado = quieto || !alcanzaParaForjar(alforjas, arma);', 'const apagado = quieto;'),
+      riberas.replace('return conLaForja ? todas.filter((o) => !esOpcionDeForjar(o)) : todas;', 'return todas;'),
+      riberas.replace('const conLaForja = esBotas && yo !== null;', 'const conLaForja = yo !== null;'),
+      riberas.replace(
+        'const armaDelColono = esBotas ? (asiento: string): Arma | null => armaDeLaVista(laVista, asiento) : undefined;',
+        'const armaDelColono = (asiento: string): Arma | null => armaDeLaVista(laVista, asiento);',
+      ),
+    ],
+    'un arma encendida sin materiales es un toque que el reductor rechaza sin explicar nada; sin el filtro cada arma sale dos veces; y fuera de botas no hay forja',
+  );
+
+  /* ── Las Lindes: los escudos y la leva ── */
+  regla(
+    'Las Lindes: los escudos sólo en una mesa de botas con asiento, la leva encendida SÓLO si `puedePagarLaLeva`, mandada con `movimientoDeLaLeva` por `mover`, fuera de la tira de acciones, y la línea de lo que vale guardarlos',
+    (t) => {
+      const c = soloCodigo(t);
+      const panel = /function LosEscudos\([\s\S]*?\n\}\n/.exec(c)?.[0] ?? '';
+      return (
+        /const conLosEscudos = esBotas && vista\.yo !== null;/.test(c) &&
+        /const sinRepetir = conLosEscudos \? valle\.sinRepetir\.filter\(\(a\) => a\.toque\.tipo !== LEVA\) : valle\.sinRepetir;/.test(c) &&
+        /\{conLosEscudos && vista\.yo !== null \? \(\s*<LosEscudos /.test(c) &&
+        /const apagado = quieto \|\| !puedePagarLaLeva\(escudos, levas\);/.test(panel) &&
+        /disabled=\{apagado\}/.test(panel) &&
+        /if \(apagado\) return;\s*void mover\(movimientoDeLaLeva\(opciones\)\);/.test(panel) &&
+        /\{ROTULO_DE_LA_LEVA\}/.test(panel) &&
+        /\{LO_QUE_VALE_GUARDARLOS\}/.test(panel) &&
+        /escudosDeLaVista\(vista\.vista, yo\)/.test(panel) &&
+        /levasDeLaVista\(vista\.vista, yo\)/.test(panel) &&
+        !/onClick/.test(c)
+      );
+    },
+    lindes,
+    [
+      lindes.replace('const apagado = quieto || !puedePagarLaLeva(escudos, levas);', 'const apagado = quieto;'),
+      lindes.replace(
+        'const sinRepetir = conLosEscudos ? valle.sinRepetir.filter((a) => a.toque.tipo !== LEVA) : valle.sinRepetir;',
+        'const sinRepetir = valle.sinRepetir;',
+      ),
+      lindes.replace('const conLosEscudos = esBotas && vista.yo !== null;', 'const conLosEscudos = vista.yo !== null;'),
+      lindes.replace('<Text style={estilos.escudosPista}>{LO_QUE_VALE_GUARDARLOS}</Text>', ''),
+    ],
+    'una leva encendida sin escudos es un toque que el reductor rechaza; sin el filtro sale dos veces; y sin la línea de los puntos no se sabe qué se pierde al pagarla',
+  );
+  regla(
+    'y los números de la leva y de los puntos salen de `shared/`, no escritos a mano en la app',
+    (t) =>
+      /export const ROTULO_DE_LA_LEVA = `Leva \(\$\{String\(ESCUDOS_POR_LEVA\)\} escudos → 1 labriego\)`;/.test(t) &&
+      /export const LO_QUE_VALE_GUARDARLOS = `Cada escudo sin gastar vale \$\{String\(PUNTOS_POR_ESCUDO\)\}/.test(t),
+    aPie,
+    [aPie.replace('${String(ESCUDOS_POR_LEVA)} escudos', '3 escudos')],
+    'un tres escrito aquí y otro en el reductor se separan el día que la leva cambie de precio',
+  );
+}
+
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», el mismo que llevan el servidor y la escena.
  *
@@ -4257,7 +4577,11 @@ paso('Boots on Board en la app: «Golpear» sólo a pie y con canal, con el toqu
  * mitad, la red del contrato vista caer sin el apunte. Y una más: la rueda de la app con los números
  * del escritorio. El guardia sube con ellas.
  */
-const COMPROBACIONES_ESCRITAS = 334;
+/*
+ * Y treinta y cinco de lo que se hace a pie —el aviso al recoger, la forja y la leva—, veintidós de
+ * ellas vacunas: el guardia sube con ellas.
+ */
+const COMPROBACIONES_ESCRITAS = 369;
 
 if (fallos.length > 0) {
   console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);

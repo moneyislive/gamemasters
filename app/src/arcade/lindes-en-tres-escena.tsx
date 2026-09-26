@@ -68,6 +68,15 @@
  * El ATLAS del tablero, compilado a bytes (`COMPLEMENTOS_DEL_TABLERO`): sin él, en iOS y en
  * Android cada casa y cada muralla salían blancas. Y la CALIDAD, que la juzga el controlador con
  * lo que la escena mide por `alMedir`, igual que en el escritorio.
+ *
+ * ═══ Y A PIE SE RECOGEN ESCUDOS, Y SE PAGA LA LEVA ═══
+ *
+ * En una mesa de botas los escudos andan sueltos por el valle (`docs/AVATARES-JUGABLES.md` §5). La
+ * escena avisa con `alRecoger` y esta pantalla lo dice en un cartel arriba, debajo del canal y de
+ * las cámaras —la palanca y los botones son de abajo—: «+1 escudo» o «Bruno se lleva un escudo».
+ * Y en la hoja, el panel de los escudos (`LosEscudos`): cuántos tengo, cuántos lleva cada uno, el
+ * botón de la leva —encendido si `puedePagarLaLeva`— y la línea que dice lo que vale guardarlos.
+ * La leva sale de la tira de acciones para no enseñarse dos veces.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -90,10 +99,26 @@ import { asientosQueAndan, esMesaDeBotas } from '../../../escenas/paseo/mesa-de-
  * del binario —por si se llega por enlace directo— es el contrato de pintor.
  */
 import { LINDES } from '../../../shared/arcade/juegos/lindes';
+import {
+  escudosDeLaVista,
+  LEVA,
+  LEVAS_POR_JUGADOR,
+  levasDeLaVista,
+  puedePagarLaLeva,
+} from '../../../shared/arcade/juegos/lindes-escudos';
 import { tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
+import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
+import {
+  ElAvisoDelHallazgo,
+  LO_QUE_VALE_GUARDARLOS,
+  movimientoDeLaLeva,
+  ROTULO_DE_LA_LEVA,
+  usarElAvisoDelHallazgo,
+} from './a-pie-en-botas';
 import { MandosDelPaseo } from './mandos-del-paseo';
 import { BotonDeGolpear } from './mandos-del-paseo';
 import { direccionDelCanal } from './mesa';
+import type { MesaVista, OpcionDeMesa } from './mesa';
 import { LETRA, SALA } from './muebles';
 import { ElRespaldo, LaMesaDeUnPintor, RedDelLienzo } from './pintor-propio';
 import type { LoQueVeElPintor } from './pintor-propio';
@@ -130,8 +155,13 @@ export default function LasLindesPorDentro(): JSX.Element {
  * detrás de los `return` del vestíbulo.
  */
 function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
-  const { mesa, vista, juego, abajo, laBarra } = pintor;
+  const { mesa, vista, juego, nombres, abajo, laBarra } = pintor;
   const [modo, ponerModo] = useState<'mesa' | 'hombro' | 'ojos'>('mesa');
+  /*
+   * EL AVISO AL RECOGER, también aquí arriba con los demás ganchos. Se le pasa a la escena siempre:
+   * en una mesa normal no hay canal y nadie lo llama.
+   */
+  const { alRecoger, frase: fraseDelHallazgo } = usarElAvisoDelHallazgo('lindes', nombres);
   /*
    * La palanca y el correr, en una referencia que escribe `MandosDelPaseo` y lee la escena en
    * su bucle. Aquí arriba, con los demás ganchos: debajo de una salida temprana, React se
@@ -185,7 +215,14 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
     modo,
     traer,
   });
-  const { laLosa, girosAqui, girar, sitios, sinRepetir, alTocar } = valle;
+  const { laLosa, girosAqui, girar, sitios, alTocar } = valle;
+  /*
+   * LA LEVA SE ENSEÑA UNA VEZ: en una mesa de botas con asiento la pinta el panel de los escudos,
+   * con su cuenta y su porqué, así que sale de la tira de acciones, que la traería otra vez a secas
+   * (el reductor la ofrece como opción y el tablero declarado la pinta como acción).
+   */
+  const conLosEscudos = esBotas && vista.yo !== null;
+  const sinRepetir = conLosEscudos ? valle.sinRepetir.filter((a) => a.toque.tipo !== LEVA) : valle.sinRepetir;
 
   /*
    * ═══ EL RESPALDO: EL RETABLO, Y SE JUEGA IGUAL ═══
@@ -229,9 +266,16 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
               complementosDelTablero={COMPLEMENTOS_DEL_TABLERO}
               canal={canal}
               mandos={mandos}
+              alRecoger={alRecoger}
             />
           </Canvas>
         </RedDelLienzo>
+
+        {/*
+          EL AVISO AL RECOGER, arriba y debajo del canal y de las cámaras: abajo están la palanca,
+          el correr y «Golpear». No coge el dedo. Ver `a-pie-en-botas.tsx`.
+        */}
+        <ElAvisoDelHallazgo frase={fraseDelHallazgo} style={estilos.avisoDelHallazgo} />
 
         {/*
           LOS MANDOS DEL PASEO, encima del lienzo y sólo a pie. Sin ellos, en el teléfono se
@@ -370,6 +414,15 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
         ) : null}
 
         {/*
+          LOS ESCUDOS, sólo en una mesa de botas y con asiento: cuántos tengo, cuántos lleva cada
+          uno —en la refriega se ve quién va cargado— y la leva. Va en la hoja, que se queda
+          siempre a la vista, porque gastar o guardar es una decisión de la partida y no del paseo.
+        */}
+        {conLosEscudos && vista.yo !== null ? (
+          <LosEscudos vista={vista} yo={vista.yo} opciones={vista.opciones ?? []} quieto={mesa.quieto} mover={mesa.mover} />
+        ) : null}
+
+        {/*
           ═══ EL MARCADOR ES EL QUE DECLARA EL JUEGO, Y NO UNA LISTA DE NOMBRES ═══
 
           Aquí había una fila con los nombres de los sentados y nada más: ni los puntos, ni
@@ -397,8 +450,80 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
   );
 }
 
+/**
+ * LOS ESCUDOS DE LAS LINDES A PIE: los míos y las levas pagadas, los de cada uno en una línea (el
+ * marcador de los escudos, que los paneles del juego no traen), el botón de la leva —encendido si
+ * `puedePagarLaLeva`— y la otra cara de la elección: guardarlos puntúa.
+ *
+ * Los números son de la vista, leídos con los lectores de `shared/`; el movimiento, la opción del
+ * juego si la ofrece (`movimientoDeLaLeva`). Apagado se ve y no manda nada: saber que la leva existe
+ * y cuánto falta para ella es parte de la decisión. La tira de acciones ya no la trae (ver
+ * `sinRepetir`): se enseña aquí, una vez, con su cuenta y su porqué.
+ */
+function LosEscudos({
+  vista,
+  yo,
+  opciones,
+  quieto,
+  mover,
+}: {
+  readonly vista: MesaVista;
+  readonly yo: string;
+  readonly opciones: readonly OpcionDeMesa[];
+  readonly quieto: boolean;
+  readonly mover: (m: MovimientoDeclarado) => unknown;
+}): JSX.Element {
+  const escudos = escudosDeLaVista(vista.vista, yo);
+  const levas = levasDeLaVista(vista.vista, yo);
+  const apagado = quieto || !puedePagarLaLeva(escudos, levas);
+  const deCadaUno = vista.asientos
+    .map((a) => `${a.id === yo ? 'Tú' : a.nombre} ${String(escudosDeLaVista(vista.vista, a.id))}`)
+    .join(' · ');
+  const mios = `Tienes ${String(escudos)} ${escudos === 1 ? 'escudo' : 'escudos'} · levas ${String(levas)} de ${String(LEVAS_POR_JUGADOR)}`;
+  return (
+    <View style={estilos.panel}>
+      <Text style={estilos.panelTitulo}>Escudos</Text>
+      <Text style={estilos.panelLinea}>{mios}</Text>
+      <Text style={estilos.escudosPista} numberOfLines={2}>
+        {deCadaUno}
+      </Text>
+      <View style={estilos.fila}>
+        <Pressable
+          style={[estilos.leva, apagado && estilos.botonQuieto]}
+          disabled={apagado}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: apagado }}
+          accessibilityLabel={`${ROTULO_DE_LA_LEVA}. ${mios}`}
+          onPress={() => {
+            if (apagado) return;
+            void mover(movimientoDeLaLeva(opciones));
+          }}
+        >
+          <Text style={[estilos.botonTexto, apagado && estilos.botonTextoQuieto]}>{ROTULO_DE_LA_LEVA}</Text>
+        </Pressable>
+      </View>
+      <Text style={estilos.escudosPista}>{LO_QUE_VALE_GUARDARLOS}</Text>
+    </View>
+  );
+}
+
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: SALA.suelo },
+  /*
+   * EL AVISO AL RECOGER: a lo ancho, debajo de la placa del canal y de las cámaras (8 de margen y
+   * unos 30 de alto cada una), y lejos de abajo, que es de la palanca y de los botones del paseo.
+   */
+  avisoDelHallazgo: { position: 'absolute', top: 48, left: 12, right: 12 },
+  /* La leva: la placa de acento de «Girar», que es la otra acción de la hoja. */
+  leva: {
+    backgroundColor: SALA.acento,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  escudosPista: { color: SALA.tenue, fontSize: 13, ...LETRA.cuerpo },
   lienzo: { flex: 1, minHeight: 200, backgroundColor: '#8cb8de' },
   canvas: { flex: 1 },
   /*

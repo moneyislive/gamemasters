@@ -129,6 +129,14 @@
  * de la mesa y pinta a los demás vadeando como quien pasea. Se empieza a pie —bajando por
  * `cambiarDeCamara`, como los botones— y en la tira de las cámaras se dice cómo va el canal. En una
  * mesa normal no se pasa nada y no se abre ningún socket.
+ *
+ * ═══ Y A PIE SE RECOGEN MATERIALES Y SE FORJAN ARMAS ═══
+ *
+ * Sólo en una mesa de botas (`docs/AVATARES-JUGABLES.md` §4). La escena avisa con `alRecoger` y
+ * aquí sale un cartel arriba que no coge el dedo (`a-pie-en-botas.tsx`). La FORJA es una hoja más
+ * —el mismo mueble que la de comprar— que se abre con su botón, el primero del pie, y manda la
+ * opción `forjar:<arma>` del juego por `mesa.mover`; por eso las de forjar salen de la lista del
+ * pie, que las traería otra vez a secas. Y la ficha de cada colono dice con qué arma va.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -250,6 +258,17 @@ import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import type { CanalDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import { direccionDelCanal } from './mesa';
 import type { OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
+import {
+  alcanzaParaForjar,
+  alforjasDeLaVista,
+  ARMAS,
+  armaDeLaVista,
+  FICHA_DEL_ARMA,
+  MATERIALES,
+  NOMBRE_DEL_MATERIAL,
+} from '../../../shared/arcade/juegos/riberas-armas';
+import type { Arma } from '../../../shared/arcade/juegos/riberas-armas';
+import { ElAvisoDelHallazgo, esOpcionDeForjar, movimientoDeForjar, recetaDicha, usarElAvisoDelHallazgo } from './a-pie-en-botas';
 
 /**
  * EL CAMPO VERTICAL DE LA CÁMARA, en radianes: los 45° del `fov` del `Canvas` de la mesa.
@@ -585,6 +604,16 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    */
   const esBotas = esMesaDeBotas(vista);
   const [estadoDelCanal, ponerEstadoDelCanal] = useState<EstadoDelCanal | null>(null);
+  /*
+   * ═══ A PIE SE RECOGEN MATERIALES, Y SE FORJA ═══
+   *
+   * En una mesa de botas brotan hierro, pedernal, cuero y junco (`docs/AVATARES-JUGABLES.md` §4). La
+   * escena avisa con `alRecoger` y la pantalla lo dice en un cartel arriba —«+1 hierro», «Bruno se
+   * lleva 1 cuero»—. Y la FORJA es una hoja más de esta pantalla, como la de comprar: se abre con su
+   * botón del pie y se cierra con «Dejarlo». Aquí arriba con los demás ganchos.
+   */
+  const { alRecoger, frase: fraseDelHallazgo } = usarElAvisoDelHallazgo('riberas', nombres);
+  const [forjaAbierta, ponerForjaAbierta] = useState(false);
   const llaveDelAsiento = mesa.llave ?? null;
   const canal = useMemo<CanalDeBotas | undefined>(
     () =>
@@ -813,10 +842,17 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    * null` es la llave del QUINTO hueco (§4.4), y con `null` las piezas se correrían al
    * recoger y volverían al sacar. Se recoge la mesa, no se desmonta la barra.
    */
-  const fueraDelTablero = useMemo(
-    () => opcionesFueraDeLaMesa(fueraDeLaBarra, mesaRecogida ? null : dados),
-    [fueraDeLaBarra, dados, mesaRecogida],
-  );
+  /*
+   * Y SIN LAS DE FORJAR cuando la forja las enseña (mesa de botas con asiento): cada movimiento se
+   * enseña exactamente una vez, y en la forja van con su receta y su ayuda.
+   */
+  const conLaForja = esBotas && yo !== null;
+  /* El arma de cada colono, para su ficha del marcador: sólo en una mesa de botas, que es donde hay. */
+  const armaDelColono = esBotas ? (asiento: string): Arma | null => armaDeLaVista(laVista, asiento) : undefined;
+  const fueraDelTablero = useMemo(() => {
+    const todas = opcionesFueraDeLaMesa(fueraDeLaBarra, mesaRecogida ? null : dados);
+    return conLaForja ? todas.filter((o) => !esOpcionDeForjar(o)) : todas;
+  }, [fueraDeLaBarra, dados, mesaRecogida, conLaForja]);
 
   /*
    * ═══ LA MESA SALE SOLA AL PASAR A TOCARME, Y ESPERA SI HAY ALGO EN LA MANO ═══
@@ -1191,7 +1227,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
           delta los dejaría a todos sin saber quién va ganando. (Y durante meses fue
           la rama que veía TODO el móvil, hasta que el atlas se compiló para él.)
         */}
-        <ElMarcador marcador={marcador} />
+        <ElMarcador marcador={marcador} armaDe={armaDelColono} />
         {/*
           LA NOTA DEL RESPALDO, en tenue y no en alarma: no es un peligro, es un
           cambio de pincel. Dice el motivo porque «no se ha podido» sin motivo
@@ -1337,7 +1373,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
         toca justo cuando hace falta tocarlo. El lienzo mide lo mismo que antes: esta
         franja se lleva su alto del pie, que es el que cede.
       */}
-      <ElMarcador marcador={marcador} />
+      <ElMarcador marcador={marcador} armaDe={armaDelColono} />
 
       <View style={[estilos.cajaDelLienzo, { height: altoDelLienzo }]}>
         {catalogo.que === 'listo' ? (
@@ -1442,6 +1478,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
                   figura={vista.asientos.find((a) => a.id === yo)?.figura}
                   mandos={mandos}
                   canal={canal}
+                  alRecoger={alRecoger}
                 />
               </Canvas>
             </View>
@@ -1459,6 +1496,16 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
         */}
         <MandosDelPaseo mandos={mandos} visibles={aPie} />
         <BotonDeGolpear mandos={mandos} visible={aPie && canal !== undefined} />
+
+        {/*
+          EL AVISO AL RECOGER, arriba: abajo son de la palanca, el correr y «Golpear». A pie arriba
+          no hay nada; en la mesa baja por debajo de «Tablero entero» y «Recoger la mesa», que viven
+          en la esquina de arriba a la izquierda. No coge el dedo. Ver `a-pie-en-botas.tsx`.
+        */}
+        <ElAvisoDelHallazgo
+          frase={fraseDelHallazgo}
+          style={[estilos.avisoDelHallazgo, aPie ? null : estilos.avisoDelHallazgoEnLaMesa]}
+        />
 
         {/*
           EL TELÓN, mientras el modelo llega: suelo con el nombre del juego y una
@@ -1579,6 +1626,23 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
             alDejarlo={soltarTodo}
           />
         ) : null}
+
+        {/*
+          Y LA CUARTA, LA FORJA, sólo en una mesa de botas con asiento y sólo si no hay otra hoja
+          abierta: las otras tres salen de coger algo del tablero y ésta de un botón del pie, así
+          que podrían coincidir, y dos hojas pegadas abajo se taparían la una a la otra.
+        */}
+        {forjaAbierta && conLaForja && yo !== null && aQuien === null && comoJugarla === null && comprando === null ? (
+          <HojaDeLaForja
+            vista={laVista}
+            yo={yo}
+            quieto={mesa.quieto}
+            alForjar={(arma) => {
+              void mesa.mover(movimientoDeForjar(opciones, arma));
+            }}
+            alDejarlo={() => ponerForjaAbierta(false)}
+          />
+        ) : null}
       </View>
 
       {/*
@@ -1626,6 +1690,24 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
         enseña exactamente una vez. El pie cede y se desplaza por dentro.
       */}
       <ScrollView style={estilos.pieDeLaMesa} contentContainerStyle={{ paddingBottom: abajo }}>
+        {/*
+          EL BOTÓN DE LA FORJA, el primero del pie: es un `hojaBoton`, el mismo que abre el
+          componedor, porque es la misma clase de cosa —abre algo, no juega nada—. Dice lo que se
+          lleva para que no haga falta abrirla para saberlo.
+        */}
+        {conLaForja && yo !== null ? (
+          <View style={estilos.forjaEnElPie}>
+            <Pressable
+              style={[estilos.hojaBoton, forjaAbierta ? estilos.componedorElegido : null]}
+              onPress={() => ponerForjaAbierta(!forjaAbierta)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: forjaAbierta }}
+              accessibilityLabel={`Forja. Llevas ${loQueLlevas(armaDeLaVista(laVista, yo))}.`}
+            >
+              <Text style={estilos.hojaBotonRotulo}>{`Forja · llevas ${loQueLlevas(armaDeLaVista(laVista, yo))}`}</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {fueraDelTablero.length > 0 ? (
           <LasOpciones opciones={fueraDelTablero} alTocar={mesa.mover} quieto={mesa.quieto} />
         ) : null}
@@ -2249,6 +2331,93 @@ function HojaDeComprar({
 }
 
 // ---------------------------------------------------------------------------
+// La forja (sólo en una mesa de botas)
+// ---------------------------------------------------------------------------
+
+/** Lo que se lleva, dicho: el arma en minúscula, o «los puños». */
+function loQueLlevas(arma: Arma | null): string {
+  return arma === null ? 'los puños' : FICHA_DEL_ARMA[arma].nombre.toLowerCase();
+}
+
+/**
+ * LA HOJA DE LA FORJA: las alforjas, el arma que se lleva y un botón por arma con su receta y su
+ * ayuda, encendido si alcanza (`alcanzaParaForjar`). Ver `docs/AVATARES-JUGABLES.md` §4.
+ *
+ * ═══ EL MISMO MUEBLE QUE LAS OTRAS TRES HOJAS ═══
+ *
+ * Teja pegada abajo sobre el lienzo, contorno blanco al 40 %, la lista que se desplaza con su tope y
+ * «Dejarlo». Tapa la palanca mientras está abierta, como las otras: es una pregunta, y mientras se
+ * contesta no se anda. Lo que NO se escribe aquí es ni una regla: las recetas, los nombres y las
+ * ayudas son de `FICHA_DEL_ARMA`, y lo que se manda lo compone `movimientoDeForjar` con la opción
+ * del juego (`forjar:<arma>`) si la ofrece.
+ *
+ * ═══ NO SE CIERRA AL FORJAR, A PROPÓSITO ═══
+ *
+ * La respuesta de haber forjado es ver cambiar las alforjas y el «(la llevas)» en la misma hoja; una
+ * hoja que se cerrara sola obligaría a abrirla otra vez para comprobarlo. Apagado se ve y no manda:
+ * saber qué falta para la maza es parte de ir a buscarlo.
+ */
+function HojaDeLaForja({
+  vista,
+  yo,
+  quieto,
+  alForjar,
+  alDejarlo,
+}: {
+  vista: unknown;
+  yo: string;
+  quieto: boolean;
+  alForjar: (arma: Arma) => void;
+  alDejarlo: () => void;
+}): JSX.Element {
+  const alforjas = alforjasDeLaVista(vista, yo);
+  const lleva = armaDeLaVista(vista, yo);
+  const lasAlforjas = MATERIALES.map((m) => `${String(alforjas[m])} ${NOMBRE_DEL_MATERIAL[m].toLowerCase()}`).join(' · ');
+  return (
+    <View style={estilos.hoja} accessibilityViewIsModal>
+      <Text style={estilos.hojaRotulo}>Forja</Text>
+      <Text style={estilos.hojaTexto}>{`Alforjas: ${lasAlforjas}`}</Text>
+      <Text style={estilos.hojaTexto}>{`Llevas ${loQueLlevas(lleva)}.`}</Text>
+      <ScrollView style={estilos.hojaLista} contentContainerStyle={estilos.hojaListaDentro}>
+        {ARMAS.map((arma) => {
+          const ficha = FICHA_DEL_ARMA[arma];
+          const apagado = quieto || !alcanzaParaForjar(alforjas, arma);
+          return (
+            <Pressable
+              key={arma}
+              style={[estilos.hojaBoton, estilos.forjaArma, apagado ? estilos.componedorApagado : null]}
+              disabled={apagado}
+              onPress={() => {
+                if (apagado) return;
+                alForjar(arma);
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: apagado, selected: lleva === arma }}
+              accessibilityLabel={`${ficha.nombre}${lleva === arma ? ', la llevas' : ''}. ${recetaDicha(arma)}. ${ficha.ayuda}`}
+            >
+              <Text style={[estilos.hojaBotonRotulo, apagado ? estilos.componedorApagadoRotulo : null]}>
+                {`${ficha.nombre}${lleva === arma ? ' (la llevas)' : ''}`}
+              </Text>
+              <Text style={estilos.forjaReceta}>{recetaDicha(arma)}</Text>
+              <Text style={estilos.forjaAyuda}>{ficha.ayuda}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <Text style={estilos.forjaAyuda}>Los materiales se encuentran andando. Forjar otra arma sustituye a la que llevas.</Text>
+      <Pressable
+        style={estilos.hojaDejarlo}
+        onPress={alDejarlo}
+        accessibilityRole="button"
+        accessibilityLabel="Dejarlo, sin forjar nada"
+      >
+        <Text style={estilos.hojaDejarloRotulo}>Dejarlo</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // El marcador
 // ---------------------------------------------------------------------------
 
@@ -2278,7 +2447,14 @@ function HojaDeComprar({
  * dedo cuesta un alto y ninguno más. Las fichas no se reordenan nunca —van por
  * asiento— para que la propia se busque por el sitio y no leyendo los nombres.
  */
-function ElMarcador({ marcador }: { marcador: MarcadorEnTres | null }): JSX.Element | null {
+function ElMarcador({
+  marcador,
+  armaDe,
+}: {
+  marcador: MarcadorEnTres | null;
+  /** El arma de cada asiento, sólo en una mesa de botas: en la refriega se ve con qué va cada uno. */
+  armaDe?: (asiento: string) => Arma | null;
+}): JSX.Element | null {
   if (marcador === null || marcador.colonos.length === 0) return null;
   return (
     <ScrollView
@@ -2303,7 +2479,7 @@ function ElMarcador({ marcador }: { marcador: MarcadorEnTres | null }): JSX.Elem
         <Text style={estilos.mazoCifra}>{marcador.mazo}</Text>
       </View>
       {marcador.colonos.map((c) => (
-        <FichaDelColono key={c.asiento} colono={c} marcador={marcador} />
+        <FichaDelColono key={c.asiento} colono={c} marcador={marcador} arma={armaDe?.(c.asiento) ?? null} />
       ))}
     </ScrollView>
   );
@@ -2330,9 +2506,12 @@ function ElMarcador({ marcador }: { marcador: MarcadorEnTres | null }): JSX.Elem
 function FichaDelColono({
   colono,
   marcador,
+  arma = null,
 }: {
   colono: ColonoEnElMarcador;
   marcador: MarcadorEnTres;
+  /** El arma que lleva, en una mesa de botas; `null` son los puños y no se escribe. */
+  arma?: Arma | null;
 }): JSX.Element {
   const oculto = colono.puntosConLoOculto;
   const soloMios = oculto === null ? 0 : oculto - colono.puntos;
@@ -2358,6 +2537,7 @@ function FichaDelColono({
     loQueSeOyeDelVado(colono, marcador),
     colono.titulos.length > 0 ? `ha revelado ${colono.titulos.join(', ')}` : null,
     premios.length > 0 ? `tiene ${premios.join(' y ')}` : null,
+    arma !== null ? `lleva ${FICHA_DEL_ARMA[arma].nombre.toLowerCase()}` : null,
   ]
     .filter((t): t is string => t !== null)
     .join('. ');
@@ -2396,6 +2576,8 @@ function FichaDelColono({
         {premios.length > 0 ? (
           <Text style={estilos.fichaPremio}>{premios.join(' · ')}</Text>
         ) : null}
+        {/* El arma, a pie en una mesa de botas: un renglón más, y sólo si lleva una. */}
+        {arma !== null ? <Text style={estilos.fichaPremio}>{`Lleva ${FICHA_DEL_ARMA[arma].nombre.toLowerCase()}`}</Text> : null}
       </View>
     </View>
   );
@@ -2605,6 +2787,24 @@ const estilos = StyleSheet.create({
   hojaLista: { flexGrow: 0, flexShrink: 1, maxHeight: 220 },
   hojaListaDentro: { gap: 8 },
   hojaDejarlo: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  /*
+   * ═══ LA FORJA ═══
+   *
+   * El botón que la abre va el primero del pie, con el aire del componedor. Cada arma es un
+   * `hojaBoton` con dos renglones más —la receta y la ayuda—, así que crece en alto y deja de
+   * centrarse: arriba y con su relleno vertical. Las letras, a 13 como mínimo, el de la casa.
+   */
+  forjaEnElPie: { paddingHorizontal: 16, paddingTop: 10 },
+  forjaArma: { justifyContent: 'flex-start', paddingVertical: 8, gap: 2 },
+  forjaReceta: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 13 },
+  forjaAyuda: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 13, lineHeight: 18 },
+  /*
+   * EL AVISO AL RECOGER: a lo ancho y arriba, que abajo es de la palanca, el correr y «Golpear».
+   * En la mesa baja a 116 —«Recoger la mesa» acaba en 64 + 44 = 108— para no ponerse encima de
+   * los dos mandos de esa esquina.
+   */
+  avisoDelHallazgo: { position: 'absolute', top: 12, left: 12, right: 12 },
+  avisoDelHallazgoEnLaMesa: { top: 116 },
   /*
    * ═══ EL PREGÓN DEL RETABLO: LO MISMO QUE EN EL PC, CON LOS MUEBLES DE AQUÍ ═══
    *

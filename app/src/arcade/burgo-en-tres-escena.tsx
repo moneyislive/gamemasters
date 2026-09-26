@@ -254,6 +254,7 @@ import {
 } from './hojas-del-burgo';
 import { MandosDelPaseo } from './mandos-del-paseo';
 import { BotonDeGolpear } from './mandos-del-paseo';
+import { ElAvisoDelHallazgo, usarElAvisoDelHallazgo } from './a-pie-en-botas';
 import { esMesaDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import type { CanalDeBotas } from '../../../escenas/paseo/mesa-de-botas';
 import { direccionDelCanal } from './mesa';
@@ -703,6 +704,15 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
   useEffect(() => {
     if (esBotas) ponerModo('hombro');
   }, [esBotas, vista.codigo]);
+  /*
+   * ═══ Y POR LA CALLE SE ENCUENTRA DINERO ═══
+   *
+   * Propinas, carteras y maletines (`docs/AVATARES-JUGABLES.md` §3). La escena avisa con
+   * `alRecoger` y la pantalla lo dice en un cartel encima de la franja del paseo, junto al del
+   * canal: «+25 € · una cartera», «Bruno se lleva una cartera». Los euros son los del reductor
+   * (`EUROS_DEL_HALLAZGO`), no unos escritos aquí. Ver `a-pie-en-botas.tsx`.
+   */
+  const { alRecoger, frase: fraseDelHallazgo } = usarElAvisoDelHallazgo('burgo', nombres);
 
   /*
    * ═══ LA POSE DE SALIDA ES LA DEL BURGO, Y HAY QUE PONERLA ═══
@@ -1419,6 +1429,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
                     camara={camara}
                     mandos={mandos}
                     canal={canal}
+                    alRecoger={alRecoger}
                     bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
                     reloj={relojDeArena}
                     alPasarElTurno={alPasarElTurno}
@@ -1515,6 +1526,11 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
                 </Text>
               </View>
             ) : null}
+            {/*
+              EL AVISO AL RECOGER, en la misma pila y encima de la franja: crece hacia arriba, así que
+              la palanca, el correr y «Golpear» no se mueven ni un punto al salir. No coge el dedo.
+            */}
+            <ElAvisoDelHallazgo frase={fraseDelHallazgo} style={estilos.avisoDelHallazgo} />
             {/*
               ═══ LA FRANJA DEL PASEO: LAS TRES CÁMARAS, Y A PIE LA PALANCA, JUSTO ENCIMA DEL PIE ═══
 
@@ -1695,6 +1711,8 @@ const estilos = StyleSheet.create({
    * coge toques y sus muebles sí.
    */
   pieFlotante: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end' },
+  /* El aviso al recoger: con el aire de los lados del pie, y un respiro por debajo contra la franja. */
+  avisoDelHallazgo: { paddingHorizontal: 12, paddingBottom: 6 },
   /*
    * LOS BOTONES QUE NO RECOGIÓ NINGÚN MUEBLE, con tope y desplazables. Con el cajón
    * cerrado aquí caen sobre todo las pujas de una subasta: cuatro botones con su
