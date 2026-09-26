@@ -4376,11 +4376,19 @@ paso('14. El rayo en los mandos: el gesto, el cable, el apuntado, la cámara, la
     }
   };
   recorrer(new URL('../src/quiebro/', import.meta.url), '');
+  /*
+   * Los BANCOS (`…/banco*.tsx`: páginas de desarrollo con su propio HTML, como el banco del rayo de EFECTOS) fabrican
+   * disparos con la tabla y no son el juego; el juego no los importa (se mira aquí también).
+   */
+  const deLosBancos = quienLeeLaTabla.filter((f) => /(^|\/)banco[^/]*\.tsx$/.test(f));
+  const quienLaLeeEnElJuego = quienLeeLaTabla.filter((f) => !deLosBancos.includes(f));
+  const importaUnBanco = /from '\.\/[^']*banco[^']*'|import\('\.\/[^']*banco[^']*'\)/.test(juego);
   const importaElJuguete = juego.match(/tiro-de-prueba/g) ?? [];
   comprobar(
-    'el juego cuelga los efectos en la partida; y la tabla del rayo sólo la lee el tiro de JUGUETE, que se carga con `import()` dentro del bloque de desarrollo',
+    'el juego cuelga los efectos en la partida; y la tabla del rayo sólo la lee el tiro de JUGUETE (y los bancos, que el juego no importa), que se carga con `import()` dentro del bloque de desarrollo',
     /partida\.efectos = sistema;/.test(juego) &&
-      quienLeeLaTabla.join() === 'red/tiro-de-prueba.ts' &&
+      quienLaLeeEnElJuego.join() === 'red/tiro-de-prueba.ts' &&
+      !importaUnBanco &&
       importaElJuguete.length === 1 &&
       /if \(!import\.meta\.env\.DEV\) return;[\s\S]{0,400}void import\('\.\/red\/tiro-de-prueba'\)/.test(juego) &&
       !/from '\.\/red\/tiro-de-prueba'/.test(juego),
