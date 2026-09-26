@@ -4308,7 +4308,7 @@ paso('A pie en la app: el aviso al recoger en los tres juegos, la forja de Riber
   const frasesBuenas = (m) =>
     m !== null &&
     m.fraseDelHallazgo('burgo', { por: 'b', clase: 'cartera', mio: true }, 'Bruno') === '+25 € · una cartera' &&
-    m.fraseDelHallazgo('burgo', { por: 'b', clase: 'propina', mio: true }, null) === '+10 € · una propina' &&
+    m.fraseDelHallazgo('burgo', { por: 'b', clase: 'propina', mio: true }, null) === '+10 € · unas monedas' &&
     m.fraseDelHallazgo('burgo', { por: 'b', clase: 'maletin', mio: true }, null) === '+60 € · un maletín' &&
     m.fraseDelHallazgo('burgo', { por: 'b', clase: 'cartera', mio: false }, 'Bruno') === 'Bruno se lleva una cartera' &&
     m.fraseDelHallazgo('burgo', { por: 'b', clase: 'toString', mio: true }, null) === 'Te llevas toString' &&

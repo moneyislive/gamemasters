@@ -46,7 +46,7 @@ export function aspectoDe(clase: string): AspectoDeHallazgo {
 export const CAPACIDAD_DE_BROTES = 16;
 
 /** A qué altura sobre el suelo flota el centro de la pieza, y cuánto sube y baja. */
-export const FLOTA = 0.75;
+export const FLOTA = 1.1;
 export const VAIVEN = 0.12;
 
 /** La luz de una clase: color (ya con su intensidad), alto de la columna y ancho, en unidades. */
@@ -68,17 +68,26 @@ function brillo(hex: string, cuanto: number): THREE.Color {
   return new THREE.Color(hex).multiplyScalar(cuanto);
 }
 
+/*
+ * ═══ LAS MEDIDAS SALIERON DE JUGAR UNA MESA, NO DE LA MESA DE DIBUJO ═══
+ *
+ * Las primeras —columnas de 3,5 a 9 unidades y una pieza de escala 1— se miraron en el Burgo desde
+ * el hombro (27-sep-2026): a 57 unidades la columna era una raya de un píxel, a 38 la cartera no se
+ * distinguía, y los edificios, de 10 a 40 de alto, la tapaban entera. Así que la pieza va un 60 % más
+ * grande —la mitad de alto que quien anda— y la columna tres veces más alta, para asomar por
+ * encima de una manzana; lo gruesa que es la da `geometriaDeLaLuz`.
+ */
 const PIEZAS: Readonly<Record<AspectoDeHallazgo, PiezaDeHallazgo>> = {
-  propina: { escala: 1, giro: 0.6, luz: { color: brillo('#ffd24a', 0.5), alto: 3.5, ancho: 1 } },
-  cartera: { escala: 1, giro: 0.4, luz: { color: brillo('#e0a060', 0.5), alto: 4.5, ancho: 1.2 } },
+  propina: { escala: 1.6, giro: 0.6, luz: { color: brillo('#ffd24a', 0.55), alto: 12, ancho: 1 } },
+  cartera: { escala: 1.6, giro: 0.4, luz: { color: brillo('#e0a060', 0.55), alto: 15, ancho: 1.2 } },
   /* El que más vale, el que más se ve: más alto, más ancho y casi blanco. */
-  maletin: { escala: 1.25, giro: 0.3, luz: { color: brillo('#fff2b0', 1), alto: 9, ancho: 2.2 } },
-  hierro: { escala: 1, giro: 0.4, luz: { color: brillo('#c8d6e6', 0.45), alto: 4, ancho: 1 } },
-  pedernal: { escala: 1, giro: 0.45, luz: { color: brillo('#ffae66', 0.45), alto: 4, ancho: 1 } },
-  cuero: { escala: 1, giro: 0.4, luz: { color: brillo('#e6b884', 0.45), alto: 4, ancho: 1 } },
-  junco: { escala: 1, giro: 0.35, luz: { color: brillo('#a6ea78', 0.45), alto: 4, ancho: 1 } },
-  escudo: { escala: 1.1, giro: 0.35, luz: { color: brillo('#86b6ff', 0.6), alto: 5, ancho: 1.3 } },
-  desconocida: { escala: 1, giro: 0.3, luz: { color: brillo('#ffffff', 0.35), alto: 3, ancho: 1 } },
+  maletin: { escala: 2, giro: 0.3, luz: { color: brillo('#fff2b0', 1), alto: 30, ancho: 2.2 } },
+  hierro: { escala: 1.6, giro: 0.4, luz: { color: brillo('#c8d6e6', 0.5), alto: 13, ancho: 1 } },
+  pedernal: { escala: 1.6, giro: 0.45, luz: { color: brillo('#ffae66', 0.5), alto: 13, ancho: 1 } },
+  cuero: { escala: 1.6, giro: 0.4, luz: { color: brillo('#e6b884', 0.5), alto: 13, ancho: 1 } },
+  junco: { escala: 1.6, giro: 0.35, luz: { color: brillo('#a6ea78', 0.5), alto: 13, ancho: 1 } },
+  escudo: { escala: 1.75, giro: 0.35, luz: { color: brillo('#86b6ff', 0.65), alto: 16, ancho: 1.3 } },
+  desconocida: { escala: 1.6, giro: 0.3, luz: { color: brillo('#ffffff', 0.4), alto: 10, ancho: 1 } },
 };
 
 export function piezaDe(aspecto: AspectoDeHallazgo): PiezaDeHallazgo {
@@ -263,13 +272,13 @@ export function geometriaDe(aspecto: AspectoDeHallazgo): THREE.BufferGeometry {
  * negro no pinta— y el color de cada brote, en la instancia.
  */
 export function geometriaDeLaLuz(): THREE.BufferGeometry {
-  const columna = new THREE.CylinderGeometry(0.06, 0.12, 1, 8, 1, true).translate(0, 0.5, 0);
+  const columna = new THREE.CylinderGeometry(0.22, 0.4, 1, 10, 1, true).translate(0, 0.5, 0);
   /* Casi a ras: la instancia estira la altura por el alto de la columna, y esto también. */
-  const halo = new THREE.RingGeometry(0.2, 0.6, 20, 1).rotateX(-Math.PI / 2).translate(0, 0.005, 0);
+  const halo = new THREE.RingGeometry(0.4, 1.2, 20, 1).rotateX(-Math.PI / 2).translate(0, 0.005, 0);
   return fundir(
     [
       { geo: columna, color: (_x, y) => (1 - Math.min(1, Math.max(0, y))) ** 2 },
-      { geo: halo, color: (x, _y, z) => 1 - Math.min(1, Math.max(0, (Math.hypot(x, z) - 0.2) / 0.4)) },
+      { geo: halo, color: (x, _y, z) => 1 - Math.min(1, Math.max(0, (Math.hypot(x, z) - 0.4) / 0.8)) },
     ],
     false,
   );

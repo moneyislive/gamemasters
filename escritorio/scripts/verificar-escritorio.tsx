@@ -2356,7 +2356,7 @@ function losAvataresJugablesEnLaSala(): void {
     f('lindes', { por: 'a', clase: 'escudo', mio: true }, 'Ana'),
     f('burgo', { por: 'b', clase: 'toString', mio: true }, 'Bruno'),
   ];
-  const esperadas = ['+25 € · una cartera', 'Bruno se lleva una cartera', '+10 € · una propina', '+60 € · un maletín', '+1 hierro', '+1 escudo'];
+  const esperadas = ['+25 € · una cartera', 'Bruno se lleva una cartera', '+10 € · unas monedas', '+60 € · un maletín', '+1 hierro', '+1 escudo'];
   const avisosBien = (fs: readonly string[]): boolean => esperadas.every((e, i) => fs[i] === e) && !/€/.test(fs[6] ?? '€');
   comprobar(
     'el aviso al recoger: «+25 € · una cartera» si es mío, «Bruno se lleva una cartera» si no, los euros de la tabla del Burgo, «+1 hierro» y «+1 escudo»; y una clase rara no es dinero',

@@ -54,7 +54,7 @@ export interface Recogido {
 export type JuegoQueSeRecoge = 'burgo' | 'riberas' | 'lindes';
 
 /** Cómo se dice lo que se encuentra en el Burgo, con su artículo. */
-const LO_DE_LA_CALLE: Readonly<Record<string, string>> = { propina: 'una propina', cartera: 'una cartera', maletin: 'un maletín' };
+const LO_DE_LA_CALLE: Readonly<Record<string, string>> = { propina: 'unas monedas', cartera: 'una cartera', maletin: 'un maletín' };
 
 /** Un material de Riberas en minúscula, o la clase tal cual si no es de la tabla. */
 function nombreDelMaterial(clase: string): string {
