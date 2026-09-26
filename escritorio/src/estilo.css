@@ -6300,14 +6300,24 @@ code {
   font-size: 0.8rem;
 }
 
+/*
+ * La ayuda va en el color del botón, sólo atenuada: con `--tenue` y encima la opacidad del botón
+ * apagado —que es como está casi siempre, mientras no alcanzan las alforjas— salía gris sobre gris y
+ * no se leía (visto jugando, 27-sep-2026). Y la receta es lo que se consulta con el botón apagado.
+ */
 .forja-arma-ayuda {
-  color: var(--tenue);
+  opacity: 0.85;
 }
 
 .forja-arma[aria-disabled='true'],
 .lindes-leva[aria-disabled='true'] {
-  opacity: 0.55;
+  opacity: 0.75;
   cursor: not-allowed;
+}
+
+.forja-armados {
+  margin: 0.5rem 0 0;
+  font-weight: 600;
 }
 
 .lindes-escudos-cuenta {

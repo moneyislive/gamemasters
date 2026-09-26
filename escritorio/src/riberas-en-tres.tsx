@@ -1842,7 +1842,7 @@ export function RiberasEnTres({
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
   const { alRecoger, aviso: avisoDelHallazgo } = usarElAvisoDelHallazgo('riberas', puesta.asientos);
   const laForja =
-    esBotas && yo !== null ? <LaForja vista={vista} yo={yo} opciones={opciones} quieto={quieto} mover={mover} /> : null;
+    esBotas && yo !== null ? <LaForja vista={vista} yo={yo} opciones={opciones} quieto={quieto} mover={mover} asientos={puesta.asientos} /> : null;
 
   /*
    * ═══ LA MESA SALE SOLA AL PASAR A TOCARME, Y ESPERA SI HAY ALGO EN LA MANO ═══

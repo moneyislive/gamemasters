@@ -209,15 +209,28 @@ export function LaForja({
   opciones,
   quieto,
   mover,
+  asientos = [],
 }: {
   readonly vista: unknown;
   readonly yo: string;
   readonly opciones: readonly Opcion[];
   readonly quieto: boolean;
   readonly mover: (m: MovimientoDeclarado) => unknown;
+  /** Los de la mesa, para decir con qué va cada uno. Sin ellos no se dice. */
+  readonly asientos?: readonly { readonly id: string; readonly nombre: string }[];
 }): JSX.Element {
   const alforjas = alforjasDeLaVista(vista, yo);
   const lleva = armaDeLaVista(vista, yo);
+  /*
+   * CON QUÉ VA CADA UNO. Jugando una mesa (27-sep-2026) Bruno forjó un hacha y en la pantalla de
+   * Ana no salía en ningún sitio: el pintor 3D no pinta el panel «A pie» que declara el juego, y el
+   * renglón del marcador está medido al punto para que quepan seis colonos. Saber que el de enfrente
+   * tumba en dos golpes es justo lo que decide si se le planta cara, así que va aquí.
+   */
+  const armados = asientos
+    .filter((a) => a.id !== yo)
+    .map((a) => ({ nombre: a.nombre, arma: armaDeLaVista(vista, a.id) }))
+    .filter((a): a is { nombre: string; arma: Arma } => a.arma !== null);
   return (
     <section className="forja" aria-label="Forja">
       <h3>Forja</h3>
@@ -252,6 +265,13 @@ export function LaForja({
           );
         })}
       </ul>
+      {asientos.length > 1 ? (
+        <p className="forja-armados">
+          {armados.length === 0
+            ? 'Nadie más lleva arma.'
+            : `Van armados: ${armados.map((a) => `${a.nombre}, ${FICHA_DEL_ARMA[a.arma].nombre.toLowerCase()}`).join(' · ')}.`}
+        </p>
+      ) : null}
       <p className="forja-nota">Los materiales se encuentran andando. Forjar otra arma sustituye a la que llevas.</p>
     </section>
   );
