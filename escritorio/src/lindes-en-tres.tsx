@@ -50,7 +50,7 @@ import {
 import { asientosQueAndan, esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../escenas/paseo/mandos';
-import { escudosDeLaVista } from '../../shared/arcade/juegos/lindes-escudos';
+import { escudosDeLaVista, LEVA } from '../../shared/arcade/juegos/lindes-escudos';
 import { LosEscudos, usarElAvisoDelHallazgo } from './a-pie-en-botas';
 import { LimiteDelMundo } from './lienzo-propio';
 import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
@@ -219,13 +219,26 @@ export function LindesEnTres({
    * el del respaldo —abajo, cuando no hay tablero en tres dimensiones— no pinta «Dónde plantar»,
    * así que allí `acciones` tiene que seguir trayéndolos todos o no se podría plantar.
    */
-  const loQueNoEstaArriba = useMemo(() => ({ ...tablero, acciones: sinRepetir }), [tablero, sinRepetir]);
+  /*
+   * Y LA LEVA SE ENSEÑA UNA VEZ: en una mesa de botas con asiento la pinta `LosEscudos`, con su
+   * cuenta y su porqué, así que sale de las dos tiras de acciones, que la traerían otra vez a secas.
+   * Es lo mismo que hace la app (`app/src/arcade/lindes-en-tres-escena.tsx`).
+   */
+  const conLosEscudos = esBotas && yoEnLaMesa !== null;
+  const loQueNoEstaArriba = useMemo(
+    () => ({ ...tablero, acciones: conLosEscudos ? sinRepetir.filter((a) => a.toque.tipo !== LEVA) : sinRepetir }),
+    [tablero, sinRepetir, conLosEscudos],
+  );
+  const lasDelRespaldo = useMemo(
+    () => (conLosEscudos ? { ...tablero, acciones: tablero.acciones.filter((a) => a.toque.tipo !== LEVA) } : tablero),
+    [tablero, conLosEscudos],
+  );
 
   if (valle.escena === null || valle.roto !== null) {
     return (
       <div className="lindes-respaldo">
         <Retablo tablero={tablero} alTocar={alTocar} quieto={quieto} />
-        <AccionesDelTablero tablero={tablero} alTocar={alTocar} quieto={quieto} />
+        <AccionesDelTablero tablero={lasDelRespaldo} alTocar={alTocar} quieto={quieto} />
         {esBotas && yoEnLaMesa !== null ? (
           <LosEscudos vista={puesta.vista} yo={yoEnLaMesa} opciones={opciones} quieto={quieto} mover={mover} />
         ) : null}

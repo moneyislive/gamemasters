@@ -162,7 +162,7 @@ import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import type { CanalDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../escenas/paseo/mandos';
-import { LaForja, usarElAvisoDelHallazgo } from './a-pie-en-botas';
+import { LaForja, opcionesFueraDeLaForja, usarElAvisoDelHallazgo } from './a-pie-en-botas';
 import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
 /*
  * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
@@ -1597,12 +1597,12 @@ export function RiberasEnTres({
     () =>
       opcionesFueraDeLasIslas(
         opcionesFueraDeLaBolsa(
-          opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mesaRecogida ? null : mazo),
+          opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opcionesFueraDeLaForja(opciones, esMesaDeBotas(puesta) && yo !== null))), mesaRecogida ? null : mazo),
           bolsa,
         ),
         destinosDelEstiaje,
       ),
-    [opciones, mazo, mesaRecogida, bolsa, destinosDelEstiaje],
+    [opciones, puesta, yo, mazo, mesaRecogida, bolsa, destinosDelEstiaje],
   );
   /*
    * LA MANO DE LA IZQUIERDA: mis premios y mis cartas del mazo, apagada entera mientras

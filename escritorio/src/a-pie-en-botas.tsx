@@ -179,6 +179,16 @@ export function recetaDicha(arma: Arma): string {
     .join(' + ');
 }
 
+/**
+ * LAS OPCIONES SIN LAS DE FORJAR, cuando las pinta `LaForja`. El reductor ofrece un `forjar:<arma>`
+ * por cada arma que alcanza, y sin esta criba salían otra vez, a secas, en el carril y en el cajón
+ * de Riberas: la misma forja dos veces en la misma pantalla. `conLaForja` es la condición con la que
+ * se monta el panel (mesa de botas y con asiento); sin panel, las opciones pasan enteras.
+ */
+export function opcionesFueraDeLaForja(opciones: readonly Opcion[], conLaForja: boolean): readonly Opcion[] {
+  return conLaForja ? opciones.filter((o) => o.tipo !== FORJAR) : opciones;
+}
+
 /** El movimiento de forjar `arma`: la opción del juego si la ofrece, o `{ tipo: FORJAR, carga: { arma } }`. */
 export function movimientoDeForjar(opciones: readonly Opcion[], arma: Arma): MovimientoDeclarado {
   return movimientoOfrecido(

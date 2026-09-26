@@ -4618,7 +4618,7 @@ function elMazoEnLaPantalla(): void {
    */
   comprobar(
     'y el botón se quita con `opcionesFueraDeLaBarra` pasándole EL MAZO, no un interruptor suelto',
-    /opcionesFueraDeLaBarra\(\s*opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(
+    /opcionesFueraDeLaBarra\(\s*opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opcionesFueraDeLaForja\(opciones, esMesaDeBotas\(puesta\) && yo !== null\)\)\), mesaRecogida \? null : mazo\)/.test(
       fuenteDelCliente,
     ),
   );
@@ -5278,9 +5278,14 @@ function losDadosEnLaPantalla(): void {
     /if \(!haySitioParaLosDados\) return null;\s+const suyos = dadosEnTres\(vista, yo, opciones\);\s+return suyos === null \|\| !quieto \? suyos : \{ \.\.\.suyos, disponible: false \};/.test(codigo),
   );
   comprobar(
+    'las opciones de forjar no salen en el carril ni en el cajón cuando las pinta la forja: `opcionesFueraDeLaForja` es la primera criba, con la condición del panel',
+    /opcionesFueraDeLaForja\(opciones, esMesaDeBotas\(puesta\) && yo !== null\)/.test(codigo) &&
+      /esBotas && yo !== null \? <LaForja vista=\{vista\} yo=\{yo\} opciones=\{opciones\}/.test(codigo),
+  );
+  comprobar(
     'TIRAR se cae de los botones con `opcionesFueraDeLaMesa` pasándole LOS DADOS (no un interruptor) y DESPUÉS de la cadena de siempre, y el pregón la cierra',
     /opcionesFueraDelPregon\(opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\), pregon\)/.test(codigo.replace(/\s+/g, ' ')) &&
-      /const fueraDeLaBarra = useMemo\( \(\) => opcionesFueraDeLasIslas\( opcionesFueraDeLaBolsa\( opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\), bolsa, \), destinosDelEstiaje, \), /.test(codigo.replace(/\s+/g, ' ')),
+      /const fueraDeLaBarra = useMemo\( \(\) => opcionesFueraDeLasIslas\( opcionesFueraDeLaBolsa\( opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opcionesFueraDeLaForja\(opciones, esMesaDeBotas\(puesta\) && yo !== null\)\)\), mesaRecogida \? null : mazo\), bolsa, \), destinosDelEstiaje, \), /.test(codigo.replace(/\s+/g, ' ')),
     codigo.replace(/\s+/g, ' ').slice(codigo.replace(/\s+/g, ' ').indexOf('const fueraDeLaBarra'), codigo.replace(/\s+/g, ' ').indexOf('const fueraDeLaBarra') + 300),
   );
   comprobar(
@@ -5402,7 +5407,7 @@ function recogerLaMesa(): void {
   comprobar(
     'con la mesa recogida, TIRAR y COMPRAR vuelven a los botones: la cinta se compone con `null` en los dos filtros que la mesa se lleva',
     /opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\)/.test(codigo) &&
-      /opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(codigo),
+      /opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opcionesFueraDeLaForja\(opciones, esMesaDeBotas\(puesta\) && yo !== null\)\)\), mesaRecogida \? null : mazo\)/.test(codigo),
   );
   comprobar(
     'y la ESCENA sigue recibiendo `dados` y `mazo` sin tocar: son la llave del quinto y del cuarto hueco, y con `null` las piezas se moverían al recoger',
