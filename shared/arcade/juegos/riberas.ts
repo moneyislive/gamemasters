@@ -182,6 +182,23 @@ import type { ContextoMovimiento, Movimiento } from '../movimiento';
 import { comoSeLlama, ESPECTADOR, NADIE_SENTADO } from '../tipos';
 import type { ArcadeId, AsientoId, LosSentados, ManifiestoDeArcade, QuienMira } from '../tipos';
 import { esBotin, leerElBotin } from './botin';
+import { esHallazgo, leerElHallazgo } from './hallazgo';
+import { clasesDe, HALLAZGOS_DE_RIBERAS } from './hallazgos-de-los-juegos';
+import {
+  alcanzaParaForjar,
+  ALFORJAS_VACIAS,
+  ARMAS,
+  alforjasDeLaVista,
+  armaDeLaVista,
+  esArma,
+  esMaterial,
+  FICHA_DEL_ARMA,
+  FORJAR,
+  gastarLaReceta,
+  MATERIALES,
+  NOMBRE_DEL_MATERIAL,
+} from './riberas-armas';
+import type { Alforjas, Arma, Material } from './riberas-armas';
 
 /**
  * `Opcion` SE REEXPORTA Y YA NO SE DEFINE AQUÍ.
@@ -1257,7 +1274,31 @@ export interface RefriegaDeRiberas {
   de: AsientoId;
   para: AsientoId;
   fichas: number;
+  /**
+   * EL MATERIAL QUE SE LLEVÓ DE LAS ALFORJAS, y SÓLO SI se llevó alguno (mesas `botas`). Éste sí se
+   * dice: las alforjas son públicas —en la refriega se ve quién va cargado—, al revés que el almacén.
+   */
+  material?: Material;
+  /** EL ARMA QUE SE LE ROMPIÓ A QUIEN CAYÓ, y SÓLO SI llevaba una. Pública, como todas las armas. */
+  rota?: Arma;
 }
+
+/**
+ * LO QUE SE HACE A PIE EN RIBERAS Y NO ES PELEARSE: encontrar un material o forjar un arma. Sólo en
+ * mesas `botas` (`docs/AVATARES-JUGABLES.md` §4). Una crónica corta, como `refriegas`, para que el
+ * panel y las escenas lo cuenten: «Ana encuentra hierro.», «Bruno forja una honda.».
+ *
+ * `n` es el número de serie del suceso, que sólo sube: una lista recortada por delante con dos
+ * sucesos iguales seguidos («Ana encuentra hierro» dos veces) no dice por sí sola que hubo uno más, y
+ * quien pinta un aviso necesita saber que el último es NUEVO. Se calcula del último de la lista, así
+ * que no hace falta un contador aparte en el estado.
+ */
+export type AndanzaDeRiberas =
+  | { n: number; de: AsientoId; que: 'encuentra'; material: Material }
+  | { n: number; de: AsientoId; que: 'forja'; arma: Arma };
+
+/** Cuántas andanzas recuerda la mesa para contarlas. Las más viejas se caen por delante. */
+export const ANDANZAS_QUE_SE_RECUERDAN = 4;
 
 /** Quién tiene el Vado Largo y con qué longitud. `de: null` si está vacante. */
 export interface Vado {
@@ -1484,6 +1525,24 @@ export interface EstadoDeRiberas {
    * que no hay nada que rellenar. El campo aparece con la primera refriega y ya no se va.
    */
   refriegas?: RefriegaDeRiberas[];
+
+  /*
+   * ═══ LO DE ANDAR A PIE: ALFORJAS, ARMAS Y SU CRÓNICA. OPCIONALES, COMO `refriegas` ═══
+   *
+   * Sólo existen en mesas `botas` (`docs/AVATARES-JUGABLES.md` §1 y §4), y por la misma razón que
+   * `refriegas` no se rellenan en `comoSiSiempreHubieraHabidoMazo`: que falten ES lo cierto —nadie
+   * encontró ni forjó nada— y una partida normal tiene que quedar byte a byte como la de antes,
+   * que es lo que vigila el oro (`oro:arcade`). Cada uno aparece con su primer uso y ya no se va.
+   *
+   * Los tres son PÚBLICOS: en la refriega se ve quién va cargado y con qué arma, y el servidor de la
+   * sala lee `armas` de la vista del espectador para saber cuánto daña un golpe (`armaDeLaVista`).
+   */
+  /** Los materiales de cada colono. Aparece con el primer hallazgo. Ver `elHallazgo`. */
+  alforjas?: Record<AsientoId, Alforjas>;
+  /** El arma de cada colono que lleve una. Aparece con la primera forja. Ver `forjar`. */
+  armas?: Record<AsientoId, Arma>;
+  /** Los últimos hallazgos y forjas, para contarlos. Ver `AndanzaDeRiberas`. */
+  andanzas?: AndanzaDeRiberas[];
 }
 
 /**
@@ -1713,6 +1772,13 @@ export function avanzarRiberas(
   if (esBotin(movimiento)) return elBotin(actual, movimiento.carga, ctx);
 
   /*
+   * Y EL HALLAZGO, POR LO MISMO: lo mete el servidor cuando alguien recoge algo a pie en Boots on
+   * Board, con `quien: null`, y nadie lo ofrece. `leerElHallazgo` dice que no a todo lo que llegue
+   * con `quien` y a toda clase que no sea un material de Riberas.
+   */
+  if (esHallazgo(movimiento)) return elHallazgo(actual, movimiento.carga, ctx);
+
+  /*
    * EL PORTILLO. Se proyecta para quien manda —o sea, se le tapa lo que no puede
    * ver— y se le pregunta al propio juego qué le habría ofrecido.
    *
@@ -1803,6 +1869,8 @@ export function avanzarRiberas(
       return jugarLasDosVeredas(actual, ctx, campoDeTexto(movimiento.carga, 'carta'));
     case REVELAR:
       return revelarUnTitulo(actual, ctx, campoDeTexto(movimiento.carga, 'carta'));
+    case FORJAR:
+      return forjar(actual, ctx, campoDeTexto(movimiento.carga, 'arma'));
     default:
       /*
        * Un movimiento que este juego no conoce se ignora y devuelve el estado. No
@@ -3084,7 +3152,15 @@ function elBotin(
   const debe = estado.momento === 'descartando' ? loQueDebeTirar(estado, suyo.asiento) : 0;
   const sobran = suyo.almacen.length - debe;
   const cuantas = sobran < FICHAS_DEL_BOTIN ? sobran : FICHAS_DEL_BOTIN;
-  if (cuantas <= 0) return estado;
+  /*
+   * ═══ A PIE HAY MÁS QUE LLEVARSE, Y SÓLO SI QUIEN CAE LO LLEVA ENCIMA ═══
+   *
+   * En una mesa `botas` quien cae puede llevar alforjas y un arma (§4 de `AVATARES-JUGABLES.md`).
+   * Si no lleva ni una cosa ni otra, esto es EXACTAMENTE el botín de antes: la misma salida por la
+   * misma línea, el mismo azar gastado y la misma crónica. Por eso lo de a pie va en `aPie` y
+   * sólo cambia algo cuando hay algo que cambiar.
+   */
+  if (cuantas <= 0 && !llevaAlgoAPie(estado, botin.de)) return estado;
 
   /*
    * De una en una, y cada una con `elRobo`: la segunda —si un día `FICHAS_DEL_BOTIN` pasa de una—
@@ -3101,10 +3177,200 @@ function elBotin(
     azar = robo.azar;
     llevadas++;
   }
-  if (llevadas === 0) return estado;
 
-  const refriegas = [...(estado.refriegas ?? []), { de: botin.de, para: botin.para, fichas: llevadas }];
-  return { ...estado, colonos, azar, refriegas: refriegas.slice(-REFRIEGAS_QUE_SE_RECUERDAN) };
+  /* Lo de a pie va DESPUÉS de las fichas, con el azar que dejaron: así el orden es uno y el mismo. */
+  const aPie = elBotinDeAPie({ ...estado, colonos, azar }, botin.de, botin.para);
+  if (llevadas === 0 && aPie === null) return estado;
+
+  const refriega: RefriegaDeRiberas = { de: botin.de, para: botin.para, fichas: llevadas };
+  if (aPie === null) {
+    const refriegas = [...(estado.refriegas ?? []), refriega];
+    return { ...estado, colonos, azar, refriegas: refriegas.slice(-REFRIEGAS_QUE_SE_RECUERDAN) };
+  }
+  const conloDeAPie: RefriegaDeRiberas = {
+    ...refriega,
+    ...(aPie.material === null ? {} : { material: aPie.material }),
+    ...(aPie.rota === null ? {} : { rota: aPie.rota }),
+  };
+  const refriegas = [...(estado.refriegas ?? []), conloDeAPie];
+  return {
+    ...aPie.estado,
+    colonos,
+    refriegas: refriegas.slice(-REFRIEGAS_QUE_SE_RECUERDAN),
+  };
+}
+
+/** ¿Lleva este asiento algo que perder a pie: algún material en las alforjas, o un arma? */
+function llevaAlgoAPie(estado: EstadoDeRiberas, asiento: AsientoId): boolean {
+  return totalDeLasAlforjas(alforjasDe(estado, asiento)) > 0 || armaDe(estado, asiento) !== null;
+}
+
+/** Las alforjas de un asiento en el estado, vacías si no tiene. */
+function alforjasDe(estado: EstadoDeRiberas, asiento: AsientoId): Alforjas {
+  const todas = estado.alforjas;
+  if (todas === undefined || !Object.prototype.hasOwnProperty.call(todas, asiento)) return ALFORJAS_VACIAS;
+  return todas[asiento] as Alforjas;
+}
+
+/** El arma de un asiento en el estado, o `null`. */
+function armaDe(estado: EstadoDeRiberas, asiento: AsientoId): Arma | null {
+  const todas = estado.armas;
+  if (todas === undefined || !Object.prototype.hasOwnProperty.call(todas, asiento)) return null;
+  return todas[asiento] as Arma;
+}
+
+/** Cuántos materiales hay en unas alforjas, de todas las clases. */
+function totalDeLasAlforjas(alforjas: Alforjas): number {
+  let total = 0;
+  for (const m of MATERIALES) total += alforjas[m];
+  return total;
+}
+
+/**
+ * LO QUE EL BOTÍN SE LLEVA A PIE: UN material al azar de las alforjas de quien cae, que pasa a las de
+ * quien lo tumbó, y el arma de quien cae, que SE ROMPE (desaparece; no pasa a nadie).
+ *
+ * El material se sortea UNIDAD A UNIDAD y no clase a clase, igual que una ficha del almacén: quien
+ * lleva cinco de hierro y uno de junco pierde hierro cinco veces de cada seis. Con el azar del estado
+ * —`enteroEntre`, como `elRobo`—, que viaja con él y lo hace reejecutable.
+ *
+ * `null` si quien cae no lleva nada a pie: ni un material ni un arma. Así el botín de siempre no toca
+ * el azar de más ni añade campos, y el oro de las partidas normales no se mueve.
+ */
+function elBotinDeAPie(
+  estado: EstadoDeRiberas,
+  de: AsientoId,
+  para: AsientoId,
+): { estado: EstadoDeRiberas; material: Material | null; rota: Arma | null } | null {
+  const suyas = alforjasDe(estado, de);
+  const total = totalDeLasAlforjas(suyas);
+  const rota = armaDe(estado, de);
+  if (total === 0 && rota === null) return null;
+
+  let siguiente = estado;
+  let material: Material | null = null;
+  if (total > 0) {
+    const tirada = enteroEntre(estado.azar, 0, total - 1);
+    let queda = tirada.valor;
+    for (const m of MATERIALES) {
+      if (queda < suyas[m]) {
+        material = m;
+        break;
+      }
+      queda -= suyas[m];
+    }
+    const cual = material as Material;
+    const mias = alforjasDe(estado, para);
+    siguiente = {
+      ...siguiente,
+      azar: tirada.azar,
+      alforjas: {
+        ...(estado.alforjas ?? {}),
+        [de]: { ...suyas, [cual]: suyas[cual] - 1 },
+        [para]: { ...mias, [cual]: mias[cual] + 1 },
+      },
+    };
+  }
+  if (rota !== null) {
+    const armas: Record<AsientoId, Arma> = {};
+    for (const [asiento, arma] of Object.entries(siguiente.armas ?? {})) {
+      if (asiento !== de) armas[asiento] = arma;
+    }
+    siguiente = { ...siguiente, armas };
+  }
+  return { estado: siguiente, material, rota };
+}
+
+// ---------------------------------------------------------------------------
+// A PIE: LOS HALLAZGOS Y LA FORJA (sólo mesas `botas`)
+// ---------------------------------------------------------------------------
+
+/** Una andanza más en la crónica, con su número de serie, recortada por delante. */
+function conLaAndanza(
+  estado: EstadoDeRiberas,
+  andanza:
+    | { de: AsientoId; que: 'encuentra'; material: Material }
+    | { de: AsientoId; que: 'forja'; arma: Arma },
+): AndanzaDeRiberas[] {
+  const antes = estado.andanzas ?? [];
+  const ultima = antes[antes.length - 1];
+  const n = ultima === undefined ? 1 : ultima.n + 1;
+  return [...antes, { n, ...andanza } as AndanzaDeRiberas].slice(-ANDANZAS_QUE_SE_RECUERDAN);
+}
+
+/**
+ * EL HALLAZGO: `para` ha recogido un material a pie en Boots on Board. +1 de ese material en sus
+ * alforjas, y nada más.
+ *
+ * Se escribe como el botín y por lo mismo (`hallazgo.ts`): la carga mala, lo que manda un asiento,
+ * el que no está sentado y la clase que no es un material de Riberas lo dice `leerElHallazgo`; lo que
+ * sólo sabe el juego lo dice esto —que haya partida (ni `'reuniendo'` ni `'terminada'`) y que `para`
+ * sea COLONO de esta partida—. Se aplica también mientras se coloca y en el descarte de un siete: en
+ * Boots on Board ya se anda, y ninguna de las dos cosas depende de las alforjas.
+ *
+ * NO TOCA el turno, ni el momento, ni el azar, ni nada del tablero: la mesa reprograma su plazo
+ * cuando cambia `turnoDe`, y un hallazgo que lo moviera le daría o quitaría tiempo a quien juega.
+ */
+function elHallazgo(
+  estado: EstadoDeRiberas,
+  carga: unknown,
+  ctx: ContextoMovimiento,
+): EstadoDeRiberas | Rechazo<EstadoDeRiberas> {
+  const hallazgo = leerElHallazgo(carga, ctx.quien, ctx.asientos, clasesDe(HALLAZGOS_DE_RIBERAS));
+  if (hallazgo === null || !esMaterial(hallazgo.clase)) {
+    return rechazar(estado, 'Ese hallazgo no vale: lo mete la mesa, para un sentado y de un material de Riberas.');
+  }
+  if (estado.momento === 'reuniendo') return rechazar(estado, 'La partida no ha empezado: todavía no hay nada que encontrar.');
+  if (estado.momento === 'terminada') return rechazar(estado, 'La partida ya ha terminado: ya no hay nada que encontrar.');
+  if (indiceDelAsiento(estado, hallazgo.para) < 0) {
+    return rechazar(estado, 'Ese hallazgo es de alguien que no juega esta partida.');
+  }
+
+  const material = hallazgo.clase;
+  const suyas = alforjasDe(estado, hallazgo.para);
+  return {
+    ...estado,
+    alforjas: { ...(estado.alforjas ?? {}), [hallazgo.para]: { ...suyas, [material]: suyas[material] + 1 } },
+    andanzas: conLaAndanza(estado, { de: hallazgo.para, que: 'encuentra', material }),
+  };
+}
+
+/**
+ * FORJAR: el colono gasta la receta de un arma de sus alforjas y se la cuelga. Una sola: la que
+ * llevara se sustituye (y no se devuelve nada de ella).
+ *
+ * ═══ NO HACE FALTA QUE SEA SU TURNO, Y ES LO MISMO QUE CONTESTAR UN TRUEQUE ═══
+ *
+ * La refriega no espera a los turnos, así que se forja cuando se quiera mientras la partida se juega
+ * —colocando, jugando o en el descarte de un siete—. El motor no mira el turno de nadie (el turno es
+ * del estado opaco de cada juego), y el portillo sólo mira si `opciones()` se lo ofreció a QUIEN LO
+ * MANDA; `opcionesDeRiberas` se lo ofrece a todo colono al que le alcance, tenga o no el turno, como
+ * ya ofrece aceptar y rechazar un trueque. Esto vuelve a validarlo todo con el estado, que es la
+ * segunda mitad del «sólo si».
+ *
+ * No toca el turno, ni el momento, ni el azar, ni el tablero.
+ */
+function forjar(
+  estado: EstadoDeRiberas,
+  ctx: ContextoMovimiento,
+  arma: string | null,
+): EstadoDeRiberas | Rechazo<EstadoDeRiberas> {
+  if (!esArma(arma)) return rechazar(estado, 'Esa arma no se puede forjar.');
+  if (estado.momento === 'reuniendo' || estado.momento === 'terminada') {
+    return rechazar(estado, 'Sólo se forja mientras la partida se juega.');
+  }
+  const yo = indiceDelAsiento(estado, ctx.quien);
+  if (yo < 0) return rechazar(estado, 'Sólo forja quien juega esta partida.');
+  const asiento = (estado.colonos[yo] as Colono).asiento;
+  const suyas = alforjasDe(estado, asiento);
+  if (!alcanzaParaForjar(suyas, arma)) return rechazar(estado, 'No te alcanzan las alforjas para esa arma.');
+
+  return {
+    ...estado,
+    alforjas: { ...(estado.alforjas ?? {}), [asiento]: gastarLaReceta(suyas, arma) },
+    armas: { ...(estado.armas ?? {}), [asiento]: arma },
+    andanzas: conLaAndanza(estado, { de: asiento, que: 'forja', arma }),
+  };
 }
 
 /** Cuántas fichas le faltan todavía por tirar a este asiento en el descarte de ahora. Cero si nada. */
@@ -4763,6 +5029,19 @@ export interface VistaDeRiberas {
    * y la lista cerrada de campos de `verify:mesa` sigue diciendo la verdad sobre ella.
    */
   refriegas?: RefriegaDeRiberas[];
+  /**
+   * LAS ALFORJAS Y LAS ARMAS DE CADA COLONO, y SÓLO SI existen en el estado (mesas `botas`, desde el
+   * primer hallazgo o la primera forja). Con ESTOS nombres y ESTA forma —`{ [asiento]: Alforjas }` y
+   * `{ [asiento]: Arma }`—, que es como las leen `alforjasDeLaVista` y `armaDeLaVista`
+   * (`riberas-armas.ts`): el servidor de la sala usa `armas` de la vista del espectador para el daño.
+   *
+   * Públicas, y no entran en `loSecretoDeRiberas`: en la refriega se ve quién va cargado y con qué.
+   * Y opcionales por lo mismo que `refriegas`: una partida normal manda la vista de siempre.
+   */
+  alforjas?: Record<AsientoId, Alforjas>;
+  armas?: Record<AsientoId, Arma>;
+  /** Los últimos hallazgos y forjas, públicos, y SÓLO SI hubo alguno. Ver `AndanzaDeRiberas`. */
+  andanzas?: AndanzaDeRiberas[];
   /** El tablero YA RESUELTO, para el mueble genérico. Ver `tableroDeRiberas`. */
   tablero: TableroDeclarado;
 }
@@ -4831,8 +5110,29 @@ function loQueSeVe(
     /* Sólo si hubo alguna: una partida sin refriega manda la vista de siempre, campo a campo. */
     ...(estado.refriegas === undefined
       ? {}
-      : { refriegas: estado.refriegas.map((r) => ({ de: r.de, para: r.para, fichas: r.fichas })) }),
+      : {
+          refriegas: estado.refriegas.map((r) => ({
+            de: r.de,
+            para: r.para,
+            fichas: r.fichas,
+            ...(r.material === undefined ? {} : { material: r.material }),
+            ...(r.rota === undefined ? {} : { rota: r.rota }),
+          })),
+        }),
+    /* Lo de a pie, igual: sólo si existe. Una partida normal no manda ninguno de los tres. */
+    ...(estado.alforjas === undefined ? {} : { alforjas: copiaDeLasAlforjas(estado.alforjas) }),
+    ...(estado.armas === undefined ? {} : { armas: { ...estado.armas } }),
+    ...(estado.andanzas === undefined ? {} : { andanzas: estado.andanzas.map((a) => ({ ...a })) }),
   };
+}
+
+/** Una copia de las alforjas de todos, para que la vista no comparta objetos con el estado. */
+function copiaDeLasAlforjas(todas: Record<AsientoId, Alforjas>): Record<AsientoId, Alforjas> {
+  const copia: Record<AsientoId, Alforjas> = {};
+  for (const [asiento, a] of Object.entries(todas)) {
+    copia[asiento] = { hierro: a.hierro, pedernal: a.pedernal, cuero: a.cuero, junco: a.junco };
+  }
+  return copia;
 }
 
 /** El asiento a quien le toca, o `null`. */
@@ -4966,6 +5266,19 @@ export function opcionesDeRiberas(vista: unknown, quien: QuienMira): readonly Op
   if (quien === ESPECTADOR) return [];
 
   if (v.momento === 'reuniendo') return opcionesDeReunion();
+  /*
+   * LA FORJA VA DETRÁS DE TODO, Y FUERA DEL DESPACHO POR MOMENTO: se forja con la partida en juego
+   * —colocando, jugando o descartando—, tenga o no el turno quien forja. Sin alforjas en la vista
+   * (toda mesa normal) sale vacía, así que la lista de siempre es exactamente la de siempre.
+   */
+  const deMomento = opcionesDelMomento(v, quien);
+  if (v.momento !== 'colocando' && v.momento !== 'jugando' && v.momento !== 'descartando') return deMomento;
+  const forja = opcionesDeLaForja(v, quien);
+  return forja.length === 0 ? deMomento : [...deMomento, ...forja];
+}
+
+/** El despacho por momento de `opcionesDeRiberas`, sin la forja. */
+function opcionesDelMomento(v: VistaSinTablero, quien: AsientoId): readonly Opcion[] {
   if (v.momento === 'colocando') return opcionesDeColocacion(v, quien);
   /*
    * ═══ EL DESCARTE VIVE AQUÍ, Y NO DENTRO DE `opcionesDeTurno` ═══
@@ -5163,6 +5476,53 @@ function opcionesDeDescarte(v: VistaSinTablero, quien: AsientoId): readonly Opci
   }
   return opciones;
 }
+
+/**
+ * LA FORJA: una opción por arma cuya receta alcancen MIS alforjas. Sin mirar el turno, como
+ * contestar un trueque; sólo a quien es colono de la partida.
+ *
+ * Aquí el «sólo si» del §5 bis se cumple sin holgura: mis alforjas están en la vista (son públicas),
+ * así que se ofrece exactamente lo que el reductor va a aceptar. Y el `id` —`forjar:honda`— lleva el
+ * nombre del arma, que no es ningún secreto: está en la carga y en la tabla de `riberas-armas.ts`.
+ * Se ofrece también la que ya llevo: forjarla otra vez gasta y no cambia de arma, pero es legal, y
+ * esconderla haría pensar que la receta no alcanza.
+ */
+function opcionesDeLaForja(v: VistaSinTablero, quien: AsientoId): Opcion[] {
+  if (!v.colonos.some((c) => c.asiento === quien)) return [];
+  const mias = alforjasDeLaVista(v, quien);
+  const opciones: Opcion[] = [];
+  for (const arma of ARMAS) {
+    if (!alcanzaParaForjar(mias, arma)) continue;
+    const ficha = FICHA_DEL_ARMA[arma];
+    const receta = MATERIALES.filter((m) => (ficha.receta[m] ?? 0) > 0)
+      .map((m) => `${ficha.receta[m] as number} de ${NOMBRE_DEL_MATERIAL[m].toLowerCase()}`)
+      .join(' y ');
+    opciones.push({
+      id: `forjar:${arma}`,
+      tipo: FORJAR,
+      carga: { arma },
+      rotulo: `Forjar ${UN_ARMA[arma]}`,
+      ayuda: `Cuesta ${receta}. ${ficha.ayuda} Sólo se lleva un arma: sustituye a la que tengas.`,
+    });
+  }
+  return opciones;
+}
+
+/** Cómo se dice «una honda» en una frase. */
+const UN_ARMA: Readonly<Record<Arma, string>> = {
+  honda: 'una honda',
+  lanza: 'una lanza',
+  hacha: 'un hacha',
+  maza: 'una maza',
+};
+
+/** Y «la honda», para cuando se rompe. */
+const EL_ARMA: Readonly<Record<Arma, string>> = {
+  honda: 'la honda',
+  lanza: 'la lanza',
+  hacha: 'el hacha',
+  maza: 'la maza',
+};
 
 /** El turno de verdad: tirar, alzar, trocar, contestar y pasar. */
 function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[] {
@@ -6406,13 +6766,57 @@ function panelesDe(v: VistaSinTablero): PanelDeTablero[] {
   if (refriegas.length > 0) {
     paneles.push({ titulo: 'La refriega', lineas: refriegas.map((r) => fraseDeLaRefriega(v, r)) });
   }
+
+  /*
+   * A PIE: las alforjas y el arma de cada colono que lleve algo, y los últimos hallazgos y forjas.
+   * Sólo en mesas `botas` y sólo desde que alguien encontró algo: una vista sin esos campos no pinta
+   * este panel, así que la lista de paneles de una partida normal es la de siempre.
+   */
+  const aPie = lineasDeAPie(v);
+  if (aPie.length > 0) paneles.push({ titulo: 'A pie', lineas: aPie });
   return paneles;
 }
 
-/** «Ana le quita una ficha a Bruno en la refriega.» Contada desde quien se la lleva. */
+/** Los renglones del panel «A pie»: quién lleva qué, y lo último que pasó andando. */
+function lineasDeAPie(v: VistaSinTablero): string[] {
+  const lineas: string[] = [];
+  for (const c of v.colonos) {
+    const alforjas = alforjasDeLaVista(v, c.asiento);
+    const arma = armaDeLaVista(v, c.asiento);
+    const lleva = MATERIALES.filter((m) => alforjas[m] > 0).map((m) => `${NOMBRE_DEL_MATERIAL[m].toLowerCase()} ${alforjas[m]}`);
+    if (lleva.length === 0 && arma === null) continue;
+    const conArma = arma === null ? 'sin arma' : `con ${UN_ARMA[arma]}`;
+    lineas.push(`${nombreEnLaVista(v, c.asiento)}: ${lleva.length === 0 ? 'alforjas vacías' : lleva.join(', ')}; ${conArma}.`);
+  }
+  const andanzas = Array.isArray(v.andanzas) ? v.andanzas : [];
+  for (const a of andanzas) lineas.push(fraseDeLaAndanza(v, a));
+  return lineas;
+}
+
+/** «Ana encuentra hierro.» o «Bruno forja una honda.» */
+function fraseDeLaAndanza(v: VistaSinTablero, a: AndanzaDeRiberas): string {
+  const quien = nombreEnLaVista(v, a.de);
+  if (a.que === 'encuentra') return `${quien} encuentra ${NOMBRE_DEL_MATERIAL[a.material].toLowerCase()}.`;
+  return `${quien} forja ${UN_ARMA[a.arma]}.`;
+}
+
+/**
+ * «Ana le quita una ficha a Bruno en la refriega.» Contada desde quien se la lleva. A pie añade el
+ * material y el arma rota: «…, y un hierro; a Bruno se le rompe la honda.».
+ */
 function fraseDeLaRefriega(v: VistaSinTablero, r: RefriegaDeRiberas): string {
-  const cuantas = r.fichas === 1 ? 'una ficha' : `${r.fichas} fichas`;
-  return `${nombreEnLaVista(v, r.para)} le quita ${cuantas} a ${nombreEnLaVista(v, r.de)} en la refriega.`;
+  const gana = nombreEnLaVista(v, r.para);
+  const pierde = nombreEnLaVista(v, r.de);
+  if (r.material === undefined && r.rota === undefined) {
+    const cuantas = r.fichas === 1 ? 'una ficha' : `${r.fichas} fichas`;
+    return `${gana} le quita ${cuantas} a ${pierde} en la refriega.`;
+  }
+  const cosas: string[] = [];
+  if (r.fichas > 0) cosas.push(r.fichas === 1 ? 'una ficha' : `${r.fichas} fichas`);
+  if (r.material !== undefined) cosas.push(`${NOMBRE_DEL_MATERIAL[r.material].toLowerCase()}`);
+  const quita = cosas.length === 0 ? `${gana} tumba a ${pierde} en la refriega` : `${gana} le quita ${cosas.join(' y ')} a ${pierde} en la refriega`;
+  const rota = r.rota === undefined ? '' : `; a ${pierde} se le rompe ${EL_ARMA[r.rota]}`;
+  return `${quita}${rota}.`;
 }
 
 /** La línea grande de arriba: qué se espera y de quién. */

@@ -171,7 +171,17 @@ import { opcionesSueltas } from '../../shared/mecanicas/tablero-declarado';
  * reparte cosas—. Lo que este bloque necesita es una tabla concreta de un juego concreto,
  * así que se pide donde vive, igual que `riberas-en-3d` unas líneas más abajo.
  */
-import { RINDE } from '../../shared/arcade/juegos/riberas';
+import { partidaNueva, RINDE } from '../../shared/arcade/juegos/riberas';
+/*
+ * Y LO DE A PIE (`docs/AVATARES-JUGABLES.md` §4): el hallazgo y el botín se construyen como los
+ * construye el servidor, y la forja y las lecturas de la vista salen del contrato que comparten el
+ * reductor, el servidor y los clientes.
+ */
+import { ESPECTADOR } from '../../shared/arcade';
+import { movimientoDelBotin } from '../../shared/arcade/juegos/botin';
+import { movimientoDelHallazgo } from '../../shared/arcade/juegos/hallazgo';
+import { alforjasDeLaVista, armaDeLaVista, FORJAR, MATERIALES } from '../../shared/arcade/juegos/riberas-armas';
+import type { Alforjas } from '../../shared/arcade/juegos/riberas-armas';
 /*
  * Y LA PALETA DE LA ESCENA, que es la mitad que hay que contrastar.
  *
@@ -5972,6 +5982,260 @@ paso('Dos islas nunca se llaman igual, y el rumbo es lo que las separa');
   );
 }
 
+// ---------------------------------------------------------------------------
+paso('A pie (sólo `botas`): el hallazgo llena las alforjas, la forja cuelga un arma y el botín la rompe');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE SE AFIRMA, Y POR QUÉ SOBRE UN ESTADO MONTADO ═══
+ *
+ * Riberas a pie es `docs/AVATARES-JUGABLES.md` §4: materiales que sólo se encuentran andando
+ * (`arcade:hallazgo`, lo mete el servidor), armas que se forjan con ellos (`riberas:forjar`, lo manda
+ * el colono cuando quiera, tenga o no el turno) y un botín que además se lleva un material y rompe el
+ * arma. Se monta sobre `escenarioDeMazo` porque lo que se mira no depende de cómo se llegó a la mesa,
+ * y así cada comprobación sabe exactamente qué hay en cada almacén.
+ *
+ * Y lo que más importa, que es lo que vigila el oro: SIN ALFORJAS NI ARMA TODO ES LO DE ANTES —el
+ * botín, la vista, las opciones—.
+ */
+{
+  const ESTRADO = ['A', 'B', 'C'];
+  const conNadie = { quien: null, azar: 1, tic: 0, asientos: ESTRADO };
+  const hallazgo = (estado: EstadoDeRiberas | undefined, para: string, clase: string, ctx: ContextoMovimiento = conNadie): EstadoDeRiberas =>
+    avanzarRiberas(estado, movimientoDelHallazgo(para, clase), ctx);
+  const motivoDelHallazgo = (estado: EstadoDeRiberas, para: string, clase: string, ctx: ContextoMovimiento = conNadie): string | null =>
+    motivoDe(estado, movimientoDelHallazgo(para, clase), ctx);
+  const deQuien = (quien: string): ContextoMovimiento => ({ quien, azar: 1, tic: 0, asientos: ESTRADO });
+  const forja = (arma: string): Movimiento => ({ tipo: FORJAR, carga: { arma } });
+  const forjasOfrecidas = (estado: EstadoDeRiberas, quien: string): string[] =>
+    ofrecidasA(estado, quien).filter((o) => o.tipo === FORJAR).map((o) => o.id);
+
+  /* A tiene el turno; B y C no. B tiene sal para que el botín tenga una ficha que llevarse. */
+  const base = escenarioDeMazo({ bienes: [['limo', 'junco'], ['sal'], ['grano', 'piedra']] });
+  const turnoDeBase = proyectarRiberas(base, ESPECTADOR).turnoDe;
+
+  /* ── El hallazgo ── */
+  const conHierro = hallazgo(base, 'B', 'hierro');
+  comprobar(
+    'a pie: el hallazgo del servidor suma UN material a las alforjas de quien lo recoge',
+    conHierro !== base && canonico(conHierro.alforjas ?? null) === canonico({ B: { hierro: 1, pedernal: 0, cuero: 0, junco: 0 } }),
+    conHierro.alforjas,
+  );
+  comprobar(
+    'a pie: y no toca el turno, ni el azar, ni el tablero, ni los almacenes',
+    proyectarRiberas(conHierro, ESPECTADOR).turnoDe === turnoDeBase &&
+      canonico(conHierro.azar) === canonico(base.azar) &&
+      canonico(sinLoDeAPie(conHierro)) === canonico(base),
+  );
+  comprobar(
+    'a pie: y la crónica lo apunta: «B encuentra hierro.»',
+    canonico(conHierro.andanzas ?? null) === canonico([{ n: 1, de: 'B', que: 'encuentra', material: 'hierro' }]) &&
+      (proyectarRiberas(conHierro, ESPECTADOR).tablero.paneles.find((p) => p.titulo === 'A pie')?.lineas ?? []).includes('B encuentra hierro.'),
+    conHierro.andanzas,
+  );
+  {
+    const rechazos: [string, string | null, EstadoDeRiberas, EstadoDeRiberas][] = [];
+    const probar = (que: string, estado: EstadoDeRiberas, para: string, clase: string, ctx: ContextoMovimiento, porque: string): void => {
+      const motivo = motivoDelHallazgo(estado, para, clase, ctx);
+      const tras = hallazgo(estado, para, clase, ctx);
+      comprobar(`a pie: el hallazgo ${que} se rechaza con su motivo, y la mesa igual`, motivo !== null && motivo.includes(porque) && tras === estado, motivo);
+      rechazos.push([que, motivo, estado, tras]);
+    };
+    probar('que manda un asiento (quien ≠ null)', base, 'B', 'hierro', deQuien('B'), 'no vale');
+    probar('de una clase ajena (el escudo de Las Lindes)', base, 'B', 'escudo', conNadie, 'no vale');
+    probar('de un bien del almacén y no de la forja', base, 'B', 'limo', conNadie, 'no vale');
+    probar('para alguien que no está sentado', base, 'D', 'hierro', conNadie, 'no vale');
+    probar('para un sentado que no juega esta partida', base, 'D', 'hierro', { ...conNadie, asientos: [...ESTRADO, 'D'] }, 'no juega');
+    probar('con la partida terminada', { ...base, momento: 'terminada', ganadores: ['A'] }, 'B', 'hierro', conNadie, 'ha terminado');
+    const sinEmpezar = motivoDe(partidaNueva(), movimientoDelHallazgo('B', 'hierro'), conNadie);
+    comprobar('a pie: el hallazgo con la partida sin empezar se rechaza con su motivo', sinEmpezar !== null && sinEmpezar.includes('no ha empezado'), sinEmpezar);
+    comprobar('a pie: se han probado los seis rechazos del hallazgo', rechazos.length === 6, rechazos.length);
+  }
+
+  /* ── La forja ── */
+  comprobar(
+    'a pie: sin materiales no se le ofrece forjar a nadie, y una vista normal no trae alforjas, armas ni andanzas',
+    ESTRADO.every((q) => forjasOfrecidas(base, q).length === 0) &&
+      !('alforjas' in proyectarRiberas(base, 'A')) &&
+      !('armas' in proyectarRiberas(base, 'A')) &&
+      !('andanzas' in proyectarRiberas(base, 'A')) &&
+      !proyectarRiberas(base, 'A').tablero.paneles.some((p) => p.titulo === 'A pie'),
+  );
+  let paraLaHonda = hallazgo(hallazgo(hallazgo(base, 'B', 'cuero'), 'B', 'cuero'), 'B', 'pedernal');
+  comprobar(
+    'a pie: con 2 cuero y 1 pedernal se le ofrece forjar la honda, y sólo la honda',
+    canonico(forjasOfrecidas(paraLaHonda, 'B')) === canonico(['forjar:honda']),
+    forjasOfrecidas(paraLaHonda, 'B'),
+  );
+  comprobar(
+    'a pie: y a los que no tienen alforjas no se les ofrece nada',
+    forjasOfrecidas(paraLaHonda, 'A').length === 0 && forjasOfrecidas(paraLaHonda, 'C').length === 0,
+  );
+  {
+    const falta = motivoDe(base, forja('honda'), deQuien('B'));
+    comprobar('a pie: forjar sin materiales se rechaza con motivo (el portillo no lo ofreció)', falta !== null && avanzarRiberas(base, forja('honda'), deQuien('B')) === base, falta);
+    const otra = motivoDe(paraLaHonda, forja('hacha'), deQuien('B'));
+    comprobar('a pie: y forjar un arma cuya receta no alcanza, también', otra !== null, otra);
+    const rara = motivoDe(paraLaHonda, forja('catapulta'), deQuien('B'));
+    comprobar('a pie: y un arma que no existe, también', rara !== null, rara);
+  }
+  /* B NO TIENE EL TURNO, y forja por el árbitro de verdad. */
+  {
+    comprobar('a pie: el turno es de A, no de B', proyectarRiberas(paraLaHonda, ESPECTADOR).turnoDe === 'A');
+    const mesaDeLaForja = mesaSobre('RIB-FORJA', paraLaHonda, ESTRADO);
+    const tras = jugar(mesaDeLaForja, { quien: 'B', rev: mesaDeLaForja.rev, movimiento: forja('honda') });
+    const e = estadoDe(tras);
+    comprobar(
+      'a pie: B forja FUERA DE SU TURNO, por el árbitro: gasta la receta entera y se cuelga la honda',
+      tras.rev === mesaDeLaForja.rev + 1 &&
+        canonico(e.alforjas?.['B'] ?? null) === canonico({ hierro: 0, pedernal: 0, cuero: 0, junco: 0 }) &&
+        e.armas?.['B'] === 'honda',
+      { alforjas: e.alforjas, armas: e.armas },
+    );
+    comprobar(
+      'a pie: y el turno sigue siendo de A',
+      proyectarRiberas(e, ESPECTADOR).turnoDe === 'A' && e.turno === paraLaHonda.turno && e.tirado === paraLaHonda.tirado,
+    );
+    comprobar('a pie: con la receta gastada ya no se le ofrece forjar', forjasOfrecidas(e, 'B').length === 0);
+    const vista = proyectarRiberas(e, 'C');
+    comprobar(
+      'a pie: la vista (de otro, C) publica `armas` y `alforjas` con esos nombres, y `armaDeLaVista` / `alforjasDeLaVista` las leen',
+      canonico(vista.armas ?? null) === canonico({ B: 'honda' }) &&
+        armaDeLaVista(vista, 'B') === 'honda' &&
+        armaDeLaVista(vista, 'A') === null &&
+        canonico(alforjasDeLaVista(vista, 'B')) === canonico({ hierro: 0, pedernal: 0, cuero: 0, junco: 0 }) &&
+        armaDeLaVista(proyectarRiberas(e, ESPECTADOR), 'B') === 'honda',
+      { armas: vista.armas, alforjas: vista.alforjas },
+    );
+    comprobar(
+      'a pie: y la crónica cuenta la forja: «B forja una honda.»',
+      (proyectarRiberas(e, ESPECTADOR).tablero.paneles.find((p) => p.titulo === 'A pie')?.lineas ?? []).includes('B forja una honda.'),
+    );
+    paraLaHonda = e;
+  }
+  /* Forjar otra sustituye a la que llevaba. */
+  {
+    const paraElHacha = hallazgo(hallazgo(hallazgo(paraLaHonda, 'B', 'hierro'), 'B', 'hierro'), 'B', 'cuero');
+    const conHacha = avanzarRiberas(paraElHacha, forja('hacha'), deQuien('B'));
+    comprobar('a pie: forjar otra arma sustituye a la que llevaba: una sola', canonico(conHacha.armas ?? null) === canonico({ B: 'hacha' }), conHacha.armas);
+  }
+  /* También mientras se coloca y en el descarte, que es «cuando quiera mientras la partida se juega». */
+  {
+    const colocando: EstadoDeRiberas = { ...hallazgo(hallazgo(hallazgo(base, 'C', 'junco'), 'C', 'junco'), 'C', 'hierro'), momento: 'colocando', paso: 0, faltaVereda: false };
+    comprobar(
+      'a pie: colocando, a C —que no coloca ahora— se le ofrece forjar la lanza',
+      proyectarRiberas(colocando, ESPECTADOR).turnoDe !== 'C' && canonico(forjasOfrecidas(colocando, 'C')) === canonico(['forjar:lanza']),
+      forjasOfrecidas(colocando, 'C'),
+    );
+    const descartando: EstadoDeRiberas = { ...colocando, momento: 'descartando', paso: base.paso, descartes: [{ de: 'A', faltan: 1 }] };
+    comprobar(
+      'a pie: y en el descarte de un siete, a C, que no debe nada, también',
+      canonico(forjasOfrecidas(descartando, 'C')) === canonico(['forjar:lanza']) &&
+        avanzarRiberas(descartando, forja('lanza'), deQuien('C')).armas?.['C'] === 'lanza',
+    );
+  }
+
+  /* ── El botín ── */
+  {
+    /* B lleva la honda y le damos 1 hierro y 2 junco: tres materiales, dos clases. */
+    const cargado = hallazgo(hallazgo(hallazgo(paraLaHonda, 'B', 'hierro'), 'B', 'junco'), 'B', 'junco');
+    const antesB = alforjasDe(cargado, 'B');
+    const antesC = alforjasDe(cargado, 'C');
+    const tras = avanzarRiberas(cargado, movimientoDelBotin('B', 'C'), conNadie);
+    const despuesB = alforjasDe(tras, 'B');
+    const despuesC = alforjasDe(tras, 'C');
+    const perdidos = MATERIALES.filter((m) => despuesB[m] === antesB[m] - 1);
+    const ganados = MATERIALES.filter((m) => despuesC[m] === antesC[m] + 1);
+    comprobar(
+      'a pie: el botín se lleva UN material de las alforjas de quien cae, y es el mismo que gana quien lo tumbó',
+      perdidos.length === 1 && canonico(perdidos) === canonico(ganados) &&
+        MATERIALES.reduce((s, m) => s + despuesB[m], 0) === 2 && MATERIALES.reduce((s, m) => s + despuesC[m], 0) === 1,
+      { antesB, despuesB, despuesC },
+    );
+    comprobar('a pie: y el arma de quien cae SE ROMPE: desaparece, y no pasa a nadie', armaDeLaVista(proyectarRiberas(tras, ESPECTADOR), 'B') === null && canonico(tras.armas ?? null) === canonico({}), tras.armas);
+    comprobar(
+      'a pie: además de la ficha de siempre',
+      (colonoDelEstado(tras, 'B')?.almacen.length ?? -1) === 0 && (colonoDelEstado(tras, 'C')?.almacen.length ?? -1) === 3,
+    );
+    /*
+     * B sólo tiene UNA ficha, y sortear entre una no gasta azar (`enteroEntre` con mínimo igual a
+     * máximo); los tres materiales sí gastan una tirada. O sea, exactamente una más.
+     */
+    comprobar('a pie: con el azar del reductor: la ficha única no sortea, el material sí (una tirada)', tras.azar.tiradas === cargado.azar.tiradas + 1, { antes: cargado.azar.tiradas, despues: tras.azar.tiradas });
+    const refriega = tras.refriegas?.[tras.refriegas.length - 1];
+    comprobar(
+      'a pie: la crónica de la refriega dice el material y el arma rota, que son públicos',
+      refriega !== undefined && refriega.fichas === 1 && refriega.material === perdidos[0] && refriega.rota === 'honda' &&
+        (proyectarRiberas(tras, ESPECTADOR).tablero.paneles.find((p) => p.titulo === 'La refriega')?.lineas[0] ?? '').includes('se le rompe la honda'),
+      refriega,
+    );
+    comprobar('a pie: y el turno no se mueve', proyectarRiberas(tras, ESPECTADOR).turnoDe === proyectarRiberas(cargado, ESPECTADOR).turnoDe);
+    /* Mismo botín, dos veces: el material que sale es función del estado. */
+    comprobar('a pie: el mismo botín sobre el mismo estado da el mismo material', canonico(avanzarRiberas(cargado, movimientoDelBotin('B', 'C'), conNadie)) === canonico(tras));
+
+    /* Sin fichas ni materiales, sólo con el arma: el botín la rompe igual. */
+    const soloArma: EstadoDeRiberas = {
+      ...base,
+      colonos: base.colonos.map((c) => (c.asiento === 'B' ? { ...c, almacen: [] } : c)),
+      armas: { B: 'maza' },
+    };
+    const trasSoloArma = avanzarRiberas(soloArma, movimientoDelBotin('B', 'C'), conNadie);
+    comprobar(
+      'a pie: sin fichas ni materiales pero con arma, el botín rompe el arma (y no gasta azar)',
+      trasSoloArma !== soloArma && canonico(trasSoloArma.armas ?? null) === canonico({}) && trasSoloArma.azar.tiradas === soloArma.azar.tiradas &&
+        canonico(trasSoloArma.refriegas?.[0] ?? null) === canonico({ de: 'B', para: 'C', fichas: 0, rota: 'maza' }),
+      trasSoloArma.refriegas,
+    );
+  }
+  /* SIN ALFORJAS NI ARMA, EL BOTÍN DE ANTES: aunque otros de la mesa sí lleven. */
+  {
+    const deSiempre = avanzarRiberas(base, movimientoDelBotin('A', 'C'), conNadie);
+    comprobar(
+      'a pie: en una mesa sin nada a pie, el botín es el de siempre: una ficha, una tirada, y ni un campo nuevo',
+      deSiempre.azar.tiradas === base.azar.tiradas + 1 &&
+        !('alforjas' in deSiempre) && !('armas' in deSiempre) && !('andanzas' in deSiempre) &&
+        canonico(deSiempre.refriegas ?? null) === canonico([{ de: 'A', para: 'C', fichas: 1 }]),
+      deSiempre.refriegas,
+    );
+    const conOtros: EstadoDeRiberas = { ...base, alforjas: { B: { hierro: 2, pedernal: 0, cuero: 0, junco: 0 } }, armas: { B: 'lanza' } };
+    const deAConOtros = avanzarRiberas(conOtros, movimientoDelBotin('A', 'C'), conNadie);
+    comprobar(
+      'a pie: y si quien cae no lleva nada a pie aunque otros sí, es EXACTAMENTE el de antes',
+      canonico(sinLoDeAPie(deAConOtros)) === canonico(deSiempre) &&
+        canonico(deAConOtros.alforjas) === canonico(conOtros.alforjas) && canonico(deAConOtros.armas) === canonico(conOtros.armas),
+    );
+    const vacio: EstadoDeRiberas = { ...conOtros, colonos: base.colonos.map((c) => (c.asiento === 'A' ? { ...c, almacen: [] } : c)) };
+    comprobar(
+      'a pie: y sin nada que llevarse, EL MISMO objeto, como siempre',
+      avanzarRiberas(vacio, movimientoDelBotin('A', 'C'), conNadie) === vacio,
+    );
+  }
+  /* El oro de a pie no es secreto: nada de esto entra en `loSecretoDeRiberas`. */
+  comprobar(
+    'a pie: lo secreto de la mesa no cambia con alforjas ni armas (son públicas)',
+    canonico(loSecretoDeRiberas(paraLaHonda)) === canonico(loSecretoDeRiberas(sinLoDeAPie(paraLaHonda))),
+  );
+}
+
+/** Las alforjas de un asiento en un estado, vacías si no tiene. Para el bloque de a pie. */
+function alforjasDe(estado: EstadoDeRiberas, asiento: string): Alforjas {
+  return estado.alforjas?.[asiento] ?? { hierro: 0, pedernal: 0, cuero: 0, junco: 0 };
+}
+
+/** El estado sin los tres campos de a pie: lo que habría sin andar. Para el bloque de a pie. */
+function sinLoDeAPie(estado: EstadoDeRiberas): EstadoDeRiberas {
+  const copia = { ...estado };
+  delete copia.alforjas;
+  delete copia.armas;
+  delete copia.andanzas;
+  return copia;
+}
+
+/** El colono de un asiento. Para el bloque de a pie. */
+function colonoDelEstado(estado: EstadoDeRiberas, asiento: string): Colono | undefined {
+  return estado.colonos.find((c) => c.asiento === asiento);
+}
+
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», que este guion no tenia.
  *
@@ -6011,7 +6275,11 @@ paso('Dos islas nunca se llaman igual, y el rumbo es lo que las separa');
  * comprobaciones y 10 rojas, o sea que ni una se cae de su bloque y el guardia no se pone
  * delante de las rojas.
  */
-const COMPROBACIONES_ESCRITAS = 646;
+/*
+ * Y CON LO DE A PIE (hallazgo, forja y el botín con alforjas) SE HACEN 695, ASI QUE EL GUARDIA VA
+ * EN 684: treinta y ocho nuevas, con los once de margen de siempre.
+ */
+const COMPROBACIONES_ESCRITAS = 684;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(
