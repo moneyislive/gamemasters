@@ -59,8 +59,23 @@ import type { Escenificador } from '../red/escenificar';
 import { GiroEnLoAlto } from '../red/bajada';
 import type { SistemaDeEfectos } from '../efectos';
 import type { Sonido } from '../sonido';
+import { desvioDeGiro, empujeFueraDeLaSilueta, friccionDelIman, giroDeEntrada, giroParaApuntar, ojoNuevo, pasoDelGiroDeEntrada, tironDelIman } from '../mandos/rayo';
+import type { GiroDeEntrada, OjoDelRayo } from '../mandos/rayo';
 import type { CajaAlta, EncuadreDeLaCamara, Punto3 } from './encuadre';
-import { ALTO_DEL_PIVOTE, CABECEO_MAXIMO, CABECEO_MINIMO, camaraNueva, encuadrar, FOV_MOVIL, FOV_PC, primerCorte } from './encuadre';
+import {
+  ALTO_DEL_PIVOTE,
+  CABECEO_MAXIMO,
+  CABECEO_MINIMO,
+  camaraNueva,
+  encuadrar,
+  FOV_MOVIL,
+  FOV_PC,
+  primerCorte,
+  retrocesoDelDisparo,
+  sensibilidadDelZoom,
+  suavizarElZoom,
+  zoomDeLaCarga,
+} from './encuadre';
 
 export type ModoDeLaCamara = 'orbita' | 'bajada' | 'juego';
 
@@ -145,8 +160,35 @@ function suave(t: number): number {
   return x * x * (3 - 2 * x);
 }
 
+/** La sacudida del disparo propio: poca con un chispazo, entera con el pleno (`c²`). */
+function sacudidaDelDisparo(c: number): number {
+  return 0.22 + 0.78 * c * c;
+}
+
+/** Escribe en `o` la cámara de este fotograma, en números (`mandos/rayo.ts` no sabe de three). */
+function escribirElOjo(cam: THREE.PerspectiveCamera, ancho: number, alto: number, o: OjoDelRayo, eje: THREE.Vector3): void {
+  o.x = cam.position.x;
+  o.y = cam.position.y;
+  o.z = cam.position.z;
+  eje.set(0, 0, -1).applyQuaternion(cam.quaternion);
+  o.fx = eje.x;
+  o.fy = eje.y;
+  o.fz = eje.z;
+  eje.set(1, 0, 0).applyQuaternion(cam.quaternion);
+  o.rx = eje.x;
+  o.ry = eje.y;
+  o.rz = eje.z;
+  eje.set(0, 1, 0).applyQuaternion(cam.quaternion);
+  o.ux = eje.x;
+  o.uy = eje.y;
+  o.uz = eje.z;
+  o.tanMedio = Math.tan((cam.fov * Math.PI) / 360);
+  o.aspecto = alto > 0 ? ancho / alto : 16 / 9;
+}
+
 export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
   const camara = useThree((s) => s.camera);
+  const tamano = useThree((s) => s.size);
   const cajas = useMemo<readonly CajaAlta[]>(() => cajasDelLugar(p.lugar).map(cajaParaLaCamara), [p.lugar]);
   const plaza = useMemo(() => centroDeLaBajada(p.lugar), [p.lugar]);
   const estado = useRef(camaraNueva(0));
@@ -154,16 +196,53 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
   const mirar = useRef(new THREE.Vector3());
   const adelante = useRef(new THREE.Vector3());
   const vuelta = useRef(new GiroEnLoAlto());
+  /*
+   * EL RAYO (`docs/quiebro/EL-RAYO.md` §1.1 y §3): el zoom suavizado, el giro de entrada al blanco más a mano,
+   * el último disparo visto (para su golpe de campo y su sacudida) y la cámara en números para apuntar.
+   */
+  const zoom = useRef(0);
+  const entrada = useRef<GiroDeEntrada | null>(null);
+  const cargabaAntes = useRef(false);
+  const disparoVisto = useRef<number>(Number.NEGATIVE_INFINITY);
+  const ojoDelRayo = useRef<OjoDelRayo>(ojoNuevo());
+  const eje = useRef(new THREE.Vector3());
 
   useFrame((_s, dt) => {
     const ahora = performance.now();
     const cam = camara as THREE.PerspectiveCamera;
     const e = estado.current;
+    const rayo = p.partida.rayo;
+    const cargando = rayo.activo;
+    const paso = Math.min(0.1, dt);
     const giro = p.mandos.tomarMirada();
-    e.giro += giro.giro;
-    e.cabeceo = Math.max(CABECEO_MINIMO, Math.min(CABECEO_MAXIMO, e.cabeceo + giro.cabeceo));
+    /*
+     * LA MANO CON ZOOM: el arrastre gira en la proporción del campo (con 10° menos, un 15 % menos), y con un blanco
+     * enganchado, el imán: el dedo frena al cruzarlo y la vista se deja caer hacia él. Sin carga, lo de siempre.
+     */
+    const base = p.tactil ? FOV_MOVIL : FOV_PC;
+    const sensibilidad = cargando ? sensibilidadDelZoom(cam.fov, base) : 1;
     const yo = p.partida.yo();
     const cuerpo = yo === null ? null : p.partida.pintadoDe(yo);
+    const blancoDelRayo = cargando && rayo.blanco !== 0 ? p.partida.pintadoDe(rayo.blanco) : null;
+    /* El hombro del fotograma anterior: el del encuadre de apuntar mientras entra (de 0,7 a 1,05 m). */
+    const quiereGiro = cuerpo !== null && blancoDelRayo !== null ? giroParaApuntar(cuerpo.x, cuerpo.z, blancoDelRayo.x, blancoDelRayo.z, e.hombro) : null;
+    const desvio = quiereGiro === null ? Number.POSITIVE_INFINITY : desvioDeGiro(e.giro, quiereGiro);
+    e.giro += giro.giro * sensibilidad * (cargando ? friccionDelIman(desvio) : 1);
+    e.cabeceo = Math.max(CABECEO_MINIMO, Math.min(CABECEO_MAXIMO, e.cabeceo + giro.cabeceo * sensibilidad));
+    /* Al empezar a cargar, el blanco más a mano en toda la pantalla, y la cámara gira hacia él en ≈0,18 s, en curva suave. */
+    if (cargando && !cargabaAntes.current) {
+      entrada.current = giroDeEntrada(ahora);
+      p.partida.apuntarElRayo(ojoDelRayo.current, ahora, true);
+    }
+    if (!cargando) entrada.current = null;
+    cargabaAntes.current = cargando;
+    const girando = entrada.current !== null && ahora < entrada.current.hastaMs;
+    if (quiereGiro !== null && Number.isFinite(desvio)) {
+      const deLaEntrada = entrada.current === null ? null : pasoDelGiroDeEntrada(entrada.current, rayo.blanco, desvio, ahora);
+      e.giro += deLaEntrada ?? tironDelIman(desvio, paso);
+    }
+    /* Y el blanco enganchado, nunca detrás de mí: si entra en la franja de mi silueta, la vista lo saca de ella (`mandos/rayo.ts`). */
+    if (cuerpo !== null && blancoDelRayo !== null) e.giro += empujeFueraDeLaSilueta(ojoDelRayo.current, cuerpo.x, cuerpo.z, blancoDelRayo.x, blancoDelRayo.z, paso);
     let encuadre: EncuadreDeLaCamara;
 
     if (p.modo === 'orbita' || cuerpo === null) {
@@ -181,14 +260,20 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
       }
       const blanco = p.partida.blanco === 0 ? null : p.partida.pintadoDe(p.partida.blanco);
       const vigia = !p.partida.conCuerpo();
+      /* El zoom del rayo: entra en ≈0,25 s al pulsar y sigue con la carga; sale en ≈0,12 s al soltar o dejarlo. */
+      zoom.current = suavizarElZoom(zoom.current, zoomDeLaCarga(cargando, rayo.c), paso);
       const encuadrado = encuadrar(e, {
         x: cuerpo.x,
         z: cuerpo.z,
-        dt: Math.min(0.1, dt),
+        dt: paso,
         enemigosCerca: p.partida.enemigosCerca(),
         blanco,
-        mandaElDedo: p.mandos.mandaElDedo(ahora),
+        /* Cargando, la cámara automática no pelea con quien apunta (EL-RAYO.md §3). */
+        mandaElDedo: p.mandos.mandaElDedo(ahora) || cargando,
         remanso: p.sistema.reloj.intensidad(ahora),
+        carga: zoom.current,
+        /* Y el encuadre de apuntar: el hombro a 1,05 m, 0,15 m más baja y 0,6 m más cerca, con la misma curva (`encuadre.ts`). */
+        apuntando: cargando,
         tactil: p.tactil,
         vigia,
         cajas,
@@ -222,6 +307,13 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
       } else encuadre = alHombro;
     }
 
+    /* EL DISPARO PROPIO: su sacudida, una vez por disparo, y un golpe de campo de −2° que vuelve en 150 ms. */
+    const disparo = p.partida.ultimoDisparo;
+    if (disparo !== null && disparo.t !== disparoVisto.current) {
+      disparoVisto.current = disparo.t;
+      p.escena.sacudida = Math.max(p.escena.sacudida, sacudidaDelDisparo(disparo.c));
+    }
+    const golpeDeCampo = disparo === null ? 0 : retrocesoDelDisparo(ahora - disparo.t);
     /* La sacudida de un golpe: unos centímetros, y se apaga en un cuarto de segundo. */
     const s = p.escena.sacudida;
     const temblor = s > 0.01 ? s * 0.07 : 0;
@@ -233,12 +325,16 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
     );
     mirar.current.set(encuadre.mira.x, encuadre.mira.y, encuadre.mira.z);
     cam.lookAt(mirar.current);
-    if (Math.abs(cam.fov - encuadre.fov) > 0.01) {
-      cam.fov = encuadre.fov;
+    const fov = encuadre.fov + golpeDeCampo;
+    if (Math.abs(cam.fov - fov) > 0.01) {
+      cam.fov = fov;
       cam.updateProjectionMatrix();
     }
     /* La palanca empuja relativa a hacia donde mira la cámara (su giro sin la órbita del Remanso). */
     p.partida.giroDeLaCamara = e.giro;
+    /* Y el rayo apunta con ESTA cámara: el blanco bajo la mira y el punto que toca (ver `Partida.apuntarElRayo`). */
+    escribirElOjo(cam, tamano.width, tamano.height, ojoDelRayo.current, eje.current);
+    if (cargando) p.partida.apuntarElRayo(ojoDelRayo.current, ahora, girando);
     /* El oído, en la cámara. */
     cam.getWorldDirection(adelante.current);
     p.sonido.oyente({ x: cam.position.x, y: cam.position.y, z: cam.position.z }, { x: adelante.current.x, y: adelante.current.y, z: adelante.current.z });

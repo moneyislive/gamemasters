@@ -93,6 +93,11 @@ export function Hud(p: PropsDelHud): JSX.Element {
   useEffect(() => {
     if (!conMapa) ponerPlano(false);
   }, [conMapa]);
+  /* Abrir el plano (la M, su botón o el minimapa) quita la mano del juego: una carga del rayo se deja sin disparar. */
+  const { mandos } = p;
+  useEffect(() => {
+    if (plano) mandos.cancelarRayo();
+  }, [plano, mandos]);
   if (!p.bajado) return <Azotea alBajar={p.alBajar} />;
   if (v === null) {
     return (

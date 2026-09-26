@@ -32,6 +32,17 @@
  */
 export type Boton = 'golpe' | 'quiebro' | 'empellon' | 'usar' | 'aviso' | 'rayo';
 
+/**
+ * UN RAYO SOLTADO que la partida aún no ha mandado: desde cuándo se cargaba y cuándo se soltó (los dos
+ * `timeStamp` de sus eventos: la carga que cuenta la sala es la resta de los dos, en el reloj del aparato) y el
+ * blanco que se veía bajo la mira al soltar (0 = ninguno: sale por la mira).
+ */
+export interface RayoSoltado {
+  readonly desde: number;
+  readonly hasta: number;
+  readonly blanco: number;
+}
+
 export interface Pulsacion {
   readonly boton: Boton;
   /** El `timeStamp` de su evento (escala de `performance.now()`). */
@@ -79,10 +90,12 @@ export class EstadoDeLosMandos {
   /** USAR mantenido: desde cuándo (su `timeStamp`), o `null`. */
   usarDesde: number | null = null;
   /**
-   * EL RAYO mantenido: desde cuándo se carga (el `timeStamp` del evento que empezó), o `null`. FASE 0 del
-   * contrato (`rayo/contrato.ts`): el campo existe y nadie lo pone todavía; lo rellena MANDOS.
+   * EL RAYO mantenido: desde cuándo se carga (el `timeStamp` del evento que empezó), o `null`. Lo ponen el botón
+   * RAYO y la R (`cargarRayo`); lo quitan soltar (que además deja el disparo en `soltado`) y cancelar.
    */
   rayoDesde: number | null = null;
+  /** El rayo soltado que la partida aún no ha tomado (`tomarRayoSoltado`), o `null`. */
+  private soltado: RayoSoltado | null = null;
   /** Qué mando se usó por última vez: el HUD enseña los botones del que toca. */
   tipo: 'tactil' | 'teclado' = 'teclado';
   /** El marcador abierto (Tab, o el botón del menú). */
@@ -122,8 +135,22 @@ export class EstadoDeLosMandos {
     return ahora - this.ultimaMiradaMs < EL_DEDO_MANDA_MS;
   }
 
-  /** Se pulsa un botón, en el instante de su evento. */
+  /**
+   * Se pulsa un botón, en el instante de su evento.
+   *
+   * MIENTRAS SE CARGA EL RAYO (EL-RAYO.md §1.3) los botones de la derecha están apagados: el pulgar derecho apunta.
+   * QUIEBRO no: sigue valiendo, y CANCELA la carga antes de esquivar (lo que la sala hará igual al ver otra acción
+   * en el `aqui`). GOLPE, EMPELLÓN y USAR se tiran —en PC, un clic con la R pisada no rompe la carga por
+   * accidente—.
+   *
+   * AVISO, una sola regla: NUNCA rompe la carga (es un mensaje aparte, no va por el `aqui`), así que aquí pasa, y en
+   * PC la Q vale mientras se mantiene la R. En el TÁCTIL su botón cae en la mitad que apunta (arriba a la derecha) y,
+   * mientras se carga, se aparta del dedo como los demás (`hud.css`, `.q-tactil.cargando`): un arrastre que empieza
+   * encima apunta, no avisa. No es otra conducta, es dónde cae el dedo.
+   */
   pulsar(boton: Boton, timeStamp: number): void {
+    if (this.rayoDesde !== null && (boton === 'golpe' || boton === 'empellon' || boton === 'usar')) return;
+    if (boton === 'quiebro' && this.rayoDesde !== null) this.cancelarRayo();
     if (boton === 'usar') {
       if (this.usarDesde === null) this.usarDesde = timeStamp;
       return;
@@ -142,23 +169,44 @@ export class EstadoDeLosMandos {
   }
 
   /*
-   * EL RAYO (`docs/quiebro/EL-RAYO.md` §3), STUBS DE LA FASE 0: las firmas del contrato, en el camino de verdad
-   * (`pulsar('rayo')` llega a `cargarRayo`, y `soltarTodo` cancela), sin hacer nada todavía. MANDOS los rellena:
-   * soltar dispara (guardando su hora y el blanco que se vio); cancelar, o perder el dedo, anula SIN disparar.
+   * EL RAYO (`docs/quiebro/EL-RAYO.md` §1.1 y §3). Aquí sólo se apunta lo que hicieron las manos, con la hora de
+   * cada evento; si se puede cargar, qué nivel sale y qué se manda lo decide la partida (`red/partida.ts`), que lo
+   * lee en cada latido. Tres reglas:
+   *   · SOLTAR DISPARA, y es lo ÚNICO que dispara: deja el disparo en `soltado` con las dos horas y el blanco que
+   *     se veía, y la partida lo manda una vez.
+   *   · CANCELAR ANULA: el dedo que el sistema se lleva (`pointercancel`, la captura perdida), el QUIEBRO, el menú,
+   *     el plano, irse al fondo. No manda nada y no gasta recarga.
+   *   · Un soltar sin carga (se canceló antes, o la partida no la dejó empezar) no es nada.
    */
 
-  /** Empieza a cargar el rayo, en el instante de su evento. STUB (fase 0): no hace nada. */
+  /** Empieza a cargar el rayo, en el instante de su evento. Si ya se carga, nada (el primer instante manda). */
   cargarRayo(timeStamp: number): void {
-    void timeStamp;
+    if (this.rayoDesde !== null || !Number.isFinite(timeStamp)) return;
+    this.rayoDesde = timeStamp;
   }
 
-  /** Se suelta el rayo en `timeStamp` con el blanco que se veía (0 = ninguno): dispara. STUB (fase 0): no hace nada. */
+  /** Se suelta el rayo en `timeStamp` con el blanco que se veía (0 = ninguno): DISPARA. Sin carga, nada. */
   soltarRayo(timeStamp: number, blanco: number): void {
-    void timeStamp;
-    void blanco;
+    const desde = this.rayoDesde;
+    if (desde === null) return;
+    this.rayoDesde = null;
+    const hasta = Number.isFinite(timeStamp) ? Math.max(desde, timeStamp) : desde;
+    this.soltado = { desde, hasta, blanco: Number.isInteger(blanco) && blanco > 0 ? blanco : 0 };
   }
 
-  /** Se deja el rayo sin disparar (dedo perdido, daño, quiebro, menú…). */
+  /**
+   * El rayo soltado que falta por mandar, y se olvida; `null` si no hay. Lo toma la partida en cada latido.
+   */
+  tomarRayoSoltado(): RayoSoltado | null {
+    const s = this.soltado;
+    this.soltado = null;
+    return s;
+  }
+
+  /**
+   * Se deja el rayo sin disparar (dedo perdido, daño, quiebro, menú…). Un disparo YA soltado no se toca: soltar
+   * y luego quebrar en el mismo fotograma es un rayo y un quiebro, en ese orden.
+   */
   cancelarRayo(): void {
     this.rayoDesde = null;
   }
@@ -181,6 +229,8 @@ export class EstadoDeLosMandos {
     this.aFondoDesde = null;
     this.correrPedido = false;
     this.usarDesde = null;
+    /* Como las pulsaciones sin atender: un rayo soltado justo antes de irse no sale al volver. */
+    this.soltado = null;
     /* El rayo se CANCELA, no se suelta: irse no dispara (EL-RAYO.md §3). */
     this.cancelarRayo();
   }

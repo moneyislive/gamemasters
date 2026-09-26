@@ -36,10 +36,13 @@ import { CIERRE_DE_LA_LIZA, CODIGO_DE_MODO, PRIMER_NUMERO_DE_ENTIDAD } from '../
 import { MS_POR_TIC } from '../../../../shared/mecanicas/liza/declaracion';
 import type { EstadoDeLosMandos } from '../mandos/estado';
 import { direccionHacia } from '../mandos/enganche';
+import { NOMBRE_DEL_RAYO } from '../mandos/Tactil';
 import type { Escenificador } from '../red/escenificar';
 import type { Partida } from '../red/partida';
 import { COLORES_DE_ASIENTO } from '../red/partida';
 import { cifra, etiquetaDeLaFase, loQueLeQueda, miIndice, multiplicadorEnTexto, portableDeLasEsquirlas, relojEnTexto, valorDeLasEsquirlas } from './lectura';
+import { MiraDelRayo } from './MiraDelRayo';
+import { RayoDePC } from './RayoDePC';
 
 export interface PropsDelCombate {
   readonly vista: VistaDelQuiebro;
@@ -189,6 +192,7 @@ export function Combate({ vista, yo, partida, escena, mandos, aprendiz, tactil, 
       </div>
       <Brujula partida={partida} />
       <RotulosDeLaGente partida={partida} ojo={ojo} />
+      <MiraDelRayo partida={partida} ojo={ojo} />
 
       <div className="q-botin">
         <div className="esquirlas" aria-label={NOMBRES_DEL_QUIEBRO.cuentas.esquirlas}>
@@ -241,8 +245,15 @@ export function Combate({ vista, yo, partida, escena, mandos, aprendiz, tactil, 
           <kbd>clic</kbd>/<kbd>J</kbd> {NOMBRES_DEL_QUIEBRO.botones.golpe.toLowerCase()} · <kbd>espacio</kbd>/<kbd>K</kbd> {NOMBRES_DEL_QUIEBRO.botones.quiebro.toLowerCase()}
           <br />
           <kbd>F</kbd> {NOMBRES_DEL_QUIEBRO.golpes.empellon.toLowerCase()} · <kbd>E</kbd> usar · <kbd>Q</kbd> aviso · <kbd>Tab</kbd> marcador
+          {(partida?.tiroPropio() ?? null) !== null ? (
+            <>
+              <br />
+              <kbd>R</kbd> mantén: {NOMBRE_DEL_RAYO.toLowerCase()} · suelta: dispara
+            </>
+          ) : null}
         </div>
       ) : null}
+      {mandos.tipo === 'teclado' && !tactil ? <RayoDePC partida={partida} /> : null}
 
       {ausencia === 'ausente' ? (
         <div className="q-ausente q-panel" role="status">

@@ -46,6 +46,20 @@
  *      a cada una de las 640 cabinas acaba donde USAR descuelga, por un último tramo que se anda, y sus
  *      metros llegan a 0 allí; el ojo que pinta la cámara nunca queda dentro de una caja ni detrás del cerco
  *      en las salidas de avenida; y lo que va suelto sobre la escena lleva su sombra de noche.
+ *  14. EL RAYO EN LOS MANDOS (`docs/quiebro/EL-RAYO.md` §1 y §3, contrato del rayo §5.1): lo que apuntan las
+ *      manos (cargar, soltar que dispara, cancelar que anula, el QUIEBRO que cancela y esquiva, lo que se tira
+ *      mientras se carga); la partida con un tiro de juguete contra el enchufe de mentira —`[apuntar, msPulsar,
+ *      0]` repetido y plantado, UN `[soltar, msSoltar, blanco]`, el toque corto, cancelar que no manda nada, el
+ *      daño y el quiebro que cortan, los efectos llamados en el acto y leídos en cada llamada, la recarga que
+ *      pone la bala de la sala, los gestos propios y ajenos, cuándo NO se empieza a cargar (tocado, descolocado,
+ *      con un golpe propio anunciado, fuera de combate, sin cuerpo) y lo que corta una carga en el acto (la
+ *      fase, el fondo, quedarse sin cuerpo)—; el apuntado en PANTALLA (alcance, vista, histéresis, el giro que
+ *      pone al blanco bajo la mira, el imán, la línea de la mira); la cámara (el zoom de campo hasta 10° sin
+ *      acercar, sus tiempos, el golpe de −2°, la sensibilidad, el giro de entrada en curva suave); la mira
+ *      fotograma a fotograma (tres marcas, sin círculo, su radio, su muelle, el cierre por niveles, la
+ *      tensión, el PUNTO del pleno sin aro, el arco sólo abierto, los dos finales, el halo desenfocado); los
+ *      botones (iconos propios, sin emoji, las clases que salen de la sala, las recargas, la amenaza, la Tanda,
+ *      sus tamaños, los rótulos DENTRO del aro); el teclado (la R); y el tiro de juguete sólo en desarrollo.
  *
  * ═══ CÓMO SE SABE QUE MIRA ═══
  *
@@ -100,7 +114,7 @@ import { ALCANZA_M, FUNDIDO_MS, LineaDelCuerpo, pintadoNuevo } from '../src/quie
 import { dentroDelLimite, PasoPropio } from '../src/quiebro/red/prediccion';
 import { SalaVista } from '../src/quiebro/red/sala-vista';
 import { leerLaLiza } from '../src/quiebro/red/diccionario';
-import { Partida, ROTULO_DE_LA_VUELTA_MS } from '../src/quiebro/red/partida';
+import { botonesNuevos, Partida, ROTULO_DE_LA_VUELTA_MS } from '../src/quiebro/red/partida';
 import { CAIDA_MINIMA_MS, CAIDA_MS, GiroEnLoAlto, RelojDeLaBajada } from '../src/quiebro/red/bajada';
 import { PuertoDePrueba, PLAZO_DE_LA_MESA_S } from '../src/quiebro/red/puerto-de-prueba';
 import { EstadoDeLosMandos, sinZonaMuerta, ZONA_MUERTA } from '../src/quiebro/mandos/estado';
@@ -173,6 +187,61 @@ import { genteDeLaCiudad } from '../src/quiebro/personajes/multitud';
 import { cajaParaLaCamara, ojoFueraDeLasCajas } from '../src/quiebro/camara/Camara';
 import { Hud } from '../src/quiebro/hud/Hud';
 import type { CuerpoPintado } from '../src/quiebro/cuerpos';
+import type { TiroDeclarado } from '../../shared/mecanicas/liza/declaracion';
+import { cargaDe, leerElTiro, nivelDeLaCarga, semillaDelRayo } from '../src/quiebro/rayo/contrato';
+import type { BocaDe, DisparoDelRayo, EfectosDelRayo, EstadoDelRayo } from '../src/quiebro/rayo/contrato';
+import {
+  apuntadoNuevo,
+  apuntarPorLaMira,
+  desvioDeGiro,
+  distanciaAlEje,
+  elegirBlancoDelRayo,
+  empujeFueraDeLaSilueta,
+  enPantallaNuevo,
+  FRANJA_DE_LA_SILUETA,
+  FRICCION_EN_EL_BLANCO,
+  friccionDelIman,
+  giroDeEntrada,
+  GIRO_DE_ENTRADA_MS,
+  giroParaApuntar,
+  HISTERESIS_DEL_BLANCO,
+  ojoNuevo,
+  pasoDelGiroDeEntrada,
+  proyectar,
+  RADIO_DE_ENGANCHE,
+  RADIO_DEL_IMAN,
+  siluetaEnPantalla,
+  siluetaNueva,
+  tironDelIman,
+} from '../src/quiebro/mandos/rayo';
+import type { OjoDelRayo } from '../src/quiebro/mandos/rayo';
+import { ACERCAMIENTO_AL_APUNTAR, BAJADA_AL_APUNTAR, FOV_DE_LA_CARGA, FOV_MOVIL, HOMBRO_DE_APUNTAR, HOMBRO_M, retrocesoDelDisparo, sensibilidadDelZoom, suavizarElZoom, ZOOM_AL_EMPEZAR, zoomDeLaCarga } from '../src/quiebro/camara/encuadre';
+import type { EncuadreDeLaCamara } from '../src/quiebro/camara/encuadre';
+import { AJUSTE_MINIMO, ajusteDelRotulo, CIRCUNFERENCIA_DEL_ARO, clasesDeLosBotones, cuerdaDelAro, desfaseDelAro, MandosTactiles, NOMBRE_DEL_RAYO, pintarLasMuescas, segundosDeLaRecarga } from '../src/quiebro/mandos/Tactil';
+import { RayoDePC } from '../src/quiebro/hud/RayoDePC';
+import {
+  ARCO_ENTERO_DESDE_PX,
+  ARCO_NINGUNO_BAJO_PX,
+  CANCELAR_MS,
+  DISPARO_MS,
+  escalaDeLaMarca,
+  estadoDeLaMiraNuevo,
+  luzDelArco,
+  MiraDelRayo,
+  muelleDelRadio,
+  pasoDeLaMira,
+  PULSO_MS,
+  radioDeLaMira,
+  RADIO_DEL_PLENO_PX,
+  RADIO_DEL_PUNTO_PX,
+  RADIO_MAXIMO_PX,
+  RADIO_MINIMO_PX,
+  TENSION,
+  TENSION_MS,
+  TRAMO_DEL_ARCO,
+  tramoDelArco,
+} from '../src/quiebro/hud/MiraDelRayo';
+import type { DibujoDeLaMira, VistaDeLaMira } from '../src/quiebro/hud/MiraDelRayo';
 
 /* ─────────────────────────────── El arnés, en corto ─────────────────────────────── */
 
@@ -3175,4 +3244,1148 @@ paso('13 bis. Lo que se vio jugando: el rótulo de la Bajada, el rumbo hasta don
   );
 }
 
-terminar(210);
+/* ─────────────────────────────── 14. El rayo en los mandos ─────────────────────────────── */
+
+/*
+ * EL RAYO EN EL CLIENTE, frente MANDOS (docs/quiebro/EL-RAYO.md §1 y §3; el contrato del rayo, §5.1). La sala
+ * todavía no cumple el tiro (fase 0): la partida se prueba con uno DE JUGUETE sobre la liza del diseño, con sus
+ * propios ids (30 y 31: los reservados del Quiebro, 12 y 13, son aquí el remate y el descolgar), la tabla del
+ * §1.2 y un espía en `efectos.rayo`. Lo que la sala hará con el cable es de REGLAS; aquí, que el cable dice lo
+ * que el contrato promete.
+ */
+paso('14. El rayo en los mandos: el gesto, el cable, el apuntado, la cámara, la mira y los botones');
+{
+  const sinComentariosDe = (x: string): string => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  /* ── Lo que apuntan las manos ── */
+  const m = new EstadoDeLosMandos();
+  m.pulsar('rayo', 100);
+  const cargando = m.rayoDesde;
+  const enLaCola = m.tomarPulsaciones().length;
+  m.soltarRayo(640, 17);
+  const soltado = m.tomarRayoSoltado();
+  const otraVez = m.tomarRayoSoltado();
+  comprobar(
+    'el RAYO se mantiene: pulsar lo carga (sin pasar por la cola) y SOLTAR deja un disparo, uno, con las dos horas y el blanco que se veía',
+    cargando === 100 && enLaCola === 0 && soltado !== null && soltado.desde === 100 && soltado.hasta === 640 && soltado.blanco === 17 && otraVez === null && m.rayoDesde === null,
+    { cargando, enLaCola, soltado, otraVez },
+  );
+  m.soltarRayo(700, 3);
+  const sinCarga = m.tomarRayoSoltado();
+  m.pulsar('rayo', 800);
+  m.cancelarRayo();
+  m.soltarRayo(900, 3);
+  const trasCancelar = m.tomarRayoSoltado();
+  m.pulsar('rayo', 1000);
+  m.soltarRayo(1100, 0);
+  m.soltarTodo();
+  const trasIrse = m.tomarRayoSoltado();
+  comprobar(
+    'soltar sin carga no es nada; cancelar ANULA (el soltar de después no dispara); e irse tira un disparo que aún no se mandó',
+    sinCarga === null && trasCancelar === null && trasIrse === null,
+    { sinCarga, trasCancelar, trasIrse },
+  );
+  m.pulsar('rayo', 2000);
+  m.pulsar('golpe', 2010);
+  m.pulsar('empellon', 2020);
+  m.pulsar('usar', 2030);
+  m.pulsar('aviso', 2040);
+  const mientras = m.tomarPulsaciones().map((p) => p.boton);
+  const usarMientras = m.usarDesde;
+  m.pulsar('quiebro', 2050);
+  const conQuiebro = m.tomarPulsaciones().map((p) => p.boton);
+  comprobar(
+    'mientras se carga, GOLPE, EMPELLÓN y USAR se tiran (no rompen la carga), AVISO pasa, y QUIEBRO CANCELA la carga y esquiva',
+    mientras.join() === 'aviso' && usarMientras === null && conQuiebro.join() === 'quiebro' && m.rayoDesde === null,
+    { mientras, usarMientras, conQuiebro, rayoDesde: m.rayoDesde },
+  );
+
+  /* ── El apuntado, en la pantalla ── */
+  const ojoDe = (en: EncuadreDeLaCamara, aspecto = 844 / 390): OjoDelRayo => {
+    const o = ojoNuevo();
+    const fx = en.mira.x - en.ojo.x;
+    const fy = en.mira.y - en.ojo.y;
+    const fz = en.mira.z - en.ojo.z;
+    const lf = Math.hypot(fx, fy, fz);
+    o.x = en.ojo.x;
+    o.y = en.ojo.y;
+    o.z = en.ojo.z;
+    o.fx = fx / lf;
+    o.fy = fy / lf;
+    o.fz = fz / lf;
+    /* La derecha es f × arriba, y el arriba de la cámara, derecha × f (lo que hace `lookAt`). */
+    const rx = -o.fz;
+    const rz = o.fx;
+    const lr = Math.hypot(rx, rz);
+    o.rx = rx / lr;
+    o.ry = 0;
+    o.rz = rz / lr;
+    o.ux = o.ry * o.fz - o.rz * o.fy;
+    o.uy = o.rz * o.fx - o.rx * o.fz;
+    o.uz = o.rx * o.fy - o.ry * o.fx;
+    o.tanMedio = Math.tan((en.fov * Math.PI) / 360);
+    o.aspecto = aspecto;
+    return o;
+  };
+  const situacion = { dt: 1, enemigosCerca: false, blanco: null, mandaElDedo: true, remanso: 0, tactil: true, vigia: false, cajas: [] as CajaAlta[] };
+  const ojoEn = (x: number, z: number, giro: number, carga = 0): OjoDelRayo => ojoDe(encuadrar(camaraNueva(giro), { ...situacion, x, z, carga }));
+  const alNorte = ojoEn(0, 0, 0);
+  const sinCajas = new Int32Array(0);
+  /* A 4 m y un poco a la izquierda (cerca en el suelo); a 14 m justo bajo la mira (lejos, pero es a lo que se apunta). */
+  const cerca = { numero: 20, x: -1.4, z: -4 };
+  const bajoLaMira = { numero: 21, x: HOMBRO_M, z: -14 };
+  const base = { ojo: alNorte, x: 0, z: 0, alcance: 24, radio: RADIO_DE_ENGANCHE, anterior: 0, cuerpos: sinCajas };
+  const enPantalla = enPantallaNuevo();
+  proyectar(alNorte, cerca.x, 1.25, cerca.z, enPantalla);
+  const uCerca = enPantalla.u;
+  comprobar(
+    'el blanco del rayo es el que cae más cerca de la mira EN LA PANTALLA (no el más cercano en el suelo), y sólo si el nivel de ahora lo alcanza',
+    elegirBlancoDelRayo(base, [cerca, bajoLaMira]) === 21 && elegirBlancoDelRayo({ ...base, alcance: 12 }, [cerca, bajoLaMira]) === 0 && Math.abs(uCerca) > RADIO_DE_ENGANCHE,
+    { conAlcance24: elegirBlancoDelRayo(base, [cerca, bajoLaMira]), conAlcance12: elegirBlancoDelRayo({ ...base, alcance: 12 }, [cerca, bajoLaMira]), uCerca },
+  );
+  const pared = new Int32Array([u(-3), u(-9), u(3), u(-8)]);
+  const entrada = { ...base, radio: alNorte.aspecto + 0.1, alcance: 12 };
+  comprobar(
+    'tras una pared no se engancha; y al EMPEZAR (la pantalla entera) sale el más a mano de la pantalla',
+    elegirBlancoDelRayo({ ...base, cuerpos: pared }, [bajoLaMira]) === 0 && elegirBlancoDelRayo(entrada, [cerca, bajoLaMira]) === 20,
+  );
+  /*
+   * La histéresis: con la mira un poco más cerca del otro, el que ya estaba se queda (y sin él de antes, sale el otro:
+   * es la ventaja la que lo sostiene); con la mira encima del otro, cambia.
+   */
+  const a = { numero: 30, x: 0.3, z: -12 };
+  const rival = { numero: 31, x: 1.8, z: -12 };
+  const hacia = (f: number): OjoDelRayo => ojoEn(0, 0, giroParaApuntar(0, 0, a.x + (rival.x - a.x) * f, a.z, HOMBRO_M));
+  const cercaDelRival = hacia(0.6);
+  proyectar(cercaDelRival, a.x, 1.25, a.z, enPantalla);
+  const dA = Math.hypot(enPantalla.u, enPantalla.v);
+  proyectar(cercaDelRival, rival.x, 1.25, rival.z, enPantalla);
+  const dRival = Math.hypot(enPantalla.u, enPantalla.v);
+  const seQueda = elegirBlancoDelRayo({ ...base, ojo: cercaDelRival, anterior: 30 }, [rival, a]);
+  const sinAnterior = elegirBlancoDelRayo({ ...base, ojo: cercaDelRival, anterior: 0 }, [a, rival]);
+  const cambia = elegirBlancoDelRayo({ ...base, ojo: hacia(1), anterior: 30 }, [a, rival]);
+  comprobar(
+    'con dos blancos casi igual de cerca de la mira no salta: el que ya estaba tiene ventaja; con la mira claramente sobre el otro, cambia',
+    dRival < dA && dA - dRival < HISTERESIS_DEL_BLANCO && seQueda === 30 && sinAnterior === 31 && cambia === 31,
+    { dA, dRival, seQueda, sinAnterior, cambia },
+  );
+  /* El giro que pone al blanco bajo la mira, con la cámara del juego (el hombro a 0,7 m). */
+  let peorU = 0;
+  let giros = 0;
+  for (const [bx, bz] of [
+    [2, -3],
+    [-5, -6],
+    [8, 2],
+    [-20, -30],
+    [0, 40],
+    [30, -1],
+  ] as const) {
+    const g = giroParaApuntar(0, 0, bx, bz, HOMBRO_M);
+    const o = ojoEn(0, 0, g);
+    if (proyectar(o, bx, 1.5, bz, enPantalla)) {
+      giros++;
+      peorU = Math.max(peorU, Math.abs(enPantalla.u));
+    }
+  }
+  const sinHombro = ojoEn(0, 0, Math.atan2(2, 3));
+  proyectar(sinHombro, 2, 1.5, -3, enPantalla);
+  comprobar(
+    'el giro de entrada pone al blanco bajo la mira con el hombro a 0,7 m (y sin tenerlo en cuenta se desvía): la mira cae encima en los seis',
+    giros === 6 && peorU < 0.01 && Math.abs(enPantalla.u) > 0.05,
+    { giros, peorU, sinHombro: enPantalla.u },
+  );
+  comprobar(
+    'el imán: el dedo frena encima del blanco y nada fuera de su radio; la vista se deja caer hacia él, menos que lo que falta, y nada fuera',
+    friccionDelIman(0) === FRICCION_EN_EL_BLANCO &&
+      friccionDelIman(RADIO_DEL_IMAN) === 1 &&
+      friccionDelIman(RADIO_DEL_IMAN * 0.5) > FRICCION_EN_EL_BLANCO &&
+      friccionDelIman(RADIO_DEL_IMAN * 0.5) < 1 &&
+      tironDelIman(0.05, 1 / 60) > 0 &&
+      tironDelIman(0.05, 1 / 60) < 0.05 &&
+      tironDelIman(-0.05, 1 / 60) < 0 &&
+      tironDelIman(RADIO_DEL_IMAN * 1.01, 1 / 60) === 0 &&
+      casi(desvioDeGiro(0.1, 0.3), 0.2) &&
+      casi(desvioDeGiro(3.1, -3.1), 2 * Math.PI - 6.2),
+  );
+  const apunte = apuntadoNuevo();
+  const libre = apuntarPorLaMira(alNorte, 0, 0, 16, 0.05, sinCajas, apunte);
+  const aLibre = { ...apunte };
+  proyectar(alNorte, aLibre.x, 1.5, aLibre.z, enPantalla);
+  const uLibre = enPantalla.u;
+  const conPared = apuntarPorLaMira(alNorte, 0, 0, 16, 0.05, pared, apunte);
+  const aPared = { ...apunte };
+  /* Un poste en el camino del CUERPO que la línea de la mira (0,7 m a la derecha) no toca: el rayo se para en él igual. */
+  const poste = new Int32Array([u(-0.3), u(-6), u(0.35), u(-5)]);
+  const conPoste = apuntarPorLaMira(alNorte, 0, 0, 16, 0.05, poste, apunte);
+  comprobar(
+    'sin blanco, el rayo va por la línea de la mira: al alcance del nivel desde el cuerpo y bajo la mira; con una pared delante, o un poste en el camino del cuerpo que la mira no ve, se para en él',
+    libre &&
+      !aLibre.choca &&
+      casi(Math.hypot(aLibre.x, aLibre.z), 16, 0.01) &&
+      Math.abs(uLibre) < 0.01 &&
+      conPared &&
+      aPared.choca &&
+      Math.hypot(aPared.x, aPared.z) < 9.1 &&
+      conPoste &&
+      apunte.choca &&
+      Math.hypot(apunte.x, apunte.z) < 5.2,
+    { aLibre, uLibre, aPared, poste: { ...apunte } },
+  );
+
+  /* ── La cámara ── */
+  const quieta = encuadrar(camaraNueva(0), { ...situacion, x: 0, z: 0 });
+  const llena = encuadrar(camaraNueva(0), { ...situacion, x: 0, z: 0, carga: 1 });
+  const media = encuadrar(camaraNueva(0), { ...situacion, x: 0, z: 0, carga: 0.5 });
+  const enPc = encuadrar(camaraNueva(0), { ...situacion, x: 0, z: 0, tactil: false, carga: 1 });
+  comprobar(
+    'el zoom del rayo cierra el campo hasta 10° (75 → 65 en el teléfono, 70 → 60 en PC) y NO acerca la cámara: el ojo y la mira, los mismos',
+    FOV_DE_LA_CARGA === 10 &&
+      llena.fov === FOV_MOVIL - 10 &&
+      media.fov === FOV_MOVIL - 5 &&
+      enPc.fov === 60 &&
+      llena.ojo.x === quieta.ojo.x &&
+      llena.ojo.y === quieta.ojo.y &&
+      llena.ojo.z === quieta.ojo.z &&
+      llena.mira.z === quieta.mira.z,
+    { llena: llena.fov, media: media.fov, enPc: enPc.fov },
+  );
+  const tiempoHasta = (desde: number, quiere: number, umbral: (z: number) => boolean): number => {
+    let z = desde;
+    for (let t = 0; t < 2000; t += 5) {
+      if (umbral(z)) return t;
+      z = suavizarElZoom(z, quiere, 0.005);
+    }
+    return Number.POSITIVE_INFINITY;
+  };
+  const entra = tiempoHasta(0, 1, (z) => z >= 0.95);
+  const sale = tiempoHasta(1, 0, (z) => z <= 0.05);
+  comprobar(
+    'el zoom entra en ≈0,25 s y sale en ≈0,12 s; al pulsar ya entra una parte, y lleno sólo en el pleno',
+    entra >= 200 && entra <= 300 && sale >= 90 && sale <= 150 && zoomDeLaCarga(true, 0) === ZOOM_AL_EMPEZAR && ZOOM_AL_EMPEZAR > 0 && zoomDeLaCarga(true, 1) === 1 && zoomDeLaCarga(false, 1) === 0 && zoomDeLaCarga(true, 0.5) < 1,
+    { entra, sale },
+  );
+  const golpes = [0, 30, 75, 120, 149, 150, 400].map(retrocesoDelDisparo);
+  comprobar(
+    'el disparo da un golpe de campo de −2° que vuelve en 150 ms; y con el campo cerrado el dedo gira menos, en la proporción tan(fov/2)',
+    golpes[0] === -2 && golpes.slice(0, 5).every((g, i, l) => i === 0 || g > (l[i - 1] as number)) && golpes[5] === 0 && golpes[6] === 0 && sensibilidadDelZoom(75, 75) === 1 && casi(sensibilidadDelZoom(65, 75), Math.tan((65 * Math.PI) / 360) / Math.tan((75 * Math.PI) / 360)) && sensibilidadDelZoom(65, 75) < 0.9,
+    golpes,
+  );
+  const camara = sinComentariosDe(readFileSync(new URL('../src/quiebro/camara/Camara.tsx', import.meta.url), 'utf8'));
+  comprobar(
+    'la cámara del juego: la automática no pelea mientras se carga, el zoom suavizado va al encuadre, el dedo con la sensibilidad y el imán, y apunta con ESTA cámara',
+    /mandaElDedo: p\.mandos\.mandaElDedo\(ahora\) \|\| cargando/.test(camara) &&
+      /carga: zoom\.current/.test(camara) &&
+      /zoom\.current = suavizarElZoom\(zoom\.current, zoomDeLaCarga\(cargando, rayo\.c\), paso\)/.test(camara) &&
+      /e\.giro \+= giro\.giro \* sensibilidad \* \(cargando \? friccionDelIman\(desvio\) : 1\)/.test(camara) &&
+      /p\.partida\.apuntarElRayo\(ojoDelRayo\.current, ahora, girando\)/.test(camara) &&
+      /retrocesoDelDisparo\(ahora - disparo\.t\)/.test(camara),
+  );
+  /*
+   * El giro de entrada: una curva SUAVE de 180 ms (arranca y llega con velocidad cero), no una exponencial que arranca
+   * a toda velocidad (con τ = 50 ms, el 28 % del giro en el primer fotograma: un latigazo de 18° en uno de 63°).
+   */
+  const curvaDeEntrada = (desvio0: number, velocidadDelBlanco: number): { pasos: number[]; falta: number } => {
+    const g = giroDeEntrada(0);
+    let giro = 0;
+    let quiere = desvio0;
+    const pasos: number[] = [];
+    let falta = quiere - giro;
+    pasoDelGiroDeEntrada(g, 7, quiere - giro, 0);
+    for (let i = 1; i < 40; i++) {
+      quiere += velocidadDelBlanco / 60;
+      const p = pasoDelGiroDeEntrada(g, 7, quiere - giro, (i * 1000) / 60);
+      if (p === null) break;
+      pasos.push(p / desvio0);
+      giro += p;
+      falta = quiere - giro;
+    }
+    return { pasos, falta };
+  };
+  const quieta63 = curvaDeEntrada((63 * Math.PI) / 180, 0);
+  const huye = curvaDeEntrada((63 * Math.PI) / 180, 0.6);
+  const rehace = giroDeEntrada(0);
+  pasoDelGiroDeEntrada(rehace, 7, 1, 0);
+  pasoDelGiroDeEntrada(rehace, 7, 1, 50);
+  const alCambiar = pasoDelGiroDeEntrada(rehace, 9, 1, 100);
+  const trasCambiar = pasoDelGiroDeEntrada(rehace, 9, 1, 100 + 1000 / 60);
+  const tarde = giroDeEntrada(0);
+  const fueraDeLaVentana = pasoDelGiroDeEntrada(tarde, 11, 1, GIRO_DE_ENTRADA_MS + 40);
+  comprobar(
+    'el giro de entrada es SUAVE: el primer fotograma no llega al 12 % del giro y ninguno pasa del 20 %; a los ≈180 ms está en el blanco, también si el blanco se mueve; un blanco nuevo dentro de la ventana empieza otra curva, y fuera de ella (o sin blanco) no gira la entrada: tira el imán',
+    (quieta63.pasos[0] ?? 1) < 0.12 &&
+      Math.max(...quieta63.pasos.map(Math.abs)) < 0.2 &&
+      quieta63.pasos.length >= 10 &&
+      quieta63.pasos.length <= 12 &&
+      Math.abs(quieta63.falta) < 1e-9 &&
+      Math.abs(huye.falta) < 1e-9 &&
+      alCambiar === 0 &&
+      trasCambiar !== null &&
+      trasCambiar > 0 &&
+      trasCambiar < 0.12 &&
+      fueraDeLaVentana === null &&
+      pasoDelGiroDeEntrada(giroDeEntrada(0), 0, 1, 50) === null,
+    { primero: quieta63.pasos[0], pasos: quieta63.pasos.length, falta: quieta63.falta, huye: huye.falta, alCambiar, trasCambiar, fueraDeLaVentana },
+  );
+  comprobar(
+    'y la cámara del juego gira con ESA curva al empezar a cargar (la entrada manda mientras dura; luego, el imán)',
+    /entrada\.current = giroDeEntrada\(ahora\);/.test(camara) &&
+      /const deLaEntrada = entrada\.current === null \? null : pasoDelGiroDeEntrada\(entrada\.current, rayo\.blanco, desvio, ahora\);\s*e\.giro \+= deLaEntrada \?\? tironDelIman\(desvio, paso\);/.test(camara),
+  );
+
+  /* ── La partida, con un tiro de juguete, contra el enchufe de mentira ── */
+  const APUNTAR = 30;
+  const SOLTAR = 31;
+  const CARGANDO = 60;
+  const TABLA = [
+    { desdeMs: 0, area: 3, alcance: 16, recargaTics: 60 },
+    { desdeMs: 300, area: 2, alcance: 24, recargaTics: 72 },
+    { desdeMs: 750, area: 1, alcance: 32, recargaTics: 86 },
+    { desdeMs: 1300, area: 0, alcance: 45, recargaTics: 100 },
+  ] as const;
+  const tiro: TiroDeclarado = {
+    apuntar: APUNTAR,
+    soltar: SOLTAR,
+    puesta: puesta(CARGANDO, 40),
+    niveles: TABLA.map((n, i) => ({ desdeMs: n.desdeMs, proyectil: 90 + i, ancho: u(0.2), area: u(n.area), efectoDelArea: n.area === 0 ? null : efecto(10, puesta(EST.tocado, 10), u(1)), recargaTics: n.recargaTics })),
+    enganche: { radio: u(45), conoRumbos: 8, holgura: u(0.5) },
+    holgura: u(0.6),
+    cargaMaximaMs: 2000,
+  };
+  const CON_TIRO: LizaDeclarada = {
+    ...LIZA,
+    asientos: LIZA.asientos.map((r) => ({ ...r, tiro })),
+    estados: [...LIZA.estados, { id: CARGANDO, bloqueaPaso: true, bloqueaAccion: false, cancelaCon: [], seCortaConDano: true }],
+    proyectiles: [...LIZA.proyectiles, ...TABLA.map((n, i) => ({ id: 90 + i, apuntarTics: 1, balas: 1, cadaTics: 0, velocidad: u(400), radio: u(0.05), alcance: u(n.alcance), efecto: efecto(10, puesta(EST.tocado, 10)) }))],
+  };
+  const leido = leerElTiro(tiro, CON_TIRO.proyectiles);
+  const relojes = new RelojesDeMentira();
+  const mandos = new EstadoDeLosMandos();
+  const enchufes: EnchufeDeMentira[] = [];
+  const partida = new Partida({
+    direccion: 'ws://x/api/arcade/mesas/QUIEB/liza',
+    llave: 'k1',
+    fabrica: (d) => {
+      const en = new EnchufeDeMentira(d);
+      enchufes.push(en);
+      return en;
+    },
+    relojes,
+    mandos,
+  });
+  const llamadas: string[] = [];
+  const soltados: DisparoDelRayo[] = [];
+  const cargas: number[] = [];
+  const espia = (quien: string): EfectosDelRayo => ({
+    empezarCarga: (q) => void llamadas.push(`${quien}:empezar ${String(q)}`),
+    actualizarCarga: (q, es: Readonly<EstadoDelRayo>) => {
+      llamadas.push(`${quien}:actualizar ${String(q)}`);
+      cargas.push(es.c);
+    },
+    cancelarCarga: (q) => void llamadas.push(`${quien}:cancelar ${String(q)}`),
+    soltar: (d) => {
+      llamadas.push(`${quien}:soltar ${String(d.quien)}`);
+      soltados.push(d);
+    },
+    estallar: () => void llamadas.push(`${quien}:estallar`),
+  });
+  const efectos: { rayo: EfectosDelRayo; boca: BocaDe | null } = { rayo: espia('a'), boca: null };
+  partida.efectos = efectos;
+  partida.ponerLaDeclaracion(CON_TIRO, { tipo: 'barrio', barrio: BARRIO }, 'a1');
+  partida.asegurarElCanal(true);
+  const e = enchufes[0] as EnchufeDeMentira;
+  e.abrir();
+  const origen = relojes.t;
+  e.llega({ t: 'dentro', yo: 1, k: 1000, x: NACE.x, z: NACE.z, r: 0, hz: 20 });
+  e.llega({ t: 'tic', k: 1000, ev: [{ e: 'fase', clave: 'n1-o1', modo: 2, limite: ID_DE_LIMITE_EN_LA_LIZA.glorieta48, relojMs: 0, encuentroTics: 3000 }] });
+  e.llega({ t: 'eco', c: 0, k: 1000, ms: 50_000 });
+  const fotograma = (ms: number): void => {
+    relojes.t += ms;
+    partida.fotograma(relojes.t, ms / 1000);
+  };
+  const cuantas = (x: string): number => llamadas.filter((l) => l === x).length;
+  const aquisDesde = (n: number): Aqui[] => e.leidos().slice(n).filter((x): x is Aqui => x.t === 'aqui');
+  const kAhora = (): number => Math.max(1000, Math.round(partida.ticDeLaSala(relojes.t)));
+  fotograma(1);
+  for (let i = 0; i < 4; i++) fotograma(16);
+  const yoX = NACE.x / UNO;
+  const yoZ = NACE.z / UNO;
+  /* Un Celador a 6 m, hacia un lado con calle libre, y la cámara mirándolo. */
+  /* Hacia un lado que NO sea el norte (el cuerpo nace mirando al norte: así se ve que al cargar se vuelve hacia la mira). */
+  const dir = [Math.PI / 2, -Math.PI / 2, Math.PI, (3 * Math.PI) / 4, (-3 * Math.PI) / 4].find((ang) => libreHacia(NACE.x, NACE.z, ang, 7)) ?? Math.PI / 2;
+  const cel = { x: yoX + Math.sin(dir) * 6, z: yoZ - Math.cos(dir) * 6 };
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'nace', id: 16, clase: 1, x: Math.round(cel.x * 100), z: Math.round(cel.z * 100), r: 128 }] });
+  e.llega({ t: 'foto', k: kAhora(), p: [[16, Math.round(cel.x * 100), Math.round(cel.z * 100), 128, 0, 0]] });
+  partida.giroDeLaCamara = dir;
+  fotograma(16);
+  const giroAlCelador = giroParaApuntar(yoX, yoZ, cel.x, cel.z, HOMBRO_M);
+  const ojoAlCelador = ojoEn(yoX, yoZ, giroAlCelador);
+
+  /* Cargar, empujando la palanca: plantado, `[apuntar, ms, 0]` con el mismo `ms`, y los efectos una vez por fotograma. */
+  const antesDeCargar = e.leidos().length;
+  const llamadasAntes = llamadas.length;
+  const t0 = relojes.t - 2.5;
+  mandos.ponerPalanca(0, 1, relojes.t);
+  mandos.pulsar('rayo', t0);
+  const cargasDelCuerpo: number[] = [];
+  let marcos = 0;
+  for (let i = 0; i < 50; i++) {
+    fotograma(16);
+    marcos++;
+    partida.apuntarElRayo(ojoAlCelador, relojes.t, false);
+    cargasDelCuerpo.push(partida.pintadoDe(1)?.carga ?? -1);
+  }
+  const gestoCargando = partida.pintadoDe(1)?.gesto;
+  const aquisCargando = aquisDesde(antesDeCargar);
+  const msPulsar = Math.floor(t0 - origen);
+  const primerAqui = aquisCargando[0];
+  const actualizaciones = llamadas.slice(llamadasAntes).filter((l) => l === 'a:actualizar 1').length;
+  comprobar(
+    'CARGANDO, cada `aqui` lleva `[apuntar, msPulsar, 0]` con el MISMO `ms` de su evento, y el cuerpo se planta aunque la palanca empuje',
+    aquisCargando.length >= 14 &&
+      aquisCargando.every((x) => x.a !== 0 && x.a[0] === APUNTAR && x.a[1] === msPulsar && x.a[2] === 0) &&
+      primerAqui !== undefined &&
+      aquisCargando.every((x) => x.x === primerAqui.x && x.z === primerAqui.z),
+    aquisCargando.slice(0, 3),
+  );
+  comprobar(
+    'y en el acto: los efectos empiezan UNA vez, actualizan UNA vez por fotograma con la carga que sube, y el cuerpo carga (`cargar-rayo`, con su carga)',
+    cuantas('a:empezar 1') === 1 &&
+      actualizaciones === marcos &&
+      cargas.length >= 2 &&
+      (cargas[cargas.length - 1] as number) > (cargas[0] as number) &&
+      gestoCargando === 'cargar-rayo' &&
+      (cargasDelCuerpo[cargasDelCuerpo.length - 1] as number) > (cargasDelCuerpo[0] as number) &&
+      (cargasDelCuerpo[0] as number) >= 0,
+    { empezar: cuantas('a:empezar 1'), actualizaciones, marcos, gestoCargando },
+  );
+  const rumboDeLaCarga = aquisCargando[aquisCargando.length - 1]?.r ?? -1;
+  const rumboAlBlanco = rumboDeRadianes(direccionHacia(cel.x - yoX, cel.z - yoZ));
+  const antesDeLaCarga = e
+    .leidos()
+    .slice(0, antesDeCargar)
+    .filter((x): x is Aqui => x.t === 'aqui')
+    .pop()?.r ?? -1;
+  const vuelta = (x: number, y: number): number => Math.min(Math.abs(x - y), 256 - Math.abs(x - y));
+  comprobar(
+    'con la cámara mirando al Celador, la mira lo engancha y apunta a su pecho, y el cuerpo (el `r` de cada `aqui`), que miraba a otro lado, se vuelve hacia lo apuntado',
+    partida.rayo.blanco === 16 && Math.hypot(partida.rayo.apuntado.x - cel.x, partida.rayo.apuntado.z - cel.z) < 0.01 && vuelta(rumboDeLaCarga, rumboAlBlanco) <= 1 && vuelta(antesDeLaCarga, rumboAlBlanco) > 16,
+    { rumboDeLaCarga, rumboAlBlanco, antesDeLaCarga },
+  );
+  /* Los efectos se leen en CADA llamada: otro `rayo` colgado a media carga recibe lo que sigue. */
+  efectos.rayo = espia('b');
+  fotograma(16);
+  partida.apuntarElRayo(ojoAlCelador, relojes.t, false);
+  comprobar('los efectos del rayo se leen en cada llamada (el que los envuelva a media carga recibe lo que sigue)', cuantas('b:actualizar 1') === 1);
+
+  /* Soltar: UN `[soltar, msSoltar, blanco]`, y los efectos sueltan en el acto lo predicho. */
+  const t1 = relojes.t - 1;
+  mandos.soltarRayo(t1, partida.rayo.blanco);
+  fotograma(16);
+  const gestoAlSoltar = partida.pintadoDe(1);
+  const gesto1 = { gesto: gestoAlSoltar?.gesto, desde: gestoAlSoltar?.gestoDesdeMs, impacto: gestoAlSoltar?.impactoMs };
+  for (let i = 0; i < 8; i++) fotograma(16);
+  const trasSoltar = aquisDesde(antesDeCargar);
+  const iSoltar = trasSoltar.findIndex((x) => x.a !== 0 && x.a[0] === SOLTAR);
+  const elSoltar = trasSoltar[iSoltar];
+  const msSoltar = Math.floor(t1 - origen);
+  const cargaMs = msSoltar - msPulsar;
+  const esperado = leido === null ? null : nivelDeLaCarga(leido, cargaMs);
+  const rumboAlCelador = rumboDeRadianes(direccionHacia(cel.x - yoX, cel.z - yoZ));
+  comprobar(
+    'al SOLTAR, UN `aqui` con `[soltar, msSoltar, blanco]` justo tras la carga, mirando al blanco, y detrás los `aqui` sin acción',
+    elSoltar !== undefined &&
+      elSoltar.a !== 0 &&
+      elSoltar.a[1] === msSoltar &&
+      elSoltar.a[2] === 16 &&
+      trasSoltar.filter((x) => x.a !== 0 && x.a[0] === SOLTAR).length === 1 &&
+      (trasSoltar[iSoltar - 1]?.a as readonly number[] | 0 | undefined) !== undefined &&
+      trasSoltar[iSoltar - 1]?.a !== 0 &&
+      (trasSoltar[iSoltar - 1]?.a as readonly number[])[0] === APUNTAR &&
+      Math.min(Math.abs(elSoltar.r - rumboAlCelador), 256 - Math.abs(elSoltar.r - rumboAlCelador)) <= 1 &&
+      trasSoltar.slice(iSoltar + 1).length >= 2 &&
+      trasSoltar.slice(iSoltar + 1).every((x) => x.a === 0),
+    { elSoltar, rumboAlCelador, previo: trasSoltar[iSoltar - 1]?.a },
+  );
+  const d = soltados[0];
+  comprobar(
+    'y en el acto los efectos sueltan el rayo predicho: bala 0, su nivel y su carga (la de `msSoltar − msPulsar`), hacia el blanco, y la semilla del contrato',
+    soltados.length === 1 &&
+      d !== undefined &&
+      esperado !== null &&
+      leido !== null &&
+      esperado.nivel === 3 &&
+      d.bala === 0 &&
+      d.quien === 1 &&
+      d.nivel === esperado.nivel &&
+      d.area === esperado.area &&
+      casi(d.c, cargaDe(leido, cargaMs)) &&
+      d.dio === true &&
+      Math.hypot(d.destino.x - cel.x, d.destino.z - cel.z) < 0.01 &&
+      d.semilla === semillaDelRayo(1, Math.round(t1)) &&
+      d.t === t1,
+    { d, cargaMs, esperado: esperado?.nivel },
+  );
+  comprobar(
+    'el cuerpo LANZA (`lanzar-rayo`, con el impacto en el instante del disparo), la carga se apaga y la cámara ve el disparo',
+    gesto1.gesto === 'lanzar-rayo' && gesto1.desde === t1 && gesto1.impacto === t1 && partida.ultimoDisparo?.t === t1 && !partida.rayo.activo && partida.rayo.nivel === 0,
+    gesto1,
+  );
+
+  /*
+   * La recarga: mientras la sala no cuenta la bala, no se carga otra (pasado ya el gesto de lanzar, que también lo
+   * impide: así se mira la espera y no el gesto); la bala propia trae la de su nivel.
+   */
+  relojes.t += 500;
+  fotograma(16);
+  mandos.pulsar('rayo', relojes.t);
+  fotograma(16);
+  const enEspera = cuantas('b:empezar 1') === 0 && mandos.rayoDesde === null && !partida.leerLosBotones(relojes.t).rayo.listo;
+  const nivelSalido = esperado ?? TABLA.length;
+  const proyectilSalido = leido === null || esperado === null ? 0 : (leido.niveles[esperado.nivel - 1]?.proyectil ?? 0);
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'bala', id: 70, de: 1, p: proyectilSalido, x: Math.round(yoX * 100), z: Math.round(yoZ * 100), r: rumboAlCelador, t: msSoltar }] });
+  fotograma(16);
+  const recargaMs = esperado?.recargaMs ?? 0;
+  const botones1 = partida.leerLosBotones(relojes.t);
+  const recarga1 = { recarga: botones1.rayo.recarga, quedaMs: botones1.rayo.quedaMs, esperado: msSoltar + origen + recargaMs - relojes.t };
+  mandos.pulsar('rayo', relojes.t);
+  fotograma(16);
+  const enRecarga = cuantas('b:empezar 1') === 0;
+  relojes.t += recargaMs;
+  fotograma(16);
+  mandos.pulsar('rayo', relojes.t);
+  fotograma(16);
+  comprobar(
+    'tras soltar, no se carga otro hasta que la sala cuenta la bala; la bala PROPIA trae la recarga de su nivel desde que salió; y pasada, se vuelve a cargar',
+    enEspera &&
+      nivelSalido !== undefined &&
+      recargaMs === TABLA[2].recargaTics * 50 &&
+      casi(partida.rayo.recargaHastaMs, msSoltar + origen + recargaMs, 0.001) &&
+      casi(recarga1.quedaMs, recarga1.esperado, 0.001) &&
+      casi(recarga1.recarga, recarga1.esperado / recargaMs, 1e-9) &&
+      recarga1.recarga > 0.5 &&
+      enRecarga &&
+      cuantas('b:empezar 1') === 1,
+    { enEspera, recarga1, enRecarga, empezadas: cuantas('b:empezar 1') },
+  );
+
+  /* Cancelar: nada por el cable, los efectos cancelan, y el soltar de después no dispara. */
+  for (let i = 0; i < 4; i++) fotograma(16);
+  const antesDeCancelar = e.leidos().length;
+  mandos.cancelarRayo();
+  for (let i = 0; i < 6; i++) fotograma(16);
+  mandos.soltarRayo(relojes.t, 16);
+  for (let i = 0; i < 4; i++) fotograma(16);
+  const trasCancelar2 = aquisDesde(antesDeCancelar);
+  comprobar(
+    'CANCELAR no manda nada (el primer `aqui` va sin acción, y la sala la suelta sin disparar): los efectos cancelan una vez y no sueltan',
+    cuantas('b:cancelar 1') === 1 && soltados.length === 1 && trasCancelar2.length >= 3 && trasCancelar2.every((x) => x.a === 0),
+    trasCancelar2.slice(0, 3).map((x) => x.a),
+  );
+
+  /* El daño corta la carga; el QUIEBRO la cancela y esquiva; GOLPE no sale mientras. */
+  mandos.pulsar('rayo', relojes.t);
+  for (let i = 0; i < 4; i++) fotograma(16);
+  mandos.pulsar('golpe', relojes.t);
+  for (let i = 0; i < 4; i++) fotograma(16);
+  const golpeMientras = aquisDesde(antesDeCancelar).some((x) => x.a !== 0 && x.a[0] === ACC.entrada);
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'estado', a: 1, est: EST.tocado, tics: 6, into: 0 }] });
+  fotograma(16);
+  const trasElDano = { cancelados: cuantas('b:cancelar 1'), rayoDesde: mandos.rayoDesde };
+  mandos.soltarRayo(relojes.t, 0);
+  for (let i = 0; i < 4; i++) fotograma(16);
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'estado', a: 1, est: 0, tics: 0, into: 0 }] });
+  relojes.t += 400;
+  fotograma(16);
+  comprobar(
+    'mientras se carga GOLPE no sale; y un golpe recibido corta la carga sin disparar (el soltar de después no es nada)',
+    !golpeMientras && trasElDano.cancelados === 2 && trasElDano.rayoDesde === null && soltados.length === 1,
+    { golpeMientras, trasElDano, soltados: soltados.length },
+  );
+  const antesDelQuiebro = e.leidos().length;
+  mandos.pulsar('rayo', relojes.t);
+  for (let i = 0; i < 4; i++) fotograma(16);
+  mandos.pulsar('quiebro', relojes.t);
+  for (let i = 0; i < 6; i++) fotograma(16);
+  const trasQuiebro = aquisDesde(antesDelQuiebro);
+  comprobar(
+    'QUIEBRO a media carga la cancela (sin soltar) y esquiva: su `aqui` sale con la esquiva',
+    cuantas('b:cancelar 1') === 3 && soltados.length === 1 && trasQuiebro.some((x) => x.a !== 0 && x.a[0] === ACC.quiebro) && !trasQuiebro.some((x) => x.a !== 0 && x.a[0] === SOLTAR),
+    { cancelados: cuantas('b:cancelar 1') },
+  );
+
+  /* Un toque tan corto que se pulsa y se suelta entre dos latidos: sale igual, con su sostenida delante. */
+  relojes.t += 3000;
+  for (let i = 0; i < 4; i++) fotograma(16);
+  const antesDelToque = e.leidos().length;
+  mandos.pulsar('rayo', relojes.t - 8);
+  mandos.soltarRayo(relojes.t - 2, 0);
+  for (let i = 0; i < 8; i++) fotograma(16);
+  const toque = aquisDesde(antesDelToque).filter((x) => x.a !== 0);
+  comprobar(
+    'un toque corto (pulsar y soltar entre dos latidos) no se pierde: sale su `[apuntar]` y detrás su `[soltar]`, un chispazo',
+    toque.length === 2 && toque[0]?.a !== 0 && (toque[0]?.a as readonly number[])[0] === APUNTAR && (toque[1]?.a as readonly number[])[0] === SOLTAR && soltados.length === 2 && soltados[1]?.nivel === 1,
+    toque.map((x) => x.a),
+  );
+
+  /* Los demás: su estado de cargar pone el gesto con la carga que crece, y su bala, el de lanzar. */
+  const otroX = yoX + Math.sin(dir + Math.PI / 2) * 3;
+  const otroZ = yoZ - Math.cos(dir + Math.PI / 2) * 3;
+  const fotoDelOtro = (): void => e.llega({ t: 'foto', k: kAhora(), p: [[2, Math.round(otroX * 100), Math.round(otroZ * 100), 0, 0, 0]] });
+  fotoDelOtro();
+  fotoDelOtro();
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'estado', a: 2, est: CARGANDO, tics: 40, into: 0 }] });
+  fotograma(16);
+  const cargaDelOtro1 = { gesto: partida.pintadoDe(2)?.gesto, carga: partida.pintadoDe(2)?.carga ?? -1 };
+  for (let i = 0; i < 20; i++) fotograma(16);
+  fotoDelOtro();
+  const cargaDelOtro2 = { gesto: partida.pintadoDe(2)?.gesto, carga: partida.pintadoDe(2)?.carga ?? -1 };
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'bala', id: 71, de: 2, p: 91, x: Math.round(otroX * 100), z: Math.round(otroZ * 100), r: 0, t: Math.floor(relojes.t - origen) }] });
+  fotograma(16);
+  const lanzaElOtro = partida.pintadoDe(2)?.gesto;
+  comprobar(
+    'otro jugador que carga se pinta cargando (`cargar-rayo`) con la carga que lleva en su estado; y su bala le pone el gesto de lanzar',
+    cargaDelOtro1.gesto === 'cargar-rayo' && cargaDelOtro2.gesto === 'cargar-rayo' && cargaDelOtro2.carga > cargaDelOtro1.carga && cargaDelOtro1.carga >= 0 && lanzaElOtro === 'lanzar-rayo',
+    { cargaDelOtro1, cargaDelOtro2, lanzaElOtro },
+  );
+
+  /* Los botones: la recarga del EMPELLÓN es la de su anuncio; QUIEBRO se enciende con un golpe hacia mí; GOLPE lleva la Tanda. */
+  relojes.t += 3000;
+  fotograma(16);
+  mandos.pulsar('empellon', relojes.t);
+  fotograma(60);
+  const sinAnuncio = partida.leerLosBotones(relojes.t).empellon.recarga;
+  const impactoDelEmpellon = Math.floor(relojes.t - origen) + 500;
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'anuncio', id: 5, de: 1, a: 16, acc: ACC.empellon, t: impactoDelEmpellon, x: Math.round(yoX * 100), z: Math.round(yoZ * 100) }] });
+  fotograma(16);
+  const empellon = { ...partida.leerLosBotones(relojes.t).empellon };
+  const esperaDelEmpellon = impactoDelEmpellon + origen + (60 - 10) * 50 - relojes.t;
+  comprobar(
+    'la recarga del EMPELLÓN la pone su ANUNCIO de la sala (desde que lanzó, sus tics), no la hora de la pulsación: sin anuncio, ninguna',
+    sinAnuncio === 0 && casi(empellon.quedaMs, esperaDelEmpellon, 0.001) && empellon.recarga > 0.9 && !empellon.listo,
+    { sinAnuncio, empellon, esperaDelEmpellon },
+  );
+  const sinAmenaza = partida.leerLosBotones(relojes.t).quiebro.amenaza;
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'anuncio', id: 9, de: 16, a: 1, acc: ACC.tandaCelador, t: Math.floor(relojes.t - origen) + 400, x: Math.round(cel.x * 100), z: Math.round(cel.z * 100) }] });
+  fotograma(16);
+  const amenaza1 = partida.leerLosBotones(relojes.t).quiebro.amenaza;
+  relojes.t += 250;
+  fotograma(16);
+  const amenaza2 = partida.leerLosBotones(relojes.t).quiebro.amenaza;
+  relojes.t += 400;
+  fotograma(16);
+  const amenaza3 = partida.leerLosBotones(relojes.t).quiebro.amenaza;
+  comprobar(
+    'QUIEBRO se enciende mientras un golpe viene hacia mí (por dónde va su anillo, de 0 al impacto) y se apaga pasado',
+    sinAmenaza === -1 && amenaza1 >= 0 && amenaza1 < 0.2 && amenaza2 > 0.6 && amenaza2 <= 1 && amenaza3 === -1,
+    { sinAmenaza, amenaza1, amenaza2, amenaza3 },
+  );
+  relojes.t += 4000;
+  fotograma(16);
+  mandos.pulsar('golpe', relojes.t);
+  fotograma(60);
+  const impactoDeLaEntrada = Math.floor(relojes.t - origen) + 300;
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'anuncio', id: 11, de: 1, a: 16, acc: ACC.entrada, t: impactoDeLaEntrada, x: Math.round(yoX * 100), z: Math.round(yoZ * 100) }] });
+  fotograma(16);
+  const tandaAntes = { ...partida.leerLosBotones(relojes.t).golpe };
+  relojes.t += 250;
+  fotograma(16);
+  const tandaEnLaVentana = { ...partida.leerLosBotones(relojes.t).golpe };
+  relojes.t += 700;
+  fotograma(16);
+  const tandaRota = { ...partida.leerLosBotones(relojes.t).golpe };
+  comprobar(
+    'GOLPE lleva el paso de la Tanda: dada la Entrada, 1 de 4, y el siguiente se enciende mientras su ventana está abierta; pasada, se rompe',
+    tandaAntes.paso === 1 && tandaAntes.de === 4 && !tandaAntes.ventana && tandaEnLaVentana.paso === 1 && tandaEnLaVentana.ventana && tandaRota.paso === 0 && !tandaRota.ventana,
+    { tandaAntes, tandaEnLaVentana, tandaRota },
+  );
+
+  /*
+   * NO SE EMPIEZA A CARGAR (EL-RAYO.md §1.1, paso 6): tocado o descolocado, con un golpe propio anunciado sin resolver
+   * (aunque su gesto ya no corra), fuera de combate o sin cuerpo. Con un control al lado —libre, en el mismo sitio, SÍ
+   * carga—, para que el «no» no sea verde por nada. Los modos de fase: 1 la calma, 2 el encuentro (`CODIGO_DE_MODO`).
+   */
+  relojes.t += 6000;
+  for (let i = 0; i < 4; i++) fotograma(16);
+  const intentarCargar = (): boolean => {
+    const antes = cuantas('b:empezar 1');
+    const n0 = e.leidos().length;
+    mandos.pulsar('rayo', relojes.t);
+    for (let i = 0; i < 3; i++) fotograma(16);
+    const empezo = cuantas('b:empezar 1') > antes || aquisDesde(n0).some((x) => x.a !== 0 && x.a[0] === APUNTAR);
+    mandos.cancelarRayo();
+    for (let i = 0; i < 3; i++) fotograma(16);
+    return empezo;
+  };
+  const estadoPropio = (est: number, tics: number): void => e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'estado', a: 1, est, tics, into: 0 }] });
+  const faseNueva = (clave: string, modo: number): void =>
+    e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'fase', clave, modo, limite: ID_DE_LIMITE_EN_LA_LIZA.glorieta48, relojMs: 0, encuentroTics: modo === 2 ? 3000 : 0 }] });
+  const libreCarga = intentarCargar();
+  estadoPropio(EST.tocado, 20);
+  const tocadoCarga = intentarCargar();
+  estadoPropio(EST.descolocado, 20);
+  const descolocadoCarga = intentarCargar();
+  estadoPropio(0, 0);
+  /* Un golpe mío anunciado, y otro recibido que corta mi gesto pero no el anuncio: sigue sin resolver. */
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'anuncio', id: 41, de: 1, a: 16, acc: ACC.entrada, t: Math.floor(relojes.t - origen) + 1500, x: Math.round(yoX * 100), z: Math.round(yoZ * 100) }] });
+  estadoPropio(EST.tocado, 2);
+  estadoPropio(0, 0);
+  const conGolpeCarga = intentarCargar();
+  relojes.t += 2500;
+  fotograma(16);
+  const resueltoCarga = intentarCargar();
+  faseNueva('n1-c1', 1);
+  const enCalmaCarga = intentarCargar();
+  faseNueva('n1-o2', 2);
+  for (let i = 0; i < 3; i++) fotograma(16);
+  comprobar(
+    'no se EMPIEZA a cargar tocado, ni descolocado, ni con un golpe propio anunciado sin resolver (aunque su gesto ya no corra), ni fuera de combate; libre, en el mismo sitio, sí (y pasado el golpe, también)',
+    libreCarga && !tocadoCarga && !descolocadoCarga && !conGolpeCarga && resueltoCarga && !enCalmaCarga,
+    { libreCarga, tocadoCarga, descolocadoCarga, conGolpeCarga, resueltoCarga, enCalmaCarga },
+  );
+  /*
+   * Y una carga EN CURSO se corta en el acto (sin esperar al fotograma) y sin disparar: al cambiar de fase —también a
+   * otra de combate: la sala suelta la sostenida, y si no, se seguiría mandando la de antes—, al irse al fondo y al
+   * quedarse sin cuerpo; y sin cuerpo no se vuelve a cargar.
+   */
+  const cargarYVer = (): boolean => {
+    mandos.pulsar('rayo', relojes.t);
+    for (let i = 0; i < 4; i++) fotograma(16);
+    return partida.rayo.activo;
+  };
+  const soltadosAntesDeCortar = soltados.length;
+  const leidosAntesDeCortar = e.leidos().length;
+  const c0 = cuantas('b:cancelar 1');
+  const cargaAntesDeLaFase = cargarYVer();
+  faseNueva('n1-o3', 2);
+  const cortaLaFase = cuantas('b:cancelar 1') === c0 + 1;
+  for (let i = 0; i < 3; i++) fotograma(16);
+  const sigueTrasLaFase = partida.rayo.activo || mandos.rayoDesde !== null;
+  const c1 = cuantas('b:cancelar 1');
+  const cargaAntesDelFondo = cargarYVer();
+  partida.callar(true);
+  const cortaElFondo = cuantas('b:cancelar 1') === c1 + 1;
+  partida.callar(false);
+  mandos.cancelarRayo();
+  for (let i = 0; i < 3; i++) fotograma(16);
+  const c2 = cuantas('b:cancelar 1');
+  const cargaAntesDeSalir = cargarYVer();
+  e.llega({ t: 'tic', k: kAhora(), ev: [{ e: 'sale', a: 1, zona: 30 }] });
+  const cortaAlSalir = cuantas('b:cancelar 1') === c2 + 1;
+  for (let i = 0; i < 3; i++) fotograma(16);
+  const sinCuerpoCarga = intentarCargar();
+  const soltaronAlCortar = aquisDesde(leidosAntesDeCortar).some((x) => x.a !== 0 && x.a[0] === SOLTAR);
+  comprobar(
+    'una carga en curso se CORTA en el acto y sin disparar al cambiar de fase (también a otra de combate), al irse al fondo y al quedarse sin cuerpo; y sin cuerpo no se vuelve a cargar',
+    cargaAntesDeLaFase && cortaLaFase && !sigueTrasLaFase && cargaAntesDelFondo && cortaElFondo && cargaAntesDeSalir && cortaAlSalir && !sinCuerpoCarga && !soltaronAlCortar && soltados.length === soltadosAntesDeCortar,
+    { cargaAntesDeLaFase, cortaLaFase, sigueTrasLaFase, cargaAntesDelFondo, cortaElFondo, cargaAntesDeSalir, cortaAlSalir, sinCuerpoCarga, soltaronAlCortar },
+  );
+  partida.cerrar();
+
+  /* ── Los botones, pintados ── */
+  const botonesHtml = renderToStaticMarkup(createElement(MandosTactiles, { mandos: new EstadoDeLosMandos(), partida: null, zurdo: false }));
+  const iconos = ['golpe', 'quiebro', 'empellon', 'usar', 'rayo', 'aviso'].filter((i) => botonesHtml.includes(`class="icono icono-${i}"`));
+  const nombres = [NOMBRES_DEL_QUIEBRO.botones.golpe, NOMBRES_DEL_QUIEBRO.botones.quiebro, NOMBRES_DEL_QUIEBRO.botones.empellon, NOMBRES_DEL_QUIEBRO.botones.usar, NOMBRES_DEL_QUIEBRO.botones.aviso, NOMBRE_DEL_RAYO];
+  const iconosFuente = readFileSync(new URL('../src/quiebro/mandos/iconos.tsx', import.meta.url), 'utf8');
+  const conEmoji = /\p{Extended_Pictographic}/u.test(botonesHtml) || /\p{Extended_Pictographic}/u.test(iconosFuente) || /<image|<img|xlink:href|href=/.test(iconosFuente);
+  comprobar(
+    'los botones llevan su ICONO propio en SVG (golpe, quiebro, empellón, usar, rayo, aviso), su rótulo de siempre, y ni un emoji ni una imagen de fuera',
+    iconos.length === 6 && nombres.every((n) => botonesHtml.includes(`aria-label="${n}"`) && botonesHtml.includes(`>${n}<`)) && !conEmoji && NOMBRE_DEL_RAYO.length > 0,
+    { iconos, conEmoji },
+  );
+  comprobar('los segundos de una recarga se leen «3», «2», «1», y nada al acabar', segundosDeLaRecarga(2400) === '3' && segundosDeLaRecarga(1000) === '1' && segundosDeLaRecarga(1001) === '2' && segundosDeLaRecarga(100) === '');
+  const tactil = sinComentariosDe(readFileSync(new URL('../src/quiebro/mandos/Tactil.tsx', import.meta.url), 'utf8'));
+  const cuerpoDe = (nombre: string): string => {
+    const i = tactil.indexOf(`const ${nombre} = `);
+    return i < 0 ? '' : tactil.slice(i, tactil.indexOf('\n  };', i));
+  };
+  const alSoltarElRayo = cuerpoDe('alSoltarElRayo');
+  const alPerderElRayo = cuerpoDe('alPerderElRayo');
+  const alPulsarElRayo = cuerpoDe('alPulsarElRayo');
+  comprobar(
+    'el dedo del RAYO se captura; SOLTAR lo deja a `null` ANTES de disparar (la captura perdida que llega detrás no cancela); cancelar y la captura perdida ANULAN',
+    /setPointerCapture\(e\.pointerId\)/.test(alPulsarElRayo) &&
+      /mandos\.pulsar\('rayo', e\.timeStamp\)/.test(alPulsarElRayo) &&
+      alSoltarElRayo.indexOf('d.rayo = null') >= 0 &&
+      alSoltarElRayo.indexOf('d.rayo = null') < alSoltarElRayo.indexOf('mandos.soltarRayo(e.timeStamp,') &&
+      /mandos\.cancelarRayo\(\)/.test(alPerderElRayo) &&
+      !/soltarRayo/.test(alPerderElRayo) &&
+      /onPointerUp=\{alSoltarElRayo\}\s+onPointerCancel=\{alPerderElRayo\}\s+onLostPointerCapture=\{alPerderElRayo\}/.test(tactil) &&
+      /onContextMenu=\{sinMenu\}/.test(tactil) &&
+      /const sinMenu = \(e: EventoDeRaton<HTMLDivElement>\): void => \{\s*e\.preventDefault\(\);/.test(tactil) &&
+      /d\.rayo = null;\s*if \(base\.current !== null\) base\.current\.style\.display = 'none';/.test(tactil),
+  );
+  const css = sinComentariosDe(readFileSync(new URL('../src/quiebro/hud/hud.css', import.meta.url), 'utf8'));
+  const reglaCss = (selector: string): string => {
+    const i = css.indexOf(`\n${selector} {`);
+    return i < 0 ? '' : css.slice(i, css.indexOf('\n}', i));
+  };
+  const lado = (selector: string): number => Number(/\n  width: (\d+(?:\.\d+)?)px;/.exec(reglaCss(selector))?.[1] ?? Number.NaN);
+  const tamanos = { golpe: lado('.q-tecla.golpe'), quiebro: lado('.q-tecla.quiebro'), empellon: lado('.q-tecla.empellon'), usar: lado('.q-tecla.usar'), aviso: lado('.q-tecla.aviso'), rayo: lado('.q-tecla.rayo') };
+  const dentroDe = (t: number, hoy: number): boolean => t >= hoy && t <= hoy * 1.1;
+  const mandosCss = css.slice(css.indexOf('.q-tactil {'), css.indexOf('.q-teclas {'));
+  comprobar(
+    'los tamaños: los de hoy o hasta un 10 % más, el RAYO de unos 76 a la izquierda y a 28 pt o más del borde; mientras se carga, la derecha deja pasar el dedo salvo QUIEBRO; y ni un `backdrop-filter`',
+    dentroDe(tamanos.golpe, 88) &&
+      dentroDe(tamanos.quiebro, 72) &&
+      dentroDe(tamanos.empellon, 60) &&
+      dentroDe(tamanos.usar, 64) &&
+      dentroDe(tamanos.aviso, 44) &&
+      tamanos.rayo >= 72 &&
+      tamanos.rayo <= 80 &&
+      /\n  left: calc\((\d+)px \+ var\(--q-izq\)\);/.test(reglaCss('.q-tecla.rayo')) &&
+      Number(/\n  left: calc\((\d+)px \+ var\(--q-izq\)\);/.exec(reglaCss('.q-tecla.rayo'))?.[1] ?? 0) >= 28 &&
+      /\n  pointer-events: none;/.test(reglaCss('.q-tactil.cargando .q-botones .q-tecla:not(.quiebro),\n.q-tactil.cargando .q-tecla.aviso')) &&
+      !/backdrop-filter/.test(mandosCss),
+    tamanos,
+  );
+  comprobar(
+    'N0 barato: los botones, la palanca y la mira sin sombras ni halos en `data-nivel=0`',
+    /\n  box-shadow: 0 0 0 1px rgba\(2, 5, 6, 0\.55\);/.test(reglaCss(".quiebro-raiz[data-nivel='0'] .q-tecla")) &&
+      /box-shadow: none/.test(reglaCss(".quiebro-raiz[data-nivel='0'] .q-palanca-pomo")) &&
+      /display: none/.test(reglaCss(".quiebro-raiz[data-nivel='0'] .q-mira .marca .halo,\n.quiebro-raiz[data-nivel='0'] .q-mira .punto .halo")),
+  );
+
+  /* Las clases de los botones, de lo que dice la sala (lo que el fotograma de los mandos escribe tal cual). */
+  const bn = botonesNuevos();
+  bn.activos = true;
+  bn.golpe.listo = true;
+  bn.quiebro.listo = true;
+  bn.empellon.listo = true;
+  bn.rayo.hay = true;
+  bn.rayo.listo = true;
+  const enReposo = clasesDeLosBotones(bn, null);
+  const conElDedo = clasesDeLosBotones(bn, 1234);
+  bn.rayo.cargando = true;
+  bn.rayo.c = 0.5;
+  const aMedias = clasesDeLosBotones(bn, 1234);
+  bn.rayo.c = 1;
+  const enElPleno = clasesDeLosBotones(bn, 1234);
+  bn.rayo.cargando = false;
+  bn.rayo.c = 0;
+  bn.rayo.listo = false;
+  bn.rayo.recarga = 0.4;
+  bn.rayo.quedaMs = 2000;
+  bn.quiebro.amenaza = 0.3;
+  bn.empellon.recarga = 0.5;
+  const rayoEnRecarga = clasesDeLosBotones(bn, null);
+  bn.rayo.recarga = 0;
+  bn.rayo.quedaMs = 0;
+  bn.quiebro.amenaza = -1;
+  const noPuede = clasesDeLosBotones(bn, null);
+  bn.rayo.hay = false;
+  const sinTiro = clasesDeLosBotones(bn, null);
+  comprobar(
+    'las clases de los botones salen de la sala: cargar apaga la derecha desde que baja el dedo (antes de que la partida lo cuente); el RAYO en recarga sólo mientras no carga, apagado si no puede y no es la recarga, cargando, y pleno con la carga llena; QUIEBRO con la amenaza, EMPELLÓN con su recarga; sin tiro, sin botón',
+    !enReposo.cargando &&
+      enReposo.conRayo &&
+      !enReposo.rayoEnRecarga &&
+      !enReposo.rayoApagado &&
+      !enReposo.amenaza &&
+      conElDedo.cargando &&
+      aMedias.cargando &&
+      aMedias.rayoCargando &&
+      !aMedias.pleno &&
+      enElPleno.pleno &&
+      rayoEnRecarga.rayoEnRecarga &&
+      !rayoEnRecarga.rayoApagado &&
+      !rayoEnRecarga.cargando &&
+      rayoEnRecarga.amenaza &&
+      rayoEnRecarga.empellonEnRecarga &&
+      noPuede.rayoApagado &&
+      !noPuede.rayoEnRecarga &&
+      !noPuede.amenaza &&
+      !sinTiro.conRayo &&
+      !sinTiro.rayoApagado &&
+      !sinTiro.rayoEnRecarga,
+    { enReposo, conElDedo, aMedias, enElPleno, rayoEnRecarga, noPuede, sinTiro },
+  );
+  comprobar(
+    'y el fotograma de los mandos las escribe tal cual (la capa `cargando`, el RAYO en recarga, apagado, cargando y pleno, la amenaza, la recarga del Empellón), y ajusta los rótulos al montar, al llegar las letras y cuando uno cambia o aparece',
+    /const clases = clasesDeLosBotones\(b, mandos\.rayoDesde\);/.test(tactil) &&
+      /alternar\(raiz\.current, 'cargando', clases\.cargando\);/.test(tactil) &&
+      /alternar\(rayo\.current, 'recarga', clases\.rayoEnRecarga\);/.test(tactil) &&
+      /alternar\(rayo\.current, 'apagada', clases\.rayoApagado\);/.test(tactil) &&
+      /alternar\(rayo\.current, 'cargando', clases\.rayoCargando\);/.test(tactil) &&
+      /alternar\(rayo\.current, 'pleno', clases\.pleno\);/.test(tactil) &&
+      /alternar\(quiebro\.current, 'amenaza', clases\.amenaza\);/.test(tactil) &&
+      /alternar\(empellon\.current, 'recarga', clases\.empellonEnRecarga\);/.test(tactil) &&
+      /for \(const el of raiz\.current\.querySelectorAll<HTMLElement>\('\.q-tecla \.rotulo'\)\) ajustarElRotulo\(el\);/.test(tactil) &&
+      (tactil.match(/ajustar = true;/g) ?? []).length >= 4 &&
+      /let ajustar = true;/.test(tactil),
+  );
+
+  /*
+   * LOS RÓTULOS, DENTRO DEL ARO: la cuerda del aro a la altura del rótulo manda. Con la letra de casa (Bahnschrift
+   * comprimida: 0,42-0,53 em por letra medidos en Edge) cabe sin estrecharse; con una de reserva ancha (Arial o Roboto:
+   * 0,60-0,71 em) `ajustarElRotulo` lo estrecha, y nunca más de un 30 %. Los rótulos, de la hoja (tamaño, espaciado,
+   * altura y relleno) y los textos, todos los que salen (USAR dice también REMATAR, RESCATAR y DESCOLGAR).
+   */
+  comprobar(
+    'la cuerda del aro: en el centro, el diámetro útil; en el borde, nada; más estrecha cuanto más abajo; y el ajuste estrecha lo justo, nunca más del mínimo',
+    casi(cuerdaDelAro(64, 32), 2 * (64 * 0.429 - 1.5), 1e-9) &&
+      cuerdaDelAro(64, 0) === 0 &&
+      cuerdaDelAro(64, 12) < cuerdaDelAro(64, 18) &&
+      ajusteDelRotulo(30, 37) === 1 &&
+      casi(ajusteDelRotulo(50, 37), 0.74, 1e-9) &&
+      ajusteDelRotulo(500, 37) === AJUSTE_MINIMO,
+  );
+  const medidaDe = (regla: string, prop: string): number | null => {
+    const hallada = new RegExp(`\\n  ${prop}: (\\d+(?:\\.\\d+)?)(?:px|em|%);`).exec(regla);
+    return hallada === null ? null : Number(hallada[1]);
+  };
+  const reglaDelRotulo = reglaCss('.q-tecla .rotulo');
+  const LETRA_DE_CASA_EM = 0.54;
+  const LETRA_ANCHA_EM = 0.72;
+  const nb = NOMBRES_DEL_QUIEBRO.botones;
+  const rotulos = [
+    { boton: 'golpe', lado: tamanos.golpe, regla: '.q-tecla.golpe .rotulo', textos: [nb.golpe] },
+    { boton: 'quiebro', lado: tamanos.quiebro, regla: '.q-tecla.quiebro .rotulo', textos: [nb.quiebro] },
+    { boton: 'empellon', lado: tamanos.empellon, regla: '.q-tecla.empellon .rotulo', textos: [nb.empellon] },
+    { boton: 'usar', lado: tamanos.usar, regla: '.q-tecla.usar .rotulo', textos: [nb.usar, nb.rematar, nb.rescatar, nb.descolgar] },
+    { boton: 'aviso', lado: tamanos.aviso, regla: '.q-tecla.aviso .rotulo', textos: [nb.aviso] },
+    { boton: 'rayo', lado: tamanos.rayo, regla: '.q-tecla.rayo .rotulo', textos: [NOMBRE_DEL_RAYO] },
+    { boton: 'rayo de PC', lado: lado('.q-tecla.rayo.q-rayo-pc'), regla: '.q-tecla.rayo.q-rayo-pc .rotulo', textos: [NOMBRE_DEL_RAYO] },
+  ].flatMap((c) =>
+    c.textos.map((texto) => {
+      const propia = reglaCss(c.regla);
+      const tam = medidaDe(propia, 'font-size') ?? medidaDe(reglaDelRotulo, 'font-size') ?? Number.NaN;
+      const espacio = medidaDe(propia, 'letter-spacing') ?? medidaDe(reglaDelRotulo, 'letter-spacing') ?? Number.NaN;
+      const abajo = ((medidaDe(propia, 'bottom') ?? medidaDe(reglaDelRotulo, 'bottom') ?? Number.NaN) / 100) * c.lado;
+      const relleno = (medidaDe(reglaDelRotulo, 'padding-left') ?? Number.NaN) * tam;
+      const cabe = cuerdaDelAro(c.lado, abajo);
+      const casa = texto.length * tam * (LETRA_DE_CASA_EM + espacio) + relleno;
+      const ancha = texto.length * tam * (LETRA_ANCHA_EM + espacio) + relleno;
+      return { boton: c.boton, texto, cabe: Math.round(cabe * 10) / 10, casa: Math.round(casa * 10) / 10, ajusteConLaAncha: Math.round(ajusteDelRotulo(ancha, cabe) * 100) / 100 };
+    }),
+  );
+  const noCaben = rotulos.filter((x) => !(x.casa <= x.cabe) || !(x.ajusteConLaAncha >= 0.7));
+  comprobar(
+    `los ${String(rotulos.length)} rótulos caben DENTRO de su aro con la letra de casa, sin estrecharse, y con una de reserva ancha el ajuste los deja dentro estrechando un 30 % como mucho`,
+    rotulos.length === 10 && noCaben.length === 0 && /\n  width: max-content;/.test(reglaDelRotulo) && /\n  transform: translateX\(-50%\) scaleX\(var\(--q-ajuste, 1\)\);/.test(reglaDelRotulo),
+    noCaben.length > 0 ? noCaben : rotulos,
+  );
+  comprobar(
+    'en espejo el rótulo conserva su centrado y su ajuste, y los segundos su altura',
+    /\n  transform: translateX\(-50%\) scaleX\(calc\(-1 \* var\(--q-ajuste, 1\)\)\);/.test(reglaCss('.q-tactil.zurdo .q-botones .q-tecla > .rotulo')) &&
+      /\n  transform: translateY\(-50%\) scaleX\(-1\);/.test(reglaCss('.q-tactil.zurdo .q-botones .q-tecla > .segundos')),
+  );
+
+  /* ── La mira ── */
+  const miraHtml = renderToStaticMarkup(createElement(MiraDelRayo, { partida: null, ojo: { current: null } }));
+  const marcas = (miraHtml.match(/class="marca"/g) ?? []).length;
+  const arcoLleno = tramoDelArco(0, 40, 1);
+  const barrido = /A40 40 0 0 1 /.test(arcoLleno);
+  comprobar(
+    'la mira son TRES marcas (su chevrón hacia dentro), su arco partido en tres y el punto del pleno (relleno, de 3 px o menos): ni cruz, ni círculo de mira telescópica, ni retícula',
+    marcas === 3 &&
+      (miraHtml.match(/class="punto"/g) ?? []).length === 1 &&
+      RADIO_DEL_PUNTO_PX <= 3 && !/<circle|<line|<rect|<ellipse|<polyline/.test(miraHtml) && (miraHtml.match(/class="carga"/g) ?? []).length === 3 && TRAMO_DEL_ARCO <= 80 && barrido && tramoDelArco(0, 40, 0) === '',
+    { marcas, arcoLleno },
+  );
+  comprobar(
+    'su radio es el área a la distancia del blanco (2 m a 12 m con 75°: unos 49 px de 390), entre 10 y 90 px, y en el pleno (sin área) se juntan en un punto',
+    casi(radioDeLaMira(2, 12, 75, 390), (2 / (12 * Math.tan((75 * Math.PI) / 360))) * 195, 0.01) &&
+      radioDeLaMira(0.05, 40, 75, 390) === RADIO_MINIMO_PX &&
+      radioDeLaMira(6, 2, 75, 390) === RADIO_MAXIMO_PX &&
+      radioDeLaMira(0, 12, 75, 390) === RADIO_DEL_PLENO_PX &&
+      RADIO_DEL_PLENO_PX < RADIO_MINIMO_PX &&
+      escalaDeLaMarca(RADIO_DEL_PLENO_PX) < 0.5 &&
+      escalaDeLaMarca(40) === 1,
+  );
+  let r = RADIO_MAXIMO_PX;
+  let v = 0;
+  let peor = 0;
+  let pasa = 0;
+  for (let i = 0; i < 12; i++) {
+    const s = muelleDelRadio(r, v, 20, 0.05);
+    r = s.radio;
+    v = s.velocidad;
+    if (!Number.isFinite(r)) peor = Number.POSITIVE_INFINITY;
+    pasa = Math.max(pasa, 20 - r);
+    peor = Math.max(peor, Math.abs(r - 20));
+  }
+  comprobar('el muelle del radio se cierra con un poco de sobrepaso y es estable con fotogramas lentos (50 ms): en 0,6 s está en su sitio', Number.isFinite(peor) && Math.abs(r - 20) < 0.5 && pasa > 0 && pasa < 12, { r, pasa });
+
+  /* La mira, fotograma a fotograma: lo que decide `pasoDeLaMira` es lo que el componente pinta. */
+  const vista = (v: Partial<VistaDeLaMira>): VistaDeLaMira => ({ activa: true, enPantalla: true, x: 400, y: 200, quiere: 60, blanco: 0, c: 0.3, disparo: null, ...v });
+  const correrLaMira = (em: ReturnType<typeof estadoDeLaMiraNuevo>, v: VistaDeLaMira, desde: number, ms: number): (DibujoDeLaMira | null)[] => {
+    const dibujos: (DibujoDeLaMira | null)[] = [];
+    for (let t = desde; t < desde + ms; t += 16) dibujos.push(pasoDeLaMira(em, v, t, 0.016));
+    return dibujos;
+  };
+  const ultimo = (l: (DibujoDeLaMira | null)[]): DibujoDeLaMira | null => l[l.length - 1] ?? null;
+  /* El pleno: de un área abierta (arco entero) a la línea sin área; lo que queda, un punto que late. */
+  const alPleno = estadoDeLaMiraNuevo(null);
+  const abierta = ultimo(correrLaMira(alPleno, vista({ quiere: 40, c: 0.8, blanco: 7 }), 0, 600));
+  const pleno = correrLaMira(alPleno, vista({ quiere: radioDeLaMira(0, 18, 65, 390), c: 1, blanco: 7 }), 600, 400 + PULSO_MS * 2).slice(-Math.ceil(PULSO_MS / 16) - 2);
+  const plenos = pleno.filter((x): x is DibujoDeLaMira => x !== null);
+  const escalas = plenos.map((x) => x.escala);
+  comprobar(
+    'EN EL PLENO la mira se junta en UN PUNTO: sin arco (ni un aro alrededor), las marcas cerradas en el radio del pleno y fundidas, y el punto de luz encendido, que late; abierta, el arco entero y sin punto',
+    abierta !== null &&
+      abierta.arco === 1 &&
+      abierta.punto === 0 &&
+      abierta.marcas === 1 &&
+      plenos.length === pleno.length &&
+      plenos.length > 10 &&
+      plenos.every((x) => x.arco === 0 && x.radio <= RADIO_DEL_PLENO_PX + 0.5 && x.marcas <= 0.3 && x.punto >= 0.7) &&
+      Math.max(...escalas) / Math.min(...escalas) > 1.05 &&
+      RADIO_DEL_PUNTO_PX <= 3,
+    { abierta, pleno: plenos[0], escalas: [Math.min(...escalas), Math.max(...escalas)] },
+  );
+  comprobar(
+    `el arco de la carga sólo rodea marcas ABIERTAS: nada con ellas por debajo de ${String(ARCO_NINGUNO_BAJO_PX)} px (el radio mínimo del área incluido), entero desde ${String(ARCO_ENTERO_DESDE_PX)}; cerradas, un arco alrededor sería un aro con algo dentro`,
+    luzDelArco(RADIO_MINIMO_PX) === 0 &&
+      luzDelArco(ARCO_NINGUNO_BAJO_PX) === 0 &&
+      luzDelArco(ARCO_NINGUNO_BAJO_PX - 0.1) === 0 &&
+      luzDelArco(ARCO_ENTERO_DESDE_PX) === 1 &&
+      luzDelArco(RADIO_MAXIMO_PX) === 1 &&
+      ARCO_NINGUNO_BAJO_PX >= 18 &&
+      ultimo(correrLaMira(estadoDeLaMiraNuevo(null), vista({ quiere: RADIO_MINIMO_PX, c: 0.9 }), 0, 700))?.arco === 0,
+  );
+  /* Se cierra con el área: 3 m, 2 m y 1 m a 9 m, cada escalón más cerrado, y el muelle llega a cada uno. */
+  const cierra = estadoDeLaMiraNuevo(null);
+  const radios = [3, 2, 1].map((area, i) => {
+    const quiere = radioDeLaMira(area, 9, 70, 390);
+    return { quiere, tiene: ultimo(correrLaMira(cierra, vista({ quiere, c: 0.2 + 0.3 * i }), i * 700, 700))?.radio ?? Number.NaN };
+  });
+  comprobar(
+    'la mira se CIERRA con la carga: a cada nivel, el área más pequeña, y el muelle llega a su radio',
+    radios.every((x) => Math.abs(x.tiene - x.quiere) < 0.5) && (radios[0]?.tiene ?? 0) > (radios[1]?.tiene ?? 0) && (radios[1]?.tiene ?? 0) > (radios[2]?.tiene ?? 0),
+    radios,
+  );
+  /* La tensión al fijar un blanco nuevo; con el mismo, nada. */
+  const tensa = estadoDeLaMiraNuevo(null);
+  const sinBlanco = ultimo(correrLaMira(tensa, vista({ quiere: 40, c: 0.4 }), 0, 300));
+  const alFijar = pasoDeLaMira(tensa, vista({ quiere: 40, c: 0.4, blanco: 7 }), 300, 0.016);
+  const pasada = ultimo(correrLaMira(tensa, vista({ quiere: 40, c: 0.4, blanco: 7 }), 316, TENSION_MS + 16));
+  comprobar(
+    'al FIJAR un blanco la mira se tensa (un salto de escala que vuelve en 140 ms) y brilla más; pasada la tensión, con el mismo blanco, nada',
+    sinBlanco !== null &&
+      sinBlanco.escala === 1 &&
+      alFijar !== null &&
+      casi(alFijar.escala, 1 + TENSION, 1e-9) &&
+      alFijar.brillo >= 0.99 &&
+      pasada !== null &&
+      pasada.escala === 1 &&
+      pasada.brillo < 0.5 &&
+      pasada.brillo > sinBlanco.brillo,
+    { sinBlanco: sinBlanco?.escala, alFijar: alFijar?.escala, pasada: pasada?.escala },
+  );
+  /* Los dos finales: el disparo se cierra en el punto y se apaga; la cancelación se abre y se apaga. */
+  const aDisparar = estadoDeLaMiraNuevo(null);
+  correrLaMira(aDisparar, vista({ quiere: 40, c: 0.9 }), 0, 400);
+  const disparo = correrLaMira(aDisparar, vista({ activa: false, disparo: 1234 }), 400, DISPARO_MS + 40);
+  const aCancelar = estadoDeLaMiraNuevo(null);
+  correrLaMira(aCancelar, vista({ quiere: 40, c: 0.9 }), 0, 400);
+  const cancela = correrLaMira(aCancelar, vista({ activa: false, disparo: null }), 400, CANCELAR_MS + 40);
+  const vistosDelDisparo = disparo.filter((x): x is DibujoDeLaMira => x !== null);
+  const vistosAlCancelar = cancela.filter((x): x is DibujoDeLaMira => x !== null);
+  comprobar(
+    'al SOLTAR la mira se cierra en el punto y se apaga (sin aro); al CANCELAR se abre y se apaga; y luego no queda nada',
+    vistosDelDisparo.length >= 5 &&
+      vistosDelDisparo.every((x, i, l) => i === 0 || x.radio < (l[i - 1] as DibujoDeLaMira).radio) &&
+      (vistosDelDisparo[vistosDelDisparo.length - 1]?.radio ?? 99) < 3 &&
+      (vistosDelDisparo[vistosDelDisparo.length - 1]?.punto ?? 0) > 0.9 &&
+      (vistosDelDisparo[vistosDelDisparo.length - 1]?.arco ?? 1) === 0 &&
+      disparo[disparo.length - 1] === null &&
+      vistosAlCancelar.length >= 4 &&
+      vistosAlCancelar.every((x, i, l) => i === 0 || (x.radio > (l[i - 1] as DibujoDeLaMira).radio && x.opacidad < (l[i - 1] as DibujoDeLaMira).opacidad)) &&
+      vistosAlCancelar.every((x) => x.punto === 0) &&
+      cancela[cancela.length - 1] === null,
+    { disparo: vistosDelDisparo.map((x) => Math.round(x.radio * 10) / 10), cancela: vistosAlCancelar.map((x) => Math.round(x.radio * 10) / 10) },
+  );
+  /* El componente le pasa lo que ve (el área de AHORA a la distancia del blanco) y pinta lo que devuelve. */
+  const miraFuente = sinComentariosDe(readFileSync(new URL('../src/quiebro/hud/MiraDelRayo.tsx', import.meta.url), 'utf8'));
+  comprobar(
+    'y el componente de la mira le pasa lo que ve —el radio del área de ahora a la distancia del blanco, el blanco, la carga y el disparo— y pinta lo que devuelve: sin arco, ni un tramo',
+    /quiere = radioDeLaMira\(rayo\.area, profundidad, fov, alto\);/.test(miraFuente) &&
+      /\{ activa, enPantalla, x, y, quiere, blanco: rayo\?\.blanco \?\? 0, c: rayo\?\.c \?\? 0, disparo: partida\?\.ultimoDisparo\?\.t \?\? null \}/.test(miraFuente) &&
+      /arcos\.current\[k\]\?\.setAttribute\('d', d\.arco > 0 \? tramoDelArco\(k, d\.radioDelArco, d\.c\) : ''\);/.test(miraFuente) &&
+      /grupoDeArcos\.current\?\.setAttribute\('opacity', redondo\(d\.arco, 100\)\);/.test(miraFuente) &&
+      /punto\.current\?\.setAttribute\('opacity', redondo\(d\.punto, 100\)\);/.test(miraFuente) &&
+      /grupoDeMarcas\.current\?\.setAttribute\('opacity', redondo\(d\.marcas, 100\)\);/.test(miraFuente),
+  );
+  /* El halo: un resplandor (la marca desenfocada), no un contorno duro; y el trazo, fino. */
+  const anchoDelTrazo = (regla: string): number => Number(/\n  stroke-width: (\d+(?:\.\d+)?);/.exec(regla)?.[1] ?? Number.NaN);
+  const desenfoque = Number(/<filter id="q-mira-difuso"[^>]*><feGaussianBlur stdDeviation="(\d+(?:\.\d+)?)"/.exec(miraHtml)?.[1] ?? Number.NaN);
+  const halos = (miraHtml.match(/<path class="halo" d="M-6 -9\.5L0 0L6 -9\.5" filter="url\(#q-mira-difuso\)"/g) ?? []).length;
+  const trazos = { halo: anchoDelTrazo(reglaCss('.q-mira .marca .halo')), filo: anchoDelTrazo(reglaCss('.q-mira .marca .filo')), nucleo: anchoDelTrazo(reglaCss('.q-mira .marca .nucleo')), arco: anchoDelTrazo(reglaCss('.q-mira .carga')) };
+  comprobar(
+    'el halo de las marcas es un RESPLANDOR (su chevrón desenfocado por el filtro de la mira), no un contorno de bordes duros; y el trazo es fino: filo de 3 px o menos con el núcleo dentro, y el arco de menos de 2',
+    desenfoque >= 1.5 && halos === 3 && trazos.halo <= 6 && trazos.filo <= 3 && trazos.nucleo < trazos.filo && trazos.nucleo <= 2 && trazos.arco < 2,
+    { desenfoque, halos, trazos },
+  );
+
+  /* ── El teclado: la R ── */
+  const ventana = new EventTarget();
+  const documento = new EventTarget() as EventTarget & { visibilityState: string; pointerLockElement: unknown; exitPointerLock: () => void };
+  documento.visibilityState = 'visible';
+  documento.pointerLockElement = null;
+  documento.exitPointerLock = () => undefined;
+  const g = globalThis as unknown as Record<string, unknown>;
+  const antesW = g.window;
+  const antesD = g.document;
+  g.window = ventana;
+  g.document = documento;
+  try {
+    const mt = new EstadoDeLosMandos();
+    const superficie = new EventTarget() as EventTarget & HTMLElement;
+    const soltarTeclado = engancharElTeclado(mt, { superficie, activo: () => true, blancoDelRayo: () => 23 });
+    const tecla = (tipo: string, code: string, t: number): void => {
+      const ev = new Event(tipo) as Event & { code: string; repeat: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean; timeStamp: number };
+      Object.assign(ev, { code, repeat: false, ctrlKey: false, metaKey: false, altKey: false });
+      Object.defineProperty(ev, 'timeStamp', { value: t });
+      ventana.dispatchEvent(ev);
+    };
+    tecla('keydown', 'KeyR', 300);
+    const conR = mt.rayoDesde;
+    tecla('keyup', 'KeyR', 1100);
+    const tiroDeR = mt.tomarRayoSoltado();
+    tecla('keydown', 'KeyR', 1500);
+    tecla('keydown', 'Escape', 1600);
+    const trasEsc = mt.rayoDesde;
+    tecla('keyup', 'KeyR', 1700);
+    const nadaTrasEsc = mt.tomarRayoSoltado();
+    tecla('keydown', 'KeyR', 2000);
+    ventana.dispatchEvent(new Event('blur'));
+    const trasBlur = mt.rayoDesde;
+    soltarTeclado();
+    comprobar(
+      'en PC, mantener la R carga y SOLTARLA dispara con la hora de su `keyup` y el blanco de la mira; Esc y perder el foco la cancelan',
+      conR === 300 && tiroDeR !== null && tiroDeR.desde === 300 && tiroDeR.hasta === 1100 && tiroDeR.blanco === 23 && trasEsc === null && nadaTrasEsc === null && trasBlur === null,
+      { conR, tiroDeR, trasEsc, nadaTrasEsc, trasBlur },
+    );
+  } finally {
+    g.window = antesW;
+    g.document = antesD;
+  }
+  const combate = sinComentariosDe(readFileSync(new URL('../src/quiebro/hud/Combate.tsx', import.meta.url), 'utf8'));
+  const hud = sinComentariosDe(readFileSync(new URL('../src/quiebro/hud/Hud.tsx', import.meta.url), 'utf8'));
+  comprobar(
+    'la ayuda de teclas dice la R, el HUD monta la mira y el rayo de PC, y abrir el plano (la M) cancela la carga',
+    /<kbd>R<\/kbd> mantén/.test(combate) && /<MiraDelRayo partida=\{partida\} ojo=\{ojo\} \/>/.test(combate) && /<RayoDePC partida=\{partida\} \/>/.test(combate) && /if \(plano\) mandos\.cancelarRayo\(\);/.test(hud),
+  );
+
+  /* ── El juego cuelga los efectos, y el tiro de juguete sólo existe en desarrollo ── */
+  const juego = sinComentariosDe(readFileSync(new URL('../src/quiebro/Quiebro.tsx', import.meta.url), 'utf8'));
+  const quienLeeLaTabla: string[] = [];
+  const recorrer = (carpeta: URL, rel: string): void => {
+    for (const f of readdirSync(carpeta, { withFileTypes: true })) {
+      if (f.isDirectory()) recorrer(new URL(`${f.name}/`, carpeta), `${rel}${f.name}/`);
+      else if (/\.(ts|tsx)$/.test(f.name) && /NIVELES_DEL_RAYO/.test(sinComentariosDe(readFileSync(new URL(f.name, carpeta), 'utf8')))) quienLeeLaTabla.push(`${rel}${f.name}`);
+    }
+  };
+  recorrer(new URL('../src/quiebro/', import.meta.url), '');
+  const importaElJuguete = juego.match(/tiro-de-prueba/g) ?? [];
+  comprobar(
+    'el juego cuelga los efectos en la partida; y la tabla del rayo sólo la lee el tiro de JUGUETE, que se carga con `import()` dentro del bloque de desarrollo',
+    /partida\.efectos = sistema;/.test(juego) &&
+      quienLeeLaTabla.join() === 'red/tiro-de-prueba.ts' &&
+      importaElJuguete.length === 1 &&
+      /if \(!import\.meta\.env\.DEV\) return;[\s\S]{0,400}void import\('\.\/red\/tiro-de-prueba'\)/.test(juego) &&
+      !/from '\.\/red\/tiro-de-prueba'/.test(juego),
+    { quienLeeLaTabla, importaElJuguete: importaElJuguete.length },
+  );
+}
+
+terminar(266);

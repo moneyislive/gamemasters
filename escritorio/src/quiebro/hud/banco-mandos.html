@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE LOS MANDOS Y DE LA MIRA DEL RAYO: los botones de la pelea y la mira, sin servidor ni lienzo,
+      en el estado que se pida por la dirección, para fotografiarlos con Edge sin ventana (y mirarlos en un
+      teléfono). Lo que decide cada estado lo prueba `verify:quiebro-juego` en Node; aquí se juzga a ojo.
+
+      Se abre en http://localhost:PUERTO/sala/src/quiebro/hud/banco-mandos.html?… (el Vite del escritorio).
+      Los mandos están en la cabecera de `banco-mandos.tsx`.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Banco de pruebas · los mandos del Quiebro</title>
+    <meta name="theme-color" content="#020605" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #020605;
+        overflow: hidden;
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/quiebro/hud/banco-mandos.tsx"></script>
+  </body>
+</html>
