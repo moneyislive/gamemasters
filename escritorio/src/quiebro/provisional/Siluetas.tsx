@@ -193,6 +193,8 @@ export function poseDe(c: CuerpoPintado, t: number, p: Pose): Pose {
       break;
     case 'apuntar':
     case 'disparar':
+    case 'cargar-rayo':
+    case 'lanzar-rayo':
       p.brazoD = Math.PI / 2;
       break;
     case 'imprimirse':

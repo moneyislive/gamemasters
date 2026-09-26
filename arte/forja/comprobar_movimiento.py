@@ -98,6 +98,10 @@ def fundidos_del_cliente():
         info[m.group(1)] = (m.group(2), int(m.group(3)))
     m = re.search(r'FUNDIDO_DE_LEVANTARSE_MS\s*=\s*(\d+)', t)
     levantarse = int(m.group(1)) if m else 160
+    m = re.search(r'FUNDIDO_AL_DEJAR_LA_CARGA_MS\s*=\s*(\d+)', t)
+    dejar_la_carga = int(m.group(1)) if m else 200
+    m = re.search(r'FUNDIDO_DEL_RAYO_AL_GOLPE_MS\s*=\s*(\d+)', t)
+    rayo_al_golpe = int(m.group(1)) if m else None
 
     def fundido(de, a):
         ta, ea = info[a]
@@ -106,10 +110,24 @@ def fundidos_del_cliente():
             return 60
         if de == 'derribado' and a == 'levantarse':
             return levantarse
+        if de == 'cargar-rayo' and ta == 'marcha':
+            return dejar_la_carga
+        if rayo_al_golpe is not None and de in ('cargar-rayo', 'lanzar-rayo') and a in ('tocado', 'descolocado', 'derribado'):
+            return rayo_al_golpe
         if ta == 'marcha' and td != 'marcha':
             return 200
         return ea
     return info, fundido
+
+
+def fotogramas_del_rayo():
+    """De reparto.json: el fotograma en que acaba la entrada de cada clip (`entradaMs`) y en el que empieza su salida
+    (`salidaMs`); y de gestos.ts, `FUNDIDO_A_LA_SALIDA_MS` (con qué fundido se entra en la salida al dejar la carga)."""
+    clips = json.load(open(MANIFIESTO, encoding='utf-8')).get('clips', {})
+    entrada = {n: int(round(c['entradaMs'] * FPS / 1000.0)) for n, c in clips.items() if 'entradaMs' in c}
+    salida = {n: int(round(c['salidaMs'] * FPS / 1000.0)) for n, c in clips.items() if 'salidaMs' in c}
+    m = re.search(r'FUNDIDO_A_LA_SALIDA_MS\s*=\s*(\d+)', open(GESTOS_TS, encoding='utf-8').read())
+    return entrada, salida, int(m.group(1)) if m else 150
 
 
 # (gesto, clip, de dónde sale: 'fin' o 'bucle') -> (gesto, clip): lo que el juego encadena
@@ -139,10 +157,27 @@ SECUENCIAS = [
     ('correr', 'correr', 'bucle0', 'guardia', 'guardia'), ('apuntar', 'apuntar', 'bucle', 'tocado', 'tocado'),
     ('rescatar', 'rescatar', 'fin', 'guardia', 'guardia'), ('guardia', 'guardia', 'bucle', 'victoria', 'victoria'),
     ('reposo', 'reposo', 'bucle', 'rescatar', 'rescatar'),
+    # el rayo: se carga desde el reposo, se lanza desde la carga (el juego entra por el impacto, el fotograma 1, que es
+    # la misma pose que el 0 salvo la palma) y se vuelve al reposo
+    ('reposo', 'reposo', 'bucle', 'cargar-rayo', 'cargar-rayo'), ('cargar-rayo', 'cargar-rayo', 'fin', 'lanzar-rayo', 'lanzar-rayo'),
+    ('lanzar-rayo', 'lanzar-rayo', 'fin', 'reposo', 'reposo'),
+    # el chispazo (revisión 1): el lanzar espera a que la carga acabe de entrar (`esperaLaEntrada`: el paso dado y la
+    # palma arriba, el fotograma de `entradaMs`) y entra desde ahí con su fundido
+    ('cargar-rayo', 'cargar-rayo', 'entrada', 'lanzar-rayo', 'lanzar-rayo'),
+    # un golpe recibido en la carga (EL-RAYO §1.1.5: «cualquier daño corta la carga»), como el de apuntar
+    ('cargar-rayo', 'cargar-rayo', 'bucle', 'tocado', 'tocado'),
 ]
+# la salida del rayo (`salidaDelRayo`): dejar la carga quieto entra en el clip de lanzar por su fotograma de `salidaMs`
+# en `FUNDIDO_A_LA_SALIDA_MS` (y de ahí baja el brazo y recoge el pie); cuenta como un fundido más. Desde la carga con el
+# paso dado ('cola': desde su fotograma de `entradaMs` menos los 2 de `PASO_HECHO_ANTES_S`): antes se vuelve a la marcha
+SALIDAS_DEL_RAYO = [('cargar-rayo', 'cola', 'lanzar-rayo')]
 # lo que el cliente de hoy hace (no respeta `entraCon` ni pinta levantarse al volver): se mide, no cuenta
 DEL_CLIENTE = [('guardia', 'guardia', 'bucle', 'desconectado', 'desconectado'),
-               ('desconectado', 'desconectado', 'bucle', 'reposo', 'reposo')]
+               ('desconectado', 'desconectado', 'bucle', 'reposo', 'reposo'),
+               # cancelar la carga del rayo (daño, quiebro, soltar el dedo): el cliente vuelve al reposo fundiendo
+               ('cargar-rayo', 'cargar-rayo', 'bucle', 'reposo', 'reposo'),
+               # echar a andar a media salida del lanzar (los 260 ms del juego): se funde a la marcha, que tapa el pie
+               ('lanzar-rayo', 'lanzar-rayo', 'f8', 'andar', 'andar')]
 CLAVE = ['cabeza', 'pecho', 'caderas'] + [b + S for S in 'LR' for b in ('mano_', 'antebrazo_', 'pie_', 'pierna_', 'punta_')]
 
 
@@ -449,6 +484,7 @@ def comprobar(sexo):
         datos[nombre] = d
     # los fundidos
     gestos, fundido = fundidos_del_cliente()
+    entrada_del_clip, salida_del_clip, a_la_salida = fotogramas_del_rayo()
     trans, trans_cliente = [], []
     for lista, destino in ((SECUENCIAS, trans), (DEL_CLIENTE, trans_cliente)):
         for gd, cd, modo, ga, ca in lista:
@@ -462,6 +498,12 @@ def comprobar(sexo):
                 desde = [series[cd][-1]]
             elif modo == 'bucle0':
                 desde = [series[cd][0]]
+            elif modo == 'entrada':
+                if cd not in entrada_del_clip:
+                    continue
+                desde = [series[cd][min(len(series[cd]) - 1, entrada_del_clip[cd])]]
+            elif modo.startswith('f'):
+                desde = [series[cd][min(len(series[cd]) - 1, int(modo[1:]))]]
             else:
                 desde = series[cd]
             peor = (0.0, '')
@@ -476,6 +518,25 @@ def comprobar(sexo):
             destino.append(fila)
             if destino is trans and vel > UMBRAL['fundido_ms']:
                 fallos.append('fundido %s -> %s en %d ms: %s salta %.0f cm (%.1f m/s)' % (fila['de'], ca, ms, peor[1], 100 * peor[0], vel))
+    for cd, modo, ca in SALIDAS_DEL_RAYO:
+        if cd not in series or ca not in series or ca not in salida_del_clip:
+            continue
+        if SOLO is not None and cd not in SOLO and ca not in SOLO:
+            continue
+        b = pose_rel(series[ca][min(len(series[ca]) - 1, salida_del_clip[ca])])
+        peor = (0.0, '')
+        desde = series[cd][max(0, entrada_del_clip.get(cd, 0) - 2):] if modo == 'cola' else series[cd]
+        for x in desde:
+            a = pose_rel(x)
+            for k in CLAVE:
+                dd = float(np.linalg.norm(a[k] - b[k]))
+                if dd > peor[0]:
+                    peor = (dd, k)
+        vel = peor[0] / max(a_la_salida, 1) * 1000.0
+        fila = dict(de='%s(%s)' % (cd, modo), a='%s(salida)' % ca, ms=a_la_salida, m=round(peor[0], 3), hueso=peor[1], ms_=round(vel, 2))
+        trans.append(fila)
+        if vel > UMBRAL['fundido_ms']:
+            fallos.append('fundido %s -> %s en %d ms: %s salta %.0f cm (%.1f m/s)' % (fila['de'], fila['a'], a_la_salida, peor[1], 100 * peor[0], vel))
     res = dict(sexo=sexo, fallos=fallos, clips=datos, fundidos=trans, fundidos_del_cliente=trans_cliente, umbrales=UMBRAL)
     os.makedirs(SAL, exist_ok=True)
     with open(os.path.join(SAL, 'movimiento_%s.json' % sexo), 'w', encoding='utf-8', newline='\n') as f:

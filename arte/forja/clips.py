@@ -1190,9 +1190,9 @@ GESTOS = {
     'desalojable': 'desalojable', 'rematar': 'rematar', 'absorber': 'absorber', 'rescatar': 'rescatar',
     'descolgar': 'descolgar', 'imprimirse': 'imprimirse', 'salir': 'salir', 'desconectado': 'desconectado',
     'victoria': 'victoria',
-    # EL RAYO (escritorio/src/quiebro/rayo/contrato.ts), fase 0: los clips de apuntar y disparar hasta que
-    # lleguen los de la captura (Spell_Simple_Enter/Idle_Loop/Shoot/Exit de UAL, retargeteados con captura.py)
-    'cargar-rayo': 'apuntar', 'lanzar-rayo': 'disparar',
+    # EL RAYO (escritorio/src/quiebro/rayo/contrato.ts): los clips de la captura (Spell_Simple_Enter/Idle_Loop/Shoot/
+    # Exit de UAL, en espejo: captura.py, «EL RAYO»). Con CAPTURA=0 no existen y pintan los de apuntar y disparar (abajo).
+    'cargar-rayo': 'cargar-rayo', 'lanzar-rayo': 'lanzar-rayo',
 }
 # por dirección, relativa a la cara (`direccionDelGesto` - `rumbo`): la del DESPLAZAMIENTO. En el quiebro,
 # hacia donde se va; en el tocado y el derribado, hacia donde empuja el golpe (me pegan de frente: atrás).
@@ -1216,3 +1216,15 @@ QUIEBRO_POR_DIRECCION = POR_DIRECCION['quiebro']
 import captura  # noqa: E402
 
 CAPTURADOS = captura.registrar(CLIPS)
+
+# ═══ LOS CLIPS QUE SÓLO TIENE LA CAPTURA ═══ Los del rayo no tienen clip de la forja: se hornean detrás de `disparar` si
+# la captura los registró; con CAPTURA=0 (la forja pura, para comparar) sus gestos pintan los del tirador, como en la
+# fase 0 del contrato.
+_TRAS = 'disparar'
+for _nombre, _en_la_forja in (('cargar-rayo', 'apuntar'), ('lanzar-rayo', 'disparar')):
+    if _nombre in CLIPS:
+        if _nombre not in ORDEN:
+            ORDEN.insert(ORDEN.index(_TRAS) + 1, _nombre)
+        _TRAS = _nombre
+    else:
+        GESTOS[_nombre] = _en_la_forja

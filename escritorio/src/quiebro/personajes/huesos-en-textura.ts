@@ -50,6 +50,9 @@
  */
 import * as THREE from 'three';
 
+/** 2^(e − 15) para cada exponente de la media precisión (lo que lee `puntoEn` sin llamadas). */
+const POTENCIAS_DE_DOS = Float64Array.from({ length: 32 }, (_v, e) => Math.pow(2, e - 15));
+
 /** Fotogramas por segundo del horneado (los de la forja). */
 export const FPS_DEL_HORNEADO = 30;
 
@@ -74,6 +77,13 @@ export interface HuesosEnTextura {
   readonly media: boolean;
   /** La matriz de piel del hueso `j` en la fila `fila`, tal como la lee la GPU. */
   matriz(fila: number, j: number, salida: THREE.Matrix4): THREE.Matrix4;
+  /**
+   * DÓNDE LLEVA LA POSE UN PUNTO: el `punto` del espacio de enlace, pegado al hueso `j`, con la piel de las filas
+   * `filas.a` y `filas.b` mezcladas por `filas.mezcla` —la misma cuenta que el sombreador del rebaño—, en el espacio del
+   * cuerpo (sin su sitio, su giro ni su escala). Escribe en `salida`, sin asignar: la mano de un lejano, la boca del
+   * rayo (`director.ts`), cada fotograma.
+   */
+  puntoEn(filas: Readonly<FilasDeAnimacion>, j: number, punto: Readonly<{ x: number; y: number; z: number }>, salida: { x: number; y: number; z: number }): void;
 }
 
 /** Un clip que hornear, con la postura que se le pone encima (el paraguas) si la hay. */
@@ -284,6 +294,52 @@ export class HornoDeHuesos implements HuesosEnTextura {
     e[11] = 0;
     e[15] = 1;
     return salida;
+  }
+
+  puntoEn(filas: Readonly<FilasDeAnimacion>, j: number, punto: Readonly<{ x: number; y: number; z: number }>, salida: { x: number; y: number; z: number }): void {
+    /* (las filas y el punto en objetos y no sueltos: un número con decimales como argumento de una llamada que V8 no
+     * funde es una caja nueva, y esto va en cada fotograma) */
+    const a = filas.a;
+    const b = filas.b;
+    const x = punto.x;
+    const y = punto.y;
+    const z = punto.z;
+    const m = Math.min(1, Math.max(0, filas.mezcla));
+    const d16 = this.datos16;
+    const d32 = this.datos32;
+    /*
+     * Cada texel es una fila de la matriz de piel (3 × 4); la mezcla de dos filas, como el sombreador. La media precisión
+     * se lee AQUÍ, sin llamar a `DataUtils.fromHalfFloat`: un número con decimales que vuelve de una llamada que V8 no
+     * funde se guarda en una caja nueva, y esto se pide en cada fotograma por cada cuerpo que carga (el perfil lo vio).
+     */
+    for (let r = 0; r < 3; r++) {
+      let va = 0;
+      let vb = 0;
+      for (let q = 0; q < 2; q++) {
+        if (q === 1 && m <= 0) break;
+        const base = ((q === 0 ? a : b) * this.ancho + j * 3) * 4 + r * 4;
+        let acc = 0;
+        for (let c = 0; c < 4; c++) {
+          let v: number;
+          if (d16 !== null) {
+            const hf = d16[base + c] as number;
+            const e = (hf >> 10) & 0x1f;
+            const f = hf & 0x3ff;
+            const mag = e === 0 ? f * 5.960464477539063e-8 : e === 31 ? (f === 0 ? Number.POSITIVE_INFINITY : Number.NaN) : (1 + f / 1024) * (POTENCIAS_DE_DOS[e] as number);
+            v = (hf & 0x8000) !== 0 ? -mag : mag;
+          } else {
+            v = (d32 as Float32Array)[base + c] as number;
+          }
+          acc += c === 0 ? v * x : c === 1 ? v * y : c === 2 ? v * z : v;
+        }
+        if (q === 0) va = acc;
+        else vb = acc;
+      }
+      const v = m > 0 ? va * (1 - m) + vb * m : va;
+      if (r === 0) salida.x = v;
+      else if (r === 1) salida.y = v;
+      else salida.z = v;
+    }
   }
 }
 

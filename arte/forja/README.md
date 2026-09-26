@@ -3,7 +3,7 @@
 Todos los personajes de El Quiebro (`docs/EL-QUIEBRO.md` §1, §3, §4.8, §8) salen de aquí: seis
 desvelados (hombre y mujer con Gabardina, Ligera y Mole), cuatro Celadores (alto y enjuto, ancho,
 mujer y mayor con sombrero; el tirador es el mismo con la pistola en la mano), ocho durmientes (dos
-cuerpos por cuatro ropas de calle), dos piezas aparte (pistola y paraguas) y los 46 clips que pintan
+cuerpos por cuatro ropas de calle), dos piezas aparte (pistola y paraguas) y los 48 clips que pintan
 cada `Gesto` de `escritorio/src/quiebro/cuerpos.ts` (con sus variantes por dirección y por clase).
 Blender 4.2 sin ventana modela con campos de distancia (SDF), malla con *surface nets*, pesa, anima y
 exporta. Lo único que viene de fuera es la captura de movimiento de UAL (CC0, en `arte/ual/`), que
@@ -234,10 +234,28 @@ cambia, y el manifiesto dice de dónde sale cada uno (`clips.<clip>.fuente`).
 | `derribado` | mezcla: UAL2 Hit_Knockback + LayToIdle + la guardia | 1,5 s: espalda en el suelo a 300 ms, se levanta desde 533 |
 | `levantarse` | UAL2 LayToIdle desde el último fotograma de `caer` + la guardia | 1,13 s |
 | `descolgar` | mezcla: UAL1 Interact en espejo + UAL2 Idle_TalkingPhone_Loop + la mano de la forja en la oreja (agarrada, respecto a la cabeza) | 1,5 s |
+| `cargar-rayo` | UAL1 Spell_Simple_Enter + Spell_Simple_Idle_Loop, EN ESPEJO (la derecha es la boca del rayo), desde el reposo, con los pies del reposo y el izquierdo quieto (`PieComo`: sólo da un paso el derecho) | entra 0-9 (300 ms: el chispazo; `entrada`), se asienta 9-33, y desde el 33 la cola en bucle (`bucle_desde`, 2,1 s); 3,2 s |
+| `lanzar-rayo` | desde el fotograma 33 de la carga (`FinalDe(..., fotograma=33)`) + el retroceso de UAL1 Spell_Simple_Shoot aumentado ×1,9 + Spell_Simple_Exit en espejo, y al reposo | la palma empuja en el impacto (fotograma 1: el destello), retrocede 1-5, baja el brazo 15-27 y recoge el pie 25-33 (desde el 15, la salida: `salida`); 1,1 s |
 | quiebros (×8), `entrada`, `cierre`, `empellon`, `replica`, `tocado-espalda`, `derribado-espalda` | mezcla: la forja con la guardia de la captura en sus dos extremos (`ConGuardia`) | los de la forja |
 | `descolocado`, `avance` | la forja con la guardia de la captura al principio | los de la forja |
 | `salir` | la forja desde el último fotograma de `descolgar` | 1 s |
 | `guardia-celador`, `retroceder`, `lateral-*`, `respuesta`, `apuntar`, `disparar`, `desalojable`, `rematar`, `absorber`, `rescatar`, `imprimirse`, `victoria` | la forja (por la misma maquinaria: bisagras, muñeca con topes) | los de la forja |
+
+**El rayo (26-sep, `docs/quiebro/EL-RAYO.md` §6).** Los dos clips sólo existen con la captura (con `CAPTURA=0` sus gestos
+pintan `apuntar` y `disparar`, como en la fase 0 del contrato). La carga es un clip de UNA vez con la cola en bucle:
+`bucle_desde` en la receta, `bucleDesdeMs` en el manifiesto; el cliente pinta la entrada una vez y repite sólo la cola
+(`tiempoConEntrada` en `personajes/gestos.ts`, la misma cuenta con esqueleto y en el rebaño), y el horneado cierra la
+tela de esa cola como la de un bucle (`animacion.hornear`, «la cola en bucle»). El brazo que lanza lo apunta el cliente
+al rumbo del gesto y tiembla con la carga (`personajes/postura.ts`, encima del clip); la mano (el hueco de `agarre_R`)
+es la boca del rayo (`DirectorDeLosPersonajes.bocaDe`). `empaquetar.py clips` ya cambia el clip de un gesto si
+`clips.GESTOS` lo cambia (antes se quedaba el del manifiesto viejo).
+
+Lo que pasa ENTRE los gestos del rayo (la revisión 1) también sale de la receta: `entrada` (en el manifiesto `entradaMs`)
+dice cuándo la carga ha dado el paso y subido la palma, y un lanzar que llega antes (el chispazo, el toque corto) espera a
+que acabe en vez de fundirse a medio paso (`esperaLaEntrada`); `salida` (`salidaMs`) dice desde dónde el lanzar baja el
+brazo y recoge el pie, y el cliente la pinta entera si el cuerpo se queda quieto aunque el juego ya vuelva al reposo (a los
+260 ms del destello) o deje la carga sin lanzar (`salidaDelRayo`). `comprobar_movimiento.py` mide los dos empalmes (la
+carga en su `entrada` al lanzar; la cola de la carga a la `salida`) y el golpe recibido en la carga.
 
 **Por qué la forja con la guardia de la captura.** UAL no tiene patada circular, quiebros de lado, empellón
 ni caída hacia delante. Pero la Tanda empalma golpe con golpe (fundido de 60 ms): si el Cierre empezara en la

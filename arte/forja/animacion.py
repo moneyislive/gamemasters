@@ -2246,6 +2246,19 @@ def hornear(arm, sk, nombre, nubes, faldon, log=print):
         estados = [[[q.copy() for q in cad] for cad in FALDON_FINAL[c['faldon_de']]] for _ in cuadros]
     else:
         estados = faldon.simular(cuadros, viento=c.get('viento', (0, 0, 0)), bucle=c['bucle'], tope=c.get('tope_faldon'))
+    if c.get('bucle_desde') and not c['bucle']:
+        # ═══ LA COLA EN BUCLE ═══ (la carga del rayo: entra una vez y desde `bucle_desde` se repite) El cuerpo del
+        # último fotograma es el de `bucle_desde`, pero la tela se simuló de corrido: se cierra como un bucle, con la
+        # diferencia repartida a lo largo de la cola, para que al volver del último a `bucle_desde` no salte.
+        L0 = int(c['bucle_desde'])
+        m = n - L0
+        if 0 <= L0 < n:
+            err = [[estados[n][k][j] - estados[L0][k][j] for j in range(len(estados[n][k]))] for k in range(len(estados[n]))]
+            for fr in range(L0 + 1, n + 1):
+                a = (fr - L0) / float(m)
+                for k in range(len(err)):
+                    for j in range(1, len(err[k])):
+                        estados[fr][k][j] = estados[fr][k][j] - err[k][j] * a
     Dfal = faldon.rotaciones(cuadros, estados)
     if nubes.ok and nubes.falda_ok:
         corregidos = 0
@@ -2376,7 +2389,7 @@ def hornear_todo(arm, nubes=(), log=print, clips=None):
             d['intocable_fotogramas'] = list(c['intocable'])
         if 'intocable_ms' in c:
             d['intocable_ms'] = list(c['intocable_ms'])
-        for k in ('efector', 'levanta_desde', 'cae_en', 'tope_faldon'):
+        for k in ('efector', 'levanta_desde', 'cae_en', 'tope_faldon', 'bucle_desde', 'entrada', 'salida'):
             if k in c:
                 d[k] = c[k]
         d['fuente'] = c.get('fuente', 'forja')
