@@ -29,6 +29,7 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
 import type { NivelDeCalidad } from '../calidad/niveles';
 import type { CapacidadesDelAparato } from '../calidad/capacidades';
 import { sondearElAparato } from '../calidad/sondeo';
@@ -74,8 +75,9 @@ export interface PropsDelPosproceso {
   readonly alAvisar?: (camino: CaminoDelPosproceso, aviso: string | null) => void;
   /**
    * EL SISTEMA DE EFECTOS del juego, para lo que el rayo pone en la imagen (`docs/quiebro/EL-RAYO.md` §3-§4: el
-   * fogonazo, el golpe y la viñeta de la carga), que se lee de él en cada fotograma. Opcional: los bancos no lo
-   * pasan. FASE 0 del contrato (`rayo/contrato.ts`): llega, y todavía no se lee.
+   * fogonazo de pantalla, el golpe alrededor de donde dio y la viñeta de la carga propia), que se lee en cada
+   * fotograma de `sistema.rayos.imagen` (lo pone al día `evaluarLosRayos`, con prioridad −1). Opcional: los bancos
+   * que no pintan rayos no lo pasan, y sin él no hay nada de eso.
    */
   readonly sistema?: SistemaDeEfectos;
 }
@@ -98,6 +100,9 @@ export function Posproceso(props: PropsDelPosproceso): null {
   const semilla = useRef(0);
   const conClaridad = useRef<{ base: AjustesDeLaImagen | null; claridad: number; ajustes: AjustesDeLaImagen }>({ base: null, claridad: -1, ajustes: IMAGEN_DE_LA_NOCHE });
   const dicho = useRef<{ camino: CaminoDelPosproceso; aviso: string | null } | null>(null);
+  /* Lo del rayo, reutilizado: dónde dio, proyectado a la pantalla, y lo que se le pasa al compositor. */
+  const golpe = useMemo(() => new THREE.Vector3(), []);
+  const rayo = useMemo(() => ({ fogonazo: 0, golpeX: 0.5, golpeY: 0.5, golpe: 0, carga: 0 }), []);
 
   useEffect(() => {
     const nuevo = crearElCompositor(gl, props.nivel, capacidades);
@@ -130,12 +135,28 @@ export function Posproceso(props: PropsDelPosproceso): null {
       cc.ajustes = conLaLuz(base, claridad);
     }
     const ajustes = cc.ajustes;
+    const imagen = props.sistema?.rayos.imagen;
+    if (imagen !== undefined) {
+      rayo.fogonazo = imagen.fogonazo;
+      rayo.carga = imagen.carga;
+      rayo.golpe = 0;
+      if (imagen.golpe > 0.001) {
+        /* Dónde dio, en la pantalla (0-1); detrás de la cámara, sin golpe. */
+        golpe.set(imagen.golpeX, imagen.golpeY, imagen.golpeZ).project(estado.camera);
+        if (golpe.z < 1 && Math.abs(golpe.x) < 1.6 && Math.abs(golpe.y) < 1.6) {
+          rayo.golpeX = golpe.x * 0.5 + 0.5;
+          rayo.golpeY = golpe.y * 0.5 + 0.5;
+          rayo.golpe = imagen.golpe;
+        }
+      }
+    }
     c.pintar(estado.scene, estado.camera, {
       remanso: leerNumero(props.remanso, 0),
       foco: leerNumero(props.foco, FOCO_POR_OMISION),
       semilla: semilla.current,
       capaNitida: props.capaNitida !== false,
       ajustes,
+      ...(imagen === undefined ? {} : { rayo }),
     });
     const aviso = c.aviso();
     const antes = dicho.current;

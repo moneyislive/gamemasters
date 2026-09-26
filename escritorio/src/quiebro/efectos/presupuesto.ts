@@ -80,6 +80,14 @@ export const SALIDAS_A_LA_VEZ = 2;
 /** El cable de la cabina en tramos rectos (del auricular al poste, del poste a la marquesina, y arriba). */
 export const TRAMOS_DEL_CABLE = 3;
 export const ESQUIRLAS_A_LA_VEZ = 96;
+/*
+ * EL RAYO (`docs/quiebro/EL-RAYO.md` §4 y §7). Seis asientos pueden cargar y soltar a la vez, pero lo que se VE a la
+ * vez es menos: un rayo dura en pantalla menos de medio segundo y una carga, lo que se mantenga el botón. Cuatro de
+ * cada cosa; con más, se pisa lo más viejo (`Ranuras`). Las marcas chamuscadas duran unos segundos y van aparte.
+ */
+export const RAYOS_A_LA_VEZ = 4;
+export const CARGAS_A_LA_VEZ = 4;
+export const MARCAS_A_LA_VEZ = 4;
 
 /** Los ajustes de adorno que cambian con el nivel. Cada pieza lee los suyos. */
 export const POR_NIVEL = {
@@ -101,7 +109,48 @@ export const POR_NIVEL = {
   panelesDelMuro: [24, 32, 48, 64],
   /** Bandas del marco del Bis: en N0 sólo arriba y abajo. */
   bandasDelMarco: [2, 4, 4, 4],
+  /*
+   * EL RAYO, por nivel (EL-RAYO.md §4, la tabla N0-N3). Lo que el jugador USA para decidir —dónde da, cuánto
+   * abarca (la onda del suelo mide el área de verdad), la carga de otro— sale igual en los cuatro; lo que baja en
+   * N0 es el detalle: el canal en menos tramos, sin ramas, una sola descarga y una estela corta.
+   */
+  /** Tramos de doce segmentos en que se parte el canal de un rayo (el primero, junto a la mano, el más corto). */
+  tramosDelRayo: [4, 5, 7, 8],
+  /** Ramas de un rayo. */
+  ramasDelRayo: [0, 1, 2, 3],
+  /** Descargas del pleno (la primera y sus re-descargas, en menos de 90 ms). */
+  descargasDelRayo: [1, 2, 3, 3],
+  /** Lo que dura la estela ionizada del pleno, en ms (en el reloj presentado). */
+  estelaDelRayo: [150, 250, 350, 450],
+  /** Filamentos que chisporrotean alrededor de la mano que carga. */
+  filamentosDeLaCarga: [2, 3, 4, 5],
+  /** Motas que convergen hacia la mano que carga. */
+  motasDeLaCarga: [4, 6, 8, 10],
+  /** Soplos de vapor del suelo mojado en el estallido. */
+  vaporDelEstallido: [0, 1, 2, 3],
 } as const satisfies Record<string, PorNivel>;
+
+/**
+ * Las cintas de un rayo en un nivel: dos por tramo del canal —el NÚCLEO, fino y quebrado a todas las escalas, y su
+ * VELO, ancho y con el quiebro fino muy rebajado (una cinta ancha que sigue un quiebro más corto que su anchura se
+ * dobla sobre sí misma y sale una soga borrosa)— y las ramas.
+ */
+export function cintasPorRayo(n: Nivel): number {
+  return 2 * POR_NIVEL.tramosDelRayo[n] + POR_NIVEL.ramasDelRayo[n];
+}
+/** Las cintas de una carga en un nivel: los filamentos y las motas. */
+export function cintasPorCarga(n: Nivel): number {
+  return POR_NIVEL.filamentosDeLaCarga[n] + POR_NIVEL.motasDeLaCarga[n];
+}
+/**
+ * Las ondas de un rayo: el fogonazo de la boca, el resplandor del estallido, la onda del suelo, el destello del
+ * área, el charco de luz en el suelo y los soplos de vapor.
+ */
+export function ondasPorRayo(n: Nivel): number {
+  return 5 + POR_NIVEL.vaporDelEstallido[n];
+}
+/** Las ondas de una carga: el núcleo que crece en la palma y el aro que se contrae. */
+export const ONDAS_POR_CARGA = 2;
 
 export type AjusteDeNivel = keyof typeof POR_NIVEL;
 
@@ -122,7 +171,8 @@ export type Pieza =
   | 'marco'
   | 'esquirlas'
   | 'cielo'
-  | 'pantallas';
+  | 'pantallas'
+  | 'rayos';
 
 export interface RenglonDePieza {
   readonly pieza: Pieza;
@@ -212,10 +262,27 @@ export const PIEZAS: readonly RenglonDePieza[] = [
     pieza: 'ondas',
     familia: 'ondas',
     forma: 'cuadro',
-    queLleva: 'ondas de aire tras las balas, onda y destello de los impactos',
+    queLleva: 'ondas de aire tras las balas, onda y destello de los impactos; del rayo, la boca, el resplandor, la onda del suelo, el charco de luz, el vapor, la carga y la marca',
     deJuego: false,
     reloj: 'verdadero',
-    instancias: porNivel((n) => BALAS_A_LA_VEZ * POR_NIVEL.ondasPorBala[n] + IMPACTOS_A_LA_VEZ * 2),
+    instancias: porNivel(
+      (n) => BALAS_A_LA_VEZ * POR_NIVEL.ondasPorBala[n] + IMPACTOS_A_LA_VEZ * 2 + RAYOS_A_LA_VEZ * ondasPorRayo(n) + CARGAS_A_LA_VEZ * ONDAS_POR_CARGA + MARCAS_A_LA_VEZ,
+    ),
+  },
+  {
+    /*
+     * EL RAYO (EL-RAYO.md §4): el canal quebrado, sus ramas y su estela, y los filamentos y las motas de la carga,
+     * como cintas curvas que el sombreador quiebra (el tipo 4 de `materiales.ts`). No es señal de juego —lo que se
+     * juzga es la bala de la sala, y el área la dice la onda del suelo—, así que va de adorno y crece con el nivel.
+     * Su reloj es el verdadero (el destello llega cuando llega); la estela, dentro, va en el presentado.
+     */
+    pieza: 'rayos',
+    familia: 'cintas',
+    forma: 'cinta-curva',
+    queLleva: 'el rayo: canal, ramas, estela; y los filamentos y motas de la carga',
+    deJuego: false,
+    reloj: 'verdadero',
+    instancias: porNivel((n) => RAYOS_A_LA_VEZ * cintasPorRayo(n) + CARGAS_A_LA_VEZ * cintasPorCarga(n)),
   },
   {
     pieza: 'trazos',

@@ -71,8 +71,8 @@ import { apuntarLaCuenta } from '../calidad/medida';
 import type { CaminoDelPosproceso } from './camino';
 import { caminoPara } from './camino';
 import { LADO_DE_LA_LUT, tablaDeLaLut } from './gradacion';
-import type { UniformeDeDesenfocar, UniformeDeExtraer, UniformeDelUber, UniformeDelVelo } from './sombreadores';
-import { DESENFOCAR, EXTRAER, UBER, VELO, VERTICE_DE_PANTALLA } from './sombreadores';
+import type { UniformeDeDesenfocar, UniformeDeExtraer, UniformeDelFogonazo, UniformeDelUber, UniformeDelVelo } from './sombreadores';
+import { DESENFOCAR, EXTRAER, FOGONAZO, UBER, VELO, VERTICE_DE_PANTALLA } from './sombreadores';
 import { falloDelTono, ponerElTonoPropio } from './tono';
 import { UNIFORMES_DE_LA_CIUDAD } from '../ciudad/retoques';
 
@@ -130,7 +130,15 @@ export interface LoDeEsteFotograma {
   readonly semilla: number;
   readonly capaNitida: boolean;
   readonly ajustes: AjustesDeLaImagen;
+  /**
+   * EL RAYO (docs/quiebro/EL-RAYO.md §4), opcional (sin él, nada): el fogonazo de pantalla (0 a ~0,3, blanco cálido),
+   * el golpe (dónde dio en la pantalla, 0-1, y su fuerza) y la carga propia (0-1), que cierra la viñeta.
+   */
+  readonly rayo?: { readonly fogonazo: number; readonly golpeX: number; readonly golpeY: number; readonly golpe: number; readonly carga: number };
 }
+
+/** El blanco cálido del fogonazo del rayo, en lineal (el del núcleo del destello, `efectos/rayo.ts`). */
+const COLOR_DEL_FOGONAZO = new THREE.Color(1, 0.9, 0.76);
 
 export interface Compositor {
   readonly camino: CaminoDelPosproceso;
@@ -225,6 +233,9 @@ function crearElUber(lut: THREE.Data3DTexture, defines: Record<string, string>):
     uVistaInversa: new THREE.Matrix4(),
     uReflejos: 0,
     uHumedad: 0.5,
+    uFogonazo: new THREE.Vector3(0, 0, 0),
+    uGolpe: new THREE.Vector3(0.5, 0.5, 0),
+    uCargaDelRayo: 0,
   });
   /* `toneMappingExposure` lo declara el trozo de three que el uber incluye con `ENTRADA_HDR`. */
   const material = materialDePantalla('quiebro.uber', UBER, { ...u, toneMappingExposure: { value: 1 } }, defines);
@@ -253,6 +264,11 @@ function alimentarElUber(u: Uniformes<UniformeDelUber>, f: LoDeEsteFotograma): v
   u.uFoco.value = f.foco;
   u.uRangoDelFoco.value = Math.max(0.1, f.ajustes.rangoDelFocoM);
   u.uOclusion.value = Math.min(1, Math.max(0, f.ajustes.oclusion));
+  const r = f.rayo;
+  const fogonazo = r === undefined ? 0 : Math.min(0.4, Math.max(0, r.fogonazo));
+  (u.uFogonazo.value as THREE.Vector3).set(COLOR_DEL_FOGONAZO.r * fogonazo, COLOR_DEL_FOGONAZO.g * fogonazo, COLOR_DEL_FOGONAZO.b * fogonazo);
+  (u.uGolpe.value as THREE.Vector3).set(r?.golpeX ?? 0.5, r?.golpeY ?? 0.5, r === undefined ? 0 : Math.min(1, Math.max(0, r.golpe)));
+  u.uCargaDelRayo.value = r === undefined ? 0 : Math.min(1, Math.max(0, r.carga));
 }
 
 /**
@@ -324,6 +340,11 @@ class CaminoDirecto implements Compositor {
   private readonly u: Uniformes<UniformeDelVelo>;
   private readonly velo: THREE.ShaderMaterial;
   private readonly cuadro: FullScreenQuad;
+  /** El fogonazo del rayo: un cuadro que SUMA (ver `FOGONAZO`), sólo cuando lo hay. */
+  private readonly uFogonazo: Uniformes<UniformeDelFogonazo>;
+  private readonly fogonazo: THREE.ShaderMaterial;
+  private readonly cuadroDelFogonazo: FullScreenQuad;
+  private compilado = false;
   private readonly tamano = new THREE.Vector2();
   private readonly elAviso: string | null;
 
@@ -333,7 +354,7 @@ class CaminoDirecto implements Compositor {
     const conTonoPropio = ponerElTonoPropio();
     renderer.toneMapping = conTonoPropio ? THREE.CustomToneMapping : THREE.ACESFilmicToneMapping;
     this.elAviso = conTonoPropio ? null : falloDelTono();
-    this.u = uniformesDe<UniformeDelVelo>({ uRemanso: 0, uAspecto: 1 });
+    this.u = uniformesDe<UniformeDelVelo>({ uRemanso: 0, uAspecto: 1, uCargaDelRayo: 0 });
     this.velo = materialDePantalla('quiebro.velo', VELO, this.u);
     /* Lo que sale del velo MULTIPLICA el lienzo: destino × origen. */
     this.velo.blending = THREE.CustomBlending;
@@ -342,6 +363,15 @@ class CaminoDirecto implements Compositor {
     this.velo.blendDst = THREE.SrcColorFactor;
     this.velo.transparent = true;
     this.cuadro = new FullScreenQuad(this.velo);
+    this.uFogonazo = uniformesDe<UniformeDelFogonazo>({ uFogonazo: new THREE.Vector3(0, 0, 0) });
+    this.fogonazo = materialDePantalla('quiebro.fogonazo', FOGONAZO, this.uFogonazo);
+    /* dst × (1 + src): origen × color de destino + destino (ver `FOGONAZO`). */
+    this.fogonazo.blending = THREE.CustomBlending;
+    this.fogonazo.blendEquation = THREE.AddEquation;
+    this.fogonazo.blendSrc = THREE.DstColorFactor;
+    this.fogonazo.blendDst = THREE.OneFactor;
+    this.fogonazo.transparent = true;
+    this.cuadroDelFogonazo = new FullScreenQuad(this.fogonazo);
   }
 
   aviso(): string | null {
@@ -350,17 +380,40 @@ class CaminoDirecto implements Compositor {
 
   pintar(escena: THREE.Scene, camara: THREE.Camera, f: LoDeEsteFotograma): void {
     const r = this.renderer;
+    /*
+     * Los dos cuadros se compilan con el primer fotograma, sin pintarlos: el velo y el fogonazo sólo se pintan en
+     * el Remanso y en un rayo, y compilarlos entonces sería un tirón justo en el momento que más se mira.
+     */
+    if (!this.compilado) {
+      this.compilado = true;
+      const plano = new THREE.PlaneGeometry(2, 2);
+      const grupo = new THREE.Group();
+      grupo.add(new THREE.Mesh(plano, this.velo), new THREE.Mesh(plano, this.fogonazo));
+      r.compile(grupo, camara);
+      plano.dispose();
+    }
+    const carga = f.rayo === undefined ? 0 : Math.min(1, Math.max(0, f.rayo.carga));
+    const fogonazo = f.rayo === undefined ? 0 : Math.min(0.4, Math.max(0, f.rayo.fogonazo));
     contando(r, (apuntarLaEscena) => {
       r.setRenderTarget(null);
       r.render(escena, camara);
       apuntarLaEscena();
-      if (f.remanso > 0.001) {
+      if (f.remanso > 0.001 || carga > 0.001) {
         r.getDrawingBufferSize(this.tamano);
         this.u.uRemanso.value = Math.min(1, f.remanso);
         this.u.uAspecto.value = aspectoDe(this.tamano);
+        this.u.uCargaDelRayo.value = carga;
         const limpiar = r.autoClear;
         r.autoClear = false;
         this.cuadro.render(r);
+        r.autoClear = limpiar;
+      }
+      if (fogonazo > 0.002) {
+        /* En N0 el lienzo ya está en pantalla (sRGB): lo que se multiplica, como el 4× de N1. */
+        (this.uFogonazo.uFogonazo.value as THREE.Vector3).set(COLOR_DEL_FOGONAZO.r * fogonazo * 4, COLOR_DEL_FOGONAZO.g * fogonazo * 4, COLOR_DEL_FOGONAZO.b * fogonazo * 4);
+        const limpiar = r.autoClear;
+        r.autoClear = false;
+        this.cuadroDelFogonazo.render(r);
         r.autoClear = limpiar;
       }
       if (f.capaNitida) pintarLaCapaNitida(r, escena, camara);
@@ -371,6 +424,8 @@ class CaminoDirecto implements Compositor {
     this.renderer.toneMapping = this.tonoAntes;
     this.velo.dispose();
     this.cuadro.dispose();
+    this.fogonazo.dispose();
+    this.cuadroDelFogonazo.dispose();
   }
 }
 
@@ -410,6 +465,9 @@ class CaminoBarato implements Compositor {
       uTexel: new THREE.Vector2(1, 1),
       uUmbral: IMAGEN_DE_LA_NOCHE.brilloBarato.umbral,
       uRodilla: IMAGEN_DE_LA_NOCHE.brilloBarato.rodilla,
+      /* El canal del rayo en el brillo (sombreadores.ts): a cero no hace nada, que es lo de hoy. */
+      uCanal: new THREE.Vector4(0, 0, 0, 0),
+      uCanalForma: new THREE.Vector4(0, 0, 0, 0),
     });
     this.extraer = materialDePantalla('quiebro.extraer', EXTRAER, this.uExtraer);
     this.uDesenfocar = uniformesDe<UniformeDeDesenfocar>({ tEntrada: null, uPaso: new THREE.Vector2(0, 0) });

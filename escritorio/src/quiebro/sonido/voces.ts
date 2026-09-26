@@ -35,12 +35,12 @@
  * palomas, farolas) va por el mundo y además por la cinta del Bis.
  */
 import { frecuencia } from './partitura';
-import { aleteo, chapaGolpeada, cristalRoto } from './sintesis';
+import { aleteo, chapaGolpeada, cristalRoto, DURACION_DEL_TRUENO_S, truenoDelRayo } from './sintesis';
 import { barrido, bufer, envolvente, escalonador, filtro, ganancia, oscilador, ruidoEn, saturador, soplo, sordo, tono } from './piezas';
 import type { Camino, CategoriaDeSonido, MotorDelSonido, Voz } from './motor';
 import { colocar } from './motor';
 import type { NombreDeAlcance, Punto3 } from './cuentas';
-import { corteDelAire, distancia } from './cuentas';
+import { corteDelAire, crepitacionesDeLaCarga, distancia, puntoDelTramoMasCercano, retrasoDelTrueno, tonoDeLaCarga } from './cuentas';
 
 export type TipoDeGolpe = 'entrada' | 'seguida' | 'cierre' | 'empellon' | 'replica';
 export type Material = 'chapa' | 'cristal' | 'piedra';
@@ -73,6 +73,12 @@ export const IDS_DE_SONIDO = [
   'palomas',
   'farola',
   'latido',
+  'carga-rayo',
+  'rayo',
+  'rayo-corto',
+  'trueno',
+  'rayo-fijado',
+  'rayo-listo',
 ] as const;
 
 export type IdDeSonido = (typeof IDS_DE_SONIDO)[number];
@@ -97,6 +103,14 @@ export interface OpcionesDeSonido {
    * instante que dijo el servidor; si ya pasó, suena en el acto.
    */
   readonly enMs?: number;
+  /** La carga del rayo (`carga-rayo`): con cuánta empieza a sonar (0-1) y lo que tarda en llenarse, en ms. */
+  readonly carga?: number;
+  readonly subidaMs?: number;
+  /**
+   * El otro extremo de lo que suena (el `trueno`: el canal del rayo va de `posicion` a `hasta`). La voz se pone en el
+   * punto del canal más cercano al oyente, y el retumbo llega con el retraso de esa distancia.
+   */
+  readonly hasta?: Punto3 | null;
 }
 
 /** Lo que devuelve `sonar`: para mover lo que se mueve y cortar lo que dura. */
@@ -117,6 +131,11 @@ export interface Resueltas {
   readonly duracionS: number;
   /** La altura MIDI del acento «a compás», o `null`. La pone quien conoce la música. */
   readonly acento: number | null;
+  /** La carga del rayo al empezar a sonar (0-1) y lo que tarda en llenarse (s). */
+  readonly c0: number;
+  readonly subidaS: number;
+  /** A cuántos metros del oyente suena (0 sin sitio): el trueno llega con su retraso. */
+  readonly distanciaM: number;
 }
 
 interface Receta {
@@ -600,6 +619,169 @@ function hacerLatido(m: MotorDelSonido, v: Voz, o: Resueltas): number {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════
+// El rayo (EL-RAYO.md §5): la carga, el disparo, el chispazo, el trueno, el tic y el «listo»
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+/** Cuántos tramos rectos lleva cada curva de la carga (tono, corte, temblor, volumen). */
+const TRAMOS_DE_LA_CARGA = 12;
+
+/**
+ * Lleva `p` por la curva `f(c)` mientras la carga sube de `c0` a 1 en `subidaS`: tramos rectos encadenados (y no
+ * `setValueCurveAtTime`, que lanza si hay otro evento dentro de su intervalo, y el oscilador ya pone uno en `t`).
+ */
+function seguirLaCarga(p: AudioParam, t: number, o: Resueltas, f: (c: number) => number): void {
+  p.setValueAtTime(f(o.c0), t);
+  if (o.subidaS <= 0.02) return;
+  for (let i = 1; i <= TRAMOS_DE_LA_CARGA; i++) {
+    const u = i / TRAMOS_DE_LA_CARGA;
+    p.linearRampToValueAtTime(f(o.c0 + (1 - o.c0) * u), t + o.subidaS * u);
+  }
+}
+
+/** El corte del paso bajo resonante de la carga: se abre de 260 Hz a ~3 kHz con ella. */
+const corteDeLaCarga = (c: number): number => 260 * Math.pow(2, 3.5 * c);
+
+/**
+ * LA CARGA (`carga-rayo`): una voz larga que se corta con `parar()` al soltar o cancelar. Dos sierras desafinadas en el
+ * tono de la carga (`tonoDeLaCarga`) por un paso bajo resonante que se abre, un seno grave una octava abajo, un
+ * temblor que acelera y crepitaciones cada vez más seguidas (`crepitacionesDeLaCarga`). Las crepitaciones son UN
+ * ruido y UNA ganancia con sus picos programados, no un nodo por chasquido: una carga de diez segundos lleva cientos.
+ */
+function hacerCargaRayo(m: MotorDelSonido, v: Voz, o: Resueltas): number {
+  const t = o.t;
+  const fin = t + o.duracionS;
+  const f = o.fuerza;
+  const g = ganancia(m, v, v.entrada);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(1, t + 0.06);
+  g.gain.setValueAtTime(1, Math.max(t + 0.07, fin - 0.12));
+  g.gain.linearRampToValueAtTime(0, fin);
+  // El cuerpo sube de volumen con la carga.
+  const cuerpo = ganancia(m, v, g);
+  seguirLaCarga(cuerpo.gain, t, o, (c) => (0.28 + 0.72 * c) * f);
+  // El temblor: 0,7 ± 0,3, de 5 a 22 Hz.
+  const temblor = ganancia(m, v, cuerpo, 0.7);
+  const lfo = oscilador(m, v, 'sine', 5, t, fin, ganancia(m, v, temblor.gain, 0.3));
+  seguirLaCarga(lfo.frequency, t, o, (c) => 5 + 17 * c * c);
+  // Las sierras, por el paso bajo que se abre.
+  const pasa = filtro(m, v, 'lowpass', corteDeLaCarga(o.c0), 7, ganancia(m, v, temblor, 0.16));
+  seguirLaCarga(pasa.frequency, t, o, corteDeLaCarga);
+  const s1 = oscilador(m, v, 'sawtooth', tonoDeLaCarga(o.c0), t, fin, pasa);
+  seguirLaCarga(s1.frequency, t, o, tonoDeLaCarga);
+  const s2 = oscilador(m, v, 'sawtooth', tonoDeLaCarga(o.c0) * 1.012, t, fin, pasa);
+  seguirLaCarga(s2.frequency, t, o, (c) => tonoDeLaCarga(c) * 1.012);
+  // El grave, sin temblor: el zumbido tiene suelo.
+  const sub = oscilador(m, v, 'sine', tonoDeLaCarga(o.c0) / 2, t, fin, ganancia(m, v, cuerpo, 0.32));
+  seguirLaCarga(sub.frequency, t, o, (c) => tonoDeLaCarga(c) / 2);
+  // Las crepitaciones.
+  const chis = ganancia(m, v, g);
+  const agudo = filtro(m, v, 'highpass', 2600, 0.8, chis);
+  ruidoEn(m, v, 'blanco', t, fin, agudo);
+  const instantes = crepitacionesDeLaCarga(o.c0, o.subidaS, o.duracionS - 0.15, Math.floor(m.azar() * 0x7fffffff));
+  for (const dt of instantes) {
+    const c = o.subidaS > 0 ? Math.min(1, o.c0 + ((1 - o.c0) * dt) / o.subidaS) : 1;
+    const k = t + dt;
+    const pico = (0.06 + 0.26 * c) * f * (0.55 + 0.45 * m.azar());
+    chis.gain.setValueAtTime(0, k);
+    chis.gain.linearRampToValueAtTime(pico, k + 0.0006);
+    chis.gain.exponentialRampToValueAtTime(0.0003, k + 0.006 + 0.014 * m.azar());
+  }
+  return fin;
+}
+
+/**
+ * EL RAYO (`rayo`, niveles 2 y más): el chasquido seco (menos de 1 ms de ataque: lo que se oye en un altavoz de
+ * teléfono), el zap que cae de 3 kHz a 150 Hz, el estampido saturado de 90 a 28 Hz y un chisporroteo que se apaga.
+ * El trueno va aparte (`trueno`), con su retraso.
+ */
+function hacerRayo(m: MotorDelSonido, v: Voz, o: Resueltas): number {
+  const t = o.t;
+  const f = o.fuerza;
+  soplo(m, v, t, 'highpass', 2500, 0.7, 0.0004, 0.95 * f, 0.014, v.entrada);
+  soplo(m, v, t, 'bandpass', 5200, 0.5, 0.0003, 0.55 * f, 0.035, v.entrada);
+  // El zap: una cuadrada y su quinta, que caen juntas.
+  const gz = ganancia(m, v, v.entrada);
+  const finZap = envolvente(gz.gain, t, 0.0008, 0.3 * f, 0.13);
+  const suave = filtro(m, v, 'lowpass', 7000, 0.7, gz);
+  barrido(suave.frequency, t, 7000, 900, 0.12);
+  const z1 = oscilador(m, v, 'square', 3000, t, finZap + 0.01, suave);
+  barrido(z1.frequency, t, 3000, 150, 0.1);
+  const z2 = oscilador(m, v, 'sawtooth', 4500, t, finZap + 0.01, ganancia(m, v, suave, 0.5));
+  barrido(z2.frequency, t, 4500, 225, 0.1);
+  // El estampido.
+  const sat = saturador(m, v, 4, v.entrada);
+  let fin = sordo(m, v, t, 90, 28, 0.35, f, 0.55, sat);
+  // El chisporroteo: ruido agudo que tiembla a 70 Hz y se apaga.
+  const gc = ganancia(m, v, v.entrada);
+  const finChis = envolvente(gc.gain, t + 0.02, 0.004, 0.22 * f, 0.3);
+  const tiembla = ganancia(m, v, gc, 0.5);
+  oscilador(m, v, 'square', 70, t + 0.02, finChis + 0.01, ganancia(m, v, tiembla.gain, 0.5));
+  ruidoEn(m, v, 'blanco', t + 0.02, finChis + 0.01, filtro(m, v, 'bandpass', 4200, 0.9, tiembla));
+  fin = Math.max(fin, finZap, finChis);
+  return fin;
+}
+
+/**
+ * EL CHISPAZO (`rayo-corto`, nivel 1): «fsst-pak». El «fsst» es el aire que se rasga (un siseo que baja de 6 a 2,5 kHz
+ * en lo que tarda en llegar), el «pak» el golpe donde para, y un chisporroteo de unos pocos chasquidos. Sin trueno.
+ */
+function hacerRayoCorto(m: MotorDelSonido, v: Voz, o: Resueltas): number {
+  const t = o.t;
+  const f = o.fuerza;
+  const gs = ganancia(m, v, v.entrada);
+  gs.gain.setValueAtTime(0, t);
+  gs.gain.linearRampToValueAtTime(0.42 * f, t + 0.012);
+  gs.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  gs.gain.linearRampToValueAtTime(0, t + 0.075);
+  const sisea = filtro(m, v, 'bandpass', 6000, 1.1, gs);
+  barrido(sisea.frequency, t, 6000, 2500, 0.06);
+  ruidoEn(m, v, 'blanco', t, t + 0.08, sisea);
+  const pak = t + 0.045;
+  soplo(m, v, pak, 'bandpass', 1800, 1.2, 0.0005, 0.7 * f, 0.03, v.entrada);
+  let fin = sordo(m, v, pak, 180, 70, 0.03, 0.5 * f, 0.07, saturador(m, v, 2.5, v.entrada));
+  for (let i = 0; i < 7; i++) {
+    const cuando = pak + 0.01 + Math.pow(m.azar(), 1.4) * 0.26;
+    fin = Math.max(fin, soplo(m, v, cuando, 'highpass', 3800 + m.azar() * 2400, 0.8, 0.0003, (0.16 - i * 0.015) * f, 0.005 + m.azar() * 0.006, v.entrada));
+  }
+  return Math.max(fin, t + 0.08);
+}
+
+/** Cuántos truenos distintos hay (búferes `trueno-0`…): dos rayos seguidos no retumban igual. */
+export const TRUENOS = 3;
+/** La velocidad de lectura del trueno más lenta: su duración como mucho es la del búfer entre ésta. */
+const VELOCIDAD_MINIMA_DEL_TRUENO = 0.9;
+
+/**
+ * EL TRUENO (`trueno`): el búfer estéreo sembrado de `sintesis.ts`, que llega con el retraso de la distancia
+ * (`retrasoDelTrueno`: el chasquido de `rayo` nunca se retrasa, el retumbo sí) y la reverberación de la calle.
+ */
+function hacerTrueno(m: MotorDelSonido, v: Voz, o: Resueltas): number {
+  const variante = Math.floor(m.azar() * TRUENOS);
+  const b = m.bufer(`trueno-${variante}`, (sr) => truenoDelRayo(sr, 401 + variante));
+  const velocidad = VELOCIDAD_MINIMA_DEL_TRUENO + m.azar() * 0.15;
+  const llega = o.t + retrasoDelTrueno(o.distanciaM);
+  bufer(m, v, b, llega, ganancia(m, v, v.entrada, 0.95 * o.fuerza), velocidad);
+  return llega + b.duration / velocidad;
+}
+
+/** EL TIC de la mira al fijar un blanco (`rayo-fijado`): un clic fino con un brillo encima. */
+function hacerRayoFijado(m: MotorDelSonido, v: Voz, o: Resueltas): number {
+  const t = o.t;
+  soplo(m, v, t, 'bandpass', 4200, 6, 0.0004, 0.2 * o.fuerza, 0.012, v.entrada);
+  return tono(m, v, t, 2637, 0.07 * o.fuerza, 0.04, v.entrada);
+}
+
+/** EL «LISTO» del pleno (`rayo-listo`): sutil, una quinta que brilla y se va. */
+function hacerRayoListo(m: MotorDelSonido, v: Voz, o: Resueltas): number {
+  const t = o.t;
+  const f = o.fuerza;
+  tono(m, v, t, 1318.5, 0.09 * f, 0.22, v.entrada);
+  const fin = tono(m, v, t + 0.05, 1975.5, 0.07 * f, 0.24, v.entrada);
+  soplo(m, v, t, 'highpass', 7000, 0.7, 0.002, 0.05 * f, 0.08, v.entrada);
+  return fin;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
 // El recetario
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -632,10 +814,29 @@ export const RECETAS: Readonly<Record<IdDeSonido, Receta>> = {
   palomas: { categoria: 'ambiente', camino: 'mundo', alcance: 'golpe', reverberacion: 0.25, tope: 2, duracion: fijo(1.6), hacer: hacerPalomas },
   farola: { categoria: 'ambiente', camino: 'mundo', alcance: 'golpe', reverberacion: 0.1, tope: 4, duracion: fijo(0.9), hacer: hacerFarola },
   latido: { categoria: 'efectos', camino: 'claro', alcance: 'golpe', reverberacion: 0, tope: 2, duracion: fijo(0.32), hacer: hacerLatido },
+  'carga-rayo': { categoria: 'efectos', camino: 'mundo', alcance: 'golpe', reverberacion: 0.12, tope: 3, duracion: (o) => o.duracionS, hacer: hacerCargaRayo },
+  rayo: { categoria: 'efectos', camino: 'mundo', alcance: 'trueno', reverberacion: 0.4, tope: 4, duracion: fijo(0.95), hacer: hacerRayo },
+  'rayo-corto': { categoria: 'efectos', camino: 'mundo', alcance: 'golpe', reverberacion: 0.25, tope: 4, duracion: fijo(0.35), hacer: hacerRayoCorto },
+  trueno: {
+    categoria: 'efectos',
+    camino: 'mundo',
+    alcance: 'trueno',
+    reverberacion: 0.6,
+    tope: 2,
+    duracion: (o) => retrasoDelTrueno(o.distanciaM) + DURACION_DEL_TRUENO_S / VELOCIDAD_MINIMA_DEL_TRUENO,
+    hacer: hacerTrueno,
+  },
+  'rayo-fijado': { categoria: 'efectos', camino: 'claro', alcance: 'senal', reverberacion: 0, tope: 2, duracion: fijo(0.06), hacer: hacerRayoFijado },
+  'rayo-listo': { categoria: 'efectos', camino: 'claro', alcance: 'senal', reverberacion: 0.15, tope: 2, duracion: fijo(0.3), hacer: hacerRayoListo },
 };
 
-/** Duración por defecto de lo que dura, si el juego no la da: la bala a 15 m, el apuntado de 12 tics. */
-const DURACION_POR_DEFECTO_S: Partial<Record<IdDeSonido, number>> = { bala: 0.75, apuntado: 0.6 };
+/**
+ * Duración por defecto de lo que dura, si el juego no la da: la bala a 15 m, el apuntado de 12 tics, y la carga del
+ * rayo (la sostiene quien la toca: al acabarse, si sigue cargando, la vuelve a pedir).
+ */
+const DURACION_POR_DEFECTO_S: Partial<Record<IdDeSonido, number>> = { bala: 0.75, apuntado: 0.6, 'carga-rayo': 6 };
+/** Lo que tarda la carga en llenarse, si el juego no lo da: el pleno de la tabla de partida (EL-RAYO.md §1.2). */
+const SUBIDA_POR_DEFECTO_S = 1.3;
 
 /**
  * TOCA UN SONIDO del recetario. `acento` es la altura del acento «a compás» si toca (la calcula quien
@@ -645,6 +846,12 @@ export function tocar(m: MotorDelSonido, id: IdDeSonido, opciones: OpcionesDeSon
   const receta = RECETAS[id];
   const fuerza = Math.max(0, Math.min(1.2, opciones.fuerza ?? 1));
   const duracionS = Math.max(0.05, (opciones.duracionMs ?? (DURACION_POR_DEFECTO_S[id] ?? 0) * 1000) / 1000);
+  const c0 = Math.max(0, Math.min(1, Number.isFinite(opciones.carga) ? (opciones.carga as number) : 0));
+  const subidaMs = opciones.subidaMs;
+  const subidaS = Math.max(0, Math.min(30, Number.isFinite(subidaMs) ? (subidaMs as number) / 1000 : SUBIDA_POR_DEFECTO_S * (1 - c0)));
+  /* Un canal (`hasta`) suena desde su punto más cercano al oyente. */
+  const hasta = opciones.hasta ?? null;
+  const posicion = opciones.posicion === undefined || opciones.posicion === null ? null : hasta === null ? opciones.posicion : puntoDelTramoMasCercano(opciones.posicion, hasta, m.oyente());
   const resueltas: Resueltas = {
     t,
     fuerza,
@@ -653,9 +860,11 @@ export function tocar(m: MotorDelSonido, id: IdDeSonido, opciones: OpcionesDeSon
     cuenta: opciones.cuenta ?? 1,
     duracionS,
     acento: opciones.aCompas === true ? acento : null,
+    c0,
+    subidaS,
+    distanciaM: posicion === null ? 0 : distancia(posicion, m.oyente()),
   };
   if (!m.admitir(id, receta.tope, t + receta.duracion(resueltas))) return MANEJO_INERTE;
-  const posicion = opciones.posicion ?? null;
   const v = m.voz({
     categoria: receta.categoria,
     camino: receta.camino,

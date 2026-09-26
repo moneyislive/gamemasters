@@ -43,6 +43,8 @@ import {
   VAIVEN_DE_LA_ESQUIRLA,
 } from './cuentas';
 import type { Familia } from './presupuesto';
+import { GLSL_ALTURA } from '../ciudad/reflejos';
+import { UNIFORMES_DE_LA_CIUDAD } from '../ciudad/retoques';
 import {
   flotante,
   GLSL_AZAR,
@@ -219,13 +221,14 @@ void main() {
 /* ─────────────────────────────── Cintas ─────────────────────────────── */
 
 const CINTAS_VERTICE = /* glsl */ `
+${GLSL_AZAR}
 ${GLSL_NIEBLA_PARS_VERTICE}
 attribute vec4 aA;        // xyz: principio; w: ancho en metros
 attribute vec4 aB;        // xyz: final; w: ancho mínimo en píxeles
-attribute vec4 aC;        // xyz: punto de control; w: tipo (0 apuntado, 1 bala, 2 hilo, 3 cable)
-attribute vec4 aColorA;   // rgb lineal en el principio; a: intensidad
-attribute vec4 aColorB;   // rgb lineal en el final; a: semilla
-attribute vec4 aTramo;    // cola (0-1), frente (0-1), flujo de glifos (m/s), destello
+attribute vec4 aC;        // xyz: punto de control (el rayo: su tangente en A); w: tipo (0 apuntado, 1 bala, 2 hilo, 3 cable, 4 rayo + rotura/2)
+attribute vec4 aColorA;   // rgb lineal en el principio; a: intensidad (el rayo: rgb del núcleo por su brillo)
+attribute vec4 aColorB;   // rgb lineal en el final; a: semilla (el rayo: rgb del velo por su brillo)
+attribute vec4 aTramo;    // cola (0-1), frente (0-1), flujo de glifos (m/s) o quiebro del rayo (m), destello o núcleo del rayo (px; <0 rama que se afila)
 uniform float uPxPorMetro;
 varying vec2 vUV;
 varying float vLargo;
@@ -234,6 +237,49 @@ varying vec4 vColor;
 varying vec4 vTramo;
 varying float vTipo;
 varying float vSemilla;
+varying vec3 vVeloQ;
+// EL RAYO (tipo 4): el tramo de un canal quebrado. Cada vértice de la cinta (doce segmentos) se aparta de la curva
+// por un azar sembrado, perpendicular al canal y con una envolvente que vale 0 en las puntas: dos tramos seguidos
+// empalman sin costura, y el canal entero sale quebrado a dos escalas (los puntos gruesos, de la CPU; los finos,
+// de aquí).
+vec3 curvaQ(float u, vec3 A, vec3 B, vec3 C) {
+  float w = 1.0 - u;
+  return w * w * A + 2.0 * u * w * C + u * u * B;
+}
+// Un vector unidad empaquetado en un float (octaedro, 12 bits por componente): la tangente del canal en la costura
+// con el tramo siguiente, para que los dos tramos pongan la cinta de lado igual y empalmen sin solaparse.
+vec3 desempaquetarQ(float p) {
+  float a = floor(p / 4096.0);
+  float b = p - a * 4096.0;
+  vec2 e = vec2(a, b) / 4095.0 * 2.0 - 1.0;
+  vec3 v = vec3(e.x, 1.0 - abs(e.x) - abs(e.y), e.y);
+  if (v.y < 0.0) v.xz = (1.0 - abs(v.zx)) * vec2(v.x >= 0.0 ? 1.0 : -1.0, v.z >= 0.0 ? 1.0 : -1.0);
+  return normalize(v);
+}
+// Un ruido de valor en 1D, con esquinas (interpolación lineal entre enteros): un quiebro, no una ola.
+float quiebro1Q(float x, float semilla) {
+  float i = floor(x);
+  float f = x - i;
+  return mix(azar2(i + 7.0, semilla), azar2(i + 8.0, semilla), f) * 2.0 - 1.0;
+}
+// Tres escalas, como un rayo de verdad: la gruesa (dos quiebros por tramo), la media (cuatro) y la fina (uno por
+// segmento), cada una con menos amplitud. Con sólo la fina el canal salía como una soga borrosa.
+float fractalQ(float x, float semilla) {
+  return 0.5 * quiebro1Q(x * 2.0, semilla) + 0.32 * quiebro1Q(x * 4.0, semilla + 101.0) + 0.28 * quiebro1Q(x * 12.0, semilla + 211.0);
+}
+vec3 quiebroQ(float i, vec3 A, vec3 B, float amp, float semilla) {
+  if (i < 0.5 || i > 11.5) return vec3(0.0);
+  vec3 eje = B - A;
+  float l = length(eje);
+  eje = l > 1e-4 ? eje / l : vec3(1.0, 0.0, 0.0);
+  vec3 n1 = abs(eje.y) < 0.95 ? normalize(cross(eje, vec3(0.0, 1.0, 0.0))) : vec3(1.0, 0.0, 0.0);
+  vec3 n2 = cross(eje, n1);
+  float x = i / 12.0;
+  float envolvente = min(1.0, 5.0 * x * (1.0 - x));
+  float h1 = fractalQ(x, semilla);
+  float h2 = fractalQ(x, semilla + 4099.0);
+  return (n1 * h1 + n2 * h2 * 0.8) * amp * envolvente;
+}
 void main() {
   float u = position.x;
   vec3 A = aA.xyz;
@@ -242,7 +288,30 @@ void main() {
   float w = 1.0 - u;
   vec3 P = w * w * A + 2.0 * u * w * C + u * u * B;
   vec3 T = 2.0 * w * (C - A) + 2.0 * u * (B - C);
+  vVeloQ = vec3(0.0);
+  // El seno del ángulo entre el tramo del rayo y la mirada: 1 de lado, casi 0 de punta (el rayo propio, por la espalda).
+  float senoQ = 1.0;
+  if (aC.w > 3.5) {
+    // El rayo va recto de A a B (aC.xyz no es un punto de control: es la tangente en A, la de la costura con el tramo
+    // de antes); aColorA.a trae empaquetada la tangente en B. Dentro, la tangente sale de los vecinos ya quebrados.
+    float i = floor(u * 12.0 + 0.5);
+    vec3 alOjoDelTramo = cameraPosition - (A + B) * 0.5;
+    vec3 ejeDelTramo = B - A;
+    senoQ = length(cross(ejeDelTramo, alOjoDelTramo)) / max(length(ejeDelTramo) * length(alOjoDelTramo), 1e-6);
+    // El quiebro fino, en proporción a lo que el tramo OCUPA en pantalla (como el grueso: aplanadoDelCanal en
+    // efectos/rayo.ts). De punta, un palmo de quiebro desbordaba el tramo entero y el canal era una maraña.
+    float amp = aTramo.z * clamp(senoQ / 0.6, 0.15, 1.0);
+    float s = mod(aColorB.a, 65536.0);
+    vec3 recta = (A + B) * 0.5;
+    vec3 P0 = curvaQ(max(i - 1.0, 0.0) / 12.0, A, B, recta) + quiebroQ(i - 1.0, A, B, amp, s);
+    vec3 P1 = curvaQ(min(i + 1.0, 12.0) / 12.0, A, B, recta) + quiebroQ(i + 1.0, A, B, amp, s);
+    P = curvaQ(i / 12.0, A, B, recta) + quiebroQ(i, A, B, amp, s);
+    T = P1 - P0;
+    if (i < 0.5 && dot(aC.xyz, aC.xyz) > 0.5) T = aC.xyz;
+    if (i > 11.5 && aColorA.a > 0.5) T = desempaquetarQ(aColorA.a - 1.0);
+  }
   if (length(T) < 1e-5) T = vec3(1.0, 0.0, 0.0);
+  float escorzoQ = 1.0;
   vec3 alOjo = cameraPosition - P;
   float distancia = max(length(alOjo), 1e-3);
   vec3 lado = cross(normalize(T), alOjo / distancia);
@@ -251,13 +320,43 @@ void main() {
   float ancho = max(aA.w, aB.w * distancia / max(uPxPorMetro, 1.0));
   vec3 mundo = P + lado * position.y * ancho * 0.5;
   gl_Position = projectionMatrix * viewMatrix * vec4(mundo, 1.0);
+  if (aC.w > 3.5) {
+    // EL RAYO SE ABRE EN PANTALLA, no en el mundo: el lado de la cinta sale de la tangente PROYECTADA. Un rayo que se
+    // aleja de la cámara (el disparo propio, visto por la espalda) va casi paralelo a la mirada, y ahí el lado del
+    // mundo (tangente × mirada) cambia de sentido de un vértice al siguiente: la cinta se retorcía y salía ruido.
+    vec3 Tn = normalize(T);
+    vec4 cP = projectionMatrix * viewMatrix * vec4(P, 1.0);
+    vec4 c0 = projectionMatrix * viewMatrix * vec4(P - Tn * 0.05, 1.0);
+    vec4 c1 = projectionMatrix * viewMatrix * vec4(P + Tn * 0.05, 1.0);
+    float aspecto = projectionMatrix[1][1] / projectionMatrix[0][0];
+    vec2 t2 = (c1.xy / max(c1.w, 1e-3) - c0.xy / max(c0.w, 1e-3)) * vec2(aspecto, 1.0);
+    float lt = length(t2);
+    t2 = lt > 1e-7 ? t2 / lt : vec2(1.0, 0.0);
+    float altoPx = max(uPxPorMetro, 1.0) * 2.0 / projectionMatrix[1][1];
+    float anchoPx = max(aA.w * uPxPorMetro / max(cP.w, 1e-3), aB.w);
+    vec2 desvio = vec2(-t2.y, t2.x) * position.y * anchoPx / altoPx;
+    desvio.x /= aspecto;
+    gl_Position = cP + vec4(desvio * cP.w, 0.0, 0.0);
+    mundo = P;
+    // EL ESCORZO: el rayo propio, visto por la espalda, va casi de punta, y sus veinte metros caben en un palmo de
+    // pantalla: el núcleo HDR entero, amontonado ahí y pasado por el brillo del posproceso, hacía una bola blanca que
+    // tapaba el quiebro. Cada tramo se apaga con el seno del ángulo entre él y la mirada: de lado, el hilo entero; de
+    // punta, el núcleo a la cuarta parte (sigue siendo lo más claro de la pantalla, pero se le ve la forma) y el velo,
+    // que es lo que se amontona en una mancha (o en un tubo de luz), a la doceava.
+    escorzoQ = smoothstep(0.08, 0.55, senoQ);
+  }
   vUV = vec2(u, position.y);
-  vLargo = length(C - A) + length(B - C);
+  vLargo = aC.w > 3.5 ? length(B - A) : length(C - A) + length(B - C);
   vAncho = ancho;
   vColor = vec4(mix(aColorA.rgb, aColorB.rgb, u), aColorA.a);
+  if (aC.w > 3.5) {
+    // El rayo: el núcleo y el velo, cada uno con su color, a todo lo largo (cada uno con su escorzo).
+    vColor = vec4(aColorA.rgb * mix(0.25, 1.0, escorzoQ), 1.0);
+    vVeloQ = aColorB.rgb * mix(0.08, 1.0, escorzoQ);
+  }
   vTramo = aTramo;
   vTipo = aC.w;
-  vSemilla = aColorB.a;
+  vSemilla = aC.w > 3.5 ? mod(aColorB.a, 65536.0) : aColorB.a;
   ${GLSL_NIEBLA_VERTICE}
 }
 `;
@@ -274,12 +373,40 @@ varying vec4 vColor;
 varying vec4 vTramo;
 varying float vTipo;
 varying float vSemilla;
+varying vec3 vVeloQ;
 void main() {
   float u = vUV.x;
   float v = vUV.y;
   float cola = vTramo.x;
   float frente = vTramo.y;
   if (u < cola || u > frente) discard;
+  if (vTipo > 3.5) {
+    // EL RAYO: un núcleo de uno o dos píxeles (medido en píxeles de pantalla, a cualquier distancia) y un velo
+    // que llena la cinta y se apaga hacia sus bordes. La luz no es uniforme a lo largo (un canal de verdad tiene
+    // tramos más vivos), y la estela, al enfriarse, se rompe en trozos. Sin glifos: esto es luz, no código.
+    float pxLado = 1.0 / max(fwidth(v), 1e-4);
+    float d = abs(v) * pxLado;
+    float nucleoPx = max(abs(vTramo.w), 0.35);
+    float nucleoR = exp(-(d * d) / (nucleoPx * nucleoPx));
+    float velo = exp(-abs(v) * 4.2) * (1.0 - abs(v));
+    float tramo = floor(u * vLargo * 0.6);
+    float n = azar2(tramo + 17.0, vSemilla);
+    float vivo = 0.8 + 0.2 * n;
+    // La rotura va en lo que pasa de 4 (4 + rotura/2). Con fract() no: el 4 interpolado sale a veces 3,9999999, su
+    // parte fraccionaria casi 1, y la cinta entera se llenaba de píxeles apagados sueltos (una trama de ruido).
+    float rotura = max(0.0, vTipo - 4.0) * 2.0;
+    // Los trozos se apagan con el borde suave (una estela no se corta a tijera), y la rotura entra poco a poco.
+    if (rotura > 0.001) vivo *= mix(1.0, smoothstep(rotura - 0.15, rotura + 0.3, n), min(1.0, rotura * 4.0));
+    // La punta de la guía mientras avanza (la de la cabeza: frente < 1), y la rama que se afila hacia su final.
+    float punta = frente < 0.999 ? exp(-max(0.0, frente - u) * vLargo * 2.2) * 2.5 : 0.0;
+    float afila = vTramo.w < 0.0 ? pow(max(0.0, 1.0 - (u - cola) / max(frente - cola, 1e-4) * 0.85), 1.6) : 1.0;
+    vec3 rgb = (vColor.rgb * nucleoR * (1.0 + punta) + vVeloQ * velo * (1.0 + 0.5 * punta)) * vivo * afila;
+    gl_FragColor = vec4(rgb, 1.0);
+    // Un destello se ve a través de la bruma, emborronado: la niebla lo apaga menos que a lo demás.
+    gl_FragColor.rgb *= 1.0 - 0.7 * nieblaQueApaga();
+    ${GLSL_SALIDA}
+    return;
+  }
   float nucleo = pow(max(0.0, 1.0 - abs(v)), 2.0);
   // Un espinazo de dos o tres píxeles por el centro, a cualquier distancia: la cinta es tan ancha
   // como sus glifos, y sin esto una línea de glifos de lejos sería una mancha sin dirección.
@@ -449,9 +576,10 @@ void main() {
 
 const ONDAS_VERTICE = /* glsl */ `
 ${GLSL_NIEBLA_PARS_VERTICE}
+${GLSL_ALTURA}
 attribute vec4 aCentro;   // xyz, radio (m)
-attribute vec4 aEje;      // normal xyz; w: 1 plano fijo, 0 de cara a la cámara
-attribute vec4 aForma;    // grosor (m), relleno (0-1), —, opacidad
+attribute vec4 aEje;      // w: 0 de cara a la cámara (x: cuánto se adelanta hacia ella, m); 1 plano fijo de normal xyz; 2 en el suelo (y: altura sobre él)
+attribute vec4 aForma;    // grosor (m), relleno (0-1), blancura o vuelta, modo (0 aro, 1 resplandor, 2 brasa, 3 corona), opacidad
 attribute vec3 aColor;
 varying vec2 vLocal;
 varying vec4 vForma;
@@ -460,7 +588,13 @@ varying float vRadio;
 void main() {
   vec3 e1;
   vec3 e2;
-  if (aEje.w > 0.5) {
+  vec3 centro = aCentro.xyz;
+  if (aEje.w > 1.5) {
+    // En el suelo: tumbado y posado en la acera o en la calzada (el mapa de alturas de la ciudad).
+    e1 = vec3(1.0, 0.0, 0.0);
+    e2 = vec3(0.0, 0.0, -1.0);
+    centro.y = alturaDelSueloQ(centro.xz) + aEje.y;
+  } else if (aEje.w > 0.5) {
     vec3 n = normalize(aEje.xyz);
     vec3 ref = abs(n.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     e1 = normalize(cross(ref, n));
@@ -468,10 +602,15 @@ void main() {
   } else {
     e1 = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
     e2 = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+    // Adelantado hacia la cámara lo que se pida (el truco de los halos): un resplandor pegado a una pared no se
+    // corta en seco contra ella.
+    vec3 alOjo = cameraPosition - centro;
+    float d = length(alOjo);
+    centro += alOjo / max(d, 1e-3) * min(max(aEje.x, 0.0), d * 0.5);
   }
   float lado = aCentro.w + aForma.x * 2.0;
   vLocal = position.xy * lado;
-  vec3 mundo = aCentro.xyz + (e1 * position.x + e2 * position.y) * lado;
+  vec3 mundo = centro + (e1 * position.x + e2 * position.y) * lado;
   gl_Position = projectionMatrix * viewMatrix * vec4(mundo, 1.0);
   vForma = aForma;
   vColor = aColor;
@@ -481,6 +620,7 @@ void main() {
 `;
 
 const ONDAS_FRAGMENTO = /* glsl */ `
+${GLSL_AZAR}
 ${GLSL_NIEBLA_PARS_FRAGMENTO}
 varying vec2 vLocal;
 varying vec4 vForma;
@@ -488,16 +628,51 @@ varying vec3 vColor;
 varying float vRadio;
 void main() {
   float r = length(vLocal);
-  float aa = max(fwidth(r), 1e-4);
-  float g = vForma.x;
-  float aro = 1.0 - smoothstep(g * 0.5 - aa, g * 0.5 + aa, abs(r - vRadio));
-  // Un aro de aire no es una línea: tiene un brillo suave por dentro del borde, que se apaga
-  // hacia el centro en cuatro grosores (no un disco gris: eso fue la primera versión).
-  float dentro = smoothstep(vRadio - g * 4.0, vRadio, r) * step(r, vRadio) * 0.25;
-  float disco = vForma.y * pow(max(0.0, 1.0 - r / max(vRadio, 1e-3)), 2.0);
-  float a = (aro + dentro * (1.0 - vForma.y) + disco * 2.0) * vForma.w;
+  float a;
+  vec3 rgb = vColor;
+  if (vForma.z > 2.5) {
+    // LA CORONA: el aro que se cierra hacia la mano que carga, a trazos que giran y chisporrotean (vForma.y es su
+    // vuelta, de 0 a 1). Un aro liso era una pegatina delante del personaje.
+    float aa = max(fwidth(r), 1e-4);
+    float g = vForma.x;
+    float aro = 1.0 - smoothstep(g * 0.5 - aa, g * 0.5 + aa, abs(r - vRadio));
+    float ang = atan(vLocal.y, vLocal.x) / 6.2831853 + 0.5;
+    float x = ang * 14.0 + vForma.y * 3.0;
+    float trazo = step(0.4, azar2(floor(x) + 64.0, floor(vForma.y * 24.0) + 3.0));
+    float dentro = fract(x);
+    trazo *= smoothstep(0.0, 0.2, dentro) * smoothstep(1.0, 0.65, dentro);
+    a = aro * trazo * vForma.w;
+  } else if (vForma.z > 1.5) {
+    // LA BRASA: la marca chamuscada del rayo en el suelo mojado. Grietas que brillan (un azar por celdas de 6 cm,
+    // más vivo hacia el centro) y un cerco que se apaga; el color y la fuerza los pone la CPU al enfriarse.
+    float q = r / max(vRadio, 1e-3);
+    if (q > 1.0) discard;
+    vec2 celda = floor(vLocal * 16.0 + 64.0);
+    float n = azar2(celda.x, celda.y + 7.0);
+    float grieta = smoothstep(0.55, 0.95, n) * (1.0 - q);
+    float cerco = exp(-q * q * 3.0) * 0.45;
+    a = (grieta * 1.6 + cerco) * (1.0 - q * q) * vForma.w;
+  } else if (vForma.z > 0.5) {
+    // EL RESPLANDOR: un núcleo pequeño que se quema a blanco (vForma.y dice cuánto) y un velo ancho que se apaga
+    // hacia el borde. Es la luz en el aire mojado, la del fogonazo de la boca y la del estallido.
+    float q2 = dot(vLocal, vLocal) / max(vRadio * vRadio, 1e-6);
+    if (q2 > 1.0) discard;
+    float nucleo = exp(-q2 * 30.0);
+    float velo = exp(-q2 * 4.5) * (1.0 - q2);
+    rgb = mix(vColor, vec3(1.0), nucleo * vForma.y);
+    a = (velo + nucleo * 1.8) * vForma.w;
+  } else {
+    float aa = max(fwidth(r), 1e-4);
+    float g = vForma.x;
+    float aro = 1.0 - smoothstep(g * 0.5 - aa, g * 0.5 + aa, abs(r - vRadio));
+    // Un aro de aire no es una línea: tiene un brillo suave por dentro del borde, que se apaga
+    // hacia el centro en cuatro grosores (no un disco gris: eso fue la primera versión).
+    float dentro = smoothstep(vRadio - g * 4.0, vRadio, r) * step(r, vRadio) * 0.25;
+    float disco = vForma.y * pow(max(0.0, 1.0 - r / max(vRadio, 1e-3)), 2.0);
+    a = (aro + dentro * (1.0 - vForma.y) + disco * 2.0) * vForma.w;
+  }
   if (a <= 0.002) discard;
-  gl_FragColor = vec4(vColor * a, 1.0);
+  gl_FragColor = vec4(rgb * a, 1.0);
   gl_FragColor.rgb *= 1.0 - nieblaQueApaga();
   ${GLSL_SALIDA}
 }
@@ -509,12 +684,13 @@ const CHISPAS_VERTICE = /* glsl */ `
 ${GLSL_NIEBLA_PARS_VERTICE}
 attribute vec3 aOrigen;
 attribute vec3 aVelocidad;
-attribute vec4 aTiempos;  // nace (s), vida (s), talla (m), semilla
+attribute vec4 aTiempos;  // nace (s), vida (s), talla (m; negativa: la chispa se enfría), semilla
 attribute vec3 aColor;
 uniform float uTiempo;
 varying vec2 vTrazo;
 varying float vEdad;
 varying vec3 vColor;
+varying float vEnfria;
 const vec3 GRAVEDAD = vec3(0.0, -9.0, 0.0);
 const float FRENO = 2.4;
 vec3 sitioEn(float tau) {
@@ -530,6 +706,7 @@ void main() {
     vTrazo = vec2(0.0);
     vEdad = 1.0;
     vColor = vec3(0.0);
+    vEnfria = 0.0;
     return;
   }
   vec3 cabeza = sitioEn(tau);
@@ -542,8 +719,11 @@ void main() {
   float l = length(lado);
   lado = l > 1e-5 ? lado / l : vec3(1.0, 0.0, 0.0);
   float s = tau / vida;
-  float talla = aTiempos.z * (1.0 - 0.6 * s);
-  vec3 mundo = mix(cola - eje * talla, cabeza + eje * talla * 0.5, position.x) + lado * position.y * talla * 0.5;
+  vEnfria = aTiempos.z < 0.0 ? 1.0 : 0.0;
+  float talla = abs(aTiempos.z) * (1.0 - 0.6 * s);
+  // La que se enfría (la del rayo) es un trazo de luz: sin la punta redonda de delante, sólo el rastro que deja.
+  float delante = aTiempos.z < 0.0 ? 0.15 : 0.5;
+  vec3 mundo = mix(cola - eje * talla, cabeza + eje * talla * delante, position.x) + lado * position.y * talla * 0.5;
   gl_Position = projectionMatrix * viewMatrix * vec4(mundo, 1.0);
   vTrazo = position.xy;
   vEdad = s;
@@ -557,10 +737,18 @@ ${GLSL_NIEBLA_PARS_FRAGMENTO}
 varying vec2 vTrazo;
 varying float vEdad;
 varying vec3 vColor;
+varying float vEnfria;
 void main() {
   float a = pow(max(0.0, 1.0 - abs(vTrazo.y)), 2.0) * (0.35 + 0.65 * vTrazo.x) * pow(1.0 - vEdad, 1.5) * 3.0;
+  vec3 color = vColor;
+  if (vEnfria > 0.5) {
+    // LA CHISPA INCANDESCENTE (la del rayo): nace blanca, se enfría al ámbar y al rojo, y el rastro se afila hacia
+    // atrás. Un metal que se enfría no se vuelve gris: se vuelve rojo y se apaga.
+    a = pow(max(0.0, 1.0 - abs(vTrazo.y)), 2.0) * vTrazo.x * vTrazo.x * pow(1.0 - vEdad, 1.2) * 3.0;
+    color = vColor * mix(vec3(1.0), vec3(1.0, 0.36, 0.07), smoothstep(0.03, 0.5, vEdad));
+  }
   if (a <= 0.002) discard;
-  gl_FragColor = vec4(vColor * a, 1.0);
+  gl_FragColor = vec4(color * a, 1.0);
   gl_FragColor.rgb *= 1.0 - nieblaQueApaga();
   ${GLSL_SALIDA}
 }
@@ -714,7 +902,9 @@ export function materialDe(familia: Familia, opciones: OpcionesDelMaterial = {})
         name: 'efectos-ondas',
         vertexShader: ONDAS_VERTICE,
         fragmentShader: ONDAS_FRAGMENTO,
-        uniforms: uniformes(niebla, {}),
+        /* El mapa de alturas de la ciudad (lo que está en el suelo se posa en la acera): los mismos objetos que la
+           ciudad, sin clonar. Sin ciudad (un banco), la textura vacía de three: todo a cota 0. */
+        uniforms: uniformes(niebla, { uAlturas: UNIFORMES_DE_LA_CIUDAD.uAlturas, uAlturasCaja: UNIFORMES_DE_LA_CIUDAD.uAlturasCaja }),
       });
     case 'chispas':
       return new THREE.ShaderMaterial({

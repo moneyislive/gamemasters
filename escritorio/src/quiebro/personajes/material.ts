@@ -51,6 +51,7 @@ import { GLSL_CIELO_REFLEJADO } from '../ciudad/glsl';
 import { GLSL_ALTURA } from '../ciudad/reflejos';
 import type { MallaFundida } from './malla';
 import { ZONAS_COMO_MUCHO } from './reparto';
+import { DESTELLOS_COMO_MUCHO, UNIFORMES_DEL_DESTELLO } from '../rayo/contrato';
 
 /** El verde-cian del código: el contorno de amenaza (§1). En sRGB. */
 export const COLOR_DE_AMENAZA = '#3ff2c2';
@@ -214,7 +215,12 @@ diffuseColor.a = 1.0;
  *   · una LUZ DE BORDE del color del aire (`uBordeDeLosCuerpos`, de la paleta de la luz): el cielo y la
  *     niebla que recortan la figura por detrás, sobre todo en hombros y cabeza. Va en el brillo (y no en
  *     la difusa) porque en una tela oscura el borde es brillo de Fresnel, no color;
- *   · lo MOJADO: con la humedad de la noche, lo que mira al cielo (hombros, cabeza, brazos) se alisa.
+ *   · lo MOJADO: con la humedad de la noche, lo que mira al cielo (hombros, cabeza, brazos) se alisa;
+ *   · EL DESTELLO DEL RAYO (`docs/quiebro/EL-RAYO.md` §4, `UNIFORMES_DEL_DESTELLO`): hasta cuatro destellos —la
+ *     carga en la mano, el fogonazo de la boca, el estallido— alumbran el cuerpo sin ninguna luz real (N0-N1 no
+ *     tienen, y poner una recompilaría la escena). En la difusa, con una caída que llega a cero en su alcance, lo que
+ *     mira hacia el destello entero y lo que le da la espalda un cuarto (la luz de un fogonazo rebota en todo). Los
+ *     escribe `efectos/rayo.ts`; apagados (alcance 0) no suman nada.
  *
  * Nada de esto toca el contorno (va después, sobre el color ya hecho) ni lo tenue ni el corte.
  */
@@ -222,6 +228,8 @@ const RETOQUE_LUZ_DEL_CUERPO: Retoque = {
   nombre: 'luz-del-cuerpo',
   orden: 50,
   uniformes: {
+    uDestelloQ: UNIFORMES_DEL_DESTELLO.uDestelloQ,
+    uDestelloColorQ: UNIFORMES_DEL_DESTELLO.uDestelloColorQ,
     uLuzCalle: UNIFORMES_DE_LA_CIUDAD.uLuzCalle,
     uLuzCalleCaja: UNIFORMES_DE_LA_CIUDAD.uLuzCalleCaja,
     uColorDeSodio: UNIFORMES_DE_LA_CIUDAD.uColorDeSodio,
@@ -248,13 +256,29 @@ uniform float uFarolas;
 uniform float uHumedad;
 uniform float uFarolasEnLosCuerpos;
 uniform vec3 uBordeDeLosCuerpos;
+uniform vec4 uDestelloQ[${String(DESTELLOS_COMO_MUCHO)}];
+uniform vec4 uDestelloColorQ[${String(DESTELLOS_COMO_MUCHO)}];
+vec3 destelloDelCuerpoQ(vec3 p, vec3 n) {
+  vec3 suma = vec3(0.0);
+  for (int k = 0; k < ${String(DESTELLOS_COMO_MUCHO)}; k++) {
+    vec4 d = uDestelloQ[k];
+    if (d.w <= 0.0) continue;
+    vec3 L = d.xyz - p;
+    float dist = length(L);
+    float caida = clamp(1.0 - dist / d.w, 0.0, 1.0);
+    float lado = dot(n, L / max(dist, 1e-3));
+    suma += uDestelloColorQ[k].rgb * caida * caida * (0.25 + 0.75 * max(lado, 0.0)) / (1.0 + dist * dist * 0.12);
+  }
+  return suma;
+}
 vec3 luzDelCuerpoQ(vec3 p, vec3 n) {
+  vec3 destello = destelloDelCuerpoQ(p, n);
   vec2 uvL = (p.xz + n.xz * 0.6 - uLuzCalleCaja.xy) * uLuzCalleCaja.zw;
-  if (uvL.x < 0.0 || uvL.y < 0.0 || uvL.x > 1.0 || uvL.y > 1.0) return vec3(0.0);
+  if (uvL.x < 0.0 || uvL.y < 0.0 || uvL.x > 1.0 || uvL.y > 1.0) return destello;
   vec4 m = texture(uLuzCalle, uvL);
   /* La farola está arriba: lo que mira hacia arriba la recibe más que lo que mira al suelo. */
   float haciaArriba = 0.55 + 0.45 * clamp(n.y + 0.4, 0.0, 1.0);
-  return (m.rgb + uColorDeSodio * m.a * uFarolas * uFarolasEnLosCuerpos) * haciaArriba;
+  return (m.rgb + uColorDeSodio * m.a * uFarolas * uFarolasEnLosCuerpos) * haciaArriba + destello;
 }`,
     },
     {

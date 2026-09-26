@@ -331,6 +331,50 @@ const PRUEBAS: readonly Prueba[] = [
       detalle: `pico ${cifra(picoAbs, 3)} · nivel ${cifra(nivel)} dBFS`,
     };
   },
+  async () => {
+    /*
+     * EL RAYO A 68,6 m (EL-RAYO.md §5): el chasquido llega cuando se pide (50 ms) y el trueno 200 ms después
+     * (d/343 s). La llegada es la primera ventana de 1 ms que pasa del 5 % de la más fuerte.
+     */
+    const LEJOS = 68.6;
+    const [trueno, rayo] = await Promise.all([
+      renderizar(1.2, (s) => {
+        s.sonar('trueno', { posicion: { x: 0, y: 1.7, z: -LEJOS }, enMs: 50 });
+      }),
+      renderizar(1.2, (s) => {
+        s.sonar('rayo', { posicion: { x: 0, y: 1.7, z: -LEJOS }, enMs: 50 });
+      }),
+    ]);
+    const llegada = (b: AudioBuffer): number => {
+      const env = envolvente(mono(b), 0, 1100, 1);
+      const pico = env.reduce((a, v) => Math.max(a, v), 0);
+      return env.findIndex((v) => v > pico * 0.05);
+    };
+    const tt = llegada(trueno);
+    const tr = llegada(rayo);
+    return {
+      nombre: 'el chasquido del rayo no se retrasa y el trueno llega con el retraso de su distancia (a 68,6 m, 200 ms)',
+      bien: tr >= 45 && tr <= 60 && tt >= 245 && tt <= 285,
+      detalle: `chasquido en ${String(tr)} ms (pedido en 50) · trueno en ${String(tt)} ms (esperado 250)`,
+    };
+  },
+  async () => {
+    /* LA CARGA sube de tono con la carga (de c 0 a 1 en 1,3 s: octava y media) y la voz acaba cuando se le dijo. */
+    const b = await renderizar(2.0, (s) => {
+      s.sonar('carga-rayo', { carga: 0, subidaMs: 1300, duracionMs: 1600 });
+    });
+    const m = mono(b);
+    const bajo = tonoPorAutocorrelacion(m, SR, ms(150), ms(400), 40, 400);
+    const alto = tonoPorAutocorrelacion(m, SR, ms(1300), ms(1550), 40, 400);
+    const sonando = db(rms(m, ms(200), ms(1500)));
+    /* Después sólo queda la cola de la calle (su envío de reverberación): 30 dB por debajo de lo que sonaba. */
+    const despues = db(rms(m, ms(1680), ms(2000)));
+    return {
+      nombre: 'la carga del rayo sube de tono al llenarse, suena mientras dura y calla al acabarse su voz',
+      bien: alto > bajo * 1.8 && sonando > -40 && despues - sonando < -30,
+      detalle: `tono ${cifra(bajo)} → ${cifra(alto)} Hz (×${cifra(alto / Math.max(1e-9, bajo), 2)}) · sonando ${cifra(sonando)} dBFS · después ${cifra(despues - sonando)} dB`,
+    };
+  },
 ];
 
 /** CORRE LA AUTOPRUEBA entera. `alAvanzar` recibe cada resultado según sale. */

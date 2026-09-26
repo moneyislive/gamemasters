@@ -99,7 +99,19 @@ import {
   tonoPorAutocorrelacion,
 } from '../src/quiebro/sonido/sintesis';
 import { RECETAS, IDS_DE_SONIDO, alturaDeLaEsquirla } from '../src/quiebro/sonido/voces';
+import type { IdDeSonido, OpcionesDeSonido } from '../src/quiebro/sonido/voces';
 import { crearSonido } from '../src/quiebro/sonido/index';
+import { crepitacionesDeLaCarga, puntoDelTramoMasCercano, retrasoDelTrueno, tonoDeLaCarga, VELOCIDAD_DEL_SONIDO_MS } from '../src/quiebro/sonido/cuentas';
+import { DURACION_DEL_TRUENO_S, truenoDelRayo } from '../src/quiebro/sonido/sintesis';
+import { RayoQueSuena, VOZ_DE_LA_CARGA_MS } from '../src/quiebro/sonido/rayo';
+import type { SonidoDelRayo } from '../src/quiebro/sonido/rayo';
+import { estadoDelRayoApagado } from '../src/quiebro/rayo/contrato';
+import type { EfectosDelRayo } from '../src/quiebro/rayo/contrato';
+
+/** El fuente sin comentarios: una regla que se cazara a sí misma en su comentario no valdría. */
+function sinComentariosDe(s: string): string {
+  return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
 
 const { comprobar, paso, nota, terminar } = arnes();
 const SR = 48000;
@@ -886,4 +898,304 @@ paso('El recetario y la puerta: las señales van claras, y sin WebAudio nada lan
   );
 }
 
-terminar({ escritas: 77, enVerde: 'El sonido del Quiebro dice la verdad sobre el tiempo.' });
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+paso('El rayo: el trueno que llega tarde, la carga que sube, y quien los toca (EL-RAYO.md §5)');
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+{
+  /* EL TRUENO, en búfer: estéreo, sembrado, que retumba en grave y acaba en silencio. */
+  const truenos = [401, 402, 403].map((s) => truenoDelRayo(SR, s));
+  const malos: string[] = [];
+  for (const [i, [izq, der]] of truenos.entries()) {
+    const n = `trueno ${String(i)}`;
+    if (izq.length !== Math.round(DURACION_DEL_TRUENO_S * SR) || der.length !== izq.length) malos.push(`${n}: dura ${String(izq.length)}`);
+    if (tieneNoFinitos(izq) || tieneNoFinitos(der)) malos.push(`${n}: NaN`);
+    const p = Math.max(pico(izq), pico(der));
+    if (p > 0.9 + 1e-6 || p < 0.5) malos.push(`${n}: pico ${p.toFixed(3)}`);
+    const cola = db(Math.max(rms(izq, izq.length - 0.05 * SR), rms(der, der.length - 0.05 * SR)) / p);
+    if (cola > -45) malos.push(`${n}: acaba a ${cola.toFixed(1)} dB`);
+    const r = correlacion(izq, der);
+    if (r > 0.9) malos.push(`${n}: los dos canales son casi el mismo (${r.toFixed(2)})`);
+  }
+  comprobar('los tres truenos: 3,4 s en estéreo de verdad, sin NaN, pico entre 0,5 y 0,9 y acaban en silencio (−45 dB)', truenos.length === 3 && malos.length === 0, malos);
+  const [izq] = truenos[0] as readonly [Float32Array, Float32Array];
+  const otroIgual = truenoDelRayo(SR, 401)[0];
+  comprobar(
+    'el trueno se siembra: la misma semilla da el mismo búfer (todos los aparatos oyen el mismo) y otra da otro',
+    otroIgual.every((v, i) => v === izq[i]) && !(truenos[1] as readonly [Float32Array, Float32Array])[0].every((v, i) => v === izq[i]),
+  );
+  /* Retumba: después del desgarro sigue sonando, y en grave (un paso bajo de un polo a 250 Hz). */
+  const desgarro = rms(izq, 0, 0.3 * SR);
+  const retumbo = rms(izq, 0.35 * SR, 2 * SR);
+  const grave = new Float32Array(izq.length);
+  const k = 1 - Math.exp((-2 * Math.PI * 250) / SR);
+  let y = 0;
+  for (let i = 0; i < izq.length; i++) {
+    y += k * ((izq[i] ?? 0) - y);
+    grave[i] = y;
+  }
+  const parteGrave = rms(grave, 0.35 * SR, 2 * SR) / Math.max(1e-9, retumbo);
+  comprobar(
+    'el trueno no es un golpe: después del desgarro retumba (a menos de 14 dB de él) y el retumbo es grave (más de un tercio bajo 250 Hz)',
+    db(retumbo / desgarro) > -14 && parteGrave > 0.35,
+    { retumboSobreDesgarro: db(retumbo / desgarro), parteGrave },
+  );
+
+  /* LAS CUENTAS: el retraso, el tono de la carga, las crepitaciones, el punto del canal. */
+  const retrasos = [0, 10, 68.6, 120, 343].map(retrasoDelTrueno);
+  comprobar(
+    'el trueno llega d/343 s tarde (a 68,6 m, 200 ms), acotado a su alcance, y nunca antes (ni con distancias locas)',
+    retrasos[0] === 0 &&
+      Math.abs((retrasos[2] as number) - 0.2) < 1e-9 &&
+      retrasos.every((r, i) => i === 0 || r >= (retrasos[i - 1] as number)) &&
+      retrasos[4] === ALCANCES.trueno.alcanceM / VELOCIDAD_DEL_SONIDO_MS &&
+      retrasoDelTrueno(Number.NaN) === 0 &&
+      retrasoDelTrueno(-5) === 0,
+    retrasos,
+  );
+  const tonos = Array.from({ length: 101 }, (_, i) => tonoDeLaCarga(i / 100));
+  const pasos = tonos.slice(1).map((t, i) => Math.log2(t / (tonos[i] as number)));
+  comprobar(
+    'la carga sube de tono octava y media, sin bajar nunca y más deprisa al final (el oído lee «ya casi»), y no se sale de ahí',
+    tonos[0] === 82 &&
+      Math.abs((tonos[100] as number) - 82 * 2 ** 1.5) < 1e-9 &&
+      pasos.every((p, i) => p > 0 && (i === 0 || p >= (pasos[i - 1] as number) - 1e-12)) &&
+      tonoDeLaCarga(-1) === 82 &&
+      tonoDeLaCarga(2) === tonos[100] &&
+      tonoDeLaCarga(Number.NaN) === 82,
+  );
+  const crepitas = crepitacionesDeLaCarga(0, 1.3, 4, 77);
+  const huecos = crepitas.slice(1).map((t, i) => t - (crepitas[i] as number));
+  const media = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+  const alPrincipio = media(huecos.filter((_, i) => (crepitas[i] as number) < 0.3));
+  const lleno = media(huecos.filter((_, i) => (crepitas[i] as number) > 1.4));
+  comprobar(
+    'las crepitaciones de la carga van cada vez más seguidas (al llenarse, a menos de la mitad del hueco del principio), en orden, dentro de la voz y sembradas',
+    crepitas.length > 20 &&
+      crepitas.length <= 400 &&
+      crepitas.every((t) => t >= 0 && t < 4) &&
+      huecos.every((h) => h >= 0.045 * 0.75 - 1e-9 && h <= 0.19 * 1.25 + 1e-9) &&
+      lleno < alPrincipio / 2 &&
+      crepitacionesDeLaCarga(0, 1.3, 4, 77).every((t, i) => t === crepitas[i]) &&
+      !crepitacionesDeLaCarga(0, 1.3, 4, 78).every((t, i) => t === crepitas[i]),
+    { cuantas: crepitas.length, alPrincipio, lleno },
+  );
+  const pc = puntoDelTramoMasCercano({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -40 }, { x: 5, y: 1, z: -10 });
+  const antesDelTramo = puntoDelTramoMasCercano({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -40 }, { x: 1, y: 0, z: 9 });
+  const nulo = puntoDelTramoMasCercano({ x: 3, y: 1, z: 2 }, { x: 3, y: 1, z: 2 }, { x: 0, y: 0, z: 0 });
+  comprobar(
+    'el trueno de un canal largo sale de su punto más cercano al oyente (el pie de la perpendicular, o la punta), y un canal nulo es su punto',
+    pc.x === 0 && pc.y === 0 && pc.z === -10 && antesDelTramo.z === 0 && nulo.x === 3 && nulo.y === 1 && nulo.z === 2,
+    { pc, antesDelTramo, nulo },
+  );
+
+  /* LAS RECETAS del rayo. */
+  const delRayo = ['carga-rayo', 'rayo', 'rayo-corto', 'trueno', 'rayo-fijado', 'rayo-listo'] as const;
+  const delMundo = (['carga-rayo', 'rayo', 'rayo-corto', 'trueno'] as const).filter((id) => RECETAS[id].camino !== 'mundo');
+  const avisos = (['rayo-fijado', 'rayo-listo'] as const).filter((id) => RECETAS[id].camino !== 'claro' || RECETAS[id].categoria === 'senales');
+  const base: Parameters<(typeof RECETAS)['trueno']['duracion']>[0] = {
+    t: 0,
+    fuerza: 1,
+    golpe: 'entrada',
+    material: 'chapa',
+    cuenta: 1,
+    duracionS: 1,
+    acento: null,
+    c0: 0,
+    subidaS: 1,
+    distanciaM: 100,
+  };
+  comprobar(
+    'el rayo tiene sus seis sonidos: la carga, el rayo, el chispazo y el trueno por el mundo (en el Remanso bajan de tono), el tic y el «listo» claros sin agachar el mundo, el rayo y el trueno con alcance de ~120 m, topes de 1 a 4, y el trueno cuenta su retraso en lo que dura',
+    delRayo.every((id) => (IDS_DE_SONIDO as readonly string[]).includes(id) && RECETAS[id].tope >= 1 && RECETAS[id].tope <= 4) &&
+      delMundo.length === 0 &&
+      avisos.length === 0 &&
+      RECETAS.rayo.alcance === 'trueno' &&
+      RECETAS.trueno.alcance === 'trueno' &&
+      ALCANCES.trueno.alcanceM >= 100 &&
+      ALCANCES.trueno.alcanceM <= 150 &&
+      RECETAS.trueno.duracion(base) >= 100 / VELOCIDAD_DEL_SONIDO_MS + DURACION_DEL_TRUENO_S,
+    { delMundo, avisos },
+  );
+  const fuente = (f: string): string => sinComentariosDe(readFileSync(new URL(`../src/quiebro/sonido/${f}`, import.meta.url), 'utf8'));
+  comprobar(
+    'el trueno que se precalienta y el que suena son los mismos búferes (las mismas semillas en `index.ts` y en `voces.ts`)',
+    /truenoDelRayo\(sr, 401 \+ k\)/.test(fuente('index.ts')) && /truenoDelRayo\(sr, 401 \+ variante\)/.test(fuente('voces.ts')) && /trueno-\$\{k\}/.test(fuente('index.ts')),
+  );
+
+  /* QUIEN LOS TOCA: el envoltorio de `sistema.rayo` (sonido/rayo.ts), con un espía debajo y un sonido de mentira. */
+  const llamadas: string[] = [];
+  const espia: EfectosDelRayo = {
+    empezarCarga: (q, t) => void llamadas.push(`empezar ${String(q)} ${String(t)}`),
+    actualizarCarga: (q, e, t) => void llamadas.push(`actualizar ${String(q)} ${String(e.c)} ${String(t)}`),
+    cancelarCarga: (q, t) => void llamadas.push(`cancelar ${String(q)} ${String(t)}`),
+    soltar: (d) => void llamadas.push(`soltar ${String(d.quien)} ${String(d.bala)}`),
+    estallar: (e) => void llamadas.push(`estallar ${String(e.quien)} ${String(e.bala)}`),
+  };
+  interface Sonado {
+    id: IdDeSonido;
+    o: OpcionesDeSonido;
+    parado: number;
+  }
+  const sonados: Sonado[] = [];
+  let devolverNada = false;
+  const sonido: SonidoDelRayo = {
+    sonar(id, o = {}) {
+      const s: Sonado = { id, o, parado: 0 };
+      sonados.push(s);
+      if (devolverNada) return undefined;
+      return { parar: () => void s.parado++, mover: () => undefined };
+    },
+  };
+  const donde = (q: number, salida: { x: number; y: number; z: number }): boolean => {
+    salida.x = q * 10;
+    salida.y = 1.35;
+    salida.z = 0;
+    return true;
+  };
+  const r = new RayoQueSuena(espia, sonido, (q) => q === 1, donde);
+  const doble = new RayoQueSuena(r, sonido, (q) => q === 1, donde);
+  const estado = estadoDelRayoApagado();
+  estado.activo = true;
+  estado.desdeMs = 1000;
+  const actualizar = (q: number, t: number, blanco = 0): void => {
+    estado.c = Math.min(1, (t - 1000) / 1300);
+    estado.blanco = blanco;
+    r.actualizarCarga(q, estado, t);
+  };
+  r.empezarCarga(1, 1000);
+  actualizar(1, 1020);
+  const antesDelRitmo = sonados.length;
+  actualizar(1, 1100);
+  const voz = sonados[sonados.length - 1];
+  for (let t = 1116; t < 6940; t += 16) actualizar(1, t);
+  const unaVoz = sonados.filter((s) => s.id === 'carga-rayo').length;
+  actualizar(1, 6960);
+  const relevo = sonados.filter((s) => s.id === 'carga-rayo')[1];
+  comprobar(
+    'la voz de la carga empieza cuando ya se sabe su ritmo (con lo que le falta para el pleno), no se repite cada fotograma y se releva, llena, antes de acabarse',
+    antesDelRitmo === 0 &&
+      voz?.id === 'carga-rayo' &&
+      Math.abs((voz.o.carga ?? -1) - 100 / 1300) < 1e-9 &&
+      Math.abs((voz.o.subidaMs ?? -1) - 1200) < 1e-6 &&
+      voz.o.posicion === null &&
+      voz.o.duracionMs === VOZ_DE_LA_CARGA_MS &&
+      unaVoz === 1 &&
+      relevo?.o.carga === 1 &&
+      relevo.o.subidaMs === 0,
+    { antesDelRitmo, voz: voz?.o, unaVoz, relevo: relevo?.o },
+  );
+  sonados.length = 0;
+  llamadas.length = 0;
+  r.empezarCarga(1, 1000);
+  for (const [t, blanco] of [
+    [1100, 0],
+    [1200, 20],
+    [1300, 20],
+    [1400, 21],
+    [1500, 0],
+    [2300, 21],
+    [2400, 21],
+    [2500, 21],
+  ] as const)
+    actualizar(1, t, blanco);
+  r.empezarCarga(2, 1000);
+  for (const [t, blanco] of [
+    [1100, 0],
+    [1200, 20],
+    [2300, 21],
+    [2500, 21],
+  ] as const)
+    actualizar(2, t, blanco);
+  const tics = sonados.filter((s) => s.id === 'rayo-fijado').length;
+  const listos = sonados.filter((s) => s.id === 'rayo-listo').length;
+  const vozAjena = sonados.find((s) => s.id === 'carga-rayo' && s.o.posicion !== null);
+  comprobar(
+    'el tic suena al fijar OTRO blanco (no al repetirlo ni al soltarlo) y el «listo» UNA vez al llegar al pleno; los dos sólo en mi carga, y la carga de otro suena desde su boca, más baja',
+    tics === 3 && listos === 1 && vozAjena !== undefined && vozAjena.o.posicion?.x === 20 && (vozAjena.o.fuerza ?? 1) < 1,
+    { tics, listos, vozAjena: vozAjena?.o },
+  );
+  const cargaPropia = sonados.find((s) => s.id === 'carga-rayo' && s.o.posicion === null);
+  sonados.length = 0;
+  const disparo = (quien: number, nivel: number, c: number): Parameters<RayoQueSuena['soltar']>[0] => ({
+    quien,
+    bala: quien === 1 ? 0 : 70 + nivel,
+    origen: { x: 1, y: 1.35, z: 0 },
+    destino: { x: 1, y: 1.35, z: -30 },
+    nivel,
+    c,
+    area: 0,
+    dio: null,
+    semilla: 5,
+    t: 3000,
+  });
+  r.soltar(disparo(1, 4, 1));
+  const pleno = sonados.map((s) => s.id).join(',');
+  const truenoDelPleno = sonados.find((s) => s.id === 'trueno');
+  const rayoPropio = sonados.find((s) => s.id === 'rayo');
+  sonados.length = 0;
+  r.soltar(disparo(2, 1, 0));
+  const chispazo = sonados.map((s) => s.id).join(',');
+  sonados.length = 0;
+  r.soltar(disparo(3, 2, 0.23));
+  const segundo = sonados.map((s) => s.id).join(',');
+  const rayoAjeno = sonados[0];
+  comprobar(
+    'al soltar se calla la carga; el pleno suena con el rayo (en el jugador) y el trueno (del canal, de la boca al destino); el chispazo, corto y sin trueno; el nivel 2, sin trueno; el de otro, desde su boca y en su instante',
+    (cargaPropia?.parado ?? 0) >= 1 &&
+      pleno === 'rayo,trueno' &&
+      rayoPropio?.o.posicion === null &&
+      truenoDelPleno?.o.posicion?.x === 1 &&
+      truenoDelPleno.o.hasta?.z === -30 &&
+      chispazo === 'rayo-corto' &&
+      segundo === 'rayo' &&
+      rayoAjeno?.o.posicion?.x === 1 &&
+      rayoAjeno.o.enMs === 3000,
+    { cargaParada: cargaPropia?.parado, pleno, chispazo, segundo },
+  );
+  sonados.length = 0;
+  r.estallar({ quien: 1, bala: 99, x: 1, y: 1.35, z: -30, nivel: 4, area: 0, t: 3040 });
+  const yaOido = sonados.length;
+  r.estallar({ quien: 5, bala: 120, x: 8, y: 1.35, z: 8, nivel: 4, area: 0, t: 3050 });
+  const sinDisparo = sonados.map((s) => s.id).join(',');
+  r.empezarCarga(4, 5000);
+  estado.desdeMs = 5000;
+  estado.c = 0.3;
+  r.actualizarCarga(4, estado, 5100);
+  const vozDel4 = sonados[sonados.length - 1];
+  r.cancelarCarga(4, 5200);
+  devolverNada = true;
+  let lanza = false;
+  try {
+    r.empezarCarga(6, 6000);
+    r.actualizarCarga(6, estado, 6100);
+    r.actualizarCarga(6, estado, 6116);
+    r.soltar(disparo(6, 4, 1));
+    r.cancelarCarga(6, 6200);
+    r.estallar({ quien: 7, bala: 130, x: 0, y: 0, z: 0, nivel: 1, area: 3, t: 6300 });
+    r.callar();
+  } catch {
+    lanza = true;
+  }
+  const pedidasSinManejo = sonados.filter((s) => s.id === 'carga-rayo' && s.o.carga === 0.3 && s.parado === 0).length;
+  comprobar(
+    'un `estalla` ya oído con su disparo no suena otra vez, uno sin disparo suena donde estalla; cancelar calla la carga; y con un sonido que no devuelve manejo nada lanza ni se pide la voz cada fotograma',
+    yaOido === 0 && sinDisparo === 'rayo,trueno' && vozDel4?.id === 'carga-rayo' && vozDel4.parado === 1 && !lanza && pedidasSinManejo === 1,
+    { yaOido, sinDisparo, vozDel4: vozDel4?.parado, lanza, pedidasSinManejo },
+  );
+  /* Y DELEGA: lo de debajo recibe cada llamada, una vez, en su orden (también envuelto dos veces). */
+  llamadas.length = 0;
+  doble.empezarCarga(9, 100);
+  doble.actualizarCarga(9, estado, 116);
+  doble.cancelarCarga(9, 132);
+  doble.soltar(disparo(9, 3, 0.6));
+  doble.estallar({ quien: 9, bala: 73, x: 0, y: 0, z: 0, nivel: 3, area: 1, t: 150 });
+  comprobar(
+    'el envoltorio del sonido DELEGA en el `sistema.rayo` que había cada llamada, una vez y en su orden, y no se envuelve dos veces (CONTRATO §5.8)',
+    doble.base === espia &&
+      llamadas.join(' | ') === `empezar 9 100 | actualizar 9 0.3 116 | cancelar 9 132 | soltar 9 73 | estallar 9 73`,
+    llamadas,
+  );
+  nota(`trueno: retumbo ${db(retumbo / desgarro).toFixed(1)} dB bajo el desgarro, ${(parteGrave * 100).toFixed(0)} % grave; crepitaciones de ${(alPrincipio * 1000).toFixed(0)} a ${(lleno * 1000).toFixed(0)} ms`);
+}
+
+terminar({ escritas: 91, enVerde: 'El sonido del Quiebro dice la verdad sobre el tiempo.' });

@@ -19,8 +19,17 @@
  * edificio. Cada pocos fotogramas se mira desde JavaScript si la recta en planta de la cámara a cada
  * fuente cruza alguna huella de edificio (muestras cada 2 m contra una rejilla), y las tapadas se
  * apagan. Lo que queda tapado por delante (un coche, un pilar) lo hace la prueba de profundidad.
+ *
+ * ═══ EL DESTELLO DEL RAYO, EN EL CHARCO ═══
+ *
+ * Detrás de las fuentes de la ciudad van siempre `DESTELLOS_COMO_MUCHO` tarjetas más, RESERVADAS (EL-RAYO.md §4: «en
+ * N0/N1, tarjeta y halo dinámicos en las mallas de la ciudad»): su fuente no está en los atributos sino en los
+ * uniformes del destello (`UNIFORMES_DEL_DESTELLO`, que escribe `efectos/rayo.ts` cada fotograma), así que el rayo se
+ * refleja en el suelo mojado sin escribir un atributo ni añadir una llamada. Apagadas (alcance 0), no pintan un
+ * píxel. Se marcan con `aColor.w` = 2 + su hueco (las farolas llevan 1 y lo demás 0).
  */
 import * as THREE from 'three';
+import { DESTELLOS_COMO_MUCHO, UNIFORMES_DEL_DESTELLO } from '../rayo/contrato';
 import { UNIFORMES_DE_LA_LUZ } from '../atmosfera/paleta';
 import { nieblaEn } from '../atmosfera/niebla';
 import { GLSL_CHARCOS, GLSL_RUIDO } from './glsl';
@@ -62,6 +71,8 @@ attribute vec4 aColor;
 attribute float aVisible;
 uniform float uFarolas;
 uniform float uTarjetas;
+uniform vec4 uDestelloQ[${String(DESTELLOS_COMO_MUCHO)}];
+uniform vec4 uDestelloColorQ[${String(DESTELLOS_COMO_MUCHO)}];
 ${GLSL_ALTURA}
 varying vec2 vQ;
 varying vec3 vColor;
@@ -70,6 +81,16 @@ varying float vSueloQ;
 varying vec2 vMedidaQ;
 void main() {
   vec3 L = aFuente.xyz;
+  float tamano = aFuente.w;
+  vec3 colorDeLaFuente = aColor.rgb * mix(1.0, uFarolas, step(0.5, aColor.w) * step(aColor.w, 1.5));
+  if (aColor.w > 1.5) {
+    // Una tarjeta reservada para el destello del rayo: su fuente, de los uniformes (apagada, color 0: se descarta).
+    int k = int(aColor.w - 1.5);
+    vec4 d = uDestelloQ[k];
+    L = d.xyz;
+    tamano = 0.25 + d.w * 0.03;
+    colorDeLaFuente = d.w > 0.0 ? uDestelloColorQ[k].rgb * 0.35 : vec3(0.0);
+  }
   vec3 cam = cameraPosition;
   float camY = max(cam.y, 0.4);
   float t = camY / (camY + max(L.y, 0.1));
@@ -79,14 +100,14 @@ void main() {
   vec2 dir = d > 1e-3 ? hacia / d : vec2(0.0, 1.0);
   vec2 lado = vec2(-dir.y, dir.x);
   float dist0 = length(p0 - cam.xz);
-  float ancho = aFuente.w * t * 0.9 + 0.04 + dist0 * 0.002;
+  float ancho = tamano * t * 0.9 + 0.04 + dist0 * 0.002;
   float largo = ancho * 1.5 + (L.y + camY) * 0.28 + dist0 * 0.22;
   vec2 xz = p0 + dir * position.y * 2.0 * largo + lado * position.x * 2.0 * ancho;
   float y = alturaDelSueloQ(xz) + 0.01;
   vec4 mvPosition = viewMatrix * vec4(xz.x, y, xz.y, 1.0);
   gl_Position = projectionMatrix * mvPosition;
   vQ = position.xy * 2.0;
-  vColor = aColor.rgb * mix(1.0, uFarolas, aColor.w) * aVisible * uTarjetas;
+  vColor = colorDeLaFuente * aVisible * uTarjetas;
   vPosQ = vec3(xz.x, y, xz.y);
   vSueloQ = y;
   vMedidaQ = vec2(ancho, largo);
@@ -136,6 +157,8 @@ export function materialDeLasTarjetas(): THREE.ShaderMaterial {
       uHumedad: UNIFORMES_DE_LA_CIUDAD.uHumedad,
       uFarolas: UNIFORMES_DE_LA_CIUDAD.uFarolas,
       uTarjetas: UNIFORMES_DE_LA_LUZ.uTarjetas,
+      uDestelloQ: UNIFORMES_DEL_DESTELLO.uDestelloQ,
+      uDestelloColorQ: UNIFORMES_DEL_DESTELLO.uDestelloColorQ,
       uAlturas: UNIFORMES_DE_LA_CIUDAD.uAlturas,
       uAlturasCaja: UNIFORMES_DE_LA_CIUDAD.uAlturasCaja,
     },
@@ -243,17 +266,31 @@ export class RejillaDeHuellas {
   }
 }
 
-/** Las listas instanciadas de unas fuentes, con sitio para `n` (lo que sobra, a cero). */
+/**
+ * Las listas instanciadas de unas fuentes, con sitio para `n` más las tarjetas reservadas del destello, que van
+ * justo detrás de las fuentes (lo que sobra después, a cero). Se pintan `fuentes.length + DESTELLOS_COMO_MUCHO`.
+ */
 function datosDeLasTarjetas(fuentes: readonly FuenteDeReflejo[], n: number): { aFuente: Float32Array; aColor: Float32Array; aVisible: Float32Array } {
-  const aFuente = new Float32Array(Math.max(1, n) * 4);
-  const aColor = new Float32Array(Math.max(1, n) * 4);
-  const aVisible = new Float32Array(Math.max(1, n));
+  const total = Math.max(n, fuentes.length) + DESTELLOS_COMO_MUCHO;
+  const aFuente = new Float32Array(total * 4);
+  const aColor = new Float32Array(total * 4);
+  const aVisible = new Float32Array(total);
   fuentes.forEach((f, i) => {
     aFuente.set([f.x, f.y, f.z, f.tamano], i * 4);
     aColor.set([f.color[0], f.color[1], f.color[2], f.farola ? 1 : 0], i * 4);
     aVisible[i] = 1;
   });
+  for (let k = 0; k < DESTELLOS_COMO_MUCHO; k++) {
+    const i = fuentes.length + k;
+    aColor[i * 4 + 3] = 2 + k;
+    aVisible[i] = 1;
+  }
   return { aFuente, aColor, aVisible };
+}
+
+/** Cuántas tarjetas se pintan con estas fuentes: ellas y las reservadas del destello. */
+export function tarjetasQueSePintan(fuentes: number): number {
+  return fuentes + DESTELLOS_COMO_MUCHO;
 }
 
 /** Hasta dónde se miran las fuentes: más lejos, la niebla ya se las ha comido. */
@@ -280,7 +317,9 @@ export class TarjetasDeReflejo {
     const visible = new THREE.InstancedBufferAttribute(d.aVisible, 1);
     visible.setUsage(THREE.DynamicDrawUsage);
     plano.setAttribute('aVisible', visible);
-    this.malla = new THREE.InstancedMesh(plano, material, fuentes.length);
+    /* Las reservadas del destello van detrás de las fuentes (ver la cabecera): el `count` las cuenta. */
+    this.malla = new THREE.InstancedMesh(plano, material, n + DESTELLOS_COMO_MUCHO);
+    this.malla.count = tarjetasQueSePintan(fuentes.length);
     this.malla.name = 'quiebro-tarjetas-de-reflejo';
     /* La posición la calcula el sombreador desde la cámara: la esfera de las instancias no dice nada. */
     this.malla.frustumCulled = false;
@@ -291,7 +330,7 @@ export class TarjetasDeReflejo {
   poner(fuentes: readonly FuenteDeReflejo[], tapan: readonly CajaXZ[], camara: THREE.Vector3): void {
     this.fuentes = fuentes;
     this.rejilla = new RejillaDeHuellas(tapan);
-    rellenarInstancias(this.malla, datosDeLasTarjetas(fuentes, fuentes.length), fuentes.length);
+    rellenarInstancias(this.malla, datosDeLasTarjetas(fuentes, fuentes.length), tarjetasQueSePintan(fuentes.length));
     this.actualizar(camara, true);
   }
 

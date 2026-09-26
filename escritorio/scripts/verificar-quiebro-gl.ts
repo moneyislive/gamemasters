@@ -39,6 +39,8 @@
  *     de fxc sólo se apuntan.
  *   · (10) LA PÉRDIDA DE CONTEXTO, sólo en informe hasta la ola 4: la luminancia media antes y después de forzar
  *     `WEBGL_lose_context` y restaurar.
+ *   · EL RAYO ENCHUFADO (`docs/quiebro/EL-RAYO.md`): con el banco del rayo en N3, medido en la página, el canal se
+ *     pinta, el estallido alumbra la calle, llega el fogonazo de pantalla y todo se va; ver `juzgarElRayoEnLaGpu`.
  *
  * ═══ CÓMO SE SABE QUE MIRA ═══
  *
@@ -312,10 +314,111 @@ async function elBanco(puerto: string): Promise<{ readonly resultado: ResultadoD
   return { resultado: JSON.parse(json) as ResultadoDelBancoGl, arbolDelDom: arbol, salto: null };
 }
 
+/* ═══════════════════════════════ EL RAYO EN LA GPU ═══════════════════════════════ */
+
+/**
+ * EL RAYO, ENCHUFADO Y VISTO (`docs/quiebro/EL-RAYO.md` §4 y §8): el banco del rayo (`banco-quiebro-rayo.html`, con
+ * la ciudad, los cuerpos, las luces y el posproceso de N3, como el juego) fotografía un pleno DE LADO antes de cargar
+ * (−1.500 ms: la referencia), en la primera descarga (33), entre dos descargas (50) y con la estela a medio enfriar
+ * (300), y MIDE cada foto en la página (`medir=1`, `medirLaFoto` de `rayo/banco.tsx`). Aquí se juzga que:
+ *
+ *   · SE PINTA EL CANAL: en su camino, la luz sube (la estela a 300 ms, cuando lo demás ya se ha ido; y la descarga);
+ *   · EL ESTALLIDO ALUMBRA LA CALLE: la mitad de abajo de la foto, lejos del canal y del blanco, sube en la descarga
+ *     (el foco reservado de N3: sin él, o sin `evaluarLosRayos` que lo apunta, sube menos de la mitad);
+ *   · LLEGA EL FOGONAZO DE PANTALLA: entre dos descargas, la franja de arriba (a donde el foco no llega) sube;
+ *   · Y SE APAGA: a 300 ms, abajo y arriba vuelven a como estaban.
+ *
+ * Los umbrales, CALIBRADOS con las cuatro mutaciones de la revisión 1 (una copia del árbol sin cada conexión; las
+ * medidas, en `MEDIDAS_DESENCHUFADAS`): el sano da canal 141/241, luz +65, fogonazo ×1,133; sin la pieza el canal
+ * da 10, sin el foco la luz +39, sin `evaluarLosRayos` +31 y ×1,026, sin la imagen al compositor ×1,037.
+ */
+export interface MedidaDelRayo {
+  readonly t: number;
+  readonly canal: number;
+  readonly abajo: number;
+  readonly arriba: number;
+  readonly media: number;
+}
+const CONSULTA_DEL_RAYO = 'nivel=3&luz=madrugada&distancia=8&ojo=27.6,1.6,46&mira=23.4,1.3,46&medir=1&hoja=-1500,33,50,300&panel=0';
+const UMBRALES_DEL_RAYO = { canalEnLaEstela: 60, canalEnLaDescarga: 120, luz: 45, fogonazo: 1.08, luzQueQueda: 8, fogonazoQueQueda: 1.02 } as const;
+
+export function juzgarElRayoEnLaGpu(medidas: readonly MedidaDelRayo[]): string[] {
+  const de = (t: number): MedidaDelRayo | undefined => medidas.find((m) => m.t === t);
+  const ref = de(-1500);
+  const pico = de(33);
+  const entre = de(50);
+  const estela = de(300);
+  if (ref === undefined || pico === undefined || entre === undefined || estela === undefined) return ['faltan fotos (−1500, 33, 50, 300)'];
+  const u = UMBRALES_DEL_RAYO;
+  const malos: string[] = [];
+  if (!(estela.canal >= u.canalEnLaEstela)) malos.push(`no se pinta el canal: su estela a 300 ms sube la luz ${estela.canal.toFixed(1)} en su camino (< ${String(u.canalEnLaEstela)})`);
+  if (!(pico.canal >= u.canalEnLaDescarga)) malos.push(`no se pinta el canal en la descarga: ${pico.canal.toFixed(1)} (< ${String(u.canalEnLaDescarga)})`);
+  if (!(pico.abajo - ref.abajo >= u.luz)) malos.push(`el estallido no alumbra la calle: la mitad de abajo sube ${(pico.abajo - ref.abajo).toFixed(1)} (< ${String(u.luz)})`);
+  if (!(entre.arriba / ref.arriba >= u.fogonazo)) malos.push(`no llega el fogonazo de pantalla: arriba ×${(entre.arriba / ref.arriba).toFixed(3)} entre descargas (< ×${String(u.fogonazo)})`);
+  if (!(estela.abajo - ref.abajo <= u.luzQueQueda && estela.arriba / ref.arriba <= u.fogonazoQueQueda)) malos.push('a 300 ms la luz o el fogonazo siguen ahí');
+  return malos;
+}
+
+/** Las medidas de las mutaciones de la revisión 1 (N3, esta escena): el juez tiene que ponerlas todas en rojo. */
+const MEDIDAS_DESENCHUFADAS: Readonly<Record<string, readonly MedidaDelRayo[]>> = {
+  'sin evaluarLosRayos': [
+    { t: -1500, canal: 0, abajo: 28.6, arriba: 50.7, media: 39.5 },
+    { t: 33, canal: 241.5, abajo: 59.5, arriba: 59.1, media: 74.8 },
+    { t: 50, canal: 209.2, abajo: 43.5, arriba: 52.0, media: 51.7 },
+    { t: 300, canal: 140.8, abajo: 30.7, arriba: 50.7, media: 41.7 },
+  ],
+  'sin la pieza del rayo': [
+    { t: -1500, canal: 0, abajo: 28.6, arriba: 50.7, media: 39.5 },
+    { t: 33, canal: 61.4, abajo: 78.5, arriba: 60.9, media: 74.6 },
+    { t: 50, canal: 36.6, abajo: 60.2, arriba: 57.2, media: 62.1 },
+    { t: 300, canal: 10.5, abajo: 30.7, arriba: 50.8, media: 41.2 },
+  ],
+  'sin la imagen al compositor': [
+    { t: -1500, canal: 0, abajo: 28.6, arriba: 50.7, media: 39.5 },
+    { t: 33, canal: 240.0, abajo: 84.6, arriba: 61.6, media: 89.8 },
+    { t: 50, canal: 210.7, abajo: 56.0, arriba: 52.6, media: 59.5 },
+    { t: 300, canal: 140.4, abajo: 30.7, arriba: 50.7, media: 41.7 },
+  ],
+  'sin el foco': [
+    { t: -1500, canal: 0, abajo: 28.6, arriba: 50.7, media: 39.5 },
+    { t: 33, canal: 241.0, abajo: 67.7, arriba: 67.1, media: 83.4 },
+    { t: 50, canal: 214.4, abajo: 47.9, arriba: 56.8, media: 56.6 },
+    { t: 300, canal: 141.2, abajo: 30.8, arriba: 50.7, media: 41.7 },
+  ],
+};
+
+async function elBancoDelRayo(puerto: string): Promise<{ readonly medidas: readonly MedidaDelRayo[] | null; readonly arbolDelDom: string | null; readonly salto: string | null }> {
+  if (!existsSync(EDGE)) return { medidas: null, arbolDelDom: null, salto: `no está Edge en ${EDGE}` };
+  const perfil = process.env['PERFIL_EDGE'] ?? join(carpetaDeTrabajo(), `quiebro-gl-edge-${puerto}`);
+  mkdirSync(perfil, { recursive: true });
+  const r = spawnSync(
+    EDGE,
+    [
+      '--headless=new',
+      '--disable-gpu-sandbox',
+      '--use-angle=d3d11',
+      '--enable-unsafe-swiftshader',
+      `--user-data-dir=${perfil}`,
+      '--window-size=1000,600',
+      '--virtual-time-budget=90000',
+      '--hide-scrollbars',
+      '--dump-dom',
+      `http://localhost:${puerto}/sala/banco-quiebro-rayo.html?${CONSULTA_DEL_RAYO}`,
+    ],
+    { encoding: 'utf8', timeout: 600_000, maxBuffer: 256 * 1024 * 1024 },
+  );
+  const dom = r.stdout ?? '';
+  const arbol = /id="banco-arbol"[^>]*data-arbol="([^"]*)"/.exec(dom)?.[1] ?? /data-arbol="([^"]*)"[^>]*id="banco-arbol"/.exec(dom)?.[1] ?? null;
+  const m = /<pre id="medidas-del-rayo"[^>]*>([\s\S]*?)<\/pre>/.exec(dom);
+  if (m === null) return { medidas: null, arbolDelDom: arbol, salto: null };
+  const json = (m[1] as string).replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  return { medidas: JSON.parse(json) as MedidaDelRayo[], arbolDelDom: arbol, salto: null };
+}
+
 /* ═══════════════════════════════ LAS COMPROBACIONES ═══════════════════════════════ */
 
 /** Las comprobaciones que el guion hace hoy con todo a mano (servidor de este árbol, Edge y fxc). Con menos, sale con 2. */
-const ESCRITAS = 37;
+const ESCRITAS = 40;
 
 async function principal(): Promise<void> {
   paso('el banco de la GPU, del Vite de ESTE árbol');
@@ -406,6 +509,27 @@ async function principal(): Promise<void> {
   const x = r.contexto;
   nota(x === null ? 'sin WEBGL_lose_context: no se ha podido forzar' : `luminancia media ${x.antes.toFixed(2)} antes y ${x.despues.toFixed(2)} después (${x.restaurado ? 'restaurado' : 'SIN restaurar'}); nadie escucha la pérdida hasta la ola 4`);
 
+  paso('el rayo, enchufado y visto: el banco del rayo en N3, medido');
+  const rayo = await elBancoDelRayo(puerto);
+  if (rayo.salto !== null) nota(`${rayo.salto}: no se ha mirado el rayo`);
+  else {
+    const medidas = rayo.medidas;
+    comprobar(
+      `el banco del rayo sale de ESTE árbol y dejó sus cuatro medidas`,
+      rayo.arbolDelDom !== null && normal(rayo.arbolDelDom) === normal(ARBOL) && medidas !== null && medidas.length === 4,
+      { arbol: rayo.arbolDelDom, medidas },
+    );
+    if (medidas !== null) nota(`rayo: ${medidas.map((x) => `t${String(x.t)} canal ${x.canal.toFixed(1)} abajo ${x.abajo.toFixed(1)} arriba ${x.arriba.toFixed(1)}`).join(' · ')}`);
+    const malos = medidas === null ? ['sin medidas'] : juzgarElRayoEnLaGpu(medidas);
+    comprobar('el rayo se VE en la GPU: el canal se pinta (y su estela), el estallido alumbra la calle (el foco), llega el fogonazo de pantalla y a los 300 ms se ha ido', malos.length === 0, malos);
+    const desenchufados = Object.entries(MEDIDAS_DESENCHUFADAS).map(([que, m]) => ({ que, malos: juzgarElRayoEnLaGpu(m) }));
+    comprobar(
+      'vacuna del juez del rayo: con las medidas del rayo desenchufado (sin evaluarLosRayos, sin la pieza, sin la imagen al compositor, sin el foco), rojo en las cuatro',
+      desenchufados.every((d) => d.malos.length > 0),
+      desenchufados,
+    );
+  }
+
   paso('§7.4 con fxc: las instrucciones del HLSL de ANGLE, contra su tope');
   const fxc = buscarFxc();
   if (fxc === null) {
@@ -474,5 +598,5 @@ await principal();
 terminar({
   escritas: ESCRITAS,
   enVerde:
-    'La ciudad del Quiebro, en la GPU de verdad y servida por este árbol: las reglas gemelas dan lo mismo en GLSL que en JS, todo material enlaza en N0-N3 y en cada estado del pintor con sus programas en su tope, un cambio N1 → N2 enlaza y sube lo que le cabe, su libro de bytes cabe en §7.3 y sus sombreadores en las instrucciones de §7.4.',
+    'La ciudad del Quiebro, en la GPU de verdad y servida por este árbol: las reglas gemelas dan lo mismo en GLSL que en JS, todo material enlaza en N0-N3 y en cada estado del pintor con sus programas en su tope, un cambio N1 → N2 enlaza y sube lo que le cabe, su libro de bytes cabe en §7.3 y sus sombreadores en las instrucciones de §7.4; y el rayo se ve enchufado (canal, luz y fogonazo).',
 });

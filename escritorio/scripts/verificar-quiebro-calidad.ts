@@ -62,15 +62,26 @@ import {
 import {
   DESENFOCAR,
   EXTRAER,
+  FOGONAZO,
   LADO_DE_LA_LUT_EN_EL_UBER,
   UBER,
   UNIFORMES_DE_DESENFOCAR,
   UNIFORMES_DE_EXTRAER,
+  UNIFORMES_DEL_FOGONAZO,
   UNIFORMES_DEL_UBER,
   UNIFORMES_DEL_VELO,
   VELO,
   VERTICE_DE_PANTALLA,
 } from '../src/quiebro/posproceso/sombreadores';
+
+/**
+ * Las lecturas de textura del uber antes del rayo (contadas en el código del uber del contrato, 9641b1b, con los trozos
+ * que interpola y sin comentarios): el rayo no suma ninguna. Las `texture(` a secas, y las llamadas a `leer(` (el
+ * ayudante del uber que lee la imagen: cada llamada es una lectura más, o seis en el bucle del Remanso), sin contar su
+ * definición: una llamada nueva a `leer` (un desenfoque en el golpe, por ejemplo) no cambia las `texture(`.
+ */
+const LECTURAS_DEL_UBER_ANTES_DEL_RAYO = 8;
+const LLAMADAS_A_LEER_ANTES_DEL_RAYO = 4;
 import { LINEA_DE_FABRICA, ponerElTonoPropio, textoDelTonoPropio } from '../src/quiebro/posproceso/tono';
 import { ShaderChunk } from 'three';
 import * as THREE from 'three';
@@ -827,18 +838,47 @@ paso('Cada sombreador declara exactamente los uniformes que su material le da');
     ['extraer', EXTRAER, UNIFORMES_DE_EXTRAER],
     ['desenfocar', DESENFOCAR, UNIFORMES_DE_DESENFOCAR],
     ['velo', VELO, UNIFORMES_DEL_VELO],
+    ['fogonazo', FOGONAZO, UNIFORMES_DEL_FOGONAZO],
   ];
   const mal = pares
     .map(([que, texto, lista]) => ({ que, declarados: uniformesDeclarados(texto), lista }))
     .filter((x) => !mismoConjunto(x.declarados, x.lista));
-  comprobar('los cuatro, uniforme por uniforme', mal.length === 0, mal);
+  comprobar('los cinco, uniforme por uniforme', mal.length === 0, mal);
+  /*
+   * EL RAYO EN EL UBER (EL-RAYO.md §7: «0 lecturas extra en el posproceso»): el fogonazo y el golpe son uniformes, no
+   * pasadas ni lecturas. El fogonazo sólo MULTIPLICA (lo alumbrado se dispara y los negros siguen negros: un velo
+   * blanco sumado lava la noche entera), y el uber lee las mismas texturas que antes del rayo.
+   */
+  const codigoDelUber = UBER.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const usosDelFogonazo = codigoDelUber.split('\n').filter((l) => l.includes('uFogonazo') && !/^\s*uniform\b/.test(l));
+  comprobar(
+    'el fogonazo del rayo en el uber sólo multiplica lo que hay (nunca suma luz a los negros)',
+    usosDelFogonazo.length >= 1 && usosDelFogonazo.every((l) => /\*=?\s*\(?\s*1\.0 \+ [0-9.]+ \* uFogonazo\b/.test(l)),
+    usosDelFogonazo,
+  );
+  /** Las lecturas de un uber: sus `texture(` y sus llamadas a `leer(` (sin la definición del ayudante). */
+  const lecturasDe = (codigo: string): { texturas: number; leer: number } => ({
+    texturas: (codigo.match(/\btexture(2D)?\s*\(/g) ?? []).length,
+    leer: (codigo.match(/\bleer\s*\(/g) ?? []).length - (codigo.match(/\bvec3\s+leer\s*\(/g) ?? []).length,
+  });
+  const comoAntes = (l: { texturas: number; leer: number }): boolean => l.texturas === LECTURAS_DEL_UBER_ANTES_DEL_RAYO && l.leer === LLAMADAS_A_LEER_ANTES_DEL_RAYO;
+  const lecturasDelUber = lecturasDe(codigoDelUber);
+  comprobar(
+    `el rayo no añade lecturas al uber: las mismas ${String(LECTURAS_DEL_UBER_ANTES_DEL_RAYO)} texture( y ${String(LLAMADAS_A_LEER_ANTES_DEL_RAYO)} llamadas a leer( de antes (el golpe y la aberración reutilizan las suyas)`,
+    comoAntes(lecturasDelUber),
+    lecturasDelUber,
+  );
+  comprobar(
+    'VACUNA de las lecturas: una llamada a leer( de más, o una texture( de más, en una copia del uber, no son «las de antes»',
+    !comoAntes(lecturasDe(`${codigoDelUber}\nvec3 deMas( vec2 uv ) { return leer( uv * 0.98 ); }`)) && !comoAntes(lecturasDe(`${codigoDelUber}\nvec4 deMas2( vec2 uv ) { return texture( tDiffuse, uv ); }`)),
+  );
   comprobar(
     'VACUNA: el lector de uniformes ve uno de más y uno de menos',
     !mismoConjunto(uniformesDeclarados(`${VELO}\nuniform float uDeMas;`), UNIFORMES_DEL_VELO) &&
       !mismoConjunto(uniformesDeclarados(VELO), [...UNIFORMES_DEL_VELO, 'uQueFalta']) &&
       uniformesDeclarados(UBER).length === UNIFORMES_DEL_UBER.length,
   );
-  const todos = [VERTICE_DE_PANTALLA, UBER, EXTRAER, DESENFOCAR, VELO];
+  const todos = [VERTICE_DE_PANTALLA, UBER, EXTRAER, DESENFOCAR, VELO, FOGONAZO];
   comprobar(
     'ninguno incluye `colorspace_pars_fragment` (three ya lo pone en `ShaderMaterial`: repetido no compila)',
     todos.every((t) => !t.includes('colorspace_pars_fragment')),
@@ -1118,7 +1158,7 @@ paso('Las palancas de la ciudad por nivel no bajan al subir de nivel, campo a ca
 }
 
 terminar({
-  escritas: 80,
+  escritas: 83,
   enVerde:
     'Los niveles son los del §8; el gobernador baja deprisa, sube a prueba, no vuelve a lo que falló y no se deja engañar por la pestaña oculta; el sondeo arranca a cada aparato donde toca; la gradación respeta la paleta y la LUT es su fórmula; el tono de N0 entra en la three instalada; los sombreadores declaran lo que sus materiales les dan; lo que se va a pintar se compila antes, sin esperar al compilador en el fotograma que lo usa; y ninguna palanca de la ciudad baja al subir de nivel.',
 });

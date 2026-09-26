@@ -42,6 +42,7 @@ const ORDEN: Readonly<Record<Pieza, number>> = {
   chispas: 6,
   ondas: 7,
   trazos: 8,
+  rayos: 9,
   anillos: 20,
   marco: 21,
 };

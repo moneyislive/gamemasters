@@ -37,9 +37,9 @@ import { hayWebAudio, MotorDelSonido } from './motor';
 import type { CalidadDelSonido, Camino, CategoriaDeSonido, EstadoDelSonido, OpcionesDelMotor } from './motor';
 import { MusicaDelQuiebro } from './musica';
 import type { EstadoDeLaMusica } from './musica';
-import { MANEJO_INERTE, RECETAS, tocar } from './voces';
+import { MANEJO_INERTE, RECETAS, tocar, TRUENOS } from './voces';
 import type { IdDeSonido, ManejoDeSonido, OpcionesDeSonido } from './voces';
-import { aleteo, chapaGolpeada, cristalRoto, cuerdaPulsada, golpeteoEnToldo, gotasDeLluvia, ruido, timbreDeCabina } from './sintesis';
+import { aleteo, chapaGolpeada, cristalRoto, cuerdaPulsada, golpeteoEnToldo, gotasDeLluvia, ruido, timbreDeCabina, truenoDelRayo } from './sintesis';
 
 export type { ManejoDelAnillo } from './anillo';
 export type { EstadoDelAmbiente } from './ambiente';
@@ -278,6 +278,11 @@ const BUFERES: readonly [string, (sr: number) => Float32Array<ArrayBuffer> | rea
   ['cuerda-110', (sr) => cuerdaPulsada(sr, 110, 2.2, 110)],
   ['cuerda-220', (sr) => cuerdaPulsada(sr, 220, 2.2, 220)],
   ['cuerda-440', (sr) => cuerdaPulsada(sr, 440, 2.2, 440)],
+  // Los truenos del rayo: las mismas semillas que `hacerTrueno` en `voces.ts` (401 + variante).
+  ...Array.from({ length: TRUENOS }, (_, k): [string, (sr: number) => readonly [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>]] => [
+    `trueno-${k}`,
+    (sr) => truenoDelRayo(sr, 401 + k),
+  ]),
 ];
 
 /**

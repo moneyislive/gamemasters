@@ -21,6 +21,7 @@
  * (el frente de personajes lo pinta aparte).
  */
 import * as THREE from 'three';
+import { FOCO_DEL_DESTELLO } from '../efectos/rayo';
 import type { PaletaDeLaLuz } from './paleta';
 
 /** Una farola que puede encender una luz real. */
@@ -76,11 +77,40 @@ export interface OpcionesDeLasLuces {
   readonly sombras: number;
 }
 
+/*
+ * ═══ EL FOCO DEL DESTELLO (EL-RAYO.md §4) ═══
+ *
+ * Donde hay luces de verdad (N2-N3, `reales` > 0), un FOCO más, reservado: visible, sin sombra y con intensidad 0
+ * mientras no hay rayo. Nunca se quita ni se pone (cambiar el número de luces recompila la escena entera): se
+ * enciende. Cada fotograma sigue al destello más fuerte que eligió el rayo (`FOCO_DEL_DESTELLO` de `efectos/rayo.ts`:
+ * el estallido, el fogonazo de la boca o la carga) colgado un par de metros por encima y mirando al suelo, con el
+ * cono abierto: así alumbra EN DIFUSA el suelo mojado, las fachadas bajas y los cuerpos (una luz puntual a la ciudad
+ * sólo le da brillo: el retoque `solo-brillo` de `ciudad/retoques.ts`; los focos se evalúan después y no lo tienen).
+ * Su coste en los sombreadores de la ciudad lo mide `verify:quiebro-gl` con fxc (el banco monta estas mismas luces).
+ */
+/**
+ * Cuántas candelas por unidad de destello: el estallido del pleno llega a unos 2,9 (≈ 160 cd, como una farola, pero
+ * a menos de tres metros del suelo en vez de a cinco: el corro que alumbra es tres veces más claro que el de una
+ * farola). Con más (llegó a ser 500 cd), el suelo y las fachadas de alrededor salían más claros que el propio canal, y
+ * desde el hombro el suelo mojado entre quien dispara y el blanco (y el blanco mismo) se quemaban a blanco y el brillo
+ * del posproceso los volvía un velo sobre media pantalla; en un rayo de verdad lo más claro es SIEMPRE el canal.
+ */
+export const CANDELAS_POR_DESTELLO = 55;
+/**
+ * A qué altura sobre el destello cuelga el foco, y su cono (medio ángulo, rad) y su penumbra. Más bajo, el blanco
+ * (con la cabeza a medio metro de la luz) se quemaba entero a blanco.
+ */
+export const ALTO_DEL_FOCO = 2.8;
+export const CONO_DEL_FOCO = 1.3;
+export const PENUMBRA_DEL_FOCO = 0.85;
+
 export class LucesDeLaNoche {
   readonly grupo = new THREE.Group();
   readonly hemisferio: THREE.HemisphereLight;
   readonly direccional: THREE.DirectionalLight;
   private readonly reales: THREE.PointLight[] = [];
+  /** El foco del destello del rayo (ver arriba), sólo donde hay luces de verdad. */
+  readonly focoDelDestello: THREE.SpotLight | null;
   private readonly destino: (FarolaEncendible | null)[] = [];
   /** Las farolas que pueden encenderse: una lista fija (el barrio) o la que dé la ventana de celdas ahora. */
   private readonly farolas: () => readonly FarolaEncendible[];
@@ -123,6 +153,33 @@ export class LucesDeLaNoche {
       this.destino.push(null);
       this.grupo.add(luz);
     }
+    if (opciones.reales > 0) {
+      const foco = new THREE.SpotLight(new THREE.Color('#ffffff'), 0, 12, CONO_DEL_FOCO, PENUMBRA_DEL_FOCO, 2);
+      foco.name = 'quiebro-foco-del-destello';
+      foco.castShadow = false;
+      foco.position.set(0, -50, 0);
+      foco.target.position.set(0, -60, 0);
+      this.grupo.add(foco);
+      this.grupo.add(foco.target);
+      this.focoDelDestello = foco;
+    } else this.focoDelDestello = null;
+  }
+
+  /** El foco del destello sigue al destello más fuerte del rayo en este fotograma (ver arriba). */
+  private seguirElDestello(): void {
+    const foco = this.focoDelDestello;
+    if (foco === null) return;
+    const d = FOCO_DEL_DESTELLO;
+    if (!(d.intensidad > 0.02)) {
+      if (foco.intensity !== 0) foco.intensity = 0;
+      return;
+    }
+    foco.position.set(d.x, d.y + ALTO_DEL_FOCO, d.z);
+    foco.target.position.set(d.x, 0, d.z);
+    foco.target.updateMatrixWorld();
+    foco.color.setRGB(d.r / d.intensidad, d.g / d.intensidad, d.b / d.intensidad);
+    foco.intensity = d.intensidad * CANDELAS_POR_DESTELLO;
+    foco.distance = (d.alcance + ALTO_DEL_FOCO) * 1.4;
   }
 
   /**
@@ -171,6 +228,7 @@ export class LucesDeLaNoche {
       this.direccional.target.updateMatrixWorld();
     }
 
+    this.seguirElDestello();
     if (this.reales.length === 0) return;
     this.reloj += dt;
     if (this.reloj >= 0.3) {

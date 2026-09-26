@@ -19,6 +19,12 @@
  *      juego no cambia con el nivel, y los triángulos que se declaran son los de la geometría que se
  *      monta DE VERDAD (construida aquí con three, sin GPU).
  *   6. EL SISTEMA de ranuras no confunde un anillo viejo con uno nuevo, no crece, y siembra igual.
+ *   7. EL RAYO (EL-RAYO.md) es un destello: llega en 50 ms como mucho, sus descargas caben en 90 ms y a 300 ms
+ *      no queda casi nada; el fogonazo es uno, breve y sólo desde media carga; la onda llega al área exacta; el
+ *      canal se siembra y se quiebra sin desbocarse; la tangente empaquetada no pierde; su paleta es la del
+ *      jugador; es UNA pieza nueva y N0 sigue en 12 llamadas; el impacto propio predicho se concilia con el de
+ *      la sala; la luz del estallido se enciende y se apaga; y en `escenificar.ts` la carga de otro sale de su
+ *      estado de cargar, se cancela con gracia, no se cancela si sale su bala, y su pleno cercano sacude.
  *
  * ═══ CÓMO SE SABE QUE MIRA ═══
  *
@@ -107,6 +113,43 @@ import type { Nivel, RenglonDePieza } from '../src/quiebro/efectos/presupuesto';
 import { geometriaDeLaPieza, triangulosDe } from '../src/quiebro/efectos/geometrias';
 import { FUENTES_DE_LAS_FAMILIAS, materialDe } from '../src/quiebro/efectos/materiales';
 import { Anillos, crearSistemaDeEfectos } from '../src/quiebro/efectos/sistema';
+import { COLORES } from '../src/quiebro/efectos/cuentas';
+import { POR_NIVEL, RAYOS_A_LA_VEZ } from '../src/quiebro/efectos/presupuesto';
+import {
+  COLORES_DEL_RAYO,
+  DESCARGAS_MS,
+  FOCO_DEL_DESTELLO,
+  FOGONAZO_MAXIMO,
+  ONDA_SIN_AREA_M,
+  brilloDelCanal,
+  descargasDelRayo,
+  desempaquetarDireccion,
+  duracionDeLaOnda,
+  empaquetarDireccion,
+  evaluarLosRayos,
+  fogonazoDelRayo,
+  golpeDelRayo,
+  llegadaDelRayo,
+  ondaDelSuelo,
+  puntosDelCanal,
+} from '../src/quiebro/efectos/rayo';
+import { UNIFORMES_DEL_DESTELLO, cargaDe, estadoDelRayoApagado } from '../src/quiebro/rayo/contrato';
+import type { DisparoDelRayo, EfectosDelRayo } from '../src/quiebro/rayo/contrato';
+import '../../shared/arcade/juegos';
+import { avanzarConMotivo, vistaDeAsiento } from '../../shared/arcade';
+import { lizaDeLaMesa } from '../../shared/arcade/juegos/lizas';
+import { ACCION_DEL_QUIEBRO, ESTADO_DEL_QUIEBRO, NIVELES_DEL_RAYO } from '../../shared/arcade/juegos/quiebro-reglas';
+import type { NivelDelRayo } from '../../shared/arcade/juegos/quiebro-reglas';
+import { leerVistaDelQuiebro } from '../../shared/arcade/juegos/quiebro-vista';
+import { deNumero, UNO } from '../../shared/mecanicas/fijo';
+import { paradaDeLaBalaEn } from '../../shared/mecanicas/liza/proyectiles';
+import type { EfectoDeclarado, LizaDeclarada, PuestaDeEstado, TiroDeclarado } from '../../shared/mecanicas/liza/declaracion';
+import type { SucesoDelTic } from '../../shared/mecanicas/liza/protocolo';
+import { leerLaLiza } from '../src/quiebro/red/diccionario';
+import { Escenificador } from '../src/quiebro/red/escenificar';
+import type { Partida } from '../src/quiebro/red/partida';
+import type { BalaVista, EstadoVisto, Novedad } from '../src/quiebro/red/sala-vista';
+import type { Sonido } from '../src/quiebro/sonido';
 
 /* ─────────────────────────────── El arnés, en corto ─────────────────────────────── */
 
@@ -905,4 +948,537 @@ paso('El sistema: asas que caducan, ranuras que no crecen, chispas que se siembr
   );
 }
 
-terminar(75);
+/* ─────────────────────────────── 8. El rayo ─────────────────────────────── */
+
+/**
+ * LOS JUECES DEL RAYO (EL-RAYO.md §4: «prácticamente no se ve, es un destello»), cada uno con su vacuna. Reciben lo
+ * que juzgan y devuelven lo que está mal (vacío = bien).
+ */
+function juzgarLaLlegada(llegada: (c: number) => number, descargas: (c: number, n: Nivel) => number): string[] {
+  const malos: string[] = [];
+  for (let k = 0; k <= 20; k++) {
+    const c = k / 20;
+    const l = llegada(c);
+    if (!(l >= 25 && l <= 50)) malos.push(`c ${String(c)}: llega en ${String(l)} ms`);
+    for (const n of NIVELES) {
+      const d = descargas(c, n);
+      if (!(d >= 1 && d <= 3) || (DESCARGAS_MS[d - 1] as number) > 90) malos.push(`N${String(n)} c ${String(c)}: ${String(d)} descargas`);
+    }
+  }
+  if (descargas(0, 3) !== 1) malos.push('el chispazo lleva más de una descarga');
+  if (descargas(1, 3) < 2) malos.push('el pleno de N3 no repite la descarga');
+  return malos;
+}
+
+function juzgarElDestello(brillo: (ms: number, c: number, d: number) => number): string[] {
+  const malos: string[] = [];
+  for (const c of [0, 0.58, 1]) {
+    const d = descargasDelRayo(c, 3);
+    const l = llegadaDelRayo(c);
+    let pico = 0;
+    for (let ms = 0; ms <= 600; ms++) pico = Math.max(pico, brillo(ms, c, d));
+    if (!(pico >= 0.9)) malos.push(`c ${String(c)}: el pico es ${pico.toFixed(2)}`);
+    if (brillo(l - 1, c, d) > 0.5 * pico) malos.push(`c ${String(c)}: antes de llegar ya brilla`);
+    const queda = brillo(l + 300, c, d) / pico;
+    if (queda > 0.05) malos.push(`c ${String(c)}: a 300 ms de llegar queda el ${(queda * 100).toFixed(0)} %`);
+    for (let k = 1; k < d; k++) {
+      const en = l + (DESCARGAS_MS[k] as number);
+      if (!(brillo(en, c, d) > brillo(en - 3, c, d) * 1.5)) malos.push(`c ${String(c)}: la descarga ${String(k + 1)} no se ve`);
+    }
+  }
+  return malos;
+}
+
+function juzgarElFogonazo(fogonazo: (ms: number, c: number) => number, golpe: (ms: number, c: number) => number): string[] {
+  const malos: string[] = [];
+  for (const c of [0, 0.2, 0.5]) for (let ms = 0; ms <= 400; ms += 2) if (fogonazo(ms, c) !== 0 || (c < 0.5 && golpe(ms, c) !== 0)) malos.push(`c ${String(c)} en ${String(ms)} ms`);
+  const l = llegadaDelRayo(1);
+  let pico = 0;
+  let antes = Number.POSITIVE_INFINITY;
+  let sube = false;
+  for (let ms = l; ms <= l + 400; ms++) {
+    const f = fogonazo(ms, 1);
+    pico = Math.max(pico, f);
+    if (f > antes + 1e-12) sube = true;
+    antes = f;
+  }
+  if (!(pico > 0 && pico <= FOGONAZO_MAXIMO)) malos.push(`el pico del pleno es ${String(pico)}`);
+  if (sube) malos.push('el fogonazo vuelve a subir: no es UNO');
+  if (fogonazo(l + 150, 1) > 0.05 * pico) malos.push('a 150 ms sigue el fogonazo');
+  return malos;
+}
+
+function juzgarLaOnda(onda: (ms: number, area: number) => { radio: number; fuerza: number }): string[] {
+  const malos: string[] = [];
+  for (const area of [0, 1, 2, 3]) {
+    const dura = duracionDeLaOnda(area);
+    const final = area > 0 ? area : ONDA_SIN_AREA_M;
+    if (onda(dura, area).radio !== final) malos.push(`área ${String(area)}: llega a ${String(onda(dura, area).radio)}`);
+    let antes = 0;
+    for (let ms = 0; ms <= dura; ms += 5) {
+      const r = onda(ms, area).radio;
+      if (r < antes - 1e-9 || r > final + 1e-9) malos.push(`área ${String(area)}: ${String(r)} en ${String(ms)} ms`);
+      antes = r;
+    }
+    if (onda(dura * 1.6, area).radio !== 0) malos.push(`área ${String(area)}: no se apaga`);
+  }
+  return malos;
+}
+
+/** Una mesa por la misma puerta que la de verdad (como `verificar-quiebro-rayo.ts`), y su tiro si aún no lo declara. */
+function lizaConTiro(): LizaDeclarada | null {
+  let estado: unknown = undefined;
+  const asientos = ['s1', 's2', 's3'];
+  const sentados = asientos.map((asiento) => ({ asiento, nombre: asiento }));
+  const mandar = (quien: string | null, tipo: string, carga: unknown): void => {
+    const s = avanzarConMotivo('quiebro', estado, { tipo, carga }, { quien, azar: 20260926, tic: 0, asientos });
+    if (s.motivo === null) estado = s.estado;
+  };
+  const vista = (): unknown => vistaDeAsiento('quiebro', estado, null, sentados);
+  mandar('s1', 'empezar', null);
+  const enLaBajada = leerVistaDelQuiebro(vista());
+  if (enLaBajada?.reloj !== null && enLaBajada?.reloj !== undefined) mandar(null, 'arcade:reloj', { id: enLaBajada.reloj.id });
+  const l = lizaDeLaMesa('quiebro', vista(), 'RAYOS');
+  if (l === null || l.asientos.every((a) => a.tiro !== null && a.tiro !== undefined)) return l;
+  const puesta = (e: number, tics: number): PuestaDeEstado => ({ estado: e, tics, intocableTics: 0, soltableDesdeTic: tics, distanciaExtra: 0 });
+  const efecto = (dano: number, p: PuestaDeEstado | null, empuje: number): EfectoDeclarado => ({
+    dano,
+    danoAlRitmo: dano,
+    puntos: 10,
+    puntosAlRitmo: 10,
+    puesta: p,
+    empuje,
+    alChocar: { dano: 0, tics: 0 },
+    rompeGuardia: false,
+  });
+  let cargar = 0;
+  for (const e of l.estados) cargar = Math.max(cargar, e.id);
+  cargar++;
+  let primera = 0;
+  for (const p of l.proyectiles) primera = Math.max(primera, p.id);
+  primera++;
+  const deja = (n: NivelDelRayo): PuestaDeEstado => puesta(ESTADO_DEL_QUIEBRO[n.deja], n.dejaTics);
+  const tiro: TiroDeclarado = {
+    apuntar: ACCION_DEL_QUIEBRO.apuntarRayo,
+    soltar: ACCION_DEL_QUIEBRO.soltarRayo,
+    puesta: puesta(cargar, 40),
+    niveles: NIVELES_DEL_RAYO.map((n, i) => ({
+      desdeMs: n.desdeMs,
+      proyectil: primera + i,
+      ancho: deNumero(0.2),
+      area: deNumero(n.areaMetros),
+      efectoDelArea: n.areaMetros === 0 ? null : efecto(n.dano, deja(n), deNumero(n.empujeMetros)),
+      recargaTics: n.recargaTics,
+    })),
+    enganche: { radio: deNumero(45), conoRumbos: 8, holgura: deNumero(0.5) },
+    holgura: deNumero(0.6),
+    cargaMaximaMs: 2000,
+  };
+  const balas = NIVELES_DEL_RAYO.map((n, i) => ({
+    id: primera + i,
+    apuntarTics: 1,
+    balas: 1,
+    cadaTics: 0,
+    velocidad: deNumero(400),
+    radio: deNumero(0.05),
+    alcance: deNumero(n.alcanceMetros),
+    efecto: efecto(n.dano, deja(n), deNumero(n.empujeMetros)),
+  }));
+  return {
+    ...l,
+    asientos: l.asientos.map((a) => ({ ...a, tiro })),
+    estados: [...l.estados, { id: cargar, bloqueaPaso: true, bloqueaAccion: false, cancelaCon: [], seCortaConDano: true }],
+    proyectiles: [...l.proyectiles, ...balas],
+  };
+}
+
+paso('El rayo: un destello que llega en tres fotogramas, se siembra, cabe, alumbra, se apaga, y el de otro se ve cargar');
+{
+  const llegada = juzgarLaLlegada(llegadaDelRayo, descargasDelRayo);
+  comprobar(
+    'el rayo llega en 50 ms como mucho (el pleno en 25): el chispazo es UNA descarga y el pleno de N3 se repite, todo dentro de 90 ms',
+    llegada.length === 0,
+    llegada,
+  );
+  const destello = juzgarElDestello(brilloDelCanal);
+  comprobar('el canal es un destello: nada antes de llegar la cabeza, un pico por descarga y a 300 ms menos del 5 % del pico', destello.length === 0, destello);
+  const fogonazo = juzgarElFogonazo(fogonazoDelRayo, golpeDelRayo);
+  comprobar(
+    'el fogonazo de pantalla es UNO, breve (a 150 ms, menos del 5 %) y tope 6 %, y ni él ni el golpe salen hasta media carga',
+    fogonazo.length === 0,
+    fogonazo,
+  );
+  const onda = juzgarLaOnda((ms, area) => ondaDelSuelo(ms, area));
+  comprobar('la onda del suelo crece sin volver atrás hasta el radio EXACTO del área (o 1 m sin área) y se apaga', onda.length === 0, onda);
+  comprobar(
+    'VACUNA: los jueces del rayo ven uno que tarda 80 ms, un canal que se queda encendido, un fogonazo en el chispazo y una onda que no llega',
+    juzgarLaLlegada((c) => 80 - 25 * c, descargasDelRayo).length > 0 &&
+      juzgarLaLlegada(llegadaDelRayo, () => 1).length > 0 &&
+      juzgarElDestello((ms, c, d) => Math.max(0.3, brilloDelCanal(ms, c, d))).length > 0 &&
+      juzgarElFogonazo((ms) => 0.03 * Math.exp(-ms / 45), golpeDelRayo).length > 0 &&
+      juzgarLaOnda((ms, area) => ({ radio: 0.9 * ondaDelSuelo(ms, area).radio, fuerza: 1 })).length > 0,
+  );
+
+  /* EL CANAL, sembrado y quebrado. */
+  const a = new Float32Array(13 * 3);
+  const b = new Float32Array(13 * 3);
+  let rectos = 0;
+  let desbocados = 0;
+  let mal = 0;
+  let mirados = 0;
+  for (let semilla = 1; semilla <= 60; semilla++) {
+    for (const c of [0, 1]) {
+      mirados++;
+      puntosDelCanal(semilla, 0, 1.35, 0, 0, 1.35, -30, c, 12, a);
+      puntosDelCanal(semilla, 0, 1.35, 0, 0, 1.35, -30, c, 12, b);
+      if (!a.every((v, i) => v === b[i] && Number.isFinite(v))) mal++;
+      if (a[0] !== 0 || Math.abs((a[1] as number) - 1.35) > 1e-6 || a[36] !== 0 || Math.abs((a[38] as number) + 30) > 1e-5) mal++;
+      let mayor = 0;
+      for (let k = 1; k < 12; k++) {
+        const lado = Math.abs(a[k * 3] as number);
+        const alto = Math.abs((a[k * 3 + 1] as number) - 1.35);
+        mayor = Math.max(mayor, lado);
+        if (lado > 3 + 1e-5 || alto > 1.65 + 1e-5) desbocados++;
+      }
+      if (mayor < 0.3) rectos++;
+    }
+  }
+  puntosDelCanal(2, 0, 1.35, 0, 0, 1.35, -30, 1, 12, b);
+  puntosDelCanal(1, 0, 1.35, 0, 0, 1.35, -30, 1, 12, a);
+  comprobar(
+    'el canal se siembra (la misma semilla, el mismo rayo en todos los aparatos; otra, otro), sale de la boca, llega a su sitio, se quiebra y no se aparta más de 3 m',
+    mirados === 120 && mal === 0 && rectos === 0 && desbocados === 0 && !a.every((v, i) => v === b[i]),
+    { mirados, mal, rectos, desbocados },
+  );
+  let peorGrado = 0;
+  let noCabe = 0;
+  let empaquetadas = 0;
+  for (let k = 0; k < 4000; k++) {
+    const u = ((k * 0.61803398875) % 1) * 2 - 1;
+    const f = ((k * 0.7548776662) % 1) * Math.PI * 2;
+    const r = Math.sqrt(1 - u * u);
+    const x = r * Math.cos(f);
+    const y = u;
+    const z = r * Math.sin(f);
+    const p = empaquetarDireccion(x, y, z);
+    if (Math.fround(1 + p) !== 1 + p) noCabe++;
+    const [ux, uy, uz] = desempaquetarDireccion(p);
+    peorGrado = Math.max(peorGrado, (Math.acos(Math.min(1, x * ux + y * uy + z * uz)) * 180) / Math.PI);
+    empaquetadas++;
+  }
+  comprobar(
+    'la tangente de la costura viaja empaquetada en un float sin perder: vuelve con menos de 0,2° de error y cabe entera en la mantisa',
+    empaquetadas === 4000 && peorGrado < 0.2 && noCabe === 0,
+    { peorGrado, noCabe },
+  );
+  const calidos = (['nucleo', 'filo', 'caliente', 'frio', 'chispa'] as const).filter((k) => {
+    const v = COLORES_DEL_RAYO[k];
+    const r = (v >> 16) & 255;
+    const g = (v >> 8) & 255;
+    const bl = v & 255;
+    /* Cálido: el rojo por encima del verde y éste del azul; el núcleo es casi blanco, pero con calor. */
+    return !(r >= g && g >= bl && r - bl >= (k === 'nucleo' ? 10 : 30));
+  });
+  comprobar(
+    'el rayo es del jugador: blanco cálido y ámbar (nada de cian del código ni de magenta de los rótulos), y la carga es el ámbar de la paleta',
+    calidos.length === 0 && COLORES_DEL_RAYO.carga === COLORES.ambar,
+    calidos,
+  );
+  const rayos = PIEZAS.find((p) => p.pieza === 'rayos');
+  const antes = ['anillos', 'trazos', 'ondas', 'chispas', 'siluetas', 'hilos', 'muro', 'marco', 'esquirlas', 'cielo', 'pantallas'];
+  const nuevas = PIEZAS.map((p) => p.pieza).filter((p) => !antes.includes(p));
+  comprobar(
+    'el rayo es UNA pieza nueva (las cintas del rayo), de adorno, y N0 sigue en 12 llamadas como mucho',
+    rayos !== undefined && !rayos.deJuego && rayos.familia === 'cintas' && nuevas.join(',') === 'rayos' && gastoDelNivel(0).llamadas <= 12,
+    { nuevas, llamadas: gastoDelNivel(0).llamadas },
+  );
+  comprobar(
+    'las descargas y la estela del rayo por nivel: N0 una descarga y la estela más corta; N3 tres y la más larga',
+    POR_NIVEL.descargasDelRayo[0] === 1 && POR_NIVEL.descargasDelRayo[3] === 3 && POR_NIVEL.estelaDelRayo[0] < POR_NIVEL.estelaDelRayo[3],
+  );
+
+  /* EL SISTEMA: predice el impacto propio, lo concilia con el de la sala, y no crece. */
+  const s = crearSistemaDeEfectos(crearRelojDePresentacion(), 0);
+  s.nivel = 3;
+  s.rayos.yo = 1;
+  const disparo = (bala: number, t: number, dio: boolean | null, c = 1, quien = 1): DisparoDelRayo => ({
+    quien,
+    bala,
+    origen: { x: 0, y: 1.35, z: 0 },
+    destino: { x: 0, y: 1.35, z: -20 },
+    nivel: c >= 1 ? 4 : 1,
+    c,
+    area: c >= 1 ? 0 : 3,
+    dio,
+    semilla: 7,
+    t,
+  });
+  const ranura = (t0: number): number => {
+    for (let i = 0; i < RAYOS_A_LA_VEZ; i++) if (s.rayos.vivo[i] === 1 && s.rayos.t0[i] === t0) return i;
+    return -1;
+  };
+  s.rayo.soltar(disparo(0, 1000, true));
+  const i1 = ranura(1000);
+  const predicho = i1 >= 0 && s.rayos.impacto[i1] === 1 && s.rayos.dz[i1] === -20 && s.rayos.tImpacto[i1] === 1000 + llegadaDelRayo(1);
+  s.rayo.estallar({ quien: 1, bala: 55, x: 0.5, y: 1.35, z: -20.4, nivel: 4, area: 0, t: 1060 });
+  const quieto = i1 >= 0 && s.rayos.dz[i1] === -20 && s.rayos.bala[i1] === 55 && s.rayos.confirmado[i1] === 1;
+  s.rayo.soltar(disparo(0, 2000, true));
+  const i2 = ranura(2000);
+  s.rayo.estallar({ quien: 1, bala: 56, x: 0, y: 1.35, z: -9, nivel: 4, area: 0, t: 2040 });
+  /* Lejos, pero SOBRE el canal (un cuerpo que se cruza): el estallido va allí y el canal se recorta, con su forma. */
+  const movido = i2 >= 0 && Math.abs((s.rayos.iz[i2] as number) + 9) < 1e-9 && s.rayos.dz[i2] === -20 && Math.abs((s.rayos.corte[i2] as number) - 0.45) < 1e-9;
+  /* Lejos y FUERA del canal (a seis metros de su recta): el canal va a él. */
+  s.rayo.soltar(disparo(0, 2500, true));
+  const i3 = ranura(2500);
+  s.rayo.estallar({ quien: 1, bala: 57, x: 6, y: 1.35, z: -8, nivel: 4, area: 0, t: 2540 });
+  const retrazado = i3 >= 0 && s.rayos.ix[i3] === 6 && s.rayos.dx[i3] === 6 && s.rayos.dz[i3] === -8 && s.rayos.corte[i3] === 1;
+  s.rayo.estallar({ quien: 3, bala: 90, x: 5, y: 1.35, z: 5, nivel: 2, area: 2, t: 2100 });
+  let sinCanal = false;
+  for (let i = 0; i < RAYOS_A_LA_VEZ; i++) if (s.rayos.vivo[i] === 1 && s.rayos.bala[i] === 90) sinCanal = s.rayos.sinCanal[i] === 1;
+  comprobar(
+    'el rayo propio predice su impacto al soltar; la sala lo confirma cerca y se queda (no salta); lo pone lejos sobre el canal y el canal se RECORTA ahí con su forma (no se vuelve a sembrar), o fuera de él y el canal va a él; un `estalla` sin rayo visto estalla solo',
+    predicho && quieto && movido && retrazado && sinCanal,
+    { predicho, quieto, movido, retrazado, sinCanal },
+  );
+  const arrays = [s.rayos.vivo, s.rayos.t0, s.rayos.marcaViva];
+  for (let k = 0; k < 50; k++) s.rayo.soltar(disparo(0, 3000 + k, true));
+  let vivos = 0;
+  for (let i = 0; i < RAYOS_A_LA_VEZ; i++) vivos += s.rayos.vivo[i] as number;
+  comprobar(
+    'con más rayos que ranuras se pisa el más viejo: nunca más de los que caben, y los arrays son los mismos',
+    vivos === RAYOS_A_LA_VEZ && arrays[0] === s.rayos.vivo && arrays[1] === s.rayos.t0 && arrays[2] === s.rayos.marcaViva,
+  );
+
+  /* LA LUZ Y LA IMAGEN: el estallido alumbra y se apaga; el fogonazo y la viñeta son del propio. */
+  const l = crearSistemaDeEfectos(crearRelojDePresentacion(), 0);
+  l.nivel = 3;
+  l.rayos.yo = 1;
+  l.localizar = (quien, salida) => {
+    salida.x = quien === 1 ? 0 : 40;
+    salida.y = 0;
+    salida.z = 0;
+    return true;
+  };
+  l.rayo.soltar(disparo(0, 1000, true));
+  evaluarLosRayos(l, 1000 + llegadaDelRayo(1) + 4);
+  const pos = UNIFORMES_DEL_DESTELLO.uDestelloQ.value;
+  const col = UNIFORMES_DEL_DESTELLO.uDestelloColorQ.value;
+  let alumbraElImpacto = false;
+  for (let k = 0; k < 4; k++) if ((pos[k * 4 + 3] as number) > 0 && Math.abs((pos[k * 4 + 2] as number) + 20) < 1 && (col[k * 4] as number) > (col[k * 4 + 2] as number)) alumbraElImpacto = true;
+  const focoEncendido = FOCO_DEL_DESTELLO.intensidad > 0;
+  const fogonazoPropio = l.rayos.imagen.fogonazo;
+  evaluarLosRayos(l, 1000 + 2500);
+  let apagado = FOCO_DEL_DESTELLO.intensidad === 0 && l.rayos.imagen.fogonazo === 0;
+  for (let k = 0; k < 4; k++) if ((pos[k * 4 + 3] as number) !== 0) apagado = false;
+  comprobar(
+    'el estallido del pleno alumbra donde estalla (luz cálida en los uniformes del destello y en el foco), el fogonazo es del que dispara, y a los 2,5 s todo apagado',
+    alumbraElImpacto && focoEncendido && fogonazoPropio > 0 && apagado,
+    { alumbraElImpacto, focoEncendido, fogonazoPropio, apagado },
+  );
+  l.rayo.soltar({ ...disparo(70, 5000, true, 1, 2), origen: { x: 40, y: 1.35, z: 0 }, destino: { x: 40, y: 1.35, z: -20 } });
+  evaluarLosRayos(l, 5000 + llegadaDelRayo(1) + 4);
+  const fogonazoAjenoLejos = l.rayos.imagen.fogonazo;
+  const estado = estadoDelRayoApagado();
+  estado.activo = true;
+  estado.c = 0.6;
+  estado.nivel = 3;
+  estado.desdeMs = 7000;
+  l.rayo.actualizarCarga(2, estado, 7300);
+  evaluarLosRayos(l, 7300);
+  const vinetaAjena = l.rayos.imagen.carga;
+  l.rayo.actualizarCarga(1, estado, 7300);
+  evaluarLosRayos(l, 7310);
+  const vinetaPropia = l.rayos.imagen.carga;
+  comprobar(
+    'el pleno de otro a 40 m no me ciega la pantalla, y la viñeta de la carga es sólo de la mía',
+    fogonazoAjenoLejos === 0 && vinetaAjena === 0 && vinetaPropia > 0.5,
+    { fogonazoAjenoLejos, vinetaAjena, vinetaPropia },
+  );
+
+  /* LOS AJENOS en `escenificar.ts`: su carga sale de su estado de cargar, se cancela con gracia y no si sale su rayo. */
+  const liza = lizaConTiro();
+  const lectura = liza === null ? null : leerLaLiza(liza, 1);
+  const tiro = lectura?.tiroDelAsiento(2) ?? null;
+  if (lectura === null || tiro === null) {
+    comprobar('la liza de la mesa, con su tiro, para probar los rayos ajenos', false, { liza: liza === null });
+  } else {
+    const sistema = crearSistemaDeEfectos(crearRelojDePresentacion(), 0);
+    const llamadas: string[] = [];
+    const cargas: number[] = [];
+    const destinos: number[] = [];
+    const espia: EfectosDelRayo = {
+      empezarCarga: (quien) => void llamadas.push(`empezar ${String(quien)}`),
+      actualizarCarga: (quien, e) => {
+        llamadas.push(`actualizar ${String(quien)}`);
+        if (quien === 2) cargas.push(e.c);
+      },
+      cancelarCarga: (quien) => void llamadas.push(`cancelar ${String(quien)}`),
+      soltar: (d) => {
+        llamadas.push(`soltar ${String(d.quien)}`);
+        destinos.push(Math.hypot(d.destino.x - d.origen.x, d.destino.z - d.origen.z));
+      },
+      estallar: (e) => void llamadas.push(`estallar ${String(e.quien)}`),
+    };
+    sistema.rayo = espia;
+    const sonados: string[] = [];
+    const sonido = { sonar: (id: string) => void sonados.push(id), remanso: () => undefined, cabina: () => undefined } as unknown as Sonido;
+    const estados = new Map<number, EstadoVisto>();
+    const cola: Novedad[] = [];
+    /* Los cuerpos pintados (para predecir dónde para un cuerpo el rayo de otro): vacío hasta la prueba de eso. */
+    const cuerpos: { id: number; x: number; z: number; gesto: string }[] = [];
+    const partida = {
+      lectura,
+      sala: { yo: 1, estados },
+      paraLaEscena: cola,
+      pulsacionesAtendidas: [],
+      sitioDe: (n: number) => (n === 1 ? { x: 0, z: 0 } : null),
+      pintadoDe: () => null,
+      cuerpos: () => cuerpos,
+    } as unknown as Partida;
+    const escena = new Escenificador(partida, sistema, sonido);
+    const cargando = (desdeMs: number): EstadoVisto => ({ est: tiro.estado, desdeMs, hastaMs: desdeMs + 5000, intocableHastaMs: 0 });
+    estados.set(2, cargando(1000));
+    estados.set(1, cargando(1000));
+    estados.set(20, cargando(1000));
+    for (let t = 1000; t <= 1400; t += 16) escena.cadaFotograma(t, null);
+    const cuantas = (x: string): number => llamadas.filter((c) => c === x).length;
+    const ultima = cargas[cargas.length - 1] ?? -1;
+    const sube = cargas.every((c, i) => i === 0 || c >= (cargas[i - 1] as number));
+    const cargaBien =
+      cuantas('empezar 2') === 1 &&
+      cuantas('actualizar 2') === 26 &&
+      !llamadas.some((c) => c.endsWith(' 1') || c.endsWith(' 20')) &&
+      sube &&
+      Math.abs(ultima - cargaDe(tiro, 400)) < 1e-9 &&
+      sistema.rayos.yo === 1;
+    estados.delete(2);
+    for (let t = 1416; t <= 1600; t += 16) escena.cadaFotograma(t, null);
+    const antesDeLaGracia = cuantas('cancelar 2');
+    for (let t = 1616; t <= 1800; t += 16) escena.cadaFotograma(t, null);
+    const despues = cuantas('cancelar 2');
+    comprobar(
+      'la carga de otro sale de su estado de cargar (una vez, cada fotograma, subiendo con la cuenta de su tiro; ni la mía ni la de una entidad) y se cancela pasada la gracia, una vez',
+      cargaBien && antesDeLaGracia === 0 && despues === 1,
+      { cargaBien, sube, ultima, esperada: cargaDe(tiro, 400), antesDeLaGracia, despues, llamadas: llamadas.slice(0, 6) },
+    );
+    /*
+     * El asiento 3 carga y sale su bala; su estado de cargar sigue un momento en la sala (llega en otro tic): se suelta,
+     * no vuelve a empezar, y al irse el estado no se cancela nada.
+     */
+    const pleno = tiro.niveles[tiro.niveles.length - 1] as (typeof tiro.niveles)[number];
+    const chispazo = tiro.niveles[0] as (typeof tiro.niveles)[number];
+    estados.set(3, cargando(2000));
+    for (let t = 2000; t <= 3400; t += 16) escena.cadaFotograma(t, null);
+    /*
+     * Desde (33; 24,4): hacia el norte (rumbo 0) una fachada lo para a unos 6 m; hacia el oeste (192) la calle está
+     * libre y llega a su alcance. El pleno va al norte y el chispazo al oeste: uno parado y otro entero.
+     */
+    const vista = (id: number, de: number, p: number, r: number): BalaVista => ({ id, de, p, x: 33, z: 24.4, r, salidaMs: 3410 });
+    const suceso = (sc: SucesoDelTic, bala: BalaVista | null): Novedad => ({ tipo: 'suceso', k: 1, llegoMs: 3410, suceso: sc, anuncio: null, bala, entidad: null, monton: null, apuntado: null });
+    cola.push(suceso({ e: 'bala', id: 41, de: 3, p: pleno.proyectil, x: 3300, z: 2440, r: 0, t: 5 }, vista(41, 3, pleno.proyectil, 0)));
+    escena.drenar(3410);
+    for (let t = 3416; t <= 3600; t += 16) escena.cadaFotograma(t, null);
+    estados.delete(3);
+    for (let t = 3616; t <= 3900; t += 16) escena.cadaFotograma(t, null);
+    const sacudidaAntes = escena.sacudida;
+    cola.push(suceso({ e: 'estalla', bala: 41, x: 150, z: 0 }, vista(41, 3, pleno.proyectil, 0)));
+    escena.drenar(3950);
+    const sacudidaDelPleno = escena.sacudida;
+    escena.sacudida = 0;
+    cola.push(suceso({ e: 'bala', id: 42, de: 2, p: chispazo.proyectil, x: 3300, z: 2440, r: 192, t: 5 }, vista(42, 2, chispazo.proyectil, 192)));
+    cola.push(suceso({ e: 'estalla', bala: 42, x: 150, z: 0 }, vista(42, 2, chispazo.proyectil, 192)));
+    escena.drenar(4000);
+    const sacudidaDelChispazo = escena.sacudida;
+    /* Hasta dónde lo pinta: donde lo para la cuenta de la sala (la estructura, el límite), sin pasar de su alcance. */
+    const hasta = (n: (typeof tiro.niveles)[number], r: number): number => {
+      const pr = lectura.proyectil(n.proyectil);
+      if (pr === null) return n.alcance;
+      const { parada } = paradaDeLaBalaEn(lectura.liza, lectura.arena, Math.round(33 * UNO), Math.round(24.4 * UNO), r, pr);
+      return Math.min(n.alcance, parada / UNO);
+    };
+    const esperados = [hasta(pleno, 0), hasta(chispazo, 192)];
+    comprobar(
+      'la carga de otro que acaba en su `bala` se suelta, no se cancela ni vuelve a empezar aunque su estado de cargar tarde en irse; su rayo llega hasta donde lo para la cuenta de la sala (sin pasar de su alcance); su pleno a 1,5 m me sacude y su chispazo no',
+      cuantas('soltar 3') === 1 &&
+        cuantas('empezar 3') === 1 &&
+        cuantas('cancelar 3') === 0 &&
+        destinos.length === 2 &&
+        destinos.every((d, i) => Math.abs(d - (esperados[i] as number)) < 1e-6 && d > 0) &&
+        sacudidaAntes === 0 &&
+        sacudidaDelPleno > 0.3 &&
+        sacudidaDelChispazo === 0,
+      { llamadas: llamadas.filter((c) => c.endsWith(' 3')), destinos, esperados, sacudidaAntes, sacudidaDelPleno, sacudidaDelChispazo },
+    );
+    nota(`rayos ajenos de prueba: el pleno llega a ${(destinos[0] ?? 0).toFixed(2)} m (alcance ${pleno.alcance.toFixed(0)}), el chispazo a ${(destinos[1] ?? 0).toFixed(2)} m`);
+    comprobar(
+      'y suena: la carga de otro con su voz, su pleno con el rayo y el trueno, su chispazo corto',
+      sonados.includes('carga-rayo') && sonados.includes('rayo') && sonados.includes('trueno') && sonados.includes('rayo-corto'),
+      sonados,
+    );
+    /*
+     * Un cuerpo que se cruza: el rayo de otro se pinta HASTA ÉL (lo predice `escenificar.ts`, como el propio), no hasta
+     * la estructura para luego saltar cuando llega su `estalla`. Un asiento (sin fuego amigo) y uno que ya se va, no.
+     */
+    cuerpos.push({ id: 1, x: 31, z: 24.4, gesto: 'reposo' }, { id: 21, x: 30, z: 24.4, gesto: 'desalojable' }, { id: 30, x: 29, z: 24.5, gesto: 'reposo' });
+    cola.push(suceso({ e: 'bala', id: 43, de: 2, p: chispazo.proyectil, x: 3300, z: 2440, r: 192, t: 5 }, vista(43, 2, chispazo.proyectil, 192)));
+    escena.drenar(4100);
+    const alCuerpo = destinos[2] ?? -1;
+    /* Entra en el corro de medio metro del cuerpo que está a 4 m y a 0,1 m de la recta. */
+    const alCorro = 4 - Math.sqrt(0.25 - 0.01);
+    comprobar(
+      'el rayo de otro se pinta hasta el primer ENEMIGO que se le cruza (predicho): ni hasta la estructura, ni lo paran un asiento (sin fuego amigo) o uno que ya se va',
+      destinos.length === 3 && Math.abs(alCuerpo - alCorro) < 1e-6 && (destinos[1] as number) > 10,
+      { alCuerpo, alCorro, sinCuerpos: destinos[1] },
+    );
+  }
+}
+
+/*
+ * EL RAYO, ENCHUFADO AL JUEGO (revisión 1 del frente: quitando cualquiera de estas cuatro conexiones, la batería seguía
+ * en verde). En la fuente sin comentarios: la raíz de los efectos pinta la pieza del rayo y pone el rayo al día en su
+ * fotograma; el posproceso le pasa al compositor lo que el rayo pone en la imagen; y las luces encienden el foco del
+ * destello en cada fotograma. Lo que se VE (que el canal se pinta, que el foco alumbra, que llega el fogonazo) lo mira
+ * `verify:quiebro-gl` en la GPU con el banco del rayo.
+ */
+{
+  const fuente = (ruta: string): string => soloCodigo(readFileSync(new URL(`../src/quiebro/${ruta}`, import.meta.url), 'utf8'));
+  /** El trozo de `texto` que va de `desde` a la primera aparición de `hasta` después (vacío si falta alguno). */
+  const trozo = (texto: string, desde: RegExp, hasta: string): string => {
+    const m = desde.exec(texto);
+    if (m === null) return '';
+    const fin = texto.indexOf(hasta, m.index + m[0].length);
+    return fin < 0 ? '' : texto.slice(m.index, fin + hasta.length);
+  };
+  const juezDelCableado = (efectos: string, posproceso: string, luz: string): string[] => {
+    const malos: string[] = [];
+    const fotograma = trozo(efectos, /useFrame\(\(\) => \{/, '}, -1);');
+    if (!/sistema\.fotograma\(ahora\);[\s\S]*evaluarLosRayos\(sistema, ahora\);/.test(fotograma)) malos.push('Efectos.tsx: el fotograma de la raíz no llama a evaluarLosRayos(sistema, ahora) tras sistema.fotograma');
+    if (!/<RayosDelRayo sistema=\{sistema\} \/>/.test(efectos)) malos.push('Efectos.tsx: no monta <RayosDelRayo sistema={sistema} />');
+    const pinta = trozo(posproceso, /c\.pintar\(estado\.scene, estado\.camera, \{/, '});');
+    if (!/\brayo\b/.test(pinta)) malos.push('Posproceso.tsx: el compositor no recibe `rayo`');
+    if (!/props\.sistema\?\.rayos\.imagen/.test(posproceso)) malos.push('Posproceso.tsx: no lee sistema.rayos.imagen');
+    const actualizar = trozo(luz, /\n {2}actualizar\(/, '\n  }\n');
+    if (!/this\.seguirElDestello\(\);/.test(actualizar)) malos.push('luz.ts: LucesDeLaNoche.actualizar no llama a seguirElDestello');
+    return malos;
+  };
+  const efectos = fuente('efectos/Efectos.tsx');
+  const posproceso = fuente('posproceso/Posproceso.tsx');
+  const luz = fuente('atmosfera/luz.ts');
+  const malos = juezDelCableado(efectos, posproceso, luz);
+  comprobar('el rayo está ENCHUFADO: Efectos.tsx monta su pieza y lo pone al día en el fotograma, Posproceso.tsx le pasa al compositor su imagen y luz.ts enciende el foco en cada fotograma', malos.length === 0, malos);
+  /* LA VACUNA: sin cada una de las cuatro conexiones (las mutaciones A, C, D y E de la revisión), el juez la señala. */
+  const sin = (texto: string, quitar: string): string => (texto.includes(quitar) ? texto.replace(quitar, '') : `${texto}\n/* no estaba: ${quitar} */`);
+  const vacunas = [
+    juezDelCableado(sin(efectos, 'evaluarLosRayos(sistema, ahora);'), posproceso, luz),
+    juezDelCableado(sin(efectos, '<RayosDelRayo sistema={sistema} />'), posproceso, luz),
+    juezDelCableado(efectos, sin(posproceso, '...(imagen === undefined ? {} : { rayo }),'), luz),
+    juezDelCableado(efectos, posproceso, sin(luz, 'this.seguirElDestello();')),
+  ];
+  comprobar(
+    'VACUNA del cableado: sin evaluarLosRayos, sin la pieza, sin la imagen al compositor o sin el foco, el juez señala esa conexión (y sólo ésa)',
+    vacunas.every((v) => v.length === 1),
+    vacunas,
+  );
+}
+
+terminar(95);
