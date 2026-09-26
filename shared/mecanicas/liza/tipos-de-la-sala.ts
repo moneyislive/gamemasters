@@ -83,7 +83,8 @@
  * En cada `EntradaConexion` —la primera, la de quien recargó la pestaña y la de quien reemplaza un canal
  * abierto con el mismo asiento— la sala:
  *   · olvida lo que dependía del reloj viejo de ese aparato: su último `n` (vuelve a −1), su acción
- *     guardada, su acción sostenida y su eslabón de cadena;
+ *     guardada, su acción sostenida (sin disparar, si era una carga), la carga que dejó y su eslabón de
+ *     cadena;
  *   · REESCRIBE con el desfase nuevo el `tBlanco` y el `tAutor` de los anuncios pendientes que le tocan,
  *     y su `salidaEnSuReloj` en cada bala en vuelo: el número guardado ya no es de ningún reloj que exista;
  *   · y le manda la puesta al día (ver `Bienvenida`).
@@ -454,6 +455,12 @@ export interface CuerpoDeAsiento {
   /** El tic de la sala en que el rasgo `firmeCadaTics` se gastó por última vez (−1 = nunca). */
   readonly firmeGastadoEnTic: number;
   readonly sostenida: SostenidaEnCurso | null;
+  /**
+   * El `ms` DEL APARATO de la última carga de su tiro que se dejó (disparada o no), o −1. Un `apuntar` con ese
+   * mismo `ms` es el mismo dedo, que aún no se ha levantado: tras un golpe que corta la carga, mantenerlo no la
+   * vuelve a empezar —cargar otra vez es pulsar otra vez—. Vuelve a −1 con cada canal nuevo (otro reloj).
+   */
+  readonly cargaDejadaMs: number;
   /** La acción pulsada cuando no se podía, guardada hasta el tic `hastaTic` (ver `guardaTics`). */
   readonly guardada: { readonly accion: AccionRecibida; readonly desfaseMs: number; readonly hastaTic: number } | null;
   readonly lleva: readonly CargaDePortable[];
@@ -622,11 +629,15 @@ export interface AnuncioPendiente {
   readonly avancePorTic: number;
 }
 
-/** UNA BALA EN VUELO. Su sitio en cada tic sale de aquí con `geometria.desplazado`. */
+/**
+ * UNA BALA EN VUELO. Su sitio en cada tic sale de aquí con `geometria.desplazado`. La de una entidad se juzga
+ * contra los asientos; la del TIRO de un asiento (declaración W: `de` es un número de asiento, de 1 a 15),
+ * contra las entidades, y `juzgadaContra` no se usa (va a 0).
+ */
 export interface BalaDeLaSala {
   readonly numero: number;
   readonly proyectil: IdDeclarado;
-  /** Quién disparó (número de entidad). */
+  /** Quién disparó: el número de la entidad, o el del asiento si es la bala de su tiro. */
   readonly de: number;
   /** Desde dónde (Q16.16) y hacia qué rumbo, y en qué tic de la sala salió. */
   readonly x: number;

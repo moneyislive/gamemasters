@@ -56,7 +56,7 @@ import { PLANTAR } from '../../shared/arcade/juegos/lindes';
 import { barrioDeLaNoche, despejarLaPlaza, mundoDeLaLizaDelBarrio, mundoDelBarrio, pasoAbierto, trenEn } from '../../shared/arcade/juegos/quiebro-barrio';
 import type { Barrio } from '../../shared/arcade/juegos/quiebro-barrio';
 import { DURMIENTES, durmienteMasCercano, escribirLosDurmientes, guionDeLosDurmientes } from '../../shared/arcade/juegos/quiebro-durmientes';
-import { Aparato, Banco, fnv, guerrero, idsDe, jugarLaLizaAbierta, jugarLaLizaAbiertaConOlvido, jugarLaLizaDeJuguete, jugarLaLizaSinBlanco, paseante, salidasDe } from './liza-de-juguete';
+import { Aparato, arquero, Banco, fnv, guerrero, guerreroConTiro, idsDe, jugarLaLizaAbierta, jugarLaLizaAbiertaConOlvido, jugarLaLizaDeJuguete, jugarLaLizaSinBlanco, paseante, salidasDe } from './liza-de-juguete';
 import type { JugadaConOlvido, JugadaDeLaLiza, JugadaDeLaLizaAbierta, JugadaSinBlanco } from './liza-de-juguete';
 import { jugarAlQuiebro } from './robot-de-quiebro';
 import { lizaDelQuiebro } from '../../shared/arcade/juegos/quiebro-liza';
@@ -341,20 +341,31 @@ export interface SalaDelQuiebroJugada {
   /** Entidades que entraron en el límite de la fase desde fuera, y de ésas, las que lo hicieron sin nadie a quien perseguir. */
   entraron: number;
   entraronSinBlanco: number;
+  /**
+   * EL RAYO (el tiro cargado de la Liza): los que le llegaron al asiento 1, las veces que alguien empezó a cargar,
+   * los que estallaron y las entidades que alcanzaron. Sólo los usa la sala del rayo (ver `SALAS_DEL_QUIEBRO`).
+   */
+  rayos: number;
+  cargas: number;
+  estallas: number;
+  alcanzadas: number;
   /** El hilo de todo lo que salió de la sala, tic a tic, y el estado final (FNV sobre la forma canónica). */
   salidas: string;
   huella: string;
 }
 
 /**
- * Las mesas cuya sala se juega: semilla, asientos y qué combate. En solitario, la primera oleada: sus
- * Prestados salen de las bocas de las calles, fuera de la glorieta, en tres tandas —la segunda mientras el
- * asiento está callado: entran sin nadie a quien perseguir—. Entre dos, la primera oleada con tirador
- * (balas y líneas). Escritas, como las semillas.
+ * Las mesas cuya sala se juega: semilla, asientos, qué combate y quién lleva el RAYO. En solitario, la primera
+ * oleada: sus Prestados salen de las bocas de las calles, fuera de la glorieta, en tres tandas —la segunda
+ * mientras el asiento está callado: entran sin nadie a quien perseguir—. Entre dos, la primera oleada con
+ * tirador (balas y líneas). Y otra entre dos con tirador en la que los dos juegan con el rayo: el primero lo
+ * usa cuando no tiene a nadie cerca, y el segundo sólo carga y suelta —el robot que carga y suelta de
+ * `verify:determinismo`, con su suelo—. Escritas, como las semillas.
  */
-export const SALAS_DEL_QUIEBRO: readonly (readonly [number, number, 'primera' | 'tiradores'])[] = [
-  [3, 1, 'primera'],
-  [7, 2, 'tiradores'],
+export const SALAS_DEL_QUIEBRO: readonly (readonly [number, number, 'primera' | 'tiradores', boolean])[] = [
+  [3, 1, 'primera', false],
+  [7, 2, 'tiradores', false],
+  [13, 2, 'tiradores', true],
 ];
 export const TICS_DE_LA_SALA_DEL_QUIEBRO = 900;
 /** Los tics de la liza sin blanco: sus cuatro entidades nacen entre el 60 y el 120, y entran antes del 250. */
@@ -410,7 +421,7 @@ function dentroDelLimiteDe(s: EstadoDeLaSala, x: number, z: number): boolean {
 }
 
 /** La sala de un combate de El Quiebro con esa semilla y asientos, jugada `tics` tics. Ver `SalaDelQuiebroJugada`. */
-export function jugarLaSalaDelQuiebro(semilla: number, asientos: number, cual: 'primera' | 'tiradores', tics: number): SalaDelQuiebroJugada {
+export function jugarLaSalaDelQuiebro(semilla: number, asientos: number, cual: 'primera' | 'tiradores', tics: number, conRayo = false): SalaDelQuiebroJugada {
   const partida = jugarAlQuiebro({ asientos, semilla, noches: 2, politica: 'gana', travesuras: false });
   let l: LizaDeclarada | null = null;
   for (const v of partida.vistas) {
@@ -418,13 +429,39 @@ export function jugarLaSalaDelQuiebro(semilla: number, asientos: number, cual: '
     if (l !== null || x === null || x.fase.modo !== 'encuentro' || x.fase.encuentro === null) continue;
     if (cual === 'primera' || conTiradores(x)) l = x;
   }
-  const vacia: SalaDelQuiebroJugada = { semilla, asientos, clave: '', tics: 0, anuncios: 0, balas: 0, lineas: 0, nacidas: 0, ausentes: 0, entraron: 0, entraronSinBlanco: 0, salidas: '', huella: '' };
+  const vacia: SalaDelQuiebroJugada = {
+    semilla,
+    asientos,
+    clave: '',
+    tics: 0,
+    anuncios: 0,
+    balas: 0,
+    lineas: 0,
+    nacidas: 0,
+    ausentes: 0,
+    entraron: 0,
+    entraronSinBlanco: 0,
+    rayos: 0,
+    cargas: 0,
+    estallas: 0,
+    alcanzadas: 0,
+    salidas: '',
+    huella: '',
+  };
   if (l === null) return vacia;
   const ids = idsDe(l);
   const aparatos: Aparato[] = [];
   for (let i = 1; i <= l.asientos.length; i++) {
-    aparatos.push(new Aparato(i, 3000 * i, 20 * i, 60 + 40 * i, (17 * i) % 50, i === 2 ? paseante(semilla * 31 + i, ids) : guerrero(110, ids)));
+    /* Con el rayo, el primero lee y lo usa cuando no tiene a nadie cerca, y el segundo sólo carga y suelta. */
+    const robot = conRayo ? (i === 2 ? arquero() : guerreroConTiro(110, ids)) : i === 2 ? paseante(semilla * 31 + i, ids) : guerrero(110, ids);
+    aparatos.push(new Aparato(i, 3000 * i, 20 * i, 60 + 40 * i, (17 * i) % 50, robot));
   }
+  const cargar = l.asientos[0]?.tiro?.puesta.estado ?? -1;
+  const deRayo: number[] = [];
+  let rayos = 0;
+  let cargas = 0;
+  let estallas = 0;
+  let alcanzadas = 0;
   const b = new Banco(l, l.fase.semilla, aparatos);
   b.guardarPasos = false;
   for (let i = 1; i <= l.asientos.length; i++) b.conectar(i);
@@ -446,10 +483,18 @@ export function jugarLaSalaDelQuiebro(semilla: number, asientos: number, cual: '
     for (const x of p.sucesos) {
       const e = x.suceso;
       if (x.para === 1 && e.e === 'anuncio') anuncios++;
-      else if (x.para === 1 && e.e === 'bala') balas++;
-      else if (x.para === 1 && e.e === 'apunta' && e.a !== 0) lineas++;
+      else if (x.para === 1 && e.e === 'bala') {
+        balas++;
+        if (e.de < 16) {
+          rayos++;
+          deRayo.push(e.id);
+        }
+      } else if (x.para === 1 && e.e === 'apunta' && e.a !== 0) lineas++;
       else if (x.para === 0 && e.e === 'nace') nacidas++;
       else if (x.para === 0 && e.e === 'estado' && e.est === l.presencia.estadoAusente) ausentes++;
+      else if (x.para === 0 && e.e === 'estado' && e.est === cargar) cargas++;
+      else if (x.para === 0 && e.e === 'estalla') estallas++;
+      else if (x.para === 0 && e.e === 'impacta' && e.a >= 16 && deRayo.indexOf(e.bala) >= 0) alcanzadas++;
     }
     const sinBlanco = !hayBlanco(p.sala);
     for (const e of p.sala.entidades) {
@@ -475,6 +520,10 @@ export function jugarLaSalaDelQuiebro(semilla: number, asientos: number, cual: '
     ausentes,
     entraron,
     entraronSinBlanco,
+    rayos,
+    cargas,
+    estallas,
+    alcanzadas,
     salidas,
     huella: fnv(huellaDeLaSala(b.sala)),
   };
@@ -770,7 +819,7 @@ export function jugarLaTanda(): Tanda {
     mesasDelQuiebro.push(jugarUnaDelQuiebro(SEMILLAS[i] as number, ASIENTOS_EN_EL_QUIEBRO[i] as number));
   }
   const salasDelQuiebro: SalaDelQuiebroJugada[] = [];
-  for (const sala of SALAS_DEL_QUIEBRO) salasDelQuiebro.push(jugarLaSalaDelQuiebro(sala[0], sala[1], sala[2], TICS_DE_LA_SALA_DEL_QUIEBRO));
+  for (const sala of SALAS_DEL_QUIEBRO) salasDelQuiebro.push(jugarLaSalaDelQuiebro(sala[0], sala[1], sala[2], TICS_DE_LA_SALA_DEL_QUIEBRO, sala[3]));
   const lizaSinBlanco = jugarLaLizaSinBlanco(TICS_DE_LA_LIZA_SIN_BLANCO);
   const lizaAbierta = jugarLaLizaAbierta(SEMILLA_DE_LA_LIZA_ABIERTA, TICS_DE_LA_LIZA_ABIERTA);
   const lizaConOlvido = jugarLaLizaAbiertaConOlvido(SEMILLA_DE_LA_LIZA_CON_OLVIDO, TICS_DE_LA_LIZA_CON_OLVIDO);

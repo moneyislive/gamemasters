@@ -28,13 +28,17 @@
  *
  * Una bala que se para (estructura o alcance) sigue en la sala hasta que todos los horizontes pasan su
  * último tic: un asiento con la red lenta todavía puede estar en su camino en un tic que aún no se juzgó.
+ *
+ * Las balas del TIRO de un asiento (declaración W) vuelan con estas mismas cuentas —`sitioDeLaBala`,
+ * `paradaDeLaBalaEn`— pero se juzgan al revés: contra las entidades, en el presente de la sala, y en
+ * `tiro.ts`. Aquí sólo se saltan, y no cuentan en el aforo (`balasDeEntidades`).
  */
 import { TICS_POR_SEGUNDO } from '../andar';
 import { UNO } from '../fijo';
 import type { Arena } from '../mundo';
 import type { CajaDeLaLiza, LizaDeclarada, ProyectilDeclarado, ReglasDeAsiento } from './declaracion';
 import { desplazado, primeraLosa, puntoDelTramo, rumboHacia, tramoTocaCuerpo } from './geometria';
-import { aCentesimas, MOTIVO_DE_IRSE, RESULTADO } from './protocolo';
+import { aCentesimas, MOTIVO_DE_IRSE, PRIMER_NUMERO_DE_ENTIDAD, RESULTADO } from './protocolo';
 import type { CodigoDeResultado } from './protocolo';
 import { bitDe, contar, intocableEn, msDelTic, nuevoNumero, ticsQueCubren } from './paso-en-curso';
 import type { AsientoEnCurso, BalaInterna, EntidadEnCurso, PasoEnCurso } from './paso-en-curso';
@@ -97,12 +101,22 @@ export function paradaDeLaBalaEn(
 /* ─── DISPARAR ───────────────────────────────────────────────────────────── */
 
 /**
- * DISPARA UNA BALA de la entidad `e` hacia `(ax, az)`. Si ya vuelan tantas como el aforo, no sale: el
- * aforo es tope. La salida se apunta en el reloj de cada asiento (`salidaEnSuReloj`) y va a cada canal
- * abierto con el instante en el suyo.
+ * Las balas de ENTIDADES que vuelan: las que cuenta el aforo. Las de los tiros de los asientos (`de` es un
+ * número de asiento) tienen su plaza aparte, una por asiento (ver «el aforo» en `TiroDeclarado`).
+ */
+export function balasDeEntidades(p: PasoEnCurso): number {
+  let n = 0;
+  for (const b of p.balas) if (b.de >= PRIMER_NUMERO_DE_ENTIDAD) n++;
+  return n;
+}
+
+/**
+ * DISPARA UNA BALA de la entidad `e` hacia `(ax, az)`. Si ya vuelan tantas de entidades como el aforo, no
+ * sale: el aforo es tope. La salida se apunta en el reloj de cada asiento (`salidaEnSuReloj`) y va a cada
+ * canal abierto con el instante en el suyo.
  */
 export function dispararBala(p: PasoEnCurso, e: EntidadEnCurso, proyectil: ProyectilDeclarado, ax: number, az: number): void {
-  if (p.balas.length >= p.declaracion.aforo.balas) return;
+  if (balasDeEntidades(p) >= p.declaracion.aforo.balas) return;
   const dx = ax - e.x;
   const dz = az - e.z;
   const rumbo = dx === 0 && dz === 0 ? e.mira : rumboHacia(dx, dz);
@@ -159,6 +173,11 @@ export function avanzarLasBalas(p: PasoEnCurso): void {
   let i = 0;
   while (i < p.balas.length) {
     let b = p.balas[i] as BalaInterna;
+    /* Las de los tiros de los asientos se juzgan contra las entidades, en `tiro.ts` (`avanzarLosTiros`). */
+    if (b.de < PRIMER_NUMERO_DE_ENTIDAD) {
+      i++;
+      continue;
+    }
     const proyectil = p.indices.proyectiles[b.proyectil];
     if (proyectil === undefined) {
       p.balas.splice(i, 1);

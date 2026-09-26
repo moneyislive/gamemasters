@@ -544,11 +544,28 @@ comprobar(
     const b = segunda.liza[i] as JugadaDeLaLiza | undefined;
     console.log(
       `  liza de juguete, semilla ${String(a.semilla).padStart(10)} · ${a.tics} tics · ${String(a.anuncios).padStart(3)} anuncios · ` +
-        `${String(a.balas).padStart(3)} balas · ${String(a.lineas).padStart(3)} líneas · ${a.ausentes} ausentes · ${String(a.nacidas).padStart(3)} nacidas · ${a.fases} fases`,
+        `${String(a.balas).padStart(3)} balas · ${String(a.lineas).padStart(3)} líneas · ${a.ausentes} ausentes · ${String(a.nacidas).padStart(3)} nacidas · ${a.fases} fases · ` +
+        `arco: ${a.tensadas} tensadas, ${a.tiros} flechas, ${a.estallas} estallan, ${a.alcanzadas} alcanzadas`,
     );
+    /*
+     * EL TIRO CARGADO (W) entra en la tanda con el arco de la liza de juguete: el cuarto asiento lo usa cuando no
+     * tiene a nadie cerca y el quinto sólo tensa y suelta (`bancoLleno`). Con semillas 1 y 20260831, 18 y 15
+     * tensadas, 11 y 8 flechas, 10 y 7 estallidos, 10 y 12 alcanzadas: el suelo pide 8, 5, 4 y 4.
+     */
     comprobar(
-      `la liza de juguete de la semilla ${a.semilla} se juega de verdad: golpes, balas con su línea, un ausente, entidades que nacen y las tres fases`,
-      a.tics === TICS_DE_LA_LIZA && a.anuncios >= 30 && a.balas >= 100 && a.lineas >= 40 && a.resueltos >= 30 && a.nacidas >= 20 && a.ausentes >= 1 && a.fases >= 3,
+      `la liza de juguete de la semilla ${a.semilla} se juega de verdad: golpes, balas con su línea, un ausente, entidades que nacen, las tres fases, y flechas de asiento que se tensan, salen, estallan y alcanzan`,
+      a.tics === TICS_DE_LA_LIZA &&
+        a.anuncios >= 30 &&
+        a.balas >= 100 &&
+        a.lineas >= 40 &&
+        a.resueltos >= 30 &&
+        a.nacidas >= 20 &&
+        a.ausentes >= 1 &&
+        a.fases >= 3 &&
+        a.tensadas >= 8 &&
+        a.tiros >= 5 &&
+        a.estallas >= 4 &&
+        a.alcanzadas >= 4,
       { ...a, salidas: undefined, huella: undefined },
     );
     comprobar(
@@ -565,9 +582,11 @@ comprobar(
   for (let i = 0; i < primera.salasDelQuiebro.length; i++) {
     const a = primera.salasDelQuiebro[i] as SalaDelQuiebroJugada;
     const b = segunda.salasDelQuiebro[i] as SalaDelQuiebroJugada | undefined;
+    const conRayo = SALAS_DEL_QUIEBRO[i]?.[3] === true;
     console.log(
       `  sala de El Quiebro, semilla ${String(a.semilla).padStart(10)} · ${a.asientos} asientos · ${a.clave} · ${a.tics} tics · ${String(a.anuncios).padStart(3)} anuncios · ` +
-        `${String(a.balas).padStart(3)} balas · ${String(a.lineas).padStart(3)} líneas · ${a.nacidas} nacidas · ${a.entraron} entraron (${a.entraronSinBlanco} sin blanco) · ${a.ausentes} ausentes`,
+        `${String(a.balas).padStart(3)} balas · ${String(a.lineas).padStart(3)} líneas · ${a.nacidas} nacidas · ${a.entraron} entraron (${a.entraronSinBlanco} sin blanco) · ${a.ausentes} ausentes` +
+        (conRayo ? ` · rayo: ${a.cargas} cargas, ${a.rayos} rayos, ${a.estallas} estallan, ${a.alcanzadas} alcanzadas` : ''),
     );
     /*
      * Desde la ciudad abierta (entrega 1: el límite es la ciudad en todas las fases de combate) nada nace
@@ -577,9 +596,20 @@ comprobar(
      * la sala de uno golpea menos mientras su asiento está callado: 12 anuncios con L10 y 18 sin él, con
      * seis olvidos y seis nacidas de más. El suelo pide 10.
      */
+    /*
+     * La sala del RAYO (el tiro cargado de El Quiebro, con sus robots que cargan y sueltan): con la semilla 13, 8
+     * cargas, 6 rayos, 6 estallidos y 6 alcanzadas; el suelo pide 4, 3, 3 y 2. Sus balas y líneas de tirador las
+     * mira la sala de la semilla 7, que es la misma oleada sin el rayo.
+     */
     comprobar(
-      `la sala de El Quiebro de la semilla ${a.semilla} se juega de verdad: golpes, entidades que nacen${a.asientos === 1 ? '' : ', balas con su línea'} y un ausente`,
-      a.tics >= 800 && a.anuncios >= 10 && a.nacidas >= 6 && a.ausentes >= 1 && (a.asientos === 1 || (a.balas >= 20 && a.lineas >= 8)),
+      conRayo
+        ? `la sala de El Quiebro de la semilla ${a.semilla} se juega de verdad: golpes, entidades que nacen, un ausente, y rayos que se cargan, salen, estallan y alcanzan`
+        : `la sala de El Quiebro de la semilla ${a.semilla} se juega de verdad: golpes, entidades que nacen${a.asientos === 1 ? '' : ', balas con su línea'} y un ausente`,
+      a.tics >= 800 &&
+        a.anuncios >= 10 &&
+        a.nacidas >= 6 &&
+        a.ausentes >= 1 &&
+        (conRayo ? a.cargas >= 4 && a.rayos >= 3 && a.estallas >= 3 && a.alcanzadas >= 2 : a.asientos === 1 || (a.balas >= 20 && a.lineas >= 8)),
       { ...a, salidas: undefined, huella: undefined },
     );
     comprobar(
@@ -1252,8 +1282,9 @@ if (fallos.length === 0) {
       '  las cuatro clases, dan el mismo estado final en los dos motores — con botines de la\n' +
       '  refriega metidos entre medias en las ocho.\n' +
       '  Y El Quiebro: cuatro barrios con sus durmientes, dos lizas de juguete jugadas seiscientos tics\n' +
-      '  con un ausente y dos cambios de fase, cuatro mesas jugadas por su robot con travesuras, y dos\n' +
-      '  salas de sus combates de verdad jugadas novecientos tics, con entidades que entran en el límite;\n' +
+      '  con un ausente, dos cambios de fase y el arco (flechas que se tensan, vuelan y estallan), cuatro\n' +
+      '  mesas jugadas por su robot con travesuras, y tres salas de sus combates de verdad jugadas\n' +
+      '  novecientos tics —una con el rayo, cargado y soltado por sus robots—;\n' +
       '  y la liza sin blanco, con las que entran rodeando un muro sin nadie a quien perseguir.\n' +
       '  Y la liza abierta, una ciudad de juguete de ochocientas cajas y ochocientos nudos jugada\n' +
       '  cuatrocientos tics POR LOS ÍNDICES de la Liza: losas y nudos por celdas, y campos por meta.\n' +

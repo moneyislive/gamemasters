@@ -29,6 +29,13 @@
  * entidad (que en una variante dispara); un proyectil; un portable; dos zonas de acción. Es la regla del
  * §11 del diseño que estrena la Liza: ninguna declaración entra sin un uso que no sea el juego que la
  * pidió.
+ *
+ * Y un ARCO en cada asiento: el tiro cargado de la Liza (W, `TiroDeclarado`) en su segundo uso nombrado. Se
+ * tensa manteniendo `A.tensar` y se suelta con `A.soltar`; sus flechas VUELAN —de cuatro a siete tics, no un
+ * destello—, así que el juicio contra las entidades se hace de verdad tic a tic, con ellas moviéndose. Sin
+ * tensar sale un golpe en ANILLO (el pisotón: poco alcance y un área de dos metros), a media tensión una
+ * flecha con un área de uno, y tenso del todo una flecha larga sin área que derriba. Lo usa `arquero`, el
+ * robot que tensa y suelta.
  */
 import { UNO } from '../../shared/mecanicas/fijo';
 import { DT_DEL_TIC, COSENO, SENO } from '../../shared/mecanicas/andar';
@@ -43,10 +50,14 @@ import type {
   FaseDeLaLiza,
   GrupoDeclarado,
   LizaDeclarada,
+  NivelDelTiro,
   OlvidoDeclarado,
+  ProyectilDeclarado,
   PuestaDeEstado,
   ReglasDeAsiento,
+  TiroDeclarado,
 } from '../../shared/mecanicas/liza/declaracion';
+import { nivelDeLaCarga } from '../../shared/mecanicas/liza/tiro';
 import { MOTIVO_DE_IRSE } from '../../shared/mecanicas/liza/protocolo';
 import type { SucesoDelTic, TuplaDeFoto } from '../../shared/mecanicas/liza/protocolo';
 import type { AccionRecibida, EntradaDeLaSala, EstadoDeLaSala, PasoDeLaSala } from '../../shared/mecanicas/liza/tipos-de-la-sala';
@@ -86,6 +97,8 @@ export const E = {
   caidaAsiento: 11,
   rematando: 12,
   absorbiendo: 13,
+  /** Tensando el arco: se planta, un golpe lo corta, y no bloquea las acciones (soltar es una). */
+  tensando: 14,
 } as const;
 
 /** Las acciones del juguete. */
@@ -99,10 +112,53 @@ export const A = {
   rescate: 11,
   remate: 12,
   zona: 13,
+  /** El arco: la sostenida que tensa y la pulsación que suelta. */
+  tensar: 20,
+  soltar: 21,
   golpe: 40,
   segundo: 41,
   respuesta: 42,
 } as const;
+
+/** Las flechas del arco, una por nivel (la bala 1 es la del tirador). */
+export const FLECHA = { anillo: 2, media: 3, tensa: 4 } as const;
+
+/**
+ * EL ARCO DE JUGUETE (el segundo uso nombrado del tiro cargado). Tres niveles: sin tensar, el golpe en anillo
+ * —8 de alcance a 40 por segundo (cuatro tics), y un área de 2 que descoloca—; desde 400 ms, una flecha de 18 a
+ * 60 (seis tics) con un área de 1; y desde 900 ms, tensa, una de 30 a 90 (siete tics) sin área, que derriba. Se
+ * mantiene tres segundos como mucho; recarga de 16, 24 y 30 tics.
+ */
+export function arco(): NonNullable<ReglasDeAsiento['tiro']> {
+  return {
+    apuntar: A.tensar,
+    soltar: A.soltar,
+    puesta: puesta(E.tensando, 60, 0, u(0.5)),
+    niveles: [
+      { desdeMs: 0, proyectil: FLECHA.anillo, ancho: u(0.2), area: u(2), efectoDelArea: efecto(4, puesta(E.descolocado, 8), u(1.5)), recargaTics: 16 },
+      { desdeMs: 400, proyectil: FLECHA.media, ancho: u(0.1), area: u(1), efectoDelArea: efecto(6, puesta(E.tocado, 10), u(1)), recargaTics: 24 },
+      { desdeMs: 900, proyectil: FLECHA.tensa, ancho: u(0.05), area: 0, efectoDelArea: null, recargaTics: 30 },
+    ],
+    enganche: { radio: u(30), conoRumbos: 16, holgura: u(0.5) },
+    holgura: u(0.3),
+    cargaMaximaMs: 900,
+  };
+}
+
+/** Las tres flechas del arco: de un solo disparo, con su alcance y su velocidad, y lo que le hacen al blanco directo. */
+export function flechas(): LizaDeclarada['proyectiles'] {
+  const flecha = (id: number, alcance: number, velocidad: number, dano: number, p: PuestaDeEstado, empuje: number) => ({
+    id,
+    apuntarTics: 1,
+    balas: 1,
+    cadaTics: 0,
+    velocidad: u(velocidad),
+    radio: u(0.05),
+    alcance: u(alcance),
+    efecto: efecto(dano, p, u(empuje)),
+  });
+  return [flecha(FLECHA.anillo, 8, 40, 6, puesta(E.descolocado, 8), 1), flecha(FLECHA.media, 18, 60, 12, puesta(E.tocado, 10), 1), flecha(FLECHA.tensa, 30, 90, 25, puesta(E.derribado, 20), 2)];
+}
 
 export function puesta(estado: number, tics: number, intocableTics = 0, distanciaExtra = 0, soltableDesdeTic = tics): PuestaDeEstado {
   return { estado, tics, intocableTics, distanciaExtra, soltableDesdeTic };
@@ -185,8 +241,8 @@ export function reglas(asiento: string): ReglasDeAsiento {
       ruptura: { coste: 50, desde: [E.tocado], puesta: puesta(E.esquivando, 9, 6, u(4), 6) },
     },
     rescate: { accion: A.rescate, radio: u(1.5), mantenerTics: 30, puesta: puesta(E.sosteniendo, 30), vidaAlVolver: 40, medidorAmbos: 0 },
-    /* El tiro cargado (W) todavía no lo cumple la sala: su arco de juguete llega con quien lo cablee. */
-    tiro: null,
+    /* El tiro cargado (W): el arco de juguete, su segundo uso nombrado (ver `arco`). */
+    tiro: arco(),
     medidor: { tope: 100, porLimpia: 35, porRitmo: 5, porRemate: 20, porChoque: 10 },
     puntos: { factor: UNO, multiplicador: { paso: 6554, tope: 2 * UNO }, porLimpia: 50, porChoque: 30, porRemate: 100, porRescate: 75, porSalir: 150 },
     alEmpezar: { vida: 100, medidor: 0, lleva: [{ portable: 1, n: 0 }] },
@@ -432,9 +488,10 @@ export function montarJuguete(o: OpcionesDelJuguete): LizaDeclarada {
       estado(E.caidaAsiento, true, true),
       estado(E.rematando, true, true),
       estado(E.absorbiendo, true, true),
+      estado(E.tensando, true, false, [], true),
     ],
     clases: [o.clase ?? clase()],
-    proyectiles: [{ id: 1, apuntarTics: 12, balas: 3, cadaTics: 3, velocidad: u(20), radio: u(0.2), alcance: u(30), efecto: efecto(o.danoDeBala ?? 12, puesta(E.tocado, 10)) }],
+    proyectiles: [{ id: 1, apuntarTics: 12, balas: 3, cadaTics: 3, velocidad: u(20), radio: u(0.2), alcance: u(30), efecto: efecto(o.danoDeBala ?? 12, puesta(E.tocado, 10)) }, ...flechas()],
     turnos: { cuerpoACuerpo: 2, disparo: 1, anunciosALaVez: 3, excluyen: [E.premio, E.sinCuerpo, E.ausente, E.reaparecido], alargarConLaRed: true, repetirTrasTics: o.repetirTrasTics ?? 0 },
     portables: [{ id: 1, tope: 12, radioDeRecogida: u(1.2), montonTics: 400, pago: { tipo: 'triangular', porUnidad: 10 } }],
     equipo: {
@@ -839,12 +896,185 @@ export function premioDe(d: LizaDeclarada, n: number): number {
   return d.asientos[n - 1]?.esquiva.alAcertar.puesta.estado ?? -1;
 }
 
+/* ─── LOS ROBOTS DEL TIRO CARGADO (declaración W) ────────────────────────── */
+
+/** El tiro del asiento de este aparato, según la declaración de la sala, o `null`. */
+export function tiroDe(b: Banco, n: number): TiroDeclarado | null {
+  return b.sala.declaracion.asientos[n - 1]?.tiro ?? null;
+}
+
+/** La bala de un nivel del tiro, de la declaración de la sala. */
+function balaDelNivel(b: Banco, n: NivelDelTiro): ProyectilDeclarado | null {
+  for (const p of b.sala.declaracion.proyectiles) if (p.id === n.proyectil) return p;
+  return null;
+}
+
+/** La entidad en pie (ni apareciendo, ni caída, ni deshecha) más cercana a `a`, con su distancia en Q16.16. */
+export function masCercanaEnPie(b: Banco, a: Aparato): { numero: number; x: number; z: number; d: number } | null {
+  let mejor: { numero: number; x: number; z: number; d: number } | null = null;
+  for (const e of b.sala.entidades) {
+    const m = e.cerebro.modo;
+    if (e.vida <= 0 || m === 'caida' || m === 'absorber' || m === 'deshecha' || m === 'aparecer') continue;
+    const dx = e.x - a.x;
+    const dz = e.z - a.z;
+    const d = Math.floor(Math.sqrt(dx * dx + dz * dz));
+    if (mejor === null || d < mejor.d || (d === mejor.d && e.numero < mejor.numero)) mejor = { numero: e.numero, x: e.x, z: e.z, d };
+  }
+  return mejor;
+}
+
+/** Cuántas cargas y sueltas lleva un robot del tiro, para los suelos de los comprobadores. */
+export interface CuentaDelArquero {
+  cargas: number;
+  sueltas: number;
+}
+
+export interface OpcionesDelArquero {
+  /** Cuánto tensa cada vez, en ms, en rueda: una por disparo. Sin decir, uno de cada nivel. */
+  readonly cargasMs?: readonly number[];
+  /** Si manda el número de su blanco al soltar (el enganche de la sala). Sin decir, sí. */
+  readonly mandaBlanco?: boolean;
+  /** Si va hacia su blanco cuando no le llega. Sin decir, sí. */
+  readonly anda?: boolean;
+  /** Sus cuentas, si alguien las quiere. */
+  readonly cuenta?: CuentaDelArquero;
+}
+
+/**
+ * EL ARQUERO: el robot que TENSA Y SUELTA. Busca la entidad en pie más cercana; si el nivel que va a sacar le
+ * llega, se planta, la mira y mantiene `apuntar` lo que toque en su rueda de cargas; entonces suelta hacia ella
+ * (mandando su número: el enganche de la sala) y espera la recarga de ese nivel, que calcula de la declaración
+ * como la calcularía un aparato. Si no le llega, anda hacia ella. No esquiva: es para ver volar, tocar y
+ * estallar, y para que los dos motores jueguen el tiro entero.
+ */
+export function arquero(o: OpcionesDelArquero = {}): Robot {
+  let vuelta = 0;
+  let cargando: { desde: number; hasta: number; blanco: number; ms: number } | null = null;
+  let listoDesde = -1e9;
+  return (a, b, reloj) => {
+    const tiro = tiroDe(b, a.numero);
+    if (tiro === null) return;
+    if (cargando !== null) {
+      a.meta = null;
+      const e = b.sala.entidades.find((x) => x.numero === (cargando as { blanco: number }).blanco);
+      if (e !== undefined && (e.x !== a.x || e.z !== a.z)) a.mira = rumboHacia(e.x - a.x, e.z - a.z);
+      if (reloj < cargando.hasta) return;
+      const nivel = nivelDeLaCarga(tiro, reloj - cargando.ms);
+      a.planear(tiro.soltar, reloj, o.mandaBlanco === false ? 0 : cargando.blanco);
+      if (o.cuenta !== undefined) o.cuenta.sueltas++;
+      listoDesde = reloj + nivel.recargaTics * 50 + 100;
+      cargando = null;
+      return;
+    }
+    if (reloj < listoDesde || a.planes.length > 0) return;
+    const blanco = masCercanaEnPie(b, a);
+    if (blanco === null) return;
+    const cargas = o.cargasMs ?? tiro.niveles.map((n) => n.desdeMs + 50);
+    const cargaMs = cargas[vuelta % cargas.length] as number;
+    const bala = balaDelNivel(b, nivelDeLaCarga(tiro, cargaMs));
+    if (bala === null) return;
+    if (blanco.d > bala.alcance - u(0.5)) {
+      if (o.anda !== false) a.meta = { x: blanco.x, z: blanco.z };
+      return;
+    }
+    vuelta++;
+    a.meta = null;
+    if (blanco.x !== a.x || blanco.z !== a.z) a.mira = rumboHacia(blanco.x - a.x, blanco.z - a.z);
+    a.sosten = { id: tiro.apuntar, ms: reloj, blanco: 0 };
+    cargando = { desde: reloj, hasta: reloj + cargaMs, blanco: blanco.numero, ms: reloj };
+    if (o.cuenta !== undefined) o.cuenta.cargas++;
+  };
+}
+
+/**
+ * EL QUE LEE, CON EL TIRO: el guerrero de siempre, y cuando no tiene a nadie a menos de cuatro metros, ni nada
+ * que hacer, carga el nivel más alto y lo suelta contra la entidad más cercana que le llegue. Si mientras carga
+ * le anuncian un golpe, la deja y vuelve a leer: cargar es no poder quebrar, y quien lee lo sabe.
+ */
+export function guerreroConTiro(X: number, ids: IdsDelRobot = IDS_DEL_JUGUETE, cuenta?: CuentaDelArquero): Robot {
+  const pelear = guerrero(X, ids);
+  let cargando: { hasta: number; blanco: number; ms: number; oidos: number } | null = null;
+  let listoDesde = -1e9;
+  return (a, b, reloj) => {
+    const tiro = tiroDe(b, a.numero);
+    if (cargando !== null && tiro !== null) {
+      let meAnuncian = false;
+      for (let i = cargando.oidos; i < a.oido.length; i++) {
+        const s = (a.oido[i] as { suceso: SucesoDelTic }).suceso;
+        if (s.e === 'anuncio' && s.a === a.numero) meAnuncian = true;
+      }
+      if (meAnuncian) {
+        a.sosten = null;
+        cargando = null;
+      } else {
+        a.meta = null;
+        const e = b.sala.entidades.find((x) => x.numero === (cargando as { blanco: number }).blanco);
+        if (e !== undefined && (e.x !== a.x || e.z !== a.z)) a.mira = rumboHacia(e.x - a.x, e.z - a.z);
+        if (reloj < cargando.hasta) return;
+        const nivel = nivelDeLaCarga(tiro, reloj - cargando.ms);
+        a.planear(tiro.soltar, reloj, cargando.blanco);
+        if (cuenta !== undefined) cuenta.sueltas++;
+        listoDesde = reloj + nivel.recargaTics * 50 + 100;
+        cargando = null;
+        return;
+      }
+    }
+    pelear(a, b, reloj);
+    if (tiro === null || reloj < listoDesde || a.planes.length > 0 || a.sosten !== null) return;
+    const blanco = masCercanaEnPie(b, a);
+    const tenso = tiro.niveles[tiro.niveles.length - 1] as NivelDelTiro;
+    const bala = balaDelNivel(b, tenso);
+    if (blanco === null || bala === null || blanco.d < u(4) || blanco.d > bala.alcance - u(1)) return;
+    if (!hayLineaDeVista(b.arena.cuerpos, a.x, a.z, blanco.x, blanco.z)) return;
+    a.meta = null;
+    a.mira = rumboHacia(blanco.x - a.x, blanco.z - a.z);
+    a.sosten = { id: tiro.apuntar, ms: reloj, blanco: 0 };
+    cargando = { hasta: reloj + tenso.desdeMs + 50, blanco: blanco.numero, ms: reloj, oidos: a.oido.length };
+    if (cuenta !== undefined) cuenta.cargas++;
+  };
+}
+
+/**
+ * EL QUE APORREA, CON EL TIRO: el aporreador de siempre, y en cuanto el tiro está listo lo suelta sin cargar
+ * contra lo más cercano que le llegue —el nivel más bajo, el de área—, una y otra vez.
+ */
+export function aporreadorConTiro(ids: IdsDelRobot = IDS_DEL_JUGUETE, cuenta?: CuentaDelArquero): Robot {
+  const aporrear = aporreador(ids);
+  let cargandoDesde: number | null = null;
+  let blancoDeLaCarga = 0;
+  let listoDesde = -1e9;
+  return (a, b, reloj) => {
+    const tiro = tiroDe(b, a.numero);
+    if (tiro !== null && cargandoDesde !== null) {
+      const nivel = nivelDeLaCarga(tiro, reloj - cargandoDesde);
+      a.planear(tiro.soltar, reloj, blancoDeLaCarga);
+      if (cuenta !== undefined) cuenta.sueltas++;
+      listoDesde = reloj + nivel.recargaTics * 50 + 100;
+      cargandoDesde = null;
+      return;
+    }
+    if (tiro !== null && reloj >= listoDesde) {
+      const blanco = masCercanaEnPie(b, a);
+      const bala = balaDelNivel(b, tiro.niveles[0] as NivelDelTiro);
+      if (blanco !== null && bala !== null && blanco.d <= bala.alcance) {
+        a.mira = rumboHacia(blanco.x - a.x === 0 && blanco.z - a.z === 0 ? 1 : blanco.x - a.x, blanco.z - a.z);
+        a.sosten = { id: tiro.apuntar, ms: reloj, blanco: 0 };
+        cargandoDesde = reloj;
+        blancoDeLaCarga = blanco.numero;
+        if (cuenta !== undefined) cuenta.cargas++;
+        return;
+      }
+    }
+    aporrear(a, b, reloj);
+  };
+}
+
 /** EL QUE APORREA: esquiva cada tres tics y golpea (entrada al más cercano) en los otros, sin mirar nada. */
-export function aporreador(): Robot {
+export function aporreador(ids: IdsDelRobot = IDS_DEL_JUGUETE): Robot {
   let vuelta = 0;
   return (a, b, reloj) => {
     vuelta++;
-    if (vuelta % 3 === 0) a.planear(A.esquiva, reloj, 0);
+    if (vuelta % 3 === 0) a.planear(ids.esquiva, reloj, 0);
     else {
       let mejor = 0;
       let mejorD = Infinity;
@@ -856,7 +1086,7 @@ export function aporreador(): Robot {
           mejor = t[0];
         }
       }
-      if (mejor !== 0) a.planear(A.entrada, reloj, mejor);
+      if (mejor !== 0) a.planear(ids.entrada, reloj, mejor);
     }
     void b;
   };
@@ -947,7 +1177,11 @@ export function bancoLleno(d: LizaDeclarada, semilla: number): Banco {
   const aparatos: Aparato[] = [];
   const rtts = [50, 90, 130, 170, 210, 250];
   const errores = [0, 40, -40, 17, -23, 35];
-  for (let i = 1; i <= 6; i++) aparatos.push(new Aparato(i, 1000 * i + 37 * i * i, errores[i - 1] as number, rtts[i - 1] as number, (13 * i) % 50, guerrero(80 + 20 * i)));
+  /* Seis guerreros, y dos de ellos con el arco: el cuarto lo usa cuando no tiene a nadie cerca, y el quinto sólo tensa y suelta. */
+  for (let i = 1; i <= 6; i++) {
+    const robot = i === 4 ? guerreroConTiro(80 + 20 * i) : i === 5 ? arquero() : guerrero(80 + 20 * i);
+    aparatos.push(new Aparato(i, 1000 * i + 37 * i * i, errores[i - 1] as number, rtts[i - 1] as number, (13 * i) % 50, robot));
+  }
   const b = new Banco(d, semilla, aparatos);
   for (let i = 1; i <= 6; i++) b.conectar(i);
   b.guardarPasos = false;
@@ -971,6 +1205,14 @@ export interface JugadaDeLaLiza {
   nacidas: number;
   ausentes: number;
   fases: number;
+  /**
+   * EL TIRO CARGADO: las flechas de los asientos que le llegaron al asiento 1, las veces que alguien empezó a
+   * tensar, las flechas que estallaron y las entidades que alcanzaron.
+   */
+  tiros: number;
+  tensadas: number;
+  estallas: number;
+  alcanzadas: number;
   /** El hilo de todo lo que salió de la sala, tic a tic (FNV sobre la forma canónica), y el estado final. */
   salidas: string;
   huella: string;
@@ -1009,6 +1251,11 @@ export function jugarLaLizaDeJuguete(semilla: number, tics: number): JugadaDeLaL
   let resueltos = 0;
   let nacidas = 0;
   let ausentes = 0;
+  let tiros = 0;
+  let tensadas = 0;
+  let estallas = 0;
+  let alcanzadas = 0;
+  const deTiro: number[] = [];
   let salidas = '';
   for (let i = 0; i < tics; i++) {
     if (i === callaEn) sexto.mudo = true;
@@ -1020,15 +1267,39 @@ export function jugarLaLizaDeJuguete(semilla: number, tics: number): JugadaDeLaL
     for (const x of p.sucesos) {
       const e = x.suceso;
       if (x.para === 1 && e.e === 'anuncio') anuncios++;
-      else if (x.para === 1 && e.e === 'bala') balas++;
-      else if (x.para === 1 && e.e === 'apunta' && e.a !== 0) lineas++;
+      else if (x.para === 1 && e.e === 'bala') {
+        balas++;
+        if (e.de < 16) {
+          tiros++;
+          deTiro.push(e.id);
+        }
+      } else if (x.para === 1 && e.e === 'apunta' && e.a !== 0) lineas++;
       else if (x.para === 0 && e.e === 'resuelve') resueltos++;
       else if (x.para === 0 && e.e === 'nace') nacidas++;
       else if (x.para === 0 && e.e === 'estado' && e.est === E.ausente) ausentes++;
+      else if (x.para === 0 && e.e === 'estado' && e.est === E.tensando) tensadas++;
+      else if (x.para === 0 && e.e === 'estalla') estallas++;
+      else if (x.para === 0 && e.e === 'impacta' && e.a >= 16 && deTiro.indexOf(e.bala) >= 0) alcanzadas++;
       else if ((x.para === 0 || x.para === 1) && e.e === 'fase' && claves.indexOf(e.clave) < 0) claves.push(e.clave);
     }
   }
-  return { semilla, tics, anuncios, balas, lineas, resueltos, nacidas, ausentes, fases: claves.length, salidas, huella: fnv(huellaDeLaSala(b.sala)) };
+  return {
+    semilla,
+    tics,
+    anuncios,
+    balas,
+    lineas,
+    resueltos,
+    nacidas,
+    ausentes,
+    fases: claves.length,
+    tiros,
+    tensadas,
+    estallas,
+    alcanzadas,
+    salidas,
+    huella: fnv(huellaDeLaSala(b.sala)),
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

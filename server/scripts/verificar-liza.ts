@@ -201,8 +201,13 @@ import {
   A,
   accion,
   anunciosContraMi,
+  aporreadorConTiro,
   Aparato,
+  arco,
+  arquero,
   AzarDeJuguete,
+  FLECHA,
+  guerreroConTiro,
   ALCANCE_DE_LA_ABIERTA,
   bancoDeLaCiudad,
   corredor,
@@ -245,7 +250,7 @@ import {
   salidasDe,
   u,
 } from './liza-de-juguete';
-import type { IdsDelRobot, OpcionesDelJuguete, Robot } from './liza-de-juguete';
+import type { CuentaDelArquero, IdsDelRobot, OpcionesDelJuguete, Robot } from './liza-de-juguete';
 
 const { comprobar, paso, nota, terminar } = arnes();
 
@@ -2093,6 +2098,7 @@ paso('15 · El coste: microsegundos por tic de una sala llena (6 asientos, 14 en
   let entidades = 0;
   let balas = 0;
   let masBalas = 0;
+  let tiros = 0;
   let sucesos = 0;
   for (let t = 0; t < 5; t++) {
     b.costeMs = 0;
@@ -2102,7 +2108,10 @@ paso('15 · El coste: microsegundos por tic de una sala llena (6 asientos, 14 en
       entidades += p.sala.entidades.length;
       balas += p.sala.balas.length;
       sucesos += p.sucesos.length;
-      if (p.sala.balas.length > masBalas) masBalas = p.sala.balas.length;
+      /* El aforo es el de las balas de ENTIDADES; las flechas de los asientos (el arco del cuarto y el quinto) van aparte. */
+      const deEntidades = p.sala.balas.filter((x) => x.de >= PRIMER_NUMERO_DE_ENTIDAD).length;
+      if (deEntidades > masBalas) masBalas = deEntidades;
+      for (const s of p.sucesos) if (s.para === 1 && s.suceso.e === 'bala' && s.suceso.de < PRIMER_NUMERO_DE_ENTIDAD) tiros++;
     }
     tomas.push((b.costeMs * 1000) / b.llamadas);
   }
@@ -2113,7 +2122,11 @@ paso('15 · El coste: microsegundos por tic de una sala llena (6 asientos, 14 en
       `de media ${(entidades / 2000).toFixed(1)} entidades, ${(balas / 2000).toFixed(1)} balas (${String(masBalas)} a la vez como mucho) y ${(sucesos / 2000).toFixed(1)} sucesos por tic; ` +
       `${((mediana * 20) / 1000).toFixed(2)} ms de CPU por segundo de sala`,
   );
-  comprobar('la sala está llena de verdad: 14 entidades casi siempre y el aforo de balas alcanzado', entidades / 2000 >= 13 && masBalas === 12 && b.sala.encuentro !== null && b.sala.encuentro.resultado === null, { entidades: entidades / 2000, masBalas });
+  comprobar(
+    'la sala está llena de verdad: 14 entidades casi siempre, el aforo de balas de entidades alcanzado, y flechas de los asientos por encima',
+    entidades / 2000 >= 13 && masBalas === 12 && tiros >= 10 && b.sala.encuentro !== null && b.sala.encuentro.resultado === null,
+    { entidades: entidades / 2000, masBalas, tiros },
+  );
   comprobar(`un tic de la sala llena cuesta ${String(TOPE_DEL_TIC_US)} µs o menos (la mejor de cinco tomas: la máquina puede estar ocupada con otros frentes)`, mejor <= TOPE_DEL_TIC_US, tomas);
   const b2 = bancoLleno(lizaLlena(), 92);
   const todas: PasoDeLaSala[] = [];
@@ -4970,11 +4983,753 @@ function jugarHuyendo(d: LizaDeclarada, semilla: number, tics: number): { tics: 
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 26 · EL TIRO CARGADO (W)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * El ataque a distancia de un asiento (`TiroDeclarado`, `tiro.ts`), jugado con el ARCO de la liza de juguete —su
+ * segundo uso nombrado: flechas que vuelan de cuatro a siete tics, así que el juicio contra las entidades se hace
+ * de verdad tic a tic— y, si su productor está, con el rayo de El Quiebro. Lo que pide el contrato del rayo (§4):
+ * la carga en el reloj del aparato, sin que el desfase la mueva; cada nivel; el juicio contra las entidades
+ * (fracción menor, número menor, nunca las caídas); el área con línea de vista y sin el blanco directo; sin fuego
+ * amigo; las cancelaciones que no disparan ni gastan la recarga; la recarga; el aforo aparte; y que el robot que
+ * LEE siga sacando al menos el doble que el que APORREA, también con el tiro.
+ *
+ * Las escenas ponen ESTATUAS —entidades que no andan, no pegan y se van al caer— y las COLOCAN donde dice la
+ * prueba (su sitio se escribe en el estado de la sala en cuanto nacen: un sitio exacto, no uno sorteado en una
+ * zona). El asiento está en (0, −10) mirando al sur (rumbo 128, hacia +z), y el aparato lleva un GUION: tensa en
+ * un instante de SU reloj y suelta en otro, como pulsaría una persona.
+ */
+paso('26 · El tiro cargado (W): la carga en el reloj del aparato, cada nivel, el juicio contra las entidades, el área, las cancelaciones, la recarga y el aforo');
+/** Las comprobaciones de este bloque con la liza de juguete, y las que suma El Quiebro si su productor está. */
+const DEL_TIRO = 24;
+const DEL_TIRO_EN_EL_QUIEBRO = 2;
+{
+  const SUR = 128;
+  const D = 7000;
+  /** Una estatua: no anda, no pega y se va al caer (salvo que la prueba pida otra cosa). */
+  const estatua = (extra: Partial<ClaseDeEntidad> = {}): ClaseDeEntidad =>
+    clase({
+      vida: 40,
+      velocidad: 0,
+      acciones: [],
+      guardia: null,
+      cerebro: { distanciaMinima: u(1), distanciaMaxima: u(2), decideCadaTics: 4, costeCuerpoACuerpo: 1, costeDisparo: 1, sigueElGrafo: true, alcanceDeBlanco: 0 },
+      aparicion: { modo: 'imprimir', tics: 4 },
+      alCaer: { tipo: 'irse' },
+      ...extra,
+    });
+  interface Escena {
+    readonly asientos?: readonly { x: number; z: number }[];
+    readonly estatuas: number;
+    /** Cajas de más en el suelo, en UNIDADES (el suelo es el `MundoDeclarado` de `mundo.ts`). */
+    readonly cajas?: readonly { x0: number; z0: number; x1: number; z1: number }[];
+    readonly clase?: ClaseDeEntidad;
+    readonly aforo?: { entidades: number; balas: number; montones: number };
+    readonly arco?: ReglasDeAsiento['tiro'];
+  }
+  /** La liza de una escena: `estatuas` entidades que nacen en las esquinas y luego se colocan (`colocar`). */
+  const escenaDelTiro = (o: Escena): LizaDeclarada => {
+    const n = o.asientos?.length ?? 1;
+    const base = montarJuguete({
+      asientos: n,
+      nace: (o.asientos ?? [{ x: 0, z: -10 }]).slice(),
+      clase: o.clase ?? estatua(),
+      relojTics: 6000,
+      aforo: o.aforo,
+      grupos: (nn) => [{ clase: 1, cuantos: porN(nn, () => o.estatuas), vivasALaVez: porN(nn, () => o.estatuas), claseDeZona: 1, desdeTic: 0, cadaTics: 0, eleccion: 'azar' }],
+    });
+    const en = base.fase.encuentro;
+    const cajas = o.cajas ?? [];
+    const d: LizaDeclarada = {
+      ...base,
+      asientos: o.arco === undefined ? base.asientos : base.asientos.map((a) => ({ ...a, tiro: o.arco ?? null })),
+      mundo: { ...base.mundo, suelo: { ...base.mundo.suelo, cuerpos: [...base.mundo.suelo.cuerpos, ...cajas] }, clasesDeCaja: [...base.mundo.clasesDeCaja, ...cajas.map(() => CLASE_DE_CAJA.alta)] },
+      fase: en === null ? base.fase : { ...base.fase, encuentro: { ...en, vivasALaVez: porN(n, () => 14) } },
+    };
+    const problemas = problemasDeLaDeclaracion(d);
+    if (problemas.length > 0) throw new Error(`la escena del tiro está mal declarada: ${problemas.slice(0, 3).join(' | ')}`);
+    return d;
+  };
+  /**
+   * COLOCA las entidades en `sitios` (en unidades), en orden de número, en cuanto han nacido todas (o al tic 40).
+   * Devuelve sus números, en ese orden.
+   */
+  const colocar = (b: Banco, sitios: readonly { x: number; z: number }[]): number[] => {
+    while (b.sala.entidades.length < sitios.length && b.k < 40) b.tic();
+    const numeros = b.sala.entidades.map((e) => e.numero).sort((x, y) => x - y);
+    const entidades = b.sala.entidades.map((e) => {
+      const s = sitios[numeros.indexOf(e.numero)];
+      return s === undefined ? e : { ...e, x: u(s.x), z: u(s.z) };
+    });
+    b.sala = { ...b.sala, entidades };
+    return numeros;
+  };
+  interface Disparo {
+    /** Cuándo tensa, en ms del reloj del aparato, y cuánto mantiene. */
+    readonly en: number;
+    readonly carga: number;
+    readonly blanco?: number;
+    readonly mira?: number;
+    /** Si se deja de mantener antes de soltar: a los tantos ms de tensar (y suelta igual, `carga` después). */
+    readonly dejaEn?: number;
+    /** Otra pulsación en mitad de la carga, a los tantos ms de tensar. */
+    readonly pulsa?: { readonly id: number; readonly a: number; readonly blanco: number };
+  }
+  /**
+   * EL GUION de un aparato: mira a `mira` (o a la de cada disparo) y, disparo a disparo, tensa en su instante (un
+   * `aqui` con `tensar` y ese `ms`, y luego los que hagan falta con el mismo), y suelta en el suyo con su blanco. Un
+   * disparo tensa siempre en un tic y suelta en otro posterior, como un aparato de verdad.
+   */
+  const guion = (disparos: readonly Disparo[], mira = SUR): Robot => {
+    let i = 0;
+    let tensado = false;
+    let pulsado = false;
+    return (a, _b, reloj) => {
+      const d = disparos[i];
+      a.mira = d?.mira ?? mira;
+      if (d === undefined) return;
+      if (!tensado) {
+        if (reloj < d.en) return;
+        a.sosten = { id: A.tensar, ms: d.en, blanco: 0 };
+        tensado = true;
+        pulsado = false;
+        return;
+      }
+      if (d.pulsa !== undefined && !pulsado && reloj >= d.en + d.pulsa.a) {
+        a.planear(d.pulsa.id, d.en + d.pulsa.a, d.pulsa.blanco);
+        pulsado = true;
+      }
+      if (d.dejaEn !== undefined && reloj >= d.en + d.dejaEn && a.sosten !== null && a.sosten.id === A.tensar) a.sosten = null;
+      if (reloj >= d.en + d.carga) {
+        a.planear(A.soltar, d.en + d.carga, d.blanco ?? 0);
+        i++;
+        tensado = false;
+      }
+    };
+  };
+  /** Las balas de tiro que le llegaron al asiento `para`, con su tic. */
+  const tirosVistos = (b: Banco, para = 1): { k: number; id: number; p: number }[] => {
+    const r: { k: number; id: number; p: number }[] = [];
+    for (const p of b.pasos) for (const s of p.sucesos) if (s.para === para && s.suceso.e === 'bala' && s.suceso.de < PRIMER_NUMERO_DE_ENTIDAD) r.push({ k: p.sala.tic, id: s.suceso.id, p: s.suceso.p });
+    return r;
+  };
+  /** Las veces que el asiento `n` entró en el estado de tensar. */
+  const tensadas = (b: Banco, n = 1): number => sucesosDe(b, 'estado').filter((x) => x.s.a === n && x.s.est === E.tensando).length;
+  /** Un banco de un asiento con su guion, con las estatuas colocadas en `sitios`; y las corre `tics`. */
+  const jugarEscena = (d: LizaDeclarada, sitios: readonly { x: number; z: number }[], robot: Robot, tics: number, red: { error?: number; rtt?: number; fase?: number } = {}): { b: Banco; numeros: number[] } => {
+    const b = bancoDeUno(d, new Aparato(1, D, red.error ?? 20, red.rtt ?? 100, red.fase ?? 17, robot));
+    const numeros = colocar(b, sitios);
+    b.correr(tics);
+    return { b, numeros };
+  };
+  const T = D + 50 * 30;
+
+  /* ── La carga, en el reloj del aparato ── */
+  {
+    const d = escenaDelTiro({ estatuas: 1 });
+    const casos: readonly (readonly [number, number])[] = [
+      [380, FLECHA.anillo],
+      [420, FLECHA.media],
+      [880, FLECHA.media],
+      [920, FLECHA.tensa],
+    ];
+    const malos: string[] = [];
+    let jugados = 0;
+    for (const error of [0, 40, -40]) {
+      for (const rtt of [50, 150, 250]) {
+        for (const fase of [3, 27, 49]) {
+          for (const [carga, flecha] of casos) {
+            const { b } = jugarEscena(d, [{ x: 0, z: -4 }], guion([{ en: T, carga }]), 70, { error, rtt, fase });
+            const t = tirosVistos(b);
+            jugados++;
+            if (t.length !== 1 || t[0]!.p !== flecha) malos.push(`${String(carga)} ms, error ${String(error)}, red ${String(rtt)}, fase ${String(fase)}: ${JSON.stringify(t.map((x) => x.p))}`);
+          }
+        }
+      }
+    }
+    comprobar(
+      'la carga es msSoltar − msPulsar en el reloj del aparato: con 380, 420, 880 y 920 ms sale el nivel de su carga, con el desfase estimado con 0 y ±40 ms de error, 50/150/250 de red y tres fases del aparato',
+      jugados === 108 && malos.length === 0,
+      malos.slice(0, 6),
+    );
+  }
+
+  /* ── Un aparato que miente con su carga ── */
+  {
+    const d = escenaDelTiro({ estatuas: 1 });
+    const mentiroso: Robot = (() => {
+      let paso = 0;
+      return (a, _b, reloj) => {
+        a.mira = SUR;
+        if (reloj < T) return;
+        paso++;
+        /* Dice que tensó hace cinco segundos y suelta al tic siguiente: la sala sólo le ha visto dos tics. */
+        if (paso === 1) a.sosten = { id: A.tensar, ms: reloj - 5000, blanco: 0 };
+        if (paso === 3) a.planear(A.soltar, reloj, 0);
+      };
+    })();
+    const { b } = jugarEscena(d, [{ x: 0, z: -4 }], mentiroso, 60);
+    const t = tirosVistos(b);
+    /*
+     * Lo que la sala se cree es lo que VIO: los dos tics, más su `comp` (dos tics con 100 ms de ida y vuelta) y el
+     * del `aqui`, contados desde el tic de la pulsación acotado —que ya queda un `comp` y un tic atrás—: ocho tics,
+     * 400 ms, la flecha media. Nunca la tensa de los cinco segundos que dice.
+     */
+    comprobar('la carga que se cree no pasa de lo que la sala vio: quien dice cinco segundos de carga con dos tics a la vista saca la flecha de 400 ms, no la tensa', t.length === 1 && t[0]!.p === FLECHA.media, t);
+  }
+
+  /* ── Cada nivel ── */
+  {
+    const filas: string[] = [];
+    let bien = 0;
+    for (const [carga, flecha, dano] of [
+      [100, FLECHA.anillo, 6],
+      [500, FLECHA.media, 12],
+      [1000, FLECHA.tensa, 25],
+    ] as const) {
+      const d = escenaDelTiro({ estatuas: 1 });
+      const { b, numeros } = jugarEscena(d, [{ x: 0, z: -4 }], guion([{ en: T, carga }]), 80);
+      const t = tirosVistos(b);
+      const suc = b.sucesos();
+      const iE = suc.findIndex((x) => x.s.e === 'estalla');
+      const iI = suc.findIndex((x) => x.s.e === 'impacta');
+      const est = suc[iE];
+      const imp = suc[iI];
+      const ok =
+        t.length === 1 &&
+        t[0]!.p === flecha &&
+        est !== undefined &&
+        imp !== undefined &&
+        est.s.e === 'estalla' &&
+        imp.s.e === 'impacta' &&
+        est.k === imp.k &&
+        iE < iI &&
+        est.s.bala === t[0]!.id &&
+        est.s.x === 0 &&
+        est.s.z === -400 &&
+        imp.s.bala === t[0]!.id &&
+        imp.s.a === numeros[0] &&
+        imp.s.r === RESULTADO.da &&
+        imp.s.dano === dano;
+      if (ok) bien++;
+      filas.push(`${String(carga)} ms: ${JSON.stringify({ tiros: t, estalla: est?.s, impacta: imp?.s })}`);
+    }
+    comprobar('cada nivel saca su flecha, que estalla en el CENTRO del cuerpo que toca —antes que su impacta y en el mismo tic— y le hace el efecto de su bala', bien === 3, filas);
+  }
+
+  /* ── La recarga ── */
+  {
+    const filas: string[] = [];
+    let bien = 0;
+    for (const [carga, recargaMs, flecha] of [
+      [100, 16 * 50, FLECHA.anillo],
+      [1000, 30 * 50, FLECHA.tensa],
+    ] as const) {
+      const d = escenaDelTiro({ estatuas: 1 });
+      const suelta = T + carga;
+      const disparos = [
+        { en: T, carga },
+        { en: suelta + recargaMs - 250, carga: 100 },
+        { en: suelta + recargaMs + 300, carga },
+      ];
+      const { b } = jugarEscena(d, [{ x: 0, z: -4 }], guion(disparos), 140);
+      const t = tirosVistos(b);
+      const ok = t.length === 2 && t[0]!.p === flecha && t[1]!.p === flecha && tensadas(b) === 2;
+      if (ok) bien++;
+      filas.push(`${String(flecha)}: ${JSON.stringify(t)} tensadas ${String(tensadas(b))}`);
+    }
+    comprobar('la recarga de cada nivel cuenta desde que sale: tensar dentro de ella no carga (ni estado, ni flecha), y después sí', bien === 2, filas);
+  }
+
+  /* ── El área: con línea de vista desde el centro, y sin el blanco directo ── */
+  {
+    const muro = { x0: -0.95, z0: -5, x1: -0.75, z1: -3 };
+    /* El directo; una a 1,5 del centro; otra a 1,5 tras un muro; otra FUERA (2,8); y otra a 2,2: fuera del área (2) y dentro con la holgura (2,3). */
+    const sitios = [
+      { x: 0, z: -4 },
+      { x: 1.5, z: -4 },
+      { x: -1.5, z: -4 },
+      { x: 2.8, z: -4 },
+      { x: 0, z: -1.8 },
+    ];
+    const jugar = (conMuro: boolean): { imp: { a: number; dano: number; r: number }[]; numeros: number[]; orden: string[] } => {
+      const d = escenaDelTiro({ estatuas: 5, cajas: conMuro ? [muro] : [] });
+      const { b, numeros } = jugarEscena(d, sitios, guion([{ en: T, carga: 100 }]), 60);
+      const imp: { a: number; dano: number; r: number }[] = [];
+      const orden: string[] = [];
+      for (const x of b.sucesos()) {
+        if (x.s.e === 'estalla') orden.push('estalla');
+        if (x.s.e === 'impacta') {
+          imp.push({ a: x.s.a, dano: x.s.dano, r: x.s.r });
+          orden.push(`impacta ${String(x.s.a)}`);
+        }
+      }
+      return { imp, numeros, orden };
+    };
+    const con = jugar(true);
+    const [A1, B1, C1, D1, E1] = con.numeros;
+    const deA = con.imp.filter((x) => x.a === A1);
+    const [antes, despues] = (B1 as number) < (E1 as number) ? [B1, E1] : [E1, B1];
+    comprobar(
+      'el área alcanza a quien tiene alrededor con línea de vista desde el centro (a su radio más la holgura), con el efecto del área; al blanco directo, sólo el de su bala y una vez; a quien queda tras un muro o fuera del área, nada; y por su orden: estalla, el directo, el área por número',
+      deA.length === 1 &&
+        deA[0]!.dano === 6 &&
+        con.imp.filter((x) => x.a === B1).length === 1 &&
+        con.imp.find((x) => x.a === B1)?.dano === 4 &&
+        con.imp.filter((x) => x.a === E1).length === 1 &&
+        con.imp.every((x) => x.a !== C1 && x.a !== D1) &&
+        con.orden.join(',') === `estalla,impacta ${String(A1)},impacta ${String(antes)},impacta ${String(despues)}`,
+      con,
+    );
+    const sin = jugar(false);
+    const [, , C2, D2] = sin.numeros;
+    comprobar(
+      'y sin el muro, el de detrás sí la recibe (lo que lo salvaba era la línea de vista), y el de fuera del área sigue sin nada',
+      sin.imp.filter((x) => x.a === C2).length === 1 && sin.imp.find((x) => x.a === C2)?.dano === 4 && sin.imp.every((x) => x.a !== D2),
+      sin,
+    );
+  }
+
+  /* ── El juez: la fracción menor, el número menor, y nunca las caídas ── */
+  {
+    const d = escenaDelTiro({ estatuas: 2 });
+    /*
+     * Las dos, a 2 y a 3,5 m de la boca: la flecha tensa vuela 4,5 m por tic, así que las dos caen en el MISMO tramo
+     * (el primero) y lo que decide es la fracción. La de delante es la de número mayor: si el juez mirase el número
+     * antes que la fracción, o tomase la fracción mayor, daría a la de detrás.
+     */
+    const cerca = jugarEscena(d, [{ x: 0, z: -6.5 }, { x: 0, z: -8 }], guion([{ en: T, carga: 1000 }]), 80);
+    const impCerca = sucesosDe(cerca.b, 'impacta');
+    comprobar('entre dos en la línea y en el mismo tramo de vuelo, la toca la de delante (la fracción menor del tramo), y la de detrás no', impCerca.length === 1 && impCerca[0]!.s.a === cerca.numeros[1], impCerca.map((x) => x.s));
+
+    const empate = jugarEscena(d, [{ x: 0.3, z: -5 }, { x: -0.3, z: -5 }], guion([{ en: T, carga: 1000 }]), 80);
+    const impEmpate = sucesosDe(empate.b, 'impacta');
+    comprobar('a igual fracción —dos a los lados de la línea, a la misma distancia—, la de número menor', impEmpate.length === 1 && impEmpate[0]!.s.a === empate.numeros[0], { imp: impEmpate.map((x) => x.s), numeros: empate.numeros });
+
+    /* Una que roza la línea pero tiene un muro fino en medio: la flecha pasa a su lado y no la toca. */
+    const dMuro = escenaDelTiro({ estatuas: 1, cajas: [{ x0: 0.1, z0: -6, x1: 0.15, z1: -2 }] });
+    const tras = jugarEscena(dMuro, [{ x: 0.6, z: -4 }], guion([{ en: T, carga: 1000 }]), 80);
+    const sucTras = tras.b.sucesos();
+    comprobar(
+      'y a través de un muro no se alcanza: la que queda al lado de la línea, con un muro fino en medio, no recibe nada (la flecha sigue hasta el quiosco)',
+      tirosVistos(tras.b).length === 1 && !sucTras.some((x) => x.s.e === 'impacta') && sucTras.some((x) => x.s.e === 'seva' && x.s.por === MOTIVO_DE_IRSE.choca),
+      sucTras.filter((x) => x.s.e === 'impacta' || x.s.e === 'estalla' || x.s.e === 'seva').map((x) => x.s),
+    );
+
+    /* Una que cae rematable delante; el segundo tiro la atraviesa y da a la de detrás. */
+    const dCaida = escenaDelTiro({ estatuas: 2, clase: estatua({ vida: 20, alCaer: clase().alCaer }) });
+    const caida = jugarEscena(dCaida, [{ x: 0, z: -3 }, { x: 0, z: -6 }], guion([{ en: T, carga: 1000 }, { en: T + 1000 + 30 * 50 + 200, carga: 500 }]), 110);
+    const impCaida = sucesosDe(caida.b, 'impacta');
+    const tumbadas = sucesosDe(caida.b, 'estado').filter((x) => x.s.a === caida.numeros[1] && x.s.est === E.caidaEntidad).length;
+    comprobar(
+      'la caída no para un tiro: el primero la tumba (queda rematable en el suelo, en la línea) y el segundo pasa por encima y da a la de detrás',
+      impCaida.length === 2 && impCaida[0]!.s.a === caida.numeros[1] && impCaida[0]!.s.vida === 0 && tumbadas === 1 && impCaida[1]!.s.a === caida.numeros[0],
+      { imp: impCaida.map((x) => x.s), tumbadas },
+    );
+  }
+
+  /* ── Sin fuego amigo ── */
+  {
+    const juega = (sitio2: { x: number; z: number }, carga: number): { impAsiento: number; vida2: number; impEstatua: number } => {
+      const d = escenaDelTiro({ estatuas: 1, asientos: [{ x: 0, z: -10 }, sitio2] });
+      const b = new Banco(d, 7, [new Aparato(1, D, 20, 100, 17, guion([{ en: T, carga }])), new Aparato(2, 9000, -20, 120, 31, quieto)]);
+      b.conectar(1);
+      b.conectar(2);
+      colocar(b, [{ x: 0, z: -4 }]);
+      b.correr(70);
+      const imp = sucesosDe(b, 'impacta');
+      return { impAsiento: imp.filter((x) => x.s.a < PRIMER_NUMERO_DE_ENTIDAD).length, vida2: b.sala.asientos[1]!.vida, impEstatua: imp.filter((x) => x.s.a >= PRIMER_NUMERO_DE_ENTIDAD).length };
+    };
+    const enMedio = juega({ x: 0, z: -7 }, 1000);
+    const enElArea = juega({ x: 1.2, z: -4.4 }, 100);
+    comprobar(
+      'sin fuego amigo: la flecha atraviesa al asiento que tiene delante y da a la estatua, y el área no toca al que está dentro de ella',
+      enMedio.impAsiento === 0 && enMedio.vida2 === 100 && enMedio.impEstatua === 1 && enElArea.impAsiento === 0 && enElArea.vida2 === 100 && enElArea.impEstatua === 1,
+      { enMedio, enElArea },
+    );
+  }
+
+  /* ── Las cancelaciones: ninguna dispara ── */
+  {
+    const d = escenaDelTiro({ estatuas: 1 });
+    const soloSoltar = (): Robot => {
+      let hecho = false;
+      return (a, _b, reloj) => {
+        a.mira = SUR;
+        if (hecho || reloj < T) return;
+        a.planear(A.soltar, reloj, 0);
+        hecho = true;
+      };
+    };
+    const casos: [string, Robot, number, ((b: Banco) => void) | null][] = [
+      ['soltar sin haber tensado', soloSoltar(), 60, null],
+      ['dejar de mantener y soltar después', guion([{ en: T, carga: 700, dejaEn: 300 }]), 70, null],
+      ['golpear en mitad de la carga', guion([{ en: T, carga: 700, pulsa: { id: A.entrada, a: 300, blanco: 0 } }]), 70, null],
+      ['quebrar en mitad de la carga', guion([{ en: T, carga: 700, pulsa: { id: A.esquiva, a: 300, blanco: 0 } }]), 70, null],
+      ['mantener más de lo que dura su estado (60 tics)', guion([{ en: T, carga: 3400 }]), 120, null],
+      ['empezar otra fase en mitad de la carga', guion([{ en: T, carga: 900 }]), 70, (b) => b.meter(b.k * 50 + 1, { tipo: 'vista', declaracion: { ...d, fase: { ...d.fase, clave: 'otra-fase' } } })],
+      ['quedarse ausente en mitad de la carga (y volver)', guion([{ en: T, carga: 4000 }]), 160, null],
+    ];
+    const malos: string[] = [];
+    let empezadas = 0;
+    for (const [que, robot, tics, alTic35] of casos) {
+      const b = bancoDeUno(d, new Aparato(1, D, 20, 100, 17, robot));
+      colocar(b, [{ x: 0, z: -4 }]);
+      const yo = b.aparato(1);
+      for (let i = 0; i < tics; i++) {
+        if (b.k === 35 && alTic35 !== null) alTic35(b);
+        if (que.startsWith('quedarse ausente')) yo.mudo = b.k >= 36 && b.k < 100;
+        b.tic();
+      }
+      if (tensadas(b) > 0) empezadas++;
+      const t = tirosVistos(b);
+      if (t.length > 0) malos.push(`${que}: ${JSON.stringify(t)}`);
+    }
+    comprobar(
+      'sólo dispara el soltar de una carga viva: ni soltar sin tensar, ni dejar de mantener, ni golpear, quebrar, mantener de más, otra fase o quedarse ausente en mitad de la carga sacan flecha (y las seis cargas sí empezaron)',
+      malos.length === 0 && empezadas === 6,
+      { malos, empezadas },
+    );
+  }
+
+  /* ── El daño corta la carga, el mismo dedo no la vuelve a empezar, y dejarla no gasta la recarga ── */
+  {
+    /* Una que pega, al lado del asiento (fuera de la línea de tiro), con un golpe que deja tocado 12 tics. */
+    const pegona = estatua({ acciones: [accion(A.golpe, { anuncioTics: 11, enganche: null, alFallar: null, efecto: efecto(1, puesta(E.tocado, 12)) })], cerebro: { distanciaMinima: u(0.8), distanciaMaxima: u(1.5), decideCadaTics: 2, costeCuerpoACuerpo: 1, costeDisparo: 1, sigueElGrafo: true, alcanceDeBlanco: 0 } });
+    const d = escenaDelTiro({ estatuas: 1, clase: pegona });
+    /* Tensa 2,5 s con el mismo dedo (le pegan en medio), y suelta; luego, pulsación nueva y rápida. */
+    let tras = 0;
+    const b = bancoDeUno(d, new Aparato(1, D, 20, 100, 17, guion([{ en: T, carga: 2500 }])));
+    colocar(b, [{ x: 1, z: -10 }]);
+    b.correr(90);
+    const pegado = sucesosDe(b, 'resuelve').some((x) => x.s.r === RESULTADO.da && x.s.dano === 1);
+    const tirosAntes = tirosVistos(b).length;
+    const empezo = tensadas(b);
+    /* La pulsación nueva, cuando el golpe ya pasó y entre dos de la pegona. */
+    const yo = b.aparato(1);
+    const libre = (): boolean => {
+      const s = b.sala.asientos[0]!;
+      return s.estado === null || b.k >= s.estado.hastaTic;
+    };
+    for (let i = 0; i < 200 && !libre(); i++) b.tic();
+    const en = yo.reloj(b.k * 50 + 17) + 60;
+    yo.robot = guion([{ en, carga: 60 }]);
+    tras = tirosVistos(b).length;
+    b.correr(12);
+    const tirosDespues = tirosVistos(b).length - tras;
+    comprobar(
+      'un golpe en mitad de la carga la corta sin disparar, y el mismo dedo, mantenido, no la vuelve a empezar: su soltar no saca nada',
+      pegado && empezo === 1 && tirosAntes === 0,
+      { pegado, empezo, tirosAntes },
+    );
+    comprobar('y dejarla no gasta la recarga: una pulsación nueva, en cuanto se puede, carga y dispara', tirosDespues === 1, { tirosDespues });
+
+    /*
+     * El golpe de arriba pone un estado que bloquea, y ése solo ya pisaría el de tensar. Éste no pone NADA: sólo
+     * quita un punto de vida. Lo que corta la carga es entonces que el estado de tensar se corta con el daño.
+     */
+    const pellizco = estatua({ acciones: [accion(A.golpe, { anuncioTics: 11, enganche: null, alFallar: null, efecto: efecto(1, null) })], cerebro: { distanciaMinima: u(0.8), distanciaMaxima: u(1.5), decideCadaTics: 2, costeCuerpoACuerpo: 1, costeDisparo: 1, sigueElGrafo: true, alcanceDeBlanco: 0 } });
+    const bp = bancoDeUno(escenaDelTiro({ estatuas: 1, clase: pellizco }), new Aparato(1, D, 20, 100, 17, guion([{ en: T, carga: 2500 }])));
+    colocar(bp, [{ x: 1, z: -10 }]);
+    bp.correr(90);
+    const soltoEn = Math.ceil((T + 2500 - D) / 50);
+    const pellizcos = sucesosDe(bp, 'resuelve').filter((x) => x.s.r === RESULTADO.da && x.s.dano === 1 && x.k < soltoEn);
+    const puestos = sucesosDe(bp, 'estado').filter((x) => x.s.a === 1 && x.s.est !== E.tensando && x.s.est !== 0);
+    comprobar(
+      'y un golpe que no pone estado —sólo daño— también la corta: el estado de tensar se corta con el daño, y su soltar no saca nada',
+      pellizcos.length >= 1 && puestos.length === 0 && tensadas(bp) === 1 && tirosVistos(bp).length === 0,
+      { pellizcos: pellizcos.map((x) => x.k), soltoEn, puestos: puestos.map((x) => x.s), tensadas: tensadas(bp), tiros: tirosVistos(bp) },
+    );
+  }
+
+  /* ── El aforo: el de las entidades no se traga un tiro; y la plaza de cada asiento ── */
+  {
+    const d = escenaDelTiro({ estatuas: 1, aforo: { entidades: 14, balas: 0, montones: 8 } });
+    const { b } = jugarEscena(d, [{ x: 0, z: -4 }], guion([{ en: T, carga: 1000 }]), 70);
+    comprobar('un aforo de balas de entidades lleno (aquí, de cero) no se traga un tiro: la flecha sale y da', tirosVistos(b).length === 1 && sucesosDe(b, 'impacta').length === 1);
+
+    /*
+     * Y al revés: una flecha en el aire no ocupa sitio en ese aforo. Una tiradora quieta, con aforo de UNA bala y
+     * balas de un punto sin estado, le tira al segundo asiento (un cebo quieto a 8 m); el primero, a 21 m de ella,
+     * suelta hacia el norte, sin nada delante, flechas cortas a paso de hombre (sus 8 m en 40 tics: una rápida pasa
+     * casi toda su vida en el pasado que compensa la red, y apenas se ve en la sala). Alguna bala de la tiradora
+     * tiene que nacer en un tic con una flecha en el aire de principio a fin (la había antes del tic y sigue después).
+     */
+    const dCebo0 = escenaDelTiro({ estatuas: 1, asientos: [{ x: 0, z: -10 }, { x: 20, z: -10 }], clase: claseTiradora({ velocidad: 0, guardia: null }), aforo: { entidades: 14, balas: 1, montones: 8 } });
+    const dCebo: LizaDeclarada = { ...dCebo0, proyectiles: dCebo0.proyectiles.map((x) => (x.id === 1 ? { ...x, efecto: efecto(1, null) } : x.id === FLECHA.anillo ? { ...x, velocidad: u(4) } : x)) };
+    const flechasAlNorte = Array.from({ length: 15 }, (_, i) => ({ en: T + i * 2600, carga: 60 }));
+    const bc = new Banco(dCebo, 7, [new Aparato(1, D, 20, 100, 17, guion(flechasAlNorte, 0)), new Aparato(2, 9000, -20, 120, 31, quieto)]);
+    bc.conectar(1);
+    bc.conectar(2);
+    colocar(bc, [{ x: 20, z: -2 }]);
+    let antes: number[] = [];
+    let conFlechaEnElAire = 0;
+    let nacidas = 0;
+    let deEntidadesALaVez = 0;
+    for (let i = 0; i < 800; i++) {
+      const paso = bc.tic();
+      const ahora = paso.sala.balas.filter((x) => x.de < PRIMER_NUMERO_DE_ENTIDAD).map((x) => x.numero);
+      const nacen = paso.sucesos.filter((x) => x.para === 2 && x.suceso.e === 'bala' && x.suceso.de >= PRIMER_NUMERO_DE_ENTIDAD).length;
+      nacidas += nacen;
+      if (nacen > 0 && ahora.some((id) => antes.indexOf(id) >= 0)) conFlechaEnElAire++;
+      const deEntidades = paso.sala.balas.length - ahora.length;
+      if (deEntidades > deEntidadesALaVez) deEntidadesALaVez = deEntidades;
+      antes = ahora;
+    }
+    comprobar(
+      'y una flecha en el aire no ocupa sitio en el aforo de las entidades: con aforo de una bala, la tiradora sigue tirando mientras vuelan (y nunca lleva dos)',
+      conFlechaEnElAire >= 5 && nacidas >= 10 && deEntidadesALaVez === 1 && tirosVistos(bc).length >= 12,
+      { conFlechaEnElAire, nacidas, deEntidadesALaVez, flechas: tirosVistos(bc).length },
+    );
+
+    /* Un arco sin recarga, hacia el este y sin nada delante: la flecha tensa vuela sus 30 en siete tics, y mientras vuela no se tensa otra. */
+    const sinRecarga = arco();
+    const conPlaza = escenaDelTiro({ estatuas: 1, asientos: [{ x: -20, z: -10 }], arco: { ...sinRecarga, niveles: sinRecarga.niveles.map((n) => ({ ...n, recargaTics: 0 })) } });
+    const bp = bancoDeUno(conPlaza, new Aparato(1, D, 20, 100, 17, guion([{ en: T, carga: 1000 }, { en: T + 1000 + 60, carga: 60 }, { en: T + 1000 + 700, carga: 60 }], 64)));
+    colocar(bp, [{ x: 15, z: 18 }]);
+    let enElAire = 0;
+    let dosALaVez = false;
+    for (let i = 0; i < 90; i++) {
+      bp.tic();
+      const deTiro = bp.sala.balas.filter((x) => x.de < PRIMER_NUMERO_DE_ENTIDAD).length;
+      if (deTiro > 0) enElAire++;
+      if (deTiro > 1) dosALaVez = true;
+    }
+    const tp = tirosVistos(bp);
+    comprobar(
+      'cada asiento tiene su PLAZA: mientras vuela su flecha (aquí sin recarga) no se vuelve a tensar —ni estado ni flecha—, y en cuanto cae sí',
+      tp.length === 2 && tensadas(bp) === 2 && enElAire >= 3 && !dosALaVez,
+      { tp, tensadas: tensadas(bp), enElAire, dosALaVez },
+    );
+  }
+
+  /* ── Lo que no deja empezar: el estado que no bloquea (el premio) y el golpe propio anunciado ── */
+  {
+    const d = escenaDelTiro({ estatuas: 1 });
+    /* El premio de una limpia, puesto a mano: 40 tics de un estado que no bloquea. */
+    const bPremio = bancoDeUno(d, new Aparato(1, D, 20, 100, 17, guion([{ en: T, carga: 300 }, { en: T + 2600, carga: 300 }])));
+    colocar(bPremio, [{ x: 0, z: -4 }]);
+    while (bPremio.k < 28) bPremio.tic();
+    const k = bPremio.k;
+    const yo = bPremio.sala.asientos[0]!;
+    bPremio.sala = { ...bPremio.sala, asientos: [{ ...yo, estado: { estado: E.premio, desdeTic: k, hastaTic: k + 40, intocableHastaTic: k + 40, soltableEnTic: k + 40, distanciaExtra: 0 } }] };
+    bPremio.correr(110);
+    const enPremio = tirosVistos(bPremio);
+    /* El golpe propio: la entrada, y tensar en mitad de su anuncio. */
+    const golpea = (): Robot => {
+      let hecho = false;
+      return (a, _b, reloj) => {
+        a.mira = SUR;
+        if (hecho || reloj < T) return;
+        a.planear(A.entrada, T, 0);
+        hecho = true;
+      };
+    };
+    const bGolpe = bancoDeUno(d, new Aparato(1, D, 20, 100, 17, golpea()));
+    colocar(bGolpe, [{ x: 0, z: -4 }]);
+    while (bGolpe.k < 32) bGolpe.tic();
+    bGolpe.aparato(1).robot = guion([{ en: T + 150, carga: 200 }]);
+    bGolpe.correr(40);
+    comprobar(
+      'no se empieza a cargar en un estado que no bloquea (el premio de una limpia: la carga lo acabaría) ni con un golpe propio anunciado sin resolver; y acabado el premio, sí',
+      enPremio.length === 1 && tensadas(bPremio) === 1 && tirosVistos(bGolpe).length === 0 && tensadas(bGolpe) === 0,
+      { enPremio, tensadasPremio: tensadas(bPremio), golpe: tirosVistos(bGolpe), tensadasGolpe: tensadas(bGolpe) },
+    );
+  }
+
+  /* ── El enganche: la estatua a 19 rumbos del norte (el cono del arco es de 16), y el tiro hacia el norte ── */
+  {
+    const caseta = { x0: 1.3, z0: -13.5, x1: 1.7, z1: -12.5 };
+    const juega = (mira: number, blanco: boolean, conCaseta: boolean): string => {
+      const d = escenaDelTiro({ estatuas: 1, cajas: conCaseta ? [caseta] : [] });
+      const b = bancoDeUno(d, new Aparato(1, D, 20, 100, 17, quieto));
+      const [n] = colocar(b, [{ x: 3, z: -16 }]);
+      b.aparato(1).robot = guion([{ en: T, carga: 1000, mira, blanco: blanco ? n : 0 }]);
+      b.correr(70);
+      const suc = b.sucesos();
+      if (suc.some((x) => x.s.e === 'impacta' && x.s.a === n)) return 'da';
+      if (suc.some((x) => x.s.e === 'seva' && x.s.por === MOTIVO_DE_IRSE.choca)) return 'choca';
+      if (suc.some((x) => x.s.e === 'seva' && x.s.por === MOTIVO_DE_IRSE.alcance)) return 'alcance';
+      return 'nada';
+    };
+    const dentro = juega(10, true, false);
+    const fueraDelCono = juega(0, true, false);
+    const sinBlanco = juega(10, false, false);
+    const tapado = juega(10, true, true);
+    comprobar(
+      'el enganche: con el blanco dentro del cono de la mira va derecho a él y da; fuera del cono, o sin mandarlo, o sin línea de vista, sale por la mira (y aquí no toca nada)',
+      dentro === 'da' && fueraDelCono === 'alcance' && sinBlanco === 'alcance' && tapado === 'alcance',
+      { dentro, fueraDelCono, sinBlanco, tapado },
+    );
+  }
+
+  /* ── La estructura y el alcance ── */
+  {
+    const d = escenaDelTiro({ estatuas: 1, asientos: [{ x: 0, z: 0 }] });
+    const { b, numeros } = jugarEscena(d, [{ x: 0.9, z: 3.2 }], guion([{ en: T, carga: 500 }]), 70);
+    const suc = b.sucesos().filter((x) => x.s.e === 'estalla' || x.s.e === 'impacta' || (x.s.e === 'seva' && x.s.id >= PRIMER_NUMERO_DE_ENTIDAD && x.s.id !== numeros[0]));
+    const est = suc[0];
+    comprobar(
+      'la que para la estructura estalla donde se para (a cinco centímetros del quiosco), alcanza a quien tiene al lado con el área, y se va con su seva por el choque',
+      suc.length === 3 &&
+        est !== undefined &&
+        est.s.e === 'estalla' &&
+        est.s.x === 0 &&
+        est.s.z === 395 &&
+        suc[1]!.s.e === 'impacta' &&
+        suc[1]!.s.a === numeros[0] &&
+        suc[1]!.s.dano === 6 &&
+        suc[2]!.s.e === 'seva' &&
+        suc[2]!.s.por === MOTIVO_DE_IRSE.choca,
+      suc.map((x) => x.s),
+    );
+    const dN = escenaDelTiro({ estatuas: 1 });
+    const n = jugarEscena(dN, [{ x: 10, z: 12 }], guion([{ en: T, carga: 1000 }], 0), 70);
+    const sn = n.b.sucesos();
+    comprobar(
+      'y la que llega a su alcance (recortado al límite de la fase) sin tocar nada no estalla: sólo su seva por el alcance',
+      tirosVistos(n.b).length === 1 && !sn.some((x) => x.s.e === 'estalla' || x.s.e === 'impacta') && sn.filter((x) => x.s.e === 'seva' && x.s.por === MOTIVO_DE_IRSE.alcance).length === 1,
+      sn.filter((x) => x.s.e === 'seva' || x.s.e === 'estalla').map((x) => x.s),
+    );
+  }
+
+  /* ── La puesta al día: quien entra con una flecha en el aire la recibe una vez (la tensa, hacia el este: siete tics) ── */
+  {
+    const d = escenaDelTiro({ estatuas: 1, asientos: [{ x: -20, z: -10 }, { x: 6, z: -14 }] });
+    const juega = (conectarEn: number | null): { b: Banco; delDos: number; id: number } => {
+      const b = new Banco(d, 7, [new Aparato(1, D, 20, 100, 17, guion([{ en: T, carga: 1000 }], 64)), new Aparato(2, 9000, -20, 120, 31, quieto)]);
+      b.conectar(1);
+      colocar(b, [{ x: 15, z: 18 }]);
+      for (let i = 0; i < 80; i++) {
+        if (conectarEn !== null && b.k === conectarEn) b.conectar(2);
+        b.tic();
+      }
+      const t = tirosVistos(b, 1);
+      const id = t[0]?.id ?? -1;
+      return { b, delDos: tirosVistos(b, 2).filter((x) => x.id === id).length, id };
+    };
+    const primera = juega(null);
+    const k = tirosVistos(primera.b, 1)[0]?.k ?? -1;
+    const mismoPaso = juega(k - 1);
+    const enVuelo = juega(k + 1);
+    comprobar(
+      'quien conecta con una flecha de tiro en el aire la recibe en su puesta al día UNA vez: en el mismo paso en que sale, y dos tics después',
+      k > 0 && mismoPaso.delDos === 1 && enVuelo.delDos === 1,
+      { k, mismoPaso: mismoPaso.delDos, enVuelo: enVuelo.delDos },
+    );
+  }
+
+  /* ── El que lee contra el que aporrea, los dos con el arco ── */
+  {
+    const zonaAlrededor = { id: 9, clase: 9, caja: caja(-4, -4, 4, -3) };
+    const d = juguete({
+      asientos: 1,
+      relojTics: 1200,
+      grupos: (n) => [{ clase: 1, cuantos: porN(n, () => 40), vivasALaVez: porN(n, () => 3), claseDeZona: 9, desdeTic: 0, cadaTics: 20, eleccion: 'azar' }],
+      zonasExtra: [zonaAlrededor],
+      nace: [{ x: 0, z: -8 }],
+    });
+    const puntosDe = (robot: (c: CuentaDelArquero) => Robot, semilla: number): { puntos: number; tiros: number } => {
+      const cuenta: CuentaDelArquero = { cargas: 0, sueltas: 0 };
+      const b = bancoDeUno(d, new Aparato(1, 6000, 25, 150, 17, robot(cuenta)), semilla);
+      for (let i = 0; i < 1201 && (b.sala.encuentro === null || b.sala.encuentro.resultado === null); i++) b.tic();
+      return { puntos: b.sala.asientos[0]!.puntos, tiros: tirosVistos(b).length };
+    };
+    let lee = 0;
+    let aporrea = 0;
+    let tirosLee = 0;
+    let tirosAporrea = 0;
+    const detalle: unknown[] = [];
+    for (const semilla of [21, 22]) {
+      const l = puntosDe((c) => guerreroConTiro(120, IDS_DEL_JUGUETE, c), semilla);
+      const p = puntosDe((c) => aporreadorConTiro(IDS_DEL_JUGUETE, c), semilla);
+      lee += l.puntos;
+      aporrea += p.puntos;
+      tirosLee += l.tiros;
+      tirosAporrea += p.tiros;
+      detalle.push({ semilla, lee: l, aporrea: p });
+    }
+    nota(`con el arco, en dos minutos de encuentro: el que lee ${String(lee)} puntos (${String(tirosLee)} flechas), el que aporrea ${String(aporrea)} (${String(tirosAporrea)} flechas)`);
+    comprobar('con el arco en la mano, el que lee sigue sacando al menos el doble que el que aporrea (y los dos lo usan)', lee > 0 && lee >= 2 * aporrea && tirosLee > 0 && tirosAporrea > 0, detalle);
+  }
+
+  /* ── El rayo de El Quiebro, con su declaración de verdad ── */
+  if (HAY_QUIEBRO) {
+    const productor = (await import(pathToFileURL(RUTA_DEL_PRODUCTOR).href)) as { lizaDelQuiebro: (vista: unknown, codigo: string) => LizaDeclarada | null };
+    const robotDeLaMesa = (await import(pathToFileURL(RUTA_DEL_ROBOT).href)) as {
+      jugarAlQuiebro: (o: { asientos: number; semilla: number; noches: number; politica: 'gana' | 'pierde' | 'mezcla'; travesuras: boolean }) => { vistas: readonly unknown[] };
+    };
+    const oleadas: LizaDeclarada[] = [];
+    for (const semilla of [7, 11]) {
+      const claves = new Set<string>();
+      for (const v of robotDeLaMesa.jugarAlQuiebro({ asientos: 1, semilla, noches: 1, politica: 'gana', travesuras: false }).vistas) {
+        const l = productor.lizaDelQuiebro(v, 'K7M2P');
+        if (l === null || l.fase.modo !== 'encuentro' || l.fase.encuentro === null || l.fase.encuentro.fin.tipo !== 'vaciar' || claves.has(l.fase.clave)) continue;
+        claves.add(l.fase.clave);
+        oleadas.push(l);
+      }
+    }
+    const jugar = (l: LizaDeclarada, robot: Robot): { puntos: number; tiros: { p: number }[]; danos: Map<number, number[]> } => {
+      const b = bancoDeUno(l, new Aparato(1, 5000, 25, 150, 17, robot), l.fase.semilla);
+      for (let i = 0; i < 2400 && (b.sala.encuentro === null || b.sala.encuentro.resultado === null); i++) b.tic();
+      const tiros = tirosVistos(b);
+      const deTiro = new Map<number, number>();
+      for (const t of tiros) deTiro.set(t.id, t.p);
+      const danos = new Map<number, number[]>();
+      for (const x of sucesosDe(b, 'impacta')) {
+        const p = deTiro.get(x.s.bala);
+        if (p === undefined || x.s.r !== RESULTADO.da) continue;
+        const lista = danos.get(p) ?? [];
+        lista.push(x.s.dano);
+        danos.set(p, lista);
+      }
+      return { puntos: b.sala.asientos[0]!.puntos, tiros, danos };
+    };
+    let lee = 0;
+    let aporrea = 0;
+    let tirosLee = 0;
+    let tirosAporrea = 0;
+    const danosPorBala = new Map<number, Set<number>>();
+    for (const l of oleadas) {
+      const ids = idsDe(l);
+      const a = jugar(l, guerreroConTiro(110, ids));
+      const p = jugar(l, aporreadorConTiro(ids));
+      const q = jugar(l, arquero());
+      lee += a.puntos;
+      aporrea += p.puntos;
+      tirosLee += a.tiros.length;
+      tirosAporrea += p.tiros.length;
+      for (const r of [a, p, q]) {
+        for (const [bala, lista] of r.danos) {
+          const s = danosPorBala.get(bala) ?? new Set<number>();
+          for (const x of lista) s.add(x);
+          danosPorBala.set(bala, s);
+        }
+      }
+    }
+    nota(`El Quiebro, ${String(oleadas.length)} oleadas de un asiento: el que lee con el rayo ${String(lee)} puntos (${String(tirosLee)} rayos), el que aporrea con el rayo ${String(aporrea)} (${String(tirosAporrea)} rayos)`);
+    comprobar('con el rayo de El Quiebro, el que lee sigue sacando al menos el doble que el que aporrea (y los dos lo usan)', oleadas.length >= 4 && lee >= 2 * aporrea && tirosLee > 0 && tirosAporrea > 0, { lee, aporrea, tirosLee, tirosAporrea });
+    const tiro = oleadas[0]?.asientos[0]?.tiro ?? null;
+    const esperados = tiro === null ? [] : tiro.niveles.map((n) => {
+      const bala = oleadas[0]!.proyectiles.find((x) => x.id === n.proyectil);
+      return { p: n.proyectil, directo: bala?.efecto.dano ?? -1, area: n.efectoDelArea?.dano ?? -1 };
+    });
+    const vistos = esperados.map((e) => ({ ...e, vistos: [...(danosPorBala.get(e.p) ?? new Set<number>())] }));
+    comprobar(
+      'y jugado de verdad salen sus cuatro niveles, cada uno con el daño de la tabla a quien alcanza (el directo y los del área)',
+      vistos.length === 4 && vistos.every((v) => v.vistos.length > 0 && v.vistos.every((x) => x === v.directo || x === v.area)),
+      vistos,
+    );
+  }
+}
+
 /*
  * El suelo: 139 comprobaciones de la Liza sola, más las del ausente (bloque 19), las del pulido (20),
  * las de la línea de apuntado (21), las de su revisión (22), las de la Liza por dentro (23), las de L10
- * (24) y las de la revisión de la entrega 1 (25), y las de El Quiebro si su productor está (el bloque 16
- * lo dice en su nota cuando no). Escrito exacto: un bloque que deja de correr lo baja del suelo.
+ * (24), las de la revisión de la entrega 1 (25) y las del tiro cargado (26), y las de El Quiebro si su
+ * productor está (el bloque 16 lo dice en su nota cuando no). Escrito exacto: un bloque que deja de correr
+ * lo baja del suelo.
  */
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -5245,7 +6000,16 @@ paso('17 · Los avisos, el pago de lo que se lleva, la zona que se enciende y la
 
 terminar({
   escritas:
-    139 + DEL_AUSENTE + DEL_PULIDO + DEL_APUNTADO + DE_LA_REVISION + POR_DENTRO + DEL_OLVIDO + DE_LA_ENTREGA_1 + (HAY_QUIEBRO ? DEL_QUIEBRO + DEL_QUIEBRO_JUGADO + DE_LA_ENTREGA_1_EN_EL_QUIEBRO : 0),
+    139 +
+    DEL_AUSENTE +
+    DEL_PULIDO +
+    DEL_APUNTADO +
+    DE_LA_REVISION +
+    POR_DENTRO +
+    DEL_OLVIDO +
+    DE_LA_ENTREGA_1 +
+    DEL_TIRO +
+    (HAY_QUIEBRO ? DEL_QUIEBRO + DEL_QUIEBRO_JUGADO + DE_LA_ENTREGA_1_EN_EL_QUIEBRO + DEL_TIRO_EN_EL_QUIEBRO : 0),
   enVerde:
     'La sala de la Liza nace y empieza cada fase como dice su contrato, valida el sitio y corrige lo que no cuadra,\n' +
     'juzga la esquiva en el reloj del aparato con el mismo veredicto con cualquier desfase y red, reparte los turnos,\n' +

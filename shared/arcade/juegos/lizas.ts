@@ -143,9 +143,10 @@ export function lizaDeLaMesa(arcade: ArcadeId, vista: unknown, codigo: string): 
  * ≈ 7,9 ms/s una sala llena de seis con sus 20 entidades: lo fijo sube (racimos, disparos, los campos por
  * meta que se rehacen al trote) y cada entidad cuesta más (su línea de vista y su camino van por una
  * ciudad, no por una glorieta). Con el aforo de El Quiebro (20 entidades y 12 balas en todas sus mesas),
- * una sala llena declara 8.380 µs/s y caben 9 por proceso (antes 11); una en solitario, 7.130, y caben 11
- * (antes 13). La palanca de caber más —declarar el aforo por asientos al empezar— es de la plataforma y
- * queda fuera de esta obra (§7, decisión 4).
+ * una sala llena declaraba 8.380 µs/s y cabían 9 por proceso (antes 11); una en solitario, 7.130, y cabían
+ * 11 (antes 13). Con el rayo (una plaza de bala por asiento, ver `costeDeLaLiza`), 8.620 y 7.170: siguen
+ * cabiendo 9 y 11. La palanca de caber más —declarar el aforo por asientos al empezar— es de la plataforma
+ * y queda fuera de esta obra (§7, decisión 4).
  *
  * ═══ POR QUÉ NO SE BAJAN AUNQUE LA MESA REAL MIDA UN TERCIO ═══
  *
@@ -175,10 +176,19 @@ export const COSTE_DE_UNA_SALA = {
  */
 export const PRESUPUESTO_DE_LAS_LIZAS = 80000;
 
-/** Lo que cuesta tener abierta la sala de esta liza, según su aforo (µs de CPU por segundo, en PC). */
+/**
+ * Lo que cuesta tener abierta la sala de esta liza, según su aforo (µs de CPU por segundo, en PC).
+ *
+ * LAS BALAS DE LOS TIROS (declaración W, el rayo de El Quiebro) no cuentan en `aforo.balas`, que es el de las
+ * entidades: cada asiento con tiro tiene su PLAZA, una bala en el aire como mucho (ver `TiroDeclarado`). Cada
+ * plaza se cuenta como una bala más. Es generoso: la de un tiro vuela uno o dos tics cada tres segundos o más,
+ * pero su juicio (contra todas las entidades, con la línea de vista del área) cuesta más que el tic de una bala.
+ */
 export function costeDeLaLiza(liza: LizaDeclarada): number {
   const c = COSTE_DE_UNA_SALA;
-  return c.base + c.porAsiento * liza.asientos.length + c.porEntidad * liza.aforo.entidades + c.porBala * liza.aforo.balas;
+  let plazasDeTiro = 0;
+  for (const a of liza.asientos) if (a.tiro !== null && a.tiro !== undefined) plazasDeTiro++;
+  return c.base + c.porAsiento * liza.asientos.length + c.porEntidad * liza.aforo.entidades + c.porBala * (liza.aforo.balas + plazasDeTiro);
 }
 
 /**

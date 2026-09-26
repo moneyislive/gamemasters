@@ -58,10 +58,13 @@ import type {
   LizaDeclarada,
   ModoDeLaFase,
   MundoDeLaLiza,
+  NivelDelTiro,
   OlvidoDeclarado,
+  ProyectilDeclarado,
   PuestaDeEstado,
   ReglasDeAsiento,
   SitioDeNacer,
+  TiroDeclarado,
   ZonaDelMundo,
 } from '../../mecanicas/liza/declaracion';
 import { semillaDelCodigo } from '../../mecanicas/semilla';
@@ -94,12 +97,14 @@ import {
   ESTADO_DEL_QUIEBRO as E,
   FOCO,
   GOLPES,
+  NIVELES_DEL_RAYO,
   OLEADA_TICS,
   PERSECUCION_DEL_SISTEMA,
   PRESENCIA,
   PROYECTIL_DEL_QUIEBRO,
   PUNTOS,
   QUIEBRO_DEL_DESVELADO,
+  RAYO,
   RED,
   TURNOS,
   componerReglamento,
@@ -112,7 +117,7 @@ import {
   salenParaGanar,
   ticsDeLaLlamada,
 } from './quiebro-reglas';
-import type { GolpeCompuesto, GrupoDeLaNoche, ReglamentoCompuesto, ReglasDelDesvelado, ZonaDeEntrada } from './quiebro-reglas';
+import type { GolpeCompuesto, GrupoDeLaNoche, NivelDelRayo, ReglamentoCompuesto, ReglasDelDesvelado, ZonaDeEntrada } from './quiebro-reglas';
 import { COLUMNAS_DE_LA_RONDA, ESQUIRLAS_COMO_MUCHO, PLAZA_DE_LA_PRIMERA_BAJADA, PORTABLE_ESQUIRLA, bajadaDeLaNoche, leerVistaDelQuiebro } from './quiebro-vista';
 import type { AsientoDelQuiebro, FaseDelQuiebro, VistaDelQuiebro } from './quiebro-vista';
 
@@ -172,6 +177,8 @@ const ESTADOS: readonly EstadoDeclarado[] = [
   estado(E.ausente, true, true, [], false),
   estado(E.desalojable, true, true, [], false),
   estado(E.absorbiendo, true, true, [], false),
+  /* EL RAYO: se planta (bloquea el paso), cualquier daño corta la carga, y NO bloquea las acciones —soltar es una—. */
+  estado(E.cargando, true, false, [], true),
 ];
 
 /** Los estados que no bloquean acciones: su puesta no se suelta antes (va igual a sus tics). */
@@ -195,6 +202,76 @@ function efecto(dano: number, danoAlRitmo: number, puntos: number, puntosAlRitmo
 }
 
 const SIN_CHOQUE = { dano: 0, tics: 0 } as const;
+
+/* ─── EL RAYO (declaración W: el tiro cargado) ───────────────────────────── */
+
+/**
+ * LO QUE LE HACE UN NIVEL DEL RAYO a cada uno que alcanza —el blanco directo y los de su área—: su daño, lo que
+ * le deja y su empuje; y sus puntos, los de su daño, como los de un golpe (ver `NIVELES_DEL_RAYO`). Sin
+ * estampado: lo que choca contra la estructura por un rayo no suma el daño del Cierre (el choque, y lo que
+ * premia, sí cuenta: es de la Liza).
+ */
+function efectoDelRayo(n: NivelDelRayo): EfectoDeclarado {
+  const deja = puesta(E[n.deja], n.dejaTics);
+  return efecto(n.dano, n.dano, n.dano, n.dano, deja, m(n.empujeMetros), SIN_CHOQUE, false);
+}
+
+/** La bala de cada nivel del rayo, por su orden en `NIVELES_DEL_RAYO`. */
+const BALAS_DEL_RAYO: readonly number[] = [PROYECTIL_DEL_QUIEBRO.rayo1, PROYECTIL_DEL_QUIEBRO.rayo2, PROYECTIL_DEL_QUIEBRO.rayo3, PROYECTIL_DEL_QUIEBRO.rayo4];
+
+/** Los proyectiles del rayo: una bala de un solo disparo por nivel, que recorre su alcance en `RAYO.ticsDeVuelo`. */
+function proyectilesDelRayo(): ProyectilDeclarado[] {
+  const balas: ProyectilDeclarado[] = [];
+  for (let i = 0; i < NIVELES_DEL_RAYO.length; i++) {
+    const n = NIVELES_DEL_RAYO[i] as NivelDelRayo;
+    balas.push({
+      id: BALAS_DEL_RAYO[i] as number,
+      apuntarTics: 1,
+      balas: 1,
+      cadaTics: 0,
+      velocidad: m((n.alcanceMetros * 20) / RAYO.ticsDeVuelo),
+      radio: m(RAYO.radioContraLaEstructuraMetros),
+      alcance: m(n.alcanceMetros),
+      efecto: efectoDelRayo(n),
+    });
+  }
+  return balas;
+}
+
+/**
+ * EL TIRO DEL RAYO (`docs/quiebro/EL-RAYO.md`, §2): se mantiene `apuntarRayo` para cargar y se pulsa `soltarRayo`
+ * para que salga, con la tabla de `NIVELES_DEL_RAYO` y lo que ella no fija en `RAYO`. El estado de cargar planta
+ * al desvelado y un golpe lo corta; el enganche llega al alcance del pleno. Es el mismo en todo asiento: el rayo
+ * es igual para los tres estilos (Miguel, 26-sep).
+ */
+function tiroDelRayo(): TiroDeclarado {
+  const niveles: NivelDelTiro[] = [];
+  for (let i = 0; i < NIVELES_DEL_RAYO.length; i++) {
+    const n = NIVELES_DEL_RAYO[i] as NivelDelRayo;
+    niveles.push({
+      desdeMs: n.desdeMs,
+      proyectil: BALAS_DEL_RAYO[i] as number,
+      ancho: m(RAYO.anchoMetros[i] as number),
+      area: m(n.areaMetros),
+      efectoDelArea: n.areaMetros === 0 ? null : efectoDelRayo(n),
+      recargaTics: n.recargaTics,
+    });
+  }
+  const pleno = NIVELES_DEL_RAYO[NIVELES_DEL_RAYO.length - 1] as NivelDelRayo;
+  return {
+    apuntar: A.apuntarRayo,
+    soltar: A.soltarRayo,
+    puesta: puesta(E.cargando, RAYO.cargarTics, 0, RAYO.cargarTics, m(RAYO.pasoMientrasCargaMetros)),
+    niveles,
+    enganche: { radio: m(pleno.alcanceMetros), conoRumbos: RAYO.enganche.conoRumbos, holgura: m(RAYO.enganche.holguraMetros) },
+    holgura: m(RAYO.holguraMetros),
+    cargaMaximaMs: pleno.desdeMs,
+  };
+}
+
+/** El tiro y las balas del rayo, compuestos una vez: son los mismos en toda mesa, fase y asiento. */
+const TIRO_DEL_RAYO: TiroDeclarado = tiroDelRayo();
+const PROYECTILES_DEL_RAYO: readonly ProyectilDeclarado[] = proyectilesDelRayo();
 
 /** Encadenar tras `tras` en la ventana de la Tanda; con compás si `alCompas` es otro anuncio. */
 function cadena(tras: number, anuncioTics: number, alCompas: number | null): CadenaDeclarada {
@@ -363,11 +440,8 @@ function reglasDeAsiento(r: ReglasDelDesvelado, a: AsientoDelQuiebro, c: Reglame
       vidaAlVolver: entre(r.rescate.aguanteAlVolver, 1, r.aguante),
       medidorAmbos: r.rescate.focoAmbos,
     },
-    /*
-     * EL RAYO, todavía sin declarar: la sala aún no cumple el tiro cargado de la Liza y rechaza uno que no sea
-     * `null`. Lo cablea el frente de reglas, con `NIVELES_DEL_RAYO` y los ids `apuntarRayo`/`soltarRayo`.
-     */
-    tiro: null,
+    /* EL RAYO: el tiro cargado de la Liza, el mismo en todo asiento y estilo (ver `TIRO_DEL_RAYO`). */
+    tiro: TIRO_DEL_RAYO,
     medidor: { tope: FOCO.tope, porLimpia: FOCO.porLimpio, porRitmo: FOCO.porCompas, porRemate: FOCO.porDesalojo, porChoque: FOCO.porEstampado },
     puntos: {
       factor: factorDePuntos(c),
@@ -836,6 +910,7 @@ export function lizaDelQuiebro(vista: unknown, codigo: string): LizaDeclarada | 
           alcance: m(ENEMIGOS.tirador.bala.alcanceMetros),
           efecto: efecto(c.enemigos.tirador.balaDano, c.enemigos.tirador.balaDano, 0, 0, puesta(E.tocado, ENEMIGOS.tirador.bala.tocadoTics), 0, SIN_CHOQUE, false),
         },
+        ...PROYECTILES_DEL_RAYO,
       ],
       turnos: {
         cuerpoACuerpo: TURNOS.cuerpoACuerpo,

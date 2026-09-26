@@ -14,7 +14,8 @@
  *      el orden de `Bienvenida`. Va DESPUÉS de las entradas y ANTES de simular: lo que pase en el tic
  *      (un `estado`, un `resuelve`) llega detrás de lo que lo explica, nunca de algo que no conoce.
  *   4. EL TIC, si la fase no es `quieta`: los presupuestos; y en un encuentro vivo, por este orden, las
- *      repeticiones que salen, los impactos que tocan, las balas, las pulsaciones guardadas, las
+ *      repeticiones que salen, los impactos que tocan, las balas (las de las entidades, y luego las de los
+ *      tiros de los asientos, en `tiro.ts`), las pulsaciones guardadas, las
  *      sostenidas, las caídas, la presencia, el olvido, las entidades, lo que sale del encuentro,
  *      los montones, y si se acabó. Los impactos van antes que las guardadas para que un golpe encadenado
  *      salga en el mismo tic en que se resuelve el anterior; las entidades, después de los impactos,
@@ -68,6 +69,7 @@ import {
   soltarLaSostenida,
 } from './combate';
 import { avanzarLasBalas } from './proyectiles';
+import { avanzarLosTiros, MANOS_DEL_TIRO } from './tiro';
 import { pensarLasEntidades } from './cerebro';
 import { avanzarElEncuentro, empezarElEncuentro, mirarElFinal, olvidarLasEntidades, vidaDelBlanco } from './encuentros';
 import { caducarMontones, llevaDe, recogerMontones } from './portables';
@@ -130,6 +132,7 @@ export function salaNueva(declaracion: LizaDeclarada, semilla: number): EstadoDe
       esquivasRecientes: [],
       firmeGastadoEnTic: -1,
       sostenida: null,
+      cargaDejadaMs: -1,
       guardada: null,
       lleva: r.alEmpezar.lleva.slice(),
       contadores: contadoresACero(),
@@ -214,6 +217,7 @@ function simular(p: PasoEnCurso): void {
   anunciarProgramados(p);
   resolverAnuncios(p);
   avanzarLasBalas(p);
+  avanzarLosTiros(p);
   reintentarGuardadas(p);
   avanzarSostenidas(p);
   avanzarLasCaidas(p);
@@ -339,7 +343,7 @@ function atenderEntrada(p: PasoEnCurso, e: EntradaDeLaSala): void {
       if (a === null) return;
       const r = validarAqui(p, a, e);
       if (r === 'tirado') return;
-      if (hayCombate(p)) atenderLaAccionDelAqui(p, a, e.accion, e.desfaseMs);
+      if (hayCombate(p)) atenderLaAccionDelAqui(p, a, e.accion, e.desfaseMs, MANOS_DEL_TIRO);
       else if (a.sostenida !== null) soltarLaSostenida(p, a);
       return;
     }
@@ -392,6 +396,7 @@ function conectar(p: PasoEnCurso, e: EntradaConexion): void {
   a.nDelSitio = -1;
   a.guardada = null;
   soltarLaSostenida(p, a);
+  a.cargaDejadaMs = -1;
   a.cadena = null;
   a.esquivasRecientes = [];
   a.corregidoEnTic = -1;

@@ -105,10 +105,19 @@ olvido a 90 m en 10 s del diseño vuelven con la travesía, y mientras tanto `ve
 su ciudad con ellos puestos. Las lizas de juguete de otros comprobadores todavía no la escriben. Se quita
 cuando todos la escriban.
 
+**Y una que no es de aquel §11: el tiro cargado (W de `declaracion.ts`).** El ataque a distancia de un
+asiento, que pidió el rayo de El Quiebro (`docs/quiebro/EL-RAYO.md`). Entró primero con su forma —la revisión lo
+rechazaba mientras la sala no lo cumplía— y hoy la sala lo cumple entero (`shared/mecanicas/liza/tiro.ts`):
+
+| # | Declaración | En el código | Qué dice | Segundo uso |
+|---|---|---|---|---|
+| W | Tiro cargado | `TiroDeclarado`, `NivelDelTiro`, en `ReglasDeAsiento.tiro`; el suceso `estalla` | Se MANTIENE `apuntar` (una sostenida) y se pulsa `soltar`: la carga es `msSoltar − msPulsar`, dos instantes del reloj del mismo aparato (el desfase no la mueve), acotada por lo que la sala vio y por `cargaMaximaMs`; el nivel es el último de la tabla con `desdeMs` ≤ la carga. Sale una bala de ese nivel desde el tic de la pulsación de `soltar`, hacia la mira o hacia el blanco que acepta el enganche (cono y línea de vista), y se juzga CONTRA LAS ENTIDADES en pie en el presente de la sala —nunca contra asientos: sin fuego amigo—, tramo a tramo, fracción menor y número menor, con línea de vista hasta el cuerpo. Donde se para (el centro del cuerpo, o la estructura) sale `estalla`, y su ÁREA alcanza a las demás en pie con línea de vista desde ahí, empujadas hacia fuera; el blanco directo no la recibe dos veces. Sólo el `soltar` explícito dispara: dejar de mantener, un golpe, quebrar, otra pulsación, otra fase o quedarse ausente la dejan sin disparar y sin gastar la recarga, y el mismo dedo no la vuelve a empezar. No se carga en un estado que no bloquea (acabarlo sería quitarle lo que da), con un golpe propio anunciado, en la recuperación, en la recarga ni con la bala anterior en el aire: cada asiento tiene su PLAZA, fuera del aforo de las entidades, y el coste la cuenta. La guardia no lo para | El ARCO de la liza de juguete de `verify:liza` (flechas que vuelan de cuatro a siete tics; su robot, `arquero`, tensa y suelta), y el golpe en anillo (el área de un nivel) |
+
 **Lo que la Liza no declara, a propósito.** Ningún nombre que se lea: los ids son enteros de 1 a 255
 y los nombres son del juego. Ninguna altura: el mundo sigue siendo plano como el de `mundo.ts`, y «en
-el aire» será un ESTADO (D) con cajas de clase `baja` (B), no una coordenada `y`. Ninguna foto por
-equipo con bits ocultos (W): llegará con el modo que la necesite, no antes.
+el aire» será un ESTADO (D) con cajas de clase `baja` (B), no una coordenada `y` (y por eso una bala, la
+de una entidad o la de un tiro, se para también contra lo bajo). Ninguna foto por equipo con bits ocultos
+(la W de aquel §11, que no es el tiro): llegará con el modo que la necesite, no antes.
 
 ---
 
@@ -311,21 +320,24 @@ sala.
   la Liza degrada porque allí todos están siempre abajo. Las dos razones son buenas y dependen del
   modo, así que la propuesta es que sea una propiedad del registro, no un `if` por juego. Se decide.
 - **El que asoma.** Miguel aceptó el 20-sep 150-250 ms de ventaja del que asoma para una arena lenta. La
-  esquiva juzgada en el reloj del defensor quita esa ventaja en lo que se anuncia, pero la Liza no
-  compensa el disparo instantáneo porque no lo tiene. Un modo contra jugadores (La Azotea de El Quiebro,
-  su fase 3) tendrá que decidir si alarga los anuncios o no, con pruebas en redes móviles.
+  esquiva juzgada en el reloj del defensor quita esa ventaja en lo que se anuncia. El tiro cargado (W) es
+  casi instantáneo, pero sólo se juzga contra ENTIDADES, cuyos sitios decide la sala: contra un asiento no
+  existe, así que no hay disparo instantáneo que compensar entre jugadores. Un modo contra jugadores (La
+  Azotea de El Quiebro, su fase 3) tendrá que decidir si alarga los anuncios y qué hace con el tiro, con
+  pruebas en redes móviles.
 - **La altura.** Ninguna de las dos la tiene. La propuesta es la misma para las dos: «en el aire» como
   estado temporizado con cajas `baja`, no una `y`; lo que obligue a subir de verdad va en su propia
   decisión, porque toca `mundo.ts`, `andar.ts` y la foto de los dos canales.
 - **El coste.** El modelo de `lizas.ts` sale de la tabla del diseño del juego: con la ciudad abierta
-  (`docs/quiebro/CIUDAD-ABIERTA.md` §5.6), base 400, 250 por asiento, 300 por entidad y 40 por bala, y una
-  sala llena de El Quiebro declara 8.380 µs/s (caben 9 por proceso; antes, con el barrio, ≈ 5,9 ms/s y
-  13). Se afina con `medir:liza` en el plan donde corre. Si Boots on Board adopta el aforo, sus
-  coeficientes salen de `medir:botas`, no de éstos.
+  (`docs/quiebro/CIUDAD-ABIERTA.md` §5.6), base 400, 250 por asiento, 300 por entidad y 40 por bala —y
+  una bala más por cada asiento con tiro, su plaza—, y una sala llena de El Quiebro declara 8.620 µs/s con
+  el rayo (8.380 sin él; caben 9 por proceso; antes, con el barrio, ≈ 5,9 ms/s y 13). Se afina con
+  `medir:liza` en el plan donde corre. Si Boots on Board adopta el aforo, sus coeficientes salen de
+  `medir:botas`, no de éstos.
 
 ---
 
-## 6 · Estado a 24-sep-2026 (tras el pulido)
+## 6 · Estado a 26-sep-2026 (con el tiro cargado)
 
 | Pieza | Fichero | Estado |
 |---|---|---|
@@ -335,6 +347,7 @@ sala.
 | La E/S del servidor | `server/src/liza/` | escrita, con `verify:sala-de-la-liza` (robots WebSocket) y `medir:liza` fuera de la batería |
 | El primer juego | El Quiebro (`docs/EL-QUIEBRO.md`) | se juega entero en el navegador, en solitario y a varias pestañas (`/sala/quiebro.html?prueba=1&codigo=…`); falta el aparato real (`docs/quiebro/ARQUITECTURA.md` §6) |
 | La liza abierta (L1-L12) | `AmpliacionDeLaLiza` en `declaracion.ts`; los índices por dentro en `geometria.ts` y `cerebro.ts` | los índices (losas y nudos por celdas, campos por meta, la validación del mundo una vez) escritos y comprobados contra la fuerza bruta; **L10 cumplido por la sala** (`cerebro.ts`: `blancoAlAlcance` y `acercarseSinBlanco`; `encuentros.ts`: `olvidarLasEntidades`), con los bloques 24 y 25 de `verify:liza` (el 25, con la ciudad de El Quiebro y el L10 del diseño mientras su productor no lo declara: persecuciones que rodean una manzana y combates con todos huyendo por las calles) y su partida en Node y en Hermes en `verify:determinismo`, que se acerca sin blanco en los dos motores; las otras once, con su forma y su revisión, esperando a la sala. Y el cerebro ya no se clava donde no llega en recta a ninguno de sus nudos cercanos —el bolsillo de la cabina de la Llamada, entre su poste, un coche y la fachada—: busca uno más lejos (`nudoParaSalir`), y el bloque 18 vigila que nada pase 10 s acechando lejos de su blanco sin moverse |
+| El tiro cargado (W) | `shared/mecanicas/liza/tiro.ts` (cargar, soltar, el vuelo, el juicio contra las entidades y el área); la revisión en `declaracion.ts`; el suceso `estalla` | **cumplido por la sala** (26-sep), con el arco de la liza de juguete y el rayo de El Quiebro declarados; el bloque 26 de `verify:liza` (la carga en el reloj del aparato, cada nivel, el juicio, el área con línea de vista, sin fuego amigo, las cancelaciones, la recarga, la plaza, y el que lee que sigue sacando el doble que el que aporrea, también con el tiro), sus roturas en `verify:liza-protocolo`, su declaración en `verify:quiebro`, y una sala con el rayo en la tanda Node/Hermes de `verify:determinismo` |
 
 Nada se ha empujado. Cualquier cambio que esta propuesta pida en un fichero de Boots on Board se pide
 por escrito a su sesión, no se hace desde aquí (`docs/EL-QUIEBRO.md` §14, riesgo 9).
