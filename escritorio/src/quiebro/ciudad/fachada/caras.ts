@@ -14,14 +14,17 @@
  * Lo que el sombreador lee del muro de una cara (`aCara`, `aVolumen`, `aPlanta`, ver `declaraciones.ts`) sale
  * de `atributosDelMuro` y de ningún otro sitio: quien empaquete ahí algo más (la variedad por edificio, el
  * patrón de balcón, la marca de bulto) lo empaqueta para la ventana y para la LOD1 a la vez, porque las dos
- * escriben sus muros por aquí. Hoy da los mismos números que antes de partir `fachadas.ts`.
+ * escriben sus muros por aquí. Desde la ola 2 del plan del detalle empaqueta también el subestilo y la edad de
+ * cada edificio (ver «la variedad por edificio», abajo).
  */
 import type { Molde } from '../geometria';
 import { azarEn, mezclar } from '../azar';
 import { NUMERO_DEL_ESTILO } from '../hash';
-import type { BajoDeLaFachada, EdificioDelPlano, Orientacion, Volumen } from '../tipos';
+import type { BajoDeLaFachada, EdificioDelPlano, EstiloDeFachada, Orientacion, Volumen } from '../tipos';
 import { BAJO, EPS, HUECO_DEL_ESTILO, TIPO } from './tipos-de-cara';
 import type { Cara, CaraDelVolumen, GradoDeLaFachada, ObraDeLaFachada, Toque } from './tipos-de-cara';
+import { patronDeBalcon } from './balcones';
+import { volumenMasAlto } from './torres';
 
 /** Las cuatro caras de un volumen. */
 export function carasDe(v: Volumen): Cara[] {
@@ -186,18 +189,99 @@ export interface AtributosDelMuro {
   readonly aPlanta: readonly [number, number];
 }
 
+/*
+ * ═══ LA VARIEDAD POR EDIFICIO, SIN TOCAR `shared/` (ola 2 del plan del detalle, O2-PAREDES) ═══
+ *
+ * De la semilla del edificio salen un SUBESTILO (el aparejo del ladrillo, el mortero, la piedra de la sillería, el
+ * encofrado del hormigón, el despiece del azulejo, el color del antepecho del muro cortina: `fachada/glsl-muro.ts`) y
+ * una EDAD (cuánta suciedad, cuántos desconchones, cuánto salitre), sesgada por el estilo y, cuando el edificio lo
+ * diga, por su distrito (el Casco es viejo; las Torres, nuevas). Van empaquetados en los atributos de siempre, sin
+ * un byte nuevo: el subestilo en la parte entera de `aVolumen.z` (el tinte, en la fraccionaria) y la edad en
+ * `aPlanta.y`, con el bajo y el patrón de balcón (`bajo + 4·patrón + 32·edad`, ver `declaraciones.ts`).
+ */
+
+/** Cuántos subestilos tiene cada estilo. */
+export const SUBESTILOS = 4;
+
+/** La edad más alta (la edad va de 0 a esto: tres bits en `aPlanta.y`). */
+export const EDAD_MAXIMA = 7;
+
+/** El patrón de balcón más alto que cabe en `aPlanta.y` (tres bits). */
+export const PATRON_MAXIMO = 7;
+
+/** La edad de partida de cada estilo: lo de piedra y ladrillo, viejo; el vidrio, nuevo. */
+const EDAD_DEL_ESTILO: Readonly<Record<EstiloDeFachada, number>> = { piedra: 5, ladrillo: 5, revoco: 4, azulejo: 3, hormigon: 2, vidrio: 1 };
+
+/** Lo que el distrito le suma a la edad (cuando el edificio del plano lo lleve). */
+const EDAD_DEL_DISTRITO: Readonly<Record<string, number>> = { casco: 2, naves: 1, lonja: 1, ensanche: 0, torres: -2 };
+
+/** El subestilo de un edificio (0-3): de su semilla, el mismo en sus cuatro caras, en la ventana y en la LOD1. */
+export function subestiloDe(e: EdificioDelPlano): number {
+  return Math.min(SUBESTILOS - 1, Math.floor(azarEn(e.semilla, 101) * SUBESTILOS));
+}
+
+/**
+ * La edad de un edificio (0-7): la de su estilo, más la de su distrito si el plano la trae (el campo `distrito` lo
+ * pone otro paquete de la ola 2; sin él, nada), más o menos uno al azar.
+ */
+export function edadDe(e: EdificioDelPlano): number {
+  const distrito = (e as EdificioDelPlano & { readonly distrito?: string }).distrito;
+  const sesgo = distrito === undefined ? 0 : (EDAD_DEL_DISTRITO[distrito] ?? 0);
+  const azar = Math.floor(azarEn(e.semilla, 103) * 3) - 1;
+  return Math.min(EDAD_MAXIMA, Math.max(0, EDAD_DEL_ESTILO[e.estilo] + sesgo + azar));
+}
+
+/** Empaqueta `aPlanta.y`: `bajo + 4·patrón + 32·edad` (ver `declaraciones.ts`). */
+export function empaquetarLaPlanta(bajo: number, patron: number, edad: number): number {
+  const entero = (x: number, tope: number): number => Math.min(tope, Math.max(0, Math.round(x)));
+  return entero(bajo, 3) + 4 * entero(patron, PATRON_MAXIMO) + 32 * entero(edad, EDAD_MAXIMA);
+}
+
+/**
+ * La gemela JS de `desempaquetarLaPlantaQ` (`declaraciones.ts`): `[bajo, patrón, edad]`, con la misma cuenta en
+ * coma flotante. `verify:quiebro-ciudad` (paredes, e) evalúa las dos con todos los bajos, patrones y edades.
+ */
+export function desempaquetarLaPlanta(y: number): readonly [number, number, number] {
+  const c = Math.floor(y + 0.5);
+  const edad = Math.floor(c / 32);
+  const resto = c - 32 * edad;
+  const patron = Math.floor(resto / 4);
+  return [resto - 4 * patron, patron, edad];
+}
+
+/** El tinte en el muro: dentro de [0,001; 0,989], para que el subestilo de la parte entera no se lea mal. */
+export function tinteDelMuro(e: EdificioDelPlano): number {
+  return Math.min(0.989, Math.max(0.001, tinteDe(e)));
+}
+
+/**
+ * Empaqueta `aVolumen.z` del muro: `subestilo + 4·cima + tinte`. La CIMA es el volumen más alto del edificio (el
+ * de la corona de las torres: sin ella, una torre escalonada encendía una corona en cada retranqueo).
+ */
+export function empaquetarElVolumen(subestilo: number, cima: boolean, tinte: number): number {
+  return Math.min(SUBESTILOS - 1, Math.max(0, Math.round(subestilo))) + (cima ? SUBESTILOS : 0) + Math.min(0.989, Math.max(0.001, tinte));
+}
+
+/** La gemela JS de la lectura del prefacio (`glsl-cuerpo.ts`): `[subestilo, cima (0 o 1), tinte]`. */
+export function desempaquetarElVolumen(z: number): readonly [number, number, number] {
+  const s = Math.floor(z + 0.0005);
+  const cima = s >= SUBESTILOS ? 1 : 0;
+  return [s - SUBESTILOS * cima, cima, z - s];
+}
+
 /**
  * LOS ATRIBUTOS DEL MURO de la cara `c` de `e` (ver la cabecera): el ancho de la cara, el estilo, la semilla
  * y si es fachada o medianera (`ciega`: un tramo tapado por un vecino en una cara que no da a la calle); la
- * planta baja, el techo del volumen, el tinte y el vano; la altura de planta y qué hay en el bajo. Una
- * función pura del edificio y de la cara: la misma en la ventana y en la LOD1. `grado` hoy no cambia nada.
+ * planta baja, el techo del volumen, el subestilo, si es la cima y el tinte, y el vano; la altura de planta y el
+ * bajo, el patrón de balcón y la edad, empaquetados. Una función pura del edificio y de la cara: la misma en la
+ * ventana y en la LOD1. `grado` hoy no cambia nada.
  */
 export function atributosDelMuro(e: EdificioDelPlano, c: CaraDelVolumen, grado: GradoDeLaFachada, ciega = false): AtributosDelMuro {
   const bajo = c.fachada === undefined ? BAJO.sinCalle : BAJO[c.fachada.bajo];
   return {
     aCara: [c.cara.hasta - c.cara.desde, NUMERO_DEL_ESTILO[e.estilo], c.semilla, ciega ? TIPO.medianera : TIPO.fachada],
-    aVolumen: [e.plantaBaja, c.volumen.y1, tinteDe(e), e.vano],
-    aPlanta: [e.alturaDePlanta, bajo],
+    aVolumen: [e.plantaBaja, c.volumen.y1, empaquetarElVolumen(subestiloDe(e), c.indice === volumenMasAlto(e), tinteDe(e)), e.vano],
+    aPlanta: [e.alturaDePlanta, empaquetarLaPlanta(bajo, patronDeBalcon(e), edadDe(e))],
   };
 }
 
