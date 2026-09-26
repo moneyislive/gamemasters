@@ -205,6 +205,9 @@ process.on('unhandledRejection', reventar);
  * Un juez que lee su vara del mismo fichero que juzga se deja engañar por él. Lo que el plan fija se
  * copia aquí; el producto se mide contra esto (y, además, contra sus propias tablas).
  */
+/** (g): lo que puede diferir el color sin la marca de barniz, en unidades de 0 a 1: orden ulp (ver el juez). */
+const TOLERANCIA_DEL_LOBULO_SIN_MARCA = 1e-6;
+
 const EXIGE = {
   /** §2.2: el sha de la textura del prototipo (`mat-analitico/banco/ruido-gen.js`). */
   shaDelRuido: '5d9df310578ac622b85d6ec6d7d82bf884110dfa2b381a5e67f22da2f45ad238',
@@ -1269,7 +1272,12 @@ function juzgarElBarniz(r: ResultadoDelBanco): string[] {
       problemas.push(`${n}: el banco no midió la familia sin la marca`);
       continue;
     }
-    if (m.maxSinMarca !== 0) problemas.push(`${n}: sin la marca de barniz, la familia cambia el color con el lóbulo (máx ${String(m.maxSinMarca)}): ¿un stub con barniz?`);
+    /*
+     * Con una familia de verdad que pone barniz (la carrocería, ola 2), A0 y B0 son dos programas distintos y el
+     * compilador reordena: salen a 1-3 ulp (2-3e-8 en N2 y N3), no a 0. Un stub con barniz de verdad da 0,2. La
+     * tolerancia es de orden ulp y no tapa nada que se vea (acta del plan del detalle, §13.2, decisión 1).
+     */
+    if (m.maxSinMarca > TOLERANCIA_DEL_LOBULO_SIN_MARCA) problemas.push(`${n}: sin la marca de barniz, la familia cambia el color con el lóbulo (máx ${String(m.maxSinMarca)}): ¿un stub con barniz?`);
     if (m.nivel === 0 && m.cambianConElStubRoto !== 0) problemas.push('N0: la vacuna del stub cambia píxeles (en N0 no se reparte)');
     if (m.nivel >= 1 && m.cambianConElStubRoto < m.pixelesDelCoche * EXIGE.partesQueCambianConLaVacuna) {
       problemas.push(`${n}: la vacuna del stub (barniz 1 sin la marca) sólo cambia ${String(m.cambianConElStubRoto)} píxeles: la comparación sin la marca no mira`);
@@ -1398,8 +1406,9 @@ async function principal(): Promise<void> {
   }
   comprobar(`b · textos con MATERIA_Q 0 inspeccionados ${String(deMateria0.length)} ≥ ${String(EXIGE.minimoDeTextosDeN0)}`, deMateria0.length >= EXIGE.minimoDeTextosDeN0);
   /* Vacuna: la fachada de hoy con la materia puesta pero sin cablear (sus fbmQ de siempre, en N0). */
-  const fachadaDeHoyN0 = materialDeHoy('fachada', 0);
-  parchear(fachadaDeHoyN0, retoqueDeLaMateria(0));
+  /* La fachada con un fbmQ de adorno puesto a mano (la de hoy ya no lo tiene: la ola 2 la pasó a la materia). */
+  const fachadaDeHoyN0 = materialConMateria('fachada', 0).material;
+  parchear(fachadaDeHoyN0, { nombre: 'vacuna-fbmq-de-adorno', orden: 11, fragmento: [{ buscar: '#include <normal_fragment_maps>', como: 'despues', texto: 'diffuseColor.rgb *= fbmQ(vPosMundoQ.xz);' }] });
   const mDeHoyN0 = medir(preprocesar(compilar(fachadaDeHoyN0, 0).frag), FUNCIONES_DE_LA_MATERIA);
   comprobar('b · vacuna: la fachada de hoy en N0 tiene fbmQ de adorno, y el juez lo ve', juzgarElAdornoDeN0(mDeHoyN0).length > 0, mDeHoyN0);
   /* Y los charcos no cuentan: el asfalto de N0 los llama, y su hash es del plan. */
@@ -1506,7 +1515,9 @@ async function principal(): Promise<void> {
   ] as const) {
     const m = materialConMateria('fachada', 2).material;
     parchear(m, { nombre: `materia-vacuna-gemelo-${sha256(texto).slice(0, 8)}`, orden: 50, fragmento: [{ buscar: '#include <lights_pars_begin>', como: 'antes', texto }] });
-    const r = juzgarLosSamplersDelMontado(compilar(m, 2).frag, compilar(materialDeHoy('fachada', 2), 2).frag);
+    const hoy2 = materialDeHoy('fachada', 2);
+    const sinMateria2 = retoquesDe(hoy2).some((x) => x.nombre.startsWith('materia-')) ? copiaConLosRetoques(hoy2, retoquesDe(hoy2).filter((x) => !x.nombre.startsWith('materia-'))) : hoy2;
+    const r = juzgarLosSamplersDelMontado(compilar(m, 2).frag, compilar(sinMateria2, 2).frag);
     comprobar(`b · vacuna del montado: ${que}`, r.problemas.length > 0 && r.anadeElRuido, r);
   }
   /*
@@ -1850,7 +1861,8 @@ async function principal(): Promise<void> {
     `${String(fuentes.length)} ficheros de materia/**; ${String(montados.length)} textos montados (${String(conDescarte)} con discard, ${String(conFundido)} con el fundido de la ventana o de lo lejano detrás del preámbulo)`,
   );
   /* Vacuna: el ancla de antes (el preámbulo DESPUÉS del recorte) con el fundido: el discard queda delante. */
-  const vacunaDelOrden = materialDeFachada(1);
+  const fachadaDelOrden = materialDeFachada(1);
+  const vacunaDelOrden = copiaConLosRetoques(fachadaDelOrden, retoquesDe(fachadaDelOrden).filter((x) => !x.nombre.startsWith('materia-')));
   const materiaDespues = retoqueDeLaMateria(1);
   parchear(vacunaDelOrden, RETOQUE_DEL_FUNDIDO, {
     ...materiaDespues,
@@ -2084,7 +2096,10 @@ async function principal(): Promise<void> {
     ...resto,
   });
   comprobar('g · control: un banco bueno pasa el juez', juzgarElBarniz(bancoBueno()).length === 0, juzgarElBarniz(bancoBueno()));
+  const bancoConUlp = bancoBueno((m) => (m.nivel >= 2 ? { maxSinMarca: 3e-8 } : {}));
+  comprobar('g · control: 1-3 ulp sin la marca (una familia con barniz de verdad) pasan el juez', juzgarElBarniz(bancoConUlp).length === 0, juzgarElBarniz(bancoConUlp));
   const venenosDelBanco: readonly (readonly [string, ResultadoDelBanco])[] = [
+    ['sin la marca, una diferencia por encima del orden ulp (1e-5)', bancoBueno((m) => (m.nivel >= 1 ? { maxSinMarca: 1e-5 } : {}))],
     ['un banco que dice que el lóbulo cambia el color', bancoBueno((m) => (m.nivel === 2 ? { maxAB: 0.01 } : {}))],
     ['un banco cuya vacuna no cambia nada', bancoBueno(() => ({ cambianConLaVacuna: 0 }))],
     ['un stub con barniz (sin la marca, el lóbulo cambia el color)', bancoBueno((m) => (m.nivel >= 1 ? { maxSinMarca: 0.2 } : {}))],

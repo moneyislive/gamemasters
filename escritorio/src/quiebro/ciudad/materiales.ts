@@ -51,8 +51,9 @@
  * camino (`verify:quiebro-materia`, b) del MATERIAL ENTERO, con las familias de todos los paquetes (la fundición
  * de SUELO, el follaje de FAROLAS-Y-PIEZAS, la carrocería, la llanta, el aluminio y el viaducto de VEHÍCULOS
  * también se reparten aquí). N0 es «≤ hoy» (461 del plan más los 42 del tono propio de N0, que el juego pinta y
- * `verify:quiebro-gl` confirma); N1-N3 dejan 100 de margen bajo §7.4 para la ola 3 (40 del horizonte local y 60
- * de lo cercano).
+ * `verify:quiebro-gl` confirma). N1-N3 = §7.4: la reserva de 100 que dejaban para la ola 3 (40 del horizonte local y
+ * 60 de lo cercano) se liberó al archivar las olas 3 y 4 (26-sep), y N2-N3 subieron a 1.800 / 2.400 porque las
+ * familias de la ola 2 juntas miden 971 / 1.677 / 2.194 (acta §13.3 del plan del detalle).
  */
 import * as THREE from 'three';
 import type { Retoque } from '../atmosfera/parcheo';
@@ -131,9 +132,9 @@ export interface TopeDelSombreador {
  */
 export const TOPE_DEL_SOMBREADOR_POR_NIVEL: Readonly<Record<NivelDeLaCiudad, TopeDelSombreador>> = {
   0: { instrucciones: 503, lecturas: 3 },
-  1: { instrucciones: 900, lecturas: 12 },
-  2: { instrucciones: 1400, lecturas: 18 },
-  3: { instrucciones: 1900, lecturas: 24 },
+  1: { instrucciones: 1000, lecturas: 12 },
+  2: { instrucciones: 1800, lecturas: 18 },
+  3: { instrucciones: 2400, lecturas: 24 },
 };
 
 /** Las declaraciones del vértice: el acabado (plano desde N1; sin familia en N0) y la UV del molde. */

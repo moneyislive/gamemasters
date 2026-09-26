@@ -1987,7 +1987,7 @@ paso('la cortina del borde no tapa la pantalla a quien se arrima a ella');
 }
 
 terminar({
-  escritas: 106,
+  escritas: 168,
   enVerde:
     'El barrio se construye, cabe, pinta su estructura y nada más; la ciudad abierta cabe en el 50 % en sus 32 trazas, pinta celda a celda su estructura en cada nivel y cada grado (con los neones y las capas), trabaja a trozos contados con las llamadas quietas al cruzarla, su luz por losetas es la de una vez y su borde de glifos cubre las tres salidas sin tapar la pantalla; y la ciudad de otro nivel o de otra noche se prepara detrás, callada y sin prisa, y releva compilada, sin dejar basura quieta. Y lo que el detalle va a cambiar ya tiene quien lo mire: ni una cara al revés nueva, las reglas gemelas iguales en GLSL y JS, la Grafía la última, la memoria en sus topes, toda textura subida en el relevo, las fuentes de luz iguales en todo grado, ningún escritor de pieza por encima del trozo y cada capa con las llamadas que declara.',
 });

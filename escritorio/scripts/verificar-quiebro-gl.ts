@@ -153,7 +153,12 @@ const TOPES_DE_FXC_DEL_PLAN: Readonly<Record<string, Readonly<Record<NivelDeLaCi
   fachada: { 0: 6303 + TONO_PROPIO_DE_N0, 1: 7381, 2: 9500, 3: 12000 },
   asfalto: { 0: 2303 + TONO_PROPIO_DE_N0, 1: 2841, 2: 3500, 3: 4500 },
   acera: { 0: 2072 + TONO_PROPIO_DE_N0, 1: 2072, 2: 2800, 3: 3500 },
-  mobiliario: { 0: 461 + TONO_PROPIO_DE_N0, 1: 1000, 2: 1500, 3: 2000 },
+  /*
+   * N2 y N3 suben de 1.500 / 2.000 a 1.800 / 2.400 (coordinador, 26-sep, acta §13.3 del plan del detalle): con las familias
+   * de los cuatro paquetes de la ola 2 juntas (carrocería, llanta, aluminio, viaducto, follaje, fundición y las del
+   * mobiliario) el material mide 1.677 / 2.194. El mobiliario ocupa poca pantalla y N2-N3 son los aparatos buenos.
+   */
+  mobiliario: { 0: 461 + TONO_PROPIO_DE_N0, 1: 1000, 2: 1800, 3: 2400 },
 };
 /**
  * El módulo de la fábrica de cada material (donde exportará su `TOPE_DEL_SOMBREADOR_POR_NIVEL`, §5.2.9). Un módulo
