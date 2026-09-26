@@ -95,6 +95,7 @@
     "verify:cors": "tsx scripts/verificar-cors.ts",
     "verify:mesas-frias": "tsx scripts/verificar-mesas-frias.ts",
     "verify:sala-de-botas": "tsx scripts/verificar-sala-de-botas.ts",
+    "verify:hallazgos": "tsx scripts/verificar-hallazgos.ts",
     "verify:botas": "tsx scripts/verificar-botas.ts",
     "verify:cuotas-de-botas": "tsx scripts/verificar-cuotas-de-botas.ts",
     "verify:liza-protocolo": "tsx scripts/verificar-liza-protocolo.ts",

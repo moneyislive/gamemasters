@@ -59,9 +59,14 @@ export interface SitioDeHallazgo {
 export function sitiosDeHallazgo(arena: Arena): SitioDeHallazgo[] {
   const paso = PASO_DE_LA_REJILLA * UNO;
   const x0 = (arena.desdeX - 0.5) * arena.lado;
-  const z0 = (arena.desdeY - 0.5) * arena.lado;
+  /*
+   * Las filas de la arena se cuentan por `-z` (`sueloEn` mira `casillaDe(-z)`): el norte es la `z`
+   * negativa. Tomadas por `z` a secas, en un tablero que no es simétrico —Riberas, Las Lindes— la
+   * rejilla recorría el rectángulo reflejado y dejaba media mesa sin sitios.
+   */
+  const z1 = -(arena.desdeY - 0.5) * arena.lado;
   const x1 = x0 + arena.anchura * arena.lado;
-  const z1 = z0 + arena.fondo * arena.lado;
+  const z0 = z1 - arena.fondo * arena.lado;
   const sitios: SitioDeHallazgo[] = [];
   for (let z = Math.ceil(z0 / paso) * paso; z <= z1; z += paso) {
     for (let x = Math.ceil(x0 / paso) * paso; x <= x1; x += paso) {

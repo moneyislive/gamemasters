@@ -566,6 +566,13 @@ const BATERIA = [
       'la sala del canal con el reloj en la mano: el `hola` en su plazo y la versión (4007), la llave, la mesa en `botas` y recorrible, un canal por asiento, el presupuesto de distancia con su tope de un segundo, la estructura con la escuadra de un tic, lo que viene de camino tras corregir, el cubo, el quieto, la gracia, una foto por sala con TODOS los sentados y un solo temporizador que se para sin salas, el mundo que cambia debajo de alguien, derivar mundos por turno con abrir delante; la refriega entera —el golpe a su manejador sin envenenar la foto, la recarga desde el último aceptado, el alcance, el cono, la espalda, el muro, el más cercano, 250 ms de rebobinado y ni uno más, caer, renacer lejos, intocable y `vidas`—; nadie inmune por no bajar; los topes del botín por pareja y por mesa; el canal atascado (4008); la vía interna con mesas de verdad de los tres juegos; una subida que revienta sin tirar el servidor, y SIGTERM con el montaje de verdad cerrando con 1001 dentro de la despedida',
   },
   {
+    nombre: 'los hallazgos y las armas de Boots on Board',
+    donde: 'server',
+    guion: 'verify:hallazgos',
+    porque:
+      'lo que se hace a pie en la sala del servidor (docs/AVATARES-JUGABLES.md §2 y §4): brotan brotesDeLaMesa(sentados) en sitios de la arena y lejos de todos, con la clase por peso y ids que sólo crecen; `brotes` llega justo después de `vidas` y a toda la sala en cada cambio; se recoge al pasar a RADIO_DE_RECOGER, con `recoge` y luego `brotes` a todos y `arcade:hallazgo` a la mesa, y si la mesa no lo quiere (sin efecto, rechazado) o aún no ha contestado el brote se queda sin gastar topes; rebrota a los REBROTE_MS; los topes por asiento y por mesa dejan el brote en el suelo; sin canal y caído no se recoge; el mundo que cambia los recoloca con su id; y el golpe pega con el arma de la vista pública —los puños exactamente como antes, el hacha quita dos sin bajar de cero, la honda llega a 6 u y no fuera de su cono—, leída una vez por revisión; y con la mesa de verdad del Burgo, el hallazgo entra por la vía interna y queda en el diario',
+  },
+  {
     nombre: 'Boots on Board de punta a punta',
     donde: 'server',
     guion: 'verify:botas',

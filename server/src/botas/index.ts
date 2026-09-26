@@ -21,11 +21,12 @@
  */
 import type { Server } from 'node:http';
 import { arcadesInstalados } from '../../../shared/arcade';
-import { mundoDeLaMesa, sePuedeRecorrer } from '../../../shared/arcade/juegos/mundos';
+import { armaEnLaRefriega, hallazgosDelJuego, mundoDeLaMesa, sePuedeRecorrer } from '../../../shared/arcade/juegos/mundos';
 import { MesaDesconocida, mirar, ponerLaDespedida, quienEsLaLlave, revisionDe } from '../arcade/mesas';
 import { admiteBotas, admitirBotas } from '../arcade/modalidades';
 import type { ContextoDelCors } from '../puerta/origenes';
 import { meterElBotinDeVerdad } from './botin';
+import { meterElHallazgoDeVerdad } from './hallazgo';
 import { CanalDeBotas, cuentasVacias } from './canal';
 import type { DiagnosticoDeBotas, LaMesa, LosMundos, Reloj } from './canal';
 import { enchufarElCanal } from './enchufe';
@@ -76,12 +77,17 @@ export const LA_MESA_DE_VERDAD: LaMesa = {
         vista: v.vista,
       };
     }),
-  /* La única que escribe: el botín de la refriega, por la vía interna de la mesa (`botin.ts`). */
+  /* Las dos que escriben, por la vía interna de la mesa: el botín de la refriega (`botin.ts`)… */
   botin: meterElBotinDeVerdad,
+  /* …y el hallazgo que alguien recoge a pie (`hallazgo.ts`). */
+  hallazgo: meterElHallazgoDeVerdad,
 };
 
-/** Los mundos de verdad: los del registro de `shared/arcade/juegos/mundos.ts`. */
-export const LOS_MUNDOS_DE_VERDAD: LosMundos = { sePuedeRecorrer, mundoDeLaMesa };
+/**
+ * Los mundos de verdad: los del registro de `shared/arcade/juegos/mundos.ts`, con lo que se hace a
+ * pie —qué brota en cada juego y con qué pega cada uno—.
+ */
+export const LOS_MUNDOS_DE_VERDAD: LosMundos = { sePuedeRecorrer, mundoDeLaMesa, hallazgosDelJuego, armaEnLaRefriega };
 
 /**
  * DA DE ALTA EN `admiteBotas` CADA ARCADE INSTALADO QUE SE PUEDE RECORRER, y devuelve cuáles.

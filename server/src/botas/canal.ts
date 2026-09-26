@@ -51,11 +51,30 @@
  * `RECARGA_DEL_GOLPE_MS` desde su último golpe ACEPTADO —los ignorados no alargan la recarga—. Si se
  * acepta, `lanza` a toda la sala, y se busca a quién le da (`aQuienDa`): a los demás que están DE PIE
  * —ni caídos ni intocables—, vistos donde los veía quien golpeó (rebobinados `REBOBINADO_MS` sobre su
- * rastro de sitios aceptados), a `ALCANCE_DEL_GOLPE` o menos, dentro del cono de la mirada del golpe
+ * rastro de sitios aceptados), al alcance del arma o menos, dentro del cono de la mirada del golpe
  * y sin muro en medio; y de ésos, al MÁS CERCANO, uno solo. `da` a toda la sala; con la vida a cero,
  * `cae`: `CAIDO_MS` en el suelo, sin andar ni golpear, y luego `renace` donde dice `sitioDeRenacer`
  * con la vida entera e intocable `INTOCABLE_MS`. Quien entra —o vuelve a entrar— recibe `vidas`
  * justo después de `dentro`, y a partir de ahí lo sigue por `da`, `cae` y `renace`.
+ *
+ * El golpe pega con el ARMA de quien golpea (`docs/AVATARES-JUGABLES.md` §4): daño, alcance y cono
+ * salen de `armaEnLaRefriega`, leída de la vista pública de la mesa una vez por asiento y revisión
+ * (`golpeDe`). Con los puños, los números de siempre. La vida sigue siendo `VIDA_ENTERA` y no baja
+ * de cero.
+ *
+ * ═══ LOS HALLAZGOS, EN UNA PANTALLA ═══
+ *
+ * `docs/AVATARES-JUGABLES.md` §2. Cada sala tiene sus BROTES (`hallazgos.ts`): sitios sacados de la
+ * arena del mundo de ahora, `brotesDeLaMesa(sentados)` vivos a la vez, la clase sorteada por los
+ * pesos de `hallazgosDelJuego` con el azar PROPIO de la sala —no el de la mesa, y nada de esto va al
+ * diario—, y un juego sin tabla no tiene ninguno. Quien entra recibe `brotes` justo después de
+ * `vidas`, y toda la sala lo recibe otra vez en cada cambio. Se recoge sin mensaje del aparato: al
+ * ACEPTAR un `aqui` de alguien que no está caído, si queda a `RADIO_DE_RECOGER` o menos de un brote y
+ * los topes por asiento y por mesa lo dejan, el brote se aparta y `arcade:hallazgo` va a la mesa por
+ * la vía interna (`recoger`). Si ENTRA, se quita, `recoge` a toda la sala y luego `brotes`, y a los
+ * `REBROTE_MS` brota uno nuevo en otro sitio libre; si no entra (sin efecto, rechazado), el brote se
+ * queda y no gasta ningún tope. Cuando el mundo cambia, lo que se queda donde ya no se puede estar se
+ * recoloca.
  *
  * ═══ NADIE ES INMUNE POR NO BAJAR ═══
  *
@@ -88,10 +107,10 @@
  *
  *   · SE SALTA —y se cuenta— lo que otro mensaje sustituye: la FOTO (llega otra en 100 ms), el
  *     `corrige` (si el aparato insiste desde el sitio malo, pasado un segundo se le repite), el
- *     `lanza` (es un gesto), y el `fuera` de un canal que se cierra igual (el código de cierre dice
- *     por qué).
- *   · CIERRA EL CANAL, con `atascado`, lo que no se puede perder: `dentro`, `vidas`, `da`, `cae` y
- *     `renace`. Quien se salta un `da` cuenta mal las vidas para siempre —el contrato promete que
+ *     `lanza` (es un gesto), el `recoge` (es un aviso, y detrás va la lista), y el `fuera` de un
+ *     canal que se cierra igual (el código de cierre dice por qué).
+ *   · CIERRA EL CANAL, con `atascado`, lo que no se puede perder: `dentro`, `vidas`, `da`, `cae`,
+ *     `renace` y `brotes` (sólo se manda cuando cambia: saltárselo dejaría brotes fantasma). Quien se salta un `da` cuenta mal las vidas para siempre —el contrato promete que
  *     llegan todos y en orden—, así que no se le salta: se le cierra, y al volver a entrar `dentro` y
  *     `vidas` le ponen al día.
  *
@@ -137,9 +156,21 @@ import type {
   Fuera,
   Golpe,
   Lanza,
+  Recoge,
   Renace,
   Vidas,
 } from '../../../shared/mecanicas/canal-de-botas';
+import {
+  brotesDeLaMesa,
+  HALLAZGOS_POR_ASIENTO_Y_MINUTO,
+  HALLAZGOS_POR_MESA_Y_MINUTO,
+  REBROTE_MS,
+} from '../../../shared/mecanicas/hallazgos';
+import type { Brote, ClaseDeHallazgo } from '../../../shared/mecanicas/hallazgos';
+import { PUNOS } from '../../../shared/arcade/juegos/riberas-armas';
+import type { ArmaEnLaRefriega } from '../../../shared/arcade/juegos/riberas-armas';
+import { randomInt } from 'node:crypto';
+import { azarConSemilla, BrotesDeLaSala, LEJOS_DE_TODOS_AL_BROTAR } from './hallazgos';
 import {
   COSENO,
   DT_DEL_TIC,
@@ -277,13 +308,58 @@ export const IDA_Y_VUELTA_SUPUESTA_MS = 100;
  */
 export const REBOBINADO_MS = Math.min(REBOBINADO_MAXIMO_MS, RETRASO_DE_LOS_DEMAS_MS + IDA_Y_VUELTA_SUPUESTA_MS);
 
-/** El alcance del golpe en Q16.16, y su cuadrado: 163.840² cabe en un doble sin perder nada. */
-const ALCANCE = deNumero(ALCANCE_DEL_GOLPE);
-const ALCANCE_AL_CUADRADO = ALCANCE * ALCANCE;
-
 /** El coseno al cuadrado del cono en Q16.16 (0,5 → 32.768), para compararlo con enteros exactos. */
 const CONO_EN_FIJO = BigInt(deNumero(COSENO_CUADRADO_DEL_CONO));
 const UNO_GRANDE = BigInt(UNO);
+
+/**
+ * UN GOLPE, CON LOS NÚMEROS DE SU ARMA YA EN ENTEROS: daño, alcance en Q16.16 y su cuadrado, y el
+ * coseno al cuadrado del cono en Q16.16 como entero grande. Lo que de verdad compara `aQuienDa`.
+ *
+ * ═══ LAS ARMAS (docs/AVATARES-JUGABLES.md §4) ═══
+ *
+ * El daño, el alcance y el cono ya no son constantes del canal: salen del arma de quien golpea
+ * (`armaEnLaRefriega` del registro de mundos, leída de la vista PÚBLICA de la mesa). Con los puños
+ * salen EXACTAMENTE los números de antes —`deNumero(ALCANCE_DEL_GOLPE)` y
+ * `deNumero(COSENO_CUADRADO_DEL_CONO)`, 1 de daño—, que es lo que `GOLPE_DE_PUNOS` fija aquí y
+ * `verify:hallazgos` comprueba. El alcance más largo de la tabla (6 u, la honda) da productos de
+ * 2⁷² en el cono: por eso el cono sigue en enteros grandes, y el cuadrado del alcance (393.216² ≈
+ * 1,5·10¹¹) cabe en un doble sin perder nada.
+ */
+export interface GolpeDelArma {
+  readonly dano: number;
+  readonly alcance: number;
+  readonly alcanceAlCuadrado: number;
+  readonly cono: bigint;
+}
+
+/** Los números de un arma, pasados a enteros. Un arma rara —daño negativo, alcance sin sentido— pega como los puños. */
+export function golpeDelArma(arma: ArmaEnLaRefriega): GolpeDelArma {
+  const bien =
+    Number.isFinite(arma.dano) &&
+    arma.dano >= 0 &&
+    Number.isFinite(arma.alcance) &&
+    arma.alcance > 0 &&
+    arma.alcance <= 64 &&
+    Number.isFinite(arma.cosenoCuadrado) &&
+    arma.cosenoCuadrado >= 0 &&
+    arma.cosenoCuadrado <= 1;
+  const a = bien ? arma : PUNOS;
+  const alcance = deNumero(a.alcance);
+  return {
+    dano: Math.floor(a.dano),
+    alcance,
+    alcanceAlCuadrado: alcance * alcance,
+    cono: BigInt(deNumero(a.cosenoCuadrado)),
+  };
+}
+
+/** El golpe sin arma: la refriega de siempre, con `ALCANCE_DEL_GOLPE` y `COSENO_CUADRADO_DEL_CONO`. */
+export const GOLPE_DE_PUNOS: GolpeDelArma = golpeDelArma({
+  dano: 1,
+  alcance: ALCANCE_DEL_GOLPE,
+  cosenoCuadrado: COSENO_CUADRADO_DEL_CONO,
+});
 
 /**
  * EL RADIO CON QUE SE MIRA SI HAY MURO EN MEDIO: una décima de unidad, un cuarto del de quien anda.
@@ -399,7 +475,7 @@ export interface LoQueFueDelBotin {
  * «esa mesa no existe». Lo real está en `index.ts` (`quienEsLaLlave`, `revisionDe` y `mirar` de
  * `arcade/mesas.ts`, las tres sin llave, como un espectador).
  *
- * La cuarta, `botin`, es la única que escribe: la de verdad (`meterElBotinDeVerdad`, de `botin.ts`)
+ * La cuarta, `botin`, escribe —y la quinta, `hallazgo`, igual—: la de verdad (`meterElBotinDeVerdad`, de `botin.ts`)
  * la pone `index.ts` en `LA_MESA_DE_VERDAD`, y va a la vía interna de la mesa y avisa a quien sondea.
  * Es opcional para que una prueba que no mira el botín no tenga que escribirla, y sin ella el botín
  * no entra en ninguna mesa (`sinMesa`): este fichero no conoce la mesa de verdad, y así las pruebas
@@ -410,12 +486,25 @@ export interface LaMesa {
   revision(codigo: string): Promise<{ readonly rev: number; readonly terminada: boolean } | null>;
   vista(codigo: string): Promise<VistaDeLaMesa | null>;
   botin?(codigo: string, pierde: string, gana: string): Promise<LoQueFueDelBotin>;
+  /**
+   * La otra que escribe: el hallazgo que alguien ha recogido a pie (`meterElHallazgoDeVerdad`, de
+   * `hallazgo.ts`), por la misma vía interna. Opcional por lo mismo que `botin`: sin ella, el
+   * hallazgo no entra en ninguna mesa (`sinMesa`), aunque el brote sí se recoge.
+   */
+  hallazgo?(codigo: string, para: string, clase: string): Promise<LoQueFueDelBotin>;
 }
 
-/** De dónde sale el mundo: `sePuedeRecorrer` y `mundoDeLaMesa` de `shared/arcade/juegos/mundos.ts`. */
+/**
+ * De dónde sale el mundo: `sePuedeRecorrer` y `mundoDeLaMesa` de `shared/arcade/juegos/mundos.ts`.
+ * Y, del mismo registro, lo que se hace a pie: `hallazgosDelJuego` (qué brota) y `armaEnLaRefriega`
+ * (cómo pega cada uno). Las dos son opcionales para que unos mundos de prueba que no las traen sean
+ * los de antes: sin tabla no brota nada, y sin armas todos pegan con los puños.
+ */
 export interface LosMundos {
   sePuedeRecorrer(arcade: string): boolean;
   mundoDeLaMesa(arcade: string, vista: unknown, codigo: string): MundoDeclarado | null;
+  hallazgosDelJuego?(arcade: string): readonly ClaseDeHallazgo[];
+  armaEnLaRefriega?(arcade: string, vista: unknown, asiento: string): ArmaEnLaRefriega;
 }
 
 export interface OpcionesDelCanal {
@@ -430,6 +519,12 @@ export interface OpcionesDelCanal {
    * mentira. Por defecto, `performance.now()`.
    */
   readonly cronometro?: () => number;
+  /**
+   * La semilla del azar de los brotes de cada sala que se abre. Por defecto, una al azar del
+   * sistema: el azar de la sala no es el de la mesa ni se reproduce (ver `hallazgos.ts`). Las
+   * pruebas la fijan.
+   */
+  readonly semillaDeLaSala?: (codigo: string) => number;
 }
 
 /* ─── LO QUE SE CUENTA ───────────────────────────────────────────────────── */
@@ -442,6 +537,13 @@ export type PorQueSeCorrige = 'presupuesto' | 'estructura' | 'rescate' | 'repeti
 
 /** Qué fue de cada botín que pidió una caída, y por qué no se pidió el que no se pidió. */
 export type CuentaDelBotin = SalidaDelBotin | 'porPareja' | 'porTope' | 'fallos';
+
+/**
+ * Qué fue de cada hallazgo: cuántos se recogieron (los que ENTRARON), qué contestó la mesa a cada
+ * uno, cuántas veces un tope dejó uno en el suelo (una por paso aceptado encima de él, así que crece
+ * deprisa quien espera encima) y cuántos volvieron a brotar.
+ */
+export type CuentaDelHallazgo = SalidaDelBotin | 'recogidos' | 'porTopeDeAsiento' | 'porTopeDeMesa' | 'fallos' | 'rebrotes';
 
 /**
  * Por qué una subida se negó en la capa de cuotas (`cuotas.ts`), antes de llegar a ser un canal:
@@ -483,6 +585,9 @@ export interface DiagnosticoDeBotas {
   caidas: number;
   renacidas: number;
   botines: Record<CuentaDelBotin, number>;
+  hallazgos: Record<CuentaDelHallazgo, number>;
+  /** Cuántos brotes hay vivos ahora en todas las salas. */
+  brotesVivos: number;
   /** Cuántos sitios guardan ahora los rastros de todas las salas: la memoria del rebobinado. */
   sitiosEnLosRastros: number;
   rederivaciones: number;
@@ -532,6 +637,20 @@ export function cuentasVacias(): DiagnosticoDeBotas {
       porTope: 0,
       fallos: 0,
     },
+    hallazgos: {
+      recogidos: 0,
+      entro: 0,
+      sinEfecto: 0,
+      rechazado: 0,
+      terminada: 0,
+      apartado: 0,
+      sinMesa: 0,
+      porTopeDeAsiento: 0,
+      porTopeDeMesa: 0,
+      fallos: 0,
+      rebrotes: 0,
+    },
+    brotesVivos: 0,
     sitiosEnLosRastros: 0,
     rederivaciones: 0,
     fallosAlRederivar: 0,
@@ -612,14 +731,14 @@ export function seAndaElTramo(arena: Arena, desde: Andante, hasta: Andante, radi
  * En el mismo sitio (`d` nulo) da: los paseantes no chocan entre sí, y quien está encima de otro
  * está a su alcance lo mire como lo mire.
  */
-export function enElCono(dx: number, dz: number, mx: number, mz: number): boolean {
+export function enElCono(dx: number, dz: number, mx: number, mz: number, cono: bigint = CONO_EN_FIJO): boolean {
   const gx = BigInt(dx);
   const gz = BigInt(dz);
   const hx = BigInt(mx);
   const hz = BigInt(mz);
   const dm = gx * hx + gz * hz;
   if (dm < 0n) return false;
-  return dm * dm * UNO_GRANDE >= CONO_EN_FIJO * (gx * gx + gz * gz) * (hx * hx + hz * hz);
+  return dm * dm * UNO_GRANDE >= cono * (gx * gx + gz * gz) * (hx * hx + hz * hz);
 }
 
 /**
@@ -698,7 +817,41 @@ interface Sala {
   cerrada: boolean;
   /** Desde cuándo no tiene a nadie con canal; `null` mientras alguien lo tiene. */
   vaciaDesde: number | null;
+  /** La vista pública de la revisión `rev`: de aquí sale el arma de cada uno. */
+  vista: unknown;
+  /** El golpe de cada asiento, leído de `vista` la primera vez que golpea. Se vacía al cambiar la vista. */
+  readonly golpes: Map<string, GolpeDelArma>;
+  /** Lo que hay brotado; `null` si el juego no tiene tabla de hallazgos. */
+  readonly brotes: BrotesDeLaSala | null;
+  /** Los rebrotes programados: cada uno es un brote recogido que volverá a los `REBROTE_MS`. */
+  readonly rebrotes: Set<Temporizador>;
 }
+
+/**
+ * EL LIBRO DE HALLAZGOS DE UNA MESA: cuándo ENTRÓ cada uno, por asiento y en total, en el último
+ * minuto, y quién tiene uno de camino. Vive en el canal y no en la sala, por lo mismo que el de
+ * botines: vaciar la sala no puede devolver el cupo.
+ *
+ * Como el botín, sólo cuenta lo que ENTRA en la mesa, y lo que va de camino se reserva para el tope de
+ * la mesa (`enCamino`, uno por persona como mucho). Un hallazgo que la mesa no quiere —el dinero en
+ * vilo del Burgo, quien ha quebrado— no gasta nada y el brote se queda en el suelo; a quien lo intentó
+ * se le hace esperar un poco (`esperaHasta`) para no preguntar a la mesa veinte veces por segundo.
+ */
+interface LibroDeHallazgos {
+  readonly porAsiento: Map<string, number[]>;
+  readonly mesa: number[];
+  /** Los asientos con un hallazgo de camino a la mesa. */
+  readonly enCamino: Set<string>;
+  /** Hasta cuándo no puede volver a intentarlo quien recibió una negativa de la mesa. */
+  readonly esperaHasta: Map<string, number>;
+}
+
+/**
+ * CUÁNTO ESPERA QUIEN RECIBIÓ UNA NEGATIVA antes de que se le vuelva a pedir a la mesa por él: dos
+ * segundos. Una subasta del Burgo se resuelve en ese orden de tiempo, y parado encima de un brote se
+ * aceptan veinte pasos por segundo: sin esto, cuarenta preguntas a la mesa por cada negativa.
+ */
+export const ESPERA_TRAS_NEGATIVA_MS = 2000;
 
 /** Una mesa que no se puede recorrer ahora, y cómo se le dice a quien llama. */
 interface Negativa {
@@ -801,6 +954,10 @@ export class CanalDeBotas {
   private readonly conexiones = new Set<Conexion>();
   /** Los libros de botines, por mesa. Ver `LibroDeBotines`. */
   private readonly libros = new Map<string, LibroDeBotines>();
+  /** Los libros de hallazgos, por mesa. Ver `LibroDeHallazgos`. */
+  private readonly librosDeHallazgos = new Map<string, LibroDeHallazgos>();
+  private readonly meterElHallazgo: (codigo: string, para: string, clase: string) => Promise<LoQueFueDelBotin>;
+  private readonly semillaDeLaSala: (codigo: string) => number;
   private temporizador: Temporizador | null = null;
   private apagado = false;
   private readonly cuentas = cuentasVacias();
@@ -822,6 +979,9 @@ export class CanalDeBotas {
     this.cronometro = opciones.cronometro ?? (() => performance.now());
     const botin = opciones.mesa.botin;
     this.meterElBotin = botin === undefined ? async () => ({ salida: 'sinMesa' }) : botin.bind(opciones.mesa);
+    const hallazgo = opciones.mesa.hallazgo;
+    this.meterElHallazgo = hallazgo === undefined ? async () => ({ salida: 'sinMesa' }) : hallazgo.bind(opciones.mesa);
+    this.semillaDeLaSala = opciones.semillaDeLaSala ?? (() => randomInt(0, 0x1_0000_0000));
   }
 
   /* ── Entrar ──────────────────────────────────────────────────────────── */
@@ -987,9 +1147,18 @@ export class CanalDeBotas {
       enCola: false,
       cerrada: false,
       vaciaDesde: ahora,
+      vista: v.vista,
+      golpes: new Map(),
+      brotes: this.brotesNuevos(codigo, v.arcade),
+      rebrotes: new Set(),
     };
     /* TODOS los sentados, de pie en su sitio de nacer, y en el orden de la mesa: ver la cabecera. */
     for (const id of v.asientos) this.ponerEnLaSala(sala, id, ahora);
+    /* Y lo que brota, ya con todos de pie: nada nace encima de nadie. Todavía no hay a quién decírselo. */
+    if (sala.brotes !== null) {
+      sala.brotes.ponerLaArena(arena, this.hayAlguienCerca(sala));
+      sala.brotes.rellenar(this.brotesQueTocan(sala), this.hayAlguienCerca(sala));
+    }
     this.salas.set(codigo, sala);
     this.encenderElReloj();
     this.registrar(`se abre la sala de la mesa ${codigo} (${v.arcade})`);
@@ -1061,6 +1230,8 @@ export class CanalDeBotas {
     const dentro: Dentro = { t: 'dentro', yo: id, x: o.x, z: o.z, r: o.r, hz: TICS_POR_SEGUNDO };
     this.mandar(c, JSON.stringify(dentro), 'cerrar');
     this.mandar(c, JSON.stringify(this.vidasDe(sala, ahora)), 'cerrar');
+    /* Lo que hay brotado, justo después de `vidas`: la lista entera, la misma cadena que ven los demás. */
+    if (sala.brotes?.hayTabla === true) this.mandar(c, sala.brotes.texto(), 'cerrar');
   }
 
   /* ── Andar ───────────────────────────────────────────────────────────── */
@@ -1116,6 +1287,7 @@ export class CanalDeBotas {
     o.m = m.m;
     c.pendiente = null;
     this.cuentas.aceptados++;
+    this.recoger(sala, o, ahora);
   }
 
   private corregir(c: Conexion, n: number, porque: PorQueSeCorrige, ahora: number): void {
@@ -1189,9 +1361,10 @@ export class CanalDeBotas {
     const lanza: Lanza = { t: 'lanza', de: o.id };
     this.repartir(sala, JSON.stringify(lanza), 'saltar');
 
-    const blanco = this.aQuienDa(sala, o, m.r, ahora);
+    const arma = this.golpeDe(sala, o.id);
+    const blanco = this.aQuienDa(sala, o, m.r, ahora, arma);
     if (blanco === null) return;
-    blanco.vida = Math.max(0, blanco.vida - 1);
+    blanco.vida = Math.max(0, blanco.vida - arma.dano);
     this.cuentas.aciertos++;
     const da: Da = { t: 'da', de: o.id, a: blanco.id, vida: blanco.vida };
     this.repartir(sala, JSON.stringify(da), 'cerrar');
@@ -1200,12 +1373,13 @@ export class CanalDeBotas {
 
   /**
    * A QUIÉN LE DA UN GOLPE de `quien` hacia `r`, o `null`. Los demás DE PIE ahora, cada uno donde
-   * estaba `REBOBINADO_MS` antes según su rastro; a `ALCANCE_DEL_GOLPE` o menos de quien golpea —en
-   * su sitio aceptado—, dentro del cono y sin muro en medio. El más cercano, uno solo; a igual
-   * distancia, el que se sentó antes. El muro se mira el último y sólo hasta el primero que pasa:
-   * es lo único caro.
+   * estaba `REBOBINADO_MS` antes según su rastro; al alcance del ARMA de quien golpea o menos —en su
+   * sitio aceptado—, dentro del cono de esa arma y sin muro en medio. El más cercano, uno solo; a
+   * igual distancia, el que se sentó antes. El muro se mira el último y sólo hasta el primero que
+   * pasa: es lo único caro. Con los puños, el alcance es `ALCANCE_DEL_GOLPE` y el cono el de siempre.
    */
-  private aQuienDa(sala: Sala, quien: Ocupante, r: number, ahora: number): Ocupante | null {
+  private aQuienDa(sala: Sala, quien: Ocupante, r: number, ahora: number, arma: GolpeDelArma): Ocupante | null {
+    const alcance = arma.alcance;
     const cuando = ahora - REBOBINADO_MS;
     const mx = SENO[r] as number;
     const mz = -(COSENO[r] as number);
@@ -1217,9 +1391,9 @@ export class CanalDeBotas {
       const sitio = sitioEnElRastro(otro.rastro, cuando, otro);
       const dx = sitio.x - quien.x;
       const dz = sitio.z - quien.z;
-      if (dx > ALCANCE || dx < -ALCANCE || dz > ALCANCE || dz < -ALCANCE) continue;
+      if (dx > alcance || dx < -alcance || dz > alcance || dz < -alcance) continue;
       const d2 = dx * dx + dz * dz;
-      if (d2 > ALCANCE_AL_CUADRADO || !enElCono(dx, dz, mx, mz)) continue;
+      if (d2 > arma.alcanceAlCuadrado ||!enElCono(dx, dz, mx, mz, arma.cono)) continue;
       candidatos.push({ o: otro, sitio, d2, orden });
     }
     candidatos.sort((a, b) => a.d2 - b.d2 || a.orden - b.orden);
@@ -1396,6 +1570,217 @@ export class CanalDeBotas {
     );
   }
 
+  /* ── Las armas ───────────────────────────────────────────────────────── */
+
+  /**
+   * CÓMO PEGA UN ASIENTO AHORA: el arma que dice la vista pública de la revisión que tiene la sala,
+   * ya en enteros. Se lee la primera vez que golpea y se guarda hasta que cambie la vista —que es
+   * cuando puede haber forjado otra o habérsele roto—: un golpe no vuelve a leer la vista. Sin
+   * `armaEnLaRefriega` en los mundos, o si leerla revienta, los puños.
+   */
+  private golpeDe(sala: Sala, id: string): GolpeDelArma {
+    const hay = sala.golpes.get(id);
+    if (hay !== undefined) return hay;
+    const leer = this.mundos.armaEnLaRefriega;
+    let golpe = GOLPE_DE_PUNOS;
+    if (leer !== undefined) {
+      try {
+        golpe = golpeDelArma(leer.call(this.mundos, sala.arcade, sala.vista, id));
+      } catch (error) {
+        this.registrar(
+          `no se ha podido leer el arma de un asiento de la mesa ${sala.codigo}; pega con los puños: ` +
+            (error instanceof Error ? error.message : String(error)),
+        );
+      }
+    }
+    sala.golpes.set(id, golpe);
+    return golpe;
+  }
+
+  /* ── Los hallazgos (docs/AVATARES-JUGABLES.md §2) ────────────────────── */
+
+  /** La lista de brotes de una sala nueva, con su azar propio; `null` si el juego no tiene tabla. */
+  private brotesNuevos(codigo: string, arcade: string): BrotesDeLaSala | null {
+    const clases = this.mundos.hallazgosDelJuego?.(arcade) ?? [];
+    const brotes = new BrotesDeLaSala(clases, azarConSemilla(this.semillaDeLaSala(codigo)));
+    return brotes.hayTabla ? brotes : null;
+  }
+
+  /** Cuántos brotes tiene que haber vivos AHORA: los de la mesa menos los que están por volver. */
+  private brotesQueTocan(sala: Sala): number {
+    return Math.max(0, brotesDeLaMesa(sala.asientos.length) - sala.rebrotes.size);
+  }
+
+  /** ¿Hay alguien de la sala —caído o no, con canal o sin él— cerca de este punto? Nada brota encima de nadie. */
+  private hayAlguienCerca(sala: Sala): (x: number, z: number) => boolean {
+    return (x, z) => {
+      for (const o of sala.ocupantes.values()) {
+        if (Math.abs(o.x - x) < LEJOS_DE_TODOS_AL_BROTAR && Math.abs(o.z - z) < LEJOS_DE_TODOS_AL_BROTAR) return true;
+      }
+      return false;
+    };
+  }
+
+  private libroDeHallazgosDe(codigo: string): LibroDeHallazgos {
+    let libro = this.librosDeHallazgos.get(codigo);
+    if (libro === undefined) {
+      libro = { porAsiento: new Map(), mesa: [], enCamino: new Set(), esperaHasta: new Map() };
+      this.librosDeHallazgos.set(codigo, libro);
+    }
+    return libro;
+  }
+
+  /** Quita del libro lo que tiene más de un minuto y las esperas vencidas. `true` si se ha quedado vacío. */
+  private podarHallazgos(libro: LibroDeHallazgos, ahora: number): boolean {
+    const podar = (lista: number[]): void => {
+      let viejos = 0;
+      while (viejos < lista.length && ahora - (lista[viejos] as number) >= VENTANA_DEL_TOPE_MS) viejos++;
+      if (viejos > 0) lista.splice(0, viejos);
+    };
+    podar(libro.mesa);
+    for (const [id, lista] of libro.porAsiento) {
+      podar(lista);
+      if (lista.length === 0) libro.porAsiento.delete(id);
+    }
+    for (const [id, hasta] of libro.esperaHasta) if (ahora >= hasta) libro.esperaHasta.delete(id);
+    return libro.mesa.length === 0 && libro.porAsiento.size === 0 && libro.enCamino.size === 0 && libro.esperaHasta.size === 0;
+  }
+
+  /**
+   * RECOGER, al aceptar un sitio de `o`. Si está de pie —los intocables también: recoger no es
+   * pegar— a `RADIO_DE_RECOGER` o menos de un brote, no tiene otro de camino ni está esperando tras
+   * una negativa, y ni él ni la mesa han llegado a su tope del último minuto —contando los que van de
+   * camino—: el brote se APARTA y se pide a la mesa. Lo que pase después lo decide la mesa, en
+   * `pedirElHallazgo`. Con el tope lleno, el brote se queda donde está y nadie se entera.
+   *
+   * Sólo llega aquí quien ANDA: se llama desde `validar`, y los asientos sin canal no mandan `aqui`.
+   * Quien se quedó de pie donde nació, o donde cerró su canal, no recoge lo que brote a su lado.
+   */
+  private recoger(sala: Sala, o: Ocupante, ahora: number): void {
+    const brotes = sala.brotes;
+    if (brotes === null || brotes.cuantos === 0) return;
+    if (o.conexion === null || this.estadoDe(o, ahora) === CAIDO) return;
+    const b = brotes.alAlcance(o.x, o.z);
+    if (b === null) return;
+
+    const libro = this.libroDeHallazgosDe(sala.codigo);
+    this.podarHallazgos(libro, ahora);
+    /* Uno de camino por persona, y tras una negativa de la mesa, un respiro: ver `ESPERA_TRAS_NEGATIVA_MS`. */
+    if (libro.enCamino.has(o.id) || libro.esperaHasta.has(o.id)) return;
+    if ((libro.porAsiento.get(o.id)?.length ?? 0) >= HALLAZGOS_POR_ASIENTO_Y_MINUTO) {
+      this.cuentas.hallazgos.porTopeDeAsiento++;
+      return;
+    }
+    if (libro.mesa.length + libro.enCamino.size >= HALLAZGOS_POR_MESA_Y_MINUTO) {
+      this.cuentas.hallazgos.porTopeDeMesa++;
+      return;
+    }
+    brotes.apartar(b.id);
+    libro.enCamino.add(o.id);
+    this.pedirElHallazgo(sala, libro, o.id, b);
+  }
+
+  /**
+   * EL HALLAZGO QUE ENTRÓ: se anota contra los topes, se quita el brote, `recoge` y el `brotes` nuevo a
+   * toda la sala, y se programa el rebrote. Si entre medias el brote se quitó —el mundo cambió y no le
+   * quedó sitio—, el hallazgo ya es de quien llegó y se avisa igual; lo que no hay es rebrote que
+   * programar, porque ya falta uno.
+   */
+  private recogido(sala: Sala, libro: LibroDeHallazgos, para: string, b: Brote): void {
+    const t = this.reloj.ahora();
+    const suyos = libro.porAsiento.get(para) ?? [];
+    suyos.push(t);
+    libro.porAsiento.set(para, suyos);
+    libro.mesa.push(t);
+    this.cuentas.hallazgos.recogidos++;
+    const brotes = sala.brotes;
+    if (sala.cerrada || brotes === null) return;
+    const estaba = brotes.quitar(b.id);
+    const recoge: Recoge = { t: 'recoge', h: b.id, por: para, clase: b.clase };
+    /* El aviso se puede saltar —es un gesto, y detrás va la lista—; la lista no. */
+    this.repartir(sala, JSON.stringify(recoge), 'saltar');
+    if (estaba) {
+      this.repartir(sala, brotes.texto(), 'cerrar');
+      this.programarElRebrote(sala);
+    }
+  }
+
+  /** Dentro de `REBROTE_MS`, uno nuevo en otro sitio libre. Hasta entonces, el que falta no se repone. */
+  private programarElRebrote(sala: Sala): void {
+    const t = this.reloj.dentroDe(REBROTE_MS, () => {
+      sala.rebrotes.delete(t);
+      if (sala.cerrada) return;
+      try {
+        this.cuentas.hallazgos.rebrotes++;
+        this.sembrar(sala);
+      } catch (error) {
+        this.registrar(`no ha podido rebrotar nada en la mesa ${sala.codigo}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    });
+    sala.rebrotes.add(t);
+  }
+
+  /** Brota lo que falte, y si ha brotado algo, la lista nueva a toda la sala. */
+  private sembrar(sala: Sala): void {
+    const brotes = sala.brotes;
+    if (brotes === null) return;
+    if (brotes.rellenar(this.brotesQueTocan(sala), this.hayAlguienCerca(sala))) this.repartir(sala, brotes.texto(), 'cerrar');
+  }
+
+  /** Para los rebrotes de una sala que se cierra: nadie los va a ver. */
+  private pararLosRebrotes(sala: Sala): void {
+    for (const t of sala.rebrotes) t.parar();
+    sala.rebrotes.clear();
+  }
+
+  /**
+   * METE EL HALLAZGO EN LA MESA, por la vía interna, y según conteste:
+   *
+   *   · ENTRÓ: es suyo (`recogido`).
+   *   · CUALQUIER OTRA COSA —sin efecto (el dinero en vilo del Burgo), rechazado (quien ha quebrado,
+   *     una partida que no está en juego), la mesa terminada o apartada, o un fallo—: el brote se
+   *     SUELTA y se queda donde estaba, sin `recoge` y sin gastar ningún tope, igual que el botín sólo
+   *     cuenta lo que entra. Quien lo intentó espera `ESPERA_TRAS_NEGATIVA_MS` antes de volver a
+   *     intentarlo: si no, parado encima haría una petición a la mesa por cada paso, veinte por segundo.
+   */
+  private pedirElHallazgo(sala: Sala, libro: LibroDeHallazgos, para: string, b: Brote): void {
+    const codigo = sala.codigo;
+    const noEntro = (): void => {
+      libro.enCamino.delete(para);
+      libro.esperaHasta.set(para, this.reloj.ahora() + ESPERA_TRAS_NEGATIVA_MS);
+      sala.brotes?.soltar(b.id);
+    };
+    let promesa: Promise<LoQueFueDelBotin>;
+    try {
+      promesa = this.meterElHallazgo(codigo, para, b.clase);
+    } catch (error) {
+      promesa = Promise.reject(error);
+    }
+    promesa
+      .then(
+        (fue) => {
+          this.cuentas.hallazgos[fue.salida]++;
+          if (fue.salida !== 'entro') {
+            noEntro();
+            return;
+          }
+          libro.enCamino.delete(para);
+          this.recogido(sala, libro, para, b);
+        },
+        (error: unknown) => {
+          noEntro();
+          this.cuentas.hallazgos.fallos++;
+          this.registrar(
+            `un hallazgo recogido en la mesa ${codigo} no ha podido entrar: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        },
+      )
+      .catch((error: unknown) => {
+        /* Lo que reviente avisando no puede quedarse sin atender: se dice y se sigue. */
+        this.registrar(`tras meter un hallazgo en la mesa ${codigo}: ${error instanceof Error ? error.message : String(error)}`);
+      });
+  }
+
   /* ── Mandar ──────────────────────────────────────────────────────────── */
 
   /** Manda a un canal, mirando antes si da abasto. Ver «Lo que se puede perder y lo que no». */
@@ -1452,6 +1837,9 @@ export class CanalDeBotas {
     }
     if (this.cuentas.tics % TICS_POR_SEGUNDO === 0) {
       for (const [codigo, libro] of this.libros) if (this.podar(libro, ahora)) this.libros.delete(codigo);
+      for (const [codigo, libro] of this.librosDeHallazgos) {
+        if (this.podarHallazgos(libro, ahora)) this.librosDeHallazgos.delete(codigo);
+      }
     }
     if (this.salas.size === 0) this.apagarElReloj();
   }
@@ -1625,6 +2013,9 @@ export class CanalDeBotas {
       const arena = this.derivarElMundo(sala.arcade, v.vista, sala.codigo);
       sala.rev = v.rev;
       sala.asientos = v.asientos;
+      /* La vista de esta revisión, y el arma de cada uno se vuelve a leer de ella al golpear. */
+      sala.vista = v.vista;
+      sala.golpes.clear();
       /* Un mundo que desaparece no deja a nadie en el vacío: se sigue con el que había. */
       if (arena !== null) {
         sala.arena = arena;
@@ -1633,6 +2024,17 @@ export class CanalDeBotas {
       }
       const ahora = this.reloj.ahora();
       for (const id of v.asientos) if (!sala.ocupantes.has(id)) this.ponerEnLaSala(sala, id, ahora);
+      /*
+       * Los brotes, sobre el mundo nuevo: los que se han quedado donde ya no se puede estar se
+       * recolocan (o se quitan si no cabe ninguno), y si se ha sentado alguien, brotan los que le tocan.
+       */
+      const brotes = sala.brotes;
+      if (brotes !== null) {
+        const hayAlguien = this.hayAlguienCerca(sala);
+        const movidos = arena !== null && brotes.ponerLaArena(arena, hayAlguien);
+        const nuevos = brotes.rellenar(this.brotesQueTocan(sala), hayAlguien);
+        if (movidos || nuevos) this.repartir(sala, brotes.texto(), 'cerrar');
+      }
     } catch (error) {
       this.cuentas.fallosAlRederivar++;
       this.registrar(
@@ -1727,13 +2129,15 @@ export class CanalDeBotas {
 
   private cerrarLaSala(sala: Sala, motivo: string): void {
     sala.cerrada = true;
+    this.pararLosRebrotes(sala);
     this.borrarSala(sala);
     for (const o of [...sala.ocupantes.values()]) {
       if (o.conexion !== null) this.echar(o.conexion, 'mesaCerrada', motivo);
     }
     sala.ocupantes.clear();
-    /* Una mesa acabada u olvidada ya no admite botines: su libro se va con ella. */
+    /* Una mesa acabada u olvidada ya no admite botines ni hallazgos: sus libros se van con ella. */
     this.libros.delete(sala.codigo);
+    this.librosDeHallazgos.delete(sala.codigo);
     this.registrar(`se cierra la sala de la mesa ${sala.codigo}: ${motivo}`);
     if (this.salas.size === 0) this.apagarElReloj();
   }
@@ -1742,7 +2146,10 @@ export class CanalDeBotas {
   cerrarLaMesa(codigo: string, motivo: string): void {
     const sala = this.salas.get(codigo);
     if (sala !== undefined) this.cerrarLaSala(sala, motivo);
-    else this.libros.delete(codigo);
+    else {
+      this.libros.delete(codigo);
+      this.librosDeHallazgos.delete(codigo);
+    }
   }
 
   /** SIGTERM: todos los canales se cierran con 1001 y no se abre ninguno más. */
@@ -1752,8 +2159,10 @@ export class CanalDeBotas {
     for (const c of [...this.conexiones]) {
       this.echar(c, 'apagado', 'El servidor se está reiniciando: vuelve a entrar en unos segundos.');
     }
+    for (const sala of this.salas.values()) this.pararLosRebrotes(sala);
     this.salas.clear();
     this.libros.clear();
+    this.librosDeHallazgos.clear();
     /* Quien esperaba turno para derivar se queda esperando: el proceso se va, y nadie lo va a leer. */
     this.esperandoTurno.length = 0;
     this.esperaDelTurno?.parar();
@@ -1776,9 +2185,15 @@ export class CanalDeBotas {
     let enSala = 0;
     for (const c of this.conexiones) if (c.estado === 'dentro') enSala++;
     let sitios = 0;
-    for (const sala of this.salas.values()) for (const o of sala.ocupantes.values()) sitios += o.rastro.length / 3;
+    let brotesVivos = 0;
+    for (const sala of this.salas.values()) {
+      for (const o of sala.ocupantes.values()) sitios += o.rastro.length / 3;
+      brotesVivos += sala.brotes?.cuantos ?? 0;
+    }
     return {
       ...this.cuentas,
+      brotesVivos,
+      hallazgos: { ...this.cuentas.hallazgos },
       salas: this.salas.size,
       canales: this.conexiones.size,
       enSala,
