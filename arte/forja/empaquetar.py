@@ -482,6 +482,16 @@ def lista_de_clips():
             c['caeEnMs'] = round(d['cae_en'] * 1000 / fps)
         if 'levanta_desde' in d:
             c['levantaDesdeMs'] = round(d['levanta_desde'] * 1000 / fps)
+        if 'bucle_desde' in d:
+            # un clip de una vez cuya cola se repite (la carga del rayo: entra una vez y desde aquí, en bucle)
+            c['bucleDesdeMs'] = round(d['bucle_desde'] * 1000 / fps)
+        if 'entrada' in d:
+            # hasta dónde entra el clip (la carga del rayo: el paso y la palma arriba); un lanzar antes espera a que acabe
+            c['entradaMs'] = round(d['entrada'] * 1000 / fps)
+        if 'salida' in d:
+            # desde dónde el clip sale al reposo (lanzar el rayo: baja el brazo y recoge el pie); el cliente la pinta
+            # entera si el cuerpo se queda quieto, y al dejar la carga sin lanzar
+            c['salidaMs'] = round(d['salida'] * 1000 / fps)
         if d.get('raiz_animada'):
             c['desplazamientoM'] = d.get('raiz_final_gltf')
             c.setdefault('mujer', {})['desplazamientoM'] = df.get('raiz_final_gltf')
@@ -699,6 +709,13 @@ def solo_clips():
         fallo('comprimir.mjs salio con %d' % r.returncode)
         return 1
     lista_clips, gestos, por_direccion, por_clase, entra_con, marcha = lista_de_clips()
+    # EL CLIP DE CADA GESTO sí sigue al horneado (`clips.GESTOS`): un gesto que cambia de clip (el rayo, que en la fase 0
+    # pintaba `apuntar` y `disparar` y ahora tiene los suyos) se quedaba con el viejo, porque esto no tocaba `gestos`.
+    # Sus variantes (por dirección, por clase, entraCon) sí se quedan como estaban.
+    for g, clip in gestos.items():
+        if g in man['gestos'] and man['gestos'][g].get('clip') != clip:
+            print('  el gesto %s pinta ahora %s (antes %s)' % (g, clip, man['gestos'][g].get('clip')))
+            man['gestos'][g]['clip'] = clip
     for g, e in man['gestos'].items():
         for c in [e['clip']] + list(e.get('porDireccion', {}).values()) + list(e.get('porClase', {}).values()) + \
                 ([e['entraCon']] if e.get('entraCon') else []):

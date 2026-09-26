@@ -26,7 +26,19 @@
  * zancada: nadie resbala, ni a 0,5 m/s (pasea despacio: pasos cortos y lentos, no de pie).
  */
 import type { CuerpoPintado, Gesto } from '../cuerpos';
-import { CICLOS_COMO_MUCHO, GESTOS, INFO_DE_GESTOS, direccionRelativa, fundidoEntre, gestoEnBucle, tiempoDelGesto } from './gestos';
+import {
+  CICLOS_COMO_MUCHO,
+  FUNDIDO_A_LA_SALIDA_MS,
+  GESTOS,
+  INFO_DE_GESTOS,
+  direccionRelativa,
+  esperaLaEntrada,
+  fundidoEntre,
+  gestoEnBucle,
+  ritmoParaDurar,
+  salidaDelRayo,
+  tiempoDelGesto,
+} from './gestos';
 import type { InfoDelGesto } from './gestos';
 import { clipDelGesto, marchaDelReparto } from './reparto';
 import type { Direccion, PuntoDeLaMarcha, Reparto } from './reparto';
@@ -128,12 +140,28 @@ interface Tramo {
   impactoClipMs: number | null;
   desde: number;
   impacto: number | null;
+  /** Desde dónde repite su cola un clip con entrada (la carga del rayo: `tiempoConEntrada`), o `null`. */
+  bucleDesdeMs: number | null;
+  /** Hasta dónde entra el clip (la carga del rayo: `entradaMs`), o `null`: ver `esperaLaEntrada`. */
+  entradaMs: number | null;
   /** El segundo en que se quedó (sólo el que sale de la marcha: la fase deja de correr). */
   congelado: number;
 }
 
 function tramoNuevo(): Tramo {
-  return { nombre: '', bucle: false, marcha: false, info: INFO_DE_GESTOS.reposo, clipMs: 1000, impactoClipMs: null, desde: 0, impacto: null, congelado: 0 };
+  return { nombre: '', bucle: false, marcha: false, info: INFO_DE_GESTOS.reposo, clipMs: 1000, impactoClipMs: null, desde: 0, impacto: null, bucleDesdeMs: null, entradaMs: null, congelado: 0 };
+}
+
+/** El segundo del clip en que va un tramo que no es de la marcha, en `t`. */
+function segundoDelTramo(a: Tramo, t: number): number {
+  return tiempoDelGesto(a.info, a.clipMs, a.impactoClipMs, a.desde, a.impacto, t, a.bucleDesdeMs);
+}
+
+/** Lo que la salida del rayo necesita del clip de lanzar: su nombre en la textura, cuánto dura y desde dónde sale. */
+interface ElLanzarDelLejano {
+  readonly nombre: string;
+  readonly clipMs: number;
+  readonly salidaS: number | null;
 }
 
 interface EstadoDelLejano {
@@ -167,8 +195,23 @@ export interface MarchaDelLejano {
 export class AnimacionDeLosLejanos {
   private readonly estados = new Map<number, EstadoDelLejano>();
   private vuelta = 0;
+  private lanzarVisto: ElLanzarDelLejano | null = null;
 
   constructor(private readonly reparto: Reparto) {}
+
+  /** El clip de lanzar el rayo, mirado una vez (se pide en cada fotograma de una salida: no asigna). */
+  private get lanzar(): ElLanzarDelLejano {
+    if (this.lanzarVisto === null) {
+      const e = clipDelGesto(this.reparto, 'lanzar-rayo', null);
+      const datos = this.reparto.clips[e.clip];
+      this.lanzarVisto = {
+        nombre: nombreDelClipLejano(this.reparto, 'lanzar-rayo', null),
+        clipMs: datos?.duracionMs ?? 1000,
+        salidaS: datos?.salidaMs !== undefined ? datos.salidaMs / 1000 : null,
+      };
+    }
+    return this.lanzarVisto;
+  }
 
   /** Empieza un fotograma (para `podar`). */
   empezar(): void {
@@ -233,12 +276,53 @@ export class AnimacionDeLosLejanos {
       e.fase = (e.fase + (Math.max(0, dtMs) / 1000) * ciclos) % 1;
     }
     /*
+     * ── La salida del rayo (`salidaDelRayo`, la misma regla que el cuerpo con esqueleto) ── El juego pide la marcha y el
+     * cuerpo, quieto, lanzaba (sigue su clip hasta el final: baja el brazo y recoge el pie) o cargaba con la entrada
+     * hecha (entra el clip de lanzar desde su salida). Mientras dure, `e.gesto` sigue siendo `lanzar-rayo`.
+     */
+    if (esMarcha && (e.gesto === 'lanzar-rayo' || e.gesto === 'cargar-rayo')) {
+      const act = e.actual;
+      const l = this.lanzar;
+      const s = salidaDelRayo(e.gesto, c.gesto, c.velocidad, segundoDelTramo(act, t), act.clipMs / 1000, act.entradaMs === null ? null : act.entradaMs / 1000, l.salidaS);
+      if (s !== null) {
+        if (e.gesto === 'cargar-rayo') {
+          const viejo = e.previo;
+          e.previo = e.actual;
+          e.actual = viejo;
+          e.fundido = FUNDIDO_A_LA_SALIDA_MS;
+          e.cambio = t;
+          e.gesto = 'lanzar-rayo';
+          e.desde = Number.NaN;
+          e.direccion = null;
+          const a = e.actual;
+          a.info = INFO_DE_GESTOS['lanzar-rayo'];
+          a.marcha = false;
+          a.bucle = false;
+          a.nombre = l.nombre;
+          a.clipMs = l.clipMs;
+          a.impactoClipMs = null;
+          a.impacto = null;
+          a.bucleDesdeMs = null;
+          a.entradaMs = null;
+          a.desde = t - (s * 1000) / ritmoParaDurar(l.clipMs, a.info);
+        }
+        return this.pintar(e, t, marcha, salida);
+      }
+    }
+    /*
      * ── ¿Gesto nuevo? El que había pasa a salir, con el fundido de los cuerpos con esqueleto ──
      * De un paso de la marcha a otro no hay cambio: la fase es común y el clip lo elige la velocidad.
      */
     const nombre = esMarcha ? marchaNombre : nombreDelClipLejano(this.reparto, c.gesto, direccion);
     const eraMarcha = e.gesto !== null && INFO_DE_GESTOS[e.gesto].tipo === 'marcha';
     const cambia = e.gesto === null || (esMarcha ? !eraMarcha : e.gesto !== c.gesto || e.desde !== c.gestoDesdeMs || e.direccion !== direccion);
+    /*
+     * El chispazo (`esperaLaEntrada`, la misma regla que el cuerpo con esqueleto): el juego ya lanza y la carga aún acaba
+     * de entrar; se sigue pintando la carga (`e.gesto` no cambia: se vuelve a mirar en el siguiente fotograma).
+     */
+    if (cambia && e.gesto === 'cargar-rayo' && esperaLaEntrada(e.gesto, c.gesto, segundoDelTramo(e.actual, t), e.actual.entradaMs === null ? null : e.actual.entradaMs / 1000)) {
+      return this.pintar(e, t, marcha, salida);
+    }
     if (cambia) {
       const viejo = e.previo;
       e.previo = e.actual;
@@ -256,11 +340,15 @@ export class AnimacionDeLosLejanos {
       if (esMarcha) {
         a.bucle = true;
         a.impactoClipMs = null;
+        a.bucleDesdeMs = null;
+        a.entradaMs = null;
       } else {
         const base = clipDelGesto(this.reparto, c.gesto, direccion).clip;
         const datos = this.reparto.clips[base];
         a.clipMs = datos?.duracionMs ?? 1000;
         a.impactoClipMs = datos?.impactoMs ?? null;
+        a.bucleDesdeMs = datos?.bucleDesdeMs ?? null;
+        a.entradaMs = datos?.entradaMs ?? null;
         a.bucle = gestoEnBucle(info, datos?.bucle === true);
       }
     }
@@ -269,15 +357,21 @@ export class AnimacionDeLosLejanos {
     a.nombre = nombre;
     a.impacto = c.impactoMs;
     if (esMarcha) a.clipMs = marchaMs;
+    return this.pintar(e, t, marcha, salida);
+  }
+
+  /** Lo que se pinta: el tramo que entra y, mientras dura el fundido, el que sale. */
+  private pintar(e: EstadoDelLejano, t: number, marcha: MarchaDelLejano, salida: PoseDelLejano): PoseDelLejano {
+    const a = e.actual;
     const mezcla = e.fundido > 0 ? Math.min(1, Math.max(0, (t - e.cambio) / e.fundido)) : 1;
     salida.b = a.nombre;
-    salida.tb = esMarcha ? this.segundoDeLaMarcha(e, a, marcha) : tiempoDelGesto(a.info, a.clipMs, a.impactoClipMs, a.desde, a.impacto, t);
+    salida.tb = a.marcha ? this.segundoDeLaMarcha(e, a, marcha) : segundoDelTramo(a, t);
     salida.bucleB = a.bucle;
     salida.mezcla = mezcla;
     const p = e.previo;
     if (mezcla < 1 && p.nombre !== '') {
       salida.a = p.nombre;
-      salida.ta = p.marcha ? p.congelado : tiempoDelGesto(p.info, p.clipMs, p.impactoClipMs, p.desde, p.impacto, t);
+      salida.ta = p.marcha ? p.congelado : segundoDelTramo(p, t);
       salida.bucleA = p.bucle;
     } else {
       salida.a = a.nombre;

@@ -89,11 +89,10 @@
 import * as THREE from 'three';
 import type { Barrio } from '../../../../shared/arcade/juegos/quiebro-barrio';
 import type { CuerpoPintado, FuenteDeCuerpos } from '../cuerpos';
-import { ALTO_DE_LA_BOCA_SIN_MANO } from '../rayo/contrato';
 import type { BocaDe } from '../rayo/contrato';
 import { Almacen } from './almacen';
 import type { Lector, PedidoDeHorneado } from './almacen';
-import { CuerpoConEsqueleto, PASEAR_CON_PARAGUAS, TENUE, colorDelContorno, corteDelGesto, esAmenaza, llenoDelContorno } from './cuerpo';
+import { APUNTA_AL_LANZAR_S, BOCA_DELANTE_DE_LA_PALMA_M, CuerpoConEsqueleto, PASEAR_CON_PARAGUAS, TENUE, colorDelContorno, corteDelGesto, esAmenaza, llenoDelContorno } from './cuerpo';
 import type { ContextoDeLosCuerpos, CorteDelCuerpo, MarchaDelEsqueleto } from './cuerpo';
 import { INFO_DE_GESTOS } from './gestos';
 import type { MarchaGirada } from './gestos';
@@ -108,7 +107,7 @@ import { CUERPOS_COMO_MUCHO, HISTERESIS_M, POLITICA, cabeUnoQueSeVa, detalleDe, 
 import type { LodElegido } from './presupuesto';
 import type { CuerpoAMedir, DetalleDelCuerpo, Nivel } from './presupuesto';
 import { Rebano, TABLA_DE_CELADORES, TABLA_DE_DESVELADOS, TABLA_DE_DURMIENTES, cabezaNueva } from './rebano';
-import type { TablaDelRebano } from './rebano';
+import type { Cabeza, TablaDelRebano } from './rebano';
 import {
   clipsDeLaMarchaGirada,
   coloresDelTraje,
@@ -160,6 +159,33 @@ interface RebanoHecho {
   readonly pasearConParaguas: string;
   readonly reposoConParaguas: string;
   readonly reposo: string;
+  /**
+   * LA MANO EN LA TEXTURA (la boca del rayo de un lejano): qué hueso de la piel es el hueco de la mano derecha
+   * (`agarre_R`, o la muñeca si el maniquí no lo lleva; −1 si ninguno) y dónde está su origen en el espacio de enlace.
+   */
+  readonly manoJ: number;
+  readonly manoEnlace: THREE.Vector3;
+}
+
+/**
+ * LA ÚLTIMA POSE DE UN LEJANO, para su boca: lo que se le puso al rebaño en su último fotograma (las filas, la
+ * mezcla, el sitio, el giro y la escala). Uno por id, que se crea una vez y se reutiliza (`bocaDe` no asigna).
+ */
+interface PoseDeLaBoca {
+  vuelta: number;
+  rebano: RebanoHecho | null;
+  a: number;
+  b: number;
+  mezcla: number;
+  x: number;
+  z: number;
+  giro: number;
+  ex: number;
+  ey: number;
+  ez: number;
+  /** Lo que la boca va por delante de la palma (el de `CuerpoConEsqueleto.boca`) y hacia dónde (el rumbo del gesto). */
+  adelante: number;
+  rumbo: number;
 }
 
 /** Un rebaño que el nivel va a querer: se crea en cuanto se pueda (y su textura se hornea a trozos). */
@@ -195,29 +221,46 @@ type AlRebano = 'pintado' | 'fuera' | 'sin-rebano';
 export class DirectorDeLosPersonajes {
   readonly grupo = new THREE.Group();
   readonly almacen: Almacen;
-  /** La fuente del último fotograma: con ella sabe `bocaDe` dónde está cada cuerpo. */
-  private ultimaFuente: FuenteDeCuerpos | null = null;
   /**
-   * LA BOCA DEL RAYO (`rayo/contrato.ts`): dónde está la mano derecha del cuerpo `id` en este fotograma.
-   * `Quiebro.tsx` la cuelga del sistema de efectos (`sistema.boca`) al montarse el director.
+   * LA BOCA DEL RAYO (`rayo/contrato.ts`): dónde está la mano derecha del cuerpo `id` TAL COMO SE PINTÓ en el último
+   * fotograma. `Quiebro.tsx` la cuelga del sistema de efectos (`sistema.boca`) al montarse el director.
    *
-   * FASE 0 (el stub del contrato): todavía no hay mano, así que da el PIVOTE del cuerpo —su sitio pintado, a
-   * `ALTO_DE_LA_BOCA_SIN_MANO`— de la fuente del último fotograma. ANIMACIÓN la cambia por la mano de verdad
-   * (`huesosDelBrazoDerecho` en los cuerpos con esqueleto; en los lejanos, la pose horneada), con la misma firma.
+   *   · Con esqueleto: la palma de su esqueleto (`CuerpoConEsqueleto.boca`: el hueco de la mano, con el brazo ya
+   *     apuntado y temblando, y un poco por delante si carga o lanza).
+   *   · En el rebaño: la misma palma sacada de la TEXTURA de huesos con las filas y la mezcla que se le pusieron
+   *     (`HuesosEnTextura.puntoEn`, la cuenta del sombreador), llevada a su sitio, su giro y su escala.
+   *   · Si no se pintó (fuera de cuadro, demasiado lejos, sin cargar todavía): `false`, y los efectos usan su sitio.
+   *
+   * Sin asignar: se llama en cada fotograma por cada cuerpo que carga o lanza.
    */
   readonly bocaDe: BocaDe = (id, salida) => {
-    const fuente = this.ultimaFuente;
-    if (fuente === null) return false;
-    const lista = fuente.cuerpos();
-    for (let i = 0; i < lista.length; i++) {
-      const c = lista[i] as CuerpoPintado;
-      if (c.id !== id) continue;
-      salida.x = c.x;
-      salida.y = ALTO_DE_LA_BOCA_SIN_MANO;
-      salida.z = c.z;
-      return true;
-    }
-    return false;
+    const cuerpo = this.cuerpos.get(id);
+    if (cuerpo !== undefined && cuerpo.raiz.parent !== null && cuerpo.raiz.visible && this.pintadoConEsqueleto.get(id) === this.vuelta) return cuerpo.boca(salida);
+    const p = this.bocasLejanas.get(id);
+    if (p === undefined || p.vuelta !== this.vuelta || p.rebano === null || p.rebano.manoJ < 0) return false;
+    const rb = p.rebano;
+    const q = this.puntoDeLaBoca;
+    rb.textura.puntoEn(p, rb.manoJ, rb.manoEnlace, q);
+    /* La matriz de la cabeza del rebaño (`Rebano.poner`): escala, giro alrededor de +Y y sitio. */
+    const x = q.x * p.ex;
+    const z = q.z * p.ez;
+    const cs = Math.cos(p.giro);
+    const sn = Math.sin(p.giro);
+    salida.x = p.x + x * cs + z * sn + Math.sin(p.rumbo) * p.adelante;
+    salida.y = q.y * p.ey;
+    salida.z = p.z - x * sn + z * cs - Math.cos(p.rumbo) * p.adelante;
+    return true;
+  };
+  /** En qué vuelta se pintó cada cuerpo con esqueleto (su boca sólo vale si se pintó en ésta). */
+  private readonly pintadoConEsqueleto = new Map<number, number>();
+  /** La última pose de cada lejano (ver `PoseDeLaBoca`), y el punto de la cuenta. */
+  private readonly bocasLejanas = new Map<number, PoseDeLaBoca>();
+  private readonly puntoDeLaBoca = { x: 0, y: 0, z: 0 };
+  private readonly podarBoca = (p: PoseDeLaBoca, id: number): void => {
+    if (p.vuelta !== this.vuelta) this.bocasLejanas.delete(id);
+  };
+  private readonly podarPintado = (v: number, id: number): void => {
+    if (v !== this.vuelta) this.pintadoConEsqueleto.delete(id);
   };
   private readonly ctx: ContextoDeLosCuerpos;
   private readonly marchas = new Map<string, MarchaDelEsqueleto>();
@@ -551,7 +594,13 @@ export class DirectorDeLosPersonajes {
       const textura = tabla === null ? null : this.almacen.texturaDeHuesos(figura.figura, figura.esqueleto, f.malla, p.pedidos, tipoReal);
       if (tabla === null || textura === null) return null;
       const rebano = new Rebano(`rebano-${clave}`, f.malla, textura, tipoReal === 'multitud' ? DURMIENTES_PINTADOS_COMO_MUCHO + CUERPOS_COMO_MUCHO : CUERPOS_COMO_MUCHO, tabla);
-      hecho = { rebano, textura, pasear: p.pasear, pasearConParaguas: p.conParaguas, reposoConParaguas: p.paradoConParaguas, reposo: p.reposo };
+      /* La mano de la boca del rayo: el hueco de la mano derecha si la piel lo lleva, si no la muñeca. */
+      const agarre = this.ctx.reparto.esqueletos[figura.esqueleto]?.agarre.derecha ?? 'agarre_R';
+      let manoJ = f.malla.huesos.indexOf(agarre);
+      if (manoJ < 0) manoJ = f.malla.huesos.indexOf('mano_R');
+      const inversa = manoJ >= 0 ? f.malla.inversas[manoJ] : undefined;
+      const manoEnlace = inversa !== undefined ? new THREE.Vector3().setFromMatrixPosition(inversa.clone().invert()) : new THREE.Vector3();
+      hecho = { rebano, textura, pasear: p.pasear, pasearConParaguas: p.conParaguas, reposoConParaguas: p.paradoConParaguas, reposo: p.reposo, manoJ: inversa !== undefined ? manoJ : -1, manoEnlace };
       this.rebanos.set(clave, hecho);
       this.listaDeRebanos.push(hecho);
       this.grupo.add(rebano.malla);
@@ -742,6 +791,7 @@ export class DirectorDeLosPersonajes {
     f.direccionDelGesto = c.direccionDelGesto;
     f.contorno = c.contorno;
     f.tenue = c.tenue;
+    f.carga = c.carga;
   }
 
   /* ─────────────────────────────── El fotograma ─────────────────────────────── */
@@ -752,7 +802,6 @@ export class DirectorDeLosPersonajes {
    * su gente (ver «De dónde sale la gente»).
    */
   fotograma(fuente: FuenteDeCuerpos, nivel: Nivel, barrio: Barrio | null, camara: THREE.Camera, ahora: number, presentado: (t: number) => number): void {
-    this.ultimaFuente = fuente;
     this.liberarLosSoltados();
     if (this.nivelPreparado !== nivel) this.preparar(nivel);
     const pol = POLITICA[nivel];
@@ -835,6 +884,7 @@ export class DirectorDeLosPersonajes {
         cuerpo.raiz.visible = true;
         cuerpo.actualizar(c, tCuerpo, dt, detalle, d, 0);
         this.guardarFoto(c);
+        this.pintadoConEsqueleto.set(c.id, this.vuelta);
         conEsqueleto++;
         this.sombras.poner(c.x, c.z, 1);
       } else {
@@ -848,6 +898,7 @@ export class DirectorDeLosPersonajes {
         if (hecho === 'sin-rebano' && tenia !== undefined) {
           tenia.actualizar(c, tCuerpo, dt, detalleDe('esqueleto', pol.trisLejos, 0, false), d, 0);
           this.guardarFoto(c);
+          this.pintadoConEsqueleto.set(c.id, this.vuelta);
           conEsqueleto++;
           continue;
         }
@@ -886,6 +937,8 @@ export class DirectorDeLosPersonajes {
     }
     if (this.relojes.size > lista.length) this.relojes.forEach(this.podarReloj);
     if (this.figurasRecordadas.size > lista.length) this.figurasRecordadas.forEach(this.podarFigura);
+    if (this.bocasLejanas.size > lista.length) this.bocasLejanas.forEach(this.podarBoca);
+    if (this.pintadoConEsqueleto.size > lista.length) this.pintadoConEsqueleto.forEach(this.podarPintado);
     this.lejanos.podar();
 
     /* ── 4. La multitud (y sin gente, nadie: se sueltan los durmientes con esqueleto) ── */
@@ -1121,7 +1174,47 @@ export class DirectorDeLosPersonajes {
     k.corteAltura = corte.altura;
     k.corteModo = corte.modo;
     this.sombras.poner(c.x, c.z, 0.9);
-    return rb.rebano.poner(k) ? 'pintado' : 'fuera';
+    const puesto = rb.rebano.poner(k);
+    if (puesto) {
+      this.relojDeLaBoca = t;
+      this.recordarLaBoca(c, rb, k);
+    }
+    return puesto ? 'pintado' : 'fuera';
+  }
+
+  /**
+   * Guarda la pose con que se pintó un lejano (para su boca), en su registro de siempre. Recibe la cabeza entera y no
+   * sus números sueltos: cada número con decimales que cruza una llamada que V8 no funde es una caja nueva.
+   */
+  private relojDeLaBoca = 0;
+  private recordarLaBoca(c: CuerpoPintado, rb: RebanoHecho, k: Readonly<Cabeza>): void {
+    const t = this.relojDeLaBoca;
+    let p = this.bocasLejanas.get(c.id);
+    if (p === undefined) {
+      p = { vuelta: 0, rebano: null, a: 0, b: 0, mezcla: 0, x: 0, z: 0, giro: 0, ex: 1, ey: 1, ez: 1, adelante: 0, rumbo: 0 };
+      this.bocasLejanas.set(c.id, p);
+    }
+    p.vuelta = this.vuelta;
+    p.rebano = rb;
+    p.a = k.filaA;
+    p.b = k.filaB;
+    p.mezcla = k.mezcla;
+    p.x = k.x;
+    p.z = k.z;
+    p.giro = k.giro;
+    p.ex = k.escalaX;
+    p.ey = k.escalaY;
+    p.ez = k.escalaZ;
+    /* El rumbo del gesto, el mismo con que se giró la cabeza (`k.giro` = π − rumbo). */
+    p.rumbo = Math.PI - k.giro;
+    /* Por delante de la palma como el cuerpo con esqueleto: al cargar, y al lanzar hasta que baja el brazo. */
+    let adelante = 0;
+    if (c.gesto === 'cargar-rayo') adelante = 1;
+    else if (c.gesto === 'lanzar-rayo' && c.impactoMs !== null) {
+      const u = Math.min(1, Math.max(0, ((t - c.impactoMs) / 1000 - APUNTA_AL_LANZAR_S.hasta) / (APUNTA_AL_LANZAR_S.suelta - APUNTA_AL_LANZAR_S.hasta)));
+      adelante = 1 - u * u * (3 - 2 * u);
+    }
+    p.adelante = adelante * BOCA_DELANTE_DE_LA_PALMA_M;
   }
 
   /** Cuenta lo que se pinta de verdad (para el banco): una llamada por malla visible. */

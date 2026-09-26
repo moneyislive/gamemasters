@@ -97,10 +97,12 @@ export const INFO_DE_GESTOS: Readonly<Record<Gesto, InfoDelGesto>> = {
   apuntar: { tipo: 'bucle', duracionMs: null, entraMs: 150, direccion: 'cuerpo', ritmo: 0.6 },
   disparar: { tipo: 'golpe', duracionMs: null, entraMs: 50, direccion: 'cuerpo', ritmo: 1 },
   /*
-   * EL RAYO (`rayo/contrato.ts`), FASE 0: los mismos números que `apuntar` y `disparar`, y en el manifiesto los
-   * mismos clips, hasta que ANIMACIÓN traiga los de la captura (Spell_Simple_*: entrar, bucle, disparo, salir).
+   * EL RAYO (`rayo/contrato.ts`; los clips, de la captura: `arte/forja/captura.py`, «EL RAYO»). Cargar es un bucle
+   * CON ENTRADA: el clip da un paso, sube la palma y desde `bucleDesdeMs` repite su cola (`tiempoConEntrada`); a su
+   * ritmo, que es el de la captura. Lanzar es un golpe cuyo impacto es el destello: el juego lo pone en el instante del
+   * disparo (`impactoMs` = `gestoDesdeMs`) y el clip entra por su fotograma de impacto, con la palma delante.
    */
-  'cargar-rayo': { tipo: 'bucle', duracionMs: null, entraMs: 150, direccion: 'cuerpo', ritmo: 0.6 },
+  'cargar-rayo': { tipo: 'bucle', duracionMs: null, entraMs: 120, direccion: 'cuerpo', ritmo: 1 },
   'lanzar-rayo': { tipo: 'golpe', duracionMs: null, entraMs: 50, direccion: 'cuerpo', ritmo: 1 },
   desalojable: { tipo: 'sostenido', duracionMs: null, entraMs: 150, direccion: 'no', ritmo: 1 },
   rematar: { tipo: 'bucle', duracionMs: null, entraMs: 150, direccion: 'cuerpo', ritmo: 1 },
@@ -128,14 +130,87 @@ export const GESTOS: readonly Gesto[] = Object.keys(INFO_DE_GESTOS) as Gesto[];
  * (funde dos poses iguales) y la tela cae en su sitio.
  */
 export const FUNDIDO_DE_LEVANTARSE_MS = 160;
+/**
+ * DEJAR LA CARGA DEL RAYO SIN LANZAR (un golpe, el quiebro, soltar el dedo): el cuerpo vuelve a andar o al reposo desde
+ * el brazo al frente y el pie derecho adelantado, sin clip que los recoja. Con los 200 ms de siempre la palma caía 1,1 m a
+ * 5,6 m/s (lo mide `comprobar_movimiento.py`, «del cliente»); con éstos, a unos 3.
+ */
+export const FUNDIDO_AL_DEJAR_LA_CARGA_MS = 350;
+/**
+ * UN GOLPE RECIBIDO EN LA POSTURA DEL RAYO (la carga o el lanzar: el pie derecho 30 cm adelante y el brazo al frente).
+ * `tocado`, `descolocado` y `derribado` entran en 45-80 ms, y desde esa postura el pie saltaba 44 cm atrás a 10 m/s
+ * (EL-RAYO §1.1.5: «cualquier daño corta la carga», el modo más frecuente de cortarla). Con éstos el pie va a unos 4 m/s
+ * y la mano izquierda, que viene de atrás, a menos de 6 (el tope de `comprobar_movimiento.py`; con 110 ms, 7,3): el pie se
+ * ve empujado atrás, no teletransportado, y el golpe sigue empezando en el primer fotograma.
+ */
+export const FUNDIDO_DEL_RAYO_AL_GOLPE_MS = 140;
 export function fundidoEntre(de: Gesto | null, a: Gesto): number {
   const info = INFO_DE_GESTOS[a];
   if (de === null) return 0;
   const antes = INFO_DE_GESTOS[de];
   if (antes.tipo === 'golpe' && info.tipo === 'golpe') return 60;
   if (de === 'derribado' && a === 'levantarse') return FUNDIDO_DE_LEVANTARSE_MS;
+  if (de === 'cargar-rayo' && info.tipo === 'marcha') return FUNDIDO_AL_DEJAR_LA_CARGA_MS;
+  if ((de === 'cargar-rayo' || de === 'lanzar-rayo') && (a === 'tocado' || a === 'descolocado' || a === 'derribado')) return FUNDIDO_DEL_RAYO_AL_GOLPE_MS;
   if (info.tipo === 'marcha' && antes.tipo !== 'marcha') return 200;
   return info.entraMs;
+}
+
+/**
+ * EL CHISPAZO: ¿ESPERA EL LANZAR A QUE LA CARGA ACABE DE ENTRAR? (EL-RAYO §1.2: soltar antes de 300 ms, lo normal al
+ * pulsar rápido en el móvil). `lanzar-rayo` sale de la carga HECHA (el pie derecho adelante y la palma a la altura del
+ * hombro); con el toque corto la carga va a medio paso, y en los 50 ms de su fundido el pie resbalaba 24 cm por el suelo a
+ * 6,6 m/s y la palma subía a 29 m/s (la revisión). Un fundido más largo tampoco vale: con el toque de 50 ms la carga aún
+ * no pesa ni la mitad (su propio fundido desde el reposo) y el pie se arrastraba 30 cm a 1,3 m/s sin levantarse.
+ *
+ * Así que la carga SIGUE hasta acabar su entrada (`entradaMs` del clip, en segundos `entradaS`: el paso dado y la palma
+ * arriba, 300 ms), y entonces entra el lanzar con su fundido de siempre, por el segundo que le toca (el destello ya
+ * salió: el clip va desde su impacto, que es el instante de soltar). El pie da su paso entero, levantado, y la palma sube
+ * a su ritmo: el destello nace de la mano en plena subida. `true` mientras `de` es la carga, `a` el lanzar y el clip que
+ * sale va por `segundo` < `entradaS`. Puro: lo usan el cuerpo con esqueleto y el rebaño con los mismos números.
+ */
+export function esperaLaEntrada(de: Gesto | null, a: Gesto, segundo: number, entradaS: number | null): boolean {
+  return de === 'cargar-rayo' && a === 'lanzar-rayo' && entradaS !== null && segundo < entradaS;
+}
+
+/** Por encima de esta velocidad (m/s) el cuerpo anda: la salida del rayo se corta y se funde a la marcha. */
+export const ANDA_DESDE_MS = 0.3;
+/** El fundido de la carga a su salida (dejar la carga sin lanzar, quieto: la carga y el principio de la salida casan). */
+export const FUNDIDO_A_LA_SALIDA_MS = 150;
+/**
+ * Cuánto antes de acabar su entrada (`entradaMs`, 300 ms) tiene la carga el paso dado: el pie derecho apoya a los ~230
+ * ms (medido con el director: `pie_R` quieto desde ahí) y lo que queda es la palma. Desde ahí, dejar la carga ya sale
+ * por la salida del lanzar (baja el brazo y recoge el pie con otro paso); antes, el pie apenas se ha movido y se vuelve
+ * a la marcha fundiendo.
+ */
+export const PASO_HECHO_ANTES_S = 0.07;
+
+/**
+ * LA SALIDA DEL RAYO: qué segundo del clip de `lanzar-rayo` pintar cuando el juego pide la marcha, o `null` si no toca.
+ * El juego vuelve al reposo a los 260 ms del destello (`COLA_DEL_GOLPE_MS` de `red/partida.ts`) y al dejar la carga sin
+ * lanzar (soltar el dedo, perder el foco); el clip de lanzar trae después su salida (baja el brazo y recoge el pie
+ * derecho con un paso: desde `salidaMs`). Sin ella, el pie adelantado resbalaba 30 cm por el suelo en el fundido a la
+ * marcha, en CADA disparo. Con el cuerpo QUIETO (`velocidad` < `ANDA_DESDE_MS`):
+ *  · de `lanzar-rayo`: el mismo clip sigue donde va (`segundo`) hasta su final;
+ *  · de `cargar-rayo` con el paso ya en el suelo (`segundo` ≥ `entradaS` − `PASO_HECHO_ANTES_S`: lo que queda de la
+ *    entrada es subir la palma): el clip de lanzar desde su salida (`salidaS`), que la carga que sale acaba de subir.
+ * Andando, o con la carga a medio entrar, la marcha como siempre (el paso de andar tapa el pie). `clipS` es la duración del
+ * clip que sale. Sin `salidaS` (el clip de lanzar no declara su salida en el manifiesto), nunca: el clip no acaba en el
+ * reposo. Puro y sin estado: el cuerpo con esqueleto y el rebaño lo preguntan en cada fotograma.
+ */
+export function salidaDelRayo(
+  de: Gesto | null,
+  a: Gesto,
+  velocidad: number,
+  segundo: number,
+  clipS: number,
+  entradaS: number | null,
+  salidaS: number | null,
+): number | null {
+  if (salidaS === null || INFO_DE_GESTOS[a].tipo !== 'marcha' || !(Math.abs(velocidad) < ANDA_DESDE_MS)) return null;
+  if (de === 'lanzar-rayo') return segundo < clipS - 1 / 60 ? Math.max(0, segundo) : null;
+  if (de === 'cargar-rayo' && (entradaS === null || segundo >= entradaS - PASO_HECHO_ANTES_S)) return salidaS;
+  return null;
 }
 
 /* ─────────────────────────────── Direcciones ─────────────────────────────── */
@@ -231,15 +306,40 @@ export function gestoEnBucle(info: InfoDelGesto, clipEnBucle: boolean): boolean 
 }
 
 /**
+ * UN CLIP CON ENTRADA Y COLA EN BUCLE (la carga del rayo: `bucleDesdeMs` en el manifiesto). El clip se pinta una vez
+ * hasta su final y desde ahí vuelve a `bucleDesdeS`, no a 0: la entrada (el paso y subir la palma) no se repite. `s` es
+ * el segundo corrido desde el principio del gesto; devuelve el segundo del clip, en [0, `clipS`). Sin cola (`null`, o
+ * una que no cabe), el clip entero en bucle, como siempre. Puro y sin estado: lo usan el cuerpo con esqueleto (que pone
+ * el tiempo de su acción) y el rebaño (que elige la fila), y así los dos pintan la misma pose.
+ */
+export function tiempoConEntrada(s: number, clipS: number, bucleDesdeS: number | null): number {
+  if (!(clipS > 0)) return 0;
+  const desde = bucleDesdeS !== null && bucleDesdeS >= 0 && bucleDesdeS < clipS - 1e-6 ? bucleDesdeS : 0;
+  if (s < clipS) return Math.max(0, s);
+  const cola = clipS - desde;
+  return desde + ((s - clipS) % cola);
+}
+
+/**
  * EN QUÉ SEGUNDO DEL CLIP VA UN GESTO en `t` (ms), sin estado: lo que usan los cuerpos SIN esqueleto
  * (el rebaño), que no tienen mezclador que integre un `timeScale`. Un golpe con anuncio va por la misma
  * recta que la anticipación elástica (`inicioDelGolpe` da en cada instante dónde «debería» ir el clip
  * para llegar a su impacto en `impacto`) y después del impacto a su ritmo; lo demás, a su ritmo desde
- * `desde`. Así el puño de un Celador a 20 m también cae en su instante, y no en reposo.
+ * `desde`. Así el puño de un Celador a 20 m también cae en su instante, y no en reposo. Un clip con cola en
+ * bucle (`bucleDesdeMs`, la carga del rayo) va por `tiempoConEntrada`.
  */
-export function tiempoDelGesto(info: InfoDelGesto, clipMs: number, impactoClipMs: number | null, desde: number, impacto: number | null, t: number): number {
+export function tiempoDelGesto(
+  info: InfoDelGesto,
+  clipMs: number,
+  impactoClipMs: number | null,
+  desde: number,
+  impacto: number | null,
+  t: number,
+  bucleDesdeMs: number | null = null,
+): number {
   if (info.tipo === 'golpe' && impacto !== null && impactoClipMs !== null) return inicioDelGolpe(desde, t, impacto, impactoClipMs);
-  return (Math.max(0, t - desde) / 1000) * ritmoParaDurar(clipMs, info);
+  const s = (Math.max(0, t - desde) / 1000) * ritmoParaDurar(clipMs, info);
+  return bucleDesdeMs !== null ? tiempoConEntrada(s, clipMs / 1000, bucleDesdeMs / 1000) : s;
 }
 
 /* ─────────────────────────────── Las capas y sus pesos ─────────────────────────────── */
@@ -318,6 +418,17 @@ export class MezclaDeCapas {
   peso(nombre: string): number {
     for (const c of this.capas) if (c.nombre === nombre) return c.peso;
     return 0;
+  }
+
+  /** Cuántas capas hay, y el nombre y el peso de la `i`-ésima: para recorrerlas sin asignar (el rayo, en `cuerpo.ts`). */
+  get cuantas(): number {
+    return this.capas.length;
+  }
+  nombreEn(i: number): string {
+    return (this.capas[i] as Capa).nombre;
+  }
+  pesoEn(i: number): number {
+    return (this.capas[i] as Capa).peso;
   }
 
   /** La capa que entra (la de objetivo 1), o `null`. */

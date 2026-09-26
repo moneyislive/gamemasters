@@ -761,6 +761,46 @@ class Desplazada(Pista):
         return self.pista.pose(f, ctx).desplazada(self._d[id(ctx)])
 
 
+class PieComo(Pista):
+    """La pista movida en el suelo (entera, una vez) para que su pie `S` en el fotograma `f` quede donde lo tiene `ref`
+    en su fotograma `f_ref`, y girado sobre el suelo como lo tiene `ref` (su rumbo). Para cambiar de postura con UN paso:
+    el conjuro del rayo, en espejo, adelanta el pie derecho y el reposo lo tiene atrás; fundidos tal cual, los dos pies se
+    cruzaban a la vez (un saltito de 8 cm). Con el izquierdo donde lo tiene el reposo, sólo da el paso el derecho. Y con
+    su mismo rumbo: si no, el pie quieto giraba 15° al entrar (la punta barría 10 cm) y los pies clavados de la carga y
+    del lanzar no casaban entre sí (`comprobar_movimiento`, el fundido de uno a otro)."""
+
+    def __init__(self, pista, S, ref, f=0.0, f_ref=0.0):
+        self.pista, self.S, self.ref, self.f, self.f_ref = pista, S, ref, f, f_ref
+        self._d = {}
+
+    @staticmethod
+    def _rumbo_del_pie(p, ctx, S):
+        """El rumbo del pie `S` de la pose `p` en el suelo, y los giros que lo sostienen (para girarlo)."""
+        from mathutils import Vector
+        cfg = ctx.destino.cfg
+        muslo, pierna, pie, _ = cfg['piernas'][S]
+        Dsup = p.q[cfg['cadera']].to_matrix() @ p.q[muslo].to_matrix() @ p.q[pierna].to_matrix()
+        Dp = Dsup @ p.q[pie].to_matrix()
+        _t, tal0, bol0 = ctx.destino.pie[S]
+        d = Dp @ (bol0 - tal0)
+        return math.atan2(d.x, -d.y), Dsup, Dp, pie
+
+    def pose(self, f, ctx):
+        from mathutils import Matrix, Vector
+        if id(ctx) not in self._d:
+            pa = self.pista.pose(self.f, ctx)
+            pb = self.ref.pose(self.f_ref, ctx)
+            a, b = pa.tob[self.S], pb.tob[self.S]
+            giro = _angulo(PieComo._rumbo_del_pie(pb, ctx, self.S)[0] - PieComo._rumbo_del_pie(pa, ctx, self.S)[0])
+            self._d[id(ctx)] = (Vector((b.x - a.x, b.y - a.y, 0.0)), giro)
+        desp, giro = self._d[id(ctx)]
+        p = self.pista.pose(f, ctx).desplazada(desp)
+        if abs(giro) > 1e-6:
+            _r, Dsup, Dp, pie = PieComo._rumbo_del_pie(p, ctx, self.S)
+            p.q[pie] = (Dsup.transposed() @ Matrix.Rotation(giro, 3, 'Z') @ Dp).to_quaternion()
+        return p
+
+
 class Erguida(Pista):
     """La pista con la cadera `dz` más alta (las piernas, con IK a los mismos tobillos, más estiradas): el
     reposo de UAL dobla las rodillas y los muslos, inclinados, abrían el bajo de la gabardina."""
@@ -2168,8 +2208,8 @@ def receta(nombre, frames, pista, info, fuente, **kw):
 
 
 # ═══ EL REPOSO Y LA GUARDIA ═══
-receta('reposo', 75, RodillasAdelante(PiesRectos(Erguida(PiesJuntos(Ual('ual1:Idle_Loop', ciclo=75), 0.8, 0.3), 0.025), 15.0),
-                                        20.0),
+_REPOSO = RodillasAdelante(PiesRectos(Erguida(PiesJuntos(Ual('ual1:Idle_Loop', ciclo=75), 0.8, 0.3), 0.025), 15.0), 20.0)
+receta('reposo', 75, _REPOSO,
        'reposo de pie: respiración y peso que pasa de un pie a otro (captura, con los pies casi a la par: la de UAL los '
        'separa 40 cm de delante a atrás)',
        'UAL1 Idle_Loop', bucle=True, clavar=False, tope_faldon=35)
@@ -2267,6 +2307,62 @@ receta('descolgar', 45, Mezcla(Tramos((0, _ALCANZA, 0), (14, _TEL, 10)), (_TEL, 
        'agarrado, con el puño en la mejilla y el lado del pulgar en la oreja como en la forja (1,5 s, CABINA.descolgarTics); '
        'el auricular va en agarre_R', 'mezcla: UAL1 Interact (en espejo) + UAL2 Idle_TalkingPhone_Loop + la mano de la forja',
        oreja=('R', 13, 25), manos_excluir=('R',))
+
+# ═══ EL RAYO (docs/quiebro/EL-RAYO.md §6) ═══ El conjuro de UAL1 (Spell_Simple_Enter, _Idle_Loop, _Shoot y _Exit) EN
+# ESPEJO: la captura lanza con la izquierda, y la boca del rayo es la mano derecha (`rayo/contrato.ts`, `BocaDe`). El
+# brazo que lanza va recto al frente a la altura del hombro, la palma abierta hacia el blanco y los dedos arriba; el otro,
+# atrás y abajo; el cuerpo perfilado sobre la pierna de delante. Los pies, recogidos como en el reposo (de ahí sale casi
+# siempre: el propio está en reposo o andando cuando pulsa).
+#
+# CARGAR es una ENTRADA y un BUCLE en el mismo clip: se sube el brazo (0-9, 300 ms: lo que dura el chispazo, el nivel 1
+# de la carga, EL-RAYO §1.2; con 400 ms un toque rápido soltaba el destello con la palma aún en la cadera; `entrada`, en
+# el manifiesto `entradaMs`: un lanzar antes espera a que acabe, ver `esperaLaEntrada` en `personajes/gestos.ts`),
+# se asienta (9-33: la tela del abrigo deja de balancearse) y desde el 33 el bucle de la carga de UAL (63
+# fotogramas, 2,1 s) se repite: `bucle_desde` (el manifiesto: `bucleDesdeMs`) dice al cliente desde dónde. El último
+# fotograma (el 96) es la misma pose que el 33 (el bucle de UAL es periódico, y la tela se cierra ahí igual que en un
+# bucle: `animacion.hornear`).
+#
+# LANZAR sale de la pose del fotograma 33 de la carga SIN PROCESAR (`Quieta(_RAYO_CARGAR, 33)`: el procesado de lanzar la
+# deja igual que el de cargar; con la ya procesada los brazos se abrían dos veces y la izquierda saltaba 6 cm al soltar
+# —lo vio `comprobar_movimiento`—), empuja la palma en el
+# impacto (fotograma 1, 33 ms: `impactoMs`, el instante del destello) y retrocede: el retroceso de Spell_Simple_Shoot
+# (la palma 6 cm atrás, la muñeca arriba, el hombro que cede) AUMENTADO ×1,9, porque el de UAL es de un conjuro menor y
+# éste es el ataque especial; se asienta y sale (Spell_Simple_Exit) al reposo. Desde el 15 (`salida`, en el manifiesto
+# `salidaMs`) es la SALIDA: la pose es otra vez la de la carga y de ahí baja el brazo y recoge el pie. El cliente la pinta
+# entera si el cuerpo se queda quieto (el juego vuelve al reposo a los 260 ms del destello: sin ella, el pie adelantado
+# resbalaba 30 cm en el fundido), y también al dejar la carga sin lanzar (`salidaDelRayo` en `personajes/gestos.ts`).
+RAYO_ENTRA = 9             # fotogramas en subir el brazo
+RAYO_SALIDA = 15           # desde aquí, lanzar es la salida (la pose de la carga que baja el brazo)
+RAYO_DESDE = 33            # desde aquí, el bucle de la carga
+RAYO_CICLO = 63            # el bucle de UAL: 2,1 s
+RAYO_KY = 0.45             # los pies, de delante a atrás, respecto a la captura (el reposo: 0,3)
+RAYO_PIES = 35.0           # cuánto pueden girar los pies respecto a la cadera perfilada
+
+
+def _conjuro(pista):
+    """La postura del conjuro, recogida como el reposo (pies menos separados, cadera erguida, rodillas adelante), y con
+    el pie izquierdo (el de atrás) donde lo tiene el reposo: al entrar y al salir sólo da un paso el derecho."""
+    return PieComo(RodillasAdelante(PiesRectos(Erguida(PiesJuntos(pista, 0.8, RAYO_KY), 0.025), RAYO_PIES), 20.0), 'L', _REPOSO)
+
+
+_RAYO_ENTRA = Ual('ual1:Spell_Simple_Enter', espejo=True, t=[(0, 0.0), (RAYO_ENTRA, 0.5333)])
+_RAYO_CARGA = Ual('ual1:Spell_Simple_Idle_Loop', espejo=True, t=lambda f: ((f - RAYO_ENTRA) % RAYO_CICLO) / float(RAYO_CICLO) * 2.1)
+_RAYO_CARGAR = Tramos((0, Quieta(_REPOSO, 0.0), 0), (0, _conjuro(Tramos((0, _RAYO_ENTRA, 0), (RAYO_ENTRA, _RAYO_CARGA, 2))), 7))
+receta('cargar-rayo', RAYO_DESDE + RAYO_CICLO, _RAYO_CARGAR,
+       'cargar el rayo (captura, en espejo): desde el reposo da un paso con la derecha y la sube al frente, la palma abierta '
+       'hacia el blanco a la altura del hombro (0-9), se asienta (9-33) y sostiene la carga en bucle desde el 33 (2,1 s)',
+       'UAL1 Spell_Simple_Enter + Spell_Simple_Idle_Loop (en espejo: la derecha)', bucle_desde=RAYO_DESDE, entrada=RAYO_ENTRA,
+       tope_faldon=35)
+_RAYO_TIRO = Ual('ual1:Spell_Simple_Shoot', espejo=True, t=lambda f: 0.0 if f < 0 else 0.13)   # f -1: antes; si no, el retroceso
+_RAYO_SALE = Ual('ual1:Spell_Simple_Exit', espejo=True, t=[(15, 0.0), (27, 0.4333)])
+receta('lanzar-rayo', 33,
+       Tramos((0, Suma(Quieta(_RAYO_CARGAR, float(RAYO_DESDE)), _RAYO_TIRO, ref=-1.0, huesos=PARTE_ALTA, cadera=False,
+                       escala=[(0, 0.0), (1, -1.2), (5, 1.9, 'suave'), (10, 1.15, 'suave'), (RAYO_SALIDA, 0.0, 'suave')]), 0),
+              (RAYO_SALIDA, _conjuro(_RAYO_SALE), 3), (25, Quieta(_REPOSO, 0.0), 8)),
+       'lanzar el rayo (captura, en espejo): la palma empuja en el impacto (fotograma 1: sale el destello), retrocede con el '
+       'hombro (1-5), se asienta (5-15), baja el brazo (15-27) y recoge el pie derecho al reposo (25-33)',
+       'UAL1 Spell_Simple_Shoot (el retroceso x1,9) + Spell_Simple_Exit (en espejo), desde la carga', impacto=(1, 3), salida=RAYO_SALIDA,
+       tope_faldon=35)
 
 
 # ═══ LA FORJA CON LA GUARDIA DE LA CAPTURA ═══ Lo que UAL no tiene (la patada circular del Cierre, los
@@ -2415,7 +2511,11 @@ def registrar(clips):
         e.update(frames=r['frames'], bucle=r.get('bucle', False), info=r['info'], fuente=r['fuente'])
         if 'tope_faldon' in r or 'tope_faldon' in base:
             e['tope_faldon'] = r.get('tope_faldon', base.get('tope_faldon'))
-        for k in ('raiz', 'contacto', 'vuelo', 'cae_en', 'levanta_desde', 'faldon_de', 'raiz_lineal'):
+        # (`impacto` sin `golpe`: el instante de un gesto que no golpea con el cuerpo, como el destello del rayo; y
+        # `bucle_desde`: un clip de una vez cuya cola, desde ese fotograma, se repite: la carga del rayo; `entrada`: hasta
+        # dónde entra un clip, y `salida`: desde dónde sale al reposo, las dos del rayo)
+        for k in ('raiz', 'contacto', 'vuelo', 'cae_en', 'levanta_desde', 'faldon_de', 'raiz_lineal', 'impacto', 'bucle_desde',
+                  'entrada', 'salida'):
             if k in r:
                 e[k] = r[k]
         g = r.get('golpe')

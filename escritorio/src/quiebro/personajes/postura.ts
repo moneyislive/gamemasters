@@ -124,6 +124,7 @@ const tmp = {
   x: new THREE.Vector3(),
   y: new THREE.Vector3(),
   z: new THREE.Vector3(),
+  euler: new THREE.Euler(),
 };
 
 /** Gira `hueso` (en mundo) para que su +Y apunte a `direccion` (en mundo), mezclado con `peso`. */
@@ -183,4 +184,105 @@ export function posturaDelParaguas(cuerpo: THREE.Object3D, h: HuesosDelBrazo, pe
 /** Los huesos que toca `posturaDelParaguas` (para vigilarlos con `PoseGuardada`). */
 export function huesosQueTocaLaPostura(h: HuesosDelBrazo): THREE.Object3D[] {
   return [h.brazo, h.antebrazo, h.mano, ...h.dedos];
+}
+
+/* ─────────────────────────────── El brazo del rayo ─────────────────────────────── */
+
+/**
+ * LO QUE EL RAYO LE HACE AL BRAZO EN ESTE FOTOGRAMA. Un objeto por cuerpo, que el cuerpo rellena y pasa entero: los
+ * números van en él y no como argumentos, porque cada número con decimales que cruza una llamada que V8 no funde se
+ * guarda en una caja nueva (el perfil de V8 lo vio: unos 120 bytes por cuerpo y fotograma entre apuntar y temblar).
+ */
+export interface ElRayoEnElBrazo {
+  /** Hacia dónde apunta (radianes del contrato: 0 al norte, −z, creciendo al este). */
+  rumbo: number;
+  /** Cuánto apunta (0-1: el peso del gesto). */
+  apuntar: number;
+  /** Cuánto tiembla (0-1: `temblorDeLaCarga` por el peso de la carga). */
+  temblor: number;
+  /** El segundo del reloj del cuerpo, y su semilla (dos que cargan a la vez no tiemblan al unísono). */
+  tS: number;
+  semilla: number;
+}
+
+export function rayoEnElBrazoNuevo(semilla = 0): ElRayoEnElBrazo {
+  return { rumbo: 0, apuntar: 0, temblor: 0, tS: 0, semilla };
+}
+
+/**
+ * EL BRAZO QUE LANZA APUNTA A LA MIRA. El clip de la carga (la captura en espejo) lleva la palma al frente, pero «al
+ * frente» es el del CUERPO, que gira hacia el rumbo a su ritmo (`cuerpo.ts`, 14 rad/s) y además en cada figura el brazo
+ * de la captura cae unos grados hacia dentro. Aquí se gira el brazo (desde el hombro) para que la recta del hombro a la
+ * palma vaya hacia `r.rumbo`, conservando su altura: la de la captura, casi horizontal. Con `r.apuntar` < 1 se queda a
+ * medio camino (el fundido del gesto).
+ *
+ * Y EL TEMBLOR DE LA CARGA: un giro pequeño de alta frecuencia en el hombro, el codo y la muñeca (tres senos de 6 a 21 Hz
+ * sin múltiplo común, deterministas), de amplitud `r.temblor`. Con el temblor entero la palma se mueve 1-2 cm.
+ *
+ * Encima del clip: quien llama devuelve la pose del mezclador antes de la siguiente vuelta (`PoseGuardada`). Sin asignar.
+ */
+export function elRayoEnElBrazo(h: HuesosDelBrazo, r: ElRayoEnElBrazo): void {
+  if (r.apuntar > 0) apuntarConElRayo(h, r);
+  if (r.temblor > 0) temblarConElRayo(h, r);
+}
+
+function apuntarConElRayo(h: HuesosDelBrazo, r: ElRayoEnElBrazo): void {
+  const padre = h.brazo.parent;
+  if (padre === null) return;
+  h.agarre.updateWorldMatrix(true, false);
+  tmp.x.setFromMatrixPosition(h.brazo.matrixWorld);
+  tmp.eje.setFromMatrixPosition(h.agarre.matrixWorld).sub(tmp.x);
+  const horizontal = Math.sqrt(tmp.eje.x * tmp.eje.x + tmp.eje.z * tmp.eje.z);
+  if (horizontal < 1e-4) return;
+  tmp.destino.set(Math.sin(r.rumbo) * horizontal, tmp.eje.y, -Math.cos(r.rumbo) * horizontal).normalize();
+  tmp.eje.normalize();
+  tmp.qGiro.setFromUnitVectors(tmp.eje, tmp.destino);
+  tmp.qDeseo.identity().slerp(tmp.qGiro, Math.min(1, r.apuntar));
+  h.brazo.getWorldQuaternion(tmp.qHueso);
+  tmp.qDeseo.multiply(tmp.qHueso);
+  padre.getWorldQuaternion(tmp.qPadre);
+  h.brazo.quaternion.copy(tmp.qPadre.invert().multiply(tmp.qDeseo));
+  h.brazo.updateMatrixWorld(true);
+}
+
+/** El giro del temblor de cada hueso con el temblor entero, en radianes: el hombro poco, la muñeca más. */
+export const TEMBLOR_RAD = { brazo: 0.012, antebrazo: 0.02, mano: 0.035 } as const;
+
+function temblarConElRayo(h: HuesosDelBrazo, r: ElRayoEnElBrazo): void {
+  const d = 2 * Math.PI;
+  const t = r.tS;
+  for (let k = 0; k < 3; k++) {
+    const hueso = k === 0 ? h.brazo : k === 1 ? h.antebrazo : h.mano;
+    const rad = (k === 0 ? TEMBLOR_RAD.brazo : k === 1 ? TEMBLOR_RAD.antebrazo : TEMBLOR_RAD.mano) * r.temblor;
+    const s0 = r.semilla + (k === 0 ? 0 : k === 1 ? 0.19 : 0.43);
+    /* El ruido de cada eje (x, y más suave, z), con su semilla corrida: la misma cuenta, sin llamadas. */
+    const sx = s0;
+    const sy = s0 + 0.31;
+    const sz = s0 + 0.57;
+    const nx = 0.55 * Math.sin(d * (13.3 * t + sx)) + 0.3 * Math.sin(d * (21.1 * t + 2.7 * sx)) + 0.25 * Math.sin(d * (6.1 * t + 5.3 * sx));
+    const ny = 0.55 * Math.sin(d * (13.3 * t + sy)) + 0.3 * Math.sin(d * (21.1 * t + 2.7 * sy)) + 0.25 * Math.sin(d * (6.1 * t + 5.3 * sy));
+    const nz = 0.55 * Math.sin(d * (13.3 * t + sz)) + 0.3 * Math.sin(d * (21.1 * t + 2.7 * sz)) + 0.25 * Math.sin(d * (6.1 * t + 5.3 * sz));
+    tmp.euler.set(rad * nx, rad * 0.4 * ny, rad * nz);
+    tmp.qGiro.setFromEuler(tmp.euler);
+    hueso.quaternion.multiply(tmp.qGiro);
+  }
+  h.brazo.updateMatrixWorld(true);
+}
+
+/** Para el comprobador: apuntar el brazo a `rumbo` con `peso`, sin temblar (la misma cuenta que `elRayoEnElBrazo`). */
+const soloApuntar = rayoEnElBrazoNuevo();
+export function apuntarElBrazo(h: HuesosDelBrazo, rumbo: number, peso: number): void {
+  soloApuntar.rumbo = rumbo;
+  soloApuntar.apuntar = peso;
+  soloApuntar.temblor = 0;
+  elRayoEnElBrazo(h, soloApuntar);
+}
+
+/**
+ * CUÁNTO TIEMBLA LA CARGA con `c` (0-1): casi nada al principio y deprisa al acercarse al pleno (EL-RAYO §4: «un leve
+ * temblor; al acercarse al pleno, chasquidos más frecuentes»). 0 en 0, 1 en 1, creciente.
+ */
+export function temblorDeLaCarga(c: number): number {
+  const x = Math.min(1, Math.max(0, c));
+  return 0.12 * x + 0.88 * x * x * x;
 }

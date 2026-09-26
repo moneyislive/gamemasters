@@ -94,6 +94,15 @@ export interface ClipDelReparto {
   readonly velocidadMs?: number;
   /** Cuándo llega el golpe, desde el principio del clip: sólo los golpes. */
   readonly impactoMs?: number;
+  /**
+   * Un clip de una vez con la cola en bucle (la carga del rayo): se pinta entero una vez y luego repite desde aquí
+   * (`tiempoConEntrada` en `gestos.ts`). Sin él, un gesto en bucle repite el clip entero.
+   */
+  readonly bucleDesdeMs?: number;
+  /** Hasta dónde entra el clip (la carga del rayo: el paso y la palma arriba): `esperaLaEntrada` en `gestos.ts`. */
+  readonly entradaMs?: number;
+  /** Desde dónde el clip sale al reposo (lanzar el rayo: baja el brazo y recoge el pie): `salidaDelRayo` en `gestos.ts`. */
+  readonly salidaMs?: number;
 }
 
 export interface GestoDelReparto {

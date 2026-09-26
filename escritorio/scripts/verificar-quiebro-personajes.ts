@@ -64,9 +64,9 @@ import { UNO } from '../../shared/mecanicas/fijo';
 import type { CuerpoPintado, FuenteDeCuerpos, Gesto } from '../src/quiebro/cuerpos';
 import { Almacen, cargador, clipEnElSitio, plantillaDeHuesos } from '../src/quiebro/personajes/almacen';
 import { TENUE, contornoDe, corteDelGesto, llenoDelContorno } from '../src/quiebro/personajes/cuerpo';
-import { DirectorDeLosPersonajes, PRIMER_ID_DE_DURMIENTE } from '../src/quiebro/personajes/director';
+import { DirectorDeLosPersonajes, PRIMER_ID_DE_DURMIENTE, distancia3 } from '../src/quiebro/personajes/director';
 import { clipsDeLosLejanos, direccionDelLejano, nombreDelClipLejano } from '../src/quiebro/personajes/lejanos';
-import { huesosDelBrazoDerecho, posturaDelParaguas } from '../src/quiebro/personajes/postura';
+import { apuntarElBrazo, huesosDelBrazoDerecho, posturaDelParaguas, temblorDeLaCarga } from '../src/quiebro/personajes/postura';
 import { clipEnEspejo, espejoDelEsqueleto, parejaDe } from '../src/quiebro/personajes/espejo';
 import type { EspejoDelEsqueleto } from '../src/quiebro/personajes/espejo';
 import {
@@ -78,12 +78,14 @@ import {
   inicioDelGolpe,
   mezclaDeLaMarchaNueva,
   mezclarLaMarcha,
+  normalizarAngulo,
   pesosDeLaMarcha,
   ritmoElastico,
+  tiempoConEntrada,
   tiempoDelGesto,
 } from '../src/quiebro/personajes/gestos';
 import type { MarchaGirada } from '../src/quiebro/personajes/gestos';
-import { HornoDeHuesos, filasDeLaMezcla, filasEn, hornearHuesos } from '../src/quiebro/personajes/huesos-en-textura';
+import { FPS_DEL_HORNEADO, HornoDeHuesos, filasDeLaMezcla, filasEn, hornearHuesos } from '../src/quiebro/personajes/huesos-en-textura';
 import type { HuesosEnTextura } from '../src/quiebro/personajes/huesos-en-textura';
 import { MeshoptSimplifier } from 'three/examples/jsm/libs/meshopt_simplifier.module.js';
 import { fundirElLod, paletaBase, simplificarMalla } from '../src/quiebro/personajes/malla';
@@ -127,7 +129,7 @@ import {
   varianteMasLigera,
   zonasDeLaFigura,
 } from '../src/quiebro/personajes/reparto';
-import type { Reparto } from '../src/quiebro/personajes/reparto';
+import type { ClipDelReparto, Reparto } from '../src/quiebro/personajes/reparto';
 
 /* ─────────────────────────────── El arnés, en corto ─────────────────────────────── */
 
@@ -2299,16 +2301,20 @@ paso('Sin asignar por fotograma (lo que asigna el código de los personajes, sin
         if (c.gesto !== gesto) {
           c.gesto = gesto;
           c.gestoDesdeMs = t;
-          c.impactoMs = gesto === 'entrada' || gesto === 'seguida-1' ? t + 350 : null;
-          c.direccionDelGesto = gesto === 'quiebro' ? c.rumbo + (i % 2 === 1 ? 1.5 : -1.5) : null;
+          c.impactoMs = gesto === 'entrada' || gesto === 'seguida-1' ? t + 350 : gesto === 'lanzar-rayo' ? t : null;
+          c.direccionDelGesto = gesto === 'quiebro' ? c.rumbo + (i % 2 === 1 ? 1.5 : -1.5) : gesto === 'cargar-rayo' || gesto === 'lanzar-rayo' ? c.rumbo : null;
         }
+        c.carga = c.gesto === 'cargar-rayo' ? Math.min(1, (t - c.gestoDesdeMs) / 1300) : 0;
       });
     };
+    const boca = { x: 0, y: 0, z: 0 };
     const paso = (): void => {
       t += 1000 / 60;
       tic += 1 / 3;
       mover();
       d7.fotograma(fuente, nivel, genteDeLaVuelta === null ? noche2 : null, cam, t, (v) => v);
+      /* Lo que piden los efectos cada fotograma (EL RAYO): la boca de cada cuerpo, con esqueleto y en el rebaño. */
+      for (const c of lista) d7.bocaDe(c.id, boca);
     };
     for (let k = 0; k < 2400; k++) {
       paso();
@@ -2335,5 +2341,550 @@ paso('Sin asignar por fotograma (lo que asigna el código de los personajes, sin
   sesion.disconnect();
 }
 
+/* ═══════════════════════════════ 11. EL RAYO ═══════════════════════════════ */
+
+paso('El rayo: los clips de la captura, la carga con entrada y cola en bucle, el brazo que apunta, el temblor y la boca');
+{
+  /* ── Los clips: los suyos, de la captura, y no los del tirador de la fase 0 ── */
+  const juezDeLosClipsDelRayo = (r: Reparto): { bien: boolean; detalle?: unknown } => {
+    const carga = r.gestos['cargar-rayo']?.clip ?? '';
+    const lanza = r.gestos['lanzar-rayo']?.clip ?? '';
+    const cc = r.clips[carga] as (ClipDelReparto & { fuente?: string }) | undefined;
+    const cl = r.clips[lanza] as (ClipDelReparto & { fuente?: string }) | undefined;
+    const bien =
+      carga !== 'apuntar' &&
+      lanza !== 'disparar' &&
+      cc !== undefined &&
+      cl !== undefined &&
+      /Spell_Simple/.test(cc.fuente ?? '') &&
+      /Spell_Simple/.test(cl.fuente ?? '') &&
+      cc.bucleDesdeMs !== undefined &&
+      cc.bucleDesdeMs >= 300 &&
+      cc.duracionMs - cc.bucleDesdeMs >= 1500 &&
+      cl.impactoMs !== undefined &&
+      cl.impactoMs > 0 &&
+      cl.impactoMs <= 100 &&
+      cl.duracionMs >= 600;
+    return { bien, detalle: { carga, lanza, bucleDesdeMs: cc?.bucleDesdeMs, duracion: cc?.duracionMs, impactoMs: cl?.impactoMs, fuentes: [cc?.fuente, cl?.fuente] } };
+  };
+  const faseCero = copia(reparto) as Reparto & { gestos: Record<string, { clip: string }> };
+  faseCero.gestos['cargar-rayo'] = { clip: 'apuntar' };
+  faseCero.gestos['lanzar-rayo'] = { clip: 'disparar' };
+  juzgar(
+    'cargar y lanzar el rayo pintan sus clips de la captura (Spell_Simple de UAL): la carga con su cola en bucle (≥ 1,5 s) tras la entrada, y el lanzar con el destello en los primeros 100 ms',
+    juezDeLosClipsDelRayo,
+    reparto,
+    faseCero as Reparto,
+    'los clips del tirador de la fase 0 (apuntar y disparar)',
+  );
+
+  /* ── La cola en bucle: la entrada una vez, luego sólo la cola, sin saltos salvo al volver a su principio ── */
+  const cargar = reparto.clips[reparto.gestos['cargar-rayo']?.clip ?? ''];
+  const clipS = (cargar?.duracionMs ?? 3200) / 1000;
+  const desdeS = (cargar?.bucleDesdeMs ?? 1100) / 1000;
+  const juezDeLaCola = (f: (s: number, clip: number, desde: number | null) => number): { bien: boolean; detalle?: unknown } => {
+    const malos: string[] = [];
+    let vueltas = 0;
+    let antes = f(0, clipS, desdeS);
+    for (let s = 1 / 60; s < 12; s += 1 / 60) {
+      const v = f(s, clipS, desdeS);
+      if (!(v >= 0 && v < clipS)) malos.push(`fuera: ${s.toFixed(3)} → ${v.toFixed(3)}`);
+      if (s < clipS - 1e-9 && Math.abs(v - s) > 1e-9) malos.push(`la entrada no va a su ritmo: ${s.toFixed(3)} → ${v.toFixed(3)}`);
+      if (s >= clipS && v < desdeS - 1e-9) malos.push(`repite la entrada: ${s.toFixed(3)} → ${v.toFixed(3)}`);
+      const salto = v - antes;
+      if (salto < 0) {
+        vueltas++;
+        if (Math.abs(antes + 1 / 60 - clipS - (v - desdeS)) > 1e-6) malos.push(`vuelve a otro sitio: ${antes.toFixed(3)} → ${v.toFixed(3)}`);
+      } else if (Math.abs(salto - 1 / 60) > 1e-6) malos.push(`salta: ${antes.toFixed(3)} → ${v.toFixed(3)}`);
+      antes = v;
+    }
+    return { bien: malos.length === 0 && vueltas >= 3, detalle: { vueltas, malos: malos.slice(0, 4) } };
+  };
+  juzgar(
+    'la carga del rayo pinta su entrada una vez y luego repite sólo su cola (sin saltos: de su final vuelve a bucleDesdeMs), 12 s a 60 Hz',
+    juezDeLaCola,
+    tiempoConEntrada,
+    (s: number, clip: number) => s % clip,
+    'el bucle de three, que repite el clip entero con la entrada',
+  );
+
+  /* ── El brazo que apunta: con el cuerpo aún girando, la recta del hombro a la palma va al rumbo del gesto ── */
+  const dS = new DirectorDeLosPersonajes(reparto, (a) => join(RECURSOS, a), lectorDeNode);
+  const dR = new DirectorDeLosPersonajes(reparto, (a) => join(RECURSOS, a), lectorDeNode);
+  const yoR = cuerpoDePrueba(1, 'desvelado', 1);
+  const lanzador = cuerpoDePrueba(41, 'desvelado', 0);
+  lanzador.z = -15;
+  lanzador.rumbo = Math.PI;
+  const fuenteS = fuenteDe([lanzador], 41);
+  const fuenteR = fuenteDe([yoR, lanzador], 1);
+  const camS = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 400);
+  camS.position.set(0, 1.7, -11.8);
+  camS.lookAt(0, 1.2, -15);
+  camS.updateMatrixWorld();
+  const camR = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 400);
+  camR.position.set(0, 1.7, 3);
+  camR.lookAt(0, 1, -15);
+  camR.updateMatrixWorld();
+  let t = 100000;
+  const hechoR = (): boolean => [...dR.rebanosHechos().values()].filter((rb) => rb.textura.lista).length >= 2 && dR.medida.porHornear === 0;
+  for (let k = 0; k < 6000 && (dS.cuerpo(41) === null || !hechoR()); k++) {
+    t += 16.7;
+    dS.fotograma(fuenteS, 2, null, camS, t, (v) => v);
+    dR.fotograma(fuenteR, 0, null, camR, t, (v) => v);
+    if (k % 3 === 0) await esperarUnPoco(2);
+  }
+  const cuerpoS = dS.cuerpo(41);
+  comprobar('el cuerpo del rayo lleva esqueleto de cerca (N2) y va en el rebaño de lejos (N0)', cuerpoS !== null && dR.cuerpo(41) === null && hechoR(), { esqueleto: cuerpoS !== null, rebano: hechoR() });
+  const pasoDeAmbos = (): void => {
+    t += 1000 / 60;
+    dS.fotograma(fuenteS, 2, null, camS, t, (v) => v);
+    dR.fotograma(fuenteR, 0, null, camR, t, (v) => v);
+  };
+  lanzador.gesto = 'cargar-rayo';
+  lanzador.gestoDesdeMs = t + 1000 / 60;
+  lanzador.direccionDelGesto = lanzador.rumbo;
+  lanzador.carga = 0;
+  const desdeDeLaCarga = lanzador.gestoDesdeMs;
+  for (let k = 0; k < 300; k++) pasoDeAmbos();
+  /* La pose del esqueleto va por la misma cuenta que la del rebaño (5 s: en la cola). */
+  const g = cuerpoS?.gestoEnCurso() ?? null;
+  const esperado = tiempoDelGesto(INFO_DE_GESTOS['cargar-rayo'], clipS * 1000, null, desdeDeLaCarga, null, t, cargar?.bucleDesdeMs ?? null);
+  comprobar(
+    'a los 5 s de carga el esqueleto va por la cola, en el mismo segundo que la cuenta del rebaño (< 1 ms)',
+    g !== null && g.clip === 'cargar-rayo' && Math.abs(g.tiempo - esperado) < 1e-3 && g.tiempo >= desdeS,
+    { g, esperado },
+  );
+  /* Y el rebaño la pinta en esa fila de su textura (la que se manda a la GPU: `aAnimQ`), no en la entrada ni al final. */
+  {
+    let fila = Number.NaN;
+    let clip: { inicio: number; filas: number } | undefined;
+    for (const [clave, rb] of dR.rebanosHechos()) {
+      if (!clave.startsWith('lejanos')) continue;
+      const m = rb.rebano.malla.instanceMatrix.array;
+      const anim = rb.rebano.malla.geometry.getAttribute('aAnimQ').array;
+      for (let i = 0; i < rb.rebano.cuantas; i++) {
+        if (Math.abs((m[i * 16 + 12] as number) - lanzador.x) > 0.01 || Math.abs((m[i * 16 + 14] as number) - lanzador.z) > 0.01) continue;
+        fila = anim[i * 4] as number;
+        clip = rb.textura.clips.get('cargar-rayo');
+      }
+    }
+    const debida = clip === undefined ? Number.NaN : clip.inicio + Math.floor(esperado * FPS_DEL_HORNEADO);
+    comprobar('y el lejano (rebaño) la pinta en la fila de su textura que toca en la cola (±1)', clip !== undefined && Math.abs(fila - debida) <= 1, { fila, debida, clip });
+  }
+  /* La boca, de cerca y de lejos: la misma palma (el esqueleto, con el brazo ya apuntado; el rebaño, de la textura). */
+  const bS = { x: 0, y: 0, z: 0 };
+  const bR = { x: 0, y: 0, z: 0 };
+  const hayS = dS.bocaDe(41, bS);
+  const hayR = dR.bocaDe(41, bR);
+  const entreBocas = distancia3(bS.x - bR.x, bS.y - bR.y, bS.z - bR.z);
+  nota(`la boca con esqueleto (${bS.x.toFixed(3)}, ${bS.y.toFixed(3)}, ${bS.z.toFixed(3)}) y en el rebaño (${bR.x.toFixed(3)}, ${bR.y.toFixed(3)}, ${bR.z.toFixed(3)}): ${(entreBocas * 100).toFixed(1)} cm`);
+  /* Dónde tiene que estar: delante del pecho, a la altura del hombro, del lado derecho (el cuerpo mira a +z). */
+  const juezDeLaBoca = (b: { x: number; y: number; z: number }): { bien: boolean; detalle?: unknown } => {
+    const delante = b.z - lanzador.z;
+    const derecha = lanzador.x - b.x;
+    return { bien: delante >= 0.45 && delante <= 1.0 && b.y >= 1.25 && b.y <= 1.75 && derecha >= -0.05 && derecha <= 0.4, detalle: { delante, alto: b.y, derecha } };
+  };
+  juzgar('la boca del rayo (con esqueleto) está en la palma: 45-100 cm delante, a la altura del hombro, del lado derecho', juezDeLaBoca, bS, { x: lanzador.x, y: 1.35, z: lanzador.z }, 'el pivote del cuerpo a 1,35 m (la boca de la fase 0)');
+  juzgar('y la de un lejano (sacada de la textura de huesos), igual', juezDeLaBoca, bR, { x: lanzador.x, y: 1.35, z: lanzador.z }, 'el pivote del cuerpo a 1,35 m (la boca de la fase 0)');
+  comprobar('la boca de cerca y la de lejos son la misma palma (< 2,5 cm: lo que corrige el brazo apuntado y la media precisión)', hayS && hayR && entreBocas < 0.025, { entreBocas });
+  /* En el instante del destello (el impacto del lanzar), también. */
+  lanzador.gesto = 'lanzar-rayo';
+  lanzador.gestoDesdeMs = t + 1000 / 60;
+  lanzador.impactoMs = lanzador.gestoDesdeMs;
+  lanzador.carga = 0;
+  pasoDeAmbos();
+  for (let k = 0; k < 8; k++) pasoDeAmbos();
+  dS.bocaDe(41, bS);
+  dR.bocaDe(41, bR);
+  const alLanzar = distancia3(bS.x - bR.x, bS.y - bR.y, bS.z - bR.z);
+  nota(`al lanzar, 130 ms después del destello: ${(alLanzar * 100).toFixed(1)} cm entre la boca de cerca y la de lejos`);
+  comprobar('al lanzar (130 ms después del destello) la boca de cerca y la de lejos siguen en la misma palma (< 4 cm: de cerca el brazo sigue apuntado mientras el retroceso gira el tronco; de lejos no se apunta), delante del pecho', alLanzar < 0.04 && juezDeLaBoca(bS).bien, { alLanzar, cerca: juezDeLaBoca(bS).detalle });
+  /* Si el cuerpo no se pinta, no hay boca (y los efectos usan su sitio). */
+  {
+    const intacta = { x: 7.5, y: 7.5, z: 7.5 };
+    const sinCuerpo = !dS.bocaDe(999, intacta) && !dR.bocaDe(999, intacta);
+    comprobar('un cuerpo que no está no tiene boca (false, y no toca la salida)', sinCuerpo && intacta.x === 7.5 && intacta.y === 7.5 && intacta.z === 7.5, intacta);
+  }
+
+  /* ── El brazo que apunta, suelto: el cuerpo 25° por detrás de su rumbo, y el brazo va al rumbo igualmente ── */
+  lanzador.gesto = 'cargar-rayo';
+  lanzador.gestoDesdeMs = t + 1000 / 60;
+  lanzador.impactoMs = null;
+  for (let k = 0; k < 90; k++) pasoDeAmbos();
+  const raiz = cuerpoS?.raiz ?? null;
+  const brazo = raiz !== null ? huesosDelBrazoDerecho(raiz, reparto.esqueletos.hombre?.agarre.derecha ?? 'agarre_R') : null;
+  const juezDelBrazo = (apuntar: (h: NonNullable<typeof brazo>, rumbo: number, peso: number) => void): { bien: boolean; detalle?: unknown } => {
+    if (raiz === null || brazo === null) return { bien: false, detalle: 'sin esqueleto' };
+    const huesos = [brazo.brazo, brazo.antebrazo, brazo.mano];
+    const guardados = huesos.map((h) => h.quaternion.clone());
+    const giroAntes = raiz.rotation.y;
+    raiz.rotation.y = giroAntes + (25 * Math.PI) / 180;
+    raiz.updateMatrixWorld(true);
+    apuntar(brazo, lanzador.rumbo, 1);
+    brazo.agarre.updateWorldMatrix(true, false);
+    const h = new THREE.Vector3().setFromMatrixPosition(brazo.brazo.matrixWorld);
+    const p = new THREE.Vector3().setFromMatrixPosition(brazo.agarre.matrixWorld);
+    const rumboDelBrazo = Math.atan2(p.x - h.x, -(p.z - h.z));
+    const error = Math.abs(normalizarAngulo(rumboDelBrazo - lanzador.rumbo));
+    huesos.forEach((x, i) => x.quaternion.copy(guardados[i] as THREE.Quaternion));
+    raiz.rotation.y = giroAntes;
+    raiz.updateMatrixWorld(true);
+    return { bien: error < (2 * Math.PI) / 180, detalle: `${((error * 180) / Math.PI).toFixed(2)}° del rumbo` };
+  };
+  juzgar('con el cuerpo 25° por detrás del rumbo (girando), la recta del hombro a la palma va al rumbo del rayo (< 2°)', juezDelBrazo, apuntarElBrazo, () => undefined, 'el brazo del clip, sin apuntar');
+  /* Y de punta a punta: el cuerpo gira hacia un rumbo nuevo (90° a la derecha) y en el fotograma siguiente la palma ya va a él. */
+  const hombro = { x: 0, y: 0, z: 0 };
+  const palma = { x: 0, y: 0, z: 0 };
+  lanzador.rumbo = Math.PI / 2;
+  lanzador.direccionDelGesto = Math.PI / 2;
+  pasoDeAmbos();
+  cuerpoS?.hombroYPalma(hombro, palma);
+  const girando = Math.abs(normalizarAngulo(Math.atan2(palma.x - hombro.x, -(palma.z - hombro.z)) - lanzador.rumbo));
+  comprobar('de punta a punta, en el primer fotograma de un giro de 90° (el cuerpo aún va por 14°) el brazo ya apunta al rumbo nuevo (< 2°)', girando < (2 * Math.PI) / 180, `${((girando * 180) / Math.PI).toFixed(2)}°`);
+  lanzador.rumbo = Math.PI;
+  lanzador.direccionDelGesto = Math.PI;
+  for (let k = 0; k < 60; k++) pasoDeAmbos();
+
+  /* ── El temblor: crece con la carga, casi nada al principio, se ve al acercarse al pleno y no se acumula ── */
+  const juezDelTemblor = (f: (c: number) => number): { bien: boolean; detalle?: unknown } => {
+    let crece = true;
+    for (let c = 0; c < 1; c += 0.05) if (f(c + 0.05) < f(c)) crece = false;
+    return { bien: f(0) === 0 && Math.abs(f(1) - 1) < 1e-9 && crece && f(0.5) < 0.25, detalle: { medio: f(0.5), lleno: f(1) } };
+  };
+  juzgar('el temblor de la carga: 0 sin carga, entero en el pleno, creciente y poco hasta la mitad (< 25 %)', juezDelTemblor, temblorDeLaCarga, (c: number) => c, 'un temblor lineal (a media carga ya tiembla la mitad)');
+  const temblor = (c: number): { paso: number; lejos: number } => {
+    lanzador.carga = c;
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const zs: number[] = [];
+    for (let k = 0; k < 120; k++) {
+      pasoDeAmbos();
+      dS.bocaDe(41, bS);
+      xs.push(bS.x);
+      ys.push(bS.y);
+      zs.push(bS.z);
+    }
+    let paso = 0;
+    for (let k = 1; k < xs.length; k++) paso += distancia3((xs[k] as number) - (xs[k - 1] as number), (ys[k] as number) - (ys[k - 1] as number), (zs[k] as number) - (zs[k - 1] as number));
+    const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const my = ys.reduce((a, b) => a + b, 0) / ys.length;
+    const mz = zs.reduce((a, b) => a + b, 0) / zs.length;
+    let lejos = 0;
+    for (let k = 0; k < xs.length; k++) lejos = Math.max(lejos, distancia3((xs[k] as number) - mx, (ys[k] as number) - my, (zs[k] as number) - mz));
+    return { paso: paso / (xs.length - 1), lejos };
+  };
+  const t0 = temblor(0);
+  const tMedio = temblor(0.5);
+  const tLleno = temblor(1);
+  const tLlenoOtraVez = temblor(1);
+  nota(`la palma, fotograma a fotograma: ${(t0.paso * 1000).toFixed(2)} mm sin carga, ${(tMedio.paso * 1000).toFixed(2)} a media carga, ${(tLleno.paso * 1000).toFixed(2)} en el pleno (se aparta hasta ${(tLleno.lejos * 1000).toFixed(1)} mm)`);
+  comprobar(
+    'la palma tiembla con la carga: < 1 mm por fotograma sin carga, más a media carga, ≥ 2 mm en el pleno; nunca se aparta más de 3 cm, y no se acumula (el pleno dos veces seguidas, lo mismo)',
+    t0.paso < 0.001 && tMedio.paso > t0.paso && tLleno.paso > tMedio.paso && tLleno.paso >= 0.002 && tLleno.lejos < 0.03 && Math.abs(tLlenoOtraVez.lejos - tLleno.lejos) < 0.004,
+    { t0, tMedio, tLleno, tLlenoOtraVez },
+  );
+
+  /*
+   * ── Con el reloj parado (el banco congelado; un fotograma repetido) el temblor no se acumula: se pone encima de la
+   * pose del clip y se borra antes de la siguiente vuelta (`PoseGuardada`). El mezclador de three no reescribe un hueso
+   * cuyo valor no cambia, así que sin borrar el giro se sumaba fotograma a fotograma, como los dedos del paraguas. ──
+   */
+  {
+    lanzador.carga = 1;
+    pasoDeAmbos();
+    dS.bocaDe(41, bS);
+    const quieta = { x: bS.x, y: bS.y, z: bS.z };
+    for (let k = 0; k < 90; k++) dS.fotograma(fuenteS, 2, null, camS, t, (v) => v);
+    dS.bocaDe(41, bS);
+    const deriva = distancia3(bS.x - quieta.x, bS.y - quieta.y, bS.z - quieta.z);
+    comprobar('con el reloj parado, 90 fotogramas iguales en el pleno: la palma no se mueve (< 1 mm; el temblor no se acumula)', deriva < 0.001, `${(deriva * 1000).toFixed(2)} mm`);
+  }
+
+  /*
+   * ── El chispazo, la salida y el golpe recibido (la revisión 1): lo que pasa ENTRE los gestos del rayo, medido con el
+   * director entero (un cuerpo con esqueleto a 3 m y el mismo en el rebaño a 18 m) a 60 Hz, como los manda el juego:
+   *  · el chispazo: 100 ms de carga y soltar (el toque corto del móvil). El lanzar sale de la carga hecha; antes, en su
+   *    fundido de 50 ms el pie resbalaba 24 cm a 6,6 m/s y la palma subía a 29 m/s;
+   *  · el juego vuelve al reposo a los 260 ms del destello (`COLA_DEL_GOLPE_MS`): sin la salida del clip, el pie
+   *    adelantado resbalaba 30 cm en el fundido, en cada disparo;
+   *  · dejar la carga sin lanzar, quieto: lo mismo;
+   *  · un golpe recibido en la postura del rayo: el pie saltaba 44 cm en 45 ms (10 m/s).
+   * El pie «en el suelo» es el que está a menos de 12 mm de donde apoya en el reposo en los dos fotogramas: el que da un
+   * paso, levantado, va a su ritmo. La vacuna: el reparto sin `entradaMs` ni `salidaMs` (lo de antes). ──
+   */
+  {
+    const HUESOS_DEL_PASO = ['pie_R', 'punta_R', 'pie_L', 'punta_L', 'agarre_R'] as const;
+    interface Tramo {
+      gesto: Gesto;
+      fotogramas: number;
+      velocidad?: number;
+    }
+    interface Medida {
+      pieEnElSuelo: number;
+      dondePie: string;
+      pieConGolpe: number;
+      palma: number;
+      entreBocas: number;
+      dondeBocas: string;
+      salidaVista: boolean;
+      salidaAlFinal: boolean;
+      esperaVista: boolean;
+      palmaEnElDestello: number;
+    }
+    const medirEntreGestos = async (rep: Reparto, tramos: readonly Tramo[]): Promise<Medida> => {
+      const cerca = new DirectorDeLosPersonajes(rep, (a) => join(RECURSOS, a), lectorDeNode);
+      const lejos = new DirectorDeLosPersonajes(rep, (a) => join(RECURSOS, a), lectorDeNode);
+      const quien = cuerpoDePrueba(51, 'desvelado', 0);
+      quien.z = -15;
+      quien.rumbo = Math.PI;
+      const yo = cuerpoDePrueba(1, 'desvelado', 1);
+      const fC = fuenteDe([quien], 51);
+      const fL = fuenteDe([yo, quien], 1);
+      let reloj = 200000;
+      const listoL = (): boolean => [...lejos.rebanosHechos().values()].filter((rb) => rb.textura.lista).length >= 2 && lejos.medida.porHornear === 0;
+      for (let k = 0; k < 6000 && (cerca.cuerpo(51) === null || !listoL()); k++) {
+        reloj += 16.7;
+        cerca.fotograma(fC, 2, null, camS, reloj, (v) => v);
+        lejos.fotograma(fL, 0, null, camR, reloj, (v) => v);
+        if (k % 3 === 0) await esperarUnPoco(2);
+      }
+      const dt = 1000 / 60;
+      const avanzar = (): void => {
+        reloj += dt;
+        cerca.fotograma(fC, 2, null, camS, reloj, (v) => v);
+        lejos.fotograma(fL, 0, null, camR, reloj, (v) => v);
+      };
+      quien.gestoDesdeMs = reloj + dt;
+      for (let k = 0; k < 120; k++) avanzar();
+      const cuerpo = cerca.cuerpo(51);
+      const m: Medida = { pieEnElSuelo: 0, dondePie: '', pieConGolpe: 0, palma: 0, entreBocas: 0, dondeBocas: '', salidaVista: false, salidaAlFinal: true, esperaVista: false, palmaEnElDestello: Number.NaN };
+      if (cuerpo === null || !listoL()) return { ...m, pieEnElSuelo: 99 };
+      const huesos = HUESOS_DEL_PASO.map((n) => cuerpo.raiz.getObjectByName(n) ?? null);
+      const v = new THREE.Vector3();
+      const pos = (): number[][] =>
+        huesos.map((h) => {
+          if (h === null) return [0, 0, 0];
+          h.updateWorldMatrix(true, false);
+          v.setFromMatrixPosition(h.matrixWorld);
+          return [v.x - quien.x, v.y, v.z - quien.z];
+        });
+      let antes = pos();
+      const suelo = antes.map((p) => p[1] as number);
+      const bC = { x: 0, y: 0, z: 0 };
+      const bL = { x: 0, y: 0, z: 0 };
+      let suelta = Number.NaN;
+      for (const tr of tramos) {
+        quien.gesto = tr.gesto;
+        quien.gestoDesdeMs = reloj + dt;
+        quien.velocidad = tr.velocidad ?? 0;
+        const rayo = tr.gesto === 'cargar-rayo' || tr.gesto === 'lanzar-rayo';
+        quien.direccionDelGesto = rayo ? quien.rumbo : null;
+        quien.impactoMs = tr.gesto === 'lanzar-rayo' ? quien.gestoDesdeMs : null;
+        if (tr.gesto === 'lanzar-rayo') suelta = quien.gestoDesdeMs;
+        const desde = quien.gestoDesdeMs;
+        for (let k = 0; k < tr.fotogramas; k++) {
+          quien.carga = tr.gesto === 'cargar-rayo' ? Math.min(1, (reloj + dt - desde) / 1300) : 0;
+          quien.z -= ((tr.velocidad ?? 0) * dt) / 1000;
+          avanzar();
+          const p = pos();
+          const anda = (tr.velocidad ?? 0) > 0;
+          for (let i = 0; i < 4; i++) {
+            const a = antes[i] as number[];
+            const b = p[i] as number[];
+            const vel = distancia3((b[0] as number) - (a[0] as number), (b[1] as number) - (a[1] as number), (b[2] as number) - (a[2] as number)) / (dt / 1000);
+            if (tr.gesto === 'tocado') m.pieConGolpe = Math.max(m.pieConGolpe, vel);
+            else if (!anda && (a[1] as number) - (suelo[i] as number) < 0.012 && (b[1] as number) - (suelo[i] as number) < 0.012 && vel > m.pieEnElSuelo) {
+              m.pieEnElSuelo = vel;
+              m.dondePie = `${HUESOS_DEL_PASO[i]} en ${tr.gesto} a ${String(Math.round(reloj - desde))} ms`;
+            }
+          }
+          const a4 = antes[4] as number[];
+          const b4 = p[4] as number[];
+          const vPalma = distancia3((b4[0] as number) - (a4[0] as number), (b4[1] as number) - (a4[1] as number), (b4[2] as number) - (a4[2] as number)) / (dt / 1000);
+          if (tr.gesto !== 'tocado' && !anda) m.palma = Math.max(m.palma, vPalma);
+          if (tr.gesto === 'lanzar-rayo' && k === 0) m.palmaEnElDestello = b4[1] as number;
+          if (cuerpo.enLaSalidaDelRayo) m.salidaVista = true;
+          if (cuerpo.lanzarEsperando) m.esperaVista = true;
+          if (!anda && tr.gesto !== 'tocado' && cerca.bocaDe(51, bC) && lejos.bocaDe(51, bL)) {
+            /* El rebaño va en filas de 1/30 s (`FPS_DEL_HORNEADO`): con la palma deprisa, un fotograma horneado de retraso. */
+            const d = distancia3(bC.x - bL.x, bC.y - bL.y, bC.z - bL.z) - vPalma / FPS_DEL_HORNEADO;
+            if (d > m.entreBocas) {
+              m.entreBocas = d;
+              m.dondeBocas = `${tr.gesto} a ${String(Math.round(reloj - (Number.isNaN(suelta) ? desde : suelta)))} ms`;
+            }
+          }
+          antes = p;
+        }
+      }
+      m.salidaAlFinal = cuerpo.enLaSalidaDelRayo;
+      cerca.liberar();
+      lejos.liberar();
+      return m;
+    };
+    const CHISPAZO: Tramo[] = [
+      { gesto: 'cargar-rayo', fotogramas: 6 },
+      { gesto: 'lanzar-rayo', fotogramas: 16 },
+      { gesto: 'reposo', fotogramas: 80 },
+    ];
+    const LLENO: Tramo[] = [
+      { gesto: 'cargar-rayo', fotogramas: 90 },
+      { gesto: 'lanzar-rayo', fotogramas: 16 },
+      { gesto: 'reposo', fotogramas: 80 },
+    ];
+    const DEJAR: Tramo[] = [
+      { gesto: 'cargar-rayo', fotogramas: 90 },
+      { gesto: 'reposo', fotogramas: 80 },
+    ];
+    const GOLPE: Tramo[] = [
+      { gesto: 'cargar-rayo', fotogramas: 90 },
+      { gesto: 'tocado', fotogramas: 20 },
+    ];
+    const ANDAR: Tramo[] = [
+      { gesto: 'cargar-rayo', fotogramas: 90 },
+      { gesto: 'lanzar-rayo', fotogramas: 16 },
+      { gesto: 'reposo', fotogramas: 10 },
+      { gesto: 'andar', fotogramas: 20, velocidad: 1.4 },
+    ];
+    const deAntes = copia(reparto) as Reparto & { clips: Record<string, ClipDelReparto & { entradaMs?: number; salidaMs?: number }> };
+    for (const c of Object.values(deAntes.clips)) {
+      delete c.entradaMs;
+      delete c.salidaMs;
+    }
+    const chispazo = await medirEntreGestos(reparto, CHISPAZO);
+    const chispazoAntes = await medirEntreGestos(deAntes as Reparto, CHISPAZO);
+    const lleno = await medirEntreGestos(reparto, LLENO);
+    const llenoAntes = await medirEntreGestos(deAntes as Reparto, LLENO);
+    const dejar = await medirEntreGestos(reparto, DEJAR);
+    const golpe = await medirEntreGestos(reparto, GOLPE);
+    const andar = await medirEntreGestos(reparto, ANDAR);
+    const cifras = (x: Medida): string =>
+      `pie en el suelo ${x.pieEnElSuelo.toFixed(2)} m/s (${x.dondePie}), palma ${x.palma.toFixed(2)} m/s, bocas ${(x.entreBocas * 100).toFixed(1)} cm sobre un fotograma horneado (${x.dondeBocas})`;
+    nota(`el chispazo: ${cifras(chispazo)}; la palma en el destello a ${chispazo.palmaEnElDestello.toFixed(2)} m`);
+    nota(`  sin esperar a la entrada ni salida (antes): ${cifras(chispazoAntes)}`);
+    nota(`el pleno y el reposo a los 260 ms: ${cifras(lleno)}; antes: ${cifras(llenoAntes)}`);
+    nota(`dejar la carga, quieto: ${cifras(dejar)}; un golpe en la carga: el pie a ${golpe.pieConGolpe.toFixed(2)} m/s`);
+    const juezDelPaso = (x: Medida): { bien: boolean; detalle?: unknown } => ({ bien: x.pieEnElSuelo < 1 && x.palma < 10, detalle: cifras(x) });
+    juzgar(
+      'el chispazo (100 ms de carga, soltar y el reposo a los 260 ms): ningún pie resbala por el suelo a 1 m/s o más y la palma no pasa de 10 m/s (el lanzar espera a que la carga acabe su paso)',
+      juezDelPaso,
+      chispazo,
+      chispazoAntes,
+      'el reparto sin entradaMs ni salidaMs (el lanzar entra en 50 ms a medio paso)',
+    );
+    comprobar('y en el chispazo el lanzar esperó de verdad a la carga (se vio la espera y la salida)', chispazo.esperaVista && chispazo.salidaVista && !chispazo.salidaAlFinal, chispazo);
+    juzgar(
+      'soltar el pleno y volver al reposo a los 260 ms del destello (lo que manda el juego): el cuerpo sigue la salida del clip y ningún pie resbala a 1 m/s',
+      juezDelPaso,
+      lleno,
+      llenoAntes,
+      'el reparto sin salidaMs (se funde a la marcha con el pie adelantado)',
+    );
+    comprobar('y la salida se vio, y al acabar el clip se volvió a la marcha', lleno.salidaVista && !lleno.salidaAlFinal, lleno);
+    comprobar('dejar la carga sin lanzar, quieto: sale por la salida del lanzar y ningún pie resbala a 1 m/s', juezDelPaso(dejar).bien && dejar.salidaVista && !dejar.salidaAlFinal, cifras(dejar));
+    comprobar(
+      'de cerca y de lejos (rebaño) pintan lo mismo en el chispazo, el pleno con su salida y al dejar la carga: la boca a menos de 6 cm en todos los fotogramas (más lo que la palma recorre en un fotograma horneado, 1/30 s)',
+      chispazo.entreBocas < 0.06 && lleno.entreBocas < 0.06 && dejar.entreBocas < 0.06,
+      { chispazo: chispazo.entreBocas, lleno: lleno.entreBocas, dejar: dejar.entreBocas, donde: [chispazo.dondeBocas, lleno.dondeBocas, dejar.dondeBocas] },
+    );
+    comprobar(`un golpe recibido en la carga lleva el pie atrás a menos de 6 m/s (en 45 ms iba a 10-11)`, golpe.pieConGolpe < 6 && golpe.pieConGolpe > 0.5, golpe.pieConGolpe.toFixed(2));
+    comprobar('echar a andar a media salida la corta (no se pinta el clip en el sitio mientras el cuerpo avanza)', andar.salidaVista && !andar.salidaAlFinal, andar);
+  }
+
+  /*
+   * ── Dos cuerpos de la misma figura que cargan a la vez no tiemblan al unísono (la semilla lleva el id) ──
+   */
+  {
+    /* El 43, como el 41, es de asiento impar: la misma figura (`sexoDelAsiento`), el mismo clip en el mismo segundo. */
+    const otro = cuerpoDePrueba(43, 'desvelado', 0);
+    otro.x = 1.2;
+    otro.z = lanzador.z;
+    otro.rumbo = lanzador.rumbo;
+    const fuenteDos = fuenteDe([lanzador, otro], 41);
+    for (const c of [lanzador, otro]) {
+      c.gesto = 'cargar-rayo';
+      c.gestoDesdeMs = t + 1000 / 60;
+      c.direccionDelGesto = c.rumbo;
+      c.impactoMs = null;
+      c.carga = 1;
+    }
+    for (let k = 0; k < 600 && dS.cuerpo(43) === null; k++) {
+      t += 1000 / 60;
+      dS.fotograma(fuenteDos, 2, null, camS, t, (v) => v);
+      if (k % 3 === 0) await esperarUnPoco(2);
+    }
+    /*
+     * Lo que se mueve cada palma de un fotograma al siguiente (desde su sitio): el clip las mueve igual, así que lo que
+     * difiere es el temblor. Al unísono, los dos pasos serían el mismo.
+     */
+    const uno = { x: 0, y: 0, z: 0 };
+    const dos = { x: 0, y: 0, z: 0 };
+    let distinto = 0;
+    let temblando = 0;
+    let antes: number[] | null = null;
+    for (let k = 0; k < 90; k++) {
+      t += 1000 / 60;
+      dS.fotograma(fuenteDos, 2, null, camS, t, (v) => v);
+      if (!dS.bocaDe(41, uno) || !dS.bocaDe(43, dos) || k < 30) continue;
+      const ahora = [uno.x - lanzador.x, uno.y, uno.z - lanzador.z, dos.x - otro.x, dos.y, dos.z - otro.z] as const;
+      if (antes !== null) {
+        const a = antes;
+        const p1 = [ahora[0] - (a[0] as number), ahora[1] - (a[1] as number), ahora[2] - (a[2] as number)] as const;
+        const p2 = [ahora[3] - (a[3] as number), ahora[4] - (a[4] as number), ahora[5] - (a[5] as number)] as const;
+        distinto = Math.max(distinto, distancia3(p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]));
+        temblando = Math.max(temblando, distancia3(p1[0], p1[1], p1[2]));
+      }
+      antes = [...ahora];
+    }
+    const mismaFigura = dS.cuerpo(41)?.figura.figura === dS.cuerpo(43)?.figura.figura;
+    nota(`dos desvelados de la misma figura en el pleno: lo que se mueve cada palma en un fotograma difiere hasta ${(distinto * 1000).toFixed(2)} mm`);
+    comprobar(
+      'dos desvelados de la misma figura cargando a la vez no tiemblan al unísono (lo que se mueve cada palma de un fotograma al siguiente difiere ≥ 2 mm)',
+      mismaFigura && temblando > 0.001 && distinto >= 0.002,
+      { mismaFigura, distinto, temblando },
+    );
+    lanzador.gesto = 'cargar-rayo';
+    for (let k = 0; k < 30; k++) pasoDeAmbos();
+  }
+
+  /* ── La boca no asigna: la piden los efectos cada fotograma (medido ya caliente, como va en el juego) ── */
+  for (let k = 0; k < 100000; k++) {
+    dS.bocaDe(41, bS);
+    dR.bocaDe(41, bR);
+  }
+  const { Session } = await import('node:inspector/promises');
+  const s = new Session();
+  s.connect();
+  await s.post('HeapProfiler.enable');
+  type Nodo = { callFrame: { url: string; functionName: string }; selfSize: number; children: unknown[] };
+  const bytesPorLlamada = async (llamar: () => void): Promise<{ bytes: number; peores: string[] }> => {
+    await s.post('HeapProfiler.startSampling', { samplingInterval: 64, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+    for (let k = 0; k < 40000; k++) llamar();
+    const { profile } = (await s.post('HeapProfiler.stopSampling')) as { profile: { head: Nodo } };
+    let bytes = 0;
+    const quien = new Map<string, number>();
+    const recorrer = (nodo: Nodo, dentro: boolean): void => {
+      const nuestro = dentro || /personajes[\\/](director|cuerpo|huesos-en-textura)/.test(nodo.callFrame.url);
+      if (nuestro && nodo.selfSize > 0) {
+        bytes += nodo.selfSize;
+        const n = `${nodo.callFrame.functionName || '(anónima)'}@${nodo.callFrame.url.split(/[\\/]/).pop() ?? ''}`;
+        quien.set(n, (quien.get(n) ?? 0) + nodo.selfSize);
+      }
+      for (const h of nodo.children) recorrer(h as Nodo, nuestro);
+    };
+    recorrer(profile.head, false);
+    return { bytes: bytes / 40000, peores: [...quien.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, b]) => `${n} ${(b / 40000).toFixed(2)} B`) };
+  };
+  const conEsqueleto = await bytesPorLlamada(() => dS.bocaDe(41, bS));
+  const enElRebano = await bytesPorLlamada(() => dR.bocaDe(41, bR));
+  s.disconnect();
+  comprobar(
+    'pedir la boca no asigna: menos de 2 bytes por llamada con esqueleto y en el rebaño, 40.000 de cada (lo que queda son números que V8 encajona)',
+    conEsqueleto.bytes < 2 && enElRebano.bytes < 2,
+    { conEsqueleto, enElRebano },
+  );
+  dS.liberar();
+  dR.liberar();
+}
+
 director.liberar();
-terminar(174);
+terminar(207);

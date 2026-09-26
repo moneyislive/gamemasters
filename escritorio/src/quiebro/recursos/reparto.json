@@ -36,7 +36,7 @@
   "mismoNombre": "en un fichero con varias variantes, una zona puede tener un material por variante con el mismo nombre y otro color (el abrigo de la gabardina no es el de la chaqueta corta)"
  },
  "bytes": {
-  "total": 5621216,
+  "total": 5715804,
   "tope": 8388608,
   "porArchivo": {
    "celador-hombre-lod1.glb": 194028,
@@ -45,8 +45,8 @@
    "celador-mujer-lod1.glb": 72516,
    "celador-mujer-lod2.glb": 35512,
    "celador-mujer.glb": 136780,
-   "clips-hombre.glb": 820888,
-   "clips-mujer.glb": 818080,
+   "clips-hombre.glb": 868456,
+   "clips-mujer.glb": 865100,
    "desvelado-hombre-gabardina.glb": 139580,
    "desvelado-hombre-ligera.glb": 123088,
    "desvelado-hombre-lod1.glb": 198952,
@@ -85,7 +85,7 @@
     "pieza-pistola.glb",
     "pieza-paraguas.glb"
    ],
-   "total": 3194484,
+   "total": 3289072,
    "nota": "el propio a LOD0 (su estilo, en los dos sexos: cuenta la gabardina, las tres pesan casi igual); companeros, Celadores y Prestados cercanos a LOD1; la multitud en el maniqui LOD3 de los durmientes"
   }
  },
@@ -2414,6 +2414,28 @@
     300
    ]
   },
+  "cargar-rayo": {
+   "duracionMs": 3200,
+   "fotogramas": 96,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "cargar el rayo (captura, en espejo): desde el reposo da un paso con la derecha y la sube al frente, la palma abierta hacia el blanco a la altura del hombro (0-9), se asienta (9-33) y sostiene la carga en bucle desde el 33 (2,1 s)",
+   "fuente": "UAL1 Spell_Simple_Enter + Spell_Simple_Idle_Loop (en espejo: la derecha)",
+   "bucleDesdeMs": 1100,
+   "entradaMs": 300
+  },
+  "lanzar-rayo": {
+   "duracionMs": 1100,
+   "fotogramas": 33,
+   "fps": 30,
+   "bucle": false,
+   "raiz": false,
+   "descripcion": "lanzar el rayo (captura, en espejo): la palma empuja en el impacto (fotograma 1: sale el destello), retrocede con el hombro (1-5), se asienta (5-15), baja el brazo (15-27) y recoge el pie derecho al reposo (25-33)",
+   "fuente": "UAL1 Spell_Simple_Shoot (el retroceso x1,9) + Spell_Simple_Exit (en espejo), desde la carga",
+   "impactoMs": 33,
+   "salidaMs": 500
+  },
   "desalojable": {
    "duracionMs": 2000,
    "fotogramas": 60,
@@ -2613,10 +2635,10 @@
    "clip": "victoria"
   },
   "cargar-rayo": {
-   "clip": "apuntar"
+   "clip": "cargar-rayo"
   },
   "lanzar-rayo": {
-   "clip": "disparar"
+   "clip": "lanzar-rayo"
   }
  },
  "usoDeLosClips": {

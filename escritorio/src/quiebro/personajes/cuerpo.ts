@@ -39,11 +39,14 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { CuerpoPintado, Gesto } from '../cuerpos';
+import type { PuntoDelRayo } from '../rayo/contrato';
 import type { Almacen, ClipsDelEsqueleto } from './almacen';
 import {
+  FUNDIDO_A_LA_SALIDA_MS,
   INFO_DE_GESTOS,
   MezclaDeCapas,
   direccionRelativa,
+  esperaLaEntrada,
   fundidoEntre,
   inicioDelGolpe,
   mezclaDeLaMarchaNueva,
@@ -52,13 +55,16 @@ import {
   normalizarAngulo,
   ritmoElastico,
   ritmoParaDurar,
+  salidaDelRayo,
+  tiempoConEntrada,
 } from './gestos';
 import type { MarchaGirada } from './gestos';
 import type { MallaFundida } from './malla';
 import { COLOR_DE_AMENAZA, COLOR_DE_SALIDA, alPintar, materialDeCuerpo, tenir } from './material';
 import type { MaterialDeCuerpo } from './material';
 import { MuellesDelFaldon } from './muelles';
-import { PoseGuardada, huesosDelBrazoDerecho, huesosQueTocaLaPostura, posturaDelParaguas } from './postura';
+import { PoseGuardada, elRayoEnElBrazo, huesosDelBrazoDerecho, huesosQueTocaLaPostura, posturaDelParaguas, rayoEnElBrazoNuevo, temblorDeLaCarga } from './postura';
+import type { ElRayoEnElBrazo } from './postura';
 import type { HuesosDelBrazo } from './postura';
 import type { DetalleDelCuerpo } from './presupuesto';
 import { lodElegido } from './presupuesto';
@@ -90,6 +96,14 @@ const IMPRESION_MS = 1200;
 const SALIDA_MS = 900;
 /** Hasta cuánto después del impacto se anima un golpe en cada fotograma aunque el cuerpo sea lejano. */
 export const GOLPE_A_TODO_RITMO_MS = 150;
+
+/**
+ * EL BRAZO DEL RAYO AL LANZAR: apunta entero hasta que el clip empieza a bajarlo (`lanzar-rayo` de la forja: retrocede
+ * 1-5, se asienta 5-15 y baja el brazo 15-27, a 30 fotogramas por segundo) y lo suelta en ese tramo.
+ */
+export const APUNTA_AL_LANZAR_S = { hasta: 0.45, suelta: 0.75 } as const;
+/** La boca del rayo va este tanto delante de la palma (hacia el rumbo del rayo): el destello nace fuera de la mano. */
+export const BOCA_DELANTE_DE_LA_PALMA_M = 0.05;
 
 /** El corte de un cuerpo: la altura (m) y el modo (0 ninguno, 1 imprimirse: se ve por debajo, 2 salir: por encima). */
 export interface CorteDelCuerpo {
@@ -148,6 +162,14 @@ interface CapaDeGesto {
   readonly impactoClipMs: number | null;
   /** El ritmo del clip fuera de la preparación elástica. */
   readonly ritmo: number;
+  /** Un clip con entrada y cola en bucle (la carga del rayo): desde qué segundo repite, o `null`. */
+  readonly bucleDesdeS: number | null;
+  /** Hasta qué segundo entra el clip (la carga del rayo: `entradaMs`), o `null`: ver `esperaLaEntrada`. */
+  readonly entradaS: number | null;
+  /** Desde qué segundo sale el clip al reposo (lanzar el rayo: `salidaMs`), o `null`: ver `salidaDelRayo`. */
+  readonly salidaS: number | null;
+  /** Cuándo empezó su gesto (ms del reloj del cuerpo): con él sale su tiempo si tiene cola en bucle. */
+  readonly desdeMs: number;
   /** Entró en este fotograma: el mezclador no la avanza todavía. */
   recien: boolean;
 }
@@ -196,6 +218,24 @@ export class CuerpoConEsqueleto {
   private acumulado = 0;
   private readonly muelles: MuellesDelFaldon;
   private readonly brazo: HuesosDelBrazo | null;
+  /** El brazo derecho de todos (el del paraguas es el mismo): el que lanza el rayo y cuya mano es su boca. */
+  private readonly derecho: HuesosDelBrazo | null;
+  /** Lo que pesa ahora el rayo en este cuerpo (cargar o lanzar), para apuntar el brazo y la boca. */
+  private pesoDelRayo = 0;
+  /** Hacia dónde apunta el rayo (el rumbo del gesto, en radianes del contrato) y la semilla del temblor. */
+  private rumboDelRayo = 0;
+  /** Lo que el rayo le hace al brazo en este fotograma (`postura.ts`): uno por cuerpo, que se rellena. */
+  private readonly rayoEnElBrazo: ElRayoEnElBrazo;
+  /** La semilla del temblor de la figura; la de cada cuerpo le suma su id (dos iguales no tiemblan al unísono). */
+  private readonly semillaDeLaFigura: number;
+  /**
+   * LA SALIDA DEL RAYO en curso (`salidaDelRayo` en `gestos.ts`): la capa del clip de lanzar que se sigue pintando con el
+   * juego ya en la marcha (baja el brazo y recoge el pie), o `null`. Se corta al acabar el clip, al echar a andar o con
+   * otro gesto.
+   */
+  private salidaEnCurso: string | null = null;
+  /** El chispazo (`esperaLaEntrada`): el juego ya lanza y la carga aún acaba de entrar; el lanzar entra al acabar. */
+  private lanzarEnEspera = false;
   private readonly columna: THREE.Object3D | null;
   private readonly pecho: THREE.Object3D | null;
   private readonly clips: ClipsDelEsqueleto;
@@ -230,11 +270,16 @@ export class CuerpoConEsqueleto {
     this.brazo = figura.piezas.some((p) => p === 'paraguas' || p === ctx.reparto.durmientes.paraguas)
       ? huesosDelBrazoDerecho(this.huesos, esqueleto?.agarre.derecha ?? 'agarre_R')
       : null;
+    this.derecho = huesosDelBrazoDerecho(this.huesos, esqueleto?.agarre.derecha ?? 'agarre_R');
+    this.semillaDeLaFigura = (figura.figura.length * 0.37 + figura.silueta.escala[1] * 3.1) % 1;
+    this.rayoEnElBrazo = rayoEnElBrazoNuevo(this.semillaDeLaFigura);
     this.columna = this.porNombre.get('columna1') ?? null;
     this.pecho = this.porNombre.get('pecho') ?? null;
     /* Lo que se retoca encima del mezclador, vigilado (ver «Lo que se hace después del mezclador»). */
     if (figura.silueta.encorvado > 0) this.pose.vigilar([this.columna, this.pecho]);
     if (this.brazo !== null) this.pose.vigilar(huesosQueTocaLaPostura(this.brazo));
+    /* El brazo que apunta y tiembla con el rayo (`postura.ts`, `apuntarElBrazo` y `temblorDelRayo`). */
+    if (this.derecho !== null) this.pose.vigilar(huesosQueTocaLaPostura(this.derecho));
     this.pose.vigilar(this.muelles.huesos);
     const base = ctx.marchaDe(figura.esqueleto);
     /*
@@ -348,6 +393,17 @@ export class CuerpoConEsqueleto {
   /** Entra un gesto nuevo (o el mismo, vuelto a empezar). */
   private entrar(c: CuerpoPintado, ahora: number): void {
     const info = INFO_DE_GESTOS[c.gesto];
+    /* El que sale (la capa activa), para el chispazo y la salida del rayo. */
+    const activa = this.mezcla.activa();
+    const saliente = activa === null || activa === 'marcha' ? undefined : this.capas.get(activa);
+    this.salidaEnCurso = null;
+    this.lanzarEnEspera = false;
+    if (info.tipo === 'marcha' && activa !== null && saliente !== undefined && this.entrarEnLaSalida(c, saliente, activa, ahora)) return;
+    /* El chispazo: la carga acaba de entrar antes de que entre el lanzar (`esperaLaEntrada`; ver `seguirLaEspera`). */
+    if (saliente !== undefined && esperaLaEntrada(saliente.gesto, c.gesto, saliente.accion.time, saliente.entradaS)) {
+      this.lanzarEnEspera = true;
+      return;
+    }
     const fundido = fundidoEntre(this.gestoAnterior, c.gesto);
     this.gestoAnterior = c.gesto;
     if (info.tipo === 'marcha') {
@@ -356,19 +412,11 @@ export class CuerpoConEsqueleto {
     }
     const direccion = info.direccion === 'clip' && c.direccionDelGesto !== null ? direccionRelativa(c.rumbo, c.direccionDelGesto) : null;
     const elegido = clipDelGesto(this.ctx.reparto, c.gesto, direccion);
-    const base = this.clips.clip(elegido.clip, elegido.espejo);
-    if (base === null) {
+    const clip = this.clipSinPeso(elegido.clip, elegido.espejo);
+    if (clip === null) {
       this.mezcla.entrar('marcha', fundido);
       return;
     }
-    /*
-     * Si el mismo clip todavía pesa (otro golpe igual en la Tanda, dos `tocado` seguidos), la acción
-     * nueva es la de su gemelo: se usa la de las dos que menos pese, que es la que ya casi ha salido.
-     */
-    const gemelo = this.clips.gemelo(base);
-    const pesoBase = this.mezcla.peso(base.uuid) + (this.mezcla.activa() === base.uuid ? 1 : 0);
-    const pesoGemelo = this.mezcla.peso(gemelo.uuid) + (this.mezcla.activa() === gemelo.uuid ? 1 : 0);
-    const clip = pesoBase > pesoGemelo ? gemelo : base;
     const capa = clip.uuid;
     const accion = this.mixer.clipAction(clip);
     const datos = this.ctx.reparto.clips[elegido.clip];
@@ -379,14 +427,104 @@ export class CuerpoConEsqueleto {
     const impactoClipMs = info.tipo === 'golpe' && c.impactoMs !== null && datos?.impactoMs !== undefined ? datos.impactoMs : null;
     const ritmo = ritmoParaDurar(clip.duration * 1000, info);
     const pasado = Math.max(0, ahora - c.gestoDesdeMs);
+    /* Una cola en bucle (la carga del rayo) sólo si el gesto se repite: si no, el clip se pinta una vez, como todos. */
+    const bucleDesdeS = bucle && datos?.bucleDesdeMs !== undefined ? datos.bucleDesdeMs / 1000 : null;
     let t = impactoClipMs !== null && c.impactoMs !== null ? inicioDelGolpe(c.gestoDesdeMs, ahora, c.impactoMs, impactoClipMs) : (pasado / 1000) * ritmo;
+    if (bucleDesdeS !== null) t = tiempoConEntrada(t, clip.duration, bucleDesdeS);
     if (!bucle) t = Math.min(clip.duration, t);
     accion.time = t;
     accion.timeScale = ritmo;
     accion.setEffectiveWeight(0);
     accion.play();
-    this.capas.set(capa, { accion, gesto: c.gesto, impactoClipMs, ritmo, recien: true });
+    const entradaS = datos?.entradaMs !== undefined ? datos.entradaMs / 1000 : null;
+    const salidaS = datos?.salidaMs !== undefined ? datos.salidaMs / 1000 : null;
+    this.capas.set(capa, { accion, gesto: c.gesto, impactoClipMs, ritmo, bucleDesdeS, entradaS, salidaS, desdeMs: c.gestoDesdeMs, recien: true });
     this.mezcla.entrar(capa, fundido);
+  }
+
+  /**
+   * El clip `nombre` (en espejo o no), o su gemelo si el mismo clip todavía pesa (otro golpe igual en la Tanda, dos
+   * `tocado` seguidos): se usa el de los dos que menos pese, que es el que ya casi ha salido.
+   */
+  private clipSinPeso(nombre: string, espejo: boolean): THREE.AnimationClip | null {
+    const base = this.clips.clip(nombre, espejo);
+    if (base === null) return null;
+    const gemelo = this.clips.gemelo(base);
+    const pesoBase = this.mezcla.peso(base.uuid) + (this.mezcla.activa() === base.uuid ? 1 : 0);
+    const pesoGemelo = this.mezcla.peso(gemelo.uuid) + (this.mezcla.activa() === gemelo.uuid ? 1 : 0);
+    return pesoBase > pesoGemelo ? gemelo : base;
+  }
+
+  /**
+   * LA SALIDA DEL RAYO (`salidaDelRayo`): el juego pide la marcha y el cuerpo, quieto, está lanzando o cargando. De
+   * lanzar, la misma capa sigue; de la carga, entra el clip de lanzar desde su salida. `true` si la hay (la marcha espera
+   * a que acabe: ver `seguirLaSalida`). Sólo al cambiar de gesto: no asigna por fotograma.
+   */
+  private entrarEnLaSalida(c: CuerpoPintado, saliente: CapaDeGesto, nombre: string, ahora: number): boolean {
+    if (saliente.gesto !== 'lanzar-rayo' && saliente.gesto !== 'cargar-rayo') return false;
+    const elegido = clipDelGesto(this.ctx.reparto, 'lanzar-rayo', null);
+    const salidaMs = this.ctx.reparto.clips[elegido.clip]?.salidaMs;
+    const s = salidaDelRayo(saliente.gesto, c.gesto, c.velocidad, saliente.accion.time, saliente.accion.getClip().duration, saliente.entradaS, salidaMs === undefined ? null : salidaMs / 1000);
+    if (s === null) return false;
+    this.gestoAnterior = 'lanzar-rayo';
+    if (saliente.gesto === 'lanzar-rayo') {
+      this.salidaEnCurso = nombre;
+      return true;
+    }
+    const clip = this.clipSinPeso(elegido.clip, elegido.espejo);
+    if (clip === null) return false;
+    const accion = this.mixer.clipAction(clip);
+    const ritmo = ritmoParaDurar(clip.duration * 1000, INFO_DE_GESTOS['lanzar-rayo']);
+    accion.reset();
+    accion.setLoop(THREE.LoopOnce, 1);
+    accion.clampWhenFinished = true;
+    accion.time = Math.min(clip.duration, s);
+    accion.timeScale = ritmo;
+    accion.setEffectiveWeight(0);
+    accion.play();
+    this.capas.set(clip.uuid, { accion, gesto: 'lanzar-rayo', impactoClipMs: null, ritmo, bucleDesdeS: null, entradaS: null, salidaS: salidaMs === undefined ? null : salidaMs / 1000, desdeMs: ahora - (s * 1000) / ritmo, recien: true });
+    this.mezcla.entrar(clip.uuid, FUNDIDO_A_LA_SALIDA_MS);
+    this.salidaEnCurso = clip.uuid;
+    return true;
+  }
+
+  /** La salida del rayo, en cada vuelta del mezclador: se corta al acabar el clip, al echar a andar o si ya no manda. */
+  private seguirLaSalida(c: CuerpoPintado): void {
+    const nombre = this.salidaEnCurso;
+    if (nombre === null) return;
+    const capa = this.capas.get(nombre);
+    const sigue =
+      capa !== undefined &&
+      this.mezcla.activa() === nombre &&
+      salidaDelRayo('lanzar-rayo', c.gesto, c.velocidad, capa.accion.time, capa.accion.getClip().duration, null, capa.salidaS) !== null;
+    if (sigue) return;
+    this.salidaEnCurso = null;
+    if (INFO_DE_GESTOS[c.gesto].tipo !== 'marcha') return;
+    this.mezcla.entrar('marcha', fundidoEntre('lanzar-rayo', c.gesto));
+    this.gestoAnterior = c.gesto;
+  }
+
+  /**
+   * El chispazo en espera, en cada vuelta del mezclador: en cuanto la carga ha acabado de entrar (o ya no manda), entra el
+   * lanzar, por el segundo que le toca desde su impacto (`entrar`).
+   */
+  private seguirLaEspera(c: CuerpoPintado, ahora: number): void {
+    if (!this.lanzarEnEspera) return;
+    const activa = this.mezcla.activa();
+    const capa = activa === null || activa === 'marcha' ? undefined : this.capas.get(activa);
+    if (capa !== undefined && esperaLaEntrada(capa.gesto, c.gesto, capa.accion.time, capa.entradaS)) return;
+    this.lanzarEnEspera = false;
+    this.entrar(c, ahora);
+  }
+
+  /** Para el banco y el comprobador: ¿el lanzar espera a que la carga acabe de entrar (el chispazo)? */
+  get lanzarEsperando(): boolean {
+    return this.lanzarEnEspera;
+  }
+
+  /** Para el banco y el comprobador: ¿pinta la salida del rayo con el juego ya en la marcha? */
+  get enLaSalidaDelRayo(): boolean {
+    return this.salidaEnCurso !== null;
   }
 
   /** La marcha de este fotograma: pesos por velocidad y dirección, y la fase común. */
@@ -494,6 +632,8 @@ export class CuerpoConEsqueleto {
         this.desdeVisto = c.gestoDesdeMs;
         this.entrar(c, ahora);
       }
+      this.seguirLaSalida(c);
+      this.seguirLaEspera(c, ahora);
       for (const fuera of this.mezcla.avanzar(dt)) {
         if (fuera === 'marcha') {
           for (const a of this.marchaAcciones) {
@@ -520,6 +660,13 @@ export class CuerpoConEsqueleto {
         } else if (capa.impactoClipMs !== null && c.impactoMs !== null && this.mezcla.activa() === nombre) {
           /* La anticipación elástica: el `timeScale` que hace llegar el golpe a su hora. */
           capa.accion.timeScale = ritmoElastico(capa.accion.time, ahora - dt, ahora, c.impactoMs, capa.impactoClipMs, INFO_DE_GESTOS[capa.gesto].ritmo);
+        } else if (capa.bucleDesdeS !== null) {
+          /*
+           * La cola en bucle: el tiempo se pone, no se integra (el mezclador de three repetiría el clip ENTERO, con su
+           * entrada). La misma cuenta que el rebaño (`tiempoDelGesto`): de cerca y de lejos, la misma pose.
+           */
+          capa.accion.timeScale = 0;
+          capa.accion.time = tiempoConEntrada((Math.max(0, ahora - capa.desdeMs) / 1000) * capa.ritmo, capa.accion.getClip().duration, capa.bucleDesdeS);
         } else if (capa.gesto === 'avance') {
           const correr = this.marcha[this.marcha.length - 1];
           const ciclos = correr !== undefined && correr.zancada > 0 ? Math.min(2.4, Math.max(0.8, c.velocidad / correr.zancada)) : 1.6;
@@ -544,6 +691,48 @@ export class CuerpoConEsqueleto {
         const reposo = this.marcha[0]?.clip ?? '';
         const parado = this.paseaConParaguas ? pesoEnLaMarcha(this.mezclaDeLaMarcha, reposo) * this.mezcla.peso('marcha') + (1 - this.mezcla.peso('marcha')) : 1;
         posturaDelParaguas(this.silueta, this.brazo, conParaguas * parado);
+      }
+      /*
+       * El rayo: el brazo que lanza apunta al rumbo del gesto (la mira: el cuerpo va detrás, girando) y, mientras se
+       * carga, tiembla con la carga (`postura.ts`). Encima del clip y borrado antes de la siguiente vuelta.
+       */
+      this.rumboDelRayo = objetivo;
+      this.pesoDelRayo = 0;
+      let pesoDeLaCarga = 0;
+      /*
+       * Lo que apunta el brazo: lo que pesa el rayo, salvo en la entrada de la carga, donde crece con ella (0 al empezar,
+       * entero con la palma arriba: `entradaS`). En la entrada el brazo de la captura aún cuelga y sube por delante; apuntar
+       * «la recta del hombro a la palma» con la palma en la cadera la sacaba 20 cm de la trayectoria de la captura (lo vio
+       * el rebaño, que no apunta: la boca de cerca y la de lejos se separaban 40 cm a los 117 ms, y 20 sin apuntar).
+       */
+      let apunta = 0;
+      if (this.derecho !== null) {
+        for (let i = 0; i < this.mezcla.cuantas; i++) {
+          const nombre = this.mezcla.nombreEn(i);
+          const capa = nombre === 'marcha' ? undefined : this.capas.get(nombre);
+          if (capa === undefined) continue;
+          const w = this.mezcla.pesoEn(i);
+          if (capa.gesto === 'cargar-rayo') {
+            this.pesoDelRayo += w;
+            pesoDeLaCarga += w;
+            const e = capa.entradaS !== null && capa.entradaS > 0 ? Math.min(1, Math.max(0, capa.accion.time / capa.entradaS)) : 1;
+            apunta += w * e * e * (3 - 2 * e);
+          } else if (capa.gesto === 'lanzar-rayo') {
+            const t = capa.accion.time;
+            const u = Math.min(1, Math.max(0, (t - APUNTA_AL_LANZAR_S.hasta) / (APUNTA_AL_LANZAR_S.suelta - APUNTA_AL_LANZAR_S.hasta)));
+            const p = w * (1 - u * u * (3 - 2 * u));
+            /* En la salida (el juego ya está en la marcha) la boca es la palma sola, como en el rebaño, que mira el gesto. */
+            if (nombre !== this.salidaEnCurso) this.pesoDelRayo += p;
+            apunta += p;
+          }
+        }
+        const r = this.rayoEnElBrazo;
+        r.rumbo = objetivo;
+        r.apuntar = apunta;
+        r.temblor = pesoDeLaCarga > 0 ? pesoDeLaCarga * temblorDeLaCarga(c.carga ?? 0) : 0;
+        r.tS = ahora / 1000;
+        r.semilla = (this.semillaDeLaFigura + c.id * 0.6180339887) % 1;
+        if (r.apuntar > 0 || r.temblor > 0) elRayoEnElBrazo(this.derecho, r);
       }
       if (detalle.muelles && this.muelles.tiene) {
         /* La aceleración y el giro, del mundo al espacio del cuerpo. */
@@ -579,6 +768,44 @@ export class CuerpoConEsqueleto {
       this.bandaVista = corte.modo;
       u.uBandaQ.value.set(corte.modo === 1 ? COLOR_DE_AMENAZA : COLOR_DE_SALIDA);
     }
+  }
+
+  /**
+   * LA BOCA DEL RAYO: dónde está la palma derecha (el hueco de la mano, `agarre_R`) en el mundo, tal como se pinta en
+   * este fotograma, y un poco por delante de ella si el cuerpo carga o lanza (`BOCA_DELANTE_DE_LA_PALMA_M`, hacia el
+   * rumbo del rayo). `false` si la figura no tiene ese brazo. Sin asignar: lo pide `DirectorDeLosPersonajes.bocaDe`.
+   */
+  boca(salida: PuntoDelRayo): boolean {
+    const h = this.derecho;
+    if (h === null) return false;
+    h.agarre.updateWorldMatrix(true, false);
+    const e = h.agarre.matrixWorld.elements;
+    const k = BOCA_DELANTE_DE_LA_PALMA_M * Math.min(1, this.pesoDelRayo);
+    salida.x = (e[12] as number) + Math.sin(this.rumboDelRayo) * k;
+    salida.y = e[13] as number;
+    salida.z = (e[14] as number) - Math.cos(this.rumboDelRayo) * k;
+    return true;
+  }
+
+  /** Para el comprobador: el hombro (la cabeza de `brazo_R`) y el hueco de la mano derecha en el mundo, tal como se pintan. */
+  hombroYPalma(hombro: PuntoDelRayo, palma: PuntoDelRayo): boolean {
+    const h = this.derecho;
+    if (h === null) return false;
+    h.agarre.updateWorldMatrix(true, false);
+    const a = h.brazo.matrixWorld.elements;
+    const b = h.agarre.matrixWorld.elements;
+    hombro.x = a[12] as number;
+    hombro.y = a[13] as number;
+    hombro.z = a[14] as number;
+    palma.x = b[12] as number;
+    palma.y = b[13] as number;
+    palma.z = b[14] as number;
+    return true;
+  }
+
+  /** Lo que pesa el rayo ahora (cargar, y lanzar hasta que baja el brazo): para el banco y el comprobador. */
+  get pesoDelRayoAhora(): number {
+    return this.pesoDelRayo;
   }
 
   /** Suelta el mezclador, el material y los esqueletos (las geometrías son del almacén). */
