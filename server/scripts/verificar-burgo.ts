@@ -114,6 +114,7 @@ import {
   DESEMPENAR,
   EMPENAR,
   EMPEZAR,
+  EUROS_DEL_HALLAZGO,
   LIBRE,
   loSecretoDelBurgo,
   MANIFIESTO_BURGO,
@@ -183,6 +184,8 @@ import {
   valorDeEmpeno,
 } from '../../shared/arcade/juegos/burgo-tablero';
 import type { CartaDelBurgo, MazoId } from '../../shared/arcade/juegos/burgo-tablero';
+import { movimientoDelHallazgo } from '../../shared/arcade/juegos/hallazgo';
+import { clasesDe, HALLAZGOS_DEL_BURGO } from '../../shared/arcade/juegos/hallazgos-de-los-juegos';
 import { MARCAS_VETADAS } from './marcas-registradas';
 import { asientosDelRobot, jugarConElRobot, loQueHaceElRobot, loQueHaceElRobotMudo } from './robot-del-burgo';
 import type { DecisionDelRobot } from './robot-del-burgo';
@@ -2860,6 +2863,123 @@ function reprochesDeNoObrar(e: EstadoDelBurgo, quien: AsientoId, casilla: number
   comprobar('sin tope (0), noventa y nueve vueltas no acaban nada: es la partida que ofrece el Muelle hoy', nadaDeFin.momento === 'jugando', nadaDeFin.momento);
 }
 
+{
+  /*
+   * ═══ EL HALLAZGO DE LA CALLE (`arcade:hallazgo`, docs/AVATARES-JUGABLES.md §3) ═══
+   *
+   * Lo mete el servidor con `quien: null` cuando alguien recoge algo a pie en Boots on Board. Se
+   * afirma: que cada clase da lo que dice `EUROS_DEL_HALLAZGO` y lo saca de la banca por el camino
+   * de la Salida (un `cobra` de `de: null` con `porque: 'calle'`); que el pregón lo dice con la
+   * clase; que no toca nada más; que con el dinero en vilo sale EL MISMO objeto; y que lo que no
+   * debió llegar se rechaza con motivo y deja la mesa igual.
+   */
+  const ctxDelServidor = (asientos: readonly AsientoId[], quien: AsientoId | null = null): ContextoMovimiento => ({
+    quien,
+    azar: 7,
+    tic: 0,
+    asientos: [...asientos],
+  });
+  const hallazgo = (
+    e: EstadoDelBurgo,
+    para: string,
+    clase: string,
+    asientos: readonly AsientoId[] = TRES,
+    quien: AsientoId | null = null,
+  ): { estado: EstadoDelBurgo; motivo: string | null } => {
+    const r = aplicarConMotivo<EstadoDelBurgo | undefined>(avanzarElBurgo, e, movimientoDelHallazgo(para, clase), ctxDelServidor(asientos, quien));
+    return { estado: r.estado as EstadoDelBurgo, motivo: r.motivo };
+  };
+
+  const base = turnoDe(estadoDe(empezada('HALL', TRES, 23)), ANA, 'por-pasar');
+  comprobar('EL HALLAZGO: la mesa de la prueba está jugando, sin nada en vilo', base.momento === 'jugando' && base.apuro === null && base.almoneda === null);
+  comprobar(
+    'las tres clases de la tabla de brotes tienen precio en el Burgo, y son las del diseño',
+    canonico(clasesDe(HALLAZGOS_DEL_BURGO)) === canonico(['propina', 'cartera', 'maletin']) &&
+      EUROS_DEL_HALLAZGO.propina === 10 &&
+      EUROS_DEL_HALLAZGO.cartera === 25 &&
+      EUROS_DEL_HALLAZGO.maletin === 60,
+    EUROS_DEL_HALLAZGO,
+  );
+  const PALABRAS: Readonly<Record<string, string>> = { propina: 'unas monedas', cartera: 'una cartera', maletin: 'un maletín' };
+  for (const clase of clasesDe(HALLAZGOS_DEL_BURGO)) {
+    const euros = EUROS_DEL_HALLAZGO[clase] as number;
+    const r = hallazgo(base, BRUNO, clase);
+    const tras = r.estado;
+    comprobar(
+      `  ${clase}: entra sin motivo y suma ${euros} € a quien lo recoge, y a nadie más`,
+      r.motivo === null &&
+        jugadorDe(tras, BRUNO).mrs === jugadorDe(base, BRUNO).mrs + euros &&
+        jugadorDe(tras, ANA).mrs === jugadorDe(base, ANA).mrs &&
+        jugadorDe(tras, CARLA).mrs === jugadorDe(base, CARLA).mrs,
+      r.motivo,
+    );
+    comprobar(
+      `  ${clase}: sale de la banca por el camino de la Salida: un solo cobro de nadie, por la calle y con la clase`,
+      canonico(tras.sucesos) ===
+        canonico([{ que: 'cobra', quien: BRUNO, de: null, cuanto: euros, porque: 'calle', casilla: jugadorDe(base, BRUNO).casilla, hallazgo: clase }]) &&
+        tras.jugada === base.jugada + 1,
+      tras.sucesos,
+    );
+    const pregon = proyectarElBurgo(tras, ESPECTADOR, NOMBRES).pregon;
+    const frase = `Bruno se encuentra ${PALABRAS[clase] as string}: ${maravedies(euros)}.`;
+    comprobar(`  ${clase}: y el pregón lo cuenta con lo que era: «${frase}»`, pregon.includes(frase), pregon);
+    comprobar(
+      `  ${clase}: ni el turno, ni el paso, ni los dados, ni los dobles, ni los tratos, ni los títulos`,
+      canonico({ ...tras, jugadores: [], jugada: 0, sucesos: [] }) === canonico({ ...base, jugadores: [], jugada: 0, sucesos: [] }) &&
+        tras.jugadores.every((j, i) => canonico({ ...j, mrs: 0 }) === canonico({ ...(base.jugadores[i] as JugadorDelBurgo), mrs: 0 })),
+    );
+    comprobar(`  ${clase}: a quien juega no se le ofrece recogerlo: sólo lo mete el servidor`, opcionesEn(tras, BRUNO).every((o) => o.tipo !== 'arcade:hallazgo'));
+  }
+  {
+    /* En el turno de otro, en `por-tirar`, y quien recoge está en la Comisaría: también entra. */
+    const enComisaria = conJugador(turnoDe(base, CARLA, 'por-tirar'), ANA, { presa: 1, casilla: LA_MAZMORRA });
+    const r = hallazgo(enComisaria, ANA, 'maletin');
+    comprobar(
+      '  fuera de su turno y en la Comisaría también se encuentra, y ni la presa ni el turno se mueven',
+      r.motivo === null &&
+        jugadorDe(r.estado, ANA).mrs === jugadorDe(enComisaria, ANA).mrs + 60 &&
+        jugadorDe(r.estado, ANA).presa === 1 &&
+        r.estado.turno === enComisaria.turno &&
+        r.estado.paso === 'por-tirar',
+      r.motivo,
+    );
+  }
+
+  /* CON EL DINERO EN VILO, EL MISMO OBJETO, sin motivo: como el botín. */
+  const deuda: ApuroDelBurgo = { quien: CARLA, deudas: [{ a: null, cuanto: 99999, porque: 'renta' }] };
+  const subasta: AlmonedaDelBurgo = { casilla: 1, edificio: false, puja: 0, quienPuja: null, pujaDe: BRUNO, enPie: [...TRES], abiertaPor: ANA };
+  const enVilo: ReadonlyArray<readonly [string, EstadoDelBurgo]> = [
+    ['un apuro abierto', { ...base, paso: 'apuro', apuro: deuda }],
+    ['un apuro en cola', { ...base, colaDeApuros: [deuda] }],
+    ['una subasta en cola', { ...base, colaDeAlmonedas: [1] }],
+    ['una subasta abierta', { ...base, paso: 'almoneda', almoneda: subasta }],
+  ];
+  for (const [que, e] of enVilo) {
+    const r = hallazgo(e, BRUNO, 'cartera');
+    comprobar(`  con ${que}: EL MISMO estado, sin motivo y sin crónica`, r.estado === e && r.motivo === null, r.motivo);
+  }
+
+  /* Lo que no debió llegar: rechazo CON MOTIVO y la mesa igual. */
+  const quebrada = conJugador(base, CARLA, { quebrado: true, mrs: 0 });
+  const MALOS: ReadonlyArray<readonly [string, EstadoDelBurgo, string, string, readonly AsientoId[], AsientoId | null]> = [
+    ['que manda un asiento', base, BRUNO, 'cartera', TRES, BRUNO],
+    ['de una clase que no es del Burgo', base, BRUNO, 'escudo', TRES, null],
+    ['para alguien que no está sentado', base, DIEGO, 'cartera', TRES, null],
+    ['para alguien sentado que no juega esta partida', base, DIEGO, 'cartera', CUATRO, null],
+    ['para quien ha quebrado', quebrada, CARLA, 'maletin', TRES, null],
+    ['con la partida sin empezar', partidaNueva(), BRUNO, 'cartera', TRES, null],
+    ['con la partida terminada', { ...base, momento: 'terminada', ganadores: [ANA] }, BRUNO, 'cartera', TRES, null],
+  ];
+  for (const [que, e, para, clase, asientos, quien] of MALOS) {
+    const r = hallazgo(e, para, clase, asientos, quien);
+    comprobar(`  se rechaza con motivo un hallazgo ${que}, y la mesa no cambia`, r.motivo !== null && r.motivo.length > 0 && canonico(r.estado) === canonico(e), r.motivo);
+  }
+  {
+    const r = aplicarConMotivo(avanzarElBurgo, base, { tipo: 'arcade:hallazgo', carga: { para: BRUNO, clase: 'cartera', cuanto: 5000 } }, ctxDelServidor(TRES));
+    comprobar('  y uno con una clave de más en la carga (lo que vale no lo dice el servidor)', r.motivo !== null && r.estado === base, r.motivo);
+  }
+}
+
 // ═══ FIN DE LOS BLOQUES ═══
 
 // ---------------------------------------------------------------------------
@@ -2876,7 +2996,8 @@ if (fallos.length > 0) {
  * fichero) y DESPUÉS de imprimir las rojas: al ras dispara antes que la roja y se
  * lleva por delante los nombres de lo que ya se había encontrado.
  */
-const COMPROBACIONES_ESCRITAS = 601;
+/* 631 = las 601 de antes + las 30 del hallazgo de la calle. */
+const COMPROBACIONES_ESCRITAS = 631;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion: ` +

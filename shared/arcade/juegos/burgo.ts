@@ -100,6 +100,10 @@
  *     `MRS_DEL_BOTIN` de la bolsa de quien cae, nunca abre un apuro, y NO se aplica —mismo
  *     estado— con una subasta o un apuro en la mesa, abiertos o en cola. Un quebrado ni lo da ni
  *     lo recibe. Ver `elBotin`.
+ *   · El hallazgo de la calle (`arcade:hallazgo`, también lo mete el servidor) saca de la banca
+ *     `EUROS_DEL_HALLAZGO[clase]` por el mismo camino que el sueldo de la Salida, con el motivo
+ *     `'calle'`; con el dinero en vilo, mismo estado, como el botín; a un quebrado no se le da
+ *     nada. Ver `elHallazgo`.
  *
  * ═══ LAS CUATRO REGLAS OFICIALES QUE FALTABAN, Y CÓMO SE CIERRAN ═══
  *
@@ -193,6 +197,8 @@ import { esTic } from '../reloj';
 import { comoSeLlama, ESPECTADOR, NADIE_SENTADO } from '../tipos';
 import type { ArcadeId, AsientoId, LosSentados, ManifiestoDeArcade, QuienMira } from '../tipos';
 import { esBotin, leerElBotin } from './botin';
+import { esHallazgo, leerElHallazgo } from './hallazgo';
+import { clasesDe, HALLAZGOS_DEL_BURGO } from './hallazgos-de-los-juegos';
 import {
   BARRIOS,
   CASAS_DEL_CONCEJO,
@@ -323,6 +329,23 @@ export const PASOS_DE_UN_PASEO = 12;
  */
 export const MRS_DEL_BOTIN = 100;
 
+/**
+ * LO QUE VALE CADA HALLAZGO DE LA CALLE, en euros. Las clases (y su peso al brotar) las dice
+ * `HALLAZGOS_DEL_BURGO`; lo que vale cada una lo dice el juego, que es quien sabe qué es dinero en
+ * su mesa. Ver `docs/AVATARES-JUGABLES.md` §3 y `elHallazgo`.
+ *
+ * El maletín, que es el raro, es poco más de un cuarto del sueldo de la Salida: con los topes del
+ * servidor, andar da del orden de un sueldo cada pocos minutos. Cuenta, y no sustituye a la mesa.
+ */
+export const EUROS_DEL_HALLAZGO: Readonly<Record<string, number>> = { propina: 10, cartera: 25, maletin: 60 };
+
+/** Cómo se dice lo que se encuentra, con su artículo: «Ana se encuentra una cartera: 25 €.» */
+const HALLAZGO_EN_PALABRAS: Readonly<Record<string, string>> = {
+  propina: 'unas monedas',
+  cartera: 'una cartera',
+  maletin: 'un maletín',
+};
+
 /** `presa` de un jugador libre. */
 export const LIBRE = -1;
 /** El índice de «nadie» en `jugadores`. */
@@ -419,7 +442,9 @@ export type PorqueDelDinero =
   | 'reparaciones'
   | 'sorteo'
   /** El botín de Boots on Board: lo que se lleva quien tumba a otro. Nunca es una deuda. */
-  | 'refriega';
+  | 'refriega'
+  /** Lo que se encuentra a pie en Boots on Board: sale de la banca. Nunca es una deuda. */
+  | 'calle';
 
 export interface DeudaDelBurgo {
   readonly a: AsientoId | null;
@@ -494,6 +519,12 @@ export type SucesoDelBurgo =
       readonly cuanto: number;
       readonly porque: PorqueDelDinero;
       readonly casilla: number;
+      /**
+       * SÓLO con `porque: 'calle'`: la clase de lo que se encontró (`propina`, `cartera`,
+       * `maletin`), para que el pregón diga QUÉ y no sólo cuánto. Opcional y ausente en todo otro
+       * cobro: los sucesos de una partida sin hallazgos son, byte a byte, los de antes.
+       */
+      readonly hallazgo?: string;
     }
   | {
       readonly que: 'paga';
@@ -2577,6 +2608,8 @@ export function avanzarElBurgo(
    * siempre. Su lector es más estricto que el portillo. Ver `elBotin`.
    */
   if (esBotin(movimiento)) return elBotin(actual, movimiento.carga, ctx);
+  /* EL HALLAZGO DE LA CALLE, por lo mismo que el botín: lo mete el servidor y nadie lo ofrece. */
+  if (esHallazgo(movimiento)) return elHallazgo(actual, movimiento.carga, ctx);
 
   const vista = loQueSeVe(actual, ctx.quien, NADIE_SENTADO);
   if (!estaOfrecido(opcionesDelBurgo(vista, ctx.quien), movimiento)) {
@@ -2850,6 +2883,75 @@ function elBotin(e: EstadoDelBurgo, carga: unknown, ctx: ContextoMovimiento): Es
   /* No puede fallar —`cuanto` cabe en la bolsa—, y si fallara no se escribe ni un suceso de algo que no pasó. */
   if (!pagoHecho(e, s, de, cuanto)) return e;
   return conSucesos(s, cronica);
+}
+
+// ---------------------------------------------------------------------------
+// EL HALLAZGO DE LA CALLE: lo único que entra en la mesa porque alguien anduvo
+// ---------------------------------------------------------------------------
+
+/**
+ * EL HALLAZGO: `para` recogió a pie algo de la clase `clase` en Boots on Board. La banca le da
+ * `EUROS_DEL_HALLAZGO[clase]`, y nada más. Ver `docs/AVATARES-JUGABLES.md` §3.
+ *
+ * ═══ POR EL MISMO CAMINO QUE EL SUELDO DE LA SALIDA ═══
+ *
+ * `transferirEntre` desde el Ayuntamiento (`de: null`), que es como `mover` paga la Salida: la
+ * banca no se queda sin dinero, así que el pago no puede abrir un apuro, y deja en la crónica el
+ * `cobra` de siempre —con `porque: 'calle'` y la clase en `hallazgo`— para que la escena anime las
+ * monedas y el pregón lo cuente: «Ana se encuentra una cartera: 25 €.» Es el ÚNICO dinero que Boots
+ * on Board crea: el botín lo pasa de uno a otro, y esto lo saca de la banca.
+ *
+ * ═══ LO QUE SE RECHAZA, CON SU MOTIVO ═══
+ *
+ * La carga mal hecha, lo que manda un asiento, quien no está sentado y una clase que no es de
+ * `HALLAZGOS_DEL_BURGO` ya los dice `leerElHallazgo`. Lo que sólo sabe el juego lo dice esto: que la
+ * partida esté `jugando`, que `para` juegue ESTA partida y que no haya quebrado —quien quiebra está
+ * fuera, y `transferirEntre` le pasaría el dinero al Ayuntamiento, que es darle a la banca su propio
+ * dinero y apuntar en la crónica que alguien se encontró algo—.
+ *
+ * ═══ CON EL DINERO EN VILO, EL MISMO ESTADO, COMO EL BOTÍN ═══
+ *
+ * Con una subasta o un apuro en la mesa, abiertos o en cola, NO se aplica, por las mismas razones que
+ * escribe `elBotin`: un endeudado que cobra en medio de su apuro quedaría con dinero para pagar y
+ * seguiría en apuro, y un postor que cobra a mitad de puja cambiaría la puja sin pujar. No es un
+ * rechazo: el hallazgo era bueno, y sencillamente la mesa no lo puede tomar ahora. Quien lo recogió
+ * lo pierde, como pierde el botín quien tumba a otro en ese momento.
+ *
+ * ═══ LO QUE NO TOCA ═══
+ *
+ * Ni el turno, ni el paso, ni `luego`, ni los dobles, ni la tirada, ni los plazos, ni los tratos: la
+ * mesa reprograma su plazo cuando cambia `turnoDe`, y un hallazgo que lo moviera le daría o le
+ * quitaría tiempo a quien juega sin que jugara nadie. Sube `jugada` y sustituye `sucesos`, que es
+ * como cierra cualquier cambio. Y no mira si la partida acabó: dinero que entra no quiebra a nadie.
+ */
+function elHallazgo(e: EstadoDelBurgo, carga: unknown, ctx: ContextoMovimiento): EstadoDelBurgo | Rechazo<EstadoDelBurgo> {
+  const hallazgo = leerElHallazgo(carga, ctx.quien, ctx.asientos, clasesDe(HALLAZGOS_DEL_BURGO));
+  if (hallazgo === null) {
+    return rechazar(e, 'Ese hallazgo no vale: lo mete la mesa, para un sentado y de una clase que exista en el Burgo.');
+  }
+  if (e.momento === 'reuniendo') return rechazar(e, 'La partida no ha empezado: todavía no hay nada que encontrar.');
+  if (e.momento !== 'jugando') return rechazar(e, 'La partida ya ha terminado: ya no hay nada que encontrar.');
+  const para = indiceDelJugador(e, hallazgo.para);
+  if (para === NADIE) return rechazar(e, 'Ese hallazgo es de alguien que no juega esta partida.');
+  if (!estaVivo(e, para)) return rechazar(e, 'Quien ha quebrado ya no juega: no se le da nada.');
+  if (elDineroEstaEnVilo(e)) return e;
+
+  const cuanto = Object.prototype.hasOwnProperty.call(EUROS_DEL_HALLAZGO, hallazgo.clase)
+    ? (EUROS_DEL_HALLAZGO[hallazgo.clase] as number)
+    : 0;
+  /* Una clase de la tabla de brotes sin precio aquí es un fallo de este fichero, no del servidor. */
+  if (!(cuanto > 0)) return rechazar(e, `El Burgo no sabe cuánto vale «${hallazgo.clase}».`);
+
+  const j = jugadorEn(e, para) as JugadorDelBurgo;
+  const cronica: Cronica = [];
+  const s = transferirEntre(e, null, para, cuanto, 'calle', j.casilla, cronica);
+  const d = jugadorEn(s, para);
+  /* No puede fallar —la banca siempre paga—, y si fallara no se escribe un suceso de algo que no pasó. */
+  if (d === null || d.mrs !== j.mrs + cuanto) return e;
+  const conClase: Cronica = cronica.map((suceso) =>
+    suceso.que === 'cobra' && suceso.porque === 'calle' ? { ...suceso, hallazgo: hallazgo.clase } : suceso,
+  );
+  return conSucesos(s, conClase);
 }
 
 /**
@@ -3181,6 +3283,8 @@ export function porqueEnPalabras(porque: PorqueDelDinero): string {
       return 'del sorteo';
     case 'refriega':
       return 'en la refriega';
+    case 'calle':
+      return 'por la calle';
     default:
       return '';
   }
@@ -3231,6 +3335,17 @@ function fraseDe(s: SucesoDelBurgo, nombre: (a: AsientoId | null) => string, deO
         s.porLaPuertaMayor ? ' pasando por la Salida' : ''
       }.`;
     case 'cobra':
+      /*
+       * LO QUE SE ENCUENTRA POR LA CALLE no se cobra: se encuentra. «Ana cobra 25 € por la calle»
+       * se leería como un sueldo; se dice qué fue y cuánto traía.
+       */
+      if (s.porque === 'calle' && s.de === null) {
+        const que =
+          s.hallazgo !== undefined && Object.prototype.hasOwnProperty.call(HALLAZGO_EN_PALABRAS, s.hallazgo)
+            ? (HALLAZGO_EN_PALABRAS[s.hallazgo] as string)
+            : 'algo';
+        return `${nombre(s.quien)} se encuentra ${que}: ${maravedies(s.cuanto)}.`;
+      }
       return s.de === null ? `${nombre(s.quien)} cobra ${maravedies(s.cuanto)} ${porqueEnPalabras(s.porque)}.` : '';
     case 'paga':
       /*

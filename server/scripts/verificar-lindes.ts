@@ -85,8 +85,22 @@ import {
   tableroDeLasLindes,
   proyectarLasLindes,
   seAcabo,
+  ID_DE_LA_LEVA,
+  PUNTOS_DEL_BOTIN,
 } from '../../shared/arcade/juegos/lindes';
-import type { EstadoDeLasLindes } from '../../shared/arcade/juegos/lindes';
+import type { EstadoDeLasLindes, Labriego, Opcion, VistaDeLasLindes } from '../../shared/arcade/juegos/lindes';
+import {
+  ESCUDOS_DEL_BOTIN,
+  ESCUDOS_POR_LEVA,
+  LEVA,
+  LEVAS_POR_JUGADOR,
+  PUNTOS_POR_ESCUDO,
+  escudosDeLaVista,
+  levasDeLaVista,
+} from '../../shared/arcade/juegos/lindes-escudos';
+import { movimientoDelHallazgo } from '../../shared/arcade/juegos/hallazgo';
+import { movimientoDelBotin } from '../../shared/arcade/juegos/botin';
+import { HALLAZGOS_DE_LAS_LINDES, clasesDe } from '../../shared/arcade/juegos/hallazgos-de-los-juegos';
 import { aplicar, esRechazo } from '../../shared/arcade/motor';
 import { canonico } from '../../shared/mecanicas/canonico';
 import type { ContextoMovimiento, Movimiento } from '../../shared/arcade/movimiento';
@@ -994,6 +1008,344 @@ paso('El portillo y lo que no puede salir');
       'y no falta ninguna: son las mismas que dice el catálogo',
       vista.colocaciones.length === dondeCabe(estado.tablero as Tablero, losa.id).length,
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+paso('A pie: el escudo, la leva, el recuento final y el botín con escudos (AVATARES-JUGABLES §5)');
+// ---------------------------------------------------------------------------
+
+{
+  /*
+   * ═══ LO QUE SE AFIRMA, Y CONTRA QUÉ ═══
+   *
+   * Todo lo de aquí sólo existe en una mesa `botas`: los escudos llegan por `arcade:hallazgo`, que
+   * sólo mete el servidor. Que una partida sin hallazgos quede byte a byte como antes lo congela
+   * `oro:arcade`; aquí se afirma lo nuevo, con el reductor de verdad y una partida jugada entera:
+   *
+   *   · el hallazgo suma un escudo a quien lo recoge, y rechaza con motivo lo que no debió llegar;
+   *   · la leva se ofrece SÓLO a quien puede pagarla, tenga o no el turno; gasta, suma un labriego,
+   *     apunta la leva y no toca el turno; no pasa de `LEVAS_POR_JUGADOR`;
+   *   · en el recuento final cada escudo sin gastar suma `PUNTOS_POR_ESCUDO` y cuenta para ganar;
+   *   · el botín pasa un escudo si lo hay, y sin escudos es exactamente el de antes.
+   */
+  const ANA: AsientoId = 'p-ana';
+  const BEA: AsientoId = 'p-bea';
+  const CID: AsientoId = 'p-cid';
+  const DAN: AsientoId = 'p-dan';
+  const TRES_A: readonly AsientoId[] = [ANA, BEA, CID];
+  const CUATRO_A: readonly AsientoId[] = [ANA, BEA, CID, DAN];
+  const SENTADOS_A: LosSentados = [
+    { asiento: ANA, nombre: 'Ana' },
+    { asiento: BEA, nombre: 'Bea' },
+    { asiento: CID, nombre: 'Cid' },
+  ];
+  const AZAR = 20260927;
+
+  interface Salida {
+    readonly estado: EstadoDeLasLindes;
+    readonly motivo: string | null;
+  }
+  const mandar = (e: EstadoDeLasLindes, mov: Movimiento, quien: AsientoId | null, asientos: readonly AsientoId[] = TRES_A): Salida => {
+    const s = avanzarLasLindes(e, mov, ctxDe(quien, asientos, AZAR));
+    return esRechazo(s) ? { estado: s.estado, motivo: s.motivo } : { estado: s, motivo: null };
+  };
+  const escudo = (
+    e: EstadoDeLasLindes,
+    para: AsientoId,
+    asientos: readonly AsientoId[] = TRES_A,
+    quien: AsientoId | null = null,
+    clase = 'escudo',
+  ): Salida => mandar(e, movimientoDelHallazgo(para, clase), quien, asientos);
+  const escudos = (e: EstadoDeLasLindes, para: AsientoId, cuantos: number): EstadoDeLasLindes => {
+    let s = e;
+    for (let i = 0; i < cuantos; i++) s = escudo(s, para).estado;
+    return s;
+  };
+  const leva = (e: EstadoDeLasLindes, quien: AsientoId | null, asientos: readonly AsientoId[] = TRES_A): Salida =>
+    mandar(e, { tipo: LEVA, carga: {} }, quien, asientos);
+  const opcionesDe = (e: EstadoDeLasLindes, quien: AsientoId): readonly Opcion[] =>
+    opcionesDeLasLindes(loQueSeVe(e, quien, NADIE_SENTADO), quien);
+  const ofreceLaLeva = (e: EstadoDeLasLindes, quien: AsientoId): boolean =>
+    opcionesDe(e, quien).some((o) => o.tipo === LEVA && o.id === ID_DE_LA_LEVA);
+  const labriego = (e: EstadoDeLasLindes, a: AsientoId): Labriego => e.labriegos.find((l) => l.asiento === a) as Labriego;
+  const vistaPublica = (e: EstadoDeLasLindes): VistaDeLasLindes => proyectarLasLindes(e, null, SENTADOS_A);
+  /** Todo menos lo que un cambio de a pie puede tocar: para afirmar que no tocó nada más. */
+  const loDelTurno = (e: EstadoDeLasLindes): string =>
+    canonico({ ...e, labriegos: e.labriegos.map((l) => l.asiento), escudos: null, levas: null, refriegas: null });
+
+  /**
+   * UNA PARTIDA ENTERA JUGADA SIEMPRE IGUAL: quien tiene el turno hace lo primero que se le ofrece
+   * que no sea la leva. Así la misma partida se puede jugar con y sin escudos y comparar el final.
+   * `alEmpezar` mete lo de a pie justo después de volcar la bolsa.
+   */
+  const jugarEntera = (
+    alEmpezar: (e: EstadoDeLasLindes) => EstadoDeLasLindes,
+  ): { final: EstadoDeLasLindes } => {
+    let e = alEmpezar(mandar(partidaNueva(), { tipo: EMPEZAR, carga: null }, ANA).estado);
+    for (let vuelta = 0; vuelta < 600 && !seAcabo(e); vuelta++) {
+      const quien = deQuienEsElTurno(e);
+      if (quien === null) break;
+      const o = opcionesDe(e, quien).find((x) => x.tipo !== LEVA);
+      if (o === undefined) break;
+      const s = mandar(e, { tipo: o.tipo, carga: o.carga }, quien);
+      if (s.motivo !== null || s.estado === e) break;
+      e = s.estado;
+    }
+    return { final: e };
+  };
+
+  const empezada = mandar(partidaNueva(), { tipo: EMPEZAR, carga: null }, ANA).estado;
+  comprobar('A PIE: la partida de la prueba se juega, colocando, y le toca a Ana', empezada.momento === 'colocando' && deQuienEsElTurno(empezada) === ANA);
+  comprobar('las Lindes sólo tienen una clase de hallazgo, el escudo', canonico(clasesDe(HALLAZGOS_DE_LAS_LINDES)) === canonico(['escudo']));
+  comprobar(
+    'sin hallazgos no hay ni `escudos` ni `levas`, ni en el estado ni en la vista',
+    !('escudos' in empezada) && !('levas' in empezada) && !('escudos' in vistaPublica(empezada)) && !('levas' in vistaPublica(empezada)),
+  );
+  comprobar('y a nadie se le ofrece la leva', TRES_A.every((a) => !ofreceLaLeva(empezada, a)));
+
+  /* EL HALLAZGO. */
+  {
+    const r = escudo(empezada, BEA);
+    comprobar('un escudo entra sin motivo y suma uno a quien lo recoge', r.motivo === null && canonico(r.estado.escudos) === canonico({ [BEA]: 1 }), r.estado.escudos);
+    comprobar(
+      '  y no toca ni el turno, ni el momento, ni la losa de la mano, ni los puntos',
+      loDelTurno(r.estado) === loDelTurno(empezada) && canonico(r.estado.labriegos) === canonico(empezada.labriegos),
+    );
+    const dos = escudo(escudo(r.estado, BEA).estado, CID).estado;
+    comprobar('  se acumulan, por asiento', canonico(dos.escudos) === canonico({ [BEA]: 2, [CID]: 1 }), dos.escudos);
+    const vista = vistaPublica(dos);
+    comprobar(
+      '  la vista pública los enseña con el nombre `escudos`, y los lee `escudosDeLaVista`',
+      escudosDeLaVista(vista, BEA) === 2 && escudosDeLaVista(vista, CID) === 1 && escudosDeLaVista(vista, ANA) === 0 && !('levas' in vista),
+      vista.escudos,
+    );
+    comprobar('  y la ve igual quien juega que quien mira: no son secretos', canonico(proyectarLasLindes(dos, ANA, SENTADOS_A).escudos) === canonico(vista.escudos));
+    comprobar(
+      '  un panel los cuenta',
+      vista.tablero.paneles.some((p) => p.titulo === 'Los escudos' && p.lineas.some((l) => l.startsWith('Bea: 2 escudos'))),
+      vista.tablero.paneles,
+    );
+  }
+  const terminadaSola = jugarEntera((e) => e).final;
+  comprobar('la partida de la prueba termina', seAcabo(terminadaSola), terminadaSola.momento);
+  {
+    const MALOS: ReadonlyArray<readonly [string, EstadoDeLasLindes, AsientoId, readonly AsientoId[], AsientoId | null, string]> = [
+      ['que manda un asiento', empezada, BEA, TRES_A, BEA, 'escudo'],
+      ['de una clase que no es del valle', empezada, BEA, TRES_A, null, 'cartera'],
+      ['para alguien que no está sentado', empezada, DAN, TRES_A, null, 'escudo'],
+      ['para alguien sentado que no juega esta partida', empezada, DAN, CUATRO_A, null, 'escudo'],
+      ['con la partida sin empezar', partidaNueva(), ANA, TRES_A, null, 'escudo'],
+      ['con la partida terminada', terminadaSola, ANA, TRES_A, null, 'escudo'],
+    ];
+    for (const [que, e, para, asientos, quien, clase] of MALOS) {
+      const r = escudo(e, para, asientos, quien, clase);
+      comprobar(
+        `  se rechaza con motivo un hallazgo ${que}, y la mesa no cambia`,
+        r.motivo !== null && r.motivo.length > 0 && canonico(r.estado) === canonico(e),
+        r.motivo,
+      );
+    }
+  }
+
+  /* LA LEVA. */
+  {
+    const conDos = escudos(empezada, BEA, ESCUDOS_POR_LEVA - 1);
+    comprobar(`con ${ESCUDOS_POR_LEVA - 1} escudos no se ofrece la leva`, !ofreceLaLeva(conDos, BEA));
+    const r0 = leva(conDos, BEA);
+    comprobar('  y mandada a mano se rechaza con motivo, sin tocar nada', r0.motivo !== null && r0.estado === conDos, r0.motivo);
+
+    const conTres = escudos(empezada, BEA, ESCUDOS_POR_LEVA);
+    comprobar(
+      `con ${ESCUDOS_POR_LEVA} se le ofrece a Bea aunque no sea su turno, con id «${ID_DE_LA_LEVA}»`,
+      ofreceLaLeva(conTres, BEA) && deQuienEsElTurno(conTres) === ANA,
+    );
+    const opcion = opcionesDe(conTres, BEA).find((o) => o.tipo === LEVA);
+    comprobar('  la opción lleva la carga vacía, que es la del contrato', opcion !== undefined && canonico(opcion.carga) === canonico({}), opcion);
+    comprobar('  y a los demás, que no tienen escudos, no', !ofreceLaLeva(conTres, ANA) && !ofreceLaLeva(conTres, CID));
+    const deAna = opcionesDe(escudos(empezada, ANA, ESCUDOS_POR_LEVA), ANA);
+    comprobar(
+      '  a quien tiene el turno se le ofrece también, DETRÁS de sus colocaciones',
+      deAna.length > 1 && deAna[deAna.length - 1]?.tipo === LEVA && deAna.slice(0, -1).every((o) => o.tipo === PONER),
+      deAna.map((o) => o.id),
+    );
+    {
+      const suyo = tableroDeLasLindes(loQueSeVe(conTres, BEA, NADIE_SENTADO), opcionesDe(conTres, BEA));
+      comprobar(
+        '  en el tablero de quien espera sale el botón de la leva, y sigue diciendo «Le toca a otro»',
+        suyo.acciones.some((a) => a.id === ID_DE_LA_LEVA && a.disponible) && suyo.acciones.some((a) => a.id === 'espera'),
+        suyo.acciones.map((a) => a.id),
+      );
+    }
+
+    const r = leva(conTres, BEA);
+    comprobar('la leva entra sin motivo', r.motivo === null, r.motivo);
+    comprobar(`  gasta ${ESCUDOS_POR_LEVA} escudos`, escudosDeLaVista(vistaPublica(r.estado), BEA) === 0, r.estado.escudos);
+    comprobar('  suma un labriego sin plantar', labriego(r.estado, BEA).sinPlantar === labriego(conTres, BEA).sinPlantar + 1);
+    comprobar(
+      '  y apunta la leva, en el estado y en la vista (`levas`)',
+      canonico(r.estado.levas) === canonico({ [BEA]: 1 }) && levasDeLaVista(vistaPublica(r.estado), BEA) === 1,
+      r.estado.levas,
+    );
+    comprobar('  sin tocar el turno, el momento ni la losa de la mano', loDelTurno(r.estado) === loDelTurno(conTres));
+    comprobar(
+      '  ni los puntos de nadie, ni los labriegos de los demás',
+      r.estado.labriegos.every((l, i) =>
+        l.asiento === BEA ? l.puntos === labriego(conTres, BEA).puntos : canonico(l) === canonico(conTres.labriegos[i]),
+      ),
+    );
+    comprobar('  y gastados los escudos ya no se ofrece', !ofreceLaLeva(r.estado, BEA));
+
+    /* El tope. */
+    let e = escudos(empezada, CID, ESCUDOS_POR_LEVA * (LEVAS_POR_JUGADOR + 1));
+    let pagadas = 0;
+    for (let i = 0; i < LEVAS_POR_JUGADOR; i++) {
+      const s = leva(e, CID);
+      if (s.motivo === null && s.estado !== e) pagadas++;
+      e = s.estado;
+    }
+    comprobar(
+      `se pagan hasta ${LEVAS_POR_JUGADOR} levas por partida`,
+      pagadas === LEVAS_POR_JUGADOR && labriego(e, CID).sinPlantar === LABRIEGOS_POR_JUGADOR + LEVAS_POR_JUGADOR,
+    );
+    comprobar(
+      `  con ${ESCUDOS_POR_LEVA} escudos aún en la mano, la ${LEVAS_POR_JUGADOR + 1}.ª ya no se ofrece`,
+      escudosDeLaVista(vistaPublica(e), CID) === ESCUDOS_POR_LEVA && !ofreceLaLeva(e, CID),
+    );
+    const tercera = leva(e, CID);
+    comprobar('  y mandada a mano se rechaza con motivo', tercera.motivo !== null && tercera.estado === e, tercera.motivo);
+
+    /* En `plantando` también, y de quien no tiene el turno. */
+    let puesta = conTres;
+    for (const o of opcionesDe(conTres, ANA)) {
+      if (o.tipo !== PONER) continue;
+      const s = mandar(conTres, { tipo: PONER, carga: o.carga }, ANA).estado;
+      if (s.momento === 'plantando') {
+        puesta = s;
+        break;
+      }
+    }
+    comprobar('hay una colocación de la primera losa que deja a Ana plantando', puesta.momento === 'plantando');
+    comprobar('  en `plantando` se ofrece igual a quien puede pagarla', ofreceLaLeva(puesta, BEA));
+    const p = leva(puesta, BEA);
+    comprobar(
+      '  y entra sin mover el turno ni el momento',
+      p.motivo === null && p.estado.momento === 'plantando' && deQuienEsElTurno(p.estado) === ANA && loDelTurno(p.estado) === loDelTurno(puesta),
+      p.motivo,
+    );
+
+    /* Quien no puede. */
+    const mal1 = leva(conTres, DAN, CUATRO_A);
+    comprobar('la leva de un sentado que no juega esta partida se rechaza con motivo', mal1.motivo !== null && mal1.estado === conTres, mal1.motivo);
+    const mal2 = leva(partidaNueva(), ANA);
+    comprobar('  y la de una partida sin empezar', mal2.motivo !== null, mal2.motivo);
+    comprobar('  y en la partida terminada no se le ofrece nada a nadie', TRES_A.every((a) => opcionesDe(terminadaSola, a).length === 0));
+  }
+
+  /* EL RECUENTO FINAL. */
+  {
+    const sinEscudos = terminadaSola;
+    const puntos = (a: AsientoId): number => labriego(sinEscudos, a).puntos;
+    let mayor = 0;
+    for (const a of TRES_A) if (puntos(a) > mayor) mayor = puntos(a);
+    const rezagado = TRES_A.slice().sort((x, y) => puntos(x) - puntos(y))[0] as AsientoId;
+    const cuantos = mayor - puntos(rezagado) + 1;
+    const conEscudos = jugarEntera((e) => escudos(e, rezagado, cuantos)).final;
+    comprobar('con escudos la partida se juega igual y termina', seAcabo(conEscudos) && canonico(conEscudos.tablero) === canonico(sinEscudos.tablero));
+    comprobar(
+      `el recuento final suma ${PUNTOS_POR_ESCUDO} por escudo sin gastar a su dueño, y a nadie más`,
+      labriego(conEscudos, rezagado).puntos === puntos(rezagado) + cuantos * PUNTOS_POR_ESCUDO &&
+        TRES_A.filter((a) => a !== rezagado).every((a) => labriego(conEscudos, a).puntos === puntos(a)),
+      { rezagado, cuantos, antes: sinEscudos.labriegos, despues: conEscudos.labriegos },
+    );
+    comprobar(
+      `  y cuenta para ganar: quien iba último, con ${cuantos} escudos, gana solo`,
+      canonico(conEscudos.ganadores) === canonico([rezagado]) && canonico(sinEscudos.ganadores) !== canonico([rezagado]),
+      { antes: sinEscudos.ganadores, despues: conEscudos.ganadores },
+    );
+    const vista = vistaPublica(conEscudos);
+    comprobar(
+      '  y el marcador final dice de dónde salieron esos puntos',
+      vista.tablero.paneles.some(
+        (p) => p.titulo === 'Los escudos' && p.lineas.some((l) => l.includes(`+${cuantos * PUNTOS_POR_ESCUDO} en el recuento`)),
+      ),
+      vista.tablero.paneles,
+    );
+    comprobar('  los escudos se quedan escritos después del recuento, para poder contarlo', escudosDeLaVista(vista, rezagado) === cuantos);
+  }
+
+  /* EL BOTÍN CON ESCUDOS. */
+  {
+    /*
+     * Los puntos se ponen a mano: la partida de «lo primero que se ofrece» no cierra casi nada antes
+     * del recuento, y lo que se prueba aquí es el botín, no cómo se ganan.
+     */
+    const conPuntos: EstadoDeLasLindes | null = {
+      ...empezada,
+      labriegos: empezada.labriegos.map((l) => (l.asiento === ANA ? { ...l, puntos: PUNTOS_DEL_BOTIN + 4 } : l)),
+    };
+    comprobar('la mesa del botín: Ana lleva más puntos que el botín', labriego(conPuntos, ANA).puntos > PUNTOS_DEL_BOTIN);
+    if (conPuntos !== null) {
+      const de = conPuntos.labriegos.find((l) => l.puntos > PUNTOS_DEL_BOTIN)?.asiento as AsientoId;
+      const para = TRES_A.find((a) => a !== de) as AsientoId;
+      const botin = (e: EstadoDeLasLindes): Salida => mandar(e, movimientoDelBotin(de, para), null);
+
+      const sinNada = botin(conPuntos);
+      comprobar(
+        'sin escudos, el botín es el de antes: ni `escudos` en el estado ni en la refriega',
+        sinNada.motivo === null &&
+          !('escudos' in sinNada.estado) &&
+          canonico(sinNada.estado.refriegas) === canonico([{ de, para, puntos: PUNTOS_DEL_BOTIN }]),
+        sinNada.estado.refriegas,
+      );
+      const conMapa = escudo(conPuntos, para).estado;
+      const conMapaTras = botin(conMapa);
+      comprobar(
+        '  y con escudos en la mesa pero ninguno en quien cae, igual: la refriega no los nombra y el mapa no cambia',
+        canonico(conMapaTras.estado.refriegas) === canonico([{ de, para, puntos: PUNTOS_DEL_BOTIN }]) &&
+          canonico(conMapaTras.estado.escudos) === canonico(conMapa.escudos),
+      );
+
+      const cargado = escudos(conPuntos, de, 2);
+      const r = botin(cargado);
+      comprobar(
+        `con escudos, además de los ${PUNTOS_DEL_BOTIN} puntos pasa ${ESCUDOS_DEL_BOTIN} escudo de quien cae a quien lo tumbó`,
+        r.motivo === null &&
+          escudosDeLaVista(vistaPublica(r.estado), de) === 2 - ESCUDOS_DEL_BOTIN &&
+          escudosDeLaVista(vistaPublica(r.estado), para) === ESCUDOS_DEL_BOTIN &&
+          labriego(r.estado, de).puntos === labriego(cargado, de).puntos - PUNTOS_DEL_BOTIN &&
+          labriego(r.estado, para).puntos === labriego(cargado, para).puntos + PUNTOS_DEL_BOTIN,
+        r.estado.escudos,
+      );
+      comprobar(
+        '  y la refriega lo apunta y lo cuenta',
+        canonico(r.estado.refriegas) === canonico([{ de, para, puntos: PUNTOS_DEL_BOTIN, escudos: ESCUDOS_DEL_BOTIN }]) &&
+          (vistaPublica(r.estado).refriegas ?? []).some(
+            (x) => x.escudos === ESCUDOS_DEL_BOTIN && x.frase.includes(`${PUNTOS_DEL_BOTIN} puntos y 1 escudo`),
+          ),
+        vistaPublica(r.estado).refriegas,
+      );
+      comprobar('  sin tocar el turno ni la losa de la mano', loDelTurno(r.estado) === loDelTurno(cargado));
+
+      /* Sin puntos y con un escudo: se lleva el escudo, y la refriega dice sólo eso. */
+      const pobre = escudo(empezada, BEA).estado;
+      const p = mandar(pobre, movimientoDelBotin(BEA, CID), null);
+      comprobar(
+        'quien cae sin puntos pero con un escudo pierde el escudo, y no es el mismo estado',
+        p.motivo === null &&
+          p.estado !== pobre &&
+          escudosDeLaVista(vistaPublica(p.estado), BEA) === 0 &&
+          escudosDeLaVista(vistaPublica(p.estado), CID) === 1,
+        p.estado.escudos,
+      );
+      comprobar(
+        '  y la frase no habla de puntos',
+        (vistaPublica(p.estado).refriegas ?? []).some((x) => x.frase === 'Cid le quita 1 escudo a Bea en la refriega.'),
+        vistaPublica(p.estado).refriegas,
+      );
+      const nada = mandar(empezada, movimientoDelBotin(BEA, CID), null);
+      comprobar('  y sin puntos ni escudos, EL MISMO estado, como antes', nada.estado === empezada && nada.motivo === null);
+    }
   }
 }
 

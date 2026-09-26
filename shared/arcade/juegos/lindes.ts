@@ -49,6 +49,18 @@ import { rechazar } from '../motor';
 import type { Rechazo } from '../motor';
 import { esTic } from '../reloj';
 import { esBotin, leerElBotin } from './botin';
+import { esHallazgo, leerElHallazgo } from './hallazgo';
+import { HALLAZGOS_DE_LAS_LINDES, clasesDe } from './hallazgos-de-los-juegos';
+import {
+  ESCUDOS_DEL_BOTIN,
+  ESCUDOS_POR_LEVA,
+  LEVA,
+  LEVAS_POR_JUGADOR,
+  PUNTOS_POR_ESCUDO,
+  escudosDeLaVista,
+  levasDeLaVista,
+  puedePagarLaLeva,
+} from './lindes-escudos';
 import { NADIE_SENTADO, comoSeLlama } from '../tipos';
 import type { ArcadeId, AsientoId, LosSentados, ManifiestoDeArcade, QuienMira } from '../tipos';
 import type { ContextoMovimiento, Movimiento } from '../movimiento';
@@ -170,6 +182,12 @@ export const PONER = 'lindes:poner';
 export const PLANTAR = 'lindes:plantar';
 /** No planta, y el turno pasa. */
 export const PASAR = 'lindes:pasar';
+/*
+ * Y UN QUINTO QUE SÓLO EXISTE A PIE: `LEVA` (`lindes-escudos.ts`), `{}`, que paga
+ * `ESCUDOS_POR_LEVA` escudos por un labriego más. Sólo se ofrece a quien tiene
+ * escudos, y los escudos sólo llegan por `arcade:hallazgo` en una mesa `botas`: en
+ * una mesa normal no se ofrece nunca. Ver `alistarUnLabriego`.
+ */
 
 // ---------------------------------------------------------------------------
 // El estado
@@ -234,6 +252,11 @@ export interface RefriegaDeLasLindes {
   readonly de: AsientoId;
   readonly para: AsientoId;
   readonly puntos: number;
+  /**
+   * Los escudos que pasaron además de los puntos (`ESCUDOS_DEL_BOTIN` como mucho). SÓLO si pasó
+   * alguno: una refriega sin escudos se escribe exactamente como antes de que existieran.
+   */
+  readonly escudos?: number;
 }
 
 export interface EstadoDeLasLindes {
@@ -283,6 +306,16 @@ export interface EstadoDeLasLindes {
    * recapturarlo sin mirar. Así que aparece con la primera refriega y ya no se va.
    */
   refriegas?: RefriegaDeLasLindes[];
+  /**
+   * LOS ESCUDOS SIN GASTAR DE CADA UNO, recogidos a pie en Boots on Board (`arcade:hallazgo`, clase
+   * `escudo`). Públicos: en la mesa se ven. Se gastan en la leva o valen `PUNTOS_POR_ESCUDO` cada uno
+   * en el recuento final, y se quedan escritos después de él para que se vea de dónde salieron esos
+   * puntos. OPCIONAL por lo mismo que `refriegas`: aparece con el primer hallazgo, y una partida en
+   * la que nadie baja al valle es, byte a byte, la de antes. Ver `docs/AVATARES-JUGABLES.md` §5.
+   */
+  escudos?: Record<AsientoId, number>;
+  /** Cuántas levas ha pagado cada uno, de `LEVAS_POR_JUGADOR`. Opcional: aparece con la primera. */
+  levas?: Record<AsientoId, number>;
 }
 
 /** Una mesa recién puesta, sin bolsa y sin tablero. */
@@ -377,6 +410,8 @@ export function avanzarLasLindes(
    * `elBotin` con su propio lector, que es más estricto que él. Ver `botin.ts`.
    */
   if (esBotin(movimiento)) return elBotin(actual, movimiento.carga, ctx);
+  /* EL HALLAZGO, por lo mismo: lo mete el servidor cuando alguien recoge un escudo a pie. */
+  if (esHallazgo(movimiento)) return elHallazgo(actual, movimiento.carga, ctx);
 
   const vista = loQueSeVe(actual, ctx.quien, NADIE_SENTADO);
   if (!estaOfrecido(opcionesDeLasLindes(vista, ctx.quien), movimiento)) {
@@ -395,6 +430,8 @@ export function avanzarLasLindes(
       return plantarUnLabriego(actual, ctx, movimiento.carga);
     case PASAR:
       return rematarElTurno(actual, ctx.quien);
+    case LEVA:
+      return alistarUnLabriego(actual, ctx);
     default:
       /*
        * Un movimiento que este juego no conoce se ignora y devuelve el estado: la
@@ -926,6 +963,20 @@ function rematarLaPartida(estado: EstadoDeLasLindes): EstadoDeLasLindes {
     labriegos = conPuntos(labriegos, quienes, puntos);
   }
 
+  /*
+   * LOS ESCUDOS SIN GASTAR, cada uno `PUNTOS_POR_ESCUDO`, ANTES de decidir quién gana: guardarlos es
+   * la otra mitad de la elección de la leva, y un escudo guardado que no contara para ganar no sería
+   * elección. Se quedan escritos en `escudos` —no se vacían— para que el marcador final pueda decir
+   * de dónde salieron esos puntos (`panelesDeLasLindes`). Sin `escudos`, no se toca nada.
+   */
+  const escudos = estado.escudos;
+  if (escudos !== undefined) {
+    labriegos = labriegos.map((l) => {
+      const suyos = contadorDe(escudos, l.asiento);
+      return suyos > 0 ? { ...l, puntos: l.puntos + suyos * PUNTOS_POR_ESCUDO } : l;
+    });
+  }
+
   let mayor = 0;
   for (const l of labriegos) if (l.puntos > mayor) mayor = l.puntos;
   const ganadores = labriegos.filter((l) => l.puntos === mayor).map((l) => l.asiento);
@@ -961,7 +1012,9 @@ export function deQuienEsElTurno(estado: EstadoDeLasLindes): AsientoId | null {
 
 /**
  * EL BOTÍN: `de` cayó en Boots on Board y `para` lo tumbó. Pasan hasta `PUNTOS_DEL_BOTIN`
- * puntos de uno a otro, y nada más.
+ * puntos de uno a otro y, si `de` lleva escudos, `ESCUDOS_DEL_BOTIN` escudo; nada más. Quien no
+ * lleva escudos da exactamente el botín de antes de que existieran. Con cero puntos Y cero
+ * escudos no hay nada que llevarse (ver abajo); con cero puntos y algún escudo, se lleva el escudo.
  *
  * ═══ QUIÉN PUEDE MANDARLO, Y POR QUÉ SE RECHAZA CON MOTIVO ═══
  *
@@ -1022,15 +1075,122 @@ function elBotin(
 
   const suyos = (estado.labriegos[de] as Labriego).puntos;
   const puntos = suyos < PUNTOS_DEL_BOTIN ? suyos : PUNTOS_DEL_BOTIN;
-  if (puntos <= 0) return estado;
+  /*
+   * Y EL ESCUDO, si quien cae lleva alguno (sólo pasa en `botas`, que es donde hay escudos). Sin
+   * escudos, `escudos` es 0 y todo lo de aquí abajo es exactamente el botín de antes: ni el campo
+   * `escudos` del estado ni el de la refriega se escriben.
+   */
+  const suyosEscudos = estado.escudos === undefined ? 0 : contadorDe(estado.escudos, botin.de);
+  const escudos = suyosEscudos < ESCUDOS_DEL_BOTIN ? suyosEscudos : ESCUDOS_DEL_BOTIN;
+  if (puntos <= 0 && escudos <= 0) return estado;
 
-  const labriegos = estado.labriegos.map((l, i) => {
-    if (i === de) return { ...l, puntos: l.puntos - puntos };
-    if (i === para) return { ...l, puntos: l.puntos + puntos };
-    return l;
-  });
-  const refriegas = [...(estado.refriegas ?? []), { de: botin.de, para: botin.para, puntos }];
-  return { ...estado, labriegos, refriegas: refriegas.slice(-REFRIEGAS_QUE_SE_RECUERDAN) };
+  const labriegos =
+    puntos <= 0
+      ? estado.labriegos
+      : estado.labriegos.map((l, i) => {
+          if (i === de) return { ...l, puntos: l.puntos - puntos };
+          if (i === para) return { ...l, puntos: l.puntos + puntos };
+          return l;
+        });
+  const refriega: RefriegaDeLasLindes =
+    escudos > 0 ? { de: botin.de, para: botin.para, puntos, escudos } : { de: botin.de, para: botin.para, puntos };
+  const refriegas = [...(estado.refriegas ?? []), refriega];
+  const conBotin: EstadoDeLasLindes = { ...estado, labriegos, refriegas: refriegas.slice(-REFRIEGAS_QUE_SE_RECUERDAN) };
+  if (escudos <= 0 || estado.escudos === undefined) return conBotin;
+  const mapa = { ...estado.escudos };
+  mapa[botin.de] = suyosEscudos - escudos;
+  mapa[botin.para] = contadorDe(estado.escudos, botin.para) + escudos;
+  return { ...conBotin, escudos: mapa };
+}
+
+/** Un contador de un mapa opcional del estado (`escudos` o `levas`). Cero si no hay. */
+function contadorDe(mapa: Readonly<Record<AsientoId, number>>, asiento: AsientoId): number {
+  if (!Object.prototype.hasOwnProperty.call(mapa, asiento)) return 0;
+  const n = mapa[asiento];
+  return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+// ---------------------------------------------------------------------------
+// A pie: el escudo que se recoge y la leva que se paga con ellos
+// ---------------------------------------------------------------------------
+
+/**
+ * EL HALLAZGO: `para` recogió un escudo a pie en Boots on Board. +1 en su cuenta de `escudos`, y
+ * nada más. Ver `docs/AVATARES-JUGABLES.md` §5.
+ *
+ * Como el botín: lo mete el servidor con `quien: null`, lo lee `leerElHallazgo` contra la tabla del
+ * juego (`HALLAZGOS_DE_LAS_LINDES`), y lo que sólo sabe el juego lo mira esto —la partida en juego,
+ * `para` jugando ESTA partida— y lo rechaza con su motivo. No toca el turno, ni el momento, ni la
+ * losa de la mano, ni los puntos: un escudo no vale nada hasta que se gasta o se cuenta al final.
+ *
+ * El mapa `escudos` aparece aquí, con el primer escudo de la partida, y no antes (ver
+ * `EstadoDeLasLindes.escudos`).
+ */
+function elHallazgo(
+  estado: EstadoDeLasLindes,
+  carga: unknown,
+  ctx: ContextoMovimiento,
+): EstadoDeLasLindes | Rechazo<EstadoDeLasLindes> {
+  const hallazgo = leerElHallazgo(carga, ctx.quien, ctx.asientos, clasesDe(HALLAZGOS_DE_LAS_LINDES));
+  if (hallazgo === null) {
+    return rechazar(estado, 'Ese hallazgo no vale: lo mete la mesa, para un sentado y de una clase que exista en el valle.');
+  }
+  if (estado.momento === 'reuniendo') return rechazar(estado, 'La partida no ha empezado: todavía no hay escudos.');
+  if (estado.momento === 'terminada') return rechazar(estado, 'La partida ya ha terminado: ya no hay escudos.');
+  if (!estado.labriegos.some((l) => l.asiento === hallazgo.para)) {
+    return rechazar(estado, 'Ese escudo es de alguien que no juega esta partida.');
+  }
+  const antes = estado.escudos ?? {};
+  const escudos = { ...antes };
+  escudos[hallazgo.para] = contadorDe(antes, hallazgo.para) + 1;
+  return { ...estado, escudos };
+}
+
+/**
+ * LA LEVA: quien la manda paga `ESCUDOS_POR_LEVA` escudos y alista un labriego más (+1 `sinPlantar`),
+ * como mucho `LEVAS_POR_JUGADOR` veces por partida.
+ *
+ * ═══ EN CUALQUIER MOMENTO DE LA PARTIDA EN JUEGO, Y NO SÓLO EN SU TURNO ═══
+ *
+ * Como aceptar un trueque en Riberas: la leva no decide nada del turno de otro —no pone, no planta,
+ * no cobra—, sólo cambia cuántos labriegos tiene quien la paga para cuando le toque. Así que se
+ * ofrece colocando y plantando, al que tiene el turno y a los demás, y sólo a quien PUEDE pagarla
+ * (`puedePagarLaLeva`, que mira los escudos y las levas de la vista pública). El portillo ya lo ha
+ * mirado con la vista; esto lo vuelve a mirar con el estado entero, que es la otra mitad.
+ *
+ * ═══ LO QUE NO TOCA ═══
+ *
+ * Ni el turno, ni el momento, ni la losa de la mano, ni los sitios ya calculados de quien está
+ * plantando: si quien tiene el turno se había quedado sin labriegos en `plantando`, el turno ya se
+ * remató solo al poner (ver `ponerLaLosa`), así que un labriego nuevo no abre ningún sitio a medias.
+ */
+function alistarUnLabriego(
+  estado: EstadoDeLasLindes,
+  ctx: ContextoMovimiento,
+): EstadoDeLasLindes | Rechazo<EstadoDeLasLindes> {
+  if (estado.momento !== 'colocando' && estado.momento !== 'plantando') {
+    return rechazar(estado, 'La leva sólo se paga mientras se juega la partida.');
+  }
+  const quien = ctx.quien;
+  if (quien === null || !estado.labriegos.some((l) => l.asiento === quien)) {
+    return rechazar(estado, 'Sólo paga una leva quien juega esta partida.');
+  }
+  const tiene = estado.escudos === undefined ? 0 : contadorDe(estado.escudos, quien);
+  const pagadas = estado.levas === undefined ? 0 : contadorDe(estado.levas, quien);
+  if (!puedePagarLaLeva(tiene, pagadas)) {
+    return rechazar(
+      estado,
+      pagadas >= LEVAS_POR_JUGADOR
+        ? `Ya has pagado las ${LEVAS_POR_JUGADOR} levas que caben en una partida.`
+        : `Una leva cuesta ${ESCUDOS_POR_LEVA} escudos, y tienes ${tiene}.`,
+    );
+  }
+  const escudos = { ...(estado.escudos ?? {}) };
+  escudos[quien] = tiene - ESCUDOS_POR_LEVA;
+  const levas = { ...(estado.levas ?? {}) };
+  levas[quien] = pagadas + 1;
+  const labriegos = estado.labriegos.map((l) => (l.asiento === quien ? { ...l, sinPlantar: l.sinPlantar + 1 } : l));
+  return { ...estado, labriegos, escudos, levas };
 }
 
 // ---------------------------------------------------------------------------
@@ -1082,6 +1242,8 @@ export interface RefriegaVista {
   readonly de: AsientoId;
   readonly para: AsientoId;
   readonly puntos: number;
+  /** Los escudos que pasaron, sólo si pasó alguno (ver `RefriegaDeLasLindes.escudos`). */
+  readonly escudos?: number;
   readonly frase: string;
 }
 
@@ -1120,6 +1282,13 @@ export interface VistaSinTablero {
    * nadie ha caído, por lo mismo que no existe en su estado (ver `EstadoDeLasLindes.refriegas`).
    */
   readonly refriegas?: readonly RefriegaVista[];
+  /**
+   * LOS ESCUDOS SIN GASTAR Y LAS LEVAS PAGADAS de cada asiento, públicos, y SÓLO si existen en el
+   * estado (con su primer uso). Con estos nombres y esta forma los leen `escudosDeLaVista` y
+   * `levasDeLaVista` en los dos clientes, y `opcionesDeLasLindes` para ofrecer la leva.
+   */
+  readonly escudos?: Readonly<Record<AsientoId, number>>;
+  readonly levas?: Readonly<Record<AsientoId, number>>;
   readonly ganadores: readonly string[];
   /** Dónde cabe la losa de la mano. Público: se ve mirando el tablero. */
   readonly colocaciones: readonly Colocacion[];
@@ -1234,14 +1403,28 @@ export function loQueSeVe(
             de: r.de,
             para: r.para,
             puntos: r.puntos,
+            ...(r.escudos === undefined ? {} : { escudos: r.escudos }),
             frase: fraseDeLaRefriega(r, sentados),
           })),
         }),
+    /* Lo mismo con los escudos y las levas: sólo si alguien bajó al valle. */
+    ...(estado.escudos === undefined ? {} : { escudos: copiaOrdenada(estado.escudos) }),
+    ...(estado.levas === undefined ? {} : { levas: copiaOrdenada(estado.levas) }),
     ganadores: estado.ganadores.map((a) => comoSeLlama(sentados, a)),
     colocaciones,
     sitios,
     aviso: elAviso(estado, sentados),
   };
+}
+
+/**
+ * Una copia de un contador por asiento, con las llaves en orden: la vista no depende de quién
+ * recogió su primer escudo antes, y los dos motores la escriben igual.
+ */
+function copiaOrdenada(mapa: Readonly<Record<AsientoId, number>>): Record<AsientoId, number> {
+  const salida: Record<AsientoId, number> = {};
+  for (const asiento of Object.keys(mapa).sort(porTexto)) salida[asiento] = contadorDe(mapa, asiento);
+  return salida;
 }
 
 /** La casilla que hay detrás de una llave. Aquí ya se sabe que la llave es buena. */
@@ -1293,8 +1476,12 @@ function fraseDelCobro(c: Cobro, sentados: LosSentados): string {
  * no diría cuántos.
  */
 function fraseDeLaRefriega(r: RefriegaDeLasLindes, sentados: LosSentados): string {
+  const escudos = r.escudos === undefined ? 0 : r.escudos;
   const cuantos = r.puntos === 1 ? '1 punto' : `${r.puntos} puntos`;
-  return `${comoSeLlama(sentados, r.para)} le quita ${cuantos} a ${comoSeLlama(sentados, r.de)} en la refriega.`;
+  const deEscudos = escudos === 1 ? '1 escudo' : `${escudos} escudos`;
+  /* Sin escudos, la frase de siempre, letra a letra: es la que congela el oro. */
+  const que = escudos <= 0 ? cuantos : r.puntos <= 0 ? deEscudos : `${cuantos} y ${deEscudos}`;
+  return `${comoSeLlama(sentados, r.para)} le quita ${que} a ${comoSeLlama(sentados, r.de)} en la refriega.`;
 }
 
 /**
@@ -1411,18 +1598,27 @@ export function opcionesDeLasLindes(vista: unknown, quien: QuienMira): readonly 
     ];
   }
 
-  if (v.momento === 'terminada' || quien !== v.turnoDe) return [];
+  if (v.momento === 'terminada') return [];
+
+  /*
+   * LA LEVA, a quien pueda pagarla, tenga o no el turno (ver `alistarUnLabriego`). Va al final de la
+   * lista, detrás de lo del turno, para que quien elige «lo primero» siga eligiendo lo de siempre.
+   * Sin escudos en la vista no sale nunca: una mesa normal ofrece lo mismo que antes.
+   */
+  const leva = opcionDeLaLeva(v, quien);
+  if (quien !== v.turnoDe) return leva;
 
   if (v.momento === 'colocando') {
     const losa = losaPorId(v.claseEnMano);
     const como = losa === null ? 'la losa' : losa.nombre.toLowerCase();
-    return v.colocaciones.map((c) => ({
+    const poner: Opcion[] = v.colocaciones.map((c) => ({
       id: `poner:${c.x},${c.y}:${c.giro}`,
       tipo: PONER,
       carga: { x: c.x, y: c.y, giro: c.giro },
       rotulo: `Poner en ${c.x}, ${c.y} ${FLECHA_DEL_GIRO[c.giro]}`,
       ayuda: `Deja ${como} ahí, con el norte mirando ${HACIA_DONDE[c.giro]}.`,
     }));
+    return leva.length === 0 ? poner : [...poner, ...leva];
   }
 
   const opciones: Opcion[] = v.sitios.map((s) => ({
@@ -1439,7 +1635,36 @@ export function opcionesDeLasLindes(vista: unknown, quien: QuienMira): readonly 
     rotulo: 'No plantar',
     ayuda: 'Guarda los labriegos y pasa el turno.',
   });
+  for (const o of leva) opciones.push(o);
   return opciones;
+}
+
+/** El id de la opción de la leva. Uno solo: la leva no lleva nada dentro. */
+export const ID_DE_LA_LEVA = 'leva';
+
+/**
+ * LA LEVA, si `quien` juega esta partida, la partida se juega y puede pagarla con lo que dice la
+ * vista pública. Una lista de una o de ninguna, para poder pegarla detrás de las demás.
+ */
+function opcionDeLaLeva(v: VistaSinTablero, quien: AsientoId): Opcion[] {
+  if (v.momento !== 'colocando' && v.momento !== 'plantando') return [];
+  if (!v.labriegos.some((l) => l.asiento === quien)) return [];
+  const tiene = escudosDeLaVista(v, quien);
+  const pagadas = levasDeLaVista(v, quien);
+  if (!puedePagarLaLeva(tiene, pagadas)) return [];
+  const quedan = LEVAS_POR_JUGADOR - pagadas - 1;
+  return [
+    {
+      id: ID_DE_LA_LEVA,
+      tipo: LEVA,
+      carga: {},
+      rotulo: `Alistar un labriego (${ESCUDOS_POR_LEVA} escudos)`,
+      ayuda:
+        `Gasta ${ESCUDOS_POR_LEVA} de tus ${tiene} escudos en un labriego más. ` +
+        `Cada escudo que guardes vale ${PUNTOS_POR_ESCUDO} al final. ` +
+        (quedan === 0 ? 'Es tu última leva.' : quedan === 1 ? 'Te quedará otra más.' : `Te quedarán ${quedan} más.`),
+    },
+  ];
 }
 
 /** El artículo que le toca a cada cosa, para que la frase se lea. */
@@ -1682,8 +1907,10 @@ function accionesDelTablero(
   opciones: readonly Opcion[],
 ): TableroDeclarado['acciones'] {
   const salida: TableroDeclarado['acciones'] = [];
+  let delTurno = 0;
   for (const o of opciones) {
     if (o.tipo === PONER) continue;
+    if (o.tipo !== LEVA) delTurno++;
     salida.push({
       id: o.id,
       rotulo: o.rotulo,
@@ -1705,7 +1932,11 @@ function accionesDelTablero(
    * el raíl y la losa en mi mano. Ninguna de las 13.295 comprobaciones del reglamento lo
    * vio, porque todas miran QUÉ SE PUEDE HACER y ésta es una frase sobre quién manda.
    */
-  if (salida.length === 0 && vista.momento === 'colocando') {
+  /*
+   * La leva no cuenta: es un botón de a pie que no dice nada del turno, y con ella en la lista quien
+   * espera dejaba de leer «Le toca a otro» y quien pone, «Ponla en el tablero».
+   */
+  if (delTurno === 0 && vista.momento === 'colocando') {
     const meToca = vista.turnoDe !== null && vista.turnoDe === vista.yo;
     salida.push(
       meToca
@@ -1811,6 +2042,32 @@ function panelesDeLasLindes(vista: VistaSinTablero): TableroDeclarado['paneles']
   const refriegas = Array.isArray(vista.refriegas) ? vista.refriegas : [];
   if (refriegas.length > 0) {
     paneles.push({ titulo: 'La refriega', lineas: refriegas.map((r) => r.frase) });
+  }
+
+  /*
+   * LOS ESCUDOS, sólo si alguien bajó al valle (la vista no trae el campo si no). Mientras se juega,
+   * cuántos lleva cada uno y cuántas levas ha pagado; al final, lo que sumaron en el recuento, que
+   * es donde se ve que guardarlos valía algo. Leídos con los lectores de `lindes-escudos.ts`, que
+   * son los mismos que usan los clientes y no se fían de la red.
+   */
+  if (vista.escudos !== undefined || vista.levas !== undefined) {
+    const lineas: string[] = [];
+    for (const l of vista.labriegos) {
+      const escudos = escudosDeLaVista(vista, l.asiento);
+      const levas = levasDeLaVista(vista, l.asiento);
+      if (escudos === 0 && levas === 0) continue;
+      const deEscudos = escudos === 1 ? '1 escudo' : `${escudos} escudos`;
+      if (acabada) {
+        lineas.push(
+          escudos > 0
+            ? `${l.nombre}: ${deEscudos} sin gastar, +${escudos * PUNTOS_POR_ESCUDO} en el recuento.`
+            : `${l.nombre}: los gastó todos en levas.`,
+        );
+      } else {
+        lineas.push(`${l.nombre}: ${deEscudos} · ${levas} de ${LEVAS_POR_JUGADOR} levas`);
+      }
+    }
+    if (lineas.length > 0) paneles.push({ titulo: 'Los escudos', lineas });
   }
 
   paneles.push({
