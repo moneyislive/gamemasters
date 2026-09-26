@@ -160,6 +160,9 @@ export const UNIFORMES_DEL_UBER = [
   'uRangoDelFoco',
   'tOclusion',
   'uOclusion',
+  'uFogonazo',
+  'uGolpe',
+  'uCargaDelRayo',
 ] as const;
 export type UniformeDelUber = (typeof UNIFORMES_DEL_UBER)[number];
 
@@ -192,6 +195,11 @@ uniform float uFoco;
 uniform float uRangoDelFoco;
 uniform sampler2D tOclusion;
 uniform float uOclusion;
+/* EL RAYO (docs/quiebro/EL-RAYO.md §3-§4): el fogonazo de pantalla (color lineal que se suma), el golpe (xy: dónde dio,
+   en la pantalla; z: su fuerza) y la carga propia (0-1), que cierra la viñeta. Cero lecturas más. */
+uniform vec3 uFogonazo;
+uniform vec3 uGolpe;
+uniform float uCargaDelRayo;
 
 varying vec2 vUv;
 
@@ -240,8 +248,14 @@ void main() {
 	/* El Remanso abomba un poco la imagen hacia fuera. */
 	vec2 uv = 0.5 + d * ( 1.0 - 0.045 * uRemanso * r2 );
 
-	/* Aberración: el rojo hacia fuera y el azul hacia dentro; nada en el centro, más en el Remanso. */
-	vec2 desvio = d * uAberracion * ( 1.0 + 2.5 * uRemanso ) * r2;
+	/* EL GOLPE DEL RAYO: un abombado breve alrededor de donde dio, con su aberración (mueven dónde se lee; no leen más). */
+	vec2 dg = uv - uGolpe.xy;
+	vec2 dgA = dg * vec2( aspecto, 1.0 );
+	float golpe = uGolpe.z * exp( -dot( dgA, dgA ) * 7.0 );
+	uv -= dg * 0.03 * golpe;
+
+	/* Aberración: el rojo hacia fuera y el azul hacia dentro; nada en el centro, más en el Remanso y en el golpe. */
+	vec2 desvio = d * uAberracion * ( 1.0 + 2.5 * uRemanso ) * r2 + dg * 0.006 * golpe;
 	vec3 c = vec3( leer( uv + desvio ).r, leer( uv ).g, leer( uv - desvio ).b );
 
 	/* El enfoque del Remanso: lo de fuera del foco se desenfoca, y sólo mientras hay Remanso. */
@@ -271,6 +285,9 @@ void main() {
 #endif
 
 #ifdef ENTRADA_HDR
+	/* El fogonazo del rayo, en lineal y antes del mapeo: MULTIPLICA la luz que hay (lo alumbrado se dispara y los
+	   negros se quedan). Sumar, aunque fuera poco, levantaba los negros de toda la imagen: un velo, niebla. */
+	c *= 1.0 + 6.0 * uFogonazo;
 	/* Lineal y sin techo → pantalla: el mismo ACES que los materiales de N0 y N1, y la curva sRGB. */
 	c = sRGBTransferOETF( vec4( ACESFilmicToneMapping( c ), 1.0 ) ).rgb;
 #endif
@@ -278,6 +295,11 @@ void main() {
 #ifdef BRILLO_PROPIO
 	vec3 brillo = clamp( texture2D( tBrillo, uv ).rgb * uFuerzaDelBrillo, 0.0, 1.0 );
 	c = 1.0 - ( 1.0 - clamp( c, 0.0, 1.0 ) ) * ( 1.0 - brillo );
+#endif
+
+#ifndef ENTRADA_HDR
+	/* Sin HDR (N1), el fogonazo en pantalla: multiplica lo que hay (como en el camino pleno, sin levantar los negros). */
+	c = clamp( c * ( 1.0 + 4.0 * uFogonazo ), 0.0, 1.0 );
 #endif
 
 	/* La gradación: la LUT de 32³ leída en el centro de sus téxeles de los bordes. */
@@ -290,8 +312,8 @@ void main() {
 	c = mix( c, vec3( l ), 0.7 * uRemanso );
 	c *= mix( vec3( 1.0 ), vec3( 0.9, 1.0, 1.06 ), uRemanso );
 
-	/* Viñeta, que se cierra un poco más en el Remanso. */
-	c *= 1.0 - uVineta * ( 1.0 + 0.8 * uRemanso ) * smoothstep( 0.2, 1.1, r2 );
+	/* Viñeta, que se cierra un poco más en el Remanso y mientras se carga el rayo (el ojo se va a la mira). */
+	c *= 1.0 - ( uVineta * ( 1.0 + 0.8 * uRemanso ) + 0.4 * uCargaDelRayo ) * smoothstep( 0.2, 1.1, r2 );
 
 	/*
 	 * EL REMANSO ES UN MOMENTO DE CINE: dos bandas negras entran desde arriba y desde abajo (hasta el
@@ -317,7 +339,115 @@ void main() {
 	gl_FragColor = vec4( clamp( c, 0.0, 1.0 ), 1.0 );
 }`;
 
-export const UNIFORMES_DE_EXTRAER = ['tEntrada', 'uTexel', 'uUmbral', 'uRodilla'] as const;
+/**
+ * EL CANAL DEL RAYO, CON SU PESO PROPIO EN EL BRILLO (docs/quiebro/EL-RAYO.md §4: «un hilo blanco sobreexpuesto casi
+ * sin grosor»). El brillo del posproceso (el barato de N1 y el `UnrealBloomPass` de N2-N3) recoge TODO lo que pasa de su
+ * umbral y lo esparce. El núcleo del rayo pasa de sobra, y es una línea: esparcida, un halo mucho más ancho que ella.
+ * De lado todavía se lee un hilo dentro de su aura, pero desde el hombro, que es como lo ve quien dispara, el canal de
+ * ocho metros cabe en cincuenta píxeles y su halo era una cuña de luz blanda (en N3) o un tubo ámbar y blanco (en N1)
+ * que se tragaba el hilo.
+ *
+ * Así que en la EXTRACCIÓN del brillo (antes de esparcir: el halo de lo demás sigue siendo suave y continuo) lo que cae
+ * en una banda alrededor del canal en la pantalla entra con menos peso: `1 − bandaDelCanal(uv)`. La banda es la recta de
+ * la mano a donde da (`uCanal`, en uv), con su medio ancho y el largo de sus puntas (`uCanalForma`, en altos de
+ * pantalla; w, el aspecto); cerca de las dos puntas se abre, para que el fogonazo de la boca y el del blanco brillen
+ * enteros. La forma la calcula `formaDeLaBandaDelCanal` cada fotograma (con el canal que se ve, `rayos.imagen`). Sin
+ * canal, `uCanalForma.x` = 0: nada. Son uniformes: cero lecturas más.
+ */
+export const GLSL_BANDA_DEL_CANAL = /* glsl */ `
+uniform vec4 uCanal;
+uniform vec4 uCanalForma;
+float bandaDelCanal( vec2 uv ) {
+	if ( uCanalForma.x <= 0.0 ) return 0.0;
+	vec2 escala = vec2( uCanalForma.w, 1.0 );
+	vec2 a = uCanal.xy * escala;
+	vec2 ab = uCanal.zw * escala - a;
+	float largo = max( length( ab ), 1e-5 );
+	vec2 eje = ab / largo;
+	vec2 p = uv * escala - a;
+	float k = dot( p, eje );
+	float lado = abs( dot( p, vec2( -eje.y, eje.x ) ) );
+	float dentro = 1.0 - smoothstep( uCanalForma.y * 0.55, uCanalForma.y, lado );
+	float puntas = smoothstep( 0.0, uCanalForma.z, k ) * smoothstep( 0.0, uCanalForma.z, largo - k );
+	return uCanalForma.x * dentro * puntas;
+}
+`;
+
+/** La banda del canal en JavaScript, la misma cuenta que `bandaDelCanal` (para el comprobador). */
+export function bandaDelCanal(
+  u: number,
+  v: number,
+  canal: readonly [number, number, number, number],
+  forma: readonly [number, number, number, number],
+): number {
+  const [quita, medio, punta, aspecto] = forma;
+  if (!(quita > 0)) return 0;
+  const ax = canal[0] * aspecto;
+  const ay = canal[1];
+  const bx = canal[2] * aspecto - ax;
+  const by = canal[3] - ay;
+  const largo = Math.max(Math.hypot(bx, by), 1e-5);
+  const ex = bx / largo;
+  const ey = by / largo;
+  const px = u * aspecto - ax;
+  const py = v - ay;
+  const k = px * ex + py * ey;
+  const lado = Math.abs(-px * ey + py * ex);
+  const suave = (a: number, b: number, x: number): number => {
+    const s = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return s * s * (3 - 2 * s);
+  };
+  return quita * (1 - suave(medio * 0.55, medio, lado)) * suave(0, punta, k) * suave(0, punta, largo - k);
+}
+
+/**
+ * LA FORMA DE LA BANDA DEL CANAL para un canal que ocupa `largoPx` en una pantalla de `altoPx` de alto y está a
+ * `presencia` (0-1: recién hecho 1, apagándose su estela hacia 0): [lo que quita del brillo, medio ancho, largo de las
+ * puntas] (los dos últimos en altos de pantalla).
+ *
+ *   · LO QUE QUITA: un canal corto en la pantalla (visto casi de punta, el propio desde el hombro) es donde el halo se
+ *     amontona y se come el hilo: le quita el 85 %. Uno largo (de lado, cruzando la calle) lleva su aura repartida en
+ *     cientos de píxeles y se lee igual: el 45 %.
+ *   · EL MEDIO ANCHO: lo que el hilo se aparta de la recta en la pantalla crece con su largo (el quiebro va en proporción
+ *     a lo que ocupa: `aplanadoDelCanal`), así que la banda también: 10 px más la décima parte del largo, hasta 70.
+ *   · LAS PUNTAS: hasta 14 px (o la quinta parte del largo) junto a la mano y al blanco, sin quitar nada.
+ */
+export function formaDeLaBandaDelCanal(largoPx: number, altoPx: number, presencia: number): [number, number, number] {
+  if (!(largoPx >= 2) || !(altoPx > 0) || !(presencia > 0)) return [0, 0, 0];
+  const s = Math.min(1, Math.max(0, (largoPx - 120) / 330));
+  const quita = Math.min(1, presencia) * (0.85 - 0.4 * s * s * (3 - 2 * s));
+  const medio = Math.min(70, 10 + 0.1 * largoPx) / altoPx;
+  const punta = Math.min(14, 0.2 * largoPx) / altoPx;
+  return [quita, medio, punta];
+}
+
+export const UNIFORMES_DEL_BRILLO_HDR = ['tDiffuse', 'luminosityThreshold', 'smoothWidth', 'defaultColor', 'defaultOpacity', 'uCanal', 'uCanalForma'] as const;
+export type UniformeDelBrilloHdr = (typeof UNIFORMES_DEL_BRILLO_HDR)[number];
+
+/**
+ * LA EXTRACCIÓN DEL BRILLO DE N2-N3: la de `UnrealBloomPass` (su `LuminosityHighPassShader`, los mismos uniformes y la
+ * misma cuenta) más el peso propio del canal del rayo (`GLSL_BANDA_DEL_CANAL`). El compositor la pone en su lugar
+ * (`BrilloDelQuiebro` en `compositor.ts`). Una lectura, como la de three.
+ */
+export const BRILLO_HDR = /* glsl */ `
+uniform sampler2D tDiffuse;
+uniform vec3 defaultColor;
+uniform float defaultOpacity;
+uniform float luminosityThreshold;
+uniform float smoothWidth;
+${GLSL_BANDA_DEL_CANAL}
+varying vec2 vUv;
+
+void main() {
+	vec4 texel = texture2D( tDiffuse, vUv );
+	float v = luminance( texel.xyz );
+	vec4 outputColor = vec4( defaultColor.rgb, defaultOpacity );
+	float alpha = smoothstep( luminosityThreshold, luminosityThreshold + smoothWidth, v );
+	alpha *= 1.0 - bandaDelCanal( vUv );
+	gl_FragColor = mix( outputColor, texel, alpha );
+}`;
+
+export const UNIFORMES_DE_EXTRAER = ['tEntrada', 'uTexel', 'uUmbral', 'uRodilla', 'uCanal', 'uCanalForma'] as const;
 export type UniformeDeExtraer = (typeof UNIFORMES_DE_EXTRAER)[number];
 
 /**
@@ -330,12 +460,15 @@ export type UniformeDeExtraer = (typeof UNIFORMES_DE_EXTRAER)[number];
  * que en lineal pasaba de 1 —una farola de 4, un neón de 3— ha quedado en 1, así que sin normalizar
  * lo más brillante de la escena sólo aportaría un tercio de su color y el halo no se vería. Con la
  * normalización, un blanco de pantalla entra entero y un 0,8 entra a medias.
+ *
+ * Y EL CANAL DEL RAYO entra con su peso propio (`GLSL_BANDA_DEL_CANAL`): en N1 era un tubo ámbar y blanco.
  */
 export const EXTRAER = /* glsl */ `
 uniform sampler2D tEntrada;
 uniform vec2 uTexel;
 uniform float uUmbral;
 uniform float uRodilla;
+${GLSL_BANDA_DEL_CANAL}
 varying vec2 vUv;
 
 void main() {
@@ -348,6 +481,7 @@ void main() {
 	float blando = clamp( mayor - uUmbral + uRodilla, 0.0, 2.0 * uRodilla );
 	blando = blando * blando / ( 4.0 * uRodilla + 0.00001 );
 	float peso = min( 1.0, max( blando, mayor - uUmbral ) / max( mayor * ( 1.0 - uUmbral ), 0.00001 ) );
+	peso *= 1.0 - bandaDelCanal( vUv );
 	gl_FragColor = vec4( c * peso, 1.0 );
 }`;
 
@@ -373,26 +507,45 @@ void main() {
 	gl_FragColor = vec4( c, 1.0 );
 }`;
 
-export const UNIFORMES_DEL_VELO = ['uRemanso', 'uAspecto'] as const;
+export const UNIFORMES_DEL_VELO = ['uRemanso', 'uAspecto', 'uCargaDelRayo'] as const;
 export type UniformeDelVelo = (typeof UNIFORMES_DEL_VELO)[number];
 
 /**
  * El velo del Remanso en N0: lo que sale MULTIPLICA el lienzo (mezcla `dst × src`). Un 1 no cambia
  * nada; los bordes bajan y se enfrían. Es todo el Remanso que N0 puede pintar sin leer la imagen: el
- * resto (la lluvia quieta, la cámara que orbita, el sonido) no depende del posproceso.
+ * resto (la lluvia quieta, la cámara que orbita, el sonido) no depende del posproceso. También cierra
+ * los bordes mientras se carga el rayo (`uCargaDelRayo`, como la viñeta del uber).
  */
 export const VELO = /* glsl */ `
 uniform float uRemanso;
 uniform float uAspecto;
+uniform float uCargaDelRayo;
 varying vec2 vUv;
 
 void main() {
 	vec2 d = vUv - 0.5;
 	float r2 = ( d.x * d.x * uAspecto * uAspecto + d.y * d.y ) / ( 0.25 * uAspecto * uAspecto + 0.25 );
-	float oscuro = 1.0 - 0.55 * uRemanso * smoothstep( 0.1, 1.0, r2 );
+	float oscuro = 1.0 - ( 0.55 * uRemanso + 0.4 * uCargaDelRayo ) * smoothstep( 0.1, 1.0, r2 );
 	vec3 frio = mix( vec3( 1.0 ), vec3( 0.86, 0.97, 1.0 ), 0.6 * uRemanso );
 	/* Las bandas de cine, como en el uber: multiplicar por cero es lo único que N0 necesita para ellas. */
 	float banda = 0.075 * uRemanso * uRemanso * ( 3.0 - 2.0 * uRemanso );
 	float cine = step( banda, vUv.y ) * step( banda, 1.0 - vUv.y );
 	gl_FragColor = vec4( frio * oscuro * cine, 1.0 );
+}`;
+
+export const UNIFORMES_DEL_FOGONAZO = ['uFogonazo'] as const;
+export type UniformeDelFogonazo = (typeof UNIFORMES_DEL_FOGONAZO)[number];
+
+/**
+ * EL FOGONAZO DEL RAYO EN N0 (EL-RAYO.md §4: «cuadro aditivo»): N0 no lee la imagen, así que el fogonazo de pantalla
+ * es un cuadro que se mezcla con el lienzo como `dst × (1 + src)` (origen por el color de destino, más el destino
+ * entero): lo alumbrado se dispara y los negros se quedan, como en el uber. Sólo en los fotogramas en que lo hay, y
+ * acotado igual (fotosensibilidad: un destello, corto).
+ */
+export const FOGONAZO = /* glsl */ `
+uniform vec3 uFogonazo;
+varying vec2 vUv;
+
+void main() {
+	gl_FragColor = vec4( uFogonazo, 1.0 );
 }`;

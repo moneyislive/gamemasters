@@ -539,6 +539,12 @@ const RESTO: readonly [IdDeSonido, string][] = [
   ['farola', 'Farola que parpadea'],
   ['latido', 'Latido'],
   ['paso', 'Paso en mojado'],
+  ['carga-rayo', 'Carga del rayo (1,3 s)'],
+  ['rayo', 'Rayo (sin el trueno)'],
+  ['trueno', 'Trueno'],
+  ['rayo-corto', 'Chispazo'],
+  ['rayo-fijado', 'Tic de la mira'],
+  ['rayo-listo', 'Rayo listo'],
 ];
 
 function SeccionGolpes(props: { fuente: Punto3 }): JSX.Element {

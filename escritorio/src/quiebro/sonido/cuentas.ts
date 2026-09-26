@@ -491,9 +491,55 @@ export const ALCANCES = {
   cabina: { refM: 6, alcanceM: 150, gananciaEnAlcance: 0.125 },
   /** El tren elevado: grande y lejano. */
   tren: { refM: 12, alcanceM: 200, gananciaEnAlcance: 0.12 },
+  /** El trueno del rayo (EL-RAYO.md §5): se oye en todo el barrio, como un trueno de verdad. */
+  trueno: { refM: 6, alcanceM: 120, gananciaEnAlcance: 0.15 },
 } as const satisfies Record<string, PerfilDeAlcance>;
 
 export type NombreDeAlcance = keyof typeof ALCANCES;
+
+/** La velocidad del sonido en el aire, m/s. */
+export const VELOCIDAD_DEL_SONIDO_MS = 343;
+
+/**
+ * EL RETRASO DEL TRUENO (EL-RAYO.md §5: «el retumbo puede llegar con retraso d/343 s, el chasquido nunca»): lo que
+ * tarda en llegar el retumbo desde `distanciaM`, en segundos, acotado al alcance del perfil del trueno (más allá no se
+ * oye). El chasquido del disparo no se retrasa: es la señal de que ha salido.
+ */
+export function retrasoDelTrueno(distanciaM: number): number {
+  const d = Math.min(ALCANCES.trueno.alcanceM, Math.max(0, Number.isFinite(distanciaM) ? distanciaM : 0));
+  return d / VELOCIDAD_DEL_SONIDO_MS;
+}
+
+/**
+ * EL TONO DE LA CARGA (EL-RAYO.md §5: «zumbido que sube de tono con la carga»): la fundamental de las dos sierras, en
+ * Hz, para una carga de 0 a 1. Sube octava y media, más deprisa al final (el oído lee «ya casi»).
+ */
+export function tonoDeLaCarga(c: number): number {
+  const x = Math.min(1, Math.max(0, Number.isFinite(c) ? c : 0));
+  return 82 * Math.pow(2, 1.5 * x * (0.6 + 0.4 * x));
+}
+
+/**
+ * LAS CREPITACIONES DE LA CARGA: los instantes (s, desde que empieza a sonar) de los chasquidos mientras la carga sube
+ * de `c0` a 1 en `subidaS` segundos y se sostiene hasta `hastaS`. Cada vez más seguidos al llenarse (de 190 ms a
+ * 45 ms), con un azar sembrado de ±25 % para que no suene a metrónomo. Puro: lo prueba el comprobador.
+ */
+export function crepitacionesDeLaCarga(c0: number, subidaS: number, hastaS: number, semilla: number): number[] {
+  const salen: number[] = [];
+  let s = semilla >>> 0 || 1;
+  const azar = (): number => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  let t = 0.05;
+  const inicio = Math.min(1, Math.max(0, Number.isFinite(c0) ? c0 : 0));
+  while (t < hastaS && salen.length < 400) {
+    salen.push(t);
+    const c = subidaS > 0 ? Math.min(1, inicio + ((1 - inicio) * t) / subidaS) : 1;
+    t += (0.19 - 0.145 * c) * (0.75 + 0.5 * azar());
+  }
+  return salen;
+}
 
 /** El `rolloffFactor` que hace que el perfil se cumpla en su alcance. */
 export function caidaDelPerfil(p: PerfilDeAlcance): number {
@@ -528,6 +574,20 @@ export function unidad(v: Punto3): Punto3 | null {
   const l = Math.hypot(v.x, v.y, v.z);
   if (!Number.isFinite(l) || l < 1e-6) return null;
   return { x: v.x / l, y: v.y / l, z: v.z / l };
+}
+
+/**
+ * EL PUNTO DEL TRAMO `a`–`b` MÁS CERCANO A `p`: de ahí sale el trueno de un canal largo (lo primero que llega es el
+ * sonido del tramo más cercano, y lo demás rueda detrás). Un tramo de largo nulo es su punto `a`.
+ */
+export function puntoDelTramoMasCercano(a: Punto3, b: Punto3, p: Punto3): Punto3 {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dz = b.z - a.z;
+  const l2 = dx * dx + dy * dy + dz * dz;
+  if (!Number.isFinite(l2) || l2 < 1e-9) return { x: a.x, y: a.y, z: a.z };
+  const k = Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy + (p.z - a.z) * dz) / l2));
+  return { x: a.x + dx * k, y: a.y + dy * k, z: a.z + dz * k };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════

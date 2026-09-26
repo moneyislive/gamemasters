@@ -48,6 +48,7 @@ import {
 import { subirLasPrimeras } from './geometrias';
 import { mallaDeEfecto, pxPorMetroDeLaCamara } from './malla';
 import { ajuste } from './presupuesto';
+import { EscritorDeOndas, ondasDelRayo } from './rayos';
 import type { SistemaDeEfectos } from './sistema';
 import { COLA_DEL_APUNTADO_MS } from './sistema';
 
@@ -197,6 +198,7 @@ export function Ondas({ sistema }: { sistema: SistemaDeEfectos }): JSX.Element {
   const bala = useMemo(() => ({ salida: 0, x: 0, y: 0, z: 0, rumbo: 0, fin: null as number | null, velocidad: 0, alcance: 0 }), []);
   const dir = useMemo(() => ({ x: 0, z: 0 }), []);
   const todos = useMemo(() => Object.values(pieza.atributos), [pieza]);
+  const rayo = useMemo(() => new EscritorDeOndas(), []);
 
   useFrame(() => {
     const t = sistema.ahora.verdadero;
@@ -294,6 +296,11 @@ export function Ondas({ sistema }: { sistema: SistemaDeEfectos }): JSX.Element {
         n++;
       }
     }
+
+    /* EL RAYO: la boca, el estallido, la onda del suelo, el vapor, la marca y la carga (`rayos.tsx`). */
+    rayo.empezar(CE, EJ, FO, CO, n, cabe);
+    ondasDelRayo(sistema.rayos, t, tp, sistema.nivel, rayo);
+    n = rayo.n;
 
     pieza.pintar(n);
     if (n > 0) for (const a of todos) subirLasPrimeras(a, n);

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DEL RAYO (docs/quiebro/EL-RAYO.md §4).
+
+      Entrada APARTE de `index.html`, como los otros bancos: no es una pantalla del producto, es donde se JUZGA A OJO
+      el rayo —la carga, el chispazo, el pleno, la estela, la luz sobre la calle mojada— en la ciudad de verdad, con
+      los cuerpos de verdad, la atmósfera y el posproceso del nivel, en un instante EXACTO. Sin servidor: los sucesos
+      se inyectan como los mandaría el juego (`sistema.rayo`), con el reloj parado en el instante pedido.
+
+      Se abre en http://localhost:<puerto>/sala/banco-quiebro-rayo.html (el Vite de este árbol). Mandos en la
+      dirección (la cabecera de `src/quiebro/rayo/banco.tsx` los cuenta todos):
+        ?nivel=3&luz=madrugada&carga=1300&t=33&escena=cerca&distancia=8
+        ?nivel=1&carga=150&hoja=-800,-400,-100,0,16,33,50,83,133,200,300,500,800   (hoja de contactos en el DOM)
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banco · el rayo del Quiebro</title>
+    <meta name="theme-color" content="#050807" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #050807;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/quiebro/rayo/banco.tsx"></script>
+  </body>
+</html>

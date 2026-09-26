@@ -30,13 +30,15 @@ import { cajasDelLugar, posteDeLaZona, trenDelLugar, trenEnElLugar, velocidadDel
 import type { LugarDeLaNoche } from './lugar';
 import { UNO } from '../../../../shared/mecanicas/fijo';
 import { MOTIVO_DE_IRSE, PRIMER_NUMERO_DE_ENTIDAD, RESULTADO } from '../../../../shared/mecanicas/liza/protocolo';
-import type { Gesto } from '../cuerpos';
+import { paradaDeLaBalaEn } from '../../../../shared/mecanicas/liza/proyectiles';
+import type { CuerpoPintado, Gesto } from '../cuerpos';
 import type { SistemaDeEfectos, VeredictoDelAnillo } from '../efectos';
-import { ALTO_DE_LA_BOCA_SIN_MANO, cargaDelNivel, nivelDelProyectil, semillaDelRayo } from '../rayo/contrato';
-import type { NivelLeido, PuntoDelRayo, TiroLeido } from '../rayo/contrato';
-import type { BalaVista } from './sala-vista';
+import { ALTO_DE_LA_BOCA_SIN_MANO, cargaDe, cargaDelNivel, estadoDelRayoApagado, nivelDeLaCarga, nivelDelProyectil, semillaDelRayo } from '../rayo/contrato';
+import type { EstadoDelRayo, NivelLeido, PuntoDelRayo, TiroLeido } from '../rayo/contrato';
+import type { BalaVista, EstadoVisto } from './sala-vista';
 import type { ManejoDelAnillo, Material, Sonido, TipoDeGolpe } from '../sonido';
 import { desvioDelPulso } from '../sonido';
+import { RayoQueSuena } from '../sonido/rayo';
 import type { Partida } from './partida';
 import type { Novedad } from './sala-vista';
 
@@ -45,6 +47,18 @@ const ALTO_DEL_GOLPE = 1.3;
 const ALTO_DEL_PECHO = 1.25;
 /** A compás: ±75 ms del pulso (diseño §4.5). Aquí sólo afina el sonido; lo juzga la sala. */
 const A_COMPAS_MS = 75;
+/**
+ * LA CARGA AJENA que deja de verse sin que llegue su `bala` se cancela pasado este margen (ms): el `estado` que la
+ * acaba y la `bala` que la suelta pueden llegar en tics distintos, y cancelar antes apagaría un rayo que sí sale.
+ */
+const GRACIA_DE_LA_CARGA_AJENA_MS = 250;
+/** Un pleno ajeno que estalla a menos de esto de mí sacude la cámara (m). */
+const SACUDE_EL_RAYO_AJENO_M = 12;
+/**
+ * El corro de un cuerpo para predecir dónde lo para el rayo de otro (m): el del cuerpo y algo del ancho del rayo.
+ * Aproximado a propósito (lo exacto es de la sala, y llega con su `estalla`).
+ */
+const CORRO_DEL_CUERPO_M = 0.5;
 
 /** El golpe de la Tanda que suena, por el gesto de quien lo lanza. */
 function golpeDelGesto(g: Gesto): TipoDeGolpe {
@@ -119,6 +133,20 @@ export class Escenificador {
   ultimoLimpioMs = Number.NEGATIVE_INFINITY;
   /** Una sacudida de cámara pendiente, de 0 a 1 (la lee la cámara y la gasta). */
   sacudida = 0;
+  /** El rayo con su sonido: envuelve el `sistema.rayo` que había y delega en él (CONTRATO §5.8). */
+  private readonly rayoQueSuena: RayoQueSuena;
+  /**
+   * LAS CARGAS AJENAS, por asiento: desde cuándo carga (la llegada de su `estado` de cargar; `NaN` si no carga), cuándo
+   * dejó de verse cargando (`NaN` mientras carga), si este fotograma se ha visto cargando, y el estado que se le pasa a
+   * `actualizarCarga` (uno por asiento, hecho la primera vez).
+   */
+  private readonly cargaAjenaDesde = new Float64Array(PRIMER_NUMERO_DE_ENTIDAD).fill(Number.NaN);
+  private readonly cargaAjenaDejo = new Float64Array(PRIMER_NUMERO_DE_ENTIDAD).fill(Number.NaN);
+  /** La carga que ya salió (su `desdeMs`): si su estado de cargar sigue un momento en la sala, no vuelve a empezar. */
+  private readonly cargaAjenaSoltada = new Float64Array(PRIMER_NUMERO_DE_ENTIDAD).fill(Number.NaN);
+  private readonly cargaAjenaVista = new Uint8Array(PRIMER_NUMERO_DE_ENTIDAD);
+  private readonly estadoAjeno: (EstadoDelRayo | undefined)[] = [];
+  private ahoraDelFotograma = 0;
 
   constructor(
     private readonly partida: Partida,
@@ -134,6 +162,22 @@ export class Escenificador {
       salida.z = c.z;
       return true;
     };
+    /*
+     * EL RAYO SUENA: el envoltorio delega TODO en el `sistema.rayo` que había (el de los efectos, o el espía de quien
+     * prueba), y si ya era uno de éstos (otra partida con el mismo sistema), en el de debajo: no se envuelve dos veces.
+     */
+    this.rayoQueSuena = new RayoQueSuena(
+      sistema.rayo,
+      sonido,
+      (quien) => quien === partida.sala.yo,
+      (quien, salida) => {
+        if (sistema.boca !== null && sistema.boca(quien, salida)) return true;
+        if (sistema.localizar === null || !sistema.localizar(quien, salida)) return false;
+        salida.y = ALTO_DE_LA_BOCA_SIN_MANO;
+        return true;
+      },
+    );
+    sistema.rayo = this.rayoQueSuena;
   }
 
   /** Olvida lo que había en pantalla (otra noche, otro canal). */
@@ -146,6 +190,10 @@ export class Escenificador {
     this.haz = null;
     this.sistema.vaciar();
     this.sonido.cabina(null);
+    this.rayoQueSuena.callar();
+    this.cargaAjenaDesde.fill(Number.NaN);
+    this.cargaAjenaDejo.fill(Number.NaN);
+    this.cargaAjenaSoltada.fill(Number.NaN);
   }
 
   private sitio(numero: number): { x: number; z: number } | null {
@@ -167,6 +215,9 @@ export class Escenificador {
   /** Lo que se hace en cada fotograma aunque no llegue nada: el Remanso que suena, el tren. */
   cadaFotograma(ahora: number, lugar: LugarDeLaNoche | null): void {
     this.sonido.remanso(this.sistema.reloj.intensidad(ahora));
+    /* Quién mira esta pantalla: su carga oscurece los bordes y su pleno da el fogonazo (`efectos/rayo.ts`). */
+    this.sistema.rayos.yo = this.partida.sala.yo;
+    this.lasCargasAjenas(ahora);
     if (lugar !== null) {
       const tic = this.partida.ticDeLosDurmientes();
       const tren = trenEnElLugar(lugar, tic);
@@ -179,6 +230,64 @@ export class Escenificador {
       this.trenPasando = tren !== null;
     }
   }
+
+  /**
+   * LAS CARGAS AJENAS (CONTRATO §5.2): el estado de cargar de cada asiento que no soy yo (por la foto o por su suceso
+   * `estado`) empieza su carga y la pone al día; si deja de verse sin que llegue su `bala`, pasada la gracia, se
+   * cancela. La carga ajena no viaja: sale de lo que lleva en su estado, con la cuenta de su tiro (`cargaDe`). Sin
+   * `sala.estados` (una partida de prueba que no los da), no hay cargas ajenas. No asigna por fotograma.
+   */
+  private lasCargasAjenas(ahora: number): void {
+    const estados = (this.partida.sala as { readonly estados?: unknown }).estados;
+    if (this.partida.lectura === null || !(estados instanceof Map)) return;
+    this.ahoraDelFotograma = ahora;
+    this.cargaAjenaVista.fill(0);
+    (estados as Map<number, EstadoVisto>).forEach(this.verUnEstado);
+    const rayo = this.sistema.rayo;
+    for (let quien = 1; quien < PRIMER_NUMERO_DE_ENTIDAD; quien++) {
+      const desde = this.cargaAjenaDesde[quien] as number;
+      if (Number.isNaN(desde) || this.cargaAjenaVista[quien] === 1) continue;
+      const dejo = this.cargaAjenaDejo[quien] as number;
+      if (Number.isNaN(dejo)) this.cargaAjenaDejo[quien] = ahora;
+      else if (ahora - dejo >= GRACIA_DE_LA_CARGA_AJENA_MS) {
+        this.cargaAjenaDesde[quien] = Number.NaN;
+        this.cargaAjenaDejo[quien] = Number.NaN;
+        rayo.cancelarCarga(quien, ahora);
+      }
+    }
+  }
+
+  /** Un estado de la sala, en el fotograma de `ahoraDelFotograma`: si es un asiento ajeno que carga, su carga. */
+  private readonly verUnEstado = (e: EstadoVisto, quien: number): void => {
+    const ahora = this.ahoraDelFotograma;
+    const l = this.partida.lectura;
+    if (l === null || quien < 1 || quien >= PRIMER_NUMERO_DE_ENTIDAD || quien === this.partida.sala.yo) return;
+    if (ahora >= e.hastaMs || l.sentidoDelEstado(e.est) !== 'cargando' || e.desdeMs === this.cargaAjenaSoltada[quien]) return;
+    const tiro = l.tiroDelAsiento(quien);
+    if (tiro === null) return;
+    const rayo = this.sistema.rayo;
+    if (Number.isNaN(this.cargaAjenaDesde[quien] as number) || (this.cargaAjenaDesde[quien] as number) !== e.desdeMs) {
+      this.cargaAjenaDesde[quien] = e.desdeMs;
+      rayo.empezarCarga(quien, e.desdeMs);
+    }
+    this.cargaAjenaVista[quien] = 1;
+    this.cargaAjenaDejo[quien] = Number.NaN;
+    let estado = this.estadoAjeno[quien];
+    if (estado === undefined) {
+      estado = estadoDelRayoApagado();
+      this.estadoAjeno[quien] = estado;
+    }
+    const lleva = Math.max(0, ahora - e.desdeMs);
+    const nivel = nivelDeLaCarga(tiro, lleva);
+    estado.activo = true;
+    estado.desdeMs = e.desdeMs;
+    estado.c = cargaDe(tiro, lleva);
+    estado.nivel = nivel.nivel;
+    estado.blanco = 0;
+    estado.area = nivel.area;
+    estado.alcance = nivel.alcance;
+    rayo.actualizarCarga(quien, estado, ahora);
+  };
 
   private unaNovedad(n: Novedad, ahora: number): void {
     if (n.tipo === 'dentro') {
@@ -424,6 +533,15 @@ export class Escenificador {
           area: nivel?.area ?? 0,
           t: ahora,
         });
+        /* Un rayo ajeno cargado que estalla cerca de mí me sacude (el propio lo sacude la cámara al soltar). */
+        if (b !== null && b.de !== yo && tiro !== null && nivel !== null) {
+          const c = cargaDelNivel(tiro, nivel);
+          const mio = yo > 0 ? this.sitio(yo) : null;
+          if (mio !== null && c >= 0.5) {
+            const d = Math.hypot(s.x / 100 - mio.x, s.z / 100 - mio.z);
+            if (d < SACUDE_EL_RAYO_AJENO_M) this.sacudida = Math.max(this.sacudida, 0.7 * c * (1 - d / SACUDE_EL_RAYO_AJENO_M));
+          }
+        }
         return;
       }
       default:
@@ -433,14 +551,22 @@ export class Escenificador {
 
   /**
    * EL RAYO DE OTRO (`rayo/contrato.ts`): de su `bala`, un `DisparoDelRayo` —desde su boca, hacia su rumbo hasta
-   * el alcance de su nivel— que se suelta en el sistema. FASE 0 del contrato: el camino entero, con los efectos
-   * que no pintan nada; EFECTOS lo afina (dónde se para de verdad lo dice luego su `estalla`).
+   * donde se para contra la estructura (la misma cuenta que la sala: `paradaDeLaBalaEn`), o hasta el alcance de su
+   * nivel si esa cuenta no se puede hacer— que se suelta en el sistema. Contra un cuerpo lo para luego su `estalla`.
    */
   private soltarUnRayoAjeno(b: BalaVista, tiro: TiroLeido, nivel: NivelLeido): void {
+    /* Sale: su carga ya no se cancela (la acaba `soltar`), ni vuelve a empezar si su estado de cargar tarda en irse. */
+    if (b.de > 0 && b.de < PRIMER_NUMERO_DE_ENTIDAD) {
+      this.cargaAjenaSoltada[b.de] = this.cargaAjenaDesde[b.de] as number;
+      this.cargaAjenaDesde[b.de] = Number.NaN;
+      this.cargaAjenaDejo[b.de] = Number.NaN;
+    }
     const origen: PuntoDelRayo = { x: b.x, y: ALTO_DE_LA_BOCA_SIN_MANO, z: b.z };
     if (this.sistema.boca !== null) this.sistema.boca(b.de, origen);
     const rumbo = (b.r / 256) * Math.PI * 2;
-    const destino: PuntoDelRayo = { x: origen.x + Math.sin(rumbo) * nivel.alcance, y: origen.y, z: origen.z - Math.cos(rumbo) * nivel.alcance };
+    /* Hasta la estructura, o antes si se cruza un cuerpo (lo que diga luego su `estalla`, si cae en él, lo recorta). */
+    const alcance = this.primerCuerpoEnElRayo(b.x, b.z, rumbo, this.paradaDelRayo(b, nivel));
+    const destino: PuntoDelRayo = { x: origen.x + Math.sin(rumbo) * alcance, y: origen.y, z: origen.z - Math.cos(rumbo) * alcance };
     this.sistema.rayo.soltar({
       quien: b.de,
       bala: b.id,
@@ -453,6 +579,51 @@ export class Escenificador {
       semilla: semillaDelRayo(b.de, b.id),
       t: b.salidaMs,
     });
+  }
+
+  /**
+   * HASTA DÓNDE LLEGA EL RAYO DE OTRO, en metros: lo que su bala recorre antes de pararse contra la estructura o el
+   * límite de la fase, con la cuenta de la sala (en Q16.16, desde donde salió la bala). Si la cuenta no se puede
+   * hacer (una liza sin su proyectil, un número fuera de rango), el alcance entero de su nivel.
+   */
+  private paradaDelRayo(b: BalaVista, nivel: NivelLeido): number {
+    const l = this.partida.lectura;
+    const pr = l === null ? null : l.proyectil(b.p);
+    if (l === null || pr === null) return nivel.alcance;
+    try {
+      const { parada } = paradaDeLaBalaEn(l.liza, l.arena, Math.round(b.x * UNO), Math.round(b.z * UNO), b.r, pr);
+      const metros = parada / UNO;
+      return Number.isFinite(metros) && metros > 0 ? Math.min(nivel.alcance, metros) : nivel.alcance;
+    } catch {
+      return nivel.alcance;
+    }
+  }
+
+  /**
+   * DÓNDE SE CRUZA UN CUERPO con el rayo de otro que sale de `(x, z)` hacia `rumbo`, en metros (o `hasta` si ninguno
+   * antes): el primer enemigo pintado (una entidad: sin fuego amigo) cuyo corro toca la recta. Es una PREDICCIÓN, como
+   * la del rayo propio: la sala lo dice con su `estalla` un tic después, y así el canal no se dibuja atravesando al
+   * enemigo para luego saltar. Sin cuerpos que mirar (una partida de prueba que no los da), `hasta`.
+   */
+  private primerCuerpoEnElRayo(x: number, z: number, rumbo: number, hasta: number): number {
+    const fuente = this.partida as { cuerpos?: () => readonly CuerpoPintado[] };
+    const cuerpos = typeof fuente.cuerpos === 'function' ? fuente.cuerpos() : null;
+    if (cuerpos === null) return hasta;
+    const fx = Math.sin(rumbo);
+    const fz = -Math.cos(rumbo);
+    let primero = hasta;
+    for (const c of cuerpos) {
+      if (c.id < PRIMER_NUMERO_DE_ENTIDAD || c.gesto === 'desalojable' || c.gesto === 'imprimirse') continue;
+      const ex = c.x - x;
+      const ez = c.z - z;
+      const a = ex * fx + ez * fz;
+      const lado = ex * fz - ez * fx;
+      if (a <= 0 || Math.abs(lado) >= CORRO_DEL_CUERPO_M) continue;
+      /* Donde el rayo entra en su corro. */
+      const d = a - Math.sqrt(CORRO_DEL_CUERPO_M * CORRO_DEL_CUERPO_M - lado * lado);
+      if (d > 0.3 && d < primero) primero = d;
+    }
+    return primero;
   }
 
   /** El sitio de la cabina de la zona `id` de la Liza (el poste), en metros. */

@@ -51,6 +51,8 @@ import { soltarElAtlas } from './atlas';
 import { ChispasDeImpacto, EsquirlasAmbar } from './chispas';
 import { Hilos } from './hilos';
 import type { Nivel } from './presupuesto';
+import { evaluarLosRayos } from './rayo';
+import { RayosDelRayo } from './rayos';
 import { crearRelojDePresentacion, rejillaDelRemanso } from './reloj';
 import { UNIFORMES_DE_LA_CIUDAD } from '../ciudad/retoques';
 import type { SistemaDeEfectos } from './sistema';
@@ -70,13 +72,20 @@ export interface PropsDeLosEfectos {
   readonly semillaDelCielo?: number;
   /** Sin cielo de Grafía (si `atmosfera/` pinta el suyo o en bancos que no lo quieren). */
   readonly sinCielo?: boolean;
+  /**
+   * SÓLO PARA LOS BANCOS: el reloj de los efectos (ms en la escala de `performance.now()`). El banco del rayo lo
+   * fija para fotografiar un instante exacto; sin él, `performance.now()`, como en el juego.
+   */
+  readonly reloj?: () => number;
 }
 
-export function EfectosDelQuiebro({ sistema, nivel, semillaDelCielo = 1, sinCielo = false }: PropsDeLosEfectos): JSX.Element {
+export function EfectosDelQuiebro({ sistema, nivel, semillaDelCielo = 1, sinCielo = false, reloj }: PropsDeLosEfectos): JSX.Element {
   useFrame(() => {
     sistema.nivel = nivel;
-    const ahora = performance.now();
+    const ahora = reloj === undefined ? performance.now() : reloj();
     sistema.fotograma(ahora);
+    /* El rayo: las manos de quien carga, las luces del destello y lo que pone en la imagen (`rayo.ts`). */
+    evaluarLosRayos(sistema, ahora);
     /* El pico del Remanso: las fachadas enseñan su rejilla de glifos (el uniforme es de la ciudad). */
     UNIFORMES_DE_LA_CIUDAD.uRejillaDeGlifos.value = rejillaDelRemanso(sistema.reloj.ultimoInicio(), ahora);
   }, -1);
@@ -103,6 +112,7 @@ export function EfectosDelQuiebro({ sistema, nivel, semillaDelCielo = 1, sinCiel
       <ChispasDeImpacto sistema={sistema} />
       <Ondas sistema={sistema} />
       <Trazos sistema={sistema} />
+      <RayosDelRayo sistema={sistema} />
       <AnillosDelAnuncio sistema={sistema} />
       <MarcoDelBis sistema={sistema} />
     </group>

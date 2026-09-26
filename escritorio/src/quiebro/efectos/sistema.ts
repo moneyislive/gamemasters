@@ -74,7 +74,7 @@ import {
   capacidadDe,
 } from './presupuesto';
 import type { RelojDePresentacion } from './reloj';
-import { crearEfectosDelRayo } from './rayo';
+import { EstadoDeLosRayos, crearEfectosDelRayo } from './rayo';
 import type { BocaDe, EfectosDelRayo } from '../rayo/contrato';
 
 /** Un punto del mundo, en metros (x al este, z al sur, y arriba). */
@@ -398,8 +398,12 @@ export class Chispas {
   /** Cuándo muere la última que sigue viva (s presentados): hasta entonces la malla se pinta. */
   vivasHasta = Number.NEGATIVE_INFINITY;
 
-  /** Escribe una chispa en el anillo de `tope` ranuras (el del nivel). */
-  lanzar(tope: number, ox: number, oy: number, oz: number, vx: number, vy: number, vz: number, nace: number, vida: number, talla: number, color: number): void {
+  /**
+   * Escribe una chispa en el anillo de `tope` ranuras (el del nivel). `brillo` multiplica el color (por encima de 1 es
+   * luz HDR: una chispa incandescente, no un palito de color); con `enfria`, la chispa nace blanca y se enfría al
+   * ámbar y al rojo antes de apagarse (las del rayo): el sombreador lo sabe por la talla, que viaja NEGATIVA.
+   */
+  lanzar(tope: number, ox: number, oy: number, oz: number, vx: number, vy: number, vz: number, nace: number, vida: number, talla: number, color: number, brillo = 1, enfria = false): void {
     const n = Math.max(1, Math.min(tope, this.capacidad));
     const i = this.siguiente % n;
     this.siguiente = (i + 1) % n;
@@ -411,12 +415,13 @@ export class Chispas {
     this.velocidad[i * 3 + 2] = vz;
     this.tiempos[i * 4] = nace;
     this.tiempos[i * 4 + 1] = vida;
-    this.tiempos[i * 4 + 2] = talla;
+    this.tiempos[i * 4 + 2] = enfria ? -Math.max(1e-4, talla) : talla;
     this.tiempos[i * 4 + 3] = (i * 0.618034) % 1;
     const [r, g, b] = componentesLineales(color);
-    this.color[i * 3] = r;
-    this.color[i * 3 + 1] = g;
-    this.color[i * 3 + 2] = b;
+    const k = Number.isFinite(brillo) && brillo > 0 ? brillo : 1;
+    this.color[i * 3] = r * k;
+    this.color[i * 3 + 1] = g * k;
+    this.color[i * 3 + 2] = b * k;
     this.escritas++;
     this.vivasHasta = Math.max(this.vivasHasta, nace + vida);
     if (this.suciasDesde >= this.suciasHasta) {
@@ -432,6 +437,20 @@ export class Chispas {
   limpiar(): void {
     this.suciasDesde = 0;
     this.suciasHasta = 0;
+  }
+
+  /**
+   * SÓLO PARA LOS BANCOS: las olvida todas (vida 0) y vuelve a escribir desde la primera. El banco del rayo
+   * fotografía varios instantes en la misma página rehaciendo los sucesos de cada uno: sin esto, cada vez sumaría
+   * otra tanda de las mismas chispas encima de la anterior.
+   */
+  reiniciar(): void {
+    for (let i = 0; i < this.capacidad; i++) this.tiempos[i * 4 + 1] = 0;
+    this.siguiente = 0;
+    this.escritas = 0;
+    this.vivasHasta = Number.NEGATIVE_INFINITY;
+    this.suciasDesde = 0;
+    this.suciasHasta = this.capacidad;
   }
 }
 
@@ -734,9 +753,16 @@ export interface SistemaDeEfectos {
   /**
    * EL RAYO (`rayo/contrato.ts`): MANDOS lo llama con el rayo propio y `red/escenificar.ts` con los ajenos.
    * Se lee aquí en CADA llamada (`sistema.rayo.soltar(…)`) y no se guarda: quien lo pinta puede cambiarlo por
-   * otro que lo envuelva. Empieza con el de `efectos/rayo.ts` (en la fase 0, el que no hace nada).
+   * otro que lo envuelva (`red/escenificar.ts` le pone el sonido delante, y delega). Empieza con el de
+   * `efectos/rayo.ts`, que escribe en `rayos`.
    */
   rayo: EfectosDelRayo;
+  /**
+   * LO QUE LOS RAYOS TIENEN AHORA (cargas, rayos, marcas, y lo que ponen en la imagen): lo escribe `rayo`, lo pone al
+   * día `evaluarLosRayos` cada fotograma y lo leen las piezas y el posproceso. Es el dato, no la puerta: aunque
+   * alguien cambie `rayo` por un doble de prueba, esto sigue aquí (y vacío).
+   */
+  readonly rayos: EstadoDeLosRayos;
   /**
    * Dónde está la mano (la boca del rayo) de cada cuerpo, fotograma a fotograma; `null` hasta que la pongan.
    * La pone `Quiebro.tsx` con la de los personajes (`DirectorDeLosPersonajes.bocaDe`).
@@ -796,13 +822,16 @@ export function crearSistemaDeEfectos(reloj: RelojDePresentacion, origen: number
   const esquirlas = new Esquirlas();
   const ahora = { verdadero: origen, presentado: origen };
   const bisEnCurso = { inicio: Number.NaN, x: 0, z: 0, radio: RADIO_DEL_BIS };
+  const rayos = new EstadoDeLosRayos();
 
   const sistema: SistemaDeEfectos = {
     reloj,
     origen,
     nivel: 1,
     localizar: null,
+    /* Se pone justo debajo, con el sistema ya hecho: sus efectos escriben en `rayos` y en las chispas. */
     rayo: crearEfectosDelRayo(),
+    rayos,
     boca: null,
     ahora,
     anillos,
@@ -964,9 +993,11 @@ export function crearSistemaDeEfectos(reloj: RelojDePresentacion, origen: number
       for (let i = 0; i < esquirlas.capacidad; i++) esquirlas.tiempos[i * 4 + 3] = 0;
       esquirlas.version++;
       bisEnCurso.inicio = Number.NaN;
+      rayos.vaciar();
       /* Las chispas no se vacían: mueren solas en medio segundo. */
     },
   };
+  sistema.rayo = crearEfectosDelRayo(sistema);
   return sistema;
 }
 

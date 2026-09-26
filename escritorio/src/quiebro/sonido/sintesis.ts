@@ -824,3 +824,99 @@ export function aleteo(frecuenciaDeMuestreo: number, semilla: number): Estereo {
   normalizar([izquierda, derecha], 0.8);
   return [izquierda, derecha];
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+// El trueno del rayo
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+/** Lo que dura el búfer del trueno, en segundos. */
+export const DURACION_DEL_TRUENO_S = 3.4;
+
+/**
+ * EL TRUENO DEL RAYO (EL-RAYO.md §5), en estéreo y sembrado: el pleno lo toca detrás del chasquido, y la calle mojada
+ * le pone la cola. Tres capas, como un trueno cercano de verdad:
+ *
+ *   1. EL DESGARRO (0-0,3 s): decenas de chasquidos de ruido derivado, amontonados al principio y cada vez más
+ *      flojos, a los dos lados: el aire que se rasga a lo largo del canal (cada tramo del rayo suena desde su sitio,
+ *      y por eso un trueno cercano no es UN golpe sino una tela que se rompe).
+ *   2. EL RETUMBO: ruido marrón (un paseo con fuga) por un paso bajo de ~220 Hz, con una envolvente de cinco
+ *      «rodillos» (campanas de Gauss sembradas) que se apagan: el retumbo que va y viene mientras llega el sonido de
+ *      los tramos lejanos del canal y los ecos de las fachadas.
+ *   3. EL GRUÑIDO: ruido por una banda de 280-900 Hz con la misma envolvente y un temblor lento, lo que hace que el
+ *      retumbo no sea sólo un grave que en un teléfono no se oye.
+ *
+ * Acaba en silencio (fundido de 150 ms) y con el pico en 0,9, como los demás búferes.
+ */
+export function truenoDelRayo(frecuenciaDeMuestreo: number, semilla: number): Estereo {
+  const sr = frecuenciaDeMuestreo;
+  const n = Math.round(DURACION_DEL_TRUENO_S * sr);
+  const azar = azarSembrado(semilla);
+  /* 1. El desgarro. */
+  const dI = new Float32Array(n);
+  const dD = new Float32Array(n);
+  for (let k = 0; k < 46; k++) {
+    const t = Math.pow(azar(), 1.7) * 0.28;
+    const amplitud = entre(azar, 0.25, 1) * (1 - t / 0.34);
+    const lado = azar();
+    const dura = entre(azar, 0.0015, 0.007);
+    rafaga(dI, sr, azar, t, dura, amplitud * Math.cos(lado * Math.PI * 0.5));
+    rafaga(dD, sr, azar, t + entre(azar, 0, 0.0008), dura, amplitud * Math.sin(lado * Math.PI * 0.5));
+  }
+  normalizar([dI, dD], 0.8);
+  /* 2 y 3. El retumbo y el gruñido, con la envolvente de los rodillos. */
+  const centros: number[] = [];
+  const anchos: number[] = [];
+  const pesos: number[] = [];
+  for (let k = 0; k < 5; k++) {
+    centros.push(0.1 + k * 0.45 + azar() * 0.25);
+    anchos.push(0.2 + 0.4 * azar());
+    pesos.push((1 - k * 0.15) * (0.6 + 0.4 * azar()));
+  }
+  const rI = new Float32Array(n);
+  const rD = new Float32Array(n);
+  const bajo = 1 - Math.exp((-DOS_PI * 220) / sr);
+  const agudoDeLaBanda = 1 - Math.exp((-DOS_PI * 900) / sr);
+  const graveDeLaBanda = 1 - Math.exp((-DOS_PI * 280) / sr);
+  let marronI = 0;
+  let marronD = 0;
+  let bI = 0;
+  let bD = 0;
+  let a1I = 0;
+  let a2I = 0;
+  let a1D = 0;
+  let a2D = 0;
+  const fase = azar() * DOS_PI;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    let e = 0;
+    for (let k = 0; k < 5; k++) {
+      const x = (t - (centros[k] as number)) / (anchos[k] as number);
+      e += (pesos[k] as number) * Math.exp(-x * x);
+    }
+    e *= Math.exp(-t / 1.0) * Math.min(1, t / 0.03);
+    const wI = azar() * 2 - 1;
+    const wD = azar() * 2 - 1;
+    marronI = marronI * 0.995 + wI * 0.06;
+    marronD = marronD * 0.995 + wD * 0.06;
+    bI += bajo * (marronI - bI);
+    bD += bajo * (marronD - bD);
+    a1I += agudoDeLaBanda * (wI - a1I);
+    a2I += graveDeLaBanda * (a1I - a2I);
+    a1D += agudoDeLaBanda * (wD - a1D);
+    a2D += graveDeLaBanda * (a1D - a2D);
+    const temblor = 0.65 + 0.35 * Math.sin(DOS_PI * 7 * t + fase);
+    rI[i] = e * (bI * 2.2 + (a1I - a2I) * 0.9 * temblor);
+    rD[i] = e * (bD * 2.2 + (a1D - a2D) * 0.9 * (1.3 - temblor));
+  }
+  normalizar([rI, rD], 0.6);
+  const izquierda = new Float32Array(n);
+  const derecha = new Float32Array(n);
+  const fundido = Math.round(0.15 * sr);
+  for (let i = 0; i < n; i++) {
+    const k = i >= n - fundido ? (n - 1 - i) / fundido : 1;
+    izquierda[i] = ((dI[i] ?? 0) + (rI[i] ?? 0)) * k;
+    derecha[i] = ((dD[i] ?? 0) + (rD[i] ?? 0)) * k;
+  }
+  normalizar([izquierda, derecha], 0.9);
+  return [izquierda, derecha];
+}
