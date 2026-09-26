@@ -25,8 +25,9 @@
  *   · `usarLaPrecompilacionAlCambiar`: tras un cambio de nivel el estado del renderizador cambia de todas
  *     formas (el posproceso cambia de mapeo tonal o de blanco; en N2+ hay sombras y luces de verdad) y TODO lo
  *     que se ve necesita programas nuevos en el primer pintado con el estado nuevo. Eso no se puede evitar,
- *     pero sí que sea uno detrás de otro: en ese pintado se piden TODOS a la vez (`renderer.compile` de lo que
- *     cuelga de la escena) antes de que el pintado use el primero, y el compilador los hace en paralelo.
+ *     pero sí que sea uno detrás de otro: en ese pintado se piden TODOS a la vez (`compileAsync` de lo que
+ *     cuelga de la escena) y, si hay alguno nuevo, la escena no se pinta hasta que estén (26-sep: esperarlos en el
+ *     pintado paraba el hilo 7,5 s en la portada con la caché fría). Los primeros pintados, los de la portada, también.
  *   · `guardarLosProgramas`: lo que se suelta (la ciudad del nivel de antes, el cielo de antes) guarda sus
  *     programas para la próxima pieza igual. Medido en el juego (24-sep, PC, caché del navegador caliente):
  *     con las tres de arriba, un cambio de nivel aún enlazaba 22-25 programas, todos de la ciudad y del cielo
@@ -37,7 +38,7 @@
  * Nada de esto cambia qué se pinta ni cómo: sólo CUÁNDO se compila. Sin la extensión de compilación en
  * paralelo, `compileAsync` espera igual (three marca los programas listos en seguida) y todo queda como antes.
  */
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type * as THREE from 'three';
 
@@ -65,12 +66,31 @@ export function alPintarLaEscena(escena: THREE.Scene, fn: AlPintar): () => void 
     citas = lista;
     CITAS.set(escena, lista);
     const antes = escena.onBeforeRender;
+    const despues = escena.onAfterRender;
+    /* Si un bloque se está compilando (`compilarEnBloque`), este pintado sale vacío y la escena se vuelve a ver al acabar. */
+    let escondida = false;
     const envolver = function (this: THREE.Object3D, ...a: unknown[]): void {
+      if (escondida) {
+        escondida = false;
+        escena.visible = true;
+      }
       (antes as (...b: unknown[]) => void).apply(this, a);
       const [gl, s, c] = a as [Compilador, THREE.Scene, THREE.Camera];
       for (const f of lista) f(gl, s, c);
+      if (compilandoEnBloque(escena)) {
+        escondida = true;
+        escena.visible = false;
+      }
+    };
+    const envolverDespues = function (this: THREE.Object3D, ...a: unknown[]): void {
+      if (escondida) {
+        escondida = false;
+        escena.visible = true;
+      }
+      (despues as (...b: unknown[]) => void).apply(this, a);
     };
     escena.onBeforeRender = envolver as unknown as THREE.Object3D['onBeforeRender'];
+    escena.onAfterRender = envolverDespues as unknown as THREE.Object3D['onAfterRender'];
   }
   const suyas = citas;
   suyas.add(fn);
@@ -92,7 +112,9 @@ export function usarAlPintarLaEscena(fn: AlPintar | null): void {
   useFrame(() => {
     nuevo.current = true;
   }, -1000);
-  useEffect(
+  /* Antes del primer fotograma (`useLayoutEffect`): con `useEffect` la cita llegaba tarde al primer pintado, que es el que
+     compila la portada entera (26-sep). */
+  useLayoutEffect(
     () =>
       alPintarLaEscena(escena, (gl, s, c) => {
         if (!nuevo.current) return;
@@ -268,8 +290,13 @@ export class BloqueAlCambiar {
   /** Cuántas veces se compiló en bloque. */
   bloques = 0;
 
+  /**
+   * Los primeros pintados también van en bloque: son los de la portada, y compilarlos uno detrás de otro con la caché
+   * fría paraba el hilo 7,5 s (26-sep: BAJAR «no hacía nada» en un PC de sobra).
+   */
   constructor(clave: unknown) {
     this.clave = clave;
+    this.pendientes = PINTADOS_EN_BLOQUE;
   }
 
   /** La clave de ahora (el nivel): si cambió, tocan los siguientes pintados. */
@@ -288,13 +315,22 @@ export class BloqueAlCambiar {
     this.bloques++;
     return true;
   }
+
+  /**
+   * Siguen apareciendo programas (la ciudad se monta a trozos, los cuerpos llegan cuando cargan): el bloque dura otros
+   * `PINTADOS_EN_BLOQUE` pintados. Sin esto, lo que se montaba tras los tres primeros se compilaba en el pintado que lo
+   * usaba, uno detrás de otro: 8,3 s de `onFirstUse` en la portada con la caché fría (perfil del 26-sep).
+   */
+  alargar(): void {
+    this.pendientes = Math.max(this.pendientes, PINTADOS_EN_BLOQUE);
+  }
 }
 
 /**
  * COMPILA EN BLOQUE lo que cuelga de la escena en el pintado principal, antes de que el pintado lo use, cuando
  * toca (`BloqueAlCambiar`). Cada hijo visible de la escena por separado, para no compilar lo apagado del todo.
  */
-export function usarLaPrecompilacionAlCambiar(clave: unknown): BloqueAlCambiar {
+export function usarLaPrecompilacionAlCambiar(clave: unknown, esconder: () => boolean = () => true): BloqueAlCambiar {
   const bloque = useRef<BloqueAlCambiar | null>(null);
   bloque.current ??= new BloqueAlCambiar(clave);
   const b = bloque.current;
@@ -303,16 +339,53 @@ export function usarLaPrecompilacionAlCambiar(clave: unknown): BloqueAlCambiar {
   if ((import.meta.env as { readonly DEV?: boolean } | undefined)?.DEV === true && typeof window !== 'undefined') {
     (window as unknown as { __quiebroBloque?: BloqueAlCambiar }).__quiebroBloque = b;
   }
+  /* El último programa visto en el pintado principal: si entre dos hay más, alguien compiló pintando y vendrán otros. */
+  const visto = useRef(-1);
   usarAlPintarLaEscena((gl, escena, camara) => {
     const r = gl as unknown as THREE.WebGLRenderer;
-    if (b.toca(claveDelPintado(r, r.getRenderTarget() !== null))) compilarEnBloque(gl, escena, camara);
+    if (visto.current >= 0 && ultimoPrograma(gl) !== visto.current) b.alargar();
+    if (b.toca(claveDelPintado(r, r.getRenderTarget() !== null)) && compilarEnBloque(gl, escena, camara, esconder())) b.alargar();
+    visto.current = ultimoPrograma(gl);
   });
   return b;
 }
 
-/** Pide a la vez los programas de todo lo que cuelga de la escena (sus hijos visibles), para el estado de ahora. */
-export function compilarEnBloque(gl: Compilador, escena: THREE.Scene, camara: THREE.Camera): void {
-  for (const hijo of escena.children) if (hijo.visible) gl.compile(hijo, camara, escena);
+/** Lo más que una escena se queda sin pintar esperando a un bloque: después se pinta y lo que falte se espera ahí. */
+export const TOPE_DE_UN_BLOQUE_MS = 10_000;
+
+/** Bloques pedidos y sin acabar, por escena (ver `compilarEnBloque`). */
+const BLOQUES_EN_CURSO = new WeakMap<THREE.Scene, number>();
+
+/** ¿Hay un bloque de esta escena compilándose? Mientras, sus pintados salen vacíos (ver `alPintarLaEscena`). */
+export function compilandoEnBloque(escena: THREE.Scene): boolean {
+  return (BLOQUES_EN_CURSO.get(escena) ?? 0) > 0;
+}
+
+/**
+ * Pide a la vez los programas de todo lo que cuelga de la escena (sus hijos visibles), para el estado de ahora, SIN
+ * ESPERARLOS (`compileAsync`). Si hay alguno nuevo, la escena no se pinta hasta que estén todos: pintarla los usaría
+ * en el acto y el hilo principal esperaría al compilador en ese fotograma —medido el 26-sep con la caché fría: 7,5 s
+ * en la portada y 3,7 s en un cambio de nivel—. Así la página sigue viva (los botones, el reloj, la red) y el
+ * compilador trabaja en paralelo. Sin programas nuevos no se esconde nada.
+ */
+export function compilarEnBloque(gl: Compilador, escena: THREE.Scene, camara: THREE.Camera, esconder = true): boolean {
+  const antes = ultimoPrograma(gl);
+  const listos: Promise<unknown>[] = [];
+  for (const hijo of escena.children) if (hijo.visible) listos.push(gl.compileAsync(hijo, camara, escena));
+  if (ultimoPrograma(gl) === antes) return false;
+  /* En plena pelea no se esconde nada: un fotograma vacío se ve más que uno que tarda. Se piden igual a la vez. */
+  if (!esconder) return true;
+  BLOQUES_EN_CURSO.set(escena, (BLOQUES_EN_CURSO.get(escena) ?? 0) + 1);
+  let hecho = false;
+  const acabado = (): void => {
+    if (hecho) return;
+    hecho = true;
+    BLOQUES_EN_CURSO.set(escena, Math.max(0, (BLOQUES_EN_CURSO.get(escena) ?? 1) - 1));
+  };
+  void Promise.all(listos).then(acabado, acabado);
+  /* Un bloque que no avisa (un programa que nunca dice estar listo) no puede dejar la escena sin pintar para siempre. */
+  setTimeout(acabado, TOPE_DE_UN_BLOQUE_MS);
+  return true;
 }
 
 /* ═══════════════════════════════ LOS PROGRAMAS QUE SE GUARDAN ═══════════════════════════════ */

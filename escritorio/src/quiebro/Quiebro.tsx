@@ -517,7 +517,14 @@ interface DirectorQueMide {
 
 /** LO QUE VA DENTRO DEL LIENZO: el nivel, el bucle y las piezas de cada frente. */
 function Escena(p: PropsDeLaEscena): JSX.Element {
-  const nivel = usarElNivel();
+  /* En la Bajada y en la pelea el nivel no cambia: recompilar toda la ciudad congelaría la imagen segundos. */
+  const modoVivo = useRef(p.modo);
+  modoVivo.current = p.modo;
+  const nivel = usarElNivel({
+    nivelQuieto: () => modoVivo.current !== 'orbita',
+    claveDelBloque: p.modo,
+    esconderAlCompilar: () => modoVivo.current !== 'juego',
+  });
   const remanso = useRef(0);
   const { alNivel } = p;
   useEffect(() => alNivel(nivel.nivel), [nivel.nivel, alNivel]);

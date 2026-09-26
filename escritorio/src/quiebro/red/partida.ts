@@ -253,6 +253,8 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
   private antesZ = 0;
   private tengoCuerpo = true;
   private recolocarDesdeLaFoto = false;
+  /** El tic de la sala desde el que vale una foto para recolocarme (el del suceso que me devolvió el cuerpo). */
+  private recolocarDesdeK = 0;
   private readonly pendientes: AccionDelAparato[] = [];
   private sostenida: { accion: IdDeclarado; ms: number; blanco: number; desdeMs: number } | null = null;
   private gesto: GestoPropio | null = null;
@@ -433,6 +435,8 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
       }
       case 'corrige':
         if (this.paso !== null && this.paso.corregir(n.n, n.x, n.z, this.ultimoEnviado)) {
+          /* La corrección es de la sala y de ahora: ninguna foto la mejora (la de la cabina al reaparecer, p. ej.). */
+          this.recolocarDesdeLaFoto = false;
           this.antesX = this.paso.x;
           this.antesZ = this.paso.z;
           if (this.gesto !== null && (this.gesto.gesto === 'quiebro' || this.gesto.gesto === 'avance')) this.gesto = null;
@@ -498,6 +502,7 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
         } else if (!this.tengoCuerpo) {
           this.tengoCuerpo = true;
           this.recolocarDesdeLaFoto = true;
+          this.recolocarDesdeK = n.k;
         }
         /* Un golpe recibido corta mi gesto de golpe (el cuerpo no puede estar pegando y encajando a la vez). */
         if (sentido === 'tocado' || sentido === 'derribado' || sentido === 'caido' || sentido === 'descolocado') {
@@ -608,6 +613,7 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
         if (!this.tengoCuerpo) {
           this.tengoCuerpo = true;
           this.recolocarDesdeLaFoto = true;
+          this.recolocarDesdeK = n.k;
         }
         /* La carga no pasa de una fase a otra (la sala suelta la sostenida al cambiar de fase). */
         this.cancelarLaCarga(ahora);
@@ -1017,6 +1023,26 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
     this.pendientes.push([accion, ms, blanco]);
     this.pulsacionesAtendidas.push({ boton, accion, t: timeStamp, blanco });
 
+    /*
+     * TIRADO NO SE PEGA (26-sep, lo vio Miguel: muerto, GOLPE lo levantaba, pegaba y se volvía a tumbar). En un
+     * estado que bloquea las acciones y que esta acción no corta, la sala no la lanza (sólo la guarda si al estado
+     * le quedan menos de `guardaTics`): se le manda igual, pero el cuerpo no hace el gesto ni el viaje, salvo en esa
+     * guarda, que sí saldrá. El quiebro y la ruptura propios no cuentan: desde su tic soltable se puede golpear, y
+     * eso ya lo mira `saleYa`.
+     */
+    const est = this.sala.estadoEn(this.sala.yo, ahora);
+    const declaradoEst = est === 0 ? null : l.estado(est);
+    const quedaDelEstadoMs = (this.sala.estados.get(this.sala.yo)?.hastaMs ?? ahora) - ahora;
+    if (
+      declaradoEst !== null &&
+      declaradoEst.bloqueaAccion &&
+      !declaradoEst.cancelaCon.includes(accion) &&
+      sentido !== 'quiebro' &&
+      sentido !== 'ruptura' &&
+      quedaDelEstadoMs > r.cuerpo.guardaTics * MS_POR_TIC
+    )
+      return;
+
     /* EL CUERPO RESPONDE EN EL ACTO: el gesto empieza al pulsar, y el quiebro y la acometida, el viaje. */
     if (boton === 'quiebro') {
       this.empezarElQuiebro(timeStamp, sentido, palancaX, palancaY);
@@ -1029,8 +1055,6 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
      * hago yo, entera: la sala sólo me da por andado lo que puede ir de camino en los `aqui` que aún no ha
      * visto, no lo que no anduve (`llegaConSuAvance` en `combate.ts`).
      */
-    const est = this.sala.estadoEn(this.sala.yo, ahora);
-    const declaradoEst = est === 0 ? null : l.estado(est);
     const miQuiebro = this.gesto !== null && this.gesto.gesto === 'quiebro' ? this.gesto : null;
     const saleYa =
       declaradoEst === null || !declaradoEst.bloqueaAccion || (sentido === 'quiebro' && miQuiebro !== null && timeStamp >= miQuiebro.desdeMs + r.esquiva.puesta.soltableDesdeTic * MS_POR_TIC);
@@ -1664,7 +1688,7 @@ export class Partida implements FuenteDeCuerpos, FuenteConGente {
     /* ── Yo, predicho ── */
     if (yo > 0 && this.paso !== null && reloj !== null && l !== null) {
       if (this.recolocarDesdeLaFoto) {
-        const t = this.sala.fotos.ultimaTupla(yo);
+        const t = this.sala.fotos.ultimaTuplaDesde(yo, this.recolocarDesdeK);
         if (t !== null) {
           this.paso.colocar(Math.round((t[1] / 100) * UNO), Math.round((t[2] / 100) * UNO));
           this.antesX = this.paso.x;

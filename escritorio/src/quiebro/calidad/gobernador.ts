@@ -49,6 +49,11 @@ import { TABLA_DE_NIVELES, escaleraDeDpr } from './niveles';
 export const FOTOGRAMAS_DE_LA_VENTANA = 60;
 /** Media por encima de la cual la ventana es mala (45 fps). */
 export const UMBRAL_DE_BAJADA_MS = 22;
+/**
+ * Media que baja de nivel AUNQUE el nivel esté quieto (en la pelea): por debajo de 25 fps no se juega, y el tirón de
+ * recompilar una vez sale más barato que la oleada entera a saltos.
+ */
+export const UMBRAL_DE_DESPLOME_MS = 40;
 /** Media por debajo de la cual la ventana tiene holgura (a 60 Hz, casi sin saltos). */
 export const UMBRAL_DE_HOLGURA_MS = 18;
 /** Cuánto tiempo seguido con holgura hace falta para subir un peldaño o probar el nivel de arriba. */
@@ -75,6 +80,12 @@ export interface MuestraDelFotograma {
   readonly llamadas: number;
   /** Triángulos de la escena en ese fotograma. */
   readonly triangulos: number;
+  /**
+   * En plena pelea el NIVEL no se cambia: cambiarlo recompila los sombreadores de todo lo que se ve y, con la caché
+   * fría, congela la imagen varios segundos (medido el 26-sep: 3,7 s de hilo parado con la caché templada, al
+   * salir de la plaza en la oleada). El DPR sí, que no recompila nada. Lo que el nivel pida se hace en la calma.
+   */
+  readonly nivelQuieto?: boolean;
 }
 
 export interface EstadoDelGobernador {
@@ -192,21 +203,22 @@ export function gobernar(estado: EstadoDelGobernador, muestra: MuestraDelFotogra
     ventanaTriangulos: Math.max(estado.ventanaTriangulos, muestra.triangulos),
   };
   if (conEste.ventanaFotogramas < FOTOGRAMAS_DE_LA_VENTANA) return { estado: conEste, cambio: null };
-  return cerrarLaVentana(conEste);
+  return cerrarLaVentana(conEste, muestra.nivelQuieto === true);
 }
 
 /** Juzga la ventana que se acaba de llenar. */
-function cerrarLaVentana(e: EstadoDelGobernador): PasoDelGobernador {
+function cerrarLaVentana(e: EstadoDelGobernador, quieto: boolean): PasoDelGobernador {
   const media = e.ventanaMs / e.ventanaFotogramas;
   const tope = TABLA_DE_NIVELES[e.nivel].topes;
   const sobreElTope = e.ventanaLlamadas > tope.llamadas || e.ventanaTriangulos > tope.triangulos;
   const cerrada: EstadoDelGobernador = { ...e, ...VENTANA_VACIA, ultimaMediaMs: media, ultimaSobreElTope: sobreElTope };
   const antes = { nivel: e.nivel, dpr: dprDe(e) };
 
-  /* ─ Ventana mala: se baja, deprisa. ─ */
+  /* ─ Ventana mala: se baja, deprisa. Con el nivel quieto, sólo el DPR, salvo que el juego se hunda. ─ */
   if (media > UMBRAL_DE_BAJADA_MS) {
+    const sinNivel = quieto && media <= UMBRAL_DE_DESPLOME_MS;
     const sinHolgura: EstadoDelGobernador = { ...cerrada, holguraMs: 0 };
-    if (e.aPrueba && e.nivel > 0) {
+    if (e.aPrueba && e.nivel > 0 && !sinNivel) {
       /* A prueba no hay peldaños: se vuelve al nivel de antes, en el peldaño alto que ya tenía. */
       const siguiente = conCambio(sinHolgura, (e.nivel - 1) as NivelDeCalidad, 0, marcar(e.fallidos, e.nivel));
       return { estado: siguiente, cambio: { motivo: 'prueba-fallida', de: antes, a: aDonde(siguiente), mediaMs: media } };
@@ -216,11 +228,11 @@ function cerrarLaVentana(e: EstadoDelGobernador): PasoDelGobernador {
       const siguiente = conCambio(sinHolgura, e.nivel, e.peldano + 1, e.fallidos);
       return { estado: siguiente, cambio: { motivo: 'bajar-dpr', de: antes, a: aDonde(siguiente), mediaMs: media } };
     }
-    if (e.nivel > 0) {
+    if (e.nivel > 0 && !sinNivel) {
       const siguiente = conCambio(sinHolgura, (e.nivel - 1) as NivelDeCalidad, 0, marcar(e.fallidos, e.nivel));
       return { estado: siguiente, cambio: { motivo: 'bajar-nivel', de: antes, a: aDonde(siguiente), mediaMs: media } };
     }
-    /* N0 en su peldaño más bajo: no hay más palanca. Se sigue midiendo por si alguien pregunta. */
+    /* N0 en su peldaño más bajo (o el nivel quieto): no hay más palanca. Se sigue midiendo por si alguien pregunta. */
     return { estado: sinHolgura, cambio: null };
   }
 
@@ -252,7 +264,7 @@ function cerrarLaVentana(e: EstadoDelGobernador): PasoDelGobernador {
     return { estado: siguiente, cambio: { motivo: 'subir-dpr', de: antes, a: aDonde(siguiente), mediaMs: media } };
   }
   const arriba = e.nivel + 1;
-  if (arriba <= e.techo && !seguida.fallidos.includes(arriba as NivelDeCalidad)) {
+  if (arriba <= e.techo && !seguida.fallidos.includes(arriba as NivelDeCalidad) && !quieto) {
     const nivelDeArriba = arriba as NivelDeCalidad;
     const peldanoBajo = escaleraDeDpr(nivelDeArriba, e.dprDelAparato).length - 1;
     const siguiente: EstadoDelGobernador = {

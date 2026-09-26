@@ -52,7 +52,7 @@ import {
 } from './gobernador';
 import { sondearElAparato } from './sondeo';
 import { laCuentaDe } from './medida';
-import { usarLaPrecompilacionAlCambiar } from './precompilar';
+import { compilandoEnBloque, usarLaPrecompilacionAlCambiar } from './precompilar';
 
 export interface OpcionesDelNivel {
   /** Un nivel forzado; `null` o sin dar = lo decide el gobernador. */
@@ -63,6 +63,12 @@ export interface OpcionesDelNivel {
   readonly recordar?: boolean;
   /** Cada cambio del gobernador, para el diagnóstico o para contárselo al jugador. */
   readonly alCambiar?: (cambio: CambioDelGobernador) => void;
+  /** ¿Se pelea ahora? Entonces el gobernador sólo toca el DPR (ver `nivelQuieto` en `gobernador.ts`). */
+  readonly nivelQuieto?: () => boolean;
+  /** Lo que, al cambiar, pide compilar en bloque además del nivel (la fase de la cámara: llegan cuerpos y efectos). */
+  readonly claveDelBloque?: string;
+  /** ¿Se puede dejar la escena sin pintar mientras compila? (En la pelea no: ver `compilarEnBloque`.) */
+  readonly esconderAlCompilar?: () => boolean;
 }
 
 /** Lo último medido, para quien lo quiera enseñar. */
@@ -152,6 +158,8 @@ export function usarElNivel(opciones: OpcionesDelNivel = {}): ElNivel {
   const ultimo = useRef<LoUltimoMedido>(NADA_MEDIDO);
   const alCambiar = useRef(opciones.alCambiar);
   alCambiar.current = opciones.alCambiar;
+  const nivelQuieto = useRef(opciones.nivelQuieto);
+  nivelQuieto.current = opciones.nivelQuieto;
 
   const [donde, setDonde] = useState<{ readonly nivel: NivelDeCalidad; readonly dpr: number }>(() =>
     fijo !== null ? fijoEn(fijo, dprDelAparato) : { nivel: gobernador.current?.nivel ?? 1, dpr: gobernador.current === null ? 1 : dprDe(gobernador.current) },
@@ -181,7 +189,8 @@ export function usarElNivel(opciones: OpcionesDelNivel = {}): ElNivel {
   useFrame((estado, deltaSegundos) => {
     const cuenta = laCuentaDe(estado.gl);
     const info = estado.gl.info.render;
-    const oculta = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    /* Un fotograma sin la escena (se compila en bloque: ver `precompilar.ts`) tampoco dice nada del aparato. */
+    const oculta = (typeof document !== 'undefined' && document.visibilityState === 'hidden') || compilandoEnBloque(estado.scene);
     const medido: LoUltimoMedido = {
       ms: deltaSegundos * 1000,
       oculta,
@@ -198,6 +207,7 @@ export function usarElNivel(opciones: OpcionesDelNivel = {}): ElNivel {
       oculta,
       llamadas: medido.llamadasDeLaEscena,
       triangulos: medido.triangulosDeLaEscena,
+      nivelQuieto: nivelQuieto.current?.() === true,
     });
     gobernador.current = paso.estado;
     const cambio = paso.cambio;
@@ -215,7 +225,9 @@ export function usarElNivel(opciones: OpcionesDelNivel = {}): ElNivel {
   });
 
   /* Los programas del nivel nuevo, pedidos a la vez (ver la cabecera). */
-  usarLaPrecompilacionAlCambiar(donde.nivel);
+  const esconder = useRef(opciones.esconderAlCompilar);
+  esconder.current = opciones.esconderAlCompilar;
+  usarLaPrecompilacionAlCambiar(`${String(donde.nivel)}|${opciones.claveDelBloque ?? ''}`, () => esconder.current?.() !== false);
 
   const gobernadorLeido = gobernador as { readonly current: EstadoDelGobernador };
   return useMemo<ElNivel>(

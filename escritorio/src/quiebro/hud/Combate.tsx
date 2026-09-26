@@ -147,6 +147,11 @@ export function Combate({ vista, yo, partida, escena, mandos, aprendiz, tactil, 
   const ausencia = partida?.ausencia(ahora) ?? null;
   if (ausencia === 'vuelta' && rotulo === null) rotulo = { texto: 'De vuelta', clase: 'q-rotulo limpio' };
 
+  /* Caído o sin cuerpo, con su cuenta (26-sep: sin ella, la espera de volver se leía como una carga que no acababa). */
+  const miSentido = partida?.sentidoPropio(ahora) ?? null;
+  const miCaida = sala !== null && (miSentido === 'caido' || miSentido === 'sin-cuerpo') ? (sala.estados.get(sala.yo) ?? null) : null;
+  const quedanS = miCaida === null ? null : Math.max(0, Math.ceil((miCaida.hastaMs - ahora) / 1000));
+
   const uso = partida?.usoPosible(ahora) ?? null;
   const progreso = partida?.progresoDeUsar(ahora) ?? null;
   const golpeado = escena !== null && ahora - escena.ultimoGolpeRecibidoMs < 200;
@@ -260,6 +265,19 @@ export function Combate({ vista, yo, partida, escena, mandos, aprendiz, tactil, 
           <div className="q-titulo">{NOMBRES_DEL_QUIEBRO.estados.ausente}</div>
           <p>La calle ha dejado de verte: nadie te persigue ni te pega, y tú ni andas ni golpeas.</p>
           <p className="q-nota">Vuelves en cuanto el aparato contesta, con medio segundo de intocable.</p>
+        </div>
+      ) : null}
+
+      {miCaida !== null && ausencia !== 'ausente' ? (
+        <div className="q-ausente q-panel" role="status">
+          <div className="q-titulo">{NOMBRES_DEL_QUIEBRO.estados.desconectado}</div>
+          <p>
+            {miSentido === 'caido'
+              ? `Si alguien de la mesa llega en ${String(quedanS)} s, te levanta.`
+              : quedanS === null || quedanS > 60
+                ? 'Sin monedas: vuelves en la pausa.'
+                : `Vuelves en ${String(quedanS)} s, en la cabina de refugio, con dos segundos de intocable.`}
+          </p>
         </div>
       ) : null}
 

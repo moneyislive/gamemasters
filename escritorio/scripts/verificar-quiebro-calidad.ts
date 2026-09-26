@@ -42,6 +42,7 @@ import {
   DURACION_DE_LA_PRUEBA_MS,
   FOTOGRAMAS_DE_GRACIA,
   HOLGURA_PARA_SUBIR_MS,
+  UMBRAL_DE_DESPLOME_MS,
   arranqueConRecuerdo,
   dprDe,
   gobernadorNuevo,
@@ -94,6 +95,7 @@ import {
   alPintarLaEscena,
   claveDelPintado,
   compilarEnBloque,
+  compilandoEnBloque,
   guardarLosProgramas,
   materialesGuardados,
 } from '../src/quiebro/calidad/precompilar';
@@ -475,6 +477,37 @@ paso('El gobernador: baja deprisa, primero el DPR');
     'con una pantalla de 1× la escalera de N2 es un peldaño: la ventana mala baja de nivel directamente',
     aUnoX.cambios[0]?.motivo === 'bajar-nivel' && aUnoX.estado.nivel === 1,
     motivos(aUnoX),
+  );
+
+  /*
+   * EN LA PELEA EL NIVEL SE QUEDA QUIETO (26-sep: la imagen congelada al salir de la plaza en la oleada): cambiar
+   * de nivel recompila todo lo que se ve. El DPR sí baja; bajar, subir o suspender la prueba esperan a la calma.
+   */
+  const quietoAbajo = correr(enEstado(3, 0), segundos(120, 30), muestra(30, { nivelQuieto: true }));
+  const quietoArriba = correr(enEstado(1, 0), segundos(60), muestra(A_60_HZ, { nivelQuieto: true }));
+  const quietoAPrueba = correr(enEstado(3, 2, { aPrueba: true }), segundos(5, 30), muestra(30, { nivelQuieto: true }));
+  comprobar(
+    'con el nivel quieto, el que no llega sólo baja el DPR (N3 hasta 1,5), y el que sobra no sube ni suspende la prueba',
+    quietoAbajo.estado.nivel === 3 && motivos(quietoAbajo).join(' ') === 'bajar-dpr:N3@1.75 bajar-dpr:N3@1.5' &&
+      quietoArriba.cambios.length === 0 && quietoAPrueba.cambios.length === 0 && quietoAPrueba.estado.nivel === 3,
+    { abajo: motivos(quietoAbajo), arriba: motivos(quietoArriba), aPrueba: motivos(quietoAPrueba) },
+  );
+  const sueltoArriba = correr(enEstado(1, 0), segundos(60), muestra(A_60_HZ));
+  const sueltoAPrueba = correr(enEstado(3, 2, { aPrueba: true }), segundos(5, 30), muestra(30));
+  const calma = correr(quietoAbajo.estado, segundos(10, 30), muestra(30));
+  /* Y el desplome: por debajo de 25 fps baja de nivel aunque se pelee (la oleada entera a saltos es peor que un tirón). */
+  const desplome = correr(enEstado(3, 2), segundos(10, 50), muestra(50, { nivelQuieto: true }));
+  const desplomeAPrueba = correr(enEstado(3, 2, { aPrueba: true }), segundos(5, 50), muestra(50, { nivelQuieto: true }));
+  comprobar(
+    `con el nivel quieto, una media por encima de ${String(UMBRAL_DE_DESPLOME_MS)} ms sí baja de nivel (y suspende la prueba), y una de 30 ms no`,
+    desplome.cambios[0]?.motivo === 'bajar-nivel' && desplomeAPrueba.cambios[0]?.motivo === 'prueba-fallida' && quietoAbajo.estado.nivel === 3,
+    { desplome: motivos(desplome), aPrueba: motivos(desplomeAPrueba) },
+  );
+  comprobar(
+    'VACUNA: sin el freno las mismas series sí cambian de nivel, y al llegar la calma el que no llegaba baja',
+    sueltoArriba.cambios[0]?.motivo === 'subir-a-prueba' && sueltoAPrueba.cambios[0]?.motivo === 'prueba-fallida' &&
+      calma.cambios[0]?.motivo === 'bajar-nivel',
+    { arriba: motivos(sueltoArriba), aPrueba: motivos(sueltoAPrueba), calma: motivos(calma) },
   );
 }
 
@@ -1026,7 +1059,8 @@ paso('Compilar antes de pintar: la cita en el pintado, la compilación aparte, e
   for (let k = 0; k < PINTADOS_EN_BLOQUE + 2; k++) toca.push(bloque.toca('E0'));
   toca.push(bloque.toca('E1'));
   toca.push(bloque.toca('E1'));
-  const esperado = [false, false, false, false, ...Array.from({ length: PINTADOS_EN_BLOQUE }, () => true), false, false, true, false];
+  /* Los tres primeros pintados (la portada) también van en bloque: con la caché fría eran 7,5 s de hilo parado. */
+  const esperado = [true, true, true, false, ...Array.from({ length: PINTADOS_EN_BLOQUE }, () => true), false, false, true, false];
   const renderizador = (tono: number, color: string, sombras: boolean): Parameters<typeof claveDelPintado>[0] => ({ toneMapping: tono, outputColorSpace: color, shadowMap: { enabled: sombras } });
   const claves = new Set([
     claveDelPintado(renderizador(0, 'srgb', false), false),
@@ -1037,7 +1071,7 @@ paso('Compilar antes de pintar: la cita en el pintado, la compilación aparte, e
   ]);
   comprobar(
     `tras un cambio de nivel se compila en bloque ${String(PINTADOS_EN_BLOQUE)} pintados, y una vez cuando cambia el estado del renderizador (mapeo tonal, color de salida, sombras o blanco); nunca más`,
-    toca.join(',') === esperado.join(',') && claves.size === 5 && bloque.bloques === PINTADOS_EN_BLOQUE + 1,
+    toca.join(',') === esperado.join(',') && claves.size === 5 && bloque.bloques === 2 * PINTADOS_EN_BLOQUE + 1,
     { toca, esperado, claves: claves.size, bloques: bloque.bloques },
   );
   const enLaEscena = new THREE.Scene();
@@ -1055,6 +1089,34 @@ paso('Compilar antes de pintar: la cita en el pintado, la compilación aparte, e
     'el bloque pide lo que cuelga de la escena y se ve (con lo apagado de dentro: el muro del Bis está montado y apagado hasta el Bis), y no lo que está apagado entero',
     pedidos.length === 1 && pedidos[0] === visible && gl.info.programs.length > 0,
     pedidos.map((o) => o.uuid),
+  );
+
+  /*
+   * EL BLOQUE NO SE ESPERA (26-sep): se pide con `compileAsync` y, si trae programas nuevos, los pintados de esa escena
+   * salen vacíos hasta que acaba; al acabar se vuelve a ver. Sin programas nuevos no se esconde nada.
+   */
+  const conBloque = new THREE.Scene();
+  conBloque.add(pieza());
+  const quitarLaCita = alPintarLaEscena(conBloque, () => undefined);
+  const pintarYa = (): boolean => {
+    (conBloque.onBeforeRender as unknown as (...a: unknown[]) => void).call(conBloque, gl, conBloque, camara, null);
+    const seVe = conBloque.visible;
+    (conBloque.onAfterRender as unknown as (...a: unknown[]) => void).call(conBloque, gl, conBloque, camara);
+    return seVe;
+  };
+  compilarEnBloque(gl, conBloque, camara);
+  const escondidaAlPedir = compilandoEnBloque(conBloque) && !pintarYa() && conBloque.visible;
+  gl.acabar();
+  await vuelta();
+  const vistaAlAcabar = !compilandoEnBloque(conBloque) && pintarYa();
+  compilarEnBloque(gl, conBloque, camara);
+  const sinNuevosNoSeEsconde = !compilandoEnBloque(conBloque) && pintarYa();
+  gl.acabar();
+  quitarLaCita();
+  comprobar(
+    'el bloque se pide sin esperarlo: con programas nuevos la escena sale vacía hasta que acaba (y vuelve a verse tras cada pintado), y sin nuevos se pinta ya',
+    escondidaAlPedir && vistaAlAcabar && sinNuevosNoSeEsconde,
+    { escondidaAlPedir, vistaAlAcabar, sinNuevosNoSeEsconde },
   );
 
   /* Los programas que se guardan: lo soltado no se suelta hasta que llega otro juego de su clave (o más, si se pide). */
@@ -1158,7 +1220,7 @@ paso('Las palancas de la ciudad por nivel no bajan al subir de nivel, campo a ca
 }
 
 terminar({
-  escritas: 83,
+  escritas: 87,
   enVerde:
     'Los niveles son los del §8; el gobernador baja deprisa, sube a prueba, no vuelve a lo que falló y no se deja engañar por la pestaña oculta; el sondeo arranca a cada aparato donde toca; la gradación respeta la paleta y la LUT es su fórmula; el tono de N0 entra en la three instalada; los sombreadores declaran lo que sus materiales les dan; lo que se va a pintar se compila antes, sin esperar al compilador en el fotograma que lo usa; y ninguna palanca de la ciudad baja al subir de nivel.',
 });

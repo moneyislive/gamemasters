@@ -94,6 +94,21 @@ export class FotosDeLaSala {
   }
 
   /** La tupla del cuerpo `numero` en la última foto que lo tiene (para su estado, por ejemplo). */
+  /**
+   * La tupla de `numero` en la foto más nueva que lo tenga, sólo si esa foto es del tic `desdeK` o de después. Quien
+   * vuelve a tener cuerpo se coloca con ESTO: la última foto que lo tenía puede ser de antes de caer, y colocarlo ahí
+   * lo devolvía al sitio donde cayó mientras la sala lo tenía en la cabina, a merced de los golpes (26-sep).
+   */
+  ultimaTuplaDesde(numero: number, desdeK: number): TuplaDeFoto | null {
+    for (let i = this.fotos.length - 1; i >= 0; i--) {
+      const f = this.fotos[i] as FotoGuardada;
+      if (f.k < desdeK) return null;
+      const t = f.porNumero.get(numero);
+      if (t !== undefined) return t;
+    }
+    return null;
+  }
+
   ultimaTupla(numero: number): TuplaDeFoto | null {
     for (let i = this.fotos.length - 1; i >= 0; i--) {
       const t = (this.fotos[i] as FotoGuardada).porNumero.get(numero);

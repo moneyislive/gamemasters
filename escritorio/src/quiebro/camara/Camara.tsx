@@ -193,6 +193,8 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
   const plaza = useMemo(() => centroDeLaBajada(p.lugar), [p.lugar]);
   const estado = useRef(camaraNueva(0));
   const primera = useRef(true);
+  /* Al volver a tener cuerpo (reaparecer), la cámara se pone como la primera vez: detrás, mirando hacia donde mira. */
+  const teniaCuerpo = useRef(true);
   const mirar = useRef(new THREE.Vector3());
   const adelante = useRef(new THREE.Vector3());
   const vuelta = useRef(new GiroEnLoAlto());
@@ -253,6 +255,9 @@ export function CamaraDelQuiebro(p: PropsDeLaCamara): null {
         fov: p.tactil ? FOV_MOVIL : FOV_PC,
       };
     } else {
+      const conCuerpoAhora = p.partida.conCuerpo();
+      if (conCuerpoAhora && !teniaCuerpo.current) primera.current = true;
+      teniaCuerpo.current = conCuerpoAhora;
       if (primera.current) {
         /* La primera vez, detrás de mí: mirando hacia donde miro al aparecer. */
         e.giro = cuerpo.rumbo;
