@@ -195,7 +195,7 @@ export interface Fuera {
   readonly motivo: string;
 }
 
-export type MensajeDelServidor = Dentro | Foto | Corrige | Fuera | Lanza | Da | Cae | Renace | Vidas;
+export type MensajeDelServidor = Dentro | Foto | Corrige | Fuera | Lanza | Da | Cae | Renace | Vidas | Brotes | Recoge;
 
 /* ─── LA REFRIEGA ────────────────────────────────────────────────────────── */
 
@@ -302,6 +302,39 @@ export interface Renace {
 export interface Vidas {
   readonly t: 'vidas';
   readonly v: readonly (readonly [string, number, number])[];
+}
+
+/* ─── LOS HALLAZGOS (docs/AVATARES-JUGABLES.md §2) ──────────────────────── */
+
+/*
+ * Lo que brota por el tablero y se recoge a pie. NO hay mensaje del aparato: el servidor recoge
+ * por él cuando acepta un sitio a `RADIO_DE_RECOGER` de un brote (`shared/mecanicas/hallazgos.ts`).
+ * Los dos mensajes son nuevos y la versión del canal NO sube: un aparato anterior los lee como
+ * `null` y los tira, que es justo lo que debe hacer quien no sabe pintarlos.
+ */
+
+/**
+ * Lo que hay brotado ahora en la mesa, ENTERO: `[id, clase, x, z]` con `x` y `z` en Q16.16. Llega
+ * al entrar y cada vez que cambia; el aparato sustituye su lista por ésta.
+ */
+export interface Brotes {
+  readonly t: 'brotes';
+  readonly b: readonly (readonly [number, string, number, number])[];
+}
+
+/** `por` recogió el brote `h`, que era de la clase `clase`. Detrás llega el `brotes` nuevo. */
+export interface Recoge {
+  readonly t: 'recoge';
+  readonly h: number;
+  readonly por: string;
+  readonly clase: string;
+}
+
+/** Lo más larga que puede ser una clase de hallazgo: las de las tablas son palabras cortas. */
+const TOPE_DE_CLASE = 24;
+
+function esClase(v: unknown): v is string {
+  return typeof v === 'string' && v.length > 0 && v.length <= TOPE_DE_CLASE;
 }
 
 /* ─── LOS LECTORES ESTRICTOS ─────────────────────────────────────────────── */
@@ -438,6 +471,24 @@ export function leerMensajeDelServidor(texto: string): MensajeDelServidor | null
       lista.push([a, vida, estado]);
     }
     return { t: 'vidas', v: lista };
+  }
+  if (m.t === 'brotes') {
+    if (!Array.isArray(m.b)) return null;
+    const b: [number, string, number, number][] = [];
+    const vistos: number[] = [];
+    for (const e of m.b as unknown[]) {
+      if (!Array.isArray(e) || e.length !== 4) return null;
+      const [id, clase, x, z] = e as unknown[];
+      if (!esEntero(id) || id < 0 || !esClase(clase) || !esCoordenada(x) || !esCoordenada(z)) return null;
+      if (vistos.indexOf(id) >= 0) return null;
+      vistos.push(id);
+      b.push([id, clase, x, z]);
+    }
+    return { t: 'brotes', b };
+  }
+  if (m.t === 'recoge') {
+    if (!esEntero(m.h) || m.h < 0 || typeof m.por !== 'string' || !esClase(m.clase)) return null;
+    return { t: 'recoge', h: m.h, por: m.por, clase: m.clase };
   }
   return null;
 }

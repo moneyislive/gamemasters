@@ -38,6 +38,10 @@ import { tableroEnTres as tableroDeLasLindes } from './lindes-en-tres';
 import { mundoDeLasLindes } from './lindes-mundo';
 import { RIBERAS } from './riberas';
 import { mundoDeRiberas } from './riberas-mundo';
+import type { ClaseDeHallazgo } from '../../mecanicas/hallazgos';
+import { HALLAZGOS_DE_LAS_LINDES, HALLAZGOS_DE_RIBERAS, HALLAZGOS_DEL_BURGO } from './hallazgos-de-los-juegos';
+import { armaDeLaVista, PUNOS, refriegaDelArma } from './riberas-armas';
+import type { ArmaEnLaRefriega } from './riberas-armas';
 
 /**
  * Cómo se saca el mundo de una mesa: de su vista pública y su código. `null` si la vista todavía
@@ -89,4 +93,31 @@ export function mundoDeLaMesa(arcade: ArcadeId, vista: unknown, codigo: string):
   const productor = PRODUCTORES.get(arcade);
   if (productor === undefined) return null;
   return productor(vista, codigo);
+}
+
+/* ─── LO QUE SE HACE A PIE: HALLAZGOS Y ARMAS (docs/AVATARES-JUGABLES.md) ───────────────────── */
+
+/**
+ * QUÉ BROTA EN CADA JUEGO. Un juego que se recorre y no está aquí no tiene hallazgos: se anda y se
+ * pelea, y nada más. La tabla es de `hallazgos-de-los-juegos.ts`; esto sólo la ata al arcade.
+ */
+const HALLAZGOS: ReadonlyMap<ArcadeId, readonly ClaseDeHallazgo[]> = new Map<ArcadeId, readonly ClaseDeHallazgo[]>([
+  [BURGO, HALLAZGOS_DEL_BURGO],
+  [RIBERAS, HALLAZGOS_DE_RIBERAS],
+  [LINDES, HALLAZGOS_DE_LAS_LINDES],
+]);
+
+/** Las clases de hallazgo de un arcade, con su peso. Vacío si no tiene. */
+export function hallazgosDelJuego(arcade: ArcadeId): readonly ClaseDeHallazgo[] {
+  return HALLAZGOS.get(arcade) ?? [];
+}
+
+/**
+ * LO QUE HACE EN LA REFRIEGA EL GOLPE DE UN ASIENTO: daño, alcance y cono. Lo lee la sala del
+ * servidor de la vista pública de la mesa (la de quien mira sin asiento). Sólo Riberas tiene
+ * armas; en los demás, y ante cualquier vista rara, los puños de siempre.
+ */
+export function armaEnLaRefriega(arcade: ArcadeId, vista: unknown, asiento: string): ArmaEnLaRefriega {
+  if (arcade !== RIBERAS) return PUNOS;
+  return refriegaDelArma(armaDeLaVista(vista, asiento));
 }
