@@ -6034,3 +6034,288 @@ code {
     max-height: 40%;
   }
 }
+
+/*
+ * ═══ LOS MANDOS TÁCTILES DE LA SALA: la palanca, «Correr» y «Golpear» ═══
+ *
+ * Ver `mandos-tactiles.tsx`. Sólo existen a pie y en un aparato que se toca; en la mesa y con ratón
+ * no hay ni un nodo. La capa ocupa la franja de abajo del lienzo y NO coge el puntero —lo que queda
+ * entre los mandos sigue siendo tablero—; los mandos sí.
+ *
+ * Los tamaños son los de la app (`app/src/arcade/mandos-del-paseo.tsx`): base de 8rem (128), pomo de
+ * 3.5rem (56), golpe de 4.75rem (76) y correr de 7rem (112) de ancho y 3rem (48) de alto, todos de
+ * pulgar. Golpear y Correr van APILADOS a la derecha y no en fila: en fila, con la palanca, suman 364
+ * puntos, y en un teléfono de 320 no caben; apilados miden lo que la palanca de alto, y los dos
+ * pulgares quedan a la par.
+ *
+ * `z-index: 1`: por encima del lienzo y por debajo de las cintas (2) y del velo de las cajas (3), así
+ * que una caja abierta los tapa y no se anda por debajo de un menú.
+ *
+ * Los colores son los de las cámaras de Las Lindes y los de la app: placa oscura translúcida sobre el
+ * mundo, filo claro, y encendido en crema con la tinta oscura. El golpe, redondo y en teja: es el
+ * único mando que no mueve a nadie, y se distingue sin leerlo.
+ */
+.mandos-tactiles {
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* En Las Lindes la cinta va pegada abajo a todo el ancho: los mandos, encima de ella. */
+.mandos-tactiles-sobre-la-cinta {
+  bottom: 3rem;
+}
+
+.mandos-tactiles-palanca {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 50%;
+  background: rgba(12, 20, 8, 0.45);
+  border: 1px solid rgba(243, 236, 216, 0.45);
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+
+.mandos-tactiles-palanca:active {
+  cursor: grabbing;
+}
+
+.mandos-tactiles-pomo {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: rgba(243, 236, 216, 0.85);
+  border: 1px solid #f3ecd8;
+  pointer-events: none;
+}
+
+.mandos-tactiles-botones {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+/*
+ * APAISADO Y BAJO, EN FILA. Apilados miden 132 puntos de alto, y en un teléfono tumbado (320 de
+ * lienzo) el golpe subiría hasta la columna de cámaras de Riberas, que baja por la derecha hasta los
+ * 212. En fila miden 76 y caben por debajo; y de ancho, ahí sobra.
+ */
+@media (max-height: 30rem) {
+  .mandos-tactiles-botones {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+}
+
+.mandos-tactiles-golpear,
+.mandos-tactiles-correr {
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #f3ecd8;
+  border: 1px solid rgba(243, 236, 216, 0.45);
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mandos-tactiles-golpear {
+  display: grid;
+  place-items: center;
+  width: 4.75rem;
+  height: 4.75rem;
+  padding: 0;
+  border-radius: 50%;
+  border-width: 2px;
+  border-color: rgba(243, 236, 216, 0.7);
+  background: rgba(122, 34, 24, 0.78);
+  font-size: 0.85rem;
+}
+
+.mandos-tactiles-correr {
+  width: 7rem;
+  min-height: 3rem;
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  background: rgba(12, 20, 8, 0.62);
+  font-size: 0.95rem;
+}
+
+.mandos-tactiles-golpear.mandos-tactiles-apretado,
+.mandos-tactiles-correr.mandos-tactiles-puesto {
+  background: #f3ecd8;
+  border-color: #f3ecd8;
+  color: #1b2411;
+}
+
+.mandos-tactiles-golpear:focus-visible,
+.mandos-tactiles-correr:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+/*
+ * En Riberas el cartel de cómo se anda vive abajo a la izquierda, donde en un teléfono va la palanca:
+ * con la palanca, sube por encima de ella (su base de 8rem, su margen y un respiro).
+ */
+.riberas-como-se-anda.riberas-como-se-anda-tactil {
+  bottom: calc(0.75rem + 8rem + 0.5rem);
+}
+
+/*
+ * ═══ EL AVISO AL RECOGER: «+25 € · una cartera» ═══
+ *
+ * Un cartel breve arriba en el centro, por debajo de la cinta, que se va solo (`DURA_EL_AVISO`, en
+ * `a-pie-en-botas.tsx`). No coge el puntero y vacío no se ve: la región viva está siempre en el
+ * árbol para que se oiga, y `:empty` le quita todo. Lo mío, en crema con la tinta oscura; lo de otro,
+ * en la placa oscura, que es noticia y no ganancia.
+ */
+.aviso-del-hallazgo {
+  position: absolute;
+  top: 5.5rem;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  max-width: calc(100% - 1.5rem);
+  margin: 0;
+  pointer-events: none;
+  text-align: center;
+}
+
+.aviso-del-hallazgo:empty {
+  display: none;
+}
+
+.aviso-del-hallazgo-frase {
+  display: inline-block;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radio-mando, 0.5rem);
+  border: 1px solid rgba(243, 236, 216, 0.45);
+  background: rgba(12, 20, 8, 0.72);
+  color: #f3ecd8;
+  font-weight: 600;
+  animation: aviso-del-hallazgo-entra 0.18s ease-out;
+}
+
+.aviso-del-hallazgo-mio {
+  background: #f3ecd8;
+  border-color: #f3ecd8;
+  color: #1b2411;
+}
+
+@keyframes aviso-del-hallazgo-entra {
+  from {
+    opacity: 0;
+    transform: translateY(-0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aviso-del-hallazgo-frase {
+    animation: none;
+  }
+}
+
+/*
+ * ═══ LA FORJA DE RIBERAS, en el cajón, y LOS ESCUDOS DE LAS LINDES, en el raíl ═══
+ *
+ * Fichas como las de su alrededor. Los botones de arma son renglones con tres líneas —nombre,
+ * receta, ayuda—, y apagados (`aria-disabled`) se leen tenues pero siguen en el árbol y con foco.
+ */
+.forja {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radio-ficha);
+  background: var(--ficha);
+  outline: 1px solid var(--filo);
+}
+
+.forja h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.forja-alforjas,
+.forja-lleva,
+.forja-nota {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.forja-nota {
+  color: var(--tenue);
+}
+
+.forja-armas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.forja-arma {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 2.75rem;
+  text-align: left;
+}
+
+.forja-arma-nombre {
+  font-weight: 700;
+}
+
+.forja-arma-receta,
+.forja-arma-ayuda {
+  font-size: 0.8rem;
+}
+
+.forja-arma-ayuda {
+  color: var(--tenue);
+}
+
+.forja-arma[aria-disabled='true'],
+.lindes-leva[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lindes-escudos-cuenta {
+  margin: 0;
+}
+
+.lindes-leva {
+  margin-top: 0.5rem;
+  width: 100%;
+  min-height: 2.75rem;
+}

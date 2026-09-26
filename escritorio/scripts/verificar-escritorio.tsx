@@ -97,7 +97,30 @@ import type { LaMesa, MesaVista, ResultadoDelMovimiento } from '../src/mesa';
 import { elVeredictoDelAparato, guardarElVeredicto } from '../src/mesa';
 import { MARCA_DE_BOTAS, MOTIVO_NO_LLEGA, MOTIVO_SIN_MEDIR } from '../../escenas/compuerta-de-botas';
 /* Boots on Board, la refriega: la tecla de golpear y cómo se dice, de donde las lee el paseo. */
-import { COMO_SE_GOLPEA, TECLA_DE_GOLPEAR, teclaDelPaseo } from '../../escenas/paseo/mandos';
+import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA, TECLA_DE_GOLPEAR, teclaDelPaseo } from '../../escenas/paseo/mandos';
+import type { MandosDeFuera } from '../../escenas/paseo/mandos';
+/* Avatares jugables: los mandos táctiles de la Sala, el aviso al recoger, la forja y la leva. */
+import {
+  COMO_SE_ANDA_CON_EL_DEDO,
+  COMO_SE_GOLPEA_CON_EL_DEDO,
+  conElCorrer,
+  conLaPalanca,
+  conUnGolpeMas,
+  esAparatoTactil,
+  MandosTactiles,
+  palancaDelArrastre,
+} from '../src/mandos-tactiles';
+import {
+  fraseDelHallazgo,
+  LaForja,
+  LosEscudos,
+  movimientoDeForjar,
+  movimientoDeLaLeva,
+  recetaDicha,
+  ROTULO_DE_LA_LEVA,
+} from '../src/a-pie-en-botas';
+import { FORJAR } from '../../shared/arcade/juegos/riberas-armas';
+import { LEVA } from '../../shared/arcade/juegos/lindes-escudos';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
 import { haEmpezado } from '../src/empezada';
 import { Muelle } from '../src/muelle';
@@ -2124,6 +2147,298 @@ function laRefriegaEnElEscritorio(): void {
 }
 
 // ---------------------------------------------------------------------------
+// 5 quater · Avatares jugables: la palanca en el teléfono, el aviso, la forja y la leva
+// ---------------------------------------------------------------------------
+
+/**
+ * LO QUE SE HACE A PIE EN LA SALA DESDE UN TELÉFONO (`docs/AVATARES-JUGABLES.md` §6).
+ *
+ * Miguel abrió los tres tableros en el navegador del móvil y sólo había un cartel de «W A S D»:
+ * nadie escribía los `MandosDeFuera` de la escena. Lo que de aquí puede fallar sin que falle nada:
+ * que la palanca escriba mal la referencia —que pise los golpes del otro pulgar, o que el eje `y`
+ * vaya al revés y la palanca hacia arriba haga retroceder—; que un pintor de los tres no la monte o
+ * no le pase la referencia a su escena (la palanca se movería y el avatar no); que el cartel siga
+ * diciendo W A S D en el teléfono; que la hoja deje a la palanca sin `touch-action: none` (el dedo
+ * desplazaría la página en vez de andar) o con mandos por debajo de un pulgar; y en una mesa de
+ * botas, que la forja o la leva manden otra cosa que su contrato, o se enciendan sin alcanzar.
+ */
+function losAvataresJugablesEnLaSala(): void {
+  paso('Avatares jugables en la Sala: la palanca en los tres pintores, el cartel del teléfono, el aviso, la forja y la leva');
+
+  /* ── 1. La palanca: de píxeles a −1…1, con la `y` hacia delante y recortada en círculo ── */
+  const cerca = (a: number, b: number): boolean => Math.abs(a - b) < 1e-9;
+  const palancaBien = (f: typeof palancaDelArrastre): boolean => {
+    const quieta = f(0, 0);
+    const arriba = f(0, -44);
+    const abajoDeMas = f(0, 88);
+    const derecha = f(44, 0);
+    const diagonal = f(100, 100);
+    const rota = f(Number.NaN, 3);
+    return (
+      quieta.x === 0 && quieta.y === 0 &&
+      cerca(arriba.x, 0) && cerca(arriba.y, 1) &&
+      cerca(abajoDeMas.y, -1) &&
+      cerca(derecha.x, 1) && cerca(derecha.y, 0) &&
+      cerca(Math.hypot(diagonal.x, diagonal.y), 1) &&
+      rota.x === 0 && rota.y === 0
+    );
+  };
+  comprobar('la palanca: arriba es delante (y = 1), abajo detrás, a tope en un círculo de 44 px, y lo que no es un número es soltarla', palancaBien(palancaDelArrastre));
+  comprobar(
+    'se ve fallar: una palanca con la `y` de pantalla sin invertir, o recortada en cuadrado, cae',
+    !palancaBien((dx, dy) => palancaDelArrastre(dx, -dy)) &&
+      !palancaBien((dx, dy) => ({ x: Math.max(-1, Math.min(1, dx / 44)), y: Math.max(-1, Math.min(1, -dy / 44)) })),
+  );
+
+  /* ── 2. La referencia: la palanca y el correr COPIAN los golpes; el golpe sólo suma ── */
+  const antes: MandosDeFuera = { palanca: { x: 0.2, y: 0.4 }, deprisa: true, golpes: 7 };
+  const reglasDeLaReferencia = (
+    palanca: typeof conLaPalanca,
+    correr: typeof conElCorrer,
+    golpe: typeof conUnGolpeMas,
+  ): boolean => {
+    const p = palanca(antes, { x: 1, y: 0 });
+    const c = correr(antes, false);
+    const g = golpe(antes);
+    return (
+      p.golpes === 7 && p.deprisa && p.palanca.x === 1 &&
+      c.golpes === 7 && !c.deprisa && c.palanca === antes.palanca &&
+      g.golpes === 8 && g.deprisa && g.palanca === antes.palanca
+    );
+  };
+  comprobar(
+    'la referencia: mover la palanca y poner el correr copian los golpes del otro pulgar, y «Golpear» suma uno sin tocar lo demás',
+    reglasDeLaReferencia(conLaPalanca, conElCorrer, conUnGolpeMas),
+  );
+  comprobar(
+    'se ve fallar: una palanca que empezara de cero los golpes (el primer toque del otro pulgar se perdería), cae',
+    !reglasDeLaReferencia((a, p) => ({ ...SIN_MANDOS_DE_FUERA, palanca: p, deprisa: a.deprisa }), conElCorrer, conUnGolpeMas),
+  );
+
+  /* ── 3. Qué es un aparato táctil ── */
+  const tactilBien = (f: typeof esAparatoTactil): boolean =>
+    !f({ punteroGrueso: false, puntosDeToque: 0 }) &&
+    !f({ punteroGrueso: false, puntosDeToque: undefined }) &&
+    f({ punteroGrueso: true, puntosDeToque: 0 }) &&
+    f({ punteroGrueso: false, puntosDeToque: 5 });
+  comprobar('táctil es puntero grueso o algún punto de toque; un ratón a secas, no', tactilBien(esAparatoTactil));
+  comprobar('se ve fallar: mirando sólo el puntero grueso, cae', !tactilBien((a) => a.punteroGrueso));
+
+  /* ── 4. Los mandos pintados: nada si no tocan, la palanca y el correr a pie, y Golpear sólo con canal ── */
+  const ref = { current: SIN_MANDOS_DE_FUERA };
+  const apagados = renderToStaticMarkup(<MandosTactiles mandos={ref} visibles={false} conGolpe />);
+  const sinGolpe = renderToStaticMarkup(<MandosTactiles mandos={ref} visibles conGolpe={false} />);
+  const conGolpe = renderToStaticMarkup(<MandosTactiles mandos={ref} visibles conGolpe />);
+  const mandosBien = (a: string, s: string, c: string): boolean =>
+    a === '' &&
+    /class="mandos-tactiles-palanca"/.test(s) && /Correr/.test(s) && !/Golpear/.test(s) &&
+    /class="mandos-tactiles-palanca"/.test(c) && /Correr/.test(c) && />Golpear</.test(c) &&
+    /aria-pressed="false"/.test(c) &&
+    !/ disabled=""/.test(c);
+  comprobar(
+    'los mandos no existen fuera de a pie; a pie salen la palanca y «Correr» (con `aria-pressed`), y «Golpear» sólo con canal',
+    mandosBien(apagados, sinGolpe, conGolpe),
+    { apagados, sinGolpe, conGolpe },
+  );
+  comprobar('se ve fallar: un «Golpear» también sin canal, o unos mandos invisibles que siguieran en el árbol, cae', !mandosBien(apagados, conGolpe, conGolpe) && !mandosBien(sinGolpe, sinGolpe, conGolpe));
+
+  const fuenteDeLosMandos = sinComentarios(readFileSync(new URL('../src/mandos-tactiles.tsx', import.meta.url), 'utf8'));
+  const cogeSuDedo = (t: string): boolean =>
+    /setPointerCapture\(e\.pointerId\)/.test(t) &&
+    /onPointerDown=\{alBajarEnLaPalanca\}/.test(t) &&
+    /onPointerCancel=\{alSoltarLaPalanca\}/.test(t) &&
+    /onLostPointerCapture=\{alSoltarLaPalanca\}/.test(t) &&
+    /'\(pointer: coarse\)'/.test(t) &&
+    /maxTouchPoints/.test(t) &&
+    /mandos\.current = SIN_MANDOS_DE_FUERA;/.test(t) &&
+    /addEventListener\('change', mirar\)/.test(t);
+  comprobar(
+    'la palanca coge su dedo (`setPointerCapture`) y lo suelta al cancelarse; el táctil se decide con `(pointer: coarse)` o `maxTouchPoints` y escucha si cambia; al dejar de andar, todo suelto',
+    cogeSuDedo(fuenteDeLosMandos),
+  );
+  comprobar(
+    'se ve fallar: sin la captura, o sin soltar al dejar de andar, cae',
+    !cogeSuDedo(fuenteDeLosMandos.replace('setPointerCapture(e.pointerId)', 'focus()')) &&
+      !cogeSuDedo(fuenteDeLosMandos.replace('mandos.current = SIN_MANDOS_DE_FUERA;', '')),
+  );
+
+  /* ── 5. Los tres pintores montan la palanca y le pasan LA MISMA referencia a su escena ── */
+  const pintores = (['burgo-en-tres.tsx', 'riberas-en-tres.tsx', 'lindes-en-tres.tsx'] as const).map(
+    (f): [string, string] => [f, sinComentarios(readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8'))],
+  );
+  const montaLaPalanca = (t: string): boolean =>
+    /const tactil = usarAparatoTactil\(\);/.test(t) &&
+    /const mandos = useRef<MandosDeFuera>\(SIN_MANDOS_DE_FUERA\);/.test(t) &&
+    /<MandosTactiles\s+mandos=\{mandos\}\s+visibles=\{tactil && (?:aPie|modo !== 'mesa')\}\s+conGolpe=\{canal !== undefined\}/.test(t) &&
+    /<(?:Burgo|Delta|Lindes)\b(?:(?!\/>)[\s\S])*\bmandos=\{mandos\}(?:(?!\/>)[\s\S])*\/>/.test(t) &&
+    /<(?:Burgo|Delta|Lindes)\b(?:(?!\/>)[\s\S])*\balRecoger=\{alRecoger\}(?:(?!\/>)[\s\S])*\/>/.test(t);
+  const losTres = (ps: readonly [string, string][]): string[] => ps.filter(([, t]) => !montaLaPalanca(t)).map(([f]) => f);
+  comprobar(
+    'los tres pintores (Burgo, Riberas, Las Lindes) montan la palanca a pie y en táctil, con «Golpear» sólo con canal, y le pasan a su escena la MISMA referencia y el aviso al recoger',
+    losTres(pintores).length === 0,
+    losTres(pintores),
+  );
+  comprobar(
+    'se ve fallar: un pintor que montara la palanca y no le pasara la referencia a la escena (el pomo se movería y el avatar no), cae',
+    losTres(pintores.map(([f, t]): [string, string] => [f, f === 'riberas-en-tres.tsx' ? t.replace(/mandos=\{mandos\}\s+alRecoger/, 'alRecoger') : t])).length === 1,
+  );
+
+  /* ── 6. El cartel en el teléfono: la palanca, no W A S D; y con canal, «Golpear» y no la G ── */
+  const carteles = (tactil: boolean, canal: string | undefined): string[] =>
+    (['hombro', 'ojos'] as const).flatMap((modo) => [
+      renderToStaticMarkup(<ComoSeAnda modo={modo} canal={canal} tactil={tactil} />),
+      renderToStaticMarkup(<ComoSeAndaPorElBurgo modo={modo} canal={canal} tactil={tactil} />),
+      renderToStaticMarkup(<ComoSeAndaPorElDelta modo={modo} canal={canal} tactil={tactil} />),
+    ]);
+  const tactilCon = carteles(true, 'Dentro');
+  const tactilSin = carteles(true, undefined);
+  const teclasCon = carteles(false, 'Dentro');
+  const dicenLoTactil = (con: readonly string[], sin: readonly string[], teclas: readonly string[]): boolean =>
+    con.length === 6 &&
+    [...con, ...sin].every((h) => h.includes(COMO_SE_ANDA_CON_EL_DEDO) && !/W A S D|Mayúsculas/.test(h)) &&
+    con.every((h) => h.includes(COMO_SE_GOLPEA_CON_EL_DEDO) && !h.includes(COMO_SE_GOLPEA)) &&
+    sin.every((h) => !h.includes(COMO_SE_GOLPEA_CON_EL_DEDO)) &&
+    teclas.every((h) => /W A S D/.test(h) && h.includes(COMO_SE_GOLPEA) && !h.includes(COMO_SE_ANDA_CON_EL_DEDO)) &&
+    con.filter((h) => /riberas-como-se-anda/.test(h)).every((h) => /riberas-como-se-anda-tactil/.test(h));
+  comprobar(
+    'en un teléfono los tres carteles dicen la palanca y no W A S D, «Golpear» con canal y no la G; con teclado siguen como estaban; y el de Riberas sube por encima de la palanca',
+    dicenLoTactil(tactilCon, tactilSin, teclasCon),
+    { tactilCon, tactilSin },
+  );
+  comprobar(
+    'se ve fallar: un cartel que en el teléfono siguiera diciendo W A S D, cae',
+    !dicenLoTactil(tactilCon.map((h, i) => (i === 1 ? h.replace(COMO_SE_ANDA_CON_EL_DEDO, 'W A S D o las flechas para andar') : h)), tactilSin, teclasCon),
+  );
+
+  /* ── 7. La hoja: la palanca con `touch-action: none`, la capa sin coger el puntero, y todo de pulgar ── */
+  const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
+  /* La ÚLTIMA regla con el selector solo: la primera de `correr` es la compartida con el golpe. */
+  const regla = (h: string, selector: string): string => {
+    const i = h.lastIndexOf(`\n${selector} {`);
+    return i < 0 ? '' : h.slice(i, h.indexOf('}', i));
+  };
+  const rem = (bloque: string, propiedad: string): number => {
+    const m = new RegExp(`(?:^|\\s|;)${propiedad}:\\s*([\\d.]+)rem`).exec(bloque);
+    return m === null ? 0 : Number(m[1]);
+  };
+  const hojaBien = (h: string): boolean => {
+    const capa = regla(h, '.mandos-tactiles');
+    const palanca = regla(h, '.mandos-tactiles-palanca');
+    const golpe = regla(h, '.mandos-tactiles-golpear');
+    const correr = regla(h, '.mandos-tactiles-correr');
+    return (
+      /pointer-events: none;/.test(capa) && /user-select: none;/.test(capa) && /touch-action: none;/.test(capa) &&
+      /pointer-events: auto;/.test(palanca) && /touch-action: none;/.test(palanca) &&
+      rem(palanca, 'width') >= 3 && rem(palanca, 'height') >= 3 &&
+      rem(golpe, 'width') >= 3 && rem(golpe, 'height') >= 3 &&
+      rem(correr, 'width') >= 3 && rem(correr, 'min-height') >= 3 &&
+      /\.riberas-como-se-anda\.riberas-como-se-anda-tactil \{[^}]*bottom: calc\(/.test(h)
+    );
+  };
+  comprobar(
+    'la hoja: la palanca con `touch-action: none` (el dedo anda, no desplaza la página), la capa sin coger el puntero ni seleccionar, y palanca, golpe y correr de 48 puntos o más',
+    hojaBien(hoja),
+    { palanca: regla(hoja, '.mandos-tactiles-palanca'), golpe: regla(hoja, '.mandos-tactiles-golpear') },
+  );
+  comprobar(
+    'se ve fallar: una palanca sin `touch-action: none`, o un golpe de 2rem, cae',
+    !hojaBien(hoja.replace(/(\n\.mandos-tactiles-palanca \{[^}]*)touch-action: none;/, '$1')) &&
+      !hojaBien(hoja.replace(/(\n\.mandos-tactiles-golpear \{[^}]*)width: 4\.75rem;/, '$1width: 2rem;')),
+  );
+
+  /* ── 8. El aviso al recoger ── */
+  const frases = (f: typeof fraseDelHallazgo): string[] => [
+    f('burgo', { por: 'b', clase: 'cartera', mio: true }, 'Bruno'),
+    f('burgo', { por: 'b', clase: 'cartera', mio: false }, 'Bruno'),
+    f('burgo', { por: 'a', clase: 'propina', mio: true }, 'Ana'),
+    f('burgo', { por: 'a', clase: 'maletin', mio: true }, 'Ana'),
+    f('riberas', { por: 'a', clase: 'hierro', mio: true }, 'Ana'),
+    f('lindes', { por: 'a', clase: 'escudo', mio: true }, 'Ana'),
+    f('burgo', { por: 'b', clase: 'toString', mio: true }, 'Bruno'),
+  ];
+  const esperadas = ['+25 € · una cartera', 'Bruno se lleva una cartera', '+10 € · una propina', '+60 € · un maletín', '+1 hierro', '+1 escudo'];
+  const avisosBien = (fs: readonly string[]): boolean => esperadas.every((e, i) => fs[i] === e) && !/€/.test(fs[6] ?? '€');
+  comprobar(
+    'el aviso al recoger: «+25 € · una cartera» si es mío, «Bruno se lleva una cartera» si no, los euros de la tabla del Burgo, «+1 hierro» y «+1 escudo»; y una clase rara no es dinero',
+    avisosBien(frases(fraseDelHallazgo)),
+    frases(fraseDelHallazgo),
+  );
+  comprobar('se ve fallar: un aviso que dijera lo de otro como mío, cae', !avisosBien(frases((j, r, n) => fraseDelHallazgo(j, { ...r, mio: true }, n))));
+
+  /* ── 9. La forja de Riberas ── */
+  const vistaDeForja = { alforjas: { a: { hierro: 2, cuero: 1, pedernal: 0, junco: 0 } }, armas: { a: 'honda' } };
+  const forjaBien = (html: string, quieta: string): boolean => {
+    const botones = html.match(/<button[^>]*class="forja-arma"[^>]*>/g) ?? [];
+    const encendidos = botones.filter((b) => /aria-disabled="false"/.test(b));
+    return (
+      botones.length === 4 &&
+      encendidos.length === 1 &&
+      /Hacha/.test(html) && /2 hierro \+ 1 cuero/.test(html) &&
+      /Llevas: honda/.test(html) &&
+      /2 hierro · 0 pedernal · 1 cuero · 0 junco/.test(html) &&
+      !/ disabled=""/.test(html) &&
+      (quieta.match(/aria-disabled="true"/g) ?? []).length === 4
+    );
+  };
+  const forja = renderToStaticMarkup(<LaForja vista={vistaDeForja} yo="a" opciones={[]} quieto={false} mover={() => undefined} />);
+  const forjaQuieta = renderToStaticMarkup(<LaForja vista={vistaDeForja} yo="a" opciones={[]} quieto mover={() => undefined} />);
+  comprobar(
+    'la forja: las alforjas, el arma que se lleva y un botón por arma con su receta, encendido SÓLO el que alcanza (el hacha, con 2 hierro y 1 cuero), con `aria-disabled` y apagado todo con la mesa quieta',
+    forjaBien(forja, forjaQuieta),
+    forja,
+  );
+  comprobar('se ve fallar: con un cuero de menos no queda ninguno encendido, y cae', !forjaBien(renderToStaticMarkup(<LaForja vista={{ alforjas: { a: { hierro: 2, cuero: 0, pedernal: 0, junco: 0 } } }} yo="a" opciones={[]} quieto={false} mover={() => undefined} />), forjaQuieta));
+  const ofrecida = { id: 'forja-1', tipo: FORJAR, carga: { arma: 'hacha' } } as unknown as Opcion;
+  const forjar = (f: typeof movimientoDeForjar): boolean => {
+    const conOpcion = f([ofrecida], 'hacha');
+    const sinOpcion = f([], 'lanza');
+    return (
+      conOpcion.tipo === FORJAR && conOpcion.carga === ofrecida.carga &&
+      sinOpcion.tipo === FORJAR && JSON.stringify(sinOpcion.carga) === JSON.stringify({ arma: 'lanza' }) &&
+      recetaDicha('honda') === '2 cuero + 1 pedernal'
+    );
+  };
+  comprobar('forjar manda la opción que ofrece el juego tal cual, y si no la ofrece, `{ tipo: FORJAR, carga: { arma } }`', forjar(movimientoDeForjar));
+  comprobar('se ve fallar: forjar siempre el hacha, cae', !forjar((o) => movimientoDeForjar(o, 'hacha')));
+
+  /* ── 10. La leva de Las Lindes ── */
+  const leva = (escudos: number, levas: number, quieto = false): string =>
+    renderToStaticMarkup(<LosEscudos vista={{ escudos: { a: escudos }, levas: { a: levas } }} yo="a" opciones={[]} quieto={quieto} mover={() => undefined} />);
+  const encendida = (h: string): boolean => /class="lindes-leva" aria-disabled="false"/.test(h);
+  const levaBien = (hs: readonly [string, string, string, string]): boolean =>
+    encendida(hs[0]) && !encendida(hs[1]) && !encendida(hs[2]) && !encendida(hs[3]) &&
+    hs[0].includes(ROTULO_DE_LA_LEVA) && /Leva \(3 escudos → 1 labriego\)/.test(hs[0]) &&
+    /Tienes 3 escudos/.test(hs[0]) && /vale 1 punto al final/.test(hs[0]) && !/ disabled=""/.test(hs[0]);
+  const casos: [string, string, string, string] = [leva(3, 0), leva(2, 0), leva(5, 2), leva(3, 0, true)];
+  comprobar(
+    'la leva: encendida con 3 escudos y levas por pagar; apagada con 2, con las 2 levas pagadas o con la mesa quieta; y dice que cada escudo guardado vale un punto',
+    levaBien(casos),
+    casos,
+  );
+  comprobar('se ve fallar: una leva encendida con 2 escudos, cae', !levaBien([casos[0], casos[0], casos[2], casos[3]]));
+  const levar = movimientoDeLaLeva([]);
+  comprobar('la leva manda `{ tipo: LEVA, carga: {} }` si el juego no la ofrece', levar.tipo === LEVA && JSON.stringify(levar.carga) === '{}', levar);
+
+  /* ── 11. La forja y la leva sólo en una mesa de botas, y los escudos en el marcador sólo si los hay ── */
+  const [, deRiberas] = pintores[1] ?? ['', ''];
+  const [, deLasLindes] = pintores[2] ?? ['', ''];
+  const soloEnBotas = (r: string, l: string): boolean =>
+    /const laForja =\s*esBotas && yo !== null \? <LaForja /.test(r) &&
+    (r.match(/\{laForja\}/g) ?? []).length === 2 &&
+    (l.match(/\{esBotas && yoEnLaMesa !== null \? \(\s*<LosEscudos /g) ?? []).length === 2;
+  comprobar('la forja (en el cajón y en el respaldo) y la leva (en el raíl y en el respaldo) sólo salen en una mesa de botas y con asiento', soloEnBotas(deRiberas, deLasLindes));
+  comprobar('se ve fallar: una forja sin la pregunta de botas, cae', !soloEnBotas(deRiberas.replace('esBotas && yo !== null ? <LaForja', 'yo !== null ? <LaForja'), deLasLindes));
+  const labriegos = [{ asiento: 'a', nombre: 'Ana', color: '#aa0000', puntos: 3, sinPlantar: 5 }];
+  const marcadorCon = renderToStaticMarkup(<MarcadorDeLasLindes vista={{ labriegos, quedan: 10, escudos: { a: 2 } }} yo="a" />);
+  const marcadorSin = renderToStaticMarkup(<MarcadorDeLasLindes vista={{ labriegos, quedan: 10 }} yo="a" />);
+  comprobar(
+    'el marcador de Las Lindes dice los escudos de cada uno si la vista los trae, y en una mesa normal es el de antes',
+    /2 escudos/.test(marcadorCon) && !/escudo/.test(marcadorSin),
+    { marcadorCon, marcadorSin },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 6 · Riberas en tres dimensiones: sin Canvas en Node, y cada movimiento una vez
 // ---------------------------------------------------------------------------
 
@@ -3244,7 +3559,7 @@ function elBurgoAPie(): void {
     /const \[modo, ponerModo\] = useState<ModoDelBurgo>\('mesa'\);/.test(c) &&
     /const camara = useMemo\(\(\): ModoDeCamara => \(modo === 'mesa' \? \{ modo: 'mesa' \} : \{ modo, asiento: yo \?\? '' \}\), \[modo, yo\]\);/.test(c) &&
     /<Burgo\n(?:(?!\/>)[\s\S])*camara=\{camara\}/.test(c) &&
-    /<LasCamarasDelBurgo\s+modo=\{modo\}\s+alElegir=\{ponerModo\}\s+conCarril=\{cuadrados\.length > 0\}\s+canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\}\s*\/>/.test(c) &&
+    /<LasCamarasDelBurgo\s+modo=\{modo\}\s+alElegir=\{ponerModo\}\s+conCarril=\{cuadrados\.length > 0\}\s+canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\}\s+tactil=\{tactil\}\s*\/>/.test(c) &&
     c.indexOf('<LasCamarasDelBurgo') > c.indexOf('</LimiteDelMundo>') &&
     /const cual = camaraDeLaTecla\(e, document\.activeElement\);/.test(c) &&
     /\{alPrincipio \|\| aPie \? null : \(/.test(c);
@@ -5360,7 +5675,7 @@ function riberasAPie(): void {
   regla(
     'y el pintor lo monta encima del lienzo con el modo puesto —y con cómo va el canal SÓLO en una mesa de botas—, y la hoja le da su sitio sin coger el puntero: es un cartel, no un control',
     (par: readonly [string, string]) =>
-      /<ComoSeAndaPorElDelta modo=\{modo\} canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\} \/>/.test(par[0]) &&
+      /<ComoSeAndaPorElDelta modo=\{modo\} canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\} tactil=\{tactil\} \/>/.test(par[0]) &&
       /\.riberas-como-se-anda \{[^}]*position: absolute;[^}]*pointer-events: none;/.test(par[1]),
     [fuente, hoja] as const,
     [fuente, hoja.replace(/(\.riberas-como-se-anda \{[^}]*)pointer-events: none;/, '$1')] as const,
@@ -5368,7 +5683,7 @@ function riberasAPie(): void {
   regla(
     'y el canal se le pasa sólo detrás de la pregunta de botas: sin ella, una mesa normal diría «Conectando…» sin abrir ningún socket',
     (t: string) =>
-      /<ComoSeAndaPorElDelta modo=\{modo\} canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\} \/>/.test(t),
+      /<ComoSeAndaPorElDelta modo=\{modo\} canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\} tactil=\{tactil\} \/>/.test(t),
     fuente,
     fuente.replace("canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined}", "canal={estadoDelCanal?.texto ?? 'Conectando…'}"),
   );
@@ -6365,7 +6680,7 @@ function elPintorDeLasLindes(): void {
   );
   comprobar(
     'y el pintor lo monta encima del lienzo con el modo que lleva puesto, y con el canal SÓLO en una mesa de botas',
-    /<ComoSeAnda modo=\{modo\} canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\} \/>/.test(
+    /<ComoSeAnda modo=\{modo\} canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\} tactil=\{tactil\} \/>/.test(
       readFileSync(new URL('../src/lindes-en-tres.tsx', import.meta.url), 'utf8'),
     ),
   );
@@ -10335,6 +10650,7 @@ lasDirecciones();
 elMuelle();
 laCompuertaDeBotas();
 laRefriegaEnElEscritorio();
+losAvataresJugablesEnLaSala();
 riberasEnTres();
 burgoEnTres();
 elAcercamientoDelDelta();

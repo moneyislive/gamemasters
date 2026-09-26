@@ -197,7 +197,10 @@ import type { ModoDelBurgo } from '../../escenas/burgo/a-pie';
 import type { EstadoDelCanal } from '../../escenas/paseo/canal-de-botas';
 import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import type { CanalDeBotas } from '../../escenas/paseo/mesa-de-botas';
-import { COMO_SE_GOLPEA } from '../../escenas/paseo/mandos';
+import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos';
+import type { MandosDeFuera } from '../../escenas/paseo/mandos';
+import { usarElAvisoDelHallazgo } from './a-pie-en-botas';
+import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
 import { poseDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { RelojDeLaMesa } from '../../escenas/reloj';
@@ -489,13 +492,28 @@ export function camaraDeLaTecla(e: { readonly key: string; readonly metaKey: boo
  * y conviene saber si al bajar se verá a los demás—, y va en la columna de las cámaras, que está en
  * los dos modos; sin canal, en la mesa no sale nada, como siempre. Con canal se golpea, y la tecla
  * va con las demás (`COMO_SE_GOLPEA`, como en Las Lindes).
+ *
+ * ═══ Y EN UN TELÉFONO, LO QUE SE TOCA ═══
+ *
+ * Con `tactil` (`usarAparatoTactil`, `mandos-tactiles.tsx`) no hay teclado que nombrar: dice la
+ * palanca, el «Correr», el botón de volver y, con canal, el «Golpear».
  */
-export function ComoSeAndaPorElBurgo({ modo, canal }: { readonly modo: ModoDelBurgo; readonly canal?: string }): JSX.Element | null {
+export function ComoSeAndaPorElBurgo({
+  modo,
+  canal,
+  tactil = false,
+}: {
+  readonly modo: ModoDelBurgo;
+  readonly canal?: string;
+  readonly tactil?: boolean;
+}): JSX.Element | null {
   if (modo === 'mesa') return canal === undefined ? null : <p className="burgo-como-se-anda">{canal}</p>;
   return (
     <p className="burgo-como-se-anda">
-      W A S D o las flechas para andar · Mayúsculas para correr · 1 para volver a la mesa
-      {canal === undefined ? null : ` · ${COMO_SE_GOLPEA}`}
+      {tactil
+        ? `${COMO_SE_ANDA_CON_EL_DEDO} · «La mesa» para volver`
+        : 'W A S D o las flechas para andar · Mayúsculas para correr · 1 para volver a la mesa'}
+      {canal === undefined ? null : ` · ${tactil ? COMO_SE_GOLPEA_CON_EL_DEDO : COMO_SE_GOLPEA}`}
       {canal === undefined ? null : (
         <>
           <br />
@@ -517,12 +535,15 @@ export function LasCamarasDelBurgo({
   alElegir,
   conCarril,
   canal,
+  tactil = false,
 }: {
   readonly modo: ModoDelBurgo;
   readonly alElegir: (modo: ModoDelBurgo) => void;
   readonly conCarril: boolean;
   /** Cómo va el canal, sólo en una mesa de botas: va en el cartel de debajo. Ver `ComoSeAndaPorElBurgo`. */
   readonly canal?: string;
+  /** Si el aparato se toca: el cartel dice la palanca y no el teclado. */
+  readonly tactil?: boolean;
 }): JSX.Element {
   return (
     <div className={conCarril ? 'burgo-a-pie burgo-a-pie-con-carril' : 'burgo-a-pie'}>
@@ -542,7 +563,7 @@ export function LasCamarasDelBurgo({
           </button>
         ))}
       </div>
-      <ComoSeAndaPorElBurgo modo={modo} canal={canal} />
+      <ComoSeAndaPorElBurgo modo={modo} canal={canal} tactil={tactil} />
     </div>
   );
 }
@@ -1225,6 +1246,17 @@ export function BurgoEnTres({
   useEffect(() => {
     if (esBotas) ponerModo('hombro');
   }, [esBotas, puesta.codigo]);
+
+  /*
+   * ═══ EN UN TELÉFONO, LA PALANCA ═══
+   *
+   * La referencia que la escena lee en su bucle (`mandos`) y que escriben los mandos táctiles
+   * (`mandos-tactiles.tsx`), sólo a pie y sólo si el aparato se toca. Y el aviso al recoger dinero
+   * por la calle, que la escena cuenta por `alRecoger` (`a-pie-en-botas.tsx`).
+   */
+  const tactil = usarAparatoTactil();
+  const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
+  const { alRecoger, aviso: avisoDelHallazgo } = usarElAvisoDelHallazgo('burgo', puesta.asientos);
 
   // -------------------------------------------------------------------------
   // Las cribas: qué enseña la escena, qué la caja, qué el carril, qué la hoja
@@ -1945,10 +1977,14 @@ export function BurgoEnTres({
                   alFallar={alFallarElLienzo}
                   alMedir={alMedir}
                   canal={canal}
+                  mandos={mandos}
+                  alRecoger={alRecoger}
                 />
               </Canvas>
             </LimiteDelMundo>
-            {/*
+            {avisoDelHallazgo}
+            {/* En un teléfono y a pie, la palanca: ver `mandos-tactiles.tsx`. */}
+            <MandosTactiles mandos={mandos} visibles={tactil && aPie} conGolpe={canal !== undefined} />            {/*
               A PIE: las tres cámaras y, mientras se anda, cómo se anda; y en una mesa de botas, en los
               dos modos, cómo va el canal. Ver `LasCamarasDelBurgo`.
             */}
@@ -1957,6 +1993,7 @@ export function BurgoEnTres({
               alElegir={ponerModo}
               conCarril={cuadrados.length > 0}
               canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined}
+              tactil={tactil}
             />
             {/*
               LA SALIDA, y sólo cuando hace falta. Está FUERA del `Canvas`: es un botón de la

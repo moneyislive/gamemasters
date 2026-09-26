@@ -160,7 +160,10 @@ import { asientosQueAndanPorElDelta } from '../../escenas/delta-a-pie';
 import type { EstadoDelCanal } from '../../escenas/paseo/canal-de-botas';
 import { esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import type { CanalDeBotas } from '../../escenas/paseo/mesa-de-botas';
-import { COMO_SE_GOLPEA } from '../../escenas/paseo/mandos';
+import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos';
+import type { MandosDeFuera } from '../../escenas/paseo/mandos';
+import { LaForja, usarElAvisoDelHallazgo } from './a-pie-en-botas';
+import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
 /*
  * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
  * `verify:riberas` mide contra los seis colores de colono: el carril la usa para la barra de
@@ -367,19 +370,29 @@ export const CAMARA_DE_LA_TECLA: ReadonlyMap<string, ModoDeCamaraDelDelta['modo'
  * ahí taparía la pieza de la barra que se va a coger. Una mesa de botas se empieza a pie, y es a pie
  * donde se ve a los demás: ahí sí. Y ahí se golpea: la tecla va con las demás (`COMO_SE_GOLPEA`,
  * como en Las Lindes), y los corazones propios los trae el texto del canal.
+ *
+ * ═══ Y EN UN TELÉFONO, LO QUE SE TOCA, Y MÁS ARRIBA ═══
+ *
+ * Con `tactil` (`usarAparatoTactil`, `mandos-tactiles.tsx`) no hay teclado que nombrar: dice la
+ * palanca, el «Correr», el mando «Mesa» y, con canal, el «Golpear». Y sube por encima de la palanca
+ * (`.riberas-como-se-anda-tactil`), que en un teléfono ocupa esta misma esquina.
  */
 export function ComoSeAndaPorElDelta({
   modo,
   canal,
+  tactil = false,
 }: {
   readonly modo: ModoDeCamaraDelDelta['modo'];
   readonly canal?: string;
+  readonly tactil?: boolean;
 }): JSX.Element | null {
   if (modo === 'mesa') return null;
   return (
-    <p className="riberas-como-se-anda">
-      W A S D o las flechas para andar · Mayúsculas para correr · M vuelve a la mesa
-      {canal === undefined ? null : ` · ${COMO_SE_GOLPEA}`}
+    <p className={tactil ? 'riberas-como-se-anda riberas-como-se-anda-tactil' : 'riberas-como-se-anda'}>
+      {tactil
+        ? `${COMO_SE_ANDA_CON_EL_DEDO} · «${LOS_MANDOS_DE_LA_CAMARA.subir.rotulo}» vuelve a la mesa`
+        : 'W A S D o las flechas para andar · Mayúsculas para correr · M vuelve a la mesa'}
+      {canal === undefined ? null : ` · ${tactil ? COMO_SE_GOLPEA_CON_EL_DEDO : COMO_SE_GOLPEA}`}
       {canal === undefined ? null : (
         <>
           <br />
@@ -1819,6 +1832,19 @@ export function RiberasEnTres({
   }, [esBotas, puesta.codigo, cambiarDeCamara]);
 
   /*
+   * ═══ EN UN TELÉFONO, LA PALANCA; Y EN UNA MESA DE BOTAS, LO QUE SE RECOGE ═══
+   *
+   * La referencia que la escena lee en su bucle (`mandos`) y que escriben los mandos táctiles
+   * (`mandos-tactiles.tsx`), sólo a pie y sólo si el aparato se toca. Y el aviso al recoger un
+   * material, que la escena cuenta por `alRecoger` (`a-pie-en-botas.tsx`). La forja va en el cajón.
+   */
+  const tactil = usarAparatoTactil();
+  const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
+  const { alRecoger, aviso: avisoDelHallazgo } = usarElAvisoDelHallazgo('riberas', puesta.asientos);
+  const laForja =
+    esBotas && yo !== null ? <LaForja vista={vista} yo={yo} opciones={opciones} quieto={quieto} mover={mover} /> : null;
+
+  /*
    * ═══ LA MESA SALE SOLA AL PASAR A TOCARME, Y ESPERA SI HAY ALGO EN LA MANO ═══
    *
    * Decisión 16 del §1, cerrada por Miguel: recoger es para MIRAR, y cuando hay que actuar
@@ -2872,6 +2898,7 @@ export function RiberasEnTres({
         )}
         <Retablo tablero={sinContestar} alTocar={mover} quieto={quieto} />
         <AccionesDelTablero tablero={sinContestar} alTocar={mover} quieto={quieto} />
+        {laForja}
         {componedor === null ? null : (
           <ElComponedorDelRetablo
             componedor={componedor}
@@ -3283,6 +3310,11 @@ export function RiberasEnTres({
                   atajos={false}
                 />
               ) : null}
+              {/*
+                LA FORJA (sólo en una mesa de botas): delante del marcador, que es lo que se hace
+                con lo recogido andando. El cajón se abre desde la cinta, que está también a pie.
+              */}
+              {laForja}
               {elRail}
             </div>
           </>
@@ -3408,9 +3440,14 @@ export function RiberasEnTres({
                   traer={traer}
                   figura={puesta.asientos.find((a) => a.id === yo)?.figura}
                   canal={canal}
+                  mandos={mandos}
+                  alRecoger={alRecoger}
                 />
               </Canvas>
             </LimiteDelMundo>
+            {avisoDelHallazgo}
+            {/* En un teléfono y a pie, la palanca: ver `mandos-tactiles.tsx`. */}
+            <MandosTactiles mandos={mandos} visibles={tactil && aPie} conGolpe={canal !== undefined} />
             {/*
               LA SALIDA, y sólo cuando hace falta. Un zoom del que no se sabe volver
               atrapa: se entra a mirar una esquina del delta y ya no se encuentra el
@@ -3485,7 +3522,7 @@ export function RiberasEnTres({
                 alPulsar={() => cambiarDeCamara(modo === 'ojos' ? 'hombro' : 'ojos')}
               />
             ) : null}
-            <ComoSeAndaPorElDelta modo={modo} canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined} />
+            <ComoSeAndaPorElDelta modo={modo} canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined} tactil={tactil} />
             {/*
               EL CARTEL QUE EXPLICA EL NAIPE (`docs/LAS-CARTAS-SE-EXPLICAN.md`, fase 3).
 

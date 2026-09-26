@@ -36,7 +36,7 @@
  * dice también cómo va el canal. En una mesa normal no se pasa nada y la escena no abre
  * ningún socket.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Lindes } from '../../escenas/lindes/Lindes';
@@ -48,8 +48,12 @@ import {
   usarElValleEnLaMesa,
 } from '../../escenas/lindes/el-valle-en-la-mesa';
 import { asientosQueAndan, esMesaDeBotas } from '../../escenas/paseo/mesa-de-botas';
-import { COMO_SE_GOLPEA } from '../../escenas/paseo/mandos';
+import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos';
+import type { MandosDeFuera } from '../../escenas/paseo/mandos';
+import { escudosDeLaVista } from '../../shared/arcade/juegos/lindes-escudos';
+import { LosEscudos, usarElAvisoDelHallazgo } from './a-pie-en-botas';
 import { LimiteDelMundo } from './lienzo-propio';
+import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
 import { direccionDelCanal } from './mesa';
 import { traer } from './muelle';
 import type { LoQueVeElPintor } from './pintores';
@@ -75,19 +79,26 @@ import { AccionesDelTablero, Retablo } from './retablo';
  * en la mesa no sale nada, como siempre. Y con canal se golpea: la tecla va con las de andar
  * (`COMO_SE_GOLPEA`, que sale de la misma tecla que lee el paseo), y los corazones propios los
  * trae el texto del canal.
+ *
+ * ═══ Y EN UN TELÉFONO, LO QUE SE TOCA ═══
+ *
+ * Con `tactil` (`usarAparatoTactil`, `mandos-tactiles.tsx`) no hay teclado que nombrar: el cartel
+ * dice la palanca, el «Correr» y, con canal, el «Golpear» que se ven en pantalla.
  */
 export function ComoSeAnda({
   modo,
   canal,
+  tactil = false,
 }: {
   readonly modo: 'mesa' | 'hombro' | 'ojos';
   readonly canal?: string;
+  readonly tactil?: boolean;
 }): JSX.Element | null {
   if (modo === 'mesa') return canal === undefined ? null : <p className="lindes-como-se-anda">{canal}</p>;
   return (
     <p className="lindes-como-se-anda">
-      W A S D o las flechas para andar · Mayúsculas para correr
-      {canal === undefined ? null : ` · ${COMO_SE_GOLPEA}`}
+      {tactil ? COMO_SE_ANDA_CON_EL_DEDO : 'W A S D o las flechas para andar · Mayúsculas para correr'}
+      {canal === undefined ? null : ` · ${tactil ? COMO_SE_GOLPEA_CON_EL_DEDO : COMO_SE_GOLPEA}`}
       {canal === undefined ? null : (
         <>
           <br />
@@ -172,6 +183,17 @@ export function LindesEnTres({
   }, [esBotas, puesta.codigo]);
 
   /*
+   * ═══ EN UN TELÉFONO, LA PALANCA ═══
+   *
+   * La referencia que la escena lee en su bucle (`mandos`) y que escriben los mandos táctiles
+   * (`mandos-tactiles.tsx`), sólo a pie y sólo si el aparato se toca. Y el aviso al recoger un
+   * escudo, que la escena cuenta por `alRecoger` (`a-pie-en-botas.tsx`).
+   */
+  const tactil = usarAparatoTactil();
+  const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
+  const { alRecoger, aviso } = usarElAvisoDelHallazgo('lindes', puesta.asientos);
+
+  /*
    * EL CONTROLADOR DE LAS LINDES: la escena, el giro, la calidad, los sitios y lo que manda cada
    * toque, lo mismo que la app. Ver la cabecera de `escenas/lindes/el-valle-en-la-mesa.ts`.
    */
@@ -204,6 +226,9 @@ export function LindesEnTres({
       <div className="lindes-respaldo">
         <Retablo tablero={tablero} alTocar={alTocar} quieto={quieto} />
         <AccionesDelTablero tablero={tablero} alTocar={alTocar} quieto={quieto} />
+        {esBotas && yoEnLaMesa !== null ? (
+          <LosEscudos vista={puesta.vista} yo={yoEnLaMesa} opciones={opciones} quieto={quieto} mover={mover} />
+        ) : null}
       </div>
     );
   }
@@ -213,13 +238,22 @@ export function LindesEnTres({
       <div className="lindes-lienzo" ref={apuntarElRecuadro}>
         <LimiteDelMundo alFallar={valle.alFallar}>
           <Canvas {...EL_LIENZO_DEL_VALLE} onCreated={alCrearElLienzoDelValle}>
-            <Lindes {...valle.escena} canal={canal} />
+            <Lindes {...valle.escena} canal={canal} mandos={mandos} alRecoger={alRecoger} />
           </Canvas>
         </LimiteDelMundo>
 
         <p className="lindes-cinta">{tablero.aviso}</p>
 
-        <ComoSeAnda modo={modo} canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined} />
+        {aviso}
+
+        <MandosTactiles
+          mandos={mandos}
+          visibles={tactil && modo !== 'mesa'}
+          conGolpe={canal !== undefined}
+          clase="mandos-tactiles-sobre-la-cinta"
+        />
+
+        <ComoSeAnda modo={modo} canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined} tactil={tactil} />
 
         <div className="lindes-camaras" role="group" aria-label="Desde dónde se mira">
           {LAS_CAMARAS_DEL_VALLE.map((c) => (
@@ -306,6 +340,11 @@ export function LindesEnTres({
 
         <AccionesDelTablero tablero={loQueNoEstaArriba} alTocar={alTocar} quieto={quieto} />
 
+        {/* Los escudos y la leva: sólo en una mesa de botas y con asiento. Ver `LosEscudos`. */}
+        {esBotas && yoEnLaMesa !== null ? (
+          <LosEscudos vista={puesta.vista} yo={yoEnLaMesa} opciones={opciones} quieto={quieto} mover={mover} />
+        ) : null}
+
         {tablero.paneles.map((p) => (
           <section key={p.titulo} className="lindes-panel">
             <h3>{p.titulo}</h3>
@@ -341,6 +380,11 @@ export function MarcadorDeLasLindes({ vista, yo }: { vista: unknown; yo: string 
   if (v === null || typeof v !== 'object' || !Array.isArray(v.labriegos) || v.labriegos.length === 0) {
     return null;
   }
+  /*
+   * LOS ESCUDOS, sólo si la vista los trae: el campo es opcional y aparece con el primero que se
+   * recoge (`lindes-escudos.ts`). Una mesa normal no lo tiene nunca, y su marcador es el de antes.
+   */
+  const conEscudos = typeof (vista as { escudos?: unknown }).escudos === 'object' && (vista as { escudos?: unknown }).escudos !== null;
   return (
     <section className="lindes-marcador">
       <h3>La mesa</h3>
@@ -354,6 +398,11 @@ export function MarcadorDeLasLindes({ vista, yo }: { vista: unknown; yo: string 
             </span>
             <span className="lindes-puntos">{l.puntos}</span>
             <span className="lindes-labriegos">{l.sinPlantar} labriegos</span>
+            {conEscudos ? (
+              <span className="lindes-labriegos lindes-escudos">
+                {escudosDeLaVista(vista, l.asiento) === 1 ? '1 escudo' : `${String(escudosDeLaVista(vista, l.asiento))} escudos`}
+              </span>
+            ) : null}
           </li>
         ))}
       </ul>
