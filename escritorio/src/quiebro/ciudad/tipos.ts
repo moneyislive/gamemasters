@@ -18,6 +18,7 @@
  *
  * Ejes: `x` al este, `z` al sur, `y` arriba; metros; origen en el centro de la glorieta.
  */
+import type { IdDeDistrito } from '../../../../shared/arcade/juegos/quiebro-ciudad';
 
 /** Los cuatro niveles de detalle del diseño (§8): N0 Android modesto … N3 PC con gráfica. */
 export type NivelDeLaCiudad = 0 | 1 | 2 | 3;
@@ -86,6 +87,11 @@ export interface EdificioDelPlano {
   readonly pilares: readonly CajaXZ[];
   /** Entero no negativo: siembra ventanas, colores y tiendas. */
   readonly semilla: number;
+  /**
+   * El distrito de la ciudad al que pertenece (el de su hueco, como lo da la mesa). No lo tienen los edificios del
+   * barrio viejo ni los de detrás del cerco: ahí falta. Lo lee `hitoDe` (la chimenea de las Naves, la cúpula de la Lonja).
+   */
+  readonly distrito?: IdDeDistrito;
 }
 
 export interface RotuloDelPlano {

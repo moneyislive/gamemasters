@@ -44,11 +44,10 @@ export function gradoDeLaCelda(nivel: NivelDeLaCiudad, dx: number, dz: number): 
 }
 
 /**
- * EL GRADO DE LOS COCHES HORNEADOS de cada nivel. En la ola 1 reproduce `cochesFinos` (N0 la caja, N1-N3 con
- * ruedas y retrovisores): 1 / 2 / 2 / 2. La tabla final (§3.7) es 1 / 1 / 2 / 3, con el anillo de N3 en g2: la
- * pone quien escriba los coches por grado (O2-VEHICULOS).
+ * EL GRADO DE LOS COCHES HORNEADOS de cada nivel: la tabla final (§3.7), 1 / 1 / 2 / 3, con el anillo de N3 en g2
+ * (`gradoDeLosCoches`). Ya no depende de `cochesFinos`: el coche que se ve a 2-5 m sube en la capa de lo cercano.
  */
-export const GRADO_DE_LOS_COCHES_POR_NIVEL: Readonly<Record<NivelDeLaCiudad, GradoDeLaCelda>> = { 0: 1, 1: 2, 2: 2, 3: 2 };
+export const GRADO_DE_LOS_COCHES_POR_NIVEL: Readonly<Record<NivelDeLaCiudad, GradoDeLaCelda>> = { 0: 1, 1: 1, 2: 2, 3: 3 };
 
 /** El grado de los coches horneados de una celda: el de su nivel y, en N3, no más que el de la celda (el anillo, g2). */
 export function gradoDeLosCoches(nivel: NivelDeLaCiudad, grado: GradoDeLaCelda): GradoDeLaCelda {
