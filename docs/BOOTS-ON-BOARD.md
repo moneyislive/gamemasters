@@ -383,7 +383,12 @@ tocones que, puestos, pasan de la cintura de quien anda (media persona, 1,27 u),
 de su radio medido (`comoEstorbaLaPuesta`); `verify:lindes-mundo` vigila que ninguna tape una
 senda, el hueco de una puerta o un sitio de nacer, ni parta el valle. Y como el servidor tiene
 muchas mesas a la vez y el aparato una, el mundo de Las Lindes se recuerda POR MESA con un tope
-medido: con 100 mesas en rueda, una jugada cuesta lo que en una mesa caliente. El Burgo declara sus edificios (que no dependen de la calidad) y
+medido: con 100 mesas en rueda, una jugada cuesta lo que en una mesa caliente. Lo que va girado a
+un ángulo cualquiera (arboledas, almiar) se cubre también con el cuadrado de su radio medido
+(`ALTO_Y_RADIO_DEL_MODELO`), y sólo cierra rincones de menos de una celda sin sitio de nacer. En el
+Burgo, las obras del anillo que paran a quien anda son estructura (87 cajas medidas en `obras.ts`,
+`OBRAS_QUE_PARAN`), y detrás de los 8 sitios de entrar hay unos 156 para renacer, en el anillo y en
+las calles, de modo que desde cada punto de juego haya al menos dos a entre 52,8 y 132 u. El Burgo declara sus edificios (que no dependen de la calidad) y
 Riberas su tierra, su vado y sus poblados desde la vista pública; su paisaje fino se queda donde
 está.
 
@@ -439,6 +444,7 @@ Estado al cierre del 23-sep-2026. Todo está en la rama `botas-servidor` (worktr
 | 2 | cuotas de conexión en el `upgrade` (tras un revisor adversario) | hecho (`cuotas`, fusionado) |
 | 2 | la modalidad y su compuerta; el Burgo y Riberas a pie; Las Lindes en la app con su atlas y su juez | hecho (`c49bc24`, `13b5f78`, `d5eea02`, `6b6ba15`) |
 | 2 | las piedras grandes de Las Lindes estorban; su mundo se recuerda por mesa | hecho (`botas-rocas`, `cache-lindes`, fusionados) |
+| 2 | lo girado de Las Lindes por su radio; las obras del anillo del Burgo y sus sitios para renacer | hecho (`mundos`, fusionado) |
 | 3 | los contratos de la refriega y del botín | hecho (`b9f7674`, `db88dff`) |
 | 3 | el botín en los tres reductores | hecho (`botas-botin`, fusionado) |
 | 3 | la refriega y el botín en el servidor: golpe con rebobinado, caer y renacer cerca y a salvo, nadie inmune por no bajar, la vía interna de la mesa, topes, 4007/4008 | hecho (`c63d15f`…`36987c5`) |

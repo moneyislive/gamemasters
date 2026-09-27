@@ -1611,11 +1611,16 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   }, -1);
   const laNiebla = useRef<THREE.Fog>(null);
   useFrame((s) => {
-    /* La niebla de la mesa se aparta detrás del tablero; la de a pie se acerca y manda en el detalle. */
+    /*
+     * La niebla de la mesa se aparta detrás del tablero —y se retira con el ojo, que en retrato se
+     * retira para que quepa el anillo: fija, dejaba el tablero entero detrás de ella y la app lo
+     * pintaba en blanco (`nieblaDeLaMesa`)—; la de a pie se acerca y manda en el detalle.
+     */
     const n = laNiebla.current;
     if (n !== null) {
-      n.near = aPie ? NIEBLA_A_PIE.cerca : laNieblaDeLaMesa.cerca;
-      n.far = aPie ? NIEBLA_A_PIE.lejos : laNieblaDeLaMesa.lejos;
+      const mesa = nieblaDeLaMesa(s.size.width / Math.max(1, s.size.height));
+      n.near = aPie ? NIEBLA_A_PIE.cerca : mesa.cerca;
+      n.far = aPie ? NIEBLA_A_PIE.lejos : mesa.lejos;
     }
     if (!aPie) return;
     s.camera.position.copy(camaraDelPaseo.current.posicion);
@@ -1857,12 +1862,6 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   }, [props.alTocarCasilla, props.alSenalarCasilla]);
 
   const tamano = useThree((s) => s.size);
-  /*
-   * La niebla de la mesa se retira con el ojo, que en retrato se retira para que quepa el anillo:
-   * fija, dejaba el tablero entero detrás de ella y la app lo pintaba en blanco (`nieblaDeLaMesa`).
-   * Con la proporción del LIENZO, la misma con la que se retira el ojo.
-   */
-  const laNieblaDeLaMesa = nieblaDeLaMesa(tamano.width / Math.max(1, tamano.height));
   const reloj = useThree((s) => s.clock);
   /** Las aceras repintadas este fotograma por un empeño en curso: al acabar, vuelven a su color base. */
   const acerasEnCurso = useRef(new Set<number>());
@@ -3053,11 +3052,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
   return (
     <>
-      {/*
-       * La niebla la mueve el fotograma: la de la mesa, que se retira con el ojo (`laNieblaDeLaMesa`: en retrato el ojo
-       * se retira para que quepa el anillo y una niebla fija dejaba el tablero en blanco), o la de a pie. Los `args` son
-       * sólo con los que nace.
-       */}
+      {/* La niebla la mueve el fotograma: la de la mesa o la de a pie. Los `args` son sólo con los que nace. */}
       <fog ref={laNiebla} attach="fog" args={[COLOR_DE_LA_NIEBLA, NIEBLA_DE_LA_MESA.cerca, NIEBLA_DE_LA_MESA.lejos]} />
 
       {/* El fondo: la cúpula de mediodía pegada a la cámara. Se dibuja la primera y no escribe profundidad. */}

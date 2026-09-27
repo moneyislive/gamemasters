@@ -24,11 +24,22 @@
  *
  * ═══ LO QUE NO ESTÁ, AUNQUE PAREZCA ESTRUCTURA ═══
  *
- *   · El TEMPLETE y el ESTANQUE del parque. Cuelgan del sendero, y el sendero sortea su onda con
- *     el chorro de azar de la ciudad DESPUÉS de distritos cuya densidad depende de la calidad:
- *     medido, en 48 de 62 mesas salen en otro sitio en un móvil que en un PC. Declararlos sería
- *     poner una pared invisible a medio mundo. Arreglarlo es sacar su sorteo a un azar propio, y
- *     eso los mueve de sitio en la app de hoy: no se hace aquí.
+ *   · El TEMPLETE y el ESTANQUE del parque, mirados otra vez el 24 de septiembre, y fuera por dos
+ *     razones distintas:
+ *       - EL TEMPLETE ES ESTRUCTURA: la escena lo pinta como un bloque macizo de 12 × 12 y 6 de
+ *         alto —`geometriaDeUnBulto(112)` es una caja con bandas, no un kiosco de columnas—, y eso
+ *         para a quien anda. Pero cuelga del sendero, y el sendero sortea su onda con el chorro de
+ *         azar de la ciudad DESPUÉS de distritos cuya densidad depende de la calidad: sale en otro
+ *         sitio en sobria que en plena en 7 de las 12 mesas de `verify:burgo-mundo` (en 48 de 62
+ *         cuando se midió primero). Declararlo sería poner una pared invisible en el móvil de medio
+ *         mundo. Se declara el día que la escena saque la onda del sendero de un azar propio del
+ *         parque —gastando igual las dos tiradas del chorro, para que el resto de la ciudad no se
+ *         mueva—; eso mueve el templete de sitio en la app de hoy, y es de la escena, no de aquí.
+ *       - EL ESTANQUE NO LO ES: es agua a ras de la acera, 0,30 de hondo y sin pretil, que la
+ *         escena cuenta entre los suelos de un distrito, y no para a nadie de pie. Lo que sería es
+ *         un vado, como el agua somera de Riberas, y el mundo del Burgo no puede declararlo: su
+ *         suelo es una sola casilla de 864. El canal sí es cuerpo, pero va hundido 0,90 entre sus
+ *         cantiles.
  *   · El QUITAMIEDOS del circuito, que es una cinta con curvas y no una caja.
  *   · Las piezas del pack que un distrito pone como MOBILIARIO —la cripta, las mesas de la feria,
  *     la torre de agua de la grúa—. Van en la lista cuya densidad decide la calidad; alguna, como

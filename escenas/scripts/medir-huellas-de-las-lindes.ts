@@ -49,21 +49,30 @@
  * del modelo en el que ninguna rodaja de muro pasa de `MEDIO_GRUESO_DE_LA_HOJA`, a todas las
  * alturas hasta la cabeza. La hoja no para: una muralla con puerta se cruza por la puerta.
  *
- * ═══ Y DE LAS PIEDRAS, ADEMÁS, EL ALTO Y EL RADIO ═══
+ * ═══ Y DE TODO LO QUE ESTORBA, ADEMÁS, EL ALTO Y EL RADIO ═══
  *
  * Las piedras, las rocas y los tocones estorban sólo si, puestos, pasan de la cintura de quien
  * anda (`comoEstorba`, en `lindes-piezas.ts`). Para contestarlo en `shared/` hace falta lo que
  * mide cada modelo de alto —lo más alto de su geometría, desde el origen, que es el suelo donde
  * se apoya—, y se mide aquí con lo demás.
  *
- * Y su RADIO: lo más lejos del origen que llega su planta, medido en el mismo trozo de abajo que
- * la huella. El reparto las pone giradas de cualquier manera, y a un ángulo que no es un cuarto el
- * mundo no puede girar la caja: tiene que cubrirlas con algo que no cambie al girar. El mayor
- * semieje de la caja sólo vale para lo que es redondo de verdad, y la piedra no lo es —su punto
- * más lejano está un cuarto más allá—; el radio vale para todo, se gire como se gire.
+ * Y el RADIO: lo más lejos del origen que llega su planta, medido en el mismo trozo de abajo que
+ * la huella. El reparto pone lo del campo girado de cualquier manera, y a un ángulo que no es un
+ * cuarto el mundo no puede girar la caja: tiene que cubrirlo con algo que no cambie al girar. El
+ * mayor semieje de la caja sólo vale para lo que es redondo de verdad, y medido casi nada lo es:
+ * el punto más lejano de la piedra está un 26 % más allá de su semieje, el de la arboleda grande
+ * un 11 %, el del almiar un 8 %, el de la arboleda pequeña un 4 %, el de la media un 3 % y el de
+ * la colina un 0,4 %. Sólo los dos árboles sueltos son redondos al diezmilésimo. El radio vale
+ * para todo, se gire como se gire.
  *
- * Su huella no pide otra altura de corte: son más bajas que la de la huella, así que lo que se
- * mide de ellas es su planta ENTERA. Por qué eso basta está en la cabecera de `comoEstorba`.
+ * Se miden los dos de TODO lo que estorba y no sólo de lo que hoy va girado o de lo que hoy se
+ * decide por la cintura: medirlo cuesta nada, y así ninguna pieza queda sin él el día que el
+ * reparto la ponga de otra manera. Una tabla con los mismos nombres que la de las huellas es una
+ * tabla que `verify:lindes-mundo` puede exigir entera.
+ *
+ * La huella de las piedras no pide otra altura de corte: son más bajas que la de la huella, así
+ * que lo que se mide de ellas es su planta ENTERA. Por qué eso basta está en la cabecera de
+ * `comoEstorba`.
  *
  * ═══ EL REDONDEO VA HACIA FUERA, Y EL DEL HUECO HACIA DENTRO ═══
  *
@@ -133,7 +142,7 @@ export interface HuellasMedidas {
   readonly altura: number;
   readonly huellas: Readonly<Record<string, CajaEnPlanta>>;
   readonly crudas: Readonly<Record<string, CajaEnPlanta>>;
-  /** De lo que estorba sólo si pasa de la cintura: su alto y su radio, redondeados hacia fuera. */
+  /** De todo lo que estorba: su alto y su radio, redondeados hacia fuera. */
   readonly altosYRadios: Readonly<Record<string, AltoYRadio>>;
   readonly altosYRadiosCrudos: Readonly<Record<string, AltoYRadio>>;
   readonly hueco: { readonly x0: number; readonly x1: number };
@@ -346,12 +355,11 @@ export async function medirLasHuellas(glb: string = TABLERO_GLB): Promise<Huella
     if (planta === null) throw new Error(`«${pieza}» no tiene nada por debajo de ${h.toFixed(3)} del pack`);
     crudas[pieza] = planta;
     huellas[pieza] = redondearCaja(planta);
-    if (comoEstorba(pieza) === 'si-pasa-de-la-cintura') {
-      const crudo = { alto: altoDe(tris), radio: radioBajo(tris, h) };
-      altosYRadiosCrudos[pieza] = crudo;
-      /* Hacia fuera los dos: la piedra pasa antes de la cintura, y su caja girada crece. */
-      altosYRadios[pieza] = { alto: hacia(crudo.alto, true), radio: hacia(crudo.radio, true) };
-    }
+    /* De todo lo que estorba, no sólo de las piedras: ver la cabecera. */
+    const crudo = { alto: altoDe(tris), radio: radioBajo(tris, h) };
+    altosYRadiosCrudos[pieza] = crudo;
+    /* Hacia fuera los dos: la piedra pasa antes de la cintura, y la caja girada crece. */
+    altosYRadios[pieza] = { alto: hacia(crudo.alto, true), radio: hacia(crudo.radio, true) };
     if (comoEstorba(pieza) === 'puerta') {
       huecoCrudo = huecoDeLaPuerta(tris, h);
       /* Hacia dentro: el hueco encoge. */
@@ -384,10 +392,11 @@ export function textoDeLaTabla(m: HuellasMedidas): string {
  *
  * Es la caja en planta de cada modelo de \`tablero.glb\` que estorba al andar, medida por debajo
  * de la cabeza de una persona, con el origen donde el reparto pone la pieza y en unidades del
- * pack; y, de las piedras, las rocas y los tocones, que estorban sólo si pasan de la cintura, su
- * alto y el radio de su planta. Cómo se mide y por qué así está en la cabecera del guion que la
- * escribe; quién estorba y quién no, en \`comoEstorba\` (\`lindes-piezas.ts\`); y cómo se convierte
- * en una caja del mundo —escala, largo, giro—, en \`lindes-mundo.ts\`.
+ * pack; y, de cada uno, su alto —con el que se decide si una piedra pasa de la cintura— y el
+ * radio de su planta —con el que se cubre lo que va girado de cualquier manera—. Cómo se mide y
+ * por qué así está en la cabecera del guion que la escribe; quién estorba y quién no, en
+ * \`comoEstorba\` (\`lindes-piezas.ts\`); y cómo se convierte en una caja del mundo —escala, largo,
+ * giro—, en \`lindes-mundo.ts\`.
  *
  * Es literal porque la usa \`shared/\`, que corre en el servidor y en Hermes y no abre un \`.glb\`.
  * \`verify:lindes-mundo\` la vuelve a medir y exige los mismos números: si se recompila el pack,
@@ -418,7 +427,11 @@ export interface AltoYRadioDelModelo {
   readonly radio: number;
 }
 
-/** De lo que estorba sólo si pasa de la cintura: las piedras, las rocas y los tocones. */
+/**
+ * De todo lo que estorba, con los mismos nombres que la huella. El alto lo usan las piedras, las
+ * rocas y los tocones, que estorban sólo si pasan de la cintura; el radio, todo lo que el reparto
+ * pone girado a un ángulo que no es un cuarto de vuelta.
+ */
 export const ALTO_Y_RADIO_DEL_MODELO: Readonly<Record<string, AltoYRadioDelModelo>> = {
 ${filasDeAltoYRadio.join('\n')}
 };
@@ -447,13 +460,14 @@ if (esElGuion) {
       `  ${pieza.padEnd(18)} x ${c.x0.toFixed(4)} … ${c.x1.toFixed(4)}   z ${c.z0.toFixed(4)} … ${c.z1.toFixed(4)}   (${String(m.triangulos[pieza])} triángulos)`,
     );
   }
-  console.log('\n  de lo que estorba sólo si pasa de la cintura:');
+  console.log('\n  el alto y el radio, de todo lo que estorba:');
   for (const pieza of Object.keys(m.altosYRadios).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
     const a = m.altosYRadios[pieza] as AltoYRadio;
     const c = m.huellas[pieza] as CajaEnPlanta;
     const semieje = Math.max(-c.x0, c.x1, -c.z0, c.z1);
+    const asoma = a.radio > semieje ? ` · asoma un ${((100 * (a.radio - semieje)) / semieje).toFixed(1)} % de su semieje` : '';
     console.log(
-      `  ${pieza.padEnd(18)} alto ${a.alto.toFixed(4)}   radio ${a.radio.toFixed(4)} (mayor semieje de su caja ${semieje.toFixed(4)})`,
+      `  ${pieza.padEnd(18)} alto ${a.alto.toFixed(4)}   radio ${a.radio.toFixed(4)} (mayor semieje de su caja ${semieje.toFixed(4)}${asoma})`,
     );
   }
   console.log(`\n  hueco de la puerta: x ${m.hueco.x0.toFixed(4)} … ${m.hueco.x1.toFixed(4)}`);

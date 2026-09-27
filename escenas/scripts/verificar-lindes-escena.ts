@@ -1332,8 +1332,11 @@ paso('Quien pasea no nace dentro de una casa');
    * y 5,64 desde que las piedras que pasan de la cintura estorban (`comoEstorba`): en
    * `villa-tres-senda`, con y sin blasón, giro 1, la caja de una piedra de la cuneta echó al
    * paseante del sitio de antes, y el mejor que queda en esa senda corta tiene una arboleda a
-   * 5,64. Sigue por encima del umbral —5,09—, pero ya no lejos: si un día baja de él, es la
-   * senda de esa losa la que se ha quedado sin sitio, y hay que mirarla antes que el número.
+   * 5,64. Y 5,32 desde que lo del campo va con la caja de su radio y no con la de su semieje
+   * (`lindes-mundo.ts`): es la misma arboleda media, en el mismo sitio, con su caja 0,32 más
+   * ancha por cada lado; quien pasea sigue naciendo donde nacía. Sigue por encima del umbral
+   * —5,09—, pero ya no lejos: si un día baja de él, es la senda de esa losa la que se ha quedado
+   * sin sitio, y hay que mirarla antes que el número.
    */
   const HOLGURA_MINIMA = ALTURA_DE_UNA_PERSONA * 2;
 

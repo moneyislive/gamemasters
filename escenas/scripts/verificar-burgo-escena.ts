@@ -5533,7 +5533,7 @@ paso('A pie por el Burgo: el paseo común con el mundo de la mesa, de qué sitio
       elFotograma > reponeEn &&
       /const sg = seguimiento\.current;/.test(c) &&
       /useFrame\(\(s, dtCrudo\) => \{\s*if \(aPie\) return;\s*const dt = Math\.min\(0\.1, Math\.max\(0, dtCrudo\)\);\s*const ahora = s\.clock\.elapsedTime;\s*const cam = s\.camera as THREE\.PerspectiveCamera;\s*const sg = seguimiento\.current;/.test(c) &&
-      /n\.near = aPie \? NIEBLA_A_PIE\.cerca : laNieblaDeLaMesa\.cerca;\s*n\.far = aPie \? NIEBLA_A_PIE\.lejos : laNieblaDeLaMesa\.lejos;/.test(c) &&
+      /n\.near = aPie \? NIEBLA_A_PIE\.cerca : mesa\.cerca;\s*n\.far = aPie \? NIEBLA_A_PIE\.lejos : mesa\.lejos;/.test(c) &&
       /aPie \? UMBRALES_A_PIE\[c\.ciudad\.calidad\] : undefined\)/.test(c) &&
       /if \(aPie \|\| !plena \|\| !INTERRUPTORES_DEL_BANCO\.interiores/.test(c)
     );
@@ -5904,10 +5904,8 @@ paso('La niebla de la mesa se retira con el ojo: en un móvil en vertical el ani
   );
   const escenaDeLaNiebla = sinComentarios(fs.readFileSync(path.join(CARPETA, 'Burgo.tsx'), 'utf8'));
   comprobar(
-    'y la escena la pone con la proporción del LIENZO —la misma con la que se retira el ojo— sin rehacer la niebla: nace con la de un monitor y el fotograma la retira (en la mesa la de `nieblaDeLaMesa`, a pie la suya)',
-    /const tamano = useThree\(\(s\) => s\.size\);\s*const laNieblaDeLaMesa = nieblaDeLaMesa\(tamano\.width \/ Math\.max\(1, tamano\.height\)\);/.test(escenaDeLaNiebla) &&
-      /<fog\s+ref=\{laNiebla\}\s+attach="fog"\s+args=\{\[COLOR_DE_LA_NIEBLA, NIEBLA_DE_LA_MESA\.cerca, NIEBLA_DE_LA_MESA\.lejos\]\}\s*\/>/.test(escenaDeLaNiebla) &&
-      /n\.near = aPie \? NIEBLA_A_PIE\.cerca : laNieblaDeLaMesa\.cerca;\s*n\.far = aPie \? NIEBLA_A_PIE\.lejos : laNieblaDeLaMesa\.lejos;/.test(escenaDeLaNiebla),
+    'y la escena la pone en cada fotograma con la proporción del LIENZO —la misma con la que se retira el ojo—, y a pie la de a pie',
+    /const mesa = nieblaDeLaMesa\(s\.size\.width \/ Math\.max\(1, s\.size\.height\)\);\s*n\.near = aPie \? NIEBLA_A_PIE\.cerca : mesa\.cerca;\s*n\.far = aPie \? NIEBLA_A_PIE\.lejos : mesa\.lejos;/.test(escenaDeLaNiebla),
   );
 }
 
