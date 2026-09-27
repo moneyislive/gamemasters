@@ -1,6 +1,7 @@
 /**
- * LAS PANTALLAS DE LA MESA: la reunión, la pausa, el recuento, el final, la noche interrumpida y la mesa
- * cerrada. Lo que se decide con calma, encima de la ciudad.
+ * LAS PANTALLAS DE LA MESA: el menú de la noche (la reunión y la preparación), la pausa, el amanecer (el
+ * recuento y el final), la noche interrumpida y la mesa cerrada. Lo que se decide con calma, encima de la
+ * ciudad.
  *
  * ═══ LO QUE SE PINTA SALE DE LA VISTA Y DE LAS OPCIONES ═══
  *
@@ -33,7 +34,7 @@ import type { RelojDeLaBajada } from '../red/bajada';
 import { COLORES_DE_ASIENTO } from '../red/partida';
 import { Boton } from './Boton';
 import type { EleccionPendiente } from './lectura';
-import { cifra, etiquetaDeLaFase, loQueLeQueda, miIndice, queHacerConLaEleccion, quienesFaltanEnLaBajada, relojEnTexto, seVotaEnLaPausa } from './lectura';
+import { cifra, enLaPreparacion, etiquetaDeLaFase, loQueLeQueda, miIndice, queHacerConLaEleccion, queMandarAlBajar, quienesFaltanEnLaBajada, relojEnTexto, seVotaEnLaPausa } from './lectura';
 
 /** El id del arcade en el registro. */
 export const ID_DEL_QUIEBRO = 'quiebro';
@@ -107,16 +108,51 @@ function cifrasDeLosEstilos(vista: VistaDelQuiebro, codigo: string, yo: string |
   return salida;
 }
 
+/** La elección del menú de la noche: qué estilo se quiere, y cuáles se pueden querer. */
+export interface EleccionDelEstilo {
+  readonly querido: IdDeEstilo | null;
+  readonly alQuerer: (id: IdDeEstilo) => void;
+  readonly admite: (id: IdDeEstilo) => boolean;
+}
+
 /**
- * LAS TARJETAS DE LOS ESTILOS. Con `mover`, cada una manda su `estilo` si la mesa lo ofrece; SIN él
- * (la reunión) sólo se enseñan: ahí el reductor no admite estilo, y un botón que manda lo que se va a
- * rechazar es un botón que miente.
+ * LAS TARJETAS DE LOS ESTILOS. Con `eleccion` (el menú de la noche) cada una sólo MARCA el estilo
+ * querido, sin mandar nada: lo manda BAJAR, en la Bajada, que es donde el reductor lo admite. Con
+ * `mover`, cada una manda su `estilo` si la mesa lo ofrece. Sin ninguno de los dos sólo se enseñan.
  */
-export function Estilos({ vista, codigo, yo, opciones, mover }: { vista: VistaDelQuiebro; codigo: string; yo: string | null; opciones: readonly Opcion[]; mover: Mover | null }): JSX.Element {
+export function Estilos({
+  vista,
+  codigo,
+  yo,
+  opciones,
+  mover,
+  eleccion,
+}: {
+  vista: VistaDelQuiebro;
+  codigo: string;
+  yo: string | null;
+  opciones: readonly Opcion[];
+  mover: Mover | null;
+  eleccion?: EleccionDelEstilo;
+}): JSX.Element {
   const i = miIndice(vista, yo);
   const actual = i >= 0 ? vista.reglamento.asientos[i]?.estilo : undefined;
   const cifras = useMemo(() => cifrasDeLosEstilos(vista, codigo, yo), [vista, codigo, yo]);
   const sePuede = mover !== null && laOpcion(opciones, MOVIMIENTO_DEL_QUIEBRO.estilo) !== null;
+  if (eleccion !== undefined) {
+    const querido = eleccion.querido ?? actual;
+    return (
+      <div className="q-fila">
+        {IDS_DE_ESTILO.map((id) => (
+          <Boton key={id} clase="q-tarjeta" elegido={querido === id} desactivado={i < 0 || !eleccion.admite(id)} alPulsar={() => eleccion.alQuerer(id)}>
+            <span className="nombre">{NOMBRES_DEL_QUIEBRO.estilos[id]}</span>
+            <span className="detalle">{PAPEL_DEL_ESTILO[id]}</span>
+            {cifras[id] !== undefined ? <span className="cifras">{cifras[id]}</span> : null}
+          </Boton>
+        ))}
+      </div>
+    );
+  }
   if (mover === null) {
     return (
       <div className="q-fila">
@@ -151,62 +187,165 @@ export function Estilos({ vista, codigo, yo, opciones, mover }: { vista: VistaDe
   );
 }
 
-/* ─────────────────────────── La reunión ─────────────────────────── */
+/* ─────────────────────────── El menú de la noche ─────────────────────────── */
 
-export interface PropsDeLaReunion {
-  readonly vista: VistaDelQuiebro;
+export interface PropsDelMenuDeLaNoche {
+  readonly vista: VistaDelQuiebro | null;
   readonly puerto: PuertoDeMesa;
   readonly mover: Mover;
-  /**
-   * EL MODO DE PRUEBA: la dirección con que otra pestaña se sienta en ESTA mesa
-   * (`?prueba=1&codigo=…`), o `undefined` fuera de él (en la Sala y en la app, el código ya lo reparte el
-   * anfitrión con su enlace).
-   */
+  /** ¿Ya se tocó BAJAR en este aparato? (el toque que desbloquea el sonido, diseño §2.1 y §9). */
+  readonly bajado: boolean;
+  readonly alBajar: () => void;
+  /** El nombre del sitio de la noche (la plaza o el barrio), o `null` si aún no se sabe. */
+  readonly rotulo: string | null;
+  readonly bajada: RelojDeLaBajada;
+  /** En el modo de prueba, la dirección con que otra pestaña se sienta en ESTA mesa. */
   readonly enlaceParaEntrar?: string;
 }
 
-/*
- * EL ESTILO Y EL APRENDIZ NO SE MANDAN EN LA REUNIÓN: el reductor (`quiebro.ts`, `opcionesDeLaMesa`) sólo
- * admite EMPEZAR mientras la mesa se reúne, porque la lista de sentados aún cambia y la reunión se
- * rehace con ella. El estilo se elige en la Bajada —que es la preparación, y elegirlo ya es estar
- * listo— y entre noches; el aprendiz lo manda `Quiebro.tsx` al llegar la Bajada. Aquí los estilos se
- * ENSEÑAN (con sus cifras de verdad, sin `mover`: `Estilos` no pinta botones) y se dice cuándo se eligen.
+/**
+ * EL MENÚ DE LA NOCHE: la azotea, la reunión y la preparación en UNA pantalla (26-sep, lo pidió
+ * Miguel: eran tres seguidas, y la del medio enseñaba estilos que no se podían elegir).
+ *
+ * Se elige el estilo aquí mismo y un solo BAJAR hace lo que hacían los tres botones: desbloquea el
+ * sonido, EMPIEZA la noche si la mesa aún se reúne (y la cierra: nadie más se sienta), y, al llegar la
+ * Bajada, manda el estilo querido o LISTO (`queMandarAlBajar` en `lectura.ts`). Las fases de la mesa no
+ * cambian: el aparato encadena los movimientos por su cuenta, y cada uno es una opción que la mesa
+ * ofrece, tal cual.
+ *
+ * EL ENCADENADO SE MIRA CON CADA VISTA. Tras pulsar BAJAR, cada vista nueva (otra `rev`) vuelve a
+ * preguntar qué toca mandar; si un movimiento no entró (un 409 porque el aprendiz de la primera noche se
+ * mandó a la vez), se reintenta con la vista siguiente y no antes, así que no hay bucle. Cuando la mesa
+ * me da por listo, este menú deja paso al rótulo de la Bajada, que espera a los demás.
+ *
+ * A quien llega con la noche ya en marcha (o a una mesa acabada) no se le ofrece estilo: BAJAR sólo
+ * desbloquea el sonido y le deja en la calle.
  */
-export function Reunion({ vista, puerto, mover, enlaceParaEntrar }: PropsDeLaReunion): JSX.Element {
+export function MenuDeLaNoche({ vista, puerto, mover, bajado, alBajar, rotulo, bajada, enlaceParaEntrar }: PropsDelMenuDeLaNoche): JSX.Element {
+  /* El reloj de la Bajada se repinta solo: la vista no cambia mientras corre. */
+  const [, repintar] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => repintar((n) => (n + 1) % 1_000_000), 250);
+    return () => clearInterval(id);
+  }, []);
+  const [querido, ponerQuerido] = useState<IdDeEstilo | null>(null);
+  const [pedido, ponerPedido] = useState(false);
   const [copiado, ponerCopiado] = useState(false);
-  const [yendo, ponerYendo] = useState(false);
-  const empezar = laOpcion(puerto.opciones, MOVIMIENTO_DEL_QUIEBRO.empezar);
-  const i = miIndice(vista, puerto.yo);
-  const alEmpezar = async (): Promise<void> => {
-    if (empezar === null || yendo) return;
-    ponerYendo(true);
-    try {
-      await mover(empezar.tipo, empezar.carga);
-    } finally {
-      ponerYendo(false);
-    }
+  /* Cada respuesta de la mesa vuelve a mirar qué toca: una vista que llega mientras se manda no se pierde. */
+  const [vuelta, ponerVuelta] = useState(0);
+  const enviando = useRef(false);
+  const revDelUltimo = useRef<number | null>(null);
+
+  const f = vista?.fase.tipo ?? null;
+  const preparando = vista !== null && (f === 'reunion' || (f === 'bajada' && enLaPreparacion(vista, puerto.yo)));
+  const i = vista === null ? -1 : miIndice(vista, puerto.yo);
+  const actual = vista !== null && i >= 0 ? (vista.reglamento.asientos[i]?.estilo ?? null) : null;
+  const estilo = querido ?? actual;
+
+  const intentar = (): void => {
+    if (vista === null || enviando.current) return;
+    const op = queMandarAlBajar(vista, puerto.yo, puerto.opciones, estilo);
+    if (op === null) return;
+    enviando.current = true;
+    revDelUltimo.current = puerto.rev;
+    void mover(op.tipo, op.carga).finally(() => {
+      enviando.current = false;
+      ponerVuelta((n) => (n + 1) % 1_000_000);
+    });
   };
+  useEffect(() => {
+    if (!pedido || revDelUltimo.current === puerto.rev) return;
+    intentar();
+    // `intentar` lee lo de este mismo repintado; lo que cambia la decisión va en las dependencias.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedido, vista, puerto.rev, vuelta]);
+
+  const alPulsarBajar = (): void => {
+    if (!bajado) alBajar();
+    if (!preparando) return;
+    ponerPedido(true);
+    intentar();
+  };
+
+  /*
+   * En la Bajada, un estilo que no es el mío sólo se puede querer si la mesa lo ofrece (uno por tramo,
+   * `puedeCambiarDeEstilo`): una tarjeta que se deja marcar y luego baja con otro estilo mentiría. En la
+   * reunión todos: el primer cambio de la noche siempre se admite.
+   */
+  const eleccion: EleccionDelEstilo = {
+    querido: estilo,
+    alQuerer: (id) => {
+      if (!pedido) ponerQuerido(id);
+    },
+    admite: (id) =>
+      !pedido &&
+      (f !== 'bajada' || id === actual || laOpcion(puerto.opciones, MOVIMIENTO_DEL_QUIEBRO.estilo, (c) => (c as { readonly id?: unknown } | null)?.id === id) !== null),
+  };
+
+  const quedaMs = f === 'bajada' ? bajada.quedaMs(performance.now()) : null;
+  const faltan = vista === null ? [] : quienesFaltanEnLaBajada(vista);
+  const r = vista?.reglamento ?? null;
+  const detalle =
+    f === 'bajada' && r !== null
+      ? [
+          rotulo,
+          `${NOMBRES_DEL_QUIEBRO.cuentas.nivel} ${nombreDelNivel(r.nivel)}`,
+          r.averia === 'ninguna' ? null : NOMBRES_DEL_QUIEBRO.averias[r.averia],
+          r.contramedida === 'ninguna' ? null : `${NOMBRES_DEL_QUIEBRO.cuentas.memoria}: ${NOMBRES_DEL_QUIEBRO.contramedidas[r.contramedida]}`,
+        ].filter((x): x is string => x !== null)
+      : [];
+  const nota = !preparando
+    ? vista === null
+      ? null
+      : 'La noche de esta mesa ya está en marcha: bajas directamente a la calle.'
+    : f === 'reunion'
+      ? 'Al bajar empieza la noche, y la mesa se cierra: nadie más se sienta hasta la siguiente.'
+      : faltan.length > 1 || (faltan.length === 1 && faltan[0] !== i)
+        ? `Esperando a: ${faltan
+            .filter((k) => k !== i)
+            .map((k) => nombreDelAsiento(k, false))
+            .join(', ')}. Si no, a la calle cuando se acabe el reloj.`
+        : null;
+
   return (
-    <div className="q-pantalla clara">
+    <div className="q-pantalla q-menu-noche">
       <div className="q-hoja q-panel">
-        <h2>{NOMBRES_DEL_QUIEBRO.fases.reunion}</h2>
-        <h1>{NOMBRES_DEL_QUIEBRO.juego.nombre}</h1>
-        <p className="gancho">{NOMBRES_DEL_QUIEBRO.juego.gancho}</p>
-        <div className="q-fila" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div className="q-titulo">Código de la mesa</div>
-            <div className="q-codigo-mesa">{puerto.codigo}</div>
-          </div>
-          <div className="q-asientos">
-            {vista.asientos.map((a, k) => (
-              <div key={a.asiento} className="q-asiento">
-                <Muestra i={k} />
-                {nombreDelAsiento(k, k === i)} · {NOMBRES_DEL_QUIEBRO.estilos[vista.reglamento.asientos[k]?.estilo ?? 'gabardina']}
-              </div>
-            ))}
-          </div>
+        <div className="cabeza">
+          <div className="nombre-del-juego q-rotulo-neon">{NOMBRES_DEL_QUIEBRO.juego.nombre}</div>
+          <div className="frase">{NOMBRES_DEL_QUIEBRO.juego.cabeFrase}</div>
         </div>
-        {enlaceParaEntrar !== undefined ? (
+        {f === 'bajada' ? (
+          <div className="lugar">
+            <span className="q-titulo">{detalle.join(' · ')}</span>
+            {quedaMs !== null ? <span className={quedaMs < 5000 ? 'reloj aprieta' : 'reloj'}>{relojEnTexto(quedaMs)}</span> : null}
+          </div>
+        ) : null}
+        {vista !== null && preparando && i >= 0 ? (
+          <>
+            <h2>Tu estilo</h2>
+            <Estilos vista={vista} codigo={puerto.codigo} yo={puerto.yo} opciones={puerto.opciones} mover={null} eleccion={eleccion} />
+          </>
+        ) : null}
+        {vista !== null && vista.asientos.length > 0 ? (
+          <div className="q-fila" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="q-asientos">
+              {vista.asientos.map((a, k) => (
+                <div key={a.asiento} className={f === 'bajada' && a.haElegido ? 'q-asiento listo' : a.ausente ? 'q-asiento ausente' : 'q-asiento'}>
+                  <Muestra i={k} />
+                  {nombreDelAsiento(k, k === i)} · {NOMBRES_DEL_QUIEBRO.estilos[k === i && estilo !== null ? estilo : (vista.reglamento.asientos[k]?.estilo ?? 'gabardina')]}
+                  {f === 'bajada' ? ` · ${a.haElegido ? 'listo' : a.ausente ? NOMBRES_DEL_QUIEBRO.estados.ausente.toLowerCase() : 'eligiendo…'}` : ''}
+                </div>
+              ))}
+            </div>
+            {f === 'reunion' ? (
+              <div>
+                <div className="q-titulo">Mesa</div>
+                <div className="q-codigo-mesa">{puerto.codigo}</div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {f === 'reunion' && enlaceParaEntrar !== undefined ? (
           <div className="q-enlace">
             <span className="q-nota">Para jugar a dos en este navegador, abre esto en otra pestaña: se sienta en esta mesa.</span>
             <code>{enlaceParaEntrar}</code>
@@ -223,13 +362,10 @@ export function Reunion({ vista, puerto, mover, enlaceParaEntrar }: PropsDeLaReu
             </Boton>
           </div>
         ) : null}
-        <h2>Los estilos</h2>
-        <Estilos vista={vista} codigo={puerto.codigo} yo={puerto.yo} opciones={puerto.opciones} mover={null} />
-        <span className="q-nota">El estilo se elige al bajar a la calle (elegirlo ya es estar listo) y entre noches.</span>
         <div className="q-fila derecha" style={{ alignItems: 'center' }}>
-          <span className="q-nota">Al empezar, la mesa se cierra: nadie más se sienta esta noche.</span>
-          <Boton clase="q-boton principal" desactivado={empezar === null || yendo} alPulsar={() => void alEmpezar()}>
-            {NOMBRES_DEL_QUIEBRO.mesa.empezar}
+          {nota !== null ? <span className="q-nota">{nota}</span> : null}
+          <Boton clase="q-boton principal" desactivado={bajado && (!preparando || pedido)} alPulsar={alPulsarBajar}>
+            {pedido ? 'Bajando…' : NOMBRES_DEL_QUIEBRO.mesa.bajar}
           </Boton>
         </div>
       </div>
@@ -356,33 +492,57 @@ export function Pausa({ vista, puerto, mover, relojHastaMs }: PropsDeLaPausa): J
   );
 }
 
-/* ─────────────────────────── El recuento y el final ─────────────────────────── */
+/* ─────────────────────────── El amanecer: el recuento y el final ─────────────────────────── */
 
 export interface PropsDelRecuento {
   readonly vista: VistaDelQuiebro;
   readonly puerto: PuertoDeMesa;
   readonly mover: Mover;
+  /** Dejar la mesa: en la Sala, levantarse y volver al vestíbulo; en la app, volver a ella. */
   readonly alOtraMesa: () => void;
 }
 
+/**
+ * EL AMANECER (26-sep, rehecho porque «la experiencia no es muy buena»): antes el final ofrecía de
+ * golpe los estilos, «Otra mesa», «Cerrar la mesa» y «Otra noche», y cerrar llevaba a una pantalla de
+ * mesa cerrada y de ahí a la mesa de la Sala, con su «Tirar la mesa». Ahora son DOS salidas, y las dos
+ * se quedan en el juego o salen del todo:
+ *
+ *   · OTRA NOCHE (la principal): la misma mesa, a la Bajada de la noche siguiente, que abre otra vez el
+ *     menú de la noche con los estilos. Se ofrece ya en el recuento: los 20 s del amanecer son para
+ *     mirar, pero quien quiera seguir no espera (`opcionesDeLaMesa`).
+ *   · SALIR: deja la mesa (`alOtraMesa`), sin pasar por la mesa cerrada ni por el plano.
+ *
+ * El estilo ya no se elige aquí: se elige en el menú de la noche, que es donde se elige siempre.
+ */
 export function Recuento({ vista, puerto, mover, alOtraMesa }: PropsDelRecuento): JSX.Element {
+  const [yendo, ponerYendo] = useState(false);
   const i = miIndice(vista, puerto.yo);
   const f = vista.fase;
   const ultima = vista.historial[vista.historial.length - 1];
   const resultado = f.tipo === 'recuento' ? f.resultado : (ultima?.resultado ?? null);
   const gana = resultado === 'ganada';
-  const esFinal = f.tipo === 'final';
   const otraNoche = laOpcion(puerto.opciones, MOVIMIENTO_DEL_QUIEBRO.otraNoche);
-  const cerrar = laOpcion(puerto.opciones, MOVIMIENTO_DEL_QUIEBRO.cerrar);
   const titulos = ultima !== undefined && vista.noche !== null && ultima.noche === vista.noche.numero ? ultima.titulos : [];
+  const pedirOtraNoche = async (): Promise<void> => {
+    if (otraNoche === null || yendo) return;
+    ponerYendo(true);
+    try {
+      await mover(otraNoche.tipo, otraNoche.carga);
+    } finally {
+      ponerYendo(false);
+    }
+  };
   return (
-    <div className="q-pantalla">
+    <div className="q-pantalla q-amanecer">
       <div className="q-hoja q-panel">
-        <h2>
-          {NOMBRES_DEL_QUIEBRO.fases.amanecer} · {NOMBRES_DEL_QUIEBRO.cuentas.noche} {String(vista.noche?.numero ?? '')}
-        </h2>
-        {resultado !== null ? <div className={gana ? 'q-resultado gana' : 'q-resultado pierde'}>{NOMBRES_DEL_QUIEBRO.resultados[resultado]}</div> : null}
-        {resultado !== null && !gana ? <p>{NOMBRES_DEL_QUIEBRO.pantalla.ciudadSeReinicia}.</p> : null}
+        <div className="cabeza">
+          <h2>
+            {NOMBRES_DEL_QUIEBRO.fases.amanecer} · {NOMBRES_DEL_QUIEBRO.cuentas.noche} {String(vista.noche?.numero ?? '')}
+          </h2>
+          {resultado !== null ? <div className={gana ? 'q-resultado gana' : 'q-resultado pierde'}>{NOMBRES_DEL_QUIEBRO.resultados[resultado]}</div> : null}
+          {resultado !== null && !gana ? <p>{NOMBRES_DEL_QUIEBRO.pantalla.ciudadSeReinicia}.</p> : null}
+        </div>
         <table className="q-tabla">
           <thead>
             <tr>
@@ -428,22 +588,17 @@ export function Recuento({ vista, puerto, mover, alOtraMesa }: PropsDelRecuento)
             {cifra(vista.mejorNoche.puntos)} ({NOMBRES_DEL_QUIEBRO.cuentas.noche.toLowerCase()} {String(vista.mejorNoche.noche)})
           </p>
         ) : null}
-        {esFinal ? (
-          <>
-            <Estilos vista={vista} codigo={puerto.codigo} yo={puerto.yo} opciones={puerto.opciones} mover={mover} />
-            <div className="q-fila derecha">
-              <Boton clase="q-boton secundario" alPulsar={alOtraMesa}>
-                {NOMBRES_DEL_QUIEBRO.mesa.otraMesa}
-              </Boton>
-              <Boton clase="q-boton" desactivado={cerrar === null} alPulsar={() => cerrar !== null && void mover(cerrar.tipo, cerrar.carga)}>
-                {NOMBRES_DEL_QUIEBRO.mesa.cerrarLaMesa}
-              </Boton>
-              <Boton clase="q-boton principal" desactivado={otraNoche === null} alPulsar={() => otraNoche !== null && void mover(otraNoche.tipo, otraNoche.carga)}>
-                {NOMBRES_DEL_QUIEBRO.mesa.otraNoche}
-              </Boton>
-            </div>
-          </>
-        ) : null}
+        <div className="q-fila derecha" style={{ alignItems: 'center' }}>
+          {otraNoche === null && f.tipo === 'final' && i >= 0 ? <span className="q-nota">Esta mesa ya ha jugado todas sus noches.</span> : null}
+          <Boton clase="q-boton secundario" alPulsar={alOtraMesa}>
+            Salir
+          </Boton>
+          {otraNoche !== null ? (
+            <Boton clase="q-boton principal" desactivado={yendo} alPulsar={() => void pedirOtraNoche()}>
+              {NOMBRES_DEL_QUIEBRO.mesa.otraNoche}
+            </Boton>
+          ) : null}
+        </div>
       </div>
     </div>
   );

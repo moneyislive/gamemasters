@@ -4,11 +4,11 @@
  *
  * ═══ QUÉ SE ENSEÑA EN CADA FASE ═══
  *
- *   reunión ........ la reunión (los estilos para mirar, EMPEZAR, el código de la mesa)
- *   bajada ......... la preparación: el rótulo del barrio, el reloj, estilo o BAJAR, y quién falta
+ *   reunión ........ el menú de la noche: el estilo, quién se sienta, el código de la mesa y BAJAR
+ *   bajada ......... el menú de la noche mientras no esté listo; luego, el rótulo y quién falta
  *   oleada, llamada  la pelea (`Combate.tsx`) y los mandos
  *   pausa .......... la pelea detrás y la elección del retoque (y el voto) delante
- *   recuento, final  el recuento; en el final, además, las tres salidas
+ *   recuento, final  el amanecer: el recuento, OTRA NOCHE y SALIR
  *   interrumpida ... Reanudar o Rendirse
  *   cerrada ........ la mesa cerrada
  *
@@ -19,9 +19,10 @@
  * (`Plano.tsx`, que se abre con el botón, tocando el minimapa o con la M), leyendo el mapa VIVO de la
  * partida (`red/orientarse.ts`). En el barrio no: cabe entero en la pantalla y no hay nada que buscar.
  *
- * Antes que todo eso, UNA VEZ por montaje: la azotea con BAJAR. Ese toque desbloquea el audio (diseño
- * §2.1, §9: el navegador no deja sonar hasta que la persona toca algo), y es también cuando se avisa,
- * la primera vez en un iPhone, de que el interruptor de silencio calla los golpes.
+ * Antes que todo eso, UNA VEZ por montaje: BAJAR, en el menú de la noche (`MenuDeLaNoche`), que hasta el
+ * 26-sep era una azotea aparte. Ese toque desbloquea el audio (diseño §2.1, §9: el navegador no deja
+ * sonar hasta que la persona toca algo), y es también cuando se avisa, la primera vez en un iPhone, de
+ * que el interruptor de silencio calla los golpes.
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { JSX, MutableRefObject } from 'react';
@@ -41,9 +42,9 @@ import { Combate } from './Combate';
 import { Minimapa } from './Minimapa';
 import { BotonDelPlano, Plano, usarLaTeclaDelPlano } from './Plano';
 import type { FuenteDelMapa, OrdenesDelMapa } from '../orientacion';
-import { cifra, miIndice } from './lectura';
+import { cifra, enLaPreparacion, miIndice } from './lectura';
 import type { Mover } from './Pantallas';
-import { Cerrada, Interrumpida, laOpcion, Pausa, Recuento, Reunion, RotuloDeLaBajada } from './Pantallas';
+import { Cerrada, Interrumpida, laOpcion, MenuDeLaNoche, Pausa, Recuento, RotuloDeLaBajada } from './Pantallas';
 
 export interface PropsDelHud {
   readonly vista: VistaDelQuiebro | null;
@@ -98,8 +99,12 @@ export function Hud(p: PropsDelHud): JSX.Element {
   useEffect(() => {
     if (plano) mandos.cancelarRayo();
   }, [plano, mandos]);
-  if (!p.bajado) return <Azotea alBajar={p.alBajar} />;
-  if (v === null) {
+  /*
+   * EL MENÚ DE LA NOCHE va en su propio hueco, el primero, y lo demás en el segundo: así sigue montado
+   * (con el estilo querido y el BAJAR pedido) al pasar la mesa de la reunión a la Bajada.
+   */
+  const enMenu = !p.bajado || (v !== null && enLaPreparacion(v, p.puerto.yo));
+  if (!enMenu && v === null) {
     return (
       <div className="q-pantalla">
         <div className="q-hoja q-panel" style={{ maxWidth: 520 }}>
@@ -109,35 +114,55 @@ export function Hud(p: PropsDelHud): JSX.Element {
       </div>
     );
   }
-  const f = v.fase.tipo;
+  const f = v?.fase.tipo ?? null;
   const enPelea = f === 'oleada' || f === 'llamada' || f === 'pausa' || f === 'bajada';
   const quedaDeLaPausa = p.partida?.sala.fase?.relojHastaMs ?? null;
+  const deLaFase =
+    enMenu || v === null ? null : (
+      <>
+        {enPelea && f !== 'bajada' ? <Combate vista={v} yo={p.puerto.yo} partida={p.partida} escena={p.escena} mandos={p.mandos} aprendiz={p.primeraNoche} tactil={p.tactil} ojo={p.ojo} /> : null}
+        {f === 'bajada' ? <RotuloDeLaBajada vista={v} rotulo={p.rotuloDelBarrio} puerto={p.puerto} mover={p.mover} bajada={p.bajada} /> : null}
+        {p.rotuloDeFase !== null && (f === 'oleada' || f === 'llamada') ? (
+          <div key={p.rotuloDeFase} className="q-rotulo q-rotulo-neon">
+            {p.rotuloDeFase}
+          </div>
+        ) : null}
+        {f === 'pausa' ? <Pausa vista={v} puerto={p.puerto} mover={p.mover} relojHastaMs={quedaDeLaPausa} /> : null}
+        {f === 'recuento' || f === 'final' ? <Recuento vista={v} puerto={p.puerto} mover={p.mover} alOtraMesa={p.alOtraMesa} /> : null}
+        {f === 'interrumpida' ? <Interrumpida puerto={p.puerto} mover={p.mover} /> : null}
+        {/* Con la mesa cerrada no queda nada que hacer en ella: se sale del todo, no al plano de la mesa. */}
+        {f === 'cerrada' ? <Cerrada alSalir={p.alOtraMesa} /> : null}
+        {conMapa && p.mapa !== null ? (
+          <>
+            <Minimapa fuente={p.mapa} zurdo={p.zurdo && p.tactil} alTocar={alternarElPlano} />
+            <BotonDelPlano abierto={plano} alAlternar={alternarElPlano} zurdo={p.zurdo && p.tactil} tactil={p.tactil} />
+            <Plano fuente={p.mapa} ordenes={p.mapa} abierto={plano} alCerrar={cerrarElPlano} />
+          </>
+        ) : null}
+        {p.marcador && enPelea ? <Marcador vista={v} puerto={p.puerto} partida={p.partida} /> : null}
+      </>
+    );
   return (
     <>
-      {enPelea && f !== 'bajada' ? <Combate vista={v} yo={p.puerto.yo} partida={p.partida} escena={p.escena} mandos={p.mandos} aprendiz={p.primeraNoche} tactil={p.tactil} ojo={p.ojo} /> : null}
-      {f === 'bajada' ? <RotuloDeLaBajada vista={v} rotulo={p.rotuloDelBarrio} puerto={p.puerto} mover={p.mover} bajada={p.bajada} /> : null}
-      {p.rotuloDeFase !== null && (f === 'oleada' || f === 'llamada') ? (
-        <div key={p.rotuloDeFase} className="q-rotulo q-rotulo-neon">
-          {p.rotuloDeFase}
-        </div>
+      {enMenu ? (
+        <MenuDeLaNoche
+          vista={v}
+          puerto={p.puerto}
+          mover={p.mover}
+          bajado={p.bajado}
+          alBajar={p.alBajar}
+          rotulo={p.rotuloDelBarrio}
+          bajada={p.bajada}
+          {...(p.enlaceParaEntrar === undefined ? {} : { enlaceParaEntrar: p.enlaceParaEntrar })}
+        />
       ) : null}
-      {f === 'reunion' ? <Reunion vista={v} puerto={p.puerto} mover={p.mover} {...(p.enlaceParaEntrar === undefined ? {} : { enlaceParaEntrar: p.enlaceParaEntrar })} /> : null}
-      {f === 'pausa' ? <Pausa vista={v} puerto={p.puerto} mover={p.mover} relojHastaMs={quedaDeLaPausa} /> : null}
-      {f === 'recuento' || f === 'final' ? <Recuento vista={v} puerto={p.puerto} mover={p.mover} alOtraMesa={p.alOtraMesa} /> : null}
-      {f === 'interrumpida' ? <Interrumpida puerto={p.puerto} mover={p.mover} /> : null}
-      {f === 'cerrada' ? <Cerrada alSalir={p.alSalir} /> : null}
-      {conMapa && p.mapa !== null ? (
-        <>
-          <Minimapa fuente={p.mapa} zurdo={p.zurdo && p.tactil} alTocar={alternarElPlano} />
-          <BotonDelPlano abierto={plano} alAlternar={alternarElPlano} zurdo={p.zurdo && p.tactil} tactil={p.tactil} />
-          <Plano fuente={p.mapa} ordenes={p.mapa} abierto={plano} alCerrar={cerrarElPlano} />
-        </>
+      {deLaFase}
+      {v !== null ? (
+        <Boton clase="q-menu-boton" etiqueta={NOMBRES_DEL_QUIEBRO.botones.menu} alPulsar={() => p.alMenu(!p.menu)}>
+          ≡
+        </Boton>
       ) : null}
-      {p.marcador && enPelea ? <Marcador vista={v} puerto={p.puerto} partida={p.partida} /> : null}
-      <Boton clase="q-menu-boton" etiqueta={NOMBRES_DEL_QUIEBRO.botones.menu} alPulsar={() => p.alMenu(!p.menu)}>
-        ≡
-      </Boton>
-      {p.menu ? <Menu {...p} /> : null}
+      {p.menu && v !== null ? <Menu {...p} /> : null}
       {p.avisoDelSilencio ? <div className="q-canal q-canal-arriba q-panel">{NOMBRES_DEL_QUIEBRO.pantalla.sinSonido}</div> : null}
       {/*
        * «GIRA EL TELÉFONO», SÓLO EN LA PELEA. La reunión, la preparación de la Bajada, la pausa, el recuento y
@@ -155,19 +180,6 @@ export function Hud(p: PropsDelHud): JSX.Element {
         </div>
       ) : null}
     </>
-  );
-}
-
-/** LA AZOTEA: el nombre, la frase y BAJAR. */
-function Azotea({ alBajar }: { readonly alBajar: () => void }): JSX.Element {
-  return (
-    <div className="q-azotea">
-      <div className="nombre-del-juego q-rotulo-neon">{NOMBRES_DEL_QUIEBRO.juego.nombre}</div>
-      <div className="frase">{NOMBRES_DEL_QUIEBRO.juego.cabeFrase}</div>
-      <Boton clase="q-boton principal" alPulsar={alBajar}>
-        {NOMBRES_DEL_QUIEBRO.botones.bajar}
-      </Boton>
-    </div>
   );
 }
 

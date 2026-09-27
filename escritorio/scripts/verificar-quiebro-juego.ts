@@ -120,8 +120,8 @@ import { PuertoDePrueba, PLAZO_DE_LA_MESA_S } from '../src/quiebro/red/puerto-de
 import { EstadoDeLosMandos, sinZonaMuerta, ZONA_MUERTA } from '../src/quiebro/mandos/estado';
 import { escucharElFondo, EVENTO_DEL_FONDO } from '../src/quiebro/mandos/fondo';
 import { engancharElTeclado } from '../src/quiebro/mandos/teclado';
-import { quienesFaltanEnLaBajada } from '../src/quiebro/hud/lectura';
-import { Reunion, RotuloDeLaBajada } from '../src/quiebro/hud/Pantallas';
+import { enLaPreparacion, queMandarAlBajar, quienesFaltanEnLaBajada } from '../src/quiebro/hud/lectura';
+import { MenuDeLaNoche, Recuento, RotuloDeLaBajada } from '../src/quiebro/hud/Pantallas';
 import type { PuertoDeMesa } from '../src/quiebro/contrato';
 import { anguloEntre, direccionHacia, elegirBlanco } from '../src/quiebro/mandos/enganche';
 import { camaraNueva, DISTANCIA_ABIERTA, DISTANCIA_AL_HOMBRO, encuadrar, FOV_PC, losaEnTresEjes } from '../src/quiebro/camara/encuadre';
@@ -1698,16 +1698,44 @@ await (async () => {
     suscribir: () => () => undefined,
   });
   const enLaReunion = vista();
-  const htmlDeLaReunion = renderToStaticMarkup(createElement(Reunion, { vista: enLaReunion, puerto: puertoDe(enLaReunion, 's1', [...opcionesDe('s1'), { id: 'estilo:ligera', tipo: 'estilo', carga: { id: 'ligera' }, rotulo: 'Ligera', ayuda: '' }], []), mover: async () => ({ resultado: 'hecho' as const, motivo: '' }), enlaceParaEntrar: 'http://x/sala/quiebro.html?prueba=1&codigo=QUIEB' }));
-  const tarjetasConBoton = (htmlDeLaReunion.match(/<button[^>]*class="q-tarjeta/g) ?? []).length;
-  comprobar(
-    'la reunión ENSEÑA los estilos sin un solo botón que mande (aunque le llegara la opción): el estilo se elige al bajar; y en el modo de prueba enseña la dirección de la segunda pestaña',
-    tarjetasConBoton === 0 && (htmlDeLaReunion.match(/class="q-tarjeta/g) ?? []).length === 3 && htmlDeLaReunion.includes('?prueba=1&amp;codigo=QUIEB'),
-    { tarjetasConBoton },
+  /*
+   * EL MENÚ DE LA NOCHE (26-sep): la azotea, la reunión y la preparación son UNA pantalla. En la reunión
+   * los tres estilos ya se pueden querer (se marcan sin mandar nada: el reductor no admite estilo hasta la
+   * Bajada) y hay un solo BAJAR; y lo que ese BAJAR manda en cada fase lo decide `queMandarAlBajar`, que
+   * se prueba aquí contra el reductor de verdad: cada opción que devuelve, la mesa la acepta.
+   */
+  const puertoDeLaReunion = puertoDe(enLaReunion, 's1', opcionesDe('s1'), []);
+  const htmlDelMenu = renderToStaticMarkup(
+    createElement(MenuDeLaNoche, { vista: enLaReunion, puerto: puertoDeLaReunion, mover: async () => ({ resultado: 'hecho' as const, motivo: '' }), bajado: false, alBajar: () => undefined, rotulo: null, bajada: new RelojDeLaBajada(), enlaceParaEntrar: 'http://x/sala/quiebro.html?prueba=1&codigo=QUIEB' }),
   );
-  mandar('s1', 'empezar', null);
-  mandar('s2', 'estilo', { id: 'mole' });
+  const tarjetasVivas = (htmlDelMenu.match(/<button[^>]*class="q-tarjeta[^"]*"[^>]*aria-disabled="false"/g) ?? []).length;
+  const botonesPrincipales = (htmlDelMenu.match(/class="q-boton principal"/g) ?? []).length;
+  comprobar(
+    'el menú de la noche, en la reunión: los TRES estilos se pueden querer, la Gabardina marcada, UN solo BAJAR y, en el modo de prueba, la dirección de la segunda pestaña',
+    tarjetasVivas === 3 && /q-tarjeta elegida[^>]*>.{0,80}Gabardina/i.test(htmlDelMenu) && botonesPrincipales === 1 && htmlDelMenu.includes(`>${NOMBRES_DEL_QUIEBRO.mesa.bajar}<`) && htmlDelMenu.includes('?prueba=1&amp;codigo=QUIEB'),
+    { tarjetasVivas, botonesPrincipales },
+  );
+  const alEmpezar = queMandarAlBajar(enLaReunion, 's1', opcionesDe('s1'), 'ligera');
+  comprobar(
+    'en la reunión BAJAR manda EMPEZAR (la opción que ofrece la mesa, tal cual), y el menú toca a todos, con o sin asiento',
+    alEmpezar?.tipo === 'empezar' && enLaPreparacion(enLaReunion, 's1') && enLaPreparacion(enLaReunion, null),
+    alEmpezar,
+  );
+  comprobar('la mesa acepta el EMPEZAR que manda BAJAR', alEmpezar !== null && mandar('s1', alEmpezar.tipo, alEmpezar.carga) === null);
+  const trasEmpezar = vista();
+  const alBajarConLigera = queMandarAlBajar(trasEmpezar, 's1', opcionesDe('s1'), 'ligera');
+  const alBajarConLaSuya = queMandarAlBajar(trasEmpezar, 's3', opcionesDe('s3'), null);
+  comprobar(
+    'en la Bajada BAJAR manda el estilo querido si no es el que ya lleva, y LISTO si es el suyo (o no ha querido ninguno)',
+    trasEmpezar.fase.tipo === 'bajada' && alBajarConLigera?.tipo === 'estilo' && (alBajarConLigera.carga as { id?: unknown } | null)?.id === 'ligera' && alBajarConLaSuya?.tipo === 'listo' && queMandarAlBajar(trasEmpezar, 's3', opcionesDe('s3'), 'gabardina')?.tipo === 'listo',
+    { alBajarConLigera, alBajarConLaSuya },
+  );
+  comprobar('la mesa acepta el estilo que manda BAJAR en la Bajada', mandar('s2', 'estilo', { id: 'mole' }) === null);
   const enLaBajada = vista();
+  comprobar(
+    'a quien ya está listo (elegir estilo ya es estarlo) el menú no le toca y BAJAR no manda nada; a quien no, sí',
+    !enLaPreparacion(enLaBajada, 's2') && queMandarAlBajar(enLaBajada, 's2', opcionesDe('s2'), 'ligera') === null && enLaPreparacion(enLaBajada, 's1'),
+  );
   const faltan = quienesFaltanEnLaBajada(enLaBajada);
   comprobar('en la Bajada faltan los que no han dicho que están listos (elegir estilo ya es estarlo), y fuera de ella nadie', faltan.join() === '0,2' && quienesFaltanEnLaBajada(enLaReunion).length === 0, faltan);
   const relojVisto = new RelojDeLaBajada();
@@ -1729,6 +1757,25 @@ await (async () => {
   comprobar(
     'a quien ya está listo, ni estilos ni BAJAR: se le dice «listo» y con qué estilo baja',
     !htmlDeS2.includes(`>${NOMBRES_DEL_QUIEBRO.mesa.bajar}<`) && !/<button[^>]*class="q-tarjeta/.test(htmlDeS2) && htmlDeS2.includes('Listo') && htmlDeS2.includes(NOMBRES_DEL_QUIEBRO.estilos.mole),
+  );
+
+  /*
+   * EL AMANECER (26-sep): dos salidas y ninguna más —OTRA NOCHE, que la mesa ofrece ya en el recuento, y
+   * SALIR—; ni estilos (se eligen en el menú de la noche) ni «Cerrar la mesa», que llevaba a la mesa
+   * cerrada y de ahí al plano de la Sala con «Tirar la mesa».
+   */
+  comprobar('rendirse lleva la noche al recuento', mandar('s1', 'rendirse', null) === null && vista().fase.tipo === 'recuento');
+  const enElRecuento = vista();
+  const htmlDelAmanecer = renderToStaticMarkup(createElement(Recuento, { vista: enElRecuento, puerto: puertoDe(enElRecuento, 's1', opcionesDe('s1'), []), mover: async () => ({ resultado: 'hecho' as const, motivo: '' }), alOtraMesa: () => undefined }));
+  comprobar(
+    'el amanecer ofrece OTRA NOCHE (la principal) y SALIR, sin estilos ni «Cerrar la mesa»',
+    htmlDelAmanecer.includes(`>${NOMBRES_DEL_QUIEBRO.mesa.otraNoche}<`) && htmlDelAmanecer.includes('>Salir<') && !htmlDelAmanecer.includes(NOMBRES_DEL_QUIEBRO.mesa.cerrarLaMesa) && !/class="q-tarjeta/.test(htmlDelAmanecer) && (htmlDelAmanecer.match(/class="q-boton principal"/g) ?? []).length === 1,
+    htmlDelAmanecer.slice(0, 300),
+  );
+  const otra = opcionesDe('s1').find((o) => o.tipo === 'otra-noche');
+  comprobar(
+    'OTRA NOCHE vuelve a la Bajada, donde el menú de la noche se abre otra vez para todos',
+    otra !== undefined && mandar('s1', otra.tipo, otra.carga) === null && vista().fase.tipo === 'bajada' && asientos.every((a) => enLaPreparacion(vista(), a)),
   );
 
   /* ── El ausente, el propio y el de los demás; y el aparato callado al fondo ── */
@@ -4396,4 +4443,4 @@ paso('14. El rayo en los mandos: el gesto, el cable, el apuntado, la cámara, la
   );
 }
 
-terminar(266);
+terminar(274);

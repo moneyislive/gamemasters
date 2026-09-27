@@ -854,6 +854,85 @@
   color: var(--q-codigo);
 }
 
+/*
+ * ─── El menú de la noche: la azotea, la reunión y la preparación en una (26-sep) ───
+ *
+ * Con el fondo de la azotea (el resplandor de sodio que sube de la calle) y la hoja de las pantallas de
+ * fase: el nombre en neón arriba, el estilo en medio y BAJAR abajo, pegado al borde al desplazar.
+ */
+.q-menu-noche {
+  background:
+    radial-gradient(ellipse at 50% 120%, rgba(255, 150, 50, 0.18), transparent 60%),
+    linear-gradient(180deg, rgba(2, 8, 7, 0.45), rgba(2, 6, 5, 0.88));
+}
+
+.q-menu-noche .q-hoja {
+  width: min(780px, 100%);
+}
+
+/* Un botón centra su contenido en vertical: la tarjeta de detalle más corto quedaba 7 px más abajo. */
+.q-menu-noche .q-tarjeta {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.q-menu-noche .cabeza,
+.q-amanecer .cabeza {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.q-menu-noche .nombre-del-juego {
+  font-size: clamp(30px, 6vw, 60px);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin-right: -0.3em;
+}
+
+.q-menu-noche .frase {
+  font-size: 13px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--q-codigo);
+}
+
+.q-menu-noche .lugar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.q-menu-noche .reloj {
+  font-family: var(--q-cifra);
+  font-size: 26px;
+  color: var(--q-texto);
+}
+
+.q-menu-noche .reloj.aprieta {
+  color: var(--q-ambar);
+}
+
+.q-menu-noche .q-codigo-mesa {
+  font-size: 20px;
+}
+
+/* ─── El amanecer: el resultado arriba y en grande, y dos salidas ─── */
+.q-amanecer {
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(255, 171, 64, 0.14), transparent 55%),
+    radial-gradient(ellipse at 50% 60%, rgba(2, 6, 5, 0.35), rgba(2, 6, 5, 0.85));
+}
+
+.q-amanecer .q-hoja {
+  width: min(720px, 100%);
+}
+
 /* ─── La Bajada ─── */
 
 .q-bajada {
@@ -960,6 +1039,22 @@
 
   .q-enlace {
     margin: 0;
+  }
+
+  .q-menu-noche .nombre-del-juego {
+    font-size: 26px;
+  }
+
+  .q-menu-noche .frase {
+    display: none;
+  }
+
+  .q-menu-noche .reloj {
+    font-size: 20px;
+  }
+
+  .q-menu-noche .q-tarjeta .nombre {
+    font-size: 16px;
   }
 
   .q-bajada {
