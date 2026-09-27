@@ -98,14 +98,21 @@ export function pasear(arena: Arena, desde: number, pasos: number, semilla: numb
     quien = pasoDelTic(arena, quien, rumbo, marcha);
     const movioX = quien.x !== antes.x;
     const movioZ = quien.z !== antes.z;
-    if (!movioX && !movioZ) {
-      /* El destino, calculado EXACTAMENTE como lo calcula `unPaso` (en el Burgo no hay vados). */
-      const v = marcha === CORRIENDO ? VELOCIDAD_CORRIENDO : VELOCIDAD_ANDANDO;
-      const dx = por(por(v, SENO[rumbo] as number), DT_DEL_TIC);
-      const dz = por(-por(v, COSENO[rumbo] as number), DT_DEL_TIC);
+    /* El destino, calculado EXACTAMENTE como lo calcula `unPaso` (en el Burgo no hay vados). */
+    const v = marcha === CORRIENDO ? VELOCIDAD_CORRIENDO : VELOCIDAD_ANDANDO;
+    const dx = por(por(v, SENO[rumbo] as number), DT_DEL_TIC);
+    const dz = por(-por(v, COSENO[rumbo] as number), DT_DEL_TIC);
+    if (quien.x !== antes.x + dx || quien.z !== antes.z + dz) {
+      /*
+       * Todo TROPIEZO —pararse en seco o resbalar— y no sólo la parada en seco, como en
+       * `paseo-del-banco.ts`: desde la talla a pie (`shared/mecanicas/talla.ts`) se anda a pasos de la
+       * mitad y se resbala alrededor de casi todo, y contando sólo las paradas en seco un paseante se
+       * quedaba en cero con los cuerpos funcionando.
+       */
       if (hayPiso(arena, antes.x + dx, antes.z + dz)) porCuerpo++;
       else porBorde++;
-    } else if (!movioX || !movioZ) resbalados++;
+      if (movioX !== movioZ) resbalados++;
+    }
     if (!hayPiso(arena, quien.x, quien.z)) fuera++;
     h = (h ^ quien.x) | 0;
     h = Math.imul(h, 2654435761) | 0;

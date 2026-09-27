@@ -773,7 +773,11 @@ function ensancheDelDelta(x: number, z: number): number {
       }
       let vadeo = false;
       let paradoEnElBorde = false;
-      for (let t = 0; t < 400; t++) {
+      /*
+       * Ochocientos tics: los cuatrocientos de antes a 12 u/s. Desde la talla a pie se anda a la mitad
+       * (`shared/mecanicas/andar.ts`), y desde las orillas más largas a cuatrocientos no se llegaba a lo hondo.
+       */
+      for (let t = 0; t < 800; t++) {
         const suelo = sueloEn(a, quien.x, quien.z);
         const despues = pasoDelTic(a, quien, rumbo, ANDANDO);
         const ddx = despues.x - quien.x;

@@ -83,7 +83,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RADIO_DEL_PASEANTE, rumboDeRadianes, VELOCIDAD_CORRIENDO } from '../../shared/mecanicas/andar';
+import { RADIO_DEL_PASEANTE, rumboDeRadianes, TICS_POR_SEGUNDO, VELOCIDAD_ANDANDO, VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR } from '../../shared/mecanicas/andar';
 import { canonico, porQueNoEsCanonico } from '../../shared/mecanicas/canonico';
 import { arenaDe, chocaConCuerpo, hayPiso, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Arena, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
@@ -122,6 +122,9 @@ import { CAIDO_MS, INTOCABLE_MS } from '../../shared/mecanicas/canal-de-botas';
 import { deNumero, por, UNO } from '../../shared/mecanicas/fijo';
 import { OBRAS_QUE_PARAN, RENACE_EN_EL_ANILLO, SEPARACION_ENTRE_SITIOS_DEL_BURGO, V_DE_LA_PRIMERA_FILA, V_DE_LA_SEGUNDA_FILA } from '../../shared/arcade/juegos/burgo-mundo';
 import type { ObraQueParaDelBurgo } from '../../shared/arcade/juegos/burgo-mundo';
+
+/** Los tics de andar que cubren 36 unidades a la velocidad de andar de hoy. */
+const TICS_AL_FRENTE = Math.ceil(36 / (VELOCIDAD_ANDANDO / UNO / TICS_POR_SEGUNDO));
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(AQUI, '..', '..');
@@ -909,8 +912,12 @@ function sePuedeNacer(arena: Arena, x: number, z: number): boolean {
     for (let k = 0; k < mundo.nace.length; k++) {
       const s = mundo.nace[k] as { x: number; z: number; rumbo: number };
       if (!sePuedeNacer(arena, s.x, s.z)) malos.push({ codigo, sitio: k, s });
-      /* Sesenta tics andando al frente: si a los pocos pasos hay una pared, se nace mirándola. */
-      const e = embestir(arena, { x0: 9999, z0: 9999, x1: 10000, z1: 10000 }, s, rumboDeRadianes(s.rumbo), 60);
+      /*
+       * Treinta y seis unidades andando al frente: si a los pocos pasos hay una pared, se nace mirándola. Eran
+       * sesenta tics a 12 u/s; desde la talla a pie se anda a la mitad (`andar.ts`), y lo que se vigila es la
+       * DISTANCIA libre por delante, así que los tics salen de ella.
+       */
+      const e = embestir(arena, { x0: 9999, z0: 9999, x1: 10000, z1: 10000 }, s, rumboDeRadianes(s.rumbo), TICS_AL_FRENTE);
       if (e.parado > 0 || e.avanzado < 30) contraLaPared.push({ codigo, sitio: k, parado: e.parado, avanzado: e.avanzado });
       /* Los de renacer, fuera del carril de la marcha: allí sólo las cuatro Puertas, que son de entrar. */
       if (k >= NACE_EN_EL_BURGO.length && pisaLaMarcha({ x0: s.x, z0: s.z, x1: s.x, z1: s.z })) enLaMarcha.push({ codigo, sitio: k, s });
@@ -940,7 +947,7 @@ function sePuedeNacer(arena: Arena, x: number, z: number): boolean {
    * tiene que ponerse rojo, no bajar con ella.
    */
   comprobar('están repartidos: en ninguna mesa hay dos a menos de 20', separacion >= 20 && SEPARACION_ENTRE_SITIOS_DEL_BURGO >= 20, { separacion, dondeSeparacion });
-  comprobar('y ninguno mira a una pared: sesenta tics al frente se andan sin pararse', contraLaPared.length === 0, contraLaPared.slice(0, 4));
+  comprobar(`y ninguno mira a una pared: ${String(TICS_AL_FRENTE)} tics al frente (36 unidades) se andan sin pararse`, contraLaPared.length === 0, contraLaPared.slice(0, 4));
   comprobar('y ninguno de los de renacer está sobre el carril de la marcha', enLaMarcha.length === 0, enLaMarcha.slice(0, 4));
   /* La vacuna: nacer en el centro de la glorieta es nacer dentro del pedestal. */
   comprobar('se ve fallar: en el centro de la glorieta está el pedestal', !sePuedeNacer(arenaDe(mundos.get('QWXYZ') as MundoDeclarado), 0, 0));
@@ -973,8 +980,13 @@ paso('5b · Se renace lejos de quien te tumbó y cerca de donde caíste, aunque 
  * es la de siempre: con sólo los de entrar, en la mayor parte del tablero no hay ninguno. Y el caso
  * medido, tal cual: cuatro en las Puertas que no bajan, y una pelea en la glorieta.
  */
-const LEJOS_AL_RENACER = por(VELOCIDAD_CORRIENDO, deNumero(INTOCABLE_MS / 1000)) / UNO;
-const CERCA_AL_RENACER = por(VELOCIDAD_CORRIENDO, deNumero(CAIDO_MS / 1000)) / UNO;
+/*
+ * Con la velocidad que ACEPTA el servidor (26,4 u/s) y no con la de correr del aparato de hoy (13,2): es
+ * la que usa el servidor para `LEJOS_AL_RENACER` (`server/src/botas/canal.ts`), porque quien te tumbó puede
+ * llevar la app 1.8.x y correr al doble. La regla protege lo mismo que protegía.
+ */
+const LEJOS_AL_RENACER = por(VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR, deNumero(INTOCABLE_MS / 1000)) / UNO;
+const CERCA_AL_RENACER = por(VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR, deNumero(CAIDO_MS / 1000)) / UNO;
 
 /**
  * LOS PUNTOS DE JUEGO: los de una rejilla de `paso` donde se puede estar y a los que se llega andando
