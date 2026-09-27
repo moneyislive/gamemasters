@@ -66,6 +66,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { QUIEBRO } from '../../../shared/arcade/juegos/quiebro';
 import type { ResultadoDelMovimiento } from '../../../escritorio/src/quiebro/contrato';
 import { servidorActual } from '../api';
+import { usarPantallaCompleta } from '../pantalla-completa';
 import { guardarElVeredicto } from './mesa';
 import { BOTON, LETRA, RADIO, SALA } from './muebles';
 import { ElRespaldo, LaMesaDeUnPintor, RedDelLienzo } from './pintor-propio';
@@ -192,6 +193,7 @@ export default function ElQuiebroPorDentro(): JSX.Element {
  */
 function LaNocheEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
   const { mesa, juego, laBarra } = pintor;
+  usarPantallaCompleta(); /* Sin barras del sistema mientras se juega; vuelven al salir. */
   const [enLaNoche, ponerEnLaNoche] = useState(true);
   const [cayo, ponerCayo] = useState<string | null>(null);
   /* Cada intento es una superficie nueva: la `key` la desmonta entera, con su documento. */

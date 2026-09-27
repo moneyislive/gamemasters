@@ -51,7 +51,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Share,
@@ -64,6 +63,7 @@ import type { LayoutChangeEvent } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { servidorActual } from '../api';
+import { confirmar } from '../confirmar';
 import { conAlfa } from '../tema';
 import { FIGURAS, figura as figuraPorId, figuraQueSePinta } from '../../../escenas/embarcadero/figuras';
 import type { FiguraId } from '../../../escenas/embarcadero/figuras';
@@ -661,10 +661,8 @@ function EnElMuelle({
         <Pressable
           style={estilos.mandoChico}
           onPress={() => {
-            Alert.alert('¿Tirar la mesa?', 'Se acaba la partida para todos los que estén sentados.', [
-              { text: 'No', style: 'cancel' },
-              { text: 'Tirarla', style: 'destructive', onPress: mesa.tirar },
-            ]);
+            /* `confirmar` y no `Alert.alert`, que en `/jugar` está vacío (ver `app/src/confirmar.ts`). */
+            confirmar('¿Tirar la mesa?', 'Se acaba la partida para todos los que estén sentados.', 'Tirarla', mesa.tirar);
           }}
           accessibilityRole="button"
           accessibilityLabel="Tirar la mesa para todos"

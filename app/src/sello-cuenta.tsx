@@ -295,10 +295,11 @@ function Fila({
 }
 
 const estilos = StyleSheet.create({
+  /* 44 y 12: los mínimos de `docs/PANTALLAS.md` §4, igual que los botones fantasma de al lado. */
   disco: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: ORO_TENUE,
     backgroundColor: 'rgba(5,13,9,0.35)',
@@ -322,10 +323,10 @@ const estilos = StyleSheet.create({
   puntoFuera: { backgroundColor: 'rgba(232,207,127,0.45)' },
   etiqueta: {
     marginTop: 4,
-    fontSize: 9,
-    letterSpacing: 1.1,
+    fontSize: 12,
+    letterSpacing: 1,
     color: 'rgba(232,207,127,0.75)',
-    maxWidth: 62,
+    maxWidth: 72,
     textAlign: 'center',
   },
 

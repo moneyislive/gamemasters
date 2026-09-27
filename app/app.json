@@ -82,6 +82,12 @@
       "expo-apple-authentication",
       "expo-asset",
       [
+        "expo-navigation-bar",
+        {
+          "style": "light"
+        }
+      ],
+      [
         "expo-screen-orientation",
         {
           "initialOrientation": "PORTRAIT_UP"

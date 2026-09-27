@@ -103,15 +103,18 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ComponentType } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
+import { BotonDePantallaCompleta } from '../pantalla-completa';
+import { confirmar } from '../confirmar';
 import { useLocalSearchParams } from 'expo-router';
 import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
 import type { ArcadeId } from '../../../shared/arcade';
@@ -529,6 +532,7 @@ export function LaMesaDeUnPintor({
           tirar={mesa.tirar}
           arriba={bordes.top}
           deBotas={esMesaDeBotas(vista)}
+          lados={{ izquierda: bordes.left, derecha: bordes.right }}
         />
       }
     />
@@ -781,6 +785,26 @@ function ElAviso({ texto }: { texto: string }): JSX.Element | null {
  * mesa: `LaMesaDeUnPintor`, una vez para todos sus pintores. Sin la prop no hay
  * marca, que es lo que decía la barra antes de que existiera.
  */
+/**
+ * ¿ES UNA PANTALLA BAJA? Por debajo de 520 de alto —un teléfono tumbado: 390 en un iPhone, 412 en
+ * un Android grande— el marco común de la mesa (la barra y la tarjeta del turno) se aprieta a un
+ * renglón cada una para dejarle la pantalla al tablero (`docs/PANTALLAS.md` §4.7: «tumbado se
+ * reparte distinto, no se amontona»). Se mide la VENTANA y no el aparato: un portátil con la
+ * ventana baja también la necesita. Exportada para que las pantallas de cada juego repartan lo
+ * suyo con el mismo corte.
+ */
+export const ALTO_DE_PANTALLA_APRETADA = 520;
+/*
+ * LA TARJETA DEL TURNO SE APRIETA ANTES QUE LA BARRA: por debajo de 720 —un 360×640, un iPhone SE
+ * de 667— la tarjeta de dos renglones y la barra de tres se quedaban 180 de 640, casi un tercio,
+ * y la tarjeta en un renglón sigue diciendo lo mismo. La barra no: en un teléfono de pie y
+ * estrecho, apretarla a un renglón cortaría el código de la mesa, que es imprescindible.
+ */
+export const ALTO_DE_TARJETA_APRETADA = 720;
+export function usarPantallaApretada(bajoDe: number = ALTO_DE_PANTALLA_APRETADA): boolean {
+  return useWindowDimensions().height < bajoDe;
+}
+
 function BarraDeLaMesa({
   juego,
   codigo,
@@ -788,6 +812,7 @@ function BarraDeLaMesa({
   salir,
   tirar,
   arriba,
+  lados,
   deBotas = false,
 }: {
   juego: string;
@@ -807,21 +832,67 @@ function BarraDeLaMesa({
    * inset vale 0 y la barra queda exactamente como estaba.
    */
   arriba: number;
+  /**
+   * LO QUE EL SISTEMA SE QUEDA A LOS LADOS: la muesca de un iPhone tumbado cae a la izquierda o a
+   * la derecha, y con 16 de relleno se comía el nombre del juego o el botón de «Tirar». Mismo
+   * trato que `arriba`: se suma, y sin muesca vale 0.
+   */
+  lados?: { izquierda: number; derecha: number };
 }): JSX.Element {
   const sentados = asientos.map((a) => `${a.nombre}${a.presente ? '' : ' (fuera)'}`);
+  const apretada = usarPantallaApretada();
+  const { width: anchoDeLaVentana } = useWindowDimensions();
+  /*
+   * ═══ EN UNA PANTALLA ESTRECHA O BAJA, LA BARRA ES UN RENGLÓN ═══
+   *
+   * Medido con el fotógrafo. Tumbado (844×390), la barra de tres renglones —110 de alto— y la
+   * tarjeta del turno se quedaban más de media pantalla. Y de pie en 360, con «Tirar mesa», el
+   * nombre del juego y el código se partían en dos renglones cada uno y la barra se comía 130 de
+   * 640. Por debajo de `ANCHO_DE_BARRA_COMPACTA` o de `ALTO_DE_PANTALLA_APRETADA`:
+   *
+   *   · el nombre y el código en UN renglón (el código sin «Mesa»: lo dice su etiqueta);
+   *   · los sentados fuera de la vista —ya están en el marcador de cada juego— y dentro de lo que
+   *     se oye, en la etiqueta del bloque;
+   *   · «Salir» y «Tirar mesa» como iconos de 44 con su etiqueta accesible entera, como el de
+   *     pantalla completa.
+   */
+  const compacta = apretada || anchoDeLaVentana < ANCHO_DE_BARRA_COMPACTA;
+  const gente = (
+    <Text style={estilos.gente} accessibilityLabel={`Sentados: ${sentados.join(', ')}`}>
+      {sentados.join(' · ')}
+    </Text>
+  );
   return (
-    <View style={[estilos.barra, { paddingTop: arriba + 14 }]}>
+    <View
+      style={[
+        estilos.barra,
+        compacta ? estilos.barraApretada : null,
+        {
+          paddingTop: arriba + (compacta ? 6 : 14),
+          paddingLeft: 16 + (lados?.izquierda ?? 0),
+          paddingRight: 16 + (lados?.derecha ?? 0),
+        },
+      ]}
+    >
       <View style={estilos.barraFila}>
-        <View style={estilos.mesaId}>
+        <View
+          style={[estilos.mesaId, compacta ? estilos.mesaIdApretada : null]}
+          accessible={compacta}
+          accessibilityLabel={
+            compacta
+              ? `${juego}, mesa ${codigo}${deBotas ? `, de ${MARCA_DE_BOTAS}` : ''}. Sentados: ${sentados.join(', ')}`
+              : undefined
+          }
+        >
           <Text style={estilos.mesaJuego}>{juego}</Text>
-          <Text style={estilos.codigo}>Mesa {codigo}</Text>
+          <Text style={estilos.codigo}>{compacta ? codigo : `Mesa ${codigo}`}</Text>
           {deBotas ? (
             <Text style={estilos.marcaDeBotas} accessibilityLabel={`Mesa de ${MARCA_DE_BOTAS}`}>
               {MARCA_DE_BOTAS}
             </Text>
           ) : null}
         </View>
-        <View style={estilos.mandos}>
+        <View style={[estilos.mandos, compacta ? estilos.mandosApretados : null]}>
           {/*
             SALIR TIENE QUE ESTAR AQUÍ Y NO SÓLO EN LA PANTALLA DE ERROR.
 
@@ -834,13 +905,20 @@ function BarraDeLaMesa({
           */}
           <Pressable
             onPress={salir}
-            style={estilos.salir}
+            style={[estilos.salir, compacta ? estilos.mandoDeIcono : null]}
             accessibilityRole="button"
             accessibilityLabel="Salir de esta pantalla sin dejar la mesa"
           >
-            <Text style={estilos.salirRotulo}>Salir</Text>
+            {compacta ? <IconoDeMando trazo={TRAZO_DE_SALIR} /> : <Text style={estilos.salirRotulo}>Salir</Text>}
           </Pressable>
-          <BotonTirar tirar={tirar} />
+          <BotonTirar tirar={tirar} compacto={compacta} />
+          {/*
+            PANTALLA COMPLETA, discreto y el último: en `/jugar` entra y sale de la
+            Fullscreen API; en el teléfono no se pinta, porque la partida ya la
+            tiene (`app/src/pantalla-completa.tsx`). Tampoco se pinta donde el
+            navegador no la da —el iPhone—.
+          */}
+          <BotonDePantallaCompleta />
         </View>
       </View>
       {/*
@@ -851,9 +929,28 @@ function BarraDeLaMesa({
         código. El texto de pantalla no cambia —quien la ve ya sabe qué es— y la
         etiqueta lo pone delante para quien no.
       */}
-      <Text style={estilos.gente} accessibilityLabel={`Sentados: ${sentados.join(', ')}`}>
-        {sentados.join(' · ')}
-      </Text>
+      {compacta ? null : gente}
+    </View>
+  );
+}
+
+/**
+ * Por debajo de este ancho la barra de la mesa va compacta (ver `BarraDeLaMesa`): los tres móviles
+ * de pie del fotógrafo —360, 375, 390— y el Android grande de 412. Una tableta de pie, 768, no.
+ */
+export const ANCHO_DE_BARRA_COMPACTA = 600;
+
+/* Los dos iconos de la barra compacta, en una caja de 20: una puerta con la flecha saliendo, y una papelera. */
+const TRAZO_DE_SALIR = 'M9 3H4v14h5M8 10h9M13 6l4 4-4 4';
+const TRAZO_DE_TIRAR = 'M3 5h14M8 5V3h4v2M5 5l1 12h8l1-12M8.5 8.5v5.5M11.5 8.5v5.5';
+
+/** Un icono de mando de la barra: trazo claro, sin relleno, en la tinta de «Salir». */
+function IconoDeMando({ trazo }: { trazo: string }): JSX.Element {
+  return (
+    <View pointerEvents="none">
+      <Svg width={20} height={20} viewBox="0 0 20 20">
+        <Path d={trazo} stroke={SALA.tenue} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
     </View>
   );
 }
@@ -922,20 +1019,26 @@ function LaCronica({ cronica }: { cronica: readonly AvisoDeMesa[] }): JSX.Elemen
  * porque las dos son una mesa viva. Tenerlo en una sola sería la misma asimetría
  * que se acaba de corregir, sólo que dentro del mismo cliente.
  */
-function BotonTirar({ tirar }: { tirar: () => void }): JSX.Element {
+function BotonTirar({ tirar, compacto = false }: { tirar: () => void; compacto?: boolean }): JSX.Element {
   return (
     <Pressable
       onPress={() => {
-        Alert.alert('¿Tirar la mesa?', 'Se acaba la partida para todos los que estén sentados.', [
-          { text: 'No', style: 'cancel' },
-          { text: 'Tirarla', style: 'destructive', onPress: tirar },
-        ]);
+        /* Con `confirmar` y no con `Alert.alert`, que en `/jugar` está vacío: el botón no hacía nada. */
+        confirmar('¿Tirar la mesa?', 'Se acaba la partida para todos los que estén sentados.', 'Tirarla', tirar);
       }}
-      style={estilos.salir}
+      style={[estilos.salir, compacto ? estilos.mandoDeIcono : null]}
       accessibilityRole="button"
       accessibilityLabel="Tirar la mesa para todos"
     >
-      <Text style={estilos.salirRotulo}>Tirar</Text>
+      {/*
+        «TIRAR MESA» Y NO «TIRAR» A SECAS. En El Burgo este botón queda a un palmo de los
+        dados, y «Tirar» se leía como «tirar los dados»: quien iba a tirar se encontraba
+        con la pregunta de acabar la partida para todos. Es lo mismo que la Sala escribe
+        «Tirar la mesa» (`escritorio/src/muelle.tsx`, `sala.tsx`), sin el artículo. En la
+        barra compacta es una papelera —tirar la mesa, no los dados— y lo que se oye es
+        la etiqueta entera.
+      */}
+      {compacto ? <IconoDeMando trazo={TRAZO_DE_TIRAR} /> : <Text style={estilos.salirRotulo}>Tirar mesa</Text>}
     </Pressable>
   );
 }
@@ -1025,10 +1128,29 @@ function LasOpciones({
 function LineaDelTurno({
   mesa,
   nombres,
+  cede = false,
 }: {
   mesa: { terminada: boolean; venceEn: number | null; turnoDesde: number; yo: string | null; vista: unknown };
   nombres: Map<string, string>;
+  /**
+   * EL JUEGO YA PINTA DE QUIÉN ES EL TURNO, y la tarjeta le cede el sitio.
+   *
+   * El Burgo enseña abajo su ficha «TURNO DE ANA · Puedes obrar…», y con la tarjeta común
+   * arriba la misma pantalla de 360×640 decía el turno DOS veces. Un pintor que pinta el suyo
+   * pasa `cede` y la tarjeta no se pinta… salvo cuando lleva un dato que la ficha del juego no
+   * tiene: la cuenta atrás de una mesa CON plazo, o que la partida ha terminado. Y aunque no se
+   * pinte, la región viva se queda (invisible): quien juega con lector de pantalla sigue oyendo
+   * el cambio de turno, que es para lo que existe. Sin `cede`, como siempre: los juegos que no
+   * pintan su turno no tienen nada que hacer.
+   */
+  cede?: boolean;
 }): JSX.Element | null {
+  /*
+   * En una pantalla baja (ver `ALTO_DE_TARJETA_APRETADA`) la tarjeta es UN renglón —rótulo, nombre y
+   * cuenta seguidos— y deja de ser la caja de 100 de alto que, sumada a la barra, se quedaba media
+   * pantalla de un móvil tumbado. Va antes de los `return`: es un hook.
+   */
+  const apretada = usarPantallaApretada(ALTO_DE_TARJETA_APRETADA);
   /*
    * SE DICE QUE HA TERMINADO, en vez de apagar la línea y no poner nada.
    *
@@ -1041,7 +1163,7 @@ function LineaDelTurno({
    */
   if (mesa.terminada) {
     return (
-      <View style={estilos.turnoCaja} accessible accessibilityRole="text">
+      <View style={[estilos.turnoCaja, apretada ? estilos.turnoCajaApretada : null]} accessible accessibilityRole="text">
         {/*
           RAÍL FRÍO, sin acento. Una partida terminada no pide nada a nadie, y el
           acento de esta identidad quiere decir exactamente lo contrario. Se queda
@@ -1049,7 +1171,7 @@ function LineaDelTurno({
           que hacer algo?» no se mueva al acabarse la partida.
         */}
         <View style={estilos.turnoRail} />
-        <View style={estilos.turnoCuerpo}>
+        <View style={[estilos.turnoCuerpo, apretada ? estilos.turnoCuerpoApretado : null]}>
           <Text style={estilos.terminada}>La partida ha terminado.</Text>
         </View>
       </View>
@@ -1095,6 +1217,9 @@ function LineaDelTurno({
    */
   const quien =
     turno.de === null ? 'Nadie todavía' : mio ? 'Te toca' : (nombres.get(turno.de) ?? 'Alguien');
+  /* La frase de la tarjeta apretada, que va sin el rótulo de encima y tiene que decirlo sola. */
+  const frase =
+    turno.de === null ? 'Nadie tiene el turno' : mio ? 'Te toca' : `Turno de ${nombres.get(turno.de) ?? 'alguien'}`;
 
   const cola =
     mesa.venceEn === null
@@ -1123,6 +1248,19 @@ function LineaDelTurno({
    * teñía —y se teñía, con `turnoMio` en neón— la línea gritaba con cuatro voces y
    * no se oía ninguna.
    */
+  if (cede && mesa.venceEn === null) {
+    /* Cede lo que se ve y se queda lo que se oye: la región viva, sin caja. Ver `cede`. */
+    return (
+      <View
+        style={estilos.turnoCedido}
+        accessible
+        accessibilityRole="text"
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={`${dequien} · ${cola}`}
+      />
+    );
+  }
+
   return (
     /*
       REGIÓN VIVA, que es lo que le faltaba a la línea mejor etiquetada de la
@@ -1133,20 +1271,36 @@ function LineaDelTurno({
       escribió esta línea.
     */
     <View
-      style={[estilos.turnoCaja, mio ? estilos.turnoCajaMia : null]}
+      style={[estilos.turnoCaja, apretada ? estilos.turnoCajaApretada : null, mio ? estilos.turnoCajaMia : null]}
       accessible
       accessibilityRole="text"
       accessibilityLiveRegion="polite"
       accessibilityLabel={`${dequien} · ${cola}`}
     >
       <View style={[estilos.turnoRail, mio ? estilos.turnoRailMio : null]} />
-      <View style={estilos.turnoCuerpo}>
-        <View style={estilos.turnoFila}>
-          <Text style={estilos.turnoEtiqueta}>Tiene el turno</Text>
+      {apretada ? (
+        /*
+          ═══ APRETADA: LA FRASE ENTERA, SIN RÓTULO Y SIN PUNTOS SUSPENSIVOS ═══
+
+          Iba en un renglón con los tres campos —«TIENE EL TURNO», el nombre y la cuenta—
+          y `numberOfLines={1}` en cada uno. Medido en 360×640: «TIENE EL TUR… · Te to… ·
+          LLEVA 3 M…», o sea que no se leía ninguno. Ahora el rótulo se va (la frase ya lo
+          dice: «Te toca», «Turno de Berto»), nada se corta, y si la cuenta no cabe al lado
+          baja al renglón de abajo en vez de comerse el nombre.
+        */
+        <View style={[estilos.turnoCuerpo, estilos.turnoCuerpoApretado]}>
+          <Text style={[estilos.turnoNombre, estilos.turnoNombreApretado]}>{frase}</Text>
           <Text style={estilos.turnoCola}>{cola}</Text>
         </View>
-        <Text style={estilos.turnoNombre}>{quien}</Text>
-      </View>
+      ) : (
+        <View style={estilos.turnoCuerpo}>
+          <View style={estilos.turnoFila}>
+            <Text style={estilos.turnoEtiqueta}>Tiene el turno</Text>
+            <Text style={estilos.turnoCola}>{cola}</Text>
+          </View>
+          <Text style={estilos.turnoNombre}>{quien}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -1378,8 +1532,15 @@ const estilos = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
   },
+  /*
+   * En una pantalla baja: menos relleno abajo, y el renglón del nombre lleva también a la gente
+   * sentada (sin cortarla: si no cabe, envuelve).
+   */
+  barraApretada: { paddingBottom: 6, gap: 0 },
   /* Envuelve a los dos por si el nombre del juego es largo: rompe en dos renglones. */
   mesaId: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', flexShrink: 1, gap: 10 },
+  /* Apretada, la gente viaja en el renglón del nombre; si no cabe, envuelve: nunca se corta con «…». */
+  mesaIdApretada: { rowGap: 0 },
   mesaJuego: { ...LETRA.rotulo, color: SALA.palabra, fontSize: 15 },
   /* El acento: es lo que se dicta por teléfono para que venga alguien. */
   codigo: { ...LETRA.rotuloChico, color: SALA.acento, fontSize: 13 },
@@ -1398,6 +1559,9 @@ const estilos = StyleSheet.create({
     overflow: 'hidden',
   },
   mandos: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  /* Compacta: tres iconos de 44 con 6 de aire; el renglón del nombre se queda con el resto. */
+  mandosApretados: { gap: 6 },
+  mandoDeIcono: { width: 44, paddingHorizontal: 0, alignItems: 'center' },
   /* 44 de alto: el mismo mínimo de dedo que el retablo aplica a sus figuras. */
   salir: {
     minHeight: 44,
@@ -1519,6 +1683,25 @@ const estilos = StyleSheet.create({
     fontSize: 22,
     lineHeight: 26,
   },
+  /*
+   * LA TARJETA EN UNA PANTALLA BAJA: el mismo contorno, el mismo raíl y el mismo halo cuando te
+   * toca, en un renglón de 36. El nombre baja a 17 —sigue siendo lo más grande de la línea— y la
+   * letra pequeña se queda en 13, el mínimo de la casa.
+   */
+  turnoCajaApretada: { marginTop: 6 },
+  turnoCuerpoApretado: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingVertical: 7,
+    columnGap: 12,
+    rowGap: 2,
+  },
+  /* Sin `flexShrink`: la frase no cede letras; si no cabe con la cuenta, la cuenta baja. */
+  turnoNombreApretado: { fontSize: 17, lineHeight: 21 },
+  /* La región viva de la tarjeta cedida: está en el árbol y no ocupa ni se ve. */
+  turnoCedido: { position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' },
   terminada: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 15, fontWeight: '700' },
 
   ayuda: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 13, textAlign: 'center', maxWidth: 320 },

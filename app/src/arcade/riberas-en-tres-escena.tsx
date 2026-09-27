@@ -225,6 +225,7 @@ import { semillaDelCodigo } from '../../../shared/mecanicas/semilla';
 import { Delta, encuadreDelDelta } from '../../../escenas/delta';
 import type { ModoDeCamaraDelDelta } from '../../../escenas/delta';
 import { asientosQueAndanPorElDelta } from '../../../escenas/delta-a-pie';
+import { salidaDelDelta } from '../../../escenas/salida-del-delta';
 import type { EstadoDelCanal } from '../../../escenas/paseo/canal-de-botas';
 /*
  * A PIE: la palanca y el correr escriben en una referencia que la escena lee en su bucle, la
@@ -289,20 +290,18 @@ import {
   LineaDelTurno,
 } from './tablero-en-linea';
 import { traer } from './traer';
+import { usarPantallaCompleta } from '../pantalla-completa';
 
 /** El azul del cielo de mediodía, que es también el color al que se funde la niebla. Ver `banco3d`. */
 const COLOR_DEL_CIELO = '#9ec9e2';
 
-/**
- * CUÁNTO ALTO SE LLEVA EL LIENZO: el 58 % de la pantalla y nunca menos de 360.
- *
- * Fijo y no elástico, al revés que la caja del `Retablo`: un `flex: 1` sin suelo se
- * encoge hasta cero antes de que nada se desplace, y un lienzo de tres dimensiones
- * a cero de alto es un contexto de GL que se crea y se destruye por nada. El pie
- * —opciones sueltas y crónica— es lo que cede y se desplaza por dentro.
+/*
+ * EL ALTO DEL LIENZO YA NO ES UNA FRACCIÓN. Era el 58 % de la pantalla con un suelo de 360, y
+ * con la cabeza de la partida encima eso SUMABA más que la pantalla: en 360×640 las cámaras y el
+ * pie quedaban fuera y la página rodaba; en 844×390 el lienzo empezaba a 280. Ahora el lienzo es
+ * `flex: 1` con un suelo de 200 (`cajaDelLienzo`) —el suelo sigue impidiendo el contexto de GL a
+ * cero de alto— y lo que cede es el pie, que tiene techo y rueda por dentro. Ver `tumbado`.
  */
-const PARTE_DEL_ALTO = 0.58;
-const ALTO_MINIMO_DEL_LIENZO = 360;
 
 /**
  * LA NOTA DE CUANDO SOIS MÁS DE CUATRO. El atlas del tablero sólo trae cuatro
@@ -482,11 +481,24 @@ export default function ElTableroEnTresPorDentro(): JSX.Element {
  * más de cuatro colonos, vista sin islas— se siguen decidiendo aquí, ANTES de montar el `Canvas`.
  */
 function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeElPintor): JSX.Element {
+  usarPantallaCompleta(); /* Sin barras del sistema mientras se juega; vuelven al salir. */
   const catalogo = usarCatalogoDelTablero();
   /* Si el lienzo cayó una vez en este aparato, esta pantalla no vuelve a montarlo. */
   const [elLienzoCayo, ponerElLienzoCayo] = useState<string | null>(null);
-  const { height: altoDeLaPantalla } = useWindowDimensions();
-  const altoDelLienzo = Math.max(ALTO_MINIMO_DEL_LIENZO, Math.round(altoDeLaPantalla * PARTE_DEL_ALTO));
+  /*
+   * ═══ TUMBADO, EL DELTA A LA IZQUIERDA Y LA PARTIDA A LA DERECHA (PANTALLAS §4.7) ═══
+   *
+   * Con la columna de siempre —turno, marcador, lienzo, cámaras, pie— el fotógrafo, el 27-sep, dio
+   * en 844×390 un lienzo que EMPEZABA a 280 puntos: se veía una franja de mar y la página rodaba.
+   * Tumbado sobra ancho y falta alto, así que la partida se pone al lado: el lienzo se lleva todo el
+   * alto que deja la barra de la mesa, y el turno, el marcador, las cámaras y el pie van en una
+   * columna que rueda por dentro. De pie la columna de siempre, con el lienzo llevándose lo que
+   * quede (`flex: 1`) en vez de un 58 % fijo que en 360×640 echaba las cámaras fuera de la pantalla.
+   */
+  const { width: anchoDeLaPantalla, height: altoDeLaPantalla } = useWindowDimensions();
+  const tumbado = anchoDeLaPantalla > altoDeLaPantalla;
+  const anchoDelLado = Math.round(Math.min(340, Math.max(260, anchoDeLaPantalla * 0.34)));
+  const [cronicaAbierta, ponerCronicaAbierta] = useState(false);
 
   /*
    * ═══ LO COGIDO VIVE AQUÍ, Y SE SUELTA CUANDO CAMBIA LA MESA ═══
@@ -628,18 +640,6 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
         : undefined,
     [esBotas, laVista, llaveDelAsiento, vista.asientos, vista.codigo, yo],
   );
-  /*
-   * UNA MESA DE BOTAS SE EMPIEZA A PIE, y por la MISMA puerta que los botones de cámara:
-   * `cambiarDeCamara` suelta lo cogido y recoge la mesa, que es lo que bajar tiene que hacer se baje
-   * como se baje. Una vez por mesa —se apunta su código—, y luego mandan los botones.
-   */
-  const bajadoEnLaMesa = useRef<string | null>(null);
-  useEffect(() => {
-    if (!esBotas || bajadoEnLaMesa.current === vista.codigo) return;
-    bajadoEnLaMesa.current = vista.codigo;
-    cambiarDeCamara('hombro');
-  }, [esBotas, vista.codigo, cambiarDeCamara]);
-
   /*
    * ═══ LAS ISLAS CONSERVAN SU IDENTIDAD ENTRE SONDEOS, Y ESO ES LO QUE NO TIEMBLA ═══
    *
@@ -893,6 +893,25 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
   }, [meTocaAhora, cogida, cogidaDelMazo, aPie]);
 
   /*
+   * UNA MESA DE BOTAS SE EMPIEZA A PIE, y por la MISMA puerta que los botones de cámara:
+   * `cambiarDeCamara` suelta lo cogido y recoge la mesa, que es lo que bajar tiene que hacer se baje
+   * como se baje. Una vez por mesa —se apunta su código—, y luego mandan los botones.
+   *
+   * VA DETRÁS DEL EFECTO DE ARRIBA, Y EL ORDEN ES EL ARREGLO. Los efectos corren en el orden en que
+   * se escriben, y en el primer render actúan los dos: sentarse en mi turno es un flanco de
+   * `meToca`, y aquel efecto, que aún ve `aPie` en falso, SACABA la mesa justo después de que éste
+   * la recogiera. Con el fotógrafo, el 27-sep: se empezaba a pie con la barra entera colgada
+   * debajo de la palanca y de «Golpear». Escrito aquí detrás, el último en hablar es bajar a andar,
+   * y la salida apuntada sigue apuntada: la mesa sale al volver a ella.
+   */
+  const bajadoEnLaMesa = useRef<string | null>(null);
+  useEffect(() => {
+    if (!esBotas || bajadoEnLaMesa.current === vista.codigo) return;
+    bajadoEnLaMesa.current = vista.codigo;
+    cambiarDeCamara('hombro');
+  }, [esBotas, vista.codigo, cambiarDeCamara]);
+
+  /*
    * EL ENCUADRE mide el MUNDO —lo grande que es el delta— y sólo se recalcula cuando
    * cambian las islas, que gracias a la firma de arriba es una vez por partida. Lo
    * que depende de la PANTALLA (retrato, apaisado) no entra aquí: lo resuelve
@@ -933,6 +952,36 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
     verElTableroEntero,
     laInterfazSeLoQueda,
   } = usarMiradorTactil(medida, encuadre?.alcance ?? 0, { apagado: aPie });
+
+  /*
+   * ═══ LA POSE DE SALIDA: EL DELTA ENTERO ENCIMA DE LA MESA (PANTALLAS §4.6) ═══
+   *
+   * `usarMiradorTactil` nace mirando al centro del delta desde la distancia de siempre, y en un
+   * lienzo apaisado eso deja la fila sur de comarcas detrás de la mesa de madera. La misma cuenta
+   * que el escritorio —`salidaDelDelta`, en `escenas/`, medible en Node— corre la mirada y ajusta
+   * el acercamiento para que el delta quepa entero entre el canto de arriba y la barra, y sin
+   * meterse bajo los naipes que asoman por los lados. Es el patrón del Burgo: se escribe en la
+   * referencia MIENTRAS NO SE HAYA MOVIDO NADIE, y «Tablero entero» (que deja `seHaMovido` en
+   * falso) la vuelve a poner. No se llama con el gesto: inclinar sigue siendo inclinar.
+   *
+   * Y SÓLO DEPENDE DEL LIENZO —las islas se reparten una vez por partida—: los naipes van y vienen
+   * con las jugadas, así que se les deja su tira SIEMPRE, y la cámara no salta con la revisión.
+   */
+  const laPoseDeSalida = useMemo(
+    () =>
+      datos === null || encuadre === null
+        ? null
+        : salidaDelDelta(datos.islas.map((i) => i.hex), encuadre.alcance, {
+            ancho: medida.ancho,
+            alto: medida.alto,
+            conManos: true,
+          }),
+    [datos, encuadre, medida.ancho, medida.alto],
+  );
+  useEffect(() => {
+    if (seHaMovido || laPoseDeSalida === null) return;
+    cercania.current = laPoseDeSalida;
+  }, [seHaMovido, laPoseDeSalida, cercania]);
 
   /* ─── Lo que se toca, traducido al movimiento que se manda ─── */
 
@@ -1361,21 +1410,33 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
   /* Quien pasea es quien está sentado en esta pantalla; un mirón pasea sin asiento. */
   const camara: ModoDeCamaraDelDelta = modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: yo ?? '' };
 
-  return (
-    <View style={estilos.todo}>
-      {laBarra}
+  /*
+   * LA CABEZA DE LA PARTIDA: de quién es el turno, el aviso y el marcador. De pie va encima del
+   * lienzo; tumbado, arriba de la columna de al lado. Se escribe una vez y se pone en uno de los dos
+   * sitios, para que no haya dos marcadores que se separen.
+   */
+  const cabeza = (
+    <>
       <LineaDelTurno mesa={vista} nombres={nombres} />
       <ElAviso texto={mesa.aviso} />
       {/*
         EL MARCADOR VA CON EL CROMO DE LA MESA Y NO ENCIMA DEL LIENZO. Es lo que se
         mira ANTES de decidir —quién va ganando, cuánto mazo queda—, no mientras se
         arrastra una pieza, y un panel flotante sobre el delta taparía tablero que se
-        toca justo cuando hace falta tocarlo. El lienzo mide lo mismo que antes: esta
-        franja se lleva su alto del pie, que es el que cede.
+        toca justo cuando hace falta tocarlo. En un teléfono va RECOGIDO —nombre y puntos,
+        un renglón— y se abre tocándolo: ver `ElMarcador`.
       */}
       <ElMarcador marcador={marcador} armaDe={armaDelColono} />
+    </>
+  );
 
-      <View style={[estilos.cajaDelLienzo, { height: altoDelLienzo }]}>
+  return (
+    <View style={estilos.todo}>
+      {laBarra}
+      <View style={tumbado ? estilos.mesaTumbada : estilos.mesaDePie}>
+      {tumbado ? null : cabeza}
+
+      <View style={estilos.cajaDelLienzo}>
         {catalogo.que === 'listo' ? (
           <RedDelLienzo juego={juego} alCaer={ponerElLienzoCayo}>
           {/* El mismo gesto siempre: a pie lo apaga su gancho (`apagado`). */}
@@ -1645,6 +1706,10 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
         ) : null}
       </View>
 
+      {/* Lo que no es el lienzo: debajo de él de pie, en su columna tumbado. */}
+      <View style={tumbado ? [estilos.ladoTumbado, { width: anchoDelLado }] : estilos.debajoDePie}>
+      {tumbado ? cabeza : null}
+
       {/*
         ═══ DESDE DÓNDE SE MIRA: LA MESA, AL HOMBRO O DESDE SUS OJOS ═══
 
@@ -1689,7 +1754,10 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
         `opcionesSueltas` aplica al retablo, y por lo mismo: cada movimiento se
         enseña exactamente una vez. El pie cede y se desplaza por dentro.
       */}
-      <ScrollView style={estilos.pieDeLaMesa} contentContainerStyle={{ paddingBottom: abajo }}>
+      <ScrollView
+        style={[estilos.pieDeLaMesa, tumbado ? estilos.pieTumbado : { maxHeight: Math.round(altoDeLaPantalla * 0.28) }]}
+        contentContainerStyle={{ paddingBottom: abajo }}
+      >
         {/*
           EL BOTÓN DE LA FORJA, el primero del pie: es un `hojaBoton`, el mismo que abre el
           componedor, porque es la misma clase de cosa —abre algo, no juega nada—. Dice lo que se
@@ -1711,8 +1779,26 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
         {fueraDelTablero.length > 0 ? (
           <LasOpciones opciones={fueraDelTablero} alTocar={mesa.mover} quieto={mesa.quieto} />
         ) : null}
-        <LaCronica cronica={mesa.cronica} />
+        {/*
+          LA CRÓNICA SE RECOGE: es lo que ha pasado, no lo que hay que hacer, y abierta siempre se
+          llevaba el alto que le faltaba al lienzo en 360×640 (fotógrafo, 27-sep). Un botón la abre y
+          la cierra, y el lienzo no cambia de tamaño al hacerlo: el pie tiene techo.
+        */}
+        <View style={estilos.forjaEnElPie}>
+          <Pressable
+            style={[estilos.camara, estilos.cronicaBoton, cronicaAbierta ? estilos.camaraPuesta : null]}
+            onPress={() => ponerCronicaAbierta(!cronicaAbierta)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: cronicaAbierta }}
+            accessibilityLabel={cronicaAbierta ? 'Cerrar la crónica de la partida' : 'Abrir la crónica de la partida'}
+          >
+            <Text style={estilos.camaraRotulo}>{cronicaAbierta ? 'Crónica ▴' : 'Crónica ▾'}</Text>
+          </Pressable>
+        </View>
+        {cronicaAbierta ? <LaCronica cronica={mesa.cronica} /> : null}
       </ScrollView>
+      </View>
+      </View>
     </View>
   );
 }
@@ -2455,12 +2541,26 @@ function ElMarcador({
   /** El arma de cada asiento, sólo en una mesa de botas: en la refriega se ve con qué va cada uno. */
   armaDe?: (asiento: string) => Arma | null;
 }): JSX.Element | null {
+  /*
+   * ═══ EN UN TELÉFONO, RECOGIDO: NOMBRE Y PUNTOS, Y EL RESTO A UN TOQUE ═══
+   *
+   * Cada ficha medía 105 puntos de alto —nombre, cifra, cartas y guardias, el vado, títulos— y en
+   * 360×640, sumada a la barra y al turno, le dejaba al delta menos de la mitad de la pantalla
+   * (fotógrafo, 27-sep). Lo que se mira a cada rato es quién va ganando: eso queda a la vista, en un
+   * renglón de 44. El resto —el vado, las guardias, los títulos— se abre con el «▾», que es el
+   * primer cuadrado de la cinta, y se vuelve a cerrar con el mismo. Lo que se OYE no cambia: cada
+   * ficha lleva su frase entera recogida o no.
+   */
+  const { width: ancho, height: alto } = useWindowDimensions();
+  const telefono = Math.min(ancho, alto) < 600;
+  const [abierto, ponerAbierto] = useState(false);
   if (marcador === null || marcador.colonos.length === 0) return null;
+  const recogido = telefono && !abierto;
   return (
     <ScrollView
       horizontal
       style={estilos.marcador}
-      contentContainerStyle={estilos.marcadorFila}
+      contentContainerStyle={[estilos.marcadorFila, recogido ? estilos.marcadorFilaRecogida : null]}
       showsHorizontalScrollIndicator={false}
     >
       {/*
@@ -2469,17 +2569,29 @@ function ElMarcador({
         puede salir un título. Puesto al final se iría fuera de la pantalla en cuanto
         se sentara el cuarto colono, que es justo cuando más se cuenta.
       */}
+      {/* «DETALLE» VA EL PRIMERO: al final se iba fuera de la pantalla detrás de las fichas, y no se sabía que existía. */}
+      {telefono ? (
+        <Pressable
+          style={[estilos.detalle, abierto ? estilos.componedorElegido : null]}
+          onPress={() => ponerAbierto(!abierto)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: abierto }}
+          accessibilityLabel={abierto ? 'Recoger el detalle del marcador' : 'Ver el detalle del marcador'}
+        >
+          <Text style={estilos.camaraRotulo}>{abierto ? '▴' : '▾'}</Text>
+        </Pressable>
+      ) : null}
       <View
-        style={estilos.mazo}
+        style={[estilos.mazo, recogido ? estilos.enRenglon : null]}
         accessible
         accessibilityRole="text"
         accessibilityLabel={`Quedan ${String(marcador.mazo)} cartas en el mazo`}
       >
         <Text style={estilos.marcadorRotulo}>Mazo</Text>
-        <Text style={estilos.mazoCifra}>{marcador.mazo}</Text>
+        <Text style={[estilos.mazoCifra, recogido ? estilos.cifraRecogida : null]}>{marcador.mazo}</Text>
       </View>
       {marcador.colonos.map((c) => (
-        <FichaDelColono key={c.asiento} colono={c} marcador={marcador} arma={armaDe?.(c.asiento) ?? null} />
+        <FichaDelColono key={c.asiento} colono={c} marcador={marcador} arma={armaDe?.(c.asiento) ?? null} recogida={recogido} />
       ))}
     </ScrollView>
   );
@@ -2507,11 +2619,14 @@ function FichaDelColono({
   colono,
   marcador,
   arma = null,
+  recogida = false,
 }: {
   colono: ColonoEnElMarcador;
   marcador: MarcadorEnTres;
   /** El arma que lleva, en una mesa de botas; `null` son los puños y no se escribe. */
   arma?: Arma | null;
+  /** En un teléfono, un renglón: el nombre, la cifra y lo que sólo cuento yo. Ver `ElMarcador`. */
+  recogida?: boolean;
 }): JSX.Element {
   const oculto = colono.puntosConLoOculto;
   const soloMios = oculto === null ? 0 : oculto - colono.puntos;
@@ -2556,6 +2671,15 @@ function FichaDelColono({
         persona sin leer un nombre.
       */}
       <View style={[estilos.fichaRail, { backgroundColor: colono.color }]} />
+      {recogida ? (
+        <View style={[estilos.fichaCuerpo, estilos.enRenglon]}>
+          <Text style={[estilos.fichaNombre, estilos.nombreRecogido]} numberOfLines={1}>
+            {colono.soyYo ? `${colono.nombre} (tú)` : colono.nombre}
+          </Text>
+          <Text style={[estilos.fichaPuntos, estilos.cifraRecogida]}>{colono.puntos}</Text>
+          {soloMios > 0 ? <Text style={estilos.fichaOculto}>{`+${String(soloMios)}`}</Text> : null}
+        </View>
+      ) : (
       <View style={estilos.fichaCuerpo}>
         <Text style={estilos.fichaNombre} numberOfLines={1}>
           {colono.soyYo ? `${colono.nombre} (tú)` : colono.nombre}
@@ -2579,6 +2703,7 @@ function FichaDelColono({
         {/* El arma, a pie en una mesa de botas: un renglón más, y sólo si lleva una. */}
         {arma !== null ? <Text style={estilos.fichaPremio}>{`Lleva ${FICHA_DEL_ARMA[arma].nombre.toLowerCase()}`}</Text> : null}
       </View>
+      )}
     </View>
   );
 }
@@ -2604,8 +2729,21 @@ const estilos = StyleSheet.create({
    * para que el telón y la hoja se recorten con ella. Sin fondo propio: el `Canvas`
    * pinta el cielo, y mientras no está, el telón pinta el suelo.
    */
-  cajaDelLienzo: { width: '100%', overflow: 'hidden' },
+  cajaDelLienzo: { flex: 1, minHeight: 200, overflow: 'hidden' },
   lienzo: { flex: 1 },
+  /*
+   * EL REPARTO DE LA MESA: de pie una columna (cabeza, lienzo, cámaras y pie), tumbada una fila
+   * (lienzo y columna de al lado). En las dos el lienzo es el único que crece: se lleva lo que
+   * quede, y lo demás mide lo suyo. Ver `tumbado` en `LaMesaEnTres`.
+   */
+  mesaDePie: { flex: 1 },
+  mesaTumbada: { flex: 1, flexDirection: 'row' },
+  debajoDePie: { flexGrow: 0, flexShrink: 0 },
+  ladoTumbado: { flexGrow: 0, flexShrink: 0, borderLeftWidth: 1, borderLeftColor: SALA.filo },
+  /* Tumbado, el pie se lleva lo que la columna deja y rueda por dentro. */
+  pieTumbado: { flexGrow: 1, flexShrink: 1 },
+  /* El botón de la crónica: el cromo de una cámara, a la izquierda y no a todo lo ancho. */
+  cronicaBoton: { alignSelf: 'flex-start' },
   /*
    * EL BOTÓN DE VOLVER AL TABLERO ENTERO: cromo sobre el lienzo, arriba y a la
    * IZQUIERDA. Que es la única esquina de las cuatro que la propia interfaz no usa.
@@ -2730,7 +2868,8 @@ const estilos = StyleSheet.create({
    * regla de lo elegido en esta Sala (`componedorElegido`): el acento lleno significa «esto es
    * lo que hay que tocar», y una cámara puesta no lo es.
    */
-  camaras: { flexGrow: 0, flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 6 },
+  /* Con `flexWrap`: en 360 de ancho, o en la columna de al lado tumbado, el canal de botas baja a su renglón en vez de cortarse («Dentro · ♥♥♥ · 1 …», fotógrafo 27-sep). */
+  camaras: { flexGrow: 0, flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 6 },
   camara: {
     minHeight: 44,
     justifyContent: 'center',
@@ -2747,7 +2886,7 @@ const estilos = StyleSheet.create({
    * botones, y con la tinta de lo que se lee —«Sin conexión» es justo lo que no se puede perder—.
    * Va sobre el suelo de la Sala, no sobre el delta, así que no le hace falta caja.
    */
-  canal: { ...LETRA.cuerpo, flex: 1, alignSelf: 'center', color: SALA.palabra, fontSize: 13, lineHeight: 18 },
+  canal: { ...LETRA.cuerpo, flexGrow: 1, flexBasis: 150, alignSelf: 'center', color: SALA.palabra, fontSize: 13, lineHeight: 18 },
   /*
    * LA HOJA: una ficha sobre el lienzo, pegada abajo. Teja con el contorno que se
    * ve —blanco al 40 %, 3,63 sobre la teja—, porque aquí sí se dibuja una caja.
@@ -2966,4 +3105,22 @@ const estilos = StyleSheet.create({
   fichaOculto: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 13 },
   fichaPie: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 13 },
   fichaPremio: { ...LETRA.rotuloChico, color: SALA.palabra, fontSize: 13 },
+  /*
+   * EL MARCADOR RECOGIDO: un renglón de 44 —el suelo de toque, aunque las fichas no se tocan, para
+   * que «Detalle» y ellas midan lo mismo—, con la cifra a 18 en vez de 22. Ver `ElMarcador`.
+   */
+  marcadorFilaRecogida: { paddingTop: 6, alignItems: 'center' },
+  enRenglon: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 42, paddingVertical: 0 },
+  nombreRecogido: { maxWidth: 110 },
+  cifraRecogida: { fontSize: 18 },
+  detalle: {
+    width: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.teja,
+  },
 });

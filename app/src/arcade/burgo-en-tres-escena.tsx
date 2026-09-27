@@ -251,6 +251,7 @@ import {
   LaHojaDelBurgo,
   LaHojaSobreElLienzo,
   usarLaSeccionAbierta,
+  ANCHO_DEL_CARRIL_SIN_ROTULO,
 } from './hojas-del-burgo';
 import { MandosDelPaseo } from './mandos-del-paseo';
 import { BotonDeGolpear } from './mandos-del-paseo';
@@ -272,6 +273,7 @@ import type { LoQueVeElPintor } from './pintor-propio';
 import { Retablo } from './retablo';
 import { hayAlgoQuePintar, LaCronica, LasOpciones, LineaDelTurno } from './tablero-en-linea';
 import { traer } from './traer';
+import { usarPantallaCompleta } from '../pantalla-completa';
 
 /**
  * CUÁNTO ALTO SE LLEVA EL LIENZO: TODO EL QUE QUEDA. Ya no hay fracción.
@@ -336,6 +338,10 @@ const ALTO_DE_LA_FRANJA_EN_LA_MESA = 44 + 8;
  * sale «Ver el burgo entero»; arriba a la derecha no hay nada. Objeto de módulo, como la cámara.
  */
 const SITIO_DE_LA_BANDEJA: SitioDeLaBandeja = { esquina: 'arriba-derecha', margen: 12 };
+/** Por debajo de este ancho de lienzo el pie va en una fila y la caja se encoge: ver `estrecho`. El mismo corte que `ElCarrilDeLaMesa`. */
+const ANCHO_ESTRECHO = ANCHO_DEL_CARRIL_SIN_ROTULO;
+/** La parte del ancho a la que se para la caja en un lienzo estrecho: con el 62 % mide la mitad de alto que a todo lo ancho. */
+const PARTE_DE_LA_CAJA_EN_ESTRECHO = 0.62;
 
 /** La clave con la que los pregones entran en la crónica del mueble. Ver `AvisoDeMesa`. */
 const CLAVE_DEL_PREGON = 'burgo:pregon';
@@ -381,6 +387,7 @@ interface QueHacesAqui {
  * `verify:app` lee con el árbol de TypeScript.
  */
 function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeElPintor): JSX.Element {
+  usarPantallaCompleta(); /* Sin barras del sistema mientras se juega; vuelven al salir. */
   /* Si el lienzo cayó una vez en este aparato, esta pantalla no vuelve a montarlo. */
   const [elLienzoCayo, ponerElLienzoCayo] = useState<string | null>(null);
   /* Y si el mundo no ha llegado, tampoco: la partida se juega sobre el retablo. */
@@ -439,6 +446,41 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
   const medir = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     ponerMedida({ ancho: width, alto: height });
+  }, []);
+  /*
+   * ═══ DÓNDE EMPIEZA EL PIE, PARA QUE LA MESA NO SE ENCUADRE DEBAJO DE ÉL (27-sep-2026) ═══
+   *
+   * El pie flota sobre el lienzo —carril, cinta y la franja de las cámaras encima—, y la pose de salida
+   * sólo sabía de la caja: medido con el fotógrafo en un teléfono de 360 × 640, la mitad de abajo del
+   * anillo quedaba detrás del carril y de la cinta. Se mide el alto del pie (su `onLayout`, en puntos
+   * del lienzo) y la franja de las cámaras se suma encima; todo eso va de estorbo a
+   * `poseDeSalidaAlLadoDeLaCaja`. Redondeado a 8 puntos, para que un renglón que cambia de alto no
+   * mueva la cámara con cada aviso.
+   */
+  const [arribaDelPie, ponerArribaDelPie] = useState<number | null>(null);
+  const medirElPie = useCallback((e: LayoutChangeEvent) => {
+    const y = Math.floor(e.nativeEvent.layout.y / 8) * 8;
+    ponerArribaDelPie((antes) => (antes === y ? antes : y));
+  }, []);
+  /* Tumbado, el carril y la cinta van en una fila y no uno encima del otro: ver `filaDelPieApaisada`. */
+  const apaisado = medida.ancho > medida.alto && medida.alto > 0;
+  /*
+   * ═══ UN TELÉFONO ESTRECHO DE PIE (360 × 640, iPhone SE): EL TABLERO LO MÁS GRANDE POSIBLE (27-sep-2026) ═══
+   *
+   * Medido con el fotógrafo en 360 × 640 con la barra de la mesa arriba: al lienzo le quedaban 430 puntos,
+   * y de ellos la caja se llevaba 130 arriba, el carril y la cinta 151 abajo y las cámaras 52 más: el
+   * anillo no cabía en NINGUNA pose (barrido en Node) y la cámara caía a la de la caja sola, con las
+   * cámaras encima de su canto de abajo. Así que, por debajo de `ANCHO_ESTRECHO`: el carril y la cinta
+   * van en UNA fila, como tumbado (el carril sin su rótulo, que se oye igual); la caja se para en el
+   * 62 % del ancho, y las cámaras van de estorbo con su rectángulo medido (`medirLasCamaras`).
+   */
+  const estrecho = medida.ancho > 0 && medida.ancho < ANCHO_ESTRECHO;
+  const pieEnFila = apaisado || estrecho;
+  const [lasCamarasEn, ponerLasCamarasEn] = useState<{ x: number; ancho: number } | null>(null);
+  const medirLasCamaras = useCallback((e: LayoutChangeEvent) => {
+    const { x, width } = e.nativeEvent.layout;
+    const nuevo = { x: Math.floor(x / 8) * 8, ancho: Math.ceil(width / 8) * 8 };
+    ponerLasCamarasEn((antes) => (antes !== null && antes.x === nuevo.x && antes.ancho === nuevo.ancho ? antes : nuevo));
   }, []);
 
   /* ─── De la vista a la escena, todo por `burgo-en-tres.ts` ─── */
@@ -659,6 +701,25 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
   const aPie = modo !== 'mesa';
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
   const camara = useMemo((): ModoDeCamara => (modo === 'mesa' ? CAMARA_DE_MESA : { modo, asiento: yo ?? '' }), [modo, yo]);
+  /*
+   * ═══ A PIE Y TUMBADO, LA CAJA SE ENCOGE (27-sep-2026) ═══
+   *
+   * Medido con el fotógrafo en 844 × 390: arriba a la derecha y con su alto de siempre, la caja bajaba
+   * hasta donde la franja del paseo pone «Golpear», y el botón caía encima de los dados. A pie, tumbado,
+   * se para en un tercio del ancho: sigue arriba a la derecha, se tira igual, y deja el aire libre por
+   * encima de los mandos. Y en un teléfono estrecho de pie, en la mesa y a pie, se para en el 62 % del
+   * ancho (ver `estrecho`): la mitad de alto que antes, y el tablero crece lo que ella deja. Si no, la
+   * de siempre.
+   */
+  const sitioDeLaBandeja = useMemo(
+    (): SitioDeLaBandeja =>
+      aPie && apaisado
+        ? { ...SITIO_DE_LA_BANDEJA, anchoMaximo: Math.round(medida.ancho / 3) }
+        : estrecho
+          ? { ...SITIO_DE_LA_BANDEJA, anchoMaximo: Math.round(medida.ancho * PARTE_DE_LA_CAJA_EN_ESTRECHO) }
+          : SITIO_DE_LA_BANDEJA,
+    [aPie, apaisado, estrecho, medida.ancho],
+  );
 
   /*
    * EL GESTO Y LA CÁMARA. El alcance es el del Burgo y no el del delta: 570,24 unidades de
@@ -737,15 +798,34 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    * pose de salida no deja casillas detrás de ella (`poseDeSalidaAlLadoDeLaCaja`) y «Ver el burgo
    * entero» baja debajo. Sin lienzo medido, nada.
    */
-  const rectanguloDeLaCaja = useMemo(
-    () => (medida.ancho > 0 && medida.alto > 0 ? poseDeLaBandeja(medida.ancho, medida.alto, CAMPO_DE_LA_CAMARA, SITIO_DE_LA_BANDEJA).rectangulo : null),
-    [medida.ancho, medida.alto],
+  /* La de la MESA, que es la que cuenta para su encuadre: a pie la caja se aparta distinto y la cámara de mesa no se usa. */
+  const sitioDeLaBandejaEnLaMesa = useMemo(
+    (): SitioDeLaBandeja => (estrecho ? { ...SITIO_DE_LA_BANDEJA, anchoMaximo: Math.round(medida.ancho * PARTE_DE_LA_CAJA_EN_ESTRECHO) } : SITIO_DE_LA_BANDEJA),
+    [estrecho, medida.ancho],
   );
+  const rectanguloDeLaCaja = useMemo(
+    () => (medida.ancho > 0 && medida.alto > 0 ? poseDeLaBandeja(medida.ancho, medida.alto, CAMPO_DE_LA_CAMARA, sitioDeLaBandejaEnLaMesa).rectangulo : null),
+    [medida.ancho, medida.alto, sitioDeLaBandejaEnLaMesa],
+  );
+  /*
+   * Lo que tapa el anillo por abajo: el pie entero, y encima de él las cámaras. Medidas, sólo su
+   * rectángulo (a su izquierda la franja es tablero); sin medir todavía, la franja entera.
+   */
+  const estorbos = useMemo(() => {
+    if (arribaDelPie === null || !(medida.ancho > 0 && medida.alto > 0)) return [];
+    const franja = Math.max(0, arribaDelPie - ALTO_DE_LA_FRANJA_EN_LA_MESA);
+    return [
+      { x0: 0, y0: arribaDelPie, x1: medida.ancho, y1: medida.alto },
+      lasCamarasEn === null
+        ? { x0: 0, y0: franja, x1: medida.ancho, y1: arribaDelPie }
+        : { x0: lasCamarasEn.x, y0: franja, x1: Math.min(medida.ancho, lasCamarasEn.x + lasCamarasEn.ancho), y1: arribaDelPie },
+    ];
+  }, [arribaDelPie, lasCamarasEn, medida.ancho, medida.alto]);
   useEffect(() => {
     if (seHaMovido) return;
     mirador.current = MIRADOR_DEL_BURGO;
-    cercania.current = poseDeSalidaAlLadoDeLaCaja(ventana, rectanguloDeLaCaja);
-  }, [seHaMovido, ventana, mirador, cercania, rectanguloDeLaCaja]);
+    cercania.current = poseDeSalidaAlLadoDeLaCaja(ventana, rectanguloDeLaCaja, estorbos);
+  }, [seHaMovido, ventana, mirador, cercania, rectanguloDeLaCaja, estorbos]);
 
   /*
    * ═══ SEGUIR AL QUE MUEVE: SE APAGA AL TOCAR Y SE ENCIENDE AL TURNO SIGUIENTE ═══
@@ -809,7 +889,21 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    * marcador dice una cosa y el tablero otra.
    */
   const [laEscenaVaDetras, ponerLaEscenaVaDetras] = useState(false);
+  /*
+   * CON LA MISMA REGLA QUE LA ESCENA, o el aviso no se va nunca. `Burgo.tsx` NO anima la primera
+   * vista que recibe ni una jugada que ya vio (`ultimaJugada`), y sólo avisa `alTerminarLaCola` de
+   * lo que encoló. Aquí se encendía con cualquier lista con sucesos: al abrir una mesa en marcha
+   * —la vista trae los de la última jugada— y en cada lectura de la misma jugada, el aviso se
+   * quedaba puesto para siempre (medido el 27-sep-2026: 40 s después, a 57 fotogramas por segundo).
+   */
+  const ultimaJugadaVista = useRef<number | null>(null);
   useEffect(() => {
+    if (ultimaJugadaVista.current === null) {
+      ultimaJugadaVista.current = sucesos.jugada;
+      return;
+    }
+    if (sucesos.jugada === ultimaJugadaVista.current) return;
+    ultimaJugadaVista.current = sucesos.jugada;
     if (sucesos.lista.length > 0) ponerLaEscenaVaDetras(true);
   }, [sucesos]);
   const alTerminarLaCola = useCallback(() => {
@@ -992,10 +1086,10 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    */
   const verElBurgoEntero = useCallback(() => {
     verElTableroEntero();
-    cercania.current = poseDeSalidaAlLadoDeLaCaja(ventana, rectanguloDeLaCaja);
+    cercania.current = poseDeSalidaAlLadoDeLaCaja(ventana, rectanguloDeLaCaja, estorbos);
     mirador.current = MIRADOR_DEL_BURGO;
     ponerSeguir(false);
-  }, [verElTableroEntero, cercania, mirador, ventana, rectanguloDeLaCaja]);
+  }, [verElTableroEntero, cercania, mirador, ventana, rectanguloDeLaCaja, estorbos]);
 
   /* ─── El pie, las hojas y el cajón, que son los mismos en las dos ramas ─── */
 
@@ -1069,7 +1163,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    * anillo dejaría de responder al gesto sin que se viera por qué.
    */
   const elPie = (sueltas: readonly OpcionDeMesa[]): JSX.Element => (
-    <View style={[estilos.pieDeLaMesa, { paddingBottom: abajo + 8 }]} pointerEvents="box-none">
+    <View style={[estilos.pieDeLaMesa, { paddingBottom: abajo + 8 }]} pointerEvents="box-none" onLayout={medirElPie}>
       {elCartel === null ? null : (
         <ElCartelDeLaCasilla
           cartel={elCartel}
@@ -1093,19 +1187,29 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
           <LasOpciones opciones={sueltas} alTocar={mesa.mover} quieto={mesa.quieto} />
         </ScrollView>
       ) : null}
-      <ElCarrilDeLaMesa carril={carril} quieto={mesa.quieto} alElegir={alElegirOpcion} />
       {/*
-        LA CINTA SE LLEVA TAMBIÉN EL AVISO DE LA MESA, y por eso ya no se monta
-        `ElAviso` en ninguna de las dos ramas: ver la cabecera del fichero. Es el
-        único mueble de esta pantalla que está SIEMPRE en el árbol y en las dos ramas,
-        que es lo que un aviso necesita para poder anunciarse.
+        TUMBADO, EL CARRIL Y LA CINTA EN UNA FILA (27-sep-2026). Medido con el fotógrafo en 844 × 390:
+        uno encima del otro sumaban 160 puntos de un lienzo de 290, y la cinta —el asa del cajón y de
+        quién es el turno— se salía por abajo. En fila miden lo que el más alto. Y también de pie en un
+        teléfono estrecho (`estrecho`), donde lo que se ahorra de alto es tablero. Si no, como estaban.
       */}
-      <LaCintaDelBurgo
-        cinta={hoja.cinta}
-        cajonAbierto={cajonAbierto}
-        alAlternarElCajon={alternarElCajon}
-        avisoDeLaMesa={mesa.aviso}
-      />
+      <View style={pieEnFila ? estilos.filaDelPieApaisada : estilos.filaDelPie} pointerEvents="box-none">
+        <ElCarrilDeLaMesa carril={carril} quieto={mesa.quieto} alElegir={alElegirOpcion} />
+        {/*
+          LA CINTA SE LLEVA TAMBIÉN EL AVISO DE LA MESA, y por eso ya no se monta
+          `ElAviso` en ninguna de las dos ramas: ver la cabecera del fichero. Es el
+          único mueble de esta pantalla que está SIEMPRE en el árbol y en las dos ramas,
+          que es lo que un aviso necesita para poder anunciarse.
+        */}
+        <View style={pieEnFila ? estilos.cintaApaisada : null}>
+          <LaCintaDelBurgo
+            cinta={hoja.cinta}
+            cajonAbierto={cajonAbierto}
+            alAlternarElCajon={alternarElCajon}
+            avisoDeLaMesa={mesa.aviso}
+          />
+        </View>
+      </View>
     </View>
   );
 
@@ -1430,7 +1534,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
                     mandos={mandos}
                     canal={canal}
                     alRecoger={alRecoger}
-                    bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
+                    bandejaDeLosDados={sitioDeLaBandeja}
                     reloj={relojDeArena}
                     alPasarElTurno={alPasarElTurno}
                     seguirAlQueMueve={seguirAlQueMueve}
@@ -1511,7 +1615,12 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
               anterior. Sin esta línea, el marcador dice una cosa y el tablero otra
               durante ocho segundos y no hay manera de saber cuál va bien.
             */}
-            {laEscenaVaDetras ? <Text style={estilos.alDia}>El burgo se está poniendo al día…</Text> : null}
+            {/*
+              TUMBADO, ARRIBA Y FUERA DE LA PILA (27-sep-2026): en 844 × 390 esta línea era lo que sobraba
+              para que la pila del pie cupiera, y el carril y la cinta se cortaban por abajo. Arriba a la
+              izquierda no tapa nada que se toque: la caja va a la derecha.
+            */}
+            {laEscenaVaDetras ? <Text style={[estilos.alDia, apaisado ? estilos.alDiaArriba : null]}>El burgo se está poniendo al día…</Text> : null}
             {/*
               CÓMO VA EL CANAL, sólo en una mesa de botas: «Conectando…», «Dentro», «Sin conexión: …».
               Aquí, encima de la franja del paseo, y no arriba a la izquierda como en Las Lindes: arriba
@@ -1546,7 +1655,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
               Con `box-none`, como el pie: lo que la franja no ocupa sigue siendo tablero.
             */}
             <View style={[estilos.franjaDelPaseo, aPie ? estilos.franjaAndando : null]} pointerEvents="box-none">
-              <View style={estilos.camaras} accessibilityRole="radiogroup" accessibilityLabel="Desde dónde se mira el burgo">
+              <View style={estilos.camaras} accessibilityRole="radiogroup" accessibilityLabel="Desde dónde se mira el burgo" onLayout={medirLasCamaras}>
                 {LAS_CAMARAS.map((c) => (
                   <Pressable
                     key={c.modo}
@@ -1684,6 +1793,10 @@ const estilos = StyleSheet.create({
    * Flotando, encima del lienzo, esto no hace nada.
    */
   pieDeLaMesa: { flexShrink: 1, gap: 8, paddingHorizontal: 12 },
+  /* El carril y la cinta: de pie, uno encima del otro; tumbado, en fila, con la cinta llevándose lo que sobra. */
+  filaDelPie: { gap: 8 },
+  filaDelPieApaisada: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
+  cintaApaisada: { flex: 1, minWidth: 0, justifyContent: 'flex-end' },
   /*
    * ═══ DÓNDE FLOTA EL PIE, Y POR QUÉ AHORA TIENE TECHO ═══
    *
@@ -1760,6 +1873,7 @@ const estilos = StyleSheet.create({
     borderColor: conAlfa(SALA.blanco, 0.4),
     backgroundColor: SALA.teja,
   },
+  alDiaArriba: { position: 'absolute', top: 8, left: 0 },
   /*
    * CÓMO VA EL CANAL, en una mesa de botas: la misma caja que «se está poniendo al día» y por lo
    * mismo —flota sobre el campo del burgo, y sin caja no hay contraste que se pueda medir—, pero con

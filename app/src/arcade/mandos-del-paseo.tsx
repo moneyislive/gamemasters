@@ -245,9 +245,13 @@ export function BotonDeGolpear({ mandos, visible }: BotonDeGolpearProps): JSX.El
         onTouchEnd={() => ponerApretado(false)}
         onTouchCancel={() => ponerApretado(false)}
       >
-        <Text style={[estilos.golpearTexto, apretado && estilos.golpearTextoApretado]} numberOfLines={1} adjustsFontSizeToFit>
-          Golpear
-        </Text>
+        {/*
+          «GOLPE» Y NO «GOLPEAR»: en 360 de ancho el botón mide 64 y «GOLPEAR» en caja alta a 13
+          no cabe —salía «GOLPE…»—, y `adjustsFontSizeToFit` no hace nada en la web. Cinco
+          letras caben enteras de 48 a 76 sin bajar de 12. Lo que se OYE sigue siendo «Golpear»
+          (`accessibilityLabel`), y sin `numberOfLines`: si algún día no cupiera, envuelve.
+        */}
+        <Text style={[estilos.golpearTexto, apretado && estilos.golpearTextoApretado]}>Golpe</Text>
       </View>
     </View>
   );
@@ -313,6 +317,6 @@ const estilos = StyleSheet.create({
     borderColor: 'rgba(243, 236, 216, 0.7)',
   },
   golpearApretado: { backgroundColor: '#f3ecd8', borderColor: '#f3ecd8' },
-  golpearTexto: { color: '#f3ecd8', fontSize: 13, ...LETRA.rotuloChico, letterSpacing: 0.6 },
+  golpearTexto: { color: '#f3ecd8', fontSize: 13, ...LETRA.rotuloChico, letterSpacing: 0.6, textAlign: 'center' },
   golpearTextoApretado: { color: '#1b2411' },
 });

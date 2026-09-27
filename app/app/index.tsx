@@ -506,12 +506,12 @@ export default function Portada(): JSX.Element {
           {/* Cambiar el avatar: el lápiz junto a la figura. */}
           <Pressable
             onPress={() => router.push('/avatar')}
-            hitSlop={10}
+            hitSlop={4}
             accessibilityRole="button"
             accessibilityLabel="Cambiar tu avatar"
-            style={[estilos.editarAvatar, { top: altoHero * 0.36, left: width / 2 + 66 }]}
+            style={[estilos.editarAvatar, { top: altoHero * 0.36 - 7, left: width / 2 + 59 }]}
           >
-            <Text style={{ fontSize: 14, color: color.oro300 }}>✎</Text>
+            <Text style={{ fontSize: 18, color: color.oro300 }}>✎</Text>
           </Pressable>
 
           <View style={estilos.pistaAbajo} pointerEvents="none">
@@ -1689,10 +1689,14 @@ const estilos = StyleSheet.create({
     color: 'rgba(232,207,127,0.75)',
     paddingTop: 10,
   },
+  /*
+   * 44 Y 12, LOS MÍNIMOS DE `docs/PANTALLAS.md` §4: eran 42 de disco y 9 de letra, medidos con el
+   * fotógrafo en los diez aparatos —la letra de 9 no se lee en un móvil, y 42 se queda corto de dedo—.
+   */
   fantasma: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: 'rgba(232,207,127,0.35)',
     backgroundColor: 'rgba(5,13,9,0.35)',
@@ -1701,8 +1705,8 @@ const estilos = StyleSheet.create({
   },
   fantasmaEtiqueta: {
     fontFamily: fuente.titulo,
-    fontSize: 9,
-    letterSpacing: 1.2,
+    fontSize: 12,
+    letterSpacing: 1,
     color: 'rgba(232,207,127,0.7)',
     textAlign: 'center',
     marginTop: 3,
@@ -1710,7 +1714,7 @@ const estilos = StyleSheet.create({
   rotuloSala: { position: 'absolute', left: espacio.lg, bottom: espacio.lg + 14 },
   rotuloSalaEyebrow: {
     fontFamily: fuente.titulo,
-    fontSize: 9.5,
+    fontSize: 12,
     letterSpacing: 2.4,
     color: 'rgba(217,201,163,0.55)',
   },
@@ -1722,11 +1726,12 @@ const estilos = StyleSheet.create({
     textShadowRadius: 8,
     textShadowOffset: { width: 0, height: 2 },
   },
+  /* 44 de dedo (era 30 con `hitSlop`: el toque llegaba, pero el blanco que se ve era de 30). */
   editarAvatar: {
     position: 'absolute',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: 'rgba(232,207,127,0.4)',
     backgroundColor: 'rgba(5,13,9,0.55)',

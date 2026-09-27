@@ -1100,10 +1100,24 @@ paso('El delta se puede mirar de cerca, recorrer, y siempre se puede volver');
    * quien está mirando una esquina de cerca se queda donde estaba aunque otro
    * juegue. Una cámara que salta con cada jugada ajena marea y hace imposible
    * construir. Se compra tocando la única forma que hay de moverla desde aquí.
+   *
+   * ═══ SALVO LA POSE DE SALIDA, QUE SÓLO DEPENDE DEL LIENZO (27-SEP) ═══
+   *
+   * Aquí se exigía que la pantalla no escribiera NUNCA la cercanía. Desde que mirar al centro
+   * dejaba la fila sur del delta detrás de la mesa en los apaisados, la pantalla escribe UNA vez
+   * la pose de salida (`salidaDelDelta`), como hace el Burgo, y sólo mientras nadie la ha movido.
+   * La intención de esta regla —que la cámara no salte con la revisión— se sigue comprando: la
+   * única escritura es ésa, y la pose depende de las islas y del TAMAÑO del lienzo, nunca de la
+   * vista, de la mano ni de las opciones.
    */
+  const escriturasDeLaCercania = codigoDeLaEscena.filter((l) => /cercania\.current\s*=[^=]/.test(l));
+  const lineasDeLaEscena = codigoDeLaEscena.join('\n');
   comprobar(
-    'la pantalla no escribe nunca la cercanía: la cámara no salta con la revisión de la mesa',
-    !codigoDeLaEscena.some((l) => /cercania\.current\s*=[^=]/.test(l)),
+    'la pantalla sólo escribe la cercanía con la pose de salida, que depende del tamaño del lienzo y no de la revisión: la cámara no salta cuando juega otro',
+    escriturasDeLaCercania.length === 1 &&
+      /cercania\.current = laPoseDeSalida;/.test(escriturasDeLaCercania[0] ?? '') &&
+      /const laPoseDeSalida = useMemo\([\s\S]*?\[datos, encuadre, medida\.ancho, medida\.alto\],\s*\);/.test(lineasDeLaEscena) &&
+      /if \(seHaMovido \|\| laPoseDeSalida === null\) return;/.test(lineasDeLaEscena),
     'la revisión cambia con cada jugada de cualquiera, y recolocar ahí es marear a quien construye',
   );
 }
@@ -1585,7 +1599,7 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
   );
   comprobar(
     'la ficha recibe el marcador entero, y ni el cinco ni el «de» se escriben en la pantalla',
-    /<FichaDelColono key=\{c\.asiento\} colono=\{c\} marcador=\{marcador\} arma=\{armaDe\?\.\(c\.asiento\) \?\? null\} \/>/.test(escena) &&
+    /<FichaDelColono key=\{c\.asiento\} colono=\{c\} marcador=\{marcador\} arma=\{armaDe\?\.\(c\.asiento\) \?\? null\}(?: recogida=\{recogido\})? \/>/.test(escena) &&
       !codigoDeLaEscena.some((l) => /vado\b[^\n]*\bde (5|\$\{)/.test(l)) &&
       !codigoDeLaEscena.some((l) => /`vado \$\{/.test(l)),
     'un cinco escrito aquí y otro en el escritorio se separan el día que la regla cambie',
@@ -2073,7 +2087,7 @@ paso('Riberas a pie en la app: la palanca sólo a pie, el mirador táctil apagad
         /LAS_CAMARAS\.map\(\(c\) => \([\s\S]*?onPress=\{\(\) => cambiarDeCamara\(c\.modo\)\}[\s\S]*?accessibilityState=\{\{ selected: modo === c\.modo \}\}/.test(c) &&
         botones > c.indexOf('</RedDelLienzo>') &&
         botones > c.indexOf('</GestureDetector>') &&
-        botones < c.indexOf('style={estilos.pieDeLaMesa}', botones)
+        botones < c.indexOf('estilos.pieDeLaMesa', botones)
       );
     },
     escena,
@@ -2098,7 +2112,7 @@ paso('Riberas a pie en la app: la palanca sólo a pie, el mirador táctil apagad
         (c.match(/style=\{estilos\.canal\}/g) ?? []).length === 1 &&
         tira > c.indexOf('</RedDelLienzo>') &&
         cartel > tira &&
-        cartel < c.indexOf('style={estilos.pieDeLaMesa}', tira)
+        cartel < c.indexOf('estilos.pieDeLaMesa', tira)
       );
     },
     escena,
@@ -4453,7 +4467,8 @@ paso('A pie en la app: el aviso al recoger en los tres juegos, la forja de Riber
     [riberas, lindes, burgo],
     [
       [riberas.replace("avisoDelHallazgo: { position: 'absolute', top: 12,", "avisoDelHallazgo: { position: 'absolute', bottom: 12,"), lindes, burgo],
-      [riberas, lindes.replace("avisoDelHallazgo: { position: 'absolute', top: 48,", "avisoDelHallazgo: { position: 'absolute', bottom: 16,"), burgo],
+      /* Las Lindes baja el cartel a 108 desde que las cámaras miden 44 y el canal va debajo de ellas (docs/PANTALLAS.md). */
+      [riberas, lindes.replace("avisoDelHallazgo: { position: 'absolute', top: 108,", "avisoDelHallazgo: { position: 'absolute', bottom: 16,"), burgo],
       [
         riberas,
         lindes,
@@ -4543,6 +4558,310 @@ paso('A pie en la app: el aviso al recoger en los tres juegos, la forja de Riber
   );
 }
 
+paso('La pantalla completa en la app: las cuatro pantallas de juego la piden, se devuelve al salir, y la web tiene su botón, su manifiesto y sus zonas seguras');
+{
+  /*
+   * ═══ QUÉ SE VIGILA AQUÍ (`docs/PANTALLAS.md` §4-§5) ═══
+   *
+   * El gancho común (`app/src/pantalla-completa.tsx` en el teléfono, `.web.tsx` en `/jugar`) se monta
+   * con una línea en el pintor de cada juego. Lo que se puede romper sin que falle nada: que una
+   * pantalla se quede sin la línea (la partida con barras, y nadie lo nota en el escritorio), que la
+   * línea se quede en un comentario, que el gancho deje de devolver las barras al desmontarse (la
+   * Sala entera sin barra de estado después de la primera partida), que la web se quede sin botón o
+   * que se lo pinte donde no hay API, y que la plantilla de `/jugar` pierda `viewport-fit=cover`,
+   * `100dvh` o el manifiesto. Cada regla va con sus envenenados: la regla se ve caer.
+   */
+  const soloCodigo = (texto) =>
+    texto
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const regla = (que, prueba, bueno, envenenados, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    envenenados.forEach((envenenado, i) => {
+      comprobar(
+        `y «${que}» se ve CAER con el caso envenenado ${String(i + 1)}`,
+        envenenado !== bueno && !prueba(envenenado),
+        envenenado === bueno ? 'el envenenado no ha cambiado el fichero: la regla no se está poniendo a prueba' : porque,
+      );
+    });
+  };
+  const APP_RAIZ = path.resolve(SRC, '..');
+
+  /* ── Las cuatro pantallas de juego: la línea, en el pintor y en código ── */
+  const PINTORES = [
+    { fichero: 'burgo-en-tres-escena.tsx', pintor: 'LaMesaEnTres' },
+    { fichero: 'riberas-en-tres-escena.tsx', pintor: 'LaMesaEnTres' },
+    { fichero: 'lindes-en-tres-escena.tsx', pintor: 'ElValleEnLaMesa' },
+    { fichero: 'quiebro-en-tres-escena.tsx', pintor: 'LaNocheEnLaMesa' },
+  ];
+  for (const { fichero, pintor } of PINTORES) {
+    const fuente = leer(path.join(SRC, 'arcade', fichero));
+    /* Dentro del pintor: desde su `function` hasta la siguiente función de arriba del módulo. */
+    const llamaEnElPintor = (t) => {
+      const c = soloCodigo(t);
+      const desde = c.indexOf(`\nfunction ${pintor}(`);
+      if (desde < 0) return false;
+      const siguiente = c.slice(desde + 1).search(/\n(export )?(default )?function /);
+      const cuerpo = siguiente < 0 ? c.slice(desde) : c.slice(desde, desde + 1 + siguiente);
+      return (
+        /import \{ usarPantallaCompleta \} from '\.\.\/pantalla-completa';/.test(c) &&
+        /\n {2}usarPantallaCompleta\(\);/.test(cuerpo)
+      );
+    };
+    regla(
+      `${fichero}: su pintor pide la pantalla completa con UNA línea —\`usarPantallaCompleta()\`—, la del gancho común`,
+      llamaEnElPintor,
+      fuente,
+      [
+        fuente.replace(/\n {2}usarPantallaCompleta\(\);[^\n]*/, ''),
+        fuente.replace(/\n {2}usarPantallaCompleta\(\);/, '\n  // usarPantallaCompleta();'),
+      ],
+      'sin la línea, esa partida se juega con la barra de estado y la de navegación encima: casi una quinta parte de un teléfono tumbado',
+    );
+  }
+
+  /* ── El gancho del teléfono: esconde con la pila de la barra de estado, y DEVUELVE al salir ── */
+  const nativo = leer(path.join(SRC, 'pantalla-completa.tsx'));
+  regla(
+    'en el teléfono el gancho esconde la barra de estado EN LA PILA y la de navegación en inmersivo, y al desmontarse las devuelve cuando ya no la pide ninguna pantalla',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /StatusBar\.pushStackEntry\(\{ hidden: true/.test(c) &&
+        /StatusBar\.popStackEntry\(entrada\)/.test(c) &&
+        /navegacionA\('hidden'\)/.test(c) &&
+        /function salirDeLaPartida\(\): void \{[\s\S]*?if \(pedidas > 0\) return;[\s\S]*?navegacionA\('visible'\);[\s\S]*?\n\}/.test(c) &&
+        /useEffect\(\(\) => \{\s*entrarEnLaPartida\(\);\s*return salirDeLaPartida;\s*\}, \[\]\);/.test(c) &&
+        !/StatusBar\.setHidden\(/.test(c)
+      );
+    },
+    nativo,
+    [
+      nativo.replace('return salirDeLaPartida;', ''),
+      nativo.replace("  navegacionA('visible');\n}", '}'),
+      nativo.replace(
+        "entrada = StatusBar.pushStackEntry({ hidden: true, animated: true, showHideTransition: 'fade' });",
+        'StatusBar.setHidden(true);',
+      ),
+    ],
+    'sin devolverlas, la Sala y la portada se quedan sin barra de estado tras la primera partida; con `setHidden` a pelo, el primer `<StatusBar>` que cambie la vuelve a enseñar en plena mesa',
+  );
+
+  /* ── El gancho de la web: primer toque en táctil, devolver sólo lo que puso, botón donde hay API ── */
+  const web = leer(path.join(SRC, 'pantalla-completa.web.tsx'));
+  regla(
+    'en `/jugar` se pide al primer toque sólo en táctil, se devuelve al salir sólo si la puso el juego, y el botón no se pinta donde no hay Fullscreen API',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /if \(pedidas > 1 \|\| !esTactil\(\) \|\| !hayPantallaCompleta\(\) \|\| enPantallaCompleta\(\)\) return;/.test(c) &&
+        /const GESTOS = \['pointerup', 'touchend'\] as const;/.test(c) &&
+        /if \(laPusoElJuego\) soltar\(\);/.test(c) &&
+        /useEffect\(\(\) => \{\s*entrarEnLaPartida\(\);\s*return salirDeLaPartida;\s*\}, \[\]\);/.test(c) &&
+        /if \(!hay\) return null;/.test(c)
+      );
+    },
+    web,
+    [
+      web.replace('if (pedidas > 1 || !esTactil() || ', 'if (pedidas > 1 || '),
+      web.replace('if (laPusoElJuego) soltar();', 'soltar();'),
+      web.replace('if (!hay) return null;', ''),
+      web.replace("const GESTOS = ['pointerup', 'touchend'] as const;", "const GESTOS = ['pointerdown'] as const;"),
+    ],
+    'en un ordenador quitaría las pestañas sin preguntar; al salir echaría de la pantalla completa a quien la puso a mano; en el iPhone pintaría un botón que no hace nada; y `pointerdown` con el dedo no cuenta como gesto',
+  );
+
+  /* ── La barra de la mesa monta el botón, y «Tirar» pregunta de verdad en la web ── */
+  const laBarraDeLaMesa = leer(path.join(SRC, 'arcade', 'tablero-en-linea.tsx'));
+  regla(
+    'la barra de la mesa monta el botón de pantalla completa junto a «Salir» y «Tirar», y «Tirar» pregunta con `confirmar` —el `Alert.alert` de la web está vacío—',
+    (t) => {
+      const c = soloCodigo(t);
+      const barra = /function BarraDeLaMesa\([\s\S]*?\n\}\n/.exec(c)?.[0] ?? '';
+      return (
+        /<BotonTirar tirar=\{tirar\}[^>]*\/>\s*<BotonDePantallaCompleta \/>/.test(barra) &&
+        /confirmar\('¿Tirar la mesa\?'/.test(c) &&
+        !/Alert\.alert\(/.test(c)
+      );
+    },
+    laBarraDeLaMesa,
+    [
+      laBarraDeLaMesa.replace(/\n\s*<BotonDePantallaCompleta \/>/, ''),
+      laBarraDeLaMesa.replace(
+        "confirmar('¿Tirar la mesa?', 'Se acaba la partida para todos los que estén sentados.', 'Tirarla', tirar);",
+        "Alert.alert('¿Tirar la mesa?', '', [{ text: 'Tirarla', onPress: tirar }]);",
+      ),
+    ],
+    'sin el botón no hay forma de pedir la pantalla completa en un ordenador; con `Alert.alert`, «Tirar» en `/jugar` no pregunta ni tira',
+  );
+  regla(
+    'y en una pantalla baja la barra y la tarjeta del turno se aprietan a un renglón, con la muesca de los lados sumada',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /export const ALTO_DE_PANTALLA_APRETADA = 520;/.test(c) &&
+        /const apretada = usarPantallaApretada\(\);/.test(c) &&
+        /const apretada = usarPantallaApretada\(ALTO_DE_TARJETA_APRETADA\);/.test(c) &&
+        /paddingLeft: 16 \+ \(lados\?\.izquierda \?\? 0\)/.test(c) &&
+        /lados=\{\{ izquierda: bordes\.left, derecha: bordes\.right \}\}/.test(c)
+      );
+    },
+    laBarraDeLaMesa,
+    [
+      laBarraDeLaMesa.replace('const apretada = usarPantallaApretada(ALTO_DE_TARJETA_APRETADA);', 'const apretada = false;'),
+      laBarraDeLaMesa.replace('lados={{ izquierda: bordes.left, derecha: bordes.right }}', ''),
+    ],
+    'tumbado, la barra y la tarjeta se quedaban 210 de 390 y el tablero asomaba en una franja; sin los lados, la muesca de un iPhone tumbado se come el nombre o «Tirar»',
+  );
+  /*
+   * ── Lo apretado se lee ENTERO, la tarjeta cede ante el turno que pinta el juego, y «Tirar mesa» ──
+   *
+   * La tarjeta apretada salía en 360×640 como «TIENE EL TUR… · Te to… · LLEVA 3 M…»: tres campos
+   * con `numberOfLines={1}` y ninguno legible. Ahora es la frase («Te toca», «Turno de Berto») y la
+   * cuenta, sin cortar nada, y ni la barra ni la tarjeta llevan un `numberOfLines`.
+   */
+  regla(
+    'la tarjeta del turno apretada dice la frase ENTERA —«Te toca», «Turno de …»— y la cuenta, y ni ella ni la barra cortan nada con «…»',
+    (t) => {
+      const c = soloCodigo(t);
+      const linea = /\nfunction LineaDelTurno\([\s\S]*?\n\}\n/.exec(c)?.[0] ?? '';
+      const barra = /\nfunction BarraDeLaMesa\([\s\S]*?\n\}\n/.exec(c)?.[0] ?? '';
+      return (
+        linea.length > 0 &&
+        barra.length > 0 &&
+        /mio \? 'Te toca' : `Turno de \$\{nombres\.get\(turno\.de\) \?\? 'alguien'\}`/.test(linea) &&
+        /<Text style=\{\[estilos\.turnoNombre, estilos\.turnoNombreApretado\]\}>\{frase\}<\/Text>/.test(linea) &&
+        !/numberOfLines/.test(linea) &&
+        !/numberOfLines/.test(barra)
+      );
+    },
+    laBarraDeLaMesa,
+    [
+      laBarraDeLaMesa.replace(
+        '<Text style={[estilos.turnoNombre, estilos.turnoNombreApretado]}>{frase}</Text>',
+        '<Text style={[estilos.turnoNombre, estilos.turnoNombreApretado]} numberOfLines={1}>{frase}</Text>',
+      ),
+      laBarraDeLaMesa.replace(
+        '<Text style={estilos.gente} accessibilityLabel',
+        '<Text style={estilos.gente} numberOfLines={1} accessibilityLabel',
+      ),
+    ],
+    'con `numberOfLines` en un renglón estrecho se corta lo que había que leer: medido en 360×640, los tres campos de la tarjeta a la vez',
+  );
+  regla(
+    'un pintor que pinta su propio turno puede pasar `cede`, y la tarjeta cede lo que se ve —salvo con plazo— pero no la región viva',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /cede = false,/.test(c) &&
+        /if \(cede && mesa\.venceEn === null\) \{\s*return \(\s*<View\s+style=\{estilos\.turnoCedido\}\s+accessible\s+accessibilityRole="text"\s+accessibilityLiveRegion="polite"/.test(c)
+      );
+    },
+    laBarraDeLaMesa,
+    [
+      laBarraDeLaMesa.replace('if (cede && mesa.venceEn === null) {', 'if (cede) {'),
+      laBarraDeLaMesa.replace(
+        'style={estilos.turnoCedido}\n        accessible\n        accessibilityRole="text"\n        accessibilityLiveRegion="polite"',
+        'style={estilos.turnoCedido}\n        accessible\n        accessibilityRole="text"',
+      ),
+    ],
+    'cediendo con plazo se pierde la cuenta atrás, que la ficha del juego no tiene; y sin la región viva el cambio de turno deja de oírse',
+  );
+  regla(
+    'el botón de acabar la mesa dice «Tirar mesa», no «Tirar» a secas, que junto a los dados del Burgo se lee como tirar los dados',
+    (t) => /<Text style=\{estilos\.salirRotulo\}>Tirar mesa<\/Text>/.test(soloCodigo(t)) && !/>Tirar<\/Text>/.test(soloCodigo(t)),
+    laBarraDeLaMesa,
+    [laBarraDeLaMesa.replace('<Text style={estilos.salirRotulo}>Tirar mesa</Text>', '<Text style={estilos.salirRotulo}>Tirar</Text>')],
+    'quien va a tirar los dados pulsa «Tirar» y le preguntan si quiere acabar la partida para todos',
+  );
+  regla(
+    'en un móvil de pie (menos de 600 de ancho) o tumbado, la barra es UN renglón: nombre y código juntos, sin los sentados a la vista, y «Salir» y «Tirar mesa» como iconos de 44 con su etiqueta entera',
+    (t) => {
+      const c = soloCodigo(t);
+      const barra = /\nfunction BarraDeLaMesa\([\s\S]*?\n\}\n/.exec(c)?.[0] ?? '';
+      return (
+        /export const ANCHO_DE_BARRA_COMPACTA = 600;/.test(c) &&
+        /const compacta = apretada \|\| anchoDeLaVentana < ANCHO_DE_BARRA_COMPACTA;/.test(barra) &&
+        /\{compacta \? null : gente\}/.test(barra) &&
+        /\{compacta \? <IconoDeMando trazo=\{TRAZO_DE_SALIR\} \/> : <Text style=\{estilos\.salirRotulo\}>Salir<\/Text>\}/.test(barra) &&
+        /<BotonTirar tirar=\{tirar\} compacto=\{compacta\} \/>/.test(barra) &&
+        /mandoDeIcono: \{ width: 44,/.test(c)
+      );
+    },
+    laBarraDeLaMesa,
+    [
+      laBarraDeLaMesa.replace('{compacta ? null : gente}', 'gente'),
+      laBarraDeLaMesa.replace('<BotonTirar tirar={tirar} compacto={compacta} />', '<BotonTirar tirar={tirar} />'),
+      laBarraDeLaMesa.replace('const compacta = apretada || anchoDeLaVentana < ANCHO_DE_BARRA_COMPACTA;', 'const compacta = apretada;'),
+    ],
+    'en 360 de pie, con «Tirar mesa» en letra, el nombre y el código se partían en dos renglones cada uno y la barra se comía 130 de 640',
+  );
+  const losMandos = leer(path.join(SRC, 'arcade', 'mandos-del-paseo.tsx'));
+  regla(
+    '«Golpe» cabe entero en el botón de 64 de un móvil de 360, sin cortarse ni bajar de 12, y lo que se oye sigue siendo «Golpear»',
+    (t) => {
+      const c = soloCodigo(t);
+      const boton = /export function BotonDeGolpear\([\s\S]*?\n\}\n/.exec(c)?.[0] ?? '';
+      return (
+        /estilos\.golpearTextoApretado\]\}>Golpe<\/Text>/.test(boton) &&
+        !/numberOfLines/.test(boton) &&
+        /accessibilityLabel="Golpear"/.test(boton) &&
+        /golpearTexto: \{[^}]*fontSize: 1[2-9]\b/.test(c)
+      );
+    },
+    losMandos,
+    [
+      losMandos.replace('estilos.golpearTextoApretado]}>Golpe</Text>', 'estilos.golpearTextoApretado]} numberOfLines={1}>Golpear</Text>'),
+      losMandos.replace("golpearTexto: { color: '#f3ecd8', fontSize: 13,", "golpearTexto: { color: '#f3ecd8', fontSize: 10,"),
+    ],
+    '«GOLPEAR» en caja alta no cabe en 64 y salía «GOLPE…»; y bajarla de 12 la hace ilegible en el móvil',
+  );
+
+  /* ── La plantilla de `/jugar`, el manifiesto y el complemento nativo ── */
+  const plantilla = leer(path.join(APP_RAIZ, 'public', 'index.html'));
+  regla(
+    'la plantilla de `/jugar` llega bajo la muesca (`viewport-fit=cover`), mide `100dvh`, y trae el manifiesto y las metas de aplicación web del iPhone',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /<meta name="viewport" content="[^"]*viewport-fit=cover[^"]*" \/>/.test(c) &&
+        /height: 100dvh;/.test(c) &&
+        /<link id="manifiesto" rel="manifest" href="\/jugar\/manifest\.webmanifest" \/>/.test(c) &&
+        /<meta name="apple-mobile-web-app-capable" content="yes" \/>/.test(c)
+      );
+    },
+    plantilla,
+    [
+      plantilla.replace(', viewport-fit=cover', ''),
+      plantilla.replace('height: 100dvh;', ''),
+      plantilla.replace('<meta name="apple-mobile-web-app-capable" content="yes" />', ''),
+    ],
+    'sin `viewport-fit` las zonas seguras miden cero; con `100vh` el pie del juego queda bajo la barra del navegador; y sin las metas el iPhone no tiene pantalla completa de ninguna manera',
+  );
+  const manifiestoWeb = (() => {
+    try {
+      return JSON.parse(leer(path.join(APP_RAIZ, 'public', 'manifest.webmanifest')));
+    } catch {
+      return null;
+    }
+  })();
+  comprobar(
+    'el manifiesto de `/jugar` pide `display: fullscreen` y empieza en `/jugar/`',
+    manifiestoWeb?.display === 'fullscreen' && manifiestoWeb?.start_url === '/jugar/',
+    manifiestoWeb,
+  );
+  const appJson = JSON.parse(leer(path.join(APP_RAIZ, 'app.json')));
+  const paquete = JSON.parse(leer(path.join(APP_RAIZ, 'package.json')));
+  comprobar(
+    '`expo-navigation-bar` está instalado y su complemento en `app.json` (pide APK nuevo)',
+    typeof paquete.dependencies?.['expo-navigation-bar'] === 'string' &&
+      (appJson.expo?.plugins ?? []).some((p) => (Array.isArray(p) ? p[0] : p) === 'expo-navigation-bar'),
+    { dependencia: paquete.dependencies?.['expo-navigation-bar'] ?? null },
+  );
+}
+
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», el mismo que llevan el servidor y la escena.
  *
@@ -4581,7 +4900,56 @@ paso('A pie en la app: el aviso al recoger en los tres juegos, la forja de Riber
  * Y treinta y cinco de lo que se hace a pie —el aviso al recoger, la forja y la leva—, veintidós de
  * ellas vacunas: el guardia sube con ellas.
  */
-const COMPROBACIONES_ESCRITAS = 369;
+/*
+ * Y treinta y tres de la pantalla completa en la app —la línea en las cuatro pantallas, devolver las
+ * barras al salir, el botón y el primer toque de la web, la barra apretada y la plantilla de
+ * `/jugar`—, veinticinco de ellas vacunas: el guardia sube con ellas.
+ */
+/*
+ * «EL BURGO SE ESTÁ PONIENDO AL DÍA…» SE ENCIENDE CON LA MISMA REGLA CON QUE LA ESCENA ENCOLA.
+ *
+ * `escenas/burgo/Burgo.tsx` no anima la primera vista ni una jugada que ya vio, y sólo avisa de que
+ * acabó lo que encoló. La pantalla lo encendía con cualquier lista con sucesos: al abrir una mesa en
+ * marcha el aviso se quedaba para siempre (27-sep-2026, 40 s a 57 fotogramas por segundo).
+ */
+paso('El Burgo en la app: el aviso de «poniéndose al día» sigue la regla de la escena y se apaga');
+{
+  const escena = leer(path.join(SRC, 'arcade', 'burgo-en-tres-escena.tsx'));
+  const sinComentarios = (t) =>
+    t
+      .split('\n')
+      .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+      .join('\n');
+  const prueba = (t) => {
+    const c = sinComentarios(t);
+    return (
+      /if \(ultimaJugadaVista\.current === null\) \{\s*ultimaJugadaVista\.current = sucesos\.jugada;\s*return;\s*\}/.test(c) &&
+      /if \(sucesos\.jugada === ultimaJugadaVista\.current\) return;/.test(c) &&
+      !/useEffect\(\(\) => \{\s*if \(sucesos\.lista\.length > 0\) ponerLaEscenaVaDetras\(true\);\s*\}, \[sucesos\]\);/.test(c)
+    );
+  };
+  comprobar(
+    'el aviso no se enciende con la primera vista ni con una jugada ya vista, como no las encola la escena',
+    prueba(escena),
+    'si se enciende con algo que la escena no encola, `alTerminarLaCola` no llega nunca y el aviso se queda puesto',
+  );
+  const envenenado = escena.replace(
+    /const ultimaJugadaVista = useRef<number \| null>\(null\);\s*useEffect\(\(\) => \{[\s\S]*?\}, \[sucesos\]\);/,
+    'useEffect(() => {\n    if (sucesos.lista.length > 0) ponerLaEscenaVaDetras(true);\n  }, [sucesos]);',
+  );
+  comprobar(
+    'y la regla se ve CAER con el código de antes',
+    envenenado !== escena && !prueba(envenenado),
+    'una regla que no se ve caer puede estar mirando otra cosa',
+  );
+}
+
+/*
+ * Y once más de lo común de la app: la tarjeta apretada sin «…», la tarjeta que cede ante el turno
+ * que pinta el juego, «Tirar mesa» y «Golpe» entero en 360. El guardia sube con ellas. Y cuatro
+ * de la barra compacta en un renglón (de pie por debajo de 600, y tumbado).
+ */
+const COMPROBACIONES_ESCRITAS = 419;
 
 if (fallos.length > 0) {
   console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);

@@ -80,7 +80,7 @@ import type { ReactNode } from 'react';
  * qué se pinta ni cómo se juega — eso es lo que la pantalla del Burgo tiene prohibido,
  * y `verify:sala` lo vigila allí.
  */
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { BURGO } from '../../../shared/arcade/juegos';
 import {
   EL_CARRIL_DE_LA_MESA,
@@ -356,24 +356,36 @@ export function LaCintaDelBurgo({
   /* Lo que se acaba de pulsar y no ha llegado manda sobre lo que hay que esperar. Ver la cabecera. */
   const dicho =
     avisoDeLaMesa.length > 0 ? avisoDeLaMesa : cinta.aviso.length > 0 ? cinta.aviso : cinta.espera;
+  /*
+   * EN UN TELÉFONO ESTRECHO LA CINTA COMPARTE FILA CON EL CARRIL (27-sep-2026), y con el renglón del
+   * turno dentro no quedaba sitio ni para él ni para el aviso: «TURNO …» y «Puedes obrar, …». De quién
+   * es el turno ya lo dice la tarjeta de la mesa, arriba; aquí queda el aviso, que es lo que hay que
+   * hacer, ENTERO: sin tope de renglones (con tres se cortaba «Puedes obrar, tratar o …»), y con la
+   * cinta y el dinero más apretados para que sean los menos. Lo que se oye no cambia: el turno sigue
+   * en la etiqueta.
+   */
+  const { width } = useWindowDimensions();
+  const estrecha = width < ANCHO_DEL_CARRIL_SIN_ROTULO;
   return (
-    <View style={estilos.cinta}>
-      <View style={estilos.cintaDicho}>
-        <Text style={estilos.cintaTurno} numberOfLines={1}>
-          {cinta.turno}
-        </Text>
-        <Text style={estilos.cintaEspera} numberOfLines={2}>
+    <View style={[estilos.cinta, estrecha ? estilos.cintaEstrecha : null]}>
+      <View style={estilos.cintaDicho} accessibilityLabel={estrecha ? `${cinta.turno}. ${dicho}` : undefined}>
+        {estrecha ? null : (
+          <Text style={estilos.cintaTurno} numberOfLines={1}>
+            {cinta.turno}
+          </Text>
+        )}
+        <Text style={estilos.cintaEspera} numberOfLines={estrecha ? undefined : 2}>
           {dicho}
         </Text>
       </View>
       <Pressable
-        style={[estilos.miDinero, hayCifra ? { borderColor: cinta.miColor } : null]}
+        style={[estilos.miDinero, estrecha ? estilos.miDineroEstrecho : null, hayCifra ? { borderColor: cinta.miColor } : null]}
         onPress={alAlternarElCajon}
         accessibilityRole="button"
         accessibilityState={{ expanded: cajonAbierto }}
         accessibilityLabel={hayCifra ? `Tienes ${cinta.miDinero}. ${loQueHaceElAsa}` : loQueHaceElAsa}
       >
-        <Text style={estilos.miDineroCifra}>{hayCifra ? cinta.miDinero : '≡'}</Text>
+        <Text style={[estilos.miDineroCifra, estrecha ? estilos.miDineroCifraEstrecha : null]}>{hayCifra ? cinta.miDinero : '≡'}</Text>
       </Pressable>
     </View>
   );
@@ -420,6 +432,9 @@ export function LaCintaDelBurgo({
  * sección «Ahora» manda aquí con ese nombre escrito en un renglón, y un renglón que
  * nombra un sitio que no se ve en la pantalla no es una indicación.
  */
+/** Por debajo de este ancho de ventana el carril va sin su rótulo pintado, y la pantalla del Burgo pone el pie en una fila. */
+export const ANCHO_DEL_CARRIL_SIN_ROTULO = 480;
+
 export function ElCarrilDeLaMesa({
   carril,
   quieto,
@@ -429,11 +444,18 @@ export function ElCarrilDeLaMesa({
   quieto: boolean;
   alElegir: (o: OpcionDeMesa) => void;
 }): JSX.Element | null {
+  /*
+   * EN UN TELÉFONO ESTRECHO EL RÓTULO NO SE PINTA (27-sep-2026): con dos cuadrados se llevaba la mitad
+   * de la fila, y ahí el carril comparte fila con la cinta. Sigue siendo el NOMBRE del mueble —la vista
+   * accesible lo lleva, y «Ahora» manda aquí por él—; lo que se quita es la tinta.
+   */
+  const { width } = useWindowDimensions();
+  const conRotulo = width >= ANCHO_DEL_CARRIL_SIN_ROTULO;
   if (carril.length === 0) return null;
   return (
-    <View style={estilos.carril}>
-      <Text style={estilos.rotuloDeGrupo}>{EL_CARRIL_DE_LA_MESA}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.carrilFila}>
+    <View style={estilos.carril} accessibilityLabel={conRotulo ? undefined : EL_CARRIL_DE_LA_MESA}>
+      {conRotulo ? <Text style={estilos.carrilRotulo}>{EL_CARRIL_DE_LA_MESA}</Text> : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={estilos.carrilTira} contentContainerStyle={estilos.carrilFila}>
         {carril.map((g) => (
           <Pressable
             key={g.opcion.id}
@@ -1703,6 +1725,14 @@ const estilos = StyleSheet.create({
     fontSize: 16,
   },
   /*
+   * EN UN TELÉFONO ESTRECHO (ver `LaCintaDelBurgo`): menos relleno en la cinta y en el dinero, y la
+   * cifra a 14. Son unos 25 puntos que pasan al aviso, que así se lee entero en dos o tres renglones.
+   * El asa sigue en sus 44 de dedo.
+   */
+  cintaEstrecha: { gap: 6, paddingHorizontal: 8 },
+  miDineroEstrecho: { paddingHorizontal: 6 },
+  miDineroCifraEstrecha: { fontSize: 14 },
+  /*
    * ═══ EL CARRIL: UNA TIRA DE CUADRADOS, Y LO QUE NO SE LLEVA DE ALTO ═══
    *
    * Rótulo de 13 y cuadrados de 44 con su renglón corto debajo: unos 84 puntos de
@@ -1714,15 +1744,27 @@ const estilos = StyleSheet.create({
    * sección «Ahora» manda aquí con ese nombre escrito— y flotando sobre la escena un
    * `SALA.tenue` suelto cae a 1,12:1 sobre el campo. Los cuadrados ya traían el suyo;
    * el que nombra el mueble no tenía ninguno.
+   *
+   * ═══ Y EL RÓTULO VA AL LADO, NO ENCIMA (27-sep-2026) ═══
+   *
+   * Medido con el fotógrafo (`docs/PANTALLAS.md`): con el rótulo en su renglón y 10 de relleno, el
+   * carril medía 97 puntos para UN cuadrado, y en un móvil tumbado el pie entero empujaba la cinta
+   * fuera de la pantalla. El rótulo sigue escrito —«Ahora» manda aquí por su nombre—, pero a la
+   * izquierda de la tira y en dos renglones estrechos: el carril mide lo que un cuadrado y su aire.
    */
   carril: {
-    gap: 4,
-    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: RADIO.ficha,
     borderWidth: 1,
     borderColor: conAlfa(SALA.blanco, 0.4),
     backgroundColor: SALA.teja,
   },
+  carrilRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 12, lineHeight: 15, maxWidth: 104 },
+  carrilTira: { flexGrow: 0, flexShrink: 1 },
   carrilFila: { gap: 8, paddingVertical: 2, alignItems: 'flex-start' },
   cuadrado: {
     minWidth: DEDO,

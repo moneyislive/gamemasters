@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <!--
+      ═══ LA PLANTILLA DE `/jugar` ═══
+
+      La app web sale en una sola página (`web.output: "single"` en `app.json`), y en ese modo
+      Expo toma ESTE fichero como plantilla —`public/index.html`— en vez de la suya; `+html.tsx`
+      sólo cuenta con salida estática. Es la suya con tres cosas más (`docs/PANTALLAS.md` §4-§5):
+
+        1. `viewport-fit=cover`: la página llega hasta debajo de la muesca y de la barra de
+           gestos, y lo que no debe quedar ahí lo apartan las zonas seguras
+           (`env(safe-area-inset-*)`, que es lo que lee `react-native-safe-area-context`).
+        2. `100dvh` y no `100%`/`100vh`: en el móvil `100vh` mide con la barra del navegador
+           escondida, y el pie del juego quedaba debajo de ella.
+        3. El manifiesto y las metas de aplicación web: en el iPhone no hay Fullscreen API para
+           páginas, y añadida a la pantalla de inicio `/jugar` se abre sin barras del navegador.
+
+      Las direcciones van con `/jugar/` delante porque ahí se sirve (`experiments.baseUrl`); el
+      guion de aquí abajo las cambia a la raíz en el servidor de desarrollo, que sirve ahí `public/`.
+    -->
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1710" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="GameMasters" />
+    <link id="manifiesto" rel="manifest" href="/jugar/manifest.webmanifest" />
+    <link id="icono" rel="apple-touch-icon" href="/jugar/icono.png" />
+    <script>
+      /*
+       * En producción `public/` se sirve bajo `/jugar/`; el servidor de desarrollo de Expo la sirve
+       * en la raíz. Se apunta a donde esté de verdad para que el manifiesto se pueda probar en los dos.
+       */
+      (function () {
+        var base = location.pathname.indexOf('/jugar') === 0 ? '/jugar/' : '/';
+        document.getElementById('manifiesto').href = base + 'manifest.webmanifest';
+        document.getElementById('icono').href = base + 'icono.png';
+      })();
+    </script>
+    <title>%WEB_TITLE%</title>
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* La página entera mide la ventana VISIBLE: `100dvh` donde lo hay, `100%` donde no. */
+      html,
+      body {
+        height: 100%;
+        height: 100dvh;
+        background-color: #0b1710;
+      }
+      /* Sin desplazamiento de la página ni rebote: el que haga falta lo pone cada pantalla. */
+      body {
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
+    <noscript>
+      You need to enable JavaScript to run this app.
+    </noscript>
+    <!-- The root element for your Expo app. -->
+    <div id="root"></div>
+  </body>
+</html>

@@ -79,7 +79,7 @@
  * La leva sale de la tira de acciones para no enseñarse dos veces.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Canvas } from '../tres/Lienzo';
 import { decodificaImagenes, texturasDelTablero } from '../tres/texturas-nativas';
 import { Lindes } from '../../../escenas/lindes/Lindes';
@@ -123,6 +123,7 @@ import { LETRA, SALA } from './muebles';
 import { ElRespaldo, LaMesaDeUnPintor, RedDelLienzo } from './pintor-propio';
 import type { LoQueVeElPintor } from './pintor-propio';
 import { traer } from './traer';
+import { usarPantallaCompleta } from '../pantalla-completa';
 
 /**
  * ═══ CON QUÉ SE ABRE EL TABLERO: EN UN TELÉFONO, CON SU ATLAS COMPILADO ═══
@@ -156,6 +157,7 @@ export default function LasLindesPorDentro(): JSX.Element {
  */
 function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
   const { mesa, vista, juego, nombres, abajo, laBarra } = pintor;
+  usarPantallaCompleta(); /* Sin barras del sistema mientras se juega; vuelven al salir. */
   const [modo, ponerModo] = useState<'mesa' | 'hombro' | 'ojos'>('mesa');
   /*
    * EL AVISO AL RECOGER, también aquí arriba con los demás ganchos. Se le pasa a la escena siempre:
@@ -216,6 +218,29 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
     traer,
   });
   const { laLosa, girosAqui, girar, sitios, alTocar } = valle;
+
+  /*
+   * ═══ DE PIE, LA HOJA DEBAJO Y CON TOPE; TUMBADO, AL LADO ═══
+   *
+   * La hoja crecía con lo que traía —la mesa, la losa, dónde cabe un labriego con un renglón por
+   * sitio, la bolsa, lo cobrado, los escudos— y el lienzo se quedaba con lo que sobrara, que en
+   * un teléfono tumbado (844×390, 27-sep-2026, `docs/PANTALLAS.md`) eran unos cien puntos de valle
+   * con la hoja cortada por abajo y sin poder desplazarse. Ahora la hoja se desplaza sola: de pie
+   * no pasa del 42 % del alto, y tumbado —donde lo que sobra es ancho— se va a una columna a la
+   * derecha, y el valle se lleva el alto que deja la barra.
+   */
+  const ventana = useWindowDimensions();
+  const tumbado = ventana.width > ventana.height && ventana.height < 560;
+
+  /*
+   * LOS RINCONES, POR ENCIMA DE LA PALANCA. A pie, abajo van la palanca (16 de margen y 128 de
+   * base) y el correr y el golpe a su altura: la losa de la mano y el reloj se apoyan encima
+   * (`reservaAbajo`, `escenas/lindes/rincones.ts`) en vez de quedarse debajo del pulgar.
+   */
+  const reservaAbajo = modo === 'mesa' ? 0 : FRANJA_DE_LOS_MANDOS;
+
+  /* «En la mano» ya lo dice la fila de la losa, con su «Girar»: el panel, sólo si esa fila no está. */
+  const losPaneles = (tablero?.paneles ?? []).filter((p) => !(p.titulo === 'En la mano' && laLosa !== null));
   /*
    * LA LEVA SE ENSEÑA UNA VEZ: en una mesa de botas con asiento la pinta el panel de los escudos,
    * con su cuenta y su porqué, así que sale de la tira de acciones, que la traería otra vez a secas
@@ -257,7 +282,13 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
         cuando alguien se ha ido y la partida ya no puede seguir. Ahora llega hecha del contrato
         de pintor —con el hueco de arriba y la marca de Boots on Board—, en las dos ramas.
       */}
+      {/*
+        Arriba y a lo ancho también tumbado: en una pantalla baja la barra se aprieta a un renglón
+        ella sola (`usarPantallaApretada`), y metida en la columna de la hoja se partía y cortaba
+        el código de la mesa —«MES KQV»—, que es lo que hay que dictar.
+      */}
       {laBarra}
+      <View style={tumbado ? estilos.cuerpoTumbado : estilos.cuerpo}>
       <View style={estilos.lienzo}>
         <RedDelLienzo juego={juego} alCaer={valle.alFallar}>
           <Canvas style={estilos.canvas} {...EL_LIENZO_DEL_VALLE} onCreated={alCrearElLienzoDelValle}>
@@ -267,6 +298,7 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
               canal={canal}
               mandos={mandos}
               alRecoger={alRecoger}
+              reservaAbajo={reservaAbajo}
             />
           </Canvas>
         </RedDelLienzo>
@@ -322,8 +354,11 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
         escritorio es un raíl y no un cajón: la decisión de este juego es «dónde
         encaja esto», y se toma mirando el tablero y la losa A LA VEZ. Un cajón
         obligaría a abrirlo y cerrarlo en cada turno.
+
+        Y SE DESPLAZA: de pie con tope, tumbado en su columna (ver `tumbado`, arriba).
       */}
-      <View style={[estilos.hoja, { paddingBottom: abajo + 10 }]}>
+      <View style={tumbado ? estilos.columna : estilos.pie}>
+      <ScrollView style={estilos.hojaDesplazable} contentContainerStyle={[estilos.hoja, { paddingBottom: abajo + 10 }]}>
         {/*
           EL AVISO DE LA MESA MANDA SOBRE EL DEL JUEGO. «No ha salido el movimiento» no se veía en
           ninguna parte de esta pantalla mientras se jugaba: sólo en el vestíbulo. Es lo que el Burgo
@@ -435,7 +470,7 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
           mismo reductor, sin un dato nuevo ni una regla escrita en el cliente. Es la regla de
           la casa —ningún juego sólo para PC— aplicada a lo único que aquí faltaba.
         */}
-        {(tablero?.paneles ?? []).map((panel, i) => (
+        {losPaneles.map((panel, i) => (
           <View key={`panel-${String(i)}`} style={estilos.panel}>
             <Text style={estilos.panelTitulo}>{panel.titulo}</Text>
             {panel.lineas.map((linea, j) => (
@@ -445,6 +480,8 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
             ))}
           </View>
         ))}
+      </ScrollView>
+      </View>
       </View>
     </View>
   );
@@ -507,13 +544,35 @@ function LosEscudos({
   );
 }
 
+/**
+ * LO QUE OCUPAN ABAJO LOS MANDOS DEL PASEO, en puntos: el margen de la palanca (16), su base
+ * (128) y un respiro. Son las medidas de `mandos-del-paseo.tsx`; el correr y el golpe van a la
+ * altura del centro de la palanca, así que no suben más que ella.
+ */
+const FRANJA_DE_LOS_MANDOS = 16 + 128 + 8;
+
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: SALA.suelo },
+  /* De pie: el valle arriba y la hoja debajo, con tope. Tumbado: el valle a la izquierda y la columna. */
+  cuerpo: { flex: 1, flexDirection: 'column' },
+  cuerpoTumbado: { flex: 1, flexDirection: 'row' },
+  pie: { flexShrink: 0, maxHeight: '42%' },
+  columna: {
+    width: '40%',
+    maxWidth: 360,
+    minWidth: 240,
+    borderLeftColor: SALA.filo,
+    borderLeftWidth: 1,
+    backgroundColor: SALA.pared,
+  },
+  hojaDesplazable: { flexGrow: 0, flexShrink: 1 },
   /*
-   * EL AVISO AL RECOGER: a lo ancho, debajo de la placa del canal y de las cámaras (8 de margen y
-   * unos 30 de alto cada una), y lejos de abajo, que es de la palanca y de los botones del paseo.
+   * EL AVISO AL RECOGER: a lo ancho, debajo de las cámaras (8 de margen y 44 de alto, que es lo
+   * que pide un dedo) y de la placa del canal, que va debajo de ellas (60) y no a su lado: con las
+   * cámaras a 44 y un canal de dos renglones, en un teléfono de 375 las dos placas se pisaban. Y
+   * lejos de abajo, que es de la palanca y de los botones del paseo.
    */
-  avisoDelHallazgo: { position: 'absolute', top: 48, left: 12, right: 12 },
+  avisoDelHallazgo: { position: 'absolute', top: 108, left: 12, right: 12 },
   /* La leva: la placa de acento de «Girar», que es la otra acción de la hoja. */
   leva: {
     backgroundColor: SALA.acento,
@@ -551,6 +610,8 @@ const estilos = StyleSheet.create({
   camara: {
     paddingHorizontal: 10,
     paddingVertical: 5,
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: 8,
     backgroundColor: 'rgba(12, 20, 8, 0.62)',
     borderWidth: 1,
@@ -562,7 +623,7 @@ const estilos = StyleSheet.create({
   /* La misma placa que las cámaras, para que se lea como de la misma familia. */
   canal: {
     position: 'absolute',
-    top: 8,
+    top: 60,
     left: 8,
     maxWidth: '52%',
     paddingHorizontal: 10,
@@ -590,6 +651,8 @@ const estilos = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   tira: { flexDirection: 'row', gap: 8, paddingVertical: 2 },
   chip: {
@@ -599,7 +662,9 @@ const estilos = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    minHeight: 44,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 2,
   },
   chipTexto: { color: SALA.palabra, fontSize: 13, ...LETRA.cuerpo },
