@@ -54,7 +54,7 @@ import { pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
  * jugador recibe de golpe las seis cosas que sabe, las suelta en la primera
  * ronda y la velada se queda sin gasolina a mitad.
  */
-function conocimientoDesbloqueado(total: number, round: number, totalRounds: number): number {
+export function conocimientoDesbloqueado(total: number, round: number, totalRounds: number): number {
   if (total === 0) return 0;
   if (round <= 0) return Math.min(1, total);
   // Reparto proporcional: al llegar a la última ronda está todo disponible.
@@ -334,6 +334,8 @@ export function vistaDeJugador(
       conocimientoPendiente: Math.max(0, todoElConocimiento.length - desbloqueado),
       giros,
       cronologiaPropia,
+      // Es suya y la vivió: la tiene desde el principio, igual que en el papel.
+      ...(personaje?.nightStory ? { nocheSuya: personaje.nightStory } : {}),
       notas: jugador.notas,
       soyElSenalado,
       pediEmpezar: jugador.pideEmpezar === true,
@@ -648,6 +650,23 @@ export function partidaParaElTaller(game: GameSession): GameSession {
         : undefined,
       // Y lo que cada juego guarda de su trama: en la Momia, el orden verdadero.
       delJuego: undefined,
+      /*
+       * La revisión habla de la solución con todas las letras —«la pista 7
+       * señala demasiado a la condesa»—, y sus lecturas dicen a quién apuntaba
+       * la sospecha en cada ronda. A ciegas queda el veredicto y cuántas
+       * cosas se corrigieron, que es lo que hace falta para fiarse de la trama.
+       */
+      revision: plot.revision
+        ? {
+            veredicto: plot.revision.veredicto,
+            pasadas: plot.revision.pasadas,
+            hallazgos: [],
+            cambios: plot.revision.cambios.length
+              ? [`La revisión hizo ${plot.revision.cambios.length} cambios. No se detallan: juegas a ciegas.`]
+              : [],
+            revisadaEl: plot.revision.revisadaEl,
+          }
+        : undefined,
     },
   };
 }

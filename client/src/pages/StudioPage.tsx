@@ -44,7 +44,9 @@ import StylePanel from '../components/studio/StylePanel';
 import BoardView from '../components/board/BoardView';
 import DocumentsPanel from '../components/documents/DocumentsPanel';
 import LivePanel from '../components/live/LivePanel';
-import GenerateOverlay, { startGeneration, startRefresh } from '../components/generate/GenerateOverlay';
+import GenerateOverlay, { startRefresh } from '../components/generate/GenerateOverlay';
+import ConfirmarVelada from '../components/generate/ConfirmarVelada';
+import { cambiarModo } from '../api/client';
 import '../styles/studio.css';
 
 /** Qué hace el botón principal según el estado de la partida. */
@@ -214,9 +216,8 @@ export default function StudioPage() {
           else store.setActiveTab(command.target);
           break;
         case 'start_generation':
-          void startGeneration().catch(() =>
-            showToast('No se pudo iniciar la generación del misterio.'),
-          );
+          // El asistente propone generar; quien dirige confirma modo y precio.
+          store.abrirConfirmacion();
           break;
       }
     });
@@ -281,6 +282,22 @@ export default function StudioPage() {
     }
   };
 
+  /** Papel ↔ app. Si pasar a app cuesta algo, el servidor contesta 402 y se dice. */
+  const alternarModo = async (): Promise<void> => {
+    if (!game?.settings?.modo) return;
+    const otro = game.settings.modo === 'app' ? 'papel' : 'app';
+    const pagadaEnPapel = otro === 'app' && game.cobro && !game.cobro.exenta && game.cobro.modo === 'papel';
+    if (pagadaEnPapel && !window.confirm('Pasar esta velada a la app incluye al Mayordomo y cobra la diferencia. ¿Seguimos?')) {
+      return;
+    }
+    try {
+      useAppStore.getState().setGame(await cambiarModo(game.id, otro));
+      showToast(otro === 'app' ? 'La velada se jugará con la app.' : 'La velada se jugará en papel.');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'No se pudo cambiar el modo.');
+    }
+  };
+
   /* ---------- Requisitos de generación ---------- */
 
   /*
@@ -294,10 +311,12 @@ export default function StudioPage() {
 
   const generateDisabled = generating || !ready || missing.length > 0;
 
+  /**
+   * Generar abre la confirmación: el modo —papel o app—, lo que se va a
+   * escribir y el precio. La generación la lanza el diálogo al confirmar.
+   */
   const handleGenerate = () => {
-    void startGeneration().catch(() =>
-      showToast('No se pudo iniciar la generación del misterio.'),
-    );
+    useAppStore.getState().abrirConfirmacion();
   };
 
   const handleRefresh = () => {
@@ -482,7 +501,26 @@ export default function StudioPage() {
             </span>
           )}
 
-          {config && (
+          {/*
+            EL MODO DE LA VELADA, siempre a la vista: papel o app. Cambiarlo
+            aquí es gratis salvo pasar a app una velada pagada en papel, que
+            cobra la diferencia y lo pregunta antes.
+          */}
+          {game?.settings?.modo && (
+            <button
+              className="studio-modo mono-caps has-tip"
+              data-tip={
+                game.settings.modo === 'app'
+                  ? 'Se juega con la app. Pulsa para pasarla a papel (sin coste).'
+                  : 'Se juega en papel. Pulsa para pasarla a la app.'
+              }
+              onClick={() => void alternarModo()}
+            >
+              {game.settings.modo === 'app' ? '📱 Con app' : '📜 En papel'}
+            </button>
+          )}
+
+          {config?.puedeCambiarModelo && (
             <label className="studio-model">
               <span className="studio-model-label mono-caps">Modelo</span>
               <select
@@ -599,6 +637,7 @@ export default function StudioPage() {
       {/* Siempre montados: tarjetas del agente y overlay de generación */}
       <AgentPopups />
       <GenerateOverlay />
+      <ConfirmarVelada />
 
       {toast && <div className="studio-toast">{toast}</div>}
     </div>

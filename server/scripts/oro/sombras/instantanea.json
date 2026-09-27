@@ -17,12 +17,12 @@
       "largo": 23745
     },
     "anfitrion/dosier-escolta/color": {
-      "huella": "be4bd518a0e746d5",
-      "largo": 65567
+      "huella": "cd09aa9a72caca66",
+      "largo": 67693
     },
     "anfitrion/dosier-escolta/blanco": {
-      "huella": "89a4f5416238db78",
-      "largo": 65568
+      "huella": "34a1e5798430b3fe",
+      "largo": 67694
     },
     "anfitrion/hitos-camino/color": {
       "huella": "13cf7afc08f939cf",
@@ -81,12 +81,12 @@
       "largo": 23655
     },
     "ciego/dosier-escolta/color": {
-      "huella": "be4bd518a0e746d5",
-      "largo": 65567
+      "huella": "cd09aa9a72caca66",
+      "largo": 67693
     },
     "ciego/dosier-escolta/blanco": {
-      "huella": "89a4f5416238db78",
-      "largo": 65568
+      "huella": "34a1e5798430b3fe",
+      "largo": 67694
     },
     "ciego/hitos-camino/color": {
       "huella": "13cf7afc08f939cf",
@@ -131,36 +131,36 @@
   },
   "dosieres": {
     "e0/color": {
-      "huella": "f084cf6f6f155faf",
-      "largo": 26836
+      "huella": "7207e502985d42f1",
+      "largo": 27380
     },
     "e0/blanco": {
-      "huella": "d8e0b5846888687d",
-      "largo": 26837
+      "huella": "7e85c2829c456684",
+      "largo": 27381
     },
     "e1/color": {
-      "huella": "26ac9a6df222f017",
-      "largo": 26865
+      "huella": "09ea83fb748a2b93",
+      "largo": 27431
     },
     "e1/blanco": {
-      "huella": "a180c1ac2a913bfb",
-      "largo": 26866
+      "huella": "18539de988a35ba4",
+      "largo": 27432
     },
     "e2/color": {
-      "huella": "286dfe7b5a457615",
-      "largo": 26883
+      "huella": "735450b479a06520",
+      "largo": 27441
     },
     "e2/blanco": {
-      "huella": "4ca3be8a1d7402e8",
-      "largo": 26884
+      "huella": "db977ebc3cb2b116",
+      "largo": 27442
     },
     "e3/color": {
-      "huella": "8a8ac857a2e74277",
-      "largo": 27097
+      "huella": "df295f2307db30f2",
+      "largo": 27702
     },
     "e3/blanco": {
-      "huella": "336fbef9842cc50a",
-      "largo": 27098
+      "huella": "c92d104ddafe7cd8",
+      "largo": 27703
     }
   },
   "partida": [

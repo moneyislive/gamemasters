@@ -99,6 +99,15 @@ import '../plot/cluedo-generacion';
  * los personajes que faltan sin escribir. Sin un solo error.
  */
 import '../plot/cluedo-ampliacion';
+/*
+ * Y su material de la velada y su revisión adversaria. El material se daba de
+ * alta desde `routes/material.ts`, que es quien lo usaba; ahora la tubería lo
+ * escribe también al generar, y un alta que depende de qué ruta se cargue
+ * antes es la clase de fallo mudo que este fichero existe para evitar. Sin la
+ * segunda línea la trama se entrega sin revisar, y el informe lo diría.
+ */
+import '../plot/cluedo-material';
+import '../plot/cluedo-revision';
 
 // El Misterio de la Momia: reductores, proyección del estado y trofeos.
 /*
@@ -136,6 +145,12 @@ import '../docs/imprimibles/momia/dosierExpedicionario';
 // Y sus ocho plantillas de imprimible. Ver el porque en la linea de CLUEDO.
 import '../docs/imprimibles/momia/registro';
 
+/*
+ * Y su revisión adversaria, con su expedición ciega. Sin esta línea la noche se
+ * entrega con el veredicto «sin revisar» y nada falla.
+ */
+import '../plot/momia-revision';
+
 // El Paso de las Sombras: reductores, proyección del estado, consejo y trofeos.
 import '../plot/sombras-generacion';
 import '../agent/sombras-guia';
@@ -157,6 +172,12 @@ import '../docs/imprimibles/sombras/dosierEscolta';
 import '../docs/imprimibles/sombras/registro';
 
 /*
+ * Y su revisión adversaria, con su columna ciega. Sin esta línea la noche se
+ * entrega con el veredicto «sin revisar» y nada falla.
+ */
+import '../plot/sombras-revision';
+
+/*
  * ═══ EL NUDO DE VALDEHIERRO ═══
  *
  * Ocho lineas, y ninguna es opcional. Este juego no tiene NINGUNA importacion
@@ -174,6 +195,12 @@ import './nudo-amanecer';
 import './nudo-trama';
 import '../docs/imprimibles/nudo/dosierFerroviario';
 import '../docs/imprimibles/nudo/registro';
+/*
+ * Y su revisión adversaria. Sin esta línea la velada se entrega con el veredicto
+ * «sin revisar»: se juega igual, pero es una velada de pago que nadie ha leído
+ * con el cuadro delante.
+ */
+import '../plot/nudo-revision';
 
 /*
  * ═══ Y AHORA SE ELIGE CUALES QUEDAN INSTALADOS ═══

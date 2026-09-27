@@ -148,9 +148,10 @@ export function tablaDeLaNoche(
       <span class="etiqueta">Tope de esta partida: ${vista.retrasoMaximo} minutos</span>
       <div style="text-align:center; line-height:2.3;">${casillas(vista.retrasoMaximo)}</div>
       <p style="margin:6px 0 0; font-size:10.5pt; color:#5b4b31;">
-        Tacha una casilla por cada minuto que suba y bórrala si alguien lo recupera. Cuando se
-        tachen las ${vista.retrasoMaximo}, <strong>el puerto se cierra</strong> y la noche se acaba
-        ahí mismo: no se sigue jugando para ver si salen los que faltan.
+        Tacha una casilla por cada minuto que suba y bórrala si alguien lo recupera. El tope se
+        puede tocar, pero no pasar: la cuenta se cierra al amanecer, sumando lo que quede en la
+        vía, y si entonces pasa de ${vista.retrasoMaximo}, <strong>el puerto se cerró</strong> con
+        la nieve. Hasta entonces se sigue jugando.
       </p>
     </div>
 
@@ -331,16 +332,18 @@ ${filasDeSalidas}
     <div class="caja caja--violeta junto">
       <ol class="reglas">
         <li>
-          <strong>Cruzan los seis y gana el turno.</strong>
-          Los ${convoyes} convoyes han salido —el Correo entre ellos— y el retraso no ha llegado a
-          ${vista.retrasoMaximo}. Ganan todos: aquí nadie gana por su cuenta y nadie pierde por
+          <strong>Cruza el Correo y gana el turno.</strong>
+          El Correo ha salido y, con la cuenta del amanecer, el retraso no pasa de
+          ${vista.retrasoMaximo}. Los otros ${convoyes - 1} suman a esa cuenta si se quedan en la
+          vía, pero no deciden. Ganan todos: aquí nadie gana por su cuenta y nadie pierde por
           culpa de nadie.
         </li>
         <li>
-          <strong>Se cierra el puerto y se acaba ahí.</strong>
-          El retraso llega a ${vista.retrasoMaximo} minutos y la noche termina en ese instante, con
-          el Correo dentro. No se juega la franja que estaba abierta ni se espera a ver si salía
-          alguien más: dilo, cierra y pasa al parte.
+          <strong>Se cierra el puerto.</strong>
+          Si con la cuenta del amanecer el retraso pasa de ${vista.retrasoMaximo} minutos, el puerto
+          se cerró con la nieve y el suero no llega a tiempo, aunque el Correo haya salido. No se
+          corta a mitad: se juega hasta el amanecer, y cada convoy que todavía salga es uno menos
+          que sumar al final.
         </li>
         <li>
           <strong>Amanece con convoyes en la vía.</strong>

@@ -21,7 +21,7 @@ import { printableDocsFor } from '../../../../shared/documents';
 import { categoriaDeJugadores, manifiestoDe, personasDe } from '../../../../shared/juegos';
 import { palabrasDe } from '../../juegos/palabras';
 import type { DocumentAudience } from '../../../../shared/documents';
-import { startMaterial, startRefresh } from '../generate/GenerateOverlay';
+import { startMaterial, startRefresh, startRevision } from '../generate/GenerateOverlay';
 import './documents.css';
 
 interface Sobre {
@@ -143,6 +143,74 @@ export default function DocumentsPanel(): JSX.Element {
           onClick={() => void startMaterial().catch(() => undefined)}
         >
           {material ? 'Reescribir' : 'Escribir el material'}
+        </button>
+      </div>
+    </section>
+  ) : null;
+
+  /*
+   * EL INFORME DE LA REVISIÓN ADVERSARIA. A ciegas llega recortado desde el
+   * servidor —solo el veredicto—, así que aquí no hace falta esconder nada: se
+   * pinta lo que haya.
+   */
+  const revision = game.plot?.revision;
+  const pendientes = (revision?.hallazgos ?? []).filter((h) => h.estado === 'pendiente' && h.gravedad !== 'menor');
+  const corregidos = (revision?.hallazgos ?? []).filter((h) => h.estado === 'corregido').length;
+  const bloqueRevision = revision ? (
+    <section className={`deco-frame docs-material docs-revision docs-revision--${revision.veredicto}`}>
+      <span className="docs-material-glyph" aria-hidden="true">
+        {revision.veredicto === 'apta' ? '✓' : revision.veredicto === 'no-apta' ? '✗' : '⚖'}
+      </span>
+      <div className="docs-material-body">
+        <p className="docs-material-kicker mono-caps">Revisión adversaria</p>
+        <h3 className="docs-material-title">
+          {revision.veredicto === 'apta' && 'La trama se sostiene'}
+          {revision.veredicto === 'apta-con-avisos' && 'Jugable, con algún aviso'}
+          {revision.veredicto === 'no-apta' && 'La revisión no ha podido garantizar esta trama'}
+          {revision.veredicto === 'sin-revisar' && 'Esta trama no está revisada'}
+        </h3>
+        <p className="docs-material-note text-dim">
+          {revision.veredicto === 'sin-revisar'
+            ? revision.error ?? 'Este juego todavía no tiene revisión de trama.'
+            : revision.pasadas === 0
+              ? 'Se ha medido con código lo que se puede contar de la noche. El revisor necesita el modelo y aquí ' +
+                'no ha corrido: lo de abajo está sin corregir.'
+              : /*
+                 * Con lector ciego (CLUEDO, la Momia, las Sombras) o sin él (el Nudo, cuyo
+                 * cuadro se mide con código): el texto dice lo que de verdad pasó.
+                 */
+                `${revision.lecturas ? 'Alguien que no conocía la solución intentó adivinarla antes de tiempo, y un' : 'Un'} ` +
+                `revisor que sí la conocía la corrigió en ${revision.pasadas} ${revision.pasadas === 1 ? 'pasada' : 'pasadas'}: ` +
+                `${corregidos} ${corregidos === 1 ? 'cosa corregida' : 'cosas corregidas'}` +
+                (revision.cambios.length ? `, ${revision.cambios.length} cambios en el texto.` : '.')}
+        </p>
+        {pendientes.length > 0 && (
+          <ul className="docs-stale-list">
+            {pendientes.map((h, i) => (
+              <li key={`${h.codigo}-${i}`}>
+                <b>{h.gravedad === 'bloqueante' ? 'Importante' : 'Aviso'}:</b> {h.texto}
+              </li>
+            ))}
+          </ul>
+        )}
+        {revision.cambios.length > 0 && (
+          <details className="docs-revision-cambios">
+            <summary className="mono-caps">Qué se cambió</summary>
+            <ul>
+              {revision.cambios.map((c, i) => (
+                <li key={i}>{c}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </div>
+      <div className="docs-material-action">
+        <button
+          className={`btn${revision.veredicto === 'apta' ? '' : ' btn--primary'}`}
+          disabled={generating}
+          onClick={() => void startRevision().catch(() => undefined)}
+        >
+          Revisar de nuevo
         </button>
       </div>
     </section>
@@ -277,6 +345,7 @@ export default function DocumentsPanel(): JSX.Element {
     <div className="docs-panel">
       {aviso}
       {bloqueMaterial}
+      {bloqueRevision}
 
       <SectionDesigner />
       <PrintablePicker />

@@ -200,9 +200,9 @@ ${ORNAMENTO}
       </li>
       <li>
         <strong>El tope de esta partida son ${vista.retrasoMaximo} minutos.</strong>
-        Al llegar ahí se cierra el puerto y se acabó la noche, salgan los que salgan después. Al
-        amanecer, además, cada convoy que no llegó a cruzar suma
-        ${vista.tarifa.convoyVarado} minutos más a la cuenta final.
+        Se puede tocar, pero no pasar: la cuenta se cierra al amanecer, y si entonces pasa del tope
+        el puerto se cerró con la nieve, aunque el Correo haya salido. En esa cuenta, cada convoy
+        que no llegó a cruzar suma ${vista.tarifa.convoyVarado} minutos más.
       </li>
       <li>
         <strong>Lo que cuesta cursar no lo lleva esta hoja.</strong>

@@ -108,8 +108,11 @@ services:
       - key: MESAS_DIR
         value: /var/data/mesas
 
+      # El modelo de la casa: el que escribe las veladas que no eligen otro.
+      # Uno que no sea de velada (ver `MODEL_OPTIONS` en server/src/config.ts)
+      # se ignora y se usa Opus 5.5.
       - key: ANTHROPIC_MODEL
-        value: claude-fable-5
+        value: claude-opus-5-5
       - key: MONGODB_DB
         value: harkania
 
@@ -200,6 +203,38 @@ services:
         value: "250"
       - key: TOPE_DIARIO_ESTUDIO
         value: "8"
+
+      # --- El cobro (ver docs/VELADA-DE-PAGO.md) ------------------------------
+      # APAGADO hasta que la pasarela esté dada de alta y los términos digan el
+      # precio: encenderlo sin eso es cobrar sin decir cuánto ni poder cobrar.
+      - key: COBRO_ACTIVO
+        value: "no"
+      - key: COBRO_MARGEN
+        value: "2.5"
+      - key: COBRO_PRECIO_MINIMO
+        value: "399"
+      - key: COBRO_EUROS_POR_DOLAR
+        value: "0.92"
+      - key: COBRO_CREDITOS_SUSCRIPCION
+        value: "2000"
+      - key: COBRO_PRECIO_SUSCRIPCION
+        value: "1499"
+      - key: COBRO_PRECIO_PASE
+        value: "499"
+      - key: COBRO_PASE_EN_SUSCRIPCION
+        value: "si"
+      - key: COBRO_EXENTOS_ADMITIDOS
+        value: "si"
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRECIO_SUSCRIPCION
+        sync: false
+      - key: STRIPE_GESTIONADO
+        value: "no"
+      - key: STRIPE_IMPUESTOS
+        value: "no"
 
       # --- Identidad, cuando la tengas ---------------------------------------
       - key: GOOGLE_CLIENT_IDS

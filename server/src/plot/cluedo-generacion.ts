@@ -13,7 +13,7 @@
 import { objetosDe, salasDe, sospechososDe } from '../juegos/cluedo';
 import type { GameSession, Plot } from '../../../shared/types';
 import { DEMO_MODE } from '../config';
-import { getAnthropicClient, resolveModel } from '../agent/anthropic';
+import { esfuerzoPara, getAnthropicClient, resolveModel, streamDeGeneracion, textoDe } from '../agent/anthropic';
 import { generateDemoPlot } from './cluedo-demo';
 import { PLOT_SCHEMA } from './cluedo-esquema';
 import { buildStyleBlock } from './style';
@@ -44,12 +44,12 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
 
   const model = await resolveModel(game);
 
-  // Ruta NO beta y sin fallbacks; sin temperature/top_p/top_k ni `thinking`.
-  const stream = client.messages.stream({
+  const stream = streamDeGeneracion(client, {
     model,
-    max_tokens: 64000,
-    system: [{ type: 'text', text: SYSTEM_TRAMA, cache_control: { type: 'ephemeral' } }],
-    output_config: { format: { type: 'json_schema', schema: PLOT_SCHEMA } },
+    esfuerzo: esfuerzoPara(game, 'trama'),
+    maxTokens: 128000,
+    system: SYSTEM_TRAMA,
+    schema: PLOT_SCHEMA,
     messages: [{ role: 'user', content: construirPrompt(game) }],
   });
 
@@ -59,7 +59,7 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
 
   const mensaje = await stream.finalMessage();
   // Lo que ha costado esta llamada. No puede tumbar la generacion.
-  apuntarUso({ concepto: 'trama', model, usage: mensaje.usage, gameId: game.id });
+  apuntarUso({ concepto: 'trama', model: mensaje.model ?? model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error(
@@ -68,14 +68,11 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
   }
   if (mensaje.stop_reason === 'max_tokens') {
     throw new Error(
-      'La trama superó el límite de tokens y quedó incompleta. Reduce la cantidad de datos e inténtalo de nuevo.',
+      'La trama salió más larga de lo que cabe en una respuesta y se cortó. Vuelve a intentarlo; si se repite, baja el esfuerzo en las opciones avanzadas.',
     );
   }
 
-  let texto = '';
-  for (const bloque of mensaje.content) {
-    if (bloque.type === 'text') texto += bloque.text;
-  }
+  const texto = textoDe(mensaje);
 
   try {
     return JSON.parse(texto) as Plot;
@@ -141,23 +138,31 @@ ${pasadizos}
 REQUISITOS:
 1. Trama elaborada ambientada en los años 20, adaptada al espacio REAL descrito por las salas: el escenario debe sentirse como esa casa concreta convertida en mansión.
 2. Un personaje por sospechoso, hecho A MEDIDA de la persona real: usa su nombre y su descripción psicológica; el campo personalHook debe explicar cómo el personaje aprovecha su forma de ser.
-3. Coherencia total: coartadas cruzadas entre personajes, secretos que se entrelazan con el motivo del crimen, sin contradicciones con la cronología.
-4. La solución (solution.murdererId, solution.weaponId, solution.lugarId) DEBE usar ids EXISTENTES de las listas anteriores. Igual para characters[].participanteId (exactamente uno por sospechoso), clues[].lugarId y timeline[].participanteIds.
-5. La sinopsis es pública: NO debe revelar asesino, arma ni sala del crimen.
-6. PASADIZOS: si mencionas alguno en secretos, coartadas o pistas, debe ser EXACTAMENTE uno de los listados arriba. No inventes conexiones entre salas que el plano no tiene.
-7. timeline: de 8 a 12 eventos con hora ("19:30"), mezclando públicos y secretos.
+3. LA VÍCTIMA SE GANA SU FINAL: agravia en público, durante la velada, a varios invitados a la vez (un anuncio en la cena, una humillación, una amenaza). Esos agravios públicos se reparten: tocan a personas distintas, y ninguna —tampoco la culpable— acumula más que las demás. Un resumen cuyas tres desgracias recaen en la misma persona la está señalando tres veces.
+4. LAS FALTAS QUE NO SON EL CRIMEN: al menos la mitad de los inocentes hace esa noche algo que tiene que esconder aunque no sea el asesinato —un robo, una falsificación, un chantaje, un sabotaje, algo echado en una copa, tocar la escena— y lo hace en el tramo confuso, donde puede parecer el crimen. Cada falta deja al menos una pista física y tiene su explicación: vista de lejos parece el asesinato y deja de parecerlo al conocerse. Esa falta es el secreto de ese personaje. Así el caso se resuelve separando lo que cada cual esconde de lo que de verdad mató a la víctima. Y el culpable no puede ser el único sin nada que confesar, porque se le señalaría por descarte: o algún inocente tampoco tiene falta esa noche, o el culpable tiene también una falta menor propia, con su pista, que le sirve de tapadera.
+5. EL CAMINO HASTA EL CULPABLE: el crimen se prueba reconstruyendo un trayecto —de dónde salió el objeto, cómo y cuándo se movió, qué pasó a la hora del crimen y cómo volvió quien lo hizo— y con un RASGO del culpable (físico, de oficio o de costumbre, sacado de su descripción real) que las pistas de las rondas 3 y 4 dibujan sin nombrarlo. Ese rasgo lo comparten en parte al menos otras dos personas de la mesa: acotarlo exige combinar pruebas.
+6. CADENA DE DEDUCCIÓN (se revisa): el culpable, el arma y la sala solo se prueban COMBINANDO al menos tres pistas de al menos dos rondas distintas. Ninguna pista identifica al culpable por sí sola, tampoco las de la ronda 4: la última ronda cierra el caso al sumarse a lo anterior, no al decirlo. Y cada inocente tiene que poder descartarse con alguna prueba, o al menos quedar por debajo al final.
+7. EL MISMO TRATO (se revisa): la persona culpable recibe la misma atención que las demás en todo lo que lee la mesa —título, lema, sinopsis, ambientación, cronología pública, caras públicas y pistas de las rondas 1 a 3—. Ni más, porque se delataría; ni menos, porque nadie la sospecharía y el caso se resolvería por descarte. La sinopsis y la ambientación nombran a todas las personas por igual, o a ninguna.
+8. NADIE DE RELLENO: cada personaje tiene un secreto que merezca esconderse, un motivo creíble contra la víctima, al menos un movimiento sospechoso en la cronología y al menos dos pistas que hablen de él a lo largo de la noche. Cada uno tiene su nightStory, y todas de la misma extensión: la del culpable no puede ser la más larga, ni la de un inocente un trámite.
+9. OBJETOS CON HISTORIA: cada objeto de la lista aparece por su NOMBRE en al menos una pista y en el dosier de al menos un personaje, al que está ligado (le pertenece, lo heredó, es de su oficio, lo usó esa noche o tiene una historia con él). Cada uno tiene una razón para poder ser el arma, y los que no lo son quedan descartados por alguna prueba. Si el arma es de un inocente, la sospecha sobre su dueño es un señuelo que las pistas desmontan.
+10. La solución (solution.murdererId, solution.weaponId, solution.lugarId) DEBE usar ids EXISTENTES de las listas anteriores. Igual para characters[].participanteId (exactamente uno por sospechoso), clues[].lugarId y timeline[].participanteIds.
+11. LO QUE SE SABE AL EMPEZAR NO RESUELVE NADA: la sinopsis, la ambientación, la cronología pública y todo lo que los dosieres dejan contar desde el principio —las coartadas y lo que cada cual sabe de los demás (knowledge)— no revelan asesino, arma ni sala. Traen motivos, relaciones, faltas ajenas y observaciones ambiguas; NUNCA la hora de la muerte, el trayecto del objeto ni el rasgo del culpable. Esas piezas llegan poco a poco: con las pistas, con los hechos que se establecen al cerrar cada ronda y con los giros de las rondas 3 y 4. Al empezar, al menos tres personas tienen un hueco sin testigos en el tramo en que pudo ocurrir el crimen, y ese tramo es ancho: la mesa todavía no sabe a qué hora murió la víctima. Guardar las piezas del camino NO es esconder a la persona: en lo que se sabe al empezar, el culpable sale tanto como los demás, con su motivo, sus relaciones y sus movimientos ambiguos.
+12. PASADIZOS: si mencionas alguno en secretos, coartadas, noches o pistas, debe ser EXACTAMENTE uno de los listados arriba. No inventes conexiones entre salas que el plano no tiene.
+13. timeline: de 8 a 12 eventos con hora ("19:30"), mezclando públicos y secretos.
    - isPublic true SOLO para los momentos que presenciaron TODOS a la vez (llegada, cena, anuncio, apagón, hallazgo del cuerpo). Serán los únicos que vean los jugadores.
    - isPublic false para todo lo demás: quién se movió durante el apagón, quién manipuló qué, quién provocó el apagón, conversaciones privadas, alteraciones de la escena y el crimen.
    - Un evento que implique a UNA sola persona nunca puede ser público.
-8. COHERENCIA HORARIA (crítico, se revisa): las horas de la cronología, las coartadas de los personajes y las pistas deben encajar sin contradecirse.
+14. COHERENCIA HORARIA (crítico, se revisa): las horas de la cronología, las coartadas, las nightStory y las pistas deben encajar sin contradecirse.
    - Si dos personajes se dan coartada mutua, ambos dosieres deben indicar el MISMO intervalo.
    - Nadie puede estar en dos sitios a la vez ni presenciar algo fuera de su intervalo.
+   - Una coartada declarada puede esconder una ausencia —la del culpable la esconde—; entonces su nightStory cuenta lo que de verdad hizo en ese hueco.
    - Si una pista fija una hora, ningún personaje puede contradecirla sin que eso sea una mentira deliberada y marcada como tal en su secreto.
-9. clues: aproximadamente 2 pistas por sala, mezcla de verdaderas y señuelos; pointsTo indica qué o a quién señala cada una.
-   - REPARTO POR RONDAS con el campo "round": 1 motivos, conflictos y señuelos; 2 objetos desplazados y coartadas incompletas; 3 horarios, trayectos y contradicciones; 4 evidencias decisivas.
-   - Ninguna pista que por sí sola identifique al culpable puede llevar round 1 o 2. Reparte de forma pareja entre las cuatro rondas.
-10. gmScript: al menos 6 pasos concretos para conducir la velada. Debe incluir abrir un sobre de pistas por ronda y una puesta en común al final de cada ronda.
-9. TODO en español, con elegancia de novela negra de los años 20.${buildStyleBlock(game)}`;
+15. clues: aproximadamente 2 pistas por sala, mezcla de verdaderas y señuelos; pointsTo indica qué o a quién señala cada una.
+   - Cada ronda (campo "round") tiene su papel: 1 MOTIVOS Y PRIMERAS CONTRADICCIONES —casi todos tenían motivo, y algún indicio compromete a alguien por una falta que no es el crimen—; 2 EL TRAMO CONFUSO —qué se movió, quién faltaba, qué cambió de sitio; separa el desorden de la hora de la muerte—; 3 LAS FALTAS QUE NO SON EL CRIMEN —robos, falsificaciones, documentos; se rompen coartadas aparentes—; 4 LA RECONSTRUCCIÓN —piezas del trayecto del objeto, marcas horarias y el rasgo del culpable; cada una es una pieza y ninguna cierra el caso sola—.
+   - Reparto parejo: el mismo número de pistas en cada ronda; dentro de una ronda, salas distintas; cada sala tiene pistas en al menos una ronda (con 8 salas y 4 rondas, cada sala sale en dos) y ninguna acumula el doble que otra.
+   - pointsTo lo lee quien encuentra la pista al cerrar la ronda: escribe lo que la pista SUGIERE (una hora que no cuadra, un objeto fuera de su sitio, una mentira), nunca un veredicto como «señala al asesino».
+16. gmScript: al menos 6 pasos concretos para conducir la velada: abrir las pistas de cada ronda en sus salas, marcar su mitad y cerrarla. La investigación es individual: cada cual elige sala y habla con quien coincide; nada de equipos, portavoces ni informes de grupo.
+17. TODO en español, con elegancia de novela negra de los años 20.${buildStyleBlock(game)}`;
 }
 
 // ---------------------------------------------------------------------------

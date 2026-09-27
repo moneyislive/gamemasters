@@ -239,6 +239,61 @@ function tituloSolucion(plot: Plot): string {
   return `${plot.title} — El sobre del crimen`;
 }
 
+/**
+ * Cómo jugar la noche: uno para quien mató y otro para quien no, de la misma
+ * extensión (se comprueba en `verify:revision`), porque van en el mismo sitio
+ * del dosier y un párrafo más largo que los demás ya es una pista.
+ */
+export const CONSEJO_CULPABLE =
+  'participa en las conversaciones con normalidad y acusa a otros con moderación —quien más grita, antes cae—. ' +
+  'Sostén la coartada de tu dosier y no la cambies: las contradicciones son lo primero que se detecta. Si alguien ' +
+  'te acorrala con una prueba, admite un detalle menor para ganar credibilidad y desvía la atención hacia el secreto ' +
+  'de otro invitado.';
+export const CONSEJO_INOCENTE =
+  'sostén la coartada de tu dosier aunque esconda lo que hiciste, y no inventes otra versión. Tu falta no es el ' +
+  'crimen: si una prueba te acorrala, confesarla a tiempo te saca de la lista, y callarla demasiado te convierte ' +
+  'en el sospechoso perfecto. Escucha más de lo que hablas: lo que viste esta noche vale más de lo que crees.';
+
+/**
+ * «Tu noche»: el mismo recuadro en TODOS los dosieres.
+ *
+ * Antes solo lo llevaba el culpable —«☠ Tú eres el asesino», en rojo y con el
+ * relato entero del crimen—, y eso lo delataba dos veces: por el color, que se
+ * ve desde el otro lado de la mesa, y por el largo, que se nota en el sobre. En
+ * la casa Sabrón su dosier salía un 23 % más largo que el de cualquier otro.
+ *
+ * Ahora cada cual lee aquí su noche, con el mismo aspecto, una primera frase en
+ * negrita y un consejo de la misma extensión. El culpable sabe que lo es por lo
+ * que dice esa frase, no por cómo se ve.
+ *
+ * Una trama escrita antes de que existiera `nightStory` no la trae: el culpable
+ * lee entonces el relato del crimen, como antes, y un inocente los momentos
+ * secretos de la cronología en los que estuvo. Es lo más parecido que hay.
+ */
+function bloqueTuNoche(
+  plot: Plot,
+  personaje: PlotCharacter,
+  esAsesino: boolean,
+  arma: string | undefined,
+  sala: string | undefined,
+): string {
+  const victima = victimaDe(plot).name;
+  const primeraFrase = esAsesino
+    ? `Tú mataste a ${victima}${arma ? ` con ${arma}` : ''}${sala ? `, en ${sala}` : ''}.`
+    : `No mataste a ${victima}, pero tu noche también tiene algo que esconder.`;
+  const suyos = plot.timeline
+    .filter((e) => !e.isPublic && e.participanteIds.includes(personaje.participanteId))
+    .map((e) => `A las ${e.time}: ${e.description}`)
+    .join(' ');
+  const noche = personaje.nightStory?.trim() || (esAsesino ? plot.solution.howItHappened : suyos);
+  return `<div class="caja caja--secreto" style="margin-top:22px">
+              <div class="titulo-secreto">☾ Tu noche — solo para tus ojos</div>
+              <p><strong>${esc(primeraFrase)}</strong></p>
+              ${noche ? `<p>${esc(noche)}</p>` : ''}
+              <p style="margin-bottom:0"><em>Cómo jugarla:</em> ${esc(esAsesino ? CONSEJO_CULPABLE : CONSEJO_INOCENTE)}</p>
+            </div>`;
+}
+
 function dosierJugador(
   opciones: DocumentRenderOptions,
   game: GameSession,
@@ -301,16 +356,7 @@ function dosierJugador(
           : ''
       }
 
-      ${
-        esAsesino
-          ? `<div class="caja caja--asesino" style="margin-top:22px">
-              <div class="titulo-secreto">☠ Tú eres el asesino</div>
-              <p><strong>Mataste a ${esc(victimaDe(plot).name)}${armaDelCrimen ? ` con ${esc(armaDelCrimen.name)}` : ''}${salaDelCrimen ? `, en ${esc(salaDelCrimen.name)}` : ''}.</strong></p>
-              <p>${esc(plot.solution.howItHappened)}</p>
-              <p style="margin-bottom:0"><em>Cómo jugarlo sin delatarte:</em> participa en las conversaciones con normalidad y acusa a otros con moderación —quien más grita, antes cae—. Puedes mentir sobre tu coartada, pero mantén siempre la misma versión: las contradicciones son lo primero que se detecta. Si alguien te acorrala con una prueba, admite un detalle menor para ganar credibilidad y desvía la atención hacia el secreto de otro invitado.</p>
-            </div>`
-          : ''
-      }
+      ${bloqueTuNoche(plot, personaje, esAsesino, armaDelCrimen?.name, salaDelCrimen?.name)}
     </section>`
     : '';
 

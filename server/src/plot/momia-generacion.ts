@@ -41,7 +41,7 @@ import type { TramaMomia } from '../../../shared/juegos/momia-tipos';
  */
 import { entidadesDe } from '../../../shared/juegos';
 import { DEMO_MODE } from '../config';
-import { getAnthropicClient, resolveModel } from '../agent/anthropic';
+import { esfuerzoPara, getAnthropicClient, resolveModel, streamDeGeneracion, textoDe } from '../agent/anthropic';
 import { cimientosDeMomia } from './momia-cimientos';
 import type { Cimientos, EntidadesDeMomia } from './momia-cimientos';
 import { MOMIA_TRAMA_SCHEMA } from './momia-esquema';
@@ -151,10 +151,16 @@ export interface TramaEnsamblada {
  * concesión» — el único con pinta normal. Un filtro que señala a quien no filtró
  * es peor que no filtrar.
  */
-const RECAMBIO_OFICIO = 'miembro de la expedición';
+export const RECAMBIO_OFICIO = 'miembro de la expedición';
 
-/** Un texto de recambio cuando el modelo escribe algo que no puede salir a la mesa. */
-const RECAMBIO_PUBLICO =
+/**
+ * Un texto de recambio cuando el modelo escribe algo que no puede salir a la mesa.
+ *
+ * Se exporta para que la revisión los reconozca: un recambio es un hueco en la
+ * noche y, en una narración, una marca —sale justo donde el texto nombraba a
+ * quien rompió el sello—. La auditoría los cuenta y el revisor los reescribe.
+ */
+export const RECAMBIO_PUBLICO =
   'La expedición no se pone de acuerdo en lo que pasó aquella noche, y lo que se cuenta cambia según quién lo cuente.';
 
 /**
@@ -509,18 +515,23 @@ export function ensamblarTramaMomia(
   };
 }
 
+/** Los textos del dosier mínimo. Se exportan para que la revisión lo reconozca y lo reescriba. */
+export const DOSIER_MINIMO = {
+  publicPersona: 'Llegó con la misión y ha estado en todas las cámaras que se han abierto.',
+  secret: 'Callas algo de aquella noche que todavía no has sabido cómo contar.',
+  motive: 'Si la tumba no se sella, la concesión sigue viva otra temporada.',
+  alibi: 'Dices que estabas en el corredor cuando se apagó la lámpara.',
+  personalHook: 'Su papel se ha quedado sin escribir: improvisa con lo que sepas de la persona.',
+} as const;
+
 /** El dosier que se escribe cuando el modelo se deja a alguien. Feo, pero jugable. */
 function dosierMinimo(persona: Entidad): PlotCharacter {
   return {
     participanteId: persona.id,
     characterName: persona.name,
-    role: 'miembro de la expedición',
-    publicPersona: 'Llegó con la misión y ha estado en todas las cámaras que se han abierto.',
-    secret: 'Callas algo de aquella noche que todavía no has sabido cómo contar.',
-    motive: 'Si la tumba no se sella, la concesión sigue viva otra temporada.',
-    alibi: 'Dices que estabas en el corredor cuando se apagó la lámpara.',
+    role: RECAMBIO_OFICIO,
+    ...DOSIER_MINIMO,
     knowledge: [],
-    personalHook: 'Su papel se ha quedado sin escribir: improvisa con lo que sepas de la persona.',
   };
 }
 
@@ -629,18 +640,19 @@ async function unaTirada(
   cimientos: Cimientos,
   emit: Emitir,
 ): Promise<RespuestaMomia> {
-  const stream = client.messages.stream({
+  const stream = streamDeGeneracion(client, {
     model,
-    max_tokens: 64000,
-    system: [{ type: 'text', text: SISTEMA_MOMIA, cache_control: { type: 'ephemeral' } }],
-    output_config: { format: { type: 'json_schema', schema: MOMIA_TRAMA_SCHEMA } },
+    esfuerzo: esfuerzoPara(game, 'trama'),
+    maxTokens: 128000,
+    system: SISTEMA_MOMIA,
+    schema: MOMIA_TRAMA_SCHEMA,
     messages: [{ role: 'user', content: construirPromptMomia(game, cimientos.trama, entidades) }],
   });
 
   stream.on('text', emisorDeProgreso(game, emit));
   const mensaje = await stream.finalMessage();
   // Lo que ha costado esta llamada. No puede tumbar la generacion.
-  apuntarUso({ concepto: 'trama', model, usage: mensaje.usage, gameId: game.id });
+  apuntarUso({ concepto: 'trama', model: mensaje.model ?? model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error(
@@ -653,10 +665,7 @@ async function unaTirada(
     );
   }
 
-  let texto = '';
-  for (const bloque of mensaje.content) {
-    if (bloque.type === 'text') texto += bloque.text;
-  }
+  const texto = textoDe(mensaje);
   try {
     return JSON.parse(texto) as RespuestaMomia;
   } catch {

@@ -810,6 +810,8 @@ export const SOMBRAS: ManifiestoDeJuego = {
 
   trofeos: TROFEOS_SOMBRAS,
   seccionesDeDosier: SECCIONES_SOMBRAS,
+  // El kanchō está oculto: la revisión lee la noche a ciegas para ver si algo lo delata.
+  lectorCiego: true,
 
   preparacion: {
     anfitrion: [

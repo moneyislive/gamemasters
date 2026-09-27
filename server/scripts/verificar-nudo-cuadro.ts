@@ -499,7 +499,7 @@ paso('La corrección rechaza lo que no vale, y no revienta con basura');
   const inst = plantearInstrumento('agujas', 3, 'basura', VOCABULARIO);
   const p = inst.planteamiento as ManiobraPlanteada;
 
-  const basura = ['', 'aaaa', '{"hacer":"pasar"}', 'a9,s7,p'.repeat(30), ' '];
+  const basura = ['', 'aaaa', '{"hacer":"pasar"}', 'a9,s7,p'.repeat(30), '\u0000'];
   for (const texto of basura) {
     const r = corregirInstrumento('agujas', inst.planteamiento, inst.solucion, texto);
     comprobar(`la maniobra rechaza «${texto.slice(0, 12)}» sin reventar`, r.vale === false);

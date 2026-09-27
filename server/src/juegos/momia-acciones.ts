@@ -317,10 +317,9 @@ function leFaltaSoloUno(estado: EstadoMomia, participanteId: string): boolean {
  *
  * LOS DESTINOS VAN EN CAMPOS DISTINTOS SEGÚN LO QUE SEAN, y no en un `objetivo`
  * para todo. La razón es del motor: valida cada campo contra la categoría que la
- * acción declara, así que una persona y una cámara no pueden compartir campo. Y
- * lo que no es una entidad —un fragmento, una mentira— no puede declararse
- * siquiera, así que esos dos solo llegan cuando se llama a esta función
- * directamente y por el cable se usa el valor por defecto.
+ * acción declara, así que una persona y una cámara no pueden compartir campo. Lo
+ * que no es una entidad —cuál de tus dones, qué fragmento— llega por
+ * `eligeLibre`, sin validar, y lo valida esta función.
  *
  * Los valores por defecto son DETERMINISTAS, nunca al azar: una partida tiene
  * que poder repetirse con la misma semilla.
@@ -565,11 +564,19 @@ registrarAcciones('momia', {
    * acción pida una persona, una cámara o nada según el don. Cuál mirar lo
    * decide el reductor, porque el motor no puede: el don es secreto.
    */
+  /*
+   * `fragmento` NO LLEGABA. El manifiesto lo declara en `eligeLibre` y el motor
+   * lo manda, pero aquí se quedaba fuera: desde la app el Fotógrafo publicaba
+   * siempre su primer fragmento y el saqueador soltaba siempre la primera mentira
+   * de la lista, eligieran lo que eligieran. La jugada del traidor se la
+   * decidía el orden de un array.
+   */
   invocar: ({ game, sesion, participanteId, datos }) =>
     invocarDon(game, sesion, participanteId, {
       don: datos.don,
       persona: datos.objetivo,
       camara: datos.camara,
+      fragmento: datos.fragmento,
     }),
 
   /*

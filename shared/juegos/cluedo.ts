@@ -46,10 +46,19 @@ export const REGLAS_CLUEDO: ReglaDeJuego[] = [
     texto:
       'Interpreta al personaje de tu dosier durante toda la velada. Tu forma de ser, tus opiniones y tus intenciones son tuyas; los hechos que el dosier da por ciertos, no.',
   },
+  /*
+   * LA COARTADA SE SOSTIENE, NO SE INVENTA. Decía «no puedes mentir sobre dónde
+   * estuviste realmente», y eso no casa con ninguna trama: la coartada del
+   * culpable esconde el crimen, y la de medio reparto esconde su propia falta.
+   * Con esa regla, una pregunta directa obligaba a confesar. La velada de la casa
+   * Sabrón —la mejor que ha salido— la corrigió a mano en su validación, y es la
+   * que queda: se sostiene la versión del dosier aunque oculte una ausencia, y lo
+   * único prohibido es inventarse otra.
+   */
   {
     titulo: 'Qué puedes ocultar y qué no',
     texto:
-      'Puedes callar, desviar la atención y mentir sobre tus opiniones, intenciones y sospechas. No puedes negar un hecho que tu dosier afirme, mentir sobre dónde estuviste realmente, inventarte pruebas ni cambiar lo que dice una pista. Sobre una prueba puedes discutir su interpretación, nunca su contenido.',
+      'Puedes callar, responder a medias y mentir sobre tus opiniones, intenciones y sospechas. Puedes sostener la coartada que declara tu dosier aunque oculte una ausencia o un secreto; lo que no puedes es inventarte otra versión ni adornarla con lo que no dice. Tampoco puedes inventarte pruebas ni cambiar lo que dice una pista: discute su interpretación, nunca su contenido.',
   },
   {
     titulo: 'Tu secreto',
@@ -64,7 +73,7 @@ export const REGLAS_CLUEDO: ReglaDeJuego[] = [
   {
     titulo: 'Preguntas dirigidas',
     texto:
-      'En cada ronda puedes hacer una pregunta directa a alguien que esté en tu sala. Puede responder con la verdad, dar una respuesta parcial o negarse a contestar; negarse también dice cosas. Lo que no puede es contradecir un hecho de su dosier.',
+      'En cada ronda puedes hacer una pregunta directa a alguien que esté en tu sala. Puede responder con la verdad, dar una respuesta parcial o negarse a contestar; negarse también dice cosas. Lo que no puede es salirse de la versión de su dosier.',
   },
   {
     titulo: 'Hipótesis',
@@ -441,4 +450,5 @@ export const CLUEDO: ManifiestoDeJuego = {
   },
 
   materialDeVelada: true,
+  lectorCiego: true,
 };

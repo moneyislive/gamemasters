@@ -15,6 +15,7 @@
 import type { BoardLayout, BoardMode } from './types';
 import type { CategoriaId, EjeId, JuegoId } from './juegos/tipos';
 import type { CorreoDeCuenta, IdentidadDeProveedor } from './identidad';
+import type { CobroDeLaCuenta } from './cobro';
 
 // ---------------------------------------------------------------------------
 // Estado de la partida
@@ -255,6 +256,12 @@ export interface LiveSession {
   roundStartedAt?: string;
   /** Fin previsto de la ronda; el reloj del móvil se sincroniza con esto. */
   roundEndsAt?: string;
+  /**
+   * Cuántas preguntas ha contestado el Mayordomo en esta apertura. Cada una es
+   * una llamada al modelo, y no tenían tope: ver `preguntasDelMayordomo` en
+   * `server/src/cobro/velada.ts`.
+   */
+  preguntasAlMayordomo?: number;
   players: LivePlayer[];
   /**
    * LAS RESPUESTAS QUE HA ENTREGADO LA GENTE.
@@ -587,6 +594,12 @@ export interface Account {
    * modelo esculpido): aquél es un retrato y éste es un personaje que anda.
    */
   figura?: string;
+  /**
+   * Lo que se sabe del cobro de esta cuenta: su cliente en la pasarela, su
+   * suscripción y sus pases. El SALDO no está aquí: sale del libro de
+   * movimientos (ver `server/src/cobro/monedero.ts`).
+   */
+  cobro?: CobroDeLaCuenta;
 }
 
 // ---------------------------------------------------------------------------
@@ -721,6 +734,12 @@ export interface VistaJugador {
      * que es quien decide qué momentos son seguros de enviar.
      */
     cronologiaPropia: MomentoVista[];
+    /**
+     * «Tu noche» contada: el mismo párrafo que lleva el dosier impreso, en
+     * segunda persona. Solo viene si la trama lo tiene —las de CLUEDO escritas
+     * desde el 25-sep-2026—; los demás juegos y las tramas viejas no lo mandan.
+     */
+    nocheSuya?: string;
     notas: string;
     /**
      * ERES TU LA RESPUESTA. Solo lo sabes tu, y le cambia el tono a la app.

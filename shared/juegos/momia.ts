@@ -762,6 +762,8 @@ export const MOMIA: ManifiestoDeJuego = {
 
   trofeos: TROFEOS_MOMIA,
   seccionesDeDosier: SECCIONES_MOMIA,
+  // Quien rompió el sello está oculto: la revisión lee la noche a ciegas para ver si algo lo delata.
+  lectorCiego: true,
   preparacion: {
     anfitrion: [
       'Imprime el paquete. Los fragmentos de papiro, a UNA CARA: a doble cara se leen al trasluz y se acaba el juego.',

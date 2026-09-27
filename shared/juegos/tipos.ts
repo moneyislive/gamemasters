@@ -999,6 +999,19 @@ export interface ManifiestoDeJuego {
   materialDeVelada?: boolean;
 
   /**
+   * ¿La revisión de este juego tiene un LECTOR CIEGO, alguien que no conoce la
+   * solución y lee la noche momento a momento para ver si algo la delata?
+   *
+   * Lo tienen los juegos con alguien oculto (el culpable, el traidor, quien
+   * rompió el sello). No lo tiene el Nudo: su respuesta es un cuadro de marchas
+   * que ni siquiera el modelo que escribe conoce, y se mide con código.
+   *
+   * Es dato y no registro porque lo lee el presupuesto: cada lectura es una
+   * llamada que se cobra, y cobrar un paso que el juego no tiene es cobrar de más.
+   */
+  lectorCiego?: boolean;
+
+  /**
    * ¿Este juego trae sus propios dosieres en `documentos`?
    *
    * La plataforma sabe componer un dosier por persona, uno para quien dirige y

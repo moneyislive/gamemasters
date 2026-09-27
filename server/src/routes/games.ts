@@ -6,6 +6,7 @@
  *   PATCH  /games/:id  → patch parcial {name?, boardMode?, boardImageUrl?, settings?}
  *   DELETE /games/:id  → {ok:true}
  */
+import { veLasHuerfanas } from '../taller/dueno';
 import { juegosInstalados, manifiestoDe } from '../../../shared/juegos';
 import type { DocumentSectionId, GameSettings } from '../../../shared/types';
 import { isPrintableDocId } from '../../../shared/documents';
@@ -45,7 +46,8 @@ router.get('/games', async (req, res) => {
      * cada vez que alguien abria el recibidor, y crece con el uso.
      */
     const mias = await getStore().listGameIdsDeCuenta(quien.cuentaId);
-    res.json(todas.filter((r) => r.huerfana || mias.has(r.id)));
+    const conHuerfanas = await veLasHuerfanas(req, quien.cuentaId);
+    res.json(todas.filter((r) => (r.huerfana && conHuerfanas) || mias.has(r.id)));
     return;
   } catch (err) {
     console.error('[partidas] Error al listar:', err);

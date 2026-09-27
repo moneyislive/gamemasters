@@ -302,9 +302,10 @@ export const REGLAS_NUDO: ReglaDeJuego[] = [
   {
     titulo: 'Qué se gana',
     texto:
-      'Se gana o se pierde EN GRUPO. Si los seis convoyes cruzan antes del amanecer y el retraso ' +
-      'de la estación no ha llegado a su tope, gana el turno entero. Aquí nadie es el malo y ' +
-      'nadie compite con nadie: lo único que hay enfrente es el reloj.',
+      'Se gana o se pierde EN GRUPO. Si el Correo de Medianoche cruza y, con la cuenta del ' +
+      'amanecer, el retraso de la estación no pasa de su tope, gana el turno entero. Los otros ' +
+      'convoyes también cuentan: cada uno que se quede en la vía suma retraso a esa cuenta. Aquí ' +
+      'nadie es el malo y nadie compite con nadie: lo único que hay enfrente es el reloj.',
   },
   {
     titulo: 'El Correo de Medianoche',
@@ -897,7 +898,7 @@ export const NUDO: ManifiestoDeJuego = {
     sinIa: {
       reglas:
         'Cada franja sale un convoy y solo uno. Se cursa la orden desde la app: si es el que tocaba, ' +
-        'sale; si no, el enclavamiento no da paso y son dos minutos menos de margen. Cursar gasta ' +
+        'sale; si no, el enclavamiento no da paso y la estación suma dos minutos de retraso. Cursar gasta ' +
         'una conformidad, y las conformidades se ganan resolviendo el instrumento de cada puesto.',
       personaje:
         'Su oficio y su maña los lleva usted en el dosier. La maña es una sola vez en toda la noche, ' +

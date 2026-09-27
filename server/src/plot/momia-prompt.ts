@@ -46,8 +46,8 @@ const DONES: Record<DonId, string> = {
   falsificar: 'sabe imitar la mano de un escriba muerto',
 };
 
-/** Cómo se le dicta al modelo una restricción, sin que tenga que interpretarla. */
-function dictarRestriccion(r: Restriccion, nombre: (id: RitoId) => string): string {
+/** Cómo se le dicta al modelo una restricción, sin que tenga que interpretarla. La usa también el revisor. */
+export function dictarRestriccion(r: Restriccion, nombre: (id: RitoId) => string): string {
   switch (r.tipo) {
     case 'antes':
       return `«${nombre(r.a)}» va en algún momento ANTES que «${nombre(r.b)}» (no necesariamente pegado).`;
@@ -74,7 +74,7 @@ function dictarRestriccion(r: Restriccion, nombre: (id: RitoId) => string): stri
  * puede distinguirlas. Fijando que el rito que va antes se nombre antes, la
  * frase solo admite una lectura.
  */
-const REGLAS_DE_REDACCION = `REGLAS DE REDACCIÓN DE LOS FRAGMENTOS (se comprueban una a una con código; una frase
+export const REGLAS_DE_REDACCION = `REGLAS DE REDACCIÓN DE LOS FRAGMENTOS (se comprueban una a una con código; una frase
 que no las cumpla se tira y se sustituye por otra sosa escrita a máquina):
 
   R1. La frase nombra los ritos implicados por su NOMBRE tal y como aparece en la
@@ -228,6 +228,16 @@ LO QUE TIENES QUE ESCRIBIR
      dos versiones tienen que decir lo mismo.
    - "knowledge": de dos a cuatro cosas que sabe de OTROS y puede soltar en la
      mesa. Es lo que da conversación a quien es tímido.
+   - EL MISMO TRATO PARA TODOS. Una persona de la que nadie habla es la primera a
+     la que se mira, y una a la que todos acusan, también. Entre lo que cada cual
+     sabe de los demás, que NADIE se quede sin que otro hable de él —tampoco
+     quien rompió el sello—, y que nada acuse a nadie de haberlo roto. Los
+     inocentes también esconden algo con peso en su secreto: nadie puede ser
+     señalado por ser el único con algo que callar.
+   - El dosier se imprime en caras fijas: presentación y gancho, de dos a cuatro
+     frases cada uno; secreto, de dos a cuatro; motivo y coartada, de una o dos;
+     lo que sabe de otros, de una o dos frases por cosa. Uno que se alargue se
+     desborda a otra hoja, y ese sobre se ve más gordo que los demás.
 
 3. QUIÉN ROMPIÓ EL SELLO Y POR QUÉ. Elige a UNO de la expedición (su id exacto en
    "saqueadorId"). Su motivo tiene que DOLER: no «lo hizo por dinero», sino algo
@@ -235,12 +245,16 @@ LO QUE TIENES QUE ESCRIBIR
    un padre borrado de la historia por quien firma los hallazgos, un pacto hecho
    cuando no había otra salida—. Que al descubrirse, a alguien le dé pena.
    El saqueador NO se anuncia en ninguna parte pública: ni en la sinopsis, ni en
-   las vigilias, ni en el dosier de nadie más.
+   las vigilias, ni en el dosier de nadie más. Su oficio y su presentación —que
+   se imprimen en el dosier de todos— tienen la misma extensión y el mismo tono
+   que los de cualquiera.
 
 4. LA NARRACIÓN DE CADA VIGILIA (${trama.profanadas.length} en total, en orden), para leerse en voz
-   alta. Cada una nombra la cámara que se profana esa noche y sube la presión:
-   la maldición avanza, el aire se enrarece, quedan menos horas. Ninguna dice el
-   orden de los ritos ni insinúa quién rompió el sello.
+   alta. Cada una nombra la cámara que se profana ESA noche —y ninguna otra: la
+   de mañana es justo lo que el Mecenas paga por saber— y sube la presión: la
+   maldición avanza, el aire se enrarece, quedan menos horas. No nombran a nadie
+   de la expedición, no dicen el orden de los ritos ni insinúan quién rompió el
+   sello.
 
 5. LOS RITOS Y LAS CÁMARAS. Una invocación y un gesto físico por rito —algo que
    se pueda hacer de verdad en un salón— y una inscripción de dintel por cámara.
@@ -269,6 +283,12 @@ Este orden aparece ÚNICAMENTE en "desenlace.reconstruccion". No lo enumeres en 
 sinopsis, ni en las vigilias, ni en las inscripciones de las cámaras, ni en los
 dosieres, ni en las ayudas, ni en el guion de quien dirige. Si aparece fuera de ahí, la velada se acaba en la
 primera media hora.
+
+Y TAMPOCO A TROZOS. Una frase como «el rito del Agua va antes que el del Fuego» o
+«el Nombre es el tercero», en una narración o en un cartel, es un fragmento de
+papiro regalado: la mesa lo apunta igual. Fuera del desenlace, ninguna frase dice
+qué rito va antes que otro ni qué lugar ocupa uno. La única excepción es la ayuda
+de nivel 3, que puede decir qué rito ocupa un extremo, y tiene que ser verdad.
 
 Los expedicionarios, por si necesitas nombrarlos en el desenlace: ${entidades.expedicionarios.map((e) => `${e.name} (${e.id})`).join(', ')}.
 Son personas de carne y hueso que van a leer esto en voz alta: el personaje se

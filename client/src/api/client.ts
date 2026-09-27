@@ -12,27 +12,56 @@ import type {
   Suspect,
   Weapon,
 } from '../../../shared/types';
+import type {
+  ConfirmacionDeVelada,
+  EstadoDelMonedero,
+  ModoDeJuego,
+  RespuestaDelPresupuesto,
+} from '../../../shared/cobro';
 
 const BASE = '/api';
+
+/**
+ * Un error que contestó el servidor, con su estado y su mensaje en español.
+ *
+ * Existe por las ceremonias de generación: un 402 (falta saldo), un 409 (ya se
+ * está generando) o un 429 (tope del día) llegan ANTES de abrir el stream, y se
+ * pintaban como «Revisa la conexión con el servidor». El mensaje bueno venía en
+ * el cuerpo y nadie lo leía.
+ */
+export class ErrorDeApi extends Error {
+  constructor(
+    readonly estado: number,
+    mensaje: string,
+    /** El cuerpo entero, por si trae algo más que el mensaje (un presupuesto, un saldo). */
+    readonly datos?: unknown,
+  ) {
+    super(mensaje);
+  }
+}
+
+async function errorDeRespuesta(res: Response): Promise<ErrorDeApi> {
+  // El servidor responde {error: "…"} en español: ese mensaje es el útil para
+  // el usuario, así que se propaga tal cual en vez del código HTTP crudo.
+  const text = await res.text().catch(() => '');
+  let mensaje = text || res.statusText;
+  let datos: unknown;
+  try {
+    const cuerpo = JSON.parse(text) as { error?: unknown };
+    datos = cuerpo;
+    if (typeof cuerpo.error === 'string' && cuerpo.error.trim()) mensaje = cuerpo.error;
+  } catch {
+    // La respuesta no era JSON: se usa el texto crudo.
+  }
+  return new ErrorDeApi(res.status, mensaje, datos);
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: init?.body instanceof FormData ? undefined : { 'Content-Type': 'application/json' },
     ...init,
   });
-  if (!res.ok) {
-    // El servidor responde {error: "…"} en español: ese mensaje es el útil para
-    // el usuario, así que se propaga tal cual en vez del código HTTP crudo.
-    const text = await res.text().catch(() => '');
-    let mensaje = text || res.statusText;
-    try {
-      const cuerpo = JSON.parse(text) as { error?: unknown };
-      if (typeof cuerpo.error === 'string' && cuerpo.error.trim()) mensaje = cuerpo.error;
-    } catch {
-      // La respuesta no era JSON: se usa el texto crudo.
-    }
-    throw new Error(mensaje);
-  }
+  if (!res.ok) throw await errorDeRespuesta(res);
   return res.json() as Promise<T>;
 }
 
@@ -42,6 +71,8 @@ export interface AuthStatus {
   /** ¿La instancia está protegida con contraseña? */
   required: boolean;
   authenticated: boolean;
+  /** ¿Puede entrar cualquier cuenta (el taller es público porque se cobra)? */
+  publico?: boolean;
 }
 
 export const getAuthStatus = () => request<AuthStatus>('/auth/status');
@@ -143,10 +174,8 @@ async function postSSE<E>(
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
   });
-  if (!res.ok || !res.body) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`API ${res.status}: ${text || res.statusText}`);
-  }
+  if (!res.ok) throw await errorDeRespuesta(res);
+  if (!res.body) throw new ErrorDeApi(res.status, 'El servidor no abrió el canal de progreso.');
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -180,12 +209,35 @@ export const chatWithAgent = (
   signal?: AbortSignal,
 ) => postSSE<ChatStreamEvent>(`/games/${gameId}/chat`, { message }, onEvent, signal);
 
-/** Genera trama + tablero + documentos (streaming con progreso). */
+/**
+ * Genera trama + material + revisión + documentos (streaming con progreso).
+ * Lleva lo que se confirmó antes de generar: el modo, las opciones avanzadas y
+ * el precio que se vio.
+ */
 export const generateGame = (
   gameId: string,
   onEvent: (event: GenerateStreamEvent) => void,
+  confirmacion?: ConfirmacionDeVelada,
   signal?: AbortSignal,
-) => postSSE<GenerateStreamEvent>(`/games/${gameId}/generate`, {}, onEvent, signal);
+) => postSSE<GenerateStreamEvent>(`/games/${gameId}/generate`, confirmacion ?? {}, onEvent, signal);
+
+// ---------- La velada: presupuesto, modo y monedero ----------
+
+/** Lo que costaría la velada con estas opciones, y el saldo de quien paga. */
+export const pedirPresupuesto = (gameId: string, opciones: { modo: ModoDeJuego; model?: string; esfuerzo?: string }) =>
+  request<RespuestaDelPresupuesto>(`/games/${gameId}/presupuesto`, { method: 'POST', body: JSON.stringify(opciones) });
+
+/** Papel o app. De app a papel es gratis; de papel a app en una velada pagada, la diferencia. */
+export const cambiarModo = (gameId: string, modo: ModoDeJuego) =>
+  request<GameSession>(`/games/${gameId}/modo`, { method: 'POST', body: JSON.stringify({ modo }) });
+
+export const fetchMonedero = () => request<EstadoDelMonedero>('/cobro/estado');
+
+/** Abre el pago en la pasarela y devuelve adónde ir. */
+export const comprar = (oferta: string, extra: { creditos?: number; gameId?: string } = {}) =>
+  request<{ url: string }>('/cobro/comprar', { method: 'POST', body: JSON.stringify({ oferta, ...extra }) });
+
+export const abrirPortalDePagos = () => request<{ url: string }>('/cobro/portal', { method: 'POST' });
 
 /**
  * Pone al día una partida ya generada tras cambiar jugadores, salas u objetos:
@@ -209,6 +261,13 @@ export const generateMaterial = (
   onEvent: (event: GenerateStreamEvent) => void,
   signal?: AbortSignal,
 ) => postSSE<GenerateStreamEvent>(`/games/${gameId}/material`, {}, onEvent, signal);
+
+/** Vuelve a pasar la revisión adversaria sobre la trama actual. Mismo protocolo que `generateGame`. */
+export const revisarTrama = (
+  gameId: string,
+  onEvent: (event: GenerateStreamEvent) => void,
+  signal?: AbortSignal,
+) => postSSE<GenerateStreamEvent>(`/games/${gameId}/revision`, {}, onEvent, signal);
 
 // ---------- Documentos ----------
 

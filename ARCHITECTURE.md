@@ -208,6 +208,12 @@ Prefijo `/api`. Todas las respuestas JSON. Mutaciones de entidades devuelven la
 | POST | `/api/games/:id/chat` | SSE — ver protocolo |
 | POST | `/api/games/:id/generate` | SSE — ver protocolo |
 | POST | `/api/games/:id/refresh` | SSE — pone al día una partida ya generada (ver Coherencia) |
+| POST | `/api/games/:id/material` | SSE — reescribe el material de la velada y lo pasa por la revisión de su alcance |
+| POST | `/api/games/:id/revision` | SSE — vuelve a pasar la revisión adversaria sobre la trama actual |
+| GET | `/api/cobro/estado` | `EstadoDelMonedero` de quien llama (`shared/cobro.ts`) |
+| POST | `/api/cobro/comprar` | body `{oferta, creditos?, gameId?}` → `{url}` de la pasarela |
+| POST | `/api/cobro/portal` | → `{url}` del portal del cliente |
+| POST | `/api/cobro/aviso` | avisos firmados de Stripe; cuerpo crudo, fuera de la puerta del taller |
 | GET | `/api/games/:id/documents/:suspectId` | HTML del dosier (Content-Type text/html; `?download=1` añade Content-Disposition attachment) |
 
 ### Protocolo SSE
@@ -232,16 +238,17 @@ Dos implementaciones detrás de la misma interfaz, elegidas en el arranque:
 ## Agente de CLUEDO (server/src/agent/*)
 
 - SDK: `@anthropic-ai/sdk`, cliente con `apiKey` de env. Modo demo si no hay key.
-- Modelo: el de `settings.model` de la partida o el global de config
-  (por defecto `claude-fable-5`).
+- Modelo: el de `settings.model` de la partida (opción avanzada) o el de la casa
+  (`modeloDeLaCasa`: el guardado en config si sigue siendo de velada; si no,
+  `ANTHROPIC_MODEL`, por defecto `claude-opus-5-5`).
 - **Reglas API críticas** (ya verificadas contra la doc oficial):
   - NO enviar `temperature`/`top_p`/`top_k` nunca.
   - NO enviar el parámetro `thinking` (Fable 5 lo lleva siempre activo; en el resto
     el valor por defecto es correcto).
-  - Chat: usar `client.beta.messages.stream({...})` con
-    `betas: ['server-side-fallback-2026-07-01']` y `fallbacks: 'default'` SOLO cuando
-    el modelo sea `claude-fable-5` o `claude-opus-5` (en sonnet/haiku, usar
-    `client.messages.stream` normal sin fallbacks).
+  - Chat y generación: `client.beta.messages.stream({...})` con
+    `betas: ['server-side-fallback-2026-07-01']` y `fallbacks: 'default'` cuando el
+    modelo los tenga (`usesFallbacks`: Opus 5.5, Fable 5.1, Fable 5, Opus 5); en
+    Sonnet y Haiku, `client.messages.stream` normal sin fallbacks.
   - Comprobar `stop_reason === 'refusal'` antes de leer contenido; si ocurre,
     emitir evento de error legible.
   - `max_tokens`: 16000 en chat; 64000 en generación (siempre streaming).
@@ -275,7 +282,15 @@ Dos implementaciones detrás de la misma interfaz, elegidas en el arranque:
 
 ## Pipeline de generación (server/src/plot/*, server/src/routes/generate.ts)
 
-Etapas emitidas por SSE (`stage`): `board` → `plot` → `documents`.
+Etapas emitidas por SSE (`stage`): `board` → `plot` → `material` → `revision` → `documents`.
+
+`material` corre si el juego registra generador de material (`juegos/materiales.ts`);
+`revision`, si registra revisor (`juegos/revisores.ts`). La de CLUEDO está en
+`plot/cluedo-revision.ts`: auditoría con código, detective que no conoce la solución
+y revisor que reescribe, con dos pasadas como mucho. El informe queda en
+`plot.revision` (`InformeDeRevision`); a ciegas, el taller solo recibe el veredicto.
+Todas las llamadas de generación pasan por `streamDeGeneracion` (`agent/anthropic.ts`):
+esfuerzo explícito por paso y fallbacks de servidor en los modelos que los tienen.
 
 1. **board**: si no hay `board` o boardMode cambió, llamar al generador determinista.
 2. **plot**: llamada a la API con streaming y salida estructurada

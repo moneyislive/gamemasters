@@ -102,6 +102,7 @@ import {
 } from '../../../shared/arcade';
 import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 import type { Request, Response } from 'express';
+import { puedeLlevar } from '../cobro/pase';
 import { crearRouter } from '../rutas';
 
 const router = crearRouter();
@@ -429,6 +430,19 @@ function figuraDelCuerpo(
 }
 
 /**
+ * ¿Puede quien llama llevar esa figura? Las de forma `pase-…` son del Pase de la
+ * Sala y piden una cuenta con el pase vigente (ver `cobro/pase.ts`); el resto,
+ * de todos. Va aquí, en la ruta, y no en `arcade/mesas.ts`: la mesa guarda una
+ * cadena opaca y no sabe de cuentas ni de pases, y así tiene que seguir.
+ */
+async function figuraConPermiso(req: Request, res: Response, figura: string | undefined): Promise<boolean> {
+  const permiso = await puedeLlevar(req, figura);
+  if (permiso.ok) return true;
+  res.status(permiso.estado).json({ error: permiso.error, motivo: permiso.motivo });
+  return false;
+}
+
+/**
  * La `modalidad` del cuerpo, comprobada ENTERA: forma y si este juego la admite.
  *
  * ═══ POR QUÉ LA RUTA LO PREGUNTA, SI `abrir` TAMBIÉN LO PREGUNTA ═══
@@ -504,6 +518,7 @@ router.post('/arcade/mesas', contadorDeAperturas, async (req, res) => {
 
   const conFigura = figuraDelCuerpo(cuerpo, res);
   if (conFigura === null) return;
+  if (!(await figuraConPermiso(req, res, conFigura.figura))) return;
 
   const conModalidad = modalidadDelCuerpo(cuerpo, arcade, res);
   if (conModalidad === null) return;
@@ -569,6 +584,7 @@ router.post('/arcade/mesas/:codigo/asientos', contadorDeCodigos, async (req, res
 
   const conFigura = figuraDelCuerpo(cuerpo, res);
   if (conFigura === null) return;
+  if (!(await figuraConPermiso(req, res, conFigura.figura))) return;
 
   /*
    * ═══ A QUÉ JUEGO CREÍA ESTAR ENTRANDO, Y POR QUÉ HAY QUE PREGUNTARLO ═══
@@ -678,6 +694,7 @@ router.put('/arcade/mesas/:codigo/figura', contadorDeCodigos, async (req, res) =
     });
     return;
   }
+  if (!(await figuraConPermiso(req, res, cuerpo.figura))) return;
 
   try {
     const antes = await mirar(codigo, llave);

@@ -363,6 +363,7 @@ const BATERIA = [
   { nombre: 'almacén', donde: 'server', guion: 'verify:almacen', porque: 'lo que se guarda se vuelve a leer igual' },
   { nombre: 'presencia', donde: 'server', guion: 'verify:presencia', porque: 'quién está conectado y quién no' },
   { nombre: 'tope de gasto', donde: 'server', guion: 'verify:tope', porque: 'un bucle no puede vaciar la cuenta' },
+  { nombre: 'cobro', donde: 'server', guion: 'verify:cobro', porque: 'cada crédito entra una vez, sale una vez y se puede explicar' },
   { nombre: 'campaña', donde: 'server', guion: 'verify:campana', porque: 'una velada de varios encuentros' },
   { nombre: 'credenciales', donde: 'server', guion: 'verify:credenciales', porque: 'con qué se entra y con qué no' },
   { nombre: 'borrado', donde: 'server', guion: 'verify:borrado', porque: 'quien pide que le borren, queda borrado' },
@@ -372,6 +373,30 @@ const BATERIA = [
   { nombre: 'invitaciones', donde: 'server', guion: 'verify:invitaciones', porque: 'los sobres llegan a quien deben' },
   { nombre: 'proveedores', donde: 'server', guion: 'verify:proveedores', porque: 'entrar con Google y con correo' },
   { nombre: 'enlaces', donde: 'server', guion: 'verify:enlaces', porque: 'los enlaces firmados valen para una cosa' },
+  {
+    nombre: 'revisión adversaria',
+    donde: 'server',
+    guion: 'verify:revision',
+    porque: 'lo que estropeó veladas de verdad —el resumen que acusa, el arma sin nombre, la pista que dicta— se ve antes de cobrarla',
+  },
+  {
+    nombre: 'revisión · el Nudo',
+    donde: 'server',
+    guion: 'verify:revision-nudo',
+    porque: 'una frase que ata un convoy a su franja, un parte que cuenta cómo va la noche o un cuadro que dejó de salir se ven antes de cobrarla',
+  },
+  {
+    nombre: 'revisión · las Sombras',
+    donde: 'server',
+    guion: 'verify:revision-sombras',
+    porque: 'la senda dicha en voz alta, un kanchō señalado o escondido, o su sobre más gordo se ven antes de cobrarla',
+  },
+  {
+    nombre: 'revisión · la Momia',
+    donde: 'server',
+    guion: 'verify:revision-momia',
+    porque: 'el orden de los ritos dicho a trozos, la cámara de mañana, un saqueador señalado o escondido, o su sobre más gordo se ven antes de cobrarla',
+  },
   {
     nombre: 'esquemas de la trama',
     donde: 'server',

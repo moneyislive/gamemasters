@@ -19,33 +19,61 @@ if (fs.existsSync(rootEnvPath)) {
 // sobreescribe variables ya definidas, así que esta llamada es inocua.
 dotenv.config();
 
-/** Catálogo de modelos disponibles para el agente maestro de ceremonias. */
+/**
+ * Catálogo de modelos.
+ *
+ * El orden importa: el primero es el que se usa cuando nadie elige, y el taller
+ * los enseña en este orden. Los que llevan `paraVeladas: false` se quedan para
+ * poder leer partidas antiguas que los tienen guardados, pero no se ofrecen al
+ * generar: el tope de calidad de una velada pagada no lo puede bajar un
+ * desplegable.
+ */
 export const MODEL_OPTIONS: ModelOption[] = [
   {
-    id: 'claude-fable-5',
-    label: 'Fable 5 — máxima calidad narrativa',
+    id: 'claude-opus-5-5',
+    label: 'Opus 5.5 — el de la casa',
     description:
-      'El narrador supremo: tramas profundas, personajes memorables y giros elegantes. La elección para la velada definitiva.',
+      'Tramas bien atadas, coartadas que encajan y giros con intención, a un precio contenido. Es el que se usa si no eliges nada.',
+    paraVeladas: true,
   },
   {
-    id: 'claude-opus-5',
-    label: 'Opus 5 — deducción magistral',
+    id: 'claude-fable-5-1',
+    label: 'Fable 5.1 — máxima calidad narrativa',
     description:
-      'Potencia deductiva de primer nivel para misterios complejos, con muchos sospechosos y coartadas entrelazadas.',
+      'El narrador más fino: personajes más hondos y prosa más cuidada. Cuesta bastante más que el de la casa.',
+    paraVeladas: true,
   },
   {
     id: 'claude-sonnet-5',
-    label: 'Sonnet 5 — equilibrio brillante',
+    label: 'Sonnet 5 — económico',
     description:
-      'Rapidez y calidad a partes iguales: perfecto para preparar partidas sin apenas esperas.',
+      'Más rápido y más barato. Tramas algo más sencillas: va bien con mesas pequeñas y pocas salas.',
+    paraVeladas: true,
+  },
+  {
+    id: 'claude-fable-5',
+    label: 'Fable 5 (versión anterior)',
+    description: 'Sustituido por Fable 5.1, al mismo precio. Se conserva para las partidas que lo tenían.',
+    paraVeladas: false,
+  },
+  {
+    id: 'claude-opus-5',
+    label: 'Opus 5 (versión anterior)',
+    description: 'Sustituido por Opus 5.5, que es mejor y más barato. Se conserva para las partidas que lo tenían.',
+    paraVeladas: false,
   },
   {
     id: 'claude-haiku-4-5',
-    label: 'Haiku 4.5 — ligero y veloz',
-    description:
-      'Respuestas casi instantáneas, ideal para pruebas rápidas y partidas improvisadas.',
+    label: 'Haiku 4.5 — solo pruebas',
+    description: 'Casi instantáneo, pero no escribe tramas a la altura de una velada de pago.',
+    paraVeladas: false,
   },
 ];
+
+/** ¿Se puede escribir una velada con este modelo? */
+export function esModeloDeVelada(value: unknown): value is ModelId {
+  return MODEL_OPTIONS.some((option) => option.id === value && option.paraVeladas);
+}
 
 /** Comprueba en tiempo de ejecución que un valor es un ModelId conocido. */
 export function isModelId(value: unknown): value is ModelId {
@@ -140,7 +168,7 @@ function readDefaultModel(): ModelId {
   // ANTHROPIC_MODEL es el nombre documentado en .env.example; DEFAULT_MODEL se
   // acepta como alias por comodidad.
   const raw = process.env.ANTHROPIC_MODEL ?? process.env.DEFAULT_MODEL;
-  return isModelId(raw) ? raw : 'claude-fable-5';
+  return esModeloDeVelada(raw) ? raw : 'claude-opus-5-5';
 }
 
 /**

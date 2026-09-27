@@ -29,8 +29,32 @@ import {
 } from './identidad/sesion';
 import { admitidoEnElTaller } from './identidad/cuentas-proveedor';
 import { getStore } from './db/store';
-import { cuentaDeCasa } from './taller/cuenta-de-casa';
+import { cuentaDeCasa, esCuentaDeCasa } from './taller/cuenta-de-casa';
 import type { ProveedorId } from '../../shared/identidad';
+import type { Account } from '../../shared/live';
+import { COBRO_ACTIVO } from './cobro/ofertas';
+
+/**
+ * ¿Está el taller abierto a CUALQUIER cuenta, o solo a la casa y a quien ella
+ * autoriza (`GM_ADMITIDOS`)?
+ *
+ * Abierto solo cuando se cobra, y no es un detalle: con el taller abierto y el
+ * cobro apagado, cualquiera con una cuenta de Google generaría veladas pagadas
+ * con la clave de la casa, y los topes diarios solo lo frenarían. Así que las
+ * dos cosas van juntas, y encenderlas es una sola decisión: `COBRO_ACTIVO=si`.
+ */
+export function tallerPublico(): boolean {
+  return COBRO_ACTIVO;
+}
+
+/**
+ * ¿Es de la casa esta cuenta? La autorizada en `GM_ADMITIDOS` o la cuenta de
+ * casa (la de la contraseña con nombre). Son las que ven las partidas antiguas
+ * sin dueño y las que no pagan.
+ */
+export function esDeLaCasa(cuenta: Account): boolean {
+  return admitidoEnElTaller(cuenta) || esCuentaDeCasa(cuenta);
+}
 
 const COOKIE = 'gm_sesion';
 /** La sesión de cuenta dura noventa días: es una plataforma, no una velada. */
@@ -141,6 +165,20 @@ export function identidadDeTaller(req: Request): IdentidadDeTaller | null {
  * de casa y pasaporte— y su cuenta no está en `GM_ADMITIDOS` ni tiene por qué;
  * si un pasaporte no admitido cortara aquí, ese camino se cerraría solo.
  */
+/**
+ * ¿Trae esta petición la llave de la casa (la cookie de la contraseña)?
+ *
+ * Aparte de `identidadDeTaller` porque quien entra con contraseña Y nombre lleva
+ * las dos cosas, y ahí manda el pasaporte: para saber si es de la casa —y por
+ * tanto no se le cobra— hay que mirar la cookie por separado.
+ */
+export function llevaLaLlaveDeLaCasa(req: Request): boolean {
+  const password = env.appPassword;
+  if (!password) return false;
+  const cookie = leerCookie(req, COOKIE);
+  return Boolean(cookie && igualSeguro(cookie, tokenDeSesion(password)));
+}
+
 export async function tallerAbiertoPara(req: Request): Promise<boolean> {
   const pasaporte = sesionDeCuentaDePeticion(req);
   if (pasaporte) {
@@ -148,6 +186,21 @@ export async function tallerAbiertoPara(req: Request): Promise<boolean> {
     // Revocación de verdad: quitar el correo de `GM_ADMITIDOS` cierra en la
     // petición siguiente, sin esperar a que caduquen noventa días de sesión.
     if (cuenta && admitidoEnElTaller(cuenta) && pasaporteVigente(pasaporte, cuenta)) return true;
+    /*
+     * CON EL TALLER PÚBLICO, cualquier cuenta que haya entrado con un proveedor
+     * (Google, Apple). No basta el pasaporte: también lo tiene quien solo guardó
+     * su perfil de jugador desde la app, y ése no ha demostrado nada. Lo que
+     * cada cual ve dentro lo decide el guardián de dueños, y las partidas sin
+     * dueño —las antiguas de la casa— dejan de verse (`veLasHuerfanas`).
+     */
+    if (
+      tallerPublico() &&
+      cuenta &&
+      (cuenta.identidades?.length ?? 0) > 0 &&
+      pasaporteVigente(pasaporte, cuenta)
+    ) {
+      return true;
+    }
   }
 
   const password = env.appPassword;
@@ -187,7 +240,12 @@ const router = crearRouter();
 
 /** Estado de la sesión: lo consulta el cliente al arrancar. */
 router.get('/auth/status', async (req, res) => {
-  res.json({ required: passwordRequired(), authenticated: await tallerAbiertoPara(req) });
+  res.json({
+    required: passwordRequired(),
+    authenticated: await tallerAbiertoPara(req),
+    // Para que la puerta invite a entrar con la cuenta y no solo con la contraseña.
+    publico: tallerPublico(),
+  });
 });
 
 router.post('/auth/login', async (req, res) => {

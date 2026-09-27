@@ -17,12 +17,12 @@
       "largo": 28849
     },
     "anfitrion/dosier-expedicionario/color": {
-      "huella": "695de1cc28735d1f",
-      "largo": 38377
+      "huella": "7bfb36a3b3cb7140",
+      "largo": 48933
     },
     "anfitrion/dosier-expedicionario/blanco": {
-      "huella": "41a55e0c6e82dd95",
-      "largo": 38378
+      "huella": "a47081811b3197b4",
+      "largo": 48934
     },
     "anfitrion/fragmentos-papiro/color": {
       "huella": "847ffddff8a7172c",
@@ -49,12 +49,12 @@
       "largo": 12896
     },
     "anfitrion/tabla-marcas/color": {
-      "huella": "f2450f1353fad7ba",
-      "largo": 14854
+      "huella": "077ecd5997b52484",
+      "largo": 14965
     },
     "anfitrion/tabla-marcas/blanco": {
-      "huella": "2941f97af96adeac",
-      "largo": 14855
+      "huella": "d1788d0d13917aeb",
+      "largo": 14966
     },
     "anfitrion/papiro-sellado/color": {
       "huella": "d1186bb992a2eac5",
@@ -81,12 +81,12 @@
       "largo": 28450
     },
     "ciego/dosier-expedicionario/color": {
-      "huella": "695de1cc28735d1f",
-      "largo": 38377
+      "huella": "7bfb36a3b3cb7140",
+      "largo": 48933
     },
     "ciego/dosier-expedicionario/blanco": {
-      "huella": "41a55e0c6e82dd95",
-      "largo": 38378
+      "huella": "a47081811b3197b4",
+      "largo": 48934
     },
     "ciego/fragmentos-papiro/color": {
       "huella": "847ffddff8a7172c",
@@ -113,12 +113,12 @@
       "largo": 12896
     },
     "ciego/tabla-marcas/color": {
-      "huella": "f2450f1353fad7ba",
-      "largo": 14854
+      "huella": "077ecd5997b52484",
+      "largo": 14965
     },
     "ciego/tabla-marcas/blanco": {
-      "huella": "2941f97af96adeac",
-      "largo": 14855
+      "huella": "d1788d0d13917aeb",
+      "largo": 14966
     },
     "ciego/papiro-sellado/color": {
       "huella": "8b2cb2e863876a7f",
@@ -131,36 +131,36 @@
   },
   "dosieres": {
     "e0/color": {
-      "huella": "8bd5ab0c62364790",
-      "largo": 16191
+      "huella": "0fd228179399bc40",
+      "largo": 19478
     },
     "e0/blanco": {
-      "huella": "6c1a0d82ba13b250",
-      "largo": 16192
+      "huella": "563bcef08e978a82",
+      "largo": 19479
     },
     "e1/color": {
-      "huella": "f37b60c3023833a9",
-      "largo": 16214
+      "huella": "bcbd9cb16948e187",
+      "largo": 19515
     },
     "e1/blanco": {
-      "huella": "8c76331709fa3019",
-      "largo": 16215
+      "huella": "465aaa08415aae00",
+      "largo": 19516
     },
     "e2/color": {
-      "huella": "25050133ba0ec9d2",
-      "largo": 16190
+      "huella": "3549bb13d7cf6ccf",
+      "largo": 19515
     },
     "e2/blanco": {
-      "huella": "e394ae58afbf10de",
-      "largo": 16191
+      "huella": "9dc03b1c06d4b4fd",
+      "largo": 19516
     },
     "e3/color": {
-      "huella": "cdfb444a880dc42d",
-      "largo": 17994
+      "huella": "d0f1b54e9e56d65e",
+      "largo": 19246
     },
     "e3/blanco": {
-      "huella": "ea923952759440c7",
-      "largo": 17995
+      "huella": "c42862507d9d508a",
+      "largo": 19247
     }
   },
   "partida": [

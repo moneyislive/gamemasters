@@ -14,6 +14,13 @@
  * NO LLEVA LOS DONES ESCRITOS. La tabla se queda sobre la mesa de quien dirige y
  * la ve cualquiera que se asome; los dones son de cada cual y están en su dosier
  * y en la guía. Aquí solo la aritmética.
+ *
+ * NI QUÉ CÁMARA SE PROFANA CADA NOCHE, que imprimía de antemano. Por la misma
+ * razón y con más motivo: de las cuatro vigilias solo se sabe la de ESTA noche,
+ * que se anuncia al abrirla; las siguientes son justo lo que el Mecenas paga con
+ * su don por saber un día antes. Con la tabla a la vista, las sabía cualquiera
+ * que se asomara, y quien dirige a ciegas —que juega— las tenía todas desde el
+ * principio. Ahora la columna va en blanco y se rellena al anunciarla.
  */
 import { esc } from '../../html';
 import { envolverPapiro, portadaPapiro, sinTrama } from './comun';
@@ -45,9 +52,9 @@ export function tablaMarcas(
 
   const vigilias = vista.profanadas
     .map(
-      (camara, i) => `        <tr>
+      (_, i) => `        <tr style="height:12mm;">
           <td style="width:20mm; text-align:center;">${i + 1}</td>
-          <td>${esc(camara?.name ?? '—')}</td>
+          <td></td>
           <td style="width:64mm;"></td>
         </tr>`,
     )
@@ -93,7 +100,8 @@ ${filas}
 
     <h2>Qué se profana cada noche</h2>
     <p style="font-size:11pt; color:#7a5c34;">
-      Lo anuncias en voz alta al abrir cada vigilia, antes de que nadie elija dónde entra.
+      Se anuncia en voz alta al abrir cada vigilia, antes de que nadie elija dónde entra, y se
+      apunta aquí en ese momento: esta hoja está a la vista, y la cámara de mañana no la sabe nadie.
     </p>
     <table>
       <thead><tr><th>Vigilia</th><th>Cámara profanada</th><th>Quién entró</th></tr></thead>

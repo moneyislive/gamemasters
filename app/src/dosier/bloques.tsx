@@ -320,7 +320,9 @@ const Gancho: Bloque = ({ vista }) => (
  */
 const CronologiaPropia: Bloque = ({ vista }) => {
   const momentos = vista.yo.cronologiaPropia;
-  if (momentos.length === 0) return null;
+  // El relato de la noche, cuando la trama lo trae: el mismo párrafo que el papel.
+  const noche = vista.yo.nocheSuya?.trim() ?? '';
+  if (momentos.length === 0 && !noche) return null;
   return (
     <>
       <Ornamento />
@@ -328,18 +330,25 @@ const CronologiaPropia: Bloque = ({ vista }) => {
       <Cuerpo tenue style={{ fontSize: 15, marginBottom: espacio.md }}>
         Lo que hizo tu personaje de verdad. Tu coartada es lo que cuentas; esto es lo que pasó.
       </Cuerpo>
-      <Marco tono="papel">
-        {momentos.map((m, i) => (
-          <Animated.View
-            key={`${m.time}-${i}`}
-            entering={FadeInUp.delay(50 * i).duration(420)}
-            style={[estilos.momento, i === momentos.length - 1 && estilos.momentoUltimo]}
-          >
-            <Cuerpo style={estilos.hora}>{m.time}</Cuerpo>
-            <Cuerpo style={{ color: color.caoba700, flex: 1 }}>{m.description}</Cuerpo>
-          </Animated.View>
-        ))}
-      </Marco>
+      {noche ? (
+        <Marco tono="papel">
+          <Cuerpo style={{ color: color.caoba700 }}>{noche}</Cuerpo>
+        </Marco>
+      ) : null}
+      {momentos.length > 0 ? (
+        <Marco tono="papel">
+          {momentos.map((m, i) => (
+            <Animated.View
+              key={`${m.time}-${i}`}
+              entering={FadeInUp.delay(50 * i).duration(420)}
+              style={[estilos.momento, i === momentos.length - 1 && estilos.momentoUltimo]}
+            >
+              <Cuerpo style={estilos.hora}>{m.time}</Cuerpo>
+              <Cuerpo style={{ color: color.caoba700, flex: 1 }}>{m.description}</Cuerpo>
+            </Animated.View>
+          ))}
+        </Marco>
+      ) : null}
     </>
   );
 };

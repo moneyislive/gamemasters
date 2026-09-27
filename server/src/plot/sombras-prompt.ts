@@ -14,6 +14,20 @@
  * que alguien mire el informe.
  */
 import { buildStyleBlock } from './style';
+
+/**
+ * Dónde va la senda en la reconstrucción. El modelo que escribe no conoce la
+ * senda —no se le da, para que no se le escape en la prosa pública— y el
+ * desenlace sí tiene que decirla: así que escribe esta marca y el ensamblaje
+ * pone los cuatro pasos en su orden.
+ */
+export const MARCA_DE_LA_SENDA = '{SENDA}';
+
+/** Los cuatro pasos de la senda en una frase: «el Vado, el Collado, la Cueva y el Puerto». */
+export function sendaEnPalabras(senda: string[], nombre: (id: string) => string): string {
+  const nombres = senda.map(nombre);
+  return nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : (nombres[0] ?? '');
+}
 import { HORAS_DE_LA_NOCHE, PAPELES_REPARTIBLES, PORTES } from '../juegos/sombras-trama';
 import type { EntidadesDeSombras } from './sombras-cimientos';
 import type { Condicion, TramaSombras } from '../../../shared/juegos/sombras-tipos';
@@ -28,8 +42,8 @@ export const SISTEMA_SOMBRAS =
   'y nadie hace discursos. Usas los términos japoneses que hacen falta y los explicas la primera ' +
   'vez. Devuelves exclusivamente el JSON pedido, respetando los ids proporcionados.';
 
-/** Cómo se le describe al modelo una condición, para que la redacte. */
-function decirCondicion(c: Condicion, nombre: (id: string) => string): string {
+/** Cómo se le describe al modelo una condición, para que la redacte. La usa también el revisor. */
+export function decirCondicion(c: Condicion, nombre: (id: string) => string): string {
   const a = nombre(c.a);
   switch (c.tipo) {
     case 'antes':
@@ -49,8 +63,8 @@ function decirCondicion(c: Condicion, nombre: (id: string) => string): string {
   }
 }
 
-/** La regla de forma que tiene que cumplir la frase de cada tipo. */
-function formaExigida(c: Condicion): string {
+/** La regla de forma que tiene que cumplir la frase de cada tipo. La usa también el revisor. */
+export function formaExigida(c: Condicion): string {
   switch (c.tipo) {
     case 'antes':
       return 'nombra PRIMERO el que va antes; usa «antes», «precede» o «delante»; NO uses «después», «tras», «luego», «sigue», «justo», «directamente» ni «pegado»';
@@ -195,22 +209,40 @@ QUÉ MÁS TIENES QUE ESCRIBIR
 
 1. UN DOSIER POR PERSONA, hecho A MEDIDA de la persona real: usa su nombre y lo que se cuenta de
    ella; \`personalHook\` debe citar ese rasgo y explicar cómo lo aprovecha el papel. El disfraz
-   viene dado: no lo cambies, solo explica en \`elDisfraz\` por qué esa persona lo lleva.
+   viene dado: no lo cambies, solo explica en \`elDisfraz\` por qué esa persona lo lleva. Todos de
+   una extensión parecida, y \`role\` es un oficio corto, no un párrafo. El dosier se imprime en
+   caras fijas: presentación y gancho, de dos a cuatro frases cada uno; secreto, de dos a cuatro;
+   motivo y coartada, de una o dos; lo que sabe de otros, de una o dos frases por cosa. Uno que se
+   alargue se desborda a otra hoja, y ese sobre se ve más gordo que los demás.
 2. QUIÉN COBRA DE AKECHI (\`kanchoId\`): elige a UNA de la lista, con su id exacto. Su dosier NO
    puede sonar distinto de los demás: su \`role\` y su \`publicPersona\` tienen que parecer los de
-   cualquiera. Lo único que cambia es \`secret\`, que solo lee esa persona, y donde SÍ se le dice
-   claramente que cobra de Akechi y qué puede hacer.
-3. EL MOTIVO (\`motivoDelKancho\`) tiene que DOLER. Iga fue arrasada hace un año por el aliado de
+   cualquiera, con la misma extensión y el mismo tono. Lo único que cambia es \`secret\`, que solo
+   lee esa persona, y donde SÍ se le dice claramente que cobra de Akechi y qué puede hacer.
+3. EL MISMO TRATO PARA TODOS. Una persona de la que nadie habla es la primera a la que se mira, y
+   una a la que todos acusan, también. Así que:
+     · en \`knowledge\`, cada cual sabe de dos a cuatro cosas de OTROS, y entre todas, que NADIE se
+       quede sin que otro hable de él —tampoco quien cobra de Akechi—. Ninguna acusa de cobrar;
+     · cada \`alibi\` nombra a otra persona concreta, la de quien cobra de Akechi también;
+     · los inocentes también esconden algo con peso en su \`secret\`, de lo que haría sospechar si
+       saliera: nadie puede ser señalado por ser el único con algo que callar.
+4. EL MOTIVO (\`motivoDelKancho\`) tiene que DOLER. Iga fue arrasada hace un año por el aliado de
    este mismo señor: hay motivos que la mesa casi perdonaría. Nada de «lo hizo por dinero».
-4. LA INSCRIPCIÓN de cada paso, para el cartel que se cuelga en la puerta de esa habitación real.
-   Evocadora y corta. NO dice nada de la senda ni de dónde esperan los cazadores.
-5. UNA NARRACIÓN POR HORA, para leerse en voz alta. Nombra la hora del zodiaco que le toca.
-   PROHIBIDO decir dónde esperan los cazadores: es lo único que no se anuncia, y de eso vive el
-   juego.
-6. LA CRONOLOGÍA del día anterior, de Honnō-ji a la salida de Sakai. Un momento con UNA sola
+5. LA INSCRIPCIÓN de cada paso, para el cartel que se cuelga en la puerta de esa habitación real.
+   Evocadora y corta. NO dice nada de la senda, ni de la barca, ni de emboscadas: ni «cazadores»,
+   ni «esperan», ni «acechan», ni «lanzas», ni «campesinos».
+6. UNA NARRACIÓN POR HORA, cada una distinta, para leerse en voz alta. Nombra la hora del zodiaco
+   que le toca y NO nombra a nadie de la columna: una narración que nombra a unos y no a otros
+   señala. PROHIBIDO decir dónde esperan los cazadores: es lo único que no se anuncia, y de eso
+   vive el juego.
+7. LA CRONOLOGÍA del día anterior, de Honnō-ji a la salida de Sakai. Un momento con UNA sola
    persona nunca es público: los públicos se imprimen en el dosier de todo el mundo.
-7. TRES AYUDAS graduadas y EL DESENLACE, con la confesión del kanchō en primera persona.
-8. EL GUION de quien dirige: al menos ocho pasos concretos.
+8. TRES AYUDAS graduadas, de MÉTODO: cómo cruzar lo que se sabe, qué hacer con lo que no encaja. No
+   nombran ningún paso —tú no sabes cuál es la senda y una ayuda equivocada manda a la mesa por
+   el camino malo— ni a nadie.
+9. EL DESENLACE. En la reconstrucción, escribe ${MARCA_DE_LA_SENDA} justo donde va el camino verdadero —«la
+   senda era ${MARCA_DE_LA_SENDA}»—: el programa pone ahí los cuatro pasos en su orden. Di quién cobraba de
+   Akechi y por qué. La confesión, del kanchō y en primera persona.
+10. EL GUION de quien dirige: al menos ocho pasos concretos.
 
 ═══════════════════════════════════════════════════════════════
 LO QUE NO PUEDES ESCRIBIR EN NINGÚN TEXTO PÚBLICO

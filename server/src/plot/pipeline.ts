@@ -20,6 +20,8 @@
 import type { GameSession, GenerateStreamEvent, Plot } from '../../../shared/types';
 import { lugaresDe, manifiestoDe } from '../../../shared/juegos';
 import { generadorDeTrama } from '../juegos/generadores';
+import { generadorDeMaterial } from '../juegos/materiales';
+import { informeSinRevisar, revisorDe } from '../juegos/revisores';
 import { repararRespuestas } from '../juegos/solucion';
 import { volcarGasto } from '../gasto/contador';
 import { partidaParaElTaller } from '../live/proyeccion';
@@ -39,11 +41,12 @@ export type Emitir = (evento: GenerateStreamEvent) => void;
 /** Ejecuta la generación completa sobre la partida dada. */
 /**
  * Cuanto se espera antes de dar por muerta una generacion que dejo la partida en
- * `generating`. La mas larga medida —CLUEDO, dos llamadas— tarda siete minutos,
- * y la Momia puede pedir una segunda tirada; veinte deja margen de sobra sin que
+ * `generating`. Una velada de CLUEDO completa son ahora trama, material y
+ * revision —hasta dos pasadas del revisor y tres lecturas del detective—: unos
+ * quince minutos medidos en el peor caso. Cuarenta y cinco deja margen sin que
  * una partida colgada por un proceso muerto quede bloqueada para siempre.
  */
-const PLAZO_DE_GENERACION = 20 * 60 * 1000;
+const PLAZO_DE_GENERACION = 45 * 60 * 1000;
 
 /**
  * ¿Esta partida se esta generando AHORA MISMO?
@@ -128,7 +131,7 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
      * trama recién nacida. Esa conversión es la frontera del generador de
      * CLUEDO y se ha ido con él.
      */
-    const plot = await alta.generar(game, emit);
+    let plot = await alta.generar(game, emit);
     /*
      * Y se reparan las respuestas que apunten a algo que ya no existe. Esto era
      * `corregirSolucion`, una funcion de una linea que vivia en la mitad de
@@ -137,6 +140,52 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
      * sean, asi que es generica de verdad y se llama directamente.
      */
     repararRespuestas(plot, game);
+
+    // ---------- Etapa 2b: el material, para quien lo escribe aparte ----------
+    /*
+     * UNA VELADA QUE SE COBRA SE ENTREGA ENTERA. El material —narraciones,
+     * giros, hechos, ayudas y desenlace— era un segundo boton que habia que
+     * acordarse de pulsar, y una trama sin el llega a la mesa sin nada que leer
+     * en voz alta. Ahora se escribe aqui, y ademas por una razon que pesa mas:
+     * la revision tiene que ver el material, porque es ahi donde se lee en alto
+     * lo que puede delatar a alguien.
+     *
+     * Si falla, se pierde el material y no la trama —la misma promesa que hacia
+     * el boton—, y el boton sigue ahi para volver a intentarlo.
+     */
+    const escribirMaterial = generadorDeMaterial(game.settings?.juego);
+    if (escribirMaterial) {
+      emit({ type: 'stage', stage: 'material', label: 'Escribiendo el material de la velada…' });
+      try {
+        plot.material = await escribirMaterial(game, plot, emit);
+      } catch (error) {
+        console.warn('[pipeline] el material no se pudo escribir; la trama sigue:', error);
+        emit({
+          type: 'text',
+          delta: '\n[El material no se pudo escribir. La trama sigue; se puede escribir después desde Documentos.]\n',
+        });
+      }
+    }
+
+    // ---------- Etapa 2c: la revision adversaria ----------
+    /*
+     * Quien la tenga dada de alta. Un juego sin revisor se entrega con el
+     * informe diciendo que no se reviso, en vez de callarlo: si la velada se
+     * cobra, saber si se reviso es parte de lo que se entrega.
+     */
+    const revisor = revisorDe(game.settings?.juego);
+    if (revisor) {
+      try {
+        const revisada = await revisor(game, plot, emit, 'completa');
+        plot = revisada.plot;
+        plot.revision = revisada.informe;
+      } catch (error) {
+        console.error('[pipeline] la revision fallo; se entrega la trama sin revisar:', error);
+        plot.revision = informeSinRevisar(error instanceof Error ? error.message : String(error));
+      }
+    } else {
+      plot.revision = informeSinRevisar();
+    }
     game.plot = plot;
 
     // ---------- Etapa 3: documentos ----------

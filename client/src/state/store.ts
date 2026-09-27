@@ -82,6 +82,15 @@ interface AppState {
   setGenerationStage: (stage: string | null) => void;
   appendGenerationLog: (delta: string) => void;
   resetGenerationLog: () => void;
+
+  /**
+   * La confirmación de antes de generar (`ConfirmarVelada`). Se abre desde el
+   * botón de generar y desde el asistente cuando dice «generemos»: nadie
+   * genera una velada sin ver antes el modo y el precio.
+   */
+  confirmacionAbierta: boolean;
+  abrirConfirmacion: () => void;
+  cerrarConfirmacion: () => void;
 }
 
 let popupSeq = 0;
@@ -210,6 +219,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({ popups: state.popups.filter((p) => p.id !== id) })),
 
   setGenerating: (generating) => set({ generating }),
+  confirmacionAbierta: false,
+  abrirConfirmacion: () => set({ confirmacionAbierta: true }),
+  cerrarConfirmacion: () => set({ confirmacionAbierta: false }),
   setGenerationStage: (stage) => set({ generationStage: stage }),
   appendGenerationLog: (delta) =>
     set((state) => ({ generationLog: state.generationLog + delta })),

@@ -2,29 +2,44 @@
  * Los dosieres de la columna: uno por persona, para meter en un sobre.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * CUATRO PÁGINAS POR PERSONA, LAS MISMAS PARA TODOS. POR QUÉ IMPORTA TANTO
+ * SEIS PÁGINAS POR PERSONA, LAS MISMAS PARA TODOS. POR QUÉ IMPORTA TANTO
  * ─────────────────────────────────────────────────────────────────────────────
  *
  * El catálogo declara este documento a doble cara, así que cada hoja lleva dos
- * páginas. Un dosier tiene que ocupar un número PAR de caras: si ocupase tres,
- * la cuarta sería la primera página del dosier SIGUIENTE, y al repartir los
+ * páginas. Un dosier tiene que ocupar un número PAR de caras: si ocupase cinco,
+ * la sexta sería la primera página del dosier SIGUIENTE, y al repartir los
  * sobres alguien se llevaría media ficha de otra persona pegada a la suya. Con
  * secretos dentro.
  *
- * Aquí son cuatro —dos hojas—, y no dos como en la Momia, porque este juego pide
- * más papel: la tabla de quién cruza, la carga, los pasos y trece reglas no
- * caben en una hoja sin dejarlas ilegibles. Se midió: en una sola hoja el dosier
- * se desbordaba a una tercera cara, que es exactamente el fallo de arriba.
+ * ERAN CUATRO, «CUADRADAS A MANO», Y NO CABÍAN. Medido el 25-sep-2026 con Edge
+ * imprimiendo a PDF (`scripts/medir-paginas.ts`): la primera cara medía 1115 px
+ * sobre los 1009 de un A4 con estos márgenes, y TODOS los dosieres del maestro
+ * de oro salían a cinco caras —con textos cortos de plantilla; con los del
+ * modelo, más—. Y el del kanchō, 100 px más largo que los demás, porque su
+ * secreto lo era. Con cuatro caras al límite, lo que decidía cuántas hojas lleva
+ * cada sobre era lo largo que el modelo hubiera escrito a cada cual: el sobre
+ * más gordo de la mesa podía ser el del traidor sin que nadie lo decidiera.
  *
- * LAS CUATRO CARAS ESTÁN CUADRADAS A MANO y no por casualidad: 1057 / 917 / 1017
- * / 1018 px de alto sobre las 1009 que da un A4 con estos márgenes. Si se añade
- * o se quita contenido hay que volver a repartirlo entre las cuatro, no dejar
- * que el navegador parta por donde quiera.
+ * Así que son seis, repartidas para que cada cara tenga holgura de verdad:
  *
- * Y LA SEGUNDA CARA EXISTE EN TODOS LOS DOSIERES. Es donde el kanchō lee lo
- * suyo; quien no lo es encuentra allí el cuaderno de la noche. Si esa cara fuera
- * solo del traidor, su sobre sería el más gordo de la mesa y el juego se
- * acabaría antes de repartirlo.
+ *   1. Quién eres y tu disfraz.
+ *   2. Tu secreto, lo que ganarías, lo que declaraste y cómo se reconoce un paso.
+ *   3. Los pasos del camino y la cara privada (el cuaderno, o lo del kanchō).
+ *   4. Lo que sabes de los demás y la carga.
+ *   5. Quiénes cruzan: LA MISMA TABLA EN TODOS LOS DOSIERES, con todo el mundo
+ *      dentro. Antes cada dosier la imprimía sin su dueño, y la altura de la
+ *      tabla cambiaba con la presentación que faltaba.
+ *   6. Tus prendas y cómo se juega, que no cambian de nadie a nadie.
+ *
+ * Lo que varía de una persona a otra (las caras 1 a 4) tiene presupuesto: la
+ * auditoría de la revisión (`sombras-auditoria.ts`) avisa si un texto pasa del
+ * que cabe, y el revisor lo acorta. Si se añade contenido aquí, se vuelve a
+ * medir con `scripts/medir-paginas.ts`.
+ *
+ * Y LA CARA PRIVADA EXISTE EN TODOS LOS DOSIERES, con el mismo aspecto. Es donde
+ * el kanchō lee lo suyo; quien no lo es encuentra allí el cuaderno de la noche.
+ * Si esa cara fuera solo del traidor, o se viera distinta desde la silla de al
+ * lado, el juego se acabaría antes de repartirlo.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * EL DOSIER DEL KANCHŌ
@@ -46,6 +61,29 @@ import { envolverWashi, portadaWashi, sinTrama } from './comun';
 import { vistaDeLasSombras } from './datos';
 import { registrarDosieres } from '../../dosieres';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
+import { repartirEnCaras, type MedidasDeLaTabla } from '../caras';
+
+/**
+ * Las medidas de «Quiénes cruzan» con la hoja de washi (ver `../caras.ts`).
+ *
+ * Calibradas el 25-sep-2026 midiendo filas con Edge: una presentación de 361
+ * caracteres da una fila de 206 px (8 líneas), una de 451, 251 (10) y una de
+ * 586, 299 (13); la cabecera mide 58. O sea, unos 46 caracteres y 20 px por
+ * línea de presentación, más el puesto a tamaño de texto y el aire de la celda.
+ *
+ * Si la estimación falla por una fila, el total puede salir impar: eso solo
+ * estropea la impresión de la mesa entera a doble cara, y a TODOS los dosieres
+ * por igual. Lo que no puede hacer es que un sobre abulte más que otro.
+ */
+export const MEDIDAS_DE_LA_COLUMNA: MedidasDeLaTabla = {
+  arriba: 58 + 60 + 58,
+  cabecera: 58,
+  aire: 20,
+  nombre: { linea: 24, porLinea: 22 },
+  debajo: { linea: 20, porLinea: 26 },
+  puesto: { linea: 24, porLinea: 40 },
+  presentacion: { linea: 20.2, porLinea: 46 },
+};
 
 export function dosierEscolta(
   game: GameSession,
@@ -85,6 +123,63 @@ export function dosierEscolta(
     })
     .join('\n');
 
+  /*
+   * «Quiénes cruzan»: todo el mundo, también quien lee. La misma tabla en todos
+   * los dosieres, partida en caras AQUÍ (`repartirEnCaras`) y no por el
+   * navegador: así el dosier sabe cuántas caras ocupa, y todos llevan las mismas.
+   */
+  const filas = vista.escoltas.map((e) => {
+    const suyo = plot.characters.find((c) => c.participanteId === e.id);
+    const suBandera = vista.estandarteDe(e.id);
+    return {
+      nombre: suyo?.characterName ?? e.name,
+      debajo: [e.name, suBandera?.name ?? ''],
+      puesto: suyo?.role ?? '',
+      presentacion: suyo?.publicPersona ?? '',
+      html: `        <tr>
+          <td style="width:46mm;"><strong>${esc(suyo?.characterName ?? e.name)}</strong><br /><span style="font-size:10pt; color:#7c7159;">${esc(e.name)}</span>${
+            suBandera ? `<br /><span style="font-size:10pt;">${esc(suBandera.name)}</span>` : ''
+          }</td>
+          <td>${esc(suyo?.role ?? '')}<br /><span style="font-size:10.5pt;">${esc(suyo?.publicPersona ?? '')}</span></td>
+          <td style="width:44mm;"></td>
+        </tr>`,
+    };
+  });
+  const trozos = repartirEnCaras(filas, MEDIDAS_DE_LA_COLUMNA);
+  const columna = trozos
+    .map(
+      (indices, i) => `${i === 0 ? '' : '\n      <div class="pagina"></div>'}
+      <table>
+        <thead>
+          <tr>
+            <th style="width:46mm;">Quién</th>
+            <th>Lo que sabe todo el mundo</th>
+            <th style="width:44mm;">Sospecho porque…</th>
+          </tr>
+        </thead>
+        <tbody>
+${indices.map((j) => filas[j]!.html).join('\n')}
+        </tbody>
+      </table>`,
+    )
+    .join('');
+
+  // Cinco caras fijas más las de la tabla, y una de notas si el total sale impar.
+  const conNotas = (5 + trozos.length) % 2 === 1;
+  const caras = 5 + trozos.length + (conNotas ? 1 : 0);
+  const notas = conNotas
+    ? `
+
+      <div class="pagina"></div>
+      <h2>Notas</h2>
+      <p style="font-size:11pt; color:#7c7159;">Para lo que no quepa en el cuaderno.</p>
+      <table>
+        <tbody>
+${Array.from({ length: 22 }, () => '          <tr style="height:10mm;"><td></td></tr>').join('\n')}
+        </tbody>
+      </table>`
+    : '';
+
   const dosieres = gente
     .map((persona, indice) => {
       const personaje = plot.characters.find((c) => c.participanteId === persona.id);
@@ -92,7 +187,6 @@ export function dosierEscolta(
       const elDisfraz = vista.sabor?.elDisfraz[persona.id] ?? '';
       const estandarte = vista.estandarteDe(persona.id);
       const esKancho = persona.id === kanchoId;
-      const otros = vista.escoltas.filter((e) => e.id !== persona.id);
 
       /*
        * LA CARA PRIVADA, Y POR QUÉ LA TIENE TAMBIÉN QUIEN NO ES EL KANCHŌ.
@@ -105,12 +199,18 @@ export function dosierEscolta(
        *
        * Y no es relleno: en este juego se gana atando quién estuvo dónde a cada
        * hora, que es justo lo que la mesa no puede sostener de memoria.
+       *
+       * LAS DOS CAJAS SE VEN IGUAL desde la silla de al lado: la misma caja, la
+       * misma etiqueta, la misma letra. La del kanchō iba en bermellón, con el
+       * borde triple y «Cobras de Akechi» a 14 puntos, y al abrir los sobres a la
+       * vez se veía de un vistazo quién tenía la página roja.
        */
       const cuaderno = `<div class="caja junto">
-        <span class="etiqueta">Tu cuaderno de la noche</span>
-        <p style="margin:0 0 2.5mm; font-size:10.5pt; color:#7c7159;">
-          Nadie te lo va a pedir ni lo va a leer. Apunta en cuanto se cierre la hora: lo que no
-          se escribe se discute a gritos al amanecer y no se recuerda.
+        <span class="etiqueta">Esto solo lo lees tú</span>
+        <p style="margin:0 0 2.5mm;"><strong>Tu cuaderno de la noche.</strong>
+          <span style="font-size:10.5pt; color:#7c7159;">Nadie te lo va a pedir ni lo va a leer. Apunta
+          en cuanto se cierre la hora: lo que no se escribe se discute a gritos al amanecer y no se
+          recuerda.</span>
         </p>
         <table>
           <thead>
@@ -134,39 +234,17 @@ ${vista.horas
   .join('\n')}
           </tbody>
         </table>
-      </div>
-
-      <div class="caja junto">
-        <span class="etiqueta">De quién sospechas, y por qué</span>
-        <table>
-          <tbody>
-${otros
-  .map(
-    (otro) => `            <tr style="height:11mm;">
-              <td style="width:46mm; vertical-align:top;">${esc(otro.name)}</td>
-              <td></td>
-            </tr>`,
-  )
-  .join('\n')}
-          </tbody>
-        </table>
       </div>`;
+      /*
+       * «DE QUIÉN SOSPECHAS» YA NO VA AQUÍ, y era un delator que crecía con la
+       * mesa: una fila por cada otra persona, solo en el cuaderno. Con siete a la
+       * mesa esta cara se desbordaba en los inocentes y no en el kanchō, y su
+       * sobre pasaba a ser el más fino. Ahora es una columna de «Quiénes cruzan»,
+       * que es la misma hoja para todos.
+       */
 
       const conocimiento = (personaje?.knowledge ?? [])
         .map((k) => `        <li>${esc(k)}</li>`)
-        .join('\n');
-
-      const columna = otros
-        .map((otro) => {
-          const suyo = plot.characters.find((c) => c.participanteId === otro.id);
-          const suBandera = vista.estandarteDe(otro.id);
-          return `        <tr>
-          <td style="width:46mm;"><strong>${esc(suyo?.characterName ?? otro.name)}</strong><br /><span style="font-size:10pt; color:#7c7159;">${esc(otro.name)}</span>${
-            suBandera ? `<br /><span style="font-size:10pt;">${esc(suBandera.name)}</span>` : ''
-          }</td>
-          <td>${esc(suyo?.role ?? '')}<br /><span style="font-size:10.5pt;">${esc(suyo?.publicPersona ?? '')}</span></td>
-        </tr>`;
-        })
         .join('\n');
 
       const batidosDelKancho = vista.horas
@@ -204,15 +282,7 @@ ${portadaWashi(
         </p>
       </div>
 
-      <div class="caja junto">
-        <span class="etiqueta">Cómo se reconoce un paso</span>
-        <p style="margin:0;">
-          Vas <strong>andando</strong> hasta la habitación, lees en voz baja la palabra escrita en
-          el cartel de la puerta y la dices —o la tecleas—. Solo entonces te dan el hito de ese
-          paso a esa hora. Si te equivocas de palabra no pierdes la hora: vuelve a mirar.
-        </p>
-      </div>
-
+      <div class="pagina"></div>
       <div class="caja caja--bermellon junto">
         <span class="etiqueta">Tu secreto — nadie más lo lee</span>
         <p style="margin:0;">${esc(personaje?.secret ?? '')}</p>
@@ -228,6 +298,15 @@ ${portadaWashi(
         <p style="margin:0;">${esc(personaje?.alibi ?? '')}</p>
       </div>
 
+      <div class="caja junto">
+        <span class="etiqueta">Cómo se reconoce un paso</span>
+        <p style="margin:0;">
+          Vas <strong>andando</strong> hasta la habitación, lees en voz baja la palabra escrita en
+          el cartel de la puerta y la dices —o la tecleas—. Solo entonces te dan el hito de ese
+          paso a esa hora. Si te equivocas de palabra no pierdes la hora: vuelve a mirar.
+        </p>
+      </div>
+
       <div class="pagina"></div>
       <h2>Los pasos del camino</h2>
       <p style="font-size:11pt; color:#7c7159;">
@@ -238,12 +317,17 @@ ${portadaWashi(
       <p>${vista.pasos.map((p) => esc(p.name)).join(' · ')}</p>
 
       ${
+        /*
+         * Sin «cómo se vendió»: es de quien dirige (lo lleva la hoja de la senda
+         * verdadera) y era el texto más largo del dosier, justo en la única cara
+         * que solo tiene el kanchō. Lo que le hace falta para jugar es por qué lo
+         * hace, dónde esperan y qué puede hacer.
+         */
         esKancho
-          ? `<div class="caja caja--bermellon junto" style="border-width:3px;">
-        <span class="etiqueta bermellon">Esto solo lo lees tú</span>
-        <p style="margin:0; font-size:14pt;"><strong>Cobras de Akechi.</strong> No quieres que el señor llegue a Shirako, y esta noche eso significa dejar que amanezca.</p>
+          ? `<div class="caja junto">
+        <span class="etiqueta">Esto solo lo lees tú</span>
+        <p style="margin:0;"><strong>Cobras de Akechi.</strong> No quieres que el señor llegue a Shirako, y esta noche eso significa dejar que amanezca.</p>
         <p style="margin:2.5mm 0 0;">${esc(plot.solution?.motive ?? '')}</p>
-        <p style="margin:2.5mm 0 0;">${esc(plot.solution?.howItHappened ?? '')}</p>
         <p style="margin:3mm 0 0;">
           <strong>Sabes dónde esperan los cazadores cada hora.</strong> Te lo dijeron:
         </p>
@@ -266,13 +350,6 @@ ${portadaWashi(
       <h2>Lo que sabes de los demás</h2>
       ${conocimiento ? `<ul>\n${conocimiento}\n      </ul>` : '<p><em>Nada en concreto. Tendrás que preguntar.</em></p>'}
 
-      <h2>Quiénes cruzan</h2>
-      <table>
-        <tbody>
-${columna}
-        </tbody>
-      </table>
-
       <h2>La carga</h2>
       <p style="font-size:11pt; color:#7c7159;">
         Quién lleva qué es público, y se pasa de mano dándolo de verdad. Tres de estas cosas pesan
@@ -283,6 +360,13 @@ ${columna}
 ${carga}
         </tbody>
       </table>
+
+      <div class="pagina"></div>
+      <h2>Quiénes cruzan</h2>
+      <p style="font-size:11pt; color:#7c7159;">
+        Lo que sabe de cada cual toda la columna. Es la misma hoja en todos los dosieres: tú también
+        sales. La última columna es tuya: apunta de quién sospechas, y por qué.
+      </p>${columna}
 
       <div class="pagina"></div>
       <div class="caja junto">
@@ -301,7 +385,7 @@ ${carga}
       <h2>Cómo se juega</h2>
       <div class="reglas">
 ${reglas.map((r) => `        <p><strong>${esc(r.titulo)}.</strong> ${esc(r.texto)}</p>`).join('\n')}
-      </div>
+      </div>${notas}
     </section>`;
     })
     .join('\n\n');
@@ -313,11 +397,12 @@ ${reglas.map((r) => `        <p><strong>${esc(r.titulo)}.</strong> ${esc(r.texto
     <div class="caja caja--anil junto no-imprimir">
       <span class="etiqueta">Cómo se reparte</span>
       <ol style="margin:0;">
-        <li>Cada dosier ocupa <strong>dos hojas por las dos caras</strong> —cuatro páginas—.
-          Imprime a doble cara y separa de dos en dos hojas.</li>
-        <li>Son cuatro páginas <strong>en todos los dosieres, sin excepción</strong>. Si cuentas
-          uno con cinco, algo se ha desbordado al imprimir: no lo repartas así, porque la hoja
-          que sobra de uno cae en el sobre del siguiente.</li>
+        <li>Cada dosier ocupa <strong>${caras / 2} hojas por las dos caras</strong> —${caras} páginas—.
+          Imprime a doble cara y separa de ${caras / 2} en ${caras / 2} hojas.</li>
+        <li>Son las mismas páginas <strong>en todos los dosieres, sin excepción</strong>. Si
+          cuentas uno con más que los demás, algo se ha desbordado al imprimir: no lo repartas así,
+          porque la hoja que sobra de uno cae en el sobre del siguiente y porque el sobre más gordo
+          se ve.</li>
         <li>Mete cada uno en un sobre con el nombre de su persona. <strong>Nadie abre el ajeno.</strong></li>
         <li>Todos son iguales por fuera <em>y pesan lo mismo</em>: la segunda página de uno dice
           cosas que los demás no dicen, pero ocupa lo mismo que la de ellos. No la comentes, no la

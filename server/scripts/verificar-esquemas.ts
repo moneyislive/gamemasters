@@ -32,17 +32,35 @@
  */
 import { PLOT_EXTENSION_SCHEMA, PLOT_SCHEMA } from '../src/plot/cluedo-esquema';
 import { MATERIAL_SCHEMA } from '../src/plot/cluedo-material';
+import { REVISION_MATERIAL_SCHEMA, REVISION_SOLO_MATERIAL_SCHEMA, REVISION_TRAMA_SCHEMA } from '../src/plot/cluedo-revisor';
+import { DETECTIVE_SCHEMA } from '../src/plot/cluedo-detective';
 import { MOMIA_TRAMA_SCHEMA } from '../src/plot/momia-esquema';
 import { NUDO_TRAMA_SCHEMA } from '../src/plot/nudo-prompt';
+import { NUDO_REVISION_SCHEMA } from '../src/plot/nudo-revisor';
 import { SOMBRAS_TRAMA_SCHEMA } from '../src/plot/sombras-esquema';
+import { SOMBRAS_REVISION_DOSIERES_SCHEMA, SOMBRAS_REVISION_SCHEMA } from '../src/plot/sombras-revisor';
+import { LECTOR_SOMBRAS_SCHEMA } from '../src/plot/sombras-lector';
+import { MOMIA_REVISION_DOSIERES_SCHEMA, MOMIA_REVISION_SCHEMA } from '../src/plot/momia-revisor';
+import { LECTOR_MOMIA_SCHEMA } from '../src/plot/momia-lector';
 
 const ESQUEMAS: Record<string, unknown> = {
   'CLUEDO · trama': PLOT_SCHEMA,
   'CLUEDO · ampliación': PLOT_EXTENSION_SCHEMA,
   'CLUEDO · material': MATERIAL_SCHEMA,
+  'CLUEDO · revisión de la trama': REVISION_TRAMA_SCHEMA,
+  'CLUEDO · revisión del material': REVISION_MATERIAL_SCHEMA,
+  'CLUEDO · revisión solo del material': REVISION_SOLO_MATERIAL_SCHEMA,
+  'CLUEDO · detective': DETECTIVE_SCHEMA,
   'Momia · trama': MOMIA_TRAMA_SCHEMA,
+  'Momia · revisión': MOMIA_REVISION_SCHEMA,
+  'Momia · revisión de los dosieres': MOMIA_REVISION_DOSIERES_SCHEMA,
+  'Momia · expedición ciega': LECTOR_MOMIA_SCHEMA,
   'Nudo · trama': NUDO_TRAMA_SCHEMA,
+  'Nudo · revisión': NUDO_REVISION_SCHEMA,
   'Sombras · trama': SOMBRAS_TRAMA_SCHEMA,
+  'Sombras · revisión': SOMBRAS_REVISION_SCHEMA,
+  'Sombras · revisión de los dosieres': SOMBRAS_REVISION_DOSIERES_SCHEMA,
+  'Sombras · columna ciega': LECTOR_SOMBRAS_SCHEMA,
 };
 
 const fallos: string[] = [];

@@ -37,7 +37,7 @@ import { SOMBRAS_TRAMA_SCHEMA } from '../src/plot/sombras-esquema';
 import { construirPromptSombras } from '../src/plot/sombras-prompt';
 import { tramaDe } from '../src/juegos/sombras-trama';
 import { renderPrintableDocument } from '../src/docs/imprimibles/index';
-import { sendasDe } from '../../shared/juegos/sombras-tipos';
+import { cumpleCondicion, sendasDe } from '../../shared/juegos/sombras-tipos';
 import { listaDeCategoria, manifiestoDe } from '../../shared/juegos';
 import { computeStaleness } from '../../shared/staleness';
 import { ampliarColumna } from '../src/juegos/sombras-trama';
@@ -118,11 +118,15 @@ comprobar(
   sendasDe(entidades.pasos.map((p) => p.id), trama.condiciones.map((c) => c.condicion)).length === 1,
 );
 comprobar('hay mentiras preparadas', trama.falsasCandidatas.length >= 2, trama.falsasCandidatas.length);
+/*
+ * LLEVABA UN `|| true` AL FINAL y pasaba siempre, comprobando o no. Una mentira
+ * es cierta si la senda verdadera la cumple: entonces el kanchō, al publicarla,
+ * le estaría dando a la mesa una pista buena.
+ */
 comprobar(
   'ninguna mentira es cierta',
-  trama.falsasCandidatas.every(
-    (f) => sendasDe(entidades.pasos.map((p) => p.id), [f.condicion]).every((s) => s.join('|') !== trama.sendaVerdadera.join('|')) || true,
-  ),
+  trama.falsasCandidatas.every((f) => !cumpleCondicion(trama.sendaVerdadera, f.condicion)),
+  trama.falsasCandidatas.filter((f) => cumpleCondicion(trama.sendaVerdadera, f.condicion)),
 );
 comprobar(
   'cada persona tiene un disfraz, y ninguno es el del kanchō',

@@ -10,6 +10,10 @@ import { generacionEnCurso, runGeneration } from '../plot/pipeline';
 import { crearRouter } from '../rutas';
 import { quienPide } from '../gasto/quien';
 import { cabeHoy, mensajeDeTope } from '../gasto/tope';
+import type { Esfuerzo } from '../../../shared/types';
+import type { ModoDeJuego } from '../../../shared/cobro';
+import { ORDEN_DE_ESFUERZO } from '../agent/anthropic';
+import { cerrarElCobro, cobrarAlGenerar, esModo, modeloValido } from '../cobro/velada';
 
 const router = crearRouter();
 
@@ -59,6 +63,48 @@ router.post('/games/:id/generate', async (req, res) => {
     return;
   }
 
+  /*
+   * LO QUE SE CONFIRMÓ ANTES DE GENERAR: el modo —papel o app—, y si se tocaron
+   * las opciones avanzadas, el modelo y el esfuerzo. Y el precio que se vio,
+   * para no cobrar uno distinto del que se confirmó.
+   *
+   * Sin modo en el cuerpo vale el guardado, y sin guardado, papel: es lo que no
+   * incluye nada que no se haya elegido. Así sigue funcionando quien genera sin
+   * pasar por la confirmación —el asistente del taller con `start_generation`,
+   * los comprobadores—.
+   */
+  const cuerpo = (req.body ?? {}) as { modo?: unknown; model?: unknown; esfuerzo?: unknown; creditosVistos?: unknown };
+  const modo: ModoDeJuego = esModo(cuerpo.modo) ? cuerpo.modo : (game.settings?.modo ?? 'papel');
+  if (cuerpo.model !== undefined && cuerpo.model !== null && !modeloValido(cuerpo.model)) {
+    res.status(400).json({ error: 'Ese modelo no escribe veladas.' });
+    return;
+  }
+  if (cuerpo.esfuerzo !== undefined && cuerpo.esfuerzo !== null && !ORDEN_DE_ESFUERZO.includes(cuerpo.esfuerzo as Esfuerzo)) {
+    res.status(400).json({ error: 'Nivel de esfuerzo no válido.' });
+    return;
+  }
+  game.settings = {
+    ...game.settings,
+    modo,
+    ...(modeloValido(cuerpo.model) ? { model: cuerpo.model } : {}),
+    ...(ORDEN_DE_ESFUERZO.includes(cuerpo.esfuerzo as Esfuerzo) ? { esfuerzo: cuerpo.esfuerzo as Esfuerzo } : {}),
+  };
+
+  // EL COBRO, ANTES DE GASTAR NADA. Sin cobro activo, o para la casa, no cobra.
+  const cobro = await cobrarAlGenerar(req, game, {
+    modo,
+    ...(typeof cuerpo.creditosVistos === 'number' ? { creditosVistos: cuerpo.creditosVistos } : {}),
+  });
+  if (!cobro.ok) {
+    res.status(cobro.estado).json({
+      error: cobro.error,
+      motivo: cobro.motivo,
+      ...(cobro.presupuesto ? { presupuesto: cobro.presupuesto } : {}),
+      ...(cobro.saldo !== undefined ? { saldo: cobro.saldo } : {}),
+    });
+    return;
+  }
+  game.cobro = cobro.cobro;
 
   // Cabeceras del stream: se envían antes de cualquier trabajo pesado.
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -86,6 +132,19 @@ router.post('/games/:id/generate', async (req, res) => {
           : 'Error inesperado durante la generación.',
     });
   } finally {
+    /*
+     * Y SI NO SALIÓ, SE DEVUELVE, sin que nadie lo pida: una generación que
+     * falla, o una trama que la revisión no puede dar por buena. Va en el
+     * `finally` para que ni un fallo inesperado se quede con el dinero.
+     */
+    try {
+      const cierre = await cerrarElCobro(game.id, cobro.cargoId);
+      if (cierre === 'devuelta') {
+        emit({ type: 'text', delta: '\n[No se ha podido garantizar esta velada: se te ha devuelto entera.]\n' });
+      }
+    } catch (error) {
+      console.error('[generate] no se pudo cerrar el cobro de la velada:', error);
+    }
     res.end();
   }
 });
