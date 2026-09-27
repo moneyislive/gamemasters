@@ -4612,8 +4612,6 @@ paso('15. La carga: el guion de arranque (listo, cola, carga, fallos), la toma d
       interrumpido !== 'jugable' &&
       interrumpido.fraccion > compilando.fraccion &&
       !pasos.includes('jugable') &&
-      interrumpido !== null &&
-      interrumpido !== 'jugable' &&
       interrumpido.etapa === 'personajes' &&
       trasCortar.filter((p) => p === 'jugable').length === 1 &&
       trasCortar[trasCortar.length - 1] === 'jugable' &&
