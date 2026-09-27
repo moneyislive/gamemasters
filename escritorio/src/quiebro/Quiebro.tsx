@@ -400,6 +400,13 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
   useEffect(() => {
     if (!jugandoAhora.current) mandos.soltarTodo();
   }, [menu, fase, mandos]);
+  /*
+   * Otra fase, el menú cerrado: abierto a mitad de oleada, se quedaba encima de la hoja de la pausa o del
+   * recuento que llegaba después (medido en 844×390: tapaba la mitad izquierda del recuento).
+   */
+  useEffect(() => {
+    ponerMenu(false);
+  }, [fase]);
 
   const [nivelActual, ponerNivelActual] = useState<0 | 1 | 2 | 3>(1);
   const alNivel = useCallback(

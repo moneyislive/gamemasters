@@ -209,8 +209,13 @@
   stroke: #b8fff0;
 }
 
+/*
+ * El ancho del aguante acaba antes de donde empieza el reloj del centro: el tercer término es media pantalla
+ * menos lo que ocupan a su izquierda el menú y el Foco (unos 120 px) y medio reloj (unos 50). En un iPhone
+ * pequeño tumbado (667 px) el 34 % se metía debajo de «OLEADA 1».
+ */
 .q-aguante {
-  width: min(34vw, 260px);
+  width: min(34vw, 260px, calc(50vw - 172px));
 }
 
 .q-aguante .barra {
@@ -532,6 +537,19 @@
   color: var(--q-ambar-claro);
 }
 
+/*
+ * El aviso del silencio sale al pulsar BAJAR, con la reunión delante: abajo en medio caía encima de la fila
+ * de EMPEZAR (medido en 844×390). Arriba, bajo el reloj y la brújula, no tapa nada que se pulse.
+ */
+.q-canal.q-canal-arriba {
+  bottom: auto;
+  top: calc(84px + var(--q-arr));
+  width: max-content;
+  max-width: calc(100% - 140px);
+  text-align: center;
+  z-index: 5;
+}
+
 /* ─── Las pantallas de fase (reunión, pausa, recuento…) ─── */
 
 .q-pantalla {
@@ -572,8 +590,14 @@
 .q-hoja > .q-fila.derecha:last-child {
   position: sticky;
   bottom: 0;
-  padding: 8px 0;
-  background: linear-gradient(180deg, rgba(4, 10, 12, 0), rgba(4, 10, 12, 0.92) 28%);
+  /*
+   * El fundido, corto y por ENCIMA de la nota: con el 28 % de antes la nota de la fila («Al empezar, la mesa
+   * se cierra…») quedaba en la parte transparente, escrita sobre las tarjetas que pasaban por debajo. Y
+   * OPACO del todo: con un 0,96 las tarjetas seguían leyéndose a través de la fila en 375×667.
+   */
+  padding: 16px 0 8px;
+  background: linear-gradient(180deg, rgba(4, 10, 12, 0), #040a0c 12px);
+  z-index: 2;
 }
 
 .q-hoja h1 {
@@ -929,6 +953,11 @@
     display: none;
   }
 
+  /* El gancho de la reunión es la tarjeta de la Sala otra vez: tumbado, su sitio es para el código y EMPEZAR. */
+  .q-hoja > p.gancho {
+    display: none;
+  }
+
   .q-enlace {
     margin: 0;
   }
@@ -954,6 +983,90 @@
 
   .q-preparacion .q-tarjeta .nombre {
     font-size: 16px;
+  }
+}
+
+/*
+ * UN TELÉFONO DE PIE: la reunión, la Bajada, la pausa y el recuento se juegan así (sólo la pelea pide
+ * girarlo). La hoja deja arriba el sitio del menú (≡), que si no se come el título, y las filas de botones
+ * se apilan a lo ancho, para que EMPEZAR, BAJAR o CONFIRMAR sean un blanco de pulgar y no un botón en una
+ * esquina con la nota apretada al lado.
+ */
+@media (max-width: 600px) {
+  .q-pantalla {
+    padding-top: calc(64px + var(--q-arr));
+    padding-left: calc(10px + var(--q-izq));
+    padding-right: calc(10px + var(--q-der));
+  }
+
+  .q-hoja {
+    gap: 10px;
+    padding: 14px 14px;
+  }
+
+  .q-hoja h1 {
+    font-size: 26px;
+    letter-spacing: 0.14em;
+  }
+
+  .q-hoja .q-fila.derecha,
+  .q-preparacion .q-fila.derecha {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .q-hoja .q-fila.derecha .q-nota,
+  .q-preparacion .q-fila.derecha .q-nota {
+    text-align: center;
+  }
+
+  .q-tarjeta {
+    flex-basis: 100%;
+  }
+
+  .q-codigo-mesa {
+    font-size: 24px;
+  }
+
+  .q-tabla {
+    font-size: 13px;
+  }
+
+  .q-tabla th,
+  .q-tabla td {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .q-tabla th {
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+
+  .q-resultado {
+    font-size: 26px;
+    letter-spacing: 0.12em;
+  }
+
+  /* La Bajada de pie: el rótulo bajo el menú, y la preparación entera a la vista. */
+  .q-bajada {
+    top: calc(64px + var(--q-arr));
+    bottom: calc(10px + var(--q-aba));
+    overflow-y: auto;
+    padding: 0 10px;
+  }
+
+  .q-bajada .barrio {
+    font-size: 24px;
+  }
+
+  .q-preparacion {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .q-preparacion .q-tarjeta {
+    flex-basis: 100%;
   }
 }
 
@@ -1055,7 +1168,11 @@
   }
 }
 
-@media (orientation: portrait) and (pointer: coarse) {
+/*
+ * Sólo un TELÉFONO de pie (y el HUD sólo lo monta en la pelea: `Hud.tsx`). Una tableta de pie tiene ancho de
+ * sobra para la palanca y el arco de botones, y taparla era no dejarla jugar.
+ */
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 600px) {
   .q-gira {
     display: flex;
   }
@@ -1086,11 +1203,35 @@
   top: calc(60px + var(--q-arr));
   left: calc(10px + var(--q-izq));
   min-width: 250px;
+  /* Nunca más alto que la pantalla: tumbado, RENDIRSE y SALIR se quedaban por debajo del borde. */
+  max-height: calc(100% - 70px - var(--q-arr) - var(--q-aba));
+  box-sizing: border-box;
+  overflow-y: auto;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   pointer-events: auto;
+  z-index: 30;
+}
+
+/* Tumbado (390 px de alto) caben seis botones en dos columnas; en una sola, dos se salían. */
+@media (max-height: 460px) {
+  .q-menu {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+    gap: 8px 10px;
+  }
+
+  .q-menu .q-titulo,
+  .q-menu label {
+    grid-column: 1 / -1;
+  }
+
+  .q-menu .q-boton {
+    font-size: 15px;
+    padding: 11px 12px;
+  }
 }
 
 .q-menu label {
@@ -1205,9 +1346,13 @@
   box-shadow: none;
 }
 
+/*
+ * «MUÉVETE», donde nace la palanca pero a la derecha del RAYO (que va a 28 px del borde y mide 76): con el
+ * 8 % / 18 % de antes, en una tableta tumbada caía encima del botón del rayo.
+ */
 .q-palanca-pista {
   position: absolute;
-  left: calc(8% + var(--q-izq));
+  left: calc(124px + var(--q-izq));
   bottom: calc(18% + var(--q-aba));
   font-size: 12px;
   letter-spacing: 0.24em;
@@ -1246,7 +1391,7 @@
 
 .q-tactil.zurdo .q-palanca-pista {
   left: auto;
-  right: calc(8% + var(--q-der));
+  right: calc(124px + var(--q-der));
 }
 
 /* ── El botón ── */

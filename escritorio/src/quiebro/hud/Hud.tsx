@@ -138,13 +138,22 @@ export function Hud(p: PropsDelHud): JSX.Element {
         ≡
       </Boton>
       {p.menu ? <Menu {...p} /> : null}
-      {p.avisoDelSilencio ? <div className="q-canal q-panel">{NOMBRES_DEL_QUIEBRO.pantalla.sinSonido}</div> : null}
-      <div className="q-gira">
-        <div className="telefono" />
-        <div className="q-rotulo-neon" style={{ fontSize: 22, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-          {NOMBRES_DEL_QUIEBRO.pantalla.giraElTelefono}
+      {p.avisoDelSilencio ? <div className="q-canal q-canal-arriba q-panel">{NOMBRES_DEL_QUIEBRO.pantalla.sinSonido}</div> : null}
+      {/*
+       * «GIRA EL TELÉFONO», SÓLO EN LA PELEA. La reunión, la preparación de la Bajada, la pausa, el recuento y
+       * el final son hojas que se leen y se tocan igual de pie: taparlas obligaba a girar el teléfono para
+       * pulsar EMPEZAR o elegir un retoque (medido el 27-sep en 360×640 y en una tableta de pie, donde la
+       * reunión entera quedaba bajo el aviso). La pelea sí pide el teléfono tumbado: la palanca y el arco de
+       * botones no caben de pie sin tapar la calle. El CSS lo limita además a los teléfonos (`hud.css`).
+       */}
+      {f === 'oleada' || f === 'llamada' ? (
+        <div className="q-gira">
+          <div className="telefono" />
+          <div className="q-rotulo-neon" style={{ fontSize: 22, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            {NOMBRES_DEL_QUIEBRO.pantalla.giraElTelefono}
+          </div>
         </div>
-      </div>
+      ) : null}
     </>
   );
 }
@@ -207,7 +216,14 @@ function Menu(p: PropsDelHud): JSX.Element {
         </Boton>
       ) : null}
       {rendirse !== null ? (
-        <Boton clase="q-boton secundario" alPulsar={() => void p.mover(rendirse.tipo, rendirse.carga)}>
+        <Boton
+          clase="q-boton secundario"
+          alPulsar={() => {
+            /* El menú se cierra: si no, se quedaba abierto encima del recuento que trae la rendición. */
+            p.alMenu(false);
+            void p.mover(rendirse.tipo, rendirse.carga);
+          }}
+        >
           {NOMBRES_DEL_QUIEBRO.mesa.rendirse}
         </Boton>
       ) : null}

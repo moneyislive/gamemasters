@@ -191,7 +191,7 @@ export function Reunion({ vista, puerto, mover, enlaceParaEntrar }: PropsDeLaReu
       <div className="q-hoja q-panel">
         <h2>{NOMBRES_DEL_QUIEBRO.fases.reunion}</h2>
         <h1>{NOMBRES_DEL_QUIEBRO.juego.nombre}</h1>
-        <p>{NOMBRES_DEL_QUIEBRO.juego.gancho}</p>
+        <p className="gancho">{NOMBRES_DEL_QUIEBRO.juego.gancho}</p>
         <div className="q-fila" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div className="q-titulo">Código de la mesa</div>
