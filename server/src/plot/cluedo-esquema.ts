@@ -62,7 +62,14 @@ const PERSONAJE_SCHEMA: Record<string, unknown> = {
 const PISTA_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'roomId', 'description', 'pointsTo', 'round'],
+  /*
+   * `lugarId`, EL MISMO NOMBRE QUE EN `properties`. Desde el 30-ago-2026 aquí
+   * ponía `roomId`: el renombrado de sala a lugar cambió la propiedad y se dejó
+   * el `required`. La API no se queja —ignora un obligatorio que no está
+   * definido— y deja `lugarId` como OPCIONAL, así que una pista podía salir sin
+   * sala. Lo sujeta `verificar-esquemas.ts`.
+   */
+  required: ['id', 'lugarId', 'description', 'pointsTo', 'round'],
   properties: {
     id: { type: 'string', description: 'Identificador único de la pista, p. ej. "pista-1"' },
     lugarId: {
@@ -128,7 +135,14 @@ export const PLOT_SCHEMA: Record<string, unknown> = {
     solution: {
       type: 'object',
       additionalProperties: false,
-      required: ['murdererId', 'weaponId', 'roomId', 'motive', 'howItHappened'],
+      /*
+       * `lugarId`, como en `properties`: con `roomId` aquí, el modelo escribía
+       * `lugarId` (el único definido) y `comoLoEsperaLaPlataforma` leía
+       * `roomId`, así que la sala del crimen llegaba VACÍA y
+       * `repararRespuestas` ponía la primera sala de la lista, dijera lo que
+       * dijera el relato del crimen.
+       */
+      required: ['murdererId', 'weaponId', 'lugarId', 'motive', 'howItHappened'],
       properties: {
         murdererId: {
           type: 'string',

@@ -223,6 +223,7 @@ function comoLoEsperaLaPlataforma(plot: Plot): Plot {
   const s = plot.solution as unknown as {
     murdererId?: string;
     weaponId?: string;
+    lugarId?: string;
     roomId?: string;
     respuestas?: Record<string, string>;
   };
@@ -230,10 +231,16 @@ function comoLoEsperaLaPlataforma(plot: Plot): Plot {
   plot.solution.respuestas = respuestasCluedo({
     murdererId: s.murdererId ?? '',
     weaponId: s.weaponId ?? '',
-    lugarId: s.roomId ?? '',
+    /*
+     * `lugarId` es el que pide el esquema. `roomId` se lee también porque es
+     * el que pedía antes, y una trama escrita con aquel esquema puede llegar
+     * todavía por una generación que empezó antes de desplegar esto.
+     */
+    lugarId: s.lugarId || s.roomId || '',
   });
   delete s.murdererId;
   delete s.weaponId;
+  delete s.lugarId;
   delete s.roomId;
   return plot;
 }
