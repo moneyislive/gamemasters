@@ -24,6 +24,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
@@ -1274,6 +1275,162 @@ paso('Ninguna tabla de módulo nombra algo que todavía no existe');
     prematuras.length === 0,
     prematuras.join(' | ') ||
       'al importar el fichero eso lanza «Cannot access X before initialization» y deja la app en blanco',
+  );
+}
+
+/*
+ * ═══ EL `import()` BAJA SU TROZO ANTES DE PEDIR EL MÓDULO ═══
+ *
+ * En la web, cada primera carga de una pantalla perezosa dejaba en el parte de fallos
+ * «Requiring unknown module "1627"» como FATAL, y la app decía al volver que se había
+ * cerrado. El `import()` de Expo pregunta por el módulo antes de bajar su trozo, y el
+ * `require` de Metro no lanza al no encontrarlo: se lo manda a `ErrorUtils` como fatal. La
+ * historia entera, en la cabecera de `src/carga-de-trozos.js`.
+ *
+ * No se lee el texto del envoltorio: se EJECUTA, con un Expo y un runtime de Metro de
+ * mentira que hacen lo mismo que los de verdad —el de la web sondea primero; el del aparato
+ * baja primero—, y se cuentan las sondas que preguntan por un módulo que aún no está. Cada
+ * una de esas es un fatal en el parte. Y se ve CAER con el envoltorio de antes, que es no
+ * tener envoltorio: pasarle la pregunta a Expo sin bajar nada.
+ *
+ * Y el cableado se lee de `metro.config.js` CARGÁNDOLO, que es lo que hace Metro: un
+ * envoltorio perfecto que nadie enchufa no arregla nada.
+ */
+paso('El import() baja su trozo antes de pedir el módulo');
+{
+  const FICHERO = path.join(SRC, 'carga-de-trozos.js');
+  const fuente = leer(FICHERO);
+
+  /** Ejecuta el envoltorio con un Expo y un Metro de mentira y cuenta lo que pasa. */
+  async function ensayar(fuenteDelEnvoltorio, plataforma) {
+    const definidos = new Set([15]); // el 15 vive en el paquete principal: ya está
+    const sondasEnFalso = [];
+    const bajadas = [];
+    const guardadas = new Map();
+    const rutaDe = (id) => `/jugar/_expo/static/js/web/trozo-${String(id)}.js`;
+    /* `__loadBundleAsync`: una promesa por ruta, como `buildAsyncRequire.ts`. */
+    const bajar = (ruta) => {
+      bajadas.push(ruta);
+      if (!guardadas.has(ruta)) {
+        const id = Number(/trozo-(\d+)\.js$/.exec(ruta)?.[1]);
+        guardadas.set(ruta, Promise.resolve().then(() => definidos.add(id)));
+      }
+      return guardadas.get(ruta);
+    };
+    /* El `require` de Metro: preguntar por un módulo que no está es el fatal del parte. */
+    const pedir = (id) => {
+      if (definidos.has(id)) return { default: `módulo ${String(id)}` };
+      sondasEnFalso.push(id);
+      throw new Error(`Requiring unknown module "${String(id)}".`);
+    };
+    let loQueDevolvioExpo = null;
+    /* El `import()` de Expo 57: en la web sondea y baja si falla; en el aparato baja y pide. */
+    const importDeExpo = (id, rutas) => {
+      const ruta = rutas?.[String(id)];
+      if (plataforma === 'web') {
+        try {
+          loQueDevolvioExpo = pedir(id);
+        } catch (error) {
+          if (ruta == null) throw error;
+          loQueDevolvioExpo = bajar(ruta).then(() => pedir(id));
+        }
+      } else {
+        loQueDevolvioExpo = ruta == null ? pedir(id) : bajar(ruta).then(() => pedir(id));
+      }
+      return loQueDevolvioExpo;
+    };
+    importDeExpo.unstable_importMaybeSync = (id, rutas) => importDeExpo(id, rutas);
+    importDeExpo.prefetch = () => {};
+    importDeExpo.unstable_resolve = () => '';
+    importDeExpo.unstable_createWorker = () => null;
+
+    const modulo = { exports: {} };
+    const cargar = new Function(
+      'require',
+      'module',
+      'exports',
+      'process',
+      'globalThis',
+      '__METRO_GLOBAL_PREFIX__',
+      fuenteDelEnvoltorio,
+    );
+    cargar(
+      (quien) => {
+        if (quien === 'expo/internal/async-require-module') return importDeExpo;
+        throw new Error(`el envoltorio pide «${quien}», que el ensayo no tiene`);
+      },
+      modulo,
+      modulo.exports,
+      { env: { EXPO_OS: plataforma } },
+      { __loadBundleAsync: bajar },
+      '',
+    );
+    const envoltorio = modulo.exports;
+
+    const rutas1627 = { 1627: rutaDe(1627) };
+    const devuelto = envoltorio(1627, rutas1627);
+    const mismoQueExpo = devuelto === loQueDevolvioExpo;
+    const primero = await devuelto;
+    const segundo = await envoltorio(1627, rutas1627);
+    const quizaSincrono = await envoltorio.unstable_importMaybeSync(1628, { 1628: rutaDe(1628) });
+    const delPrincipal = await envoltorio(15, null);
+    return {
+      sondasEnFalso,
+      bajadas,
+      mismoQueExpo,
+      trae:
+        primero?.default === 'módulo 1627' &&
+        segundo?.default === 'módulo 1627' &&
+        quizaSincrono?.default === 'módulo 1628' &&
+        delPrincipal?.default === 'módulo 15',
+      loDemasEsDeExpo:
+        envoltorio.prefetch === importDeExpo.prefetch &&
+        envoltorio.unstable_resolve === importDeExpo.unstable_resolve &&
+        envoltorio.unstable_createWorker === importDeExpo.unstable_createWorker,
+    };
+  }
+
+  const web = await ensayar(fuente, 'web');
+  comprobar(
+    'en la web, ningún import() pregunta por un módulo antes de que su trozo esté en la página',
+    web.sondasEnFalso.length === 0,
+    `sondas en falso: ${web.sondasEnFalso.join(', ')} — cada una es un «Requiring unknown module» fatal en el parte`,
+  );
+  comprobar('en la web, cada import() trae su módulo, del trozo o del paquete principal', web.trae, web);
+  comprobar(
+    'en la web, un trozo se baja una vez por ruta aunque se importe dos veces',
+    new Set(web.bajadas).size === 2,
+    web.bajadas,
+  );
+  comprobar('prefetch, unstable_resolve y los Worker siguen siendo los de Expo', web.loDemasEsDeExpo);
+
+  const aparato = await ensayar(fuente, 'android');
+  comprobar(
+    'en el aparato el envoltorio no hace nada: devuelve lo que devuelve Expo, tal cual',
+    aparato.mismoQueExpo && aparato.trae && aparato.sondasEnFalso.length === 0,
+    aparato,
+  );
+
+  const sinBajarPrimero = fuente.replace(
+    /const trozo = bajarElTrozo\(idDelModulo, rutas\);\s*if \(trozo === null\) return importDeExpo\(idDelModulo, rutas, nombre\);/,
+    'return importDeExpo(idDelModulo, rutas, nombre);',
+  );
+  const envenenado = sinBajarPrimero === fuente ? null : await ensayar(sinBajarPrimero, 'web');
+  comprobar(
+    'y se ve CAER con el import() de antes, que pregunta primero y baja después',
+    envenenado !== null && envenenado.sondasEnFalso.length > 0,
+    envenenado === null
+      ? 'el envenenado no ha cambiado el fichero: la regla no se está poniendo a prueba'
+      : 'con el envenenado no hubo sondas en falso: el ensayo no reproduce el fallo',
+  );
+
+  const requerir = createRequire(import.meta.url);
+  const config = requerir(path.join(SRC, '..', 'metro.config.js'));
+  const normal = (r) => String(r).replace(/\\/g, '/').toLowerCase();
+  comprobar(
+    'metro.config.js enchufa el envoltorio como asyncRequireModulePath',
+    normal(config?.transformer?.asyncRequireModulePath) === normal(FICHERO),
+    config?.transformer?.asyncRequireModulePath,
   );
 }
 

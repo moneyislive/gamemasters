@@ -113,6 +113,21 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 };
 
 /*
+ * ═══ EL `import()` BAJA SU TROZO ANTES DE PEDIR EL MÓDULO, TAMBIÉN EN LA WEB ═══
+ *
+ * El `import()` de Expo, en la web, pide el módulo antes de bajar su trozo «por si ya
+ * estuviera», y el `require` de Metro no lanza al no encontrarlo: lo manda como FATAL a
+ * `ErrorUtils`. Cada primera carga de una pantalla perezosa dejaba en el parte de fallos
+ * «Requiring unknown module …» y la app enseñaba al volver que se había cerrado. El
+ * envoltorio baja primero y luego deja hacer a Expo; la historia entera está en la
+ * cabecera de `src/carga-de-trozos.js`.
+ *
+ * Va con ruta ABSOLUTA porque Metro resuelve este `require` desde cada fichero que tenga un
+ * `import()`, y una ruta relativa sólo valdría para los que estén en la misma carpeta.
+ */
+config.transformer.asyncRequireModulePath = path.resolve(raizApp, 'src', 'carga-de-trozos.js');
+
+/*
  * ═══ Y AQUÍ NO HAY NADA PARA `canvaskit.wasm`, QUE ES LO QUE HABÍA QUE MIRAR ═══
  *
  * El §7 del diseño del motor de arcade dejó apuntado que, al entrar Skia, habría
